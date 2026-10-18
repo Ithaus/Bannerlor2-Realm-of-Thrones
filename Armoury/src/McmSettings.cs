@@ -4636,7 +4636,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float NightSightFactor { get; set; } = 0.65f;
 
-        [SettingPropertyBool("Map Speed Buttons", HintText = "three speed buttons above the clock on the campaign map: x1 (normal play), Fast and Very Fast. The chosen fast speed is used only while time runs fast - also by the game's own fast-forward button, key 3 and holding space; off = the fast-forward speed comes from Fast Forward Multiplier as before")]
+        [SettingPropertyBool("Map Speed Buttons", HintText = "three speed buttons above the clock on the campaign map: x1 (normal play), Fast and Very Fast. The chosen fast speed is used only while time runs fast - also by the game's own fast-forward button, key 3 and holding space; off = the fast-forward speed comes from Fast Forward Multiplier as before. The buttons are added to the map bar when the game starts: switched off, they are only hidden until you restart the game, and switched back on they come back after a restart (keys 4, 5 and 6 work at once)")]
         [SettingPropertyGroup("Map speed buttons")]
         public bool MapSpeedButtons { get; set; } = true;
 
@@ -7840,6 +7840,10 @@ namespace Armoury
         [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
         public bool SideVillageCraftCropFilter { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Craft New Layout Balance", HintText = "with Side Village Crafts: when the map village layout differs from the one the first-day balance was worked out on (for example after Village Layout V7 is switched on or off, or a new layout comes with an update), the balance is worked out again on the first day after loading, so the world still makes as much of every good as the day before (only which villages make what shifts). Off = the old balance stays and the world's output of some goods jumps on that day")]
+        [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
+        public bool SideVillageCraftNewLayoutBalance { get; set; } = true;
+
         [SettingPropertyBool("District Icon Craft Value", HintText = "with District Icon From Sum and Start Calibration applied: the icon follows the same rule as without the calibration - each part counts the craft of its land (the main village its game type), valued by the people at home, the craft's rates and the market town's prices (without the first-day balance factors, which the calibration does not use) - so the icon changes only where another craft of the district's own villages truly earns more (about 80 districts), not wherever the calibration grows bread for the village itself. Off = by District Icon Part Crafts, as before")]
         [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
         public bool DistrictIconCraftValue { get; set; } = true;
@@ -9863,6 +9867,7 @@ namespace Armoury
             s.SideVillageCraftNeutralPerGood = SideVillageCraftNeutralPerGood;
             s.SideVillageCraftMeasureNow = SideVillageCraftMeasureNow;
             s.SideVillageCraftCropFilter = SideVillageCraftCropFilter;
+            s.SideVillageCraftNewLayoutBalance = SideVillageCraftNewLayoutBalance;
             s.DistrictIconCraftValue = DistrictIconCraftValue;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;

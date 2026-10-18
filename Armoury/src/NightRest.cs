@@ -728,15 +728,18 @@ namespace Armoury
 
         /// <summary>
         /// f9-predkosc (MapSpeedPerf): praca namiotow AI w klatce ekranu mapy (MapFramePostfix - raz na klatke, takze na pauzie): najpierw do TentPerFrame zdjec
-        /// switu z kolejki, potem - gdy RefreshNearbyTents zostawil kandydatow - jeszcze jeden dobor (znowu najwyzej TentPerFrame postawien). Te same warunki co
-        /// odswiezenie co 2 s w OnTick (oboz swiata, ikony namiotow, godzina obozu, ktos spi); klucz wylaczony w trakcie gry - kolejka schodzi od reki.
+        /// switu z kolejki, potem - gdy RefreshNearbyTents zostawil kandydatow - jeszcze jeden dobor (znowu najwyzej TentPerFrame postawien). Warunki jak przy
+        /// wolaniu RefreshNearbyTents z taktu godzinowego (oboz swiata, ikony namiotow, godzina obozu) - bez "ktos spi": stojace kolumny nocy maja namiot takze przy
+        /// pustym obozie swiata (recenzja calosci scalenia6); klucz wylaczony w trakcie gry - kolejka schodzi od reki.
         /// </summary>
         private static void TentFrameWork()
         {
             var s = Settings.Current;
             if (_tentClear.Count > 0) DrainTentClear(s != null && s.MapSpeedPerf ? TentPerFrame : int.MaxValue);
             if (!_tentMore) return;
-            if (s == null || !s.MapSpeedPerf || !s.AiCampsAtNight || !s.CampTentIcon || Campaign.Current == null || _camping.Count == 0
+            // recenzja calosci (scalenie6): bez warunku "ktos spi" (_camping) - _tentMore stawia tez petla stojacych kolumn nocy (RefreshNearbyTents), ktora nie pyta
+            // o _camping; przy pustym obozie swiata reszta kolumn czekala na takt godzinowy po TentPerFrame na godzine gry (przed f9 - wszystkie w jednym wywolaniu)
+            if (s == null || !s.MapSpeedPerf || !s.AiCampsAtNight || !s.CampTentIcon || Campaign.Current == null
                 || !InCamp(CampaignTime.Now.GetHourOfDay))
             { _tentMore = false; return; }
             MapSpeedProfile.TentBacklogRuns++;

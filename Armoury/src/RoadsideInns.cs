@@ -120,6 +120,9 @@ namespace Armoury
 
         internal static Inn Find(string uid) { Inn i; return uid != null && _byUid.TryGetValue(uid, out i) ? i : null; }
 
+        /// <summary>Recenzja calosci (scalenie6): liczba zajazdow wczytanych w tej sesji (0 - plik nie czytany, brak albo pusty). TownInns.CheckTimes.</summary>
+        internal static int InnCount { get { return _inns.Count; } }
+
         /// <summary>Nazwa zajazdu po uid (stan noclegu z zapisu - TownInns.Rest.Town); null = nie ma takiego zajazdu w tej sesji.</summary>
         internal static string NameOf(string uid)
         {

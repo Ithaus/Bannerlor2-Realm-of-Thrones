@@ -946,6 +946,19 @@ namespace Armoury
             var r = _rest;
             if (r == null) return "";
             long now = NowMin();
+            // recenzja calosci (scalenie6, f10-uklad): oplacony nocleg w zajezdzie, ktorego uid nie ma w pliku zajazdow tej sesji (uklad v7: 135 zajazdow, z dawnych 196 uid
+            // zostaly 4) - dotad stan schodzil po cichu przy pobudce (InnSleep: brak zajazdu = daleko, linia tylko w logu); teraz od razu linia i komunikat gracza. Pieniadze
+            // bez zmian: lozko zaplacone przy wejsciu, kiesy wsi, podatek panow i korona juz rozliczone. Plik bez zajazdow (brak, blad) albo zajazdy wylaczone - jak dotad.
+            if (r.Phase == 1 && r.RoadUid != null && RoadsideInns.On)
+            {
+                RoadsideInns.EnsureLoaded();
+                if (RoadsideInns.InnCount > 0 && RoadsideInns.Find(r.RoadUid) == null)
+                {
+                    _rest = null; _dNoRest++;
+                    Log.Player("The roadside inn where you took lodgings is no longer by the road - the night's lodging is lost and nobody wakes rested.", true);
+                    return " (zapis: nocleg w zajezdzie " + r.RoadUid + " - zajazdu nie ma w pliku zajazdow tej sesji (inny uklad wiosek), stan zdjety bez premii, komunikat gracza)";
+                }
+            }
             if (r.Phase == 2 && r.UntilMin - now > 24 * 60) { _rest = null; return " (zapis: wypoczeci do " + When(r.UntilMin) + " - dalej niz 24 h, stan zdjety)"; }
             if (r.Phase == 1 && Math.Max(r.CommitMin, r.StartMin) > now + 60) { _rest = null; return " (zapis: nocleg z " + When(Math.Max(r.CommitMin, r.StartMin)) + " - z przyszlosci, stan zdjety)"; }
             if (r.Phase == 1 && r.WakeMin > now + HoldMaxMin) { long w = r.WakeMin; r.WakeMin = 0; return " (zapis: pobudka " + When(w) + " - dalej niz 12 h, bez czekania do switu)"; }

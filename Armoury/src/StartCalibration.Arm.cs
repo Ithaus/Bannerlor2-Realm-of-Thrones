@@ -438,9 +438,17 @@ namespace Armoury
             if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { WhyLine(day, "samo wlaczenie - nic", "zapis uzbrojony innej kampanii (id " + _campaign + ", gra " + gid + ")"); return; }
             if (_armLandCrc != _landCrc)
             {
-                Log.Info(PK + "dzien " + day + " | samo wlaczenie: plik ziemi inny niz przy uzbrojeniu (" + _armLandCrc.ToString("X8") + " / teraz " + _landCrc.ToString("X8") + ") - dojrzaly Plan liczony od nowa.");
-                _armLandCrc = _landCrc; _matureSince = -1;
+                // recenzja calosci (scalenie6, f10-uklad): inny plik ziemi (uklad v7 - nakladka ziemi KS na 1600 wierszy) = uzbrojenie od zera, jak Jeffowi powiedziano
+                // ("KS od nowa ok. 35 dob"): doba uzbrojenia dzis, srednia ksiegi towarow od zera (28 dob pomiaru na nowej ziemi), ostatni Plan i Plan w toku
+                // niedojrzale (srednia z dawnej ziemi - zostaja tylko cieplym startem), potem 7 dob dojrzalego Planu. Dotad: tylko dojrzalosc od nowa - srednia
+                // z zapisu (glownie doby dawnego ukladu) zostawala i KS wlaczal sie ok. 11 dob po wczytaniu. Bramki 7 dob i pomiar pieniedzy - bez zmian.
+                int was = _armDay, wasEma = _emaDays; uint wasLand = _armLandCrc;
+                _armDay = today; _armHash = PlanHash(_plan); _armLandCrc = _landCrc; _matureSince = -1;
                 _matureUse = -1; _matureUseGuess = false;   // f4b-zapis
+                _ema.Clear(); _emaDays = 0; _wEma = _planEma = 0; _emaRestored = false;   // jak PlanReset, bez kasowania Planu (cieply start) i bez _emaLastDay (doba czesciowa wczytania dalej pominieta)
+                Log.Info(PK + "dzien " + day + " | samo wlaczenie: plik ziemi inny niz przy uzbrojeniu (" + wasLand.ToString("X8") + " / teraz " + _landCrc.ToString("X8") + ") - uzbrojenie od zera: doba "
+                         + today + " (dawniej " + was + "), srednia ksiegi towarow od zera (bylo " + Math.Min(wasEma, MinLedgerDays) + "/" + MinLedgerDays + " dob), ostatni Plan niedojrzaly"
+                         + " | wlaczenie samo najwczesniej doba " + (today + MinLedgerDays + GateDays) + " (" + MinLedgerDays + " dob pomiaru + " + GateDays + " dob dojrzalego Planu).");
             }
             bool mature = PlanMature();
             if (mature && _matureSince < 0) _matureSince = Math.Max(_planDay, _armDay);

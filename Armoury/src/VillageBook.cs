@@ -142,6 +142,7 @@ namespace Armoury
         private static double _resolveMs;
         private static int _rowsNoVillage, _distNoVillage, _savedN, _savedB, _savedBad;
         private static bool _layoutSame;
+        private static uint _saveCrc; private static bool _saveCrcSet;   // recenzja calosci scalenia6: "L:" zapisu (uklad wiosek przy zapisie) - VillageCrafts.LayoutCheck
         // Jeff 16.10 (D5): przeniesienie pustych osad z zapisu innego ukladu - liczniki do linii pierwszej doby (raz na sesje)
         private static int _pendDists, _pendBad, _pendMemSkipped;
         private static double _pendR0, _pendF0, _pendR, _pendF, _pendDrop;
@@ -227,7 +228,7 @@ namespace Armoury
             lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); _news.Clear(); _nBurned = _nNewsLost = _nMemNew = _savedM = 0; }
             LookTouchAll();                                 // E7/W4: stare okregi puszczone, widok czyta wszystko od nowa
             _pending = null; _resolved = _resolveTried = false; _firstDay = true; _offSeen = _offLogged = false; _pSet = false; _p = 250;
-            _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false; _distNoVillageIds.Clear();
+            _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false; _saveCrc = 0; _saveCrcSet = false; _distNoVillageIds.Clear();
             _pendDists = _pendBad = _pendMemSkipped = 0; _pendR0 = _pendF0 = _pendR = _pendF = _pendDrop = 0.0;
             _pendMapFile = null; _pendWhere = "-"; _mapKept = _mapHeld = _mapGone = _mapFlags = _mapFlagsMoved = _mapMem = _mapMemMoved = _mapMemLost = 0; _pendAddR = _pendAddF = 0.0;
             _newN.Clear(); _newNames.Clear(); _csvPath = null;
@@ -495,6 +496,7 @@ namespace Armoury
             }
             try { DistrictRaid.Import(sr, sc); } catch (Exception e) { Stumble("VillageBook.Import(r/c)", e); }
             _layoutSame = hasCrc && _file != null && crc == _layoutCrc;
+            _saveCrc = crc; _saveCrcSet = hasCrc;            // recenzja calosci scalenia6: uklad zapisu dla VillageCrafts.LayoutCheck (n zajec wiosek liczone na tym ukladzie)
             if (!string.IsNullOrEmpty(sn))
                 foreach (var item in sn.Split(';'))
                 {
@@ -2017,6 +2019,14 @@ namespace Armoury
         {
             crc = _layoutCrc;
             return _file != null;
+        }
+
+        /// <summary>Recenzja calosci (scalenie6): crc ukladu wiosek zapisanego w arm_district ("L:" - uklad przy zapisie); false - zapis bez klucza albo bez pola
+        /// (nowa kampania, zapis sprzed E4/11, nieznana wersja). VillageCrafts.LayoutCheck - zapis arm_crafts bez wlasnego pola L:. Tylko odczyt (po Resolve).</summary>
+        internal static bool SaveLayoutCrc(out uint crc)
+        {
+            crc = _saveCrc;
+            return _saveCrcSet;
         }
 
         /// <summary>E7/W2 (233, R11): crc ukladu (ten sam co "L:" zapisu) i uid wierszy pliku ukladu - bramka danych lore (MapVillageLore). Plik ukladu wczytuje LoadFile

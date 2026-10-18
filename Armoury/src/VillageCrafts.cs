@@ -181,6 +181,9 @@ namespace Armoury
         /// <summary>f5 (klucz Side Village Craft Crop Filter): towar zajecia zabroniony we wsi przez filtr klimatu upraw (papirus poza goracym poludniem). Nie rzuca.</summary>
         private static bool CropBlocked(Village v, ItemObject it) { return CropKey && MineralOnce.CropBlocks(v, it); }
         private static int _onDay = -1;             // doba wlaczenia (neutralny start)
+        // recenzja calosci (scalenie6, f10-uklad): crc ukladu wiosek, na ktorym policzono n (SwitchOn; zapis arm_crafts pole "L:" - starsza DLL go pomija); _nLaySet false -
+        // nieznany (zapis bez pola: LayoutCheck bierze "L:" ksiegi wiosek arm_district). Uklad sesji inny niz ten n - neutralny start od nowa (LayoutCheck).
+        private static uint _nLay; private static bool _nLaySet, _layChecked, _nLayBook;   // _nLayBook - uklad wziety z "L:" ksiegi wiosek (zapis bez pola)
         private static readonly Dictionary<string, double> _regionMoved = new Dictionary<string, double>(StringComparer.Ordinal);
         private static int _regionSeason = -1;
         private static string _pending;             // zapis do rozwiazania przy pierwszej dobie sesji
@@ -245,6 +248,7 @@ namespace Armoury
             {
                 _side.Clear(); _n = null; _onDay = -1; _regionMoved.Clear(); _regionSeason = -1; _pending = null; _loadNote = "nowa kampania albo zapis bez arm_crafts";
                 _zwHeldKind = 0;                                              // recenzja calosci fali 5
+                _nLay = 0; _nLaySet = false; _layChecked = false; _nLayBook = false;   // recenzja calosci scalenia6: uklad n(typ)
                 _dist.Clear(); _built = false; _builtSide = _builtNoRow = _builtStartFix = 0;
                 _plans = new Dictionary<Village, Plan>(); _mem.Clear(); _dirty.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _notes.Clear(); _offLogged = false;
@@ -1604,6 +1608,7 @@ namespace Armoury
                 if (_pending != null) { string p = _pending; _pending = null; ImportNow(p); }
                 if (_ngPending != null) { string g = _ngPending; _ngPending = null; ImportGoodsNow(g); }   // f5-zajecia: n na towar z zapisu (po arm_crafts)
                 Build();
+                LayoutCheck();                                        // recenzja calosci scalenia6: n z innego ukladu wiosek - neutralny start od nowa (nizej, ta doba)
             }
             if (_n == null)
             {
@@ -1666,8 +1671,48 @@ namespace Armoury
             if (LogGate.Lines) Line(today - 1, fall, ks, other, inTrans, countBy, plans.Count, ms, snow);
         }
 
+        /// <summary>
+        /// Recenzja calosci (scalenie6, f10-uklad): n(typ) i n na towar neutralnego startu liczone na ukladzie wiosek doby wlaczenia. Inny uklad (v6 -> v7: 1526
+        /// wiosek w innych miejscach i z inna liczba osad, nakladka ziemi KS na 1600 wierszy) zmienia udzialy ludzi wiosek pobocznych i zajecia startowe z wierszy
+        /// ziemi, a stare n zostawalo - produkcja swiata skakala w pierwszej dobie po wczytaniu (owce x2.6, ryby -23%, futra, drewno, jedwab w dol), wbrew obietnicy
+        /// klucza Side Village Crafts. Uklad tej sesji inny niz uklad n (pole "L:" arm_crafts; zapis bez pola - "L:" ksiegi wiosek arm_district, ten sam zapis) -
+        /// n i n na towar porzucone, neutralny start od nowa w tej dobie (SwitchOn w Daily: "przed" = wszystkie wioski typu okregu, "po" = zajecia na ukladzie
+        /// tej sesji; pomiar pelny i poprawka jak w dobie wlaczenia). Zajecia, przebudowy, nacisk i udzial regionu zostaja; doba wlaczenia (kroki reguly co 7 dob)
+        /// od tej doby. Bez zmian zajec od wlaczenia (zapis Jeffa: "zaczete 0") swiat robi dokladnie tyle, co dzien wczesniej; po zmianach z reguly - ich laczny
+        /// skutek na towar wraca do n neutralnego (zajecia wiosek dalej te, ktore wybraly). Klucz Side Village Craft New Layout Balance wylaczony - n jak dotad
+        /// (linia). Raz na sesje, pod Gate (Daily, po Build). Nie rzuca.
+        /// </summary>
+        private static void LayoutCheck()
+        {
+            if (_layChecked) return;
+            _layChecked = true;
+            try
+            {
+                uint now;
+                if (!VillageBook.LayoutCrcNow(out now)) return;              // plik ukladu nieczynny - nie ma z czym porownac (n jak dotad)
+                if (_n == null) return;                                      // neutralny start przed nami - policzy sie na tym ukladzie (SwitchOn zapisze crc)
+                uint was; string src;
+                if (_nLaySet) { was = _nLay; src = _nLayBook ? "ksiega wiosek arm_district - zapis bez pola L: arm_crafts" : "arm_crafts"; }
+                else if (VillageBook.SaveLayoutCrc(out was)) src = "ksiega wiosek arm_district - zapis bez pola L: arm_crafts";
+                else { _nLay = now; _nLaySet = true; Log.Info(P + "uklad n(typ): nieznany (zapis bez L: w arm_crafts i arm_district) - przyjety uklad tej sesji " + now.ToString("X8") + ", n(typ) z doby " + _onDay + " zostaje."); return; }
+                if (was == now) { _nLay = now; _nLaySet = true; _nLayBook = false; return; }
+                var s = Settings.Current;
+                string what = "uklad wiosek inny niz przy neutralnym starcie (crc " + was.ToString("X8") + " z " + src + ", teraz " + now.ToString("X8") + ")";
+                if (s != null && !s.SideVillageCraftNewLayoutBalance)
+                {
+                    Log.Info(P + what + " - n(typ) z doby " + _onDay + " ZOSTAJE (klucz Side Village Craft New Layout Balance wylaczony; produkcja swiata zmienia sie w tej dobie skokiem).");
+                    return;
+                }
+                int onDay = _onDay; bool hadNg = _ng != null;
+                _n = null; _ng = null; _ngNoAdd = null; _ngNote = "";
+                Log.Info(P + what + " - neutralny start od nowa w tej dobie (linia 'start neutralny'): n(typ) z doby " + onDay + (hadNg ? " i n na towar" : "") + " porzucone; zajecia, przebudowy i nacisk wiosek zostaja"
+                         + " (klucz Side Village Craft New Layout Balance).");
+            }
+            catch (Exception e) { Stumble("LayoutCheck", e); }
+        }
+
         /// <summary>Neutralny start (A6): n(T) = rece swiata typu T przed (wszystkie wioski = typ okregu) / po (zajecia startowe); rece = ludzie w domu okregu x udzial
-        /// czesci. Okregi pod KS poza rachunkiem. Raz na kampanie (zapis).</summary>
+        /// czesci. Okregi pod KS poza rachunkiem. Raz na kampanie (zapis) - i od nowa przy innym ukladzie wiosek (LayoutCheck, recenzja calosci scalenia6).</summary>
         private static void SwitchOn(int today)
         {
             var before = new double[KsTab.NC]; var after = new double[KsTab.NC];
@@ -1751,6 +1796,7 @@ namespace Armoury
             }
             else goodsNote = "WYLACZONE (Side Village Craft Neutral Goods) - n z rak";
             _n = n; _onDay = today;
+            { uint lc; _nLayBook = false; if (VillageBook.LayoutCrcNow(out lc)) { _nLay = lc; _nLaySet = true; } else _nLaySet = false; }   // recenzja calosci scalenia6: uklad tego n (zapis L:)
             if (goods && ngood != null && PerGoodKey) { _ngNoAdd = nadd != null && nadd.Count > 0 ? nadd : null; _ng = ngood; }
             _measDay = today; _measRound = 0; lock (Gate) { _meas.Clear(); _measW2 = measW2; }   // recenzja: pomiar na towarach w tej dobie (linia "pomiar neutralnosci" doby nastepnej)
             if (MeasureNowKey)
@@ -2336,6 +2382,8 @@ namespace Armoury
         // ============================================================ zapis arm_crafts
         // zw1|doba wlaczenia|sezon|n:typ=v,...|r:region=rece,...|s:uid~zajecie~start~cel~TStart~TEnd~F~held~koszt~zaplacone;...[|k:1]
         // recenzja calosci fali 5: "|k:1" - Held liczony sygnalem KS (_zwHeldKind); pole tylko przy 1 (zapis bez sygnalu jak dotad); starsza DLL czyta pola 0-5 i je pomija
+        // recenzja calosci scalenia6: "|L:<crc hex>" - uklad wiosek, na ktorym policzono n (po k:1, gdy jest); DLL z poprawka fali 5 czyta tylko p[6] == "k:1" - L: w p[6]
+        // (bez k:1) daje jej Held dawna miara, czyli tyle samo, co brak pola
         internal static string Export()
         {
             try
@@ -2360,6 +2408,7 @@ namespace Armoury
                           .Append('~').Append(s.F.ToString("R", Inv)).Append('~').Append(s.Held).Append('~').Append(Math.Round(s.Cost).ToString("0", Inv)).Append('~').Append(Math.Round(s.Paid).ToString("0", Inv));
                     }
                     if (_zwHeldKind == 1) sb.Append("|k:1");                  // recenzja calosci fali 5: miara Held - sygnal KS
+                    if (_n != null && _nLaySet) sb.Append("|L:").Append(_nLay.ToString("X8", Inv));   // recenzja calosci scalenia6: uklad wiosek tego n (LayoutCheck)
                     string res = sb.ToString();
                     // recenzja calosci (noc 17/18.10): bez twardego sufitu - dawne "" przy > 512 KB kasowalo stan (przebudowy, n(typ)) zamiast go trzymac; SaveText.Sync dzieli
                     // dlugi napis na kawalki, wiec duzy zapis tylko nazwany w logu
@@ -2422,11 +2471,21 @@ namespace Armoury
                         if (s.Target < 0) { s.TStart = s.TEnd = -1; s.F = 0f; }
                         _side[s.Uid] = s; ns++;
                     }
-                _zwHeldKind = p.Length > 6 && p[6] == "k:1" ? 1 : 0;          // recenzja calosci fali 5: brak pola (zapis sprzed poprawki) - Held dawna miara
+                // recenzja calosci fali 5: "k:1" - brak pola (zapis sprzed poprawki) - Held dawna miara; recenzja calosci scalenia6: "L:crc" - uklad wiosek n (brak - nieznany)
+                _zwHeldKind = 0; _nLaySet = false; _nLay = 0; _nLayBook = false;
+                for (int i = 6; i < p.Length; i++)
+                {
+                    if (p[i] == "k:1") _zwHeldKind = 1;
+                    else if (p[i].StartsWith("L:", StringComparison.Ordinal)) { uint lc; if (uint.TryParse(p[i].Substring(2), NumberStyles.HexNumber, Inv, out lc)) { _nLay = lc; _nLaySet = true; } }
+                }
+                // zapis bez pola L: (DLL sprzed poprawki): uklad n = uklad zapisu ksiegi wiosek (ten sam zapis; ksiega rozwiazana przed nami - OnSessionLaunched). Od razu przy
+                // wczytaniu, nie dopiero w LayoutCheck - zapis zrobiony przed pierwsza doba sesji niesie wtedy L: dawnego ukladu (bez tego ksiega zapisalaby juz nowy uklad
+                // i n starego ukladu przeszloby nastepne wczytanie jako "ten sam")
+                if (!_nLaySet && _n != null) { uint w; if (VillageBook.SaveLayoutCrc(out w)) { _nLay = w; _nLaySet = true; _nLayBook = true; } }
                 _loadNote = "arm_crafts: doba wlaczenia " + _onDay + ", n(typ) " + (_n != null ? "TAK" : "NIE") + ", wiosek ze stanem " + ns + (bad > 0 ? " (zlych " + bad + ")" : "") + ", regionow " + _regionMoved.Count
-                            + (_zwHeldKind == 1 ? ", Held wedlug sygnalu KS" : "");
+                            + (_zwHeldKind == 1 ? ", Held wedlug sygnalu KS" : "") + (_nLaySet ? ", uklad n " + _nLay.ToString("X8", Inv) : "");
             }
-            catch (Exception e) { _loadNote = "blad odczytu arm_crafts - od zera"; _side.Clear(); _n = null; _onDay = -1; _zwHeldKind = 0; Stumble("Import", e); }
+            catch (Exception e) { _loadNote = "blad odczytu arm_crafts - od zera"; _side.Clear(); _n = null; _onDay = -1; _zwHeldKind = 0; _nLaySet = false; Stumble("Import", e); }
         }
 
         // ============================================================ f5-zajecia: zapis arm_crafts_g (n na towar)

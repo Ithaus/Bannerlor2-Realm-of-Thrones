@@ -25,11 +25,44 @@ namespace Armoury
         {
             if (_done) return;
             _done = true;
+            // recenzja calosci (scalenie6): MapSpeedButtons = NIE przy starcie gry - wstawka i mixin w ogole nie rejestrowane (dotad zawsze; MCM tylko chowal przyciski,
+            // wiec wstawka, ktora zle wyglada na pasku Jeffa, zostawala do nastepnej DLL). MCM wchodzi do Settings dopiero w sesji - tu plik MCM (ButtonsAtStart).
+            string src;
+            if (!ButtonsAtStart(out src))
+            {
+                State = "NIE rejestrowane - MapSpeedButtons wylaczone przy starcie gry (" + src + "); wlaczenie w MCM - przyciski po ponownym uruchomieniu gry, klawisze 4/5/6 od razu";
+                Log.Info("Predkosc mapy (f9): UIExtenderEx - " + State + ".");
+                return;
+            }
             var ext = UIExtender.Create("Armoury");
             ext.Register(new[] { typeof(MapSpeedBarExtension), typeof(MapSpeedMixin) });
             ext.Enable();
-            State = "wstawka MapBar i mixin MapTimeControlVM zarejestrowane";
+            State = "wstawka MapBar i mixin MapTimeControlVM zarejestrowane (MapSpeedButtons przy starcie: " + src + ")";
             Log.Info("Predkosc mapy (f9): UIExtenderEx - " + State + ".");
+        }
+
+        /// <summary>
+        /// Recenzja calosci (scalenie6): MapSpeedButtons przy starcie gry (OnSubModuleLoad - MCM wchodzi do Settings dopiero w sesji, McmSettings.Apply). Kolejnosc:
+        /// plik MCM (Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json, wpis "MapSpeedButtons": true/false - to on wygrywa
+        /// w sesji), bez wpisu albo pliku - Settings.Current (Armoury.settings.xml albo domyslne z kodu: TAK). Tylko odczyt, bez typow UIExtenderEx. Nie rzuca.
+        /// </summary>
+        private static bool ButtonsAtStart(out string src)
+        {
+            bool on = Settings.Current == null || Settings.Current.MapSpeedButtons;
+            src = "ustawienia modulu / domyslne: " + (on ? "TAK" : "NIE");
+            try
+            {
+                string doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                if (string.IsNullOrEmpty(doc)) return on;
+                string f = System.IO.Path.Combine(doc, "Mount and Blade II Bannerlord", "Configs", "ModSettings", "Global", "Armoury", "Armoury.json");
+                if (!System.IO.File.Exists(f)) return on;
+                var m = System.Text.RegularExpressions.Regex.Match(System.IO.File.ReadAllText(f), "\"MapSpeedButtons\"\\s*:\\s*(true|false)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!m.Success) { src = "plik MCM bez wpisu, " + src; return on; }
+                on = string.Equals(m.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase);
+                src = "plik MCM: " + (on ? "TAK" : "NIE");
+            }
+            catch (Exception e) { src = "plik MCM nieczytelny (" + e.GetType().Name + "), " + src; }
+            return on;
         }
     }
 
