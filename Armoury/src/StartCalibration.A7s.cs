@@ -44,6 +44,7 @@ namespace Armoury
         private static double A7sBand { get { var s = Settings.Current; double b = s != null ? s.KsSwitchMarketBand : 0.15; if (!(b >= 0)) b = 0; return Math.Min(0.5, b); } }
 
         private const int A7sAvg = 4;               // srednia wykladnicza 4 krokow (co 7 dob - ok. 28 dob)
+        private const int A7sPayEvery = 7;          // rata przebudowy co 7 dob od poczatku (Progress) - koszt doby i zamowienie materialu na sztuki
         private const int A7sSaveMax = 65536;       // straznik rozmiaru arm_ks_a7 (znakow); ponad - zapis bez srednich cen
         private const string A7sVer = "a7s1";
         private const string A7sP = "KS: ";

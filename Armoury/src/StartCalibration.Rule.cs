@@ -25,6 +25,8 @@ namespace Armoury
     ///  - REGALE: co 28 dob od D rece przy zlozu +10% przy indeksie towaru w miescie > 1.2, -10% przy < 0.8 (sufit - polowa rak bloku poza domem, dno 0).
     ///  - Klucz Start Calibration Switch Rule wylaczony (domyslnie od recenzji 16.10 - ceny startu nie sa cenami cienia): sam POMIAR nacisku (licznik 60 dob, linia),
     ///    bez zmian zajec; regale dzialaja.
+    ///  - f5-a7 (noc 17/18.10, StartCalibration.A7s.cs): klucz Ks Switch Signal - dochod liczony przy cenach KS (cena cienia Planu x gradient krainy x ograniczone odchylenie
+    ///    rynku miasta, srednia 4 krokow) zamiast indeksu gry; klucz Ks Switch Signal Rule - zmiany naprawde (ten sam hamulec), rata przebudowy co 7 dob.
     /// Pola mieszczan - ta sama regula bez kosztu w zlocie (zloza i sprzet miasta). Pieniadz: tylko przelew kiesa wsi -> kasa miasta (MoneyLedger MKs).
     /// </summary>
     internal static partial class StartCalibration
@@ -201,7 +203,12 @@ namespace Armoury
             bool reg = d0 >= 0 && today > d0 && (today - d0) % RegCycle == 0;
             if (step) { if (sig) { try { A7sStepBegin(today); } catch (Exception e) { Stumble("A7sStepBegin", e); } } else A7sOff(); }   // f5-a7: srednia cen sygnalu, Held od zera przy pierwszym kroku sygnalu
             // f4-pomiary (klucz Measure Craft Rule): diagnoza A7 w dobie kroku i w dobie D - sam odczyt, przed petla reguly (niczego nie zmienia)
-            if (d0 >= 0 && (step || today == d0) && F4A7On) { try { F4A7Diag(today, d0, rule, step); } catch (Exception e) { Stumble("F4A7Diag", e); } }
+            if (d0 >= 0 && (step || today == d0) && F4A7On)
+            {
+                long f4t = sig ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+                try { F4A7Diag(today, d0, rule, step); } catch (Exception e) { Stumble("F4A7Diag", e); }
+                if (sig) a7t0 += System.Diagnostics.Stopwatch.GetTimestamp() - f4t;   // f5-a7: koszt reguly bez diagnozy f4 (ta ma wlasny czas w swojej linii)
+            }
             bool f4reg = reg && F4RegOn;                                     // f4-pomiary (klucz Measure Regale Shelf): regale wobec polki - tylko liczniki
             if (f4reg) F4RegBegin();
             double sigma = Math.Max(1, DailyLife.KsSigma);
@@ -329,7 +336,10 @@ namespace Armoury
                 // dotad kiesa wsi -> kasa miasta); rece przechodza najwyzej X0/T na dobe i nigdy ponad czesc zaplacona (pierwsza doba z pelna zaplata - jak dotad)
                 double fTime = Math.Min(1.0, Math.Max(0, today - b.TStart) / (double)T);
                 double owe = Math.Min(b.Cost - b.Paid, fTime * b.Cost - b.Paid);
-                int ask = owe >= 0.5 ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4) : 0;
+                // f5-a7 (klucz Ks Switch Signal): rata co 7 dob od poczatku przebudowy (najpierw inwestycja za tydzien, potem rece; material kupuje sie wiekszym zamowieniem,
+                // a koszt doby KS nie rosnie z liczba przebudow - zakup z polki raz na tydzien na czesc okregu); rece ida dalej codziennie do czesci zaplaconej
+                bool payDay = !A7sOn || (today - b.TStart) % A7sPayEvery == 0;
+                int ask = owe >= 0.5 && payDay ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4) : 0;
                 long got = ask > 0 && mt != null ? (A7sOn ? A7sPay(ld.V, mt, ask) : VillageCrafts.PayRebuild(ld.V, mt, ask, _tally)) : 0;   // f5-a7: ta sama rata + pomiar (zloto, material, polka)
                 b.Paid += got; _rPaid += got;
                 double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
