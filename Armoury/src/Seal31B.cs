@@ -695,7 +695,7 @@ namespace Armoury
                 if (PerfD2.FastHooksOn)
                 {
                     sum = NotableCore(town, true);
-                    if (PerfD2.FastProbe()) { float s = NotableCore(town, false); if (!PerfD2.FastSame(PerfD2.FNotable, s == sum)) sum = s; }
+                    if (PerfD2.FastProbe(PerfD2.FNotable)) { float s = NotableCore(town, false); if (!PerfD2.FastSame(PerfD2.FNotable, s == sum)) sum = s; }
                 }
                 else sum = NotableCore(town, false);
                 if (sum <= 0f) return 0f;
@@ -748,7 +748,7 @@ namespace Armoury
                 if (PerfD2.FastHooksOn)
                 {
                     sum = UnpaidCore(town, true, out paidSum, out n);
-                    if (PerfD2.FastProbe())
+                    if (PerfD2.FastProbe(PerfD2.FUnpaid))
                     {
                         float p2; int n2;
                         float s2 = UnpaidCore(town, false, out p2, out n2);

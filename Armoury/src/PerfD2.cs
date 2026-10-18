@@ -46,6 +46,12 @@ namespace Armoury
     ///    (PerfFast) zamiast MethodInfo.Invoke / PropertyInfo.GetValue / Traverse (ok. 100 ns na wywolanie odbiciem wobec ok. 7 ns delegatem - pomiar
     ///    syntetyczny net472 tej nocy), zachowanie BKBuildingsBehavior z pamieci kampanii (GetCampaignBehavior szuka liniowo po ok. 300 zachowaniach). Co 64.
     ///    wywolanie liczy tez stara droga (odbicie) i porownuje wynik - rozjazd: wynik starej drogi, licznik.
+    /// 3b. f4b-perf PerfSutlerWageExact: pamiec zoldu z punktu 3 tylko dla zoldu PEWNEGO - BK liczy zold bohatera partii poza wodzem z losowym zaokragleniem
+    ///    (BKCompanionPrices.GetHeroWage: MBRandom.RoundRandomized), wiec zold takiej partii jest inny przy kazdym liczeniu i kazde liczenie zuzywa losowanie
+    ///    wspolnego generatora gry (fin87 NPERF-4: 44 rozjazdy na 2141 probek). Pamiec: bez bohatera poza wodzem i bez losowania przy pierwszym liczeniu
+    ///    (straznik stanu MBFastRandom); reszta - kazdy odczyt jak dotad.
+    /// 5b. f4b-perf PerfProbeEachPlace: probki hakow podatku miast z punktu 5 osobno na miejsce (wspolny licznik 1/64 przy 4 hakach na liczenie trafial
+    ///    zawsze w TownBase - trzy miejsca nigdy nie byly sprawdzane) i liczba wywolan kazdego miejsca w linii doby.
     /// Linia doby "Szybkosc doby (perf-d2d3): dzien N | ..." (za okres od poprzedniej linii; wolana na poczatku taktu doby po Cost174).
     /// Bez zapisu w grze (same liczniki sesji). Wolane z watku gry; licznik podatku miast - Interlocked (podatek bywa liczony z watkow AI).
     /// </summary>
@@ -58,6 +64,9 @@ namespace Armoury
         internal static bool SutlerWageOn { get { var s = Settings.Current; return s != null && s.PerfSutlerWageOnce; } }
         internal static bool TaxSkipKey { get { var s = Settings.Current; return s != null && s.PerfTownTaxSkipBk; } }
         internal static bool FastHooksOn { get { var s = Settings.Current; return s != null && s.PerfTownTaxFastHooks; } }
+        // f4b-perf (noc 17/18.10): pamiec zoldu markietanow tylko dla zoldu pewnego (3b) i probki hakow podatku miast osobno na miejsce (5b)
+        internal static bool SutlerExactOn { get { var s = Settings.Current; return s != null && s.PerfSutlerWageExact; } }
+        internal static bool ProbeEachOn { get { var s = Settings.Current; return s != null && s.PerfProbeEachPlace; } }
 
         private static double Ms(long ticks) { return ticks * 1000.0 / Stopwatch.Frequency; }
         private static double Us(long ticks, long n) { return n > 0 ? ticks * 1000000.0 / Stopwatch.Frequency / n : 0.0; }
@@ -135,6 +144,130 @@ namespace Armoury
 
         internal static void WageScope() { _wScopes++; }
 
+        // ================================================================= 3b. f4b-perf (PerfSutlerWageExact): pamiec zoldu tylko dla zoldu pewnego
+        // Dowod (fin87, Armoury-2026-10-18_00-26-23.log, NPERF-4: 44 rozjazdy na 2141 probek): BannerKings BKPartyWageModel.GetTotalWage dodaje zold kazdego
+        // bohatera w rosterze partii poza jej wodzem (towarzysze, czlonkowie rodu; gracz z umowa BK - Contract.Wage) przez BKCompanionPrices.GetHeroWage =
+        // MBRandom.RoundRandomized(suma umiejetnosci x 0.005) - kazde liczenie zoldu takiej partii losuje zaokraglenie i zuzywa jedno losowanie wspolnego
+        // generatora gry (Game.RandomGenerator, MBRandom.RoundRandomized zawsze wola RandomFloat) na bohatera (dekompilacja BannerKings.Redux i TaleWorlds.Core).
+        // Pamiec perf-d2d3 zmieniala wiec wynik (2. i 3. odczyt = pierwsze losowanie, nie nowe) i ciag losowy calej gry (mniej losowan). Teraz pamiec tylko, gdy
+        // (a) w rosterze nie ma bohatera poza wodzem i (b) pierwsze liczenie w zakresie nie ruszylo generatora losowego (straznik na stanie MBFastRandom: _x _y _z _w -
+        // kazde inne, nieznane losowanie w lancuchu zoldu tez wylacza pamiec tej partii). Reszta partii - kazdy odczyt liczony jak dotad (te same losowania).
+        // Probka 1/64 odczytow z pamieci: zold liczony drugi raz (jak stara droga w tym odczycie) - rozjazd albo losowanie w probce zdejmuje pamiec do konca zakresu.
+        private static int _xFirst, _xSure, _xHero, _xDrew, _xRaw, _xProbeDrew, _xNoGuard;
+
+        // straznik losowania: stan generatora gry (MBRandom.Random = Game.Current.RandomGenerator, MBFastRandom - xorshift128, pola _x _y _z _w)
+        private static bool _rngTried, _rngOk;
+        private static string _rngWhy = "nie sprawdzano";
+        private static Func<TaleWorlds.Core.Game, TaleWorlds.Core.MBFastRandom> _rngGet;
+        private static AccessTools.FieldRef<TaleWorlds.Core.MBFastRandom, uint> _rX, _rY, _rZ, _rW;
+
+        internal struct RngState { public uint X, Y, Z, W; public bool Ok; }
+
+        private static void RngResolve()
+        {
+            _rngTried = true;
+            try
+            {
+                var g = AccessTools.PropertyGetter(typeof(TaleWorlds.Core.Game), "RandomGenerator");
+                if (g == null) { _rngWhy = "brak Game.RandomGenerator"; return; }
+                _rngGet = (Func<TaleWorlds.Core.Game, TaleWorlds.Core.MBFastRandom>)Delegate.CreateDelegate(typeof(Func<TaleWorlds.Core.Game, TaleWorlds.Core.MBFastRandom>), g);
+                _rX = AccessTools.FieldRefAccess<TaleWorlds.Core.MBFastRandom, uint>("_x");
+                _rY = AccessTools.FieldRefAccess<TaleWorlds.Core.MBFastRandom, uint>("_y");
+                _rZ = AccessTools.FieldRefAccess<TaleWorlds.Core.MBFastRandom, uint>("_z");
+                _rW = AccessTools.FieldRefAccess<TaleWorlds.Core.MBFastRandom, uint>("_w");
+                _rngOk = _rngGet != null && _rX != null && _rY != null && _rZ != null && _rW != null;
+                _rngWhy = _rngOk ? "stan MBFastRandom (_x _y _z _w) generatora gry" : "brak pol MBFastRandom";
+            }
+            catch (Exception e) { _rngOk = false; _rngWhy = "blad: " + e.GetType().Name; }
+        }
+
+        /// <summary>Stan generatora losowego gry teraz (Ok falsz - straznik niedostepny w tym odczycie: decyduje sam warunek bohaterow).</summary>
+        internal static RngState RngNow()
+        {
+            var r = default(RngState);
+            if (!_rngTried) RngResolve();
+            if (!_rngOk) return r;
+            try
+            {
+                var game = TaleWorlds.Core.Game.Current;
+                var gen = game != null ? _rngGet(game) : null;
+                if (gen == null) return r;
+                r.X = _rX(gen); r.Y = _rY(gen); r.Z = _rZ(gen); r.W = _rW(gen); r.Ok = true;
+            }
+            catch { r.Ok = false; }   // jeden odczyt - bez globalnego wylacznika (nastepny probuje znowu)
+            return r;
+        }
+
+        /// <summary>Czy miedzy a i teraz generator gry losowal (oba odczyty czynne i stan inny). Nieczynny straznik - falsz.</summary>
+        private static bool RngMoved(RngState a, out bool known)
+        {
+            known = false;
+            if (!a.Ok) return false;
+            var b = RngNow();
+            if (!b.Ok) return false;
+            known = true;
+            return a.X != b.X || a.Y != b.Y || a.Z != b.Z || a.W != b.W;
+        }
+
+        /// <summary>Warunek (a): w rosterze partii zaden bohater poza wodzem (LeaderHero) - BK nie dolicza zoldu bohatera (GetHeroWage, losowane zaokraglenie).
+        /// Bez wodza (LeaderHero null) kazdy bohater w rosterze idzie przez GetHeroWage - wtedy tez falsz.</summary>
+        internal static bool WageSure(MobileParty mp)
+        {
+            var r = mp != null ? mp.MemberRoster : null;
+            if (r == null) return false;
+            if (r.TotalHeroes <= 0) return true;
+            var leader = mp.LeaderHero;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var c = r.GetCharacterAtIndex(i);
+                if (c != null && c.IsHero && !ReferenceEquals(c.HeroObject, leader)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Pierwszy odczyt zoldu partii w zakresie przy PerfSutlerWageExact: zold liczony jak dotad (WageRaw); keep - wolno go pamietac (warunek bohaterow
+        /// i straznik losowania). Wyjatek warunku - bez pamieci (stara droga).</summary>
+        internal static int WageFirst(MobileParty mp, out bool keep)
+        {
+            keep = false;
+            _xFirst++;
+            bool sure;
+            try { sure = WageSure(mp); } catch { sure = false; }
+            if (!sure) { _xHero++; return MenPurse.WageRaw(mp); }
+            var a = RngNow();
+            int v = MenPurse.WageRaw(mp);
+            bool known;
+            if (RngMoved(a, out known)) { _xDrew++; return v; }
+            if (!known) _xNoGuard++;
+            _xSure++;
+            keep = true;
+            return v;
+        }
+
+        /// <summary>Odczyt zoldu partii bez pamieci w zakresie (zold niepewny) - liczony jak dotad.</summary>
+        internal static int WageNoMemo(MobileParty mp) { _xRaw++; return MenPurse.WageRaw(mp); }
+
+        /// <summary>Odczyt z pamieci przy PerfSutlerWageExact: jak WageHit, a probka sprawdza tez generator losowy; rozjazd albo losowanie w probce - drop
+        /// (pamiec zdjeta do konca zakresu, dalsze odczyty liczone jak dotad).</summary>
+        internal static int WageHitExact(MobileParty mp, int memo, out bool drop)
+        {
+            drop = false;
+            _wHits++;
+            if ((++_wSeq & 63) == 0)
+            {
+                _wProbes++;
+                var a = RngNow();
+                long t = Stopwatch.GetTimestamp();
+                int fresh = MenPurse.WageRaw(mp);
+                _wProbeTicks += Stopwatch.GetTimestamp() - t;
+                bool known;
+                if (RngMoved(a, out known)) { _xProbeDrew++; drop = true; }
+                if (fresh != memo) { _wDiff++; drop = true; }
+                if (drop) return fresh;
+            }
+            return memo;
+        }
+
         // ================================================================= 4. dochod modelu w ksiedze rodow wedlug rodzaju rodu (tylko pomiar)
         private const int MNone = 0, MFief = 1, MRuler = 2;
         private static readonly long[] _mTicks = new long[3];
@@ -209,6 +342,7 @@ namespace Armoury
                      + " | podatek miast - cialo BK pominiete przy rencie (PerfTownTaxSkipBk) " + OnOff(TaxSkipKey) + ", straznik: " + (_taxLive ? "CZYNNY" : "STOI") + " (" + _taxWhy + ")"
                      + " | zold markietanow raz na partie (PerfSutlerWageOnce) " + OnOff(SutlerWageOn)
                      + " | haki podatku miast bez refleksji (PerfTownTaxFastHooks) " + OnOff(FastHooksOn)
+                     + " | zold markietanow tylko pewny (PerfSutlerWageExact) " + OnOff(SutlerExactOn) + " | probki hakow osobno na miejsce (PerfProbeEachPlace) " + OnOff(ProbeEachOn)
                      + " | kontrola: stara droga obok w probce 1/64, rozjazdy w linii doby.");
         }
 
@@ -384,6 +518,26 @@ namespace Armoury
 
         internal static bool FastProbe() { return (Interlocked.Increment(ref _fSeq) & 63) == 0; }
 
+        // 5b. f4b-perf (PerfProbeEachPlace): jedno liczenie podatku miasta przy rencie wola FastProbe dokladnie 4 razy w stalej kolejnosci (KeptTownLines,
+        // UnpaidOwnerTaxLines, NotableTaxLines, TownBase - PopulationLaw.TownTaxPostfix), a wspolny licznik probkuje co 64. wywolanie - 64 dzieli sie przez 4,
+        // wiec probka trafiala ZAWSZE w TownBase (fin87: rada 87 probek/dobe, linie placone, notabli i wlascicieli 0 probek przez 160 dob - "rozjazdow 0" tych
+        // trzech miejsc nic nie sprawdzalo). Teraz kazde miejsce ma wlasny licznik (co 64. jego wywolanie) i licznik wywolan do linii doby; klucz wylaczony -
+        // wspolny licznik jak dotad. Probka liczy obok stara droge (same odczyty BK - sprawdzone w dekompilacji: GetWorkshopTaxes, GetMiningRevenue,
+        // GetMaterialExpenses - odczyt slownika, GetPopData i GetCouncil - leniwe tworzenie raz, Autonomy, Positions, Member, AdministrativeCosts - pola i stale),
+        // wiec wynik gry ten sam przy kazdym wzorze probek.
+        private static readonly long[] _fSeqAt = new long[FSites], _fCalls = new long[FSites];
+
+        internal static bool FastProbe(int site)
+        {
+            if (site < 0 || site >= FSites) return FastProbe();
+            Interlocked.Increment(ref _fCalls[site]);
+            if (!ProbeEachOn) return FastProbe();   // klucz wylaczony - wspolny licznik jak dotad
+            return (Interlocked.Increment(ref _fSeqAt[site]) & 63) == 0;
+        }
+
+        /// <summary>f4b-perf: wywolanie miejsca z wlasnym licznikiem probek (zachowanie BK z pamieci - PerfFast.Behavior) - tylko licznik linii.</summary>
+        internal static void FastCall(int site) { if (site >= 0 && site < FSites) Interlocked.Increment(ref _fCalls[site]); }
+
         /// <summary>Wynik probki starej drogi: same - ten sam wynik. Zwraca same (falsz - wolajacy bierze wynik starej drogi).</summary>
         internal static bool FastSame(int site, bool same)
         {
@@ -399,6 +553,8 @@ namespace Armoury
             _vsGathers = _vsGathersFast = 0; _vsTicks = 0;
             _vsHeroSkip = _vsHeroProbe = _vsHeroDiff = _vsRosterSkip = _vsRosterProbe = _vsRosterDiff = 0;
             _wScopes = _wHits = _wProbes = _wDiff = 0; _wProbeTicks = 0;
+            _xFirst = _xSure = _xHero = _xDrew = _xRaw = _xProbeDrew = _xNoGuard = 0;   // f4b-perf
+            for (int i = 0; i < FSites; i++) Interlocked.Exchange(ref _fCalls[i], 0);   // f4b-perf (licznik probek _fSeqAt bez zerowania - faza plynie jak _fSeq)
             Array.Clear(_mTicks, 0, 3); Array.Clear(_mCalls, 0, 3); _mFiefs = 0;
             Interlocked.Exchange(ref _tCalls, 0); Interlocked.Exchange(ref _tSkip, 0); Interlocked.Exchange(ref _tProbe, 0); Interlocked.Exchange(ref _tOff, 0);
             Interlocked.Exchange(ref _tUncov, 0); Interlocked.Exchange(ref _tProbeUncov, 0);
@@ -470,6 +626,15 @@ namespace Armoury
                 sb.Append(i == 0 ? " " : ", ").Append(FNames[i]).Append(" probek ").Append(pr).Append(" (rozjazdow ").Append(d).Append(')');
             }
             sb.Append("; rozjazdow razem ").Append(fd);
+            // 3b i 5b (f4b-perf): kontrola dokladnosci - nowy segment (stare segmenty bez zmian, checker nperf czyta je jak dotad)
+            sb.Append(" | kontrola dokladnosci (f4b-perf): zold markietanow tylko pewny (PerfSutlerWageExact) ").Append(OnOff(SutlerExactOn))
+              .Append(": pierwszych liczen ").Append(_xFirst).Append(", z pamiecia ").Append(_xSure)
+              .Append(", bez pamieci: bohater poza wodzem (zold BK losowany) ").Append(_xHero).Append(", losowanie przy liczeniu ").Append(_xDrew)
+              .Append("; odczytow liczonych jak dotad ").Append(_xRaw).Append(", losowanie w probce ").Append(_xProbeDrew)
+              .Append(", bez straznika ").Append(_xNoGuard).Append(", straznik losowania ").Append(_rngOk ? "CZYNNY" : (_rngTried ? "BRAK (" + _rngWhy + ")" : "nieuzyty"))
+              .Append(" | probki hakow osobno na miejsce (PerfProbeEachPlace) ").Append(OnOff(ProbeEachOn)).Append(": wywolan");
+            for (int i = 0; i < FSites; i++)
+                sb.Append(i == 0 ? " " : ", ").Append(FNames[i]).Append(' ').Append(Interlocked.Read(ref _fCalls[i]));
             sb.Append(" | koszt linii i straznika ").Append(guardMs.ToString("0.00", Inv)).Append(" ms.");
             return sb.ToString();
         }
@@ -645,6 +810,7 @@ namespace Armoury
             var c = Campaign.Current;
             var h = _beh;
             object b = h != null && ReferenceEquals(h.C, c) && h.T == t ? h.B : null;
+            if (b != null) PerfD2.FastCall(PerfD2.FBeh);   // f4b-perf: odczyt z pamieci - licznik wywolan miejsca (tylko linia)
             bool probe = b != null && (Interlocked.Increment(ref _behSeq) & 63) == 0;
             if (b != null && !probe) return b;
             var real = getBeh.Invoke(c, null);

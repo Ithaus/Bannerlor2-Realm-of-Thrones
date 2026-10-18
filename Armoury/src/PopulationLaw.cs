@@ -1159,7 +1159,7 @@ namespace Armoury
                 if (PerfD2.FastHooksOn)
                 {
                     float f = KeptTownLinesFast(town);
-                    if (PerfD2.FastProbe())
+                    if (PerfD2.FastProbe(PerfD2.FKept))
                     {
                         float s = KeptTownLinesSlow(town);
                         if (!PerfD2.FastSame(PerfD2.FKept, s == f)) return s;
