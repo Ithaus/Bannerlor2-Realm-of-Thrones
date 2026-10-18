@@ -225,6 +225,7 @@ namespace Armoury
             ClearDay();
             Reset169();                                     // paczka 169: pierscien reszty 28 dob, zloto swiata na poczatku bloku
             try { F4Reset(); } catch { }                    // f4-pomiary: okno wyniku handlowego karawan od zera (MoneyLedger.F4.cs)
+            VilReset();                                     // f14-wsie: wsie-kiesy.csv - okno od nowa (MoneyLedger.Villages.cs)
         }
 
         private static void ClearDay()
@@ -677,6 +678,7 @@ namespace Armoury
             try { _blockSnap = Snap(); _inBlock = true; }
             catch (Exception e) { _inBlock = false; _blockSnap = null; Log.Error("MoneyLedger.BlockOpen", e); }
             BlockWorld169();                                // paczka 169 (D10): zloto swiata przed naszym tickiem (RB) - wlasny try
+            VilBlockOpen();                                 // f14-wsie: migawka kiesy kazdej wsi (wsie-kiesy.csv; tylko przy logu) - wlasny try
         }
 
         /// <summary>Po module naszego ticku: zmiana kas od poprzedniej migawki idzie na jego konto.</summary>
@@ -690,6 +692,7 @@ namespace Armoury
                 _blockSnap = s;
                 try { AlleyProbe.OnMark(kind); } catch { }  // m6b (6, recenzja): ta sama pozycja dla kazdego miasta-zaulka (tylko log)
                 MarkWorld169(kind, s);                      // paczka 169b: zloto swiata na granicy modulow (RB wedlug odcinkow) - wlasny try
+                VilMark(kind);                              // f14-wsie: ta sama pozycja wies po wsi (wsie-kiesy.csv) - wlasny try
             }
             catch (Exception e) { Log.Error("MoneyLedger.Mark", e); }
         }
@@ -1231,6 +1234,7 @@ namespace Armoury
                 var end = Snap();
                 if (_inBlock && _blockSnap != null)
                     for (int c = 0; c < Classes; c++) _mark[c, MRest] += end[c] - _blockSnap[c];
+                if (_inBlock && _blockSnap != null) VilMark(MRest);   // f14-wsie: reszta bloku wies po wsi (jak klasy wyzej) - wlasny try
                 var hold = ReadHolders(end);
                 if (!_modelsLogged) { _modelsLogged = true; Log.Info(ModelsLine()); }
                 if (_first || _lastSnap == null || _lastHold == null)
@@ -1279,6 +1283,7 @@ namespace Armoury
                     try { Log.Info(PumpsLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.PumpsLine", e); }   // N1(a) (noc 16.10): "Pompy - sztuczne przelewy (nekon)" - te same liczniki co "Obieg" (tylko log)
                     try { F4CaravanDay(day, hold, _lastHold); } catch (Exception e) { Log.Error("MoneyLedger.F4CaravanDay", e); }   // f4-pomiary (klucz Measure Caravan Trade): wynik handlowy karawan co 7 dob (tylko log, przed ClearDay)
                 }
+                VilDaily(day);                                  // f14-wsie: wsie-kiesy.csv co 7 dob (tylko odczyt, po liniach ksiegi) - wlasny try
                 _lastSnap = end; _lastHold = hold; _first = false;
             }
             catch (Exception e) { Log.Error("MoneyLedger.Daily", e); }

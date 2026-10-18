@@ -237,6 +237,22 @@ namespace Armoury
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             DsDues(__state, works);
             F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
+            CartCsv(__state);                                // f14-wsie: utarg wozu wies po wsi do wsie-kiesy.csv (tylko licznik, po wszystkich krokach okna)
+        }
+
+        /// <summary>f14-wsie (wsie-kiesy.csv): koniec okna powrotu wozu - gotowka oddana przez woz i przyrost kiesy netto wsi, ktorej kiesa urosla (macierzysta, a gdy woz
+        /// oddal utarg w obcej wsi - ta obca), po 112, F4b, pracach okregu, daninach DS i splacie drewna f5. Tylko licznik (MoneyLedger.NoteVillageCart). Wlasny try.</summary>
+        private static void CartCsv(Entry st)
+        {
+            try
+            {
+                if (st == null || st.Party == null || st.Home == null) return;
+                int handed = st.Gold - st.Party.PartyTradeGold;
+                if (handed <= 0) return;
+                if (st.Here == null) MoneyLedger.NoteVillageCart(st.Home, handed, (long)st.Home.Gold - st.HomeGold);
+                else MoneyLedger.NoteVillageCart(st.Here, handed, (long)st.Here.Gold - st.HereGold);
+            }
+            catch (Exception e) { Stumble("VillageTakings.CartCsv", e); }
         }
 
         /// <summary>f5-ruda (klucz Bloomery Wood Credit; splata takze przy kluczu wylaczonym, gdy dlug jest): woz wrocil do wsi MACIERZYSTEJ - to, co z przyrostu kiesy w oknie
