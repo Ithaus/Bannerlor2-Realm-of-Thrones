@@ -44,3 +44,12 @@
 - **Drogi widoczne przez kilka sekund przy oddalonej kamerze (stawianie z budzetem):** `UpdateVisibility` szla tylko po `_built`, a `_visKnown` jest zerowane przy pierwszym stawianiu, wlaczeniu w MCM i planie od nowa - wiec `hidden` w `Build()` bylo zawsze false: kamera nad min(`MapVillagesHideAboveCameraHeight`, 110) przy wejsciu na mape / wlaczeniu klucza = drogi widoczne przez ok. 1.5-4 s stawiania, potem gasly naraz (kosmetyka, bez ryzyka). Teraz `OnVisualTick` wola `UpdateVisibility(screen)` takze PRZED kazda porcja `Build()` (gdy `!_built`): pierwszy odczyt ustawia `_visKnown` / `_visible` z kamery, nowe decale powstaja od razu schowane, juz postawione przelaczane tylko przy przejsciu progu (histereza 10 bez zmian). Kontrola: wszystkie drogi do ponownego stawiania (`_wasOff`, `CheckLayout`, pierwsze) zaczynaja od pustej listy decali (`RemoveAll`), wiec skrot "pierwszy odczyt bez przelaczania" (decale stawiane widoczne) dalej prawdziwy; brak kamery = jak dotad (widoczne); bieg zdjec (wszystko jednym tickiem) - ten sam stan koncowy, co przed poprawka (dotad: postawione widoczne i schowane w tym samym ticku). Koszt: jeden odczyt pozycji kamery wiecej na cwierc sekundy tylko w czasie stawiania. Build Armoury kod 0.
 
 **Status:** DO SPRAWDZENIA (kod gotowy, build kod 0, klucz domyslnie NIE; zdjecia z autotestu przed decyzja Jeffa).
+
+### Wygladzenie (18.10 ok. 12:15 PDT, decyzja Jeffa "2. tak wygladz")
+- **Problem:** na zdjeciach z biegu foto1 (z 10) droga boczna wygladala jak lancuch ceglastych prostokatow (stemple 1.2 jedn. co 0.5, pelna alfa, kolor FF918976).
+- **Zmiana:** nowe domyslne wygladu po porownaniu dwoch wariantow w grze (biegi drogi2 A/B, zdjecia at-20261018-110344 i -110711): Spacing 0.15, StampHalfLen 0.9, Width 0.5,
+  Alpha 0.55, kolor FF7E7466 (szarobura ziemia), MaxStamps 80000. Wariant B (mainmap_decal_mud_a) prawie niewidoczny - odrzucony.
+- **Pomiar wariantu A (Armoury-2026-10-18_11-03-58.log):** 69 065 decali (z 69 502 stempli; 437 nad woda/brodem/mostem), stawianie 74.9 ms raz na mape (w grze z budzetem ok. 8 ms co 0.25 s,
+  czyli ok. 2.5 s), klatki z drogami widocznymi sr. 11.6 ms / p95 23 (bieg 1 doby; foto1 z 21k decali 10.2 / 19 w 3 dobach - nieporownywalne wprost).
+- **Ryzyko:** koszt rysowania 3x wiecej decali w grze Jeffa (drogi chowaja sie powyzej z 110 razem z wioskami). Klucz MapSideRoads dalej domyslnie NIE.
+- **Status:** DO SPRAWDZENIA (Jeff wlacza sam, gdy zechce).

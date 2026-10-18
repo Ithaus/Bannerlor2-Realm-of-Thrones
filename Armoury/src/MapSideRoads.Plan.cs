@@ -45,12 +45,12 @@ namespace Armoury
             public float RouteStep = 1f;          // krata trasy (jedn.)
             public float ObstR = 2.2f;            // promien miasta / zamku nieprzejezdny dla bocznej drogi
             public float VillageAvoidR = 0.8f;    // srodek innej wioski - drozej (droga nie przez domy)
-            public float Width = 0.55f;           // szerokosc pasa drogi
-            public float StampHalfLen = 0.6f;     // pol-dlugosc stempla wzdluz drogi
-            public float Spacing = 0.5f;          // odstep stempli (stemple zachodza na siebie - kazdy punkt drogi pod 2 stemplami)
+            public float Width = 0.5f;            // szerokosc pasa drogi (wygladzone 18.10, decyzja Jeffa "tak wygladz" - wariant A ze zdjec)
+            public float StampHalfLen = 0.9f;     // pol-dlugosc stempla wzdluz drogi (bylo 0.6 - z bliska lancuch prostokatow)
+            public float Spacing = 0.15f;         // odstep stempli (gesto - kazdy punkt drogi pod ok. 12 stemplami, ciagly pas; bylo 0.5)
             public float Meander = 0.3f;          // amplituda wicia (jedn.)
             public int MaxRoads = 1500;           // bezpieczniki
-            public int MaxStamps = 24000;         // wiecej stempli niz tyle - rzadziej i dluzsze (ta sama zakladka), nigdy urwana droga
+            public int MaxStamps = 80000;         // (v7: ok. 69.5k stempli, stawianie 75 ms raz na mape) wiecej stempli niz tyle - rzadziej i dluzsze (ta sama zakladka), nigdy urwana droga
             public int Seed = 1811;
 
             internal void Clamp()

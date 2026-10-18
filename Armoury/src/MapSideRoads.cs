@@ -47,7 +47,7 @@ namespace Armoury
         internal const string FlagName = "armoury-drogi-boczne.flag";
         internal const string P = "Drogi boczne (f11): ";
         internal const string DefaultMaterial = "mainmap_decal_undervillage";
-        internal const uint DefaultFactor = 0xFF918976u;         // ROT-Map scene.xscene: map_decal_undervillage factor="4287727990"
+        internal const uint DefaultFactor = 0xFF7E7466u;         // ciemniejsza, szarobura ziemia (wariant A 18.10); ROT-Map pod wsiami ma FF918976
         internal static readonly string[] FallbackMaterials = { "mainmap_decal_mud_a", "decal_battania_path_a" };
         internal const float DefaultHideZ = 110f;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -57,7 +57,7 @@ namespace Armoury
         {
             public string Material = DefaultMaterial;
             public uint Factor = DefaultFactor;
-            public float Alpha = 1f;
+            public float Alpha = 0.55f;          // polprzezroczyste - gesto nalozone stemple daja miekki ciagly pas (wariant A 18.10)
             public float HideZ = DefaultHideZ;
             public bool HasArg;
             public float A0 = 1f, A1 = 1f, A2, A3;
