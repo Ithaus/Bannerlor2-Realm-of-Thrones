@@ -409,6 +409,7 @@ namespace Armoury
                     if (day % 7 == 0) { try { string pn = PriceNowLine(day); if (pn != null) Log.Info(pn); string rl = R4cLine(day); if (rl != null) Log.Info(rl); } catch (Exception e) { Stumble("R4cLines", e); } }   // KS r4 (r4-ceny): ceny chwilowe (NKS-7d), linia paczki
                     try { string ml = MarketLine(); if (ml != null) Log.Info(ml); } catch (Exception e) { Stumble("MarketLine", e); }
                 }
+                F5Check(today, day);                                   // f5-koszt: kontrola diagnozy A7 raz na sesje i bledy watku co dobe (recenzja: niezaleznie od cichych logow), linia "KS: koszt f5" przy liniach (poza czasem doby KS)
             }
             catch (Exception e) { Stumble("Daily", e); }
         }

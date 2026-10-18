@@ -55,6 +55,15 @@ namespace Armoury
         {
             if (_f4A7Day == today) return;
             _f4A7Day = today;
+            // f5-koszt (klucz Ks Cost Fast2): ten sam rachunek i ta sama linia (poza czasem) - na watku glownym przeglad blokow, L i renta x ha kazdego kandydata raz i zestaw G
+            // (dochody zapamietane w bloku dla reguly A7 tej doby), reszta pomiaru i linia na watku z puli (StartCalibration.F5Koszt.cs). Wylaczony - stary rachunek co do linii.
+            if (SwCostFast2 && !F5Off) F4A7Async(today, d0, rule, step);       // recenzja: po roznicy (F5Fallback) stary rachunek do konca sesji
+            else Log.Info(F4A7Old(today, d0, rule, step));
+        }
+
+        /// <summary>Diagnoza A7 - stary rachunek (paczka f4-pomiary bez zmian; zwraca linie zamiast ja pisac - f5-koszt: klucz Ks Cost Fast2 wylaczony i kontrola F5Check).</summary>
+        private static string F4A7Old(int today, int d0, bool rule, bool step)
+        {
             long t0 = Stopwatch.GetTimestamp();
             int st0 = _f4A7St;
             EnsureValues();
@@ -187,7 +196,7 @@ namespace Armoury
             sb.Append(" | przejscia przy indeksie 1 (top 5): ").Append(F4Top(vB, 5));
             if (vPlan != null) sb.Append(" | przejscia wzoru Planu (top 5): ").Append(F4Top(vS2, 5));
             sb.Append(" | czas ").Append(ms.ToString("0.0", Inv)).Append(" ms, potkniecia ").Append(_f4A7St - st0).Append('.');
-            Log.Info(sb.ToString());
+            return sb.ToString();
         }
 
         private static void F4Eval(F4Var var, LiveBlock b, string type, int cur, double hands, double[] px, double[] row)

@@ -54,6 +54,7 @@ namespace Armoury
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
             _pxRestartDay = -1; _pxRestartEnd = -1;               // KS r4 P7 (r4-ceny): restart srednich cen od nowa przy wlaczeniu
             _f4A7Day = -1;                                        // f4-pomiary: doba ostatniej diagnozy A7 (nowa kampania / wczytanie)
+            F5Reset();                                            // f5-koszt: liczniki linii "KS: koszt f5" i kontrola raz na sesje
         }
 
         /// <summary>Doba D (po polkach startu): srednie cen miast od zera - A7 i regale licza od D na cenach po rampie (recenzja 16.10).</summary>
@@ -204,6 +205,7 @@ namespace Armoury
             int active = 0;
             // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
             var vTab = step && SwCostFast ? new Dictionary<double[], double[]>() : null;
+            bool f5g = step && SwCostFast2;                                  // f5-koszt: dochody G z diagnozy A7 tej doby (pamiec w bloku)
             // ks-koszt T10 (K4a, klucz Ks Cost Fast): doba bez kroku A7 i bez cyklu regali, a ostatni pelny przeglad tego stanu blokow nie mial zadnej przebudowy w toku -
             // petla nic by nie zrobila (przebudowy zaczynaja sie tylko w dobie kroku; Target zmienia tylko ta funkcja, a odczyt zapisu daje nowa mape okregow) - bez petli
             if (!step && !reg && SwCostFast && _k4Clean && ReferenceEquals(_k4Live, _live)) { _rActive = 0; return; }
@@ -231,8 +233,16 @@ namespace Armoury
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
                         int cur = b.C[ci];
-                        double incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px), incBest = double.NegativeInfinity; int best = -1;
-                        foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
+                        double incCur, incBest = double.NegativeInfinity; int best = -1;
+                        // f5-koszt (klucz Ks Cost Fast2): te same dochody przy cenach gry policzyla dzis diagnoza A7 (ten sam wiersz cen miasta, to samo zajecie biezace, ta sama
+                        // lista kandydatow i kolejnosc) - bez liczenia drugi raz; probka 1/64 sprawdza je starym rachunkiem (linia "KS: koszt f5")
+                        // (recenzja: po roznicy w probce F5Fallback - od nastepnego bloku do konca sesji starym rachunkiem; blok z roznica bierze liczby starego rachunku)
+                        if (f5g && !F5Off && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, today, ref incCur, ref incBest, ref best); }
+                        else
+                        {
+                            incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
+                        }
                         if (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur)) { b.Held = 0; continue; }
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
                         if (b.Held < HoldDays) continue;

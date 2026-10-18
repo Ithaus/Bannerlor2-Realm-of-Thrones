@@ -45,6 +45,9 @@ namespace Armoury
             // pamiec sesji
             public string Uid; public List<int> Cand;
             public bool Pure;                                  // z zapisu "*": cale rece w zajeciu startowym bloku (ResolveLive ustawia C i X)
+            // f5-koszt (klucz Ks Cost Fast2): dochody przy cenach gry z diagnozy A7 tej doby (doba, wiersz cen miasta, zajecie biezace) - regula A7 tej doby bierze je zamiast
+            // liczyc drugi raz te same liczby (tylko pamiec doby, poza zapisem)
+            public int F5Day = int.MinValue, F5Cur, F5Best; public double F5Ic, F5Ib; public double[] F5Px;
         }
 
         private sealed class LiveDist

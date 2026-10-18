@@ -1090,6 +1090,15 @@ Uzycie (Python 3, tylko odczyt):
                     "Kupcy zywnosci (KS-H) koszt" (wstep, decyzje z probka 1/8: ceny lotow, wartosc u celu, indeks, wysylka; fracht wsi, przyjazdy - INFO). Log sprzed
                     ks-koszt - INFO, nigdy wyjatek. Recenzja ks-koszt: NKS-9z ulamki plonu pol mieszczan w zapisie (T13: dopisek linii T0 "okregow w ostatnim
                     zapisie N (ponad limit M), wczytanych z zapisu K"; prog ponad limit = 0; bez dopisku - INFO).
+                    KS-R5 f5-koszt (noc 17/18.10, fala 5; StartCalibration.F5Koszt.cs, klucz Ks Cost Fast2 - kolce doby KS z fin88: diagnoza A7 f4-pomiary 12 ms w dobie kroku):
+                    NKS-9s kolce doby KS (5 najdrozszych dob zastosowanych z dwoma najwiekszymi pod-czasami T0, dob > 15 ms - INFO), NKS-9r regula_a7 w dobach kroku A7
+                    (doba T0 = doba linii "KS: A7 diagnoza ... krok reguly A7" - 1) mediana <= 6 ms, NKS-9g diagnoza A7 na watku glownym z linii "KS: koszt f5" (co 7 dob,
+                    D+7k+3) mediana <= 5 ms, NKS-9f kontrola paczki: probka 1/64 dochodow reguly A7 z diagnozy wobec starego rachunku rozne = 0, kontrola diagnozy raz na
+                    sesje (stary rachunek wobec szybkiego na tych samych danych) nie ROZNA, bledy watku z puli 0. Bez linii - INFO (log sprzed paczki), nigdy wyjatek.
+                    Recenzja f5-koszt: linia "KS: koszt f5" przy liniach co dobe w dobie D+7k+3, przy cichych logach (gra Jeffa) w dobie linii co 7 dob; kontrola diagnozy
+                    raz na sesje w pierwszej dobie D+7k+3 po szybkiej diagnozie niezaleznie od cichych logow; jednorazowa linia "KS: koszt f5 ROZNICA dzien N" (probka reguly
+                    albo kontrola diagnozy rozna - do konca sesji stary rachunek) i dopisek "po roznicy stary rachunek od doby N" - NKS-9f NIE. NKS-9x (INFO): progi NKS-9
+                    mediana <= 3, NKS-9b <= 10 i NKS-28 <= 1.5 poza zasiegiem f5-koszt bit w bit (decyzja Jeffa: T13 Ks Town Fields Every2 albo progi).
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -37716,6 +37725,13 @@ NKS_KSHC = re.compile(r"Kupcy zywnosci \(KS-H\) koszt dzien (?P<day>-?\d+) \| cz
 # recenzja ks-koszt: ulamki plonu pol mieszczan w zapisie (T13, pole 9 okregu "T") - dopisek linii T0
 NKS_T13S = re.compile(r"ulamki plonu pol mieszczan w zapisie \(T13\): okregow w ostatnim zapisie (?P<sv>\d+)(?: \(ponad limit (?P<ov>\d+)\))?, wczytanych z zapisu (?P<ld>\d+)")
 NKS_SAVEKH = re.compile(r"KS: zapis arm_ks_kupcy doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB")
+# f5-koszt (noc 17/18.10, fala 5): linia "KS: koszt f5" co 7 dob (diagnoza A7 na watku glownym i na watku z puli, dochody reguly A7 z diagnozy, kontrola raz na sesje)
+NKS_F5 = re.compile(r"KS: koszt f5 dzien (?P<day>-?\d+) \| klucz Ks Cost Fast2 TAK \| diagnoza A7 \(f4-pomiary\): ostatnia doba (?P<dd>-?\d+|-), watek glowny (?P<mm>[\d.]+|-) ms, "
+                    r"watek z puli (?P<wm>[\d.]+|-) ms \((?P<kind>\w+), na miejscu - poprzednia w toku (?P<inl>\d+), bledy watku (?P<err>\d+).*? \| regula A7: dochody z diagnozy tej doby "
+                    r"(?P<ru>\d+) blokow, probka 1/64 starym rachunkiem: zgodne (?P<ok>\d+), rozne (?P<bad>\d+) \| kontrola diagnozy \(stary rachunek wobec szybkiego na tych samych danych, "
+                    r"raz na sesje\): (?P<chk>.*?)(?:, czas kontroli (?P<cms>[\d.]+) ms poza czasem doby KS)?(?: \| po roznicy stary rachunek od doby (?P<off>-?\d+))? \| tylko")
+# recenzja f5-koszt: jednorazowa linia roznicy szybkiego rachunku wobec starego (do konca sesji stary rachunek)
+NKS_F5D = re.compile(r"KS: koszt f5 ROZNICA dzien (?P<day>-?\d+) \| (?P<why>.*?) \| do konca sesji")
 NKS_SAVER3 = re.compile(r"arm_ks_r3 \(stan rundy 3, osobny klucz\) (?P<kb>[\d.]+) KB, razem (?P<tot>[\d.]+) KB")
 # KS-R4 r4-kupcy (noc 17/18.10): kredyt kupcow KS-H, probka wyceny (srednia i najwiekszy blad), zablokowane wedlug towaru, glod pierwszy, Polnoc i Mur, wersja tabeli dob
 NKS_KSHPRB = re.compile(r"\| probka wyceny 1/64 (?P<se>[\d.]+)% \(max (?P<sx>[\d.]+)%, lotow (?P<n>\d+)")
@@ -38514,6 +38530,84 @@ def nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day):
         rep.add("NKS-9z: ulamki plonu pol mieszczan w zapisie (T13)", "brak dopisku w liniach T0 (T13 nie dzialal w tej sesji - klucz Ks Town Fields Every2 NIE)", "INFO", None)
 
 
+def nks_f5_rows(rep, t0rows, f5ln, f4a7, on_day, f5diff=()):
+    """f5-koszt (noc 17/18.10, fala 5; StartCalibration.F5Koszt.cs, klucz Ks Cost Fast2): NKS-9s kolce doby KS (5 najdrozszych dob zastosowanych z pod-czasem, ktory je
+    wyznacza, i liczba dob > 15 ms - INFO), NKS-9r regula_a7 w dobach kroku A7 (doba T0 = doba linii diagnozy A7 "krok reguly A7" - 1; mediana <= 6 ms, fin88 bez paczki
+    ok. 16 ms - diagnoza f4-pomiary 12 ms), NKS-9g diagnoza A7 na watku glownym (linia "KS: koszt f5": mediana <= 5 ms, najwiekszy - INFO; czas petli z linii diagnozy - INFO),
+    NKS-9f kontrola paczki (probka 1/64 dochodow reguly z diagnozy wobec starego rachunku: rozne = 0; kontrola diagnozy raz na sesje: nie ROZNA; bledy watku 0).
+    Brak linii (log sprzed paczki albo klucz wylaczony) - INFO, nigdy wyjatek. Recenzja: linie "KS: koszt f5 ROZNICA" i dopisek "po roznicy stary rachunek" - NKS-9f NIE;
+    NKS-9x (INFO) - ktore progi NKS-9/9b/28 sa poza zasiegiem paczki (decyzja Jeffa)."""
+    ap = {d: v for d, v in t0rows.items() if v[1] == "ZASTOSOWANY" and (on_day is None or d >= on_day)}
+    keys = ["ksiega", "odbior", "sterowanie", "ceny", "plan_odbior", "bramki", "plan_start", "stany", "okregi_przeliczone", "okregi_bez_przeliczenia", "rampa",
+            "pola_mieszczan", "regula_a7", "mapa_koszyka", "polki_pliki", "linie_logu"]
+    if ap:
+        top = sorted(ap.items(), key=lambda kv: -kv[1][0])
+        over = [d for d, v in ap.items() if v[0] > 15.0]
+        parts = []
+        for d, v in top[:5]:
+            t = v[2]
+            big = sorted(((t.get(k, 0.0), k) for k in keys), reverse=True)[:2]
+            parts.append(f"{d} {v[0]:.2f} ms ({', '.join(f'{k} {x:.2f}' for x, k in big)})")
+        rep.add("NKS-9s: kolce doby KS (f5-koszt, 5 najdrozszych dob zastosowanych)", f"dob > 15 ms: {len(over)} z {len(ap)}; " + "; ".join(parts),
+                "INFO (q95 NKS-9 = 95. centyl; doba wlaczenia KS zawsze najdrozsza)", None)
+    else:
+        rep.add("NKS-9s: kolce doby KS (f5-koszt)", "brak linii 'KS: koszt doby (T0)' w stanie zastosowanym", "INFO", None)
+    steps = set()
+    for ln in f4a7:
+        md = re.search(r"A7 diagnoza \(f4-pomiary\) dzien (-?\d+) \|.*?\) krok reguly A7", ln)
+        if md:
+            steps.add(int(md.group(1)) - 1)
+    ra = [ap[d][2].get("regula_a7", 0.0) for d in sorted(steps) if d in ap]
+    if ra:
+        mr = nks_med(ra)
+        rep.add("NKS-9r: regula_a7 w dobach kroku A7 (f5-koszt; T0 doba = doba diagnozy - 1)", f"mediana {mr:.2f} ms, max {max(ra):.2f} ms ({len(ra)} dob kroku)",
+                "mediana <= 6 ms (fin88 bez paczki ok. 16 ms)", mr <= 6.0)
+    else:
+        rep.add("NKS-9r: regula_a7 w dobach kroku A7 (f5-koszt)", "brak dob kroku (linie 'KS: A7 diagnoza ... krok reguly A7' i T0 tej doby)", "INFO (prog: mediana <= 6 ms)", None)
+    good = [x for x in f5ln if x]
+    nbad = len(f5ln) - len(good)
+    a7ms = []
+    for ln in f4a7:
+        mc = re.search(r"\| czas ([\d.]+) ms, potkniecia \d+\.$", ln)
+        if mc:
+            a7ms.append(float(mc.group(1)))
+    if good:
+        mm = [float(x["mm"]) for x in good if x["mm"] != "-"]
+        wm = [float(x["wm"]) for x in good if x["wm"] != "-"]
+        mx = max(mm) if mm else None
+        rep.add("NKS-9g: diagnoza A7 na watku glownym (f5-koszt, linia 'KS: koszt f5')",
+                (f"najwiekszy {mx:.2f} ms, mediana {nks_med(mm):.2f} ms" if mm else "brak czasu") + (f"; watek z puli mediana {nks_med(wm):.2f} ms" if wm else "")
+                + (f"; czas z linii diagnozy (watek glowny + petla na watku) mediana {nks_med(a7ms):.1f} ms" if a7ms else "") + f" ({len(good)} linii)",
+                "mediana <= 5 ms (fin88 bez paczki 11.5-12.7 ms na watku glownym; doba D z pierwszym liczeniem L blokow 17.3 - tylko INFO w najwiekszym)", (nks_med(mm) <= 5.0) if mm else None)
+        bad = sum(int(x["bad"]) for x in good)
+        ok = sum(int(x["ok"]) for x in good)
+        ru = sum(int(x["ru"]) for x in good)
+        err = sum(int(x["err"]) for x in good)
+        inl = sum(int(x["inl"]) for x in good)
+        chk = [x["chk"].strip() for x in good if not x["chk"].startswith("jeszcze nie")]
+        chk_bad = [c for c in chk if c.startswith("ROZNA")]
+        offs = sorted({int(x["off"]) for x in good if x.get("off")})
+        txt = (f"regula A7 z dochodem z diagnozy {ru} blokow, probka 1/64 zgodne {ok}, rozne {bad}; kontrola diagnozy (raz na sesje): "
+               + (chk[-1][:160] if chk else "jeszcze nie") + f"; bledy watku {err}, na miejscu (poprzednia w toku) {inl}" + (f"; linii nierozpoznanych {nbad}" if nbad else "")
+               + (f"; linie ROZNICA {len(f5diff)} (pierwsza: doba {f5diff[0][0]} - {f5diff[0][1][:140]})" if f5diff else "")
+               + (f"; stary rachunek po roznicy od dob {offs}" if offs else ""))
+        rep.add("NKS-9f: kontrola f5-koszt (te same wyniki co stary rachunek)", txt, "rozne = 0, kontrola nie ROZNA, bledy watku 0, linii ROZNICA 0",
+                bad == 0 and not chk_bad and err == 0 and nbad == 0 and not f5diff and not offs)
+    else:
+        rep.add("NKS-9g: diagnoza A7 na watku glownym (f5-koszt)", "brak linii 'KS: koszt f5'" + (f" (nierozpoznanych {nbad})" if nbad else "")
+                + (f"; czas z linii diagnozy mediana {nks_med(a7ms):.1f} ms (bez paczki - caly na watku glownym)" if a7ms else ""),
+                "INFO (log sprzed f5-koszt albo klucz Ks Cost Fast2 NIE)", False if nbad else None)
+        if f5diff:
+            rep.add("NKS-9f: kontrola f5-koszt", f"brak linii 'KS: koszt f5', ale linie ROZNICA {len(f5diff)} (pierwsza: doba {f5diff[0][0]} - {f5diff[0][1][:140]})",
+                    "linii ROZNICA 0", False)
+        else:
+            rep.add("NKS-9f: kontrola f5-koszt", "brak linii 'KS: koszt f5' (D+7k+3 przy liniach; ciche logi - doba linii co 7 dob; stan zastosowany)", "INFO (prog: rozne = 0, kontrola nie ROZNA)", None)
+    # recenzja f5-koszt (uwaga wazna): paczka scina tylko kolce dob kroku A7 (q95); mediana doby KS, NKS-9b i KS-H zostaja - bit w bit nie da sie ich zejsc ponizej progow
+    rep.add("NKS-9x: progi kosztu poza zasiegiem f5-koszt", "NKS-9 mediana <= 3 ms, NKS-9b <= 10 ms, NKS-28 <= 1.5 ms - bit w bit nieosiagalne (zwykla doba ok. 4.3 ms: mapa koszyka "
+            "1.5 - ok. 3700 TownMarketData.GetPrice, okregi przeliczone 0.8, pola mieszczan 0.6; zakupy wsi - ItemRoster.AddToCounts gry; KS-H - GetPrice modelu cen BKROT "
+            "z latkami i AIInfluence, czystosci nie da sie dowiesc)", "INFO - decyzja Jeffa: T13 Ks Town Fields Every2 (zmienia rytm pol mieszczan) albo nowe progi; q95 NKS-9 - po tescie w grze", None)
+
+
 def nks_med(v):
     v = sorted(v)
     if not v:
@@ -38576,6 +38670,8 @@ def nks_main(logp, until=120, bdp=None):
     t0rows = {}        # ks-koszt: doba -> (razem ms, stan, {pod-czas: ms})
     kchk = []          # ks-koszt: (doba, zgodne, rozne, opis, T1)
     kshc = {}          # ks-koszt: doba -> (czas doby ms, {pod-czas: ms})
+    f5ln = []          # f5-koszt: linie "KS: koszt f5" (slownik grup albo None)
+    f5diff = []        # recenzja f5-koszt: linie "KS: koszt f5 ROZNICA" (doba, przyczyna)
     saves_kh, saves_r3 = [], []
     planunc = {}       # doba Planu -> {rynek: (zastepcze %, bez pokrycia %)}
     goods = {}         # (dzien, towar) -> (zapas, produkcja, zuzycie) - swiat
@@ -38611,6 +38707,14 @@ def nks_main(logp, until=120, bdp=None):
                 mm = NKS_KCHK.match(s)
                 if mm:
                     kchk.append((int(mm.group("day")), int(mm.group("ok")), int(mm.group("bad")), mm.group("body"), (mm.group("t1") or "-").strip()))
+                    continue
+                if s.startswith("KS: koszt f5 dzien "):
+                    mm = NKS_F5.match(s)
+                    f5ln.append(mm.groupdict() if mm else None)   # f5-koszt (NKS-9f/9g); None - linia nierozpoznana
+                    continue
+                if s.startswith("KS: koszt f5 ROZNICA "):
+                    mm = NKS_F5D.match(s)
+                    f5diff.append((int(mm.group("day")), mm.group("why")) if mm else (None, s[:160]))   # recenzja f5-koszt (NKS-9f)
                     continue
             if s.startswith("Kupcy zywnosci (KS-H) koszt dzien "):
                 mm = NKS_KSHC.match(s)
@@ -39714,6 +39818,7 @@ def nks_main(logp, until=120, bdp=None):
     else:
         rep.add("NKS-28: czas kupcow zywnosci KS-H", "brak linii 'Kupcy zywnosci (KS-H)' w stanie czynnym", "mediana <= 1.5 ms", None)
     nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day)
+    nks_f5_rows(rep, t0rows, f5ln, f4a7, on_day, f5diff)   # f5-koszt (fala 5): kolce doby KS, regula A7 w dobach kroku, diagnoza A7 na watku glownym, kontrola
     # NKS-21 modele popytu HistoricalPrices (DemandPostfix z parametrem int __2)
     if side["hpm"] is not None:
         if base and base["hpm"] is not None:

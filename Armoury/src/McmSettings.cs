@@ -7536,6 +7536,10 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: day cost")]
         public bool KsCostFast { get; set; } = true;
 
+        [SettingPropertyBool("Ks Cost Fast2", HintText = "with Start Calibration applied: the weekly work-rule check and the weekly work rule itself are counted in a quicker way that gives exactly the same numbers - each district part's land and rent are looked up once instead of once for every set of prices, and the rule reuses the incomes the check counted the same day; off = the old, slower way")]
+        [SettingPropertyGroup("Start calibration: day cost")]
+        public bool KsCostFast2 { get; set; } = true;
+
         [SettingPropertyBool("Side Village Crafts", HintText = "each side village of a district works at its own craft - fishing hamlets fish, mill and granary villages grow grain, the others what their land, water and climate suit best (no olives, vines or grain in the snow); the district makes the sum of all its villages. With Start Calibration applied this comes from the start calibration itself; this setting governs villages outside it. On the first day the world makes as much of every good as the day before (the change only shifts which villages make what). Off = the district makes only the goods of its game village's type, as before")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageCrafts { get; set; } = false;
@@ -9543,6 +9547,7 @@ namespace Armoury
             s.CrownWindfallToReserve = CrownWindfallToReserve;
             s.KsTownFieldsEvery2 = KsTownFieldsEvery2;
             s.KsCostFast = KsCostFast;
+            s.KsCostFast2 = KsCostFast2;
             s.SideVillageCrafts = SideVillageCrafts;
             s.SideVillageCraftSwitch = SideVillageCraftSwitch;
             s.SideVillageCraftHoldDays = SideVillageCraftHoldDays;
