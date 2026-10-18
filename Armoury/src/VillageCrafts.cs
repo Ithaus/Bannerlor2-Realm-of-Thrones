@@ -161,7 +161,18 @@ namespace Armoury
         private static string _loadNote = "nowa kampania albo zapis bez arm_crafts";
 
         // pamiec sesji
-        private sealed class DistInfo { public Village V; public string Id, Region; public VillageType Type; public int TypeCraft; public readonly List<Side> Sides = new List<Side>(); }
+        private sealed class DistInfo
+        {
+            public Village V; public string Id, Region; public VillageType Type; public int TypeCraft; public readonly List<Side> Sides = new List<Side>();
+            public Plan Plan; public bool HasPlan, Dirty = true; public int Slot = -1;   // plan produkcji z ostatniego przeliczenia (co 7 dob na zmiane; od razu przy zmianie stanu)
+        }
+        private static readonly HashSet<string> _dirty = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>Okreg do przeliczenia planu nastepnej doby (prace okregu: zakup, ogien) - bez czekania na kolejke 7 dob. Nie rzuca.</summary>
+        internal static void MarkDirty(Village v)
+        {
+            try { if (v != null && v.Settlement != null && v.Settlement.StringId != null) lock (Gate) _dirty.Add(v.Settlement.StringId); } catch { }
+        }
         private static readonly Dictionary<string, DistInfo> _dist = new Dictionary<string, DistInfo>(StringComparer.Ordinal);
         private static bool _built; private static int _builtSide, _builtNoRow, _builtStartFix;
 
@@ -185,7 +196,7 @@ namespace Armoury
         }
 
         // liczniki do linii (od ostatniej linii)
-        private static int _st, _stAll, _dLists, _dAdded, _dNoMem, _dSteps, _dStarted, _dDone, _dStall, _dBusy, _dBudget, _dLocked, _dPress, _dCancel;
+        private static int _st, _stAll, _dLists, _dAdded, _dNoMem, _dSteps, _dStarted, _dDone, _dStall, _dBusy, _dBudget, _dLocked, _dPress, _dCancel, _dRedone;
         private static long _dPaid, _mVil, _mTown;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _notes = new List<string>();
@@ -197,13 +208,13 @@ namespace Armoury
             {
                 _side.Clear(); _n = null; _onDay = -1; _regionMoved.Clear(); _regionSeason = -1; _pending = null; _loadNote = "nowa kampania albo zapis bez arm_crafts";
                 _dist.Clear(); _built = false; _builtSide = _builtNoRow = _builtStartFix = 0;
-                _plans = new Dictionary<Village, Plan>(); _mem.Clear();
+                _plans = new Dictionary<Village, Plan>(); _mem.Clear(); _dirty.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _notes.Clear(); _offLogged = false;
                 _meta = null; _metaFor = null;
             }
         }
 
-        private static void ZeroDay() { _dLists = _dAdded = _dNoMem = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = 0; _dPaid = 0; }
+        private static void ZeroDay() { _dLists = _dAdded = _dNoMem = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -635,11 +646,17 @@ namespace Armoury
                     fall++;
                     // przebudowy w toku (co dobe) i regula zmiany (co 7 dob)
                     Town mt = di.V.TradeBound != null ? di.V.TradeBound.Town : (di.V.Bound != null ? di.V.Bound.Town : null);
-                    bool busy = false;
-                    foreach (var s in di.Sides) if (s.Target >= 0) { Progress(di, s, today, mt); if (s.Target >= 0) busy = true; }
-                    if (step && mt != null) Rule(di, mt, today, busy);
-                    var pl = BuildPlan(di, parts);
-                    if (pl != null) plans[di.V] = pl;
+                    bool busy = false, moved = false;
+                    foreach (var s in di.Sides) if (s.Target >= 0) { Progress(di, s, today, mt); moved = true; if (s.Target >= 0) busy = true; }
+                    if (step && mt != null) { int before = _dStarted; Rule(di, mt, today, busy); if (_dStarted != before) moved = true; }
+                    // koszt doby: plan okregu przeliczany co 7 dob na zmiane (udzialy ludzi w domu zmieniaja sie powoli), od razu przy przebudowie, pracach i pierwszej dobie sesji
+                    if (di.Slot < 0) di.Slot = (int)((uint)(di.Id ?? "").GetHashCode() % 7u);
+                    bool dirty; lock (Gate) dirty = _dirty.Remove(di.Id);
+                    if (!di.HasPlan || di.Dirty || dirty || moved || (today + di.Slot) % 7 == 0)
+                    {
+                        di.Plan = BuildPlan(di, parts); di.HasPlan = true; di.Dirty = false; _dRedone++;
+                    }
+                    if (di.Plan != null) plans[di.V] = di.Plan;
                     foreach (var s in di.Sides)
                     {
                         if (s.Craft >= 0 && s.Craft < KsTab.NC) countBy[s.Craft]++;
@@ -866,7 +883,7 @@ namespace Armoury
             var n = _n;
             if (n != null) for (int c = 0; c < KsTab.NC; c++) { if (Math.Abs(n[c] - 1.0) < 1e-4) continue; sb.Append(f ? " " : ", ").Append(KsTab.Crafts[c]).Append(' ').Append(n[c].ToString("0.000", Inv)); f = false; }
             if (f) sb.Append(" 1");
-            sb.Append(" | krok zajec (doba): wsi z planem ").Append(plans).Append(", wsi z pamiecia ").Append(mems).Append(", listy BK z dopiskiem ").Append(_dLists).Append(", wywolan towaru typu ").Append(_dSteps)
+            sb.Append(" | krok zajec (doba): wsi z planem ").Append(plans).Append(" (przeliczone dzis ").Append(_dRedone).Append(", co 7 dob na zmiane)").Append(", wsi z pamiecia ").Append(mems).Append(", listy BK z dopiskiem ").Append(_dLists).Append(", wywolan towaru typu ").Append(_dSteps)
               .Append(", dopiskow ").Append(_dAdded).Append(" (bez pamieci M ").Append(nomem).Append(") | wartosc bazowa: zdjete z typu ").Append(remV.ToString("0", Inv)).Append(", dodane zajec ").Append(addV.ToString("0", Inv))
               .Append(", premia prac w typie ").Append(bonV.ToString("0", Inv))
               .Append(" | kontrola pieniedzy: kiesy wsi -").Append(_mVil).Append(" / kasy miast +").Append(_mTown).Append(" (roznica ").Append(_mVil - _mTown).Append(")")

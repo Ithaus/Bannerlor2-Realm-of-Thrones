@@ -98,6 +98,7 @@ namespace Armoury
             public double SeenBr = -1, SeenBf = -1;
             public double Paid7, Exp7;                            // wyplacone i oczekiwane od ostatniej linii 7 dob (CSV, komunikat)
             public bool War;                                      // wojna z krolestwem okregu przy ostatnim sprawdzeniu (komunikat raz)
+            public double Kit;                                    // ostatnia znana cena pelnego sprzetu osady tej czesci (zakup, doba) - wartosc straty przy ogniu (czesc bez stojacych osad ma cene 0)
             // pamiec sesji
             public double Eff(int today)
             {
@@ -111,7 +112,16 @@ namespace Armoury
         }
         private static readonly List<Row> _rows = new List<Row>();
         private static readonly Dictionary<string, int> _relDay = new Dictionary<string, int>(StringComparer.Ordinal);   // okreg -> doba ostatniej relacji
-        private static readonly Dictionary<string, double> _handed = new Dictionary<string, double>(StringComparer.Ordinal); // okreg -> utarg oddany (srednia wykladnicza dnia)
+        private static readonly Dictionary<string, double> _handed = new Dictionary<string, double>(StringComparer.Ordinal); // okreg -> suma utargu oddanego przy wozach (okno ok. 28 dob, zanikajace)
+        private static readonly Dictionary<string, int> _handedDays = new Dictionary<string, int>(StringComparer.Ordinal); // okreg -> doby w sumie (najwyzej 28)
+        private static readonly Dictionary<string, double> _handToday = new Dictionary<string, double>(StringComparer.Ordinal); // okreg -> utarg oddany od ostatniej doby
+
+        /// <summary>Utarg oddany na dobe (srednia okna ok. 28 dob) okregu z pracami; 0 - brak pomiaru.</summary>
+        private static double HandedPerDay(string id)
+        {
+            double s; int d;
+            return _handed.TryGetValue(id, out s) && _handedDays.TryGetValue(id, out d) && d >= 7 ? s / d : 0.0;
+        }
         private static string _pending; private static string _loadNote = "nowa kampania albo zapis bez arm_works";
         private static int _loadBad;
 
@@ -135,7 +145,7 @@ namespace Armoury
         {
             lock (Gate)
             {
-                _rows.Clear(); _relDay.Clear(); _handed.Clear(); _pending = null; _loadNote = "nowa kampania albo zapis bez arm_works"; _loadBad = 0;
+                _rows.Clear(); _relDay.Clear(); _handed.Clear(); _handedDays.Clear(); _handToday.Clear(); _pending = null; _loadNote = "nowa kampania albo zapis bez arm_works"; _loadBad = 0;
                 _bonus = new Dictionary<Village, Dictionary<string, Bonus>>(); _val.Clear(); _ksExtra.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _dNotes.Clear(); _startLogged = false; _lastWeek = -1;
             }
@@ -289,8 +299,8 @@ namespace Armoury
         {
             try
             {
-                double h; string id = v.Settlement.StringId;
-                lock (Gate) if (vd > 0 && _handed.TryGetValue(id, out h) && h > 0) return Math.Max(0.2, Math.Min(1.5, h / vd));
+                string id = v.Settlement.StringId;
+                lock (Gate) { double h = HandedPerDay(id); if (vd > 0 && h > 0) return Math.Max(0.2, Math.Min(1.5, h / vd)); }
             }
             catch { }
             return DefaultH;
@@ -414,6 +424,7 @@ namespace Armoury
                     foreach (var x in _rows) if (x.Clan == clan.StringId && x.Dist == v.Settlement.StringId && x.Part == part) { r = x; break; }
                     if (r == null) { r = new Row { Clan = clan.StringId, Dist = v.Settlement.StringId, Part = part, Craft = q.Craft, Kind = q.WKind, Day0 = Today() }; _rows.Add(r); }
                     if (r.SeenBr < 0) { r.SeenBr = q.Br; r.SeenBf = q.Bf; }
+                    r.Kit = q.KitPer;
                     r.Ramp.Add(new Lot { Units = units, Day = Today(), Ready = KReady[q.WKind] });
                     r.In += amount; r.InWage += wage - matVil; r.InMat += matTown + matVil;
                     if (animals > 0) { r.Animal = animal; r.Animals += animals; }
@@ -424,6 +435,7 @@ namespace Armoury
                 }
                 RebuildBonus();
                 StartCalibration.KsDirty(v);                                     // pod KS: dodatek do stawek okregu nastepnej doby
+                VillageCrafts.MarkDirty(v);                                      // bez KS: plan produkcji okregu z dodatkiem nastepnej doby
                 res.Ok = true; res.Paid = paid; res.Wage = wage - matVil; res.MatTown = matTown; res.MatVil = matVil; res.Units = units; res.Pieces = pieces; res.Animals = animals;
                 res.Market = market != null && market.Name != null ? market.Name.ToString() : "the market";
                 string dname = Name(v);
@@ -581,8 +593,7 @@ namespace Armoury
                             double lost = KL[r.Kind] * moved;
                             r.Z += lost; r.I += moved - lost;
                             _dBurnN++; _dBurnU += lost; _dIdleU += moved - lost;
-                            double kit = 0;
-                            long g = (long)Math.Round(lost * KitOfRow(r, v, out kit) );
+                            long g = (long)Math.Round(lost * r.Kit);                     // ostatnia znana cena (bez wyceny pod blokada; czesc spalona ma dzis 0 osad stojacych)
                             r.LostG += g; _dLostG += g;
                             if (r.Kind == KHerd && r.Animals > 0 && lost > 0) herd.Add(new KeyValuePair<Row, double>(r, lost));
                             if (r.Clan == PlayerClanId() && lost > 1e-3)
@@ -609,7 +620,7 @@ namespace Armoury
                 }
                 foreach (var kv in herd) DriveOff(kv.Key, kv.Value, v, raider);
                 RebuildBonus();
-                if (strike) StartCalibration.KsDirty(v);
+                if (strike) { StartCalibration.KsDirty(v); VillageCrafts.MarkDirty(v); }
             }
             catch (Exception e) { Stumble("Diff", e); }
         }
@@ -674,10 +685,9 @@ namespace Armoury
             {
                 lock (Gate)
                 {
-                    double h; _handed.TryGetValue(id, out h);
-                    _handed[id] = h + (handed - h) * 0.1;        // srednia wykladnicza utargu na powrot (H okregu w wycenie)
                     bool any = false; foreach (var r in _rows) if (r.Dist == id) { any = true; break; }
-                    if (!any) return;
+                    if (!any) return;                                 // okreg bez prac - nic (bez pamieci utargu: wycena bierze srednia swiata H)
+                    double h; _handToday.TryGetValue(id, out h); _handToday[id] = h + handed;   // utarg doby (H okregu = utarg na dobe / wartosc produkcji dnia)
                 }
                 var s = Settings.Current;
                 double share = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictWorksShare)) : 0.5;
@@ -758,7 +768,15 @@ namespace Armoury
                 if (e > 0) { d.EPart[part] = e; d.E += e; }
             }
             d.V += d.E;
-            lock (Gate) _val[id] = d;
+            lock (Gate)
+            {
+                _val[id] = d;
+                foreach (var r in _rows)                                      // cena sprzetu czesci (wartosc straty przy ogniu)
+                {
+                    if (r.Dist != id) continue;
+                    foreach (var q in qs) if (PartKey(q.Uid) == r.Part && q.KitPer > 0) { r.Kit = q.KitPer; break; }
+                }
+            }
             return d;
         }
 
@@ -787,7 +805,19 @@ namespace Armoury
                     }
                 Remap(today);                                                // prace na wioskach spoza ukladu tej sesji - przy rownej wartosci
                 var dists = new HashSet<string>(StringComparer.Ordinal);
-                lock (Gate) foreach (var r in _rows) dists.Add(r.Dist);
+                lock (Gate)
+                {
+                    foreach (var r in _rows) dists.Add(r.Dist);
+                    // utarg doby do okna ok. 28 dob (suma zanikajaca 27/28 po 28 dobach)
+                    foreach (var id in dists)
+                    {
+                        double t; _handToday.TryGetValue(id, out t);
+                        double s0; _handed.TryGetValue(id, out s0); int d0; _handedDays.TryGetValue(id, out d0);
+                        if (d0 >= 28) { s0 *= 27.0 / 28.0; d0 = 27; }
+                        _handed[id] = s0 + t; _handedDays[id] = d0 + 1;
+                    }
+                    _handToday.Clear();
+                }
                 foreach (var id in dists)
                 {
                     var st = Settlement.Find(id); var v = st != null ? st.Village : null;
@@ -819,7 +849,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             double share = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictWorksShare)) : 0.5;
-            double h; lock (Gate) _handed.TryGetValue(id, out h);
+            double h; lock (Gate) h = HandedPerDay(id);
             double H = dv.V > 0 && h > 0 ? Math.Max(0.2, Math.Min(1.5, h / dv.V)) : DefaultH;
             double e = share * H * dv.E;
             lock (Gate) foreach (var r in _rows) if (r.Dist == id) { double ep; if (dv.EPart.TryGetValue(r.Part, out ep)) r.Exp7 += e > 0 && dv.E > 0 ? e * ep / dv.E / Math.Max(1, CountPart(id, r.Part)) : 0; }
@@ -861,6 +891,7 @@ namespace Armoury
                 if (leader == null) continue;
                 bool player = clan == Clan.PlayerClan;
                 double kit; KitOfRow(r, v, out kit);
+                if (!(kit > 0)) kit = r.Kit;
                 int cost = (int)Math.Ceiling(KR[r.Kind] * kit * rb.Units);
                 int wages = 0;
                 try { var pp = leader.PartyBelongedTo; wages = pp != null ? Math.Max(0, pp.TotalWage) : 0; } catch { wages = 0; }
@@ -1014,7 +1045,7 @@ namespace Armoury
             try
             {
                 bool any;
-                lock (Gate) any = _dNew + _dNewAi + _dPays + _dWar + _dBurnN + _dIdleN + _dBackN + _dRebN + _dExpN + _dRemN + _dHerdN + _dRel + _dViolate + _st > 0 || _rows.Count > 0 && LogGate.Lines && day % 7 == 0;
+                lock (Gate) any = _dNew + _dNewAi + _dPays + _dWar + _dBurnN + _dIdleN + _dBackN + _dRebN + _dExpN + _dRemN + _dHerdN + _dRel + _dViolate + _st > 0 || _dNotes.Count > 0 || _rows.Count > 0 && LogGate.Lines && day % 7 == 0;
                 if (!any) { lock (Gate) { ZeroDay(); _dNotes.Clear(); _st = 0; } return; }
                 var sb = new StringBuilder(1500);
                 lock (Gate)
@@ -1073,7 +1104,8 @@ namespace Armoury
                     {
                         if (!f) sb.Append(','); f = false;
                         int rd; _relDay.TryGetValue(kv.Key, out rd);
-                        sb.Append(C(kv.Key)).Append('=').Append(D(kv.Value)).Append(':').Append(_relDay.ContainsKey(kv.Key) ? rd : -1);
+                        int hd; _handedDays.TryGetValue(kv.Key, out hd);
+                        sb.Append(C(kv.Key)).Append('=').Append(D(kv.Value)).Append(':').Append(_relDay.ContainsKey(kv.Key) ? rd : -1).Append(':').Append(hd);
                     }
                     sb.Append("|a:").Append(_autoOff ? 0 : 1);                 // przelacznik odbudowy samoczynnej gracza z okna (1 - wedlug klucza)
                     string res = sb.ToString();
@@ -1094,7 +1126,7 @@ namespace Armoury
 
         private static void ImportNow(string t)
         {
-            _rows.Clear(); _handed.Clear(); _relDay.Clear(); _loadBad = 0;
+            _rows.Clear(); _handed.Clear(); _handedDays.Clear(); _relDay.Clear(); _loadBad = 0;
             try
             {
                 var p = t.Split('|');
@@ -1126,6 +1158,7 @@ namespace Armoury
                         var a = e.Substring(q + 1).Split(':');
                         _handed[e.Substring(0, q)] = Math.Max(0, PD(a[0]));
                         if (a.Length > 1) { int rd = PI(a[1], -1); if (rd >= 0) _relDay[e.Substring(0, q)] = rd; }
+                        _handedDays[e.Substring(0, q)] = a.Length > 2 ? Math.Max(0, Math.Min(28, PI(a[2], 0))) : 0;
                     }
                 if (p.Length > 3 && p[3] == "a:0") _autoOff = true;
                 _loadNote = "arm_works: prac " + _rows.Count + (_loadBad > 0 ? " (zlych " + _loadBad + " - pominiete)" : "") + ", okregow z utargiem " + _handed.Count;

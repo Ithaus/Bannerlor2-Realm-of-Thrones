@@ -36,7 +36,7 @@ namespace Armoury
         private static int _lastDay = -1, _diff, _changed, _updated, _st, _stAll, _districts, _ks, _snowKs;
         private static double _ms;
         private static bool _wired; private static string _wiredText = "nie wpiete";
-        private static Type _tVm; private static FieldInfo _fSettlement; private static PropertyInfo _pEvents; private static FieldInfo _fEventType; private static PropertyInfo _pParam;
+        private static Type _tVm, _tItem; private static FieldInfo _fSettlement; private static PropertyInfo _pEvents; private static FieldInfo _fEventType; private static PropertyInfo _pParam;
 
         internal static void Reset()
         {
@@ -59,6 +59,7 @@ namespace Armoury
             {
                 _tVm = AccessTools.TypeByName("SandBox.ViewModelCollection.Nameplate.SettlementNameplateEventsVM");
                 var tItem = AccessTools.TypeByName("SandBox.ViewModelCollection.Nameplate.SettlementNameplateEventItemVM");
+                _tItem = tItem;
                 var m = _tVm != null ? AccessTools.DeclaredMethod(_tVm, "AddPrimaryProductionIcon") : null;
                 _fSettlement = _tVm != null ? AccessTools.Field(_tVm, "_settlement") : null;
                 _pEvents = _tVm != null ? AccessTools.Property(_tVm, "EventsList") : null;
@@ -223,13 +224,14 @@ namespace Armoury
                 if (__instance == null) return;
                 lock (_vms) { _vms.Add(new WeakReference(__instance)); if (_vms.Count > 4000) _vms.RemoveAll(w => !w.IsAlive); }
                 if (!On) return;
-                Apply(__instance);
+                Apply(__instance, false);
             }
             catch (Exception e) { Stumble("IconPostfix", e); }
         }
 
-        /// <summary>Pozycja Production tabliczki = ikona okregu (bez zmiany - nic).</summary>
-        private static bool Apply(object vm)
+        /// <summary>Pozycja Production tabliczki = ikona okregu (bez zmiany - nic). Przy tworzeniu VM (postfiks) - sama wartosc; w sesji (rachunek co 28 dob) pozycja zdjeta
+        /// i dodana od nowa w tym samym miejscu: widzet gry (SettlementNameplateEventVisualBrushWidget) ustala obrazek raz, przy pierwszym LateUpdate.</summary>
+        private static bool Apply(object vm, bool live)
         {
             var st = _fSettlement.GetValue(vm) as Settlement;
             var info = InfoOf(st);
@@ -243,7 +245,12 @@ namespace Armoury
                 if (et == null || Convert.ToInt32(et) != 6) continue;          // SettlementEventType.Production = 6
                 string cur = _pParam.GetValue(it, null) as string;
                 if (cur == info.IconId) return false;
-                _pParam.SetValue(it, info.IconId, null);
+                if (!live || _tItem == null) { _pParam.SetValue(it, info.IconId, null); return true; }
+                int at = list.IndexOf(it);
+                object fresh = Activator.CreateInstance(_tItem, new object[] { info.IconId });
+                if (at < 0 || fresh == null) return false;
+                list.RemoveAt(at);
+                list.Insert(at, fresh);
                 return true;
             }
             return false;
@@ -258,7 +265,7 @@ namespace Armoury
                 _vms.RemoveAll(w => !w.IsAlive);
                 foreach (var w in _vms)
                 {
-                    try { var vm = w.Target; if (vm != null && Apply(vm)) n++; }
+                    try { var vm = w.Target; if (vm != null && Apply(vm, true)) n++; }
                     catch (Exception e) { Stumble("UpdateVms", e); }
                 }
             }

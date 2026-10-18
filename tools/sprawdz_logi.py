@@ -39351,7 +39351,7 @@ NZW_NEUTRAL = re.compile(r"Zajecia wiosek \(ZW\): start neutralny \(A6\) doba (?
 NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|NIECZYNNE[^|]*) \| okregow z wioskami (?P<d>\d+) \(bez KS (?P<fall>\d+), pod KS (?P<ks>\d+)[^)]*\), wiosek (?P<sides>\d+) "
                      r".*?\| inne niz typ okregu (?P<other>\d+), w przebudowie (?P<trans>\d+), uprawy na sniegu \(inne niz typ okregu\) (?P<snow>\d+) "
                      r"\| zmiany: nacisk (?P<press>\d+), zaczete (?P<started>\d+), skonczone (?P<done>\d+),"
-                     r".*?\| krok zajec \(doba\): wsi z planem (?P<plans>\d+), wsi z pamiecia (?P<mems>\d+), listy BK z dopiskiem (?P<lists>\d+), wywolan towaru typu (?P<steps>\d+), dopiskow (?P<adds>\d+) \(bez pamieci M (?P<nomem>\d+)\)"
+                     r".*?\| krok zajec \(doba\): wsi z planem (?P<plans>\d+) \(przeliczone dzis (?P<redone>\d+), co 7 dob na zmiane\), wsi z pamiecia (?P<mems>\d+), listy BK z dopiskiem (?P<lists>\d+), wywolan towaru typu (?P<steps>\d+), dopiskow (?P<adds>\d+) \(bez pamieci M (?P<nomem>\d+)\)"
                      r".*?\| kontrola pieniedzy: kiesy wsi -(?P<mv>\d+) / kasy miast \+(?P<mt>\d+) \(roznica (?P<mdiff>-?\d+)\)"
                      r".*?\| koszt (?P<ms>[\d.]+) ms \| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<stall>\d+)\)\.$")
 NZW_ICON = re.compile(r"Zajecia wiosek \(ZW\): ikony dzien (?P<day>-?\d+) \| okregow (?P<d>\d+) \(pod KS (?P<ks>\d+)\), ikona inna niz typ wsi: (?P<diff>\d+) okregow"

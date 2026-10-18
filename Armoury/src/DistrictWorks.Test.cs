@@ -115,7 +115,7 @@ namespace Armoury
                 string keep = Export();
                 lock (Gate) { ImportNow(SaveVer + "||d:"); }
                 int zero = _rows.Count;
-                lock (Gate) { if (string.IsNullOrEmpty(keep)) { _rows.Clear(); _handed.Clear(); _relDay.Clear(); } else ImportNow(keep); }
+                lock (Gate) { if (string.IsNullOrEmpty(keep)) { _rows.Clear(); _handed.Clear(); _handedDays.Clear(); _relDay.Clear(); } else ImportNow(keep); }
                 add("T0 zapis bez prac", zero == 0, "wierszy " + zero);
                 // 1: zakupy 30 000 w 4 czesci i 8 000 w inna - co do monety
                 var cand = new List<KeyValuePair<Village, List<Quote>>>();
