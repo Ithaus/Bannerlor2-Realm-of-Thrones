@@ -33,7 +33,7 @@ namespace Armoury
         private sealed class Info { public int Day = -1; public int Craft = -1; public ItemObject Item; public string IconId; public string Mix = ""; public string Counts = ""; }
         private static readonly Dictionary<string, Info> _info = new Dictionary<string, Info>(StringComparer.Ordinal);
         private static readonly List<WeakReference> _vms = new List<WeakReference>();
-        private static int _lastDay = -1, _diff, _changed, _updated, _st, _stAll, _districts, _ks;
+        private static int _lastDay = -1, _diff, _changed, _updated, _st, _stAll, _districts, _ks, _snowKs;
         private static double _ms;
         private static bool _wired; private static string _wiredText = "nie wpiete";
         private static Type _tVm; private static FieldInfo _fSettlement; private static PropertyInfo _pEvents; private static FieldInfo _fEventType; private static PropertyInfo _pParam;
@@ -104,7 +104,7 @@ namespace Armoury
             if (_lastDay >= 0 && today - _lastDay < 28) return;
             _lastDay = today;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            _diff = _changed = _districts = _ks = 0;
+            _diff = _changed = _districts = _ks = _snowKs = 0;
             var s = Settings.Current;
             float margin = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictIconMargin)) : 0.10f;
             var parts = new List<VillageCrafts.PartCraft>();
@@ -116,6 +116,7 @@ namespace Armoury
                     bool ks;
                     if (!VillageCrafts.PartsOf(v, parts, out ks)) continue;
                     _districts++; if (ks) _ks++;
+                    if (ks) foreach (var p in parts) if (!p.Main && p.Craft != VillageCrafts.CraftOfType(v.VillageType) && VillageCrafts.SnowCrop(p.Uid, p.Craft)) _snowKs++;
                     Info old; _info.TryGetValue(v.Settlement.StringId, out old);
                     var ni = Compute(v, parts, old, margin, today);
                     _info[v.Settlement.StringId] = ni;
@@ -128,7 +129,7 @@ namespace Armoury
             _updated += UpdateVms();
             _ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             Log.Info(VillageCrafts.P + "ikony dzien " + today + " | okregow " + _districts + " (pod KS " + _ks + "), ikona inna niz typ wsi: " + _diff + " okregow (projekt: ok. 81 z 558, prog 40-130), zmienione od poprzedniego rachunku "
-                     + _changed + ", tabliczki poprawione w sesji " + _updated + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv) + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
+                     + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv) + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
             _st = 0;
         }
 

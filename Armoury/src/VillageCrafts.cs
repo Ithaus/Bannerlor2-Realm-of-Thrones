@@ -624,7 +624,7 @@ namespace Armoury
             bool step = _onDay >= 0 && today > _onDay && (today - _onDay) % StepDays == 0;
             var plans = new Dictionary<Village, Plan>();
             var parts = new List<VillageBook.PartView>();
-            int fall = 0, ks = 0, other = 0, inTrans = 0;
+            int fall = 0, ks = 0, other = 0, inTrans = 0, snow = 0;
             var countBy = new int[KsTab.NC];
             foreach (var di in _dist.Values)
             {
@@ -640,13 +640,19 @@ namespace Armoury
                     if (step && mt != null) Rule(di, mt, today, busy);
                     var pl = BuildPlan(di, parts);
                     if (pl != null) plans[di.V] = pl;
-                    foreach (var s in di.Sides) { if (s.Craft >= 0 && s.Craft < KsTab.NC) countBy[s.Craft]++; if (s.Craft != di.TypeCraft) other++; if (s.Target >= 0) inTrans++; }
+                    foreach (var s in di.Sides)
+                    {
+                        if (s.Craft >= 0 && s.Craft < KsTab.NC) countBy[s.Craft]++;
+                        if (s.Craft != di.TypeCraft) other++;
+                        if (s.Target >= 0) inTrans++;
+                        if (s.Row != null && s.Row.O != null && s.Row.O.Terr == "snieg" && (Crop(s.Craft) && s.Craft != di.TypeCraft || Crop(s.Target))) snow++;
+                    }
                 }
                 catch (Exception e) { Stumble("Daily(okreg)", e); }
             }
             _plans = plans;
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-            if (LogGate.Lines) Line(today - 1, fall, ks, other, inTrans, countBy, plans.Count, ms);
+            if (LogGate.Lines) Line(today - 1, fall, ks, other, inTrans, countBy, plans.Count, ms, snow);
         }
 
         /// <summary>Neutralny start (A6): n(T) = rece swiata typu T przed (wszystkie wioski = typ okregu) / po (zajecia startowe); rece = ludzie w domu okregu x udzial
@@ -728,7 +734,7 @@ namespace Armoury
                 if (busy) { _dBusy++; continue; }
                 double h; home.TryGetValue(s.Uid, out h);
                 double hands = h * 0.5;                                       // rece wioski: polowa ludzi w domu pracuje w polu (jak udzial pracy chlopow KS)
-                double rh = RegionHands(di.Region), moved;
+                double rh = RegionHands(di.Region, today), moved;
                 _regionMoved.TryGetValue(di.Region ?? "-", out moved);
                 float share = s0 != null ? Math.Max(0f, Math.Min(1f, s0.SideVillageCraftRegionShare)) : 0.05f;
                 if (moved + hands > share * rh) { _dBudget++; continue; }
@@ -744,17 +750,33 @@ namespace Armoury
             }
         }
 
-        private static double RegionHands(string region)
+        private static Dictionary<string, double> _rh; private static int _rhDay = -1;
+
+        /// <summary>Rece wiosek pobocznych regionu (warownia i jej wsie): polowa ludzi w domu - raz na dobe dla wszystkich regionow (pamiec doby).</summary>
+        private static double RegionHands(string region, int today)
         {
-            double h = 0;
-            var parts = new List<VillageBook.PartView>();
-            foreach (var di in _dist.Values)
+            if (_rh == null || _rhDay != today)
             {
-                if (di.Region != region || di.V == null) continue;
-                if (!VillageBook.PartsOf(di.V, parts)) continue;
-                foreach (var p in parts) if (!p.Main) h += p.Home * 0.5;
+                var m = new Dictionary<string, double>(StringComparer.Ordinal);
+                var parts = new List<VillageBook.PartView>();
+                foreach (var di in _dist.Values)
+                {
+                    if (di.V == null || !VillageBook.PartsOf(di.V, parts)) continue;
+                    double h = 0; foreach (var p in parts) if (!p.Main) h += p.Home * 0.5;
+                    double cur; m.TryGetValue(di.Region ?? "-", out cur); m[di.Region ?? "-"] = cur + h;
+                }
+                _rh = m; _rhDay = today;
             }
-            return h;
+            double r; return _rh.TryGetValue(region ?? "-", out r) ? r : 0.0;
+        }
+
+        private static bool Crop(int c) { return c == KsTab.CWheat || c == KsTab.CFlax || c == KsTab.CSilk || c == KsTab.CVine || c == KsTab.COlive || c == KsTab.CDate || c == KsTab.CCitrus; }
+
+        /// <summary>Uprawa na sniegu (teren "snieg" ziemi wioski) - kontrola projektu (0 upraw na sniegu). false - bez wiersza ziemi.</summary>
+        internal static bool SnowCrop(string uid, int craft)
+        {
+            if (uid == null || !Crop(craft)) return false;
+            lock (Gate) { Side s; return _side.TryGetValue(uid, out s) && s.Row != null && s.Row.O != null && s.Row.O.Terr == "snieg"; }
         }
 
         /// <summary>Doba przebudowy: zaplata czesci kosztu (kiesa wsi gry -> kasa miasta targowego, najwyzej 1/4 kiesy), postep proporcjonalny do zaplaty; koniec - nowe
@@ -813,7 +835,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Notify", e); }
         }
 
-        private static void Line(int day, int fall, int ks, int other, int inTrans, int[] countBy, int plans, double ms)
+        private static void Line(int day, int fall, int ks, int other, int inTrans, int[] countBy, int plans, double ms, int snow)
         {
             var sb = new StringBuilder(1600);
             var s = Settings.Current;
@@ -835,7 +857,7 @@ namespace Armoury
             bool f = true;
             for (int c = 0; c < KsTab.NC; c++) { if (countBy[c] == 0) continue; sb.Append(f ? " " : ", ").Append(KsTab.Crafts[c]).Append(' ').Append(countBy[c]); f = false; }
             if (f) sb.Append(" -");
-            sb.Append(" | inne niz typ okregu ").Append(other).Append(", w przebudowie ").Append(inTrans)
+            sb.Append(" | inne niz typ okregu ").Append(other).Append(", w przebudowie ").Append(inTrans).Append(", uprawy na sniegu (inne niz typ okregu) ").Append(snow)
               .Append(" | zmiany: nacisk ").Append(_dPress).Append(", zaczete ").Append(_dStarted).Append(", skonczone ").Append(_dDone).Append(", wstrzymane (inna wioska okregu) ").Append(_dBusy)
               .Append(", (udzial regionu) ").Append(_dBudget).Append(", zamrozone pracami ").Append(_dLocked).Append(", doby bez pelnej zaplaty ").Append(_dStall).Append(", porzucone ").Append(_dCancel)
               .Append(", zaplacone ").Append(_dPaid).Append(" zl").Append(_notes.Count > 0 ? " (" + string.Join("; ", _notes.ToArray()) + ")" : "")

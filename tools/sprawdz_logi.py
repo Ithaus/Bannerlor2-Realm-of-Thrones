@@ -1159,6 +1159,19 @@ Uzycie (Python 3, tylko odczyt):
                     zwalniania sr. <= 2 ms, NHB-10 herbow gry razem <= 1000, NHB-11 potkniecia
                     i ERROR MapVillagesView.PennantTex* 0, NHB-12 nieprzyjete zamowienia 0, NHB-13 liczniki (INFO). Log sprzed paczki: INFO (stara linia - herb pana zamiast
                     gospodarza jako INFO), bez wyjatku.
+--grupa nzw       : (noc 17/18.10, paczka inwest - zajecia wiosek pobocznych, ikona okregu, etap 0 W2; Armoury/src/VillageCrafts.cs, DistrictIcon.cs, HamletKinds.cs;
+                    projekt docs/PROJEKT-INWESTYCJE-OKREGU-2026-10-16.md czesc A i TESTS 2) python -I tools/sprawdz_logi.py --grupa nzw <Armoury-*.log> (strumieniowo).
+                    NZW-0 linia startu (klucz Side Village Crafts), NZW-1 neutralny start: swiat kazdego typu w 1% (linia "start neutralny (A6)"), NZW-2 0 upraw na sniegu
+                    (wioski bez KS i pod KS), NZW-3 ikona inna niz typ wsi w 40-130 okregach (projekt ok. 81 z 558), NZW-4 linie rozpoznane, NZW-5 przebudowa: kiesy wsi -
+                    kasy miast = 0, NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 dopiski bez pamieci M (INFO), NZW-8 koszt (doba <= 5 ms, ikony <= 300 ms),
+                    NZW-9 potkniecia i ERROR 0, NZW-10 etap 0 (proba W2: krok wolany, a - b = 0; przy zajeciach W2 milknie - INFO), NZW-11 tabliczka i dymek wpiete.
+                    Log bez paczki: INFO, bez wyjatku.
+--grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
+                    python -I tools/sprawdz_logi.py --grupa npo <Armoury-*.log> (strumieniowo). NPO-0 linia startu (klucz TAK, AI WYLACZONE, menu wpiete, opcje BEE 5/15/30
+                    tys. ukryte, krok 112 wpiety), NPO-1 linie doby rozpoznane, NPO-2 wplacone = place + material (0), NPO-3 wyplacone = licznik pana + kiesa wsi, naruszenia 0,
+                    NPO-4 wyplata <= pula <= pol utargu, NPO-5 wyplacone vs oczekiwane w 15% (>= 28 dob z wyplatami; krocej INFO), NPO-6 proba autotestu (plik
+                    Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-po-test.flag, T0-T7: zakupy co do monety, ogien, odbudowa, termin, wojna, zapis, uklad) NIE 0,
+                    NPO-7 koszt <= 5 ms, NPO-8 potkniecia i ERROR 0, NPO-9 ogien i stada (INFO). Bez prac i bez proby - INFO. Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -39330,6 +39343,281 @@ def nherby_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nzw / npo (noc 17/18.10, paczka inwest: zajecia wiosek pobocznych + prace okregu; Armoury/src/VillageCrafts.cs,
+# DistrictIcon.cs, DistrictWorks*.cs, StartCalibration.Inwest.cs, HamletKinds.cs - etap 0)
+NZW_HEAD = "Zajecia wiosek (ZW): "
+NZW_START = re.compile(r"Zajecia wiosek \(ZW\): start \| wiosek pobocznych (?P<n>\d+) w (?P<d>\d+) okregach \(bez wiersza ziemi KS (?P<norow>\d+), zajecie startowe poprawione na typ okregu (?P<fix>\d+)\)")
+NZW_NEUTRAL = re.compile(r"Zajecia wiosek \(ZW\): start neutralny \(A6\) doba (?P<day>-?\d+) \| okregow (?P<d>\d+) \|.*najwieksza odchylka (?P<dev>[\d.]+)% \(prog 1%\)\.")
+NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|NIECZYNNE[^|]*) \| okregow z wioskami (?P<d>\d+) \(bez KS (?P<fall>\d+), pod KS (?P<ks>\d+)[^)]*\), wiosek (?P<sides>\d+) "
+                     r".*?\| inne niz typ okregu (?P<other>\d+), w przebudowie (?P<trans>\d+), uprawy na sniegu \(inne niz typ okregu\) (?P<snow>\d+) "
+                     r"\| zmiany: nacisk (?P<press>\d+), zaczete (?P<started>\d+), skonczone (?P<done>\d+),"
+                     r".*?\| krok zajec \(doba\): wsi z planem (?P<plans>\d+), wsi z pamiecia (?P<mems>\d+), listy BK z dopiskiem (?P<lists>\d+), wywolan towaru typu (?P<steps>\d+), dopiskow (?P<adds>\d+) \(bez pamieci M (?P<nomem>\d+)\)"
+                     r".*?\| kontrola pieniedzy: kiesy wsi -(?P<mv>\d+) / kasy miast \+(?P<mt>\d+) \(roznica (?P<mdiff>-?\d+)\)"
+                     r".*?\| koszt (?P<ms>[\d.]+) ms \| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<stall>\d+)\)\.$")
+NZW_ICON = re.compile(r"Zajecia wiosek \(ZW\): ikony dzien (?P<day>-?\d+) \| okregow (?P<d>\d+) \(pod KS (?P<ks>\d+)\), ikona inna niz typ wsi: (?P<diff>\d+) okregow"
+                      r".*?zmienione od poprzedniego rachunku (?P<chg>\d+), tabliczki poprawione w sesji (?P<upd>\d+) \| uprawy na sniegu pod KS \(wioski\) (?P<snow>\d+)"
+                      r".*?\| koszt (?P<ms>[\d.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<stall>\d+)\)\.$")
+NZW_WIRED = re.compile(r"Zajecia wiosek \(ZW\): ikona okregu - wpiete: (?P<w>.*) \(VillageType\.PrimaryProduction bez latki\)\.")
+NZW_W2 = re.compile(r"Wioski wedlug rodzaju \(210\): dzien (?P<day>-?\d+) \| (?P<state>[^|]*) \| okregow z rybakami (?P<n>\d+) .*?zboza -(?P<a>[\d.]+), ryb \+(?P<b>[\d.]+), kontrola a - b = (?P<ab>-?[\d.]+)")
+NZW_W2P = re.compile(r"proba W2 \(inwest etap 0\): wywolania kroku zboza (?P<g>\d+), ryb (?P<f>\d+), wsi bez u (?P<nu>\d+), przy kroku nieczynnym (?P<off>\d+), ciche wyjatki modelu \(MaterialLaw\) (?P<silent>\d+)")
+NZW_ERR = ("ERROR in VillageCrafts.", "ERROR in DistrictIcon.", "ERROR in SyncData.arm_crafts", "ERROR in StartCalibration.WorksKs", "ERROR in StartCalibration.KsPartsOf", "ERROR in StartCalibration.SideRows")
+NZW_ICON_LO, NZW_ICON_HI = 40, 130      # projekt TESTS 2: ikona inna niz typ w 40-130 okregach (oczekiwane 81 z 558)
+NZW_DEV_MAX = 1.0                       # projekt TESTS 2: w dobie wlaczenia swiat kazdego typu w 1%
+NZW_MS_MAX = 5.0                        # koszt doby zajec (ms, mediana)
+NZW_ICON_MS_MAX = 300.0                 # koszt rachunku ikon (co 28 dob)
+NZW_PACE = 0.01                         # zmiany zajec bez KS: najwyzej 1% wiosek na 7 dob (hamulec Jeffa: 60 dob + 1 wioska okregu + 5% regionu na sezon)
+
+
+def nzw_main(logp):
+    """nzw (noc 17/18.10, paczka inwest - zajecia wiosek pobocznych, ikona okregu, etap 0 W2). Wejscie: log Armoury (strumieniowo).
+    NZW-0 linia startu (klucz Side Village Crafts; WYLACZONE - INFO), NZW-1 neutralny start: swiat kazdego typu po x n / przed w 1% (projekt TESTS 2), NZW-2 0 upraw na sniegu
+    (wioski bez KS i pod KS), NZW-3 ikona inna niz typ wsi w 40-130 okregach (projekt: ok. 81 z 558), NZW-4 linie doby rozpoznane, NZW-5 kontrola pieniedzy przebudowy
+    (kiesy wsi - kasy miast = 0), NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 krok zajec: dopiski bez pamieci M <= 5% (INFO), NZW-8 koszt (doba <= 5 ms mediana,
+    ikony <= 300 ms), NZW-9 potkniecia i ERROR paczki 0, NZW-10 etap 0 (proba W2): przy zajeciach W2 milknie (INFO), bez zajec - krok W2 wolany i a - b = 0,
+    NZW-11 tabliczka ikony wpieta (INFO bez linii). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NZW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, offs, neutral, days, bad, icons, bad_icons, wired, w2, w2p = [], [], [], [], [], [], [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NZW_HEAD):
+                if s.startswith(NZW_HEAD + "start neutralny"):
+                    mm = NZW_NEUTRAL.match(s)
+                    if mm:
+                        neutral.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+                elif s.startswith(NZW_HEAD + "start |"):
+                    mm = NZW_START.match(s)
+                    if mm:
+                        starts.append(mm.groupdict())
+                    elif "WYLACZONE" in s:
+                        offs.append(s)
+                    else:
+                        bad.append(s)
+                elif s.startswith(NZW_HEAD + "dzien "):
+                    mm = NZW_DAY.match(s)
+                    (days.append(mm.groupdict()) if mm else bad.append(s))
+                elif s.startswith(NZW_HEAD + "ikony dzien"):
+                    mm = NZW_ICON.match(s)
+                    (icons.append(mm.groupdict()) if mm else bad_icons.append(s))
+                elif s.startswith(NZW_HEAD + "ikona okregu"):
+                    mm = NZW_WIRED.match(s)
+                    if mm:
+                        wired.append(mm.group("w"))
+            elif s.startswith("Wioski wedlug rodzaju (210): dzien"):
+                mm = NZW_W2.match(s)
+                if mm:
+                    g = mm.groupdict()
+                    pm = NZW_W2P.search(s)
+                    g["probe"] = pm.groupdict() if pm else None
+                    w2.append(g)
+            elif s.startswith(NZW_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)} (wylaczone {len(offs)}), neutralny start {len(neutral)}, doby {len(days)} (nierozpoznanych {len(bad)}), ikony {len(icons)} "
+          f"(nierozpoznanych {len(bad_icons)}), W2 {len(w2)}")
+    if not starts and not offs and not days and not icons and not neutral and not bad and not bad_icons and n_err == 0:
+        rep.add("NZW-0: linie 'Zajecia wiosek (ZW)'", "brak w logu", "INFO (log sprzed paczki inwest)", None)
+        # etap 0 i tak: linia W2 z proba albo bez
+        if w2:
+            last = w2[-1]
+            rep.add("NZW-10: W2 (210) - stan (log sprzed paczki)", f"okregow z rybakami {last['n']}, zboza -{last['a']}, ryb +{last['b']}; {last['state'][:60]}",
+                    "INFO (proba etapu 0 dopiero z paczka)", None)
+        rep.show()
+        return 0
+    # NZW-0
+    if starts:
+        s0 = starts[-1]
+        rep.add("NZW-0: linia startu sesji", f"wiosek {s0['n']} w {s0['d']} okregach, bez wiersza ziemi KS {s0['norow']}, start poprawiony {s0['fix']}",
+                "wiosek > 0 (bez wiersza ziemi - INFO: brak arm_ks_land.tsv = brak zajec, jak dzis)", int(s0["n"]) > 0)
+    elif offs:
+        rep.add("NZW-0: linia startu sesji", offs[-1][len(NZW_HEAD):][:160], "INFO (klucz Side Village Crafts wylaczony)", None)
+    else:
+        rep.add("NZW-0: linia startu sesji", "brak (sa inne linie ZW)", "linia przy kazdym starcie sesji", False)
+    # NZW-1
+    if neutral:
+        dev = max(float(g["dev"]) for g in neutral)
+        rep.add("NZW-1: neutralny start (swiat typu po x n / przed)", f"najwieksza odchylka {dev:.3f}% ({len(neutral)} linii, okregow {neutral[-1]['d']})", f"<= {NZW_DEV_MAX:.0f}%", dev <= NZW_DEV_MAX)
+    else:
+        rep.add("NZW-1: neutralny start", "brak linii", "INFO (n z zapisu - wlaczone w innej sesji - albo klucz wylaczony)", None)
+    # NZW-2
+    snow_d = max([int(g["snow"]) for g in days] + [0])
+    snow_k = max([int(g["snow"]) for g in icons] + [0])
+    if days or icons:
+        rep.add("NZW-2: uprawy na sniegu (zboze, len, bawelna, winnice, gaje, daktyle, cytrusy)", f"wioski bez KS najwiecej {snow_d}, pod KS (rachunek ikon) najwiecej {snow_k}", "0 / 0", snow_d == 0 and snow_k == 0)
+    # NZW-3
+    if icons:
+        diff = int(icons[-1]["diff"])
+        ok3 = NZW_ICON_LO <= diff <= NZW_ICON_HI
+        rep.add("NZW-3: ikona okregu inna niz typ wsi gry", f"{diff} okregow z {icons[-1]['d']} (pod KS {icons[-1]['ks']}), zmienione {icons[-1]['chg']}, tabliczki poprawione {icons[-1]['upd']}",
+                f"{NZW_ICON_LO}-{NZW_ICON_HI} (projekt ok. 81 z 558)", ok3)
+    else:
+        rep.add("NZW-3: ikona okregu", "brak linii 'ikony dzien'", "INFO (klucz District Icon From Sum wylaczony albo sesja bez doby)", None)
+    # NZW-4
+    rep.add("NZW-4: linie doby rozpoznane", f"doby {len(days)} (nierozpoznane {len(bad)}), ikony {len(icons)} (nierozpoznane {len(bad_icons)})"
+            + (f" (np. {(bad or bad_icons)[0][:160]})" if bad or bad_icons else ""), "nierozpoznane 0", not bad and not bad_icons)
+    # NZW-5
+    if days:
+        md = [g for g in days if int(g["mdiff"]) != 0]
+        paid = sum(int(g["mv"]) for g in days)
+        rep.add("NZW-5: przebudowa - kiesy wsi -> kasy miast (kontrola pieniedzy)", f"zaplacone {paid}, doby z roznica {len(md)}", "roznica 0 w kazdej dobie", not md)
+    # NZW-6
+    if days:
+        sides = max(int(g["sides"]) for g in days)
+        started = sum(int(g["started"]) for g in days)
+        weeks = max(1.0, len(days) / 7.0)
+        rate = started / weeks / max(1, sides)
+        rep.add("NZW-6: tempo zmian zajec bez KS (hamulec Jeffa)", f"zaczete {started} w {len(days)} dobach, wiosek {sides}: {100 * rate:.3f}% na 7 dob; skonczone {sum(int(g['done']) for g in days)}",
+                f"<= {100 * NZW_PACE:.0f}% wiosek na 7 dob", rate <= NZW_PACE)
+    # NZW-7
+    if days:
+        adds = sum(int(g["adds"]) for g in days)
+        nomem = sum(int(g["nomem"]) for g in days)
+        share = nomem / max(1, adds + nomem)
+        rep.add("NZW-7: krok zajec - dopiski bez pamieci M (okno BK przed tickiem)", f"dopiskow {adds}, bez pamieci {nomem} ({100 * share:.1f}%), wsi z planem najwiecej {max(int(g['plans']) for g in days)}",
+                "INFO (<= 5% oczekiwane)", None)
+    # NZW-8
+    if days or icons:
+        msd = st.median([float(g["ms"]) for g in days]) if days else 0.0
+        msi = max([float(g["ms"]) for g in icons] + [0.0])
+        rep.add("NZW-8: koszt (doba zajec mediana; rachunek ikon najgorszy)", f"{msd:.2f} ms / {msi:.1f} ms", f"<= {NZW_MS_MAX:.0f} ms / <= {NZW_ICON_MS_MAX:.0f} ms", msd <= NZW_MS_MAX and msi <= NZW_ICON_MS_MAX)
+    # NZW-9
+    stum = sum(int(g["st"]) for g in days) + sum(int(g["st"]) for g in icons)
+    rep.add("NZW-9: potkniecia i ERROR paczki", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+    # NZW-10 etap 0
+    if w2:
+        last = w2[-1]
+        pr = last.get("probe")
+        if "WYLACZONE - zajecia" in last["state"]:
+            rep.add("NZW-10: etap 0 - W2 (210)", f"W2 milknie przy zajeciach wiosek; okregow z rybakami {last['n']}", "INFO (zajecia zastepuja W2)", None)
+        elif pr:
+            g = sum(int(x["probe"]["g"]) for x in w2 if x.get("probe"))
+            n = max(int(x["n"]) for x in w2)
+            ab = max(abs(float(x["ab"])) for x in w2)
+            sil = sum(int(x["probe"]["silent"]) for x in w2 if x.get("probe"))
+            rep.add("NZW-10: etap 0 - W2 (210) krok wolany, liczy i zamyka", f"wywolania kroku zboza {g}, okregow z rybakami najwiecej {n}, |a - b| najwiecej {ab:.1f}, ciche wyjatki modelu {sil}",
+                    "wywolania > 0, okregow > 0, a - b = 0 (wywolania 0 = krok nie wolany - przyczyna w lancuchu modelu)", g > 0 and n > 0 and ab < 0.05)
+        else:
+            rep.add("NZW-10: etap 0 - W2 (210)", f"okregow z rybakami {last['n']} (linia bez proby)", "INFO (DLL sprzed paczki)", None)
+    # NZW-11
+    if wired:
+        w = wired[-1]
+        rep.add("NZW-11: ikona - tabliczka i dymek wpiete", w[:200], "tabliczka (AddPrimaryProductionIcon) i dymek", "tabliczka (AddPrimaryProductionIcon)" in w and "dymek" in w)
+    rep.show()
+    return 0
+
+
+NPO_HEAD = "Prace okregu (PO): "
+NPO_START = re.compile(r"Prace okregu \(PO\): start \| klucz District Works (?P<key>TAK|WYLACZONY)[^,]*, AI (?P<ai>TAK|WYLACZONE) \| menu (?P<menu>[^|]*) \| BEE: (?P<bee>[^|]*) "
+                       r"\| krok 112 \(wyplata przy wozie\) (?P<cart>wpiety|NIECZYNNY) \| z zapisu: (?P<load>[^|]*)\|")
+NPO_DAY = re.compile(r"Prace okregu \(PO\): dzien (?P<day>-?\d+) \| prac (?P<rows>\d+), jednostek (?P<units>[\d.]+), kapital (?P<cap>-?\d+) zl "
+                     r"\| nowe: gracz (?P<newp>\d+), AI (?P<newa>\d+), wplacone (?P<inn>\d+) = place (?P<wage>-?\d+) \+ material polka (?P<mt>\d+) \+ material magazyn wsi (?P<mv>\d+) \(szt\. (?P<pcs>\d+); roznica (?P<indiff>-?\d+)\) "
+                     r"\| wyplaty: powrotow (?P<pays>\d+), utarg (?P<handed>\d+), pula (?P<pool>\d+), wyplacone (?P<out>\d+) = z licznika pana (?P<tax>\d+) \+ z kiesy wsi (?P<vil>\d+) "
+                     r"\(oczekiwane (?P<exp>\d+), wstrzymane wojna (?P<war>\d+), powroty bez wyceny (?P<nocart>\d+)\) "
+                     r"\| ogien: uderzen (?P<burn>\d+), stracone (?P<lostu>[\d.]+) jedn\. \((?P<lostg>\d+) zl\), bezczynne (?P<idle>[\d.]+), stada do napastnikow (?P<herd>\d+) \(szt\. (?P<herdp>\d+)\)"
+                     r".*?\| kontrole: wplacone - place - material (?P<cdiff>-?\d+), wyplacone - licznik - kiesa 0, naruszenia \([^)]*\) (?P<viol>\d+)"
+                     r".*?\| koszt (?P<ms>[\d.]+) ms \| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<stall>\d+)\)\.$")
+NPO_TEST = re.compile(r"Prace okregu \(PO\): test \(autotest, plik armoury-po-test\.flag zuzyty\) \| wynik TAK (?P<p>\d+), NIE (?P<f>\d+), INFO (?P<i>\d+)(?P<rest>.*)$")
+NPO_ERR = ("ERROR in DistrictWorks.", "ERROR in SyncData.arm_works", "ERROR in VillageTakings.WorksPay", "ERROR in DistrictWorksAi.", "ERROR in Devastation.Strike(inwest)")
+NPO_PAY_TOL = 0.15     # projekt TESTS 3: wyplacone vs oczekiwane w 15% na 28 dob
+NPO_MS_MAX = 5.0
+
+
+def npo_main(logp):
+    """npo (noc 17/18.10, paczka inwest - prace okregu gracza; AI wylaczone). Wejscie: log Armoury (strumieniowo). NPO-0 linia startu (klucz, AI WYLACZONE - decyzja Jeffa 16.10,
+    menu wpiete, BEE: opcje 5/15/30 tys. ukryte, krok 112 wpiety), NPO-1 linie doby rozpoznane, NPO-2 wplacone = place + material (roznica 0, kazda doba), NPO-3 wyplacone =
+    licznik pana + kiesa wsi i naruszenia 0 (wyplata <= pula <= pol utargu, zakup = cena), NPO-4 pula <= pol utargu (suma linii), NPO-5 wyplacone vs oczekiwane w 15% (okno
+    >= 28 dob z wyplatami; krocej - INFO), NPO-6 proba autotestu (plik armoury-po-test.flag): NIE 0, NPO-7 koszt doby <= 5 ms, NPO-8 potkniecia i ERROR paczki 0,
+    NPO-9 ogien i odbudowa (INFO). Autotest bez gracza w menu i bez pliku proby - linie doby tylko co 7 dob przy pracach; bez prac - INFO. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NPO-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, bad_start, days, bad, tests = [], [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NPO_HEAD):
+                if s.startswith(NPO_HEAD + "start |"):
+                    mm = NPO_START.match(s)
+                    (starts.append(mm.groupdict()) if mm else bad_start.append(s))
+                elif s.startswith(NPO_HEAD + "dzien "):
+                    mm = NPO_DAY.match(s)
+                    (days.append(mm.groupdict()) if mm else bad.append(s))
+                elif s.startswith(NPO_HEAD + "test "):
+                    mm = NPO_TEST.match(s)
+                    if mm:
+                        tests.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+            elif s.startswith(NPO_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)} (nierozpoznanych {len(bad_start)}), doby {len(days)} (nierozpoznanych {len(bad)}), proby {len(tests)}")
+    if not starts and not bad_start and not days and not bad and not tests and n_err == 0:
+        rep.add("NPO-0: linie 'Prace okregu (PO)'", "brak w logu", "INFO (log sprzed paczki inwest)", None)
+        rep.show()
+        return 0
+    # NPO-0
+    if starts:
+        s0 = starts[-1]
+        bee_ok = "ukryte" in s0["bee"] or "BEE nieobecny" in s0["bee"]
+        menu_ok = "village index" in s0["menu"] and "index -1" not in s0["menu"]
+        rep.add("NPO-0: linia startu (klucz, AI, menu, BEE, krok 112)", f"klucz {s0['key']}, AI {s0['ai']}, menu: {s0['menu'].strip()[:80]}, BEE: {s0['bee'].strip()[:80]}, krok 112 {s0['cart']}",
+                "klucz TAK, AI WYLACZONE (Jeff 16.10), menu wpiete, BEE 5/15/30 ukryte, krok 112 wpiety", s0["key"] == "TAK" and s0["ai"] == "WYLACZONE" and menu_ok and bee_ok and s0["cart"] == "wpiety")
+        rep.add("NPO-0b: prace z zapisu", s0["load"].strip()[:160], "INFO", None)
+    else:
+        rep.add("NPO-0: linia startu", "brak" + (f" (nierozpoznana: {bad_start[0][:160]})" if bad_start else ""), "linia przy pierwszej dobie sesji", False)
+    # NPO-1
+    rep.add("NPO-1: linie doby rozpoznane", f"doby {len(days)} (nierozpoznane {len(bad)})" + (f" (np. {bad[0][:160]})" if bad else ""), "nierozpoznane 0", not bad)
+    if days:
+        # NPO-2
+        d2 = [g for g in days if int(g["indiff"]) != 0 or int(g["cdiff"]) != 0 or int(g["inn"]) != int(g["wage"]) + int(g["mt"]) + int(g["mv"])]
+        rep.add("NPO-2: wplacone = place + material polka + material magazyn wsi", f"wplacone {sum(int(g['inn']) for g in days)}, doby niezgodne {len(d2)}", "0", not d2)
+        # NPO-3
+        d3 = [g for g in days if int(g["out"]) != int(g["tax"]) + int(g["vil"]) or int(g["viol"]) != 0]
+        rep.add("NPO-3: wyplacone = licznik pana + kiesa wsi; naruszenia", f"wyplacone {sum(int(g['out']) for g in days)}, doby z niezgodnoscia/naruszeniem {len(d3)}", "0", not d3)
+        # NPO-4
+        pool = sum(int(g["pool"]) for g in days); handed = sum(int(g["handed"]) for g in days); out = sum(int(g["out"]) for g in days)
+        if handed > 0:
+            rep.add("NPO-4: wyplata <= pula <= pol utargu (suma)", f"wyplacone {out}, pula {pool}, utarg {handed}", "wyplacone <= pula <= 0.5 x utarg", out <= pool + len(days) and pool <= 0.5 * handed + len(days))
+        else:
+            rep.add("NPO-4: wyplaty przy wozach", "brak wyplat", "INFO (bez prac albo bez powrotow wozow)", None)
+        # NPO-5
+        exp = sum(int(g["exp"]) for g in days)
+        span = (int(days[-1]["day"]) - int(days[0]["day"])) if len(days) > 1 else 0
+        if exp > 0 and out > 0 and span >= 28:
+            r = out / exp
+            rep.add("NPO-5: wyplacone wobec oczekiwanych (F10)", f"{out} / {exp} = {r:.2f} ({span} dob)", f"1 +- {NPO_PAY_TOL:.2f}", abs(r - 1.0) <= NPO_PAY_TOL)
+        else:
+            rep.add("NPO-5: wyplacone wobec oczekiwanych", f"wyplacone {out}, oczekiwane {exp}, okno {span} dob", "INFO (< 28 dob z wyplatami)", None)
+        # NPO-7
+        ms = max(float(g["ms"]) for g in days)
+        rep.add("NPO-7: koszt doby prac okregu (najgorsza)", f"{ms:.2f} ms", f"<= {NPO_MS_MAX:.0f} ms", ms <= NPO_MS_MAX)
+        # NPO-9
+        rep.add("NPO-9: ogien i stada (INFO)", f"uderzen {sum(int(g['burn']) for g in days)}, stracone {sum(float(g['lostu']) for g in days):.2f} jedn. ({sum(int(g['lostg']) for g in days)} zl), "
+                f"stada {sum(int(g['herd']) for g in days)} (szt. {sum(int(g['herdp']) for g in days)}), wojna wstrzymala {sum(int(g['war']) for g in days)}", "INFO", None)
+    # NPO-6
+    if tests:
+        t = tests[-1]
+        rep.add("NPO-6: proba autotestu (T0-T7)", f"TAK {t['p']}, NIE {t['f']}, INFO {t['i']}" + (f" | {t['rest'][:220]}" if t["f"] != "0" else ""), "NIE 0", t["f"] == "0")
+    else:
+        rep.add("NPO-6: proba autotestu", "brak linii", "INFO (bez pliku armoury-po-test.flag)", None)
+    # NPO-8
+    stum = sum(int(g["st"]) for g in days)
+    rep.add("NPO-8: potkniecia i ERROR paczki", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -39557,6 +39845,10 @@ def main(argv):
         return nuchodzcy_main(logp)   # nuchodzcy (noc 17/18.10, sw-uchodzcy): uchodzcy z najazdu w miescie - miejsca, przybyli = odeszli, powroty, kiesa, klasa biedoty, nikt dwa razy (RaidRefugees)
     if group == "nksarm" and logp:
         return nksarm_main(logp)   # nksarm (noc 17/18.10, paczka ks-arm): samo uzbrojenie KS, twarde bramki rozdz. 10, bramka krainy rozdz. 8, zrodla z niczego znane z nazwy (StartCalibration.Arm.cs)
+    if group == "nzw" and logp:
+        return nzw_main(logp)   # nzw (noc 17/18.10, inwest): zajecia wiosek pobocznych, neutralny start, uprawy na sniegu, ikona okregu, etap 0 W2 (VillageCrafts, DistrictIcon, HamletKinds)
+    if group == "npo" and logp:
+        return npo_main(logp)   # npo (noc 17/18.10, inwest): prace okregu gracza - pieniadze zakupu i wyplat, pula, oczekiwane, proba autotestu (DistrictWorks)
     if group == "nherby" and logp:
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
     if group != "etap2" or not logp:

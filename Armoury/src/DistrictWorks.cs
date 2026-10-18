@@ -183,6 +183,7 @@ namespace Armoury
         internal static bool Locks(Village v, string uid)
         {
             if (v == null || v.Settlement == null) return false;
+            if (_rows.Count == 0) return false;                          // szybka droga (regula A7 KS pyta o kazdy blok co dobe)
             string id = v.Settlement.StringId, part = PartKey(uid);
             lock (Gate) { foreach (var r in _rows) if (r.Dist == id && r.Part == part && r.Held() > 1e-6) return true; }
             return false;
@@ -275,6 +276,7 @@ namespace Armoury
                     else if (watch) { q.Allowed = false; q.Why = "The Night's Watch's gift villages make the same whatever is spent on them."; }
                     else if (q.State == VillageBook.SBurned || q.State == VillageBook.SBurning || q.State == VillageBook.SAbandoned) { q.Allowed = false; q.Why = "No new works until it stands again."; }
                     else if (!(q.KitPer > 0)) { q.Allowed = false; q.Why = "Nobody works here now."; }
+                    else if (held < 0 && (pc.Target >= 0 || (pc.Ks && pc.F > 0))) { q.Allowed = false; q.Why = "The village is changing its craft - wait until it is done."; }
                     into.Add(q);
                 }
                 return true;
@@ -783,6 +785,7 @@ namespace Armoury
                             if (c == null || c.IsEliminated) { r.Clan = VillageClan; _dNotes.Add("rod wymarl - prace " + r.Dist + "/" + r.Part + " przechodza na wies"); }
                         }
                     }
+                Remap(today);                                                // prace na wioskach spoza ukladu tej sesji - przy rownej wartosci
                 var dists = new HashSet<string>(StringComparer.Ordinal);
                 lock (Gate) foreach (var r in _rows) dists.Add(r.Dist);
                 foreach (var id in dists)
@@ -804,6 +807,7 @@ namespace Armoury
                 }
                 DistrictWorksAi.Daily(today);
                 if (today % 7 == 0 && today != _lastWeek) { _lastWeek = today; Week(today); }
+                if (TestWanted(today)) Test(today);                         // proba autotestu (plik armoury-po-test.flag, tylko DLL autotestu)
             }
             catch (Exception e) { Stumble("Daily", e); }
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
