@@ -518,6 +518,8 @@ Uzycie (Python 3, tylko odczyt):
                     wylaczonym gracz 0 / 0, W6b-4 liczby gracza (INFO). Autotest (gracz bez lenna): W6b-3 TAK, reszta INFO "warunki nie spelnione".
                     Uwaga: read_csv pomija wiersz gracza - od W6b sumy kolumn W5b-1 (doplata_ze_skarbca_w5b) i W6-1b (tarczowe_w6,
                     doplata_z_tarczowego_w6) doliczaja go (read_csv_player), inaczej gracz-platnik dawalby tam rozjazd rowny swojej kwocie.
+                    Okno 2-120 dob kampanii: na pozniejszej kampanii (zapis fin92 - doby kampanii 240-399) grupy w5 / w6 / w6b / w7 bez --do-doby 100000 nic nie
+                    sprawdzaja (W5-0 / W6b-0 mowia wtedy "poza oknem"); tozsamosc doplata_w5 rodow AI co dobe - --grupa nsrednim NSK-6b (bez okna).
 --grupa n7        : (N7, decyzja Jeffa 13.10 "proporcje pasuja") rozbici z pobitej druzyny lorda wracaja pod choragiew (55 / 30 / 15 z poprawkami),
                     zbiorka w twierdzy rodu, odbior przez druzyny rodu w zasiegu, rozejscie po czasie czekania.
                     python -I tools/sprawdz_logi.py --grupa n7 [--do-doby 120] <Armoury-*.log>
@@ -1601,7 +1603,8 @@ Uzycie (Python 3, tylko odczyt):
                     linii: w pokoju 0, ponad 2R 0; CSV: rod z doplata_srednim_w5c > 0 ma wojna 1, pasmo f6/f7 nie 2, mnoznik_w5c > 0); NSK-4 pomoc <= brak (kontrola linii:
                     ponad f x brak 0, gotowka przy zoldzie w pulapie wlasnym 0; CSV: gotowka W5c <= doplata_w5 i <= 1.05 x zold_partii + 50 (zold z ticku); f x (zold - pulap
                     wlasny tej doby) - INFO);
-                    NSK-5 skarbiec nie ponizej zapasu wojny i dlugow po W5c (kontrola linii 0); NSK-6 suma kolumny doplata_srednim_w5c (AI i gracz) = wyplacono; NSK-7
+                    NSK-5 skarbiec nie ponizej zapasu wojny i dlugow po W5c (kontrola linii 0); NSK-6 suma kolumny doplata_srednim_w5c (AI i gracz) = wyplacono; NSK-6b suma
+                    kolumny doplata_w5 (AI i gracz) = W5 + W5b + W6 + M1 + W5c z linii W5 i W6 co dobe, caly log bez okna (takze log sprzed W5c - bez W5c); NSK-7
                     srednie 28 dob (wyplacono wedlug pasm, podniesienie, budzet, chec, pula, zmiana skarbcow krolestw w wojnie i ich wojsko z linii "Skarbce:"; INFO),
                     NSK-7b z --baza-doby: zmiana skarbcow w wojnie i wojsko bieg / baza (INFO); NSK-7c skarbce krolestw w wojnie nie rosna (cel f15; TAK albo DECYZJA - nie
                     znika w INFO); NSK-8 ERROR KingdomTreasury.MidAid 0 i potkniecia 0; NSK-D skutek reguly na sucho z CSV i linii W5 (budzet = 1/30 nadwyzki - pula W5b
@@ -16822,7 +16825,10 @@ def w5_main(logp, start_arg, until=120, csvp=None):
             tot[d] = [int(x) for x in m.groups()]   # garnek, danina, rodow z potrzeba, ocenianych, potrzeba, przydzial, wyplacono, rodow, reszta
     # ---- W5-0 linia i klucz
     if not win:
-        rep.add("W5-0: linia Doplata wedlug potrzeby (W5)", "brak w logu", "jest od wgrania W5 (LogEnabled); bez niej wiersze paczki = INFO (bieg odniesienia)", None)
+        late = sorted(d for d in w5 if run_day(d, start) > until)   # recenzja scalenia f15: pozniejsza kampania - linie poza oknem, nie "brak"
+        rep.add("W5-0: linia Doplata wedlug potrzeby (W5)",
+                f"brak w oknie dob kampanii 2-{until}: linii poza oknem {len(late)} (doby kampanii {run_day(late[0], start)}-{run_day(late[-1], start)}) - uruchom z --do-doby 100000"
+                if late else "brak w logu", "jest od wgrania W5 (LogEnabled); bez niej wiersze paczki = INFO (bieg odniesienia)", None)
     else:
         offc = [d for d in on if "renty 180 (Crown Rents) tak" not in w5[d] or "budzet rodow 166 tak" not in w5[d] or "danina z oszczednosci P1 (Folk War Aid) tak" not in w5[d]]
         unread = [d for d in on if d not in tot]
@@ -16945,6 +16951,19 @@ def w5_main(logp, start_arg, until=120, csvp=None):
             w6paid[d6] = num(r"wyplacone przez W5 ponad danine (\d+)", s6) or 0
         for d6 in w5:   # W5b: gotowka W5 ze skarbca ponad zapas wojny (ta sama linia; log bez paczki - 0)
             w6paid[d6] = w6paid.get(d6, 0) + (num(r", wyplacono ze skarbca (\d+) \(rodow", w5[d6]) or 0)
+            # recenzja scalenia f15: M1 (RentAid) i W5c (MidAid) tez dopisuja gotowke do _naCash, a NeedAidRefundCut nastepnej doby zdejmuje ja z podstawy
+            # zwrotu - "wczorajsza doplata" = W5 + W5b + W6 + M1 + W5c, jak suma kolumny doplata_w5 w W6b-1 (bez segmentu - 0, log sprzed paczki)
+            w6paid[d6] += num(r"\(M1, Need Aid From Rents (?:tak|nie)\): pula \d+ w \d+ krolestwach, wyplacono (\d+)", w5[d6]) or 0
+            w6paid[d6] += num(r"\| dla srednich \(W5c, Crown War Aid Middle [^)]*\): wyplacono (\d+)", w5[d6]) or 0
+        # recenzja scalenia f15: wczytanie zapisu w polowie doby (G20) - gotowka W5 kroku sprzed zapisu wraca do _naCash (KingdomTreasury.RefundHeldResolve), a jej
+        # wyplaty nie ma w tym logu (linia W5 tej doby po wczytaniu: 0, budzet 166 "doplata od jutra"); dopisana do wyplaty doby z zapisu (klucz linii W5 = dzien - 1),
+        # inaczej zwrot nastepnej doby dawal falszywe "ponad wczorajsza doplate" (fin92: 1 doba, 74987 z odtworzonych 75025)
+        for s in lines:
+            if s.startswith("Doba po wczytaniu (G20): dzien "):
+                mg = re.search(r"zwrot 70%: gotowka W5 z doby (\d+) u \d+ rodow \((\d+) zl\)[^|]*? - odtworzone", s)
+                if mg:
+                    k = int(mg.group(1)) - 1
+                    w6paid[k] = w6paid.get(k, 0) + int(mg.group(2))
         for i, d in enumerate(ds):
             c = num(r"zold oplacony wczorajsza doplata poza podstawa zwrotu 70% \(dzis\) (\d+)", w5[d])
             if c is None:
@@ -19827,7 +19846,11 @@ def w6b_main(logp, start_arg, until=120, csvp=None):
     has6 = [d for d in win6 if p6[d] is not None]
     # ---- W6b-0 segment i klucz
     if not has5 and not has6:
-        rep.add("W6b-0: segment gracza w liniach W5 i W6", "brak (log sprzed W6b albo bez linii W5 / W6)", "jest od wgrania W6b (LogEnabled)", None)
+        # recenzja scalenia f15: pozniejsza kampania (np. fin92 - doby kampanii 240-399) - linie sa, ale poza oknem 2-until; bez tej uwagi grupa "nic nie sprawdza" po cichu
+        late = [d for d in alld if run_day(d, start) > until] if not win5 and not win6 else []
+        rep.add("W6b-0: segment gracza w liniach W5 i W6",
+                (f"brak w oknie dob kampanii 2-{until}: linii W5 / W6 poza oknem {len(late)} (doby kampanii {run_day(late[0], start)}-{run_day(late[-1], start)}) - uruchom z --do-doby 100000"
+                 if late else "brak (log sprzed W6b albo bez linii W5 / W6)"), "jest od wgrania W6b (LogEnabled)", None)
         rep.show()
         return 0
     keyon = sum(1 for d in has5 if p5[d][0]) + sum(1 for d in has6 if p6[d][0])
@@ -46573,6 +46596,7 @@ def nboczne_main(logp):
 # do zoldu takze srednim rodom - W5c ponad gwarancje W5, f jak zwrot f6 i renty f7); Armoury/src/KingdomTreasury.MidAid.cs, klucz Crown War Aid Middle
 NSK_LINE = "Skarbiec dla srednich (W5c): dzien "
 NSK_W5 = "Doplata wedlug potrzeby (W5): dzien "
+NSK_W6 = "Tarczowe (W6): dzien "
 NSK_RX_KEY = re.compile(r"\| klucz Crown War Aid Middle (tak, ale [^|]*|tak|nie \([^)]*\))")
 NSK_RX_TOT = re.compile(r"\| budzet (\d+), chec \(f x brak ponad W5 przy pelnym limicie\) (\d+), pula (\d+) \| wyplacono (\d+) \(rodow (\d+) z (\d+) ocenionych\),"
                         r" podniesienie pulapu ponad W5 (\d+) u (\d+) rodow")
@@ -46594,7 +46618,7 @@ NSK_RX_W5K = re.compile(r"([^:;|]+?): garnek (\d+) .*?ze skarbca ponad zapas (\d
 def _nsk_scan(logp):
     """nsrednim: strumieniowo linia W5c, segment W5c i krolestwa linii W5 (nadwyzka, pula W5b - do NSK-D), linia 165 (segment W5c), "Skarbce:" (skarbce i wojsko
     krolestw w wojnie) i bledy KingdomTreasury.MidAid."""
-    D = {"mc": {}, "bad": [], "w5": {}, "w5k": {}, "k165": {}, "tre": {}, "err": []}
+    D = {"mc": {}, "bad": [], "w5": {}, "w5k": {}, "k165": {}, "tre": {}, "err": [], "w6": {}}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -46631,7 +46655,10 @@ def _nsk_scan(logp):
                     continue
                 kw = num(r"\| krolestw w wojnie (\d+), z garnkiem", s)
                 sg = NSK_RX_W5SEG.search(s)
-                D["w5"][day] = {"kw": kw if kw is not None else 0, "seg": (int(sg.group(1)), int(sg.group(2))) if sg else None}
+                D["w5"][day] = {"kw": kw if kw is not None else 0, "seg": (int(sg.group(1)), int(sg.group(2))) if sg else None,
+                                # NSK-6b: szczeble gotowki korony linii W5 (danina, skarbiec W5b, M1); W5c - "seg"; W6 - linia "Tarczowe (W6)"
+                                "a5": num(r", wyplacono (\d+) \(rodow \d+\), reszta do rent", s), "b5": num(r", wyplacono ze skarbca (\d+) \(rodow", s) or 0,
+                                "m1": num(r"\(M1, Need Aid From Rents (?:tak|nie)\): pula \d+ w \d+ krolestwach, wyplacono (\d+)", s) or 0}
                 i = s.find("| na krolestwo: ")
                 ks = {}
                 if i >= 0:
@@ -46643,6 +46670,11 @@ def _nsk_scan(logp):
                         if mk:
                             ks[mk.group(1).strip()] = (int(mk.group(5)), int(mk.group(4)))   # nadwyzka, pula W5b
                 D["w5k"][day] = ks
+                continue
+            if s.startswith(NSK_W6):
+                day = num(r"dzien (\d+)", s)
+                if day is not None:
+                    D["w6"][day] = num(r"wyplacone przez W5 ponad danine (\d+)", s) or 0
                 continue
             if s.startswith(NZR_165):
                 day = num(r"dzien (\d+)", s)
@@ -46895,6 +46927,27 @@ def nsrednim_main(logp, bdp=None, csvp=None):
                 len(D["err"]) == 0 and st == 0)
     else:
         rep.add("NSK-1..8: linie W5c", "brak linii (log sprzed paczki albo bez wojny)", "INFO", None)
+    # NSK-6b (recenzja scalenia f15): kolumna doplata_w5 = gotowka korony tej doby razem (_naPaid: W5 + W5b + W6 + M1 + W5c) - suma wierszy (rody AI i gracz, bo
+    # linie licza tez gracza z W6b) = szczeble linii W5 i W6 co dobe, przez caly log (bez okna --do-doby; W6b-1 sprawdza sumy tylko w dobach, gdy gracz placi
+    # albo dostaje). Log sprzed W5c - ta sama tozsamosc bez W5c.
+    i0 = next((rs[0] for rs in csvd.values() if rs), None)
+    if i0 is not None and "doplata_w5" in i0 and w5:
+        ibad, iun, icmp = [], [], 0
+        for d in sorted(w5):
+            if d not in csvd:
+                continue
+            x = w5[d]
+            if x["a5"] is None:
+                iun.append(d); continue
+            icmp += 1
+            ln5 = x["a5"] + x["b5"] + (D["w6"].get(d) or 0) + x["m1"] + (x["seg"][0] if x["seg"] else 0)
+            if int(round(sum(_nsk_fv(r, "doplata_w5") for r in csvd[d]))) != ln5:
+                ibad.append(d)
+        rep.add("NSK-6b: suma kolumny doplata_w5 (rody AI i gracz) = W5 + W5b + W6 + M1 + W5c z linii W5 i W6 co dobe (caly log)",
+                f"dob porownanych {icmp}, rozjazdow {len(ibad)}, linii W5 bez pola wyplacono {len(iun)}" + (f" (d{(ibad + iun)[:5]})" if ibad or iun else ""),
+                "0 / 0 (nic z niczego: kazda zlotowka kolumny ma szczebel w linii)", (not ibad and not iun) if icmp or iun else None)
+    else:
+        rep.add("NSK-6b: suma kolumny doplata_w5 = szczeble linii W5 i W6", "brak linii W5" if not w5 else ("CSV bez kolumny doplata_w5" if csvd else f"brak CSV ({csvp})"), "0", None)
     # NSK-D skutek na sucho z CSV i linii W5 (zawsze - takze w logu z paczka: porownanie z wyplata linii)
     if csvd and D["w5k"]:
         dd = sorted(d for d in D["w5k"] if d in csvd)[-28:]
