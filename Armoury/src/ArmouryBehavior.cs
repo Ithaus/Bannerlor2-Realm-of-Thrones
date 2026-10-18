@@ -1036,6 +1036,10 @@ namespace Armoury
                 if (dataStore.IsLoading) ClanIncomeBook.Import(ci);
             }
             catch (Exception e) { Log.Error("SyncData.ClanIncome", e); }
+            // f19-e3 (przeglad 18.10, uwagi 1 i 2): pamiec D stalego miedzy sesjami - na rod srednia 28 dob zatrzymanych wedlug potrzeby (f6/f7) i ziemia D stalego z chwili
+            // zapisu (pierscienie czesci D zyja tylko w sesji); wlasny try, Export tylko przy zapisie; brak klucza (zapis sprzed paczki) = pusto, pierwsza doba jak dotad
+            try { string sm = dataStore.IsSaving ? ClanIncomeBook.ExportStableMem() : null; SaveText.Sync(dataStore, "arm_stabled", ref sm); if (dataStore.IsLoading) ClanIncomeBook.ImportStableMem(sm); }
+            catch (Exception e) { Log.Error("SyncData.arm_stabled", e); }
             // zapas kowali miast z napraw u kwatermistrza Spoils (MendMaterial: reszty calych sztuk materialu zdjetych z polki, kg i wartosc);
             // osobny try - wyjatek innego klucza go nie gubi; brak klucza (stary zapis) = pusty zapas
             try

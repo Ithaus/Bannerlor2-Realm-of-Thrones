@@ -105,6 +105,10 @@ namespace Armoury
         private static double _cuDecAmt, _cuBills;
         private static long _cuPaidL, _cuPaidC, _cuTook, _cuShort, _cuNoLord, _cuPaidLS, _cuPaidCS;
         private static long _cuTicks;
+        // f19-e3 (przeglad 18.10, uwaga 4): gersuma zaplacona TEJ doby (od DayStart do DayStart) - czesc pana na miasto, czesc korony na krolestwo; czytaja ksiega rodow
+        // (ClanIncomeBook.StableBegin - "jednorazowe", nie "ziemia" D stalego) i DsSeason.Sample ("inne", nie firmy). Tylko liczniki - zloto sie nie rusza
+        private static readonly Dictionary<Settlement, long> _gersLord = new Dictionary<Settlement, long>();
+        private static readonly Dictionary<Kingdom, long> _gersCrown = new Dictionary<Kingdom, long>();
 
         private static void ClearCounters()
         {
@@ -127,7 +131,22 @@ namespace Armoury
             _dayOn = -1; _fixDay = -1; _mDays = 0; _worldShare = double.NaN; _farm.Clear();
             SwitchDue = false; _stumblesSess = 0; _err.Clear(); _events.Clear(); _aidPend.Clear(); _waitLogged = false; _atFlag = -1;
             _cuStumSess = 0; _cuNS = 0; _cuPaidLS = _cuPaidCS = 0;   // f7-kasy: sesja
+            _gersLord.Clear(); _gersCrown.Clear();                   // f19-e3
             ClearCounters();
+        }
+
+        /// <summary>f19-e3 (klucz Ks Farm Catch Up One Off): czesc pana z gersumy zaplaconej dzis przez miasto (w RentOf / RentToday tej doby) - 0 bez klucza. Nie rzuca.</summary>
+        internal static long GersumaLordOf(Settlement st)
+        {
+            try { long v; var s = Settings.Current; return s != null && s.KsFarmCatchUpOneOff && st != null && _gersLord.TryGetValue(st, out v) && v > 0 ? v : 0; }
+            catch { return 0; }
+        }
+
+        /// <summary>f19-e3 (klucz Ks Farm Catch Up One Off): czesc korony z gersum zaplaconych dzis (w TownPurse.CrownToday tej doby) - 0 bez klucza. Nie rzuca.</summary>
+        internal static long GersumaCrownOf(Kingdom k)
+        {
+            try { long v; var s = Settings.Current; return s != null && s.KsFarmCatchUpOneOff && k != null && _gersCrown.TryGetValue(k, out v) && v > 0 ? v : 0; }
+            catch { return 0; }
         }
 
         private static void Stumble(string where, Exception e)
@@ -279,6 +298,7 @@ namespace Armoury
         /// <summary>Stan F3: wylaczone - stare zasady (i porzadki); start okna pomiaru; ustalenie firm po DsFarmMeasureDays; dni kwartalu (zaleglosci), odnowy, zmiany wlascicieli.</summary>
         internal static void DayStart()
         {
+            _gersLord.Clear(); _gersCrown.Clear();   // f19-e3: gersuma tej doby (TownDay w PopulationLaw.Daily biegnie po DayStart)
             try
             {
                 var s = Settings.Current;
@@ -791,6 +811,9 @@ namespace Armoury
                 long gC = pC > 0 && k != null ? ToCrown(t, k, pC) : 0;
                 got = gL + gC;
                 lordPay = (int)Math.Min(int.MaxValue, (long)lordPay + gL); crownFarm = (int)Math.Min(int.MaxValue, (long)crownFarm + gC);
+                // f19-e3: ta sama kwota co w lordPay / crownFarm (RentToday pana, CrownToday korony) - osobno, jako jednorazowa (licznik; klucz czyta wolajacy)
+                if (gL > 0) { long g1; _gersLord.TryGetValue(st, out g1); _gersLord[st] = g1 + gL; }
+                if (gC > 0 && k != null) { long g2; _gersCrown.TryGetValue(k, out g2); _gersCrown[k] = g2 + gC; }
                 _cuTook += g0 - t.Gold; _cuPaidL += (long)lord.Gold - h0; _cuPaidC += k != null ? (long)k.KingdomBudgetWallet - w0 : 0;
                 _cuPaidLS += gL; _cuPaidCS += gC;
                 if (got > 0) { _cuPaidN++; _cuNS++; }

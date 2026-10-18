@@ -377,6 +377,9 @@ namespace Armoury
                 vav *= Math.Max(0, (double)s.DsVassalAidWarPercent) / w0;
             }
             double oth = Ransom178.ThirdsOf(k) + d.Other;
+            // f19-e3 (klucz Ks Farm Catch Up One Off): gersuma korony tej doby (jednorazowa, w TownPurse.CrownToday) - do 'inne' (mediana), nie do firm (srednia)
+            long gersC = Math.Max(0L, Math.Min(farmT, DsTowns.GersumaCrownOf(k)));
+            farmT -= gersC; oth += gersC;
             double inc = farmT + farmC + cust + vav + d.Release;   // fin75: bez 'inne' (osobno w ROth, mediana w sesji)
             int h = g.H;
             g.ROth[h] = oth;

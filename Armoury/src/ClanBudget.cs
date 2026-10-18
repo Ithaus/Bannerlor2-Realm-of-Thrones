@@ -21,7 +21,8 @@ namespace Armoury
     ///
     /// Raz na dobe (po Banku, przed ksiega rodow - na D z wczoraj, czesc "ziemia" z dzisiejszych lenn), dla kazdego rodu AI:
     ///  - D = D staly (169c: ziemia + korona + kontrakt + majatek; u najezdzcow - Zelazne Wyspy, Dothrakowie, Wolni Ludzie - takze lup), mieszany z D z
-    ///    zapisu, dopoki pomiar ma mniej niz 28 dob (pierscienie D stalego zyja tylko w sesji); start kampanii D = G/60. G = kiesy rodziny (glowa +
+    ///    zapisu, dopoki pomiar ma mniej niz 28 dob (pierscienie D stalego zyja tylko w sesji; f19-e3, klucz Stable D First Day From Save: takze pierwsza doba
+    ///    po wczytaniu, gdy pomiaru jeszcze nie ma - samo D z zapisu, nie D169); start kampanii D = G/60. G = kiesy rodziny (glowa +
     ///    dorosli). R = max(20 000; 20 x D) + 5 000 x doroslych.
     ///  - pulap zoldu (partie + zalogi + karawany): pokoj 0.28 D (+ Z.1: 0.4 x skrzynia wojenna przy G > R), wojna 0.60 D + 0.8 (G - R)/45 przy G > R;
     ///    bieda: pokoj G < 60 D -> x (1 - 0.1 (1 - G/60D)),
@@ -426,7 +427,25 @@ namespace Armoury
         /// kompania najemna, Straz bez zoldu (Zero), dluznik i rod w zajeciu (168). Poza Pending - false (wolajacy bierze ChestOf). Tylko odczyt.</summary>
         internal static bool PendingChestOf(Clan c, out double G, out double R, out bool war)
         {
-            G = 0; R = 0; war = false;
+            double D;
+            return PendingCore(c, out G, out R, out war, out D);
+        }
+
+        /// <summary>f19-e3 (przeglad 18.10, uwaga 2): PendingChestOf dla MIARY POTRZEBY f6/f7 (KingdomTreasury.RbnOf) - R przez NeedReserve z tym samym D (D z zapisu
+        /// albo G/60), jak NeedChestOf od drugiej doby (b.RNeed). Klucz Need Reserve Uncut Saved wylaczony albo miara bez klucza Need Reserve Uncut - R jak PendingChestOf.
+        /// TourneyPay i inni wolajacy PendingChestOf - bez zmian (R budzetu, jak ChestOf). Tylko odczyt.</summary>
+        internal static bool PendingNeedChestOf(Clan c, out double G, out double R, out bool war)
+        {
+            double D;
+            if (!PendingCore(c, out G, out R, out war, out D)) return false;
+            try { var s = Settings.Current; if (s != null && s.NeedReserveUncutSaved) R = NeedReserve(c, R, D); }
+            catch (Exception e) { Stumble("PendingNeedChestOf", e); }
+            return true;
+        }
+
+        private static bool PendingCore(Clan c, out double G, out double R, out bool war, out double D)
+        {
+            G = 0; R = 0; war = false; D = 0;
             try
             {
                 var s = Settings.Current;
@@ -435,7 +454,7 @@ namespace Armoury
                 if (DebtLadder.On && (DebtLadder.IsDebtor(c) || DebtLadder.IsSeized(c))) return false;
                 long g = ClanIncomeBook.FamilyGoldOf(c);
                 double[] sv;
-                double D = _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0 && sv[0] >= 0 ? sv[0] : Math.Max(0, g / 60.0);
+                D = _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0 && sv[0] >= 0 ? sv[0] : Math.Max(0, g / 60.0);
                 war = AtWar(c);
                 double f, chest;
                 Ceiling(D, g, war, AdultsOf(c), out R, out f, out chest);
@@ -443,6 +462,21 @@ namespace Armoury
                 return true;
             }
             catch (Exception e) { Stumble("PendingChestOf", e); return false; }
+        }
+
+        /// <summary>f19-e3 (przeglad 18.10, uwaga 1): D rodu z zapisu budzetu (D ostatniego budzetu przed zapisem - to samo, co DLast dalby "wczoraj") - tylko przed pierwszym
+        /// budzetem sesji (Pending: Bank i inne kroki doby biegna przed ClanBudget.Daily) i przy kluczu Stable D First Day From Save; -1 - brak (wolajacy bierze dalsze zrodla).
+        /// Tylko odczyt.</summary>
+        internal static double SavedD(Clan c)
+        {
+            try
+            {
+                var s = Settings.Current;
+                double[] sv;
+                if (s == null || !s.StableDFirstDayFromSave || !Pending || c == null || c.StringId == null) return -1;
+                return _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0 && sv[0] >= 0 ? sv[0] : -1;
+            }
+            catch { return -1; }
         }
 
         /// <summary>W6 (KingdomTreasury.Scutage.cs - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu do podstawy
@@ -587,6 +621,9 @@ namespace Armoury
                 days = Math.Max(0, Math.Min(Days28, days));
                 return (days * d + (Days28 - days) * b.D0) / Days28;   // pomiar krotszy niz 28 dob - reszta z D z zapisu (albo G/60)
             }
+            // f19-e3 (przeglad 18.10, uwaga 1): D staly wlaczony, ale pomiaru jeszcze nie ma - pierwsza doba po wczytaniu (pierscienie czesci D zyja tylko w sesji, a budzet
+            // biegnie przed ksiega rodow): days = 0 w tym samym wzorze, czyli D z zapisu (albo G/60 na starcie 166) - nie D169 (dochod brutto ksiegi, ok. 2 x D staly od f6/f7)
+            if (s.ClanBudgetStableD && s.StableDFirstDayFromSave && ClanIncomeBook.StableDOn) return b.D0;
             double d169 = ClanIncomeBook.StableIncome(c);
             return d169 >= 0 ? d169 : b.D0;
         }

@@ -33,7 +33,7 @@ namespace Armoury
         internal static bool StableDOn { get { var s = Settings.Current; return s != null && s.ClanIncomeBookEnabled && s.ClanIncomeBookStableD; } }
 
         // czesci wplywu doby rodu; QDouble jest "w tym" jednorazowych (poza suma)
-        private const int QLand = 0, QOwn = 1, QCrown = 2, QContract = 3, QAssets = 4, QOnce = 5, QOther = 6, QFamily = 7, QInflow = 8, QDouble = 9, QReaver = 10, Q = 11;   // WW2: QReaver "w tym" jednorazowych (jak QDouble), poza suma
+        private const int QLand = 0, QOwn = 1, QCrown = 2, QContract = 3, QAssets = 4, QOnce = 5, QOther = 6, QFamily = 7, QInflow = 8, QDouble = 9, QReaver = 10, QGers = 11, Q = 12;   // WW2: QReaver "w tym" jednorazowych (jak QDouble), poza suma; f19-e3: QGers - gersuma f7-kasy "w tym" jednorazowych, poza suma
 
         private sealed class Ring
         {
@@ -59,10 +59,15 @@ namespace Armoury
         private static readonly Dictionary<Settlement, Ring> _rCastle = new Dictionary<Settlement, Ring>();  // 110: zawor zamku bez "wlasnych" (wedlug wlasciciela)
         private static readonly Dictionary<Clan, Ring> _rLoose = new Dictionary<Clan, Ring>();               // ziemia bez osady (nie do przypisania)
         private static readonly Dictionary<Clan, Ring> _rNeedCut = new Dictionary<Clan, Ring>();             // recenzja calosci 18.10: zwrot f6 i renty f7 zatrzymane wedlug potrzeby (poza D)
+        // f19-e3 (przeglad 18.10, uwagi 1 i 2): z zapisu (klucz arm_stabled) - id rodu -> [srednia 28 dob zatrzymanych wedlug potrzeby (NeedCutAdd), ziemia D stalego (StableLand)]
+        // z chwili zapisu; pierscienie zyja tylko w sesji, wiec bez tego pierwsza doba po wczytaniu nie miala ziemi, a miara potrzeby startowala od zera
+        private static readonly Dictionary<string, double[]> _stSaved = new Dictionary<string, double[]>();
+        private static int _stImportN = -1, _stImportBad;
         private static readonly Dictionary<Settlement, long> _ownPaid = new Dictionary<Settlement, long>();  // wplaty rodu do kasy wlasnej osady od ostatniego Daily
         private static readonly Dictionary<Settlement, long> _ownPaidOld = new Dictionary<Settlement, long>();  // E5 A2b: te same wplaty w zapasie CourtFull (tylko pomiar starej reguly)
         private static readonly Dictionary<Clan, long> _ownByClan = new Dictionary<Clan, long>();            // "wlasne" dzis (zawor oddal rodowi jego pieniadze)
         private static readonly Dictionary<Clan, long> _ownCastleByClan = new Dictionary<Clan, long>();      // 110: "wlasne" dzis z zaworu zamkow
+        private static readonly Dictionary<Clan, long> _gersByClan = new Dictionary<Clan, long>();           // f19-e3: gersuma f7-kasy dzis (czesc pana z miast rodu) - "jednorazowe", nie "ziemia"
         private static readonly Dictionary<Clan, List<Settlement>> _villagesOf = new Dictionary<Clan, List<Settlement>>();   // dzis: wsie wedlug posiadacza (BK)
         private static readonly Dictionary<Clan, long> _vTaxOf = new Dictionary<Clan, long>();                // dzis: suma podatku wsi posiadacza (do porownania z linia modelu)
         private static readonly Dictionary<Clan, int> _cutToday = new Dictionary<Clan, int>();               // zold przyciety z braku w kiesie (SoldierPay) od ostatniego Daily
@@ -75,6 +80,7 @@ namespace Armoury
         // sumy swiata doby (linia)
         private static long _dRentC, _dOwnC;   // 110: zawor zamkow i jego "wlasne" (swiat, dzis)
         private static long _dCrownRent;        // 180: renty korony (swiat, dzis)
+        private static long _dGers;             // f19-e3: gersuma f7-kasy panom (swiat, dzis) - poza "ziemia", w "jednorazowych"
         private static long _dVd, _dWd, _dRentV, _dRentT, _dOwn, _dPol, _dSup, _dRefund, _dMint, _dMerc, _dShop, _dCarPar, _dFamily, _dOther, _dOnce, _dDouble, _dInflow, _dVdCalc;
         private static int _dVdOff, _dLooseN, _dClans;
         // "inne z modelu" rozbite (przeglad 169c): znane linie spoza D, wplyw bez opisu (m.in. "za tier" gry - Add bez nazwy), nierozpoznane (modul)
@@ -99,7 +105,9 @@ namespace Armoury
         internal static void ResetStable()
         {
             _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownPaidOld.Clear(); _ownByClan.Clear(); _rCastle.Clear(); _ownCastleByClan.Clear();
+            _gersByClan.Clear(); _dGers = 0;   // f19-e3
             _rNeedCut.Clear();   // recenzja calosci 18.10
+            _stSaved.Clear(); _stImportN = -1; _stImportBad = 0;   // f19-e3
             _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
             ZeroStableDay();
             LastTicksStableBegin = LastTicksStableClans = LastTicksStableLine = 0;
@@ -109,7 +117,7 @@ namespace Armoury
 
         private static void ZeroStableDay()
         {
-            _dRentC = _dOwnC = 0; _dCrownRent = 0;
+            _dRentC = _dOwnC = 0; _dCrownRent = 0; _dGers = 0;
             _dVd = _dWd = _dRentV = _dRentT = _dOwn = _dPol = _dSup = _dRefund = _dMint = _dMerc = _dShop = _dCarPar = _dFamily = _dOther = _dOnce = _dDouble = _dInflow = _dVdCalc = 0;
             _dVdOff = _dLooseN = _dClans = 0;
             _dKnown = _dUnlisted = _dUnrec = _dUnrecAbs = 0;
@@ -261,7 +269,7 @@ namespace Armoury
 
         private static void StableBeginBody()
         {
-            _unknown.Clear(); _ownByClan.Clear(); _ownCastleByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear();
+            _unknown.Clear(); _ownByClan.Clear(); _ownCastleByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear(); _gersByClan.Clear();
             ResolveNames();
             ResolveBk();
             // posiadacze wsi (BK: tytul) i podatek kazdej wsi - ta sama funkcja, ktora BK liczy linie "Village Demesnes"
@@ -366,7 +374,10 @@ namespace Armoury
                     long oldp;   // E5 A2b (tylko pomiar): stara regula dla miasta
                     if (st.IsTown && _ownPaidOld.TryGetValue(st, out oldp) && oldp > 0 && pay > 0 && avail > 0) CourtFull.NoteOldOwn(Math.Min(pay, (long)(oldp * Math.Min(1.0, (double)pay / avail))));
                     if (own > 0 && st.OwnerClan != null) { long o0; _ownByClan.TryGetValue(st.OwnerClan, out o0); _ownByClan[st.OwnerClan] = o0 + own; }
-                    RingOf(_rRent, st).Push(pay - own);
+                    // f19-e3 (klucz Ks Farm Catch Up One Off): gersuma zaplacona dzis panu (w pay - jak rata firmy) to oplata jednorazowa - poza pierscieniem renty miasta ("ziemia")
+                    long gers = st.IsTown ? Math.Max(0L, Math.Min(pay - own, DsTowns.GersumaLordOf(st))) : 0;
+                    if (gers > 0 && st.OwnerClan != null) { long g0; _gersByClan.TryGetValue(st.OwnerClan, out g0); _gersByClan[st.OwnerClan] = g0 + gers; }
+                    RingOf(_rRent, st).Push(pay - own - gers);
                 }
                 catch (Exception e) { Stumble("StableBegin(renty)", e); }
             }
@@ -447,17 +458,21 @@ namespace Armoury
             long own = ownT + ownC;
             long once = r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent;   // trzecia + zdarzenia (+ reszta Today z zapisu); 185: bez kontraktu od korony; 180: bez renty korony
             long other = a - (vd + wd + pol + sup + merc + shop + carpar);
-            _t[QLand] = vd + wd + rent - own;
+            // f19-e3: gersuma f7-kasy pana tej doby (z renty miast, po "wlasnych") - z "ziemi" do "jednorazowych"; suma czesci bez zmian (0 bez klucza)
+            long gersC; _gersByClan.TryGetValue(c, out gersC);
+            gersC = Math.Max(0L, Math.Min(gersC, rentT - ownT));
+            _t[QLand] = vd + wd + rent - own - gersC;
             _t[QOwn] = own;
             _t[QCrown] = pol + sup + r.TodayRefund + r.TodayCrown + r.TodayRent;   // 180: renta korony w czesci "korona" (raz - poza jednorazowymi)
             _t[QContract] = merc + r.TodayContract;   // 185: kontrakt najemnika od korony (gra dla AI - 0)
             _t[QAssets] = shop + carpar - family;
-            _t[QOnce] = once;
+            _t[QOnce] = once + gersC;
             _t[QOther] = other;
             _t[QFamily] = family;
             _t[QInflow] = a + rent + r.Today;
             _t[QDouble] = Math.Min(Math.Max(0L, once), r.TodayEstates);
             _t[QReaver] = Math.Min(Math.Max(0L, once - _t[QDouble]), Math.Max(0L, r.TodayReaver));   // WW2 (wyspy-wolni): lup na zalogi w jednorazowych (nigdy wiecej niz one)
+            _t[QGers] = gersC;   // f19-e3: "w tym" jednorazowych (QDouble i QReaver licza sie z jednorazowych zdarzen - bez gersumy)
             PartRing pr;
             if (!_parts.TryGetValue(c, out pr)) { pr = new PartRing(); _parts[c] = pr; }
             pr.Push(_t);
@@ -502,6 +517,7 @@ namespace Armoury
             // sumy swiata (linia)
             _dVd += vd; _dWd += wd; _dRentV += Math.Max(0, rentV); _dRentT += rentT; _dOwn += ownT; _dRentC += rentC; _dOwnC += ownC; _dPol += pol; _dSup += sup; _dRefund += r.TodayRefund; _dMint += r.TodayCrown;
             _dCrownRent += r.TodayRent;   // 180
+            _dGers += gersC;              // f19-e3
             _dMerc += merc; _dShop += shop; _dCarPar += carpar; _dFamily += family; _dOther += other; _dOnce += once; _dDouble += _t[QDouble]; _dInflow += _t[QInflow]; _dClans++;
         }
 
@@ -511,6 +527,7 @@ namespace Armoury
             public double D, Land, LandVTax, LandRent, LandTown, LandCastle, LandLoose, Crown, Contract, Assets;
             public double Own, Once, Double, Other, Family, Inflow, SumParts; public int Days;
             public double Reaver;   // WW2 (wyspy-wolni): lup na zalogi w jednorazowych (srednia jak Once)
+            public double Gers;     // f19-e3: gersuma f7-kasy w jednorazowych (srednia jak Once)
         }
 
         private static bool TryStable(Clan c, out StableParts p)
@@ -536,6 +553,7 @@ namespace Armoury
             p.D = p.Land + p.Crown + p.Contract + p.Assets;
             p.Own = pr.Avg(QOwn); p.Once = pr.Avg(QOnce); p.Double = pr.Avg(QDouble); p.Other = pr.Avg(QOther); p.Family = pr.Avg(QFamily); p.Inflow = pr.Avg(QInflow);
             p.Reaver = pr.Avg(QReaver);
+            p.Gers = pr.Avg(QGers);   // f19-e3
             p.SumParts = pr.Avg(QLand) + p.Own + p.Crown + p.Contract + p.Assets + p.Once + p.Other + p.Family;
             p.Days = pr.Filled;
             return true;
@@ -548,18 +566,115 @@ namespace Armoury
             catch { return -1; }
         }
 
-        /// <summary>Recenzja calosci 18.10 (f6 + f7): o ile D staly rodu bylby wyzszy, gdyby korona nie ciela zwrotu i rent wedlug potrzeby - suma pierscienia / 28
-        /// (to samo mieszanie co D w budzecie: dni zmierzone x srednia / 28, reszta z D z zapisu). 0 - brak pomiaru. Tylko odczyt; nie rzuca.</summary>
+        /// <summary>Recenzja calosci 18.10 (f6 + f7): o ile D staly rodu bylby wyzszy, gdyby korona nie ciela zwrotu i rent wedlug potrzeby - suma pierscienia / 28.
+        /// f19-e3 (klucz Need Reserve Uncut Saved): to samo mieszanie co D w budzecie - doby zmierzone z pierscienia, brakujace (28 - zmierzone) ze sredniej z zapisu
+        /// (arm_stabled); pierwsza doba po wczytaniu (pierscien pusty) = srednia z zapisu. Klucz wylaczony - suma / 28 jak dotad (brakujace doby jako 0). 0 - brak pomiaru.
+        /// Tylko odczyt; nie rzuca.</summary>
         internal static double NeedCutAdd(Clan c)
         {
             try
             {
-                Ring r;
-                if (c == null || !StableDOn || !_rNeedCut.TryGetValue(c, out r) || r.Filled <= 0) return 0;
-                long s = 0; for (int i = 0; i < Days; i++) s += r.V[i];
-                return Math.Max(0.0, (double)s / Days);
+                var st = Settings.Current;
+                return c == null || !StableDOn ? 0 : NeedCutMean(c, st != null && st.NeedReserveUncutSaved);
             }
             catch { return 0; }
+        }
+
+        /// <summary>f19-e3: srednia 28 dob zatrzymanych wedlug potrzeby; fill - brakujace doby pierscienia ze sredniej z zapisu (bez zapisu - 0, jak dotad).</summary>
+        private static double NeedCutMean(Clan c, bool fill)
+        {
+            Ring r;
+            bool ring = _rNeedCut.TryGetValue(c, out r) && r.Filled > 0;
+            double saved = 0; double[] sv;
+            if (fill && c.StringId != null && _stSaved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0 && sv[0] > 0) saved = sv[0];
+            if (!ring && !(saved > 0)) return 0;
+            long s = 0; int filled = 0;
+            if (ring) { for (int i = 0; i < Days; i++) s += r.V[i]; filled = Math.Min(Days, r.Filled); }
+            return Math.Max(0.0, (s + (Days - filled) * saved) / Days);
+        }
+
+        /// <summary>f19-e3 (przeglad 18.10, uwaga 1): ziemia D stalego rodu z zapisu (StableLand z chwili zapisu) - tylko gdy D staly wlaczony, klucz Stable D First Day
+        /// From Save i rod nie ma jeszcze pomiaru w tej sesji (pierwsza doba po wczytaniu: powinnosci i Bank biegna przed ksiega rodow). -1 - brak (wolajacy: stara droga).
+        /// Tylko odczyt; nie rzuca.</summary>
+        internal static double SavedLand(Clan c)
+        {
+            try
+            {
+                var st = Settings.Current;
+                PartRing pr; double[] sv;
+                if (c == null || c.StringId == null || st == null || !st.StableDFirstDayFromSave || !StableDOn) return -1;
+                if (_parts.TryGetValue(c, out pr) && pr.Filled > 0) return -1;   // jest pomiar - wolajacy ma StableLand
+                return _stSaved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 1 && sv[1] >= 0 ? sv[1] : -1;
+            }
+            catch { return -1; }
+        }
+
+        // ------------------------------------------------------------ f19-e3: zapis (SaveText, "arm_stabled")
+        /// <summary>"v1|id:zatrzymane:ziemia;..." - rody z pomiarem w tej sesji (srednia zatrzymanych z uzupelnieniem z zapisu, StableLand) i rody z zapisu bez pomiaru
+        /// (np. wczytanie i zapis bez doby - nie gubimy). D staly wylaczony - pusto. Nie rzuca.</summary>
+        internal static string ExportStableMem()
+        {
+            try
+            {
+                if (!StableDOn) return "";
+                var inv = CultureInfo.InvariantCulture;
+                var sb = new StringBuilder(_parts.Count * 32 + 8);
+                sb.Append("v1|");
+                bool first = true;
+                var done = new HashSet<string>();
+                foreach (var kv in _parts)
+                {
+                    var c = kv.Key;
+                    if (c == null || c.StringId == null || c.StringId.IndexOfAny(StBad) >= 0 || kv.Value == null || kv.Value.Filled <= 0) continue;
+                    double land = StableLand(c);
+                    if (land < 0) continue;
+                    double cut = NeedCutMean(c, true);
+                    if (!first) sb.Append(';'); first = false;
+                    sb.Append(c.StringId).Append(':').Append(Math.Round(cut).ToString(inv)).Append(':').Append(Math.Round(land).ToString(inv));
+                    done.Add(c.StringId);
+                }
+                foreach (var kv in _stSaved)
+                {
+                    if (kv.Key == null || kv.Key.IndexOfAny(StBad) >= 0 || done.Contains(kv.Key) || kv.Value == null || kv.Value.Length < 2) continue;
+                    if (!first) sb.Append(';'); first = false;
+                    sb.Append(kv.Key).Append(':').Append(Math.Round(kv.Value[0]).ToString(inv)).Append(':').Append(Math.Round(kv.Value[1]).ToString(inv));
+                }
+                return sb.ToString();
+            }
+            catch (Exception e) { Stumble("ExportStableMem", e); return ""; }
+        }
+        private static readonly char[] StBad = { '|', ';', ':' };
+
+        /// <summary>Pusty albo null = brak pamieci (zapis sprzed f19-e3 - pierwsza doba i miara potrzeby jak dotad). Zly rekord pominiety i policzony. Obiektow Clan tu NIE szukamy.</summary>
+        internal static void ImportStableMem(string data)
+        {
+            _stSaved.Clear(); _stImportN = 0; _stImportBad = 0;
+            try
+            {
+                if (string.IsNullOrEmpty(data)) return;
+                var f = data.Split('|');
+                if (f.Length < 2 || f[0] != "v1") { _stImportBad++; return; }
+                if (f[1].Length == 0) return;
+                var inv = CultureInfo.InvariantCulture;
+                foreach (var p in f[1].Split(';'))
+                {
+                    var x = p.Split(':'); double cut, land;
+                    if (x.Length == 3 && x[0].Length > 0 && double.TryParse(x[1], NumberStyles.Float, inv, out cut) && double.TryParse(x[2], NumberStyles.Float, inv, out land)
+                        && !double.IsNaN(cut) && !double.IsInfinity(cut) && !double.IsNaN(land) && !double.IsInfinity(land))
+                    { _stSaved[x[0]] = new[] { Math.Max(0, cut), Math.Max(0, land) }; _stImportN++; }
+                    else _stImportBad++;
+                }
+            }
+            catch (Exception e) { Stumble("ImportStableMem", e); }
+        }
+
+        /// <summary>f19-e3: dopisek linii "D staly (169c)" - ile rodow wczytano z pamieci zapisu (raz, w pierwszej linii po wczytaniu).</summary>
+        private static string StableMemNote()
+        {
+            if (_stImportN < 0) return "";
+            string t = " | pamiec z zapisu (f19-e3, arm_stabled): rodow " + _stImportN + " (bledne " + _stImportBad + ")";
+            _stImportN = -1;
+            return t;
         }
 
         /// <summary>165 (2.6): czesc "ziemia" D stalego (wsie, renty i zawory osad z dzisiejszych lenn, bez "wlasnych") albo -1 - podstawa powinnosci.</summary>
@@ -624,7 +739,8 @@ namespace Armoury
                 StableParts p;
                 if (!StableDOn || !TryStable(c, out p)) return false;
                 // WW2: lup na zalogi poza D (kosz WW2) - recenzja R1-5 / R2-6: tylko u rodow z oknem (WindowClan); Wolni Ludzie przy WL1 i najemnicy Wysp - lup w D (W-1)
-                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double - (ReaverLaw.WindowClan(c) ? p.Reaver : 0));
+                // f19-e3: gersuma f7-kasy poza D takze u najezdzcow (oplata jednorazowa miasta, nie lup) - p.Gers 0 bez klucza
+                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double - (ReaverLaw.WindowClan(c) ? p.Reaver : 0) - p.Gers);
                 return true;
             }
             catch { return false; }
@@ -667,6 +783,7 @@ namespace Armoury
             var dl = new List<double>(); var castleD = new List<double>(); var castleD169 = new List<double>();
             double sCastle = 0;
             double sD = 0, sLand = 0, sVt = 0, sRent = 0, sTown = 0, sLoose = 0, sCrown = 0, sContr = 0, sAssets = 0, sOwn = 0, sOnce = 0, sDouble = 0, sOther = 0, sFam = 0, sInflow = 0, sParts = 0, sD169 = 0;
+            double sGers = 0;   // f19-e3
             int n = 0, bankrupt = 0, shortDays = 0, bankBlind = 0, bankIb = 0, bankBoth = 0, bankAny = 0;
             for (int i = 0; i < aiClans.Count; i++)
             {
@@ -686,6 +803,7 @@ namespace Armoury
                     n++; if (p.Days < Days) shortDays++;
                     dl.Add(p.D); sD += p.D; sLand += p.Land; sVt += p.LandVTax; sRent += p.LandRent; sTown += p.LandTown; sCastle += p.LandCastle; sLoose += p.LandLoose; sCrown += p.Crown; sContr += p.Contract;
                     sAssets += p.Assets; sOwn += p.Own; sOnce += p.Once; sDouble += p.Double; sOther += p.Other; sFam += p.Family; sInflow += p.Inflow; sParts += p.SumParts;
+                    sGers += p.Gers;   // f19-e3
                     var rr = Of(c); if (rr != null) sD169 += rr.D;
                     int towns = 0, castles = 0;
                     var fiefs = c.Fiefs;
@@ -714,6 +832,7 @@ namespace Armoury
               .Append(", majatek ").Append(N0(sAssets))
               .Append(" | poza D: wlasne ").Append(N0(sOwn)).Append(", jednorazowe ").Append(N0(sOnce)).Append(" (w tym podwojne - majatki BK ").Append(N0(sDouble)).Append("), inne z modelu ").Append(N0(sOther))
               .Append(", przelewy w rodzie ").Append(N0(sFam)).Append(", zajete w D3 - (168)")
+              .Append(sGers > 0 || _dGers > 0 ? "; gersuma kas miast panom (f19-e3, w jednorazowych, nie w ziemi) " + N0(sGers) + " (dzis " + _dGers + ")" : "")   // f19-e3
               .Append(" | kontrola zamkniecia (z budowy - inne z modelu to reszta; tylko blad ksiegowania): ")
               .Append(N0(sParts)).Append(" wobec ").Append(N0(sInflow)).Append(" - roznica ").Append(closure.ToString("0.00", inv)).Append("%")
               .Append(" | dzis (swiat): linie modelu - podatek wsi ").Append(_dVd).Append(" (wedlug wsi BK ").Append(_dVdCalc).Append(", roznica u ").Append(_dVdOff).Append(" rodow), cla i podatek miast ").Append(_dWd)
@@ -734,6 +853,7 @@ namespace Armoury
               .Append(" | czas D stalego (ms na dobe): poczatek doby ").Append(Ms(_ticksStableBegin)).Append(", rozbicie rodow ").Append(Ms(_ticksStableClans))
               .Append(", linia poprzedniej doby ").Append(Ms(LastTicksStableLine)).Append("; dochod modelu z opisami (caly) ").Append(Ms(LastTicksModel))
               .Append(" | BK: ").Append(_bkNote)
+              .Append(StableMemNote())   // f19-e3
               .Append(_stumbles > 0 ? " | potkniecia ksiegi " + _stumbles : "").Append('.');
             return sb.ToString();
         }
