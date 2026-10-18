@@ -49,6 +49,12 @@ namespace CrashScribe
     ///      (prefiks InheritanceHelper.ApplyInheritanceAllTitles) - gdy ta glowa zyje, jest w rodzie i nim rzadzi.
     ///  RotEventRulerInKingdom: ChangeRulingClanAction z wydarzenia ROT dla rodu spoza krolestwa - rod niezalezny najpierw dolacza
     ///      (ChangeKingdomAction.ApplyByJoinToKingdom), rod w innym krolestwie / wybity / najemny / gracza - przekazanie tronu pominiete.
+    ///      Recenzja: ROT wybija rod, od ktorego tron mial odejsc, linie po przekazaniu (JeorMutinyEvent: DestroyClan Mormontow, BastardsEvent: DestroyClan
+    ///      Snow) - gra przy DestroyClanAction tronu nie przenosi (Kingdom.RemoveClanInternal nie rusza RulingClan; sukcesja w KillCharacterAction wymaga
+    ///      victim.Clan.Kingdom != null). Dlatego po zakonczeniu metody wydarzenia (finalizer kontekstu, glebokosc 0) krolestwo z zablokowanym
+    ///      przekazaniem jest sprawdzane: rod panujacy wybity / poza krolestwem / bez zywej glowy -> tron dla pierwszego rodu krolestwa zdolnego do rzadow
+    ///      (DiplomacyModel.IsClanEligibleToBecomeRuler, nie gracza, nie najemny - jak galaz else ROT JeorMutinyEvent); gdy takiego nie ma - dla rodu z ROT
+    ///      (jak chcial ROT). Rod panujacy wciaz w porzadku (np. wybrany przez gre po smierci wladcy w tym wydarzeniu) - tron zostaje (StoryThrone tez go trzyma).
     /// Zapis: klucz "cs_rotfx_v1" (lista tekstow: czekajacy na smierc i nastepcy z ROT, najwyzej 2 x 64 wpisy); stary zapis bez klucza - pusta lista.
     /// </summary>
     internal static class RotEventFx
@@ -98,8 +104,17 @@ namespace CrashScribe
             public Hero NewRef, OldRef;
         }
 
+        /// <summary>Przekazanie tronu zablokowane w biezacym wywolaniu wydarzenia ROT - sprawdzane po wyjsciu z metody wydarzenia (bez zapisu - zyje w jednym stosie wywolan).</summary>
+        private sealed class Blk
+        {
+            public Kingdom K;
+            public Clan Target;
+            public string Ev, Why;
+        }
+
         private static readonly List<Pending> _pending = new List<Pending>();
         private static readonly List<Heir> _heirs = new List<Heir>();
+        private static readonly List<Blk> _blocked = new List<Blk>();
 
         public sealed class St
         {
@@ -125,6 +140,7 @@ namespace CrashScribe
             _perEvent.Clear(); _pending.Clear(); _heirs.Clear(); Saved = new List<string>();
             _killedByUs = _diedByGame = 0; _lastLineDay = -1; _lastEnd = null; _lastEndHour = -1; _costMs = 0;
             _depth = _actDepth = 0; _ev = null;
+            _stumbles = 0; _blocked.Clear();   // recenzja: potkniecia liczone na sesje (RX-1 czyta ostatnia linie RX - bez potkniec z poprzedniej kampanii / wczytania)
         }
 
         private static int Day()
@@ -323,7 +339,13 @@ namespace CrashScribe
         public static Exception CtxExit(Exception __exception)
         {
             if (_depth > 0) _depth--;
-            if (_depth == 0) { _actDepth = 0; _ev = null; }
+            if (_depth == 0)
+            {
+                _actDepth = 0; _ev = null;
+                // recenzja: tron zablokowany w tym wywolaniu - sprawdzenie dopiero po calej metodzie wydarzenia (ROT wybija stary rod linie nizej);
+                // poza kontekstem (glebokosc 0), wiec nasza ChangeRulingClanAction nie przechodzi przez straz wydarzenia
+                if (_blocked.Count > 0) { try { RepairBlocked(); } catch (Exception e) { Stumble("RepairBlocked", e); } }
+            }
             return __exception;
         }
 
@@ -712,8 +734,11 @@ namespace CrashScribe
                     try { ChangeKingdomAction.ApplyByJoinToKingdom(__1, __0, default(CampaignTime), false); } catch (Exception e) { Stumble("RulingPre.Join", e); }
                     if (__1.Kingdom == __0) { st.Pre = "JOINED"; return true; }
                 }
-                st.Pre = "BLOCK:" + (__1.IsEliminated ? "rod wybity" : __1 == Clan.PlayerClan ? "rod gracza poza krolestwem"
-                                     : __1.IsUnderMercenaryService ? "rod najemny" : __1.Kingdom != null ? "rod w krolestwie " + Nm(__1.Kingdom) : "rod nie moze dolaczyc");
+                string why = __1.IsEliminated ? "rod wybity" : __1 == Clan.PlayerClan ? "rod gracza poza krolestwem"
+                             : __1.IsUnderMercenaryService ? "rod najemny" : __1.Kingdom != null ? "rod w krolestwie " + Nm(__1.Kingdom) : "rod nie moze dolaczyc";
+                st.Pre = "BLOCK:" + why;
+                for (int i = _blocked.Count - 1; i >= 0; i--) if (_blocked[i].K == __0) _blocked.RemoveAt(i);
+                _blocked.Add(new Blk { K = __0, Target = __1, Ev = _ev ?? "?", Why = why });
                 return false;
             }
             catch (Exception e) { Stumble("RulingPre", e); return true; }
@@ -732,7 +757,7 @@ namespace CrashScribe
                 if (pre.StartsWith("BLOCK:"))
                 {
                     Effect(_ev, 2, "tron", obj, "zablokowany przez CrashScribe (RotEventRulerInKingdom): " + pre.Substring(6) + " - tron zostaje przy " + Nm(k != null ? k.RulingClan : null)
-                           + " (bez tego krolestwo mialoby wladce spoza siebie)");
+                           + " (bez tego krolestwo mialoby wladce spoza siebie; po wydarzeniu sprawdzone, czy ten rod dalej moze rzadzic)");
                     return;
                 }
                 if (k == null || c == null) { Effect(_ev, 4, "tron", obj, "bez skutku (brak krolestwa / rodu)"); return; }
@@ -746,6 +771,75 @@ namespace CrashScribe
                 Effect(_ev, prev == c ? 4 : 0, "tron", obj, prev == c ? "bez skutku (juz rzadzil)" : "wykonany");
             }
             catch (Exception e) { Stumble("RulingPost", e); }
+        }
+
+        /// <summary>null = rod panujacy moze dalej rzadzic; inaczej powod (wybity / poza krolestwem / bez zywej glowy). Glowa ze znakiem smierci - w porzadku:
+        /// gdy umrze, gra sama wybiera nastepny rod (KillCharacterAction, rod jeszcze w krolestwie).</summary>
+        private static string RulerBad(Kingdom k, Clan c)
+        {
+            if (c == null) return "brak rodu panujacego";
+            if (c.IsEliminated) return Nm(c) + " wybity";
+            if (c.Kingdom != k) return Nm(c) + " poza krolestwem (w " + Nm(c.Kingdom) + ")";
+            if (c.Leader == null || !c.Leader.IsAlive) return Nm(c) + " bez zywej glowy";
+            return null;
+        }
+
+        /// <summary>Zastepca na tron: pierwszy rod krolestwa (kolejnosc Kingdom.Clans - jak galaz else ROT JeorMutinyEvent) inny niz obecny i niz rod z ROT,
+        /// nie gracza, nie najemny, nie wybity, z zywa glowa bez znaku smierci, DiplomacyModel.IsClanEligibleToBecomeRuler.</summary>
+        private static Clan SubstituteRuler(Kingdom k, Clan cur, Clan target)
+        {
+            var dm = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.DiplomacyModel : null;
+            foreach (var c in k.Clans)
+            {
+                if (c == null || c == cur || c == target || c == Clan.PlayerClan || c.IsEliminated || c.IsUnderMercenaryService || c.IsBanditFaction) continue;
+                if (c.Leader == null || !c.Leader.IsAlive || c.Leader.DeathMark != KillCharacterAction.KillCharacterActionDetail.None) continue;
+                if (dm != null && !dm.IsClanEligibleToBecomeRuler(c)) continue;
+                return c;
+            }
+            return null;
+        }
+
+        /// <summary>Po metodzie wydarzenia ROT (finalizer kontekstu, glebokosc 0): krolestwo z zablokowanym przekazaniem tronu, w ktorym rod panujacy
+        /// nie moze juz rzadzic (ROT wybil go zaraz po przekazaniu - JeorMutinyEvent, BastardsEvent) - tron dla zastepcy z krolestwa, a bez niego dla
+        /// rodu z ROT (zywy wladca spoza krolestwa lepszy niz rod wybity). Rod panujacy w porzadku - bez zmian (stan sprzed recenzji).</summary>
+        private static void RepairBlocked()
+        {
+            var list = new List<Blk>(_blocked);
+            _blocked.Clear();   // przed akcjami - sluchacze RulingClanChanged moga wejsc w metody ROT i znow dojsc do glebokosci 0
+            foreach (var b in list)
+            {
+                try
+                {
+                    var k = b.K;
+                    if (k == null || k.IsEliminated) continue;
+                    var cur = k.RulingClan;
+                    string bad = RulerBad(k, cur);
+                    if (bad == null) continue;
+                    var sub = SubstituteRuler(k, cur, b.Target);
+                    if (sub != null)
+                    {
+                        ChangeRulingClanAction.Apply(k, sub);
+                        string obj = Nm(k) + ": " + Nm(cur) + " -> " + Nm(sub);
+                        if (k.RulingClan == sub)
+                            Effect(b.Ev, 3, "tron", obj, "naprawiony przez CrashScribe (RotEventRulerInKingdom): po wydarzeniu rod panujacy " + bad + " - tron dla pierwszego rodu krolestwa "
+                                   + "zdolnego do rzadow (jak galaz else ROT JeorMutinyEvent), nie dla " + Nm(b.Target) + " (" + b.Why + ")");
+                        else
+                            Effect(b.Ev, 2, "tron", obj, "zablokowany przez inna latke (zastepca " + Nm(sub) + ", rzadzi " + Nm(k.RulingClan) + "; rod panujacy " + bad + ")");
+                        continue;
+                    }
+                    var t = b.Target;
+                    if (t != null && !t.IsEliminated && t != Clan.PlayerClan && t.Leader != null && t.Leader.IsAlive)
+                    {
+                        ChangeRulingClanAction.Apply(k, t);
+                        Effect(b.Ev, k.RulingClan == t ? 0 : 2, "tron", Nm(k) + ": " + Nm(cur) + " -> " + Nm(t), k.RulingClan == t
+                               ? "wykonany po wydarzeniu - UWAGA wladca spoza krolestwa (rod panujacy " + bad + ", w krolestwie brak innego rodu zdolnego do rzadow - tron dla rodu z ROT, " + b.Why + ")"
+                               : "zablokowany przez inna latke (rzadzi " + Nm(k.RulingClan) + "; rod panujacy " + bad + ")");
+                        continue;
+                    }
+                    Effect(b.Ev, 2, "tron", Nm(k) + ": " + Nm(cur) + " -> " + Nm(t), "zablokowany - krolestwo bez rodu zdolnego do rzadow (rod panujacy " + bad + "; rod z ROT " + b.Why + ")");
+                }
+                catch (Exception e) { Stumble("RepairBlocked." + (b.K != null ? b.K.StringId : "-"), e); }
+            }
         }
 
         // ------------------------------------------------------------ krolestwo rodu

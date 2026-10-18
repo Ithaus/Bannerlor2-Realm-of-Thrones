@@ -849,8 +849,9 @@ Uzycie (Python 3, tylko odczyt):
                     bledow RotEventFx 0, RX-2 smierci z wydarzen ROT zablokowane (CanHeroDie / inna droga) 0, RX-3 smierci odroczone przez gre (znak smierci - druzyna
                     w bitwie / oblezeniu): przy kluczu RotEventDeathNow kazda wykonana <= 26 h i czekajacych dluzej niz 2 doby w ostatniej linii RX 0 (bez klucza - INFO),
                     RX-4 nastepcy z ROT: "glowa rodu" / "tron i tytul suwerena" / "tytuly BK" zablokowane 0 (klucz RotEventHeirKeepsTitles; naprawione - INFO),
-                    RX-5 tron: przekazanie z wydarzenia ROT rodowi spoza krolestwa wykonane ("UWAGA wladca spoza krolestwa") 0 i krolestwa z wladca spoza krolestwa
-                    w ostatniej linii RX 0, RX-6 inne skutki zablokowane (krolestwo rodu, wlasciciel osady, wolnosc, upadek rodu / krolestwa) 0, RX-7 koszt doby
+                    RX-5 tron: przekazanie z wydarzenia ROT rodowi spoza krolestwa wykonane ("UWAGA wladca spoza krolestwa") 0, krolestwa bez rodu zdolnego do rzadow
+                    po wydarzeniu 0 (recenzja: po blokadzie ROT wybija stary rod - JeorMutiny, Bastards - zastepca z krolestwa = "naprawiony", INFO) i krolestwa
+                    z wladca spoza krolestwa w ostatniej linii RX 0, RX-6 inne skutki zablokowane (krolestwo rodu, wlasciciel osady, wolnosc, upadek rodu / krolestwa) 0, RX-7 koszt doby
                     (godziny + doba) <= 5 ms, RX-8 wydarzenia zakonczone bez skutkow (np. ROT RooseDeathEvent - ConditionsHold = false w ROT) i starty FABULA bez
                     linii "zakonczone" - INFO, RX-9 skutki wedlug wyniku (INFO). Log bez paczki (brak linii startu) - INFO, bez wyjatku.
 --grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
@@ -17223,11 +17224,13 @@ def nrot_main(logp, csp=None):
             (len(hk_block) == 0) if heir_key else None)
     thr = [m for m in effs if kind(m) == "tron"]
     thr_out = [m for m in thr if "UWAGA wladca spoza krolestwa" in m.group(5)]
+    thr_none = [m for m in thr if "bez rodu zdolnego do rzadow" in m.group(5)]   # recenzja: po blokadzie ROT wybil stary rod, a zastepcy brak
     out_last = int(days[-1].group("out")) if days else 0
     rep.add("RX-5: tron z wydarzenia ROT / wladca spoza krolestwa", f"przekazan {len(thr)}, do rodu spoza krolestwa wykonanych {len(thr_out)}, zablokowanych "
-            f"{sum(1 for m in thr if verdict(m) == 'zablokowany')}, naprawionych {sum(1 for m in thr if verdict(m) == 'naprawiony')} | krolestwa z wladca spoza krolestwa "
-            f"(ostatnia linia RX) {out_last}" + (f" [{days[-1].group('ol')[:120]}]" if days and out_last else ""),
-            "0 i 0" if ruler_key else "INFO (klucz NIE)", (len(thr_out) == 0 and out_last == 0) if ruler_key else None)
+            f"{sum(1 for m in thr if verdict(m) == 'zablokowany')}, naprawionych {sum(1 for m in thr if verdict(m) == 'naprawiony')}, krolestw bez rodu zdolnego "
+            f"do rzadow {len(thr_none)} | krolestwa z wladca spoza krolestwa (ostatnia linia RX) {out_last}" + (f" [{days[-1].group('ol')[:120]}]" if days and out_last else "")
+            + (" | " + "; ".join(f"{m.group(1)}: {m.group(3)[:60]}" for m in (thr_none + thr_out)[:2]) if thr_none or thr_out else ""),
+            "0, 0 i 0" if ruler_key else "INFO (klucz NIE)", (len(thr_out) == 0 and len(thr_none) == 0 and out_last == 0) if ruler_key else None)
     other = [m for m in effs if kind(m) not in ("smierc", "glowa rodu", "tron i tytul suwerena", "tytuly BK", "tron")]
     o_block = [m for m in other if verdict(m) == "zablokowany"]
     rep.add("RX-6: inne skutki zablokowane (krolestwo rodu, osada, wolnosc, upadek)", f"{len(o_block)} z {len(other)}"
