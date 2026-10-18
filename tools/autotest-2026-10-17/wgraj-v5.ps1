@@ -19,7 +19,8 @@ foreach ($m in 'Armoury', 'CrashScribe', 'RealisticCaptivity', 'GrandTourney', '
     $items += [pscustomobject]@{ name = $m + '.dll'; src = (Join-Path $DllDir ($m + '.dll')); dst = (Join-Path $GameDir ('Modules\' + $m + '\bin\Win64_Shipping_Client\' + $m + '.dll')); dll = $true }
 }
 foreach ($r in 'Armoury\GUI\Prefabs\ArmBurnedVillageLabels.xml', 'Armoury\GUI\Prefabs\ArmMapVillageTooltip.xml', 'Armoury\ModuleData\arm_map_roads_probe.tsv',
-               'Armoury\ModuleData\arm_map_villages.tsv', 'Armoury\ModuleData\arm_map_village_lore.tsv', 'Armoury\Prefabs\arm_map_roads.xml', 'CrashScribe\ModuleData\CrashScribe.settings.xml') {
+               'Armoury\ModuleData\arm_map_villages.tsv', 'Armoury\ModuleData\arm_map_village_lore.tsv', 'Armoury\Prefabs\arm_map_roads.xml', 'CrashScribe\ModuleData\CrashScribe.settings.xml',
+               'Armoury\SubModule.xml') {   # 18.10 f9-predkosc: UIExtenderEx LoadBeforeThis (optional) - SubModule.xml idzie z DLL
     $items += [pscustomobject]@{ name = $r; src = (Join-Path $Tree $r); dst = (Join-Path $GameDir ('Modules\' + $r)); dll = $false }
 }
 # Jeff 16.10 (uklad wiosek v5, galaz w-toku/noc-wioski): uklad wiosek i lore ida PARAMI (bramka layout_crc). arm_map_villages.tsv zawsze (wyzej); pliki _v4
@@ -36,6 +37,11 @@ $kl = Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv'   # 16.10 KS kalibrac
 if (Test-Path -LiteralPath $kl -PathType Leaf) { $items += [pscustomobject]@{ name = 'Armoury\ModuleData\arm_ks_land.tsv'; src = $kl; dst = (Join-Path $GameDir 'Modules\Armoury\ModuleData\arm_ks_land.tsv'); dll = $false } }
 $hc = Join-Path $Tree 'Armoury\ModuleData\arm_houses_canon.tsv'
 if (Test-Path -LiteralPath $hc -PathType Leaf) { $items += [pscustomobject]@{ name = 'Armoury\ModuleData\arm_houses_canon.tsv'; src = $hc; dst = (Join-Path $GameDir 'Modules\Armoury\ModuleData\arm_houses_canon.tsv'); dll = $false } }
+# 17.10 noc: kazdy plik danych Armoury\ModuleData\arm_*.tsv z drzewa (zajazdy, drogi geo, uklad v6 ...), ktorego jeszcze nie ma na liscie
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.tsv' -File -ErrorAction SilentlyContinue)) {
+    $r0 = 'Armoury\ModuleData\' + $f.Name
+    if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
+}
 foreach ($i in $items) {
     if (-not (Test-Path -LiteralPath $i.src -PathType Leaf)) { Write-Host ("STOP: brak zrodla " + $i.src); exit 2 }
     if ((Get-Item -LiteralPath $i.src).Length -eq 0) { Write-Host ("STOP: zrodlo puste " + $i.src); exit 2 }

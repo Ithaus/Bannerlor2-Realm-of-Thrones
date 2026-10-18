@@ -34,6 +34,8 @@ $v5tree = (Test-Path -LiteralPath $lay -PathType Leaf) -and ((Get-Content -Liter
 if ($v5tree) { $rel += 'Armoury\ModuleData\arm_map_villages_v4.tsv'; $rel += 'Armoury\ModuleData\arm_map_village_lore_v4.tsv' }
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_houses_canon.tsv')) { $rel += 'Armoury\ModuleData\arm_houses_canon.tsv' }   # 16.10 herby kanon (noc-herby)
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv')) { $rel += 'Armoury\ModuleData\arm_ks_land.tsv' }   # 16.10 KS kalibracja startu
+# 17.10 noc: kazdy plik danych Armoury\ModuleData\arm_*.tsv z drzewa (zajazdy, drogi geo, uklad v6 ...), ktorego jeszcze nie ma na liscie
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.tsv' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\ModuleData\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
 $ef = @()
 foreach ($r in $rel) {
     $src = Join-Path $Tree $r
