@@ -1515,7 +1515,7 @@ namespace Armoury
         public int CampBackground = 1;                     // picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like
         public bool MapClockEnabled = true;                // the hour of the day next to the date on the map bar ("Year 299, Day 256, Autumn - 14:30")
         public bool ReadableDateEnabled = true;            // dates read "Year 299, Day 256, Autumn": the year, the day of that year (1 to 364) and the season - on the map bar, in the encyclopedia and war logs, in the notices with a scene and in the Iron Bank's terms; the day turns at midnight sharp; off = the old "Day 3659 of Summer, 299 AC" (which now turns at midnight too)
-        public float FastForwardMultiplier = 8f;           // how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock
+        public float FastForwardMultiplier = 8f;           // how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock; with Map Speed Buttons on, the chosen Fast / Very Fast speed is used instead
         public float SleepHoursNeeded = 6f;                // base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it
         public float DayRestFactor = 0.6f;                 // sleep by daylight counts at this rate (camp noise, heat, light) - night hours count in full
         public bool QuickCampKey = true;                   // press O on the campaign map to pitch the BannerKings camp on the spot
@@ -1581,6 +1581,17 @@ namespace Armoury
         public bool SightCycleEnabled = true;              // eyes follow the sun: every party sees further by day and shorter after dark
         public float DaySightFactor = 1.15f;               // spotting range in daylight, times this
         public float NightSightFactor = 0.65f;             // spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud
+
+        // --- Map speed buttons ---
+        // f9-predkosc (Jeff 18.10: "przy x8 gra zwalnia i sie przycina ... jest mod, ktory daje trzy buttony x1, x4 i x8"): MapSpeed.cs, MapSpeedUi.cs, MapSpeedProfile.cs.
+        // Przyciski nad zegarem paska mapy (UIExtenderEx), klawisze 4/5/6, wybrany bieg dziala tylko w biegu szybkim (x1 = zwykle play). Wylaczone MapSpeedButtons =
+        // mnoznik z FastForwardMultiplier jak dotad. MapSpeedPerf - oszczedne liczenie bez zmiany wyniku gry (pamiec FindType, siatka band w spoczynku) i widoku
+        // tylko w szczegolach (namioty AI po kilka na klatke, zegar paska najwyzej 10 razy na sekunde przy biegu szybkim); wylaczone = kod jak przed f9.
+        public bool MapSpeedButtons = true;                // three speed buttons above the clock on the campaign map: x1 (normal play), Fast and Very Fast. The chosen fast speed is used only while time runs fast - also by the game's own fast-forward button, key 3 and holding space; off = the fast-forward speed comes from Fast Forward Multiplier as before
+        public int MapSpeedFast = 4;                       // the Fast button: how many times faster than normal play
+        public int MapSpeedVeryFast = 8;                   // the Very Fast button: how many times faster than normal play
+        public bool MapSpeedKeys = true;                   // keys 4, 5 and 6 on the campaign map pick Normal, Fast and Very Fast speed (keys 1, 2, 3 and space keep their usual jobs)
+        public bool MapSpeedPerf = true;                   // leaner bookkeeping at high map speed, same outcome: AI camp tents near you go up and come down a few per frame instead of all in one frame, the map clock text refreshes at most ten times a second while time runs fast, resting bands look for nearby lords through a map grid; off = the old way
 
         // --- The worth of a lesson ---
         public bool CombatXpFixEnabled = true;             // RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions

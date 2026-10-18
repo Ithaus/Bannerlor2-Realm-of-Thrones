@@ -640,7 +640,9 @@ namespace Armoury
             double dms = (t1 - t0) * 1000.0 / Stopwatch.Frequency, cms = (t2 - t1) * 1000.0 / Stopwatch.Frequency;
             _day.DebtCalls++; _day.DebtMsSum += dms; if (dms > _day.DebtMsMax) _day.DebtMsMax = dms;
             _day.CampCalls++; _day.CampMsSum += cms; if (cms > _day.CampMsMax) _day.CampMsMax = cms;
+            long tb = Stopwatch.GetTimestamp();
             AiBanditRest(s, h);
+            MapSpeedProfile.Bandit(Stopwatch.GetTimestamp() - tb);   // f9-predkosc: czas band w spoczynku do linii "Predkosc mapy (f9)" (tylko log)
             try { SnapshotPositions(s); } catch (Exception e) { Log.Error("NightRest.SnapshotPositions", e); }
         }
 
@@ -700,6 +702,7 @@ namespace Armoury
                 foreach (var mp in _townHold) EnableAi(mp);
                 _townHold.Clear();
                 foreach (var mp in _camping) if (mp != null && mp.IsActive) EnableAi(mp);
+                DrainTentClear(int.MaxValue); _tentMore = false;   // f9-predkosc: zdjecia switu z kolejki (MapSpeedPerf) - od reki, jak reszta wylacznika
                 foreach (var mp in _tented) Tent(mp, false);
                 _tented.Clear(); _tentPos.Clear();
                 foreach (var mp in new List<MobileParty>(_orders.Keys)) GiveOrderBack(mp);

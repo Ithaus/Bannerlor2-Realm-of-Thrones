@@ -435,6 +435,9 @@ RANGES = {
     'KsSwitchMarketBand': (0.0, 0.5, "0.00"),
     # f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band na zajeta kryjowke - kod przycina do 48, a <= 12 (ROT) to cel gry bez zmian (BanditLimit.RaisedTarget)
     'BanditLimitPerHideout': (12, 48, "0"),
+    # f9-predkosc (18.10): biegi przyciskow mapy - kod przycina do 2..16 i 2..32 (MapSpeed.FastOf / VeryFastOf)
+    'MapSpeedFast': (2, 16, "0"),
+    'MapSpeedVeryFast': (2, 32, "0"),
 }
 
 def gen(module_dir, ns, display):

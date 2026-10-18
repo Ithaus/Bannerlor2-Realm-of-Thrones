@@ -1207,13 +1207,33 @@ namespace Armoury
         }
 
         /// <summary>DLL DTE nazywa sie z numerem wersji (v1.4.7) - szukamy typu po WSZYSTKICH zestawach.</summary>
+        // f9-predkosc (MapSpeedPerf): pamiec ZNALEZIONYCH typow - przeglad wszystkich zestawow procesu (ok. 270 + dynamiczne) kosztuje ok. 50 us na wywolanie
+        // (pomiar syntetyczny f9 na zestawach gry Jeffa), a NightRest.Tent wola FindType przy kazdym namiocie AI. Ten sam wynik: zestaw raz zaladowany zostaje
+        // w procesie, nowe dochodza na koniec listy GetAssemblies, wiec pierwszy zestaw z typem jest zawsze ten sam. Chybienia NIE sa zapamietywane (typ moze
+        // dojsc z pozniej ladowanym zestawem) - szukane jak dotad. Wylaczony klucz = przeglad przy kazdym wywolaniu.
+        private static readonly Dictionary<string, Type> _ftCache = new Dictionary<string, Type>();
+        private static readonly object _ftLock = new object();
+
         internal static Type FindType(string fullName)
         {
+            MapSpeedProfile.FtCalls++;
+            var s = Settings.Current;
+            bool memo = fullName != null && s != null && s.MapSpeedPerf;
+            if (memo)
+            {
+                lock (_ftLock)
+                {
+                    Type hit;
+                    if (_ftCache.TryGetValue(fullName, out hit)) { MapSpeedProfile.FtHits++; return hit; }
+                }
+            }
+            Type found = null;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
-                try { var t = asm.GetType(fullName); if (t != null) return t; } catch { }
+                try { var t = asm.GetType(fullName); if (t != null) { found = t; break; } } catch { }
             }
-            return null;
+            if (found != null && memo) lock (_ftLock) { _ftCache[fullName] = found; }
+            return found;
         }
 
         internal static void ApplyAll(Harmony h)

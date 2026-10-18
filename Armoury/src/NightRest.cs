@@ -385,6 +385,12 @@ namespace Armoury
         // pozycja przy postawieniu namiotu AI - kto odjechal > 0.3 jedn., traci namiot
         private static readonly System.Collections.Generic.Dictionary<MobileParty, Vec2> _tentPos =
             new System.Collections.Generic.Dictionary<MobileParty, Vec2>();
+        // f9-predkosc (MapSpeedPerf, sam widok): namioty AI stawiane i zdejmowane najwyzej po TentPerFrame na klatke ekranu mapy. Postawienie to encja z herbem
+        // klanu (AddTentEntityForParty), zdjecie - przebudowa wizerunku partii (ClearVisualMemory); przy starcie obozu w gestym miejscu do AiTentCap (60) naraz
+        // w klatce taktu godziny (AiNightCamp maks. 18-52 ms w logach Jeffa), o swicie tyle samo. Ksiega snu, rozkazy i _camping bez zmian - tylko chwila obrazka.
+        private const int TentPerFrame = 8;
+        private static readonly System.Collections.Generic.List<MobileParty> _tentClear = new System.Collections.Generic.List<MobileParty>();   // zdjecia switu czekajace
+        private static bool _tentMore;   // RefreshNearbyTents zostawil kandydatow (budzet klatki) - TentFrameWork dobiera w nastepnej klatce
         // liczniki godziny (log w linii "AiNightCamp"): obudzenia wedlug rodzaju i zjazd
         private static float _wokenDriftSum, _wokenDriftMax;
         private static int _wokenHold, _wokenOurOrder, _wokenOther;
@@ -404,6 +410,7 @@ namespace Armoury
             try
             {
                 _camping.Clear(); _tented.Clear(); _bedPos.Clear(); _stillPos.Clear(); _tentPos.Clear(); _orders.Clear();
+                _tentClear.Clear(); _tentMore = false;   // f9-predkosc: kolejka namiotow poprzedniej kampanii (jej wizerunkow juz nie ma)
                 _lastHoldSweep = CampaignTime.Zero; _lastTentDrop = CampaignTime.Zero; _lastTentRefresh = DateTime.MinValue;
                 _cfgSig = -1;
                 // T10 poprawka recenzji: pozycja gracza z poprzedniej kampanii nie liczy sie jako ruch - pierwsza godzina po wczytaniu
@@ -660,6 +667,11 @@ namespace Armoury
         {
             try
             {
+                // f9-predkosc (MapSpeedPerf): zdjecia switu z kolejki schodza PRZED kazdym nowym namiotem (najpierw zdjac, potem stawiac - jak dotad);
+                // stawianie najwyzej TentPerFrame namiotow na wywolanie - reszta w nastepnych klatkach (TentFrameWork), zamiast do 60 encji z herbami w jednej klatce
+                if (_tentClear.Count > 0) DrainTentClear(int.MaxValue);
+                _tentMore = false;
+                int budget = s.MapSpeedPerf ? TentPerFrame : int.MaxValue, made = 0;
                 if (!s.CampTentIcon || MobileParty.MainParty == null) return;
                 var me = MobileParty.MainParty.GetPosition2D;
                 float radius = MathF.Max(5f, s.AiTentRadius);
@@ -682,13 +694,15 @@ namespace Armoury
                     if (mp.Ai == null || !mp.Ai.IsDisabled) continue;      // obudzony = zadnego namiotu
                     if (_tented.Contains(mp)) continue;
                     if (mp.GetPosition2D.Distance(me) > radius) continue;
+                    if (made >= budget) { _tentMore = true; break; }   // f9: reszta w nastepnej klatce
                     Tent(mp, true);
                     _tented.Add(mp);
+                    made++;
                 }
                 // NOCA kazda STOJACA kolumna w zasiegu wyglada jak oboz (Jeff
                 // 31.08: "inni stoja konik lub piechur jakby nic; promien ~100")
                 // - takze te, ktore zatrzymalo vanilla AI, nie nasz nocleg
-                if (nightNow)
+                if (nightNow && !_tentMore)
                 {
                     foreach (var mp in MobileParty.All)
                     {
@@ -701,13 +715,46 @@ namespace Armoury
                         if (mp.GetPosition2D.Distance(me) > radius) continue;
                         if (!IsStill(mp)) continue;
                         if (Undead.Party(mp)) continue;                    // umarli nie obozuja
+                        if (made >= budget) { _tentMore = true; break; }   // f9: reszta w nastepnej klatce
                         Tent(mp, true);
                         _tented.Add(mp);
+                        made++;
                     }
                 }
                 PruneStill(me, radius);
             }
             catch (Exception e) { Log.Error("RefreshNearbyTents", e); }
+        }
+
+        /// <summary>
+        /// f9-predkosc (MapSpeedPerf): praca namiotow AI w klatce ekranu mapy (MapFramePostfix - raz na klatke, takze na pauzie): najpierw do TentPerFrame zdjec
+        /// switu z kolejki, potem - gdy RefreshNearbyTents zostawil kandydatow - jeszcze jeden dobor (znowu najwyzej TentPerFrame postawien). Te same warunki co
+        /// odswiezenie co 2 s w OnTick (oboz swiata, ikony namiotow, godzina obozu, ktos spi); klucz wylaczony w trakcie gry - kolejka schodzi od reki.
+        /// </summary>
+        private static void TentFrameWork()
+        {
+            var s = Settings.Current;
+            if (_tentClear.Count > 0) DrainTentClear(s != null && s.MapSpeedPerf ? TentPerFrame : int.MaxValue);
+            if (!_tentMore) return;
+            if (s == null || !s.MapSpeedPerf || !s.AiCampsAtNight || !s.CampTentIcon || Campaign.Current == null || _camping.Count == 0
+                || !InCamp(CampaignTime.Now.GetHourOfDay))
+            { _tentMore = false; return; }
+            MapSpeedProfile.TentBacklogRuns++;
+            RefreshNearbyTents(s);
+        }
+
+        /// <summary>f9-predkosc: zdjecie najwyzej n namiotow z kolejki switu (od konca listy). Kazdy namiot schodzi dokladnie raz (Tent(mp, false) jak dotad o swicie).</summary>
+        private static void DrainTentClear(int n)
+        {
+            int k = 0;
+            while (_tentClear.Count > 0 && k < n)
+            {
+                int i = _tentClear.Count - 1;
+                var mp = _tentClear[i];
+                _tentClear.RemoveAt(i);
+                Tent(mp, false);
+                k++;
+            }
         }
 
         // czy partia stoi w miejscu: porownanie z pozycja z poprzedniego
@@ -1026,9 +1073,17 @@ namespace Armoury
                     _tentPos.Clear();
                     if (_tented.Count > 0)
                     {
-                        foreach (var mp in _tented) Tent(mp, false);
+                        // f9-predkosc (MapSpeedPerf): zdjecia namiotow do kolejki - schodza po TentPerFrame na klatke (TentFrameWork); wylaczony klucz - wszystkie od reki
+                        if (s.MapSpeedPerf)
+                        {
+                            _tentClear.AddRange(_tented);
+                            MapSpeedProfile.TentClearQueued += _tented.Count;
+                            if (_tentClear.Count > MapSpeedProfile.TentClearMax) MapSpeedProfile.TentClearMax = _tentClear.Count;
+                        }
+                        else foreach (var mp in _tented) Tent(mp, false);
                         _tented.Clear();
                     }
+                    _tentMore = false;
                     _camping.Clear();
                     _bedPos.Clear();
                     // SWIT: kazdy uspiony lord dostaje z powrotem swoj rozkaz
@@ -1184,6 +1239,58 @@ namespace Armoury
         }
 
         /// <summary>
+        /// f9-predkosc (MapSpeedPerf): siatka pozycji lordow do AiBanditRest. Bok komorki C = 1.0625 x promien + 0.0625: kazda para z obliczonym Distance <= promien
+        /// ma |dx|, |dy| <= promien x (1 + 4e-7), wiec numery komorek (Math.Floor w double) roznia sie najwyzej o 1 - przeglad 3 x 3 komorek zawiera wszystkie
+        /// takie pary. W komorkach sprawdzany ten sam test co w starej petli (punkt bandy .Distance(pozycja lorda) <= promien) - siatka tylko pomija lordow, ktorzy
+        /// nie moga go spelnic. Lord z NaN / nieskonczonoscia w pozycji - pominiety (Distance <= promien nigdy prawda); pozycja o numerze komorki ponad 1e8 -
+        /// lista luzna, sprawdzana zawsze. Punkt bandy nieskonczony albo za daleki: -1 (decyduje stara petla).
+        /// </summary>
+        private sealed class BanditGrid
+        {
+            private readonly double _c;
+            private readonly System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<Vec2>> _cells =
+                new System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<Vec2>>();
+            private readonly System.Collections.Generic.List<Vec2> _loose = new System.Collections.Generic.List<Vec2>();
+
+            internal BanditGrid(System.Collections.Generic.List<MobileParty> lords, float r)
+            {
+                _c = r * 1.0625 + 0.0625;
+                foreach (var t in lords)
+                {
+                    var p = t.GetPosition2D;
+                    if (!Finite(p.x) || !Finite(p.y)) continue;
+                    double fx = Math.Floor(p.x / _c), fy = Math.Floor(p.y / _c);
+                    if (Math.Abs(fx) > 1e8 || Math.Abs(fy) > 1e8) { _loose.Add(p); continue; }
+                    long k = Key((int)fx, (int)fy);
+                    System.Collections.Generic.List<Vec2> l;
+                    if (!_cells.TryGetValue(k, out l)) { l = new System.Collections.Generic.List<Vec2>(4); _cells[k] = l; }
+                    l.Add(p);
+                }
+            }
+
+            internal static bool Finite(float v) { return !float.IsNaN(v) && !float.IsInfinity(v); }
+            private static long Key(int cx, int cy) { return ((long)cx << 32) | (uint)cy; }
+
+            /// <summary>1 - jakis lord w promieniu, 0 - zaden, -1 - punkt bandy poza siatka (stara petla).</summary>
+            internal int Any(Vec2 p, float r)
+            {
+                if (!Finite(p.x) || !Finite(p.y)) return -1;
+                double fx = Math.Floor(p.x / _c), fy = Math.Floor(p.y / _c);
+                if (Math.Abs(fx) > 1e8 || Math.Abs(fy) > 1e8) return -1;
+                int cx = (int)fx, cy = (int)fy;
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        System.Collections.Generic.List<Vec2> l;
+                        if (!_cells.TryGetValue(Key(cx + dx, cy + dy), out l)) continue;
+                        for (int i = 0; i < l.Count; i++) if (p.Distance(l[i]) <= r) return 1;
+                    }
+                for (int i = 0; i < _loose.Count; i++) if (p.Distance(_loose[i]) <= r) return 1;
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// NATURY BAND (Jeff: "niektorzy poluja w dzien, inni w nocy, roznie").
         /// Kazda banda ma stala nature (z jej Id, nie zmienia sie): trzy na
         /// cztery to NOCNI lowcy - za dnia (10-16) leza w ukryciu, noca chodza;
@@ -1206,6 +1313,12 @@ namespace Armoury
                 foreach (var t in MobileParty.All)
                     if (t != null && t.IsActive && t.IsLordParty) lords.Add(t);
 
+                // f9-predkosc (MapSpeedPerf): "czy jakis lord w promieniu" przez siatke pozycji lordow (BanditGrid) zamiast petli banda x wszyscy lordowie - ten sam
+                // test Distance <= promien na tych samych parach, ta sama odpowiedz tak/nie (pozycje lordow stoja w tej petli: nikt sie nie rusza, Hold bandy nie
+                // przesuwa nikogo). Co 64. zapytanie takze stara petla - roznice do linii "Predkosc mapy (f9)" (musza byc 0). Promien <= 0 / NaN - stara petla.
+                float dangerR = s.AiCampDangerRadius;
+                BanditGrid grid = s.MapSpeedPerf && dangerR > 0f && BanditGrid.Finite(dangerR) && lords.Count > 0 ? new BanditGrid(lords, dangerR) : null;
+
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || !mp.IsActive || !mp.IsBandit) continue;
@@ -1217,8 +1330,26 @@ namespace Armoury
                     if (dayWindow && dayHunter) continue;              // dzienny wlasnie poluje
                     if (nightWindow && !dayHunter) continue;           // nocny wlasnie poluje
                     bool danger = false;
-                    foreach (var t in lords)
-                        if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
+                    int g = grid != null ? grid.Any(mp.GetPosition2D, dangerR) : -1;
+                    if (g >= 0)
+                    {
+                        danger = g == 1;
+                        MapSpeedProfile.GridQueries++;
+                        if ((MapSpeedProfile.GridQueries & 63) == 1)
+                        {
+                            bool lin = false;
+                            foreach (var t in lords)
+                                if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { lin = true; break; }
+                            MapSpeedProfile.GridSamples++;
+                            if (lin != danger) MapSpeedProfile.GridDiff++;
+                            danger = lin;   // w probce decyduje stara petla
+                        }
+                    }
+                    else
+                    {
+                        foreach (var t in lords)
+                            if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
+                    }
                     if (danger) continue;
                     mp.Ai.DisableForHours(1);
                     mp.SetMoveModeHold();
@@ -1256,7 +1387,15 @@ namespace Armoury
             return d != null && d.Contains(party) ? d[party] : null;
         }
 
+        /// <summary>f9-predkosc: stoper namiotu AI (tylko log, linia "Predkosc mapy (f9)") wokol TentCore - postawienie / zdjecie wizerunku bez zmian.</summary>
         internal static void Tent(MobileParty mp, bool on)
+        {
+            long tt = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { TentCore(mp, on); }
+            finally { if (mp != null && mp != MobileParty.MainParty) MapSpeedProfile.Tent(on, System.Diagnostics.Stopwatch.GetTimestamp() - tt); }
+        }
+
+        private static void TentCore(MobileParty mp, bool on)
         {
             try
             {
@@ -1782,7 +1921,15 @@ namespace Armoury
 
         private static Vec2 _campPos;
 
+        /// <summary>f9-predkosc: stoper haka klatki (TickEvent i klatka MapScreen; tylko log) wokol OnTickCore - dzialanie bez zmian.</summary>
         internal static void OnTick(float dt)
+        {
+            long th = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { OnTickCore(dt); }
+            finally { MapSpeedProfile.Hook(MapSpeedProfile.HNight, System.Diagnostics.Stopwatch.GetTimestamp() - th); }
+        }
+
+        private static void OnTickCore(float dt)
         {
             try
             {
@@ -2348,7 +2495,11 @@ namespace Armoury
         internal static void MapFramePostfix()
         {
             try { OnTick(0f); } catch { }
+            try { TentFrameWork(); }   // f9-predkosc: namioty AI po kilka na klatke (MapSpeedPerf)
+            catch (Exception e) { _tentWorkStumbles++; if (_tentWorkStumbles <= 3 || _tentWorkStumbles % 1000 == 0) Log.Error("NightRest.TentFrameWork (potkniecie " + _tentWorkStumbles + ")", e); }
         }
+
+        private static int _tentWorkStumbles;   // f9-predkosc: potkniecia pracy namiotow w klatce - log dlawiony (co klatke nie zalewa logu), funkcja dziala dalej
 
         internal static void ApplyAll(Harmony harmony)
         {
