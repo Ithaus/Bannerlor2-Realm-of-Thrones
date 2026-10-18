@@ -2953,3 +2953,6 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   renty, splata z D i lupow, drabina 168 przy zwloce; tez gracz z menu); 4. SAKIEWKA TURNIEJOWA OD MIESZCZAN - TAK; 6. NIEWOLA ZA DLUGI - TAK (tylko kultury z niewola, 1%/rok przy
   Dostatku < 0.8 bez zapasu); 7. LIMIT BAND ROT - (b) WYZEJ, ok. 2200 (zajete kryjowki x 24), z pomiarem spowolnienia (Jeff pytal "o ile spowolni"); 1. kasy miast z dlugami, 3. karta
   miejska, 5. duchowni - NIE.
+- 08:10 PDT 18.10: JEFF GRA (WGRANIE 80, Armoury 7b9f9ad0): "chce teraz pograc, rob wszystko w tle, jak skoncze gre to dam ci znac i zaczniesz wgrywac i robic swoje testy" -> ZADNYCH testow
+  i wgran do jego sygnalu. W tle: fala 6 (wf_a61661c1-43f) i fala 7 (wf_e82bf741-4cc) - tylko kod. Po jego grze: kopia logow sesji Jeffa (D:/Backup-Bannerlord/logi-jeffa/2026-10-18) i
+  zapisu, sprawdzenie logu (KS: samo uzbrojenie, ERROR), potem scalenie, test, WGRANIE 81.
