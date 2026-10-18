@@ -46,10 +46,20 @@ namespace Armoury
     /// stan (2 bity: 0 nieznany, 1 poza droga, 2 na drodze). Zapis w SpeedRoad (watek liczacy te partie), odczyt w postfiksie pamieci; jeden long =
     /// zapis atomowy na x64 (Volatile). Inna partia w tym samym slocie = stan nieznany = decyduje gra (jak bez latki). Ta sama komorka bez odcinkow =
     /// stan "poza droga" bez liczenia odleglosci (O(1)). Tablica czyszczona przy kazdym starcie sesji (indeksy partii sa z kampanii).
+    /// STRAZNIK ZAPISU (recenzja 17/18.10, uwaga 1): stan drogi zapisywany do pamieci partii TYLKO w liczeniu, ktore gra zapisuje do _lastCalculatedSpeed
+    /// (dekompilacja 1.4.8: jedyne zapisy to MobileParty.CalculateSpeedForPartyUnified i getter SpeedExplained) - prefiks + finalizer na obu ustawia
+    /// [ThreadStatic] _writer = ta partia. Model wolany wprost (BkrotChains.SpeedOf co dobe, takze dla gracza; szacunki innych modow) nie zapisuje stanu -
+    /// inaczej slot mowilby "na drodze", a pamiec gry trzymalaby predkosc sprzed wejscia na droge (postfiks pamieci nie widzialby roznicy). Bez obu latek
+    /// straznika (blad wpinania) - zapis jak przed recenzja (wszystkie liczenia poza probka E7/T i audytem).
+    /// LATKA PREDKOSCI: premia jedzie w latce MarchPace (wpinana przy starcie gry, gdy MarchPaceEnabled albo MapRoadSpeedBonus) - MarchPace.ApplyAll podaje
+    /// liczbe wpietych modeli (SpeedModels). 0 = klucz wlaczony dopiero w trakcie gry przy obu kluczach wylaczonych na starcie: linie mowia NIECZYNNA (restart).
     ///
     /// POMIAR (tylko log): spis partio-godzin w dobach pomiaru (LogGate.Today - w grze co QuietLogEveryDays, w autotescie codziennie), audyt w takcie
     /// linii (do 8 partii AI na drodze + gracz: predkosc bez premii drogi i z premia z modelu wprost - bez zapisu do pamieci partii; premia rzeczywista,
     /// wpis "Road", sufit, pamiec gry), linia "Drogi (DR): dzien N". Bledy liczone (potkniecia), nigdy wylacznik calej funkcji. Nic nie idzie do zapisu gry.
+    /// Ciche logi (recenzja, uwaga 2): liczniki predkosci i potkniec zerowane takze w dobie bez linii - linia mowi o tej samej dobie co spis godzinny.
+    /// Podloga gry (recenzja, uwaga 3): partia na LimitMin (MinimumSpeed 1, np. dlug snu 3 = -90% w NightRest po nas) traci premie i w modelu, i u nas -
+    /// audyt liczy ja osobno ("na podlodze LimitMin"), poza srednia premii i "zjedzona przez sufit".
     /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (15), MapRoadMargin (0.4). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
     /// pamieci wychodza od razu; plik nie jest wczytywany).
     /// </summary>
@@ -139,9 +149,15 @@ namespace Armoury
         // audyt: [ThreadStatic] - tylko watek glowny audytu; watki robocze gry widza false
         [ThreadStatic] private static bool _suppress;   // liczenie "bez premii drogi"
         [ThreadStatic] private static bool _noRecord;   // liczenie bez zapisu stanu do pamieci partii
+        // straznik zapisu (recenzja, uwaga 1): partia, ktorej predkosc gra wlasnie liczy DO PAMIECI (CalculateSpeedForPartyUnified / getter SpeedExplained);
+        // [ThreadStatic] - kazdy watek roboczy gry ma swoja; poprzednia wartosc wraca w finalizerze (__state), takze przy wyjatku
+        [ThreadStatic] private static MobileParty _writer;
+        private static int _writerHooks;               // 0..2 wpietych latek straznika; 2 = straznik czynny, inaczej zapis jak przed recenzja
+        /// <summary>MarchPace.ApplyAll: liczba modeli predkosci z latka MarchPace.SpeedPostfix (niesie SpeedRoad); 0 = latka niewpieta przy starcie gry.</summary>
+        internal static int SpeedModels;
 
         // liczniki z watkow roboczych (przyblizone - bez blokad, jak HorseState): przeliczenia wymuszone, wywolania postfiksu pamieci, probka czasu
-        private static long _flips, _cacheCalls, _cacheTicks, _cacheSampled, _speedCalls, _speedOn;
+        private static long _flips, _cacheCalls, _cacheTicks, _cacheSampled, _speedCalls, _speedOn, _recSkipped;
         private static int _parStumbles, _parStumblesAll;
         private static int _stumbles, _stumblesAll;
         private static Exception _firstPar;
@@ -200,7 +216,9 @@ namespace Armoury
                 float x = p.X, y = p.Y;
                 int c = g.CellOf(x, y);
                 bool on = !g.Empty(c) && g.OnRoad(c, x, y, MarginOf(s));
-                if (!_noRecord && !TerrainEase.ProbeActive) Record(mp, c, on);
+                // stan do pamieci partii tylko z liczenia, ktore gra zapisuje do _lastCalculatedSpeed (straznik zapisu); bez straznika - jak przed recenzja
+                if (!_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp))) Record(mp, c, on);
+                else _recSkipped++;
                 _speedCalls++;
                 if (!on) return;
                 _speedOn++;
@@ -256,6 +274,67 @@ namespace Armoury
             finally { if (t0 != 0) { _cacheTicks += Stopwatch.GetTimestamp() - t0; _cacheSampled++; } }
         }
 
+        /// <summary>Straznik zapisu - prefiks MobileParty.CalculateSpeedForPartyUnified (prywatna) i gettera SpeedExplained: gra liczy predkosc tej partii DO
+        /// PAMIECI (_lastCalculatedSpeed); SpeedRoad zapisze stan drogi tylko wtedy. Poprzednia wartosc w __state (zagniezdzenie innej partii).</summary>
+        public static void WriterPrefix(MobileParty __instance, out MobileParty __state)
+        {
+            __state = _writer;
+            _writer = __instance;
+        }
+
+        /// <summary>Straznik zapisu - finalizer (biegnie takze przy wyjatku, wyjatek gry idzie dalej bez zmian): przywraca poprzednia partie watku.</summary>
+        public static void WriterFinalizer(MobileParty __state)
+        {
+            _writer = __state;
+        }
+
+        private static bool HasOurs(MethodBase m, string patchName, bool finalizer)
+        {
+            var pi = Harmony.GetPatchInfo(m);
+            if (pi == null) return false;
+            foreach (var x in finalizer ? pi.Finalizers : pi.Prefixes)
+                if (x.PatchMethod != null && x.PatchMethod.DeclaringType == typeof(MapRoads) && x.PatchMethod.Name == patchName) return true;
+            return false;
+        }
+
+        /// <summary>Straznik zapisu: prefiks + finalizer na obu metodach zapisujacych pamiec predkosci gry. Obie albo zadna (jedna wpieta = straznik dziurawy -
+        /// zdjeta tym samym MethodInfo; zapis stanu jak przed recenzja).</summary>
+        private static void HookWriters(Harmony h)
+        {
+            _writerHooks = 0;
+            var pre = typeof(MapRoads).GetMethod("WriterPrefix", BindingFlags.Public | BindingFlags.Static);
+            var fin = typeof(MapRoads).GetMethod("WriterFinalizer", BindingFlags.Public | BindingFlags.Static);
+            var targets = new MethodBase[]
+            {
+                AccessTools.DeclaredMethod(typeof(MobileParty), "CalculateSpeedForPartyUnified"),
+                AccessTools.DeclaredPropertyGetter(typeof(MobileParty), "SpeedExplained")
+            };
+            var done = new List<MethodBase>(2);
+            string why = "";
+            foreach (var t in targets)
+            {
+                if (t == null) { why += " brak metody;"; continue; }
+                try
+                {
+                    h.Patch(t, prefix: new HarmonyMethod(pre), finalizer: new HarmonyMethod(fin));
+                    if (HasOurs(t, "WriterPrefix", false) && HasOurs(t, "WriterFinalizer", true)) done.Add(t);
+                    else why += " " + t.Name + " bez latki po Patch;";
+                }
+                catch (Exception e) { why += " " + t.Name + " " + e.GetType().Name + ";"; Log.Error("MapRoads.HookWriters " + t.Name, e); }
+            }
+            if (done.Count == targets.Length) _writerHooks = done.Count;
+            else
+            {
+                foreach (var t in done)
+                {
+                    try { h.Unpatch(t, pre); h.Unpatch(t, fin); } catch (Exception e) { Log.Error("MapRoads.HookWriters Unpatch " + t.Name, e); }
+                }
+            }
+            Log.Info(P + "straznik zapisu stanu drogi (MobileParty.CalculateSpeedForPartyUnified, getter SpeedExplained) " + _writerHooks + "/2 "
+                     + (_writerHooks == 2 ? "wpiety - stan drogi zapisywany tylko w liczeniu, ktore gra zapisuje do pamieci predkosci (model wolany wprost - bez zapisu)."
+                                          : "NIEWPIETY (" + why.Trim() + ") - stan drogi zapisywany przy kazdym liczeniu (jak przed recenzja)."));
+        }
+
         // ------------------------------------------------------------------ latka (menu glowne, SubModuleMain - po MarchPace.ApplyAll)
         internal static void ApplyAll(Harmony h)
         {
@@ -284,6 +363,8 @@ namespace Armoury
                 _hookNote = ok ? "wpieta" : "NIE wpieta (brak postfiksu po Patch)";
                 Log.Info(P + "latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid " + (ok ? "wpieta" : "NIE wpieta (brak postfiksu po Patch)")
                          + " (premia drogi przeliczana przy wejsciu na droge i zejsciu z niej, nie tylko przy zmianie sciany siatki).");
+                // straznik zapisu (recenzja, uwaga 1) potrzebny tylko postfiksowi pamieci - bez niego latki straznika bylyby samym kosztem
+                if (ok) HookWriters(h);
             }
             catch (Exception e) { _hookNote = "NIE wpieta (" + e.GetType().Name + ")"; Log.Error("MapRoads.ApplyAll", e); }
         }
@@ -303,8 +384,22 @@ namespace Armoury
         {
             for (int i = 0; i < _hN.Length; i++) { _hN[i] = 0; _hOn[i] = 0; }
             _hours = 0; _censusTicks = 0;
-            _flips = 0; _cacheCalls = 0; _cacheTicks = 0; _cacheSampled = 0; _speedCalls = 0; _speedOn = 0;
+            ZeroSpeed();
+        }
+
+        /// <summary>Liczniki sciezki predkosci i potkniec doby (bez spisu godzinnego - ten zbiera tylko w dobach pomiaru i zeruje sie po linii).</summary>
+        private static void ZeroSpeed()
+        {
+            _flips = 0; _cacheCalls = 0; _cacheTicks = 0; _cacheSampled = 0; _speedCalls = 0; _speedOn = 0; _recSkipped = 0;
             _parStumbles = 0; _stumbles = 0;
+        }
+
+        /// <summary>Stan premii do linii startu sesji i doby: CZYNNA / NIECZYNNA z powodem (bez siatki, bez latki predkosci MarchPace).</summary>
+        private static string Status(Grid g)
+        {
+            if (g == null) return "NIECZYNNA";
+            if (SpeedModels <= 0) return "NIECZYNNA (latka predkosci niewpieta przy starcie gry - klucz wlaczony w trakcie gry, potrzebny restart gry)";
+            return _cacheHooked ? "CZYNNA" : "CZYNNA (bez latki pamieci - tylko przy zmianie sciany siatki)";
         }
 
         /// <summary>Start sesji kampanii (OnSessionLaunched, po McmSettings.Apply): pamiec partii od zera, plik wczytany do siatki (przy wlaczonym kluczu).</summary>
@@ -325,8 +420,9 @@ namespace Armoury
                      + "%), margines " + MarginOf(s).ToString("0.00", Inv) + " jedn. | " + _note
                      + (g != null ? " | siatka komorek " + CellSize.ToString("0", Inv) + " jedn.: " + g.Nx + " x " + g.Ny + ", z drogami " + g.CellsUsed + ", wpisow " + g.Entries
                                     + ", maks. odcinkow na komorke " + g.MaxPerCell : "")
-                     + " | latka pamieci predkosci " + _hookNote + " | wczytanie " + ms.ToString("0.0", Inv) + " ms"
-                     + " | premia " + (g != null && _cacheHooked ? "CZYNNA" : g != null ? "CZYNNA (bez latki pamieci - tylko przy zmianie sciany siatki)" : "NIECZYNNA") + ".");
+                     + " | latka pamieci predkosci " + _hookNote + " | straznik zapisu stanu " + _writerHooks + "/2 | latka predkosci MarchPace w " + SpeedModels + " modelach"
+                     + " | wczytanie " + ms.ToString("0.0", Inv) + " ms"
+                     + " | premia " + Status(g) + ".");
         }
 
         private static void Load()
@@ -528,7 +624,9 @@ namespace Armoury
             {
                 if (s.MapRoadSpeedBonus && _grid == null && _note == "nie wczytany") Load();   // klucz wlaczony w MCM w trakcie sesji - plik wczytany tu (watek glowny)
                 if (!s.MapRoadSpeedBonus) { ZeroDay(); return; }
-                if (!LogGate.Lines) return;   // ciche logi: spis zbiera sie do doby linii
+                // ciche logi: doba bez linii - spis godzinny zostaje (zbiera tylko w dobie pomiaru, LogGate.Today), liczniki predkosci i potkniec od zera,
+                // zeby linia w takcie S+1 mowila o tej samej dobie S co spis (recenzja, uwaga 2); potkniecia z dob bez linii zostaja w "od wczytania"
+                if (!LogGate.Lines) { ZeroSpeed(); return; }
                 Line(s, (int)CampaignTime.Now.ToDays - 1);
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -556,7 +654,9 @@ namespace Armoury
               .Append(" | gracz godzin w ruchu ").Append(_hN[5]).Append(", na drodze ").Append(_hOn[5]);
             long sc = _speedCalls, so = _speedOn;
             sb.Append(" | liczenia predkosci (ok.) ").Append(sc).Append(", z premia drogi ").Append(so).Append(" (").Append(sc > 0 ? (100.0 * so / sc).ToString("0.0", ci) : "-").Append("%)")
-              .Append(", przeliczenia wymuszone zmiana drogi (ok.) ").Append(_flips).Append(", latka pamieci ").Append(_cacheHooked ? "wpieta" : "NIE");
+              .Append(", przeliczenia wymuszone zmiana drogi (ok.) ").Append(_flips).Append(", latka pamieci ").Append(_cacheHooked ? "wpieta" : "NIE")
+              .Append(", straznik zapisu ").Append(_writerHooks).Append("/2, liczenia bez zapisu stanu (model wprost, ok.) ").Append(_recSkipped)
+              .Append(", premia ").Append(Status(g));
             Audit(s, g, sb, pct);
             double censusMs = _censusTicks * 1000.0 / Stopwatch.Frequency;
             double cacheUs = _cacheSampled > 0 ? _cacheTicks * 1e6 / Stopwatch.Frequency / _cacheSampled : 0;
@@ -598,31 +698,36 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Audit.Scan", e); }
             }
-            int n = 0, noLine = 0, eaten = 0, atCap = 0, cacheOk = 0, cacheN = 0;
+            int n = 0, nb = 0, noLine = 0, eaten = 0, atCap = 0, atFloor = 0, cacheOk = 0, cacheN = 0;
             double sum = 0, mn = double.MaxValue, mx = double.MinValue;
             int k = Math.Min(AuditMax, _cand.Count);
             for (int i = 0; i < k; i++)
             {
                 int j = i + _rng.Next(_cand.Count - i);
                 var tmp = _cand[i]; _cand[i] = _cand[j]; _cand[j] = tmp;
-                float r0, r1, lim, cached;
+                float r0, r1, lim, lmin, cached;
                 bool line;
-                if (!Probe(model, _cand[i], out r0, out r1, out lim, out line, out cached)) continue;
+                if (!Probe(model, _cand[i], out r0, out r1, out lim, out lmin, out line, out cached)) continue;
                 n++;
+                if (!line) noLine++;
+                if (cached > 0f) { cacheN++; if (Math.Abs(cached - r1) <= 0.02f * r1) cacheOk++; }
+                // podloga gry (LimitMin, MinimumSpeed 1): wynik bez premii na podlodze = premia ginie w modelu gry (np. dlug snu 3 w NightRest po nas) -
+                // osobny licznik, poza srednia premii i "zjedzona przez sufit" (recenzja, uwaga 3)
+                if (r0 <= lmin + 0.001f) { atFloor++; continue; }
+                nb++;
                 double b = r0 > 0.0001f ? r1 / r0 - 1.0 : 0.0;
                 sum += b; if (b < mn) mn = b; if (b > mx) mx = b;
-                if (!line) noLine++;
                 if (r1 < r0 * (1f + pct) * 0.995f) eaten++;
                 if (lim < float.MaxValue * 0.5f && r1 >= lim - 0.0015f) atCap++;
-                if (cached > 0f) { cacheN++; if (Math.Abs(cached - r1) <= 0.02f * r1) cacheOk++; }
             }
             int candN = _cand.Count;
             _cand.Clear();
             sb.Append(" | audyt AI na drodze: kandydatow ").Append(candN).Append("; probek ").Append(n)
-              .Append(", premia rzeczywista sr. ").Append(n > 0 ? (100.0 * sum / n).ToString("0.00", ci) : "-").Append("% (min ").Append(n > 0 ? (100.0 * mn).ToString("0.00", ci) : "-")
-              .Append(", maks ").Append(n > 0 ? (100.0 * mx).ToString("0.00", ci) : "-").Append(')')
+              .Append(", premia rzeczywista sr. ").Append(nb > 0 ? (100.0 * sum / nb).ToString("0.00", ci) : "-").Append("% (min ").Append(nb > 0 ? (100.0 * mn).ToString("0.00", ci) : "-")
+              .Append(", maks ").Append(nb > 0 ? (100.0 * mx).ToString("0.00", ci) : "-").Append(')')
               .Append(", bez wpisu Road ").Append(noLine).Append(", zjedzona przez sufit ").Append(eaten).Append(", na suficie LimitMax ").Append(atCap)
-              .Append(", pamiec gry zgodna ").Append(cacheOk).Append('/').Append(cacheN);
+              .Append(", pamiec gry zgodna ").Append(cacheOk).Append('/').Append(cacheN)
+              .Append(", na podlodze LimitMin (poza srednia) ").Append(atFloor);
             // gracz (na ladzie): zawsze, z flaga drogi
             try
             {
@@ -632,13 +737,14 @@ namespace Armoury
                     int c = g.CellOf(p.X, p.Y);
                     bool on = !g.Empty(c) && g.OnRoad(c, p.X, p.Y, margin);
                     float ed = g.EdgeDist(c, p.X, p.Y);
-                    float r0, r1, lim, cached;
+                    float r0, r1, lim, lmin, cached;
                     bool line;
-                    if (Probe(model, main, out r0, out r1, out lim, out line, out cached))
+                    if (Probe(model, main, out r0, out r1, out lim, out lmin, out line, out cached))
                         sb.Append(" | gracz: na drodze ").Append(on ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
                           .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
                           .Append(", LimitMax ").Append(lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak")
-                          .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci));
+                          .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
+                          .Append(", na podlodze LimitMin ").Append(r0 <= lmin + 0.001f ? "tak" : "nie");
                     else sb.Append(" | gracz: audyt nieudany");
                 }
                 else sb.Append(" | gracz: na morzu / w przejsciu / nieczynny");
@@ -646,14 +752,14 @@ namespace Armoury
             catch (Exception e) { Stumble("Audit.Player", e); sb.Append(" | gracz: blad audytu"); }
         }
 
-        private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out bool line, out float cached)
+        private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out float lmin, out bool line, out float cached)
         {
-            r0 = r1 = lim = cached = 0f; line = false;
+            r0 = r1 = lim = cached = 0f; lmin = float.MinValue; line = false;
             try
             {
                 _noRecord = true;
                 _suppress = true;
-                try { r0 = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, false)).ResultNumber; }
+                try { var e0 = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, false)); r0 = e0.ResultNumber; lmin = e0.LimitMinValue; }
                 finally { _suppress = false; }
                 var en = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, true));
                 r1 = en.ResultNumber;

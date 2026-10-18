@@ -190,6 +190,7 @@ namespace Armoury
                         catch { }
                     }
                 }
+                MapRoads.SpeedModels = done;   // SW-DROGI (recenzja, uwaga 4): linie "Drogi (DR)" mowia NIECZYNNA, gdy ta latka nie weszla przy starcie gry
                 if (c.MarchPaceEnabled) Log.Info("MarchPace: kolumna marszowa wpieta w " + done + " modeli predkosci.");
                 else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla premii drog (MapRoadSpeedBonus).");
             }
