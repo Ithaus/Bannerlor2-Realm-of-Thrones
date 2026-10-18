@@ -373,6 +373,21 @@ namespace Armoury
         /// <summary>Plan (CorrDelivered): dowiezione wozami KS-H wedlug krain (srednia 28 dob, szt./d): "zrodlo|cel|towar KsTab".</summary>
         internal static Dictionary<string, double> DeliveredSnapshot() { return new Dictionary<string, double>(_delEma, StringComparer.Ordinal); }
 
+        // r4-glodbunt (recenzja): odczyty dla KsLordFood (pan miasta placi za dowoz) - nic tu nie zmienia stanu
+        /// <summary>Czy doba `today` jest doba przegladu miasta jako celu (ta sama parzystosc Fnv co Daily -> KsFoodCore.In.Review; poza nia cel nie zamawia).</summary>
+        internal static bool ReviewDay(Settlement st, int today) { return st != null && st.StringId != null && (Fnv(st.StringId) & 1u) == (uint)(today & 1); }
+
+        /// <summary>Ksiega kupcow KS-H: zaplacone przez kase celu za wozy kupione w dobie `today` (towar + fracht - to, co Ship zdjal z kasy celu), wedlug celu.</summary>
+        internal static void PaidAsDstOn(int today, Dictionary<Settlement, long> into)
+        {
+            into.Clear();
+            foreach (var c in _carts)
+            {
+                if (c == null || c.Dst == null || c.DayBought != today) continue;
+                long v; into.TryGetValue(c.Dst, out v); into[c.Dst] = v + Math.Max(0, c.Paid) + Math.Max(0, c.Freight);
+            }
+        }
+
         // ------------------------------------------------------------ doba (SupplyDemand.DailyTrade, po TradeCarts.Arrivals; okno MoneyLedger MTrade / MKsH)
         /// <summary>Dostawy, czekanie pod oblezeniem, powroty (30 dob po terminie albo utrata celu). Dziala takze przy wylaczonym kluczu (oplacone wozy dojezdzaja).</summary>
         internal static void Arrivals()

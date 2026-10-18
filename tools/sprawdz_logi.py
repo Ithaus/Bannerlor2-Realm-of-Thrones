@@ -968,8 +968,10 @@ Uzycie (Python 3, tylko odczyt):
                     "Glod miast (KS)" i "Pan miasta placi za dowoz (KS)" bez luk, NGL-1 latki (lojalnosc i bezpieczenstwo czynnego modelu, posilek), NGL-2 pomiar w miastach KS,
                     NGL-3 bez podwojnego liczenia z kara gry Starving (kontrola 0), NGL-4 kara "Hunger" tylko przy glodzie i nigdy dodatnia (NGL-4b INFO: glodne, kara,
                     lojalnosc), NGL-5 bunt nie z niczego (nowe bunty z lojalnoscia wczoraj > 25 = 0), NGL-6 zloto panow zamkniete (panowie + kasy + wierzyciele = 0,
-                    zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c od panow <= wydatek KS-H, NGL-6d tryb pana zgodny z kodem kupcow (kredyt
-                    r4-kupcy bez podlaczonych rachunkow = NIE), NGL-7 INFO doplaty,
+                    zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c (recenzja) od panow <= ksiega kupcow KS-H
+                    (zaplacone przez kasy celu za wozy kupione dzis) i <= wydatek kasy netto, kasa netto ponad ksiege 0 miast, NGL-6d tryb pana zgodny z kodem kupcow (kredyt
+                    r4-kupcy bez podlaczonych rachunkow = NIE), NGL-6e (recenzja) doplata tylko w dobie przegladu celu KS-H (INFO: miasta poza nia), NGL-7 INFO doplaty,
+                    NGL-1b (recenzja) mianownik spichlerza = stale czynnego modelu jedzenia zgodne ze wzorem Famine.cs (40, 20),
                     NGL-8 ERROR i potkniecia 0, NGL-9 koszt <= 1 ms (mediana). Log bez paczki: "brak linii" (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -35453,6 +35455,8 @@ def _nglod_scan(logp):
         "pay": re.compile(r"platnik: pan placi (\d+) \(rodow (\d+)\), gracz (\d+) \(nigdy\), rod bez budzetu / dluznik / Straz (\d+), bez miejsca ponad rezerwe wojny i tempo skrzyni (\d+)"),
         "gold": re.compile(r"wplacone na czas zakupow (-?\d+) zl, zwrocone (-?\d+) zl, zaplacone przez panow (-?\d+) zl \(potrzeba (-?\d+) zl\)"),
         "spend": re.compile(r"wydatek KS-H tych kas (-?\d+) zl: z kasy miasta (-?\d+), od panow (-?\d+)"),
+        "off": re.compile(r"poza doba przegladu KS-H \(cel co 2\. doba\) (\d+)"),
+        "book": re.compile(r"ksiega kupcow KS-H: zaplacone kupcom przez te kasy (-?\d+) zl \(towar \+ fracht wozow kupionych dzis\), od panow (-?\d+) zl, udzial pana uciety ksiega (\d+), kasa netto ponad ksiege (\d+) miast \((-?\d+) zl\)"),
         "bills": re.compile(r"rachunki: otwarte (-?\d+) zl, splacone przez panow (-?\d+) zl"),
         "ctl": re.compile(r"kontrola: zloto panow (-?\d+) \+ kasy miast (-?\d+) \+ wierzyciele (-?\d+) = (-?\d+) \(oczekiwane 0\), zaplacone - \(wplacone - zwrocone \+ rachunki\) = (-?\d+)"),
         "bad": re.compile(r"pan ponizej rezerwy wojny po zaplacie (\d+), ponad tempo skrzyni (\d+), zwrot uciety \(kasa za mala\) (\d+) \((-?\d+) zl\), zaleglosc nawiasu (\d+)"),
@@ -35502,7 +35506,8 @@ def nglod_main(logp, until=100000):
     (bunt mechanizmem gry/BK), pan miasta placi kupcom KS-H za dowoz. Wejscie: log Armoury (strumieniowo). Brak linii (log sprzed paczki, klucze wylaczone) - INFO, bez wyjatku.
     NGL-0 linie doby, NGL-1 latki, NGL-2 pomiar w KS, NGL-3 bez podwojnego liczenia z kara gry Starving, NGL-4 kara tylko przy glodzie (+ INFO glodne i kara), NGL-5 bunt
     nie z niczego, NGL-6 zloto panow zamkniete (kontrola 0, zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny i tempo skrzyni, NGL-6c pan placi najwyzej
-    wydatek KS-H, NGL-7 INFO doplaty, NGL-8 bledy i potkniecia, NGL-9 koszt."""
+    ksiege kupcow KS-H i wydatek kasy netto, kasa netto ponad ksiege 0 (recenzja), NGL-6e doplata tylko w dobie przegladu celu, NGL-1b mianownik spichlerza (stale czynnego
+    modelu jedzenia), NGL-7 INFO doplaty, NGL-8 bledy i potkniecia, NGL-9 koszt."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NGL-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -35540,6 +35545,14 @@ def nglod_main(logp, until=100000):
     rep.add("NGL-1: latki wpiete (lojalnosc i bezpieczenstwo czynnego modelu, posilek UpdateDemandShift)",
             f"doby z BRAK {len(bad_h)} z {len(hk)}; starty z BRAK {len(st_bad)} z {len(D['start'])}" + (f" ({st_bad[0][:200]})" if st_bad else ""),
             "0", (not bad_h and not st_bad) if (hk or D["start"]) else None)
+    # NGL-1b (recenzja): mianownik spichlerza przy Food 0 = spozycie bilansu Food czynnego modelu (stale zgodne ze wzorem Famine.cs)
+    fm = [s_ for s_ in D["start"] if "spichlerz przy Food 0:" in s_]
+    fm_bad = [s_ for s_ in fm if "NIEZGODNE" in s_ or "zgodne ze wzorem Famine.cs" not in s_]
+    if fm:
+        rep.add("NGL-1b: mianownik spichlerza (Food 0) = stale spozycia czynnego modelu jedzenia (zgodne ze wzorem Famine.cs 40 / 20)",
+                f"starty {len(fm)}, NIEZGODNE / nieczytelne {len(fm_bad)}" + (f" ({fm_bad[0][fm_bad[0].find('spichlerz'):][:200]})" if fm_bad else ""), "0", not fm_bad)
+    else:
+        rep.add("NGL-1b: mianownik spichlerza (Food 0)", "brak segmentu w linii startu", "INFO (log sprzed recenzji r4-glodbunt)", None)
     # NGL-2 pomiar w KS
     ksd = [d for d in hd if "keys" in H[d] and H[d]["keys"][2] == "zastosowana"]
     meas = [d for d in ksd if g(H[d], "ks", 0, int, 0) > 0]
@@ -35599,8 +35612,24 @@ def nglod_main(logp, until=100000):
                 (below == 0 and over == 0 and stale == 0) if b6 else None)
         sp = [(d, g(L[d], "spend", 0, int, 0), g(L[d], "spend", 2, int, 0)) for d in ld if "spend" in L[d]]
         bad6c = [x for x in sp if x[2] > x[1] + 1]
-        rep.add("NGL-6c: pan placi najwyzej to, co kupcy KS-H naprawde sprzedali tym kasom (od panow <= wydatek KS-H)",
-                f"dob {len(sp)}, z doplata ponad wydatek {len(bad6c)}" + (f" (dzien {bad6c[0][0]}: {bad6c[0][2]} > {bad6c[0][1]})" if bad6c else ""), "0", (not bad6c) if sp else None)
+        # recenzja: niezalezny pomiar - ksiega kupcow KS-H (towar + fracht zaplacone przez kasy celu za wozy kupione dzis) wobec udzialu panow i delty kasy
+        bk = [(d,) + tuple(g(L[d], "book", i, int, 0) for i in range(5)) for d in ld if "book" in L[d]]
+        bad6c_b = [x for x in bk if x[2] > x[1]]
+        mis = [x for x in bk if x[4] > 0]
+        if bk:
+            rep.add("NGL-6c: pan placi najwyzej to, co kupcy KS-H naprawde wzieli od tych kas (od panow <= ksiega kupcow i <= wydatek kasy netto; kasa netto ponad ksiege 0)",
+                    f"dob {len(bk)}, od panow ponad ksiege {len(bad6c_b)}" + (f" (dzien {bad6c_b[0][0]}: {bad6c_b[0][2]} > {bad6c_b[0][1]})" if bad6c_b else "")
+                    + f", ponad wydatek kasy {len(bad6c)}" + (f" (dzien {bad6c[0][0]}: {bad6c[0][2]} > {bad6c[0][1]})" if bad6c else "")
+                    + f"; kasa netto ponad ksiege: doby {len(mis)}, miasto-doby {sum(x[4] for x in bk)}, zl {sum(x[5] for x in bk)}" + (f" (dzien {mis[0][0]})" if mis else "")
+                    + f"; ksiega razem {sum(x[1] for x in bk)} zl, od panow {sum(x[2] for x in bk)} zl, uciete ksiega {sum(x[3] for x in bk)}",
+                    "0, 0 i 0 (kasa netto ponad ksiege = ktos poza KS-H ruszyl kase w nawiasie)", not bad6c_b and not bad6c and not mis)
+        else:
+            rep.add("NGL-6c: pan placi najwyzej to, co kupcy KS-H naprawde sprzedali tym kasom (od panow <= wydatek KS-H; bez segmentu ksiegi kupcow)",
+                    f"dob {len(sp)}, z doplata ponad wydatek {len(bad6c)}" + (f" (dzien {bad6c[0][0]}: {bad6c[0][2]} > {bad6c[0][1]})" if bad6c else ""), "0", (not bad6c) if sp else None)
+        offd = [g(L[d], "off", 0, int, 0) for d in ld if "off" in L[d]]
+        rep.add("NGL-6e: doplata tylko w dobie przegladu celu KS-H (cel co 2. doba - poza nia wplata wracalaby cala)",
+                f"miasto-doby glodne poza doba przegladu {sum(offd)} w {len(offd)} dobach" if offd else "brak segmentu w linii",
+                "INFO (okolo polowy miasto-dob glodnych w trybie DOPLATA)", None)
         unw = [d for d in ld if "key" in L[d] and "NIEPODLACZONY" in L[d]["key"][1]]
         rep.add("NGL-6d: tryb pana zgodny z kodem kupcow (po scaleniu r4-kupcy: rachunki podlaczone - FoodBillsOpen / FoodBillsPay)",
                 f"dob z trybem KREDYT KUPCOW NIEPODLACZONY {len(unw)} z {len(ld)}" + (f" ({L[unw[0]]['key'][1][:120]})" if unw else ""),

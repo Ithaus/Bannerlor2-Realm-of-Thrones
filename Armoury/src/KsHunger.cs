@@ -24,6 +24,11 @@ namespace Armoury
     ///    Tylko miasta z koszykiem ZC4 po rampie (kalibracja zastosowana, lambda >= 0.999); zamki i miasta poza KS - bez zmian.
     ///  - SPICHLERZ GRY (zapasy): miasto z Food 0 (gra IsStarving) - brak u_s = niedobor / spozycie (ten sam wzor co Famine.cs przy zgonach mieszczan: dobrobyt / 40 +
     ///    zaloga / 20; bez schronionych uchodzcow - sa tylko w oblezeniu). Glod miasta u = max(u_r, u_s).
+    ///    Recenzja (noc 17/18.10, sprawdzone w dekompilacji): Town.FoodChange = czynny model jedzenia (u Jeffa ROTSettlementFoodModel -> BKFoodModel); BKFoodModel
+    ///    .CalculateTownFoodStocksChange wola baze DefaultSettlementFoodModel (spozycie dobrobyt / NumberOfProsperityToEatOneFood + zaloga / NumberOfMenOnGarrisonToEatOneFood,
+    ///    BK 40 i 20, ROT je przekazuje) i dodaje tylko "Local farmland"; spozycie z populacji BK (GetPopulationFoodConsumption) do bilansu Food NIE wchodzi (tylko
+    ///    GetFoodEstimate i HandleExcessFood - ta ostatnia martwa, gdy czynny model nie jest BKFoodModel). Mianownik = spozycie bilansu Food; stale czytane z czynnego
+    ///    modelu (linia startu: zgodne / NIEZGODNE ze wzorem Famine.cs).
     ///  - SKUTEK (postfiksy na CalculateLoyaltyChange / CalculateSecurityChange CZYNNEGO modelu - u Jeffa BKLoyaltyModel i NavalDLCSettlementSecurityModel; PatchTarget.OfActive,
     ///    klasa deklarujaca; zakladane w kampanii - BKLoyaltyModel ma pola statyczne z GameTexts): czesc kary f = (u - prog) / (1 - prog) ponad KsHungerTolerance (0.1);
     ///    lojalnosc H = KsHungerLoyaltyMax (4) x f, bezpieczenstwo KsHungerSecurityMax (2) x f na dobe, linia "Hunger". Dryf gry i BK ciagnie lojalnosc do 50 o 0.1 x odleglosc
@@ -53,6 +58,9 @@ namespace Armoury
         private static bool _loyWired, _secWired, _bkLoy;
         private static string _loyName = "-", _secName = "-";
         private static TextObject _txt;                 // leniwie (bez TextObject w konstruktorze statycznym)
+        // recenzja: spozycie spichlerza - stale czynnego modelu jedzenia (gra / BK / ROT: 40 dobrobytu i 20 ludzi zalogi na 1 jedzenie); odczyt w EnsureHooks
+        private static float _prosPer = 40f, _garPer = 20f;
+        private static string _foodWhy = "nie czytany";
         private static int _main = -1;
 
         // pomiar posilku (watek glowny): ostatni posilek miasta od poprzedniej doby
@@ -126,11 +134,31 @@ namespace Armoury
             }
             _loyWired = Wire(true, out _loyName);
             _secWired = Wire(false, out _secName);
+            ReadFoodModel();
             var s = Settings.Current;
             Log.Info("Glod miast (KS): start sesji | posilek " + _mealWhy + " | lojalnosc " + (_loyWired ? "wpieta: " + _loyName : "BRAK (" + _loyName + ")")
                      + (_bkLoy ? " (czlon jedzenia BK: Starving -2, Well fed +0.5)" : " (czlon jedzenia gry: Starving -1, po 14 dobach -2)")
                      + " | bezpieczenstwo " + (_secWired ? "wpiete: " + _secName : "BRAK (" + _secName + ")")
+                     + " | spichlerz przy Food 0: brak = niedobor / (dobrobyt / " + _prosPer.ToString("0.##", Inv) + " + zaloga / " + _garPer.ToString("0.##", Inv) + ") - " + _foodWhy
                      + " | Ks Hunger Unrest " + (UnrestOn(s) ? "tak" : "nie") + ", Ks Lord Funds Food " + (s != null && s.KsLordFundsFood ? "tak" : "nie") + ".");
+        }
+
+        /// <summary>Recenzja: stale spozycia bilansu Food z czynnego modelu jedzenia (ROTSettlementFoodModel przekazuje je modelowi pod spodem - BK 40 i 20). Brak / 0 - 40 i 20.</summary>
+        private static void ReadFoodModel()
+        {
+            _prosPer = 40f; _garPer = 20f; _foodWhy = "czynny model jedzenia nieczytelny - 40 i 20";
+            try
+            {
+                var fm = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SettlementFoodModel : null;
+                if (fm == null) { _foodWhy = "brak czynnego modelu jedzenia - 40 i 20"; return; }
+                int np = fm.NumberOfProsperityToEatOneFood, ng = fm.NumberOfMenOnGarrisonToEatOneFood;
+                if (np > 0) _prosPer = np;
+                if (ng > 0) _garPer = ng;
+                _foodWhy = "stale czynnego modelu jedzenia " + fm.GetType().FullName + " (dobrobyt na 1 jedzenie " + np + ", zaloga na 1 jedzenie " + ng + ") - "
+                         + (np == 40 && ng == 20 ? "zgodne ze wzorem Famine.cs (40, 20)" : "NIEZGODNE ze wzorem Famine.cs (40, 20)")
+                         + "; spozycie z populacji BK poza bilansem Food gry";
+            }
+            catch (Exception e) { Stumble("ReadFoodModel", e); }
         }
 
         /// <summary>Harmony.GetPatchInfo na metodzie deklarujacej: czy nasza latka (wlasciciel HarmonyId) naprawde wisi (finalizer BKROTPatch polyka bledy Patch - PatchTarget.cs).</summary>
@@ -195,12 +223,12 @@ namespace Armoury
             catch (Exception e) { Stumble("MealPostfix", e); }
         }
 
-        /// <summary>Spichlerz gry: miasto z Food 0 - niedobor / spozycie (wzor Famine.cs: dobrobyt / 40 + zaloga / 20), 0..1; inaczej 0.</summary>
+        /// <summary>Spichlerz gry: miasto z Food 0 - niedobor / spozycie (wzor Famine.cs: dobrobyt / 40 + zaloga / 20 - stale czynnego modelu jedzenia), 0..1; inaczej 0.</summary>
         private static double StockShort(Town t)
         {
             if (t.Settlement == null || !t.Settlement.IsStarving) return 0;
             var gp = t.GarrisonParty;
-            double cons = Math.Max(0f, t.Prosperity) / 40.0 + (gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : 0) / 20.0;
+            double cons = Math.Max(0f, t.Prosperity) / (double)_prosPer + (gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : 0) / (double)_garPer;
             double deficit = Math.Max(0.0, -(double)t.FoodChange);
             return cons > 0 ? Clamp(deficit / cons, 0, 1) : 0;
         }

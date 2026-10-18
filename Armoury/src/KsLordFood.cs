@@ -25,6 +25,11 @@ namespace Armoury
     ///    kasa placi najpierw do swojego budzetu, pan reszte (najwyzej e i X); niewydana reszta X wraca do pana od razu. Pieniadze pana nigdy nie zostaja w kasie poza tym
     ///    nawiasem (bunt nie wezmie ich z kasy - RebelPurseFromTown; inne wyplaty z nadwyzki kasy ich nie widza). Zloto: glowa -> kasa (na chwile) -> zrodla, furmani, zalogi
     ///    (ksiegi KS-H) -> zwrot reszty kasa -> glowa; pozycja MKsH "Przeplywy osad" obejmuje wiec takze doplate panow (linia tej klasy ja rozpisuje).
+    ///    Recenzja (noc 17/18.10): (a) doplata tylko w DOBIE PRZEGLADU miasta jako celu KS-H (KsFoodCarts.ReviewDay - ta sama parzystosc Fnv co KsFoodCore; poza nia cel
+    ///    nie zamawia, wiec wplata wracalaby w calosci - pusty obieg duzych kwot przez kase); limit nadal tempo JEDNEJ doby (2 x tempo w dobie przegladu przekroczyloby
+    ///    skrzynie: ClanBudget zdejmuje doplate ze skrzyni sprzetu jednej doby z obcieciem do 0). (b) udzial pana ograniczony tez KSIEGA KUPCOW - zaplacone przez kase
+    ///    celu za wozy kupione dzis (towar + fracht, KsFoodCarts.PaidAsDstOn) minus budzet wlasny kasy; kontrola niezalezna: wydatek kasy netto (delta kasy w nawiasie)
+    ///    nie wiekszy niz ksiega kupcow (inaczej w nawiasie ruszyl kase ktos poza KS-H - linia "kasa netto ponad ksiege", oczekiwane 0).
     ///  - TRYB "RACHUNKI KUPCOW" (po scaleniu z r4-kupcy - kredyt kupcow: zaplata przy dostawie, reszta rachunkiem): gdy ustawione FoodBillsOpen i FoodBillsPay, Before splaca
     ///    otwarte rachunki zywnosci glodnego miasta z kiesy pana (najwyzej tempo i rachunki; FoodBillsPay oddaje wierzycielom i zwraca kwote zaplacona, reszta wraca do pana),
     ///    bez doplaty kasy. Scalenie: patrz docs/noc-1718/r4-glodbunt-CHANGELOG.md.
@@ -41,7 +46,7 @@ namespace Armoury
         /// <summary>r4-kupcy (scalenie): splata rachunkow zywnosci miasta (najstarsze najpierw) z pieniedzy JUZ zdjetych platnikowi - przelew do wierzycieli; zwraca zaplacone (0..x).</summary>
         internal static Func<Settlement, long, long> FoodBillsPay = null;
 
-        private sealed class Dep { public Town T; public Hero H; public Clan C; public long X, G0, Cap; public double Own0; }
+        private sealed class Dep { public Town T; public Hero H; public Clan C; public long X, G0, Cap; public double Own0; public int Day; }
         private static readonly List<Dep> _open = new List<Dep>();
         private static readonly List<KeyValuePair<Town, KsHunger.Row>> _hungry = new List<KeyValuePair<Town, KsHunger.Row>>();
         private static readonly Dictionary<Clan, long> _paid = new Dictionary<Clan, long>();
@@ -52,6 +57,10 @@ namespace Armoury
         // liczniki doby (linia)
         private static int _dDay = int.MinValue, _nH, _nOk, _nGap0, _nNeed, _nPay, _nPl, _nNb, _nRoom, _nNoBills, _nBelow, _nOver, _nCut, _nStale;
         private static long _dep, _ret, _lordPaid, _need, _spend, _dLords, _dTowns, _billsOpen, _billsPaid, _cut;
+        // recenzja: doba poza przegladem celu KS-H (bez wplaty), ksiega kupcow (zaplacone przez kasy z wplata), kasa netto ponad ksiege (miasta, zl), udzial pana uciety ksiega
+        private static int _nOff, _nMis, _nBookCut;
+        private static long _book, _mis;
+        private static readonly Dictionary<Settlement, long> _bookOf = new Dictionary<Settlement, long>();
         private static readonly HashSet<Clan> _clans = new HashSet<Clan>();
         private static bool _ksh, _bills, _creditOff;
         // r4-kupcy (bezpiecznik scalenia): kod KS-H z kredytem kupcow (zaplata przy dostawie) bez podlaczonych rachunkow - doplata kasy NIE moze biec (wplata na czas
@@ -74,7 +83,7 @@ namespace Armoury
         /// <summary>Nowa kampania i wczytanie (KsHunger.EnsureHooks): pamiec od nowa. Otwarty nawias z poprzedniej sesji nie istnieje (Before i After w jednym wywolaniu doby).</summary>
         internal static void Reset()
         {
-            _open.Clear(); _hungry.Clear(); _paid.Clear(); _paidDay = int.MinValue; _out.Clear(); _resv.Clear();
+            _open.Clear(); _hungry.Clear(); _paid.Clear(); _paidDay = int.MinValue; _out.Clear(); _resv.Clear(); _bookOf.Clear();
             ClearDay(); _dDay = int.MinValue; _stumbles = 0; _err.Clear();
         }
 
@@ -105,6 +114,7 @@ namespace Armoury
         {
             _nH = _nOk = _nGap0 = _nNeed = _nPay = _nPl = _nNb = _nRoom = _nNoBills = _nBelow = _nOver = _nCut = _nStale = 0;
             _dep = _ret = _lordPaid = _need = _spend = _dLords = _dTowns = _billsOpen = _billsPaid = _cut = 0;
+            _nOff = _nMis = _nBookCut = 0; _book = _mis = 0;
             _clans.Clear(); _ksh = false; _bills = false; _creditOff = false; _ticks = 0;
         }
 
@@ -211,6 +221,8 @@ namespace Armoury
                         var t = kv.Key; var r = kv.Value; var st = t.Settlement;
                         if (st == null || st.IsUnderSiege) continue;
                         _nH++;
+                        // recenzja: tryb DOPLATA tylko w dobie przegladu celu KS-H (poza nia KsFoodCore.Decide pomija cel - wplata wrocilaby cala); RACHUNKI - kazda doba
+                        if (!_bills && !KsFoodCarts.ReviewDay(st, day)) { _nOff++; continue; }
                         long res = 0; try { res = Math.Max(0, Seal31.TownReserve(t)); } catch { res = 0; }
                         long g = t.Gold;
                         double own0 = Budget(g, res);
@@ -265,7 +277,7 @@ namespace Armoury
                         long got2 = Move(h, t, x);
                         if (got2 <= 0) continue;
                         _dep += got2;
-                        _open.Add(new Dep { T = t, H = h, C = c, X = got2, G0 = g, Own0 = own0, Cap = extra });
+                        _open.Add(new Dep { T = t, H = h, C = c, X = got2, G0 = g, Own0 = own0, Cap = extra, Day = day });
                         _out[c] = outC + got2; _resv[c] = resC + extra;
                     }
                     catch (Exception e) { Stumble("Before(miasto)", e); }
@@ -286,13 +298,22 @@ namespace Armoury
 
         private static void Settle()
         {
+            int bookDay = int.MinValue;
             foreach (var d in _open)
             {
                 try
                 {
+                    // recenzja: ksiega kupcow KS-H doby wplaty (zaplacone przez kase celu za wozy kupione tej doby) - niezalezny pomiar obok delty kasy
+                    if (d.Day != bookDay) { bookDay = d.Day; try { KsFoodCarts.PaidAsDstOn(d.Day, _bookOf); } catch (Exception e) { _bookOf.Clear(); Stumble("Settle(ksiega)", e); } }
+                    long book = 0; if (d.T.Settlement != null) _bookOf.TryGetValue(d.T.Settlement, out book);
                     long g1 = d.T.Gold;
                     long spent = Math.Max(0, d.G0 + d.X - g1);                     // wydatek KS-H tej kasy w nawiasie (przychody miasta jako zrodla go zmniejszaja)
-                    long p = Math.Max(0, Math.Min(Math.Min(d.X, d.Cap), (long)Math.Ceiling(spent - d.Own0)));
+                    if (spent > book) { _nMis++; _mis += spent - book; }             // kasa netto ponad ksiege kupcow: w nawiasie ruszyl kase ktos poza KS-H (oczekiwane 0)
+                    long pDelta = (long)Math.Ceiling(spent - d.Own0), pBook = (long)Math.Ceiling(book - d.Own0);
+                    long pMax = Math.Min(d.X, d.Cap);
+                    if (pBook < pDelta && pBook < pMax) _nBookCut++;                 // udzial pana uciety ksiega (tylko przy takim ruchu kasy spoza KS-H)
+                    long p = Math.Max(0, Math.Min(pMax, Math.Min(pDelta, pBook)));
+                    _book += book;
                     long r = d.X - p;
                     long back = r > 0 ? -Move(d.H, d.T, -r) : 0;
                     if (back < r) { _nCut++; _cut += r - back; }                     // kasa miasta za mala na pelny zwrot - pan zaplacil o tyle wiecej (licznik)
@@ -327,12 +348,15 @@ namespace Armoury
               .Append(" | KS-H ").Append(_ksh ? "czynne" : "nieczynne")
               .Append(" | miasta glodne ").Append(_nH).Append(": kasa sama starcza ").Append(_nOk).Append(", bez luki rynku dzis ").Append(_nGap0)
               .Append(", bez rachunkow ").Append(_nNoBills).Append(", do doplaty ").Append(_nNeed)
+              .Append(", poza doba przegladu KS-H (cel co 2. doba) ").Append(_nOff)
               .Append(" | platnik: pan placi ").Append(_nPay).Append(" (rodow ").Append(_clans.Count).Append("), gracz ").Append(_nPl)
               .Append(" (nigdy), rod bez budzetu / dluznik / Straz ").Append(_nNb).Append(", bez miejsca ponad rezerwe wojny i tempo skrzyni ").Append(_nRoom)
               .Append(" | wplacone na czas zakupow ").Append(_dep).Append(" zl, zwrocone ").Append(_ret).Append(" zl, zaplacone przez panow ").Append(_lordPaid)
               .Append(" zl (potrzeba ").Append(_need).Append(" zl)")
               .Append(" | wydatek KS-H tych kas ").Append(_spend).Append(" zl: z kasy miasta ").Append(Math.Max(0, _spend - (_lordPaid - _billsPaid)))
               .Append(", od panow ").Append(_lordPaid - _billsPaid)
+              .Append(" | ksiega kupcow KS-H: zaplacone kupcom przez te kasy ").Append(_book).Append(" zl (towar + fracht wozow kupionych dzis), od panow ").Append(_lordPaid - _billsPaid)
+              .Append(" zl, udzial pana uciety ksiega ").Append(_nBookCut).Append(", kasa netto ponad ksiege ").Append(_nMis).Append(" miast (").Append(_mis).Append(" zl)")
               .Append(" | rachunki: otwarte ").Append(_billsOpen).Append(" zl, splacone przez panow ").Append(_billsPaid).Append(" zl")
               .Append(" | kontrola: zloto panow ").Append(_dLords).Append(" + kasy miast ").Append(_dTowns).Append(" + wierzyciele ").Append(_billsPaid)
               .Append(" = ").Append(_dLords + _dTowns + _billsPaid).Append(" (oczekiwane 0), zaplacone - (wplacone - zwrocone + rachunki) = ").Append(_lordPaid - (_dep - _ret + _billsPaid))
