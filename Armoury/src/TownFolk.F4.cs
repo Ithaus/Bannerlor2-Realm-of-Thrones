@@ -7,8 +7,9 @@ namespace Armoury
     ///  - FromCofferWR / CreditWR: kasa miasta -> kiesy W i R w JAWNYCH kwotach klasy (czesc W po czynniku plac W, czesc R bez zmiany) - ta sama ksiega co FromCoffer /
     ///    Credit (zarobek okna klas, EarnK rodzaju, praca niewolnych z czesci W do wlascicieli R40/P60, _ctlIn); wolane TYLKO, gdy czynnik plac W &lt; 1 (inaczej stara droga
     ///    FromCoffer co do monety);
-    ///  - F4HoardRate: stawka doby danin od skarbca klasy W (Ds Hoard Due) w miescie z regula Ks Labour To Basket - ten sam wzor rampy co DaRateNow, z min(Ds Hoard Due Rate,
-    ///    Ks Labour Basket Hoard Rate) zamiast Ds Hoard Due Rate; inne klasy, zamki, wsie i miasta bez reguly - stawka podana (jak dotad).
+    ///  - F4HoardRate: stawka doby danin od skarbca klasy W (Ds Hoard Due) w miescie z regula Ks Labour To Basket - ten sam wzor rampy co DaRateNow, ze stawka
+    ///    KsFolkWage.HoardRate zamiast Ds Hoard Due Rate (recenzja 18.10: od Ds Hoard Due Rate przy kappa 1 do min(Ds Hoard Due Rate, Ks Labour Basket Hoard Rate) przy kappa
+    ///    najnizej, liniowo z kappa miasta); inne klasy, zamki, wsie i miasta bez reguly - stawka podana (jak dotad).
     /// Nie rzucaja (czysta arytmetyka i przelew kasy jak FromCoffer).
     /// </summary>
     internal static partial class TownFolk
@@ -36,9 +37,10 @@ namespace Armoury
         }
 
         /// <summary>Kasa osady -> kiesy W i R w jawnych kwotach (przelew w calosci tutaj, najwyzej stan kasy; przy przycieciu W i R w tej samej proporcji). Zwraca to,
-        /// co naprawde zeszlo z kasy.</summary>
-        private static long FromCofferWR(Folk f, long xW, long xR, int kind)
+        /// co naprawde zeszlo z kasy; `gotW` - czesc W tego, co zeszlo (recenzja 18.10: tozsamosc linii f4 liczy zaplacone z przelewu, nie ze zlecenia).</summary>
+        private static long FromCofferWR(Folk f, long xW, long xR, int kind, out long gotW)
         {
+            gotW = 0;
             xW = Math.Max(0, xW); xR = Math.Max(0, xR);
             long x = xW + xR;
             if (x <= 0 || f == null || f.St == null || f.St.Town == null) return 0;
@@ -52,11 +54,12 @@ namespace Armoury
             long gW = got >= x ? xW : (long)Math.Floor(got * (double)xW / x);
             CreditWR(f, gW, got - gW, kind);
             _ctlIn += got;
+            gotW = gW;
             return got;
         }
 
         /// <summary>f4-place-ludu (c): stawka doby danin od skarbca klasy `c` osady `f` przy firmach DS - klasa W miasta z regula plac wedlug koszyka: rampa jak DaRateNow
-        /// z nizsza stawka docelowa; inaczej `rate` bez zmiany.</summary>
+        /// z nizsza stawka docelowa (KsFolkWage.HoardRate - schodzi z Ds Hoard Due Rate razem z kappa miasta, recenzja 18.10); inaczej `rate` bez zmiany.</summary>
         private static double F4HoardRate(Folk f, int c, Settings s, double rate)
         {
             try

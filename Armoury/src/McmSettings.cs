@@ -7312,7 +7312,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
         public float KsWageHandsMax { get; set; } = 1.3f;
 
-        [SettingPropertyBool("Ks Wage Hands Down", HintText = "with Ks Wage By Hands: where hands are plentiful (the region keeps many free men and the town's food crafts stand half idle) the labourers' wage level keeps falling each week by the same step below the usual wage, down to Ks Wage Hands Floor - the other side of the same rule: the merchants pay the labourers less and keep the difference. Craftsmen's pay is not cut, and labourers with less than Ks Labour Basket Low Days of their basket saved are always paid at least the usual wage. Off = wages never fall below the usual wage")]
+        [SettingPropertyBool("Ks Wage Hands Down", HintText = "with Ks Wage By Hands: where hands are plentiful (the region's figures show many free men and the town's food crafts stand half idle) the labourers' wage level keeps falling each week by the same step below the usual wage, down to Ks Wage Hands Floor - the other side of the same rule: the merchants pay the labourers less and keep the difference. Works only together with the quarterly farm review of the towns (Ds Farm Review Days above 0), so that what the merchants keep goes on to the lord and the crown through the farm. A town without such figures is never cut. Craftsmen's pay is not cut, and labourers with less than Ks Labour Basket Low Days of their basket saved are always paid at least the usual wage; the cut comes in step by step between Ks Labour Basket Low Days and Ks Labour Basket High Days. Off = wages never fall below the usual wage")]
         [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (18.10)")]
         public bool KsWageHandsDown { get; set; } = true;
 
@@ -7336,15 +7336,15 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (18.10)")]
         public float KsLabourBasketHighDays { get; set; } = 30f;
 
-        [SettingPropertyFloatingInteger("Ks Labour Basket Min", 0.00f, 1.00f, "0.00", HintText = "with Ks Labour To Basket: the lowest share of the full rate the labourers get when they hold Ks Labour Basket High Days of their basket or more")]
+        [SettingPropertyFloatingInteger("Ks Labour Basket Min", 0.00f, 1.00f, "0.00", HintText = "with Ks Labour To Basket: the lowest share of the full rate the labourers get when they hold Ks Labour Basket High Days of their basket or more (the rate settles where the labourers' purse stops growing, usually well above this floor)")]
         [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (18.10)")]
-        public float KsLabourBasketMin { get; set; } = 0.25f;
+        public float KsLabourBasketMin { get; set; } = 0.10f;
 
         [SettingPropertyFloatingInteger("Ks Labour Basket Step Percent", 0.50f, 20.00f, "0.0", HintText = "with Ks Labour To Basket: how much the labourers' rate may change in one day (percent of the full rate), so a cheaper basket does not cut wages overnight")]
         [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (18.10)")]
         public float KsLabourBasketStepPercent { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Ks Labour Basket Hoard Rate", 0.000f, 0.100f, "0.000", HintText = "with Ks Labour To Basket and Ds Hoard Due: in a town where the labourers' wage follows their basket, the lord's tallage on the labourers' hoard above their normal level is this share a day (never more than Ds Hoard Due Rate) - an occasional tallage, since the wage no longer fills their purses. Craftsmen, patricians, castle folk and villages pay Ds Hoard Due Rate as before")]
+        [SettingPropertyFloatingInteger("Ks Labour Basket Hoard Rate", 0.000f, 0.100f, "0.000", HintText = "with Ks Labour To Basket and Ds Hoard Due: in a town where the labourers' wage follows their basket, the lord's tallage on the labourers' hoard above their normal level falls from Ds Hoard Due Rate to this share a day as the labourers' rate falls to Ks Labour Basket Min (never more than Ds Hoard Due Rate) - an occasional tallage, since the wage no longer fills their purses; the lord's income does not drop overnight. Craftsmen, patricians, castle folk and villages pay Ds Hoard Due Rate as before")]
         [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (18.10)")]
         public float KsLabourBasketHoardRate { get; set; } = 0.01f;
 

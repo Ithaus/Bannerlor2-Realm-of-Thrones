@@ -12,7 +12,9 @@ namespace Armoury
     /// na koncu nizsza danina; Jeff 17.10 noc "Poprawka 2 - tak") - PLACE WYROBNIKOW (KLASA W) MIAST Z KS:
     ///  (a) klucz Ks Wage Hands Down (KsWageHands.cs): wskaznik plac schodzi ponizej 1 (do Ks Wage Hands Floor) tym samym krokiem, ktorym rosnie przy braku rak, tam gdzie
     ///      wolnych rak duzo - druga strona tej samej reguly podazy i popytu rak. Dotyczy tylko czesci W robocizny handlu i doplaty do wyrobow (wolne rece regionu to
-    ///      wyrobnicy; place rzemieslnikow R bez ciecia - R ma dzis 14.5 dnia zapasu przy normie 21).
+    ///      wyrobnicy; place rzemieslnikow R bez ciecia - R ma dzis 14.5 dnia zapasu przy normie 21). Recenzja 18.10 (werdykt przegladu "(a) tylko razem z poprawka firm"):
+    ///      czynne tylko przy przegladzie firm DS co kwartal (Ds Farm Review Days > 0, paczka P5) i tylko przy dowodzie wolnych rak; ciecie (a) wchodzi liniowo w pasmie
+    ///      Lo-Hi dni koszyka (jak kappa), bez skoku na progu Lo.
     ///  (b) klucz Ks Labour To Basket: stawka placy wyrobnikow wedlug ich koszyka (jak sredniowieczne taksy plac "wedlug drozyzny chleba"): miasto mierzy kiese W w dniach
     ///      koszyka KS (Need[0] kotwicy - koszyk klasy W po cenach targu, ZC4); do Ks Labour Basket Low Days - pelna stawka (wyrobnicy odkladaja), ponad - stawka schodzi
     ///      liniowo do Ks Labour Basket Min przy Ks Labour Basket High Days; zmiana najwyzej Ks Labour Basket Step Percent na dobe (bez skoku przy wlaczeniu KS, gdy
@@ -20,12 +22,17 @@ namespace Armoury
     ///      z nadwyzki R i P dla W (zamozne domy).
     ///  PODLOGA PRZEZYCIA (a i b): wyrobnicy z kiesa ponizej Ks Labour Basket Low Days koszyka (albo bez kotwicy - brak miary) dostaja pelna stawke - nikt nie glodnieje
     ///  przez te regule.
-    ///  (c) w miescie z regula (b) danina pana od skarbca klasy W (Ds Hoard Due) ma stawke Ks Labour Basket Hoard Rate (najwyzej Ds Hoard Due Rate) - rzadki tallage
-    ///      zamiast 3%/d, bo place juz nie napelniaja kies W (TownFolk.F4.cs, TownFolk.Hoard.cs). R, P, podzamcza i wsie - stawka jak dotad.
+    ///  (c) w miescie z regula (b) danina pana od skarbca klasy W (Ds Hoard Due) schodzi z Ds Hoard Due Rate do Ks Labour Basket Hoard Rate RAZEM Z KAPPA miasta (kappa 1 -
+    ///      stawka jak dotad, kappa najnizej - rzadki tallage; recenzja 18.10: bez skoku dochodu panow pierwszej doby) - place juz nie napelniaja kies W (TownFolk.F4.cs,
+    ///      TownFolk.Hoard.cs). R, P, podzamcza i wsie - stawka jak dotad.
     /// ZAMKNIETY PIENIADZ: czesc placy, ktorej pracodawca nie placi, nigdy nie schodzi z jego kiesy - zostaje w kasie miasta (robocizna, doplata) albo w kiesie R/P (place
-    /// z nadwyzki - idzie wtedy na towar z oferty klasy, jak reszta wydatku z nadwyzki). Nic z niczego, nic w nicosc: tozsamosc linii pelne = zaplacone + zostalo u placacych.
-    /// Dalsza droga pieniadza w kasach: ponad 1.5 x zapas kupcow - wyplata kupcom M6 (P i R, 1/28 dziennie) i dziesiata M9; ponizej - kasa splaca firmy DS (zaleglosci
-    /// biednych miast) i skupuje towar. Firmy DS stale do odnowy (DsFarmRenewDays) - linia pokazuje kasy miast z KS, zeby kasa nie stala sie nowym akumulatorem.
+    /// z nadwyzki - przy liscie dostatku P3 oferta R/P liczy sie od nadwyzki, nie od reszty po placach, wiec ta czesc ZOSTAJE w kiesie R/P: jej dalsze place, zbytki, P1
+    /// i danina od skarbca R/P - recenzja 18.10). Nic z niczego, nic w nicosc: tozsamosc linii pelne = zaplacone + zostalo u placacych.
+    /// Dalsza droga pieniadza w kasach: ponad 1.5 x zapas kupcow - wyplata kupcom M6 (P 70% i R 30%, 1/28 dziennie) i dziesiata M9; ponizej - kasa splaca firmy DS
+    /// (zaleglosci biednych miast) i skupuje towar. Recenzja 18.10 (model zamkniety tools/ekonomia-symulatory-2026-10-17/f4/simw3.py): obieg miasta (kasy -> P/R -> W)
+    /// opuszcza pieniadz tylko danina od skarbca, firmy DS, P1 i M9 - bez przegladu firm (P5) nadwyzka zatrzymana u W konczy w kasach (ponad 1.5 x zapas) i u P/R,
+    /// a danina od skarbca P/R przejmuje dawna danine W; z P5 przejmuje ja firma (panom i koronie) w 1-2 lata. Linia pokazuje kasy miast z KS i nadwyzke ponad
+    /// 1.5 x zapas kupcow (zapas, z ktorego idzie M6); sprawdz_logi nakum NAKUM-12/14/15/16.
     /// Linia doby "Place W wedlug koszyka (f4-place-ludu): dzien N" (TownFolk.DailyLive po "Place za brak rak"). Zapis arm_ks_place: "f4|miasto:wskaznik&lt;1,...|miasto:kappa,...".
     /// Wyjatek per miasto - licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7).
     /// </summary>
@@ -35,7 +42,7 @@ namespace Armoury
         private static readonly Dictionary<string, float> _k = new Dictionary<string, float>(StringComparer.Ordinal);   // kappa miasta (brak wpisu = 1)
         private static readonly HashSet<string> _err = new HashSet<string>();
         // liczniki doby (DayLine zeruje)
-        private static double _dFull, _dPaid, _dCutA, _dCutB, _dSurpFull, _dSurpPaid;
+        private static double _dFull, _dPaid, _dCutA, _dCutB, _dSurpFull, _dSurpPaid, _dRule, _dHr;
         private static int _dTowns, _dB, _dBelow, _dIn, _dAbove, _dNoNeed, _dProt, _dDownA, _stum;
         private static long _dKW, _dKR, _dKP; private static double _dNW, _dNR, _dNP;
         private static readonly List<float> _dDays = new List<float>(), _dKap = new List<float>();
@@ -56,7 +63,7 @@ namespace Armoury
 
         private static void Zero()
         {
-            _dFull = _dPaid = _dCutA = _dCutB = _dSurpFull = _dSurpPaid = 0;
+            _dFull = _dPaid = _dCutA = _dCutB = _dSurpFull = _dSurpPaid = _dRule = _dHr = 0;
             _dTowns = _dB = _dBelow = _dIn = _dAbove = _dNoNeed = _dProt = _dDownA = 0;
             _dKW = _dKR = _dKP = 0; _dNW = _dNR = _dNP = 0;
             _dDays.Clear(); _dKap.Clear(); _ticks = 0;
@@ -75,14 +82,30 @@ namespace Armoury
             catch (Exception e) { Stumble("Active", e); return false; }
         }
 
-        /// <summary>(c) stawka danin od skarbca klasy W w miescie z regula (b): min(Ds Hoard Due Rate, Ks Labour Basket Hoard Rate); -1 - bez zmiany (miasto bez reguly).</summary>
+        /// <summary>(c) stawka danin od skarbca klasy W w miescie z regula (b): od Ds Hoard Due Rate (kappa 1) do min(Ds Hoard Due Rate, Ks Labour Basket Hoard Rate) (kappa
+        /// najnizej), liniowo z kappa miasta (recenzja 18.10: danina schodzi razem z placa, ktora juz nie napelnia kies - bez skoku dochodu panow); -1 - bez zmiany (miasto bez reguly).</summary>
         internal static double HoardRate(Settlement st)
         {
             var s = Settings.Current;
             if (s == null || !Active(st)) return -1.0;
+            return HoardRateAt(s, KappaOf(st));
+        }
+
+        private static double HoardRateAt(Settings s, double k)
+        {
             double a = s.DsHoardDueRate, b = s.KsLabourBasketHoardRate;
             if (double.IsNaN(a)) a = 0; if (double.IsNaN(b)) b = 0;
-            return Math.Max(0.0, Math.Min(0.1, Math.Min(a, b)));
+            double hiR = Math.Max(0.0, Math.Min(0.1, a)), loR = Math.Max(0.0, Math.Min(0.1, Math.Min(a, b)));
+            double mn = Min, sh = mn >= 1.0 - 1e-9 ? 1.0 : (k - mn) / (1.0 - mn);
+            if (double.IsNaN(sh)) sh = 1.0;
+            return loR + (hiR - loR) * Math.Max(0.0, Math.Min(1.0, sh));
+        }
+
+        /// <summary>Kappa miasta (brak wpisu - 1).</summary>
+        private static double KappaOf(Settlement st)
+        {
+            float k0;
+            return st != null && st.StringId != null && _k.TryGetValue(st.StringId, out k0) ? k0 : 1.0;
         }
 
         /// <summary>
@@ -111,7 +134,14 @@ namespace Armoury
                 if (downA)
                 {
                     _dDownA++;
-                    if (poor || !info) _dProt++; else fA = Math.Max(0.0, Math.Min(1.0, hwIdx));   // bez miary (brak kotwicy) - bez ciecia
+                    if (poor || !info) _dProt++;                                // podloga przezycia / bez miary (brak kotwicy) - bez ciecia
+                    else
+                    {
+                        // recenzja 18.10: ciecie (a) wchodzi liniowo w pasmie Lo-Hi (jak kappa: kt(Lo) = 1) - bez skoku placy W na progu Lo (wczesniej: ponizej Lo x1,
+                        // od Lo od razu x wskaznik, wiec kiesa W skakala wokol Lo z dnia na dzien o 40% placy)
+                        double rmp = Math.Max(0.0, Math.Min(1.0, (d - lo) / (hi - lo)));
+                        fA = 1.0 - (1.0 - Math.Max(0.0, Math.Min(1.0, hwIdx))) * rmp;
+                    }
                 }
                 if (onB)
                 {
@@ -133,6 +163,7 @@ namespace Armoury
                     if (id.Length > 0) { if (k >= 0.99995) _k.Remove(id); else _k[id] = (float)k; }
                     fB = k;
                     _dKap.Add((float)k);
+                    var s0 = Settings.Current; if (s0 != null) _dHr += HoardRateAt(s0, k);   // (c) stawka danin W tej doby (linia: srednia miast z regula)
                     if (!info) { } else if (d < lo) _dBelow++; else if (d < hi) _dIn++; else _dAbove++;
                 }
                 return fA * fB;
@@ -141,17 +172,20 @@ namespace Armoury
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
-        /// <summary>TownLive krok 2: place W z kasy tej doby - pelne (bez a i b) i zaplacone (po przycieciu do stanu kasy w obu); fA/fB - podzial tego, co zostalo w kasie.</summary>
-        internal static void NoteCoffer(double fullW, double paidW, double fA, double fB)
+        /// <summary>TownLive krok 2: place W z kasy tej doby (po przycieciu do stanu kasy, zaokraglone w dol jak przelew) - `fullW` przy czynniku 1, `ruleW` zlecone kasie
+        /// wedlug reguly (a i b), `paidW` - czesc W, ktora NAPRAWDE zeszla z kasy (FromCofferWR; recenzja 18.10 - wczesniej zapisywane bylo zlecenie, wiec kontrola linii
+        /// nie mogla sie nie zgodzic). Zostalo w kasie = pelne - zlecone; fA/fB - podzial tego, co zostalo.</summary>
+        internal static void NoteCoffer(long fullW, long ruleW, long paidW, double fA, double fB)
         {
-            if (!(fullW > 0)) return;
-            _dFull += fullW; _dPaid += paidW;
-            double cut = Math.Max(0, fullW - paidW), a = fullW * (1.0 - fA);
+            if (fullW <= 0) return;
+            _dFull += fullW; _dRule += ruleW; _dPaid += paidW;
+            double cut = Math.Max(0, fullW - ruleW), a = fullW * (1.0 - fA);
             if (a > cut) a = cut;
+            if (a < 0) a = 0;
             _dCutA += a; _dCutB += cut - a;
         }
 
-        /// <summary>TownLive krok 5: place z nadwyzki R/P dla W - pelne i zaplacone (reszta zostaje w kiesie R/P i idzie na towar z oferty klasy).</summary>
+        /// <summary>TownLive krok 5: place z nadwyzki R/P dla W - pelne i zaplacone (reszta zostaje w kiesie R/P).</summary>
         internal static void NoteSurplus(long full, long paid)
         {
             if (full <= 0) return;
@@ -170,32 +204,38 @@ namespace Armoury
                 if (s == null) return;
                 if (_dTowns == 0) return;                                    // klucze wylaczone albo KS niezastosowany (zadne miasto z regula tej doby) - bez linii (log jak dotad)
                 long t0 = Stopwatch.GetTimestamp();
-                // kasy miast z KS (dalsza droga pieniadza, ktory zostal u pracodawcow): razem i ponad 1.5 x zapas kupcow (zrodlo wyplaty kupcom M6)
-                long gold = 0; int nT = 0, nOver = 0;
+                // kasy miast z KS (dalsza droga pieniadza, ktory zostal u pracodawcow): razem i ponad 1.5 x zapas kupcow (zrodlo wyplaty kupcom M6) - liczba miast i NADWYZKA
+                // (zapas zl ponad 1.5 x zapas; recenzja 18.10: NAKUM-16 pilnuje, zeby M6 ja oproznial, a nie zeby rosla)
+                long gold = 0, over = 0; int nT = 0, nOver = 0;
                 foreach (var t in TaleWorlds.CampaignSystem.Settlements.Town.AllTowns)
                 {
                     try
                     {
                         if (t == null || t.Settlement == null || !StartCalibration.KsTownApplied(t)) continue;
                         nT++; gold += Math.Max(0, t.Gold);
-                        if (t.Gold > DsTowns.OverReserve * TownPurse.Reserve(t)) nOver++;
+                        double lim = DsTowns.OverReserve * TownPurse.Reserve(t);
+                        if (t.Gold > lim) { nOver++; over += (long)Math.Floor(t.Gold - lim); }
                     }
                     catch (Exception e) { Stumble("DayLine.kasa", e); }
                 }
                 float mdD = Med(_dDays), mdK = Med(_dKap);
                 float mnK = _dKap.Count > 0 ? _dKap[0] : float.NaN, mxK = _dKap.Count > 0 ? _dKap[_dKap.Count - 1] : float.NaN;
                 int kLow = 0; foreach (var v in _dKap) if (v < 0.99995f) kLow++;
-                long full = (long)Math.Round(_dFull), cut = (long)Math.Round(_dCutA + _dCutB), cutA = (long)Math.Round(_dCutA);
-                long paid = full - cut, cutB = cut - cutA;
+                long full = (long)Math.Round(_dFull), paid = (long)Math.Round(_dPaid), cut = (long)Math.Round(_dCutA + _dCutB), cutA = (long)Math.Round(_dCutA);
+                long cutB = cut - cutA;                                          // kontrola full - paid - cut = zlecone - zeszlo z kas (0, gdy kasy zaplacily cale zlecenie)
                 long sf = (long)Math.Round(_dSurpFull), sp = (long)Math.Round(_dSurpPaid);
                 double hr = Math.Max(0.0, Math.Min(0.1, Math.Min(s.DsHoardDueRate, s.KsLabourBasketHoardRate)));
+                double hrNow = _dB > 0 ? _dHr / _dB : double.NaN;            // (c) srednia stawka danin W miast z regula tej doby (schodzi razem z kappa)
+                int frd = KsWageHands.FarmReviewDays(s);
                 var sb = new StringBuilder(1200);
                 sb.Append("Place W wedlug koszyka (f4-place-ludu): dzien ").Append(day)
                   .Append(" | klucze: Ks Labour To Basket ").Append(On ? "TAK" : "NIE").Append(", Ks Wage Hands Down ").Append(KsWageHands.DownOn ? "TAK" : "NIE")
-                  .Append(" (podloga x").Append(KsWageHands.FloorNow.ToString("0.00", Inv)).Append(")")
+                  .Append(" (podloga x").Append(KsWageHands.FloorNow.ToString("0.00", Inv)).Append("; klucz ").Append(s.KsWageHandsDown ? "TAK" : "NIE")
+                  .Append(", przeglad firm DS co kwartal - Ds Farm Review Days ").Append(frd >= 0 ? frd.ToString(Inv) : "brak klucza (bez P5)").Append(")")
                   .Append(" | pasmo ").Append(Lo.ToString("0", Inv)).Append('-').Append(Hi.ToString("0", Inv)).Append(" dni koszyka KS, najnizej x").Append(Min.ToString("0.00", Inv))
                   .Append(", krok ").Append((100 * Step).ToString("0.0", Inv)).Append("%/d, danina od skarbca W w tych miastach ").Append((100 * hr).ToString("0.00", Inv))
-                  .Append("%/d (Ds Hoard Due Rate ").Append((100 * Math.Max(0.0, Math.Min(0.1, s.DsHoardDueRate))).ToString("0.00", Inv)).Append("%)")
+                  .Append("%/d (dzis srednio ").Append(F(100 * hrNow, "0.00")).Append("%, schodzi razem z kappa; Ds Hoard Due Rate ")
+                  .Append((100 * Math.Max(0.0, Math.Min(0.1, s.DsHoardDueRate))).ToString("0.00", Inv)).Append("%)")
                   .Append(" | miasta z regula ").Append(_dTowns).Append(" (b: ").Append(_dB).Append("): ponizej pasma (pelna placa) ").Append(_dBelow).Append(", w pasmie ").Append(_dIn)
                   .Append(", ponad pasmem ").Append(_dAbove).Append(", bez potrzeby W (pelna placa) ").Append(_dNoNeed)
                   .Append(" | (a) wskaznik < 1: miast ").Append(_dDownA).Append(", podloga przezycia (bez ciecia) ").Append(_dProt)
@@ -205,8 +245,9 @@ namespace Armoury
                   .Append(F(_dNP > 0 ? _dKP / _dNP : double.NaN, "0.0")).Append(')')
                   .Append(" | doba: place W z kas pelne ").Append(full).Append(" = zaplacone ").Append(paid).Append(" + zostalo w kasach miast ").Append(cut)
                   .Append(" (kontrola pelne - zaplacone - zostalo = ").Append(full - paid - cut).Append("), z tego (a) wskaznik ponizej 1: ").Append(cutA).Append(", (b) stawka wedlug koszyka: ").Append(cutB)
-                  .Append("; place z nadwyzki R/P dla W (Ks Labour Basket Households ").Append(HouseholdsOn ? "TAK" : "NIE").Append(") pelne ").Append(sf).Append(" = zaplacone ").Append(sp).Append(" + zostalo u R/P (na towar) ").Append(sf - sp)
-                  .Append(" | kasy miast z KS razem ").Append(gold).Append(" (miast ").Append(nT).Append(", ponad 1.5 x zapas kupcow ").Append(nOver).Append(')')
+                  .Append("; place z nadwyzki R/P dla W (Ks Labour Basket Households ").Append(HouseholdsOn ? "TAK" : "NIE").Append(") pelne ").Append(sf).Append(" = zaplacone ").Append(sp).Append(" + zostalo w kiesach R/P ").Append(sf - sp)
+                  .Append(" | kasy miast z KS razem ").Append(gold).Append(" (miast ").Append(nT).Append(", ponad 1.5 x zapas kupcow ").Append(nOver)
+                  .Append(", nadwyzka ponad 1.5 x zapas ").Append(over).Append(')')
                   .Append(" | czas ").Append(((_ticks + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stum).Append('.');
                 Log.Info(sb.ToString());
             }

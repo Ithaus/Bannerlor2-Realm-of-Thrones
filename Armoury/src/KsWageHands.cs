@@ -23,7 +23,10 @@ namespace Armoury
     /// f4-place-ludu (klucz Ks Wage Hands Down, KsFolkWage.cs): przy duzej liczbie wolnych rak wskaznik schodzi dalej PONIZEJ 1 tym samym krokiem, najwyzej do Ks Wage Hands
     /// Floor - druga strona tej samej reguly. Wskaznik ponizej 1 tnie tylko czesc W robocizny i doplaty (TownFolk.TownLive krok 2; podloga przezycia - KsFolkWage.WFactor);
     /// Factor (koszt pracy przetworow ZC5 - rece rzemieslnikow) zostaje >= 1. Wskazniki ponizej 1 w osobnym kluczu zapisu arm_ks_place (arm_ks_koszyk jak dotad >= 1).
-    /// Klucz wylaczony - podloga 1, co do liczby jak dotad.
+    /// Klucz wylaczony - podloga 1, co do liczby jak dotad. Recenzja 18.10: (1) w dol ponizej 1 tylko RAZEM z przegladem firm DS co kwartal (paczka P5, klucz Ds Farm
+    /// Review Days > 0 - werdykt przegladu ekonomii: inaczej zloto przejdzie do kupcow i zostanie w kasach); pole czytane przez refleksje, bo przed scaleniem z P5 go nie ma
+    /// (wtedy (a) nieczynne, podloga 1); (2) ponizej 1 tylko przy DOWODZIE wolnych rak (dane regionu sa i f - a >= f/2; przetwory, jesli miasto je ma, zajete < 50%);
+    /// brak danych (FreeHands nieczynny, region bez komorki, prog ~1, miasto bez przetworow) - wskaznik wraca do 1 z obu stron, nigdy nie schodzi ponizej 1.
     /// </summary>
     internal static class KsWageHands
     {
@@ -43,10 +46,24 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.KsWageByHands; } }
         private static double Step { get { var s = Settings.Current; return s != null ? Math.Max(0.0, Math.Min(0.10, s.KsWageHandsStepPercent / 100.0)) : 0.03; } }
         private static double Max { get { var s = Settings.Current; return s != null ? Math.Max(1.0, Math.Min(2.0, s.KsWageHandsMax)) : 1.3; } }
-        /// <summary>f4-place-ludu (a): wskaznik moze zejsc ponizej 1 (klucze Ks Wage By Hands i Ks Wage Hands Down).</summary>
-        internal static bool DownOn { get { var s = Settings.Current; return s != null && s.KsWageByHands && s.KsWageHandsDown; } }
-        /// <summary>f4-place-ludu (a): podloga wskaznika - Ks Wage Hands Floor (0.3..1) przy kluczu Ks Wage Hands Down, inaczej 1 (jak dotad).</summary>
-        private static double Floor { get { var s = Settings.Current; return s != null && s.KsWageHandsDown ? Math.Max(0.3, Math.Min(1.0, (double)s.KsWageHandsFloor)) : 1.0; } }
+        /// <summary>f4-place-ludu (a): wskaznik moze zejsc ponizej 1 (klucze Ks Wage By Hands i Ks Wage Hands Down, przeglad firm DS co kwartal czynny).</summary>
+        internal static bool DownOn { get { var s = Settings.Current; return s != null && s.KsWageByHands && DownKey(s); } }
+        /// <summary>f4-place-ludu (a): podloga wskaznika - Ks Wage Hands Floor (0.3..1) przy kluczu Ks Wage Hands Down i przegladzie firm DS co kwartal, inaczej 1 (jak dotad).</summary>
+        private static double Floor { get { var s = Settings.Current; return s != null && DownKey(s) ? Math.Max(0.3, Math.Min(1.0, (double)s.KsWageHandsFloor)) : 1.0; } }
+        private static bool DownKey(Settings s) { return s.KsWageHandsDown && FarmReviewDays(s) > 0; }
+        // recenzja 18.10: pole Ds Farm Review Days paczki P5 (f4-kasy-miast-i-kupcy-z) - przed scaleniem nie istnieje (null - (a) nieczynne); Patch nie dotyczy (zwykle pole)
+        private static readonly System.Reflection.FieldInfo _farmReview = FindFarmReview();
+        private static System.Reflection.FieldInfo FindFarmReview()
+        {
+            try { var fi = typeof(Settings).GetField("DsFarmReviewDays"); return fi != null && fi.FieldType == typeof(int) ? fi : null; }
+            catch { return null; }
+        }
+        /// <summary>Ds Farm Review Days (przeglad firm DS co kwartal, paczka P5); -1 - brak pola (galaz bez P5).</summary>
+        internal static int FarmReviewDays(Settings s)
+        {
+            try { return s != null && _farmReview != null ? (int)_farmReview.GetValue(s) : -1; }
+            catch { return -1; }
+        }
         internal static double FloorNow { get { return Floor; } }
 
         internal static void Reset()
@@ -97,9 +114,13 @@ namespace Armoury
             bool byFree = fh && a >= f, byCraft = craft && use >= 0.9;
             bool shortH = byFree || byCraft;
             bool slack = !shortH && (!fh || (f - a) >= 0.5 * f) && (!craft || use < 0.5);
+            // f4-place-ludu (recenzja 18.10): PONIZEJ 1 tylko przy dowodzie wolnych rak - dane regionu sa (fh) i f - a >= f/2, przetwory (jesli miasto je ma) zajete < 50%;
+            // stary warunek slack (brak danych regionu liczy sie jak duzo rak) zostaje tylko do powrotu wskaznika do 1 - z gory (jak dotad) i z dolu (bez dowodu wolnych rak)
+            bool slackDown = !shortH && fh && (f - a) >= 0.5 * f && (!craft || use < 0.5);
             double step = Step, max = Max, fl = Floor, idx = Math.Max(fl, Math.Min(max, w.Idx));   // f4-place-ludu (a): podloga Ks Wage Hands Floor albo 1 (jak dotad)
             if (shortH) idx = Math.Min(max, idx * (1.0 + step));
-            else if (slack) idx = Math.Max(fl, idx / (1.0 + step));
+            else if (slackDown) idx = Math.Max(fl, idx / (1.0 + step));                   // bez klucza fl = 1 - co do liczby jak dotad
+            else if (slack) idx = idx > 1.0 ? Math.Max(1.0, idx / (1.0 + step)) : Math.Min(1.0, idx * (1.0 + step));   // brak danych: do 1 (bez klucza idx >= 1 - jak dotad)
             w.Idx = (float)idx; w.State = (byte)(shortH ? 1 : slack ? 2 : 0);
             w.A = fh ? (float)a : -1f; w.F = fh ? (float)f : -1f; w.Use = craft ? (float)use : -1f; w.ByFree = byFree; w.ByCraft = byCraft;
             w.Avail = w.Used = 0;
@@ -171,12 +192,16 @@ namespace Armoury
                 sb.Append(" | doba: kasy miast zaplacily robocizne i doplate ").Append(_dPaid).Append(" zl, kiesy ludu przyjely ").Append(_dRecv).Append(" zl (roznica ").Append(_dPaid - _dRecv)
                   .Append("), z tego ponad stawke (place za brak rak) ").Append(Math.Round(_dExtra).ToString("0", Inv)).Append(" zl w ").Append(_dUp).Append(" miastach (miast z placami ").Append(_dTowns).Append(')')
                   .Append(" | potkniecia ").Append(_stum);
-                // f4-place-ludu (a): wskazniki ponizej 1 (tylko przy kluczu Ks Wage Hands Down - inaczej linia jak dotad); 12 najnizszych miast - krok miedzy dobami (NKO-11)
+                // f4-place-ludu (a): wskazniki ponizej 1 (tylko przy kluczu Ks Wage Hands Down - inaczej linia jak dotad); 12 najnizszych miast - krok miedzy dobami (NKO-11);
+                // recenzja 18.10: czynne tylko z przegladem firm DS co kwartal (P5) - bez niego podloga x1.00 (dopisek mowi, czemu)
                 var sNow = Settings.Current;
                 if (sNow != null && sNow.KsWageHandsDown)
                 {
                     int dn = 0; foreach (var v in vals) if (v < 0.9995f) dn++;
-                    sb.Append(" | w dol (f4-place-ludu): klucz Ks Wage Hands Down TAK, podloga x").Append(flF.ToString("0.00", Inv)).Append(", tylko place W, miasta < 1: ").Append(dn);
+                    int frd = FarmReviewDays(sNow);
+                    sb.Append(" | w dol (f4-place-ludu): klucz Ks Wage Hands Down TAK, czynne ").Append(DownKey(sNow) ? "TAK" : "NIE")
+                      .Append(" (przeglad firm DS co kwartal - Ds Farm Review Days ").Append(frd >= 0 ? frd.ToString(Inv) : "brak klucza (bez P5)").Append(")")
+                      .Append(", podloga x").Append(flF.ToString("0.00", Inv)).Append(", tylko place W, miasta < 1: ").Append(dn);
                     if (dn > 0)
                     {
                         sb.Append(" (");
