@@ -1153,6 +1153,17 @@ Uzycie (Python 3, tylko odczyt):
                     dopisek "w dol" mowi "czynne TAK/NIE (przeglad firm DS co kwartal - Ds Farm Review Days N)" - (a) czynne tylko z P5 (bez niego podloga x1.00).
                     Recenzja calosci 18.10: oba dopiski maja tez "firmy DS ustalone TAK/NIE" (DsTowns.FarmsLive) - NKO-21: (a) czynne tylko przy ustalonych firmach
                     (Ds Towns czynne i po oknie pomiaru - inaczej przeglad kwartalny nie biegnie); log bez pola = INFO.
+                    f5-lud (noc 17/18.10, klucze Ks Folk Income All Kinds / R P / Hoard Falls / Zero Need, Ks Farm Follows Surplus; KsFolkIncome.cs, TownFolk.F5.cs,
+                    DsTowns.SurplusReview; linia "Dochod ludu wedlug koszyka (f5-lud)"): NKO-22 linia kazdej doby od pierwszej (luk 0, nierozpoznanych 0; bez linii INFO),
+                    NKO-23 tozsamosci drog kazdej doby: z zewnatrz (Earn) pelne = przyjete + oddane kasom miast, z kas (robocizna i doplata R, obrot P, przelewy gracza) i M6
+                    pelne = zlecone + zostalo w kasach, kontrola zlecone - zaplacone >= 0 (tylko brak zlota w kasie), od P dla R pelne = zaplacone + zostalo u P, razem
+                    niezaplacone ludowi = suma drog, przyjete <= pelne kazdej klasy (+-2 zl sumy klas), NKO-24 kappa W2 / R / P w [najnizej, 1], NKO-25 podloga przezycia
+                    (miast z kappa < 1 <= w pasmie + ponad pasmem + bez koszyka klasy + bez miary, kazda klasa), NKO-26 stawka danin od skarbca R/P w [Ks Labour Basket
+                    Hoard Rate, Ds Hoard Due Rate] i stawka efektywna <= Ds Hoard Due Rate, NKO-27 skutek (INFO): kappy, dni koszyka (mediana) pierwsza / ostatnia doba,
+                    niezaplacone ludowi, podwyzki firm, NKO-28 czas linii (mediana) <= 1 ms, potkniecia 0 i ERROR paczki 0 (KsFolkIncome, TownFolk.KsFolkIncome,
+                    DsTowns.SurplusReview/SurplusHolds, SyncData.arm_ks_dochod). Recenzja f5: NKO-23 z zewnatrz pelne = przyjete + oddane kasom miast + wrocilo do wsi
+                    (roboty gminy DS i przebudowa zajec - placacy to kiesa wsi), "we wsiach" = wrocilo do wsi; NKO-29 pila firm - obnizki przegladem zwyklym w pierwszym
+                    przegladzie po podwyzce wedlug nadwyzki (suma) <= max(2, 25% podwyzek); stara linia bez pol - pola 0 / INFO.
 --grupa npolnoc   : (r4-polnoc, noc 17/18.10, Jeff 17.10 "Polnoc i za Murem - najpierw wyzywic siebie (hodowla, ryby, owies)"; Armoury/src/StartCalibration.Feed.cs,
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
                     NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
@@ -1224,6 +1235,14 @@ Uzycie (Python 3, tylko odczyt):
                     1.5 x zapas' - zapas, z ktorego idzie M6) - przyrost w oknie <= max(30 tys., 0.15 x zostalo)/d i od pierwszej linii f4 <= max(1 mln, 28 x srednia
                     zostalo) (M6 1/28 dziennie musi ja oprozniac), NAKUM-17 skutek (INFO): danina W / R+P / do panow i wyplata kupcom M6 ('Firmy miast', miasta) przed
                     i w oknie - gdzie poszla dawna pompa W. Pola dopisane po recenzji - brak pola (stara linia f4) = INFO.
+                    f5-lud (noc 17/18.10; kazda klasa ludu miast z KS zarabia wedlug swojego koszyka - W2 / R / P - a czego lud nie przyjal, zostaje w kasach i idzie firma
+                    do panow i korony przez przeglad wedlug nadwyzki kasy; model tools/ekonomia-symulatory-2026-10-17/f5/simlud.py; linia "Dochod ludu wedlug koszyka
+                    (f5-lud)"): okno - ostatnie 28 dob, nie wczesniej niz 28 dob od pierwszej linii f5 (kappy schodza 3%/d; bez linii albo < 35 dob - INFO). NAKUM-18 kiesy
+                    R i P miast ('Kiesa ludu') - przyrost <= +15 tys./d kazda (fin88 +19.2 / +17.5), NAKUM-19 zapas dni koszyka W/R/P (mediana miast z regula, ostatnia doba)
+                    <= 1.1 x gorna granica pasma klasy (fin88: W 60.2 przy 15-30), NAKUM-20 kasy miast z KS i ich nadwyzka ponad 1.5 x zapas kupcow (linia f5) - przyrost
+                    w oknie <= max(30 tys., 0.15 x 'niezaplacone ludowi w kasach') (placacy nie jest nowym akumulatorem), NAKUM-21 danina od skarbca W/R/P miast z regula -
+                    stawka efektywna w oknie (pobrano / podstawa ponad poziom normalny) <= Ks Labour Basket Hoard Rate + 0.1 pkt (rzadki tallage <= 1%/d), NAKUM-22 lud miast
+                    (W+R+P) i kasy miast z KS razem - przyrost <= +30 tys./d (pieniadz miasta nie gromadzi sie ani u ludu, ani u kupcow), NAKUM-23 skutek (INFO).
 --grupa nglod     : (noc 17/18.10, r4-glodbunt; Jeff "jak nie ma jedzenia to bedzie bunt; w interesie miasta lorda jest aby dowiesc jedzenie"; Armoury/src/KsHunger.cs,
                     KsLordFood.cs, StartCalibration.Glod.cs) python -I tools/sprawdz_logi.py --grupa nglod [--do-doby N] <Armoury-*.log> (strumieniowo). NGL-0 linie doby
                     "Glod miast (KS)" i "Pan miasta placi za dowoz (KS)" bez luk, NGL-1 latki (lojalnosc i bezpieczenstwo czynnego modelu, posilek), NGL-2 pomiar w miastach KS,
@@ -36643,6 +36662,48 @@ NKO_F4 = re.compile(r"Place W wedlug koszyka \(f4-place-ludu\): dzien (?P<day>-?
                     r"zaplacone (?P<sp>-?\d+) \+ zostalo (?:u R/P \(na towar\)|w kiesach R/P) (?P<sc>-?\d+) \| kasy miast z KS razem (?P<gold>-?\d+) \(miast (?P<nt>\d+), ponad 1\.5 x zapas kupcow (?P<nover>\d+)"
                     r"(?:, nadwyzka ponad 1\.5 x zapas (?P<over>-?\d+))?\) "
                     r"\| czas (?P<ms>[\d.]+) ms \| potkniecia (?P<stum>\d+)")
+# f5-lud (noc 17/18.10): linia "Dochod ludu wedlug koszyka (f5-lud)" - dochod klas W2 / R / P miast z KS wedlug koszyka, tozsamosci drog (pelne = przyjete + zostalo u placacych),
+# danina od skarbca (stawka efektywna), kasy miast z KS i przeglad firmy wedlug nadwyzki kasy (KsFolkIncome.cs, TownFolk.F5.cs, DsTowns.SurplusReview)
+NLU_HEAD = "Dochod ludu wedlug koszyka (f5-lud): dzien "
+NLU_RX = re.compile(
+    r"Dochod ludu wedlug koszyka \(f5-lud\): dzien (?P<day>-?\d+) \| klucze: Ks Folk Income All Kinds (?P<kall>TAK|NIE), Ks Folk Income R P (?P<krp>TAK|NIE), "
+    r"Ks Folk Income Hoard Falls (?P<khf>TAK|NIE), Ks Folk Income Zero Need (?P<kzn>TAK|NIE), Ks Farm Follows Surplus (?P<kfs>TAK|NIE) \(co (?P<rd>\d+) dob, najwyzej \+(?P<rm>\d+)%\) "
+    r"\| pasma dni koszyka KS: W (?P<wlo>[\d.]+)-(?P<whi>[\d.]+) \(najnizej x(?P<wmn>[\d.]+)\), R (?P<rlo>[\d.]+)-(?P<rhi>[\d.]+), P (?P<plo>[\d.]+)-(?P<phi>[\d.]+) "
+    r"\(najnizej x(?P<rpmn>[\d.]+)\), krok W/RP (?P<sw>[\d.]+)/(?P<srp>[\d.]+)%/d "
+    r"\| miasta z regula (?P<n>\d+): kappa W2/R/P mediana (?P<km>[\d.\-]+/[\d.\-]+/[\d.\-]+), min (?P<kn>[\d.\-]+/[\d.\-]+/[\d.\-]+), miast z kappa < 1 (?P<kl>\d+/\d+/\d+); "
+    r"ponizej pasma \(pelna stawka\) (?P<b0>\d+/\d+/\d+), w pasmie (?P<b1>\d+/\d+/\d+), ponad pasmem (?P<b2>\d+/\d+/\d+), bez koszyka klasy (?P<b3>\d+/\d+/\d+), bez miary (?P<b4>\d+/\d+/\d+) "
+    r"\| dni koszyka W/R/P \(kiesy / potrzeba miast z regula\) (?P<da>[\d.\-]+/[\d.\-]+/[\d.\-]+), mediana (?P<dm>[\d.\-]+/[\d.\-]+/[\d.\-]+) "
+    r"\| doba: z zewnatrz \(uslugi, dwor, budowy, kopalnie, warsztaty\) pelne (?P<ef>-?\d+) = przyjete (?P<ep>-?\d+) \+ oddane kasom miast (?P<ec>-?\d+)"
+    r"(?: \+ wrocilo do wsi \(roboty gminy, przebudowa zajec\) (?P<ev>-?\d+))? "                   # recenzja f5 (uwaga 1): zwrot do kies wsi (stara linia bez pola tez pasuje)
+    r"\(W (?P<efw>-?\d+)/(?P<epw>-?\d+), R (?P<efr>-?\d+)/(?P<epr>-?\d+), P (?P<efp>-?\d+)/(?P<epp>-?\d+)\) "
+    r"\| z kas \(robocizna i doplata R, obrot P, przelewy gracza\) pelne (?P<cf>-?\d+) = zlecone (?P<cq>-?\d+) \+ zostalo w kasach (?P<cc>-?\d+), zaplacone (?P<cp>-?\d+) "
+    r"\(kontrola zlecone - zaplacone = (?P<cctl>-?\d+); W (?P<cfw>-?\d+)/(?P<cpw>-?\d+), R (?P<cfr>-?\d+)/(?P<cpr>-?\d+), P (?P<cfp>-?\d+)/(?P<cpp>-?\d+)\) "
+    r"\| wyplata kupcom M6 pelna (?P<mf>-?\d+) = zlecona (?P<mq>-?\d+) \+ zostalo w kasach (?P<mc>-?\d+), zaplacona (?P<mp>-?\d+) "
+    r"\(kontrola zlecona - zaplacona = (?P<mctl>-?\d+); P (?P<mfp>-?\d+)/(?P<mpp>-?\d+), R (?P<mfr>-?\d+)/(?P<mpr>-?\d+)\) "
+    r"\| place od P dla R pelne (?P<hf>-?\d+) = zaplacone (?P<hp>-?\d+) \+ zostalo u P (?P<hc>-?\d+) "
+    r"\| razem niezaplacone ludowi: w kasach miast (?P<tc>-?\d+), u P (?P<tp>-?\d+)(?:, we wsiach (?P<tv>-?\d+))? "
+    r"\| danina od skarbca W/R/P w tych miastach: podstawa (?P<hb>-?\d+), pobrano (?P<ht>-?\d+) \(W (?P<htw>-?\d+) / R (?P<htr>-?\d+) / P (?P<htp>-?\d+)\), "
+    r"stawka efektywna (?P<her>[\d.]+|-)%/d; stawka R/P dzis srednio (?P<hrr>[\d.]+|-)/(?P<hrp>[\d.]+|-)% \(od (?P<hhi>[\d.]+)% do (?P<hlo>[\d.]+)%\) "
+    r"\| kasy miast z KS razem (?P<gold>-?\d+) \(miast (?P<nt>\d+), ponad 1\.5 x zapas kupcow (?P<nover>\d+), nadwyzka ponad 1\.5 x zapas (?P<over>-?\d+)\) "
+    r"\| przeglad firmy wedlug nadwyzki kasy: podwyzek dzis (?P<rn>\d+) \(\+(?P<ra>-?\d+) zl/rok\), od startu sesji (?P<rns>\d+) \(\+(?P<ras>-?\d+) zl/rok\), "
+    r"przeglad zwykly bez obnizki przy nadwyzce dzis (?P<rnc>\d+)(?:, wstrzymane - R/P miasta ponizej pasma \(nadwyzka najpierw do ich domow przez M6\) dzis (?P<rnh>\d+))?"
+    r"(?:, udzial firmy w doplywie netto podniesiony z podwyzka dzis (?P<rsh>\d+), obnizek przegladem zwyklym po podwyzce wedlug nadwyzki dzis (?P<rca>\d+) "
+    r"\(od startu sesji (?P<rcas>\d+)\))? "                                                         # recenzja f5 (uwaga 2): jedna miara obu przegladow, miara pily
+    r"\| czas (?P<ms>[\d.]+) ms \| potkniecia (?P<stum>\d+)")
+NLU_ERR = ("ERROR in KsFolkIncome", "ERROR in TownFolk.KsFolkIncome", "ERROR in SyncData.arm_ks_dochod", "ERROR in DsTowns.SurplusReview", "ERROR in DsTowns.SurplusHolds")
+
+
+def _nlu_f(v):
+    """Pole liczby linii f5 ("-" - brak miary) -> float albo None."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _nlu_tri(v):
+    """'a/b/c' linii f5 -> [float|None, float|None, float|None]."""
+    return [_nlu_f(x) for x in (v or "-/-/-").split("/")]
 
 
 def nkoszyk_main(logp, until=120):
@@ -36654,12 +36715,23 @@ def nkoszyk_main(logp, until=120):
         return 0
     p9, ch, wg, errs = {}, {}, {}, 0
     f4, f4bad = {}, 0                                            # f4-place-ludu: linia "Place W wedlug koszyka"
+    f5, f5bad, err5 = {}, 0, 0                                   # f5-lud: linia "Dochod ludu wedlug koszyka" i bledy paczki
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
             if s.startswith(NKO_ERR):
                 errs += 1
+                continue
+            if s.startswith(NLU_ERR):
+                err5 += 1
+                continue
+            if s.startswith(NLU_HEAD):
+                mm = NLU_RX.match(s)
+                if mm:
+                    f5[int(mm.group("day"))] = mm.groupdict()
+                else:
+                    f5bad += 1
                 continue
             if s.startswith("KS: tanszy koszyk miast"):
                 r9 = p9_parse(s)
@@ -36896,6 +36968,73 @@ def nkoszyk_main(logp, until=120):
     else:
         rep.add("NKO-21 (recenzja calosci): place W w dol (a) tylko przy ustalonych firmach DS", "BRAK pola 'firmy DS ustalone'",
                 "INFO (log sprzed recenzji calosci, klucz Ks Wage Hands Down wylaczony albo KS niezastosowany)", None)
+    # NKO-22..28 f5-lud: linia "Dochod ludu wedlug koszyka" - dochod klas W2 / R / P wedlug koszyka, tozsamosci drog, kappy, podloga przezycia, danina, czas
+    d5 = sorted(f5)
+    if d5:
+        gaps5 = [d for a, d in zip(d5, d5[1:]) if d - a > 1]
+        rep.add("NKO-22 (f5): linia 'Dochod ludu wedlug koszyka (f5-lud)' kazdej doby", f"dob {len(d5)} ({d5[0]}-{d5[-1]}), luk {len(gaps5)}, nierozpoznanych {f5bad}",
+                "luk 0, nierozpoznane 0", not gaps5 and f5bad == 0)
+        bad23, bad24, bad25, bad26, ms5, stum5 = [], [], [], [], [], 0
+        for d in d5:
+            x = f5[d]
+            I = {k: int(x[k]) for k in ("ef", "ep", "ec", "efw", "epw", "efr", "epr", "efp", "epp", "cf", "cq", "cc", "cp", "cctl", "cfw", "cpw", "cfr", "cpr", "cfp", "cpp",
+                                        "mf", "mq", "mc", "mp", "mctl", "mfp", "mpp", "mfr", "mpr", "hf", "hp", "hc", "tc", "tp")}
+            I["ev"] = int(x.get("ev") or 0); I["tv"] = int(x.get("tv") or 0)   # recenzja f5 (uwaga 1): zwrot do kies wsi (brak pola - stara linia, 0)
+            ok = (I["ef"] == I["ep"] + I["ec"] + I["ev"] and I["ec"] >= 0 and I["ev"] >= 0 and I["tv"] == I["ev"]
+                  and abs(I["efw"] + I["efr"] + I["efp"] - I["ef"]) <= 2 and abs(I["epw"] + I["epr"] + I["epp"] - I["ep"]) <= 2
+                  and I["cf"] == I["cq"] + I["cc"] and I["cc"] >= 0 and I["cctl"] == I["cq"] - I["cp"] and I["cctl"] >= 0
+                  and I["mf"] == I["mq"] + I["mc"] and I["mc"] >= 0 and I["mctl"] == I["mq"] - I["mp"] and I["mctl"] >= 0
+                  and I["hf"] == I["hp"] + I["hc"] and I["hc"] >= 0
+                  and I["tc"] == I["ec"] + I["cc"] + I["mc"] and I["tp"] == I["hc"]
+                  and I["epw"] <= I["efw"] and I["epr"] <= I["efr"] and I["epp"] <= I["efp"] and I["cpw"] <= I["cfw"] and I["cpr"] <= I["cfr"] and I["cpp"] <= I["cfp"]
+                  and I["mpp"] <= I["mfp"] and I["mpr"] <= I["mfr"])
+            if not ok:
+                bad23.append(f"d{d}")
+            mins = [float(x["wmn"]), float(x["rpmn"]), float(x["rpmn"])]
+            for c, (km, kn) in enumerate(zip(_nlu_tri(x["km"]), _nlu_tri(x["kn"]))):
+                if (kn is not None and kn < mins[c] - 0.0005) or (km is not None and km > 1.0005):
+                    bad24.append(f"d{d} {('W2', 'R', 'P')[c]} {kn}-{km}")
+            kl = [int(v) for v in x["kl"].split("/")]
+            b1, b2, b3, b4 = ([int(v) for v in x[k].split("/")] for k in ("b1", "b2", "b3", "b4"))
+            for c in range(3):
+                if kl[c] > b1[c] + b2[c] + b3[c] + b4[c]:
+                    bad25.append(f"d{d} {('W2', 'R', 'P')[c]} {kl[c]} > {b1[c]}+{b2[c]}+{b3[c]}+{b4[c]}")
+            hi, lo = float(x["hhi"]), float(x["hlo"])
+            for v in (_nlu_f(x["hrr"]), _nlu_f(x["hrp"])):
+                if v is not None and (v < lo - 0.011 or v > hi + 0.011):
+                    bad26.append(f"d{d} stawka {v}")
+            her = _nlu_f(x["her"])
+            if her is not None and her > hi + 0.011:
+                bad26.append(f"d{d} efektywna {her}")
+            ms5.append(float(x["ms"])); stum5 += int(x["stum"])
+        rep.add("NKO-23 (f5): tozsamosci drog dochodu - z zewnatrz pelne = przyjete + oddane kasom + wrocilo do wsi, z kas i M6 pelne = zlecone + zostalo w kasach "
+                "(zlecone - zaplacone >= 0), od P dla R pelne = zaplacone + zostalo u P, razem = suma drog (we wsiach = wrocilo do wsi), przyjete <= pelne kazdej klasy",
+                f"dob {len(d5)}, odstepstw {len(bad23)}" + (f" ({', '.join(bad23[:5])})" if bad23 else ""), "0 (nic z niczego, nic w nicosc)", not bad23)
+        rep.add("NKO-24 (f5): kappa W2 / R / P w [najnizej, 1] kazdej doby", f"poza {len(bad24)}" + (f" ({', '.join(bad24[:5])})" if bad24 else ""), "0", not bad24)
+        rep.add("NKO-25 (f5): podloga przezycia - miast z kappa < 1 <= w pasmie + ponad pasmem + bez koszyka klasy + bez miary (kazda klasa)",
+                f"dob ponad {len(bad25)}" + (f" ({', '.join(bad25[:3])})" if bad25 else ""), "0 (klasa ponizej pasma ma pelna stawke)", not bad25)
+        rep.add("NKO-26 (f5): danina od skarbca R/P w miastach z regula - stawka w [Ks Labour Basket Hoard Rate, Ds Hoard Due Rate], efektywna <= Ds Hoard Due Rate",
+                f"odstepstw {len(bad26)}" + (f" ({', '.join(bad26[:4])})" if bad26 else ""), "0", not bad26)
+        a5, b5 = f5[d5[0]], f5[d5[-1]]
+        rep.add("NKO-27 (f5): skutek (INFO) - kappa W2/R/P i dni koszyka W/R/P (mediana) pierwsza / ostatnia doba, niezaplacone ludowi (kasy / u P), stawka efektywna danin, podwyzki firm",
+                f"kappa {a5['km']} -> {b5['km']}; dni {a5['dm']} -> {b5['dm']} (kiesy / potrzeba {b5['da']}); ostatnia doba: w kasach {b5['tc']}, u P {b5['tp']}, we wsiach {b5.get('tv') or '-'}; "
+                f"danina efektywna {b5['her']}%/d; podwyzki firm od startu sesji {b5['rns']} (+{b5['ras']} zl/rok)", "INFO", None)
+        ms5.sort()
+        rep.add("NKO-28 (f5): czas linii (mediana), potkniecia i ERROR paczki (KsFolkIncome, TownFolk.KsFolkIncome, DsTowns.SurplusReview/SurplusHolds, arm_ks_dochod)",
+                f"{ms5[len(ms5) // 2]:.2f} ms, potkniecia {stum5}, ERROR {err5}", "<= 1 ms, 0, 0", ms5[len(ms5) // 2] <= 1.0 and stum5 == 0 and err5 == 0)
+        # NKO-29 recenzja f5 (uwaga 2): pila firm - obnizka przegladem zwyklym w pierwszym przegladzie po podwyzce wedlug nadwyzki (udzial firmy idzie za podwyzka, wiec
+        # przeglad zwykly obniza tylko, gdy zysk kupcow naprawde spadl)
+        d29 = [d for d in d5 if f5[d].get("rca") is not None]
+        if d29:
+            rn29 = sum(int(f5[d]["rn"]) for d in d29); ca29 = sum(int(f5[d]["rca"]) for d in d29); sh29 = sum(int(f5[d]["rsh"]) for d in d29)
+            lim29 = max(2, int(0.25 * rn29))
+            rep.add("NKO-29 (f5, recenzja): pila firm - obnizki przegladem zwyklym po podwyzce wedlug nadwyzki (suma dob z polem)",
+                    f"podwyzek {rn29} (udzial firmy w gore z podwyzka {sh29}), obnizek po podwyzce {ca29}", f"<= {lim29} (max(2, 25% podwyzek))", ca29 <= lim29)
+        else:
+            rep.add("NKO-29 (f5, recenzja): pila firm", "BRAK pola 'obnizek przegladem zwyklym po podwyzce'", "INFO (linia sprzed recenzji f5)", None)
+    else:
+        rep.add("NKO-22 (f5): linia 'Dochod ludu wedlug koszyka (f5-lud)'", "BRAK" + (f" (nierozpoznanych {f5bad})" if f5bad else "") + (f", ERROR paczki {err5}" if err5 else ""),
+                "INFO (log sprzed f5-lud, klucze wylaczone albo KS niezastosowany)", None if not (f5bad or err5) else False)
     rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line, TownFolk.KsWageHands, SyncData.arm_ks_koszyk; f4: KsFolkWage, F4HoardRate, arm_ks_place)", str(errs), "0", errs == 0)
     rep.show()
     return 0
@@ -37267,7 +37406,7 @@ NAK_TRANSIT = ("razem", "cla miast i zamkow", "podatek wsi", "portfele wezwan do
 def _nak_scan(path):
     """Jeden przebieg po logu: linia 'Akumulator kies', posiadacze 'Pieniadz swiata', 'Kiesa ludu' (W/R/P, podzamcze, zapas dni W), firmy F3 (doba ustalenia),
     'Zbytki ludu' (lepszy stol), linia 'KS: rampa' (bieg z KS), ERROR paczki."""
-    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None, "f4": {}, "m6": {}}
+    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None, "f4": {}, "m6": {}, "f5": {}}
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -37280,7 +37419,13 @@ def _nak_scan(path):
                     D["err1"] = D["err1"] or s[:200]
                 continue
             c0 = s[:1]
-            if c0 not in "AKPFZ":
+            if c0 not in "AKPFZD":
+                continue
+            if c0 == "D":
+                if s.startswith(NLU_HEAD):                           # f5-lud (regex grupy nkoszyk)
+                    mm = NLU_RX.match(s)
+                    if mm:
+                        D["f5"][int(mm.group("day"))] = mm.groupdict()
                 continue
             if s.startswith(NAK_HEAD):
                 day = num(r"dzien (\d+)", s[:60])
@@ -37592,11 +37737,12 @@ def nakum_main(logp, until=None):
             mc = sum(cuts) / len(cuts) if cuts else 0.0
             lim16, lim16b = max(30000.0, 0.15 * mc), max(1e6, 28.0 * mca)
             dst = ov[od[-1]] - ov[od[0]]
-            ok16 = (go is None or go <= lim16) and dst <= lim16b
+            f5on = bool(D.get("f5"))                                 # f5-lud: M6 tnie kappa P/R - nadwyzke kas oproznia przeglad firmy wedlug nadwyzki (NAKUM-20), nie M6
+            ok16 = (go is None or go <= lim16) and (dst <= lim16b or f5on)
             rep.add("NAKUM-16 (f4): kasy ponad 1.5 x zapas kupcow (linia f4, zrodlo M6) - zapas",
                     f"{ov[od[0]] / 1e6:.2f} -> {ov[od[-1]] / 1e6:.2f} mln (od pierwszej linii {dst:+.0f}), w oknie " + (f"{go:+.0f}/d" if go is not None else "-")
-                    + f"; zostalo w kasach srednio {mca:.0f}/d (w oknie {mc:.0f}/d)",
-                    f"w oknie <= {lim16:.0f}/d i od pierwszej linii <= {lim16b:.0f} (M6 1/28 dziennie oproznia nadwyzke)", ok16)
+                    + f"; zostalo w kasach srednio {mca:.0f}/d (w oknie {mc:.0f}/d)" + ("; f5-lud: czesc 'od pierwszej linii' INFO (przejscie - NAKUM-20)" if f5on else ""),
+                    f"w oknie <= {lim16:.0f}/d i od pierwszej linii <= {lim16b:.0f} (M6 1/28 dziennie oproznia nadwyzke; przy f5 tylko w oknie)", ok16)
         else:
             rep.add("NAKUM-16 (f4): kasy ponad 1.5 x zapas kupcow", "brak pola 'nadwyzka ponad 1.5 x zapas' (linia f4 sprzed recenzji)", "INFO", None)
         M6 = D["m6"]
@@ -37608,6 +37754,56 @@ def nakum_main(logp, until=None):
     else:
         rep.add("NAKUM-10..17 (f4): place W wedlug koszyka", f"linii f4 {len(fd)}" + (f" od doby {fd[0]} (za krotko - potrzeba 35 dob)" if fd else ""),
                 "INFO (log sprzed f4-place-ludu, klucze wylaczone albo KS niezastosowany)", None)
+    # NAKUM-18..23 f5-lud (kazda klasa ludu miast z KS zarabia wedlug swojego koszyka; linia "Dochod ludu wedlug koszyka (f5-lud)"): okno - ostatnie 28 dob, nie wczesniej
+    # niz 28 dob od pierwszej linii f5 (kappy schodza 3%/d)
+    F5 = D["f5"]; d5 = sorted(F5)
+    if d5 and last - d5[0] >= 35:
+        w5 = [d for d in alld if max(d5[0] + 28, last - 27) <= d <= last]
+        gr5 = _nak_growth({d: v[1] for d, v in D["kl"].items()}, w5); gp5 = _nak_growth({d: v[2] for d, v in D["kl"].items()}, w5)
+        if gr5 is not None and gp5 is not None:
+            rep.add(f"NAKUM-18 (f5): kiesy R i P miast ('Kiesa ludu') - przyrost na dobe (doby {w5[0]}-{w5[-1]})", f"R {gr5:+.0f}/d, P {gp5:+.0f}/d",
+                    "R <= +15 000/d i P <= +15 000/d (fin88 przed f5: R +19.2 tys., P +17.5 tys./d - trzymala je danina 3%/d)", gr5 <= 15000 and gp5 <= 15000)
+        else:
+            rep.add("NAKUM-18 (f5): kiesy R i P miast", "brak linii 'Kiesa ludu' w oknie", "INFO", None)
+        b5 = F5[d5[-1]]
+        dm = _nlu_tri(b5["dm"]); his = [float(b5["whi"]), float(b5["rhi"]), float(b5["phi"])]
+        over19 = [f"{('W', 'R', 'P')[c]} {dm[c]:.1f} > {1.1 * his[c]:.1f}" for c in range(3) if dm[c] is not None and dm[c] > 1.1 * his[c]]
+        rep.add("NAKUM-19 (f5): zapas dni koszyka W/R/P (mediana miast z regula, ostatnia doba) w pasmie", f"W/R/P {b5['dm']} dni (pasma W {b5['wlo']}-{b5['whi']}, R {b5['rlo']}-{b5['rhi']}, P {b5['plo']}-{b5['phi']}; "
+                f"kiesy / potrzeba {b5['da']})" + (f" | ponad: {', '.join(over19)}" if over19 else ""), "mediana <= 1.1 x gorna granica pasma kazdej klasy (fin88: W 60.2 dni przy pasmie 15-30)", not over19)
+        g5 = _nak_growth({d: int(F5[d]["gold"]) for d in d5}, [d for d in d5 if d in w5])
+        o5 = _nak_growth({d: int(F5[d]["over"]) for d in d5}, [d for d in d5 if d in w5])
+        tcs = [int(F5[d]["tc"]) for d in d5 if d in w5]
+        if g5 is not None and tcs:
+            mt = sum(tcs) / len(tcs); lim20 = max(30000.0, 0.15 * mt)
+            rep.add("NAKUM-20 (f5): kasy miast z KS (linia f5) i ich nadwyzka ponad 1.5 x zapas kupcow - przyrost w oknie wobec 'niezaplacone ludowi w kasach'",
+                    f"kasy {g5:+.0f}/d, nadwyzka {o5:+.0f}/d przy niezaplaconym w kasach {mt:.0f}/d; kasy {int(F5[d5[-1]]['gold']) / 1e6:.2f} mln (ponad 1.5 x zapas: {F5[d5[-1]]['nover']} miast)",
+                    f"oba <= {lim20:.0f}/d (max(30 tys., 0.15 x niezaplacone) - placacy nie jest nowym akumulatorem: firma w gore wedlug nadwyzki kasy)", g5 <= lim20 and (o5 is None or o5 <= lim20))
+        else:
+            rep.add("NAKUM-20 (f5): kasy miast z KS", "za malo dob linii f5 w oknie", "INFO", None)
+        hb = sum(int(F5[d]["hb"]) for d in d5 if d in w5); ht = sum(int(F5[d]["ht"]) for d in d5 if d in w5)
+        lo5 = float(b5["hlo"])
+        if hb > 0:
+            er = 100.0 * ht / hb
+            rep.add("NAKUM-21 (f5): danina od skarbca W/R/P miast z regula - stawka efektywna w oknie (pobrano / podstawa ponad poziom normalny)",
+                    f"{er:.2f}%/d (pobrano {ht / max(1, len(w5)):.0f}/d z podstawy {hb / max(1, len(w5)):.0f}/d; stawka R/P ostatniej doby {b5['hrr']}/{b5['hrp']}%)",
+                    f"<= {lo5 + 0.1:.2f}%/d (rzadki tallage: Ks Labour Basket Hoard Rate {lo5:.2f}% + 0.1 pkt; Ds Hoard Due Rate {b5['hhi']}%)", er <= lo5 + 0.1)
+        else:
+            rep.add("NAKUM-21 (f5): danina od skarbca W/R/P miast z regula", "podstawa 0 w oknie (nikt ponad poziom normalny)", "INFO (danina nie potrzebna)", None)
+        kw5 = {d: v[0] + v[1] + v[2] for d, v in D["kl"].items()}
+        gt = {d: kw5[d] + int(F5[d]["gold"]) for d in d5 if d in kw5}
+        g23 = _nak_growth(gt, [d for d in sorted(gt) if d in w5])
+        if g23 is not None:
+            rep.add("NAKUM-22 (f5): lud miast (W+R+P) i kasy miast z KS razem - przyrost na dobe w oknie", f"{g23:+.0f}/d (podwyzki firm wedlug nadwyzki od startu sesji {b5['rns']}: +{b5['ras']} zl/rok)",
+                    "<= +30 000/d (pieniadz miasta nie gromadzi sie ani u ludu, ani u kupcow - idzie firma do panow i korony)", g23 <= 30000)
+        else:
+            rep.add("NAKUM-22 (f5): lud miast i kasy miast z KS razem", "za malo dob w oknie", "INFO", None)
+        rep.add("NAKUM-23 (f5): skutek (INFO) - kappa W2/R/P mediana, niezaplacone ludowi (kasy / u P) srednio w oknie, przeglad zwykly bez obnizki przy nadwyzce",
+                f"kappa {b5['km']}; w kasach {sum(tcs) / max(1, len(tcs)):.0f}/d, u P {sum(int(F5[d]['tp']) for d in d5 if d in w5) / max(1, len(w5)):.0f}/d, "
+                f"we wsiach {sum(int(F5[d].get('tv') or 0) for d in d5 if d in w5) / max(1, len(w5)):.0f}/d; "
+                f"bez obnizki {sum(int(F5[d]['rnc']) for d in d5 if d in w5)} razy w oknie", "INFO", None)
+    else:
+        rep.add("NAKUM-18..23 (f5): dochod klas wedlug koszyka", f"linii f5 {len(d5)}" + (f" od doby {d5[0]} (za krotko - potrzeba 35 dob)" if d5 else ""),
+                "INFO (log sprzed f5-lud, klucze wylaczone albo KS niezastosowany)", None)
     # NAKUM-8 czas, NAKUM-9 potkniecia i ERROR
     if ad:
         tm = sorted(float(A[d]["time"][0]) for d in ad if "time" in A[d])

@@ -59,6 +59,7 @@ namespace Armoury
         internal static void Reset()
         {
             _k.Clear(); _err.Clear(); Zero(); _stum = 0;
+            KsFolkIncome.Reset();   // f5-lud: kappy dochodu klas W2 / R / P (zapis arm_ks_dochod)
         }
 
         private static void Zero()

@@ -69,6 +69,8 @@ namespace Armoury
             public long G0 = long.MinValue, PaidWin;               // zamek: kasa przy poprzedniej probce, pobory od niej
             public string OwnerK; public int CapDay = -1;          // krolestwo wlasciciela widziane ostatnio, doba zmiany
             public double Sales; public int SalesDay = -1;         // podstawa M7 z doby ludu
+            public long SG0 = long.MinValue; public int SGDay = -1;  // f5-lud (Ks Farm Follows Surplus): kasa miasta na poczatku pomiaru przyrostu i doba (sesja)
+            public bool SRaised;                                   // recenzja f5 (uwaga 2): podwyzka wedlug nadwyzki od ostatniego przegladu zwyklego (sesja; tylko licznik pily)
         }
 
         // ------------------------------------------------------------ stan (zapis arm_daniny_miasta)
@@ -306,6 +308,7 @@ namespace Armoury
                 {
                     if (today % Quarter == 0) Terms();
                     Renew(today, s);
+                    SurplusReview(today, s);                      // f5-lud (Ks Farm Follows Surplus): firma miasta z KS w gore o przyrost kasy ponad 1.5 x zapas kupcow
                 }
             }
             catch (Exception e) { Stumble("DayStart", e); }
@@ -397,6 +400,9 @@ namespace Armoury
                     double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                     double nf = Math.Max(F * (1 - m), Math.Min(F * (1 + m), target));
                     double r = nf / F;
+                    if (r < 1 - 1e-9 && SurplusHolds(f, s)) { r = 1.0; KsFolkIncome.NoteNoCut(); }   // f5-lud: bez obnizki przy nadwyzce kasy (Ks Farm Follows Surplus)
+                    if (f.SRaised) { f.SRaised = false; if (r < 1 - 1e-9) KsFolkIncome.NoteCutAfterRaise(); }   // recenzja f5 (uwaga 2): miara pily (tylko licznik)
+                    if (r > 1 + 1e-9 || r < 1 - 1e-9) { f.SG0 = long.MinValue; f.SGDay = -1; }   // recenzja f5 (uwaga 2): pomiar przyrostu kasy (SurplusReview) od nowa - bez tych samych dob drugi raz
                     f.FL *= r; f.FC *= r; f.FLf *= r;
                     if (r > 1 + 1e-9) _renewUp++; else if (r < 1 - 1e-9) _renewDown++;
                 }
@@ -454,7 +460,10 @@ namespace Armoury
                         if (arrears && target > F + 1e-9) _revHeld++;
                         double nf = Math.Max(F * (1 - m), Math.Min(hi, target));
                         r = nf / F;
+                        if (r < 1 - 1e-9 && SurplusHolds(f, s)) { r = 1.0; KsFolkIncome.NoteNoCut(); }   // f5-lud: bez obnizki przy nadwyzce kasy (Ks Farm Follows Surplus); wymuszony - jak dotad
                     }
+                    if (f.SRaised) { f.SRaised = false; if (r < 1 - 1e-9) KsFolkIncome.NoteCutAfterRaise(); }   // recenzja f5 (uwaga 2): miara pily (tylko licznik; wymuszony tez)
+                    if (r > 1 + 1e-9 || r < 1 - 1e-9) { f.SG0 = long.MinValue; f.SGDay = -1; }   // recenzja f5 (uwaga 2): przeglad zwykly zmienil firme - pomiar przyrostu kasy (SurplusReview) od nowa, bez tych samych dob drugi raz
                     f.FL *= r; f.FC *= r; f.FLf *= r;
                     double d = all0 * (r - 1);
                     if (r > 1 + 1e-9) { _renewUp++; _revUpAmt += d; }
@@ -462,6 +471,84 @@ namespace Armoury
                     else _revSame++;
                 }
                 catch (Exception e) { Stumble("Review", e); }
+            }
+        }
+
+        // ============================================================ f5-lud: firma miasta z KS wedlug nadwyzki kasy (Ks Farm Follows Surplus)
+        /// <summary>f5-lud (Ks Farm Follows Surplus): kasa miasta z KS ponad 1.5 x zapas kupcow (prog wyplaty kupcom M6) - kupcy maja nadwyzke; klucz wylaczony, zamek, miasto
+        /// bez KS - false (przeglad jak dotad).</summary>
+        private static bool SurplusHolds(Farm f, Settings s)
+        {
+            try
+            {
+                if (s == null || !s.KsFarmFollowsSurplus || f == null || f.St == null || !f.St.IsTown || f.St.Town == null) return false;
+                var t = f.St.Town;
+                return StartCalibration.KsTownApplied(t) && t.Gold > OverReserve * TownPurse.Reserve(t);
+            }
+            catch (Exception e) { Stumble("SurplusHolds", e); return false; }
+        }
+
+        /// <summary>
+        /// f5-lud (noc 17/18.10, Ks Farm Follows Surplus; model tools/ekonomia-symulatory-2026-10-17/f5/simlud.py S9): dochod ludu miast z KS idzie za koszykiem klas
+        /// (KsFolkIncome) - czego lud nie przyjal, zostaje w kasie miasta (kupcy). Przeglad kwartalny (Review) liczy firme z doplywu netto kupcow, w ktorym wyplata kupcom M6
+        /// jest poborem - nie widzi wiec M6 zatrzymanej w kasie i podnosi firme najwyzej o 15% na kwartal (model: kasy +20 mln w pol roku - nowy akumulator). Tu: miasto
+        /// z KS, ktorego kasa stoi ponad 1.5 x zapas kupcow, ma co Ks Farm Surplus Review Days przeglad W GORE o przyrost kasy na dobe od poprzedniego przegladu (x 364 =
+        /// zl/rok), najwyzej Ks Farm Surplus Review Max firmy; firma pana i korony w tym samym stosunku (czesc z oszczednosci ludu bez zmiany). Przyrost liczony od ostatniej
+        /// podwyzki (bez liczenia drugi raz tych samych dob); kasa nie ponad progiem, oblezenie, zmiana krolestwa, zaleglosci - pomiar od nowa. Pamiec sesyjna (po wczytaniu
+        /// pierwszy przeglad po Ks Farm Surplus Review Days). Domy najpierw: miasto, w ktorym R albo P maja mniej niz dolna granica swojego pasma (KsFolkIncome.HousesFirst),
+        /// nie dostaje podwyzki - nadwyzka kupcow idzie do ich domow wyplata kupcom M6 (kappa 1). Zloto sie nie rusza - zmienia sie nalezna rata (kontrola linii "platnicy - odbiorcy" jak dotad). Kazda osada
+        /// we wlasnym try, potkniecia liczone. Recenzja f5 (uwaga 2): po podwyzce udzial firmy w doplywie netto (Share) w gore do nowej firmy (najwyzej 1) - przeglad zwykly
+        /// celuje w ten sam poziom (jedna miara, bez pily kwartal w dol / 14 dob w gore); licznik obnizek w pierwszym przegladzie zwyklym po podwyzce w linii f5.
+        /// </summary>
+        private static void SurplusReview(int today, Settings s)
+        {
+            if (s == null || !s.KsFarmFollowsSurplus) return;
+            if (_renewN > 0) return;                                             // dzis byl przeglad zwykly (Review / Renew) - podwyzki dzien pozniej (jedna zmiana firm na dobe; NKA-2)
+            int days = Math.Max(7, Math.Min(91, s.KsFarmSurplusReviewDays));
+            double mx = Math.Max(0.0, Math.Min(1.0, (double)s.KsFarmSurplusReviewMax));
+            foreach (var f in _farm.Values)
+            {
+                try
+                {
+                    var st = f.St;
+                    if (st == null || !st.IsTown || st.Town == null || f.Fixed < 0) continue;
+                    var t = st.Town;
+                    if (!StartCalibration.KsTownApplied(t)) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
+                    long g = t.Gold;
+                    double inst = (f.FL + f.FC + f.FLf) / Weeks;
+                    bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
+                    if (g <= OverReserve * TownPurse.Reserve(t) || RemitOf(st) != 0 || arrears) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
+                    // domy najpierw: R albo P miasta ponizej dolnej granicy pasma - nadwyzka kupcow idzie do nich wyplata kupcom M6 (pelna stawka), firma bez podwyzki (model
+                    // simlud: biedne R/P 35 miast Essos d160 8.3 zamiast 5.6 dnia koszyka); pomiar od nowa
+                    if (KsFolkIncome.HousesFirst(st)) { f.SG0 = long.MinValue; f.SGDay = -1; KsFolkIncome.NoteHousesHeld(); continue; }
+                    if (f.SG0 == long.MinValue || f.SGDay < 0) { f.SG0 = g; f.SGDay = today; continue; }
+                    int span = today - f.SGDay;
+                    if (span < days) continue;
+                    double grow = (g - f.SG0) / (double)span;
+                    f.SG0 = g; f.SGDay = today;                                  // przyrost od tej doby (bez liczenia drugi raz)
+                    double F = f.FL + f.FC;
+                    if (!(grow > 0) || !(F > 0)) continue;
+                    double add = Math.Min(grow * YearDays, mx * F);
+                    if (!(add > 0)) continue;
+                    double r = (F + add) / F;
+                    f.FL *= r; f.FC *= r;
+                    KsFolkIncome.NoteRaise(add);
+                    f.SRaised = true;
+                    // recenzja f5 (uwaga 2): JEDNA MIARA dla obu przegladow - udzial firmy w doplywie netto kupcow (Share) idzie za podwyzka. Podwyzka nie zmienia doplywu
+                    // netto (= zmiana kasy + pobory: przyrost kasy przechodzi w raty firmy), wiec przy starym Share przeglad zwykly (cel Share x doplyw netto x 364) cofalby ja
+                    // w najblizszy kwartal, gdy kasa zejdzie do progu 1.5 x zapas (SurplusHolds juz nie trzyma), a 14 dob pozniej ta regula podnosilaby znowu - pila firm
+                    // i dochodu panow / korony. Teraz przeglad zwykly zmienia firme tylko, gdy zmienia sie zysk kupcow. Share najwyzej 1 (firma nie wieksza niz caly doplyw
+                    // netto - nadmiar cofnie przeglad zwykly); nigdy w dol tutaj; brak pomiaru doplywu (mniej niz 7 dob) - bez zmiany. Share jest w zapisie (arm_daniny_miasta).
+                    double net = NetAvg(f, NetMinDays);
+                    if (net > 0)
+                    {
+                        double sh = Math.Min(1.0, (f.FL + f.FC) / YearDays / net);
+                        double old = !double.IsNaN(f.Share) ? f.Share : _worldShare;
+                        if (double.IsNaN(old)) old = 0;
+                        if (sh > old + 1e-9) { f.Share = sh; KsFolkIncome.NoteShareUp(); }
+                    }
+                }
+                catch (Exception e) { Stumble("SurplusReview", e); }
             }
         }
 

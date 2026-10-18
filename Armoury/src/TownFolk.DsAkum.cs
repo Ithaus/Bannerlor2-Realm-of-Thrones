@@ -377,8 +377,9 @@ namespace Armoury
             }
             if (wagePaid > 0)
             {
-                fin = Earn(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour);   // kiesa wsi -> lud targu (zarobek okna, podatek jutro)
-                if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); _dwRefund += wagePaid - fin; got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi
+                long f5c;
+                fin = EarnBack(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour, out f5c);   // kiesa wsi -> lud targu (zarobek okna, podatek jutro)
+                if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); NoteF5VillageBack(Math.Min(wagePaid - fin, f5c)); _dwRefund += wagePaid - fin; got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi (recenzja f5: czesc reguly f5 w linii f5 "wrocilo do wsi")
             }
             if (o.Sept) { _dsMat += matPaid; _dsWage += wagePaid; _dsN++; _dsVilN++; _dsPayOut += got; _dsCofIn += cin; _dsFolkIn += fin; }
             else
@@ -441,8 +442,9 @@ namespace Armoury
                 }
                 if (wagePaid > 0)
                 {
-                    long fin = Earn(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour);   // kiesa wsi -> lud targu (rzemieslnicy)
-                    if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi
+                    long f5c;
+                    long fin = EarnBack(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour, out f5c);   // kiesa wsi -> lud targu (rzemieslnicy)
+                    if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); NoteF5VillageBack(Math.Min(wagePaid - fin, f5c)); got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi (recenzja f5: czesc reguly f5 w linii f5 "wrocilo do wsi")
                 }
                 mat = matPaid; wage = wagePaid;
                 return Math.Max(0, got);

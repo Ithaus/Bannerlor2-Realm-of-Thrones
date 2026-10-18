@@ -64,8 +64,10 @@ namespace Armoury
         {
             try
             {
-                if (c != 0 || f == null || f.Kind != 0 || s == null) return rate;
-                double nr = KsFolkWage.HoardRate(f.St);
+                if (f == null || f.Kind != 0 || s == null) return rate;
+                // f5-lud (Ks Folk Income Hoard Falls): klasy R (c 1) i P (c 2) miasta z regula - stawka schodzi razem z kappa klasy (ten sam wzor rampy); klucz wylaczony
+                // albo miasto bez reguly - HoardRate -1 i stawka bez zmiany (jak dotad); W (c 0) - f4 jak dotad
+                double nr = c == 0 ? KsFolkWage.HoardRate(f.St) : (c == 1 || c == 2) ? KsFolkIncome.HoardRate(f.St, c) : -1.0;
                 if (nr < 0) return rate;
                 double r = DsTowns.NewShare;
                 return (1 - r) * HoardRateNow(s) + Math.Min(r, DaKeyShare(s)) * nr;
