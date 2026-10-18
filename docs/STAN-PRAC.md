@@ -2782,3 +2782,10 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   krolestwo-doby z Bankiem male). DECYZJA (moja, wedlug zasady Jeffa "jedna regula na zjawisko, bez akumulatorow"): DsHoardDueVillages TAK (ta sama danina od majatku ponad 3 x zapas
   we wsiach) + punkt 14 (ZC6/ZC7: Mobility, Freedom - wykup wolnosci = ujscie oszczednosci chlopskich, WarScar) wlaczone w scaleniu; po KS koszyk wsi i tak wchlonie wiekszosc
   nadwyzki (fin80 kiesy wsi spadaly). Do raportu dla Jeffa prostymi slowami.
+- 19:40 PDT: FALA 1b GOTOWA (wf_d6583ac4-35d, 42 agentow): 14/14 paczek build rc 0, kazda recenzja + poprawki: r4-kupcy b01676c1 (12 kluczy: kredyt, trasy wg dni, dalsze miasta,
+  wzgledny zapas, DestValue, budzet wg potrzeby, glod najpierw/Polnoc, korytarze z kredytem, LotPrice; zapis arm_daniny_kupcy), r4-polnoc 8a4bc194, r4-mur 3fe032e8, r4-koszyk 50255051,
+  r4-bkwies 840faec0 (sol w kroku 5, NKS-26), r4-ceny 0cf7e5f5, sw-drogi 06ba7585 (arm_map_roads_geo.tsv), sw-przysiolki 14e11334 (uklad v6 F5456602 + pliki _v5), sw-herby 5d3365aa
+  (512x512 - gra nie daje 256), ks-arm 339dd07a (samoczynne uzbrojenie KS w zapisie Jeffa, bramka krainy, twarde bramki), zbrojownia a1bcf1ff, stare-a12 1bbf2566, stare-a17 067212eb,
+  rot-wydarzenia 0b9a7249. Wyniki: scratchpad fala1b-wynik.json, raporty-paczek.json. Wszystkie galezie na GitHub.
+- 19:40 PDT: workflow wf_17028fbf-513 (scalenie 17 galezi do w-toku/noc-ks4 + polaczenie rachunkow KS-H z doplata pana + decyzje nocy: DsHoardDueVillages TAK, ZC6/ZC7 TAK;
+  potem 3 recenzje calosci (ekonomia/akumulatory, kod/zapis, gra Jeffa) + weryfikacja + poprawki).
