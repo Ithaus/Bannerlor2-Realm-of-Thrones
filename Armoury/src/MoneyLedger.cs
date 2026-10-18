@@ -691,7 +691,9 @@ namespace Armoury
                 for (int c = 0; c < Classes; c++) _mark[c, kind] += s[c] - _blockSnap[c];
                 _blockSnap = s;
                 try { AlleyProbe.OnMark(kind); } catch { }  // m6b (6, recenzja): ta sama pozycja dla kazdego miasta-zaulka (tylko log)
+                bool sub0 = Want169();                      // f19-e1: granica w odcinku "budowy" / "po paserze" przed ta migawka (Mark budowy zamyka odcinek - liczy sie)
                 MarkWorld169(kind, s);                      // paczka 169b: zloto swiata na granicy modulow (RB wedlug odcinkow) - wlasny try
+                if (sub0 || Want169()) SubMark169(kind, null, s);   // f19-e1: bisekcja RB (tylko log, klucz LedgerSegmentBisectLog) - wlasny try
                 VilMark(kind);                              // f14-wsie: ta sama pozycja wies po wsi (wsie-kiesy.csv) - wlasny try
             }
             catch (Exception e) { Log.Error("MoneyLedger.Mark", e); }
@@ -1250,6 +1252,7 @@ namespace Armoury
                     {
                         long ts = System.Diagnostics.Stopwatch.GetTimestamp();
                         try { Log.Info(BalanceCausesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.BalanceCausesLine", e); }
+                        if (BisectOn && _blockWorld0 != long.MinValue && _subCount > 0) { try { Log.Info(BisectLine(day, hold)); } catch (Exception e) { Log.Error("MoneyLedger.BisectLine", e); } }   // f19-e1: bisekcja RB (tylko log)
                         t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
                     }
                     Log.Info(ClanLine(day));

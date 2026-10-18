@@ -591,7 +591,7 @@ namespace Armoury
             catch (Exception e) { Stumble("FoodPost", e); }
         }
 
-        /// <summary>Prefiks i postfiks lambdy BK Demand.FinancialCompromise (fulfiller placi ChangeHeroGold(-koszt) bez odbiorcy). Tylko odczyt kiesy.</summary>
+        /// <summary>Prefiks i postfiks lambdy BK Demand.FinancialCompromise (fulfiller placi ChangeHeroGold(-koszt) bez odbiorcy; f19-e1: odbiorce daje BkDipGold.CompFin). Tylko odczyt kiesy.</summary>
         public static void CompPre(Hero __0, out long __state)
         {
             __state = -1;
@@ -617,7 +617,7 @@ namespace Armoury
             try { if (__0 != null && __0.Gold > 0 && On) { _drN++; _drGold += __0.Gold; } } catch (Exception e) { Stumble("DrainPre", e); }
         }
 
-        /// <summary>Prefiks i postfiks BK BuyGoodsAction.BuyGoods(stash, market, buyer, ...): kupujacy placi ChangeHeroGold(-suma), miasto zlota nie dostaje. Tylko odczyt kiesy.</summary>
+        /// <summary>Prefiks i postfiks BK BuyGoodsAction.BuyGoods(stash, market, buyer, ...): kupujacy placi ChangeHeroGold(-suma), miasto zlota nie dostaje (f19-e1: kase miasta placi BkDipGold.ShopFin). Tylko odczyt kiesy.</summary>
         public static void BuyPre(Hero __2, out long __state)
         {
             __state = -1;
@@ -645,7 +645,7 @@ namespace Armoury
             try
             {
                 sb.Append(" | pomiar E8/P3 (gra bez zmian): zywnosc BK dla band hersztow (GiveFood) ").Append(_bfN).Append(" razy, ").Append(_bfUnits).Append(" szt. zywnosci wartej ").Append(_bfValue)
-                  .Append(" (inne wywolania GiveFood ").Append(_bfOther).Append("); ujscia BK bez odbiorcy: ugoda z grupa interesu (FinancialCompromise) ").Append(_fcN).Append(" razy / ").Append(_fcGold)
+                  .Append(" (inne wywolania GiveFood ").Append(_bfOther).Append("); ujscia BK (zabrane platnikowi; odbiorce ugody i zakupow dworu daje E5/A8 wyzej przy kluczach Group Compromise Pays Group i Court Shopping Pays Town, DrainGold bez odbiorcy): ugoda z grupa interesu (FinancialCompromise) ").Append(_fcN).Append(" razy / ").Append(_fcGold)
                   .Append(" zl (gracz ").Append(_fcPlayer).Append("), zloto dworzan zerowane (DrainGold) ").Append(_drN).Append(" razy / ").Append(_drGold)
                   .Append(" zl, zakupy laski dworu (BuyGoods) ").Append(_bgN).Append(" razy / ").Append(_bgGold).Append(" zl (gracz ").Append(_bgPlayer).Append("; wywolan ").Append(_bgCalls)
                   .Append("); latki pomiaru wpiete ").Append(_wiredN).Append('/').Append(_wantedN);
@@ -780,7 +780,7 @@ namespace Armoury
 
         /// <summary>Lambda wyplaty z BK Demand.FinancialCompromise: jedyna metoda typu Demand (albo jego typow zagniezdzonych) o nazwie z "FinancialCompromise",
         /// (Hero) -> bool, ktora wola ChangeHeroGold (nazwa nadana przez kompilator - szukana po IL). 0 albo wiecej niz 1 trafienie = brak.</summary>
-        private static MethodBase FindCompromise()
+        internal static MethodBase FindCompromise()   // f19-e1: internal - ta sama metoda dla zamkniecia ugody (BkDipGold 6)
         {
             var t = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.Demands.Demand");
             if (t == null) return null;

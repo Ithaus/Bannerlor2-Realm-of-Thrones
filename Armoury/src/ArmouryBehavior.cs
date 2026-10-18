@@ -2387,6 +2387,7 @@ namespace Armoury
             // 110 (projekt etapu 2 krok B): zawor kasy zamku - 7% nadwyzki ponad zapas kupcow do pana zamku, linia "Zawor zamkow (110)";
             // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
             try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); } DayProfile.Lap("CastlePurse.Daily");
+            try { MoneyLedger.Probe169("CastlePurse.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { PeopleMarket.StartGoldCastles(); } catch (Exception e) { Log.Error("PeopleMarket.StartGoldCastles", e); } DayProfile.Lap("PeopleMarket.StartGoldCastles");   // GL-2 (recenzja obiegu D4): pula podzamczy zlota startowego - w dobie StartGold, PO darze zamkow (CastlePurse.TrimStartGift / SeedCastle)
             try { MoneyLedger.Mark(MoneyLedger.MCastle); } catch { }
             // E5/0 (195): kiesa ludu na sucho (tylko log) - po rentach i zaworze zamkow (RentOf, CastlePurse.DuesOf czytelne), przed budowami; E5/B1 (173): przy kiesie
@@ -2395,24 +2396,30 @@ namespace Armoury
             // salda w kiesie W, linia "Uchodzcy do miast (RT)" - PO powrocie i glodzie tej doby (Devastation, Famine), PRZED kiesa ludu (kotwica jutra liczy ich glowy),
             // w pozycji MFolk ksiegi pieniadza (Mark ponizej)
             try { RaidRefugees.Daily(); } catch (Exception e) { Log.Error("RaidRefugees.Daily", e); } DayProfile.Lap("RaidRefugees.Daily");
+            try { MoneyLedger.Probe169("RaidRefugees.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             var gfFolk = GoodsLedger.Begin(GoodsLedger.FFolkVill);
             try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }
             finally { GoodsLedger.End(gfFolk); } DayProfile.Lap("TownFolk.Daily");
+            try { MoneyLedger.Probe169("TownFolk.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // K1-3a krok 2: wymiana padlych koni roboczych miast i zamkow z polki osady za zloto kiesy ludu - PO kotwicy doby (pieniadze ponad jutrzejszy koszyk),
             // w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa osady); poza ramka zakupow wsi ksiegi towarow (kon nie jest towarem tej ksiegi)
             try { TownFolk.WorkHorsesDaily(); } catch (Exception e) { Log.Error("TownFolk.WorkHorsesDaily", e); } DayProfile.Lap("TownFolk.WorkHorsesDaily");
+            try { MoneyLedger.Probe169("TownFolk.WorkHorsesDaily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // E6/R1 (214): woz kopalni kupuje drewno dymarki z polki miasta handlowego za zloto wsi (na nastepna dobe) - zakup wsi w miescie jak E5/B1
             // (pozycja MFolk ksiegi pieniadza, wlasna ramka ksiegi towarow FBloom), PRZED ksiega zelaza i drewna (OreLedger.Daily)
             try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); } DayProfile.Lap("Bloomery.Daily");
+            try { MoneyLedger.Probe169("Bloomery.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // N2-E4 (noc 16.10, noc-ekonomia2): opal mieszczan z polki miasta za zloto kiesy ludu ponad jutrzejszy koszyk - PO koniach roboczych (ta sama regula zaplaty)
             // i PO dymarkach (drewno dymarek pierwsze), w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa miasta); wlasna ramka ksiegi towarow FCons ("mieszczanie")
             try { TownFolk.FirewoodDaily(); } catch (Exception e) { Log.Error("TownFolk.FirewoodDaily", e); } DayProfile.Lap("TownFolk.FirewoodDaily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow
+            try { MoneyLedger.Probe169("WarFront.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 146: ksiega towarow - material zdjety przez budowy (tylko licznik)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
             finally { GoodsLedger.End(gfBuild); } DayProfile.Lap("BuildFunding.Daily");
+            try { MoneyLedger.Probe169("BuildFunding.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // ds-akumulator (DsWorksRealMaterial): zlecenia robot gminy wsi i budowy septow - prawdziwy material z polek PO budowach pana i ludu tej doby (wlasne ramki FBuild
             // z osada targu), przed migawka MBuild (kiesy wsi i ludu -> kasy targow i lud targow); klucz wylaczony - kolejka pusta, nic
             try { TownFolk.DaWorksRun(); } catch (Exception e) { Log.Error("TownFolk.DaWorksRun", e); } DayProfile.Lap("TownFolk.DaWorksRun");
@@ -2509,6 +2516,7 @@ namespace Armoury
             try { FreeFolkRaids.Daily(); } catch (Exception e) { Log.Error("FreeFolkRaids.Daily", e); } DayProfile.Lap("FreeFolkRaids.Daily");
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); } DayProfile.Lap("OutlawLaw.Daily");   // wyrzutki: bieda, powroty, werbunek band
             try { BanditLimit.Daily(); } catch (Exception e) { Log.Error("BanditLimit.Daily", e); } DayProfile.Lap("BanditLimit.Daily");   // f8-bandy: linia "Bandy i limit (f8-bandy): dzien N" - bandy wobec celu, narodziny, koszt AI band, doba realna (PO OutlawLaw.Daily - czas jego odcinka z profilu doby)
+            try { MoneyLedger.Probe169("BanditLimit.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); } DayProfile.Lap("IronBank.Daily");   // Bank Zelazny: pozyczki AI, raty, bankructwa
             // 166 + 162m (projekt etapu 2, 2.0b): budzet rodow po Banku, przed ksiega rodow (na D z wczoraj); osobna pozycja ksiegi pieniadza (dwor do kas siedzib,
             // sakiewki zwolnionych do kies wsi) - granica MRest przed, MBudget po
@@ -2522,7 +2530,9 @@ namespace Armoury
             try { VetPurse.Daily(); } catch (Exception e) { Log.Error("VetPurse.Daily", e); } DayProfile.Lap("VetPurse.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MVetPurse); } catch { }
             try { ReaverLaw.Roll(); } catch (Exception e) { Log.Error("ReaverLaw.Roll", e); }   // WW2 (wyspy-wolni): lup doby (rabunki, dziesiecina korsarzy z OutlawLaw.Daily) do okna 28 dob - przed budzetem rodow
+            try { MoneyLedger.Probe169("ReaverLaw.Roll"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ClanBudget.Daily(); } catch (Exception e) { Log.Error("ClanBudget.Daily", e); } DayProfile.Lap("ClanBudget.Daily");   // linia "Budzet rodow (166)"
+            try { MoneyLedger.Probe169("ClanBudget.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { CourtGoods.Daily(); } catch (Exception e) { Log.Error("CourtGoods.Daily", e); } DayProfile.Lap("CourtGoods.Daily");   // E3-P1 (noc-ekonomia3 czesc 2): linia "Dwor - towar z polki (E3-P1)" - po dworach pana (ClanBudget) i krola (CrownRents) tej doby
             try { VetPurse.Line(); } catch (Exception e) { Log.Error("VetPurse.Line", e); } DayProfile.Lap("VetPurse.Line");   // E5/B6 (201): linia "Weterani - pieniadze (E5/B6)" - ta sama doba co 166 (zloto nie rusza)
             try { DebtLadder.Report(); } catch (Exception e) { Log.Error("DebtLadder.Report", e); } DayProfile.Lap("DebtLadder.Report");   // 168: linia "Dlugi (168)" - po budzecie (kredyt wojenny dnia); zloto nie rusza
@@ -2531,24 +2541,35 @@ namespace Armoury
             // TP (16.10, recenzja): splata dlugow osad wobec gracza (kasa osady, gospodarz, panujacy) i linia "Turniej-platnik (TP): dzien N" - PO ClanBudget.Daily,
             // zeby rody placily z budzetu 166 TEJ doby (takze pierwsza polnoc po wczytaniu); PO Mark(MBudget) - przelewy kas osad w "pozostale moduly ticku", nie w budzecie
             try { TourneyPay.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("TourneyPay.Daily", e); } DayProfile.Lap("TourneyPay.Daily");
+            try { MoneyLedger.Probe169("TourneyPay.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { TourneyFolkPurse.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("TourneyFolkPurse.Daily", e); } DayProfile.Lap("TourneyFolkPurse.Daily");   // f8-sakiewka (18.10): linia "Sakiewka turniejowa (f8): dzien N" (tylko log; przelewy biegna przy turnieju)
+            try { MoneyLedger.Probe169("TourneyFolkPurse.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { TownInns.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("TownInns.Daily", e); } DayProfile.Lap("TownInns.Daily");   // KA (16.10): linia "Karczmy (KA): dzien N" - noclegi, zaplata, kontrola obiegu, premia (tylko log)
+            try { MoneyLedger.Probe169("TownInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RoadsideInns.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("RoadsideInns.Daily", e); } DayProfile.Lap("RoadsideInns.Daily");   // sw-zajazdy: linia "Zajazdy (ZJ): dzien N" - wejscia, noclegi, kiesy wsi, kontrola obiegu, widok
+            try { MoneyLedger.Probe169("RoadsideInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { Rumours.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Rumours.Daily", e); } DayProfile.Lap("Rumours.Daily");   // sw-zajazdy: linia "Plotki (PL): dzien N" - sluchane, ksiega band, wiesci
+            try { MoneyLedger.Probe169("Rumours.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); } DayProfile.Lap("ClanIncomeBook.Daily");   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
+            try { MoneyLedger.Probe169("ClanIncomeBook.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { Measure169c.Daily(); } catch (Exception e) { Log.Error("Measure169c.Daily", e); } DayProfile.Lap("Measure169c.Daily");         // 169c: linie pomiarow etapu 2 (tylko log) - po ksiedze rodow (D staly, wplyw doby), przed ksiega pieniadza
             try { OthersRise.Daily(); } catch (Exception e) { Log.Error("OthersRise.Daily", e); } DayProfile.Lap("OthersRise.Daily");           // E4/2 (190): linie "Inni z poleglych (E4/2)" i "Ludzie (ksiega)" - zaraz po "Wzrost Innych (169c)"
             try { ArmsFromPeople.Daily(); } catch (Exception e) { Log.Error("ArmsFromPeople.Daily", e); } DayProfile.Lap("ArmsFromPeople.Daily");   // E4/8 (164b-2): linie "Wojsko z ludzi (E4/8)" i "Miasta (E4/8 R2)" - po ksiedze ludzi (PeopleBook.Daily w OthersRise.Daily), przed Measure40
+            try { MoneyLedger.Probe169("ArmsFromPeople.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // E4/9 (192): linia "Straz z Westeros" (odcinek Strazy zamkniety w PeopleBook.Daily, zwolnienia 166 doby z ClanBudget.Daily), budzet pul na nowa dobe; potem smierc
             // niewolnych i linia "Niewolni" - PO uzgodnieniu doby i FreeHands.Update, PRZED Measure40 (W11 czyta licznik pojmanych) i PeopleLedger (czyta WatchLaw.Last*)
             try { WatchLaw.Daily(); } catch (Exception e) { Log.Error("WatchLaw.Daily", e); } DayProfile.Lap("WatchLaw.Daily");
             try { ThrallLaw.Daily(); } catch (Exception e) { Log.Error("ThrallLaw.Daily", e); } DayProfile.Lap("ThrallLaw.Daily");
+            try { MoneyLedger.Probe169("ThrallLaw.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { PeopleScale.Daily(); } catch (Exception e) { Log.Error("PeopleScale.Daily", e); } DayProfile.Lap("PeopleScale.Daily");   // GL-0: skale "ludzie okregu" (u_v, m_t, podzamcze) - spis i pamiec doby PO zamknieciu doby ksiegi ludzi (OthersRise -> PeopleBook.Daily), linie P0 "Skale ludzi (GL0)" (tylko log)
             try { VillageByPeople.Daily(); } catch (Exception e) { Log.Error("VillageByPeople.Daily", e); } DayProfile.Lap("VillageByPeople.Daily");   // GL-1 (P1): plon wsi od ludzi - kalibracja g (nowa kampania), przejscia stanu, linia "Plon wsi od ludzi (GL1)", co 7 dob tabela krolestw i plon-wsi.csv - PO PeopleScale.Daily (pamiec skal tej doby)
             try { PeopleMarket.Daily(); } catch (Exception e) { Log.Error("PeopleMarket.Daily", e); } DayProfile.Lap("PeopleMarket.Daily");   // GL-2/GL-3: linia "Rynek od ludzi (GL2)" (okno nawiasow konsumpcji od wczoraj), co 7 dob tabela krolestw - PO PeopleScale.Daily i TownFolk.Daily (tylko log)
+            try { MoneyLedger.Probe169("PeopleMarket.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { PeopleLevy.Daily(); } catch (Exception e) { Log.Error("PeopleLevy.Daily", e); } DayProfile.Lap("PeopleLevy.Daily");   // GL-4 (P4): czynniki poboru i milicji od ludzi na jutro (pamiec skal tej doby), linia "Pobor i milicja od ludzi (GL4)", co 7 dob tabela krolestw - PO PeopleScale.Daily
+            try { MoneyLedger.Probe169("PeopleLevy.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { GoodsRates.Daily(); } catch (Exception e) { Log.Error("GoodsRates.Daily", e); } DayProfile.Lap("GoodsRates.Daily");   // GL-5 (P5): linia "Stawki towarow (GL5)" (tylko log)
             try { GoodsPaths.Daily(); } catch (Exception e) { Log.Error("GoodsPaths.Daily", e); } DayProfile.Lap("GoodsPaths.Daily");   // ZC1: sztaby z polek -> zelazo, budzet marmuru, linia "Towary (ZC1)"
+            try { MoneyLedger.Probe169("GoodsPaths.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { NightEcon.Daily(); } catch (Exception e) { Log.Error("NightEcon.Daily", e); } DayProfile.Lap("NightEcon.Daily");   // noc 16.10: linia "Noc-ekonomia (NE): dzien" (futra, kopalnie w miastach, drewno kuzni - tylko log)
             try { VineOlive.Daily(); } catch (Exception e) { Log.Error("VineOlive.Daily", e); } DayProfile.Lap("VineOlive.Daily");   // B6: linia "Winnice i gaje (B6)" (tylko log)
             // ZC0 (16.10, zycie codzienne - pomiar na sucho): linie "Zycie (ZC0)" i "Spizarnia (ZC)", co 7 dob krolestwa i stany-dostatek.csv - PO TownFolk.Daily (zarobek klas),
@@ -2562,10 +2583,13 @@ namespace Armoury
             // (przebudowa: kiesa wsi -> kasa miasta), pola mieszczan (kasa miasta -> kiesy ludu) - wlasna pozycja "Przeplywy osad" (MKs)
             try { DistrictWorks.BeforeProduction(); } catch (Exception e) { Log.Error("DistrictWorks.BeforeProduction", e); } DayProfile.Lap("DistrictWorks.BeforeProduction");   // inwest (recenzja): b prac okregu tej doby PRZED rachunkiem KS i planem zajec (ta sama doba co wyplaty przy wozach)
             try { StartCalibration.Daily(); } catch (Exception e) { Log.Error("StartCalibration.Daily", e); } DayProfile.Lap("StartCalibration.Daily");
+            try { MoneyLedger.Probe169("StartCalibration.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // inwest (noc 17/18.10): PO KS (bloki KS doby) - zajecia wiosek bez KS (plany produkcji, przebudowy: kiesa wsi -> kasa miasta), ikona okregu (co 28 dob), prace okregu
             // (rampa, roznice ksiegi wiosek PO VillageBook.Daily, odbudowa, linia PO) - przed znacznikiem MKs (ta sama natura przeplywu: przebudowa zajec wsi)
             try { VillageCrafts.Daily(); } catch (Exception e) { Log.Error("VillageCrafts.Daily", e); } DayProfile.Lap("VillageCrafts.Daily");
+            try { MoneyLedger.Probe169("VillageCrafts.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { DistrictIcon.Daily(); } catch (Exception e) { Log.Error("DistrictIcon.Daily", e); } DayProfile.Lap("DistrictIcon.Daily");
+            try { MoneyLedger.Probe169("DistrictIcon.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
@@ -2574,36 +2598,51 @@ namespace Armoury
             try { RansomRepeat.Report(); } catch (Exception e) { Log.Error("RansomRepeat.Report", e); } DayProfile.Lap("RansomRepeat.Report");
             try { MercTenure.Daily(); } catch (Exception e) { Log.Error("MercTenure.Daily", e); } DayProfile.Lap("MercTenure.Daily");
             try { PeaceHold.Daily(); } catch (Exception e) { Log.Error("PeaceHold.Daily", e); } DayProfile.Lap("PeaceHold.Daily");
+            try { MoneyLedger.Probe169("PeaceHold.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // 171: zawrocony towar i nadwyzki zalog na polkach PRZED handlem kupcow (kupcy wywioza nadwyzke zamkow tego samego dnia)
             try { GarrisonCarts.Daily(); } catch (Exception e) { Log.Error("GarrisonCarts.Daily", e); } DayProfile.Lap("GarrisonCarts.Daily");     // zamowienia zamkow w drodze: dostawy, zawrocenia, linia "Zaopatrzenie zamkow (171)"
+            try { MoneyLedger.Probe169("GarrisonCarts.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); } DayProfile.Lap("GarrisonArmory.Daily");   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
+            try { MoneyLedger.Probe169("GarrisonArmory.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { GarrisonKit.ClanFillOnce(); } catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); } DayProfile.Lap("GarrisonKit.ClanFillOnce");   // sklad7b-p: raz na sesje - wypelnienie zbrojowni partii Twojego rodu
+            try { MoneyLedger.Probe169("GarrisonKit.ClanFillOnce"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); } DayProfile.Lap("ArmsDrill.Daily");             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
+            try { MoneyLedger.Probe169("ArmsDrill.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { Measure174b.Daily(); } catch (Exception e) { Log.Error("Measure174b.Daily", e); } DayProfile.Lap("Measure174b.Daily");         // 174b.0: linie "Zbroja na polkach (174b)" i "ZakupyAI wedlug kupujacego (174b)" (tylko log)
             try { Drill.Daily(); } catch (Exception e) { Log.Error("Drill.Daily", e); } DayProfile.Lap("Drill.Daily");                     // musztra: "Musztra (gracz)", "Musztra AI", co 5 dob "Musztra AI wedlug krolestw"; zasilenie zapasu w autotescie
+            try { MoneyLedger.Probe169("Drill.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { SkillLedger.Daily(); } catch (Exception e) { Log.Error("SkillLedger.Daily", e); } DayProfile.Lap("SkillLedger.Daily");         // E8/P1 (243): linie "Umiejetnosci (E8/P1)", "XP wojska (E8/P1)", co 7 dob "Poziomy lordow (E8/P1)" (tylko log)
             try { XpFair.Daily(); } catch (Exception e) { Log.Error("XpFair.Daily", e); } DayProfile.Lap("XpFair.Daily");                 // E8/X (248): linia "Doswiadczenie (E8/X)" - gra / po zmianie (strzal, jedzenie, zwiad, drobne, RBL)
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2 / B-2: kasy osad przed wywozem kupcow - pozostale moduly osobno
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); } DayProfile.Lap("SupplyDemand.DailyTrade");   // E6/R3 (215): w srodku wozy kupcow (TradeCarts - dostawy, wywoz, linia "Przewoz kupcow wozem")
+            try { MoneyLedger.Probe169("SupplyDemand.DailyTrade"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { AiGear.BardingDaily(); } catch (Exception e) { Log.Error("AiGear.BardingDaily", e); } DayProfile.Lap("AiGear.BardingDaily");   // E6/R3 (215): linia "Uprzaz (215)" - po spisie polek w DailyTrade (tylko log)
+            try { MoneyLedger.Probe169("AiGear.BardingDaily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ToolsByUse.Daily(); } catch (Exception e) { Log.Error("ToolsByUse.Daily", e); } DayProfile.Lap("ToolsByUse.Daily");         // E6/R3 (215): linia "Narzedzia wedlug zuzycia (215)" (tylko log)
             try { MoneyLedger.Mark(MoneyLedger.MTrade); } catch { }  // B-2: wywoz kupcow osobna pozycja w "Przeplywy osad" (kasy zamkow placa za konie i uprzaz - tylko z nadwyzki)
             try { MaterialOrders.Daily(); } catch (Exception e) { Log.Error("MaterialOrders.Daily", e); } DayProfile.Lap("MaterialOrders.Daily");   // 174.2: kontrakty surowca dla prawdziwych karawan (po handlu bronia i wozach zamkow), linia "Kontrakty surowca (174)"
             try { MoneyLedger.Mark(MoneyLedger.MOrders); } catch { }
             try { ArmsScrap.Daily(); } catch (Exception e) { Log.Error("ArmsScrap.Daily", e); } DayProfile.Lap("ArmsScrap.Daily");   // 174 pytanie 4: pomiar popytu koszykow zawsze; skup na zlom tylko przy OldStockToScrap (domyslnie wylaczony)
+            try { MoneyLedger.Probe169("ArmsScrap.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); } DayProfile.Lap("SellByCondition.Daily");   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
+            try { MoneyLedger.Probe169("SellByCondition.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); } DayProfile.Lap("RecruitCost.Daily");   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)
+            try { MoneyLedger.Probe169("RecruitCost.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RotLeaks37.Daily(); } catch (Exception e) { Log.Error("RotLeaks37.Daily", e); } DayProfile.Lap("RotLeaks37.Daily");   // 3.7: linia "ROT szczelnosc (3.7): dzien" (tylko gdy cos sie zdarzylo)
             try { ShelfBuy.Daily(); } catch (Exception e) { Log.Error("ShelfBuy.Daily", e); } DayProfile.Lap("ShelfBuy.Daily");   // ceny hurtu (Jeff 09.10 08:00): linia "Ceny hurtu (09.10)" - pomiar petli po sztukach i doplata (tylko log)
+            try { MoneyLedger.Probe169("ShelfBuy.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ShelfIndex.DailyOwn(); } catch (Exception e) { Log.Error("ShelfIndex.DailyOwn", e); } DayProfile.Lap("ShelfIndex.DailyOwn");   // E8/O1 (265): linia "Polka i delegaty (E8/O1)" - pamiec polki po wlasnej zmianie, delegaty DTE/BK (tylko log)
             try { WorkshopLaw.DailyFast(); } catch (Exception e) { Log.Error("WorkshopLaw.DailyFast", e); } DayProfile.Lap("WorkshopLaw.DailyFast");   // E8/O2 (266): linia "Warsztaty bez powtorzen (E8/O2)" - pamieci i klucze warsztatow, probka stara / nowa droga (tylko log)
+            try { MoneyLedger.Probe169("WorkshopLaw.DailyFast"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { Log.DailyO6((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Log.DailyO6", e); } DayProfile.Lap("Log.DailyO6");   // E8/O6 (270): linia "Log (E8/O6)" - pisarze logu, zapisy stracone, proba 3 dob: linie wyslane wobec linii w plikach (tylko log)
             try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); } DayProfile.Lap("MountedWage.Daily");   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
             try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); } DayProfile.Lap("CavalryTemplate.Daily");   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
             try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); } DayProfile.Lap("HorseCensus.Daily");   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
             try { GoldenKits.Daily(); } catch (Exception e) { Log.Error("GoldenKits.Daily", e); } DayProfile.Lap("GoldenKits.Daily");   // PLAN 1.6 (14.10): linia "Zlota Kompania (PLAN 1.6)" - zestawy, potrzeba i pokrycie lukow kusznikow ZK (tylko log, tylko przy Army175GoldenBows)
+            try { MoneyLedger.Probe169("GoldenKits.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RockGold.Daily(); } catch (Exception e) { Log.Error("RockGold.Daily", e); } DayProfile.Lap("RockGold.Daily");   // 24d (14.10): linia "Zloto Casterly Rock (24d)" - wydobycie kruszcow Skaly przed sufitem 0 (tylko log, tylko przy CasterlyGoldExhausted)
             try { SaddleLaw.Daily(); } catch (Exception e) { Log.Error("SaddleLaw.Daily", e); } DayProfile.Lap("SaddleLaw.Daily");   // E8/H (271): linia "Jezdzcy i uprzaz (E8/H)" - spis par kon + uprzaz (partie rodow AI, zalogi, rod gracza) i liczniki bramy, zakupow, bitwy (tylko log)
+            try { MoneyLedger.Probe169("SaddleLaw.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { KingdomBalance.Daily(); } catch (Exception e) { Log.Error("KingdomBalance.Daily", e); } DayProfile.Lap("KingdomBalance.Daily");   // 175.0: linia "Balans krolestw (175)" + balans-krolestw.csv (tylko log)
             try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); } DayProfile.Lap("MoneyLedger.Daily");     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
             try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); } DayProfile.Lap("Stage6Measure.Daily");   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia

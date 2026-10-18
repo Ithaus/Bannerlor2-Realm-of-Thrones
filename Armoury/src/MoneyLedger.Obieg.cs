@@ -28,9 +28,10 @@ namespace Armoury
         internal const int N169Toll = 6;                     // E3-G3 (poprawki noc-ekonomia3): polowa myta pana bez zywego pana do kasy osady (TownToll.Take)
         internal const int N169CartBuy = 7;                  // E3-W1 (poprawki noc-ekonomia3): kiesa wsi -> kasa osady przy zakupie wozem w miescie sprzedazy (TownFolk.CartBuys)
         internal const int N169Dues = 8;                     // DS (F1): daniny wsi przy wozie - kiesa wsi -> skarbiec korony (W4), kiesa ludu i kasa miasta targowego (septy)
-        private const int N169 = 9;
+        internal const int N169BkCourt = 9;                  // f19-e1: sezonowe zakupy dworu BK z polki miasta (BuyGoodsAction.BuyGoods) - zaplata pana do kasy miasta targu (BkDipGold 5)
+        private const int N169 = 10;
         private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne", "sakwy taborow wsi (112)",
-                                                      "myto do kas osad (E3-G3)", "zakupy wsi wozem (E3-W1)", "daniny wsi przy wozie (DS)" };
+                                                      "myto do kas osad (E3-G3)", "zakupy wsi wozem (E3-W1)", "daniny wsi przy wozie (DS)", "zakupy dworu BK z polki (f19-e1)" };
         private static readonly long[,] _n169In = new long[Classes, N169], _n169Out = new long[Classes, N169];
         private static long _purseGoneWin, _purseGoneTown;  // sakiewki rozbitych partii: do zwyciezcow (i ich lordow) / do kas miast
         private static readonly long[] _classRest = new long[Classes];   // reszta starej linii kas (ClassLine) - do linii przyczyn
@@ -66,6 +67,7 @@ namespace Armoury
                 Array.Clear(_tmRing, 0, _tmRing.Length); _tmHead = 0; _tmFilled = 0;
                 _clanKingdom = null; _err169.Clear();
                 _repGotSess = _repDebtSess = _tribPaidSess = 0;
+                _subCount = 0; _subOver = 0; _subDays = 0; _subTicks = 0; _subSess.Clear();   // f19-e1: bisekcja - suma sesji od zera
                 ClearDay169();
             }
             catch { }
@@ -132,11 +134,162 @@ namespace Armoury
             catch (Exception e) { Stumble169("MarkWorld169", e); }
         }
 
+        // ------------------------------------------------------------ f19-e1: bisekcja RB (przeglad 18.10, uwaga 3 - zaokraglenia w naszym ticku). TYLKO LOG.
+        // Odcinek "budowy" (Mark renty -> Mark budowy) gubi zloto KAZDEJ doby (fin93: 160/160 dob, razem -46 200, skok z ok. -30 do ok. -400 w 7. dobie po wczytaniu),
+        // "po paserze" (Mark paser band -> koniec bloku) je robi (82 doby +, 0 dob -; razem +35 721). Tu: zloto swiata i pozycje nazwane bloku w kazdej granicy Mark
+        // wewnatrz tych dwoch odcinkow (w kolejnosci wywolan) i w probkach Probe169 wstawionych miedzy moduly (ArmouryBehavior) - linia "Odcinki ticku - bisekcja (f19-e1)"
+        // pokazuje reszte kazdego kroku (suma krokow = odcinek z linii przyczyn; kontrola w linii) i sume sesji wedlug kroku. Klucz LedgerSegmentBisectLog
+        // (wylaczony = zadnego przegladu swiata wiecej niz dotad). Krok, ktory gubi albo robi zloto co dobe, to miejsce poprawki (podzial "ostatni bierze reszte").
+        private const int SubMax = 96;                     // ok. 45 probek + 15 granic Mark na dobe
+        private static readonly long[] _subW = new long[SubMax], _subN = new long[SubMax];
+        private static readonly int[] _subK = new int[SubMax];
+        private static readonly string[] _subL = new string[SubMax];
+        private static int _subCount, _subOver, _subDays;
+        private static long _subTicks;
+        private static readonly Dictionary<string, long[]> _subSess = new Dictionary<string, long[]>(StringComparer.Ordinal);   // krok -> [suma sesji, dob -, dob +]
+
+        internal static bool BisectOn { get { var s = Settings.Current; return s != null && s.LedgerSegmentBisectLog && CW.On; } }
+
+        /// <summary>Czy biezacy punkt bloku lezy w odcinku "budowy" (po Mark renty, przed Mark budowy) albo "po paserze" (po Mark paser band).</summary>
+        private static bool Want169()
+        {
+            return _blockWorld0 != long.MinValue && ((_segOk[0] && !_segOk[1]) || _segOk[3]);
+        }
+
+        /// <summary>Zapis granicy kroku: zloto swiata (ci sami posiadacze co linia przyczyn) i pozycje nazwane bloku. kind - rodzaj Mark albo -1 (Probe169).</summary>
+        private static void SubMark169(int kind, string label, long[] snap)
+        {
+            try
+            {
+                if (_blockWorld0 == long.MinValue || snap == null || !BisectOn) return;
+                if (_subCount >= SubMax) { _subOver++; return; }
+                long t0 = Stopwatch.GetTimestamp();
+                var h = ReadHolders(snap);
+                long t = 0;
+                for (int k = 0; k < Holders; k++) t += h[k];
+                int i = _subCount++;
+                _subW[i] = t; _subN[i] = CW.BlockNamed; _subK[i] = kind; _subL[i] = label;
+                _subTicks += Stopwatch.GetTimestamp() - t0;
+            }
+            catch (Exception e) { Stumble169("SubMark169", e); }
+        }
+
+        /// <summary>f19-e1: probka bisekcji po module naszego ticku (ArmouryBehavior; etykieta = modul, ktory wlasnie skonczyl). Tylko odczyt;
+        /// poza odcinkami "budowy" i "po paserze", poza blokiem i przy wylaczonym kluczu - nic.</summary>
+        internal static void Probe169(string label)
+        {
+            try
+            {
+                if (!_inBlock || !Want169() || !BisectOn) return;
+                SubMark169(-1, label, Snap());
+            }
+            catch (Exception e) { Stumble169("Probe169", e); }
+        }
+
+        private static string MShort(int k)
+        {
+            switch (k)
+            {
+                case MRent: return "renty"; case MBuild: return "budowy"; case MCrown: return "korona"; case MRest: return "pozostale moduly"; case MFence: return "paser band";
+                case MLife: return "bandy - zycie"; case MOrders: return "kontrakty surowca"; case MCastle: return "zawor zamkow"; case MTrim: return "dar zamkow";
+                case MTrade: return "wywoz kupcow"; case MBudget: return "budzet rodow"; case MTownTrim: return "dar miast"; case MSutlers: return "markietani";
+                case MFolk: return "kiesa ludu"; case MFolkStart: return "start kies ludu"; case MZc6: return "ziemia ZC6"; case MKs: return "KS"; case MKsH: return "kupcy KS-H";
+                case MVetPurse: return "weterani";
+                default: return "M" + k;
+            }
+        }
+
+        private static string StepLabel(int i) { return _subK[i] >= 0 ? "Mark " + MShort(_subK[i]) : "po " + (_subL[i] ?? "?"); }
+
+        /// <summary>Krok do sumy sesji (klucz: odcinek, etykieta i kolejne wystapienie tej etykiety w odcinku tej doby).</summary>
+        private static void SubSess(string seg, string lab, Dictionary<string, int> seen, long v)
+        {
+            int n; seen.TryGetValue(lab, out n); n++; seen[lab] = n;
+            string key = seg + ": " + lab + (n > 1 ? " #" + n : "");
+            long[] a;
+            if (!_subSess.TryGetValue(key, out a)) { a = new long[3]; _subSess[key] = a; }
+            a[0] += v; if (v < 0) a[1]++; else if (v > 0) a[2]++;
+        }
+
+        /// <summary>f19-e1: linia "Odcinki ticku - bisekcja (f19-e1): dzien N" (z MoneyLedger.Daily, po linii przyczyn, przed ClearDay).</summary>
+        private static string BisectLine(int day, long[] hold)
+        {
+            long holdSum = 0; for (int i = 0; i < Holders; i++) holdSum += hold[i];
+            int r0 = -1, r1 = -1, f0 = -1;
+            for (int i = 0; i < _subCount; i++)
+            {
+                if (r0 < 0 && _subK[i] == MRent) r0 = i;
+                else if (r0 >= 0 && r1 < 0 && _subK[i] == MBuild) r1 = i;
+                if (f0 < 0 && _subK[i] == MFence) f0 = i;
+            }
+            _subDays++;
+            var sb = new StringBuilder(2048);
+            sb.Append("Odcinki ticku - bisekcja (f19-e1): dzien ").Append(day);
+            // budowy: od Mark renty do Mark budowy; dar startowy kas zamkow (nazwane ujscie, raz na kampanie) - w kroku konczacym sie na Mark dar zamkow (jak w linii przyczyn)
+            sb.Append(" | budowy (od Mark renty do Mark budowy)");
+            if (r0 >= 0 && r1 > r0)
+            {
+                long trim = TrimNow();
+                int trimAt = r0 + 1;
+                for (int i = r0 + 1; i <= r1; i++) if (_subK[i] == MTrim) { trimAt = i; break; }
+                long sum = 0; var steps = new StringBuilder(512); var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                for (int i = r0 + 1; i <= r1; i++)
+                {
+                    long st = (_subW[i] - _subW[i - 1]) - (_subN[i] - _subN[i - 1]);
+                    if (i == trimAt) st += trim;
+                    sum += st;
+                    string lab = StepLabel(i);
+                    if (steps.Length > 0) steps.Append(", ");
+                    steps.Append(lab).Append(' ').Append(S(st));
+                    SubSess("budowy", lab, seen, st);
+                }
+                long segRef = _segOk[0] && _segOk[1] ? (_segW[1] - _segW[0]) - (_segN[1] - _segN[0]) + trim : long.MinValue;
+                sb.Append(' ').Append(S(sum)).Append(": ").Append(steps.ToString())
+                  .Append(" (zgodne z odcinkiem linii przyczyn: ").Append(segRef == long.MinValue ? "-" : (segRef == sum ? "tak" : "NIE " + S(segRef))).Append(')');
+            }
+            else sb.Append(": brak granic w tej dobie");
+            // po paserze: od Mark paser band do konca bloku (migawka MoneyLedger.Daily)
+            sb.Append(" | po paserze (od Mark paser band do konca bloku)");
+            if (f0 >= 0)
+            {
+                long sum = 0; var steps = new StringBuilder(1024); var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                for (int i = f0 + 1; i <= _subCount; i++)
+                {
+                    bool end = i == _subCount;
+                    long w = end ? holdSum : _subW[i], n = end ? CW.BlockNamed : _subN[i];
+                    long st = (w - _subW[i - 1]) - (n - _subN[i - 1]);
+                    sum += st;
+                    string lab = end ? "koniec bloku (do MoneyLedger.Daily)" : StepLabel(i);
+                    if (steps.Length > 0) steps.Append(", ");
+                    steps.Append(lab).Append(' ').Append(S(st));
+                    SubSess("po paserze", lab, seen, st);
+                }
+                long segRef = _segOk[3] ? (holdSum - _segW[3]) - (CW.BlockNamed - _segN[3]) : long.MinValue;
+                sb.Append(' ').Append(S(sum)).Append(": ").Append(steps.ToString())
+                  .Append(" (zgodne z odcinkiem linii przyczyn: ").Append(segRef == long.MinValue ? "-" : (segRef == sum ? "tak" : "NIE " + S(segRef))).Append(')');
+            }
+            else sb.Append(": brak granicy w tej dobie");
+            // suma sesji: 8 krokow o najwiekszej |sumie|
+            var top = new List<KeyValuePair<string, long[]>>();
+            foreach (var kv in _subSess) if (kv.Value[0] != 0) top.Add(kv);
+            top.Sort((a, b) => Math.Abs(b.Value[0]).CompareTo(Math.Abs(a.Value[0])));
+            sb.Append(" | sesja (").Append(_subDays).Append(" dob) - kroki o najwiekszej reszcie: ");
+            if (top.Count == 0) sb.Append("brak");
+            for (int i = 0; i < top.Count && i < 8; i++)
+            {
+                if (i > 0) sb.Append("; ");
+                sb.Append(top[i].Key).Append(' ').Append(S(top[i].Value[0])).Append(" (dob - ").Append(top[i].Value[1]).Append(", + ").Append(top[i].Value[2]).Append(')');
+            }
+            sb.Append(" | granic ").Append(_subCount).Append(" (ponad limit ").Append(_subOver).Append("), czas ").Append(Ms(_subTicks)).Append(" ms.");
+            return sb.ToString();
+        }
+
         /// <summary>D10: zloto swiata przy otwarciu naszego ticku (ta sama migawka kas co _blockSnap - jeden przeglad posiadaczy).</summary>
         private static void BlockWorld169()
         {
             _blockWorld0 = long.MinValue;
             try { Array.Clear(_segOk, 0, _segOk.Length); SegTicks = 0; } catch { }
+            _subCount = 0; _subOver = 0; _subTicks = 0;      // f19-e1: granice bisekcji od nowa w kazdym bloku
             try
             {
                 if (!CW.On || !_inBlock || _blockSnap == null) return;
@@ -493,7 +646,7 @@ namespace Armoury
                 {
                     long v = _n169In[c, k] - _n169Out[c, k];
                     armSum += v;
-                    if ((c == CTown && k != N169Dues) || v != 0) arm.Add(N169Name[k] + " " + S(v));   // DS (recenzja 17.10): pozycja DS tylko gdy != 0 - log przy wylaczonym DS jak WGRANIE 74
+                    if ((c == CTown && k != N169Dues && k != N169BkCourt) || v != 0) arm.Add(N169Name[k] + " " + S(v));   // DS (recenzja 17.10): pozycja DS tylko gdy != 0 - log przy wylaczonym DS jak WGRANIE 74; f19-e1: zakupy dworu BK tak samo (doba bez zakupow - linia jak dotad)
                 }
                 fresh += armSum;
                 if (arm.Count > 0) parts.Add("Armoury bez licznika: " + string.Join(", ", arm.ToArray()));
