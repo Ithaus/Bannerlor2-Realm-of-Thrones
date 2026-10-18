@@ -2815,3 +2815,8 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   bylo +0.69), nprzysiolki 17/17 (uklad v6 z zapisu F), nzajazdy, ndrogi, nherby, nzbroj, na12, na17, nrot, nzc0, nzc2, nkarczmy, nglod - 0 NIE; nds 5 NIE (3b +0.297%/d, 3e 4.0%,
   korona 0.857, D 0.903, takt 566 ms vs 493); RT-1 (narzedzie). Uchodzcy do miast dzialaja tylko przy KS (Zc4Host) - w grze Jeffa po wlaczeniu KS.
 - 22:02 PDT: TEST fin85 = ta sama DLL + plik armoury-ks-auto.flag (USUNAC!), 160 dob = PELNA SCIEZKA GRY JEFFA (KS sam sie uzbraja, pomiar ~5 tyg., wlaczenie, rampa).
+- 22:52 PDT: TEST fin85 (DLL fin83 + armoury-ks-auto.flag, 160 dob, Armoury-2026-10-17_22-00-21.log): kod 0, ERROR 0, flaga usunieta. KS SAM SIE UZBROIL (doba 109076), pomiar 28/28,
+  dojrzaly Plan, bramki gry TAK, bramka krainy TAK - ALE NIE WLACZYL SIE: twarda bramka "zrodla bez nazwy > 2 szt./d" = sumpter_horse 12-17/d (konie juczne z niczego). Bez poprawki KS w grze
+  Jeffa nigdy nie ruszy. -> workflow wf_2d6c4a59-791 (zb/fix-ksarm od 100eaedf): znalezc i zamknac zrodlo koni jucznych (kod -> recenzja -> poprawki).
+- 22:55 PDT: test 5 dob + 1 bitwa dokladnych DLL (test/wgr77: Armoury d784e458, CrashScribe 5258adcd, RC/GT/FV bez zmian) przed WGRANIEM 77 (= 100eaedf; KS uzbroi sie i bedzie mierzyc,
+  wlaczy sie dopiero po WGRANIU 78 z poprawka koni). at-wgr77-5dob-bitwa.out.txt.
