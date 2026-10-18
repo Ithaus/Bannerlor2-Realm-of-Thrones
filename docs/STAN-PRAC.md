@@ -3137,3 +3137,6 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   e4 3bdb0e4c (napis A7 zamrozone, NAKUM-7 bez skarbcow wedlug Jeffa). Recenzje: e3 WAZNE (arm_stabled pierwszy zapis - srednia zanizona), e2/e4 drobne - do poprawek w scaleniu7.
   DECYZJE DLA JEFFA: W5/W5b/M1 dla rodow > 2R (~48k/d; rada: ten sam f co renty), danina Wolnych Miast dla Dothrakow, "bez miary" f=1, Bank Zelazny akumulator, A7 / podaz jedzenia nie
   reaguje na ceny po D+49, nadanie wojenne DS bez patrzenia na nadwyzke skarbca, spichlerze na 2 lata bez psucia.
+- 16:00 PDT: DECYZJE JEFFA 18.10 (verbatim "1.b 2.c 3. a 4. b"): (1) W5/W5b/M1 wedlug potrzeby (ten sam f co zwrot/renty); (2) danina Wolnych Miast dla Dothrakow WYLACZONA; (3) zysk Banku
+  Zelaznego ponad zapas do wlascicieli w Braavos (wydaja w Braavos); (4) podaz jedzenia i soli za cena - regula jak KsIronHandsFollowMarket (co 7 dob <= 5% rak), A7 pozniej. -> paczki f20-d1..d4
+  (zb/f20-d1..d4 od 6478f861). Wszystko pod NOWYMI kluczami (plik MCM Jeffa ma wszystkie stare klucze).
