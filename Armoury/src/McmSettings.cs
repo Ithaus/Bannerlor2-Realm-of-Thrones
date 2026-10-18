@@ -6724,7 +6724,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationTownCrafts { get; set; } = true;
 
-        [SettingPropertyBool("Ks Self Feed First", HintText = "with Start Calibration: in the cold lands (the North, beyond the Wall, the Night's Watch lands, Skagos, the Iron Islands, Ib) a village first puts its hands to the food work that feeds the most mouths per hand on its own land - barley and oats, the byre, sheep and goats, fishing, the hunt - until its own people are fed, as far as its land and hands allow; only the hands left over follow the market (furs, wool, timber). What is still missing comes by cart and ship, as tribute to the Wall, or not at all. Off = every hand follows the price")]
+        [SettingPropertyBool("Ks Self Feed First", HintText = "with Start Calibration: in the cold lands (the North, beyond the Wall, the Night's Watch lands, Skagos, the Iron Islands, Ib) a village whose people go hungry first puts its hands to the food work that feeds the most mouths per hand on its own land - barley and oats, the byre, sheep and goats, fishing, the hunt - until its own people are fed, as far as its land and hands allow; only the hands left over follow the market (furs, wool, timber). A village that buys more food with its furs than its land would grow (after its lord's and the crown's share) keeps its trappers. What is still missing comes by cart and ship, as tribute to the Wall, or not at all. Off = every hand follows the price")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsSelfFeedFirst { get; set; } = true;
 
