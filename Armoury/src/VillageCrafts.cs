@@ -192,6 +192,7 @@ namespace Armoury
             public Dictionary<ItemObject, float> Add;          // towar -> M x ten mnoznik = dopisek (suma po zajeciach innych wiosek)
             public HashSet<ItemObject> TypeGoods;
             public Dictionary<ItemObject, float> TypeRate;     // stawka typu na towar (suma wag)
+            public Dictionary<int, double> AddK;               // f4b recenzja: zajecie -> k dopisku (udzial x g/g x n x (1 + premia); towar = k x stawka x poprawka) - tylko pomiar (watek glowny)
         }
         private static volatile Dictionary<Village, Plan> _plans = new Dictionary<Village, Plan>();
 
@@ -439,6 +440,7 @@ namespace Armoury
             float gD = VillageByPeople.GOf(di.Type);
             double other = 0, typeBonus = 0;
             var add = new Dictionary<ItemObject, float>();
+            Dictionary<int, double> kBy = null;                       // f4b recenzja: dopisek wedlug zajecia (pomiar neutralnosci - rozbicie wyniku na n zajec)
             var bySide = new Dictionary<string, Side>(StringComparer.Ordinal);
             foreach (var s in di.Sides) bySide[s.Uid] = s;
             foreach (var p in parts)
@@ -459,6 +461,8 @@ namespace Armoury
                     var m = meta[c];
                     if (m == null || m.Type == null) return;
                     double k = part * (VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD)) * N(c) * (1.0 + bb);
+                    if (kBy == null) kBy = new Dictionary<int, double>();
+                    double kc; kBy.TryGetValue(c, out kc); kBy[c] = kc + k;
                     for (int i = 0; i < m.Goods.Length; i++)
                     {
                         float cur; add.TryGetValue(m.Goods[i], out cur);
@@ -470,7 +474,7 @@ namespace Armoury
             double nD = N(D);
             if (other <= 1e-6 && Math.Abs(nD - 1.0) < 1e-4 && typeBonus <= 1e-9) return null;
             var pl = new Plan { Other = (float)Math.Min(1.0, other), NType = (float)nD, TypeBonus = (float)(typeBonus * nD), Type = di.Type, Add = add, KitchenKeep = di.Type.StringId != "wheat_farm",
-                                TypeGoods = new HashSet<ItemObject>(), TypeRate = new Dictionary<ItemObject, float>() };
+                                TypeGoods = new HashSet<ItemObject>(), TypeRate = new Dictionary<ItemObject, float>(), AddK = kBy };
             foreach (var pr in di.Type.Productions)
             {
                 if (pr.Item1 == null || !(pr.Item2 > 0f)) continue;
@@ -542,6 +546,7 @@ namespace Armoury
                     if (F < 0f) F = 0f;
                     float sum = 1f + r.SumOfFactors;
                     if (before > 0f && Math.Abs(F - 1f) > 1e-5f && sum > 0f) r.AddFactor((F - 1f) * sum, _txtType);
+                    float typePart = Math.Max(0f, r.ResultNumber);                // f4b recenzja: czesc towaru typu po czynniku F (pomiar - rozbicie na n zajec)
                     float added = 0f;
                     if (hasAdd && A > 0f)
                     {
@@ -555,7 +560,8 @@ namespace Armoury
                         var m = MemFor(v, today);
                         Put(m, item, kitchen ? 0f : before * (1f - F + pl.TypeBonus) * item.Value, added * item.Value, kitchen ? 0f : before * pl.TypeBonus * item.Value);
                         _dSteps++;
-                        if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, before, r.ResultNumber);   // pomiar neutralnosci (A6): wynik przed i po kroku zajec
+                        // pomiar neutralnosci (A6): wynik przed i po kroku zajec; f4b recenzja: czesc bez n (zboze kuchenne) i czesc towaru typu (n typu okregu) - reszta to dopisek
+                        if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, before, r.ResultNumber, kitchen ? typePart : 0f, kitchen ? 0f : typePart);
                     }
                     return;
                 }
@@ -563,10 +569,16 @@ namespace Armoury
                 float r1 = r.ResultNumber;
                 r.Add(A, _txtAdd);                                            // towar spoza typu: model gry dal baze 0 - te same czynniki, ktore juz sa, i dalsze kroki lancucha
                 // f4b-inwest (klucz Side Village Craft Adds Winter): zima (WinterBite.VillageProdPostfix) pomija wynik 0 - towar spoza listy typu nie dostawal ciecia zimy, ktore
-                // ten sam towar ma we wsi swojego typu; ten sam czynnik (-ciecie, dopisany do sumy jak w WinterBite) po dopisku bazy
-                if (!pl.WorksOnly && WinterAdds) { float cut = WinterBite.VillageCut(v); if (cut > 0f && r.ResultNumber > 0f) r.AddFactor(-cut, _txtWinter); }
+                // ten sam towar ma we wsi swojego typu. Recenzja f4b: tniemy TYLKO dopisek (A x ciecie - ta sama postac co WinterBite: baza x (1 + suma - ciecie)), zmiana bazy
+                // o -A x ciecie / (1 + suma); czynnik na calym wyniku cial tez baze owocow i jaj VillageFruit.Base (pomarancze gaju, jablka i marchew farmy - zima ich nie tnie)
+                // i wielblada Qarthu, ktore ten sam towar ma juz w r1 - jedno zjawisko, dwie reguly. Wynik dopisku = A x (1 + suma - ciecie) - ten sam wzor co NeutralGoods.
+                if (!pl.WorksOnly && WinterAdds)
+                {
+                    float cut = WinterBite.VillageCut(v), fs = 1f + r.SumOfFactors;
+                    if (cut > 0f && fs > 1e-3f && r.ResultNumber > 0f) r.Add(-A * Math.Min(cut, fs) / fs, _txtWinter);   // dopisek najwyzej do 0 (NeutralGoods: fac >= 0)
+                }
                 float got = Math.Max(0f, r.ResultNumber - r1);
-                lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, r1, r.ResultNumber); }
+                lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, r1, r.ResultNumber, Math.Max(0f, r1), 0f); }
             }
             catch (Exception e) { Stumble("Base", e); }
         }
@@ -598,13 +610,15 @@ namespace Armoury
         private static Dictionary<Village, double> _measW2;   // recenzja calosci: u W2 dnia wczesniej wsi z SwitchOn (ten sam W2, ktory wszedl do "przed" neutralnego startu)
         private static bool _deferLogged;
 
-        /// <summary>Pod Gate: wynik przed i po kroku zajec (koniec lancucha - jeszcze nie).</summary>
-        private static void MeasPut(Village v, ItemObject it, float before, float mid)
+        /// <summary>Pod Gate: wynik przed i po kroku zajec (koniec lancucha - jeszcze nie). f4b recenzja: unsc - czesc wyniku po kroku, ktorej n nie skaluje (zboze kuchenne
+        /// typu niezbozowego, owoce VillageFruit i wielblad Qarthu w r1 towaru spoza typu); typ - czesc towaru typu po czynniku F (skaluje ja n typu okregu); reszta (mid - unsc
+        /// - typ) to dopisek zajec innych wiosek (skaluje go n zajec wedlug skladu planu, Plan.AddK).</summary>
+        private static void MeasPut(Village v, ItemObject it, float before, float mid, float unsc, float typ)
         {
             Dictionary<ItemObject, float[]> d;
             if (!_meas.TryGetValue(v, out d)) { d = new Dictionary<ItemObject, float[]>(); _meas[v] = d; }
-            float[] a; if (!d.TryGetValue(it, out a)) { a = new float[3]; d[it] = a; }
-            a[0] = before; a[1] = mid; a[2] = -1f;
+            float[] a; if (!d.TryGetValue(it, out a)) { a = new float[5]; d[it] = a; }
+            a[0] = before; a[1] = mid; a[2] = -1f; a[3] = unsc; a[4] = typ;
         }
 
         /// <summary>MaterialLaw.ProdPostfix - koniec lancucha (przed ksiega rudy): wynik koncowy wywolania - tylko w dobie pomiaru neutralnosci. Nie rzuca.</summary>
@@ -640,6 +654,10 @@ namespace Armoury
                 var w2 = _measW2; double w2g = 0;                              // recenzja calosci: W2 dnia wczesniej - zboze x (1 - u), ryby + u x zboze (tyle samo sztuk; W2 to ostatni krok)
                 ItemObject grainIt = null, fishIt = null;
                 try { grainIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("grain"); fishIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("fish"); } catch { }
+                // f4b recenzja: wynik "po" (koniec lancucha) rozbity na czesc bez n (zboze kuchenne, owoce VillageFruit, wielblad) i czesci skalowane n kazdego zajecia
+                // (towar typu - n typu okregu, dopisek - n zajec wedlug skladu planu) - poprawka z pomiaru liczy n tylko z czesci, ktora n naprawde skaluje
+                var unsc = new Dictionary<ItemObject, double>();
+                var scl = new Dictionary<ItemObject, double[]>();
                 lock (Gate)
                 {
                     foreach (var kv in _meas)
@@ -648,6 +666,8 @@ namespace Armoury
                         if (whole && !WholeMeasured(kv.Key, kv.Value, plansM)) { partial++; continue; }
                         vil++;
                         double uw = 0; if (w2 != null && grainIt != null && fishIt != null) w2.TryGetValue(kv.Key, out uw);
+                        Plan plv = null; if (plansM != null) plansM.TryGetValue(kv.Key, out plv);
+                        int Dv = plv != null ? CraftOfType(plv.Type) : -1;
                         foreach (var x in kv.Value)
                         {
                             var a = x.Value;
@@ -661,6 +681,7 @@ namespace Armoury
                             double c;
                             bef.TryGetValue(x.Key, out c); bef[x.Key] = c + bf;
                             aft.TryGetValue(x.Key, out c); aft[x.Key] = c + fin;
+                            SplitAfter(x.Key, a, mid, fin, plv, Dv, meta, unsc, scl);
                         }
                     }
                     _meas.Clear();
@@ -711,7 +732,7 @@ namespace Armoury
                     if (s0 != null && s0.SideVillageCraftNeutralFix && vil > 0 && calls > 0 && _n != null)
                     {
                         int changed;
-                        string fx = FixFromMeasure(bef, aft, meta, out changed);
+                        string fx = FixFromMeasure(bef, aft, unsc, scl, meta, out changed);
                         sb.Append(" | poprawka n z pomiaru (f4b, Side Village Craft Neutral Fix): ").Append(fx);
                         if (changed > 0) again = true;
                     }
@@ -734,39 +755,138 @@ namespace Armoury
         }
 
         /// <summary>f4b-inwest: poprawka n z pomiaru doby wlaczenia - dla zajecia c wartosc przed / po na jego wlasnych towarach (wlasciciel = najwiekszy wytworca "przed"
-        /// z rachunku na towarach; bez niego - zajecie, ktorego glowny towar to ten towar, albo pierwsze zajecie z tym towarem). |przed/po - 1| > 0.5%: n x przed/po, najwyzej
-        /// o 10%, w widelkach 0.5-2.0. Zwraca opis do linii.</summary>
-        private static string FixFromMeasure(Dictionary<ItemObject, double> bef, Dictionary<ItemObject, double> aft, CraftMeta[] meta, out int changed)
+        /// z rachunku na towarach; bez niego - zajecie, ktorego glowny towar to ten towar, albo pierwsze zajecie z tym towarem). |po/przed - 1| > 0.5%: n x r, najwyzej
+        /// o 10%, w widelkach 0.5-2.0. Recenzja f4b: r NIE jest prostym ilorazem przed / po - wynik "po" towarow zajecia c to czesc bez n (zboze kuchenne typu niezbozowego,
+        /// owoce VillageFruit, wielblad Qarthu) + suma po zajeciach d (n(d) x czesc skalowana n(d); towar na liscie kilku typow - np. ryby rybakow, wielorybnikow i lowcow
+        /// morsow - skaluja n kilku zajec). Uklad liniowy przed_c = bez_n_c + suma_d r_d x X[d, c] rozwiazany iteracja Gaussa-Seidla z widelkami (zajecie bez wlasnej czesci
+        /// skalowanej - bez poprawki); zajecie w 0.5% wchodzi do ukladu, gdy poprawki innych wypchnelyby je poza prog. Prosty iloraz zostawialby blad K x (1 - B / (nS + K)) / B
+        /// przy czesci bez n K (zboze +5% przy 40% kuchennego - nadal ok. +2%). Zwraca opis do linii (bez pionowej kreski).</summary>
+        private static string FixFromMeasure(Dictionary<ItemObject, double> bef, Dictionary<ItemObject, double> aft, Dictionary<ItemObject, double> unsc, Dictionary<ItemObject, double[]> scl,
+                                             CraftMeta[] meta, out int changed)
         {
             changed = 0;
-            var fb = new double[KsTab.NC]; var fa = new double[KsTab.NC];
+            int NC = KsTab.NC;
+            var fb = new double[NC]; var fa = new double[NC]; var fu = new double[NC];
+            var X = new double[NC, NC];                                   // X[d, c]: wartosc "po" towarow zajecia c skalowana n(d)
             var owner = _owner;
             var items = new HashSet<ItemObject>(bef.Keys); foreach (var k in aft.Keys) items.Add(k);
             foreach (var it in items)
             {
                 int c = -1;
                 if (owner == null || !owner.TryGetValue(it, out c)) c = OwnerByMeta(it, meta);
-                if (c < 0 || c >= KsTab.NC) continue;
-                double b, a; bef.TryGetValue(it, out b); aft.TryGetValue(it, out a);
+                if (c < 0 || c >= NC) continue;
+                double b, a, u; bef.TryGetValue(it, out b); aft.TryGetValue(it, out a);
                 double val = Math.Max(1, it.Value);
                 fb[c] += b * val; fa[c] += a * val;
+                if (unsc != null && unsc.TryGetValue(it, out u) && u > 0) fu[c] += u * val;
+                double[] sv; if (scl != null && scl.TryGetValue(it, out sv) && sv != null) for (int d = 0; d < NC && d < sv.Length; d++) if (sv[d] > 0) X[d, c] += sv[d] * val;
             }
             var n = (double[])_n.Clone();
-            var notes = new List<string>();
-            for (int c = 0; c < KsTab.NC; c++)
+            var r = new double[NC]; var raw = new double[NC]; var lo = new double[NC]; var hi = new double[NC]; var act = new bool[NC];
+            for (int c = 0; c < NC; c++)
             {
-                if (!(fb[c] > 0) || !(fa[c] > 0)) continue;
-                double r = fb[c] / fa[c];
-                if (Math.Abs(r - 1.0) <= 0.005) continue;
-                double rc = Math.Max(0.9, Math.Min(1.1, r));
-                double nn = Math.Max(NMin, Math.Min(NMax, n[c] * rc));
+                r[c] = 1.0; raw[c] = 1.0;
+                double nc = c < n.Length && n[c] > 0 ? n[c] : 1.0;
+                lo[c] = Math.Min(1.0, Math.Max(0.9, NMin / nc)); hi[c] = Math.Max(1.0, Math.Min(1.1, NMax / nc));
+                if (c < n.Length && fb[c] > 0 && fa[c] > 0 && X[c, c] > 0 && Math.Abs(fa[c] / fb[c] - 1.0) > 0.005) act[c] = true;
+            }
+            int iters = 0;
+            for (int round = 0; round < 4; round++)
+            {
+                for (int k = 0; k < 200; k++)
+                {
+                    double md = 0;
+                    for (int c = 0; c < NC; c++)
+                    {
+                        if (!act[c]) continue;
+                        double rest = fu[c];
+                        for (int d = 0; d < NC; d++) if (d != c) rest += r[d] * X[d, c];
+                        double rr = (fb[c] - rest) / X[c, c];
+                        raw[c] = rr;
+                        rr = Math.Max(lo[c], Math.Min(hi[c], rr));
+                        md = Math.Max(md, Math.Abs(rr - r[c]));
+                        r[c] = rr;
+                    }
+                    iters++;
+                    if (md < 1e-10) break;
+                }
+                bool more = false;
+                for (int c = 0; c < NC; c++)
+                {
+                    if (act[c] || c >= n.Length || !(fb[c] > 0) || !(X[c, c] > 0)) continue;
+                    double p = fu[c]; for (int d = 0; d < NC; d++) p += r[d] * X[d, c];
+                    if (Math.Abs(p / fb[c] - 1.0) > 0.005) { act[c] = true; more = true; }
+                }
+                if (!more) break;
+            }
+            // opis: poprawione zajecia, czesc bez n, luka rozbicia (bez_n + suma X wobec "po") i przewidywana odchylka po poprawce
+            var notes = new List<string>();
+            double gap = 0, worstP = 0, fuT = 0, faT = 0; string worstPT = "-";
+            for (int c = 0; c < NC; c++)
+            {
+                if (fa[c] > 0) { double s = fu[c]; for (int d = 0; d < NC; d++) s += X[d, c]; gap = Math.Max(gap, Math.Abs(s - fa[c]) / fa[c]); fuT += fu[c]; faT += fa[c]; }
+                if (fb[c] > 0 && (fa[c] > 0 || X[c, c] > 0))
+                {
+                    double p = fu[c]; for (int d = 0; d < NC; d++) p += r[d] * X[d, c];
+                    double dv = p / fb[c] - 1.0;
+                    if (Math.Abs(dv) > Math.Abs(worstP)) { worstP = dv; worstPT = KsTab.Crafts[c]; }
+                }
+                if (!act[c] || Math.Abs(r[c] - 1.0) < 1e-6) continue;
+                double nn = Math.Max(NMin, Math.Min(NMax, n[c] * r[c]));
                 if (Math.Abs(nn - n[c]) < 1e-6) continue;
-                notes.Add(KsTab.Crafts[c] + " x" + (nn / n[c]).ToString("0.0000", Inv) + " (n " + n[c].ToString("0.000", Inv) + "->" + nn.ToString("0.000", Inv) + (Math.Abs(rc - r) > 1e-9 ? ", przyciete z x" + r.ToString("0.000", Inv) : "") + ")");
+                double oth = 0; for (int d = 0; d < NC; d++) if (d != c) oth += X[d, c];
+                bool clip = Math.Abs(raw[c] - r[c]) > 1e-9;
+                notes.Add(KsTab.Crafts[c] + " x" + (nn / n[c]).ToString("0.0000", Inv) + " (n " + n[c].ToString("0.000", Inv) + "->" + nn.ToString("0.000", Inv)
+                          + "; prosty iloraz x" + (fa[c] > 0 ? fb[c] / fa[c] : 1.0).ToString("0.0000", Inv)
+                          + ", bez n " + (fa[c] > 0 ? 100 * fu[c] / fa[c] : 0).ToString("0.0", Inv) + "%, n innych zajec " + (fa[c] > 0 ? 100 * oth / fa[c] : 0).ToString("0.0", Inv) + "%"
+                          + (clip ? ", przyciete z x" + raw[c].ToString("0.000", Inv) : "") + ")");
                 n[c] = nn; changed++;
             }
             if (changed > 0) _n = n;
             return "zajec poprawionych " + changed + (notes.Count > 0 ? ": " + string.Join(", ", notes.ToArray()) : " (wszystkie w 0.5%)") + (changed > 0 ? " - plany od nowa w tej dobie, pomiar po poprawce w linii doby nastepnej" : "")
-                   + (owner == null ? " (wlasciciel towaru z typow - bez rachunku na towarach)" : "");
+                   + (owner == null ? " (wlasciciel towaru z typow - bez rachunku na towarach)" : "")
+                   + "; uklad liniowy (f4b recenzja): czesc bez n " + (faT > 0 ? 100 * fuT / faT : 0).ToString("0.0", Inv) + "% wyniku po, luka rozbicia " + (100 * gap).ToString("0.000", Inv)
+                   + "%, przewidywana odchylka po poprawce " + (100 * Math.Abs(worstP)).ToString("0.000", Inv) + "% w " + worstPT + ", iteracji " + iters;
+        }
+
+        /// <summary>f4b recenzja: wynik koncowy jednego wywolania (pod Gate) rozbity na czesc bez n i czesci skalowane n zajec. a = [przed, po kroku, koniec, bez n, typ];
+        /// mnozniki lancucha za krokiem zajec (koniec / po kroku) wspolne dla wszystkich czesci. Dopisek dzielony wedlug skladu planu (k zajecia x stawka x poprawka stawki).</summary>
+        private static void SplitAfter(ItemObject it, float[] a, double mid, double fin, Plan plv, int Dv, CraftMeta[] meta, Dictionary<ItemObject, double> unsc, Dictionary<ItemObject, double[]> scl)
+        {
+            if (it == null || a == null || !(fin > 0)) return;
+            double c0;
+            if (!(mid > 1e-6)) { unsc.TryGetValue(it, out c0); unsc[it] = c0 + fin; return; }
+            double k = fin / mid;
+            double U = a.Length > 3 ? Math.Max(0.0, Math.Min(mid, a[3])) : 0.0;
+            double T = a.Length > 4 ? Math.Max(0.0, Math.Min(mid - U, a[4])) : 0.0;
+            double ad = Math.Max(0.0, mid - U - T);
+            double[] sv = null;
+            if (T > 0)
+            {
+                if (Dv >= 0 && Dv < KsTab.NC) { if (!scl.TryGetValue(it, out sv)) { sv = new double[KsTab.NC]; scl[it] = sv; } sv[Dv] += T * k; }
+                else U += T;
+            }
+            if (ad > 1e-9)
+            {
+                double W = 0;
+                if (plv != null && plv.AddK != null && meta != null) foreach (var kc in plv.AddK) W += kc.Value * RateIn(meta, kc.Key, it);
+                if (W > 0)
+                {
+                    if (sv == null && !scl.TryGetValue(it, out sv)) { sv = new double[KsTab.NC]; scl[it] = sv; }
+                    foreach (var kc in plv.AddK) { double w = kc.Value * RateIn(meta, kc.Key, it); if (w > 0 && kc.Key >= 0 && kc.Key < KsTab.NC) sv[kc.Key] += ad * k * w / W; }
+                }
+                else U += ad;
+            }
+            if (U > 0) { unsc.TryGetValue(it, out c0); unsc[it] = c0 + U * k; }
+        }
+
+        /// <summary>f4b recenzja: stawka towaru w zajeciu c (suma stawek typu x poprawka stawki GoodsRates - ten sam wzor co dopisek BuildPlan); 0 - zajecie go nie robi.</summary>
+        private static double RateIn(CraftMeta[] meta, int c, ItemObject it)
+        {
+            if (meta == null || c < 0 || c >= meta.Length || meta[c] == null || meta[c].Type == null || meta[c].Goods == null) return 0.0;
+            var m = meta[c]; double s = 0;
+            for (int i = 0; i < m.Goods.Length; i++) if (ReferenceEquals(m.Goods[i], it)) s += m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, it.StringId);
+            return s;
         }
 
         /// <summary>f4b-inwest: wies zmierzona w calosci - jej plan nie ma dopiskow spoza listy typu albo choc jeden z nich mial wywolanie modelu (z koncem lancucha)

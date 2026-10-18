@@ -1261,6 +1261,8 @@ Uzycie (Python 3, tylko odczyt):
                     Village Craft Neutral Goods); NZW-1c poprawka n z pomiaru (klucz Side Village Craft Neutral Fix): linia "pomiar neutralnosci po poprawce (A6)" w 1%
                     (bez poprawki - INFO); NZW-1d sposob liczenia n (towary / rece - INFO); NZW-3 ostatnia linia ikon (prog 40-130 bez zmian) z rozbiciem bez KS / pod KS;
                     NZW-3b (INFO) ostatnia linia ikon bez KS (projekt TESTS 2 liczony dla zajec bez KS) i zmiany typ->ikona. Linie sprzed f4b - INFO, bez wyjatku.
+                    Recenzja f4b: NZW-1e poprawka n jako uklad liniowy (wynik "po" = czesc bez n + czesci skalowane n zajec) - luka rozbicia <= 0.1%, przewidywana
+                    odchylka po poprawce w opisie; NZW-3b dopisuje ikony inne niz typ przy wartosci typu 0 (bez progu zmiany - do decyzji o progu 40-130 pod KS).
 --grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
                     python -I tools/sprawdz_logi.py --grupa npo <Armoury-*.log> (strumieniowo). NPO-0 linia startu (klucz TAK, AI WYLACZONE, menu wpiete, opcje BEE 5/15/30
                     tys. ukryte, krok 112 wpiety), NPO-1 linie doby rozpoznane, NPO-2 wplacone = place + material (0), NPO-3 wyplacone = licznik pana + kiesa wsi, naruszenia 0,
@@ -40663,6 +40665,9 @@ NZW_MEAS2 = re.compile(r"Zajecia wiosek \(ZW\): pomiar neutralnosci po poprawce 
 NZW_FIX = re.compile(r"poprawka n z pomiaru \(f4b, Side Village Craft Neutral Fix\): zajec poprawionych (?P<n>\d+)(?P<rest>[^|]*)")
 NZW_PARTIAL = re.compile(r"wsi poza pomiarem - dopiski bez wywolania w dobie pomiaru \(tick przed wlaczeniem, f4b\): (?P<n>\d+)")
 NZW_GOODS = re.compile(r"\| n na towarach \(f4b, Side Village Craft Neutral Goods\): (?P<note>.*)$")
+# f4b recenzja: uklad liniowy poprawki n (czesc bez n, luka rozbicia, przewidywana odchylka) i ikony inne niz typ przy wartosci typu 0 (bez progu zmiany)
+NZW_FIXLIN = re.compile(r"uklad liniowy \(f4b recenzja\): czesc bez n (?P<un>[\d.]+)% wyniku po, luka rozbicia (?P<gap>[\d.]+)%, przewidywana odchylka po poprawce (?P<pred>[\d.]+)% w (?P<pt>\S+), iteracji (?P<it>\d+)")
+NZW_ICONZ = re.compile(r"\| inna niz typ przy wartosci typu 0 \(f4b recenzja - bez progu x[\d.]+\): bez KS (?P<zn>\d+), pod KS (?P<zk>\d+)")
 NZW_ICONKS = re.compile(r"\| inna niz typ: bez KS (?P<dn>\d+) z (?P<nn>\d+), pod KS (?P<dk>\d+) z (?P<nk>\d+) \| regula pod KS \(f4b, District Icon Part Crafts\): (?P<rule>[^|]*)\| zmiany typ->ikona: (?P<pairs>[^|]*)\|")
 NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|NIECZYNNE[^|]*) \| okregow z wioskami (?P<d>\d+) \(bez KS (?P<fall>\d+), pod KS (?P<ks>\d+)[^)]*\), wiosek (?P<sides>\d+) "
                      r".*?\| inne niz typ okregu (?P<other>\d+), w przebudowie (?P<trans>\d+), uprawy na sniegu \(inne niz typ okregu\) (?P<snow>\d+) "
@@ -40681,6 +40686,7 @@ NZW_ICON_LO, NZW_ICON_HI = 40, 130      # projekt TESTS 2: ikona inna niz typ w 
 NZW_DEV_MAX = 1.0                       # projekt TESTS 2: w dobie wlaczenia swiat kazdego typu w 1%
 NZW_MS_MAX = 5.0                        # koszt doby zajec (ms, mediana)
 NZW_ICON_MS_MAX = 300.0                 # koszt rachunku ikon (co 28 dob)
+NZW_GAP_MAX = 0.1                       # f4b recenzja: luka rozbicia wyniku "po" (bez n + czesci skalowane n wobec po) w % - tozsamosc, tylko zaokraglenia
 NZW_PACE = 0.01                         # zmiany zajec bez KS: najwyzej 1% wiosek na 7 dob (hamulec Jeffa: 60 dob + 1 wioska okregu + 5% regionu na sezon)
 
 
@@ -40693,7 +40699,8 @@ def nzw_main(logp):
     mediana, ikony <= 300 ms), NZW-9 potkniecia i ERROR paczki 0, NZW-10 etap 0 (proba W2): krok W2 wolany i a - b = 0 (W2 milknie tylko we wsiach z planem zajec;
     gdy wszystkie wsie z rybakami maja plan - INFO), NZW-11 tabliczka ikony wpieta (INFO bez linii). Log bez paczki: INFO, bez wyjatku.
     f4b-inwest: NZW-1 = PIERWSZA linia pomiaru (doba wlaczenia), NZW-1c poprawka n z pomiaru i linia "po poprawce" (w 1%; bez poprawki - INFO), NZW-1d sposob
-    liczenia n (INFO), NZW-3b ikony bez KS i zmiany typ->ikona (INFO)."""
+    liczenia n (INFO), NZW-3b ikony bez KS i zmiany typ->ikona (INFO). Recenzja f4b: NZW-1e uklad liniowy poprawki n - luka rozbicia wyniku "po" <= 0.1%
+    (przewidywana odchylka po poprawce - w opisie); NZW-3b dopisuje ikony inne niz typ przy wartosci typu 0 (okreg nic nie sprzedaje z typu - bez progu zmiany)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NZW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -40734,6 +40741,8 @@ def nzw_main(logp):
                         g = mm.groupdict()
                         km = NZW_ICONKS.search(s)
                         g["split"] = km.groupdict() if km else None
+                        zm = NZW_ICONZ.search(s)
+                        g["zero"] = zm.groupdict() if zm else None
                         icons.append(g)
                     else:
                         bad_icons.append(s)
@@ -40822,6 +40831,16 @@ def nzw_main(logp):
             rep.add("NZW-1c: poprawka n z pomiaru", f"zajec poprawionych 0{fx['rest'][:80]}", "INFO (wszystkie zajecia w 0.5% juz w dobie wlaczenia)", None)
     elif meas:
         rep.add("NZW-1c: poprawka n z pomiaru", "brak w linii pomiaru", "INFO (klucz Side Village Craft Neutral Fix wylaczony albo DLL sprzed f4b)", None)
+    # f4b recenzja: NZW-1e - uklad liniowy poprawki (wynik "po" = czesc bez n + czesci skalowane n zajec; luka to tozsamosc rozbicia) i przewidywana odchylka po poprawce
+    if fixes:
+        lm = NZW_FIXLIN.search(fixes[0]["rest"])
+        if lm:
+            gap = float(lm.group("gap"))
+            rep.add("NZW-1e: poprawka n - uklad liniowy (rozbicie wyniku po na czesc bez n i n zajec)",
+                    f"czesc bez n {lm.group('un')}% (zboze kuchenne, owoce, wielblad), luka rozbicia {gap:.3f}%, przewidywana odchylka po poprawce {lm.group('pred')}% w {lm.group('pt')}, iteracji {lm.group('it')}",
+                    f"luka <= {NZW_GAP_MAX}% (przewidywana > 1% tylko przy przycieciu 10% - wtedy NZW-1c pokaze reszte)", gap <= NZW_GAP_MAX)
+        else:
+            rep.add("NZW-1e: poprawka n - uklad liniowy", "brak dopisku w linii pomiaru", "INFO (DLL sprzed recenzji f4b - prosty iloraz przed / po)", None)
     if goods_notes:
         rep.add("NZW-1d: n neutralnego startu - sposob liczenia", goods_notes[-1][:220], "INFO (TAK - n na towarach; WYLACZONE - n z rak jak inwest)", None)
     elif neutral:
@@ -40844,6 +40863,8 @@ def nzw_main(logp):
         if pre or sp:
             txt = (f"ostatnia linia bez KS: {pre[-1]['diff']} z {pre[-1]['d']} (doba {pre[-1]['day']})" if pre else "linii bez KS brak")
             txt += (f"; zmiany typ->ikona (ostatnia linia): {sp['pairs'].strip()[:200]}" if sp else "")
+            zr = icons[-1].get("zero")
+            txt += (f"; inna niz typ przy wartosci typu 0 (bez progu zmiany): bez KS {zr['zn']}, pod KS {zr['zk']}" if zr else "")
             rep.add("NZW-3b: ikony bez KS i zmiany typ->ikona", txt, "INFO (projekt 40-130 liczony dla zajec bez KS)", None)
     else:
         rep.add("NZW-3: ikona okregu", "brak linii 'ikony dzien'", "INFO (klucz District Icon From Sum wylaczony albo sesja bez doby)", None)
