@@ -4,7 +4,8 @@
 #   - wioska na ziemi innej kultury / innego krolestwa (kolumny kultura / krolestwo komorki wobec komorki wsi gry okregu),
 #   - odleglosc od wlasnej wsi gry (mediana / 90% / max) i "daleko obca" (> 2 x odleglosc do najblizszej wsi gry i > 40 jedn.),
 #   - odleglosc minimalna: naglowek pliku min_distance wobec wioska-wioska i wioska-wies gry, od miasta / zamku,
-#   - zajazdy: budynek - najblizsza wioska poboczna / wies gry.
+#   - zajazdy: budynek - najblizsza wioska poboczna / wies gry,
+#   - (f16-drobne) przeniesione na scianie ladowej siatki gry pod srodkiem (navmesh.bin z katalogu a-teren, IsLandGroup jak linia ukladu v7 w grze; brod Fording to nie lad).
 # Uzycie (z katalogu repo): python -I tools/wioski-v7/sprawdz_v7.py [--geo <geo-siatka.tsv>] [--teren <a-teren>] [--uklad <plik>] [--stary <plik v6>]
 #   [--zajazdy <arm_roadside_inns.tsv>]. Kod wyjscia 1, gdy prog nie jest spelniony (progi w PROGI ponizej; ten sam zestaw co raport generatora).
 import argparse, io, json, math, os, sys
@@ -32,6 +33,50 @@ def read_layout(path):
             continue
         rows.append(dict(zip(cols, line.split("\t"))))
     return head, rows
+
+
+LAND_GROUPS = {1, 2, 3, 4, 5, 14, 15, 16, 20}   # MapVillageData.IsLandGroup: Plain, Desert, Snow, Forest, Steppe, RuralArea, Swamp, Dune, Beach (bez Fording 6)
+
+
+def face_land(teren, pts):
+    """f16-drobne: [(na ladzie, grupa sciany)] dla punktow - sciana siatki nawigacyjnej gry pod punktem (wielokat z siatka.npz, kandydaci z siatka_raster.npz co 0.5
+    jedn.), lad = grupa w LAND_GROUPS (jak VillageHamlets: GetFaceIndex + IsLandGroup); brak sciany - grupa -1. None - brak plikow albo numpy."""
+    try:
+        import numpy as np
+        S = np.load(os.path.join(teren, "siatka.npz"))
+        R = np.load(os.path.join(teren, "siatka_raster.npz"))
+    except Exception:
+        return None
+    V, fs, fv, grp, fr = S["V"], S["fstart"], S["fv"], S["group"], R["face"]
+    res = float(R["res"])
+
+    def inside(x, y, f):
+        P = V[fv[fs[f]:fs[f + 1]], :2]
+        n, ins, j = len(P), False, len(P) - 1
+        for i in range(n):
+            xi, yi = float(P[i][0]), float(P[i][1]); xj, yj = float(P[j][0]), float(P[j][1])
+            if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+                ins = not ins
+            j = i
+        return ins
+
+    out = []
+    for (x, y) in pts:
+        ix, iy = int(x / res), int(y / res)
+        cand = []
+        for dy in (-2, -1, 0, 1, 2):
+            for dx in (-2, -1, 0, 1, 2):
+                if 0 <= iy + dy < fr.shape[0] and 0 <= ix + dx < fr.shape[1]:
+                    f = int(fr[iy + dy, ix + dx])
+                    if f >= 0 and f not in cand:
+                        cand.append(f)
+        g = -1
+        for f in cand:
+            if inside(x, y, f):
+                g = int(grp[f])
+                break
+        out.append((g in LAND_GROUPS, g))
+    return out
 
 
 def main():
@@ -83,6 +128,7 @@ def main():
         res = dict(n=len(rows), dist=0, cult=0, king=0, far=0, dmain=[], cult_pairs={}, ss=[], sm=[], town=[], castle=[], head=head, pts=[])
         pts = [(float(r["x"]), float(r["y"])) for r in rows]
         res["pts"] = pts
+        res["uid"] = [r["uid"] for r in rows]
         for k, r in enumerate(rows):
             x, y = pts[k]
             vid = r["village_id"]
@@ -134,6 +180,20 @@ def main():
         mvd = [math.hypot(new["pts"][k][0] - old["pts"][k][0], new["pts"][k][1] - old["pts"][k][1]) for k in range(min(len(new["pts"]), len(old["pts"])))]
         # nowe zlamania wobec v6 (wioska, ktora w v6 stala na swojej ziemi / kulturze, a w v7 nie)
         out.append("przeniesione wobec v6 (> 0.5 jedn.): %d" % sum(1 for v in mvd if v > 0.5))
+        # f16-drobne: lad pod srodkiem wioski jak w grze (VillageHamlets.V7Line: sciana siatki nawigacyjnej pod punktem, MapVillageData.IsLandGroup) - z prawdziwej siatki
+        # navmesh.bin (siatka.npz + siatka_raster.npz katalogu a-teren). Sonda geo-siatka liczy brod (Fording) jako nawig - fin93: "na ladzie 1518/1519", wioska na brodzie.
+        land = face_land(a.teren, new["pts"])
+        if land is not None:
+            mv_idx = [k for k, v in enumerate(mvd) if v >= 0.5]
+            off = [k for k in mv_idx if not land[k][0]]
+            off_all = sum(1 for k in range(len(land)) if not land[k][0])
+            out.append("na scianie ladowej siatki gry (navmesh.bin, IsLandGroup jak VillageHamlets): przeniesione %d/%d, caly plik %d/%d%s" % (
+                len(mv_idx) - len(off), len(mv_idx), len(land) - off_all, len(land),
+                (" | poza ladem: " + ", ".join("%s (%.2f, %.2f) grupa %d" % (new["uid"][k], new["pts"][k][0], new["pts"][k][1], land[k][1]) for k in off[:5])) if off else ""))
+            if off:
+                bad.append("przeniesione poza sciana ladowa siatki gry %d" % len(off))
+        else:
+            out.append("na scianie ladowej siatki gry: brak siatka.npz / siatka_raster.npz albo numpy - bez sprawdzenia")
     ss_min, sm_min = min(new["ss"]), min(new["sm"])
     below_t = sum(1 for v in new["ss"] if td > 0 and v < td - 1e-6)
     below_tm = sum(1 for v in new["sm"] if td > 0 and v < td - 1e-6)

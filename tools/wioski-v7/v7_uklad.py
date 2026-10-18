@@ -14,6 +14,11 @@
 #   Potok z zajazdami (Jeff 18.10 "zajazdy nie sa obok wiosek"): najpierw plan miejsc zajazdow (tools/zajazdy/zajazdy_gen.py --plan-out, ludzie z v6),
 #   potem ten skrypt (wioski >= min_village planu, 12.26 jedn., od budynku i postoju zajazdu), na koncu plik zajazdow (zajazdy_gen.py --plan-in) - opis w zajazdy_gen.py.
 #   Sprawdzenie wyniku (niezalezne od generatora, miary recenzji 18.10): python -I tools/wioski-v7/sprawdz_v7.py.
+#   UWAGA (f16-drobne, 18.10): plik w module (WGRANIE 81, gra Jeffa) = przebieg SPRZED reguly brodu (crc ukladu 5F9875B1, raport-v7.txt / wioski-v7.tsv tego
+#   przebiegu) - jedna wioska (castle_village_EN9_2#91390709 Drowned Wood) stoi na brodzie (sprawdz_v7: "na scianie ladowej siatki gry 1518/1519"; widok gry
+#   przesuwa srodek obrazka poza ladem na lad do 6 jedn., lad 2.1 jedn. obok). Pelny przebieg z regula brodu zmienia 11 wierszy i osady dwoch wiosek (crc 3D776223): zapis z 5F9875B1 nie jest znany
+#   VillageBook.OldLayout (ksiega wiosek "uklad zapisu nieznany"), a kolumny ks_* 5 wiosek zmieniaja podpis nakladki KS (KS od zera / stan zastosowany pominiety)
+#   i ZW startuje neutralnie. Wiec: puszczac dopiero przy nastepnej zaplanowanej zmianie ukladu, razem z przejsciem zapisu (plik 5F9875B1 jako kandydat OldLayout).
 #
 # WYNIK (raport-v7.txt, po recenzji 18.10): odleglosc docelowa D = 2 x v6 = 12.26 ma 61% wiosek (najblizsza osada >= D: v6 358 -> v7 1192 z 1957); najblizsza
 #   wioska min 6.13 -> 6.75, 10% 6.58 -> 10.26, mediana 9.50 -> 12.73; najblizsza osada ponizej 0.8 D 1263 -> 162; skupiska 47 -> 9. Gdzie lad kultury nie miesci
@@ -25,7 +30,8 @@
 #  1. Odleglosc docelowa D = 2 x najmniejsza odleglosc wioska-wioska ukladu v6 (6.13 -> 12.26 jedn.) - miedzy kazdymi dwiema wioskami pobocznymi i miedzy wioska
 #     poboczna a wsia gry (v6: 6.00). Wsie gry stoja tam, gdzie postawila je gra (pary wies gry - wies gry ponizej D zostaja - dane ROT).
 #  2. Miejsce pod wioske: lad przejezdny w rastrze (bez bagna, rzeki, stromizny >= 0.35, morza i ladu nieprzejezdnego w kwadracie 3x3; gora - w ROT takze
-#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9), od miasta >= 12, zamku >= 9 (jak v6), kryjowki >= 5,
+#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9; f16-drobne: komorka sondy na brodzie - teren
+#     Fording - nie liczy sie jako lad, bo gra (IsLandGroup) nie stawia na nim wioski), od miasta >= 12, zamku >= 9 (jak v6), kryjowki >= 5,
 #     poza malowana droga (>= 1.5 jedn. od jej srodka), >= min_village planu zajazdow (12.26) od budynku i postoju.
 #     Ziemia okregu (recenzja 18.10, Jeff: "zeby to wygladalo naturalnie, a nie jak blad") = komorki, ktorych najblizsza wies gry (sonda gry, kolumna wies_gry) to
 #     wies gry okregu, do 60 jedn. (v6: najdalej 60.0), ten sam lad; komorka pogranicza (kultura albo krolestwo ziemi inne niz przy wsi gry) - z kara jak pas.
@@ -611,13 +617,15 @@ def main():
     cul_code, kin_code = {}, {}
     with io.open(A.geo, encoding="utf-8") as f:
         ghd = f.readline().rstrip("\r\n").split("\t")
-        i_w, i_c, i_k = ghd.index("wies_gry"), ghd.index("kultura"), ghd.index("krolestwo")
+        i_w, i_c, i_k, i_t = ghd.index("wies_gry"), ghd.index("kultura"), ghd.index("krolestwo"), ghd.index("teren")
         for line in f:
             c = line.rstrip("\r\n").split("\t")
             if c[2] == "tak":
                 xi, yi = int(c[0]) // 2, int(c[1]) // 2
                 if 0 <= yi < nav.shape[0] and 0 <= xi < nav.shape[1]:
-                    nav[yi, xi] = True
+                    # f16-drobne: brod (Fording) jest przejezdny dla partii (nawig tak), ale nie jest ladem pod budynek - gra (MapVillageData.IsLandGroup,
+                    # linia ukladu v7 "na ladzie") liczy tylko Plain/Desert/Snow/Forest/Steppe/RuralArea/Swamp/Dune/Beach; ziemia okregu (gvid) jak dotad
+                    nav[yi, xi] = c[i_t] != "Fording"
                     if c[i_w] != "-":
                         gvid[yi, xi] = vidx.get(c[i_w], -2)
                         gcul[yi, xi] = cul_code.setdefault(c[i_c], len(cul_code))
