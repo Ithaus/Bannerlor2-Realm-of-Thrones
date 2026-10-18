@@ -7666,7 +7666,7 @@ namespace Armoury
 
         [SettingPropertyBool("Ks Switch Signal Rule", HintText = "with Ks Switch Signal: village parts really change their work by that reckoning, with the same brake as Start Calibration Switch Rule - another work must pay at least 25% better for about 60 days, one part of a district at a time, within what its land allows, at most 5% of the region's hands a season; the village pays for timber, tools and stone really bought at its market town's stall and for the town craftsmen, and the hands move over 60 days (vineyards, groves, orchards and date palms a year). AI villages and the player's villages alike. Off = works stay as the calibration set them (only the pressure to change is written to the log), unless Start Calibration Switch Rule is on")]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
-        public bool KsSwitchSignalRule { get; set; } = true;
+        public bool KsSwitchSignalRule { get; set; } = false;
 
         [SettingPropertyFloatingInteger("Ks Switch Market Band", 0.00f, 0.50f, "0.00", HintText = "with Ks Switch Signal: how far a good's shortage or glut at the market town may move its price in the reckoning, compared with the town's other goods (0.15 = at most 15% up or down; 0 = the calibration's own prices only)")]
         [SettingPropertyGroup("Village works follow prices (18.10)")]

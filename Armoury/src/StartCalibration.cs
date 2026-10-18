@@ -298,7 +298,8 @@ namespace Armoury
                          + " | " + _landNote + " | uklad wiosek tej sesji " + (lm ? "zgodny z plikiem" : "NIEZGODNY albo ksiega wiosek nieczynna - wioski poboczne poza KS, Apply zablokowane")
                          + " | stany ZC (Daily Life Measure) " + (DailyLife.KeyOn ? "TAK" : "NIE - bez stanow ZC KS w stanie zastosowanym dziala jak Undo, wlaczenie zablokowane")
                          + " | premia mapy " + (s != null ? s.StartCalibrationMapInertia : 1.25f).ToString("0.00", Inv) + ", pola mieszczan " + (s == null || s.StartCalibrationTownFields ? "TAK" : "NIE")
-                         + ", regula zmiany zajec po wlaczeniu " + (s == null || s.StartCalibrationSwitchRule ? "TAK" : "NIE (sam pomiar nacisku)") + ", przetwory miast (ZC5) " + (s == null || s.StartCalibrationTownCrafts ? "TAK" : "NIE")
+                         + ", regula zmiany zajec po wlaczeniu " + (s == null || A7RuleOn ? "TAK" + (s != null && s.KsSwitchSignal ? " (" + A7sRuleSrc() + ")" : "") : "NIE (sam pomiar nacisku)")   // recenzja f5-a7: regula czynna takze z nowym kluczem / plikiem autotestu
+                         + (s != null && s.KsSwitchSignal ? " przy sygnale cen KS (f5-a7)" : "") + ", przetwory miast (ZC5) " + (s == null || s.StartCalibrationTownCrafts ? "TAK" : "NIE")
                          + " | rampa: podaz " + RampSupply + " dob (A..D), popyt koszyka ZC4 od D przez " + (RampDemand - RampSupply) + " dob (D..D+14), polki startu w D, A7 i regale od D | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }

@@ -22,7 +22,8 @@ namespace Armoury
     ///    mieso i skory, konie z wartoscia Planu - stadniny ich nie traca, mieso wieloryba jako mieso). Przy cenach Planu bez gradientu ten wzor dawal w fin88 nacisk 5.9-7.9%
     ///    blokow (3.7-5.3% rak) wobec 92% przy indeksach gry (linia "KS: A7 diagnoza (f4-pomiary)", wariant S2);
     ///  - Held liczony nowym sygnalem od zera (pierwszy krok z kluczem: Held wszystkich blokow = 0 - 60 dob nacisku tego sygnalu, nie starego);
-    ///  - zmiany naprawde z kluczem Ks Switch Signal Rule (albo dawnym Start Calibration Switch Rule) - wartosc domyslna starego klucza zapisana w MCM Jeffa nie zmienilaby
+    ///  - zmiany naprawde z kluczem Ks Switch Signal Rule (recenzja: domyslnie WYL. do pomiaru; autotest - plik armoury-a7-wlacz.flag) albo dawnym Start Calibration Switch
+    ///    Rule - wartosc domyslna starego klucza zapisana w MCM Jeffa nie zmienilaby
     ///    sie (CLAUDE.md, pulapka Armoury.json), wiec nowy klucz;
     ///  - droga bez KS (zajecia wiosek pobocznych, VillageCrafts.Rule): ta sama funkcja dochodu przy kluczu Side Village Craft Ks Signal (jedna regula na zjawisko).
     /// POMIAR: linia "KS: A7 regula zajec (f5-a7)" w kazdej dobie kroku A7 (nacisk, trzymane 60 dob, zmiany sezonu z rekami wedlug rynku i regionu, przejscia, przebudowa:
@@ -38,14 +39,42 @@ namespace Armoury
         /// <summary>f5-a7: regula A7 mierzy dochod sygnalem KS (klucz Ks Switch Signal).</summary>
         internal static bool A7sOn { get { var s = Settings.Current; return s != null && s.KsSwitchSignal; } }
 
-        /// <summary>f5-a7: regula A7 naprawde zmienia zajecia - dawny klucz albo sygnal KS z kluczem Ks Switch Signal Rule (klucze f5 wylaczone = Start Calibration Switch Rule).</summary>
-        internal static bool A7RuleOn { get { var s = Settings.Current; return s != null && (s.StartCalibrationSwitchRule || (s.KsSwitchSignal && s.KsSwitchSignalRule)); } }
+        /// <summary>f5-a7: regula A7 naprawde zmienia zajecia - dawny klucz albo sygnal KS z kluczem Ks Switch Signal Rule (klucze f5 wylaczone = Start Calibration Switch Rule).
+        /// Recenzja f5-a7: Ks Switch Signal Rule domyslnie WYL. (sygnal niezmierzony w grze); w autotescie plik armoury-a7-wlacz.flag wlacza zmiany zamiast klucza.</summary>
+        internal static bool A7RuleOn { get { var s = Settings.Current; return s != null && (s.StartCalibrationSwitchRule || (s.KsSwitchSignal && (s.KsSwitchSignalRule || A7sTestFlag()))); } }
+
+        /// <summary>Recenzja f5-a7: plik-przelacznik autotestu (jak armoury-ks-auto.flag) w katalogu CrashScribe - regula zmiany zajec przy sygnale KS naprawde zmienia zajecia
+        /// w tym biegu (pomiar NA7-3..NA7-8 z prawdziwymi zmianami). Tylko tryb autotestu CrashScribe (LogGate 1/2) - nigdy w grze Jeffa; nie zuzywany (caly bieg);
+        /// dysk raz na dobe.</summary>
+        internal const string A7sTestFlagName = "armoury-a7-wlacz.flag";
+        private static int _a7sFlagDay = int.MinValue; private static bool _a7sFlagVal;
+
+        private static bool A7sTestFlag()
+        {
+            if (!AutotestMode()) return false;
+            int t = Today();
+            if (t == _a7sFlagDay) return _a7sFlagVal;
+            _a7sFlagDay = t;
+            try { _a7sFlagVal = System.IO.File.Exists(FlagPath(A7sTestFlagName)); } catch { _a7sFlagVal = false; }
+            return _a7sFlagVal;
+        }
+
+        /// <summary>Zrodlo wlaczenia reguly (do linii): dawny klucz, nowy klucz albo plik autotestu.</summary>
+        private static string A7sRuleSrc()
+        {
+            var s = Settings.Current;
+            if (s != null && s.StartCalibrationSwitchRule) return "Start Calibration Switch Rule";
+            if (s != null && s.KsSwitchSignal && s.KsSwitchSignalRule) return "Ks Switch Signal Rule";
+            return "plik " + A7sTestFlagName + " - autotest";
+        }
 
         private static double A7sBand { get { var s = Settings.Current; double b = s != null ? s.KsSwitchMarketBand : 0.15; if (!(b >= 0)) b = 0; return Math.Min(0.5, b); } }
 
         private const int A7sAvg = 4;               // srednia wykladnicza 4 krokow (co 7 dob - ok. 28 dob)
-        private const int A7sPayEvery = 7;          // rata przebudowy co 7 dob od poczatku (Progress) - koszt doby i zamowienie materialu na sztuki
-        private const int A7sSaveMax = 65536;       // straznik rozmiaru arm_ks_a7 (znakow); ponad - zapis bez srednich cen
+        private const int A7sPayEvery = 7;          // rata przebudowy co 7 dob (Progress), dzien raty rozlozony na bloki (hasz bloku) - ok. 1/7 przebudow placi danego dnia
+        private const int A7sSaveMax = 65536;       // straznik rozmiaru arm_ks_a7 (znakow); ponad - najpierw mniej pamieci powrotow, potem zapis bez srednich cen
+        private const int A7sLastMax = 2500;        // recenzja f5-a7: pamiec powrotow w zapisie - najwyzej tyle ostatnich zmian (14 znakow na wpis, ok. 35 KB)
+        private const int A7sLastW = 14;            // wpis pamieci powrotow: hasz bloku 6 + z 2 + na 2 + doba 4 (base36)
         private const string A7sVer = "a7s1";
         private const string A7sP = "KS: ";
 
@@ -63,7 +92,9 @@ namespace Armoury
         private static Dictionary<string, double> _sigRent; private static object _sigRentFor;   // ZW: uid -> renta bloku Planu
         private static readonly Dictionary<double[], double[]> _sigV = new Dictionary<double[], double[]>();   // krok: wartosc towarow zajecia na wiersz ceny (pamiec)
         private static ItemObject[] _a7sMat;
-        private static readonly Dictionary<string, int[]> _a7sLast = new Dictionary<string, int[]>(StringComparer.Ordinal);   // blok -> [z, na, doba] ostatniej zmiany (powroty)
+        // blok (hasz 31 bit uid@okreg) -> [z, na, doba] ostatniej zmiany (powroty A->B->A); recenzja f5-a7: w zapisie arm_ks_a7 (ostatnie 364 doby, najwyzej A7sLastMax) -
+        // powrot po wczytaniu tez liczony
+        private static readonly Dictionary<int, int[]> _a7sLast = new Dictionary<int, int[]>();
         // liczniki od ostatniej linii kroku
         private static int _a7sN, _a7sNoSig, _a7sPress, _a7sHeld, _a7sStarted, _a7sDone, _a7sCancel, _a7sFlip, _a7sSt, _a7sNoShelf, _a7sNoMat, _a7sHeldZero, _a7sDays, _a7sSaveOver;
         private static double _a7sHands, _a7sPressH, _a7sHeldH, _a7sMsSum, _a7sMsMax;
@@ -74,6 +105,7 @@ namespace Armoury
         {
             _sig.Clear(); _sigN.Clear(); _sigLoad = null; _sigDay = -1; _sigPlanDay = -1; _heldKind = -1; _a7sSea = new A7sSeason();
             _sigMv = null; _sigRent = null; _sigRentFor = null; _sigV.Clear(); _a7sMat = null; _a7sLast.Clear();
+            _a7sFlagDay = int.MinValue; _a7sFlagVal = false;
             A7sZero(); _a7sSaveOver = 0;
         }
 
@@ -264,7 +296,7 @@ namespace Armoury
                 double[] tr; int k = cur * 64 + best;
                 if (!sea.Tr.TryGetValue(k, out tr)) { if (sea.Tr.Count < 200) { tr = new double[2]; sea.Tr[k] = tr; } }
                 if (tr != null) { tr[0] += 1; tr[1] += hands; }
-                string key = (b.Uid ?? (b.K != null ? b.K.Uid : null) ?? "?") + "@" + (ld.Id ?? "?");
+                int key = (int)(A7sHash(ld, b) & 0x7FFFFFFF);          // recenzja f5-a7: hasz bloku - ten sam klucz w zapisie (powroty po wczytaniu)
                 int[] last;
                 if (_a7sLast.TryGetValue(key, out last) && last[0] == best && last[1] == cur && today - last[2] <= 364) _a7sFlip++;
                 _a7sLast[key] = new[] { cur, best, today };
@@ -286,6 +318,39 @@ namespace Armoury
             string tn = mt != null && mt.Name != null ? mt.Name.ToString() : "the market";
             Log.Player(vn + ": part of its fields is turning from " + a + " to " + z + " - " + z + " sells better at " + tn + ". The change takes about " + T + " days; the village pays about "
                        + Math.Max(0, (int)Math.Round(b.Cost)).ToString(Inv) + " denars for timber, tools and the town's craftsmen as it goes.");
+        }
+
+        /// <summary>Recenzja f5-a7: staly hasz bloku (FNV-1a 32 bit z "uid@okreg") - ten sam w kazdej sesji i po wczytaniu (string.GetHashCode nie jest pewny miedzy procesami).
+        /// Klucz pamieci powrotow i przesuniecie dnia raty przebudowy.</summary>
+        private static uint A7sHash(LiveDist ld, LiveBlock b)
+        {
+            string a = b.Uid ?? (b.K != null ? b.K.Uid : null) ?? "?", c = ld.Id ?? "?";
+            uint h = 2166136261u;
+            for (int i = 0; i < a.Length; i++) { h ^= a[i]; h *= 16777619u; }
+            h ^= '@'; h *= 16777619u;
+            for (int i = 0; i < c.Length; i++) { h ^= c[i]; h *= 16777619u; }
+            return h;
+        }
+
+        /// <summary>Recenzja f5-a7 (rata co 7 dob): dzien raty przebudowy bloku - co 7 dob od poczatku, przesuniety o hasz bloku (0..6), wiec przebudowy placa rozlozone na
+        /// doby tygodnia, a nie wszystkie w dobie kroku A7 (start przebudowy jest zawsze w dobie kroku). Pierwsza rata w 1..7 dobie od poczatku. Zwraca liczbe dob od poprzedniego
+        /// dnia raty (1..7) - granica kiesy raty jak przy racie dziennej przez te doby (Progress) - albo 0: dzis bez raty.</summary>
+        private static int A7sPaySpan(LiveDist ld, LiveBlock b, int today)
+        {
+            int d = today - b.TStart;
+            if (d <= 0) return 0;
+            int off = (int)(A7sHash(ld, b) % (uint)A7sPayEvery);
+            if ((d + off) % A7sPayEvery != 0) return 0;
+            return Math.Min(A7sPayEvery, d);
+        }
+
+        /// <summary>Recenzja f5-a7: najwiecej zlota na rate obejmujaca `span` dob - tyle, ile pozwolilaby rata dzienna (najwyzej 1/4 kiesy na dobe) przez te doby: kiesa x (1 - (3/4)^span);
+        /// span 1 = dawne kiesa / 4. Tempo zaplaty jak przy racie dziennej (bez spowolnienia raty tygodniowej); skrzynia DS chroniona dalej w CraftsRebuildPay.</summary>
+        private static int A7sPayCap(int gold, int span)
+        {
+            if (gold <= 0 || span <= 0) return 0;
+            if (span == 1) return gold / 4;
+            return (int)Math.Floor(gold * (1.0 - Math.Pow(0.75, span)));
         }
 
         /// <summary>Rata przebudowy (Progress): ta sama droga VillageCrafts.PayRebuild, do tego pomiar - zloto z kies wsi / do kas targu i ludu, material, sztuki = zmiana polek.</summary>
@@ -389,7 +454,7 @@ namespace Armoury
             sb.Append(A7sP).Append("A7 regula zajec (f5-a7) dzien ").Append(today).Append(" | D ").Append(d0).Append(" (D+").Append(today - d0).Append(")")
               .Append(" | sygnal: ceny KS (cena cienia Planu doby ").Append(_sigPlanDay).Append(" x gradient krainy x rynek miasta +-").Append((100 * A7sBand).ToString("0", Inv))
               .Append("% wzgledem mediany, srednia ").Append(A7sAvg).Append(" krokow, miast ").Append(_sig.Count).Append(")")
-              .Append(" | regula: ").Append(rule ? "TAK (" + (Settings.Current != null && Settings.Current.StartCalibrationSwitchRule ? "Start Calibration Switch Rule" : "Ks Switch Signal Rule") + ")" : "WYLACZONA - sam pomiar")
+              .Append(" | regula: ").Append(rule ? "TAK (" + A7sRuleSrc() + ")" : "WYLACZONA - sam pomiar")
               .Append(" | ocenionych ").Append(_a7sN).Append(" blokow, rak ").Append(_a7sHands.ToString("0", Inv)).Append(", bez sygnalu miasta ").Append(_a7sNoSig)
               .Append("; nacisk (>= x").Append(SwitchRatio.ToString("0.00", Inv)).Append(") ").Append(_a7sPress).Append(" blokow (").Append(Pc(_a7sPress, _a7sN)).Append("%), rak ").Append(_a7sPressH.ToString("0", Inv))
               .Append(" (").Append(_a7sHands > 0 ? (100.0 * _a7sPressH / _a7sHands).ToString("0.0", Inv) : "-").Append("%)")
@@ -423,7 +488,7 @@ namespace Armoury
                 var sea = _a7sSea.S == oldSeason ? _a7sSea : new A7sSeason { S = oldSeason };
                 Log.Info(A7sP + "A7 sezon zamkniety (f5-a7) sezon " + oldSeason + " | " + A7sSeasonText(sea, blocks, world) + "; najwiekszy udzial regionu " + (100 * maxShare).ToString("0.00", Inv)
                          + "% (prog " + (100 * RegionShare).ToString("0", Inv) + "%), regionow ze zmiana " + nReg + ", top: " + regTop + " | przejscia (top 10, blokow/rak): " + A7sTop(sea.Tr, 10)
-                         + " | regula " + (A7RuleOn ? "TAK" : "WYLACZONA - sam pomiar") + ".");
+                         + " | regula " + (A7RuleOn ? "TAK (" + A7sRuleSrc() + ")" : "WYLACZONA - sam pomiar") + ".");
             }
             catch (Exception e) { _a7sSt++; Stumble("A7sSeasonClose", e); }
             _a7sSea = new A7sSeason();
@@ -478,11 +543,12 @@ namespace Armoury
 
         // ------------------------------------------------------------ zapis arm_ks_a7
         // a7s1|doba sredniej|doba Planu|rodzaj Held|sezon~bloki~rece~Wb~Wh~Eb~Eh~przejscia (k:n:h,...)|miasto:n:ceny (3 znaki base36 na towar, cena x 1000)!miasto...
+        //     |pamiec powrotow (recenzja f5-a7: wpisy po 14 znakow base36 - hasz bloku 6, z 2, na 2, doba 4; pole moze nie istniec)
         internal static string ExportA7s()
         {
             try
             {
-                if (_sig.Count == 0 && _sigLoad == null && _heldKind < 0 && _a7sSea.Blocks == 0) return null;   // nic do zapisania - bez klucza (zapis jak przed paczka)
+                if (_sig.Count == 0 && _sigLoad == null && _heldKind < 0 && _a7sSea.Blocks == 0 && _a7sLast.Count == 0) return null;   // nic do zapisania - bez klucza (zapis jak przed paczka)
                 var sb = new StringBuilder(16000);
                 sb.Append(A7sVer).Append('|').Append(_sigDay).Append('|').Append(_sigPlanDay).Append('|').Append(_heldKind).Append('|');
                 var sea = _a7sSea;
@@ -502,7 +568,11 @@ namespace Armoury
                     sb.Append(Clean(kv.Key.Settlement.StringId)).Append(':').Append(n).Append(':');
                     for (int g = 0; g < KsTab.NG; g++) sb.Append(E36(Math.Max(0, Math.Min(46655, (int)Math.Round(kv.Value[g] * 1000))), 3));
                 }
-                if (sb.Length > A7sSaveMax) { sb.Length = head; _a7sSaveOver++; }   // straznik: bez srednich cen (Held i sezon zostaja)
+                if (sb.Length > A7sSaveMax - 1) { sb.Length = head; _a7sSaveOver++; }   // straznik: bez srednich cen (Held i sezon zostaja)
+                // recenzja f5-a7: pamiec powrotow A->B->A (ostatnie zmiany blokow z 364 dob, najnowsze najpierw, najwyzej A7sLastMax i w granicy straznika) - NA7-7 liczy
+                // powroty takze po wczytaniu; pole 7 (starszy zapis paczki bez niego - pamiec od zera)
+                sb.Append('|');
+                A7sExportLast(sb, Today(), Math.Min(A7sLastMax, Math.Max(0, (A7sSaveMax - sb.Length) / A7sLastW)));
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("ExportA7s", e); return null; }
@@ -546,8 +616,36 @@ namespace Armoury
                         if (ok) load[r[0]] = new KeyValuePair<int, double[]>(n, a);
                     }
                 _sigLoad = load.Count > 0 ? load : null;
+                if (p.Length >= 7) A7sImportLast(p[6]);                    // recenzja f5-a7: pamiec powrotow (brak pola - od zera)
             }
             catch (Exception e) { Stumble("ImportA7s", e); _sigLoad = null; }
+        }
+
+        /// <summary>Recenzja f5-a7: pamiec powrotow do zapisu - wpisy po 14 znakow (hasz bloku 6, z 2, na 2, doba 4; base36), tylko zmiany z ostatnich 364 dob, najnowsze najpierw.</summary>
+        private static void A7sExportLast(StringBuilder sb, int today, int max)
+        {
+            if (max <= 0 || _a7sLast.Count == 0) return;
+            var l = new List<KeyValuePair<int, int[]>>(_a7sLast.Count);
+            foreach (var kv in _a7sLast)
+            {
+                var v = kv.Value;
+                if (v == null || v.Length < 3 || kv.Key < 0 || today - v[2] > 364 || v[2] < 0 || v[2] >= 1679616 || v[0] < 0 || v[0] >= 1296 || v[1] < 0 || v[1] >= 1296) continue;
+                l.Add(kv);
+            }
+            l.Sort((x, y) => y.Value[2].CompareTo(x.Value[2]));
+            for (int i = 0; i < l.Count && i < max; i++)
+                sb.Append(E36(l[i].Key, 6)).Append(E36(l[i].Value[0], 2)).Append(E36(l[i].Value[1], 2)).Append(E36(l[i].Value[2], 4));
+        }
+
+        private static void A7sImportLast(string t)
+        {
+            if (string.IsNullOrEmpty(t)) return;
+            for (int a = 0; a + A7sLastW <= t.Length && _a7sLast.Count < A7sLastMax; a += A7sLastW)
+            {
+                int k = D36(t, a, 6), z = D36(t, a + 6, 2), n = D36(t, a + 8, 2), d = D36(t, a + 10, 4);
+                if (k < 0 || z < 0 || n < 0 || d < 0 || _a7sLast.ContainsKey(k)) continue;
+                _a7sLast[k] = new[] { z, n, d };
+            }
         }
     }
 }

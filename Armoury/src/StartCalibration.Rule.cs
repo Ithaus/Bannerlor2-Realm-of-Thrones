@@ -26,7 +26,8 @@ namespace Armoury
     ///  - Klucz Start Calibration Switch Rule wylaczony (domyslnie od recenzji 16.10 - ceny startu nie sa cenami cienia): sam POMIAR nacisku (licznik 60 dob, linia),
     ///    bez zmian zajec; regale dzialaja.
     ///  - f5-a7 (noc 17/18.10, StartCalibration.A7s.cs): klucz Ks Switch Signal - dochod liczony przy cenach KS (cena cienia Planu x gradient krainy x ograniczone odchylenie
-    ///    rynku miasta, srednia 4 krokow) zamiast indeksu gry; klucz Ks Switch Signal Rule - zmiany naprawde (ten sam hamulec), rata przebudowy co 7 dob.
+    ///    rynku miasta, srednia 4 krokow) zamiast indeksu gry; klucz Ks Switch Signal Rule (domyslnie WYL. do pomiaru; autotest: plik armoury-a7-wlacz.flag) - zmiany
+    ///    naprawde (ten sam hamulec), rata przebudowy co 7 dob rozlozona na doby tygodnia (hasz bloku), granica kiesy jak przy racie dziennej.
     /// Pola mieszczan - ta sama regula bez kosztu w zlocie (zloza i sprzet miasta). Pieniadz: tylko przelew kiesa wsi -> kasa miasta (MoneyLedger MKs).
     /// </summary>
     internal static partial class StartCalibration
@@ -339,10 +340,16 @@ namespace Armoury
                 // dotad kiesa wsi -> kasa miasta); rece przechodza najwyzej X0/T na dobe i nigdy ponad czesc zaplacona (pierwsza doba z pelna zaplata - jak dotad)
                 double fTime = Math.Min(1.0, Math.Max(0, today - b.TStart) / (double)T);
                 double owe = Math.Min(b.Cost - b.Paid, fTime * b.Cost - b.Paid);
-                // f5-a7 (klucz Ks Switch Signal): rata co 7 dob od poczatku przebudowy (najpierw inwestycja za tydzien, potem rece; material kupuje sie wiekszym zamowieniem,
-                // a koszt doby KS nie rosnie z liczba przebudow - zakup z polki raz na tydzien na czesc okregu); rece ida dalej codziennie do czesci zaplaconej
-                bool payDay = !A7sOn || (today - b.TStart) % A7sPayEvery == 0;
-                int ask = owe >= 0.5 && payDay ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4) : 0;
+                // f5-a7 (klucz Ks Switch Signal): rata co 7 dob (material kupowany wiekszym zamowieniem, zakup z polki raz na tydzien na przebudowe - ok. 1/7 wywolan
+                // PayRebuild na dobe wobec raty dziennej); rece ida dalej codziennie do czesci zaplaconej. Recenzja f5-a7: dzien raty przesuniety haszem bloku (A7sPaySpan) -
+                // przebudowy zaczynaja sie tylko w dobie kroku A7, wiec bez przesuniecia wszystkie placilyby w dobie kroku; granica kiesy raty = tyle, ile rata dzienna
+                // (1/4 kiesy na dobe) przez doby od poprzedniej raty (A7sPayCap) - tempo zaplaty jak przy racie dziennej. Klucz wylaczony - rata dzienna jak dotad.
+                int ask = 0;
+                if (owe >= 0.5)
+                {
+                    if (!A7sOn) ask = (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4);
+                    else { int span = A7sPaySpan(ld, b, today); if (span > 0) ask = (int)Math.Min(Math.Ceiling(owe), A7sPayCap(ld.V.Gold, span)); }
+                }
                 long got = ask > 0 && mt != null ? (A7sOn ? A7sPay(ld.V, mt, ask) : VillageCrafts.PayRebuild(ld.V, mt, ask, _tally)) : 0;   // f5-a7: ta sama rata + pomiar (zloto, material, polka)
                 b.Paid += got; _rPaid += got;
                 double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
