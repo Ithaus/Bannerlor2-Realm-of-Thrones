@@ -2776,3 +2776,9 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   naszych modow bez zmian (~0.57 s), prawdopodobnie obciazenie komputera przez budowy 14 agentow; sprawdzic w tescie koncowym.
 - 18:45 PDT: test fin82 = w-toku/ds-akumulator 6bc640ef (Armoury b1de92c6), BEZ flag (uklad gry Jeffa: DS F1+F3, KS nie zastosowany), 160 dob (po rampie F3), at-fin82-akum.out.txt;
   ocena: nakum, nds --baza-doby 18-23-34, porownanie z fin76 (14-24-13, DS F3 bez KS, akumulator +195k/d).
+- 19:30 PDT: TEST fin82 (ds-akumulator 6bc640ef, uklad gry Jeffa bez KS, 160 dob, Armoury-2026-10-17_18-39-06.log, kopia logi-testow): kod 0, ERROR 0. nakum 16/18:
+  akumulator miast ZATRZYMANY (+18.7k/d, zapas dni W 44.9 -> 41.0; danina od skarbca 105k/d srednio, bez skoku), roboty gminy tylko z prawdziwego materialu (453 zl/d; reszta 375k/d
+  zostaje we wsiach) -> NOWY AKUMULATOR WE WSIACH: kiesy wsi +0.39..0.69%/d (8.9 -> 13.5 mln, 6.1% zlota swiata). D staly 0.908 (fin80 0.865), korona po rampie 0.822 (zwrot zoldu 100%,
+  krolestwo-doby z Bankiem male). DECYZJA (moja, wedlug zasady Jeffa "jedna regula na zjawisko, bez akumulatorow"): DsHoardDueVillages TAK (ta sama danina od majatku ponad 3 x zapas
+  we wsiach) + punkt 14 (ZC6/ZC7: Mobility, Freedom - wykup wolnosci = ujscie oszczednosci chlopskich, WarScar) wlaczone w scaleniu; po KS koszyk wsi i tak wchlonie wiekszosc
+  nadwyzki (fin80 kiesy wsi spadaly). Do raportu dla Jeffa prostymi slowami.
