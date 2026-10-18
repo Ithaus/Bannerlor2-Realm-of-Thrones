@@ -245,6 +245,7 @@ namespace Armoury
                 if (n <= 0) return;
                 v.Settlement.ItemRoster.AddToCounts(wood, n);
                 OreLedger.NoteWoodlot(wood, v.Settlement, n);
+                WorkshopFairScore.NoteProduced(v.Settlement, wood, n, WorkshopFairScore.SrcWoodlot);   // F4 (recenzja): drewno lasu wsi do pomiaru wsadu regionu (wies -> miasto targowe) - bez zdarzenia gry
                 _made += n; _villages++;
             }
             catch (Exception e)

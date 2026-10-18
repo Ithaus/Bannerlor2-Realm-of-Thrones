@@ -146,6 +146,7 @@ namespace Armoury
                         int ore = (int)oa; _oreAcc[t] = oa - ore;
                         roster.AddToCounts(_ore, ore);
                         OreLedger.NoteScrap(_ore, ore);
+                        WorkshopFairScore.NoteProduced(t.Settlement, _ore, ore, WorkshopFairScore.SrcScrap);   // F4 (recenzja): zelazo ze zlomu do pomiaru wsadu regionu - bez zdarzenia gry
                         oreBack += ore;
                     }
                 }

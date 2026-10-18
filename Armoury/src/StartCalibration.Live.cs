@@ -773,6 +773,7 @@ namespace Armoury
                     if (ok < n) { unpaid += n - ok; ld.Frac[i] = Math.Min(ld.Frac[i] + (n - ok), Math.Max(1.0, 7.0 * flow)); }
                     if (ok <= 0) continue;
                     town.Settlement.ItemRoster.AddToCounts(it, ok);
+                    WorkshopFairScore.NoteProduced(town.Settlement, it, ok, WorkshopFairScore.SrcTownFields);   // F4 (recenzja): plon pol mieszczan do pomiaru wsadu regionu - bez zdarzenia gry (sam licznik, przy kluczu Workshop Retool Fair Score)
                     pieces += ok; paid += got; made[i] += ok;
                 }
             }

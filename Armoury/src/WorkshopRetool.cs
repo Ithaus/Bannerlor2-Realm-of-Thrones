@@ -27,6 +27,10 @@ namespace Armoury
     /// WorkshopTrade.ConvertPrefix/Postfix przy ChangeProductionTypeOfWorkshopAction.Apply(w, t, false); bez niej (ConvertWired) i bez paczki warsztatow
     /// (WorkshopTrade.On) regula (b) nie dziala - gra kasowalaby koszt w nicosc. Zmiana typu jest akcja gry i jest trwala; wylaczenie klucza tylko zatrzymuje dalsze.
     /// Nic w zapisie. Wyjatek per warsztat - licznik potkniec.
+    /// F4 (noc 17/18.10, paczka f4-warsztaty, klucz WorkshopRetoolFairScore; dowod fin86: spodziewane 16 603 d/d kuzni srebra przy 0 cykli): obecny typ = wlasny zmierzony
+    /// wynik warsztatu (srednia roku >= 60 dob + utrzymanie), nowy typ = WorkshopFairScore (cena sprawiedliwa cyklu, cykle z wsadu regionu dzielonego miedzy warsztaty,
+    /// typ obecny w regionie - najwyzej jego zmierzony wynik), kara x0.8 za dubel w regionie rynku; progi (x1.3, +10 d, kiesa, limity) bez zmian. Tydzien pomiaru wsadu
+    /// po starym zapisie - zmiany odlozone (licznik "odlozone (pomiar w toku)"). Linia dnia: spodziewany vs rzeczywisty po 30 dobach i liczby typow swiata.
     /// </summary>
     internal static class WorkshopRetool
     {
@@ -39,6 +43,7 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _dDone = new List<string>(), _dBankSamples = new List<string>();
         private static int _dShops, _dCands, _dChanged, _dNoInput, _dNoGain, _dNoPurse, _dLimit, _dBankPicks, _dBankSwaps, _dStumbles, _sessStumbles, _sessChanged;
+        private static int _dBankWarm;   // F4: bankructwa w tygodniu pomiaru wsadu (wybor gry/BK zostal)
         private static long _dGear;
         private static bool _startDone;
 
@@ -54,6 +59,7 @@ namespace Armoury
         {
             _dDone.Clear(); _dBankSamples.Clear();
             _dShops = _dCands = _dChanged = _dNoInput = _dNoGain = _dNoPurse = _dLimit = _dBankPicks = _dBankSwaps = _dStumbles = 0;
+            _dBankWarm = 0;
             _dGear = 0;
         }
 
@@ -80,10 +86,23 @@ namespace Armoury
             try
             {
                 _dBankPicks++;
-                float sb;
-                var best = NoTownMines.BestByPrice(town, exclude, WorkshopInputs.InputsNear(town), out sb);
-                if (best == null || best == result) return;
-                float sr = result != null ? NoTownMines.MarketScore(town, result, true) : -1e9f;
+                float sb, sr;
+                WorkshopType best;
+                if (WorkshopFairScore.On)
+                {
+                    // F4 (noc 17/18.10): ta sama ocena co krok (b); pierwszy tydzien pomiaru wsadu - wybor gry/BK zostaje
+                    if (!WorkshopFairScore.Ready) { _dBankWarm++; return; }
+                    WorkshopFairScore.Quote fq;
+                    best = WorkshopFairScore.Best(town, exclude, WorkshopInputs.InputsNear(town), null, out sb, out fq);
+                    if (best == null || best == result) return;
+                    sr = result != null ? WorkshopFairScore.Score(town, result, null).Score : -1e9f;
+                }
+                else
+                {
+                    best = NoTownMines.BestByPrice(town, exclude, WorkshopInputs.InputsNear(town), out sb);
+                    if (best == null || best == result) return;
+                    sr = result != null ? NoTownMines.MarketScore(town, result, true) : -1e9f;
+                }
                 if (!(sb > Math.Max(0f, BankruptGain * sr))) return;
                 if (_dBankSamples.Count < 6) _dBankSamples.Add(Name(town.Settlement) + " " + (result != null ? result.StringId : "?") + " (" + F1(sr) + ") -> " + best.StringId + " (" + F1(sb) + ")");
                 result = best;
@@ -101,6 +120,11 @@ namespace Armoury
             if (s == null || Campaign.Current == null) { ZeroDay(); return; }
             if (!_startDone) SessionStart();
             int today = (int)CampaignTime.Now.ToDays;
+            // F4 (noc 17/18.10, klucz WorkshopRetoolFairScore): dzisiejsza produkcja wsadu do sredniej (przed decyzjami; wylaczony klucz - tylko czysci licznik); czas calego
+            // kroku E3-D3 do linii tylko dla informacji - "czas F4" liczy sama regula (recenzja: tu siedzi tez akcja gry przezbrojenia i przebieg kandydatow)
+            bool f4 = WorkshopFairScore.On;
+            long f4t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            WorkshopFairScore.DayFold();
             bool live = On && WorkshopTrade.On && WorkshopTrade.ConvertWired;
             try
             {
@@ -137,12 +161,24 @@ namespace Armoury
                         {
                             int last;
                             if ((_townLast.TryGetValue(c.T, out last) && today - last < TownGapDays) || (_shopLast.TryGetValue(c.W, out last) && today - last < ShopGapDays)) { _dLimit++; continue; }
+                            if (f4 && !WorkshopFairScore.Ready) { WorkshopFairScore.NoteWarm(); continue; }   // F4: pierwszy tydzien pomiaru wsadu - bez zmian typu
                             Dictionary<ItemCategory, float> dict;
                             if (!near.TryGetValue(c.T, out dict)) { dict = WorkshopInputs.InputsNear(c.T); near[c.T] = dict; }
                             var cur = c.W.WorkshopType;
-                            float sc = NoTownMines.MarketScore(c.T, cur, true);
-                            float sb;
-                            var best = NoTownMines.BestByPrice(c.T, cur, dict, out sb);
+                            float sc, sb;
+                            WorkshopType best;
+                            WorkshopFairScore.Quote fq = null;
+                            if (f4)
+                            {
+                                // F4: obecny typ - wlasny zmierzony wynik (>= 60 dob, jak warunek kandydata); nowy - cena sprawiedliwa, wsad regionu, zmierzony wynik regionu
+                                sc = WorkshopFairScore.OwnScore(c.W);
+                                best = WorkshopFairScore.Best(c.T, cur, dict, c.W, out sb, out fq);
+                            }
+                            else
+                            {
+                                sc = NoTownMines.MarketScore(c.T, cur, true);
+                                best = NoTownMines.BestByPrice(c.T, cur, dict, out sb);
+                            }
                             if (best == null) { _dNoInput++; continue; }
                             float need = sc > -1e8f ? Math.Max(sc + GainMin, sc * GainShare) : GainMin;
                             if (!(sb > 0f) || sb < need) { _dNoGain++; continue; }
@@ -156,8 +192,10 @@ namespace Armoury
                             done++; _dChanged++; _sessChanged++;
                             _dGear += Math.Max(0, g0 - o.Gold);
                             _townLast[c.T] = today; _shopLast[c.W] = today;
+                            float raw = fq != null ? fq.Score : sb;
+                            if (f4) WorkshopFairScore.NoteRetool(c.W, best, raw, today);   // F4: spodziewany wynik (przed kara za dubel) do porownania po 30 dobach
                             if (_dDone.Count < 8) _dDone.Add(Name(c.T.Settlement) + " " + from + " -> " + best.StringId + " (wynik " + F1(sc) + " -> " + F1(sb) + " d/d, srednia " + c.Avg.ToString("0.0", Inv)
-                                                         + " / rok " + c.Slow.ToString("0.0", Inv) + ", sprzet " + Math.Max(0, g0 - o.Gold) + ")");
+                                                         + " / rok " + c.Slow.ToString("0.0", Inv) + ", sprzet " + Math.Max(0, g0 - o.Gold) + (f4 ? ", " + WorkshopFairScore.QuoteText(fq, raw) : "") + ")");
                         }
                         catch (Exception e) { Stumble("Daily(zmiana)", e); }
                     }
@@ -186,13 +224,19 @@ namespace Armoury
                    .Append(" | bankructwa i warsztaty odebrane graczowi: wyborow ").Append(_dBankPicks).Append(", typ z cen zamiast wyboru gry ").Append(_dBankSwaps)
                    .Append(_dBankSamples.Count > 0 ? " [" + string.Join("; ", _dBankSamples.ToArray()) + "]" : "")
                    .Append(" | zmian w sesji ").Append(_sessChanged)
-                   .Append(" | kara za typ juz obecny w miescie x0.8 na warsztat; miast z 3+ warsztatami jednego typu ").Append(dupTowns)
-                   .Append(" | wplyw na skrzynie: notable -> kasy miast (sprzet)")
-                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_sessStumbles).Append(").");
+                   .Append(f4 ? " | kara za typ juz obecny w regionie rynku x0.8 na warsztat (F4); miast z 3+ warsztatami jednego typu " : " | kara za typ juz obecny w miescie x0.8 na warsztat; miast z 3+ warsztatami jednego typu ").Append(dupTowns)
+                   .Append(" | wplyw na skrzynie: notable -> kasy miast (sprzet)");
+                if (f4)
+                {
+                    if (_dBankWarm > 0) sb2.Append(" | bankructwa w tygodniu pomiaru wsadu (wybor gry zostal) ").Append(_dBankWarm);
+                    double stepMs = (System.Diagnostics.Stopwatch.GetTimestamp() - f4t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                    sb2.Append(WorkshopFairScore.DayText(today, stepMs));
+                }
+                sb2.Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_sessStumbles).Append(").");
                 Log.Info(sb2.ToString());
             }
             catch (Exception e) { Log.Error("WorkshopRetool.Daily", e); }
-            finally { ZeroDay(); }
+            finally { ZeroDay(); WorkshopFairScore.EndDay(); }
         }
 
         /// <summary>Linia startu (WorkshopTradeBehavior.OnSessionLaunched, takze leniwie z Daily).</summary>
@@ -206,7 +250,8 @@ namespace Armoury
                          + " | paczka warsztatow towarowych " + (WorkshopTrade.On ? "czynna" : "NIECZYNNA") + ", latka zmiany produkcji (sprzet do kasy miasta) " + (WorkshopTrade.ConvertWired ? "wpieta" : "BRAK")
                          + ", wybor typu przy bankructwie (NoTownMines.Postfix) " + NoTownMines.Hook
                          + " | regula: tracacy od " + MinDays + " dob warsztat notabla -> typ z najlepszym wynikiem po placach z cen targu (x" + GainShare.ToString("0.0", Inv) + " i +" + GainMin.ToString("0", Inv) + " d), "
-                         + PerDay + " na dobe, miasto co " + TownGapDays + " dob, warsztat co " + ShopGapDays + " dob; bankructwo - typ z cen przy > x" + BankruptGain.ToString("0.00", Inv) + " wyboru gry | potkniecia 0.");
+                         + PerDay + " na dobe, miasto co " + TownGapDays + " dob, warsztat co " + ShopGapDays + " dob; bankructwo - typ z cen przy > x" + BankruptGain.ToString("0.00", Inv) + " wyboru gry"
+                         + (WorkshopFairScore.On ? " | " + WorkshopFairScore.StartText() : "") + " | potkniecia 0.");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
