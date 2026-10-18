@@ -2886,3 +2886,7 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   bohaterow i bez losowania), f4b-zapis aca97840 (nasze napisy = 4.7% pliku zapisu, nowe klucze nocy 2.3%; ARM-3: KS wlacza sie po 28 + 7 = 35 dobach, klucz KsArmMatureFromUse).
 - 02:21 PDT: workflow wf_29205654-862 (scalenie3: 11 galezi fali 4 + 4b do w-toku/noc-ks4 od f5fd0ae3, 3 recenzje calosci + weryfikacja + poprawki) -> test sciezki Jeffa 160 dob ->
   5 dob + bitwa -> WGRANIE 79 (gdy Jeff nie gra).
+- 03:15 PDT: SCALENIE3 GOTOWE (wf_29205654-862): w-toku/noc-ks4 **7ce0c740** (GitHub) = f5fd0ae3 + 11 galezi fali 4 i 4b + recenzja calosci (4 wazne - poprawione: splata rachunkow zywnosci
+  przez pana liczona jako odplyw kasy miasta w przegladzie firm (TownPurse.NoteLordFood), place w dol tylko przy czynnych firmach DS (DsTowns.FarmsLive), wylaczenie dozowania uchodzcow nie
+  wpuszcza wszystkich naraz). Armoury 366afa39 (1912 ustawien). Jeff nie gra (03:12 PDT).
+- 03:16 PDT: TEST fin88 = 7ce0c740, armoury-ks-auto.flag (USUNAC!), 160 dob (sciezka Jeffa); potem test zimy 120 dob (armoury-zima-teraz.flag + armoury-ks-wlacz.flag - zima ekonomii przez caly bieg).
