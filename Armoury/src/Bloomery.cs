@@ -163,6 +163,7 @@ namespace Armoury
             _carts.Clear(); _roads.Clear(); _dayOne = true; _shelfUse = null; _shelfDay.Clear(); _shelfN = 0;
             _mineNeed = null;   // f4-opal
             F5Reset();          // f5-ruda: wytop 7 dob per kopalnia, kredyt kupcow na drewno (stan z zapisu arm_f5_woodcredit - Import po tym)
+            F7Reset();          // f7-wegiel: weglarze przy kopalni (bez zapisu - r co dobe z KS)
             NewDay(); _stumbles = 0; _cPrev = -1; _bPrev = -1;
         }
 
@@ -405,11 +406,16 @@ namespace Armoury
                 Mine m;
                 int bank = _mines.TryGetValue(village, out m) ? m.Bank : 0;
                 int cap = Math.Max(0, bank / wpb - _tvReserved);
-                F5Note(village, x, x > cap ? x - cap : 0f);   // f5-ruda: wytop 7 dob per kopalnia (model i lupy bez drewna) - tylko przy kluczu Ks Iron Hands Follow Market
+                float coll = 0f;   // f7-wegiel: rece weglarzy (lupy modelu)
+                bool f7 = F7On;
+                if (x > cap && m != null && f7) cap = F7Colliers(village, m, x, cap, wpb, out coll);   // f7-wegiel: bezczynne rece pala wegiel z lasu okregu (klucz Bloomery Colliers)
+                float idle = x > cap ? Math.Max(0f, x - cap - coll) : 0f;   // klucz NIE: x - cap jak dotad
+                F5Note(village, x, idle);   // f5-ruda: wytop 7 dob per kopalnia (model i lupy bez drewna) - tylko przy kluczu Ks Iron Hands Follow Market (f7: bez rak weglarzy)
+                if (f7) F7Note(x, x > cap ? cap : x, idle);
                 if (x > cap)
                 {
-                    _dUnwon += x - cap;
-                    if (m != null) m.Unwon += x - cap;   // F4a: linia per kopalnia
+                    _dUnwon += idle;
+                    if (m != null) m.Unwon += idle;   // F4a: linia per kopalnia
                     r.LimitMax(Math.Min((float)cap, r.LimitMaxValue), _txtNoCoal);
                     _tvReserved += cap;
                 }
@@ -567,6 +573,7 @@ namespace Armoury
                 foreach (var m in _mines.Values) _bCut += m.RollBill(coal);
                 try { RollShelfUse(full); } catch (Exception e) { Stumble("Daily(ShelfUse)", e); }
                 try { RollMineNeed(); } catch (Exception e) { Stumble("Daily(MineNeed)", e); }   // f4-opal krok 3
+                try { F7Refresh(); } catch (Exception e) { F7Stumble("Refresh(Daily)", e); }       // f7-wegiel: r kopaln z okregu KS na ticki do nastepnego Daily
             }
             catch (Exception e) { Stumble("Daily", e); }
         }
@@ -1086,6 +1093,7 @@ namespace Armoury
               .Append(", brak zlota wsi ").Append(_dShortGold).Append(", bez miasta handlowego ").Append(_dNoMarket).Append(")")
               .Append("; kopalnia bez wegla ").Append(_dUnwon.ToString("0.#", inv)).Append(" lup (model ponad drewno w dymarce)")
               .Append(", lupy bez drewna ").Append(_dOver)
+              .Append(F7Segment())   // f7-wegiel: weglarze (tylko klucz TAK przy KS - inaczej pusto)
               .Append("; w dymarkach ").Append(bank).Append(" ladunkow przy potrzebie doby ").Append(want).Append(" (kopalni ponizej potrzeby ").Append(empty).Append(")")
               .Append("; kopalnie BK w miastach: lupy ").Append(_dTownMine).Append(", drewno ").Append(_dTownMineWood).Append(", bez drewna/kapitalu ").Append(_dTownMineSkip).Append(", cykl odrzucony przez gre ").Append(_dTownMineRej);
             // F4b: wstawka rachunku PRZED wstawka kopaln (koniec tamtej czyta narzedzie progow); wlasny try - jej wyjatek nie gasi reszty linii
@@ -1165,6 +1173,7 @@ namespace Armoury
 
         internal static void NewDay()
         {
+            try { F7Roll(); } catch (Exception e) { F7Stumble("Roll(NewDay)", e); }   // f7-wegiel: linia weglarzy z tozsamoscia drewna dymarek - PRZED zerowaniem licznikow doby
             _dBlooms = 0; _dBurnt = 0; _dWoods = 0; _dBought = 0; _dGold = 0; _dShortShelf = 0; _dShortGold = 0; _dNoMarket = 0; _dTicked = 0; _dOver = 0;
             _dTownMine = 0; _dTownMineWood = 0; _dTownMineSkip = 0; _dTownMineRej = 0; _dUnwon = 0f; _stumblesDay = 0;
             // F4a: liczniki wozow i lupy niewytopione per kopalnia; stan "w drodze" do kontroli nastepnej doby

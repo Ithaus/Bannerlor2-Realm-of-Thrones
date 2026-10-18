@@ -1508,6 +1508,17 @@ Uzycie (Python 3, tylko odczyt):
                     (fin88 0.55: lancuch gry w mieszance rampy liczyl dubel BK raz - 163 wobec 296; ETAP > 0.55), linie "Mineraly w rampie KS (f5-ruda)" (INFO).
                     Bazy: fin88 Armoury-2026-10-18_03-13-38.log (ac03aa25 = WGRANIE 79), fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin88):
                     NRU-7..10 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
+--grupa nwegiel   : (noc 18.10, paczka f7-wegiel - weglarze przy kopalni pod KS, klucz Bloomery Colliers) python -I tools/sprawdz_logi.py --grupa nwegiel <Armoury-*.log>
+                    (strumieniowo). Linia "Weglarze kopaln (f7-wegiel): dzien N" (doba, przy KS zastosowanym): bezczynne rece przy zlozu pala wegiel z lasu okregu (r = ladunki
+                    drewna z rak jednej lupy: P0 drwala x przydatnosc lasu blokow z zelazem / P0 zelaza; pustynia i step 0), tozsamosci: rece (lupy modelu) = wytopione + weglarze
+                    + bez wegla; drewno dymarek: wczoraj + las okregu + targ + kredyt + wozy + weglarze - spalone = dzis; pieniadze 0 zl. Wstawka "weglarze (f7-wegiel)" w linii
+                    "Zelazo (lupy) (214)" po "lupy bez drewna N". Od paczki "kopalnia bez wegla" (NOP-8, NRU-8) liczy tylko rece BEZCZYNNE (rece weglarzy pracuja przy weglu).
+                    Okno konca biegu: ostatnie 28 dob pelnego KS (lambda ZC4 >= 0.99). NWE-0 linia i wstawka (0 nierozpoznanych), NWE-1 tozsamosc rak |reszta| <= 0.5 w kazdej
+                    dobie, NWE-2 tozsamosc drewna dymarek (reszta 0 w kazdej dobie z kontrola), NWE-2b pieniadze 0 zl, NWE-3 'kopalnia bez wegla' <= 28.1 lup/d (bez KS; ETAP
+                    < 93.8 fin91), NWE-4 lupy wsi >= 390/d (szacunek po weglarzach na fin91 413; ETAP > 362 fin91; bez KS 271), NWE-5 rece weglarzy <= 30% modelu lup (las x0.4
+                    najwyzej 29%), NWE-6 kopalnie KS bez lasu - bez wegla (INFO; fin91 Bir Seif 11.4, Sunmine 11.1, Tylemos 3.9 lup/d), NWE-7 lupy dzieki weglarzom (INFO;
+                    szacunek +51/d), NWE-8 potkniecia i ERROR 0, NWE-9 czas doby <= 2 ms, NWE-10 kredyt drewna f5-ruda na koniec (INFO; fin91 otwarty 17596 zl).
+                    Baza: fin91 Armoury-2026-10-18_06-29-09.log (7ca98719 = WGRANIE 80). Log sprzed paczki: NWE-3/4 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -44929,6 +44940,161 @@ def nruda_main(logp):
     return 0
 
 
+NWE_LINE = "Weglarze kopaln (f7-wegiel): dzien "
+NWE_L = re.compile(r"^Weglarze kopaln \(f7-wegiel\): dzien (\d+) \| klucz Bloomery Colliers TAK \| weglarze dzis w (\d+) kopalniach: drewno z lasu okregu (\d+) ladunkow "
+                   r"\(rece ([\d.]+) lup przy weglu zamiast przy rudzie, ok\. (\d+) ludzi\), wytopione dzieki nim ([\d.]+) lup \| kopalnie KS bez lasu \(przydatnosc lasu 0 - "
+                   r"pustynia, step\): bez wegla ([\d.]+) lup w (\d+) kopalniach \| rece przy zlozach \(lupy modelu\): model ([\d.]+) = wytopione ([\d.]+) \+ weglarze ([\d.]+) "
+                   r"\+ bez wegla ([\d.]+) \(reszta (-?[\d.]+)\) \| (?:drewno dymarek \(ladunki\): w dymarkach wczoraj (\d+) \+ las okregu (\d+) \+ targ (\d+) \+ kredyt (\d+) "
+                   r"\+ wozy (\d+) \+ weglarze (\d+) - spalone (\d+) - w dymarkach dzis (\d+) = reszta (-?\d+)|drewno dymarek: kontrola od nastepnej doby \(w dymarkach dzis (\d+)\)) "
+                   r"\| pieniadze i towar: (\d+) zl .*?\| kopalnie KS: z lasem (\d+) \(las srednio x([\d.]+)\), bez lasu (\d+) \| czas ([\d.]+) ms \(odswiezenie ([\d.]+) ms\) "
+                   r"\| potkniecia dzis (\d+) \(sesja (\d+)\)\.$")
+# indeksy grup NWE_L (od 0 po groups())
+(NWE_DAY, NWE_MINES, NWE_WOOD, NWE_COLL, NWE_PEOPLE, NWE_GAIN, NWE_NOLAND, NWE_NOLANDN, NWE_MODEL, NWE_FIRED, NWE_COLL2, NWE_IDLE, NWE_HREST,
+ NWE_B0, NWE_FOREST, NWE_SHELF, NWE_CRED, NWE_CARTS, NWE_WOOD2, NWE_BURNT, NWE_B1, NWE_WREST, NWE_B1FIRST, NWE_ZL, NWE_WITHF, NWE_FL, NWE_NOF,
+ NWE_MS, NWE_MSREF, NWE_STUMD, NWE_STUMS) = range(31)
+NWE_SEG = re.compile(r"; weglarze \(f7-wegiel\): drewno z lasu okregu (\d+) ladunkow, rece ([\d.]+) lup \(ok\. (\d+) ludzi\), wytopione dzieki nim ([\d.]+) lup, "
+                     r"kopalnie bez lasu bez wegla ([\d.]+) lup")
+NWE_ERR = ("ERROR in Bloomery.F7", "ERROR in StartCalibration.F7CollierRatio")
+NWE_WIN = 28
+NWE_COAL_MAX, NWE_COAL_BASE = 28.1, 93.8          # NWE-3: 'kopalnia bez wegla' lup/d (= NOP-8 / NRU-8; bez KS 28.1, fin91 93.8 - baza paczki, fin88 45.4)
+NWE_PROD_MIN, NWE_PROD_BASE = 390, 362            # NWE-4: lupy wsi na dobe (fin91 362 srednio 28 dob; szacunek po weglarzach na fin91 413)
+NWE_SHARE_MAX = 0.30                              # NWE-5: rece weglarzy / model lup (najwiecej przy lesie x0.4: 5 / (5 + 12) = 29%)
+NWE_HREST_MAX = 0.5                               # NWE-1: |model - wytopione - weglarze - bez wegla| w kazdej dobie
+NWE_MS_MAX = 2.0                                  # NWE-9: czas weglarzy doby (ticki + odswiezenie)
+
+
+def nwegiel_main(logp):
+    """nwegiel (noc 18.10, paczka f7-wegiel): weglarze przy kopalni pod KS - bezczynne rece przy zlozu pala wegiel z lasu okregu (tabela swiata: drwal P0 x przydatnosc
+    lasu bloku), bez zlota; 'kopalnia bez wegla' (NOP-8 / NRU-8) liczy odtad tylko rece bezczynne. Wejscie: log Armoury (strumieniowo). Progi NWE-0..NWE-10 - opis
+    w naglowku pliku (--grupa nwegiel). Log bez linii paczki: liczby bazowe jako INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NWE-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    days, segs, zc4, iron, creds, errs = {}, {}, {}, {}, {}, []
+    bad = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NWE_LINE):
+                a = NWE_L.match(s)
+                if a:
+                    days[int(a.group(1))] = a.groups()
+                else:
+                    bad += 1
+                continue
+            if s.startswith("Koszyk stanow (ZC4): dzien "):
+                a = NOP_ZC4.match(s)
+                if a:
+                    try:
+                        zc4[int(a.group(1))] = min(float(a.group(2)), float(a.group(3)))
+                    except ValueError:
+                        pass
+                continue
+            if s.startswith("Zelazo (lupy) (214): dzien "):
+                a = NRU_IRON.match(s)
+                if a:
+                    d = int(a.group(1))
+                    iron[d] = (int(a.group(2)), float(a.group(3)))
+                    g = NWE_SEG.search(s)
+                    if g:
+                        segs[d] = g.groups()
+                continue
+            if s.startswith(NRU_CRED):
+                a = NRU_C.match(s)
+                if a:
+                    creds[int(a.group(1))] = a.groups()
+                continue
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in NWE_ERR):
+                errs.append(s[:160])
+    pkg = bool(days) or bool(segs)
+    print(f"plik: {logp} | linii weglarzy {len(days)} (nierozpoznanych {bad}), wstawek weglarzy w linii zelaza {len(segs)}, ZC4 {len(zc4)}, zelaza {len(iron)},"
+          f" kredytu drewna {len(creds)}, ERROR {len(errs)}")
+    base_note = "" if pkg else " - log sprzed paczki: liczba bazowa (INFO)"
+
+    def ok_or_info(v):
+        return v if pkg else None
+
+    full = sorted(d for d, l in zc4.items() if l >= 0.99)
+    win = full[-NWE_WIN:]
+    wnote = f"okno: ostatnie {len(win)} dob pelnego KS" + (f" ({win[0]}-{win[-1]})" if win else "")
+
+    # NWE-0 linie paczki
+    rep.add("NWE-0: linia 'Weglarze kopaln (f7-wegiel)' (doba przy KS zastosowanym) i wstawka 'weglarze (f7-wegiel)' linii zelaza",
+            f"linii {len(days)} (nierozpoznanych {bad}), wstawek {len(segs)}",
+            "obie przy KS zastosowanym (klucz Bloomery Colliers TAK), 0 nierozpoznanych; brak - INFO (log sprzed paczki, KS niezastosowany albo klucz NIE)",
+            (bad == 0) if pkg else None)
+    # NWE-1 tozsamosc rak, NWE-2 tozsamosc drewna dymarek
+    if days:
+        badh = [(d, float(g[NWE_HREST])) for d, g in sorted(days.items()) if abs(float(g[NWE_HREST])) > NWE_HREST_MAX]
+        rep.add("NWE-1: rece przy zlozach - model = wytopione + weglarze + bez wegla (lupy modelu, kazda doba)", f"dob {len(days)}, z reszta > {NWE_HREST_MAX}: {len(badh)}"
+                + (f" ({badh[:3]})" if badh else ""), f"|reszta| <= {NWE_HREST_MAX}", not badh)
+        chk = [(d, int(g[NWE_WREST])) for d, g in sorted(days.items()) if g[NWE_WREST] is not None]
+        badw = [(d, r) for d, r in chk if r != 0]
+        rep.add("NWE-2: drewno dymarek - wczoraj + las + targ + kredyt + wozy + weglarze - spalone = dzis (kazda doba z kontrola)",
+                f"dob z kontrola {len(chk)}, reszta != 0: {len(badw)}" + (f" ({badw[:3]})" if badw else ""), "0", (not badw) if chk else None)
+        zl = sorted(set(int(g[NWE_ZL]) for g in days.values()))
+        rep.add("NWE-2b: pieniadze weglarzy (zamknieta ekonomia - drewno z rak i lasu okregu, bez zakupu)", f"zl w liniach: {zl}", "0 zl w kazdej dobie", zl == [0])
+    else:
+        rep.add("NWE-1: rece przy zlozach - tozsamosc", "brak linii", "INFO (log sprzed paczki albo KS niezastosowany)", None)
+        rep.add("NWE-2: drewno dymarek - tozsamosc", "brak linii", "INFO", None)
+    # NWE-3 kopalnia bez wegla (= NOP-8 / NRU-8, od f7 bez rak weglarzy), NWE-4 lupy wsi
+    wi = [iron[d][1] for d in win if d in iron]
+    if wi:
+        coal = sum(wi) / len(wi)
+        rep.add("NWE-3: 'kopalnia bez wegla' (Zelazo (lupy) - od f7 tylko rece bezczynne; = NOP-8 / NRU-8)" + base_note, f"{coal:.1f} lup/d (srednio {len(wi)} dob; {wnote})",
+                f"<= {NWE_COAL_MAX} (bez KS); ETAP < {NWE_COAL_BASE} (fin91)", ok_or_info(coal <= NWE_COAL_MAX), etap=coal < NWE_COAL_BASE)
+        prod = sum(iron[d][0] for d in win if d in iron) / len(wi)
+        rep.add("NWE-4: lupy wsi na dobe (Zelazo (lupy) 'wsie dopisaly')" + base_note, f"{prod:.0f}/d (srednio {len(wi)} dob)",
+                f">= {NWE_PROD_MIN} (szacunek po weglarzach na fin91 413); ETAP > {NWE_PROD_BASE} (fin91); bez KS 271", ok_or_info(prod >= NWE_PROD_MIN), etap=prod > NWE_PROD_BASE)
+    else:
+        rep.add("NWE-3: 'kopalnia bez wegla'", f"brak linii zelaza w oknie ({wnote})", "INFO", None)
+        rep.add("NWE-4: lupy wsi na dobe", f"brak linii zelaza w oknie ({wnote})", "INFO", None)
+    # NWE-5 udzial rak weglarzy, NWE-6 kopalnie bez lasu, NWE-7 lupy dzieki weglarzom
+    wd = [d for d in win if d in days]
+    if wd:
+        mod = sum(float(days[d][NWE_MODEL]) for d in wd)
+        col = sum(float(days[d][NWE_COLL]) for d in wd)
+        share = col / mod if mod > 0 else 0.0
+        rep.add("NWE-5: rece weglarzy wobec modelu lup (okno)", f"weglarze {col / len(wd):.1f} lup rak/d (ok. {sum(int(days[d][NWE_PEOPLE]) for d in wd) / len(wd):.0f} ludzi) "
+                f"przy modelu {mod / len(wd):.1f}/d = {100 * share:.1f}%; drewno weglarzy {sum(int(days[d][NWE_WOOD]) for d in wd) / len(wd):.0f} ladunkow/d",
+                f"<= {100 * NWE_SHARE_MAX:.0f}% (las x0.4: najwyzej 29%; szacunek fin91 ok. 3%)", share <= NWE_SHARE_MAX)
+        nl = sum(float(days[d][NWE_NOLAND]) for d in wd) / len(wd)
+        g1 = days[wd[-1]]
+        rep.add("NWE-6: kopalnie KS bez lasu (pustynia, step) - bez wegla (INFO)",
+                f"{nl:.1f} lup/d (srednio okna); kopalnie KS z lasem {g1[NWE_WITHF]} (las srednio x{g1[NWE_FL]}), bez lasu {g1[NWE_NOF]}",
+                "INFO (fin91: Bir Seif 11.4, Sunmine 11.1, Tylemos 3.9 lup/d - drewno tylko z targu i wozami)", None)
+        gain = sum(float(days[d][NWE_GAIN]) for d in wd) / len(wd)
+        rep.add("NWE-7: lupy wytopione dzieki weglarzom (INFO)", f"{gain:.1f} lup/d (srednio okna)", "INFO (szacunek na fin91: +51 lup/d)", None)
+    else:
+        rep.add("NWE-5: rece weglarzy wobec modelu", f"brak linii w oknie ({wnote})", "INFO", None)
+        rep.add("NWE-6: kopalnie KS bez lasu", "brak linii", "INFO", None)
+        rep.add("NWE-7: lupy wytopione dzieki weglarzom", "brak linii", "INFO", None)
+    # NWE-8 potkniecia i ERROR, NWE-9 czas
+    st_d = sum(int(g[NWE_STUMD]) for g in days.values())
+    st_s = max((int(g[NWE_STUMS]) for g in days.values()), default=0)
+    rep.add("NWE-8: potkniecia weglarzy i ERROR (Bloomery.F7*, StartCalibration.F7CollierRatio)", f"ERROR {len(errs)}, potkniecia (suma dob) {st_d}, sesja najwiecej {st_s}"
+            + (f" ({errs[0]})" if errs else ""), "0", (not errs and st_d == 0 and st_s == 0) if pkg or errs else None)
+    if days:
+        ms = [float(g[NWE_MS]) + float(g[NWE_MSREF]) for g in days.values()]
+        rep.add("NWE-9: czas weglarzy doby (ticki kopaln + odswiezenie r)", f"najwiecej {max(ms):.2f} ms, srednio {sum(ms) / len(ms):.3f} ms ({len(ms)} dob)", f"<= {NWE_MS_MAX} ms",
+                max(ms) <= NWE_MS_MAX)
+    else:
+        rep.add("NWE-9: czas weglarzy doby", "brak linii", "INFO", None)
+    # NWE-10 kredyt drewna f5-ruda na koniec (INFO - weglarze zdejmuja z kopaln presje kredytu)
+    if creds:
+        last = creds[max(creds)]
+        lent = sum(int(g[NRUC_LENTZL]) for g in creds.values())
+        rep.add("NWE-10: kredyt drewna kupcow (f5-ruda) - otwarty na koniec, udzielony w biegu (INFO)", f"otwarty {last[NRUC_OPEN]} zl w {last[NRUC_OPENN]} kopalniach, udzielono {lent} zl",
+                "INFO (fin91: otwarty 17596 zl w 5 kopalniach, udzielono 49207 zl; Akirys 15085 zl zalegly 42 doby)", None)
+    else:
+        rep.add("NWE-10: kredyt drewna kupcow (f5-ruda)", "brak linii", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -45170,6 +45336,8 @@ def main(argv):
         return nopal_main(logp)   # nopal (noc 17/18.10, fala 4 f4-opal): opal mieszczan pod KS - pora roku, limit dowozu drewna, popyt ceny, zapas dymarek; drewno, ruda, kopalnia bez wegla, zima
     if group == "nruda" and logp:
         return nruda_main(logp)   # nruda (noc 18.10, fala 5 f5-ruda): ruda/zelazo pod KS - rece przy zlozach zelaza za ruda rynku, kredyt kupcow na drewno dymarek; NOP-7/NOP-8, zapas rudy, lupy
+    if group == "nwegiel" and logp:
+        return nwegiel_main(logp)   # nwegiel (noc 18.10, f7-wegiel): weglarze przy kopalni pod KS - bezczynne rece pala wegiel z lasu okregu (tabela swiata), bez zlota; NOP-8 bez rak weglarzy, lupy, tozsamosci
     if group == "nzapis" and logp:
         return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
     if group == "nskory" and logp:
