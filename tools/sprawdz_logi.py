@@ -1058,6 +1058,20 @@ Uzycie (Python 3, tylko odczyt):
                     kupcy -10-20% w miescie, NZC7-3 po najezdzie D okregu -30-60% w 7 dob (epizody z trafionymi >= 20%; same male najazdy - DECYZJA), NZC7-4 >= 50%
                     powrotu w rok bez wojny (krotszy bieg - INFO), NZC7-5 obieg zamkniety (kontrola kies 0), NZC7-6 potkniecia i ERROR 0, NZC7-7..12 INFO. Razem
                     z --grupa nzc6 (granice pasm, limit 0.2%), nzc2 (zapis v4 + wczytanie) i nzc0 (czas bloku).
+--grupa nniewola  : (18.10, paczka f8-niewola - decyzja Jeffa "6 tak": niewola za dlugi tylko w kulturach z niewola, 1%/rok przy Dostatku < 0.8 bez zapasu; projekt
+                    docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 10; Armoury/src/DailyLife.Debt.cs, DailyLife.Mobility.cs przejscie TDebtSl, klucz Debt Slavery)
+                    python -I tools/sprawdz_logi.py --grupa nniewola <Armoury-*.log> [--csv <katalog sesji>/stany-dostatek.csv] (strumieniowo; CSV obok logu, w Logs/<znacznik>/
+                    albo w Modules/Armoury/Logs gry; klucz dziala tylko z Daily Life Mobility - wyzwolenia w druga strone). NNW-0 start sesji: klucz i lista
+                    kultur = ghiscari, lyseni, myrish, norvos, qartheen, qohorik, tyroshi, valyrian, volantine (bez sturgia - Zelazne Wyspy, Westeros - i khuzait -
+                    Dothrakowie bez pieniadza), NNW-0b linie nieczytelne 0, NNW-1 linia "Niewola za dlugi (f8): dzien N"
+                    w kazdej dobie z linia "Awans (ZC6)" (przy kluczu), NNW-2 ruchy tylko w kulturach z niewola (poza lista 0, kultury w liniach z listy), NNW-3 tozsamosc ludzi
+                    (z wolnych = do niewolnych +-0.15, suma udzialow osady = 1 000 000, kultury = razem, wsie + miasta = razem), NNW-4 tempo od wczytania <= 1.25%/rok biednych
+                    (cel 1%; INFO przy < 50 000 ludzio-przegladow albo bez biednych - regula spi), NNW-5 pieniadze: kiesa W = wierzyciele R + P co do zlotowki, kontrola kies 0
+                    (wsie - kiesa wspolna), NNW-6 najwiekszy ruch w osadzie <= 0.2% na przeglad (limit ZC6), NNW-7 "do niewoli" = wpis "niewola za dlugi" linii ZC6 tej doby
+                    (+-1), NNW-8 potkniecia i ERROR DailyLife.NiewolaZaDlugi / DebtSl 0, NNW-9 czas <= 2 ms/dobe, NNW-10 stany-dostatek.csv: udzial niewolnych ksiegi stanow
+                    (bez konta NIEWOLNI) poza kulturami z niewola nie rosnie od pierwszej do ostatniej doby pliku (tylko TDebtSl dodaje niewolnych), NNW-11/12 INFO (kultury,
+                    wolni, powody bez ruchu: bez KS, wladca bez niewoli, D >= 0.8, zapas >= 7 dni). Log sprzed paczki (np. Armoury-2026-10-17_23-22-37.log): linie INFO,
+                    NNW-10 z CSV liczony, bez wyjatku.
 --grupa ndrogi    : (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, plik
                     Armoury/ModuleData/arm_map_roads_geo.tsv) python -I tools/sprawdz_logi.py --grupa ndrogi <Armoury-*.log> (strumieniowo). NDR-0 start sesji: plik drog
                     wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa ROT zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid
@@ -35968,6 +35982,8 @@ def nzc2_main(logp, bdp=None, until=120):
                 zc6_moves = True
             elif s.startswith("Blizna wojny (ZC7): start sesji") and "Daily Life War Scar tak" in s:
                 zc6_moves = True   # ZC7 (16.10): blizna wojny przesuwa udzialy (ruina przy zlupieniu, rzemieslnicy wsi po najezdzie, powrot) - NZC2-6 INFO
+            elif s.startswith("Niewola za dlugi (f8): start sesji") and "klucz Debt Slavery tak" in s and "nikt nie wpada" not in s:
+                zc6_moves = True   # f8-niewola (18.10, recenzja): niewola za dlugi przesuwa udzialy (biedni wolni -> niewolni) - NZC2-6 INFO
     print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Stany {len(days)} (nierozpoznanych {len(bad)}), zasiewow {len(seeds)}, zapisow {len(saves)}, "
           f"wczytan {len(loads)} (bez ksiegi stanow {len(loads_other)}), doby Zycie (ZC0) {len(zc0)}")
     if not sess and not days and not bad and not saves and not loads and not loads_other:
@@ -36557,6 +36573,286 @@ def nzc7_main(logp, bdp=None, until=120):
             f"dlug odpisany ponizej progu {sum(vals('offN')):.0f} ({sum(vals('offP')):.0f} ludzi), po 2 latach spokoju {sum(vals('forgetN')):.0f} osad; "
             f"liczniki spadku wsi wstrzymane po wlaczeniu ZC7 (przegladow) {sum(vals('holdV')):.0f}; zlupienia przed pierwszym switem po wczytaniu {sum(vals('sackLate')):.0f}",
             "INFO (wczytanie v1/v2/v3/v4; zapis + wczytanie - nzc2 NZC2-4, rozmiar - NZC2-5)", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ nniewola (18.10, paczka f8-niewola - decyzja Jeffa "6 tak": niewola za dlugi tylko w kulturach z niewola,
+# 1%/rok przy Dostatku < 0.8 bez zapasu; Armoury/src/DailyLife.Debt.cs, DailyLife.Mobility.cs przejscie TDebtSl, klucz Debt Slavery)
+NNW_HEAD = "Niewola za dlugi (f8): "
+NNW_CULT = ("ghiscari", "lyseni", "myrish", "norvos", "qartheen", "qohorik", "tyroshi", "valyrian", "volantine")
+NNW_START = re.compile(r"Niewola za dlugi \(f8\): start sesji \| klucz Debt Slavery (?P<k>tak|WYLACZONE) \(Daily Life Estates (?P<e>tak|WYLACZONE), "
+                       r"Daily Life Measure (?P<z>tak|WYLACZONE)(?:, Daily Life Mobility (?P<mo>tak|WYLACZONE))?\).*?\| kultury: (?P<cul>[a-z, ]+?) \(")
+NNW_DAY = re.compile(r"Niewola za dlugi \(f8\): dzien (?P<day>-?\d+) \| klucz (?P<k>tak|nie) \| od ostatniej linii (?P<dd>\d+) dob: przegladow osad kultur z niewola (?P<seen>\d+) "
+                     r"\(biednych (?P<poor>\d+); pominiete: bez KS (?P<noks>\d+), wladca bez niewoli (?P<fr>\d+), D >= [\d.]+ (?P<rich>\d+), zapas >= [\d.]+ dni (?P<sav>\d+), "
+                     r"zapas nieznany (?P<nop>\d+), D nieznane (?P<nod>\d+), bez ludzi stanu (?P<empty>\d+)\) \| do niewoli (?P<mv>-?\d+|-) ludzi \(wsie chlopi (?P<v>-?\d+|-), "
+                     r"miasta biedota (?P<t>-?\d+|-)\) w (?P<moves>\d+) przegladach, granice pasm / limit ciecia (?P<band>\d+), najwiekszy ruch (?P<max>[-\d.]+|-)% \(")
+NNW_FIELDS = (
+    ("cul", r"\| wedlug kultur: (.*?) \| od wczytania", str),
+    ("daysS", r"\| od wczytania \((\d+) dob\): do niewoli", int),
+    ("mvS", r"dob\): do niewoli (-?\d+|-) \(wsie", float),
+    ("vS", r"dob\): do niewoli (?:-?\d+|-) \(wsie (-?\d+|-), miasta", float),
+    ("tS", r"\(wsie (?:-?\d+|-), miasta (-?\d+|-)\), biedni w przegladach", float),
+    ("poorS", r"biedni w przegladach (-?\d+|-), tempo", float),
+    ("rate", r"tempo ([-\d.]+|-)% na rok", float),
+    ("freeS", r"wolni stanu zrodlowego w przegladach (-?\d+|-) \(na rok", float),
+    ("freeRate", r"\(na rok ([-\d.]+|-)% wolnych\)", float),
+    ("culS", r"\| wedlug kultur od wczytania: (.*?) \| ludzie", str),
+    ("out", r"ludzie \(ksiega stanow\): z wolnych -([-\d.]+), do niewolnych", float),
+    ("inn", r"ludzie \(ksiega stanow\): z wolnych -[-\d.]+, do niewolnych \+([-\d.]+), roznica", float),
+    ("pdiff", r"do niewolnych \+[-\d.]+, roznica ([-\d.]+); od wczytania", float),
+    ("outS", r"; od wczytania z wolnych -([-\d.]+), do niewolnych", float),
+    ("inS", r"; od wczytania z wolnych -[-\d.]+, do niewolnych \+([-\d.]+)", float),
+    ("pdiffS", r"; od wczytania z wolnych -[-\d.]+, do niewolnych \+[-\d.]+, roznica ([-\d.]+);", float),
+    ("sumBad", r"osad z suma udzialow != 1000000 (\d+)", int),
+    ("badCul", r"ruchy poza kulturami z niewola (\d+)", int),
+    ("W", r"pieniadze \(zl gry\): kiesa W -(-?\d+)", int),
+    ("R", r", wierzyciele R \+(-?\d+)", int),
+    ("P", r", wierzyciele R \+-?\d+, P \+(-?\d+)", int),
+    ("mdiff", r", P \+-?\d+, roznica (-?\d+), kontrola kies", int),
+    ("ctl", r"kontrola kies ludu (-?\d+);", int),
+    ("WS", r"; od wczytania W -(-?\d+)", int),
+    ("RS", r"; od wczytania W -\d+, R \+(-?\d+)", int),
+    ("PS", r"; od wczytania W -\d+, R \+\d+, P \+(-?\d+)", int),
+    ("ctlS", r", kontrola (-?\d+) \(wsie", int),
+    ("ms", r"\| czas ([-\d.]+|-) ms", float),
+    ("msd", r" ms \(([-\d.]+|-) ms/dobe\)", float),
+    ("stum", r"\| potkniecia (\d+) \(sesja", int),
+    ("stumS", r"\(sesja (\d+)\)\.\s*$", int),
+)
+NNW_ZC6 = re.compile(r"Awans \(ZC6\): dzien (-?\d+) \|.*?niewola za dlugi \(biedni wolni->niewolni\) (-?\d+|-)(?:,| \| w gore )")
+NNW_ZC6DAY = re.compile(r"Awans \(ZC6\): dzien (-?\d+) \|")
+NNW_ERR = ("ERROR in DailyLife.NiewolaZaDlugi", "ERROR in DailyLife.DebtSl")
+NNW_RATE_TOL = 1.25        # tempo od wczytania <= 1%/rok x 1.25 (ulamek milionowej w malych osadach; limit 0.2%/tydz. i granice pasm tylko obnizaja)
+NNW_RATE_MINPOOR = 50000   # biednych w przegladach (ludzie x przeglady) - ponizej tempo INFO (za malo prob)
+NNW_MS_DAY = 2.0           # ms na dobe kodu paczki (przeplyw w przegladzie + przelew kiesy) - najwyzej w kazdej linii
+NNW_MOVE_CAP = 0.2 + 0.001 # % ludzi osady na przeglad (limit ZC6 0.2%/tydz. + ulamek milionowej)
+NNW_GAME_LOGS = r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\Armoury\Logs"
+
+
+def _nnw_val(x, cast):
+    if x is None:
+        return None
+    if cast is str:
+        return x
+    if x == "-":
+        return None
+    try:
+        return cast(x)
+    except ValueError:
+        return None
+
+
+def _nnw_cul(txt):
+    """'ghiscari 12, volantine 3' -> {kultura: ludzie}; '-' -> {}."""
+    out = {}
+    if not txt or txt.strip() == "-":
+        return out
+    for part in txt.split(","):
+        bits = part.strip().rsplit(" ", 1)
+        if len(bits) != 2:
+            out[part.strip()] = None
+            continue
+        try:
+            out[bits[0]] = float(bits[1]) if bits[1] != "-" else None
+        except ValueError:
+            out[bits[0]] = None
+    return out
+
+
+def _nnw_csv_path(logp, csvp):
+    """stany-dostatek.csv biegu: --csv (plik albo katalog obok), uklad archiwum / gry (nzc0_csv_path), katalog Logs gry."""
+    if csvp:
+        if os.path.basename(csvp).lower() == "stany-dostatek.csv" and os.path.isfile(csvp):
+            return csvp
+        q = os.path.join(os.path.dirname(csvp), "stany-dostatek.csv")
+        if os.path.isfile(q):
+            return q
+    p = nzc0_csv_path(logp)
+    if p:
+        return p
+    stem = os.path.splitext(os.path.basename(logp))[0].replace("Armoury-", "")
+    q = os.path.join(NNW_GAME_LOGS, stem, "stany-dostatek.csv")
+    return q if os.path.isfile(q) else None
+
+
+def _nnw_csv(path):
+    """Udzial niewolnych ksiegi stanow (niewolni - konto NIEWOLNI ksiegi) / ludzie ksiegi: pierwsza i ostatnia doba pliku na osade (miasta i wsie)."""
+    first, last, days = {}, {}, set()
+    with open(path, encoding="utf-8", errors="replace", newline="") as fh:
+        for r in csv.DictReader(fh, delimiter=";"):
+            try:
+                d = int(r["dzien"]); L = float(r["ludzie_ksiega"]); s = float(r["niewolni"]) - float(r.get("konto_niewolnych") or 0)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if r.get("rodzaj") == "zamek" or L <= 0:
+                continue
+            days.add(d)
+            k = r.get("osada_id") or "?"
+            rec = (d, s / L, L, r.get("kultura") or "?", r.get("osada") or k, s)
+            if k not in first or d < first[k][0]:
+                first[k] = rec
+            if k not in last or d > last[k][0]:
+                last[k] = rec
+    return first, last, sorted(days)
+
+
+def nniewola_main(logp, csvp=None):
+    """nniewola (18.10, paczka f8-niewola): niewola za dlugi (DailyLife.Debt.cs, klucz Debt Slavery) - linie 'Niewola za dlugi (f8)', krzyzowo z linia 'Awans (ZC6)'
+    i stany-dostatek.csv (obok logu, w ukladzie gry albo --csv). Progi NNW-0..NNW-12 - opis w naglowku pliku (--grupa nniewola). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NNW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, bad, zc6, zc6days, errs = [], {}, [], {}, set(), []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in NNW_ERR):
+                errs.append(s[:200])
+                continue
+            if s.startswith("Awans (ZC6): dzien "):
+                md = NNW_ZC6DAY.match(s)
+                if md:
+                    zc6days.add(int(md.group(1)))
+                mz = NNW_ZC6.match(s)
+                if mz:
+                    zc6[int(mz.group(1))] = None if mz.group(2) == "-" else float(mz.group(2))
+                continue
+            if not s.startswith(NNW_HEAD):
+                continue
+            if s.startswith(NNW_HEAD + "start sesji"):
+                ms_ = NNW_START.match(s)
+                starts.append(ms_.groupdict() if ms_ else {"k": "?", "e": "?", "z": "?", "mo": "?", "cul": ""})
+                continue
+            md = NNW_DAY.match(s)
+            if not md:
+                bad.append(s[:220])
+                continue
+            d = {k: (v if k == "k" else _nnw_val(v, float)) for k, v in md.groupdict().items()}
+            for k, pat, cast in NNW_FIELDS:
+                mm = re.search(pat, s)
+                d[k] = _nnw_val(mm.group(1), cast) if mm else None
+            days[int(d["day"])] = d
+    dd = sorted(days)
+    # klucz czynny: Debt Slavery, Estates i Measure tak, a Daily Life Mobility tak albo linia sprzed recenzji (bez tego pola) - DebtSlOn wymaga ruchu ZC6
+    keyon = [x for x in starts if x.get("k") == "tak" and x.get("e") in ("tak", "?") and x.get("z") in ("tak", "?") and x.get("mo") in (None, "tak", "?")]
+    print(f"plik: {logp} | linii startu {len(starts)} (klucz tak {len(keyon)}) | linii doby {len(dd)}" + (f" (dzien {dd[0]}-{dd[-1]})" if dd else "")
+          + f" | nieczytelnych {len(bad)} | linii Awans (ZC6) {len(zc6days)} (z wpisem niewoli {len(zc6)}) | ERROR paczki {len(errs)}")
+    # ---- NNW-0 start sesji: klucz i lista kultur
+    if starts:
+        cul_bad = [x.get("cul") for x in starts if tuple(sorted(c.strip() for c in (x.get("cul") or "").split(",") if c.strip())) != NNW_CULT]
+        rep.add("NNW-0: start sesji (klucz Debt Slavery, kultury z niewola znajace pieniadz)",
+                f"linii {len(starts)}, klucz: {', '.join(sorted(set(x.get('k', '?') for x in starts)))} (Daily Life Mobility: {', '.join(sorted(set(x.get('mo') or '-' for x in starts)))}); lista kultur inna niz {len(NNW_CULT)} oczekiwanych w {len(cul_bad)}"
+                + (f" (np. '{cul_bad[0]}')" if cul_bad else ""), f"lista = {', '.join(NNW_CULT)} (bez sturgia i khuzait)", len(cul_bad) == 0)
+    else:
+        rep.add("NNW-0: start sesji (klucz Debt Slavery)", "brak linii startu", "INFO (log sprzed paczki f8-niewola)", None)
+    if bad:
+        rep.add("NNW-0b: linie 'Niewola za dlugi (f8): dzien N' nieczytelne", f"{len(bad)} (np. {bad[0][:160]})", "0", False)
+    if not dd:
+        why = "klucz wylaczony - linii doby nie ma" if starts and not keyon else "log sprzed paczki albo bez dob z linia ZC"
+        rep.add("NNW-1..9: linie doby niewoli za dlugi", f"brak linii doby ({why})", "INFO", None)
+    else:
+        # ---- NNW-1 linia w kazdej dobie z linia ZC6 (przy kluczu)
+        miss = [x for x in sorted(zc6days) if x not in days and x >= dd[0]]
+        rep.add("NNW-1: linia 'Niewola za dlugi (f8)' w kazdej dobie z linia 'Awans (ZC6)' (od pierwszej linii paczki)",
+                f"linii {len(dd)}, doby ZC6 bez linii f8 {len(miss)}" + (f" (np. {miss[:5]})" if miss else ""), "0", len(miss) == 0)
+        # ---- NNW-2 tylko kultury z niewola
+        badc = sum((days[x]["badCul"] or 0) for x in dd)
+        foreign = sorted({c for x in dd for c in list(_nnw_cul(days[x].get("cul")).keys()) + list(_nnw_cul(days[x].get("culS")).keys()) if c not in NNW_CULT})
+        rep.add("NNW-2: ruchy tylko w kulturach z niewola (Westeros, Zelazne Wyspy, Dothrakowie i kultury bez niewoli nietkniete)",
+                f"ruchy poza kulturami z niewola (suma linii) {badc}; kultury w liniach spoza listy: {', '.join(foreign) if foreign else '-'}",
+                "0 / brak", badc == 0 and not foreign)
+        # ---- NNW-3 tozsamosc ludzi
+        b3 = []
+        for x in dd:
+            r = days[x]
+            cs = _nnw_cul(r.get("cul"))
+            csum = sum(v for v in cs.values() if v is not None)
+            ok = r["pdiff"] is not None and abs(r["pdiff"]) <= 0.15 and (r["sumBad"] or 0) == 0
+            if r["mv"] is not None:
+                ok = ok and abs(csum - r["mv"]) <= 0.5 * max(1, len(cs)) + 1 and r["v"] is not None and r["t"] is not None and abs(r["v"] + r["t"] - r["mv"]) <= 1.5
+            if not ok:
+                b3.append(x)
+        lastr = days[dd[-1]]
+        rep.add("NNW-3: tozsamosc ludzi (z wolnych = do niewolnych, suma udzialow osady = 1 000 000, kultury = razem, wsie + miasta = razem)",
+                f"niezgodne {len(b3)} z {len(dd)} linii" + (f" (doby {b3[:5]})" if b3 else "") + f"; od wczytania z wolnych -{lastr.get('outS')}, do niewolnych +{lastr.get('inS')}, "
+                f"roznica {lastr.get('pdiffS')}", "0 (roznica <= 0.15 czlowieka - zaokraglenie linii)", len(b3) == 0 and lastr.get("pdiffS") is not None and abs(lastr["pdiffS"]) <= 0.15)
+        # ---- NNW-4 tempo 1%/rok biednych
+        rate, poorS, mvS = lastr.get("rate"), lastr.get("poorS"), lastr.get("mvS")
+        if not poorS:
+            rep.add("NNW-4: tempo niewoli za dlugi <= 1%/rok biednych (od wczytania)", f"biednych w przegladach 0, do niewoli {mvS}",
+                    "INFO (brak biednych z D < 0.8 bez zapasu w kulturach z niewola pod KS - regula spi)", None)
+        elif poorS < NNW_RATE_MINPOOR:
+            rep.add("NNW-4: tempo niewoli za dlugi <= 1%/rok biednych (od wczytania)", f"tempo {rate}% na rok, biednych w przegladach {poorS:.0f}, do niewoli {mvS}",
+                    f"INFO (mniej niz {NNW_RATE_MINPOOR} ludzio-przegladow - za malo prob)", None)
+        else:
+            rep.add("NNW-4: tempo niewoli za dlugi <= 1%/rok biednych (od wczytania)", f"tempo {rate}% na rok, biednych w przegladach {poorS:.0f}, do niewoli {mvS}",
+                    f"<= {NNW_RATE_TOL:.2f}% (cel 1%; limit 0.2%/tydz. i pasma tylko obnizaja)", rate is not None and rate <= NNW_RATE_TOL)
+        # ---- NNW-5 pieniadze: kiesa W = R + P, kontrola kies 0
+        b5 = [x for x in dd if days[x]["mdiff"] is None or days[x]["mdiff"] != 0 or (days[x]["ctl"] or 0) != 0]
+        WS, RS, PS = lastr.get("WS") or 0, lastr.get("RS") or 0, lastr.get("PS") or 0
+        rep.add("NNW-5: pieniadze zamkniete (kiesa W -x = wierzyciele R + P, suma kies ludu miasta bez zmian)",
+                f"niezgodne {len(b5)} z {len(dd)} linii" + (f" (doby {b5[:5]})" if b5 else "") + f"; od wczytania W -{WS}, R +{RS}, P +{PS}, kontrola {lastr.get('ctlS')}"
+                + (f"; udzial R {100.0 * RS / (RS + PS):.1f}%" if RS + PS > 0 else ""), "0 (co do zlotowki; wsie - kiesa wspolna, bez przelewu)",
+                len(b5) == 0 and WS == RS + PS and (lastr.get("ctlS") or 0) == 0)
+        # ---- NNW-6 limit ruchu w osadzie
+        mx = [(days[x]["max"] or 0.0, x) for x in dd]
+        worst = max(mx) if mx else (0.0, None)
+        rep.add("NNW-6: najwiekszy ruch niewoli za dlugi w osadzie na przeglad <= 0.2% (limit ZC6)", f"najwiecej {worst[0]:.3f}% (dzien {worst[1]})", f"<= {NNW_MOVE_CAP:.3f}%",
+                worst[0] <= NNW_MOVE_CAP)
+        # ---- NNW-7 krzyzowo z linia ZC6
+        both = [x for x in dd if x in zc6]
+        b7 = [x for x in both if days[x]["mv"] is not None and zc6[x] is not None and abs(days[x]["mv"] - zc6[x]) > 1.0]
+        if both:
+            rep.add("NNW-7: 'do niewoli' linii f8 = 'niewola za dlugi' linii 'Awans (ZC6)' tej samej doby", f"niezgodne {len(b7)} z {len(both)} dob" + (f" (doby {b7[:5]})" if b7 else ""),
+                    "0 (+-1 czlowiek zaokraglenia)", len(b7) == 0)
+        else:
+            rep.add("NNW-7: krzyzowo z linia 'Awans (ZC6)'", "brak wpisu niewoli w liniach ZC6", "INFO", None)
+        # ---- NNW-8 potkniecia i ERROR
+        st = sum((days[x]["stum"] or 0) for x in dd)
+        rep.add("NNW-8: potkniecia paczki i ERROR DailyLife.NiewolaZaDlugi / DebtSl", f"potkniecia (suma linii) {st}, sesja {lastr.get('stumS')}, ERROR {len(errs)}"
+                + (f" (np. {errs[0][:120]})" if errs else ""), "0 / 0", st == 0 and not errs)
+        # ---- NNW-9 czas
+        msd = [days[x]["msd"] for x in dd if days[x]["msd"] is not None]
+        rep.add("NNW-9: czas kodu paczki na dobe (przeplyw w przegladzie + przelew kiesy)", f"najwiecej {max(msd):.3f} ms/dobe, srednio {sum(msd) / len(msd):.3f}" if msd else "brak liczb",
+                f"<= {NNW_MS_DAY} ms/dobe", (max(msd) <= NNW_MS_DAY) if msd else None)
+        # ---- NNW-11 / 12 INFO: kultury, wolni, powody
+        rep.add("NNW-11: do niewoli od wczytania wedlug kultur (ostatnia linia)", f"{lastr.get('culS') or '-'}; razem {mvS} (wsie {lastr.get('vS')}, miasta {lastr.get('tS')}) w "
+                f"{lastr.get('daysS')} dobach; na rok {lastr.get('freeRate')}% wolnych stanu zrodlowego (wolni w przegladach {lastr.get('freeS')})", "INFO", None)
+        sums = {k: sum((days[x][k] or 0) for x in dd) for k in ("seen", "poor", "noks", "fr", "rich", "sav", "nop", "nod", "empty", "band", "moves")}
+        rep.add("NNW-12: przeglady osad kultur z niewola i powody bez ruchu (suma linii)",
+                f"przegladow {sums['seen']:.0f}, biednych {sums['poor']:.0f} (z ruchem {sums['moves']:.0f}); bez KS {sums['noks']:.0f}, wladca bez niewoli {sums['fr']:.0f}, "
+                f"D >= 0.8 {sums['rich']:.0f}, zapas >= 7 dni {sums['sav']:.0f}, zapas nieznany {sums['nop']:.0f}, D nieznane {sums['nod']:.0f}, bez ludzi stanu {sums['empty']:.0f}; "
+                f"granice pasm / limit {sums['band']:.0f}", "INFO", None)
+    # ---- NNW-10 stany-dostatek.csv: udzial niewolnych ksiegi stanow poza kulturami z niewola nie rosnie
+    cp = _nnw_csv_path(logp, csvp)
+    if not cp:
+        rep.add("NNW-10: stany-dostatek.csv - niewolni ksiegi stanow poza kulturami z niewola nie rosna", "brak pliku (obok logu, Logs/<znacznik>/ ani --csv)", "INFO", None)
+    else:
+        try:
+            first, last, cdays = _nnw_csv(cp)
+            up_out, up_in, n_out, add_in = [], 0, 0, 0.0
+            for k, a in first.items():
+                b = last.get(k)
+                if b is None or b[0] <= a[0]:
+                    continue
+                if a[3] in NNW_CULT:
+                    if b[1] > a[1] + 2.0 / max(1.0, b[2]) + 1e-6:
+                        up_in += 1
+                        add_in += max(0.0, b[1] - a[1]) * b[2]
+                    continue
+                n_out += 1
+                if b[1] > a[1] + 2.0 / max(1.0, b[2]) + 1e-6:
+                    up_out.append(f"{b[4]} ({b[3]}) {100 * a[1]:.3f}% -> {100 * b[1]:.3f}%")
+            rep.add("NNW-10: stany-dostatek.csv - udzial niewolnych ksiegi stanow (bez konta NIEWOLNI) poza kulturami z niewola nie rosnie",
+                    f"doby {cdays[0] if cdays else '-'}-{cdays[-1] if cdays else '-'}, osad poza lista {n_out}, z udzialem w gore {len(up_out)}" + (f" (np. {up_out[:3]})" if up_out else "")
+                    + f"; w kulturach z niewola osad z udzialem w gore {up_in} (ok. +{add_in:.0f} ludzi wobec pierwszej doby - INFO)", "0 (tylko TDebtSl dodaje niewolnych; 2 ludzi zaokraglenia)",
+                    len(up_out) == 0 if cdays and len(cdays) > 1 else None)
+        except Exception as e:   # plik w nieznanym ukladzie - INFO, bez wyjatku
+            rep.add("NNW-10: stany-dostatek.csv", f"blad odczytu {cp}: {e}", "INFO", None)
     rep.show()
     return 0
 
@@ -46646,6 +46942,8 @@ def main(argv):
         return nzc6_main(logp, bdp, until_arg)   # nzc6 (16.10, zycie codzienne ZC6): Dostatek czynny - awans i spadek, wyzwolenie, dobrobyt (DailyLife.Mobility.cs, DailyLife.Prosperity.cs)
     if group == "nzc7" and logp:
         return nzc7_main(logp, bdp, until_arg)   # nzc7 (16.10, zycie codzienne ZC7): wojna i blizna - ruina przy zlupieniu, blizna najazdu, powrot (DailyLife.War.cs)
+    if group == "nniewola" and logp:
+        return nniewola_main(logp, csvp)   # nniewola (18.10, paczka f8-niewola): niewola za dlugi tylko w kulturach z niewola - tempo, tozsamosc ludzi i pieniedzy, kultury (DailyLife.Debt.cs)
     if group == "nkupcy" and logp:
         return nkupcy_main(logp)   # nkupcy (noc 17/18.10, KS runda 4 r4-kupcy): kredyt kupcow KS-H, rachunki, tozsamosci, zwloka, glod pierwszy, Polnoc i Mur (KsFoodCarts.cs, KsFoodCredit.cs)
     if group == "nks" and logp:

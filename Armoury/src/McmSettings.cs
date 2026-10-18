@@ -6936,6 +6936,10 @@ namespace Armoury
         [SettingPropertyGroup("Daily life - rise, fall and war")]
         public bool DailyLifeWarScar { get; set; } = true;
 
+        [SettingPropertyBool("Debt Slavery", HintText = "with Daily Life Estates and Daily Life Mobility (under which owners also free a few slaves each year), only in the slaving lands of Essos that know coin and debt (Slaver's Bay, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, Qarth - not the Iron Islands, not the Dothraki): the poorest free people of a place - peasants in a village, labourers in a town - whose Livelihood stays below 0.8 and who have less than a week of savings fall into debt slavery, about 1% of them a year, and become slaves of the same place. Their few coins go to their creditors, the craftsmen and merchants of the town who own its slaves; as slaves they work for their owners and are fed by them. Only under the start calibration and while the region is ruled by a slaving realm. No one is made or lost, and Westeros is never touched (off = no one falls into slavery for debt, as before)")]
+        [SettingPropertyGroup("Daily life - rise, fall and war")]
+        public bool DebtSlavery { get; set; } = true;
+
         [SettingPropertyBool("Start Calibration", HintText = "Start calibration (the plan only): once a week the hands and the land of every district - the game village, its side villages and the fields of the townsfolk - are reckoned with one table of what a worker makes on his land, and who does what is chosen the way families choose it: where the work pays best after the cost of the herd, the boat or the grove. The plan itself only writes the log and ks-plan.csv; the game changes only once the calibration is started - by itself after about five weeks of survey with Start Calibration Auto Arm (on), or with Arm This Save and Confirm. On a save where the calibration was already applied, off = from the next day the villages produce as before (the state stays in the save)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibration { get; set; } = true;
@@ -9573,6 +9577,7 @@ namespace Armoury
             s.DailyLifeFreedom = DailyLifeFreedom;
             s.DailyLifeProsperityLink = DailyLifeProsperityLink;
             s.DailyLifeWarScar = DailyLifeWarScar;
+            s.DebtSlavery = DebtSlavery;
             s.StartCalibration = StartCalibration;
             s.StartCalibrationMapInertia = StartCalibrationMapInertia;
             s.StartCalibrationTownFields = StartCalibrationTownFields;

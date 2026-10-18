@@ -32,6 +32,9 @@ namespace Armoury
     ///   kultura nie zna niewoli (LosersFlee.SlaveCulture; wladca krolestwa, bez krolestwa - glowa rodu), 10% niewolnych na 28 dob (2.6% na przeglad), bez granic pasm
     ///   i limitu 0.2% - tylko po ZDOBYCIU: osada widziana od wlaczenia klucza pod wladca z niewola (EBook.FreeBase 1, zapis v4); stan zastany (region juz pod wladca
     ///   bez niewoli w dniu wlaczenia - stary zapis) nie wyzwala (recenzja 16.10: start neutralny). Konto NIEWOLNI ksiegi (jency, PeopleBook) nietkniete.
+    ///  NIEWOLA ZA DLUGI (f8-niewola, klucz DebtSlavery, DailyLife.Debt.cs): w kulturach z niewola znajacych pieniadz (bez Zelaznych Wysp i Dothrakow), pod KS i pod
+    ///   wladca z niewola biedni wolni (wies chlopi, miasto biedota) z D < 0.8 i zapasem < 7 dni - 1%/rok do niewolnych tej osady (TDebtSl, w limicie 0.2% i pasmach);
+    ///   miasto - ich udzial kiesy W do wierzycieli R 40% / P 60%.
     ///  GRANICE: udzial stanu w [0.5 x pasmo, 1.5 x pasmo] (pasma rozdz. 5.2 kultury z kalibracji), w osadzie najwyzej 0.2% ludzi na tydzien (awans, spadek, wyzwolenia).
     ///  MIGRACJA (codziennie, kazde miasto): przybysze ze wsi regionu (TownGrowth E4/8 R2, ta sama doba) to biedota - etykieta: ich udzial w innych stanach miasta
     ///   (stale udzialy rozlozylyby ich po wszystkich) przechodzi do biedoty. Wies traci migrantow wedlug swoich udzialow (95% chlopi) - bez poprawki.
@@ -55,14 +58,15 @@ namespace Armoury
 
         // przejscia
         // ZC7 (DailyLife.War.cs): TBackV / TBackC / TBackM - powrot zrujnowanych przez wojne do zawodu (dlug blizny, w pokoju 25%/rok) - nie liczone do "w gore" ZC6
-        private const int TPC = 0, TLC = 1, TCM = 2, TMG = 3, TPG = 4, TCD = 5, TMD = 6, TGD = 7, TMan = 8, TFree = 9, TMig = 10, TBackV = 11, TBackC = 12, TBackM = 13, TN = 14;
+        // f8-niewola (DailyLife.Debt.cs, klucz DebtSlavery): TDebtSl - biedni wolni -> niewolni (wies chlopi, miasto biedota - zrodlo w WeekOne) - ani "w gore", ani "w dol"
+        private const int TPC = 0, TLC = 1, TCM = 2, TMG = 3, TPG = 4, TCD = 5, TMD = 6, TGD = 7, TMan = 8, TFree = 9, TMig = 10, TBackV = 11, TBackC = 12, TBackM = 13, TDebtSl = 14, TN = 15;
         private static readonly string[] TPl =
         {
             "chlopi->rzemieslnicy (wies)", "biedota->rzemieslnicy", "rzemieslnicy->kupcy", "kupcy->szlachta", "zamozni chlopi->szlachta (wies)",
             "rzemieslnicy->biedota/chlopi", "kupcy->rzemieslnicy", "szlachta->kupcy/chlopi", "wyzwoleni (0.5%/rok)", "wyzwoleni przez zdobywce", "przybysze ze wsi->biedota",
-            "powrot blizny chlopi->rzemieslnicy (wies)", "powrot blizny biedota->rzemieslnicy", "powrot blizny rzemieslnicy->kupcy"
+            "powrot blizny chlopi->rzemieslnicy (wies)", "powrot blizny biedota->rzemieslnicy", "powrot blizny rzemieslnicy->kupcy", "niewola za dlugi (biedni wolni->niewolni)"
         };
-        private static readonly int[] TFrom = { EPeasant, ELabour, ECraft, EMerchant, EPeasant, ECraft, EMerchant, EGentry, ESlave, ESlave, ELabour, EPeasant, ELabour, ECraft };
+        private static readonly int[] TFrom = { EPeasant, ELabour, ECraft, EMerchant, EPeasant, ECraft, EMerchant, EGentry, ESlave, ESlave, ELabour, EPeasant, ELabour, ECraft, EPeasant };
         private static bool IsUp(int t) { return t <= TPG; }
         private static bool IsDown(int t) { return t >= TCD && t <= TGD; }
         private static bool IsBack(int t) { return t >= TBackV && t <= TBackM; }
@@ -76,6 +80,7 @@ namespace Armoury
                 case TMG: case TPG: return EGentry;
                 case TCD: return town ? ELabour : EPeasant;
                 case TGD: return town ? EMerchant : EPeasant;
+                case TDebtSl: return ESlave;                    // f8-niewola: niewola za dlugi
                 default: return town ? ELabour : EPeasant;      // wyzwoleni
             }
         }
@@ -103,6 +108,7 @@ namespace Armoury
             _mvDays = _mvDaysS = 0; ZeroMobLine();
             _landK.Clear(); _landMine.Clear();
             ResetProsperity();
+            ResetDebtSl();                                   // f8-niewola: liczniki niewoli za dlugi (DailyLife.Debt.cs)
         }
 
         private static void ZeroMobLine()
@@ -155,9 +161,10 @@ namespace Armoury
         private static void ActiveDay(int day)
         {
             _mvDays++; _mvDaysS++;
-            bool mob = MobOn, free = FreeOn, war = WarOn;
+            bool mob = MobOn, free = FreeOn, war = WarOn, bond = DebtSlOn;
+            if (bond) { _dslDays++; _dslDaysS++; }           // f8-niewola: doby z kluczem (linia "Niewola za dlugi (f8)")
             try { WarAfter(day); } catch (Exception e) { _wStum++; Stumble("WarAfter", e); }   // ZC7: komunikaty gracza (Dostatek po najezdzie), najnizszy Dostatek epizodow
-            if (mob || free || war)
+            if (mob || free || war || bond)
             {
                 if (mob) LandShares();
                 int bucket = ((day % 7) + 7) % 7;
@@ -171,7 +178,7 @@ namespace Armoury
                         if (mob && r.Kind == KTown) MigrantsLabel(r, eb, day);
                         if (BucketOf(r.Id) != bucket) continue;
                         if (r.YDays < WarmDays) { _mvWarm++; continue; }
-                        WeekOne(r, eb, day, mob, free, war);
+                        WeekOne(r, eb, day, mob, free, war, bond);
                     }
                     catch (Exception e) { _mvStum++; Stumble("Awans(osada)", e); }
                 }
@@ -239,7 +246,7 @@ namespace Armoury
         }
 
         /// <summary>Przeglad tygodniowy osady: przeplywy w gore, w dol, wyzwolenia; limit 0.2%, granice pasm, ulamek milionowej, pieniadze z ludzmi i kupno ziemi.</summary>
-        private static void WeekOne(Rec r, EBook eb, int day, bool mob, bool free, bool war)
+        private static void WeekOne(Rec r, EBook eb, int day, bool mob, bool free, bool war, bool bond)
         {
             _mvSeen++;
             ShiftRing(eb, day);
@@ -299,16 +306,19 @@ namespace Armoury
                 if (n[ESlave] > 0) fl[TMan] = RManum * WeekYear * n[ESlave];
             }
             if (war) WarBack(r, eb, day, town, fl, L);       // ZC7: powrot zrujnowanych do zawodu w pokoju (dlug blizny)
-            // w osadzie najwyzej 0.2% ludzi na tydzien (awans, spadek, wyzwolenia, powrot blizny ZC7)
+            if (bond) fl[TDebtSl] = DebtSlFlow(r, town, n, dW, dV);   // f8-niewola: biedni wolni -> niewolni (1%/rok przy D < 0.8 bez zapasu, DailyLife.Debt.cs)
+            // w osadzie najwyzej 0.2% ludzi na tydzien (awans, spadek, wyzwolenia, powrot blizny ZC7, niewola za dlugi f8)
             {
                 double reg = 0;
                 for (int t = 0; t <= TMan; t++) reg += fl[t];
                 for (int t = TBackV; t <= TBackM; t++) reg += fl[t];
+                reg += fl[TDebtSl];
                 if (reg > MoveCapWeek * L)
                 {
                     double k = MoveCapWeek * L / reg;
                     for (int t = 0; t <= TMan; t++) fl[t] *= k;
                     for (int t = TBackV; t <= TBackM; t++) fl[t] *= k;
+                    fl[TDebtSl] *= k;
                     _mvCapHit++;
                 }
             }
@@ -333,12 +343,13 @@ namespace Armoury
                 double x = fl[t];
                 if (!(x > 0)) continue;
                 int f = TFrom[t], d = ToOf(t, town);
+                if (t == TDebtSl && town) f = ELabour;          // f8-niewola: w miescie z biedoty (we wsi z chlopow - TFrom)
                 double ppm = x / L * PpmAll;
                 if (t != TFree)
                 {
                     double room = Math.Min(p[f] - 0.5 * _mBand[f] * PpmAll, 1.5 * _mBand[d] * PpmAll - p[d]);
-                    if (!(room > 0)) { _mvBand++; continue; }
-                    if (ppm > room) { ppm = room; _mvBand++; }
+                    if (!(room > 0)) { _mvBand++; if (t == TDebtSl) _dslBand++; continue; }
+                    if (ppm > room) { ppm = room; _mvBand++; if (t == TDebtSl) _dslBand++; }
                 }
                 int q = Math.Min(p[f], RoundPpm(ppm, r.Id, day, t));
                 if (IsBack(t)) q = Math.Min(q, eb.Debt[t == TBackC ? 1 : 0]);   // ZC7: najwyzej tylu, ilu zrujnowala wojna
@@ -352,6 +363,7 @@ namespace Armoury
                     ppl = q * L / PpmAll;
                 }
                 else if (t == TGD) LandBack(r, q, L, town);      // odkup ziemi: pan placi za majatek (ilu stac pana) - spadek i tak (z biedy, nie ze sprzedazy)
+                else if (t == TDebtSl) { if (town && purses) DebtSlCarry(r, hW * ppl); }   // f8-niewola: ich udzial kiesy W do wierzycieli R 40% / P 60%; wies - kiesa wspolna
                 else if (town && purses)
                 {
                     if (t == TLC)
@@ -366,7 +378,9 @@ namespace Armoury
                     else if (t == TBackC) Carry(r, 0, 1, hW * ppl, ref _wBW2R, 0);   // ZC7: powrot do cechu z oszczednosciami (bez oplaty - byli w cechu)
                     else if (t == TBackM) Carry(r, 1, 2, hR * ppl, ref _wBR2P, 0);
                 }
+                int pf0 = p[f], pd0 = p[d];
                 p[f] -= q; p[d] += q;
+                if (t == TDebtSl) DebtSlDone(r, town, L, p, pf0 - p[f], p[d] - pd0);   // f8-niewola: liczniki ludzi z roznicy udzialow, tozsamosc sumy, kultura
                 eb.Mv[t] += (float)ppl;
                 _mvT[t] += ppl; _mvTS[t] += ppl;
                 if (t != TFree) regPpl += ppl;
@@ -395,7 +409,7 @@ namespace Armoury
             }
         }
 
-        private static readonly int[] Order = { TFree, TMan, TCD, TMD, TGD, TBackV, TBackC, TBackM, TPC, TLC, TCM, TMG, TPG };
+        private static readonly int[] Order = { TFree, TMan, TCD, TMD, TGD, TDebtSl, TBackV, TBackC, TBackM, TPC, TLC, TCM, TMG, TPG };   // f8-niewola: TDebtSl po spadkach
 
         /// <summary>Przybysze ze wsi w pamieci przegladow osady (4 ostatnie przeglady) - udzialy poza pasmem od etykiety migracji, nie od awansu i spadku.</summary>
         private static bool MigRecent(EBook eb)
@@ -604,6 +618,7 @@ namespace Armoury
                          + " | dobrobyt: " + ProsperityWhere + " | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("MobilitySessionStart", e); }
+            try { DebtSlSessionStart(); } catch (Exception e) { Stumble("DebtSlSessionStart", e); }   // f8-niewola: linia "Niewola za dlugi (f8): start sesji"
         }
 
         /// <summary>Linia doby ZC6 (doba linii): przejscia od ostatniej linii, pieniadze, blokady, granice, mediany Dostatku stanow, dobrobyt. Zeruje liczniki linii.</summary>
@@ -620,7 +635,11 @@ namespace Armoury
               .Append(", dobrobyt ").Append(ProsOn ? "tak" : "nie")
               .Append(" | od ostatniej linii ").Append(_mvDays).Append(" dob: przegladow osad ").Append(_mvSeen).Append(" (rozgrzewka - bez przegladu ").Append(_mvWarm).Append(')')
               .Append(" | ludzie (ksiega):");
-            for (int t = 0; t < TN; t++) sb.Append(t == 0 ? " " : ", ").Append(TPl[t]).Append(' ').Append(N0(_mvT[t]));
+            for (int t = 0; t < TN; t++)
+            {
+                if (t == TDebtSl && !DebtSlOn && !(_mvT[t] > 0)) continue;   // f8-niewola: przy wylaczonym kluczu linia jak dotad
+                sb.Append(t == 0 ? " " : ", ").Append(TPl[t]).Append(' ').Append(N0(_mvT[t]));
+            }
             sb.Append(" | w gore ").Append(N0(up)).Append(", w dol ").Append(N0(down)).Append(", netto ").Append(N0(up - down))
               .Append(" | od wczytania (").Append(_mvDaysS).Append(" dob): w gore ").Append(N0(upS)).Append(", w dol ").Append(N0(downS))
               .Append(", wyzwoleni ").Append(N0(_mvTS[TMan] + _mvTS[TFree])).Append(", przybysze ").Append(N0(_mvTS[TMig]))
@@ -672,7 +691,7 @@ namespace Armoury
             "wealthy peasants bought land and joined the gentry", "craftsmen lost their trade", "merchants fell back to a craft", "gentry sold their land",
             "slaves were freed by their owners", "slaves were set free under the new rule", "newcomers from the villages joined the labourers",
             "peasants went back to the craft they had lost in the raids", "labourers went back to the craft they had lost in the sack",
-            "craftsmen went back to the trade they had lost in the sack"
+            "craftsmen went back to the trade they had lost in the sack", "poor free folk fell into debt slavery"
         };
 
         /// <summary>Zdanie "Rose and fell in the last 28 days: ..." - ludzie wedlug przejsc z pamieci przegladow (sesja). null - brak ruchow albo pamieci.</summary>
@@ -680,7 +699,7 @@ namespace Armoury
         {
             try
             {
-                if (r == null || r.Kind == KCastle || !SafeId(r.Id) || !(MobOn || FreeOn)) return null;
+                if (r == null || r.Kind == KCastle || !SafeId(r.Id) || !(MobOn || FreeOn || DebtSlOn)) return null;
                 EBook eb;
                 if (!_eb.TryGetValue(r.Id, out eb) || eb.P == null) return null;
                 var sum = new double[TN];
