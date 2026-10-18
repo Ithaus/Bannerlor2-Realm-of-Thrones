@@ -205,28 +205,31 @@ namespace Armoury
             catch (Exception e) { Log.Error("StartCalibration.ArmApplyAll", e); }
         }
 
-        /// <summary>Prefiks BKBuildingsBehavior.RunPorts: ryby w magazynie miasta przed polowem portu (do nazwy w ksiedze). Gra bez zmian.</summary>
+        /// <summary>Prefiks BKBuildingsBehavior.RunPorts: ryby w magazynie miasta przed polowem portu (do nazwy w ksiedze). Gra bez zmian.
+        /// Scalenie ze stare-a17 (A17 PortsPre na tej samej metodzie, priorytet First, przy KS zastosowanym zwraca false): stan = ryby + 1, a 0 (domyslne __state,
+        /// gdy ten prefiks nie biegl) znaczy "bez pomiaru" - postfiks nie moze wziac calego magazynu za przyrost.</summary>
         public static void BkPortPrefix(Town __0, out int __state)
         {
-            __state = -1;
+            __state = 0;
             try
             {
                 if (__0 == null || !BkPortsKey || !KeyOn || !GoodsLedger.On) return;
                 var ow = __0.Owner; var fish = ItemOf("fish");
-                if (ow != null && ow.ItemRoster != null && fish != null) __state = ow.ItemRoster.GetItemNumber(fish);
+                if (ow != null && ow.ItemRoster != null && fish != null) __state = ow.ItemRoster.GetItemNumber(fish) + 1;
             }
-            catch { __state = -1; }
+            catch { __state = 0; }
         }
 
         /// <summary>Postfiks BKBuildingsBehavior.RunPorts: przyrost ryb w magazynie miasta - nazwane zrodlo ksiegi towarow (z ramki ticku miasta).</summary>
         public static void BkPortPostfix(Town __0, int __state)
         {
-            if (__state < 0 || __0 == null) return;
+            if (__state <= 0 || __0 == null) return;                    // scalenie: 0 = prefiks nie biegl / bez pomiaru
+            int fish0 = __state - 1;
             try
             {
                 var ow = __0.Owner; var fish = ItemOf("fish");
                 if (ow == null || ow.ItemRoster == null || fish == null) return;
-                int n = ow.ItemRoster.GetItemNumber(fish) - __state;
+                int n = ow.ItemRoster.GetItemNumber(fish) - fish0;
                 if (n <= 0) return;
                 _portFishNamed += n;
                 GoodsLedger.NoteKnownSource(fish, n, "porty BK miast - polow za zloto kasy miasta");
@@ -239,7 +242,7 @@ namespace Armoury
         /// ryby w magazynie wsi (__state), zeby postfiks nazwal przyrost w ksiedze towarow (recenzja ks-arm: nic sie nie zmienia przed koncem pomiaru).</summary>
         public static bool PerkFishPrefix(Settlement __0, out int __state)
         {
-            __state = -1;
+            __state = 0;                                        // scalenie ze stare-a17 (A17 NavalVillagePre na tej samej metodzie): stan = ryby + 1, 0 = bez pomiaru
             try
             {
                 if (__0 == null || !__0.IsVillage || __0.Village == null || !NoPerkFishKey || !KeyOn) return true;
@@ -251,21 +254,22 @@ namespace Armoury
                 }
                 if (!GoodsLedger.On) return true;               // ksiega towarow wylaczona - nic do nazwania (bramka (3) i tak bez liczb)
                 var ow = __0.Village.Owner; var fish = ItemOf("fish");
-                if (ow != null && ow.ItemRoster != null && fish != null) __state = ow.ItemRoster.GetItemNumber(fish);
+                if (ow != null && ow.ItemRoster != null && fish != null) __state = ow.ItemRoster.GetItemNumber(fish) + 1;
                 return true;
             }
-            catch { __state = -1; return true; }
+            catch { __state = 0; return true; }
         }
 
         /// <summary>Postfiks: przyrost ryb w magazynie wsi z perku (przed wlaczeniem KS) - nazwane zrodlo ksiegi towarow (z ramki ticku osady do pozycji nazwanej).</summary>
         public static void PerkFishPostfix(Settlement __0, int __state)
         {
-            if (__state < 0 || __0 == null) return;
+            if (__state <= 0 || __0 == null) return;                    // scalenie: 0 = prefiks nie biegl / bez pomiaru
+            int fish0 = __state - 1;
             try
             {
                 var ow = __0.Village != null ? __0.Village.Owner : null; var fish = ItemOf("fish");
                 if (ow == null || ow.ItemRoster == null || fish == null) return;
-                int n = ow.ItemRoster.GetItemNumber(fish) - __state;
+                int n = ow.ItemRoster.GetItemNumber(fish) - fish0;
                 if (n <= 0) return;
                 _perkFishNamed += n;
                 GoodsLedger.NoteKnownSource(fish, n, "ryby z perku Night Raider (NavalDLC) - z niczego, przy KS zastosowanym zamkniete");
