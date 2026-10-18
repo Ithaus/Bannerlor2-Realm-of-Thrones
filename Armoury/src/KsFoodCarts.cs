@@ -516,7 +516,7 @@ namespace Armoury
                 for (int i = 0; i < nt; i++)
                 {
                     var t = _t[i]; var st = _st[i];
-                    a.Siege[i] = st.IsUnderSiege;
+                    a.Siege[i] = st.IsUnderSiege || StartCalibration.LandBackOf(st);   // ks-arm: miasto krainy wroconej (bramka krainy) - ani zrodlo, ani cel KS-H
                     a.Review[i] = (Fnv(st.StringId) & 1u) == (uint)(today & 1);
                     var ro = st.ItemRoster;
                     if (ro != null)

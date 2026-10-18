@@ -51,7 +51,9 @@ namespace Armoury
         internal const int MinLedgerDays = 28;                    // recenzja 16.10 (krytyczne): wlaczenie tylko z Planu z >= 28 dobami sredniej ksiegi towarow w tej sesji
         // recenzja 16.10 (wazne): bramka krainy (projekt rozdz. 8: powrot krainy przy glodzie) i reszta twardych bramek rozdz. 10 nie sa jeszcze w kodzie - do tego czasu
         // Confirm w grze Jeffa jest odrzucany (linia + komunikat); autotest dziala (klucz albo plik tylko w autotescie). Wlaczyc dopiero z bramkami i proba zimy.
-        private static readonly bool LandGateReady = false;
+        // ks-arm (noc 17/18.10): bramka krainy jest w kodzie (StartCalibration.Arm.cs) - LandGateReady z klucza Ks Land Gate zamiast stalej false (wylaczony = jak dotad:
+        // Confirm w grze odrzucany, samo wlaczenie czeka)
+        private static bool LandGateReady { get { return LandGateKey; } }
 
         // ------------------------------------------------------------ stan kampanii (zapis arm_ks)
         private static int _state = StatePlan;
@@ -93,6 +95,7 @@ namespace Armoury
             CraftsReset();
             MoneyReset();
             R3Reset();
+            ArmReset();                                              // ks-arm: samo uzbrojenie, bramka krainy, srednia ksiegi w zapisie
         }
 
         private static void Stumble(string where, Exception e)
@@ -279,6 +282,7 @@ namespace Armoury
                 EnsureLand();
                 ResolvePending();
                 if (_state == StateApplied) ResolveLive();
+                try { ArmSessionStart(); } catch (Exception ae) { Stumble("ArmSessionStart", ae); }   // ks-arm: arm_ks_arm z zapisu (po stanie KS), krainy wrocone, linia
                 uint lay; bool lm = LandReady && LayoutMatches(out lay);
                 var s = Settings.Current;
                 Log.Info(P + "start sesji | klucz Start Calibration " + (KeyOn ? "TAK (Plan co 7 dob - tylko liczy)" : "NIE (nic nie liczy; zastosowany stan - produkcja jak dzis)")
@@ -336,6 +340,7 @@ namespace Armoury
                 if (!LandReady) { KeysIdle(day); return; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 try { LedgerEma(); } catch (Exception e) { Stumble("LedgerEma", e); }   // srednia ksiegi towarow - co dobe (popyt 1:1 Planu)
+                try { GateCollect(); } catch (Exception e) { Stumble("GateCollect", e); }   // ks-arm: twarde bramki (zrodla bez nazwy, RemoveParty) - 7 pelnych dob
                 try { MoneyEma(today); } catch (Exception e) { Stumble("MoneyEma", e); }   // krok 8: udzial kiesy wsi w utargu, zarobek klas miast (srednie 28 dob)
                 // KS-R3: odbior miast (P3, KS-H), kasa 28 dob (krok 5), sterowanie rynku (P4), tabela dob miast KS-H (najwyzej 200 wywolan drogi na dobe)
                 try { TakeDaily(today); } catch (Exception e) { Stumble("TakeDaily", e); }
@@ -352,13 +357,18 @@ namespace Armoury
                 {
                     bool planOk = _plan != null && _plan.Error == null && _planIn != null;
                     if (ApplyWanted() && PlanMature()) Apply(today, true);
-                    else KeysDaily(today, planOk);
+                    else
+                    {
+                        KeysDaily(today, planOk);
+                        try { ArmDaily(today, planOk); } catch (Exception e) { Stumble("ArmDaily", e); }   // ks-arm: samo uzbrojenie i samo wlaczenie po pomiarze (klucz Start Calibration Auto Arm)
+                    }
                     if (_state != StateApplied && (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue || EarlyPlan(day))) PlanStart(day);
                 }
                 else
                 {
                     KeysApplied(day);                                   // klucze uzbrojenia na zapisie juz zastosowanym - Off (inny zapis nigdy ich nie zobaczy)
                     if (_wasOff) RampRestart(today);                   // klucz znow wlaczony po przerwie (Undo -> Redo) - rampa od nowa, bez skoku
+                    try { LandGateDaily(today); } catch (Exception e) { Stumble("LandGateDaily", e); }   // ks-arm: bramka krainy (rozdz. 8) - PRZED stawkami jutra
                     LiveDaily(today);
                     if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);   // Plan dalej co 7 dob - pomiar nacisku i lepszy stol (gra bez zmian)
                 }
@@ -414,6 +424,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !AutotestMode() || !(s.StartCalibrationAutotestApply || ApplyFlag())) return false;
+            if (AutoArmKey && AutoFlag()) return false;          // ks-arm: autotest z plikiem armoury-ks-auto.flag - droga samego uzbrojenia (jak w grze), nie wlaczenie przy pierwszym Planie
             uint lay;
             return LayoutMatches(out lay) && DailyLife.KeyOn;
         }
@@ -442,7 +453,7 @@ namespace Armoury
             if (!PlanMature()) { why = "za malo dob ksiegi towarow w tej sesji (Plan liczony z " + _planEma + " dob sredniej, potrzeba " + MinLedgerDays + "; w sesji teraz " + _emaDays + ")"; en = "too few days of goods ledger this session (" + Math.Min(_emaDays, MinLedgerDays) + " of " + MinLedgerDays + ") - play on and try again."; return false; }
             if (!DailyLife.KeyOn) { why = "Daily Life Measure wylaczony - bez stanow ZC nie ma koszyka ZC4"; en = "Daily Life Measure is off - the people's basket cannot be reckoned."; return false; }
             if (s != null && (!s.BkRecipeYieldByWorkshop || !s.WhaleMeatFromWhalersOnly)) { why = "twarde bramki ZC1 (rozdz. 10): BkRecipeYieldByWorkshop " + (s.BkRecipeYieldByWorkshop ? "tak" : "NIE") + ", WhaleMeatFromWhalersOnly " + (s.WhaleMeatFromWhalersOnly ? "tak" : "NIE"); en = "switch on Bk Recipe Yield By Workshop and Whale Meat From Whalers Only first."; return false; }
-            if (winter) { why = "zima (WinterBite) - wlaczenie w zimie tylko z bramka krainy (rozdz. 7-8), ktorej jeszcze nie ma"; en = "not in winter - try again after the thaw."; return false; }
+            if (winter && !LandGateReady) { why = "zima (WinterBite) - wlaczenie w zimie tylko z bramka krainy (rozdz. 7-8; klucz Ks Land Gate wylaczony)"; en = "not in winter - try again after the thaw."; return false; }
             if (!LayoutMatches(out lay)) { why = "uklad wiosek niezgodny z plikiem ziemi"; en = "the village layout does not match the land file - nothing done."; return false; }
             why = en = null;
             return true;
@@ -527,11 +538,11 @@ namespace Armoury
             if (s.StartCalibrationArmThisSave)
             {
                 KeyOff(true);
-                if (_state == StateArmed) { Log.Info(PK + "dzien " + day + " | Arm This Save: ten zapis juz uzbrojony (doba " + _armDay + ") - klucz wraca na Off."); Tell("Start calibration: this save is already armed. Use Confirm after a week of plans."); }
+                if (_state == StateArmed && !(_autoArm && !AutoPathOn())) { Log.Info(PK + "dzien " + day + " | Arm This Save: ten zapis juz uzbrojony (doba " + _armDay + (_autoArm ? ", samo - wlaczy sie sam po pomiarze" : "") + ") - klucz wraca na Off."); Tell(_autoArm ? "Start calibration: this save is being surveyed and starts by itself when the survey is done." : "Start calibration: this save is already armed. Use Confirm after a week of plans."); }
                 else if (!GameGates(planOk, out why, out en)) { Log.Info(PK + "dzien " + day + " | Arm This Save odrzucony: " + why + " - nic, klucz wraca na Off."); Tell("Start calibration: " + en); }
                 else
                 {
-                    _state = StateArmed; _armDay = today; _armHash = PlanHash(_plan); _armLandCrc = _landCrc; _campaign = gid;
+                    _state = StateArmed; _armDay = today; _armHash = PlanHash(_plan); _armLandCrc = _landCrc; _campaign = gid; _autoArm = false;   // ks-arm: uzbrojenie reczne (Confirm)
                     int ready = Math.Max(today + 1, _firstPlanDay + MinPlanDays);
                     Log.Info(PK + "uzbrojony zapis doba " + today + " | kampania " + (gid.Length > 0 ? gid : "-") + ", skrot planu " + _armHash.ToString("X8") + " (plan nr " + _plans + " doby " + _planDay + ", ksiega towarow " + _planEma + " dob)"
                              + ", plik ziemi " + _armLandCrc.ToString("X8") + ", Plan na tym zapisie od doby " + _firstPlanDay + " | Confirm najwczesniej doba " + ready + " (ten sam plan i plik ziemi)"
@@ -545,12 +556,14 @@ namespace Armoury
                 uint ph = PlanHash(_plan);
                 if (_state != StateArmed) { Log.Info(PK + "klucz bez uzbrojenia tego zapisu - nic nie robie (dzien " + day + ", Confirm bez Arm This Save; klucz wraca na Off)."); Tell("Start calibration: this save is not armed - nothing done. Use Arm This Save first."); }
                 else if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { Log.Info(PK + "klucz bez uzbrojenia tego zapisu - nic nie robie (dzien " + day + ", inny id kampanii " + gid + " / uzbrojony " + _campaign + ")."); Tell("Start calibration: this save is not the one that was armed - nothing done."); }
+                else if (_autoArm && AutoPathOn()) { Log.Info(PK + "dzien " + day + " | Confirm: zapis uzbrojony sam (Start Calibration Auto Arm) - wlaczy sie sam po pomiarze i bramkach (linia 'KS: pomiar przed wlaczeniem'); klucz wraca na Off."); Tell("Start calibration: this save starts by itself when the survey is done."); }
                 else if (today <= _armDay) { Log.Info(PK + "dzien " + day + " | Confirm odrzucony: ta sama doba co uzbrojenie (" + _armDay + ") - potwierdzenie najwczesniej nastepnej doby; klucz wraca na Off."); Tell("Start calibration: confirm on a later day than arming - nothing done."); }
                 else if (_firstPlanDay < 0 || today - _firstPlanDay < MinPlanDays) { Log.Info(PK + "dzien " + day + " | Confirm: za wczesnie - Plan na tym zapisie od doby " + _firstPlanDay + ", potrzeba " + MinPlanDays + " dob (najwczesniej doba " + (_firstPlanDay + MinPlanDays) + ") - nic, klucz wraca na Off."); Tell("Start calibration: too early - wait until day " + (_firstPlanDay + MinPlanDays) + " and confirm again."); }
                 else if (!GameGates(planOk, out why, out en)) { Log.Info(PK + "dzien " + day + " | Confirm odrzucony: " + why + " - nic, klucz wraca na Off."); Tell("Start calibration: " + en); }
                 else if (_armLandCrc != _landCrc) { Log.Info(PK + "dzien " + day + " | Confirm odrzucony: plik ziemi inny niz przy uzbrojeniu (" + _armLandCrc.ToString("X8") + " / teraz " + _landCrc.ToString("X8") + ") - uzbroj zapis jeszcze raz; klucz wraca na Off."); Tell("Start calibration: the land file changed since arming - use Arm This Save again."); }
                 else if (ph != _armHash) { Log.Info(PK + "dzien " + day + " | Confirm odrzucony: skrot planu " + ph.ToString("X8") + " inny niz przy uzbrojeniu " + _armHash.ToString("X8") + " (nowy Plan od doby " + _planDay + ") - uzbroj zapis jeszcze raz; klucz wraca na Off."); Tell("Start calibration: the plan has changed since this save was armed - use Arm This Save again."); }
-                else if (!LandGateReady) { Log.Info(PK + "dzien " + day + " | Confirm odrzucony: w grze brak jeszcze bramki krainy (projekt rozdz. 8 - powrot krainy przy glodzie) i reszty twardych bramek rozdz. 10 - kalibracja w kampanii zablokowana do ich wdrozenia; zapis zostaje uzbrojony, klucz wraca na Off."); Tell("Start calibration cannot start in a campaign yet: the famine safeguards are not finished. Nothing changed; the save stays armed."); }
+                else if (!LandGateReady) { Log.Info(PK + "dzien " + day + " | Confirm odrzucony: bramka krainy wylaczona (klucz Ks Land Gate) - kalibracja w kampanii zablokowana; zapis zostaje uzbrojony, klucz wraca na Off."); Tell("Start calibration cannot start in a campaign while Ks Land Gate (the famine gate) is off. Nothing changed; the save stays armed."); }
+                else if (!HardGatesConfirm(day)) { }
                 else
                 {
                     Log.Info(PK + "potwierdzone doba " + today + " | zapis uzbrojony doba " + _armDay + " (skrot " + _armHash.ToString("X8") + "), kampania " + (gid.Length > 0 ? gid : "-") + " | plan do wlaczenia nr " + _plans + " doby " + _planDay
@@ -559,7 +572,7 @@ namespace Armoury
                     Tell("Start calibration has begun: over the next 14 days the villages move to what their hands make on their land; the people's daily basket comes to the market over the 14 days after that.");
                 }
             }
-            if (_state == StateArmed && LogGate.Lines && today != _keyLineDay && (today - _armDay) % 7 == 0)
+            if (_state == StateArmed && !_autoArm && LogGate.Lines && today != _keyLineDay && (today - _armDay) % 7 == 0)
             {
                 _keyLineDay = today;
                 Log.Info(PK + "dzien " + day + " | zapis uzbrojony doba " + _armDay + " - czeka na Confirm (najwczesniej doba " + Math.Max(_armDay + 1, _firstPlanDay + MinPlanDays) + (LandGateReady ? "" : "; w grze Confirm odrzucany do bramki krainy") + "); gra bez zmian.");

@@ -963,6 +963,15 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
+--grupa nksarm    : (noc 17/18.10, paczka ks-arm, Jeff "ma byc gra rano ... z poprawnie dzialajaca ekonomia"; Armoury/src/StartCalibration.Arm.cs - samo uzbrojenie KS,
+                    twarde bramki rozdz. 10, bramka krainy rozdz. 8, ryby z niczego perku Night Raider) python -I tools/sprawdz_logi.py --grupa nksarm <Armoury-*.log>
+                    (strumieniowo; te same wiersze NKS-ARM-* dopisuje grupa nks). ARM-0 linia startu (klucz Auto Arm, droga gra / autotest z plikiem
+                    armoury-ks-auto.flag), ARM-1 latka ryb z perku wpieta, ARM-2 samo uzbrojenie (linia "KS: uzbrojony zapis doba N (samo"), ARM-3 nic przed pomiarem:
+                    wlaczenie najwczesniej 28 + 7 dob po uzbrojeniu (samo; reczne/autotest - INFO), ARM-4 bramki przy wlaczeniu (7/7 pelnych dob, zrodla bez nazwy
+                    i RemoveParty jedzenia <= 2 szt./d), ARM-5 zrodla bez nazwy z ksiegi towarow (inne ticki dobowe) w 7 dobach przed wlaczeniem <= 2 szt./d na towar
+                    (5b: ryby od uzbrojenia - perk zablokowany - INFO), ARM-6 linie pomiaru (INFO: ostatni WYNIK), ARM-7 linia bramki krainy w >= 90% dob po wlaczeniu
+                    (w grze co 7 dob - INFO), ARM-8 czas bramki krainy mediana <= 1 ms, ARM-9 powroty krain i glod z winy KS (INFO; w tescie 120 dob z progiem zapasu
+                    364 oczekiwane 0), ARM-10 arm_ks_arm <= 64 KB, ARM-11 ERROR paczki i potkniecia bramki 0. Log sprzed paczki: wiersze INFO "brak linii".
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -34584,6 +34593,7 @@ def nks_main(logp, until=120, bdp=None):
         return 0
     starts, plans, perr, bil, prod_days, days_ms, money, prices, errs = [], [], 0, {}, set(), [], [], [], 0
     on_day, on_src, on_ema, arm_day, conf_day = None, None, None, None, None
+    on_auto = False    # ks-arm: wlaczenie samo po pomiarze (Start Calibration Auto Arm)
     ramp_a, ramp_d, ramp_e, ramp_lam_end, ramp_lam = None, None, None, None, {}
     shelf_day, shelf_txt, start_px = None, None, {}
     zc4_days, zc4_stum, zc4_v, zc4_hook, zc4_aff, zc4_purse = set(), 0, {}, {}, {}, {}
@@ -34823,6 +34833,7 @@ def nks_main(logp, until=120, bdp=None):
                         on_day = int(mm.group("day"))
                         mo2 = NKS_ONSRC.match(s)
                         on_src = mo2.group("src") if mo2 else "?"
+                        on_auto = "samo po pomiarze" in s
                         me = NKS_ONEMA.search(s)
                         on_ema = int(me.group("e")) if me else None
                 elif s.startswith(NKS_K + "uzbrojony zapis"):
@@ -35205,6 +35216,10 @@ def nks_main(logp, until=120, bdp=None):
         # NKS-11 wlaczenie
         if on_src == "autotest":
             rep.add("NKS-11: wlaczenie (autotest albo uzbrojenie w zapisie)", f"autotest doba {on_day}", "autotest; w grze: uzbrojony -> potwierdzone (Confirm w grze odrzucany do bramki krainy)", True)
+        elif on_auto:
+            ok11 = arm_day is not None and on_day is not None and on_day - arm_day >= 35
+            rep.add("NKS-11: wlaczenie (samo po pomiarze, ks-arm)", f"uzbrojony {arm_day}, wlaczone {on_day}" + (f" ({on_day - arm_day} dob)" if arm_day is not None and on_day is not None else ""),
+                    "samo uzbrojenie -> pomiar >= 28 + 7 dob -> wlaczenie", ok11)
         else:
             ok11 = arm_day is not None and conf_day is not None and conf_day > arm_day
             rep.add("NKS-11: wlaczenie (autotest albo uzbrojenie w zapisie)", f"uzbrojony {arm_day}, potwierdzone {conf_day}, wlaczone {on_day}", "uzbrojony -> potwierdzone (doba pozniej)", ok11)
@@ -35416,10 +35431,215 @@ def nks_main(logp, until=120, bdp=None):
                     False if side["hpm_bad"] else None)
     else:
         rep.add("NKS-21: popyt miast w nowej monecie - modele", "brak linii HistoricalPrices", "= baza", None)
+    try:
+        nksarm_rows(rep, nksarm_scan(logp), "NKS-ARM")   # ks-arm (noc 17/18.10): samo uzbrojenie, twarde bramki, bramka krainy
+    except Exception as e:   # narzedzie nigdy nie konczy sie wyjatkiem na starym logu
+        rep.add("NKS-ARM: odczyt linii ks-arm", f"blad narzedzia {type(e).__name__}: {e}", "INFO", None)
     rep.show()
     # recenzja rundy 3 (wazne): do odbioru i do raportu dla Jeffa ETAP = NIE PRZESZLO (ETAP mowi tylko "lepiej niz runda 3" - pasma 95-105% nie spelnia)
     n_fail = sum(1 for r in rep.rows if r[3] in ("NIE", "ETAP", "DECYZJA"))
     print(f"-- ODBIOR nks: nie przeszlo {n_fail} z {len(rep.rows)} (NIE + ETAP + DECYZJA; ETAP = lepiej niz runda 3, ale prog niespelniony)")
+    return 0
+
+
+# ------------------------------------------------------------ ks-arm (noc 17/18.10): samo uzbrojenie KS, twarde bramki, bramka krainy
+KA_START = "KS: samo uzbrojenie (ks-arm) start sesji"
+KA_ARM = re.compile(r"KS: uzbrojony zapis doba (?P<day>-?\d+) \(samo")
+KA_WAIT = re.compile(r"KS: pomiar przed wlaczeniem dzien (?P<day>-?\d+)")
+KA_AUTO = re.compile(r"KS: samo wlaczenie doba (?P<day>-?\d+)")
+KA_ON = re.compile(r"KS: WLACZONE doba (?P<day>-?\d+) \((?P<src>autotest|gra)")
+KA_GATES = re.compile(r"pelnych dob ksiegi (?P<n>\d+)/(?P<need>\d+), zrodla bez nazwy max (?P<u>[\d.]+) szt\./d \((?P<ui>[^)]*)\).*?RemoveParty jedzenia max (?P<r>[\d.]+) szt\./d \((?P<ri>[^)]*)\)")
+KA_LG = re.compile(r"KS: bramka krainy dzien (?P<day>-?\d+) \| krain z KS (?P<k>\d+), wroconych (?P<b>\d+).*?\| glod z winy KS: wsi (?P<h>\d+).*?\| czas (?P<ms>[\d.]+) ms, potkniecia (?P<st>\d+)")
+KA_BACK = re.compile(r"KS: powrot krainy (?P<land>\S+) doba (?P<day>-?\d+) - (?P<why>[^|]*)")
+KA_SAVE = re.compile(r"KS: zapis arm_ks_arm doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB \(limit (?P<lim>\d+) KB (?P<ok>\S+)")
+KA_PERK = "StartCalibration (ks-arm): ryby z niczego"
+KA_GOODS = re.compile(r"Towary: dzien (?P<day>-?\d+) - (?P<g>\S+) \(\d+ d\): zapas \d+ .*?\| produkcja \d+ \[(?P<src>.*?)\] \| zuzycie")
+KA_TICK = re.compile(r"inne ticki dobowe (\d+)")
+KA_ERR = ("ERROR in StartCalibration.ArmApplyAll", "ERROR in StartCalibration.LandGateDaily", "ERROR in StartCalibration.ArmDaily", "ERROR in StartCalibration.GateCollect",
+          "ERROR in StartCalibration.LandReturn", "ERROR in StartCalibration.ArmSessionStart", "ERROR in StartCalibration.ImportArm", "ERROR in StartCalibration.ExportArm",
+          "ERROR in SyncData.arm_ks_arm", "ERROR in Famine.HungerFromWar", "ERROR in StartCalibration.ConsumeAutoFlag")
+
+
+def nksarm_scan(logp):
+    """Jedno przejscie po logu: linie paczki ks-arm i zrodla 'inne ticki dobowe' ksiegi towarow (dzien -> towar -> szt.)."""
+    D = {"start": [], "perk": [], "arm": None, "waits": [], "auto": None, "auto_txt": None, "on": None, "on_src": None, "on_auto": False,
+         "lg": [], "back": [], "save": [], "err": 0, "ticks": {}, "first_day": None, "last_day": None}
+    if not logp or not os.path.isfile(logp):
+        return D
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(KA_ERR):
+                    D["err"] += 1
+                continue
+            if s.startswith("Towary: dzien "):
+                mm = KA_GOODS.match(s)
+                if mm:
+                    d = int(mm.group("day"))
+                    if D["first_day"] is None:
+                        D["first_day"] = d
+                    D["last_day"] = d
+                    mt = KA_TICK.search(mm.group("src"))
+                    if mt and int(mt.group(1)) > 0:
+                        D["ticks"].setdefault(d, {})[mm.group("g")] = int(mt.group(1))
+                    else:
+                        D["ticks"].setdefault(d, {})
+                continue
+            if s.startswith(KA_PERK):
+                D["perk"].append(s)
+                continue
+            if not s.startswith("KS: "):
+                continue
+            if s.startswith(KA_START):
+                D["start"].append(s)
+            elif s.startswith("KS: uzbrojony zapis"):
+                mm = KA_ARM.match(s)
+                if mm and D["arm"] is None:
+                    D["arm"] = int(mm.group("day"))
+            elif s.startswith("KS: pomiar przed wlaczeniem"):
+                mm = KA_WAIT.match(s)
+                if mm:
+                    D["waits"].append((int(mm.group("day")), s))
+            elif s.startswith("KS: samo wlaczenie"):
+                mm = KA_AUTO.match(s)
+                if mm and D["auto"] is None:
+                    D["auto"] = int(mm.group("day"))
+                    D["auto_txt"] = s
+            elif s.startswith("KS: WLACZONE"):
+                mm = KA_ON.match(s)
+                if mm and D["on"] is None:
+                    D["on"] = int(mm.group("day"))
+                    D["on_src"] = mm.group("src")
+                    D["on_auto"] = "samo po pomiarze" in s
+            elif s.startswith("KS: bramka krainy"):
+                mm = KA_LG.match(s)
+                if mm:
+                    D["lg"].append((int(mm.group("day")), int(mm.group("k")), int(mm.group("b")), int(mm.group("h")), float(mm.group("ms")), int(mm.group("st"))))
+            elif s.startswith("KS: powrot krainy"):
+                mm = KA_BACK.match(s)
+                if mm:
+                    D["back"].append((mm.group("land"), int(mm.group("day")), mm.group("why").strip()))
+            elif s.startswith("KS: zapis arm_ks_arm"):
+                mm = KA_SAVE.match(s)
+                if mm:
+                    D["save"].append((int(mm.group("day")), float(mm.group("kb")), int(mm.group("lim")), mm.group("ok")))
+    return D
+
+
+def nksarm_rows(rep, D, pfx="ARM"):
+    """Wiersze ks-arm (grupa nksarm i NKS-ARM w grupie nks). Brak linii - INFO, nigdy wyjatek."""
+    if D["start"]:
+        s0 = D["start"][-1]
+        droga = "gra" if "droga gra" in s0 else ("autotest (plik)" if "droga autotest" in s0 else "nieczynna")
+        rep.add(f"{pfx}-0: linia startu (klucz Start Calibration Auto Arm, droga)", s0[len(KA_START):][:220], "linia jest (INFO o drodze)", True)
+    else:
+        droga = None
+        rep.add(f"{pfx}-0: linia startu ks-arm", "brak linii (log sprzed paczki ks-arm albo KS bez pliku ziemi)", "INFO", None)
+    if D["perk"]:
+        p0 = D["perk"][-1]
+        rep.add(f"{pfx}-1: latka ryb z niczego (perk Night Raider, NavalDLC)", p0[len(KA_PERK):][:160], "latka wpieta", "latka wpieta" in p0)
+    else:
+        rep.add(f"{pfx}-1: latka ryb z niczego", "brak linii", "INFO", None)
+    arm, on, auto = D["arm"], D["on"], D["auto"]
+    if droga in ("gra", "autotest (plik)"):
+        rep.add(f"{pfx}-2: samo uzbrojenie (linia 'KS: uzbrojony zapis doba N (samo')", f"doba {arm}" if arm is not None else "brak linii", "linia jest (pierwsza doba z droga czynna)", arm is not None)
+    else:
+        rep.add(f"{pfx}-2: samo uzbrojenie", f"doba {arm}" if arm is not None else "brak (droga nieczynna albo log sprzed paczki)", "INFO", None)
+    if on is not None and D["on_auto"]:
+        ok3 = arm is not None and on - arm >= 35
+        rep.add(f"{pfx}-3: nic przed koncem pomiaru (wlaczenie samo >= 28 + 7 dob po uzbrojeniu)", f"uzbrojony {arm}, wlaczone {on}" + (f" ({on - arm} dob)" if arm is not None else ""), ">= 35 dob", ok3)
+    elif on is not None:
+        rep.add(f"{pfx}-3: wlaczenie", f"doba {on} ({D['on_src']}, nie samo)", "INFO (autotest plikiem armoury-ks-wlacz.flag albo Confirm)", None)
+    else:
+        last_w = D["waits"][-1][1] if D["waits"] else None
+        rep.add(f"{pfx}-3: wlaczenie", "brak wlaczenia" + (f"; ostatni pomiar: {last_w[last_w.find('WYNIK'):][:200]}" if last_w else ""), "INFO (w grze ok. 5 tygodni pomiaru)", None)
+    if auto is not None and D["auto_txt"]:
+        mg = KA_GATES.search(D["auto_txt"])
+        if mg:
+            n, need, u, r = int(mg.group("n")), int(mg.group("need")), float(mg.group("u")), float(mg.group("r"))
+            ok4 = n >= need and u <= 2.0 and r <= 2.0
+            rep.add(f"{pfx}-4: twarde bramki przy samym wlaczeniu (linia 'KS: samo wlaczenie')", f"pelnych dob {n}/{need}, zrodla bez nazwy max {u} ({mg.group('ui')}), RemoveParty jedzenia max {r} ({mg.group('ri')})",
+                    "7/7, <= 2 szt./d, <= 2 szt./d", ok4)
+        else:
+            rep.add(f"{pfx}-4: twarde bramki przy samym wlaczeniu", "linia bez liczb bramek", "7/7, <= 2, <= 2", False)
+    else:
+        rep.add(f"{pfx}-4: twarde bramki przy samym wlaczeniu", "brak linii 'KS: samo wlaczenie'", "INFO", None)
+    ticks = D["ticks"]
+    days = sorted(ticks)
+    if on is not None and days:
+        win = [d for d in days if on - 7 <= d < on and d != days[0]]
+        if len(win) >= 3:
+            tot = {}
+            for d in win:
+                for g, v in ticks[d].items():
+                    tot[g] = tot.get(g, 0) + v
+            over = sorted(((g, v / len(win)) for g, v in tot.items() if v / len(win) > 2.0), key=lambda x: -x[1])
+            rep.add(f"{pfx}-5: zrodla bez nazwy (inne ticki dobowe) w {len(win)} dobach przed wlaczeniem (ksiega towarow)",
+                    f"towarow ponad 2 szt./d: {len(over)}" + (" (" + ", ".join(f"{g} {v:.1f}" for g, v in over[:6]) + ")" if over else ""),
+                    "0 (kazdy towar <= 2 szt./d)", not over if D["on_auto"] else None)
+        else:
+            rep.add(f"{pfx}-5: zrodla bez nazwy przed wlaczeniem", f"za malo dob ksiegi przed wlaczeniem ({len(win)})", "INFO", None)
+    else:
+        rep.add(f"{pfx}-5: zrodla bez nazwy przed wlaczeniem", "brak wlaczenia albo linii ksiegi towarow", "INFO", None)
+    if arm is not None and days:
+        fa = [ticks[d].get("fish", 0) for d in days if d > arm + 1]
+        fb = [ticks[d].get("fish", 0) for d in days if d <= arm]
+        if fa:
+            rep.add(f"{pfx}-5b: ryby 'bez nazwy' po uzbrojeniu (perk Night Raider zablokowany)", f"{sum(fa) / len(fa):.1f} szt./d ({len(fa)} dob)" + (f", przed uzbrojeniem {sum(fb) / len(fb):.1f}" if fb else ""),
+                    "INFO (fin80 bez blokady: 111-241 szt./d)", None)
+    if D["waits"]:
+        lw = D["waits"][-1]
+        rep.add(f"{pfx}-6: linie 'KS: pomiar przed wlaczeniem'", f"{len(D['waits'])} linii, ostatnia dzien {lw[0]}: {lw[1][lw[1].find('WYNIK'):][:220] if 'WYNIK' in lw[1] else lw[1][-160:]}", "INFO", None)
+    else:
+        rep.add(f"{pfx}-6: linie 'KS: pomiar przed wlaczeniem'", "brak", "INFO", None)
+    lg = D["lg"]
+    if on is not None:
+        last = D["last_day"] if D["last_day"] is not None else on
+        span = max(0, last - on)
+        got = len({x[0] for x in lg if x[0] >= on})
+        if span >= 3:
+            daily = droga is not None and droga != "gra"     # log sprzed paczki (bez linii startu ks-arm) - INFO
+            cov = got / span if span else 0.0
+            rep.add(f"{pfx}-7: linia 'KS: bramka krainy' po wlaczeniu", f"{got} dob z linia na {span} dob po wlaczeniu ({100 * cov:.0f}%)", ">= 90% dob (autotest; w grze co 7 dob - INFO)",
+                    (cov >= 0.9) if daily else None)
+        else:
+            rep.add(f"{pfx}-7: linia 'KS: bramka krainy'", f"za malo dob po wlaczeniu ({span})", "INFO", None)
+    else:
+        rep.add(f"{pfx}-7: linia 'KS: bramka krainy'", "brak wlaczenia", "INFO", None)
+    if lg:
+        ms = sorted(x[4] for x in lg)
+        med = ms[len(ms) // 2]
+        rep.add(f"{pfx}-8: czas bramki krainy (mediana linii)", f"{med:.2f} ms, max {ms[-1]:.2f} ms ({len(ms)} linii)", "mediana <= 1 ms", med <= 1.0)
+        hmax = max(x[3] for x in lg)
+        rep.add(f"{pfx}-9: powroty krain (bramka krainy)", f"powrotow {len(D['back'])}" + (" (" + "; ".join(f"{b[0]} doba {b[1]}: {b[2][:80]}" for b in D['back'][:5]) + ")" if D['back'] else "")
+                + f", glod z winy KS max {hmax} wsi, wroconych w ostatniej linii {lg[-1][2]} z {lg[-1][1] + lg[-1][2]} krain", "INFO (test 120 dob z progiem zapasu 364: oczekiwane 0)", None)
+        stl = sum(x[5] for x in lg)
+    else:
+        rep.add(f"{pfx}-8: czas bramki krainy", "brak linii", "mediana <= 1 ms", None)
+        rep.add(f"{pfx}-9: powroty krain", f"powrotow {len(D['back'])}", "INFO", None)
+        stl = 0
+    if D["save"]:
+        big = max(x[1] for x in D["save"])
+        bad = [x for x in D["save"] if x[3] != "TAK)" and not x[3].startswith("TAK")]
+        rep.add(f"{pfx}-10: zapis arm_ks_arm", f"najwiekszy {big:.1f} KB ({len(D['save'])} zapisow), przekroczen {len(bad)}", "<= 64 KB, bez przekroczen", big <= 64.0 and not bad)
+    else:
+        rep.add(f"{pfx}-10: zapis arm_ks_arm", "brak linii (bez zapisu gry w biegu)", "INFO", None)
+    rep.add(f"{pfx}-11: ERROR paczki ks-arm i potkniecia bramki krainy", f"ERROR {D['err']}, potkniecia (suma linii) {stl}", "0 / 0", D["err"] == 0 and stl == 0)
+
+
+def nksarm_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ARM-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    try:
+        nksarm_rows(rep, nksarm_scan(logp), "ARM")
+    except Exception as e:
+        rep.add("ARM: odczyt linii ks-arm", f"blad narzedzia {type(e).__name__}: {e}", "INFO", None)
+    rep.show()
     return 0
 
 
@@ -35619,7 +35839,9 @@ def main(argv):
     if group == "nks" and logp:
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group == "nds" and logp:
-        return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
+        return nds_main(logp, bdp, until_arg)
+    if group == "nksarm" and logp:
+        return nksarm_main(logp)   # nksarm (noc 17/18.10, paczka ks-arm): samo uzbrojenie KS, twarde bramki rozdz. 10, bramka krainy rozdz. 8, ryby z perku (StartCalibration.Arm.cs)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

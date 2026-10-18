@@ -255,6 +255,24 @@ namespace Armoury
             catch (Exception e) { Stumble("Famine.FamPartOf", e); return 0.0; }
         }
 
+        /// <summary>ks-arm (bramka krainy KS, projekt KS rozdz. 8 "poza oblezeniem i najazdem"): glod tej wsi liczylby sie w linii glodu jako oblezony albo spustoszony
+        /// (R1-3: wies nie Normal, region oblezony albo rabowany w ciagu roku, uchodzcy inni niz z glodu na koncie). Nie rzuca.</summary>
+        internal static bool HungerFromWar(Village v)
+        {
+            if (v == null || v.Settlement == null) return false;
+            try
+            {
+                if (v.VillageState != Village.VillageStates.Normal) return true;
+                var node = OutlawLaw.RegionFor(v.Settlement) ?? v.Settlement;
+                if (node != null && node.IsUnderSiege) return true;
+                double acc = PeopleBook.RefugeesOf(v), famAcc = 0.0;
+                string id = v.Settlement.StringId;
+                if (id != null) lock (Gate) { Barn b; if (_barns.TryGetValue(id, out b) && b.FamOut) famAcc = FamPart(b, acc); }
+                return acc - famAcc > 0.5 || StruckWithinYear(node, (int)CampaignTime.Now.ToDays);
+            }
+            catch (Exception e) { Stumble("Famine.HungerFromWar", e); return false; }
+        }
+
         /// <summary>E4/11 (Z5, menu okregu): dni spichlerza okregu dla gospodarzy (racje / ludzie w domu). false - wylaczone, spichlerz nie zalozony albo brak ludzi.
         /// Nie rzuca.</summary>
         internal static bool DaysOf(Village v, out double days)
@@ -577,7 +595,9 @@ namespace Armoury
                     double q = level >= 0 ? f / (level + 1) * FreeHands.FamineFix(v) : 0.0;
                     x.Q = double.IsNaN(q) || double.IsInfinity(q) || q < 0.0 ? 0.0 : Math.Min(QMax, q);
                     x.Harvest = yield * x.L * x.Q;
+                    double harvest0 = x.Harvest;                               // ks-arm: wzor gry przed KS (bramka krainy - czy powrot do wzoru pomoze)
                     x.Harvest = StartCalibration.GranaryFloor(v, x.Harvest);   // KS (rozdz. 8): wies zastosowana - max(racje z czesci domowej KS, wzor dzis)
+                    StartCalibration.NoteGranary(v, harvest0, x.Harvest);
                     x.Feed = yield * x.Q / Math.Max(1e-3, Devastation.YieldFactor(v));    // plon na gospodarza (bramka powrotu)
                     x.Cap = years * yd * x.L;
                     x.Winter = WinterBite.VillageCut(v) > 0f;

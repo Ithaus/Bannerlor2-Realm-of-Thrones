@@ -803,6 +803,10 @@ namespace Armoury
             // "=" jak poprzedni blok) - SaveText w kawalkach; brak klucza (zapis sprzed paczki) albo inny format = Plan od nowa, produkcja jak dzis; Reset przed SyncData (konstruktor)
             try { string ks = dataStore.IsSaving ? StartCalibration.Export() : null; SaveText.Sync(dataStore, "arm_ks", ref ks); if (dataStore.IsLoading) StartCalibration.Import(ks); }
             catch (Exception e) { Log.Error("SyncData.arm_ks", e); }
+            // ks-arm (noc 17/18.10): samo uzbrojenie KS - srednia ksiegi towarow (pomiar przez sesje), dojrzaly Plan od doby, twarde bramki 7 dob, krainy wrocone przez
+            // bramke krainy (Z + base64 deflate, <= 64 KB) - brak klucza (stary zapis) = pomiar od zera; starsza DLL go pomija
+            try { string ka = dataStore.IsSaving ? StartCalibration.ExportArm() : null; SaveText.Sync(dataStore, "arm_ks_arm", ref ka); if (dataStore.IsLoading) StartCalibration.ImportArm(ka); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_arm", e); }
             // KS-R3 G1: wozy kupcow zywnosci (KS-H) w drodze - brak klucza = brak wozow (stary zapis)
             try { string kh = dataStore.IsSaving ? KsFoodCarts.Export() : null; SaveText.Sync(dataStore, "arm_ks_kupcy", ref kh); if (dataStore.IsLoading) KsFoodCarts.Import(kh); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_kupcy", e); }

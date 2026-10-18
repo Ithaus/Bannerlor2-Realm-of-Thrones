@@ -230,6 +230,7 @@ namespace Armoury
         internal static double GranaryFloor(Village v, double harvest)
         {
             if (v == null || _state != StateApplied || !KeyOn) return harvest;
+            if (LandBackOf(v.Settlement)) return harvest;               // ks-arm: kraina wrocona przez bramke krainy - spichlerz ze wzoru gry (jak dzis)
             try
             {
                 var st = v.Settlement; LiveDist ld;
@@ -265,6 +266,7 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("StartCalibration.ApplyAll", e); }
             try { Zc4ApplyAll(h); } catch (Exception e) { Log.Error("StartCalibration.Zc4ApplyAll", e); }
+            try { ArmApplyAll(h); } catch (Exception e) { Log.Error("StartCalibration.ArmApplyAll", e); }   // ks-arm: ryby z niczego perku Night Raider (NavalDLC) przy KS uzbrojonym/zastosowanym
         }
 
         // ============================================================ budowa stanu (z Planu) i rachunek okregu
@@ -373,7 +375,7 @@ namespace Armoury
             ResolveLive();
             _liveFull = true;
             if (autotest) ConsumeApplyFlag();
-            Log.Info(PK + "WLACZONE doba " + today + " (" + (autotest ? "autotest: klucz Start Calibration Autotest Apply albo plik " + ApplyFlagName : "gra: zapis uzbrojony doba " + _armDay + " i Confirm") + ") - zajecia blokow z Planu doby " + _planDay
+            Log.Info(PK + "WLACZONE doba " + today + " (" + (autotest ? "autotest: klucz Start Calibration Autotest Apply albo plik " + ApplyFlagName : (_autoApplying ? "gra: samo po pomiarze (Start Calibration Auto Arm), zapis uzbrojony doba " + _armDay : "gra: zapis uzbrojony doba " + _armDay + " i Confirm")) + ") - zajecia blokow z Planu doby " + _planDay
                      + " (plan nr " + _plans + ", skrot " + _applyHash.ToString("X8") + "): okregow " + map.Count + ", blokow " + nb
                      + " | Plan z ksiega towarow " + _planEma + " dob | rampa: podaz KS doby " + today + ".." + DDay + " (D), popyt koszyka ZC4 lambda 0 do D, potem doby " + DDay + ".." + (today + RampDemand) + ", polki startu, A7 i regale od doby D"
                      + " | od jutra wsie przechodza na to, co daja ich rece na ich ziemi (stawki KS), zywnosc wsi gry z niczego gasnie razem z rampa, pola mieszczan na polki miast, przetwory miast (ZC5)"
@@ -478,10 +480,11 @@ namespace Armoury
             var regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
             var tfList = new List<KeyValuePair<LiveDist, DistResult>>();
             bool full = _liveFull; _liveFull = false;
-            int redone = 0;
+            int redone = 0, backSkip = 0;
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null) continue;
+                if (LandBackOf(ld.St)) { backSkip++; continue; }           // ks-arm: kraina wrocona przez bramke krainy - bez stawek KS, pol mieszczan i koszyka ZC4 (jak dzis)
                 try
                 {
                     // koszt doby (projekt rozdz. 11.3: doba KS <= 3 ms): okreg przeliczany co LiveEvery dob na zmiane (ludzie, udzialy osad, zima i rece zmieniaja sie powoli;
@@ -602,7 +605,7 @@ namespace Armoury
               .Append(" (kcal z wlasnego pola i domu ").Append(kcalNeed > 0 ? (100 * ownKcal / kcalNeed).ToString("0", Inv) : "-").Append("% potrzeby)");
             sb.Append(" | ").Append(coffers);
             sb.Append(" | ").Append(RuleText()).Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (sesja ").Append(_stumbles).Append(", haki ").Append(_liveStumbles)
-              .Append(", okregi bez obiektu gry ").Append(_resolveBad).Append(").");
+              .Append(", okregi bez obiektu gry ").Append(_resolveBad).Append(")").Append(backSkip > 0 ? " | okregi krain wroconych (bramka krainy) " + backSkip : "").Append('.');
             Log.Info(sb.ToString());
             try { Log.Info(RampLine(day)); } catch (Exception e) { Stumble("RampLine", e); }
             try { Log.Info(Zc4Line(day)); } catch (Exception e) { Stumble("Zc4Line", e); }
