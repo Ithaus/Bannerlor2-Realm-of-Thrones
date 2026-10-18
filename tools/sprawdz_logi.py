@@ -1519,7 +1519,9 @@ Uzycie (Python 3, tylko odczyt):
                     <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande; ruch partii Campaign.RealTick i udzial band
                     liniowo wedlug liczby partii - INFO), NBD-7 z --baza-doby: doba realna tych samych
                     dob gry <= 1.15 x bazy (bez bazy INFO), NBD-8 ERROR BanditLimit i potkniecia 0, NBD-9 stopery z wywolaniami (0 = latka nie weszla), NBD-10 z --baza-doby:
-                    koszt +100 band w s/dobe (INFO). Log sprzed paczki: NBD-B z liczbami, reszta INFO, bez wyjatku.
+                    koszt +100 band w s/dobe (INFO). Log sprzed paczki: NBD-B z liczbami, reszta INFO, bez wyjatku. NBD-7/NBD-10 podaja klucze obu biegow (limit, cel
+                    podniesiony, narodziny przy ludziach); gdy biegi roznia sie Bandit Births Where People, NBD-10 ostrzega, ze wzrost band to limit + miejsce narodzin
+                    (czysty limit: noga z kluczem 24 i Bandit Births Where People NIE wobec nogi 24 + TAK i bazy 12).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -45029,6 +45031,20 @@ def _nbd_scan(logp):
     return D
 
 
+def _nbd_legs(D):
+    """Recenzja (pomiar A/B): opis biegu z kluczy paczki - limit i narodziny przy ludziach z linii doby (ostatnia), inaczej z linii startu; log bez paczki = 'bez paczki'.
+    Przy celu podniesionym klucz Bandit Births Where People zmienia tez miejsce narodzin (obie strefy), wiec roznica band wobec bazy miesza dwie zmiany."""
+    L = D["days"]
+    if L:
+        l = L[max(L)]
+        return f"limit {l['limit']}, cel podniesiony {'TAK' if l['raised'] == 'TAK' else 'NIE'}, narodziny przy ludziach {l['people']}", l["raised"] == "TAK" and l["people"] == "TAK"
+    for s in reversed(D["start"]):
+        a = re.search(r"Bandit Limit Per Hideout (\d+), Bandit Births Where People (TAK|NIE)", s)
+        if a:
+            return f"limit {a.group(1)}, narodziny przy ludziach {a.group(2)} (z linii startu, bez linii doby)", None
+    return "bez paczki (cel ROT, wybor kryjowki gry)", False
+
+
 def nbandy_main(logp, bdp=None):
     """nbandy (noc 18.10, paczka f8-bandy): limit band ROT na zajeta kryjowke (klucz Bandit Limit Per Hideout, domyslnie 24 zamiast 12), narodziny tylko przy kryjowce
     z ludzmi (Bandit Births Where People), koszt AI band i doba realna (Bandit Cost Log). Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log biegu bazowego>
@@ -45172,12 +45188,24 @@ def nbandy_main(logp, bdp=None):
             ta = [W[d][4] for d in common if d in W]
             db = (sum(ta) / len(ta) - sum(ba) / len(ba)) if ba and ta else 0.0
             per100 = ((a - b) / db * 100.0) if db > 1 else None
+            leg_t, mix_t = _nbd_legs(D)
+            leg_b, mix_b = _nbd_legs(B)
             rep.add("NBD-7: doba realna wobec biegu bazowego (te same doby gry)",
                     f"{a:.2f} s wobec {b:.2f} s ({len(common)} dob) = {r:.3f} x; band srednio {sum(ta) / max(1, len(ta)):.0f} wobec {sum(ba) / max(1, len(ba)):.0f}"
-                    + (f"; na +100 band {per100:+.2f} s/dobe" if per100 is not None else ""),
+                    + (f"; na +100 band {per100:+.2f} s/dobe" if per100 is not None else "") + f" | ten bieg: {leg_t}; baza: {leg_b}",
                     f"<= {NBD_SDAY_RATIO} x (szum biegu ok. +-10%: fin86-fin91 15.4-17.3 s przy tym samym kodzie)", r <= NBD_SDAY_RATIO)
-            rep.add("NBD-10: koszt +100 band (z porownania z baza)", f"{per100:+.2f} s na dobe gry" if per100 is not None else "roznica band < 1 - brak oszacowania",
-                    "INFO (szacunek z kodu przed testem: 0.05-0.3 s na +100 band; test 4-letni bez widocznego trendu)", None)
+            # recenzja: przy narodzinach przy ludziach TAK (cel podniesiony) dodatkowe bandy sa skutkiem limitu I nowego miejsca narodzin (takze ponizej starego celu)
+            mixed = bool(mix_t) != bool(mix_b)
+            both_raised = "cel podniesiony TAK" in leg_t and "cel podniesiony TAK" in leg_b
+            note = ""
+            if mixed and both_raised:
+                note = " | UWAGA: oba biegi z celem podniesionym, roznia sie tylko miejscem narodzin (Bandit Births Where People) - roznica band to skutek wyboru kryjowki z ludzmi"
+            elif mixed:
+                note = (" | UWAGA: biegi roznia sie tez miejscem narodzin (Bandit Births Where People) - wzrost band to limit + narodziny przy ludziach, nie sam limit;"
+                        " czysty limit: trzecia noga z kluczem 24 i Bandit Births Where People NIE")
+            rep.add("NBD-10: koszt +100 band (z porownania z baza)",
+                    (f"{per100:+.2f} s na dobe gry" if per100 is not None else "roznica band < 1 - brak oszacowania") + note,
+                    "INFO (szacunek z kodu przed testem: 0.05-0.3 s na +100 band; test 4-letni bez widocznego trendu; koszt na bande - NBD-6 us na bande)", None)
         else:
             rep.add("NBD-7: doba realna wobec biegu bazowego", "brak wspolnych dob gry", "INFO", None)
     else:

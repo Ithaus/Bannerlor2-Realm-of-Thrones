@@ -33,7 +33,7 @@ namespace Armoury
     ///    limit <= ROT (12) albo prawo wylaczone = wynik ROT bez zmian (stara droga co do liczby).
     /// 2. BanditBirthsWherePeople (tylko przy celu podniesionym): kazda proba narodzin bandy klanu z kryjowkami (ponizej i ponad stary cel ROT - obie strefy
     ///    liczone osobno w linii) rodzi sie tylko przy kryjowce klanu, ktorej region (z sasiadami - jak OutlawLaw.Draw) ma w puli wyrzutkow co najmniej
-    ///    OutlawMinBand ludzi; wybor wazony jak w grze (GetSpawnChanceInSettlement, kandydaci jak SelectBanditHideout); gdy takiej kryjowki nie ma - proba
+    ///    OutlawMinBand calych ludzi (OutlawLaw.AvailFor - pozycje puli w dol jak Draw); wybor wazony jak w grze (GetSpawnChanceInSettlement, kandydaci jak SelectBanditHideout); gdy takiej kryjowki nie ma - proba
     ///    odmowiona. Bez tego: dzis ok. 70% prob narodzin konczy sie pusta banda tworzona i kasowana godzine pozniej (OutlawLaw._empty), a przy celu x2
     ///    prob jest wiecej - takze ponizej starego celu, gdy klan ma mniej band niz zajete kryjowki x 12 (pula za mala): dla klanu z 10 kryjowkami i 70 bandami
     ///    5 prob na godzine nocy przy 12 i 17 przy 24, wszystkie losowo, wiec ok. 3.4 x wiecej pustych. Bramka GateClan juz przepuszcza tylko klan, ktory ma
@@ -65,6 +65,7 @@ namespace Armoury
         // ------------------------------------------------------------ latki (raz na proces)
         private static Harmony _h;
         private static MethodInfo _aroundGetter;
+        private static bool _aroundLive;   // recenzja: getter czynnego modelu TEJ kampanii ma nasza latke (blad Patch / inny model bez latki = falsz = cel ROT)
         private static bool _aroundTried, _pickTried, _costTried;
         private static string _aroundWhy = "niezakladana", _pickWhy = "niezakladana", _modelName = "-";
         private static int _baseAround = -1, _inEach = -1;
@@ -144,7 +145,7 @@ namespace Armoury
         internal static int RaisedTarget()
         {
             var s = Settings.Current;
-            if (s == null || _baseAround < 0 || _inEach < 0 || !OutlawLaw.On) return 0;
+            if (s == null || !_aroundLive || _baseAround < 0 || _inEach < 0 || !OutlawLaw.On) return 0;
             int t = Math.Min(48, s.BanditLimitPerHideout);
             return t > _baseAround + _inEach ? t : 0;
         }
@@ -175,21 +176,32 @@ namespace Armoury
 
         private static void HookAround()
         {
+            // recenzja: _aroundLive tylko gdy getter czynnego modelu TEJ kampanii ma latke - inaczej RaisedTarget = 0 (cel ROT, linia "cel podniesiony NIE")
+            _aroundLive = false;
             var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.BanditDensityModel : null;
-            if (model == null) { if (_aroundGetter == null) _aroundWhy = "brak modelu gestosci band w kampanii"; return; }
+            if (model == null) { _aroundWhy = "brak modelu gestosci band w kampanii"; return; }
             _modelName = model.GetType().FullName;
             var g = FindGetter(model.GetType(), "NumberOfMaximumBanditPartiesAroundEachHideout");
             if (g == null) { _aroundWhy = "nie znaleziono gettera NumberOfMaximumBanditPartiesAroundEachHideout w " + _modelName; return; }
-            if (g == _aroundGetter) return;                                  // ten sam getter co w poprzedniej kampanii procesu - latka jest
+            if (g == _aroundGetter)                                          // ten sam getter co w poprzedniej kampanii procesu - latka jest
+            {
+                _aroundLive = true;
+                _aroundWhy = "zalozona na " + g.DeclaringType.FullName + ".get_NumberOfMaximumBanditPartiesAroundEachHideout (z poprzedniej kampanii procesu)";
+                return;
+            }
             if (_aroundTried && _aroundGetter != null) Log.Info(P + "inny model gestosci band w tej kampanii (" + _modelName + ") - latka takze na jego getterze.");
             _aroundTried = true;
             try
             {
-                // wartosci ROT czytane PRZED latka (po latce getter oddaje juz podniesiony cel)
-                _baseAround = model.NumberOfMaximumBanditPartiesAroundEachHideout;
-                _inEach = model.NumberOfMaximumBanditPartiesInEachHideout;
+                // wartosci ROT czytane PRZED latka (po latce getter oddaje juz podniesiony cel); do pol dopiero po udanym Patch (recenzja: blad Patch
+                // zostawial pola >= 0 i RaisedTarget podawal cel podniesiony bez latki)
+                int baseAround = model.NumberOfMaximumBanditPartiesAroundEachHideout;
+                int inEach = model.NumberOfMaximumBanditPartiesInEachHideout;
                 _h.Patch(g, postfix: new HarmonyMethod(typeof(BanditLimit), nameof(AroundPostfix)) { priority = Priority.Last });
+                _baseAround = baseAround;
+                _inEach = inEach;
                 _aroundGetter = g;
+                _aroundLive = true;
                 _aroundWhy = "zalozona na " + g.DeclaringType.FullName + ".get_NumberOfMaximumBanditPartiesAroundEachHideout";
             }
             catch (Exception e) { _aroundWhy = "blad: " + e.Message; Stumble("HookAround", e); }
@@ -233,7 +245,7 @@ namespace Armoury
             return l;
         }
 
-        /// <summary>Kryjowka klanu z ludzmi w puli regionu (z sasiadami) - waga gry; null = zadna zajeta kryjowka kultury klanu nie ma ludzi.</summary>
+        /// <summary>Kryjowka klanu z ludzmi w puli regionu (z sasiadami) - waga gry; null = zadna zajeta kryjowka kultury klanu nie ma ludzi. AvailFor liczy cale ludzi na pozycje puli, jak Draw (recenzja: suma ulamkow przepuszczala pule, z ktorej Draw daje 0).</summary>
         private static Hideout PickWithPeople(BanditSpawnCampaignBehavior b, Clan clan)
         {
             int min = Math.Max(1, Settings.Current.OutlawMinBand);
