@@ -12,6 +12,8 @@ namespace Armoury
     ///
     ///  - POLNOC -> NOCNA STRAZ: GiftNorthToWatchShare (25%) wplywow dnia skarbca Polnocy (165: wplywy dnia z 1/360 zapasu).
     ///  - WOLNE MIASTA -> DOTHRAKOWIE: kazde Wolne Miasto GiftFreeCitiesToDothrakiShare (15% - regula korekty 182 po tescie 120 dob; bylo 10%) swoich wplywow dnia ([D] 03:45 nr 12 = Q4a).
+    ///    f20-d2 (decyzja Jeffa 18.10 "2.c" - wylaczyc calkiem): galaz tylko przy NOWYM kluczu GiftFreeCitiesToDothraki (domyslnie NIE). Dothrakowie zyja z lupow,
+    ///    okupow i najazdow; udzial Wolnego Miasta zostaje w reszcie jego wplywow dnia (dalej raty reparacji, kontrakty, zwrot zoldu, renty 180 wedlug potrzeby).
     ///  - Dar idzie przez skarbiec odbiorcy TEGO SAMEGO DNIA do glow rodow odbiorcy wedlug STALYCH wag (Z8 - nigdy wedlug liczby ludzi):
     ///    Straz - twierdza (miasto albo zamek) 1, wies 0.25, rod bez lenna 0.5; Dothrakowie - rowno na kazdy rod khalasaru. Liczy sie do ich D
     ///    (czesc "korona" D stalego). Reszta z zaokraglen zostaje w skarbcu odbiorcy (nic nie znika).
@@ -243,7 +245,9 @@ namespace Armoury
                              + ", Wolne Miasta " + found.Count + " z " + FreeCityIds.Length + " (" + string.Join(", ", found.ToArray()) + ").");
                 }
                 var det = new List<string>();
-                float fShare = Math.Max(0f, Math.Min(1f, s.GiftFreeCitiesToDothrakiShare));
+                // f20-d2: danina Wolnych Miast dla Dothrakow tylko przy kluczu GiftFreeCitiesToDothraki (domyslnie NIE) - przy NIE udzial 0, galaz nie biegnie
+                bool fOn = s.GiftFreeCitiesToDothraki;
+                float fShare = fOn ? Math.Max(0f, Math.Min(1f, s.GiftFreeCitiesToDothrakiShare)) : 0f;
                 // Jeff 10.10: na Straz zrzuca sie cale Westeros (procenty Jeffa), i tylko wtedy, gdy Straz potrzebuje - oszczednosci jej rodow ponizej
                 // GiftWatchNeedDays (60) dob jej kosztow (zold partii i zalog + jedzenie braci); test c3c: Straz 1.32 -> 2.41 mln w 120 dob przy darze samej Polnocy 25%
                 if (watch != null)
@@ -296,7 +300,8 @@ namespace Armoury
                 if (s.LogEnabled)
                     Log.Info("Dary koron (182): dzien " + (int)CampaignTime.Now.ToDays
                              + " | Westeros -> Straz " + LastToWatch + " zl do " + LastWatchClans + " rodow (wagi stale: twierdza 1, wies 0.25, rod bez lenna 0.5; wedlug potrzeby: oszczednosci Strazy " + LastWatchHave + " wobec " + Math.Max(0, s.GiftWatchNeedDays) + " dob kosztow po " + LastWatchCostDay + " - dar " + (LastWatchNeeds ? "TAK" : "NIE") + ")"
-                             + " | Wolne Miasta -> Dothrakowie " + LastToDothraki + " zl do " + LastDothrakiClans + " rodow (rowno na rod)"
+                             + " | Wolne Miasta -> Dothrakowie " + LastToDothraki + " zl do " + LastDothrakiClans + " rodow (rowno na rod; danina f20-d2 GiftFreeCitiesToDothraki "
+                             + (fOn ? "TAK, udzial " + fShare.ToString("0.00", Inv) : "NIE - off") + ")"
                              + " | ze skarbcow dawcow zeszlo " + (LastNorth + LastFree) + ", do rodow doszlo " + (LastToWatch + LastToDothraki) + ", w skarbcach odbiorcow zostalo (zaokraglenia) " + LastKept
                              + " | szczegoly: " + _lastDetail
                              + " | Straz bez zoldu (WatchUnpaid): " + (WatchUnpaidOn ? "TAK" : "NIE") + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
