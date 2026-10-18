@@ -497,9 +497,28 @@ namespace Armoury
             {
                 if (s == null || !s.KsFarmFollowsSurplus || f == null || f.St == null || !f.St.IsTown || f.St.Town == null) return false;
                 var t = f.St.Town;
-                return StartCalibration.KsTownApplied(t) && t.Gold > OverReserve * TownPurse.Reserve(t);
+                // f16-akum (Ks Farm Surplus Net Of Dues): nadwyzka kasy PO tym, co kasa jest winna w najblizszym tygodniu - kasa przed dniem raty trzyma doplyw zebrany
+                // na te rate, wiec miasto z firma ponad doplyw mialo "nadwyzke" i przeglad nie obnizal firmy (fin93 Starfall: kasa 231 tys. wobec progu 53 tys., rata
+                // 298 tys./tydz, doplyw 225 tys./tydz - zaleglosci +136 tys. w tydzien). Klucz wylaczony - cala kasa jak dotad
+                double owes = s.KsFarmSurplusNetOfDues ? CofferOwes(f, s) : 0.0;
+                return StartCalibration.KsTownApplied(t) && t.Gold - owes > OverReserve * TownPurse.Reserve(t);
             }
             catch (Exception e) { Stumble("SurplusHolds", e); return false; }
+        }
+
+        /// <summary>f16-akum: zobowiazania kasy kupcow miasta na najblizszy tydzien - to samo, co Pay zdejmie z kasy w dniu raty: rata firmy z kasy (pan i korona; czesc
+        /// z oszczednosci ludu tylko przy wylaczonym DsFarmFolkFromSavings - inaczej placi ja lud) x rampa przejscia, zaleglosc firmy z kasy, zaleglosc pomocy od sprzedazy M7,
+        /// rata dziesiatej M9 x rampa i reszta gersumy f7 (placona z kasy w oknie przegladu). Tylko odczyt; wolajacy w try.</summary>
+        private static double CofferOwes(Farm f, Settings s)
+        {
+            bool folkPays = s.DsFarmFolkFromSavings;
+            double rn = NewShare;
+            double owe = (Math.Max(0, f.FL) + Math.Max(0, f.FC) + (folkPays ? 0 : Math.Max(0, f.FLf))) / Weeks * rn;
+            owe += Math.Max(0, f.AL) + Math.Max(0, f.AC) + (folkPays ? 0 : Math.Max(0, f.ALf));
+            owe += Math.Max(0, f.AidArr);
+            if (f.MovLeft >= 1) owe += Math.Min(Math.Max(0, f.MovPer), f.MovLeft) * rn;
+            owe += Math.Max(0, f.CLeft);
+            return double.IsNaN(owe) || double.IsInfinity(owe) ? 0.0 : owe;
         }
 
         /// <summary>
