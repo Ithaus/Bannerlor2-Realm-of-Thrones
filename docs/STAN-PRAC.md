@@ -2799,3 +2799,5 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   nkoszyk, nzajazdy, nuchodzcy, nglod, nakum, ndrogi, nprzysiolki, nherby, nksarm, nzbroj, na12, na17, nrot, nzc0-2 (skrypt run_all_groups.py w scratchpad).
 - 20:45 PDT: workflow wf_ab683a3a-156 (fala 3, worktree zb/<nazwa> od 100eaedf): feed-swiat (wyzywic siebie dla calego swiata + stabilnosc Essos), ks-koszt (T0-T13), inwest (specjalizacja
   wiosek + prace okregu, AI WYL.), perf-d2d3 (szybkosc naszych modow i cudzego kodu), zapis-d4 (rozmiar zapisu, cichsze logi).
+- 20:33 PDT: okno 5 h 81% (reset 21:20 PDT), tydzien 22% -> fala 3 (wf_ab683a3a-156) ZATRZYMANA po 1 min (worktree czyste); wznowic po resecie: Workflow scriptPath scratchpad/fala3.js
+  (BASE 100eaedf). Test fin83 biegnie (gra nie zuzywa limitu).
