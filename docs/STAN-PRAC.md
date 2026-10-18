@@ -3103,3 +3103,7 @@ rozlozenie gospodarki doby (Jeff: pozniej).
   przeniesione wobec v6); KS: "inny plik ziemi - stan pominiety, Plan od nowa" (stan UZBROJONY 109020 czeka na Confirm - ponowne uzbrojenie od zera w pierwszej dobie, SPRAWDZIC);
   zajazdy 135; drogi boczne WLACZONE: 1033 drogi, 69 072 decali w 75 ms (10 tickow, najdluzszy 10.1 ms). Recenzja f17: bez blokujacych; pomiar klatki f9 przy Better Time poprawiony
   w noc-ks4 **5086a630** (nie wgrane).
+- 14:35 PDT: Jeff zagral krotko (109044 -> 109056, Armoury-2026-10-18_13-50-06.log + session + CSV w D:/Backup-Bannerlord/logi-jeffa/2026-10-18b; zapisy D:/Backup-Bannerlord/zapisy-jeffa/
+  2026-10-18-po-sesji-81b): ERROR 0, KS ponownie uzbrojony od zera w dobie wczytania 109044 (dziala). Jeff (verbatim): "mozesz wgrac kolejne poprawki zamknalem gre ... nie podoba mi sie ze Robb
+  zdobyl polnoc: i jakim prawem ma sojusz Dorzecze ze Stannisem ... czy mozesz w savie przywrocic kazdej ze stron posiadlosci jakie powinni miec ... jak w ksiazce ... i sprawdz armie".
+  -> analiza wf_568b42ee-ac1 (wlosci / sojusze / armie, tylko odczyt); test 5 dob + bitwa wgr82t (noc-ks4 5086a630, Armoury aa1c01dc) przed WGRANIEM 82 (+ f18-mcm po scaleniu).
