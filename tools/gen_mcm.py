@@ -373,6 +373,16 @@ RANGES = {
     'KsLabourBasketMin': (0.0, 1.0, "0.00"),
     'KsLabourBasketStepPercent': (0.5, 20.0, "0.0"),
     'KsLabourBasketHoardRate': (0.0, 0.1, "0.000"),
+    # f5-lud (noc 17/18.10): dochod R/P wedlug koszyka i przeglad firmy wedlug nadwyzki kasy - zgodnie z przycieciem w kodzie (KsFolkIncome: dni 1..240 / 480,
+    # udzial 0..1, krok 0.5..20%/d; DsTowns: doby 7..91, podwyzka 0..1)
+    'KsFolkIncomeRLowDays': (1.0, 120.0, "0"),
+    'KsFolkIncomeRHighDays': (2.0, 240.0, "0"),
+    'KsFolkIncomePLowDays': (1.0, 120.0, "0"),
+    'KsFolkIncomePHighDays': (2.0, 240.0, "0"),
+    'KsFolkIncomeMin': (0.0, 1.0, "0.00"),
+    'KsFolkIncomeStepPercent': (0.5, 20.0, "0.0"),
+    'KsFarmSurplusReviewDays': (7, 91, "0"),
+    'KsFarmSurplusReviewMax': (0.0, 1.0, "0.00"),
     # r4-mur (17.10): danina zbozowa Muru i najazdy Wolnych Ludzi - zgodnie z przycieciem w kodzie (WallTribute: udzial 0..100%, psucie 0..50%/d; FreeFolkRaids: szansa 0..1, band 0..64)
     'WallTributeTargetDays': (0, 728, "0"),
     'WallTributeRefillDays': (1, 364, "0"),

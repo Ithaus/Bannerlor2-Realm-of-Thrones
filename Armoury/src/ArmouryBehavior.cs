@@ -1213,6 +1213,11 @@ namespace Armoury
             // PO arm_ks_koszyk (nadpisuje 1 z tamtego klucza); pisany tylko z danymi (wszystko 1 - bez klucza, zapis jak dotad); wlasny try, straznik rozmiaru; brak klucza (stary zapis, Ironman Jeffa) = wskazniki >= 1 i kappa 1; starsza DLL ignoruje klucz
             try { string kp = dataStore.IsSaving ? KsFolkWage.ExportAll() : null; if (!dataStore.IsSaving || kp != null) SaveText.Sync(dataStore, "arm_ks_place", ref kp); if (dataStore.IsLoading) KsFolkWage.ImportAll(kp); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_place", e); }
+            // f5-lud (noc 17/18.10): kappy dochodu klas ludu miast z KS wedlug koszyka (W2 - zarobek W poza placami z kas i od domow, R, P) - "f5|W2:miasto:k,...|R:...|P:...";
+            // pisany tylko z danymi (wszystko 1 - bez klucza, zapis jak dotad); wlasny try, straznik rozmiaru (Import: 600 000 znakow, 4000 miast na klase); brak klucza
+            // (stary zapis, Ironman Jeffa) = kappy 1 (schodza krokiem dobowym od pierwszej doby - bez skoku dochodu); starsza DLL ignoruje klucz
+            try { string kd = dataStore.IsSaving ? KsFolkIncome.Export() : null; if (!dataStore.IsSaving || kd != null) SaveText.Sync(dataStore, "arm_ks_dochod", ref kd); if (dataStore.IsLoading) KsFolkIncome.Import(kd); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_dochod", e); }
             // inwest (noc 17/18.10): zajecia wiosek pobocznych drogi bez KS (arm_crafts: n neutralnego startu, zajecia zmienione, przebudowy, rece regionu w sezonie) i prace okregu
             // (arm_works: wiersze prac, utarg okregow, przelacznik odbudowy); wlasny try, brak klucza (stary zapis, Ironman Jeffa) = pusto, starsza DLL ignoruje klucze
             try { string zw = dataStore.IsSaving ? VillageCrafts.Export() : null; SaveText.Sync(dataStore, "arm_crafts", ref zw); if (dataStore.IsLoading) VillageCrafts.Import(zw); }

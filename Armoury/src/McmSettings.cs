@@ -7416,6 +7416,58 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (18.10)")]
         public float KsLabourBasketHoardRate { get; set; } = 0.01f;
 
+        [SettingPropertyBool("Ks Folk Income All Kinds", HintText = "with Ks Labour To Basket: in a town under the start calibration the labourers' other earnings - serving soldiers, caravans and bands, the court, building work, mines and craft wages - follow their basket too, by the same rule as their wages from the merchants (its own rate, moving at most Ks Labour Basket Step Percent a day, so nothing changes overnight). What the labourers are not paid stays with the town's merchants. Off = only the merchants' wages and the households' wages follow the basket, as before")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFolkIncomeAllKinds { get; set; } = true;
+
+        [SettingPropertyBool("Ks Folk Income R P", HintText = "with Ks Labour To Basket: in a town under the start calibration the craftsmen and the patricians earn by their own baskets as well - their share of the merchants' work, of the merchants' draw, of the turnover and of the town's outside earnings falls once they hold more than their low days of savings, down to Ks Folk Income Min at their high days; the merchants (or the patrician who pays a craftsman from his savings) keep the rest. Below their low days they always get the full rate. Off = craftsmen and patricians earn at the full rate however much they hold")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFolkIncomeRP { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Folk Income R Low Days", 1.00f, 120.00f, "0", HintText = "with Ks Folk Income R P: up to this many days of their basket in savings the craftsmen get the full rate (21 = their reserve for hard times)")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkIncomeRLowDays { get; set; } = 21f;
+
+        [SettingPropertyFloatingInteger("Ks Folk Income R High Days", 2.00f, 240.00f, "0", HintText = "with Ks Folk Income R P: at this many days of their basket in savings and above, the craftsmen get Ks Folk Income Min of the full rate")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkIncomeRHighDays { get; set; } = 42f;
+
+        [SettingPropertyFloatingInteger("Ks Folk Income P Low Days", 1.00f, 120.00f, "0", HintText = "with Ks Folk Income R P: up to this many days of their basket in savings the patricians get the full rate (30 = their reserve for hard times)")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkIncomePLowDays { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Ks Folk Income P High Days", 2.00f, 240.00f, "0", HintText = "with Ks Folk Income R P: at this many days of their basket in savings and above, the patricians get Ks Folk Income Min of the full rate")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkIncomePHighDays { get; set; } = 60f;
+
+        [SettingPropertyFloatingInteger("Ks Folk Income Min", 0.00f, 1.00f, "0.00", HintText = "with Ks Folk Income R P: the lowest share of the full rate craftsmen and patricians get when they hold their high days of savings or more (the rate settles where their purse stops growing, usually above this floor)")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkIncomeMin { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Ks Folk Income Step Percent", 0.50f, 20.00f, "0.0", HintText = "with Ks Folk Income R P: how much the craftsmen's and patricians' rate may change in one day (percent of the full rate)")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkIncomeStepPercent { get; set; } = 3f;
+
+        [SettingPropertyBool("Ks Folk Income Hoard Falls", HintText = "with Ks Folk Income R P and Ds Hoard Due: in a town where craftsmen and patricians earn by their basket, the lord's tallage on their hoard above the normal level falls from Ds Hoard Due Rate to Ks Labour Basket Hoard Rate as their rate falls to Ks Folk Income Min - an occasional tallage, as for the labourers. Off = they pay Ds Hoard Due Rate as before")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFolkIncomeHoardFalls { get; set; } = true;
+
+        [SettingPropertyBool("Ks Folk Income Zero Need", HintText = "with Ks Labour To Basket: in a town under the start calibration whose market sets no basket at all for a class (the day's reckoning is done, but that class needs nothing there - frontier camps, khalasars), that class counts as fully provided and its rate falls to the lowest, instead of being paid the full rate into a purse it cannot spend. Off = such a class keeps the full rate, as before")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFolkIncomeZeroNeed { get; set; } = true;
+
+        [SettingPropertyBool("Ks Farm Follows Surplus", HintText = "with Ds Towns and the start calibration applied in a town: when the town's purse holds more than one and a half times the merchants' working coin, its farm is raised every Ks Farm Surplus Review Days by what the purse grew since the last raise (at most Ks Farm Surplus Review Max of the farm at a time), and the regular review does not lower the farm while that surplus lasts (unpaid farm still lowers it). What the townsfolk are no longer paid thus goes on to the lord and the crown through the farm instead of piling up in the purse. Off = only the regular review, as before")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFarmFollowsSurplus { get; set; } = true;
+
+        [SettingPropertyInteger("Ks Farm Surplus Review Days", 7, 91, "0", HintText = "with Ks Farm Follows Surplus: how many days the town's purse is watched before its farm is raised by what the purse grew (7 at the least)")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public int KsFarmSurplusReviewDays { get; set; } = 14;
+
+        [SettingPropertyFloatingInteger("Ks Farm Surplus Review Max", 0.00f, 1.00f, "0.00", HintText = "with Ks Farm Follows Surplus: the largest raise of a town's farm at one such review (share of the farm)")]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFarmSurplusReviewMax { get; set; } = 0.25f;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -9513,6 +9565,19 @@ namespace Armoury
             s.KsLabourBasketMin = KsLabourBasketMin;
             s.KsLabourBasketStepPercent = KsLabourBasketStepPercent;
             s.KsLabourBasketHoardRate = KsLabourBasketHoardRate;
+            s.KsFolkIncomeAllKinds = KsFolkIncomeAllKinds;
+            s.KsFolkIncomeRP = KsFolkIncomeRP;
+            s.KsFolkIncomeRLowDays = KsFolkIncomeRLowDays;
+            s.KsFolkIncomeRHighDays = KsFolkIncomeRHighDays;
+            s.KsFolkIncomePLowDays = KsFolkIncomePLowDays;
+            s.KsFolkIncomePHighDays = KsFolkIncomePHighDays;
+            s.KsFolkIncomeMin = KsFolkIncomeMin;
+            s.KsFolkIncomeStepPercent = KsFolkIncomeStepPercent;
+            s.KsFolkIncomeHoardFalls = KsFolkIncomeHoardFalls;
+            s.KsFolkIncomeZeroNeed = KsFolkIncomeZeroNeed;
+            s.KsFarmFollowsSurplus = KsFarmFollowsSurplus;
+            s.KsFarmSurplusReviewDays = KsFarmSurplusReviewDays;
+            s.KsFarmSurplusReviewMax = KsFarmSurplusReviewMax;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;

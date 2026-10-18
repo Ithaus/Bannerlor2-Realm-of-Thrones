@@ -123,6 +123,7 @@ namespace Armoury
                 long purse0 = Math.Max(0, PurseOf(f, c));
                 HoardNote(s, room, Math.Max(0, aid), credit, purse0, due >= 1 ? Math.Min((long)Math.Floor(Math.Min(due, room)), purse0) : 0);   // N7 / N8: liczniki porownania
                 if (dsDue) DaNoteSeen(room, aidCred, farm, due, m9, m9d);
+                if (dsDue && f.Kind == 0) KsFolkIncome.NoteHoard(f.St, c, room + baseX, 0);   // f5-lud: podstawa danin W/R/P miast z regula (stawka efektywna w linii; tylko licznik)
                 if (!(due >= 1)) { if (aid > 0 || farm > 0 || m9d > 0) _hdCovered++; _hdE0 += room; _hdE1 += room; return 0; }
                 long x = (long)Math.Floor(Math.Min(due, room));
                 x = Math.Min(x, purse0);
@@ -171,6 +172,7 @@ namespace Armoury
                 _hdTake[slot] += x - cp; _hdE0 += room; _hdE1 += room - x;   // obieg2: "pobrano" linii kiesa2 = do panow + do kas (czesc korony osobno - _gdCrownT)
                 if (cp > 0) { _gdCrownT += cp; _gdCrownTN++; }
                 if (dsDue) DaNoteTake(slot, x, lp, tp, cp);           // ds-akumulator: linia "Akumulator kies" (pobrane = do panow + do kas osad)
+                if (dsDue && f.Kind == 0) KsFolkIncome.NoteHoard(f.St, c, 0, x);   // f5-lud: pobrane z klas W/R/P miast z regula (tylko licznik)
                 try
                 {
                     _hdPlaces.Add(st);

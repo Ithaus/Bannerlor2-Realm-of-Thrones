@@ -21,14 +21,33 @@ namespace Armoury
                 var f = Get(st);
                 if (f == null || f.Kind != 0) return 0;
                 var town = st.Town;
-                int ask = (int)Math.Min(int.MaxValue, Math.Min(x, Math.Max(0, town.Gold)));
+                double ps = double.IsNaN(pShare) ? 0.7 : Math.Max(0, Math.Min(1, pShare));
+                // f5-lud (Ks Folk Income R P): czesc P x kappa P, czesc R x kappa R - z kasy schodzi tylko zlecone, reszta zostaje w kasie (przeglad firmy wedlug nadwyzki
+                // kasy oddaje ja panu i koronie); bez reguly albo czynniki 1 - droga co do monety jak dotad
+                double f5R, f5P;
+                long xP = 0, xR = 0, aP = 0, aR = 0;
+                bool f5 = KsFolkIncome.RP(st, out f5R, out f5P);
+                long want = x;
+                if (f5)
+                {
+                    xP = Math.Min(x, (long)Math.Round(x * ps)); xR = x - xP;
+                    aP = (long)(xP * Math.Max(0.0, Math.Min(1.0, f5P))); aR = (long)(xR * Math.Max(0.0, Math.Min(1.0, f5R)));
+                    want = aP + aR;
+                    if (want <= 0) { try { KsFolkIncome.NoteM6(xP, xR, 0, 0, 0, 0); } catch (Exception e) { Stumble("KsFolkIncome.NoteM6", e); } return 0; }
+                }
+                int ask = (int)Math.Min(int.MaxValue, Math.Min(want, Math.Max(0, town.Gold)));
                 if (ask <= 0) return 0;
                 int had = town.Gold;
                 town.ChangeGold(-ask);
                 long got = had - town.Gold;
                 if (got <= 0) return 0;
-                double ps = double.IsNaN(pShare) ? 0.7 : Math.Max(0, Math.Min(1, pShare));
-                long p = Math.Min(got, (long)Math.Round(got * ps)), r = got - p;
+                long p, r;
+                if (!f5) { p = Math.Min(got, (long)Math.Round(got * ps)); r = got - p; }
+                else
+                {
+                    p = got >= want ? aP : (long)Math.Floor(got * (double)aP / want); r = got - p;
+                    try { KsFolkIncome.NoteM6(xP, xR, aP, aR, p, r); } catch (Exception e) { Stumble("KsFolkIncome.NoteM6", e); }
+                }
                 f.KR += r; f.KP += p; f.EarnWin[1] += r; f.EarnWin[2] += p;
                 f.LDayIn += got; f.EarnK[EValve] += got;
                 _ctlIn += got; _win.ValveT += got; _win.Earn[EValve] += got;

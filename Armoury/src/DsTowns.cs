@@ -69,6 +69,7 @@ namespace Armoury
             public long G0 = long.MinValue, PaidWin;               // zamek: kasa przy poprzedniej probce, pobory od niej
             public string OwnerK; public int CapDay = -1;          // krolestwo wlasciciela widziane ostatnio, doba zmiany
             public double Sales; public int SalesDay = -1;         // podstawa M7 z doby ludu
+            public long SG0 = long.MinValue; public int SGDay = -1;  // f5-lud (Ks Farm Follows Surplus): kasa miasta na poczatku pomiaru przyrostu i doba (sesja)
         }
 
         // ------------------------------------------------------------ stan (zapis arm_daniny_miasta)
@@ -306,6 +307,7 @@ namespace Armoury
                 {
                     if (today % Quarter == 0) Terms();
                     Renew(today, s);
+                    SurplusReview(today, s);                      // f5-lud (Ks Farm Follows Surplus): firma miasta z KS w gore o przyrost kasy ponad 1.5 x zapas kupcow
                 }
             }
             catch (Exception e) { Stumble("DayStart", e); }
@@ -397,6 +399,7 @@ namespace Armoury
                     double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                     double nf = Math.Max(F * (1 - m), Math.Min(F * (1 + m), target));
                     double r = nf / F;
+                    if (r < 1 - 1e-9 && SurplusHolds(f, s)) { r = 1.0; KsFolkIncome.NoteNoCut(); }   // f5-lud: bez obnizki przy nadwyzce kasy (Ks Farm Follows Surplus)
                     f.FL *= r; f.FC *= r; f.FLf *= r;
                     if (r > 1 + 1e-9) _renewUp++; else if (r < 1 - 1e-9) _renewDown++;
                 }
@@ -454,6 +457,7 @@ namespace Armoury
                         if (arrears && target > F + 1e-9) _revHeld++;
                         double nf = Math.Max(F * (1 - m), Math.Min(hi, target));
                         r = nf / F;
+                        if (r < 1 - 1e-9 && SurplusHolds(f, s)) { r = 1.0; KsFolkIncome.NoteNoCut(); }   // f5-lud: bez obnizki przy nadwyzce kasy (Ks Farm Follows Surplus); wymuszony - jak dotad
                     }
                     f.FL *= r; f.FC *= r; f.FLf *= r;
                     double d = all0 * (r - 1);
@@ -462,6 +466,64 @@ namespace Armoury
                     else _revSame++;
                 }
                 catch (Exception e) { Stumble("Review", e); }
+            }
+        }
+
+        // ============================================================ f5-lud: firma miasta z KS wedlug nadwyzki kasy (Ks Farm Follows Surplus)
+        /// <summary>f5-lud (Ks Farm Follows Surplus): kasa miasta z KS ponad 1.5 x zapas kupcow (prog wyplaty kupcom M6) - kupcy maja nadwyzke; klucz wylaczony, zamek, miasto
+        /// bez KS - false (przeglad jak dotad).</summary>
+        private static bool SurplusHolds(Farm f, Settings s)
+        {
+            try
+            {
+                if (s == null || !s.KsFarmFollowsSurplus || f == null || f.St == null || !f.St.IsTown || f.St.Town == null) return false;
+                var t = f.St.Town;
+                return StartCalibration.KsTownApplied(t) && t.Gold > OverReserve * TownPurse.Reserve(t);
+            }
+            catch (Exception e) { Stumble("SurplusHolds", e); return false; }
+        }
+
+        /// <summary>
+        /// f5-lud (noc 17/18.10, Ks Farm Follows Surplus; model tools/ekonomia-symulatory-2026-10-17/f5/simlud.py S9): dochod ludu miast z KS idzie za koszykiem klas
+        /// (KsFolkIncome) - czego lud nie przyjal, zostaje w kasie miasta (kupcy). Przeglad kwartalny (Review) liczy firme z doplywu netto kupcow, w ktorym wyplata kupcom M6
+        /// jest poborem - nie widzi wiec M6 zatrzymanej w kasie i podnosi firme najwyzej o 15% na kwartal (model: kasy +20 mln w pol roku - nowy akumulator). Tu: miasto
+        /// z KS, ktorego kasa stoi ponad 1.5 x zapas kupcow, ma co Ks Farm Surplus Review Days przeglad W GORE o przyrost kasy na dobe od poprzedniego przegladu (x 364 =
+        /// zl/rok), najwyzej Ks Farm Surplus Review Max firmy; firma pana i korony w tym samym stosunku (czesc z oszczednosci ludu bez zmiany). Przyrost liczony od ostatniej
+        /// podwyzki (bez liczenia drugi raz tych samych dob); kasa nie ponad progiem, oblezenie, zmiana krolestwa, zaleglosci - pomiar od nowa. Pamiec sesyjna (po wczytaniu
+        /// pierwszy przeglad po Ks Farm Surplus Review Days). Zloto sie nie rusza - zmienia sie nalezna rata (kontrola linii "platnicy - odbiorcy" jak dotad). Kazda osada
+        /// we wlasnym try, potkniecia liczone.
+        /// </summary>
+        private static void SurplusReview(int today, Settings s)
+        {
+            if (s == null || !s.KsFarmFollowsSurplus) return;
+            int days = Math.Max(7, Math.Min(91, s.KsFarmSurplusReviewDays));
+            double mx = Math.Max(0.0, Math.Min(1.0, (double)s.KsFarmSurplusReviewMax));
+            foreach (var f in _farm.Values)
+            {
+                try
+                {
+                    var st = f.St;
+                    if (st == null || !st.IsTown || st.Town == null || f.Fixed < 0) continue;
+                    var t = st.Town;
+                    if (!StartCalibration.KsTownApplied(t)) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
+                    long g = t.Gold;
+                    double inst = (f.FL + f.FC + f.FLf) / Weeks;
+                    bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
+                    if (g <= OverReserve * TownPurse.Reserve(t) || RemitOf(st) != 0 || arrears) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
+                    if (f.SG0 == long.MinValue || f.SGDay < 0) { f.SG0 = g; f.SGDay = today; continue; }
+                    int span = today - f.SGDay;
+                    if (span < days) continue;
+                    double grow = (g - f.SG0) / (double)span;
+                    f.SG0 = g; f.SGDay = today;                                  // przyrost od tej doby (bez liczenia drugi raz)
+                    double F = f.FL + f.FC;
+                    if (!(grow > 0) || !(F > 0)) continue;
+                    double add = Math.Min(grow * YearDays, mx * F);
+                    if (!(add > 0)) continue;
+                    double r = (F + add) / F;
+                    f.FL *= r; f.FC *= r;
+                    KsFolkIncome.NoteRaise(add);
+                }
+                catch (Exception e) { Stumble("SurplusReview", e); }
             }
         }
 
