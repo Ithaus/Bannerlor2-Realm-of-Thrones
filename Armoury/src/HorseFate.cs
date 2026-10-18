@@ -42,7 +42,8 @@ namespace Armoury
     ///      zwyciezcow wedlug wkladu (ContributionToBattle z migawki MapEventEnded; jak zloto A6 - proporcja, reszta najwiekszym), zaloga/milicja/osada -
     ///      na polke swojej osady, Inni - nic; ponad udzwig zwyciezcy - na polke najblizszej przyjaznej warowni; bez zwyciezcy (rozwiazanie) - polka osady
     ///      rozwiazania albo najblizszej przyjaznej warowni (kasa osady nie placi - porzucony dobytek). BK BKCaravansBehavior.OnMapEventEnded (zwycieska
-    ///      karawana wyrzuca zwierzeta ponad ludzi i towar ponad udzwig): roznica rosteru - na polke najblizszej przyjaznej warowni.
+    ///      karawana wyrzuca zwierzeta ponad ludzi i towar ponad udzwig): roznica rosteru - na polke najblizszej przyjaznej warowni; f16-ksiega: to samo dla
+    ///      kopii gry CaravansCampaignBehavior.OnMapEventEnded (ten sam kod, biegnie zwykle pierwsza - dotad jej zrzut znikal, licznik osobno).
     ///  (3) VeteranKeepsHorse. Konny zolnierz, ktory staje w karczmie (PeopleBook.VetCommit, klasa konna), bierze wolnego konia swojej kategorii ze zbrojowni
     ///      partii (Balance bez niego) do puli koni miasta (zapis arm_horsefate); najem konnego najemnika przez AI (RecruitKit) - kon z puli zamiast wzorca;
     ///      karczma pokazuje typ konny tylko do liczby koni w puli, bez koni - typ pieszy (Veterans.Sync); konie ponad konnych weteranow miasta (odeszli do domu,
@@ -93,10 +94,10 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, Beaten> _beaten = new Dictionary<MobileParty, Beaten>();
         private sealed class LootSnapshot { public List<KeyValuePair<MobileParty, Dictionary<ItemObject, int>>> Win; public List<MobileParty> Lose; public bool Horses, Rest; }
         private sealed class SimSnapshot { public Dictionary<ItemObject, int> Before; }   // E8/L: zbrojownia druzyny gracza przed lupem DTE z "Send troops"
-        private sealed class BkSnap { public List<KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>> Rows; }
+        private sealed class BkSnap { public List<KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>> Rows; public bool Game; }   // f16-ksiega: Game - kopia gry (CaravansCampaignBehavior)
 
         // ------------------------------------------------------------ wpiecie
-        private static string _wMission = "nie wpieta", _wDte = "nie wpiete", _wBk = "nie wpiete", _wGift = "nie wpiete", _wFin = "nie wpiete";
+        private static string _wMission = "nie wpieta", _wDte = "nie wpiete", _wBk = "nie wpiete", _wGift = "nie wpiete", _wFin = "nie wpiete", _wGame = "nie wpiete";
         private static bool _endWired;
         private static System.Reflection.FieldInfo _playerArmory;
         [ThreadStatic] private static bool _giftRun;
@@ -110,6 +111,7 @@ namespace Armoury
         private static long _dTrEvents, _dTrMissing, _dTrGar, _dTrLord, _dTrOther, _dTrParties, _dSimEvents, _dSimGained, _dSimShare;
         private static long _dSpWinPcs, _dSpWinHorses, _dSpShelfPcs, _dSpShelfHorses, _dSpArmHorses, _dSpOverflow, _dSpLeft, _dSpParties, _dSpNoWhere, _dSpSkip;
         private static long _dBkPcs, _dBkHorses;
+        private static long _dGamePcs, _dGameHorses;   // f16-ksiega: zrzut zwycieskiej karawany w kopii gry (CaravansCampaignBehavior.OnMapEventEnded) na polki
         // P3/Z3-B (TRIAZ-3 O2-3 zmiana B): dobytek na polki wedlug rodzaju osady (zamki / miasta), osobno zelazo i drewno; towar nie-zywnosciowy przekierowany z zamku do miasta
         private static long _dShCastle, _dShTown, _dShIronCastle, _dShIronTown, _dShWoodCastle, _dShWoodTown, _dShToTown, _dShNoTown;
         private static readonly Dictionary<object, Settlement> _townMemo = new Dictionary<object, Settlement>();   // miasto dla zwyciezcy / zamku - na czas jednego rozdania dobytku
@@ -138,7 +140,7 @@ namespace Armoury
             Array.Clear(_dTrGained, 0, _dTrGained.Length); Array.Clear(_dTrTaken, 0, _dTrTaken.Length);   // E8/L (252)
             _dTrEvents = _dTrMissing = _dTrGar = _dTrLord = _dTrOther = _dTrParties = _dSimEvents = _dSimGained = _dSimShare = 0;
             _dSpWinPcs = _dSpWinHorses = _dSpShelfPcs = _dSpShelfHorses = _dSpArmHorses = _dSpOverflow = _dSpLeft = _dSpParties = _dSpNoWhere = _dSpSkip = 0;
-            _dBkPcs = _dBkHorses = 0;
+            _dBkPcs = _dBkHorses = 0; _dGamePcs = _dGameHorses = 0;
             _dShCastle = _dShTown = _dShIronCastle = _dShIronTown = _dShWoodCastle = _dShWoodTown = _dShToTown = _dShNoTown = 0; _townMemo.Clear();
             _dVetIn = _dVetNoHorse = _dVetPlayer = _dVetHire = _dVetHireNone = _dVetOut = _dVetFootShown = _dMercTemplate = 0;
             _dGiftHorses = _dGiftFood = _dGiftNoHorse = _dGiftNoFood = _dGiftGold = _dGiftParties = _dGiftNoSeat = 0;
@@ -990,14 +992,20 @@ namespace Armoury
         }
 
         // BK BKCaravansBehavior.OnMapEventEnded: zwycieska karawana wyrzuca zwierzeta ponad ludzi i towar ponad udzwig - na polke najblizszej przyjaznej warowni
-        public static void BkPrefix(MapEvent __0, out object __state)
+        public static void BkPrefix(MapEvent __0, out object __state) { __state = Snap(__0, false, "BkPrefix"); }
+
+        // f16-ksiega: ta sama regula dla kopii gry CaravansCampaignBehavior.OnMapEventEnded (ten sam kod co BK: zwierzeta ponad ludzi, potem towar ponad udzwig
+        // od najtanszego). Oba sluchacze MapEventEnded biegna po kolei - kto pierwszy, ten zrzuca; dotad latana byla tylko kopia BK, a zrzut gry znikal bez sladu
+        // (fin93 d109135 zelazo -56: A17 D5 "CaravansCampaignBehavior 0/-56"; BK na polki 0 w 160 z 161 dob)
+        public static void GamePrefix(MapEvent __0, out object __state) { __state = Snap(__0, true, "GamePrefix"); }
+
+        private static BkSnap Snap(MapEvent me, bool game, string where)
         {
-            __state = null;
             try
             {
-                if (__0 == null || !SpoilsOn) return;
-                var sn = new BkSnap { Rows = new List<KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>>() };
-                foreach (var pb in __0.InvolvedParties)
+                if (me == null || !SpoilsOn) return null;
+                var sn = new BkSnap { Rows = new List<KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>>(), Game = game };
+                foreach (var pb in me.InvolvedParties)
                 {
                     var mp = pb != null ? pb.MobileParty : null;
                     if (mp == null || !mp.IsCaravan || mp.ItemRoster == null) continue;
@@ -1009,9 +1017,9 @@ namespace Armoury
                     }
                     sn.Rows.Add(new KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>(mp, d));
                 }
-                if (sn.Rows.Count > 0) __state = sn;
+                return sn.Rows.Count > 0 ? sn : null;
             }
-            catch (Exception e) { Stumble("BkPrefix", e); }
+            catch (Exception e) { Stumble(where, e); return null; }
         }
 
         public static void BkPostfix(object __state)
@@ -1041,7 +1049,8 @@ namespace Armoury
                             if (mTown != null) { to = mTown; _dShToTown += gone; } else _dShNoTown += gone;
                         }
                         to.ItemRoster.AddToCounts(kv.Key, gone);
-                        _dBkPcs += gone; if (IsHorse(kv.Key.Item)) _dBkHorses += gone;
+                        if (sn.Game) { _dGamePcs += gone; if (IsHorse(kv.Key.Item)) _dGameHorses += gone; }   // f16-ksiega: kopia gry osobno w linii doby
+                        else { _dBkPcs += gone; if (IsHorse(kv.Key.Item)) _dBkHorses += gone; }
                         NoteShelf(to, kv.Key.Item, gone);
                     }
                 }
@@ -1384,7 +1393,7 @@ namespace Armoury
             long dm = 0, da = 0; for (int i = 0; i < Cats; i++) { dm += _dDeadMission[i]; da += _dDeadAuto[i]; }
             return "polegle (misja " + dm + " / autobitwa " + da + ", W " + W.ToString("0.00", CultureInfo.InvariantCulture) + ") " + Row(Sum(_dDeadMission, _dDeadAuto))
                    + " | przeniesienia: lup zwyciezcow " + _dLootMoved + " (kopie DTE zdjete u pokonanych " + _dLootCopies + "), dobytek rozbitych do zwyciezcow " + _dSpWinHorses
-                   + ", porzucone do osad " + (_dSpShelfHorses + _dBkHorses) + ", pula weteranow +" + _dVetIn + "/-" + (_dVetHire + _dVetOut)
+                   + ", porzucone do osad " + (_dSpShelfHorses + _dBkHorses + _dGameHorses) + ", pula weteranow +" + _dVetIn + "/-" + (_dVetHire + _dVetOut)
                    + ", dary startowe z polki: konie " + _dGiftHorses + ", zywnosc " + _dGiftFood + " / brak " + _dGiftNoHorse + "/" + _dGiftNoFood;
         }
 
@@ -1420,6 +1429,7 @@ namespace Armoury
                   .Append(" | dobytek rozbitych (partii ").Append(_dSpParties).Append("): do zwyciezcow sztuk ").Append(_dSpWinPcs).Append(" (koni ").Append(_dSpWinHorses)
                   .Append("), na polki osad ").Append(_dSpShelfPcs).Append(" (koni ").Append(_dSpShelfHorses).Append(", ponad udzwig ").Append(_dSpOverflow)
                   .Append("), w tym konie zbrojowni rozbitych ").Append(_dSpArmHorses).Append(", BK karawany na polki ").Append(_dBkPcs).Append(" (koni ").Append(_dBkHorses)
+                  .Append("), karawany gry na polki (f16-ksiega) ").Append(_dGamePcs).Append(" (koni ").Append(_dGameHorses)
                   .Append("), zostalo w taborze (unikaty, nie-towar) ").Append(_dSpLeft).Append(", bez miejsca ").Append(_dSpNoWhere)
                   .Append(", pominiete partie bez niszczyciela (inne mody, dostawy BK) ").Append(_dSpSkip)
                   .Append(", polki wedlug osady (P3/Z3-B, klucz ").Append(yn(s != null && s.SpoilsNonFoodToTown)).Append("): zamki ").Append(_dShCastle).Append(", miasta ").Append(_dShTown)
@@ -1436,7 +1446,7 @@ namespace Armoury
                   .Append("; siodla z polki siedziby (P2/C3) ").Append(_dGiftSaddles).Append(" / brak ").Append(_dGiftNoSaddle).Append(", w tym zloto za siodla ").Append(_dGiftSaddleGold)
                   .Append(", konie nie kupione - partia juz je miala ").Append(_dGiftHadHorse)
                   .Append(" | zamiany ROT na konnego: z koniem ").Append(_dRotHorse).Append(", na pieszego ").Append(_dRotFoot).Append(", zostal konny bez konia ").Append(_dRotKeep)
-                  .Append(" | wpiecie: misja ").Append(_wMission).Append(", okno DTE ").Append(_wDte).Append(", BK karawany ").Append(_wBk).Append(", rozliczenie DTE ").Append(_wFin).Append(", dary ").Append(_wGift)
+                  .Append(" | wpiecie: misja ").Append(_wMission).Append(", okno DTE ").Append(_wDte).Append(", BK karawany ").Append(_wBk).Append(", karawany gry ").Append(_wGame).Append(", rozliczenie DTE ").Append(_wFin).Append(", dary ").Append(_wGift)
                   .Append(" | potkniecia dzis ").Append(_dStumbles).Append(" (razem ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
             }
@@ -1558,6 +1568,18 @@ namespace Armoury
                 else _wBk = "BRAK (BK BKCaravansBehavior.OnMapEventEnded)";
             }
             catch (Exception e) { _wBk = "BLAD"; Log.Error("HorseFate.ApplyAll(BK karawany)", e); }
+            try
+            {
+                // f16-ksiega: kopia gry tej samej reguly (metoda zadeklarowana w CaravansCampaignBehavior - DeclaredMethod, CLAUDE.md 7 "latka na metode dziedziczona")
+                var m = AccessTools.DeclaredMethod(typeof(CaravansCampaignBehavior), "OnMapEventEnded", new[] { typeof(MapEvent) });
+                if (m != null)
+                {
+                    h.Patch(m, prefix: new HarmonyMethod(typeof(HorseFate), nameof(GamePrefix)), postfix: new HarmonyMethod(typeof(HorseFate), nameof(BkPostfix)));
+                    _wGame = "wpiete";
+                }
+                else _wGame = "BRAK (CaravansCampaignBehavior.OnMapEventEnded)";
+            }
+            catch (Exception e) { _wGame = "BLAD"; Log.Error("HorseFate.ApplyAll(karawany gry)", e); }
             try
             {
                 var m = AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "GiveInitialItemsToParty", new[] { typeof(MobileParty) });
