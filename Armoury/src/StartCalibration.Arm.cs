@@ -82,7 +82,12 @@ namespace Armoury
         // 7 dob od tej doby. Zapis: trzecie pole "A=" (starsza DLL czyta dwa pierwsze); zapis bez pola - _matureSince + PlanUseLag (typowe opoznienie odbioru Planu).
         private static int _matureUse = -1;
         private const int PlanUseLag = 2;
+        // f4b-zapis (recenzja): _matureUse z zapisu BEZ trzeciego pola (WGRANIE 78, klucz wylaczony przy zapisie) - szacunek _matureSince + 2, najwyzej doba wczytania
+        // (pierwsze uzycie bylo przed zapisem); moze sie mylic o ok. 1 dobe (Plan dojrzaly juz przy uzbrojeniu, wolniejszy odbior Planu). Znacznik do linii (ARM-3 34/36
+        // dob wytlumaczone) i do zapisu (czwarte pole "1" - starsza DLL czyta dwa pierwsze, ta - trzy pierwsze i znacznik).
+        private static bool _matureUseGuess;
         private static bool MatureFromUseKey { get { var s = Settings.Current; return s != null && s.KsArmMatureFromUse; } }
+        private const string GuessTxt = "doba uzycia z zapisu bez pola - szacunek doba danych Planu + 2, mozliwe +-1 doba";   // f4b-zapis (recenzja): tekst stalej dla sprawdz_logi
         private sealed class LandBack { public int Day; public string Why; }
         private static readonly Dictionary<string, LandBack> _back = new Dictionary<string, LandBack>(StringComparer.Ordinal);
         private static volatile HashSet<Settlement> _backSet = new HashSet<Settlement>();   // osady krain wroconych (haki - tylko odczyt opublikowanego zbioru)
@@ -113,7 +118,7 @@ namespace Armoury
             _emaRestored = false; _whyCodes = null; _whyDay = int.MinValue; _gateTmp.Clear(); _gPrev.Clear(); _gHarv.Clear(); _perkFishSkip = 0;
             _autoFlagDay = int.MinValue; _autoFlagVal = false; _autoApplying = false; _gPrevDay = int.MinValue;
             _perkFishNamed = _patrolNamed = _patrolPaid = _patrolNone = _portFishNamed = 0; _backDep = 0;
-            _matureUse = -1;   // f4b-zapis
+            _matureUse = -1; _matureUseGuess = false;   // f4b-zapis
         }
 
         private static string CampaignId()
@@ -410,7 +415,7 @@ namespace Armoury
                     return;
                 }
                 _state = StateArmed; _armDay = today; _armHash = PlanHash(_plan); _armLandCrc = _landCrc; _campaign = gid; _autoArm = true; _matureSince = -1;
-                _matureUse = -1;   // f4b-zapis
+                _matureUse = -1; _matureUseGuess = false;   // f4b-zapis
                 Log.Info(PK + "uzbrojony zapis doba " + today + " (samo - klucz Start Calibration Auto Arm" + (AutotestMode() ? "; autotest: " + (AutoTestKey ? "klucz Start Calibration Auto Arm Autotest" : "plik " + AutoFlagName) : "") + ") | kampania " + (gid.Length > 0 ? gid : "-")
                          + ", plik ziemi " + _landCrc.ToString("X8") + " | pomiar: srednia ksiegi towarow " + Math.Min(_emaDays, MinLedgerDays) + "/" + MinLedgerDays + " dob" + (_emaRestored ? " (z zapisu)" : "")
                          + ", potem " + GateDays + " dob dojrzalego Planu, Plan z pomiarem pieniedzy, bramki gry i twarde bramki rozdz. 10 - wlaczenie samo, najwczesniej doba " + (today + MinLedgerDays + GateDays)
@@ -429,11 +434,11 @@ namespace Armoury
             {
                 Log.Info(PK + "dzien " + day + " | samo wlaczenie: plik ziemi inny niz przy uzbrojeniu (" + _armLandCrc.ToString("X8") + " / teraz " + _landCrc.ToString("X8") + ") - dojrzaly Plan liczony od nowa.");
                 _armLandCrc = _landCrc; _matureSince = -1;
-                _matureUse = -1;   // f4b-zapis
+                _matureUse = -1; _matureUseGuess = false;   // f4b-zapis
             }
             bool mature = PlanMature();
             if (mature && _matureSince < 0) _matureSince = Math.Max(_planDay, _armDay);
-            if (mature && _matureUse < 0) _matureUse = today;   // f4b-zapis: pierwsza doba uzycia dojrzalego Planu (zapis bez pola - ImportArmData: _matureSince + PlanUseLag)
+            if (mature && _matureUse < 0) { _matureUse = today; _matureUseGuess = false; }   // f4b-zapis: pierwsza doba uzycia dojrzalego Planu (zapis bez pola - ImportArmData: _matureSince + PlanUseLag)
             var why = new List<string>(); var codes = new StringBuilder();
             if (!mature) { why.Add("srednia ksiegi towarow " + Math.Min(_emaDays, MinLedgerDays) + "/" + MinLedgerDays + " dob (ostatni Plan z " + _planEma + ")"); codes.Append('E'); }
             else if (!_plan.MoneyMeasured) { why.Add("Plan doby " + _planDay + " bez pomiaru pieniedzy (7 dob tej sesji)"); codes.Append('M'); }
@@ -472,7 +477,8 @@ namespace Armoury
         private static void ApplyAuto(int today, string gatesLine)
         {
             Log.Info(PK + "samo wlaczenie doba " + today + " | zapis uzbrojony doba " + _armDay + " (samo), Plan doby " + _planDay + " (nr " + _plans + ") z ksiega towarow " + _planEma + " dob, pieniadze z pomiaru TAK"
-                     + ", dojrzaly Plan od doby " + _matureSince + (MatureFromUseKey ? ", w uzyciu od doby " + _matureUse + " (" + (today - _matureUse) + " dob uzycia; Ks Arm Mature From Use TAK, uzbrojony " + (today - _armDay) + " dob temu)" : " (" + (today - _matureSince) + " dob)")   // f4b-zapis
+                     + ", dojrzaly Plan od doby " + _matureSince + (MatureFromUseKey ? ", w uzyciu od doby " + _matureUse + " (" + (today - _matureUse) + " dob uzycia; Ks Arm Mature From Use TAK, uzbrojony " + (today - _armDay) + " dob temu"
+                                                                     + (_matureUseGuess ? "; " + GuessTxt : "") + ")" : " (" + (today - _matureSince) + " dob)")   // f4b-zapis
                      + " | " + gatesLine + " | bramka krainy TAK (" + LandGateRule(false) + ")"
                      + " | pieniadze: przelewow 0 zl, towar: 0 szt. (samo wlaczenie zmienia tylko zasady produkcji i popytu - rampa) | wszystkie bramki TAK - wlaczam.");
             _autoApplying = true;
@@ -720,14 +726,14 @@ namespace Armoury
                      + " | twarde bramki " + (HardGatesKey ? "TAK" : "NIE") + " | ryby z perku Night Raider " + (NoPerkFishKey ? (_perkPatched ? "przed wlaczeniem nazwane w ksiedze, po wlaczeniu zablokowane" : "BRAK latki") : "jak dotad (klucz NIE)")
                      + " | zboze patroli miast " + (PatrolKey ? (_patrolPatched ? "przed wlaczeniem nazwane w ksiedze, po wlaczeniu ze spichlerza miasta" : "BRAK latki") : "jak dotad (klucz NIE)")
                      + " | ryby portow BK miast " + (BkPortsKey ? (_portPatched ? "nazwane w ksiedze" : "BRAK latki") : "jak dotad (klucz NIE)")
-                     + " | 7 dob dojrzalego Planu (Ks Arm Mature From Use) " + (MatureFromUseKey ? "TAK - od pierwszej doby uzycia Planu" + (_matureUse >= 0 ? " (doba " + _matureUse + ")" : "") + ", wlaczenie samo najwczesniej uzbrojenie + " + (MinLedgerDays + GateDays) + " dob"
+                     + " | 7 dob dojrzalego Planu (Ks Arm Mature From Use) " + (MatureFromUseKey ? "TAK - od pierwszej doby uzycia Planu" + (_matureUse >= 0 ? " (doba " + _matureUse + (_matureUseGuess ? "; " + GuessTxt : "") + ")" : "") + ", wlaczenie samo najwczesniej uzbrojenie + " + (MinLedgerDays + GateDays) + " dob"
                                                                                     : "NIE - od doby danych Planu (stara regula, ok. 2 doby wczesniej)") + ".");   // f4b-zapis: znacznik dla sprawdz_logi (ARM-3, NKS-11)
         }
 
         private static void ArmStateClear()
         {
             _autoArm = false; _matureSince = -1; _back.Clear(); _drawStreak.Clear(); _gateRing.Clear(); _landLoss.Clear();
-            _matureUse = -1;   // f4b-zapis
+            _matureUse = -1; _matureUseGuess = false;   // f4b-zapis
         }
 
         // ============================================================ zapis arm_ks_arm
@@ -744,7 +750,11 @@ namespace Armoury
                 sb.Append("V=").Append(ArmVersion).Append('\n');
                 sb.Append("C=").Append(Clean(CampaignId())).Append('\n');
                 sb.Append("A=").Append(_autoArm ? 1 : 0).Append('|').Append(_matureSince);
-                if (MatureFromUseKey && _matureUse >= 0) sb.Append('|').Append(_matureUse);   // f4b-zapis: trzecie pole (starsza DLL czyta p[0], p[1]); klucz wylaczony - wiersz jak dotad
+                if (MatureFromUseKey && _matureUse >= 0)
+                {
+                    sb.Append('|').Append(_matureUse);   // f4b-zapis: trzecie pole (starsza DLL czyta p[0], p[1]); klucz wylaczony - wiersz jak dotad
+                    if (_matureUseGuess) sb.Append("|1");   // f4b-zapis (recenzja): czwarte pole - doba uzycia to szacunek z zapisu bez pola (znacznik przezywa kolejny zapis)
+                }
                 sb.Append('\n');
                 if (_gateRing.Count > 0)
                 {
@@ -836,8 +846,16 @@ namespace Armoury
                     _matureSince = _state == StateArmed ? a1 : -1;
                     // f4b-zapis: pierwsza doba uzycia dojrzalego Planu (trzecie pole); zapis starszej DLL albo z kluczem wylaczonym - typowe opoznienie odbioru Planu
                     int a2;
-                    if (p.Length >= 3 && int.TryParse(p[2], out a2) && a2 >= 0 && _matureSince >= 0) _matureUse = Math.Max(a2, _matureSince);
-                    else _matureUse = _matureSince >= 0 ? _matureSince + PlanUseLag : -1;
+                    if (p.Length >= 3 && int.TryParse(p[2], out a2) && a2 >= 0 && _matureSince >= 0) { _matureUse = Math.Max(a2, _matureSince); _matureUseGuess = p.Length >= 4 && p[3] == "1"; }
+                    else if (_matureSince >= 0)
+                    {
+                        // f4b-zapis (recenzja): szacunek - doba danych + 2, ale nie pozniej niz doba wczytania (dojrzaly Plan byl w uzyciu przed zapisem, a zapis i wczytanie
+                        // to ta sama doba); nie wczesniej niz doba danych
+                        _matureUse = _matureSince + PlanUseLag;
+                        if (_loadDay != int.MinValue && _loadDay < _matureUse) _matureUse = Math.Max(_loadDay, _matureSince);
+                        _matureUseGuess = true;
+                    }
+                    else { _matureUse = -1; _matureUseGuess = false; }
                 }
             }
             if (map.TryGetValue('G', out v) && _state != StateApplied)
