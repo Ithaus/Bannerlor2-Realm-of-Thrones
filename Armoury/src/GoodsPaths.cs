@@ -669,7 +669,7 @@ namespace Armoury
         // dostaje nazwane zrodlo (GoodsLedger.NoteKnownSource): przy zalozeniu partii (DailyTickClan, poza ramkami) dar szedl dotad do "bez wyjasnienia"
         // (d109176 +15, d109213 +429 = "GiveFood 1 razy, 429 szt." linii E5/A8), w ticku partii (ramka) - do "inne ticki dobowe". Rodzaj -2 = tylko ksiega.
         private const int KHeroLedger = -2;
-        private const string HeroFoodSub = "dar BK dla bandy herszta (GiveFood, z niczego)";
+        private const string HeroFoodSub = "dar BK dla bandy herszta (GiveFood) - z niczego";
         private static long _dHeroLedger;   // sztuki daru herszta nazwane w ksiedze (doba) - tylko licznik
 
         private static bool BanditHero(MobileParty mp)
