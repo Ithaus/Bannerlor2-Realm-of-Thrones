@@ -2738,3 +2738,6 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   0.865 (fin78 0.948) i korona 0.914 (0.945) - prawdopodobnie KsRecipes (mniej wyrobow z wsadu), SOL dziwna (S/C 2.5-4.5, cena 5.5x, 160% zuzycia bez rynku), ceny 2-3x
   przy S/C > 1 (NKS-7), podloga spichlerza 99% (NKS-26 liczy STAN FloorOn, nie podloge dana - _granNoFloor nie w linii; do poprawy linii i progu), wlna/len 0.2-0.6,
   KS-H kasa celu za mala 37.8% (kredyt w r4-kupcy), koszt 4.45/14.3 ms (q95 33.5). Diagnoza: workflow wf_2165d530-0b5 (4 agenci, tylko odczyt: dochod, sol, kiesy, ceny).
+- 17:10 PDT: workflow wf_278cdd52-962 (noc-1718-fala2a): sw-uchodzcy (RaidRefugeesToTowns: uchodzcy z najazdu do najblizszego miasta, biedota, rece, kiesa z wsi i z powrotem)
+  i r4-glodbunt (KsHungerUnrest: glod miasta -> linia "Hunger" w czynnym modelu lojalnosci/bezpieczenstwa -> bunt mechanizmem gry/BK; KsLordFundsFood: pan miasta placi za dowoz
+  z zlota ponad rezerwe wojny); worktree zb/sw-uchodzcy, zb/r4-glodbunt (od efbbf0dc); scalenie po fali 1.
