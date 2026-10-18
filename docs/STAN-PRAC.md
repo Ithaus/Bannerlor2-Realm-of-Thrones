@@ -3111,3 +3111,6 @@ rozlozenie gospodarki doby (Jeff: pozniej).
 ### 88. NOC 18/19.10 - PRACA NOCNA (Jeff wraca rano ok. 12 h) - START TUTAJ
 Zadania Jeffa doslownie i kolejnosc: docs/PLAN-NOC-2026-10-18.md (gospodarka dostrojona, cofniecie Polnocy + wydarzenia, Stannis bez sojuszu z Dorzeczem, audyt i poprawki gospodarki,
 droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
+- 14:50 PDT: w toku: test 5 dob + bitwa wgr82t (b1ygy6m3m) -> WGRANIE 82; f18-mcm (wf_0e0e0567-597, poprawki); analiza kanon/Polnoc (wf_568b42ee-ac1); f19-drogi (wf_65af1d03-cd5,
+  zb/f19-drogi od 5086a630: droga do kazdej wioski, nowy klucz); f19-ekonomia-audyt (wf_743d7727-901: 4 audyty pieniadz/towary/kolejnosc/realizm -> weryfikacja -> poprawki w zb/f19-e1..e4
+  od 5086a630 -> recenzja). Po analizie: f19-kanon (przywrocenie wlosci + sojusz Stannis-Dorzecze).
