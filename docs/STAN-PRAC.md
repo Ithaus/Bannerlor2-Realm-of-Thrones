@@ -2989,3 +2989,7 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   Recenzja: 2 drobne (armia zbierajaca sie > 24 h wypadala z zasiegu; licznik zwolnionych) - poprawione. KL: wydarzenie ROT "KingsLanding" to nagroda GRACZA (KP + Red Keep u rodu gracza),
   zdobycie KP przez Polnoc go nie psuje; ryzyko fabularne niskie - pominiety bylby tylko Czarny Nurt (rozrusznik oznacza Stuck po 6 dniach). Ochrony fabuly NIE robie (Jeff nie prosil).
   -> do scalenia razem z f9/f10/f11.
+- 09:35 PDT: SCALENIE5 GOTOWE (wf_7848c2da-a0b): noc-ks4 af1caffa = 7ca98719 + fala 6 (f7-renty, f7-kasy, f7-wegiel, f7-browary) + fala 7 (f8-pozyczka, f8-sakiewka, f8-niewola, f8-bandy;
+  BanditLimitPerHideout domyslnie 12, suwak 12-48) + recenzja calosci (4 poprawione: KTown nie robi dluznika 166; korona2 bierze z kasy kupcow ponad prog gersumy + NoteCofferLoan;
+  licznik linii scalenia; NeedReserveUncut - R miary potrzeby bez ciec f6/f7, koniec sprzezenia D -> R -> f). + f12-odsiecz -> **8cd7b556** (1963 ustawien, build rc 0, Armoury 997b14b7).
+- 09:36 PDT: TEST fin92 = 8cd7b556 (test/fin92), armoury-ks-auto.flag (USUNAC!), 160 dob sciezki Jeffa, at-fin92-fala67.out.txt. f9/f10/f11 jeszcze w kodzie (bez gry).
