@@ -674,6 +674,15 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
+        /// <summary>f8-bandy (BanditLimit.Daily): czas odcinka taktu doby o tej nazwie w BIEZACYM takcie (odcinek juz zamkniety Lap); -1 = profil wylaczony,
+        /// poza taktem albo odcinka jeszcze nie bylo. Tylko odczyt.</summary>
+        internal static double LapMsNow(string name)
+        {
+            if (!_inTick || name == null) return -1.0;
+            for (int i = 0; i < _lN; i++) if (_lName[i] == name) return Ms(_lTicks[i]);
+            return -1.0;
+        }
+
         private sealed class ByTicks : System.Collections.Generic.IComparer<int>
         {
             private readonly long[] _t;
