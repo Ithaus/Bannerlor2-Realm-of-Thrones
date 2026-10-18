@@ -367,7 +367,11 @@ namespace Armoury
                 else
                 {
                     KeysApplied(day);                                   // klucze uzbrojenia na zapisie juz zastosowanym - Off (inny zapis nigdy ich nie zobaczy)
-                    if (_wasOff) RampRestart(today);                   // klucz znow wlaczony po przerwie (Undo -> Redo) - rampa od nowa, bez skoku
+                    if (_wasOff)
+                    {
+                        RampRestart(today);                             // klucz znow wlaczony po przerwie (Undo -> Redo) - rampa od nowa, bez skoku
+                        try { LandRetry(today); } catch (Exception e) { Stumble("LandRetry", e); }   // ks-arm (recenzja): druga proba krain wroconych - tylko recznie, razem z rampa
+                    }
                     try { LandGateDaily(today); } catch (Exception e) { Stumble("LandGateDaily", e); }   // ks-arm: bramka krainy (rozdz. 8) - PRZED stawkami jutra
                     LiveDaily(today);
                     if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);   // Plan dalej co 7 dob - pomiar nacisku i lepszy stol (gra bez zmian)
@@ -442,7 +446,7 @@ namespace Armoury
         }
 
         /// <summary>Bramki wlaczenia w grze (Arm This Save i Confirm; projekt rozdz. 7, 10, 12 i recenzja 16.10): gotowy Plan z dojrzala ksiega towarow, Daily Life Measure,
-        /// twarde bramki ZC1, nie w zimie (do czasu bramki krainy), uklad wiosek zgodny. false - powod (log) i komunikat po angielsku.</summary>
+        /// twarde bramki ZC1, nie w zimie (chyba ze bramka krainy i podloga spichlerza Famine - recenzja ks-arm), uklad wiosek zgodny. false - powod (log) i komunikat po angielsku.</summary>
         private static bool GameGates(bool planOk, out string why, out string en)
         {
             var s = Settings.Current;
@@ -453,7 +457,10 @@ namespace Armoury
             if (!PlanMature()) { why = "za malo dob ksiegi towarow w tej sesji (Plan liczony z " + _planEma + " dob sredniej, potrzeba " + MinLedgerDays + "; w sesji teraz " + _emaDays + ")"; en = "too few days of goods ledger this session (" + Math.Min(_emaDays, MinLedgerDays) + " of " + MinLedgerDays + ") - play on and try again."; return false; }
             if (!DailyLife.KeyOn) { why = "Daily Life Measure wylaczony - bez stanow ZC nie ma koszyka ZC4"; en = "Daily Life Measure is off - the people's basket cannot be reckoned."; return false; }
             if (s != null && (!s.BkRecipeYieldByWorkshop || !s.WhaleMeatFromWhalersOnly)) { why = "twarde bramki ZC1 (rozdz. 10): BkRecipeYieldByWorkshop " + (s.BkRecipeYieldByWorkshop ? "tak" : "NIE") + ", WhaleMeatFromWhalersOnly " + (s.WhaleMeatFromWhalersOnly ? "tak" : "NIE"); en = "switch on Bk Recipe Yield By Workshop and Whale Meat From Whalers Only first."; return false; }
-            if (winter && !LandGateReady) { why = "zima (WinterBite) - wlaczenie w zimie tylko z bramka krainy (rozdz. 7-8; klucz Ks Land Gate wylaczony)"; en = "not in winter - try again after the thaw."; return false; }
+            // recenzja ks-arm: projekt rozdz. 7 - w zimie tylko z podloga Famine I bramka krainy; przy Ks Granary No Floor (domyslnie) podlogi nie ma, a proby zimy z KS nie bylo -
+            // wlaczenie czeka do odwilzy (jak przed paczka)
+            bool floorOn = s != null && !s.KsGranaryNoFloor;
+            if (winter && !(LandGateReady && floorOn)) { why = "zima (WinterBite) - wlaczenie w zimie tylko z bramka krainy i podloga spichlerza Famine (rozdz. 7; Ks Land Gate " + (LandGateReady ? "tak" : "NIE") + ", Ks Granary No Floor " + (floorOn ? "nie" : "TAK - bez podlogi") + ")"; en = "not in winter - try again after the thaw."; return false; }
             if (!LayoutMatches(out lay)) { why = "uklad wiosek niezgodny z plikiem ziemi"; en = "the village layout does not match the land file - nothing done."; return false; }
             why = en = null;
             return true;

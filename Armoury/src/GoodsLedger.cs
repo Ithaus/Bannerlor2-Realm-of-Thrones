@@ -1136,6 +1136,27 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteSource", e); }
         }
 
+        // ks-arm (recenzja, noc 17/18.10): zrodla znane z nazwy dla twardej bramki KS (projekt rozdz. 10 pkt 3 - "inne ticki dobowe" maja byc tylko zrodlami nieznanymi):
+        // ryby z perku Night Raider (NavalDLC), zboze nowych druzyn patrolowych miast, ryby portow BK miast - wlasna grupa (poza SrcOrder - drukowana po "inne ticki"),
+        // nie wchodzi do liczb Planu KS (KsNote) ani do bramki (KsGateTake liczy tylko GTick)
+        internal const string GKnown = "zrodla znane z nazwy (KS)";
+
+        /// <summary>ks-arm: jak NoteSource (przyrost zdjety z otwartej ramki, zeby nie poszedl do "inne ticki"), ale grupa GKnown i bez klucza FoodSourcesInLedger
+        /// (decyduja klucze KS wolajacego). Nie rzuca.</summary>
+        internal static void NoteKnownSource(ItemObject it, int n, string sub)
+        {
+            try
+            {
+                if (n == 0 || it == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(it, out i)) return;
+                var f = _top;
+                if (f != null && Environment.CurrentManagedThreadId == f.Thread) { f.Touch(i); f.Net[i] -= n; }
+                Book(i, GKnown, sub, n);
+            }
+            catch (Exception e) { Stumble("NoteKnownSource", e); }
+        }
+
         /// <summary>m6b (5): MobileParty.RemoveParty bez zdarzenia zniszczenia (konwoje DTE - CutTheirSupplyBehavior.CleanupCaravan): roster znika bez sladu
         /// (G MobileParty.cs:3525 ItemRoster.Clear - nie przez AddToCounts) - towar jako ujscie. Po zdarzeniu zniszczenia liczy OnPartyDestroyed (GLost).</summary>
         internal static void OnPartyRemoved(MobileParty mp)

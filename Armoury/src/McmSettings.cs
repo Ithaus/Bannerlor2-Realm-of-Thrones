@@ -6672,7 +6672,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationAutotestApply { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan, land file) and this switch turns itself off again, so another save is never touched. Needs a plan built on 28 days of the goods ledger in this session, Daily Life Measure, Bk Recipe Yield By Workshop and Whale Meat From Whalers Only, and not in winter unless Ks Land Gate is on. Nothing in the game changes yet")]
+        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan, land file) and this switch turns itself off again, so another save is never touched. Needs a plan built on 28 days of the goods ledger in this session, Daily Life Measure, Bk Recipe Yield By Workshop and Whale Meat From Whalers Only, and not in winter (unless Ks Land Gate is on and Ks Granary No Floor is off). Nothing in the game changes yet")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationArmThisSave { get; set; } = false;
 
@@ -6680,29 +6680,41 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationConfirm { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Auto Arm", HintText = "with Start Calibration: the calibration arms itself on a running campaign the first time it is loaded with this version and only surveys at first - 28 days of the goods ledger, then 7 days of finished weekly plans (the survey is kept in the save from one session to the next) - and checks its safeguards (the famine gate of every land, no goods from nowhere in the ledger, the village layout, not in winter without the famine gate). When all pass it starts by itself with the usual ramp: 14 days in which the villages move to what their hands make on their land, then 14 days in which the people's daily basket comes to the markets. Nothing changes before that. Off = only Arm This Save and Confirm start it. To undo at any time switch Start Calibration off (from the next day output and demand are as before)")]
+        [SettingPropertyBool("Start Calibration Auto Arm", HintText = "with Start Calibration: the calibration arms itself on a running campaign the first time it is loaded with this version and only surveys at first - 28 days of the goods ledger, then 7 days of finished weekly plans (the survey is kept in the save from one session to the next) - and checks its safeguards (the famine gate of every land, no goods from nowhere in the ledger, the village layout, not in winter unless the old granary floor is on). When all pass it starts by itself with the usual ramp: 14 days in which the villages move to what their hands make on their land, then 14 days in which the people's daily basket comes to the markets. Nothing changes before that. Off = only Arm This Save and Confirm start it. To undo at any time switch Start Calibration off (from the next day output and demand are as before)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationAutoArm { get; set; } = true;
 
-        [SettingPropertyBool("Ks Land Gate", HintText = "with Start Calibration applied: the famine gate of every land - when a village of a land goes hungry because of the calibration (a shortage above a tenth of its food, not raided, looted or besieged, and the old harvest rule would have fed it better), or the land's granaries fall by more than 1% of its need a day for 7 days in a row while they hold less than Ks Land Gate Reserve Days, that land alone goes back to the old village output, granary, market and food carts from the next day; the rest of the realm keeps the calibration. Off = no famine gate, and the calibration cannot start in a campaign (as before)")]
+        [SettingPropertyBool("Ks Land Gate", HintText = "with Start Calibration applied: the famine gate of every land - when a village of a land starts to run out of food because of the calibration (its granary is nearly empty and it eats a tenth less, it is not being raided, looted or besieged right now, and the old harvest rule would have fed it better), or the land's granaries fall by more than 1% of its need a day for 7 days in a row once they have lost Ks Land Gate Loss Days under the calibration or hold less than Ks Land Gate Reserve Days, that land alone - and the villages that trade in its towns - goes back to the old village output, granary, market and food carts from the next day; the rest of the realm keeps the calibration. A second try comes only by hand: switch Start Calibration off and on again (the whole realm ramps in again). Off = the calibration cannot start in a campaign (as before); once it has started in a campaign the gate keeps working - deaths from hunger cannot be undone, so only Start Calibration off stops it")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsLandGate { get; set; } = true;
 
-        [SettingPropertyInteger("Ks Land Gate Reserve Days", 0, 728, "0", HintText = "with Ks Land Gate: the granaries of a land count as falling only once they hold less than this many days of its need (full granaries hold two years; 364 = half of them). 0 = from the first day - then almost every land would go back within a week, because honest granaries without the old floor fall slowly where the land cannot feed itself")]
+        [SettingPropertyInteger("Ks Land Gate Reserve Days", 0, 728, "0", HintText = "with Ks Land Gate: a land whose granaries hold less than this many days of its need counts a fall from the first day (full granaries hold two years; 364 = half of them - lands already emptied by war). 0 = always - then almost every land would go back within a week, because honest granaries without the old floor fall slowly where the land cannot feed itself")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public int KsLandGateReserveDays { get; set; } = 364;
+
+        [SettingPropertyInteger("Ks Land Gate Loss Days", 0, 364, "0", HintText = "with Ks Land Gate: how many days of a land's need its granaries may lose under the calibration before a fall of more than 1% a day for 7 days sends that land back - counted from the day the calibration started, only on days it fed the land less than the old harvest rule would have (granaries filling up again count back; losses to raids do not count). 91 = one season of the land's two-year store, so the winter reserve stays nearly whole. 0 = any loss (the strict rule)")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public int KsLandGateLossDays { get; set; } = 91;
 
         [SettingPropertyBool("Ks Hard Gates", HintText = "with Start Calibration: before the calibration starts in a campaign (by itself or with Confirm) the goods ledger must show at most 2 pieces a day of any good appearing from nowhere (daily ticks of unknown origin) and of food lost with removed parties over the last 7 full days, and the free food of supply convoys and Banner Kings parties must be shut off; until then it keeps waiting and the log says why. Off = only the older checks")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsHardGates { get; set; } = true;
 
-        [SettingPropertyBool("Ks No Fish From Perk", HintText = "with the start calibration armed or applied: the Night Raider perk of a town's governor (War Sails) no longer conjures fish each day for every village trading with that town (about 100 to 150 fish a day across the world, from no boat and no fisherman) - fish come only from fishermen's hands. Off = as before")]
+        [SettingPropertyBool("Ks No Fish From Perk", HintText = "with Start Calibration: the Night Raider perk of a town's governor (War Sails) conjures fish each day for every village trading with that town (about 100 to 150 fish a day across the world, from no boat and no fisherman). While the calibration only surveys, those fish are written in the goods ledger as a known source and the game is unchanged; once it is applied the perk no longer makes them - fish come only from fishermen's hands (in a land sent back by the famine gate the perk works as before). Off = as before")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsNoFishFromPerk { get; set; } = true;
 
         [SettingPropertyBool("Start Calibration Auto Arm Autotest", HintText = "FOR THE AUTOTEST ONLY: while the CrashScribe autotest runs, the calibration takes the same self-arming path as a normal campaign (Start Calibration Auto Arm: arm on the first day, survey, safeguards, then start by itself) instead of starting at the first finished plan; the same as the file armoury-ks-auto.flag. In a normal game it does nothing")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationAutoArmAutotest { get; set; } = false;
+
+        [SettingPropertyBool("Ks Patrol Grain From Town", HintText = "with Start Calibration: the 15 to 30 grain the game gives every new town patrol from nothing. While the calibration only surveys, that grain is written in the goods ledger as a known source and the game is unchanged; once it is applied the grain comes out of the home town's food stocks (nothing from nothing; a town without the stock still gives it, written as such; in a land sent back by the famine gate as before). Off = as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsPatrolGrainFromTown { get; set; } = true;
+
+        [SettingPropertyBool("Ks Bk Ports In Ledger", HintText = "with Start Calibration: the fish that Banner Kings' town ports and harbours catch each day (paid from the town's gold) are written in the goods ledger under their own name instead of 'daily ticks of unknown origin', so the safeguard before the calibration starts counts only goods that truly come from nowhere. Ledger only - nothing in the game changes. Off = as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsBkPortsInLedger { get; set; } = true;
 
         [SettingPropertyBool("Ks Food Carts", HintText = "with the calibration applied: a town short of food buys grain, fish, meat, cheese, salt and the other foods in a town of the same market that has more than it needs, and the cart goes for as many days as the road (by sea a ship is four times faster and much cheaper than a cart). The buying town pays the selling town for every piece and the carters of the seller's villages (by sea - its dock hands) for the haul, only when the merchants gain on it, and never below half of the town merchants' reserve. Fish, meat, fruit and the other perishables go at most 7 days and lose a little on the way; off = no new food carts (carts on the road still arrive)")]
         [SettingPropertyGroup("Start calibration (KS)")]
@@ -8632,9 +8644,12 @@ namespace Armoury
             s.StartCalibrationAutoArm = StartCalibrationAutoArm;
             s.KsLandGate = KsLandGate;
             s.KsLandGateReserveDays = KsLandGateReserveDays;
+            s.KsLandGateLossDays = KsLandGateLossDays;
             s.KsHardGates = KsHardGates;
             s.KsNoFishFromPerk = KsNoFishFromPerk;
             s.StartCalibrationAutoArmAutotest = StartCalibrationAutoArmAutotest;
+            s.KsPatrolGrainFromTown = KsPatrolGrainFromTown;
+            s.KsBkPortsInLedger = KsBkPortsInLedger;
             s.KsFoodCarts = KsFoodCarts;
             s.KsLandGradient = KsLandGradient;
             s.KsAlphaNet = KsAlphaNet;

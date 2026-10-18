@@ -306,6 +306,8 @@ RANGES = {
     'StartCalibrationMapInertia': (1.0, 2.0, "0.00"),
     # ks-arm (noc 17/18.10): prog zapasu bramki krainy - kod przycina do 0..728 (StartCalibration.ReserveDaysKey)
     'KsLandGateReserveDays': (0, 728, "0"),
+    # recenzja ks-arm: budzet straty spichlerzy krainy pod KS - kod przycina do 0..364 (StartCalibration.LossDaysKey)
+    'KsLandGateLossDays': (0, 364, "0"),
     # DS F1 (17.10): daniny wsi - zgodnie z przycieciem w kodzie (DsVillage: udzial korony 0..0.5, doby 0..3640 / 0..364, udzial BK 0..1)
     'DsWarShareVillage': (0.0, 0.5, "0.00"),
     'DsRentForgiveDays': (0, 728, "0"),

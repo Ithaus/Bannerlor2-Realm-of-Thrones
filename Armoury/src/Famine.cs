@@ -255,20 +255,18 @@ namespace Armoury
             catch (Exception e) { Stumble("Famine.FamPartOf", e); return 0.0; }
         }
 
-        /// <summary>ks-arm (bramka krainy KS, projekt KS rozdz. 8 "poza oblezeniem i najazdem"): glod tej wsi liczylby sie w linii glodu jako oblezony albo spustoszony
-        /// (R1-3: wies nie Normal, region oblezony albo rabowany w ciagu roku, uchodzcy inni niz z glodu na koncie). Nie rzuca.</summary>
+        /// <summary>ks-arm (bramka krainy KS, projekt KS rozdz. 8 "poza oblezeniem i najazdem"): glod tej wsi jest z wojny TERAZ - wies najezdzana albo spladrowana
+        /// (nie Normal), jej warownia albo region oblegany. Recenzja ks-arm: bez "rabowany w ciagu roku" i bez uchodzcow z regula R1-3 linii glodu - to wlasnie strefy
+        /// wojny, a bramka (z warunkiem: racje KS ponizej wzoru gry, wiec powrot pomoze) ma chronic przed zgonami, ktorych nie da sie cofnac. Nie rzuca.</summary>
         internal static bool HungerFromWar(Village v)
         {
             if (v == null || v.Settlement == null) return false;
             try
             {
                 if (v.VillageState != Village.VillageStates.Normal) return true;
-                var node = OutlawLaw.RegionFor(v.Settlement) ?? v.Settlement;
-                if (node != null && node.IsUnderSiege) return true;
-                double acc = PeopleBook.RefugeesOf(v), famAcc = 0.0;
-                string id = v.Settlement.StringId;
-                if (id != null) lock (Gate) { Barn b; if (_barns.TryGetValue(id, out b) && b.FamOut) famAcc = FamPart(b, acc); }
-                return acc - famAcc > 0.5 || StruckWithinYear(node, (int)CampaignTime.Now.ToDays);
+                if (v.Bound != null && v.Bound.IsUnderSiege) return true;
+                var node = OutlawLaw.RegionFor(v.Settlement);
+                return node != null && node.IsUnderSiege;
             }
             catch (Exception e) { Stumble("Famine.HungerFromWar", e); return false; }
         }
