@@ -394,6 +394,7 @@ namespace Armoury
             if (pantry != null) Log.Info(pantry);
             if (estates) { try { Log.Info(EstatesLine(day)); } catch (Exception e) { Stumble("EstatesLine", e); } }   // ZC2: linia "Stany (ZC2): dzien N"
             if (estates) { try { Log.Info(MobilityLine(day)); } catch (Exception e) { Stumble("MobilityLine", e); } }   // ZC6: linia "Awans (ZC6): dzien N" (liczniki od ostatniej linii)
+            if (estates && DebtSlOn) { try { Log.Info(DebtSlLine(day)); } catch (Exception e) { Stumble("DebtSlLine", e); } }   // f8-niewola: linia "Niewola za dlugi (f8): dzien N" (przy kluczu)
             if (estates) { try { Log.Info(WarLine(day)); } catch (Exception e) { Stumble("WarLine", e); } }   // ZC7: linia "Blizna wojny (ZC7): dzien N" (liczniki od ostatniej linii)
         }
 

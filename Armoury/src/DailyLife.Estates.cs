@@ -393,7 +393,7 @@ namespace Armoury
             try
             {
                 Log.Info(PE + "dzien " + _eDay + " | zasiano " + (towns + vils) + " osad (miasta " + towns + ", wsie " + vils + ") z pasm x klasy BK (pochylonych " + tilt + ", bez klas BK " + noBk
-                         + ") - od teraz stany w ksiedze i w zapisie (arm_estates), " + (MobOn || FreeOn || WarOn ? "udzialy przesuwaja: " + MoversText() : "udzialy stoja (awans ZC6 i blizna ZC7 wylaczone)")
+                         + ") - od teraz stany w ksiedze i w zapisie (arm_estates), " + (MobOn || FreeOn || WarOn || DebtSlOn ? "udzialy przesuwaja: " + MoversText() : "udzialy stoja (awans ZC6 i blizna ZC7 wylaczone)")
                          + " | " + (_eLoaded ? "zapis mial ksiege stanow " + _eLoadP + " osad" : "zapis bez ksiegi stanow (sprzed ZC2) albo nowa kampania")
                          + " | ksiega stanow teraz " + CountP() + " osad, zapis ok. " + F1(EstimateKb()) + " KB | " + GameEffectText() + ".");
             }
@@ -407,6 +407,7 @@ namespace Armoury
             if (MobOn) l.Add("awans i spadek (ZC6)");
             if (FreeOn) l.Add("wyzwolenie przez zdobywce (ZC6)");
             if (WarOn) l.Add("blizna wojny (ZC7)");
+            if (DebtSlOn) l.Add("niewola za dlugi (f8)");
             return l.Count > 0 ? string.Join(", ", l.ToArray()) : "nikt";
         }
 
@@ -418,6 +419,7 @@ namespace Armoury
             if (FreeOn) l.Add("wyzwolenia przez zdobywce (Freedom)");
             if (ProsOn) l.Add("dobrobyt warowni za Dostatkiem regionu (Prosperity Link)");
             if (WarOn) l.Add("blizna wojny w stanach i Dostatku (War Scar)");
+            if (DebtSlOn) l.Add("niewola za dlugi biednych w kulturach z niewola pod KS, ich udzial kiesy W do wierzycieli (Debt Slavery)");
             return l.Count == 0 ? "gra bez zmian (etykiety ludzi i widok - zloto, towar, ceny, dobrobyt, AI nietkniete)"
                                 : "ZC2 to etykiety i widok, ale w grze dzialaja: " + string.Join("; ", l.ToArray());
         }
