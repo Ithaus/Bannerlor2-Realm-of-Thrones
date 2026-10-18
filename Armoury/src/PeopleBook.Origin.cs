@@ -252,6 +252,7 @@ namespace Armoury
             // stary menedzer nie zna osad nowej kampanii (A5 z klasa BK po cichu bez zdjecia). BkResolve jest leniwe - podepnie sie do nowego.
             _bkTried = false; _popMgr = null; _getPopData = null;
             _goneLines = _goneBig = 0;     // drobne2: linie diagnozy "Ludzie przy zniknieciu partii" - limit na sesje
+            ResetGone();                   // A12: licznik regionow "zp:" i liczniki doby (PeopleBook.Gone.cs)
             OriginNewDay();
             try { FreeHands.Reset(); } catch (Exception e) { Stumble("ResetOrigin(FreeHands)", e); }
         }
@@ -268,6 +269,7 @@ namespace Armoury
             _defParties = 0; _defMen = 0; _siegeCalls = 0; _siegeDead = 0; _villTown = 0; _villTownBy = null;     // fixA
             _townShareVill = 0; _townShareBack = 0;                                                     // fix2
             Array.Clear(_cutBy, 0, SKinds); _cutTop.Clear();
+            GoneNewDay();           // A12: liczniki doby linii "Ludzie przy zniknieciu partii (A12)"
             _oStumblesDay = 0;
             _kind.Clear();          // rodzaj partii raz na dobe (Straz, rod - moga sie zmienic)
         }
@@ -353,17 +355,19 @@ namespace Armoury
                   .Append(';').Append(N3(r.TRef)).Append(';').Append(N3(r.WRef)).Append(';').Append(N3(r.TDead));     // E4/9 (pola 19-21; zapis bez nich - 0)
                 first = false;
             }
+            ExportGone(sb);     // A12: "zp:" - ludzie przy zniknieciu partii wedlug regionu od siewu (bez sekcji, gdy pusto)
         }
 
         /// <summary>Import: jedna sekcja E4/7 ("sw:", "so:", "jo:", "wo:", "rg:"); false = nie nasza. so/jo - odlozone do ResolveOrigin (partii w SyncData jeszcze nie ma).</summary>
         private static bool ImportOriginPart(string part)
         {
             string p2 = part.Substring(0, 3);
-            if (p2 != "sw:" && p2 != "so:" && p2 != "jo:" && p2 != "wo:" && p2 != "rg:") return false;
+            if (p2 != "sw:" && p2 != "so:" && p2 != "jo:" && p2 != "wo:" && p2 != "rg:" && p2 != "zp:") return false;
             try
             {
                 string body = part.Substring(3);
-                if (p2 == "sw:")
+                if (p2 == "zp:") ImportGone(body);     // A12 (PeopleBook.Gone.cs)
+                else if (p2 == "sw:")
                 {
                     var a = body.Split(';');
                     int d; if (a.Length > 0 && int.TryParse(a[0], NumberStyles.Integer, Inv, out d)) { _sown = true; _sowDay = d; }
@@ -1276,11 +1280,12 @@ namespace Armoury
             if (_mem.TryGetValue(pb, out o))
             {
                 if (o != null && o.Sum >= GoneDiagMen) { try { GoneDiag(pb, o, destroyed); } catch (Exception e) { OStumble("OriginPartyGone(diagnoza)", e); } }
+                CountGone(o);     // A12 (PartyGoneMenCounted): licznik regionu pochodzenia w rownaniu regionu (wlasny try)
                 _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _mem.Remove(pb);
                 try { DoomedPartyMen.NoteGone(pb, o.Sum); } catch { }      // A17 (poz. 11): resztka slownika partii skasowanej po bitwie - linia "Ludzie kasowanych partii (A17)"
                 try { if (pb.IsMobile && pb.MobileParty != null && KindOf(pb.MobileParty) == KWatch) _wGone += o.Sum; } catch (Exception e) { OStumble("OriginPartyGone(E4/9)", e); }
             }
-            if (_pris.TryGetValue(pb, out o)) { _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _pris.Remove(pb); try { DoomedPartyMen.NoteGone(pb, o.Sum); } catch { } }
+            if (_pris.TryGetValue(pb, out o)) { CountGone(o); _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _pris.Remove(pb); try { DoomedPartyMen.NoteGone(pb, o.Sum); } catch { } }
             var mp = pb.MobileParty;
             Shares p;
             if (mp != null && _pending.TryGetValue(mp, out p)) { _pendLost += p.Total; _pending.Remove(mp); }
@@ -1793,7 +1798,8 @@ namespace Armoury
                     // E4/9 (4.7): + NIEWOLNI i MUR z regionu (stan) - ich stan dnia siewu + zmarli niewolni od siewu; liczniki Enslaved/ToWall rosna juz tylko przy wylaczonych prawach
                     // N7: + czekajacy w osadach zbiorki (Rally; bez stanu w dniu siewu - udzialy z pochodzeniem dostaja dopiero przy rozbiciu po siewie)
                     v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet + x.T + x.W + x.Rally) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef + r.TRef + r.WRef)
-                             - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall + r.TDead - r.Drift + r.MigOut - r.MigIn;
+                             - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall + r.TDead - r.Drift + r.MigOut - r.MigIn
+                             + ZpOf(kv.Key);     // A12 (PartyGoneMenCounted): + ludzie regionu przy zniknieciu partii od siewu (jak POLEGLI; bez klucza - 0)
                 }
                 try
                 {
@@ -1999,6 +2005,7 @@ namespace Armoury
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             sb.Append(" | czas ").Append(ms.ToString("0.0", Inv)).Append(" ms (uzgodnienie i regiony ").Append(_lastMs.ToString("0.0", Inv)).Append(" ms).");
             Log.Info(sb.ToString());
+            try { GoneLine(day); } catch (Exception e) { OStumble("GoneLine(A12)", e); }     // A12: "Ludzie przy zniknieciu partii (A12)" - te same liczniki doby
             try { FreeHands.Line(day); } catch (Exception e) { OStumble("FreeHands.Line", e); }
         }
 
