@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-18 (noc 17/18.10, przygotowanie WGRANIA 79) - specjalizacja wiosek i ikona okregu domyslnie WYLACZONE
+
+**Mod:** Armoury | **Galaz:** `w-toku/noc-ks4` (na 7ce0c740) | **Tor:** S
+
+**Problem:** test fin88 (sciezka gry Jeffa, 160 dob, Armoury-2026-10-18_03-13-38.log): NZW-1 neutralny start zajec wiosek pobocznych 13.3% odchylki (date_farm; prog 1%), NZW-3 ikona inna niz typ wsi w 177 okregach (prog 40-130). Specjalizacja dziala tez bez KS - w grze Jeffa od pierwszej doby.
+
+**Przyczyna:** neutralny start (f4b-inwest) poprawil odchylke z 27.6% do 13.3%, ale nie do 1%; ikona pod KS liczona z zajec Planu.
+
+**Zmiana:** domyslne `SideVillageCrafts` = NIE i `DistrictIconFromSum` = NIE (MCM: wlaczalne). Inwestycje w okreg (`DistrictWorks`) dzialaja dalej na zwyklym zajeciu wioski (VillageCrafts.PartsOf daje typ wsi przy kluczu WYL.). Armoury.json Jeffa nie ma tych kluczy - dzialaja domyslne.
+
+**Ryzyko / co sprawdzic:** klucze WYL. = droga sprzed paczki inwest (test 5 dob + bitwa przed wgraniem). Do dokonczenia: neutralny start <= 1% i ikony 40-130, potem wlaczyc.
+
+**Status:** DO SPRAWDZENIA (WGRANIE 79)
+
 ## 2026-10-17/18 (noc, SCALENIE fali 4 + 4b do w-toku/noc-ks4: 11 paczek na f5fd0ae3 (fala 3), polaczone intencje; place W w dol razem z przegladem firm P5)
 
 **Mod:** Armoury + `tools/sprawdz_logi.py` + `tools/gen_mcm.py` + `tools/ekonomia-symulatory-2026-10-17/f4/` (simw2.py, simw3.py - model kiesy W f4-place-ludu, tylko narzedzie) | **Galaz:** `w-toku/noc-ks4` (na `f5fd0ae3` = scalenie fali 3, niewgrane; w grze Jeffa WGRANIE 78 = 100eaedf + fix-ksarm) | **Tor:** L (bez gry; build Armoury kod 0 po kazdym scaleniu; CrashScribe - zadna paczka go nie rusza, zrodlo bez zmian; checker - wszystkie 104 grupy bez wyjatku na fin87) | **Klucze:** 34 nowe (gen_mcm Armoury 1878 -> 1912); zadna domyslna istniejacego klucza NIE zmieniona (zmienione tylko opisy `RaidRefugeesTownIntake` i `DsFarmRenewDays`). Armoury.json Jeffa (13.10) nie ma zadnego z nowych kluczy ani tych dwoch (sprawdzone grep, tylko odczyt) - dzialaja domyslne z kodu. | **Zapis:** nowe klucze `arm_hide_frac` (f4-ksiega-i-skory) i `arm_wsinput` (f4-warsztaty, pisany tylko przy kluczu) w `WorkshopTradeBehavior.SyncData`, kazdy we wlasnym try; `arm_ks_place` (f4-place-ludu, ArmouryBehavior, pisany tylko z danymi); trzecie (i czwarte - znacznik szacunku) pole wiersza `A=` w `arm_ks_arm` (f4b-zapis); `arm_raidref` bez zmiany formatu (f4-uchodzcy: przyjeci = N z zapisu). Wszystkie klucze Sync rozne (sprawdzone grep; `arm_wsinput` dwa razy = galaz zapisu i odczytu tego samego bloku). Starsza DLL nowe klucze i pola pomija. | **Pliki danych:** zadnego nowego pliku w `Armoury/ModuleData`.

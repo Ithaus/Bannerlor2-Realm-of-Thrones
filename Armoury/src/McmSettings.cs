@@ -7538,7 +7538,7 @@ namespace Armoury
 
         [SettingPropertyBool("Side Village Crafts", HintText = "each side village of a district works at its own craft - fishing hamlets fish, mill and granary villages grow grain, the others what their land, water and climate suit best (no olives, vines or grain in the snow); the district makes the sum of all its villages. With Start Calibration applied this comes from the start calibration itself; this setting governs villages outside it. On the first day the world makes as much of every good as the day before (the change only shifts which villages make what). Off = the district makes only the goods of its game village's type, as before")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
-        public bool SideVillageCrafts { get; set; } = true;
+        public bool SideVillageCrafts { get; set; } = false;
 
         [SettingPropertyFloatingInteger("Side Village Craft Switch", 1.00f, 3.00f, "0.00", HintText = "with Side Village Crafts: a side village turns to another craft only when that craft would earn at least this many times its present one at its market town (land suitability x prices)")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
@@ -7562,7 +7562,7 @@ namespace Armoury
 
         [SettingPropertyBool("District Icon From Sum", HintText = "the main village's map icon shows the good of the craft that earns the whole district (main village and side villages) the most money; the settlement tooltip lists the district's goods. Off = the icon of the game village's type, as before")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
-        public bool DistrictIconFromSum { get; set; } = true;
+        public bool DistrictIconFromSum { get; set; } = false;
 
         [SettingPropertyFloatingInteger("District Icon Margin", 0.00f, 1.00f, "0.00", HintText = "with District Icon From Sum: the icon changes only when another craft earns the district this much more than the shown one (0.10 = 10%)")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
