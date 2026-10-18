@@ -727,7 +727,7 @@ Uzycie (Python 3, tylko odczyt):
                     NWAR-13 K1 rzemioslo 148 po warsztatach w >= 95% miasto-dob (po / (po + przed)), NWAR-14 K2 odbior skory i plotna zmierzony (> 0) i nie wiekszy niz ksiega
                     towarow (suma "odziez wojska (150)" + "naprawy kowali miasta (135)" + "wsie (zakupy w miescie, E5/B1)" + "dwory (E3-P1)" z linii "Towary: ... leather/linen"
                     biegu; tylko miasta - <= 1.05 x ksiega + najwieksza doba), NWAR-15 klin cen wyrobu wobec wsadu (mediany z linii "Rzemioslo miasta (148)": skora / skory
-                    i plotno / len) na koniec >= 0.9 x poczatek (fin91 bez paczki: 0.49 -> 0.25 i 0.52 -> 0.34), NWAR-16a K3 glina dla garncarzy (INFO: miast z garncarzami,
+                    i plotno / len) na koniec >= 0.9 x poczatek (fin91 bez paczki: 0.49 -> 0.25 i 0.52 -> 0.34; z --baza-doby gorzej od poczatku, ale nie gorzej niz koniec bazy - ETAP), NWAR-16a K3 glina dla garncarzy (INFO: miast z garncarzami,
                     prog, glina na ich polkach, budowy zostawily; warsztaty codzienne swiata z linii f7), NWAR-16b cykle garbarni / tkalni lnu / garncarzy / browarow na dobe
                     biegu z 'Warsztaty towarowe' (INFO, z --baza-doby porownanie). Log bez paczki f7: INFO, bez wyjatku.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
@@ -32916,25 +32916,34 @@ def _nwar_f7(rep, f7, ws, bdp=None):
 
 
 def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
-    """NWAR-15 (klin cen wyrobu wobec wsadu) i NWAR-16b (cykle towarow codziennych na dobe, z baza) - liczone takze w logu bez linii f7 (INFO)."""
+    """NWAR-15 (klin cen wyrobu wobec wsadu; z --baza-doby: gorzej niz poczatek, ale nie gorzej niz koniec bazy - ETAP) i NWAR-16b (cykle towarow codziennych
+    na dobe, z baza) - liczone takze w logu bez linii f7 (INFO)."""
+    bws, btc = None, {}
+    if bdp and os.path.isfile(bdp):
+        try:
+            bf7 = {}
+            _bd3, bws, _bst, _be = _nwar_read(bdp, None, bf7)
+            btc = bf7.get("tc", {})
+        except Exception as e:   # baza nieczytelna - bez porownania
+            print(f"baza-doby (f7): {bdp} nieczytelna ({e})")
+            bws, btc = None, {}
     tc = f7.get("tc", {})
     a, b = _nwar_wedge(tc, True), _nwar_wedge(tc, False)
+    bb_end = _nwar_wedge(btc, False) if btc else None
     if a and b and a[0] != b[0]:
         txt = f"d{a[0]} -> d{b[0]}: skora/skory {a[1]:.2f} -> {b[1]:.2f}, plotno/len {a[2]:.2f} -> {b[2]:.2f} (mediany indeksow z linii 'Rzemioslo miasta (148)')"
+        if bb_end:
+            txt += f"; baza na koniec (d{bb_end[0]}): {bb_end[1]:.2f}, {bb_end[2]:.2f}"
         ok = (b[1] >= 0.9 * a[1] and b[2] >= 0.9 * a[2]) if has_f7 else None
+        et = bool(bb_end) and ok is False and b[1] >= bb_end[1] and b[2] >= bb_end[2]
         rep.add("NWAR-15: klin cen wyrobu wobec wsadu (skora/skory, plotno/len) koniec wobec poczatku", txt,
-                ">= 0.9 x poczatek obu par (fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34)" + ("" if has_f7 else " - INFO bez paczki f7"), ok)
+                ">= 0.9 x poczatek obu par (fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34); gorzej, ale nie gorzej niz koniec bazy (--baza-doby) - ETAP"
+                + ("" if has_f7 else " - INFO bez paczki f7"), ok, etap=et)
     else:
         rep.add("NWAR-15: klin cen wyrobu wobec wsadu", "za malo linii 'Rzemioslo miasta (148)' z polkami", "INFO", None)
     cyc = _nwar_ws_cycles(ws) if ws else {}
     if cyc:
-        base = None
-        if bdp and os.path.isfile(bdp):
-            try:
-                _bd3, bws, _bst, _be = _nwar_read(bdp)
-                base = _nwar_ws_cycles(bws) if bws else None
-            except Exception as e:   # baza nieczytelna - bez porownania
-                print(f"baza-doby (f7): {bdp} nieczytelna ({e})")
+        base = _nwar_ws_cycles(bws) if bws else None
         parts = []
         for t in NWAR_DAILY_GOODS:
             c, w = cyc.get(t, (0.0, 0.0))
