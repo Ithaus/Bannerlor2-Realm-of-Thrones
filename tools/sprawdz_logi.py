@@ -963,6 +963,15 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
+--grupa nuchodzcy : (noc 17/18.10, decyzja Jeffa "4. tak" do STAN-PRAC 57 "uchodzcy ida do najblizszego miasta (ludnosc/biedota), potem wracaja"; galaz w-toku/sw-uchodzcy,
+                    Armoury/src/RaidRefugees.cs, TownFolk.Refugees.cs, DailyLife.Guests.cs; klucz RaidRefugeesToTowns) python -I tools/sprawdz_logi.py --grupa nuchodzcy <Armoury-*.log>
+                    (strumieniowo; linia "Uchodzcy do miast (RT): dzien N"). RT-0 linia startu sesji, RT-1 linie doby rozpoznane, RT-2 ludzie w miastach (kontrola rachunku doby,
+                    ruch konta bez rozliczenia "inne" <= max(0.5, 0.1%)), RT-3 przybyli do miast = odeszli z regionu (niezalezny licznik uderzen i przydzialu, <= max(1, 1%)),
+                    RT-4 uchodzcy wedlug miejsca (konto = miasta + regiony +-0.2; konta z miastem ponad konto 0), RT-5 nikt dwa razy ze spichlerzami (goscie regionow + w murach
+                    + w miastach + konta bez wsi = konto, <= max(1, 0.01%)), RT-6 zmiana klasy biedoty miast = obecni uchodzcy (ZC dopisuje dokladnie obecnych), RT-7 kiesa
+                    (kontrola salda 0, z powracajacymi = odniesione + brak + czeka, sesja: saldo = poczatek + przyniesione + netto w miescie - odniesione - brak), RT-8 brak
+                    w kiesie W przy powrocie <= 1%, RT-9 potkniecia i ERROR paczki 0, RT-10 czas <= 5 ms/d, RT-11..13 ruch, kiesa, miejsca (INFO). Log bez paczki albo z kluczem
+                    wylaczonym: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -35423,6 +35432,195 @@ def nks_main(logp, until=120, bdp=None):
     return 0
 
 
+# ------------------------------------------------------------ nuchodzcy (noc 17/18.10, sw-uchodzcy - decyzja Jeffa "4. tak" do STAN-PRAC 57; Armoury/src/RaidRefugees.cs,
+# TownFolk.Refugees.cs, DailyLife.Guests.cs; klucz RaidRefugeesToTowns)
+NRT_HEAD = "Uchodzcy do miast (RT): "
+_NRT_N = r"-?\d+(?:\.\d+)?"
+_NRT_S = r"[+-]\d+(?:\.\d+)?"
+_NRT_I = r"-?\d+"
+
+
+def _nrt_n(name):
+    return r"(?P<" + name + r">" + _NRT_N + r")"
+
+
+def _nrt_s(name):
+    return r"(?P<" + name + r">" + _NRT_S + r")"
+
+
+def _nrt_i(name):
+    return r"(?P<" + name + r">" + _NRT_I + r")"
+
+
+NRT_DAY = re.compile(
+    r"Uchodzcy do miast \(RT\): dzien " + _nrt_i("day") + r" \| CZYNNE"
+    r" \| konto UCHODZCY " + _nrt_n("led") + r" = w miastach " + _nrt_n("town") + r" \+ w regionach " + _nrt_n("reg")
+    + r" \(kont z miastem (?P<acc>\d+), miast (?P<ntown>\d+); konta z miastem ponad konto (?P<over>\d+)\)"
+    r" \| w miastach: wczoraj " + _nrt_n("t0") + r" \+ przybyli " + _nrt_n("arr") + r" \(z uderzen " + _nrt_n("a1") + r", z regionu " + _nrt_n("a2")
+    + r"\) - wrocili " + _nrt_n("home") + r" - zmarli " + _nrt_n("dead") + r" \(w drodze " + _nrt_n("d1") + r", glod miasta " + _nrt_n("d2")
+    + r"\) - pojmani " + _nrt_n("capt") + r" - podloga 10 " + _nrt_n("floor") + r" - do regionu " + _nrt_n("leave")
+    + r" \+ inne " + _nrt_n("other") + r" = " + _nrt_n("t1") + r" \(kontrola " + _nrt_s("tchk") + r"\)"
+    r" \| przybyli " + _nrt_n("arr2") + r" = odeszli z regionu do miast " + _nrt_n("dep") + r" \(dopisani przez uderzenia " + _nrt_n("dhit")
+    + r", czesc z najazdu przy przydziale " + _nrt_n("dasg") + r"; roznica " + _nrt_s("ddiff") + r"\)"
+    r" \| powrot wstrzymany oblezeniem miasta pobytu (?P<hold>\d+) kont \(" + _nrt_n("holdp") + r" ludzi\)"
+    r" \| przydzialy: nowe (?P<asg>\d+) \(wlasne krolestwo (?P<same>\d+), niewrogie (?P<friend>\d+)\), bez miasta w promieniu (?P<rad>\d+) (?P<notown>\d+) kont"
+    r" \(zostaja w regionie " + _nrt_n("rup") + r" ludzi\), zamkniete (?P<closed>\d+)"
+    r" \| kiesa W miast \(saldo uchodzcow\): wczoraj " + _nrt_i("b0") + r" \+ przyniesione z kies wsi " + _nrt_i("bin") + r" \+ udzial glow w zmianie kiesy W " + _nrt_i("bsh")
+    + r" \+ doplata ludu miasta " + _nrt_i("bsub") + r" - przyciete do kiesy W " + _nrt_i("btrim") + r" - z powracajacymi " + _nrt_i("bmv") + r" = " + _nrt_i("b1")
+    + r" \(kontrola " + _nrt_i("bchk") + r"\)"
+    r" \| z powracajacymi " + _nrt_i("bmv2") + r" = odniesione do kies wsi " + _nrt_i("bout") + r" \+ brak w kiesie W " + _nrt_i("bshort")
+    + r" \(miast (?P<bshortn>\d+)\) \+ czeka " + _nrt_i("bwait")
+    + r" \| od wczytania: saldo na poczatku " + _nrt_i("s0") + r", przyniesione " + _nrt_i("sin") + r", odniesione " + _nrt_i("sout") + r", brak " + _nrt_i("sshort")
+    + r", netto w miescie " + _nrt_i("snet") + r", saldo " + _nrt_i("s1") + r" \(wydane netto w miastach " + _nrt_i("sspent") + r"\)"
+    r" \| kiesa ludu (?P<live>czynna|NIECZYNNA - kiesa zostaje we wsi)"
+    r"(?: \| spichlerze \(E4/6\): w regionach " + _nrt_n("fg") + r" \+ w murach " + _nrt_n("fs") + r" \+ w miastach " + _nrt_n("ft") + r" \+ konta bez wsi " + _nrt_n("fl")
+    + r" = " + _nrt_n("fsum") + r" wobec konta " + _nrt_n("fled") + r" \(roznica " + _nrt_s("fdiff") + r"\)| \| spichlerze \(E4/6\): brak migawki tej doby)"
+    r"(?: \| ZC \(doba " + _nrt_i("zd") + r"\): biedota miast " + _nrt_n("zl") + r" \+ uchodzcy " + _nrt_n("zg") + r" = " + _nrt_n("zs")
+    + r" \(obecni w miastach wtedy " + _nrt_n("zp") + r", miast (?P<zt>\d+), roznica " + _nrt_s("zdiff") + r"\)| \| ZC: brak migawki)"
+    r"(?: \| najwiecej w: (?P<top>.*?))?"
+    r" \| potkniecia (?P<st>\d+) \(razem (?P<sta>\d+)\) \| czas " + _nrt_n("ms") + r" ms\.$")
+NRT_ERR = ("ERROR in RaidRefugees.", "ERROR in SyncData.arm_raidref", "ERROR in DailyLife.TownGuests", "ERROR in Famine.TownKeep", "ERROR in Famine.Daily(RT",
+           "ERROR in TownFolk.Refugee", "ERROR in PeopleMenu.RaidRefugees", "ERROR in DailyLife.RaidRefugees")
+
+
+def nuchodzcy_main(logp):
+    """nuchodzcy (noc 17/18.10; Armoury/src/RaidRefugees.cs, TownFolk.Refugees.cs, DailyLife.Guests.cs; klucz RaidRefugeesToTowns): uchodzcy z najazdu w najblizszym
+    miescie (biedota, kiesa W, powrot jak dotad). Wejscie: log Armoury (strumieniowo). RT-0 linia startu sesji (klucze), RT-1 linie doby rozpoznane, RT-2 ludzie w miastach
+    (kontrola wczoraj + przybyli - wrocili - zmarli - pojmani - podloga - do regionu + inne = dzis; "inne" = ruch konta bez rozliczenia <= max(0.5, 0.1% w miastach)
+    kazdej doby), RT-3 przybyli = odeszli z regionu do miast (niezalezny licznik uderzen i przydzialu; |roznica| <= max(1, 1% przybylych)), RT-4 uchodzcy wedlug
+    miejsca (konto = miasta + regiony +-0.2, konta z miastem ponad konto 0), RT-5 nikt dwa razy - spichlerze (goscie regionow + w murach + w miastach + konta bez wsi
+    = konto, |roznica| <= max(1, 0.01% konta)), RT-6 zmiana klasy biedoty miast = obecni uchodzcy (uchodzcy dopisani przez ZC = obecni w miastach w tej chwili,
+    |roznica| <= max(0.5, 0.01%)), RT-7 kiesa (saldo: kontrola 0 kazdej doby; z powracajacymi = odniesione + brak + czeka; sesja: saldo = poczatek + przyniesione
+    + netto w miescie - odniesione - brak), RT-8 brak w kiesie W przy zwrocie <= 1% oddanego, RT-9 potkniecia i ERROR paczki 0, RT-10 czas <= 5 ms/d srednio,
+    RT-11..13 ruch, kiesa i miejsca (INFO). Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("RT-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess, days, bad, off, msgs = [], [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NRT_HEAD):
+                if s.startswith(NRT_HEAD + "start sesji"):
+                    sess.append(s)
+                elif s.startswith(NRT_HEAD + "dzien ") and " | CZYNNE" in s[:60]:
+                    mm = NRT_DAY.match(s)
+                    if mm:
+                        days.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+                elif s.startswith(NRT_HEAD + "dzien "):
+                    off.append(s)
+                elif s.startswith(NRT_HEAD + "komunikat gracza"):
+                    msgs.append(s)
+            elif s.startswith(NRT_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby CZYNNE {len(days)} (nierozpoznanych {len(bad)}), doby WYLACZONE {len(off)}, komunikatow gracza {len(msgs)}, ERROR {n_err}")
+    if not sess and not days and not bad:
+        why = "klucz wylaczony (linia WYLACZONE)" if off else "log sprzed paczki sw-uchodzcy"
+        rep.add("RT-0: linie 'Uchodzcy do miast (RT)'", f"brak linii CZYNNE ({len(off)} linii WYLACZONE)", f"INFO ({why})", None)
+        rep.add("RT-9: ERROR paczki", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+
+    def f(g, k):
+        v = g.get(k)
+        return float(v) if v not in (None, "") else None
+
+    def i(g, k):
+        v = g.get(k)
+        return int(v) if v not in (None, "") else None
+
+    if sess:
+        rep.add("RT-0: linia startu sesji (klucze, z zapisu)", sess[-1][len(NRT_HEAD):][:240], "linia przy starcie sesji", True)
+    else:
+        rep.add("RT-0: linia startu sesji", "brak (sa linie doby)", "linia przy kazdym starcie sesji z kluczem", False)
+    rep.add("RT-1: linie doby rozpoznane", f"doby {len(days)} (nierozpoznane {len(bad)})" + (f" (np. {bad[0][:200]})" if bad else ""), "nierozpoznane 0", not bad)
+    if not days:
+        rep.add("RT-2..8: doby", "brak rozpoznanych linii doby", "INFO", None)
+        rep.add("RT-9: potkniecia i ERROR paczki", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+    # RT-2 ludzie w miastach
+    tchk = max(abs(f(g, "tchk")) for g in days)
+    oth_bad = [g for g in days if abs(f(g, "other")) > max(0.5, 0.001 * abs(f(g, "town")))]
+    rep.add("RT-2: ludzie w miastach - rachunek doby i ruch bez rozliczenia ('inne')",
+            f"max |kontrola| {tchk:.3f}; doby z |inne| ponad prog {len(oth_bad)} z {len(days)}"
+            + (f" (np. dzien {oth_bad[0]['day']}: inne {oth_bad[0]['other']} przy {oth_bad[0]['town']} w miastach)" if oth_bad else ""),
+            "kontrola <= 0.01; |inne| <= max(0.5, 0.1% w miastach) kazdej doby", tchk <= 0.01 and not oth_bad)
+    # RT-3 przybyli = odeszli
+    dep_bad = [g for g in days if abs(f(g, "ddiff")) > max(1.0, 0.01 * abs(f(g, "arr")))]
+    arr_all = sum(f(g, "arr") for g in days)
+    rep.add("RT-3: przybyli do miast = odeszli z regionu (uderzenia + przydzial)", f"przybyli razem {arr_all:.0f}; doby z roznica ponad prog {len(dep_bad)}"
+            + (f" (np. dzien {dep_bad[0]['day']}: {dep_bad[0]['arr']} wobec {dep_bad[0]['dep']})" if dep_bad else ""),
+            "|roznica| <= max(1, 1% przybylych) kazdej doby", not dep_bad)
+    # RT-4 uchodzcy wedlug miejsca
+    split_bad = [g for g in days if abs(f(g, "led") - f(g, "town") - f(g, "reg")) > 0.2 or f(g, "town") < -0.05 or f(g, "reg") < -0.5]
+    over = sum(i(g, "over") for g in days)
+    last = days[-1]
+    rep.add("RT-4: uchodzcy wedlug miejsca (konto = miasta + regiony; konta z miastem ponad konto)",
+            f"dzien {last['day']}: konto {last['led']} = w miastach {last['town']} + w regionach {last['reg']}; doby niespojne {len(split_bad)}, konta ponad konto (suma dob) {over}",
+            "+-0.2 kazdej doby, ponad konto 0", not split_bad and over == 0)
+    # RT-5 nikt dwa razy - spichlerze
+    fam = [g for g in days if g.get("fdiff") is not None]
+    if fam:
+        fb = [g for g in fam if abs(f(g, "fdiff")) > max(1.0, 0.0001 * f(g, "fled"))]
+        rep.add("RT-5: nikt dwa razy - spichlerze (goscie regionow + w murach + w miastach + konta bez wsi = konto)",
+                f"doby z migawka {len(fam)}, ponad prog {len(fb)}" + (f" (np. dzien {fb[0]['day']}: roznica {fb[0]['fdiff']})" if fb else "")
+                + f"; ostatnia: regiony {fam[-1]['fg']}, w murach {fam[-1]['fs']}, miasta {fam[-1]['ft']}, konto {fam[-1]['fled']}",
+                "|roznica| <= max(1, 0.01% konta) kazdej doby", not fb)
+    else:
+        rep.add("RT-5: nikt dwa razy - spichlerze", "brak migawki spichlerzy w liniach", "INFO (Famine wylaczone)", None)
+    # RT-6 zmiana klasy biedoty miast = obecni uchodzcy
+    zc = [g for g in days if g.get("zdiff") is not None]
+    if zc:
+        zb = [g for g in zc if abs(f(g, "zdiff")) > max(0.5, 0.0001 * abs(f(g, "zg")))]
+        rep.add("RT-6: zmiana klasy biedoty miast (ZC) = obecni uchodzcy w miastach",
+                f"doby z migawka ZC {len(zc)}, ponad prog {len(zb)}" + (f" (np. doba ZC {zb[0]['zd']}: dopisani {zb[0]['zg']} wobec obecnych {zb[0]['zp']})" if zb else "")
+                + f"; ostatnia: biedota miast {zc[-1]['zl']} + uchodzcy {zc[-1]['zg']} = {zc[-1]['zs']} w {zc[-1]['zt']} miastach",
+                "|dopisani - obecni| <= max(0.5, 0.01%) kazdej doby", not zb)
+    else:
+        rep.add("RT-6: klasa biedoty miast (ZC)", "brak migawki ZC w liniach", "INFO (Daily Life wylaczone albo pierwsza doba)", None)
+    # RT-7 kiesa
+    bchk = [g for g in days if i(g, "bchk") != 0]
+    bmv = [g for g in days if i(g, "bmv") != i(g, "bmv2") or i(g, "bmv2") != i(g, "bout") + i(g, "bshort") + i(g, "bwait")]
+    ses = [g for g in days if abs(i(g, "s1") - (i(g, "s0") + i(g, "sin") + i(g, "snet") - i(g, "sout") - i(g, "sshort"))) > 1 or i(g, "s1") != i(g, "b1")]
+    rep.add("RT-7: kiesa - saldo uchodzcow (wies -> saldo -> wydane w miescie, reszta z powrotem)",
+            f"doby z kontrola salda != 0: {len(bchk)}; z powracajacymi != odniesione + brak + czeka: {len(bmv)}; sesja niespojna: {len(ses)}"
+            + (f" (np. dzien {(bchk or bmv or ses)[0]['day']})" if bchk or bmv or ses else ""),
+            "0 / 0 / 0 (saldo = poczatek + przyniesione + netto w miescie - odniesione - brak)", not bchk and not bmv and not ses)
+    gave = sum(i(g, "bout") for g in days)
+    short = sum(i(g, "bshort") for g in days)
+    if gave + short > 0:
+        rep.add("RT-8: brak w kiesie W przy powrocie (saldo bez pokrycia)", f"oddane {gave}, brak {short} ({100.0 * short / (gave + short):.2f}%)", "<= 1% nalezne",
+                short <= 0.01 * (gave + short))
+    else:
+        rep.add("RT-8: brak w kiesie W przy powrocie", "nikt nie wrocil z saldem", "INFO", None)
+    stum = sum(i(g, "st") for g in days)
+    rep.add("RT-9: potkniecia (suma dob) i ERROR paczki (RaidRefugees.*, SyncData.arm_raidref, DailyLife.TownGuests, Famine RT, TownFolk.Refugee*, PeopleMenu)",
+            f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+    ms = [f(g, "ms") for g in days]
+    rep.add("RT-10: czas linii (koszt doby paczki)", f"srednio {sum(ms) / len(ms):.2f} ms/d, max {max(ms):.2f}", "<= 5 ms/d srednio", sum(ms) / len(ms) <= 5.0)
+
+    def tot(k):
+        return sum(f(g, k) for g in days)
+    rep.add("RT-11: ruch w miastach (INFO, suma dob)",
+            f"przybyli {tot('arr'):.0f} (z uderzen {tot('a1'):.0f}, z regionu {tot('a2'):.0f}), wrocili {tot('home'):.0f}, zmarli {tot('dead'):.1f} (w drodze {tot('d1'):.1f}, "
+            f"glod miasta {tot('d2'):.1f}), pojmani {tot('capt'):.0f}, podloga 10 {tot('floor'):.0f}, do regionu {tot('leave'):.0f}; przydzialy {sum(i(g, 'asg') for g in days)} "
+            f"(wlasne {sum(i(g, 'same') for g in days)}, niewrogie {sum(i(g, 'friend') for g in days)}), bez miasta w promieniu (konto-doby) {sum(i(g, 'notown') for g in days)}; "
+            f"powrot wstrzymany oblezeniem (konto-doby) {sum(i(g, 'hold') for g in days)}; komunikatow gracza {len(msgs)}", "INFO", None)
+    rep.add("RT-12: kiesa (INFO)", f"przyniesione z kies wsi {sum(i(g, 'bin') for g in days)}, odniesione {gave}, udzial glow w zmianie kiesy W {sum(i(g, 'bsh') for g in days)}, "
+            f"doplata ludu miasta {sum(i(g, 'bsub') for g in days)}, przyciete {sum(i(g, 'btrim') for g in days)}; saldo na koniec {last['b1']}; kiesa ludu: {last['live']}", "INFO", None)
+    rep.add("RT-13: miejsca (INFO, ostatnia doba)", f"dzien {last['day']}: w miastach {last['town']} ({last['acc']} kont, {last['ntown']} miast), w regionach {last['reg']}; "
+            f"najwiecej w: {(last.get('top') or '-')[:220]}", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -35620,6 +35818,8 @@ def main(argv):
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group == "nds" and logp:
         return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
+    if group == "nuchodzcy" and logp:
+        return nuchodzcy_main(logp)   # nuchodzcy (noc 17/18.10, sw-uchodzcy): uchodzcy z najazdu w miescie - miejsca, przybyli = odeszli, powroty, kiesa, klasa biedoty, nikt dwa razy (RaidRefugees)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
