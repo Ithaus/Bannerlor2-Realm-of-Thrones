@@ -335,6 +335,9 @@ RANGES = {
     'DsGrantSessionDays': (1, 91, "0"),
     'DsCrownLoanLimitDaysPledged': (0.0, 728.0, "0"),
     'DsFolkSurplusSpendDays': (0, 120, "0"),
+    # ds-akumulator (18.10): stawki przycinane w kodzie (DsHoardDueRate 0..0.1, DsWorksWagePerMaterial 0..3)
+    'DsHoardDueRate': (0.0, 0.1, "0.000"),
+    'DsWorksWagePerMaterial': (0.0, 3.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

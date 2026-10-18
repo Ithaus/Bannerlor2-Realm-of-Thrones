@@ -230,7 +230,7 @@ namespace Armoury
                     if (!(q > 0)) continue;
                     var c = _lxCats[i];
                     float v = dict[c];
-                    double x = off * q * StartCalibration.Zc4OfferFactor(town, c);   // ZC4: kategorie koszyka x (1 - lambda) - reszta zostaje w kiesie
+                    double x = DaOffer(f, town, c, ceil, off * q);   // ZC4: kategorie koszyka x (1 - lambda) - reszta zostaje w kiesie; ds-akumulator (FolkBetterTable): lepszy stol z oszczednosci do ceny granicznej P4
                     if (!(x > 0)) continue;
                     if (cl && _lxCloth[i])                               // (c) plotno i skora z oferty tylko ponad prog polki (reszta zostaje w kiesie)
                     {

@@ -511,6 +511,7 @@ namespace Armoury
                 if (st == null || st.StringId == null || s == null) return 0;
                 double over = Math.Max(0, gold - chest);
                 _kVill++; _kGold += Math.Max(0, gold); _kChest += chest; _kOver += over;
+                AkNote(st, gold, chest);   // ds-akumulator: skrzynia wsi tej doby (danina od skarbca wsi) i mediany kies / skrzyn (NDS-3c) - tylko liczniki
                 int sd = SpendDays(s);
                 double ramp = Ramp;
                 int carry;
@@ -541,6 +542,65 @@ namespace Armoury
             if (goods > 0) { _kP5 += goods; _kGoods += goods; }
             if (works > 0) { _kP5 += works; _kWorks += works; _kWorksWage += wage; _kWorksMat += mat; _kWorksN++; }
             if (noWorks >= 1) { _kWorksNo += noWorks; _kWorksNoN++; }
+        }
+
+        // ============================================================ ds-akumulator (noc 17/18.10): miary kies i skrzyn, roboty gminy po budowach
+        private static readonly Dictionary<string, double> _akChest = new Dictionary<string, double>();   // id wsi -> skrzynia tej doby (SurplusDay)
+        private static readonly List<double> _akGold = new List<double>(), _akCh = new List<double>(), _akRat = new List<double>();
+        private static int _akDay = -1;
+
+        private static void AkNote(Settlement st, int gold, double chest)
+        {
+            try
+            {
+                int today = Today;
+                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); }
+                if (st == null || st.StringId == null) return;
+                _akChest[st.StringId] = chest;
+                _akGold.Add(Math.Max(0, gold)); _akCh.Add(Math.Max(0, chest));
+                if (chest >= 1) _akRat.Add(Math.Max(0, gold) / chest);
+            }
+            catch (Exception e) { Stumble("AkNote", e); }
+        }
+
+        /// <summary>TownFolk (ds-akumulator): skrzynia wsi policzona dzis w kroku 4 (SurplusDay); -1 - nie liczona dzis.</summary>
+        internal static double ChestToday(Settlement st)
+        {
+            double c;
+            return st != null && st.StringId != null && _akDay == Today && _akChest.TryGetValue(st.StringId, out c) ? c : -1;
+        }
+
+        private static double Med(List<double> v)
+        {
+            if (v == null || v.Count == 0) return double.NaN;
+            var a = v.ToArray(); Array.Sort(a);
+            int n = a.Length;
+            return n % 2 == 1 ? a[n / 2] : 0.5 * (a[n / 2 - 1] + a[n / 2]);
+        }
+
+        /// <summary>TownFolk (linia "Akumulator kies"): mediana kiesy wsi DS, mediana skrzyni i mediana kiesa / skrzynia z dzisiejszego kroku 4; false - doby nie bylo.</summary>
+        internal static bool AkMedians(out int n, out double medGold, out double medChest, out double medRatio, out double sumGold, out double sumChest)
+        {
+            n = 0; medGold = medChest = medRatio = double.NaN; sumGold = sumChest = 0;
+            try
+            {
+                if (_akDay != Today || _akGold.Count == 0) return false;
+                n = _akGold.Count; medGold = Med(_akGold); medChest = Med(_akCh); medRatio = Med(_akRat);
+                foreach (var x in _akGold) sumGold += x;
+                foreach (var x in _akCh) sumChest += x;
+                return true;
+            }
+            catch (Exception e) { Stumble("AkMedians", e); return false; }
+        }
+
+        /// <summary>TownFolk.DaWorksRun (DsWorksRealMaterial): roboty gminy wykonane po budowach tej doby - towar z polki (`mat`) i rzemieslnicy miasta (`wage`); w kroku 5 byly
+        /// liczone jako niewydane (zlecenie) - tu przechodza do "roboty gminy" linii DS.</summary>
+        internal static void NoteWorksLate(long mat, long wage)
+        {
+            long works = Math.Max(0, mat) + Math.Max(0, wage);
+            if (works <= 0) return;
+            _kP5 += works; _kWorks += works; _kWorksWage += Math.Max(0, wage); _kWorksMat += Math.Max(0, mat); _kWorksN++;
+            _kWorksNo = Math.Max(0, _kWorksNo - works);
         }
 
         /// <summary>DsSeason.TreasuryForRefund przy samym F1 (bez firm F3): brak zwrotu pokryty ze skarbca ponad zapas wojny - licznik linii.</summary>

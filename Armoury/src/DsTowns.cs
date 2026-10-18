@@ -459,6 +459,22 @@ namespace Armoury
             catch (Exception e) { Stumble("LordFarmPerDay", e); return 0; }
         }
 
+        /// <summary>ds-akumulator (DsHoardDue, TownFolk.PayHoard): czesc firmy pana z oszczednosci ludu na dobe (F_Lf / 364 x rampa przejscia) - ta warstwa oszczednosci jest
+        /// juz oplacona firma (DsFolkRate w dzien raty), wiec danina od skarbca ludu liczy ja jako zaplacona (nic dwa razy). 0 - bez firm, klucz DsFarmFolkFromSavings
+        /// wylaczony (firme placi kasa), osada bez firmy, oblezenie albo zdobycie (rata darowana). Nie rzuca.</summary>
+        internal static double FolkFarmPerDay(Settlement st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !FarmsLive || st == null || !s.DsFarmFolkFromSavings) return 0;
+                var f = FarmOf(st, false);
+                if (f == null || !(f.FLf > 0) || RemitOf(st) != 0) return 0;
+                return f.FLf / YearDays * NewShare;
+            }
+            catch (Exception e) { Stumble("FolkFarmPerDay", e); return 0; }
+        }
+
         private static void SampleTown(Settlement st, Town t, Farm f, int reserve)
         {
             long net;

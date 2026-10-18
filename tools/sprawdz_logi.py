@@ -33787,10 +33787,53 @@ NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy 
 }
 
 
+NDS_AK = "Akumulator kies (ds-akumulator): "
+NDS_AKMED = re.compile(r"mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+|-)")
+_NDS_KSPLIT = re.compile(r", (?=[^,]*? -?\d+\+-?\d+(?: |,|$))")
+_NDS_KPART = re.compile(r"^(.*?) (-?\d+)\+(-?\d+)(?: |$)")
+
+
+def _nds_kmeas(seg):
+    """ds-akumulator: wplyw dnia na krolestwo z linii 165 ("Dorne 1218874+2205 (184 ...) zwrot ..., Riverlands ..."): {nazwa: wplyw dnia (bez 1/450)}.
+    Podzial tylko na ", " przed kawalkiem z "N+M" (nazwy z przecinkiem, np. "House Targaryen, Aegon", sklejane z kawalkiem bez liczb)."""
+    out = {}
+    seg = seg.split(" | ")[0].rstrip(".")
+    pend = ""
+    for part in _NDS_KSPLIT.split(seg):
+        mm = _NDS_KPART.match(part)
+        if not mm:
+            pend = (pend + ", " if pend else "") + part
+            continue
+        name = ((pend + ", ") if pend else "") + mm.group(1)
+        pend = ""
+        out[name.strip()] = int(mm.group(2))
+    return out
+
+
+def _nds_windfall(incK, times=3.0, ring=28, nmin=7, floor=1000):
+    """ds-akumulator (NDS-7b / NDS-9 bez jednorazowych): na krolestwo wplyw dnia ponad times x max(mediana jego wplywu z ostatnich `ring` dob, wplyw doby
+    poprzedniej) (ujemne jako 0, od nmin probek) - skok jednej doby, nie nowy poziom (wojna, trybut: od drugiej doby poprzednia doba podnosi prog); suma nadwyzek
+    krolestw na dobe (zl). Ta sama regula co CrownWindfallToReserve w grze (tam na 'inne')."""
+    hist, wf = {}, {}
+    for d in sorted(incK):
+        tot = 0
+        for k, v in incK[d].items():
+            h = hist.setdefault(k, [])
+            if len(h) >= nmin:
+                med = st.median([max(0, x) for x in h[-ring:]])
+                cap = times * max(med, max(0, h[-1]))
+                if v > cap and v - cap >= floor:
+                    tot += v - cap
+            h.append(v)
+        wf[d] = tot
+    return wf
+
+
 def _nds_scan(path, full):
     """Jeden przebieg po logu: linie DS i linie niezalezne (stare pobory, ksiegi, korona, Bank, kiesy wsi, koszt). full=False (baza) - tylko liczby odniesienia."""
     D = {"ds": {}, "dsbad": [], "start": [], "off": [], "n_err": 0, "err1": None, "inc": {}, "refund": {}, "bankkd": {}, "kd": {}, "D": {}, "takt": {}, "bank": {}, "bil": {},
-         "vil": {}, "hv": {}, "vkor": {}, "w7v": {}, "extra": {}, "titheold": {}, "tithedsrest": {}, "ut": {}, "utbez": {}, "tw1": {}, "fee": {}, "firmy": {}, "zal": {}, "korona": {}}
+         "vil": {}, "hv": {}, "vkor": {}, "w7v": {}, "extra": {}, "titheold": {}, "tithedsrest": {}, "ut": {}, "utbez": {}, "tw1": {}, "fee": {}, "firmy": {}, "zal": {}, "korona": {},
+         "incK": {}, "ksend": None, "akmed": {}}   # ds-akumulator: wplyw dnia na krolestwo (jednorazowe), koniec rampy KS (NDS-3a), mediany kiesa / skrzynia (NDS-3c)
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -33803,9 +33846,20 @@ def _nds_scan(path, full):
                     D["err1"] = D["err1"] or s[:200]
                 continue
             c0 = s[:1]
-            if c0 not in "DPKSUFRV":
+            if c0 not in "DPKSUFRVA":
                 continue
             day = num(r"dzien (\d+)", s[:90])
+            if D["ksend"] is None and s.startswith("KS: rampa dzien"):
+                v = num(r"koniec popytu (-?\d+)\)", s)
+                if v is not None:
+                    D["ksend"] = v
+                continue
+            if s.startswith(NDS_AK):
+                if day is not None:
+                    mm = NDS_AKMED.search(s)
+                    if mm:
+                        D["akmed"][day] = (float(mm.group(1)), float(mm.group(2)), None if mm.group(3) == "-" else float(mm.group(3)))
+                continue
             if s.startswith(NDS_HEAD):
                 if "| WYLACZONE" in s:
                     D["off"].append((day, s)); continue
@@ -33833,6 +33887,8 @@ def _nds_scan(path, full):
                 if g is not None and n is not None:
                     D["refund"][day] = (g, n)
                 i = s.find("na krolestwo (wplywy+zapas, wydatki): ")
+                if i > 0:
+                    D["incK"][day] = _nds_kmeas(s[i + len("na krolestwo (wplywy+zapas, wydatki): "):])
                 if i > 0:
                     seg = s[i:]
                     nk = len(re.findall(r"zwrot \d+/(\d+)", seg)); nb = len(re.findall(r"kredyt186 \+\d+", seg))
@@ -34040,18 +34096,39 @@ def nds_main(logp, bdp=None, until=120):
     # NDS-3 kiesy wsi
     vd = [d for d in win if d in D["vil"] and "stan" in D["vil"][d]]
     if len(vd) >= 30:
-        tail = vd[-60:] if len(vd) >= 60 else vd[len(vd) // 2:]
+        # ds-akumulator (18.10, diagnoza fin80 "kiesy"): okno dryfu od konca rampy KS (koniec popytu, linia "KS: rampa") albo rampy DS F1 (DayOn + 28) + 2 x DsSurplusSpendDays
+        # (15 - krok 5 reaguje na nowy odplyw ze stala 15 dob; dotad okno 60 dob lapalo jednorazowy uskok po starcie koszyka ZC4); za krotkie (< 14 dob) - ostatnie 30 dob
+        f1on = [R(d, "ramp", 1) for d in win if R(d, "ramp", 1) > 0]
+        f1end = (min(f1on) + 28) if f1on else None
+        ends = [x for x in (D.get("ksend"), f1end) if x is not None]
+        w0_ = (max(ends) + 2 * 15) if ends else None
+        tail = [d for d in vd if w0_ is not None and d >= w0_]
+        how3 = f"od doby {w0_} (koniec rampy {'KS ' + str(D.get('ksend')) if D.get('ksend') is not None else ''}{' / ' if D.get('ksend') is not None and f1end is not None else ''}{'DS F1 ' + str(f1end) if f1end is not None else ''} + 2 x 15)" if w0_ is not None else ""
+        if len(tail) < 14:
+            tail = vd[-30:]
+            how3 = "ostatnie 30 dob (okno od konca rampy za krotkie)"
         a, b = D["vil"][tail[0]]["stan"], D["vil"][tail[-1]]["stan"]
         n = max(1, tail[-1] - tail[0])
         drift = (b - a) / n / max(1.0, (a + b) / 2)
-        rep.add(f"NDS-3a: kiesy wsi - dryf ostatnich {len(tail)} dob (dol)", f"{a / 1e6:.2f} -> {b / 1e6:.2f} mln = {100 * drift:+.3f}%/d", ">= -0.2%/d (projekt 14)", drift >= -0.002)
-        rep.add(f"NDS-3b: kiesy wsi - dryf ostatnich {len(tail)} dob (gora: wies bez towaru nie moze chomikowac wolnego pieniadza)", f"{100 * drift:+.3f}%/d",
+        rep.add(f"NDS-3a: kiesy wsi - dryf {len(tail)} dob {how3} (dol)", f"{a / 1e6:.2f} -> {b / 1e6:.2f} mln = {100 * drift:+.3f}%/d", ">= -0.2%/d (projekt 14)", drift >= -0.002)
+        rep.add(f"NDS-3b: kiesy wsi - dryf {len(tail)} dob {how3} (gora: wies bez towaru nie moze chomikowac wolnego pieniadza)", f"{100 * drift:+.3f}%/d",
                 "<= +0.2%/d (projekt 9.3: kiesy plaskie po skrzyni; model 17.10 bez KS: +1.1..+1.3%/d)", drift <= 0.002)
-        m0 = [D["vil"][d]["med"] for d in vd[:7] if D["vil"][d].get("med") is not None]
-        m1 = [D["vil"][d]["med"] for d in vd[-7:] if D["vil"][d].get("med") is not None]
-        if m0 and m1:
-            r = (sum(m1) / len(m1)) / max(1.0, sum(m0) / len(m0))
-            rep.add("NDS-3c: mediana kiesy wsi (7 ostatnich dob / 7 pierwszych)", f"{sum(m1) / len(m1):.0f} / {sum(m0) / len(m0):.0f} = {r:.2f}", ">= 0.9", r >= 0.9)
+        # ds-akumulator: mediana kiesy wobec mediany SKRZYNI (projekt DS: kiesa dazy do skrzyni + 15 x nadwyzka), nie wobec startu (normy sprzed DS)
+        am = [D["akmed"][d] for d in vd[-7:] if d in D["akmed"]]
+        if am:
+            rr = [x[2] for x in am if x[2] is not None]
+            r = sum(rr) / len(rr) if rr else (sum(x[0] for x in am) / max(1.0, sum(x[1] for x in am)))
+            rep.add("NDS-3c: mediana kiesa / skrzynia wsi DS (7 ostatnich dob, linia 'Akumulator kies')", f"{r:.2f} (mediana kiesy {sum(x[0] for x in am) / len(am):.0f}, mediana skrzyni {sum(x[1] for x in am) / len(am):.0f})",
+                    ">= 0.9 (kiesa nie ponizej skrzyni)", r >= 0.9)
+        else:
+            m1 = [D["vil"][d]["med"] for d in vd[-7:] if D["vil"][d].get("med") is not None]
+            ch = [R(d, "chest", 2) / max(1.0, R(d, "chest", 0)) for d in vd[-7:] if d in D["ds"] and "chest" in D["ds"][d] and R(d, "chest", 0) > 0]
+            if m1 and ch:
+                r = (sum(m1) / len(m1)) / max(1.0, sum(ch) / len(ch))
+                rep.add("NDS-3c: mediana kiesy wsi / srednia skrzynia wsi DS (7 ostatnich dob; log bez linii 'Akumulator kies' - skrzynia srednia z linii DS)",
+                        f"{sum(m1) / len(m1):.0f} / {sum(ch) / len(ch):.0f} = {r:.2f}", ">= 0.9 (kiesa nie ponizej skrzyni)", r >= 0.9)
+            else:
+                rep.add("NDS-3c: mediana kiesy wsi wobec skrzyni", "brak mediany lub skrzyni w logu", "INFO", None)
         lo = [D["vil"][d]["lo"] / max(1, D["vil"][d].get("n") or 571) for d in vd[-7:] if D["vil"][d].get("lo") is not None]
         if lo:
             x = sum(lo) / len(lo)
@@ -34091,6 +34168,21 @@ def nds_main(logp, bdp=None, until=120):
     rep.add("NDS-7a: zwrot zoldu 100% naleznego kazdej doby (165; w tym z Banku - zwrot pierwszy z wydatkow wojska)", f"dob {len(ref_days)}, z niedoplata {len(short)} (brak razem {miss})"
             + (f" (dzien {short[0][0]}: {short[0][1][0]}/{short[0][1][1]})" if short else "") + (f"; baza w tych dobach: {bshort[0]} dob, brak {bshort[1]}" if bshort is not None else ""),
             "0 dob z niedoplata (z baza: nie wiecej dob i brak <= bazy x 1.1 + 1000 - niedoplata przy pustej puli Banku jest i bez DS)", ok7a)
+    # ds-akumulator (18.10, diagnoza fin80 "dochod"): wplyw dnia i D staly bez jednorazowych wplywow krolestw (wplyw dnia krolestwa ponad 3 x mediana 28 dob - fin78 przeszedl
+    # tylko dzieki 1.6 mln lupu Dorne); w biegu i w bazie ta sama regula; D staly: minus srednia jednorazowych z 28 dob (renty 180 oddaja je tego samego dnia)
+    wfD = _nds_windfall(D["incK"]); wfB = _nds_windfall(B["incK"]) if B is not None and B.get("incK") else {}
+    nwf = sum(1 for v in wfD.values() if v > 0)
+    rep.add("NDS-7w: jednorazowe wplywy krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia)) - poza NDS-7b i NDS-9", f"bieg: {sum(wfD.values()):.0f} zl w {nwf} dobach"
+            + (f"; baza: {sum(wfB.values()):.0f} zl w {sum(1 for v in wfB.values() if v > 0)} dobach" if wfB else ""), "INFO (w grze: klucz Crown Windfall To Reserve - do zapasu)", None)
+    D["inc"] = {d: v - wfD.get(d, 0) for d, v in D["inc"].items()}
+    if B is not None and B.get("inc"):
+        B["inc"] = {d: v - wfB.get(d, 0) for d, v in B["inc"].items()}
+    def _dadj(X, wf):
+        ks_ = sorted(X)
+        return {d: X[d] - sum(wf.get(x, 0) for x in range(d - 27, d + 1)) / 28.0 for d in ks_}
+    D["D"] = _dadj(D["D"], wfD)
+    if B is not None and B.get("D"):
+        B["D"] = _dadj(B["D"], wfB)
     for lab, sel, thr in (("rampa i obieg (doby DS 1-56)", [d for d in win if d - first + 1 <= 56], 0.85), ("po rampie (doby DS 57+)", [d for d in win if d - first + 1 > 56], 0.95)):
         v = [D["inc"][d] for d in sel if d in D["inc"]]
         if len(v) < 7:
@@ -34098,7 +34190,7 @@ def nds_main(logp, bdp=None, until=120):
             continue
         ref, how = _nds_ref(B, D, "inc", sel)
         x = sum(v) / len(v)
-        rep.add(f"NDS-7b: wplyw dnia korony + 1/450 - {lab}", f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how})" if ref else f"{x:.0f} (odniesienia brak)",
+        rep.add(f"NDS-7b: wplyw dnia korony + 1/450 bez jednorazowych - {lab}", f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how})" if ref else f"{x:.0f} (odniesienia brak)",
                 f">= {thr:.2f} x odniesienia (projekt 14 NDS-7)", (x >= thr * ref) if ref else None)
     bk = [D["bankkd"][d] for d in win if d in D["bankkd"]]
     if bk:
@@ -34122,7 +34214,7 @@ def nds_main(logp, bdp=None, until=120):
     if len(dv) >= 7:
         ref, how = _nds_ref(B, D, "D", win[-28:])
         x = sum(dv) / len(dv)
-        rep.add("NDS-9: D staly rodow (ostatnie 28 dob)", f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how})" if ref else f"{x:.0f}", ">= 0.95 x odniesienia", (x >= 0.95 * ref) if ref else None)
+        rep.add("NDS-9: D staly rodow bez jednorazowych wplywow koron (ostatnie 28 dob)", f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how})" if ref else f"{x:.0f}", ">= 0.95 x odniesienia", (x >= 0.95 * ref) if ref else None)
     else:
         rep.add("NDS-9: D staly rodow", f"dob {len(dv)}", "INFO", None)
     rep.add("NDS-9b: nieoplacone partie", "brak miary w logu (linia budzetu rodow bez licznika)", "INFO", None)

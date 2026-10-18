@@ -123,6 +123,17 @@ namespace Armoury
             d.TiPriestN++;
             long alms = (long)Math.Round(t * TitheAlms), build = t - alms, wage = (long)Math.Round(build * TitheWage), mat = build - wage;
             f.KW += alms; d.TiAlmsT += alms;                                 // jalmuzna - dar, nie zarobek (bez okna podatku)
+            if (DaWorksOn && build > 0)
+            {
+                // ds-akumulator (DsWorksRealMaterial): budowa septu - prawdziwy material z polki albo nic; czesc budowy wraca do kies klas (wedlug dziesieciny klas)
+                // i jest zlecona (TownFolk.DsAkum.cs DaWorksRun po budowach tej doby) - lud placi za towar zdjety i rzemieslnikow (najwyzej 3 x material)
+                long b0 = (long)Math.Floor((double)build * t0 / t), b1 = (long)Math.Floor((double)build * t1 / t), b2 = Math.Min(t2, build - b0 - b1);
+                b0 += build - b0 - b1 - b2;
+                f.KW += b0; f.KR += b1; f.KP += b2;
+                _daTiSept += build;
+                DaSeptTown(f, build, t0, t1, t2);
+                return;
+            }
             if (wage > 0) { Credit(f, wage, KBuildLabour); f.LDayIn -= wage; d.TiWage += wage; }   // place budowy septu - zarobek (podatek jutro), przelew wewnatrz ludu
             if (mat > 0)
             {
@@ -164,6 +175,7 @@ namespace Armoury
                     Folk mf = null;
                     if (mk != null && mk.Town != null) _f.TryGetValue(mk, out mf);
                     if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive) || build <= 0) { d.TiNoMarket += Math.Max(0, build); continue; }
+                    if (DaWorksOn) { _daTiSept += build; DaSeptVillage(vil, mk, build); continue; }   // ds-akumulator: budowa septu zlecona - material prawdziwy albo nic (kiesa wsi do wykonania)
                     int had = vil.Gold;
                     vil.ChangeGold(-(int)build);
                     long got = Math.Max(0, had - vil.Gold);
@@ -211,6 +223,7 @@ namespace Armoury
                 Folk mf = null;
                 if (mk != null && mk.Town != null) _f.TryGetValue(mk, out mf);
                 if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive) || build <= 0) { state = 2; return x; }
+                if (DaWorksOn) { state = 3; _daTiSept += build; DaSeptVillage(vil, mk, build); return x; }   // ds-akumulator: budowa septu zlecona (wykonanie po budowach doby) - material prawdziwy albo nic
                 int had = vil.Gold;
                 vil.ChangeGold(-(int)Math.Min(int.MaxValue, build));
                 long got = Math.Max(0, (long)had - vil.Gold);
@@ -260,7 +273,8 @@ namespace Armoury
                    + " | przez kaplanow " + viaPriest + " (osad " + d.TiPriestN + "): jalmuzna " + (d.TiAlmsT + d.TiAlmsV) + " (kiesy W miast " + d.TiAlmsT + ", kiesy wsi " + d.TiAlmsV
                    + "), budowa septow " + (d.TiWage + d.TiMat + d.TiNoMarket) + ": place ludu " + d.TiWage + ", material do kas miast " + d.TiMat + ", wsie bez miasta targowego (zostalo w kiesie) " + d.TiNoMarket
                    + " | bez kaplana " + (d.TiNoPriestT + d.TiNoPriestV) + " (osad " + d.TiNoPriestN + "): miasta do kasy " + d.TiNoPriestT + ", wsie - zostalo w kiesie " + d.TiNoPriestV
-                   + " | kaplani BK: osad z zywym kaplanem " + (_priests != null ? _priests.Count.ToString() : "-") + ".";
+                   + " | kaplani BK: osad z zywym kaplanem " + (_priests != null ? _priests.Count.ToString() : "-")
+                   + DaTitheNote() + ".";
         }
     }
 }
