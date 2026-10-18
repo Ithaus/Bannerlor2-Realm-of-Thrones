@@ -2,8 +2,8 @@
 
 ## Najwazniejsze w trzech zdaniach
 
-1. **Gra jest gotowa do gry: WGRANIE 77 (wgrane 18.10 ok. 08:05 Twojego czasu).** W srodku sa wszystkie poprawki tej nocy. Test 120 i 160 dob przeszedl bez bledow, a test z bitwa tez.
-2. **Nowa ekonomia (kalibracja startu, "KS") wlaczy sie w Twoim zapisie sama.** Najpierw przez ok. 5 tygodni gry liczy Twoj swiat, potem w 14 dni lagodnie przestawia rynek. W WGRANIU 77 jeszcze sie nie przestawi: blokuje ja jedna bramka "nic z niczego" (konie juczne pojawiaja sie znikad). Poprawka idzie jako WGRANIE 78 - ponizej, czy zdazylem.
+1. **Gra jest gotowa do gry: WGRANIE 78 (wgrane 18.10 ok. 09:17 Twojego czasu).** W srodku sa wszystkie poprawki tej nocy. Testy 120 i 160 dob przeszly bez bledow, testy z bitwa tez.
+2. **Nowa ekonomia (kalibracja startu, "KS") wlaczy sie w Twoim zapisie sama.** Przy pierwszym wczytaniu zaczyna liczyc Twoj swiat (ok. 33 dni gry), potem w 14 dni lagodnie przestawia rynek. W tescie Twojej sciezki (160 dob) wlaczyla sie sama w 33. dniu, bez glodu i bez wstrzasu. Po drodze znalazlem i zamknalem ostatnie "nic z niczego", ktore ja blokowalo: konwoje zaopatrzenia moda DTE dostawaly ok. 28 koni jucznych dziennie znikad.
 3. Twoj zapis jest bezpieczny. Kopia: `D:\Backup-Bannerlord\zapisy-jeffa\IronmanjCg6MOpv28iN-2026-10-17-przed-wgraniem77.sav`, poprzednie pliki modow leza obok jako `*.bak-2026-10-17-wgranie77-przed`.
 
 ## Co zobaczysz w grze
@@ -59,4 +59,5 @@
 `Modules\Armoury\Armoury-*.log`: linie "KS: samo uzbrojenie" (dzien, w ktorym nowa ekonomia zaczela liczyc), "Akumulator kies (ds-akumulator)", "Zajazdy", "Przysiolki", "Uchodzcy do miast (RT)", "Glod miast (KS)". Bledow ERROR ma byc 0.
 
 ## Stan nocy
-(uzupelniane na biezaco - patrz koniec pliku)
+- 08:05 WGRANIE 77 (wszystko z nocy), 09:17 WGRANIE 78 (+ konwoje DTE bez koni z niczego - nowa ekonomia moze sie sama wlaczyc).
+- W toku: fala 3 - "najpierw wyzywic siebie" dla calego swiata (bez reguly dla jednej krainy), szybsza doba nowej ekonomii, inwestycje w okreg i specjalizacja wiosek, mniejszy zapis, poprawki uchodzcow, Muru, ksiegi towarow i cen. Wgram ja jako WGRANIE 79 tylko wtedy, gdy przejdzie testy i gdy nie bedziesz grac - napisz mi, kiedy siadasz do gry.
