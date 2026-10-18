@@ -1254,7 +1254,7 @@ Uzycie (Python 3, tylko odczyt):
                     NZW-0 linia startu (klucz Side Village Crafts; "neutralny start odlozony" bez pliku ziemi - INFO), NZW-1 neutralny start NA TOWARACH: produkcja kazdego
                     typu we wsiach z planem w dobie wlaczenia w 1% (linia "pomiar neutralnosci (A6, TESTS 2)" doby nastepnej; recenzja: rece z linii "start neutralny"
                     sa rowne z definicji n - NZW-1b tylko INFO), NZW-2 0 upraw na sniegu (wioski bez KS i pod KS), NZW-3 ikona inna niz typ wsi w 40-130 okregach (projekt
-                    ok. 81 z 558), NZW-4 linie rozpoznane, NZW-5 przebudowa: kiesy wsi - kasy miast = 0, NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 M wsi
+                    ok. 81 z 558), NZW-4 linie rozpoznane, NZW-5 przebudowa: kiesy wsi - kasy i lud miast = 0 (NZW-5b material z polki / rzemieslnicy / droga dawna - INFO), NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 M wsi
                     (szacunek - INFO), NZW-8 koszt (doba <= 5 ms, ikony <= 300 ms), NZW-9 potkniecia i ERROR 0, NZW-10 etap 0 (proba W2: krok wolany, a - b = 0; W2 milknie
                     tylko we wsiach z planem zajec - liczba w linii W2), NZW-11 tabliczka i dymek wpiete. Log bez paczki: INFO, bez wyjatku.
 --grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
@@ -40657,7 +40657,7 @@ NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>
                      r".*?\| inne niz typ okregu (?P<other>\d+), w przebudowie (?P<trans>\d+), uprawy na sniegu \(inne niz typ okregu\) (?P<snow>\d+) "
                      r"\| zmiany: nacisk (?P<press>\d+), zaczete (?P<started>\d+), skonczone (?P<done>\d+),"
                      r".*?\| krok zajec \(doba\): wsi z planem (?P<plans>\d+) \(przeliczone dzis (?P<redone>\d+), co 7 dob na zmiane\), wsi z pamiecia (?P<mems>\d+), listy BK z dopiskiem (?P<lists>\d+), wywolan towaru typu (?P<steps>\d+), dopiskow (?P<adds>\d+) \((?:bez pamieci M (?P<nomem>\d+)|M szacunek[^)]*)\)"
-                     r".*?\| kontrola pieniedzy: kiesy wsi -(?P<mv>\d+) / kasy miast \+(?P<mt>\d+) \(roznica (?P<mdiff>-?\d+)\)"
+                     r".*?\| kontrola pieniedzy: kiesy wsi -(?P<mv>\d+) / kasy (?:i lud )?miast \+(?P<mt>\d+) \(roznica (?P<mdiff>-?\d+)\)"   # recenzja calosci: + lud (rzemieslnicy)
                      r".*?\| koszt (?P<ms>[\d.]+) ms \| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<stall>\d+)\)\.$")
 NZW_ICON = re.compile(r"Zajecia wiosek \(ZW\): ikony dzien (?P<day>-?\d+) \| okregow (?P<d>\d+) \(pod KS (?P<ks>\d+)\), ikona inna niz typ wsi: (?P<diff>\d+) okregow"
                       r".*?zmienione od poprzedniego rachunku (?P<chg>\d+), tabliczki poprawione w sesji (?P<upd>\d+) \| uprawy na sniegu pod KS \(wioski\) (?P<snow>\d+)"
@@ -40710,7 +40710,7 @@ def nzw_main(logp):
                         bad.append(s)
                 elif s.startswith(NZW_HEAD + "dzien "):
                     mm = NZW_DAY.match(s)
-                    (days.append(mm.groupdict()) if mm else bad.append(s))
+                    (days.append(dict(mm.groupdict(), raw=s)) if mm else bad.append(s))
                 elif s.startswith(NZW_HEAD + "ikony dzien"):
                     mm = NZW_ICON.match(s)
                     (icons.append(mm.groupdict()) if mm else bad_icons.append(s))
@@ -40792,7 +40792,16 @@ def nzw_main(logp):
     if days:
         md = [g for g in days if int(g["mdiff"]) != 0]
         paid = sum(int(g["mv"]) for g in days)
-        rep.add("NZW-5: przebudowa - kiesy wsi -> kasy miast (kontrola pieniedzy)", f"zaplacone {paid}, doby z roznica {len(md)}", "roznica 0 w kazdej dobie", not md)
+        rep.add("NZW-5: przebudowa - kiesy wsi -> kasy i lud miast (kontrola pieniedzy)", f"zaplacone {paid}, doby z roznica {len(md)}", "roznica 0 w kazdej dobie", not md)
+        # recenzja calosci (noc 17/18.10): rata przebudowy = prawdziwy material z polki + rzemieslnicy (Ds Works Real Material); droga dawna bez towaru - INFO
+        rx5 = re.compile(r"przebudowa \(Ds Works Real Material\): material z polki \+(\d+) \(szt\. (\d+)\), rzemieslnicy miasta \+(\d+), doby bez materialu albo kiesy ponad skrzynie (\d+), droga dawna bez towaru \(klucz wylaczony / kiesa ludu nieczynna\) \+(\d+)")
+        m5 = [rx5.search(g.get("raw", "")) for g in days]
+        m5 = [m for m in m5 if m]
+        if m5:
+            mat5, pcs5, wg5, nm5, old5 = (sum(int(m.group(i)) for m in m5) for i in range(1, 6))
+            rep.add("NZW-5b: przebudowa - material z polki / rzemieslnicy / droga dawna bez towaru",
+                    f"material {mat5} zl ({pcs5} szt.), rzemieslnicy {wg5} zl, bez materialu {nm5} razy, bez towaru {old5} zl",
+                    "INFO (bez towaru > 0 tylko przy Ds Works Real Material wylaczonym albo kiesie ludu nieczynnej)", None)
     # NZW-6
     if days:
         sides = max(int(g["sides"]) for g in days)

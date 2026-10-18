@@ -100,7 +100,7 @@ namespace Armoury
         /// <summary>ArmouryBehavior.OnDailyTick (po VillageCrafts.Daily): ikony okregow od nowa w pierwszej dobie sesji i co 28 dob; zmienione - tabliczki w sesji.</summary>
         internal static void Daily()
         {
-            if (!On) return;
+            if (!On) { if (_info.Count > 0) Restore(); return; }   // recenzja calosci: klucz wylaczony w sesji - tabliczki wracaja raz, przy zmianie stanu
             int today = (int)CampaignTime.Now.ToDays;
             if (_lastDay >= 0 && today - _lastDay < 28) return;
             _lastDay = today;
@@ -132,6 +132,32 @@ namespace Armoury
             Log.Info(VillageCrafts.P + "ikony dzien " + today + " | okregow " + _districts + " (pod KS " + _ks + "), ikona inna niz typ wsi: " + _diff + " okregow (projekt: ok. 81 z 558, prog 40-130), zmienione od poprzedniego rachunku "
                      + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv) + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
             _st = 0;
+        }
+
+        /// <summary>Recenzja calosci (noc 17/18.10): District Icon From Sum wylaczony w trakcie sesji - dymek i lista produkcji sluchaja klucza od razu, a tabliczki zmienione
+        /// juz wczesniej (UpdateVms przesuwa je tylko ku ikonie okregu) zostalyby do wczytania. Raz, przy zmianie stanu (pierwsza doba z kluczem wylaczonym, _info niepuste):
+        /// ikona kazdego okregu = glowny towar typu wsi gry (ten sam napis co AddPrimaryProductionIcon), tabliczki w sesji poprawione, pamiec wyczyszczona; ponowne wlaczenie
+        /// liczy ikony od razu (_lastDay -1). Nie rzuca.</summary>
+        private static void Restore()
+        {
+            int n = 0;
+            try
+            {
+                foreach (var v in Village.All)
+                {
+                    try
+                    {
+                        if (v == null || v.Settlement == null || v.VillageType == null) continue;
+                        Info i; if (!_info.TryGetValue(v.Settlement.StringId, out i) || i == null) continue;
+                        i.Item = v.VillageType.PrimaryProduction; i.IconId = IconId(i.Item);
+                    }
+                    catch (Exception e) { Stumble("Restore(okreg)", e); }
+                }
+                n = UpdateVms();
+            }
+            catch (Exception e) { Stumble("Restore", e); }
+            _info.Clear(); _lastDay = -1; _diff = _changed = 0;
+            Log.Info(VillageCrafts.P + "ikony: WYLACZONE w MCM (District Icon From Sum) - tabliczki wrocily do ikony typu wsi gry (poprawione w sesji " + n + ").");
         }
 
         /// <summary>Do linii ZW: stan ikon (ostatni rachunek).</summary>

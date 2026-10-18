@@ -389,6 +389,67 @@ namespace Armoury
             return Math.Max(0, got);
         }
 
+        /// <summary>
+        /// Recenzja calosci (noc 17/18.10): rata przebudowy zajecia wioski pobocznej (VillageCrafts bez KS i regula A7 KS) - TA SAMA regula co roboty gminy wsi z prawdziwym
+        /// materialem (DaRunOne / DaPayVillage), od razu, nie w kolejce: VillageCrafts.Daily i StartCalibration.Daily biegna w ArmouryBehavior PO BuildFunding.Daily
+        /// i DaWorksRun, wiec przebudowa nie zabiera materialu budowom pana, ludu ani robotom gminy tej doby. Budzet = `amount`, najwyzej kiesa wsi ponad skrzynie tej doby
+        /// (wies DS - regula efbbf0dc); material = budzet / (1 + k) z polki miasta targowego (BuildFunding.DsWorksBuy, ramka FBuild), rzemieslnicy miasta najwyzej
+        /// k x material (k = DsWorksWagePerMaterial). Kiesa wsi -> kasa targu (material, sprzedaz kupcow MixBuild) i lud targu (Earn KBuildLabour; czego lud nie przyjmie -
+        /// wraca do wsi). Brak materialu na polce albo targ bez kiesy ludu - nic nie schodzi (0: rata czeka, przebudowa stoi). Zwraca zloto, ktore zeszlo z kiesy wsi;
+        /// -1 - droga nieczynna (Ds Works Real Material wylaczone albo kiesa ludu nieczynna, poza watkiem glownym) - wolajacy jak dotad. Bez licznikow robot gminy DS
+        /// (osobne zjawisko - liczy wolajacy w swojej linii). Nie rzuca.
+        /// </summary>
+        internal static long CraftsRebuildPay(Village vil, Settlement mk, long amount, out long mat, out long matIn, out long wage, out int pcs)
+        {
+            mat = matIn = wage = 0; pcs = 0;
+            try
+            {
+                if (!DaWorksOn || OffMain()) return -1;
+                if (vil == null || mk == null || mk.Town == null || amount < 2) return 0;
+                Folk mf = null;
+                _f.TryGetValue(mk, out mf);
+                if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive)) return 0;
+                long avail = Math.Max(0, vil.Gold);
+                double ch = vil.Settlement != null ? DsVillage.ChestToday(vil.Settlement) : -1;
+                if (ch >= 0) avail = Math.Max(0, avail - (long)Math.Floor(ch));
+                long budget = Math.Min(amount, avail);
+                if (budget < 2) return 0;
+                var s = Settings.Current;
+                double k = s != null ? Math.Max(0, Math.Min(3.0, (double)s.DsWorksWagePerMaterial)) : 0.5;
+                double matBudget = Math.Floor(budget / (1.0 + k));
+                if (matBudget < 1) return 0;
+                var items = BuildFunding.DsWorksItems();
+                var pc = new int[Math.Max(BuildFunding.DsWorksMatCount, 1)];
+                int spent = 0, cap, drop; bool none;
+                var gf = GoodsLedger.Begin(GoodsLedger.FBuild, mk);   // ksiega towarow: material na rynek osady targu (jak roboty gminy)
+                if (gf != null) gf.Info = "przebudowa zajecia wioski";
+                try { spent = BuildFunding.DsWorksBuy(mk, matBudget, items, pc, out cap, out none, out drop); }
+                finally { GoodsLedger.End(gf); }
+                for (int i = 0; i < pc.Length; i++) pcs += pc[i];
+                if (spent <= 0) return 0;
+                long w = Math.Max(0, Math.Min((long)Math.Floor(k * spent), budget - spent));
+                int had = vil.Gold;
+                vil.ChangeGold(-(int)Math.Min(int.MaxValue, spent + w));
+                long got = Math.Max(0, (long)had - vil.Gold);
+                long matPaid = Math.Min(got, spent), wagePaid = got - matPaid;
+                if (matPaid > 0)
+                {
+                    int c0 = mk.Town.Gold;
+                    mk.Town.ChangeGold((int)matPaid);
+                    matIn = (long)mk.Town.Gold - c0;                            // zmierzone po stronie kasy (kontrola w linii wolajacego)
+                    mf.Sale[MixBuild] += matPaid;                               // sprzedaz kupcow targu - podstawa robocizny (jak material robot gminy)
+                }
+                if (wagePaid > 0)
+                {
+                    long fin = Earn(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour);   // kiesa wsi -> lud targu (rzemieslnicy)
+                    if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi
+                }
+                mat = matPaid; wage = wagePaid;
+                return Math.Max(0, got);
+            }
+            catch (Exception e) { DaStumble("CraftsRebuildPay", e); return 0; }
+        }
+
         /// <summary>Lud miasta placi za septy z dziesieciny: kiesy klas (wagi dziesieciny) -> kasa miasta (material; ksiega kies _ctlOut) i rzemieslnicy tego ludu (przelew wewnatrz).
         /// Zwraca zloto, ktore zeszlo z kies klas.</summary>
         private static long DaPayTown(DaOrder o, Settlement mk, Folk mf, long mat, long wage)

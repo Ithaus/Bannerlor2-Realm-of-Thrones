@@ -279,8 +279,9 @@ namespace Armoury
         /// <summary>Powierzchnia bloku (ha): ziemia okregu x udzial bloku (ostatni rachunek doby).</summary>
         private static double BlockArea(LiveDist ld, LiveBlock b) { return b.K != null ? b.K.Area : 0.0; }
 
-        /// <summary>Doba przebudowy: zaplata dzisiejszej czesci kosztu (kiesa wsi -> kasa miasta targowego, najwyzej 1/4 kiesy), postep proporcjonalny do zaplaty, rece
-        /// z zajecia biezacego do nowego; koniec - gdy stare zajecie nie ma juz rak. Ziemia bloku pelna (ludzi przybylo) - rece nie przechodza (recenzja 16.10).</summary>
+        /// <summary>Doba przebudowy: rata (koszt do dzis wedlug czasu minus zaplacone, najwyzej 1/4 kiesy) - material z polki miasta targowego i rzemieslnicy
+        /// (VillageCrafts.PayRebuild, recenzja calosci 17/18.10), rece z zajecia biezacego do nowego najwyzej X0/T na dobe i nie ponad czesc zaplacona; koniec - gdy stare
+        /// zajecie nie ma juz rak. Ziemia bloku pelna (ludzi przybylo) - rece nie przechodza (recenzja 16.10).</summary>
         private static void Progress(LiveDist ld, LiveBlock b, int today, Town mt)
         {
             int ci = IndexOfCraft(b, b.Cur), ti = IndexOfCraft(b, b.Target);
@@ -292,26 +293,18 @@ namespace Armoury
             double progress = 1.0;
             if (b.Cost > 0 && !ld.TF && ld.V != null)
             {
-                double due = b.Cost / T;
-                int ask = (int)Math.Min(Math.Ceiling(Math.Max(0.0, Math.Min(due, b.Cost - b.Paid))), Math.Max(0, ld.V.Gold) / 4);
-                int got = 0;
-                if (ask > 0 && mt != null)
-                {
-                    int had = ld.V.Gold;
-                    ld.V.ChangeGold(-ask);
-                    got = had - ld.V.Gold;
-                    if (got > 0)
-                    {
-                        int th = mt.Gold;
-                        mt.ChangeGold(got);
-                        _mVil += got; _mTown += mt.Gold - th;
-                    }
-                    else got = 0;
-                }
+                // recenzja calosci (noc 17/18.10): ta sama regula co zajecia wiosek bez KS (VillageCrafts.PayRebuild) - rata wedlug czasu (zaleglosci czekaja, material kupuje
+                // sie na sztuki), najwyzej 1/4 kiesy, placona prawdziwym materialem z polki miasta targowego i rzemieslnikami miasta (Ds Works Real Material wylaczone - jak
+                // dotad kiesa wsi -> kasa miasta); rece przechodza najwyzej X0/T na dobe i nigdy ponad czesc zaplacona (pierwsza doba z pelna zaplata - jak dotad)
+                double fTime = Math.Min(1.0, Math.Max(0, today - b.TStart) / (double)T);
+                double owe = Math.Min(b.Cost - b.Paid, fTime * b.Cost - b.Paid);
+                int ask = owe >= 0.5 ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4) : 0;
+                long got = ask > 0 && mt != null ? VillageCrafts.PayRebuild(ld.V, mt, ask, _tally) : 0;
                 b.Paid += got; _rPaid += got;
-                progress = due > 0 ? Math.Min(1.0, got / due) : 1.0;
-                if (b.Paid >= b.Cost - 0.5) progress = 1.0;
-                if (progress < 1.0) _rStall++;
+                double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
+                double moved = b.X0 > 1e-6f ? Math.Max(0.0, Math.Min(1.0, 1.0 - b.X[ci] / (double)b.X0)) : 1.0;
+                progress = Math.Max(0.0, Math.Min(1.0, (fPay - moved) * T));
+                if (progress < 1.0 - 1e-6) _rStall++;
             }
             double dx = Math.Min(b.X[ci], b.X0 / T * progress);
             b.X[ci] -= (float)dx; b.X[ti] += (float)dx;
@@ -344,7 +337,8 @@ namespace Armoury
         }
 
         // kontrola pieniedzy KS od ostatniej linii: przebudowa (kiesy wsi -> kasy miast), pola mieszczan (kasy miast -> kiesy ludu)
-        private static long _mVil, _mTown, _mTfTown, _mTfFolk;
+        private static long _mTfTown, _mTfFolk;
+        private static readonly VillageCrafts.RebuildTally _tally = new VillageCrafts.RebuildTally();   // recenzja calosci: rata przebudowy A7 (kiesy wsi -> kasa targu za material + lud)
 
         /// <summary>Linia co 7 dob: wedlug rynku (Westeros, Essos) mediana 28-dobowego indeksu cen miast dla towarow KS i odsetek miast na suficie / podlodze wzoru ceny
         /// w ostatnim odczycie (pomiar "ceny blisko startu" - progi nks NKS-7).</summary>
@@ -395,9 +389,11 @@ namespace Armoury
         /// za plon pol mieszczan - roznice musza byc 0 (nic z niczego).</summary>
         private static string MoneyText()
         {
-            string t = "kontrola pieniedzy KS: przebudowa kiesy wsi -" + _mVil + " / kasy miast +" + _mTown + " (roznica " + (_mVil - _mTown) + "), pola mieszczan kasy miast -" + _mTfTown
-                       + " / kiesy ludu +" + _mTfFolk + " (roznica " + (_mTfTown - _mTfFolk) + ")";
-            _mVil = _mTown = _mTfTown = _mTfFolk = 0;
+            // recenzja calosci (noc 17/18.10): "kasy miast" przebudowy = kasy targow (material) + lud miast (rzemieslnicy) - te same liczby co dotad przy Ds Works Real Material wylaczonym
+            string t = "kontrola pieniedzy KS: przebudowa kiesy wsi -" + _tally.Vil + " / kasy miast +" + (_tally.Town + _tally.Folk) + " (roznica " + (_tally.Vil - _tally.Town - _tally.Folk) + "), pola mieszczan kasy miast -" + _mTfTown
+                       + " / kiesy ludu +" + _mTfFolk + " (roznica " + (_mTfTown - _mTfFolk) + ")"
+                       + (_tally.Vil > 0 || _tally.NoMat > 0 ? ", przebudowa: material z polki +" + _tally.Mat + " (szt. " + _tally.Pcs + "), rzemieslnicy +" + _tally.Wage + ", bez materialu " + _tally.NoMat + " razy, droga dawna bez towaru +" + _tally.Old : "");
+            _tally.Clear(); _mTfTown = _mTfFolk = 0;
             return t;
         }
 

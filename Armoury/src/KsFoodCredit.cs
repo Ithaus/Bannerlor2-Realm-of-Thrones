@@ -21,7 +21,8 @@ namespace Armoury
     /// (zrodlo, cel) z rachunkiem; par nie da sie scalic bez utraty odbiorcy splaty, wiec ponad ok. 1600 par zapis zostaje wiekszy (SaveText dzieli go na paczki) i linia
     /// zapisu mowi "NADAL PONAD 64 KB" (NKU-10 NIE). Gorna granica: pary miast tego samego rynku, w praktyce do 20 zrodel na miasto (12 najblizszych + 8 dalszych).
     /// KS-R5 ceny-r5 (recenzja): roszczenia z zadatkow kupcow celu (OpenClaim) na OSOBNYCH kontach pary (Claim, wpis zapisu z 5. polem "z"): splacane w PayDaily
-    /// jak rachunki i przepadaja przy wojnie, ale nie blokuja dowozu do dluznika (OverdueDst) i nie placi ich pan glodnego miasta (OverdueOf / PayByLord).
+    /// jak rachunki, ale przy wojnie czekaja do pokoju (recenzja calosci 17/18.10 - nie przepadaja), nie blokuja dowozu do dluznika (OverdueDst) i nie placi ich pan
+    /// glodnego miasta (OverdueOf / PayByLord).
     /// </summary>
     internal static class KsFoodCredit
     {
@@ -92,7 +93,7 @@ namespace Armoury
         internal static long FreeOf(Town t) { return Free(t); }
 
         /// <summary>KS-R5 ceny-r5 (zadatek): roszczenie wierzyciela `creditor` (miasto celu, ktore zaplacilo zadatek) wobec dluznika `debtor` (miasto zrodla bez kasy na zwrot
-        /// nadplaty albo zadatku zawroconego wozu) - splata jak rachunek (od najstarszego z kasy ponad podloge w PayDaily, wojna = przepada); zloto sie nie rusza.
+        /// nadplaty albo zadatku zawroconego wozu) - splata jak rachunek (od najstarszego z kasy ponad podloge w PayDaily; wojna - czeka do pokoju, recenzja calosci); zloto sie nie rusza.
         /// Recenzja ceny-r5: osobne konto (Claim) - zwrot zadatku to nie rachunek za jedzenie: NIE blokuje dowozu do dluznika (OverdueDst) i NIE placi go pan glodnego
         /// miasta (OverdueOf / PayByLord - pan placi za jedzenie dowiezione do swojego miasta, a dluznik roszczenia jedzenia za nie nie dostal).</summary>
         internal static void OpenClaim(Settlement creditor, Settlement debtor, long x, int today)
@@ -165,6 +166,9 @@ namespace Armoury
                     var a = kv.Value;
                     try
                     {
+                        // recenzja calosci (noc 17/18.10): roszczenie z zadatku (Claim) przy wojnie CZEKA do pokoju (bez splaty i bez przepadku) - zrodlo wozu zawroconego wojna
+                        // odebralo caly towar, wiec przepadek roszczenia zostawialby mu tez zadatek (cel placilby za nic); rachunki za dowiezione jedzenie - jak dotad
+                        if (a.Claim && a.Src != null && a.Dst != null && a.Src.Town != null && a.Dst.Town != null && AtWar(a.Src, a.Dst)) continue;
                         if (a.Src == null || a.Dst == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst))
                         {
                             // kupcy stracili - roszczenie znika (bez zlota)

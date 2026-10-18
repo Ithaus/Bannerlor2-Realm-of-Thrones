@@ -747,9 +747,11 @@ namespace Armoury
 
         // ============================================================ wyplata przy powrocie wozu (money_routes 2)
         /// <summary>VillageTakings.EnterPostfix (woz wrocil do wsi macierzystej; po 112 i F4b, przed danina DS): pula prac okregu z licznika pana i z kiesy wsi w proporcji
-        /// tego, co weszlo w tym oknie. handed - utarg oddany, tax / purse - przyrost licznika i kiesy w oknie.</summary>
-        internal static void OnCartReturn(MobileParty cart, Village home, int handed, long tax, long purse)
+        /// tego, co weszlo w tym oknie. handed - utarg oddany, tax / purse - przyrost licznika i kiesy w oknie. paid - wyplacone posiadaczom prac (licznik + kiesa; recenzja
+        /// calosci: linia DS liczy je osobno, nie jako udzial pana).</summary>
+        internal static void OnCartReturn(MobileParty cart, Village home, int handed, long tax, long purse, out long paid)
         {
+            paid = 0;
             if (home == null || home.Settlement == null || handed <= 0 || !On) return;
             string id = home.Settlement.StringId;
             try
@@ -811,6 +813,7 @@ namespace Armoury
                     if (fromVil > 0) MoneyLedger.Note169(MoneyLedger.N169Other, home.Settlement, -(int)fromVil);   // kiesa wsi poza tickiem - nazwane ("inne")
                     paidTax += fromTax; paidVil += fromVil;
                     long got = fromTax + fromVil;
+                    paid += got;
                     lock (Gate)
                         foreach (var x in er)
                             if (x.Key.Clan == kv.Key) { double rp = got * x.Value / kv.Value; x.Key.Out += (long)Math.Round(rp); x.Key.Paid7 += rp; }
@@ -1220,7 +1223,8 @@ namespace Armoury
                     }
                     sb.Append("|a:").Append(_autoOff ? 0 : 1);                 // przelacznik odbudowy samoczynnej gracza z okna (1 - wedlug klucza)
                     string res = sb.ToString();
-                    if (res.Length > 512 * 1024) { Log.Info(P + "zapis arm_works za duzy (" + res.Length + ") - pominiety."); return ""; }
+                    // recenzja calosci (noc 17/18.10): bez twardego sufitu - dawne "" kasowalo wiersze prac (zloto gracza In/InWage/Out); SaveText.Sync dzieli dlugi napis
+                    if (res.Length > 512 * 1024) Log.Info(P + "zapis arm_works duzy (" + res.Length + " znakow) - zapisany w kawalkach (SaveText).");
                     return res;
                 }
             }

@@ -6844,7 +6844,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationTownFields { get; set; } = true;
 
-        [SettingPropertyBool("Start Calibration Switch Rule", HintText = "with Start Calibration applied: a village part changes its work only when another work has paid at least 25% better for about 60 days, one part of a district at a time, within the land of that part and at most 5% of the region's hands a season; the village pays the town's craftsmen for the new gear and the hands move over 60 days (vineyards, groves, orchards and date palms a year). Off (default for the first season) = the works stay as the calibration set them and the pressure to change is only measured in the log")]
+        [SettingPropertyBool("Start Calibration Switch Rule", HintText = "with Start Calibration applied: a village part changes its work only when another work has paid at least 25% better for about 60 days, one part of a district at a time, within the land of that part and at most 5% of the region's hands a season; the village pays for the timber, tools and stone really bought at its market town's stall and for the town craftsmen who make the new gear (no coin or no material on the stall - the change waits) and the hands move over 60 days (vineyards, groves, orchards and date palms a year). Off (default for the first season) = the works stay as the calibration set them and the pressure to change is only measured in the log")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationSwitchRule { get; set; } = false;
 
@@ -7444,7 +7444,7 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public int SideVillageCraftHoldDays { get; set; } = 60;
 
-        [SettingPropertyInteger("Side Village Craft Change Days", 7, 364, "0", HintText = "with Side Village Crafts: how many days the change takes - the old goods fade while the new ones grow; the village pays the town's craftsmen for the new gear meanwhile (no money - the change waits)")]
+        [SettingPropertyInteger("Side Village Craft Change Days", 7, 364, "0", HintText = "with Side Village Crafts: how many days the change takes - the old goods fade while the new ones grow; meanwhile the village pays for the timber, tools and stone really bought at its market town's stall and for the town craftsmen who make the new gear (no coin or no material on the stall - the change waits)")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public int SideVillageCraftChangeDays { get; set; } = 60;
 

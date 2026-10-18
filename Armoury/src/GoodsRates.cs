@@ -130,8 +130,6 @@ namespace Armoury
 
         // ============================================================ (a) sol - MaterialLaw.ProdPostfix (dowolny watek)
 
-        /// <summary>MaterialLaw.ProdPostfix, zaraz po kroku P1: wies solna, towar sol - czynnik x2.0 (N3: x3.5 przy SaltRateRaised) wzorem "czynnik x suma".
-        /// Klucz wylaczony - nic. P8a: wies traperska, towar futra - czynnik x3 tym samym wzorem (wlasny klucz FurRateRaised). Nie rzuca.</summary>
         /// <summary>inwest (zajecia wiosek pobocznych bez KS): poprawka stawki typu wsi dla towaru (sol wsi solnych, futra trapperow) - ten sam czynnik, ktory ProdStep daje
         /// wsi tego typu; wioska poboczna z tym zajeciem w okregu innego typu dostaje go w bazie (lancuch wsi patrzy na typ wsi gry). 1 - bez poprawki.</summary>
         internal static float TypeRateFactor(string typeId, string itemId)
@@ -145,6 +143,8 @@ namespace Armoury
             return 1f;
         }
 
+        /// <summary>MaterialLaw.ProdPostfix, zaraz po kroku P1: wies solna, towar sol - czynnik x2.0 (N3: x3.5 przy SaltRateRaised) wzorem "czynnik x suma".
+        /// Klucz wylaczony - nic. P8a: wies traperska, towar futra - czynnik x3 tym samym wzorem (wlasny klucz FurRateRaised). Nie rzuca.</summary>
         internal static void ProdStep(Village village, ItemObject item, ref ExplainedNumber r)
         {
             try

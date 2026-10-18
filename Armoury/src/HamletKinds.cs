@@ -96,6 +96,29 @@ namespace Armoury
             return _fish != null && _grain != null;
         }
 
+        /// <summary>Recenzja calosci (noc 17/18.10, neutralny start zajec wiosek - VillageCrafts.SwitchOn i pomiar neutralnosci): u kroku W2 wsi `v` tak, jak liczy je
+        /// ListStep (udzial ludzi w domu wiosek rybackich x 0.5, prog MinU, sufit 0.5), przy kluczu i zrodlach czynnych i zbozu dokladnie raz (ryby najwyzej raz) na
+        /// liscie typu wsi gry - przyblizenie listy BK (filtr klimatu moze zdjac zboze; tam W2 i tak nic nie robil). Bez ReplacesW2 (pytanie o dzien PRZED planem zajec).
+        /// 0 - W2 tej wsi nic nie zamienia. Sam odczyt, nie rzuca.</summary>
+        internal static double ShareOf(Village v)
+        {
+            try
+            {
+                if (v == null || v.VillageType == null || !On || !Items()) return 0.0;
+                int gc = 0, fc = 0;
+                foreach (var p in v.VillageType.Productions)
+                {
+                    if (ReferenceEquals(p.Item1, _grain)) gc++;
+                    else if (ReferenceEquals(p.Item1, _fish)) fc++;
+                }
+                if (gc != 1 || fc > 1) return 0.0;
+                double u = VillageBook.FishersShare(v) * FishersHalf;
+                if (double.IsNaN(u) || !(u >= MinU)) return 0.0;
+                return Math.Min(u, (double)FishersHalf);
+            }
+            catch { return 0.0; }
+        }
+
         /// <summary>Lista wsi wraca z BK bez naszego kroku (potkniecie, klucz wylaczony) - zboze tej wsi bez zmian.</summary>
         internal static void Forget(Village v)
         {
