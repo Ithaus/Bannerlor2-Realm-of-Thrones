@@ -1038,7 +1038,8 @@ Uzycie (Python 3, tylko odczyt):
                     doba KS wedlug rodzaju doby (zwykla / odbior Planu / start Planu / krok A7 z pod-czasow T0 - INFO), NKS-9k kontrola szybkich drog (linia "KS: koszt -
                     kontrola szybkich drog" co 7 dob: szybkie drogi wobec starych na tych samych danych, rozne = 0; bez linii - INFO), NKS-28t pod-czasy KS-H z linii
                     "Kupcy zywnosci (KS-H) koszt" (wstep, decyzje z probka 1/8: ceny lotow, wartosc u celu, indeks, wysylka; fracht wsi, przyjazdy - INFO). Log sprzed
-                    ks-koszt - INFO, nigdy wyjatek.
+                    ks-koszt - INFO, nigdy wyjatek. Recenzja ks-koszt: NKS-9z ulamki plonu pol mieszczan w zapisie (T13: dopisek linii T0 "okregow w ostatnim
+                    zapisie N (ponad limit M), wczytanych z zapisu K"; prog ponad limit = 0; bez dopisku - INFO).
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -36399,6 +36400,8 @@ NKS_T0 = re.compile(r"KS: koszt doby \(T0\) dzien (?P<day>-?\d+) \| razem (?P<ms
 NKS_T0ITEM = re.compile(r"(?P<k>[a-z][a-z0-9_]*) (?P<v>\d+\.\d+)(?=[,|)( ]|$)")
 NKS_KCHK = re.compile(r"KS: koszt - kontrola szybkich drog dzien (?P<day>-?\d+) \| zgodne (?P<ok>\d+), rozne (?P<bad>\d+) \((?P<body>[^|]*)\)(?: \| na targ Planu T1 \(raz na proces\) (?P<t1>[^|]*))?")
 NKS_KSHC = re.compile(r"Kupcy zywnosci \(KS-H\) koszt dzien (?P<day>-?\d+) \| czas doby (?P<ms>[\d.]+) ms \(NKS-28\)(?P<body>.*)$")
+# recenzja ks-koszt: ulamki plonu pol mieszczan w zapisie (T13, pole 9 okregu "T") - dopisek linii T0
+NKS_T13S = re.compile(r"ulamki plonu pol mieszczan w zapisie \(T13\): okregow w ostatnim zapisie (?P<sv>\d+)(?: \(ponad limit (?P<ov>\d+)\))?, wczytanych z zapisu (?P<ld>\d+)")
 NKS_SAVEKH = re.compile(r"KS: zapis arm_ks_kupcy doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB")
 NKS_SAVER3 = re.compile(r"arm_ks_r3 \(stan rundy 3, osobny klucz\) (?P<kb>[\d.]+) KB, razem (?P<tot>[\d.]+) KB")
 # KS-R4 r4-kupcy (noc 17/18.10): kredyt kupcow KS-H, probka wyceny (srednia i najwiekszy blad), zablokowane wedlug towaru, glod pierwszy, Polnoc i Mur, wersja tabeli dob
@@ -36985,6 +36988,16 @@ def nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day):
         rep.add("NKS-28t: pod-czasy kupcow zywnosci KS-H (mediany ms)", f"czas doby {nks_med([v[0] for v in kshc.values()]):.2f} ms; {', '.join(parts)} ({len(kshc)} dob)", "INFO (decyzje: probka 1/8 wywolan)", None)
     else:
         rep.add("NKS-28t: pod-czasy kupcow zywnosci KS-H", "brak linii 'Kupcy zywnosci (KS-H) koszt' (log sprzed ks-koszt)", "INFO", None)
+    # recenzja ks-koszt: T13 (klucz Ks Town Fields Every2) - plon wstrzymany w polu idzie do zapisu (pole 9); ponad limit 24 KB tekstu = plon tych miast ginie przy wczytaniu
+    t13 = [(d, v[2]) for d, v in sorted(t0rows.items()) if "_t13_zapis" in v[2]]
+    if t13:
+        over = max(x[1]["_t13_limit"] for x in t13)
+        last = t13[-1]
+        rep.add("NKS-9z: ulamki plonu pol mieszczan w zapisie (T13)",
+                f"dob z dopiskiem {len(t13)}; ostatni (doba {last[0]}): okregow w zapisie {last[1]['_t13_zapis']}, wczytanych z zapisu {max(x[1]['_t13_wczyt'] for x in t13)}, ponad limit (max) {over}",
+                "ponad limit = 0", over == 0)
+    else:
+        rep.add("NKS-9z: ulamki plonu pol mieszczan w zapisie (T13)", "brak dopisku w liniach T0 (T13 nie dzialal w tej sesji - klucz Ks Town Fields Every2 NIE)", "INFO", None)
 
 
 def nks_med(v):
@@ -37070,7 +37083,11 @@ def nks_main(logp, until=120, bdp=None):
                 # ks-koszt: pod-czasy doby KS (T0) i kontrola szybkich drog
                 mm = NKS_T0.match(s)
                 if mm:
-                    t0rows[int(mm.group("day"))] = (float(mm.group("ms")), mm.group("st"), {k: float(v) for k, v in NKS_T0ITEM.findall(mm.group("body"))})
+                    t0d = {k: float(v) for k, v in NKS_T0ITEM.findall(mm.group("body"))}
+                    m13 = NKS_T13S.search(mm.group("body"))
+                    if m13:
+                        t0d["_t13_zapis"] = int(m13.group("sv")); t0d["_t13_limit"] = int(m13.group("ov") or 0); t0d["_t13_wczyt"] = int(m13.group("ld"))
+                    t0rows[int(mm.group("day"))] = (float(mm.group("ms")), mm.group("st"), t0d)
                     continue
                 mm = NKS_KCHK.match(s)
                 if mm:

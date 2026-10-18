@@ -57,7 +57,8 @@ namespace Armoury
               .Append(" | odbior Planu ms: na_targ ").Append(T0F(T0CMk)).Append(" (watek roboczy ").Append(_t0Worker ? "TAK" : "NIE").Append("), lepszy_stol ").Append(T0F(T0CNeed))
               .Append(", linie_planu ").Append(Math.Max(0.0, T0Ms(_t0[T0CLines] - _t0[T0CMk])).ToString("0.00", Inv)).Append(", pliki_planu ").Append(T0F(T0CCsv))
               .Append(" | reszta ").Append(Math.Max(0.0, totalMs - main - live).ToString("0.00", Inv)).Append(" ms | okregow przeliczonych ").Append(_t0Redo)
-              .Append(" | klucze: Ks Cost Fast ").Append(SwCostFast ? "TAK" : "NIE").Append(", Ks Town Fields Every2 ").Append(SwTownFieldsEvery2 ? "TAK (pola mieszczan bez dostawy dzis " + _t13Skip + ")" : "NIE").Append('.');
+              .Append(" | klucze: Ks Cost Fast ").Append(SwCostFast ? "TAK" : "NIE").Append(", Ks Town Fields Every2 ").Append(SwTownFieldsEvery2 ? "TAK (pola mieszczan bez dostawy dzis " + _t13Skip + ")" : "NIE")
+              .Append(_t13Saved >= 0 || _t13Loaded > 0 ? " | ulamki plonu pol mieszczan w zapisie (T13): okregow w ostatnim zapisie " + Math.Max(0, _t13Saved) + (_t13SaveOver > 0 ? " (ponad limit " + _t13SaveOver + ")" : "") + ", wczytanych z zapisu " + _t13Loaded : "").Append('.');
             return sb.ToString();
         }
 
@@ -200,10 +201,63 @@ namespace Armoury
                 if (_items[i] == null) continue;
                 ld.Frac[i] += res.Market[i] * Beta(m, i);
             }
-            _t13Skip++;
+            _t13Skip++; _t13Seen = true;
             return true;
         }
         private static int _t13Skip;
+
+        // T13 w zapisie (recenzja ks-koszt): plon wstrzymany w dobie bez dostawy czeka w ld.Frac, ktorego zapis dotad nie mial - wczytanie gubilo do jednej doby plonu
+        // pol mieszczan polowy miast. Pole 9 okregu "T" w ciele okregow arm_ks: "towar:ilosc,..." (ulamki plonu > 0.0005 szt.); starsza DLL go nie czyta (pola 7 i 8
+        // tylko dla wsi, pole 9 poza jej odczytem). Pisane tylko gdy T13 dziala (klucz albo doba bez dostawy w tej sesji) - klucz wylaczony od poczatku sesji = zapis
+        // jak dotad co do znaku. Odczyt: ulamki wracaja do pola (dostawa nastepnej doby dostawy, zaplata przy wejsciu na polke jak dotad) - plon bez zaplaty nie powstaje
+        // z niczego (to ten sam plon, ktory przed zapisem byl w ld.Frac) i nie ginie w nicosc.
+        private static bool _t13Seen;                       // T13 wstrzymal plon w tej sesji (doba bez dostawy) - zapis ulamkow takze po wylaczeniu klucza
+        private static int _t13Saved = -1, _t13SaveOver, _t13Loaded;   // okregi z ulamkami w ostatnim zapisie (-1 - bez pola), pominiete przez limit, wczytane z zapisu
+        private const int T13SaveMaxChars = 24 * 1024;      // limit pola 9 w calym zapisie (ok. 97 miast x 12 towarow x 14 znakow = 16 KB tekstu, po kompresji ok. 6 KB)
+
+        /// <summary>T13 (zapis): budzet znakow pola 9 na jeden zapis albo -1 (pole nie pisane - zapis jak dotad).</summary>
+        private static int T13SaveBegin()
+        {
+            if (!(SwTownFieldsEvery2 || _t13Seen)) { _t13Saved = -1; return -1; }
+            _t13Saved = 0; _t13SaveOver = 0;
+            return T13SaveMaxChars;
+        }
+
+        /// <summary>T13 (zapis): pole 9 okregu pol mieszczan ("~~~" + towar:ilosc,...) - tylko przy budget >= 0 i ulamkach > 0.0005; ponad budzet - okreg bez pola (licznik).</summary>
+        private static void T13SaveText(StringBuilder sb, LiveDist ld, ref int budget)
+        {
+            if (budget < 0 || ld == null || !ld.TF || ld.Frac == null) return;
+            int start = sb.Length; bool first = true;
+            for (int i = 0; i < ItemCount && i < ld.Frac.Length; i++)
+            {
+                double v = ld.Frac[i];
+                if (!(v > 0.0005) || double.IsInfinity(v)) continue;
+                if (first) sb.Append("~~~"); else sb.Append(',');
+                first = false;
+                sb.Append(ItemIds[i]).Append(':').Append(v.ToString("0.###", Inv));
+            }
+            if (first) return;
+            int len = sb.Length - start;
+            if (len > budget) { sb.Length = start; _t13SaveOver++; return; }
+            budget -= len; _t13Saved++;
+        }
+
+        /// <summary>T13 (odczyt): pole 9 okregu pol mieszczan - ulamki plonu z powrotem do ld.Frac (towar spoza tabeli, ilosc ujemna albo nieskonczona - pominiete).</summary>
+        private static void T13LoadText(string t, LiveDist ld)
+        {
+            if (string.IsNullOrEmpty(t) || ld == null || !ld.TF || ld.Frac == null) return;
+            bool any = false;
+            foreach (var kv in t.Split(','))
+            {
+                int c = kv.IndexOf(':');
+                if (c <= 0) continue;
+                int i = Array.IndexOf(ItemIds, kv.Substring(0, c));
+                double v;
+                if (i < 0 || i >= ld.Frac.Length || !double.TryParse(kv.Substring(c + 1), System.Globalization.NumberStyles.Float, Inv, out v) || !(v > 0) || v > 1e5) continue;
+                ld.Frac[i] = v; any = true;
+            }
+            if (any) _t13Loaded++;
+        }
 
         // ============================================================ T6: pozycja koszyka towaru KS (RampZ) z tablicy
         private static int[] _rampZTab;
