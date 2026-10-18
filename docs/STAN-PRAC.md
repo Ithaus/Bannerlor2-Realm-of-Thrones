@@ -2909,3 +2909,8 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
 - 04:15 PDT: TEST fin89 = WGRANIE 79 DLL (test/wgr79) z armoury-zima-teraz.flag + armoury-ks-wlacz.flag (OBA USUNAC!), 120 dob - zima ekonomii przez caly bieg (test zimy, obowiazkowy po f4-opal).
 - 04:16 PDT: workflow wf_9399700d-d24 (fala 5, zb/f5-* od ac03aa25): f5-a7 (dynamiczne zajecia pod KS z hamulcem Jeffa - sygnal z cen KS, nie z indeksow gry), f5-ruda (ruda/zelazo pod KS),
   f5-lud (akumulator ludu od strony dochodu, R/P), f5-zajecia (neutralny start specjalizacji <= 1%, ikony 40-130), f5-koszt (szczyty KS), f5-bitwa (mocna druzyna przegrywa - panika).
+- 04:42 PDT: TEST ZIMY fin89 (WGRANIE 79, zima ekonomii przez 120 dob + KS od D, Armoury-2026-10-18_04-08-45.log, flagi usuniete): kod 0, ERROR 0, ZGONY Z GLODU 0, nglod/nuchodzcy/nmur/
+  nskory/nkasy 0 NIE. Obciazenie: wsie kupuja 17% chcianego (zyja ze spichlerzy), drewno 2.08, ruda 6.52 / 66 miast bez rudy, lud miast +107k/d (W 83.9 -> 94 dni), kasy miast +49k/d,
+  Plany niezbiezne 18 (Essos -11.9% -> -7.5%). Skrajny test (wieczna zima) - do fali 5/6: ruda i akumulator zima.
+- 04:45 PDT: TEST ROCZNY fin90 = WGRANIE 79 DLL, armoury-ks-auto.flag (USUNAC!), 364 dob (sciezka Jeffa przez caly rok), at-fin90-rok.out.txt. Przerwac, gdyby Jeff chcial grac
+  (zamknac gre, test/autotest-bitwa.ps1 -RestoreOnly, flagi usunac).
