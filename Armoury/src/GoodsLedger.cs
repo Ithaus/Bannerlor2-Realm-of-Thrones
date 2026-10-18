@@ -1205,6 +1205,7 @@ namespace Armoury
             // E6/K1 (211, R14, SpoilsOfBrokenParties): tabor i konie zbrojowni rozbitej/rozwiazanej partii - do zwyciezcow albo na polke osady (PRZED licznikami
             // "przepadlo" i ArmsLeaks.NoteLost - licza juz tylko to, co zostalo: unikaty dla UniqueSpoils, sztuki nie-towarowe); nie rzuca
             try { HorseFate.Spoils(mp, destroyer); } catch (Exception e) { Stumble("OnPartyDestroyed(K1)", e); }
+            try { A17Fix.BkArrival(mp, destroyer); } catch (Exception e) { Stumble("OnPartyDestroyed(A17 F1)", e); }   // A17 F1: konie partii BK kasowanej bez niszczyciela na targ osady (PRZED licznikami "przepadlo")
             try
             {
                 if (mp == null || !On || !EnsureItems()) return;

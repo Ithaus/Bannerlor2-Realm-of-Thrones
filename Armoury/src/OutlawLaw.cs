@@ -1687,8 +1687,9 @@ namespace Armoury
             bool armour = need > BodyOf(from) + 2f;
             bool horse = to.IsMounted && !from.IsMounted;
             if (!armour && !horse) return true;
-            Func<ItemObject, bool> armourOk = it => it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null && it.ArmorComponent.BodyArmor >= need * 0.8f;
-            Func<ItemObject, bool> horseOk = it => it.ItemType == ItemObject.ItemTypeEnum.Horse && it.HorseComponent != null && !it.HorseComponent.IsPackAnimal;
+            // A17 F3 (klucz A17UniquesNotOutlawKit): unikat nie idzie na awans bandy (znikal w zolnierzu - renly_armor, lyanna_armor) - zostaje na polce albo w jukach; czlon ostatni (licznik kandydatow)
+            Func<ItemObject, bool> armourOk = it => it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null && it.ArmorComponent.BodyArmor >= need * 0.8f && !A17Fix.OutlawSkip(it);
+            Func<ItemObject, bool> horseOk = it => it.ItemType == ItemObject.ItemTypeEnum.Horse && it.HorseComponent != null && !it.HorseComponent.IsPackAnimal && !A17Fix.OutlawSkip(it);
             ItemObject a = null, h = null;
             Settlement aTown = null, hTown = null;
             int aPrice = 0, hPrice = 0;

@@ -98,7 +98,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _stumbles++; _stumblesAll++; if (!_err) { _err = true; Log.Error("DoomedPartyMen.Before", e); } }
-            finally { try { LosersFlee.A17Forget(me); } catch { } }
+            finally { try { LosersFlee.A17Forget(me); } catch { } try { A17Fix.Forget(me); } catch { } }
         }
 
         /// <summary>Warunek gry z MapEventSide.HandleMapEventEndForPartyInternal (1.4.8, :439) - te same pola, w tej samej chwili bitwy (po wyniku, przed
@@ -285,6 +285,7 @@ namespace Armoury
                   .Append(", armia ").Append(mp != null && mp.Army != null ? "tak" : "nie")
                   .Append(" | szeregowi ").Append(men).Append(" (ranni ").Append(wnd).Append("), zdrowi w skladzie (z bohaterami) ").Append(healthy).Append(", jency szeregowi ").Append(pmen)
                   .Append(" | H3: ").Append(LosersFlee.A17NoteOf(me))
+                  .Append(" | wynik gry (A17 F4): ").Append(A17Fix.CommitNote(me))
                   .Append(" | regula: ").Append(rule).Append(" | linia ").Append(_diag).Append('/').Append(DiagMax).Append('.');
                 Log.Info(sb.ToString());
             }
