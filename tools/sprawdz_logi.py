@@ -945,7 +945,9 @@ Uzycie (Python 3, tylko odczyt):
                     liczba odbiorcow = sakiewki), TS-4 turnieje = sakiewki + powody braku + zwrocone, TS-5 kiesa klasy ponizej zapasu dni po sakiewce 0, TS-6 sakiewka
                     <= oferta dnia ludu x dni (+3 na zaokraglenia), TS-7 pod KS z czynna kiesa ludu (>= 7 dob, >= 5 turniejow z odbiorca) sakiewki > 0 (inaczej INFO),
                     TS-8 potkniecia i ERROR in TourneyFolkPurse.* / TownFolk.TourneyPurse* 0, TS-9 koszt sluchacza <= 1 ms/dobe, TS-10 sumy, powody, najwieksza
-                    sakiewka i nagrody turniejow AI z linii Szczelnosc (164a) (INFO). Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log): TS-0 INFO, bez wyjatku.
+                    sakiewka i nagrody turniejow AI z linii Szczelnosc (164a) (INFO), TS-11 (recenzja f8) wpis linii "Obieg" (rody dostaly) "sakiewka turniejowa ludu
+                    (f8)" = glowy rodow + gracz z linii doby sakiewki tej samej doby (roznica 0; brak wpisu - INFO). Log sprzed paczki (np. fin86
+                    Armoury-2026-10-17_23-22-37.log): TS-0 INFO, bez wyjatku.
 --grupa nzbroj    : (noc 17/18.10, przeglad 16.10 STAN-PRAC 46 - zbrojownia gracza; galaz w-toku/zbrojownia, Armoury/src/ArmouryZb.cs + ArmouryBehavior.cs ZB-1,
                     QuartermasterLaw.cs, MenPurse.cs, NightRest.cs, GearFit.cs, CrashScribe/src/Mends.cs) python -I tools/sprawdz_logi.py --grupa nzbroj <Armoury-*.log>
                     [--crashscribe <session-*.log>] (strumieniowo). Klucze ZB-1 ArmouryBookPerModifier (ksiega per id + modyfikator), ZB-2 ArmouryListSpareHorsesWhenKept,
@@ -34207,11 +34209,17 @@ NTS_EV = re.compile(r"Sakiewka turniejowa \(f8\): (?P<town>.+?): lud W (?P<w>\d+
 NTS_ERR = ("ERROR in TourneyFolkPurse.", "ERROR in TownFolk.TourneyPurse")
 NTS_PRIZE = re.compile(r"nagrody turniejow: gra chciala (\d+), zaplacili (\d+), uciete \d+ \((\d+) wyplat")
 NTS_MS_MAX = 1.0   # koszt sluchacza (kilka turniejow na dobe, jedna osada kazdy) - najwyzej 1 ms na dobe
+# recenzja f8: wpis linii "Obieg: dzien N" (rody dostaly [P]) - migawka TourneyFolkPurse.Daily tej samej doby (TourneyFolkPurse.ObiegNote)
+NTS_OBG = re.compile(r", sakiewka turniejowa ludu \(f8\) kiesy ludu -> glowy rodow i gracz (?P<all>\d+) \(glowy rodow (?P<heads>\d+) w (?P<headsn>\d+) sakiewkach, "
+                     r"gracz (?P<pl>\d+) w (?P<pln>\d+)\)")
+NTS_OBG_DAY = re.compile(r"Obieg: dzien (-?\d+) ")
 
 
-def nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, n_err, prize):
-    """f8-sakiewka: wiersze TS-0..TS-10 grupy nturniej (opis w naglowku pliku, --grupa nturniej). tdays / tev - slowniki rozpoznanych linii doby i sakiewek,
-    tbad / tevbad - nierozpoznane, n_err - ERROR paczki, prize - (nalezne, zaplacone, wyplat) nagrod turniejow AI z linii Szczelnosc (164a) - INFO. Bez wyjatku."""
+def nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, n_err, prize, tobg=0):
+    """f8-sakiewka: wiersze TS-0..TS-11 grupy nturniej (opis w naglowku pliku, --grupa nturniej). tdays / tev - slowniki rozpoznanych linii doby i sakiewek,
+    tbad / tevbad - nierozpoznane, n_err - ERROR paczki, prize - (nalezne, zaplacone, wyplat) nagrod turniejow AI z linii Szczelnosc (164a) - INFO,
+    tobg - liczba linii "Obieg" z wpisem "sakiewka turniejowa ludu (f8)"; wpis przypiety do linii doby sakiewki tej samej doby jako g["_obg"] (TS-11, recenzja f8;
+    brak - INFO). Bez wyjatku."""
     if not tdays and not tbad and not tev and not tevbad:
         rep.add("TS-0: linie 'Sakiewka turniejowa (f8)'", "brak w logu", "INFO (log sprzed paczki f8-sakiewka albo klucz Tourney Folk Purse WYLACZONY)", None)
         if n_err:
@@ -34267,6 +34275,18 @@ def nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, n_err, prize):
                 f"({tot('headsn')}), gracz {tot('pl')} ({tot('pln')}); najwieksza {mx['max']} ({mx['maxtown']}, dzien {mx['day']}); bez sakiewki: KS niezastosowany {tot('noks')}, "
                 f"kiesa nieczynna {tot('nolive')}, nie bohater {tot('nohero')}, bez odbiorcy {tot('norec')}, bez kiesy {tot('nofolk')}, bez swiezej doby {tot('stale')}, "
                 f"bez nadwyzki {tot('nooffer')}, zajeta {tot('noroom')}, ponizej minimum {tot('belowmin')}{pr}", "INFO", None)
+        # TS-11 (recenzja f8): wpis linii "Obieg" (rody dostaly) = glowy rodow + gracz z linii doby sakiewki tej samej doby
+        pairs = [(g, g["_obg"]) for g in tdays if "_obg" in g]
+        if pairs:
+            bad = [(g, o) for g, o in pairs if int(o["heads"]) != i(g, "heads") or int(o["pl"]) != i(g, "pl") or int(o["headsn"]) != i(g, "headsn")
+                   or int(o["pln"]) != i(g, "pln") or int(o["all"]) != int(o["heads"]) + int(o["pl"])]
+            rep.add("TS-11: wpis linii Obieg (rody dostaly) 'sakiewka turniejowa ludu (f8)' = glowy rodow + gracz z linii doby sakiewki",
+                    f"dob porownanych {len(pairs)} z {len(tdays)}, niezgodnych {len(bad)}"
+                    + (f" (np. dzien {bad[0][0]['day']}: Obieg glowy {bad[0][1]['heads']} / gracz {bad[0][1]['pl']}, linia doby {bad[0][0]['heads']} / {bad[0][0]['pl']})" if bad else ""),
+                    "0", not bad)
+        else:
+            rep.add("TS-11: wpis linii Obieg 'sakiewka turniejowa ludu (f8)'", f"brak wpisu w dobach linii sakiewki (linii Obieg z wpisem {tobg})",
+                    "INFO (Obieg bez wpisu - DLL sprzed recenzji f8 albo ksiega pieniadza wylaczona)", None)
     else:
         rep.add("TS-2..10: linie doby sakiewki", f"brak linii doby (sakiewek {len(tev)})", "INFO (sesja krotsza niz doba)", None)
         if n_err:
@@ -34287,6 +34307,7 @@ def nturniej_main(logp):
     sess, days, bad, pays, reps = [], [], [], 0, 0
     n_err = 0
     tdays, tbad, tev, tevbad, ts_err, prize = [], [], [], [], 0, [0, 0, 0]   # f8-sakiewka (wiersze TS)
+    tobg = 0   # recenzja f8 (TS-11): linie "Obieg" z wpisem "sakiewka turniejowa ludu (f8)" (wpis przypiety do linii doby sakiewki tej samej doby)
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -34301,6 +34322,19 @@ def nturniej_main(logp):
                 continue
             if s.startswith(NTS_ERR):
                 ts_err += 1
+                continue
+            if s.startswith("Obieg: dzien ") and "sakiewka turniejowa ludu (f8)" in s:
+                mo, md = NTS_OBG.search(s), NTS_OBG_DAY.match(s)
+                if mo and md:
+                    tobg += 1
+                    od_ = int(md.group(1))
+                    # linia doby sakiewki biegnie w tym samym ticku przed "Obieg" (TourneyFolkPurse.Daily przed MoneyLedger.Daily) - przypnij do ostatniej
+                    # linii tej doby bez wpisu (wczytanie zapisu i powtorzona doba - kazda para osobno)
+                    for g_ in reversed(tdays):
+                        if int(g_["day"]) == od_:
+                            if "_obg" not in g_:
+                                g_["_obg"] = mo.groupdict()
+                            break
                 continue
             if s.startswith("Szczelnosc (164a): dzien") and "nagrody turniejow: gra chciala" in s:
                 mm = NTS_PRIZE.search(s)
@@ -34325,7 +34359,7 @@ def nturniej_main(logp):
           f" | sakiewka mieszczan (f8): doby {len(tdays)} (nierozpoznane {len(tbad)}), sakiewki {len(tev)} (nierozpoznane {len(tevbad)})")
     if not sess and not days and not bad:
         rep.add("TP-0: linie 'Turniej-platnik (TP)'", "brak w logu", "INFO (log sprzed paczki TP)", None)
-        nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, ts_err, prize)
+        nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, ts_err, prize, tobg)
         rep.show()
         return 0
     if sess:
@@ -34358,7 +34392,7 @@ def nturniej_main(logp):
                 "INFO", None)
     else:
         rep.add("TP-2: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba)", None)
-    nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, ts_err, prize)   # f8-sakiewka: wiersze TS-0..TS-10
+    nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, ts_err, prize, tobg)   # f8-sakiewka: wiersze TS-0..TS-11
     rep.show()
     return 0
 

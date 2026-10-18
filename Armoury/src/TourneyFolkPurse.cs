@@ -45,6 +45,10 @@ namespace Armoury
         private static string _maxTown = "-";
         private static int _stumbles, _stumblesDay;
 
+        // recenzja f8: migawka doby dla linii "Obieg" (rody dostaly) - Daily biegnie przed MoneyLedger.Daily i czysci liczniki doby (jak W7 LastLordLevy)
+        internal static long LastToHeads, LastToPlayer;
+        internal static int LastHeadsN, LastPlayerN;
+
         private static void Stumble(string where, Exception e)
         {
             _stumbles++; _stumblesDay++;
@@ -59,7 +63,19 @@ namespace Armoury
         }
 
         /// <summary>Nowa kampania i kazde wczytanie (TourneyPay.Reset - PlayerFees8.Reset - konstruktor ArmouryBehavior).</summary>
-        internal static void Reset() { _stumbles = 0; ClearDay(); }
+        internal static void Reset() { _stumbles = 0; ClearDay(); LastToHeads = LastToPlayer = 0; LastHeadsN = LastPlayerN = 0; }
+
+        /// <summary>
+        /// Wpis linii "Obieg" (rody dostaly [P]) - migawka doby z Daily (MoneyLedger.Daily biegnie po TourneyFolkPurse.Daily tej samej doby).
+        /// Klucz wylaczony i zero przelewow - pusty napis (linia "Obieg" jak przed paczka).
+        /// </summary>
+        internal static string ObiegNote()
+        {
+            long all = LastToHeads + LastToPlayer;
+            if (!KeyOn && all == 0) return "";
+            return ", sakiewka turniejowa ludu (f8) kiesy ludu -> glowy rodow i gracz " + all + " (glowy rodow " + LastToHeads + " w " + LastHeadsN
+                   + " sakiewkach, gracz " + LastToPlayer + " w " + LastPlayerN + ")";
+        }
 
         private static string NameOf(Hero h) { return h != null && h.Name != null ? h.Name.ToString() : "?"; }
 
@@ -168,6 +184,8 @@ namespace Armoury
         {
             try
             {
+                // migawka przed sprawdzeniem klucza: przelewy tej doby sie odbyly, nawet gdy klucz wylaczono w trakcie doby (przy kluczu wylaczonym od rana - 0)
+                LastToHeads = _toHeads; LastToPlayer = _toPlayer; LastHeadsN = _headsN; LastPlayerN = _playerN;
                 if (!KeyOn) return;
                 var s = Settings.Current;
                 double days = s != null ? s.TourneyFolkPurseDays : 1.0;
