@@ -3089,3 +3089,13 @@ rozlozenie gospodarki doby (Jeff: pozniej).
   UWAGA: Armoury.json Jeffa ma teraz WSZYSTKIE 1975 kluczy (MCM zapisal calosc 13:35; jedyna zmiana wartosci: MapSideRoads true) - KAZDA przyszla zmiana domyslnej w Settings.cs
   NIE zadziala u Jeffa bez zmiany jego pliku (CLAUDE.md pulapka MCM). Drogi boczne u Jeffa wlaczone (zaladuja sie od startu sesji - sciezka z biegow zdjec).
   Jeff pyta o mod z dodatkowa strzalka predkosci (prawdopodobnie "Better Time", Shemiroth) - nasze przyciski x1/x4/x8 zarejestrowane w jego logu (13:30:33); czy widac - pytam Jeffa.
+- 14:00 PDT: BETTER TIME (Jeff: "better time wgraj wrzuc go i tam sa strzalki, ustaw x1, x3 i x6"): modul z archiwum Jeffa (Downloads/BetterTime 2849 1.1.3 ... .7z, kopia
+  D:/Backup-Bannerlord/mody-obce/BetterTime-1.1.3) w Modules/BetterTime (BetterTime.dll 74ecfe4a), LauncherData.xml + BetterTime po GrandTourney (kopia .bak-2026-10-18-przed-bettertime),
+  Configs/ModSettings/Global/BetterTime/BetterTime.json: FastForward 3, ExtraFastForward 6, CtrlSpace 16 (bylo 4/8/16). Konflikt z naszym f9/MapClock (co godzine x8) -> hotfix
+  **f17-bettertime** 21d10bac (MapSpeed.BetterTimeActive z Utilities.GetModulesNames: bez naszej wstawki MapBar, klawiszy 4/5/6 i ApplySpeed) - WGRANIE 81b: Armoury **42d5b95b**
+  (kopie *.bak-2026-10-18-wgranie81b-przed). Jeff gra.
+- 14:00 PDT: f16-fin93 GOTOWE (wf_6598e0b6-c3e; scratchpad f16-wynik.txt): f16-akum d9a8bf87 (NKA-1: przeglad firm DS liczyl nadwyzke z rata zebrana na wyplate - KsFarmSurplusNetOfDues,
+  czesc raty od ostatniej wyplaty; skarbce - strukturalne, Jeff: nie blad), f16-ks f672839d (v7 NIE przyczyna; NKS-30m od KsCtlOwnFood f14 - do decyzji; ZC1-16b baza 2-29), f16-ksiega
+  56543d06 (wyciek: CaravansCampaignBehavior.OnMapEventEnded gry kasuje zrzut zwycieskiej karawany - latana byla tylko kopia BK; teraz zrzut na polke), f16-drobne a71a6b96 (Drowned Wood na
+  brodzie - regula w generatorze, dane v7 BEZ zmian (zmiana crc zresetowalaby zapis Jeffa); NBD-2 mierzy nasze). Scalone z f17 do noc-ks4 **0d7e6fa3** (1976 ustawien, build rc 0).
+- 14:05 PDT: paczka f18-mcm (zb/f18-mcm od 0d7e6fa3): RequireRestart = false w gen_mcm dla ustawien dzialajacych bez restartu.
