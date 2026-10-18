@@ -57,7 +57,8 @@ namespace Armoury
         }
 
         /// <summary>Zapas wojny krolestwa - ta sama liczba co w regule 184 (WarTaxDaily): wieksze z CrownReserveGold i WarTaxReserveDays x sredni nalezny zwrot
-        /// zoldu z 28 dob (pierscien 184; tu stan do wczoraj - krok 184 dopisuje dzisiejsza dobe pozniej). Krolestwo bez pierscienia - sama podloga.</summary>
+        /// zoldu z 28 dob (pierscien 184; tu stan do wczoraj - krok 184 dopisuje dzisiejsza dobe pozniej). Krolestwo bez pierscienia - sama podloga.
+        /// f6-zwrot (recenzja): pierscien niesie PELNY zwrot (KDay.RefundFull, przed mnoznikiem potrzeby rodu) - zapas wojny i jego czytelnicy jak przed f6.</summary>
         private static long WarReserveOf(Kingdom k, Settings s)
         {
             long floor = Math.Max(0, s.CrownReserveGold);

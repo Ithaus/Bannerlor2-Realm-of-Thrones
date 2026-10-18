@@ -1407,15 +1407,17 @@ Uzycie (Python 3, tylko odczyt):
                     WageRefund, CourtFull.Goods, CourtGoods.Gear, ClanBudget.Court - klucze Crown Refund By Need, Lapsed Gear Buys Goods) python -I tools/sprawdz_logi.py
                     --grupa nzwrot <Armoury-*.log> [--csv budzet-rodow.csv] [--baza-doby <log bazy>] (strumieniowo; bez --csv budzet-rodow.csv obok logu - csv_path_of). NZR-0 linie paczki (INFO), NZR-1 linia
                     "Korona: zwrot wedlug potrzeby (f6)" w kazdej dobie z linia zwrotu zoldu (brak 0), NZR-2 tozsamosci co do zlotowki: suma pasm = razem (pelny i wedlug
-                    potrzeby), oszczednosc = pelny - wedlug potrzeby, nalezny dzis = wedlug potrzeby (klucz czynny) albo pelny (na sucho / bez budzetu), = "nalezne" linii
+                    potrzeby), roznica (zwrot mniejszy o) = pelny - wedlug potrzeby, nalezny dzis = wedlug potrzeby (klucz czynny) albo pelny (na sucho / bez budzetu), = "nalezne" linii
                     zwrotu, przy kluczu "pelny" linii zwrotu = razem pelny; NZR-3 pasma: ponad 2R wedlug potrzeby 0, ponizej R i bez miary = pelny, R-2R <= pelny; NZR-4
                     zwrot wyplacony <= nalezny i nalezny linii 165 = linii zwrotu; NZR-5 budzet-rodow.csv rod po rodzie (kolumny zwrot_f6_*): f = clamp((2R - G) / R),
-                    pasmo wedlug G i R, ponad 2R bez zwrotu, wedlug potrzeby = pelny x f, suma rodow = linia f6 (CSV bez kolumn - INFO); NZR-6 pasma i oszczednosc korony
-                    (INFO, srednia 28 dob), NZR-7 korona: brak zwrotu z Banku / skarbca ponad zapas / zaliczek mieszczan, W5, W5b, renty 180, skarbce razem i dlug w Banku
-                    (INFO), NZR-7b z --baza-doby: Bank + K5 + zaliczki <= baza + 500 zl/d; NZR-8 sprzet niewydany: do zaplaty = kupione + zostalo, zostalo = miasta + zamki,
+                    pasmo wedlug G i R, ponad 2R bez zwrotu, wedlug potrzeby = pelny x f, suma rodow = linia f6 (CSV bez kolumn - INFO); NZR-6 pasma i roznica zwrotu
+                    (INFO, srednia 28 dob - to NIE oszczednosc skarbcow: roznica zostaje w reszcie wplywow dnia i idzie dalej w W5 / M1 / M3 / renty 180), NZR-7 korona: brak
+                    zwrotu z Banku / skarbca ponad zapas / zaliczek mieszczan, W5, W5b, renty 180, skarbce razem i dlug w Banku, zapas wojny razem (linia "Nadwyzka kas
+                    (E5/0)" - recenzja f6: z pelnego zwrotu, jak przed f6) (INFO), NZR-7b z --baza-doby: Bank + K5 + zaliczki <= baza + 500 zl/d; NZR-7c z --baza-doby:
+                    prawdziwa zmiana skarbcow wobec bazy (zmiana skarbcow na dobe, renty 180, W5, W5b, zwrot, zapas wojny - roznice, INFO); NZR-8 sprzet niewydany: do zaplaty = kupione + zostalo, zostalo = miasta + zamki,
                     przy kluczu wplacone do kas siedzib (E5/A2) = kupione i zamki 0; NZR-8b czesc f6 linii E3-P1: kupione = dopisek 166, grupa jedzenia 0; NZR-8c kwoty
                     (INFO); NZR-9 ERROR RefundNeed / CourtFull.Goods / CourtGoods.Gear i potkniecia f6 i E5/A2 0; NZR-D skutek reguly na sucho z CSV (G i R tej doby -
-                    przyblizenie, INFO). Log sprzed paczki (np. fin88 Armoury-2026-10-18_03-13-38.log): linie f6 INFO, NZR-D i NZR-8 (stary przelew) z liczbami, bez wyjatku.
+                    przyblizenie; rod ze szczeblem dlugu 168 - kolumna szczebel != '-' - bez miary, pelny zwrot, jak w grze; INFO). Log sprzed paczki (np. fin88 Armoury-2026-10-18_03-13-38.log): linie f6 INFO, NZR-D i NZR-8 (stary przelew) z liczbami, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -43363,7 +43365,11 @@ NZR_RX_REF = re.compile(r"^Korona: dzien (\d+) - zwrot zoldu ze skarbcow krolest
 NZR_RX_BANK = re.compile(r"z kredytu Banku \(186, brak zwrotu - kapital -> skarbiec -> rody\) (\d+) w (\d+) krolestwach")
 NZR_RX_KEY = re.compile(r"\| Crown Refund By Need (tak \(czynny\)|NIE \(na sucho[^)]*\)|NIE \(budzet 166[^)]*\))")
 NZR_RX_BAND = re.compile(r"rodow (\d+) \(zloto rodzin ([\d.]+) mln\), pelny (\d+), wedlug potrzeby (\d+)")
-NZR_RX_TOT = re.compile(r"\| razem pelny (\d+), wedlug potrzeby (\d+), nalezny dzis (\d+); korona (oszczedza|oszczedzilaby \(na sucho\)) (-?\d+) zl/d")
+# recenzja f6: "zwrot mniejszy o" (dawniej "korona oszczedza" - to nie oszczednosc skarbca); stary napis czytany dalej (logi sprzed recenzji)
+NZR_RX_TOT = re.compile(r"\| razem pelny (\d+), wedlug potrzeby (\d+), nalezny dzis (\d+); (korona oszczedza|korona oszczedzilaby \(na sucho\)|zwrot mniejszy o"
+                        r"|zwrot bylby mniejszy o \(na sucho\)) (-?\d+) zl/d")
+NZR_NK = "Nadwyzka kas (E5/0): dzien "
+NZR_RX_RES = re.compile(r"zapas wojny \(max\(.*?\)\) razem (\d+)")
 NZR_RX_CUT = re.compile(r"\| rodow z ucietym zwrotem (\d+)")
 NZR_RX_RICH = re.compile(r"krolestw w wojnie bez naleznego \(same rody ponad 2R\) (\d+) \(zold (\d+)\)")
 NZR_RX_PL = re.compile(r"\| rod gracza: pasmo ([^,|]+), f ([\d.]+), G (-?\d+), R (\d+), pelny (\d+), wedlug potrzeby (\d+)")
@@ -43380,7 +43386,8 @@ NZR_BANDS = ("ponizej R", "R-2R", "ponad 2R", "bez miary")
 
 def _nzr_scan(logp):
     """nzwrot: strumieniowo linia zwrotu zoldu, linia f6, linia 165, "Skarbce:", "Budzet rodow (166)" (E5/A2 + f6), "Dwor - towar z polki (E3-P1)" i bledy paczki."""
-    D = {"ref": {}, "f6": {}, "f6bad": [], "k165": {}, "tre": {}, "debt": {}, "a2": {}, "a2g": {}, "a2st": {}, "p1g": {}, "p1z": {}, "p1l": {}, "err": [], "start": None}
+    D = {"ref": {}, "f6": {}, "f6bad": [], "k165": {}, "tre": {}, "debt": {}, "a2": {}, "a2g": {}, "a2st": {}, "p1g": {}, "p1z": {}, "p1l": {}, "err": [], "start": None,
+         "res": {}}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -43406,7 +43413,7 @@ def _nzr_scan(logp):
                 kk = key.group(1)
                 r = {"state": "on" if kk.startswith("tak") else ("dry" if "na sucho" in kk else "nobud"),
                      "bands": [(int(a), float(b_), int(c), int(d)) for a, b_, c, d in bands],
-                     "full": int(tot.group(1)), "need": int(tot.group(2)), "due": int(tot.group(3)), "save": int(tot.group(5)), "dryw": tot.group(4) != "oszczedza"}
+                     "full": int(tot.group(1)), "need": int(tot.group(2)), "due": int(tot.group(3)), "save": int(tot.group(5)), "dryw": "na sucho" in tot.group(4)}
                 c = NZR_RX_CUT.search(s); r["cut"] = int(c.group(1)) if c else None
                 c = NZR_RX_RICH.search(s); r["richk"], r["richpaid"] = (int(c.group(1)), int(c.group(2))) if c else (None, None)
                 c = NZR_RX_PL.search(s); r["pl"] = c.groups() if c else None
@@ -43422,6 +43429,12 @@ def _nzr_scan(logp):
                                   "l1": num(r"z zaliczek mieszczan \(DS L1\) (\d+)", s, int, 0), "rent": num(r"renty \(180\) (\d+)", s, int, 0),
                                   "w5": num(r"doplata do zoldu wedlug potrzeby \(W5, przed rentami\) (\d+)", s, int, 0),
                                   "w5b": num(r"\(W5b, poza wplywami dnia - z zapasu\) (\d+)", s, int, 0)}
+                continue
+            if s.startswith(NZR_NK):
+                day = num(r"dzien (\d+)", s)
+                mres = NZR_RX_RES.search(s)
+                if day is not None and mres:
+                    D["res"][day] = int(mres.group(1))   # recenzja f6: zapas wojny koron razem (sonda korony - ta sama liczba co pierscien 184)
                 continue
             if s.startswith(NZR_SK):
                 day = num(r"dzien (\d+)", s)
@@ -43528,7 +43541,7 @@ def nzwrot_main(logp, bdp=None, csvp=None):
                     ok = ok and rr["full"] is None
             if not ok:
                 bad.append(d)
-        rep.add("NZR-2: tozsamosci f6 (pasma = razem, oszczednosc = pelny - wedlug potrzeby, nalezny dzis = wedlug potrzeby / pelny, = 'nalezne' i 'pelny' linii zwrotu)",
+        rep.add("NZR-2: tozsamosci f6 (pasma = razem, roznica zwrotu = pelny - wedlug potrzeby, nalezny dzis = wedlug potrzeby / pelny, = 'nalezne' i 'pelny' linii zwrotu)",
                 f"niezgodne {len(bad)} z {len(fd)} dob" + (f" (doby {bad[:6]})" if bad else ""), "0 (co do zlotowki)", len(bad) == 0)
 
         # ---- NZR-3 pasma: ponad 2R nic, ponizej R i bez miary pelny
@@ -43603,10 +43616,11 @@ def nzwrot_main(logp, bdp=None, csvp=None):
         cutm = [F6[d]["cut"] for d in w if F6[d]["cut"] is not None]
         txt = "; ".join(f"{NZR_BANDS[i]}: rodow {mb(i, 0):.0f}, zloto {mb(i, 1):.1f} mln, pelny {mb(i, 2):.0f} -> {mb(i, 3):.0f}" for i in range(4))
         last = F6[fd[-1]]
-        rep.add("NZR-6: zwrot wedlug potrzeby - pasma i oszczednosc korony (srednia ostatnich %d dob z linia f6)" % len(w),
-                f"{txt}; razem pelny {fu:.0f}/d, korona {'oszczedza' if last['state'] == 'on' else 'oszczedzilaby (na sucho)'} {sv:.0f}/d ({100 * sv / fu if fu else 0:.1f}%)"
+        rep.add("NZR-6: zwrot wedlug potrzeby - pasma i roznica zwrotu (srednia ostatnich %d dob z linia f6; NIE oszczednosc skarbcow - NZR-7c)" % len(w),
+                f"{txt}; razem pelny {fu:.0f}/d, zwrot {'mniejszy o' if last['state'] == 'on' else 'bylby mniejszy o (na sucho)'} {sv:.0f}/d ({100 * sv / fu if fu else 0:.1f}%)"
                 + (f"; rodow z ucietym zwrotem {st.mean(cutm):.0f}" if cutm else "") + (f"; rod gracza (ostatnia doba): {last['pl']}" if last.get("pl") else ""),
-                "INFO (przeglad 18.10: ok. 90-96 tys./d przy kiesie glowy; z zlotem rodziny ChestOf i czescia R-2R wiecej - fin88 na sucho z CSV ok. 150 tys./d)", None)
+                "INFO (przeglad 18.10: ok. 90-96 tys./d przy kiesie glowy; z zlotem rodziny ChestOf i czescia R-2R wiecej - fin88 na sucho z CSV - NZR-D; roznica zostaje"
+                " w reszcie wplywow dnia, prawdziwa zmiana skarbcow - NZR-7c)", None)
 
     # ---- NZR-7 korona: Bank, K5, zaliczki, renty, skarbce (srednia 28 ostatnich dob; z baza - porownanie)
     def crown(DD):
@@ -43617,8 +43631,10 @@ def nzwrot_main(logp, bdp=None, csvp=None):
         tr = sorted(DD["tre"])
         tw = tr[-29:]
         dtr = (DD["tre"][tw[-1]] - DD["tre"][tw[0]]) / max(1, tw[-1] - tw[0]) if len(tw) >= 2 else None
+        rs = sorted(DD["res"])[-28:]
         return {"n": len(ks), "bank": m("bank"), "k5": m("k5"), "l1": m("l1"), "rent": m("rent"), "w5": m("w5"), "w5b": m("w5b"), "due": m("due"),
-                "dtr": dtr, "tre": DD["tre"][tr[-1]] if tr else None, "debt": DD["debt"][tr[-1]] if tr else None}
+                "dtr": dtr, "tre": DD["tre"][tr[-1]] if tr else None, "debt": DD["debt"][tr[-1]] if tr else None,
+                "res": sum(DD["res"][d] for d in rs) / len(rs) if rs else None, "resl": DD["res"][rs[-1]] if rs else None}
     C = crown(D)
     B = None
     if bdp and os.path.isfile(bdp):
@@ -43631,7 +43647,8 @@ def nzwrot_main(logp, bdp=None, csvp=None):
     def ctext(X):
         dtr = "-" if X["dtr"] is None else f"{X['dtr']:+.0f}"
         return (f"zwrot nalezny {X['due']:.0f}/d, z Banku {X['bank']:.0f}, skarbiec ponad zapas (K5) {X['k5']:.0f}, zaliczki mieszczan {X['l1']:.0f}, W5 {X['w5']:.0f}, W5b {X['w5b']:.0f},"
-                f" renty 180 {X['rent']:.0f}; skarbce razem {X['tre'] or 0:.0f} ({dtr}/d w 28 dobach), dlug koron w Banku {X['debt'] or 0:.0f}")
+                f" renty 180 {X['rent']:.0f}; skarbce razem {X['tre'] or 0:.0f} ({dtr}/d w 28 dobach), dlug koron w Banku {X['debt'] or 0:.0f}"
+                + (f"; zapas wojny razem (Nadwyzka kas) {X['res']:.0f} sr. 28 dob, ostatnia doba {X['resl']}" if X.get("res") is not None else "; zapas wojny - brak linii Nadwyzka kas"))
     if C:
         rep.add("NZR-7: korona - brak zwrotu z Banku / skarbca / zaliczek, renty 180, skarbce (srednia %d ostatnich dob)" % C["n"],
                 ctext(C) + (f" | baza: {ctext(B)}" if B else ""), "INFO (bez bazy); z --baza-doby: NZR-7b", None)
@@ -43639,6 +43656,17 @@ def nzwrot_main(logp, bdp=None, csvp=None):
             cov, covb = C["bank"] + C["k5"] + C["l1"], B["bank"] + B["k5"] + B["l1"]
             rep.add("NZR-7b: brak zwrotu pokryty Bankiem, skarbcem ponad zapas i zaliczkami mieszczan - nie wiecej niz w bazie",
                     f"{cov:.0f}/d wobec bazy {covb:.0f}/d (Bank {C['bank']:.0f} / {B['bank']:.0f})", "<= baza + 500 zl/d", cov <= covb + 500)
+            # recenzja f6: prawdziwa zmiana skarbcow (nie "pelny - wedlug potrzeby"): roznica zwrotu zostaje w reszcie wplywow dnia, z ktorej tego samego dnia biora W5 / M1 /
+            # M3 / renty 180 - skarbce zyskuja tylko to, czego te kroki nie wezma (i mniej braku z K5 / zaliczek / Banku)
+            def dl(a, b):
+                return "-" if a is None or b is None else f"{a - b:+.0f}"
+            def sg(a):
+                return "-" if a is None else f"{a:+.0f}"
+            rep.add("NZR-7c: prawdziwa zmiana skarbcow wobec bazy (srednie 28 dob; roznica = bieg - baza)",
+                    f"zmiana skarbcow na dobe {dl(C['dtr'], B['dtr'])}/d (bieg {sg(C['dtr'])} / baza {sg(B['dtr'])});"
+                    f" zwrot nalezny {dl(C['due'], B['due'])}/d, renty 180 {dl(C['rent'], B['rent'])}/d, W5 {dl(C['w5'], B['w5'])}/d, W5b {dl(C['w5b'], B['w5b'])}/d,"
+                    f" brak z Banku + K5 + zaliczek {dl(cov, covb)}/d; zapas wojny razem {dl(C.get('res'), B.get('res'))} (recenzja f6: z pelnego zwrotu - bez zmiany od f6)",
+                    "INFO (czesc mniejszego zwrotu idzie tego samego dnia w renty 180 i W5 - patrz roznice; skarbce zyskuja reszte)", None)
     else:
         rep.add("NZR-7: korona", "brak linii 165", "INFO", None)
 
@@ -43689,7 +43717,8 @@ def nzwrot_main(logp, bdp=None, csvp=None):
     # ---- NZR-D skutek na sucho z CSV (G, R i zwrot_korony dzisiejszego budzetu - przyblizenie: gra liczy f z wczorajszego G i R)
     if CS:
         days = sorted(CS)[-28:]
-        acc = [[0, 0.0, 0.0, 0.0] for _ in range(3)]
+        acc = [[0, 0.0, 0.0, 0.0] for _ in range(4)]
+        dbt = [0, 0.0]   # recenzja f6: dluznicy 168 ponad R - pelny zwrot mimo zlota (wyjatek reguly, jak W5 / W6 / M3)
         nd = 0
         for d in days:
             got = False
@@ -43698,9 +43727,15 @@ def nzwrot_main(logp, bdp=None, csvp=None):
                     G = float(r.get("G") or 0); Rr = float(r.get("R") or 0); z = float(r.get("zwrot_korony") or 0)
                 except ValueError:
                     continue
-                if z <= 0 or Rr <= 0:
+                if z <= 0:
                     continue
                 got = True
+                sz = (r.get("szczebel") or "-").strip() or "-"
+                if Rr <= 0 or sz != "-":   # recenzja f6: rod bez R albo ze szczeblem dlugu 168 (kredyt, zaleglosc, zajecie) - w grze bez miary (pelny zwrot)
+                    acc[3][0] += 1; acc[3][1] += G; acc[3][2] += z; acc[3][3] += z
+                    if Rr > 0 and G > Rr:
+                        dbt[0] += 1; dbt[1] += z
+                    continue
                 f = _nzr_f(G, Rr)
                 i = 0 if G <= Rr else (2 if G >= 2 * Rr else 1)
                 acc[i][0] += 1; acc[i][1] += G; acc[i][2] += z; acc[i][3] += z * f
@@ -43708,9 +43743,11 @@ def nzwrot_main(logp, bdp=None, csvp=None):
         if nd:
             tz = sum(a[2] for a in acc) / nd; tf = sum(a[3] for a in acc) / nd
             rep.add("NZR-D: skutek reguly wedlug CSV (G i R z budzet-rodow.csv tej doby, zwrot_korony; srednia %d dob)" % nd,
-                    "; ".join(f"{NZR_BANDS[i]}: rodow {acc[i][0] / nd:.0f}, zloto {acc[i][1] / nd / 1e6:.1f} mln, zwrot {acc[i][2] / nd:.0f} -> {acc[i][3] / nd:.0f}" for i in range(3))
-                    + f"; razem {tz:.0f} -> {tf:.0f}, korona mniej o {tz - tf:.0f}/d ({100 * (tz - tf) / tz if tz else 0:.1f}%)",
-                    "INFO (przyblizenie - gra bierze G i R z wczoraj; renty 180 nietkniete: zaoszczedzone idzie dalej w W5 / M1 / M3 / renty)", None)
+                    "; ".join(f"{NZR_BANDS[i]}{' (dluznik / zajecie / bez R)' if i == 3 else ''}: rodow {acc[i][0] / nd:.0f}, zloto {acc[i][1] / nd / 1e6:.1f} mln,"
+                              f" zwrot {acc[i][2] / nd:.0f} -> {acc[i][3] / nd:.0f}" for i in range(4))
+                    + f"; razem {tz:.0f} -> {tf:.0f}, zwrot mniejszy o {tz - tf:.0f}/d ({100 * (tz - tf) / tz if tz else 0:.1f}%)"
+                    + f"; w tym dluznicy ponad R z pelnym zwrotem: rodow {dbt[0] / nd:.0f}, zwrot {dbt[1] / nd:.0f}/d",
+                    "INFO (przyblizenie - gra bierze G i R z wczoraj; renty 180 nietkniete: roznica zwrotu idzie dalej w W5 / M1 / M3 / renty)", None)
     rep.show()
     return 0
 

@@ -295,7 +295,12 @@ namespace Armoury
                             rc.Due[i] = RbnDue(list[i].Key != null ? list[i].Key.Clan : null, list[i].Value, pct, out fu, out nr);
                             rc.Full[i] = fu; rc.Need[i] = nr; rc.Want += rc.Due[i];
                         }
-                        if (rc.Want <= 0) { RbnCommit(rc.Full, rc.Need, rc.PaidSum, true); continue; }   // f6: krolestwo w wojnie bez naleznego (same rody ponad 2R) - do linii f6
+                        if (rc.Want <= 0)
+                        {
+                            RbnCommit(rc.Full, rc.Need, rc.PaidSum, true);   // f6: krolestwo w wojnie bez naleznego (same rody ponad 2R) - do linii f6
+                            if (cur) { var cd0 = CrownIncome.DayOf(k); if (cd0 != null) cd0.RefundFull += RbnSum(rc.Full); }   // f6 (recenzja): pelny zwrot do zapasu wojny jak przed paczka
+                            continue;
+                        }
                         rows.Add(rc);
                         rc.Have = Math.Max(0, k.KingdomBudgetWallet);   // Diplomacy potrafi zostawic skarbiec na minusie - wtedy nic nie placimy
                         if (cur) rc.Have = CrownIncome.LeftFor(k);      // 165: z tego, co zostalo z wplywow dnia (i 1/360 zapasu) po racie 186, darach, ratach i kontraktach
@@ -371,7 +376,7 @@ namespace Armoury
                     {
                         CrownIncome.Spent(k, given);                    // 165: zwrot schodzi z reszty wplywow dnia; niedoplata przepada
                         var cd = CrownIncome.DayOf(k);
-                        if (cd != null) { cd.RefundDue += want; cd.RefundGiven += given; }
+                        if (cd != null) { cd.RefundDue += want; cd.RefundGiven += given; cd.RefundFull += RbnSum(rc.Full); }   // f6 (recenzja): RefundFull - pelny, do zapasu wojny
                     }
                     RbnCommit(rc.Full, rc.Need, paidSum, false);   // f6-zwrot: pasma tylko z krolestw, ktore doszly do wyplaty (suma "wedlug potrzeby" = nalezny linii zwrotu)
                     _refund[k] = new RefundRow { Paid = paidSum, Due = want, Given = given, Clans = clans.Count };

@@ -20,8 +20,12 @@ namespace Armoury
     /// doba sesji - PendingChestOf: G dzis, R z D zapisu). Ponizej R - calosc (f = 1), ponad 2R - nic, pomiedzy - liniowo. Rod gracza (Jeff 18.10 przyjal): G - kiesy
     /// rodziny w chwili kroku, R z pomiaru W6b (ClanBudget.PlayerCaps - ten sam wzor co AI; gracz nie ma budzetu z wczoraj). Bez miary (f = 1, jak dotad): rod bez
     /// budzetu policzonego, dluznik i rod w zajeciu (168 - kiese bierze wierzyciel), Straz i Wolni Ludzie bez zoldu, gracz bez pomiaru (pierwsza doba sesji).
+    /// Recenzja f6: rod gracza dluznik albo w zajeciu (DebtLadder.On, IsDebtor / IsSeized - z Player Same Ladder) tez bez miary - ta sama regula co AI (ChestOf) i W6b
+    /// gracza (ScutagePlayer: 'dluznik albo zajecie (168)').
+    /// Recenzja f6: zapas wojny korony (pierscien 184 - KingdomTreasury.WarReserveOf, W5b, K5, DS, L5b-1, korona2) liczy sie z PELNEGO zwrotu (KDay.RefundFull) -
+    /// zostaje jak przed f6; f6 zmienia tylko nalezny zwrot i jego bezposrednich czytelnikow (RefundDue: 165, flaga 184 'zwrot ponad wplywy', potrzeba DS, M2b).
     /// Kaskada braku (skarbiec ponad zapas K5, zaliczka mieszczan L1, kredyt Banku 186), podzial Split, wyplata, liczniki CrownIncome - bez zmian: dostaja mniejszy
-    /// nalezny. Renty 180 NIETKNIETE (nie byly czescia decyzji Jeffa) - uwaga: zaoszczedzony zwrot zostaje w reszcie wplywow dnia, z ktorej po W5/M1/M3/E3-P1 tej
+    /// nalezny. Renty 180 NIETKNIETE (nie byly czescia decyzji Jeffa) - uwaga: roznica zwrotu zostaje w reszcie wplywow dnia, z ktorej po W5/M1/M3/E3-P1 tej
     /// samej doby biora renty 180 wedlug lenn (CrownRents.Daily - LeftFor), wiec czesc wraca do rodow z lennami, takze bogatych. Regula dla rent - decyzja Jeffa.
     ///
     /// Klucz wylaczony (albo budzet 166 wylaczony) = pelny zwrot co do zlotowki jak dotad; linia "Korona: zwrot wedlug potrzeby (f6)" liczy wtedy skutek na sucho.
@@ -81,7 +85,8 @@ namespace Armoury
             {
                 double G, R; bool war;
                 bool ok = ClanBudget.ChestOf(c, out G, out R, out war) || ClanBudget.PendingChestOf(c, out G, out R, out war);
-                if (!ok && c == Clan.PlayerClan)
+                // recenzja f6: rod gracza dluznik albo w zajeciu (168, z Player Same Ladder) - bez miary jak AI (ChestOf: b.Debtor / b.Seized) i W6b gracza
+                if (!ok && c == Clan.PlayerClan && !(DebtLadder.On && (DebtLadder.IsDebtor(c) || DebtLadder.IsSeized(c))))
                 {
                     double capW5, capW6, d;
                     ok = ClanBudget.PlayerCaps(c, out capW5, out capW6, out R, out d);   // W6b: ten sam wzor rezerwy co AI (gracz bez budzetu z wczoraj)
@@ -141,6 +146,14 @@ namespace Armoury
             catch (Exception e) { RbnStumble("Commit", e); }
         }
 
+        /// <summary>Recenzja f6: suma pelnego zwrotu wierszy krolestwa (rc.Full) - KDay.RefundFull, do zapasu wojny jak przed f6 (rowna 'nalezne' sprzed paczki).</summary>
+        private static long RbnSum(int[] full)
+        {
+            long x = 0;
+            if (full != null) for (int i = 0; i < full.Length; i++) x += Math.Max(0, full[i]);
+            return x;
+        }
+
         /// <summary>Pelny zwrot doby (suma pasm) - do linii zwrotu.</summary>
         private static long RbnFullTotal() { long x = 0; for (int i = 0; i < 4; i++) x += _rbnFull[i]; return x; }
 
@@ -163,7 +176,8 @@ namespace Armoury
                     sb.Append(" | ").Append(name[b]).Append(": rodow ").Append(_rbnN[b]).Append(" (zloto rodzin ").Append((_rbnG[b] / 1e6).ToString("0.00", inv)).Append(" mln)")
                       .Append(", pelny ").Append(_rbnFull[b]).Append(", wedlug potrzeby ").Append(_rbnNeed[b]);
                 sb.Append(" | razem pelny ").Append(full).Append(", wedlug potrzeby ").Append(need).Append(", nalezny dzis ").Append(totalDue)
-                  .Append(_rbnApply ? "; korona oszczedza " : "; korona oszczedzilaby (na sucho) ").Append(full - need).Append(" zl/d")
+                  .Append(_rbnApply ? "; zwrot mniejszy o " : "; zwrot bylby mniejszy o (na sucho) ").Append(full - need)   // recenzja f6: to nie oszczednosc skarbca - roznica zostaje w reszcie wplywow dnia
+                  .Append(" zl/d (zostaje w reszcie wplywow dnia - prawdziwa zmiana skarbcow w linii 'Skarbce:')")
                   .Append(" | rodow z ucietym zwrotem ").Append(cut)
                   .Append(" | krolestw w wojnie bez naleznego (same rody ponad 2R) ").Append(_rbnRichK).Append(" (zold ").Append(_rbnRichPaid).Append(")");
                 NeedRow p = null;
@@ -173,7 +187,8 @@ namespace Armoury
                       .Append(", f ").Append(p.F.ToString("0.00", inv)).Append(", G ").Append(Math.Round(p.G).ToString("0", inv)).Append(", R ").Append(Math.Round(p.R).ToString("0", inv))
                       .Append(", pelny ").Append(p.Full).Append(", wedlug potrzeby ").Append(p.Need);
                 else sb.Append(" | rod gracza: bez zwrotu dzis");
-                sb.Append(" | renty 180 bez zmian (zaoszczedzone zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn)")
+                sb.Append(" | renty 180 bez zmian (roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn)")
+                  .Append(" | zapas wojny korony (184, W5b, K5, DS, L5b-1, korona2) z pelnego zwrotu - jak przed f6")
                   .Append(" | potkniecia ").Append(_rbnStumbles).Append(" (sesja ").Append(_rbnStumblesSess).Append(").");
                 Log.Info(sb.ToString());
                 // komunikat gracza - tylko przy zmianie pasma (klucz czynny, rod gracza z naleznym dzis)

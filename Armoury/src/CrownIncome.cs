@@ -44,6 +44,8 @@ namespace Armoury
         {
             public long Wallet0, Own, Other, Measured, Stock, Release, Spend, Left;
             public long GiftOut, GiftIn, RepOut, RepIn, Contract, RefundDue, RefundGiven;
+            public long RefundFull;       // f6-zwrot (recenzja): pelny zwrot zoldu krolestwa w wojnie (zold po cieciach W5/W7/K3 x 70%, PRZED mnoznikiem potrzeby rodu) - tylko do zapasu wojny
+                                          // (pierscien 184, KingdomTreasury.WarReserveOf, sonda korony): zapas zostaje taki jak przed f6; klucz wylaczony - rowny RefundDue
             public long Rent, RentHeld;   // 180: renty do glow rodow i udzialy wstrzymane (rody bez warunku, zaokraglenia - zostaja w skarbcu)
             public long CallToWar;        // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny (skarbiec -> portfel wezwanego)
             public long LoanIn, LoanOut;  // 186: kredyt Banku na zwrot zoldu (kapital -> skarbiec) i rata (skarbiec -> kapital, pierwszy wydatek dnia)

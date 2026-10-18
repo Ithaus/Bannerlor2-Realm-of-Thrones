@@ -23,7 +23,7 @@ namespace Armoury
     ///    czeka w osadzie na nastepny zarobek - to nie pieniadz, tylko niezaplacona reszta). Wplyw dnia korony (CrownIncome.Begin - "nasze").
     ///  - STAWKA s krolestwa co 7 dob (doba gry podzielna przez 7) wedlug potrzeby z ostatnich 7 dob: kredyt 186 (CrownIncome.DayOf.LoanIn > 0) albo nalezny
     ///    zwrot wiekszy niz wplywy dnia bez 1/360 zapasu (RefundDue > Measured), albo skarbiec < zapas wojny -> +WarTaxStep (0.5 pkt);
-    ///    zapas wojny = max(CrownReserveGold 500 000, WarTaxReserveDays (60) x sredni nalezny zwrot z 28 dob); skarbiec > 2 x zapas wojny, bez kredytu i bez
+    ///    zapas wojny = max(CrownReserveGold 500 000, WarTaxReserveDays (60) x sredni nalezny zwrot z 28 dob - f6-zwrot: pelny, przed mnoznikiem potrzeby rodu); skarbiec > 2 x zapas wojny, bez kredytu i bez
     ///    siegania do zapasu przez 7 dob i dlug 186 = 0 -> -WarTaxStep; inaczej bez zmian. Pokoj (albo 165 wylaczone) - s spada co tydzien o
     ///    max(krok, wiekszy pulap / 4), wiec do zera najwyzej w 4 tygodnie (krotki pokoj nie zeruje stawki; w pokoju pobor 0).
     ///    AI krola nie decyduje osobno - regula potrzeby jest decyzja korony (gracz-krol tak samo). Pulap pilnowany CODZIENNIE (recenzja B2): gdy spadnie miedzy
@@ -62,7 +62,7 @@ namespace Armoury
             public double S;                                                          // stawka s (ulamek: 0.005 = 0.5%)
             public readonly bool[] Loan = new bool[WtRing7], Over = new bool[WtRing7];   // 7 dob: kredyt 186 / zwrot ponad wplywy dnia bez 1/360
             public int H7, F7;
-            public readonly long[] Due = new long[WtRing28];                         // 28 dob naleznego zwrotu zoldu
+            public readonly long[] Due = new long[WtRing28];                         // 28 dob naleznego zwrotu zoldu (f6-zwrot: pelnego - KDay.RefundFull, przed mnoznikiem potrzeby)
             public int H28, F28;
             public string Name = "";
             // doba (linia)
@@ -271,10 +271,12 @@ namespace Armoury
                         w.Name = k.Name != null ? k.Name.ToString() : k.StringId;
                         w.DMove = 0; w.DStep = false;
                         // pierscienie doby (zawsze - po wlaczeniu klucza potrzeba z 7 i 28 dob jest juz znana)
+                        // f6-zwrot (recenzja): pierscien zapasu wojny bierze PELNY zwrot (KDay.RefundFull, przed mnoznikiem potrzeby rodu) - zapas wojny W5b / K5 / 184 / DS / L5b-1 / korona2
+                        // zostaje jak przed f6; flaga 'zwrot ponad wplywy dnia' (over) dalej z naleznego po f6 (RefundDue - to, co korona naprawde winna)
                         var kd = CrownIncome.DayOf(k);
                         bool loan = kd != null && kd.LoanIn > 0, over = kd != null && kd.RefundDue > kd.Measured;
                         w.Loan[w.H7] = loan; w.Over[w.H7] = over; w.H7 = (w.H7 + 1) % WtRing7; if (w.F7 < WtRing7) w.F7++;
-                        w.Due[w.H28] = kd != null ? Math.Max(0, kd.RefundDue) : 0; w.H28 = (w.H28 + 1) % WtRing28; if (w.F28 < WtRing28) w.F28++;
+                        w.Due[w.H28] = kd != null ? Math.Max(0, kd.RefundFull) : 0; w.H28 = (w.H28 + 1) % WtRing28; if (w.F28 < WtRing28) w.F28++;
                         bool loan7 = false, over7 = false; long dsum = 0;
                         for (int i = 0; i < WtRing7; i++) { if (w.Loan[i]) loan7 = true; if (w.Over[i]) over7 = true; }
                         for (int i = 0; i < WtRing28; i++) dsum += w.Due[i];
