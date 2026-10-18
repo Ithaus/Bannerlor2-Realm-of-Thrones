@@ -65,7 +65,7 @@ namespace Armoury
             return k;
         }
 
-        private sealed class ZTown
+        internal sealed class ZTown                              // ks-koszt T5: internal - zakupy wsi trzymaja mape miasta przez jedno wywolanie (TownFolk.ZcBuy)
         {
             public Town T; public Settlement St; public int Market; public double Lam, People, Surv;
             public double Hands; public bool Garum;              // ZC5: rece przetworow (roboczodni/d) i kraina garum
@@ -133,6 +133,7 @@ namespace Armoury
 
         private static void Zc4Reset()
         {
+            T4Bump();                                            // ks-koszt T4
             _zt = new Dictionary<Settlement, ZTown>(); _zv = new Dictionary<Village, float[]>(); _zvp = new Dictionary<Village, float[]>(); _zcDictTown = null; _zvBought.Clear();
             _zItems = null; _zKg = null; _zCats = new Dictionary<ItemCategory, int[]>(); _zIx = null; _zLiveCats = new Dictionary<ItemCategory, int>(); _zLive = null;
             Zc4Zero();
@@ -150,6 +151,7 @@ namespace Armoury
 
         private static void Zc4Off()
         {
+            T4Bump();                                            // ks-koszt T4
             if (_zt.Count > 0) _zt = new Dictionary<Settlement, ZTown>();
             if (_zv.Count > 0) _zv = new Dictionary<Village, float[]>();
             if (_zvp.Count > 0) _zvp = new Dictionary<Village, float[]>();
@@ -202,6 +204,7 @@ namespace Armoury
         private static void Zc4Build(int today, List<DailyLife.KsRec> recs, Dictionary<Village, float[]> vil, Dictionary<Village, float[]> vilPaid, double[] full, bool fresh, bool zFull = true)
         {
             Zc4EnsureMap();
+            T4Bump();                                            // ks-koszt T4: popyt zaplacony miast (ZDp) i mapa koszyka od nowa - pamiec progow od zera
             var prevMap = _zt;                                   // KS-R3 C1: potrzeby miasta co 7 dob na zmiane (Fnv) - pozostale doby z poprzedniej mapy
             // recenzja 17.10 (wazne): wsie kupuja pelny koszyk (vil - kiesa i drabina decyduja), popyt ceny, "na zbyt" i wsad ZC5 licza koszyk zaplacony z Planu (vilPaid -
             // to Plan postawil na targu)
@@ -851,6 +854,16 @@ namespace Armoury
             Zc4EnsureMap();
             // recenzja runda 3 (wazne): budzet przy cenie krainy (cena startu x gradient krainy miasta targowego - jak koszyk kroku 8 Planu)
             Settlement mk = null; try { mk = TradeTownOf(v); } catch { mk = null; }
+            if (T4Begin())
+            {
+                // ks-koszt T4: indeks startu i gradient krainy z pamieci doby (te same wywolania raz na dobe; to samo wyrazenie i kolejnosc mnozenia - te same liczby)
+                for (int z = 0; z < ZN && z < q.Length; z++)
+                {
+                    var it = _zItems[z]; if (it == null || !(q[z] > 0)) continue;
+                    budgetDay += q[z] * Math.Max(1, it.Value) * T4StartIndex(m, z) * T4LandGrad(mk, z);
+                }
+                return q;
+            }
             for (int z = 0; z < ZN && z < q.Length; z++)
             {
                 var it = _zItems[z]; if (it == null || !(q[z] > 0)) continue;

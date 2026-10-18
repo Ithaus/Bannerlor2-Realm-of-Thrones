@@ -88,6 +88,9 @@ namespace Armoury
             // KS-R3 (port symulatora 17.10, runda 2): drabina 2 w miastach obok (F2) - kcal i wartosc chciane juz policzone w miescie targowym (bez drugiego liczenia)
             public bool Alt;
             public bool P1;                                              // recenzja runda 3: drabina 1 koszyka zaplaconego z Planu (wartosc kupiona do NKS-13)
+            // ks-koszt T5 (klucz Ks Cost Fast): mapa koszyka miasta T rozwiazana raz na wywolanie (null - miasto poza ZC4) - ZRow / ZRowSet / ZPrice bez szukania miasta;
+            // T4: progi drabiny 2 z pamieci doby
+            public bool Fast; public StartCalibration.ZTown Z; public Town P2T; public double[] P2Row;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -103,6 +106,7 @@ namespace Armoury
             // recenzja runda 3 (wazne, H2): -1 tylko przy tej samej liczbie wierszy polki co przy ostatnim sprawdzeniu braku (nowy wiersz - towar przyjechal - szukany);
             // wynik szukania zapisany w mapie doby (nastepne wsie bez szukania)
             int rc = b.R.Count;
+            if (b.Fast) return ZcPriceFast(b, z, it, e, rc, out have);
             int ix = StartCalibration.ZRow(b.T, z, rc);
             if (ix == -1 && StartCalibration.SwBuyEvery2) return 0;
             if (ix < 0 || ix >= rc || !ReferenceEquals(b.R.GetElementCopyAtIndex(ix).EquipmentElement.Item, it) || b.R.GetElementCopyAtIndex(ix).EquipmentElement.ItemModifier != null)
@@ -115,6 +119,32 @@ namespace Armoury
             if (z == StartCalibration.ZLinen && VillClothOn) { int r = MaterialOrders.ShelfReserve(b.T, it); if (r > keep) keep = r; }
             have = b.R.GetElementNumber(ix) - keep;
             int p = StartCalibration.ZPrice(b.T, z);
+            if (p <= 0) p = b.T.MarketData.GetPrice(e);
+            return p > 0 ? p : 0;
+        }
+
+        /// <summary>ks-koszt T5 (klucz Ks Cost Fast): ZcPrice z mapa miasta z wywolania (b.Z - to samo, co ZTownOf w ZRow, ZRowSet i ZPrice) i jedna kopia wiersza polki
+        /// zamiast dwoch - te same decyzje i liczby co ZcPrice wyzej.</summary>
+        private static int ZcPriceFast(ZcBuy b, int z, ItemObject it, EquipmentElement e, int rc, out int have)
+        {
+            have = 0;
+            var zt = b.Z;
+            // ZRow: poza mapa -2; -1 tylko przy tej samej liczbie wierszy co przy sprawdzeniu braku
+            int ix = zt == null ? -2 : zt.Ix[z];
+            if (ix == -1 && zt.IxCnt[z] != rc) ix = -2;
+            if (ix == -1 && StartCalibration.SwBuyEvery2) return 0;
+            bool bad = ix < 0 || ix >= rc;
+            if (!bad) { var el = b.R.GetElementCopyAtIndex(ix); bad = !ReferenceEquals(el.EquipmentElement.Item, it) || el.EquipmentElement.ItemModifier != null; }
+            if (bad)
+            {
+                ix = b.R.FindIndexOfElement(e);
+                if (zt != null) { zt.Ix[z] = ix; zt.IxCnt[z] = rc; }       // ZRowSet
+            }
+            if (ix < 0) return 0;
+            int keep = ShelfKeep;
+            if (z == StartCalibration.ZLinen && VillClothOn) { int r = MaterialOrders.ShelfReserve(b.T, it); if (r > keep) keep = r; }
+            have = b.R.GetElementNumber(ix) - keep;
+            int p = zt != null ? zt.Px[z] : 0;                               // ZPrice
             if (p <= 0) p = b.T.MarketData.GetPrice(e);
             return p > 0 ? p : 0;
         }
@@ -172,8 +202,9 @@ namespace Armoury
             if (price <= 0 || have <= 0) { b.P2Shelf += n; return 0; }
             // recenzja runda 3 (drobne): drabine 2 racjonuje CENA - wies z oszczednosciami kupuje ponad plan, dopoki cena polki dzis jest najwyzej 0.8 x ceny startu (krainy)
             // i najwyzej do polki, przy ktorej cena doszlaby do 0.8 x startu (dni polki przy indeksie 0.8 x startu x popyt zaplacony - ok. 1.45 x cel); bez stalego pasa dla kupcow
-            if (price > StartCalibration.ZPass2Price(b.T, z)) { b.P2Shelf += n; return 0; }
-            int above = (int)Math.Floor(have + ShelfKeep - StartCalibration.ZPass2Floor(b.T, z));   // have = polka - 5
+            if (b.Fast && !ReferenceEquals(b.P2T, b.T)) { b.P2T = b.T; b.P2Row = StartCalibration.T4P2Row(b.T); }   // ks-koszt T4: progi miasta z pamieci doby
+            if (price > (b.Fast ? StartCalibration.ZPass2PriceT4(b.T, z, b.P2Row) : StartCalibration.ZPass2Price(b.T, z))) { b.P2Shelf += n; return 0; }
+            int above = (int)Math.Floor(have + ShelfKeep - (b.Fast ? StartCalibration.ZPass2FloorT4(b.T, z, b.P2Row) : StartCalibration.ZPass2Floor(b.T, z)));   // have = polka - 5
             int k = Math.Min(n, Math.Min(have, above));
             if (k <= 0) { b.P2Shelf += n; return 0; }
             if (k < n) b.P2Shelf += n - k;
@@ -203,6 +234,7 @@ namespace Armoury
             float[] carry;
             if (!_zcCarry.TryGetValue(vil, out carry) || carry == null || carry.Length != StartCalibration.ZN) { carry = new float[StartCalibration.ZN]; _zcCarry[vil] = carry; }
             var b = new ZcBuy { V = vil, Mk = mk, T = town, R = roster, D = d };
+            if (StartCalibration.SwCostFast) { b.Fast = true; b.Z = StartCalibration.ZTownFor(town); StartCalibration.T4Begin(); }   // ks-koszt T4/T5
             long spent;
             var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill, mk);   // F0: ksiega towarow na rynek miasta targowego (dotad ramka bez osady - "bez rynku")
             try { spent = Zc4BuyCore(vil, mk, q, lam, d, b, carry, Math.Max(1, days)); }
@@ -293,8 +325,9 @@ namespace Armoury
                         foreach (var alt in NearTowns(vil, mk))
                         {
                             if (alt.Town == null || alt.ItemRoster == null) continue;
-                            var keepT = b.T; var keepR = b.R; var keepM = b.Mk;
+                            var keepT = b.T; var keepR = b.R; var keepM = b.Mk; var keepZ = b.Z;
                             b.T = alt.Town; b.R = alt.ItemRoster; b.Mk = alt; b.Alt = true;
+                            if (b.Fast) b.Z = StartCalibration.ZTownFor(b.T);      // ks-koszt T5
                             var gf2 = GoodsLedger.Begin(GoodsLedger.FFolkVill, alt);
                             long s0 = b.Spent; bool rest = false;
                             try
@@ -309,7 +342,7 @@ namespace Armoury
                             }
                             finally
                             {
-                                GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Alt = false;
+                                GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Alt = false; b.Z = keepZ;
                                 long sp = b.Spent - s0;
                                 if (sp > 0) { Folk ma, mm; if (_f.TryGetValue(alt, out ma)) ma.VillWin += sp; if (_f.TryGetValue(mk, out mm)) mm.VillWin -= sp; }
                             }
@@ -438,8 +471,9 @@ namespace Armoury
                         bool any = false; for (int z = 0; z < StartCalibration.ZN; z++) if (b.Miss[z] > 0) { any = true; break; }
                         if (!any) break;
                         if (alt.Town == null || alt.ItemRoster == null) continue;
-                        var keepT = b.T; var keepR = b.R; var keepM = b.Mk;
+                        var keepT = b.T; var keepR = b.R; var keepM = b.Mk; var keepZ = b.Z;
                         b.T = alt.Town; b.R = alt.ItemRoster; b.Mk = alt;
+                        if (b.Fast) b.Z = StartCalibration.ZTownFor(b.T);          // ks-koszt T5
                         var gf2 = GoodsLedger.Begin(GoodsLedger.FFolkVill, alt);
                         long s0 = b.Spent;
                         try
@@ -455,7 +489,7 @@ namespace Armoury
                         }
                         finally
                         {
-                            GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM;
+                            GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Z = keepZ;
                             // podstawa robocizny targu (VillWin): zakupy w tamtym miescie jemu, nie miastu targowemu (wolajacy dopisze calosc miastu targowemu)
                             long sp = b.Spent - s0;
                             if (sp > 0) { Folk ma, mm; if (_f.TryGetValue(alt, out ma)) ma.VillWin += sp; if (_f.TryGetValue(mk, out mm)) mm.VillWin -= sp; }
@@ -493,6 +527,10 @@ namespace Armoury
                 var pos = vil.Settlement.GetPosition2D;
                 TaleWorlds.CampaignSystem.ComponentInterfaces.MapDistanceModel dm = null;
                 try { dm = TaleWorlds.CampaignSystem.Campaign.Current.Models.MapDistanceModel; } catch { dm = null; }
+                // ks-koszt T3 (klucz Ks Cost Fast): droga ladowa wies -> miasto z pamieci sesji (tablica drog osada -> osada gry jest stala w sesji; ta sama przebudowa
+                // co 7 dob, ten sam filtr i sortowanie - tylko bez ponownego pytania gry o te sama pare; blad zapytania nie jest pamietany)
+                Dictionary<Settlement, float> rdMemo = null;
+                if (dm != null && StartCalibration.SwCostFast && !_ntDist.TryGetValue(vil, out rdMemo)) { rdMemo = new Dictionary<Settlement, float>(); _ntDist[vil] = rdMemo; }
                 foreach (var t in Town.AllTowns)
                 {
                     if (t == null || !t.IsTown || t.Settlement == null || ReferenceEquals(t.Settlement, mk)) continue;
@@ -501,7 +539,13 @@ namespace Armoury
                     if (dm != null)
                     {
                         float rd = -1f;
-                        try { rd = dm.GetDistance(vil.Settlement, t.Settlement, false, false, TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default); } catch { rd = -1f; }
+                        if (rdMemo != null && rdMemo.TryGetValue(t.Settlement, out rd)) { }
+                        else
+                        {
+                            bool ok = true;
+                            try { rd = dm.GetDistance(vil.Settlement, t.Settlement, false, false, TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default); } catch { rd = -1f; ok = false; }
+                            if (ok && rdMemo != null) rdMemo[t.Settlement] = rd;
+                        }
                         if (!(rd >= 0f) || rd > 375f) continue;          // bez drogi ladowej (morze, rzeka bez brodu) albo za daleko droga
                         dd = rd;
                     }
@@ -524,7 +568,8 @@ namespace Armoury
         private static uint KsFnv(string s) { uint h = 2166136261; if (s != null) unchecked { foreach (char c in s) h = (h ^ c) * 16777619; } return h; }
 
         /// <summary>Nowa sesja (TownFolk.Reset): pamiec miast obok i ulamki koszyka wsi od nowa.</summary>
-        private static void KsReset() { _nearTowns.Clear(); _nearDay = -1; _zcCarry.Clear(); _zcCarry2.Clear(); }
+        private static void KsReset() { _nearTowns.Clear(); _nearDay = -1; _zcCarry.Clear(); _zcCarry2.Clear(); _ntDist.Clear(); }
+        private static readonly Dictionary<Village, Dictionary<Settlement, float>> _ntDist = new Dictionary<Village, Dictionary<Settlement, float>>();   // ks-koszt T3: droga wies -> miasto (sesja)
         private static long _zcBrewV;
     }
 }
