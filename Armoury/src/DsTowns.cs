@@ -91,6 +91,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki od ostatniej linii
         private static int _nDue, _nDueT, _remitSiege, _remitCap, _noLord, _distN, _forgN, _renewN, _renewUp, _renewDown, _aidRemit, _aidForgN;
+        private static int _shortN, _shortNT;   // f14-miary (NKA-1): raty firmy z kasy niezaplacone w calosci tej doby (kasa przy podlodze) - osady, w tym miasta; tylko licznik linii
         private static double _dueL, _dueC, _dueLf, _remit, _noLordAmt, _arrNew, _arrPaid, _forgiven, _aidArrNew, _aidLost, _aidForg, _movAssess, _movRemit, _movRamp, _movShort, _movLost;
         private static long _paidL, _paidC, _paidLf, _distL, _distC, _drawT, _drawC, _aidPaid, _aidArrPaid, _movPaid;
         private static long _payOut, _payIn;
@@ -112,6 +113,7 @@ namespace Armoury
             _tlFloorUp = _tlFloorN = _tlSgOut = _tlSgIn = 0; _tlSgN = 0;   // scalenie f7/f8: okno linii kasy kupcow
             _klFloorUp = _klFloorN = _klSgOut = _klSgIn = 0; _klSgN = 0;   // recenzja calosci 18.10: to samo dla korona2 (pozyczki koron od miast i zaliczki DS)
             _nDue = _nDueT = _remitSiege = _remitCap = _noLord = _distN = _forgN = _renewN = _renewUp = _renewDown = _aidRemit = _aidForgN = 0;
+            _shortN = _shortNT = 0;
             _dueL = _dueC = _dueLf = _remit = _noLordAmt = _arrNew = _arrPaid = _forgiven = _aidArrNew = _aidLost = _aidForg = _movAssess = _movRemit = _movRamp = _movShort = _movLost = 0;
             _paidL = _paidC = _paidLf = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
             _payOut = _payIn = 0;
@@ -1089,6 +1091,7 @@ namespace Armoury
                 long gL = pL > 0 ? ToLord(st, t, lord, pL) : 0;
                 long gC = pC > 0 && k != null ? ToCrown(t, k, pC) : 0;
                 f.AL = Math.Max(0, wantL - gL); f.AC = Math.Max(0, wantC - gC);
+                if (gL + gC + 0.5 < tot) { _shortN++; if (town) _shortNT++; }   // f14-miary: kasa nie starczyla na zaleglosc i rate (tylko licznik linii)
                 avail -= gL + gC;
                 lordPay += (int)gL; crownFarm += (int)gC;
                 _paidL += gL; _paidC += gC;
@@ -1399,6 +1402,7 @@ namespace Armoury
                           .Append(" dob (limit: najwyzej jedna zmiana na ").Append(Math.Min(qd, Quarter)).Append(" dob)");
                     }
                 }
+                if (_fixDay >= 0) { try { ArrearsBySettlement(sb, s); } catch (Exception e) { Stumble("Daily(zaleglosci osad)", e); } }   // f14-miary (NKA-1): kto zalega - tylko pomiar
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(_payOut - _payIn);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
@@ -1408,6 +1412,49 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ClearCounters(); }
+        }
+
+        /// <summary>
+        /// f14-miary (NKA-1, test fin92: zaleglosci firm +10.9 tys./d po pierwszym przegladzie, linia dotad bez rozbicia na osady): segment linii doby - zaleglosci firm
+        /// miast i zamkow osobno (razem, osad, w tym z zaleglosci >= jednej raty), raty niezaplacone w calosci tej doby (kasa przy podlodze Ds Farm Floor Share zapasu
+        /// kupcow) i 5 osad z najwieksza zaleglosc: rodzaj, zaleglosc w ratach (panu / koronie / z oszczednosci ludu), kasa wobec podlogi, dni kwartalu z zaleglosciami.
+        /// Tylko odczyt (zloto i stan firm bez zmian); petla po firmach (ok. 230) raz na dobe.
+        /// </summary>
+        private static void ArrearsBySettlement(StringBuilder sb, Settings s)
+        {
+            double aT = 0, aC = 0; int nT = 0, nC = 0, rT = 0, rC = 0;
+            var top = new List<KeyValuePair<double, Farm>>();
+            foreach (var f in _farm.Values)
+            {
+                if (f == null || f.St == null || f.St.Town == null) continue;
+                double arr = f.AL + f.AC + f.ALf;
+                if (arr < 1) continue;
+                double inst = (f.FL + f.FC + f.FLf) / Weeks;
+                bool town = f.St.IsTown;
+                if (town) { aT += arr; nT++; if (arr >= Math.Max(1.0, inst)) rT++; }
+                else { aC += arr; nC++; if (arr >= Math.Max(1.0, inst)) rC++; }
+                top.Add(new KeyValuePair<double, Farm>(arr, f));
+            }
+            top.Sort((x, y) => y.Key.CompareTo(x.Key));
+            sb.Append(" | zaleglosci wedlug osad (f14-miary): miasta ").Append(N0(aT)).Append(" zl u ").Append(nT).Append(" (z zaleglosci >= raty ").Append(rT)
+              .Append("), zamki ").Append(N0(aC)).Append(" zl u ").Append(nC).Append(" (z zaleglosci >= raty ").Append(rC).Append(")")
+              .Append("; raty z kasy niezaplacone w calosci dzis ").Append(_shortN).Append(" (miast ").Append(_shortNT).Append(") - podloga ")
+              .Append((s.TownPurseRegulator == 1 ? 1.0 : Unit(s.DsFarmFloorShare)).ToString("0.00", Inv)).Append(" zapasu kupcow; najwieksze: ");
+            int n = Math.Min(5, top.Count);
+            if (n == 0) sb.Append('-');
+            for (int i = 0; i < n; i++)
+            {
+                var f = top[i].Value;
+                var t = f.St.Town;
+                bool town = f.St.IsTown;
+                int reserve = town ? TownPurse.Reserve(t) : CastlePurse.Reserve(t);
+                double inst = (f.FL + f.FC + f.FLf) / Weeks;
+                if (i > 0) sb.Append(", ");
+                sb.Append(f.St.Name != null ? f.St.Name.ToString() : f.St.StringId).Append(" (").Append(town ? "miasto" : "zamek").Append(") ").Append(N0(top[i].Key))
+                  .Append(" = ").Append(inst > 0 ? (top[i].Key / inst).ToString("0.0", Inv) : "-").Append(" rat (panu ").Append(N0(f.AL)).Append(" / koronie ").Append(N0(f.AC))
+                  .Append(" / z oszczednosci ludu ").Append(N0(f.ALf)).Append("), kasa ").Append(t.Gold).Append(" wobec podlogi ").Append(N0(FloorOf(s, reserve)))
+                  .Append(", dni kwartalu ").Append(f.ATerms);
+            }
         }
 
         // ============================================================ zapis arm_daniny_miasta
