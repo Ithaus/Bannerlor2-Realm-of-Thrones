@@ -185,7 +185,7 @@ namespace Armoury
         /// Te same warunki co DeliverTownFields (miasto, polka, oblezenie - wtedy nic nie przybywa).</summary>
         private static bool T13Accrue(LiveDist ld, DistResult res, int today)
         {
-            if (((Fnv(ld.Id) + (uint)today) & 1u) == 0u) return false;     // doba dostawy
+            if (_items == null || res == null || ((Fnv(ld.Id) + (uint)today) & 1u) == 0u) return false;     // doba dostawy (albo bez tabel - dostawa jak dotad)
             var town = ld.T;
             if (town == null || town.Settlement == null || town.Settlement.ItemRoster == null || ld.St.IsUnderSiege) return true;
             int m = ld.Market == 0 ? 0 : 1;
