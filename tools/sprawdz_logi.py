@@ -36953,11 +36953,11 @@ def nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day):
         cls = {"zwykla": [], "odbior Planu": [], "start Planu": [], "krok A7": []}
         for d, v in ap.items():
             t = v[2]
-            if t.get("plan_odbior", 0.0) >= 1.0:
+            if t.get("linie_planu", 0.0) > 0.0 or t.get("na_targ", 0.0) > 0.0 or t.get("plan_odbior", 0.0) >= 0.5:
                 cls["odbior Planu"].append(v[0])
-            elif t.get("plan_start", 0.0) >= 1.0:
+            elif t.get("plan_start", 0.0) >= 0.5:
                 cls["start Planu"].append(v[0])
-            elif t.get("regula_a7", 0.0) >= 1.0:
+            elif t.get("regula_a7", 0.0) >= 0.5:
                 cls["krok A7"].append(v[0])
             else:
                 cls["zwykla"].append(v[0])
