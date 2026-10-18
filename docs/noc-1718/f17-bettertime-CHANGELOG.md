@@ -12,3 +12,5 @@ nic nie robi (zegar z godzina na pasku zostaje). Bez Better Time - stara droga c
 dopoki Jeff nie kliknie >> albo >>>; nasza linia profilu f9 ("Predkosc mapy (f9)") dalej mierzy klatki. Ustawienia Better Time w MCM (FastForwardMultiplier 3, ExtraFastForwardMultiplier 6)
 sa RequireRestart = false (zmiana bez zamykania gry).
 **Status:** DO SPRAWDZENIA (build Armoury kod 0).
+
+**Recenzja (18.10):** bez problemow blokujacych (GetModulesNames zwraca Id modulow z linii polecen, bezpieczne w OnSubModuleLoad; brak innych zapisow mnoznika; zegar z godzina to osobny postfiks). Poprawione w noc-ks4: return przy Better Time PO pomiarze klatki (linia "Predkosc mapy (f9)" mierzy klatki, x3/x6 w koszu "inny mnoznik"). Przy Better Time nasze ustawienia FastForwardMultiplier, MapSpeedButtons, MapSpeedFast/VeryFast, MapSpeedKeys nic nie robia. WGRANE 81b (Armoury 42d5b95b, bez tej poprawki pomiaru).

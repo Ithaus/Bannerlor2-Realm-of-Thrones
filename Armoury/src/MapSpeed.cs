@@ -122,10 +122,10 @@ namespace Armoury
                 var s = Settings.Current;
                 var c = Campaign.Current;
                 if (s == null || c == null || __instance == null) return;
-                if (BetterTimeActive) return;   // f17: predkosc prowadzi Better Time - bez naszego mnoznika i klawiszy
                 int fast = FastOf(s), very = VeryFastOf(s);
                 int state = __instance.TimeFlowState;
-                if (MapSpeedProfile.On) MapSpeedProfile.Frame(BinOf(state, c.SpeedUpMultiplier, fast, very), t0);
+                if (MapSpeedProfile.On) MapSpeedProfile.Frame(BinOf(state, c.SpeedUpMultiplier, fast, very), t0);   // pomiar klatek takze przy Better Time (jego x3 / x6 - kosz "inny mnoznik")
+                if (BetterTimeActive) return;   // f17: predkosc prowadzi Better Time - bez naszego mnoznika i klawiszy (recenzja: return PO pomiarze klatki)
                 ArmMapSpeedVM vm;
                 if (!_vms.TryGetValue(__instance, out vm)) vm = null;
                 // f9 recenzja: MapSpeedButtons wylaczone w MCM - mnoznik starej drogi (FastForwardMultiplier) od reki, raz przy zmianie. Klucz wchodzi do Settings
