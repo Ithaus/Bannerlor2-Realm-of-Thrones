@@ -1037,7 +1037,7 @@ namespace Armoury
         public bool LevyFromVillages = true;               // a recruit leaves his village (1/k of a hearth, as any man who leaves it) or his town; a soldier from that land who comes home brings him back. Works only with People Origin Enabled and People Unit Enabled. Change it only when you start a new campaign
         // E4/7b (decyzja Jeffa 11.10 12:40): niewzieci z ekranu lupu poboru wymuszonego wracaja do DOM swojej wsi - PeopleBook.PressUntaken
         public bool PressUntakenGoHome = true;             // villagers you force into service but leave behind on the loot screen go back home to their village and its hearth instead of being lost to it
-        // A12 (rownanie krain, bieg dwuletni "przy zniknieciu partii" 9 581 ludzi, d130 FABULA Harrenhal 921; 6-letni JeorMutinyEvent: 6 partii Strazy, 1 422 ludzi jednej doby): partia
+        // A12 (rownanie krain, bieg dwuletni "przy zniknieciu partii" 9 581 ludzi, d130 921 przy zniknieciu rodu; 6-letni JeorMutinyEvent: 6 partii Strazy, 1 422 ludzi jednej doby): partia
         // usunieta z zywymi ludzmi poza bitwa (DestroyClanAction - fabula ROT, rod zniszczony: MapEventSide = null i niszczyciel z bitwy) - zywi ida ta sama droga co
         // partia rozwiazana bez bitwy (bracia Strazy na Mur, reszta do DOM pochodzenia); off = jak dotad (w nicosc)
         public bool PartyGoneMenGoHome = true;             // when a story event or a fallen house removes a war party whose men are alive and not fighting, its men go home to their own lands (sworn brothers back to the Wall) instead of vanishing from the world (off = they vanish, as before)

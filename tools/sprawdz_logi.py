@@ -18699,7 +18699,7 @@ def na12_main(logp):
             (f"do domu po usunieciu poza bitwa {home:.0f} ludzi z {parties:.0f} partii (na Mur {wall:.0f}); w nicosc {gone:.0f} = w rownaniu {cnt:.0f} + bez pochodzenia {none:.0f};"
              f" dob z roznica > 0.5: {len(bad)}" + (f" (d{', d'.join(bad[:5])})" if bad else "") + (f"; od siewu w rownaniu {since:.0f}" if since is not None else "") + f" ({nG} dob)")
             if nG else "brak linii A12 (log sprzed paczki albo klucze wylaczone)",
-            "|w nicosc - w rownaniu - bez pochodzenia| <= 0.5 kazdej doby (Party Gone Men Counted); do domu - INFO (fabula ROT: Jeor 1 422, Harrenhal 921 ludzi jednej doby)",
+            "|w nicosc - w rownaniu - bez pochodzenia| <= 0.5 kazdej doby (Party Gone Men Counted); do domu - INFO (fabula ROT: bunt przeciw Jeorowi 1 422 ludzi jednej doby; bieg dwuletni d130 921)",
             (len(bad) == 0) if (nG and counted) else None)
 
     # ---------------- NA12-5 rownanie krain (INFO)

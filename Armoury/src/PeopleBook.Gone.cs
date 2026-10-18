@@ -10,7 +10,7 @@ namespace Armoury
     /// A12 (paczka stare-a12; CO-ZOSTALO 14.10 wiersz A12, diagnoza drobne2 "Ludzie przy zniknieciu partii"): LUDZIE PARTII, KTORA ZNIKA Z LUDZMI.
     /// Dowod (bieg 6-letni 14/15.10, linie diagnozy ze stosem): (a) JeorMutinyEvent (fabula ROT) -> DestroyClanAction -> DestroyPartyAction z niszczycielem - 6 partii Strazy
     /// z zywymi ludzmi (sklad 177-489 = slownik), poza bitwa (DestroyClanAction zeruje MapEventSide partii w bitwie i podaje niszczyciela z drugiej strony), 1 422 ludzi
-    /// jednej doby w nicosc; bieg dwuletni d130 (FABULA Harrenhal, klanow 364 -> 363) 921 ludzi; (b) bandy po bitwie (CaptureDefeatedPartyMembers -> MakeHeroFugitiveAction
+    /// jednej doby w nicosc; bieg dwuletni d130 921 ludzi (tej doby klanow 364 -> 363 - najpewniej zniknal rod, wniosek; HarrenhalEvent ROT partii nie usuwa - sprawdzone); (b) bandy po bitwie (CaptureDefeatedPartyMembers -> MakeHeroFugitiveAction
     /// -> DestroyPartyAction bez niszczyciela, sklad 1-4) i partie rodow po bitwie (sklad 0) - partia skasowana zanim okna bitwy E4/7 zdjely poleglych i jencow ze slownika:
     /// reszta slownika (35-266 ludzi) w nicosc. Swiat liczyl ja "w nicosc - przy zniknieciu partii", ale rownanie regionu (BuildViews) nie mialo licznika - reszta krainy
     /// ujemna (valyrian -0.216% w biegu dwuletnim).
