@@ -192,6 +192,9 @@ namespace Armoury
                     int removed = RemovePennants();
                     Log.Info("Proporczyki - tekstury (E7/W5): VillagePennantSmallTexture zmienione w MCM na " + (small ? "tak" : "NIE") + " - zdjete " + removed
                              + " proporczykow, wracaja przy kamerze.");
+                    // po recenzji sw-herby: wszystkie proporczyki stawiane od nowa w nowej drodze - zbior wiosek z herbem pana zamiast gospodarza tez od nowa
+                    // (inaczej po NIE -> tak linia tekstur pokazuje stary licznik z limitu 100/160; linia "przy zdjeciu" wyzej ma jeszcze stary stan)
+                    _penCapped.Clear();
                     PenTexStart(small);
                 }
                 if (screen == null || screen.MapCameraView == null || screen.MapCameraView.Camera == null) return;
@@ -886,6 +889,10 @@ namespace Armoury
                     catch (Exception e)
                     {
                         _stPenTex++;
+                        // po recenzji sw-herby: wywrotka w polowie zdejmowania (np. Remove drugiej encji w DropSecond) - encja, ktora dalej stoi, zatrzymuje swoj herb
+                        // (bez zwalniania tekstury i materialow pod zywa encja: ksiega zgodna z tym, co naprawde jest w scenie; herb wypadnie w kolejnym przebiegu)
+                        if (p.E != null && p.Tex != null && p.Tex.Evict) { p.Tex.Evict = false; _penTexBlocked++; }
+                        if (p.E2 != null && p.Tex2 != null && p.Tex2.Evict) { p.Tex2.Evict = false; _penTexBlocked++; }
                         if (_stPenTex <= 3 || _stPenTex % 200 == 0) Log.Error("MapVillagesView.PennantTexEvict " + s.R.Uid + " (potkniecie " + _stPenTex + ")", e);
                     }
                 }

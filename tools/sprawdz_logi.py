@@ -967,8 +967,9 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa nherby <Armoury-*.log> (strumieniowo). Linie "Proporczyki - tekstury (E7/W5): start / stan / przy zdjeciu".
                     NHB-0 linie paczki, NHB-1 tryb (klucz tak, zwalnianie dalekich CZYNNE; klucz NIE - INFO), NHB-2 rozmiar tekstury z gry 512x512, NHB-3 tozsamosc ksiegi
                     herbow (nowe - zwolnione - zapomniane - w pamieci = 0 w kazdej linii), NHB-4 klucze ArmPen_ w pamieci gry = ksiega (roznica 0), NHB-5 wiosek z herbem
-                    zastepczym (pana zamiast gospodarza) 0 i w kadrze 0, NHB-6 herbow w pamieci najwiecej <= 224, NHB-7 zwalnianie przy dlugiej podrozy (nowe > 128 ->
-                    zwolnione > 0; krotsza - INFO), NHB-8 pamiec tekstur <= 256 MiB, NHB-9 przebieg zwalniania sr. <= 2 ms, NHB-10 herbow gry razem <= 1000, NHB-11 potkniecia
+                    zastepczym (pana zamiast gospodarza) 0 i w kadrze 0, NHB-6 herbow w pamieci najwiecej <= 224, NHB-7 zwalnianie przy dlugiej podrozy (najwiecej
+                    w pamieci > 128 -> przebiegow i zwolnione > 0; krotsza albo zwalnianie BRAK - INFO), NHB-8 pamiec tekstur <= 256 MiB, NHB-9 przebieg
+                    zwalniania sr. <= 2 ms, NHB-10 herbow gry razem <= 1000, NHB-11 potkniecia
                     i ERROR MapVillagesView.PennantTex* 0, NHB-12 nieprzyjete zamowienia 0, NHB-13 liczniki (INFO). Log sprzed paczki: INFO (stara linia - herb pana zamiast
                     gospodarza jako INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -35446,7 +35447,8 @@ def nherby_main(logp):
     zwalnianie CZYNNE; klucz NIE - INFO), NHB-2 rozmiar tekstury odczytany z gry 512x512, NHB-3 tozsamosc ksiegi (nowe - zwolnione - zapomniane - w pamieci = 0
     w kazdej linii), NHB-4 klucze ArmPen_ w pamieci gry = w pamieci ksiegi (roznica 0 - zwalnianie naprawde oddaje wezly), NHB-5 wiosek z herbem zastepczym
     (pana zamiast gospodarza) 0 i teraz w kadrze 0 w kazdej linii, NHB-6 herbow w pamieci najwiecej <= siatka 224, NHB-7 zwalnianie czynne przy dlugiej
-    podrozy (nowe > 128 -> zwolnione > 0; krotsza - INFO), NHB-8 pamiec tekstur najwiecej <= 256 MiB, NHB-9 przebieg zwalniania sr. <= 2 ms, NHB-10 herbow
+    podrozy (najwiecej w pamieci > 128 -> przebiegow i zwolnione > 0; licznik nowe rosnie przez misje, wiec nie on; krotsza - INFO), NHB-8 pamiec
+    tekstur najwiecej <= 256 MiB, NHB-9 przebieg zwalniania sr. <= 2 ms, NHB-10 herbow
     gry razem <= 1000 (pojemnosc pamieci trwalej gry), NHB-11 potkniecia 0 i linie "ERROR in MapVillagesView.PennantTex" 0, NHB-12 nieprzyjete zamowienia 0,
     NHB-13 liczniki (INFO). Log sprzed paczki: NHB-0 INFO i stara linia "Proporczyki (E7/W5): w kadrze" (wiosek z herbem pana zamiast gospodarza) jako INFO."""
     rep = Report()
@@ -35541,12 +35543,24 @@ def nherby_main(logp):
     new_max = max([g(r"herby: nowe (\d+)", s) or 0 for s in small] or [0])
     freed = max([g(r", zwolnione (\d+) \(bez klucza", s) or 0 for s in small] or [0])
     nonode = max([g(r"\(bez klucza w pamieci gry (\d+)\)", s) or 0 for s in small] or [0])
-    if new_max > keep:
-        rep.add("NHB-7: zwalnianie przy dlugiej podrozy (nowe herby ponad cel)", f"nowe {new_max} > cel {keep}: zwolnione {freed} (bez klucza w pamieci gry {nonode})",
-                "zwolnione > 0", freed > 0)
+    forgot = max([g(r"zapomniane po misji (\d+)", s) or 0 for s in small] or [0])
+    # po recenzji sw-herby: zwalnianie potrzebne tylko, gdy ksiega NAPRAWDE miala naraz ponad cel (najwiecej w pamieci > 128); licznik "nowe" rosnie przez
+    # cala mape, a po kazdej misji ksiega jest zapominana (ForceClearAllCache gry) - 2-3 bitwy po ~60 herbow daja nowe > 128 bez potrzeby zwalniania
+    act = [s for s in small if "| zwalnianie CZYNNE" in s]
+    hmax_act = max([int(x.group(2)) for x in (re.search(r"w pamieci (\d+) \(najwiecej (\d+), cel", s) for s in act) if x] or [0])
+    runs_act = max([g(r"zwalnianie CZYNNE, przebiegow (\d+)", s) or 0 for s in act] or [0])
+    if not act:
+        rep.add("NHB-7: zwalnianie przy dlugiej podrozy", f"brak linii ze zwalnianiem CZYNNE (herbow w pamieci najwiecej {hmax}, zwolnione {freed})",
+                "INFO (zwalnianie BRAK - patrz NHB-1)", None)
+    elif hmax_act > keep:
+        rep.add("NHB-7: zwalnianie przy dlugiej podrozy (herbow w pamieci naraz ponad cel)",
+                f"najwiecej w pamieci {hmax_act} > cel {keep}: przebiegow zwalniania {runs_act}, zwolnione {freed} (bez klucza w pamieci gry {nonode}); "
+                f"nowe {new_max}, zapomniane po misji {forgot}",
+                "przebiegow > 0 i zwolnione > 0", runs_act > 0 and freed > 0)
     else:
-        rep.add("NHB-7: zwalnianie przy dlugiej podrozy", f"nowe herby najwiecej {new_max} <= cel {keep} (zwolnione {freed})",
-                "INFO (podroz za krotka - zwalnianie niepotrzebne; autotest zdjec po wielu celach daje dluga)", None)
+        rep.add("NHB-7: zwalnianie przy dlugiej podrozy",
+                f"herbow w pamieci najwiecej {hmax_act} <= cel {keep} (nowe {new_max}, zapomniane po misji {forgot}, zwolnione {freed})",
+                "INFO (ksiega nigdy ponad cel - zwalnianie niepotrzebne; autotest zdjec po wielu celach bez misji daje dluga podroz)", None)
     mib = max([g(r"\(najwiecej ([0-9.]+) MiB\)", s, float) or 0.0 for s in small] or [0.0])
     rep.add("NHB-8: pamiec tekstur proporczykow najwiecej", f"{mib:.1f} MiB (stara droga: do 160 x 4 MiB = 640 MiB)", f"<= {NHB_MIB_MAX:.0f} MiB", mib <= NHB_MIB_MAX)
     runs = max([g(r"przebiegow (\d+)", s) or 0 for s in small] or [0])

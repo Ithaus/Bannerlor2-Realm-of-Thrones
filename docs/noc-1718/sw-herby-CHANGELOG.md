@@ -48,7 +48,7 @@
   - NHB-4 klucze ArmPen_ = ksiega;
   - NHB-5 herb zastepczy 0 / w kadrze 0;
   - NHB-6 w pamieci <= 224;
-  - NHB-7 zwalnianie przy dlugiej podrozy (nowe > 128 -> zwolnione > 0);
+  - NHB-7 zwalnianie przy dlugiej podrozy (najwiecej w pamieci > 128 -> przebiegow i zwolnione > 0; po recenzji - wczesniej liczone z licznika nowe);
   - NHB-8 <= 256 MiB;
   - NHB-9 przebieg zwalniania <= 2 ms;
   - NHB-10 herbow gry <= 1000;
@@ -71,13 +71,41 @@
   - MapScreen.CharacterBannerMaterialCache nie rosnie juz od proporczykow (wlasne materialy) - drobna poprawa.
 - Cudzy kod: refleksja na protected `_map` / `RemoveThumbnailCacheNode` sprawdzana raz. Brak = BRAK w linii startu i stara pamiec (do misji) z limitem 400/640, bez wyjatku.
 - W grze sprawdzic (autotest zdjec po wielu celach, ktory dawal 125):
-  - nherby: NHB-5 = 0, NHB-4 roznica 0, NHB-7 zwolnione > 0;
+  - nherby: NHB-5 = 0, NHB-4 roznica 0, NHB-7 (najwiecej w pamieci > 128) przebiegow i zwolnione > 0;
   - zdjecia: herby na proporczykach ostre jak dotad (512 na malym plotnie), bez bialych / pustych flag;
   - po bitwie proporczyki wracaja (przebudowy po misji > 0);
   - etap7_w5 W5-2 < 8 ms, W5-3 potkniecia 0;
   - linia startu "zwalnianie dalekich CZYNNE".
 - Ryzyko silnika (nie do sprawdzenia bez gry): `RemoveThumbnailCacheNode` na wezle pamieci trwalej (gra robi to dla miniatur UI, dla pamieci trwalej nigdy, bo licznik odwolan 1). Zwalniamy tylko wlasne klucze, po zdjeciu encji i po wyrenderowaniu (herb starszy niz 1 s).
   - Gdyby bylo zle (puste flagi, wywrotka przy zwalnianiu): klucz VillagePennantSmallTexture = NIE wraca do starej drogi bez restartu (zmiana w MCM = proporczyki zdjete i od nowa).
+- Po recenzji (kontrola calosci):
+  - `_penCapped.Clear()` tylko w galezi zmiany klucza VillagePennantSmallTexture (nowy kod paczki). Po przelaczeniu stara linia "Proporczyki (E7/W5): w kadrze"
+    pokazuje "wiosek z herbem pana zamiast gospodarza" od przelaczenia (wszystkie proporczyki i tak stawiane od nowa); etap7_w5 tego pola nie czyta (grep).
+  - Catch w petli zwalniania: herb zablokowany zostaje w ksiedze i wraca jako kandydat w nastepnym ticku; gdy `Remove` rzuca stale dla tej samej encji,
+    rosna potkniecia tekstur (NHB-11 NIE, log bledu najwyzej 3 razy i co 200) i licznik zablokowanych, reszta herbow zwalnia sie dalej (k do 32). Bez globalnego
+    wylacznika. Tozsamosc ksiegi (NHB-3) bez zmian - herb nie wypada z ksiegi.
+  - NHB-7: linia "przy zdjeciu" tuz po przekroczeniu 128 (przed pierwszym przebiegiem, herby mlodsze niz 1 s) moglaby dac NIE - przypadek waski, w autotescie
+    linie stanu co 2 minuty go nie dotycza.
+  - Build kod 0 (Armoury.dll md5 328a2447); Settings.cs bez zmian (gen_mcm niepotrzebny); nherby na logu 15-37-31 - INFO bez wyjatku; nks bez zmian (24/53).
 - 256x256 NIE zrobione: gra daje tylko 512 albo 1024 (`BannerTextureCreator`). 256 wymagaloby wlasnego widoku miniatur i wewnetrznej sceny gry przez refleksje - za duze ryzyko wywrotki bez testu w grze. 512 + zwalnianie konczy limit.
+
+**Recenzja: 3 uwagi, poprawione 3, odrzucone 0.** Kazda sprawdzona w kodzie przed poprawka:
+1. NHB-7 falszywe NIE po bitwach (sprawdz_logi.py) - PRAWDA: licznik "herby: nowe" (`_penTexNew`) nie zeruje sie nigdy, a `PennantsClearMemory -> PenTexForgetAll`
+   po kazdej misji oproznia ksiege (`ForceClearAllCache` gry zwalnia tekstury). 2-3 bitwy po ~60 herbow = nowe > 128 przy ksiedze nigdy ponad 128, wiec
+   `PenTexTouchAndEvict` slusznie nic nie zwalnia, a NHB-7 dawal NIE. Poprawka: NHB-7 liczy sie z NAJWIEKSZEJ ksiegi naraz ("w pamieci N (najwiecej M") tylko
+   w liniach "zwalnianie CZYNNE"; prog: M > 128 -> przebiegow zwalniania > 0 i zwolnione > 0 (sam licznik zwolnionych rosnie tez od `PenTexFreeAll` przy zmianie
+   klucza); zwalnianie BRAK -> INFO (NHB-1 i tak NIE). Sprawdzone na logach syntetycznych: 3 misje po 60 herbow -> INFO (bylo NIE), dluga podroz ze zwalnianiem
+   -> TAK, ksiega 220 bez zwalniania -> NIE, zwalnianie BRAK -> NHB-7 INFO. Docstring (naglowek i funkcja) poprawiony.
+2. `_penCapped` nie czyszczony przy zmianie klucza (NHB-5 NIE po NIE -> tak) - PRAWDA: zbior jest na instancji widoku, dopisywany w `CapCode` w obu drogach,
+   nigdzie nie czyszczony; linia tekstur po przelaczeniu pokazywala stary licznik z limitu 100/160. Poprawka: `_penCapped.Clear()` w galezi zmiany klucza
+   w `PennantTick` (po `RemovePennants`, ktore najpierw wypisuje linie "przy zdjeciu" ze starym stanem; przed `PenTexStart`). Stara droga bez przelaczania -
+   bez zmian (wylacznik VillagePennants nadal NIE czysci zbioru, jak dotad).
+3. Wywrotka w petli zwalniania zostawia zywa encje na zwolnionym herbie - PRAWDA co do stanu: w `PenTexTouchAndEvict` `DropSecond(p)` stoi przed zdjeciem
+   pierwszej encji; gdy `old2.Remove(111)` rzuci, catch tylko liczyl, `p.E` zostawal z `p.Tex == t` i `t.Evict`, a `PenTexFree(t)` zwalnial wezel i materialy
+   pod zywa encja; potem `ShowPennant` pokazywal ja bez przebudowy. Skutek opisany w recenzji (pusta flaga) jest raczej ZA MOCNY: dekompilacja 1.4.8 -
+   `Texture.Release()` = `IsReleased`, `OnTargetReleased`, `ManualInvalidate()` = `IManaged.DecreaseReferenceCount`, czyli licznik odwolan; siatka encji trzyma
+   material, wiec raczej tekstura zyje dalej poza ksiega (cichy wyciek do zmiany herbu albo misji, NHB-4 tego nie widzi). Tak czy inaczej ksiega klamie, wiec
+   poprawka: w catch per wioska encja, ktora dalej stoi, zatrzymuje swoj herb (`p.E != null && p.Tex.Evict` -> `Evict = false`, licznik zablokowane; to samo
+   dla `p.E2` / `Tex2`). Gdy wywrotka byla na zdjeciu pierwszej encji, `p.Tex` jest juz null (wioska do przebudowy) - herb zwalniany jak dotad.
 
 **Status:** DO SPRAWDZENIA (nie wgrane; build kod 0; gra nie uruchamiana; test w grze - autotest zdjec wiosek + `--grupa nherby` i etap7_w5).
