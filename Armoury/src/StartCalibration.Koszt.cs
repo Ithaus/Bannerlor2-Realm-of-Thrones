@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace Armoury
 {
@@ -169,6 +170,53 @@ namespace Armoury
             double v = row[ZN + z];
             if (double.IsNaN(v)) { v = ZPass2Floor(t, z); row[ZN + z] = v; }
             return v;
+        }
+
+        // ============================================================ T6: pozycja koszyka towaru KS (RampZ) z tablicy
+        private static int[] _rampZTab;
+        /// <summary>T6: RampZ(i) dla kazdego towaru KS (Array.IndexOf(ZIds, ItemIds[i]) - stale tablice nazw) policzone raz.</summary>
+        private static int[] RampZTab()
+        {
+            var a = _rampZTab;
+            if (a != null) return a;
+            a = new int[ItemCount];
+            for (int i = 0; i < ItemCount; i++) a[i] = RampZ(i);
+            _rampZTab = a;
+            return a;
+        }
+
+        // ============================================================ T7: spis polek mapy koszyka (Zc4Build)
+        private static bool[] _t7Types; private static ItemObject[] _t7For;
+
+        /// <summary>T7: typy przedmiotow (ItemTypeEnum) pozycji koszyka - przedmiot innego typu nie jest kluczem _zIx (bron, zbroja, konie wierzchowe ...).</summary>
+        private static bool[] T7Types()
+        {
+            var items = _zItems;
+            if (items == null) return null;
+            if (_t7Types != null && ReferenceEquals(_t7For, items)) return _t7Types;
+            int max = 0;
+            foreach (var it in items) if (it != null && (int)it.ItemType > max) max = (int)it.ItemType;
+            var t = new bool[max + 1];
+            foreach (var it in items) if (it != null && (int)it.ItemType >= 0) t[(int)it.ItemType] = true;
+            _t7Types = t; _t7For = items;
+            return t;
+        }
+
+        /// <summary>T7: spis polki miasta do mapy koszyka - ten sam wynik co petla w Zc4Build (pierwszy wiersz bez modyfikatora kazdej pozycji, ilosc), kopia wiersza tylko
+        /// dla przedmiotow typu pozycji koszyka (GetItemAtIndex bez kopii).</summary>
+        private static void T7Scan(TaleWorlds.CampaignSystem.Roster.ItemRoster ro, ZTown zt, int[] cnt, bool[] types)
+        {
+            int n = ro.Count;
+            for (int k = 0; k < n; k++)
+            {
+                var ei = ro.GetItemAtIndex(k);
+                if (ei == null) continue;
+                int ty = (int)ei.ItemType;
+                if (ty < 0 || ty >= types.Length || !types[ty]) continue;          // nie jest kluczem _zIx (typ spoza pozycji koszyka)
+                var el = ro.GetElementCopyAtIndex(k); int zi;
+                if (el.EquipmentElement.ItemModifier != null || !_zIx.TryGetValue(ei, out zi) || zt.Ix[zi] >= 0) continue;
+                zt.Ix[zi] = k; cnt[zi] = el.Amount;
+            }
         }
 
         /// <summary>T5: mapa koszyka miasta t dla zakupow jednej wsi (null - poza ZC4: ZRow -2, ZPrice 0) - to samo, co ZTownOf w ZRow, ZRowSet i ZPrice.</summary>

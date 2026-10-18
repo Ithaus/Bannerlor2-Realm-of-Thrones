@@ -124,6 +124,17 @@ namespace Armoury
             _lam[0] = _lam[1] = lam;
             Array.Clear(_rampStock, 0, _rampStock.Length);
             EnsureItems();
+            int[] rz = SwCostFast ? RampZTab() : null;            // ks-koszt T6: pozycja koszyka towaru KS z tablicy (te same liczby co Array.IndexOf)
+            if (rz != null && t > RampDemand)
+            {
+                // ks-koszt T6: po rampie beta 1 wszystkich towarow (jak nizej przy t >= RampDemand); cel i zapas rampy czyta tylko linia rampy do konca rampy
+                // (t <= RampDemand) i ta funkcja (zeruje i liczy od nowa) - bez popytu zaplaconego, rurociagu i wozow w drodze
+                var nb1 = new float[2 * ItemCount];
+                for (int k = 0; k < nb1.Length; k++) nb1[k] = 1f;
+                _beta = nb1;
+                _rampHeld = 0; _rampStocked = 0;
+                return;
+            }
             var ix = _itemIx;
             if (t < RampDemand && ix != null)
             {
@@ -159,7 +170,7 @@ namespace Armoury
                 {
                     if (zt == null) continue;
                     int mo = (zt.Market == 0 ? 0 : 1) * ItemCount;
-                    for (int i = 0; i < ItemCount; i++) { int z = RampZ(i); if (z >= 0) dpM[mo + i] += zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z]; }
+                    for (int i = 0; i < ItemCount; i++) { int z = (rz != null ? rz[i] : RampZ(i)); if (z >= 0) dpM[mo + i] += zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z]; }
                 }
                 try
                 {
@@ -170,13 +181,13 @@ namespace Armoury
                     });
                 }
                 catch (Exception e) { Stumble("RampDaily(w drodze)", e); }
-                for (int m = 0; m < 2; m++) for (int i = 0; i < ItemCount; i++) { int z = RampZ(i); if (z >= 0) pipe[m * ItemCount + i] = KsFoodCarts.Pipeline(m, z); }
+                for (int m = 0; m < 2; m++) for (int i = 0; i < ItemCount; i++) { int z = (rz != null ? rz[i] : RampZ(i)); if (z >= 0) pipe[m * ItemCount + i] = KsFoodCarts.Pipeline(m, z); }
             }
             for (int m = 0; m < 2; m++)
                 for (int i = 0; i < ItemCount; i++)
                 {
                     int k = m * ItemCount + i;
-                    double baseD = dpM != null && RampZ(i) >= 0 ? dpM[k] : Math.Max(0.0, full != null && k < full.Length ? full[k] : 0.0);
+                    double baseD = dpM != null && (rz != null ? rz[i] : RampZ(i)) >= 0 ? dpM[k] : Math.Max(0.0, full != null && k < full.Length ? full[k] : 0.0);
                     double target = ShelfDays(StartPrice(m, i)) * baseD + pipe[k];
                     _rampTarget[k] = target;
                     double b;

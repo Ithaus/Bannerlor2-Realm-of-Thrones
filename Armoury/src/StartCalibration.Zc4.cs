@@ -205,6 +205,8 @@ namespace Armoury
         {
             Zc4EnsureMap();
             T4Bump();                                            // ks-koszt T4: popyt zaplacony miast (ZDp) i mapa koszyka od nowa - pamiec progow od zera
+            bool[] t7 = SwCostFast ? T7Types() : null;           // ks-koszt T7: typy przedmiotow pozycji koszyka (filtr spisu polek) i indeks startu z pamieci doby
+            if (t7 != null) T4Begin();
             var prevMap = _zt;                                   // KS-R3 C1: potrzeby miasta co 7 dob na zmiane (Fnv) - pozostale doby z poprzedniej mapy
             // recenzja 17.10 (wazne): wsie kupuja pelny koszyk (vil - kiesa i drabina decyduja), popyt ceny, "na zbyt" i wsad ZC5 licza koszyk zaplacony z Planu (vilPaid -
             // to Plan postawil na targu)
@@ -305,7 +307,8 @@ namespace Armoury
                     // indeksy wierszy polki (zakupy wsi bez szukania liniowego - recenzja kosztu) i ilosc towaru
                     var ro = r.St.ItemRoster; var cnt = new int[ZN];
                     for (int z = 0; z < ZN; z++) zt.Ix[z] = -1;
-                    if (ro != null)
+                    if (ro != null && t7 != null) T7Scan(ro, zt, cnt, t7);   // ks-koszt T7: ten sam wynik, bez kopii wierszy broni i zbroi
+                    else if (ro != null)
                         for (int k = 0; k < ro.Count; k++)
                         {
                             var el = ro.GetElementCopyAtIndex(k); var ei = el.EquipmentElement.Item; int zi;
@@ -320,7 +323,7 @@ namespace Armoury
                         if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } }
                         // F3 (poprawka po autotescie): towaru brak na polce (najwyzej 5 sztuk) - cena wzoru gry idzie na sufit (10 x wartosc) i cielaby budzet koszyka
                         // towarow, ktore SA na polce; w koszcie klas, drabinie i zakupach wsi najwyzej 1.5 x cena startu
-                        if (it != null && cnt[z] <= 5) { int cap = (int)Math.Ceiling(1.5 * KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, zt.Market) * Math.Max(1, it.Value)); if (p > cap) p = cap; }
+                        if (it != null && cnt[z] <= 5) { int cap = (int)Math.Ceiling(1.5 * (t7 != null ? T4StartIndex(zt.Market, z) : KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, zt.Market)) * Math.Max(1, it.Value)); if (p > cap) p = cap; }   // ks-koszt T7: indeks startu z pamieci doby
                         px[z] = Math.Max(1, p); zt.Px[z] = (int)px[z];
                     }
                     _zTkPrices += System.Diagnostics.Stopwatch.GetTimestamp() - tp0;
