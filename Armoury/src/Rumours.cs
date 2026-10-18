@@ -614,7 +614,7 @@ namespace Armoury
             uint s = seed ^ MapVillageData.Fnv(best.StringId ?? "");
             int g = best.SettlementComponent != null ? Math.Max(0, best.SettlementComponent.Gold) : 0;
             var t = new StringBuilder("There is an outlaw lair in the wilds ");
-            t.Append(Where(at, best.GetPosition2D, q)).Append(" - ").Append(q >= 0.45f ? (bestBands == 1 ? "one band" : bestBands + " bands") : "many bands").Append(" go in and out of it");
+            t.Append(Where(at, best.GetPosition2D, q)).Append(" - ").Append(q >= 0.45f ? (bestBands == 1 ? "one band goes" : bestBands + " bands go") : "many bands go").Append(" in and out of it");
             if (g < 100) t.Append(", though folk say there is little worth taking.");
             else t.Append(", and folk swear ").Append(Coin(g, q, s)).Append(" lies hidden there for whoever clears it out.");
             all.Add(new Item { Cat = 1, Score = 2.5f + bs / 10f, Text = t.ToString() });
