@@ -150,7 +150,8 @@ namespace Armoury
         // zaliczone na rachunek, nadplata zwrocona przez zrodlo, roszczenia celu (zrodlo bez kasy na zwrot), zwrot zadatku zawroconego wozu, bez rozliczenia (woz bez celu
         // i zrodla); zadatki w drodze wczoraj (kontrola: wczoraj + zaplacone - rozliczone = dzis)
         private static long _dDepPcs, _dDepGold, _dDepFreed, _dDepCred, _dDepOver, _dDepClaim, _dDepBack, _dDepLost, _dDepSettled; private static int _dDepLots;
-        private static long _dReexp; private static int _dReexpLots;   // KS-R5 (pomiar): wyslane ze zrodla, do ktorego ten sam towar jest w drodze (KS-H) - reeksport
+        private static long _dReexp; private static int _dReexpLots;
+        private static long _dDepShort;                               // KS-R5: zadatek planu rdzenia ponad to, co kasa celu miala ponad podloge przy wysylce (reszte niesie kredyt zrodla)   // KS-R5 (pomiar): wyslane ze zrodla, do ktorego ten sam towar jest w drodze (KS-H) - reeksport
         private static long _depPrev = -1;
         // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny [t * NZ + k) * NMiss + przyczyna], suma od ostatniej linii tygodnia, doby w sumie
         private static double[] _miss; private static int _missDays;
@@ -180,7 +181,7 @@ namespace Armoury
             _dConsPcs = _dConsVal = _gSrcFr = _dSrcCap = _dOverdue = _dFamOrd = _dFamGot = _dNorthShip = _dNorthArr = 0; _dConsLots = _dFamReq = _dFamReqK = 0;
             Array.Clear(_dPoorByZ, 0, NZ); _dNorthBy.Clear();
             _dDepPcs = _dDepGold = _dDepFreed = _dDepCred = _dDepOver = _dDepClaim = _dDepBack = _dDepLost = _dDepSettled = 0; _dDepLots = 0;
-            _dReexp = 0; _dReexpLots = 0;
+            _dReexp = 0; _dReexpLots = 0; _dDepShort = 0;
             KsFoodCredit.ClearDay();
         }
 
@@ -992,6 +993,7 @@ namespace Armoury
                     if (depPaid > 0) { int s0 = srcT.Gold; srcT.ChangeGold((int)depPaid); long gotS = srcT.Gold - s0; _gDst += depPaid; _gSrc += gotS; }
                     else depPaid = 0;
                 }
+                if (depPaid < dep) _dDepShort += dep - depPaid;
             }
             if (!consign)
             {
@@ -1260,7 +1262,7 @@ namespace Armoury
             {
                 sb.Append(" | zadatki kupcow celu (Ks Consign Deposit ").Append(DepositKey && ConsignKey ? "TAK" : "NIE").Append(", udzial ").Append(DepositShare.ToString("0.00", inv))
                   .Append("; gdy zrodlo bez miejsca kredytu): przy wysylce ").Append(_dDepLots).Append(" wozow, ").Append(_dDepPcs).Append(" szt., ").Append(_dDepGold)
-                  .Append(" zl (cel -> zrodlo), odblokowane ").Append(_dDepFreed).Append(" szt.; przy dostawie zaliczone ").Append(_dDepCred).Append(" zl, nadplata zwrocona ").Append(_dDepOver)
+                  .Append(" zl (cel -> zrodlo; przyciete kasa celu ").Append(_dDepShort).Append(" zl), odblokowane ").Append(_dDepFreed).Append(" szt.; przy dostawie zaliczone ").Append(_dDepCred).Append(" zl, nadplata zwrocona ").Append(_dDepOver)
                   .Append(" zl; zwrot zawroconych ").Append(_dDepBack).Append(" zl; roszczenia celu ").Append(_dDepClaim).Append(" zl (zrodlo bez kasy na zwrot; rachunki ")
                   .Append(KsFoodCredit.DClaimN).Append("); bez rozliczenia ").Append(_dDepLost).Append(" zl | zadatki w drodze ").Append(depNow).Append(" zl w ").Append(depCarts)
                   .Append(" wozach | kontrola zadatkow reszta ").Append(depCtl).Append(" (w drodze wczoraj + zaplacone - rozliczone - w drodze dzis)")

@@ -36457,7 +36457,7 @@ def nks_ksh_r4(s, rec):
 
 # KS-R5 ceny-r5 (noc 17/18.10): zadatki kupcow celu (linia KS-H co dobe), dowoz do krain spoza krainy (suma wszystkich korytarzy - lista korytarzy linii jest ucieta
 # do 120 pozycji, najmniejsza w fin83 48 szt./d) i brak do T* zamowien bez lotu wedlug przyczyny (co 7 dob)
-NKS_KSHDEP = re.compile(r"\| zadatki kupcow celu \(Ks Consign Deposit (?P<on>TAK|NIE), udzial (?P<sh>[\d.]+); [^)]*\): przy wysylce (?P<lots>\d+) wozow, (?P<pcs>\d+) szt\., (?P<gold>-?\d+) zl \(cel -> zrodlo\), "
+NKS_KSHDEP = re.compile(r"\| zadatki kupcow celu \(Ks Consign Deposit (?P<on>TAK|NIE), udzial (?P<sh>[\d.]+); [^)]*\): przy wysylce (?P<lots>\d+) wozow, (?P<pcs>\d+) szt\., (?P<gold>-?\d+) zl \(cel -> zrodlo(?:; przyciete kasa celu (?P<short>-?\d+) zl)?\), "
                         r"odblokowane (?P<freed>\d+) szt\.; przy dostawie zaliczone (?P<cred>-?\d+) zl, nadplata zwrocona (?P<over>-?\d+) zl; zwrot zawroconych (?P<back>-?\d+) zl; "
                         r"roszczenia celu (?P<claim>-?\d+) zl \([^)]*\); bez rozliczenia (?P<lost>-?\d+) zl \| zadatki w drodze (?P<tr>-?\d+) zl w (?P<trn>\d+) wozach \| kontrola zadatkow reszta (?P<ctl>-?\d+|-)")
 NKS_KSHIMP = re.compile(r"\| dowoz do krain spoza krainy \(srednia 28 dob, szt\./d\):(?P<body>[^|]*)")
@@ -36686,7 +36686,7 @@ def nkupcy_main(logp):
         lost = sm("lost")
         trl = ksh[dd14[-1]]
         rep.add("NKU-14: zadatki kupcow celu (KS-R5 ceny-r5, Ks Consign Deposit - gdy zrodlo bez miejsca kredytu)",
-                f"dob {len(dd14)} (klucz {trl.get('dep_on')}, udzial {trl.get('dep_sh')}), przy wysylce {sm('lots')} wozow, {sm('pcs')} szt., {sm('gold')} zl (cel -> zrodlo), odblokowane {sm('freed')} szt.; "
+                f"dob {len(dd14)} (klucz {trl.get('dep_on')}, udzial {trl.get('dep_sh')}), przy wysylce {sm('lots')} wozow, {sm('pcs')} szt., {sm('gold')} zl (cel -> zrodlo; przyciete kasa celu {sm('short')} zl), odblokowane {sm('freed')} szt.; "
                 f"przy dostawie zaliczone {sm('cred')} zl, nadplata zwrocona {sm('over')} zl, zwrot zawroconych {sm('back')} zl, roszczenia celu {sm('claim')} zl, bez rozliczenia {lost} zl; "
                 f"w drodze na koniec {trl.get('dep_tr')} zl w {trl.get('dep_trn')} wozach; dob z reszta kontroli zadatkow != 0: {len(bad14)}" + (f" ({bad14[:6]})" if bad14 else ""),
                 "kontrola zadatkow reszta 0 w kazdej dobie, bez rozliczenia 0 zl (rozliczenie i odblokowane - INFO)", not bad14 and lost == 0)
