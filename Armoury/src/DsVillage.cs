@@ -70,6 +70,7 @@ namespace Armoury
         private static long _oLevy, _oHoard, _oW7, _oW7Cut; private static int _oLevyN, _oHoardN, _oW7N, _oW7CutN;
         private static long _payOut, _payIn, _flushed;
         private static long _k5Treas; private static int _k5N;                                   // K5 przy samym F1: brak zwrotu pokryty ze skarbca ponad zapas wojny (DsSeason.TreasuryForRefund)
+        private static double _kKept; private static int _kKeptN;                               // r4-bkwies (recenzja): czesc P5 zostawiona w kiesie (potrzeba pokryta - krok 5 do potrzeby, wies z koszykiem ZC4)
 
         private static void ClearCounters()
         {
@@ -85,6 +86,7 @@ namespace Armoury
             _oLevy = _oHoard = _oW7 = _oW7Cut = 0; _oLevyN = _oHoardN = _oW7N = _oW7CutN = 0;
             _payOut = _payIn = _flushed = 0;
             _k5Treas = 0; _k5N = 0;
+            _kKept = 0; _kKeptN = 0;
             _stumbles = 0;
         }
 
@@ -242,6 +244,7 @@ namespace Armoury
         {
             int days = ChestDays(Settings.Current);
             if (days <= 0) return 0;
+            nv = VillNeeds.ChestBasket(st, nv);        // r4-bkwies (B2/M9, klucz Ks Chest Paid Basket): przy KS koszyk dnia = koszyk zaplacony z Planu (x lambda); inaczej bez zmian
             double r = Math.Max(0, rentBeforeDecree) * Decree(st);
             double c = days * (Math.Max(0, nv) + r);
             return double.IsNaN(c) || double.IsInfinity(c) ? 0 : c;
@@ -455,7 +458,7 @@ namespace Armoury
                 {
                     // 2. rata zaleglosci tylko z kiesy ponad koszyk dnia (TownFolk.Villages kupuje go po czynszu)
                     double nv, r1;
-                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, nv) : 0;
+                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
                     int pd = ArrPayDays(s);
                     double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
                     double room = g - payDay - basket;
@@ -551,6 +554,10 @@ namespace Armoury
             if (works > 0) { _kP5 += works; _kWorks += works; _kWorksWage += wage; _kWorksMat += mat; _kWorksN++; }
             if (noWorks >= 1) { _kWorksNo += noWorks; _kWorksNoN++; }
         }
+
+        /// <summary>r4-bkwies (recenzja): TownFolk.DsSurplus - czesc P5, ktora ZOSTAJE W KIESIE wsi, bo potrzeba pokryta (krok 5 do potrzeby - Ds Surplus Need Limit, wies
+        /// z koszykiem ZC4 - Ks Surplus Skips Basket, plotno zatrzymane progiem K2); P5 = towar + roboty gminy + niewydane + zostalo w kiesie.</summary>
+        internal static void NoteP5Kept(double kept) { if (kept >= 1 && !double.IsInfinity(kept)) { _kKept += kept; _kKeptN++; } }
 
         /// <summary>DsSeason.TreasuryForRefund przy samym F1 (bez firm F3): brak zwrotu pokryty ze skarbca ponad zapas wojny - licznik linii.</summary>
         internal static void NoteK5(long x) { if (x > 0) { _k5Treas += x; _k5N++; } }
@@ -696,6 +703,7 @@ namespace Armoury
                   .Append(", kupione ").Append(_kBkSpent).Append(" (w starym pulapie ").Append(_kBkOldSpent).Append(")), rampa ").Append(ramp.ToString("0.000", Inv)).Append(" (od doby ").Append(_dayOn).Append(")")
                   .Append(" | krok 5 wydany: towar ").Append(_kGoods).Append(", roboty gminy ").Append(_kWorks).Append(" (").Append(_kWorksN).Append(" wsi: place ludu miast targowych ").Append(_kWorksWage)
                   .Append(" + material do kas ").Append(_kWorksMat).Append("), niewydane ").Append(N0(_kWorksNo)).Append(" (").Append(_kWorksNoN).Append(" wsi)")
+                  .Append(_kKeptN > 0 ? ", zostalo w kiesie (potrzeba pokryta) " + N0(_kKept) + " (" + _kKeptN + " wsi)" : "")
                   .Append("; budzet BK niewydany w ticku ").Append(_kBkLeft).Append(", z poprzedniego ticku do P5 ").Append(_kBkCarry).Append(" (").Append(_kBkCarryN).Append(" wsi)")
                   .Append(" | stare pobory wsi DS (oczekiwane 0 po rampie): danina ").Append(_oLevy).Append(" (").Append(_oLevyN).Append(" wsi), podatek od nadwyzki ").Append(_oHoard).Append(" (").Append(_oHoardN)
                   .Append(" wsi), W7 ").Append(_oW7).Append(" (").Append(_oW7N).Append(" zrodel), 15%/d nadwyzki na stara liste (chciane) ").Append(N0(_kOldExtra)).Append(", stara drabina P5 (chciane) ").Append(N0(_kOldLadder))

@@ -339,6 +339,10 @@ RANGES = {
     'DsGrantSessionDays': (1, 91, "0"),
     'DsCrownLoanLimitDaysPledged': (0.0, 728.0, "0"),
     'DsFolkSurplusSpendDays': (0, 120, "0"),
+    # r4-bkwies (KS runda 4, 17.10): przycinane w kodzie (VillNeeds.RichChests 1..20, CoverDays 1..91; spichlerz awaryjny 0..364)
+    'KsBkRichChests': (1.0, 20.0, "0.0"),
+    'VillageNeedCoverDays': (1, 91, "0"),
+    'KsGranaryEmergencyDays': (0, 364, "0"),
 }
 
 def gen(module_dir, ns, display):

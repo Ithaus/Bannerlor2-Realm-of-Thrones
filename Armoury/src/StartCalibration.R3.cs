@@ -565,9 +565,15 @@ namespace Armoury
                 ld.Rations = need > 0 ? ld.PeopleHome * Math.Min(1.5, rat) : -1;
             }
             if (LogGate.Lines)
-                Log.Info(PK + "podloga spichlerza dzien " + day + " | wsi z podloga " + on + " z " + n + " (" + (n > 0 ? (100.0 * on / n).ToString("0.0", Inv) : "-") + "%), kcal podlogi "
-                         + (kcalNeed > 0 ? (100.0 * kcalFloor / kcalNeed).ToString("0.00", Inv) : "-") + "% potrzeby wsi, powroty " + _floorBack + " (sesja) | zejscie: 14 dob kupione + swoje + dom >= 95% koszyka"
+            {
+                // r4-bkwies (diagnoza fin80, NKS-26): przy Ks Granary No Floor "wsi z podloga" to STAN licznika G6, a kcal - brak schodzacy z zapasu spichlerza, nie podloga dana;
+                // podloga dana (wzor gry), bez podlogi i podloga awaryjna (z niczego) - dopisek GranText
+                var sf = Settings.Current; bool nf = sf == null || sf.KsGranaryNoFloor;
+                Log.Info(PK + "podloga spichlerza dzien " + day + " | wsi z podloga " + on + " z " + n + " (" + (n > 0 ? (100.0 * on / n).ToString("0.0", Inv) : "-") + "%), "
+                         + (nf ? "kcal braku (z zapasu spichlerza) " : "kcal podlogi ")
+                         + (kcalNeed > 0 ? (100.0 * kcalFloor / kcalNeed).ToString("0.00", Inv) : "-") + "% potrzeby wsi, powroty " + _floorBack + " (sesja)" + GranText(nf) + " | zejscie: 14 dob kupione + swoje + dom >= 95% koszyka"
                          + " i kupione >= 80% zaplaconych kcal; powrot: 3 doby racji < 90% potrzeby.");
+            }
         }
 
         /// <summary>Podloga spichlerza wsi wlaczona (G6: klucz wylaczony albo wies bez licznika - zawsze).</summary>

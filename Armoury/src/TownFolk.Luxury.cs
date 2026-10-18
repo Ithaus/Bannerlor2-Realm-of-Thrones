@@ -507,6 +507,7 @@ namespace Armoury
                     town.ChangeGold(got);
                     roster.AddToCounts(e, -n);
                     spent += got; left -= got; pieces += n;
+                    if (vil != null) VillNeeds.Note(vil, e.Item, n);     // r4-bkwies: zapas potrzeb wsi (len, sukno, garnki z listy dostatku) - klucze wylaczone: nic
                     if (wide) _lxWideP5 += got;                          // obieg2 (2): zakup P5 ponad bazowa cena graniczna
                 }
             }

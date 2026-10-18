@@ -577,7 +577,7 @@ namespace Armoury
                     double q = level >= 0 ? f / (level + 1) * FreeHands.FamineFix(v) : 0.0;
                     x.Q = double.IsNaN(q) || double.IsInfinity(q) || q < 0.0 ? 0.0 : Math.Min(QMax, q);
                     x.Harvest = yield * x.L * x.Q;
-                    x.Harvest = StartCalibration.GranaryFloor(v, x.Harvest);   // KS (rozdz. 8): wies zastosowana - max(racje z czesci domowej KS, wzor dzis)
+                    x.Harvest = StartCalibration.GranaryFloor(v, x.Harvest, x.L, BarnFoodOf(x.Id));   // KS (rozdz. 8): wies zastosowana - max(racje z czesci domowej KS, wzor dzis); r4-bkwies G1: ludzie i zapas spichlerza (podloga awaryjna)
                     x.Feed = yield * x.Q / Math.Max(1e-3, Devastation.YieldFactor(v));    // plon na gospodarza (bramka powrotu)
                     x.Cap = years * yd * x.L;
                     x.Winter = WinterBite.VillageCut(v) > 0f;
@@ -1189,5 +1189,16 @@ namespace Armoury
         private static string F0(double v) { return Math.Round(v).ToString("0", Inv); }
         private static string M(double v) { return (v / 1e6).ToString("0.000", Inv); }
         private static string Sg(double v, string fmt) { return (v >= 0.0 ? "+" : "") + v.ToString(fmt, Inv); }
+
+        /// <summary>r4-bkwies (G1, StartCalibration.GranaryFloor): zapas spichlerza wsi (racje, osobodni) przed plonem doby; -1 - spichlerz jeszcze nie zalozony.</summary>
+        internal static double BarnFoodOf(string id)
+        {
+            if (id == null) return -1;
+            lock (Gate)
+            {
+                Barn b;
+                return _barns.TryGetValue(id, out b) && b != null && !double.IsNaN(b.Food) && !double.IsInfinity(b.Food) && b.Food >= 0.0 ? b.Food : -1;
+            }
+        }
     }
 }

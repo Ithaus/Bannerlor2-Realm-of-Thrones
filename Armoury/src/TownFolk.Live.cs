@@ -1153,7 +1153,7 @@ namespace Armoury
                 if (f.Kind != 2) continue;
                 Village vilTax = null; double nvTax = 0;               // obieg2: podatek od nadwyzki wsi po koszyku dnia i P5 (finally - takze przy "continue" bez zakupow)
                 Village vilDs = null;                                  // DS (F1): krok 5 - zbytki z nadwyzki ponad skrzynie (finally - takze przy "continue" bez koszyka)
-                bool vilZc4 = false;                                   // KS r4 (r4-ceny, Ks Surplus Skips Basket): wies na koszyku ZC4 - krok 5 bez soli i narzedzi ponad koszyk
+                bool dsBasketCut = false;                              // r4-bkwies (Ks Surplus Skips Basket): wies z koszykiem ZC4 i Ks Village Paid First (jak leakCut) - krok 5 bez listy wsi
                 try
                 {
                     f.DVNeed = 0; f.DVBuy = 0;                         // E5/C4: zakupy tej doby (okno People of this land)
@@ -1173,7 +1173,7 @@ namespace Armoury
                     var mk0 = vil.TradeBound ?? vil.Bound;
                     long zSpent = 0;
                     bool zc4 = zq != null && zl > 0 && mk0 != null && mk0.Town != null;
-                    vilZc4 = zc4;
+                    dsBasketCut = zc4 && StartCalibration.SwPaidFirst;     // r4-bkwies: ten sam warunek co leakCut nizej (przed drabina - wyjatek drabiny nie zmienia kroku 5)
                     if (zc4)
                     {
                         // KS-R3 H1 (klucz Ks Village Buy Every 2): koszyk co 2. doba za dwie doby (wies wedlug Fnv), ulamki przechodza dalej
@@ -1236,7 +1236,7 @@ namespace Armoury
                 catch (Exception e) { f.ADay = -1; Stumble("Villages(wies)", e); }   // E5/C4: liczby wsi z tej doby niepewne - okno bez liczby
                 finally
                 {
-                    if (vilDs != null) DsSurplus(f, vilDs, nvTax, d, shelf, vilZc4);   // DS (F1) krok 5: zbytki tylko z nadwyzki ponad skrzynie (wlasny try)
+                    if (vilDs != null) DsSurplus(f, vilDs, nvTax, d, shelf, dsBasketCut);   // DS (F1) krok 5: zbytki tylko z nadwyzki ponad skrzynie (wlasny try)
                     if (vilTax != null && nvTax > 0) PayHoardVillage(f, vilTax, nvTax);   // obieg2: klucz FolkHoardVillages wylaczony - nic (nie rzuca)
                 }
             }
@@ -1247,13 +1247,16 @@ namespace Armoury
         /// rampa x (kiesa - skrzynia) / DsSurplusSpendDays (DsVillage.SurplusDay) - czesc P5 teraz: 1. lista dostatku na polce miasta targowego (BuyLadder, jak P5);
         /// 2. RESZTA budzetu (recenzja 17.10: dotad tylko gdy lista dostatku nie kupila nic) - lista wsi (BuyGoods; przy VillWorkOnly najpierw sol i narzedzia, jak dawne
         /// 15%/d z nadwyzki); 3. czego nie ma na polkach - ROBOTY GMINY (DsCommunalWorks; DsWorks). Czesc rynku BK odlozona do ticku BK wsi. Ponizej skrzyni nic. Nie rzuca.
+        /// r4-bkwies (recenzja): czesc listy wsi przeznaczona na potrzebe JUZ POKRYTA (wies z koszykiem ZC4 - towary koszyka; krok 5 do potrzeby - zapas w domu pelny; plotno
+        /// zatrzymane progiem K2) ZOSTAJE W KIESIE (keep, linia DS "zostalo w kiesie (potrzeba pokryta)") - do robot gminy tylko to, co nie znalazlo towaru.
         /// </summary>
-        private static void DsSurplus(Folk f, Village vil, double nv, LDay d, Dictionary<Settlement, List<EquipmentElement>> shelf, bool zc4 = false)
+        private static void DsSurplus(Folk f, Village vil, double nv, LDay d, Dictionary<Settlement, List<EquipmentElement>> shelf, bool basketCut = false)
         {
             try
             {
                 var s = Settings.Current;
                 double rent = Math.Max(0f, Math.Min(50f, s.VillageDuesPerHeadYear)) / YearDays * VillHeads(f, true);
+                VillNeeds.NoteChest(nv, VillNeeds.ChestBasket(f.St, nv));          // r4-bkwies (B2/M9): licznik linii - skrzynia z koszyka Planu (ChestOf liczy ja sam)
                 double chest = DsVillage.ChestOf(f.St, nv, rent);
                 double p5 = DsVillage.SurplusDay(f.St, vil.Gold, chest);
                 if (p5 < 1) return;
@@ -1269,31 +1272,39 @@ namespace Armoury
                     long g1 = BuyLadder(vil, null, mk, p5, ref pcs);
                     if (g1 > 0) { got = g1; _lxVBuy += g1; _lxVPcs += pcs; f.DLxBuy += g1; }
                 }
-                double rest = p5 - got;
-                // KS r4 (r4-ceny, klucz Ks Surplus Skips Basket; diagnoza fin80 - sol na suficie w 28-39% miast): wies na koszyku ZC4 z drabina "najpierw zaplacone" (ten sam
-                // warunek co G4 leakCut w Villages) NIE kupuje w kroku 5 listy wsi (sol, narzedzia, len, garnki, piwo) - kupuje je juz drabina 1 i 2 koszyka z limitem potrzeby
-                // i cena; dotad BuyGoods brala cala polke soli do 5 sztuk po kazdej cenie, bez ramki ksiegi ("bez rynku" 160% zuzycia soli). Budzet zostaje na roboty gminy
-                // albo w kiesie wsi (nic nie znika: zloto dalej w kroku 5 - DsWorks albo kiesa)
-                bool skip = rest >= 1 && StartCalibration.R4cSkipBasket(zc4);
-                if (skip) StartCalibration.R4cNoteSurplusSkip((long)rest);
-                if (rest >= 1 && !skip)
+                double rest = p5 - got, keep = 0;
+                if (rest >= 1)
                 {
                     List<EquipmentElement> list;
                     if (shelf == null || !shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); if (shelf != null) shelf[mk] = list; }
-                    bool wo = VillWorkOnly();                                     // jak dawne 15%/d z nadwyzki (wx): sol i narzedzia
-                    // KS r4 (r4-ceny, Ks Surplus Skips Basket): zakup w ramce ksiegi rynku miasta targowego (dotad jedyny zakup wsi bez ramki z osada - "bez rynku")
-                    var gf = StartCalibration.SwSurplusSkip && StartCalibration.Applied ? GoodsLedger.Begin(GoodsLedger.FFolkVill, mk) : null;
-                    long g2;
-                    try { g2 = BuyGoods(vil, mk, list, wo ? 0 : rest, d, wo ? rest : 0); }
-                    finally { GoodsLedger.End(gf); }
-                    if (gf != null) StartCalibration.R4cNoteSurplusFramed(g2);
-                    if (g2 > 0) { got += g2; Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += g2; }
+                    bool wo = VillWorkOnly();                                         // jak dawne 15%/d z nadwyzki (wx): sol i narzedzia
+                    // r4-bkwies + r4-ceny (jeden klucz Ks Surplus Skips Basket; diagnoza fin80 "sol"): wies z koszykiem ZC4 (Ks Village Paid First) - sol, narzedzia, len, garnki i piwo kupuje drabina
+                    // koszyka z limitem potrzeby i ceny; krok 5 nie kupuje ich drugi raz (jedna zasada na jedno zjawisko). Recenzja: czesc, ktora lista wsi dostalaby (podzial
+                    // BuyGoods), ZOSTAJE W KIESIE (keep - potrzeba pokryta); reszta (czego lista dostatku nie znalazla na polkach) - jak dotad roboty gminy
+                    if (basketCut && VillNeeds.SkipBasketOn) { keep = Math.Min(rest, DsSkipShare(list, wo ? 0 : rest, wo ? rest : 0)); VillNeeds.S5Skip(rest, keep); StartCalibration.R4cNoteSurplusSkip((long)rest); }   // scalenie: licznik linii r4-ceny (krok 5 bez listy wsi)
+                    else
+                    {
+                        // r4-bkwies (Ds Surplus Ledger Frame): ramka ksiegi towarow na rynek miasta targowego (dotad jedyny zakup wsi bez ramki z osada - "bez rynku")
+                        var gf5 = VillNeeds.FrameOn ? GoodsLedger.Begin(GoodsLedger.FFolkVill, mk) : null;
+                        if (gf5 != null) VillNeeds.S5Frame();
+                        long g2;
+                        try
+                        {
+                            // r4-bkwies (Ds Surplus Need Limit): wies bez koszyka ZC4 - sol i narzedzia najwyzej do zapasu potrzeb; odmowione zostaje w kiesie (keep)
+                            if (VillNeeds.LimitOn && !basketCut) g2 = DsBuyNeeds(vil, mk, list, wo ? 0 : rest, d, wo ? rest : 0, out keep);
+                            else g2 = BuyGoods(vil, mk, list, wo ? 0 : rest, d, wo ? rest : 0);
+                        }
+                        finally { GoodsLedger.End(gf5); }
+                        if (gf5 != null) StartCalibration.R4cNoteSurplusFramed(g2);   // scalenie: licznik linii r4-ceny (zakupy listy z ramka rynku)
+                        if (g2 > 0) { got += g2; Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += g2; }
+                    }
                 }
-                rest = p5 - got;
+                rest = p5 - got - keep;                                           // keep = 0 bez limitu potrzeby i bez pominiecia koszyka (jak dotad)
                 long works = 0, wage = 0, mat = 0;
                 if (rest >= 1 && s.DsCommunalWorks) works = DsWorks(vil, mk, rest, out wage, out mat);
                 if (got > 0) f.DVBuy += got;                                      // E5/C4: zakupy tej doby (towar; roboty gminy - nie towar)
                 DsVillage.NoteP5(got, works, wage, mat, rest - works);
+                if (keep >= 1) DsVillage.NoteP5Kept(keep);                        // r4-bkwies (recenzja): P5 = towar + roboty + niewydane + zostalo w kiesie (potrzeba pokryta)
             }
             catch (Exception e) { Stumble("DsSurplus", e); }
         }
@@ -1454,6 +1465,7 @@ namespace Armoury
                     roster.AddToCounts(e, -n);
                     spent += got; left -= got; d.VBuy += got; d.VPieces += n;
                     NoteVillBought(mk, c, got);   // ZC1 (CartPriceByDestination): co wsie naprawde kupily w tym miescie - koszyk wycen wozow nastepnej doby
+                    VillNeeds.Note(vil, e.Item, n);   // r4-bkwies: zapas potrzeb wsi (koszyk dnia, woz E3-W1, krok 5) - klucze wylaczone: nic
                     if (cloth) d.VClPcs += n;
                 }
                 if (held && left >= 1) d.VClKept += (long)left;   // K2: czesc plotna niewydana przez prog polki - zostaje w kiesie wsi (licznik)
