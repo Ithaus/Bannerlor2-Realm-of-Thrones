@@ -4428,6 +4428,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool TownInnPriceBonus { get; set; } = true;
 
+        [SettingPropertyBool("Roadside Inns", HintText = "inns stand by the roads between the towns and castles - fewer where fewer people live, none beyond the Wall. Click one on the map and your party rides there and goes in (stopping next to one asks you in): take lodgings at the same prices and with the same rest as a town inn - most roadside inns have only a common room, or a common room and a decent inn - and the coin goes to the purse of the village whose lands the inn stands on (its lord takes his usual share). Lodgings need Town Inns and Night Rest. Off = no roadside inns, as before")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInns { get; set; } = true;
+
+        [SettingPropertyBool("Inn Gossip", HintText = "in a roadside inn and in a town inn you can listen to the gossip: bands of outlaws about and how long they have been robbing, how much they have taken, bandit lairs and the treasure in them, lords' hosts on the march, caravans, prices in the towns nearby and news of the wars - all from what is really happening, but the farther away and the older the news, the less exact it is (numbers grow in the telling, a direction instead of a place). Off = no gossip, as before")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnGossip { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer")]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -8042,6 +8050,8 @@ namespace Armoury
             s.NightMarchNotice = NightMarchNotice;
             s.TownInns = TownInns;
             s.TownInnPriceBonus = TownInnPriceBonus;
+            s.RoadsideInns = RoadsideInns;
+            s.InnGossip = InnGossip;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;

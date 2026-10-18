@@ -64,7 +64,7 @@ namespace Armoury
     /// sufitem (recenzja 16.10, log 11-22-18: 6 z 9 audytow "=> 3.00" = sufit). Predkosc liczona rownolegle - stan noclegu to obiekt podmieniany w calosci (_rest).
     /// Wyjatek w naszym kodzie - licznik potkniec (pierwsze do Log.Error; w predkosci i morale - licznik Interlocked w linii doby), nic nie gasimy.
     /// </summary>
-    internal static class TownInns
+    internal static partial class TownInns   // sw-zajazdy: zajazdy przy szlakach w TownInns.Road.cs (te same ceny, rachunek i stan noclegu)
     {
         private const string P = "Karczmy (KA): ";
         internal const string Menu = "arm_inn";
@@ -97,12 +97,14 @@ namespace Armoury
             internal float Speed, Morale, Sleep = 1f, Heal;
             internal bool Price;                                    // gracz spal w dobrym domu - ceny w tym miescie (klucz TownInnPriceBonus czytany na zywo)
             internal long PriceGain;                                // szacowany zysk gracza z premii cen w tym noclegu (limit PriceGainCap)
+            internal string RoadUid;                                // sw-zajazdy: nocleg w zajezdzie przy szlaku (uid z arm_roadside_inns.tsv; TownId = wies okregu); null = karczma miasta
 
             /// <summary>Nazwa miasta do logu i komunikatow (po wczytaniu szukana przy pierwszym uzyciu, na watku glownym).</summary>
             internal string Town
             {
                 get
                 {
+                    if (TownName == null && RoadUid != null) TownName = RoadsideInns.NameOf(RoadUid);   // sw-zajazdy: nazwa zajazdu (null - jak dotad nizej)
                     if (TownName == null)
                     {
                         try { var st = Settlement.Find(TownId); TownName = st != null ? st.Name.ToString() : TownId; }
@@ -115,7 +117,8 @@ namespace Armoury
             internal Rest Copy(int phase)
             {
                 return new Rest { Phase = phase, Q = Q, PlayerQ = PlayerQ, TownId = TownId, TownName = TownName, CommitMin = CommitMin, StartMin = StartMin,
-                                  WakeMin = WakeMin, UntilMin = UntilMin, Speed = Speed, Morale = Morale, Sleep = Sleep, Heal = Heal, Price = Price, PriceGain = PriceGain };
+                                  WakeMin = WakeMin, UntilMin = UntilMin, Speed = Speed, Morale = Morale, Sleep = Sleep, Heal = Heal, Price = Price, PriceGain = PriceGain,
+                                  RoadUid = RoadUid };
             }
         }
         private static volatile Rest _rest;
@@ -397,6 +400,8 @@ namespace Armoury
                         delegate (MenuCallbackArgs a) { return QCondition(a, q); },
                         delegate (MenuCallbackArgs a) { Commit(q); }, false, q);
                 }
+                // sw-zajazdy (InnGossip): plotki karczmarza w miescie - okno z tekstem (bez zmiany menu); klucz wylaczony - opcji nie ma
+                starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}Listen to the gossip", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
                 starter.AddGameMenuOption(Menu, "arm_inn_back", "{=!}Back to the town",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                     delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("town"); }, true, 9);
@@ -616,6 +621,7 @@ namespace Armoury
                 var r = _rest;
                 var mp = MobileParty.MainParty;
                 var st = mp != null ? mp.CurrentSettlement : null;
+                if (r != null && r.RoadUid != null) return RoadSleepInit(args, r);   // sw-zajazdy: sen w zajezdzie przy szlaku (TownInns.Road.cs)
                 if (r == null || r.Phase != 1 || st == null || st.StringId != r.TownId) return null;
                 long now = NowMin();
                 if (r.StartMin <= 0)
@@ -651,6 +657,7 @@ namespace Armoury
             if (r == null || r.Phase != 1 || r.StartMin <= 0 || !On) return null;
             try
             {
+                if (r.RoadUid != null) return RoadNear(r) ? r : null;   // sw-zajazdy: zajazd przy szlaku - partia poza osada, przy zajezdzie
                 var mp = MobileParty.MainParty;
                 var st = mp != null ? mp.CurrentSettlement : null;
                 return st != null && st.StringId == r.TownId ? r : null;
@@ -984,20 +991,25 @@ namespace Armoury
 
         // ------------------------------------------------------------ zapis
         /// <summary>"v1;faza;q;qGracza;miasto;zaplata;start;pobudka;koniec;predkosc;morale;sen;gojenie;cena;zyskCen" (minuty kampanii, kultura niezmienna). Brak stanu = "".
-        /// Pole 15 (zysk z premii cen, recenzja 16.10) opcjonalne - zapis z 14 polami czyta sie jak dotad (zysk 0).</summary>
+        /// Pole 15 (zysk z premii cen, recenzja 16.10) opcjonalne - zapis z 14 polami czyta sie jak dotad (zysk 0).
+        /// sw-zajazdy: pole 16 (uid zajazdu przy szlaku) tylko przy noclegu w zajezdzie - starsza DLL je pomija (czyta 15 pol; sen poza miastem = stan zdjety bez premii,
+        /// wypoczeci - jak po karczmie); karczma miasta pisze 15 pol jak dotad.</summary>
         internal static string Export()
         {
             var r = _rest;
             if (r == null || r.Phase < 1) return "";
-            return string.Join(";", new[] { "v1", r.Phase.ToString(Inv), r.Q.ToString(Inv), r.PlayerQ.ToString(Inv), r.TownId ?? "", r.CommitMin.ToString(Inv), r.StartMin.ToString(Inv),
-                                            r.WakeMin.ToString(Inv), r.UntilMin.ToString(Inv), r.Speed.ToString("R", Inv), r.Morale.ToString("R", Inv), r.Sleep.ToString("R", Inv),
-                                            r.Heal.ToString("R", Inv), r.Price ? "1" : "0", r.PriceGain.ToString(Inv) });
+            var f = new List<string> { "v1", r.Phase.ToString(Inv), r.Q.ToString(Inv), r.PlayerQ.ToString(Inv), r.TownId ?? "", r.CommitMin.ToString(Inv), r.StartMin.ToString(Inv),
+                                       r.WakeMin.ToString(Inv), r.UntilMin.ToString(Inv), r.Speed.ToString("R", Inv), r.Morale.ToString("R", Inv), r.Sleep.ToString("R", Inv),
+                                       r.Heal.ToString("R", Inv), r.Price ? "1" : "0", r.PriceGain.ToString(Inv) };
+            if (r.RoadUid != null) f.Add(r.RoadUid);
+            return string.Join(";", f.ToArray());
         }
 
         internal static void Import(string data)
         {
             _rest = null;
             if (string.IsNullOrEmpty(data)) return;
+            if (data.Length > 4096) { Log.Info(P + "zapis arm_inns za dlugi (" + data.Length + " znakow) - pominiety."); return; }   // sw-zajazdy: straznik rozmiaru
             try
             {
                 var a = data.Split(';');
@@ -1008,6 +1020,8 @@ namespace Armoury
                 r.Speed = float.Parse(a[9], Inv); r.Morale = float.Parse(a[10], Inv); r.Sleep = float.Parse(a[11], Inv); r.Heal = float.Parse(a[12], Inv); r.Price = a[13] == "1";
                 long pg;
                 if (a.Length > 14 && long.TryParse(a[14], NumberStyles.Integer, Inv, out pg)) r.PriceGain = Math.Max(0, pg);
+                // sw-zajazdy: pole 16 - uid zajazdu przy szlaku (straznik dlugosci; zly - stan zdjety); bez pola - karczma miasta jak dotad
+                if (a.Length > 15 && a[15].Length > 0) { if (a[15].Length > 64) return; r.RoadUid = a[15]; r.Price = false; }
                 if (r.Phase < 1 || r.Phase > 2 || r.Q < 0 || r.Q > 2) return;
                 // czasy (UntilMin, WakeMin) sprawdza start sesji (CheckTimes) - tu CampaignTime.Now bywa jeszcze niepewny
                 // premie przyciete do projektu (zly zapis nie robi z noclegu dopalacza)
