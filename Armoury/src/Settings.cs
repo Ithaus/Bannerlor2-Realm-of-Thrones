@@ -3011,6 +3011,14 @@ namespace Armoury
         public bool FolkBetterTable = true;                // with Start Calibration applied: townsfolk with savings above their reserve may buy a better table - meat, cheese, butter, beer, wine, mead, oil, honey - beyond what their basket holds, as long as the price stays at or below the price ceiling of Market Sees Purse (above it the rich do not outbid the poor for food). Until now the basket took all of it and the coin stayed in the purse (off = as before)
         public bool CrownWindfallToReserve = true;         // a one-off windfall that falls into a crown's treasury (more than three times what the crown usually gets from outside in a day over the last 28 days - a ransom, a gift, plunder) goes into the treasury's reserve and is spent from there slowly, as the rest of the reserve, instead of being paid out to the houses as rents the same day (off = as before)
 
+        // --- Start calibration: day cost ---
+        // Paczka ks-koszt (noc 17/18.10, PLAN-KS-RUNDA4 rozdz. 9, T0-T12; StartCalibration.Koszt.cs): szybkie drogi doby KS, hakow ZC4/ZC5 i KS-H - te same wyniki co do bitu
+        // (te same liczby, te same linie logu), mniej pracy na watku glownym. Domyslnie TAK; wylaczony = stare drogi co do linii kodu (do porownania i na wypadek bledu).
+        // T13 (PLAN-KS-RUNDA4 rozdz. 9: tylko gdy mediana doby KS po T1-T12 dalej > 3 ms - pokaze to linia T0): NIE jest bit w bit (dostawa co 2 doby, te same sumy plonu
+        // i zaplaty), dlatego domyslnie NIE - wlaczyc po tescie, gdy T0 pokaze mediane ponad 3 ms.
+        public bool KsTownFieldsEvery2 = false;            // with Start Calibration applied: the townsfolk's own fields bring their crop to the town stall every second day (two days' crop at once, each town on its own day, paid in full by the town purse as before) instead of every day - half the daily work, the same crop and money over time; off = every day
+        public bool KsCostFast = true;                     // with Start Calibration: the daily work of the calibration is done in quicker ways that give exactly the same results - the weekly plan's market totals are counted on the plan's own thread, prices, stall rows and price thresholds are looked up once a day instead of again for every village, and road distances from villages to nearby towns are remembered for the session; off = the old, slower way
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

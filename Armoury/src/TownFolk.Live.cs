@@ -792,7 +792,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("DailyLive(rodzaj " + f.Kind + ")", e); }
                 }
             }
-            try { Villages(d); } catch (Exception e) { Stumble("Villages", e); }
+            try { DsVillage.DecreeMemo(StartCalibration.SwCostFast); Villages(d); } catch (Exception e) { Stumble("Villages", e); } finally { DsVillage.DecreeMemo(false); }   // ks-koszt: dekret pana raz na wies w petli
             try { KsWageHands.DayLine(day); } catch (Exception e) { Stumble("KsWageHands.DayLine", e); }   // r4-koszyk: linia "Place za brak rak" (po miastach)
             try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)

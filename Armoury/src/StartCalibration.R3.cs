@@ -45,7 +45,7 @@ namespace Armoury
         {
             _tk = null; _tkN = 0; _tkDay = -1; _gold28 = null; _goldN = 0;
             Array.Clear(_c28, 0, _c28.Length); Array.Clear(_u28, 0, _u28.Length); _cN = 0; _cDay = -1; Array.Clear(_uDay, 0, _uDay.Length); _mf = null; _cRestart = -1;
-            _landShelfPrev.Clear(); _landCut.Clear(); _landGlut.Clear(); _grad = null; _ctlLine = null;
+            _landShelfPrev.Clear(); _landCut.Clear(); _landGlut.Clear(); _grad = null; _ctlLine = null; T4Bump();
             _floor.Clear(); _ownKr.Clear(); _bKcal.Clear(); _floorBack = 0; _ownLong = 0; _ownStreak.Clear();
             _vilOut.Clear(); _vilOutDay.Clear(); _vilFrDay.Clear(); _townLand.Clear(); _castleTown.Clear();
             _ownDay = new double[6]; _shelfLineDay = -1; _csvGoodsDay = -1; _outMkDay[0] = _outMkDay[1] = _frMkDay[0] = _frMkDay[1] = 0;
@@ -323,6 +323,7 @@ namespace Armoury
         /// <summary>Regula nadmiaru krainy (raz na Plan): polki krainy (kultura miasta) wobec celu T* x popyt zaplacony i wobec Planu sprzed tygodnia.</summary>
         private static void LandGlutWeekly(int day, bool on, bool decay = false)
         {
+            T4Bump();                                            // ks-koszt T4: ciecie krain zmienia sie tutaj (w miejscu) - pamiec progow drabiny 2 od zera
             _landGlut.Clear();
             if (decay)
             {
@@ -800,6 +801,7 @@ namespace Armoury
         /// <summary>Odczyt pola dodatkowego ks4 (po ResolvePending; obiekty gry juz sa). Zly wpis - pominiety.</summary>
         private static void ImportExtra(string packed)
         {
+            T4Bump();                                            // ks-koszt T4: gradient i ciecie krain z zapisu - pamiec progow od zera
             if (string.IsNullOrEmpty(packed)) return;
             string s;
             try { s = Unpack(packed); } catch (Exception e) { Stumble("ImportExtra(rozpakowanie)", e); return; }

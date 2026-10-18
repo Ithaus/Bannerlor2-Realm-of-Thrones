@@ -261,7 +261,31 @@ namespace Armoury
 
         private static double Decree(Settlement st)
         {
+            // ks-koszt (klucz Ks Cost Fast): w petli wsi TownFolk.Villages dekret pana (polityka podatkowa BK - wywolanie przez refleksje i Traverse, kilka us) raz na wies;
+            // polityka nie zmienia sie w srodku petli - te same liczby; tylko watek, ktory wlaczyl pamiec
+            var memo = _decMemo;
+            if (memo != null && st != null && Environment.CurrentManagedThreadId == _decMemoThread)
+            {
+                double m;
+                if (memo.TryGetValue(st, out m)) return m;
+                m = DecreeRaw(st); memo[st] = m;
+                return m;
+            }
+            return DecreeRaw(st);
+        }
+
+        private static double DecreeRaw(Settlement st)
+        {
             try { float d = PopulationLaw.TaxDecree(st); return float.IsNaN(d) || d < 0 ? 1.0 : d; } catch { return 1.0; }
+        }
+
+        private static Dictionary<Settlement, double> _decMemo; private static int _decMemoThread = -1;
+
+        /// <summary>ks-koszt: pamiec dekretu pana na czas petli wsi (TownFolk.Villages); false - bez pamieci (zawsze w finally).</summary>
+        internal static void DecreeMemo(bool on)
+        {
+            _decMemoThread = on ? Environment.CurrentManagedThreadId : -1;
+            _decMemo = on ? new Dictionary<Settlement, double>() : null;
         }
 
         /// <summary>Zwolnienie z udzialu korony (W4) i z raty czynszu: 1 - wies nie Normal (rabunek, spladrowanie), 2 - zamek/miasto wsi albo miasto targowe oblezone,

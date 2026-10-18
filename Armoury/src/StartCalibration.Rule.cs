@@ -48,6 +48,7 @@ namespace Armoury
 
         private static void RuleReset()
         {
+            _k4Clean = false; _k4Live = null;                     // ks-koszt T10 (K4a)
             _px.Clear(); _pxNow.Clear(); _pxN.Clear(); _pxLoad = null; _pxDays = 0; _pxDay = -1; _hides = null; _mv = null; _valKg = null;
             _regionMoved.Clear(); _regionSeason = -1; _rFeed = 0;
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
@@ -166,6 +167,20 @@ namespace Armoury
             return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);      // r4-polnoc: ha wedlug strefy bloku (bez klucza Ks Cold Land - HaPerWorker[c])
         }
 
+        /// <summary>ks-koszt T2: Income z wartoscia towarow zajecia c z wiersza miasta (liczona raz ta sama petla co w Income) - ten sam wynik co do bitu.</summary>
+        private static double IncomeV(LiveBlock b, string type, int c, double[] px, double[] vRow)
+        {
+            double L = b.L(c, type);
+            double v = vRow[c];
+            if (double.IsNaN(v))
+            {
+                v = 0; int o = c * KsTab.NG;
+                for (int g = 0; g < KsTab.NG; g++) { double m = _mv[o + g]; if (m != 0) v += m * Px(px, g); }
+                vRow[c] = v;
+            }
+            return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);
+        }
+
         private static bool Tree(int c) { return c == KsTab.CVine || c == KsTab.COlive || c == KsTab.CDate || c == KsTab.CCitrus; }
 
         private static int IndexOfCraft(LiveBlock b, int c) { if (b.C != null) for (int i = 0; i < b.C.Length; i++) if (b.C[i] == c) return i; return -1; }
@@ -182,6 +197,11 @@ namespace Armoury
             bool reg = d0 >= 0 && today > d0 && (today - d0) % RegCycle == 0;
             double sigma = Math.Max(1, DailyLife.KsSigma);
             int active = 0;
+            // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
+            var vTab = step && SwCostFast ? new Dictionary<double[], double[]>() : null;
+            // ks-koszt T10 (K4a, klucz Ks Cost Fast): doba bez kroku A7 i bez cyklu regali, a ostatni pelny przeglad tego stanu blokow nie mial zadnej przebudowy w toku -
+            // petla nic by nie zrobila (przebudowy zaczynaja sie tylko w dobie kroku; Target zmienia tylko ta funkcja, a odczyt zapisu daje nowa mape okregow) - bez petli
+            if (!step && !reg && SwCostFast && _k4Clean && ReferenceEquals(_k4Live, _live)) { _rActive = 0; return; }
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null || ld.B == null) continue;
@@ -191,6 +211,8 @@ namespace Armoury
                     Town mt = ld.TF ? ld.T : (ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V.Bound != null ? ld.V.Bound.Town : null));
                     double[] px;
                     if (mt == null || !_px.TryGetValue(mt, out px)) continue;
+                    double[] vRow = null;
+                    if (vTab != null && !vTab.TryGetValue(px, out vRow)) { vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN; vTab[px] = vRow; }
                     string type = ld.K.Type;
                     bool busy = false;
                     foreach (var b in ld.B) if (b != null && b.Target >= 0) { busy = true; break; }
@@ -203,8 +225,8 @@ namespace Armoury
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
                         int cur = b.C[ci];
-                        double incCur = Income(b, type, cur, px), incBest = double.NegativeInfinity; int best = -1;
-                        foreach (int c in b.Cand) { if (c == cur) continue; double v = Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
+                        double incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px), incBest = double.NegativeInfinity; int best = -1;
+                        foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
                         if (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur)) { b.Held = 0; continue; }
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
                         if (b.Held < HoldDays) continue;
@@ -236,6 +258,20 @@ namespace Armoury
                 catch (Exception e) { Stumble("RuleDaily(okreg)", e); }
             }
             _rActive = active;
+            _k4Live = _live; _k4Clean = active == 0 && K4NoTransition();   // ks-koszt T10 (K4a): pelny przeglad bez przebudowy w toku (w zadnym bloku - takze okregow pominietych)
+        }
+        private static bool _k4Clean; private static object _k4Live;
+
+        /// <summary>ks-koszt T10 (K4a): zaden blok zadnego okregu nie jest w przebudowie (Target &lt; 0 wszedzie).</summary>
+        private static bool K4NoTransition()
+        {
+            if (!SwCostFast) return false;
+            foreach (var ld in _live.Values)
+            {
+                if (ld == null || ld.B == null) continue;
+                foreach (var b in ld.B) if (b != null && b.Target >= 0) return false;
+            }
+            return true;
         }
         private static readonly List<string> _startNotes = new List<string>();
 

@@ -158,6 +158,7 @@ namespace Armoury
                 bool real = SwRealOfftake;
                 _kDayTowns += 2; _kHands += hands;                       // miasto-doby: jedna przerobka za dwie doby
                 var made = new int[n]; var taken = new int[n * 2]; var side = new int[n];
+                var kc = SwCostFast ? new KcMemo(shelf, town) : null;   // ks-koszt T8: sprzedane wczoraj jednym przejsciem, ilosci polki z pamiecia wiersza (te same liczby)
                 // kolejnosc par: zysk na roboczodzien przy cenach miasta (najlepsza pierwsza)
                 var order = new int[n]; var score = new double[n];
                 for (int pi = 0; pi < n; pi++)
@@ -173,10 +174,10 @@ namespace Armoury
                     if (p.Garum && !zt.Garum) continue;
                     if (hands < p.Labor * 0.5) { _kNoHands[pi]++; continue; }
                     // na zbyt: wyrob do tygodnia zakupow miasta
-                    double dOut = (p.ZOut >= 0 ? lam * (zt.Q[p.ZOut] + zt.QV[p.ZOut]) : 0.0) + (1 - lam) * SoldYesterday(town, p.OutIt.ItemCategory);
-                    if (p.Garum) dOut = Math.Max(dOut, SoldYesterday(town, p.OutIt.ItemCategory) + 1.0);
+                    double dOut = (p.ZOut >= 0 ? lam * (zt.Q[p.ZOut] + zt.QV[p.ZOut]) : 0.0) + (1 - lam) * (kc != null ? kc.Sold(p.OutIt.ItemCategory) : SoldYesterday(town, p.OutIt.ItemCategory));
+                    if (p.Garum) dOut = Math.Max(dOut, (kc != null ? kc.Sold(p.OutIt.ItemCategory) : SoldYesterday(town, p.OutIt.ItemCategory)) + 1.0);
                     // KS-R3 G5 (klucz Ks Real Offtake): wyrob najwyzej do 4 dni zakupow (dotad 7) - swiezy lot ziarna nie staje sie tygodniem chleba przy pustej polce zboza
-                    int room = (int)Math.Ceiling((real ? 4.0 : 7.0) * dOut) - shelf.GetItemNumber(p.OutIt);
+                    int room = (int)Math.Ceiling((real ? 4.0 : 7.0) * dOut) - (kc != null ? kc.Num(p.OutIt) : shelf.GetItemNumber(p.OutIt));
                     if (room <= 0) { _kFull[pi]++; continue; }
                     int batch = Math.Max(1, (int)Math.Ceiling(room / 6.0));
                     int steps = 0, why = 0;
@@ -189,7 +190,7 @@ namespace Armoury
                         for (int j = 0; j < p.InIt.Length && k > 0; j++)
                         {
                             double reserve = 5 + (p.ZIn[j] >= 0 ? (real ? 6.0 : 2.0) * lam * (zt.Q[p.ZIn[j]] + zt.QV[p.ZIn[j]]) : 0.0);
-                            double avail = shelf.GetItemNumber(p.InIt[j]) - reserve;
+                            double avail = (kc != null ? kc.Num(p.InIt[j]) : shelf.GetItemNumber(p.InIt[j])) - reserve;
                             int kj = (int)Math.Floor((avail - acc[pi * 2 + j]) / p.Ratio[j]);
                             if (kj < k)
                             {
@@ -209,15 +210,15 @@ namespace Armoury
                             double want = acc[pi * 2 + j] + k * p.Ratio[j];
                             int take = (int)Math.Floor(want + 1e-9);
                             acc[pi * 2 + j] = want - take;
-                            if (take > 0) { shelf.AddToCounts(p.InIt[j], -take); taken[pi * 2 + j] += take; MaterialOrders.NoteUse(town, p.InIt[j], take); }
+                            if (take > 0) { if (kc != null) kc.Add(p.InIt[j], -take); else shelf.AddToCounts(p.InIt[j], -take); taken[pi * 2 + j] += take; MaterialOrders.NoteUse(town, p.InIt[j], take); }
                         }
-                        shelf.AddToCounts(p.OutIt, k);
+                        if (kc != null) kc.Add(p.OutIt, k); else shelf.AddToCounts(p.OutIt, k);
                         if (p.Side != null && p.SideRatio > 0)
                         {
                             double sw = acc[2 * n + pi] + k * p.SideRatio;
                             int sk = (int)Math.Floor(sw + 1e-9);
                             acc[2 * n + pi] = sw - sk;
-                            if (sk > 0) { shelf.AddToCounts(p.Side, sk); side[pi] += sk; }
+                            if (sk > 0) { if (kc != null) kc.Add(p.Side, sk); else shelf.AddToCounts(p.Side, sk); side[pi] += sk; }
                         }
                         made[pi] += k; room -= k; hands -= k * p.Labor;
                     }

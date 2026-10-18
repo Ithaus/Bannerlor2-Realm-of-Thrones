@@ -65,7 +65,7 @@ namespace Armoury
             return k;
         }
 
-        private sealed class ZTown
+        internal sealed class ZTown                              // ks-koszt T5: internal - zakupy wsi trzymaja mape miasta przez jedno wywolanie (TownFolk.ZcBuy)
         {
             public Town T; public Settlement St; public int Market; public double Lam, People, Surv;
             public double Hands; public bool Garum;              // ZC5: rece przetworow (roboczodni/d) i kraina garum
@@ -133,6 +133,7 @@ namespace Armoury
 
         private static void Zc4Reset()
         {
+            T4Bump();                                            // ks-koszt T4
             _zt = new Dictionary<Settlement, ZTown>(); _zv = new Dictionary<Village, float[]>(); _zvp = new Dictionary<Village, float[]>(); _zcDictTown = null; _zvBought.Clear();
             _zItems = null; _zKg = null; _zCats = new Dictionary<ItemCategory, int[]>(); _zIx = null; _zLiveCats = new Dictionary<ItemCategory, int>(); _zLive = null;
             Zc4Zero();
@@ -150,6 +151,7 @@ namespace Armoury
 
         private static void Zc4Off()
         {
+            T4Bump();                                            // ks-koszt T4
             if (_zt.Count > 0) _zt = new Dictionary<Settlement, ZTown>();
             if (_zv.Count > 0) _zv = new Dictionary<Village, float[]>();
             if (_zvp.Count > 0) _zvp = new Dictionary<Village, float[]>();
@@ -202,6 +204,9 @@ namespace Armoury
         private static void Zc4Build(int today, List<DailyLife.KsRec> recs, Dictionary<Village, float[]> vil, Dictionary<Village, float[]> vilPaid, double[] full, bool fresh, bool zFull = true)
         {
             Zc4EnsureMap();
+            T4Bump();                                            // ks-koszt T4: popyt zaplacony miast (ZDp) i mapa koszyka od nowa - pamiec progow od zera
+            bool[] t7 = SwCostFast ? T7Types() : null;           // ks-koszt T7: typy przedmiotow pozycji koszyka (filtr spisu polek) i indeks startu z pamieci doby
+            if (t7 != null) T4Begin();
             var prevMap = _zt;                                   // KS-R3 C1: potrzeby miasta co 7 dob na zmiane (Fnv) - pozostale doby z poprzedniej mapy
             // recenzja 17.10 (wazne): wsie kupuja pelny koszyk (vil - kiesa i drabina decyduja), popyt ceny, "na zbyt" i wsad ZC5 licza koszyk zaplacony z Planu (vilPaid -
             // to Plan postawil na targu)
@@ -302,7 +307,8 @@ namespace Armoury
                     // indeksy wierszy polki (zakupy wsi bez szukania liniowego - recenzja kosztu) i ilosc towaru
                     var ro = r.St.ItemRoster; var cnt = new int[ZN];
                     for (int z = 0; z < ZN; z++) zt.Ix[z] = -1;
-                    if (ro != null)
+                    if (ro != null && t7 != null) T7Scan(ro, zt.Ix, cnt, t7);   // ks-koszt T7: ten sam wynik, bez kopii wierszy broni i zbroi
+                    else if (ro != null)
                         for (int k = 0; k < ro.Count; k++)
                         {
                             var el = ro.GetElementCopyAtIndex(k); var ei = el.EquipmentElement.Item; int zi;
@@ -317,7 +323,7 @@ namespace Armoury
                         if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } }
                         // F3 (poprawka po autotescie): towaru brak na polce (najwyzej 5 sztuk) - cena wzoru gry idzie na sufit (10 x wartosc) i cielaby budzet koszyka
                         // towarow, ktore SA na polce; w koszcie klas, drabinie i zakupach wsi najwyzej 1.5 x cena startu
-                        if (it != null && cnt[z] <= 5) { int cap = (int)Math.Ceiling(1.5 * KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, zt.Market) * Math.Max(1, it.Value)); if (p > cap) p = cap; }
+                        if (it != null && cnt[z] <= 5) { int cap = (int)Math.Ceiling(1.5 * (t7 != null ? T4StartIndex(zt.Market, z) : KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, zt.Market)) * Math.Max(1, it.Value)); if (p > cap) p = cap; }   // ks-koszt T7: indeks startu z pamieci doby
                         px[z] = Math.Max(1, p); zt.Px[z] = (int)px[z];
                     }
                     _zTkPrices += System.Diagnostics.Stopwatch.GetTimestamp() - tp0;
@@ -600,11 +606,12 @@ namespace Armoury
                 double lam = zt.Lam;
                 var q = new double[ZN];
                 Array.Copy(zt.Q, q, ZN);
+                int[] sc = SwCostFast ? ShelfFirst(ro) : null;         // ks-koszt T10: ilosci pozycji na polce jednym przegladem (te same liczby co GetItemNumber)
                 // piwo domowe: piwa na polce mniej niz dzienna potrzeba - brakujace litry kupowane jako ziarno (0.4 kg/l)
                 var beer = _zItems[ZBeer]; var grain = _zItems[ZGrain];
                 if (beer != null && grain != null && q[ZBeer] > 0)
                 {
-                    int have = ro.GetItemNumber(beer);
+                    int have = sc != null ? CountZ(ro, ZBeer, sc) : ro.GetItemNumber(beer);
                     double miss = Math.Max(0.0, q[ZBeer] - have);
                     if (miss > 0)
                     {
@@ -619,7 +626,7 @@ namespace Armoury
                     {
                         var it = _zItems[z];
                         if (it == null || !(q[z] > 0)) continue;
-                        double miss = Math.Max(0.0, q[z] - ro.GetItemNumber(it));
+                        double miss = Math.Max(0.0, q[z] - (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(it)));
                         if (!(miss > 0)) continue;
                         q[z] -= miss; q[ZGrain] += miss * _zKg[z] / _zKg[ZGrain];
                         _zBreadN++; _zBreadPcs += miss;
@@ -629,7 +636,7 @@ namespace Armoury
                     for (int z = 0; z < ZN; z++)
                     {
                         if (CtlGood(z) < 0 || !(q[z] > 0) || _zItems[z] == null) continue;
-                        double miss = lam * q[z] - ro.GetItemNumber(_zItems[z]);
+                        double miss = lam * q[z] - (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(_zItems[z]));
                         if (miss > 0) KsUnmet(zt.Market, z, miss);
                     }
                 foreach (var kv in _zCats)
@@ -724,6 +731,7 @@ namespace Armoury
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             double B = Math.Max(0.0, ff) * tot, left = B;
             var md = town.MarketData; var ro = town.Settlement.ItemRoster;
+            int[] sc = ro != null && SwCostFast ? ShelfFirst(ro) : null;     // ks-koszt T10: ilosci pozycji na polce jednym przegladem (te same liczby co GetItemNumber)
             var need = new Dictionary<ItemCategory, double>(); var give = new Dictionary<ItemCategory, double>();
             var rung = new Dictionary<ItemCategory, int>(); var unit = new Dictionary<ItemCategory, double>(); var stock = new Dictionary<ItemCategory, bool>();
             foreach (var c in keys)
@@ -742,7 +750,7 @@ namespace Armoury
                         double per = Math.Max(1, p) / _zKg[z];                                         // zl za kg (litr)
                         if (ZKcalKg[z] > 0 && (rg == 3)) per /= ZKcalKg[z] / 1000.0;                   // bialko: zl za 1000 kcal
                         if (per < best) best = per;
-                        if (ro != null && ro.GetItemNumber(it) > 0) has = true;
+                        if (ro != null && (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(it)) > 0) has = true;
                     }
                 unit[c] = best < double.MaxValue ? best : 1e9; stock[c] = has;
             }
@@ -851,6 +859,16 @@ namespace Armoury
             Zc4EnsureMap();
             // recenzja runda 3 (wazne): budzet przy cenie krainy (cena startu x gradient krainy miasta targowego - jak koszyk kroku 8 Planu)
             Settlement mk = null; try { mk = TradeTownOf(v); } catch { mk = null; }
+            if (T4Begin())
+            {
+                // ks-koszt T4: indeks startu i gradient krainy z pamieci doby (te same wywolania raz na dobe; to samo wyrazenie i kolejnosc mnozenia - te same liczby)
+                for (int z = 0; z < ZN && z < q.Length; z++)
+                {
+                    var it = _zItems[z]; if (it == null || !(q[z] > 0)) continue;
+                    budgetDay += q[z] * Math.Max(1, it.Value) * T4StartIndex(m, z) * T4LandGrad(mk, z);
+                }
+                return q;
+            }
             for (int z = 0; z < ZN && z < q.Length; z++)
             {
                 var it = _zItems[z]; if (it == null || !(q[z] > 0)) continue;

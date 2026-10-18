@@ -337,6 +337,7 @@ namespace Armoury
                 try { budRows = BudgetsRows(day, inp); } catch (Exception e) { Stumble("BudgetsRows", e); }
             }
             int csvDay = day;
+            bool fastNt = SwCostFast;                                 // ks-koszt T1: sumy "na targ" odbioru na watku roboczym (klucz Ks Cost Fast)
             _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
@@ -350,6 +351,7 @@ namespace Armoury
                     KsResult r = null;
                     try { r = KsCore.Solve(inp, () => gen != Volatile.Read(ref _gen)); }
                     catch (Exception e) { r = new KsResult { Error = e.GetType().Name + ": " + e.Message }; }
+                    if (fastNt && r != null && r.Error == null) { try { PlanMarketSums(r, inp, () => gen != Volatile.Read(ref _gen)); } catch { r.NtMk = null; } }   // ks-koszt T1 (blad - odbior liczy na watku glownym)
                     if (csv && r != null && r.Error == null)
                     {
                         try { int rows; r.CsvPlan = PlanCsvText(csvDay, r, inp, names, out rows); r.CsvPlanRows = rows; } catch (Exception e) { r.CsvPlan = null; r.CsvPlanRows = -1; r.CorrLine = (r.CorrLine ?? "") + " [ks-plan.csv: " + e.GetType().Name + "]"; }
@@ -379,8 +381,11 @@ namespace Armoury
             if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; _planEma = _wEma; if (_firstPlanDay < 0) _firstPlanDay = _wDay; TownPaidFromPlan(r); }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
             MarketFactorCommit(r);                                 // recenzja runda 3: czynnik sterowania rynku tylko z Planu bez bledu
             // recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu co 7 dob, nie zamrozony z dnia wlaczenia
+            long tc = T0Now();                                     // ks-koszt T0: pod-czasy odbioru Planu
             if (r.Error == null && _state == StateApplied) { try { RefreshNeedMult(r, inp); } catch (Exception e) { Stumble("RefreshNeedMult", e); } }
+            tc = T0Lap(T0CNeed, tc);
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
+            tc = T0Lap(T0CLines, tc);
             // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku); KS-R3 C2: tekst z watku roboczego
             if (r.Error == null && r.CsvPlan != null)
             {
@@ -393,8 +398,10 @@ namespace Armoury
                 try { string path = Log.Csv(BudgetCsvName, BudgetCsvHeader, r.CsvBudgets); Log.Info(PK + BudgetCsvName + " " + (path != null ? r.CsvBudgetRows + " wierszy (doba " + _wDay + "; " + MoneyNote() + ")" : "NIE ZAPISANY (log wylaczony albo brak katalogu sesji)") + "."); }
                 catch (Exception e) { Stumble("BudgetsCsv", e); }
             }
+            T0Lap(T0CCsv, tc);
             // KS-R3: gradient krain z Planu (cieply start, zapis) - tylko Plan bez bledu z krokiem 5
             if (r.Error == null && r.Grad != null) _grad = r.Grad;
+            T4Bump();                                             // ks-koszt T4: nowy Plan i gradient - pamiec progow od zera
         }
 
         private static string F2(double x) { return double.IsNaN(x) || double.IsInfinity(x) ? "-" : x.ToString("0.00", Inv); }
@@ -507,7 +514,16 @@ namespace Armoury
             w.Append(" | ").Append(string.Join("; ", r.RegInfo.ToArray())).Append('.');
             Log.Info(w.ToString());
             // na targ (plan) wobec dzisiejszej produkcji wsi z ksiegi towarow - w sztukach gry na dobe
-            var mk = new double[ItemCount]; var tf = new double[ItemCount]; var own = new double[ItemCount]; double kcal = 0, need = 0; int nd = 0;
+            long tNt = T0Now();
+            double[] mk, tf, own; double kcal, need; int nd;
+            if (r.NtMk != null)
+            {
+                // ks-koszt T1: sumy z watku roboczego (ten sam rachunek co nizej, liczony po Solve) - odbior bez 20 ms na watku glownym
+                mk = r.NtMk; tf = r.NtTf; own = r.NtOwn; kcal = r.NtKcal; need = r.NtNeed; nd = r.NtNd; _t0Worker = true;
+            }
+            else
+            {
+            mk = new double[ItemCount]; tf = new double[ItemCount]; own = new double[ItemCount]; kcal = 0; need = 0; nd = 0;
             var live = BuildLive(r, inp, false);
             foreach (var ld in live)
             {
@@ -517,6 +533,8 @@ namespace Armoury
                 for (int i = 0; i < ItemCount; i++) { if (ld.TF) tf[i] += res.Market[i]; else { mk[i] += res.Market[i]; own[i] += res.Own[i]; } }
                 kcal += res.OwnKcal; need += res.KcalNeed;
             }
+            }
+            _t0[T0CMk] += T0Now() - tNt;
             var qb = new StringBuilder(2000);
             qb.Append(PK).Append("na targ (plan doba ").Append(_wDay).Append(", szt. gry/d = kg / (sigma x kg sztuki); wsie + pola mieszczan) wobec wsi dzis (ksiega towarow, srednia ").Append(_emaDays).Append(" dob):");
             bool f3 = true;

@@ -65,6 +65,7 @@ namespace Armoury
             double wv = 1.0 / Math.Min(28, _vtDays);
             var seen = new HashSet<Village>();
             _inflowDay[0] = _inflowDay[1] = 0;
+            T4Begin();                                          // ks-koszt T4: gradient krainy miasta targowego z pamieci doby (klucz Ks Cost Fast; bez pamieci - wprost)
             VillageTakings.ForEachVillageToday((v, h, k) =>
             {
                 double[] a;
@@ -76,7 +77,7 @@ namespace Armoury
                 // recenzja runda 3 (drobne, INFO): utarg wozow i czesc panow (oddane - do kiesy) wedlug krain importu / eksportu zboza (gradient krainy z Planu)
                 try
                 {
-                    Settlement mk = TradeTownOf(v); double gz = LandGradZ(mk, ZGrain);
+                    Settlement mk = TradeTownOf(v); double gz = T4LandGrad(mk, ZGrain);
                     int c = gz > 1.02 ? 0 : (gz < 0.98 ? 1 : 2);
                     _regDay[c * 2] += h; _regDay[c * 2 + 1] += Math.Max(0, h - k);
                 }

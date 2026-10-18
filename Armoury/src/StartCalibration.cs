@@ -345,19 +345,25 @@ namespace Armoury
                 EnsureLand();
                 if (!LandReady) { KeysIdle(day); return; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                T0Begin(); long tq = t0;                              // ks-koszt T0: pod-czasy doby KS (linia "KS: koszt doby (T0)")
                 try { LedgerEma(); } catch (Exception e) { Stumble("LedgerEma", e); }   // srednia ksiegi towarow - co dobe (popyt 1:1 Planu)
                 try { GateCollect(); } catch (Exception e) { Stumble("GateCollect", e); }   // ks-arm: twarde bramki (zrodla bez nazwy, RemoveParty) - 7 pelnych dob
                 try { MoneyEma(today); } catch (Exception e) { Stumble("MoneyEma", e); }   // krok 8: udzial kiesy wsi w utargu, zarobek klas miast (srednie 28 dob)
+                tq = T0Lap(T0Ledger, tq);
                 // KS-R3: odbior miast (P3, KS-H), kasa 28 dob (krok 5), sterowanie rynku (P4), tabela dob miast KS-H (najwyzej 200 wywolan drogi na dobe)
                 try { TakeDaily(today); } catch (Exception e) { Stumble("TakeDaily", e); }
                 try { GoldDaily(today); } catch (Exception e) { Stumble("GoldDaily", e); }
+                tq = T0Lap(T0Take, tq);
                 try { ControlDaily(today); } catch (Exception e) { Stumble("ControlDaily", e); }
+                tq = T0Lap(T0Ctl, tq);
                 PricesDaily(today);                                   // indeksy cen miast (stan zastosowany - co 7 dob na zmiane; Plan - tylko w doby linii cen)
+                tq = T0Lap(T0Prices, tq);
                 PlanCollect(day);                                     // wynik Planu z watku roboczego (linie i ks-plan.csv)
+                tq = T0Lap(T0Collect, tq);
                 if (_keepRaw != null)
                 {
                     KeysHeld(day);                                    // zapis zastosowany zachowany bez zmian - zadnych kluczy ani wlaczenia
-                    if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);
+                    if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) T0PlanStart(day);
                 }
                 else if (_state != StateApplied)
                 {
@@ -368,7 +374,7 @@ namespace Armoury
                         KeysDaily(today, planOk);
                         try { ArmDaily(today, planOk); } catch (Exception e) { Stumble("ArmDaily", e); }   // ks-arm: samo uzbrojenie i samo wlaczenie po pomiarze (klucz Start Calibration Auto Arm)
                     }
-                    if (_state != StateApplied && (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue || EarlyPlan(day))) PlanStart(day);
+                    if (_state != StateApplied && (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue || EarlyPlan(day))) T0PlanStart(day);
                 }
                 else
                 {
@@ -379,9 +385,10 @@ namespace Armoury
                         try { LandRetry(today); } catch (Exception e) { Stumble("LandRetry", e); }   // ks-arm (recenzja): druga proba krain wroconych - tylko recznie, razem z rampa
                     }
                     try { LandGateDaily(today); } catch (Exception e) { Stumble("LandGateDaily", e); }   // ks-arm: bramka krainy (rozdz. 8) - PRZED stawkami jutra
-                    LiveDaily(today);
-                    if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);   // Plan dalej co 7 dob - pomiar nacisku i lepszy stol (gra bez zmian)
+                    T0LiveDaily(today);
+                    if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) T0PlanStart(day);   // Plan dalej co 7 dob - pomiar nacisku i lepszy stol (gra bez zmian)
                 }
+                { long tb = T0Now(); _t0[T0Keys] += tb - tq - _t0[T0Live] - _t0[T0Start]; }   // ks-koszt T0: bramki = galaz bez doby zastosowanej i startu Planu (Apply - w dobie zastosowanej)
                 double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 AddMs(ms);
                 // KS-R3 G1: tabela dob miast KS-H (najwyzej 200 wywolan drogi na dobe, gotowa w ok. 25 dob stanu Plan) - poza czasem doby KS (osobny czas w linii KS-H)
@@ -396,6 +403,8 @@ namespace Armoury
                              + " | czas doby KS " + ms.ToString("0.00", Inv) + " ms (mediana " + MedianMs().ToString("0.00", Inv) + " ms z " + _msN + " dob; bez watku roboczego)"
                              + " | tabela dob KS-H " + dMs.ToString("0.00", Inv) + " ms (" + dCalls + " wywolan drogi, " + KsFoodCarts.DaysPairsDone + "/" + KsFoodCarts.DaysPairs + " par)"
                              + " | potkniecia dzis " + _stumblesDay + " (sesja " + _stumbles + ").");
+                    try { Log.Info(T0Line(day, ms)); } catch (Exception e) { Stumble("T0Line", e); }   // ks-koszt T0: pod-czasy doby KS (tylko log)
+                    KCheck(today, day);                                // ks-koszt: kontrola szybkich drog co 7 dob (tylko odczyt, poza czasem doby KS)
                     if (day % 7 == 0) { try { Log.Info(PriceLine(day)); } catch (Exception e) { Stumble("PriceLine", e); } }
                     if (day % 7 == 0) { try { string pn = PriceNowLine(day); if (pn != null) Log.Info(pn); string rl = R4cLine(day); if (rl != null) Log.Info(rl); } catch (Exception e) { Stumble("R4cLines", e); } }   // KS r4 (r4-ceny): ceny chwilowe (NKS-7d), linia paczki
                     try { string ml = MarketLine(); if (ml != null) Log.Info(ml); } catch (Exception e) { Stumble("MarketLine", e); }
