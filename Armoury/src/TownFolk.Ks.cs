@@ -367,8 +367,11 @@ namespace Armoury
                     double paidK = 0;
                     for (int z = 0; z < NZq && z < qp.Length; z++) if (qp[z] > 0 && KsBasket.Kcal[z] > 0) paidK += Math.Min(q[z], qp[z]) * lam * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
                     double shortK = paidK - b.KcalG, kr = 0;
-                    if (shortK > 0) kr = OwnFirst(vil, shortK, b.KcalW);
+                    int[] own = shortK > 0 ? new int[NZq] : null;   // f14-rynek (recenzja): sztuki zjedzone swoje wedlug pozycji koszyka
+                    if (shortK > 0) kr = OwnFirst(vil, shortK, b.KcalW, own);
                     StartCalibration.KsOwnDay(vil, kr, days);
+                    // f14-rynek (recenzja, Ks Ctl Own Food): brak drabiny 1 pokryty swoim tym samym towarem - sterowanie rynku nie liczy go drugi raz jako brak
+                    StartCalibration.KsOwnCovered(vil, mk, b.Miss, own, days);
                 }
                 catch (Exception e) { Stumble("Zc4BuyVillage(wies je swoje)", e); }
             }
@@ -379,8 +382,9 @@ namespace Armoury
         private static readonly int[] OwnOrder = { StartCalibration.ZGrain, StartCalibration.ZFish, StartCalibration.ZMeat, StartCalibration.ZCheese, StartCalibration.ZButter, StartCalibration.ZEgg,
                                                    StartCalibration.ZDate, StartCalibration.ZOlives, StartCalibration.ZGrape, StartCalibration.ZApple, StartCalibration.ZCarrot, StartCalibration.ZOrange, StartCalibration.ZHoney };
 
-        /// <summary>G3: wies je z magazynu (towar czekajacy na woz) do braku kcal: ziarno, potem wlasne jedzenie wedlug kcal, najwyzej polowa kazdego towaru.</summary>
-        private static double OwnFirst(Village vil, double shortK, double basketK)
+        /// <summary>G3: wies je z magazynu (towar czekajacy na woz) do braku kcal: ziarno, potem wlasne jedzenie wedlug kcal, najwyzej polowa kazdego towaru.
+        /// own (moze byc null) - sztuki zjedzone wedlug pozycji koszyka (f14-rynek, sterowanie rynku).</summary>
+        private static double OwnFirst(Village vil, double shortK, double basketK, int[] own)
         {
             var st = vil.Settlement; var ro = st != null ? st.ItemRoster : null;
             if (ro == null || !(shortK > 0)) return 0;
@@ -402,6 +406,7 @@ namespace Armoury
                     int took = have - ro.GetItemNumber(it);
                     if (took <= 0) continue;
                     kr += took * kc; pcs += took; shortK -= took * kc;
+                    if (own != null && z >= 0 && z < own.Length) own[z] += took;
                 }
             }
             finally { GoodsLedger.End(gf); }

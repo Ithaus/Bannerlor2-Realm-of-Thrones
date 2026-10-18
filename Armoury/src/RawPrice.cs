@@ -133,7 +133,9 @@ namespace Armoury
         /// linie towarowe warsztatow) x wartosc sztuki. Ujemny = kategoria spoza tabeli albo zamek (zostaje popyt gry).
         /// f7-browary K2 (klucz ClothDemandFromOfftake): skora i plotno - do tego odbior z polki na odziez wojska, naprawy kowali, zakupy wsi i dwory (F7Workshops.UseOf;
         /// recenzja: wsie i dwory x (1 - lambda) w miastach z koszykiem ZC4 - tam "home" ma juz koszyk wsi QV i 1:1 dworow ze Zc4Demand,
-        /// srednia ok. 14 dob) x wartosc sztuki ("off"); sama cena - zapas karawan, progi polki i zamowienia (CaravanBulk.Use) bez zmian. Klucz wylaczony - 0 (jak dotad).</summary>
+        /// srednia ok. 14 dob) x wartosc sztuki ("off"); sama cena - zapas karawan, progi polki i zamowienia (CaravanBulk.Use) bez zmian. Klucz wylaczony - 0 (jak dotad).
+        /// f14-rynek K4 (klucz ClothExportInPrice): do "off" takze wywoz skory i plotna z polki miasta przez kupcow (karawany kupujace w miescie, wozy kupcow innych miast;
+        /// F7Workshops.ExportOf, srednia ok. 14 dob) - kupiec placi zrodlu cene jego targu, wiec jego zakup jest popytem tego targu. Klucz wylaczony - 0 (jak dotad).</summary>
         internal static float UseDemand(Town town, ItemCategory cat, out float home, out float craft)
         {
             float off;
@@ -149,7 +151,7 @@ namespace Armoury
             float game = model != null ? model.GetDailyDemandForCategory(town, cat, 1000) : 0f;
             home = Math.Max(0f, game) * Math.Max(0f, HistoricalPrices.HouseShare(cat));
             craft = Math.Max(0f, use - fix) * Math.Max(1, item.Value);
-            off = F7Workshops.UseOf(town, item) * Math.Max(1, item.Value);   // f7-browary K2: 0 przy wylaczonym kluczu i dla innych towarow
+            off = (F7Workshops.UseOf(town, item) + F7Workshops.ExportOf(town, item)) * Math.Max(1, item.Value);   // f7-browary K2 + f14-rynek K4 (wywoz kupcow): 0 przy wylaczonych kluczach i dla innych towarow
             return off > 0f ? home + craft + off : home + craft;
         }
 
@@ -318,7 +320,7 @@ namespace Armoury
                       .Append(", z nadwyzka ").Append(ng).Append(" miast").Append(ng > 0 ? " - sprzedaja po " + F(Mid(glut), "0.#") + " d" : "")
                       .Append(", popyt dobowy miasta: mieszczan ").Append(F(Mid(home), "0.#")).Append(" d + rzemiosla ").Append(F(Mid(craft), "0.#"))
                       .Append(" d, w danych rynku ").Append(F(Mid(stored), "0.#")).Append(" d, sam szacunek gry ").Append(F(Mid(game), "0.#")).Append(" d");
-                    if (offs.Count > 0) sb.Append(" (f7: odbior wojska i napraw, wsi i dworow poza koszykiem ZC4 w ").Append(offs.Count).Append(" miastach, mediana ").Append(F(Mid(offs), "0.#")).Append(" d - w danych rynku, poza mieszczanami i rzemioslem)");
+                    if (offs.Count > 0) sb.Append(" (f7: odbior wojska i napraw, wsi i dworow poza koszykiem ZC4").Append(F7Workshops.ExpOn ? " i wywoz kupcow (f14 K4)" : "").Append(" w ").Append(offs.Count).Append(" miastach, mediana ").Append(F(Mid(offs), "0.#")).Append(" d - w danych rynku, poza mieszczanami i rzemioslem)");
                 }
                 // przyklady innych przeliczonych towarow handlowych: te sama stala w nowej monecie (A) widac po max indeksu
                 var other = new StringBuilder();

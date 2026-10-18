@@ -577,6 +577,8 @@ namespace Armoury
             if (_mkOn) { try { KsTake(f); } catch (Exception e) { Stumble("KsTake", e); } }
             // f7-browary K2 (klucz ClothDemandFromOfftake): odbior skory i plotna z polki miasta (odziez wojska, naprawy, zakupy wsi, dwory) - sam licznik, wlasny try w srodku
             if (f.Touched.Count > 0 && (f.Kind == FArmyCloth || f.Kind == FMend || f.Kind == FFolkVill || f.Kind == FCourt)) F7Workshops.FromFrame(f.Kind, f.A, f.Touched, f.Net, _items);
+            // f14-rynek K4 (klucz ClothExportInPrice): skora i plotno kupione z polki miasta przez karawane (handel partii, wyjazd karawany BK) - wywoz do ceny zrodla; sam licznik
+            if (f.Touched.Count > 0 && (f.Kind == FSell || f.Kind == FCaravanLeave)) F7Workshops.FromTrade(f.Kind, f.A, f.B, f.Touched, f.InB, _items);
         }
 
         /// <summary>KS-R3 (odbior miasta, StartCalibration.KsTakeNote): zuzycie z polki miasta w ramkach z osada-miastem - panowie kupili (handel partii: sprzedawca

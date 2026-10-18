@@ -32639,7 +32639,15 @@ NWAR_F7_K2C = re.compile(r"; w tych miastach wsie\+dwory skora ([\d.]+), plotno 
 NWAR_F7_K3KS = re.compile(r", przetwory KS \(ZC5\) na (\d+) targach \((\d+) szt\.\)")   # recenzja f7 (uwaga 2): przetwory KS zostawily gline garncarzom
 NWAR_ZC4 = re.compile(r"^Koszyk stanow \(ZC4\): dzien (\d+) \| lambda Westeros ([\d.]+) \(\d+ miast\), Essos ([\d.]+)")   # NWAR-16c: doba wlaczenia KS (lambda > 0)
 NWAR_F7_ST = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
-NWAR_F7_ERR = ("ERROR in F7Workshops", "ERROR in TownCrafts.SyncData(arm_f7_cloth)")
+# f14-rynek (noc 18.10): K4 - wywoz skory i plotna (karawany w miescie, wyjazd karawany BK, wozy kupcow) w cenie miasta-zrodla, rzemioslo 148 po cenie wlasnego targu
+NWAR_F14_K4 = re.compile(r"\| K4 wywoz skory i plotna w cenie targu \(Cloth Export In Price\) (tak|nie) \(ksiega towarow (tak|nie), K2 (tak|nie)\): dzis wywiezione skora (\d+) "
+                         r"\[karawany w miescie (\d+), wyjazd karawany BK (\d+), wozy kupcow (\d+)\], plotno (\d+) \[karawany w miescie (\d+), wyjazd karawany BK (\d+), wozy kupcow (\d+)\] "
+                         r"szt\. z (\d+) miast; srednia ok\. 14 dob swiat: skora ([\d.]+), plotno ([\d.]+) szt\./d z (\d+) miast \(dob pomiaru (\d+)[^)]*\); w popycie ceny miasta-zrodla "
+                         r"skora ([\d.]+), plotno ([\d.]+) szt\./d; rzemioslo miasta \(148\) bez ceny wywozu \(cena wlasnego targu\): (tak|nie)")
+NWAR_F14_CAR = re.compile(r"karawany kupily (\d+)")
+NWAR_F14_CART = re.compile(r"wozem kupcow \(P3/Z1\): CZYNNE - zawarto \d+ \[ruda \d+, drewno \d+, skora (\d+), plotno (\d+)")
+NWAR_F14_EXP = re.compile(r"(?:tkane|garbowane) tylko dzieki cenie wywozu (\d+) szt\.")
+NWAR_F7_ERR = ("ERROR in F7Workshops", "ERROR in TownCrafts.SyncData(arm_f7_cloth)", "ERROR in TownCrafts.SyncData(arm_f7_export)")   # f14-rynek: zapis K4
 NWAR_TC = re.compile(r"^Rzemioslo miasta \(148\): dzien (\d+) ")
 NWAR_TC_SHELF = re.compile(r"na polkach miast \[([^\]]*)\]")
 NWAR_TC_PART = re.compile(r"^(\S+) (\d+) \(indeks ([\d.]+)\)$")
@@ -32706,6 +32714,9 @@ def _nwar_read(logp, ks=None, f7=None):
                         if mp:
                             dd[mp.group(1)] = float(mp.group(3))
                     f7.setdefault("tc", {})[int(mm.group(1))] = dd
+                    ex = [int(x) for x in NWAR_F14_EXP.findall(s)]   # f14-rynek K4: plotno i skora "tylko dzieki cenie wywozu" (NWAR-18)
+                    if ex:
+                        f7.setdefault("texp", {})[int(mm.group(1))] = sum(ex)
                 continue
             if f7 is not None and s.startswith("Towary: dzien ") and (" - leather (" in s or " - linen (" in s):
                 mm = NWAR_LEDGER.match(s)
@@ -32716,6 +32727,15 @@ def _nwar_read(logp, ks=None, f7=None):
                         if mo:
                             tot += int(mo.group(1))
                     f7.setdefault("ledger", {}).setdefault(int(mm.group(1)), [0, 0])[0 if mm.group(2) == "leather" else 1] = tot
+                    mc = NWAR_F14_CAR.search(s)   # f14-rynek K4: karawany kupily (handel partii + wyjazd karawany - przewoz ksiegi towarow)
+                    if mc:
+                        f7.setdefault("car", {}).setdefault(int(mm.group(1)), [0, 0])[0 if mm.group(2) == "leather" else 1] = int(mc.group(1))
+                continue
+            if f7 is not None and s.startswith("Kontrakty surowca (174): dzien "):
+                mm = re.match(r"^Kontrakty surowca \(174\): dzien (\d+) ", s)
+                mw = NWAR_F14_CART.search(s) if mm else None
+                if mw:
+                    f7.setdefault("cart", {})[int(mm.group(1))] = [int(mw.group(1)), int(mw.group(2))]   # f14-rynek K4: wozy kupcow - skora, plotno (wszystkie zrodla)
                 continue
             if s.startswith(NWAR_D3):
                 mm = NWAR_DAY.match(s)
@@ -33080,6 +33100,49 @@ def _nwar_f7(rep, f7, ws, bdp=None, d3=None):
         rep.add("NWAR-16a: K3 glina dla garncarzy", "klucz wylaczony" + ttxt, "INFO", None)
     _nwar_f7_wedge_cycles(rep, f7, ws, bdp, True)
     _nwar_f7_after(rep, f7, ws, d3, True)
+    _nwar_f14(rep, f7)
+
+
+def _nwar_f14(rep, f7):
+    """f14-rynek (noc 18.10): NWAR-17..19 - wstawka K4 linii "Warsztaty codzienne (f7-browary)" (F7Workshops.ExportSegment): wywoz skory i plotna z polek miast
+    przez kupcow do popytu ceny miasta-zrodla, rzemioslo 148 po cenie wlasnego targu od 7 dob pomiaru. Log bez wstawki - INFO, bez wyjatku."""
+    days = f7.get("days", {})
+    k4 = {x: NWAR_F14_K4.search(s) for x, s in days.items()}
+    k4 = {x: m for x, m in k4.items() if m}
+    if not k4:
+        rep.add("NWAR-17: f14-rynek K4 wywoz w cenie targu", "brak wstawki K4 w linii 'Warsztaty codzienne (f7-browary)'", "INFO (log sprzed paczki f14-rynek)", None)
+        return
+    on = sorted(x for x, m in k4.items() if m.group(1) == "tak" and m.group(2) == "tak" and m.group(3) == "tak")
+    if not on:
+        rep.add("NWAR-17: f14-rynek K4 wywoz w cenie targu", f"linii {len(k4)}, klucz/ksiega/K2 czynne w 0", "INFO (klucz Cloth Export In Price, K2 albo ksiega towarow wylaczone)", None)
+        return
+    lo, hi = on[0], on[-1]
+    meas = sum(int(k4[x].group(4)) + int(k4[x].group(8)) for x in on)
+    mcar = sum(int(k4[x].group(5)) + int(k4[x].group(6)) + int(k4[x].group(9)) + int(k4[x].group(10)) for x in on)
+    mcart = sum(int(k4[x].group(7)) + int(k4[x].group(11)) for x in on)
+    per = [int(k4[x].group(4)) + int(k4[x].group(8)) for x in on]
+    car = f7.get("car", {}); cart = f7.get("cart", {})
+    lcar = sum(sum(v) for d, v in car.items() if lo - 1 <= d <= hi)
+    lcart = sum(sum(v) for d, v in cart.items() if lo - 1 <= d <= hi)
+    lmax = max([sum(car.get(d, [0, 0])) + sum(cart.get(d, [0, 0])) for d in range(lo - 1, hi + 1)] or [0])
+    last = k4[hi]
+    txt = (f"d{lo}-d{hi} ({len(on)} linii): zmierzony wywoz skora+plotno {meas} szt. (karawany {mcar}, wozy kupcow {mcart}; najwiecej na dobe {max(per) if per else 0}); "
+           f"ksiega: karawany kupily {lcar}, wozy kupcow zawarte {lcart} szt. (wszystkie zrodla, takze zamki i wsie); srednia na koniec: skora {last.group(13)}, plotno {last.group(14)} "
+           f"szt./d z {last.group(15)} miast (dob pomiaru {last.group(16)})")
+    rep.add("NWAR-17: K4 wywoz skory i plotna z polek miast zmierzony i nie wiekszy niz przewoz ksiegi (karawany kupily + wozy kupcow)", txt,
+            "> 0 i karawany <= 1.05 x karawany kupily + najwieksza doba, wozy <= wozy zawarte + najwieksza doba", meas > 0 and mcar <= 1.05 * lcar + lmax and mcart <= lcart + lmax)
+    # NWAR-18: rzemioslo bez ceny wywozu po dojrzeniu pomiaru
+    texp = f7.get("texp", {})
+    loc = [x for x in on if k4[x].group(19) == "tak"]
+    bad = [x for x in loc[1:] if texp.get(x, 0) > 0]   # pierwsza doba z 'tak' - przejscie (kolejnosc doby miast wobec linii dnia), od drugiej 0
+    first = loc[0] if loc else None
+    rep.add("NWAR-18: K4 rzemioslo miasta 148 po cenie wlasnego targu od 7 dob pomiaru ('tylko dzieki cenie wywozu' = 0)",
+            (f"od d{first} ({len(loc)} dob z 'bez ceny wywozu: tak'), dob z tkaniem/garbowaniem dzieki cenie wywozu {len(bad)}" + (f" (pierwsza d{bad[0]})" if bad else "")) if loc
+            else f"pomiar ponizej 7 dob w calym biegu (dob pomiaru na koniec {last.group(16)})",
+            "0 dob (od dojrzalego pomiaru)", (not bad) if loc else None)
+    # NWAR-19 (INFO): wywoz w popycie ceny wobec wyrobu rzemiosla
+    rep.add("NWAR-19: K4 wywoz w popycie ceny miasta-zrodla (INFO)", f"d{hi}: w popycie ceny skora {last.group(17)}, plotno {last.group(18)} szt./d; dzis wywiezione skora {last.group(4)}, plotno {last.group(8)}",
+            "INFO (sama cena - zloto i towary bez nowego przeplywu)", None)
 
 
 def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):

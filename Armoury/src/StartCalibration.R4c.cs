@@ -117,12 +117,16 @@ namespace Armoury
             if (!SwCtlPerTown) return;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             var u = new double[2 * KsTab.NG]; var lo = new double[2 * KsTab.NG]; var all = new double[2 * KsTab.NG];
+            // f14-rynek (recenzja, Ks Ctl Own Food): brak drabiny 1 wsi pokryty swoim tym samym towarem (G3) - juz w zuzyciu sterowania (MkOwn), wiec nie w braku miasta
+            var ovT = SwCtlOwnFood ? OwnCoveredByTown(_cDay) : null;
             if (_state == StateApplied && _zt.Count > 0)
             {
                 foreach (var zt in _zt.Values)
                 {
                     if (zt == null || zt.St == null) continue;
                     int m = zt.Market == 0 ? 0 : 1;
+                    double[] ova = null;
+                    if (ovT != null) ovT.TryGetValue(zt.St, out ova);
                     for (int z = 0; z < ZN; z++)
                     {
                         int g = CtlGood(z); if (g < 0) continue;
@@ -130,7 +134,17 @@ namespace Armoury
                         if (!(dp > 0.5) || double.IsNaN(dp)) continue;
                         int i = m * KsTab.NG + g;
                         all[i] += dp;
-                        if (zt.Cnt[z] < 0.5 * ZTstar(m, z) * dp) { lo[i] += dp; u[i] += Math.Max(0.0, dp - ZOff7(zt.St, z)); }
+                        if (zt.Cnt[z] < 0.5 * ZTstar(m, z) * dp)
+                        {
+                            lo[i] += dp;
+                            double un = Math.Max(0.0, dp - ZOff7(zt.St, z));
+                            if (ova != null && z < ova.Length && ova[z] > 0)
+                            {
+                                double cut = Math.Min(un, Math.Min(ova[z], Math.Max(0.0, zt.QV[z])));   // najwyzej koszyk wsi tego miasta
+                                un -= cut; _ovTown[m] += cut;
+                            }
+                            u[i] += un;
+                        }
                     }
                 }
             }
