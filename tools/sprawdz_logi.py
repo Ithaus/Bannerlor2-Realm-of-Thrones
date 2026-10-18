@@ -1402,6 +1402,20 @@ Uzycie (Python 3, tylko odczyt):
                     czy plik zimy dzialal (recenzja: tylko w autotescie - w grze "nie autotest - bez skutku"). Bazy: fin87 Armoury-2026-10-18_00-26-23.log (f5fd0ae3), fin86 Armoury-2026-10-17_23-22-37.log,
                     fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin87): NOP-5..8 jako liczby bazowe
                     (INFO), reszta brak linii (INFO), bez wyjatku.
+--grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
+                    najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
+                    WageRefund, CourtFull.Goods, CourtGoods.Gear, ClanBudget.Court - klucze Crown Refund By Need, Lapsed Gear Buys Goods) python -I tools/sprawdz_logi.py
+                    --grupa nzwrot <Armoury-*.log> [--csv budzet-rodow.csv] [--baza-doby <log bazy>] (strumieniowo; bez --csv budzet-rodow.csv obok logu - csv_path_of). NZR-0 linie paczki (INFO), NZR-1 linia
+                    "Korona: zwrot wedlug potrzeby (f6)" w kazdej dobie z linia zwrotu zoldu (brak 0), NZR-2 tozsamosci co do zlotowki: suma pasm = razem (pelny i wedlug
+                    potrzeby), oszczednosc = pelny - wedlug potrzeby, nalezny dzis = wedlug potrzeby (klucz czynny) albo pelny (na sucho / bez budzetu), = "nalezne" linii
+                    zwrotu, przy kluczu "pelny" linii zwrotu = razem pelny; NZR-3 pasma: ponad 2R wedlug potrzeby 0, ponizej R i bez miary = pelny, R-2R <= pelny; NZR-4
+                    zwrot wyplacony <= nalezny i nalezny linii 165 = linii zwrotu; NZR-5 budzet-rodow.csv rod po rodzie (kolumny zwrot_f6_*): f = clamp((2R - G) / R),
+                    pasmo wedlug G i R, ponad 2R bez zwrotu, wedlug potrzeby = pelny x f, suma rodow = linia f6 (CSV bez kolumn - INFO); NZR-6 pasma i oszczednosc korony
+                    (INFO, srednia 28 dob), NZR-7 korona: brak zwrotu z Banku / skarbca ponad zapas / zaliczek mieszczan, W5, W5b, renty 180, skarbce razem i dlug w Banku
+                    (INFO), NZR-7b z --baza-doby: Bank + K5 + zaliczki <= baza + 500 zl/d; NZR-8 sprzet niewydany: do zaplaty = kupione + zostalo, zostalo = miasta + zamki,
+                    przy kluczu wplacone do kas siedzib (E5/A2) = kupione i zamki 0; NZR-8b czesc f6 linii E3-P1: kupione = dopisek 166, grupa jedzenia 0; NZR-8c kwoty
+                    (INFO); NZR-9 ERROR RefundNeed / CourtFull.Goods / CourtGoods.Gear i potkniecia f6 i E5/A2 0; NZR-D skutek reguly na sucho z CSV (G i R tej doby -
+                    przyblizenie, INFO). Log sprzed paczki (np. fin88 Armoury-2026-10-18_03-13-38.log): linie f6 INFO, NZR-D i NZR-8 (stary przelew) z liczbami, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -37016,7 +37030,7 @@ def nds_main(logp, bdp=None, until=120):
         bs = [d for d in ref_days if d in B["refund"]]
         bshort = (sum(1 for d in bs if B["refund"][d][0] < B["refund"][d][1]), sum(max(0, B["refund"][d][1] - B["refund"][d][0]) for d in bs))
     ok7a = bool(ref_days) and (not short or (bshort is not None and len(short) <= bshort[0] and miss <= bshort[1] * 1.1 + 1000))
-    rep.add("NDS-7a: zwrot zoldu 100% naleznego kazdej doby (165; w tym z Banku - zwrot pierwszy z wydatkow wojska)", f"dob {len(ref_days)}, z niedoplata {len(short)} (brak razem {miss})"
+    rep.add("NDS-7a: zwrot nalezny wedlug potrzeby 100% kazdej doby (165; nalezny po f6 - zwrot wedlug potrzeby rodu, gdy klucz czynny; w tym z Banku - zwrot pierwszy z wydatkow wojska)", f"dob {len(ref_days)}, z niedoplata {len(short)} (brak razem {miss})"
             + (f" (dzien {short[0][0]}: {short[0][1][0]}/{short[0][1][1]})" if short else "") + (f"; baza w tych dobach: {bshort[0]} dob, brak {bshort[1]}" if bshort is not None else ""),
             "0 dob z niedoplata (z baza: nie wiecej dob i brak <= bazy x 1.1 + 1000 - niedoplata przy pustej puli Banku jest i bez DS)", ok7a)
     # ds-akumulator (18.10, diagnoza fin80 "dochod"): wplyw dnia i D staly bez jednorazowych wplywow krolestw (wplyw dnia krolestwa ponad 3 x mediana 28 dob - fin78 przeszedl
@@ -43337,6 +43351,370 @@ def st_median(v):
     return st.median(v) if v else 0.0
 
 
+# ============================================================ nzwrot (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii
+# 18.10, uwagi "Korona zwraca 70% zoldu takze najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru")
+NZR_F6 = "Korona: zwrot wedlug potrzeby (f6): dzien "
+NZR_165 = "Korona: wplywy dnia (165): dzien "
+NZR_SK = "Skarbce: dzien "
+NZR_166 = "Budzet rodow (166): dzien "
+NZR_P1 = "Dwor - towar z polki (E3-P1): dzien "
+NZR_RX_REF = re.compile(r"^Korona: dzien (\d+) - zwrot zoldu ze skarbcow krolestw w wojnie(?: \(165:[^)]*\))?: (\d+) zl dla (\d+) rodow w (\d+) krolestwach \(([\d.]+)% z (\d+)"
+                        r" zaplaconego zoldu = (?:pelny (\d+); wedlug potrzeby rodu \(f6\) )?nalezne (\d+)\)")
+NZR_RX_BANK = re.compile(r"z kredytu Banku \(186, brak zwrotu - kapital -> skarbiec -> rody\) (\d+) w (\d+) krolestwach")
+NZR_RX_KEY = re.compile(r"\| Crown Refund By Need (tak \(czynny\)|NIE \(na sucho[^)]*\)|NIE \(budzet 166[^)]*\))")
+NZR_RX_BAND = re.compile(r"rodow (\d+) \(zloto rodzin ([\d.]+) mln\), pelny (\d+), wedlug potrzeby (\d+)")
+NZR_RX_TOT = re.compile(r"\| razem pelny (\d+), wedlug potrzeby (\d+), nalezny dzis (\d+); korona (oszczedza|oszczedzilaby \(na sucho\)) (-?\d+) zl/d")
+NZR_RX_CUT = re.compile(r"\| rodow z ucietym zwrotem (\d+)")
+NZR_RX_RICH = re.compile(r"krolestw w wojnie bez naleznego \(same rody ponad 2R\) (\d+) \(zold (\d+)\)")
+NZR_RX_PL = re.compile(r"\| rod gracza: pasmo ([^,|]+), f ([\d.]+), G (-?\d+), R (\d+), pelny (\d+), wedlug potrzeby (\d+)")
+NZR_RX_ST = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.\s*$")
+NZR_RX_A2 = re.compile(r"-> dwor \(E5/A2\): przeterminowane dzis (\d+) u (\d+) rodow, wplacone do kas siedzib (\d+) u (\d+) rodow \(miasta (\d+) / zamki (\d+)\)")
+NZR_RX_A2G = re.compile(r"f6 tylko za towar niezywnosciowy ponad zapas polki \(Lapsed Gear Buys Goods (tak|nie[^)]*)\): do zaplaty (\d+), kupione (\d+), zostalo w kiesie glowy"
+                        r" bez towaru (\d+) \(miasta (\d+) / zamki bez polki (\d+)\)")
+NZR_RX_P1G = re.compile(r"\| sprzet niewydany -> dwor tylko za towar niezywnosciowy ponad zapas polki \(f6, Lapsed Gear Buys Goods (tak|nie)\): kupujacych (\d+) w (\d+) siedzibach,"
+                        r" chciane (\d+) zl, kupione (\d+) zl \([\d.]+%\), sztuk (\d+) \[jedzenie i napoje (\d+) / (\d+) zl / (\d+) szt\.")
+NZR_RX_P1Z = re.compile(r"sprzet niewydany -> kasy siedzib tylko za towar \(f6; lud bez udzialu, reszta w kiesach glow\) (\d+)")
+NZR_RX_P1L = re.compile(r"\| pan \(Court Buys Goods (?:tak|nie)\): kupujacych (\d+) w (\d+) siedzibach, chciane (\d+) zl, kupione (\d+) zl")
+NZR_BANDS = ("ponizej R", "R-2R", "ponad 2R", "bez miary")
+
+
+def _nzr_scan(logp):
+    """nzwrot: strumieniowo linia zwrotu zoldu, linia f6, linia 165, "Skarbce:", "Budzet rodow (166)" (E5/A2 + f6), "Dwor - towar z polki (E3-P1)" i bledy paczki."""
+    D = {"ref": {}, "f6": {}, "f6bad": [], "k165": {}, "tre": {}, "debt": {}, "a2": {}, "a2g": {}, "a2st": {}, "p1g": {}, "p1z": {}, "p1l": {}, "err": [], "start": None}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in ") and ("RefundNeed" in s or "CourtFull.Goods" in s or "CourtGoods.Gear" in s or "KingdomTreasury.WageRefund" in s):
+                D["err"].append(s[:200])
+                continue
+            if s.startswith("Korona: dzien "):
+                mm = NZR_RX_REF.search(s)
+                if mm:
+                    g = [None if x is None else (float(x) if "." in x else int(x)) for x in mm.groups()]
+                    day = g[0]
+                    b = NZR_RX_BANK.search(s)
+                    D["ref"][day] = {"given": g[1], "clans": g[2], "k": g[3], "pct": g[4], "paid": g[5], "full": g[6], "due": g[7],
+                                     "short": num(r"niedoplata (-?\d+);", s, int, 0), "bank": int(b.group(1)) if b else 0, "bankk": int(b.group(2)) if b else 0}
+                continue
+            if s.startswith(NZR_F6):
+                day = num(r"dzien (\d+)", s)
+                bands = NZR_RX_BAND.findall(s)
+                tot = NZR_RX_TOT.search(s); key = NZR_RX_KEY.search(s)
+                if day is None or len(bands) != 4 or not tot or not key:
+                    D["f6bad"].append(s[:200]); continue
+                kk = key.group(1)
+                r = {"state": "on" if kk.startswith("tak") else ("dry" if "na sucho" in kk else "nobud"),
+                     "bands": [(int(a), float(b_), int(c), int(d)) for a, b_, c, d in bands],
+                     "full": int(tot.group(1)), "need": int(tot.group(2)), "due": int(tot.group(3)), "save": int(tot.group(5)), "dryw": tot.group(4) != "oszczedza"}
+                c = NZR_RX_CUT.search(s); r["cut"] = int(c.group(1)) if c else None
+                c = NZR_RX_RICH.search(s); r["richk"], r["richpaid"] = (int(c.group(1)), int(c.group(2))) if c else (None, None)
+                c = NZR_RX_PL.search(s); r["pl"] = c.groups() if c else None
+                c = NZR_RX_ST.search(s); r["st"], r["stsess"] = (int(c.group(1)), int(c.group(2))) if c else (None, None)
+                D["f6"][day] = r
+                continue
+            if s.startswith(NZR_165):
+                day = num(r"dzien (\d+)", s)
+                if day is None:
+                    continue
+                D["k165"][day] = {"given": num(r"zwrot zoldu (\d+) \(nalezny", s), "due": num(r"zwrot zoldu \d+ \(nalezny (\d+)", s),
+                                  "bank": num(r"w tym z kredytu Banku \(186\) (\d+)", s, int, 0), "k5": num(r"ze skarbca ponad zapas wojny \(DS K5\) (\d+)", s, int, 0),
+                                  "l1": num(r"z zaliczek mieszczan \(DS L1\) (\d+)", s, int, 0), "rent": num(r"renty \(180\) (\d+)", s, int, 0),
+                                  "w5": num(r"doplata do zoldu wedlug potrzeby \(W5, przed rentami\) (\d+)", s, int, 0),
+                                  "w5b": num(r"\(W5b, poza wplywami dnia - z zapasu\) (\d+)", s, int, 0)}
+                continue
+            if s.startswith(NZR_SK):
+                day = num(r"dzien (\d+)", s)
+                t = num(r": skarbiec (-?\d+) \(", s)
+                if day is not None and t is not None:
+                    D["tre"][day] = D["tre"].get(day, 0) + t
+                    D["debt"][day] = D["debt"].get(day, 0) + (num(r"dlug w Banku \(186\) (\d+)", s, int, 0) or 0)
+                continue
+            if s.startswith(NZR_166):
+                day = num(r"dzien (\d+)", s)
+                if day is None:
+                    continue
+                a = NZR_RX_A2.search(s)
+                if a:
+                    D["a2"][day] = [int(x) for x in a.groups()]
+                g = NZR_RX_A2G.search(s)
+                if g:
+                    D["a2g"][day] = [g.group(1)] + [int(x) for x in g.groups()[1:]]
+                D["a2st"][day] = num(r"potkniecia E5/A2 (\d+)", s, int, 0) or 0
+                continue
+            if s.startswith(NZR_P1):
+                day = num(r"dzien (\d+)", s)
+                if day is None:
+                    continue
+                g = NZR_RX_P1G.search(s)
+                if g:
+                    D["p1g"][day + 1] = [g.group(1)] + [int(x) for x in g.groups()[1:]]   # linia E3-P1 podpisana doba - 1 (ta sama doba bloku co linia 166)
+                z = NZR_RX_P1Z.search(s)
+                if z:
+                    D["p1z"][day + 1] = int(z.group(1))
+                l_ = NZR_RX_P1L.search(s)
+                if l_:
+                    D["p1l"][day + 1] = int(l_.group(4))
+                continue
+    return D
+
+
+def _nzr_csv(csvp):
+    """budzet-rodow.csv - wszystkie wiersze (z rodem gracza): na dzien_gry lista slownikow; (wiersze, czy sa kolumny f6)."""
+    out = {}
+    if not csvp or not os.path.isfile(csvp):
+        return out, False
+    has = False
+    with open(csvp, encoding="utf-8", errors="replace", newline="") as f:
+        rd = csv.DictReader(f, delimiter=";")
+        has = "zwrot_f6_pasmo" in (rd.fieldnames or [])
+        for r in rd:
+            try:
+                d = int(r.get("dzien_gry") or 0) or (int(r.get("dzien") or 0) + 1)
+            except ValueError:
+                continue
+            out.setdefault(d, []).append(r)
+    return out, has
+
+
+def _nzr_f(G, R):
+    if R <= 0:
+        return 1.0
+    return max(0.0, min(1.0, (2.0 * R - G) / R))
+
+
+def nzwrot_main(logp, bdp=None, csvp=None):
+    """nzwrot (18.10, paczka f6-zwrot): zwrot zoldu wedlug potrzeby rodu (KingdomTreasury.RefundNeed.cs, klucz Crown Refund By Need) i przeterminowany przydzial sprzetu
+    tylko za towar niezywnosciowy z polki siedziby (CourtFull.Goods / CourtGoods.Gear, klucz Lapsed Gear Buys Goods). Wejscie: log Armoury (strumieniowo), budzet-rodow.csv
+    obok (csv_path_of), opcjonalnie --baza-doby <log bazy> (NZR-7). Progi NZR-0..NZR-9 i NZR-D - opis w naglowku pliku (--grupa nzwrot). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NZR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = _nzr_scan(logp)
+    R, F6, K165 = D["ref"], D["f6"], D["k165"]
+    csvp = csvp or csv_path_of(logp)   # --csv (CSV w katalogu gry Logs/<znacznik>/) albo obok logu
+    CS, has_f6csv = _nzr_csv(csvp)
+    rd, fd = sorted(R), sorted(F6)
+    st_ = {k: sum(1 for d in fd if F6[d]["state"] == k) for k in ("on", "dry", "nobud")}
+    print(f"plik: {logp} | linii zwrotu zoldu {len(rd)} | linii f6 {len(fd)} (czynny {st_['on']}, na sucho {st_['dry']}, bez budzetu {st_['nobud']}; nieczytelnych {len(D['f6bad'])})"
+          f" | CSV {csvp if CS else 'brak'}{' (z kolumnami f6)' if has_f6csv else ''} | linii 166 z E5/A2 {len(D['a2'])} (z dopiskiem f6 {len(D['a2g'])}) | E3-P1 z czescia f6 {len(D['p1g'])}")
+    rep.add("NZR-0: linie paczki f6-zwrot (zwrot wedlug potrzeby, sprzet tylko za towar)",
+            f"linia f6 w {len(fd)} z {len(rd)} dob zwrotu (czynny {st_['on']}, na sucho {st_['dry']}, bez budzetu 166 {st_['nobud']}); nieczytelnych {len(D['f6bad'])}"
+            + (f" (np. {D['f6bad'][0][:120]})" if D["f6bad"] else "") + f"; dopisek f6 w linii 166 {len(D['a2g'])} z {len(D['a2'])}; czesc f6 w E3-P1 {len(D['p1g'])}",
+            "INFO (brak linii = log sprzed paczki: progi z linii paczki INFO, skutek na sucho z CSV - NZR-D)", None)
+    if D["f6bad"]:
+        rep.add("NZR-0b: linie f6 nieczytelne", f"{len(D['f6bad'])}", "0", False)
+
+    # ---- NZR-1 linia f6 w kazdej dobie zwrotu
+    if fd:
+        miss = [d for d in rd if d not in F6]
+        rep.add("NZR-1: linia f6 w kazdej dobie z linia zwrotu zoldu", f"brak w {len(miss)} z {len(rd)} dob" + (f" (doby {miss[:6]})" if miss else ""), "0", len(miss) == 0)
+
+        # ---- NZR-2 tozsamosci linii f6 i linii zwrotu
+        bad = []
+        for d in fd:
+            r = F6[d]
+            sf = sum(b[2] for b in r["bands"]); sn = sum(b[3] for b in r["bands"])
+            ok = sf == r["full"] and sn == r["need"] and r["save"] == r["full"] - r["need"]
+            ok = ok and r["due"] == (r["need"] if r["state"] == "on" else r["full"])
+            rr = R.get(d)
+            if rr is not None:
+                ok = ok and rr["due"] == r["due"]
+                if r["state"] == "on":
+                    ok = ok and rr["full"] is not None and rr["full"] == r["full"]
+                else:
+                    ok = ok and rr["full"] is None
+            if not ok:
+                bad.append(d)
+        rep.add("NZR-2: tozsamosci f6 (pasma = razem, oszczednosc = pelny - wedlug potrzeby, nalezny dzis = wedlug potrzeby / pelny, = 'nalezne' i 'pelny' linii zwrotu)",
+                f"niezgodne {len(bad)} z {len(fd)} dob" + (f" (doby {bad[:6]})" if bad else ""), "0 (co do zlotowki)", len(bad) == 0)
+
+        # ---- NZR-3 pasma: ponad 2R nic, ponizej R i bez miary pelny
+        b3 = [d for d in fd if F6[d]["bands"][2][3] != 0 or F6[d]["bands"][0][3] != F6[d]["bands"][0][2] or F6[d]["bands"][3][3] != F6[d]["bands"][3][2]
+              or F6[d]["bands"][1][3] > F6[d]["bands"][1][2]]
+        rep.add("NZR-3: pasma - ponad 2R wedlug potrzeby 0, ponizej R i bez miary = pelny, R-2R <= pelny (kazda doba)", f"niezgodne {len(b3)} z {len(fd)} dob"
+                + (f" (doby {b3[:6]})" if b3 else ""), "0", len(b3) == 0)
+    else:
+        rep.add("NZR-1..3: linia f6 i tozsamosci", "brak linii f6 (log sprzed paczki)", "INFO", None)
+
+    # ---- NZR-4 zwrot wyplacony <= nalezny; linia 165 = linia zwrotu
+    if rd:
+        over = [d for d in rd if R[d]["given"] > R[d]["due"]]
+        mism = [d for d in rd if d in K165 and K165[d]["due"] is not None and K165[d]["due"] != R[d]["due"]]
+        nk = sum(1 for d in rd if d in K165)
+        rep.add("NZR-4: zwrot wyplacony <= nalezny (linia zwrotu) i 'zwrot zoldu (nalezny N)' linii 165 = nalezny linii zwrotu",
+                f"wyplacony > nalezny {len(over)}; 165 rozne {len(mism)} z {nk} dob" + (f" (doby {mism[:6]})" if mism else ""), "0 / 0", not over and not mism)
+
+    # ---- NZR-5 CSV rod po rodzie
+    if has_f6csv and fd:
+        badr, badd, nrow, inexact = [], [], 0, 0
+        for d in fd:
+            rows = [r for r in CS.get(d, []) if (r.get("zwrot_f6_pasmo") or "").strip() != ""]
+            if not rows:
+                continue
+            spf = spn = 0
+            for r in rows:
+                try:
+                    f = float(r["zwrot_f6_mnoznik"]); G = float(r["zwrot_f6_g"]); Rr = float(r["zwrot_f6_r"]); b = int(r["zwrot_f6_pasmo"])
+                    pf = int(r["zwrot_f6_pelny"]); pn = int(r["zwrot_f6_wedlug_potrzeby"])
+                except (ValueError, KeyError):
+                    badr.append((d, (r.get("rod_id") or "?")[:30], "nieczytelny")); continue
+                nrow += 1; spf += pf; spn += pn
+                why = None
+                if b in (0, 1, 2) and Rr > 0:
+                    fc = _nzr_f(G, Rr)
+                    if abs(f - fc) > 0.001 + 2.0 / Rr:
+                        why = f"f {f} != {fc:.4f}"
+                    elif b == 0 and G > Rr + 1:
+                        why = "pasmo ponizej R przy G > R"
+                    elif b == 2 and G < 2 * Rr - 1:
+                        why = "pasmo ponad 2R przy G < 2R"
+                    elif b == 1 and not (Rr - 1 <= G <= 2 * Rr + 1):
+                        why = "pasmo R-2R poza R..2R"
+                if why is None:
+                    if b == 2 and pn != 0:
+                        why = "ponad 2R z naleznym"
+                    elif b in (0, 3) and pn != pf:
+                        why = "pelny pas, a wedlug potrzeby != pelny"
+                    elif b == 1 and abs(pn - int(pf * f)) > 1 + pf * 0.0001:
+                        why = f"R-2R: {pn} != pelny x f {int(pf * f)}"
+                if why:
+                    badr.append((d, (r.get("rod_id") or "?")[:30], why))
+            # rod, ktory zniknal miedzy zwrotem a ksiega rodow (wyeliminowany, bez glowy) nie ma wiersza CSV - suma CSV nie wieksza i luka <= max(100, 0.5%)
+            if spf != F6[d]["full"] or spn != F6[d]["need"]:
+                inexact += 1
+                if spf > F6[d]["full"] or spn > F6[d]["need"] or F6[d]["full"] - spf > max(100, 0.005 * F6[d]["full"]) or F6[d]["need"] - spn > max(100, 0.005 * F6[d]["need"]):
+                    badd.append((d, spf, F6[d]["full"], spn, F6[d]["need"]))
+        rep.add("NZR-5: CSV rod po rodzie - f = clamp((2R - G) / R), pasmo wedlug G i R, ponad 2R bez zwrotu, wedlug potrzeby = pelny x f; suma rodow = linia f6",
+                f"wierszy {nrow}, niezgodnych {len(badr)}" + (f" (np. {badr[:3]})" if badr else "") + f"; dob z suma rozna od linii {len(badd)} (niedokladnych w granicy luki {inexact - len(badd)})" + (f" (np. {badd[:2]})" if badd else ""),
+                "0 / 0 (suma: CSV <= linia, luka <= max(100, 0.5%) - rod bez wiersza ksiegi)", (not badr and not badd) if nrow else None)
+    elif fd:
+        rep.add("NZR-5: CSV rod po rodzie", f"CSV {'bez kolumn f6' if CS else 'brak'} ({csvp})", "INFO", None)
+
+    # ---- NZR-6 skutek (srednia 28 ostatnich dob z linia f6)
+    if fd:
+        w = fd[-28:]
+        def mb(i, j):
+            return sum(F6[d]["bands"][i][j] for d in w) / len(w)
+        sv = sum(F6[d]["save"] for d in w) / len(w)
+        fu = sum(F6[d]["full"] for d in w) / len(w)
+        cutm = [F6[d]["cut"] for d in w if F6[d]["cut"] is not None]
+        txt = "; ".join(f"{NZR_BANDS[i]}: rodow {mb(i, 0):.0f}, zloto {mb(i, 1):.1f} mln, pelny {mb(i, 2):.0f} -> {mb(i, 3):.0f}" for i in range(4))
+        last = F6[fd[-1]]
+        rep.add("NZR-6: zwrot wedlug potrzeby - pasma i oszczednosc korony (srednia ostatnich %d dob z linia f6)" % len(w),
+                f"{txt}; razem pelny {fu:.0f}/d, korona {'oszczedza' if last['state'] == 'on' else 'oszczedzilaby (na sucho)'} {sv:.0f}/d ({100 * sv / fu if fu else 0:.1f}%)"
+                + (f"; rodow z ucietym zwrotem {st.mean(cutm):.0f}" if cutm else "") + (f"; rod gracza (ostatnia doba): {last['pl']}" if last.get("pl") else ""),
+                "INFO (przeglad 18.10: ok. 90-96 tys./d przy kiesie glowy; z zlotem rodziny ChestOf i czescia R-2R wiecej - fin88 na sucho z CSV ok. 150 tys./d)", None)
+
+    # ---- NZR-7 korona: Bank, K5, zaliczki, renty, skarbce (srednia 28 ostatnich dob; z baza - porownanie)
+    def crown(DD):
+        ks = sorted(DD["k165"])[-28:]
+        if not ks:
+            return None
+        m = lambda k: sum((DD["k165"][d][k] or 0) for d in ks) / len(ks)
+        tr = sorted(DD["tre"])
+        tw = tr[-29:]
+        dtr = (DD["tre"][tw[-1]] - DD["tre"][tw[0]]) / max(1, tw[-1] - tw[0]) if len(tw) >= 2 else None
+        return {"n": len(ks), "bank": m("bank"), "k5": m("k5"), "l1": m("l1"), "rent": m("rent"), "w5": m("w5"), "w5b": m("w5b"), "due": m("due"),
+                "dtr": dtr, "tre": DD["tre"][tr[-1]] if tr else None, "debt": DD["debt"][tr[-1]] if tr else None}
+    C = crown(D)
+    B = None
+    if bdp and os.path.isfile(bdp):
+        try:
+            B = crown(_nzr_scan(bdp))
+        except Exception as e:   # baza nieczytelna - wiersz bez porownania, nie wyjatek
+            B = None
+            print(f"baza {bdp}: {e}")
+
+    def ctext(X):
+        dtr = "-" if X["dtr"] is None else f"{X['dtr']:+.0f}"
+        return (f"zwrot nalezny {X['due']:.0f}/d, z Banku {X['bank']:.0f}, skarbiec ponad zapas (K5) {X['k5']:.0f}, zaliczki mieszczan {X['l1']:.0f}, W5 {X['w5']:.0f}, W5b {X['w5b']:.0f},"
+                f" renty 180 {X['rent']:.0f}; skarbce razem {X['tre'] or 0:.0f} ({dtr}/d w 28 dobach), dlug koron w Banku {X['debt'] or 0:.0f}")
+    if C:
+        rep.add("NZR-7: korona - brak zwrotu z Banku / skarbca / zaliczek, renty 180, skarbce (srednia %d ostatnich dob)" % C["n"],
+                ctext(C) + (f" | baza: {ctext(B)}" if B else ""), "INFO (bez bazy); z --baza-doby: NZR-7b", None)
+        if B:
+            cov, covb = C["bank"] + C["k5"] + C["l1"], B["bank"] + B["k5"] + B["l1"]
+            rep.add("NZR-7b: brak zwrotu pokryty Bankiem, skarbcem ponad zapas i zaliczkami mieszczan - nie wiecej niz w bazie",
+                    f"{cov:.0f}/d wobec bazy {covb:.0f}/d (Bank {C['bank']:.0f} / {B['bank']:.0f})", "<= baza + 500 zl/d", cov <= covb + 500)
+    else:
+        rep.add("NZR-7: korona", "brak linii 165", "INFO", None)
+
+    # ---- NZR-8 sprzet przeterminowany tylko za towar
+    a2d = sorted(D["a2"])
+    if D["a2g"]:
+        bad, badp, onn = [], [], 0
+        for d in sorted(D["a2g"]):
+            g = D["a2g"][d]; a = D["a2"].get(d)
+            on = g[0] == "tak"
+            onn += 1 if on else 0
+            ok = g[1] == g[2] + g[3] and g[3] == g[4] + g[5]
+            if on and a is not None:
+                ok = ok and a[2] == g[2] and a[5] == 0 and g[2] <= g[1]
+            if not ok:
+                bad.append(d)
+            p = D["p1g"].get(d)
+            if on and p is not None:
+                z = D["p1z"].get(d)
+                if not (p[4] == g[2] and (z is None or z == g[2]) and p[6] == 0 and p[7] == 0 and p[8] == 0):
+                    badp.append(d)
+        rep.add("NZR-8: sprzet niewydany tylko za towar - do zaplaty = kupione + zostalo, zostalo = miasta + zamki; przy kluczu: wplacone do kas (E5/A2) = kupione, zamki 0",
+                f"niezgodne {len(bad)} z {len(D['a2g'])} dob (klucz czynny {onn})" + (f" (doby {bad[:6]})" if bad else ""), "0", len(bad) == 0)
+        rep.add("NZR-8b: E3-P1 czesc f6 - kupione = dopisek 166 i 'zloto ... tylko za towar', grupa jedzenia 0 (towar niezywnosciowy)",
+                f"niezgodne {len(badp)} z {sum(1 for d in D['a2g'] if d in D['p1g'])} dob" + (f" (doby {badp[:6]})" if badp else ""), "0", len(badp) == 0)
+        w = sorted(D["a2g"])[-28:]
+        mm = lambda i: sum(D["a2g"][d][i] for d in w) / len(w)
+        gp = [D["p1g"][d][5] for d in w if d in D["p1g"]]
+        rep.add("NZR-8c: sprzet niewydany -> dwor (srednia %d ostatnich dob)" % len(w),
+                f"do zaplaty {mm(1):.0f}/d, kupione {mm(2):.0f}/d ({100 * mm(2) / mm(1) if mm(1) else 0:.1f}%), zostalo w kiesach glow {mm(3):.0f}/d (miasta {mm(4):.0f} / zamki {mm(5):.0f})"
+                + (f", sztuk {st.mean(gp):.0f}/d" if gp else ""), "INFO (przeglad 18.10: dzis ok. 150 tys./d do kas bez towaru)", None)
+    elif a2d:
+        w = a2d[-28:]
+        mm = lambda i: sum(D["a2"][d][i] for d in w) / len(w)
+        rep.add("NZR-8: sprzet niewydany -> dwor (log sprzed paczki, srednia %d ostatnich dob)" % len(w),
+                f"przeterminowane {mm(0):.0f}/d, wplacone do kas siedzib bez towaru {mm(2):.0f}/d (miasta {mm(4):.0f} / zamki {mm(5):.0f})", "INFO (po paczce - tylko za towar, NZR-8)", None)
+    else:
+        rep.add("NZR-8: sprzet niewydany -> dwor", "brak linii E5/A2", "INFO", None)
+
+    # ---- NZR-9 bledy i potkniecia
+    stf = max([F6[d]["stsess"] or 0 for d in fd] or [0])
+    stA2 = max(D["a2st"].values() or [0])
+    newerr = [e for e in D["err"] if "RefundNeed" in e or "CourtFull.Goods" in e or "CourtGoods.Gear" in e]
+    rep.add("NZR-9: bledy i potkniecia paczki (RefundNeed, CourtFull.Goods, CourtGoods.Gear; WageRefund - INFO w opisie)",
+            f"bledy paczki {len(newerr)}, potkniecia f6 (sesja) {stf}, potkniecia E5/A2 {stA2}; ERROR WageRefund {len(D['err']) - len(newerr)}", "0 / 0 / 0",
+            not newerr and stf == 0 and stA2 == 0)
+
+    # ---- NZR-D skutek na sucho z CSV (G, R i zwrot_korony dzisiejszego budzetu - przyblizenie: gra liczy f z wczorajszego G i R)
+    if CS:
+        days = sorted(CS)[-28:]
+        acc = [[0, 0.0, 0.0, 0.0] for _ in range(3)]
+        nd = 0
+        for d in days:
+            got = False
+            for r in CS[d]:
+                try:
+                    G = float(r.get("G") or 0); Rr = float(r.get("R") or 0); z = float(r.get("zwrot_korony") or 0)
+                except ValueError:
+                    continue
+                if z <= 0 or Rr <= 0:
+                    continue
+                got = True
+                f = _nzr_f(G, Rr)
+                i = 0 if G <= Rr else (2 if G >= 2 * Rr else 1)
+                acc[i][0] += 1; acc[i][1] += G; acc[i][2] += z; acc[i][3] += z * f
+            nd += 1 if got else 0
+        if nd:
+            tz = sum(a[2] for a in acc) / nd; tf = sum(a[3] for a in acc) / nd
+            rep.add("NZR-D: skutek reguly wedlug CSV (G i R z budzet-rodow.csv tej doby, zwrot_korony; srednia %d dob)" % nd,
+                    "; ".join(f"{NZR_BANDS[i]}: rodow {acc[i][0] / nd:.0f}, zloto {acc[i][1] / nd / 1e6:.1f} mln, zwrot {acc[i][2] / nd:.0f} -> {acc[i][3] / nd:.0f}" for i in range(3))
+                    + f"; razem {tz:.0f} -> {tf:.0f}, korona mniej o {tz - tf:.0f}/d ({100 * (tz - tf) / tz if tz else 0:.1f}%)",
+                    "INFO (przyblizenie - gra bierze G i R z wczoraj; renty 180 nietkniete: zaoszczedzone idzie dalej w W5 / M1 / M3 / renty)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -43584,6 +43962,8 @@ def main(argv):
         return nkasy_main(logp)   # nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z): firmy DS miast przegladane co kwartal, pan splaca rachunki zywnosci wczesniej, zawrocony woz bez straty towaru (DsTowns, KsLordFood, KsFoodCarts)
     if group == "nf4" and logp:
         return nf4_main(logp)   # nf4 (noc 17/18.10, f4-pomiary): diagnoza A7 i zajecia zamrozone, regale wobec polki, nacisk ZW, wynik handlowy karawan, zelazo i drewno z polek, drewno w wozach (same pomiary)
+    if group == "nzwrot" and logp:
+        return nzwrot_main(logp, bdp, csvp)   # nzwrot (18.10, paczka f6-zwrot): zwrot zoldu wedlug potrzeby rodu, sprzet niewydany tylko za towar niezywnosciowy (KingdomTreasury.RefundNeed, CourtFull.Goods)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

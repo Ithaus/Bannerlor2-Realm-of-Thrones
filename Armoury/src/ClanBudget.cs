@@ -1038,12 +1038,23 @@ namespace Armoury
             // E3-P1 (a) (CourtBuysGoods, noc-ekonomia3 czesc 2): siedziba-miasto - do 60% WLASNEJ czesci dworu (bez sprzetu E5/A2; dwor placony pierwszy) kupuje towar z polki
             // siedziby; towar schodzi z polki tu, zloto idzie nizej w tej samej wplacie (ta sama kwota co dotad - czesc za towar); zamki bez zmian
             long goods = seat.IsTown ? CourtGoods.Lord(seat, Math.Min((long)ix, (long)Math.Max(0, court))) : 0;
+            // f6-zwrot (2) (klucz LapsedGearBuysGoods): czesc ze sprzetu przeterminowanego (lp) idzie do kasy siedziby tylko za towar niezywnosciowy zdjety z jej polki
+            // ponad zapas (po zakupie wlasnej czesci dworu - dwor pierwszy); reszta zostaje w kiesie glowy. Towar wchodzi do "goods": lud nie bierze z niego 20% (towar,
+            // nie sluzba), robocizna handlu jak kazda sprzedaz z polki. Klucz wylaczony - lp bez zmian (calosc do kasy jak dotad).
+            bool gearGoods = lp > 0 && CourtFull.GoodsOnly;
+            if (gearGoods)
+            {
+                long lg = CourtFull.Goods(seat, lp);
+                ix -= (int)Math.Min(int.MaxValue, lp - lg);
+                lp = lg; goods += lg;
+                if (ix <= 0) return;   // nic do zaplaty (dwor 0 i sprzet bez towaru) - (a) nic nie kupilo, bo jej budzet to czesc dworu (0)
+            }
             head.ChangeHeroGold(-ix);
             CirculationWindows.NoteHeroGold(head, -ix);            // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
             int folk = TownFolk.Earn(seat, (int)((ix - goods) * (double)CourtFull.FolkShare), TownFolk.KCourt);   // E5/B1 (R8, KL 1.3): 20% dworu do ludu siedziby (zamek - podzamcze); arytmetyka; E3-P1: tylko od czesci "sluzba" (bez towaru)
             seat.Town.ChangeGold(ix - folk);                       // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
             if (seat.IsCastle) TownFolk.CourtCredit(seat, ix - folk);   // E5/B1 (kuchnia pana): czesc kupcow dworu w kasie zamku - kredyt na jedzenie podzamcza (bez zlota); CourtCredit sam sprawdza kiese czynna zamkow
-            long lpK = folk > 0 && ix > 0 ? lp - (long)(lp * (double)folk / ix) : lp;   // E5/B1: sprzet w kasie (CourtFull.Paid/Own od czesci w kasie)
+            long lpK = gearGoods ? lp : (folk > 0 && ix > 0 ? lp - (long)(lp * (double)folk / ix) : lp);   // E5/B1: sprzet w kasie (CourtFull.Paid/Own od czesci w kasie); f6: towar - lud nie bierze, calosc w kasie
             ClanIncomeBook.NoteOwnPaid(seat, c, Math.Max(0, ix - folk - CourtFull.Own(seat, c, lpK)));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
             try { TownFolk.Note(seat, ix, TownFolk.KCourt); } catch { }   // E5/0 (195): dwor w kasie siedziby (tylko licznik)
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty

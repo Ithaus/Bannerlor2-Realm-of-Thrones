@@ -3632,6 +3632,10 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public float CrownWageRefundPercent { get; set; } = 70f;
 
+        [SettingPropertyBool("Crown Refund By Need", HintText = "the crown repays wages by need: a house whose family gold is below its war reserve gets the full share, a house holding more than twice its war reserve pays for its own war and gets nothing, and in between the share falls evenly the richer the house is. Judged on the house's budget of the day before; your own house the same way. Houses without a budget, in debt or under seizure keep the full share (off = every house gets the full share, as before)")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool CrownRefundByNeed { get; set; } = true;
+
         [SettingPropertyBool("Crown Wage Refund Garrisons", HintText = "the refund counts garrison wages too; off = wages of the parties in the field only")]
         [SettingPropertyGroup("The soldier's pay")]
         public bool CrownWageRefundGarrisons { get; set; } = true;
@@ -3903,6 +3907,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Court Folk Share", 0.00f, 1.00f, "0.00", HintText = "the share of the court's money that goes to the townsfolk of the seat (servants, cooks, grooms) rather than to its merchants - with Town Folk Live on (the townsfolk's purse live) it goes into their purse, at a castle into the castle folk's purse; with it off the whole court money goes into the seat's purse")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CourtFolkShare { get; set; } = 0.2f;
+
+        [SettingPropertyBool("Lapsed Gear Buys Goods", HintText = "with Court Gets Lapsed Arms Share: the arms money a house did not spend is paid to its seat only for real goods taken from the seat town's stall - linen, velvet and furs, jewels, silver, spice and pottery, never food - and only what lies above the stall's reserve, only goods not dear there, at most a quarter of a stack a day (shared with the court's own buying). What buys nothing stays in the head's purse; a castle seat has no stall, so there it all stays with the house. The townsfolk take no fifth of it - it pays for goods, not for service (off = the whole lapsed arms money goes into the seat's purse in coin, as before)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool LapsedGearBuysGoods { get; set; } = true;
 
         [SettingPropertyBool("Own Payments Back As Own", HintText = "money a house pays into the coffers of its own town or castle (its court, garrison wages, its men's spending, arms, building wages) comes back through the dues as the house's own money for as many days as it takes, not as income from its land - so it no longer swells the house's steady income and the army it may keep (off = only one day's share counts as its own, the rest as land income, as before)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -8567,6 +8575,7 @@ namespace Armoury
             s.GarrisonPayToCoffers = GarrisonPayToCoffers;
             s.CrownWageRefundEnabled = CrownWageRefundEnabled;
             s.CrownWageRefundPercent = CrownWageRefundPercent;
+            s.CrownRefundByNeed = CrownRefundByNeed;
             s.CrownWageRefundGarrisons = CrownWageRefundGarrisons;
             s.TownWageShield = TownWageShield;
             s.CastlePurseEnabled = CastlePurseEnabled;
@@ -8635,6 +8644,7 @@ namespace Armoury
             s.WarCourtYieldsToWages = WarCourtYieldsToWages;
             s.CourtGetsLapsedArmsShare = CourtGetsLapsedArmsShare;
             s.CourtFolkShare = CourtFolkShare;
+            s.LapsedGearBuysGoods = LapsedGearBuysGoods;
             s.OwnPaymentsBackAsOwn = OwnPaymentsBackAsOwn;
             s.CrownRefundIgnoresOwnBack = CrownRefundIgnoresOwnBack;
             s.PartyLimitsShareFreeRoom = PartyLimitsShareFreeRoom;
