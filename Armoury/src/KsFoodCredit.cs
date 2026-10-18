@@ -37,6 +37,9 @@ namespace Armoury
         // scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): doba - zalegle rachunki splacone przez panow glodnych miast (KsLordFood tryb RACHUNKI; w DRepaid tez),
         // zloto od panow przyjete przez kasy zrodel (w GSrcGot tez - kontrola zlota linii KS-H: cel - panowie + zrodla), splat (miasto-doby)
         internal static long DLordRepaid, GLordPaid; internal static int DLordN;
+        // KS-R5 ceny-r5 (zadatek kupcow celu): roszczenia celu wobec zrodla (nadplacony albo niezwrocony zadatek, ktorego kasa zrodla nie oddala od razu) - rachunek
+        // odwrotny (wierzyciel = miasto celu, dluznik = miasto zrodla), splacany jak kazdy rachunek; w kontroli rachunkow obok "nowe" (nie w "u celu")
+        internal static long DClaimNew; internal static int DClaimN;
         private static long _openPrev = -1;
         private static int _stum; private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -50,6 +53,7 @@ namespace Armoury
         {
             DNew = DPaidNow = DBilled = DRepaid = DForfeit = 0; DNewN = DForfeitN = DDeliv = 0; GDstPaid = GSrcGot = 0;
             DLordRepaid = GLordPaid = 0; DLordN = 0;
+            DClaimNew = 0; DClaimN = 0;
         }
 
         internal static int TakeStumbles() { int n = _stum; _stum = 0; return n; }
@@ -74,7 +78,27 @@ namespace Armoury
         {
             if (t == null) return 0;
             long res = 0; try { res = Seal31.TownReserve(t); } catch { res = 0; }
-            return Math.Max(0L, t.Gold - (long)Math.Ceiling(FloorShare * Math.Max(0L, res)));
+            return FreeAbove(t.Gold, res);
+        }
+
+        /// <summary>KS-R5 ceny-r5: kasa ponad podloge kredytu (KsConsignFloorShare x zapas kupcow) - ta sama granica dla zaplaty przy dostawie, splat i zadatku przy wysylce.</summary>
+        internal static long FreeAbove(long gold, long reserve) { return Math.Max(0L, gold - (long)Math.Ceiling(FloorShare * Math.Max(0L, reserve))); }
+
+        /// <summary>KS-R5 ceny-r5: kasa miasta ponad podloge kredytu teraz (zadatek przy wysylce).</summary>
+        internal static long FreeOf(Town t) { return Free(t); }
+
+        /// <summary>KS-R5 ceny-r5 (zadatek): roszczenie wierzyciela `creditor` (miasto celu, ktore zaplacilo zadatek) wobec dluznika `debtor` (miasto zrodla bez kasy na zwrot
+        /// nadplaty albo zadatku zawroconego wozu) - rachunek jak kazdy (splata od najstarszego ponad podloge, zwloka, wojna = przepada); zloto sie nie rusza.</summary>
+        internal static void OpenClaim(Settlement creditor, Settlement debtor, long x, int today)
+        {
+            Resolve();
+            if (x <= 0 || creditor == null || debtor == null || creditor == debtor) return;
+            Acct a; string k = Key(creditor, debtor);
+            if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = creditor, Dst = debtor }; _acc[k] = a; }
+            var last = a.B.Count > 0 ? a.B[a.B.Count - 1] : null;
+            if (last != null && (last.Day == today || a.B.Count >= MaxEntries)) last.Left += x;
+            else a.B.Add(new Bill { Left = x, Day = today });
+            DClaimNew += x; DClaimN++;
         }
 
         /// <summary>Przelew cel -> zrodlo z pomiarem obu stron; zwraca to, co zeszlo z kasy celu (zrodlo dostaje dokladnie tyle - kasa zrodla nie ma sufitu).</summary>
@@ -293,7 +317,8 @@ namespace Armoury
             Resolve();
             openNow = 0;
             foreach (var a in _acc.Values) foreach (var b in a.B) if (b.Left > 0) openNow += b.Left;
-            string s = _openPrev < 0 ? "-" : (_openPrev + DNew - DRepaid - DForfeit - openNow).ToString(CultureInfo.InvariantCulture);
+            // KS-R5 ceny-r5: roszczenia z zadatkow (DClaimNew) - nowe rachunki odwrotne; bez zadatkow 0 (bit w bit)
+            string s = _openPrev < 0 ? "-" : (_openPrev + DNew + DClaimNew - DRepaid - DForfeit - openNow).ToString(CultureInfo.InvariantCulture);
             _openPrev = openNow;
             return s;
         }

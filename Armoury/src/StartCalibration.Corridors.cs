@@ -404,7 +404,7 @@ namespace Armoury
                             if (cr != null) { float ld; bool ls; if (CreditLink(x, cr, i, j, out ld, out ls)) { dd = ld; cr.ArcSea[i * n + j] = ls; cr.ArcSet[i * n + j] = true; } }
                             if (!(dd >= 0f) || dd > lim) continue;
                             double cm = zl > 0 ? defSh[lj * NG + g] * 0.5 * gold[lj] / (zl * Math.Max(1.0, dd)) : 0.0, c = cm;
-                            if (cr != null && cr.Src[i].Length > 0) { cm = zl > 0 ? cr.SupSh[li * NG + g] * cr.ExpGold[i] / (zl * (Math.Max(1.0, dd) + CreditPayDays)) : 0.0; c = cm; }
+                            if (cr != null && cr.Src[i].Length > 0) { cm = zl > 0 ? DepK(inp) * cr.SupSh[li * NG + g] * cr.ExpGold[i] / (zl * (Math.Max(1.0, dd) + CreditPayDays)) : 0.0; c = cm; }   // KS-R5: x zadatek importera (DepK)
                             if (inp.AfterD)
                             {
                                 double del = 0;
@@ -423,7 +423,7 @@ namespace Armoury
                             double dmin = double.MaxValue;
                             for (int j = 0; j < n; j++) { double cc = cost[i * n + j]; if (cc > 0 && cc < dmin) dmin = cc; }
                             if (dmin == double.MaxValue) continue;
-                            double capE = zl > 0 ? cr.SupSh[nodes[i] * NG + g] * cr.ExpGold[i] / (zl * (dmin + CreditPayDays)) : 0.0;
+                            double capE = zl > 0 ? DepK(inp) * cr.SupSh[nodes[i] * NG + g] * cr.ExpGold[i] / (zl * (dmin + CreditPayDays)) : 0.0;   // KS-R5: x zadatek importera (DepK)
                             exM[i] = Math.Min(ex[i], Math.Max(0.0, capE));
                         }
                     var flow = KsCorridors.Transport(n, inp.AfterD ? ex : exM, cost, cap);
@@ -625,7 +625,7 @@ namespace Armoury
                             double c = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? tsh[tj * NG + g] * 0.5 * Math.Max(0.0, inp.TownGold28[tj]) / (zl * Math.Max(1.0, dd)) : 1e12;
                             // KS-R4 r4-kupcy H7: eksporter niesie towar na kredyt - 0.5 x kasa 28 dob miasta z nadwyzka / (doby + 3), dzielone na psujace sie wedlug wartosci nadwyzki
                             if (CreditOn(inp) && inp.TownGold28 != null && ti < inp.TownGold28.Length && zl > 0)
-                                c = TownSupShare(sup, dem, ti, g, NG) * 0.5 * Math.Max(0.0, inp.TownGold28[ti]) / (zl * (Math.Max(1.0, dd) + 3.0));
+                                c = DepK(inp) * TownSupShare(sup, dem, ti, g, NG) * 0.5 * Math.Max(0.0, inp.TownGold28[ti]) / (zl * (Math.Max(1.0, dd) + 3.0));   // KS-R5: x zadatek importera (DepK)
                             if (!(c > 0)) continue;
                             cost[k] = Math.Max(1.0, dd); cap[k] = c;
                         }
@@ -790,6 +790,15 @@ namespace Armoury
         // ------------------------------------------------------------ KS-R4 r4-kupcy H7 (= K1): korytarze z modelem kredytu kupcow
         internal const double CreditFloorShare = 0.5, CreditExpShare = 0.5, CreditPayDays = 3.0; internal const int CreditTopSrc = 3;
 
+        /// <summary>KS-R5 ceny-r5 (klucz Ks Consign Deposit): zadatek kupcow importera przy wysylce (udzial wartosci lotu) - kredyt eksportera niesie tylko reszte, wiec
+        /// ta sama kasa eksportera unosi 1 / (1 - udzial) wiecej towaru w drodze (udzial najwyzej 0.9); bez zadatku (CorrDepShare 0) - 1 (H7 bit w bit).</summary>
+        private static double DepK(KsInput inp)
+        {
+            double s = inp != null ? inp.CorrDepShare : 0.0;
+            if (!(s > 0)) return 1.0;
+            return 1.0 / (1.0 - Math.Min(0.9, s));
+        }
+
         private sealed class CreditCtx
         {
             public double[] ImpCap;                     // [nl] zl/d: 15% x max(0, kasa 28 dob - 0.5 x zapas) miast krainy
@@ -927,6 +936,7 @@ namespace Armoury
             sb.Append("KS: korytarze planu doba {DOBA} | gradient krainy ").Append(x.In.Corridors ? "TAK" : "NIE (klucz Ks Land Gradient)").Append(", regula zasiegu ").Append(x.In.Reach ? "TAK" : "NIE")
               .Append(", przepustowosc ").Append(x.In.AfterD ? "po D (1.2 x dowoz KS-H, najmniej 20 szt./d)" : "przed D (budzet kasy importera: 15% kasy 28 dob na dobe, polowa kasy na towar w drodze, dzielony wedlug wartosci braku)")
               .Append(CreditOn(x.In) ? ", kredyt kupcow (H7): importer 15% kasy 28 dob ponad 0.5 x zapas na dobe, eksporter 0.5 x kasa 28 dob 3 miast z nadwyzka / (doby + 3), doby od miast z brakiem do 3 miast z nadwyzka" : "")
+              .Append(CreditOn(x.In) && x.In.CorrDepShare > 0 ? ", zadatek importera (KS-R5, Ks Consign Deposit) " + x.In.CorrDepShare.ToString("0.00", inv) + " wartosci lotu - eksporter niesie x" + DepK(x.In).ToString("0.00", inv) : "")
               .Append(", popyt krain zaplacony (po kroku 8), tau lad ").Append(CorrTauLand.ToString("0.000", inv)).Append(" morze ").Append(CorrTauSea.ToString("0.0000", inv)).Append("/d").Append(", rund kroku 5 ").Append(R.CorrRounds)
               .Append(", czas ").Append(R.CorrMs.ToString("0", inv)).Append(" ms");
             for (int m = 0; m < NM; m++)
@@ -1088,5 +1098,11 @@ namespace Armoury
                 }
             return flow;
         }
+    }
+
+    // KS-R5 ceny-r5: wejscie Planu - udzial zadatku kupcow importera (klucz Ks Consign Deposit z kredytem kupcow; 0 - bez zadatku, H7 jak w r4-kupcy)
+    internal sealed partial class KsInput
+    {
+        public double CorrDepShare;
     }
 }

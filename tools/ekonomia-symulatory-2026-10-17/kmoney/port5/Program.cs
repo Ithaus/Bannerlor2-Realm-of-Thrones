@@ -16,11 +16,16 @@ using Armoury;
 //  on      - flagi wl. (H2, H3, H4 z j0, H5 przy miejscu kredytu 0.5 x kasa, kolejka wedlug potrzeby, glod) - porownanie z portem Pythona r5core.py (lot w lot);
 //  onold   - jak on, ale H4 bez j0 (przed recenzja) + licznik lotow 2. i 3. doby z rachunkiem ponizej kosztu + frachtu;
 //  ontight - jak on, miejsce kredytu 0.02 x kasa i co 7. cel z zaleglym (galezie H5) - porownanie z r5core.py --tight (linie "ovd" tez).
+// KS-R5 ceny-r5 (noc 17/18.10): tryby zadatku kupcow celu i pomiaru przyczyn:
+//  onmiss     - jak on + pomiar Miss (brak do T* zamowien bez lotu wedlug przyczyny) - loty bajt w bajt z on (pomiar nie zmienia decyzji);
+//  ondep      - jak on + zadatek kupcow celu (udzial 0.5, wolna kasa celu = kasa - 0.5 x zapas) - przy miejscu 0.5 x kasa zadatek rzadko potrzebny;
+//  ontightdep - jak ontight + zadatek (galaz zadatku: zrodlo bez miejsca maleje, zloto: zadatki cel -> zrodlo, kontrola zadatkow).
 static class Program
 {
     static double[] Flat(JsonElement a) { var l = new List<double>(); foreach (var r in a.EnumerateArray()) foreach (var x in r.EnumerateArray()) l.Add(x.ValueKind == JsonValueKind.True ? 1 : x.ValueKind == JsonValueKind.False ? 0 : x.GetDouble()); return l.ToArray(); }
 
     static bool shipped; static long ixMiss; static double decMs; static long laterLots, lossLots, lossGold;
+    static long depGold, depLots, depPcs, depFreed, depBad; static double[] missTot = new double[KsFoodCore.NMiss];
     static int Main(string[] args)
     {
         string mode = args.Length > 2 ? args[2] : "off";
@@ -71,7 +76,8 @@ static class Program
                 if (shf[t * nk + k] <= 5) up = Math.Min(up, 1.5 * startIdx[mk[t] * nk + k] * val[k]);
                 return Math.Max(1, (int)Math.Ceiling(up - 1e-9));
             };
-            bool onold = mode == "onold", tight = mode == "ontight"; bool on = mode == "on" || onold || tight; shipped = false;
+            bool dep = mode == "ondep" || mode == "ontightdep", miss = mode == "onmiss" || dep;
+            bool onold = mode == "onold", tight = mode == "ontight" || mode == "ontightdep"; bool on = mode == "on" || onold || tight || miss; shipped = false;
             var sentTK = new Dictionary<long, long>();
 #if NEWCORE
             if (on)
@@ -101,16 +107,35 @@ static class Program
             }
 #endif
             var lots = new List<long[]>();
-            a.Ship = (s, t, k, n, cost, fr, sea0, L) =>
+#if NEWCORE
+            var res0 = j.GetProperty("res").EnumerateArray().Select(x => x.GetDouble()).ToArray();
+            if (miss) a.Miss = new double[nt * nk * KsFoodCore.NMiss];
+            if (dep)
+            {
+                // KS-R5: wolna kasa celu ponad podloge kredytu (0.5 x zapas kupcow - KsFoodCredit.FreeAbove), zadatek przy wysylce cel -> zrodlo
+                a.Deposit = true; a.DepShare = 0.5;
+                a.DstFree = new double[nt];
+                for (int i = 0; i < nt; i++) a.DstFree[i] = Math.Max(0.0, gold[i] - Math.Ceiling(0.5 * Math.Max(0.0, res0[i])));
+            }
+#endif
+            Func<int, int, int, int, long, long, bool, float, long, int> ship = (s, t, k, n, cost, fr, sea0, L, dx) =>
             {
                 shipped = true;
                 if (!on && gold[t] < cost + fr) return 0;
                 if (on && gold[s] < fr) return 0;
                 int take = Math.Min(n, (int)Math.Max(0.0, shf[s * nk + k]) - 5);
                 if (take <= 0) return 0;
-                if (take < n) { cost = (long)Math.Round(cost * (double)take / n); fr = (long)Math.Round(fr * (double)take / n); n = take; }
+                if (take < n) { cost = (long)Math.Round(cost * (double)take / n); fr = (long)Math.Round(fr * (double)take / n); dx = (long)Math.Round(dx * (double)take / n); n = take; }
                 shf[s * nk + k] -= n;
                 if (!on) { gold[t] -= cost + fr; gold[s] += cost; } else gold[s] -= fr;
+                if (dx > 0)
+                {
+                    // zadatek: najwyzej wolna kasa celu teraz (gra: KsFoodCredit.FreeOf), cel -> zrodlo
+                    double free = Math.Max(0.0, gold[t] - Math.Ceiling(0.5 * Math.Max(0.0, res0[t])));
+                    long px = (long)Math.Min(dx, Math.Floor(free));
+                    if (px < dx) depBad++;
+                    if (px > 0) { gold[t] -= px; gold[s] += px; depGold += px; depLots++; depPcs += n; }
+                }
                 lots.Add(new long[] { s, t, k, n, cost, fr });
                 if (on)
                 {
@@ -123,6 +148,10 @@ static class Program
                 }
                 return n;
             };
+            a.Ship = (s, t, k, n, cost, fr, sea0, L) => ship(s, t, k, n, cost, fr, sea0, L, 0);
+#if NEWCORE
+            if (dep) a.ShipDep = (s, t, k, n, cost, fr, sea0, L, dx) => ship(s, t, k, n, cost, fr, sea0, L, dx);
+#endif
             var st = new KsFoodCore.Stats();
             var swd = System.Diagnostics.Stopwatch.StartNew();
             for (int rep = 0; rep < (mode == "time" || mode == "timeon" ? 0 : 0); rep++) { }
@@ -135,6 +164,8 @@ static class Program
             totLots += lots.Count; totOrd += st.Ordered; totPoor += st.Poor; totNoP += st.NoProfit; totFar += st.Far;
 #if NEWCORE
             totSrc += st.SrcCap; famReq += st.FamineReq; famReqK += st.FamineReqK; famOrd += st.FamineOrd; famGot += st.FamineGot;
+            depFreed += st.DepFreed;
+            if (a.Miss != null) for (int i = 0; i < a.Miss.Length; i++) missTot[i % KsFoodCore.NMiss] += a.Miss[i];
             for (int k = 0; k < nk && k < 16; k++) poorK[k] += st.PoorByK[k];
 #endif
         }
@@ -143,6 +174,8 @@ static class Program
         Console.WriteLine($"  loty 2. i 3. doby do (cel, towar): {laterLots}, z rachunkiem (za sztukami wczesniejszych lotow) ponizej kosztu + frachtu: {lossLots} ({lossGold} zl)");
         Console.WriteLine("  szt. wedlug towaru: " + string.Join(" ", byK));
         Console.WriteLine("  zablokowane z braku pieniedzy wedlug towaru: " + string.Join(" ", poorK));
+        Console.WriteLine($"  KS-R5 zadatki: lotow {depLots}, szt. {depPcs}, zl {depGold}, odblokowane szt. {depFreed}, zadatek przyciety kasa celu {depBad}");
+        Console.WriteLine("  KS-R5 brak do T* bez lotu wedlug przyczyny: " + string.Join(", ", Enumerable.Range(0, KsFoodCore.NMiss).Select(r => KsFoodCore.MissNames[r] + " " + missTot[r].ToString("0", CultureInfo.InvariantCulture))));
         return 0;
     }
 }

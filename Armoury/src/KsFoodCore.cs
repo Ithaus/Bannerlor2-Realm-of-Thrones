@@ -26,6 +26,13 @@ namespace Armoury
     ///    kredytu zrodla nie sa juz zjadane przez zboze i ryby w stalej kolejnosci towarow; licznik sztuk zablokowanych z braku pieniedzy wedlug towaru;
     ///  - Famine (decyzja Jeffa 17.10 "dowoz jak w ksiazkach"): cel z polka zboza / ryb / miesa ponizej 0.5 T* (FamineGood) - pierwszy w kolejce (przed reszta);
     ///  - IxAt (T9, bit w bit): indeks ceny liczony tylko tam, gdzie ktos go czyta (NaN w tablicy = jeszcze nie liczony).
+    /// KS-R5 ceny-r5 (noc 17/18.10, test fin83 NKU-6: zrodlo bez miejsca kredytu 10.4% zamowionych, zboze 229618 szt. - glownie w rampie A..D):
+    ///  - Deposit (klucz Ks Consign Deposit): ZADATEK KUPCOW CELU - gdy lot nie miesci sie w miejscu kredytu zrodla, kupcy miasta celu placa przy wysylce zadatek
+    ///    DepShare x wartosc lotu u siebie (ta sama wartosc co w decyzji i w rachunku, H4), najwyzej wolna kasa celu ponad podloge (DstFree - zadatki doby); zrodlo niesie
+    ///    na kredyt tylko reszte (towar + fracht - zadatek). Lot, ktory miesci sie bez zadatku - bez zmian (bit w bit). Sredniowieczny kontrakt zbozowy: zadatek / zaliczka
+    ///    kupca miasta kupujacego (czesto polowa ceny przy umowie, reszta przy dostawie) - kapital obu stron, zaden pieniadz z niczego;
+    ///  - Miss (pomiar, bez zmiany decyzji): brak do T* (szt.) zamowien bez zadnego lotu wedlug przyczyny - brak nadwyzki u zrodel, poza zasiegiem, wojna, marza ceny,
+    ///    bez zysku kupca, bez kredytu, cel z zaleglym, za maly lot (NKS-24b: dlaczego kraina importera nie dostaje przewozu Planu).
     /// </summary>
     internal static class KsFoodCore
     {
@@ -60,7 +67,16 @@ namespace Armoury
             public bool[] FamineGood;                          // [NK] towar glodu (zboze, ryby, mieso)
             public Func<int, int, int, int, long> DestValue;   // (cel, k, j0, n) - wartosc n sztuk u celu po marzy za j0 sztukami juz wyslanymi dzis do (cel, k) (null - n x cena polki x 0.97)
             public Func<int, int, double> IxAt;                // (miasto, k) - indeks ceny na zadanie (T9; null - tablica Ix pelna)
+            // KS-R5 ceny-r5 (kazde wylaczone / null = r4-kupcy bit w bit)
+            public bool Deposit; public double DepShare;       // zadatek kupcow celu przy braku miejsca kredytu zrodla (tylko z Consign), udzial wartosci lotu u celu (0..1)
+            public double[] DstFree;                           // [nt] wolna kasa celu ponad podloge kredytu (zl) - granica zadatkow doby
+            public Func<int, int, int, int, long, long, bool, float, long, int> ShipDep;   // (zrodlo, cel, k, n, koszt, fracht, morze, doby, zadatek) - wyslane sztuki
+            public double[] Miss;                              // [(t * NK + k) * NMiss + przyczyna] brak do T* zamowien bez lotu (szt.; null - bez pomiaru)
         }
+
+        // KS-R5 ceny-r5: przyczyny zamowien bez lotu (Miss) - kolejnosc = etap, do ktorego doszlo najlepsze zrodlo
+        internal const int MissNoOffer = 0, MissRange = 1, MissWar = 2, MissMargin = 3, MissNoProfit = 4, MissCredit = 5, MissOverdue = 6, MissSmall = 7, NMiss = 8;
+        internal static readonly string[] MissNames = { "brak nadwyzki", "poza zasiegiem", "wojna", "marza ceny", "bez zysku", "bez kredytu", "cel z zaleglym", "mala oferta" };
 
         /// <summary>Liczniki doby: zamowione, kasa celu za mala, loty bez zysku, z dalszych miast, z zapasu kupcow (loty, zl), kasy miast z brakiem / zapas.
         /// KS-R4 r4-kupcy: zrodlo bez miejsca kredytu, cel z zaleglym (szt.), zablokowane z braku pieniedzy wedlug towaru, glod (celow - rozne miasta doby, zamowien
@@ -71,6 +87,8 @@ namespace Armoury
             public readonly List<double> CofShort = new List<double>();
             public long SrcCap, Overdue, FamineOrd, FamineGot; public int FamineReq, FamineReqK;
             public long[] PoorByK;
+            // KS-R5 ceny-r5: zadatki kupcow celu (plan rdzenia: loty, sztuki, zl; sztuki, ktore bez zadatku nie pojechalyby - zrodlo bez miejsca)
+            public long DepGold, DepPcs, DepFreed; public int DepLots;
         }
 
         // stan jednego wywolania Decide (wspolny dla obu kolejek)
@@ -78,6 +96,7 @@ namespace Armoury
         {
             public In A; public Stats St;
             public double[] Dz, DzB, Sh, Offer, Budget, BudgetShort, Spent, SrcSpent;
+            public double[] DepSpent;                          // KS-R5: zadatki doby wedlug celu (zl)
             public bool[] ShortSeen, FarMark, FamSeen;
             public readonly List<KeyValuePair<double, int>> Cand = new List<KeyValuePair<double, int>>(24);
         }
@@ -172,6 +191,7 @@ namespace Armoury
                     }
             }
             var r = new Run { A = a, St = st, Dz = dz, DzB = dzB, Sh = sh, Offer = offer, Budget = budget, BudgetShort = budgetShort, Spent = spent, ShortSeen = shortSeen, SrcSpent = new double[nt], FarMark = new bool[nt], FamSeen = new bool[nt] };
+            if (a.Deposit && a.Consign) r.DepSpent = new double[nt];
             if (!a.ByNeed)
             {
                 var dst = new List<int>(nt);
@@ -239,9 +259,12 @@ namespace Armoury
             double lim = a.Per[k] ? MaxPer : MaxDur;
             double d = r.Dz[t * NK + k], T = a.Ts[a.Mk[t] * NK + k];
             double Hc = sh[t * NK + k] + a.Inc[t * NK + k];
+            // KS-R5 ceny-r5 (pomiar Miss): brak do T* przy prawdziwym popycie (bez kx) i etap, do ktorego doszlo najlepsze zrodlo (0 bez oferty, 1 poza zasiegiem, 2 wojna, 3 marza)
+            double deficit = a.Miss != null ? Math.Max(0.0, T * r.DzB[t * NK + k] - Hc) : 0.0;
+            int stage = -1;
             cand.Clear();
             var ct = a.Cand[t];
-            for (int ci = 0; ci < ct.Length; ci++) AddCand(a, offer, cand, ct[ci], t, k, lim, false);
+            for (int ci = 0; ci < ct.Length; ci++) { int sg = AddCand(a, offer, cand, ct[ci], t, k, lim, false); if (sg > stage) stage = sg; }
             bool far = false;
             if ((a.FarAlways || cand.Count == 0) && a.CandFar != null && a.CandFar[t] != null)
             {
@@ -250,9 +273,11 @@ namespace Armoury
                 {
                     for (int ci = 0; ci < cf.Length && cand.Count < NCandFar; ci++)
                     {
-                        float L0 = a.Days(cf[ci], t); if (!(L0 >= 0f)) continue;
+                        float L0 = a.Days(cf[ci], t);
+                        if (!(L0 >= 0f) || L0 > lim) { if (stage < 1 && offer[cf[ci] * NK + k] >= 1 && !a.Siege[cf[ci]]) stage = 1; }
+                        if (!(L0 >= 0f)) continue;
                         if (L0 > lim) break;
-                        AddCand(a, offer, cand, cf[ci], t, k, lim, true);
+                        int sg = AddCand(a, offer, cand, cf[ci], t, k, lim, true); if (sg > stage) stage = sg;
                     }
                     far = cand.Count > 0;
                 }
@@ -264,17 +289,23 @@ namespace Armoury
                     {
                         int s = cf[ci];
                         if (offer[s * NK + k] < 1) continue;
-                        float L0 = a.Days(s, t); if (!(L0 >= 0f)) continue;
+                        float L0 = a.Days(s, t);
+                        if ((!(L0 >= 0f) || L0 > lim) && stage < 1 && !a.Siege[s]) stage = 1;
+                        if (!(L0 >= 0f)) continue;
                         if (L0 > lim) break;
                         int before = cand.Count;
-                        AddCand(a, offer, cand, s, t, k, lim, true);
+                        int sg = AddCand(a, offer, cand, s, t, k, lim, true); if (sg > stage) stage = sg;
                         if (cand.Count > before) { farN++; r.FarMark[s] = true; }
                     }
                 }
             }
             // recenzja r4-kupcy: "celow" = rozne miasta glodu doby (miasto bez zboza i ryb liczone raz), zamowienia glodu (cel, towar) osobno
             if (fam) { st.FamineReqK++; if (!r.FamSeen[t]) { r.FamSeen[t] = true; st.FamineReq++; } }
-            if (cand.Count == 0) { ClearFar(r); return; }
+            if (cand.Count == 0)
+            {
+                if (deficit > 0) NoteMiss(a, t, k, stage <= 0 ? MissNoOffer : (stage == 1 ? MissRange : (stage == 2 ? MissWar : MissMargin)), deficit);
+                ClearFar(r); return;
+            }
             cand.Sort((x, y) => x.Key != y.Key ? x.Key.CompareTo(y.Key) : x.Value.CompareTo(y.Value));
             if (a.Consign && a.DstOverdue != null && a.DstOverdue[t])
             {
@@ -289,13 +320,16 @@ namespace Armoury
                     if (fam) st.FamineOrd += n0;
                     break;
                 }
+                if (deficit > 0) NoteMiss(a, t, k, MissOverdue, deficit);
                 ClearFar(r); return;
             }
             bool shortStall = Hc < T * d;
             if (shortStall && !r.ShortSeen[t]) { r.ShortSeen[t] = true; if (a.Res[t] > 0) st.CofShort.Add(a.Gold[t] / a.Res[t]); }
             int destUnit = a.DestUnit != null ? a.DestUnit(t, k) : 0;
             int used = 0;
-            long ord0 = -1, got0 = 0; bool poorHit = false, srcHit = false;
+            long ord0 = -1, got0 = 0; bool poorHit = false, srcHit = false, noProfitHit = false;
+            // KS-R5: zadatek kupcow celu - tylko przy kredycie kupcow, z wartoscia lotu u celu i z wykonaniem lotu z zadatkiem (gra) - inaczej sciezka r4-kupcy bit w bit
+            bool depOn = a.Consign && a.Deposit && r.DepSpent != null && a.DstFree != null && t < a.DstFree.Length && a.ShipDep != null && a.DepShare > 0;
             foreach (var kv in cand)
             {
                 if (used >= MaxSrc) break;
@@ -319,12 +353,35 @@ namespace Armoury
                         if (n < Math.Max(5.0, 0.5 * d)) { n = 0; break; }
                         cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
                     }
-                    if (n <= 0 || cost + fr > Val(a, t, k, j0, n, destUnit)) { st.NoProfit++; continue; }
+                    if (n <= 0 || cost + fr > Val(a, t, k, j0, n, destUnit)) { st.NoProfit++; noProfitHit = true; continue; }
                 }
                 // kasa celu (runda 3) albo miejsce kredytu zrodla (H5: towar + fracht, cel placi dopiero przy dostawie)
                 double avail = a.Consign ? (a.SrcRoom != null && s < a.SrcRoom.Length ? a.SrcRoom[s] : 0.0) - r.SrcSpent[s]
                                          : (shortStall && a.Staple[k] ? r.BudgetShort[t] : r.Budget[t]) - r.Spent[t];
-                if (cost + fr > avail)
+                long dep = 0; long nNoDep = -1;
+                if (cost + fr > avail && depOn && destUnit > 0)
+                {
+                    // KS-R5 zadatek: zrodlo bez miejsca na caly lot - kupcy celu placa zadatek (udzial wartosci lotu u celu, najwyzej wolna kasa celu ponad podloge minus zadatki
+                    // doby); zrodlo niesie na kredyt tylko towar + fracht - zadatek. Lot za duzy takze z zadatkiem - ciety do miejsca kredytu + zadatku (zadatek rosnie z lotem)
+                    int nf0 = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
+                    nNoDep = nf0 < Math.Max(5.0, 0.5 * d) ? 0 : nf0;   // tyle pojechaloby bez zadatku (r4-kupcy) - "odblokowane" w linii
+                    double dfree = Math.Max(0.0, a.DstFree[t] - r.DepSpent[t]);
+                    dep = (long)Math.Floor(Math.Min(a.DepShare * Val(a, t, k, j0, n, destUnit), dfree));
+                    if (dep < 0) dep = 0;
+                    if (cost + fr - dep > avail)
+                    {
+                        srcHit = true;
+                        double room = Math.Max(0.0, avail) + dep;
+                        int nf = cost + fr > 0 && room > 0 ? (int)Math.Floor(n * Math.Min(1.0, room / (cost + fr))) : 0;
+                        if (nf < Math.Max(5.0, 0.5 * d)) continue;
+                        n = nf;
+                        cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
+                        dep = (long)Math.Floor(Math.Min(a.DepShare * Val(a, t, k, j0, n, destUnit), dfree));
+                        if (dep < 0) dep = 0;
+                        if (cost + fr - dep > avail + 1) continue;
+                    }
+                }
+                else if (cost + fr > avail)
                 {
                     int nf = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
                     if (a.Consign) srcHit = true; else poorHit = true;
@@ -335,7 +392,7 @@ namespace Armoury
                 }
                 if (n <= 0 || cost <= 0) continue;
                 if (a.SampleAt != null && a.Sample != null && a.SampleAt(s, t, k)) a.Sample(s, k, n);
-                int got = a.Ship(s, t, k, n, cost, fr, sea, L);
+                int got = dep > 0 ? a.ShipDep(s, t, k, n, cost, fr, sea, L, dep) : a.Ship(s, t, k, n, cost, fr, sea, L);
                 if (got <= 0) continue;
                 got0 += got;
                 used++;
@@ -346,8 +403,18 @@ namespace Armoury
                     if (over > 0) { st.ResLots++; st.ResGold += (long)Math.Round(over); }
                 }
                 offer[s * NK + k] -= got; sh[s * NK + k] -= got; Hc += got;
-                if (a.Consign) r.SrcSpent[s] += cost + fr; else r.Spent[t] += cost + fr;
+                if (dep > 0)
+                {
+                    // zadatek wedlug sztuk naprawde wyslanych (gra tnie lot do polki zrodla - tak samo tnie zadatek)
+                    double depGot = n > 0 ? dep * Math.Min(1.0, got / (double)n) : 0.0;
+                    r.DepSpent[t] += depGot;
+                    r.SrcSpent[s] += Math.Max(0.0, cost + fr - depGot);
+                    st.DepLots++; st.DepPcs += got; st.DepGold += (long)Math.Round(depGot);
+                    if (nNoDep >= 0 && got > nNoDep) st.DepFreed += got - nNoDep;
+                }
+                else if (a.Consign) r.SrcSpent[s] += cost + fr; else r.Spent[t] += cost + fr;
             }
+            if (got0 <= 0 && deficit > 0) NoteMiss(a, t, k, poorHit || srcHit ? MissCredit : (noProfitHit ? MissNoProfit : MissSmall), deficit);
             if (ord0 > 0)
             {
                 st.Ordered += ord0;
@@ -442,16 +509,27 @@ namespace Armoury
             foreach (var kv in r.Cand) r.FarMark[kv.Value] = false;
         }
 
-        private static void AddCand(In a, double[] offer, List<KeyValuePair<double, int>> cand, int s, int t, int k, double lim, bool far)
+        /// <summary>Kandydat zrodla s dla celu t i towaru k. KS-R5 ceny-r5 (pomiar Miss, bez zmiany decyzji): zwraca etap - 0 bez oferty albo oblezone, 1 poza zasiegiem
+        /// albo bez drogi, 2 wojna, 3 marza ceny (indeks celu ponizej 1.03 x koszt na miejscu), 4 dodany.</summary>
+        private static int AddCand(In a, double[] offer, List<KeyValuePair<double, int>> cand, int s, int t, int k, double lim, bool far)
         {
             int NK = a.NK;
-            if (offer[s * NK + k] < 1 || a.Siege[s]) return;
-            float L = a.Days(s, t); if (!(L >= 0f) || L > lim) return;
-            if (a.War != null && a.War(s, t)) return;
+            if (offer[s * NK + k] < 1 || a.Siege[s]) return 0;
+            float L = a.Days(s, t); if (!(L >= 0f) || L > lim) return 1;
+            if (a.War != null && a.War(s, t)) return 2;
             double tau = a.Sea(s, t) ? TauSea : TauLand;
             double c = IX(a, s * NK + k) * (1.0 + tau * L);
-            if (IX(a, t * NK + k) < c * (1.0 + Margin)) return;
+            if (IX(a, t * NK + k) < c * (1.0 + Margin)) return 3;
             cand.Add(new KeyValuePair<double, int>(c, s));
+            return 4;
+        }
+
+        /// <summary>KS-R5 ceny-r5: brak do T* zamowienia bez lotu wedlug przyczyny (tylko pomiar).</summary>
+        private static void NoteMiss(In a, int t, int k, int why, double deficit)
+        {
+            var m = a.Miss; if (m == null) return;
+            int o = (t * a.NK + k) * NMiss + why;
+            if (o >= 0 && o < m.Length) m[o] += deficit;
         }
     }
 }

@@ -44,6 +44,8 @@ namespace Armoury
         private static void KupcyPlanInputs(KsInput inp, List<Settlement> tst)
         {
             inp.CorrCredit = SwCorridorsCredit;
+            // KS-R5 ceny-r5: zadatek kupcow importera (klucz Ks Consign Deposit) - ta sama regula w Planie co w KS-H (eksporter niesie tylko reszte lotu); bez klucza 0
+            inp.CorrDepShare = inp.CorrCredit && KsFoodCarts.DepositKey ? KsFoodCarts.DepositShare : 0.0;
             if (!inp.CorrCredit || tst == null) { inp.TownRes = null; return; }
             int nt = tst.Count;
             inp.TownRes = new double[nt];

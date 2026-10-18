@@ -88,6 +88,9 @@ namespace Armoury
         private static bool LotPowKey { get { var s = Settings.Current; return s == null || s.KsLotPricePow; } }
         /// <summary>Miejsce kredytu zrodla: najwyzej ten udzial kasy zrodla w towarze w drodze, frachcie i rachunkach (0..1).</summary>
         private static double SrcExposureShare { get { var s = Settings.Current; return s == null ? 0.5 : Math.Max(0.0, Math.Min(1.0, s.KsConsignSourceExposure)); } }
+        /// <summary>KS-R5 ceny-r5: zadatek kupcow celu (klucz Ks Consign Deposit, tylko z kredytem kupcow) i jego udzial w wartosci lotu u celu (0..1).</summary>
+        internal static bool DepositKey { get { var s = Settings.Current; return s == null || s.KsConsignDeposit; } }
+        internal static double DepositShare { get { var s = Settings.Current; return s == null ? 0.5 : Math.Max(0.0, Math.Min(1.0, s.KsConsignDepositShare)); } }
         /// <summary>Klucz Ks Ship By Days w tej chwili (Plan - wersja tabeli dob).</summary>
         internal static bool DaysByShipDays { get { return EnsureTowns() && _byDays; } }
 
@@ -108,7 +111,7 @@ namespace Armoury
         private static Dictionary<int, List<KeyValuePair<Village, float>>> _vilOf;   // zrodlo -> wsie (ogniska), najwyzej 8 + reszta najwiekszej
         private static int _vilDay = -1;
 
-        private sealed class Cart { internal Settlement Src, Dst; internal int Z, N, DayBought, DayDue; internal long Paid, Freight; internal bool Sea; internal long Val = -1; internal bool Cons; }   // r4-kupcy: Cons - woz na kredyt (zaplata 0, rachunek przy dostawie), Val - wartosc zrodla lotu przy wyjezdzie
+        private sealed class Cart { internal Settlement Src, Dst; internal int Z, N, DayBought, DayDue; internal long Paid, Freight; internal bool Sea; internal long Val = -1; internal bool Cons; internal long Dep; }   // r4-kupcy: Cons - woz na kredyt (zaplata 0, rachunek przy dostawie), Val - wartosc zrodla lotu przy wyjezdzie; KS-R5 ceny-r5: Dep - zadatek kupcow celu zaplacony przy wysylce (zl)
         private static readonly List<Cart> _carts = new List<Cart>();
         private static int[] _inc;                    // [nt * NZ] w drodze do celu
         private static string _pending;
@@ -143,6 +146,13 @@ namespace Armoury
         private static bool _byDays, _daysSlow;       // tabela dob liczona regula H1 (wersja "T"); pierwsza doba naraz przekroczyla 20 ms - dalej 200 wywolan na dobe
         private static bool _consignNow;              // klucz Ks Food Carts Consign w tej dobie (Ship)
         private static string _creditCtl = "-"; private static long _creditOpen;   // kontrola rachunkow doby (KsFoodCredit.EndDay) i otwarte na koniec doby
+        // KS-R5 ceny-r5: zadatki kupcow celu (klucz Ks Consign Deposit) - doba: przy wysylce (wozy, szt., zl), odblokowane (szt., ktore bez zadatku nie pojechalyby), przy dostawie
+        // zaliczone na rachunek, nadplata zwrocona przez zrodlo, roszczenia celu (zrodlo bez kasy na zwrot), zwrot zadatku zawroconego wozu, bez rozliczenia (woz bez celu
+        // i zrodla); zadatki w drodze wczoraj (kontrola: wczoraj + zaplacone - rozliczone = dzis)
+        private static long _dDepPcs, _dDepGold, _dDepFreed, _dDepCred, _dDepOver, _dDepClaim, _dDepBack, _dDepLost, _dDepSettled; private static int _dDepLots;
+        private static long _depPrev = -1;
+        // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny [t * NZ + k) * NMiss + przyczyna], suma od ostatniej linii tygodnia, doby w sumie
+        private static double[] _miss; private static int _missDays;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static int _ranDay = -1;
 
@@ -155,6 +165,7 @@ namespace Armoury
             Array.Clear(_shipDay, 0, _shipDay.Length); Array.Clear(_shipDaysDay, 0, _shipDaysDay.Length);
             ClearDay(); _err.Clear(); _ranDay = -1;
             _north = null; _byDays = false; _daysSlow = false; _consignNow = false;
+            _depPrev = -1; _miss = null; _missDays = 0;
             KsFoodCredit.Reset();
         }
 
@@ -167,6 +178,7 @@ namespace Armoury
             _dMarVal = _dMarCost = _dNoProfit = _dSpoil = _dRetLost = 0; _dMarLots = _dMarLoss = 0; _dMarPct.Clear(); _dCofShort.Clear();
             _dConsPcs = _dConsVal = _gSrcFr = _dSrcCap = _dOverdue = _dFamOrd = _dFamGot = _dNorthShip = _dNorthArr = 0; _dConsLots = _dFamReq = _dFamReqK = 0;
             Array.Clear(_dPoorByZ, 0, NZ); _dNorthBy.Clear();
+            _dDepPcs = _dDepGold = _dDepFreed = _dDepCred = _dDepOver = _dDepClaim = _dDepBack = _dDepLost = _dDepSettled = 0; _dDepLots = 0;
             KsFoodCredit.ClearDay();
         }
 
@@ -480,8 +492,11 @@ namespace Armoury
             into.Clear();
             foreach (var c in _carts)
             {
-                if (c == null || c.Dst == null || c.DayBought != today || c.Cons) continue;   // scalenie: woz na kredyt - kasa celu nic nie zaplacila przy wysylce (fracht placi zrodlo)
-                long v; into.TryGetValue(c.Dst, out v); into[c.Dst] = v + Math.Max(0, c.Paid) + Math.Max(0, c.Freight);
+                if (c == null || c.Dst == null || c.DayBought != today) continue;
+                long v; into.TryGetValue(c.Dst, out v);
+                // scalenie: woz na kredyt - kasa celu nic nie zaplacila przy wysylce (fracht placi zrodlo); KS-R5 ceny-r5: poza zadatkiem kupcow celu
+                if (c.Cons) { if (c.Dep > 0) into[c.Dst] = v + c.Dep; continue; }
+                into[c.Dst] = v + Math.Max(0, c.Paid) + Math.Max(0, c.Freight);
             }
         }
 
@@ -510,6 +525,7 @@ namespace Armoury
                     {
                         // recenzja runda 3 (drobne): towar wozu bez celu i bez zrodla - ujscie w ksiedze towarow (dotad znikal "bez wyjasnienia")
                         GoodsLedger.NoteKsLoss(StartCalibration.ZItem(Z[c.Z]), c.N, "woz bez celu i zrodla");
+                        if (c.Dep > 0) { _dDepLost += c.Dep; _dDepSettled += c.Dep; c.Dep = 0; }   // KS-R5: zadatek bez rozliczenia (zloto zostalo w kasie zrodla przy wysylce)
                         _dLost += c.N; AddInc(c, -1); c.N = 0; done.Add(c); continue;
                     }
                     if (!dstOk || (today > c.DayDue + ReturnDays && srcOk)) { Back(c); done.Add(c); continue; }
@@ -553,7 +569,20 @@ namespace Armoury
                         finally { GoodsLedger.End(gf); }
                         StartCalibration.ZRowDirty(c.Dst, it);          // wiersz polki z mapy ZC4 nieaktualny (H2) - zakupy wsi szukaja go same
                     }
-                    if (cons && bill > 0)
+                    if (cons && c.Dep > 0)
+                    {
+                        // KS-R5 ceny-r5: zadatek kupcow celu zaliczony na wartosc lotu u celu; reszta jak bez zadatku (zaplata ponad podloge, rachunek); nadplata (cena celu spadla
+                        // ponizej zadatku) - zwrot z kasy zrodla, czego kasa zrodla nie ma - roszczenie celu (rachunek odwrotny); zloto tylko cel <-> zrodlo
+                        try
+                        {
+                            long dep = c.Dep; c.Dep = 0;
+                            _dDepCred += Math.Min(dep, Math.Max(0, bill)); _dDepSettled += dep;
+                            if (bill > dep) KsFoodCredit.Deliver(c.Src, c.Dst, bill - dep, today);
+                            else if (dep > bill) DepositReturn(c, dep - Math.Max(0, bill), today, false);
+                        }
+                        catch (Exception de) { Stumble("Arrivals.deposit", de); }
+                    }
+                    else if (cons && bill > 0)
                     {
                         // zaplata przy dostawie z kasy celu ponad 0.5 x zapas kupcow, reszta - rachunek (KsFoodCredit); zloto cel -> zrodlo
                         try { KsFoodCredit.Deliver(c.Src, c.Dst, bill, today); } catch (Exception de) { Stumble("Arrivals.credit", de); }
@@ -591,6 +620,13 @@ namespace Armoury
             AddInc(c, -1);
             var it = StartCalibration.ZItem(Z[c.Z]);
             _dBack++;
+            // KS-R5 ceny-r5: woz na kredyt z zadatkiem kupcow celu - zadatek wraca z kasy zrodla do kasy celu (towar wraca na polke zrodla, jak bez zadatku); czego kasa zrodla
+            // nie ma - roszczenie celu wobec zrodla (rachunek odwrotny)
+            if (c.Cons && c.Dep > 0)
+            {
+                long dep = c.Dep; c.Dep = 0; _dDepSettled += dep;
+                try { DepositReturn(c, dep, Today(), true); } catch (Exception e) { Stumble("Back.deposit", e); }
+            }
             // zwrot zaplaty z kasy zrodla (najwyzej kasa zrodla), frachtu nie
             long got = 0;
             if (c.Src != null && c.Src.Town != null && c.Dst != null && c.Dst.Town != null)
@@ -619,6 +655,38 @@ namespace Armoury
             int lost = c.N - nBack;
             if (lost > 0) { GoodsLedger.NoteKsLoss(it, lost, "zawrocony woz bez zwrotu zaplaty"); _dRetLost += lost; }
             c.N = 0;
+        }
+
+        /// <summary>KS-R5 ceny-r5: zwrot zadatku (nadplata przy dostawie albo zawrocony woz) z kasy zrodla do kasy celu z pomiarem obu stron (pozycja "zwroty" kontroli zlota);
+        /// czego kasa zrodla nie ma - roszczenie celu wobec zrodla (KsFoodCredit.OpenClaim, zloto sie nie rusza); bez osad - bez rozliczenia (licznik). Zwraca oddane.</summary>
+        private static long DepositReturn(Cart c, long x, int today, bool back)
+        {
+            if (x <= 0) return 0;
+            long got = 0;
+            var st = c.Src != null ? c.Src.Town : null; var dt = c.Dst != null ? c.Dst.Town : null;
+            if (st != null && dt != null)
+            {
+                long r = Math.Min(x, Math.Max(0, (long)st.Gold));
+                if (r > 0)
+                {
+                    int s0 = st.Gold; st.ChangeGold(-(int)Math.Min(int.MaxValue, r)); got = s0 - st.Gold;
+                    if (got > 0)
+                    {
+                        int d0 = dt.Gold; dt.ChangeGold((int)got);
+                        _gRefSrc += got; _gRefDst += dt.Gold - d0;
+                        if (back) _dRefund += got;
+                    }
+                    else got = 0;
+                }
+            }
+            if (back) _dDepBack += got; else _dDepOver += got;
+            long rest = x - got;
+            if (rest > 0)
+            {
+                if (c.Src != null && c.Dst != null && c.Src != c.Dst) { KsFoodCredit.OpenClaim(c.Dst, c.Src, rest, today); _dDepClaim += rest; }
+                else _dDepLost += rest;
+            }
+            return got;
         }
 
         /// <summary>Recenzja runda 3: cena sztuki towaru KS-H k na polce miasta celu (cena doby z mapy ZC4, inaczej gra; 0 - brak).</summary>
@@ -735,14 +803,27 @@ namespace Armoury
                         int i; if (!_ix.TryGetValue(c.Src, out i)) continue;
                         long v = c.Val;
                         if (v < 0) { int up = StartCalibration.ZPrice(_t[i], Z[c.Z]); v = (long)c.N * Math.Max(1, up); }
-                        exp[i] += v + Math.Max(0, c.Freight);
+                        // KS-R5 ceny-r5: zadatek kupcow celu juz w kasie zrodla - narazenie zrodla tylko ponad zadatek (bez zadatkow: bit w bit)
+                        if (c.Dep > 0) exp[i] += Math.Max(0L, v + Math.Max(0, c.Freight) - c.Dep);
+                        else exp[i] += v + Math.Max(0, c.Freight);
                     }
                     double xs = SrcExposureShare;
                     a.SrcRoom = new double[nt];
                     for (int i = 0; i < nt; i++) a.SrcRoom[i] = Math.Max(0.0, xs * a.Gold[i] - exp[i]);
                     a.DstOverdue = new bool[nt];
                     foreach (var od in KsFoodCredit.OverdueDst(today)) { int i; if (od != null && _ix.TryGetValue(od, out i)) a.DstOverdue[i] = true; }
+                    // KS-R5 ceny-r5: zadatek kupcow celu (klucz Ks Consign Deposit) - wolna kasa celu ponad podloge kredytu (ta sama, z ktorej cel placi przy dostawie)
+                    if (DepositKey && DepositShare > 0)
+                    {
+                        a.Deposit = true; a.DepShare = DepositShare;
+                        a.DstFree = new double[nt];
+                        for (int i = 0; i < nt; i++) a.DstFree[i] = KsFoodCredit.FreeAbove((long)a.Gold[i], (long)a.Res[i]);
+                        a.ShipDep = (s, t, k, n, cost, fr, sea, L, dep) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight, dep);
+                    }
                 }
+                // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny - suma do linii tygodnia (bez zmiany decyzji)
+                if (_miss == null || _miss.Length != nt * NZ * KsFoodCore.NMiss) { _miss = new double[nt * NZ * KsFoodCore.NMiss]; _missDays = 0; }
+                a.Miss = _miss; _missDays++;
                 a.SampleAt = (s, t, k) => (Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u;
                 a.Sample = (s, k, n) => { long s0 = Stopwatch.GetTimestamp(); Sample(_t[s], items[k], Math.Min(n, SampleCap), pow); _dSampleTicks += Stopwatch.GetTimestamp() - s0; };
                 a.Ship = (s, t, k, n, cost, fr, sea, L) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
@@ -751,6 +832,7 @@ namespace Armoury
                 _dOrdered += stt.Ordered; _dPoor += stt.Poor; _dNoProfit += stt.NoProfit; _dFar += stt.Far; _dRes += stt.ResLots; _dResGold += stt.ResGold;
                 _dCofShort.AddRange(stt.CofShort);
                 _dSrcCap += stt.SrcCap; _dOverdue += stt.Overdue; _dFamReq += stt.FamineReq; _dFamReqK += stt.FamineReqK; _dFamOrd += stt.FamineOrd; _dFamGot += stt.FamineGot;
+                _dDepFreed += stt.DepFreed;   // KS-R5: sztuki, ktore bez zadatku nie pojechalyby (zrodlo bez miejsca) - zaplacone zadatki licza sie przy wysylce (Ship)
                 if (stt.PoorByK != null) for (int k = 0; k < NZ && k < stt.PoorByK.Length; k++) _dPoorByZ[k] += stt.PoorByK[k];
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -871,18 +953,19 @@ namespace Armoury
 
         /// <summary>Zakup i wyjazd: towar z polki zrodla (ramka bez ksiegowania - towar idzie do posiadacza "w drodze"), kasa celu -> kasa zrodla (towar), fracht z kasy celu
         /// (ladem - do wsi zrodla na koniec doby; morzem - kiesa wyrobnikow zrodla od razu). Zwraca wyslane sztuki.</summary>
-        private static int Ship(int s, int t, int k, ItemObject it, int n, long cost, long fr, bool sea, float L, int today, Dictionary<int, long> pendFreight)
+        private static int Ship(int s, int t, int k, ItemObject it, int n, long cost, long fr, bool sea, float L, int today, Dictionary<int, long> pendFreight, long dep = 0)
         {
             var src = _st[s]; var dstS = _st[t]; var srcT = _t[s]; var dstT = _t[t];
             var ro = src.ItemRoster;
             bool consign = _consignNow;                          // KS-R4 r4-kupcy H5: woz na kredyt - cel nie placi przy wyjezdzie, fracht placi zrodlo
+            if (!consign) dep = 0;                               // KS-R5: zadatek tylko przy kredycie kupcow
             if (ro == null || (consign ? srcT.Gold < fr : dstT.Gold < cost + fr)) return 0;
             // recenzja runda 3 (drobne): sztuki bez modyfikatora (jak polka w Daily), cena i fracht za sztuki naprawde zdjete z polki
             var el = new EquipmentElement(it, null, null, false);
             int ei = ro.FindIndexOfElement(el), before = ei >= 0 ? ro.GetElementNumber(ei) : 0;
             int take = Math.Min(n, Math.Max(0, before - Keep));
             if (take <= 0) return 0;
-            if (take < n) { cost = (long)Math.Round(cost * (double)take / n); fr = (long)Math.Round(fr * (double)take / n); n = take; }
+            if (take < n) { cost = (long)Math.Round(cost * (double)take / n); fr = (long)Math.Round(fr * (double)take / n); dep = (long)Math.Round(dep * (double)take / n); n = take; }
             var gf = GoodsLedger.Begin(GoodsLedger.FKsH, src);
             try { ro.AddToCounts(el, -n); }
             finally { GoodsLedger.End(gf); }
@@ -892,9 +975,22 @@ namespace Armoury
             {
                 _dDrop += Math.Max(0, n - removed);                  // zamowione, a nie zdjete z polki (nie weszlo do drogi - poza kontrola towaru)
                 if (removed <= 0) return 0;
-                cost = (long)Math.Round(cost * (double)removed / n); fr = (long)Math.Round(fr * (double)removed / n); n = removed;
+                cost = (long)Math.Round(cost * (double)removed / n); fr = (long)Math.Round(fr * (double)removed / n); dep = (long)Math.Round(dep * (double)removed / n); n = removed;
             }
             long paidG = 0, frPaid = 0;
+            long depPaid = 0;
+            if (consign && dep > 0)
+            {
+                // KS-R5 ceny-r5: zadatek kupcow celu przy wysylce - kasa celu (ponad podloge kredytu, ta sama co przy dostawie) -> kasa zrodla, z pomiarem obu stron
+                // (w kontroli zlota: cel -, zrodla +); kasa celu ponizej podlogi - zadatek mniejszy (reszte niesie kredyt zrodla, jak bez zadatku)
+                long ask = Math.Min(dep, KsFoodCredit.FreeOf(dstT));
+                if (ask > 0)
+                {
+                    int d0 = dstT.Gold; dstT.ChangeGold(-(int)Math.Min(int.MaxValue, ask)); depPaid = d0 - dstT.Gold;
+                    if (depPaid > 0) { int s0 = srcT.Gold; srcT.ChangeGold((int)depPaid); long gotS = srcT.Gold - s0; _gDst += depPaid; _gSrc += gotS; }
+                    else depPaid = 0;
+                }
+            }
             if (!consign)
             {
             // zloto: towar
@@ -941,12 +1037,13 @@ namespace Armoury
                     long pv; pendFreight.TryGetValue(s, out pv); pendFreight[s] = pv + frPaid;
                 }
             }
-            var c = new Cart { Src = src, Dst = dstS, Z = k, N = n, DayBought = today, DayDue = today + (int)Math.Max(1f, L), Paid = paidG, Freight = frPaid, Sea = sea, Val = consign ? cost : paidG, Cons = consign };
+            var c = new Cart { Src = src, Dst = dstS, Z = k, N = n, DayBought = today, DayDue = today + (int)Math.Max(1f, L), Paid = paidG, Freight = frPaid, Sea = sea, Val = consign ? cost : paidG, Cons = consign, Dep = depPaid };
             _carts.Add(c);
             AddInc(c, +1);
             _dLots++; if (sea) _dSea++; else _dLand++;
             _dBought += n; _dGold += paidG; _dFreight += frPaid; _dByZ[k] += n;
             if (consign) { _dConsLots++; _dConsPcs += n; _dConsVal += cost; }
+            if (depPaid > 0) { _dDepLots++; _dDepPcs += n; _dDepGold += depPaid; }
             if (_north != null && t < _north.Length && _north[t]) _dNorthShip += n;
             int m = _mk[t];
             _shipDay[m * NZ + k] += n; _shipDaysDay[m * NZ + k] += n * Math.Max(1f, L);
@@ -1036,8 +1133,13 @@ namespace Armoury
                 bool active = StartCalibration.Applied && SwitchOn && StartCalibration.RampDayA >= 0 && Today() >= StartCalibration.RampDayA;
                 // KS-R4 r4-kupcy: splaty i przepadki rachunkow tez daja linie (dlugi splacane takze poza stanem zastosowanym)
                 bool credit = KsFoodCredit.Any || KsFoodCredit.DRepaid + KsFoodCredit.DForfeit + KsFoodCredit.DBilled != 0;
-                if (!active && _dBought + _dArr + _dBackPcs + _dLost == 0 && now == 0 && !credit) { _prevTransit = now; ClearDay(); return; }
-                if (!LogGate.Lines) { _prevTransit = now; ClearDay(); return; }
+                // KS-R5 ceny-r5: zadatki w drodze (kontrola zadatkow co dobe, takze bez linii) i tydzien pomiaru przyczyn bez dowozu (zerowany co 7 dob, takze bez linii)
+                long depNow = 0; int depCarts = 0; foreach (var c in _carts) if (c.Dep > 0) { depNow += c.Dep; depCarts++; }
+                string depCtl = _depPrev < 0 ? "-" : (_depPrev + _dDepGold - _dDepSettled - depNow).ToString(CultureInfo.InvariantCulture);
+                _depPrev = depNow;
+                bool week = Today() % 7 == 0;
+                if (!active && _dBought + _dArr + _dBackPcs + _dLost == 0 && now == 0 && !credit) { _prevTransit = now; if (week) ClearMiss(); ClearDay(); return; }
+                if (!LogGate.Lines) { _prevTransit = now; if (week) ClearMiss(); ClearDay(); return; }
                 var inv = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder(1500);
                 sb.Append("Kupcy zywnosci (KS-H) dzien ").Append(Today() - 1).Append(" | ").Append(active ? "CZYNNE" : (SwitchOn ? "poza stanem zastosowanym (tylko dowoz oplaconych)" : "WYLACZONE kluczem Ks Food Carts (tylko dowoz oplaconych)"))
@@ -1072,8 +1174,11 @@ namespace Armoury
                 sb.Append(" | probka wyceny 1/64 ").Append(_dSample > 0 ? (100.0 * _dSampleErr / _dSample).ToString("0.00", inv) + "% (max " + (100.0 * _dSampleMax).ToString("0.00", inv) + "%, lotow " + _dSample + ", pierwsze " + SampleCap + " szt., czas " + (_dSampleTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv) + " ms poza czasem)" : "-")
                   .Append(" | tabela dob ").Append(_pairsDone).Append('/').Append(_pairs != null ? _pairs.Length : 0);
                 AppendR4(sb, inv);
+                AppendR5(sb, inv, depNow, depCarts, depCtl);
                 sb
                   .Append(" | czas ").Append((_dTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv)).Append(" ms | potkniecia ").Append(_dStum).Append('.');
+                // KS-R5 ceny-r5 (NKS-24): co 7 dob dowoz do krain importerow (suma wszystkich korytarzy, bez sufitu 120 pozycji listy korytarzy nizej) i przyczyny braku dowozu
+                if (week) { AppendR5Week(sb, inv); ClearMiss(); }
                 if (Today() % 7 == 0 && _delEma.Count > 0)
                 {
                     var l = new List<KeyValuePair<string, double>>(_delEma);
@@ -1144,6 +1249,81 @@ namespace Armoury
 
         private static long SumInc(int t) { long v = 0; for (int k = 0; k < NZ; k++) v += _inc[t * NZ + k]; return v; }
 
+        /// <summary>KS-R5 ceny-r5: czesc linii KS-H - zadatki kupcow celu (klucz, udzial; przy wysylce, odblokowane, rozliczenie przy dostawie i przy zawroceniu, w drodze,
+        /// kontrola zadatkow: w drodze wczoraj + zaplacone - rozliczone = w drodze dzis).</summary>
+        private static void AppendR5(StringBuilder sb, CultureInfo inv, long depNow, int depCarts, string depCtl)
+        {
+            try
+            {
+                sb.Append(" | zadatki kupcow celu (Ks Consign Deposit ").Append(DepositKey && ConsignKey ? "TAK" : "NIE").Append(", udzial ").Append(DepositShare.ToString("0.00", inv))
+                  .Append("; gdy zrodlo bez miejsca kredytu): przy wysylce ").Append(_dDepLots).Append(" wozow, ").Append(_dDepPcs).Append(" szt., ").Append(_dDepGold)
+                  .Append(" zl (cel -> zrodlo), odblokowane ").Append(_dDepFreed).Append(" szt.; przy dostawie zaliczone ").Append(_dDepCred).Append(" zl, nadplata zwrocona ").Append(_dDepOver)
+                  .Append(" zl; zwrot zawroconych ").Append(_dDepBack).Append(" zl; roszczenia celu ").Append(_dDepClaim).Append(" zl (zrodlo bez kasy na zwrot; rachunki ")
+                  .Append(KsFoodCredit.DClaimN).Append("); bez rozliczenia ").Append(_dDepLost).Append(" zl | zadatki w drodze ").Append(depNow).Append(" zl w ").Append(depCarts)
+                  .Append(" wozach | kontrola zadatkow reszta ").Append(depCtl).Append(" (w drodze wczoraj + zaplacone - rozliczone - w drodze dzis)");
+            }
+            catch (Exception e) { Stumble("AppendR5", e); }
+        }
+
+        /// <summary>KS-R5 ceny-r5 (NKS-24): co 7 dob - dowoz do krain spoza krainy (srednia 28 dob, szt./d, suma wszystkich korytarzy - lista korytarzy linii jest ucieta do 120
+        /// pozycji) i brak do T* zamowien bez lotu wedlug przyczyny (kraina celu x towar, suma dob od ostatniej linii tygodnia).</summary>
+        private static void AppendR5Week(StringBuilder sb, CultureInfo inv)
+        {
+            try
+            {
+                var imp = new Dictionary<string, double>(StringComparer.Ordinal);
+                foreach (var kv in _delEma)
+                {
+                    var p = kv.Key.Split('|'); int g;
+                    if (p.Length != 3 || p[0] == p[1] || !int.TryParse(p[2], out g) || g < 0 || g >= KsTab.NG) continue;
+                    string key = p[1] + " " + KsTab.Goods[g];
+                    double v; imp.TryGetValue(key, out v); imp[key] = v + kv.Value;
+                }
+                var li = new List<KeyValuePair<string, double>>(imp); li.Sort((a, b) => b.Value.CompareTo(a.Value));
+                sb.Append(" | dowoz do krain spoza krainy (srednia 28 dob, szt./d):");
+                int n = 0;
+                foreach (var kv in li) { if (kv.Value < 1.0) break; sb.Append(n == 0 ? " " : ", ").Append(kv.Key).Append(' ').Append(kv.Value.ToString("0", inv)); n++; }
+                if (n == 0) sb.Append(" -");
+                // przyczyny braku dowozu (pomiar KsFoodCore.Miss)
+                var m = _miss; int NR = KsFoodCore.NMiss;
+                sb.Append(" | bez dowozu wedlug przyczyny (").Append(_missDays).Append(" dob, brak do T* szt.; kraina celu x towar):");
+                if (m == null || _t == null || m.Length != _nt * NZ * NR) { sb.Append(" -"); return; }
+                var tot = new double[NR];
+                var by = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                var land = new string[_nt];
+                for (int t = 0; t < _nt; t++) { try { land[t] = StartCalibration.TownLandOf(_st[t]); } catch { land[t] = null; } if (string.IsNullOrEmpty(land[t])) land[t] = "?"; }
+                for (int t = 0; t < _nt; t++)
+                    for (int k = 0; k < NZ; k++)
+                    {
+                        int o = (t * NZ + k) * NR; double s = 0; for (int r = 0; r < NR; r++) s += m[o + r];
+                        if (!(s > 0)) continue;
+                        string key = land[t] + " " + (PlanG[k] >= 0 ? KsTab.Goods[PlanG[k]] : KsBasket.Ids[Z[k]]);
+                        double[] a; if (!by.TryGetValue(key, out a)) { a = new double[NR]; by[key] = a; }
+                        for (int r = 0; r < NR; r++) { a[r] += m[o + r]; tot[r] += m[o + r]; }
+                    }
+                sb.Append(" razem");
+                for (int r = 0; r < NR; r++) sb.Append(r == 0 ? " " : ", ").Append(KsFoodCore.MissNames[r]).Append(' ').Append(tot[r].ToString("0", inv));
+                var lb = new List<KeyValuePair<string, double[]>>(by);
+                lb.Sort((x, y) => { double sx = 0, sy = 0; for (int r = 0; r < NR; r++) { sx += x.Value[r]; sy += y.Value[r]; } return sy.CompareTo(sx); });
+                int q = 0;
+                foreach (var kv in lb)
+                {
+                    if (q >= 40) break;
+                    double s = 0; for (int r = 0; r < NR; r++) s += kv.Value[r];
+                    if (s < 1.0) break;
+                    sb.Append(q == 0 ? "; " : ", ").Append(kv.Key).Append(' ').Append(s.ToString("0", inv)).Append(" (");
+                    var ord = new List<int>(); for (int r = 0; r < NR; r++) if (kv.Value[r] >= 1.0) ord.Add(r);
+                    ord.Sort((x, y) => kv.Value[y].CompareTo(kv.Value[x]));
+                    for (int i = 0; i < ord.Count; i++) sb.Append(i == 0 ? "" : " / ").Append(KsFoodCore.MissNames[ord[i]]).Append(' ').Append(kv.Value[ord[i]].ToString("0", inv));
+                    sb.Append(')');
+                    q++;
+                }
+            }
+            catch (Exception e) { Stumble("AppendR5Week", e); }
+        }
+
+        private static void ClearMiss() { if (_miss != null) Array.Clear(_miss, 0, _miss.Length); _missDays = 0; }
+
         // ------------------------------------------------------------ zapis wozow (arm_ks_kupcy): zrodlo|cel|towar|ile|doba zakupu|termin|zaplacone|fracht|morze~
         internal static string Export()
         {
@@ -1155,6 +1335,7 @@ namespace Armoury
                 sb.Append(c.Src.StringId).Append('|').Append(c.Dst.StringId).Append('|').Append(KsBasket.Ids[Z[c.Z]]).Append('|').Append(c.N).Append('|').Append(c.DayBought).Append('|')
                   .Append(c.DayDue).Append('|').Append(c.Paid).Append('|').Append(c.Freight).Append('|').Append(c.Sea ? 1 : 0);
                 if (c.Cons) sb.Append('|').Append(Math.Max(0, c.Val));   // KS-R4 r4-kupcy: woz na kredyt - 10. pole wartosc zrodla lotu (jest = woz na kredyt; starsza DLL czyta 9 pol i pomija reszte)
+                if (c.Cons && c.Dep > 0) sb.Append('|').Append(c.Dep);   // KS-R5 ceny-r5: 11. pole - zadatek kupcow celu (DLL r4-kupcy czyta 10 pol i pomija reszte)
                 sb.Append('~');
             }
             string res = sb.ToString();
@@ -1241,6 +1422,7 @@ namespace Armoury
                         || !long.TryParse(a[6], out paid) || !long.TryParse(a[7], out fr)) { lost++; continue; }
                     var c = new Cart { Src = src, Dst = dst, Z = k, N = n, DayBought = d0, DayDue = d1, Paid = Math.Max(0, paid), Freight = Math.Max(0, fr), Sea = a[8] == "1" };
                     long vv; if (a.Length >= 10 && long.TryParse(a[9], out vv) && vv >= 0) { c.Val = vv; c.Cons = true; }
+                    long dd; if (c.Cons && a.Length >= 11 && long.TryParse(a[10], out dd) && dd > 0) c.Dep = dd;   // KS-R5 ceny-r5: zadatek kupcow celu
                     _carts.Add(c);
                     if (_t != null) AddInc(c, +1);
                     ok++; pcs += n;
