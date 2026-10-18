@@ -1560,8 +1560,9 @@ Uzycie (Python 3, tylko odczyt):
                     INFO); NRN-D skutek reguly na sucho z CSV
                     (log sprzed paczki: G, R, renta_180, szczebel 168 - rod ze szczeblem dlugu bez miary; INFO). Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log
                     z --csv .../Modules/Armoury/Logs/2026-10-17_23-22-37/budzet-rodow.csv): linie f7 INFO, NRN-D z liczbami, bez wyjatku.
---grupa nskarbiec : (18.10, paczka f15-skarbiec - decyzja Jeffa "takze srednim": skarbiec krolestwa w wojnie doplaca do zoldu takze srednim rodom; Armoury/src/
-                    KingdomTreasury.MidAid.cs, klucz Crown War Aid Middle) python -I tools/sprawdz_logi.py --grupa nskarbiec <Armoury-*.log> [--csv budzet-rodow.csv]
+--grupa nsrednim  : (18.10, paczka f15-skarbiec - decyzja Jeffa "takze srednim": skarbiec krolestwa w wojnie doplaca do zoldu takze srednim rodom; Armoury/src/
+                    KingdomTreasury.MidAid.cs, klucz Crown War Aid Middle; recenzja: dawna nazwa "nskarbiec" byla zajeta przez skarbiec kryjowki z nocy 15/16.10 i
+                    przykrywala tamta grupe) python -I tools/sprawdz_logi.py --grupa nsrednim <Armoury-*.log> [--csv budzet-rodow.csv]
                     [--baza-doby <log bazy>] (strumieniowo; bez --csv budzet-rodow.csv obok logu). NSK-0 linie "Skarbiec dla srednich (W5c)" (INFO), NSK-0b nieczytelne 0,
                     NSK-1 linia W5c w kazdej dobie z linia W5, NSK-2 tozsamosci co do zlotowki: skarbce przed - po = ubylo = wyplacono (skarbiec -x = rody +x), suma pasm =
                     wyplacono, wyplacono <= pula <= budzet, segment W5c linii W5 i linii 165 = wyplacono, klucz wylaczony - 0; NSK-3 tylko wojna i tylko ponizej 2R (kontrola
@@ -1570,9 +1571,11 @@ Uzycie (Python 3, tylko odczyt):
                     wlasny tej doby) - INFO);
                     NSK-5 skarbiec nie ponizej zapasu wojny i dlugow po W5c (kontrola linii 0); NSK-6 suma kolumny doplata_srednim_w5c (AI i gracz) = wyplacono; NSK-7
                     srednie 28 dob (wyplacono wedlug pasm, podniesienie, budzet, chec, pula, zmiana skarbcow krolestw w wojnie i ich wojsko z linii "Skarbce:"; INFO),
-                    NSK-7b z --baza-doby: zmiana skarbcow w wojnie i wojsko bieg / baza (INFO); NSK-8 ERROR KingdomTreasury.MidAid 0 i potkniecia 0; NSK-D skutek reguly na
-                    sucho z CSV i linii W5 (budzet = 1/30 nadwyzki - pula W5b na krolestwo, rody z lennem i warunkiem rent w wojnie, f z G i R miary f6/f7, szczebel 168 bez
-                    zajecia - f = 1; INFO). Log sprzed paczki (np. fin92 Armoury-2026-10-18_09-33-39.log): NSK-0 INFO, NSK-D z liczbami, bez wyjatku.
+                    NSK-7b z --baza-doby: zmiana skarbcow w wojnie i wojsko bieg / baza (INFO); NSK-7c skarbce krolestw w wojnie nie rosna (cel f15; TAK albo DECYZJA - nie
+                    znika w INFO); NSK-8 ERROR KingdomTreasury.MidAid 0 i potkniecia 0; NSK-D skutek reguly na sucho z CSV i linii W5 (budzet = 1/30 nadwyzki - pula W5b
+                    na krolestwo, rody z lennem i warunkiem rent w wojnie, f z G i R miary f6/f7; szczebel 168 bez zajecia - f z G i R budzetu tym samym wzorem, jak kod po
+                    recenzji; miejsce w pulapie tylko ponad gotowke - nie narasta; INFO). Log sprzed paczki (np. fin92 Armoury-2026-10-18_09-33-39.log): NSK-0 INFO, NSK-D
+                    z liczbami, bez wyjatku.
 --grupa nruda     : (noc 18.10, fala 5 paczka f5-ruda - ruda/zelazo pod KS; Armoury/src/StartCalibration.Ruda.cs, Bloomery.F5.cs, VillageTakings.F5WoodCredit; klucze
                     Ks Iron Hands Follow Market, Bloomery Wood Credit) python -I tools/sprawdz_logi.py --grupa nruda <Armoury-*.log> (strumieniowo). Linie "Ruda KS (f5-ruda):
                     dzien N" (co 7 dob od D - rece przy zlozach zelaza za ruda rynku: polki S / cel T = suma zapasow rzemiosla CaravanBulk; S < T brak - kopalnie z drewnem
@@ -45936,7 +45939,7 @@ def nrenty_main(logp, bdp=None, csvp=None):
     return 0
 
 
-# ============================================================ nskarbiec (18.10, paczka f15-skarbiec - decyzja Jeffa "takze srednim": skarbiec krolestwa w wojnie doplaca
+# ============================================================ nsrednim (18.10, paczka f15-skarbiec - decyzja Jeffa "takze srednim": skarbiec krolestwa w wojnie doplaca
 # do zoldu takze srednim rodom - W5c ponad gwarancje W5, f jak zwrot f6 i renty f7); Armoury/src/KingdomTreasury.MidAid.cs, klucz Crown War Aid Middle
 NSK_LINE = "Skarbiec dla srednich (W5c): dzien "
 NSK_W5 = "Doplata wedlug potrzeby (W5): dzien "
@@ -45945,9 +45948,10 @@ NSK_RX_TOT = re.compile(r"\| budzet (\d+), chec \(f x brak ponad W5 przy pelnym 
                         r" podniesienie pulapu ponad W5 (\d+) u (\d+) rodow")
 NSK_RX_SUR = re.compile(r"\| nadwyzka skarbcow razem (\d+), zapas wojny razem (\d+)")
 NSK_RX_KS = re.compile(r"\| krolestw w wojnie z krokiem (\d+), z budzetem (\d+), z pula (\d+), z wyplata (\d+)")
-NSK_RX_BAND = re.compile(r"\| (ponizej R \(f = 1\)|R-2R \(f = \(2R - G\) / R\)|bez miary - dluznik 168 \(f = 1, jak f6/f7\)): rodow (\d+), z gotowka (\d+), gotowka (\d+), podniesienie (\d+)")
-NSK_RX_RICH = re.compile(r"\| ponad 2R \(nic\): pominiete (\d+), gotowka (\d+)")
-NSK_RX_SKIP = re.compile(r"\| pominiete: luz w pulapie wlasnym (\d+), platnicy tarczowego tej doby (\d+)")
+NSK_RX_BAND = re.compile(r"\| (ponizej R \(f = 1\)|R-2R \(f = \(2R - G\) / R\)|dluznik 168 - kredyt Banku albo zaleglosc \(bez miary w f6/f7; tu f z jego G i R\)"
+                         r"|bez miary - dluznik 168 \(f = 1, jak f6/f7\)): rodow (\d+)(?: \(ponizej R (\d+), R-2R (\d+)\))?, z gotowka (\d+), gotowka (\d+), podniesienie (\d+)")
+NSK_RX_RICH = re.compile(r"\| ponad 2R \(nic\): pominiete (\d+)(?: \(w tym dluznikow 168 (\d+)\))?, gotowka (\d+)")
+NSK_RX_SKIP = re.compile(r"\| pominiete: luz w pulapie wlasnym (\d+), platnicy tarczowego tej doby (\d+)(?:, bez miary \(bez G i R - nic\) (\d+))?")
 NSK_RX_WAL = re.compile(r"\| skarbce w kroku W5c: przed (-?\d+), po (-?\d+), ubylo (-?\d+) \(= wyplacono\)")
 NSK_RX_CTL = re.compile(r"\| kontrola: ponizej zapasu wojny po wyplacie (\d+), gotowka przy zoldzie druzyn w pulapie wlasnym (\d+), ponad f x brak (\d+), ponad 2R (\d+), w pokoju (\d+) \(oczekiwane 0\)")
 NSK_RX_ST = re.compile(r"\| potkniecia (\d+)\.\s*$")
@@ -45958,7 +45962,7 @@ NSK_RX_W5K = re.compile(r"([^:;|]+?): garnek (\d+) .*?ze skarbca ponad zapas (\d
 
 
 def _nsk_scan(logp):
-    """nskarbiec: strumieniowo linia W5c, segment W5c i krolestwa linii W5 (nadwyzka, pula W5b - do NSK-D), linia 165 (segment W5c), "Skarbce:" (skarbce i wojsko
+    """nsrednim: strumieniowo linia W5c, segment W5c i krolestwa linii W5 (nadwyzka, pula W5b - do NSK-D), linia 165 (segment W5c), "Skarbce:" (skarbce i wojsko
     krolestw w wojnie) i bledy KingdomTreasury.MidAid."""
     D = {"mc": {}, "bad": [], "w5": {}, "w5k": {}, "k165": {}, "tre": {}, "err": []}
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -45982,9 +45986,12 @@ def _nsk_scan(logp):
                      "w0": int(wal.group(1)), "w1": int(wal.group(2)), "wd": int(wal.group(3)),
                      "below": int(ctl.group(1)), "notcap": int(ctl.group(2)), "over": int(ctl.group(3)), "rich": int(ctl.group(4)), "peace": int(ctl.group(5)),
                      "sur": int(sur.group(1)), "res": int(sur.group(2)), "kw": int(ks.group(1)), "kpaid": int(ks.group(4)),
-                     "bands": {b[0].split(" ")[0] if not b[0].startswith("bez") else "bez": (int(b[1]), int(b[2]), int(b[3]), int(b[4])) for b in bands},
-                     "richskip": int(rich.group(1)), "richcash": int(rich.group(2))}
+                     # recenzja f15: wiersz dluznika 168 - klucz "dl" (stara etykieta "bez miary" tez); (rodow, z gotowka, gotowka, podniesienie)
+                     "bands": {("dl" if b[0].startswith(("dluznik", "bez")) else b[0].split(" ")[0]): (int(b[1]), int(b[4]), int(b[5]), int(b[6])) for b in bands},
+                     "debtband": next(((int(b[2] or 0), int(b[3] or 0)) for b in bands if b[0].startswith("dluznik")), (0, 0)),
+                     "richskip": int(rich.group(1)), "richdebt": int(rich.group(2) or 0), "richcash": int(rich.group(3))}
                 sk = NSK_RX_SKIP.search(s); r["slack"], r["scut"] = (int(sk.group(1)), int(sk.group(2))) if sk else (None, None)
+                r["nomeas"] = int(sk.group(3)) if sk and sk.group(3) else 0
                 st = NSK_RX_ST.search(s); r["st"] = int(st.group(1)) if st else None
                 D["mc"][day] = r
                 continue
@@ -46061,10 +46068,12 @@ def _nsk_cost(W, M, L, P, pc0, phi):
 
 def _nsk_dry(csvd, w5k, days, target=0.6, step=0.1, csdays=30.0):
     """NSK-D: skutek reguly W5c na sucho z CSV i linii W5 (log sprzed paczki albo z kluczem wylaczonym): budzet krolestwa = floor(nadwyzka / 30) - pula W5b
-    (linia W5), rody z lennem, warunkiem rent i wojna, f z G i R miary f6/f7 (szczebel 168 bez zajecia - f = 1, zajecie - pominiete), bez luzu w pulapie;
-    pulap wlasny = pulap - podniesienia W5/W7 - zalogi - karawany (budzet tej doby - przyblizenie budzetu z wczoraj). Zwraca srednie na dobe."""
+    (linia W5), rody z lennem, warunkiem rent i wojna, f z G i R miary f6/f7; szczebel 168 bez zajecia (bez miary w f6/f7) - recenzja f15: f z G i R budzetu
+    (kolumny G, R; R budzetu <= R miary - przyblizenie w dol) tym samym wzorem, ponad 2R - nic; zajecie - pominiete; bez luzu w pulapie. Pulap wlasny = pulap -
+    podniesienia W5/W7 - zalogi - karawany (budzet tej doby - przyblizenie budzetu z wczoraj). Miejsce dla ludzi = podniesienie ponad W5 PONAD gotowke (za ludzi,
+    ktorzy sa) / stawka - liczone co dobe od nowa, nie narasta. Zwraca srednie na dobe."""
     tot = {"budget": 0.0, "want": 0.0, "pool": 0.0, "cash": 0.0, "boost": 0.0, "men": 0.0, "n": 0}
-    band_cash = {"<R": 0.0, "R-2R": 0.0, "bez": 0.0}
+    band_cash = {"<R": 0.0, "R-2R": 0.0, "dl": 0.0}
     for d in days:
         clans = {}
         for r in csvd.get(d, []):
@@ -46074,14 +46083,15 @@ def _nsk_dry(csvd, w5k, days, target=0.6, step=0.1, csdays=30.0):
             if st in ("zajecie", "wyprzedaz"):
                 continue
             G = _nsk_fv(r, "G"); R = _nsk_fv(r, "zwrot_f6_r") or _nsk_fv(r, "renta_f7_r")
-            if st not in ("", "-") or R <= 0:
-                band, f = "bez", 1.0
-            elif G <= R:
-                band, f = "<R", 1.0
-            elif G >= 2 * R:
+            debt = st not in ("", "-")
+            if debt and R <= 0:
+                R = _nsk_fv(r, "R")   # recenzja f15: dluznik 168 - bez miary w f6/f7; W5c bierze G i R jego budzetu
+            if R <= 0:
+                continue              # bez G i R - nic
+            if G >= 2 * R:
                 continue
-            else:
-                band, f = "R-2R", (2 * R - G) / R
+            f = 1.0 if G <= R else (2 * R - G) / R
+            band = "dl" if debt else ("<R" if G <= R else "R-2R")
             W = _nsk_fv(r, "zold_partii"); M = _nsk_fv(r, "ludzi_partie"); L = _nsk_fv(r, "limit_partii")
             if L <= 0:
                 continue
@@ -46128,17 +46138,18 @@ def _nsk_dry(csvd, w5k, days, target=0.6, step=0.1, csdays=30.0):
                 spent += e
                 nb = max(b5 + f * max(0.0, b1 - b5), c5 + e)
                 tot["boost"] += max(0.0, nb - b5)
-                tot["men"] += max(0.0, nb - b5) / P if P > 0 else 0.0
+                # recenzja f15: miejsce dla NOWYCH ludzi = podniesienie ponad wieksze z (przydzial W5, gotowka korony razem z W5c) - gotowka placi ludzi, ktorzy juz sa
+                tot["men"] += max(0.0, nb - max(b5, c5 + e)) / P if P > 0 else 0.0
                 band_cash[band] += e
             tot["cash"] += spent
     n = max(1, tot["n"])
     return {k: (v / n if k != "n" else v) for k, v in tot.items()}, {k: v / n for k, v in band_cash.items()}
 
 
-def nskarbiec_main(logp, bdp=None, csvp=None):
-    """nskarbiec (18.10, paczka f15-skarbiec): W5c - skarbiec ponad zapas wojny placi w wojnie f x brak zoldu druzyn ponad W5 do pelnego limitu rodom ponizej 2R (f jak f6/f7).
+def nsrednim_main(logp, bdp=None, csvp=None):
+    """nsrednim (18.10, paczka f15-skarbiec): W5c - skarbiec ponad zapas wojny placi w wojnie f x brak zoldu druzyn ponad W5 do pelnego limitu rodom ponizej 2R (f jak f6/f7).
     Wejscie: log Armoury (strumieniowo), budzet-rodow.csv (--csv albo obok logu), opcjonalnie --baza-doby <log bazy> (NSK-7b). Progi NSK-0..NSK-8 i NSK-D - opis w naglowku
-    pliku (--grupa nskarbiec). Log bez paczki: linie INFO, skutek na sucho z CSV (NSK-D), bez wyjatku."""
+    pliku (--grupa nsrednim). Log bez paczki: linie INFO, skutek na sucho z CSV (NSK-D), bez wyjatku."""
     rep = Report()
     D = _nsk_scan(logp)
     if csvp is None:
@@ -46227,14 +46238,20 @@ def nskarbiec_main(logp, bdp=None, csvp=None):
         if t28:
             n = len(t28)
             av = lambda k: sum(mc[d][k] for d in t28) / n
-            bc = {b: sum(mc[d]["bands"].get(b, (0, 0, 0, 0))[2] for d in t28) / n for b in ("ponizej", "R-2R", "bez")}
+            bc = {b: sum(mc[d]["bands"].get(b, (0, 0, 0, 0))[2] for d in t28) / n for b in ("ponizej", "R-2R", "dl")}
             tre = D["tre"]; td = [d for d in t28 if d in tre and d - 1 in tre]
             dw = sum(tre[d][0] - tre[d - 1][0] for d in td) / len(td) if td else None
             men = sum(tre[d][1] for d in t28 if d in tre) / max(1, sum(1 for d in t28 if d in tre))
             rep.add("NSK-7: W5c srednio na dobe (ostatnie %d dob z kluczem; INFO)" % n,
-                    f"wyplacono {av('paid'):.0f} (ponizej R {bc['ponizej']:.0f}, R-2R {bc['R-2R']:.0f}, bez miary {bc['bez']:.0f}), podniesienie pulapu {av('boost'):.0f}, rodow z gotowka {av('paidn'):.1f},"
+                    f"wyplacono {av('paid'):.0f} (ponizej R {bc['ponizej']:.0f}, R-2R {bc['R-2R']:.0f}, dluznicy 168 wedlug G i R {bc['dl']:.0f}), podniesienie pulapu {av('boost'):.0f}, rodow z gotowka {av('paidn'):.1f},"
+                    f" dluznikow ponad 2R pominietych {av('richdebt'):.1f}, bez miary (nic) {av('nomeas'):.1f},"
                     f" budzet {av('budget'):.0f}, chec {av('want'):.0f}, pula {av('pool'):.0f}; skarbce krolestw w wojnie zmiana {('%+.0f' % dw) if dw is not None else '-'} zl/d, wojsko rodow krolestw w wojnie {men:.0f}",
                     "INFO - cel: skarbce w wojnie nie rosna, wojsko w strone fin91 (117 tys. w polu); pokoj - zapas na nastepna wojne", None)
+            # recenzja f15: cel paczki widoczny - skarbce krolestw w wojnie nie rosna (srednio <= 0 zl/d); niespelniony = DECYZJA dla Jeffa (W5c placi tylko za ludzi,
+            # ktorzy sa, i daje miejsce na krok werbunku - reszta puli zostaje w skarbcu, dopoki rody nie zwerbuja), nie blad kodu
+            if dw is not None:
+                rep.add("NSK-7c: skarbce krolestw w wojnie nie rosna (cel f15 - ostatnie %d dob z kluczem)" % n, f"zmiana {dw:+.0f} zl/d (dob z para dzien/dzien-1: {len(td)})",
+                        "<= 0 zl/d; niespelniony = DECYZJA Jeffa (regula W5c nie placi ponad realny brak zoldu)", dw <= 0, decide=True)
             if bdp:
                 B = _nsk_scan(bdp)
                 bt = B["tre"]; bd = sorted(bt)[-28:]
@@ -46254,8 +46271,8 @@ def nskarbiec_main(logp, bdp=None, csvp=None):
         if dd:
             t, bc = _nsk_dry(csvd, D["w5k"], dd)
             rep.add(f"NSK-D: W5c na sucho z CSV i linii W5 (ostatnie {len(dd)} dob; budzet = 1/30 nadwyzki - pula W5b; INFO)",
-                    f"budzet {t['budget']:.0f}, chec {t['want']:.0f}, pula {t['pool']:.0f}, gotowka {t['cash']:.0f} (ponizej R {bc['<R']:.0f}, R-2R {bc['R-2R']:.0f}, bez miary {bc['bez']:.0f}),"
-                    f" podniesienie pulapu ponad W5 {t['boost']:.0f} (~{t['men']:.0f} ludzi miejsca na dobe)",
+                    f"budzet {t['budget']:.0f}, chec {t['want']:.0f}, pula {t['pool']:.0f}, gotowka {t['cash']:.0f} (ponizej R {bc['<R']:.0f}, R-2R {bc['R-2R']:.0f}, dluznicy 168 wedlug G i R {bc['dl']:.0f}),"
+                    f" podniesienie pulapu ponad W5 {t['boost']:.0f} (w tym miejsce w pulapie ponad gotowke dla ok. {t['men']:.0f} nowych ludzi - liczone co dobe od nowa, nie narasta)",
                     "INFO - gotowka rosnie, gdy rody zwerbuja na miejsce (najwyzej pula); log z paczka - CSV juz z W5c (szacunek ponad wyplacone)", None)
     rep.show()
     return 0
@@ -47631,8 +47648,8 @@ def main(argv):
         return nzwrot_main(logp, bdp, csvp)   # nzwrot (18.10, paczka f6-zwrot): zwrot zoldu wedlug potrzeby rodu, sprzet niewydany tylko za towar niezywnosciowy (KingdomTreasury.RefundNeed, CourtFull.Goods)
     if group == "nrenty" and logp:
         return nrenty_main(logp, bdp, csvp)   # nrenty (18.10, paczka f7-renty): renty 180 wedlug potrzeby rodu - ta sama regula co zwrot f6, reszta w skarbcu (CrownRents.Need.cs)
-    if group == "nskarbiec" and logp:
-        return nskarbiec_main(logp, bdp, csvp)   # nskarbiec (18.10, paczka f15-skarbiec): skarbiec krolestwa w wojnie doplaca takze srednim rodom - W5c ponad W5, f jak f6/f7 (KingdomTreasury.MidAid.cs)
+    if group == "nsrednim" and logp:
+        return nsrednim_main(logp, bdp, csvp)   # nsrednim (18.10, paczka f15-skarbiec; recenzja - dawniej "nskarbiec", zajete przez skarbiec kryjowki): skarbiec krolestwa w wojnie doplaca takze srednim rodom - W5c ponad W5, f jak f6/f7 (KingdomTreasury.MidAid.cs)
     if group == "npozyczka" and logp:
         return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
     if group == "nbandy" and logp:

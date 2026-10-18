@@ -382,6 +382,23 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>Recenzja f15 (W5c - KingdomTreasury.MidAid): G i R MIARY POTRZEBY jak NeedChestOf, ale BEZ wykluczenia dluznika (b.Debtor - kredyt Banku, takze KW,
+        /// zaleglosc, dlug zoldu albo wobec korony). Tylko dla W5c: to nowa wyplata, wiec dluznik dostaje pasmo z wlasnego zlota (w f6/f7 "bez miary" zostaje - tam
+        /// znaczy "bez ciecia"). Pozostale wykluczenia jak ChestOf: rod bez budzetu, Straz bez zoldu, rod w zajeciu, kompania najemna. Tylko odczyt.</summary>
+        internal static bool NeedChestAnyOf(Clan c, out double G, out double R)
+        {
+            G = 0; R = 0;
+            try
+            {
+                var b = Of(c);
+                if (b == null || b.Zero || b.Seized || c.IsUnderMercenaryService) return false;
+                G = b.G; R = b.R;
+                if (NeedUncutOn && b.RNeed > R) R = b.RNeed;
+                return true;
+            }
+            catch (Exception e) { Stumble("NeedChestAnyOf", e); G = 0; R = 0; return false; }
+        }
+
         /// <summary>Recenzja calosci 18.10: klucz Need Reserve Uncut i miara potrzeby wlaczona (zwrot albo renty wedlug potrzeby).</summary>
         private static bool NeedUncutOn { get { var s = Settings.Current; return s != null && s.NeedReserveUncut && (s.CrownRefundByNeed || s.CrownRentsByNeed); } }
 

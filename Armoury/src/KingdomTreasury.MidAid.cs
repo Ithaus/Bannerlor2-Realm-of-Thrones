@@ -18,8 +18,12 @@ namespace Armoury
     ///
     /// REGULA (jedno zdanie): ponad gwarancje W5 (druzyny do CrownWarAidFillTarget limitu, bez zmian) skarbiec ponad zapas wojny placi czesc f braku zoldu druzyn
     /// rodu do PELNEGO limitu; f = ta sama miara potrzeby co zwrot f6 i renty f7 (KingdomTreasury.NeedOfClan - ta sama pamiec doby, te same G i R z wczorajszego
-    /// budzetu 166, R miary bez ciec - Need Reserve Uncut): ponizej R f = 1, R-2R f = (2R - G) / R, ponad 2R f = 0 (nic); "bez miary" (w krokach W5 to dluznik 168 bez
-    /// zajecia) f = 1 - ta sama regula co f6/f7 ("bez miary - pelny").
+    /// budzetu 166, R miary bez ciec - Need Reserve Uncut): ponizej R f = 1, R-2R f = (2R - G) / R, ponad 2R f = 0 (nic).
+    /// Recenzja f15 (pasmo "bez miary"): w krokach W5 "bez miary" f6/f7 to DLUZNIK 168 bez zajecia - kazdy rod z kredytem Banku (principal >= 1, takze kredyt wojenny
+    /// KW), z zaleglosc albo z dlugiem zoldu / wobec korony (ChestOf odrzuca b.Debtor). W f6/f7 "bez miary - pelny" znaczy tylko "bez ciecia" istniejacej wyplaty;
+    /// W5c to NOWA wyplata, wiec dluznik dostaje pasmo i f TYM SAMYM wzorem (NeedBand) z G i R miary z wczorajszego budzetu 166 (ClanBudget.NeedChestAnyOf - jak
+    /// NeedChestOf bez wykluczenia dluznika; gracz - PlCaps / PlayerCaps jak RbnOf): ponad 2R nic, R-2R (2R - G) / R, ponizej R 1. Rod bez G i R (bez miary w ogole) - nic
+    /// (bez miary nie ma nowych pieniedzy). Zwrot f6 i renty f7 - bez zmian ("bez miary - pelny").
     ///  - KTO: rody z kroku W5 krolestwa w wojnie (warunek rent, budzet 166, czynna druzyna, bez zajecia 168, bez Strazy i najemnikow; gracz z W6b) - TAKZE te, ktorym
     ///    W5 nic nie dal (pulap wlasny starcza na 60%, nie na pelne druzyny). Bez: pasma ponad 2R, rodu z luzem w pulapie (zold druzyn ponizej 95% pulapu wlasnego -
     ///    ta sama granica co W7 i SlackGold: rod nie jest ponizej limitu z braku pieniedzy) i platnika tarczowego tej doby (platnik i odbiorca nigdy naraz - jak W6b).
@@ -35,7 +39,10 @@ namespace Armoury
     ///    CrownWarAidRecruitStep limitu na dobe (jak W5; gracz - bez miejsca, sama gotowka). Przydzial idzie przez _naBoost / _naPaid / _naCash: podnosi pulap partii
     ///    i rodu w ClanBudget.Daily tej doby (b.Aid - nie wchodzi do D, nie otwiera nowych druzyn), dwor i niewydany sprzet mu nie ustepuja (b.AidCash), zold oplacony
     ///    gotowka W5c nie jest podstawa zwrotu 70% nastepnej doby (NeedAidRefundCut). Pozyczki wojenne tej doby (KW Banku, od ludu obieg2, miejska f8) licza brak zoldu
-    ///    BEZ gotowki W5c (ClanBudget - MidAidCashOf): ta sama zlotowka nie jest pozyczana drugi raz.
+    ///    BEZ gotowki W5c (ClanBudget - MidAidCashOf): ta sama zlotowka nie jest pozyczana drugi raz. Recenzja f15: to nie zjada pozyczek - pulap wlasny x.Pc0
+    ///    (PartyCapOwn = b.PartyCap - b.Aid) zawiera wczorajsze miejsca pozyczek (FolkRoom, TownRoom, KwRoom dodane do b.Cap przed PartyCap), wiec gotowka W5c
+    ///    jest tylko za zold PONAD pulap wlasny z miejscem pozyczek: brak do pozyczek minus gotowka W5c dalej >= miejsce pozyczek (pozyczki pelne, jak bez W5c);
+    ///    roznica tylko przy zmianie miejsca z dnia na dzien. W5c rosnie wiec u rodow ponad pulapem z pozyczkami (mniej zwolnien), nie zamiast pozyczki.
     ///  - POKOJ: krok W5 nie biegnie - W5c = 0; zatrzymane renty f7 zbieraja sie wtedy w skarbcu (zapas na nastepna wojne).
     /// Platnik -> odbiorca: Kingdom.KingdomBudgetWallet -> kiesa glowy rodu (najpierw skarbiec, potem glowa; wyjatek - zloto wraca). KDay.MidAid (linia 165, poza
     /// wplywami dnia - z zapasu), LastMidAid ("Obieg", "Pompy"). Zapis gry: nic nowego (stan doby w pamieci sesji). Linia "Skarbiec dla srednich (W5c): dzien N" i
@@ -48,7 +55,7 @@ namespace Armoury
         {
             public string Name = ""; public long Budget, Sur, Res, Pool, Paid, W0, W1; public double Want, Level = -1, Boost; public int Elig, PaidN, BoostN;
         }
-        private const int McBands = 4;   // pasma jak f6/f7: 0 ponizej R, 1 R-2R, 2 ponad 2R (pominiete), 3 bez miary (dluznik - f = 1)
+        private const int McBands = 4;   // wiersze linii: 0 ponizej R, 1 R-2R, 2 ponad 2R (pominiete), 3 dluznik 168 (bez miary w f6/f7; tu f z jego G i R - recenzja f15)
 
         private static readonly Dictionary<Clan, long> _mcPaid = new Dictionary<Clan, long>();      // rod -> gotowka W5c tej doby (CSV, kontrola pozyczek ClanBudget)
         private static readonly Dictionary<Clan, double> _mcBoost = new Dictionary<Clan, double>(); // rod -> podniesienie pulapu W5c ponad przydzial W5 tej doby (CSV)
@@ -59,6 +66,8 @@ namespace Armoury
         private static readonly double[] _mcBoostB = new double[McBands];
         private static readonly int[] _mcEligB = new int[McBands], _mcPaidB = new int[McBands];
         private static int _mcStumbles, _mcRichSkip, _mcSlackSkip, _mcScutSkip, _mcBelow, _mcNotAtCap, _mcOverShort, _mcRichPaid;
+        private static int _mcDebtRich, _mcNoMeasure;                       // recenzja f15: dluznicy 168 ponad 2R (czesc _mcRichSkip), rody bez G i R (nic)
+        private static readonly int[] _mcDebtB = new int[2];               // recenzja f15: dluznicy 168 ocenieni wedlug pasma z G i R (0 ponizej R, 1 R-2R)
         private static long _mcPlGot; private static double _mcPlF = -1; private static int _mcPlBand = -1;
         private static int _plToldMidDay = int.MinValue;   // wyjasnienie gracza - pamiec procesu jak W6b (PlTellDue), bez pola zapisu
         /// <summary>"Obieg", "Pompy" i linia 165: gotowka W5c wyplacona tej doby (skarbce ponad zapas wojny -> glowy rodow, poza wplywami dnia).</summary>
@@ -77,6 +86,7 @@ namespace Armoury
             _mcPaid.Clear(); _mcBoost.Clear(); _mcF.Clear(); _mcRows.Clear();
             for (int i = 0; i < McBands; i++) { _mcCashB[i] = 0; _mcBoostB[i] = 0; _mcEligB[i] = 0; _mcPaidB[i] = 0; }
             _mcStumbles = _mcRichSkip = _mcSlackSkip = _mcScutSkip = _mcBelow = _mcNotAtCap = _mcOverShort = _mcRichPaid = 0;
+            _mcDebtRich = _mcNoMeasure = 0; _mcDebtB[0] = 0; _mcDebtB[1] = 0;
             _mcPlGot = 0; _mcPlF = -1; _mcPlBand = -1;
         }
 
@@ -118,16 +128,26 @@ namespace Armoury
                         if (x == null || x.C == null || x.C.Leader == null || !x.C.Leader.IsAlive) continue;
                         double f, G, R;
                         int band = NeedOfClan(x.C, out f, out G, out R);              // ta sama miara i pamiec doby co zwrot f6 i renty f7
-                        if (band == NbAbove) { _mcRichSkip++; continue; }             // ponad 2R - nic (decyzja: bogaci nie)
-                        if (band == NbNone) f = 1.0;                                   // bez miary (dluznik 168) - jak f6/f7: pelny
+                        bool debt = false;
+                        if (band == NbNone)
+                        {
+                            // recenzja f15: "bez miary" f6/f7 (w W5 - dluznik 168: kredyt Banku, takze KW, zaleglosc) znaczy tam tylko "bez ciecia"; W5c to nowa wyplata -
+                            // pasmo i f z G i R miary rodu (budzet 166 z wczoraj bez wykluczenia dluznika) tym samym wzorem; bez G i R - nic
+                            if (!McDebtMeasure(x.C, out G, out R)) { _mcNoMeasure++; continue; }
+                            band = NeedBand(G, R, out f); debt = true;
+                            if (band == NbAbove) _mcDebtRich++;
+                        }
+                        if (band == NbAbove) { _mcRichSkip++; continue; }             // ponad 2R - nic (decyzja: bogaci nie; takze dluznik ponad 2R)
                         if (!(f > 0)) continue;
                         if (x.W < LvAtCap * x.Pc0) { _mcSlackSkip++; continue; }      // luz w pulapie wlasnym - rod nie stoi ponizej limitu z braku pieniedzy
                         long sp; if (_scPaid.TryGetValue(x.C, out sp) && sp > 0) { _mcScutSkip++; continue; }   // platnik tarczowego tej doby - nigdy naraz
-                        var m = new McC { X = x, F = Math.Min(1.0, f), Band = band, A = inCand.Contains(x) ? NaCost(x, Math.Max(0, lvl)) : 0 };
+                        int row3 = debt ? NbNone : band;                               // wiersz linii: dluznik osobno (f z jego pasma), reszta wedlug pasma
+                        var m = new McC { X = x, F = Math.Min(1.0, f), Band = row3, A = inCand.Contains(x) ? NaCost(x, Math.Max(0, lvl)) : 0 };
                         el.Add(m);
                         _mcF[x.C] = m.F;
-                        _mcEligB[band]++; mk.Elig++;
-                        if (x.Pl) { _mcPlF = m.F; _mcPlBand = band; }
+                        _mcEligB[row3]++; mk.Elig++;
+                        if (debt) _mcDebtB[band == NbBelow ? 0 : 1]++;
+                        if (x.Pl) { _mcPlF = m.F; _mcPlBand = row3; }
                     }
                     catch (Exception e) { McStumble("MidAidStep(rod)", e); }
                 }
@@ -230,6 +250,24 @@ namespace Armoury
             return paid;
         }
 
+        /// <summary>Recenzja f15: G i R miary dluznika 168 (bez miary w f6/f7) - budzet 166 z wczoraj bez wykluczenia dluznika (ClanBudget.NeedChestAnyOf; R miary jak
+        /// NeedChestOf), rod gracza - PlCaps (PlayerCaps raz na dobe, jak pulap gracza w W5) i R miary jak RbnOf (bez warunku dluznika; zajecie odrzuca juz krok W5). false - bez G i R (W5c nic). Nie rzuca.</summary>
+        private static bool McDebtMeasure(Clan c, out double G, out double R)
+        {
+            G = 0; R = 0;
+            try
+            {
+                bool ok = ClanBudget.NeedChestAnyOf(c, out G, out R);
+                if (!ok && c == Clan.PlayerClan && !(DebtLadder.On && DebtLadder.IsSeized(c)))
+                {
+                    ok = PlCaps();   // ta sama miara doby co pulap wlasny gracza w kroku W5 (ClanBudget.PlayerCaps raz na dobe)
+                    if (ok) { G = ClanIncomeBook.FamilyGoldOf(c); R = ClanBudget.NeedReserve(c, _plCapRes, _plD); }
+                }
+                return ok && R > 0 && !double.IsNaN(G) && !double.IsInfinity(G) && !double.IsNaN(R) && !double.IsInfinity(R);
+            }
+            catch (Exception e) { McStumble("McDebtMeasure", e); G = 0; R = 0; return false; }
+        }
+
         /// <summary>Suma f x brak ponad W5 przy poziomie phi (NaCost - ten sam wzor co W5; A - koszt przy poziomie W5). Rosnie z phi.</summary>
         private static double McCost(List<McC> el, double phi)
         {
@@ -247,6 +285,19 @@ namespace Armoury
                 long p;
                 if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays || !_mcPaid.TryGetValue(c, out p)) return 0;
                 return p > 0 ? p : 0;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>A16 "W5 miejsce" (recenzja f15): podniesienie pulapu W5c tej doby ponad przydzial W5 - czesc NeedAidBoostOf; pomiar W5 odejmuje je razem z MidAidCashOf
+        /// (linia A16 jak przed paczka). 0 - bez W5c, klucz wylaczony albo krok dzis nie biegl.</summary>
+        internal static double MidAidBoostOf(Clan c)
+        {
+            try
+            {
+                double b;
+                if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays || !_mcBoost.TryGetValue(c, out b)) return 0;
+                return b > 0 ? b : 0;
             }
             catch { return 0; }
         }
@@ -318,7 +369,7 @@ namespace Armoury
                 if (!s.LogEnabled) return;
                 parts.Sort((x, y) => y.Key.CompareTo(x.Key));
                 var txt = new List<string>(); foreach (var p in parts) txt.Add(p.Value);
-                string[] bn = { "ponizej R (f = 1)", "R-2R (f = (2R - G) / R)", "ponad 2R (nic)", "bez miary - dluznik 168 (f = 1, jak f6/f7)" };
+                string[] bn = { "ponizej R (f = 1)", "R-2R (f = (2R - G) / R)", "ponad 2R (nic)", "dluznik 168 - kredyt Banku albo zaleglosc (bez miary w f6/f7; tu f z jego G i R)" };
                 var sb = new StringBuilder(2048);
                 sb.Append("Skarbiec dla srednich (W5c): dzien ").Append(today)
                   .Append(" | klucz Crown War Aid Middle ").Append(s.CrownWarAidMiddle ? (MidAidOn ? "tak" : "tak, ale W5b (Crown Surplus Feeds Need Aid) albo W5 nieczynne - W5c 0") : "nie (W5c 0 - jak przed paczka)")
@@ -332,11 +383,14 @@ namespace Armoury
                   .Append(" u ").Append(boostN).Append(" rodow");
                 for (int b = 0; b < McBands; b++)
                 {
-                    if (b == NbAbove) { sb.Append(" | ").Append(bn[b]).Append(": pominiete ").Append(_mcRichSkip).Append(", gotowka ").Append(_mcCashB[b]); continue; }
-                    sb.Append(" | ").Append(bn[b]).Append(": rodow ").Append(_mcEligB[b]).Append(", z gotowka ").Append(_mcPaidB[b]).Append(", gotowka ").Append(_mcCashB[b])
+                    if (b == NbAbove) { sb.Append(" | ").Append(bn[b]).Append(": pominiete ").Append(_mcRichSkip).Append(" (w tym dluznikow 168 ").Append(_mcDebtRich).Append("), gotowka ").Append(_mcCashB[b]); continue; }
+                    sb.Append(" | ").Append(bn[b]).Append(": rodow ").Append(_mcEligB[b]);
+                    if (b == NbNone) sb.Append(" (ponizej R ").Append(_mcDebtB[0]).Append(", R-2R ").Append(_mcDebtB[1]).Append(')');   // recenzja f15: pasmo dluznikow z G i R
+                    sb.Append(", z gotowka ").Append(_mcPaidB[b]).Append(", gotowka ").Append(_mcCashB[b])
                       .Append(", podniesienie ").Append(Math.Round(_mcBoostB[b]).ToString("0", WtInv));
                 }
                 sb.Append(" | pominiete: luz w pulapie wlasnym ").Append(_mcSlackSkip).Append(", platnicy tarczowego tej doby ").Append(_mcScutSkip)
+                  .Append(", bez miary (bez G i R - nic) ").Append(_mcNoMeasure)
                   .Append(" | skarbce w kroku W5c: przed ").Append(w0).Append(", po ").Append(w1).Append(", ubylo ").Append(w0 - w1).Append(" (= wyplacono)")
                   .Append(" | kontrola: ponizej zapasu wojny po wyplacie ").Append(_mcBelow).Append(", gotowka przy zoldzie druzyn w pulapie wlasnym ").Append(_mcNotAtCap)
                   .Append(", ponad f x brak ").Append(_mcOverShort).Append(", ponad 2R ").Append(_mcRichPaid).Append(", w pokoju ").Append(inPeace).Append(" (oczekiwane 0)")

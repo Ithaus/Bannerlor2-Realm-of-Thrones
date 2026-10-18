@@ -61,7 +61,7 @@ namespace Armoury
         {
             string gid = null;
             try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId : null; } catch { gid = null; }
-            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = _plToldLevyDay = int.MinValue; }
+            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = _plToldLevyDay = _plToldMidDay = int.MinValue; }   // recenzja f15: + W5c
             if (last != int.MinValue && Math.Abs((long)today - last) < PlToldEvery) return false;
             last = today;
             return true;
