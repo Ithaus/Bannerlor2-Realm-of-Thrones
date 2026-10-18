@@ -659,11 +659,13 @@ namespace Armoury
                 if (pay <= 0) return;
                 double F = f.FL + f.FC;
                 long pL = k == null || !(F > 0) ? pay : (long)Math.Floor(pay * f.FL / F), pC = pay - pL;
+                long g0 = t.Gold, h0 = lord.Gold, w0 = k != null ? k.KingdomBudgetWallet : 0;   // pomiar u platnika i odbiorcow (kontrola linii)
                 long gL = pL > 0 ? ToLord(st, t, lord, pL) : 0;
                 long gC = pC > 0 && k != null ? ToCrown(t, k, pC) : 0;
                 got = gL + gC;
                 lordPay = (int)Math.Min(int.MaxValue, (long)lordPay + gL); crownFarm = (int)Math.Min(int.MaxValue, (long)crownFarm + gC);
-                _cuPaidL += gL; _cuPaidC += gC; _cuTook += got; _cuPaidLS += gL; _cuPaidCS += gC;
+                _cuTook += g0 - t.Gold; _cuPaidL += (long)lord.Gold - h0; _cuPaidC += k != null ? (long)k.KingdomBudgetWallet - w0 : 0;
+                _cuPaidLS += gL; _cuPaidCS += gC;
                 if (got > 0) { _cuPaidN++; _cuNS++; }
             }
             catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpPay", e); }
