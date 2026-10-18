@@ -6226,7 +6226,7 @@ namespace CrashScribe
                     if (n == "HideoutMissionController" || n == "HideoutAmbushMissionController" || n == "MissionSiegeEnginesLogic") { foot = true; break; }
                 }
             }
-            catch { foot = false; }
+            catch { return false; }   // lista zachowan zmieniana w tej chwili (watek roboczy) - bez zapamietania, nastepne wywolanie policzy od nowa
             lock (_footLock) { _footM = new WeakReference(m); _footV = foot; }
             return foot;
         }
