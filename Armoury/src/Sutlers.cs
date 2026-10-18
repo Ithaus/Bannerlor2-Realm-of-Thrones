@@ -251,8 +251,10 @@ namespace Armoury
                 foreach (var mp in parties)
                 {
                     _planned = false;
+                    MenPurse.WageMemoBegin(mp);   // perf-d2d3 (PerfSutlerWageOnce): zold partii raz na One (klucz wylaczony - zakres nieczynny, jak dotad)
                     try { One(mp, rate, townShare); }
                     catch (Exception e) { Stumble("One", e); }   // wyjatek jednej partii - licznik, reszta biegnie dalej (bez globalnego wylacznika)
+                    finally { MenPurse.WageMemoEnd(); }
                     if (!_planned) ReadSaved(s, mp);             // F6: One nie doszlo do CampPlan (partia pominieta albo wyjatek przed rezerwa) - odczyt jak dotad
                 }
             else

@@ -466,11 +466,17 @@ namespace Armoury
             var map = new Dictionary<string, List<Copy>>();
             Action<Copy> add = c => { List<Copy> l; if (!map.TryGetValue(c.Id, out l)) map[c.Id] = l = new List<Copy>(); l.Add(c); };
             var seen = new HashSet<Hero>();
-            foreach (var h in Hero.AllAliveHeroes) HeroCopies(h, add, seen);
-            foreach (var h in Hero.DeadOrDisabledHeroes) if (h != null && h.IsDisabled) HeroCopies(h, add, seen);
+            // perf-d2d3 (PerfValyrianCensus): ten sam spis, mniej pracy - bohater bez zadnej klingi w zadnym zestawie nie przechodzi przez Pieces (alokacje),
+            // a napis miejsca ("tabor " + nazwa partii, "targ " + nazwa osady - TextObject.ToString przy kazdej z ok. 9 tys. partii i osad) liczony tylko,
+            // gdy w rosterze jest klinga; wyniki te same (kontrola w probce 1/64 - PerfD2.VsProbe). Klucz wylaczony = stara droga 1:1.
+            bool fast = PerfD2.ValyrianOn;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            foreach (var h in Hero.AllAliveHeroes) HeroCopies(h, add, seen, fast);
+            foreach (var h in Hero.DeadOrDisabledHeroes) if (h != null && h.IsDisabled) HeroCopies(h, add, seen, fast);
             foreach (var mp in MobileParty.All)
             {
                 if (mp == null || mp.ItemRoster == null) continue;
+                if (fast && !PerfD2.VsRoster(!AnyIn(mp.ItemRoster), mp.ItemRoster)) continue;   // perf-d2d3: roster bez klingi - RosterCopies niczego by nie dodal
                 bool pl = mp == MobileParty.MainParty;
                 // tabor AI: tylko prawdziwe (gra nie lupi NotMerchandise; tam odklada Wear)
                 RosterCopies(mp.ItemRoster, pl ? 3 : 5, pl ? "tabor gracza" : "tabor " + mp.Name, pl ? "in your baggage" : null, add);
@@ -478,8 +484,8 @@ namespace Armoury
             foreach (var st in Settlement.All)
             {
                 if (st == null) continue;
-                if (st.ItemRoster != null) RosterCopies(st.ItemRoster, 6, "targ " + st.Name, null, add);
-                if (st.Stash != null) RosterCopies(st.Stash, 3, "schowek gracza " + st.Name, "in your stash at " + st.Name, add);
+                if (st.ItemRoster != null && (!fast || PerfD2.VsRoster(!AnyIn(st.ItemRoster), st.ItemRoster))) RosterCopies(st.ItemRoster, 6, "targ " + st.Name, null, add);
+                if (st.Stash != null && (!fast || PerfD2.VsRoster(!AnyIn(st.Stash), st.Stash))) RosterCopies(st.Stash, 3, "schowek gracza " + st.Name, "in your stash at " + st.Name, add);
             }
             var dte = QuartermasterLaw.DteArmory();
             if (dte != null) RosterCopies(dte, 3, "magazyn DTE gracza", "in your armoury", add);
@@ -500,14 +506,18 @@ namespace Armoury
                 });
             }
             catch (Exception ex) { if (_stumbles++ < 2) Log.Error("ValyrianBlades.Carts", ex); }
+            PerfD2.VsGatherTicks(System.Diagnostics.Stopwatch.GetTimestamp() - t0, fast);   // perf-d2d3: czas spisu (tylko linia "Szybkosc doby")
             return map;
         }
 
         /// <summary>Sztuki na bohaterze (poprawka recenzji 177 - dawniej jeden wpis na id): kazda sztuka osobno wedlug Pieces - rod gracza kazdy
         /// slot (bojowy, cywilny, ukrycia), reszta najwiecej w jednym zestawie (zestaw cywilny szablonu ROT powtarza bojowy).</summary>
-        private static void HeroCopies(Hero h, Action<Copy> add, HashSet<Hero> seen)
+        private static void HeroCopies(Hero h, Action<Copy> add, HashSet<Hero> seen, bool fast)
         {
             if (h == null || !seen.Add(h)) return;
+            // perf-d2d3 (PerfValyrianCensus): zaden slot broni w zestawie bojowym, cywilnym i ukrycia nie niesie klingi (nadzbior zestawow Sets) - Pieces
+            // dalby pusta liste; kontrola w probce 1/64 (PerfD2.VsHero: Pieces policzone i porownane - pusta)
+            if (fast && !MayHold(h) && PerfD2.VsHero(h)) return;
             var pieces = Pieces(h, null);
             if (pieces.Count == 0) return;
             bool player = Physical(h);
@@ -522,6 +532,51 @@ namespace Armoury
                     PlayerWhere = h == Hero.MainHero ? "you carry" : "carried by " + h.Name
                 });
             }
+        }
+
+        /// <summary>perf-d2d3: czy roster ma choc jedna sztuke stali valyrianskiej (ten sam warunek co RosterCopies: Amount > 0 i Is).</summary>
+        internal static bool AnyIn(ItemRoster r)
+        {
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.Amount > 0 && Is(el.EquipmentElement.Item)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>perf-d2d3: ile sztuk stali valyrianskiej dodalby RosterCopies (stara droga liczenia - do probki).</summary>
+        internal static int CountIn(ItemRoster r)
+        {
+            int n = 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.Amount <= 0 || !Is(el.EquipmentElement.Item)) continue;
+                n += el.Amount;
+            }
+            return n;
+        }
+
+        /// <summary>perf-d2d3: czy bohater MOZE niesc klinge - slot broni (0..ExtraWeaponSlot, jak Pieces) w zestawie bojowym, cywilnym albo ukrycia
+        /// (takze wspolny domyslny - nadzbior Sets). Odczyt zestawu ukrycia z bledem - true (stara droga).</summary>
+        private static bool MayHold(Hero h)
+        {
+            if (AnyVsSlot(h.BattleEquipment) || AnyVsSlot(h.CivilianEquipment)) return true;
+            Equipment st;
+            try { st = h.StealthEquipment; } catch { return true; }
+            return AnyVsSlot(st);
+        }
+
+        private static bool AnyVsSlot(Equipment eq)
+        {
+            if (eq == null) return false;
+            for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
+            {
+                var el = eq[(EquipmentIndex)s];
+                if (!el.IsEmpty && Is(el.Item)) return true;
+            }
+            return false;
         }
 
         private static void RosterCopies(ItemRoster r, int pri, string where, string playerWhere, Action<Copy> add)

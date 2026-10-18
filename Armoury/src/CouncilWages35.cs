@@ -50,6 +50,13 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         internal static bool BaseOn { get { var s = Settings.Current; return s != null && s.CouncilWagesRealBase; } }
+        /// <summary>perf-d2d3 (PerfTownTaxSkipBk): podstawa realna wlaczona i BK rozwiazany - TownBase nadpisze DueWage kazdej pozycji, ktora pisze BK.</summary>
+        internal static bool BaseReady { get { return BaseOn && BkResolve(); } }
+        /// <summary>perf-d2d3: ostatnie TownBase w tym watku doszlo do konca (lista pusta albo wszystkie pozycje) - kontrola pokrycia przy pominietym ciele BK.</summary>
+        [ThreadStatic] internal static bool TownBaseOk;
+        /// <summary>perf-d2d3 (recenzja): PerfD2.TaxSkipPrefix pominal cialo BK w tym wywolaniu (ustawia prefiks, zdejmuje finalizer) - DueWage przed TownBase nie jest
+        /// swieza pensja BK (zostala z poprzedniego TownBase albo z podatku wsi BK), wiec nie idzie do sumy "wedlug zastapionego podatku BK".</summary>
+        [ThreadStatic] internal static bool BkBodySkipped;
         internal static bool PayOn { get { var s = Settings.Current; return s != null && s.CouncilWagesPaidToAll; } }
 
         // ------------------------------------------------------------ latki (zakladane w kampanii; zyja przez caly proces)
@@ -75,6 +82,7 @@ namespace Armoury
         private static Clan _pendClan; private static CampaignTime _pendTime;
         private static long _gapRest, _revCommon, _revLords, _revMiss, _revOff; private static int _gapClans, _revN, _blindClans;
         private static long _baseOld, _baseNew, _baseCalls, _baseRentCalls;   // Interlocked - podatek miasta bywa liczony z watkow AI
+        private static long _baseSkipCalls, _baseSkipNew;   // perf-d2d3 (recenzja): przeliczenia przy pominietym ciele BK - stara pensja BK nieznana (nie w _baseOld)
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -92,6 +100,7 @@ namespace Armoury
             _gapRest = _revCommon = _revLords = _revMiss = _revOff = 0; _gapClans = _revN = _blindClans = 0; _pend.Clear(); _pendClan = null;
             Interlocked.Exchange(ref _baseOld, 0); Interlocked.Exchange(ref _baseNew, 0);
             Interlocked.Exchange(ref _baseCalls, 0); Interlocked.Exchange(ref _baseRentCalls, 0);
+            Interlocked.Exchange(ref _baseSkipCalls, 0); Interlocked.Exchange(ref _baseSkipNew, 0);
             _stumbles = 0;
         }
 
@@ -141,6 +150,53 @@ namespace Armoury
         }
 
         private static int Wage(object pos) { return (int)_pDueWage.GetValue(pos, null); }
+
+        /// <summary>perf-d2d3: nowa pensja pozycji z podstawy - ten sam rachunek co petla TownBase ((int)(podstawa x AdministrativeCosts)); long.MinValue = pozycja
+        /// pominieta (pusta, bez radnego albo stawka <= 0 - jak BK CalculateDueWages). fast - delegaty (PerfFast), inaczej odbicie.</summary>
+        private const long NwSkip = long.MinValue;
+        private static long NwOf(object p, float basis, bool fast)
+        {
+            if (p == null) return NwSkip;
+            object mem;
+            float rate;
+            if (fast)
+            {
+                var gm = PerfFast.Getter<object>(_pMember);
+                mem = gm != null ? gm(p) : _pMember.GetValue(p, null);
+                if (mem == null) return NwSkip;
+                var ga = PerfFast.M0<float>(_mAdm);
+                rate = ga != null ? ga(p) : (float)_mAdm.Invoke(p, null);
+            }
+            else
+            {
+                if (_pMember.GetValue(p, null) == null) return NwSkip;
+                rate = (float)_mAdm.Invoke(p, null);
+            }
+            if (rate <= 0f) return NwSkip;
+            return (int)(basis * rate);
+        }
+
+        /// <summary>perf-d2d3: Court() przez delegaty (BannerKingsConfig.Instance.CourtManager).</summary>
+        private static object CourtFast()
+        {
+            var gi = PerfFast.StaticGetter(_pCfgInstance);
+            var cfg = gi != null ? gi() : _pCfgInstance.GetValue(null, null);
+            if (cfg == null) return null;
+            var gc = PerfFast.Getter<object>(_pCourt);
+            return gc != null ? gc(cfg) : _pCourt.GetValue(cfg, null);
+        }
+
+        /// <summary>perf-d2d3: PositionsOf przez delegaty (GetCouncil, CouncilData.Positions) - ta sama lista BK.</summary>
+        private static IList PositionsOfFast(Clan clan)
+        {
+            var court = CourtFast();
+            if (court == null || clan == null) return null;
+            var gc = PerfFast.M1<Clan, object>(_mGetCouncil);
+            var council = gc != null ? gc(court, clan) : _mGetCouncil.Invoke(court, new object[] { clan });
+            if (council == null) return null;
+            var gp = PerfFast.Getter<object>(_pPositions);
+            return (gp != null ? gp(council) : _pPositions.GetValue(council, null)) as IList;
+        }
         private static void SetWage(object pos, int v) { _pDueWage.SetValue(pos, v, null); }
 
         // ------------------------------------------------------------ zakladanie latek (ArmouryBehavior, start sesji)
@@ -192,6 +248,7 @@ namespace Armoury
         /// w tym samym miejscu, w ktorym BK przed chwila policzyl ja od zastapionego podatku klas ludnosci.</summary>
         internal static void TownBase(Town town, float kept)
         {
+            TownBaseOk = false;   // perf-d2d3: znacznik pokrycia (tylko odczyt w PerfD2) - true, gdy ponizej zapisane wszystkie pozycje, ktore pisze BK CalculateDueWages
             if (!BaseOn || town == null) return;
             try
             {
@@ -199,13 +256,41 @@ namespace Armoury
                 var st = town.Settlement;
                 var owner = st != null ? st.OwnerClan : null;
                 if (owner == null) return;
-                var list = PositionsOf(owner);
-                if (list == null || list.Count == 0) return;
+                // perf-d2d3 (PerfTownTaxFastHooks): te same odczyty i zapisy BK przez delegaty (PerfFast); co 64. wywolanie (PerfD2.FastProbe) najpierw liczy
+                // stawki obiema drogami (sam odczyt) i porownuje - rozjazd: zapis wedlug starej drogi (licznik w linii "Szybkosc doby")
+                bool fast = PerfD2.FastHooksOn;
+                bool probe = fast && PerfD2.FastProbe();
+                var list = fast ? PositionsOfFast(owner) : PositionsOf(owner);
+                if (probe) { var l2 = PositionsOf(owner); if (!ReferenceEquals(l2, list)) { PerfD2.FastSame(PerfD2.FBase, false); list = l2; probe = false; fast = false; } }
+                if (list == null || list.Count == 0) { TownBaseOk = list != null; return; }
                 long pay = 0, avail;
                 if (st.IsTown) PopulationLaw.RentOf(st, out pay, out avail);
                 else if (st.IsCastle) CastlePurse.DuesOf(st, out pay, out avail);
                 float basis = Math.Max(0f, kept) + Math.Max(0L, pay);
                 long o = 0, n = 0;
+                if (fast)
+                {
+                    long[] use = null;
+                    if (probe)
+                    {
+                        var a = new long[list.Count]; var b = new long[list.Count];
+                        bool same = true;
+                        for (int i = 0; i < list.Count; i++) { a[i] = NwOf(list[i], basis, true); b[i] = NwOf(list[i], basis, false); if (a[i] != b[i]) same = false; }
+                        use = PerfD2.FastSame(PerfD2.FBase, same) ? a : b;
+                    }
+                    var gW = PerfFast.Getter<int>(_pDueWage);
+                    var sW = PerfFast.Setter<int>(_pDueWage);
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var p = list[i];
+                        long nl = use != null ? use[i] : NwOf(p, basis, true);
+                        if (nl == NwSkip) continue;                                         // pozycja wolna albo stawka <= 0 (jak BK)
+                        int nw = (int)nl;
+                        o += gW != null ? gW(p) : Wage(p); n += nw;
+                        if (sW != null) sW(p, nw); else SetWage(p, nw);
+                    }
+                }
+                else
                 for (int i = 0; i < list.Count; i++)
                 {
                     var p = list[i];
@@ -216,9 +301,14 @@ namespace Armoury
                     o += Wage(p); n += nw;
                     SetWage(p, nw);
                 }
+                TownBaseOk = true;   // perf-d2d3: petla do konca - kazda zajeta pozycja ze stawka > 0 (ten sam zbior co BK) ma DueWage z tej podstawy
                 Interlocked.Increment(ref _baseCalls);
                 if (pay > 0) Interlocked.Increment(ref _baseRentCalls);
-                Interlocked.Add(ref _baseOld, o); Interlocked.Add(ref _baseNew, n);
+                Interlocked.Add(ref _baseNew, n);
+                // perf-d2d3 (recenzja): przy pominietym ciele BK "o" to nie pensja BK (DueWage z poprzedniego zapisu) - poza suma starej pensji, osobny licznik;
+                // bez pominiecia (klucz wylaczony, probka R9, poza warunkiem) - jak dotad
+                if (BkBodySkipped) { Interlocked.Increment(ref _baseSkipCalls); Interlocked.Add(ref _baseSkipNew, n); }
+                else Interlocked.Add(ref _baseOld, o);
             }
             catch (Exception e) { Stumble("TownBase", e); }
         }
@@ -410,12 +500,22 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays;
                 bool pay = PayOn, bas = BaseOn;
                 long sumParts = _toCommon + _toLeaders + _toFamily + _toOtherLords + _toGone;
+                // perf-d2d3 (recenzja): liczniki podstawy czytane raz (podatek bywa liczony z watkow AI) - czesci w linii sumuja sie do calosci
+                long skC = Interlocked.Read(ref _baseSkipCalls), skN = Interlocked.Read(ref _baseSkipNew);
+                long bCalls = Interlocked.Read(ref _baseCalls), bNew = Interlocked.Read(ref _baseNew);
                 var sb = new StringBuilder(900);
                 sb.Append("Rada (3.5): dzien ").Append(day)
-                  .Append(" | podstawa (3.5a ").Append(bas ? "WL" : "WYL").Append("): przeliczenia pensji z miast i zamkow ").Append(Interlocked.Read(ref _baseCalls))
+                  .Append(" | podstawa (3.5a ").Append(bas ? "WL" : "WYL").Append("): przeliczenia pensji z miast i zamkow ").Append(bCalls)
                   .Append(" (z renta lub zaworem > 0: ").Append(Interlocked.Read(ref _baseRentCalls)).Append("; suma po wywolaniach: wedlug zastapionego podatku BK ")
-                  .Append(Interlocked.Read(ref _baseOld)).Append(" -> wedlug zachowanych linii i renty ").Append(Interlocked.Read(ref _baseNew))
-                  .Append("), rody bez miasta i zamku: wyzerowane stare pensje ").Append(_staleN).Append(" pozycji u ").Append(_staleClans).Append(" rodow (").Append(_staleGold).Append(" zl/dobe)")
+                  .Append(Interlocked.Read(ref _baseOld));
+                // perf-d2d3 (recenzja): czesc przeliczen bez ciala BK - stara pensja tylko z przeliczen z cialem BK (z para "wedlug renty" z tych samych przeliczen);
+                // suma "wedlug zachowanych linii i renty" dalej ze wszystkich (ta sama co bez paczki). Bez pominiec - linia jak dotad.
+                if (skC > 0)
+                    sb.Append(" (tylko ").Append(bCalls - skC).Append(" przeliczen z cialem BK; w nich wedlug renty ").Append(bNew - skN).Append(')');
+                sb.Append(" -> wedlug zachowanych linii i renty ").Append(bNew);
+                if (skC > 0)
+                    sb.Append("; cialo BK pominiete (perf-d2d3 PerfTownTaxSkipBk) w ").Append(skC).Append(" przeliczeniach - ich stara pensja BK nieliczona, wedlug renty ").Append(skN);
+                sb.Append("), rody bez miasta i zamku: wyzerowane stare pensje ").Append(_staleN).Append(" pozycji u ").Append(_staleClans).Append(" rodow (").Append(_staleGold).Append(" zl/dobe)")
                   .Append(" | wyplata (3.5b ").Append(pay ? "WL" : "WYL").Append("): naliczone platnikom ").Append(_charged).Append(" w ").Append(_chargedN)
                   .Append(" pozycjach u ").Append(_payerClans).Append(" rodow = nie-lordowie (placi BK) ").Append(_toCommon).Append(" [").Append(_commonN)
                   .Append("] + glowy innych rodow ").Append(_toLeaders).Append(" [").Append(_leadersN).Append("] + czlonkowie rodu platnika ").Append(_toFamily)

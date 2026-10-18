@@ -630,6 +630,46 @@ namespace Armoury
 
         public static void HeroTickFin(Hero __0) { _tickHero = null; _pend = null; }
 
+        /// <summary>perf-d2d3: Autonomy przez delegaty (te same getter i GetPopData, ten sam Convert.ToSingle i przyciecie); delegat niedostepny - odbicie.</summary>
+        private static float AutonomyFast(Settlement st)
+        {
+            try
+            {
+                var cfg = BkCfgFast();
+                object pm = null;
+                if (cfg != null && _pCfgPop != null) { var g = PerfFast.Getter<object>(_pCfgPop); pm = g != null ? g(cfg) : _pCfgPop.GetValue(cfg, null); }
+                object pd = null;
+                if (pm != null && _mGetPop != null) { var gp = PerfFast.M1<Settlement, object>(_mGetPop); pd = gp != null ? gp(pm, st) : _mGetPop.Invoke(pm, new object[] { st }); }
+                if (pd == null || _pAutonomy == null) return 0f;
+                var ga = PerfFast.Getter<float>(_pAutonomy);
+                return Math.Max(0f, Math.Min(1f, ga != null ? ga(pd) : Convert.ToSingle(_pAutonomy.GetValue(pd, null))));
+            }
+            catch { return 0f; }
+        }
+
+        /// <summary>perf-d2d3: BannerKingsConfig.Instance przez delegat (odbicie, gdy delegat niedostepny).</summary>
+        private static object BkCfgFast()
+        {
+            if (_pCfgInst == null) return null;
+            var g = PerfFast.StaticGetter(_pCfgInst);
+            return g != null ? g() : _pCfgInst.GetValue(null, null);
+        }
+
+        /// <summary>perf-d2d3: model finansow BK z konfiguracji (BannerKingsConfig.ClanFinanceModel) - przez delegat albo odbicie.</summary>
+        private static object FinOf(object cfg, bool fast)
+        {
+            if (cfg == null) return null;
+            if (!fast) return _pCfgFin.GetValue(cfg, null);
+            var g = PerfFast.Getter<object>(_pCfgFin);
+            return g != null ? g(cfg) : _pCfgFin.GetValue(cfg, null);
+        }
+
+        /// <summary>perf-d2d3: podatek BK warsztatu (GetWorkshopTaxes) jako float - delegat albo odbicie (Convert.ToSingle, jak dotad).</summary>
+        private static float WsTax(object fin, Workshop w, Func<object, Workshop, int> tax)
+        {
+            return tax != null ? (float)tax(fin, w) : Convert.ToSingle(_mGetWsTax.Invoke(fin, new object[] { w }));
+        }
+
         /// <summary>Autonomia BK osady (0..1); brak danych - 0.</summary>
         private static float Autonomy(Settlement st)
         {
@@ -650,21 +690,37 @@ namespace Armoury
             try
             {
                 if (!TaxLive || town == null || town.Workshops == null) return 0f;
-                var cfg = BkCfg();
-                var fin = cfg != null ? _pCfgFin.GetValue(cfg, null) : null;
-                if (fin == null) return 0f;
-                var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
-                float sum = 0f;
-                foreach (var w in town.Workshops)
-                    if (w != null && w.Owner != null && w.Owner != leader && w.Owner.IsNotable)
-                        sum += Convert.ToSingle(_mGetWsTax.Invoke(fin, new object[] { w }));
+                // perf-d2d3 (PerfTownTaxFastHooks): rdzen przez delegaty; co 64. wywolanie tez stara droga - rozjazd: wynik starej drogi (licznik w linii "Szybkosc doby")
+                float sum;
+                if (PerfD2.FastHooksOn)
+                {
+                    sum = NotableCore(town, true);
+                    if (PerfD2.FastProbe()) { float s = NotableCore(town, false); if (!PerfD2.FastSame(PerfD2.FNotable, s == sum)) sum = s; }
+                }
+                else sum = NotableCore(town, false);
                 if (sum <= 0f) return 0f;
-                float aut = Autonomy(town.Settlement);
-                if (aut > 0f) sum *= Math.Max(0f, 1f - 0.6f * aut);
                 System.Threading.Interlocked.Add(ref _taxLinesCut, (long)sum);
                 return sum;
             }
             catch (Exception e) { Stumble("NotableTaxLines", e); return 0f; }
+        }
+
+        /// <summary>NotableTaxLines bez licznika (fast = false: cialo sprzed perf-d2d3 - odbicie). 0 - brak linii.</summary>
+        private static float NotableCore(Town town, bool fast)
+        {
+            var cfg = fast ? BkCfgFast() : BkCfg();
+            var fin = FinOf(cfg, fast);
+            if (fin == null) return 0f;
+            var tax = fast ? PerfFast.M1<Workshop, int>(_mGetWsTax) : null;
+            var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
+            float sum = 0f;
+            foreach (var w in town.Workshops)
+                if (w != null && w.Owner != null && w.Owner != leader && w.Owner.IsNotable)
+                    sum += WsTax(fin, w, tax);
+            if (sum <= 0f) return 0f;
+            float aut = fast ? AutonomyFast(town.Settlement) : Autonomy(town.Settlement);
+            if (aut > 0f) sum *= Math.Max(0f, 1f - 0.6f * aut);
+            return sum;
         }
 
         /// <summary>
@@ -686,34 +742,58 @@ namespace Armoury
             try
             {
                 if (!TaxOn || town == null || town.Workshops == null || _mGetWsTax == null || _pCfgFin == null) return 0f;
-                var cfg = BkCfg();
-                var fin = cfg != null ? _pCfgFin.GetValue(cfg, null) : null;
-                if (fin == null || !_mGetWsTax.DeclaringType.IsInstanceOfType(fin)) return 0f;
-                var townClan = town.OwnerClan;
-                var leader = townClan != null ? townClan.Leader : null;
-                bool bkCharges = BkWorkshopModelActive();
-                bool d113 = OwnerTaxLive;
-                float sum = 0f, paidSum = 0f; int n = 0;
-                foreach (var w in town.Workshops)
+                // perf-d2d3 (PerfTownTaxFastHooks): rdzen przez delegaty; co 64. wywolanie tez stara droga - rozjazd: wynik starej drogi (licznik w linii "Szybkosc doby")
+                float paidSum; int n;
+                float sum;
+                if (PerfD2.FastHooksOn)
                 {
-                    var o = w != null ? w.Owner : null;
-                    if (o == null || o == leader || o.IsNotable) continue;                          // pan miasta - BK nie dopisuje linii; notabl - NotableTaxLines
-                    var oc = o.Clan;
-                    if (bkCharges && oc != null && oc.Leader == o && townClan != oc) continue;     // ten wlasciciel naprawde placi BK (wydatek "Workshop taxes")
-                    float t = Convert.ToSingle(_mGetWsTax.Invoke(fin, new object[] { w }));
-                    if (t <= 0f) continue;
-                    sum += t; n++;
-                    if (d113 && OwnerPays(o, townClan, leader, bkCharges)) paidSum += t;            // D11-3: placi wlasciciel przelewem (bez czlonkow rodu pana)
+                    sum = UnpaidCore(town, true, out paidSum, out n);
+                    if (PerfD2.FastProbe())
+                    {
+                        float p2; int n2;
+                        float s2 = UnpaidCore(town, false, out p2, out n2);
+                        if (!PerfD2.FastSame(PerfD2.FUnpaid, s2 == sum && p2 == paidSum && n2 == n)) { sum = s2; paidSum = p2; n = n2; }
+                    }
                 }
+                else sum = UnpaidCore(town, false, out paidSum, out n);
                 if (sum <= 0f) return 0f;
-                float aut = Autonomy(town.Settlement);
-                if (aut > 0f) { float f = Math.Max(0f, 1f - 0.6f * aut); sum *= f; paidSum *= f; }
                 ownerPaid = paidSum;
                 System.Threading.Interlocked.Add(ref _unpaidCut, (long)sum);
                 System.Threading.Interlocked.Add(ref _unpaidN, n);
                 return sum;
             }
             catch (Exception e) { Stumble("UnpaidOwnerTaxLines", e); return 0f; }
+        }
+
+        /// <summary>UnpaidOwnerTaxLines bez licznikow (fast = false: cialo sprzed perf-d2d3 - odbicie). 0 (paid 0) - brak linii.</summary>
+        private static float UnpaidCore(Town town, bool fast, out float paid, out int n)
+        {
+            paid = 0f; n = 0;
+            var cfg = fast ? BkCfgFast() : BkCfg();
+            var fin = FinOf(cfg, fast);
+            if (fin == null || !_mGetWsTax.DeclaringType.IsInstanceOfType(fin)) return 0f;
+            var tax = fast ? PerfFast.M1<Workshop, int>(_mGetWsTax) : null;
+            var townClan = town.OwnerClan;
+            var leader = townClan != null ? townClan.Leader : null;
+            bool bkCharges = BkWorkshopModelActive();
+            bool d113 = OwnerTaxLive;
+            float sum = 0f, paidSum = 0f;
+            foreach (var w in town.Workshops)
+            {
+                var o = w != null ? w.Owner : null;
+                if (o == null || o == leader || o.IsNotable) continue;                          // pan miasta - BK nie dopisuje linii; notabl - NotableTaxLines
+                var oc = o.Clan;
+                if (bkCharges && oc != null && oc.Leader == o && townClan != oc) continue;     // ten wlasciciel naprawde placi BK (wydatek "Workshop taxes")
+                float t = WsTax(fin, w, tax);
+                if (t <= 0f) continue;
+                sum += t; n++;
+                if (d113 && OwnerPays(o, townClan, leader, bkCharges)) paidSum += t;            // D11-3: placi wlasciciel przelewem (bez czlonkow rodu pana)
+            }
+            if (sum <= 0f) { n = 0; return 0f; }
+            float aut = fast ? AutonomyFast(town.Settlement) : Autonomy(town.Settlement);
+            if (aut > 0f) { float f = Math.Max(0f, 1f - 0.6f * aut); sum *= f; paidSum *= f; }
+            paid = paidSum;
+            return sum;
         }
 
         private static Type _tBkWs;

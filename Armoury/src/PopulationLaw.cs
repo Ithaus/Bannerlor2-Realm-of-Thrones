@@ -1106,6 +1106,10 @@ namespace Armoury
 
         // ------------------------------------------------------------ podatek ludnosci miasta BK -> renta (wpis 49)
         [ThreadStatic] private static int _taxDepth;
+        /// <summary>perf-d2d3: glebokosc zalatanego CalculateTownTax w tym watku (1 = wywolanie zewnetrzne - tylko tam TownTaxPostfix zastepuje wynik).</summary>
+        internal static int TaxDepth { get { return _taxDepth; } }
+        /// <summary>perf-d2d3: TownTaxPostfix zastapi wynik podatku miasta renta (ten sam warunek co w postfiksie, bez glebokosci).</summary>
+        internal static bool RentReplacesNow { get { var s = Settings.Current; return s != null && On && s.RentReplacesTownTax; } }
         public static void TownTaxPrefix() { _taxDepth++; }
         public static Exception TownTaxFinalizer(Exception __exception) { if (_taxDepth > 0) _taxDepth--; return __exception; }
         public static void TownTaxPostfix(Town __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
@@ -1150,6 +1154,27 @@ namespace Armoury
                     var pm = _bkCfg != null ? AccessTools.Property(cfgT, "PopulationManager").GetValue(_bkCfg, null) : null;
                     if (pm != null) { _popMgr = pm; _popData = AccessTools.Method(pm.GetType(), "GetPopData", new[] { typeof(Settlement) }); }
                 }
+                // perf-d2d3 (PerfTownTaxFastHooks): te same wywolania BK przez delegaty (PerfFast); co 64. wywolanie (PerfD2.FastProbe) liczy tez stara droga
+                // i porownuje - rozjazd: wynik starej drogi (licznik w linii "Szybkosc doby"). Wyjatek ktorejkolwiek drogi - 0 jak dotad (catch nizej)
+                if (PerfD2.FastHooksOn)
+                {
+                    float f = KeptTownLinesFast(town);
+                    if (PerfD2.FastProbe())
+                    {
+                        float s = KeptTownLinesSlow(town);
+                        if (!PerfD2.FastSame(PerfD2.FKept, s == f)) return s;
+                    }
+                    return f;
+                }
+                return KeptTownLinesSlow(town);
+            }
+            catch { return 0f; }
+        }
+        private static object _wsModel, _popMgr; private static System.Reflection.MethodInfo _getBeh;
+
+        /// <summary>KeptTownLines - stara droga (odbicie), cialo sprzed perf-d2d3 bez zmian.</summary>
+        private static float KeptTownLinesSlow(Town town)
+        {
                 float sum = 0f;
                 var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
                 if (_wsTax != null)
@@ -1173,10 +1198,39 @@ namespace Armoury
                     if (pd != null) { float aut = Traverse.Create(pd).Property("Autonomy").GetValue<float>(); if (aut > 0f) sum *= Math.Max(0f, 1f - 0.6f * aut); }
                 }
                 return sum;
-            }
-            catch { return 0f; }
         }
-        private static object _wsModel, _popMgr; private static System.Reflection.MethodInfo _getBeh;
+
+        /// <summary>perf-d2d3: KeptTownLines przez delegaty - te same wywolania w tej samej kolejnosci (int -> float jak Convert.ToSingle); delegat niedostepny -
+        /// odbicie jak dotad; zachowanie BK z pamieci kampanii (PerfFast.Behavior), Autonomy jak Traverse (PerfFast.FloatProp).</summary>
+        private static float KeptTownLinesFast(Town town)
+        {
+            float sum = 0f;
+            var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
+            if (_wsTax != null)
+            {
+                var tax = PerfFast.M1<TaleWorlds.CampaignSystem.Settlements.Workshops.Workshop, int>(_wsTax);
+                foreach (var w in town.Workshops)
+                    if (w != null && w.Owner != null && w.Owner != leader)
+                        sum += tax != null ? (float)tax(_wsModel, w) : Convert.ToSingle(_wsTax.Invoke(_wsModel, new object[] { w }));
+            }
+            if (_bldT != null && Campaign.Current != null)
+            {
+                if (_getBeh == null) _getBeh = typeof(Campaign).GetMethod("GetCampaignBehavior").MakeGenericMethod(_bldT);
+                var beh = PerfFast.Behavior(_bldT, _getBeh);
+                if (beh != null)
+                {
+                    if (_mining != null) { var mf = PerfFast.M1<Town, int>(_mining); sum += mf != null ? (float)mf(beh, town) : Convert.ToSingle(_mining.Invoke(beh, new object[] { town })); }
+                    if (_materials != null) { var mf = PerfFast.M1<Town, int>(_materials); sum -= mf != null ? (float)mf(beh, town) : Convert.ToSingle(_materials.Invoke(beh, new object[] { town })); }
+                }
+            }
+            if (_popData != null)
+            {
+                var pf = PerfFast.M1<Settlement, object>(_popData);
+                var pd = pf != null ? pf(_popMgr, town.Settlement) : _popData.Invoke(_popMgr, new object[] { town.Settlement });
+                if (pd != null) { float aut = PerfFast.FloatProp(pd, "Autonomy"); if (aut > 0f) sum *= Math.Max(0f, 1f - 0.6f * aut); }
+            }
+            return sum;
+        }
 
         private static System.Reflection.MethodInfo _getPolicy; private static object _policyMgr; private static bool _polResolved;
         /// <summary>Mnoznik renty z dekretu podatkowego BK osady (1 gdy brak BK albo dekretu).</summary>

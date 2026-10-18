@@ -888,6 +888,18 @@ Uzycie (Python 3, tylko odczyt):
                     zapasowa), powod (zdrowi / sila), pominiete (INFO), ND-4 zwiniete oblezenie sledzone przez OB5 -
                     'Odsiecz (OB5) koniec' z wynikiem 'utrzymane' (brak zwiniec - INFO); AUD-P1-5 (z --crashscribe): ND-5 linia dorobki tytulow wsi BK -
                     zostalo 0, nie dodane 0, potkniec 0 (klucz BkTitlesVillageFix false - INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa nperf     : (noc 17/18.10, paczka perf-d2d3 - CO-ZOSTALO D2/D3 "szybkosc naszych modow i cudzego kodu"; Armoury/src/PerfD2.cs, ValyrianBlades.Gather,
+                    MenPurse.Wage w Sutlers.One, prefiks BKTaxModel.CalculateTownTax; klucze PerfValyrianCensus, PerfTownTaxSkipBk, PerfSutlerWageOnce)
+                    python -I tools/sprawdz_logi.py --grupa nperf <Armoury-*.log> [--crashscribe <session-*.log>] [--baza-doby <log Armoury biegu bazowego>]
+                    (strumieniowo). NPERF-0 linia startu (klucze; straznik podatku miast CZYNNY - STOI = INFO z powodem), NPERF-1 linie doby "Szybkosc doby
+                    (perf-d2d3)" rozpoznane, NPERF-2 spis stali valyrianskiej: rozjazdow 0 w probce 1/64, mediana czasu spisu <= 10 ms, NPERF-3 podatek miast:
+                    rada niepokryta 0 (przy pominieciu ciala BK i w probkach), wyjatkow przy pominieciu 0 (czasy i oszczednosc INFO), NPERF-3c linia "Rada (3.5)":
+                    segment "cialo BK pominiete ... w K przeliczeniach" wtedy i tylko wtedy, gdy pominiecia > 0, czesci = calosc (przeliczenia, suma wedlug renty;
+                    stara pensja BK tylko z przeliczen z cialem BK - INFO ze stosunkiem), NPERF-4 zold markietanow:
+                    rozjazdow 0, NPERF-5 Profil doby wobec bazy (bez --baza-doby: mediany fin81 17-55-14): LegendaryLaw <= 0.55 x, Sutlers <= 0.92 x, ClanIncomeBook,
+                    KingdomTreasury, BuildFunding, takt doby i godzina <= 1.05 x, NPERF-6 nasze razem i doba zegara (INFO), NPERF-7 dochod modelu ksiegi rodow
+                    wedlug rodu (INFO), NPERF-8 (CS) swaty ROT mediana <= 400 ms, EconomyAudit (INFO), NPERF-9 ERROR w miejscach paczki 0, NPERF-10 koszt linii
+                    <= 1 ms, NPERF-11 haki podatku miast bez refleksji (PerfTownTaxFastHooks): rozjazdow 0 w probce 1/64. Log bez paczki: INFO, bez wyjatku.
 --grupa nmisje    : (noc 15/16.10, bledy misji z sesji Jeffa 15.10; galaz w-toku/noc-misje, MissionTeams.cs) python -I tools/sprawdz_logi.py
                     --grupa nmisje <Armoury-*.log> (log czytany strumieniowo). Druzyny w misji i ucieczka rannych tylko w bitwie: NM-0 linia startu
                     (klucz WoundedFleeBattlesOnly TAK), NM-1 ERROR in HideoutAlarm / BrokenMen / FleeTheField / GuardMaster.Tick / BattlefieldLaw.CountKill 0,
@@ -31014,6 +31026,308 @@ def nekon2_main(logp):
     return 0
 
 
+# ============================================================ perf-d2d3 (noc 17/18.10, CO-ZOSTALO D2/D3): szybkosc doby naszych modow i cudzego kodu - grupa nperf
+# Armoury: PerfD2.cs (linia "Szybkosc doby (perf-d2d3)"), ValyrianBlades.Gather (PerfValyrianCensus), prefiks BKTaxModel.CalculateTownTax (PerfTownTaxSkipBk),
+# MenPurse.Wage w Sutlers.One (PerfSutlerWageOnce); "Profil doby (E8/0)" i "Koszt 171-174 (doba)" (doba zegara); CrashScribe (--crashscribe): "Swaty ROT (Z.3)" i "Profil CS".
+NPF_HEAD = "Szybkosc doby (perf-d2d3): "
+NPF_VS = re.compile(r"spis stali valyrianskiej \(PerfValyrianCensus\) (\[WL\]|\[wyl\]): spisow (?P<g>\d+) \(szybkich (?P<gf>\d+)\), czas (?P<ms>[\d.]+) ms, "
+                    r"bohaterow bez klingi pominietych (?P<hs>\d+) \(probek (?P<hp>\d+), rozjazdow (?P<hd>\d+)\), rosterow bez klingi pominietych (?P<rs>\d+) "
+                    r"\(probek (?P<rp>\d+), rozjazdow (?P<rd>\d+)\)")
+NPF_TAX = re.compile(r"podatek miast - cialo BK pominiete \(PerfTownTaxSkipBk\) (?P<key>\[WL\]|\[wyl\]), straznik (?P<live>CZYNNY|STOI): wywolan (?P<calls>\d+), pominietych (?P<skip>\d+), "
+                     r"probek z cialem BK (?P<probe>\d+) \(rada niepokryta (?P<pu>\d+)\), przy pominieciu rada niepokryta (?P<su>\d+), poza warunkiem (?P<off>\d+), "
+                     r"wyjatkow przy pominieciu (?P<es>\d+) / w probkach (?P<ep>\d+); czas wywolania z cialem BK (?P<ub>[\d.]+) us \(probek (?P<nb>\d+)\), "
+                     r"bez (?P<us>[\d.]+) us \(probek (?P<ns>\d+)\) -> oszczednosc ok\. (?P<save>[\d.]+) ms")
+NPF_TAXWHY = re.compile(r"\(straznik: (.*?)\) \| zold markietanow")
+NPF_WAGE = re.compile(r"zold markietanow raz na partie \(PerfSutlerWageOnce\) (\[WL\]|\[wyl\]): odczytow z pamieci (?P<hits>\d+) \(probek (?P<p>\d+), rozjazdow (?P<d>\d+)\), "
+                      r"zold partii srednio (?P<us>[\d.]+) us -> oszczednosc ok\. (?P<save>[\d.]+) ms")
+NPF_MODEL = re.compile(r"dochod modelu w ksiedze rodow wedlug rodu: krolow (?P<rn>\d+) rodow (?P<rms>[\d.]+) ms, z lennami (?P<fn>\d+) rodow (?P<fms>[\d.]+) ms, "
+                       r"bez lenn (?P<nn>\d+) rodow (?P<nms>[\d.]+) ms \(lenn razem (?P<fiefs>\d+)\)")
+NPF_COST = re.compile(r"koszt linii i straznika ([\d.]+) ms")
+NPF_FAST = re.compile(r"haki podatku miast bez refleksji \(PerfTownTaxFastHooks\) (?P<key>\[WL\]|\[wyl\]):(?P<sites>.*?); rozjazdow razem (?P<d>\d+)")
+NPF_FAST_SITE = re.compile(r"(?P<name>[^,(]+?(?: \([A-Za-z]+\))?) probek (?P<p>\d+) \(rozjazdow (?P<d>\d+)\)")
+NPF_START = re.compile(r"^Szybkosc doby \(perf-d2d3\): start sesji \| spis stali valyrianskiej \(PerfValyrianCensus\) (\[WL\]|\[wyl\]) \| podatek miast - cialo BK pominiete przy rencie "
+                       r"\(PerfTownTaxSkipBk\) (\[WL\]|\[wyl\]), straznik: (CZYNNY|STOI) \((.*?)\) \| zold markietanow raz na partie \(PerfSutlerWageOnce\) (\[WL\]|\[wyl\])")
+# Profil doby (E8/0): funkcje paczki (top 15 taktu albo "inne sluchacze doby")
+NPF_PROF = {
+    "ClanIncomeBook.Daily": re.compile(r"ClanIncomeBook\.Daily ([\d.]+)"),
+    "KingdomTreasury.Daily": re.compile(r"KingdomTreasury\.Daily ([\d.]+)"),
+    "Sutlers.Daily": re.compile(r"Sutlers\.Daily ([\d.]+)"),
+    "BuildFunding.Daily": re.compile(r"BuildFunding\.Daily ([\d.]+)"),
+    "LegendaryLaw (czystki, ValyrianBlades)": re.compile(r"LegendaryLaw \(czystki, ValyrianBlades\) ([\d.]+)"),
+}
+NPF_TAKT = re.compile(r"takt doby ([\d.]+) ms \(wywolan \d+; top: (.*?)\); inne sluchacze doby")
+NPF_HOUR = re.compile(r"\| godzina: suma ([\d.]+) ms, maks\. godziny ([\d.]+) ms")
+NPF_OUR = re.compile(r"nasze razem \(dolna granica\) ([\d.]+) ms")
+NPF_DOBA = re.compile(r"^Koszt 171-174 \(doba\): dzien (\d+) - doba (\d+) ms \(zegar\)")
+# recenzja perf-d2d3: linia "Rada (3.5)" - przy pominietym ciele BK stara pensja BK tylko z przeliczen z cialem BK (segmenty opcjonalne - linia sprzed poprawki bez nich)
+NPF_RADA = re.compile(r"^Rada \(3\.5\): dzien (?P<day>-?\d+) \| podstawa \(3\.5a (?:WL|WYL)\): przeliczenia pensji z miast i zamkow (?P<c>\d+) \(z renta lub zaworem > 0: \d+; "
+                      r"suma po wywolaniach: wedlug zastapionego podatku BK (?P<a>-?\d+)(?: \(tylko (?P<m>\d+) przeliczen z cialem BK; w nich wedlug renty (?P<n1>-?\d+)\))? "
+                      r"-> wedlug zachowanych linii i renty (?P<b>-?\d+)(?:; cialo BK pominiete \(perf-d2d3 PerfTownTaxSkipBk\) w (?P<k>\d+) przeliczeniach - ich stara pensja BK "
+                      r"nieliczona, wedlug renty (?P<kn>-?\d+))?\)")
+NPF_ERR = ("ERROR in PerfD2", "ERROR in ValyrianBlades", "ERROR in Sutlers", "ERROR in MenPurse", "ERROR in PopulationLaw", "ERROR in CouncilWages35")
+# progi (bieg bazowy fin81 = Armoury-2026-10-17_17-55-14.log, mediany 119 dob: ClanIncomeBook 94.4, KingdomTreasury 70.8, Sutlers 49.1, LegendaryLaw 39.4,
+# takt 570.5, godzina 112.8, nasze razem 1618.9 ms, doba zegara 19.7 s); --baza-doby <log> - te same mediany z podanego biegu
+NPF_BASE = {"ClanIncomeBook.Daily": 94.4, "KingdomTreasury.Daily": 70.8, "Sutlers.Daily": 49.1, "LegendaryLaw (czystki, ValyrianBlades)": 39.4, "BuildFunding.Daily": 26.4,
+            "takt": 570.5, "godzina": 112.8, "nasze": 1618.9, "doba": 19702.0}
+NPF_LL_MAX = 0.55       # LegendaryLaw <= 0.55 x baza (spis stali valyrianskiej 30 ms z 39 - po zmianie kilka ms)
+NPF_SUT_MAX = 0.92      # Sutlers <= 0.92 x baza (zold raz zamiast 2-3 razy na partie)
+NPF_REG = 1.05          # reszta mierzonych pozycji - nie gorzej niz baza x 1.05 (szum obciazenia komputera)
+NPF_VS_MS = 10.0        # spis stali valyrianskiej (czas Gather) - mediana <= 10 ms
+NPF_Z3_MS = 400.0       # swaty ROT (CS) - mediana <= 400 ms (fin81: 300-325 ms po MarriageLazyDraw)
+
+
+def _npf_prof_scan(logp):
+    """Profil doby i doba zegara z logu -> (slownik nazwa -> lista wartosci, lista taktu, godzin, nasze, doba). Pozycja spoza top 15 - najmniejsza wartosc top (gorna granica)."""
+    vals = {k: [] for k in NPF_PROF}
+    takt, hour, our, doba = [], [], [], []
+    if not logp or not os.path.isfile(logp):
+        return vals, takt, hour, our, doba
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("Profil doby (E8/0): dzien"):
+                mt = NPF_TAKT.search(s)
+                low = None
+                if mt:
+                    takt.append(float(mt.group(1)))
+                    nums = [float(x) for x in re.findall(r" ([\d.]+)(?=, |$)", mt.group(2))]
+                    low = min(nums) if nums else None
+                for k, rx in NPF_PROF.items():
+                    mm = rx.search(s)
+                    if mm:
+                        vals[k].append(float(mm.group(1)))
+                    elif low is not None and k != "LegendaryLaw (czystki, ValyrianBlades)":
+                        vals[k].append(low)   # poza top 15 taktu - najwyzej tyle, co najmniejsza pozycja top
+                mh = NPF_HOUR.search(s)
+                if mh:
+                    hour.append(float(mh.group(1)))
+                mo = NPF_OUR.search(s)
+                if mo:
+                    our.append(float(mo.group(1)))
+            elif s.startswith("Koszt 171-174 (doba): dzien"):
+                md = NPF_DOBA.match(s)
+                if md:
+                    doba.append(float(md.group(2)))
+    return vals, takt, hour, our, doba
+
+
+def nperf_main(logp, csp=None, bdp=None):
+    """nperf (noc 17/18.10, paczka perf-d2d3 - CO-ZOSTALO D2/D3; Armoury/src/PerfD2.cs). Log Armoury (strumieniowo); --crashscribe <session-*.log> (bez niego - log sesji
+    z tego samego startu); --baza-doby <log Armoury biegu bazowego> (bez niego - mediany fin81 w kodzie: NPF_BASE). NPERF-0 linia startu sesji (klucze, straznik
+    podatku miast; STOI - INFO z powodem), NPERF-1 linie doby rozpoznane (nierozpoznane 0), NPERF-2 spis stali valyrianskiej: rozjazdow 0 (bohaterowie i rostery),
+    probek >= 1 przy pominieciach, mediana czasu spisu <= 10 ms, NPERF-3 podatek miast: rada niepokryta 0 (przy pominieciu i w probkach), wyjatkow przy pominieciu 0,
+    probek >= 1 przy pominieciach; czasy z cialem BK / bez i oszczednosc (INFO), NPERF-3c linia "Rada (3.5)": segment przeliczen przy pominietym ciele BK wtedy i tylko
+    wtedy, gdy pominiecia > 0, czesci = calosc, nierozpoznane 0 (brak linii doby perf-d2d3 - INFO), NPERF-4 zold markietanow: rozjazdow 0, probek >= 1 przy odczytach z pamieci,
+    oszczednosc (INFO), NPERF-5 Profil doby - mediany wobec bazy: LegendaryLaw <= 0.55 x baza, Sutlers <= 0.92 x baza, ClanIncomeBook, KingdomTreasury,
+    BuildFunding, takt doby, godzina - <= 1.05 x baza (nie gorzej), NPERF-6 nasze razem (dolna granica) i doba zegara wobec bazy (INFO - zalezy od obciazenia
+    komputera), NPERF-7 dochod modelu w ksiedze rodow wedlug rodu (INFO - gdzie siedzi koszt CalculateClanIncome), NPERF-8 (CS) swaty ROT - mediana czasu
+    <= 400 ms, EconomyAudit (INFO), NPERF-9 ERROR in PerfD2 / ValyrianBlades / Sutlers / MenPurse / PopulationLaw / CouncilWages35 = 0, NPERF-10 koszt
+    linii <= 1 ms, NPERF-11 haki podatku miast bez refleksji (PerfTownTaxFastHooks: KeptTownLines, linie notabli i wlascicieli, rada TownBase, zachowanie BK
+    z pamieci) - rozjazdow 0 w probce 1/64 (brak segmentu - INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NPERF-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, bad, n_err, err_first = [], [], [], 0, None
+    rada, rada_bad = [], 0   # recenzja: linie "Rada (3.5)" (NPERF-3c)
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("Rada (3.5): dzien "):
+                mm = NPF_RADA.match(s)
+                if mm:
+                    rada.append(mm.groupdict())
+                else:
+                    rada_bad += 1
+                continue
+            if s.startswith(NPF_HEAD):
+                if s.startswith(NPF_HEAD + "start sesji"):
+                    mm = NPF_START.match(s)
+                    starts.append(mm.groups() if mm else (None, None, None, s[:200], None))
+                elif s.startswith(NPF_HEAD + "dzien "):
+                    g = {"day": num(r"dzien (-?\d+)", s)}
+                    ok = True
+                    for nm, rx in (("vs", NPF_VS), ("tax", NPF_TAX), ("wage", NPF_WAGE), ("model", NPF_MODEL)):
+                        mm = rx.search(s)
+                        if mm:
+                            g[nm] = mm.groupdict()
+                        else:
+                            ok = False
+                    mc = NPF_COST.search(s)
+                    g["cost"] = float(mc.group(1)) if mc else None
+                    mf = NPF_FAST.search(s)
+                    g["fast"] = mf.groupdict() if mf else None   # segment 5 (PerfTownTaxFastHooks) - brak w liniach starszej wersji paczki: INFO
+                    mw = NPF_TAXWHY.search(s)
+                    g["why"] = mw.group(1) if mw else None
+                    (days.append(g) if ok else bad.append(s))
+            elif s.startswith(NPF_ERR):
+                n_err += 1
+                err_first = err_first or s[:160]
+    vals, takt, hour, our, doba = _npf_prof_scan(logp)
+    print(f"plik: {logp} | linii startu {len(starts)}, doby {len(days)} (nierozpoznanych {len(bad)}), Profil doby {len(takt)} dob, Koszt 171-174 {len(doba)} dob")
+    # baza
+    base, base_src = dict(NPF_BASE), "mediany fin81 (Armoury-2026-10-17_17-55-14.log)"
+    if bdp and os.path.isfile(bdp):
+        bv, bt, bh, bo, bd = _npf_prof_scan(bdp)
+        for k, v in bv.items():
+            if v:
+                base[k] = st.median(v)
+        if bt:
+            base["takt"] = st.median(bt)
+        if bh:
+            base["godzina"] = st.median(bh)
+        if bo:
+            base["nasze"] = st.median(bo)
+        if bd:
+            base["doba"] = st.median(bd)
+        base_src = f"--baza-doby {os.path.basename(bdp)} ({len(bt)} dob)"
+    # NPERF-0
+    if starts:
+        st0 = starts[-1]
+        if st0[0] is None:
+            rep.add("NPERF-0: linia startu sesji", st0[3], "format linii PerfD2.EnsureHooks", False)
+        else:
+            rep.add("NPERF-0: linia startu sesji - klucze", f"spis VS {st0[0]}, podatek miast {st0[1]}, zold markietanow {st0[4]}", "klucze [WL] (wylaczone - INFO)",
+                    None if "[wyl]" in (st0[0], st0[1], st0[4]) else True)
+            rep.add("NPERF-0b: straznik podatku miast (pominiecie ciala BK)", f"{st0[2]} ({st0[3][:220]})",
+                    "CZYNNY (STOI - INFO z powodem: obca latka, inny model, inna wersja BK - paczka bez zysku tej czesci, gra jak dotad)", True if st0[2] == "CZYNNY" else None)
+    else:
+        rep.add("NPERF-0: linia startu sesji 'Szybkosc doby (perf-d2d3)'", "brak", "INFO (log sprzed paczki perf-d2d3)", None)
+    # NPERF-1
+    if days or bad:
+        rep.add("NPERF-1: linie doby rozpoznane", f"{len(days)} (nierozpoznane {len(bad)})" + (f" np. {bad[0][:180]}" if bad else ""), "nierozpoznane 0", not bad)
+    else:
+        rep.add("NPERF-1: linie doby 'Szybkosc doby (perf-d2d3)'", "brak", "INFO (log sprzed paczki albo bieg krotszy niz 2 doby)", None)
+    if days:
+        vs = [g["vs"] for g in days]
+        hd = sum(int(v["hd"]) for v in vs); rd = sum(int(v["rd"]) for v in vs)
+        hs = sum(int(v["hs"]) for v in vs); rs = sum(int(v["rs"]) for v in vs)
+        hp = sum(int(v["hp"]) for v in vs); rp = sum(int(v["rp"]) for v in vs)
+        vms = [float(v["ms"]) for v in vs if int(v["g"]) > 0]
+        rep.add("NPERF-2: spis stali valyrianskiej - rozjazdy (stara droga w probce 1/64)", f"bohaterowie: pominieci {hs}, probek {hp}, rozjazdow {hd}; rostery: pominiete {rs}, probek {rp}, rozjazdow {rd}",
+                "rozjazdow 0; probek >= 1 przy pominieciach", hd == 0 and rd == 0 and (hs + rs == 0 or hp + rp >= 1))
+        rep.add("NPERF-2b: spis stali valyrianskiej - mediana czasu (Gather)", f"{st.median(vms):.1f} ms ({len(vms)} dob; maks. {max(vms):.1f})" if vms else "brak spisow",
+                f"<= {NPF_VS_MS:.0f} ms", (st.median(vms) <= NPF_VS_MS) if vms else None)
+        tx = [g["tax"] for g in days]
+        su = sum(int(t["su"]) for t in tx); pu = sum(int(t["pu"]) for t in tx); es = sum(int(t["es"]) for t in tx); ep = sum(int(t["ep"]) for t in tx)
+        sk = sum(int(t["skip"]) for t in tx); pr = sum(int(t["probe"]) for t in tx); calls = sum(int(t["calls"]) for t in tx); off = sum(int(t["off"]) for t in tx)
+        live = sum(1 for t in tx if t["live"] == "CZYNNY")
+        if sk + pr > 0:
+            rep.add("NPERF-3: podatek miast - rada pokryta i bez wyjatkow (cialo BK pominiete)",
+                    f"wywolan {calls}, pominietych {sk}, probek {pr}, poza warunkiem {off}; rada niepokryta: przy pominieciu {su}, w probkach {pu}; wyjatkow przy pominieciu {es} (w probkach {ep})",
+                    "rada niepokryta 0 i 0; wyjatkow przy pominieciu 0; probek >= 1", su == 0 and pu == 0 and es == 0 and pr >= 1)
+            ub = [float(t["ub"]) for t in tx if int(t["nb"]) > 0]; us_ = [float(t["us"]) for t in tx if int(t["ns"]) > 0]
+            sv = [float(t["save"]) for t in tx]
+            rep.add("NPERF-3b: podatek miast - czas wywolania i oszczednosc", f"z cialem BK mediana {st.median(ub) if ub else 0:.1f} us, bez {st.median(us_) if us_ else 0:.1f} us; "
+                    f"oszczednosc mediana {st.median(sv):.1f} ms/dobe (wywolan srednio {calls / len(tx):.0f}/dobe)", "INFO", None)
+        else:
+            why = next((g["why"] for g in reversed(days) if g.get("why")), "-")
+            rep.add("NPERF-3: podatek miast - pominiecia ciala BK", f"pominietych 0 (straznik czynny {live} z {len(tx)} dob; powod: {why[:200]})",
+                    "INFO (straznik STOI albo klucz wylaczony - gra jak dotad)", None)
+        wg = [g["wage"] for g in days]
+        wh = sum(int(w["hits"]) for w in wg); wp = sum(int(w["p"]) for w in wg); wd = sum(int(w["d"]) for w in wg)
+        wsv = [float(w["save"]) for w in wg]
+        rep.add("NPERF-4: zold markietanow raz na partie - rozjazdy (probka 1/64)", f"odczytow z pamieci {wh}, probek {wp}, rozjazdow {wd}; oszczednosc mediana {st.median(wsv):.1f} ms/dobe",
+                "rozjazdow 0; probek >= 1 przy odczytach z pamieci", wd == 0 and (wh == 0 or wp >= 1) if wh > 0 else None)
+        md = [g["model"] for g in days]
+        rep.add("NPERF-7: dochod modelu w ksiedze rodow wedlug rodu (mediana ms/dobe)",
+                f"krolow {st.median([float(x['rms']) for x in md]):.1f} ms ({md[-1]['rn']} rodow), z lennami {st.median([float(x['fms']) for x in md]):.1f} ms ({md[-1]['fn']} rodow, "
+                f"lenn {md[-1]['fiefs']}), bez lenn {st.median([float(x['nms']) for x in md]):.1f} ms ({md[-1]['nn']} rodow)", "INFO (gdzie siedzi koszt CalculateClanIncome)", None)
+        fs = [g["fast"] for g in days if g.get("fast")]
+        if fs:
+            fdiff = sum(int(x["d"]) for x in fs)
+            per = {}
+            for x in fs:
+                for mm in NPF_FAST_SITE.finditer(x["sites"]):
+                    k = mm.group("name").strip()
+                    a = per.setdefault(k, [0, 0])
+                    a[0] += int(mm.group("p")); a[1] += int(mm.group("d"))
+            tot_p = sum(v[0] for v in per.values())
+            rep.add("NPERF-11: haki podatku miast bez refleksji - rozjazdy (stara droga w probce 1/64)",
+                    f"rozjazdow razem {fdiff}; " + ", ".join(f"{k} {v[0]}/{v[1]}" for k, v in per.items()) + " (probek/rozjazdow)",
+                    "rozjazdow 0; probek >= 1 (gdy klucz [WL] i byl podatek miast)", fdiff == 0 and (tot_p >= 1 or fs[-1]["key"] == "[wyl]"))
+        else:
+            rep.add("NPERF-11: haki podatku miast bez refleksji", "brak segmentu w liniach doby", "INFO (wersja paczki bez PerfTownTaxFastHooks)", None)
+        cs_ = [g["cost"] for g in days if g["cost"] is not None]
+        rep.add("NPERF-10: koszt linii i straznika", f"mediana {st.median(cs_):.2f} ms, maks. {max(cs_):.2f}" if cs_ else "brak", "<= 1 ms (mediana)",
+                (st.median(cs_) <= 1.0) if cs_ else None)
+    # NPERF-3c (recenzja): linia "Rada (3.5)" - przeliczenia przy pominietym ciele BK oznaczone osobno (stara pensja BK z nich nieznana), czesci sumuja sie do calosci
+    if rada:
+        segs = [r for r in rada if r.get("k") is not None]
+        kk = sum(int(r["k"]) for r in segs)
+        mm_ = sum(int(r["m"]) for r in segs if r.get("m") is not None)
+        a_b = sum(int(r["a"]) for r in segs)
+        n1 = sum(int(r["n1"]) for r in segs if r.get("n1") is not None)
+        bad_sum = sum(1 for r in segs if r.get("m") is None or r.get("n1") is None
+                      or int(r["m"]) + int(r["k"]) != int(r["c"]) or int(r["n1"]) + int(r["kn"]) != int(r["b"]))
+        sk_tot = sum(int(g["tax"]["skip"]) for g in days) if days else 0
+        val = (f"dob z segmentem pominiec {len(segs)} z {len(rada)} (nierozpoznanych {rada_bad}); przeliczen pominietych {kk}, z cialem BK {mm_}; "
+               f"stara pensja BK z przeliczen z cialem BK {a_b} wobec wedlug renty w nich {n1}" + (f" (x{a_b / n1:.2f})" if n1 else "")
+               + f"; czesci != calosc w {bad_sum} dobach; pominiec ciala BK w liniach perf-d2d3 {sk_tot}")
+        if days:
+            rep.add("NPERF-3c: Rada (3.5) - przeliczenia przy pominietym ciele BK osobno (suma 'wedlug zastapionego podatku BK' bez nich)", val,
+                    "segment wtedy i tylko wtedy, gdy pominiecia ciala BK > 0; czesci = calosc (przeliczenia i suma wedlug renty); nierozpoznane 0",
+                    ((kk > 0) == (sk_tot > 0)) and bad_sum == 0 and rada_bad == 0)
+        else:
+            rep.add("NPERF-3c: Rada (3.5) - przeliczenia przy pominietym ciele BK", val, "INFO (brak linii doby perf-d2d3)", None)
+    else:
+        rep.add("NPERF-3c: Rada (3.5)", "brak linii", "INFO (CouncilWagesRealBase wylaczone albo log bez rady)", None)
+    # NPERF-5: Profil doby wobec bazy (log bez paczki - tylko pomiar wyjsciowy, INFO)
+    pkg = bool(starts or days)
+    if takt:
+        def row(name, key, vals_, mult, rule):
+            if not vals_:
+                rep.add(name, "brak w Profilu doby", "INFO", None)
+                return
+            med = st.median(vals_)
+            b = base.get(key)
+            rep.add(name, f"mediana {med:.1f} ms ({len(vals_)} dob) wobec bazy {b:.1f} ms = x{med / b:.2f}" if b else f"mediana {med:.1f} ms",
+                    rule if pkg else "INFO (log bez paczki perf-d2d3 - pomiar wyjsciowy)", (med <= b * mult) if b and pkg else None)
+        row("NPERF-5a: LegendaryLaw (czystki, ValyrianBlades)", "LegendaryLaw (czystki, ValyrianBlades)", vals["LegendaryLaw (czystki, ValyrianBlades)"], NPF_LL_MAX, f"<= {NPF_LL_MAX} x baza ({base_src})")
+        row("NPERF-5b: Sutlers.Daily (markietani)", "Sutlers.Daily", vals["Sutlers.Daily"], NPF_SUT_MAX, f"<= {NPF_SUT_MAX} x baza")
+        row("NPERF-5c: ClanIncomeBook.Daily", "ClanIncomeBook.Daily", vals["ClanIncomeBook.Daily"], NPF_REG, f"<= {NPF_REG} x baza (nie gorzej)")
+        row("NPERF-5d: KingdomTreasury.Daily", "KingdomTreasury.Daily", vals["KingdomTreasury.Daily"], NPF_REG, f"<= {NPF_REG} x baza (nie gorzej)")
+        row("NPERF-5e: BuildFunding.Daily", "BuildFunding.Daily", vals["BuildFunding.Daily"], NPF_REG, f"<= {NPF_REG} x baza (nie gorzej)")
+        row("NPERF-5f: takt doby (caly OnDailyTick)", "takt", takt, NPF_REG, f"<= {NPF_REG} x baza (nie gorzej)")
+        row("NPERF-5g: godzina (suma sluchaczy godzinowych)", "godzina", hour, NPF_REG, f"<= {NPF_REG} x baza (nie gorzej)")
+        mo = st.median(our) if our else None
+        mdb = st.median(doba) if doba else None
+        rep.add("NPERF-6: nasze razem (dolna granica) i doba zegara (mediany)",
+                (f"nasze {mo:.0f} ms (baza {base['nasze']:.0f}, x{mo / base['nasze']:.2f})" if mo else "nasze -") + "; "
+                + (f"doba {mdb / 1000:.1f} s (baza {base['doba'] / 1000:.1f} s, x{mdb / base['doba']:.2f})" if mdb else "doba -"),
+                "INFO (zalezy od obciazenia komputera - inne biegi rownolegle)", None)
+    else:
+        rep.add("NPERF-5: Profil doby (E8/0)", "brak linii", "INFO (Stage8ProfileLog wylaczony)", None)
+    # NPERF-8: CrashScribe - swaty ROT i audyt CS
+    cpath, how = crashscribe_session_of(logp, csp)
+    if cpath:
+        z3, ea = [], []
+        with open(cpath, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                m = TS.match(ln.rstrip("\r\n"))
+                s = m.group(2) if m else ln.rstrip("\r\n")
+                if s.startswith("Swaty ROT (Z.3): dzien"):
+                    v = num(r"czas ([\d.]+) ms", s, float)
+                    if v is not None:
+                        z3.append(v)
+                elif s.startswith("Profil CS (E8/0): dzien"):
+                    v = num(r"EconomyAudit: przebiegow \d+ \(po wczytaniu \d+\), ([\d.]+) ms", s, float)
+                    if v is not None:
+                        ea.append(v)
+        rep.add("NPERF-8: (CS) swaty ROT - mediana czasu doby", f"{st.median(z3[1:] or z3):.0f} ms ({len(z3)} dob; {os.path.basename(cpath)}, {how})" if z3 else f"brak linii Z.3 ({how})",
+                f"<= {NPF_Z3_MS:.0f} ms", (st.median(z3[1:] or z3) <= NPF_Z3_MS) if z3 else None)
+        rep.add("NPERF-8b: (CS) EconomyAudit - suma i mediana", f"suma {sum(ea):.0f} ms, mediana dob z przebiegiem {st.median([x for x in ea if x > 0] or [0]):.0f} ms" if ea else "brak",
+                "INFO (w grze Jeffa co 7 dob - EconomyAuditWeekly)", None)
+    else:
+        rep.add("NPERF-8: (CS) swaty ROT", f"brak logu sesji CrashScribe ({how})", "INFO", None)
+    rep.add("NPERF-9: ERROR w miejscach paczki", f"{n_err}" + (f" (np. {err_first})" if err_first else ""), "0", n_err == 0)
+    rep.show()
+    return 0
+
+
 # ============================================================ NW (noc 16.10, w-toku/noc-wydajnosc): wydajnosc - grupa nwyd
 # Armoury: LogGate.cs (ciche logi), ScorchedEarth.Next (O3), NightRest siatka zagrozen (O5), DayProfile pola NW (O4, O6), LegendaryLaw (O6c, O7);
 # CrashScribe (--crashscribe): MarriageFast.PickViableLazy (O1), EconomyAudit.Due (O2), Scribe pisarz (O9).
@@ -40284,6 +40598,8 @@ def main(argv):
         return nmisje_main(logp)   # NM (noc 15/16.10): druzyny w misji (Team.Invalid pominiety, potkniecia liczone), ucieczka rannych tylko w bitwie na mapie
     if group == "nwyd" and (logp or csp):
         return nwyd_main(logp, csp)   # nwyd (noc 16.10, w-toku/noc-wydajnosc): ciche logi, swaty leniwe, audyt CS co 7 dob, spalona ziemia, siatka zagrozen, LegendaryLaw, pisarz CS
+    if group == "nperf" and logp:
+        return nperf_main(logp, csp, bdp)   # nperf (noc 17/18.10, perf-d2d3): spis stali valyrianskiej, cialo podatku miast BK przy rencie, zold markietanow raz, Profil doby wobec bazy, swaty ROT (CS)
     if group == "nekon2" and logp:
         return nekon2_main(logp)   # noc-ekonomia2 (16.10): jaja wsi rolniczych (BK), budzet kategorii bez producenta na zbytki, wlokno do miasta targowego, opal mieszczan
     if group == "nekon3" and logp:
