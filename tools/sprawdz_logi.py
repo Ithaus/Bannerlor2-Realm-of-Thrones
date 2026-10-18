@@ -1666,7 +1666,8 @@ Uzycie (Python 3, tylko odczyt):
                     cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 (f16-drobne: tylko nasze drogi) bandy wobec najwyzszego celu
                     gry klanu w biegu (albo band z zapisu) - mediana ostatnich 28 dob <= 1.05 i <= pierwszych 28 + 0.05 (narodziny ponad cel = przeciek latki celu albo bramek)
                     i 'wokol teraz' = wokol ROT w kazdej dobie bez podniesienia; band/cel gry (dawne NBD-2 f14-miary, rosnie od spadku celu - kryjowka przestaje byc zajeta,
-                    bandy zostaja; nowa kryjowka 4 bandy, herszt) i skad nadwyzka - NBD-2b INFO, NBD-3 puste narodziny
+                    bandy zostaja; nowa kryjowka 4 bandy, herszt), klany ze spadkiem celu (band/cel/zajete pierwsze -> ostatnie 28 dob) i skad nadwyzka - NBD-2b INFO;
+                    przyczyna spadku celu NIE rozstrzygnieta (gra albo nasz odpoczynek band Bandits Rest By Day - bez nogi A/B z kluczem NIE), NBD-3 puste narodziny
                     przy celu podniesionym <= 5% urodzonych, NBD-4 bandy start -> koniec, pula, ludzie nowych band <= 'bandy nowe (ludzi)' z linii Wyrzutki, NBD-5 rodzenie band
                     <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande; ruch partii Campaign.RealTick i udzial band
                     liniowo wedlug liczby partii - INFO), NBD-7 z --baza-doby: doba realna tych samych
@@ -43310,7 +43311,7 @@ def nskory_main(logp):
 NPR_HEAD = "Przysiolki (sw-przysiolki): "
 NPR_CRC6 = "F5456602"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
 NPR_CRC5 = "68BB06AD"
-NPR_CRC7 = "3D776223"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt (recenzja 18.10: ziemia okregu + pas, bez wiosek w glebi ziemi obcej); f16-drobne: bez brodu (Fording) pod wioska - 5F9875B1 -> 3D776223
+NPR_CRC7 = "5F9875B1"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt (recenzja 18.10: ziemia okregu + pas, bez wiosek w glebi ziemi obcej)
 NPR_V7_MIN_D = 6.0         # f10-uklad (recenzja): naglowek min_distance = prawdziwe minimum pliku (wioska-wioska i wioska-wies gry) - nie ciasniej niz v6 (wioska-wies gry 6.00)
 NPR_V7_TARGET = 12.26      # f10-uklad: odleglosc docelowa = 2 x v6 6.13 (naglowek target_distance): wioska-wioska mediana >= docelowa, 10% >= 0.8 x docelowa
 NPR_INN_FAR = 12.26        # f10-uklad (recenzja): zajazd >= odleglosc docelowa od wioski i wsi gry (RoadsideInns.FarVillage, zajazdy_gen.py MIN_VIL)
@@ -47914,11 +47915,19 @@ def nbandy_main(logp, bdp=None):
     # f16-drobne (18.10, fin93 0.996 -> 1.107 przy limicie 12): band/cel gry rosnie od SPADKU CELU, nie od narodzin - desert_bandits cel 68 -> 52 i yiti_bandits 60 -> 41
     # (srednio, pierwsze / ostatnie 28 dob) przy bandach 64 -> 67 i 60 -> 58, sea_raiders wchodza do miary dopiero z zajeta kryjowka (34 / 24); zajete kryjowki w biegu
     # rosna (39.7 -> 42.9), wszystkie 415 narodzin przez SpawnBanditParty w luce celu (gra: round((zajete x 12 - bandy klanu) x 0.1)), 'wokol teraz 6' = ROT w 161 dobach.
-    # Nasz kod nie tworzy band klanow z kryjowkami (OutlawLaw / BanditLimit tylko odmawiaja proby gry; jedyna nasza banda z niczego to najazd FreeFolkRaids - klan wildlings,
-    # w biegu bez zajetej kryjowki), wiec band/cel gry zostaje INFO (NBD-2b), a NBD-2 mierzy to, co moze byc nasze: (a) bandy wobec NAJWYZSZEGO celu, jaki gra sama
-    # postawila klanowi w biegu (albo band z zapisu) - gra dorabia tylko do celu i nie kasuje band, wiec ponad ten poziom wychodza tylko narodziny ponad cel (przeciek
-    # latki celu albo bramek) oraz drobne drogi gry / BK bez celu (herszt w wypatrzonej kryjowce, bohater-zboj BK, 4 bandy nowej kryjowki); (b) cel bez naszej zmiany:
-    # 'wokol teraz' = wokol ROT w kazdej dobie bez podniesienia. fin92: 0.976 -> 0.976 (najwiecej 1.010), fin93: 0.974 -> 1.005 (najwiecej 1.011).
+    # Nasz kod nie TWORZY band klanow z kryjowkami (OutlawLaw / BanditLimit tylko odmawiaja proby gry; jedyna nasza banda z niczego to najazd FreeFolkRaids - klan wildlings,
+    # w biegu bez zajetej kryjowki), wiec NBD-2 mierzy to, co moze byc naszymi narodzinami: (a) bandy wobec NAJWYZSZEGO celu, jaki gra sama postawila klanowi w biegu
+    # (albo band z zapisu) - gra dorabia tylko do celu i nie kasuje band, wiec ponad ten poziom wychodza tylko narodziny ponad cel (przeciek latki celu albo bramek) oraz
+    # drobne drogi gry / BK bez celu (herszt w wypatrzonej kryjowce, bohater-zboj BK, 4 bandy nowej kryjowki); (b) cel bez naszej zmiany: 'wokol teraz' = wokol ROT
+    # w kazdej dobie bez podniesienia. fin92: 0.976 -> 0.976 (najwiecej 1.010), fin93: 0.974 -> 1.005 (najwiecej 1.011).
+    # Recenzja f16: SPADEK CELU (cel = 12 x zajete kryjowki klanu, Hideout.IsInfested = >= 4 band W SRODKU teraz) NIE jest udowodniony jako "tylko gra". Nasz odpoczynek
+    # band (NightRest.AiBanditRest, klucz Bandits Rest By Day - domyslnie TAK, w fin92 / fin93 TAK) wstrzymuje AI (DisableForHours(1) + SetMoveModeHold) kazdej bandzie
+    # POZA osada - takze idacej z powrotem do kryjowki - 7 godzin na dobe (nocni lowcy 10-16) albo w godzinach obozu (dzienni); bandy w kryjowce sa pominiete (moga z niej
+    # wyjsc). Ta asymetria moze zmniejszac liczbe band w srodku, a wiec cel gry - a NBD-2 z zalozenia spadku celu nie widzi. Dlatego band/cel gry zostaje w NBD-2b (INFO)
+    # z klanami, ktorym cel spadl (band/cel/zajete pierwsze -> ostatnie 28 dob), i z adnotacja "nierozstrzygniete" do nogi A/B z Bandits Rest By Day NIE (te same doby,
+    # ten sam zapis) - dopiero wtedy wolno nazwac drift zachowaniem gry. Wskazowka (nie dowod): odpoczynek dziala tak samo na kazdy klan (natura z Id bandy), a w fin93
+    # zajete kryjowki spadly tylko dwom klanom (desert 5.7 -> 4.4, yiti 5.0 -> 3.4), pieciu wzrosly (forest, mountain, robber, steppe, sea_raiders od 0); w fin92 spadly
+    # innym (robber 5.0 -> 4.1, yiti 5.0 -> 4.0).
     cl_rx = re.compile(r"(\S+) (\d+)/(\d+)/(\d+)$")
     def _cls(row):
         out = {}
@@ -47927,10 +47936,11 @@ def nbandy_main(logp, bdp=None):
             if mm:
                 out[mm.group(1)] = (int(mm.group(2)), int(mm.group(3)), int(mm.group(4)))
         return out
-    ratios, ratios_ns, leak, hist, dec = [], [], [], {}, None
+    ratios, ratios_ns, leak, hist, dec, cl_days = [], [], [], {}, None, []
     cstart = _cls(L[ld[0]])
     for d in ld:
         c = _cls(L[d])
+        cl_days.append(c)
         b = sum(v[0] for v in c.values() if v[1] > 0); t = sum(v[1] for v in c.values() if v[1] > 0)
         if t > 0:
             ratios.append(b / t)
@@ -47959,7 +47969,7 @@ def nbandy_main(logp, bdp=None):
                 f"band / najwyzszy cel klanu w biegu (albo bandy z zapisu): pierwsze 28 dob {k0:.3f}, ostatnie 28 {k1:.3f} (zmiana {k1 - k0:+.3f}), najwiecej {kx:.3f};"
                 f" 'wokol teraz' = wokol ROT w {len(nr_days) - len(bad_get)} z {len(nr_days)} dob bez podniesienia" + (f" (inaczej np. {bad_get[:5]})" if bad_get else ""),
                 f"ostatnie 28 <= {NBD_LEAK_MAX} i <= pierwsze 28 + {NBD_LEAK_DRIFT}; 'wokol teraz' = wokol ROT w kazdej dobie bez podniesienia (band/cel gry - NBD-2b INFO:"
-                " kryjowka przestaje byc zajeta, cel spada, bandy zostaja - zachowanie gry)",
+                " kryjowka przestaje byc zajeta, cel spada, bandy zostaja - gra albo nasz odpoczynek band Bandits Rest By Day, bez nogi A/B nierozstrzygniete)",
                 k1 <= NBD_LEAK_MAX and k1 <= k0 + NBD_LEAK_DRIFT and not bad_get)
     else:
         rep.add("NBD-2: bandy klanow z kryjowkami ponad najwyzszy cel gry w biegu", f"dob z celem {len(leak)}", "INFO (za malo dob, >= 56)", None)
@@ -47973,12 +47983,32 @@ def nbandy_main(logp, bdp=None):
                      + f" (dawny prog: ostatnie 28 <= pierwsze 28 + {NBD_RATIO_DRIFT} i <= {NBD_RATIO_MAX} - {'spelniony' if (m1 <= m0 + NBD_RATIO_DRIFT and m1 <= NBD_RATIO_MAX) else 'niespelniony'}) | ")
     else:
         ratio_txt = f"band/cel gry: dob z celem {len(ratios)} | "
+    # recenzja f16: klany, ktorym cel spadl (cel = 12 x zajete) - band/cel/zajete srednio pierwsze -> ostatnie 28 dob; przyczyna spadku celu nierozstrzygnieta (gra albo
+    # odpoczynek band NightRest.AiBanditRest - Bandits Rest By Day: banda poza osada stoi godzine w oknach odpoczynku, banda w kryjowce pominieta) do nogi A/B z kluczem NIE
+    fall_txt = ""
+    if len(cl_days) >= 56:
+        def _avg(ds, k):
+            return tuple(sum(dd.get(k, (0, 0, 0))[j] for dd in ds) / float(len(ds)) for j in range(3))
+        fall, rise = [], []
+        for k in sorted({kk for dd in cl_days for kk in dd}):
+            a0, a1 = _avg(cl_days[:28], k), _avg(cl_days[-28:], k)
+            if a0[1] > 0 and a1[1] < a0[1] - 1e-9:
+                fall.append((a1[1] - a0[1], k, a0, a1))
+            elif a1[2] > a0[2] + 1e-9:
+                rise.append((k, a0[2], a1[2]))
+        fall.sort()
+        fall_txt = ("klany ze spadkiem celu (band/cel/zajete srednio pierwsze -> ostatnie 28 dob): "
+                    + (", ".join(f"{k} {a0[0]:.1f}/{a0[1]:.1f}/{a0[2]:.1f} -> {a1[0]:.1f}/{a1[1]:.1f}/{a1[2]:.1f}" for _, k, a0, a1 in fall) if fall else "brak")
+                    + f"; zajete wzrosly u {len(rise)} klanow" + (" (" + ", ".join(f"{k} {z0:.1f} -> {z1:.1f}" for k, z0, z1 in rise) + ")" if rise else "")
+                    + "; przyczyna spadku celu NIE rozstrzygnieta: gra (banda wychodzi z kryjowki, w srodku < 4) albo nasz odpoczynek band (Bandits Rest By Day) -"
+                    " A/B: noga z Bandits Rest By Day NIE | ")
     rep.add("NBD-2b: band/cel gry i nadwyzka band ponad cel klan po klanie - skad (INFO)",
-            ratio_txt
+            ratio_txt + fall_txt
             + (f"koniec (d{dec[0]}): cel spadl (band <= najwyzszy cel klanu w biegu - kryjowka przestala byc zajeta, bandy zostaja) {dec[1]}, klany bez zajetej kryjowki"
                f" {dec[2]}, ponad najwyzszy cel klanu w biegu (nowa kryjowka 4 bandy, herszt, bandy z zapisu) {dec[3]}" if dec else "brak listy klanow")
             + f"; dawna miara: ponad cel x {NBD_TARGET_TOL} w {len(over)} z {len(ld)} dob",
-            "INFO (Hideout.IsInfested = >= 4 band w srodku teraz; FillANewHideoutWithBandits i AddBossParty bez celu; wildlings - FreeFolkRaids)", None)
+            "INFO (Hideout.IsInfested = >= 4 band w srodku teraz; FillANewHideoutWithBandits i AddBossParty bez celu; wildlings - FreeFolkRaids; spadek celu - gra albo"
+            " odpoczynek band, bez nogi A/B z Bandits Rest By Day NIE nierozstrzygniete)", None)
 
     # NBD-3 puste narodziny przy celu podniesionym (wybor kryjowki z ludzmi)
     rd = [d for d in raised_days if L[d]["people"] == "TAK"]

@@ -14,6 +14,11 @@
 #   Potok z zajazdami (Jeff 18.10 "zajazdy nie sa obok wiosek"): najpierw plan miejsc zajazdow (tools/zajazdy/zajazdy_gen.py --plan-out, ludzie z v6),
 #   potem ten skrypt (wioski >= min_village planu, 12.26 jedn., od budynku i postoju zajazdu), na koncu plik zajazdow (zajazdy_gen.py --plan-in) - opis w zajazdy_gen.py.
 #   Sprawdzenie wyniku (niezalezne od generatora, miary recenzji 18.10): python -I tools/wioski-v7/sprawdz_v7.py.
+#   UWAGA (f16-drobne, 18.10): plik w module (WGRANIE 81, gra Jeffa) = przebieg SPRZED reguly brodu (crc ukladu 5F9875B1, raport-v7.txt / wioski-v7.tsv tego
+#   przebiegu) - jedna wioska (castle_village_EN9_2#91390709 Drowned Wood) stoi na brodzie (sprawdz_v7: "na scianie ladowej siatki gry 1518/1519"; widok gry
+#   przesuwa srodek obrazka poza ladem na lad do 6 jedn., lad 2.1 jedn. obok). Pelny przebieg z regula brodu zmienia 11 wierszy i osady dwoch wiosek (crc 3D776223): zapis z 5F9875B1 nie jest znany
+#   VillageBook.OldLayout (ksiega wiosek "uklad zapisu nieznany"), a kolumny ks_* 5 wiosek zmieniaja podpis nakladki KS (KS od zera / stan zastosowany pominiety)
+#   i ZW startuje neutralnie. Wiec: puszczac dopiero przy nastepnej zaplanowanej zmianie ukladu, razem z przejsciem zapisu (plik 5F9875B1 jako kandydat OldLayout).
 #
 # WYNIK (raport-v7.txt, po recenzji 18.10): odleglosc docelowa D = 2 x v6 = 12.26 ma 61% wiosek (najblizsza osada >= D: v6 358 -> v7 1192 z 1957); najblizsza
 #   wioska min 6.13 -> 6.75, 10% 6.58 -> 10.26, mediana 9.50 -> 12.73; najblizsza osada ponizej 0.8 D 1263 -> 162; skupiska 47 -> 9. Gdzie lad kultury nie miesci
