@@ -116,6 +116,7 @@ namespace Armoury
                 try { WorkshopInputs.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopInputs.ApplyAll", e); }   // E6/M2 (208): bramka wsadu przy wyborze typu warsztatu (klucz czytany na zywo)
                 try { NoTownMines.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NoTownMines.ApplyAll", e); }   // N10 (noc 16.10): kopalnia BK w miescie -> najlepszy typ z cen targu (postfiks Low: po BK, przed licznikiem WorkshopInputs)
                 try { GoodsPaths.ApplyEarly(_harmony); } catch (Exception e) { Log.Error("GoodsPaths.ApplyEarly", e); }   // ZC1: wsad gliny i wapna w ladunkach (ConsumeInputFromTownMarket, koszt w progu cyklu) - PRZED latkami cyklu warsztatu
+                try { KsHides.ApplyEarly(_harmony); } catch (Exception e) { Log.Error("KsHides.ApplyEarly", e); }   // f4-ksiega-i-skory: skory z uboju rzeznikow wedlug tabeli swiata (postfiks GetItemsToProduce) - PRZED latkami cyklu warsztatu
                 try { WorkshopTrade.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopTrade.ApplyAll", e); }   // warsztaty towarowe w nowej monecie: utrzymanie i place do kas miast, cena z zarobku
                 try { TownFletchers.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFletchers.ApplyAll", e); }   // paczka 172: strzelarze miasta po warsztatach (postfiks doby miasta) i sonda linii arrows
                 Stables.ApplyAll(_harmony);

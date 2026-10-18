@@ -1288,6 +1288,21 @@ Uzycie (Python 3, tylko odczyt):
                     Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-po-test.flag, T0-T7: zakupy co do monety, ogien - stado przez HerdDriven jak w grze, odbudowa,
                     termin, wojna, zapis, uklad) NIE 0, NPO-7 koszt <= 5 ms, NPO-8 potkniecia i ERROR 0, NPO-9 ogien i stada (INFO), NPO-10 recenzja: powroty wozow bez drogi
                     produkcji (rampa KS, produkcja wsi niewpieta - bez wyplaty) i okregi ze zmienionym b (INFO). Bez prac i bez proby - INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa nskory    : (noc 17/18.10, paczka f4-ksiega-i-skory - koncowy przeglad ekonomii, pakiet P1 "Ksiega i skory"; Armoury/src/KsRecipes.cs, KsHides.cs,
+                    ArtisanInputs.cs - klucze Ks Ledger Current Recipes i Ks Hides By Table) python -I tools/sprawdz_logi.py --grupa nskory <Armoury-*.log> (strumieniowo;
+                    te same wiersze NKS-SK-* dopisuje grupa nks). Doby ksiegi liczone od linii "KS: receptury jedzenia wedlug wagi" do "PRZYWROCONE" (pierwsza doba ksiegi
+                    po wlaczeniu pominieta - czesc cykli ze starej receptury). NSK-0 wlaczenia / przywrocenia receptur KS (INFO), NSK-0b skory na sztuke zywca w linii
+                    "KS: skory z uboju w miescie wedlug tabeli swiata" = 1.60 / 0.60 / 0.40 (krowa, swinia, owca), NSK-1 latka rzeznikow (GetItemsToProduce) wpieta,
+                    NSK-2 ksiega: "mnoznik BK rzemieslnikow" (mieso, piwo, skory, zywiec) <= 1/d przy Ks Ledger Current Recipes (fin86 przed poprawka ok. 1 660/d),
+                    NSK-3 "bez wyjasnienia" skor, miesa i zywca 0 w kazdej dobie (piwo - INFO), NSK-4 skory rzemieslnikow BK z ksiegi / (1.6 x krowy + 0.6 x swinie + 0.4 x owce ubite przez
+                    rzemieslnikow BK) w 0.90-1.10 (fin86 1.99), NSK-5 to samo u rzeznikow (butcher) w 0.80-1.20 (od 20 szt. z tabeli, mniej - INFO), NSK-6 linia doby
+                    "Skory z uboju (KS-S)" z regula w >= 90% dob ksiegi, nierozpoznane 0, NSK-7 kontrola towaru linii (nalezne = pelne + przyrost licznikow osad +
+                    zaokraglenia) |roznica| <= 0.01 w kazdej linii, NSK-8 skory rzemieslnikow z linii KS-S (pelne - brak BK bez dopisania) / ksiega w 0.97-1.03 (NSK-8b sumy
+                    - INFO), NSK-9 zapas skor surowych w czasie receptur KS (INFO; garbarze stoja - osobna sprawa, bez gnicia skor), NSK-10 ERROR KsHides / KsRecipes /
+                    zapis arm_hide_frac i potkniecia 0, NSK-11 skory z uboju w miastach na dobe (INFO). Bez linii paczki (log sprzed paczki, klucz NIE) - progi NSK-2/4/5
+                    jako INFO z liczbami (fin86: 2 i 4 pokazuja stary blad), bez wyjatku. Recenzja f4: linia "KS: receptury jedzenia - nowa kampania w tym samym
+                    procesie" konczy doby receptur KS jak "PRZYWROCONE" (NSK-0 liczy je osobno); NSK-12 rzeznicy - zdjete pozycje skory i ich wartosc, obnizka progu
+                    zysku gry wedlug tabeli ((pozycje gry - skory na cykl) x cena, bez licznika osady), nieudane cykle linii uboju ze skora z kazdej przyczyny (INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -39134,6 +39149,10 @@ def nks_main(logp, until=120, bdp=None):
         nksarm_rows(rep, nksarm_scan(logp), "NKS-ARM")   # ks-arm (noc 17/18.10): samo uzbrojenie, twarde bramki, bramka krainy
     except Exception as e:   # narzedzie nigdy nie konczy sie wyjatkiem na starym logu
         rep.add("NKS-ARM: odczyt linii ks-arm", f"blad narzedzia {type(e).__name__}: {e}", "INFO", None)
+    try:
+        nskory_rows(rep, nskory_scan(logp), "NKS-SK")   # f4-ksiega-i-skory (noc 17/18.10): ksiega z aktualnych receptur KS, skory z uboju wedlug tabeli swiata
+    except Exception as e:   # narzedzie nigdy nie konczy sie wyjatkiem na starym logu
+        rep.add("NKS-SK: odczyt linii f4-ksiega-i-skory", f"blad narzedzia {type(e).__name__}: {e}", "INFO", None)
     rep.show()
     # recenzja rundy 3 (wazne): do odbioru i do raportu dla Jeffa ETAP = NIE PRZESZLO (ETAP mowi tylko "lepiej niz runda 3" - pasma 95-105% nie spelnia)
     n_fail = sum(1 for r in rep.rows if r[3] in ("NIE", "ETAP", "DECYZJA"))
@@ -40379,6 +40398,249 @@ def nksarm_main(logp):
         nksarm_rows(rep, nksarm_scan(logp), "ARM")
     except Exception as e:
         rep.add("ARM: odczyt linii ks-arm", f"blad narzedzia {type(e).__name__}: {e}", "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ nskory (noc 17/18.10, f4-ksiega-i-skory: ksiega z aktualnych receptur KS, skory z uboju w miescie
+# wedlug tabeli swiata; Armoury/src/KsRecipes.cs, KsHides.cs, ArtisanInputs.cs)
+NSK_REC = "KS: receptury jedzenia wedlug wagi"
+NSK_RESTORE = "KS: receptury jedzenia PRZYWROCONE do gry"
+NSK_CRESET = "KS: receptury jedzenia - nowa kampania w tym samym procesie"   # recenzja f4: stan KsRecipes od nowa przy nowej kampanii (jak przywrocenie)
+NSK_HIDEREC = "KS: skory z uboju w miescie wedlug tabeli swiata"
+NSK_DAY = "Skory z uboju (KS-S): dzien "
+NSK_WIRE = "Skory z uboju (KS-S): latka listy wyrobow"
+NSK_ERR = ("ERROR in KsHides", "ERROR in KsRecipes", "ERROR in WorkshopTrade.SyncData(arm_hide_frac)")
+NSK_GOODS = re.compile(r"^Towary: dzien (?P<day>-?\d+) - (?P<g>\S+) \(\d+ d\): zapas (?P<stock>\d+) .*?\| produkcja (?P<p>\d+) \[(?P<src>.*?)\] \| zuzycie (?P<c>\d+) "
+                       r"\[(?P<sink>.*?)\] \| bez wyjasnienia (?P<unex>[+-]?\d+)(?P<rest>.*)$")
+NSK_EXTRA = re.compile(r"\| mnoznik BK rzemieslnikow \+(\d+)")
+NSK_ART = re.compile(r"(?:^|; )rzemieslnicy BK (\d+)")
+NSK_SHOP_SRC = re.compile(r"(?:^|; )warsztaty \d+ \(([^)]*)\)")
+NSK_SHOP_SINK = re.compile(r"(?:^|; )linie warsztatow \d+ \(([^)]*)\)")
+NSK_BUTCHER = re.compile(r"(?:^|, )butcher(?: \(gracz\))? (\d+)")
+NSK_PERHEAD = re.compile(r"skory na sztuke zywca: krowa (?P<c>[\d.]+), swinia (?P<h>[\d.]+), owca (?P<s>[\d.]+)")
+NSK_DAYRX = re.compile(r"^Skory z uboju \(KS-S\): dzien (?P<day>-?\d+) \| Ks Hides By Table \[(?P<key>WL|wyl)\], ksiega z aktualnych receptur \(Ks Ledger Current Recipes\) \[(?P<led>WL|wyl)\]"
+                       r".*?\| nalezne wedlug tabeli swiata (?P<due>-?[\d.]+) szt\. \[krowy (?P<nc>\d+) -> (?P<dc>[\d.]+), swinie (?P<nh>\d+) -> (?P<dh>[\d.]+), owce (?P<ns>\d+) -> (?P<ds>[\d.]+)\]"
+                       r" \| pelne sztuki (?P<whole>\d+) \(rzemieslnicy BK (?P<wa>\d+) z (?P<na>\d+) wywolan, rzeznicy (?P<wb>\d+) z (?P<nb>\d+) cykli\)"
+                       r".*?\(roznica (?P<diff>-?[\d.]+)\)"
+                       r".*?brak sztuk BK wobec celu (?P<short>\d+) szt\. \(dopisane E8/B (?P<by>\d+), niesprzedane (?P<uns>\d+), bez E8/B (?P<noby>\d+)\)"
+                       r".*?\| potkniecia (?P<st>\d+)\.")
+# recenzja f4: rzeznicy w linii KS-S - zdjete pozycje (i ich wartosc), obnizka progu zysku gry wedlug tabeli, nieudane cykle linii uboju ze skora
+# (stara etykieta "cykli bez skutku po liczeniu skor" tez czytana - log syntetyczny sprzed recenzji)
+NSK_SHOPRX = re.compile(r"\| rzeznicy: pozycji skory zdjetych z listy wyrobow (?P<cut>\d+)(?: warte (?P<val>\d+) zl)?.*?utarg cyklu w progu zysku mniej (?P<inc>\d+) zl"
+                        r".*?(?:nieudanych cykli linii uboju ze skora|cykli bez skutku po liczeniu skor) (?P<fail>\d+)")
+NSK_LIVE = {"cow": 0, "hog": 1, "sheep": 2}
+NSK_TABLE = (1.6, 0.6, 0.4)   # skory na sztuke zywca z tabeli swiata (KsTab.HideOfLive x mieso z receptury wagowej / MeatOfLive)
+
+
+def nskory_scan(logp):
+    """Jedno przejscie po logu: stan receptur KS (wlaczenie / przywrocenie), linia tabeli skor, linie doby KS-S i linie ksiegi towarow (skory, mieso, piwo,
+    zywiec) zebrane w czasie receptur KS. Brak pliku - pusty slownik (wiersze INFO)."""
+    D = {"rec_on": [], "restore": 0, "creset": 0, "hiderec": None, "wire": None, "days": [], "err": 0,
+         "goods": {}, "first_ledger": None, "on": False, "skip": None}
+    if not logp or not os.path.isfile(logp):
+        return D
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(NSK_ERR):
+                    D["err"] += 1
+                continue
+            if s.startswith("Towary: dzien "):
+                if not D["on"]:
+                    continue
+                mm = NSK_GOODS.match(s)
+                if not mm:
+                    continue
+                g = mm.group("g")
+                if g not in ("hides", "meat", "beer", "cow", "hog", "sheep"):
+                    continue
+                d = int(mm.group("day"))
+                if D["skip"] is None:
+                    D["skip"] = d   # pierwsza doba ksiegi po wlaczeniu receptur - czesc cykli jeszcze ze starej receptury (pomijana)
+                if d == D["skip"]:
+                    continue
+                me = NSK_EXTRA.search(mm.group("rest"))
+                row = {"stock": int(mm.group("stock")), "unex": int(mm.group("unex")), "extra": int(me.group(1)) if me else 0}
+                ma = NSK_ART.search(mm.group("src"))
+                row["art_p"] = int(ma.group(1)) if ma else 0
+                ma = NSK_ART.search(mm.group("sink"))
+                row["art_c"] = int(ma.group(1)) if ma else 0
+                bp = 0
+                for ms in NSK_SHOP_SRC.finditer(mm.group("src")):
+                    for mb in NSK_BUTCHER.finditer(ms.group(1)):
+                        bp += int(mb.group(1))
+                bc = 0
+                for ms in NSK_SHOP_SINK.finditer(mm.group("sink")):
+                    for mb in NSK_BUTCHER.finditer(ms.group(1)):
+                        bc += int(mb.group(1))
+                row["shop_p"] = bp
+                row["shop_c"] = bc
+                D["goods"].setdefault(d, {})[g] = row
+                continue
+            if s.startswith(NSK_DAY):
+                mm = NSK_DAYRX.match(s)
+                row = mm.groupdict() if mm else {"bad": s[:160]}
+                if mm:
+                    ms = NSK_SHOPRX.search(s)
+                    if ms:
+                        row["shop"] = (int(ms.group("cut")), int(ms.group("val") or 0), int(ms.group("inc")), int(ms.group("fail")))
+                D["days"].append(row)
+                continue
+            if s.startswith(NSK_WIRE):
+                D["wire"] = s
+                continue
+            if s.startswith(NSK_REC):
+                D["rec_on"].append(s)
+                D["on"] = True
+                D["skip"] = None
+                continue
+            if s.startswith(NSK_RESTORE):
+                D["restore"] += 1
+                D["on"] = False
+                continue
+            if s.startswith(NSK_CRESET):
+                D["creset"] += 1   # nowa kampania w tym samym procesie - receptury KS od nowa (jak przywrocenie)
+                D["on"] = False
+                continue
+            if s.startswith(NSK_HIDEREC):
+                D["hiderec"] = s
+                continue
+    return D
+
+
+def nskory_rows(rep, D, pfx="NSK"):
+    """Wiersze f4-ksiega-i-skory (grupa nskory i NKS-SK w grupie nks). Brak linii - INFO, nigdy wyjatek."""
+    goods = D.get("goods") or {}
+    days = sorted(goods)
+    dl = [x for x in D.get("days", []) if "bad" not in x]
+    bad = [x for x in D.get("days", []) if "bad" in x]
+    key_on = any(x.get("key") == "WL" for x in dl) or D.get("hiderec") is not None
+    led_on = any(x.get("led") == "WL" for x in dl)
+    # 0: stan receptur KS i linia tabeli skor
+    if not D.get("rec_on"):
+        rep.add(f"{pfx}-0: receptury KS (linia 'KS: receptury jedzenia wedlug wagi')", "brak linii - KS nie zastosowany w tym logu albo Ks Real Recipes NIE",
+                "INFO (reszta wierszy bez danych)", None)
+    else:
+        rep.add(f"{pfx}-0: receptury KS - wlaczenia / przywrocenia", f"wlaczen {len(D['rec_on'])}, przywrocen {D['restore']}, nowych kampanii w procesie {D.get('creset', 0)}; "
+                f"dob ksiegi po wlaczeniu (bez pierwszej) {len(days)}", "INFO", None)
+    hr = D.get("hiderec")
+    if hr:
+        mp = NSK_PERHEAD.search(hr)
+        if mp:
+            ph = (float(mp.group("c")), float(mp.group("h")), float(mp.group("s")))
+            okp = all(abs(a - b) <= 0.005 for a, b in zip(ph, NSK_TABLE))
+            rep.add(f"{pfx}-0b: skory na sztuke zywca w linii tabeli (krowa, swinia, owca)", f"{ph[0]:.2f}, {ph[1]:.2f}, {ph[2]:.2f}", "1.60, 0.60, 0.40 (KsTab.HideOfLive x mieso / MeatOfLive)", okp)
+        else:
+            rep.add(f"{pfx}-0b: skory na sztuke zywca w linii tabeli", "linia bez liczb", "1.60, 0.60, 0.40", False)
+    else:
+        rep.add(f"{pfx}-0b: linia 'KS: skory z uboju w miescie wedlug tabeli swiata'", "brak (Ks Hides By Table NIE, KS niezastosowany albo log sprzed paczki)", "INFO", None)
+    w = D.get("wire")
+    if w:
+        rep.add(f"{pfx}-1: latka rzeznikow (GetItemsToProduce)", w.split(") ", 1)[-1][:90], "wpieta", " wpieta" in w and "BRAK" not in w and "blad" not in w)
+    else:
+        rep.add(f"{pfx}-1: latka rzeznikow (GetItemsToProduce)", "brak linii startu (log sprzed paczki)", "INFO", None)
+    if not days:
+        rep.add(f"{pfx}-2..9: ksiega po wlaczeniu receptur KS", "brak dob ksiegi w czasie receptur KS", "INFO", None)
+    else:
+        # 2: mnoznik BK rzemieslnikow (suma towarow skory, mieso, piwo, zywiec) - falszywy alarm starej pamieci receptur
+        ext = sum(r.get("extra", 0) for d in days for r in goods[d].values())
+        avg = ext / len(days)
+        rep.add(f"{pfx}-2: ksiega - 'mnoznik BK rzemieslnikow' po wlaczeniu receptur KS (mieso, piwo, skory, zywiec; bez pierwszej doby)",
+                f"{ext} szt. w {len(days)} dob ({avg:.1f}/d)",
+                "<= 1/d przy Ks Ledger Current Recipes (fin86 przed poprawka ok. 1 660/d: 907 miesa + 753 piwa)" if led_on else "INFO (log sprzed paczki albo klucz NIE)",
+                (avg <= 1.0) if led_on else None)
+        # 3: bez wyjasnienia - towary, ktore regula skor rusza fizycznie (skory, mieso, zywiec); piwo (tylko oczekiwanie ksiegi - YieldOf) jako INFO w wartosci
+        une = [(d, g, r["unex"]) for d in days for g, r in goods[d].items() if g != "beer" and r.get("unex", 0) != 0]
+        uneb = [(d, r["unex"]) for d in days for g, r in goods[d].items() if g == "beer" and r.get("unex", 0) != 0]
+        rep.add(f"{pfx}-3: ksiega - 'bez wyjasnienia' skor, miesa i zywca po wlaczeniu receptur KS",
+                f"dob z roznica {len(set(x[0] for x in une))} z {len(days)}" + (f" (np. {une[0][1]} d{une[0][0]} {une[0][2]:+d})" if une else "")
+                + f"; piwo (INFO): dob z roznica {len(uneb)}" + (f" (np. d{uneb[0][0]} {uneb[0][1]:+d})" if uneb else ""), "0 w kazdej dobie", not une)
+        # 4: skory rzemieslnikow wobec tabeli swiata z ubitego zywca
+        hp = sum(goods[d].get("hides", {}).get("art_p", 0) for d in days)
+        cnt = [sum(goods[d].get(a, {}).get("art_c", 0) for d in days) for a in ("cow", "hog", "sheep")]
+        tab = sum(c * t for c, t in zip(cnt, NSK_TABLE))
+        if tab > 0:
+            r4 = hp / tab
+            rep.add(f"{pfx}-4: skory z uboju rzemieslnikow BK wobec tabeli swiata (suma dob)",
+                    f"{hp / len(days):.0f}/d wobec tabeli {tab / len(days):.0f}/d (krowy {cnt[0] / len(days):.0f}, swinie {cnt[1] / len(days):.0f}, owce {cnt[2] / len(days):.0f} /d) = {r4:.2f}",
+                    "0.90-1.10 przy Ks Hides By Table (fin86 przed poprawka 494 wobec 249 = 1.99)" if key_on else "INFO (regula nieczynna albo log sprzed paczki)",
+                    (0.90 <= r4 <= 1.10) if key_on else None)
+        else:
+            rep.add(f"{pfx}-4: skory z uboju rzemieslnikow BK wobec tabeli swiata", "brak uboju rzemieslnikow w ksiedze", "INFO", None)
+        # 5: rzeznicy (warsztaty butcher)
+        bp = sum(goods[d].get("hides", {}).get("shop_p", 0) for d in days)
+        bcnt = [sum(goods[d].get(a, {}).get("shop_c", 0) for d in days) for a in ("cow", "hog", "sheep")]
+        btab = sum(c * t for c, t in zip(bcnt, NSK_TABLE))
+        if btab >= 20:
+            r5 = bp / btab
+            rep.add(f"{pfx}-5: skory z uboju u rzeznikow wobec tabeli swiata (suma dob)", f"{bp} wobec tabeli {btab:.0f} (krowy {bcnt[0]}, swinie {bcnt[1]}, owce {bcnt[2]}) = {r5:.2f}",
+                    "0.80-1.20 przy Ks Hides By Table (bez reguly krowa rzeznika dawala 5)" if key_on else "INFO (regula nieczynna albo log sprzed paczki)",
+                    (0.80 <= r5 <= 1.20) if key_on else None)
+        else:
+            rep.add(f"{pfx}-5: skory z uboju u rzeznikow wobec tabeli swiata", f"za malo uboju u rzeznikow (tabela {btab:.1f} szt. w {len(days)} dob, skory {bp})", "INFO (prog od 20 szt. z tabeli)", None)
+        # 9: zapas skor w czasie receptur KS
+        st_ = [(d, goods[d]["hides"]["stock"]) for d in days if "hides" in goods[d]]
+        if len(st_) >= 2:
+            slope = (st_[-1][1] - st_[0][1]) / max(1, st_[-1][0] - st_[0][0])
+            rep.add(f"{pfx}-9: zapas skor surowych w czasie receptur KS (pierwsza -> ostatnia doba)", f"{st_[0][1]} (d{st_[0][0]}) -> {st_[-1][1]} (d{st_[-1][0]}), {slope:+.1f}/d",
+                    "INFO (fin86 przed poprawka +223..+270/d; garbarze stoja - osobna sprawa, bez gnicia skor)", None)
+        tot = [goods[d].get("hides", {}).get("art_p", 0) + goods[d].get("hides", {}).get("shop_p", 0) for d in days]
+        rep.add(f"{pfx}-11: skory z uboju w miastach (rzemieslnicy BK + rzeznicy) srednio", f"{sum(tot) / len(days):.0f}/d", "INFO (fin86 przy uboju d109235 wedlug tabeli ok. 249/d, przed poprawka 494)", None)
+    # 6-8, 10: linia doby KS-S
+    if not dl and not bad:
+        rep.add(f"{pfx}-6..8: linia doby 'Skory z uboju (KS-S)'", "brak linii (log sprzed paczki albo KS niezastosowany)", "INFO", None)
+    else:
+        act = [x for x in dl if x.get("key") == "WL"]
+        if days and key_on:
+            rep.add(f"{pfx}-6: linia doby 'Skory z uboju (KS-S)' z regula w dobach ksiegi po wlaczeniu", f"{len(act)} linii [WL] / {len(days)} dob ksiegi, nierozpoznanych {len(bad)}",
+                    ">= 90% dob, nierozpoznane 0", len(act) >= 0.9 * len(days) and not bad)
+        else:
+            rep.add(f"{pfx}-6: linia doby 'Skory z uboju (KS-S)'", f"{len(dl)} linii ({len(act)} z regula), nierozpoznanych {len(bad)}", "nierozpoznane 0", not bad)
+        badd = [x for x in dl if abs(float(x["diff"])) > 0.01]
+        rep.add(f"{pfx}-7: kontrola towaru linii KS-S (nalezne = pelne + przyrost licznikow osad + zaokraglenia)",
+                f"linii z |roznica| > 0.01: {len(badd)} z {len(dl)}" + (f" (d{badd[0]['day']} {badd[0]['diff']})" if badd else ""), "0", not badd)
+        if days:
+            dset = set(days)
+            onshelf = sum(int(x["wa"]) - max(0, int(x["short"]) - int(x["by"])) for x in dl if int(x["day"]) in dset)
+            led = sum(goods[d].get("hides", {}).get("art_p", 0) for d in days if any(int(x["day"]) == d for x in dl))
+            if led > 0 and onshelf > 0:
+                r8 = onshelf / led
+                rep.add(f"{pfx}-8: skory rzemieslnikow z linii KS-S (pelne - brak bez dopisania) wobec ksiegi towarow (te same doby)", f"{onshelf} wobec {led} = {r8:.3f}",
+                        "0.97-1.03", 0.97 <= r8 <= 1.03)
+            else:
+                rep.add(f"{pfx}-8: skory rzemieslnikow z linii KS-S wobec ksiegi towarow", f"linia {onshelf}, ksiega {led}", "INFO (brak wspolnych dob z ubojem)", None)
+        due = sum(float(x["due"]) for x in dl)
+        whole = sum(int(x["whole"]) for x in dl)
+        sh = sum(int(x["short"]) for x in dl)
+        uns = sum(int(x["uns"]) + int(x["noby"]) for x in dl)
+        rep.add(f"{pfx}-8b: linia KS-S - nalezne / pelne / brak BK bez dopisania (suma)", f"{due:.1f} / {whole} / {uns} (brak wobec celu {sh})", "INFO", None)
+        # 12 (recenzja f4): rzeznicy - prog zysku gry obnizony o oczekiwanie z tabeli (nie o sztuki zdjete), nieudane cykle linii uboju ze skora (kazda przyczyna gry)
+        shp = [x["shop"] for x in dl if "shop" in x]
+        if shp:
+            sc = sum(x[0] for x in shp); sv = sum(x[1] for x in shp); si = sum(x[2] for x in shp); sf = sum(x[3] for x in shp)
+            ncyc = sum(int(x["nb"]) for x in dl if "shop" in x)
+            rep.add(f"{pfx}-12: rzeznicy w linii KS-S - zdjete pozycje skory / ich wartosc / obnizka progu zysku (tabela) / nieudane cykle linii",
+                    f"{sc} / {sv} zl / {si} zl / {sf} (udanych cykli {ncyc}" + (f", nieudane {sf / (sf + ncyc):.0%}" if sf + ncyc > 0 else "") + ")",
+                    "INFO (obnizka progu = (pozycje gry - skory na cykl) x cena, niezalezna od licznika osady; nieudane - prog, kapital albo kasa miasta)", None)
+        else:
+            rep.add(f"{pfx}-12: rzeznicy w linii KS-S", "brak pola rzeznikow w liniach", "INFO", None)
+    stum = sum(int(x["st"]) for x in dl)
+    rep.add(f"{pfx}-10: ERROR KsHides / KsRecipes / zapis arm_hide_frac i potkniecia linii KS-S", f"ERROR {D.get('err', 0)}, potkniecia {stum}", "0", D.get("err", 0) == 0 and stum == 0)
+
+
+def nskory_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NSK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    try:
+        nskory_rows(rep, nskory_scan(logp), "NSK")
+    except Exception as e:   # narzedzie nigdy nie konczy sie wyjatkiem na starym logu
+        rep.add("NSK: odczyt linii f4-ksiega-i-skory", f"blad narzedzia {type(e).__name__}: {e}", "INFO", None)
     rep.show()
     return 0
 
@@ -41642,6 +41904,8 @@ def main(argv):
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
     if group == "nzapis" and logp:
         return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
+    if group == "nskory" and logp:
+        return nskory_main(logp)   # nskory (noc 17/18.10, f4-ksiega-i-skory): ksiega z aktualnych receptur KS (mnoznik BK 0), skory z uboju w miescie wedlug tabeli swiata (KsRecipes.cs, KsHides.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

@@ -411,11 +411,15 @@ namespace Armoury
         public static void CyclePostfix(WorkshopType.Production __0, Workshop __1, bool __2, bool __result)
         {
             ArtisanInputs.CycleEnd();   // 147: koniec cyklu rzemieslnikow BK (zamyka ich rachunek takze po pominietym cyklu)
+            // f4-ksiega-i-skory: skory z uboju wedlug tabeli swiata u rzeznikow - pozycje skory zdjete z listy wyrobow cyklu (dla udzialu ceny sprawiedliwej)
+            // i zapis ulamka skory osady tylko po udanym cyklu (KsHides - wlasne try; poza regula 0 i nic)
+            int hideCut = KsHides.CutFor(__1);
+            KsHides.CycleEnd(__1, __result);
             // cena sprawiedliwa (123) przed placami: utarg ponad koszt + marze wraca do kasy miasta, z reszty warsztat placi place cyklu
             if (_cyc != null)
             {
                 var shop = _cyc; _cyc = null;
-                try { if (__result && __2 && shop == __1) FairCycle(__0, __1); }
+                try { if (__result && __2 && shop == __1) FairCycle(__0, __1, hideCut); }
                 catch (Exception e) { Stumble("WorkshopTrade.FairCycle", e); }
             }
             try
@@ -516,7 +520,7 @@ namespace Armoury
         /// Warsztat gracza, ktory czesc wyrobu odklada do magazynu: miasto placi za swoja czesc sztuk (koszt cyklu x sztuki do miasta /
         /// wszystkie sztuki cyklu) - reszta wyrobu zostaje graczowi, a z nia reszta kosztu.
         /// </summary>
-        private static void FairCycle(WorkshopType.Production p, Workshop w)
+        private static void FairCycle(WorkshopType.Production p, Workshop w, int hideCut = 0)
         {
             var town = w.Settlement != null ? w.Settlement.Town : null;
             if (town == null) return;
@@ -530,6 +534,7 @@ namespace Armoury
             if (credit <= 0) return;
             int all = 0;
             foreach (var o in p.Outputs) all += Math.Max(0, o.Item2);
+            all = Math.Max(0, all - Math.Max(0, hideCut));   // f4: skory zdjete z listy wyrobow (KsHides) nie sa sztukami cyklu - udzial z prawdziwych sztuk (0 = jak dotad)
             double share = all > 0 ? Math.Min(1.0, (double)_cycOut / all) : 1.0;
             long allowed = (long)Math.Ceiling((cost + labour) * Margin * share);
             long over = credit - allowed;
@@ -1461,6 +1466,15 @@ namespace Armoury
                 if (dataStore.IsLoading) ArtisanInputs.ImportWool(wool);
             }
             catch (Exception e) { Log.Error("WorkshopTrade.SyncData(arm_wool_frac)", e); }
+            // f4-ksiega-i-skory (noc 17/18.10): ulamki skory z uboju w miescie wedlug tabeli swiata (KsHides; osada=ulamek, najwyzej 4096 wpisow) - wlasny try;
+            // stary zapis bez klucza = puste liczniki, starsza DLL klucza nie czyta
+            try
+            {
+                string hide = dataStore.IsSaving ? KsHides.Export() : null;
+                SaveText.Sync(dataStore, "arm_hide_frac", ref hide);
+                if (dataStore.IsLoading) KsHides.Import(hide);
+            }
+            catch (Exception e) { Log.Error("WorkshopTrade.SyncData(arm_hide_frac)", e); }
         }
     }
 }
