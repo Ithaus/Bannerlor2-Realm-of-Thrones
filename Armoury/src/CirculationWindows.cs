@@ -170,6 +170,8 @@ namespace Armoury
         private static int _capGiven;                       // kwota nadana (pierwszy wynik GetInitialTradeGold w oknie)
         private static bool _minesOpen;                     // okno kopalni BK (O20) - place gornikow wracajace do miasta
         private static long _minesFolk;                     // recenzja B1 (1-3): place gornikow w oknie O20 do kiesy ludu (posiadacz H22 - w swiecie, nie w kasie)
+        private static bool _portsOpen;                     // recenzja stare-a17 (3): okno portow BK (O19) otwarte
+        private static long _portsFolk;                     // recenzja stare-a17 (3): zaplata portu za ryby w oknie O19 do kiesy ludu (A17Fix.PortsFin, klucz A17PortFishPaysFolk) - w swiecie, nie w nicosci
         private static Type _popType;                       // BannerKings.Components.PopulationPartyComponent (O21)
         private static PropertyInfo _actionTaker;           // BannerKings TitleAction.ActionTaker (O24-O27)
         private static int[] _wsCap0 = new int[16];         // O45: kapital warsztatow miasta przed (bufory wielokrotnego uzytku)
@@ -215,7 +217,7 @@ namespace Armoury
             {
                 ClearDay();
                 _ctx = 0; _ctxW = -1; _ctxSide = null; _sellSt = null; _sellIn = 0; _snapHero = null; _snapLeaders = false; _snapEvt = 0;
-                _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false; _minesFolk = 0; _repOpen = false;
+                _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false; _minesFolk = 0; _portsOpen = false; _portsFolk = 0; _repOpen = false;
                 _capH0 = null; _capDiagDone = false;   // diagnoza 6 krok 1: linia raz na sesje (od wczytania)
                 _woW = null; _wiW = null; _woSt = null; _wiSt = null; _woP = false; _wiP = false;
                 NamedRun = 0; ToCounterRun = 0; _probeOn = false;
@@ -359,6 +361,14 @@ namespace Armoury
         {
             try { if (_minesOpen && folk > 0 && On) _minesFolk += folk; }
             catch (Exception e) { Stumble("NoteMineFolk", e); }
+        }
+
+        /// <summary>Recenzja stare-a17 (3): A17Fix.PortsFin (finalizer RunPorts, Priority.First - przed PortsFin okna) - zloto, ktore BK zdjal z kasy za ryby w nicosc,
+        /// poszlo do kiesy ludu (TownFolk.Earn KMine, reszta wrocila do kasy); okno O19 liczy ujscie swiata od kasy razem z kiesa (jak O20 kopalnie).</summary>
+        internal static void NotePortsFolk(int folk)
+        {
+            try { if (_portsOpen && folk > 0 && On) _portsFolk += folk; }
+            catch (Exception e) { Stumble("NotePortsFolk", e); }
         }
 
         /// <summary>
@@ -875,6 +885,7 @@ namespace Armoury
             {
                 if (!Gate(WPorts) || __0 == null || __0.Settlement == null) return;
                 __state.St = __0.Settlement; __state.V = __0.Gold;
+                _portsOpen = true; _portsFolk = 0;   // recenzja stare-a17 (3)
                 KasaOpen(ref __state, WPorts);
             }
             catch (Exception e) { Stumble("PortsPre", e); }
@@ -884,13 +895,15 @@ namespace Armoury
         {
             if (!__state.On) return;
             long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
+            _portsOpen = false;
             try
             {
                 long dK = Gold(__state.St) - __state.V;
-                AddWorld(UPorts, -dK, -1);
+                long folk = _portsFolk; _portsFolk = 0;   // recenzja stare-a17 (3): zaplata za ryby w kiesie ludu zostala w swiecie - ujscie swiata = kasa razem z kiesa (bez klucza 0 - jak dotad)
+                AddWorld(UPorts, -(dK + folk), -1);
                 int c = ClassOf(__state.St);
                 if (c >= 0 && !MoneyLedger.InBlock) Cls[c, LPorts] += dK;
-                if (dK != 0) { Hits[WPorts]++; Sum[IPortsN]++; }
+                if (dK != 0 || folk != 0) { Hits[WPorts]++; Sum[IPortsN]++; }
             }
             catch (Exception e) { Stumble("PortsFin", e); }
             KasaClose(__state, WPorts, tf);

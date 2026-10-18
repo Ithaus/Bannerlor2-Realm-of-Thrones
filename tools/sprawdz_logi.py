@@ -781,10 +781,14 @@ Uzycie (Python 3, tylko odczyt):
                     (strumieniowo). NA17-0 linia startowa (wpiecia F1/F2/F4/F5 bez BRAK). F1 (A17BkPartyNoFreeMounts): NA17-1a konie partii BK z niczego (Konie E6/0
                     'partie BK') <= 2/d, NA17-1b przepadle po zniszczeniu <= 70/d (fin80 705 i 702/d), NA17-1c reszta ksiegi koni (INFO, cel |x| <= 5/d), NA17-1d autorzy
                     zmian koni D1b (INFO). F2 (A17FishFromHands, brama KS): NA17-2a ryby 'inne ticki dobowe' <= 2/d przy KS zastosowanym (fin80 205/d), NA17-2b ryby
-                    'bez wyjasnienia' |x| <= 2/d (fin80 +69/d), NA17-2c nazwane zrodla z niczego (INFO), NA17-2d autorzy ryb D1b (INFO), NA17-2e ryby z niczego przy KS 0.
+                    'bez wyjasnienia' |x| <= 2/d (fin80 +69/d; brama niepotwierdzona do biegu z KS), NA17-2c nazwane zrodla z niczego (INFO), NA17-2d autorzy ryb D1b (INFO),
+                    NA17-2e ryby z niczego przy KS 0, NA17-2f grupa ksiegi 'ryby z niczego poza KS (A17 F2)' (przy KS 0, poza KS INFO), NA17-2g porty BK poza KS:
+                    zaplata za ryby w nicosc 0 (klucz A17PortFishPaysFolk: zaplacone = kiesa ludu + kasa).
                     F3 (A17UniquesNotOutlawKit): NA17-3a unikaty zdjete na awans band (D3 OutlawLaw.Equip) 0. F4 (A17SiegeCommitRescue): NA17-4a wyjatki wyniku bitwy
-                    (INFO), NA17-4b Commit dokonczenia nie wszedl 0, NA17-4c/d pojmanie i slad (INFO), NA17-4e dokonczone + przepuszczone = wyjatki, NA17-4f droga C (INFO).
-                    F5 (A17ShipyardBuildsFromTimber): NA17-5a statki z niczego 0, NA17-5b zbudowane > 0 (drewno, place, AI kupno 1% - INFO). NA17-9 bledy 0.
+                    (INFO), NA17-4b Commit dokonczenia nie wszedl 0, NA17-4c/d pojmanie i slad (INFO), NA17-4e dokonczone + przepuszczone = wyjatki, NA17-4f droga C (INFO),
+                    NA17-4g wyjatki z wnetrza Commit (przepuszczone bez drugiego Commit, INFO).
+                    F5 (A17ShipyardBuildsFromTimber): NA17-5a statki z niczego 0 (z potknieciami prefiksu), NA17-5b zbudowane > 0 (drewno, place, AI kupno 1% - INFO),
+                    NA17-5c czesci nowych statkow z drewna i za place - z niczego 0. NA17-9 bledy 0.
                     Log bez paczki: INFO / BRAK, bez wyjatku.
 --grupa sludan    : (14.10, decyzje Jeffa "sluby - 48 slubow" i "danina - tak"; galaz w-toku/sluby-danina; po recenzji) python -I tools/sprawdz_logi.py --grupa sludan
                     [--crashscribe <session-*.log>] <Armoury-*.log> (log czytany strumieniowo). (A) SD-A0 start Z.3 (regulator 48 / rok) i ofert (84 / rok,
@@ -23317,18 +23321,24 @@ NA17_RX = {
     "e6gone": re.compile(r"po zniszczeniu (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)"),
     "e6rest": re.compile(r"reszta niewyjasniona (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)"),
     "f2": re.compile(r"klucz A17FishFromHands (TAK|NIE) \| KS zastosowany (TAK|NIE) \| .*?zablokowane w KS (\d+) szt\. w (\d+) wsiach, dopisane poza KS \(z niczego\) (\d+) szt\. "
-                     r"w (\d+) wsiach \| porty BK \(RunPorts\): zablokowane w KS (\d+) miast, poza KS \(z niczego\) (\d+) szt\. w (\d+) miastach za (\d+) zl w nicosc \| "
+                     r"w (\d+) wsiach \| porty BK \(RunPorts\): zablokowane w KS (\d+) miast, poza KS \(z niczego\) (\d+) szt\. w (\d+) miastach za (\d+) zl w nicosc(?: \([^|]*\))? \| "
                      r"polow zalogi na morzu .*?\) (\d+) szt\. w (\d+) godzinach partii \| razem ryby z niczego (\d+)"),
+    # recenzja stare-a17 (3): port BK poza KS - zaplata za ryby do kiesy ludu (klucz A17PortFishPaysFolk); grupa ksiegi towarow "ryby z niczego poza KS (A17 F2)"
+    "f2folk": re.compile(r"klucz A17PortFishPaysFolk (TAK|NIE): zaplacone (\d+) zl = do kiesy ludu (\d+) \+ zostalo w kasie (\d+)\)"),
+    "fishfree": re.compile(r"ryby z niczego poza KS \(A17 F2\) (\d+)"),
+    "fishcrew": re.compile(r"polow zalogi na morzu \(Master Angler\) (\d+)"),
     "fishline": re.compile(r"^Towary: dzien (-?\d+) - fish \(\d+ d\): .*?\| produkcja \d+ \[(.*?)\] \| zuzycie .*?\| bez wyjasnienia ([+-]?\d+|-) \|"),
     "tick": re.compile(r"inne ticki dobowe (\d+)"),
     "k4fish": re.compile(r"(?:: |; )fish \[([^\]]*)\]"),
     "f3": re.compile(r"klucz A17UniquesNotOutlawKit (TAK|NIE) \| unikaty pominiete przy awansie band \(kandydaci u pasera i w jukach\) (\d+) \(sesja (\d+)\)"),
     "f4": re.compile(r"klucz A17SiegeCommitRescue (TAK|NIE) \| wynikow bitew z wyjatkiem (\d+) \(oblezenia (\d+), inne (\d+)\), dokonczonych \(Commit \+ znacznik wyniku\) (\d+), "
-                     r"Commit nie wszedl (\d+), wyjatek przepuszczony (\d+) \| wyjatki: (.*?) \| pojmanie gry: weszlo (\d+), skonczone (\d+)"),
+                     r"Commit nie wszedl (\d+), wyjatek przepuszczony (\d+)(?: \([^|]*\))? \| wyjatki: (.*?) \| pojmanie gry: weszlo (\d+), skonczone (\d+)"),
+    "f4in": re.compile(r"w tym z wnetrza Commit, bez drugiego Commit (\d+)\)"),   # recenzja stare-a17 (1)
     "dpmc": re.compile(r"C H3 zostawil rannych (\d+) partii / (\d+) ludzi"),
     "f5": re.compile(r"klucz A17ShipyardBuildsFromTimber (TAK|NIE) \| statki NavalDLC chciane (\d+): zbudowane (\d+) \(wartosc kadlubow (\d+) zl; drewno (\d+) pni \+ (\d+) desek "
                      r"z polek miast; place ciesli (\d+) zl z kasy do kiesy ludu, bez kiesy ludu zostalo w kasie (\d+)\), pominiete - port ma liczbe idealna (\d+), brak drewna (\d+), "
                      r"brak nadwyzki kasy na place (\d+), brak kadluba (\d+) \| statki z niczego (\d+)"),
+    "f5p": re.compile(r"czesci nowych statkow \([^)]*\): zalozone (\d+) za (\d+) zl wartosci, pominiete - brak drewna (\d+), brak nadwyzki kasy (\d+), z niczego \(potkniecie\) (\d+)(?:, statek poza portem \(niesprawdzone\) (\d+))?"),   # recenzja stare-a17 (4)
     "s181ai": re.compile(r"kupno statkow od portow \(E3/11[^)]*\): lordowie AI (\d+) / (\d+)"),
     "d1bh": re.compile(r"konie w tickach osad i miast oraz poza ramkami \([^)]*\): (.*?) \| ryby poza ramkami \(netto doby\): (.*?) \| (?:rostery spoza mapy|sladow)"),
 }
@@ -23423,11 +23433,16 @@ def na17_main(logp):
     on2 = bool(f2) and f2[-1].group(1) == "TAK"
     ticks = []
     unexpl = []
+    ffree, fcrew = [], []
     for mm in fish:
         t = NA17_RX["tick"].search(mm.group(2))
         ticks.append(int(t.group(1)) if t else 0)
         if mm.group(3) != "-":
             unexpl.append(int(mm.group(3)))
+        t = NA17_RX["fishfree"].search(mm.group(2))
+        ffree.append(int(t.group(1)) if t else 0)
+        t = NA17_RX["fishcrew"].search(mm.group(2))
+        fcrew.append(int(t.group(1)) if t else 0)
     tv = sum(ticks[1:]) / max(1, len(ticks) - 1) if len(ticks) > 1 else None
     if tv is None:
         rep.add("NA17-2a: ryby ze zrodla 'inne ticki dobowe' (ksiega towarow, brama KS)", "brak linii Towary fish", "INFO", None)
@@ -23441,8 +23456,9 @@ def na17_main(logp):
                 "<= 2/d przy kluczu TAK i KS zastosowanym (brama KS; fin80 205/d); bez KS - INFO", judge)
     if unexpl:
         uv = sum(unexpl) / len(unexpl)
-        rep.add("NA17-2b: ryby 'bez wyjasnienia' (ksiega towarow, srednio na dobe)", f"{uv:+.1f}/d (dob {len(unexpl)})",
-                "|x| <= 2/d przy kluczu TAK (brama KS; fin80 +69/d - autor w NA17-2d, polow zalogi w ramce)", (abs(uv) <= 2.0) if on2 else None)
+        rep.add("NA17-2b: ryby 'bez wyjasnienia' (ksiega towarow, srednio na dobe)", f"{uv:+.1f}/d (dob {len(unexpl)}); polow zalogi w ramce {sum(fcrew) / max(1, len(fcrew)):.1f}/d",
+                "|x| <= 2/d przy kluczu TAK (brama KS NIEPOTWIERDZONA do biegu z KS - polow zalogi jako autor to hipoteza; fin80 +69/d - autor w NA17-2d)",
+                (abs(uv) <= 2.0) if on2 else None)
     else:
         rep.add("NA17-2b: ryby 'bez wyjasnienia'", "brak", "INFO", None)
     if f2:
@@ -23453,8 +23469,25 @@ def na17_main(logp):
         if on2 and ks_days == len(f2):
             zn = _na17_sum(f2, 13)
             rep.add("NA17-2e: ryby z niczego przy KS zastosowanym (linia F2, suma)", zn, "0", zn == 0)
+        # recenzja stare-a17 (3): zloto portow BK poza KS - do kiesy ludu zamiast w nicosc (klucz A17PortFishPaysFolk)
+        ff = [NA17_RX["f2folk"].search(s) for s in got["f2"]]
+        ff = [x for x in ff if x]
+        if ff:
+            onf = ff[-1].group(1) == "TAK"
+            void = _na17_sum(f2, 10)
+            rep.add("NA17-2g: porty BK poza KS - zaplata za ryby (suma dob)", f"zaplacone {_na17_sum(ff, 2)} zl = do kiesy ludu {_na17_sum(ff, 3)} + zostalo w kasie {_na17_sum(ff, 4)}; w nicosc {void} zl",
+                    "w nicosc 0 przy kluczach A17FishFromHands i A17PortFishPaysFolk TAK (zaplacone = kiesa + kasa)",
+                    (void == 0 and _na17_sum(ff, 2) == _na17_sum(ff, 3) + _na17_sum(ff, 4)) if (on2 and onf) else None)
+        else:
+            rep.add("NA17-2g: porty BK poza KS - zaplata za ryby", "brak dopisku A17PortFishPaysFolk", "INFO (log sprzed recenzji stare-a17)", None)
     else:
         rep.add("NA17-2c: linia 'Ryby z niczego (A17 F2)'", "brak", "INFO (log sprzed paczki)", None)
+    # recenzja stare-a17 (3): ryby z niczego poza KS nazwane w ksiedze towarow osobna grupa (zamiast "inne ticki dobowe"); przy KS - 0
+    if fish:
+        fv = sum(ffree) / len(ffree)
+        rep.add("NA17-2f: ryby z niczego poza KS nazwane w ksiedze towarow (grupa 'ryby z niczego poza KS (A17 F2)', srednio na dobe)", f"{fv:.1f}/d (dob {len(ffree)})",
+                "0 przy KS zastosowanym (brama KS); bez KS - INFO (zrodlo nazwane, dalej z niczego - stara ekonomia)",
+                (fv == 0) if (f2 and on2 and ks_days == len(f2)) else None)
     # ---------------- F3
     f3 = [NA17_RX["f3"].search(s) for s in got["f3"]]
     f3 = [x for x in f3 if x]
@@ -23484,6 +23517,10 @@ def na17_main(logp):
         rep.add("NA17-4a: wynik bitwy przerwany wyjatkiem (suma dob)", f"{fail} (oblezenia {_na17_sum(f4, 3)}, inne {_na17_sum(f4, 4)}); dokonczone {rescued}, przepuszczone {passed}; "
                 f"wyjatki: {', '.join(f'{k} x{v}' for k, v in types.items()) or '-'}", "INFO (fin80: 2 bitwy w 120 dobach - doby z droga C)", None)
         rep.add("NA17-4b: Commit dokonczenia nie wszedl", cfail, "0", cfail == 0)
+        fin = [NA17_RX["f4in"].search(s) for s in got["f4"]]
+        fin = [x for x in fin if x]
+        rep.add("NA17-4g: wyjatek z wnetrza Commit - przepuszczony bez drugiego Commit (suma dob; w 'przepuszczone')",
+                (_na17_sum(fin, 1) if fin else "brak dopisku"), "INFO (recenzja stare-a17 (1): drugi Commit dublowalby slawe, wplyw i morale)", None)
         rep.add("NA17-4c: pojmanie gry: weszlo / skonczone (suma dob)", f"{_na17_sum(f4, 9)} / {_na17_sum(f4, 10)}", "INFO (roznica = pojmania przerwane wyjatkiem)", None)
         if got["f4t"]:
             rep.add("NA17-4d: pierwszy slad wyjatku wyniku bitwy", got["f4t"][0][:400], "INFO - przyczyna w kodzie gry / modu", None)
@@ -23503,7 +23540,17 @@ def na17_main(logp):
         on5 = f5[-1].group(1) == "TAK"
         want, built, nothing = _na17_sum(f5, 2), _na17_sum(f5, 3), _na17_sum(f5, 13)
         n = len(f5)
-        rep.add("NA17-5a: statki stoczni z niczego (linia F5, suma)", nothing, "0 przy kluczu TAK", (nothing == 0) if on5 else None)
+        rep.add("NA17-5a: statki stoczni z niczego (linia F5, suma; z potknieciami prefiksu)", nothing, "0 przy kluczu TAK", (nothing == 0) if on5 else None)
+        fp = [NA17_RX["f5p"].search(s) for s in got["f5"]]
+        fp = [x for x in fp if x]
+        if fp:
+            pfree = _na17_sum(fp, 5)
+            plost = sum(int(x.group(6) or 0) for x in fp)
+            rep.add("NA17-5c: czesci nowych statkow z drewna i za place (suma dob)", f"zalozone {_na17_sum(fp, 1)} za {_na17_sum(fp, 2)} zl wartosci; zdjete - brak drewna {_na17_sum(fp, 3)}, "
+                    f"brak kasy {_na17_sum(fp, 4)}; z niczego (potkniecie) {pfree}; statek poza portem (niesprawdzone) {plost}",
+                    "z niczego 0 i niesprawdzone 0 przy kluczu TAK", (pfree == 0 and plost == 0) if on5 else None)
+        else:
+            rep.add("NA17-5c: czesci nowych statkow", "brak dopisku", "INFO (log sprzed recenzji stare-a17)", None)
         rep.add("NA17-5b: stocznie buduja z drewna i za place (suma dob)", f"chciane {want}, zbudowane {built} ({built / n:.2f}/d), drewno {_na17_sum(f5, 5)} pni + {_na17_sum(f5, 6)} desek "
                 f"({_na17_sum(f5, 5) / n:.0f} pni/d), place {_na17_sum(f5, 7)} zl ({_na17_sum(f5, 7) / n:.0f}/d), pominiete: pelne {_na17_sum(f5, 9)}, brak drewna {_na17_sum(f5, 10)}, "
                 f"brak kasy {_na17_sum(f5, 11)}" + aitxt, "zbudowane > 0 przy kluczu TAK (stocznie nie stoja)", (built > 0) if (on5 and want > 0) else None)
@@ -33812,8 +33859,16 @@ def nzc1_main(logp, bdp=None):
                 "0 (kazde jedzenie <= 2 szt./d)", not over_rm)
         # A17 F2 (noc 17/18.10): zrodlo ryb "inne ticki dobowe" - autor nazwany (NavalDLC Night Raider, porty BK) i linia "Ryby z niczego (A17 F2)" (progi w --grupa na17)
         f2n = sum(int(m.group(1)) for m in (re.search(r"razem ryby z niczego (\d+)", x) for x in D["a17f2"]) if m)
+        # recenzja stare-a17 (3): poza KS ryby z niczego ida do grupy "ryby z niczego poza KS (A17 F2)" (nazwane - ZC1-6 ich nie liczy) - tu suma, progi w na17 NA17-2f
+        ffr = 0
+        for d in use:
+            g = goods[d].get("fish")
+            mm = re.search(r"ryby z niczego poza KS \(A17 F2\) (\d+)", g[1]) if g else None
+            if mm:
+                ffr += int(mm.group(1))
         rep.add("ZC1-6b: ryby - autorzy zrodla 'inne ticki dobowe' (K4, ostatnia doba) i ryby z niczego z linii A17 F2 (suma dob)",
-                f"K4: {D['fishauth'][:220] or '-'}; A17 F2: dob {len(D['a17f2'])}, z niczego {f2n}", "INFO (progi: --grupa na17 NA17-2a/2b/2e)", None)
+                f"K4: {D['fishauth'][:220] or '-'}; A17 F2: dob {len(D['a17f2'])}, z niczego {f2n}; grupa ksiegi 'ryby z niczego poza KS (A17 F2)' {ffr / len(use):.1f}/d",
+                "INFO (progi: --grupa na17 NA17-2a/2b/2e/2f)", None)
         extra = sum(int(NZ1_EXTRA.search(g[3]).group(1)) for d in use for g in goods[d].values() if NZ1_EXTRA.search(g[3]))
         rep.add("ZC1-12: mnoznik BK rzemieslnikow ponad recepture x cykle (suma dob, wszystkie towary)", f"{extra} szt. ({extra / len(use):.0f}/d)", "INFO (dotad ok. 1 460/d - liczone na jeden cykl)", None)
     if ctl:

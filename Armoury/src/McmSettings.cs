@@ -6124,6 +6124,10 @@ namespace Armoury
         [SettingPropertyGroup("Old loose ends (A17)")]
         public float ShipyardLabourShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("A17 Port Fish Pays Folk", HintText = "outside the start calibration, the coin a Banner Kings harbour town pays for its daily catch goes to the townsfolk as the fishermen's wages instead of vanishing (works together with the fish setting above); off = the coin vanishes, as in Banner Kings")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17PortFishPaysFolk { get; set; } = true;
+
         [SettingPropertyBool("A17 Author Lines", HintText = "with the horse and fish diagnostics: also write which game or mod behaviour adds or removes horses and fish outside the known flows (read from the call stack, at most 2,000 times a day) - written to the log only, changes nothing in the game; off = not traced")]
         [SettingPropertyGroup("Old loose ends (A17)")]
         public bool A17AuthorLines { get; set; } = true;
@@ -8498,6 +8502,7 @@ namespace Armoury
             s.A17ShipyardBuildsFromTimber = A17ShipyardBuildsFromTimber;
             s.ShipyardTimberPer1000 = ShipyardTimberPer1000;
             s.ShipyardLabourShare = ShipyardLabourShare;
+            s.A17PortFishPaysFolk = A17PortFishPaysFolk;
             s.A17AuthorLines = A17AuthorLines;
             s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;
             s.BkProsperityLayerOnce = BkProsperityLayerOnce;
