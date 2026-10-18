@@ -332,6 +332,14 @@ namespace Armoury
                     if (on) self._bookModMigrate = true;
                 }
                 else if (self._bookModSeen >= 0 && on) self._bookModMigrate = true;
+                else if (self._bookModSeen < 0 && !on && self._playerStockMod.Count > 0)
+                {
+                    // poprawka po recenzji: wczytane rozbicie przy wylaczonym kluczu nie bylo czyszczone (warunek wyzej wymaga stanu znanego), a przy wylaczonym
+                    // nikt go nie prowadzi - linia doby i sprawdzarka (NZB-3) widzialy stare klucze i "rozbicie ponad ksiege". Gry to nie zmienialo (kazdy odczyt
+                    // pod BookModOn), wiec czyscimy tak samo jak przy przelaczeniu: ksiega per id bez zmian, po wlaczeniu klucza migracja przy porzadku.
+                    ArmouryZb.NoteLoadedOff(self._playerStockMod.Count);
+                    self._playerStockMod.Clear();
+                }
                 self._bookModSeen = v;
             }
             return on;
@@ -489,6 +497,7 @@ namespace Armoury
             ids = 0; pcs = 0; keys = 0; modPcs = 0; rest = 0; over = 0;
             var self = Instance;
             if (self == null) return;
+            BookModOn();   // poprawka po recenzji: stan klucza przed odczytem (wczytane rozbicie przy wylaczonym kluczu - wyczyszczone, nie liczone w linii doby)
             var sumBy = new Dictionary<string, int>();
             foreach (var kv in self._playerStockMod) { keys++; int v; sumBy.TryGetValue(IdOfKey(kv.Key), out v); sumBy[IdOfKey(kv.Key)] = v + kv.Value; }
             foreach (var kv in self._playerStock)

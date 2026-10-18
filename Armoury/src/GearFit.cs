@@ -602,7 +602,7 @@ namespace Armoury
                 if (list == null || pool == null) return;
                 List<Piece> stock = null;
                 // ZB-5 (klucz GearFitRealmFootInHideoutSiege): w kryjowce i oblezeniu jezdziec walczy pieszo - kon z przydzialu DTE nie zawaza o broni (ArmouryZb.FootMission)
-                bool foot = mission != null && ArmouryZb.FootOn && ArmouryZb.FootMission(mission);
+                bool foot = mission != null && ArmouryZb.FootOn && ArmouryZb.FootMission(mission, mp);   // wypad/odsiecz: pieszo tylko strona Attacker
                 foreach (var a in list)
                 {
                     if (a == null) continue;

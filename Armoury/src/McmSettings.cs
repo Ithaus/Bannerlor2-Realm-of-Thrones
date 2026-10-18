@@ -696,9 +696,13 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool GearFitStoreSubNoLegends { get; set; } = true;
 
-        [SettingPropertyBool("Gear Fit Realm Foot In Hideout Siege", HintText = "in hideouts and sieges riders fight on foot: the battle stores (foreign-piece swap and the weapon floor) no longer refuse them long bows, pikes and other weapons that cannot be used from the saddle just because Dynamic Troop Equipment gave them a horse there (off = judged by that horse, as before)")]
+        [SettingPropertyBool("Gear Fit Realm Foot In Hideout Siege", HintText = "in hideouts and siege assaults riders fight on foot (in a sally-out or relief battle only the besiegers, who spawn without horses there; the besieged and the relief force keep their horses): the battle stores (foreign-piece swap and the weapon floor) no longer refuse them long bows, pikes and other weapons that cannot be used from the saddle just because Dynamic Troop Equipment gave them a horse there (off = judged by that horse, as before)")]
         [SettingPropertyGroup("The finished piece")]
         public bool GearFitRealmFootInHideoutSiege { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Skill Law Foot In Hideout Siege", HintText = "the same rule for the whole-party weapon matching in battle (the skill check that gives the hardest usable piece to the most skilled man): in hideouts and siege assaults (in a sally-out or relief battle only the besiegers) a trooper whose template rides is matched as a man on foot, so he may get a long bow, a pike or another weapon that cannot be used from the saddle (off = always matched as a rider, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool GearFitSkillLawFootInHideoutSiege { get; set; } = true;
 
         [SettingPropertyBool("Night Prompt Skip When Rested", HintText = "the 'Night Falls - make camp?' question (and 'always make camp at nightfall') is not raised when your men have already slept their daily hours, e.g. after you slept in the menu - marching on costs them no sleep then (off = asked as before)")]
         [SettingPropertyGroup("The finished piece")]
@@ -7134,6 +7138,7 @@ namespace Armoury
             s.SurplusUsableAnyGroup = SurplusUsableAnyGroup;
             s.GearFitStoreSubNoLegends = GearFitStoreSubNoLegends;
             s.GearFitRealmFootInHideoutSiege = GearFitRealmFootInHideoutSiege;
+            s.GearFitSkillLawFootInHideoutSiege = GearFitSkillLawFootInHideoutSiege;
             s.NightPromptSkipWhenRested = NightPromptSkipWhenRested;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;

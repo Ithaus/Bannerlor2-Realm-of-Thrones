@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Armoury
@@ -19,6 +21,8 @@ namespace Armoury
     ///  ZB-4 GearFitStoreSubNoLegends (CrashScribe Mends.StoreSub) - zamiennik obcej sztuki z puli bez legend i bez sprzetu olbrzymow (poza olbrzymami).
     ///  ZB-5 GearFitRealmFootInHideoutSiege (CrashScribe RealmWard + GearFit.FloorOne) - w kryjowce i oblezeniu jezdziec walczy pieszo; dotad oceniany wedlug
     ///       konia, ktorego DTE i tak przydziela (DTE: _missionAllowsMountEquipment = tylko nie-morska), wiec nie dostawal broni "nie z siodla".
+    ///       W wypadzie z oblezenia i ataku odsieczy pieszo tylko strona Attacker (oblegajacy) - strona Defender wychodzi konno (poprawka po recenzji).
+    ///  ZB-5b GearFitSkillLawFootInHideoutSiege (CrashScribe SkillLawWard, po recenzji) - ta sama regula w dopasowaniu calej partii (jezdziec ze wzorca).
     ///  ZB-6 NightPromptSkipWhenRested (NightRest.OnHourly) - pytanie "Night Falls" nie wyskakuje, gdy ludzie juz wyspali baze doby (np. po snie w menu).
     /// Linia doby "Zbrojownia gracza (ZB): dzien N" (tylko log) i linia startu sesji z samosprawdzeniem. Bez stanu w zapisie (stan ZB-1 trzyma ArmouryBehavior).
     /// </summary>
@@ -52,6 +56,7 @@ namespace Armoury
         internal static void NoteClip(int n) { if (n <= 0) return; Touch(); _dClip += n; }
         internal static void NoteGhostKey(int n) { Touch(); _dGhost += n; }
         internal static void NoteModeReset(int keys) { Touch(); _dModeReset++; Log.Info("Zbrojownia (ZB-1): klucz Armoury Book Per Modifier przelaczony w trakcie gry - rozbicie ksiegi (" + keys + " kluczy) od nowa, migracja z ksiegi per id przy najblizszym porzadku."); }
+        internal static void NoteLoadedOff(int keys) { Touch(); Log.Info("Zbrojownia (ZB-1): klucz Armoury Book Per Modifier wylaczony - wczytane rozbicie ksiegi (" + keys + " kluczy) pominiete; ksiega per id bez zmian, po wlaczeniu klucza migracja przy najblizszym porzadku."); }
         internal static void NoteHorses(int listed) { Touch(); _dHorseOpens++; _dHorseListed += listed; }
         internal static void NotePromptSkip() { Touch(); _dPromptSkip++; }
 
@@ -89,33 +94,53 @@ namespace Armoury
             };
         }
 
-        // ------------------------------------------------------------ ZB-5: misja pieszo (kryjowka, zasadzka w kryjowce, oblezenie)
+        // ------------------------------------------------------------ ZB-5: misja pieszo (kryjowka, zasadzka w kryjowce, szturm oblezenia; w wypadzie i odsieczy tylko oblegajacy)
         // Ta sama regula co DTE Assignment.FillEmptySlots (flag3: HideoutMissionController / HideoutAmbushMissionController / MissionSiegeEnginesLogic - tam DTE nie
-        // dopelnia konia ze wzorca); gra w oblezeniu stawia wojsko bez koni (spawnWithHorses: false). Kopia w CrashScribe Mends.FootMission - TRZYMAC W ZGODZIE.
+        // dopelnia konia ze wzorca); gra w szturmie stawia wojsko bez koni (SandBoxSiegeMissionSpawnHandler: SetSpawnHorses false obu stronom).
+        // Poprawka po recenzji (noc 17/18.10): wypad z oblezenia i atak odsieczy tez maja MissionSiegeEnginesLogic (SandBoxMissions.OpenSiegeMissionWithDeployment),
+        // ale stawia je SandBoxSallyOutMissionController - baza SallyOutMissionController.SetupInitialSpawn: SetSpawnHorses(Defender, true),
+        // SetSpawnHorses(Attacker, false). Strona Defender (oblezeni, odsiecz) jedzie konno - jej jezdziec dalej wedlug konia (jak przed ZB-5); pieszo tylko strona
+        // Attacker (oblegajacy). Strona partii = PartyBase.Side (MapEventSide.MissionSide; misja stawia strone X z PartyGroupTroopSupplier(MapEvent, X)).
+        // Typy po nazwie z klasami bazowymi (jak Mission.HasMissionBehavior<T> - takze podklasy). Kopia w CrashScribe Mends.FootMission - TRZYMAC W ZGODZIE.
         private static WeakReference _footM;
-        private static bool _footV;
+        private static int _footK;   // rodzaj misji: 0 konno wedlug konia (jak przed ZB-5), 1 pieszo wszyscy, 2 wypad/odsiecz - pieszo tylko strona Attacker
         private static readonly object _footLock = new object();
 
-        internal static bool FootMission(Mission m)
+        internal static bool FootMission(Mission m, MobileParty party)
         {
-            if (m == null) return false;
+            int k = FootKind(m);
+            if (k == 1) return true;
+            if (k != 2) return false;
+            try { return party != null && party.Party != null && party.Party.Side == BattleSideEnum.Attacker; }
+            catch { return false; }   // strona nieznana - wedlug konia, jak przed ZB-5
+        }
+
+        private static int FootKind(Mission m)
+        {
+            if (m == null) return 0;
             lock (_footLock)
             {
-                if (_footM != null && ReferenceEquals(_footM.Target, m)) return _footV;
+                if (_footM != null && ReferenceEquals(_footM.Target, m)) return _footK;
             }
-            bool foot = false;
+            bool hideout = false, sally = false, engines = false;
             try
             {
                 foreach (var b in m.MissionBehaviors)
                 {
                     if (b == null) continue;
-                    string n = b.GetType().Name;
-                    if (n == "HideoutMissionController" || n == "HideoutAmbushMissionController" || n == "MissionSiegeEnginesLogic") { foot = true; break; }
+                    for (var t = b.GetType(); t != null && t != typeof(object); t = t.BaseType)
+                    {
+                        string n = t.Name;
+                        if (n == "HideoutMissionController" || n == "HideoutAmbushMissionController") { hideout = true; break; }
+                        if (n == "SallyOutMissionController") { sally = true; break; }
+                        if (n == "MissionSiegeEnginesLogic") { engines = true; break; }
+                    }
                 }
             }
-            catch { return false; }   // lista zachowan zmieniana w tej chwili (watek roboczy) - bez zapamietania, nastepne wywolanie policzy od nowa
-            lock (_footLock) { _footM = new WeakReference(m); _footV = foot; }
-            return foot;
+            catch { return 0; }   // lista zachowan zmieniana w tej chwili (watek roboczy) - bez zapamietania, nastepne wywolanie policzy od nowa
+            int k = hideout ? 1 : sally ? 2 : engines ? 1 : 0;
+            lock (_footLock) { _footM = new WeakReference(m); _footK = k; }
+            return k;
         }
 
         // ------------------------------------------------------------ linie
@@ -153,6 +178,7 @@ namespace Armoury
                      + " | nadwyzki - kazda grupa (Surplus Usable Any Group) " + (s.SurplusUsableAnyGroup ? "TAK" : "NIE")
                      + " | zamiennik bez legend i olbrzymow (Gear Fit Store Sub No Legends) " + (s.GearFitStoreSubNoLegends ? "TAK" : "NIE")
                      + " | jezdziec pieszo w kryjowce i oblezeniu (Gear Fit Realm Foot In Hideout Siege) " + (s.GearFitRealmFootInHideoutSiege ? "TAK" : "NIE")
+                     + " | to samo w dopasowaniu umiejetnosci (Gear Fit Skill Law Foot In Hideout Siege) " + (s.GearFitSkillLawFootInHideoutSiege ? "TAK" : "NIE")
                      + " | bez pytania o nocleg po wyspaniu (Night Prompt Skip When Rested) " + (s.NightPromptSkipWhenRested ? "TAK" : "NIE")
                      + " | samosprawdzenie ksiegi: czesc gracza na " + got + " (oczekiwane fine; regula sprzed ZB-1: " + got0 + "), reszta bez rozbicia " + (restOk ? "tak" : "NIE")
                      + " | samosprawdzenie nadwyzek: sztuka tylko dla drugiej grupy uzyteczna " + (any && saved ? "tak" : "NIE") + " (regula sprzed ZB-3: " + (old ? "tak" : "nie") + ").");

@@ -877,8 +877,9 @@ Uzycie (Python 3, tylko odczyt):
                     [--crashscribe <session-*.log>] (strumieniowo). Klucze ZB-1 ArmouryBookPerModifier (ksiega per id + modyfikator), ZB-2 ArmouryListSpareHorsesWhenKept,
                     ZB-3 SurplusUsableAnyGroup, ZB-4 GearFitStoreSubNoLegends, ZB-5 GearFitRealmFootInHideoutSiege, ZB-6 NightPromptSkipWhenRested. NZB-0 start sesji
                     (samosprawdzenie ksiegi i nadwyzek; klucze INFO), NZB-1 linie doby rozpoznane, NZB-2 szt. ksiegi = rozbicie + reszta kazdej doby, NZB-3 rozbicie ponad
-                    ksiege 0, NZB-4 ruchy ksiegi (INFO), NZB-5 migracja starego zapisu <= 1 na sesje, NZB-6 'Wymiana: NIEZMIENNIK' 0, NZB-7/8 konie na liscie i nadwyzki
-                    uratowane (INFO), NZB-9 noc z pominietym pytaniem o nocleg bez pytania 0, NZB-10 potkniecia i ERROR 0, NZB-11 CrashScribe (INFO). Log bez paczki: INFO.
+                    ksiege 0 (doby z kluczem TAK), NZB-4 ruchy ksiegi (INFO), NZB-5 migracja starego zapisu <= 1 na sesje, NZB-6 'Wymiana: NIEZMIENNIK' 0, NZB-7/8 konie na liscie i nadwyzki
+                    uratowane (INFO), NZB-9 noc z pominietym pytaniem o nocleg bez pytania 0, NZB-10 potkniecia i ERROR 0, NZB-11 CrashScribe (INFO; z ZB-5b GearFitSkillLawFootInHideoutSiege - jezdzcy pieszo w dopasowaniu umiejetnosci).
+                    Log bez paczki: INFO.
 --grupa nkarczmy  : (16.10, Jeff "w miescie moge spac tylko w karczmie, daj do wyboru trzy jakosci karczmy"; galaz w-toku/noc-karczmy, Armoury/src/TownInns.cs)
                     python -I tools/sprawdz_logi.py --grupa nkarczmy <Armoury-*.log> (strumieniowo). KA-0 latki (cena 2/2, gojenie 2/2), KA-1 start sesji (klucze),
                     KA-2 linie doby i noclegu rozpoznane, KA-3 kontrola obiegu (roznica 0), KA-4 rachunek noclegu spojny, KA-5 premie w granicach projektu,
@@ -32215,6 +32216,7 @@ NZB_DAY = re.compile(r"Zbrojownia gracza \(ZB\): dzien (-?\d+) \| ksiega per mod
                      r"otwarc (\d+), koni (\d+) \| nadwyzki - kazda grupa (TAK|NIE): uratowane od 'nikt nie udzwignie' gracz (\d+), AI (\d+) "
                      r"\| pytanie o nocleg po wyspaniu (TAK|NIE): pominiete (\d+) \| potkniecia (\d+)(?: \(pierwsze (.+?)\))?\.$")
 NZB_MIG = "Zbrojownia (ZB-1): migracja ksiegi per id -> per egzemplarz"
+NZB_OFF = "Zbrojownia (ZB-1): klucz Armoury Book Per Modifier wylaczony - wczytane rozbicie ksiegi"   # poprawka po recenzji: rozbicie z zapisu przy wylaczonym kluczu
 NZB_SKIP = re.compile(r"Nocleg: gracz - zmierzch o (\d+):00, kolumna w marszu, ale odpoczynek doby .* bez pytania o nocleg \(ZB-6, Night Prompt Skip When Rested\), noc (-?\d+)\.$")
 NZB_ASK = re.compile(r"Nocleg: gracz - zmierzch o (\d+):00, kolumna w marszu: tryb zmierzchu .*, noc (-?\d+)\.$")
 NZB_HORSE = re.compile(r"Wymiana: ZB-2 - konie zapasu ludzi na liscie: (\d+) ")
@@ -32222,7 +32224,7 @@ NZB_GHOST = re.compile(r"ReconcileStock\(.*\): rozbicie ksiegi na egzemplarze \(
 NZB_INV = "Wymiana: NIEZMIENNIK"
 NZB_ERR = ("ERROR in ArmouryZb.", "ERROR in SyncData.arm_player_stock_mod", "ERROR in QuartermasterLaw.PurgeUnusable", "ERROR in Escrow.Hold", "ERROR in BookPostfix",
            "ERROR in ReconcileStock", "ERROR in NightRest.OnHourly", "ERROR in MenPurse.SellPlayerSurplus", "ERROR in TroopSelfMend")
-NZB_CS_WARD = re.compile(r"\| ZB: zamiennik pominal legendy (\d+), sprzet olbrzymow (\d+); jezdzcy pieszo \(kryjowka/oblezenie\) (\d+)\.")
+NZB_CS_WARD = re.compile(r"\| ZB: zamiennik pominal legendy (\d+), sprzet olbrzymow (\d+); jezdzcy pieszo \(kryjowka/oblezenie\) (\d+)(?:, w dopasowaniu umiejetnosci (\d+))?\.")
 NZB_CS_LEG = "Mends: zamiennik RealmWard (ZB-4) - legendy "
 
 
@@ -32242,7 +32244,7 @@ def nzbroj_main(logp, csp=None):
         rep.show()
         return 0
     sess, days, bad, migs, skips, asks, horses, ghosts = [], {}, [], [], [], [], [], []
-    n_inv, n_err, inv_first, err_first = 0, 0, None, None
+    n_inv, n_err, inv_first, err_first, n_off = 0, 0, None, None, 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -32264,6 +32266,8 @@ def nzbroj_main(logp, csp=None):
                     bad.append(s)
             elif s.startswith(NZB_MIG):
                 migs.append((len(sess), s))
+            elif s.startswith(NZB_OFF):
+                n_off += 1
             elif s.startswith("Nocleg: gracz - zmierzch o "):
                 mm = NZB_SKIP.match(s)
                 if mm:
@@ -32324,8 +32328,11 @@ def nzbroj_main(logp, csp=None):
         mism = [d for d, r in days.items() if r["pcs"] != r["mod"] + r["rest"]]
         rep.add("NZB-2: tozsamosc ksiegi: szt. ksiegi = szt. w rozbiciu + reszta bez rozbicia", f"dob niezgodnych {len(mism)}" + (f" (pierwsza {min(mism)})" if mism else ""),
                 "0 kazdej doby (same etykiety wlasnosci - ksiega per id bez zmian)", not mism)
-        over = [d for d, r in days.items() if r["over"] > 0]
-        rep.add("NZB-3: rozbicie ponad ksiege id", f"dob z nadmiarem {len(over)}, maks. {max([days[d]['over'] for d in over] or [0])}", "0 kazdej doby (niezmiennik suma rozbicia <= ksiega)",
+        # poprawka po recenzji: tylko doby z kluczem TAK (przy wylaczonym rozbicie nie jest prowadzone; od poprawki i tak czyszczone po wczytaniu)
+        over = [d for d, r in days.items() if r["on"] and r["over"] > 0]
+        off_over = [d for d, r in days.items() if not r["on"] and r["over"] > 0]
+        rep.add("NZB-3: rozbicie ponad ksiege id (doby z kluczem TAK)", f"dob z nadmiarem {len(over)}, maks. {max([days[d]['over'] for d in over] or [0])}"
+                + (f"; doby z kluczem NIE z nadmiarem {len(off_over)} (DLL sprzed poprawki - INFO)" if off_over else ""), "0 kazdej doby (niezmiennik suma rozbicia <= ksiega)",
                 not over)
         last = days[max(days)]
         rep.add("NZB-4: ksiega i ruchy (INFO)", f"ostatnia doba: ksiega id {last['ids']} szt. {last['pcs']}, rozbicie kluczy {last['keys']} szt. {last['mod']}, reszta {last['rest']}; "
@@ -32338,8 +32345,8 @@ def nzbroj_main(logp, csp=None):
     for k, _ in migs:
         per_sess[k] = per_sess.get(k, 0) + 1
     multi = [k for k, v in per_sess.items() if v > 1]
-    rep.add("NZB-5: migracja starego zapisu (ksiega per id -> egzemplarze)", f"linii {len(migs)}" + (f"; pierwsza: {migs[0][1][len(NZB_MIG):][:160]}" if migs else ""),
-            "najwyzej 1 na sesje", not multi)
+    rep.add("NZB-5: migracja starego zapisu (ksiega per id -> egzemplarze)", f"linii {len(migs)}" + (f"; pierwsza: {migs[0][1][len(NZB_MIG):][:160]}" if migs else "")
+            + (f"; rozbicie z zapisu pominiete przy wylaczonym kluczu {n_off}" if n_off else ""), "najwyzej 1 na sesje", not multi)
     rep.add("NZB-6: linie 'Wymiana: NIEZMIENNIK' (czesc gracza w granicach egzemplarza, widok tylko Twoje)", f"{n_inv}" + (f" (pierwsza: {inv_first})" if inv_first else ""), "0", n_inv == 0)
     if days:
         rep.add("NZB-7: ZB-2 konie zapasu ludzi na liscie (INFO)", f"klucz czynny {'TAK' if any(r['hon'] for r in days.values()) else 'NIE'}, otwarc {sum(r['hopen'] for r in days.values())}, "
@@ -32366,18 +32373,18 @@ def nzbroj_cs(rep, csp):
     if not os.path.isfile(csp):
         rep.add("NZB-11: CrashScribe (ZB-4, ZB-5)", f"brak pliku {csp}", "INFO", None)
         return
-    leg, gia, foot, wards, linked = 0, 0, 0, 0, None
+    leg, gia, foot, wards, linked, skf = 0, 0, 0, 0, None, 0
     with open(csp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             if "Straz unikatow:" in ln:
                 mm = NZB_CS_WARD.search(ln)
                 if mm:
                     wards += 1
-                    leg += int(mm.group(1)); gia += int(mm.group(2)); foot += int(mm.group(3))
+                    leg += int(mm.group(1)); gia += int(mm.group(2)); foot += int(mm.group(3)); skf += int(mm.group(4) or 0)
             elif NZB_CS_LEG in ln:
                 linked = "PODPIETE" in ln
     rep.add("NZB-11: CrashScribe - zamiennik bez legend/olbrzymow, jezdzcy pieszo (INFO)",
-            f"linii strazy z dopiskiem ZB {wards}: legendy pominiete {leg}, olbrzymy {gia}, jezdzcy pieszo {foot}; filtr legend "
+            f"linii strazy z dopiskiem ZB {wards}: legendy pominiete {leg}, olbrzymy {gia}, jezdzcy pieszo {foot} (ZB-5b w dopasowaniu umiejetnosci {skf}); filtr legend "
             + ("PODPIETY" if linked else ("BRAK Armoury" if linked is False else "linii brak (bez zamiennika z puli w tej sesji)")), "INFO (autotest bez bitwy w kryjowce)", None)
 
 

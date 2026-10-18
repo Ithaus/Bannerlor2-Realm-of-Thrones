@@ -1709,6 +1709,13 @@ namespace CrashScribe
                 var pool = tr.Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary;
                 MobileParty who = null;
                 try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
+                // ZB-5b (noc 17/18.10, po recenzji; klucz Armoury GearFitSkillLawFootInHideoutSiege - brak klucza, stara Armoury: 0, jak dotad): w kryjowce, szturmie
+                // oblezenia i po stronie oblegajacych w wypadzie/odsieczy gra stawia ludzi bez koni - jezdziec ze wzorca (Assignment.IsMounted) dopasowany jak pieszy,
+                // czyli bez filtra MountOk slotow 0-3. Rodzaj misji i strona partii jak RealmWard (FootMission - raz na misje).
+                // Najpierw misja: podglad gotowosci zbrojowni na mapie (bez misji) nie czyta klucza (ArmouryFloat przeszukuje zestawy - goraca sciezka).
+                bool footW = false;
+                Mission misW = null; try { misW = tr.Field("_mission").GetValue() as Mission; } catch { misW = null; }
+                if (misW != null && ArmouryFloat("GearFitSkillLawFootInHideoutSiege", 0f) > 0.5f) footW = FootMission(misW, who);
 
                 int moved = 0, filled = 0, kept = 0, keptAmmo = 0, extras = 0;
                 var emptyByType = new System.Collections.Generic.Dictionary<string, int>();
@@ -1726,6 +1733,7 @@ namespace CrashScribe
                     riders.Add(ta);
                     bool mounted = false;
                     try { mounted = ta.Property("IsMounted").GetValue<bool>(); } catch { }
+                    if (mounted && footW) { mounted = false; WardSkillFoot++; }   // ZB-5b: jezdziec ze wzorca pieszo (kryjowka / szturm / oblegajacy w wypadzie)
                     Equipment tpl = null;
                     try { tpl = ta.Property("ReferenceEquipment").GetValue() as Equipment; } catch { }
                     if (_mIsTemp == null) { try { _mIsTemp = AccessTools.Method(a.GetType(), "IsTemporarySlot"); } catch { } }
@@ -6094,7 +6102,8 @@ namespace CrashScribe
                     if (ArmouryFloat("GearFitRealmFootInHideoutSiege", 0f) > 0.5f)
                     {
                         Mission mis = null; try { mis = tr.Field("_mission").GetValue() as Mission; } catch { mis = null; }
-                        foot = FootMission(mis);
+                        MobileParty mpw = null; try { mpw = tr.Field("_party").GetValue() as MobileParty; } catch { mpw = null; }
+                        foot = FootMission(mis, mpw);   // wypad/odsiecz: pieszo tylko strona Attacker (oblegajacy)
                     }
                 }
                 foreach (var a in list)
@@ -6153,6 +6162,7 @@ namespace CrashScribe
         // takze w kryjowce i oblezeniu (_missionAllowsMountEquipment = tylko nie-morska), gdzie gra stawia wszystkich pieszo - jezdziec nie dostawal broni
         // nie z siodla (dlugi luk, pika). Liczniki do WardReport (dopisek NA KONCU linii).
         internal static int WardSubLegend, WardSubGiant, WardFootRiders;
+        internal static int WardSkillFoot;   // ZB-5b: jezdzcy ze wzorca dopasowani jak piesi w SkillLawWard
         private static Func<ItemObject, bool> _zbLegend;
         private static bool _zbLooked;
         private static bool NoLegend(ItemObject it) { return false; }
@@ -6207,28 +6217,45 @@ namespace CrashScribe
         }
 
         // ZB-5: misja pieszo - ta sama regula co DTE Assignment.FillEmptySlots (HideoutMissionController / HideoutAmbushMissionController / MissionSiegeEnginesLogic);
-        // kopia Armoury ArmouryZb.FootMission - TRZYMAC W ZGODZIE. Raz na misje (pamiec po misji), pod zamkiem (watek roboczy).
+        // poprawka po recenzji: wypad z oblezenia i atak odsieczy (SallyOutMissionController - SetSpawnHorses(Defender, true), SetSpawnHorses(Attacker, false))
+        // pieszo tylko strona Attacker (oblegajacy), strona Defender wedlug konia. Typy po nazwie z klasami bazowymi (jak HasMissionBehavior<T>).
+        // Kopia Armoury ArmouryZb.FootMission - TRZYMAC W ZGODZIE. Rodzaj misji raz na misje (pamiec po misji), pod zamkiem (watek roboczy).
         private static WeakReference _footM;
-        private static bool _footV;
+        private static int _footK;   // 0 wedlug konia (jak przed ZB-5), 1 pieszo wszyscy, 2 wypad/odsiecz - pieszo tylko strona Attacker
         private static readonly object _footLock = new object();
 
-        private static bool FootMission(Mission m)
+        private static bool FootMission(Mission m, MobileParty party)
         {
-            if (m == null) return false;
-            lock (_footLock) { if (_footM != null && ReferenceEquals(_footM.Target, m)) return _footV; }
-            bool foot = false;
+            int k = FootKind(m);
+            if (k == 1) return true;
+            if (k != 2) return false;
+            try { return party != null && party.Party != null && party.Party.Side == BattleSideEnum.Attacker; }
+            catch { return false; }   // strona nieznana - wedlug konia, jak przed ZB-5
+        }
+
+        private static int FootKind(Mission m)
+        {
+            if (m == null) return 0;
+            lock (_footLock) { if (_footM != null && ReferenceEquals(_footM.Target, m)) return _footK; }
+            bool hideout = false, sally = false, engines = false;
             try
             {
                 foreach (var b in m.MissionBehaviors)
                 {
                     if (b == null) continue;
-                    string n = b.GetType().Name;
-                    if (n == "HideoutMissionController" || n == "HideoutAmbushMissionController" || n == "MissionSiegeEnginesLogic") { foot = true; break; }
+                    for (var t = b.GetType(); t != null && t != typeof(object); t = t.BaseType)
+                    {
+                        string n = t.Name;
+                        if (n == "HideoutMissionController" || n == "HideoutAmbushMissionController") { hideout = true; break; }
+                        if (n == "SallyOutMissionController") { sally = true; break; }
+                        if (n == "MissionSiegeEnginesLogic") { engines = true; break; }
+                    }
                 }
             }
-            catch { return false; }   // lista zachowan zmieniana w tej chwili (watek roboczy) - bez zapamietania, nastepne wywolanie policzy od nowa
-            lock (_footLock) { _footM = new WeakReference(m); _footV = foot; }
-            return foot;
+            catch { return 0; }   // lista zachowan zmieniana w tej chwili (watek roboczy) - bez zapamietania, nastepne wywolanie policzy od nowa
+            int k = hideout ? 1 : sally ? 2 : engines ? 1 : 0;
+            lock (_footLock) { _footM = new WeakReference(m); _footK = k; }
+            return k;
         }
 
         /// <summary>Raport zbiorczy strazy - raz na bitwe, nie raz na sztuke.</summary>
@@ -6236,16 +6263,16 @@ namespace CrashScribe
         {
             try
             {
-                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0 && WardForeign == 0 && WardSubLegend == 0 && WardSubGiant == 0 && WardFootRiders == 0) return;
+                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0 && WardForeign == 0 && WardSubLegend == 0 && WardSubGiant == 0 && WardFootRiders == 0 && WardSkillFoot == 0) return;
                 // GearFit (noc 15/16.10): dopisek NA KONCU - zamiennik obcej z polki rozdzielacza / bez zamiennika (slot pusty; Z + B = sztuk z polki, reszta ze wzorca)
                 Scribe.Line("Straz unikatow: " + WardBlades + " klng/unikatow zdjetych z przydzialu DTE, "
                             + WardArmour + " sztuk pancerza cofnietych do wzorca oddzialu, "
                             + WardForeign + " sztuk zza Waskiego Morza wroconych na polke, "
                             + WardStumbles + " potkniec | zamiennik z polki (GearFit) " + WardForeignSub + ", bez zamiennika (slot pusty, podloga Armoury) " + WardForeignBare
                             + ", ze wzorca (Gear Fit Realm From Stores wylaczone albo brak puli) " + WardForeignTpl + "."
-                            + " | ZB: zamiennik pominal legendy " + WardSubLegend + ", sprzet olbrzymow " + WardSubGiant + "; jezdzcy pieszo (kryjowka/oblezenie) " + WardFootRiders + ".");
+                            + " | ZB: zamiennik pominal legendy " + WardSubLegend + ", sprzet olbrzymow " + WardSubGiant + "; jezdzcy pieszo (kryjowka/oblezenie) " + WardFootRiders + ", w dopasowaniu umiejetnosci " + WardSkillFoot + ".");
                 WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0; WardForeignSub = 0; WardForeignBare = 0; WardForeignTpl = 0;
-                WardSubLegend = 0; WardSubGiant = 0; WardFootRiders = 0;
+                WardSubLegend = 0; WardSubGiant = 0; WardFootRiders = 0; WardSkillFoot = 0;
             }
             catch { }
         }
