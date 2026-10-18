@@ -24,6 +24,9 @@ RANGES = {
     'ShopKeepPieces': (0, 3, "0"),
     # NW O4 (noc 16.10): ciche logi - co ile dob pomiary tylko-log; kod przycina do 1..28 (LogGate.Every)
     'QuietLogEveryDays': (1, 28, "0"),
+    # SW-DROGI (noc 17/18.10): premia drogi ROT - kod przycina procent do 0..50 i margines do 0..2 jedn. (MapRoads.PctOf / MarginOf)
+    'MapRoadSpeedPercent': (0, 50, "0"),
+    'MapRoadMargin': (0.0, 2.0, "0.00"),
     # T10 poprawka recenzji: prog dlugu snu w calych nocach (kod porownuje dlug calkowity) - suwak bez ulamkow w opisie
     'AiNightsAwakeInChase': (0.0, 4.0, "0"),
     # T10-R: noce forsownego marszu z rzedu (dlug konczy sie na 3, dalej liczy juz tylko seria) - 0 = bez limitu

@@ -231,6 +231,8 @@ namespace Armoury
         private const int ProbesPerHour = 8;   // projekt pkt 6: najwyzej 8 rozpisek gry na godzine
         // probka z rozpiski: flaga watku (CalculateFinalSpeed bywa wolane z watkow roboczych gry - tam flaga zawsze false)
         [ThreadStatic] private static bool _probeOn;
+        // SW-DROGI: probka wola model wprost (bez zapisu predkosci do pamieci partii) - premia drogi nie zapisuje wtedy stanu drogi partii (MapRoads.SpeedRoad)
+        internal static bool ProbeActive { get { return _probeOn; } }
         private static MobileParty _probeParty;
         private static bool _pGot, _pForest;
         private static float _pGame, _pRefund, _pFlat, _pBase;
