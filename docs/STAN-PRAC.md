@@ -2966,3 +2966,7 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   168 w dniu 1 - TownLoanTakesFolkLoans; regula swiatowa, nie tylko KS), f8-sakiewka a95a5d97 (tylko przy KS), f8-niewola b01e5b8b, f8-bandy cc02e85d.
 - Jeff 18.10 ok. 09:15: "przy max x8 predkosci strasznie gra zwalnia i sie przycina tam gdzie jest duzo jednostek ... czy mozemy dodac trzy buttony x1, x4, x8?" -> paczka f9-predkosc
   (przyciski predkosci + odchudzenie pracy godzinnej naszych modow: Profil doby 'godzina: suma 114-166 ms'). Limit band: rada - zostawic x12 domyslnie (suwak w MCM), czeka na slowo Jeffa.
+- Jeff 18.10 ok. 09:25 PDT: "rozmieszczenie wiosek zle wyglada, sa za blisko nawet tam gdzie duzo ludzi ... upakowane obok siebie a potem masa terenu pusta, zwieksz dwukrotnie minimalna
+  odleglosc wioski od wioski; zajazdy nie obok wiosek (mozna spac w wiosce i wioskach pobocznych); droga poboczna prowadzi od drogi glownej, od krolewskiego traktu" -> paczka f10-uklad
+  (uklad wiosek v7: min. odleglosc x2, rozproszenie na pusty lad okregu, ludzie okregu bez zmian; zajazdy z dala od wiosek, na rozstajach/przy traktach; migracja v6 -> v7 po uid;
+  KS w zapisie Jeffa zacznie pomiar od nowa - inny plik ziemi).
