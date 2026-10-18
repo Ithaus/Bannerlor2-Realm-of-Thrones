@@ -2854,3 +2854,9 @@ Kopie *.bak-2026-10-18-wgranie78-przed i D:/Backup-Bannerlord/wgrane/2026-10-18-
 Testy: fin86 (sciezka Jeffa, 160 dob): KS uzbrojony 109076, wlaczony sam 109109, zgony z glodu 0, zwrot 100%, 0 ERROR; 5 dob + bitwa: kod 0, ERROR 0, bitwa 0 bledow.
 W grze Jeffa: przy pierwszym wczytaniu "KS: uzbrojony zapis doba N (samo)", ok. 33 dni pomiaru, potem "KS: samo wlaczenie" i rampa 14 dni.
 DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur, perf, zapis, inwest) -> test -> WGRANIE 79 (tylko jesli Jeff nie gra).
+- 00:25 PDT: SCALENIE2 GOTOWE (wf_4cb53b58-50a): w-toku/noc-ks4 **f5fd0ae3** (GitHub) = 100eaedf + fix-ksarm + 9 paczek fali 3 + recenzja calosci (8 uwag: 6 poprawione - przebudowa zajecia wioski
+  z prawdziwego materialu i plac rzemieslnikow (VillageCrafts.PayRebuild), W2 w neutralnym starcie zajec, zadatek kupcow przy wojnie czeka do pokoju, prace okregu osobno w linii DS,
+  arm_crafts/arm_works bez limitu 512 KB, ikona okregu przy wylaczeniu; 1 czesciowo; 1 odrzucona - pomarancze Essos 4.2 x popytu na podlodze ceny z narzutu KsPlanMarketsClear, nie z
+  KsSelfFeedEverywhere). OTWARTE (do raportu/kolejnej rundy): pod KS zajecia zamrozone na Planie wlaczenia (StartCalibrationSwitchRule WYL. od 16.10) - brak dostosowania produkcji do cen.
+  Build: Armoury 4d4e6f66; CrashScribe bez zmian zrodla (do gry zostaje 5258adcd).
+- 00:30 PDT: TEST fin87 = f5fd0ae3 (Armoury 4d4e6f66) z armoury-ks-auto.flag (USUNAC!), 160 dob - sciezka gry Jeffa z fala 3 -> jesli OK: 5 dob + bitwa, WGRANIE 79 (tylko gdy Jeff nie gra).
