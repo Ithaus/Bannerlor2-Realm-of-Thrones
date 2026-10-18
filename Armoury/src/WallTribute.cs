@@ -29,9 +29,10 @@ namespace Armoury
     ///    jako "nadwyzka ponad sufit"). Woz, ktory przez MaxWaitDays dob z rzedu nie rozladowal niczego, traci reszte jako zepsute u bram (nazwane ujscie
     ///    "zepsute" - recenzja r4-mur: pelne spichlerze dawcy nie przyjmuja zwrotu, a woz psulby sie bez konca).
     ///  - ZLOTO: zadne (danina, nikt nie placi). KS: tylko wsie z KS zastosowanym (StartCalibration.AppliedFor) - dawcy i biorcy.
-    ///  - MIEJSCE (fix-mur, klucz WallTributeDistrictRoom): zadanie okregu Strazy (brak + uzupelnienie wszystkich jego wsi) ograniczone wolnym miejscem WSZYSTKICH
-    ///    spichlerzy okregu (do 98% sufitu) minus wozy w drodze do okregu - ta sama regula co rozladunek (woz do wsi okregu wedlug wolnego miejsca). Wies z pelnym
-    ///    spichlerzem je z wlasnego zapasu, a zboze okregu laduje u sasiada z miejscem (zapas okregu stoi). Wylaczony - miejsce kazdej wsi osobno (jak dotad).
+    ///  - MIEJSCE (fix-mur, klucz WallTributeDistrictRoom): zadanie okregu Strazy (brak + uzupelnienie wszystkich jego wsi) ograniczone wolnym miejscem (do 98%
+    ///    sufitu) spichlerzy tych wsi okregu, ktore zamawiaja (brak doby albo spichlerz ponizej celu), minus wozy w drodze do okregu - ta sama regula co rozladunek
+    ///    (woz do tych wsi wedlug wolnego miejsca). Wies z pelnym spichlerzem je z wlasnego zapasu, a zboze okregu laduje u sasiada z miejscem (zapas okregu stoi);
+    ///    wies sama sie zywiaca z pelnym spichlerzem daniny nie przyjmuje (jej nadwyzka przelewa sie przez sufit Famine). Wylaczony - miejsce kazdej wsi osobno.
     /// KONTROLA (linia "Danina Muru (r4-mur)"): w drodze wczoraj + wyslane - zepsute - dostarczone - oddane dawcom = w drodze dzis; od poczatku kampanii (zapis):
     /// wyslane = dostarczone + zepsute + oddane dawcom + w drodze. Pokrycie Strazy: z pola (plon / ludzie) i z pola z dzisiejsza danina.
     /// Wylaczone (klucz albo KS) - nowych wozow nie ma, wozy w drodze dojezdzaja; bez wozow w drodze nic nie biegnie (stara sciezka bit w bit).
