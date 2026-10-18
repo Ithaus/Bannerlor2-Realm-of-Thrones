@@ -2789,3 +2789,13 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   rot-wydarzenia 0b9a7249. Wyniki: scratchpad fala1b-wynik.json, raporty-paczek.json. Wszystkie galezie na GitHub.
 - 19:40 PDT: workflow wf_17028fbf-513 (scalenie 17 galezi do w-toku/noc-ks4 + polaczenie rachunkow KS-H z doplata pana + decyzje nocy: DsHoardDueVillages TAK, ZC6/ZC7 TAK;
   potem 3 recenzje calosci (ekonomia/akumulatory, kod/zapis, gra Jeffa) + weryfikacja + poprawki).
+- 20:40 PDT: SCALENIE GOTOWE (wf_17028fbf-513): w-toku/noc-ks4 **100eaedf** (na GitHub) = 76 + KS r4 cz. 1-5 + zajazdy + 17 paczek (wszystkie scalone, 0 pominietych; rachunki KS-H
+  polaczone z doplata pana - pan splaca zalegle rachunki zywnosci; decyzje nocy: DsHoardDueVillages, DailyLifeMobility/Freedom/WarScar TAK) + recenzja calosci (3 soczewki + weryfikacja):
+  4 potwierdzone - poprawione: porty BK w krainie wroconej (A17 PortsPre + LandBackOf), miekki start daniny wsi, uchodzcy do miast stopniowo (RaidRefugeesTownIntake 0.01/d);
+  DO ZROBIENIA: "najpierw wyzywic siebie" tylko w zimnych strefach = regula jednej krainy (zakaz Jeffa) -> paczka feed-swiat w fali 3. Nowe pliki danych: arm_roadside_inns.tsv,
+  arm_map_roads_geo.tsv, arm_map_villages_v5.tsv, arm_map_village_lore_v5.tsv; arm_map_villages.tsv i lore -> v6 (F5456602). Build: Armoury d784e458, CrashScribe 5258adcd (gra);
+  CrashScribe-at 2afa9b1e (autotest: zb/cs-at = 100eaedf + test/at1-cs-bitwa.diff, git apply --3way czysto). Katalog test/fin83.
+- 20:45 PDT: TEST fin83 = calosc 100eaedf, 120 dob BEZ bitwy, flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC!), at-fin83-calosc.out.txt; ocena: nks, nds, nkupcy, npolnoc, nmur,
+  nkoszyk, nzajazdy, nuchodzcy, nglod, nakum, ndrogi, nprzysiolki, nherby, nksarm, nzbroj, na12, na17, nrot, nzc0-2 (skrypt run_all_groups.py w scratchpad).
+- 20:45 PDT: workflow wf_ab683a3a-156 (fala 3, worktree zb/<nazwa> od 100eaedf): feed-swiat (wyzywic siebie dla calego swiata + stabilnosc Essos), ks-koszt (T0-T13), inwest (specjalizacja
+  wiosek + prace okregu, AI WYL.), perf-d2d3 (szybkosc naszych modow i cudzego kodu), zapis-d4 (rozmiar zapisu, cichsze logi).
