@@ -2774,3 +2774,5 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
 - 18:40 PDT: TEST fin81 (n-ks4 4bfd840c = KS r4 cz. 1-5 + zajazdy/plotki, Armoury-2026-10-17_17-55-14.log, kopia logi-testow): kod 0, ERROR 0, flagi usuniete, gra przywrocona
   (d84f7b66). nzajazdy 12/12 TAK (196 zajazdow, gestosc wedlug ludzi, nocleg zaplacony = odebrany, 0 potkniec, obrazek raz na mape). Srednio 20.1 s/dobe (fin80 16.0) - takt
   naszych modow bez zmian (~0.57 s), prawdopodobnie obciazenie komputera przez budowy 14 agentow; sprawdzic w tescie koncowym.
+- 18:45 PDT: test fin82 = w-toku/ds-akumulator 6bc640ef (Armoury b1de92c6), BEZ flag (uklad gry Jeffa: DS F1+F3, KS nie zastosowany), 160 dob (po rampie F3), at-fin82-akum.out.txt;
+  ocena: nakum, nds --baza-doby 18-23-34, porownanie z fin76 (14-24-13, DS F3 bez KS, akumulator +195k/d).
