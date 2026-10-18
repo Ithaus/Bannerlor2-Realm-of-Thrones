@@ -50,7 +50,7 @@ namespace Armoury
         private static readonly Dictionary<string, long> _authF = new Dictionary<string, long>();
         private static readonly Dictionary<MethodBase, string> _authCache = new Dictionary<MethodBase, string>();
         private static int _traceH, _traceF;
-        private static long _authTicks;
+        private static long _authTicks, _authTmpH, _authTmpF;   // rostery spoza mapy (tymczasowe - np. lup bitwy przed oddaniem zwyciezcy - albo partie z ostatniej godziny): poza autorami
 
         private static readonly Dictionary<ItemRoster, int> _holder = new Dictionary<ItemRoster, int>();
         private static readonly Dictionary<ItemRoster, string> _shelfName = new Dictionary<ItemRoster, string>();
@@ -68,7 +68,7 @@ namespace Armoury
         {
             Array.Clear(_hFrame, 0, _hFrame.Length); Array.Clear(_hOut, 0, _hOut.Length);
             Array.Clear(_fishPlus, 0, Holders); Array.Clear(_fishMinus, 0, Holders); _fishInFrames = 0;
-            _authH.Clear(); _authF.Clear(); _traceH = _traceF = 0; _authTicks = 0;
+            _authH.Clear(); _authF.Clear(); _traceH = _traceF = 0; _authTicks = 0; _authTmpH = _authTmpF = 0;
         }
 
         /// <summary>GoodsLedger.Tap (postfiks ItemRoster.AddToCounts, zmiana faktycznie zaszla): frame = rodzaj najbardziej wewnetrznej otwartej ramki ksiegi towarow
@@ -83,7 +83,8 @@ namespace Armoury
                     int c = HorseBook.Cat(it);
                     if (c >= 0 && c < Cats)
                     {
-                        if (AuthOn && (frame < 0 || frame == GoodsLedger.FTickSettle || frame == GoodsLedger.FTickTown)) NoteHorseAuthor(c, n);   // A17 D1b
+                        if (AuthOn && (frame < 0 || frame == GoodsLedger.FTickSettle || frame == GoodsLedger.FTickTown))   // A17 D1b - roster tymczasowy liczony osobno (inaczej lup bitwy liczylby sie dwa razy)
+                        { if (HolderOf(r) == HUnknown) _authTmpH += n; else NoteHorseAuthor(c, n); }
                         if (frame >= 0 && frame < Frames) _hFrame[frame, c] += n;
                         else
                         {
@@ -103,8 +104,8 @@ namespace Armoury
                     if (frame >= 0) _fishInFrames += n;
                     else
                     {
-                        if (AuthOn) NoteFishAuthor(n);   // A17 D1b
                         int h = HolderOf(r);
+                        if (AuthOn) { if (h == HUnknown) _authTmpF += n; else NoteFishAuthor(n); }   // A17 D1b
                         if (n > 0) _fishPlus[h] += n; else _fishMinus[h] -= n;
                         if (Math.Abs(n) >= 2 && _fStacks < StackMax)
                         {
@@ -229,6 +230,7 @@ namespace Armoury
                 sb.Append(k > 1 ? "; " : "").Append(kv.Key).Append(' ').Append(kv.Value > 0 ? "+" : "").Append(kv.Value);
             }
             if (k == 0) sb.Append('-');
+            sb.Append(" | rostery spoza mapy (lup przed oddaniem, partie z ostatniej godziny - poza autorami): konie ").Append(_authTmpH).Append(", ryby ").Append(_authTmpF);
             sb.Append(" | sladow koni ").Append(_traceH).Append('/').Append(CapH).Append(", ryb ").Append(_traceF).Append('/').Append(CapF)
               .Append(", czas ").Append((_authTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append(" ms.");
             return sb.ToString();

@@ -23330,7 +23330,7 @@ NA17_RX = {
                      r"z polek miast; place ciesli (\d+) zl z kasy do kiesy ludu, bez kiesy ludu zostalo w kasie (\d+)\), pominiete - port ma liczbe idealna (\d+), brak drewna (\d+), "
                      r"brak nadwyzki kasy na place (\d+), brak kadluba (\d+) \| statki z niczego (\d+)"),
     "s181ai": re.compile(r"kupno statkow od portow \(E3/11[^)]*\): lordowie AI (\d+) / (\d+)"),
-    "d1bh": re.compile(r"konie w tickach osad i miast oraz poza ramkami \([^)]*\): (.*?) \| ryby poza ramkami \(netto doby\): (.*?) \| sladow"),
+    "d1bh": re.compile(r"konie w tickach osad i miast oraz poza ramkami \([^)]*\): (.*?) \| ryby poza ramkami \(netto doby\): (.*?) \| (?:rostery spoza mapy|sladow)"),
 }
 
 
