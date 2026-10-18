@@ -1024,7 +1024,9 @@ Uzycie (Python 3, tylko odczyt):
                     w domu) <= 5%; 8d reszta - INFO; 8e utarg wozow i podatek panow przed wlaczeniem i w oknie - INFO), NKS-7e kontrola wczesna D+7, NKS-9 doba KS <= 3 ms (9b z hakami ZC4/ZC5
                     <= 10 ms, 9c takt doby <= +10% bazy), NKS-10 ERROR i potkniecia 0, NKS-11 wlaczenie, NKS-12 lambda 0 w D i 1 w D+14, polki w D, NKS-13 koszyk ZC4
                     (wsie kupuja pelny koszyk z kiesy: kupione >= 40% wartosci pelnego koszyka na rynku, budzet wsi Planu wobec wplywu do kies +-25%, kiesy wsi -0.1..+0.5%/d,
-                    stac na jedzenie >= 95%), NKS-14 przetwory ZC5 (INFO), NKS-15 glod (zmarli poza oblezeniami 0), NKS-16 kasy kupcow < 7 dob spadku,
+                    stac na jedzenie >= 95%), NKS-14 przetwory ZC5 (INFO), NKS-15 glod (zmarli poza oblezeniami 0; f4b-glod: mieszczanie warowni przy Food 0 wedlug
+                    przyczyny z samej warowni - segment "zgony mieszczan ... (f4b)" linii Spichlerze, log bez niego - warownie przy Food 0 obecne w linii OB5 tej chwili;
+                    15b tozsamosc przyczyn = mieszczanie linii, kontrola 0), NKS-16 kasy kupcow < 7 dob spadku,
                     NKS-17 Dostatek (chlopi i biedota >= 1.0), NKS-18 Food miast BK +-10% bazy, NKS-19 A7 (nacisk INFO, zmiany w oknie <= 1% wiosek), NKS-20 arm_ks <= 150 KB,
                     NKS-21 modele popytu HistoricalPrices = baza.
                     KS-R3 (17.10, "kupcy i krainy", galaz w-toku/noc-ks3): NKS-6 zapasy miast + w drodze KS-H, NKS-8c bez pokrycia = 1 - kupione - dom - z magazynu
@@ -36835,6 +36837,16 @@ NKS_ERR = ("ERROR in StartCalibration", "ERROR in SyncData.arm_ks", "ERROR in Mi
 NKS_WORLD = re.compile(r"Pieniadz swiata: dzien (?P<day>-?\d+) \| razem (?P<x>-?\d+)")
 NKS_REST = re.compile(r"Pieniadz swiata \(bilans - przyczyny\): dzien (?P<day>-?\d+) \| zmiana sumy [+-]?\d+ \[P\] = .*? \+ reszta (?P<r>[+-]?\d+) \[R\]")
 NKS_FAM = re.compile(r"Spichlerze \(E4/6\): dzien (?P<day>-?\d+) .*?okregi glodne (?P<n>\d+): oblezone (?P<o>\d+), spustoszone (?P<s>\d+), tylko zima (?P<z>\d+), bez przyczyny (?P<b>\d+) \| zmarli z glodu: gospodarze (?P<g>[\d.]+), uchodzcy (?P<u>[\d.]+), mieszczanie (?P<m>[\d.]+)")
+# f4b-glod (noc 17/18.10): segment linii "Spichlerze (E4/6)" - zgony mieszczan warowni przy Food 0 wedlug przyczyny wzietej z samej warowni (oblezona /
+# po najezdzie / bez przyczyny); fin87: 163 zmarlych Sharp Point w oblezeniu liczylo sie jako "bez oblezen", bo NKS-15 bral przyczyne z okregow wsi doby
+NKS_FAMC = re.compile(r"\| zgony mieszczan warowni przy Food 0 wedlug przyczyny \(f4b\): oblezone (?P<to>[\d.]+) \(miast (?P<tno>\d+)\), po najezdzie (?P<tr>[\d.]+) "
+                      r"\(miast (?P<tnr>\d+)\), bez przyczyny (?P<tb>[\d.]+) \(miast (?P<tnb>\d+)\) = (?P<tt>[\d.]+) \(kontrola (?P<tk>[-+]?[\d.]+)\); "
+                      r"schronieni i uchodzcy z najazdu w murach oblezonych (?P<tw>[\d.]+)(?:; oblezone: (?P<nso>[^|]*?))?(?:; po najezdzie: (?P<nsr>[^|]*?))?"
+                      r"(?:; bez przyczyny: (?P<nsb>[^|]*?))?(?= \|)")
+NKS_FAMSTV = re.compile(r"\| warownie przy Food 0: (?P<n>\d+) \(AI \d+\)(?: - (?P<names>[^|]*?))? \|")
+NKS_FAMWL = re.compile(r", schronieni w murach (?P<sh>[\d.]+)(?:, uchodzcy z najazdu w miastach pobytu (?P<rt>[\d.]+))?")
+NKS_OB5D = re.compile(r"Odsiecz \(OB5\): dzien (?P<day>-?\d+) \| CZYNNE")
+NKS_OB5T = re.compile(r"(?:\| |; )(?P<name>[^|;]+?) \((?:miasto|zamek|stolica)[^)]*\) zebrane \d+ / wymagane")
 NKS_ZC0 = re.compile(r"Zycie \(ZC0\): dzien (?P<day>-?\d+) .*?\(mediana chlopow wsi (?P<peas>-?[\d.]+|-),.*?stany: (?P<dest>[^|]*)\|.*?\| D policzone (?P<dn>\d+)/(?P<dall>\d+) osad")
 NKS_BKF = re.compile(r"Zadowolenie BK \(E5/0\): dzien (?P<day>-?\d+) \| srednie Food / Industrial / General / Luxury \(0\.\.1\) miasta (?P<f>[\d.]+) / ")
 NKS_HPM = re.compile(r"HistoricalPrices: popyt miast w nowej monecie wpiety w (?P<n>\d+) modelach(?P<bad> ekonomii osad \(NIEUDANE (?P<nb>\d+))?")
@@ -37764,7 +37776,8 @@ def nks_main(logp, until=120, bdp=None):
     pieniadz swiata wobec bazy +-0.5% (bez bazy INFO), jedzenie niekupione z braku pieniedzy <= 5% (miasta i wsie), reszta bilansu (INFO), NKS-9 koszt: doba KS <= 3 ms,
     doba KS + haki ZC4/ZC5 <= 10 ms, takt doby wobec bazy <= +10%, NKS-10 ERROR i potkniecia KS 0 (bez linii KS - INFO), NKS-11 wlaczenie, NKS-12 rampa (lambda 0 w D,
     1 w D+14) i polki startu w D, NKS-13 koszyk ZC4 (linia co dobe, wsie >= 50%, stac na jedzenie >= 95% miast), NKS-14 przetwory ZC5 (INFO), NKS-15 glod: zmarli
-    z glodu poza oblezeniami i spustoszeniem 0, okregi glodne bez przyczyny 0, NKS-16 kasy kupcow: zaden rynek nie traci 7 dob z rzedu, NKS-17 Dostatek: policzony dla
+    z glodu poza oblezeniami i spustoszeniem 0, okregi glodne bez przyczyny 0 (f4b-glod: mieszczanie warowni przy Food 0 wedlug przyczyny samej warowni - segment
+    linii Spichlerze; log bez segmentu: warownia w linii OB5 tej chwili = oblezenie; NKS-15b suma przyczyn = mieszczanie linii, kontrola 0), NKS-16 kasy kupcow: zaden rynek nie traci 7 dob z rzedu, NKS-17 Dostatek: policzony dla
     wszystkich osad, mediana chlopow wsi i biedoty >= 1.0, NKS-18 Food miast BK wobec bazy +-10% (bez bazy INFO), NKS-19 A7: nacisk (INFO), prawdziwe zmiany w oknie
     <= 1% wiosek, NKS-20 arm_ks <= 150 KB, NKS-21 modele popytu HistoricalPrices = baza, nieudane 0."""
     rep = Report()
@@ -37810,6 +37823,7 @@ def nks_main(logp, until=120, bdp=None):
     mkt_own = {}       # KS-R4 P10: dzien -> {towar: (wies je swoje W, E, stracone w drodze KS-H)}
     pxnow = {}         # KS-R4 P7: dzien -> {(rynek, towar): indeks chwilowy}
     gapl = {}          # KS-R4 P4: doba Planu -> {"f": {(rynek, towar): f}, "inj": {(rynek, towar): t/d}}
+    famc, famx, ob5 = {}, {}, {}    # f4b-glod: doba -> segment przyczyny zgonow mieszczan; doba -> (warownie przy Food 0, nazwy, zgony w murach); doba OB5 -> oblezone
     px_restart = None  # KS-R4 P7: doba restartu srednich cen
     r4c = {}           # KS-R4: dzien -> (zl pominiete w kroku 5, zakupow, linia)
     saves, cof, a7, villages, fam, zc0, rest = [], {}, {}, {}, {}, {}, {}
@@ -37915,10 +37929,25 @@ def nks_main(logp, until=120, bdp=None):
                 if mm:
                     rest[int(mm.group("day"))] = int(mm.group("r"))
                 continue
+            if s.startswith("Odsiecz (OB5): dzien "):
+                # f4b-glod: oblezone twierdze krolestw tej chwili (log sprzed segmentu przyczyny - NKS-15 sprawdza, czy warownia przy Food 0 byla oblezona)
+                mm = NKS_OB5D.match(s)
+                if mm:
+                    ob5[int(mm.group("day"))] = {it.group("name").strip() for it in NKS_OB5T.finditer(s)}
+                continue
             if s.startswith("Spichlerze (E4/6): dzien"):
                 mm = NKS_FAM.match(s)
                 if mm:
-                    fam[int(mm.group("day"))] = {k: float(v) for k, v in mm.groupdict().items() if k != "day"}
+                    d = int(mm.group("day"))
+                    fam[d] = {k: float(v) for k, v in mm.groupdict().items() if k != "day"}
+                    # f4b-glod: przyczyna zgonow mieszczan z samej warowni (segment) i dane do logu sprzed segmentu (nazwy warowni przy Food 0, zgony w murach)
+                    mc = NKS_FAMC.search(s)
+                    if mc:
+                        famc[d] = {k: (float(v) if k[0] == "t" else (v or "")) for k, v in mc.groupdict().items()}
+                    mx, mw = NKS_FAMSTV.search(s), NKS_FAMWL.search(s)
+                    famx[d] = {"n": int(mx.group("n")) if mx else -1,
+                               "names": [x.strip() for x in (mx.group("names") or "").split(", ") if x.strip()] if mx else [],
+                               "walls": (float(mw.group("sh")) + float(mw.group("rt") or 0.0)) if mw else 0.0}
                 continue
             if s.startswith("Zycie (ZC0): dzien"):
                 mm = NKS_ZC0.match(s)
@@ -38736,11 +38765,50 @@ def nks_main(logp, until=120, bdp=None):
         # NKS-15 glod
         fw = {d: v for d, v in fam.items() if on_day <= d <= w1}
         if fw:
-            dead_cause = sum(v["g"] + v["u"] + v["m"] for v in fw.values() if v["o"] + v["s"] == 0)
-            dead_all = sum(v["g"] + v["u"] + v["m"] for v in fw.values())
+            # f4b-glod (fin87): wsie (gospodarze i uchodzcy obecni) - przyczyna z okregow wsi doby jak dotad; MIESZCZANIE warowni przy Food 0 - przyczyna z samej warowni
+            # (segment f4b: oblezona / po najezdzie / bez przyczyny). Log sprzed segmentu: mieszczanie doby = oblezenie, gdy kazda warownia przy Food 0 tej doby jest
+            # w linii OB5 tej chwili (OB5 "dzien d+1" pisze ten sam takt co Spichlerze "dzien d"; lista nazw pelna), inaczej jak dotad (doba bez oblezonych i spustoszonych
+            # okregow = bez przyczyny). Dotad mieszczanie oblezonego miasta, ktorego okregi nie glodowaly, liczyli sie "poza oblezeniami" (fin87: Sharp Point 163).
+            vil_all = sum(v["g"] + v["u"] for v in fw.values())
+            vil_cause = sum(v["g"] + v["u"] for v in fw.values() if v["o"] + v["s"] == 0)
             nocause = sum(v["b"] for v in fw.values())
-            rep.add("NKS-15: glod po wlaczeniu (projekt 14.5)", f"zmarli z glodu {dead_all:.0f} (w dobach bez oblezen i spustoszen {dead_cause:.0f}), okrego-dni glodnych bez przyczyny {nocause:.0f}",
+            t_sg, t_rd, t_no, t_dc, walls, n_seg, n_fb = 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0
+            n_sg, n_no = set(), set()
+            for d in sorted(fw):
+                v, c, x = fw[d], famc.get(d), famx.get(d)
+                if c:
+                    n_seg += 1
+                    t_sg += c["to"]; t_rd += c["tr"]; t_no += c["tb"]; walls += c["tw"]
+                    n_sg.update(y.strip(" ,") for y in re.findall(r"([^;()]+?) \(uchodzcy w murach", c["nso"]))
+                    n_no.update(y.strip() for y in c["nsb"].split(", ") if y.strip())
+                    continue
+                walls += x["walls"] if x else 0.0
+                if not (v["m"] > 0):
+                    continue
+                sieged = ob5.get(d + 1, set()) | ob5.get(d, set())
+                if x and x["names"] and len(x["names"]) == x["n"] and all(nm in sieged for nm in x["names"]):
+                    t_sg += v["m"]; n_fb += 1; n_sg.update(x["names"])
+                elif v["o"] + v["s"] == 0:
+                    t_no += v["m"]; n_no.update(x["names"] if x else [])
+                else:
+                    t_dc += v["m"]
+            dead_all = vil_all + t_sg + t_rd + t_no + t_dc
+            dead_cause = vil_cause + t_no
+            src = (f"przyczyna mieszczan z segmentu f4b {n_seg} dob" if n_seg else "log bez segmentu f4b") + (f", z linii OB5 {n_fb} dob" if n_fb else "")
+            rep.add("NKS-15: glod po wlaczeniu (projekt 14.5)", f"zmarli z glodu {dead_all:.0f} (wsie {vil_all:.0f}; mieszczanie warowni przy Food 0: oblezone {t_sg:.0f}"
+                    + (f" [{', '.join(sorted(n_sg)[:5])}]" if n_sg else "") + f", po najezdzie {t_rd:.0f}, bez przyczyny {t_no:.0f}"
+                    + (f" [{', '.join(sorted(n_no)[:5])}]" if n_no else "") + (f", w dobach z oblezonymi lub spustoszonymi okregami {t_dc:.0f}" if t_dc else "")
+                    + f"; schronieni i uchodzcy z najazdu w murach oblezonych {walls:.0f} - poza liczba); poza oblezeniami i najazdami {dead_cause:.0f} (wsie w dobach bez oblezen"
+                    + f" i spustoszen {vil_cause:.0f} + mieszczanie bez przyczyny {t_no:.0f}), okrego-dni glodnych bez przyczyny {nocause:.0f}; {src}",
                     "zmarli poza oblezeniami i najazdami 0, glodne bez przyczyny 0", dead_cause == 0 and nocause == 0)
+            # NKS-15b (f4b-glod): tozsamosc segmentu przyczyny - oblezone + po najezdzie + bez przyczyny = mieszczanie linii, kontrola 0 kazdej doby
+            segd = [d for d in fw if d in famc]
+            if segd:
+                bad15 = [d for d in segd if abs(famc[d]["tk"]) > 0.01 or abs(famc[d]["to"] + famc[d]["tr"] + famc[d]["tb"] - fw[d]["m"]) > 0.02 + 0.001 * fw[d]["m"]]
+                rep.add("NKS-15b: zgony mieszczan wedlug przyczyny - tozsamosc (f4b-glod)", f"dob z segmentem {len(segd)} z {len(fw)}, niezgodnych {len(bad15)}"
+                        + (f" (np. dzien {bad15[0]})" if bad15 else ""), "oblezone + po najezdzie + bez przyczyny = mieszczanie linii, kontrola 0 kazdej doby", not bad15)
+            else:
+                rep.add("NKS-15b: zgony mieszczan wedlug przyczyny - tozsamosc (f4b-glod)", "brak segmentu (log sprzed f4b-glod)", "segment w kazdej linii Spichlerze", None)
         else:
             rep.add("NKS-15: glod po wlaczeniu", "brak linii 'Spichlerze (E4/6)'", "zmarli z glodu poza oblezeniami 0", None)
         # NKS-16 kasy kupcow
