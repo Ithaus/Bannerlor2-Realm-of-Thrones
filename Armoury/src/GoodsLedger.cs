@@ -1715,8 +1715,17 @@ namespace Armoury
                 long shops = Group(a.Sink, GArms), lines = Group(a.Sink, GShopIn) + Group(a.Sink, GArt), builds = Group(a.Sink, GBuild);
                 long stock = a.Hold[HTown] + a.Hold[HCastle] + a.Hold[HVillage] + a.Hold[HWagon] + a.Hold[HCaravan] + a.Hold[HLord] + a.Hold[HPlayer] + a.Hold[HOtherParty] + a.Hold[HCart];
                 bool ok = vil == o[0] && wood == o[1] && shops == o[3] && lines == o[4] && builds == o[5] && stock == o[6];
+                // fix-ksiega (klucz OreLedgerTownCraftsColumn - wtedy osma liczba linii rudy): wsad rzemiosla miasta (ramka FTownCraft, "rzemioslo miasta (148)") wobec
+                // "przetwory miast (ZC5/148)" ksiegi rudy - dotad ksiega rudy liczyla wsad zelaza ZC5 w "linie", a ta ksiega w rzemiosle miasta (NIEZGODNA co dobe z ZC5)
+                string craft = "";
+                if (o.Length >= 8)
+                {
+                    long crafts = Group(a.Sink, GCraft);   // ujscie ramki rzemiosla miasta (jak "linie" i "zbrojne" - samo ujscie; rudy i drewna rzemioslo nie wyrabia)
+                    ok = ok && crafts == o[7];
+                    craft = ", przetwory miast " + crafts + "/" + o[7];
+                }
                 return name + " " + (ok ? "ZGODNA" : "NIEZGODNA") + " (wsie " + vil + "/" + o[0] + ", las " + wood + "/" + o[1] + ", zbrojne " + shops + "/" + o[3]
-                       + ", linie " + lines + "/" + o[4] + ", budowy " + builds + "/" + o[5] + ", zapas " + stock + "/" + o[6] + "; wyroby miast " + towns + " wobec zdarzen gry " + o[2] + ")";
+                       + ", linie " + lines + "/" + o[4] + ", budowy " + builds + "/" + o[5] + craft + ", zapas " + stock + "/" + o[6] + "; wyroby miast " + towns + " wobec zdarzen gry " + o[2] + ")";
             }
             catch (Exception e) { Stumble("Control", e); return name + " - blad kontroli"; }
         }

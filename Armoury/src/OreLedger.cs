@@ -29,6 +29,11 @@ namespace Armoury
     /// a magazyn wsi pyta model wczesniej - w pierwszej dobie "model" pokazuje wiec jeszcze wynik liczony raz (polowe).
     /// Paczka 126: drewno z lasu wsi (VillageWoodlot - kazda wies bez drwali) to osobna pozycja "las wsi" (NoteWoodlot): "wsie dopisaly"
     /// zostaje wydobyciem drwali porownywalnym z "model", a "bez wyjasnienia" liczy las wsi jak kazde dopisanie.
+    /// fix-ksiega (noc 17/18.10, klucz OreLedgerTownCraftsColumn): wsad rzemiosla miasta - przetwory ZC5 (zelazo -> narzedzia przy KS) i rzemioslo 148 - wola
+    /// OnItemConsumed tak samo jak linie warsztatow gry, ale ksiega towarow liczy go w ramce rzemiosla miasta (FTownCraft, "rzemioslo miasta (148)"), nie w "linie
+    /// warsztatow" - kontrola ksiegi towarow byla NIEZGODNA w kazdej dobie z wsadem zelaza ZC5 (fin83: 52 z 119, roznica = wsad co do sztuki). W nawiasie
+    /// TownCrafts.OnDailyTickTown (ta sama chwila co ramka FTownCraft ksiegi towarow) zdarzenie idzie do osobnej pozycji "przetwory miast (ZC5/148)"; IronLands
+    /// nie dostaje go drugi raz jako "linie towarowe" (ten sam wsad juz jest w MaterialOrders.NoteUse - "rzemioslo"). Jeden ruch = jedna pozycja w obu ksiegach.
     /// </summary>
     internal static class OreLedger
     {
@@ -43,6 +48,7 @@ namespace Armoury
             public int BloomWood;                                  // E6/R1 (214): drewno zdjete z polek miast przez dymarki przy kopalniach (Bloomery) - ujscie
             public int Coal;                                       // ZC1 (CharcoalBurners): drewno z magazynow wsi drwali wypalone na wegiel - ujscie
             public int Ingot;                                      // ZC1 (IronIngotsOffShelf): zelazo z przekutych sztab z polek osad - zrodlo
+            public int Crafts;                                     // fix-ksiega: wsad rzemiosla miasta (przetwory ZC5, rzemioslo 148) - osobno od linii towarowych gry
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
             public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
@@ -51,7 +57,7 @@ namespace Armoury
             public int[] Shown; public int ShownDay = -1;           // paczka 146: liczby ostatniej wydrukowanej linii - kontrola ksiegi towarow (GoodsLedger)
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Coal = 0; Ingot = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Coal = 0; Ingot = 0; Crafts = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; }
         }
 
@@ -74,7 +80,17 @@ namespace Armoury
             return id == "iron" ? _iron : (id == "hardwood" ? _wood : null);
         }
 
-        internal static void Reset() { _iron.Reset(); _wood.Reset(); IronLands.Reset(); }
+        internal static void Reset() { _iron.Reset(); _wood.Reset(); IronLands.Reset(); _craftDepth = 0; }
+
+        // ------------------------------------------------------------ fix-ksiega: nawias rzemiosla miasta (TownCrafts.OnDailyTickTown)
+        private static int _craftDepth;   // > 0 - trwa doba rzemiosla miasta (148 + przetwory ZC5); tylko watek glowny (DailyTickTown)
+        private static bool CraftColumnOn { get { var s = Settings.Current; return s == null || s.OreLedgerTownCraftsColumn; } }
+
+        /// <summary>TownCrafts.OnDailyTickTown: poczatek przerobu miasta (ta sama chwila co ramka FTownCraft ksiegi towarow). Para z CraftExit w finally.</summary>
+        internal static void CraftEnter() { _craftDepth++; }
+
+        /// <summary>Koniec przerobu miasta (finally) - licznik nie schodzi ponizej zera.</summary>
+        internal static void CraftExit() { if (_craftDepth > 0) _craftDepth--; }
 
         /// <summary>StartStock przeliczyl zapas startowy na ladunki: liczniki zebrane do tej chwili pochodza z tickow startowych nowej
         /// kampanii i sa w sztukach z gry (10 kg), a ksiega liczy w ladunkach. Oddajemy je do logu przeliczenia i zerujemy -
@@ -93,7 +109,8 @@ namespace Armoury
                       + (b.Woodlot != 0 ? "las wsi (126) " + b.Woodlot + " (" + b.WoodlotMakers.Count + " wsi), " : "")
                       + b.TownSource + " +" + b.Towns + ", wsad linii towarowych (" + b.LineName + ") " + b.Lines
                       + (b.Shops != 0 ? ", warsztaty zbrojne " + b.Shops : "")
-                      + (b.Builds != 0 ? ", budowy " + b.Builds : "");
+                      + (b.Builds != 0 ? ", budowy " + b.Builds : "")
+                      + (b.Crafts != 0 ? ", przetwory miast (ZC5/148) " + b.Crafts : "");
                 b.NewDay();
                 return s;
             }
@@ -126,10 +143,18 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Zdarzenie gry: wsad linii towarowej warsztatu (kuznia narzedzi, tartak). Warsztaty zbrojne ida przez NoteWorkshop.</summary>
+        /// <summary>Zdarzenie gry: wsad linii towarowej warsztatu (kuznia narzedzi, tartak). Warsztaty zbrojne ida przez NoteWorkshop.
+        /// fix-ksiega: w nawiasie rzemiosla miasta (CraftEnter/CraftExit, klucz OreLedgerTownCraftsColumn) - pozycja "przetwory miast (ZC5/148)", bez IronLands.NoteLine
+        /// (ten wsad IronLands ma juz z MaterialOrders.NoteUse jako "rzemioslo"); klucz wylaczony - jak dotad (linie towarowe).</summary>
         internal static void OnConsumed(ItemObject item, Settlement st, int count)
         {
-            try { var b = Of(item); if (b != null && count > 0) { b.Lines += count; if (b == _iron) IronLands.NoteLine(st, count); } }   // P3/P2a: wsad linii wedlug ladow (tylko licznik)
+            try
+            {
+                var b = Of(item);
+                if (b == null || count <= 0) return;
+                if (_craftDepth > 0 && CraftColumnOn) { b.Crafts += count; return; }
+                b.Lines += count; if (b == _iron) IronLands.NoteLine(st, count);   // P3/P2a: wsad linii wedlug ladow (tylko licznik)
+            }
             catch { }
         }
 
@@ -261,6 +286,8 @@ namespace Armoury
               .Append(", budowy ").Append(b.Builds)
               .Append(", strzelarze (172) ").Append(b.Fletch);
             if (b.Coal > 0) sb.Append(", wegiel drwali (ZC1) ").Append(b.Coal);
+            bool craftCol = CraftColumnOn;   // fix-ksiega: klucz wylaczony - linia co do znaku jak dotad
+            if (craftCol) sb.Append(", przetwory miast (ZC5/148) ").Append(b.Crafts);
             if (b == _wood && (b.BloomWood > 0 || Bloomery.On)) sb.Append(Bloomery.WoodSegment(b.BloomWood));   // E6/R1 (214): dymarki przy kopalniach (targ - ujscie zapasu; las okregu - poza zapasem)
             if (bloom) sb.Append(Bloomery.SmeltSegment(b.Scrap, b.DrillScrap));
             sb.Append("; zapas: miasta ").Append(towns);
@@ -273,7 +300,7 @@ namespace Armoury
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
-                int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap + b.Ingot - b.Shops - b.Lines - b.Builds - b.Fletch - b.BloomWood - b.Coal;
+                int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap + b.Ingot - b.Shops - b.Lines - b.Builds - b.Fletch - b.BloomWood - b.Coal - b.Crafts;
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)
@@ -281,7 +308,9 @@ namespace Armoury
               .Append(bloom ? ". Lupa = " : ". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
             Log.Info(sb.ToString());
             if (b == _iron) IronLands.Daily(it, (int)CampaignTime.Now.ToDays - 1);   // P3/P2a: linia "Zelazo wedlug ladow" (tylko log; wlasny licznik potkniec)
-            b.Shown = new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all }; b.ShownDay = (int)CampaignTime.Now.ToDays;
+            // fix-ksiega: przy kluczu osma liczba - przetwory miast (kontrola ksiegi towarow porownuje ja z ramka rzemiosla miasta); bez klucza 7 liczb jak dotad
+            b.Shown = craftCol ? new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all, b.Crafts } : new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all };
+            b.ShownDay = (int)CampaignTime.Now.ToDays;
             b.LastAll = all; b.LastTowns = towns; b.NewDay();
         }
     }
