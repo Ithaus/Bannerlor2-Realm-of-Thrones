@@ -507,22 +507,30 @@ namespace Armoury
             }
             for (int i = 0; i < scaK.Count; i++) ScaRestore(sca, scaK[i], scaHad[i], scaPrev[i], sb);
 
-            // (g) f21-zaloga: obsada zalogi nowego pana ludzmi jego krolestwa - tylko twierdze, ktore zmienily pana w tej probie (osada w krolestwie docelowym);
-            // zmiana, ktora nie weszla, czeka na ponowna probe (wtedy obsada razem z nia). Kazda twierdza we wlasnym try - potkniecie nie zatrzymuje reszty wiersza
+            // (g) f21-zaloga: obsada zalogi nowego pana ludzmi jego krolestwa - tylko twierdze, ktore zmienily pana w tej probie (stOk / twinOk);
+            // zmiana, ktora nie weszla, czeka na ponowna probe (wtedy obsada razem z nia). Kazda twierdza we wlasnym try - potkniecie nie zatrzymuje reszty wiersza.
+            // Po recenzji: samo "osada w krolestwie docelowym" nie wystarcza - stary pan z tego samego krolestwa (inny rod) jest w nim juz przed zmiana,
+            // wiec nieudane ApplyByDefault obsadzaloby co godzine twierdze starego pana (dawcy liczeni wzgledem starego rodu)
             bool fill = GarrisonOn;
             if (fill)
                 foreach (var s in sites)
                 {
-                    if (s.MapFaction != newF || s.OwnerClan == null) continue;
+                    bool changed = s == st ? stOk : twinOk;
+                    if (!changed || s.MapFaction != newF || s.OwnerClan == null) continue;
                     try { sb.Append(" | ").Append(FillGarrison(s, row.Id)); }
                     catch (Exception e) { Stumble("Fill(" + s.StringId + ")", e); sb.Append(" | obsada ").Append(Nm(s)).Append(": BLAD (log wyzej)"); }
                 }
 
             foreach (var s in sites)
+            {
+                bool changed = s == st ? stOk : twinOk;
                 sb.Append(" | po zmianie ").Append(Nm(s)).Append(": pan ").Append(s.OwnerClan != null ? s.OwnerClan.Name.ToString() : "-")
                   .Append(", zaloga ").Append(Men(s.Town.GarrisonParty))
-                  .Append(fill ? " (obsada z krolestwa nowego pana - przeniesieni, bez ludzi z niczego)" : " (pusta zostaje werbunkowi pana - bez ludzi z niczego)")
+                  .Append(!fill ? " (pusta zostaje werbunkowi pana - bez ludzi z niczego)"
+                          : changed ? " (obsada z krolestwa nowego pana - przeniesieni, bez ludzi z niczego)"
+                          : " (zmiana pana nie weszla - bez obsady, obsada razem z ponowna proba)")
                   .Append(", milicja ").Append((int)s.Militia);
+            }
 
             if (stNeeds && stOk)
             {
