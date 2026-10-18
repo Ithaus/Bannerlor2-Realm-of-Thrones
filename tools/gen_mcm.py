@@ -383,6 +383,9 @@ RANGES = {
     'KsFolkIncomeStepPercent': (0.5, 20.0, "0.0"),
     'KsFarmSurplusReviewDays': (7, 91, "0"),
     'KsFarmSurplusReviewMax': (0.0, 1.0, "0.00"),
+    # f7-kasy (noc 17/18.10): gersuma z zapasu kas miast - zgodnie z przycieciem w kodzie (DsTowns: udzial 0.05..1, dni firmy 0..182)
+    'KsFarmCatchUpShare': (0.05, 1.0, "0.00"),
+    'KsFarmCatchUpKeepDays': (0, 182, "0"),
     # r4-mur (17.10): danina zbozowa Muru i najazdy Wolnych Ludzi - zgodnie z przycieciem w kodzie (WallTribute: udzial 0..100%, psucie 0..50%/d; FreeFolkRaids: szansa 0..1, band 0..64)
     'WallTributeTargetDays': (0, 728, "0"),
     'WallTributeRefillDays': (1, 364, "0"),
