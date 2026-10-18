@@ -3099,3 +3099,7 @@ rozlozenie gospodarki doby (Jeff: pozniej).
   56543d06 (wyciek: CaravansCampaignBehavior.OnMapEventEnded gry kasuje zrzut zwycieskiej karawany - latana byla tylko kopia BK; teraz zrzut na polke), f16-drobne a71a6b96 (Drowned Wood na
   brodzie - regula w generatorze, dane v7 BEZ zmian (zmiana crc zresetowalaby zapis Jeffa); NBD-2 mierzy nasze). Scalone z f17 do noc-ks4 **0d7e6fa3** (1976 ustawien, build rc 0).
 - 14:05 PDT: paczka f18-mcm (zb/f18-mcm od 0d7e6fa3): RequireRestart = false w gen_mcm dla ustawien dzialajacych bez restartu.
+- 14:15 PDT: LOG JEFFA (Armoury-2026-10-18_13-50-06.log, WGRANIE 81b, dzien 109044): ERROR 0; Better Time wykryty (nasze przyciski/mnoznik wylaczone); uklad v7 wczytany (1957 wiosek,
+  przeniesione wobec v6); KS: "inny plik ziemi - stan pominiety, Plan od nowa" (stan UZBROJONY 109020 czeka na Confirm - ponowne uzbrojenie od zera w pierwszej dobie, SPRAWDZIC);
+  zajazdy 135; drogi boczne WLACZONE: 1033 drogi, 69 072 decali w 75 ms (10 tickow, najdluzszy 10.1 ms). Recenzja f17: bez blokujacych; pomiar klatki f9 przy Better Time poprawiony
+  w noc-ks4 **5086a630** (nie wgrane).
