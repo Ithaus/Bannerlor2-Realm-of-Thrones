@@ -371,6 +371,11 @@ namespace Armoury
                       .Append(" szt. za ").Append(_vArmsSkipValue.ToString(inv)).Append(" zl (w tym uprzaz ").Append(_vHarnSkip).Append("; zostaly na polkach miast, zloto w kiesach wsi)")
                       .Append("; kupione sztuki ksiegi uzbrojenia ").Append(_vArms).Append(" za ").Append(_vArmsPaid.ToString(inv)).Append(" zl (w tym uprzaz ").Append(_vHarn)
                       .Append("; ujscie ksiegi E6/0 ").Append(s1.ArmsBookBkVillageSink ? "tak" : "nie").Append(")");
+                // recenzja A12 (3): klucz wlaczony, a nasza petla rynku wsi nie biegnie (latka nie wpieta albo Bk Village Market Pays What It Has wylaczone) - BK HandleVillage
+                // jak dotad zjada uzbrojenie; bez tego odcinka w logu nie byloby sladu, ze regula nie dziala
+                else if (s1 != null && s1.BkVillageMarketNoArms)
+                    sb.Append(" | rynek wsi a uzbrojenie (A12, H-4b): regula bez uzbrojenia nieczynna (").Append(!VillageHooked ? "latka rynku wsi BK nie wpieta" : "Bk Village Market Pays What It Has wylaczone")
+                      .Append(" - BK jak dotad, wies zjada uzbrojenie)");
                 sb.Append(" | niewolnicy: ");
                 if (!SlavesHooked) sb.Append("latka nie jest wpieta (BK jak dotad)");
                 else if (!SlavesOn) sb.Append("WYLACZONE w ustawieniach (BK jak dotad)");

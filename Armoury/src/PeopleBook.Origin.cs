@@ -425,6 +425,7 @@ namespace Armoury
         /// <summary>OnSessionLaunched (obok RecruitKit.ResolvePending): slowniki so:/jo: z zapisu do partii i osad (w SyncData partii jeszcze nie ma).</summary>
         internal static void ResolveOrigin(string how)
         {
+            try { EnsureFallHook(); } catch (Exception e) { OStumble("ResolveOrigin(A12 latka)", e); }     // recenzja A12 (1): latka upadku rodu - raz na proces, w kampanii (start sesji)
             if (_pendSo != null || _pendJo != null) ResolveDicts(how);
             // cache doby od razu po wczytaniu (hamulec poboru, plon, menu) - bez czekania na pierwsza dobe sesji
             try { if (_sown && OriginOn) { BuildViews(); FreeHands.Update(_view); } } catch (Exception e) { OStumble("ResolveOrigin(cache)", e); }
@@ -1612,7 +1613,8 @@ namespace Armoury
                     else
                     {
                         Org gone;
-                        if (_mem.TryGetValue(pb, out gone)) { _gone += gone.Sum; _fOut[FGone] += gone.Sum; _tAll += gone.Sum; _mem.Remove(pb); }   // partia bez slownika skladu (TABOR, Inni) - liczone
+                        // recenzja A12 (2): + licznik regionu (PartyGoneMenCounted) - ta sama droga "w nicosc przy zniknieciu partii" co OriginPartyGone (tozsamosc linii A12)
+                        if (_mem.TryGetValue(pb, out gone)) { CountGone(gone); _gone += gone.Sum; _fOut[FGone] += gone.Sum; _tAll += gone.Sum; _mem.Remove(pb); }   // partia bez slownika skladu (TABOR, Inni) - liczone
                     }
                     ReconcileRoster(pb, mp.PrisonRoster, _pris, KPrison, null);
                 }

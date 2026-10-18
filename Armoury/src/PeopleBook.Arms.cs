@@ -361,8 +361,9 @@ namespace Armoury
                 }
                 return;
             }
-            // A12 (PartyGoneMenGoHome): partia z niszczycielem, ale poza bitwa i oblezeniem (DestroyClanAction fabuly ROT zeruje MapEventSide; koniec bitwy - po oknach E4/7)
-            // - zywi tak samo jak przy rozwiazaniu bez bitwy; bez klucza - jak dotad (w nicosc przy zniknieciu partii)
+            // A12 (PartyGoneMenGoHome): partia rodu wyjeta z bitwy przy upadku rodu (lista DestroyClanAction - zeruje MapEventSide i podaje niszczyciela) - zywi tak samo
+            // jak przy rozwiazaniu bez bitwy; recenzja A12 (1): partie kasowane przez gre po przegranej bitwie (tez niszczyciel i MapEvent null) - jak dotad (A17);
+            // bez klucza albo bez latki upadku rodu - jak dotad (w nicosc przy zniknieciu partii)
             bool goneOut = GoneOutsideBattle(mp, destroyer, removed);
             if (!has || kind < 0 || kind == KBand || kind == KPlayer || (destroyer != null && !goneOut) || mp.MapEvent != null || mp.SiegeEvent != null) return;
             // recenzja R1-4: R6 bez klucza karawan - ta sama symetria LevyLive co pobor E4/7/E4/8 (ArriveAt: !LevyLive - Note bez hearth); ludzi z DOM w partiach

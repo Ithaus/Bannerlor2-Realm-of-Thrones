@@ -3088,7 +3088,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PressUntakenGoHome { get; set; } = true;
 
-        [SettingPropertyBool("Party Gone Men Go Home", HintText = "when a story event or a fallen house removes a war party whose men are alive and not fighting, its men go home to their own lands (sworn brothers back to the Wall) instead of vanishing from the world (off = they vanish, as before)")]
+        [SettingPropertyBool("Party Gone Men Go Home", HintText = "when a house falls (for example in a story event, or when its last lord dies) while one of its war parties is in the middle of a battle, the game pulls that party out of the fight and removes it; its living men now go home to their own lands (sworn brothers back to the Wall) instead of vanishing from the world. Parties of a fallen house that were not fighting already went home, and parties beaten in battle are not affected (off = the men pulled out of the battle vanish, as before)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PartyGoneMenGoHome { get; set; } = true;
 
@@ -5336,7 +5336,7 @@ namespace Armoury
         [SettingPropertyGroup("Banner Kings coin (stage 3)")]
         public bool BkVillageMarketPaysWhatItHas { get; set; } = true;
 
-        [SettingPropertyBool("Bk Village Market No Arms", HintText = "villagers with a Banner Kings marketplace no longer buy arms, armour, shields or horse harness from their town and make them vanish - the same rule as for townsfolk (arms are not household goods); they still buy arrows, clothes and everyday goods, and the coin they would have spent stays in the village purse (off = as before)")]
+        [SettingPropertyBool("Bk Village Market No Arms", HintText = "villagers with a Banner Kings marketplace no longer buy arms, armour, shields or horse harness from their town and make them vanish - the same rule as for townsfolk (arms are not household goods); they still buy arrows, clothes and everyday goods, and the coin they would have spent stays in the village purse. Works only with Bk Village Market Pays What It Has (off = as before)")]
         [SettingPropertyGroup("Banner Kings coin (stage 3)")]
         public bool BkVillageMarketNoArms { get; set; } = true;
 

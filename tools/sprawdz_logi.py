@@ -476,6 +476,9 @@ Uzycie (Python 3, tylko odczyt):
                     E6/0 <= 20% (z ujsciem 'zjedzone na rynku wsi BK (A12)'), NA12-2 uprzaz kupiona na rynku wsi BK = 0 (Bk Village Market No Arms), NA12-3 uprzaz w ujsciach
                     tickow <= 3 szt./d, NA12-4 tozsamosc ludzi przy zniknieciu partii (w nicosc = w rownaniu krain + bez pochodzenia), NA12-5 rownanie krain (INFO),
                     NA12-6 Q-3 zawrocone z zablokowanym celem = 0 i <= 4 zawrocen jednej partii na dobe (Crossing Law Aim Block), NA12-7 (INFO). Log bez paczki - INFO.
+                    Po recenzji A12: NA12-2 = NIE, gdy klucz Bk Village Market No Arms jest wlaczony, a regula 'nieczynna' (latka rynku wsi BK nie wpieta albo
+                    Bk Village Market Pays What It Has wylaczone); NA12-4 czyta odcinek 'do domu z partii rodu wyjetej z bitwy przy upadku rodu' (tylko partie z listy
+                    DestroyClanAction; latka upadku rodu - INFO w NA12-0).
                     python -I tools/sprawdz_logi.py --grupa na12 <Armoury-*.log> (log czytany strumieniowo)
 --grupa drobne2   : (14.10, druga paczka drobnych) czesc swiat: D2-A10-1/2 dobytek z domu wedlug rodzaju (szt. na czlowieka bez zakupu >= 1.0),
                     D2-A11-1/2 karawany wyprowadzone z murow w ostatniej dobie oblezenia (zajete jawnie), D2-B6-1..3 winnice / gaje / palmy (29/19/8),
@@ -18602,7 +18605,8 @@ def na12_main(logp):
     log sprzed - INFO; log 120 dob 16-26-10: -48%, z czego rynek wsi BK 2 078 z 2 139); NA12-2 uprzaz kupiona na rynku wsi BK przy regule "bez uzbrojenia tak" = 0
     (pominiete sztuki i zloto - INFO); NA12-3 uprzaz w ujsciach tickow (linia "Uzbrojenie (ujscia 174)", HorseHarness) srednio <= 3 szt./d przy regule tak (16-26-10: 17.3);
     NA12-4 ludzie przy zniknieciu partii: tozsamosc "w nicosc = w rownaniu krain + bez pochodzenia" kazdej doby (|roznica| <= 0.5) przy Party Gone Men Counted tak,
-    do domu po usunieciu poza bitwa (INFO); NA12-5 rownanie krain - zmiana reszty swiata w oknie i ludzie w rownaniu od siewu (INFO); NA12-6 Q-3: zawrocone z zablokowanym
+    do domu z partii rodu wyjetej z bitwy przy upadku rodu (INFO; recenzja A12 (1): tylko partie z listy DestroyClanAction, nie partie kasowane po przegranej bitwie);
+    NA12-2 po recenzji A12 (3): "regula bez uzbrojenia nieczynna" przy kluczu wlaczonym = NIE; NA12-5 rownanie krain - zmiana reszty swiata w oknie i ludzie w rownaniu od siewu (INFO); NA12-6 Q-3: zawrocone z zablokowanym
     celem = 0 i najwiecej zawrocen jednej partii na dobe <= 4 (z odcinkiem "zmiana celu AI (Q-3, A12)"); NA12-7 partio-doby z >= 3 zawroceniami i blokady (INFO).
     Log czytany strumieniowo; brak linii - INFO/BRAK, nigdy wyjatek."""
     rep = Report()
@@ -18621,10 +18625,18 @@ def na12_main(logp):
     mark_arms = any("zjedzone na rynku wsi BK (A12)" in s for s in got["arms"])
     mark_bk = any("rynek wsi a uzbrojenie (A12, H-4b)" in s for s in got["bk"])
     rule_on = any("regula bez uzbrojenia tak" in s for s in got["bk"])
+    rule_dead = sum(1 for s in got["bk"] if "regula bez uzbrojenia nieczynna" in s)     # recenzja A12 (3): klucz wlaczony, petla rynku wsi BK nie biegnie
     mark_q = any("zmiana celu AI (Q-3, A12)" in s for s in got["q"])
+    fall = None
+    for s in got["gone"]:
+        mf = re.search(r"\[latka upadku rodu (.*?), rodow upadlo dzis (\d+)\]", s)
+        if mf:
+            fall = (mf.group(1), (fall[1] if fall else 0) + int(mf.group(2)))
     rep.add("NA12-0: linie i klucze paczki stare-a12",
-            f"E6/0 z ujsciem rynku wsi {'TAK' if mark_arms else 'nie'}, rynek wsi a uzbrojenie {'TAK' if mark_bk else 'nie'} (regula bez uzbrojenia {'tak' if rule_on else 'nie/brak'}), "
-            f"linia 'Ludzie przy zniknieciu partii (A12)' {len(got['gone'])}, odcinek Q-3 A12 {'TAK' if mark_q else 'nie'}",
+            f"E6/0 z ujsciem rynku wsi {'TAK' if mark_arms else 'nie'}, rynek wsi a uzbrojenie {'TAK' if mark_bk else 'nie'} (regula bez uzbrojenia {'tak' if rule_on else 'nie/brak'}"
+            + (f"; NIECZYNNA {rule_dead} dob" if rule_dead else "") + "), "
+            f"linia 'Ludzie przy zniknieciu partii (A12)' {len(got['gone'])}" + (f" (latka upadku rodu {fall[0]}, rodow upadlo {fall[1]})" if fall else "")
+            + f", odcinek Q-3 A12 {'TAK' if mark_q else 'nie'}",
             "INFO (log sprzed paczki - same 'nie'; klucze: Bk Village Market No Arms, Arms Book Bk Village Sink, Party Gone Men Go Home / Counted, Crossing Law Aim Block)", None)
 
     # ---------------- NA12-1 H-4b
@@ -18659,10 +18671,12 @@ def na12_main(logp):
         nb += 1
         sk_n += int(m.group(2)); sk_v += int(m.group(3)); sk_h += int(m.group(4)); b_n += int(m.group(5)); b_v += int(m.group(6)); b_h += int(m.group(7))
     rep.add("NA12-2: uprzaz kupiona na rynku wsi BK (regula bez uzbrojenia)",
-            (f"kupione: uprzaz {b_h}, sztuk ksiegi uzbrojenia {b_n} za {b_v} zl (strzaly i odziez cywilna - dozwolone); pominiete regula: {sk_n} szt. za {sk_v} zl"
-             f" (uprzaz {sk_h}; srednio {sk_n / nb:.0f} szt. i {sk_v / nb:.0f} zl na dobe zostaje na polkach miast i w kiesach wsi) w {nb} dobach") if nb else "brak odcinka (log sprzed A12)",
-            "uprzaz kupiona = 0 przy regule 'tak' (wies nie zjada rzedow koni ani zbroi - jak mieszczanie, 174.0)",
-            (b_h == 0) if (nb and rule_on) else None)
+            ((f"kupione: uprzaz {b_h}, sztuk ksiegi uzbrojenia {b_n} za {b_v} zl (strzaly i odziez cywilna - dozwolone); pominiete regula: {sk_n} szt. za {sk_v} zl"
+              f" (uprzaz {sk_h}; srednio {sk_n / nb:.0f} szt. i {sk_v / nb:.0f} zl na dobe zostaje na polkach miast i w kiesach wsi) w {nb} dobach") if nb else
+             ("brak odcinka z liczbami" if rule_dead else "brak odcinka (log sprzed A12)"))
+            + (f"; regula NIECZYNNA mimo klucza w {rule_dead} dobach (latka rynku wsi BK nie wpieta albo Bk Village Market Pays What It Has wylaczone - BK zjada uzbrojenie)" if rule_dead else ""),
+            "uprzaz kupiona = 0 przy regule 'tak' (wies nie zjada rzedow koni ani zbroi - jak mieszczanie, 174.0); klucz wlaczony, a regula nieczynna = NIE",
+            False if rule_dead else ((b_h == 0) if (nb and rule_on) else None))
 
     # ---------------- NA12-3 uprzaz w tickach (ksiega 174)
     hh, nl = 0, 0
@@ -18678,8 +18692,10 @@ def na12_main(logp):
             (avg <= 3.0) if (nl and rule_on) else None)
 
     # ---------------- NA12-4 ludzie przy zniknieciu partii
-    rx_g = re.compile(r"dzien (\d+) \| do domu po usunieciu partii poza bitwa \(Party Gone Men Go Home (tak|nie)\): " + F_ + r" ludzi z (\d+) partii \(w tym na Mur " + F_
-                      + r", do karczmy jako weterani " + F_ + r"\) \| w nicosc przy zniknieciu partii " + F_ + r" = w rownaniu krain " + F_ + r" \+ bez pochodzenia " + F_
+    # recenzja A12 (1): odcinek "do domu z partii rodu wyjetej z bitwy przy upadku rodu" + "[latka upadku rodu X, rodow upadlo dzis N]"; stara nazwa (przed recenzja) tez czytana
+    rx_g = re.compile(r"dzien (\d+) \| do domu (?:po usunieciu partii poza bitwa|z partii rodu wyjetej z bitwy przy upadku rodu) \(Party Gone Men Go Home (tak|nie)\): " + F_
+                      + r" ludzi z (\d+) partii \(w tym na Mur " + F_
+                      + r", do karczmy jako weterani " + F_ + r"\)(?: \[[^\]]*\])? \| w nicosc przy zniknieciu partii " + F_ + r" = w rownaniu krain " + F_ + r" \+ bez pochodzenia " + F_
                       + r" \(Party Gone Men Counted (tak|nie); roznica " + SF + r"\) \| od siewu w rownaniu krain " + F_)
     home = parties = wall = gone = cnt = none = 0.0
     bad, nG, since, counted = [], 0, None, False
@@ -18696,10 +18712,10 @@ def na12_main(logp):
                 bad.append(m.group(1))
         since = float(m.group(12))
     rep.add("NA12-4: ludzie przy zniknieciu partii - do domu i w rownaniu krain",
-            (f"do domu po usunieciu poza bitwa {home:.0f} ludzi z {parties:.0f} partii (na Mur {wall:.0f}); w nicosc {gone:.0f} = w rownaniu {cnt:.0f} + bez pochodzenia {none:.0f};"
+            (f"do domu z partii rodu wyjetych z bitwy przy upadku rodu {home:.0f} ludzi z {parties:.0f} partii (na Mur {wall:.0f}); w nicosc {gone:.0f} = w rownaniu {cnt:.0f} + bez pochodzenia {none:.0f};"
              f" dob z roznica > 0.5: {len(bad)}" + (f" (d{', d'.join(bad[:5])})" if bad else "") + (f"; od siewu w rownaniu {since:.0f}" if since is not None else "") + f" ({nG} dob)")
             if nG else "brak linii A12 (log sprzed paczki albo klucze wylaczone)",
-            "|w nicosc - w rownaniu - bez pochodzenia| <= 0.5 kazdej doby (Party Gone Men Counted); do domu - INFO (fabula ROT: bunt przeciw Jeorowi 1 422 ludzi jednej doby; bieg dwuletni d130 921)",
+            "|w nicosc - w rownaniu - bez pochodzenia| <= 0.5 kazdej doby (Party Gone Men Counted); do domu - INFO (fabula ROT: bunt przeciw Jeorowi 1 422 ludzi jednej doby z partii w bitwie; bieg dwuletni d130 921; partie kasowane po przegranej bitwie - nie tu, A17)",
             (len(bad) == 0) if (nG and counted) else None)
 
     # ---------------- NA12-5 rownanie krain (INFO)
