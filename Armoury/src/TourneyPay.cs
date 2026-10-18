@@ -152,7 +152,7 @@ namespace Armoury
             return (int)Math.Max(0L, Math.Min(int.MaxValue, Math.Min(gold, Seal31.Spare(st))));
         }
 
-        private static long RepaidToday(Clan c)
+        internal static long RepaidToday(Clan c)
         {
             long v;
             return c != null && _repDay == (int)CampaignTime.Now.ToDays && _repToday.TryGetValue(c, out v) ? v : 0;

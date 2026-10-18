@@ -963,6 +963,13 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
+--grupa nglod     : (noc 17/18.10, r4-glodbunt; Jeff "jak nie ma jedzenia to bedzie bunt; w interesie miasta lorda jest aby dowiesc jedzenie"; Armoury/src/KsHunger.cs,
+                    KsLordFood.cs, StartCalibration.Glod.cs) python -I tools/sprawdz_logi.py --grupa nglod [--do-doby N] <Armoury-*.log> (strumieniowo). NGL-0 linie doby
+                    "Glod miast (KS)" i "Pan miasta placi za dowoz (KS)" bez luk, NGL-1 latki (lojalnosc i bezpieczenstwo czynnego modelu, posilek), NGL-2 pomiar w miastach KS,
+                    NGL-3 bez podwojnego liczenia z kara gry Starving (kontrola 0), NGL-4 kara "Hunger" tylko przy glodzie i nigdy dodatnia (NGL-4b INFO: glodne, kara,
+                    lojalnosc), NGL-5 bunt nie z niczego (nowe bunty z lojalnoscia wczoraj > 25 = 0), NGL-6 zloto panow zamkniete (panowie + kasy + wierzyciele = 0,
+                    zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c od panow <= wydatek KS-H, NGL-7 INFO doplaty,
+                    NGL-8 ERROR i potkniecia 0, NGL-9 koszt <= 1 ms (mediana). Log bez paczki: "brak linii" (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -35423,6 +35430,198 @@ def nks_main(logp, until=120, bdp=None):
     return 0
 
 
+def _nglod_scan(logp):
+    """r4-glodbunt: linie 'Glod miast (KS)' (start sesji i doba) i 'Pan miasta placi za dowoz (KS)' (doba), bledy KsHunger / KsLordFood - strumieniowo."""
+    D = {"start": [], "h": {}, "hbad": [], "l": {}, "lbad": [], "err": 0, "err1": ""}
+    fnum = r"(-?\d+(?:\.\d+)?)"
+    ph = {
+        "keys": re.compile(r"klucze: Ks Hunger Unrest (tak|nie), Ks Lord Funds Food (tak|nie), kalibracja (zastosowana|NIE zastosowana)"),
+        "hooks": re.compile(r"latki: lojalnosc (wpieta|BRAK), bezpieczenstwo (wpiete|BRAK), posilek (wpiety|BRAK)"),
+        "ks": re.compile(r"miasta w KS (\d+) \(z posilkiem dzis (\d+), posilkow od wczoraj (\d+), poza watkiem (\d+)\)"),
+        "u": re.compile(r"brak jedzenia na rynku \(srednia 3 dob\): mediana " + fnum + r"%, q90 " + fnum + r"%"),
+        "hun": re.compile(r"glodne (\d+): kara lojalnosci razem " + fnum + r" \(srednio " + fnum + r"\), bezpieczenstwa razem " + fnum),
+        "food0": re.compile(r"Food 0 gry (\d+) miast \(z brakiem rynku (\d+)\); z kara gry Starving (\d+) - nasza linia mniejsza razem o " + fnum
+                            + r" pkt; premia Well fed zdjeta (\d+); kontrola podwojnego liczenia " + fnum),
+        "loy": re.compile(r"lojalnosc glodnych srednio (-|" + fnum + r"), najnizsza .*?, w stanie buntu (\d+)"),
+        "reb": re.compile(r"bunty od wczoraj (\d+) \(glodne (\d+); lojalnosc wczoraj > 25: (\d+)\)"),
+        "ms": re.compile(r"\| czas " + fnum + r" ms \| potkniecia (\d+)\."),
+    }
+    pl = {
+        "key": re.compile(r"klucz Ks Lord Funds Food (tak|nie) \| tryb (.+?) \| KS-H (czynne|nieczynne)"),
+        "cnt": re.compile(r"miasta glodne (\d+): kasa sama starcza (\d+), bez luki rynku dzis (\d+), bez rachunkow (\d+), do doplaty (\d+)"),
+        "pay": re.compile(r"platnik: pan placi (\d+) \(rodow (\d+)\), gracz (\d+) \(nigdy\), rod bez budzetu / dluznik / Straz (\d+), bez miejsca ponad rezerwe wojny i tempo skrzyni (\d+)"),
+        "gold": re.compile(r"wplacone na czas zakupow (-?\d+) zl, zwrocone (-?\d+) zl, zaplacone przez panow (-?\d+) zl \(potrzeba (-?\d+) zl\)"),
+        "spend": re.compile(r"wydatek KS-H tych kas (-?\d+) zl: z kasy miasta (-?\d+), od panow (-?\d+)"),
+        "bills": re.compile(r"rachunki: otwarte (-?\d+) zl, splacone przez panow (-?\d+) zl"),
+        "ctl": re.compile(r"kontrola: zloto panow (-?\d+) \+ kasy miast (-?\d+) \+ wierzyciele (-?\d+) = (-?\d+) \(oczekiwane 0\), zaplacone - \(wplacone - zwrocone \+ rachunki\) = (-?\d+)"),
+        "bad": re.compile(r"pan ponizej rezerwy wojny po zaplacie (\d+), ponad tempo skrzyni (\d+), zwrot uciety \(kasa za mala\) (\d+) \((-?\d+) zl\), zaleglosc nawiasu (\d+)"),
+        "ms": re.compile(r"\| czas " + fnum + r" ms \| potkniecia (\d+)\."),
+    }
+    if not logp or not os.path.isfile(logp):
+        return D
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "ERROR in KsHunger" in ln or "ERROR in KsLordFood" in ln:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = ln.strip()[:160]
+                continue
+            if "Glod miast (KS): " in ln:
+                if "Glod miast (KS): start sesji" in ln:
+                    D["start"].append(ln.strip())
+                    continue
+                m = re.search(r"Glod miast \(KS\): dzien (-?\d+) ", ln)
+                if not m:
+                    continue
+                d = int(m.group(1)); rec = {}
+                for k, p in ph.items():
+                    mm = p.search(ln)
+                    if mm:
+                        rec[k] = mm.groups()
+                if len(rec) < len(ph):
+                    D["hbad"].append(ln.strip()[:200])
+                D["h"][d] = rec
+            elif "Pan miasta placi za dowoz (KS): dzien " in ln:
+                m = re.search(r"Pan miasta placi za dowoz \(KS\): dzien (-?\d+) ", ln)
+                if not m:
+                    continue
+                d = int(m.group(1)); rec = {}
+                for k, p in pl.items():
+                    mm = p.search(ln)
+                    if mm:
+                        rec[k] = mm.groups()
+                if len(rec) < len(pl):
+                    D["lbad"].append(ln.strip()[:200])
+                D["l"][d] = rec
+    return D
+
+
+def nglod_main(logp, until=100000):
+    """nglod (noc 17/18.10, r4-glodbunt; Armoury/src/KsHunger.cs, KsLordFood.cs, StartCalibration.Glod.cs): glod miast KS -> "Hunger" w lojalnosci i bezpieczenstwie
+    (bunt mechanizmem gry/BK), pan miasta placi kupcom KS-H za dowoz. Wejscie: log Armoury (strumieniowo). Brak linii (log sprzed paczki, klucze wylaczone) - INFO, bez wyjatku.
+    NGL-0 linie doby, NGL-1 latki, NGL-2 pomiar w KS, NGL-3 bez podwojnego liczenia z kara gry Starving, NGL-4 kara tylko przy glodzie (+ INFO glodne i kara), NGL-5 bunt
+    nie z niczego, NGL-6 zloto panow zamkniete (kontrola 0, zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny i tempo skrzyni, NGL-6c pan placi najwyzej
+    wydatek KS-H, NGL-7 INFO doplaty, NGL-8 bledy i potkniecia, NGL-9 koszt."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NGL-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = _nglod_scan(logp)
+    hd = sorted(D["h"]); ld = sorted(D["l"])
+    first = hd[0] if hd else (ld[0] if ld else 0)
+    hd = [d for d in hd if d - first + 1 <= until]; ld = [d for d in ld if d - first + 1 <= until]
+    print(f"plik: {logp} | linii 'Glod miast (KS)' doby {len(hd)} (nierozpoznanych {len(D['hbad'])}), startu sesji {len(D['start'])}"
+          f" | linii 'Pan miasta placi za dowoz (KS)' {len(ld)} (nierozpoznanych {len(D['lbad'])})")
+    if not hd and not ld and not D["start"]:
+        rep.add("NGL-0: linie 'Glod miast (KS)' i 'Pan miasta placi za dowoz (KS)'", "brak linii", "INFO (log sprzed r4-glodbunt)", None)
+        for code, what in (("NGL-1", "latki"), ("NGL-2", "pomiar w KS"), ("NGL-3", "bez podwojnego liczenia"), ("NGL-4", "kara tylko przy glodzie"),
+                           ("NGL-5", "bunt nie z niczego"), ("NGL-6", "zloto panow zamkniete"), ("NGL-9", "koszt")):
+            rep.add(f"{code}: {what}", "brak linii", "INFO", None)
+        rep.add("NGL-8: ERROR KsHunger / KsLordFood", f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else ""), "0", D["err"] == 0)
+        rep.show()
+        return 0
+    H = D["h"]; L = D["l"]
+    g = lambda rec, k, i, cast=float, dflt=None: (cast(rec[k][i]) if k in rec and rec[k][i] not in (None, "-") else dflt)
+    # NGL-0
+    gaps = [d for a, d in zip(hd, hd[1:]) if d - a > 1]
+    lgaps = [d for a, d in zip(ld, ld[1:]) if d - a > 1]
+    rep.add("NGL-0: linie doby 'Glod miast (KS)' i 'Pan miasta placi za dowoz (KS)'",
+            f"glod: dob {len(hd)}, luk {len(gaps)}, nierozpoznane {len(D['hbad'])}" + (f" ({D['hbad'][0][:120]})" if D["hbad"] else "")
+            + f"; pan: dob {len(ld)}, luk {len(lgaps)}, nierozpoznane {len(D['lbad'])}" + (f" ({D['lbad'][0][:120]})" if D["lbad"] else "")
+            + f"; start sesji {len(D['start'])}",
+            "luk 0, nierozpoznane 0, start >= 1 (linia pana tylko przy kluczu Ks Lord Funds Food)",
+            bool(hd) and not gaps and not D["hbad"] and not D["lbad"] and not lgaps and bool(D["start"]))
+    # NGL-1 latki
+    hk = [d for d in hd if "hooks" in H[d]]
+    bad_h = [d for d in hk if H[d]["hooks"] != ("wpieta", "wpiete", "wpiety")]
+    st_bad = [s for s in D["start"] if "lojalnosc wpieta" not in s or "bezpieczenstwo wpiete" not in s or "posilek wpiety" not in s]
+    rep.add("NGL-1: latki wpiete (lojalnosc i bezpieczenstwo czynnego modelu, posilek UpdateDemandShift)",
+            f"doby z BRAK {len(bad_h)} z {len(hk)}; starty z BRAK {len(st_bad)} z {len(D['start'])}" + (f" ({st_bad[0][:200]})" if st_bad else ""),
+            "0", (not bad_h and not st_bad) if (hk or D["start"]) else None)
+    # NGL-2 pomiar w KS
+    ksd = [d for d in hd if "keys" in H[d] and H[d]["keys"][2] == "zastosowana"]
+    meas = [d for d in ksd if g(H[d], "ks", 0, int, 0) > 0]
+    if ksd:
+        rep.add("NGL-2: pomiar glodu w miastach KS (doby z kalibracja zastosowana)",
+                f"dob z KS {len(ksd)}, z miastami zmierzonymi {len(meas)}; miast w KS mediana {st.median([g(H[d], 'ks', 0, int, 0) for d in ksd]):.0f}"
+                + f", poza watkiem razem {sum(g(H[d], 'ks', 3, int, 0) for d in ksd)}",
+                "po rampie ZC4 (lambda 1) miasta zmierzone kazdej doby; poza watkiem 0", None if len(meas) == 0 else (sum(g(H[d], 'ks', 3, int, 0) for d in ksd) == 0))
+    else:
+        rep.add("NGL-2: pomiar glodu w miastach KS", "kalibracja nie zastosowana w zadnej dobie", "INFO (bez KS - bez pomiaru)", None)
+    # NGL-3 bez podwojnego liczenia
+    c3 = [(d, g(H[d], "food0", 5)) for d in hd if "food0" in H[d]]
+    bad3 = [x for x in c3 if x[1] is None or abs(x[1]) > 0.011]
+    starv = sum(g(H[d], "food0", 2, int, 0) for d in hd if "food0" in H[d])
+    rep.add("NGL-3: bez podwojnego liczenia z kara gry Starving / premia Well fed (kontrola linii)",
+            f"dob {len(c3)}, z kontrola != 0: {len(bad3)}" + (f" (dzien {bad3[0][0]}: {bad3[0][1]})" if bad3 else "")
+            + f"; miasto-doby z kara gry Starving i naszym glodem {starv}, z premia Well fed zdjeta {sum(g(H[d], 'food0', 4, int, 0) for d in hd if 'food0' in H[d])}",
+            "kontrola 0.00 kazdej doby", (not bad3) if c3 else None)
+    # NGL-4 kara tylko przy glodzie + INFO
+    hun = [(d, g(H[d], "hun", 0, int, 0), g(H[d], "hun", 1, float, 0.0), g(H[d], "hun", 3, float, 0.0)) for d in hd if "hun" in H[d]]
+    bad4 = [x for x in hun if x[1] == 0 and (abs(x[2]) > 1e-9 or abs(x[3]) > 1e-9)]
+    pos4 = [x for x in hun if x[2] > 1e-9 or x[3] > 1e-9]
+    rep.add("NGL-4: kara 'Hunger' tylko w miastach glodnych, nigdy dodatnia",
+            f"dob {len(hun)}, z kara bez glodnych {len(bad4)}, z kara dodatnia {len(pos4)}", "0 i 0", (not bad4 and not pos4) if hun else None)
+    if hun:
+        hh = [x[1] for x in hun]; ll = [x[2] / x[1] for x in hun if x[1] > 0]
+        u90 = [g(H[d], "u", 1) for d in hd if "u" in H[d]]
+        loyh = [g(H[d], "loy", 1) for d in hd if "loy" in H[d] and g(H[d], "loy", 1) is not None]
+        rep.add("NGL-4b: glodne miasta i kara (INFO)",
+                f"glodnych mediana {st.median(hh):.0f}, najwiecej {max(hh)}; kara lojalnosci na glodne srednio {(st.mean(ll) if ll else 0):.2f}/d; brak rynku q90 mediana dob "
+                + f"{(st.median(u90) if u90 else 0):.1f}%; lojalnosc glodnych srednio {(st.mean(loyh) if loyh else float('nan')):.1f}; w stanie buntu (ostatnia doba) "
+                + f"{g(H[hd[-1]], 'loy', 2, int, 0) if hd and 'loy' in H[hd[-1]] else '-'}", "INFO (strojenie: Ks Hunger Tolerance / Loyalty Max / Security Max)", None)
+    # NGL-5 bunt nie z niczego
+    rb = [(d, g(H[d], "reb", 0, int, 0), g(H[d], "reb", 1, int, 0), g(H[d], "reb", 2, int, 0)) for d in hd if "reb" in H[d]]
+    if rb:
+        n = sum(x[1] for x in rb); nh = sum(x[2] for x in rb); nx = sum(x[3] for x in rb)
+        rep.add("NGL-5: bunt nie z niczego (nowe bunty miast tylko z lojalnoscia wczoraj <= 25 - mechanizm gry/BK)",
+                f"buntow {n} (w miastach glodnych {nh}), z lojalnoscia wczoraj > 25: {nx}", "0 z lojalnoscia > 25", nx == 0)
+    else:
+        rep.add("NGL-5: bunt nie z niczego", "brak liczb buntow w linii", "INFO", None)
+    # NGL-6 zloto panow
+    if ld:
+        on = [d for d in ld if "key" in L[d] and L[d]["key"][0] == "tak"]
+        ctl = [(d, g(L[d], "ctl", 3, int, 0), g(L[d], "ctl", 4, int, 0)) for d in ld if "ctl" in L[d]]
+        bad6 = [x for x in ctl if x[1] != 0 or x[2] != 0]
+        paid = sum(g(L[d], "gold", 2, int, 0) for d in ld if "gold" in L[d])
+        dep = sum(g(L[d], "gold", 0, int, 0) for d in ld if "gold" in L[d]); ret = sum(g(L[d], "gold", 1, int, 0) for d in ld if "gold" in L[d])
+        rep.add("NGL-6: zloto panow zamkniete (glowa -> kasa na czas zakupow -> zrodla/furmani/zalogi; zwrot reszty; rachunki -> wierzyciele)",
+                f"dob {len(ctl)} (klucz tak {len(on)}), z kontrola != 0: {len(bad6)}" + (f" (dzien {bad6[0][0]}: suma {bad6[0][1]}, roznica {bad6[0][2]})" if bad6 else "")
+                + f"; razem wplacone {dep}, zwrocone {ret}, zaplacone {paid} zl", "zloto panow + kasy miast + wierzyciele = 0 i zaplacone = wplacone - zwrocone + rachunki kazdej doby",
+                (not bad6) if ctl else None)
+        b6 = [(d,) + tuple(g(L[d], "bad", i, int, 0) for i in range(5)) for d in ld if "bad" in L[d]]
+        below = sum(x[1] for x in b6); over = sum(x[2] for x in b6); cut = sum(x[3] for x in b6); stale = sum(x[5] for x in b6)
+        rep.add("NGL-6b: pan nie ponizej rezerwy wojny i nie szybciej niz skrzynia; gracz nigdy nie placi",
+                f"ponizej rezerwy {below}, ponad tempo {over}, zwrot uciety {cut} (zl {sum(x[4] for x in b6)}), zaleglosc nawiasu {stale}; gracz pominiety (miasto-doby) "
+                + f"{sum(g(L[d], 'pay', 2, int, 0) for d in ld if 'pay' in L[d])}", "ponizej rezerwy 0, ponad tempo 0, zaleglosc nawiasu 0 (zwrot uciety - INFO)",
+                (below == 0 and over == 0 and stale == 0) if b6 else None)
+        sp = [(d, g(L[d], "spend", 0, int, 0), g(L[d], "spend", 2, int, 0)) for d in ld if "spend" in L[d]]
+        bad6c = [x for x in sp if x[2] > x[1] + 1]
+        rep.add("NGL-6c: pan placi najwyzej to, co kupcy KS-H naprawde sprzedali tym kasom (od panow <= wydatek KS-H)",
+                f"dob {len(sp)}, z doplata ponad wydatek {len(bad6c)}" + (f" (dzien {bad6c[0][0]}: {bad6c[0][2]} > {bad6c[0][1]})" if bad6c else ""), "0", (not bad6c) if sp else None)
+        act = [d for d in ld if g(L[d], "gold", 2, int, 0) > 0]
+        rep.add("NGL-7: doplaty panow (INFO)",
+                f"dob z doplata {len(act)} z {len(ld)}; miasto-doby glodne {sum(g(L[d], 'cnt', 0, int, 0) for d in ld if 'cnt' in L[d])}, kasa sama starcza "
+                + f"{sum(g(L[d], 'cnt', 1, int, 0) for d in ld if 'cnt' in L[d])}, do doplaty {sum(g(L[d], 'cnt', 4, int, 0) for d in ld if 'cnt' in L[d])}, pan placi "
+                + f"{sum(g(L[d], 'pay', 0, int, 0) for d in ld if 'pay' in L[d])}, bez miejsca u pana {sum(g(L[d], 'pay', 4, int, 0) for d in ld if 'pay' in L[d])}; zaplacone razem {paid} zl"
+                + f", tryb {L[ld[-1]]['key'][1] if 'key' in L[ld[-1]] else '-'}", "INFO", None)
+    else:
+        rep.add("NGL-6: zloto panow zamkniete", "brak linii 'Pan miasta placi za dowoz (KS)'", "INFO (klucz Ks Lord Funds Food wylaczony albo log sprzed paczki)", None)
+    # NGL-8 bledy i potkniecia
+    pot = sum(g(H[d], "ms", 1, int, 0) for d in hd if "ms" in H[d]) + sum(g(L[d], "ms", 1, int, 0) for d in ld if "ms" in L[d])
+    rep.add("NGL-8: ERROR KsHunger / KsLordFood i potkniecia", f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else "") + f", potkniecia razem {pot}", "0 i 0",
+            D["err"] == 0 and pot == 0)
+    # NGL-9 koszt
+    t1 = [g(H[d], "ms", 0) for d in hd if "ms" in H[d]]; t2 = [g(L[d], "ms", 0) for d in ld if "ms" in L[d]]
+    if t1 or t2:
+        m1 = st.median(t1) if t1 else 0.0; m2 = st.median(t2) if t2 else 0.0
+        rep.add("NGL-9: koszt doby (glod miast + nawias pana)", f"glod mediana {m1:.3f} ms (max {max(t1) if t1 else 0:.3f}), pan mediana {m2:.3f} ms (max {max(t2) if t2 else 0:.3f})",
+                "mediana <= 1.0 ms kazdej linii", m1 <= 1.0 and m2 <= 1.0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -35620,6 +35819,8 @@ def main(argv):
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group == "nds" and logp:
         return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
+    if group == "nglod" and logp:
+        return nglod_main(logp, until_arg if "--do-doby" in args else 100000)   # nglod (noc 17/18.10, r4-glodbunt): glod miast KS -> Hunger w lojalnosci i bezpieczenstwie, pan miasta placi za dowoz KS-H (KsHunger.cs, KsLordFood.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
