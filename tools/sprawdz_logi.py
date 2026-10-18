@@ -1204,7 +1204,9 @@ Uzycie (Python 3, tylko odczyt):
                     w tydzien, 50,7 tys. przeprowadzek jednego dnia): segment linii doby "odmierzanie przybyc (...)" zamiast "dobowy limit przyjec" (pole opcjonalne).
                     RT-17a tozsamosc przybylych (przybyli dzis = przed przydzialem + z czekajacych + w nowych kontach, |roznica| <= 0.5; = "przybyli" linii, <= max(0.5, 0.1%)),
                     RT-17b dobowy limit miasta (najwiecej wobec limitu dzis <= prog pierwszego konta xM + 0.02 kazdej doby; limit 0 = bez limitu - INFO), RT-17c okno 7 dob
-                    (najwiecej przybylych w 7 dob <= 7 x M x limit + 0.05 pkt %), RT-17d czekajacy przydzieleni miastu sa w regionie (<= "w regionach" + 0.5), RT-17e INFO
+                    (najwiecej przybylych w 7 dob <= 7 x M x limit + 0.05 pkt %; recenzja f4: mianownik = srednia ludzi miasta z dob przybyc, pole "srednia dob przybyc";
+                    doba wlaczenia klucza w trakcie sesji - "przed przydzialem" > 0 - pominieta w RT-17b, 7 dob od niej w RT-17c), RT-17d czekajacy przydzieleni miastu
+                    sa w regionie (<= "w regionach" + 0.5), RT-17e INFO (z "miasta za male na limit" - recenzja f4: intake x ludzie < 1, nie sa celem nowych kont)
                     (przybyli, przyjeci w czesci, w progu pierwszego konta, czekajacy na koniec), RT-17f wzrost ludzi miasta w 7 dob z ks-miasta.csv (tygodniowe wiersze,
                     od pierwszej doby z odmierzaniem: najwiekszy wzrost <= 8 x M x limit + 3 pkt % - jedna doba zapasu na opoznienie migawki KS; bez odmierzania albo bez CSV
                     - INFO z najwiekszym wzrostem, np. fin86 Sharp Point x6.9). Log bez segmentu (klucz wylaczony, log sprzed paczki): RT-17 INFO, bez wyjatku.
@@ -39469,7 +39471,9 @@ NRT_DAY = re.compile(
     + r"\); w progu pierwszego konta (?P<mfirst>\d+) \(ponad limit " + _nrt_n("mfover") + r"\); czekaja przydzieleni miastu " + _nrt_n("mwait")
     + r" \(kont (?P<mwacc>\d+), miast (?P<mwt>\d+); dopisani dzis przez uderzenia " + _nrt_n("mhit") + r"\), czekaja bez miasta (?P<mspn>\d+) kont \("
     + _nrt_n("mspp") + r" ludzi, miast (?P<mspt>\d+)\); najwiecej wobec limitu dzis (?P<mxt>.*?) " + _nrt_n("mxa") + r" / " + _nrt_n("mxl") + r" \(x" + _nrt_n("mxr")
-    + r"\); 7 dob najwiecej (?P<m7t>.*?) " + _nrt_n("m7a") + r" = " + _nrt_n("m7p") + r"% ludzi miasta \(prog " + _nrt_n("m7thr") + r"%\))?"
+    + r"\); 7 dob najwiecej (?P<m7t>.*?) " + _nrt_n("m7a") + r" = " + _nrt_n("m7p") + r"% ludzi miasta \((?P<m7avg>srednia dob przybyc; )?prog " + _nrt_n("m7thr") + r"%\)"
+    # recenzja f4: (uwaga 3) okno 7 dob wobec sredniej ludzi miasta z dob przybyc, (uwaga 1) miasta za male na limit - pola opcjonalne (pierwsza wersja segmentu bez nich)
+    r"(?:; miasta za male na limit \(ponizej 1 czlowieka na dobe, nie sa celem nowych kont\) (?P<mtiny>\d+))?)?"
     r" \| kiesa W miast \(saldo uchodzcow\): wczoraj " + _nrt_i("b0") + r" \+ przyniesione z kies wsi " + _nrt_i("bin") + r" \+ udzial glow w zmianie kiesy W " + _nrt_i("bsh")
     + r" \+ doplata ludu miasta " + _nrt_i("bsub") + r" - przyciete do kiesy W " + _nrt_i("btrim") + r" - z powracajacymi " + _nrt_i("bmv") + r" = " + _nrt_i("b1")
     + r" \(kontrola " + _nrt_i("bchk") + r"\)"
@@ -39831,20 +39835,28 @@ def nrt_meter_rows(rep, days, logp):
             "|roznica| <= 0.5 (i <= max(0.5, 0.1%) wobec 'przybyli') kazdej doby", not bad_a)
     # RT-17b dobowy limit miasta
     lim_days = [g for g in md if (fv(g, "mlim") or 0.0) > 0.0]
+    # recenzja f4 (uwaga 3): "przed przydzialem" > 0 tylko w dobie wlaczenia klucza w trakcie sesji (dopiski kont bez przyjetych - jeszcze bez odmierzania);
+    # ta doba (RT-17b) i 7 dob od niej (RT-17c) pominiete - nie sa przekroczeniem limitu
+    tog = [int(g["day"]) for g in md if (fv(g, "mbef") or 0.0) > 0.5]
+    skip_b = [g for g in lim_days if (fv(g, "mbef") or 0.0) > 0.5]
+    skip_c = [g for g in lim_days if any(0 <= int(g["day"]) - d <= 6 for d in tog)]
     if lim_days:
-        bad_b = [g for g in lim_days if fv(g, "mxr") is not None and fv(g, "mxr") > (fv(g, "mfm") or 1.0) + 0.02]
+        bad_b = [g for g in lim_days if g not in skip_b and fv(g, "mxr") is not None and fv(g, "mxr") > (fv(g, "mfm") or 1.0) + 0.02]
         top = max(lim_days, key=lambda g: fv(g, "mxr") or 0.0)
         rep.add("RT-17b: odmierzanie - dobowy limit miasta (najwiecej wobec limitu dzis)",
                 f"doby z limitem {len(lim_days)}, ponad prog {len(bad_b)}" + (f" (np. dzien {bad_b[0]['day']}: {bad_b[0]['mxt']} {bad_b[0]['mxa']} / {bad_b[0]['mxl']})" if bad_b else "")
+                + (f"; pominiete doby wlaczenia klucza (przed przydzialem > 0) {len(skip_b)}" if skip_b else "")
                 + f"; najwiecej: dzien {top['day']} {top['mxt']} {top['mxa']} / {top['mxl']} (x{top['mxr']}, prog pierwszego konta x{top['mfm']})",
                 "najwiecej wobec limitu <= xM pierwszego konta + 0.02 kazdej doby (fin86 bez odmierzania: Sharp Point 2788 przy limicie 90)", not bad_b)
         # RT-17c okno 7 dob
-        bad_c = [g for g in lim_days if fv(g, "m7p") is not None and fv(g, "m7p") > (fv(g, "m7thr") or 0.0) + 0.05]
+        bad_c = [g for g in lim_days if g not in skip_c and fv(g, "m7p") is not None and fv(g, "m7p") > (fv(g, "m7thr") or 0.0) + 0.05]
         top7 = max(lim_days, key=lambda g: fv(g, "m7p") or 0.0)
-        rep.add("RT-17c: odmierzanie - przybyli w 7 dob wobec ludzi miasta",
+        avg7 = any(g.get("m7avg") for g in lim_days)
+        rep.add("RT-17c: odmierzanie - przybyli w 7 dob wobec ludzi miasta" + (" (srednia ludzi miasta z dob przybyc)" if avg7 else " (ludzie miasta dzis - pierwsza wersja segmentu)"),
                 f"doby ponad prog {len(bad_c)}" + (f" (np. dzien {bad_c[0]['day']}: {bad_c[0]['m7t']} {bad_c[0]['m7p']}% przy progu {bad_c[0]['m7thr']}%)" if bad_c else "")
-                + f"; najwiecej: dzien {top7['day']} {top7['m7t']} {top7['m7a']} = {top7['m7p']}% (prog {top7['m7thr']}%)",
-                "<= 7 x M x limit + 0.05 pkt % kazdej doby", not bad_c)
+                + f"; najwiecej: dzien {top7['day']} {top7['m7t']} {top7['m7a']} = {top7['m7p']}% (prog {top7['m7thr']}%)"
+                + (f"; pominiete doby w 7 dobach od wlaczenia klucza {len(skip_c)}" if skip_c else ""),
+                "<= 7 x M x limit + 0.05 pkt % kazdej doby (mianownik: srednia ludzi miasta z dob przybyc - spadek ludzi w tygodniu nie daje falszywego NIE)", not bad_c)
     else:
         rep.add("RT-17b/c: odmierzanie - dobowy limit miasta", "limit 0 (Raid Refugees Town Intake = 0 - bez limitu)", "INFO", None)
     # RT-17d czekajacy przydzieleni miastu sa w regionie
@@ -39860,7 +39872,8 @@ def nrt_meter_rows(rep, days, logp):
             f"przybyli {tot_arr:.0f} (z czekajacych {sum(fv(g, 'mwadm') or 0.0 for g in md):.0f}, w nowych kontach {sum(fv(g, 'mnew') or 0.0 for g in md):.0f}, przed przydzialem "
             f"{sum(fv(g, 'mbef') or 0.0 for g in md):.0f}); najwiecej w dobie {top_day['day']}: {top_day['marr']}; konta przyjete w czesci (konto-doby) {sum(int(g['mpart']) for g in md)}, "
             f"w progu pierwszego konta {sum(int(g['mfirst']) for g in md)} (ponad limit {sum(fv(g, 'mfover') or 0.0 for g in md):.0f}); dopisani przez uderzenia do czekajacych "
-            f"{sum(fv(g, 'mhit') or 0.0 for g in md):.0f}; na koniec czekaja przydzieleni {md[-1]['mwait']}, bez miasta {md[-1]['mspn']} kont ({md[-1]['mspp']} ludzi)",
+            f"{sum(fv(g, 'mhit') or 0.0 for g in md):.0f}; na koniec czekaja przydzieleni {md[-1]['mwait']}, bez miasta {md[-1]['mspn']} kont ({md[-1]['mspp']} ludzi)"
+            + (f"; miasta za male na limit (nie sa celem nowych kont) na koniec {md[-1]['mtiny']}" if md[-1].get("mtiny") is not None else ""),
             "INFO (fin86 bez odmierzania: 50746 jednego dnia, 151351 w tydzien)", None)
     # RT-17f wzrost ludzi miasta w 7 dob z ks-miasta.csv - od pierwszej doby z odmierzaniem
     d0 = int(md[0]["day"])

@@ -115,6 +115,8 @@ namespace Armoury
         // f4-uchodzcy (odmierzanie przybyc): uchodzcy dopisani przez uderzenia kontom z miastem, ktorzy CZEKAJA w regionie (doba; bez zapisu) i okno 7 dob przybylych
         // na miasto (id miasta -> przybyli w dobach day % 7; tylko linia i narzedzie - bez zapisu, po wczytaniu buduje sie od nowa)
         private static double _hitWait;
+        // recenzja f4 (uwaga 3): tablica miasta ma 14 miejsc - [0..6] przybyli w dobie day % 7, [7..13] ludzie miasta tej doby (ten sam mianownik co limit przyjec tej
+        // doby), wiec okno 7 dob porownuje sie ze srednia ludzi miasta z dob przybyc (spadek ludzi w tygodniu - oblezenie, glod - nie daje falszywego przekroczenia)
         private static readonly Dictionary<string, double[]> _win7 = new Dictionary<string, double[]>(StringComparer.Ordinal);
         private static int _win7Day = int.MinValue;
 
@@ -857,7 +859,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Daily(czekajacy-migawka)", e); }
                 }
                 lock (Gate) foreach (var kv in _arrTown) arrDay[kv.Key] = kv.Value;
-                try { Win7Note(day, arrDay); } catch (Exception e) { Stumble("Daily(okno7)", e); }
+                try { Win7Note(day, arrDay, hostPeople); } catch (Exception e) { Stumble("Daily(okno7)", e); }
             }
             lock (Gate)
             {
@@ -983,6 +985,7 @@ namespace Armoury
         {
             public double Before, AdmWait, AdmNew, PartRest, Spread, NoHost, NoTown, FirstOver;
             public int NAdmWait, NNew, NSame, NFriend, NPart, NSpread, NNoHost, NNoTown, NWaitOwed, NFirst;
+            public int NTiny;            // recenzja f4 (uwaga 1): miasta zdolne przyjac, ktore przy limicie nie wpuszcza nikogo (intake x ludzie < 1) - nie sa celem nowych kont
             public readonly HashSet<string> SpreadTowns = new HashSet<string>(StringComparer.Ordinal);
             public readonly Dictionary<string, double> Used = new Dictionary<string, double>(StringComparer.Ordinal);    // id miasta -> przybyli dzis (licznik dobowy)
         }
@@ -1000,6 +1003,16 @@ namespace Armoury
         {
             lock (Gate) foreach (var kv in _arrTown) { m.Used[kv.Key] = kv.Value; m.Before += kv.Value; }
             double fm = Math.Max(1.0, double.IsNaN(firstMult) || double.IsInfinity(firstMult) ? 1.0 : firstMult);
+            // recenzja f4 (uwaga 1): miasto, ktore przy limicie nie wpusci nikogo (intake x ludzie < 1 czlowiek na dobe - np. Hardhome z 0 ludzi, kultura spoza tabeli k),
+            // nie jest celem nowych kont: FindTown wybiera nastepne miasto w promieniu, ktore moze przyjac (inaczej wies stalaby w "czekaja bez miasta" na zawsze; bez
+            // innego miasta - "miasta w zasiegu nie moga przyjac", zostaja w regionie jak dotad). Miasto pelne NA DZIS zostaje celem (regula najblizszego miasta jak
+            // w dawnej petli - czekaja na jutro). Konta juz przydzielone takiemu miastu (sprzed odmierzania) zostaja: obecni w miescie, czekajacy w regionie wracaja wedlug powrotu
+            HashSet<string> findOk = hostOk;
+            if (intake > 0f)
+            {
+                findOk = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var tid in hostOk) { double tp; hostPeople.TryGetValue(tid, out tp); if (intake * tp >= 1.0) findOk.Add(tid); else m.NTiny++; }
+            }
 
             // ile miasto tid wpusci dzis z want ludzi (jedna regula dla czekajacych i nowych kont)
             Func<string, double, double> admit = (tid, want) =>
@@ -1058,7 +1071,7 @@ namespace Armoury
                     if (!(raid >= 1.0)) continue;
                     if (wait) { m.NWaitOwed++; continue; }                   // konto czeka na zwrot naleznych z poprzedniego miasta - przydzial po zwrocie
                     bool same; int seen;
-                    var town = FindTown(v, rad, hostOk, out same, out seen);
+                    var town = FindTown(v, rad, findOk, out same, out seen);      // recenzja f4 (uwaga 1): bez miast, ktore przy limicie nie wpuszcza nikogo
                     if (town == null)
                     {
                         if (seen > 0) { m.NNoHost++; m.NoHost += raid; } else { m.NNoTown++; m.NoTown += raid; }
@@ -1085,19 +1098,14 @@ namespace Armoury
         }
 
         /// <summary>f4-uchodzcy: segment linii doby RT przy odmierzaniu (narzedzie: sprawdz_logi --grupa nuchodzcy RT-17). Tozsamosc: przybyli dzis (licznik dobowy po kroku 4)
-        /// = przed przydzialem + z czekajacych + w nowych kontach = "przybyli" linii; najwiecej wobec limitu dzis <= pierwsze konto doby (xM); 7 dob <= 7 x M x limit.</summary>
+        /// = przed przydzialem + z czekajacych + w nowych kontach = "przybyli" linii; najwiecej wobec limitu dzis <= pierwsze konto doby (xM); 7 dob <= 7 x M x limit
+        /// (wobec sredniej ludzi miasta z dob przybyc - recenzja f4, uwaga 3); na koncu miasta za male na limit (recenzja f4, uwaga 1).</summary>
         private static void MeterSegment(StringBuilder sb, Settings s, float intake, MeterDay m, Dictionary<string, double> arrDay, Dictionary<string, double> hostPeople,
                                          double waitW, int waitAcc, int waitTowns)
         {
             float fm0 = s.RaidRefugeesIntakeFirstMult;
             double fm = Math.Max(1.0, float.IsNaN(fm0) || float.IsInfinity(fm0) ? 1.0 : fm0);
-            Func<string, double> tpOf = tid =>
-            {
-                double tp;
-                if (hostPeople.TryGetValue(tid, out tp)) return tp;
-                try { var st = TownOf(tid); double pp = st != null ? PopulationLaw.PeopleOf(st) : 0.0; return pp > 0.0 && !double.IsInfinity(pp) ? pp : 0.0; }
-                catch { return 0.0; }
-            };
+            Func<string, double> tpOf = tid => TpOf(tid, hostPeople);
             double arrToday = 0.0, mxArr = 0.0, mxLim = 0.0, mxR = 0.0; string mxName = "-";
             foreach (var kv in arrDay)
             {
@@ -1108,14 +1116,23 @@ namespace Armoury
                 double r = lim > 0.0 ? kv.Value / lim : 999.99;
                 if (mxName == "-" || r > mxR) { var t = TownOf(kv.Key); mxName = Clean(t != null && t.Name != null ? t.Name.ToString() : kv.Key); mxArr = kv.Value; mxLim = lim; mxR = Math.Min(999.99, r); }
             }
+            // recenzja f4 (uwaga 3): okno 7 dob wobec SREDNIEJ ludzi miasta z dob przybyc (ludzie zapisani w dobie przybycia - ten sam mianownik co limit tej doby).
+            // Kazda doba: przybyli <= M x limit x ludzie tej doby, wiec suma 7 dob <= M x limit x suma ludzi dob przybyc <= 7 x M x limit x srednia - prog linii trzyma
+            // sie takze wtedy, gdy miasto traci ludzi w tygodniu (oblezenie, glod), a dzisiejsze ludzie byly mniejszym mianownikiem
             double w7 = 0.0, w7Share = 0.0; string w7Name = "-";
-            List<KeyValuePair<string, double>> win;
-            lock (Gate) win = _win7.Select(kv => new KeyValuePair<string, double>(kv.Key, kv.Value.Sum())).ToList();
+            var win = new List<KeyValuePair<string, double[]>>();
+            lock (Gate)
+                foreach (var kv in _win7)
+                {
+                    double sa = 0.0, sp = 0.0; int nd = 0;
+                    for (int k = 0; k < 7; k++) if (kv.Value[k] > 0.0) { sa += kv.Value[k]; sp += kv.Value[7 + k]; nd++; }
+                    win.Add(new KeyValuePair<string, double[]>(kv.Key, new[] { sa, nd > 0 ? sp / nd : 0.0 }));
+                }
             foreach (var kv in win)
             {
-                double tp = tpOf(kv.Key);
-                double sh = tp > 0.0 ? kv.Value / tp : 9.9999;
-                if (w7Name == "-" || sh > w7Share) { var t = TownOf(kv.Key); w7Name = Clean(t != null && t.Name != null ? t.Name.ToString() : kv.Key); w7 = kv.Value; w7Share = Math.Min(9.9999, sh); }
+                double tp = kv.Value[1];
+                double sh = tp > 0.0 ? kv.Value[0] / tp : 9.9999;
+                if (w7Name == "-" || sh > w7Share) { var t = TownOf(kv.Key); w7Name = Clean(t != null && t.Name != null ? t.Name.ToString() : kv.Key); w7 = kv.Value[0]; w7Share = Math.Min(9.9999, sh); }
             }
             double hitWait; lock (Gate) hitWait = _hitWait;
             sb.Append(" | odmierzanie przybyc (Raid Refugees Intake Meter, limit ").Append((100.0 * intake).ToString("0.0#", Inv))
@@ -1126,7 +1143,18 @@ namespace Armoury
               .Append(" (kont ").Append(waitAcc).Append(", miast ").Append(waitTowns).Append("; dopisani dzis przez uderzenia ").Append(F1(hitWait)).Append("), czekaja bez miasta ")
               .Append(m.NSpread).Append(" kont (").Append(F1(m.Spread)).Append(" ludzi, miast ").Append(m.SpreadTowns.Count).Append("); najwiecej wobec limitu dzis ").Append(mxName)
               .Append(' ').Append(F1(mxArr)).Append(" / ").Append(F1(mxLim)).Append(" (x").Append(mxR.ToString("0.00", Inv)).Append("); 7 dob najwiecej ").Append(w7Name).Append(' ')
-              .Append(F1(w7)).Append(" = ").Append((100.0 * w7Share).ToString("0.00", Inv)).Append("% ludzi miasta (prog ").Append((700.0 * fm * intake).ToString("0.00", Inv)).Append("%)");
+              .Append(F1(w7)).Append(" = ").Append((100.0 * w7Share).ToString("0.00", Inv)).Append("% ludzi miasta (srednia dob przybyc; prog ").Append((700.0 * fm * intake).ToString("0.00", Inv)).Append("%)")
+              .Append("; miasta za male na limit (ponizej 1 czlowieka na dobe, nie sa celem nowych kont) ").Append(m.NTiny);   // recenzja f4 (uwaga 1)
+        }
+
+        /// <summary>f4-uchodzcy: ludzie miasta tid - mianownik limitu przyjec doby (hostPeople z kroku 0; miasto spoza niego - PopulationLaw.PeopleOf). Nie rzuca.</summary>
+        private static double TpOf(string tid, Dictionary<string, double> hostPeople)
+        {
+            double tp;
+            if (tid == null) return 0.0;
+            if (hostPeople != null && hostPeople.TryGetValue(tid, out tp)) return tp;
+            try { var st = TownOf(tid); double pp = st != null ? PopulationLaw.PeopleOf(st) : 0.0; return pp > 0.0 && !double.IsInfinity(pp) ? pp : 0.0; }
+            catch { return 0.0; }
         }
 
         /// <summary>f4-uchodzcy: rozliczenie konta, ktore wolajacy trzyma (jak Track, ale po kluczu konta). Nie rzuca na zewnatrz (wolajacy lapie).</summary>
@@ -1137,27 +1165,32 @@ namespace Armoury
             lock (Gate) { if (a.Town == null) return; Apply(a, id, now, cause); }
         }
 
-        /// <summary>f4-uchodzcy: okno 7 dob przybylych na miasto (linia i narzedzie). Doba bez wpisow czysci swoje miejsce; przerwa >= 7 dob - okno od zera.</summary>
-        private static void Win7Note(int day, Dictionary<string, double> arrivedToday)
+        /// <summary>f4-uchodzcy: okno 7 dob przybylych na miasto i ludzi miasta w dobie przybycia (linia i narzedzie). Doba bez wpisow czysci swoje miejsce; przerwa >= 7 dob -
+        /// okno od zera.</summary>
+        private static void Win7Note(int day, Dictionary<string, double> arrivedToday, Dictionary<string, double> hostPeople)
         {
+            // recenzja f4 (uwaga 3): ludzie miasta tej doby (mianownik limitu) poza zamkiem - TpOf moze siegnac do PopulationLaw
+            var tpDay = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (var kv in arrivedToday) if (kv.Value > 0.0) tpDay[kv.Key] = TpOf(kv.Key, hostPeople);
             lock (Gate)
             {
                 int gap = _win7Day == int.MinValue ? 7 : day - _win7Day;
                 if (gap < 0 || gap >= 7) _win7.Clear();
                 else if (gap > 0)
                     foreach (var w in _win7.Values)
-                        for (int k = 1; k <= gap; k++) w[(((_win7Day + k) % 7) + 7) % 7] = 0.0;
+                        for (int k = 1; k <= gap; k++) { int sl = (((_win7Day + k) % 7) + 7) % 7; w[sl] = 0.0; w[7 + sl] = 0.0; }
                 _win7Day = day;
                 int slot = ((day % 7) + 7) % 7;
                 foreach (var kv in arrivedToday)
                 {
                     if (!(kv.Value > 0.0)) continue;
                     double[] w;
-                    if (!_win7.TryGetValue(kv.Key, out w)) _win7[kv.Key] = w = new double[7];
+                    if (!_win7.TryGetValue(kv.Key, out w)) _win7[kv.Key] = w = new double[14];
                     w[slot] = kv.Value;
+                    double tp; tpDay.TryGetValue(kv.Key, out tp); w[7 + slot] = tp;
                 }
                 var drop = new List<string>();
-                foreach (var kv in _win7) { double t = 0; foreach (var x in kv.Value) t += x; if (!(t > 0.0)) drop.Add(kv.Key); }
+                foreach (var kv in _win7) { double t = 0; for (int k = 0; k < 7; k++) t += kv.Value[k]; if (!(t > 0.0)) drop.Add(kv.Key); }
                 foreach (var k in drop) _win7.Remove(k);
             }
         }
