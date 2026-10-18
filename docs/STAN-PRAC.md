@@ -3150,3 +3150,9 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   R-2R 69.2k/d -> zatrzymane ~72.8k/d; grupa ndoplata), d2 bd2f2469 (GiftFreeCitiesToDothraki NIE; grupa ndothraki; Dothrakowie tracili ~15k/d), d3 46f8046f (IronBankDividends: zysk
   zrealizowany ponad rezerwe co 28 dob - polowa do Braavos (lud + kasa kupcow), polowa glowom rodow bravos z lennem; stara regula 168 krok 3 wylaczona; zapis arm_bankdiv; grupa nbank),
   d4 4eac902f (KsFoodHandsFollowMarket: co 7 dob po D+49, polki+droga < 0.5 T* / > 2 T*, <= 5% rak zajecia, bez zimy; KsFoodHandsGrowGroves TAK; grupa njedz). Do scalenia8 po scaleniu7.
+- 17:50 PDT: SCALENIE7 GOTOWE (wf_2f9699cc-d9f): noc-ks4 **e32c2ea0** = 6478f861 + f19-e1..e4 + f19-kanon-a/b + f19-drogi + poprawki recenzji paczek + recenzja calosci (licznik budzetu BK do 0;
+  udzial korony w gersumie jako jednorazowy; BookHoldings - linia zagrozenia przy przywroconych twierdzach). UWAGA: moj skrypt changelog81.py w 8bc3cdc8 UCIAL CHANGELOG.md (31684 -> 1224
+  linii, brak dopisania 'tail') - scalenie7 przywrocilo historie z 25ec1fa0. 1986 ustawien. Do wgrania: Armoury + CrashScribe razem (BookHoldings -> PovertyPeace.ShiftHistory), RC + GT
+  (McmSettings RequireRestart), CrashScribe/ModuleData/CrashScribe.settings.xml (4 nowe klucze).
+- 17:55 PDT: scalenie8 (wf_c1920bb1-cb5: f20-d1..d4 na e32c2ea0) + paczka f21-zaloga (zb/f21-zaloga od e32c2ea0): przywrocone twierdze z pusta zaloga zostalyby odbite od razu - zaloga z
+  partii krolestwa nowego pana (prawdziwi ludzie, nic z niczego).
