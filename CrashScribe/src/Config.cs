@@ -144,6 +144,12 @@ namespace CrashScribe
         public static bool EconomyAuditWeekly = true;   // O2 (EconomyAudit.Due): audyt ekonomii (economy-*.csv, linia EKONOMIA) raz na 7 dob i raz po wczytaniu; w autotescie bez pomiaru klatki codziennie; false = codziennie jak dotad
         public static bool ScribeKeepOpen = true;       // O9 (Scribe.Raw): log sesji otwartym plikiem (kazdy zapis od razu u systemu, zamkniecie przy wyjsciu); false = plik otwierany na kazdy zapis jak dotad
 
+        // --- noc 17/18.10, paczka rot-wydarzenia (RAPORT-4-LATA rozdz. 2 pkt 6 "Joffrey zyje po Purpurowych Godach"; RotEventFx.cs) ---
+        public static bool RotEventFx = true;               // glowny: kontekst wydarzen ROT + linie "ROT wydarzenie: <id> skutek ... wykonany / odroczony / zablokowany przez <kto>" i "ROT wydarzenia (RX)", zapis cs_rotfx_v1; false = nic nie wpiete (stan sprzed paczki), ponizsze klucze martwe
+        public static bool RotEventDeathNow = true;         // smierc z wydarzenia ROT odlozona przez gre znakiem smierci (druzyna w bitwie / oblezeniu) - wykonana w pierwszej godzinie bez bitwy (oblezenie nie czeka; ta sama droga co gra po bitwie oblezenia); false = gra zabija dopiero po koncu oblezenia (tylko pomiar)
+        public static bool RotEventHeirKeepsTitles = true;  // glowa rodu wyznaczona przez wydarzenie ROT (Cersei po Joffreyu, Bran po Robbie...) dziedziczy tytuly BK zabitego (suweren bez linii sukcesji / wyborow BK, reszta tytulow); false = BK wybiera dziedzica jak dotad (KL: Meryn Trant krolem)
+        public static bool RotEventRulerInKingdom = true;   // tron z wydarzenia ROT dla rodu spoza krolestwa: rod niezalezny najpierw dolacza, rod w innym krolestwie / wybity / najemny / gracza - przekazanie pominiete; false = jak dotad (krolestwo moze dostac wladce spoza siebie - Nocna Straz w tescie 4 lat)
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -245,6 +251,10 @@ namespace CrashScribe
                         case "MarriageLazyDraw": MarriageLazyDraw = B(v); break;
                         case "EconomyAuditWeekly": EconomyAuditWeekly = B(v); break;
                         case "ScribeKeepOpen": ScribeKeepOpen = B(v); break;
+                        case "RotEventFx": RotEventFx = B(v); break;
+                        case "RotEventDeathNow": RotEventDeathNow = B(v); break;
+                        case "RotEventHeirKeepsTitles": RotEventHeirKeepsTitles = B(v); break;
+                        case "RotEventRulerInKingdom": RotEventRulerInKingdom = B(v); break;
                     }
                 }
             }

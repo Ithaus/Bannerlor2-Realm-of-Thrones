@@ -483,4 +483,25 @@
   <!-- Keep the session log open while the game runs instead of opening and closing the file for every line. Every line is still handed
        to Windows at once, so nothing is lost if the game crashes, and the log can be read during play. Set to false for the old behaviour. -->
   <ScribeKeepOpen>true</ScribeKeepOpen>
+  <!-- Realm of Thrones story events (found in the 4-year test: after "The Purple Wedding" King Joffrey kept leading his army for days and then
+       Ser Meryn Trant became king instead of Cersei). With this on, CrashScribe follows every effect of a story event - a death, a new head of a
+       house, a throne, a realm joined, a castle given, a release from captivity - and writes in the session log whether it happened, was put off
+       or was blocked, and by what. Nothing in the story itself changes with this setting alone. Set to false to switch off this setting and the
+       three below (old behaviour). -->
+  <RotEventFx>true</RotEventFx>
+  <!-- A character killed by a story event while his party is in a battle or a siege only gets a "death mark" from the game and lives on until
+       the siege ends - which can take weeks. With this on, the story death happens in the first hour his party is not in a battle (a siege does
+       not hold it back), the same way the game ends the life of a lord who fell during a siege assault. Not during a story siege of Realm of
+       Thrones, and never while you are in an encounter, a conversation or that siege. Set to false to let the game wait until the siege is over. -->
+  <RotEventDeathNow>true</RotEventDeathNow>
+  <!-- When a story event names a new head of a house just before its old head dies (Cersei for Joffrey, Bran for Robb, Harold Karstark, Ramsay
+       Bolton), Banner Kings used to hand the dead man's titles - the crown too - to its own heir instead (King's Landing went to Ser Meryn Trant,
+       because women cannot inherit there). With this on, the head named by the story inherits the titles, while alive and still ruling the house.
+       Needs Banner Kings. Set to false to let Banner Kings choose the heir (old behaviour). -->
+  <RotEventHeirKeepsTitles>true</RotEventHeirKeepsTitles>
+  <!-- A story event can hand a throne to a house that is no longer in that realm (in the 4-year test the Night's Watch went to the Tolletts while
+       they were in a rebel realm, so the Watch was ruled from outside). With this on, a house without a realm joins the realm first; a house in
+       another realm, a destroyed house, a mercenary house or your own house outside the realm does not get that throne. Set to false for the old
+       behaviour. -->
+  <RotEventRulerInKingdom>true</RotEventRulerInKingdom>
 </CrashScribe>

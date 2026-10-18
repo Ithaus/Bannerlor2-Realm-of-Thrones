@@ -162,6 +162,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new BkPietyBarBehavior());   // 15.10: jedna poboznosc BK na pasku mapy (BK dodawal ja przy kazdym odswiezeniu)
                 if (cgs != null) cgs.AddBehavior(new RotStoryArmiesBehavior());   // 15.10: armie fabuly ROT (Blackwater) - wywrotka d767 testu 6-letniego
                 if (cgs != null) cgs.AddBehavior(new BkBattlePerksBehavior());   // B10b (decyzja Jeffa 14.10): atuty BK z bitew - postfiksy na DefaultBattleRewardModel, linia "BK atuty bitew (B10b)"
+                if (cgs != null && Config.RotEventFx) cgs.AddBehavior(new RotEventFxBehavior());   // noc 17/18.10 (rot-wydarzenia): skutki wydarzen ROT - smierc odroczona, nastepca z tytulami BK, tron w krolestwie, linie "ROT wydarzenie"
                 if (cgs != null) cgs.AddBehavior(new BkrotSelfCallBehavior());   // P2 audytu 14.10: samowywolania BKROT (wpiecie raz na proces przy starcie sesji, linia "BKROT self call fix")
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
