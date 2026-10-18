@@ -130,10 +130,11 @@ namespace Armoury
         // Zloto: skarbiec krolestwa -> kiesa platnika (glowa rodu albo rycerz, ktory sam oplacil swoja partie).
         internal struct RefundRow { public long Paid, Due, Given; public int Clans; }
         // 186: zwrot krolestwa w wojnie przed wyplata (nalezny, reszta wplywow dnia, kredyt Banku) - kredyt dzielony miedzy korony przed wyplata
-        private sealed class RefundCalc { public Kingdom K; public List<KeyValuePair<Hero, int>> List; public int[] Due; public long PaidSum, Want, Have, Lent; }
+        // f6-zwrot: Full - pelny zwrot wiersza (zold x pct), Need - mnoznik i pasmo rodu (KingdomTreasury.RefundNeed.cs); Due - nalezny do wyplaty
+        private sealed class RefundCalc { public Kingdom K; public List<KeyValuePair<Hero, int>> List; public int[] Due, Full; public NeedRow[] Need; public long PaidSum, Want, Have, Lent; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
-        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); MarketAndCrown.Reset(); NeedAidReset(); }   // E8/R (254): liczniki linii "Rynek i korona (E8/R)" od zera
+        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); MarketAndCrown.Reset(); NeedAidReset(); RbnReset(); }   // E8/R (254): liczniki linii "Rynek i korona (E8/R)" od zera; f6-zwrot: stan zwrotu wedlug potrzeby
 
         // 169c (tylko log): niedoplata korony na krolestwo z 28 dob (1 - zwrot dany / nalezny) - miara progu etapu 2 i wejscia E1b; tylko pamiec sesji
         private sealed class ArrearRing { public readonly long[] Due = new long[28], Given = new long[28]; public int Head, Filled; }
@@ -231,6 +232,7 @@ namespace Armoury
                 bool cur = CrownIncome.On;
                 var ownSpend = CrownIncome.TakeOwnSpend();  // zawsze oproznia licznik (poza 165 pusty)
                 if (!s.CrownWageRefundEnabled) return;
+                RbnBegin();                                 // f6-zwrot: mnozniki rodow i liczniki pasm tej doby od zera
                 float pct = Math.Max(0f, Math.Min(100f, s.CrownWageRefundPercent)) / 100f;
                 float cutShare = Math.Max(0f, Math.Min(1f, s.CrownRefundOwnTownsCut));
                 long ownCut = 0;
@@ -284,9 +286,21 @@ namespace Armoury
                     {
                         foreach (var kv in list) rc.PaidSum += kv.Value;
                         if (!AtWar(k)) { peace += rc.PaidSum; continue; }
-                        rc.Due = new int[list.Count];
-                        for (int i = 0; i < list.Count; i++) { rc.Due[i] = (int)(list[i].Value * pct); rc.Want += rc.Due[i]; }
-                        if (rc.Want <= 0) continue;
+                        rc.Due = new int[list.Count]; rc.Full = new int[list.Count]; rc.Need = new NeedRow[list.Count];
+                        // f6-zwrot (decyzja Jeffa 18.10): nalezny = pelny (zold po cieciach W5/W7/K3 x pct) x f rodu, f = clamp((2R - G) / R, 0, 1) z wczorajszego budzetu;
+                        // klucz Crown Refund By Need wylaczony (albo budzet 166) - nalezny = pelny co do zlotowki jak dotad (RbnDue liczy f tylko do linii na sucho)
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            int fu; NeedRow nr;
+                            rc.Due[i] = RbnDue(list[i].Key != null ? list[i].Key.Clan : null, list[i].Value, pct, out fu, out nr);
+                            rc.Full[i] = fu; rc.Need[i] = nr; rc.Want += rc.Due[i];
+                        }
+                        if (rc.Want <= 0)
+                        {
+                            RbnCommit(rc.Full, rc.Need, rc.PaidSum, true);   // f6: krolestwo w wojnie bez naleznego (same rody ponad 2R) - do linii f6
+                            if (cur) { var cd0 = CrownIncome.DayOf(k); if (cd0 != null) cd0.RefundFull += RbnSum(rc.Full); }   // f6 (recenzja): pelny zwrot do zapasu wojny jak przed paczka
+                            continue;
+                        }
                         rows.Add(rc);
                         rc.Have = Math.Max(0, k.KingdomBudgetWallet);   // Diplomacy potrafi zostawic skarbiec na minusie - wtedy nic nie placimy
                         if (cur) rc.Have = CrownIncome.LeftFor(k);      // 165: z tego, co zostalo z wplywow dnia (i 1/360 zapasu) po racie 186, darach, ratach i kontraktach
@@ -362,22 +376,26 @@ namespace Armoury
                     {
                         CrownIncome.Spent(k, given);                    // 165: zwrot schodzi z reszty wplywow dnia; niedoplata przepada
                         var cd = CrownIncome.DayOf(k);
-                        if (cd != null) { cd.RefundDue += want; cd.RefundGiven += given; }
+                        if (cd != null) { cd.RefundDue += want; cd.RefundGiven += given; cd.RefundFull += RbnSum(rc.Full); }   // f6 (recenzja): RefundFull - pelny, do zapasu wojny
                     }
+                    RbnCommit(rc.Full, rc.Need, paidSum, false);   // f6-zwrot: pasma tylko z krolestw, ktore doszly do wyplaty (suma "wedlug potrzeby" = nalezny linii zwrotu)
                     _refund[k] = new RefundRow { Paid = paidSum, Due = want, Given = given, Clans = clans.Count };
                     kingdoms++; totalGiven += given; totalDue += want; totalPaid += paidSum; left += k.KingdomBudgetWallet;
                     if (given < want) { shortK++; if (have <= 0) emptyK++; }
                 }
+                totalPaid += _rbnRichPaid;                  // f6-zwrot: zold krolestw w wojnie bez naleznego (same rody ponad 2R) - dalej "zaplacony zold krolestw w wojnie", jak przed paczka
                 LastRefundGiven = totalGiven; LastRefundDue = totalDue; LastRefundPaid = totalPaid;   // paczka 169: linia "Obieg" (tylko log)
                 Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - zwrot zoldu ze skarbcow krolestw w wojnie" + (cur ? " (165: z wplywow dnia i 1/360 zapasu, partie w polu bez zalog, minus wydatki ludzi we wlasnych miastach rodu " + ownCut + ")" : "") + ": " + totalGiven + " zl dla " + allClans.Count + " rodow w "
                          + kingdoms + " krolestwach (" + (pct * 100f).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "% z " + totalPaid
-                         + " zaplaconego zoldu = nalezne " + totalDue + "); " + (cur ? "wplywow dnia nie starczylo" : "skarbiec nie mial dosc") + " w " + shortK + " krolestwach (w tym " + (cur ? "bez reszty wplywow" : "pusty") + ": " + emptyK + "), niedoplata "
+                         + (_rbnApply ? " zaplaconego zoldu = pelny " + RbnFullTotal() + "; wedlug potrzeby rodu (f6) nalezne " + totalDue : " zaplaconego zoldu = nalezne " + totalDue)   // f6-zwrot
+                         + "); " + (cur ? "wplywow dnia nie starczylo" : "skarbiec nie mial dosc") + " w " + shortK + " krolestwach (w tym " + (cur ? "bez reszty wplywow" : "pusty") + ": " + emptyK + "), niedoplata "
                          + (totalDue - totalGiven) + "; w skarbcach tych krolestw zostalo " + left
                          + (cur && (loanAll > 0 || CrownBorrow.On) ? "; z kredytu Banku (186, brak zwrotu - kapital -> skarbiec -> rody) " + loanAll + " w " + loanK + " krolestwach" : "")
                          + (playerGot > 0 ? "; rod gracza dostal " + playerGot : "")
                          + (toDebtors > 0 ? "; z tego " + toDebtors + " dla " + debtors.Count + " rodow dluznych koronie (gra zabierze im to na splate dlugu, ktora nie wraca do skarbca)" : "")
                          + ". Bez zwrotu: zold krolestw w pokoju " + peace + ", rodow bez krolestwa " + noKingdom + ", najemnikow " + merc + "."
                          + (stumbles > 0 ? " Potkniecia: wyjatek przy " + stumbles + " krolestwach." : ""));
+                RbnLine(totalDue);                          // f6-zwrot: linia "Korona: zwrot wedlug potrzeby (f6)" (pasma, oszczednosc korony) i komunikat gracza przy zmianie pasma
                 if (playerGot > 0)
                     Log.Player("The crown repaid your house " + playerGot + " denars of the wages it paid today - the realm is at war.");
                 if (ClanIncomeBook.StableDOn) { try { Log.Info(ArrearLine()); } catch (Exception e) { Log.Error("KingdomTreasury.ArrearLine", e); } }   // 169c (tylko log)

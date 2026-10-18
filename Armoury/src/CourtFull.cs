@@ -83,6 +83,12 @@ namespace Armoury
         /// <summary>E5 Z8 (decyzja 7): zwrot zapasu spoza zoldu zalog nie obniza zwrotu korony od zoldu zalog (SoldierPay.TakePaid).</summary>
         internal static bool Z8On { get { var s = Settings.Current; return s != null && s.CrownRefundIgnoresOwnBack; } }
 
+        /// <summary>f6-zwrot (2) (klucz LapsedGearBuysGoods; przeglad ekonomii 18.10 - "przydzial sprzetu do kas siedzib bez towaru", razem ze zwrotem zoldu wedlug potrzeby):
+        /// przeterminowany przydzial w wplacie dworu placi kasie siedziby tylko za towar niezywnosciowy zdjety z jej polki ponad zapas (CourtGoods.Gear - Goods nizej);
+        /// czego nie da sie kupic (brak towaru, drogo, limit wiersza, zamek bez polki), zostaje w kiesie glowy. Wylaczony - calosc do kasy jak dotad.</summary>
+        internal static bool GoodsOnly { get { var s = Settings.Current; return s != null && s.LapsedGearBuysGoods; } }
+        private static long _dGoodsWant, _dGoodsBought, _dNoGoodsTown, _dNoGoodsCastle;   // f6: do zaplaty ze sprzetu, kupione, zostalo w kiesie (miasta / zamki bez polki)
+
         // recenzja A2 (uwaga 1): zapas "wlasnego" - sprzet wplacony do kasy WLASNEJ siedziby, ktory nie wrocil jeszcze zaworem (opis klasy, Own, OwnBack)
         // E5 A2b: N - czesc zapasu z wplat NoteOwnPaid (OwnPaid), W - z niej zold zalog; obie schodza w tej samej proporcji co caly zapas
         private sealed class OwnStock { public Clan C; public double V, N, W; }
@@ -114,6 +120,7 @@ namespace Armoury
         {
             _dGross = _dMerc = _dNoSeat = _dDebtor = _dReserve = _dYield = _dFloor = 0;
             _dPaid = _dPaidTown = _dPaidCastle = 0; _dGrossN = _dPaidN = 0;
+            _dGoodsWant = _dGoodsBought = _dNoGoodsTown = _dNoGoodsCastle = 0;   // f6-zwrot (2)
             _dOwnBack = _dOwnCrown = _dOwnCap = _dOwnTrim = _dOwnLost = 0; _dOwnIn = 0;
             _dLateIn = _lateIn; _lateIn = 0;   // recenzja E5/A5: wplaty gracza od wczoraj wchodza do zapasu teraz (RollOwn nizej) - do linii "D staly" tej doby
             _dLateA2b = _lateA2b; _lateA2b = 0; _dBackA2b = _dBackWage = _dOldA2b = 0;   // E5 A2b: tak samo wplaty NoteOwnPaid spoza bloku
@@ -223,6 +230,28 @@ namespace Armoury
                 return paid;
             }
             catch (Exception e) { Stumble("Paid", e); return 0; }
+        }
+
+        /// <summary>f6-zwrot (2) - ClanBudget.Court, po zakupie wlasnej czesci dworu (CourtGoods.Lord), przed przelewem: czesc sprzetu lp w wplacie (z Paid) placi kasie
+        /// siedziby tylko za towar niezywnosciowy ponad zapas polki (CourtGoods.Gear; zamek - 0). Zwraca czesc sprzetu do przelewu (= koszt zdjetego towaru); reszta
+        /// (lp - wynik) zostaje w kiesie glowy - wolajacy zmniejsza wplate. Liczniki Paid (wplacone, miasta / zamki, rody) poprawione o to, co zostalo. Klucz wylaczony - lp
+        /// bez zmian (calosc do kasy jak dotad). Nie rzuca.</summary>
+        internal static long Goods(Settlement seat, long lp)
+        {
+            if (lp <= 0 || !GoodsOnly) return lp;
+            long got = 0;
+            try { got = CourtGoods.Gear(seat, lp); }
+            catch (Exception e) { Stumble("Goods", e); got = 0; }
+            got = Math.Max(0, Math.Min(lp, got));
+            long cut = lp - got;
+            _dGoodsWant += lp; _dGoodsBought += got;
+            if (cut > 0)
+            {
+                _dPaid -= cut;
+                if (seat != null && seat.IsTown) { _dPaidTown -= cut; _dNoGoodsTown += cut; } else { _dPaidCastle -= cut; _dNoGoodsCastle += cut; }
+                if (got <= 0) _dPaidN--;
+            }
+            return got;
         }
 
         /// <summary>Recenzja A2 (uwaga 1) - ClanBudget.Court, przy przelewie: czesc sprzetu lp wplacona do kasy WLASNEJ siedziby idzie do zapasu "wlasnego"
@@ -411,6 +440,10 @@ namespace Armoury
                   .Append(", dluznicy (polowa) ").Append(R(_dDebtor)).Append(", najemnicy bez dworu ").Append(R(_dMerc)).Append(", bez siedziby ").Append(R(_dNoSeat))
                   .Append("; udzial ludu (hak B1) ").Append((100.0 * FolkShare).ToString("0", Inv)).Append("% (Court Folk Share ")
                   .Append(s.CourtFolkShare.ToString("0.00", Inv)).Append(" - czynny przy kiesie ludu E5/B1)");
+                // f6-zwrot (2): sprzet tylko za towar niezywnosciowy ponad zapas polki (wplacone wyzej = kupione); reszta w kiesach glow
+                sb.Append("; f6 tylko za towar niezywnosciowy ponad zapas polki (Lapsed Gear Buys Goods ").Append(GoodsOnly ? "tak" : "nie - calosc do kas jak dotad")
+                  .Append("): do zaplaty ").Append(_dGoodsWant).Append(", kupione ").Append(_dGoodsBought).Append(", zostalo w kiesie glowy bez towaru ").Append(_dNoGoodsTown + _dNoGoodsCastle)
+                  .Append(" (miasta ").Append(_dNoGoodsTown).Append(" / zamki bez polki ").Append(_dNoGoodsCastle).Append(")");
             }
             if (_stumbles > 0) sb.Append(", potkniecia E5/A2 ").Append(_stumbles);
             return sb.ToString();

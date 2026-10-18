@@ -25,6 +25,12 @@ namespace Armoury
     /// Kto placi, kto dostaje: (a) glowa rodu -> kasa siedziby (ta sama kwota co dotad, czesc za towar); 20% dla ludu (CourtFolkShare) tylko od czesci "sluzba" - ClanBudget.Court.
     /// (b) skarbiec -> kasa stolicy z reszty wplywow dnia (CrownIncome.Spent). Towar schodzi z polki (ksiega towarow - ramka FCourt "dwory (E3-P1)", ujscie).
     /// Nic w zapisie (limit wiersza - pamiec doby). Wyjatek - potkniecie (licznik), zakup przerwany na sztukach juz zdjetych (oplacone).
+    /// Regula (c), f6-zwrot (klucz LapsedGearBuysGoods; przeglad ekonomii 18.10, uwaga "przydzial sprzetu do kas siedzib bez towaru", razem ze zwrotem zoldu wedlug
+    /// potrzeby - decyzja Jeffa 18.10): przeterminowany przydzial sprzetu (CourtFull, E5/A2) placi kasie siedziby-MIASTA tylko za towar NIEZYWNOSCIOWY z jej polki
+    /// (grupy sukno 40% i zbytki 60% - te same towary co (a) bez jedzenia), tylko ponad zapas polki (MaterialOrders.ShelfReserve: prog karawan i zuzycie warsztatow / wojska,
+    /// nie mniej niz 5 sztuk), te same bramki ceny (indeks <= 1.5, sztuka do 4 x wartosc) i ten sam limit 1/4 wiersza na dobe (wspolny z (a) dla wszystkich dworow siedziby -
+    /// w ramach rodu (a) kupuje przed (c), dwor placony pierwszy; miedzy rodami - kolejnosc rodow w ClanBudget.Daily). Wolajacy (ClanBudget.Court) przelewa kasie tylko koszt zdjetego towaru, reszta zostaje w kiesie glowy; zamek - nic (bez polki). Ta sama ramka
+    /// ksiegi towarow (dwory E3-P1), osobny licznik w linii doby.
     /// </summary>
     internal static class CourtGoods
     {
@@ -52,10 +58,10 @@ namespace Armoury
             public long Want, Gold; public int Pieces, Buyers, Seats; public long[] GWant = new long[3], GGold = new long[3]; public int[] GPcs = new int[3];
             public int Dear, AtKeep, RowCap; public readonly HashSet<Settlement> SeatSet = new HashSet<Settlement>();
         }
-        private static readonly Side _lord = new Side(), _crown = new Side();
+        private static readonly Side _lord = new Side(), _crown = new Side(), _gear = new Side();   // f6-zwrot: _gear - przeterminowany przydzial sprzetu (regula c)
         private static readonly SortedDictionary<string, long[]> _byItem = new SortedDictionary<string, long[]>(StringComparer.Ordinal);   // id -> [szt., zl]
         private static int _dStumbles, _sessStumbles;
-        internal static long LastLord, LastCrown;   // do linii "Budzet rodow (166)" i "Obieg" (kontrola ksiegi - poprzednia doba)
+        internal static long LastLord, LastCrown, LastGear;   // do linii "Budzet rodow (166)" i "Obieg" (kontrola ksiegi - poprzednia doba); f6: LastGear - regula (c)
         private static bool _startDone;
 
         internal static bool LordOn { get { var s = Settings.Current; return s != null && s.CourtBuysGoods; } }
@@ -63,7 +69,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _allow.Clear(); _allowDay = -1; _err.Clear(); _sessStumbles = 0; LastLord = LastCrown = 0; _startDone = false;
+            _allow.Clear(); _allowDay = -1; _err.Clear(); _sessStumbles = 0; LastLord = LastCrown = LastGear = 0; _startDone = false;
             ZeroDay();
         }
 
@@ -73,7 +79,7 @@ namespace Armoury
             for (int i = 0; i < 3; i++) { x.GWant[i] = 0; x.GGold[i] = 0; x.GPcs[i] = 0; }
         }
 
-        private static void ZeroDay() { ZeroSide(_lord); ZeroSide(_crown); _byItem.Clear(); _dStumbles = 0; }
+        private static void ZeroDay() { ZeroSide(_lord); ZeroSide(_crown); ZeroSide(_gear); _byItem.Clear(); _dStumbles = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -87,7 +93,7 @@ namespace Armoury
         /// Zdejmuje z polki siedziby-miasta towar dworu za najwyzej `budget` (koszt wedlug cen polki, sztuka po sztuce) - zloto NIE przechodzi tu (wolajacy placi kasie
         /// cala kwote jak dotad). Zwraca koszt zdjetego towaru (0..budget). Nie rzuca.
         /// </summary>
-        private static long Buy(Settlement seat, long budget, Side side)
+        private static long Buy(Settlement seat, long budget, Side side, bool nonFood = false)   // f6-zwrot: nonFood - regula (c), bez grupy jedzenia, tylko ponad zapas polki
         {
             if (seat == null || !seat.IsTown || seat.Town == null || budget <= 0) return 0;
             var town = seat.Town;
@@ -102,9 +108,11 @@ namespace Armoury
             var gf = GoodsLedger.Begin(GoodsLedger.FCourt, seat);
             try
             {
-                for (int g = 0; g < 3; g++)
+                for (int g = nonFood ? 1 : 0; g < 3; g++)
                 {
-                    long gb = (long)(budget * (double)GShare[g]) + carry; carry = 0;
+                    // f6 (c): sukno i zbytki w proporcji 0.2 : 0.3 (40% / 60%); (a) i (b) - udzialy jak dotad (ten sam rachunek co do zlotowki)
+                    double gs = nonFood ? GShare[g] / (1.0 - GShare[0]) : (double)GShare[g];
+                    long gb = (long)(budget * gs) + carry; carry = 0;
                     if (g == 2) gb = Math.Max(0, budget - spent);          // ostatnia grupa - cala reszta (bez zgubionych zaokraglen)
                     side.GWant[g] += gb;
                     var rows = new List<RowC>();
@@ -119,7 +127,8 @@ namespace Armoury
                         if (!(ix > 0f) || float.IsInfinity(ix)) ix = 1f;
                         if (ix > IndexMax) { side.Dear++; continue; }   // drogi tu - lud ma brak (uwaga recenzji): dwor nie bierze
                         int keep = Keep;
-                        if (it.StringId == "linen") keep = Math.Max(Keep, MaterialOrders.ShelfReserve(town, it));   // plotno tylko ponad zapas wojska
+                        if (nonFood) keep = Math.Max(Keep, MaterialOrders.ShelfReserve(town, it));                  // f6 (c): kazdy towar tylko ponad zapas polki (prog karawan, zuzycie)
+                        else if (it.StringId == "linen") keep = Math.Max(Keep, MaterialOrders.ShelfReserve(town, it));   // plotno tylko ponad zapas wojska
                         int have = el.Amount - keep;
                         if (have <= 0) { side.AtKeep++; continue; }
                         rows.Add(new RowC { El = el.EquipmentElement, Have = have, Ix = ix });
@@ -169,6 +178,16 @@ namespace Armoury
             catch (Exception e) { Stumble("Lord", e); return 0; }
         }
 
+        /// <summary>(c) f6-zwrot - CourtFull.Goods (z ClanBudget.Court, po (a), przed przelewem glowa -> kasa siedziby): towar niezywnosciowy ponad zapas polki za najwyzej
+        /// `lapsedPaid` (czesc wplaty dworu z przeterminowanego sprzetu). Zwraca koszt zdjetego towaru (0..lapsedPaid) - tylko tyle wolajacy przelewa kasie. Zamek - 0.
+        /// Klucz sprawdza wolajacy (CourtFull.GoodsOnly). Nie rzuca.</summary>
+        internal static long Gear(Settlement seat, long lapsedPaid)
+        {
+            if (lapsedPaid <= 0 || seat == null || !seat.IsTown) return 0;
+            try { return Buy(seat, lapsedPaid, _gear, true); }
+            catch (Exception e) { Stumble("Gear", e); return 0; }
+        }
+
         /// <summary>
         /// (b) CrownRents.Daily, po M3 i G5, przed podzialem rent: dwor krolewski w stolicy (siedziba rodu panujacego, tylko miasto) za CrownCourtShare puli rent.
         /// Skarbiec -> kasa stolicy (najpierw skarbiec, potem kasa - arytmetyka), CrownIncome.Spent. Zwraca zaplacone.
@@ -215,6 +234,7 @@ namespace Armoury
             _startDone = true;
             var s = Settings.Current;
             Log.Info("Dwor - towar z polki (E3-P1): start sesji | klucz Court Buys Goods " + (s != null && s.CourtBuysGoods ? "tak" : "nie") + ", Crown Court Goods " + (s != null && s.CrownCourtGoods ? "tak" : "nie")
+                     + ", Lapsed Gear Buys Goods (f6 - sprzet niewydany tylko za towar niezywnosciowy ponad zapas polki) " + (CourtFull.GoodsOnly ? "tak" : "nie")
                      + ", Crown Court Share " + (s != null ? s.CrownCourtShare.ToString("0.00", Inv) : "-")
                      + " | pan: do " + (LordShare * 100).ToString("0", Inv) + "% wlasnego dworu w siedzibie-miescie; krol: czesc puli rent w stolicy | grupy jedzenie 50% / sukno 20% / zbytki 30%, tylko indeks <= 1.5, ponad 5 szt. (plotno ponad zapas wojska), 1/4 wiersza na dobe, sztuka do 4 x wartosc"
                      + " | ramka ksiegi towarow 'dwory (E3-P1)' | potkniecia 0.");
@@ -228,17 +248,19 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || Campaign.Current == null) return;
                 if (!_startDone) SessionStart();
-                LastLord = _lord.Gold; LastCrown = _crown.Gold;
+                LastLord = _lord.Gold; LastCrown = _crown.Gold; LastGear = _gear.Gold;
                 var items = new List<KeyValuePair<long, string>>();
                 foreach (var kv in _byItem) items.Add(new KeyValuePair<long, string>(kv.Value[1], kv.Key + " " + kv.Value[0] + " szt. / " + kv.Value[1] + " zl"));
                 items.Sort((a, b) => b.Key.CompareTo(a.Key));
                 var top = new List<string>();
                 for (int i = 0; i < items.Count && i < 12; i++) top.Add(items[i].Value);
-                Log.Info("Dwor - towar z polki (E3-P1): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " | " + (s.CourtBuysGoods || s.CrownCourtGoods ? "CZYNNE" : "WYLACZONE (MCM)")
+                Log.Info("Dwor - towar z polki (E3-P1): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " | " + (s.CourtBuysGoods || s.CrownCourtGoods || CourtFull.GoodsOnly ? "CZYNNE" : "WYLACZONE (MCM)")
                          + " | " + SideText("pan (Court Buys Goods " + (s.CourtBuysGoods ? "tak" : "nie") + ")", _lord)
                          + " | " + SideText("korona (Crown Court Goods " + (s.CrownCourtGoods ? "tak" : "nie") + ")", _crown)
+                         + " | " + SideText("sprzet niewydany -> dwor tylko za towar niezywnosciowy ponad zapas polki (f6, Lapsed Gear Buys Goods " + (CourtFull.GoodsOnly ? "tak" : "nie") + ")", _gear)   // f6-zwrot (c)
                          + " | wedlug towaru: " + (top.Count > 0 ? string.Join(", ", top.ToArray()) : "-")
                          + " | zloto: pan -> kasy siedzib (czesc dworu za towar - ta sama kwota co dotad, lud bierze 20% tylko od sluzby) " + _lord.Gold + ", skarbce -> kasy stolic " + _crown.Gold
+                         + ", sprzet niewydany -> kasy siedzib tylko za towar (f6; lud bez udzialu, reszta w kiesach glow) " + _gear.Gold
                          + " | wplyw na skrzynie: lud siedzib mniej o 20% x towar pana (" + (long)(_lord.Gold * (double)CourtFull.FolkShare) + "), kasy siedzib wiecej o to samo; korony -" + _crown.Gold + ", kasy stolic +" + _crown.Gold
                          + " | potkniecia " + _dStumbles + " (sesja " + _sessStumbles + ").");
             }

@@ -810,10 +810,11 @@ namespace Armoury
                         _cpK++;
                         var kd = CrownIncome.DayOf(k);
                         long loan = kd != null ? kd.LoanIn : 0, due = kd != null ? kd.RefundDue : 0, meas = kd != null ? kd.Measured : 0;
+                        long dueFull = kd != null ? kd.RefundFull : 0;   // f6-zwrot (recenzja): zapas wojny z pelnego zwrotu - ta sama liczba co pierscien 184 (WarReserveOf)
                         CrownRing r;
                         if (!_crown.TryGetValue(k.StringId, out r)) { r = new CrownRing(); _crown[k.StringId] = r; }
                         r.Loan[r.H7] = loan > 0; r.H7 = (r.H7 + 1) % 7;
-                        r.Due[r.H28] = due; r.H28 = (r.H28 + 1) % 28; if (r.F28 < 28) r.F28++;
+                        r.Due[r.H28] = dueFull; r.H28 = (r.H28 + 1) % 28; if (r.F28 < 28) r.F28++;
                         long dsum = 0; for (int i = 0; i < r.F28; i++) dsum += r.Due[i];
                         double davg = r.F28 > 0 ? (double)dsum / r.F28 : 0;
                         long reserve = Math.Max((long)Math.Max(0, s != null ? s.CrownReserveGold : 0), (long)(60 * davg));
