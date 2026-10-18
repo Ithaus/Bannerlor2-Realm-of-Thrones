@@ -6988,7 +6988,7 @@ namespace Armoury
         [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
         public float KsConsignDepositShare { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Ks Corridors War Cut", HintText = "with Ks Corridors Credit: the weekly plan does not count a land route on which every town with food to spare is at war with every town that needs it - the merchants cannot trade across the war - instead of taking the nearest pair of towns of the two lands that are at peace; off = as before")]
+        [SettingPropertyBool("Ks Corridors War Cut", HintText = "with Ks Corridors Credit: the weekly plan does not count a land route on which every town with food to spare is at war with every town that needs it - the merchants cannot trade across the war - instead of taking the nearest pair of towns of the two lands that are at peace, and it counts the sellers' credit on a route only from the towns that are at peace with the buyers; off = as before")]
         [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
         public bool KsCorridorsWarCut { get; set; } = true;
 

@@ -1419,7 +1419,7 @@ namespace Armoury
             catch (Exception e) { Stumble("ImportEma", e); }
         }
 
-        internal static void Import(string s) { _carts.Clear(); _prevTransit = -1; _pending = string.IsNullOrEmpty(s) ? null : s; }
+        internal static void Import(string s) { _carts.Clear(); _prevTransit = -1; _depPrev = -1; _pending = string.IsNullOrEmpty(s) ? null : s; }   // KS-R5: kontrola zadatkow od nastepnej doby
 
         internal static void ResolvePending(string why)
         {

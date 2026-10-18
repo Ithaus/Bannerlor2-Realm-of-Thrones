@@ -2859,7 +2859,7 @@ namespace Armoury
         public float KsConsignDepositShare = 0.5f;         // with Ks Consign Deposit: the share of what the load is worth at the buying town's stall paid as earnest money when the cart sets out (0.5 = half now, half on arrival, as in a medieval grain contract)
         // KS-R5 ceny-r5: Plan, krok 5 z kredytem kupcow (H7) - luk krain, na ktorym kazde miasto eksportera z nadwyzka jest w wojnie z kazdym miastem importera z brakiem,
         // jest odciety (kupcy KS-H tam nie pojada); dotad Plan bral brame innej pary miast obu krain z kasa eksportera w wojnie (fin83: reach>aserai grain 967 szt./d, wojna The Reach - Dorne).
-        public bool KsCorridorsWarCut = true;              // with Ks Corridors Credit: the weekly plan does not count a land route on which every town with food to spare is at war with every town that needs it - the merchants cannot trade across the war - instead of taking the nearest pair of towns of the two lands that are at peace; off = as before
+        public bool KsCorridorsWarCut = true;              // with Ks Corridors Credit: the weekly plan does not count a land route on which every town with food to spare is at war with every town that needs it - the merchants cannot trade across the war - instead of taking the nearest pair of towns of the two lands that are at peace, and it counts the sellers' credit on a route only from the towns that are at peace with the buyers; off = as before
 
         // --- Goods paths (ZC1, 16.10) ---
         // Projekt ZYCIE CODZIENNE (docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 13-14, paczka ZC1 "drogi towarow"; GoodsPaths.cs i pliki z naglowkiem ZC1).
