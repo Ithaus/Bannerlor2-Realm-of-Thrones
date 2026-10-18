@@ -63,11 +63,14 @@ namespace Armoury
         private static long _vPaid, _vSkipValue, _vCastle;
         private static int _sSales, _sSkip, _sOdd; private static long _sGain, _sPaid, _sSold, _sBack;
         private static int _kKits, _kNoMarket; private static long _kPaid, _kFallback;
+        // A12 (H-4b): rynek wsi a uzbrojenie - pominiete przez regule BkVillageMarketNoArms (sztuki, zl, w tym uprzaz) i kupione (ujscie ksiegi uzbrojenia)
+        private static int _vArmsSkip, _vHarnSkip, _vArms, _vHarn; private static long _vArmsSkipValue, _vArmsPaid;
         private static int _stumbles;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
 
         private static void ClearDay()
         {
+            _vArmsSkip = _vHarnSkip = _vArms = _vHarn = 0; _vArmsSkipValue = _vArmsPaid = 0;
             _vBuys = _vVillages = _vSkip = 0; _vPaid = _vSkipValue = _vCastle = 0;
             _sSales = _sSkip = _sOdd = 0; _sGain = _sPaid = _sSold = _sBack = 0;
             _kKits = _kNoMarket = 0; _kPaid = _kFallback = 0;
@@ -128,6 +131,9 @@ namespace Armoury
             var roster = town.Owner.ItemRoster;
             bool any = false;
             long dsSpent = 0, dsOld = 0;
+            // A12 (H-4b): wies nie kupuje uzbrojenia (ta sama regula co mieszczanie - ArmsLeaks.IsArmsCategory) i ksiega uzbrojenia liczy sztuki, ktore tu znikaja
+            var s0 = Settings.Current;
+            bool noArms = s0 != null && s0.BkVillageMarketNoArms, bookArms = s0 != null && s0.ArmsBookBkVillageSink;
             for (int i = roster.Count - 1; i >= 0; i--)
             {
                 if (budget <= 10 && fresh <= 10) break;
@@ -142,11 +148,25 @@ namespace Armoury
                 bool inOld = budget > 10 && budget >= price;                                         // stary pulap na sztuke (BK; wies spoza DS - jedyny)
                 if (!inOld && !(ds && fresh >= price)) continue;
                 if (village.Gold < price) { _vSkip++; _vSkipValue += price; continue; }             // 3.4: dotad kasa dostawala te cene z niczego
+                // A12 (H-4b): uzbrojenie, zbroje, tarcze i rzedy koni nie sa towarem domowym (174.0 - mieszczanie); zloto zostaje w kiesie wsi, sztuka na polce miasta
+                if (noArms && ArmsLeaks.IsArmsCategory(item.ItemCategory.StringId))
+                {
+                    _vArmsSkip++; _vArmsSkipValue += price;
+                    if (item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) _vHarnSkip++;
+                    continue;
+                }
                 if (ks) { if (ksRoom < price) continue; ksRoom -= price; }
                 village.ChangeGold(-price);
                 town.ChangeGold(price);
                 roster.AddToCounts(el, -1);
                 _vBuys++; _vPaid += price; any = true;
+                // A12 (H-4b): sztuka z ksiegi uzbrojenia znika tu ze swiata (zjedli ja wiesniacy, zaplacili) - ujscie nazwane (tylko licznik)
+                if (ArmsBook.Kind(item) >= 0)
+                {
+                    if (bookArms) ArmsBook.Sink(ArmsBook.KBkVillage, item, 1);
+                    _vArms++; _vArmsPaid += price;
+                    if (item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) _vHarn++;
+                }
                 // KS-R3 P2: rynek wsi BK - wydatek wsi spoza koszyka (alfa netto); wies z koszykiem ZC4 - z nadwyzki ponad koszyk (nie z pieniedzy koszyka: bez odjecia w alfie)
                 try { if (ks) StartCalibration.NoteBkVillageMarket(village, price); else StartCalibration.KsVilOut(village.Settlement, price); } catch { }
                 if (town.IsCastle) _vCastle += price;
@@ -448,6 +468,18 @@ namespace Armoury
                 else if (!VillageOn) sb.Append("WYLACZONE w ustawieniach (BK jak dotad)");
                 else sb.Append(_vBuys).Append(" sztuk w ").Append(_vVillages).Append(" wsiach, kiesy wsi -> kasy ").Append(_vPaid.ToString(inv)).Append(" (w tym zamki ").Append(_vCastle.ToString(inv))
                        .Append("); pominiete, bo wies nie miala ceny: ").Append(_vSkip).Append(" sztuk za ").Append(_vSkipValue.ToString(inv)).Append(" (dawniej kasa dostawala je z niczego)");
+                // A12 (H-4b): odcinek tylko przy ktoryms z kluczy (oba wylaczone - linia jak dotad); towar: sztuki zostaja na polkach miast, zloto: zostaje w kiesach wsi
+                var s1 = Settings.Current;
+                if (VillageHooked && VillageOn && s1 != null && (s1.BkVillageMarketNoArms || s1.ArmsBookBkVillageSink))
+                    sb.Append(" | rynek wsi a uzbrojenie (A12, H-4b): regula bez uzbrojenia ").Append(s1.BkVillageMarketNoArms ? "tak" : "nie").Append(" - pominiete ").Append(_vArmsSkip)
+                      .Append(" szt. za ").Append(_vArmsSkipValue.ToString(inv)).Append(" zl (w tym uprzaz ").Append(_vHarnSkip).Append("; zostaly na polkach miast, zloto w kiesach wsi)")
+                      .Append("; kupione sztuki ksiegi uzbrojenia ").Append(_vArms).Append(" za ").Append(_vArmsPaid.ToString(inv)).Append(" zl (w tym uprzaz ").Append(_vHarn)
+                      .Append("; ujscie ksiegi E6/0 ").Append(s1.ArmsBookBkVillageSink ? "tak" : "nie").Append(")");
+                // recenzja A12 (3): klucz wlaczony, a nasza petla rynku wsi nie biegnie (latka nie wpieta albo Bk Village Market Pays What It Has wylaczone) - BK HandleVillage
+                // jak dotad zjada uzbrojenie; bez tego odcinka w logu nie byloby sladu, ze regula nie dziala
+                else if (s1 != null && s1.BkVillageMarketNoArms)
+                    sb.Append(" | rynek wsi a uzbrojenie (A12, H-4b): regula bez uzbrojenia nieczynna (").Append(!VillageHooked ? "latka rynku wsi BK nie wpieta" : "Bk Village Market Pays What It Has wylaczone")
+                      .Append(" - BK jak dotad, wies zjada uzbrojenie)");
                 sb.Append(" | niewolnicy: ");
                 if (!SlavesHooked) sb.Append("latka nie jest wpieta (BK jak dotad)");
                 else if (!SlavesOn) sb.Append("WYLACZONE w ustawieniach (BK jak dotad)");

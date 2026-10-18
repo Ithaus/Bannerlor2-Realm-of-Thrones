@@ -361,7 +361,11 @@ namespace Armoury
                 }
                 return;
             }
-            if (!has || kind < 0 || kind == KBand || kind == KPlayer || destroyer != null || mp.MapEvent != null || mp.SiegeEvent != null) return;
+            // A12 (PartyGoneMenGoHome): partia rodu wyjeta z bitwy przy upadku rodu (lista DestroyClanAction - zeruje MapEventSide i podaje niszczyciela) - zywi tak samo
+            // jak przy rozwiazaniu bez bitwy; recenzja A12 (1): partie kasowane przez gre po przegranej bitwie (tez niszczyciel i MapEvent null) - jak dotad (A17);
+            // bez klucza albo bez latki upadku rodu - jak dotad (w nicosc przy zniknieciu partii)
+            bool goneOut = GoneOutsideBattle(mp, destroyer, removed);
+            if (!has || kind < 0 || kind == KBand || kind == KPlayer || (destroyer != null && !goneOut) || mp.MapEvent != null || mp.SiegeEvent != null) return;
             // recenzja R1-4: R6 bez klucza karawan - ta sama symetria LevyLive co pobor E4/7/E4/8 (ArriveAt: !LevyLive - Note bez hearth); ludzi z DOM w partiach
             // daja tez pobor E4/7, milicja i nowe druzyny, wiec wylaczenie Caravans From People nie moze gasic ich powrotu
             double n2 = ArmsMen(mp, o, removed);
@@ -384,6 +388,7 @@ namespace Armoury
             try { vet = VetDisband(mp, types, men, n2, sh2); } catch (Exception e) { OStumble("ArmsPartyGone(E4/10)", e); vet = 0; }
             var a2 = ArriveAt(home2, sh2, AService, MBackDisband, MSoldier, false);
             ArmsFromPeople.NoteDisbandHome(kind, a2, removed, vet);
+            if (goneOut) { try { NoteGoneHome(a2, vet); } catch (Exception e) { OStumble("ArmsPartyGone(A12)", e); } }     // A12: licznik linii "Ludzie przy zniknieciu partii (A12)"
         }
 
         /// <summary>Ilu ludzi slownika wraca: min(slownik, sklad) - sklad teraz (MobilePartyDestroyed) albo sprzed RemoveParty (OnPartyRemoved; brak zapisu - caly slownik).</summary>

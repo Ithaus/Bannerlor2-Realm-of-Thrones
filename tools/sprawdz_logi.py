@@ -471,6 +471,15 @@ Uzycie (Python 3, tylko odczyt):
                     D2K-3 G5 jedno okno ksiegi wiosek, D2K-4 ludzie przy zniknieciu partii (INFO), D2K-5 GL2-9 bez zaworu przy kasie ponad zapasem <= 14 dob,
                     D2K-6 H-4b uprzaz wedlug miejsca (INFO), D2K-7 KR-8 ciecie stoi mimo nadmiaru = 0, D2K-8 Q-3 <= 4 zawrocen na dobe.
                     python -I tools/sprawdz_logi.py --grupa drobne2 <Armoury-*.log> (log czytany strumieniowo)
+                    (noc 17/18.10, stare-a12) grupa drobne2 wola takze --grupa na12 (raport A12 po raportach drobne2).
+--grupa na12      : (noc 17/18.10, paczka stare-a12; docs/noc-1718/stare-a12-CHANGELOG.md) naprawy spraw A12 z diagnoz drobne2: NA12-1 H-4b reszta uprzezy w ksiedze
+                    E6/0 <= 20% (z ujsciem 'zjedzone na rynku wsi BK (A12)'), NA12-2 uprzaz kupiona na rynku wsi BK = 0 (Bk Village Market No Arms), NA12-3 uprzaz w ujsciach
+                    tickow <= 3 szt./d, NA12-4 tozsamosc ludzi przy zniknieciu partii (w nicosc = w rownaniu krain + bez pochodzenia), NA12-5 rownanie krain (INFO),
+                    NA12-6 Q-3 zawrocone z zablokowanym celem = 0 i <= 4 zawrocen jednej partii na dobe (Crossing Law Aim Block), NA12-7 (INFO). Log bez paczki - INFO.
+                    Po recenzji A12: NA12-2 = NIE, gdy klucz Bk Village Market No Arms jest wlaczony, a regula 'nieczynna' (latka rynku wsi BK nie wpieta albo
+                    Bk Village Market Pays What It Has wylaczone); NA12-4 czyta odcinek 'do domu z partii rodu wyjetej z bitwy przy upadku rodu' (tylko partie z listy
+                    DestroyClanAction; latka upadku rodu - INFO w NA12-0).
+                    python -I tools/sprawdz_logi.py --grupa na12 <Armoury-*.log> (log czytany strumieniowo)
 --grupa drobne2   : (14.10, druga paczka drobnych) czesc swiat: D2-A10-1/2 dobytek z domu wedlug rodzaju (szt. na czlowieka bez zakupu >= 1.0),
                     D2-A11-1/2 karawany wyprowadzone z murow w ostatniej dobie oblezenia (zajete jawnie), D2-B6-1..3 winnice / gaje / palmy (29/19/8),
                     plon i zapas daktyli; czesci gracz i ksiegi - w swoich galeziach. python -I tools/sprawdz_logi.py --grupa drobne2 <log>
@@ -18750,6 +18759,171 @@ def drobne2k_main(logp):
             f"najwiecej {mx}; najdluzsza seria dob z >= 3: {streak} ({who}); linie z celem AI {len(qe)}" + (f" - pierwsza: {qe[0][:300]}" if qe else " (log sprzed drobne2)"),
             "<= 4 na dobe (24 h / (3 h przerwy + droga z powrotem) - petla ponownej decyzji AI, nie wibracja na granicy; seria i cel AI - INFO do decyzji)",
             mx <= 4 if got["q"] else None)
+    rep.show()
+    return 0
+
+
+def na12_main(logp):
+    """na12 (noc 17/18.10, paczka stare-a12; docs/noc-1718/stare-a12-CHANGELOG.md): male bledy biegu dwuletniego z diagnozami drobne2 - naprawy z kluczami.
+    NA12-0 linie i klucze (INFO); NA12-1 H-4b reszta uprzezy w ksiedze E6/0 / (zrodla + ujscia) w oknie <= 20% (z odcinkiem "zjedzone na rynku wsi BK (A12)";
+    log sprzed - INFO; log 120 dob 16-26-10: -48%, z czego rynek wsi BK 2 078 z 2 139); NA12-2 uprzaz kupiona na rynku wsi BK przy regule "bez uzbrojenia tak" = 0
+    (pominiete sztuki i zloto - INFO); NA12-3 uprzaz w ujsciach tickow (linia "Uzbrojenie (ujscia 174)", HorseHarness) srednio <= 3 szt./d przy regule tak (16-26-10: 17.3);
+    NA12-4 ludzie przy zniknieciu partii: tozsamosc "w nicosc = w rownaniu krain + bez pochodzenia" kazdej doby (|roznica| <= 0.5) przy Party Gone Men Counted tak,
+    do domu z partii rodu wyjetej z bitwy przy upadku rodu (INFO; recenzja A12 (1): tylko partie z listy DestroyClanAction, nie partie kasowane po przegranej bitwie);
+    NA12-2 po recenzji A12 (3): "regula bez uzbrojenia nieczynna" przy kluczu wlaczonym = NIE; NA12-5 rownanie krain - zmiana reszty swiata w oknie i ludzie w rownaniu od siewu (INFO); NA12-6 Q-3: zawrocone z zablokowanym
+    celem = 0 i najwiecej zawrocen jednej partii na dobe <= 4 (z odcinkiem "zmiana celu AI (Q-3, A12)"); NA12-7 partio-doby z >= 3 zawroceniami i blokady (INFO).
+    Log czytany strumieniowo; brak linii - INFO/BRAK, nigdy wyjatek."""
+    rep = Report()
+    pre = {"arms": "Uzbrojenie wedlug zrodla (E6/0): dzien", "leak": "Uzbrojenie (ujscia 174): dzien", "bk": "Szczelnosc BK (3.4): dzien",
+           "gone": "Ludzie przy zniknieciu partii (A12): dzien", "kb": "Ludzie (ksiega): dzien", "q": E8_Q_DAY, "qev": "CrossingLaw: AI "}
+    got = {k: [] for k in pre}
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            for k, p in pre.items():
+                if s.startswith(p):
+                    got[k].append(s)
+                    break
+    print(f"plik: {logp} | " + ", ".join(f"{k} {len(v)}" for k, v in got.items()))
+    mark_arms = any("zjedzone na rynku wsi BK (A12)" in s for s in got["arms"])
+    mark_bk = any("rynek wsi a uzbrojenie (A12, H-4b)" in s for s in got["bk"])
+    rule_on = any("regula bez uzbrojenia tak" in s for s in got["bk"])
+    rule_dead = sum(1 for s in got["bk"] if "regula bez uzbrojenia nieczynna" in s)     # recenzja A12 (3): klucz wlaczony, petla rynku wsi BK nie biegnie
+    mark_q = any("zmiana celu AI (Q-3, A12)" in s for s in got["q"])
+    fall = None
+    for s in got["gone"]:
+        mf = re.search(r"\[latka upadku rodu (.*?), rodow upadlo dzis (\d+)\]", s)
+        if mf:
+            fall = (mf.group(1), (fall[1] if fall else 0) + int(mf.group(2)))
+    rep.add("NA12-0: linie i klucze paczki stare-a12",
+            f"E6/0 z ujsciem rynku wsi {'TAK' if mark_arms else 'nie'}, rynek wsi a uzbrojenie {'TAK' if mark_bk else 'nie'} (regula bez uzbrojenia {'tak' if rule_on else 'nie/brak'}"
+            + (f"; NIECZYNNA {rule_dead} dob" if rule_dead else "") + "), "
+            f"linia 'Ludzie przy zniknieciu partii (A12)' {len(got['gone'])}" + (f" (latka upadku rodu {fall[0]}, rodow upadlo {fall[1]})" if fall else "")
+            + f", odcinek Q-3 A12 {'TAK' if mark_q else 'nie'}",
+            "INFO (log sprzed paczki - same 'nie'; klucze: Bk Village Market No Arms, Arms Book Bk Village Sink, Party Gone Men Go Home / Counted, Crossing Law Aim Block)", None)
+
+    # ---------------- NA12-1 H-4b
+    src = rest = vill = 0
+    nd = 0
+    for s in got["arms"]:
+        m = re.search(r"uprzaz t1-2/t3-4/t5-6: stan [\d/-]+, zrodla (\d+)/(\d+)/(\d+), reszta (-?\d+)/(-?\d+)/(-?\d+)", s)
+        if not m:
+            continue
+        nd += 1
+        v = [int(x) for x in m.groups()]
+        src += sum(v[:3]); rest += sum(v[3:])
+        h = re.search(r"uprzaz wedlug miejsca \(H-4b, diagnoza drobne2\): .*?zjedzone na rynku wsi BK \(A12\) (\d+)", s)
+        if h:
+            vill += int(h.group(1))
+    den = src + vill
+    pct = 100.0 * rest / den if den > 0 else 0.0
+    rep.add("NA12-1: H-4b reszta uprzezy w ksiedze uzbrojenia / (zrodla + ujscie rynku wsi BK)",
+            (f"reszta {rest:+d} przy zrodlach {src} i ujsciu rynku wsi {vill} ({pct:+.1f}%, {nd} dob)" if nd else "brak linii E6/0 z uprzeza")
+            + ("" if mark_arms else " (log sprzed A12 - bez ujscia rynku wsi)"),
+            "|reszta| <= 20% (bieg dwuletni -81%, 120 dob 16-26-10 -48%: rynek wsi BK zjadal 2 078 z 2 139 szt. reszty; zostaje lup DTE i przecieki)",
+            (abs(pct) <= 20.0) if (mark_arms and nd > 0 and den > 0) else None)
+
+    # ---------------- NA12-2 rynek wsi a uzbrojenie
+    sk_n = sk_v = sk_h = b_n = b_v = b_h = 0
+    nb = 0
+    rx_bk = re.compile(r"rynek wsi a uzbrojenie \(A12, H-4b\): regula bez uzbrojenia (tak|nie) - pominiete (\d+) szt\. za (\d+) zl \(w tym uprzaz (\d+);.*?kupione sztuki ksiegi uzbrojenia (\d+) za (\d+) zl \(w tym uprzaz (\d+)")
+    for s in got["bk"]:
+        m = rx_bk.search(s)
+        if not m:
+            continue
+        nb += 1
+        sk_n += int(m.group(2)); sk_v += int(m.group(3)); sk_h += int(m.group(4)); b_n += int(m.group(5)); b_v += int(m.group(6)); b_h += int(m.group(7))
+    rep.add("NA12-2: uprzaz kupiona na rynku wsi BK (regula bez uzbrojenia)",
+            ((f"kupione: uprzaz {b_h}, sztuk ksiegi uzbrojenia {b_n} za {b_v} zl (strzaly i odziez cywilna - dozwolone); pominiete regula: {sk_n} szt. za {sk_v} zl"
+              f" (uprzaz {sk_h}; srednio {sk_n / nb:.0f} szt. i {sk_v / nb:.0f} zl na dobe zostaje na polkach miast i w kiesach wsi) w {nb} dobach") if nb else
+             ("brak odcinka z liczbami" if rule_dead else "brak odcinka (log sprzed A12)"))
+            + (f"; regula NIECZYNNA mimo klucza w {rule_dead} dobach (latka rynku wsi BK nie wpieta albo Bk Village Market Pays What It Has wylaczone - BK zjada uzbrojenie)" if rule_dead else ""),
+            "uprzaz kupiona = 0 przy regule 'tak' (wies nie zjada rzedow koni ani zbroi - jak mieszczanie, 174.0); klucz wlaczony, a regula nieczynna = NIE",
+            False if rule_dead else ((b_h == 0) if (nb and rule_on) else None))
+
+    # ---------------- NA12-3 uprzaz w tickach (ksiega 174)
+    hh, nl = 0, 0
+    for s in got["leak"]:
+        nl += 1
+        m = re.search(r"HorseHarness (\d+) \(", s)
+        if m:
+            hh += int(m.group(1))
+    avg = hh / nl if nl else 0.0
+    rep.add("NA12-3: uprzaz zdjeta w tickach dobowych (ujscia 174, HorseHarness) - srednio na dobe",
+            f"{avg:.1f} szt./d ({hh} w {nl} dobach)" if nl else "brak linii 'Uzbrojenie (ujscia 174)' (ksiega towarow wylaczona)",
+            "<= 3 szt./d przy regule bez uzbrojenia (120 dob 16-26-10: 17.3 szt./d - rynek wsi BK w ticku osady)",
+            (avg <= 3.0) if (nl and rule_on) else None)
+
+    # ---------------- NA12-4 ludzie przy zniknieciu partii
+    # recenzja A12 (1): odcinek "do domu z partii rodu wyjetej z bitwy przy upadku rodu" + "[latka upadku rodu X, rodow upadlo dzis N]"; stara nazwa (przed recenzja) tez czytana
+    rx_g = re.compile(r"dzien (\d+) \| do domu (?:po usunieciu partii poza bitwa|z partii rodu wyjetej z bitwy przy upadku rodu) \(Party Gone Men Go Home (tak|nie)\): " + F_
+                      + r" ludzi z (\d+) partii \(w tym na Mur " + F_
+                      + r", do karczmy jako weterani " + F_ + r"\)(?: \[[^\]]*\])? \| w nicosc przy zniknieciu partii " + F_ + r" = w rownaniu krain " + F_ + r" \+ bez pochodzenia " + F_
+                      + r" \(Party Gone Men Counted (tak|nie); roznica " + SF + r"\) \| od siewu w rownaniu krain " + F_)
+    home = parties = wall = gone = cnt = none = 0.0
+    bad, nG, since, counted = [], 0, None, False
+    for s in got["gone"]:
+        m = rx_g.search(s)
+        if not m:
+            continue
+        nG += 1
+        home += float(m.group(3)); parties += int(m.group(4)); wall += float(m.group(5))
+        gone += float(m.group(7)); cnt += float(m.group(8)); none += float(m.group(9))
+        if m.group(10) == "tak":
+            counted = True
+            if abs(float(m.group(11))) > 0.5:
+                bad.append(m.group(1))
+        since = float(m.group(12))
+    rep.add("NA12-4: ludzie przy zniknieciu partii - do domu i w rownaniu krain",
+            (f"do domu z partii rodu wyjetych z bitwy przy upadku rodu {home:.0f} ludzi z {parties:.0f} partii (na Mur {wall:.0f}); w nicosc {gone:.0f} = w rownaniu {cnt:.0f} + bez pochodzenia {none:.0f};"
+             f" dob z roznica > 0.5: {len(bad)}" + (f" (d{', d'.join(bad[:5])})" if bad else "") + (f"; od siewu w rownaniu {since:.0f}" if since is not None else "") + f" ({nG} dob)")
+            if nG else "brak linii A12 (log sprzed paczki albo klucze wylaczone)",
+            "|w nicosc - w rownaniu - bez pochodzenia| <= 0.5 kazdej doby (Party Gone Men Counted); do domu - INFO (fabula ROT: bunt przeciw Jeorowi 1 422 ludzi jednej doby z partii w bitwie; bieg dwuletni d130 921; partie kasowane po przegranej bitwie - nie tu, A17)",
+            (len(bad) == 0) if (nG and counted) else None)
+
+    # ---------------- NA12-5 rownanie krain (INFO)
+    w0 = w1 = None
+    worst = None
+    for s in got["kb"]:
+        m = re.search(r"rownanie krain: najgorsza kraina (\S+) reszta " + SF + r" \(" + SF + r"% ludzi krainy\), swiat " + SF, s)
+        if m:
+            if w0 is None:
+                w0 = float(m.group(4))
+            w1 = float(m.group(4)); worst = (m.group(1), float(m.group(2)), float(m.group(3)))
+    rep.add("NA12-5: rownanie krain - zmiana reszty swiata w oknie (ludzie z niczego / w nicosc w regionach)",
+            (f"swiat {w0:+.0f} -> {w1:+.0f} (zmiana {w1 - w0:+.0f}); najgorsza kraina na koniec {worst[0]} {worst[2]:+.3f}% ({worst[1]:+.0f})"
+             + (f"; przy zniknieciu partii w oknie {gone:.0f} (w rownaniu {cnt:.0f})" if nG else "")) if w0 is not None else "brak linii 'Ludzie (ksiega)' z rownaniem krain",
+            "INFO (120 dob 16-26-10: swiat -4 490 -> -7 211, przy zniknieciu partii 576 - ok. 21% dryfu; reszta dryfu poza paczka A12)", None)
+
+    # ---------------- NA12-6 / NA12-7 Q-3
+    mx, hits, zeroed, newt, blocks, nq = 0, 0, 0, 0, 0, 0
+    over3 = 0
+    rx_q = re.compile(r"zmiana celu AI \(Q-3, A12\): latka (.*?), partii z blokada (\d+) \(celow (\d+); nowe dzis: partii (\d+), celow (\d+)\), wyniki zachowan AI zablokowane \(-1\) (\d+), zawrocone z zablokowanym celem (\d+)")
+    hook = "-"
+    for s in got["q"]:
+        m = re.search(r"najwiecej zawrocen jednej partii (\d+) \(.*?\), partii zawroconych ponad 3 razy (\d+)", s)
+        if m:
+            mx = max(mx, int(m.group(1))); over3 += int(m.group(2))
+        a = rx_q.search(s)
+        if a:
+            nq += 1
+            hook = a.group(1); blocks += int(a.group(4)); newt += int(a.group(5)); zeroed += int(a.group(6)); hits += int(a.group(7))
+    rep.add("NA12-6: Q-3 zmiana celu AI po drugim zawroceniu",
+            (f"latka {hook}; nowych blokad: partii {blocks}, celow {newt}; wyniki AI zablokowane (-1) {zeroed}; zawrocone z zablokowanym celem {hits}; najwiecej zawrocen jednej partii na dobe {mx}"
+             f" ({nq} dob)") if nq else (f"brak odcinka A12 (log sprzed paczki); najwiecej zawrocen jednej partii na dobe {mx}" if got["q"] else "brak linii 'Straz przeprawy (E8/Q)'"),
+            "zawrocone z zablokowanym celem = 0 i najwiecej zawrocen jednej partii na dobe <= 4 (bieg 6-letni: do 6, cel AI ten sam)",
+            (hits == 0 and mx <= 4 and hook == "wpieta") if nq else None)
+    rep3, blk = 0, 0
+    for s in got["qev"]:
+        m = re.search(r"zawrocenie nr (\d+) tej doby", s)
+        if m and int(m.group(1)) >= 3:
+            rep3 += 1
+        if "cel zablokowany na" in s:
+            blk += 1
+    rep.add("NA12-7: Q-3 linie zawrocen nr >= 3 tej doby i linie z blokada celu",
+            f"zawrocen nr >= 3: {rep3} linii (limit 10 na dobe), partio-dob ponad 3: {over3}; linie z blokada celu {blk}",
+            "INFO (bieg 6-letni: 354 linie nr >= 3 w 3 biegach; po A12 ma malec)", None)
     rep.show()
     return 0
 
@@ -38753,7 +38927,9 @@ def main(argv):
     if group == "a16" and logp:
         return a16_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csvp)   # A16: progi sygnalow z logow (ROZPOZNANIE-A16; log strumieniowo)
     if group == "drobne2" and logp:
-        return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
+        return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp), na12_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu); na12 (A12: naprawy H-4b, ludzie przy zniknieciu partii, Q-3)
+    if group == "na12" and logp:
+        return na12_main(logp)   # na12 (noc 17/18.10, stare-a12): H-4b rynek wsi BK bez uzbrojenia i ujscie ksiegi, ludzie partii usunietej poza bitwa do domu + licznik regionu, Q-3 zmiana celu AI
     if group == "okup" and logp:
         return okup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # okup zamiast szturmu (SiegeRansom): O0 pomiar, O1 AI z AI, O2 gracz-obronca, O3 gracz-oblegajacy
     if group == "oblezenia" and logp:

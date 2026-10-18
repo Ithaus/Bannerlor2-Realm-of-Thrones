@@ -62,7 +62,8 @@ namespace Armoury
     internal static class ArmsBook
     {
         internal const int SWorkshop = 0, SFletcher = 1, Sources = 2;
-        internal const int KScrap = 0, KRaid = 1, KSack = 2, Sinks = 3;   // KSack: L7 lupu miast (CitySack.Goods.cs) - uzbrojenie z polki zdobytej osady spalone przy spustoszeniu (nie unioslo sie);   // KRaid: E7/R1 (235) - uzbrojenie spalone w rabunku osada po osadzie (z magazynu wsi, nie unioslo sie)
+        // KBkVillage: A12 (H-4b) - rynek wsi BK (BkSeal34.RunVillage): wies kupuje sztuke z polki miasta Bound, sztuka znika (ksiegowane tylko z kluczem ArmsBookBkVillageSink)
+        internal const int KScrap = 0, KRaid = 1, KSack = 2, KBkVillage = 3, Sinks = 4;   // KSack: L7 lupu miast (CitySack.Goods.cs) - uzbrojenie z polki zdobytej osady spalone przy spustoszeniu (nie unioslo sie);   // KRaid: E7/R1 (235) - uzbrojenie spalone w rabunku osada po osadzie (z magazynu wsi, nie unioslo sie)
         internal const int TTrade = 0, TPurse = 1, TGarrison = 2, Transfers = 3;
         private const int Kinds = 10, Bands = 3, Slots = Kinds * Bands;
         private static readonly string[] KindNames = { "korpus", "helm", "nogi", "rece", "plaszcz", "tarcza", "bron biala", "strzelecka", "amunicja", "uprzaz" };
@@ -154,7 +155,22 @@ namespace Armoury
                 sb.Append(HPlaceNames[i]).Append(' ').Append(hz[i]);
                 if (prev != null) { long d = hz[i] - prev[i]; sb.Append(" (").Append(d >= 0 ? "+" : "").Append(d).Append(')'); }
             }
+            // A12 (H-4b): uprzaz zjedzona dzis na rynku wsi BK (ujscie ksiegi z kluczem ArmsBookBkVillageSink) - przy kluczu wylaczonym odcinek jak dotad
+            if (VillageSinkOn)
+            {
+                long hv = 0;
+                for (int b = 0; b < Bands; b++) hv += _sink[KBkVillage, HKind * Bands + b];
+                sb.Append(", zjedzone na rynku wsi BK (A12) ").Append(hv);
+            }
             return sb.ToString();
+        }
+
+        private static bool VillageSinkOn { get { var s = Settings.Current; return s != null && s.ArmsBookBkVillageSink; } }
+
+        /// <summary>A12 (H-4b): odcinek ujscia "zjedzone na rynku wsi BK" w linii E6/0 - tylko z kluczem ArmsBookBkVillageSink (wylaczony: linia jak dotad).</summary>
+        private static string VillageSinkText()
+        {
+            return VillageSinkOn ? ", zjedzone na rynku wsi BK (A12) " + Sum(_sink, KBkVillage) : "";
         }
 
         internal static void Daily()
@@ -238,7 +254,7 @@ namespace Armoury
                 kinds.Add(KindNames[k] + " t1-2/t3-4/t5-6: stan " + string.Join("/", st) + ", zrodla " + string.Join("/", sr) + ", reszta " + string.Join("/", rs));
             }
             Log.Info("Uzbrojenie wedlug zrodla (E6/0): dzien " + day + " | zrodla: warsztaty " + Sum(_src, SWorkshop) + ", strzelarze " + Sum(_src, SFletcher) + " (dorobek startowy ColdStart - w stanie wyjsciowym)"
-                     + " | ujscia: zlom " + Sum(_sink, KScrap) + ", spalone w rabunku (E7/R1) " + Sum(_sink, KRaid) + ", spalone przy lupie miast (L7) " + Sum(_sink, KSack) + " | przeniesienia (przyjazdy na polki miast, info): przerzut kupcow " + Sum(_xfer, TTrade) + ", sakiewki " + Sum(_xfer, TPurse)
+                     + " | ujscia: zlom " + Sum(_sink, KScrap) + ", spalone w rabunku (E7/R1) " + Sum(_sink, KRaid) + ", spalone przy lupie miast (L7) " + Sum(_sink, KSack) + VillageSinkText() + " | przeniesienia (przyjazdy na polki miast, info): przerzut kupcow " + Sum(_xfer, TTrade) + ", sakiewki " + Sum(_xfer, TPurse)
                      + ", zalogi " + Sum(_xfer, TGarrison) + " | stan " + total + " (polki i schowki osad " + shelves + ", tabory " + parties + ", zbrojownie DTE " + armories + ", w drodze wozem (215) " + road + "), zmiana " + (total - prevTotal)
                      + " | reszta " + rest + (den > 0 ? " (" + (100.0 * rest / den).ToString("0.0", CultureInfo.InvariantCulture) + "% zrodel + ujsc)" : "")
                      + " | w stanie takze pule weteranow (E8/H) " + vetPool + " szt. uprzezy, komplety weteranow (C3) " + vetKit + " szt. | nie podpiete (w reszcie): zuzycie do wraku, przecieki 174, netto lupu DTE, kuznia gracza, komplety z niczego, handel gry | koszt pomiaru E6/0 " + LastCostMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms (poprzednia doba)"

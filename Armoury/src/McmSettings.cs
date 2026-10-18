@@ -564,6 +564,10 @@ namespace Armoury
         [SettingPropertyGroup("The crossing law")]
         public bool CrossingLawAiClock { get; set; } = true;
 
+        [SettingPropertyBool("Crossing Law Aim Block", HintText = "a hostile lord turned back twice at a barred crossing gives up the place he was heading for beyond it for 5 days and picks another goal, instead of marching back to the same bridge again and again. Works only with Crossing Law Ai Clock (off = he may try the same bridge again after every 3 hour pause)")]
+        [SettingPropertyGroup("The crossing law")]
+        public bool CrossingLawAimBlock { get; set; } = true;
+
         [SettingPropertyInteger("Volunteer Regen Percent", 0, 400, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)")]
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 100;
@@ -3140,6 +3144,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PressUntakenGoHome { get; set; } = true;
 
+        [SettingPropertyBool("Party Gone Men Go Home", HintText = "when a house falls (for example in a story event, or when its last lord dies) while one of its war parties is in the middle of a battle, the game pulls that party out of the fight and removes it; its living men now go home to their own lands (sworn brothers back to the Wall) instead of vanishing from the world. Parties of a fallen house that were not fighting already went home, and parties beaten in battle are not affected (off = the men pulled out of the battle vanish, as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PartyGoneMenGoHome { get; set; } = true;
+
+        [SettingPropertyBool("Party Gone Men Counted", HintText = "men lost with a vanished party are counted against the land they came from in the people book of that land, like the fallen, so each land's tally of its people stays whole - a book-keeping rule, nobody is added or removed (off = they leave the land's tally unexplained, as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PartyGoneMenCounted { get; set; } = true;
+
         [SettingPropertyBool("Levy Village From Town", HintText = "when every village of a land is down to its last 50 hearths, a man recruited there comes from the people of the land's town instead of from nowhere")]
         [SettingPropertyGroup("Iron Bank")]
         public bool LevyVillageFromTown { get; set; } = true;
@@ -5388,6 +5400,10 @@ namespace Armoury
         [SettingPropertyGroup("Banner Kings coin (stage 3)")]
         public bool BkVillageMarketPaysWhatItHas { get; set; } = true;
 
+        [SettingPropertyBool("Bk Village Market No Arms", HintText = "villagers with a Banner Kings marketplace no longer buy arms, armour, shields or horse harness from their town and make them vanish - the same rule as for townsfolk (arms are not household goods); they still buy arrows, clothes and everyday goods, and the coin they would have spent stays in the village purse. Works only with Bk Village Market Pays What It Has (off = as before)")]
+        [SettingPropertyGroup("Banner Kings coin (stage 3)")]
+        public bool BkVillageMarketNoArms { get; set; } = true;
+
         [SettingPropertyBool("Bk Slave Sale Paid By Town", HintText = "surplus slaves sold off by a settlement's owner (Banner Kings decision to sell surplus slaves) are paid for by the merchants of that town or castle - at most what its purse may spend - instead of with coin out of nothing; the slaves they cannot pay for stay in the settlement (off = as before)")]
         [SettingPropertyGroup("Banner Kings coin (stage 3)")]
         public bool BkSlaveSalePaidByTown { get; set; } = true;
@@ -5875,6 +5891,10 @@ namespace Armoury
         [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool Stage6MeasureLog { get; set; } = true;
+
+        [SettingPropertyBool("Arms Book Bk Village Sink", HintText = "the arms book also counts the pieces villagers buy on a Banner Kings village market (they leave the world there) - written to the log only, changes nothing in the game")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ArmsBookBkVillageSink { get; set; } = true;
 
         [SettingPropertyBool("Workshop Craft By Realm", HintText = "each realm's smiths make the arms and armour of their own land - their own patterns first, then a kindred realm's, then those common to their region and their side of the sea, never a great house's livery from another realm and never a unique piece; what a realm cannot make, the traders bring. The realm of a town is the one of its land, not of its current lord. Your own forge is not limited (off = town workshops make anything of the town's culture and, when they have none, any foreign pattern, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -7420,6 +7440,7 @@ namespace Armoury
             s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;
             s.CrossingLawAiClock = CrossingLawAiClock;
+            s.CrossingLawAimBlock = CrossingLawAimBlock;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;
@@ -8064,6 +8085,8 @@ namespace Armoury
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;
+            s.PartyGoneMenGoHome = PartyGoneMenGoHome;
+            s.PartyGoneMenCounted = PartyGoneMenCounted;
             s.LevyVillageFromTown = LevyVillageFromTown;
             s.TownLevyByShare = TownLevyByShare;
             s.PrisonEscapeGoHome = PrisonEscapeGoHome;
@@ -8626,6 +8649,7 @@ namespace Armoury
             s.HistWorthWindowsOldCoin = HistWorthWindowsOldCoin;
             s.BkSupplyBuyByPartyStock = BkSupplyBuyByPartyStock;
             s.BkVillageMarketPaysWhatItHas = BkVillageMarketPaysWhatItHas;
+            s.BkVillageMarketNoArms = BkVillageMarketNoArms;
             s.BkSlaveSalePaidByTown = BkSlaveSalePaidByTown;
             s.BkKnightKitPaidToTown = BkKnightKitPaidToTown;
             s.RotSwapNoGold = RotSwapNoGold;
@@ -8748,6 +8772,7 @@ namespace Armoury
             s.VillageClothAboveReserve = VillageClothAboveReserve;
             s.FolkClothAboveReserve = FolkClothAboveReserve;
             s.Stage6MeasureLog = Stage6MeasureLog;
+            s.ArmsBookBkVillageSink = ArmsBookBkVillageSink;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;
             s.WorkshopsFollowInputs = WorkshopsFollowInputs;
