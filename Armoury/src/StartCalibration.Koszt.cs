@@ -219,6 +219,85 @@ namespace Armoury
             }
         }
 
+        // ============================================================ T8/T10: ilosci pozycji koszyka na polce jednym przegladem
+        /// <summary>T8/T10: ilosc kazdej pozycji koszyka na polce ro z semantyka ItemRoster.GetItemNumber (pierwszy wiersz z tym przedmiotem, kazdy modyfikator; brak - 0),
+        /// jednym przegladem polki zamiast jednego szukania liniowego na pozycje. cnt[z] wedlug pierwszej pozycji przedmiotu w _zIx (CountZ). null - mapa pozycji niegotowa.</summary>
+        internal static int[] ShelfFirst(TaleWorlds.CampaignSystem.Roster.ItemRoster ro)
+        {
+            var types = T7Types();
+            if (ro == null || types == null || _zIx == null) return null;
+            var cnt = new int[ZN]; var seen = new bool[ZN];
+            int n = ro.Count;
+            for (int k = 0; k < n; k++)
+            {
+                var ei = ro.GetItemAtIndex(k);
+                if (ei == null) continue;
+                int ty = (int)ei.ItemType;
+                if (ty < 0 || ty >= types.Length || !types[ty]) continue;
+                int zi;
+                if (!_zIx.TryGetValue(ei, out zi) || seen[zi]) continue;
+                seen[zi] = true; cnt[zi] = ro.GetElementNumber(k);
+            }
+            return cnt;
+        }
+
+        /// <summary>T8/T10: ro.GetItemNumber(ZItem(z)) z przegladu ShelfFirst (przedmiot spoza _zIx - szukanie jak dotad).</summary>
+        internal static int CountZ(TaleWorlds.CampaignSystem.Roster.ItemRoster ro, int z, int[] cnt)
+        {
+            var it = _zItems[z];
+            if (it == null) return 0;
+            int zi;
+            if (cnt != null && _zIx.TryGetValue(it, out zi)) return cnt[zi];
+            return ro.GetItemNumber(it);
+        }
+
+        // ============================================================ T8: przetwory ZC5 - pamiec jednej przerobki miasta (TownCraftsDay)
+        /// <summary>T8 (klucz Ks Cost Fast): (1) sprzedane wczoraj wedlug kategorii jednym przejsciem po Town.SoldItems (ta sama suma co SoldYesterday); (2) ilosc na polce
+        /// z semantyka GetItemNumber (pierwszy wiersz z przedmiotem) z zapamietanym indeksem wiersza - wazny, dopoki polka nie zmienia liczby wierszy (wszystkie zmiany polki
+        /// w przerobce ida przez Add - przy zmianie liczby wierszy pamiec od zera; AddToCounts przesuwa wiersze tylko przy usunieciu albo dopisaniu wiersza).</summary>
+        private sealed class KcMemo
+        {
+            private readonly TaleWorlds.CampaignSystem.Roster.ItemRoster _ro; private readonly Town _t;
+            private Dictionary<ItemCategory, int> _sold; private bool _soldBad;
+            private readonly Dictionary<ItemObject, int> _ix = new Dictionary<ItemObject, int>();
+            private int _cnt = -1;
+            internal KcMemo(TaleWorlds.CampaignSystem.Roster.ItemRoster ro, Town t) { _ro = ro; _t = t; }
+
+            internal int Sold(ItemCategory c)
+            {
+                if (_sold == null && !_soldBad)
+                {
+                    try
+                    {
+                        var d = new Dictionary<ItemCategory, int>();
+                        var l = _t.SoldItems;
+                        if (l != null) foreach (var x in l) { if (x.Category == null || x.Number <= 0) continue; int n0; d.TryGetValue(x.Category, out n0); d[x.Category] = n0 + x.Number; }
+                        _sold = d;
+                    }
+                    catch { _soldBad = true; }
+                }
+                if (_soldBad) return SoldYesterday(_t, c);
+                if (c == null) return 0;
+                int n; return _sold.TryGetValue(c, out n) ? n : 0;
+            }
+
+            internal int Num(ItemObject it)
+            {
+                if (it == null) return _ro.GetItemNumber(it);
+                if (_ro.Count != _cnt) { _ix.Clear(); _cnt = _ro.Count; }
+                int i;
+                if (!_ix.TryGetValue(it, out i)) { i = _ro.FindIndexOfItem(it); _ix[it] = i; }
+                return i >= 0 ? _ro.GetElementNumber(i) : 0;
+            }
+
+            internal void Add(ItemObject it, int n)
+            {
+                int c0 = _ro.Count;
+                _ro.AddToCounts(it, n);
+                if (_ro.Count != c0) { _ix.Clear(); _cnt = _ro.Count; }
+            }
+        }
+
         /// <summary>T5: mapa koszyka miasta t dla zakupow jednej wsi (null - poza ZC4: ZRow -2, ZPrice 0) - to samo, co ZTownOf w ZRow, ZRowSet i ZPrice.</summary>
         internal static ZTown ZTownFor(Town t)
         {

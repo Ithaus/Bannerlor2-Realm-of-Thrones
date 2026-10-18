@@ -606,11 +606,12 @@ namespace Armoury
                 double lam = zt.Lam;
                 var q = new double[ZN];
                 Array.Copy(zt.Q, q, ZN);
+                int[] sc = SwCostFast ? ShelfFirst(ro) : null;         // ks-koszt T10: ilosci pozycji na polce jednym przegladem (te same liczby co GetItemNumber)
                 // piwo domowe: piwa na polce mniej niz dzienna potrzeba - brakujace litry kupowane jako ziarno (0.4 kg/l)
                 var beer = _zItems[ZBeer]; var grain = _zItems[ZGrain];
                 if (beer != null && grain != null && q[ZBeer] > 0)
                 {
-                    int have = ro.GetItemNumber(beer);
+                    int have = sc != null ? CountZ(ro, ZBeer, sc) : ro.GetItemNumber(beer);
                     double miss = Math.Max(0.0, q[ZBeer] - have);
                     if (miss > 0)
                     {
@@ -625,7 +626,7 @@ namespace Armoury
                     {
                         var it = _zItems[z];
                         if (it == null || !(q[z] > 0)) continue;
-                        double miss = Math.Max(0.0, q[z] - ro.GetItemNumber(it));
+                        double miss = Math.Max(0.0, q[z] - (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(it)));
                         if (!(miss > 0)) continue;
                         q[z] -= miss; q[ZGrain] += miss * _zKg[z] / _zKg[ZGrain];
                         _zBreadN++; _zBreadPcs += miss;
@@ -635,7 +636,7 @@ namespace Armoury
                     for (int z = 0; z < ZN; z++)
                     {
                         if (CtlGood(z) < 0 || !(q[z] > 0) || _zItems[z] == null) continue;
-                        double miss = lam * q[z] - ro.GetItemNumber(_zItems[z]);
+                        double miss = lam * q[z] - (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(_zItems[z]));
                         if (miss > 0) KsUnmet(zt.Market, z, miss);
                     }
                 foreach (var kv in _zCats)
@@ -730,6 +731,7 @@ namespace Armoury
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             double B = Math.Max(0.0, ff) * tot, left = B;
             var md = town.MarketData; var ro = town.Settlement.ItemRoster;
+            int[] sc = ro != null && SwCostFast ? ShelfFirst(ro) : null;     // ks-koszt T10: ilosci pozycji na polce jednym przegladem (te same liczby co GetItemNumber)
             var need = new Dictionary<ItemCategory, double>(); var give = new Dictionary<ItemCategory, double>();
             var rung = new Dictionary<ItemCategory, int>(); var unit = new Dictionary<ItemCategory, double>(); var stock = new Dictionary<ItemCategory, bool>();
             foreach (var c in keys)
@@ -748,7 +750,7 @@ namespace Armoury
                         double per = Math.Max(1, p) / _zKg[z];                                         // zl za kg (litr)
                         if (ZKcalKg[z] > 0 && (rg == 3)) per /= ZKcalKg[z] / 1000.0;                   // bialko: zl za 1000 kcal
                         if (per < best) best = per;
-                        if (ro != null && ro.GetItemNumber(it) > 0) has = true;
+                        if (ro != null && (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(it)) > 0) has = true;
                     }
                 unit[c] = best < double.MaxValue ? best : 1e9; stock[c] = has;
             }

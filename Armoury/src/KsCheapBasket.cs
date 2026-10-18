@@ -56,6 +56,7 @@ namespace Armoury
             int n = keys.Count;
             if (n == 0) return -1;
             var ro = town.Settlement != null ? town.Settlement.ItemRoster : null;
+            int[] sc = ro != null && SwCostFast ? ShelfFirst(ro) : null;     // ks-koszt T10: ilosci pozycji na polce jednym przegladem (te same liczby co GetItemNumber)
             var need = new double[n]; var kcal = new double[n]; var rung = new int[n]; var staple = new bool[n]; var key = new double[n]; var cap = new double[n]; var give = new double[n];
             bool anyStaple = false;
             for (int i = 0; i < n; i++)
@@ -69,7 +70,7 @@ namespace Armoury
                     foreach (int z in zs)
                     {
                         var it = _zItems[z]; if (it == null) continue;
-                        int have = ro != null ? ro.GetItemNumber(it) : 0;
+                        int have = ro != null ? (sc != null ? CountZ(ro, z, sc) : ro.GetItemNumber(it)) : 0;
                         cnt += Math.Max(0, have);
                         double pk = Math.Max(1, zt.Px[z]) / _zKg[z];
                         bool st = have > 0;
