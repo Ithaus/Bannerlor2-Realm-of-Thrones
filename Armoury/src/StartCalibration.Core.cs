@@ -885,6 +885,8 @@ namespace Armoury
             // recenzja 17.10 (drobne): najlepszy stan (najmniejsza suma odchylen towarow poza granica ceny) - rownowaga, ktora konczy sie na limicie rund albo stoi,
             // oddaje najlepszy stan, nie ostatni (rownowaga drgajaca zatrzymana w gorszej fazie dawala wiecej towarow niezbieznych)
             double bestMt = double.MaxValue, lastMt = double.MaxValue; double[] bp = null, bxs = null, bS = null, brr = null; int bestImp = 0;
+            double[] eta = null; sbyte[] esg = null;                   // feed-swiat (Ks Plan Markets Clear): krok ceny towaru (maleje, gdy cena skacze w kolko)
+            if (x.In.MarketsClear && ClearEta) { eta = new double[n]; esg = new sbyte[n]; for (int i = 0; i < n; i++) eta[i] = Eta; }
             bool conv = false;
             int it = 0;
             for (it = 0; it < rounds; it++)
@@ -902,7 +904,7 @@ namespace Armoury
                 {
                     int g = i % KsTab.NG;
                     double r = KsTab.RegGoodMask[g] ? 1.0 : (x.Dm[i] + 1.0) / (S[i] + 1.0);
-                    double v = p[i] * Math.Pow(r, Eta);
+                    double v = p[i] * Math.Pow(r, eta == null ? Eta : EtaOf(eta, esg, i, r));
                     p[i] = v < PLo ? PLo : (v > PHi ? PHi : v);
                 }
                 for (int m = 0; m < NM; m++)
@@ -918,6 +920,7 @@ namespace Armoury
                     if (ws > 0) { double f = Math.Exp(wl / ws); for (int g = 0; g < KsTab.NG; g++) p[m * KsTab.NG + g] /= f; }
                 }
                 for (int m = 0; m < NM; m++) for (int g = 0; g < KsTab.NG; g++) if (KsTab.RegGoodMask[g]) p[m * KsTab.NG + g] = 1.0;
+                if (EqDebug != null) EqDebug(it, p, S, x.Dm, xs);              // feed-swiat: harness (przebieg rownowagi); w grze null
                 if (it % 50 == 49)
                 {
                     bool bad = false; double mt = 0;
@@ -952,6 +955,8 @@ namespace Armoury
             }
             done = Math.Min(rounds, it + 1);
             // koniec bez zbieznosci (stoi, limit rund albo przerwane): najlepszy stan z punktow kontrolnych, gdy ostatni jest gorszy
+            x.R.EqN++; if (conv) x.R.EqConv++;                        // feed-swiat: rownowagi Planu (linia rynkow Planu)
+            EtaStats(x, eta, act);
             if (!conv && bp != null && bestMt < lastMt)
             {
                 Array.Copy(bp, p, n); Array.Copy(bxs, xs, x.NP); Array.Copy(bS, S, n); Array.Copy(brr, rr, x.NB);
@@ -1196,6 +1201,7 @@ namespace Armoury
             var inp = x.In; var R = x.R;
             var M = new KsMoney { On = true };
             R.Money = M;
+            MuInit(x);                                                 // feed-swiat (Ks Plan Markets Clear): narzut niedoboru towarow dla mieszczan
             foreach (var d in x.D) d.NeedR8 = (double[])d.Need.Clone();
             foreach (var t in inp.Towns) t.NeedR8 = (double[])t.Need.Clone();
             var vs = new List<MDist>();
@@ -1330,6 +1336,7 @@ namespace Armoury
                     }
                     for (int m = 0; m < NM; m++) M.Global[m] = ww[m] > 0 ? gw[m] / ww[m] : 0.0;
                     M.DG = maxDG;
+                    MuRound(x, M, S, eatPrev);                         // feed-swiat: niedobor rynku bez rak do oddania - towar, ktorego brakuje, drozeje dla mieszczan
                 }
                 Array.Clear(M.VSales, 0, NM); Array.Clear(M.VSalesB, 0, NM); Array.Clear(M.VBudget, 0, NM); Array.Clear(M.VBasket, 0, NM); Array.Clear(M.VPaid, 0, NM); Array.Clear(M.VHome, 0, NM);
                 Array.Clear(M.VHands, 0, NM); Array.Clear(M.VHomeHands, 0, NM); Array.Clear(M.VShort, 0, NM); Array.Clear(M.VN, 0, NM); Array.Clear(M.VHorse, 0, NM);
@@ -1371,6 +1378,7 @@ namespace Armoury
                     int lv = x.GradOn && R4LandPrice ? LandOfD(x, d) : -1;
                     double[] pzu = pz; int po = m * NZ;
                     if (lv >= 0) { for (int z = 0; z < NZ; z++) pzv[z] = pz[m * NZ + z] * GradZ(x, lv, z); pzu = pzv; po = 0; }
+                    pzu = VillageLadderPrices(x, m, pzu, ref po, last);   // feed-swiat recenzja (klucz Ks Plan Markets Clear Villages, domyslnie WYLACZONY): narzut i dla wsi; bez klucza pzu, po
                     double bask = 0; for (int z = 0; z < NZ; z++) bask += q[z] * pzu[po + z];
                     double budget = v.Alpha * salesB;
                     double pv;
@@ -1573,15 +1581,17 @@ namespace Armoury
                         // r4-koszyk: drabina klasy przez KsCheap.PlanLadder - przy kluczu Ks Cheap Basket wylaczonym ta sama KsBasket.Ladder co dotad (co do liczby), plus podzial
                         // P9 (kcal jedzenia / rzeczy); przy kluczu - drabina tanszego koszyka (paid 0..1, podstawa ponad koszyk w tex1)
                         Array.Clear(p9, 0, p9.Length);
+                        int lpo; var lpz = TownLadderPrices(x, m, tpz, tpo, out lpo);   // feed-swiat (Ks Plan Markets Clear): cena niedoboru dla mieszczan; bez klucza tpz, tpo
                         if (tcut != null)
                         {
                             // KS-R3 regula zasiegu: psujace sie bez zrodla w 7 dobach - poza drabina miasta (budzet na reszte), czesc zaplacona 0 (odpada z popytu)
                             Array.Copy(qc, qq, NZ);
                             for (int z = 0; z < NZ && z < tcut.Length; z++) if (tcut[z]) qq[z] = 0.0;
-                            pv = KsCheap.PlanLadder(inp.CheapBasket, qq, qc, tpz, tpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
+                            pv = KsCheap.PlanLadder(inp.CheapBasket, qq, qc, lpz, lpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
                             for (int z = 0; z < NZ && z < tcut.Length; z++) if (tcut[z]) paid[z] = 0.0;
                         }
-                        else pv = KsCheap.PlanLadder(inp.CheapBasket, qc, qc, tpz, tpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
+                        else pv = KsCheap.PlanLadder(inp.CheapBasket, qc, qc, lpz, lpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
+                        if (last) ClearTownExport(x, inp.CheapBasket, m, c, tcut, qc, qq, tpz, tpo, lpz, Math.Max(0.0, t.Budget[c]), ref pv, paid, tex1, p9);   // feed-swiat recenzja: do gry - ceny startu
                         M.TBudget[m * 3 + c] += Math.Max(0.0, t.Budget[c]); M.TBasket[m * 3 + c] += cost; M.TPaid[m * 3 + c] += pv;
                         for (int k9 = 0; k9 < KsCheap.StatN; k9++) M.P9[(m * 3 + c) * KsCheap.StatN + k9] += p9[k9];
                         for (int z = 0; z < NZ; z++) { tqs[z] += qc[z]; tus[z] += (1.0 - paid[z]) * qc[z]; tex[z] += tex1[z]; M.ExtraT[m * NZ + z] += tex1[z]; }
@@ -1633,6 +1643,7 @@ namespace Armoury
                 if (cancel != null && cancel()) return;
             }
             R.Eaten = (double[])eat.Clone();
+            MuFinish(x);                                               // feed-swiat: narzut niedoboru do wyniku
             // zbieznosc punktu stalego (recenzja 17.10): sumy rynku stoja (sprzedaz, zaplacone, rece w domu - zmiana < 1% w ostatniej rundzie) i rynek bez nadwyzki
             // (< 1% popytu targu) albo brak rak do oddania (praca domowa rynku nie pokryje braku)
             for (int m = 0; m < NM; m++)

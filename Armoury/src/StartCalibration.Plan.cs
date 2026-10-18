@@ -100,6 +100,7 @@ namespace Armoury
             inp.Money = true; inp.Keep = _keep;
             inp.ClothDemand = SwClothDemand;                          // KS r4 P8 (r4-ceny): plotno, sukno, skora z odziezy wojska i warsztatow zbrojnych w popycie Planu
             SyncColdLand(); inp.SelfFeed = SelfFeedMode(); inp.SelfFeedOwn = SelfFeedOwnOnly();   // r4-polnoc: zimna ziemia (tabela swiata) i najpierw wyzywic siebie (prog Planu)
+            FeedSwiatInput(inp);                                      // feed-swiat: jedzenie podstawowe, krok progu, rynek musi sie oczyscic (cieply start z poprzedniego Planu)
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");

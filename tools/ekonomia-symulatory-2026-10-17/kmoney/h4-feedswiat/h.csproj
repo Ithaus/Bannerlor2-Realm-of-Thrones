@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- feed-swiat (noc 17/18.10): uprzaz Planu (kopia kmoney/h4 z r4-polnoc + przelaczniki kluczy scalenia i feed-swiat; NIEZB/EXC/P9 na Plan; KS_EQDBG - przebieg
+       rownowagi). Zrodla Armoury wzgledem tego katalogu (repo albo worktree). Uruchomienie: runh.sh (opis w docs/noc-1718/feed-swiat-CHANGELOG.md). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <LangVersion>latest</LangVersion>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Tables.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Core.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Deliver.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Corridors.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Feed.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Clear.cs" />
+    <Compile Include="../../../../Armoury/src/KsCheap.cs" />
+  </ItemGroup>
+</Project>

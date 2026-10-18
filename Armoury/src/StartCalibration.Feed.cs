@@ -122,10 +122,11 @@ namespace Armoury
                 if (InFeedScope(d, mode, x.B[b0]))
                 {
                     PairFood(x, d, b0, b1);
-                    double need = KsTab.FoodNeedKcal(d.Need0), regV = 0;
+                    // feed-swiat (Ks Self Feed Staples): potrzeba jedzenia podstawowego (zboze, ryby, mieso, ser, maslo), regale bez jedzenia podstawowego - na targ
+                    double need = x.In.SelfFeedStaple ? StapleNeedKcal(d.Need0) : KsTab.FoodNeedKcal(d.Need0), regV = 0;
                     double[] rb;
                     if (x.RegByDist != null && x.RegByDist.TryGetValue(d.Id, out rb) && rb != null)
-                        for (int g = 0; g < KsTab.NG; g++) { need -= rb[g] * fk[g]; if (NonFoodSold(g)) regV += rb[g] * x.Val[g]; }
+                        for (int g = 0; g < KsTab.NG; g++) { need -= rb[g] * FeedKcal(x, g); if (FeedSold(x, g)) regV += rb[g] * x.Val[g]; }
                     for (int b = b0; b < b1; b++)
                     {
                         int a = x.BStart[b], e = x.BStart[b + 1];
@@ -167,6 +168,7 @@ namespace Armoury
             x.FdDef = new double[x.Fd]; x.FdCap = new double[x.Fd]; x.FdGot = new double[x.Fd]; x.FdCut = new int[x.Fd];
             if (x.IB == null || x.IB.Length < maxP) { x.IB = new int[maxP]; x.IK = new int[maxP]; x.IG = new double[maxP]; x.IE = new double[maxP]; }
             x.FeedOn = x.Fd > 0;
+            if (x.FeedOn) FeedStepPrepare(x);                          // feed-swiat (Ks Self Feed Slow): granice udzialu progu bloku z poprzedniego Planu
         }
 
         /// <summary>Zdolnosc par blokow okregu do progu: kcal jedzenia i ziemia przy udziale 1 i PELNEJ pracy rak zajec (bez pracy domowej kroku 8 - praca domowa
@@ -185,14 +187,14 @@ namespace Armoury
                         if (!FeedFullWork)
                         {
                             double s0 = 0, v0 = 0;
-                            for (int j = x.OStart[k]; j < x.OStart[k + 1]; j++) { int g = x.OGood[j]; s0 += x.OVal[j] * fk[g]; if (NonFoodSold(g)) v0 += x.OVal[j] * x.Val[g]; }
+                            for (int j = x.OStart[k]; j < x.OStart[k + 1]; j++) { int g = x.OGood[j]; s0 += x.OVal[j] * FeedKcal(x, g); if (FeedSold(x, g)) v0 += x.OVal[j] * x.Val[g]; }
                             x.PairKcal[k] = s0; x.PairLand[k] = x.LandP[k]; x.PairNf[k] = v0;
                             continue;
                         }
                         double wH, sub, cl, W;
                         BlockOutput(d, x.B[b], x.Pc[k], o, out wH, out sub, out cl, out W);
                         double s = 0, v = 0;
-                        for (int g = 0; g < KsTab.NG; g++) if (o[g] != 0.0) { s += o[g] * fk[g]; if (NonFoodSold(g)) v += o[g] * x.Val[g]; }
+                        for (int g = 0; g < KsTab.NG; g++) if (o[g] != 0.0) { s += o[g] * FeedKcal(x, g); if (FeedSold(x, g)) v += o[g] * x.Val[g]; }   // feed-swiat: przy Ks Self Feed Staples jedzenie podstawowe
                         x.PairKcal[k] = s; x.PairNf[k] = v;
                         x.PairLand[k] = wH * KsTab.HaHome + sub * KsTab.HaOwnGrain + cl * ha[k];
                     }
@@ -227,6 +229,7 @@ namespace Armoury
                     double pg = p != null && p.Length == NM * KsTab.NG ? p[m * KsTab.NG + KsTab.GGrain] : 1.0;
                     if (!(pg > 0) || double.IsNaN(pg)) pg = 1.0;
                     pg = Math.Max(0.7, Math.Min(1.5, pg));
+                    if (x.In.SelfFeedStaple && FeedNormalPrice) pg = 1.0;   // feed-swiat: zboze po zwyklej cenie (cena startu; gradient krainy nizej) - prog nie drga z cena rownowagi
                     // cena zboza w krainie okregu (krok 5: gradient krainy - jak koszyk wsi w kroku 8; wojna i daleka droga = drogie zboze, np. Wolni Ludzie)
                     int l = x.FdL[di];
                     if (x.GradOn && R4LandPrice && l >= 0 && x.GradEff != null && l * KsTab.NG + KsTab.GGrain < x.GradEff.Length)
@@ -245,7 +248,10 @@ namespace Armoury
                 }
                 double def = x.FdNeed[di] - conv * x.FdRegV[di] - tot;
                 x.FdDef[di] = def > 0 ? def : 0; x.FdGot[di] = 0; x.FdCap[di] = 0; x.FdCut[di] = 0;
-                if (!(def > 1e-6)) continue;
+                // feed-swiat (Ks Self Feed Slow): blok z udzialem progu w poprzednim Planie trzyma najmniej (poprzedni - krok) - rece schodza z jedzenia najwyzej o krok na Plan
+                bool slow = x.In.FeedStep > 0 && x.FHi != null, hold = false;
+                if (slow) for (int b = b0; b < b1; b++) if (x.FLo[b] > 1e-12) { hold = true; break; }
+                if (!(def > 1e-6) && !hold) continue;
                 int n = 0; double capK = 0;
                 for (int b = b0; b < b1; b++)
                 {
@@ -263,6 +269,10 @@ namespace Armoury
                     {
                         if (k == fa || k == fb || !(xs[k] > 1e-12)) continue;
                         double g = (M - pk[k] - conv * pv[k]) * sc[b];
+                        // feed-swiat recenzja (wazne): takze blok trzymajacy dol (Ks Self Feed Slow) bierze rece TYLKO z par o mniejszych kcal dostepu niz mieszanka (g > 0 -
+                        // futra, len, ubozsze jedzenie). Dotad trzymanie bralo tez pary bez zysku (g <= 0, np. rybakow, ktorych logit postawil, bo daja wiecej niz zboze) - okreg
+                        // wyzywiony tracil jedzenie, a strata nie wchodzila do FdDef/FdGot (prog nie robi nikogo glodniejszym). Brak takich par - Lam schodzi ponizej FLo
+                        // (spadek w linii: FeedStepDown)
                         if (!(g > 1e-9)) continue;
                         double e = hands > 1e-9 ? g / hands : 0.0;
                         int t = n++;
@@ -274,12 +284,20 @@ namespace Armoury
                 }
                 x.FdCap[di] = capK;
                 double rem = def, got = 0; int cut = 0;
-                for (int t = 0; t < n && rem > 1e-6; t++)
+                for (int t = 0; t < n && (rem > 1e-6 || hold); t++)
                 {
                     int b = ib[t], k = ik[t];
                     double avail = Math.Min(xs[k], cap[b]);
+                    double lo = 0.0;
+                    if (slow)
+                    {
+                        avail = Math.Min(avail, x.FHi[b] - x.Lam[b]);       // feed-swiat: najwyzej poprzedni + krok
+                        lo = x.FLo[b] - x.Lam[b];
+                        if (!(rem > 1e-6) && !(lo > 1e-12)) continue;
+                    }
                     if (!(avail > 1e-15)) continue;
-                    double g = ig[t], dlt = Math.Min(avail, rem / g);
+                    double g = ig[t], dlt = Math.Min(avail, slow ? Math.Max(rem > 1e-6 ? rem / g : 0.0, lo) : rem / g);   // g > 0 (dawcy z zyskiem kcal)
+                    if (slow && !(dlt > 1e-15)) continue;
                     double dl = fm[b] - lp[k];                                 // ha na przesuniety udzial: mieszanka - dawca (> 0 - ruch bierze ziemie)
                     if (dl > 1e-12)
                     {
@@ -400,6 +418,7 @@ namespace Armoury
             var list = new List<KsFeedLand>(map.Values);
             list.Sort((p, q) => p.All.CompareTo(q.All));
             R.Feed = list;
+            FeedStepStats(x);                                          // feed-swiat: udzial progu blokow (cieply start nastepnego Planu), kontrola kroku
         }
 
         // krainy zimne w linii zawsze pierwsze (Polnoc, Wolni Ludzie, Nocna Straz, Skagos, Ib, Zelazne Wyspy, Lorath/Nord)
@@ -413,7 +432,9 @@ namespace Armoury
             var sb = new StringBuilder(4200);
             sb.Append("KS: wyzywienie krain (plan doba ").Append(day).Append("; najpierw wyzywic siebie ")
               .Append(r.SelfFeed <= 0 ? "WYLACZONE" : (r.SelfFeed >= 2 ? "TAK (wszystkie okregi wsi" : "TAK (okregi wsi stref zimnych")
-                      + (r.SelfFeedOwn ? "; prog na samym wlasnym jedzeniu)" : "; prog na kcal dostepu)"))
+                      + (r.SelfFeedOwn ? "; prog na samym wlasnym jedzeniu" : "; prog na kcal dostepu")
+                      + (r.FeedStaple ? "; jedzenie podstawowe - zboze ryby mieso ser maslo; reszta jedzenia na targ; zboze po zwyklej cenie" : "")   // feed-swiat (bez przecinkow - NPN_LINE)
+                      + (r.FeedStep > 0 ? "; krok progu " + r.FeedStep.ToString("0.00", inv) + " udzialu bloku na Plan" : "") + ")")
               .Append(", zimna ziemia ").Append(r.ColdLand ? "TAK" : "WYLACZONA")
               .Append(") | jedzenie = 1 - kcal koszyka wsi bez pokrycia (krok 8) / pelna potrzeba kcal ludzi wsi w domu w tej samej mierze (kcal koszyka, potrzeby R8; wlasne + kupione + dom); kcal wlasne / potrzeba jedzenia:")
               .Append(" wsie = (produkcja okregow wsi + praca domowa) / potrzeba wsi, kraina = (wsie + pola mieszczan) / (potrzeba wsi + miast);")
@@ -447,6 +468,13 @@ namespace Armoury
             sb.Append(" | ziemia blokow w zakresie (ha zajete / powierzchnia - miara renty Planu): ponad 0.98 przed progiem ").Append(r.FeedOver0).Append(", po progu ").Append(r.FeedOver1)
               .Append(", okregi z ruchem progu ucietym ziemia ").Append(r.FeedLandCut).Append(", najwiekszy przyrost ziemi z progu ponad granice ").Append(r.FeedLandInc.ToString("0.0E+0", inv))
               .Append(" powierzchni bloku (prog nie bierze ziemi, ktorej blok nie ma)");
+            if (r.FeedStep > 0)                                        // feed-swiat (Ks Self Feed Slow): kontrola kroku progu
+                sb.Append(" | krok progu (feed-swiat): bloki uciete w gore ").Append(r.FeedStepHi).Append(", trzymane w dol ").Append(r.FeedStepLo)
+                  .Append(", najwiekszy wzrost udzialu progu bloku wobec poprzedniego Planu ").Append(r.FeedStepGap.ToString("0.0000", inv))
+                  .Append(" (<= krok ").Append(r.FeedStep.ToString("0.00", inv)).Append("), najwiekszy spadek ").Append(r.FeedStepDown.ToString("0.0000", inv))
+                  .Append(" (dol trzymany tylko rekami par, ktore karmia gorzej niz jedzenie bloku; rynek, ktory sam stawia rece przy jedzeniu, zdejmuje prog bez ruchu rak)")
+                  .Append(r.FloorLam != null ? "; bloki z udzialem progu " + r.FloorLam.Count : "")
+                  .Append("; cieply start ").Append(r.FeedWarm ? "TAK" : "NIE (pierwszy Plan po wczytaniu - bez granic kroku)");   // recenzja: Plan bez poprzedniego w pamieci
             sb.Append(" | rece: bloki okregow w zakresie ").Append(r.FeedBlocks).Append(" (z przesunieciem ").Append(r.FeedBind).Append("), rece przesuniete do jedzenia ")
               .Append(r.FeedHandsAll > 0 ? (100 * r.FeedFloorHands / r.FeedHandsAll).ToString("0.00", inv) : "-").Append("% rak pola wsi swiata")
               .Append(", najwieksze odchylenie sumy udzialow bloku od 1 ").Append(r.FeedSumDev.ToString("0.0E+0", inv))
