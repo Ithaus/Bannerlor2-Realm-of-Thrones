@@ -50,6 +50,7 @@ namespace Armoury
                     raw[k] = have;
                     if (have <= 0) continue;
                     if (MatIds[k] == "tools") have -= ToolsKeep;
+                    else if (MatIds[k] == "clay") have -= F7Workshops.ClayHold(market, it, true);   // f7-browary K3: glina tylko ponad potrzebe garncarzy miasta (klucz wylaczony - 0, jak dotad)
                     else if (MatIds[k] == "hardwood") have -= Math.Max(WoodKeep, WoodHold(market, it, true));
                     haves[k] = Math.Max(0, have);
                     if (have > 0) any = true;

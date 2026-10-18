@@ -721,6 +721,15 @@ Uzycie (Python 3, tylko odczyt):
                     stojace srebro/aksamit/towary codzienne (INFO), NWAR-10 (recenzja) surowiec bez zdarzenia gry w pomiarze: przy polach mieszczan KS ("KS: produkcja
                     (zastosowane)" ... "na polki N szt." > 0 w dobach F4) suma "pola mieszczan KS" w linii F4 > 0 i <= 1.05 x N + najwieksza doba (las wsi, zlom - INFO).
                     Log bez paczki: INFO, bez wyjatku.
+                    f7-browary (noc 18.10, fin91 NWAR-4b 47 -> 23; Armoury/src/F7Workshops.cs, TownCrafts.cs, RawPrice.cs, GoodsLedger.cs, BuildFunding*.cs; klucze
+                    TownCraftsAfterWorkshops, ClothDemandFromOfftake, BuildClayForPotters; linia "Warsztaty codzienne (f7-browary)"): NWAR-11 linia startu (3 klucze tak,
+                    latka postfiksu wpieta, warsztaty gry w kampanii, ksiega towarow tak), NWAR-12 linie doby rozpoznane (nierozpoznanych 0) i potkniecia f7 / ERROR F7Workshops 0,
+                    NWAR-13 K1 rzemioslo 148 po warsztatach w >= 95% miasto-dob (po / (po + przed)), NWAR-14 K2 odbior skory i plotna zmierzony (> 0) i nie wiekszy niz ksiega
+                    towarow (suma "odziez wojska (150)" + "naprawy kowali miasta (135)" + "wsie (zakupy w miescie, E5/B1)" + "dwory (E3-P1)" z linii "Towary: ... leather/linen"
+                    biegu; tylko miasta - <= 1.05 x ksiega + najwieksza doba), NWAR-15 klin cen wyrobu wobec wsadu (mediany z linii "Rzemioslo miasta (148)": skora / skory
+                    i plotno / len) na koniec >= 0.9 x poczatek (fin91 bez paczki: 0.49 -> 0.25 i 0.52 -> 0.34), NWAR-16a K3 glina dla garncarzy (INFO: miast z garncarzami,
+                    prog, glina na ich polkach, budowy zostawily; warsztaty codzienne swiata z linii f7), NWAR-16b cykle garbarni / tkalni lnu / garncarzy / browarow na dobe
+                    biegu z 'Warsztaty towarowe' (INFO, z --baza-doby porownanie). Log bez paczki f7: INFO, bez wyjatku.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -32493,6 +32502,21 @@ NWAR_STEND = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
 NWAR_WSTYPE = re.compile(r"(\S+) (\d+) \(pracowalo (\d+), cykli (\d+), wynik ([+-]?\d+) = (-?[\d.]+) d na warsztat")
 NWAR_START_ON = "ocena F4 (Workshop Retool Fair Score) tak"
 NWAR_START_OFF = "ocena F4 (Workshop Retool Fair Score) nie"
+# f7-browary (noc 18.10): linia "Warsztaty codzienne (f7-browary)" (F7Workshops.cs) i dane do klina cen / ksiegi odbioru
+NWAR_F7_S = "Warsztaty codzienne (f7-browary): start sesji"
+NWAR_F7_DAY = re.compile(r"^Warsztaty codzienne \(f7-browary\): dzien (\d+) ")
+NWAR_F7_K1 = re.compile(r"\| K1 rzemioslo miasta po warsztatach \(Town Crafts After Workshops\) (tak|nie) \(latka (tak|nie), warsztaty gry (tak|nie)\): miast-dob po warsztatach (\d+), przed warsztatami (\d+)")
+NWAR_F7_K2 = re.compile(r"\| K2 popyt skory i plotna z odbioru \(Cloth Demand From Offtake\) (tak|nie) \(ksiega towarow (tak|nie)\): dzis skora (\d+) \[wojsko (\d+), naprawy (\d+), wsie (\d+), dwory (\d+)\], plotno (\d+) \[wojsko (\d+), naprawy (\d+), wsie (\d+), dwory (\d+)\] szt\. w (\d+) miastach; srednia ok\. 14 dob swiat: skora ([\d.]+), plotno ([\d.]+) szt\./d w (\d+) miastach \(dob pomiaru (\d+)")
+NWAR_F7_K3 = re.compile(r"\| K3 glina budow ponad potrzebe garncarzy \(Build Clay For Potters\) (tak|nie): miast z garncarzami (\d+) \(warsztatow (\d+), potrzeba ([\d.]+) szt\./d, prog (\d+) szt\.\), glina na ich polkach (\d+) szt\.; budowy zostawily gline - pan na (\d+) targach \((\d+) szt\.\), lud na (\d+) targach \((\d+) szt\.\)")
+NWAR_F7_TYPES = re.compile(r"\| warsztaty codzienne swiata: brewery (\d+), tannery (\d+), pottery_shop (\d+), linen_weavery (\d+) \(razem (\d+)\)")
+NWAR_F7_ST = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
+NWAR_F7_ERR = ("ERROR in F7Workshops", "ERROR in TownCrafts.SyncData(arm_f7_cloth)")
+NWAR_TC = re.compile(r"^Rzemioslo miasta \(148\): dzien (\d+) ")
+NWAR_TC_SHELF = re.compile(r"na polkach miast \[([^\]]*)\]")
+NWAR_TC_PART = re.compile(r"^(\S+) (\d+) \(indeks ([\d.]+)\)$")
+NWAR_LEDGER = re.compile(r"^Towary: dzien (\d+) - (leather|linen) \(")
+NWAR_LEDGER_OFF = (re.compile(r"odziez wojska \(150\) (\d+)"), re.compile(r"naprawy kowali miasta \(135\) (\d+)"),
+                   re.compile(r"wsie \(zakupy w miescie, E5/B1\) (\d+)"), re.compile(r"dwory \(E3-P1\) (\d+)"))
 NWAR_DAILY_GOODS = ("brewery", "tannery", "pottery_shop", "linen_weavery")   # towary codzienne, ktore znikaly w fin86 (12 -> 3, 12 -> 2, 6 -> 1, 17 -> 8)
 NWAR_BAD_PICKS = ("silversmithy", "velvet_weavery")                          # przezbrojenia bez wsadu w fin86 (19 stoi, 0 cykli; aksamit 13, pracowal 1)
 
@@ -32516,15 +32540,49 @@ def _nwar_types_from_ws(s):
     return d
 
 
-def _nwar_read(logp, ks=None):
+def _nwar_read(logp, ks=None, f7=None):
     """Strumieniowo: linie E3-D3 (doba -> tekst), starty E3-D3, 'Warsztaty towarowe' (doba -> tekst), liczba ERROR w miejscach paczki; `ks` (slownik, opcjonalnie) -
-    doba KS -> sztuki pol mieszczan na polki (linia "KS: produkcja (zastosowane)", NWAR-10)."""
+    doba KS -> sztuki pol mieszczan na polki (linia "KS: produkcja (zastosowane)", NWAR-10); `f7` (slownik, opcjonalnie) - f7-browary: "days" doba -> linia
+    "Warsztaty codzienne (f7-browary)", "starts" linie startu, "err" ERROR F7Workshops, "tc" doba -> indeksy z linii "Rzemioslo miasta (148)",
+    "ledger" doba -> [skora, plotno] odbioru z ksiegi towarow (NWAR-11..16)."""
     d3, ws, starts = {}, {}, []
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            if f7 is not None and s.startswith("Warsztaty codzienne (f7-browary): "):
+                if s.startswith(NWAR_F7_S):
+                    f7.setdefault("starts", []).append(s)
+                else:
+                    mm = NWAR_F7_DAY.match(s)
+                    if mm:
+                        f7.setdefault("days", {})[int(mm.group(1))] = s
+                continue
+            if f7 is not None and any(s.startswith(e) for e in NWAR_F7_ERR):
+                f7["err"] = f7.get("err", 0) + 1
+                continue
+            if f7 is not None and s.startswith("Rzemioslo miasta (148): dzien "):
+                mm = NWAR_TC.match(s)
+                ms = NWAR_TC_SHELF.search(s) if mm else None
+                if ms:
+                    dd = {}
+                    for part in ms.group(1).split(", "):
+                        mp = NWAR_TC_PART.match(part.strip())
+                        if mp:
+                            dd[mp.group(1)] = float(mp.group(3))
+                    f7.setdefault("tc", {})[int(mm.group(1))] = dd
+                continue
+            if f7 is not None and s.startswith("Towary: dzien ") and (" - leather (" in s or " - linen (" in s):
+                mm = NWAR_LEDGER.match(s)
+                if mm:
+                    tot = 0
+                    for rx in NWAR_LEDGER_OFF:
+                        mo = rx.search(s)
+                        if mo:
+                            tot += int(mo.group(1))
+                    f7.setdefault("ledger", {}).setdefault(int(mm.group(1)), [0, 0])[0 if mm.group(2) == "leather" else 1] = tot
+                continue
             if s.startswith(NWAR_D3):
                 mm = NWAR_DAY.match(s)
                 if mm:
@@ -32577,11 +32635,14 @@ def nwar_main(logp, bdp=None):
         rep.show()
         return 0
     ksf = {}
-    d3, ws, starts, n_err = _nwar_read(logp, ksf)
+    f7 = {}
+    d3, ws, starts, n_err = _nwar_read(logp, ksf, f7)
     f4days = {x: s for x, s in d3.items() if NWAR_F4 in s}
-    print(f"plik: {logp} | linii E3-D3 {len(d3)} (z oceniona F4 {len(f4days)}), startow E3-D3 {len(starts)}, linii 'Warsztaty towarowe' {len(ws)}, ERROR paczki {n_err}")
+    print(f"plik: {logp} | linii E3-D3 {len(d3)} (z oceniona F4 {len(f4days)}), startow E3-D3 {len(starts)}, linii 'Warsztaty towarowe' {len(ws)}, ERROR paczki {n_err}"
+          f" | f7-browary: linii doby {len(f7.get('days', {}))}, startow {len(f7.get('starts', []))}")
     if not d3 and not ws:
         rep.add("NWAR-0: linie 'Warsztaty za cena (E3-D3)' i 'Warsztaty towarowe'", "brak w logu", "INFO (log bez paczek warsztatow)", None)
+        _nwar_f7(rep, f7, ws, bdp)
         rep.show()
         return 0
     # NWAR-0 start
@@ -32747,8 +32808,139 @@ def nwar_main(logp, bdp=None):
             rep.add("NWAR-10: pola mieszczan KS w pomiarze wsadu F4 (bez zdarzenia gry)", txt, "> 0 i <= 1.05 x KS + najwieksza doba (kategorie wsadu to czesc plonu)", 0 < a <= 1.05 * n_tf + mx_tf)
         else:
             rep.add("NWAR-10: surowiec bez zdarzenia gry w pomiarze wsadu", txt, "INFO (bez pol mieszczan KS w dobach F4 - droga bez KS)", None)
+    _nwar_f7(rep, f7, ws, bdp)
     rep.show()
     return 0
+
+
+def _nwar_wedge(tc, first):
+    """Klin cen z linii "Rzemioslo miasta (148)": (doba, skora/skory, plotno/len) z pierwszej albo ostatniej doby z obiema parami."""
+    for x in (sorted(tc) if first else sorted(tc, reverse=True)):
+        d = tc[x]
+        if d.get("skory", 0) > 0 and d.get("len", 0) > 0 and "skora" in d and "plotno" in d:
+            return x, d["skora"] / d["skory"], d["plotno"] / d["len"]
+    return None
+
+
+def _nwar_ws_cycles(ws):
+    """Cykle towarow codziennych na dobe biegu z 'Warsztaty towarowe' (srednia dob z rozliczeniem): typ -> (cykli/d, warsztatow pracujacych/d)."""
+    tot = {t: [0, 0] for t in NWAR_DAILY_GOODS}
+    n = 0
+    for x in ws:
+        a = _nwar_types_from_ws(ws[x])
+        if not a:
+            continue
+        n += 1
+        for t in NWAR_DAILY_GOODS:
+            if t in a:
+                tot[t][0] += a[t][2]
+                tot[t][1] += a[t][1]
+    return {t: (v[0] / n, v[1] / n) for t, v in tot.items()} if n else {}
+
+
+def _nwar_f7(rep, f7, ws, bdp=None):
+    """f7-browary (noc 18.10): NWAR-11..16 - linia "Warsztaty codzienne (f7-browary)" (F7Workshops.cs), klin cen skora/skory i plotno/len z linii
+    "Rzemioslo miasta (148)", odbior skory i plotna z ksiegi towarow ("Towary: ... leather/linen"). Log bez paczki: INFO, bez wyjatku."""
+    days = f7.get("days", {})
+    sts = f7.get("starts", [])
+    err = f7.get("err", 0)
+    # NWAR-11 start
+    if sts:
+        s0 = sts[-1]
+        k1 = "K1 rzemioslo miasta po warsztatach (Town Crafts After Workshops) tak (latka tak, warsztaty gry w kampanii tak, czynne tak)" in s0
+        k2 = "K2 popyt skory i plotna z odbioru (Cloth Demand From Offtake) tak (ksiega towarow tak" in s0
+        k3 = "K3 glina budow ponad potrzebe garncarzy (Build Clay For Potters) tak" in s0
+        mz = re.search(r"pomiar z zapisu ([^)]*)\)", s0)
+        rep.add("NWAR-11: f7-browary start sesji (K1 czynne, K2 z ksiega towarow, K3)", f"startow {len(sts)}; K1 {'tak' if k1 else 'nie'}, K2 {'tak' if k2 else 'nie'}, K3 {'tak' if k3 else 'nie'}"
+                + (f"; pomiar z zapisu: {mz.group(1)}" if mz else ""), "tak / tak / tak", k1 and k2 and k3)
+    else:
+        rep.add("NWAR-11: f7-browary start sesji", "brak linii startu", "INFO (log sprzed paczki f7-browary)", None)
+    if not days:
+        rep.add("NWAR-12..14: f7-browary linie doby", "brak linii 'Warsztaty codzienne (f7-browary)'" + (f", ERROR F7 {err}" if err else ""),
+                "INFO (log sprzed paczki f7-browary albo klucze wylaczone)", None if err == 0 else False)
+        _nwar_f7_wedge_cycles(rep, f7, ws, bdp, False)
+        return
+    # NWAR-12 rozpoznanie i potkniecia
+    parsed, bad = {}, []
+    for x in sorted(days):
+        s = days[x]
+        r = {"k1": NWAR_F7_K1.search(s), "k2": NWAR_F7_K2.search(s), "k3": NWAR_F7_K3.search(s), "types": NWAR_F7_TYPES.search(s), "st": NWAR_F7_ST.search(s)}
+        miss = [k for k, v in r.items() if v is None]
+        if miss:
+            bad.append((x, miss))
+        parsed[x] = r
+    st_sess = max((int(r["st"].group(2)) for r in parsed.values() if r["st"]), default=0)
+    rep.add("NWAR-12: f7-browary linie doby rozpoznane, potkniecia i ERROR", f"linii {len(days)}, nierozpoznanych {len(bad)}" + (f" (d{bad[0][0]}: brak {', '.join(bad[0][1])})" if bad else "")
+            + f"; potkniecia (sesja) {st_sess}, ERROR F7 {err}", "nierozpoznanych 0 / 0 / 0", not bad and st_sess == 0 and err == 0)
+    # NWAR-13 K1
+    on1 = [r["k1"] for r in parsed.values() if r["k1"] and r["k1"].group(1) == "tak" and r["k1"].group(2) == "tak" and r["k1"].group(3) == "tak"]
+    if on1:
+        aft = sum(int(m.group(4)) for m in on1)
+        bef = sum(int(m.group(5)) for m in on1)
+        sh = aft / (aft + bef) if aft + bef > 0 else None
+        rep.add("NWAR-13: K1 rzemioslo miasta 148 po warsztatach gry (miasto-doby)", f"po warsztatach {aft}, przed {bef}" + (f" = {sh:.3f}" if sh is not None else "") + f" ({len(on1)} dob z kluczem)",
+                ">= 0.95 po warsztatach", sh is not None and sh >= 0.95)
+    else:
+        rep.add("NWAR-13: K1 rzemioslo miasta po warsztatach", "klucz wylaczony, brak latki albo warsztatow gry", "INFO", None)
+    # NWAR-14 K2 odbior vs ksiega towarow
+    on2 = [(x, parsed[x]["k2"]) for x in sorted(parsed) if parsed[x]["k2"] and parsed[x]["k2"].group(1) == "tak" and parsed[x]["k2"].group(2) == "tak"]
+    led = f7.get("ledger", {})
+    if on2:
+        lo, hi = on2[0][0], on2[-1][0]
+        per = [int(m.group(3)) + int(m.group(8)) for _x, m in on2]
+        meas = sum(per)
+        lsum = sum(sum(v) for d, v in led.items() if lo - 1 <= d <= hi)
+        lmax = max((sum(v) for d, v in led.items() if lo - 1 <= d <= hi), default=0)
+        last = on2[-1][1]
+        txt = (f"d{lo}-d{hi} ({len(on2)} linii): zmierzone w miastach skora+plotno {meas} szt. (najwiecej na dobe {max(per) if per else 0}); ksiega towarow (wojsko+naprawy+wsie+dwory, "
+               f"takze zamki) {lsum} szt." + (f" = {meas / lsum:.2f} x" if lsum > 0 else "") + f"; srednia na koniec: skora {last.group(14)}, plotno {last.group(15)} szt./d w {last.group(16)} miastach (dob pomiaru {last.group(17)})")
+        if lsum > 0:
+            rep.add("NWAR-14: K2 odbior skory i plotna z polek miast zmierzony i nie wiekszy niz ksiega towarow", txt, "> 0 i <= 1.05 x ksiega + najwieksza doba (tylko miasta)", 0 < meas <= 1.05 * lsum + lmax)
+        else:
+            rep.add("NWAR-14: K2 odbior skory i plotna", txt, "> 0 (bez linii 'Towary' leather/linen - bez porownania z ksiega)", meas > 0)
+    else:
+        rep.add("NWAR-14: K2 odbior skory i plotna", "klucz wylaczony albo ksiega towarow wylaczona", "INFO", None)
+    # NWAR-16a K3 (INFO)
+    on3 = [(x, parsed[x]["k3"]) for x in sorted(parsed) if parsed[x]["k3"] and parsed[x]["k3"].group(1) == "tak"]
+    tys = [parsed[x]["types"] for x in sorted(parsed) if parsed[x]["types"]]
+    ttxt = (f"; warsztaty codzienne swiata d{min(parsed)} -> d{max(parsed)}: razem {tys[0].group(5)} -> {tys[-1].group(5)} (brewery {tys[0].group(1)}->{tys[-1].group(1)}, tannery "
+            f"{tys[0].group(2)}->{tys[-1].group(2)}, pottery_shop {tys[0].group(3)}->{tys[-1].group(3)}, linen_weavery {tys[0].group(4)}->{tys[-1].group(4)})") if tys else ""
+    if on3:
+        lastx, lm = on3[-1]
+        held = sum(int(m.group(8)) + int(m.group(10)) for _x, m in on3)
+        rep.add("NWAR-16a: K3 glina dla garncarzy", f"d{lastx}: miast z garncarzami {lm.group(2)} (warsztatow {lm.group(3)}, potrzeba {lm.group(4)} szt./d, prog {lm.group(5)}), glina na ich polkach "
+                f"{lm.group(6)}; budowy zostawily gline w biegu {held} szt." + ttxt, "INFO", None)
+    else:
+        rep.add("NWAR-16a: K3 glina dla garncarzy", "klucz wylaczony" + ttxt, "INFO", None)
+    _nwar_f7_wedge_cycles(rep, f7, ws, bdp, True)
+
+
+def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
+    """NWAR-15 (klin cen wyrobu wobec wsadu) i NWAR-16b (cykle towarow codziennych na dobe, z baza) - liczone takze w logu bez linii f7 (INFO)."""
+    tc = f7.get("tc", {})
+    a, b = _nwar_wedge(tc, True), _nwar_wedge(tc, False)
+    if a and b and a[0] != b[0]:
+        txt = f"d{a[0]} -> d{b[0]}: skora/skory {a[1]:.2f} -> {b[1]:.2f}, plotno/len {a[2]:.2f} -> {b[2]:.2f} (mediany indeksow z linii 'Rzemioslo miasta (148)')"
+        ok = (b[1] >= 0.9 * a[1] and b[2] >= 0.9 * a[2]) if has_f7 else None
+        rep.add("NWAR-15: klin cen wyrobu wobec wsadu (skora/skory, plotno/len) koniec wobec poczatku", txt,
+                ">= 0.9 x poczatek obu par (fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34)" + ("" if has_f7 else " - INFO bez paczki f7"), ok)
+    else:
+        rep.add("NWAR-15: klin cen wyrobu wobec wsadu", "za malo linii 'Rzemioslo miasta (148)' z polkami", "INFO", None)
+    cyc = _nwar_ws_cycles(ws) if ws else {}
+    if cyc:
+        base = None
+        if bdp and os.path.isfile(bdp):
+            try:
+                _bd3, bws, _bst, _be = _nwar_read(bdp)
+                base = _nwar_ws_cycles(bws) if bws else None
+            except Exception as e:   # baza nieczytelna - bez porownania
+                print(f"baza-doby (f7): {bdp} nieczytelna ({e})")
+        parts = []
+        for t in NWAR_DAILY_GOODS:
+            c, w = cyc.get(t, (0.0, 0.0))
+            bb = base.get(t) if base else None
+            parts.append(f"{t} {c:.1f} cyk/d ({w:.1f} pracuje)" + (f" [baza {bb[0]:.1f} / {bb[1]:.1f}]" if bb else ""))
+        rep.add("NWAR-16b: cykle garbarni, tkalni lnu, garncarzy i browarow na dobe biegu ('Warsztaty towarowe')", "; ".join(parts), "INFO", None)
 
 
 # ============================================================ nekon3 czesc 2 (noc-ekonomia3 16.10: produkcja idzie za cena i ludzmi, panowie, korony i zolnierze kupuja)

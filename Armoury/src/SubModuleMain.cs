@@ -120,6 +120,7 @@ namespace Armoury
                 try { KsHides.ApplyEarly(_harmony); } catch (Exception e) { Log.Error("KsHides.ApplyEarly", e); }   // f4-ksiega-i-skory: skory z uboju rzeznikow wedlug tabeli swiata (postfiks GetItemsToProduce) - PRZED latkami cyklu warsztatu
                 try { WorkshopTrade.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopTrade.ApplyAll", e); }   // warsztaty towarowe w nowej monecie: utrzymanie i place do kas miast, cena z zarobku
                 try { TownFletchers.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFletchers.ApplyAll", e); }   // paczka 172: strzelarze miasta po warsztatach (postfiks doby miasta) i sonda linii arrows
+                try { F7Workshops.ApplyAll(_harmony); } catch (Exception e) { Log.Error("F7Workshops.ApplyAll", e); }   // f7-browary K1: rzemioslo miasta po warsztatach (postfiks High doby warsztatow - przed strzelarzami; klucz czytany na zywo)
                 Stables.ApplyAll(_harmony);
                 // paczka 175: spis koni AI i straz konia Dothrakow (zamiany ROT), przewaga Polnocy w autobitwie, miara balansu krolestw;
                 // wpinane zawsze - wylaczniki (Army175Measure, AiUpgradeHorseToArmory, Army175DothrakiHorseGuard, NorthHomeEdgePercent) czytane na zywo

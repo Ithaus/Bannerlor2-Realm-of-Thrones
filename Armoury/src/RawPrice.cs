@@ -130,17 +130,26 @@ namespace Armoury
         /// Mieszczanie: popyt gry (dobrobyt + 1000, jak w szacunku gry; juz w nowej monecie) x czesc, ktora naprawde kupuja
         /// (TownUse* - ten sam mnoznik, ktorym BudgetPostfix tnie ich budzet; ruda 0, len, welna i skory surowe 2%).
         /// Rzemioslo: zuzycie dobowe z tabeli karawan bez jej stalej czesci domowej (rece rzemieslnikow, garbowanie i tkanie,
-        /// linie towarowe warsztatow) x wartosc sztuki. Ujemny = kategoria spoza tabeli albo zamek (zostaje popyt gry).</summary>
+        /// linie towarowe warsztatow) x wartosc sztuki. Ujemny = kategoria spoza tabeli albo zamek (zostaje popyt gry).
+        /// f7-browary K2 (klucz ClothDemandFromOfftake): skora i plotno - do tego odbior z polki na odziez wojska, naprawy kowali, zakupy wsi i dwory (F7Workshops.UseOf,
+        /// srednia ok. 14 dob) x wartosc sztuki ("off"); sama cena - zapas karawan, progi polki i zamowienia (CaravanBulk.Use) bez zmian. Klucz wylaczony - 0 (jak dotad).</summary>
         internal static float UseDemand(Town town, ItemCategory cat, out float home, out float craft)
         {
-            home = 0f; craft = 0f;
+            float off;
+            return UseDemand(town, cat, out home, out craft, out off);
+        }
+
+        internal static float UseDemand(Town town, ItemCategory cat, out float home, out float craft, out float off)
+        {
+            home = 0f; craft = 0f; off = 0f;
             ItemObject item; float use, fix; int keep;
             if (!CaravanBulk.Usage(town, cat, out item, out use, out fix, out keep)) return -1f;
             var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SettlementEconomyModel : null;
             float game = model != null ? model.GetDailyDemandForCategory(town, cat, 1000) : 0f;
             home = Math.Max(0f, game) * Math.Max(0f, HistoricalPrices.HouseShare(cat));
             craft = Math.Max(0f, use - fix) * Math.Max(1, item.Value);
-            return home + craft;
+            off = F7Workshops.UseOf(town, item) * Math.Max(1, item.Value);   // f7-browary K2: 0 przy wylaczonym kluczu i dla innych towarow
+            return off > 0f ? home + craft + off : home + craft;
         }
 
         /// <summary>Postfiks GetEstimatedDemandForCategory(miasto, dane rynku, kategoria): z tego szacunku gra co dobe wygladza popyt
@@ -278,17 +287,19 @@ namespace Armoury
                 var sb = new StringBuilder();
                 var idx = new List<float>(); var bare = new List<float>(); var glut = new List<float>();
                 var home = new List<float>(); var craft = new List<float>(); var stored = new List<float>(); var game = new List<float>();
+                var offs = new List<float>();   // f7-browary K2: odbior skory i plotna (wojsko, naprawy, wsie, dwory) w popycie ceny
                 foreach (var it in items)
                 {
                     var cat = it.ItemCategory;
                     if (cat == null) continue;
-                    idx.Clear(); bare.Clear(); glut.Clear(); home.Clear(); craft.Clear(); stored.Clear(); game.Clear();
+                    idx.Clear(); bare.Clear(); glut.Clear(); home.Clear(); craft.Clear(); stored.Clear(); game.Clear(); offs.Clear();
                     var el = new EquipmentElement(it);
                     foreach (var t in Town.AllTowns)
                     {
                         if (t == null || t.Owner == null || t.Owner.ItemRoster == null || t.MarketData == null) continue;
-                        ItemObject same; float use, fix, h, c; int keep;
-                        if (!CaravanBulk.Usage(t, cat, out same, out use, out fix, out keep) || UseDemand(t, cat, out h, out c) < 0f) continue;
+                        ItemObject same; float use, fix, h, c, o; int keep;
+                        if (!CaravanBulk.Usage(t, cat, out same, out use, out fix, out keep) || UseDemand(t, cat, out h, out c, out o) < 0f) continue;
+                        if (o > 0f) offs.Add(o);
                         int n = t.Owner.ItemRoster.GetItemNumber(it);
                         idx.Add(t.GetItemCategoryPriceIndex(cat));
                         if (n <= 0) bare.Add(t.GetItemPrice(el, null, true));          // tyle miasto zaplaci za pierwsza dowieziona sztuke
@@ -306,6 +317,7 @@ namespace Armoury
                       .Append(", z nadwyzka ").Append(ng).Append(" miast").Append(ng > 0 ? " - sprzedaja po " + F(Mid(glut), "0.#") + " d" : "")
                       .Append(", popyt dobowy miasta: mieszczan ").Append(F(Mid(home), "0.#")).Append(" d + rzemiosla ").Append(F(Mid(craft), "0.#"))
                       .Append(" d, w danych rynku ").Append(F(Mid(stored), "0.#")).Append(" d, sam szacunek gry ").Append(F(Mid(game), "0.#")).Append(" d");
+                    if (offs.Count > 0) sb.Append(" (f7: odbior wojska, napraw, wsi i dworow w ").Append(offs.Count).Append(" miastach, mediana ").Append(F(Mid(offs), "0.#")).Append(" d - w danych rynku, poza mieszczanami i rzemioslem)");
                 }
                 // przyklady innych przeliczonych towarow handlowych: te sama stala w nowej monecie (A) widac po max indeksu
                 var other = new StringBuilder();
