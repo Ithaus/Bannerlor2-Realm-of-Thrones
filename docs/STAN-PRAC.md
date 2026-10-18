@@ -2906,3 +2906,6 @@ pomiary A7/regale/karawany/zelazo) + fala 4b (pomiar zgonow wedlug przyczyny, KS
 Testy: fin88 (sciezka Jeffa 160 dob) 0 ERROR, zgony z glodu 0, KS sam po 35 dobach; 5 dob + bitwa: kod 0, ERROR 0, bitwa 0 bledow.
 OTWARTE: akumulator ludu miast (W 80 dni, lud +60k/d - trzyma go danina od majatku), ruda pod KS (57 miast bez rudy), koszt KS 4.8 ms (q95 21.7), zajecia wiosek pod KS zamrozone (A7 - pomiar
 w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jeffa o zwrocie zoldu wedlug potrzeby, test zimy (armoury-zima-teraz.flag) nie zrobiony.
+- 04:15 PDT: TEST fin89 = WGRANIE 79 DLL (test/wgr79) z armoury-zima-teraz.flag + armoury-ks-wlacz.flag (OBA USUNAC!), 120 dob - zima ekonomii przez caly bieg (test zimy, obowiazkowy po f4-opal).
+- 04:16 PDT: workflow wf_9399700d-d24 (fala 5, zb/f5-* od ac03aa25): f5-a7 (dynamiczne zajecia pod KS z hamulcem Jeffa - sygnal z cen KS, nie z indeksow gry), f5-ruda (ruda/zelazo pod KS),
+  f5-lud (akumulator ludu od strony dochodu, R/P), f5-zajecia (neutralny start specjalizacji <= 1%, ikony 40-130), f5-koszt (szczyty KS), f5-bitwa (mocna druzyna przegrywa - panika).
