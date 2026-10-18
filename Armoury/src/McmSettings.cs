@@ -6736,7 +6736,7 @@ namespace Armoury
         [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
         public float KsHungerSecurityMax { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Ks Hunger Tolerance", 0.00f, 1.00f, "0.00", HintText = "with Ks Hunger Unrest: the share of the people's food a market may lack before anyone counts as hungry (0.1 = up to a tenth missing is made up in kitchens and gardens); above it the penalty grows in proportion")]
+        [SettingPropertyFloatingInteger("Ks Hunger Tolerance", 0.00f, 1.00f, "0.00", HintText = "with Ks Hunger Unrest or Ks Lord Funds Food: the share of the people's food a market may lack before anyone counts as hungry (0.1 = up to a tenth missing is made up in kitchens and gardens); above it the penalty grows in proportion")]
         [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
         public float KsHungerTolerance { get; set; } = 0.1f;
 

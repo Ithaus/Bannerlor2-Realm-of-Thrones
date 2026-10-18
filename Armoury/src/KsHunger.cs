@@ -20,7 +20,7 @@ namespace Armoury
     ///  - POMIAR (postfiks ItemConsumptionBehavior.UpdateDemandShift, Priority.Last - tuz przed konsumpcja doby miasta, tzn. "w porze posilku"): kcal koszyka mieszczan
     ///    (koszyk ZC4 zaplacony z Planu x lambda - StartCalibration.KsTownMeal) wobec kcal jedzenia koszyka na polce w tej chwili. Kcal wszystkich pozycji sa wymienne -
     ///    biedny je tansze (ziarno zamiast miesa), wiec brak pieniedzy na drozsze jedzenie NIE jest glodem (to kotwica kiesy, drabina ZC4 i chleb M3); glodem jest brak
-    ///    jedzenia na rynku: brak rynku u_r = max(0, 1 - kcal na polce / kcal koszyka). Srednia krocząca ok. 3 dob (waga 1/3) - jednodniowy dolek polki nie robi buntu.
+    ///    jedzenia na rynku: brak rynku u_r = max(0, 1 - kcal na polce / kcal koszyka). Srednia kroczaca ok. 3 dob (waga 1/3) - jednodniowy dolek polki nie robi buntu.
     ///    Tylko miasta z koszykiem ZC4 po rampie (kalibracja zastosowana, lambda >= 0.999); zamki i miasta poza KS - bez zmian.
     ///  - SPICHLERZ GRY (zapasy): miasto z Food 0 (gra IsStarving) - brak u_s = niedobor / spozycie (ten sam wzor co Famine.cs przy zgonach mieszczan: dobrobyt / 40 +
     ///    zaloga / 20; bez schronionych uchodzcow - sa tylko w oblezeniu). Glod miasta u = max(u_r, u_s).
@@ -33,13 +33,13 @@ namespace Armoury
     ///  - BEZ PODWOJNEGO LICZENIA: lojalnosc gry ma juz czlon jedzenia z Food (BK: "Starving" -2 przy Food 0, "Well fed populace" +0.5 przy Food >= 80% limitu; model gry:
     ///    -1, po 14 dobach -2). Nasza linia = min(0, -H - czlon gry): laczny czlon jedzenia = min(czlon gry, -H) przy karze gry i -H przy premii (premia "dobrze nakarmieni" nie
     ///    dziala, gdy ludzie gloduja). Bezpieczenstwo gry czlonu jedzenia nie ma. Rodzaj modelu z lancucha typu (BK fallback dla osady bez danych BK - rzadki - liczony jak BK).
-    ///  - Zapis gry: nic (srednia krocząca w pamieci sesji - po wczytaniu pierwsza doba bez linii, potem od pomiaru). Linia doby "Glod miast (KS): dzien N".
+    ///  - Zapis gry: nic (srednia kroczaca w pamieci sesji - po wczytaniu pierwsza doba bez linii, potem od pomiaru). Linia doby "Glod miast (KS): dzien N".
     /// Wyjatki per miasto / wywolanie - licznik potkniec (CLAUDE.md 7), nic nie gasimy.
     /// </summary>
     internal static class KsHunger
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private const double EmaW = 1.0 / 3.0;          // srednia krocząca braku rynku (ok. 3 dob)
+        private const double EmaW = 1.0 / 3.0;          // srednia kroczaca braku rynku (ok. 3 dob)
         private const int StaleDays = 3;                // miasto bez posilku od tylu dob - poza migawka
         private const float RebelLoyGate = 25f;         // stan buntu gry (RebelliousStateStartLoyaltyThreshold 25) - kontrola "bunt z niczego"
         private const double LamFull = 0.999;           // tylko po rampie koszyka ZC4 (przed nia polke dzieli jeszcze budzet BK)

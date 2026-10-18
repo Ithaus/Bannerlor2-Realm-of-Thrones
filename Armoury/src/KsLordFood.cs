@@ -45,13 +45,19 @@ namespace Armoury
         private static readonly List<Dep> _open = new List<Dep>();
         private static readonly List<KeyValuePair<Town, KsHunger.Row>> _hungry = new List<KeyValuePair<Town, KsHunger.Row>>();
         private static readonly Dictionary<Clan, long> _paid = new Dictionary<Clan, long>();
+        // nawias doby wedlug rodu: wplaty jeszcze nie rozliczone (zloto rodu w kasach na czas zakupow - liczone do G rodu) i zarezerwowane tempo (najwyzej tyle zaplaci)
+        private static readonly Dictionary<Clan, long> _out = new Dictionary<Clan, long>(), _resv = new Dictionary<Clan, long>();
         private static int _paidDay = int.MinValue;
 
         // liczniki doby (linia)
         private static int _dDay = int.MinValue, _nH, _nOk, _nGap0, _nNeed, _nPay, _nPl, _nNb, _nRoom, _nNoBills, _nBelow, _nOver, _nCut, _nStale;
         private static long _dep, _ret, _lordPaid, _need, _spend, _dLords, _dTowns, _billsOpen, _billsPaid, _cut;
         private static readonly HashSet<Clan> _clans = new HashSet<Clan>();
-        private static bool _ksh, _bills;
+        private static bool _ksh, _bills, _creditOff;
+        // r4-kupcy (bezpiecznik scalenia): kod KS-H z kredytem kupcow (zaplata przy dostawie) bez podlaczonych rachunkow - doplata kasy NIE moze biec (wplata na czas
+        // zakupow podnioslaby limit kredytu, a dostawe zaplacilaby kasa bez pieniedzy pana -> rachunki i blokada); -1 nie sprawdzone, 0 brak sladu, 1 slad (nazwy skladowych)
+        private static int _credit = -1;
+        private static string _creditWhy = "";
         private static long _ticks;
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -68,15 +74,38 @@ namespace Armoury
         /// <summary>Nowa kampania i wczytanie (KsHunger.EnsureHooks): pamiec od nowa. Otwarty nawias z poprzedniej sesji nie istnieje (Before i After w jednym wywolaniu doby).</summary>
         internal static void Reset()
         {
-            _open.Clear(); _hungry.Clear(); _paid.Clear(); _paidDay = int.MinValue;
+            _open.Clear(); _hungry.Clear(); _paid.Clear(); _paidDay = int.MinValue; _out.Clear(); _resv.Clear();
             ClearDay(); _dDay = int.MinValue; _stumbles = 0; _err.Clear();
+        }
+
+        /// <summary>Bezpiecznik scalenia z r4-kupcy: czy kod kupcow KS-H (KsFoodCarts, KsFoodCore) ma skladowe kredytu / rachunkow (nazwy z "bill", "rachun", "credit",
+        /// "kredyt", "debt", "owed", "overdue", "zwlok", "zaleg"). Raz na proces (refleksja na wlasnych typach). Kod bez kredytu (ta galaz) - false.</summary>
+        private static bool CreditCode()
+        {
+            if (_credit >= 0) return _credit == 1;
+            _credit = 0;
+            try
+            {
+                var tokens = new[] { "bill", "rachun", "credit", "kredyt", "debt", "owed", "overdue", "zwlok", "zaleg" };
+                const System.Reflection.BindingFlags all = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static
+                                                         | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly;
+                foreach (var t in new[] { typeof(KsFoodCarts), typeof(KsFoodCore) })
+                    foreach (var m in t.GetMembers(all))
+                    {
+                        string n = m.Name.ToLowerInvariant();
+                        foreach (var k in tokens)
+                            if (n.Contains(k)) { _credit = 1; _creditWhy = t.Name + "." + m.Name; return true; }
+                    }
+            }
+            catch (Exception e) { Stumble("CreditCode", e); }
+            return false;
         }
 
         private static void ClearDay()
         {
             _nH = _nOk = _nGap0 = _nNeed = _nPay = _nPl = _nNb = _nRoom = _nNoBills = _nBelow = _nOver = _nCut = _nStale = 0;
             _dep = _ret = _lordPaid = _need = _spend = _dLords = _dTowns = _billsOpen = _billsPaid = _cut = 0;
-            _clans.Clear(); _ksh = false; _bills = false; _ticks = 0;
+            _clans.Clear(); _ksh = false; _bills = false; _creditOff = false; _ticks = 0;
         }
 
         /// <summary>Doplata rodu `c` z biezacej doby doplat (0 - inna doba albo nic).</summary>
@@ -171,7 +200,8 @@ namespace Armoury
                 if (!On(s) || Campaign.Current == null) return;
                 _ksh = KsFoodCarts.SwitchOn && StartCalibration.Applied && StartCalibration.RampDayA >= 0 && day >= StartCalibration.RampDayA;
                 _bills = FoodBillsOpen != null && FoodBillsPay != null;
-                if (!_ksh) return;
+                _creditOff = !_bills && CreditCode();                        // kupcy na kredycie bez podlaczonych rachunkow - bez doplaty (linia: NIEPODLACZONY)
+                if (!_ksh || _creditOff) return;
                 KsHunger.Hungry(_hungry);
                 float wcd = Math.Max(1f, s.WarChestDays);
                 foreach (var kv in _hungry)
@@ -208,9 +238,10 @@ namespace Armoury
                         if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; continue; }   // gracz nigdy (jak chleb M3)
                         double G, R; bool war;
                         if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; continue; }
-                        long fam = ClanIncomeBook.FamilyGoldOf(c);
-                        double rate = TownFolk.BreadLordShare(s, war) * Math.Max(0, fam - R) / wcd - TownFolk.BreadLordToday(c) - TourneyPay.RepaidToday(c) - PaidToday(c);
-                        long cap = (long)Math.Floor(Math.Min(Math.Min(rate, fam - R), (double)h.Gold));
+                        long outC, resC; _out.TryGetValue(c, out outC); _resv.TryGetValue(c, out resC);
+                        long fam = ClanIncomeBook.FamilyGoldOf(c) + outC;          // wplaty tej doby do innych miast rodu wroca albo zaplaca najwyzej rezerwacje
+                        double rate = TownFolk.BreadLordShare(s, war) * Math.Max(0, fam - R) / wcd - TownFolk.BreadLordToday(c) - TourneyPay.RepaidToday(c) - PaidToday(c) - resC;
+                        long cap = (long)Math.Floor(Math.Min(Math.Min(rate, fam - R - resC), (double)h.Gold + (_bills ? 0 : outC)));
                         if (cap <= 0) { _nRoom++; continue; }
                         long extra = Math.Min(cap, (long)Math.Ceiling(want));
                         if (_bills)
@@ -235,6 +266,7 @@ namespace Armoury
                         if (got2 <= 0) continue;
                         _dep += got2;
                         _open.Add(new Dep { T = t, H = h, C = c, X = got2, G0 = g, Own0 = own0, Cap = extra });
+                        _out[c] = outC + got2; _resv[c] = resC + extra;
                     }
                     catch (Exception e) { Stumble("Before(miasto)", e); }
                 }
@@ -270,13 +302,17 @@ namespace Armoury
                     {
                         _nPay++; NotePaid(d.C, paid);
                         if (paid > d.Cap) _nOver++;
-                        double G, R; bool war;
-                        if (ClanBudget.ChestOf(d.C, out G, out R, out war) && ClanIncomeBook.FamilyGoldOf(d.C) < R) _nBelow++;
                     }
                 }
                 catch (Exception e) { Stumble("Settle(miasto)", e); }
             }
-            _open.Clear();
+            // kontrola po rozliczeniu wszystkich miast (dopiero teraz zloto rodu jest z powrotem u glowy): rod placacy dzis ponizej rezerwy wojny (oczekiwane 0)
+            foreach (var c in _resv.Keys)
+            {
+                try { double G, R; bool war; if (c != null && ClanBudget.ChestOf(c, out G, out R, out war) && PaidToday(c) > 0 && ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++; }
+                catch (Exception e) { Stumble("Settle(rezerwa)", e); }
+            }
+            _open.Clear(); _out.Clear(); _resv.Clear();
         }
 
         private static void Line()
@@ -287,7 +323,7 @@ namespace Armoury
             var sb = new StringBuilder(1200);
             sb.Append("Pan miasta placi za dowoz (KS): dzien ").Append(Today())
               .Append(" | klucz Ks Lord Funds Food ").Append(On(s) ? "tak" : "nie")
-              .Append(" | tryb ").Append(_bills ? "RACHUNKI KUPCOW (r4-kupcy)" : "DOPLATA KASY NA CZAS ZAKUPOW KS-H")
+              .Append(" | tryb ").Append(_bills ? "RACHUNKI KUPCOW (r4-kupcy)" : _creditOff ? "KREDYT KUPCOW NIEPODLACZONY - doplata wylaczona (slad " + _creditWhy + ")" : "DOPLATA KASY NA CZAS ZAKUPOW KS-H")
               .Append(" | KS-H ").Append(_ksh ? "czynne" : "nieczynne")
               .Append(" | miasta glodne ").Append(_nH).Append(": kasa sama starcza ").Append(_nOk).Append(", bez luki rynku dzis ").Append(_nGap0)
               .Append(", bez rachunkow ").Append(_nNoBills).Append(", do doplaty ").Append(_nNeed)

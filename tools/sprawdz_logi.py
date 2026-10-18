@@ -968,7 +968,8 @@ Uzycie (Python 3, tylko odczyt):
                     "Glod miast (KS)" i "Pan miasta placi za dowoz (KS)" bez luk, NGL-1 latki (lojalnosc i bezpieczenstwo czynnego modelu, posilek), NGL-2 pomiar w miastach KS,
                     NGL-3 bez podwojnego liczenia z kara gry Starving (kontrola 0), NGL-4 kara "Hunger" tylko przy glodzie i nigdy dodatnia (NGL-4b INFO: glodne, kara,
                     lojalnosc), NGL-5 bunt nie z niczego (nowe bunty z lojalnoscia wczoraj > 25 = 0), NGL-6 zloto panow zamkniete (panowie + kasy + wierzyciele = 0,
-                    zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c od panow <= wydatek KS-H, NGL-7 INFO doplaty,
+                    zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c od panow <= wydatek KS-H, NGL-6d tryb pana zgodny z kodem kupcow (kredyt
+                    r4-kupcy bez podlaczonych rachunkow = NIE), NGL-7 INFO doplaty,
                     NGL-8 ERROR i potkniecia 0, NGL-9 koszt <= 1 ms (mediana). Log bez paczki: "brak linii" (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -35600,6 +35601,10 @@ def nglod_main(logp, until=100000):
         bad6c = [x for x in sp if x[2] > x[1] + 1]
         rep.add("NGL-6c: pan placi najwyzej to, co kupcy KS-H naprawde sprzedali tym kasom (od panow <= wydatek KS-H)",
                 f"dob {len(sp)}, z doplata ponad wydatek {len(bad6c)}" + (f" (dzien {bad6c[0][0]}: {bad6c[0][2]} > {bad6c[0][1]})" if bad6c else ""), "0", (not bad6c) if sp else None)
+        unw = [d for d in ld if "key" in L[d] and "NIEPODLACZONY" in L[d]["key"][1]]
+        rep.add("NGL-6d: tryb pana zgodny z kodem kupcow (po scaleniu r4-kupcy: rachunki podlaczone - FoodBillsOpen / FoodBillsPay)",
+                f"dob z trybem KREDYT KUPCOW NIEPODLACZONY {len(unw)} z {len(ld)}" + (f" ({L[unw[0]]['key'][1][:120]})" if unw else ""),
+                "0 (inaczej pan nie placi wcale - podlaczyc rachunki przy scaleniu)", not unw)
         act = [d for d in ld if g(L[d], "gold", 2, int, 0) > 0]
         rep.add("NGL-7: doplaty panow (INFO)",
                 f"dob z doplata {len(act)} z {len(ld)}; miasto-doby glodne {sum(g(L[d], 'cnt', 0, int, 0) for d in ld if 'cnt' in L[d])}, kasa sama starcza "
