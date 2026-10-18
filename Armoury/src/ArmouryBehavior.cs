@@ -806,6 +806,10 @@ namespace Armoury
             // KS-R3 G1: wozy kupcow zywnosci (KS-H) w drodze - brak klucza = brak wozow (stary zapis)
             try { string kh = dataStore.IsSaving ? KsFoodCarts.Export() : null; SaveText.Sync(dataStore, "arm_ks_kupcy", ref kh); if (dataStore.IsLoading) KsFoodCarts.Import(kh); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_kupcy", e); }
+            // KS-R4 r4-kupcy H5: rachunki kredytu kupcow KS-H ("kk1|zrodlo~cel~zostalo~doba|...", najwyzej 64 KB) - brak klucza (stary zapis) = brak rachunkow; starsza DLL
+            // klucza nie czyta; Reset przed SyncData (konstruktor -> KsFoodCarts.Reset -> KsFoodCredit.Reset)
+            try { string kc = dataStore.IsSaving ? KsFoodCredit.Export() : null; SaveText.Sync(dataStore, "arm_daniny_kupcy", ref kc); if (dataStore.IsLoading) KsFoodCredit.Import(kc); }
+            catch (Exception e) { Log.Error("SyncData.arm_daniny_kupcy", e); }
             // KS-R3 (recenzja runda 3): stan rundy 3 kalibracji (gradient krain, sterowanie, kx i tabela dob KS-H, srednie dowozu, podloga, wydatki wsi ...) w osobnym kluczu -
             // arm_ks zostaje w formacie ks3 (starsza DLL czyta go jak dotad i pomija ten klucz); brak klucza = stan rundy 3 od zera
             try { string k3 = dataStore.IsSaving ? StartCalibration.ExportR3() : null; SaveText.Sync(dataStore, "arm_ks_r3", ref k3); if (dataStore.IsLoading) StartCalibration.ImportR3(k3); }

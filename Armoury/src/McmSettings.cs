@@ -6692,6 +6692,54 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsFoodCarts { get; set; } = true;
 
+        [SettingPropertyBool("Ks Food Carts Consign", HintText = "with Ks Food Carts: town merchants carry food on their own credit - the goods leave the selling town unpaid and the seller pays the carters or the ship's crew; on arrival the buying town pays what it has above half of its merchants' reserve at the price of its own stall, and the rest is written down as a bill it pays off day by day, oldest first. A town with a bill older than Ks Consign Overdue Days gets no new food carts until it pays; a war between the two towns cancels the bill (the merchants lose it). Gold only moves between the two towns and the carters - nothing is made or lost; off = the buying town pays everything when the cart sets out, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsFoodCartsConsign { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Consign Floor Share", 0.00f, 1.00f, "0.00", HintText = "with Ks Food Carts Consign: a town pays for food on arrival and pays off its food bills only from gold above this share of its merchants' reserve")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public float KsConsignFloorShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Ks Consign Source Exposure", 0.00f, 1.00f, "0.00", HintText = "with Ks Food Carts Consign: a selling town lets out on credit (goods on the road, their haul and bills not yet paid) at most this share of its gold")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public float KsConsignSourceExposure { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Ks Consign Overdue Days", 1, 364, "0", HintText = "with Ks Food Carts Consign: a town whose oldest food bill is older than this many days gets no new food carts until it has paid it")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public int KsConsignOverdueDays { get; set; } = 30;
+
+        [SettingPropertyBool("Ks Ship By Days", HintText = "with Ks Food Carts: a food cart goes by ship whenever the ship arrives sooner in days (the sea route counted at ship speed plus a day in port), not only when the sea route is shorter; the weekly plan reads the same days; off = by ship only when the land road is much longer, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsShipByDays { get; set; } = true;
+
+        [SettingPropertyBool("Ks Far Always", HintText = "with Ks Food Carts: a town short of food also asks up to 8 towns further away that have food to sell (within the days a cart may travel), not only when none of the 12 nearest can sell; off = further towns only when the nearest have nothing, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsFarAlways { get; set; } = true;
+
+        [SettingPropertyBool("Ks Rel Keep", HintText = "with Ks Food Carts: when the whole market is short of a food, a selling town keeps only about as many days of it as the market's middle town has (never less than half of its target) and sells the rest of its grain and salt and two thirds of the rest of its spare food; off = it always keeps a quarter more than its target and sells half of the rest, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsRelKeep { get; set; } = true;
+
+        [SettingPropertyBool("Ks Dest Value", HintText = "with Ks Food Carts: the merchants judge a cart and the buying town pays for it at one price - the stall price of the buying town as it falls with every piece put on the stall, never more than three times the starting price; off = today's stall price for every piece, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsDestValue { get; set; } = true;
+
+        [SettingPropertyBool("Ks Carts Budget By Need", HintText = "with Ks Food Carts: the food every town needs most - the shortest stock in days of its target - is served first, whatever the food, so a town's purse and a seller's credit are not eaten up by grain and fish before cheese, butter, grapes, olives and salt get a turn; off = food by food in a fixed order, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsCartsBudgetByNeed { get; set; } = true;
+
+        [SettingPropertyBool("Ks Famine Priority", HintText = "with Ks Food Carts: a town whose grain, fish or meat stall holds less than half of its target in days (the North and the Wall in a hard winter, a besieged land's neighbours) gets the first claim on every seller in reach, by land or by sea - still paid for in full, on credit like every other cart; off = no famine priority")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsFaminePriority { get; set; } = true;
+
+        [SettingPropertyBool("Ks Corridors Credit", HintText = "with Ks Land Gradient and Ks Food Carts Consign: the weekly plan counts the land routes as the merchants run them on credit - the days from the towns that need food to the three towns with most to spare, what the buying towns can pay above half of their reserve, and what the selling towns can carry on credit; off = the gates between lands and one purse per buying land, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsCorridorsCredit { get; set; } = true;
+
+        [SettingPropertyBool("Ks Lot Price Pow", HintText = "with Ks Food Carts: the price of a whole cart load is reckoned from the game's own price formula piece by piece with two price checks instead of three sampled prices (the same money, closer to the exact sum); off = three sampled prices, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsLotPricePow { get; set; } = true;
+
         [SettingPropertyBool("Ks Land Gradient", HintText = "with Start Calibration: the weekly plan sees the road - where food must come from far away it is dearer by the cost of the haul, so the peasants there grow more of it and their basket costs more, and where it cannot be sold it is cheaper. It counts what people there really pay for, and one purse per land for all its imports. The work of a hand stays the same, only how many hands work at each thing changes; off = the plan prices every market as one place")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsLandGradient { get; set; } = true;
@@ -8616,6 +8664,18 @@ namespace Armoury
             s.StartCalibrationArmThisSave = StartCalibrationArmThisSave;
             s.StartCalibrationConfirm = StartCalibrationConfirm;
             s.KsFoodCarts = KsFoodCarts;
+            s.KsFoodCartsConsign = KsFoodCartsConsign;
+            s.KsConsignFloorShare = KsConsignFloorShare;
+            s.KsConsignSourceExposure = KsConsignSourceExposure;
+            s.KsConsignOverdueDays = KsConsignOverdueDays;
+            s.KsShipByDays = KsShipByDays;
+            s.KsFarAlways = KsFarAlways;
+            s.KsRelKeep = KsRelKeep;
+            s.KsDestValue = KsDestValue;
+            s.KsCartsBudgetByNeed = KsCartsBudgetByNeed;
+            s.KsFaminePriority = KsFaminePriority;
+            s.KsCorridorsCredit = KsCorridorsCredit;
+            s.KsLotPricePow = KsLotPricePow;
             s.KsLandGradient = KsLandGradient;
             s.KsAlphaNet = KsAlphaNet;
             s.KsVillagePaidFirst = KsVillagePaidFirst;

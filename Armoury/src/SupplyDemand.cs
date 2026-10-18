@@ -565,6 +565,8 @@ namespace Armoury
         internal static void DailyTrade()
         {
             HarnessOnShelves = -1;
+            // KS-R4 r4-kupcy H5: splata rachunkow kredytu kupcow KS-H (cel -> zrodlo, od najstarszego, ponad 0.5 x zapas kupcow; wojna - rachunek przepada) przed wozami kupcow
+            try { KsFoodCredit.PayDaily(); } catch (Exception e) { Log.Error("KsFoodCredit.PayDaily", e); }
             try { TradeCarts.Arrivals(); } catch (Exception e) { Log.Error("TradeCarts.Arrivals", e); }
             // KS-R3 G1: kupcy zywnosci (KS-H) - dostawy i zakupy jedzenia PRZED wywozem broni; wlasna pozycja "Przeplywy osad" (MKsH) w oknie MTrade
             try { MoneyLedger.Mark(MoneyLedger.MTrade); } catch { }

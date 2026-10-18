@@ -972,6 +972,22 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
+--grupa nkupcy    : (noc 17/18.10, KS runda 4 paczka r4-kupcy: PLAN-KS-RUNDA4 rozdz. 3 H1-H8, rozdz. 8 K1, rozdz. 9 T9/T9b; Jeff 17.10 "dowoz jak w ksiazkach";
+                    Armoury/src/KsFoodCarts.cs, KsFoodCredit.cs, KsFoodCore.cs) python -I tools/sprawdz_logi.py --grupa nkupcy <Armoury-*.log> (strumieniowo).
+                    Linia "Kupcy zywnosci (KS-H) dzien N" z czescia "kredyt kupiecki". NKU-0 linie z kredytem (log sprzed paczki - INFO), NKU-1 kontrola
+                    rachunkow co dobe (otwarte wczoraj + nowe - splacone - przepadle - otwarte dzis = 0; u celu = zaplacone przy dostawie + nowe), NKU-2 tozsamosci
+                    towaru i zlota (kontrola towaru reszta 0, zlota reszta 0 z frachtem ze zrodel i rachunkami), NKU-3 rachunki (zaplacone przy dostawie >= 50%
+                    wartosci u celu i zaplacone + splacone >= 90% wartosci u celu w ostatnich 28 dobach; otwarte na koniec - INFO), NKU-4 zwloka (miasta z rachunkiem
+                    starszym niz zwloka <= 10% miast KS-H na koniec; "cel z zaleglym" <= 5% zamowionych sztuk), NKU-5 przepadle przez wojne (INFO), NKU-6 zablokowane
+                    z braku pieniedzy (zrodlo bez miejsca + kasa celu za mala) <= 10% zamowionych sztuk, wedlug towaru - INFO, NKU-7 glod pierwszy (wyslane >= 50%
+                    zamowionych sztuk glodu; "celow" = rozne miasta doby, "zamowien glodu" = pary miasto-towar), NKU-8 Polnoc i Mur zaopatrzone - MIASTA
+                    (dowiezione w ostatnich 28 dobach > 0 i do >= 3 miast Polnocy / Muru / za Murem), NKU-8b zamki Muru poza KS-H (INFO: Eastwatch by the Sea,
+                    Shadow Tower, Nightfort, The Wall - KS-H wozi tylko do miast, zboze do zamkow Muru daje danina r4-mur, grupa nmur NMUR-6; Castle Black
+                    dowiezione w 28 dobach), NKU-9 tabela dob wersja T przy statku wedlug dob (INFO), NKU-10 zapis arm_daniny_kupcy <= 64 KB i zadnego
+                    "NADAL PONAD 64 KB" (limit miekki - po scaleniu jeden wpis na pare), NKU-11 potkniecia kredytu i ERROR paczki 0, NKU-12 czas KS-H mediana
+                    <= 1.5 ms (jak NKS-28), NKU-13 stan do cofniecia DLL (INFO: wozy na kredyt w drodze i otwarte rachunki na koniec - cofniecie ponizej
+                    r4-kupcy bez strat tylko przy 0 / 0). NKS-22 (grupa nks) od paczki: przy kredycie kupcow "kasa celu za mala" zastapione
+                    "cel z zaleglym" <= 5% zamowionych; probka wyceny: srednia dobowych srednich <= 1%, najwiekszy blad <= 3%.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -34516,6 +34532,56 @@ NKS_CORRNOOUT = re.compile(r"\| bez ujscia \([^)]*\): (?P<body>[^|]*)")
 NKS_DAYTAB = re.compile(r"\| tabela dob KS-H (?P<t>[\d.]+) ms")
 NKS_SAVEKH = re.compile(r"KS: zapis arm_ks_kupcy doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB")
 NKS_SAVER3 = re.compile(r"arm_ks_r3 \(stan rundy 3, osobny klucz\) (?P<kb>[\d.]+) KB, razem (?P<tot>[\d.]+) KB")
+# KS-R4 r4-kupcy (noc 17/18.10): kredyt kupcow KS-H, probka wyceny (srednia i najwiekszy blad), zablokowane wedlug towaru, glod pierwszy, Polnoc i Mur, wersja tabeli dob
+NKS_KSHPRB = re.compile(r"\| probka wyceny 1/64 (?P<se>[\d.]+)% \(max (?P<sx>[\d.]+)%, lotow (?P<n>\d+)")
+NKS_KSHCRD = re.compile(r"\| kredyt kupiecki (?P<on>TAK|NIE): otwarte (?P<open>-?\d+) zl \((?P<bills>\d+) rachunkow, (?P<towns>\d+) miast[^)]*\), nowe (?P<new>-?\d+) zl \((?P<newn>\d+)\), "
+                        r"u celu (?P<billed>-?\d+) zl w (?P<deliv>\d+) dostawach, zaplacone przy dostawie (?P<now>-?\d+) zl, splacone (?P<rep>-?\d+) zl, starsze niz (?P<odd>\d+) dni (?P<od>-?\d+) zl "
+                        r"\((?P<odt>\d+) miast\), przepadle \(wojna\) (?P<forf>-?\d+) zl \((?P<forfn>\d+) rachunkow; od wczytania (?P<forft>-?\d+) zl\), na kredyt wyslane (?P<cpcs>\d+) szt\. "
+                        r"w (?P<clots>\d+) wozach \(wartosc zrodla (?P<cval>-?\d+) zl, fracht ze zrodel (?P<cfr>-?\d+) zl\), zablokowane: zrodlo bez miejsca (?P<srccap>\d+) szt\., "
+                        r"cel z zaleglym (?P<overd>\d+) szt\. \| kontrola kredytu reszta (?P<ctl>-?\d+|-) \([^)]*\), u celu reszta (?P<ctl2>-?\d+) \([^)]*\), potkniecia kredytu (?P<cst>\d+)")
+NKS_KSHPBZ = re.compile(r"\| zablokowane z braku pieniedzy wedlug towaru \(szt\.\):(?P<body>[^|]*)")
+NKS_KSHFAM = re.compile(r"\| glod pierwszy: celow (?P<req>\d+) \((?P<par>[^)]*)\), zamowione (?P<ord>\d+) szt\., wyslane (?P<got>\d+) szt\.")
+# recenzja r4-kupcy: "celow" = rozne miasta glodu doby, "zamowien glodu" = pary (miasto, towar); kredyt w drodze (cofniecie DLL); zamki Muru poza KS-H; zapis ponad 64 KB
+NKS_KSHFAMK = re.compile(r"zamowien glodu (?P<k>\d+)")
+NKS_KSHCTR = re.compile(r"\| kredyt w drodze: wozow (?P<n>\d+) \((?P<pcs>\d+) szt\., wartosc zrodla (?P<val>-?\d+) zl")
+NKS_KSHWALL = re.compile(r"\| zamki Muru poza KS-H (?P<n>\d+) \((?P<names>[^;)]*)")
+NKS_KSHNOR = re.compile(r"\| Polnoc i Mur \((?P<nt>\d+) miast\): wyslane (?P<ship>\d+) szt\., dowiezione (?P<arr>\d+) szt\. do (?P<towns>\d+) miast(?: \((?P<body>[^)]*)\))?, w drodze (?P<tr>\d+) szt\.")
+NKS_KSHVER = re.compile(r"\| tabela dob (?P<done>\d+)/(?P<all>\d+) \(wersja (?P<v>[ST-])")
+NKS_SAVEKC = re.compile(r"KS: zapis arm_daniny_kupcy doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB")
+
+
+def nks_ksh_r4(s, rec):
+    """KS-R4 r4-kupcy: czesci linii KS-H paczki (kredyt, probka, zablokowane, glod, Polnoc i Mur, wersja tabeli) do slownika doby (brak czesci - brak kluczy)."""
+    m = NKS_KSHPRB.search(s)
+    if m:
+        rec["se_m"] = float(m.group("se")); rec["se_x"] = float(m.group("sx")); rec["se_n"] = int(m.group("n"))
+    m = NKS_KSHCRD.search(s)
+    if m:
+        for k, v in m.groupdict().items():
+            rec["cr_" + k] = v
+    m = NKS_KSHPBZ.search(s)
+    if m:
+        rec["pbz"] = {it.group(1): int(it.group(2)) for it in re.finditer(r"([A-Za-z_]+) (\d+)", m.group("body"))}
+    m = NKS_KSHFAM.search(s)
+    if m:
+        rec["fam_req"] = int(m.group("req")); rec["fam_ord"] = int(m.group("ord")); rec["fam_got"] = int(m.group("got"))
+        mk = NKS_KSHFAMK.search(m.group("par") or "")
+        if mk:
+            rec["fam_reqk"] = int(mk.group("k"))
+    m = NKS_KSHCTR.search(s)
+    if m:
+        rec["ctr_n"] = int(m.group("n")); rec["ctr_pcs"] = int(m.group("pcs")); rec["ctr_val"] = int(m.group("val"))
+    m = NKS_KSHWALL.search(s)
+    if m:
+        rec["wall_n"] = int(m.group("n")); rec["wall_names"] = m.group("names").strip()
+    m = NKS_KSHNOR.search(s)
+    if m:
+        rec["nor_nt"] = int(m.group("nt")); rec["nor_ship"] = int(m.group("ship")); rec["nor_arr"] = int(m.group("arr")); rec["nor_towns"] = int(m.group("towns")); rec["nor_tr"] = int(m.group("tr"))
+        rec["nor_by"] = {it.group(1).strip(): int(it.group(2)) for it in re.finditer(r"([^,]+?) (\d+)(?:,|$)", m.group("body") or "")}
+    m = NKS_KSHVER.search(s)
+    if m:
+        rec["days_ver"] = m.group("v")
+    return rec
 NKS_EARLY = re.compile(r"KS: kontrola wczesna D\+(?P<k>\d+) dzien (?P<day>-?\d+) .*?w pasmie (?P<ok>\d+) z (?P<n>\d+).*?\| WYNIK: (?P<res>PRZERWAC|dalej)")
 NKS_112 = re.compile(r"Utarg wsi \(112\): dzien (?P<day>-?\d+) \| powroty taborow z utargiem (?P<r>\d+): oddane (?P<h>-?\d+) = pan \(licznik podatku\) (?P<t>-?\d+)")
 NKS_ZC4AFF = re.compile(r"stac na cale jedzenie: miasta (?P<a>[\d.]+|-)% \((?P<k>\d+)/(?P<n>\d+)\), jedzenie niekupione z braku pieniedzy: miasta (?P<mt>[\d.]+|-)% budzetu jedzenia \((?P<mz>-?\d+) zl\), wsie (?P<mv>[\d.]+|-)% chcianych sztuk \((?P<vs>-?\d+) szt\.\)")
@@ -34539,6 +34605,162 @@ NKS_CONF = re.compile(r"KS: potwierdzone doba (?P<day>-?\d+)")
 NKS_ONSRC = re.compile(r"KS: WLACZONE doba (?P<day>-?\d+) \((?P<src>autotest|gra)")
 
 
+NKU_ERR = ("ERROR in KsFoodCredit.", "ERROR in KsFoodCarts.", "ERROR in SyncData.arm_daniny_kupcy", "ERROR in SyncData.arm_ks_kupcy")
+
+
+def nkupcy_main(logp):
+    """nkupcy (noc 17/18.10, KS runda 4 r4-kupcy; KsFoodCarts.cs, KsFoodCredit.cs, KsFoodCore.cs): kredyt kupcow KS-H (H5), rachunki i ich kontrole (H6), zwloka,
+    przepadki przez wojne, zablokowane z braku pieniedzy wedlug towaru, glod pierwszy, Polnoc i Mur, tabela dob wedlug dob (H1), zapis arm_daniny_kupcy. Progi w docstringu
+    modulu (--grupa nkupcy). Log bez paczki albo bez KS-H: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NKU-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ksh, saves, loads = {}, [], []
+    n_err = 0
+    over64 = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("Kupcy zywnosci (KS-H) dzien "):
+                mm = NKS_KSH.match(s)
+                if mm:
+                    rec = mm.groupdict()
+                    nks_ksh_r4(s, rec)
+                    ksh[int(mm.group("day"))] = rec
+            elif s.startswith("KS: zapis arm_daniny_kupcy"):
+                mm = NKS_SAVEKC.match(s)
+                if mm:
+                    saves.append((int(mm.group("day")), float(mm.group("kb"))))
+                elif "NADAL PONAD 64 KB" in s:
+                    over64 += 1
+            elif s.startswith("Kupcy zywnosci (KS-H): rachunki kredytu z zapisu"):
+                loads.append(s)
+            elif s.startswith(NKU_ERR):
+                n_err += 1
+    days = sorted(ksh)
+    crd = [d for d in days if "cr_on" in ksh[d]]
+    print(f"plik: {logp} | linii KS-H {len(days)}" + (f" (doby {days[0]}-{days[-1]})" if days else "") + f", z kredytem kupcow {len(crd)}, zapisow arm_daniny_kupcy {len(saves)}, wczytan rachunkow {len(loads)}")
+    if not crd:
+        rep.add("NKU-0: linie KS-H z kredytem kupcow", f"brak (linii KS-H {len(days)})", "INFO (log sprzed paczki r4-kupcy albo bez KS)", None)
+        rep.add("NKU-11: ERROR paczki", f"{n_err}", "0", n_err == 0 if n_err else None)
+        rep.show()
+        return 0
+    on = [d for d in crd if ksh[d].get("cr_on") == "TAK"]
+    act = [d for d in crd if ksh[d].get("state") == "CZYNNE"]
+    rep.add("NKU-0: linie KS-H z kredytem kupcow", f"dob {len(crd)} (od {crd[0]} do {crd[-1]}), klucz kredytu TAK {len(on)}, CZYNNE {len(act)}", "INFO", None)
+    # NKU-1 kontrola rachunkow
+    bad1 = [d for d in crd if ksh[d].get("cr_ctl") not in (None, "-", "0")]
+    bad1b = [d for d in crd if ksh[d].get("cr_ctl2") not in (None, "0")]
+    rep.add("NKU-1: kontrola rachunkow (otwarte wczoraj + nowe - splacone - przepadle = otwarte dzis; u celu = zaplacone przy dostawie + nowe)",
+            f"dob z reszta rachunkow != 0: {len(bad1)}" + (f" ({bad1[:6]})" if bad1 else "") + f", dob z reszta u celu != 0: {len(bad1b)}" + (f" ({bad1b[:6]})" if bad1b else ""), "0 / 0", not bad1 and not bad1b)
+    # NKU-2 tozsamosci towaru i zlota
+    bad2 = [d for d in crd if ksh[d].get("gr") not in (None, "0") or ksh[d].get("zr") not in (None, "0")]
+    rep.add("NKU-2: tozsamosci towaru i zlota (kontrola towaru reszta 0, zlota reszta 0 z frachtem ze zrodel i rachunkami)", f"dob z reszta != 0: {len(bad2)}" + (f" ({bad2[:6]})" if bad2 else ""), "0", not bad2)
+    # NKU-3 rachunki w ostatnich 28 dobach
+    last = crd[-1]
+    w = [d for d in crd if d > last - 28]
+    billed = sum(int(ksh[d].get("cr_billed") or 0) for d in w); now = sum(int(ksh[d].get("cr_now") or 0) for d in w); repd = sum(int(ksh[d].get("cr_rep") or 0) for d in w)
+    newb = sum(int(ksh[d].get("cr_new") or 0) for d in w); forf = sum(int(ksh[d].get("cr_forf") or 0) for d in w)
+    lr = ksh[last]
+    open_end = int(lr.get("cr_open") or 0)
+    if billed > 0:
+        ok3 = now >= 0.5 * billed and now + repd >= 0.9 * billed
+        rep.add("NKU-3: rachunki (ostatnie 28 dob): zaplacone przy dostawie i splacone wobec wartosci u celu",
+                f"u celu {billed} zl, zaplacone przy dostawie {now} zl ({100.0 * now / billed:.1f}%), splacone {repd} zl, razem {100.0 * (now + repd) / billed:.1f}%, nowe rachunki {newb} zl, przepadle {forf} zl; "
+                f"otwarte na koniec {open_end} zl ({lr.get('cr_bills')} rachunkow, {lr.get('cr_towns')} miast)", "przy dostawie >= 50%, przy dostawie + splaty >= 90%", ok3)
+    else:
+        rep.add("NKU-3: rachunki (ostatnie 28 dob)", f"brak dostaw na kredyt w oknie (otwarte na koniec {open_end} zl)", "INFO", None)
+    # NKU-4 zwloka
+    ordered = sum(int(ksh[d].get("ord") or 0) for d in crd); overd = sum(int(ksh[d].get("cr_overd") or 0) for d in crd)
+    odt = int(lr.get("cr_odt") or 0)
+    # liczba miast KS-H nie stoi w linii - prog 10% wobec ok. 100 miast swiata (10 miast)
+    ok4 = odt <= 10 and (ordered == 0 or overd <= 0.05 * ordered)
+    rep.add("NKU-4: zwloka (miasta z rachunkiem starszym niz zwloka na koniec; cel z zaleglym wobec zamowionych)",
+            f"miast z zaleglym {odt} ({lr.get('cr_od')} zl, zwloka {lr.get('cr_odd')} dni), cel z zaleglym {overd} z {ordered} zamowionych szt. ({100.0 * overd / max(1, ordered):.1f}%)",
+            "<= 10 miast (10% z ok. 100), cel z zaleglym <= 5% zamowionych", ok4)
+    # NKU-5 przepadle
+    rep.add("NKU-5: rachunki przepadle przez wojne (kupcy stracili)", f"od wczytania {lr.get('cr_forft')} zl; w biegu {sum(int(ksh[d].get('cr_forf') or 0) for d in crd)} zl "
+            f"({sum(int(ksh[d].get('cr_forfn') or 0) for d in crd)} rachunkow)", "INFO (zalezy od wojen)", None)
+    # NKU-6 zablokowane z braku pieniedzy
+    srccap = sum(int(ksh[d].get("cr_srccap") or 0) for d in crd); poor = sum(int(ksh[d].get("poor") or 0) for d in crd)
+    byg = {}
+    for d in crd:
+        for g, v in (ksh[d].get("pbz") or {}).items():
+            byg[g] = byg.get(g, 0) + v
+    tops = ", ".join(f"{g} {v}" for g, v in sorted(byg.items(), key=lambda x: -x[1])[:8]) or "-"
+    rep.add("NKU-6: zablokowane z braku pieniedzy (zrodlo bez miejsca kredytu + kasa celu za mala) wobec zamowionych",
+            f"zrodlo bez miejsca {srccap}, kasa celu za mala {poor} z {ordered} zamowionych ({100.0 * (srccap + poor) / max(1, ordered):.1f}%); wedlug towaru: {tops}",
+            "<= 10% zamowionych (diagnoza fin80: kasa celu za mala 37.8%)", ordered == 0 or srccap + poor <= 0.10 * ordered)
+    # NKU-7 glod pierwszy
+    fo = sum(ksh[d].get("fam_ord", 0) for d in crd); fg = sum(ksh[d].get("fam_got", 0) for d in crd); fr = sum(ksh[d].get("fam_req", 0) for d in crd)
+    # recenzja r4-kupcy: od poprawki "celow" = rozne miasta doby (dotad pary miasto-towar); "zamowien glodu" = pary (brak w starszej linii - "-")
+    frk_l = [ksh[d]["fam_reqk"] for d in crd if "fam_reqk" in ksh[d]]
+    frk = str(sum(frk_l)) if frk_l else "-"
+    if fo > 0:
+        rep.add("NKU-7: glod pierwszy (cele z polka zboza / ryb / miesa ponizej 0.5 T*)", f"miast-dob {fr} (zamowien glodu - par miasto i towar - {frk}), zamowione {fo} szt., wyslane {fg} szt. ({100.0 * fg / fo:.0f}%)", "wyslane >= 50% zamowionych", fg >= 0.5 * fo)
+    else:
+        rep.add("NKU-7: glod pierwszy", f"miast-dob {fr} (zamowien glodu {frk}), zamowien glodu brak", "INFO (brak glodu w zasiegu kupcow)", None)
+    # NKU-8 Polnoc i Mur
+    nw = [d for d in crd if d > last - 28 and "nor_arr" in ksh[d]]
+    if nw:
+        arr = sum(ksh[d]["nor_arr"] for d in nw); shp = sum(ksh[d]["nor_ship"] for d in nw)
+        towns = {}
+        for d in nw:
+            for k, v in (ksh[d].get("nor_by") or {}).items():
+                towns[k] = towns.get(k, 0) + v
+        ttxt = ", ".join(f"{k} {v}" for k, v in sorted(towns.items(), key=lambda x: -x[1])[:10]) or "-"
+        rep.add("NKU-8: Polnoc i Mur zaopatrzone - MIASTA (ostatnie 28 dob; battania, nightswatch, freefolk, skagosi; zamki Muru - NKU-8b)",
+                f"miast Polnocy w KS-H {ksh[nw[-1]].get('nor_nt')}, wyslane {shp} szt., dowiezione {arr} szt. do {len(towns)} miast ({ttxt}), w drodze na koniec {ksh[nw[-1]].get('nor_tr', '-')} szt.",
+                "dowiezione > 0 i do >= 3 miast", arr > 0 and len(towns) >= 3)
+    else:
+        rep.add("NKU-8: Polnoc i Mur", "brak czesci 'Polnoc i Mur' w liniach", "INFO", None)
+    # NKU-8b zamki Muru poza KS-H (recenzja r4-kupcy: Eastwatch by the Sea i inne zamki Muru - KS-H wozi tylko do miast; zboze do Muru = danina r4-mur)
+    wl = [d for d in crd if "wall_n" in ksh[d]]
+    if wl:
+        wr = ksh[wl[-1]]
+        cb = 0
+        for d in crd:
+            if d > last - 28:
+                cb += (ksh[d].get("nor_by") or {}).get("Castle Black", 0)
+        rep.add("NKU-8b: zamki Muru poza KS-H (dowoz do zamkow Muru liczy danina r4-mur: --grupa nmur NMUR-6)",
+                f"zamkow Muru {wr['wall_n']} ({wr.get('wall_names') or '-'}); Castle Black (jedyne miasto Muru) dowiezione w 28 dobach {cb} szt.",
+                "INFO (cel 'Polnoc i Mur' spelniony dopiero przy NKU-8 TAK i NMUR-6 TAK)", None)
+    else:
+        rep.add("NKU-8b: zamki Muru poza KS-H", "brak czesci 'zamki Muru' w liniach (log sprzed recenzji r4-kupcy)", "INFO", None)
+    # NKU-9 wersja tabeli dob
+    vers = sorted({ksh[d].get("days_ver") for d in crd if ksh[d].get("days_ver")})
+    rep.add("NKU-9: tabela dob KS-H (T - statek wedlug dob, S - regula rundy 3)", f"wersje {vers or '-'} ({lr.get('days_ver', '-')} na koniec)", "INFO (T przy kluczu Ks Ship By Days)", None)
+    # NKU-10 zapis
+    if saves:
+        mx = max(kb for _, kb in saves)
+        rep.add("NKU-10: zapis arm_daniny_kupcy", f"zapisow {len(saves)}, najwiekszy {mx:.1f} KB, scalonych nadal ponad 64 KB {over64}",
+                "<= 64 KB (limit miekki: po scaleniu jeden wpis na pare - wiecej par = wiekszy zapis, roszczenia nie przepadaja)", mx <= 64.0 and over64 == 0)
+    else:
+        rep.add("NKU-10: zapis arm_daniny_kupcy", "brak linii zapisu (bieg bez zapisu albo bez rachunkow)", "INFO", None)
+    # NKU-11 potkniecia i ERROR
+    cst = sum(int(ksh[d].get("cr_cst") or 0) for d in crd); stum = sum(int(ksh[d].get("stum") or 0) for d in crd)
+    rep.add("NKU-11: potkniecia kredytu i KS-H, ERROR paczki", f"potkniecia kredytu {cst}, potkniecia KS-H {stum}, ERROR {n_err}", "0 / 0 / 0", cst == 0 and stum == 0 and n_err == 0)
+    # NKU-12 czas KS-H
+    ms = sorted(float(ksh[d]["ms"]) for d in act if ksh[d].get("ms"))
+    if ms:
+        med = ms[(len(ms) - 1) // 2]; q95 = ms[min(len(ms) - 1, int(0.95 * (len(ms) - 1)))]
+        rep.add("NKU-12: czas KS-H (doby CZYNNE)", f"mediana {med:.2f} ms, q95 {q95:.2f} ms ({len(ms)} dob)", "mediana <= 1.5 ms (NKS-28)", med <= 1.5)
+    else:
+        rep.add("NKU-12: czas KS-H", "brak dob CZYNNE", "INFO", None)
+    # NKU-13 stan do cofniecia DLL (recenzja r4-kupcy): starsza DLL dowiozlaby wozy na kredyt bez rachunku i nie zna rachunkow
+    if "ctr_n" in lr:
+        rep.add("NKU-13: stan do cofniecia DLL ponizej r4-kupcy (koniec biegu)",
+                f"wozy na kredyt w drodze {lr['ctr_n']} ({lr.get('ctr_pcs')} szt., wartosc zrodla {lr.get('ctr_val')} zl), otwarte rachunki {open_end} zl",
+                "INFO (cofniecie bez strat tylko przy 0 wozow i 0 zl: najpierw klucz Ks Food Carts Consign wyl., wozy dojezdzaja, rachunki splacane)", None)
+    else:
+        rep.add("NKU-13: stan do cofniecia DLL", "brak czesci 'kredyt w drodze' w liniach (log sprzed recenzji r4-kupcy)", "INFO", None)
+    rep.show()
+    return 0
+
+
 def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor, own, zc4_k8, start_px):
     """KS-R3 (17.10, "kupcy i krainy"; StartCalibration.Corridors.cs, KsFoodCarts.cs, StartCalibration.R3.cs): NKS-22 kupcy zywnosci KS-H (linia co dobe od A, reszta towaru
     i zlota 0, zawrocone <= 1% szt., kasa celu za mala <= 5% zamowionych, probka wyceny <= 1%, potkniecia 0), NKS-23 polki zboza miast (ks-miasta.csv: bez zboza < 0.5 dnia
@@ -34558,12 +34780,22 @@ def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor,
         ordered = sum(int(kw[d]["ord"]) for d in days); poor = sum(int(kw[d]["poor"]) for d in days)
         se = [float(kw[d]["se"]) for d in days if kw[d].get("se") not in (None, "-")]
         stum = sum(int(kw[d]["stum"]) for d in days)
-        sem = max(se) if se else None
-        ok22 = not rest_bad and not miss and not off_days and (bought == 0 or back <= 0.01 * bought) and (ordered == 0 or poor <= 0.05 * ordered) and (sem is None or sem <= 1.0) and stum == 0
-        rep.add("NKS-22: kupcy zywnosci KS-H (linia co dobe od A, stan CZYNNE, kontrola towaru i zlota, zwroty, kasa celu, probka wyceny)",
-                f"linii {len(days)} (od doby {days[0]}), dob bez linii {len(miss)}" + (f" ({miss[:6]})" if miss else "") + f", dob nie CZYNNE {len(off_days)}; kupione {bought} szt., zawrocone {back} ({100.0 * back / max(1, bought):.2f}%), kasa celu za mala {poor} z {ordered} zamowionych "
-                f"({100.0 * poor / max(1, ordered):.1f}%), probka wyceny max {sem if sem is not None else '-'}%, doby z reszta != 0: {len(rest_bad)}" + (f" ({rest_bad[:6]})" if rest_bad else "") + f", potkniecia {stum}",
-                "linia kazdej doby od A w stanie CZYNNE, reszta towaru i zlota 0 co dobe, zawrocone <= 1% szt., kasa celu za mala <= 5% zamowionych, probka <= 1%, potkniecia 0", ok22)
+        # KS-R4 r4-kupcy (NKS-22 restated, PLAN-KS-RUNDA4 rozdz. 11): probka - srednia dobowych srednich <= 1% i najwiekszy blad lotu <= 3% (dotad: najwieksza dobowa srednia <= 1%);
+        # przy kredycie kupcow (linia "kredyt kupiecki TAK") cel nie placi z gory - "kasa celu za mala" zastepuje "cel z zaleglym" <= 5% zamowionych
+        sem = (sum(se) / len(se)) if se else None
+        sxl = [kw[d]["se_x"] for d in days if "se_x" in kw[d]]
+        sxm = max(sxl) if sxl else None
+        cons = [d for d in days if kw[d].get("cr_on") == "TAK"]
+        overd = sum(int(kw[d].get("cr_overd") or 0) for d in days)
+        money_ok = (ordered == 0 or overd <= 0.05 * ordered) if cons else (ordered == 0 or poor <= 0.05 * ordered)
+        money_txt = (f"kredyt kupcow ({len(cons)} dob): cel z zaleglym {overd} z {ordered} zamowionych ({100.0 * overd / max(1, ordered):.1f}%; kasa celu za mala {poor})" if cons
+                     else f"kasa celu za mala {poor} z {ordered} zamowionych ({100.0 * poor / max(1, ordered):.1f}%)")
+        ok22 = not rest_bad and not miss and not off_days and (bought == 0 or back <= 0.01 * bought) and money_ok and (sem is None or sem <= 1.0) and (sxm is None or sxm <= 3.0) and stum == 0
+        rep.add("NKS-22: kupcy zywnosci KS-H (linia co dobe od A, stan CZYNNE, kontrola towaru i zlota, zwroty, kasa celu / cel z zaleglym, probka wyceny)",
+                f"linii {len(days)} (od doby {days[0]}), dob bez linii {len(miss)}" + (f" ({miss[:6]})" if miss else "") + f", dob nie CZYNNE {len(off_days)}; kupione {bought} szt., zawrocone {back} ({100.0 * back / max(1, bought):.2f}%), {money_txt}, "
+                f"probka wyceny srednio {f'{sem:.2f}' if sem is not None else '-'}% (max {sxm if sxm is not None else '-'}%), doby z reszta != 0: {len(rest_bad)}" + (f" ({rest_bad[:6]})" if rest_bad else "") + f", potkniecia {stum}",
+                "linia kazdej doby od A w stanie CZYNNE, reszta towaru i zlota 0 co dobe, zawrocone <= 1% szt., kasa celu za mala <= 5% zamowionych (przy kredycie kupcow: cel z zaleglym <= 5%), "
+                "probka srednio <= 1% i max <= 3%, potkniecia 0", ok22)
         # NKS-22b (recenzja rundy 3, wazne): wynik kupcow - mediana dziennych median marzy lotow dowiezionych w oknie >= 0
         mw = [kw[d] for d in days if w0 <= d <= w1 and kw[d].get("mar_m") not in (None, "-")]
         if mw:
@@ -34879,6 +35111,7 @@ def nks_main(logp, until=120, bdp=None):
                     mcf = NKS_KSHCOF.search(s)
                     if mcf:
                         ksh[int(mm.group("day"))]["cof_q10"] = mcf.group("q10")
+                    nks_ksh_r4(s, ksh[int(mm.group("day"))])   # KS-R4 r4-kupcy: kredyt, probka, glod, Polnoc i Mur
                     mc2 = NKS_KSHCOR.search(s)
                     if mc2:
                         ksh_cor[int(mm.group("day"))] = {(it.group("a"), it.group("b"), it.group("g")): float(it.group("x")) for it in NKS_CORITEM.finditer(mc2.group("body"))}
@@ -35827,6 +36060,8 @@ def main(argv):
         return nzc6_main(logp, bdp, until_arg)   # nzc6 (16.10, zycie codzienne ZC6): Dostatek czynny - awans i spadek, wyzwolenie, dobrobyt (DailyLife.Mobility.cs, DailyLife.Prosperity.cs)
     if group == "nzc7" and logp:
         return nzc7_main(logp, bdp, until_arg)   # nzc7 (16.10, zycie codzienne ZC7): wojna i blizna - ruina przy zlupieniu, blizna najazdu, powrot (DailyLife.War.cs)
+    if group == "nkupcy" and logp:
+        return nkupcy_main(logp)   # nkupcy (noc 17/18.10, KS runda 4 r4-kupcy): kredyt kupcow KS-H, rachunki, tozsamosci, zwloka, glod pierwszy, Polnoc i Mur (KsFoodCarts.cs, KsFoodCredit.cs)
     if group == "nks" and logp:
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group == "nds" and logp:

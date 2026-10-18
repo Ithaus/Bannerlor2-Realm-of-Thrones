@@ -49,6 +49,7 @@ namespace Armoury
         public float[] TownDays;                                      // [nt * nt] doby wozem (-1: brak drogi albo inny rynek)
         public bool[] TownSea, TownWar;                               // [nt * nt] para morzem, wlasciciele w wojnie
         public double[] TownGold28;                                   // [nt] srednia 28 dob kasy miasta (zl)
+        public bool CorrCredit; public double[] TownRes;              // KS-R4 r4-kupcy H7: korytarze z modelem kredytu kupcow, [nt] zapas kupcow miasta (zl; null - bez H7)
         public Dictionary<string, double> CorrDelivered;              // "kraina zrodla|kraina celu|towar KsTab" -> szt./d dowiezione wozami KS-H (srednia 28 dob)
         public Dictionary<string, double[]> GradPrev;                 // kraina -> [NG] gradient poprzedniego Planu (null - 1)
         public Dictionary<string, double[]> LandCut;                  // kraina -> [NG] ciecie nadmiaru krainy (regula nadmiaru P4; null - 1)

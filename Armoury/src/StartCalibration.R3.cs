@@ -437,6 +437,7 @@ namespace Armoury
                 }
             }
             inp.CorrDelivered = KsFoodCarts.DeliveredSnapshot();
+            KupcyPlanInputs(inp, tst);                                // KS-R4 r4-kupcy H7: zapas kupcow miast i klucz korytarzy na kredyt
             var gp = _plan != null && _plan.Error == null && _plan.Grad != null ? _plan.Grad : _grad;
             if (gp != null) { inp.GradPrev = new Dictionary<string, double[]>(StringComparer.Ordinal); foreach (var kv in gp) if (kv.Value != null) inp.GradPrev[kv.Key] = (double[])kv.Value.Clone(); }
             inp.MarketFactor = MarketControl(day, inp);

@@ -302,6 +302,10 @@ RANGES = {
     'SoldierPostureTier6Multiplier': (1.0, 3.0, "0.00"),
     # ZC0 (16.10): skala targu sigma - kod przycina do 28..73 (DailyLife.SigmaFromMcm; widelki projektu rozdz. 4)
     'DailyLifeMarketScale': (28, 73, "0"),
+    # KS-R4 r4-kupcy (noc 17/18.10): kredyt kupcow KS-H - udzialy przycinane w kodzie do 0..1, zwloka 1..364 dob (KsFoodCarts.ConsignFloor / SrcExposure / OverdueDays)
+    'KsConsignFloorShare': (0.0, 1.0, "0.00"),
+    'KsConsignSourceExposure': (0.0, 1.0, "0.00"),
+    'KsConsignOverdueDays': (1, 364, "0"),
     # KS (16.10): premia mapy - kod przycina do 1.0..2.0 (StartCalibration.BuildInput)
     'StartCalibrationMapInertia': (1.0, 2.0, "0.00"),
     # DS F1 (17.10): daniny wsi - zgodnie z przycieciem w kodzie (DsVillage: udzial korony 0..0.5, doby 0..3640 / 0..364, udzial BK 0..1)
