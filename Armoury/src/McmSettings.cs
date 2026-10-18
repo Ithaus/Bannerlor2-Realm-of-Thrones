@@ -6280,11 +6280,15 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV5 { get; set; } = true;
 
-        [SettingPropertyBool("Village Layout V6", HintText = "some villages of the most crowded clusters move out to the empty land of their own district as small hamlets - shepherds and goatherds in the hills and on the steppe, woodcutters and charcoal burners in the forest, trappers, fishers on a lonely shore. The people of every district stay the same. It takes effect when a campaign is loaded. Off = the layout before the hamlets")]
+        [SettingPropertyBool("Village Layout V6", HintText = "some villages of the most crowded clusters move out to the empty land of their own district as small hamlets - shepherds and goatherds in the hills and on the steppe, woodcutters and charcoal burners in the forest, trappers, fishers on a lonely shore. The people of every district stay the same. It takes effect when a campaign is loaded. Off = the layout before the hamlets. Used only when Village Layout V7 is off")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV6 { get; set; } = true;
 
-        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet work the land where the hamlet stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from")]
+        [SettingPropertyBool("Village Layout V7", HintText = "map villages spread over the whole land of their district - by rivers, lakes and the sea, among their fields, at the edge of the woods and in the hills - instead of crowding along the roads, aiming at twice the old spacing. A village stays on the land of its own district or just past its border, never deep in a neighbour's land or on the land of another culture; where a crowded region has no room for twice the spacing, its villages stand as evenly as the land allows. The villages and the people of every district stay the same. It takes effect when a campaign is loaded; with Start Calibration armed or applied, switching it restarts the calibration plan. Off = the layout with hamlets")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageLayoutV7 { get; set; } = true;
+
+        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet - and of every village the newest layout moved - work the land where it stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageHamletKsLand { get; set; } = true;
 
@@ -9466,6 +9470,7 @@ namespace Armoury
             s.VillagePennantSmallTexture = VillagePennantSmallTexture;
             s.VillageLayoutV5 = VillageLayoutV5;
             s.VillageLayoutV6 = VillageLayoutV6;
+            s.VillageLayoutV7 = VillageLayoutV7;
             s.VillageHamletKsLand = VillageHamletKsLand;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.PerfValyrianCensus = PerfValyrianCensus;

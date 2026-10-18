@@ -309,7 +309,8 @@ namespace Armoury
         private static Dictionary<string, OldDist> OldLayout(uint crc, out string name)
         {
             name = null;
-            foreach (var cand in new[] { MapVillageData.FileNameV4, MapVillageData.FileNameV5, MapVillageData.FileName })   // sw-przysiolki: zapis v5 na v6 (i odwrotnie) po uid
+            // sw-przysiolki: zapis v5 na v6 (i odwrotnie) po uid; f10-uklad: zapis v6 (Jeff) / v5 / v4 na v7 po uid - plik _v6
+            foreach (var cand in new[] { MapVillageData.FileNameV4, MapVillageData.FileNameV5, MapVillageData.FileNameV6, MapVillageData.FileName })
             {
                 if (string.Equals(cand, _fileName, StringComparison.Ordinal)) continue;
                 try
@@ -323,8 +324,20 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("VillageBook.OldLayout", e); }
             }
-            // sw-przysiolki (recenzja): zaden plik modulu nie ma crc zapisu - plik ukladu tej sesji (v6) niesie wiersz v5 kazdej wioski (kolumny v5_*): zapis v5 po uid
-            // takze wtedy, gdy wgranie nie przenioslo arm_map_villages_v5.tsv (dotad: sumy okregow, flagi spalonych i pamiec wojny tracone)
+            // f10-uklad: plik ukladu tej sesji (v7) niesie wiersz v6 kazdej wioski (kolumny v6_*) - zapis v6 po uid takze bez arm_map_villages_v6.tsv w module
+            try
+            {
+                var cur6 = _file;
+                var v6 = cur6 != null ? MapVillageData.V6Of(cur6.Records) : null;
+                if (v6 != null && LayoutCrcOf(v6) == crc)
+                {
+                    name = (_fileName ?? MapVillageData.FileName) + " (kolumny v6_*)";
+                    return OldMap(v6);
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.OldLayout(v6_*)", e); }
+            // sw-przysiolki (recenzja): zaden plik modulu nie ma crc zapisu - plik ukladu tej sesji (v6; f10-uklad: takze v7) niesie wiersz v5 kazdej wioski (kolumny v5_*):
+            // zapis v5 po uid takze wtedy, gdy wgranie nie przenioslo arm_map_villages_v5.tsv (dotad: sumy okregow, flagi spalonych i pamiec wojny tracone)
             try
             {
                 var cur = _file;
@@ -2030,11 +2043,25 @@ namespace Armoury
             return outl;
         }
 
+        /// <summary>f10-uklad (v7): wiersze pliku ukladu tej sesji z ziemia KS w kolumnach ks_* (kazda wioska przeniesiona przez v7 i przysiolki v6) - nakladka ziemi KS
+        /// (VillageHamlets.OverlayKs). W ukladzie v6 to te same wiersze co HamletRecords (ks_* mialy tylko przysiolki). Tylko odczyt, bez Gate (jak Layout).</summary>
+        internal static List<MapVillageRecord> KsLandRecords()
+        {
+            var outl = new List<MapVillageRecord>();
+            var f = _file;
+            if (f == null) return outl;
+            foreach (var r in f.Records) if (!string.IsNullOrEmpty(r.KsStart)) outl.Add(r);
+            return outl;
+        }
+
         /// <summary>sw-przysiolki: wszystkie wiersze pliku ukladu tej sesji (linia sprawdzenia - wioski okregow, najblizsza sasiadka); null - plik nie wczytany.</summary>
         internal static List<MapVillageRecord> LayoutRecords() { var f = _file; return f != null ? f.Records : null; }
 
         /// <summary>sw-przysiolki: nazwa wczytanego pliku ukladu ("" - brak).</summary>
         internal static string LayoutFile { get { return _file != null ? (_fileName ?? "") : ""; } }
+
+        /// <summary>f10-uklad: odleglosc minimalna wioska-wioska z naglowka pliku ukladu tej sesji ("# min_distance:"; -1 = brak naglowka albo plik nie wczytany).</summary>
+        internal static float LayoutMinDist { get { var f = _file; return f != null ? f.MinDist : -1f; } }
 
         /// <summary>sw-przysiolki (tygodniowa linia przysiolkow): ludzie w domu przysiolkow (uid z listy) oraz wszystkich wiosek pobocznych i wsi gry - te same
         /// osady i ten sam podzial co dymek i menu (DOM okregu x (osady - puste) / (n - puste)). false - ksiega nieczynna. Pod Gate, nie rzuca.</summary>

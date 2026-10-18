@@ -1394,6 +1394,11 @@ Uzycie (Python 3, tylko odczyt):
                     udzial < 10%), NPR-13 potkniecia i ERROR VillageHamlets 0, NPR-14 (recenzja) kolumny v5_* pliku v6 - crc = v5 68BB06AD (zapis v5 po uid bez pliku
                     _v5), NPR-15 (recenzja) crc ziemi KS z nakladka przysiolkow: inny niz plik, gdy nadpisane wiersze > 0, rowny plikowi bez nakladki (zapis KS przy innej
                     nakladce - droga 'inny plik ziemi'). Log bez linii paczki: INFO (stan ksiegi i lore jako odczyt), bez wyjatku.
+                    f10-uklad (18.10, uklad wiosek v7, klucz Village Layout V7): progi NPR-1..15 licza tez v7 (porownanie z ukladem poprzednim: v7 z v6, v6 z v5);
+                    NPR-16 linia "uklad v7 (f10-uklad)" (recenzja 18.10): naglowek min_distance (prawdziwe minimum pliku) >= 6.0, wioska-wioska i wioska-wies gry ponizej
+                    naglowka 0, wioska-wioska mediana >= 12.26 (2 x v6) i 10% >= 9.81, przeniesione wobec v6 na ladzie (sciana siatki gry) = wszystkie, od miasta >= 12 i od zamku >= 9;
+                    NPR-17 kolumny v6_* pliku v7 - crc = v6 F5456602 (zapis v6 Jeffa po uid bez pliku _v6); NPR-18 zajazdy z dala od wiosek (linia "Zajazdy (ZJ): start
+                    sesji" - budynek blizej niz 12.26 jedn. od wioski pobocznej albo wsi gry: 0 przy ukladzie v7; inny uklad - INFO). NPR-6 dla v7 jak v6: miasto >= 12, zamek >= 9.
 --grupa nherby    : (noc 17/18.10, paczka sw-herby, STAN-PRAC ### 60 "limit 160 tekstur herbow"; Armoury/src/MapVillagePennants.cs, klucz VillagePennantSmallTexture)
                     python -I tools/sprawdz_logi.py --grupa nherby <Armoury-*.log> (strumieniowo). Linie "Proporczyki - tekstury (E7/W5): start / stan / przy zdjeciu".
                     NHB-0 linie paczki, NHB-1 tryb (klucz tak, zwalnianie dalekich CZYNNE; klucz NIE - INFO), NHB-2 rozmiar tekstury z gry 512x512, NHB-3 tozsamosc ksiegi
@@ -35459,7 +35464,7 @@ def nkarczmy_main(logp):
 NZJ_HEAD = "Zajazdy (ZJ): "
 NZJ_PHEAD = "Plotki (PL): "
 NZJ_START = re.compile(r"zajazdow (?P<n>\d+) \(odrzucone: zly wiersz (?P<bad>\d+), brak wsi gry (?P<novil>\d+), przy wiosce na mapie (?P<near>\d+)")
-NZJ_FILE = re.compile(r"plik arm_roadside_inns\.tsv \(crc32 (?P<crc>[0-9A-F]{8}), wierszy (?P<rows>\d+)\)")
+NZJ_FILE = re.compile(r"plik arm_roadside_inns(?:_v6)?\.tsv \(crc32 (?P<crc>[0-9A-F]{8}), wierszy (?P<rows>\d+)\)")   # f10-uklad: _v6 przy ukladzie wiosek v6
 NZJ_BAND = re.compile(r"(?P<band><30k|30-60k|60-90k|>=90k): (?P<n>\d+), (?P<med>[\d.]+|-);")
 NZJ_NN = re.compile(r"najblizszy sasiad min (?P<nn>[\d.]+) \(prog 25\)")
 NZJ_PEO = re.compile(r"ludzie wokol min/mediana/maks (?P<mn>\d+)/(?P<md>\d+)/(?P<mx>\d+)")
@@ -43277,6 +43282,10 @@ def nskory_main(logp):
 NPR_HEAD = "Przysiolki (sw-przysiolki): "
 NPR_CRC6 = "F5456602"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
 NPR_CRC5 = "68BB06AD"
+NPR_CRC7 = "5F9875B1"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt (recenzja 18.10: ziemia okregu + pas, bez wiosek w glebi ziemi obcej)
+NPR_V7_MIN_D = 6.0         # f10-uklad (recenzja): naglowek min_distance = prawdziwe minimum pliku (wioska-wioska i wioska-wies gry) - nie ciasniej niz v6 (wioska-wies gry 6.00)
+NPR_V7_TARGET = 12.26      # f10-uklad: odleglosc docelowa = 2 x v6 6.13 (naglowek target_distance): wioska-wioska mediana >= docelowa, 10% >= 0.8 x docelowa
+NPR_INN_FAR = 12.26        # f10-uklad (recenzja): zajazd >= odleglosc docelowa od wioski i wsi gry (RoadsideInns.FarVillage, zajazdy_gen.py MIN_VIL)
 
 
 def nprzysiolki_main(logp):
@@ -43289,6 +43298,7 @@ def nprzysiolki_main(logp):
         return 0
     starts, ks_lines, weeks, book, lore, view, ks_start = [], [], [], [], [], [], []
     ks_crc = []                # recenzja: "KS crc ziemi" (crc ziemi KS z nakladka przysiolkow)
+    v7_lines, inn_starts = [], []   # f10-uklad: "uklad v7 (f10-uklad)" i "Zajazdy (ZJ): start sesji"
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -43303,6 +43313,10 @@ def nprzysiolki_main(logp):
                     weeks.append(t)
                 elif t.startswith(NPR_HEAD + "KS crc ziemi"):
                     ks_crc.append(t)
+                elif t.startswith(NPR_HEAD + "uklad v7 (f10-uklad)"):
+                    v7_lines.append(t)
+            elif t.startswith("Zajazdy (ZJ): start sesji"):
+                inn_starts.append(t)
             elif t.startswith("Ksiega wiosek (E4/11): start sesji"):
                 book.append(t)
             elif t.startswith("Dymek wioski (E7/W2): start"):
@@ -43336,12 +43350,18 @@ def nprzysiolki_main(logp):
     s0 = starts[-1]
     ver = g(r"start sesji \| uklad v(\d)", s0, int)
     crc = g(r"crc ukladu ([0-9A-F]{8}|BRAK)", s0)
-    key_off = "Village Layout V6 NIE" in s0
+    key7 = "Village Layout V7 " in s0                       # f10-uklad: linia z kluczem V7 (log z DLL f10-uklad)
+    key7_off = "Village Layout V7 NIE" in s0
+    key_off = "Village Layout V6 NIE" in s0 and (not key7 or key7_off)
     rep.add("NPR-0: linia startu przysiolkow", f"sesji {len(starts)}; " + s0[len(NPR_HEAD):][:200], "linia przy kazdym starcie sesji", True)
     if key_off:
         rep.add("NPR-1: uklad v6 wczytany", f"uklad v{ver}, crc {crc} (klucz Village Layout V6 NIE)", "INFO (klucz wylaczony - uklad v5/v4)", None)
+    elif key7 and not key7_off:
+        rep.add("NPR-1: uklad v7 wczytany (crc ukladu)", f"uklad v{ver}, crc {crc}", f"v7 i crc {NPR_CRC7} (plik generatora)", ver == 7 and crc == NPR_CRC7)
     else:
-        rep.add("NPR-1: uklad v6 wczytany (crc ukladu)", f"uklad v{ver}, crc {crc}", f"v6 i crc {NPR_CRC6} (plik generatora)", ver == 6 and crc == NPR_CRC6)
+        rep.add("NPR-1: uklad v6 wczytany (crc ukladu)", f"uklad v{ver}, crc {crc}" + (" (klucz Village Layout V7 NIE)" if key7_off else ""),
+                f"v6 i crc {NPR_CRC6} (plik generatora)", ver == 6 and crc == NPR_CRC6)
+    pv = 6 if ver == 7 else 5
     nw6 = g(r"\| wiosek (\d+), przysiolkow", s0, int)
     nham = g(r"przysiolkow (\d+) \(z ziemia KS", s0, int)
     nks = g(r"\(z ziemia KS (\d+)\)", s0, int)
@@ -43350,27 +43370,28 @@ def nprzysiolki_main(logp):
     nd5 = g(r"\): wiosek \d+, okregow (\d+)", s0, int)
     dn = g(r"okregow z inna liczba wiosek (\d+)", s0, int)
     ds = g(r"z inna suma osad (\d+)", s0, int)
-    um = g(r"uid spoza v5 (\d+)", s0, int)
-    o6 = g(r"osad wiosek v6 (\d+)", s0, int)
-    o5 = g(r"osad wiosek v6 \d+ / v5 (\d+)", s0, int)
+    um = g(r"uid spoza v\d (\d+)", s0, int)
+    o6 = g(r"osad wiosek v\d (\d+)", s0, int)
+    o5 = g(r"osad wiosek v\d \d+ / v\d (\d+)", s0, int)
     if nw5 is None:
         rep.add("NPR-2: wiosek i okregow jak v5", f"bez porownania z v5 ({'klucz wylaczony' if key_off else 'brak pliku _v5 albo uklad nie v6'}): wiosek {nw6}, okregow {nd6}", "INFO", None if key_off else False)
         rep.add("NPR-3: suma osad wiosek okregu = v5", "bez porownania", "INFO", None if key_off else False)
     else:
-        rep.add("NPR-2: wiosek i okregow jak v5", f"wiosek v6 {nw6} / v5 {nw5}, okregow v6 {nd6} / v5 {nd5}, okregow z inna liczba wiosek {dn}, uid spoza v5 {um}",
+        rep.add(f"NPR-2: wiosek i okregow jak v{pv}", f"wiosek v{ver} {nw6} / v{pv} {nw5}, okregow v{ver} {nd6} / v{pv} {nd5}, okregow z inna liczba wiosek {dn}, uid spoza v{pv} {um}",
                 "rowne, 0, 0", nw6 == nw5 and nd6 == nd5 and dn == 0 and um == 0)
-        rep.add("NPR-3: ludzie okregow - suma osad wiosek kazdego okregu = v5", f"okregow z inna suma osad {ds}, osad wiosek v6 {o6} / v5 {o5}", "0 i rowne (wies gry i ludzie okregu bez zmian)",
+        rep.add(f"NPR-3: ludzie okregow - suma osad wiosek kazdego okregu = v{pv}", f"okregow z inna suma osad {ds}, osad wiosek v{ver} {o6} / v{pv} {o5}", "0 i rowne (wies gry i ludzie okregu bez zmian)",
                 ds == 0 and o6 is not None and o6 == o5)
     mn6 = g(r"najblizsza sasiadka v\d min ([\d.]+)", s0, float)
     md6 = g(r"najblizsza sasiadka v\d min [\d.]+ p10 [\d.]+ med ([\d.]+)", s0, float)
-    md5 = g(r", v5 min [\d.]+ p10 [\d.]+ med ([\d.]+)", s0, float)
-    cr6 = g(r"skupiska \(>=3 sasiadow w 10 jedn\.\) v6 (\d+)", s0, int)
-    cr5 = g(r"skupiska \(>=3 sasiadow w 10 jedn\.\) v6 \d+, v5 (\d+)", s0, int)
+    md5 = g(r", v\d min [\d.]+ p10 [\d.]+ med ([\d.]+)", s0, float)
+    cr6 = g(r"skupiska \(>=3 sasiadow w 10 jedn\.\) v\d (\d+)", s0, int)
+    cr5 = g(r"skupiska \(>=3 sasiadow w 10 jedn\.\) v\d \d+, v\d (\d+)", s0, int)
     if md5 is None or cr6 is None:
         rep.add("NPR-4: najblizsza sasiadka i skupiska", f"min {mn6}, mediana {md6} (bez v5)", "INFO", None if key_off else False)
     else:
-        rep.add("NPR-4: najblizsza sasiadka i skupiska (v6 wobec v5)", f"mediana v6 {md6} / v5 {md5}, min v6 {mn6}, skupiska v6 {cr6} / v5 {cr5}", "mediana > v5, min >= 6.0, skupiska < v5",
-                md6 > md5 and mn6 >= 6.0 and cr6 < cr5)
+        rep.add(f"NPR-4: najblizsza sasiadka i skupiska (v{ver} wobec v{pv})", f"mediana v{ver} {md6} / v{pv} {md5}, min v{ver} {mn6}, skupiska v{ver} {cr6} / v{pv} {cr5}",
+                f"mediana > v{pv}, min >= 6.0, skupiska < v{pv}" + (" (v7: skupisk v6 47 -> 0 - mniej albo 0 przy 0)" if ver == 7 else ""),
+                md6 > md5 and mn6 >= 6.0 and (cr6 < cr5 or cr6 == 0))
     land = g(r"przysiolki na ladzie (\d+|\?)/", s0)
     lall = g(r"przysiolki na ladzie (?:\d+|\?)/(\d+)", s0, int)
     nomesh = g(r"poza siatka (\d+)", s0, int) or 0
@@ -43380,18 +43401,22 @@ def nprzysiolki_main(logp):
         rep.add("NPR-5: przysiolki na ladzie (sciana ladowa siatki gry)", f"{land}/{lall}, poza siatka {nomesh}", "wszystkie", land == str(lall) and nomesh == 0)
         dt = g(r"od miasta min ([\d.]+)", s0, float)
         dc = g(r"od zamku min ([\d.]+)", s0, float)
-        rep.add("NPR-6: przysiolki z dala od warowni", f"od miasta min {dt}, od zamku min {dc}", "miasto >= 12, zamek >= 9 jedn.", dt is not None and dc is not None and dt >= 12.0 and dc >= 9.0)
+        t_min, c_min = 12.0, 9.0          # recenzja f10-uklad: v7 jak v6 - wioski >= 12 od miasta i >= 9 od zamku (v7_uklad.py D_TOWN / D_CASTLE)
+        rep.add("NPR-6: przysiolki z dala od warowni", f"od miasta min {dt}, od zamku min {dc}", f"miasto >= {t_min:.0f}, zamek >= {c_min:.0f} jedn.",
+                dt is not None and dc is not None and dt >= t_min - 0.5 and dc >= c_min - 0.5)   # 0.5 - rozrzut punktu w komorce rastra generatora
     if book:
         b0 = book[-1]
         bcrc = g(r"crc ukladu ([0-9A-F]{8})", b0)
         same = "uklad zgodny" in b0
-        mapped = g(r"uklad inny \(crc zapisu ([0-9A-F]{8}) = (arm_map_villages[_v45]*\.tsv)", b0)
+        mapped = g(r"uklad inny \(crc zapisu ([0-9A-F]{8}) = (arm_map_villages[_v456]*\.tsv)", b0)
         unknown = "uklad zapisu nieznany" in b0
         newc = "brak klucza arm_district" in b0
-        how = "zgodny" if same else ("przeniesiony po uid z " + (g(r"= (arm_map_villages[_v45]*\.tsv)", b0) or "?") if mapped else ("NIEZNANY - sumy okregow" if unknown else ("nowa kampania" if newc else "?")))
+        how = "zgodny" if same else ("przeniesiony po uid z " + (g(r"= (arm_map_villages[_v456]*\.tsv)", b0) or "?") if mapped else ("NIEZNANY - sumy okregow" if unknown else ("nowa kampania" if newc else "?")))
         if mapped and "(kolumny v5_*)" in b0:
             how += " (kolumny v5_* - bez pliku _v5 w module)"
-        rep.add("NPR-7: ksiega wiosek - crc v6 i zapis", f"crc ukladu ksiegi {bcrc}, zapis: {how}", f"crc = linia startu ({crc}); zapis zgodny, po uid albo nowa kampania",
+        if mapped and "(kolumny v6_*)" in b0:
+            how += " (kolumny v6_* - bez pliku _v6 w module)"
+        rep.add(f"NPR-7: ksiega wiosek - crc v{ver} i zapis", f"crc ukladu ksiegi {bcrc}, zapis: {how}", f"crc = linia startu ({crc}); zapis zgodny, po uid albo nowa kampania",
                 bcrc == crc and (same or mapped is not None or newc))
     else:
         rep.add("NPR-7: ksiega wiosek", "brak linii 'Ksiega wiosek (E4/11): start sesji'", "linia przy starcie sesji", False)
@@ -43401,7 +43426,7 @@ def nprzysiolki_main(logp):
         la = g(r"lore \d+/(\d+)", l0, int)
         lc = g(r"bramka ([0-9A-F]{8}) zgodna", l0)
         miss = g(r"bez lore (\d+)", l0, int)
-        rep.add("NPR-8: lore v6 (bramka i pokrycie)", f"lore {ln_}/{la}, bramka {lc}, bez lore {miss}, plik {g(r'plik (arm_map_village_lore[_v45]*\.tsv)', l0)}", f"bramka = {crc}, bez lore 0",
+        rep.add(f"NPR-8: lore v{ver} (bramka i pokrycie)", f"lore {ln_}/{la}, bramka {lc}, bez lore {miss}, plik {g(r'plik (arm_map_village_lore[_v456]*\.tsv)', l0)}", f"bramka = {crc}, bez lore 0",
                 lc == crc and miss == 0 and ln_ == la)
     else:
         rep.add("NPR-8: lore", "brak linii 'Dymek wioski (E7/W2): start'", "linia przy starcie sesji", False)
@@ -43423,10 +43448,12 @@ def nprzysiolki_main(logp):
     if ks_lines:
         k1 = ks_lines[-1]
         kn = g(r"nadpisane wiersze S ziemi (\d+)", k1, int)
-        kh = g(r"uklad v\d: przysiolkow (\d+)", k1, int)
+        kh = g(r"wiosek z ziemia w ukladzie \(ks_\*\) (\d+)", k1, int)      # f10-uklad: kazdy wiersz z ks_* (v7); log sprzed - przysiolki
+        if kh is None:
+            kh = g(r"uklad v\d: przysiolkow (\d+)", k1, int)
         kmiss = g(r"bez wiersza w pliku ziemi (\d+)", k1, int)
         info = kn is None
-        rep.add("NPR-11: nakladka ziemi KS na przysiolki", k1[len(NPR_HEAD):][:220], "nadpisane = przysiolki, bez wiersza 0 (brak pliku / klucz NIE / inny uklad - INFO)",
+        rep.add("NPR-11: nakladka ziemi KS na przysiolki (v7: na kazda wioske z ziemia ks_*)", k1[len(NPR_HEAD):][:220], "nadpisane = wiersze z ziemia w ukladzie, bez wiersza 0 (brak pliku / klucz NIE / inny uklad - INFO)",
                 None if info else (kn == kh and kmiss == 0))
     else:
         rep.add("NPR-11: nakladka ziemi KS", "brak linii 'KS ziemia przysiolkow'", "linia przy starcie KS", False)
@@ -43465,6 +43492,49 @@ def nprzysiolki_main(logp):
                 "nakladka -> crc inny niz plik; bez nakladki -> crc = plik", eff is not None and filec is not None and (withov == want_ov) and ((eff != filec) == withov))
     else:
         rep.add("NPR-15: crc ziemi KS", "brak linii 'KS crc ziemi' (brak pliku ziemi albo log sprzed recenzji)", "INFO", None)
+    # f10-uklad: uklad v7 - odleglosc minimalna, przeniesione na ladzie, kolumny v6_*, zajazdy z dala od wiosek
+    if ver == 7:
+        if v7_lines:
+            v0 = v7_lines[-1]
+            dmin = g(r"odleglosc minimalna ([\d.]+) \(naglowek pliku\)", v0, float)
+            ssmin = g(r"\| wioska-wioska min ([\d.]+)", v0, float)
+            ssp10 = g(r"\| wioska-wioska min [\d.]+ p10 ([\d.]+)", v0, float)
+            ssmed = g(r"\| wioska-wioska min [\d.]+ p10 [\d.]+ med ([\d.]+)", v0, float)
+            ssb = g(r"\| wioska-wioska min [\d.]+ p10 [\d.]+ med [\d.]+, wiosek ponizej odleglosci (\d+)", v0, int)
+            smb = g(r"\| wioska-wies gry min [\d.]+ p10 [\d.]+ med [\d.]+, wiosek ponizej odleglosci (\d+)", v0, int)
+            mv = g(r"przeniesione wobec v6 (\d+) z", v0, int)
+            nall = g(r"przeniesione wobec v6 \d+ z (\d+)", v0, int) or 0
+            lnd = g(r"\), na ladzie (\d+|\?)/", v0)
+            nomesh = g(r"poza siatka (\d+)", v0, int) or 0
+            dt = g(r"od miasta min ([\d.]+)", v0, float)
+            dc = g(r"od zamku min ([\d.]+)", v0, float)
+            # recenzja 18.10: naglowek min_distance = prawdziwe minimum pliku - wioska ponizej niego to NIE (dotad 0.70 x odleglosc przechodzilo); ksztalt ukladu
+            # wobec odleglosci docelowej 2 x v6: mediana i 10% najblizszej wioski
+            ok16 = (dmin is not None and dmin >= NPR_V7_MIN_D and ssmin is not None and ssmin >= dmin - 0.01 and ssb == 0 and smb == 0 and nall > 0
+                    and ssmed is not None and ssmed >= NPR_V7_TARGET and ssp10 is not None and ssp10 >= 0.8 * NPR_V7_TARGET
+                    and mv is not None and lnd == str(mv) and nomesh == 0 and (dt is None or dt >= 11.5) and (dc is None or dc >= 8.5))
+            rep.add("NPR-16: uklad v7 - odleglosc minimalna i przeniesione na ladzie", v0[len(NPR_HEAD):][:260],
+                    f"naglowek min_distance >= {NPR_V7_MIN_D}, wioska-wioska i wioska-wies gry ponizej naglowka 0, wioska-wioska mediana >= {NPR_V7_TARGET} (2 x v6) i 10% >= "
+                    f"{0.8 * NPR_V7_TARGET:.2f}, na ladzie wszystkie, miasto >= 12, zamek >= 9 (0.5 tolerancji)", ok16)
+        else:
+            rep.add("NPR-16: linia 'uklad v7 (f10-uklad)'", "brak w logu", "linia przy starcie sesji ukladu v7", False)
+        c6e = g(r"kolumny v6_\* \(zapis v6 po uid bez pliku _v6\): crc ([0-9A-F]{8}|BRAK)", s0)
+        rep.add("NPR-17: kolumny v6_* pliku v7 (zapis v6 po uid bez pliku _v6)", f"crc {c6e}", f"= v6 {NPR_CRC6}", c6e == NPR_CRC6)
+    else:
+        rep.add("NPR-16: uklad v7", f"uklad tej sesji v{ver}", "INFO (klucz Village Layout V7 NIE albo log sprzed f10-uklad)", None)
+    if inn_starts:
+        z0 = inn_starts[-1]
+        near_ = g(r"blizej niz [\d.]+ jedn\. (\d+) zajazdow", z0, int)
+        far_ = g(r"blizej niz ([\d.]+) jedn\. \d+ zajazdow", z0, float)
+        if near_ is None:
+            rep.add("NPR-18: zajazdy z dala od wiosek", "linia zajazdow bez odleglosci od wiosek (log sprzed f10-uklad albo zajazdy wylaczone)", "INFO", None)
+        else:
+            mins = g(r"najblizsza wioska poboczna min ([\d.]+|-)", z0)
+            minm = g(r"wies gry min ([\d.]+|-)", z0)
+            rep.add(f"NPR-18: zajazdy z dala od wiosek (budynek >= {NPR_INN_FAR} jedn. od wioski i wsi gry)", f"blizej niz {far_}: {near_} zajazdow; wioska min {mins}, wies gry min {minm} (uklad v{ver})",
+                    f"prog linii {NPR_INN_FAR} i 0 przy ukladzie v7 (inny uklad - INFO)", (near_ == 0 and far_ is not None and abs(far_ - NPR_INN_FAR) < 0.01) if ver == 7 else None)
+    else:
+        rep.add("NPR-18: zajazdy z dala od wiosek", "brak linii 'Zajazdy (ZJ): start sesji'", "INFO (klucz Roadside Inns wylaczony albo log sprzed sw-zajazdy)", None)
     rep.add("NPR-I: zajecia przysiolkow (odczyt)", g(r"\| zajecia: ([^|]+)", s0) or "-", "INFO", None)
     rep.show()
     return 0
