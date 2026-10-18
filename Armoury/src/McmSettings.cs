@@ -3136,7 +3136,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int RaidRefugeesMessageMin { get; set; } = 500;
 
-        [SettingPropertyFloatingInteger("Raid Refugees Town Intake", 0.000f, 0.200f, "0.000", HintText = "how many new raid refugees a town takes in a day, as a share of its own people (0.01 = one in a hundred); the people of the first village that comes to it in a day are always taken in, the rest wait in their own land and come on the following days, so that refugees who gathered over a whole season do not all move into the towns on the one day the towns first can take them in. People driven from a village whose refugees already live in the town join them at once. 0 = no limit (all on one day)")]
+        [SettingPropertyFloatingInteger("Raid Refugees Town Intake", 0.000f, 0.200f, "0.000", HintText = "how many new raid refugees a town takes in a day, as a share of its own people (0.01 = one in a hundred); the people of the first village that comes to it in a day are always taken in, the rest wait in their own land and come on the following days, so that refugees who gathered over a whole season do not all move into the towns on the one day the towns first can take them in. People driven from a village whose refugees already live in the town join them at once. With Raid Refugees Intake Meter on (the default) this daily intake counts everyone who comes, the first village comes whole only up to Raid Refugees Intake First Mult times the intake and newly driven people wait for room like the rest. 0 = no limit (all on one day)")]
         [SettingPropertyGroup("Iron Bank")]
         public float RaidRefugeesTownIntake { get; set; } = 0.01f;
 
