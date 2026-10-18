@@ -336,7 +336,7 @@ namespace Armoury
             foreach (var id in MatIds)
             {
                 var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
-                if (it == null || market.ItemRoster.GetItemNumber(it) - WoodHold(market, it, false) <= 0) continue;   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0)
+                if (it == null || market.ItemRoster.GetItemNumber(it) - WoodHold(market, it, false) - F7Workshops.ClayHold(market, it, false) <= 0) continue;   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0); f7-browary K3: glina tylko ponad potrzebe garncarzy (klucz wylaczony - 0)
                 int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
                 int cap = CapOf(it);   // P2: sufit ceny materialu takze dla pana (klucz FolkBuildsTown; wylaczony - 0)
                 if (cap > 0 && price > cap) continue;
@@ -360,7 +360,7 @@ namespace Armoury
                     var id = MatIds[mi];
                     var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                     if (it == null) continue;
-                    int have = roster.GetItemNumber(it) - WoodHold(market, it, false);   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0)
+                    int have = roster.GetItemNumber(it) - WoodHold(market, it, false) - F7Workshops.ClayHold(market, it, false);   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0); f7-browary K3: glina ponad potrzebe garncarzy (klucz wylaczony - 0)
                     if (have <= 0) continue;
                     int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
                     int cap = CapOf(it);   // P2: sztuka najwyzej BuildMaterialPriceCap x wartosc (obaj platnicy; klucz FolkBuildsTown wylaczony - 0, bez sufitu)

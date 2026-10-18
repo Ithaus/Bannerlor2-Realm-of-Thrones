@@ -190,6 +190,7 @@ namespace Armoury
                         for (int j = 0; j < p.InIt.Length && k > 0; j++)
                         {
                             double reserve = 5 + (p.ZIn[j] >= 0 ? (real ? 6.0 : 2.0) * lam * (zt.Q[p.ZIn[j]] + zt.QV[p.ZIn[j]]) : 0.0);
+                            if (p.ZIn[j] == ZClay) reserve += F7Workshops.ClayHoldKs(sett, p.InIt[j]);   // f7-browary K3 (recenzja): glina tylko ponad potrzebe garncarzy miasta (klucz wylaczony - 0, jak dotad)
                             double avail = (kc != null ? kc.Num(p.InIt[j]) : shelf.GetItemNumber(p.InIt[j])) - reserve;
                             int kj = (int)Math.Floor((avail - acc[pi * 2 + j]) / p.Ratio[j]);
                             if (kj < k)

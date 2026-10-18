@@ -130,6 +130,8 @@ namespace Armoury
             _pairs = null; _st.Clear(); _errResolve = false; _errOnce.Clear();
             _dayStamp = -1; _stumblesAll = 0;
             ClearDay();
+            _workDay.Clear();         // f7-browary K1: dzien przerobu miast - od nowa w kazdej kampanii
+            F7Workshops.Reset();      // f7-browary: pomiar odbioru skory i plotna, liczniki gliny i kolejnosci - stan sesji (pomiar wraca z zapisu arm_f7_cloth)
         }
 
         private static void ClearDay()
@@ -269,6 +271,10 @@ namespace Armoury
             {
                 if (town == null || !town.IsTown || Campaign.Current == null || !Campaign.Current.GameStarted) return;
                 bool act = Active, ks = StartCalibration.CraftsWanted(town);   // KS etap 2 (ZC5): przetwory jedzenia, napojow i garnkow przy zastosowanej kalibracji startu
+                // f7-browary K1 (klucz TownCraftsAfterWorkshops): rzemioslo 148 idzie po warsztatach gry (postfiks doby warsztatow - RunAfterWorkshops); tu zostaja przetwory KS.
+                // Klucz wylaczony, brak latki albo zachowania warsztatow gry - jak dotad (rzemioslo przed warsztatami)
+                if (act && F7Workshops.CraftAfterOn) act = false;
+                else if (act) { _workDay[town.Settlement.StringId] = (int)CampaignTime.Now.ToDays; F7Workshops.NoteBefore(); }   // f7: raz na miasto i dobe (przelaczenie klucza w ciagu doby)
                 if (!act && !ks) return;
                 int day = (int)CampaignTime.Now.ToDays;
                 if (act && _dayStamp != day) { Flush(); _dayStamp = day; }
@@ -282,6 +288,32 @@ namespace Armoury
                 finally { OreLedger.CraftExit(); GoodsLedger.End(gf); }
             }
             catch (Exception e) { Stumble("OnDailyTickTown", e); }
+        }
+
+        // f7-browary K1: dzien ostatniego przerobu 148 miasta (osada -> doba) - przerob raz na miasto i dobe, takze gdy klucz przelaczono w ciagu doby
+        private static readonly Dictionary<string, int> _workDay = new Dictionary<string, int>();
+
+        /// <summary>f7-browary K1 (klucz TownCraftsAfterWorkshops): postfiks WorkshopsCampaignBehavior.DailyTickTown (F7Workshops.TickPostfix) - rzemieslnicy miasta
+        /// przerabiaja to, co zostalo na polce po cyklach warsztatow gry tego miasta (len, skory i welna najpierw dla warsztatow notabli, ktore za wsad placa); ta sama
+        /// praca (Work), te same ramki ksiegi towarow i rudy co w sluchaczu. Raz na miasto i dobe. Wyjatek - licznik i koniec tego miasta.</summary>
+        internal static void RunAfterWorkshops(Town town)
+        {
+            try
+            {
+                if (town == null || !town.IsTown || town.Settlement == null || Campaign.Current == null || !Campaign.Current.GameStarted) return;
+                if (!F7Workshops.CraftAfterOn || !Active) return;
+                int day = (int)CampaignTime.Now.ToDays;
+                string id = town.Settlement.StringId;
+                int last;
+                if (_workDay.TryGetValue(id, out last) && last == day) return;
+                _workDay[id] = day;
+                if (_dayStamp != day) { Flush(); _dayStamp = day; }
+                var gf = GoodsLedger.Begin(GoodsLedger.FTownCraft, town);   // ksiega towarow (146): przerob tego miasta jako osobna pozycja (tylko licznik)
+                OreLedger.CraftEnter();   // fix-ksiega: wsad tego nawiasu to "przetwory miast" (tylko licznik)
+                try { Work(town); F7Workshops.NoteAfter(); }
+                finally { OreLedger.CraftExit(); GoodsLedger.End(gf); }
+            }
+            catch (Exception e) { Stumble("RunAfterWorkshops", e); }
         }
 
         private static float Index(Town t, ItemObject it, bool selling)
@@ -582,6 +614,9 @@ namespace Armoury
         public override void RegisterEvents()
         {
             CampaignEvents.DailyTickTownEvent.AddNonSerializedListener(this, TownCrafts.OnDailyTickTown);
+            // f7-browary (noc 18.10): linia "Warsztaty codzienne (f7-browary)" i srednia odbioru skory i plotna (raz na dobe), start sesji (zachowanie warsztatow gry, zapis)
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("F7Workshops.Daily", F7Workshops.Daily));
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, s => F7Workshops.SessionStart());
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -593,6 +628,23 @@ namespace Armoury
                 if (dataStore.IsLoading) TownCrafts.Import(data);
             }
             catch (Exception e) { Log.Error("TownCrafts.SyncData", e); }
+            // f7-browary K2 (klucz ClothDemandFromOfftake): srednia odbioru skory i plotna z polek miast - wlasny try; przy wylaczonym kluczu nic nie zapisujemy
+            // (zapis jak dotad); stary zapis bez klucza = pomiar od zera (pierwsza pelna doba = srednia); starsza DLL klucza nie czyta
+            try
+            {
+                if (dataStore.IsSaving)
+                {
+                    string off = F7Workshops.Export();
+                    if (off != null) SaveText.Sync(dataStore, "arm_f7_cloth", ref off);
+                }
+                else if (dataStore.IsLoading)
+                {
+                    string off = null;
+                    SaveText.Sync(dataStore, "arm_f7_cloth", ref off);
+                    F7Workshops.Import(off);
+                }
+            }
+            catch (Exception e) { Log.Error("TownCrafts.SyncData(arm_f7_cloth)", e); }
         }
     }
 }

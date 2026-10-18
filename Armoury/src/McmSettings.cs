@@ -6884,6 +6884,18 @@ namespace Armoury
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool BuildWoodHalfReserve { get; set; } = true;
 
+        [SettingPropertyBool("Town Crafts After Workshops", HintText = "the town's own fullers, weavers and tanners (Town Crafts Enabled) work up what is left on the stalls after the town's trade workshops have run their day, not before them: a notable's weavery or tannery, which pays for its flax, hides or wool, its wages and its upkeep, buys first at the morning price, and the town's craftsmen take the rest - they have hands to spare and lose nothing by waiting. The food crafts of Start Calibration keep their place. Off = the town's craftsmen take first, as before")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool TownCraftsAfterWorkshops { get; set; } = true;
+
+        [SettingPropertyBool("Cloth Demand From Offtake", HintText = "the price of leather and linen in a town (Raw Price By Use) also counts what really leaves its stalls each day for the army's clothing, the smiths' repairs, the villages buying in their market town and the lords' courts (average of about two weeks, read from the goods ledger - needs Goods Ledger Enabled and the log on; with either of them off the measure stops and leather and linen prices go back to the old rule within about a week), not only what the townsfolk and the armourers use: leather and linen are dear where they are worn out, so the tanners and weavers can pay for their hides and flax. Where Start Calibration already prices the villages' basket and the courts, only the army's clothing and the repairs are added there, so nothing is counted twice. Only the price changes - the stock caravans keep and the stall reserves stay as they are. Off = only the townsfolk and the armourers count, as before")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool ClothDemandFromOfftake { get; set; } = true;
+
+        [SettingPropertyBool("Build Clay For Potters", HintText = "building works (the lord's, the townsfolk's and the commons') take clay off the market only above what the town's pottery workshops use in Caravan Bulk Stock Days; below it the works buy the other materials or wait, so the potters are not left without clay. The town's own potters of Start Calibration, who work before the workshops, also take clay only above it. Off = the works and the town's potters take clay down to the last pieces, as before")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool BuildClayForPotters { get; set; } = true;
+
         [SettingPropertyBool("Daily Life Measure", HintText = "Daily life (a measure only): every day the people of each village and town are reckoned by estate - slaves, peasants, labourers, craftsmen, merchants, gentry and the great houses - with their daily table in kilograms (own fields and the market) and their Livelihood: how many times over they can afford the bare survival basket of bread, pottage, salt and fuel at local prices, for each estate, village, town, district, realm and the whole world, with the income per head. Written to the log and to stany-dostatek.csv only - nothing in the game changes (no coin, goods, prices, prosperity or AI). Off = no measure, as before")]
         [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
         public bool DailyLifeMeasure { get; set; } = true;
@@ -9536,6 +9548,9 @@ namespace Armoury
             s.CrownCourtShare = CrownCourtShare;
             s.MenUpgradeOrders = MenUpgradeOrders;
             s.BuildWoodHalfReserve = BuildWoodHalfReserve;
+            s.TownCraftsAfterWorkshops = TownCraftsAfterWorkshops;
+            s.ClothDemandFromOfftake = ClothDemandFromOfftake;
+            s.BuildClayForPotters = BuildClayForPotters;
             s.DailyLifeMeasure = DailyLifeMeasure;
             s.DailyLifeMarketScale = DailyLifeMarketScale;
             s.DailyLifeEstates = DailyLifeEstates;

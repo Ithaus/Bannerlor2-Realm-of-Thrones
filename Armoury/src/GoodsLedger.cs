@@ -572,6 +572,8 @@ namespace Armoury
             _settleMk = _mkOn ? MkOfFrame(f) : -1;
             try { Settle(f); } finally { _settleMk = -1; }
             if (_mkOn) { try { KsTake(f); } catch (Exception e) { Stumble("KsTake", e); } }
+            // f7-browary K2 (klucz ClothDemandFromOfftake): odbior skory i plotna z polki miasta (odziez wojska, naprawy, zakupy wsi, dwory) - sam licznik, wlasny try w srodku
+            if (f.Touched.Count > 0 && (f.Kind == FArmyCloth || f.Kind == FMend || f.Kind == FFolkVill || f.Kind == FCourt)) F7Workshops.FromFrame(f.Kind, f.A, f.Touched, f.Net, _items);
         }
 
         /// <summary>KS-R3 (odbior miasta, StartCalibration.KsTakeNote): zuzycie z polki miasta w ramkach z osada-miastem - panowie kupili (handel partii: sprzedawca

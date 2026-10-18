@@ -220,6 +220,7 @@ namespace Armoury
                     if (it == null) continue;
                     int have = roster.GetItemNumber(it);
                     if (MatIds[k] == "tools") have -= ToolsKeep;   // narzedzia: lud zostawia na polce 5 sztuk (projekt B rozdz. 8 - wsie i warsztaty)
+                    else if (MatIds[k] == "clay") have -= F7Workshops.ClayHold(market, it, true);   // f7-browary K3: glina tylko ponad potrzebe garncarzy miasta (klucz wylaczony - 0, jak dotad)
                     else if (MatIds[k] == "hardwood") have -= Math.Max(WoodKeep, WoodHold(market, it, true));   // drewno: lud zostawia na polce 50 sztuk - dymarki (zelazo) i warsztaty kupuja po nim (bieg 120 dob: stos swiata 9 dni zuzycia); K1 (BuildWoodAboveCraftStock): nie mniej niz zapas rzemiosla miasta - ta sama regula co pan
                     if (have <= 0) continue;
                     int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
