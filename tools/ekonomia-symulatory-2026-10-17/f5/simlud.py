@@ -162,9 +162,11 @@ def run(towns, p, days=DAYS, calib=None):
             rW = p.hoardLo + (0.03 - p.hoardLo) * max(0.0, min(1.0, (kW - 0.1) / 0.9))
             rR = 0.03 if not p.rpHoard else p.hoardLo + (0.03 - p.hoardLo) * max(0.0, min(1.0, (kR - p.mn) / (1 - p.mn)))
             rP = 0.03 if not p.rpHoard else p.hoardLo + (0.03 - p.hoardLo) * max(0.0, min(1.0, (kP - p.mn) / (1 - p.mn)))
-            hW = rW * max(0.0, s['KW'] - 30 * s['NW']) * 0.55          # 0.55: zaplacone M9/FLf wliczone (fin88: W 13.4 tys. przy 1.39%)
-            hR = rR * max(0.0, s['KR'] - 63 * s['NR']) * 0.55
-            hP = rP * max(0.0, s['KP'] - 90 * s['NP']) * 0.55
+            # ulamki: zaplacone juz M9 / FLf / P1 wliczone w danine (pre) - dobrane tak, ze STARE zasady w dobie 0 daja danine z linii 'Akumulator kies' fin88
+            # (109235: W 13 708, R 44 054, P 33 675 zl/d); przyblizenie - podstawa w modelu to kiesa ponad 3 x zapas miasta po miescie
+            hW = rW * max(0.0, s['KW'] - 30 * s['NW']) * 0.10
+            hR = rR * max(0.0, s['KR'] - 63 * s['NR']) * 0.73
+            hP = rP * max(0.0, s['KP'] - 90 * s['NP']) * 0.77
             dKW = inW + servP + 0.5 * (taxW * 0.15) - spend['W'] - offW - taxW - flfW - hW - hhRW * 0
             dKW = inW + servP - spend['W'] - offW - taxW - flfW - hW
             dKR = inR + healW + healP - spend['R'] - offR - taxR - flfR - hR - hhRW   # R placi W tylko czesc zaplacona (reszta zostaje w kiesie R)
@@ -175,8 +177,9 @@ def run(towns, p, days=DAYS, calib=None):
             dG = goods + 0.33 * (hW + hR + hP) + cutExt - cofPaid - (m6P + m6R)
             net = goods + 0.33 * (hW + hR + hP) + cutExt - cofPaid          # doplyw netto kupcow (M6 to 'pobrane')
             nets.append(net)
-            lords = 0.67 * (hW + hR + hP) + flfW + flfR + flfP + (1.0 / 3.0) * (rentW + rentR) + 0.61 * (s['farm'] + s['farmX'])
-            crown = 0.39 * (s['farm'] + s['farmX'])
+            # podatki od zarobku: pan 1/2/3%, podatek wojenny 184 (s 8.4% x wagi 0.5/1/1.5) - do panow i korony; dziesiecina osobno (kaplani: jalmuzna, septy)
+            lords = 0.67 * (hW + hR + hP) + flfW + flfR + flfP + (1.0 / 3.0) * (rentW + rentR) + 0.61 * (s['farm'] + s['farmX']) + 0.01 * inW + 0.02 * inR + 0.03 * inP
+            crown = 0.39 * (s['farm'] + s['farmX']) + 0.042 * inW + 0.084 * inR + 0.126 * inP
             if calib is not None:
                 # reszta miasta (stale przeplywy spoza modelu) - z kalibracji starych zasad
                 cW, cR, cP, cG = calib[i]
@@ -201,26 +204,31 @@ def run(towns, p, days=DAYS, calib=None):
         # przeglad firm: kwartalny (wszystkie) i szybki w gore (kasa ponad 1.5 x zapas)
         if day > 0:
             for i, s in enumerate(st):
-                s['Gh'].append(s['G'])
-                if len(s['Gh']) > 29: s['Gh'].pop(0)
+                if p.grow:
+                    # jak DsTowns.SurplusReview: pomiar od nowa, gdy kasa nie ponad 1.5 x zapas; przyrost od poczatku okna (najmniej p.fast dob)
+                    if s['G'] <= 1.5 * s['Rv']: s['Gh'] = []
+                    else: s['Gh'].append(s['G'])
+                else:
+                    s['Gh'].append(s['G'])
+                    if len(s['Gh']) > 29: s['Gh'].pop(0)
                 win = [h[i] for h in netHist[-28:]]
                 avg = sum(win) / len(win)
                 base = netHist[0][i]
                 tgt = 0.96 * (avg - base)                 # cel ponad firme z dnia startu modelu (firma = udzial x doplyw netto)
                 F = s['farm'] + s['farmX']
                 due = day - s['lastRev'] >= p.review
-                fastOk = p.fast > 0 and day - s['lastFast'] >= p.fast and s['G'] > 1.5 * s['Rv']
+                fastOk = p.fast > 0 and (p.grow or day - s['lastFast'] >= p.fast) and s['G'] > 1.5 * s['Rv']
                 surplus = s['G'] > 1.5 * s['Rv']
                 if due:
                     nf = max(-p.revMax * F, min(p.revMax * F, tgt - s['farmX']))
                     if p.noDown and surplus and nf < 0: nf = 0.0
                     s['farmX'] += nf; s['lastRev'] = day
                     if not p.grow: s['lastFast'] = day
-                if fastOk and p.grow and len(s['Gh']) >= 8:
+                if fastOk and p.grow and len(s['Gh']) > p.fast:
                     g = (s['Gh'][-1] - s['Gh'][0]) / (len(s['Gh']) - 1)
+                    s['Gh'] = [s['G']]                     # przyrost liczony od tej doby (bez liczenia drugi raz tych samych dob) - takze bez podwyzki
                     if g > 0:
                         s['farmX'] += min(p.fastMax * F, g); s['lastFast'] = day
-                        s['Gh'] = [s['G']]                 # przyrost liczony od ostatniej podwyzki (bez liczenia drugi raz tych samych dob)
                 elif fastOk and not p.grow and not due and tgt > s['farmX']:
                     nf = min(p.fastMax * F, tgt - s['farmX'])
                     s['farmX'] += nf; s['lastFast'] = day
@@ -270,18 +278,13 @@ if __name__ == '__main__':
     S0, _ = run(towns, P(), calib=cal)
     show('S0 STARE (f4 jak w fin88, danina R/P 3%):', S0)
     sc = [
-        ('S1 + W2 (caly dochod W wedlug koszyka):', P(ext=True, zero=True)),
-        ('S2 + R/P wedlug koszyka + danina R/P z kappa:', P(ext=True, rp=True, rpHoard=True, zero=True)),
-        ('S3 = S2 + szybki przeglad firmy w gore co 28 dob (kasa ponad 1.5 x zapas):', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28)),
-        ('S4 = S3, szybki przeglad co 14 dob:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14)),
-        ('S5 = S2 + przeglad w gore co 28 dob WEDLUG PRZYROSTU KASY (<=15%), kwartalny bez obnizki przy nadwyzce:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True)),
-        ('S6 = S5 bez ciecia M6:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True, m6cut=False)),
-        ('S7 = S5, krok 25%:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True, fastMax=0.25)),
-        ('S8 = S5, R/P najnizej 0.0:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True, mn=0.0)),
-        ('S9 = S5, przeglad co 14 dob, krok 25%:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25)),
-        ('S10 = S9 bez ciecia M6:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, m6cut=False)),
-        ('S11 = S7 (28 dob, 25%), krok kappa f5 1%/d:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True, fastMax=0.25, step=0.01)),
-        ('S12 = S9 (14 dob, 25%), krok kappa f5 1.5%/d:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, step=0.015)),
+        ('S1 tylko W2 (caly dochod W wedlug koszyka):', P(ext=True, zero=True)),
+        ('S2 W2 + R/P + danina R/P z kappa, BEZ przegladu wedlug nadwyzki (kasa = nowy akumulator):', P(ext=True, rp=True, rpHoard=True, zero=True)),
+        ('F5 WDROZONE: S2 + przeglad firmy wedlug nadwyzki kasy co 14 dob (najwyzej +25%), zwykly bez obnizki przy nadwyzce:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25)),
+        ('czulosc: F5, przeglad co 28 dob:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True, fastMax=0.25)),
+        ('czulosc: F5, najwyzej +15%:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.15)),
+        ('czulosc: F5 bez ciecia M6 (P trzyma przejscie):', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, m6cut=False)),
+        ('czulosc: F5, R/P najnizej 0.25:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, mn=0.25)),
     ]
     res = {}
     for tag, p in sc:

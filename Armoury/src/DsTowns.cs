@@ -496,6 +496,7 @@ namespace Armoury
         private static void SurplusReview(int today, Settings s)
         {
             if (s == null || !s.KsFarmFollowsSurplus) return;
+            if (_renewN > 0) return;                                             // dzis byl przeglad zwykly (Review / Renew) - podwyzki dzien pozniej (jedna zmiana firm na dobe; NKA-2)
             int days = Math.Max(7, Math.Min(91, s.KsFarmSurplusReviewDays));
             double mx = Math.Max(0.0, Math.Min(1.0, (double)s.KsFarmSurplusReviewMax));
             foreach (var f in _farm.Values)

@@ -37661,11 +37661,12 @@ def nakum_main(logp, until=None):
             mc = sum(cuts) / len(cuts) if cuts else 0.0
             lim16, lim16b = max(30000.0, 0.15 * mc), max(1e6, 28.0 * mca)
             dst = ov[od[-1]] - ov[od[0]]
-            ok16 = (go is None or go <= lim16) and dst <= lim16b
+            f5on = bool(D.get("f5"))                                 # f5-lud: M6 tnie kappa P/R - nadwyzke kas oproznia przeglad firmy wedlug nadwyzki (NAKUM-20), nie M6
+            ok16 = (go is None or go <= lim16) and (dst <= lim16b or f5on)
             rep.add("NAKUM-16 (f4): kasy ponad 1.5 x zapas kupcow (linia f4, zrodlo M6) - zapas",
                     f"{ov[od[0]] / 1e6:.2f} -> {ov[od[-1]] / 1e6:.2f} mln (od pierwszej linii {dst:+.0f}), w oknie " + (f"{go:+.0f}/d" if go is not None else "-")
-                    + f"; zostalo w kasach srednio {mca:.0f}/d (w oknie {mc:.0f}/d)",
-                    f"w oknie <= {lim16:.0f}/d i od pierwszej linii <= {lim16b:.0f} (M6 1/28 dziennie oproznia nadwyzke)", ok16)
+                    + f"; zostalo w kasach srednio {mca:.0f}/d (w oknie {mc:.0f}/d)" + ("; f5-lud: czesc 'od pierwszej linii' INFO (przejscie - NAKUM-20)" if f5on else ""),
+                    f"w oknie <= {lim16:.0f}/d i od pierwszej linii <= {lim16b:.0f} (M6 1/28 dziennie oproznia nadwyzke; przy f5 tylko w oknie)", ok16)
         else:
             rep.add("NAKUM-16 (f4): kasy ponad 1.5 x zapas kupcow", "brak pola 'nadwyzka ponad 1.5 x zapas' (linia f4 sprzed recenzji)", "INFO", None)
         M6 = D["m6"]
