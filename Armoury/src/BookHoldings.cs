@@ -43,10 +43,12 @@ namespace Armoury
     ///      bez niej - najblizszej nie wrogiej; zarzadca najpierw zdjety (ChangeGovernorAction.RemoveGovernorOf). Zlapany Robb w lochu Joffreya psulby Krwawe Gody.
     ///      Zaloga starego pana (szeregowi, ranni razem z nimi) - do najblizszych partii lordow i zalog krolestwa starego pana do ich wolnego miejsca (limit gry),
     ///      reszta do druzyny glowy starego rodu, bez niej do najblizszego odbiorcy ponad limit (model dezercji zdejmie nadmiar, OverflowHome W4c odesle go do wsi - jak kazde przepelnienie);
-    ///      zadnego odbiorcy - osada czeka. Ludzie prawdziwi: nic nie powstaje, nic nie znika; ksiega ludzi (PeopleBook.Take/Give, "zaloga->partia") i sprzet
+    ///      zadnego odbiorcy (po recenzji) - szeregowi do domu droga przepelnienia W4c (ClanBudget.OverflowVillage + ToVillagePop, ReleaseHome) i zmiana idzie dalej;
+    ///      bez wsi z danymi BK - osada czeka. Ludzie prawdziwi: nic nie powstaje, nic nie znika; ksiega ludzi (PeopleBook.Take/Give, "zaloga->partia") i sprzet
     ///      ze zbrojowni zalogi (GarrisonArmory.KitsWithMen - ta sama regula co nowa druzyna z zalogi) ida z ludzmi. Gracz i jego partie nigdy nie sa odbiorca.
+    ///      Stary pan z krolestwa docelowego (inny rod tego samego krolestwa; po recenzji) - zaloga zostaje z osada i nie ma korekty fabuly (e): to wlasni ludzie nowego pana.
     ///      Zwykli jency w lochu - zostaja przy osadzie (jency osady; ChangeOwnerOfSettlementAction ich nie rusza), linia podaje ich liczbe; bohaterow strony nowego
-    ///      pana wypuszcza sama gra (PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged).
+    ///      pana wypuszcza sama gra (PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged). Uwolnienie zwyklych "swoich" do zalogi - decyzja Jeffa (CHANGELOG).
     ///  (d) ChangeOwnerOfSettlementAction.ApplyByDefault(glowa rodu docelowego, osada) - NIE BySiege (niszczy zaloge, kary relacji i wplywu, ekspansjonizm Diplomacy,
     ///      nasze L5b-1 / KingdomBalance / WarLedger / Rumours / SmallGold / CitySack), NIE ByGift / ByBarter (BKTitleBehavior przenosi wtedy tytuly). Default: bez
     ///      glosowania o lenno (openToClaim false), decyzje o tej osadzie gra usuwa sama, kolejka budow czyszczona, zarzadca zdjety. King's Landing tylko jako
@@ -60,7 +62,8 @@ namespace Armoury
     ///      PRZED zmiana: zadna z nich nie jest w bitwie ani oblezeniu, inaczej King's Landing czeka (jednorazowa korekta fabuly, zeby miasto nie padlo znow za godzine).
     ///  (f) zwrot skarbca (wiersz King's Landing, tylko gdy pan zmienil sie wlasnie teraz ze stolicy krolestwa "battania"): min(1 125 434, skarbiec Polnocy) ze skarbca
     ///      Polnocy do skarbca krolestwa nowego pana; zdjete = dopisane (kontrola w linii); migawka korony 165 przesunieta u obu stron (CrownIncome.ShiftSnapshot - jak
-    ///      L5b-1: to nie "wplyw dnia" ani "ujemny wplyw"). Raz na zapis (stan w zapisie).
+    ///      L5b-1: to nie "wplyw dnia" ani "ujemny wplyw"), po recenzji tak samo historia skarbca miary biedy E1 w CrashScribe (PovertyPeace.ShiftHistory - inaczej
+    ///      Polnoc przez 7 dob w falszywej biedzie). Raz na zapis (stan w zapisie).
     ///  (g) pusta zaloga nowego pana - zadnych ludzi z niczego: zostaje werbunkowi korony i naszym regulom zalog (linia podaje zaloge po zmianie).
     ///  (h) wiadomosc dla gracza po angielsku raz na partie zmian (zwykle jedna: wszystko w pierwszej godzinie).
     ///  (i) linia na osade + linia konca; Essos nietkniete (nie ma go w tabeli); idempotentne - flaga w zapisie, osada juz u rodu docelowego = "bez zmian".
@@ -351,8 +354,9 @@ namespace Armoury
             var main = stNeeds ? st : twin;
             IFaction oldF = main.MapFaction;
 
-            // (e) warunek korekty fabuly PRZED zmiana: partie krolestwa starego pana w promieniu nie moga byc w bitwie ani oblezeniu
-            bool clear = stNeeds && row.ClearRadius > 0f;
+            // (e) warunek korekty fabuly PRZED zmiana: partie krolestwa starego pana w promieniu nie moga byc w bitwie ani oblezeniu.
+            // Po recenzji: tylko przy zmianie krolestwa - stary pan z krolestwa docelowego to wlasne partie nowego pana, ich nie odsylamy
+            bool clear = stNeeds && row.ClearRadius > 0f && oldF != newF;
             if (clear)
             {
                 string busy;
@@ -372,13 +376,25 @@ namespace Armoury
                 }
             var recips = new Dictionary<Settlement, List<MobileParty>>();
             var heads = new Dictionary<Settlement, MobileParty>();
+            var homes = new Dictionary<Settlement, Settlement>();     // po recenzji: brak odbiorcy - wies, do ktorej zaloga idzie do domu (droga W4c)
             foreach (var s in sites)
             {
+                // po recenzji: stary pan z krolestwa docelowego (inny rod tego samego krolestwa) - zaloga zostaje z osada, jak przy nadaniu lenna w grze
+                // (ApplyByDefault jej nie rusza); wyprowadzamy tylko zaloge krolestwa, ktore twierdze oddaje
+                if (s.MapFaction == newF) continue;
                 int men = Men(s.Town.GarrisonParty);
                 if (men <= 0) continue;
                 var l = Recipients(s, s.MapFaction, sites);
                 var hp = HeadParty(s.OwnerClan);
-                if (l.Count == 0 && hp == null) { wait = "brak odbiorcy zalogi " + Nm(s) + " (" + men + " ludzi) w " + Nm(s.MapFaction); return null; }
+                if (l.Count == 0 && hp == null)
+                {
+                    // po recenzji (zamowienie c): zadnej partii krolestwa starego pana i glowa rodu bez druzyny - ludzie do domu, a zmiana idzie dalej.
+                    // Bez wsi z danymi BK nie ma dokad ich odeslac - osada czeka (zaloga starego pana nie moze przejsc na strone nowego)
+                    var hv = ClanBudget.OverflowVillage(s.Town.GarrisonParty);
+                    if (hv == null) { wait = "brak odbiorcy zalogi " + Nm(s) + " (" + men + " ludzi) w " + Nm(s.MapFaction) + " i brak wsi z danymi BK do odeslania jej do domu"; return null; }
+                    homes[s] = hv;
+                    continue;
+                }
                 recips[s] = l; heads[s] = hp;
             }
 
@@ -413,9 +429,11 @@ namespace Armoury
                 var g = s.Town.GarrisonParty;
                 int n0 = Men(g);
                 sb.Append(" | zaloga ").Append(Nm(s)).Append(' ').Append(n0);
-                List<MobileParty> l;
-                if (n0 <= 0 || !recips.TryGetValue(s, out l)) continue;
-                sb.Append(" -> ").Append(MoveGarrison(s, g, l, heads[s], row.Id)).Append(", zostalo ").Append(Men(g));
+                if (n0 <= 0) continue;
+                if (s.MapFaction == newF) { sb.Append(" (stary pan z krolestwa docelowego - zostaje z osada)"); continue; }
+                List<MobileParty> l; Settlement hv;
+                if (recips.TryGetValue(s, out l)) sb.Append(" -> ").Append(MoveGarrison(s, g, l, heads[s], row.Id)).Append(", zostalo ").Append(Men(g));
+                else if (homes.TryGetValue(s, out hv)) sb.Append(" -> ").Append(ReleaseHome(g, hv, row.Id)).Append(", zostalo ").Append(Men(g));
             }
 
             // jency w lochu (zostaja przy osadzie)
@@ -647,6 +665,45 @@ namespace Armoury
             return total;
         }
 
+        /// <summary>Po recenzji (zamowienie c): brak odbiorcy zalogi (krolestwo starego pana bez partii lordow i zalog, glowa rodu bez druzyny) - szeregowi
+        /// do domu ta sama droga co przepelnienie zalogi W4c (OverflowHome.SendHome): wies `village` = ClanBudget.OverflowVillage zalogi, ClanBudget.ToVillagePop
+        /// z przyczyna MW4c (ludnosc BK wsi i ksiega ludzi z udzialem pochodzenia - znani pochodzeniem do DOM swojego regionu, weterani E4/10 jak W4c).
+        /// Kolejnosc jak ClanBudget.ReleaseFrom: udzialy zdjete przed dopisaniem (Take, wyjscie "rozwiazane bez bitwy do domu"), roster po; wies nie przyjela -
+        /// Untake, ludzie zostaja w zalodze (linia "zostalo"). Wight (Inni) nie idzie do ludnosci BK - zostaje (jak w SendHome). Sprzet zostaje w zbrojowni
+        /// osady, sakiewki ludzi bez zmian (jak przy przepelnieniu W4c). Zwraca opis do linii.</summary>
+        private static string ReleaseHome(MobileParty g, Settlement village, string rowId)
+        {
+            var r = g.MemberRoster;
+            var stacks = new List<TroopRosterElement>();
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.Character != null && !el.Character.IsHero && el.Number > 0) stacks.Add(el);
+            }
+            int gone = 0, kept = 0;
+            foreach (var el in stacks)
+            {
+                var ch = el.Character;
+                int n = el.Number;
+                if (Undead.Character(ch)) { kept += n; continue; }
+                PeopleBook.Shares org = null;
+                try { if (PeopleBook.OriginLive) org = PeopleBook.Take(r, n, PeopleBook.FDisbandHome); }
+                catch (Exception e) { Stumble("Home.Take(" + rowId + ")", e); org = null; }
+                bool ok = false;
+                try { ok = ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c, org, g); }
+                catch (Exception e) { Stumble("Home(" + rowId + ")", e); ok = false; }
+                if (!ok)
+                {
+                    try { if (org != null) PeopleBook.Untake(r, org, PeopleBook.FDisbandHome); } catch (Exception e) { Stumble("Home.Untake(" + rowId + ")", e); }
+                    kept += n;
+                    continue;
+                }
+                r.AddToCounts(ch, -n, false, -el.WoundedNumber);
+                gone += n;
+            }
+            return "[do domu " + gone + " - wies " + Nm(village) + " (droga przepelnienia W4c)" + (kept > 0 ? ", wies nie przyjela " + kept : "") + "]";
+        }
+
         // ------------------------------------------------------------ (e) korekta fabuly: partie starego krolestwa przy osadzie
         private static bool LandParty(MobileParty mp) { return mp != null && mp.IsActive && !mp.IsMainParty && !mp.IsDisbanding; }
 
@@ -768,6 +825,7 @@ namespace Armoury
             long take = Math.Max(0, Math.Min(row.Refund, w0));
             take = Math.Min(take, Math.Max(0, (long)int.MaxValue - Math.Max(0, v0)));   // skarbiec odbiorcy to int
             long moved = 0, got = 0;
+            string e1 = "";
             if (take > 0)
             {
                 from.KingdomBudgetWallet -= (int)take;                 // najpierw platnik, potem odbiorca: odbiorca dostaje dokladnie to, co zeszlo
@@ -776,12 +834,49 @@ namespace Armoury
                 got = (long)to.KingdomBudgetWallet - v0;
                 CrownIncome.ShiftSnapshot(to, got);                    // 165: zwrot skarbu, nie wplyw dnia
                 CrownIncome.ShiftSnapshot(from, -moved);               // 165: ubytek skarbu, nie "ujemny wplyw"
+                // po recenzji: E1 CrashScribe (PovertyPeace) liczy ubytek z 7 dob historii skarbca i migawki 165 nie czyta - ta sama zasada co 165: przeniesienie
+                // skarbu, nie ubytek ani wplyw doby (inaczej Polnoc przez 7 dob "w biedzie": ubytek ok. 160 tys./d, zapas ponizej 28 dob)
+                e1 = ", historia skarbca E1 (CrashScribe): " + E1Text(E1Shift(to, got), Nm(to)) + ", " + E1Text(E1Shift(from, -moved), Nm(from));
             }
             _refund = "done:" + moved.ToString(Inv);
             if (moved > 0) { _batchRefund = moved; _batchRefundText = Nm(from) + " pays back " + moved.ToString("N0", Inv) + " denars to the royal treasury of " + Nm(to); }
             return "zwrot skarbca (L5b-1, dzien 109046): nalezne " + row.Refund + ", z " + Nm(from) + " (" + from.StringId + ") " + w0 + " -> " + from.KingdomBudgetWallet
                    + " do " + Nm(to) + " (" + to.StringId + ") " + v0 + " -> " + to.KingdomBudgetWallet + " | zdjete " + moved + " - dopisane " + got + " = " + (moved - got)
-                   + (moved < row.Refund ? " (skarbiec platnika nie starczyl - oddane tyle, ile bylo)" : "") + ", migawka 165 przesunieta u obu stron";
+                   + (moved < row.Refund ? " (skarbiec platnika nie starczyl - oddane tyle, ile bylo)" : "") + ", migawka 165 przesunieta u obu stron" + e1;
+        }
+
+        private static bool _e1Tried;
+        private static MethodInfo _e1Shift;
+
+        /// <summary>Po recenzji: CrashScribe PovertyPeace.ShiftHistory(Kingdom, long) - cala historia skarbca krolestwa w mierze biedy E1 przesunieta o delta
+        /// (refleksja, jak inne wywolania CrashScribe z Armoury). Zwraca liczbe przesunietych dob; -1 - E1 bez stanu krolestwa (nastepny pomiar zacznie od skarbca
+        /// po przelewie), -2 - brak metody (CrashScribe nie wczytany albo starsza DLL), -3 - wyjatek. Nie rzuca.</summary>
+        private static int E1Shift(Kingdom k, long delta)
+        {
+            try
+            {
+                if (!_e1Tried)
+                {
+                    _e1Tried = true;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        if (asm.GetName().Name != "CrashScribe") continue;
+                        var t = asm.GetType("CrashScribe.PovertyPeace", false);
+                        _e1Shift = t != null ? t.GetMethod("ShiftHistory", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public, null, new[] { typeof(Kingdom), typeof(long) }, null) : null;
+                        break;
+                    }
+                }
+                if (_e1Shift == null) return -2;
+                object r = _e1Shift.Invoke(null, new object[] { k, delta });
+                return r is int ? (int)r : -3;
+            }
+            catch (Exception e) { Stumble("E1Shift", e); return -3; }
+        }
+
+        private static string E1Text(int r, string who)
+        {
+            return who + (r >= 0 ? " przesunieta (dob " + r + ")" : r == -1 ? " bez stanu E1 (pomiar od skarbca po przelewie)"
+                        : r == -2 ? " NIEPRZESUNIETA (brak CrashScribe PovertyPeace.ShiftHistory - stara DLL?)" : " NIEPRZESUNIETA (blad w logu wyzej)");
         }
 
         // ------------------------------------------------------------ Strategic Campaign AI: roszczenie krolestwa starego pana
