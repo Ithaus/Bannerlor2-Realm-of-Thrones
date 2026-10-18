@@ -3136,6 +3136,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float RaidRefugeesTownIntake { get; set; } = 0.01f;
 
+        [SettingPropertyBool("Famine Shared Village Refugees", HintText = "Realm of Thrones places a few villages on the map twice (two settlements share one village). The refugees of such a village eat from the granaries of the land they stay in and go hungry when those granaries run out, like the refugees of every other village. Works only with Famine Enabled. Off = the granaries never feed them and they never starve (as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FamineSharedVillageRefugees { get; set; } = true;
+
         [SettingPropertyBool("People Origin Enabled", HintText = "every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleOriginEnabled { get; set; } = true;
@@ -8123,6 +8127,7 @@ namespace Armoury
             s.RaidRefugeesPurseShare = RaidRefugeesPurseShare;
             s.RaidRefugeesMessageMin = RaidRefugeesMessageMin;
             s.RaidRefugeesTownIntake = RaidRefugeesTownIntake;
+            s.FamineSharedVillageRefugees = FamineSharedVillageRefugees;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;
