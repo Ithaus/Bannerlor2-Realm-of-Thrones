@@ -2843,3 +2843,7 @@ DO SPRAWDZENIA U JEFFA (log pierwszej sesji): "KS: samo uzbrojenie", "Akumulator
   arm_people - cofniecie gubiloby stan), fix-uchodzcy 6e9b22bf, fix-mur 0cf480a1, fix-ksiega c39af137, ceny-r5 fc907a66. Galezie na GitHub.
 - 23:32 PDT: workflow wf_4cb53b58-50a (scalenie2: fix-ksarm + 9 paczek fali 3 do w-toku/noc-ks4 od 100eaedf, 3 recenzje calosci + weryfikacja + poprawki) -> potem test calosci + sciezka Jeffa
   -> WGRANIE 79. WGRANIE 78 = 100eaedf + fix-ksarm (c9f806d0) po tescie fin86 + 5 dob z bitwa.
+- 00:12 PDT 18.10: TEST fin86 (100eaedf + fix-ksarm, Armoury f02b7c5d, armoury-ks-auto.flag usuniety, 160 dob, Armoury-2026-10-17_23-22-37.log): kod 0, ERROR 0. KS SAM SIE UZBROIL (109076)
+  i SAM WLACZYL (109109, po 33 dobach; nksarm ARM-3 oczekuje >= 35 - kod liczy 28 dob ksiegi i 7 dob dojrzalego Planu na zakladke; do poprawy progu), twarde bramki TAK (bez nazwy max 0.6 camel),
+  konwoje DTE: 192, juczne z niczego 0. Po wlaczeniu: zgony z glodu 0, zwrot zoldu 100%, nmur 0 NIE, nglod 0 NIE, RT-2 TAK, wsie kupuja 89%, nks 21 z 77, nds 4 NIE, powroty krain 0.
+- 00:13 PDT: test 5 dob + bitwa dokladnych DLL WGRANIA 78 (test/wgr78: Armoury f02b7c5d, reszta jak 77), drzewo zb/fix-ksarm c9f806d0.
