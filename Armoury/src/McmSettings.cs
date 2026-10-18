@@ -6220,7 +6220,7 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV6 { get; set; } = true;
 
-        [SettingPropertyBool("Village Layout V7", HintText = "map villages stand at least twice as far apart as before and spread over the whole land of their district - by rivers, lakes and the sea, among their fields, at the edge of the woods and in the hills - instead of crowding along the roads; a district too small for its villages lends land from its neighbour. The villages and the people of every district stay the same. It takes effect when a campaign is loaded; with Start Calibration armed or applied, switching it restarts the calibration plan. Off = the layout with hamlets")]
+        [SettingPropertyBool("Village Layout V7", HintText = "map villages spread over the whole land of their district - by rivers, lakes and the sea, among their fields, at the edge of the woods and in the hills - instead of crowding along the roads, aiming at twice the old spacing. A village stays on the land of its own district or just past its border, never deep in a neighbour's land or on the land of another culture; where a crowded region has no room for twice the spacing, its villages stand as evenly as the land allows. The villages and the people of every district stay the same. It takes effect when a campaign is loaded; with Start Calibration armed or applied, switching it restarts the calibration plan. Off = the layout with hamlets")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV7 { get; set; } = true;
 

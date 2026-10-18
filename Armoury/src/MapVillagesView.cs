@@ -114,7 +114,7 @@ namespace Armoury
         public int BadRows;
         public int LevelClamped;          // poziom spoza 1..3 przyciety (wiersz zostaje)
         public string MissingColumns = ""; // brak wymaganej kolumny w naglowku = caly plik odrzucony
-        public float MinDist = -1f;       // f10-uklad: naglowek "# min_distance: <jedn.>" (uklad v7 - odleglosc minimalna wioska-wioska generatora); -1 = brak
+        public float MinDist = -1f;       // f10-uklad: naglowek "# min_distance: <jedn.>" (uklad v7 - prawdziwe minimum wioska-wioska i wioska-wies gry pliku; docelowa 2 x v6 w "# target_distance:"); -1 = brak
         public bool HasModelColumn;       // v4: naglowek ma kolumne "model" (bez niej kazda wioska = village)
         public readonly int[] ModelCounts = new int[MapVillageData.ModelCount];   // wiersze wedlug rodzaju obrazka
         public int ModelUnknown;          // nieznana wartosc w kolumnie "model" (obrazek village)
@@ -154,7 +154,7 @@ namespace Armoury
     /// <summary>Czyste funkcje danych wiosek (bez gry): wczytanie, CRC, lancuch ognia, obrys, przerzedzenie, os domow.</summary>
     internal static class MapVillageData
     {
-        internal const string FileName = "arm_map_villages.tsv";              // f10-uklad: uklad v7 (wioski po calym ladzie okregu, odleglosc minimalna 2 x v6; dotad v6 - przysiolki)
+        internal const string FileName = "arm_map_villages.tsv";              // f10-uklad: uklad v7 (wioski po calym ladzie okregu, odleglosc docelowa 2 x v6; dotad v6 - przysiolki)
         internal const string FileNameV6 = "arm_map_villages_v6.tsv";         // f10-uklad: uklad v6 (przysiolki na pustkowiach) - klucz VillageLayoutV7 = false (i VillageLayoutV6 = true)
         internal const string FileNameV5 = "arm_map_villages_v5.tsv";         // sw-przysiolki: uklad v5 (1957 wiosek) - klucze VillageLayoutV7 / V6 = false (i VillageLayoutV5 = true)
         internal const string FileNameV4 = "arm_map_villages_v4.tsv";         // uklad v4 (2446 wiosek po ok. 16 osad) - klucze VillageLayoutV7 / V6 / V5 = false

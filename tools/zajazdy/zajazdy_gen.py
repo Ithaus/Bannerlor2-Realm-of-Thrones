@@ -20,7 +20,8 @@ Regula (jedna dla calego swiata):
         (boczna droga bez farby) zjezdza z malowanej drogi na dobre (>= ZJAZD_MIN jedn. poza droga); trakt glowny (skladowa sieci >= MAIN_LEN jedn.) przed reszta;
      b) dlugi pusty odcinek malowanej drogi: punkt drogi (co 2 jedn.) dalej niz EMPTY_MIN od kazdej osady (wioski, wsie gry, miasta, zamki), najpustszy pierwszy;
      c) tam, gdzie malowanych drog nie ma (zadnej w NO_PAINT jedn.): punkt trasy AI dalej niz EMPTY_TRACK od osady (kind "track");
-  2. budynek: nie blizej niz MIN_VIL od kazdej wioski pobocznej i wsi gry (= odleglosc minimalna ukladu v7, wiec zajazd nigdy nie stoi przy wiosce), MIN_TOWN od miasta
+  2. budynek: nie blizej niz MIN_VIL od kazdej wioski pobocznej i wsi gry (= odleglosc docelowa ukladu v7, 2 x v6 = 12.26 - zajazd nie stoi blizej wioski niz dwie
+     wioski od siebie; krok 3 bierze naglowek target_distance pliku wiosek), MIN_TOWN od miasta
      (miasta maja karczmy), MIN_CASTLE od zamku; na ladzie przejezdnym (siatka nawig, budynek i postoj); nie za Murem (freefolk, nightswatch);
   3. ludzie wokol = suma ludzi wiosek pobocznych w promieniu R_PEOPLE (osady x 250); ponizej P_MIN - bez zajazdu;
   4. odstep = DAY_MARCH x sqrt(P_REF / ludzie) w granicach [SP_MIN, SP_MAX] - im mniej ludzi, tym rzadziej; zajazd wchodzi, gdy zaden wybrany nie stoi blizej
@@ -32,7 +33,8 @@ Potok f10-uklad (trzy kroki, z katalogu repo; G = --geo D:/Backup-Bannerlord/geo
 --drogi Armoury/ModuleData/arm_map_roads_geo.tsv):
   1. plan miejsc (ludzie z ukladu v6; bez sprawdzania wiosek pobocznych - uklad v7 dopiero je postawi; wsie gry omijane od razu):
      python -I tools/zajazdy/zajazdy_gen.py G --wioski Armoury/ModuleData/arm_map_villages_v6.tsv --plan-out tools/zajazdy/zajazdy-miejsca.tsv
-  2. uklad wiosek v7 (trzyma wioski >= min_village planu od budynku i postoju): python -I tools/wioski-v7/v7_uklad.py
+  2. uklad wiosek v7 (trzyma wioski >= min_village planu od budynku i postoju; wioska ciasnego okregu na swoim miejscu v6 przy zajezdzie - zajazd odpada w kroku 3):
+     python -I tools/wioski-v7/v7_uklad.py
   3. plik zajazdow (miejsca planu, ludzie z ukladu v7, pelne sprawdzenie - budynek >= MIN_VIL od kazdej wioski i wsi gry):
      python -I tools/zajazdy/zajazdy_gen.py G --wioski Armoury/ModuleData/arm_map_villages.tsv --plan-in tools/zajazdy/zajazdy-miejsca.tsv --out Armoury/ModuleData/arm_roadside_inns.tsv
   Dawny plik (sw-zajazdy, uklad v5/v6) zostaje jako arm_roadside_inns_v6.tsv - RoadsideInns czyta go przy ukladzie wiosek v6 i starszym.
@@ -47,7 +49,9 @@ import zlib
 from collections import defaultdict
 
 SCENE_CRC = "146201570"     # ROT 8.1.8 Main_map (jak arm_map_villages.tsv)
-MIN_VIL = 10.0              # od wioski pobocznej i wsi gry (f10-uklad: miejsca zajazdow rezerwowane przed ukladem v7, ktory trzyma od nich wioski tyle z dala)
+MIN_VIL = 12.26             # od wioski pobocznej i wsi gry (f10-uklad: miejsca zajazdow rezerwowane przed ukladem v7, ktory trzyma od nich wioski tyle z dala);
+                            # recenzja 18.10: = odleglosc docelowa ukladu v7 (2 x v6 6.13) - zajazd nie stoi blizej wioski niz dwie wioski od siebie; krok 3 bierze
+                            # naglowek target_distance pliku wiosek, gdy wiekszy
 MIN_TOWN = 15.0             # od miasta (miasta maja wlasne karczmy - TownInns)
 MIN_CASTLE = 10.0           # od zamku
 R_PEOPLE = 30.0             # promien liczenia ludzi wokol
@@ -156,6 +160,19 @@ def main():
         print("podaj --out (plik zajazdow) albo --plan-out (plan miejsc)")
         return 2
     min_vil = MIN_VIL
+    if not plan_mode:
+        # krok 3: odleglosc docelowa ukladu z naglowka pliku wiosek (v7: "# target_distance:"; starszy plik - "# min_distance:")
+        hd = {}
+        with io.open(a.wioski, encoding="utf-8-sig") as f:
+            for line in f:
+                if not line.startswith("#"):
+                    break
+                if ":" in line and not line.startswith("#id\t"):
+                    k, v = line[1:].split(":", 1)
+                    hd[k.strip()] = v.strip()
+        tv = fl(hd.get("target_distance"), None) or fl(hd.get("min_distance"), None)
+        if tv is not None and tv > min_vil:
+            min_vil = tv
 
     # 1. siatka gry (2 jedn.): nawig, okreg (wies gry), kultura
     nav = {}

@@ -216,7 +216,7 @@ namespace Armoury
 
         private static List<MapVillageRecord> _prev;   // uklad poprzedni tej sesji (linia startu) - tylko do linii v7, zerowany po niej
 
-        /// <summary>f10-uklad: linia ukladu v7 (raz na sesje, po linii startu): odleglosc minimalna z naglowka pliku (min_distance generatora = 2 x v6), wioska-wioska
+        /// <summary>f10-uklad: linia ukladu v7 (raz na sesje, po linii startu): odleglosc minimalna z naglowka pliku (min_distance = prawdziwe minimum pliku; docelowa 2 x v6 = target_distance - recenzja 18.10), wioska-wioska
         /// i wioska-wies gry (min, p10, mediana, wiosek ponizej odleglosci), pary wsi gry ponizej (dane gry), przeniesione wobec v6 (polozenie z pliku _v6 albo kolumn
         /// v6_*): ile, przesuniecie, na ladzie wedlug siatki gry, od miast i zamkow; wiersze z ziemia KS (ks_*). Nie rzuca.</summary>
         private static void V7Line(List<MapVillageRecord> recs, List<MapVillageRecord> prev)

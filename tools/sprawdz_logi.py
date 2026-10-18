@@ -1330,10 +1330,10 @@ Uzycie (Python 3, tylko odczyt):
                     _v5), NPR-15 (recenzja) crc ziemi KS z nakladka przysiolkow: inny niz plik, gdy nadpisane wiersze > 0, rowny plikowi bez nakladki (zapis KS przy innej
                     nakladce - droga 'inny plik ziemi'). Log bez linii paczki: INFO (stan ksiegi i lore jako odczyt), bez wyjatku.
                     f10-uklad (18.10, uklad wiosek v7, klucz Village Layout V7): progi NPR-1..15 licza tez v7 (porownanie z ukladem poprzednim: v7 z v6, v6 z v5);
-                    NPR-16 linia "uklad v7 (f10-uklad)": odleglosc minimalna z naglowka pliku >= 12, wioska-wioska min >= 0.70 x odleglosci i ponizej niej <= 15% wiosek,
-                    wioska-wies gry ponizej odleglosci <= 6% wiosek, przeniesione wobec v6 na ladzie (sciana siatki gry) = wszystkie, od miasta >= 10 i od zamku >= 8;
+                    NPR-16 linia "uklad v7 (f10-uklad)" (recenzja 18.10): naglowek min_distance (prawdziwe minimum pliku) >= 6.0, wioska-wioska i wioska-wies gry ponizej
+                    naglowka 0, wioska-wioska mediana >= 12.26 (2 x v6) i 10% >= 9.81, przeniesione wobec v6 na ladzie (sciana siatki gry) = wszystkie, od miasta >= 12 i od zamku >= 9;
                     NPR-17 kolumny v6_* pliku v7 - crc = v6 F5456602 (zapis v6 Jeffa po uid bez pliku _v6); NPR-18 zajazdy z dala od wiosek (linia "Zajazdy (ZJ): start
-                    sesji" - budynek blizej niz 10 jedn. od wioski pobocznej albo wsi gry: 0 przy ukladzie v7; inny uklad - INFO).
+                    sesji" - budynek blizej niz 12.26 jedn. od wioski pobocznej albo wsi gry: 0 przy ukladzie v7; inny uklad - INFO). NPR-6 dla v7 jak v6: miasto >= 12, zamek >= 9.
 --grupa nherby    : (noc 17/18.10, paczka sw-herby, STAN-PRAC ### 60 "limit 160 tekstur herbow"; Armoury/src/MapVillagePennants.cs, klucz VillagePennantSmallTexture)
                     python -I tools/sprawdz_logi.py --grupa nherby <Armoury-*.log> (strumieniowo). Linie "Proporczyki - tekstury (E7/W5): start / stan / przy zdjeciu".
                     NHB-0 linie paczki, NHB-1 tryb (klucz tak, zwalnianie dalekich CZYNNE; klucz NIE - INFO), NHB-2 rozmiar tekstury z gry 512x512, NHB-3 tozsamosc ksiegi
@@ -41983,8 +41983,10 @@ def nskory_main(logp):
 NPR_HEAD = "Przysiolki (sw-przysiolki): "
 NPR_CRC6 = "F5456602"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
 NPR_CRC5 = "68BB06AD"
-NPR_CRC7 = "7BC2310D"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt
-NPR_V7_MIN_D = 12.0        # f10-uklad: odleglosc minimalna z naglowka pliku v7 (generator 12.26 = 2 x v6 6.13)
+NPR_CRC7 = "5F9875B1"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt (recenzja 18.10: ziemia okregu + pas, bez wiosek w glebi ziemi obcej)
+NPR_V7_MIN_D = 6.0         # f10-uklad (recenzja): naglowek min_distance = prawdziwe minimum pliku (wioska-wioska i wioska-wies gry) - nie ciasniej niz v6 (wioska-wies gry 6.00)
+NPR_V7_TARGET = 12.26      # f10-uklad: odleglosc docelowa = 2 x v6 6.13 (naglowek target_distance): wioska-wioska mediana >= docelowa, 10% >= 0.8 x docelowa
+NPR_INN_FAR = 12.26        # f10-uklad (recenzja): zajazd >= odleglosc docelowa od wioski i wsi gry (RoadsideInns.FarVillage, zajazdy_gen.py MIN_VIL)
 
 
 def nprzysiolki_main(logp):
@@ -42100,7 +42102,7 @@ def nprzysiolki_main(logp):
         rep.add("NPR-5: przysiolki na ladzie (sciana ladowa siatki gry)", f"{land}/{lall}, poza siatka {nomesh}", "wszystkie", land == str(lall) and nomesh == 0)
         dt = g(r"od miasta min ([\d.]+)", s0, float)
         dc = g(r"od zamku min ([\d.]+)", s0, float)
-        t_min, c_min = (10.0, 8.0) if ver == 7 else (12.0, 9.0)          # f10-uklad: v7 stawia wioski >= 10 od miasta i >= 8 od zamku (v7_uklad.py D_TOWN / D_CASTLE)
+        t_min, c_min = 12.0, 9.0          # recenzja f10-uklad: v7 jak v6 - wioski >= 12 od miasta i >= 9 od zamku (v7_uklad.py D_TOWN / D_CASTLE)
         rep.add("NPR-6: przysiolki z dala od warowni", f"od miasta min {dt}, od zamku min {dc}", f"miasto >= {t_min:.0f}, zamek >= {c_min:.0f} jedn.",
                 dt is not None and dc is not None and dt >= t_min - 0.5 and dc >= c_min - 0.5)   # 0.5 - rozrzut punktu w komorce rastra generatora
     if book:
@@ -42197,6 +42199,8 @@ def nprzysiolki_main(logp):
             v0 = v7_lines[-1]
             dmin = g(r"odleglosc minimalna ([\d.]+) \(naglowek pliku\)", v0, float)
             ssmin = g(r"\| wioska-wioska min ([\d.]+)", v0, float)
+            ssp10 = g(r"\| wioska-wioska min [\d.]+ p10 ([\d.]+)", v0, float)
+            ssmed = g(r"\| wioska-wioska min [\d.]+ p10 [\d.]+ med ([\d.]+)", v0, float)
             ssb = g(r"\| wioska-wioska min [\d.]+ p10 [\d.]+ med [\d.]+, wiosek ponizej odleglosci (\d+)", v0, int)
             smb = g(r"\| wioska-wies gry min [\d.]+ p10 [\d.]+ med [\d.]+, wiosek ponizej odleglosci (\d+)", v0, int)
             mv = g(r"przeniesione wobec v6 (\d+) z", v0, int)
@@ -42205,12 +42209,14 @@ def nprzysiolki_main(logp):
             nomesh = g(r"poza siatka (\d+)", v0, int) or 0
             dt = g(r"od miasta min ([\d.]+)", v0, float)
             dc = g(r"od zamku min ([\d.]+)", v0, float)
-            ok16 = (dmin is not None and dmin >= NPR_V7_MIN_D and ssmin is not None and ssmin >= 0.70 * dmin and ssb is not None and nall > 0 and ssb <= 0.15 * nall
-                    and smb is not None and smb <= 0.06 * nall and mv is not None and lnd == str(mv) and nomesh == 0
-                    and (dt is None or dt >= 9.5) and (dc is None or dc >= 7.5))
+            # recenzja 18.10: naglowek min_distance = prawdziwe minimum pliku - wioska ponizej niego to NIE (dotad 0.70 x odleglosc przechodzilo); ksztalt ukladu
+            # wobec odleglosci docelowej 2 x v6: mediana i 10% najblizszej wioski
+            ok16 = (dmin is not None and dmin >= NPR_V7_MIN_D and ssmin is not None and ssmin >= dmin - 0.01 and ssb == 0 and smb == 0 and nall > 0
+                    and ssmed is not None and ssmed >= NPR_V7_TARGET and ssp10 is not None and ssp10 >= 0.8 * NPR_V7_TARGET
+                    and mv is not None and lnd == str(mv) and nomesh == 0 and (dt is None or dt >= 11.5) and (dc is None or dc >= 8.5))
             rep.add("NPR-16: uklad v7 - odleglosc minimalna i przeniesione na ladzie", v0[len(NPR_HEAD):][:260],
-                    f"odleglosc >= {NPR_V7_MIN_D}, wioska-wioska min >= 0.70 x odleglosc, ponizej <= 15% wiosek, wioska-wies gry ponizej <= 6%, na ladzie wszystkie, miasto >= 10, zamek >= 8",
-                    ok16)
+                    f"naglowek min_distance >= {NPR_V7_MIN_D}, wioska-wioska i wioska-wies gry ponizej naglowka 0, wioska-wioska mediana >= {NPR_V7_TARGET} (2 x v6) i 10% >= "
+                    f"{0.8 * NPR_V7_TARGET:.2f}, na ladzie wszystkie, miasto >= 12, zamek >= 9 (0.5 tolerancji)", ok16)
         else:
             rep.add("NPR-16: linia 'uklad v7 (f10-uklad)'", "brak w logu", "linia przy starcie sesji ukladu v7", False)
         c6e = g(r"kolumny v6_\* \(zapis v6 po uid bez pliku _v6\): crc ([0-9A-F]{8}|BRAK)", s0)
@@ -42219,14 +42225,15 @@ def nprzysiolki_main(logp):
         rep.add("NPR-16: uklad v7", f"uklad tej sesji v{ver}", "INFO (klucz Village Layout V7 NIE albo log sprzed f10-uklad)", None)
     if inn_starts:
         z0 = inn_starts[-1]
-        near_ = g(r"blizej niz \d+ jedn\. (\d+) zajazdow", z0, int)
+        near_ = g(r"blizej niz [\d.]+ jedn\. (\d+) zajazdow", z0, int)
+        far_ = g(r"blizej niz ([\d.]+) jedn\. \d+ zajazdow", z0, float)
         if near_ is None:
             rep.add("NPR-18: zajazdy z dala od wiosek", "linia zajazdow bez odleglosci od wiosek (log sprzed f10-uklad albo zajazdy wylaczone)", "INFO", None)
         else:
             mins = g(r"najblizsza wioska poboczna min ([\d.]+|-)", z0)
             minm = g(r"wies gry min ([\d.]+|-)", z0)
-            rep.add("NPR-18: zajazdy z dala od wiosek (budynek >= 10 jedn. od wioski i wsi gry)", f"blizej niz 10 jedn.: {near_} zajazdow; wioska min {mins}, wies gry min {minm} (uklad v{ver})",
-                    "0 przy ukladzie v7 (inny uklad - INFO)", (near_ == 0) if ver == 7 else None)
+            rep.add(f"NPR-18: zajazdy z dala od wiosek (budynek >= {NPR_INN_FAR} jedn. od wioski i wsi gry)", f"blizej niz {far_}: {near_} zajazdow; wioska min {mins}, wies gry min {minm} (uklad v{ver})",
+                    f"prog linii {NPR_INN_FAR} i 0 przy ukladzie v7 (inny uklad - INFO)", (near_ == 0 and far_ is not None and abs(far_ - NPR_INN_FAR) < 0.01) if ver == 7 else None)
     else:
         rep.add("NPR-18: zajazdy z dala od wiosek", "brak linii 'Zajazdy (ZJ): start sesji'", "INFO (klucz Roadside Inns wylaczony albo log sprzed sw-zajazdy)", None)
     rep.add("NPR-I: zajecia przysiolkow (odczyt)", g(r"\| zajecia: ([^|]+)", s0) or "-", "INFO", None)

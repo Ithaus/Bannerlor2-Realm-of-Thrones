@@ -55,7 +55,8 @@ namespace Armoury
         private const float LeaveR = 3.5f;           // pytanie wraca dopiero po odjechaniu dalej niz tyle
         private const float ArriveEps = 0.25f;       // partia u celu ruchu (stanela)
         private const float NearMapVillage = 2.2f;   // budynek zajazdu blizej wioski na mapie - pominiety
-        private const float FarVillage = 10f;        // f10-uklad (Jeff 18.10 "zajazdy nie sa obok wiosek"): generator stawia budynek >= 10 jedn. od wioski i wsi gry - linia startu liczy, ile blizej
+        private const float FarVillage = 12.26f;     // f10-uklad (Jeff 18.10 "zajazdy nie sa obok wiosek"): generator stawia budynek >= 12.26 jedn. (odleglosc docelowa ukladu v7 = 2 x v6;
+                                                     // recenzja: zajazd nie blizej wioski niz dwie wioski od siebie) od wioski i wsi gry - linia startu liczy, ile blizej
         private const float Cell = 25f;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -297,7 +298,7 @@ namespace Armoury
                 }
                 ds.Sort();
                 return "; od wiosek (f10-uklad): budynek - najblizsza wioska poboczna min " + (side.Count > 0 ? minS.ToString("0.0", Inv) : "-") + ", wies gry min "
-                       + (mains.Count > 0 ? minM.ToString("0.0", Inv) : "-") + ", mediana " + ds[ds.Count / 2].ToString("0.0", Inv) + ", blizej niz " + FarVillage.ToString("0", Inv)
+                       + (mains.Count > 0 ? minM.ToString("0.0", Inv) : "-") + ", mediana " + ds[ds.Count / 2].ToString("0.0", Inv) + ", blizej niz " + FarVillage.ToString("0.00", Inv)
                        + " jedn. " + near + " zajazdow";
             }
             catch (Exception e) { Stumble("FarText", e); return "; od wiosek (f10-uklad): blad"; }

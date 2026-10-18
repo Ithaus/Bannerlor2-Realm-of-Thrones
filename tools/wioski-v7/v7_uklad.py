@@ -5,41 +5,49 @@
 #
 # Wejscie (tylko odczyt): Armoury/ModuleData/arm_map_villages_v6.tsv i arm_map_village_lore_v6.tsv (uklad v6 bez zmian - stary uklad, jak _v5 / _v4),
 #   arm_ks_land.tsv (strefa klimatu i zajecie startowe KS wiersza S wioski), tools/wioski-v5/okregi_n_v4.tsv (regula L4), rastry mapy ROT (katalog a-teren:
-#   teren.npz, flora.npz, okregi.npz, drogi_raster.npz, osady.json - D:/Backup-Bannerlord/drogi-siec/a-teren) i sonda terenu z gry (geo-siatka.tsv, kolumna nawig -
-#   D:/Backup-Bannerlord/geo-dane-2026-10-16).
+#   teren.npz, flora.npz, okregi.npz, drogi_raster.npz, osady.json - D:/Backup-Bannerlord/drogi-siec/a-teren) i sonda terenu z gry (geo-siatka.tsv, kolumny nawig,
+#   wies_gry, kultura, krolestwo - D:/Backup-Bannerlord/geo-dane-2026-10-16).
 # Wyjscie: Armoury/ModuleData/arm_map_villages.tsv (v7), arm_map_village_lore.tsv (lore v7), tools/wioski-v7/raport-v7.txt, wioski-v7.tsv (przeniesione wioski)
 #   i (opcja --png <katalog>) obrazki v6 / v7 do przegladu. Przebieg deterministyczny (te same wejscia = te same pliki).
 #
 # Uzycie (z katalogu repo): python -I tools/wioski-v7/v7_uklad.py [--teren <a-teren>] [--geo <geo-siatka.tsv>] [--png <katalog>] [--zajazdy <plan>]
 #   Potok z zajazdami (Jeff 18.10 "zajazdy nie sa obok wiosek"): najpierw plan miejsc zajazdow (tools/zajazdy/zajazdy_gen.py --plan-out, ludzie z v6),
-#   potem ten skrypt (wioski >= min_village planu, 10 jedn., od budynku i postoju zajazdu), na koncu plik zajazdow (zajazdy_gen.py --plan-in) - opis w zajazdy_gen.py.
+#   potem ten skrypt (wioski >= min_village planu, 12.26 jedn., od budynku i postoju zajazdu), na koncu plik zajazdow (zajazdy_gen.py --plan-in) - opis w zajazdy_gen.py.
+#   Sprawdzenie wyniku (niezalezne od generatora, miary recenzji 18.10): python -I tools/wioski-v7/sprawdz_v7.py.
 #
-# WYNIK (raport-v7.txt): wioska-wioska min 6.13 -> 9.21, mediana 9.50 -> 12.91, wiosek ponizej D 1436 -> 242 (7%; wybrzeza i waskie pasy ladu Doliny,
-#   Reach, Westerlands, Dorzecza, Lys / Tyrosh - ziemia nie miesci wszystkich wiosek przy D, obnizenie do 0.85..0.95 D, pojedyncze nizej); skupiska 47 -> 0;
-#   lad okregow w 12 jedn. od osady 69.6% -> 78.4%, w 8 jedn. 50.3% -> 60.4%; 10% okregow z najgorszym pokryciem (15 jedn.) 78% -> 94%.
+# WYNIK (raport-v7.txt, po recenzji 18.10): odleglosc docelowa D = 2 x v6 = 12.26 ma 61% wiosek (najblizsza osada >= D: v6 358 -> v7 1192 z 1957); najblizsza
+#   wioska min 6.13 -> 6.75, 10% 6.58 -> 10.26, mediana 9.50 -> 12.73; najblizsza osada ponizej 0.8 D 1263 -> 162; skupiska 47 -> 9. Gdzie lad kultury nie miesci
+#   wiosek przy D (Tyrosh, Dolina, Westerlands - lad kultury na osade = heks przy D; Dorzecze, Reach, Lys, Nord - 1.3 x heks), wioski stoja rowno i ciasniej
+#   (mediana tam 11-12 jedn.). Prawdziwe minimum pliku (naglowek min_distance) 6.08 - para wioska-wies gry (v6 6.00). Ziemia (sonda gry): na ziemi innej kultury
+#   172 -> 123, innego krolestwa 179 -> 132, daleko obca 1 -> 0, od wlasnej wsi gry max 60.0 -> 59.8 (pierwsza wersja v7: 363 / 352 / 394 / 119.3).
 #
 # REGULA:
-#  1. Odleglosc minimalna D = 2 x najmniejsza odleglosc wioska-wioska ukladu v6 (6.13 -> 12.26 jedn.) - miedzy kazdymi dwiema wioskami pobocznymi i miedzy wioska
+#  1. Odleglosc docelowa D = 2 x najmniejsza odleglosc wioska-wioska ukladu v6 (6.13 -> 12.26 jedn.) - miedzy kazdymi dwiema wioskami pobocznymi i miedzy wioska
 #     poboczna a wsia gry (v6: 6.00). Wsie gry stoja tam, gdzie postawila je gra (pary wies gry - wies gry ponizej D zostaja - dane ROT).
 #  2. Miejsce pod wioske: lad przejezdny w rastrze (bez bagna, rzeki, stromizny >= 0.35, morza i ladu nieprzejezdnego w kwadracie 3x3; gora - w ROT takze
-#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9), od miasta >= 10, zamku >= 8, kryjowki >= 5,
-#     poza malowana droga (>= 1.5 jedn. od jej srodka), >= 10 od zajazdu z planu (budynek i postoj).
-#     Ziemia okregu v7 = Voronoi wazony wsi gry na tym samym ladzie (spojna skladowa) do 100 jedn.: waga rosnie okregowi, ktorego ziemia nie miesci jego wiosek
-#     (pojemnosc = komorki / 120), maleje okregowi z zapasem - gesty okreg dostaje pas ziemi sasiadow; ziemia miedzy okregami (droga > 45 jedn.) tez ma gospodarza.
+#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9), od miasta >= 12, zamku >= 9 (jak v6), kryjowki >= 5,
+#     poza malowana droga (>= 1.5 jedn. od jej srodka), >= min_village planu zajazdow (12.26) od budynku i postoju.
+#     Ziemia okregu (recenzja 18.10, Jeff: "zeby to wygladalo naturalnie, a nie jak blad") = komorki, ktorych najblizsza wies gry (sonda gry, kolumna wies_gry) to
+#     wies gry okregu, do 60 jedn. (v6: najdalej 60.0), ten sam lad; komorka pogranicza (kultura albo krolestwo ziemi inne niz przy wsi gry) - z kara jak pas.
+#     Pas sasiada: komorka tej samej kultury i krolestwa, <= 40 jedn. od wlasnej wsi gry i <= 1.5 x odleglosc do najblizszej wsi gry - wioska przy granicy swojego
+#     okregu, nigdy w glebi ziemi obcej. Gdzie to sie nie miesci przy D - mniejsza odleglosc w tym okregu (nie ziemia obca).
 #  3. Docelowy odstep okregu S = 1.07 x sqrt(ziemia okregu / (wioski + wies gry)) w granicach D..45 (rownomierne pokrycie ziemi okregu).
-#  4. Zostaja na miejscu (kolejnosc: wioski rybackie; wezly H - skrzyzowania, mosty, porty; przysiolki v6; wieksze; uid): wioska, ktora stoi na ziemi swojego okregu,
-#     >= D od wsi gry, >= 10 od zajazdu i >= max(D, 0.75 x S) od wiosek juz zostawionych. Okreg ciasny (wiosek > 0.8 x pojemnosci jego ziemi przy D) ukladany od
+#  4. Zostaja na miejscu (kolejnosc: wioski rybackie; wezly H - skrzyzowania, mosty, porty; przysiolki v6; wieksze; uid): wioska na ziemi swojego okregu albo w pasie,
+#     >= D od wsi gry, poza rezerwa zajazdu i >= max(D, 0.75 x S) od wiosek juz zostawionych. Okreg ciasny (wiosek > 0.8 x pojemnosci jego ziemi przy D) ukladany od
 #     nowa (zostaja tylko rybacy na brzegu) - zostawione stoja byle jak i zabieraja miejsce.
-#  5. (a) Upakowanie: okregi od najciasniejszego, kazda przeniesiona wioska na komorke tuz ponad D od sasiadow (najpierw rybacy na brzegu - do 4 jedn. od wody),
-#     swoja ziemia, potem ziemia sasiadow na tym samym ladzie do 100 jedn. od wsi gry; bez miejsca - odleglosc 0.95 / 0.90 / 0.85 D (do 100 jedn.), 0.85 D do
-#     120 jedn., na koncu nizej, az do odleglosci v6 (wyspy, waskie pasy ladu) - kazdy przypadek w raporcie.
-#     (b) Rozproszenie (6 przebiegow): kazda przeniesiona wioska przechodzi na najlepsza komorke swojej ziemi = min(odleglosc od najblizszej osady, S x 0.8..1.2)
-#     / S + 0.35 x atrakcyjnosc + 0.25 x szum (deterministyczny, gladki), zawsze >= D od wszystkich (obnizone - najpierw proba D). Atrakcyjnosc miejsca (jak
-#     prawdziwe siedliska): rzeka 1.0, brzeg morza / jeziora 0.9, pola i laki 0.55, step 0.45, skraj lasu 0.5 (drwale, weglarze), wzgorza 0.4 (pasterze),
-#     gleboka puszcza 0.25, snieg 0.25, piasek 0.1; dojazd z malowanej drogi (3..12 jedn.) +0.1. Pustka idzie pierwsza, wiec wioski rozchodza sie po calym
-#     ladzie okregu bez siatek i pierscieni.
+#  5. (a) Upakowanie: odleglosc okregu f x D = najwieksza (krok 0.025), przy ktorej jego ziemia i pas mieszcza jego wioski z zapasem 1.15 (caly ciasny okreg rowno,
+#     nie wiekszosc przy D i reszta w szparach); najpierw kazdy okreg na swojej ziemi (od najciasniejszego, od wsi gry - pas przy granicy zostaje dla sasiada),
+#     potem pas, potem odleglosc nizej (krok 0.025 D).
+#     (b) Rownanie odstepow: energia odpychania sum max(0, 1.25 D - d)^2 do wszystkich osad - wioska przechodzi na komorke swojej ziemi / pasa (albo na swoje miejsce
+#     v6) o najmniejszej energii, dopoki energia maleje; potem naprawa najmniejszego odstepu (wioska z najmniejszym odstepem na miejsce z wiekszym - najmniejszy
+#     odstep swiata nie maleje). Miejsce v6 przy zajezdzie planu tylko w ostatecznosci (wioska ciasniej niz najciasniej w v6) - zajazd odpada w kroku 3 zajazdow.
+#     (c) Rozproszenie (6 przebiegow): kazda przeniesiona wioska przechodzi na najlepsza komorke swojej ziemi = min(odleglosc od najblizszej osady, S x 0.8..1.2)
+#     / S + 0.35 x atrakcyjnosc + 0.25 x szum (deterministyczny, gladki) - kara pasa / pogranicza, zawsze >= progu odstepu kazdej osady (min(D, odstep po rownaniu)).
+#     Atrakcyjnosc miejsca (jak prawdziwe siedliska): rzeka 1.0, brzeg morza / jeziora 0.9, pola i laki 0.55, step 0.45, skraj lasu 0.5 (drwale, weglarze),
+#     wzgorza 0.4 (pasterze), gleboka puszcza 0.25, snieg 0.25, piasek 0.1; dojazd z malowanej drogi (3..12 jedn.) +0.1. Pustka idzie pierwsza, wiec wioski
+#     rozchodza sie po calym ladzie okregu bez siatek i pierscieni.
 #  6. Ktora wioska na ktore miejsce: najmniejszy koszt (metoda wegierska w okregu): przesuniecie / S + 1.5 (wioska rybacka v6 nie nad woda) + 0.4 (przysiolek v6
-#     nie na dzikiej ziemi); potem rozproszenie (5b). uid bez zmian (zapis v6 / v5 / v4 przechodzi po uid - VillageBook.OldLayout).
+#     nie na dzikiej ziemi); potem 5b i 5c. Wioska, ktora wrocila na swoje miejsce v6, zostaje wioska v6. uid bez zmian (zapis v6 / v5 / v4 po uid).
 #  7. Przeniesiona wioska dostaje miejsce (kind) i obrazek z ziemi: brzeg / jezioro (rybacka tylko, gdy byla rybacka w v6), rzeka (mlyn wodny albo wies), pole
 #     (zagroda, wiatrak, spichlerz, wies wedlug wielkosci); na dzikiej ziemi (las, wzgorza, step, snieg, piasek) - przysiolek z zajeciem z ziemi jak v6
 #     (owce / kozy, bydlo, swinie, drwale / weglarze, traperzy, mysliwi). Ludzie: osady okregu przeniesionych wiosek rozdzielone na nie wedlug miejsca
@@ -48,9 +56,11 @@
 #  8. Ziemia KS (kolumny ks_*) - kazda przeniesiona wioska (nie tylko przysiolek): teren, miejsce, obrazek, odleglosci punktu i zajecie startowe: przysiolek - zajecie
 #     z ziemi (tabela swiata KS, jak v6); wioska - zajecie v6 (wiersz S arm_ks_land.tsv), gdy ziemia je niesie (stadnina, kopalnia - zawsze), inaczej najlepsze
 #     z tabeli (pszenica, gdy >= 80% najlepszego). Nakladka KS (VillageHamlets.OverlayKs) czyta kazdy wiersz z ks_*.
-#  9. Nazwy: Westeros - przysiolek z nowym zajeciem dostaje nowa nazwe (jak v6), reszta stara. Lore: wioska zostawiona - bez zmian; przeniesiona - zdanie miejsca
-#     (droga, skrzyzowanie, most, brod) zastapione zdaniem nowego miejsca, mlyn / rybacy bez wody - zdanie bez mlyna / sieci, historia "o drodze" - inna;
-#     przysiolek - zajecie i historia jak v6. order / toward_village / neighbors / level - regula generatora v4 (jak v6).
+#  9. Nazwy: Westeros - przysiolek z nowym zajeciem dostaje nowa nazwe (jak v6); dawny przysiolek v6, ktory stoi teraz na polu / nad woda jako wies, dostaje nazwe
+#     wsi (recenzja: bez "Fleece Hollow" pasterzy u rolnikow) oraz zdanie zajecia i historie wsi (bez "the oldest woman of the hamlet"); reszta stara. Lore: wioska
+#     zostawiona - bez zmian; przeniesiona - zdanie miejsca (droga, skrzyzowanie, most, brod) zastapione zdaniem nowego miejsca, mlyn / rybacy bez wody - zdanie bez
+#     mlyna / sieci, historia "o drodze" - inna; przysiolek - zajecie i historia jak v6. order / toward_village / neighbors / level - regula generatora v4 (jak v6).
+# 10. Naglowek pliku: "# min_distance:" = prawdziwe minimum pliku (wioska-wioska i wioska-wies gry; VillageHamlets liczy wioski ponizej - 0), "# target_distance:" = D.
 import argparse, io, json, math, os, re, sys, zlib
 from collections import Counter, defaultdict, deque
 import numpy as np
@@ -79,24 +89,27 @@ ap.add_argument("--zajazdy", default=None, help="plan miejsc zajazdow (domyslnie
 A = ap.parse_args()
 
 SLOPE_MAX = 0.35
-D_TOWN, D_CASTLE, D_HIDE = 10.0, 8.0, 5.0      # od miasta / zamku / kryjowki (v6: wioska-miasto min 12.02, wioska-zamek min 9.02; wies gry-miasto min 5.44)
+D_TOWN, D_CASTLE, D_HIDE = 12.0, 9.0, 5.0      # od miasta / zamku / kryjowki (recenzja: jak v6 - wioska-miasto min 12.02, wioska-zamek min 9.02; wies gry-miasto min 5.44)
 D_PAINT = 1.5            # od srodka malowanej drogi (wioska nie stoi na drodze)
 S_HEX = 1.07             # odstep heksagonalny: sqrt(2 / sqrt(3)) = 1.0746
 S_CAP = 45.0
 KEEP_K = 0.75            # wioska zostaje, gdy >= max(D, KEEP_K x S) od zostawionych
 BETA, GAMMA = 0.35, 0.25 # atrakcyjnosc i szum w wyniku miejsca (rozproszenie)
 BETA_T, GAMMA_T = 0.08, 0.06   # krok a (ciasno): woda / pola i szum ledwie rozstrzygaja - najpierw wszystkie wioski musza sie zmiescic przy D
-R_TERR = 100.0           # ziemia okregu v7 (Voronoi wazony) najdalej tyle od wsi gry
-A_EFF = 120.0            # komorek miejsc na wioske (pojemnosc ziemi przy D: ciasno ok. 114)
-TERR_IT, TERR_STEP, TERR_WMAX = 40, 6.0, 60.0
+R_OWN = 60.0             # ziemia okregu (komorki sondy gry z najblizsza wsia gry okregu) najdalej tyle od wsi gry (v6: wioska najdalej 60.0 od swojej wsi gry)
+BAND_R = 40.0            # recenzja 18.10: ziemia sasiada (pas przy granicy) najdalej tyle od wlasnej wsi gry ...
+BAND_K = 1.5             # ... i nie dalej od wlasnej wsi gry niz BAND_K x odleglosc do wsi gry sasiada (najblizszej); zawsze ta sama kultura i krolestwo ziemi
 TIGHT_FULL = 0.80        # okreg ciasny: wiosek > 0.80 x pojemnosci jego ziemi przy D (bez wiosek pobocznych) - wszystkie ukladane od nowa
-FB_PEN = 0.5             # kara ziemi sasiada (plus odleglosc od wsi gry / R_FB)
+FB_PEN = 0.5             # kara ziemi sasiada (plus odleglosc od wsi gry / BAND_R)
+PACK_GV = 0.35           # krok a: wioski okregu upakowane od wsi gry (kara odleglosci od wsi gry / R_OWN) - pas przy granicy zostaje wolny dla ciasnego sasiada
 FISH_BONUS = 0.5         # wioska rybacka v6 nad woda (rozproszenie)
-RELAX_SWEEPS, RELAX_GAIN, RELAX_FB_R = 6, 0.01, 30.0   # przebiegi rozproszenia, najmniejszy zysk przejscia, ziemia sasiada wokol obecnego miejsca
+RELAX_SWEEPS, RELAX_GAIN = 6, 0.01                       # przebiegi rozproszenia, najmniejszy zysk przejscia
 VOR_MAX = 60.0
-R_FB = 100.0             # ziemia sasiadow: do tylu jedn. od wsi gry okregu (ten sam lad)
-R_FB2 = 120.0            # dalej - tylko przy odleglosci obnizonej do RELAX_FLOOR x D
-RELAX_FLOOR = 0.85       # ponizej 0.85 D - dopiero gdy dalej tez nie ma miejsca (wyspy, waskie pasy ladu)
+RELAX_STEP = 0.025       # okreg bez miejsca przy D na swojej ziemi i w pasie sasiada: odleglosc obnizana tym krokiem (recenzja: mniejsza odleglosc zamiast ziemi obcej)
+PLACE_FLOOR = 0.30       # krok C: najnizsza odleglosc pierwszego miejsca (x D) - naprawa odstepow (6a) i tak rozsuwa najciasniejsze
+REPAIR_IT, REPAIR_GAIN, REPAIR_BAND = 20000, 0.05, 1.0   # naprawa odstepow: najwiecej krokow, najmniejszy zysk odstepu, kara pasa sasiada (jedn.)
+E_CUT, E_SWEEPS, E_GAIN, E_BAND = 1.25, 12, 0.5, 4.0  # rownanie odstepow: zasieg odpychania (x D), przebiegi, najmniejszy zysk energii, kara pasa sasiada
+CAP_SAFE = 1.15          # zapas pojemnosci przy wyborze odleglosci okregu (szacunek nie widzi wiosek sasiadow przy granicy)
 CAP = 64.0               # zasieg stempla odleglosci (> S_CAP)
 FISH_SEA = 3.0
 FISH_SITE = 4.0          # wioska rybacka v6 nad woda: do 4 jedn. od wody (widok szuka brzegu do 5 jedn.)
@@ -410,6 +423,29 @@ def hamlet_name(occ, place, uid, used):
     return stems[h % len(stems)] + " Hamlet " + str(h % 97)
 
 
+# recenzja 18.10: dawny przysiolek v6, ktory w v7 stoi na polu / nad woda jako wies rolnikow, nie nosi nazwy dawnego zajecia ("Fleece Hollow", "Smokecroft")
+FARM_STEM = ["Barley", "Oat", "Rye", "Wheat", "Bean", "Hay", "Furrow", "Harrow", "Sheaf", "Plough", "Apple", "Pear", "Hedge", "Thorn", "Willow", "Alder",
+             "Elder", "Green", "Broad", "Long"]
+FARM_END = {
+    "field": ["ton", "ham", "field", "stead", "worth", "ley", "by", "thorpe", "wick", "cote"],
+    "river": ["brook", "mere", "bank", "wick", "holm", "water", "bourne", "side"],
+}
+
+
+def farm_name(cat, place, uid, used):
+    ends = FARM_END.get(cat) or NAME_END.get(place) or FARM_END["field"]
+    h = fnv1a(uid + "|farmname")
+    for k in range(len(FARM_STEM) * len(ends)):
+        s = FARM_STEM[(h + k * 7) % len(FARM_STEM)]
+        e = ends[((h >> 8) + k * 3) % len(ends)]
+        if e not in SEP_WORD and (s[-1].lower() == e[0] or s.lower().endswith(e)):
+            continue                                    # bez "Hedgeend", "Barleyley"
+        nm = (s + " " + e.capitalize()) if e in SEP_WORD else (s + e)
+        if nm not in used:
+            return nm
+    return FARM_STEM[h % len(FARM_STEM)] + "ton " + str(h % 97)
+
+
 # ---------------------------------------------------------------- lore (po angielsku)
 LIVE = {
     "shepherds": [
@@ -568,14 +604,41 @@ def main():
     badw &= ~shore_ok
     # sonda gry: nawig 2 jedn. (srodek tak i 7 z 9; brzeg 5 z 9)
     nav = np.zeros(((H // 2) + 3, (W // 2) + 3), dtype=bool)
+    # recenzja 18.10: ziemia komorki z sondy gry - wies_gry (najblizsza wies gry = okreg), kultura, krolestwo (te same kolumny liczy sprawdz_v7.py)
+    gvid = np.full(nav.shape, -1, dtype=np.int32)      # -1 brak (nie nawig), -2 wies gry spoza rastra okregow
+    gcul = np.full(nav.shape, -1, dtype=np.int32)
+    gkin = np.full(nav.shape, -1, dtype=np.int32)
+    cul_code, kin_code = {}, {}
     with io.open(A.geo, encoding="utf-8") as f:
-        f.readline()
+        ghd = f.readline().rstrip("\r\n").split("\t")
+        i_w, i_c, i_k = ghd.index("wies_gry"), ghd.index("kultura"), ghd.index("krolestwo")
         for line in f:
-            c = line.split("\t", 3)
+            c = line.rstrip("\r\n").split("\t")
             if c[2] == "tak":
                 xi, yi = int(c[0]) // 2, int(c[1]) // 2
                 if 0 <= yi < nav.shape[0] and 0 <= xi < nav.shape[1]:
                     nav[yi, xi] = True
+                    if c[i_w] != "-":
+                        gvid[yi, xi] = vidx.get(c[i_w], -2)
+                        gcul[yi, xi] = cul_code.setdefault(c[i_c], len(cul_code))
+                        gkin[yi, xi] = kin_code.setdefault(c[i_k], len(kin_code))
+    ghas = gvid != -1
+
+    def geo_cell(x, y):
+        """(okreg, kultura, krolestwo) najblizszej komorki sondy z wsia gry - jak sprawdz_v7.cell (najblizszy punkt siatki 2 jedn., do 3 pierscieni)."""
+        bx, by = int(round(x / 2.0)), int(round(y / 2.0))
+        for rr in range(0, 4):
+            best = None
+            for dx in range(-rr, rr + 1):
+                for dy in range(-rr, rr + 1):
+                    jx, jy = bx + dx, by + dy
+                    if 0 <= jy < ghas.shape[0] and 0 <= jx < ghas.shape[1] and ghas[jy, jx]:
+                        d = (2 * jx - x) ** 2 + (2 * jy - y) ** 2
+                        if best is None or d < best[0]:
+                            best = (d, (int(gvid[jy, jx]), int(gcul[jy, jx]), int(gkin[jy, jx])))
+            if best is not None:
+                return best[1]
+        return None
     navc = np.zeros(nav.shape, dtype=np.int32)
     for dy in (-1, 0, 1):
         for dx in (-1, 0, 1):
@@ -596,6 +659,7 @@ def main():
     pxi = np.clip(np.rint((xx + 0.5) / 2.0).astype(np.int32), 0, navw.shape[1] - 1)
     pyi = np.clip(np.rint((yy + 0.5) / 2.0).astype(np.int32), 0, navw.shape[0] - 1)
     probe_r = np.where(shore_ok, navs[pyi, pxi], navw[pyi, pxi])
+    r_vid, r_cul, r_kin = gvid[pyi, pxi], gcul[pyi, pxi], gkin[pyi, pxi]
     cx = (xx + 0.5).astype(np.float32); cy = (yy + 0.5).astype(np.float32)
 
     osady = json.load(io.open(J("osady.json"), encoding="utf-8"))["osady"]
@@ -625,7 +689,7 @@ def main():
         # dokladnie (raster liczy od srodka komorki, punkt ma rozrzut w komorce): miasto >= D_TOWN, zamek >= D_CASTLE
         if INX is not None and np.hypot(INX[:, 0] - x, INX[:, 1] - y).min() < inn_min:
             return False                 # zajazd (budynek albo postoj) blizej niz rezerwa
-        return (np.hypot(TWX[:, 0] - x, TWX[:, 1] - y).min() >= D_TOWN) and (np.hypot(CSX[:, 0] - x, CSX[:, 1] - y).min() >= D_CASTLE)
+        return (np.hypot(TWX[:, 0] - x, TWX[:, 1] - y).min() >= D_TOWN + 0.01) and (np.hypot(CSX[:, 0] - x, CSX[:, 1] - y).min() >= D_CASTLE + 0.01)   # zapas: zapis 2 miejsca
     painted = DR["painted"]
     d_paint = np.full((H, W), 1e6, dtype=np.float32)
     pys, pxs = np.nonzero(painted)
@@ -742,67 +806,80 @@ def main():
     D = round(2.0 * v6_min + 0.004, 2)          # 2 x 6.13 = 12.26
     D_LOW = v6_min                              # dolna granica obnizania (odleglosc v6)
 
-    # ---------- ziemia okregow v7 (Voronoi wazony wsi gry): komorka miejsca nalezy do wsi gry o najmniejszej (odleglosc - waga) na tym samym ladzie (spojna
-    # skladowa) do R_TERR jedn.; waga rosnie okregowi, ktorego ziemia nie miesci jego wiosek przy D (pojemnosc = komorki / A_EFF), i powoli maleje okregowi
-    # z zapasem - gesty okreg dostaje pas ziemi sasiadow, ktorzy maja jej za duzo (nadmiar rozchodzi sie po calym ladzie, a nie za jedna granica);
-    # ziemia miedzy okregami (droga > 45 jedn.) tez ma gospodarza
-    main_list = [(vid, mainv[vid]) for vid in sorted(mainv) if vid in vidx]
-    wins = []
-    for vid, (x, y) in main_list:
-        cm = comp_at(x, y)
-        x0, x1 = int(max(0, x - R_TERR)), int(min(W, x + R_TERR + 1)); y0, y1 = int(max(0, y - R_TERR)), int(min(H, y + R_TERR + 1))
+    # ---------- ziemia okregu (recenzja 18.10, Jeff: "zeby to wygladalo naturalnie, a nie jak blad"): komorka nalezy do okregu, gdy jej najblizsza wies gry
+    # (sonda gry, kolumna wies_gry) to wies gry okregu - do R_OWN jedn., ten sam lad (spojna skladowa), ta sama kultura i krolestwo ziemi co komorka wsi gry.
+    # Pas sasiada (tylko dla okregu, ktory nie miesci swoich wiosek przy D na swojej ziemi): komorka sasiada tej samej kultury i krolestwa, do BAND_R jedn. od
+    # wlasnej wsi gry i nie dalej niz BAND_K x odleglosc do najblizszej wsi gry - wioska stoi przy granicy swojego okregu, nigdy w glebi ziemi obcej.
+    MX = np.array([mainv[v] for v in sorted(mainv)], dtype=np.float64)
+    home = {}
+    for vid, (x, y) in mainv.items():
+        g = geo_cell(x, y)
+        home[vid] = (g[1], g[2]) if g is not None else (-1, -1)
+    dgv = dist_raster(list(mainv.values()), CAP)
+
+    def land_at(did, x, y):
+        """0 = ziemia okregu, 1 = pas sasiada (ta sama kultura i krolestwo, <= BAND_R od wsi gry, <= BAND_K x najblizsza wies gry), -1 = nie (ten sam test co maski)."""
+        g = geo_cell(x, y)
+        mxy = mainv.get(did)
+        if g is None or mxy is None:
+            return -1
+        dm = math.hypot(x - mxy[0], y - mxy[1])
+        if g[0] == vidx.get(did, -99):
+            return 0 if dm <= R_OWN + 1e-6 else -1        # swoja ziemia: najblizsza wies gry to wies gry okregu (jak w v6 - bez warunku kultury)
+        hc, hk = home[did]
+        if (hc >= 0 and g[1] != hc) or (hk >= 0 and g[2] != hk):
+            return -1                                      # pas sasiada tylko na ziemi tej samej kultury i krolestwa
+        if dm > BAND_R:
+            return -1
+        dn = float(np.hypot(MX[:, 0] - x, MX[:, 1] - y).min())
+        return 1 if dm <= BAND_K * dn + 1e-6 else -1
+
+    def point_pen(did, x, y):
+        """Kara miejsca (ta sama miara co komorki): pas sasiada FB_PEN + odleglosc / BAND_R, pogranicze swojej ziemi (inna kultura / krolestwo) FB_PEN, inaczej 0."""
+        la = land_at(did, x, y)
+        if la == 1:
+            return FB_PEN + math.hypot(x - mainv[did][0], y - mainv[did][1]) / BAND_R
+        g = geo_cell(x, y)
+        hc, hk = home[did]
+        if g is not None and ((hc >= 0 and g[1] != hc) or (hk >= 0 and g[2] != hk)):
+            return FB_PEN
+        return 0.0
+
+    E0 = np.zeros(0, dtype=np.int64)
+    cells_d, band_d, A_d, open_d = {}, {}, {}, {}      # open_d: kara komorki swojej ziemi z kultura / krolestwem innym niz wies gry (pogranicze - jak pas sasiada)
+    for did in dist:
+        li = vidx.get(did)
+        mxy = mainv.get(did)
+        cm = comp_at(*mxy) if mxy is not None else -1
+        if li is None or cm < 0:
+            cells_d[did] = (E0, E0); band_d[did] = (E0, E0, np.zeros(0, dtype=np.float32)); A_d[did] = 0; open_d[did] = np.zeros(0, dtype=np.float32)
+            continue
+        x, y = mxy
+        x0, x1 = int(max(0, x - R_OWN)), int(min(W, x + R_OWN + 1)); y0, y1 = int(max(0, y - R_OWN)), int(min(H, y + R_OWN + 1))
         dd = np.sqrt((cx[y0:y1, x0:x1] - x) ** 2 + (cy[y0:y1, x0:x1] - y) ** 2)
-        if cm >= 0:
-            ok_ = site_ok[y0:y1, x0:x1] & (comp[y0:y1, x0:x1] == cm) & (dd <= R_TERR)
-        else:
-            ok_ = np.zeros(dd.shape, dtype=bool)
-        wins.append((vidx[vid], vid, x0, x1, y0, y1, np.where(ok_, dd, 1e6).astype(np.float32)))
-    want = {vid: len(dist.get(vid, [])) + 1 for vid, _ in main_list}
-    wgt = {vid: 0.0 for vid, _ in main_list}
-    terr_hist = []
-    for it in range(TERR_IT):
-        best = np.full((H, W), 1e6, dtype=np.float32)
-        tl = np.full((H, W), -1, dtype=np.int32)
-        for li_, vid, x0, x1, y0, y1, dd in wins:
-            v = dd - np.float32(wgt[vid])
-            sb = best[y0:y1, x0:x1]
-            upd = (v < sb) & (dd < 1e5)
-            sb[upd] = v[upd]
-            tl[y0:y1, x0:x1][upd] = li_
-        cnt = np.bincount(tl[tl >= 0], minlength=len(vids))
-        over = 0
-        for li_, vid, *_ in wins:
-            r_ = want[vid] / max(0.5, cnt[li_] / A_EFF)
-            if r_ > 1.0:
-                over += 1
-            wgt[vid] = float(np.clip(wgt[vid] + TERR_STEP * float(np.clip(math.log(max(1e-3, r_)), -1.0, 1.0)), -TERR_WMAX, TERR_WMAX))
-        terr_hist.append(over)
-    terr_lab = tl
-    if A.diag:
-        print("DIAG terytoria - okregow ponad pojemnosc po iteracjach:", terr_hist)
-        ov = []
-        for li_, vid, *_ in wins:
-            r_ = want[vid] / max(0.5, cnt[li_] / A_EFF)
-            if r_ > 1.0:
-                ov.append((r_, vid, cult.get(vid), want[vid], int(cnt[li_]), round(wgt[vid], 1)))
-        ov.sort(reverse=True)
-        print("DIAG komorek w terytoriach", int(cnt.sum()), "site_ok", int(site_ok.sum()), "chce", sum(want.values()), "pojemnosc przy A_EFF", round(cnt.sum() / A_EFF))
-        print("DIAG ponad:", len(ov), "nadmiar wiosek", round(sum(w_ - c_ / A_EFF for _, _, _, w_, c_, _ in ov), 1))
-        for o_ in ov[:25]:
-            print("DIAG  %.2f %s %s want %d cells %d w %.1f" % o_)
-    flat_l = terr_lab.ravel()
-    idx_all = np.flatnonzero(flat_l >= 0)
-    srt = idx_all[np.argsort(flat_l[idx_all], kind="stable")]
-    bnd = np.searchsorted(flat_l[srt], np.arange(len(vids) + 1))
-    cells_li = {}
-    for li_ in range(len(vids)):
-        seg = srt[bnd[li_]:bnd[li_ + 1]]
-        cells_li[li_] = (seg // W, seg % W)
-    A_d = np.bincount(flat_l[idx_all], minlength=len(vids))
+        hc, hk = home[did]
+        base = site_ok[y0:y1, x0:x1] & (comp[y0:y1, x0:x1] == cm) & (dd <= R_OWN)
+        rv = r_vid[y0:y1, x0:x1]
+        own = base & (rv == li)
+        band = base & (rv != li) & (rv != -1) & (dd <= BAND_R) & (dd <= BAND_K * dgv[y0:y1, x0:x1])
+        if hc >= 0:
+            band &= r_cul[y0:y1, x0:x1] == hc
+        if hk >= 0:
+            band &= r_kin[y0:y1, x0:x1] == hk
+        oy, ox = np.nonzero(own)
+        by_, bx_ = np.nonzero(band)
+        cells_d[did] = (oy + y0, ox + x0)
+        fo = np.zeros(len(oy), dtype=bool)
+        if hc >= 0:
+            fo |= r_cul[oy + y0, ox + x0] != hc
+        if hk >= 0:
+            fo |= r_kin[oy + y0, ox + x0] != hk
+        open_d[did] = np.where(fo, FB_PEN, 0.0).astype(np.float32)
+        band_d[did] = (by_ + y0, bx_ + x0, (FB_PEN + dd[by_, bx_] / BAND_R).astype(np.float32))
+        A_d[did] = len(oy)
     S_d, K_d = {}, {}
     for did, rs in dist.items():
-        li = vidx.get(did)
-        a = float(A_d[li]) if li is not None else 0.0
+        a = float(A_d[did])
         n = len(rs) + 1
         s = S_HEX * math.sqrt(a / n) if a > 0 else D
         S_d[did] = max(D, min(S_CAP, s))
@@ -810,24 +887,6 @@ def main():
 
     # pojemnosc ziemi okregu przy D bez wiosek pobocznych (tylko wsie gry; ciasne upakowanie - szacunek). Okreg ciasny (wiosek > TIGHT_FULL x pojemnosci):
     # zadna wioska nie zostaje w miejscu v6 - caly okreg ukladany od nowa (zostawione stoja byle jak i zabieraja miejsce)
-    cells_d = {}
-    for did in dist:
-        li = vidx.get(did)
-        cells_d[did] = cells_li.get(li, (np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int64))) if li is not None else (np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int64))
-
-    def in_terr(did, x, y):
-        li = vidx.get(did, -99)
-        ix, iy = int(math.floor(x)), int(math.floor(y))
-        seen = False
-        for dy in range(-2, 3):
-            for dx in range(-2, 3):
-                jx, jy = ix + dx, iy + dy
-                if 0 <= jx < W and 0 <= jy < H and terr_lab[jy, jx] >= 0:
-                    seen = True
-                    if terr_lab[jy, jx] == li:
-                        return True
-        return (not seen) and 0 <= iy < H and 0 <= ix < W and tlab[iy, ix] == li
-    MX = np.array([mainv[v] for v in sorted(mainv)], dtype=np.float64)
 
     def cap_full(ys, xs):
         if len(xs) == 0:
@@ -850,6 +909,18 @@ def main():
 
     capf_d = {did: cap_full(*cells_d[did]) for did in dist}
     tight_full = {did for did, rs in dist.items() if len(rs) > TIGHT_FULL * capf_d[did]}
+    if A.diag:
+        sh = sum(max(0, len(rs) - capf_d[did]) for did, rs in dist.items())
+        nsh = sum(1 for did, rs in dist.items() if len(rs) > capf_d[did])
+        capb = {did: cap_full(np.concatenate([cells_d[did][0], band_d[did][0]]), np.concatenate([cells_d[did][1], band_d[did][1]])) for did in dist}
+        shb = sum(max(0, len(rs) - capb[did]) for did, rs in dist.items())
+        nshb = sum(1 for did, rs in dist.items() if len(rs) > capb[did])
+        print("DIAG ziemia: wiosek %d, pojemnosc swojej ziemi przy D (same wsie gry) suma %d, okregow z brakiem %d, brak %d; ze pasem: okregow %d, brak %d; tight_full %d"
+              % (len(rows), sum(capf_d.values()), nsh, sh, nshb, shb, len(tight_full)))
+        by_c = Counter()
+        for did, rs in dist.items():
+            by_c[cult.get(did, "?")] += max(0, len(rs) - capb[did])
+        print("DIAG brak (z pasem) wedlug kultury:", by_c.most_common(20))
 
     # ---------- 4. zostaja na miejscu
     grid = PtGrid(16.0)
@@ -867,8 +938,8 @@ def main():
             continue                                  # przy miejscu zajazdu (rezerwa) - wioska idzie dalej
         if r["village_id"] in tight_full and r["model"] != "fishing":
             continue                                  # okreg ciasny - ukladany od nowa (rybacy na brzegu zostaja, gdy maja miejsce)
-        if not in_terr(r["village_id"], r["_x"], r["_y"]):
-            continue                                  # ziemia oddana sasiadowi (Voronoi wazony)
+        if land_at(r["village_id"], r["_x"], r["_y"]) < 0:
+            continue                                  # poza ziemia okregu i pasem przy granicy (recenzja: ziemia innej kultury / krolestwa, w glebi sasiada)
         if grid.nearest(x, y, rmax=D + 1) < D:
             continue                                  # za blisko wsi gry
         kd = K_d[r["village_id"]]
@@ -907,21 +978,23 @@ def main():
     for did in moved_by_d:
         moved_by_d[did].sort(key=lambda i: (-rows[i]["_s"], rows[i]["uid"]))
     # pojemnosc ziemi okregu przy odleglosci D (ciasne upakowanie na wolnej ziemi okregu - szacunek, okregi osobno)
-    def capacity(ys, xs):
+    def capacity(ys, xs, dmin=None, nmax=None):
+        dmin = D if dmin is None else dmin
         if len(xs) == 0:
             return 0
         px, py = cx[ys, xs], cy[ys, xs]
         dn = dnear[ys, xs].copy()
         n = 0
-        while True:
-            ok = dn >= D
+        while nmax is None or n < nmax:
+            ok = dn >= dmin
             if not ok.any():
                 return n
             k = int(np.argmin(np.where(ok, dn, 1e9)))
             x, y = px[k], py[k]
-            sel = (np.abs(px - x) < D + 0.1) & (np.abs(py - y) < D + 0.1)
+            sel = (np.abs(px - x) < dmin + 0.1) & (np.abs(py - y) < dmin + 0.1)
             dn[sel] = np.minimum(dn[sel], np.sqrt((px[sel] - x) ** 2 + (py[sel] - y) ** 2))
             n += 1
+        return n
 
     if A.diag:
         ys_all, xs_all = np.nonzero(site_ok)
@@ -957,6 +1030,8 @@ def main():
                 continue
             if grid.nearest(x1, y1, rmax=dmin + 1) < dmin:
                 continue
+            if land_at(did, x1, y1) < 0:
+                continue                          # punkt (po rozrzucie w komorce) poza ziemia okregu i pasem
             return (x1, y1, jxi, jyi)
         return None
 
@@ -967,113 +1042,84 @@ def main():
         stamp(dnear, x1, y1)
         sites[did].append((x1, y1, ix, iy, how))
 
-    main_comp = {}
-
-    def fb_cells(did, rfb=None, around=None):
-        mx, my = mainv.get(did, (None, None))
-        li = vidx.get(did, -99)
-        if mx is None:
-            return None
-        if did not in main_comp:
-            main_comp[did] = comp_at(mx, my)
-        cm = main_comp[did]
-        if cm < 0:
-            return None
-        R = rfb or R_FB
-        bx, by = (around if around is not None else (mx, my))
-        x0, x1 = int(max(0, bx - R)), int(min(W, bx + R + 1)); y0, y1 = int(max(0, by - R)), int(min(H, by + R + 1))
-        sub = site_ok[y0:y1, x0:x1] & (comp[y0:y1, x0:x1] == cm) & (terr_lab[y0:y1, x0:x1] != li)
-        dd = np.sqrt((cx[y0:y1, x0:x1] - mx) ** 2 + (cy[y0:y1, x0:x1] - my) ** 2)
-        sub &= dd <= (R if around is None else R_FB2)
-        if around is not None:
-            sub &= np.sqrt((cx[y0:y1, x0:x1] - bx) ** 2 + (cy[y0:y1, x0:x1] - by) ** 2) <= R
-        ys2, xs2 = np.nonzero(sub)
-        return (ys2 + y0, xs2 + x0, (dd[ys2, xs2] / R_FB).astype(np.float32))
-
+    # recenzja 18.10: najpierw kazdy okreg na SWOJEJ ziemi przy D (krok A, wszystkie okregi), potem pas sasiada przy D (krok B, tylko okregi, ktorym zabraklo),
+    # na koncu odleglosc obnizana krokami RELAX_STEP na swojej ziemi i w pasie (krok C) - zamiast wysylania wiosek w glab ziemi obcej
     need = {did: len(moved_by_d[did]) for did in moved_by_d}
-    for did in sorted(moved_by_d, key=lambda d: (-ratio[d], d)):
-        ys, xs = cells_d[did]
-        fb = None
-        # wioski rybackie v6: najpierw tyle miejsc nad woda (morze / jezioro do FISH_SEA), swoja ziemia, potem sasiedzi - rybacy zostaja rybakami
-        fish_need = sum(1 for i in moved_by_d[did] if rows[i]["model"] == "fishing")
-        if fish_need:
+    fish_left = {did: sum(1 for i in moved_by_d[did] if rows[i]["model"] == "fishing") for did in moved_by_d}
+    order_d = sorted(moved_by_d, key=lambda d: (-ratio[d], d))
+    relax_min = {}                                   # okreg -> najnizsza uzyta odleglosc (x D)
+    # odleglosc okregu f_d x D: najwieksza (krok RELAX_STEP), przy ktorej swoja ziemia i pas (same wsie gry i zostawione) mieszcza jego wioski z zapasem CAP_SAFE -
+    # caly ciasny okreg stoi rowno przy jednej mniejszej odleglosci (a nie wiekszosc przy D i reszta wcisnieta w szpary)
+    f_d = {}
+    for did in order_d:
+        ys_ = np.concatenate([cells_d[did][0], band_d[did][0]]); xs_ = np.concatenate([cells_d[did][1], band_d[did][1]])
+        want_ = max(len(moved_by_d[did]), int(round(len(moved_by_d[did]) * CAP_SAFE)))
+        f = 1.0
+        while f - RELAX_STEP >= D_LOW / D - 1e-6 and capacity(ys_, xs_, D * f, want_) < want_:
+            f -= RELAX_STEP
+        f_d[did] = round(f, 3)
+
+    def how_of(f, band):
+        return ("fb" if band else "own") if f >= 1.0 - 1e-9 else (("fb-relax%.3f" if band else "relax%.3f") % f)
+
+    def gv_pen(did, ys, xs):
+        mx, my = mainv[did]
+        return (PACK_GV * np.sqrt((cx[ys, xs] - mx) ** 2 + (cy[ys, xs] - my) ** 2) / R_OWN + open_d[did]).astype(np.float32)
+
+    def fill(did, ys, xs, pen, dmin, how):
+        # wioski rybackie v6: najpierw miejsca nad woda (morze / jezioro do FISH_SITE) - rybacy zostaja rybakami
+        if fish_left[did] > 0 and need[did] > 0 and len(xs):
             wm = dsea[ys, xs] <= FISH_SITE
-            wys, wxs = ys[wm], xs[wm]
-            fbw = None
-            while fish_need > 0 and need[did] > 0:
-                p = try_place(did, wys, wxs, D)
-                how = "own"
-                if p is None:
-                    if fbw is None:
-                        f_ = fb_cells(did)
-                        if f_ is not None:
-                            mw = dsea[f_[0], f_[1]] <= FISH_SITE
-                            fbw = (f_[0][mw], f_[1][mw], f_[2][mw])
-                    if fbw is not None and len(fbw[0]):
-                        p = try_place(did, fbw[0], fbw[1], D, pen=FB_PEN + fbw[2])
-                        how = "fb"
+            while fish_left[did] > 0 and need[did] > 0:
+                p = try_place(did, ys[wm], xs[wm], dmin, pen=pen[wm])
                 if p is None:
                     break
                 commit(did, p, how)
                 need[did] -= 1
-                fish_need -= 1
-        while need[did] > 0:
-            p = try_place(did, ys, xs, D)
-            how = "own"
-            if p is None:
-                if fb is None:
-                    fb = fb_cells(did)
-                if fb is not None:
-                    p = try_place(did, fb[0], fb[1], D, pen=FB_PEN + fb[2])
-                    how = "fb"
+                fish_left[did] -= 1
+        while need[did] > 0 and len(xs):
+            p = try_place(did, ys, xs, dmin, pen=pen)
             if p is None:
                 break
             commit(did, p, how)
             need[did] -= 1
-    if A.diag:
-        for did in sorted((d for d in moved_by_d if need[d] > 0), key=lambda d: (-ratio[d], d)):
-            fb = fb_cells(did)
-            print("DIAG", did, cult.get(did, "?"), "moved", len(moved_by_d[did]), "cap", cap_d[did], "ratio %.2f" % ratio[did], "left", need[did],
-                  "cells", len(cells_d[did][0]), "fb", (len(fb[0]) if fb is not None else -1))
-    # reszta: odleglosc obnizana stopniami (swoja ziemia, potem sasiedzi), az do odleglosci v6; bez miejsca - zostaje w v6
-    for did in sorted((d for d in moved_by_d if need[d] > 0), key=lambda d: (-ratio[d], d)):
+
+    for did in order_d:                              # A: swoja ziemia, odleglosc okregu (D albo f_d x D)
         ys, xs = cells_d[did]
-        fb = fb_cells(did)
-        fb2 = None
+        fill(did, ys, xs, gv_pen(did, ys, xs), D * f_d[did], how_of(f_d[did], False))
+    for did in order_d:                              # B: pas sasiada, ta sama odleglosc
+        if need[did] > 0:
+            by_, bx_, bp_ = band_d[did]
+            fill(did, by_, bx_, bp_, D * f_d[did], how_of(f_d[did], True))
+    for did in order_d:
+        if f_d[did] < 1.0 - 1e-9:
+            relax_min[did] = f_d[did]
+            exc["odleglosc okregu %.3f D" % f_d[did]] += len(moved_by_d[did]) - need[did]
+    if A.diag:
+        for did in (d for d in order_d if need[d] > 0):
+            print("DIAG", did, cult.get(did, "?"), "moved", len(moved_by_d[did]), "cap", cap_d[did], "ratio %.2f" % ratio[did], "left", need[did],
+                  "own", len(cells_d[did][0]), "band", len(band_d[did][0]))
+    for did in order_d:                              # C: odleglosc obnizana (swoja ziemia, potem pas), az do odleglosci v6
+        if need[did] <= 0:
+            continue
+        ys, xs = cells_d[did]
+        gp = gv_pen(did, ys, xs)
+        by_, bx_, bp_ = band_d[did]
+        f = round(f_d[did] - RELAX_STEP, 3)
+        while need[did] > 0 and f >= PLACE_FLOOR - 1e-6:
+            n0 = need[did]
+            fill(did, ys, xs, gp, D * f, how_of(f, False))
+            if need[did] > 0:
+                fill(did, by_, bx_, bp_, D * f, how_of(f, True))
+            if need[did] < n0:
+                relax_min[did] = f
+                exc["odleglosc %.3f D (reszta)" % f] += n0 - need[did]
+                exc_list.append((did, f, n0 - need[did]))
+            f = round(f - RELAX_STEP, 3)
         while need[did] > 0:
-            p, how = None, None
-            f = 0.95
-            # najpierw 0.95 / 0.90 / 0.85 D na swojej ziemi i u sasiadow (do R_FB), potem 0.85 D dalej (do R_FB2), na koncu do odleglosci v6 (wyspy, waskie pasy ladu)
-            while p is None and f >= RELAX_FLOOR - 1e-6:
-                p = try_place(did, ys, xs, D * f)
-                how = "relax%.2f" % f
-                if p is None and fb is not None:
-                    p = try_place(did, fb[0], fb[1], D * f, pen=FB_PEN + fb[2])
-                    how = "fb-relax%.2f" % f
-                f -= 0.05
-            if p is None:
-                if fb2 is None:
-                    fb2 = fb_cells(did, rfb=R_FB2)
-                if fb2 is not None:
-                    fb2p = (fb2[0], fb2[1], FB_PEN + fb2[2] * (R_FB / R_FB2))
-                    p = try_place(did, fb2[0], fb2[1], D * RELAX_FLOOR, pen=fb2p[2])
-                    how = "far-relax%.2f" % RELAX_FLOOR
-            f = RELAX_FLOOR - 0.05
-            while p is None and D * f >= D_LOW - 1e-6:
-                p = try_place(did, ys, xs, D * f)
-                how = "relax%.2f" % f
-                if p is None and fb is not None:
-                    p = try_place(did, fb[0], fb[1], D * f, pen=FB_PEN + fb[2])
-                    how = "fb-relax%.2f" % f
-                f -= 0.05
             need[did] -= 1
-            if p is None:
-                exc["bez miejsca - zostaje w miejscu v6"] += 1
-                sites[did].append(None)
-                continue
-            exc[how] += 1
-            exc_list.append((did, how))
-            commit(did, p, how)
+            exc["bez miejsca - zostaje w miejscu v6"] += 1
+            sites[did].append(None)
 
     # ---------- 6. przydzial wiosek do miejsc (metoda wegierska w okregu)
     newpos = {}
@@ -1110,25 +1156,226 @@ def main():
         for k, i in enumerate(vill):
             newpos[i] = real[asg[k]]
 
-    # ---------- 6b. rozproszenie: kazda przeniesiona wioska po kolei przechodzi na najlepsze miejsce swojej ziemi (pustka do odstepu S wioski, woda, pola,
-    #             skraj lasu, wzgorza, szum), zawsze >= D od wszystkich - wioski rozchodza sie z ciasnego upakowania po calym ladzie okregu; kilka przebiegow
+    # ---------- 6a. naprawa odstepow (recenzja 18.10): wioska z najmniejszym odstepem (ponizej D) przechodzi na miejsce swojej ziemi albo pasa z najwiekszym odstepem
+    #             od wszystkich osad, dopoki to podnosi jej odstep - najmniejszy odstep swiata nie maleje, ciasny okreg rozchodzi sie rowno (bez par wcisnietych w szpary)
     allx = []; ally = []; owner = []
     for vid, (x, y) in mainv.items():
         allx.append(x); ally.append(y); owner.append(-1)
     for i in kept:
-        allx.append(rows[i]["_x"]); ally.append(rows[i]["_y"]); owner.append(-1)
+        allx.append(rows[i]["_x"]); ally.append(rows[i]["_y"]); owner.append(-2)
     pidx = {}
     for i in sorted(newpos):
         if newpos[i] is None:
-            allx.append(rows[i]["_x"]); ally.append(rows[i]["_y"]); owner.append(-1)
+            allx.append(rows[i]["_x"]); ally.append(rows[i]["_y"]); owner.append(-2)
             continue
         pidx[i] = len(allx)
         allx.append(newpos[i][0]); ally.append(newpos[i][1]); owner.append(i)
     PX = np.array(allx, dtype=np.float64); PY = np.array(ally, dtype=np.float64)
+    n_main = len(mainv)
+
+    def nn_at(k):
+        d_ = np.hypot(PX - PX[k], PY - PY[k])
+        d_[k] = 1e9
+        if k < n_main:
+            d_[:n_main] = 1e9                     # wies gry - wies gry: dane ROT, nie liczone
+        return float(d_.min())
+
+    NN = np.array([nn_at(k) for k in range(len(PX))])
+    movable = np.zeros(len(PX), dtype=bool)
+    for i, k in pidx.items():
+        movable[k] = True
+
+    def cand_cells(i, x_cur, y_cur, with_band):
+        did = rows[i]["village_id"]
+        ys, xs = cells_d[did]
+        pen = open_d[did].copy()
+        if with_band:
+            fb = band_d[did]
+            if len(fb[0]):
+                ys = np.concatenate([ys, fb[0]]); xs = np.concatenate([xs, fb[1]])
+                pen = np.concatenate([pen, fb[2]])
+        if rows[i]["model"] == "fishing" and dsea[int(math.floor(y_cur)), int(math.floor(x_cur))] <= FISH_SITE:
+            wm = dsea[ys, xs] <= FISH_SITE                  # rybacy nad woda zostaja nad woda
+            ys, xs, pen = ys[wm], xs[wm], pen[wm]
+        return ys, xs, pen
+
+    def v6_cand(i):
+        """Miejsce v6 wioski jako kandydat (dokladnie, bez rozrzutu): gdy na ziemi okregu albo w pasie, od warowni i zajazdow jak kazde miejsce; inaczej None.
+        Ciasny okreg nie wypada gorzej niz v6 - wioska moze wrocic na swoje miejsce v6, gdy tam ma wiekszy odstep."""
+        x6, y6 = rows[i]["_x"], rows[i]["_y"]
+        if land_at(rows[i]["village_id"], x6, y6) < 0:
+            return None
+        if np.hypot(TWX[:, 0] - x6, TWX[:, 1] - y6).min() < D_TOWN or np.hypot(CSX[:, 0] - x6, CSX[:, 1] - y6).min() < D_CASTLE:
+            return None
+        # zajazd planu blisko miejsca v6 (inn = True): tylko w ostatecznosci (naprawa, gdy wioska stoi ciasniej niz najciasniej w v6) - wtedy wioska ma pierwszenstwo
+        # (krok 3 zajazdow - zajazdy_gen.py --plan-in - odrzuca zajazd przy wiosce)
+        inn = bool(INX is not None and np.hypot(INX[:, 0] - x6, INX[:, 1] - y6).min() < inn_min)
+        return (x6, y6, min(W - 1, int(math.floor(x6))), min(H - 1, int(math.floor(y6))), inn)
+
+    v6c = {i: v6_cand(i) for i in pidx}
+
+    def dn_cells(k0, xs, ys, reach):
+        ccx = xs.astype(np.float64) + 0.5; ccy = ys.astype(np.float64) + 0.5
+        x0b, x1b, y0b, y1b = ccx.min() - reach - 1, ccx.max() + reach + 1, ccy.min() - reach - 1, ccy.max() + reach + 1
+        sel = (PX >= x0b) & (PX <= x1b) & (PY >= y0b) & (PY <= y1b)
+        sel[k0] = False
+        qx, qy = PX[sel], PY[sel]
+        dn = np.full(len(xs), 1e6)
+        for c0 in range(0, len(qx), 64):
+            d2 = (ccx[:, None] - qx[None, c0:c0 + 64]) ** 2 + (ccy[:, None] - qy[None, c0:c0 + 64]) ** 2
+            np.minimum(dn, np.sqrt(d2.min(axis=1)), out=dn)
+        return dn
+
+    # rownanie odstepow (recenzja 18.10): energia odpychania E = suma max(0, RC - d)^2 do wszystkich osad (RC = E_CUT x D) - wioska przechodzi na komorke swojej
+    # ziemi albo pasa o najmniejszej energii; w ciasnym okregu scisk rozklada sie rowno na wszystkie wioski (zamiast jednej pary wcisnietej w szpare), w luznym
+    # (odstepy > RC) nic sie nie rusza
+    RC = E_CUT * D
+
+    def energy_cells(k0, xs, ys):
+        ccx = xs.astype(np.float64) + 0.5; ccy = ys.astype(np.float64) + 0.5
+        sel = (PX >= ccx.min() - RC - 1) & (PX <= ccx.max() + RC + 1) & (PY >= ccy.min() - RC - 1) & (PY <= ccy.max() + RC + 1)
+        sel[k0] = False
+        qx, qy = PX[sel], PY[sel]
+        E = np.zeros(len(xs)); dn = np.full(len(xs), 1e6)
+        for c0 in range(0, len(qx), 64):
+            dd = np.sqrt((ccx[:, None] - qx[None, c0:c0 + 64]) ** 2 + (ccy[:, None] - qy[None, c0:c0 + 64]) ** 2)
+            E += (np.maximum(0.0, RC - dd) ** 2).sum(axis=1)
+            np.minimum(dn, dd.min(axis=1), out=dn)
+        return E, dn
+
+    def energy_pt(k0, x, y):
+        dd = np.hypot(PX - x, PY - y)
+        dd[k0] = 1e9
+        return float((np.maximum(0.0, RC - dd) ** 2).sum()), float(dd.min())
+
+    e_moves = Counter()
+    e_start = float(NN[movable].min()) if movable.any() else 0.0
+    for sweep in range(E_SWEEPS):
+        act = [k for k in np.flatnonzero(movable).tolist() if NN[k] < RC]
+        act.sort(key=lambda k: (NN[k], k))
+        nmove = 0
+        for k0 in act:
+            i = owner[k0]
+            did = rows[i]["village_id"]
+            e_cur, d_cur = energy_pt(k0, PX[k0], PY[k0])
+            if e_cur <= 1e-9:
+                continue
+            e_cur += E_BAND * (point_pen(did, PX[k0], PY[k0]) > 0)
+            ys, xs, pen = cand_cells(i, PX[k0], PY[k0], True)
+            if len(xs) == 0:
+                continue
+            E, dn = energy_cells(k0, xs, ys)
+            sc = E + E_BAND * (pen > 0)
+            idx = np.argsort(sc, kind="stable")[:40]
+            best = None
+            c6 = v6c.get(i)
+            if c6 is not None and not c6[4] and math.hypot(c6[0] - PX[k0], c6[1] - PY[k0]) > 0.01:
+                e6, _ = energy_pt(k0, c6[0], c6[1])
+                e6 += E_BAND * (point_pen(did, c6[0], c6[1]) > 0)
+                if e6 < e_cur - E_GAIN:
+                    best = (e6, c6[0], c6[1], c6[2], c6[3], land_at(did, c6[0], c6[1]))
+            for k in idx.tolist():
+                if sc[k] >= e_cur - E_GAIN or (best is not None and sc[k] >= best[0]):
+                    break
+                jx = (u01("%s|%d|%d|ex" % (rows[i]["uid"], xs[k], ys[k])) - 0.5) * 0.6
+                jy = (u01("%s|%d|%d|ey" % (rows[i]["uid"], xs[k], ys[k])) - 0.5) * 0.6
+                x1, y1 = float(xs[k]) + 0.5 + jx, float(ys[k]) + 0.5 + jy
+                jxi, jyi = int(math.floor(x1)), int(math.floor(y1))
+                if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1) or not fort_ok(x1, y1):
+                    continue
+                e_new, d_new = energy_pt(k0, x1, y1)
+                e_new += E_BAND * (point_pen(did, x1, y1) > 0)
+                if e_new >= e_cur - E_GAIN or (best is not None and e_new >= best[0]):
+                    continue
+                la_ = land_at(did, x1, y1)
+                if la_ < 0:
+                    continue
+                best = (e_new, x1, y1, jxi, jyi, la_)
+                break
+            if best is not None:
+                _, x1, y1, jxi, jyi, la_ = best
+                ox, oy = PX[k0], PY[k0]
+                PX[k0], PY[k0] = x1, y1
+                newpos[i] = (x1, y1, jxi, jyi, "own" if la_ == 0 else "fb")
+                near_ = np.flatnonzero((np.hypot(PX - ox, PY - oy) <= RC + 1) | (np.hypot(PX - x1, PY - y1) <= RC + 1))
+                for kk in near_.tolist():
+                    NN[kk] = nn_at(kk)
+                NN[k0] = nn_at(k0)
+                nmove += 1
+        e_moves[sweep] = nmove
+        if nmove == 0:
+            break
+    e_end = float(NN[movable].min()) if movable.any() else 0.0
+    stuck = set()
+    rep_moves = 0
+    nn_start = float(NN[movable].min()) if movable.any() else 0.0
+    for it in range(REPAIR_IT):
+        cand = np.where(movable & (NN < D - 1e-6), NN, np.inf)
+        if stuck:
+            cand[list(stuck)] = np.inf
+        k0 = int(np.argmin(cand))
+        if not np.isfinite(cand[k0]):
+            break
+        i = owner[k0]
+        did = rows[i]["village_id"]
+        ys, xs, pen = cand_cells(i, PX[k0], PY[k0], True)
+        if len(xs) == 0:
+            stuck.add(k0)
+            continue
+        dn = dn_cells(k0, xs, ys, D + 2.0)
+        sc = np.minimum(dn, D) - REPAIR_BAND * (pen > 0)
+        idx = np.argsort(-sc, kind="stable")[:80]
+        moved_ = False
+        best = None
+        c6 = v6c.get(i)
+        if c6 is not None and (not c6[4] or NN[k0] < D_LOW - 1e-6) and math.hypot(c6[0] - PX[k0], c6[1] - PY[k0]) > 0.01:
+            dd_ = np.hypot(PX - c6[0], PY - c6[1])
+            dd_[k0] = 1e9
+            if float(dd_.min()) > NN[k0] + REPAIR_GAIN:
+                best = (float(dd_.min()), c6[0], c6[1], c6[2], c6[3], land_at(did, c6[0], c6[1]))
+        for k in idx.tolist():
+            if dn[k] <= NN[k0] + REPAIR_GAIN or (best is not None and dn[k] <= best[0]):
+                break
+            jx = (u01("%s|%d|%d|qx" % (rows[i]["uid"], xs[k], ys[k])) - 0.5) * 0.6
+            jy = (u01("%s|%d|%d|qy" % (rows[i]["uid"], xs[k], ys[k])) - 0.5) * 0.6
+            x1, y1 = float(xs[k]) + 0.5 + jx, float(ys[k]) + 0.5 + jy
+            jxi, jyi = int(math.floor(x1)), int(math.floor(y1))
+            if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1) or not fort_ok(x1, y1):
+                continue
+            dd_ = np.hypot(PX - x1, PY - y1)
+            dd_[k0] = 1e9
+            dnew = float(dd_.min())
+            if dnew <= NN[k0] + REPAIR_GAIN or (best is not None and dnew <= best[0]):
+                continue
+            la_ = land_at(did, x1, y1)
+            if la_ < 0:
+                continue
+            best = (dnew, x1, y1, jxi, jyi, la_)
+            break
+        if best is not None:
+            _, x1, y1, jxi, jyi, la_ = best
+            ox, oy = PX[k0], PY[k0]
+            PX[k0], PY[k0] = x1, y1
+            newpos[i] = (x1, y1, jxi, jyi, "own" if la_ == 0 else "fb")
+            near_ = np.flatnonzero((np.hypot(PX - ox, PY - oy) <= 2.5 * D) | (np.hypot(PX - x1, PY - y1) <= 2.5 * D))
+            for kk in near_.tolist():
+                NN[kk] = nn_at(kk)
+                stuck.discard(kk)
+            NN[k0] = nn_at(k0)
+            rep_moves += 1
+            moved_ = True
+        if not moved_:
+            stuck.add(k0)
+    nn_end = float(NN[movable].min()) if movable.any() else 0.0
+
+    # ---------- 6b. rozproszenie: kazda przeniesiona wioska po kolei przechodzi na najlepsze miejsce swojej ziemi (pustka do odstepu S wioski, woda, pola,
+    #             skraj lasu, wzgorza, szum) - wioski rozchodza sie z ciasnego upakowania po calym ladzie okregu; kilka przebiegow. Prog odstepu kazdej osady (FL):
+    #             min(D, odstep po naprawie) - przejscie nie zbliza wioski do zadnej osady ponizej wiekszego z obu progow (najmniejszy odstep swiata nie maleje)
+    FL = np.minimum(NN, D)
+    FL[:n_main] = 0.0                                   # wies gry: prog niesie wioska
     S2 = {}
     for did, rs in dist.items():
-        li = vidx.get(did)
-        a = float(A_d[li]) if li is not None else 0.0
+        a = float(A_d[did])
         S2[did] = max(D, min(S_CAP, S_HEX * math.sqrt(a / (len(rs) + 1)) if a > 0 else D))
     moves = Counter()
     relax_order = sorted(pidx, key=lambda i: fnv1a(rows[i]["uid"] + "|relax"))
@@ -1139,74 +1386,66 @@ def main():
             did = r["village_id"]
             k0 = pidx[i]
             x_cur, y_cur = PX[k0], PY[k0]
-            ys, xs = cells_d[did]
-            pen = np.zeros(len(xs), dtype=np.float32)
-            how0 = newpos[i][4]
-            if how0 != "own":
-                fb = fb_cells(did, rfb=RELAX_FB_R, around=(x_cur, y_cur))
-                if fb is not None and len(fb[0]):
-                    ys = np.concatenate([ys, fb[0]]); xs = np.concatenate([xs, fb[1]])
-                    pen = np.concatenate([pen, FB_PEN + fb[2]])
-            if r["model"] == "fishing" and dsea[int(math.floor(y_cur)), int(math.floor(x_cur))] <= FISH_SITE:
-                wm = dsea[ys, xs] <= FISH_SITE                  # rybacy nad woda zostaja nad woda
-                ys, xs, pen = ys[wm], xs[wm], pen[wm]
+            fl_i = float(FL[k0])
+            ys, xs, pen = cand_cells(i, x_cur, y_cur, newpos[i][4] != "own" or fl_i < D - 1e-6)
             if len(xs) == 0:
                 continue
             Sv = S2[did] * (0.8 + 0.4 * u01(r["uid"] + "|S"))
-            dmin_i = D if how0 in ("own", "fb") else D * float(how0.split("relax")[1])
-            ccx = xs.astype(np.float64) + 0.5; ccy = ys.astype(np.float64) + 0.5
-            x0b, x1b, y0b, y1b = ccx.min() - Sv - 1, ccx.max() + Sv + 1, ccy.min() - Sv - 1, ccy.max() + Sv + 1
-            sel = (PX >= x0b) & (PX <= x1b) & (PY >= y0b) & (PY <= y1b)
-            sel[k0] = False
-            qx, qy = PX[sel], PY[sel]
-            if len(qx):
-                dn = np.full(len(xs), 1e6)
-                for c0 in range(0, len(qx), 64):
-                    d2 = (ccx[:, None] - qx[None, c0:c0 + 64]) ** 2 + (ccy[:, None] - qy[None, c0:c0 + 64]) ** 2
-                    np.minimum(dn, np.sqrt(d2.min(axis=1)), out=dn)
-            else:
-                dn = np.full(len(xs), 1e6)
+            dn = dn_cells(k0, xs, ys, Sv)
             fishv = r["model"] == "fishing"
             sc0 = np.minimum(dn, Sv) / Sv + BETA * attr[ys, xs] + GAMMA * noise[ys, xs] - pen
             if fishv:
                 sc0 = sc0 + np.where(dsea[ys, xs] <= FISH_SITE, FISH_BONUS, 0.0)
             # wynik obecnego miejsca (ta sama miara)
             cix, ciy = int(math.floor(x_cur)), int(math.floor(y_cur))
-            d_cur = np.sqrt((qx - x_cur) ** 2 + (qy - y_cur) ** 2).min() if len(qx) else 1e6
-            in_own = 0 <= ciy < H and 0 <= cix < W and terr_lab[ciy, cix] == vidx.get(did, -99)
-            mvx_, mvy_ = mainv.get(did, (x_cur, y_cur))
-            pen_cur = 0.0 if in_own else FB_PEN + math.hypot(x_cur - mvx_, y_cur - mvy_) / R_FB
+            dcur_ = np.hypot(PX - x_cur, PY - y_cur)
+            dcur_[k0] = 1e9
+            d_cur = float(dcur_.min())
+            pen_cur = point_pen(did, x_cur, y_cur)
             sc_cur = min(d_cur, Sv) / Sv + BETA * float(attr[ciy, cix]) + GAMMA * float(noise[ciy, cix]) - pen_cur + (FISH_BONUS if fishv and dsea[ciy, cix] <= FISH_SITE else 0.0)
-            passes = [D] if how0 in ("own", "fb") else [D, dmin_i]
-            done = False
-            for dm in passes:
-                sc = np.where(dn >= dm, sc0, -1e9)
-                base = sc_cur if d_cur >= dm - 1e-6 else -1e8
-                idx = np.argsort(-sc, kind="stable")[:60]
-                for k in idx.tolist():
-                    if sc[k] < -1e8 or sc[k] <= base + RELAX_GAIN:
-                        break
-                    jx = (u01("%s|%d|%d|rx" % (r["uid"], xs[k], ys[k])) - 0.5) * 0.6
-                    jy = (u01("%s|%d|%d|ry" % (r["uid"], xs[k], ys[k])) - 0.5) * 0.6
-                    x1, y1 = float(xs[k]) + 0.5 + jx, float(ys[k]) + 0.5 + jy
-                    jxi, jyi = int(math.floor(x1)), int(math.floor(y1))
-                    if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1) or not fort_ok(x1, y1):
-                        continue
-                    dd_ = np.sqrt((PX - x1) ** 2 + (PY - y1) ** 2)
-                    dd_[k0] = 1e9
-                    if dd_.min() < dm:
-                        continue
-                    own_new = terr_lab[jyi, jxi] == vidx.get(did, -99)
-                    PX[k0], PY[k0] = x1, y1
-                    newpos[i] = (x1, y1, jxi, jyi, ("own" if own_new else "fb") if dm >= D - 1e-6 else how0)
-                    nmove += 1
-                    moves[sweep] += 1
-                    done = True
+            sc = np.where(dn >= fl_i, sc0, -1e9)
+            idx = np.argsort(-sc, kind="stable")[:60]
+            for k in idx.tolist():
+                if sc[k] < -1e8 or sc[k] <= sc_cur + RELAX_GAIN:
                     break
-                if done:
-                    break
+                jx = (u01("%s|%d|%d|rx" % (r["uid"], xs[k], ys[k])) - 0.5) * 0.6
+                jy = (u01("%s|%d|%d|ry" % (r["uid"], xs[k], ys[k])) - 0.5) * 0.6
+                x1, y1 = float(xs[k]) + 0.5 + jx, float(ys[k]) + 0.5 + jy
+                jxi, jyi = int(math.floor(x1)), int(math.floor(y1))
+                if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1) or not fort_ok(x1, y1):
+                    continue
+                dd_ = np.hypot(PX - x1, PY - y1)
+                dd_[k0] = 1e9
+                if (dd_ < np.maximum(FL, fl_i) - 1e-9).any():
+                    continue                            # blizej niz prog tej wioski albo osady obok
+                la_ = land_at(did, x1, y1)
+                if la_ < 0:
+                    continue                            # punkt po rozrzucie poza ziemia okregu i pasem
+                PX[k0], PY[k0] = x1, y1
+                newpos[i] = (x1, y1, jxi, jyi, "own" if la_ == 0 else "fb")
+                nmove += 1
+                moves[sweep] += 1
+                break
         if nmove == 0:
             break
+    if A.diag:
+        for v_, i in sorted((nn_at(k), i) for i, k in pidx.items())[:40]:
+            did = rows[i]["village_id"]
+            print("DIAG najciasniej %.2f %s %s wiosek %d ziemia %d pas %d f_d %s (v6 %.2f)" % (v_, did, cult.get(did), len(dist[did]), len(cells_d[did][0]), len(band_d[did][0]),
+                                                                                         f_d.get(did), nn6_ss[i]))
+    # wioska, ktora wrocila na swoje miejsce v6 (ciasny okreg - tam ma wiekszy odstep), zostaje wioska v6 (miejsce, obrazek, lore jak v6)
+    back_v6 = set()
+    for i in list(pidx):
+        if math.hypot(newpos[i][0] - rows[i]["_x"], newpos[i][1] - rows[i]["_y"]) < 0.01:
+            back_v6.add(i)
+    # odstep koncowy kazdej przeniesionej wioski (raport: obnizona odleglosc = ponizej D)
+    for i, k in pidx.items():
+        x1, y1, jxi, jyi, how = newpos[i]
+        band_ = land_at(rows[i]["village_id"], x1, y1) == 1
+        if nn_at(k) < D - 1e-6:
+            newpos[i] = (x1, y1, jxi, jyi, "fb-relax" if band_ else "relax")
+        else:
+            newpos[i] = (x1, y1, jxi, jyi, "fb" if band_ else "own")
 
     # ---------- 7. miejsce, obrazek, zajecie przeniesionych wiosek
     used_names = set(r["name"] for r in rows)
@@ -1238,7 +1477,7 @@ def main():
         sea_comp[key] = (kind, seen if kind == "lake" else {key})
         return kind
 
-    moved = [i for i in range(len(rows)) if i in newpos and newpos[i] is not None]
+    moved = [i for i in range(len(rows)) if i in newpos and newpos[i] is not None and i not in back_v6]
     stayed_v6 = [i for i in range(len(rows)) if i in newpos and newpos[i] is None]
     for i in moved:
         r = rows[i]
@@ -1326,7 +1565,7 @@ def main():
         if rows[i]["_n"]["cat"] == "hamlet" and rows[i]["_s7"] > H_HI:
             rows[i]["_n"]["cat"] = "wild"
     # obrazek, poziom, zajecie i nazwa
-    occ_n = Counter(); start_n = Counter(); start6_n = Counter(); place_n = Counter(); model_n = Counter(); renamed = 0
+    occ_n = Counter(); start_n = Counter(); start6_n = Counter(); place_n = Counter(); model_n = Counter(); renamed = 0; renamed_h6 = 0
     for i in moved:
         r = rows[i]; h = r["_n"]
         people = r["_s7"] * 250
@@ -1385,6 +1624,10 @@ def main():
             if not (r["_h6"] and r["hamlet"] == occ):
                 nm = hamlet_name(occ, h["place"], r["uid"], used_names)
                 used_names.add(nm)
+        elif r["_h6"] and cul in WESTEROS and not (r["hamlet"] == "fishers" and model == "fishing"):
+            nm = farm_name(cat, h["place"], r["uid"], used_names)      # dawny przysiolek v6 (nazwa z zajecia) - teraz wies rolnikow / nad woda
+            used_names.add(nm)
+            renamed_h6 += 1
         if nm != r["name"]:
             renamed += 1
         h["name"] = nm
@@ -1428,7 +1671,26 @@ def main():
             r["_lv"] = r["_n"]["level"]
 
     # ---------- miary v7
-    pos7 = [(r["_n"]["x"], r["_n"]["y"]) if r["uid"] in mset else (r["_x"], r["_y"]) for r in rows]
+    def land_stats(pts):
+        """(na ziemi innego okregu, innej kultury, innego krolestwa, daleko obca) - te same miary co sprawdz_v7.py (komorka sondy gry)."""
+        n_d = n_c = n_k = n_far = 0
+        for k, r in enumerate(rows):
+            x, y = pts[k]
+            vid = r["village_id"]
+            mx, my = mainv[vid]
+            dm = math.hypot(x - mx, y - my)
+            if dm > 2.0 * float(np.hypot(MX[:, 0] - x, MX[:, 1] - y).min()) and dm > 40.0:
+                n_far += 1
+            g = geo_cell(x, y)
+            if g is None:
+                continue
+            hc, hk = home[vid]
+            n_d += g[0] != vidx.get(vid, -99)
+            n_c += g[1] != hc
+            n_k += g[2] != hk
+        return n_d, n_c, n_k, n_far
+
+    pos7 = [(round(r["_n"]["x"], 2), round(r["_n"]["y"], 2)) if r["uid"] in mset else (r["_x"], r["_y"]) for r in rows]   # jak w pliku (2 miejsca)
     nn7_ss = nn_list(pos7)
     nn7_sm = nn_list(pos7, mains)
 
@@ -1469,16 +1731,24 @@ def main():
     cov7 = coverage(pos7)
 
     # ---------- zapis ukladu v7 (kolejnosc wierszy jak v6 = v5; nowe kolumny v6_* na koncu)
+    # recenzja 18.10: naglowek min_distance = prawdziwe minimum pliku (wioska-wioska i wioska-wies gry, w dol do 0.01) - VillageHamlets liczy wioski ponizej
+    # niego (0); target_distance = 2 x v6 (regula tam, gdzie okreg ma miejsce)
+    md_real = math.floor(min(float(nn7_ss.min()), float(nn7_sm.min())) * 100.0 - 1e-6) / 100.0
+    n_tight7 = len({rows[k]["village_id"] for k in range(len(rows)) if min(float(nn7_ss[k]), float(nn7_sm[k])) < D - 1e-6})
     v6cols = ["v6_order", "v6_x", "v6_y", "v6_settlements"]
     out = ["# Armoury: named map villages (layout v7: villages spread over the whole land of their district - from layout v6, the same villages and people per district). One row = one map village"]
     for hline in head[1:]:
         if hline[1:].startswith("id\t"):
-            out.append("# v7 (tools/wioski-v7/v7_uklad.py from arm_map_villages_v6.tsv): minimum distance village-village and village-game village %.2f (2 x v6 %.2f); %d villages"
+            out.append("# v7 (tools/wioski-v7/v7_uklad.py from arm_map_villages_v6.tsv): target distance village-village and village-game village %.2f (2 x v6 %.2f); %d villages"
                        % (D, v6_min, len(moved)))
             out.append("# of crowded clusters moved to the empty land of their district (water, fields, forest edges, hills); people of the moved villages of a district")
-            out.append("# shared among them by their new place (district sum = v6). ks_* = land of the point for KS for every moved village (and v6 hamlets); hamlet = occupation.")
-            out.append("# v6_order / v6_x / v6_y / v6_settlements = the same row in layout v6 (every row): a save of layout v6 maps by uid from this file alone.")
-            out.append("# min_distance: %.2f" % D)
+            out.append("# shared among them by their new place (district sum = v6). A village stands on the land of its own district (its nearest game village) or in a narrow")
+            out.append("# band past the border (same culture and realm, <= %.0f from its game village); in %d crowded districts without room at the target distance the"
+                       % (BAND_R, n_tight7))
+            out.append("# villages stand closer instead (min_distance = the real minimum of this file). ks_* = land of the point for KS for every moved village (and v6 hamlets);")
+            out.append("# hamlet = occupation. v6_order / v6_x / v6_y / v6_settlements = the same row in layout v6 (every row): a save of layout v6 maps by uid from this file alone.")
+            out.append("# min_distance: %.2f" % md_real)
+            out.append("# target_distance: %.2f" % D)
             out.append(hline + "\t" + "\t".join(v6cols))
             continue
         out.append(hline)
@@ -1522,7 +1792,7 @@ def main():
             f.write("\n".join(out) + "\n")
 
     # ---------- lore v7: wiersze v6; przeniesione - zdanie miejsca, mlyn / sieci bez wody, historia "o drodze"; przysiolki jak v6
-    lore_out, lore_rows, lore_seen, lore_moved, knight_ren, lore_mill, lore_fish, lore_hist = [], 0, set(), 0, 0, 0, 0, 0
+    lore_out, lore_rows, lore_seen, lore_moved, knight_ren, lore_mill, lore_fish, lore_hist, lore_h6 = [], 0, set(), 0, 0, 0, 0, 0, 0
     lcols = None
     for raw in io.open(IN_LORE, encoding="utf-8-sig"):
         line = raw.rstrip("\r\n")
@@ -1558,7 +1828,11 @@ def main():
             else:
                 live = c[li["livelihood"]].strip()
                 if r["_h6"]:
-                    live = "Farmers: grain, beans and a few cattle on the land they cleared."   # dawny przysiolek na polu / nad woda
+                    # dawny przysiolek na polu / nad woda: zajecie i historia wsi (recenzja: bez zdan "of the hamlet")
+                    live = ("Fishers: a few boats on the shore, nets drying and fish salted for the market." if h["model"] == "fishing"
+                            else "Farmers: grain, beans and a few cattle on the land they cleared.")
+                    c[li["history"]] = NEW_HIST[fnv1a(uid + "|hist7") % len(NEW_HIST)]
+                    lore_h6 += 1
                 for rx in OLD_PLACE_RX:
                     live2 = rx.sub("", live).strip()
                     if live2 != live:
@@ -1574,7 +1848,7 @@ def main():
                 np_ = NEW_PLACE_WILD.get(h["place"], NEW_PLACE["field"]) if h["cat"] == "wild" else NEW_PLACE[h["cat"] if h["cat"] in NEW_PLACE else "field"]
                 live = (live + " " + np_[fnv1a(uid + "|place7") % len(np_)]).strip()
                 c[li["livelihood"]] = live
-                if ROAD_HIST.search(c[li["history"]] or ""):
+                if not r["_h6"] and ROAD_HIST.search(c[li["history"]] or ""):
                     c[li["history"]] = NEW_HIST[fnv1a(uid + "|hist7") % len(NEW_HIST)]
                     lore_hist += 1
             old = r["name"]
@@ -1617,16 +1891,41 @@ def main():
     rep.append("odleglosc minimalna D = 2 x min v6 wioska-wioska %.2f = %.2f jedn. (v6 wioska-wies gry min %.2f); odstep docelowy okregu S = %.2f x sqrt(ziemia / (wioski + wies gry)) w granicach D..%.0f:"
                " mediana %.1f, 10%% %.1f, 90%% %.1f" % (v6_min, D, s6sm["min"], S_HEX, S_CAP, float(np.median(list(S_d.values()))),
                                                      float(np.percentile(list(S_d.values()), 10)), float(np.percentile(list(S_d.values()), 90))))
-    rep.append("wiosek pobocznych %d (te same uid, okregow %d); zostaly w miejscu v6 %d, przeniesione %d = %.1f%% (bez miejsca - zostaly w v6 mimo regul %d)" % (
-        len(rows), len(dist), len(kept) + len(stayed_v6), len(moved), 100.0 * len(moved) / len(rows), len(stayed_v6)))
+    rep.append("wiosek pobocznych %d (te same uid, okregow %d); zostaly w miejscu v6 %d (w tym wrocily na miejsce v6 - ciasny okreg, tam wiekszy odstep - %d), przeniesione %d = %.1f%%"
+               " (bez miejsca - zostaly w v6 mimo regul %d)" % (len(rows), len(dist), len(kept) + len(stayed_v6) + len(back_v6), len(back_v6), len(moved),
+                                                                100.0 * len(moved) / len(rows), len(stayed_v6)))
     rep.append("przeniesione na: ziemie swojego okregu %d, ziemie sasiada na tym samym ladzie %d, z obnizona odlegloscia %d (%s)" % (
         sum(1 for i in moved if rows[i]["_n"]["how"] == "own"), sum(1 for i in moved if rows[i]["_n"]["how"] == "fb"),
         sum(1 for i in moved if rows[i]["_n"]["how"] not in ("own", "fb")), ", ".join("%s %d" % kv for kv in sorted(Counter(rows[i]["_n"]["how"] for i in moved if rows[i]["_n"]["how"] not in ("own", "fb")).items())) or "-"))
     rep.append("przesuniecie: min %.1f, mediana %.1f, 90%% %.1f, max %.1f jedn." % (min(mvd), float(np.median(mvd)), float(np.percentile(mvd, 90)), max(mvd)) if mvd else "przesuniecie: -")
+    rep.append("rownanie odstepow (6a, energia do %.2f x D): przejsc w przebiegach %s, najmniejszy odstep przeniesionych %.2f -> %.2f; naprawa najmniejszego odstepu: przejsc %d,"
+               " %.2f -> %.2f; rozproszenie (6b): przejsc w przebiegach %s" % (E_CUT, ", ".join(str(e_moves[k]) for k in sorted(e_moves)) or "-", e_start, e_end,
+                                                                                rep_moves, nn_start, nn_end, ", ".join(str(moves[k]) for k in sorted(moves)) or "-"))
     rep.append("najblizsza wioska (wioska-wioska): v6 min %.2f / 10%% %.2f / mediana %.2f / srednia %.2f; v7 min %.2f / 10%% %.2f / mediana %.2f / srednia %.2f" % (
         s6ss["min"], s6ss["p10"], s6ss["med"], s6ss["mean"], s7ss["min"], s7ss["p10"], s7ss["med"], s7ss["mean"]))
     rep.append("najblizsza wies gry (wioska-wies gry): v6 min %.2f / 10%% %.2f / mediana %.2f; v7 min %.2f / 10%% %.2f / mediana %.2f" % (
         s6sm["min"], s6sm["p10"], s6sm["med"], s7sm["min"], s7sm["p10"], s7sm["med"]))
+    nn7_all = np.minimum(nn7_ss, nn7_sm)
+    nn6_all = np.minimum(nn6_ss, nn6_sm)
+    rep.append("najblizsza osada (wioska albo wies gry) ponizej x D: " + ", ".join("%.1f D (%.2f): v6 %d / v7 %d" % (f_, f_ * D, int((nn6_all < f_ * D - 1e-6).sum()), int((nn7_all < f_ * D - 1e-6).sum()))
+                                                                          for f_ in (0.6, 0.7, 0.8, 0.9, 1.0)))
+    # wedlug kultury okregu (recenzja 18.10): ile ladu kultury przypada na osade (wioski + wsie gry) wobec heksu przy D - gdzie lad kultury nie miesci wiosek przy D,
+    # odstep v7 jest mniejszy (wioski nie wychodza na ziemie innej kultury)
+    inv_c = {v: k for k, v in cul_code.items()}
+    land_c = np.bincount(r_cul[(r_cul >= 0) & walk & (~sea)], minlength=len(cul_code))
+    by_hc = defaultdict(list)
+    for k, r in enumerate(rows):
+        by_hc[home[r["village_id"]][0]].append(k)
+    ng_hc = Counter(home[d_][0] for d_ in dist)
+    cl_ = []
+    for c_, ks in by_hc.items():
+        if c_ < 0 or len(ks) < 5:
+            continue
+        lp = land_c[c_] / float(len(ks) + ng_hc[c_])
+        cl_.append((lp / (0.866 * D * D), inv_c[c_], len(ks), float(np.median(nn6_all[ks])), float(np.median(nn7_all[ks])), int((nn7_all[ks] < D - 1e-6).sum())))
+    cl_.sort()
+    rep.append("wedlug kultury okregu (lad kultury na osade / heks przy D; mediana najblizszej osady v6 -> v7; ponizej D): " + "; ".join(
+        "%s %d wiosek %.2f: %.1f -> %.1f, %d" % (nm_, n_, q_, m6_, m7_, b_) for q_, nm_, n_, m6_, m7_, b_ in cl_))
     rep.append("pary ponizej D: wioska-wioska v6 %d -> v7 %d, wioska-wies gry v6 %d -> v7 %d; wies gry - wies gry (dane ROT, bez zmian) %d wsi ponizej D, min %.2f" % (
         int((nn6_ss < D).sum()), below_ss, int((nn6_sm < D).sum()), below_sm, int((mm < D).sum()), float(mm.min())))
     rep.append("skupiska (wiosek z >= 3 sasiadami w 10 jedn.): v6 %d, v7 %d; najwiecej sasiadow v6 %d, v7 %d; srednio v6 %.2f, v7 %.2f" % (c6[0], c7[0], c6[1], c7[1], c6[2], c7[2]))
@@ -1659,11 +1958,12 @@ def main():
     dmain6 = [math.hypot(r["_x"] - mainv[r["village_id"]][0], r["_y"] - mainv[r["village_id"]][1]) for r in rows]
     dmain7 = [math.hypot(pos7[k][0] - mainv[r["village_id"]][0], pos7[k][1] - mainv[r["village_id"]][1]) for k, r in enumerate(rows)]
     out_lab7 = sum(1 for k, r in enumerate(rows) if tlab[int(pos7[k][1]), int(pos7[k][0])] != vidx.get(r["village_id"], -99))
-    out_ter7 = sum(1 for k, r in enumerate(rows) if not in_terr(r["village_id"], pos7[k][0], pos7[k][1]))
-    rep.append("od wlasnej wsi gry: v6 mediana %.1f / 90%% %.1f / max %.1f, v7 mediana %.1f / 90%% %.1f / max %.1f jedn.; poza ziemia okregu KS (raster okregow) v6 0, v7 %d;"
-               " poza ziemia okregu v7 (Voronoi wazony, okregow ponad pojemnosc %d z %d) %d" % (
-                   float(np.median(dmain6)), float(np.percentile(dmain6, 90)), max(dmain6), float(np.median(dmain7)), float(np.percentile(dmain7, 90)), max(dmain7),
-                   out_lab7, terr_hist[-1] if terr_hist else -1, len(wins), out_ter7))
+    ls6, ls7 = land_stats(side6), land_stats(pos7)
+    rep.append("ziemia wioski (sonda gry geo-siatka, jak tools/wioski-v7/sprawdz_v7.py): na ziemi innego okregu v6 %d -> v7 %d (pas przy granicy: <= %.0f jedn. od wsi gry"
+               " i <= %.1f x odleglosc do najblizszej wsi gry), innej kultury %d -> %d, innego krolestwa %d -> %d, daleko obca (> 2 x najblizsza wies gry i > 40 jedn.) %d -> %d" % (
+                   ls6[0], ls7[0], BAND_R, BAND_K, ls6[1], ls7[1], ls6[2], ls7[2], ls6[3], ls7[3]))
+    rep.append("od wlasnej wsi gry: v6 mediana %.1f / 90%% %.1f / max %.1f, v7 mediana %.1f / 90%% %.1f / max %.1f jedn.; poza rasterem okregow KS v6 0, v7 %d" % (
+        float(np.median(dmain6)), float(np.percentile(dmain6, 90)), max(dmain6), float(np.median(dmain7)), float(np.percentile(dmain7, 90)), max(dmain7), out_lab7))
     if inn_pts:
         di = []
         for k, r in enumerate(rows):
@@ -1679,7 +1979,8 @@ def main():
     rep.append("wioski z obrazkiem rybackim (HamletKinds poza KS): v6 %d, v7 %d" % (fish6, fish7))
     rep.append("wioski z ziemia KS (kolumny ks_*): v6 %d, v7 %d" % (sum(1 for r in rows if r["ks_start"] != "-"),
                                                                     sum(1 for r in rows if r["uid"] in mset or r["ks_start"] != "-")))
-    rep.append("nazwy: zmienione %d (Westeros - przysiolki z nowym zajeciem); rycerz 'of <nazwa>' przemianowany %d" % (renamed, knight_ren))
+    rep.append("nazwy: zmienione %d (Westeros - przysiolki z nowym zajeciem %d, dawne przysiolki v6 teraz wsie na polu / nad woda %d); rycerz 'of <nazwa>' przemianowany %d;"
+               " lore dawnych przysiolkow (zajecie i historia wsi) %d" % (renamed, renamed - renamed_h6, renamed_h6, knight_ren, lore_h6))
     rep.append("lore v7: wierszy %d (wiosek %d, bez lore %d), przeniesionych z nowym zdaniem miejsca %d (mlyn bez wody %d, rybacy bez wody %d, historia 'o drodze' %d), bramka layout_crc %08X" % (
         lore_rows, len(rows), len(set(by_uid) - lore_seen), lore_moved, lore_mill, lore_fish, lore_hist, crc7))
     rep.append("od warowni (przeniesione, dokladnie): miasto min %.2f (prog %.0f), zamek min %.2f (%.0f), kryjowka min %.1f (%.0f); od malowanej drogi min %.1f (%.1f)" % (
@@ -1689,10 +1990,19 @@ def main():
     rep.append("na ladzie (przeniesione): raster %d/%d, sonda gry %d/%d" % (
         sum(1 for i in moved if not badw[rows[i]["_n"]["iy"], rows[i]["_n"]["ix"]]), len(moved), sum(1 for i in moved if probe_ok(rows[i]["_n"]["x"], rows[i]["_n"]["y"])), len(moved)))
     rep.append("crc ukladu (uid:osady; jak VillageBook): v6 %08X, v7 %08X; kolumny v5_* pliku v7 crc %08X (v5 68BB06AD)" % (crc6, crc7, crc5c))
-    if exc_list:
-        rel = [i for i in moved if rows[i]["_n"]["how"] not in ("own", "fb")]
+    rel = [i for i in moved if rows[i]["_n"]["how"] not in ("own", "fb")]
+    if rel:
         rep.append("obnizona odleglosc (po rozproszeniu %d wiosek) wedlug kultury okregu: " % len(rel) + ", ".join("%s %d" % kv for kv in Counter(cult.get(rows[i]["village_id"], "?") for i in rel).most_common())
                    + " | okregi: " + ", ".join("%s %d" % kv for kv in Counter(rows[i]["village_id"] for i in rel).most_common(25)))
+    if relax_min:
+        fl_ = sorted(relax_min.values())
+        rep.append("okregi bez miejsca przy D na swojej ziemi i w pasie (pierwsze miejsca przed rownaniem odstepow 6a, odleglosc obnizana krokiem %.3f D): %d okregow, najnizsza %.3f D"
+                   " = %.2f jedn.; okregi (najnizsza x D): %s" % (RELAX_STEP, len(relax_min), fl_[0], fl_[0] * D,
+                                                    ", ".join("%s %s %.3f" % (d_, cult.get(d_, "?"), f_) for d_, f_ in sorted(relax_min.items(), key=lambda kv: (kv[1], kv[0]))[:30])))
+    rep.append("naglowek pliku: min_distance %.2f (prawdziwe minimum wioska-wioska i wioska-wies gry = %.2f x v6), target_distance %.2f (2 x v6); wiosek ponizej target_distance:"
+               " wioska-wioska %d, wioska-wies gry %d; okregow z wioska ponizej target_distance %d z %d" % (md_real, md_real / v6_min, D, below_ss, below_sm, n_tight7, len(dist)))
+    land_bad = sum(1 for i in moved if land_at(rows[i]["village_id"], rows[i]["_n"]["x"], rows[i]["_n"]["y"]) < 0)
+    rep.append("przeniesione poza ziemia okregu i pasem (kontrola generatora): %d" % land_bad)
     if not A.dry:
         with io.open(OUT_REPORT, "w", encoding="utf-8", newline="\n") as f:
             f.write("\n".join(rep) + "\n")
@@ -1738,7 +2048,7 @@ def main():
         except Exception as e:
             print("obrazki: blad %s" % e)
 
-    badrun = dsum_bad > 0 or lore_rows != len(rows) or crc7 == crc6 or crc5c != 0x68BB06AD or any(not probe_ok(rows[i]["_n"]["x"], rows[i]["_n"]["y"]) for i in moved)
+    badrun = land_bad > 0 or dsum_bad > 0 or lore_rows != len(rows) or crc7 == crc6 or crc5c != 0x68BB06AD or any(not probe_ok(rows[i]["_n"]["x"], rows[i]["_n"]["y"]) for i in moved)
     return 1 if badrun else 0
 
 
