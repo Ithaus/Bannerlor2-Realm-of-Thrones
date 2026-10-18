@@ -143,10 +143,15 @@ namespace Armoury
 
         private static long ClaimsLeft(L l) { long t = 0; if (l != null) foreach (var c in l.Claims) t += Math.Max(0, c.Left); return t; }
 
+        // recenzja calosci 18.10 (scalenie f7/f8): pozyczka miejska (KTown) sama NIE robi z rodu dluznika 166 - jak dawna pozyczka od ludu obieg2, ktora zastepuje.
+        // Dotad kazdy rod z dlugiem u rady byl od pierwszego denara "dluznikiem": ChestOf / PendingChestOf / ScutageCap false (pelny zwrot f6 i pelna renta f7
+        // bez wzgledu na G, bez tarczowego W6), dwor -50%, budowy 0, PropertyBlocked - a w wojnie kapital rady splaca sie tylko z jednorazowych, wiec bogaty rod
+        // zostawal "dluznikiem" na stale i bral z korony pelna rente i zwrot (gracz: pozyczka w menu rady = pelna renta za 10% rocznie). Dlug u rady dalej splaca
+        // drabina 168 (odsetki z D, kapital z jednorazowych i po pokoju, raty 15% D); zaleglosc (Missed) i zajecie robia dluznika jak przy kazdym dlugu.
         private static bool HasCreditClaims(L l)
         {
             if (l == null) return false;
-            foreach (var c in l.Claims) if (c.Left > 0 && c.Kind != KRansom && c.Kind != KGreat) return true;
+            foreach (var c in l.Claims) if (c.Left > 0 && c.Kind != KRansom && c.Kind != KGreat && c.Kind != KTown) return true;
             return false;
         }
 
@@ -154,7 +159,8 @@ namespace Armoury
         /// <summary>Rod w zajeciu (D3/D4) - budzet liczy D bez dochodu wsi.</summary>
         internal static bool IsSeized(Clan c) { var l = Of(c, false); return l != null && l.Seized && InLadder(c); }
 
-        /// <summary>Dluznik (166 "Dluznik"): dlug w Banku, dlug zoldu albo wobec korony, zaleglosc albo zajecie (sam okup - nie).</summary>
+        /// <summary>Dluznik (166 "Dluznik"): dlug w Banku, dlug zoldu albo wobec korony, zaleglosc albo zajecie (sam okup - nie; sama pozyczka miejska KTown - nie,
+        /// jak obieg2 - recenzja calosci 18.10).</summary>
         internal static bool IsDebtor(Clan c)
         {
             if (c == null || !InLadder(c)) return false;

@@ -24,7 +24,7 @@ namespace Armoury
     ///  - CENA I SPLATA (DebtLadder.DayClan, roszczenie KTown): TownLoanRate (10%) rocznie, rok kalendarza gry, odsetki doliczane co dobe; w wojnie z D tylko odsetki,
     ///    z jednorazowych (lup, okupy) ten sam udzial co kredyt wojenny (50%, po pokoju 100%) - najpierw Bank, potem rady; po pokoju raty z D; wszystkie raty rodu
     ///    najwyzej AllInstalmentsMaxShare (15%) D. Gracz: raty z D w wojnie i w pokoju (bez automatycznej splaty z jednorazowych - jak w Banku).
-    ///  - NIESPLATA: drabina 168 bez zmian (zaleglosc, trzecia z rzedu - zajecie dochodu wsi i kiesy ponad 38 000, wyprzedaz); dluznik - dwor -50%, budowy 0. Rod wymarly -
+    ///  - NIESPLATA: drabina 168 bez zmian (zaleglosc, trzecia z rzedu - zajecie dochodu wsi i kiesy ponad 38 000, wyprzedaz); sam dlug u rady NIE robi dluznika 166 (jak obieg2 - recenzja calosci 18.10: DebtLadder.HasCreditClaims bez KTown), dwor -50% i budowy 0 dopiero przy zaleglosci / zajeciu albo innym dlugu. Rod wymarly -
     ///    dlug na nowych panow jego wsi (Inherit). Bez umorzenia.
     ///  - ZLOTO WRACA do wierzycieli osady wedlug udzialow (kiesy W / R / P, kasa kupcow, podzamcze); kiesa nieczynna - kasa osady; osady nie ma - kasa najblizszego miasta.
     ///  - JEDNA REGULA: przy kluczu nowe pozyczki obieg2 (Folk Loans) nie powstaja (FolkLoanRoom = 0); stare dlugi obieg2 biegna wedlug zasad obieg2 do splaty.
