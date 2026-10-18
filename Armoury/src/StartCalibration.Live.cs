@@ -581,6 +581,7 @@ namespace Armoury
             try { OwnLine(day); } catch (Exception e) { Stumble("OwnLine", e); }
             // polki startu w dobie D (rozdz. 6) - raz; potem srednie cen od zera (A7 i regale od D na cenach po rampie)
             if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; RulePxReset(); }
+            try { R4cPriceRestart(today); } catch (Exception e) { Stumble("R4cPriceRestart", e); }   // KS r4 P7 (r4-ceny, Ks Price Restart): srednie cen od nowa w D+14
             string coffers = CoffersDaily(day);
             if (!LogGate.Lines) return;
             var sb = new StringBuilder(2500);

@@ -156,12 +156,14 @@ namespace Armoury
             // KS (kalibracja startu, recenzja 16.10 - odbior na rynek): produkcja i zuzycie doby wedlug rynku osady ramki (0 Westeros, 1 Essos, 2 bez rynku: partie
             // poza osada, zrodla bez ramki) i zapas na polkach miast rynku; tylko przy kluczu Start Calibration (tylko licznik)
             public readonly long[] MkP = new long[3], MkC = new long[3], MkS = new long[2];
+            // KS r4 P10 (r4-ceny, pomiar NKS-5u): "wies je swoje" (G3, z magazynu wsi - poza targiem, w MkC[2]) wedlug rynku wsi - linia "KS: rynki" rozdziela "bez rynku"
+            public readonly long[] MkOwn = new long[2];
 
             public void NewDay()
             {
                 Src.Clear(); Sink.Clear(); Array.Clear(Tr, 0, Tr.Length); Array.Clear(Hold, 0, Hold.Length);
                 Extra = 0; WagonUnits = 0; WagonGold = 0;
-                Array.Clear(MkP, 0, 3); Array.Clear(MkC, 0, 3);
+                Array.Clear(MkP, 0, 3); Array.Clear(MkC, 0, 3); Array.Clear(MkOwn, 0, 2);
             }
         }
 
@@ -649,6 +651,7 @@ namespace Armoury
             var a = _acc[i];
             // recenzja runda 3 (drobne): wies je swoje z magazynu (G3) - poza targiem (rynek 2): nie jest zuzyciem rynku (sterowanie P4, NKS-5), towar nie doszedl do straganu
             if (_mkOn) { int m = _settleMk >= 0 && !ReferenceEquals(group, GKsOwn) ? _settleMk : 2; if (n > 0) a.MkP[m] += n; else a.MkC[m] -= n; }
+            if (_mkOn && n < 0 && (_settleMk == 0 || _settleMk == 1) && ReferenceEquals(group, GKsOwn)) a.MkOwn[_settleMk] -= n;   // KS r4 P10: wies je swoje wedlug rynku wsi (tylko pomiar)
             var d = n > 0 ? a.Src : a.Sink;
             Dictionary<string, long> subs;
             if (!d.TryGetValue(group, out subs)) { subs = new Dictionary<string, long>(); d[group] = subs; }
@@ -1260,7 +1263,8 @@ namespace Armoury
         // ------------------------------------------------------------ KS (kalibracja startu): liczby doby wedlug towaru do Planu (StartCalibration)
         /// <summary>KS: indeksy tablicy doby towaru: produkcja wsi, zuzycie wojska (jedzenie partii), zamkow, dworow, budow, warsztatow (linie, zbrojne, rzemieslnicy BK,
         /// rzemioslo miasta, naprawy, strzelarze, dymarki), zuzycie razem, mieszczanie, zapas w miastach, las wsi, lodzie rybackie NavalDLC.</summary>
-        internal const int KsVil = 0, KsArmy = 1, KsCastle = 2, KsCourt = 3, KsBuild = 4, KsShop = 5, KsCons = 6, KsTown = 7, KsStockTown = 8, KsWoodlot = 9, KsFishBoats = 10, KsN = 11;
+        internal const int KsVil = 0, KsArmy = 1, KsCastle = 2, KsCourt = 3, KsBuild = 4, KsShop = 5, KsCons = 6, KsTown = 7, KsStockTown = 8, KsWoodlot = 9, KsFishBoats = 10, KsCloth = 11, KsN = 12;
+        // KsCloth (KS r4 P8, r4-ceny): odziez wojska (150) + warsztaty zbrojne + naprawy kowali (135) - 1:1 plotna, sukna i skory w Planie (klucz Ks Cloth Demand)
         private static readonly Dictionary<string, double[]> _ksDay = new Dictionary<string, double[]>(StringComparer.Ordinal);
         private static int _ksDayN = -1;
 
@@ -1272,8 +1276,10 @@ namespace Armoury
             v[KsBuild] = Group(a.Sink, GBuild);
             v[KsShop] = Group(a.Sink, GShopIn) + Group(a.Sink, GArms) + Group(a.Sink, GArt) + Group(a.Sink, GCraft) + Group(a.Sink, GMend) + Group(a.Sink, GFletch) + Group(a.Sink, GBloom);
             v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
+            v[KsCloth] = Group(a.Sink, GArmyCloth) + Group(a.Sink, GArms) + Group(a.Sink, GMend);
             _ksDay[it.StringId] = v;
-            if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1] };
+            // KS r4 P10 (r4-ceny): [8..10] - wies je swoje W/E (czesc "bez rynku" z magazynu wsi) i stracone w drodze KS-H (czesc "bez rynku"); [0..7] bez zmian
+            if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1], a.MkOwn[0], a.MkOwn[1], Group(a.Sink, GKsLost) };
         }
 
         // KS: produkcja, zuzycie i zapas miast doby wedlug rynku (P W/E/bez, C W/E/bez, S W/E) - linia "KS: rynki" (StartCalibration.MarketLine)

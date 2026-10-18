@@ -98,6 +98,7 @@ namespace Armoury
             // krok 8 (pieniadze, poprawka po autotescie 16.10): budzet wsi z utargu wozow (udzial kiesy wsi x cena wozu / cena polki x (1 - zapas na oplaty)),
             // koszyk z wlasnego pola (udzialy stanow ZC), budzety klas miast z zarobku netto (28 dob)
             inp.Money = true; inp.Keep = _keep;
+            inp.ClothDemand = SwClothDemand;                          // KS r4 P8 (r4-ceny): plotno, sukno, skora z odziezy wojska i warsztatow zbrojnych w popycie Planu
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
@@ -109,7 +110,8 @@ namespace Armoury
                 inp.Items[id] = new KsItem
                 {
                     Kg = it.Weight > 0.01f ? it.Weight : 10.0, Val = Math.Max(0, it.Value), Army = Ema(id, GoodsLedger.KsArmy), Cast = Ema(id, GoodsLedger.KsCastle),
-                    Court = Ema(id, GoodsLedger.KsCourt), Bud = Ema(id, GoodsLedger.KsBuild), Ws = Ema(id, GoodsLedger.KsShop), Cons = Ema(id, GoodsLedger.KsCons), Town = Ema(id, GoodsLedger.KsTown)
+                    Court = Ema(id, GoodsLedger.KsCourt), Bud = Ema(id, GoodsLedger.KsBuild), Ws = Ema(id, GoodsLedger.KsShop), Cons = Ema(id, GoodsLedger.KsCons), Town = Ema(id, GoodsLedger.KsTown),
+                    Cloth = Ema(id, GoodsLedger.KsCloth)                  // KS r4 P8: odziez wojska, warsztaty zbrojne, naprawy kowali (popyt 1:1 przy kluczu Ks Cloth Demand)
                 };
             }
             uint lay;
@@ -243,6 +245,18 @@ namespace Armoury
                     first = false;
                 }
                 if (first) sb.Append(" -");
+            }
+            // KS r4 P10 (r4-ceny, pomiar NKS-5u): z czego jest "bez rynku" - wies je swoje z magazynu (G3, wedlug rynku wsi) i stracone w drodze KS-H; reszta - nieprzypisane
+            {
+                bool f4 = true;
+                foreach (var id in ids)
+                {
+                    long[] a;
+                    if (!_mkTmp.TryGetValue(id, out a) || a == null || a.Length < 11 || (a[8] == 0 && a[9] == 0 && a[10] == 0)) continue;
+                    if (f4) sb.Append(" | bez rynku z tego (wies je swoje Westeros/Essos/stracone w drodze KS-H):");
+                    sb.Append(f4 ? " " : ", ").Append(id).Append(' ').Append(a[8]).Append('/').Append(a[9]).Append('/').Append(a[10]);
+                    f4 = false;
+                }
             }
             sb.Append('.');
             return sb.ToString();
@@ -422,6 +436,7 @@ namespace Armoury
             // KS-R3: linie kroku 5 (korytarze i krainy - tekst z watku roboczego) i sterowania rynku (P4 - liczone przy zrzucie)
             if (r.CorrLine != null) Log.Info(r.CorrLine.Replace("{DOBA}", _wDay.ToString(Inv)));
             if (_ctlLine != null) Log.Info(_ctlLine);
+            if (_gapLine != null) Log.Info(_gapLine);              // KS r4 (r4-ceny): luka zapasu P4 i popyt na zapas polek w rownowadze
             for (int m = 0; m < 2; m++)
             {
                 var b = new StringBuilder(1500);

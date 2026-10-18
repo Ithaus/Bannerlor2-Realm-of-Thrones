@@ -223,6 +223,7 @@ namespace Armoury
                     }
                     if (why == 1) _kNoProfit[pi]++; else if (why == 2) _kNoInput[pi]++; else if (why == 3) _kNoHands[pi]++;
                 }
+                try { R4cMade7Note(town, made); } catch (Exception e) { _kStum++; Stumble("R4cMade7Note", e); }   // KS r4 P3 (r4-ceny): srednia 7 dob wyrobu par (wsad w popycie ceny)
                 for (int pi = 0; pi < n; pi++)
                 {
                     if (made[pi] <= 0) continue;

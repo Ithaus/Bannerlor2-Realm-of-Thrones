@@ -810,6 +810,10 @@ namespace Armoury
             // arm_ks zostaje w formacie ks3 (starsza DLL czyta go jak dotad i pomija ten klucz); brak klucza = stan rundy 3 od zera
             try { string k3 = dataStore.IsSaving ? StartCalibration.ExportR3() : null; SaveText.Sync(dataStore, "arm_ks_r3", ref k3); if (dataStore.IsLoading) StartCalibration.ImportR3(k3); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_r3", e); }
+            // KS r4 (r4-ceny): stan cen i sterowania rynku (doba restartu srednich cen, czynnik popytu targu do 1.25, brak miast C1) - osobny klucz, starsza DLL go pomija;
+            // brak klucza (stary zapis) = stan od zera (po D+14 srednie cen uznane za juz zerowane)
+            try { string k4 = dataStore.IsSaving ? StartCalibration.ExportR4c() : null; SaveText.Sync(dataStore, "arm_ks_r4c", ref k4); if (dataStore.IsLoading) StartCalibration.ImportR4c(k4); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_r4c", e); }
         }
 
         public override void RegisterEvents()

@@ -397,20 +397,28 @@ namespace Armoury
                 }
                 if (lab > zt.Hands && lab > 0) f = Math.Max(0.0, zt.Hands) / lab;
             }
-            foreach (var p in pairs)
+            bool m7 = real && SwMade7;
+            for (int pi = 0; pi < pairs.Count; pi++)
             {
+                var p = pairs[pi];
                 if (p.Garum || p.ZOut < 0) continue;
                 double outD = zt.Q[p.ZOut] + zt.QV[p.ZOut];
                 if (!(outD > 0)) continue;
-                if (p.Live >= 0) outD *= liveSh[(zt.Market == 0 ? 0 : 3) + p.Live];
-                double made = outD * f;
+                double ls = p.Live >= 0 ? liveSh[(zt.Market == 0 ? 0 : 3) + p.Live] : 1.0;
+                if (p.Live >= 0) outD *= ls;
+                double made = outD * f, made0 = made;
+                // KS r4 P3 (r4-ceny, klucz Ks Made7 Derived): wsad tylko tego, co przetwory miasta naprawde robia - srednia 7 dob wyrobu pary + brak do 4 dni zbytu na polce / 7
+                // (oliwa: tlocznia bez zysku nie tloczy - dotad popyt ceny oliwek liczyl wsad 23-33% popytu, ktorego nikt nie kupowal); pierwsze 7 dob - wyrob x f
+                double m7v;
+                if (m7 && R4cMade7(zt.T, pi, out m7v)) made = Math.Min(made, m7v + Math.Max(0.0, 4.0 * outD - zt.Cnt[p.ZOut] * ls) / 7.0);
                 for (int j = 0; j < p.InIt.Length; j++)
                 {
                     double x = made * p.Ratio[j];
                     if (p.Live >= 0) zt.DerLive[p.Live] += x;
-                    else if (p.ZIn[j] >= 0 && p.ZIn[j] != ZIron) zt.Der[p.ZIn[j]] += x;
+                    else if (p.ZIn[j] >= 0 && p.ZIn[j] != ZIron) { zt.Der[p.ZIn[j]] += x; if (m7) R4cDerNote(zt.Market, p.ZIn[j], x, made0 * p.Ratio[j]); }
                 }
-                if (real && f < 1.0 && (p.ZOut == ZBread || p.ZOut == ZPie || p.ZOut == ZBeer))
+                // brak przetworu chleba, placka i piwa - lud kupuje ziarno (made < outD: f < 1 albo P3 Made7; bez klucza Made7 to samo co dotad f < 1)
+                if (real && (f < 1.0 || made < outD - 1e-9) && (p.ZOut == ZBread || p.ZOut == ZPie || p.ZOut == ZBeer))
                 {
                     double miss = outD - made;
                     double kgOut = _zKg[p.ZOut] * (p.ZOut == ZBeer ? KsTab.BeerGrain : 1.0);
