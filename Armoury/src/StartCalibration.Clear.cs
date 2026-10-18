@@ -24,18 +24,35 @@ namespace Armoury
     //    Proby odrzucone w harnessie (swiat + klucze scalenia; mediana towarow niezbieznych Planow po pierwszym): jeden poziom cen miast dla wszystkich towarow -
     //    Essos do x2.5, R/P kupuja ok. 26% koszyka, owoce Essos 4 x popytu; koniec rownowagi osobno dla kazdego rynku - mediana 5 zamiast 3 i +40% rund; wiekszy
     //    krok ceny (0.10-0.25) - 6-12; sam krok ceny bez narzutu - 14-19 (niedobor Essos zostaje).
+    //    c) RECENZJA (noc 17/18.10, wazne): NARZUT TYLKO W PLANIE - rece i popyt Planu (przy kluczu Ks Plan Markets Clear Villages takze koszyk i praca domowa wsi -
+    //       DistPaid/DistHome, wies naprawde robi to sama); do gry idzie czesc zaplacona koszyka miast przy cenach startu (TownPaid/TownExtra - druga drabina
+    //       w ostatniej rundzie). Dotad gra dostawala czesc
+    //       zaplacona z narzutem: popyt miast ZC4 (Zc4Build) i mianownik glodu (KsTownMeal - koszyk zaplacony) szly w dol, wiec brak rak, ktorego gra nie zmieni,
+    //       wygladal w grze jak "nie stac" (KsHunger: to nie glod) - glod biednych Essos byl schowany. Teraz brak rak pokazuja ceny gry, puste polki i glod
+    //       (KsHungerUnrest) - Jeff: "jak nie ma jedzenia to bedzie bunt". Linia "KS: tanszy koszyk miast (P9)" i NKS-3c licza drabine przy cenach startu (jak dotad);
+    //       kcal przy narzucie (tyle rece rynku urodza) - w linii rynkow Planu.
+    //    d) RECENZJA - JEDNA CENA RYNKU W PLANIE (klucz Ks Plan Markets Clear Villages, domyslnie WYLACZONY - decyzja Jeffa): narzut placi tez koszyk wsi tego rynku (wies,
+    //       ktorej nie stac na drogie zboze, robi wiecej w domu; czego nie zrobi - kcal bez pokrycia). Harness (8 Planow, swiat + klucze scalenia): niezbiezne mediana
+    //       7 zamiast 3 (NKS-30n <= 6 - NIE), kcal wsi Essos bez pokrycia 5.0% zamiast 3.3%, R/P Essos przy narzucie 77/78% zamiast 72/73%, pomarancze Essos 3.2
+    //       zamiast 4.2 x popytu; wies z narzutem z poprzedniego Planu (proba) - mediana 5, pomarancze 4.5. W grze jedna cena jest zawsze (cena targu gry dla mieszczan
+    //       i wsi - KS-H, kiesa wsi, drabina ZC4); bez klucza dwie ceny sa tylko w rachunku Planu.
     // 2. NAJPIERW WYZYWIC SIEBIE DLA CALEGO SWIATA (Ks Self Feed Everywhere TAK + Ks Self Feed Staples): prog liczy tylko jedzenie, ktorym rodzina sie zywi -
     //    zboze (chleb, kasza, piwo), ryby, mieso, ser, maslo. Oliwki, winogrona, pomarancze, jablka, marchew, jaja, miod i daktyle rodzina sprzedaje (wartosc na targ,
     //    jak futra), cena zboza normalna (cena startu x gradient krainy - "jedzenie, ktore wies kupuje po zwyklych cenach, jest pokryte"; prog nie drga z cena
     //    rownowagi). Harness bez tej reguly: prog swiata stawial rece Dorne i Essos przy oliwkach i winogronach (najwiecej kcal na reke na suchej ziemi - 8 kg
     //    oliwek = 9200 kcal, tyle co zboze), oliwki Westeros na targ 3.3 x popytu po cenie podlogi, winogrona Essos 1.16, Essos niezbiezny.
     // 3. KROK PROGU (Ks Self Feed Slow): udzial bloku przesuniety progiem zmienia sie najwyzej o 0.07 na Plan wobec poprzedniego Planu (pierwszy Plan sesji - bez
-    //    tlumienia), w obie strony - okreg nie skacze z rak przy jedzeniu na targ i z powrotem co 7 dob.
+    //    tlumienia), w obie strony - okreg nie skacze z rak przy jedzeniu na targ i z powrotem co 7 dob. W dol (recenzja): trzymany tylko rekami par o mniejszych
+    //    kcal dostepu niz mieszanka jedzenia bloku (futra, len, ubozsze jedzenie) - nigdy z par, ktore karmia lepiej (prog nie robi nikogo glodniejszym); brak takich
+    //    par - udzial spada szybciej (linia: najwiekszy spadek).
 
     internal sealed partial class KsInput
     {
         /// <summary>feed-swiat (klucz Ks Plan Markets Clear): cena niedoboru dla mieszczan i krok ceny towaru w rownowadze. false - jak dotad (bit w bit).</summary>
         public bool MarketsClear;
+        /// <summary>Recenzja feed-swiat (klucz Ks Plan Markets Clear Villages): narzut niedoboru takze w koszyku wsi (jedna cena rynku w Planie). false - narzut tylko w drabinie
+        /// klas miast (Plan); gra i tak ma jedna cene - rynku gry.</summary>
+        public bool MarketsClearVil;
         /// <summary>[NM * NG] narzut niedoboru towaru z poprzedniego Planu (cieply start kroku 8) albo null.</summary>
         public double[] WarmMu;
         /// <summary>feed-swiat (klucz Ks Self Feed Staples): prog na jedzeniu podstawowym (zboze, ryby, mieso, ser, maslo), reszta jedzenia na targ, cena zboza normalna.</summary>
@@ -58,6 +75,11 @@ namespace Armoury
         public int FeedStepHi, FeedStepLo; public double FeedStepGap, FeedStepDown;   // krok progu: bloki uciete w gore, trzymane w dol; najwiekszy wzrost Lam wobec poprzedniego
                                                                         // Planu (kontrola <= krok) i najwiekszy spadek (rynek sam stawia rece przy jedzeniu albo brak rak do trzymania)
         public bool FeedStaple; public double FeedStep;
+        // recenzja: ostatnia runda kroku 8 przy narzucie (Plan) - miasta [m * 3 + klasa]: wydane zl/d, kcal jedzenia pelnego koszyka i kupione (do gry idzie drabina
+        // przy cenach startu - KsMoney.TPaid / P9); wsie: drabiny koszyka z narzutem (ostatnia runda); cieply start narzutu i kroku progu (pierwszy Plan po wczytaniu - NIE)
+        public double[] ClrTPaid = new double[6], ClrK0 = new double[6], ClrK1 = new double[6];
+        public int[] ClrTown = new int[2], ClrVil = new int[2];
+        public bool MuWarm, FeedWarm, MarketsClearVil;
         private static double[] Ones2() { var a = new double[2 * KsTab.NG]; for (int i = 0; i < a.Length; i++) a[i] = 1.0; return a; }
     }
 
@@ -67,6 +89,8 @@ namespace Armoury
         {
             public double[] Mu;                                        // feed-swiat: narzut niedoboru [m * NG + g] (krok 8; zostaje miedzy krokami 8 tego Planu)
             public double[] MuP;                                       // bufor cen koszyka miasta z narzutem [NZ]
+            public double[] MuPV;                                      // recenzja: bufor cen koszyka wsi z narzutem [NZ] (jedna cena rynku)
+            public bool[] MuOn;                                        // recenzja: rynek z narzutem ponad 1 na jakims towarze (bez - ceny bez kopii, co do bitu)
             public double[] FWarm, FHi, FLo;                           // feed-swiat: blok - udzial progu z poprzedniego Planu (-1 brak), granica gorna i dolna tego Planu
         }
 
@@ -89,32 +113,82 @@ namespace Armoury
             {
                 x.Mu = new double[n];
                 var w = x.In.WarmMu;
+                x.R.MuWarm = w != null && w.Length == n;
                 for (int i = 0; i < n; i++)
                 {
                     double v = w != null && w.Length == n ? w[i] : 1.0;
                     x.Mu[i] = v > 1.0 && !double.IsNaN(v) && !double.IsInfinity(v) ? Math.Min(MuMax, v) : 1.0;
                 }
             }
-            x.R.MarketsClear = true;
+            x.R.MarketsClear = true; x.R.MarketsClearVil = x.In.MarketsClearVil;
             Array.Copy(x.Mu, x.R.Mu0, n);
             for (int m = 0; m < NM; m++) x.R.ExRel0[m] = double.NaN;
+            // recenzja: liczby ostatniej rundy - od nowa w kazdym kroku 8 (ponowny krok 8 Planu nie dodaje drugi raz)
+            Array.Clear(x.R.ClrTPaid, 0, 6); Array.Clear(x.R.ClrK0, 0, 6); Array.Clear(x.R.ClrK1, 0, 6); Array.Clear(x.R.ClrTown, 0, NM); Array.Clear(x.R.ClrVil, 0, NM);
+            MuFlags(x);
         }
 
-        /// <summary>Ceny koszyka miasta do drabiny klas: cena startu pozycji x narzut niedoboru jej surowca (KsBasket.RawGood - chleb, placek, piwo z ziarna; wino
-        /// z winogron...). Bez klucza - te same ceny (tablica i przesuniecie bez zmian).</summary>
-        private static double[] TownLadderPrices(Ctx x, int m, double[] tpz, int tpo, out int lpo)
+        /// <summary>Recenzja: rynek z narzutem ponad 1 na jakims towarze (po MuInit i kazdym MuRound). Rynek bez narzutu - drabiny na tych samych tablicach cen co dotad.</summary>
+        private static void MuFlags(Ctx x)
         {
-            lpo = tpo;
-            if (!x.In.MarketsClear || x.Mu == null) return tpz;
+            if (x.MuOn == null) x.MuOn = new bool[NM];
+            for (int m = 0; m < NM; m++)
+            {
+                bool on = false;
+                for (int g = 0; g < KsTab.NG && !on; g++) on = x.Mu[m * KsTab.NG + g] > 1.0;
+                x.MuOn[m] = on;
+            }
+        }
+
+        /// <summary>Ceny koszyka z narzutem: cena pozycji (src[so + z]) x narzut niedoboru jej surowca (KsBasket.RawGood - chleb, placek, piwo z ziarna; wino
+        /// z winogron...) do bufora buf (przesuniecie 0). Bez klucza albo rynek bez narzutu - te same ceny (tablica i przesuniecie bez zmian).</summary>
+        private static double[] MarkedPrices(Ctx x, int m, double[] src, int so, ref double[] buf, out int lpo)
+        {
+            lpo = so;
+            if (!x.In.MarketsClear || x.Mu == null || x.MuOn == null || !x.MuOn[m]) return src;
             int nz = KsBasket.N;
-            if (x.MuP == null || x.MuP.Length != nz) x.MuP = new double[nz];
+            if (buf == null || buf.Length != nz) buf = new double[nz];
             for (int z = 0; z < nz; z++)
             {
                 int g = KsBasket.RawGood[z];
-                x.MuP[z] = tpz[tpo + z] * (g >= 0 ? x.Mu[m * KsTab.NG + g] : 1.0);
+                buf[z] = src[so + z] * (g >= 0 ? x.Mu[m * KsTab.NG + g] : 1.0);
             }
             lpo = 0;
-            return x.MuP;
+            return buf;
+        }
+
+        /// <summary>Ceny koszyka miasta do drabiny klas (z narzutem - MarkedPrices).</summary>
+        private static double[] TownLadderPrices(Ctx x, int m, double[] tpz, int tpo, out int lpo) { return MarkedPrices(x, m, tpz, tpo, ref x.MuP, out lpo); }
+
+        /// <summary>Recenzja (jedna cena rynku, klucz Ks Plan Markets Clear Villages - domyslnie WYLACZONY, decyzja Jeffa): ceny koszyka wsi do drabiny wsi - ten sam narzut
+        /// co mieszczanie tego rynku (wies, ktorej nie stac, robi wiecej w domu - praca domowa kroku 8). Bez klucza / rynek bez narzutu - pzu, po bez zmian (co do bitu).</summary>
+        private static double[] VillageLadderPrices(Ctx x, int m, double[] pzu, ref int po, bool last)
+        {
+            if (!x.In.MarketsClearVil) return pzu;
+            int lpo; var r = MarkedPrices(x, m, pzu, po, ref x.MuPV, out lpo);
+            if (!ReferenceEquals(r, pzu)) { po = lpo; if (last) x.R.ClrVil[m]++; }
+            return r;
+        }
+
+        /// <summary>Recenzja (wazne): ostatnia runda kroku 8, klasa miasta - narzut tylko w Planie. Drabina z narzutem (lpz) do liczb Planu (ClrTPaid, ClrK0/1 - linia
+        /// rynkow), potem ta sama drabina przy cenach startu (tpz) - do gry (TownPaid, TownExtra), KsMoney (TPaid, P9, ExtraT, UnpaidT) i NKS-3c. Brak rak rynku
+        /// pokazuje gra (ceny, polki, glod KsHunger), nie mniejszy popyt miast z Planu. Bez narzutu (lpz == tpz) - nic (jedna drabina jak dotad).</summary>
+        private static void ClearTownExport(Ctx x, bool cheap, int m, int c, bool[] tcut, double[] qc, double[] qq, double[] tpz, int tpo, double[] lpz, double budget,
+                                            ref double pv, double[] paid, double[] tex1, double[] p9)
+        {
+            if (ReferenceEquals(lpz, tpz)) return;
+            var R = x.R; int nz = KsBasket.N;
+            R.ClrTPaid[m * 3 + c] += pv; R.ClrK0[m * 3 + c] += p9[0]; R.ClrK1[m * 3 + c] += p9[1];
+            if (c == 0) R.ClrTown[m]++;
+            Array.Clear(p9, 0, p9.Length);
+            if (tcut != null)
+            {
+                Array.Copy(qc, qq, nz);
+                for (int z = 0; z < nz && z < tcut.Length; z++) if (tcut[z]) qq[z] = 0.0;
+                pv = KsCheap.PlanLadder(cheap, qq, qc, tpz, tpo, budget, paid, tex1, p9);
+                for (int z = 0; z < nz && z < tcut.Length; z++) if (tcut[z]) paid[z] = 0.0;
+            }
+            else pv = KsCheap.PlanLadder(cheap, qc, qc, tpz, tpo, budget, paid, tex1, p9);
         }
 
         /// <summary>Runda kroku 8 (po nadwyzce targu i poprawce G). Na rynku z niedoborem, ktory nie ma juz pracy domowej ponad wlasny koszyk wsi do oddania (warunek
@@ -149,6 +223,7 @@ namespace Armoury
                     }
                 }
             }
+            MuFlags(x);
         }
 
         /// <summary>Koniec kroku 8: narzut do wyniku.</summary>
@@ -215,6 +290,7 @@ namespace Armoury
             if (x.FWarm == null || x.FWarm.Length != nb) { x.FWarm = new double[nb]; x.FHi = new double[nb]; x.FLo = new double[nb]; }
             double step = x.In.FeedStep;
             var w = x.In.WarmFloor;
+            x.R.FeedWarm = step > 0 && w != null;                       // recenzja: pierwszy Plan po wczytaniu (bez poprzedniego Planu w pamieci) - bez granic kroku (linia)
             for (int b = 0; b < nb; b++)
             {
                 double v;
@@ -265,9 +341,12 @@ namespace Armoury
             var sb = new StringBuilder(1600);
             var M = r.Money;
             sb.Append("KS: rynki Planu (feed-swiat) plan doba ").Append(day).Append(" | rynek musi sie oczyscic ").Append(r.MarketsClear ? "TAK" : "WYLACZONE")
-              .Append(" (gdy rynkowi brakuje rak, a wsie nie maja pracy domowej ponad wlasny koszyk do oddania, towar, ktorego brakuje, drozeje dla mieszczan najwyzej 7% na runde kroku 8, najwyzej x")
-              .Append(MuMax.ToString("0.0", inv)).Append("; budzety klas miast w zl bez zmian - wydane <= budzet, zadna moneta nie powstaje ani nie znika; krok ceny towaru maleje, gdy cena skacze w kolko)")
-              .Append(" | rownowagi ").Append(r.EqN).Append(", zbiezne ").Append(r.EqConv);
+              .Append(" (gdy rynkowi brakuje rak, a wsie nie maja pracy domowej ponad wlasny koszyk do oddania, towar, ktorego brakuje, drozeje w Planie dla mieszczan")
+              .Append(r.MarketsClearVil ? " i wsi tego rynku (jedna cena - Ks Plan Markets Clear Villages TAK)" : " (wsie po cenie startu z praca domowa - Ks Plan Markets Clear Villages WYLACZONY)")
+              .Append(" najwyzej 7% na runde kroku 8, najwyzej x")
+              .Append(MuMax.ToString("0.0", inv)).Append("; budzety klas miast w zl bez zmian - wydane <= budzet, zadna moneta nie powstaje ani nie znika; narzut tylko w Planie - do gry idzie czesc zaplacona koszyka miast przy cenach startu; krok ceny towaru maleje, gdy cena skacze w kolko)")
+              .Append(" | rownowagi ").Append(r.EqN).Append(", zbiezne ").Append(r.EqConv)
+              .Append(", narzut z poprzedniego Planu ").Append(r.MuWarm ? "TAK" : "NIE (pierwszy Plan po wczytaniu - od 1)");
             string[] mk = { "Westeros", "Essos" };
             for (int m = 0; m < NM; m++)
             {
@@ -279,22 +358,57 @@ namespace Armoury
                   .Append(", rund kroku 8 x towary w gore ").Append(r.MuUp[m]).Append(" w dol ").Append(r.MuDown[m]);
                 if (M != null)
                 {
+                    // recenzja: KsMoney (TPaid, P9) - drabina przy cenach startu (to idzie do gry: TownPaid); przy narzucie (Plan) - ClrTPaid / ClrK (rynek bez narzutu - te same liczby)
+                    bool mark = r.ClrTown[m] > 0;
                     double bud = M.TBudget[m * 3] + M.TBudget[m * 3 + 1] + M.TBudget[m * 3 + 2];
                     double paid = M.TPaid[m * 3] + M.TPaid[m * 3 + 1] + M.TPaid[m * 3 + 2];
-                    sb.Append(", miasta: wydane ").Append(paid.ToString("0", inv)).Append(" zl/d <= budzet ").Append(bud.ToString("0", inv)).Append(" zl/d, W/R/P zaplacone ");
+                    double paidM = mark ? r.ClrTPaid[m * 3] + r.ClrTPaid[m * 3 + 1] + r.ClrTPaid[m * 3 + 2] : paid;
+                    sb.Append(", miasta: wydane ").Append(paid.ToString("0", inv)).Append(" zl/d <= budzet ").Append(bud.ToString("0", inv)).Append(" zl/d (przy narzucie Planu wydane ")
+                      .Append(paidM.ToString("0", inv)).Append(" zl/d), W/R/P zaplacone ");
                     for (int c = 0; c < 3; c++)
                     {
                         double b = M.TBasket[m * 3 + c];
                         sb.Append(c > 0 ? "/" : "").Append(b > 0 ? (100 * M.TPaid[m * 3 + c] / b).ToString("0.0", inv) : "-");
                     }
-                    sb.Append("% wartosci koszyka przy cenach startu");
+                    sb.Append("% wartosci koszyka przy cenach startu, kcal jedzenia W/R/P przy cenach startu ");
+                    int sn = KsCheap.StatN;
+                    for (int c = 0; c < 3; c++)
+                    {
+                        double k0 = M.P9[(m * 3 + c) * sn], k1 = M.P9[(m * 3 + c) * sn + 1];
+                        sb.Append(c > 0 ? "/" : "").Append(k0 > 0 ? (100 * k1 / k0).ToString("0.0", inv) : "-");
+                    }
+                    sb.Append("% (popyt miast do gry), przy narzucie Planu ");
+                    for (int c = 0; c < 3; c++)
+                    {
+                        double k0 = mark ? r.ClrK0[m * 3 + c] : M.P9[(m * 3 + c) * sn], k1 = mark ? r.ClrK1[m * 3 + c] : M.P9[(m * 3 + c) * sn + 1];
+                        sb.Append(c > 0 ? "/" : "").Append(k0 > 0 ? (100 * k1 / k0).ToString("0.0", inv) : "-");
+                    }
+                    sb.Append("% (tyle rece rynku urodza - reszta to brak, ktory pokaza ceny gry, puste polki i glod)");
+                    double fk = M.VFullKcal[m];
+                    sb.Append(", wsie: drabiny koszyka z narzutem ").Append(r.ClrVil[m]).Append(", kcal koszyka bez pokrycia ")
+                      .Append(fk > 0 ? (100 * Math.Max(0.0, M.VUnpaidKcal[m] - M.VHomeKcal[m]) / fk).ToString("0.0", inv) : "-").Append("% robione w domu ")
+                      .Append(fk > 0 ? (100 * M.VHomeKcal[m] / fk).ToString("0.0", inv) : "-").Append("%");
                 }
                 sb.Append(", krok ceny zmniejszony ").Append(r.EtaCut[m]);
                 int open = 0; string pre = mk[m] + " ";
                 foreach (var o in r.Open) if (o.StartsWith(pre, StringComparison.Ordinal)) open++;
                 sb.Append(", towary niezbiezne ").Append(open);
+                // recenzja: towary na granicy ceny (podloga 0.05 / sufit) rownowaga liczy jako zbiezne - te z odchyleniem podazy od popytu ponad 2% osobno (nadmiar przy
+                // cenie zero to tez rynek bez rownowagi: gaj rodzi, nikt nie kupuje)
+                var bnd = new List<string>();
+                if (r.S != null && r.D != null)
+                    foreach (var o in r.Bounds)
+                    {
+                        if (!o.StartsWith(pre, StringComparison.Ordinal)) continue;
+                        var sp = o.Split(' '); if (sp.Length < 2) continue;
+                        int g = Array.IndexOf(KsTab.Goods, sp[1]); if (g < 0) continue;
+                        int i = m * KsTab.NG + g; if (i >= r.S.Length || i >= r.D.Length) continue;
+                        double sd = r.S[i] / Math.Max(1.0, r.D[i]);
+                        if (Math.Abs(sd - 1.0) > Tol) bnd.Add(sp[1] + " S/D " + sd.ToString("0.00", inv));
+                    }
+                sb.Append(", na granicy ceny z odchyleniem ponad 2% ").Append(bnd.Count).Append(bnd.Count > 0 ? " (" + string.Join(" ", bnd) + ")" : "");
             }
-            sb.Append(" | towar: popyt zaplacony miast i wsi = podaz rak - zjedzone (nadwyzka targu ~0); narzut tylko w Planie (rece i czesc zaplacona koszyka miast), ceny gry robi rynek gry.");
+            sb.Append(" | towar: popyt zaplacony miast i wsi = podaz rak - zjedzone (nadwyzka targu ~0); narzut tylko w Planie (rece i popyt Planu; przy narzucie wsi - koszyk i praca domowa wsi); czesc zaplacona koszyka miast idzie do gry przy cenach startu - ceny gry robi rynek gry.");
             return sb.ToString();
         }
     }

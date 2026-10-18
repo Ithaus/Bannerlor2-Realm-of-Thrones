@@ -6960,13 +6960,17 @@ namespace Armoury
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsSelfFeedStaples { get; set; } = true;
 
-        [SettingPropertyBool("Ks Self Feed Slow", HintText = "with Ks Self Feed First: from one weekly plan to the next the share of a village's hands that the rule moves to food changes by at most 7 in 100, both ways (the first plan after loading a save - without this limit), so a village does not jump from the market to its fields and back every week. Off = the full move in every plan")]
+        [SettingPropertyBool("Ks Self Feed Slow", HintText = "with Ks Self Feed First: from one weekly plan to the next the share of a village's hands that the rule moves to food grows by at most 7 in 100, and falls by at most 7 in 100 wherever those hands can stay at food without taking them from work that feeds the village better (the first plan after loading a save - without this limit), so a village does not jump from the market to its fields and back every week. Off = the full move in every plan")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsSelfFeedSlow { get; set; } = true;
 
-        [SettingPropertyBool("Ks Plan Markets Clear", HintText = "with Start Calibration: the weekly plan settles each market - when a market as a whole has fewer hands than its townsfolk pay for and the villages have no more home work to give up, the goods it lacks grow dearer for the townsfolk (at most 7 in 100 per round of the plan, at most three times the usual price) and they buy less of them or cheaper food, the poor first, until what they pay for is what the hands make; the purses themselves stay as they are (no coin is made or lost). The plan also takes smaller price steps for a good whose price keeps swinging back and forth. Off = as before")]
+        [SettingPropertyBool("Ks Plan Markets Clear", HintText = "with Start Calibration: the weekly plan settles each market - when a market as a whole has fewer hands than its townsfolk pay for and the villages have no more home work to give up, the goods it lacks grow dearer in the plan for its townsfolk (at most 7 in 100 per round of the plan, at most three times the usual price) and the plan sets the villages' hands to what is really bought. This is only the plan's reckoning: the towns' demand in the game stays what their people pay for at the usual prices, so a real shortage still shows as dear prices, empty stalls and hunger (no coin is made or lost). The plan also takes smaller price steps for a good whose price keeps swinging back and forth. Off = as before")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsPlanMarketsClear { get; set; } = true;
+
+        [SettingPropertyBool("Ks Plan Markets Clear Villages", HintText = "with Ks Plan Markets Clear: in the plan the villages buying at a market that lacks hands pay the same dearer price as its townsfolk, and grow more of their own food at home instead (one price for every buyer in the plan's reckoning; in the game there is always one price - the market's). Off = in the plan only the townsfolk see the dearer price; villages buy at the usual price and fall back on home work as before")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsPlanMarketsClearVillages { get; set; } = false;
 
         [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter in the cold lands needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt; hunters of the warm lands as before). Off = the old table")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
@@ -9093,6 +9097,7 @@ namespace Armoury
             s.KsSelfFeedStaples = KsSelfFeedStaples;
             s.KsSelfFeedSlow = KsSelfFeedSlow;
             s.KsPlanMarketsClear = KsPlanMarketsClear;
+            s.KsPlanMarketsClearVillages = KsPlanMarketsClearVillages;
             s.KsColdLand = KsColdLand;
             s.KsHungerUnrest = KsHungerUnrest;
             s.KsHungerLoyaltyMax = KsHungerLoyaltyMax;

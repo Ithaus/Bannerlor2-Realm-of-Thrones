@@ -1378,6 +1378,7 @@ namespace Armoury
                     int lv = x.GradOn && R4LandPrice ? LandOfD(x, d) : -1;
                     double[] pzu = pz; int po = m * NZ;
                     if (lv >= 0) { for (int z = 0; z < NZ; z++) pzv[z] = pz[m * NZ + z] * GradZ(x, lv, z); pzu = pzv; po = 0; }
+                    pzu = VillageLadderPrices(x, m, pzu, ref po, last);   // feed-swiat recenzja (klucz Ks Plan Markets Clear Villages, domyslnie WYLACZONY): narzut i dla wsi; bez klucza pzu, po
                     double bask = 0; for (int z = 0; z < NZ; z++) bask += q[z] * pzu[po + z];
                     double budget = v.Alpha * salesB;
                     double pv;
@@ -1590,6 +1591,7 @@ namespace Armoury
                             for (int z = 0; z < NZ && z < tcut.Length; z++) if (tcut[z]) paid[z] = 0.0;
                         }
                         else pv = KsCheap.PlanLadder(inp.CheapBasket, qc, qc, lpz, lpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
+                        if (last) ClearTownExport(x, inp.CheapBasket, m, c, tcut, qc, qq, tpz, tpo, lpz, Math.Max(0.0, t.Budget[c]), ref pv, paid, tex1, p9);   // feed-swiat recenzja: do gry - ceny startu
                         M.TBudget[m * 3 + c] += Math.Max(0.0, t.Budget[c]); M.TBasket[m * 3 + c] += cost; M.TPaid[m * 3 + c] += pv;
                         for (int k9 = 0; k9 < KsCheap.StatN; k9++) M.P9[(m * 3 + c) * KsCheap.StatN + k9] += p9[k9];
                         for (int z = 0; z < NZ; z++) { tqs[z] += qc[z]; tus[z] += (1.0 - paid[z]) * qc[z]; tex[z] += tex1[z]; M.ExtraT[m * NZ + z] += tex1[z]; }

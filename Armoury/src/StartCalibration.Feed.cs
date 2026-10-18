@@ -269,13 +269,16 @@ namespace Armoury
                     {
                         if (k == fa || k == fb || !(xs[k] > 1e-12)) continue;
                         double g = (M - pk[k] - conv * pv[k]) * sc[b];
-                        // feed-swiat (Ks Self Feed Slow): blok trzymajacy dol bierze rece takze z par bez zysku kcal (rece schodza z jedzenia najwyzej o krok na Plan)
-                        if (!(g > 1e-9) && !(hold && x.FLo[b] > 1e-12)) continue;
+                        // feed-swiat recenzja (wazne): takze blok trzymajacy dol (Ks Self Feed Slow) bierze rece TYLKO z par o mniejszych kcal dostepu niz mieszanka (g > 0 -
+                        // futra, len, ubozsze jedzenie). Dotad trzymanie bralo tez pary bez zysku (g <= 0, np. rybakow, ktorych logit postawil, bo daja wiecej niz zboze) - okreg
+                        // wyzywiony tracil jedzenie, a strata nie wchodzila do FdDef/FdGot (prog nie robi nikogo glodniejszym). Brak takich par - Lam schodzi ponizej FLo
+                        // (spadek w linii: FeedStepDown)
+                        if (!(g > 1e-9)) continue;
                         double e = hands > 1e-9 ? g / hands : 0.0;
                         int t = n++;
                         while (t > 0 && ie[t - 1] < e) { ie[t] = ie[t - 1]; ib[t] = ib[t - 1]; ik[t] = ik[t - 1]; ig[t] = ig[t - 1]; t--; }   // malejaco wedlug zysku kcal na reke
                         ie[t] = e; ib[t] = b; ik[t] = k; ig[t] = g;
-                        if (g > 0) rb += Math.Min(xs[k], room) * g;
+                        rb += Math.Min(xs[k], room) * g;
                     }
                     capK += rb;
                 }
@@ -293,7 +296,7 @@ namespace Armoury
                         if (!(rem > 1e-6) && !(lo > 1e-12)) continue;
                     }
                     if (!(avail > 1e-15)) continue;
-                    double g = ig[t], dlt = Math.Min(avail, slow ? Math.Max(rem > 1e-6 && g > 1e-9 ? rem / g : 0.0, lo) : rem / g);
+                    double g = ig[t], dlt = Math.Min(avail, slow ? Math.Max(rem > 1e-6 ? rem / g : 0.0, lo) : rem / g);   // g > 0 (dawcy z zyskiem kcal)
                     if (slow && !(dlt > 1e-15)) continue;
                     double dl = fm[b] - lp[k];                                 // ha na przesuniety udzial: mieszanka - dawca (> 0 - ruch bierze ziemie)
                     if (dl > 1e-12)
@@ -306,8 +309,7 @@ namespace Armoury
                     xs[x.FA[b]] += dlt * x.FSa[b] / x.FSum[b];
                     if (x.FB[b] >= 0) xs[x.FB[b]] += dlt * x.FSb[b] / x.FSum[b];
                     fh[b] -= dlt * dl;
-                    cap[b] -= dlt; x.Lam[b] += dlt;
-                    if (g > 0) { rem -= dlt * g; got += dlt * g; }
+                    cap[b] -= dlt; x.Lam[b] += dlt; rem -= dlt * g; got += dlt * g;
                 }
                 x.FdGot[di] = got; x.FdCut[di] = cut;
             }
@@ -470,8 +472,9 @@ namespace Armoury
                 sb.Append(" | krok progu (feed-swiat): bloki uciete w gore ").Append(r.FeedStepHi).Append(", trzymane w dol ").Append(r.FeedStepLo)
                   .Append(", najwiekszy wzrost udzialu progu bloku wobec poprzedniego Planu ").Append(r.FeedStepGap.ToString("0.0000", inv))
                   .Append(" (<= krok ").Append(r.FeedStep.ToString("0.00", inv)).Append("), najwiekszy spadek ").Append(r.FeedStepDown.ToString("0.0000", inv))
-                  .Append(" (dol trzymany rekami, ktore nie sa jeszcze przy jedzeniu; rynek, ktory sam stawia rece przy jedzeniu, zdejmuje prog bez ruchu rak)")
-                  .Append(r.FloorLam != null ? "; bloki z udzialem progu " + r.FloorLam.Count : "");
+                  .Append(" (dol trzymany tylko rekami par, ktore karmia gorzej niz jedzenie bloku; rynek, ktory sam stawia rece przy jedzeniu, zdejmuje prog bez ruchu rak)")
+                  .Append(r.FloorLam != null ? "; bloki z udzialem progu " + r.FloorLam.Count : "")
+                  .Append("; cieply start ").Append(r.FeedWarm ? "TAK" : "NIE (pierwszy Plan po wczytaniu - bez granic kroku)");   // recenzja: Plan bez poprzedniego w pamieci
             sb.Append(" | rece: bloki okregow w zakresie ").Append(r.FeedBlocks).Append(" (z przesunieciem ").Append(r.FeedBind).Append("), rece przesuniete do jedzenia ")
               .Append(r.FeedHandsAll > 0 ? (100 * r.FeedFloorHands / r.FeedHandsAll).ToString("0.00", inv) : "-").Append("% rak pola wsi swiata")
               .Append(", najwieksze odchylenie sumy udzialow bloku od 1 ").Append(r.FeedSumDev.ToString("0.0E+0", inv))

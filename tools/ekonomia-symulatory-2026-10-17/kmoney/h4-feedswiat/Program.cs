@@ -73,9 +73,10 @@ static class Program
         { double v; if (double.TryParse(Environment.GetEnvironmentVariable("KS_MUMAX") ?? "", NumberStyles.Float, Inv, out v)) KsCore.MuMax = v;
           if (Environment.GetEnvironmentVariable("KS_PGEQ") == "1") KsCore.FeedNormalPrice = false;
           if (Environment.GetEnvironmentVariable("KS_NOETA") == "1") KsCore.ClearEta = false;
-          if (Environment.GetEnvironmentVariable("KS_NOMU") == "1") KsCore.ClearMu = false; }
+          if (Environment.GetEnvironmentVariable("KS_NOMU") == "1") KsCore.ClearMu = false;
+          if (Environment.GetEnvironmentVariable("KS_VILMU") == "1") inp.MarketsClearVil = inp.MarketsClear; }   // recenzja: klucz Ks Plan Markets Clear Villages
         { double v; if (double.TryParse(Environment.GetEnvironmentVariable("KS_ETAMAX") ?? "", NumberStyles.Float, Inv, out v)) KsCore.EtaMax = v; if (double.TryParse(Environment.GetEnvironmentVariable("KS_ETAGROW") ?? "", NumberStyles.Float, Inv, out v)) KsCore.EtaGrow = v; }
-        Console.WriteLine("feed-swiat: Staple " + inp.SelfFeedStaple + ", FeedStep " + inp.FeedStep + ", MarketsClear " + inp.MarketsClear);
+        Console.WriteLine("feed-swiat: Staple " + inp.SelfFeedStaple + ", FeedStep " + inp.FeedStep + ", MarketsClear " + inp.MarketsClear + ", MarketsClearVil " + inp.MarketsClearVil);
         Console.WriteLine("feed-swiat: CheapBasket " + inp.CheapBasket + ", ClothDemand " + inp.ClothDemand + ", MarketFactorMax " + inp.MarketFactorMax);
         { var te = Environment.GetEnvironmentVariable("KS_TEXP"); double tv; if (!string.IsNullOrEmpty(te) && double.TryParse(te, NumberStyles.Float, Inv, out tv)) { if (tv > 1.0) KsCore.TownExport = false; else KsCore.TownExportMin = tv; } }
         if (Environment.GetEnvironmentVariable("KS_TIMP") == "0") KsCore.TownImport = false;
