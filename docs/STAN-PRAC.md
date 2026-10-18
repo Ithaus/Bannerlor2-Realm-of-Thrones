@@ -3052,3 +3052,10 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   WAZNE ODKRYCIE: W5 juz dzis placi srednim (~79k/d) i tez BOGATYM ponad 2R (~37k/d + 11k/d W5b) - W5 patrzy na pulap, nie na bogactwo; wojsko ogranicza cel 60% limitu druzyn
   i hamulce werbunku, nie pieniadze. Szacunek W5c: skarbce w wojnie +17k -> ok. +12k/d na starcie; wojsko 0..+2.5k. DO DECYZJI JEFFA: W5 dla rodow ponad 2R (wbrew "bogaty nic")?
   Scalone do noc-ks4 **10beef63** (konflikt checkera nboczne/nsrednim - oba; 1975 ustawien, build rc 0). Recenzja scalenia: wf_90c50428-80e.
+- 14:05 PDT: TEST fin93 (c5933072; Armoury-2026-10-18_12-18-40.log + CSV na D:; wyniki scratchpad fin93/*.txt): kod 0, ERROR 0, zapisy nietkniete, flaga usunieta, w grze WGRANIE 80.
+  NAPRAWIONE wobec fin92: NKS-3 i NKS-27 (welna i ryby Essos w pasmie), NWAR-15 (klin skora/plotno - nwar 0 NIE), ZC1-19. Bez zmian NIE: NKU-12, ZC1-4, NKA-1, NBD-2, NDS-7b/9 (blisko progu
+  po dodaniu czesci wedlug potrzeby: 0.889 / 0.923), NDS-11. NOWE NIE: NAKUM-7 skarbce +33.4k/d (fin92 +17k), glowy rodow +22.9k, kasy zamkow +11.6k; NAKUM-18 P +17.1k; NAKUM-27 miasta
+  ponizej zapasu kupcow 8 -> 12; NKA-1 +32k/d; NKS-23/23b polki zboza i rdzenia, NKS-5u, NKS-30m Essos -3.7%; ZC1-16b jedwab 0.65; NDS-3a najgorsze okno -0.235; NPR-16 (1 wioska v7 nie na
+  ladzie); NF4-8 zelazo -56 (d109138); NSK-3 mieso -11 (d109162). Glod 0, odsiecz 100%, przysiolki/zajazdy v7 TAK (poza NPR-16).
+- 14:05 PDT: TEST fin94 = 10beef63 (f15 W5c) w toku (test/fin94, at-fin94-f15.out.txt, ks-auto.flag - USUNAC!). Workflow f16-fin93 (wf_6598e0b6-c3e): f16-akum, f16-ks, f16-ksiega,
+  f16-drobne od 10beef63 (diagnoza + kod + recenzja). Recenzja scalenia f15: wf_90c50428-80e.
