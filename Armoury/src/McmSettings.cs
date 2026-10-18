@@ -7104,6 +7104,14 @@ namespace Armoury
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool GoodsLedgerHorses { get; set; } = true;
 
+        [SettingPropertyBool("Ks Ledger Current Recipes", HintText = "with Start Calibration applied and Ks Real Recipes: the goods ledger in the log counts the town craftsmen's meat and ale against the recipes in force (by weight) - until now it remembered the game's old recipes and showed some 1,700 pieces a day of meat and ale 'from nothing' that were never made, so a real leak could hide in that noise (log only; off = as before)")]
+        [SettingPropertyGroup("Start calibration: goods ledger and slaughter hides (night 17/18.10)")]
+        public bool KsLedgerCurrentRecipes { get; set; } = true;
+
+        [SettingPropertyBool("Ks Hides By Table", HintText = "with Start Calibration applied and Ks Real Recipes: a beast slaughtered in a town - by the hidden craftsmen or at a butcher's - gives as many raw hides as the one world table counts for the same beast slaughtered in a village: 1.6 hides for a cow, 0.6 for a hog, 0.4 for a sheep (8, 5 and 10 kg of raw hide for each 100 kg of the beast). The fractions are tallied town by town and kept in the save; a whole hide reaches the stall each time a town's tally fills up. Until now a town sheep gave a whole hide (two and a half times a village sheep) and a butcher's cow five, and raw hides piled up unsold on every stall. Needs Artisan Own Inputs for the town craftsmen. Off = the recipes' round numbers, as before")]
+        [SettingPropertyGroup("Start calibration: goods ledger and slaughter hides (night 17/18.10)")]
+        public bool KsHidesByTable { get; set; } = true;
+
         [SettingPropertyBool("Dues Medieval", HintText = "the villages pay their lords and their king as they did in the Middle Ages: the lord's share, the tithe and - in war - the crown's share are taken from what the carts bring home, the moment they bring it, and a small fixed rent is paid first; nothing is taken any more as 'a share a day of whatever the village has saved' (the crown's war levy on village savings, the hoard tax, the lords' war levy from villages, the 5 percent Banner Kings village market). A village keeps three weeks of its needs and rent in its chest and spends on finer goods only what lies beyond it. The old takings fade out over Ds Ramp Days from the first day with this on (needs Town Folk Live; off by default until it is tested together with the village basket of the start calibration; off = the old rules from the next day)")]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public bool DuesMedieval { get; set; } = true;
@@ -9299,6 +9307,8 @@ namespace Armoury
             s.DteConvoyNoFreeFood = DteConvoyNoFreeFood;
             s.BkCaravanNoFreeFood = BkCaravanNoFreeFood;
             s.GoodsLedgerHorses = GoodsLedgerHorses;
+            s.KsLedgerCurrentRecipes = KsLedgerCurrentRecipes;
+            s.KsHidesByTable = KsHidesByTable;
             s.DuesMedieval = DuesMedieval;
             s.DsVillageCartDues = DsVillageCartDues;
             s.DsWarShareVillage = DsWarShareVillage;

@@ -47,6 +47,9 @@ namespace Armoury
     /// WELNA Z UBOJU (wsad: owca, wyrob kategorii wool): pierwszy cykl daje sztuke z receptury gry, owca kazdego dodatkowego cyklu - ArtisanWoolPerSheep
     /// (0.15) sztuki do licznika OSADY; pelna sztuka, gdy licznik dojdzie do 1 (pamiec ulamkow jak N1b: zapis arm_wool_frac, Reset). Jedna regula takze
     /// tam, gdzie BK dopisal welny wiecej niz 1 + pelne sztuki z licznika - nadwyzka zdjeta ze zwrotem zaplaty, jak kazda sztuka bez wsadu.
+    /// f4-ksiega-i-skory (noc 17/18.10): SKORA Z UBOJU przy recepturach KS i kluczu Ks Hides By Table - cel wywolania skory = pelne sztuki z licznika osady
+    /// (KsHides.ArtisanTarget: cykle x skora na wywolanie z tabeli swiata; krowa 1.6, swinia 0.6, owca 0.4 skory na sztuke), ta sama droga zdjecia nadwyzki
+    /// i dopisania braku co welna; YieldOf przy recepturach KS (klucz Ks Ledger Current Recipes) - 1, jak YieldNow.
     /// </summary>
     internal static class ArtisanInputs
     {
@@ -91,6 +94,7 @@ namespace Armoury
             _w = null; _open = _armed = false; _cycles = -1; _item = null;
             _errOnce.Clear();
             _woolFrac.Clear();   // E8/B: liczniki welny - wczytanie oddaje je w SyncData (arm_wool_frac), nowa kampania zaczyna od zera
+            KsHides.Reset();     // f4-ksiega-i-skory: ulamki skory z uboju (zapis arm_hide_frac) i liczniki doby - nowa kampania od zera, wczytanie oddaje je w SyncData
             SmallFixes8.Reset(); // E8/B: liczniki drobnych poprawek (sesja)
             ClearDay();
         }
@@ -185,6 +189,7 @@ namespace Armoury
                 if (!_dOut.TryGetValue(_item.StringId, out o)) { o = new int[2]; _dOut[_item.StringId] = o; }
                 o[0] += added;
                 int remove;
+                bool hideCall = false;   // f4: wywolanie skory pod regula tabeli swiata (KsHides)
                 if (_cycles < 0)
                 {
                     // pierwszy wyrob cyklu: cala nadwyzka BK schodzi z polki PRZED decyzja, kazdy dodatkowy cykl z wlasnym wsadem
@@ -219,14 +224,24 @@ namespace Armoury
                     // BK dopisal wiecej - nadwyzka zdjeta jak dotad, mniej - brakujace dopisane za zaplata kasy miasta z nadwyzki (Byproduct)
                     bool by = ByOn;
                     if (added < _cycles) { _bCalls++; _bLost += _cycles - added; }   // tyle sztuk gubi stara regula (liczone zawsze - dwie drogi w linii)
-                    int target = by ? ByTarget(w.Settlement) : _cycles;
+                    // f4-ksiega-i-skory: skora z linii uboju przy recepturach KS i kluczu Ks Hides By Table - cel wywolania z licznika osady (cykle x skory na wywolanie
+                    // z tabeli swiata, ulamek w pamieci osady); -1 = nie ta regula (stara droga bez zmian)
+                    int hideT = KsHides.ArtisanTarget(w.Settlement, _p.Outputs, _item, _cycles);
+                    hideCall = hideT >= 0;
+                    int target = hideCall ? hideT : (by ? ByTarget(w.Settlement) : _cycles);
                     remove = Math.Min(added - target, Plain(roster, _item));
                     if (remove > 0)
                     {
                         roster.AddToCounts(new EquipmentElement(_item), -remove);
-                        if (target < _cycles) _bWoolCut += remove - Math.Max(0, Math.Min(remove, added - _cycles));   // welna zdjeta ponad stara regule
+                        if (hideCall) KsHides.NoteArtisanCut(remove);
+                        else if (target < _cycles) _bWoolCut += remove - Math.Max(0, Math.Min(remove, added - _cycles));   // welna zdjeta ponad stara regule
                     }
-                    else if (by && added < target) Byproduct(w, town, roster, target - added);
+                    else if (added < target)
+                    {
+                        int add0 = _bAdd, uns0 = _bUnsold;
+                        if (by) Byproduct(w, town, roster, target - added);
+                        if (hideCall) KsHides.NoteArtisanShort(target - added, _bAdd - add0, _bUnsold - uns0);   // f4: brak sztuk BK wobec celu (dopisane / niesprzedane / bez E8/B)
+                    }
                 }
                 if (remove <= 0) return;
                 o[1] += remove;
@@ -240,6 +255,7 @@ namespace Armoury
                     town.ChangeGold(back);
                     MoneyLedger.NoteArtisans(w.Settlement, 0, back);
                     _dRefund += back;
+                    if (hideCall) KsHides.NoteArtisanRefund(back);   // f4: zwrot zaplaty BK za skory ponad tabele (kapital rzemieslnikow -> kasa miasta)
                 }
                 if (back < due) _dRefundShort += due - back;
             }
@@ -297,6 +313,9 @@ namespace Armoury
         /// <summary>ZC1: to samo dla ksiegi towarow (GoodsLedger - linia z wsadem wedlug kategorii) - gorna granica sztuk na cykl (2 w przejsciu, losowo do 2).</summary>
         internal static int YieldOf(IDictionary<ItemCategory, int> ins, ItemCategory outCat)
         {
+            // f4-ksiega-i-skory (klucz Ks Ledger Current Recipes): przy recepturach KS (piwo juz wedlug wagi, 2 zboza -> 5 piw) cykl daje 1 x receptura - jak YieldNow;
+            // dotad ksiega oczekiwala 2 x receptura i prawdziwy wyciek piwa do 100% chowalby sie pod oczekiwaniem
+            if (KsRecipes.Active && KsRecipes.LedgerKeyOn) return 1;
             if (!GoodsPaths.BeerOn || outCat == null || outCat.StringId != "beer" || ins == null || !(GoodsPaths.BeerT > 0f)) return 1;
             foreach (var k in ins.Keys) if (k != null && k.StringId == "grain") return 2;
             return 1;
@@ -457,6 +476,7 @@ namespace Armoury
         // ------------------------------------------------------------ linia dnia
         internal static void Daily()
         {
+            KsHides.Daily();   // f4-ksiega-i-skory: linia doby "Skory z uboju (KS-S)" (wlasny try; takze przy wylaczonych rzemieslnikach 147 - rzeznicy ida osobna droga)
             try
             {
                 if (!On || Campaign.Current == null) { ClearDay(); return; }
