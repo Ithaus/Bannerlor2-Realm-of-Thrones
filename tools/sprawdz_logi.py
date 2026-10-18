@@ -1091,6 +1091,11 @@ Uzycie (Python 3, tylko odczyt):
                     narodzin i powrotow band najazdu (dzien puli = dzien linii najazdow + 1), NMUR-30 koszt <= 5 ms, NMUR-31 potkniecia 0, NMUR-32 wymarsz (bandy dochodza
                     do celu - >= 1 przy >= 3 bandach i biegu >= 60 dob; bez segmentu - INFO), NMUR-E ERROR paczki 0.
                     Log bez linii (sprzed paczki albo KS niezastosowany) - INFO, bez wyjatku.
+                    fix-mur (18.10, klucze Wall Tribute District Room i Free Folk Raid Kin Peace; fin83: NMUR-6 0.895, NMUR-32 0 z 13): NMUR-13 zadanie obciete brakiem
+                    miejsca (bez miejsca / brak, 28 ostatnich dob czynnych) <= 5% przy "[miejsce: okreg" w linii (inaczej INFO - fin83 14.7%); NMUR-32 bierze licznik
+                    "cel: doszly A z B band" z ostatniej linii (od wersji fix-mur, przezywa zapis), inaczej sume "doszly dzis"; NMUR-33 bandy rozbite w marszu przez
+                    Wolnych Ludzi <= 10% wyruszylych (zwykle 0) przy "swoi nie bija swoich: tak"; NMUR-34 zatrzymane w marszu wedlug strony (Straz / Polnoc / inni,
+                    zawrocily rozbite, marsz ponad 30 dob) i odmowy ataku latki (INFO); NMUR-35 latka "swoi nie bija swoich" wpieta przy kluczu tak. Bez segmentu - INFO.
                     ds-akumulator (18.10): NDS-3a/3b dryf kies wsi w oknie od konca rampy KS (koniec popytu) albo DS F1 (DayOn + 28) + 2 x 15 dob (za krotkie - ostatnie 30 dob),
                     NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
                     jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
@@ -38014,6 +38019,8 @@ NMUR_COV_MIN = 0.90        # pokrycie Strazy z pola i daniny (mediana ostatnich 
 NMUR_BARN_DROP = 0.05      # spichlerze Strazy (dni) od pierwszej do ostatniej doby czynnej: spadek najwyzej 5%
 NMUR_MS = 5.0              # koszt linii (mediana ms) - kazda z dwoch
 NMUR_ROT_MAX = 0.05        # zboze przepadle u bram (woz 30 dob bez rozladunku) / wyslane od poczatku - tylko utrata okregu Strazy przy pelnych spichlerzach dawcow
+NMUR_CUT_MAX = 0.05        # fix-mur: zadanie obciete brakiem miejsca / brak (28 ostatnich dob czynnych) przy miejscu okregu (fin83 bez klucza: 14.7%)
+NMUR_KIN_MAX = 0.10        # fix-mur: bandy rozbite w marszu przez Wolnych Ludzi / wyruszyle - przy "swoi nie bija swoich: tak" (fin83 bez klucza: 10 z 13)
 
 
 def nmur_main(logp, until=120):
@@ -38125,6 +38132,23 @@ def nmur_main(logp, until=120):
             rep.add("NMUR-12: zboze przepadle u bram (woz 30 dob bez rozladunku)", f"{rot_s:.0f} racji = {100.0 * share:.2f}% wyslanego ({out_s:.0f})", f"<= {100 * NMUR_ROT_MAX:.0f}% (zwykle 0)", share <= NMUR_ROT_MAX)
         else:
             rep.add("NMUR-12: zboze przepadle u bram", "brak segmentu (linia sprzed recenzji r4-mur)", "INFO", None)
+        # fix-mur: zadanie obciete brakiem miejsca w spichlerzach Strazy (28 ostatnich dob czynnych)
+        cut_rows = []
+        for d in on:
+            g = fnum(r"\(brak " + F_ + r" \+ uzupelnienie", trib[d]); c = fnum(r"bez miejsca w spichlerzu " + F_, trib[d])
+            if g is not None and c is not None:
+                cut_rows.append((d, g, c, "[miejsce: okreg" in trib[d], num(r"wsi przy suficie (\d+)", trib[d])))
+        cut_rows = cut_rows[-28:]
+        if cut_rows:
+            g_s = sum(x[1] for x in cut_rows); c_s = sum(x[2] for x in cut_rows)
+            share = c_s / g_s if g_s > 0 else 0.0
+            pooled = all(x[3] for x in cut_rows)
+            fv = [x[4] for x in cut_rows if x[4] is not None]
+            extra = f", wsi przy suficie (ostatnia doba) {fv[-1]}" if fv else ""
+            rep.add("NMUR-13: zadanie Strazy obciete brakiem miejsca (bez miejsca / brak, 28 ostatnich dob)", f"{100.0 * share:.1f}% ({c_s / len(cut_rows):.0f} z {g_s / len(cut_rows):.0f} racji/d){extra}; miejsce: {'okreg' if pooled else 'wies (albo linia sprzed fix-mur)'}",
+                    f"<= {100 * NMUR_CUT_MAX:.0f}% przy miejscu okregu (inaczej INFO)", (share <= NMUR_CUT_MAX) if pooled else None)
+        else:
+            rep.add("NMUR-13: zadanie Strazy obciete brakiem miejsca", "brak segmentu", "INFO", None)
     else:
         rep.add("NMUR-1..11: danina", "brak linii czynnych" + (f" (wylaczona: {trib_off[-1][len(NMUR_TRIB):][:120]})" if trib_off else ""), "INFO", None)
 
@@ -38201,7 +38225,31 @@ def nmur_main(logp, until=120):
         stb = num(r"potkniecia (\d+)", last)
         rep.add("NMUR-31: potkniecia najazdow (od wczytania)", stb, "0", stb == 0 if stb is not None else None)
         arr = [num(r"doszly dzis (\d+)", raid[d]) for d in rd]
-        if any(x is not None for x in arr):
+        mcel = re.search(r"\| cel: doszly (\d+) z (\d+) band \(dzis \d+\), zatrzymane w marszu (\d+) \(zginely: Straz (\d+), Polnoc (\d+), Wolni Ludzie (\d+), inni (\d+); "
+                         r"zawrocily rozbite (\d+)\), marsz ponad \d+ dob (\d+), w marszu teraz (\d+), zginely po dojsciu lub w powrocie (\d+)", last)
+        if mcel:
+            # fix-mur: licznik od poczatku (w zapisie) - doszly / zatrzymane i przez kogo
+            reached, ns_c, blk, kw, kn, kf, ko, turn, capm, mar, died = (int(mcel.group(i)) for i in range(1, 12))
+            # bandy sprzed fix-mur (wczytany zapis) licza sie w "wyruszylo", nie w wyniku - prog wedlug band z wynikiem
+            known = reached + blk + capm                                       # bandy z wynikiem marszu (zginely po dojsciu - osobno, moga byc tez w "zawrocily")
+            ok = (reached >= 1) if (known >= 3 and len(rd) >= 60) else None
+            rep.add("NMUR-32: wymarsz band do celu (bez napadow po drodze; u celu patrol)", f"doszly do celu {reached} z {ns_c} band (zatrzymane w marszu {blk}, marsz ponad 30 dob {capm}, w marszu teraz {mar}, zginely po dojsciu lub w powrocie {died})",
+                    ">= 1 przy >= 3 bandach z wynikiem i biegu >= 60 dob (inaczej INFO)", ok)
+            kin = re.search(r"\| swoi nie bija swoich: (tak|nie) \(latka ([^,]+), band w migawce (\d+)\), odmowy ataku dzis (\d+) \(od wczytania (\d+)\)", last)
+            veto = sum(num(r"odmowy ataku dzis (\d+)", raid[d]) or 0 for d in rd)
+            if kin and kin.group(1) == "tak":
+                lim = NMUR_KIN_MAX * max(1, ns_c)
+                rep.add("NMUR-33: Wolni Ludzie nie bija wlasnych band najazdu (rozbite w marszu przez Wolnych Ludzi)", f"{kf} z {ns_c} wyruszylych band",
+                        f"<= {100 * NMUR_KIN_MAX:.0f}% wyruszylych (zwykle 0)", kf <= lim)
+            else:
+                rep.add("NMUR-33: Wolni Ludzie nie bija wlasnych band najazdu", f"klucz Free Folk Raid Kin Peace: {kin.group(1) if kin else 'brak segmentu'}; rozbite przez Wolnych Ludzi {kf}", "INFO", None)
+            rep.add("NMUR-34: zatrzymane w marszu wedlug strony (od poczatku)", f"Straz {kw}, Polnoc {kn}, Wolni Ludzie {kf}, inni / bez bitwy {ko}; zawrocily rozbite {turn}; odmowy ataku latki w biegu {veto}",
+                    "INFO (Straz i Polnoc to obrona Muru - zatrzymanie zgodne z ksiazkami)", None)
+            if kin:
+                hook_ok = kin.group(2).strip() == "wpieta"
+                rep.add("NMUR-35: latka 'swoi nie bija swoich' wpieta (DefaultMobilePartyAIModel.ShouldConsiderAttacking)", f"klucz {kin.group(1)}, latka {kin.group(2).strip()}",
+                        "wpieta przy kluczu tak", hook_ok if kin.group(1) == "tak" else None)
+        elif any(x is not None for x in arr):
             arr_s = sum(x or 0 for x in arr)
             mar = num(r"w marszu (\d+)", last) or 0
             m = re.search(r"band: wyruszylo (\d+)", last)
