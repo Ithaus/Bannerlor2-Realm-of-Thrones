@@ -6,6 +6,7 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
@@ -77,6 +78,8 @@ namespace Armoury
             _leather = null; _linen = null; _clay = null; _itemsTried = false;
             _clayDay = int.MinValue; _clayNeed.Clear(); _clayHeldLord.Clear(); _clayHeldFolk.Clear(); _clayHeldLordPcs = 0; _clayHeldFolkPcs = 0;
             _clayHeldKs.Clear(); _clayHeldKsPcs = 0;
+            _xToday.Clear(); _xAvg = new Dictionary<Town, float[]>(); _xDays = 0; _xFirstDay = true; _xPending = null; _xLoadedDays = -1; _xLoadedTowns = 0; _xSaveCut = 0; _xLoadedOld = false;   // f14-rynek K4
+            Array.Clear(_xSrc, 0, _xSrc.Length);
             _stumbles = 0; _stumblesAll = 0; _errOnce.Clear();
         }
 
@@ -295,6 +298,189 @@ namespace Armoury
             catch (Exception e) { Stumble("Resolve", e); }
         }
 
+        // ============================================================ K4 (f14-rynek): wywoz skory i plotna w cenie miasta-zrodla, rzemioslo 148 po cenie swojego targu
+        // fin92 (Armoury-2026-10-18_09-33-39.log, NWAR-15 NIE: klin skora/skory 0.51 -> 0.34, plotno/len 0.51 -> 0.42): rzemioslo miasta cenilo wyrob po cenie najlepszego
+        // miasta z brakiem w zasiegu (TownCrafts - Tanner/WeaverExportPrice, MaterialOrders.ExportNet: skora srednio 86-97 d przy wartosci 40 d, plotno 220-330 d przy 100 d),
+        // kazde z ok. 11 miast-zrodel w zasiegu tego samego celu z osobna, poki jego polka ponizej progu - "tylko dzieki cenie wywozu" 312-342 szt. skory na dobe, a wywiezione
+        // (kontrakty 174, wozy kupcow P3/Z1, karawany) ok. 116 szt./d. Kontrakt, woz i karawana placa zrodlu cene JEGO targu (MaterialOrders.Place / OrderByCart, CaravanBulk -
+        // SellItemsAction, ShelfBuy po cenie zrodla), wiec cena wywozu byla cena, ktorej nikt w zrodle nie dostaje: skory surowe szly do parytetu wywozu (indeks 2.0-2.5),
+        // a skora i plotno zostawaly tanie na polkach (38 i 60 miast z nadwyzka).
+        // Regula (klucz ClothExportInPrice, przy kluczu K2 i ksiedze towarow - jak K2): (a) sztuki skory i plotna, ktore kupcy wywoza z polki miasta - karawany kupujace w
+        // miescie (ramki handlu FSell: sprzedawca miasto, kupujacy karawana; wyjazd karawany BK - FCaravanLeave), wozy kupcow innych miast (MaterialCarts.Ship ze zrodla-miasta) -
+        // srednia ok. 14 dob na miasto, do popytu ceny surowcow (RawPrice.UseDemand, czesc "off" obok K2); (b) gdy pomiar ma >= 7 dob, rzemioslo miasta 148 liczy skore i
+        // plotno po cenie WLASNEGO targu (TownCrafts.ExportKind - bez ceny wywozu): wywoz jest juz w cenie targu, ktora kupiec zrodlu placi. Jedna regula na jedno zjawisko.
+        // Sama cena i rachunek rzemiosla - zloto i towary ida tymi samymi drogami (kupiec -> kasa miasta-zrodla po cenie targu). Bez klucza albo ksiegi - jak dotad.
+        internal static bool ExpKey { get { var s = Settings.Current; return s != null && s.ClothExportInPrice && s.ClothDemandFromOfftake; } }
+        /// <summary>K4 czynne: klucz (przy K2) i ksiega towarow (ramki handlu tylko przy niej) - bez ksiegi pomiar stoi i cena wywozu rzemiosla wraca (jak dotad).</summary>
+        internal static bool ExpOn { get { return ExpKey && GoodsLedger.On; } }
+        private const int ExpMature = 7;                 // dob pomiaru wywozu, po ktorych rzemioslo 148 liczy po cenie wlasnego targu (wygladzenie popytu gry 15%/d - ok. 2/3 skutku)
+        private const string ExpTag = "f14x1";
+        private const int ExpSaveMax = 20000;            // straznik rozmiaru zapisu (97 miast x 2 liczby - ok. 3 000 znakow)
+        private static readonly Dictionary<Town, float[]> _xToday = new Dictionary<Town, float[]>();   // miasto -> [skora, plotno] wywiezione od ostatniej linii (sztuki)
+        // miasto -> [skora, plotno], srednia ok. 14 dob (szt./d); podmieniany w calosci (ExportOf moze isc z watkow AI - jak UseOf)
+        private static Dictionary<Town, float[]> _xAvg = new Dictionary<Town, float[]>();
+        private static int _xDays; private static bool _xFirstDay = true;
+        private static string _xPending; private static int _xLoadedDays = -1, _xLoadedTowns, _xSaveCut; private static bool _xLoadedOld;
+        private static readonly long[,] _xSrc = new long[2, 3];   // [skora/plotno, karawany w miescie / wyjazd karawany BK / wozy kupcow] od ostatniej linii
+
+        /// <summary>K4: rzemioslo miasta 148 bez ceny wywozu (TownCrafts.ExportKind) - pomiar wywozu czynny i dojrzaly (>= 7 dob); inaczej cena wywozu jak dotad.</summary>
+        internal static bool CraftLocalOnly { get { return ExpOn && _xDays >= ExpMature; } }
+
+        private static void NoteExport(Town town, int g, int src, int n)
+        {
+            float[] arr;
+            if (!_xToday.TryGetValue(town, out arr)) { arr = new float[2]; _xToday[town] = arr; }
+            arr[g] += n;
+            _xSrc[g, src] += n;
+        }
+
+        /// <summary>GoodsLedger.SettleMk (po rozliczeniu ramki): skora i plotno, ktore karawana kupila z polki miasta - ramka handlu (FSell: a sprzedawca = osada-miasto,
+        /// b kupujacy = karawana) albo wyjazd karawany BK (FCaravanLeave: a karawana, b osada-miasto); inB - zmiana sztuk w rosterze karawany (RB obu ramek). Sam licznik.</summary>
+        internal static void FromTrade(int kind, object a, object b, List<int> touched, int[] inB, ItemObject[] items)
+        {
+            try
+            {
+                if (touched == null || touched.Count == 0 || inB == null || items == null || !ExpKey) return;
+                Settlement st; MobileParty car; int src;
+                if (kind == GoodsLedger.FSell)
+                {
+                    var seller = a as PartyBase; var buyer = b as PartyBase;
+                    if (seller == null || buyer == null || seller.IsMobile || !buyer.IsMobile) return;
+                    st = seller.Settlement; car = buyer.MobileParty; src = 0;
+                }
+                else if (kind == GoodsLedger.FCaravanLeave) { car = a as MobileParty; st = b as Settlement; src = 1; }
+                else return;
+                if (st == null || !st.IsTown || st.Town == null || car == null || !car.IsCaravan || !Items()) return;
+                foreach (var i in touched)
+                {
+                    if (i < 0 || i >= inB.Length || i >= items.Length || inB[i] <= 0) continue;
+                    var it = items[i];
+                    int g = it == _leather ? 0 : it == _linen ? 1 : -1;
+                    if (g >= 0) NoteExport(st.Town, g, src, inB[i]);
+                }
+            }
+            catch (Exception e) { Stumble("FromTrade", e); }
+        }
+
+        /// <summary>MaterialCarts.Ship: n sztuk zdjetych z polki zrodla na woz kupcow innego miasta - wywoz z miasta-zrodla (zamek pominiety - gra nie prowadzi jego danych rynku).</summary>
+        internal static void NoteCart(Settlement src, ItemObject item, int n)
+        {
+            try
+            {
+                if (n <= 0 || src == null || item == null || !src.IsTown || src.Town == null || !ExpKey || !Items()) return;
+                int g = item == _leather ? 0 : item == _linen ? 1 : -1;
+                if (g >= 0) NoteExport(src.Town, g, 2, n);
+            }
+            catch (Exception e) { Stumble("NoteCart", e); }
+        }
+
+        /// <summary>RawPrice.UseDemand: wywoz skory albo plotna z polki miasta przez kupcow (srednia ok. 14 dob, szt./d); 0 = klucz wylaczony, bez ksiegi, inny towar,
+        /// pomiar pusty albo blad (popyt jak dotad).</summary>
+        internal static float ExportOf(Town town, ItemObject item)
+        {
+            if (town == null || item == null || !ExpOn) return 0f;
+            try
+            {
+                if (!Items()) return 0f;
+                int g = item == _leather ? 0 : item == _linen ? 1 : -1;
+                if (g < 0) return 0f;
+                float[] a;
+                var avg = _xAvg;
+                return avg.TryGetValue(town, out a) && a != null && a.Length == 2 ? a[g] : 0f;
+            }
+            catch (Exception e) { Stumble("ExportOf", e); return 0f; }
+        }
+
+        private static void FoldExport(Dictionary<Town, float[]> cur)
+        {
+            _xDays++;
+            float k = Math.Min(_xDays, OffSpan);            // pierwsza pelna doba = srednia, potem srednia wykladnicza z ok. 14 dob (jak K2)
+            var old = _xAvg;
+            var next = new Dictionary<Town, float[]>(old.Count + 8);
+            var towns = new List<Town>(old.Keys);
+            foreach (var t in cur.Keys) if (!old.ContainsKey(t)) towns.Add(t);
+            foreach (var t in towns)
+            {
+                float[] o, c;
+                var a = new float[2];
+                if (old.TryGetValue(t, out o) && o != null && o.Length == 2) Array.Copy(o, a, 2);
+                cur.TryGetValue(t, out c);
+                bool any = false;
+                for (int g = 0; g < 2; g++)
+                {
+                    float now = c != null && g < c.Length ? c[g] : 0f;
+                    a[g] += (now - a[g]) / k;
+                    if (a[g] < 0.001f) a[g] = 0f;
+                    if (a[g] > 0f) any = true;
+                }
+                if (any) next[t] = a;
+            }
+            _xAvg = next;
+        }
+
+        /// <summary>SyncData (zapis, klucz "arm_f7_export"): "f14x1|doby|miasto=skora,plotno|..." - null przy wylaczonym kluczu (klucz zapisu nie powstaje).</summary>
+        internal static string ExportSave()
+        {
+            if (!ExpKey) return null;
+            try
+            {
+                ResolveExport();
+                var sb = new StringBuilder(3072);
+                sb.Append(ExpTag).Append('|').Append(_xDays.ToString(Inv));
+                foreach (var kv in _xAvg)
+                {
+                    var t = kv.Key; var a = kv.Value;
+                    string id = t != null && t.Settlement != null ? t.Settlement.StringId : null;
+                    if (a == null || a.Length != 2 || string.IsNullOrEmpty(id) || id.IndexOf('|') >= 0 || id.IndexOf('=') >= 0 || id.IndexOf(',') >= 0) continue;
+                    string part = id + "=" + a[0].ToString("0.###", Inv) + "," + a[1].ToString("0.###", Inv);
+                    if (sb.Length + part.Length + 1 > ExpSaveMax) { _xSaveCut++; break; }
+                    sb.Append('|').Append(part);
+                }
+                return sb.ToString();
+            }
+            catch (Exception e) { Stumble("ExportSave", e); return null; }
+        }
+
+        /// <summary>SyncData (wczytanie): napis odlozony do pierwszego uzycia na watku glownym; brak klucza (stary zapis) = pomiar od zera (7 dob do rzemiosla po cenie targu).</summary>
+        internal static void ExportLoad(string data) { _xPending = string.IsNullOrEmpty(data) ? null : data; }
+
+        private static void ResolveExport()
+        {
+            if (_xPending == null || Campaign.Current == null) return;
+            string data = _xPending; _xPending = null;
+            try
+            {
+                var parts = data.Split('|');
+                int d;
+                if (parts.Length < 2 || parts[0] != ExpTag || !int.TryParse(parts[1], NumberStyles.Integer, Inv, out d) || d < 0) { _xLoadedDays = 0; _xLoadedOld = true; return; }
+                var byId = new Dictionary<string, Town>(StringComparer.Ordinal);
+                foreach (var t in Town.AllTowns) if (t != null && t.IsTown && t.Settlement != null) byId[t.Settlement.StringId] = t;
+                int towns = 0;
+                var next = new Dictionary<Town, float[]>(_xAvg);
+                for (int i = 2; i < parts.Length; i++)
+                {
+                    int eq = parts[i].IndexOf('=');
+                    if (eq <= 0) continue;
+                    Town town;
+                    if (!byId.TryGetValue(parts[i].Substring(0, eq), out town)) continue;
+                    var v = parts[i].Substring(eq + 1).Split(',');
+                    if (v.Length < 2) continue;
+                    var arr = new float[2]; bool good = true;
+                    for (int g = 0; g < 2 && good; g++)
+                    {
+                        float x;
+                        good = float.TryParse(v[g], NumberStyles.Float, Inv, out x) && x >= 0f && !float.IsInfinity(x);
+                        if (good) arr[g] = x;
+                    }
+                    if (!good) continue;
+                    next[town] = arr; towns++;
+                }
+                _xAvg = next;
+                _xDays = Math.Max(_xDays, d); _xLoadedDays = d; _xLoadedTowns = towns;
+            }
+            catch (Exception e) { Stumble("ResolveExport", e); }
+        }
+
         // ============================================================ K3: glina budow ponad potrzebe garncarzy
         internal static bool ClayKey { get { var s = Settings.Current; return s != null && s.BuildClayForPotters; } }
         private static int _clayDay = int.MinValue;
@@ -379,18 +565,48 @@ namespace Armoury
                 try { _behOk = Campaign.Current != null && Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>() != null; }
                 catch (Exception e) { _behOk = false; Stumble("SessionStart(zachowanie)", e); }
                 Resolve();
+                ResolveExport();   // f14-rynek K4: pomiar wywozu z zapisu (arm_f7_export)
                 Log.Info("Warsztaty codzienne (f7-browary): start sesji | K1 rzemioslo miasta po warsztatach (Town Crafts After Workshops) " + YN(AfterKey)
                          + " (latka " + YN(AfterHooked) + ", warsztaty gry w kampanii " + YN(_behOk) + ", czynne " + YN(CraftAfterOn) + ")"
                          + " | K2 popyt skory i plotna z odbioru (Cloth Demand From Offtake) " + YN(OffKey) + " (ksiega towarow " + YN(GoodsLedger.On) + "; pomiar z zapisu "
                          + (_loadedDays >= 0 ? "dob " + _loadedDays + ", miast " + _loadedTowns + (_loadedOld ? " - stary format, od zera" : "") : "brak (pierwsza pelna doba = srednia)") + ")"
                          + "; pod KS wsie i dwory x (1 - lambda) - juz w popycie koszyka ZC4; bez logu albo ksiegi towarow pomiar staje i cena skory i plotna wraca do starej reguly"
                          + " | K3 glina budow ponad potrzebe garncarzy (Build Clay For Potters) " + YN(ClayKey) + " (takze przetwory KS ZC5)"
+                         + " | K4 wywoz skory i plotna w cenie targu (Cloth Export In Price, f14-rynek) " + YN(ExpKey) + " (ksiega towarow " + YN(GoodsLedger.On) + ", K2 " + YN(OffKey)
+                         + "; pomiar z zapisu " + (_xLoadedDays >= 0 ? "dob " + _xLoadedDays + ", miast " + _xLoadedTowns + (_xLoadedOld ? " - stary format, od zera" : "") : "brak (pierwsza pelna doba = srednia)")
+                         + "; rzemioslo miasta (148) po cenie wlasnego targu od " + ExpMature + " dob pomiaru, teraz " + YN(CraftLocalOnly) + ")"
                          + " | obieg bez nowego przeplywu (kolejnosc, cena, czekajaca budowa) | potkniecia 0.");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
 
         private static string YN(bool b) { return b ? "tak" : "nie"; }
+
+        /// <summary>f14-rynek K4: wstawka linii dnia - wywoz dzis (wedlug drogi), srednia, w popycie ceny i stan rachunku rzemiosla 148.</summary>
+        private static void ExportSegment(StringBuilder sb, Dictionary<Town, float[]> xcur, long[,] xsrc)
+        {
+            double tl = 0, tn = 0, al = 0, an = 0; int curTowns = 0, avgTowns = 0;
+            if (xcur != null)
+                foreach (var kv in xcur)
+                {
+                    var c = kv.Value; if (c == null || c.Length != 2) continue;
+                    tl += c[0]; tn += c[1];
+                    if (c[0] > 0f || c[1] > 0f) curTowns++;
+                }
+            foreach (var kv in _xAvg) { var a = kv.Value; if (a == null || a.Length != 2) continue; al += a[0]; an += a[1]; avgTowns++; }
+            bool on = ExpOn;
+            sb.Append(" | K4 wywoz skory i plotna w cenie targu (Cloth Export In Price) ").Append(YN(ExpKey)).Append(" (ksiega towarow ").Append(YN(GoodsLedger.On))
+              .Append(", K2 ").Append(YN(OffKey)).Append("): dzis wywiezione skora ").Append(tl.ToString("0", Inv)).Append(" [karawany w miescie ").Append(xsrc[0, 0])
+              .Append(", wyjazd karawany BK ").Append(xsrc[0, 1]).Append(", wozy kupcow ").Append(xsrc[0, 2]).Append("], plotno ").Append(tn.ToString("0", Inv))
+              .Append(" [karawany w miescie ").Append(xsrc[1, 0]).Append(", wyjazd karawany BK ").Append(xsrc[1, 1]).Append(", wozy kupcow ").Append(xsrc[1, 2])
+              .Append("] szt. z ").Append(curTowns).Append(" miast; srednia ok. 14 dob swiat: skora ").Append(al.ToString("0.0", Inv)).Append(", plotno ").Append(an.ToString("0.0", Inv))
+              .Append(" szt./d z ").Append(avgTowns).Append(" miast (dob pomiaru ").Append(_xDays).Append(_xFirstDay && on ? ", doba sesji niepelna - odrzucona" : "")
+              .Append(_xLoadedDays >= 0 ? ", z zapisu " + _xLoadedDays + (_xLoadedOld ? " - stary format, od zera" : "") : "").Append("); w popycie ceny miasta-zrodla skora ")
+              .Append((on ? al : 0).ToString("0.0", Inv)).Append(", plotno ").Append((on ? an : 0).ToString("0.0", Inv)).Append(" szt./d")
+              .Append("; rzemioslo miasta (148) bez ceny wywozu (cena wlasnego targu): ").Append(YN(CraftLocalOnly)).Append(" (od ").Append(ExpMature).Append(" dob pomiaru)")
+              .Append(on ? "" : "; bez K2, logu albo ksiegi towarow pomiar stoi - rzemioslo liczy cene wywozu jak dotad")
+              .Append("; zapis: obcietych miast ").Append(_xSaveCut);
+        }
         private static readonly string[] Daily4 = { "brewery", "tannery", "pottery_shop", "linen_weavery" };
 
         /// <summary>Raz na dobe (TownCraftsBehavior, DailyTickEvent): odbior od ostatniej linii do sredniej (pierwsza doba sesji niepelna - odrzucona), linia
@@ -401,6 +617,8 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             var cur = new Dictionary<Town, float[]>(_today); _today.Clear();
             var src = (long[,])_dSrc.Clone(); Array.Clear(_dSrc, 0, _dSrc.Length);
+            var xcur = new Dictionary<Town, float[]>(_xToday); _xToday.Clear();                       // f14-rynek K4: wywoz od ostatniej linii
+            var xsrc = (long[,])_xSrc.Clone(); Array.Clear(_xSrc, 0, _xSrc.Length);
             int after = _dAfter, before = _dBefore; _dAfter = 0; _dBefore = 0;
             long heldLordPcs = _clayHeldLordPcs, heldFolkPcs = _clayHeldFolkPcs; int heldLord = _clayHeldLord.Count, heldFolk = _clayHeldFolk.Count;
             _clayHeldLord.Clear(); _clayHeldFolk.Clear(); _clayHeldLordPcs = 0; _clayHeldFolkPcs = 0;
@@ -412,13 +630,19 @@ namespace Armoury
                 if (!on) _firstDay = true;
                 else if (_firstDay) _firstDay = false;   // pierwsza doba sesji (od wczytania) niepelna - odrzucona
                 else Fold(cur);
-                if (AfterKey || OffKey || ClayKey) Line(day, cur, src, after, before, heldLord, heldLordPcs, heldFolk, heldFolkPcs, heldKs, heldKsPcs, t0);   // wszystkie klucze wylaczone - bez linii (log jak dotad)
+                // f14-rynek K4: wywoz do sredniej - ta sama zasada (pierwsza doba sesji niepelna - odrzucona, pierwsza pelna = srednia); bez klucza albo ksiegi pomiar stoi
+                ResolveExport();
+                bool xon = ExpOn;
+                if (!xon) _xFirstDay = true;
+                else if (_xFirstDay) _xFirstDay = false;
+                else FoldExport(xcur);
+                if (AfterKey || OffKey || ClayKey || ExpKey) Line(day, cur, src, after, before, heldLord, heldLordPcs, heldFolk, heldFolkPcs, heldKs, heldKsPcs, t0, xcur, xsrc);   // wszystkie klucze wylaczone - bez linii (log jak dotad)
             }
             catch (Exception e) { Stumble("Daily", e); }
         }
 
         private static void Line(int day, Dictionary<Town, float[]> cur, long[,] src, int after, int before, int heldLord, long heldLordPcs, int heldFolk, long heldFolkPcs,
-                                 int heldKs, long heldKsPcs, long t0)
+                                 int heldKs, long heldKsPcs, long t0, Dictionary<Town, float[]> xcur, long[,] xsrc)
         {
             var sb = new StringBuilder(1800);
             // K2: dzis i srednia (recenzja, uwaga 1: wojsko + naprawy osobno od wsi + dworow; w popycie ceny wsie i dwory x (1 - lambda) w miastach z koszykiem ZC4)
@@ -494,9 +718,10 @@ namespace Armoury
               .Append(" targach (").Append(heldFolkPcs).Append(" szt.), przetwory KS (ZC5) na ").Append(heldKs).Append(" targach (").Append(heldKsPcs).Append(" szt.)")
               .Append(" | warsztaty codzienne swiata: ");
             for (int k = 0; k < Daily4.Length; k++) sb.Append(k > 0 ? ", " : "").Append(Daily4[k]).Append(' ').Append(types[k]);
-            sb.Append(" (razem ").Append(sumTypes).Append(")")
-              .Append(" | obieg: zloto i towary bez nowego przeplywu (K1 kolejnosc - warsztat placi miastu za wsad jak dotad, rzemioslo bez zlota; K2 tylko cena;"
-                      + " K3 budowa czeka albo kupuje inny material, przetwory KS robia mniej garnkow, glina zostaje na polce)")
+            sb.Append(" (razem ").Append(sumTypes).Append(")");
+            ExportSegment(sb, xcur, xsrc);   // f14-rynek K4 (po typach swiata - wzorce K1-K3 i typow bez zmian)
+            sb.Append(" | obieg: zloto i towary bez nowego przeplywu (K1 kolejnosc - warsztat placi miastu za wsad jak dotad, rzemioslo bez zlota; K2 tylko cena;"
+                      + " K3 budowa czeka albo kupuje inny material, przetwory KS robia mniej garnkow, glina zostaje na polce; K4 tylko cena i rachunek rzemiosla - kupiec placi zrodlu cene jego targu jak dotad)")
               .Append(" | zapis: obcietych miast ").Append(_saveCut)
               .Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms")
               .Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumblesAll).Append(").");

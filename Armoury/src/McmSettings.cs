@@ -6916,6 +6916,10 @@ namespace Armoury
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool BuildClayForPotters { get; set; } = true;
 
+        [SettingPropertyBool("Cloth Export In Price", HintText = "with Cloth Demand From Offtake: the price of leather and linen in a town also counts what merchants really carry away from its stalls each day - caravans buying there (hired ones included) and the merchants' carts sent from other towns (average of about two weeks, read from the goods ledger - needs Goods Ledger Enabled and the log on). Once a week of it is measured, the town's own tanners and weavers (Town Crafts Enabled) work for what their own market pays - the merchants who carry leather and linen away pay the town's price, and that price now holds what they carry away - instead of the best price of a town short of them far away, which none of them is paid and which every tanner and weaver around counted for himself. Only the price and the craftsmen's reckoning change - no coin or goods move differently. Off (or Goods Ledger off) = tanners and weavers reckon the export price (Tanner Export Price, Weaver Export Price) and the town price does not count the merchants, as before")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool ClothExportInPrice { get; set; } = true;
+
         [SettingPropertyBool("Daily Life Measure", HintText = "Daily life (a measure only): every day the people of each village and town are reckoned by estate - slaves, peasants, labourers, craftsmen, merchants, gentry and the great houses - with their daily table in kilograms (own fields and the market) and their Livelihood: how many times over they can afford the bare survival basket of bread, pottage, salt and fuel at local prices, for each estate, village, town, district, realm and the whole world, with the income per head. Written to the log and to stany-dostatek.csv only - nothing in the game changes (no coin, goods, prices, prosperity or AI). Off = no measure, as before")]
         [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
         public bool DailyLifeMeasure { get; set; } = true;
@@ -7575,6 +7579,10 @@ namespace Armoury
         [SettingPropertyBool("Ks Made7 Derived", HintText = "with Start Calibration applied (needs Ks Real Offtake): the town price of grain, grapes, olives, honey, clay and beasts counts as the bakers', vintners', pressers' and butchers' input only what they really made over the last week (plus what refills their stall), not what they could make; off = as before")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsMade7Derived { get; set; } = true;
+
+        [SettingPropertyBool("Ks Ctl Own Food", HintText = "with Ks Market Control: the weekly market steering counts the food a village ate from its own store waiting for the cart (when it bought less than the plan paid for) as eaten from that market - it was grown for the market and it fed the market's buyers, it only never reached the stall. Before, the plan's market supply held it but the market's use did not, so the steering cut foods the villages ate at home (Essos fish about 7%). Off = only what was bought at the stalls counts, as before")]
+        [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
+        public bool KsCtlOwnFood { get; set; } = true;
 
         [SettingPropertyBool("Ks Cloth Demand", HintText = "with Start Calibration applied: the Plan counts the linen, felt and leather that army clothing, arms workshops and smiths' repairs use up, so villages grow enough flax and wool and keep enough hides for them (the town weavers' own flax and wool are already counted in the cloth); off = as before")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
@@ -9592,6 +9600,7 @@ namespace Armoury
             s.TownCraftsAfterWorkshops = TownCraftsAfterWorkshops;
             s.ClothDemandFromOfftake = ClothDemandFromOfftake;
             s.BuildClayForPotters = BuildClayForPotters;
+            s.ClothExportInPrice = ClothExportInPrice;
             s.DailyLifeMeasure = DailyLifeMeasure;
             s.DailyLifeMarketScale = DailyLifeMarketScale;
             s.DailyLifeEstates = DailyLifeEstates;
@@ -9757,6 +9766,7 @@ namespace Armoury
             s.KsCtlPerTown = KsCtlPerTown;
             s.KsLandGlutGuard = KsLandGlutGuard;
             s.KsMade7Derived = KsMade7Derived;
+            s.KsCtlOwnFood = KsCtlOwnFood;
             s.KsClothDemand = KsClothDemand;
             s.WallGrainTribute = WallGrainTribute;
             s.WallTributeTargetDays = WallTributeTargetDays;

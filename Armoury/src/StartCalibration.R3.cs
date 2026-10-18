@@ -34,6 +34,8 @@ namespace Armoury
         internal static bool SwPerishReach { get { var s = S3; return s == null || s.KsPerishReach; } }
         internal static bool SwRealOfftake { get { var s = S3; return s == null || s.KsRealOfftake; } }
         internal static bool SwMarketControl { get { var s = S3; return s == null || s.KsMarketControl; } }
+        /// <summary>f14-rynek (klucz Ks Ctl Own Food): sterowanie rynku liczy "wies je swoje" (G3) rynku wsi w zuzyciu - podaz targu Planu, ktora nie doszla do straganu.</summary>
+        internal static bool SwCtlOwnFood { get { var s = S3; return s == null || s.KsCtlOwnFood; } }
         internal static bool SwBuyEvery2 { get { var s = S3; return s == null || s.KsVillageBuyEvery2; } }
         internal static bool SwGranaryRelease { get { var s = S3; return s == null || s.KsGranaryRelease; } }
 
@@ -207,11 +209,15 @@ namespace Armoury
             _cN++;
             double w = 1.0 / Math.Min(28, _cN);
             var c = new double[2 * KsTab.NG]; var u = new double[2 * KsTab.NG];
+            bool own = SwCtlOwnFood;
             foreach (var kv in _ctlTmp)
             {
                 int z = Array.IndexOf(ZIds, kv.Key); if (z < 0) continue;
                 int g = CtlGood(z); if (g < 0 || kv.Value == null || kv.Value.Length < 8) continue;
                 for (int m = 0; m < 2; m++) c[m * KsTab.NG + g] += Math.Max(0, kv.Value[3 + m]);
+                // f14-rynek (klucz Ks Ctl Own Food): wies je swoje (G3) rynku wsi - KsMarketTake [8 + m] (MkOwn: z magazynu wsi, poza straganem). Podaz targu Planu (dm) ma ten
+                // towar w sobie (wies miala go sprzedac i kupic koszyk na targu), a zuzycie targu nie - bez niego sterowanie widzialo nadmiar tam, gdzie wies zjadla swoje
+                if (own && kv.Value.Length >= 10) for (int m = 0; m < 2; m++) c[m * KsTab.NG + g] += Math.Max(0, kv.Value[8 + m]);
             }
             for (int m = 0; m < 2; m++) for (int z = 0; z < ZN; z++) { int g = CtlGood(z); if (g >= 0) u[m * KsTab.NG + g] += _uDay[m * ZN + z]; }
             Array.Clear(_uDay, 0, _uDay.Length);
@@ -311,7 +317,7 @@ namespace Armoury
                     sb.Append(' ').Append(KsTab.Goods[g]).Append(' ').Append(F0(_c28[i])).Append('/').Append(F0(SwCtlPerTown ? _ut28[i] : _u28[i])).Append('/').Append(F0(dm)).Append(" x").Append(k.ToString("0.000", Inv));
                 }
             }
-            sb.Append(" (towar: zuzycie bez drabiny 2 wsi / brak / podaz targu Planu szt./d, czynnik)");
+            sb.Append(SwCtlOwnFood ? " (towar: zuzycie bez drabiny 2 wsi + wies je swoje G3 (Ks Ctl Own Food) / brak / podaz targu Planu szt./d, czynnik)" : " (towar: zuzycie bez drabiny 2 wsi / brak / podaz targu Planu szt./d, czynnik)");
             sb.Append(R4cCtlNote(day));                            // KS r4 (r4-ceny): C1-C3
             _mfStage = stage;                                  // do _mf przy Planie bez bledu (PlanCollect)
             LandGlutWeekly(day, true);

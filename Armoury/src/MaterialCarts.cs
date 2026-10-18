@@ -124,6 +124,8 @@ namespace Armoury
                 Stumble("Ship", e);
                 if (c == null || !_carts.Contains(c)) { try { dst.ItemRoster.AddToCounts(item, n); } catch { } }
             }
+            // f14-rynek K4 (klucz ClothExportInPrice): skora i plotno zdjete z polki miasta-zrodla na woz kupcow - wywoz do ceny zrodla (sam licznik, wlasny try w srodku)
+            F7Workshops.NoteCart(src, item, n);
         }
 
         /// <summary>Raz na dobe na poczatku MaterialOrders.Daily (przed zamowieniami): dostawy, czekanie pod oblezeniem, zawrocenia po 30 dobach.

@@ -58,6 +58,9 @@ namespace Armoury
     /// Towary 2 / K3 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A6-2, klucz TannerExportPrice): garbarz tak samo - skora warta tyle, ile da za nia najlepsze miasto z brakiem
     /// skory w zasiegu minus droga, poki polka skory ponizej progu polki; garbarze stali "bez zysku" w 77 miastach przy 7.5 tys. skor surowych, bo skora potaniala
     /// (indeks 2.7 -> 1.1) po zdjeciu zakupow ludu, a zamowienia wojska i warsztatow z innych miast ceny tu nie podnosza.
+    /// f14-rynek K4 (noc 18.10, klucz ClothExportInPrice, F7Workshops): wywoz skory i plotna przez kupcow (karawany, wozy kupcow) idzie do popytu ceny targu miasta-zrodla
+    /// (RawPrice.UseDemand) - zamowienia innych miast podnosza teraz cene tu; od 7 dob pomiaru tkacz i garbarz licza po cenie WLASNEGO targu (ExportKind = -1), bo kupiec
+    /// placi zrodlu cene jego targu, a cena wywozu (najlepsze miasto z brakiem, liczone osobno przez kazde zrodlo w zasiegu) byla cena, ktorej nikt tu nie dostawal.
     /// </summary>
     internal static class TownCrafts
     {
@@ -115,13 +118,23 @@ namespace Armoury
         private static bool TannerOn { get { var s = Settings.Current; return s != null && s.TannerExportPrice; } }
         private const string TannerOut = "leather";    // K3: wyrob garbowany tez na wywoz
 
-        /// <summary>Rodzaj wyrobu na wywoz: 0 plotno (WeaverExportPrice), 1 skora (TannerExportPrice), -1 bez ceny wywozu (wyrob spoza listy albo klucz wylaczony).</summary>
+        /// <summary>Rodzaj wyrobu na wywoz: 0 plotno (WeaverExportPrice), 1 skora (TannerExportPrice), -1 bez ceny wywozu (wyrob spoza listy albo klucz wylaczony).
+        /// f14-rynek K4 (klucz ClothExportInPrice, pomiar wywozu >= 7 dob - F7Workshops.CraftLocalOnly): -1 - wywoz jest juz w cenie wlasnego targu (kupiec placi zrodlu
+        /// cene jego targu), wiec tkacz i garbarz licza po niej, a nie po cenie najlepszego miasta z brakiem, ktorej nikt w zrodle nie dostaje.</summary>
         private static int ExportKind(ItemObject outIt)
         {
             string id = outIt != null ? outIt.StringId : null;
+            if (id != ExportOut && id != TannerOut) return -1;
+            if (F7Workshops.CraftLocalOnly) return -1;
             if (id == ExportOut) return ExportOn ? 0 : -1;
-            if (id == TannerOut) return TannerOn ? 1 : -1;
-            return -1;
+            return TannerOn ? 1 : -1;
+        }
+
+        /// <summary>f14-rynek K4: napis klucza ceny wywozu w linii dnia - "tak" tylko, gdy cena wywozu naprawde dziala (przy K4 dojrzalym - "tak, zastapione ...").</summary>
+        private static string ExportState(bool key)
+        {
+            if (!key) return "nie";
+            return F7Workshops.CraftLocalOnly ? "tak, zastapione wywozem w cenie targu (f14 Cloth Export In Price)" : "tak";
         }
 
         /// <summary>Nowa gra / wczytanie (z WorkshopLaw.Reset, czyli z konstruktora ArmouryBehavior - przed SyncData).</summary>
@@ -499,7 +512,7 @@ namespace Armoury
                 Stocks(sb);
                 // plotno 14.10 (poprawka 2): dopisek wywozu (na koncu - stare wzorce linii bez zmian)
                 int asked = _dExpPriced[0] + _dExpNoDest[0] + _dExpFull[0];
-                sb.Append("; plotno na wywoz (WeaverExportPrice) ").Append(ExportOn ? "tak" : "nie").Append(": tkane tylko dzieki cenie wywozu ").Append(_dExp[0]).Append(" szt. w ")
+                sb.Append("; plotno na wywoz (WeaverExportPrice) ").Append(ExportState(ExportOn)).Append(": tkane tylko dzieki cenie wywozu ").Append(_dExp[0]).Append(" szt. w ")
                   .Append(_dExpTowns[0]).Append(" miastach (cena wywozu netto srednio ").Append(_dExp[0] > 0 ? (_dExpPrice[0] / _dExp[0]).ToString("0", CultureInfo.InvariantCulture) : "-")
                   .Append(" d); miast z lnem: z cena wywozu ").Append(_dExpPriced[0]).Append(" (celow w zasiegu srednio ")
                   .Append(_dExpPriced[0] > 0 ? (_dExpDests[0] / _dExpPriced[0]).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest[0])
@@ -507,7 +520,7 @@ namespace Armoury
                   .Append(asked > 0 ? (_dExpCap[0] / asked).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" szt.)");
                 // Towary 2 / K3: dopisek garbarza na wywoz (po dopisku plotna - wzorce plotna bez zmian)
                 int askedT = _dExpPriced[1] + _dExpNoDest[1] + _dExpFull[1];
-                sb.Append("; skora na wywoz (TannerExportPrice) ").Append(TannerOn ? "tak" : "nie").Append(": garbowane tylko dzieki cenie wywozu ").Append(_dExp[1]).Append(" szt. w ")
+                sb.Append("; skora na wywoz (TannerExportPrice) ").Append(ExportState(TannerOn)).Append(": garbowane tylko dzieki cenie wywozu ").Append(_dExp[1]).Append(" szt. w ")
                   .Append(_dExpTowns[1]).Append(" miastach (cena wywozu netto srednio ").Append(_dExp[1] > 0 ? (_dExpPrice[1] / _dExp[1]).ToString("0", CultureInfo.InvariantCulture) : "-")
                   .Append(" d); miast ze skorami: z cena wywozu ").Append(_dExpPriced[1]).Append(" (celow w zasiegu srednio ")
                   .Append(_dExpPriced[1] > 0 ? (_dExpDests[1] / _dExpPriced[1]).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest[1])
@@ -645,6 +658,23 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("TownCrafts.SyncData(arm_f7_cloth)", e); }
+            // f14-rynek K4 (klucz ClothExportInPrice): srednia wywozu skory i plotna z polek miast przez kupcow - wlasny try; przy wylaczonym kluczu nic nie zapisujemy
+            // (zapis jak dotad); stary zapis bez klucza = pomiar od zera (7 dob do rzemiosla po cenie targu); starsza DLL klucza nie czyta
+            try
+            {
+                if (dataStore.IsSaving)
+                {
+                    string xs = F7Workshops.ExportSave();
+                    if (xs != null) SaveText.Sync(dataStore, "arm_f7_export", ref xs);
+                }
+                else if (dataStore.IsLoading)
+                {
+                    string xs = null;
+                    SaveText.Sync(dataStore, "arm_f7_export", ref xs);
+                    F7Workshops.ExportLoad(xs);
+                }
+            }
+            catch (Exception e) { Log.Error("TownCrafts.SyncData(arm_f7_export)", e); }
         }
     }
 }
