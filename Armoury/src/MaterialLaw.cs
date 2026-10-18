@@ -183,6 +183,9 @@ namespace Armoury
                 if (StartCalibration.ProdStep(village, item, ref __result)) return;
                 CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
                 VillageFruit.Base(village, item, ref __result);     // noc 15/16.10 (placek i marchew): owoce i miod wsi wedlug wag BK - baza przed mnoznikami (P1, rece, regulator, zima)
+                // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - czynnik towarow typu okregu i baza towarow innych zajec PRZED mnoznikami (kopalnie, las, P1, rece,
+                // regulator towaru) - dopisany towar dostaje te same mnozniki co we wsi tego typu; wies pod KS, klucz wylaczony, wies bez planu - nic (wlasny try)
+                VillageCrafts.Base(village, item, ref __result);
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;
@@ -242,9 +245,6 @@ namespace Armoury
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);
-                // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - uogolniony krok W2 (towary typu x (1 - u_inne) x n + premia prac, towary innych zajec dopisane
-                // z M tej doby); wies pod KS, klucz wylaczony, wies bez planu - nic (wlasny try w VillageCrafts)
-                VillageCrafts.Step(village, item, ref __result);
                 // KS etap 2 (rampa podazy, rozdz. 6): wies zastosowana w rampie - wynik = (1 - beta) x lancuch gry (wyzej) + beta x stawka KS, PRZED sufitem dymarki i RockGold
                 // (sufity tna wynik mieszany); poza rampa tej wsi i towaru - nic
                 StartCalibration.BlendStep(village, item, ref __result);

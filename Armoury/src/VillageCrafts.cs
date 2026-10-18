@@ -19,10 +19,11 @@ namespace Armoury
     ///    generator tools/ks/ks_ziemia.py z symulacji upraw - regula A3 projektu: obrazek rybacki - rybacy, mlyn/spichlerz - zboze, typ okregu, najlepszy kandydat, zapas
     ///    strefy), kandydaci z tej samej tabeli swiata co KS (KsTab.Land2 >= 0.3). Wies gry zawsze typ okregu (A4). Zajecie musi miec typ wsi w grze (VillageType)
     ///    i typ musi gdzies byc typem okregu (inaczej neutralny start nie ma czego przeliczyc) - inaczej typ okregu.
-    ///    PRODUKCJA (uogolniony krok W2, MaterialLaw.ProdPostfix po W2, przed rampa KS): towary typu okregu x ((1 - u_inne) x n(typ) + premia prac), gdzie u_inne = udzial
-    ///    ludzi W DOMU wiosek z innym zajeciem (ten sam podzial co ksiega wiosek - plon idzie za ludzmi w domu); zboze kuchenne typu niezbozowego zostaje. Towary innych
-    ///    zajec - dopisek bazy: M x suma(udzial wioski x stawka typu zajecia x g(zajecie)/g(typ) x n(zajecie) x (1 + premia prac)), M = wynik towaru typu / stawka typu
-    ///    z tego samego ticku (pamiec doby; tick BK idzie po liscie: towary typu przed dopisanymi). Lista BK (MineralOnce, ostatni krok): towary innych zajec z waga 0.
+    ///    PRODUKCJA (uogolniony krok W2; MaterialLaw.ProdPostfix, PIERWSZY krok po KS, obok VillageFruit.Base - przed mnoznikami lancucha): towary typu okregu x
+    ///    ((1 - u_inne) x n(typ) + premia prac), gdzie u_inne = udzial ludzi W DOMU wiosek z innym zajeciem (ten sam podzial co ksiega wiosek - plon idzie za ludzmi
+    ///    w domu); zboze kuchenne typu niezbozowego zostaje. Towary innych zajec - baza: suma(udzial wioski x stawka typu zajecia x (poziom + 1) x 0.5 x g(zajecie)/g(typ)
+    ///    x n(zajecie) x (1 + premia prac)) - dalej te same mnozniki lancucha co we wsi tego typu (kopalnie i las, ludzie P1 - z g(typ) daje g(zajecie), rece E4/5 i E4/7,
+    ///    regulator TEGO towaru, zima). Lista BK (MineralOnce, ostatni krok): towary innych zajec z waga 0.
     ///    Magazyn wsi: + 5 dob dopisanych towarow (VillageFruit.CapPostfix). Krok W2 (HamletKinds) wylaczony przy tym kluczu - rybacy to zajecie rybackie (pelne rece).
     ///    NEUTRALNY START (A6): w pierwszej dobie klucza n(T) = rece swiata typu T przed / po (rece = ludzie w domu okregu x udzial czesci) - swiat ma tyle samo
     ///    kazdego typu, co dzien wczesniej; w zapisie (arm_crafts). Potem zmienia go tylko zysk.
@@ -335,7 +336,8 @@ namespace Armoury
                     for (int i = 0; i < m.Goods.Length; i++)
                     {
                         float cur; add.TryGetValue(m.Goods[i], out cur);
-                        add[m.Goods[i]] = cur + (float)(k * m.Rates[i]);
+                        // poprawka stawki typu (sol wsi solnych, futra trapperow - GoodsRates): lancuch patrzy na typ wsi gry, wioska z tym zajeciem dostaje ja w bazie
+                        add[m.Goods[i]] = cur + (float)(k * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId));
                     }
                 });
             }
@@ -384,9 +386,11 @@ namespace Armoury
         private static readonly TextObject _txtType = new TextObject("{=!}Armoury: side villages of the district work at their own crafts");
         private static readonly TextObject _txtAdd = new TextObject("{=!}Armoury: goods of the side villages' crafts");
 
-        /// <summary>MaterialLaw.ProdPostfix (po W2, przed rampa KS i sufitami kruszcow): towar typu okregu - czynnik (1 - u_inne) x n(typ) + premia prac (zboze kuchenne typu
-        /// niezbozowego bez zmian), pamiec M doby; towar zajec innych wiosek - dopisek bazy M x mnoznik planu (takze, gdy towar jest i w typie okregu).</summary>
-        internal static void Step(Village v, ItemObject item, ref ExplainedNumber r)
+        /// <summary>MaterialLaw.ProdPostfix, PIERWSZY krok po KS (obok VillageFruit.Base - przed mnoznikami lancucha: kopalnie i las, powtorzenia BK, ludzie P1, rece E4/5
+        /// i E4/7, regulator, hodowla): towar typu okregu - czynnik (1 - u_inne) x n(typ) + premia prac (zboze kuchenne typu niezbozowego bez zmian); towar zajec innych
+        /// wiosek - baza = suma(udzial x stawka typu zajecia x (poziom + 1) x 0.5 x g(zajecie)/g(typ) x n(zajecie) x (1 + premia)), a dalej te same mnozniki co towar
+        /// wioski tego typu (ten sam wzor co owoce wsi BK). Towar w typie i w zajeciu - baza / czynnik (dopisek bez czynnika typu). Wies nie Normal albo bez targu - nic.</summary>
+        internal static void Base(Village v, ItemObject item, ref ExplainedNumber r)
         {
             if (v == null || item == null || !KeyOn) return;
             try
@@ -394,39 +398,43 @@ namespace Armoury
                 Plan pl;
                 var plans = _plans;
                 if (plans.Count == 0 || !plans.TryGetValue(v, out pl) || !On || UnderKs(v)) return;
+                if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null) return;
                 int today = Today();
                 float addK = 0f; bool hasAdd = pl.Add != null && pl.Add.TryGetValue(item, out addK) && addK > 0f; if (!hasAdd) addK = 0f;
+                float lvl = (v.GetHearthLevel() + 1) * 0.5f;
+                float A = addK * lvl;                                         // dopisek zajec w bazie gry (przed czynnikami)
                 float rate;
                 if (pl.TypeGoods.Contains(item) && pl.TypeRate.TryGetValue(item, out rate) && rate > 0f)
                 {
                     float before = r.ResultNumber;
-                    if (!(before > 0f)) return;
-                    float M = before / rate;
                     bool kitchen = pl.KitchenKeep && item.StringId == "grain";
                     float F = kitchen ? 1f : (1f - pl.Other) * pl.NType + pl.TypeBonus;
                     if (F < 0f) F = 0f;
                     float sum = 1f + r.SumOfFactors;
-                    if (Math.Abs(F - 1f) > 1e-5f && sum > 0f) r.AddFactor((F - 1f) * sum, _txtType);
-                    float after = r.ResultNumber;
+                    if (before > 0f && Math.Abs(F - 1f) > 1e-5f && sum > 0f) r.AddFactor((F - 1f) * sum, _txtType);
                     float added = 0f;
-                    if (hasAdd) added = AddBase(ref r, M * addK);
+                    if (hasAdd && A > 0f)
+                    {
+                        float r0 = r.ResultNumber;
+                        if (F > 1e-3f && before > 0f) r.Add(A / F, _txtAdd);        // baza x (1 + czynniki) x F: dopisek A bez czynnika typu F
+                        else AddBase(ref r, A);
+                        added = Math.Max(0f, r.ResultNumber - r0);
+                    }
                     lock (Gate)
                     {
                         var m = MemFor(v, today);
-                        m.M = M; m.NoMem = false;
-                        Put(m, item, kitchen ? 0f : before * (1f - (1f - pl.Other) * pl.NType) * item.Value, added * item.Value, kitchen ? 0f : before * pl.TypeBonus * item.Value);
+                        Put(m, item, kitchen ? 0f : before * (1f - F + pl.TypeBonus) * item.Value, added * item.Value, kitchen ? 0f : before * pl.TypeBonus * item.Value);
                         _dSteps++;
                     }
                     return;
                 }
-                if (!hasAdd) return;
-                float mm; bool ok;
-                lock (Gate) { var m = MemFor(v, today); ok = m.M > 0f; mm = m.M; if (!ok) { m.NoMem = true; _dNoMem++; } }
-                if (!ok) return;
-                float got = AddBase(ref r, mm * addK);
+                if (!hasAdd || !(A > 0f)) return;
+                float r1 = r.ResultNumber;
+                r.Add(A, _txtAdd);                                            // towar spoza typu: model gry dal baze 0 - te same czynniki, ktore juz sa, i dalsze kroki lancucha
+                float got = Math.Max(0f, r.ResultNumber - r1);
                 lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; }
             }
-            catch (Exception e) { Stumble("Step", e); }
+            catch (Exception e) { Stumble("Base", e); }
         }
 
         /// <summary>Dopisek bazy tak, by wynik wzrosl dokladnie o amount (jak ryby W2): baza + amount / (1 + suma czynnikow); czynniki zjadaja baze - zerowane.</summary>
@@ -479,8 +487,19 @@ namespace Armoury
             {
                 float f, u, g;
                 float lvl = (v.GetHearthLevel() + 1) * 0.5f;
-                if (VillageByPeople.TryFactor(v, out f, out u, out g)) return lvl * f;
-                return lvl;
+                float m = VillageByPeople.TryFactor(v, out f, out u, out g) ? lvl * f : lvl;
+                return m * Now(v);
+            }
+            catch { return 1f; }
+        }
+
+        /// <summary>Czynnik dnia okregu jak w rachunku KS (ComputeDistrict) i w lancuchu wsi: zima x rece spustoszenia E4/5 x rece wojny E4/7. Nie rzuca.</summary>
+        internal static float Now(Village v)
+        {
+            try
+            {
+                float f = (1f - WinterBite.VillageCut(v)) * Devastation.YieldFactor(v) * FreeHands.YieldFactor(v);
+                return f >= 0f && !float.IsNaN(f) && !float.IsInfinity(f) ? f : 1f;
             }
             catch { return 1f; }
         }
@@ -512,7 +531,7 @@ namespace Armoury
                 if (StartCalibration.KsPartsOf(v, ksParts))
                 {
                     ks = true;
-                    double sigma = Math.Max(1, DailyLife.KsSigma), hands = 0;
+                    double sigma = Math.Max(1, DailyLife.KsSigma), hands = 0, fnow = Now(v);   // bloki KS bez zimy i czynnikow rak - wartosc dnia z nimi (jak stawki KS)
                     foreach (var kp in ksParts) hands += kp.Hands;
                     foreach (var p in book)
                     {
@@ -526,7 +545,7 @@ namespace Armoury
                             for (int i = 0; i < kp.Kg.Length && i < items.Length; i++)
                             {
                                 if (!(kp.Kg[i] > 0) || items[i] == null) continue;
-                                double pcs = kp.Kg[i] / (sigma * Math.Max(0.1, items[i].Weight > 0.01f ? items[i].Weight : 10.0));
+                                double pcs = fnow * kp.Kg[i] / (sigma * Math.Max(0.1, items[i].Weight > 0.01f ? items[i].Weight : 10.0));
                                 pc.Pcs[items[i]] = pcs;
                                 pc.ValDay += pcs * Price(town, items[i]);
                             }
@@ -560,7 +579,7 @@ namespace Armoury
                             double val = 0;
                             for (int i = 0; i < m.Goods.Length; i++)
                             {
-                                double pcs = k * m.Rates[i];
+                                double pcs = k * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId);
                                 double cur; pc.Pcs.TryGetValue(m.Goods[i], out cur); pc.Pcs[m.Goods[i]] = cur + pcs;
                                 val += pcs * Price(town, m.Goods[i]);
                             }
