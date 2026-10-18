@@ -62,6 +62,7 @@ namespace Armoury
             ResetGuard();    // obieg2: straznik obiegu i podatek od nadwyzki wsi (stan z zapisu arm_obieg2 wczytuje Import po Reset)
             ResetLoans();    // obieg2: pozyczki od ludu (zapis arm_obieg2)
             ResetCrownLoans();   // korona2: pozyczki koron od miast i mieszczan (zapis arm_korona2 wczytuje Import po Reset)
+            DaReset();           // ds-akumulator: kolejka zlecen robot i septow (bez zlota), liczniki linii "Akumulator kies"
         }
 
         private static void HoardBegin()
@@ -91,7 +92,10 @@ namespace Armoury
         {
             if (!HoardKey) return 0;
             double dsOld = DsTowns.OldShare;   // DS F3: podatek od skarbca ludu miast i zamkow zniesiony (czesc pana w firmie M2); recenzja 17.10: w przejsciu x (1 - rampa)
-            if (!(dsOld > 0)) return 0;
+            bool dsDue = DaDueOn;              // ds-akumulator (DsHoardDue): przy firmach F3 danina pana od skarbca ludu ponad poziom normalny zamiast zera (klucz wylaczony - jak dotad)
+            long m9 = dsDue ? DaM9Take(f, c) : 0;   // ds-akumulator (recenzja): rata M9 zdjeta dzis z tej klasy w PayAid (czesc `aid`)
+            if (!(dsOld > 0) && !dsDue) return 0;
+            if (dsDue) DaObserve();            // ds-akumulator (recenzja, miekki start): pierwsza doba klucza przy firmach - poczatek rampy klucza
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -104,14 +108,24 @@ namespace Armoury
                 // N8 (noc 16.10, FolkLoanBeforeGuard): pozyczka rodu z tej kiesy (W miasta, podzamcze) w poprzednim oknie pozyczek wlicza sie jak danina - pozyczka
                 // przed darem; klucz wylaczony / bez pozyczki - credit 0 i wzor co do monety jak dotad
                 long credit = c == 0 ? LnCreditFor(f.St) : 0;
-                double pre = Math.Max(0, aid) + credit;
-                double due = HoardRateNow(s) * (room + pre) - pre;   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza (obieg2: stawka straznika)
+                // ds-akumulator: warstwa oszczednosci oplacona juz firma pana z oszczednosci ludu (F_Lf / 364 x rampa, czesc tej klasy) liczy sie jak danina tej doby -
+                // ta sama warstwa nie jest brana dwa razy; stawka w przejsciu F3 liniowo od dawnej do DsHoardDueRate (rampa klucza - DaRateNow).
+                // Recenzja: rata M9 schodzi tylko w dzien raty osady (co 7 dob) - jako zaplacone liczy sie SREDNIA DOBY raty (m9d, codziennie, jak czesc firmy), a rata
+                // zdjeta dzis (m9) tylko wraca do podstawy nadwyzki sprzed daniny (`baseX`); klucz wylaczony - m9 = m9d = 0 i wzor co do monety jak dotad
+                double farm = dsDue ? DaFarmPre(f, c) : 0;
+                double m9d = dsDue ? DsSeason.FolkMovablesDay(f.St, slot) : 0;
+                double aidCred = Math.Max(0, aid - m9) + m9d;
+                double pre = aidCred + credit + farm;
+                double baseX = Math.Max(0, aid) + credit + farm;   // nadwyzka sprzed daniny tej doby = room + baseX (bez klucza baseX = pre)
+                double rate = dsDue ? DaRateNow(s) : HoardRateNow(s);
+                double due = rate * (room + baseX) - pre;   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza (obieg2: stawka straznika)
                 long purse0 = Math.Max(0, PurseOf(f, c));
                 HoardNote(s, room, Math.Max(0, aid), credit, purse0, due >= 1 ? Math.Min((long)Math.Floor(Math.Min(due, room)), purse0) : 0);   // N7 / N8: liczniki porownania
-                if (!(due >= 1)) { if (aid > 0) _hdCovered++; _hdE0 += room; _hdE1 += room; return 0; }
+                if (dsDue) DaNoteSeen(room, aidCred, farm, due, m9, m9d);
+                if (!(due >= 1)) { if (aid > 0 || farm > 0 || m9d > 0) _hdCovered++; _hdE0 += room; _hdE1 += room; return 0; }
                 long x = (long)Math.Floor(Math.Min(due, room));
                 x = Math.Min(x, purse0);
-                if (dsOld < 1) x = (long)Math.Floor(x * dsOld);          // DS F3: przejscie
+                if (!dsDue && dsOld < 1) x = (long)Math.Floor(x * dsOld);          // DS F3: przejscie (przy DsHoardDue przejscie jest w stawce i w czesci firmy)
                 if (x > int.MaxValue) x = int.MaxValue;
                 if (x <= 0) { _hdE0 += room; _hdE1 += room; return 0; }
                 var st = f.St;
@@ -155,6 +169,7 @@ namespace Armoury
                 f.DOver -= x; if (c >= 0 && c < 3) f.DOvC[c] = Math.Max(0, f.DOvC[c] - x);   // oferta, place z nadwyzki i W7 od reszty
                 _hdTake[slot] += x - cp; _hdE0 += room; _hdE1 += room - x;   // obieg2: "pobrano" linii kiesa2 = do panow + do kas (czesc korony osobno - _gdCrownT)
                 if (cp > 0) { _gdCrownT += cp; _gdCrownTN++; }
+                if (dsDue) DaNoteTake(slot, x, lp, tp, cp);           // ds-akumulator: linia "Akumulator kies" (pobrane = do panow + do kas osad)
                 try
                 {
                     _hdPlaces.Add(st);
@@ -233,6 +248,7 @@ namespace Armoury
               .Append(", klaso-osad ponad poziom normalny ").Append(_hdOver).Append(", ponad zapas dni, nie ponad poziom normalny ").Append(_hdUnder)
               .Append(" | kontrola: pobrano - do panow - do kas ").Append(diff).Append(", ponizej poziomu normalnego po poborze ").Append(_hdBelow).Append(" (oczekiwane 0 / 0)")
               .Append(GuardHoardNote())   // obieg2: czesc korony z miast i zamkow (poza "pobrano" wyzej) i stawka straznika - przed "czas" (narzedzie kiesa2 czyta pola wyzej)
+              .Append(DaHoardNote())      // ds-akumulator: stawka danin przy firmach DS (DsHoardDue) - pelne liczby w linii "Akumulator kies (ds-akumulator)"
               .Append(" | czas ").Append(Ms(_hdTicks)).Append(" ms | potkniecia ").Append(_hdStumbles).Append(" (sesja ").Append(_hdStumbleSess).Append(").");
             _lineHoard = sb.ToString();
         }

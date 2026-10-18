@@ -287,6 +287,26 @@ namespace Armoury
             catch (Exception e) { Stumble("FolkMovables", e); return 0; }
         }
 
+        /// <summary>
+        /// ds-akumulator (recenzja; klucz DsHoardDue, TownFolk.PayHoard): srednia doby raty M9 klasy `cls` osady - rata (Per, najwyzej Left) x rampa F3 (jak w FolkMovables)
+        /// / 7 dob (raty co 7 dob, DsTowns.PayDay). Wymiar czynny (Left >= 1) tej samej korony, bez darowania (oblezenie / zdobycie - RemitOf); inaczej 0. Tylko odczyt
+        /// (nic nie zmienia). Danina od skarbca ludu liczy te warstwe oszczednosci jako zaplacona co dzien, nie tylko w dzien raty. Nie rzuca.
+        /// </summary>
+        internal static double FolkMovablesDay(Settlement st, int cls)
+        {
+            try
+            {
+                if (!Live || st == null || st.StringId == null || cls < 0 || cls > 3) return 0;
+                Mov m;
+                if (!_mov.TryGetValue(st.StringId + "~" + cls.ToString(Inv), out m) || m == null || m.Left < 1) return 0;
+                var k = KOf(st);
+                if (k == null || m.K != k.StringId || DsTowns.RemitOf(st) != 0) return 0;
+                double inst = Math.Min(m.Per, m.Left) * Cl(DsTowns.NewShare, 0, 1);
+                return inst > 0 ? inst / 7.0 : 0;
+            }
+            catch (Exception e) { Stumble("FolkMovablesDay", e); return 0; }
+        }
+
         // ============================================================ wylaczenie F3
         /// <summary>DsTowns.DayStart (F3 wylaczone): nadania do zera, niezebrana dziesiata ludu przepada (roszczenie, nie pieniadz).</summary>
         internal static void Off()

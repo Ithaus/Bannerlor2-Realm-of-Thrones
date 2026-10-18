@@ -1335,6 +1335,9 @@ namespace Armoury
             if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive)) return 0;
             long x = (long)Math.Floor(Math.Min(want, (double)Math.Max(0, vil.Gold)));
             if (x <= 0) return 0;
+            // ds-akumulator (DsWorksRealMaterial): gmina robi roboty wlasnymi rekami - kiesa placi tylko PRAWDZIWY material z polki miasta targowego i rzemieslnikow miasta
+            // (najwyzej DsWorksWagePerMaterial x material); zlecenie wykonane po budowach pana i ludu tej doby (TownFolk.DsAkum.cs DaWorksRun). Brak materialu - pieniadz zostaje.
+            if (DaWorksOn) { DaWorksQueue(vil, null, mk, x, false); return 0; }
             int had = vil.Gold;
             vil.ChangeGold(-(int)Math.Min(int.MaxValue, x));
             long got = Math.Max(0, (long)had - vil.Gold);

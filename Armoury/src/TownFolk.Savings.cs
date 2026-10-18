@@ -89,6 +89,7 @@ namespace Armoury
                 // DS F3 (M9): przy ustalonych firmach dziesiata od ruchomosci zamiast P1 (wymiar po sesji wojennej, raty co 7 dob); P1 nie bierze (WaRate), M4 dalej z reszty
                 long tm = DsTowns.FarmsLive ? DsSeason.FolkMovables(f.St, cls, ov, Math.Max(0, PurseOf(f, c))) : 0;
                 if (tm > 0) { AddPurse(f, c, -tm); _ctlOut += tm; f.LDayOut += tm; }
+                DaM9Note(f, c, tm);   // ds-akumulator (recenzja, DsHoardDue): rata M9 tej klasy z tej doby - PayHoard liczy zamiast niej srednia doby raty (tylko notatka)
                 t = ov - tm >= 1 ? KingdomTreasury.FolkWarAid(f.St, cls, ov - tm, Math.Max(0, PurseOf(f, c))) : 0;
                 if (t > 0) { AddPurse(f, c, -t); _ctlOut += t; f.LDayOut += t; }
                 t += tm;

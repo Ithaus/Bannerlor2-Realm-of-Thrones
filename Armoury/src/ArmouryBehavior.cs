@@ -491,6 +491,15 @@ namespace Armoury
                 if (dataStore.IsLoading) DsTowns.Import(miasta);
             }
             catch (Exception e) { Log.Error("SyncData.arm_daniny_miasta", e); }
+            // ds-akumulator (recenzja, miekki start DsHoardDue): doba poczatku rampy daniny od skarbca ludu - wlasny try; brak klucza (stary zapis, Ironman Jeffa) = -1: rampa od
+            // pierwszej doby z kluczem przy firmach F3 (klucz od ustalenia firm - rampa F3 co do doby); starszy DLL ignoruje klucz (wtedy danina i tak nie biegnie)
+            try
+            {
+                string dsakum = dataStore.IsSaving ? TownFolk.ExportDsAkum() : null;
+                SaveText.Sync(dataStore, "arm_dsakum", ref dsakum);
+                if (dataStore.IsLoading) TownFolk.ImportDsAkum(dsakum);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_dsakum", e); }
             // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
             // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
             try
@@ -1956,6 +1965,9 @@ namespace Armoury
             var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 146: ksiega towarow - material zdjety przez budowy (tylko licznik)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
             finally { GoodsLedger.End(gfBuild); } DayProfile.Lap("BuildFunding.Daily");
+            // ds-akumulator (DsWorksRealMaterial): zlecenia robot gminy wsi i budowy septow - prawdziwy material z polek PO budowach pana i ludu tej doby (wlasne ramki FBuild
+            // z osada targu), przed migawka MBuild (kiesy wsi i ludu -> kasy targow i lud targow); klucz wylaczony - kolejka pusta, nic
+            try { TownFolk.DaWorksRun(); } catch (Exception e) { Log.Error("TownFolk.DaWorksRun", e); } DayProfile.Lap("TownFolk.DaWorksRun");
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
             // 24c (14.10, klucz DragonsEatHerds): smoki jedza zwierzeta z taborow i stad wsi - PRZED ksiegami (ramka FDragon w tej samej dobie co linia "Smoki (24c)")
@@ -2175,6 +2187,7 @@ namespace Armoury
             try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); } DayProfile.Lap("VillageTakings.Daily");   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
             try { DsVillage.Daily(); } catch (Exception e) { Log.Error("DsVillage.Daily", e); } DayProfile.Lap("DsVillage.Daily");
             try { DsTowns.Daily(); } catch (Exception e) { Log.Error("DsTowns.Daily", e); } DayProfile.Lap("DsTowns.Daily");   // DS (F3): linie "Firmy miast i zamkow (DS)" i "Pozyczki zaliczkowe (DS)" za okno od poprzedniej doby   // DS (F1): linia "Daniny wsi (DS)" za okno od poprzedniej doby (wozy, markietani, czynsz, skrzynia, stare pobory w rampie) i zerowanie licznikow
+            try { TownFolk.DaDaily(); } catch (Exception e) { Log.Error("TownFolk.DaDaily", e); } DayProfile.Lap("TownFolk.DaDaily");   // ds-akumulator: linia "Akumulator kies (ds-akumulator)" (danina od skarbca ludu, roboty z prawdziwym materialem, lepszy stol, jednorazowe wplywy korony, kiesy)
             try { Measure40.Daily(); } catch (Exception e) { Log.Error("Measure40.Daily", e); } DayProfile.Lap("Measure40.Daily");   // E4/0 (188): linie "Hearth", "Dobrobyt", "Jency", "Zima (E4/0)" - po 169c (milicja), przed ksiega ludzi (tylko log)
             try { PeopleLedger.Daily(); } catch (Exception e) { Log.Error("PeopleLedger.Daily", e); } DayProfile.Lap("PeopleLedger.Daily");   // demografia krok 1: "Ludzie:" i plik regionow (tylko log)
             try { Devastation.DayLine(); } catch (Exception e) { Log.Error("Devastation.DayLine", e); } DayProfile.Lap("Devastation.DayLine");   // E4/5 (113n): linia "Ludzie (spustoszenie)" i zerowanie licznikow doby - PO ksiedze ludzi i linii Hearth, ktore je czytaja

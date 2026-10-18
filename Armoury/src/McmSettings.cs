@@ -7128,6 +7128,34 @@ namespace Armoury
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
         public float FreeFolkRaidDailyChance { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Ds Hoard Due", HintText = "with Ds Towns: once the farms are set, the lord again takes a share each day of what the townsfolk and the castle folk hold above their normal level (three times their reserve days) - a tallage on movables, paid in peace and in war, as medieval lords tallaged their burgesses. What the people already paid that day (the tenth of movables, the war aid) and the part of the town's farm raised from their savings count as paid, so the same savings are never taken twice; two thirds go to the lord, the rest to the town or castle purse, nothing to the crown. Without it the labourers' purses only grew (off = no hoard tax once the farms are set, as before)")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool DsHoardDue { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ds Hoard Due Rate", 0.000f, 0.100f, "0.000", HintText = "with Ds Hoard Due: the share a day of the hoard above the normal level taken by the lord (it comes in step by step over Ds Ramp Days after the farms are set, from Folk Hoard Tax Rate). A higher rate keeps less idle coin in the people's purses; in the long run the lord takes about what the people cannot spend")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public float DsHoardDueRate { get; set; } = 0.03f;
+
+        [SettingPropertyBool("Ds Works Real Material", HintText = "a village does its communal works with its own hands - nobody is paid a coin for the villagers' own labour; its purse pays only for real material bought from the stall of its market town (timber, limestone, clay, tools, marble, planks - after the lords and the townsfolk have bought for their own works that day) and for hired town craftsmen, at most Ds Works Wage Per Material times the material. No material on the stall - no works, the coin stays in the village. The septs built from the tithe follow the same rule (real material or nothing; the craftsmen at most three times the material). Until now three quarters went as wages to the townsfolk and a quarter was paid for 'material' that never left any stall (off = as before)")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool DsWorksRealMaterial { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ds Works Wage Per Material", 0.00f, 3.00f, "0.00", HintText = "with Ds Works Real Material: the most a village pays hired town craftsmen for its communal works, as a multiple of the material it really bought")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public float DsWorksWagePerMaterial { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Ds Hoard Due Villages", HintText = "with Ds Works Real Material: a village that finds neither goods nor material for what it means to spend beyond its chest also pays its lord the Ds Hoard Due Rate a day of what its purse holds above three times its chest (two thirds to the lord, the rest to its town or castle). Off by default - the medieval dues of the villages took every share of village savings away; Jeff decides")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool DsHoardDueVillages { get; set; } = false;
+
+        [SettingPropertyBool("Folk Better Table", HintText = "with Start Calibration applied: townsfolk with savings above their reserve may buy a better table - meat, cheese, butter, beer, wine, mead, oil, honey - beyond what their basket holds, as long as the price stays at or below the price ceiling of Market Sees Purse (above it the rich do not outbid the poor for food). Until now the basket took all of it and the coin stayed in the purse (off = as before)")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool FolkBetterTable { get; set; } = true;
+
+        [SettingPropertyBool("Crown Windfall To Reserve", HintText = "a one-off windfall that falls into a crown's treasury (more than three times what the crown usually gets from outside in a day over the last 28 days - a ransom, a gift, plunder) goes into the treasury's reserve and is spent from there slowly, as the rest of the reserve, instead of being paid out to the houses as rents the same day (off = as before)")]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool CrownWindfallToReserve { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8909,6 +8937,13 @@ namespace Armoury
             s.FreeFolkRaidMinMen = FreeFolkRaidMinMen;
             s.FreeFolkRaidDays = FreeFolkRaidDays;
             s.FreeFolkRaidDailyChance = FreeFolkRaidDailyChance;
+            s.DsHoardDue = DsHoardDue;
+            s.DsHoardDueRate = DsHoardDueRate;
+            s.DsWorksRealMaterial = DsWorksRealMaterial;
+            s.DsWorksWagePerMaterial = DsWorksWagePerMaterial;
+            s.DsHoardDueVillages = DsHoardDueVillages;
+            s.FolkBetterTable = FolkBetterTable;
+            s.CrownWindfallToReserve = CrownWindfallToReserve;
         }
 
         internal static void Apply()

@@ -59,6 +59,7 @@ namespace Armoury
             public long Court;            // E3-P1 (b): dwor krolewski - towar z polki stolicy z reszty wplywow dnia (po M3 i G5, przed rentami; skarbiec -> kasa stolicy)
             public long DsMov;            // DS F3 (M9): dziesiata od ruchomosci od wczorajszego zamkniecia korony (kiesy ludu i kasy -> skarbiec) - w Own
             public long DsTreas, DsAnt;   // DS F3 (K5): brak zwrotu zoldu pokryty ze skarbca ponad zapas wojny (poza wplywami dnia) i zaliczka mieszczan pod nadanie (L1)
+            public long Windfall;         // ds-akumulator (CrownWindfallToReserve): czesc "inne" ponad 3 x mediana 28 dob krolestwa - do zapasu (Stock, 1/450), nie wplyw dnia
             public bool Snap;
         }
 
@@ -88,6 +89,44 @@ namespace Armoury
         internal static long LastAdvanceRepaid, LastAdvanceNew;
         private static long _dAdvRepaid, _dAdvNew;
 
+        // ds-akumulator (CrownWindfallToReserve, noc 17/18.10; diagnoza fin80 "dochod": Dorne doba 109180 dostalo 1 218 874 zl "inne" i tego samego dnia oddalo 1 201 594
+        // w rentach 180 - jednorazowy wplyw siedzial potem 28 dob w "D stalym" rodow): pierscien 28 dob "inne" krolestwa (pamiec sesji, bez zapisu - po wczytaniu od 7 probek)
+        private const int WfRing = 28, WfMin = 7; private const double WfTimes = 3.0; private const long WfFloor = 1000;
+        private static readonly Dictionary<string, double[]> _wfRing = new Dictionary<string, double[]>();
+        private static readonly Dictionary<string, int> _wfN = new Dictionary<string, int>();
+        /// <summary>Linia "Akumulator kies": jednorazowe "inne" odlozone do zapasu w ostatniej dobie korony (zl, krolestw).</summary>
+        internal static long LastWindfall; internal static int LastWindfallN;
+        private static long _dWf; private static int _dWfN;
+
+        /// <summary>Czesc "inne" krolestwa ponad WfTimes x max(mediana jego "inne" z ostatnich 28 dob, "inne" doby poprzedniej) (ujemne jako 0) - do zapasu: skok jednej
+        /// doby (okup, dar, lup), nie nowy staly poziom (trybut - od drugiej doby nie jest jednorazowy). Probka dopisana po decyzji (mediana z dob
+        /// poprzednich). Klucz wylaczony, brak migawki albo < 7 probek - 0 (pierscien biegnie dalej, wlaczenie w trakcie bez skoku). Nie rzuca.</summary>
+        private static long WindfallOf(Kingdom k, KDay d, Settings s)
+        {
+            try
+            {
+                if (k == null || k.StringId == null || d == null || !d.Snap) return 0;
+                double[] ring; int n;
+                if (!_wfRing.TryGetValue(k.StringId, out ring)) { ring = new double[WfRing]; _wfRing[k.StringId] = ring; }
+                _wfN.TryGetValue(k.StringId, out n);
+                long wf = 0;
+                int have = Math.Min(n, WfRing);
+                if (s != null && s.CrownWindfallToReserve && have >= WfMin && d.Other > 0)
+                {
+                    var tmp = new double[have];
+                    for (int i = 0; i < have; i++) tmp[i] = Math.Max(0, ring[i]);
+                    Array.Sort(tmp);
+                    double med = have % 2 == 1 ? tmp[have / 2] : 0.5 * (tmp[have / 2 - 1] + tmp[have / 2]);
+                    double prev = Math.Max(0, ring[(n - 1 + WfRing) % WfRing]);   // skok jednej doby, nie nowy poziom (trybut, wojna): od drugiej doby poprzednia podnosi prog
+                    double cap = WfTimes * Math.Max(med, prev);
+                    if (d.Other > cap && d.Other - cap >= WfFloor) wf = (long)Math.Floor(d.Other - cap);
+                }
+                ring[n % WfRing] = d.Other; _wfN[k.StringId] = n + 1;
+                return wf;
+            }
+            catch (Exception e) { Stumble("WindfallOf", e); return 0; }
+        }
+
         // liczniki doby (linia i "Obieg")
         internal static long LastMeasured, LastOwn, LastOther, LastRelease, LastSpend, LastGiftOut, LastRepOut, LastRepIn, LastContract, LastRefund, LastLeft;
         internal static long LastRent, LastRentHeld;   // 180
@@ -104,6 +143,7 @@ namespace Armoury
         internal static void Reset()
         {
             _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear(); _advance.Clear();
+            _wfRing.Clear(); _wfN.Clear(); LastWindfall = 0; LastWindfallN = 0; _dWf = 0; _dWfN = 0;   // ds-akumulator: pierscien "inne" - pamiec sesji
             _refDueY.Clear(); _refDueYDay = -1;   // M2b
             _dNewKing = 0; _dNewKingN = 0;        // L1 (recenzja): nowe dlugi okupow krolow - licznik linii 165 czyszczony miedzy kampaniami
             ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
@@ -219,6 +259,7 @@ namespace Armoury
         internal static void Begin()
         {
             _day.Clear(); _open = false;
+            _dWf = 0; _dWfN = 0; LastWindfall = 0; LastWindfallN = 0;   // ds-akumulator: jednorazowe "inne" tej doby korony (linia 165 i "Akumulator kies")
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             if (!On) { _ownSpend.Clear(); return; }
@@ -251,7 +292,9 @@ namespace Armoury
                         long w0;
                         if (snapOk && _wEnd.TryGetValue(k.StringId, out w0)) { d.Snap = true; d.Other = w - w0 - d.Own; }
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
-                        d.Measured = Math.Max(0, d.Own + d.Other);     // netto: wydatki skarbca spoza nas (Diplomacy, gra) zmniejszaja wplywy dnia
+                        d.Windfall = WindfallOf(k, d, s);               // ds-akumulator: jednorazowe "inne" do zapasu (klucz wylaczony - 0, wzor jak dotad)
+                        if (d.Windfall > 0) { _dWf += d.Windfall; _dWfN++; }
+                        d.Measured = Math.Max(0, d.Own + d.Other - d.Windfall);     // netto: wydatki skarbca spoza nas (Diplomacy, gra) zmniejszaja wplywy dnia
                         d.Stock = Math.Max(0, w - d.Measured);
                         d.Release = (long)(Math.Max(0, d.Stock - reserve - TownFolk.CrownTownDebt(k)) / days);   // korona2: zloto pozyczone od miast to zapas trzymany, nie do rozdania (klucz wylaczony - 0)
                         d.Spend = Math.Max(0, Math.Min(Math.Max(0, w), d.Measured + d.Release));
@@ -261,6 +304,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Begin(krolestwo)", e); }
                 }
                 _open = true;
+                LastWindfall = _dWf; LastWindfallN = _dWfN;
             }
             catch (Exception e) { Stumble("Begin", e); }
         }
@@ -403,7 +447,8 @@ namespace Armoury
                               + (d.NeedAid > 0 ? " doplata W5 " + d.NeedAid : "") + (d.NeedAidRent > 0 ? " z rent M1 " + d.NeedAidRent : "")
                               + (d.Bread > 0 ? " chleb M3 " + d.Bread : "")
                               + (d.ScutIn > 0 || d.ScutOut > 0 ? " tarczowe W6 +" + d.ScutIn + " -" + d.ScutOut : "")
-                              + (d.CrownAid > 0 ? " ze skarbca W5b -" + d.CrownAid : "")));
+                              + (d.CrownAid > 0 ? " ze skarbca W5b -" + d.CrownAid : "")
+                              + (d.Windfall > 0 ? " jednoraz. do zapasu " + d.Windfall : "")));
                 }
                 parts.Sort((x, y) => y.Key.CompareTo(x.Key));
                 var txt = new List<string>(); foreach (var p in parts) txt.Add(p.Value);
@@ -451,6 +496,7 @@ namespace Armoury
                       .Append(", splata zaliczki gry (portfel uznany z niczego) - w nicosc ").Append(LastAdvanceRepaid).Append(" (nowe zaliczki gry od wczoraj ").Append(LastAdvanceNew)
                       .Append(", niesplacone razem ").Append(AdvanceTotal()).Append(" u ").Append(_advance.Count).Append(" rodow)")
                       .Append(" | krolestwa bez wczorajszej migawki (tylko nasze liczniki) ").Append(noSnap)
+                      .Append(s.CrownWindfallToReserve || _dWf > 0 ? " | jednorazowe 'inne' do zapasu (Crown Windfall To Reserve " + (s.CrownWindfallToReserve ? "tak" : "nie") + ", ponad 3 x mediana 28 dob krolestwa, rozchodzi sie 1/" + Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv) + "): " + _dWf + " (" + _dWfN + " krolestw)" : "")
                       .Append(" | reparacje Diplomacy przechwycone: ").Append(_repWired ? "TAK" : "BRAK").Append(", splata dlugu wobec korony: ").Append(_debtWired ? "TAK" : "BRAK")
                       .Append(" | na krolestwo (wplywy+zapas, wydatki): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
                       .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');

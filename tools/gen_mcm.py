@@ -357,6 +357,9 @@ RANGES = {
     'FreeFolkRaidMinMen': (1, 120, "0"),
     'FreeFolkRaidDays': (1, 120, "0"),
     'FreeFolkRaidDailyChance': (0.0, 1.0, "0.00"),
+    # ds-akumulator (18.10): stawki przycinane w kodzie (DsHoardDueRate 0..0.1, DsWorksWagePerMaterial 0..3)
+    'DsHoardDueRate': (0.0, 0.1, "0.000"),
+    'DsWorksWagePerMaterial': (0.0, 3.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):
