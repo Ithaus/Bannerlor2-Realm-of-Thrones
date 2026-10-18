@@ -2837,3 +2837,9 @@ DO SPRAWDZENIA U JEFFA (log pierwszej sesji): "KS: samo uzbrojenie", "Akumulator
   gra daje 0.5 x ludzi jucznych w InitializeCaravanOnCreation, DTE AddReinforcementSupplies +17 sumpter_horse; RemoveParty przy dojezdzie) - fin85 179 konwojow, 4593 koni = ok. 28.5/d.
   Klucz DteConvoyNoFreePacks (TAK, razem z DteConvoyNoFreeFood): konwoj DTE bez jucznych z niczego. Symulacja: KS wlaczylby sie ok. doby 109109 (33 dni po uzbrojeniu). nksarm ARM-15a/b/c.
   Armoury f02b7c5d. TEST fin86 = fin83 + ta DLL, armoury-ks-auto.flag (USUNAC!), 160 dob, at-fin86-autoarm2.out.txt -> jesli KS sie wlaczy i 0 ERROR: test 5 dob + bitwa, WGRANIE 78.
+- 23:30 PDT: FALA 3 GOTOWA (wf_1aec7e98-75c, 27 agentow): 9/9 build rc 0 (wyniki scratchpad fala3-wynik.json): feed-swiat 59159aec (KsSelfFeedEverywhere TAK + KsSelfFeedStaples, KsSelfFeedSlow,
+  KsPlanMarketsClear - harness: niezbiezne 20 -> 4, Essos -0.9%; DECYZJA: biedni Essos 74% kcal z targu przy cenie rynkowej), ks-koszt 3ad44c96 (T0-T10 bit w bit; prognoza 4.69/13.1/2.63 ms -
+  progi nieosiagalne bez danych T0 z gry), inwest 8affd6cf (23 klucze; pod KS zmiana zajec tylko z StartCalibrationSwitchRule - WYL.), perf-d2d3 c1883462, zapis-d4 975a4b70 (bez pakowania
+  arm_people - cofniecie gubiloby stan), fix-uchodzcy 6e9b22bf, fix-mur 0cf480a1, fix-ksiega c39af137, ceny-r5 fc907a66. Galezie na GitHub.
+- 23:32 PDT: workflow wf_4cb53b58-50a (scalenie2: fix-ksarm + 9 paczek fali 3 do w-toku/noc-ks4 od 100eaedf, 3 recenzje calosci + weryfikacja + poprawki) -> potem test calosci + sciezka Jeffa
+  -> WGRANIE 79. WGRANIE 78 = 100eaedf + fix-ksarm (c9f806d0) po tescie fin86 + 5 dob z bitwa.
