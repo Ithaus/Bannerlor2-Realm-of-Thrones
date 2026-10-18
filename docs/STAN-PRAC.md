@@ -3028,3 +3028,6 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   boczne - wygladzic wyglad, nowe zdjecia; domyslnie dalej NIE), "3. tak ale nie teraz, zapisz to na pozniej" (ROZLOZENIE GOSPODARKI DOBY na pierwsze godziny dnia - szczyt ~0.5 s -> ~0.1 s,
   wyniki minimalnie inne; + EconomyAudit CrashScribe nie moze zmieniac stanu BK) -> DO ZROBIENIA PO WGRANIU 81, "4. zostawic x 12" (BanditLimitPerHideout 12, suwak 12-48 - juz tak).
 - 12:05 PDT: biegi zdjec drogi2: wariant A (ten sam material, Spacing 0.15, StampHalfLen 0.9, alfa 0.55, kolor FF7E7466) i B (mainmap_decal_mud_a, Spacing 0.2, alfa 0.7).
+- 12:20 PDT: drogi2 (2 biegi zdjec, kod 0, ERROR 0, zapisy nietkniete, flaga usunieta): wariant A (gesto, alfa 0.55, FF7E7466) - ciagla, miekka sciezka ziemi, wyglada naturalnie;
+  wariant B (mud_a) prawie niewidoczny. Wariant A wpisany jako domyslny wyglad w w-toku/f11-drogi **2f24caa6** (69k decali, stawianie 75 ms raz na mape). MapSideRoads dalej NIE.
+  Zdjecia A pokazane Jeffowi.
