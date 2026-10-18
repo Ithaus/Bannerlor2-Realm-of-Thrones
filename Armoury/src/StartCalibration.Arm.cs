@@ -40,6 +40,8 @@ namespace Armoury
     ///    wlaczeniu (projekt rozdz. 10 pkt 2: zamkniete przy KS-A) perk nie robi ryb, a zboze patrolu idzie ze spichlerza miasta (Town.FoodStocks, jak ArmsFromPeople.
     ///    SpawnGrain); w krainie wroconej jak dzis. (iii) Ryby portow BK miast (BKBuildingsBehavior.RunPorts - praca ludzi miasta za zloto kasy; klucz Ks Bk Ports In
     ///    Ledger) - tylko nazwa w ksiedze, gra bez zmian (fin78: 21-22 szt./d w "inne ticki" od doby 109140 - bez nazwy bramka (3) nie przeszlaby nigdy).
+    ///    (iv) f14-ksiega (recenzja): dar BK dla bandy herszta (GoodsPaths, BannerKingsComponent.GiveFood) - nazwany w ksiedze, ale przy wlaczeniu NIE zamykany (decyzja
+    ///    Jeffa): w linii bramek jako zrodlo otwarte, a czesc z ticku partii (dotad "inne ticki dobowe") liczy sie do bramki (3) jak dotad (GoodsLedger.NoteKnownOpenSource).
     /// Zapis arm_ks_arm (nowy klucz, Z + base64 deflate, limit 64 KB - ponad: bez sredniej ksiegi): srednia ksiegi towarow, dojrzaly Plan od doby, bramki 7 dob,
     /// krainy wrocone, serie spadku spichlerzy, strata spichlerzy krain od wlaczenia (L=), id kampanii. Brak klucza (stary zapis) - pomiar od zera; starsza DLL go pomija.
     /// Klucze wylaczone - stara droga bez zmian.
@@ -375,7 +377,11 @@ namespace Armoury
                    + " | zrodla z niczego znane z nazwy (przed wlaczeniem jak w grze, zamkniete przy wlaczeniu): ryby z perku Night Raider (Ks No Fish From Perk) "
                    + (NoPerkFishKey ? (_perkPatched ? "nazwane " + _perkFishNamed + " szt. od startu sesji" : "BRAK latki") : "NIE")
                    + ", zboze patroli miast (Ks Patrol Grain From Town) " + (PatrolKey ? (_patrolPatched ? "nazwane " + _patrolNamed + " szt. od startu sesji" : "BRAK latki") : "NIE")
-                   + "; produkcja znana z nazwy (gra bez zmian): ryby portow BK miast (Ks Bk Ports In Ledger) " + (BkPortsKey ? (_portPatched ? "nazwane " + _portFishNamed + " szt. od startu sesji" : "BRAK latki") : "NIE");
+                   + "; produkcja znana z nazwy (gra bez zmian): ryby portow BK miast (Ks Bk Ports In Ledger) " + (BkPortsKey ? (_portPatched ? "nazwane " + _portFishNamed + " szt. od startu sesji" : "BRAK latki") : "NIE")
+                   // f14-ksiega (recenzja): dar BK herszta nazwany w ksiedze, ale przy wlaczeniu NIE zamykany (decyzja Jeffa) - pokazany jako zrodlo otwarte; czesc z ticku partii
+                   // liczy sie dalej do "zrodel bez nazwy" wyzej (GoodsLedger.NoteKnownOpenSource), jak przed nazwaniem
+                   + "; zrodlo z niczego OTWARTE (gra bez zmian, przy wlaczeniu NIE zamykane - do decyzji Jeffa): dar BK dla band hersztow (GiveFood) nazwany " + GoodsPaths.HeroFoodNamed
+                   + " szt. od startu sesji, w tym w ticku partii " + GoodsPaths.HeroFoodGate + " szt. (liczone do zrodel bez nazwy, jak przed nazwaniem w ksiedze)";
             if (!HardGatesKey) { why = en = null; line += " | klucz Ks Hard Gates NIE - bramki tylko liczone"; return true; }
             if (n < GateDays) { why = "twarde bramki: za malo pelnych dob ksiegi towarow (" + n + "/" + GateDays + ")"; en = "the goods ledger needs " + GateDays + " full days first."; return false; }
             if (!leaks) { why = "twarde bramki: jedzenie z niczego konwojow DTE albo partii BK otwarte (DteConvoyNoFreeFood / BkCaravanNoFreeFood)"; en = "switch on Dte Convoy No Free Food and Bk Caravan No Free Food first."; return false; }

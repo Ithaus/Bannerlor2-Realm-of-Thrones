@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace Armoury
 {
@@ -23,6 +24,10 @@ namespace Armoury
     ///     Linia "Ryby poza ramkami (A17 diagnoza)".
     ///  D3 unikat z polki (poz. 4, renly_armor w biegu dwuletnim): ubytek unikatu (UniqueSpoils.Is) z rosteru osady - ramka albo "poza ramkami" i stos,
     ///     najwyzej 20 linii na sesje; zdjecie na czas konsumpcji osady (UniqueShelf.Busy) pomijane. Linia "Unikat z polki (A17 diagnoza D3)".
+    ///  D5 surowiec (f14-ksiega, noc 18.10; fin92 Armoury-2026-10-18_09-33-39.log: ksiega towarow "Towary: dzien 109213 - hardwood ... bez wyjasnienia -51" przy bandach
+    ///     560 -> 34 ladunkow drewna w dobie - sprawcy nie widac w zadnej linii): drewno i ruda poza ramkami ksiegi towarow (z kluczem A17AuthorLines) - zmiany >= 2 szt.
+    ///     na rosterach z mapy posiadaczy netto doby wedlug autora (stos, najwyzej CapR sladow na dobe), pojedyncze sztuki (paser, lup sztuka po sztuce) bez sladu
+    ///     wedlug posiadacza, rostery spoza mapy osobno. Linia "Surowiec poza ramkami - autorzy (A17 D5, f14-ksiega)". Gra bez zmian.
     /// </summary>
     internal static class A17Diag
     {
@@ -56,11 +61,23 @@ namespace Armoury
         private static readonly Dictionary<ItemRoster, string> _shelfName = new Dictionary<ItemRoster, string>();
         private static double _builtHour = -1.0;
 
+        // f14-ksiega D5: drewno (0) i ruda (1) poza ramkami - autorzy zmian >= 2 szt. (netto doby), pojedyncze sztuki wedlug posiadacza, rostery spoza mapy
+        private const int RawN = 2, CapR = 800;
+        private static readonly string[] RawName = { "drewno", "ruda" };
+        private static ItemObject _rawWood, _rawIron;
+        private static bool _rawLooked;
+        private static readonly Dictionary<string, long[]> _authR = new Dictionary<string, long[]>();
+        private static readonly long[,] _rawUnit = new long[Holders, RawN];
+        private static readonly long[] _rawTmp = new long[RawN];
+        private static int _traceR;
+        private static long _rawTicks;
+
         internal static void Reset()
         {
             ClearDay();
             _hStacks = _fStacks = _d3 = 0; _stumbles = 0; _err = false;
             _holder.Clear(); _shelfName.Clear(); _builtHour = -1.0;
+            _rawLooked = false; _rawWood = _rawIron = null;   // f14-ksiega D5: przedmioty od nowa w kazdej kampanii
             A17Fix.Reset();   // A17 F1-F5 (noc 17/18.10): liczniki doby i znaczniki bitew - wolane tu, zeby nie dopisywac do listy Reset w ArmouryBehavior
         }
 
@@ -69,6 +86,7 @@ namespace Armoury
             Array.Clear(_hFrame, 0, _hFrame.Length); Array.Clear(_hOut, 0, _hOut.Length);
             Array.Clear(_fishPlus, 0, Holders); Array.Clear(_fishMinus, 0, Holders); _fishInFrames = 0;
             _authH.Clear(); _authF.Clear(); _traceH = _traceF = 0; _authTicks = 0; _authTmpH = _authTmpF = 0;
+            _authR.Clear(); Array.Clear(_rawUnit, 0, _rawUnit.Length); Array.Clear(_rawTmp, 0, RawN); _traceR = 0; _rawTicks = 0;   // f14-ksiega D5
         }
 
         /// <summary>GoodsLedger.Tap (postfiks ItemRoster.AddToCounts, zmiana faktycznie zaszla): frame = rodzaj najbardziej wewnetrznej otwartej ramki ksiegi towarow
@@ -113,6 +131,11 @@ namespace Armoury
                             Log.Info("Ryby poza ramkami (A17 diagnoza D2, stos " + _fStacks + "/" + StackMax + "): " + (n > 0 ? "+" : "") + n + " | " + HolderName[h] + Where(r) + " | stos: " + Stack());
                         }
                     }
+                }
+                else if (frame < 0 && AuthOn)
+                {
+                    int k = RawOf(it);                                 // f14-ksiega D5: drewno i ruda poza ramkami (dwa porownania referencji)
+                    if (k >= 0) NoteRaw(r, k, n);
                 }
                 if (n < 0 && _d3 < D3Max && !UniqueShelf.Busy && UniqueSpoils.Is(it))
                 {
@@ -201,6 +224,80 @@ namespace Armoury
             if (typeof(CampaignBehaviorBase).IsAssignableFrom(top)) return "!" + asm + ":" + top.Name;
             return asm + ":" + top.Name + "." + m.Name;
         }
+
+        /// <summary>f14-ksiega D5: 0 drewno, 1 ruda, -1 inny przedmiot (przedmioty z menedzera obiektow raz na kampanie).</summary>
+        private static int RawOf(ItemObject it)
+        {
+            if (!_rawLooked)
+            {
+                var om = MBObjectManager.Instance;
+                if (om == null) return -1;
+                _rawWood = om.GetObject<ItemObject>("hardwood"); _rawIron = om.GetObject<ItemObject>("iron"); _rawLooked = true;
+            }
+            if (ReferenceEquals(it, _rawWood)) return 0;
+            if (ReferenceEquals(it, _rawIron)) return 1;
+            return -1;
+        }
+
+        /// <summary>f14-ksiega D5: zmiana drewna albo rudy poza ramkami - roster spoza mapy osobno, pojedyncza sztuka wedlug posiadacza (bez sladu - paser i lup
+        /// ida sztuka po sztuce), reszta netto wedlug autora (slad stosu, najwyzej CapR na dobe).</summary>
+        private static void NoteRaw(ItemRoster r, int k, int n)
+        {
+            int h = HolderOf(r);
+            if (h == HUnknown) { _rawTmp[k] += n; return; }
+            if (n == 1 || n == -1) { _rawUnit[h, k] += n; return; }
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                string who = _traceR < CapR ? Author() : "(limit sladow doby)";
+                if (_traceR < CapR) _traceR++;
+                long[] a;
+                if (!_authR.TryGetValue(who, out a)) { a = new long[RawN]; _authR[who] = a; }
+                a[k] += n;
+            }
+            catch { }
+            finally { _rawTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>f14-ksiega D5: linia doby "Surowiec poza ramkami - autorzy (A17 D5, f14-ksiega)".</summary>
+        private static string RawLine(int day)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var rs = new List<KeyValuePair<string, long[]>>();
+            int zero = 0;
+            foreach (var kv in _authR) { if (kv.Value[0] != 0 || kv.Value[1] != 0) rs.Add(kv); else zero++; }
+            rs.Sort((a, b) => (Math.Abs(b.Value[0]) + Math.Abs(b.Value[1])).CompareTo(Math.Abs(a.Value[0]) + Math.Abs(a.Value[1])));
+            var tot = new long[RawN];
+            var sb = new StringBuilder(1500);
+            sb.Append("Surowiec poza ramkami - autorzy (A17 D5, f14-ksiega): dzien ").Append(day)
+              .Append(" | zmiany >= 2 szt. wedlug autora, netto doby ").Append(string.Join("/", RawName)).Append(" (tylko netto != 0, najwyzej ").Append(AuthTop).Append("): ");
+            int k = 0;
+            foreach (var kv in rs)
+            {
+                for (int i = 0; i < RawN; i++) tot[i] += kv.Value[i];
+                if (k >= AuthTop) continue;
+                sb.Append(k++ > 0 ? "; " : "").Append(kv.Key).Append(' ').Append(Sg(kv.Value[0])).Append('/').Append(Sg(kv.Value[1]));
+            }
+            if (k == 0) sb.Append('-');
+            if (rs.Count > AuthTop) sb.Append("; dalszych ").Append(rs.Count - AuthTop);
+            sb.Append(" | autorow z netto 0: ").Append(zero).Append(" | pojedyncze sztuki wedlug posiadacza (").Append(string.Join("/", RawName)).Append("): ");
+            bool any = false;
+            for (int h = 0; h < Holders; h++)
+            {
+                if (_rawUnit[h, 0] == 0 && _rawUnit[h, 1] == 0) continue;
+                sb.Append(any ? "; " : "").Append(HolderName[h]).Append(' ').Append(Sg(_rawUnit[h, 0])).Append('/').Append(Sg(_rawUnit[h, 1]));
+                for (int i = 0; i < RawN; i++) tot[i] += _rawUnit[h, i];
+                any = true;
+            }
+            if (!any) sb.Append('-');
+            sb.Append(" | razem netto na rosterach z mapy (autorzy + pojedyncze): drewno ").Append(Sg(tot[0])).Append(", ruda ").Append(Sg(tot[1]))
+              .Append(" (wozy surowcow sa poza rosterami - ich przyjazd i zakup daja tu netto bez winy ksiegi)")
+              .Append(" | rostery spoza mapy (lup przed oddaniem, partie z ostatniej godziny): drewno ").Append(Sg(_rawTmp[0])).Append(", ruda ").Append(Sg(_rawTmp[1]))
+              .Append(" | sladow ").Append(_traceR).Append('/').Append(CapR).Append(", czas ").Append((_rawTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", inv)).Append(" ms.");
+            return sb.ToString();
+        }
+
+        private static string Sg(long v) { return (v > 0 ? "+" : "") + v; }
 
         private static string AuthorsLine(int day)
         {
@@ -371,6 +468,7 @@ namespace Armoury
                   .Append(" | w ramkach netto ").Append(_fishInFrames).Append(" | stosy ").Append(_fStacks).Append('/').Append(StackMax).Append(" | unikat z polki D3 ").Append(_d3).Append('/').Append(D3Max).Append('.');
                 Log.Info(fb.ToString());
                 if (AuthOn) Log.Info(AuthorsLine(day));   // A17 D1b (noc 17/18.10)
+                if (AuthOn) Log.Info(RawLine(day));       // f14-ksiega D5: drewno i ruda poza ramkami wedlug autora
             }
             catch (Exception e) { Log.Error("A17Diag.Daily", e); }
             ClearDay();

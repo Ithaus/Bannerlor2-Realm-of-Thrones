@@ -173,6 +173,7 @@ namespace Armoury
             _meadBaseToday = _meadBaseY = 0; _meadTownToday = 0; _meadTownY = 0;
             _looked = false; _whale = _meat = _fish = _honey = _mead = _marble = _coal = _wood = _iron = _clay = _lime = _grain = null; _clayCat = _limeCat = null; _ingots = null;
             _stumbles = 0; _errSites.Clear(); _foodTargets.Clear(); _need.Clear(); _needDay = -1; _saltMk = null;
+            _sHeroNamed = _sHeroGate = 0;   // f14-ksiega (recenzja): dar herszta - liczniki sesji
             DayReset();
         }
 
@@ -181,7 +182,7 @@ namespace Armoury
             _dWhaleSwap = _dWhaleFish = _dWhaleMade = _dHoney = _dMarbleGiven = _dCoal = _dCoalWood = _dCoalNoWood = _dCoalNoProfit = _dCoalNoTown = 0;
             _dMeadCut = _dMarbleCut = 0;
             _dIngotPcs = _dIngotValue = _dIngotIron = 0; _dIngotTowns = 0;
-            _dDteConv = _dDteFood = _dDteEats = _dBkEats = _dBkOtherEats = 0;
+            _dDteConv = _dDteFood = _dDteEats = _dBkEats = _dBkOtherEats = 0; _dHeroLedger = 0;
             Array.Clear(_dBkN, 0, _dBkN.Length); Array.Clear(_dBkUnits, 0, _dBkUnits.Length); Array.Clear(_dBkValue, 0, _dBkValue.Length);
             _dBulkIn = _dBulkTaken = _dBulkCostCut = 0;
             _dBeerExtra = _dBeerUnsold = 0;
@@ -664,6 +665,25 @@ namespace Armoury
 
         internal sealed class BkFood { public int Kind; public Dictionary<ItemObject, int> Before; }
 
+        // f14-ksiega (noc 18.10; fin92 Armoury-2026-10-18_09-33-39.log): dar BK dla bandy herszta (BanditHeroComponent.CreateParty i ConsiderLeaveHideout ->
+        // BannerKingsComponent.GiveFood) - gra bez zmian (pomiar E8/P3, decyzja "dar zostaje" - bez zywnosci herszt BK nie wychodzi na rabunek), ale ksiega towarow
+        // dostaje nazwane zrodlo (GoodsLedger.NoteKnownOpenSource - grupa "zrodla znane z nazwy (KS)"): przy zalozeniu partii (DailyTickClan, poza ramkami) dar szedl dotad do "bez wyjasnienia"
+        // (d109176 +15, d109213 +429 = "GiveFood 1 razy, 429 szt." linii E5/A8), w ticku partii (ramka) - do "inne ticki dobowe". Rodzaj -2 = tylko ksiega.
+        private const int KHeroLedger = -2;
+        private const string HeroFoodSub = "dar BK dla bandy herszta (GiveFood) - z niczego";
+        private static long _dHeroLedger;   // sztuki daru herszta nazwane w ksiedze (doba) - tylko licznik
+        // f14-ksiega (recenzja): dar herszta przy KS zastosowanym NIE jest zamykany (do decyzji Jeffa) - linia twardych bramek KS (StartCalibration.HardGates) pokazuje go
+        // jako zrodlo z niczego otwarte; sesja: sztuk nazwanych i sztuk z ticku partii (ramka - liczone dalej do bramki zrodel bez nazwy, GoodsLedger.NoteKnownOpenSource)
+        private static long _sHeroNamed, _sHeroGate;
+        internal static long HeroFoodNamed { get { return _sHeroNamed; } }
+        internal static long HeroFoodGate { get { return _sHeroGate; } }
+
+        private static bool BanditHero(MobileParty mp)
+        {
+            var pc = mp != null ? mp.PartyComponent : null;
+            return pc != null && pc.GetType().Name == "BanditHeroComponent";   // ten sam test co Stage8World.BanditHeroParty (pomiar E8/P3)
+        }
+
         /// <summary>Rodzaj partii BK dla daru GiveFood: -1 = nie ruszamy (wedrowcy - 36b, partie spoza BK).</summary>
         private static int BkKindOf(MobileParty mp)
         {
@@ -690,7 +710,10 @@ namespace Armoury
             __state = null;
             try
             {
-                if (!BkFoodOn || __0 == null || __0.ItemRoster == null) return;
+                if (__0 == null || __0.ItemRoster == null) return;
+                // f14-ksiega: herszt BK - dar zostaje (jak dotad), stan jedzenia tylko do nazwania daru w ksiedze towarow (bez ksiegi - nic)
+                if (GoodsLedger.On && _bkCaravan <= 0 && BanditHero(__0)) { __state = new BkFood { Kind = KHeroLedger, Before = FoodOf(__0.ItemRoster) }; return; }
+                if (!BkFoodOn) return;
                 int kind = BkKindOf(__0);
                 if (kind < 0) return;
                 var m = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MobilePartyFoodConsumptionModel : null;
@@ -705,12 +728,30 @@ namespace Armoury
             if (__state == null || __0 == null || __0.ItemRoster == null) return;
             try
             {
+                if (__state.Kind == KHeroLedger) { NoteHeroFood(__0.ItemRoster, __state.Before); return; }   // f14-ksiega: tylko ksiega, jukow nie ruszamy
                 long u, v;
                 TakeAdded(__0.ItemRoster, __state.Before, out u, out v);
                 int k = __state.Kind;
                 _dBkN[k]++; _dBkUnits[k] += u; _dBkValue[k] += v;
             }
             catch (Exception e) { Stumble("BkGiveFoodPost", e); }
+        }
+
+        /// <summary>f14-ksiega: jedzenie, ktore GiveFood dopisal bandzie herszta (teraz - wtedy, gdy dodatnie) - nazwane zrodlo ksiegi towarow (zdjete z otwartej ramki,
+        /// wiec w ticku partii nie idzie juz do "inne ticki dobowe"). Recenzja: dar NIE jest zamykany przy KS zastosowanym, wiec czesc z ramki (ConsiderLeaveHideout w ticku
+        /// partii) liczy sie dalej do bramki KS zrodel bez nazwy jak przed nazwaniem (NoteKnownOpenSource), a linia bramek pokazuje dar jako otwarty. Juki bez zmian.
+        /// Nie rzuca (wolajacy w try).</summary>
+        private static void NoteHeroFood(ItemRoster r, Dictionary<ItemObject, int> was)
+        {
+            foreach (var kv in FoodOf(r))
+            {
+                int w; was.TryGetValue(kv.Key, out w);
+                int d = kv.Value - w;
+                if (d <= 0) continue;
+                bool inFrame = GoodsLedger.NoteKnownOpenSource(kv.Key, d, HeroFoodSub);
+                _dHeroLedger += d; _sHeroNamed += d;
+                if (inFrame) _sHeroGate += d;
+            }
         }
 
         // ============================================================ 8. glina i wapien w ladunkach (nowa kampania)
@@ -987,6 +1028,7 @@ namespace Armoury
                     sb.Append(k == 0 ? " [" : "; ").Append(BkKindName[k]).Append(' ').Append(_dBkN[k]).Append(" x, ").Append(_dBkUnits[k]).Append(" szt. warte ").Append(_dBkValue[k]).Append(" zl");
                 sb.Append("], inne partie BK, ktore jedza ").Append(_dBkOtherEats)
                   .Append("; do spichlerzy celow karawan zywnosci nie dojdzie ").Append(_dBkUnits[1]).Append(" szt. (cele ").Append(fTargets).Append(", bez zapasu dzis ").Append(fHungry).Append(")")
+                  .Append("; dar BK dla band hersztow nazwany w ksiedze towarow (f14-ksiega, gra bez zmian) ").Append(_dHeroLedger).Append(" szt.")
                   .Append(" | glina i wapien w ladunkach (Bulk Clay Lime Charcoal ").Append(TN(s.BulkClayLimeCharcoal)).Append("): kampania ").Append(BulkText())
                   .Append(", wsad linii ").Append(_dBulkIn).Append(" -> ").Append(_dBulkTaken).Append(" ladunkow, koszt wsadu w progu -").Append(_dBulkCostCut)
                   .Append(" | latki: ").Append(_hooks)
