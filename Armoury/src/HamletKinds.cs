@@ -44,7 +44,7 @@ namespace Armoury
         // Paired = zdjete zboze, ktore dostalo OSTATNIE wywolanie ryb (para z tego samego ticku) - recenzja W2: Taken nadpisuje tez magazyn wsi gry
         // (GetWarehouseCapacity: TickProductions przed tickiem i co godzine ThinkAboutSendingItemToTown) - wies z magazynem >= 1.5 W nie ma ticku produkcji,
         // a jej odczyt zboza wchodzil do kontroli a - b jako zdjete zboze bez ryb (falszywa roznica W2-3)
-        private sealed class Rec { public int Day = int.MinValue; public float U, Taken, Paired, Landed; public bool Grain, Fish, NoMem; }
+        private sealed class Rec { public int Day = int.MinValue; public float U, Taken, Paired, Landed; public bool Grain, Fish, NoMem, Rep; }   // Rep: inwest etap 0 - rekord juz w linii (doba ticku moze byc "dzis")
 
         // wies -> u z OSTATNIEGO zlozenia jej listy produkcji BK (ryby za zbozem); brak wpisu = lista bez kroku, zboze bez zmian
         private static readonly Dictionary<Village, float> _u = new Dictionary<Village, float>(new VillageRefEq());
@@ -52,6 +52,7 @@ namespace Armoury
         private static ItemObject _fish, _grain;
         private static bool _itemsTried;
         private static int _added, _moved, _stumbles, _stumblesAll;
+        private static int _pGrain, _pFish, _pNoU, _pOff;               // inwest etap 0: proba - wywolania kroku zboza / ryb, wsi bez u w kroku, klucz albo zrodla nieczynne
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
         /// <summary>Klucz i wszystkie zrodla czynne: ksiega wiosek (rodzaj i ludzie wiosek), lista produkcji BK (ryby na liscie) i MaterialLaw w modelach
@@ -61,7 +62,8 @@ namespace Armoury
             get
             {
                 var s = Settings.Current;
-                return s != null && s.HamletKindsInDistrict && VillageBook.Active && MineralOnce.Wired && MaterialLaw.ProdModels > 0;
+                // inwest (noc 17/18.10): przy zajeciach wiosek pobocznych (Side Village Crafts, droga bez KS) W2 milknie - wioska rybacka to zajecie rybackie z pelnymi rekami
+                return s != null && s.HamletKindsInDistrict && VillageBook.Active && MineralOnce.Wired && MaterialLaw.ProdModels > 0 && !VillageCrafts.On;
             }
         }
 
@@ -140,7 +142,7 @@ namespace Armoury
         {
             Rec r;
             if (!_rec.TryGetValue(v, out r)) { r = new Rec(); _rec[v] = r; }
-            if (r.Day != day) { r.Day = day; r.U = 0f; r.Taken = 0f; r.Paired = 0f; r.Landed = 0f; r.Grain = r.Fish = r.NoMem = false; }
+            if (r.Day != day) { r.Day = day; r.U = 0f; r.Taken = 0f; r.Paired = 0f; r.Landed = 0f; r.Grain = r.Fish = r.NoMem = r.Rep = false; }
             return r;
         }
 
@@ -155,9 +157,13 @@ namespace Armoury
             if (!grain && !fish) return;
             try
             {
-                if (!On) return;
+                if (!On) { lock (Gate) _pOff++; return; }
                 float u;
-                lock (Gate) { if (!_u.TryGetValue(v, out u)) return; }
+                lock (Gate)
+                {
+                    if (grain) _pGrain++; else _pFish++;                  // inwest etap 0 (proba W2): wywolania kroku zboza i ryb
+                    if (!_u.TryGetValue(v, out u)) { _pNoU++; return; }
+                }
                 int today = (int)CampaignTime.Now.ToDays;
                 if (grain)
                 {
@@ -209,27 +215,35 @@ namespace Armoury
             else if (!MineralOnce.Wired) state = "NIECZYNNE - brak listy produkcji BK (postfiks GetProductions nie wpiety)";
             else if (MaterialLaw.ProdModels <= 0) state = "NIECZYNNE - MaterialLaw poza modelami produkcji wsi";
             else if (_itemsTried && (_fish == null || _grain == null)) state = "NIECZYNNE - gra nie zna przedmiotu fish albo grain";
+            else if (VillageCrafts.On) state = "WYLACZONE - zajecia wiosek pobocznych (Side Village Crafts) zastepuja W2: wioska rybacka to zajecie rybackie (linia Zajecia wiosek (ZW))";
             else state = "CZYNNE";
             int n = 0, c = 0, fishOnly = 0, g = 0, listed;
             double a = 0.0, b = 0.0, su = 0.0, ga = 0.0;
-            int added, moved, st, stAll;
+            int added, moved, st, stAll, pg, pf, pnu, poff;
             lock (Gate)
             {
+                // inwest etap 0 (projekt A0): tick wsi moze nadac rekordowi "dzis" przed ArmouryBehavior.OnDailyTick - liczymy rekordy doby wczorajszej ALBO dzisiejszej,
+                // ktorych jeszcze nie bylo w linii (Rep), kazdy raz
                 foreach (var r in _rec.Values)
                 {
-                    if (r.Day != day) continue;
+                    if ((r.Day != day && r.Day != day + 1) || r.Rep) continue;
+                    r.Rep = true;
                     if (r.Grain) { n++; su += r.U; if (!r.Fish) { g++; ga += r.Taken; } }   // zboze bez wywolania ryb: odczyt magazynu wsi bez ticku produkcji
                     if (r.Fish) { a += r.Paired; b += r.Landed; if (r.NoMem) c++; if (!r.Grain) fishOnly++; }
                 }
                 listed = _u.Count; added = _added; moved = _moved; st = _stumbles; stAll = _stumblesAll;
-                _added = _moved = 0; _stumbles = 0;
+                pg = _pGrain; pf = _pFish; pnu = _pNoU; poff = _pOff;
+                _added = _moved = 0; _stumbles = 0; _pGrain = _pFish = _pNoU = _pOff = 0;
             }
             Log.Info("Wioski wedlug rodzaju (210): dzien " + day + " | " + state
                      + " | okregow z rybakami " + n + " (u srednio " + (n > 0 ? (100.0 * su / n).ToString("0.0", Inv) : "0") + "%, wsi z rybami za zbozem na liscie BK " + listed + ")"
                      + ", zboza -" + a.ToString("0.0", Inv) + ", ryb +" + b.ToString("0.0", Inv) + ", kontrola a - b = " + (a - b).ToString("0.0", Inv)
                      + "; zboze bez wywolania ryb w dobie " + g + " wsi (odczyt -" + ga.ToString("0.0", Inv) + " - magazyn wsi >= 1.5 W albo bez ticku produkcji, nic nie zdjeto)"
                      + "; wsi bez pamieci zboza " + c + " (w tym bez zboza w dobie " + fishOnly + ")"
-                     + " | listy BK: ryby dopisane " + added + ", przeniesione za zboze " + moved + " wywolan | potkniecia dzis " + st + ", od wczytania " + stAll);
+                     + " | listy BK: ryby dopisane " + added + ", przeniesione za zboze " + moved + " wywolan"
+                     + " | proba W2 (inwest etap 0): wywolania kroku zboza " + pg + ", ryb " + pf + ", wsi bez u " + pnu + ", przy kroku nieczynnym " + poff
+                     + ", ciche wyjatki modelu (MaterialLaw) " + MaterialLaw.TakeSilent()
+                     + " | potkniecia dzis " + st + ", od wczytania " + stAll);
         }
     }
 }

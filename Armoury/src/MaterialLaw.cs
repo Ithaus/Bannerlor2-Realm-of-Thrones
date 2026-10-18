@@ -242,6 +242,9 @@ namespace Armoury
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);
+                // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - uogolniony krok W2 (towary typu x (1 - u_inne) x n + premia prac, towary innych zajec dopisane
+                // z M tej doby); wies pod KS, klucz wylaczony, wies bez planu - nic (wlasny try w VillageCrafts)
+                VillageCrafts.Step(village, item, ref __result);
                 // KS etap 2 (rampa podazy, rozdz. 6): wies zastosowana w rampie - wynik = (1 - beta) x lancuch gry (wyzej) + beta x stawka KS, PRZED sufitem dymarki i RockGold
                 // (sufity tna wynik mieszany); poza rampa tej wsi i towaru - nic
                 StartCalibration.BlendStep(village, item, ref __result);
@@ -252,8 +255,11 @@ namespace Armoury
                 GoodsRates.SideStep(village, item, ref __result);   // ZC1 (BkSideGoodsOrigin): marmur kopaln srebra i miod pitny drwali x (1 - przejscie) - po wszystkich krokach, przed ksiega
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
-            catch { }
+            catch { System.Threading.Interlocked.Increment(ref _silent); }   // inwest etap 0 (proba W2): ciche wyjatki lancucha tylko liczone (linia W2)
         }
+        private static int _silent;
+        /// <summary>inwest etap 0: ciche wyjatki ProdPostfix od ostatniego odczytu (lancuch modelu przerwany - kroki po wyjatku nie biegly dla tego wywolania).</summary>
+        internal static int TakeSilent() { return System.Threading.Interlocked.Exchange(ref _silent, 0); }
 
         internal static void ApplyAll(Harmony h)
         {

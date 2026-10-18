@@ -1,0 +1,235 @@
+using System;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace Armoury
+{
+    /// <summary>
+    /// inwest (noc 17/18.10, projekt docs/PROJEKT-INWESTYCJE-OKREGU-2026-10-16.md; zajecia wiosek pobocznych + prace okregu): wejscie KS dla paczki - wlasny plik
+    /// czesciowy, zeby nie ruszac reszty KS (inne paczki nocy dopisuja tam swoje wiersze).
+    ///  - ZAJECIA POD KS: wioska poboczna to blok KS (wlasna ziemia z arm_ks_land.tsv + nakladka przysiolkow v6, kandydaci zajec z jednej tabeli swiata - KsCore.Candidates,
+    ///    snieg bez upraw). Rece bloku i ich udzial w zajeciach (C/X) daje Plan przy wlaczeniu, potem zmienia je TYLKO regula A7 (StartCalibration.Rule.cs) z hamulcem Jeffa
+    ///    (+25% przez 60 dob, koszt przebudowy do kasy miasta, okres przejsciowy 60 / 364 dob, jedna czesc okregu naraz, 5% rak regionu na sezon) - Plan co 7 dob
+    ///    po wlaczeniu nie przestawia rak blokow (tylko praca domowa, z krokiem 0.02 po D+49). Paczka tylko czyta zajecie bloku (najwiekszy udzial rak) do opisu,
+    ///    ikony i prac okregu; blok z pracami okregu nie zmienia zajecia (KsWorksLock w RuleDaily).
+    ///  - PRACE OKREGU POD KS (jedna regula z droga bez KS): dodatek b czesci mnozy produkcje JEJ zajecia - kg zajecia bloku (P0 x L x rece zajecia, ten sam wzor co
+    ///    KsDeliver.Produce) x b dopisane do produkcji okregu PRZED zima, E4/5 i E4/7 (ComputeDistrict) - dalej to, co okreg zje sam, i stawki na targ jak reszta.
+    ///    Plan (watek roboczy) dodatku nie widzi - planuje rece, a prace to kapital czesci; nadwyzka idzie na targ i ceny ja wchlaniaja (podaz i popyt).
+    /// Wyjatki per okreg liczone (Stumble) - nic sie nie gasi.
+    /// </summary>
+    internal static partial class StartCalibration
+    {
+        /// <summary>inwest: czesc okregu pod KS - wioska poboczna (Uid) albo wies gry (Main: 20 blokow razem). Craft - zajecie z najwiekszym udzialem rak,
+        /// Mix - udzial rak wedlug zajecia (KsTab.NC), Kg - kg/d zajec czesci (bez zimy), Busy - przebudowa A7 w toku, Hands - rece czesci.</summary>
+        internal sealed class KsPartView { public string Uid; public bool Main; public int Craft = -1; public double[] Mix = new double[KsTab.NC]; public double Hands; public bool Busy; public double[] Kg = new double[ItemCount]; public double[] CraftVal = new double[KsTab.NC]; }
+
+        /// <summary>inwest: wies z zastosowanym KS (stan, klucz, okreg w stanie, kraina nie wrocona bramka) - opis i prace okregu licza z blokow KS.</summary>
+        internal static bool KsDistrictLive(Village v)
+        {
+            if (v == null || _state != StateApplied || !KeyOn) return false;
+            try
+            {
+                var st = v.Settlement; LiveDist ld;
+                if (st == null || st.StringId == null || !_live.TryGetValue(st.StringId, out ld) || ld == null || ld.B == null || ld.K == null) return false;
+                return !LandBackOf(st);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>inwest: wiersze ziemi wiosek pobocznych okregu (plik ziemi KS po nakladce przysiolkow v6) - zajecia startowe i kandydaci drogi bez KS.
+        /// false - brak pliku ziemi albo okregu.</summary>
+        internal static bool SideRows(string districtId, List<LandRow> into)
+        {
+            if (into != null) into.Clear();
+            if (districtId == null || into == null) return false;
+            try
+            {
+                EnsureLand();
+                LandDist d;
+                if (_landVil == null || !_landVil.TryGetValue(districtId, out d) || d == null) return false;
+                into.AddRange(d.Side);
+                return true;
+            }
+            catch (Exception e) { Stumble("SideRows", e); return false; }
+        }
+
+        /// <summary>inwest: pierwszy wiersz bloku wsi gry (punkt wsi) - ziemia wsi gry do zajec wsi gry drogi bez KS (zawsze typ okregu, projekt A4).</summary>
+        internal static bool MainRow(string districtId, out LandRow row)
+        {
+            row = null;
+            try
+            {
+                EnsureLand();
+                LandDist d;
+                if (_landVil == null || districtId == null || !_landVil.TryGetValue(districtId, out d) || d == null) return false;
+                row = d.Main[0];
+                return row != null;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>inwest: kandydaci zajec wioski (jedna tabela swiata: przydatnosc ziemi >= 0.3, zajecie startowe zawsze, regale nie) - ta sama regula co blok KS.</summary>
+        internal static List<int> CandidatesOf(LandRow row, string dtype)
+        {
+            if (row == null) return new List<int>();
+            var kb = new KsBlock { Uid = row.Uid, Start = row.Start, O = row.O, Main = false };
+            return KsCore.Candidates(kb, dtype);
+        }
+
+        /// <summary>inwest: przydatnosc ziemi wioski dla zajecia (KsTab.Land2 - strefa x teren x woda; snieg zeruje uprawy).</summary>
+        internal static double Suit(LandRow row, int craft, string dtype)
+        {
+            if (row == null || row.O == null || craft < 0 || craft >= KsTab.NC) return 0.0;
+            try { return KsTab.Land2(craft, row.O, dtype); } catch { return 0.0; }
+        }
+
+        /// <summary>inwest: czesci okregu pod KS (wies gry jako jedna czesc - 20 blokow; wioski poboczne po uid). false - okreg poza KS (droga bez KS).</summary>
+        internal static bool KsPartsOf(Village v, List<KsPartView> into)
+        {
+            if (into != null) into.Clear();
+            if (into == null || !KsDistrictLive(v)) return false;
+            try
+            {
+                LiveDist ld;
+                if (!_live.TryGetValue(v.Settlement.StringId, out ld)) return false;
+                EnsureValues();
+                string type = ld.K.Type;
+                var main = new KsPartView { Main = true };
+                var tmp = new double[ItemCount];
+                foreach (var lb in ld.B)
+                {
+                    if (lb == null || lb.K == null || lb.C == null || lb.X == null) continue;
+                    KsPartView pv;
+                    if (lb.K.Main) pv = main;
+                    else { pv = new KsPartView { Uid = lb.Uid ?? lb.K.Uid, Main = false }; into.Add(pv); }
+                    pv.Hands += lb.Hands;
+                    if (lb.Target >= 0) pv.Busy = true;
+                    for (int j = 0; j < lb.C.Length; j++)
+                    {
+                        int c = lb.C[j];
+                        if (c < 0 || c >= KsTab.NC) continue;
+                        pv.Mix[c] += lb.X[j] * lb.Hands;
+                        Array.Clear(tmp, 0, tmp.Length);
+                        BlockCraftKg(ld.K, lb, j, type, tmp);
+                        double val = 0;
+                        for (int i = 0; i < ItemCount; i++) { if (tmp[i] <= 0) continue; pv.Kg[i] += tmp[i]; val += tmp[i] * ValKgItem(i); }
+                        pv.CraftVal[c] += val;
+                    }
+                }
+                into.Add(main);
+                foreach (var pv in into)
+                {
+                    double s = 0; int best = -1; double bx = -1;
+                    for (int c = 0; c < KsTab.NC; c++) { s += pv.Mix[c]; if (pv.Mix[c] > bx) { bx = pv.Mix[c]; best = c; } }
+                    if (s > 0) for (int c = 0; c < KsTab.NC; c++) pv.Mix[c] /= s;
+                    pv.Craft = bx > 0 ? best : -1;
+                }
+                return true;
+            }
+            catch (Exception e) { Stumble("KsPartsOf", e); into.Clear(); return false; }
+        }
+
+        /// <summary>Wartosc kg towaru dostawy przy cenie bazowej (do udzialow zajec w wartosci okregu): zywiec - polowa miesa i skory, reszta Value / kg sztuki.</summary>
+        private static double ValKgItem(int i)
+        {
+            if (_items == null || i < 0 || i >= ItemCount) return 0.0;
+            var it = _items[i];
+            if (it == null) return 0.0;
+            return Math.Max(0, it.Value) / Math.Max(0.1, _itemKg != null ? _itemKg[i] : 10.0);
+        }
+
+        /// <summary>kg/d zajecia C[j] bloku lb (ten sam wzor co KsDeliver.Produce: rece zajecia poza domem i zbozem wlasnym x (1 - praca domowa) x P0 x L), bez zimy
+        /// i czynnikow rak - z liczb ostatniego rachunku bloku (Produce ustawia Hands, WH, SubNW, Lg, HW). out_ dopisywane (nie zerowane).</summary>
+        private static void BlockCraftKg(KsDistrict d, KsPart lb, int j, string type, double[] out_)
+        {
+            if (d == null || lb == null || lb.C == null || j < 0 || j >= lb.C.Length) return;
+            int c = lb.C[j];
+            double rsum = 0; if (lb.RF != null) for (int k = 0; k < lb.RF.Length; k++) rsum += lb.RF[k];
+            double scale = Math.Max(0.0, 1.0 - rsum);
+            double x = lb.X[j] * scale;
+            if (!(x > 0)) return;
+            double rem = Math.Max(0.0, lb.Hands - lb.WH);
+            double lg = lb.Lg;
+            double sub = c != KsTab.CWheat && lg > 0 ? Math.Min(rem, lb.SubNW) : 0.0;
+            double hw = lb.HW > 0 ? Math.Min(0.95, lb.HW) : 0.0;
+            double cl = (rem - sub) * (1.0 - hw);
+            if (!(cl > 0)) return;
+            double L = lb.L(c, type);
+            foreach (var kv in KsTab.P0[c])
+            {
+                int it = kv.Key == KsTab.GWhaleMeat && c == KsTab.CHunter ? IMeat : GoodToItem[kv.Key];
+                if (it >= 0) out_[it] += x * cl * kv.Value * L;
+            }
+        }
+
+        // ------------------------------------------------------------ prace okregu pod KS (dodatek produkcji czesci)
+        private static long _wkCalls, _wkParts; private static double _wkKg;
+
+        /// <summary>ComputeDistrict (zaraz po KsDeliver.Produce, przed zima i czynnikami rak): dodatek prac okregu - dla czesci z pracami b x kg zajecia prac tej czesci
+        /// (wies gry - 20 blokow, wioska poboczna - jej blok). Klucz District Works wylaczony albo okreg bez prac - nic. Dodatek zapamietany w pracach okregu
+        /// (sztuki gry na dobe przed zima - udzial dodatku w utargu przy wozie).</summary>
+        private static void WorksKs(LiveDist ld, double[] prod)
+        {
+            if (ld == null || ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null) return;
+            if (!DistrictWorks.HasWorks(ld.V)) return;
+            try
+            {
+                _wkCalls++;
+                string type = ld.K.Type;
+                var extra = new double[ItemCount];
+                var tmp = new double[ItemCount];
+                foreach (var lb in ld.B)
+                {
+                    if (lb == null || lb.K == null || lb.C == null) continue;
+                    int craft; double b;
+                    if (!DistrictWorks.BonusOf(ld.V, lb.K.Main ? null : (lb.Uid ?? lb.K.Uid), out craft, out b) || !(b > 0) || craft < 0) continue;
+                    for (int j = 0; j < lb.C.Length; j++)
+                    {
+                        if (lb.C[j] != craft && !(KsTab.Crafts[lb.C[j]] == "cattle_farm:maslo" && KsTab.Crafts[craft] == "cattle_farm")) continue;
+                        Array.Clear(tmp, 0, tmp.Length);
+                        BlockCraftKg(ld.K, lb, j, type, tmp);
+                        for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) extra[i] += b * tmp[i];
+                    }
+                    _wkParts++;
+                }
+                double sigma = Math.Max(1, DailyLife.KsSigma), kg = 0;
+                var pcs = new double[ItemCount];
+                for (int i = 0; i < ItemCount; i++)
+                {
+                    if (!(extra[i] > 0)) continue;
+                    prod[i] += extra[i]; kg += extra[i];
+                    pcs[i] = extra[i] / (sigma * (_itemKg != null ? _itemKg[i] : 10.0));
+                }
+                _wkKg += kg;
+                DistrictWorks.NoteKsExtra(ld.V, _items, pcs);
+            }
+            catch (Exception e) { Stumble("WorksKs", e); }
+        }
+
+        /// <summary>inwest: blok z pracami okregu nie zmienia zajecia (regula A7) - wioska z pracami (Uid) albo wies gry (Main), gdy prace sa w wsi gry.</summary>
+        private static bool KsWorksLock(LiveDist ld, LiveBlock b)
+        {
+            if (ld == null || ld.V == null || b == null || b.K == null) return false;
+            try { return DistrictWorks.Locks(ld.V, b.K.Main ? null : (b.Uid ?? b.K.Uid)); } catch { return false; }
+        }
+
+        /// <summary>inwest: okreg do przeliczenia nastepnej doby (nowe prace, ogien) - dodatek wchodzi do stawek KS bez czekania na kolejke 7 dob. Nie rzuca.</summary>
+        internal static void KsDirty(Village v)
+        {
+            try
+            {
+                if (v == null || v.Settlement == null || v.Settlement.StringId == null || _state != StateApplied) return;
+                LiveDist ld; if (_live.TryGetValue(v.Settlement.StringId, out ld) && ld != null) ld.Res = null;
+            }
+            catch { }
+        }
+
+        /// <summary>inwest: liczniki dodatku prac pod KS do linii "Prace okregu (PO)" (od ostatniego odczytu).</summary>
+        internal static string WorksKsText()
+        {
+            string t = "pod KS: rachunkow okregow z pracami " + _wkCalls + ", czesci z dodatkiem " + _wkParts + ", dodatek " + _wkKg.ToString("0.0", Inv) + " kg/d przed zima";
+            _wkCalls = 0; _wkParts = 0; _wkKg = 0;
+            return t;
+        }
+    }
+}

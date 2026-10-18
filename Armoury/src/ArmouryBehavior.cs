@@ -727,6 +727,11 @@ namespace Armoury
 
         public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); WorkshopInputsFix.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); VillageHolders.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); GoodsPaths.Reset(); TownInns.Reset(); BulkUnit.Reset(); NightEcon.Reset(); GentryNames.Reset(); FiefGrants.Reset(); ReaverLaw.Reset(); DoomedPartyMen.Reset(); UniqueShelf.Reset(); OthersDuel.Reset(); A17Diag.Reset(); SiegeRansom.Reset(); VineOlive.Reset(); DayHeld.Reset(); FallenCrown.Reset(); RockGold.Reset(); DragonFeed.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); GearFit.Reset(); CaravanGoods.Reset(); TownToll.Reset(); CourtGoods.Reset(); MenUpgradeOrders.Reset(); DailyLife.Reset(); DsVillage.Reset(); DsTowns.Reset(); DsSeason.Reset(); StartCalibration.Reset(); KsFoodCarts.Reset(); RoadsideInns.Reset(); Rumours.Reset(); TownInns.RoadDayReset(); }
 
+        // inwest (noc 17/18.10): stan kampanii zajec wiosek, ikon i prac okregu od zera przy kazdym nowym zachowaniu (jak Reset w konstruktorze; osobna linia - bez zmiany
+        // wspolnej linii konstruktora, ktora dopisuja inne paczki)
+        private readonly bool _inwestReset = InwestReset();
+        private static bool InwestReset() { try { VillageCrafts.Reset(); DistrictIcon.Reset(); DistrictWorks.Reset(); } catch (Exception e) { Log.Error("InwestReset", e); } return true; }
+
         public override void SyncData(IDataStore dataStore)
         {
             // zapas startowy rudy i drewna przeliczony na ladunki raz na kampanie (StartStock); brak klucza = stary zapis.
@@ -1191,6 +1196,12 @@ namespace Armoury
             // wlasny try; brak klucza (stary zapis, Ironman Jeffa) = wskazniki 1 i bez dokupionej podstawy do pierwszego Planu; starszy DLL ignoruje klucz
             try { string kk = dataStore.IsSaving ? KsWageHands.ExportAll() : null; SaveText.Sync(dataStore, "arm_ks_koszyk", ref kk); if (dataStore.IsLoading) KsWageHands.ImportAll(kk); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_koszyk", e); }
+            // inwest (noc 17/18.10): zajecia wiosek pobocznych drogi bez KS (arm_crafts: n neutralnego startu, zajecia zmienione, przebudowy, rece regionu w sezonie) i prace okregu
+            // (arm_works: wiersze prac, utarg okregow, przelacznik odbudowy); wlasny try, brak klucza (stary zapis, Ironman Jeffa) = pusto, starsza DLL ignoruje klucze
+            try { string zw = dataStore.IsSaving ? VillageCrafts.Export() : null; SaveText.Sync(dataStore, "arm_crafts", ref zw); if (dataStore.IsLoading) VillageCrafts.Import(zw); }
+            catch (Exception e) { Log.Error("SyncData.arm_crafts", e); }
+            try { string po = dataStore.IsSaving ? DistrictWorks.Export() : null; SaveText.Sync(dataStore, "arm_works", ref po); if (dataStore.IsLoading) DistrictWorks.Import(po); }
+            catch (Exception e) { Log.Error("SyncData.arm_works", e); }
         }
 
         public override void RegisterEvents()
@@ -1898,7 +1909,9 @@ namespace Armoury
             try { DailyLife.MobilitySessionStart(); } catch (Exception e) { Log.Error("DailyLife.MobilitySessionStart", e); }   // ZC6 (16.10): postfiks dobrobytu na czynnym modelu (raz na metode) i linia "Awans (ZC6): start sesji"
             try { DailyLife.WarSessionStart(); } catch (Exception e) { Log.Error("DailyLife.WarSessionStart", e); }   // ZC7 (16.10): linia "Blizna wojny (ZC7): start sesji" - klucz, dlug blizny z zapisu
             try { StartCalibration.SessionStart(); } catch (Exception e) { Log.Error("StartCalibration.SessionStart", e); }   // KS (kalibracja startu): plik ziemi, stan z zapisu (arm_ks), linia "Kalibracja startu (KS): start sesji" - PO VillageBook.Resolve i McmSettings.Apply
-            try { KsFoodCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("KsFoodCarts.ResolvePending", e); }   // KS-R3 G1: wozy KS-H w drodze z zapisu
+            try { KsFoodCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("KsFoodCarts.ResolvePending", e); }
+            try { VillageCrafts.SessionStart(); } catch (Exception e) { Log.Error("VillageCrafts.SessionStart", e); }
+            try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby   // inwest: linia "Zajecia wiosek (ZW): start" - PO VillageBook.Resolve i StartCalibration.SessionStart (plik ziemi KS z nakladka v6)   // KS-R3 G1: wozy KS-H w drodze z zapisu
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
@@ -1993,7 +2006,8 @@ namespace Armoury
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
-            try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
+            try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }
+            try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }   // inwest: "Invest in the district's works" za "Look over the district" (village, village_looted)   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
             try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
             try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
@@ -2466,6 +2480,11 @@ namespace Armoury
             // KS (kalibracja startu): PO DailyLife.Daily (stany doby) - wynik Planu z watku roboczego, Plan co 7 dob, w stanie zastosowanym stawki wsi na jutro, regula zmiany zajec
             // (przebudowa: kiesa wsi -> kasa miasta), pola mieszczan (kasa miasta -> kiesy ludu) - wlasna pozycja "Przeplywy osad" (MKs)
             try { StartCalibration.Daily(); } catch (Exception e) { Log.Error("StartCalibration.Daily", e); } DayProfile.Lap("StartCalibration.Daily");
+            // inwest (noc 17/18.10): PO KS (bloki KS doby) - zajecia wiosek bez KS (plany produkcji, przebudowy: kiesa wsi -> kasa miasta), ikona okregu (co 28 dob), prace okregu
+            // (rampa, roznice ksiegi wiosek PO VillageBook.Daily, odbudowa, linia PO) - przed znacznikiem MKs (ta sama natura przeplywu: przebudowa zajec wsi)
+            try { VillageCrafts.Daily(); } catch (Exception e) { Log.Error("VillageCrafts.Daily", e); } DayProfile.Lap("VillageCrafts.Daily");
+            try { DistrictIcon.Daily(); } catch (Exception e) { Log.Error("DistrictIcon.Daily", e); } DayProfile.Lap("DistrictIcon.Daily");
+            try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)

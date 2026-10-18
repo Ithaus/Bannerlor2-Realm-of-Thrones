@@ -7340,6 +7340,98 @@ namespace Armoury
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool CrownWindfallToReserve { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Crafts", HintText = "each side village of a district works at its own craft - fishing hamlets fish, mill and granary villages grow grain, the others what their land, water and climate suit best (no olives, vines or grain in the snow); the district makes the sum of all its villages. With Start Calibration applied this comes from the start calibration itself; this setting governs villages outside it. On the first day the world makes as much of every good as the day before (the change only shifts which villages make what). Off = the district makes only the goods of its game village's type, as before")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageCrafts { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Side Village Craft Switch", 1.00f, 3.00f, "0.00", HintText = "with Side Village Crafts: a side village turns to another craft only when that craft would earn at least this many times its present one at its market town (land suitability x prices)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideVillageCraftSwitch { get; set; } = 1.25f;
+
+        [SettingPropertyInteger("Side Village Craft Hold Days", 7, 364, "0", HintText = "with Side Village Crafts: ... and only when that has held without a break for this many days")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int SideVillageCraftHoldDays { get; set; } = 60;
+
+        [SettingPropertyInteger("Side Village Craft Change Days", 7, 364, "0", HintText = "with Side Village Crafts: how many days the change takes - the old goods fade while the new ones grow; the village pays the town's craftsmen for the new gear meanwhile (no money - the change waits)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int SideVillageCraftChangeDays { get; set; } = 60;
+
+        [SettingPropertyInteger("Side Village Craft Tree Days", 7, 728, "0", HintText = "with Side Village Crafts: the same for vineyards, olive groves, date palms and orchards, which take longer to bear")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int SideVillageCraftTreeDays { get; set; } = 364;
+
+        [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideVillageCraftRegionShare { get; set; } = 0.05f;
+
+        [SettingPropertyBool("District Icon From Sum", HintText = "the main village's map icon shows the good of the craft that earns the whole district (main village and side villages) the most money; the settlement tooltip lists the district's goods. Off = the icon of the game village's type, as before")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool DistrictIconFromSum { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("District Icon Margin", 0.00f, 1.00f, "0.00", HintText = "with District Icon From Sum: the icon changes only when another craft earns the district this much more than the shown one (0.10 = 10%)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictIconMargin { get; set; } = 0.10f;
+
+        [SettingPropertyBool("District Works", HintText = "'Invest in the district's works' in the village menu (and BetterEconomy's village menu, whose 5,000 / 15,000 / 30,000 investments are hidden): pay the villagers of one village of the district for boats, herds, ploughs or tools - the coin goes to people (wages to the village purse, real goods bought at the market town), that village makes more of its own goods, and half of what the extra sells for is yours each time the district's carts come back from market. Raiders burn the works in the homesteads they empty. Off = no new works and no pay; works already bought stay, frozen")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool DistrictWorks { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("District Works Share", 0.00f, 1.00f, "0.00", HintText = "with District Works: the investor's share of what the extra goods sell for (the lord and the village share the rest as usual)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("District Works Bonus Side", 0.00f, 2.00f, "0.00", HintText = "with District Works: how much more a side village makes with a full kit (0.30 = +30%); the first coins add the most")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksBonusSide { get; set; } = 0.30f;
+
+        [SettingPropertyFloatingInteger("District Works Bonus Main", 0.00f, 2.00f, "0.00", HintText = "with District Works: the same for the main village, where the lord's mill and ploughs already stand")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksBonusMain { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("District Works Kit Years", 0.10f, 10.00f, "0.0", HintText = "with District Works: a full kit for one homestead costs this many years of what that homestead makes of its craft")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksKitYears { get; set; } = 1.0f;
+
+        [SettingPropertyInteger("District Works Min Gold", 0, 10000, "0", HintText = "with District Works: the smallest payment for works")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int DistrictWorksMinGold { get; set; } = 200;
+
+        [SettingPropertyInteger("District Works Rebuild Days", 1, 728, "0", HintText = "with District Works: how many days after people return to burned homesteads you may still rebuild your works there (afterwards the right is gone)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int DistrictWorksRebuildDays { get; set; } = 91;
+
+        [SettingPropertyBool("District Works Auto Rebuild", HintText = "with District Works: rebuild burned works at once when people return, as long as District Works Keep Wage Days of your party's wages stay in your purse (can also be switched in the works window)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool DistrictWorksAutoRebuild { get; set; } = true;
+
+        [SettingPropertyInteger("District Works Keep Wage Days", 0, 364, "0", HintText = "with District Works Auto Rebuild: the days of party wages that must stay in the purse after paying for a rebuild")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int DistrictWorksKeepWageDays { get; set; } = 30;
+
+        [SettingPropertyBool("District Works Ai", HintText = "with District Works: AI lords invest in the works of their own districts from gold beyond their war reserve when the next coin pays enough (Jeff 16.10: not yet - off until its test passes)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool DistrictWorksAi { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("District Works Ai Min Return", 0.01f, 2.00f, "0.00", HintText = "with District Works Ai: the yearly return the next coin must bring (at today's season and prices)")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksAiMinReturn { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("District Works Ai Surplus Share", 0.00f, 1.00f, "0.00", HintText = "with District Works Ai: the share of a lord's gold beyond his reserve that he may put into works every 28 days")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksAiSurplusShare { get; set; } = 0.05f;
+
+        [SettingPropertyInteger("District Works Ai Reserve Days", 0, 364, "0", HintText = "with District Works Ai: a lord keeps this many days of his party's wages ...")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int DistrictWorksAiReserveDays { get; set; } = 60;
+
+        [SettingPropertyInteger("District Works Ai Reserve Flat", 0, 200000, "0", HintText = "with District Works Ai: ... plus this much gold, before he invests")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int DistrictWorksAiReserveFlat { get; set; } = 20000;
+
+        [SettingPropertyFloatingInteger("District Works Ai World Pace", 0.000f, 0.100f, "0.000", HintText = "with District Works Ai: all AI works together at most this share of the world's yearly village production every 28 days")]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float DistrictWorksAiWorldPace { get; set; } = 0.005f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9174,6 +9266,29 @@ namespace Armoury
             s.DsHoardDueVillages = DsHoardDueVillages;
             s.FolkBetterTable = FolkBetterTable;
             s.CrownWindfallToReserve = CrownWindfallToReserve;
+            s.SideVillageCrafts = SideVillageCrafts;
+            s.SideVillageCraftSwitch = SideVillageCraftSwitch;
+            s.SideVillageCraftHoldDays = SideVillageCraftHoldDays;
+            s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
+            s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
+            s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;
+            s.DistrictIconFromSum = DistrictIconFromSum;
+            s.DistrictIconMargin = DistrictIconMargin;
+            s.DistrictWorks = DistrictWorks;
+            s.DistrictWorksShare = DistrictWorksShare;
+            s.DistrictWorksBonusSide = DistrictWorksBonusSide;
+            s.DistrictWorksBonusMain = DistrictWorksBonusMain;
+            s.DistrictWorksKitYears = DistrictWorksKitYears;
+            s.DistrictWorksMinGold = DistrictWorksMinGold;
+            s.DistrictWorksRebuildDays = DistrictWorksRebuildDays;
+            s.DistrictWorksAutoRebuild = DistrictWorksAutoRebuild;
+            s.DistrictWorksKeepWageDays = DistrictWorksKeepWageDays;
+            s.DistrictWorksAi = DistrictWorksAi;
+            s.DistrictWorksAiMinReturn = DistrictWorksAiMinReturn;
+            s.DistrictWorksAiSurplusShare = DistrictWorksAiSurplusShare;
+            s.DistrictWorksAiReserveDays = DistrictWorksAiReserveDays;
+            s.DistrictWorksAiReserveFlat = DistrictWorksAiReserveFlat;
+            s.DistrictWorksAiWorldPace = DistrictWorksAiWorldPace;
         }
 
         internal static void Apply()

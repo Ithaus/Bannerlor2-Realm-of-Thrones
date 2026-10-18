@@ -333,6 +333,7 @@ namespace Armoury
             var res = new DistResult();
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
+            if (factors) WorksKs(ld, prod);              // inwest: dodatek prac okregu (b x kg zajecia czesci) przed zima i czynnikami rak - tylko gra (Plan nie)
             double f = 1.0;
             if (factors)
             {

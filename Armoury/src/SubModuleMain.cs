@@ -83,6 +83,7 @@ namespace Armoury
                 // GL-1 (P1): linia "People of this land" w dymku osady (wies) - postfiks dymka gry i NavalDLC (ten rejestruje dymek osady od nowa); wlasny try,
                 // linia dziala tylko przy kluczu VillageOutputByPeople
                 try { VillageByPeople.ApplyTip(_harmony); } catch (Exception e) { Log.Error("VillageByPeople.ApplyTip", e); }
+                try { DistrictIcon.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DistrictIcon.ApplyAll", e); }   // inwest: ikona okregu (tabliczka, dymek osady, lista produkcji miasta) - latki UI raz na proces
                 // ZC2 (16.10): linie "Estates (book)" i "Livelihood" w dymku osady (miasto, zamek - region, wies) - postfiks Low dymka gry i NavalDLC, PO GL1 (wstawia
                 // pod jego linie); wlasny try, linie tylko przy kluczu DailyLifeEstates
                 try { DailyLife.ApplyTip(_harmony); } catch (Exception e) { Log.Error("DailyLife.ApplyTip", e); }

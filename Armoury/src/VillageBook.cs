@@ -1822,6 +1822,42 @@ namespace Armoury
             catch (Exception e) { Stumble("VillageBook.FishersShare", e); return 0.0; }
         }
 
+        /// <summary>inwest (noc 17/18.10, prace okregu i zajecia wiosek): czesc okregu - wioska poboczna albo wies gry (Main, Uid null): nazwa, polozenie (Kind z pliku
+        /// ukladu), model obrazka (Fish), osady (Nw), puste z rabunku (Br) i z glodu (Bf), ludzie w domu i poza domem (ten sam podzial co menu i dymek), stan StateAt.</summary>
+        internal sealed class PartView { public string Uid, Name, Kind; public bool Main, Fish; public double Nw, Br, Bf, Home, Away; public int State; }
+
+        /// <summary>inwest: czesci okregu tej wsi gry (wioski poboczne w kolejnosci ksiegi, wies gry na koncu). false - ksiega nieczynna, wies nieznana albo okreg bez n.
+        /// Sam odczyt pod Gate (EnsureN jak menu), nie rzuca.</summary>
+        internal static bool PartsOf(Village v, List<PartView> into)
+        {
+            if (into != null) into.Clear();
+            if (v == null || into == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || d == null || !EnsureN(d) || d.Nw == null || d.Uid == null) return false;
+                    var sn = SnapOf(d);
+                    for (int w = 0; w <= d.W; w++)
+                    {
+                        double home, away;
+                        People(d, sn, w, out home, out away);
+                        into.Add(new PartView
+                        {
+                            Uid = w == d.W ? null : d.Uid[w], Name = d.VName[w], Kind = d.Kind[w] ?? "", Main = w == d.W, Fish = d.Fish != null && d.Fish[w],
+                            Nw = Math.Max(0.0, d.Nw[w]), Br = Math.Max(0.0, d.Br[w]), Bf = Math.Max(0.0, d.Bf[w]), Home = Math.Max(0.0, home), Away = Math.Max(0.0, away), State = StateAt(d, w)
+                        });
+                    }
+                    return true;
+                }
+            }
+            catch (Exception e) { into.Clear(); Stumble("VillageBook.PartsOf", e); return false; }
+        }
+
+        /// <summary>inwest: miejsce wioski w zdaniu ("by the river") - ten sam tekst co wiersz okna okregu; "" - bez miejsca.</summary>
+        internal static string PlaceOf(string kind) { try { return Place(kind ?? ""); } catch { return ""; } }
+
         /// <summary>
         /// Widok (PollRaids, 4 razy na sekunde - sam odczyt, gdy sesja otwarta): wioska z ogniem (fire, wies gry IsUnderRaid) albo dymem (czujnosc, IsRaided). Brak sesji
         /// przy rabunku - OTWIERA ja ta sama funkcja wyboru co Strike (krytyka K2: wybor ten sam przy widoku wlaczonym i wylaczonym, b sie nie zmienia do pierwszego Strike).
