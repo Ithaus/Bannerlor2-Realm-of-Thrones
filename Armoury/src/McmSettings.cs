@@ -6937,19 +6937,19 @@ namespace Armoury
         public bool DsFarmFolkFromSavings { get; set; } = true;
 
         [SettingPropertyBool("Ks Cheap Basket", HintText = "with Start Calibration applied: a household that cannot pay for its whole basket first buys enough of the cheapest food on its market (grain, bread, pie or fish - whichever gives the most calories for a coin and is on the stall) to feed everyone, then salt, protein (cheapest first), drink (cheapest first) and the rest; meat, wine and cheese come only from what is left. The market and the plan see the basket really bought, so prices and fields follow it. Off = the old basket ladder")]
-        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
         public bool KsCheapBasket { get; set; } = true;
 
         [SettingPropertyBool("Ks Wage By Hands", HintText = "with Start Calibration applied: in a town whose employers lack hands (the region has lost its free men to war and service, or the town's food crafts work at full stretch) the townsfolk's wages rise a little each week; where hands are plentiful they drift back. The extra pay comes out of the town's coffer (the merchants and masters who hire), never from nothing. Off = wages as before")]
-        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
         public bool KsWageByHands { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Ks Wage Hands Step Percent", 0.00f, 10.00f, "0.0", HintText = "with Ks Wage By Hands: how much the town's wage level moves in a week (percent), up where hands are short and back down where they are plentiful")]
-        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
         public float KsWageHandsStepPercent { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Ks Wage Hands Max", 1.00f, 2.00f, "0.00", HintText = "with Ks Wage By Hands: the highest wage level a shortage of hands can bring (times the usual wage of the town)")]
-        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
         public float KsWageHandsMax { get; set; } = 1.3f;
 
         public void ApplyTo(Settings s)
