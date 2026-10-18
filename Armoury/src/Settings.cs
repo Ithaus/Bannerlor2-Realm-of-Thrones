@@ -3397,6 +3397,14 @@ namespace Armoury
         public bool BanditBirthsWherePeople = true;        // with Bandit Limit Per Hideout above Realm of Thrones' own: every band the game raises for a clan with hideouts is born at one of the clan's hideouts whose land has outlaws enough for a band (chosen the way the game chooses), never as an empty band that is removed at once; where none of the clan's hideouts has such men, no band is born. Off = the game picks the hideout as before, and births where no men are come out empty and are removed
         public bool BanditCostLog = true;                  // writes one daily line with the bandit bands against their limit, the bands born that day, the time their AI and our work on them take each day, and the real seconds a game day took (diagnostics only; the timers are set when a campaign starts or loads)
 
+        // --- Book holdings (night 18.10) ---
+        // Paczka f19-kanon-b (Jeff 18.10: "czy mozesz w savie przywrocic kazdej ze stron posiadlosci jakie powinni miec, czyli oddac wlosci tak jak to wygladalo
+        // w ksiazce"; "naprawa tych wydarzen i cofniecie polnocy"): BookHoldings.cs - raz na zapis (flaga arm_book_holdings), w pierwszej godzinie z graczem na mapie:
+        // King's Landing (+ Red Keep) do Joffreya, Sharp Point / Stonedance / Sweetport / Cape Wrath / Fellwood do lennikow Stannisa, Starfall do Daynow (ApplyByDefault,
+        // bohaterowie i zalogi starej strony wyprowadzeni, partie Polnocy spod Przystani do wlasnej twierdzy), zwrot 1 125 434 zl skarbca Korony od Polnocy.
+        // Nowy klucz (MCM Jeffa trzyma stare). Nowa kampania - nic do przywracania (flaga od razu).
+        public bool BookHoldingsRestore = true;            // once per save, in the first hour the party is out on the map, set the realms back as the chronicles have them at this point of the war: King's Landing and the Red Keep return to King Joffrey, the five castles Renly took from Stannis (Sharp Point, Stonedance, Sweetport, Cape Wrath, Fellwood) return to Stannis's bannermen and Starfall to House Dayne; lords of the old side who sit there are sent to their own keeps, the old garrisons march to their own lords (no men are made or lost), the northern host near King's Landing falls back to its own fortress, and the North pays back the 1,125,434 denars it carried off from the royal treasury. Harrenhal stays with the Boltons and Essos is left as it is. Does nothing in a campaign started with this version; off = nothing changes
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

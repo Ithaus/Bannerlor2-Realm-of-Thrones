@@ -1275,6 +1275,33 @@ namespace CrashScribe
 
         private static void NoProposal(string why) { lock (_lock) { _ppWhy.Inc(why); } }
 
+        /// <summary>f19-kanon-b (wola Armoury BookHoldings.RefundTreasury przez refleksje - zwrot skarbca Korony przy przywroceniu wlosci z kronik): jednorazowy
+        /// przelew skarbca przesuwa CALA historie skarbca krolestwa o delta - to przeniesienie skarbu, nie ubytek ani wplyw doby (ta sama zasada co migawka
+        /// korony 165 w Armoury CrownIncome.ShiftSnapshot). Bez tego platnik ma przez 7 dob falszywy ubytek (zapas < 28 dob = bieda 1), a odbiorca falszywy
+        /// doplyw. Krolestwo bez stanu (przed pierwszym pomiarem, E1 wylaczone) - nic: nastepny pomiar zacznie od skarbca po przelewie. Historia trzyma
+        /// skarbiec >= 0, wiec po przesunieciu tez (przyciete do 0 - ubytek moze tylko zmalec). Stan biedy (T) liczy sie dalej raz na dobe.
+        /// Zwraca liczbe przesunietych dob, -1 - brak stanu krolestwa. Nie rzuca.</summary>
+        internal static int ShiftHistory(Kingdom k, long delta)
+        {
+            try
+            {
+                if (k == null) return -1;
+                lock (_lock)
+                {
+                    KState s;
+                    if (!_k.TryGetValue(k, out s) || s == null) return -1;
+                    if (delta == 0) return s.Hist.Count;
+                    for (int i = 0; i < s.Hist.Count; i++)
+                    {
+                        long v = (long)s.Hist[i].Value + delta;
+                        s.Hist[i] = new KeyValuePair<int, int>(s.Hist[i].Key, (int)Math.Max(0L, Math.Min((long)int.MaxValue, v)));
+                    }
+                    return s.Hist.Count;
+                }
+            }
+            catch (Exception e) { Stumble("PovertyPeace.ShiftHistory", e); return -1; }
+        }
+
         /// <summary>Nowa gra / wczytanie: stan i liczniki od zera (latka zakladana raz przy starcie gry).</summary>
         internal static void ResetSession()
         {
