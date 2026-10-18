@@ -3020,3 +3020,7 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   ciasnych okregach (Tyrosh, Dolina, Westerlands) - naglowek min_distance 6.08 + target 12.26; zajazdy 135 (rozstaja i zjazdy z traktow, >= 12.26 od wiosek; stary plik _v6 dla v6);
   migracja zapisu v6 -> v7 po uid (kolumny v6_*), KS u Jeffa: "inny plik ziemi" -> Plan od nowa (35 dob do uzbrojenia). Nazwy/lore dawnych przysiolkow poprawione.
 - 11:30 PDT: BIEG ZDJEC foto1 = f10 + f11 (w-toku/foto-f10f11 7133dd89, tylko do zdjec), armoury-drogi-boczne.flag (USUNAC!), 3 doby, 6 miejsc x 3 wysokosci, at-foto1-v7.out.txt.
+- 11:55 PDT: BIEG ZDJEC foto1 (Armoury-2026-10-18_10-44-03.log): kod 0, ERROR 0, zdjecia 18/18 (Documents/.../CrashScribe/zdjecia/at-20261018-104332), zapisy Jeffa nietkniete, flaga usunieta.
+  v7 w grze: wioska-wioska min 6.75 / p10 10.26 / med 12.73, na ladzie 1518/1519; zajazdy 135, 0 przy wiosce; drogi boczne: 1033 drogi, 21077 decali postawione w 22.7 ms (1.1 us/decal).
+  "bledy 23" = zwykle wyjatki startowe BKROTPatch/BK (w fin92 66). Wyglad drog: z 40 i 20 - kropkowane sciezki, z 10 - lancuch ceglastych prostokatow (sztuczne z bliska; do strojenia
+  plikiem-przelacznikiem: gesciej, kolor, alfa). Zdjecia pokazane Jeffowi - czekam na jego ocene ukladu v7 i drog.
