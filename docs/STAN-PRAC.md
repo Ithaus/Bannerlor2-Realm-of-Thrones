@@ -3061,3 +3061,8 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   f16-drobne od 10beef63 (diagnoza + kod + recenzja). Recenzja scalenia f15: wf_90c50428-80e.
 - 14:20 PDT: JEFF 18.10 (verbatim) o wzroscie skarbcow (+33k/d), zamkow i glow rodow: "to nie jest blad jesli tak wynika z ekonomii i nie ma doplat z niczego to tak jest".
   -> NAKUM-7 dla skarbcow krolestw = pomiar, nie warunek wgrania; warunek: zloto swiata zamkniete (bez zrodel z niczego) i posiadacz ma ujscia (skarbiec - wojna W5/W5b/W5c).
+- 14:25 PDT: JEFF CHCE GRAC - fin94 PRZERWANY na jego prosbe (zabita gra, skrypt przywrocil: DLL w grze zatwierdzone Armoury 7b9f9ad0 / CrashScribe 5258adcd = WGRANIE 80, zapisy
+  nietkniete, Configs przywrocone, flagi usuniete). fin94 (10beef63) przeszedl 51 dob (109076-109126; log Armoury-2026-10-18_13-05-09.log na D:): ERROR 0, nsrednim 13/13 TAK (W5c: tozsamosci
+  co do zlotowki, tylko wojna, tylko < 2R, pomoc <= brak, skarbiec nigdy ponizej zapasu; srednio 22.1k/d gotowki + 35.1k/d podniesienia pulapu, R-2R 14.7k), nrenty/nzwrot/npozyczka/nglod/
+  odsiecz/nzapis/nperf TAK. NAKUM-7 w rozruchu (skarbce +73.7k, kiesy wsi +65.7k - faza przed koszykiem KS, jak w fin92) - nieporownywalne z oknem konca. ZADNYCH testow i wgran do sygnalu
+  Jeffa. W tle (bez gry): f16-fin93 (wf_6598e0b6-c3e). Noc-ks4 = 25ec1fa0 (10beef63 + checker).
