@@ -7540,6 +7540,22 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float DistrictWorksAiWorldPace { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before")]
+        [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
+        public bool SideVillageCraftNeutralGoods { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Craft Neutral Fix", HintText = "with Side Village Crafts: the day after the first day, what the first day really produced is compared good by good with the day before, and any craft still off by more than half a percent is set right once (by at most 10%); the check is then repeated and written to the log. Off = no second look")]
+        [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
+        public bool SideVillageCraftNeutralFix { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Craft Adds Winter", HintText = "with Side Village Crafts: goods a side village makes outside its district's own type are cut by winter like every other village good (the game leaves goods it does not list for a village type out of its winter cut). Off = those goods are not cut in winter, as before")]
+        [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
+        public bool SideVillageCraftAddsWinter { get; set; } = true;
+
+        [SettingPropertyBool("District Icon Part Crafts", HintText = "with District Icon From Sum and Start Calibration applied: each part of a district counts only its own craft - the main village its game type, each side village the craft of its land - valued at what that part sells of it at its market town (food the district eats itself is not money). Without it the whole calibrated output counted, home-grown bread and all, and over half the icons turned to grain or timber. Off = the whole calibrated output, as before")]
+        [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
+        public bool DistrictIconPartCrafts { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9424,6 +9440,10 @@ namespace Armoury
             s.DistrictWorksAiReserveDays = DistrictWorksAiReserveDays;
             s.DistrictWorksAiReserveFlat = DistrictWorksAiReserveFlat;
             s.DistrictWorksAiWorldPace = DistrictWorksAiWorldPace;
+            s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
+            s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
+            s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
+            s.DistrictIconPartCrafts = DistrictIconPartCrafts;
         }
 
         internal static void Apply()

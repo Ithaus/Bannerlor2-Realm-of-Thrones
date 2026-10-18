@@ -3102,6 +3102,15 @@ namespace Armoury
         public int DistrictWorksAiReserveFlat = 20000;     // with District Works Ai: ... plus this much gold, before he invests
         public float DistrictWorksAiWorldPace = 0.005f;    // with District Works Ai: all AI works together at most this share of the world's yearly village production every 28 days
 
+        // --- District crafts: neutral start and icon (18.10) ---
+        // Paczka f4b-inwest (noc 17/18.10, fin87: NZW-1 bawelna +27.6% w dobie wlaczenia, NZW-3 362 ikony pod KS). VillageCrafts.cs (neutralny start na towarach, poprawka
+        // z pomiaru, zima dopiskow), MaterialLaw.ChainFactor, DistrictIcon.cs + StartCalibration.Inwest.cs (ikona z wlasnych zajec czesci i ze sprzedazy). Klucze wylaczone =
+        // droga paczki inwest bez zmian (n z rak, ikona z calej produkcji KS).
+        public bool SideVillageCraftNeutralGoods = true;   // with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before
+        public bool SideVillageCraftNeutralFix = true;     // with Side Village Crafts: the day after the first day, what the first day really produced is compared good by good with the day before, and any craft still off by more than half a percent is set right once (by at most 10%); the check is then repeated and written to the log. Off = no second look
+        public bool SideVillageCraftAddsWinter = true;     // with Side Village Crafts: goods a side village makes outside its district's own type are cut by winter like every other village good (the game leaves goods it does not list for a village type out of its winter cut). Off = those goods are not cut in winter, as before
+        public bool DistrictIconPartCrafts = true;         // with District Icon From Sum and Start Calibration applied: each part of a district counts only its own craft - the main village its game type, each side village the craft of its land - valued at what that part sells of it at its market town (food the district eats itself is not money). Without it the whole calibrated output counted, home-grown bread and all, and over half the icons turned to grain or timber. Off = the whole calibrated output, as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

@@ -29,8 +29,9 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal static bool On { get { var s = Settings.Current; return s != null && s.DistrictIconFromSum; } }
+        private static bool PartCrafts { get { var s = Settings.Current; return s != null && s.DistrictIconPartCrafts; } }
 
-        private sealed class Info { public int Day = -1; public int Craft = -1; public ItemObject Item; public string IconId; public string Mix = ""; public string Counts = ""; }
+        private sealed class Info { public int Day = -1; public int Craft = -1; public ItemObject Item; public string IconId; public string Mix = ""; public string Counts = ""; public bool TypeZero; }
         private static readonly Dictionary<string, Info> _info = new Dictionary<string, Info>(StringComparer.Ordinal);
         private static readonly List<WeakReference> _vms = new List<WeakReference>();
         private static int _lastDay = -1, _diff, _changed, _updated, _st, _stAll, _districts, _ks, _snowKs;
@@ -106,6 +107,9 @@ namespace Armoury
             _lastDay = today;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             _diff = _changed = _districts = _ks = _snowKs = 0;
+            int diffKs = 0;
+            int zeroKs = 0, zeroNo = 0;                                       // f4b recenzja: ikona inna niz typ, a zajecie typu bez wartosci (pod KS - nic nie sprzedaje)
+            var pairs = new Dictionary<string, int>(StringComparer.Ordinal);   // f4b-inwest: zmiany typ -> ikona (do linii)
             var s = Settings.Current;
             float margin = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictIconMargin)) : 0.10f;
             var parts = new List<VillageCrafts.PartCraft>();
@@ -122,15 +126,31 @@ namespace Armoury
                     var ni = Compute(v, parts, old, margin, today);
                     _info[v.Settlement.StringId] = ni;
                     var gameIcon = v.VillageType.PrimaryProduction;
-                    if (ni.Item != null && !ReferenceEquals(ni.Item, gameIcon)) _diff++;
+                    if (ni.Item != null && !ReferenceEquals(ni.Item, gameIcon))
+                    {
+                        _diff++; if (ks) diffKs++;
+                        if (ni.TypeZero) { if (ks) zeroKs++; else zeroNo++; }
+                        string pk = v.VillageType.StringId + "->" + (ni.Craft >= 0 && ni.Craft < KsTab.NC ? KsTab.Crafts[ni.Craft] : "?");
+                        int pc0; pairs.TryGetValue(pk, out pc0); pairs[pk] = pc0 + 1;
+                    }
                     if (old != null && old.Craft >= 0 && old.Craft != ni.Craft) _changed++;
                 }
                 catch (Exception e) { Stumble("Daily(okreg)", e); }
             }
             _updated += UpdateVms();
             _ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            // f4b-inwest: rozbicie ikon bez KS / pod KS i najczestsze zmiany typ -> ikona (diagnoza - czy zmienia sie tylko to, co okreg naprawde sprzedaje)
+            var pl = new List<KeyValuePair<string, int>>(pairs);
+            pl.Sort((a, b) => a.Value != b.Value ? b.Value.CompareTo(a.Value) : string.CompareOrdinal(a.Key, b.Key));
+            var ps = new StringBuilder();
+            for (int i = 0; i < pl.Count && i < 8; i++) { if (ps.Length > 0) ps.Append(", "); ps.Append(pl[i].Key).Append(' ').Append(pl[i].Value); }
             Log.Info(VillageCrafts.P + "ikony dzien " + today + " | okregow " + _districts + " (pod KS " + _ks + "), ikona inna niz typ wsi: " + _diff + " okregow (projekt: ok. 81 z 558, prog 40-130), zmienione od poprzedniego rachunku "
-                     + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv) + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
+                     + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv)
+                     + " | inna niz typ: bez KS " + (_diff - diffKs) + " z " + (_districts - _ks) + ", pod KS " + diffKs + " z " + _ks
+                     + " | regula pod KS (f4b, District Icon Part Crafts): " + (PartCrafts ? "wlasne zajecie czesci, tylko sprzedane" : "cala produkcja KS (jak dotad)")
+                     + " | zmiany typ->ikona: " + (ps.Length > 0 ? ps.ToString() : "-")
+                     + " | inna niz typ przy wartosci typu 0 (f4b recenzja - bez progu x" + (1 + margin).ToString("0.00", Inv) + "): bez KS " + zeroNo + ", pod KS " + zeroKs
+                     + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
             _st = 0;
         }
 
@@ -167,13 +187,28 @@ namespace Armoury
         {
             var val = new double[KsTab.NC];
             var cnt = new int[KsTab.NC];
+            bool own = PartCrafts;
             foreach (var p in parts)
             {
+                // f4b-inwest (District Icon Part Crafts): pod KS czesc liczy tylko wlasne zajecie (wies gry - typ, wioska - zajecie ziemi) i tylko to, co z niego sprzedaje
+                // (projekt A9 "kazda wioska ma swoje zajecie" + F2 "ceny wozow"; Jeff: "towar, ktory daje okregowi najwiecej pieniedzy") - zboze zjedzone w okregu to nie pieniadz.
+                // Bez KS CraftVal to juz wlasne zajecie czesci (tylko jej zajecie i przebudowa) - bez zmian.
+                if (own && p.Ks)
+                {
+                    if (p.IconCraft >= 0 && p.IconCraft < KsTab.NC)
+                    {
+                        if (p.IconVal > 0) val[Fold(p.IconCraft)] += p.IconVal;
+                        cnt[Fold(p.IconCraft)]++;
+                    }
+                    else if (p.Craft >= 0) cnt[Fold(p.Craft)]++;
+                    continue;
+                }
                 for (int c = 0; c < KsTab.NC; c++) { double x = p.CraftVal[c]; if (x > 0) val[Fold(c)] += x; }
                 if (p.Craft >= 0) cnt[Fold(p.Craft)]++;
             }
             var ni = new Info { Day = today };
             int D = VillageCrafts.CraftOfType(v.VillageType);
+            ni.TypeZero = D >= 0 && !(val[Fold(D)] > 0);                     // f4b recenzja (tylko log): okreg bez wartosci zajecia typu - kazda sprzedaz innego zajecia wygrywa bez progu
             bool horse = D >= KsTab.CHorse0 && D <= KsTab.CHorse5;
             int best = -1; double bv = 0;
             for (int c = 0; c < KsTab.NC; c++)

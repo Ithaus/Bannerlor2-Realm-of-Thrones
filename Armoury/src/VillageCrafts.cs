@@ -192,6 +192,7 @@ namespace Armoury
             public Dictionary<ItemObject, float> Add;          // towar -> M x ten mnoznik = dopisek (suma po zajeciach innych wiosek)
             public HashSet<ItemObject> TypeGoods;
             public Dictionary<ItemObject, float> TypeRate;     // stawka typu na towar (suma wag)
+            public Dictionary<int, double> AddK;               // f4b recenzja: zajecie -> k dopisku (udzial x g/g x n x (1 + premia); towar = k x stawka x poprawka) - tylko pomiar (watek glowny)
         }
         private static volatile Dictionary<Village, Plan> _plans = new Dictionary<Village, Plan>();
 
@@ -224,6 +225,7 @@ namespace Armoury
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _notes.Clear(); _offLogged = false;
                 _meta = null; _metaFor = null;
                 _worksOnly = 0; _w2Skip = 0; _measDay = -1; _meas.Clear(); _deferLogged = false;
+                _measRound = 0; _owner = null;                                // f4b-inwest
                 _tally.Clear(); _w2Note = ""; _measW2 = null;
             }
         }
@@ -438,6 +440,7 @@ namespace Armoury
             float gD = VillageByPeople.GOf(di.Type);
             double other = 0, typeBonus = 0;
             var add = new Dictionary<ItemObject, float>();
+            Dictionary<int, double> kBy = null;                       // f4b recenzja: dopisek wedlug zajecia (pomiar neutralnosci - rozbicie wyniku na n zajec)
             var bySide = new Dictionary<string, Side>(StringComparer.Ordinal);
             foreach (var s in di.Sides) bySide[s.Uid] = s;
             foreach (var p in parts)
@@ -458,6 +461,8 @@ namespace Armoury
                     var m = meta[c];
                     if (m == null || m.Type == null) return;
                     double k = part * (VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD)) * N(c) * (1.0 + bb);
+                    if (kBy == null) kBy = new Dictionary<int, double>();
+                    double kc; kBy.TryGetValue(c, out kc); kBy[c] = kc + k;
                     for (int i = 0; i < m.Goods.Length; i++)
                     {
                         float cur; add.TryGetValue(m.Goods[i], out cur);
@@ -469,7 +474,7 @@ namespace Armoury
             double nD = N(D);
             if (other <= 1e-6 && Math.Abs(nD - 1.0) < 1e-4 && typeBonus <= 1e-9) return null;
             var pl = new Plan { Other = (float)Math.Min(1.0, other), NType = (float)nD, TypeBonus = (float)(typeBonus * nD), Type = di.Type, Add = add, KitchenKeep = di.Type.StringId != "wheat_farm",
-                                TypeGoods = new HashSet<ItemObject>(), TypeRate = new Dictionary<ItemObject, float>() };
+                                TypeGoods = new HashSet<ItemObject>(), TypeRate = new Dictionary<ItemObject, float>(), AddK = kBy };
             foreach (var pr in di.Type.Productions)
             {
                 if (pr.Item1 == null || !(pr.Item2 > 0f)) continue;
@@ -510,6 +515,8 @@ namespace Armoury
 
         private static readonly TextObject _txtType = new TextObject("{=!}Armoury: side villages of the district work at their own crafts");
         private static readonly TextObject _txtAdd = new TextObject("{=!}Armoury: goods of the side villages' crafts");
+        private static readonly TextObject _txtWinter = new TextObject("{=!}Winter");
+        private static bool WinterAdds { get { var s = Settings.Current; return s != null && s.SideVillageCraftAddsWinter; } }
 
         /// <summary>MaterialLaw.ProdPostfix, PIERWSZY krok po KS (obok VillageFruit.Base - przed mnoznikami lancucha: kopalnie i las, powtorzenia BK, ludzie P1, rece E4/5
         /// i E4/7, regulator, hodowla): towar typu okregu - czynnik (1 - u_inne) x n(typ) + premia prac (zboze kuchenne typu niezbozowego bez zmian); towar zajec innych
@@ -539,6 +546,7 @@ namespace Armoury
                     if (F < 0f) F = 0f;
                     float sum = 1f + r.SumOfFactors;
                     if (before > 0f && Math.Abs(F - 1f) > 1e-5f && sum > 0f) r.AddFactor((F - 1f) * sum, _txtType);
+                    float typePart = Math.Max(0f, r.ResultNumber);                // f4b recenzja: czesc towaru typu po czynniku F (pomiar - rozbicie na n zajec)
                     float added = 0f;
                     if (hasAdd && A > 0f)
                     {
@@ -552,15 +560,25 @@ namespace Armoury
                         var m = MemFor(v, today);
                         Put(m, item, kitchen ? 0f : before * (1f - F + pl.TypeBonus) * item.Value, added * item.Value, kitchen ? 0f : before * pl.TypeBonus * item.Value);
                         _dSteps++;
-                        if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, before, r.ResultNumber);   // pomiar neutralnosci (A6): wynik przed i po kroku zajec
+                        // pomiar neutralnosci (A6): wynik przed i po kroku zajec; f4b recenzja: czesc bez n (zboze kuchenne) i czesc towaru typu (n typu okregu) - reszta to dopisek
+                        if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, before, r.ResultNumber, kitchen ? typePart : 0f, kitchen ? 0f : typePart);
                     }
                     return;
                 }
                 if (!hasAdd || !(A > 0f)) return;
                 float r1 = r.ResultNumber;
                 r.Add(A, _txtAdd);                                            // towar spoza typu: model gry dal baze 0 - te same czynniki, ktore juz sa, i dalsze kroki lancucha
+                // f4b-inwest (klucz Side Village Craft Adds Winter): zima (WinterBite.VillageProdPostfix) pomija wynik 0 - towar spoza listy typu nie dostawal ciecia zimy, ktore
+                // ten sam towar ma we wsi swojego typu. Recenzja f4b: tniemy TYLKO dopisek (A x ciecie - ta sama postac co WinterBite: baza x (1 + suma - ciecie)), zmiana bazy
+                // o -A x ciecie / (1 + suma); czynnik na calym wyniku cial tez baze owocow i jaj VillageFruit.Base (pomarancze gaju, jablka i marchew farmy - zima ich nie tnie)
+                // i wielblada Qarthu, ktore ten sam towar ma juz w r1 - jedno zjawisko, dwie reguly. Wynik dopisku = A x (1 + suma - ciecie) - ten sam wzor co NeutralGoods.
+                if (!pl.WorksOnly && WinterAdds)
+                {
+                    float cut = WinterBite.VillageCut(v), fs = 1f + r.SumOfFactors;
+                    if (cut > 0f && fs > 1e-3f && r.ResultNumber > 0f) r.Add(-A * Math.Min(cut, fs) / fs, _txtWinter);   // dopisek najwyzej do 0 (NeutralGoods: fac >= 0)
+                }
                 float got = Math.Max(0f, r.ResultNumber - r1);
-                lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, r1, r.ResultNumber); }
+                lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, r1, r.ResultNumber, Math.Max(0f, r1), 0f); }
             }
             catch (Exception e) { Stumble("Base", e); }
         }
@@ -592,13 +610,15 @@ namespace Armoury
         private static Dictionary<Village, double> _measW2;   // recenzja calosci: u W2 dnia wczesniej wsi z SwitchOn (ten sam W2, ktory wszedl do "przed" neutralnego startu)
         private static bool _deferLogged;
 
-        /// <summary>Pod Gate: wynik przed i po kroku zajec (koniec lancucha - jeszcze nie).</summary>
-        private static void MeasPut(Village v, ItemObject it, float before, float mid)
+        /// <summary>Pod Gate: wynik przed i po kroku zajec (koniec lancucha - jeszcze nie). f4b recenzja: unsc - czesc wyniku po kroku, ktorej n nie skaluje (zboze kuchenne
+        /// typu niezbozowego, owoce VillageFruit i wielblad Qarthu w r1 towaru spoza typu); typ - czesc towaru typu po czynniku F (skaluje ja n typu okregu); reszta (mid - unsc
+        /// - typ) to dopisek zajec innych wiosek (skaluje go n zajec wedlug skladu planu, Plan.AddK).</summary>
+        private static void MeasPut(Village v, ItemObject it, float before, float mid, float unsc, float typ)
         {
             Dictionary<ItemObject, float[]> d;
             if (!_meas.TryGetValue(v, out d)) { d = new Dictionary<ItemObject, float[]>(); _meas[v] = d; }
-            float[] a; if (!d.TryGetValue(it, out a)) { a = new float[3]; d[it] = a; }
-            a[0] = before; a[1] = mid; a[2] = -1f;
+            float[] a; if (!d.TryGetValue(it, out a)) { a = new float[5]; d[it] = a; }
+            a[0] = before; a[1] = mid; a[2] = -1f; a[3] = unsc; a[4] = typ;
         }
 
         /// <summary>MaterialLaw.ProdPostfix - koniec lancucha (przed ksiega rudy): wynik koncowy wywolania - tylko w dobie pomiaru neutralnosci. Nie rzuca.</summary>
@@ -613,24 +633,41 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Linia "pomiar neutralnosci (A6, TESTS 2)" - pierwsza doba po wlaczeniu (w tej sesji). Okregi z pracami okregu pominiete (premia prac nie jest startem).</summary>
-        private static void Measure(int day)
+        /// <summary>Linia "pomiar neutralnosci (A6, TESTS 2)" - pierwsza doba po wlaczeniu (w tej sesji). Okregi z pracami okregu pominiete (premia prac nie jest startem).
+        /// f4b-inwest (klucz Side Village Craft Neutral Fix): po pomiarze doby wlaczenia zajecie z odchylka ponad 0.5% na SWOICH towarach (wlasciciel towaru - najwiekszy
+        /// wytworca "przed") dostaje raz n x (przed / po) - najwyzej o 10%, w widelkach 0.5-2.0; plany od razu od nowa (ta doba produkuje juz z poprawionym n), pomiar
+        /// powtorzony (linia "pomiar neutralnosci po poprawce (A6)" doby nastepnej).</summary>
+        private static void Measure(int day, int today)
         {
+            bool again = false;
             try
             {
                 var meta = MetaAll();
                 var bef = new Dictionary<ItemObject, double>(); var aft = new Dictionary<ItemObject, double>();
-                int vil = 0, calls = 0, noFinal = 0, noMult = 0, works = 0;
+                int vil = 0, calls = 0, noFinal = 0, noMult = 0, works = 0, partial = 0;
+                // f4b-inwest (Side Village Craft Neutral Goods): wies z dopiskami spoza listy typu, ktorej zaden dopisek nie mial wywolania modelu w dobie pomiaru (tick
+                // produkcji przed OnDailyTick doby wlaczenia - potem tylko magazyn wsi pyta o towary typu), daje pomiar tylko towarow typu - bez dopiskow "po" bylo za malo.
+                // Taka wies poza pomiarem w calosci (ten sam zbior wsi przed i po).
+                var sM = Settings.Current;
+                bool whole = sM != null && sM.SideVillageCraftNeutralGoods;
+                var plansM = _plans;
                 var w2 = _measW2; double w2g = 0;                              // recenzja calosci: W2 dnia wczesniej - zboze x (1 - u), ryby + u x zboze (tyle samo sztuk; W2 to ostatni krok)
                 ItemObject grainIt = null, fishIt = null;
                 try { grainIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("grain"); fishIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("fish"); } catch { }
+                // f4b recenzja: wynik "po" (koniec lancucha) rozbity na czesc bez n (zboze kuchenne, owoce VillageFruit, wielblad) i czesci skalowane n kazdego zajecia
+                // (towar typu - n typu okregu, dopisek - n zajec wedlug skladu planu) - poprawka z pomiaru liczy n tylko z czesci, ktora n naprawde skaluje
+                var unsc = new Dictionary<ItemObject, double>();
+                var scl = new Dictionary<ItemObject, double[]>();
                 lock (Gate)
                 {
                     foreach (var kv in _meas)
                     {
                         if (DistrictWorks.HasWorks(kv.Key)) { works++; continue; }
+                        if (whole && !WholeMeasured(kv.Key, kv.Value, plansM)) { partial++; continue; }
                         vil++;
                         double uw = 0; if (w2 != null && grainIt != null && fishIt != null) w2.TryGetValue(kv.Key, out uw);
+                        Plan plv = null; if (plansM != null) plansM.TryGetValue(kv.Key, out plv);
+                        int Dv = plv != null ? CraftOfType(plv.Type) : -1;
                         foreach (var x in kv.Value)
                         {
                             var a = x.Value;
@@ -644,6 +681,7 @@ namespace Armoury
                             double c;
                             bef.TryGetValue(x.Key, out c); bef[x.Key] = c + bf;
                             aft.TryGetValue(x.Key, out c); aft[x.Key] = c + fin;
+                            SplitAfter(x.Key, a, mid, fin, plv, Dv, meta, unsc, scl);
                         }
                     }
                     _meas.Clear();
@@ -654,7 +692,8 @@ namespace Armoury
                 int ld = -1; try { ld = GoodsLedger.KsTake(led); } catch { ld = -1; }
                 bool ledOk = ld == day;
                 var sb = new StringBuilder(1600);
-                sb.Append(P).Append("pomiar neutralnosci (A6, TESTS 2) doba ").Append(day).Append(" | wsi zmierzonych ").Append(vil).Append(", wywolan ").Append(calls)
+                bool round2 = _measRound > 0;
+                sb.Append(P).Append(round2 ? "pomiar neutralnosci po poprawce (A6) doba " : "pomiar neutralnosci (A6, TESTS 2) doba ").Append(day).Append(" | wsi zmierzonych ").Append(vil).Append(", wywolan ").Append(calls)
                   .Append(" (bez konca lancucha ").Append(noFinal).Append(", bez mnoznika ").Append(noMult).Append("), okregi z pracami pominiete ").Append(works)
                   .Append(" | zmiana produkcji typu we wsiach z planem (wartosc, przed z W2 dnia wczesniej -> po; W2 zboze -> ryby ").Append(w2g.ToString("0", Inv)).Append(" szt.):");
                 double worst = 0, worstW = 0; string worstT = "-", worstWT = "-"; bool f = true;
@@ -684,11 +723,202 @@ namespace Armoury
                 foreach (var kv in bef) { double a; aft.TryGetValue(kv.Key, out a); if (kv.Value > 1) { double d = (a - kv.Value) / kv.Value; if (Math.Abs(d) > Math.Abs(wi)) { wi = d; wit = kv.Key.StringId; } } }
                 sb.Append(" | najwieksza odchylka produkcji typu ").Append((100 * Math.Abs(worst)).ToString("0.000", Inv)).Append("% (prog 1%) w ").Append(worstT)
                   .Append(" | wobec swiata (ksiega towarow doby ").Append(ledOk ? day.ToString(Inv) : "BRAK").Append("): najwieksza ").Append((100 * Math.Abs(worstW)).ToString("0.000", Inv)).Append("% w ").Append(worstWT)
-                  .Append(" | towar: najwieksza zmiana ").Append((100 * wi).ToString("+0.0;-0.0;0.0", Inv)).Append("% (").Append(wit).Append(") | W2 (zboze -> ryby) dnia wczesniej w 'przed' (recenzja calosci) - zajecia go zastepuja.");
+                  .Append(" | towar: najwieksza zmiana ").Append((100 * wi).ToString("+0.0;-0.0;0.0", Inv)).Append("% (").Append(wit).Append(") | W2 (zboze -> ryby) dnia wczesniej w 'przed' (recenzja calosci) - zajecia go zastepuja");
+                if (whole) sb.Append(" | wsi poza pomiarem - dopiski bez wywolania w dobie pomiaru (tick przed wlaczeniem, f4b): ").Append(partial);
+                // f4b-inwest: jednorazowa poprawka n z pomiaru doby wlaczenia (klucz Side Village Craft Neutral Fix)
+                var s0 = Settings.Current;
+                if (!round2)
+                {
+                    if (s0 != null && s0.SideVillageCraftNeutralFix && vil > 0 && calls > 0 && _n != null)
+                    {
+                        int changed;
+                        string fx = FixFromMeasure(bef, aft, unsc, scl, meta, out changed);
+                        sb.Append(" | poprawka n z pomiaru (f4b, Side Village Craft Neutral Fix): ").Append(fx);
+                        if (changed > 0) again = true;
+                    }
+                    else sb.Append(" | poprawka n z pomiaru (f4b): ").Append(s0 != null && s0.SideVillageCraftNeutralFix ? "bez pomiaru (wsi 0)" : "WYLACZONA (Side Village Craft Neutral Fix)");
+                }
+                sb.Append('.');
                 Log.Info(sb.ToString());
             }
-            catch (Exception e) { Stumble("Measure", e); }
-            finally { _measDay = -1; lock (Gate) { _meas.Clear(); _measW2 = null; } }
+            catch (Exception e) { Stumble("Measure", e); again = false; }
+            finally
+            {
+                if (again)
+                {
+                    // plany od nowa jeszcze w tej dobie (Daily buduje je zaraz po pomiarze) i pomiar tej doby po poprawce
+                    foreach (var di in _dist.Values) di.Dirty = true;
+                    _measDay = today; _measRound = 1; lock (Gate) _meas.Clear();
+                }
+                else { _measDay = -1; _measRound = 0; lock (Gate) { _meas.Clear(); _measW2 = null; } }
+            }
+        }
+
+        /// <summary>f4b-inwest: poprawka n z pomiaru doby wlaczenia - dla zajecia c wartosc przed / po na jego wlasnych towarach (wlasciciel = najwiekszy wytworca "przed"
+        /// z rachunku na towarach; bez niego - zajecie, ktorego glowny towar to ten towar, albo pierwsze zajecie z tym towarem). |po/przed - 1| > 0.5%: n x r, najwyzej
+        /// o 10%, w widelkach 0.5-2.0. Recenzja f4b: r NIE jest prostym ilorazem przed / po - wynik "po" towarow zajecia c to czesc bez n (zboze kuchenne typu niezbozowego,
+        /// owoce VillageFruit, wielblad Qarthu) + suma po zajeciach d (n(d) x czesc skalowana n(d); towar na liscie kilku typow - np. ryby rybakow, wielorybnikow i lowcow
+        /// morsow - skaluja n kilku zajec). Uklad liniowy przed_c = bez_n_c + suma_d r_d x X[d, c] rozwiazany iteracja Gaussa-Seidla z widelkami (zajecie bez wlasnej czesci
+        /// skalowanej - bez poprawki); zajecie w 0.5% wchodzi do ukladu, gdy poprawki innych wypchnelyby je poza prog. Prosty iloraz zostawialby blad K x (1 - B / (nS + K)) / B
+        /// przy czesci bez n K (zboze +5% przy 40% kuchennego - nadal ok. +2%). Zwraca opis do linii (bez pionowej kreski).</summary>
+        private static string FixFromMeasure(Dictionary<ItemObject, double> bef, Dictionary<ItemObject, double> aft, Dictionary<ItemObject, double> unsc, Dictionary<ItemObject, double[]> scl,
+                                             CraftMeta[] meta, out int changed)
+        {
+            changed = 0;
+            int NC = KsTab.NC;
+            var fb = new double[NC]; var fa = new double[NC]; var fu = new double[NC];
+            var X = new double[NC, NC];                                   // X[d, c]: wartosc "po" towarow zajecia c skalowana n(d)
+            var owner = _owner;
+            var items = new HashSet<ItemObject>(bef.Keys); foreach (var k in aft.Keys) items.Add(k);
+            foreach (var it in items)
+            {
+                int c = -1;
+                if (owner == null || !owner.TryGetValue(it, out c)) c = OwnerByMeta(it, meta);
+                if (c < 0 || c >= NC) continue;
+                double b, a, u; bef.TryGetValue(it, out b); aft.TryGetValue(it, out a);
+                double val = Math.Max(1, it.Value);
+                fb[c] += b * val; fa[c] += a * val;
+                if (unsc != null && unsc.TryGetValue(it, out u) && u > 0) fu[c] += u * val;
+                double[] sv; if (scl != null && scl.TryGetValue(it, out sv) && sv != null) for (int d = 0; d < NC && d < sv.Length; d++) if (sv[d] > 0) X[d, c] += sv[d] * val;
+            }
+            var n = (double[])_n.Clone();
+            var r = new double[NC]; var raw = new double[NC]; var lo = new double[NC]; var hi = new double[NC]; var act = new bool[NC];
+            for (int c = 0; c < NC; c++)
+            {
+                r[c] = 1.0; raw[c] = 1.0;
+                double nc = c < n.Length && n[c] > 0 ? n[c] : 1.0;
+                lo[c] = Math.Min(1.0, Math.Max(0.9, NMin / nc)); hi[c] = Math.Max(1.0, Math.Min(1.1, NMax / nc));
+                if (c < n.Length && fb[c] > 0 && fa[c] > 0 && X[c, c] > 0 && Math.Abs(fa[c] / fb[c] - 1.0) > 0.005) act[c] = true;
+            }
+            int iters = 0;
+            for (int round = 0; round < 4; round++)
+            {
+                for (int k = 0; k < 200; k++)
+                {
+                    double md = 0;
+                    for (int c = 0; c < NC; c++)
+                    {
+                        if (!act[c]) continue;
+                        double rest = fu[c];
+                        for (int d = 0; d < NC; d++) if (d != c) rest += r[d] * X[d, c];
+                        double rr = (fb[c] - rest) / X[c, c];
+                        raw[c] = rr;
+                        rr = Math.Max(lo[c], Math.Min(hi[c], rr));
+                        md = Math.Max(md, Math.Abs(rr - r[c]));
+                        r[c] = rr;
+                    }
+                    iters++;
+                    if (md < 1e-10) break;
+                }
+                bool more = false;
+                for (int c = 0; c < NC; c++)
+                {
+                    if (act[c] || c >= n.Length || !(fb[c] > 0) || !(X[c, c] > 0)) continue;
+                    double p = fu[c]; for (int d = 0; d < NC; d++) p += r[d] * X[d, c];
+                    if (Math.Abs(p / fb[c] - 1.0) > 0.005) { act[c] = true; more = true; }
+                }
+                if (!more) break;
+            }
+            // opis: poprawione zajecia, czesc bez n, luka rozbicia (bez_n + suma X wobec "po") i przewidywana odchylka po poprawce
+            var notes = new List<string>();
+            double gap = 0, worstP = 0, fuT = 0, faT = 0; string worstPT = "-";
+            for (int c = 0; c < NC; c++)
+            {
+                if (fa[c] > 0) { double s = fu[c]; for (int d = 0; d < NC; d++) s += X[d, c]; gap = Math.Max(gap, Math.Abs(s - fa[c]) / fa[c]); fuT += fu[c]; faT += fa[c]; }
+                if (fb[c] > 0 && (fa[c] > 0 || X[c, c] > 0))
+                {
+                    double p = fu[c]; for (int d = 0; d < NC; d++) p += r[d] * X[d, c];
+                    double dv = p / fb[c] - 1.0;
+                    if (Math.Abs(dv) > Math.Abs(worstP)) { worstP = dv; worstPT = KsTab.Crafts[c]; }
+                }
+                if (!act[c] || Math.Abs(r[c] - 1.0) < 1e-6) continue;
+                double nn = Math.Max(NMin, Math.Min(NMax, n[c] * r[c]));
+                if (Math.Abs(nn - n[c]) < 1e-6) continue;
+                double oth = 0; for (int d = 0; d < NC; d++) if (d != c) oth += X[d, c];
+                bool clip = Math.Abs(raw[c] - r[c]) > 1e-9;
+                notes.Add(KsTab.Crafts[c] + " x" + (nn / n[c]).ToString("0.0000", Inv) + " (n " + n[c].ToString("0.000", Inv) + "->" + nn.ToString("0.000", Inv)
+                          + "; prosty iloraz x" + (fa[c] > 0 ? fb[c] / fa[c] : 1.0).ToString("0.0000", Inv)
+                          + ", bez n " + (fa[c] > 0 ? 100 * fu[c] / fa[c] : 0).ToString("0.0", Inv) + "%, n innych zajec " + (fa[c] > 0 ? 100 * oth / fa[c] : 0).ToString("0.0", Inv) + "%"
+                          + (clip ? ", przyciete z x" + raw[c].ToString("0.000", Inv) : "") + ")");
+                n[c] = nn; changed++;
+            }
+            if (changed > 0) _n = n;
+            return "zajec poprawionych " + changed + (notes.Count > 0 ? ": " + string.Join(", ", notes.ToArray()) : " (wszystkie w 0.5%)") + (changed > 0 ? " - plany od nowa w tej dobie, pomiar po poprawce w linii doby nastepnej" : "")
+                   + (owner == null ? " (wlasciciel towaru z typow - bez rachunku na towarach)" : "")
+                   + "; uklad liniowy (f4b recenzja): czesc bez n " + (faT > 0 ? 100 * fuT / faT : 0).ToString("0.0", Inv) + "% wyniku po, luka rozbicia " + (100 * gap).ToString("0.000", Inv)
+                   + "%, przewidywana odchylka po poprawce " + (100 * Math.Abs(worstP)).ToString("0.000", Inv) + "% w " + worstPT + ", iteracji " + iters;
+        }
+
+        /// <summary>f4b recenzja: wynik koncowy jednego wywolania (pod Gate) rozbity na czesc bez n i czesci skalowane n zajec. a = [przed, po kroku, koniec, bez n, typ];
+        /// mnozniki lancucha za krokiem zajec (koniec / po kroku) wspolne dla wszystkich czesci. Dopisek dzielony wedlug skladu planu (k zajecia x stawka x poprawka stawki).</summary>
+        private static void SplitAfter(ItemObject it, float[] a, double mid, double fin, Plan plv, int Dv, CraftMeta[] meta, Dictionary<ItemObject, double> unsc, Dictionary<ItemObject, double[]> scl)
+        {
+            if (it == null || a == null || !(fin > 0)) return;
+            double c0;
+            if (!(mid > 1e-6)) { unsc.TryGetValue(it, out c0); unsc[it] = c0 + fin; return; }
+            double k = fin / mid;
+            double U = a.Length > 3 ? Math.Max(0.0, Math.Min(mid, a[3])) : 0.0;
+            double T = a.Length > 4 ? Math.Max(0.0, Math.Min(mid - U, a[4])) : 0.0;
+            double ad = Math.Max(0.0, mid - U - T);
+            double[] sv = null;
+            if (T > 0)
+            {
+                if (Dv >= 0 && Dv < KsTab.NC) { if (!scl.TryGetValue(it, out sv)) { sv = new double[KsTab.NC]; scl[it] = sv; } sv[Dv] += T * k; }
+                else U += T;
+            }
+            if (ad > 1e-9)
+            {
+                double W = 0;
+                if (plv != null && plv.AddK != null && meta != null) foreach (var kc in plv.AddK) W += kc.Value * RateIn(meta, kc.Key, it);
+                if (W > 0)
+                {
+                    if (sv == null && !scl.TryGetValue(it, out sv)) { sv = new double[KsTab.NC]; scl[it] = sv; }
+                    foreach (var kc in plv.AddK) { double w = kc.Value * RateIn(meta, kc.Key, it); if (w > 0 && kc.Key >= 0 && kc.Key < KsTab.NC) sv[kc.Key] += ad * k * w / W; }
+                }
+                else U += ad;
+            }
+            if (U > 0) { unsc.TryGetValue(it, out c0); unsc[it] = c0 + U * k; }
+        }
+
+        /// <summary>f4b recenzja: stawka towaru w zajeciu c (suma stawek typu x poprawka stawki GoodsRates - ten sam wzor co dopisek BuildPlan); 0 - zajecie go nie robi.</summary>
+        private static double RateIn(CraftMeta[] meta, int c, ItemObject it)
+        {
+            if (meta == null || c < 0 || c >= meta.Length || meta[c] == null || meta[c].Type == null || meta[c].Goods == null) return 0.0;
+            var m = meta[c]; double s = 0;
+            for (int i = 0; i < m.Goods.Length; i++) if (ReferenceEquals(m.Goods[i], it)) s += m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, it.StringId);
+            return s;
+        }
+
+        /// <summary>f4b-inwest: wies zmierzona w calosci - jej plan nie ma dopiskow spoza listy typu albo choc jeden z nich mial wywolanie modelu (z koncem lancucha)
+        /// w dobie pomiaru. Pod Gate.</summary>
+        private static bool WholeMeasured(Village v, Dictionary<ItemObject, float[]> got, Dictionary<Village, Plan> plans)
+        {
+            Plan pl;
+            if (plans == null || !plans.TryGetValue(v, out pl) || pl == null || pl.Add == null || pl.TypeGoods == null) return true;
+            bool need = false;
+            foreach (var ad in pl.Add)
+            {
+                if (!(ad.Value > 0f) || pl.TypeGoods.Contains(ad.Key)) continue;
+                need = true;
+                float[] a; if (got.TryGetValue(ad.Key, out a) && a[2] >= 0f) return true;
+            }
+            return !need;
+        }
+
+        private static int OwnerByMeta(ItemObject it, CraftMeta[] meta)
+        {
+            if (it == null || meta == null) return -1;
+            int first = -1;
+            for (int c = 0; c < meta.Length; c++)
+            {
+                var m = meta[c];
+                if (m == null || m.Type == null || m.Horse || _typeUsed == null || c >= _typeUsed.Length || !_typeUsed[c]) continue;
+                bool has = false; foreach (var g in m.Goods) if (ReferenceEquals(g, it)) { has = true; break; }
+                if (!has) continue;
+                if (ReferenceEquals(m.Icon, it)) return c;
+                if (first < 0) first = c;
+            }
+            return first;
         }
 
         private static void Put(Mem m, ItemObject it, float rem, float add, float bon)
@@ -747,6 +977,9 @@ namespace Armoury
         {
             public string Uid, Name, Kind; public bool Main, Ks; public int Craft = -1, Target = -1; public float F; public double Share, ValDay; public VillageBook.PartView Book;
             public double[] CraftVal = new double[KsTab.NC]; public Dictionary<ItemObject, double> Pcs = new Dictionary<ItemObject, double>();
+            // f4b-inwest (District Icon Part Crafts, tylko pod KS): wlasne zajecie czesci i wartosc dnia jego towarow sprzedanych (sztuki przelicznikiem wozow KS x cena miasta targowego);
+            // IconVal < 0 - nie liczone (klucz wylaczony albo droga bez KS - tam CraftVal to juz wlasne zajecie czesci)
+            public int IconCraft = -1; public double IconVal = -1;
         }
 
         /// <summary>Czesci okregu wsi gry z zajeciami i wartoscia dnia (pod KS - bloki KS; bez KS - zajecia tej klasy i plon z M). false - ksiega nieczynna / wies nieznana.
@@ -787,6 +1020,23 @@ namespace Armoury
                             }
                             double cv = 0; for (int c = 0; c < KsTab.NC; c++) cv += kp.CraftVal[c];
                             if (cv > 0) for (int c = 0; c < KsTab.NC; c++) pc.CraftVal[c] = pc.ValDay * kp.CraftVal[c] / cv;
+                            // f4b-inwest (District Icon Part Crafts): wlasne zajecie czesci - to, co z niego sprzedaje, przy cenie miasta targowego za sztuke (sztuki przelicznikiem wozow KS)
+                            if (kp.IconKg != null)
+                            {
+                                pc.IconCraft = kp.IconCraft; double iv = 0;
+                                for (int i = 0; i < kp.IconKg.Length && i < items.Length; i++)
+                                {
+                                    if (!(kp.IconKg[i] > 0) || items[i] == null) continue;
+                                    iv += fnow * kp.IconKg[i] / (sigma * StartCalibration.ItemKgOf(i)) * Price(town, items[i]);
+                                }
+                                pc.IconVal = iv;
+                            }
+                        }
+                        else if (p.Main)
+                        {
+                            // f4b: wies gry bez blokow KS w rachunku - wlasne zajecie (typ okregu) bez sprzedazy
+                            var s1 = Settings.Current;
+                            if (s1 != null && s1.DistrictIconPartCrafts) { pc.IconCraft = CraftOfType(v.VillageType); pc.IconVal = 0; }
                         }
                         into.Add(pc);
                     }
@@ -898,7 +1148,7 @@ namespace Armoury
                     Log.Info(P + "neutralny start odlozony | wiosek pobocznych " + _builtSide + ", z wierszem ziemi KS 0 (brak arm_ks_land.tsv albo okregow w pliku) - zajecia = typ okregu, W2 (210) wedlug swojego klucza; start w pierwszej dobie z plikiem ziemi.");
                 }
             }
-            if (_measDay >= 0 && today > _measDay) Measure(_measDay);    // recenzja: pomiar neutralnosci na towarach (doba po wlaczeniu)
+            if (_measDay >= 0 && today > _measDay) Measure(_measDay, today);    // recenzja: pomiar neutralnosci na towarach (doba po wlaczeniu); f4b: poprawka n i pomiar po poprawce
             int season = today / Season;
             if (season != _regionSeason) { _regionSeason = season; _regionMoved.Clear(); }
             bool step = _onDay >= 0 && today > _onDay && (today - _onDay) % StepDays == 0;
@@ -1012,17 +1262,32 @@ namespace Armoury
                 if (x < NMin || x > NMax) { clamped.Add(KsTab.Crafts[c] + " " + x.ToString("0.00", Inv)); x = Math.Max(NMin, Math.Min(NMax, x)); }
                 n[c] = x;
             }
+            // f4b-inwest (fin87: NZW-1 bawelna +27.6%, daktyle -12%, oliwki +7.4%): n z rak zaklada ten sam plon na reke wszedzie, a lancuch modelu wsi daje towarowi typu
+            // budowle, perki i cechy kultury warowni (gra: tylko towarom z listy typu), rece za cena E3-D1 (tylko "inne plony" wsi) i rozne P1 / rece / spustoszenie w roznych
+            // okregach - dopisek zajec w obcym okregu dostaje inne mnozniki niz towar we wsi swojego typu. n na towarach: ta sama suma wartosci kazdego zajecia przed i po.
+            double[] nHands = n; string goodsNote = null; bool goods = false;
+            var s0 = Settings.Current;
+            if (s0 != null && s0.SideVillageCraftNeutralGoods)
+            {
+                double[] ng = null;
+                try { ng = NeutralGoods(out goodsNote); }
+                catch (Exception e) { Stumble("NeutralGoods", e); ng = null; goodsNote = "BLAD rachunku - n z rak"; }
+                if (ng != null) { n = ng; goods = true; }
+            }
+            else goodsNote = "WYLACZONE (Side Village Craft Neutral Goods) - n z rak";
             _n = n; _onDay = today;
-            _measDay = today; lock (Gate) { _meas.Clear(); _measW2 = measW2; }   // recenzja: pomiar na towarach w tej dobie (linia "pomiar neutralnosci" doby nastepnej)
+            _measDay = today; _measRound = 0; lock (Gate) { _meas.Clear(); _measW2 = measW2; }   // recenzja: pomiar na towarach w tej dobie (linia "pomiar neutralnosci" doby nastepnej)
             _w2Note = " | W2 dnia wczesniej w 'przed' (recenzja calosci): okregow " + w2n + ", rece rybakow +" + Math.Round(w2Fish).ToString("0", Inv) + ", rece zboza -" + Math.Round(w2Grain).ToString("0", Inv)
                       + " (w tym okregi typu niezbozowego - zboze kuchenne " + w2k + ")" + (fishOk && wheatOk ? "" : " - BRAK typu rybakow albo zboza w swiecie, W2 poza 'przed'");
-            var sb = new StringBuilder(1200);
-            sb.Append(P).Append("start neutralny (A6) doba ").Append(today).Append(" | okregow ").Append(nd).Append(" | n(typ) = rece swiata przed / po:");
+            var sb = new StringBuilder(1600);
+            sb.Append(P).Append("start neutralny (A6) doba ").Append(today).Append(" | okregow ").Append(nd).Append(goods ? " | n(typ) na towarach (w nawiasie z rak: przed->po):" : " | n(typ) = rece swiata przed / po:");
             bool first = true;
             for (int c = 0; c < KsTab.NC; c++)
             {
                 if (!(before[c] > 0) && !(after[c] > 0)) continue;
-                sb.Append(first ? " " : ", ").Append(KsTab.Crafts[c]).Append(' ').Append(n[c].ToString("0.000", Inv)).Append(" (").Append(Math.Round(before[c])).Append("->").Append(Math.Round(after[c])).Append(')');
+                sb.Append(first ? " " : ", ").Append(KsTab.Crafts[c]).Append(' ').Append(n[c].ToString("0.000", Inv)).Append(" (");
+                if (goods) sb.Append(nHands[c].ToString("0.000", Inv)).Append(": ");
+                sb.Append(Math.Round(before[c])).Append("->").Append(Math.Round(after[c])).Append(')');
                 first = false;
             }
             // rece swiata typu po x n / przed - z definicji n rowne (poza przycietymi); recenzja: to NIE jest kontrola produkcji - tylko INFO. Kontrola na towarach (TESTS 2):
@@ -1030,9 +1295,196 @@ namespace Armoury
             double worst = 0;
             for (int c = 0; c < KsTab.NC; c++) if (before[c] > 0 && after[c] > 0) worst = Math.Max(worst, Math.Abs(after[c] * n[c] / before[c] - 1.0));
             sb.Append(_w2Note);
-            sb.Append(" | rece swiata typu po x n / przed (z definicji n, tylko przyciete): najwieksza odchylka ").Append((100 * worst).ToString("0.000", Inv)).Append("% (INFO; produkcja - linia pomiaru doby nastepnej)")
-              .Append(" | n przyciete do ").Append(NMin.ToString("0.0", Inv)).Append('-').Append(NMax.ToString("0.0", Inv)).Append(": ").Append(clamped.Count > 0 ? string.Join(", ", clamped.ToArray()) : "zadne").Append('.');
+            sb.Append(" | rece swiata typu po x n / przed (").Append(goods ? "n na towarach - rece nie musza sie zgadzac" : "z definicji n, tylko przyciete").Append("): najwieksza odchylka ").Append((100 * worst).ToString("0.000", Inv)).Append("% (INFO; produkcja - linia pomiaru doby nastepnej)")
+              .Append(" | n przyciete do ").Append(NMin.ToString("0.0", Inv)).Append('-').Append(NMax.ToString("0.0", Inv)).Append(": ").Append(clamped.Count > 0 ? string.Join(", ", clamped.ToArray()) : "zadne")
+              .Append(" | n na towarach (f4b, Side Village Craft Neutral Goods): ").Append(goodsNote ?? "-").Append('.');
             Log.Info(sb.ToString());
+        }
+
+        // ------------------------------------------------------------ f4b-inwest: neutralny start NA TOWARACH (klucz Side Village Craft Neutral Goods)
+        private static Dictionary<ItemObject, int> _owner;   // towar -> zajecie z najwieksza produkcja "przed" (poprawka z pomiaru liczy zajecie po jego wlasnych towarach)
+        private static int _measRound;                       // 0 - pomiar doby wlaczenia (NZW-1), 1 - pomiar po poprawce (Side Village Craft Neutral Fix)
+
+        /// <summary>Wynik modelu wsi gry dla (wies, towar) BEZ naszego postfiksu (MaterialLaw.ProbeBegin - wolajacy): [wynik, suma czynnikow] - to, co krok zajec
+        /// (VillageCrafts.Base) widzi na wejsciu. Pamiec w obrebie okregu.</summary>
+        private static float[] Probe(TaleWorlds.CampaignSystem.ComponentInterfaces.VillageProductionCalculatorModel model, Village v, ItemObject it, Dictionary<ItemObject, float[]> cache, ref int probes)
+        {
+            float[] a;
+            if (cache.TryGetValue(it, out a)) return a;
+            a = new float[2];
+            try
+            {
+                var r = model.CalculateDailyProductionAmount(v, it);
+                a[0] = r.ResultNumber; a[1] = r.SumOfFactors;
+                if (float.IsNaN(a[0]) || float.IsInfinity(a[0])) a[0] = 0f;
+                if (float.IsNaN(a[1]) || float.IsInfinity(a[1])) a[1] = 0f;
+            }
+            catch (Exception e) { Stumble("Probe", e); a[0] = 0f; a[1] = 0f; }
+            probes++;
+            cache[it] = a;
+            return a;
+        }
+
+        private static bool TypeHas(VillageType t, ItemObject it)
+        {
+            if (t == null || it == null) return false;
+            foreach (var pr in t.Productions) if (ReferenceEquals(pr.Item1, it) && pr.Item2 > 0f) return true;
+            return false;
+        }
+
+        /// <summary>f4b-inwest (fin87 NZW-1): n(T) neutralnego startu NA TOWARACH. Dla kazdego okregu poza KS (z ludzmi w domu): towary typu okregu (lista typu bez zboza
+        /// kuchennego) = wynik modelu gry bez naszego postfiksu (te same budowle, perki, cechy kultury i zima, ktore krok zajec widzi) x mnoznik lancucha za krokiem zajec
+        /// (MaterialLaw.ChainFactor: P1, rece, spustoszenie, regulator, stawki typu, ZC1); po wlaczeniu x (1 - udzial innych zajec) x n(typ). Dopiski zajec w okregu: dokladnie
+        /// wzor BuildPlan (udzial x g(zajecie)/g(typ) x stawka zajecia x poprawka stawki x poziom, n = 1, bez prac) x (1 + suma czynnikow gry tego towaru w tej wsi - towar
+        /// spoza listy typu dostaje od gry tylko czynniki bez bazy, np. polityki NavalDLC; towar z listy typu - jak towar typu) x zima (klucz Side Village Craft Adds Winter)
+        /// x ten sam mnoznik lancucha wsi gospodarza. n(T) = wartosc przed / wartosc po przy n = 1 (wartosc = szt. x Value, jak pomiar neutralnosci). W2 dnia wczesniej:
+        /// zboze swiata x (1 - u) i ryby + u x zboze (ten sam W2 co pomiar), w okregach, ktore dostana plan (okreg bez innych zajec i z n typu 1 - W2 zostaje, poza rachunkiem).
+        /// Wsie nie Normal / bez targu - krok zajec ich nie rusza (wynik gry 0, bez dopiskow). null - brak modelu (n z rak). Watek glowny, raz na kampanie.</summary>
+        private static double[] NeutralGoods(out string note)
+        {
+            note = "";
+            var meta = MetaAll();
+            TaleWorlds.CampaignSystem.ComponentInterfaces.VillageProductionCalculatorModel model = null;
+            try { model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.VillageProductionCalculatorModel : null; } catch { model = null; }
+            if (model == null || meta == null) { note = "BRAK modelu produkcji wsi - n z rak"; return null; }
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var s = Settings.Current;
+            bool winterAdd = s != null && s.SideVillageCraftAddsWinter;
+            ItemObject grainIt = null, fishIt = null;
+            try { grainIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("grain"); fishIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("fish"); } catch { }
+            bool w2ok = grainIt != null && fishIt != null && _typeUsed != null && KsTab.CFisher < _typeUsed.Length && KsTab.CWheat < _typeUsed.Length && _typeUsed[KsTab.CFisher] && _typeUsed[KsTab.CWheat];
+            var tgt = new double[KsTab.NC]; var aft = new double[KsTab.NC];
+            var own = new Dictionary<ItemObject, double[]>();          // towar -> wartosc "przed" wedlug zajecia (wlasciciel towaru do poprawki z pomiaru)
+            var parts = new List<VillageBook.PartView>();
+            var addBy = new Dictionary<int, double>();
+            var cache = new Dictionary<ItemObject, float[]>();
+            var bySide = new Dictionary<string, Side>(StringComparer.Ordinal);
+            var w2d = new List<double[]>();                              // [typ okregu, udzial innych, zboze W2 (wartosc), ryby W2 (wartosc)]
+            int nd = 0, probes = 0, w2n = 0, hosts = 0, adds = 0; double addV = 0, natV = 0;
+            MaterialLaw.ProbeBegin();
+            try
+            {
+                foreach (var di in _dist.Values)
+                {
+                    try
+                    {
+                        if (di.V == null || di.TypeCraft < 0 || UnderKs(di.V) || !VillageBook.PartsOf(di.V, parts)) continue;
+                        double tot = 0; foreach (var p in parts) tot += p.Home;
+                        if (!(tot > 0)) continue;
+                        var v = di.V; int D = di.TypeCraft; var mD = meta[D];
+                        if (mD == null || mD.Type == null) continue;
+                        nd++;
+                        float gD = VillageByPeople.GOf(di.Type);
+                        // wejscie planu jak BuildPlan (N = 1, bez prac okregu): udzial innych zajec i dopiski wedlug zajecia
+                        double other = 0; addBy.Clear(); bySide.Clear();
+                        foreach (var sd in di.Sides) bySide[sd.Uid] = sd;
+                        foreach (var p in parts)
+                        {
+                            if (p.Main || p.Uid == null) continue;
+                            double sh = p.Home / tot;
+                            if (!(sh > 0)) continue;
+                            Side sd; if (!bySide.TryGetValue(p.Uid, out sd)) continue;
+                            CraftShares(sd, (c, x) =>
+                            {
+                                if (c == D) return;
+                                double part = sh * x;
+                                other += part;
+                                var m = c >= 0 && c < meta.Length ? meta[c] : null;
+                                if (m == null || m.Type == null) return;
+                                double cur; addBy.TryGetValue(c, out cur);
+                                addBy[c] = cur + part * (VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD));
+                            });
+                        }
+                        other = Math.Min(1.0, other);
+                        bool live = v.VillageState == Village.VillageStates.Normal && v.TradeBound != null;
+                        cache.Clear();
+                        // towary typu okregu: wynik gry x lancuch (przed) i x (1 - inne) (po, przy n = 1)
+                        for (int i = 0; i < mD.Goods.Length; i++)
+                        {
+                            var it = mD.Goods[i];
+                            if (it == null) continue;
+                            var pr = Probe(model, v, it, cache, ref probes);
+                            float side; float cf = MaterialLaw.ChainFactor(v, it, out side);
+                            double q = (live ? Math.Max(0f, pr[0]) : 0.0) * cf * side, val = Math.Max(1, it.Value);
+                            tgt[D] += q * val; aft[D] += q * (1.0 - other) * val; natV += q * val;
+                            double[] ow; if (!own.TryGetValue(it, out ow)) { ow = new double[KsTab.NC]; own[it] = ow; }
+                            ow[D] += q * val;
+                        }
+                        // W2 dnia wczesniej (ostatni krok lancucha przed ZC1): u x zboze tej wsi -> tyle samo sztuk ryb
+                        double u = live && w2ok ? HamletKinds.ShareOf(v) : 0.0;
+                        if (u > 0)
+                        {
+                            var pg = Probe(model, v, grainIt, cache, ref probes);
+                            float sg; float cg = MaterialLaw.ChainFactor(v, grainIt, out sg);
+                            double G = Math.Max(0f, pg[0]) * cg;
+                            if (G > 0) { w2d.Add(new double[] { D, other, u * G * Math.Max(1, grainIt.Value), u * G * Math.Max(1, fishIt.Value) }); w2n++; }
+                        }
+                        // dopiski zajec innych wiosek w tej wsi (wies Normal z targiem - jak w kroku zajec)
+                        if (live && other > 1e-6)
+                        {
+                            hosts++;
+                            float lvl = (v.GetHearthLevel() + 1) * 0.5f;
+                            float cut = winterAdd ? WinterBite.VillageCut(v) : 0f;
+                            foreach (var kv in addBy)
+                            {
+                                var m = meta[kv.Key];
+                                for (int i = 0; i < m.Goods.Length; i++)
+                                {
+                                    var it = m.Goods[i];
+                                    if (it == null) continue;
+                                    double A = kv.Value * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, it.StringId) * lvl;
+                                    if (!(A > 0)) continue;
+                                    var pr = Probe(model, v, it, cache, ref probes);
+                                    double fac;
+                                    if (TypeHas(di.Type, it))
+                                    {
+                                        // towar z listy typu: dopisek A/F do bazy przy czynniku F - wynik + A x (1 + suma gry); F ~ 0 albo wynik 0 - dopisek bazy dokladnie A
+                                        bool kitchen = di.Type.StringId != "wheat_farm" && it.StringId == "grain";
+                                        fac = pr[0] > 0f && (kitchen || (1.0 - other) * NMin > 1e-3) ? 1.0 + pr[1] : 1.0;
+                                    }
+                                    else fac = 1.0 + pr[1] - cut;                // towar spoza listy typu: baza A x (1 + czynniki gry bez bazy - zima)
+                                    if (!(fac > 0)) fac = 0;
+                                    float side; float cf = MaterialLaw.ChainFactor(v, it, out side);
+                                    double q = A * fac * cf * side, val = Math.Max(1, it.Value);
+                                    aft[kv.Key] += q * val; addV += q * val; adds++;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception e) { Stumble("NeutralGoods(okreg)", e); }
+                }
+            }
+            finally { MaterialLaw.ProbeEnd(); }
+            // n = przed / po; W2 tylko w okregach, ktore dostana plan (okreg bez innych zajec i z n typu 1 - BuildPlan da null, W2 zostaje po obu stronach)
+            var n = new double[KsTab.NC];
+            int w2used = 0;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                var t = (double[])tgt.Clone();
+                w2used = 0;
+                if (w2ok)
+                    foreach (var w in w2d)
+                    {
+                        int D = (int)w[0];
+                        if (pass > 0 && w[1] <= 1e-6 && Math.Abs(n[D] - 1.0) < 1e-4) continue;
+                        t[KsTab.CWheat] -= w[2]; t[KsTab.CFisher] += w[3]; w2used++;
+                    }
+                for (int c = 0; c < KsTab.NC; c++) n[c] = t[c] > 0 && aft[c] > 0 ? t[c] / aft[c] : 1.0;
+            }
+            var clamped = new List<string>();
+            for (int c = 0; c < KsTab.NC; c++)
+                if (n[c] < NMin || n[c] > NMax) { clamped.Add(KsTab.Crafts[c] + " " + n[c].ToString("0.00", Inv)); n[c] = Math.Max(NMin, Math.Min(NMax, n[c])); }
+            var ownMap = new Dictionary<ItemObject, int>();
+            foreach (var kv in own) { int b = -1; double bv = 0; for (int c = 0; c < KsTab.NC; c++) if (kv.Value[c] > bv) { bv = kv.Value[c]; b = c; } if (b >= 0) ownMap[kv.Key] = b; }
+            _owner = ownMap;
+            double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            // tozsamosc: dla kazdego zajecia wartosc przed = wartosc po x n (z definicji, poza przycietymi) - suma dopiskow i towarow typu w linii
+            note = "okregow " + nd + ", wsi z dopiskami " + hosts + " (dopiskow " + adds + "), wywolan modelu bez postfiksu " + probes + ", koszt " + ms.ToString("0.0", Inv) + " ms"
+                 + " | wartosc dnia: towary typu przed " + natV.ToString("0", Inv) + ", dopiski przy n = 1 " + addV.ToString("0", Inv)
+                 + " | W2 dnia wczesniej: okregow " + w2used + " z " + w2n + (w2ok ? "" : " (BRAK typu rybakow albo zboza)")
+                 + " | zima dopiskow " + (winterAdd ? "TAK" : "NIE") + " | przyciete: " + (clamped.Count > 0 ? string.Join(", ", clamped.ToArray()) : "zadne")
+                 + " | poza rachunkiem: sufity dymarki i RockGold (zelazo, zloto), owoce E3-D1 dopisane poza lista typu";
+            return n;
         }
 
         // ------------------------------------------------------------ wolna zmiana zajecia (dopisek Jeffa 16.10)
