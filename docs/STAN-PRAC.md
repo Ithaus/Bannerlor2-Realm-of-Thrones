@@ -3066,3 +3066,19 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   co do zlotowki, tylko wojna, tylko < 2R, pomoc <= brak, skarbiec nigdy ponizej zapasu; srednio 22.1k/d gotowki + 35.1k/d podniesienia pulapu, R-2R 14.7k), nrenty/nzwrot/npozyczka/nglod/
   odsiecz/nzapis/nperf TAK. NAKUM-7 w rozruchu (skarbce +73.7k, kiesy wsi +65.7k - faza przed koszykiem KS, jak w fin92) - nieporownywalne z oknem konca. ZADNYCH testow i wgran do sygnalu
   Jeffa. W tle (bez gry): f16-fin93 (wf_6598e0b6-c3e). Noc-ks4 = 25ec1fa0 (10beef63 + checker).
+
+### 87. WGRANIE 81 (18.10 ok. 13:30 PDT = 22:30 CEST) - NA PROSBE JEFFA, SPRAWDZANIE NA JEGO ZAPISIE - START TUTAJ
+Jeff (verbatim): "a czemu nie wgrasz teraz wgranie 81 ja pogram na moim savie i na moim savie sprawdzisz dane, bede gral pewnie wiecej niz 160 dni".
+W grze: `w-toku/noc-wgranie-81` = w-toku/noc-ks4 **25ec1fa0** (GitHub) | Armoury **308534d0** (zbudowany z 10beef63 - kod gry = 25ec1fa0, roznica tylko checker) | CrashScribe **4e176f39**
+(f13: GameState nie czyta gry z watku logu) | Armoury/SubModule.xml 19429f2b (f9: UIExtenderEx LoadBeforeThis optional) | dane: arm_map_villages.tsv v7 bd482fbc, arm_map_village_lore.tsv
+115fb296, arm_roadside_inns.tsv 295c6cbd (135 zajazdow), NOWE arm_map_villages_v6 / arm_map_village_lore_v6 / arm_roadside_inns_v6 (stare 1:1), arm_map_side_roads_grid.tsv. RC/GT/FV bez zmian.
+Kopie: *.bak-2026-10-18-wgranie81-przed + D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie81-przed; zapisy Jeffa: D:/Backup-Bannerlord/zapisy-jeffa/2026-10-18-przed-wgraniem81 (386 plikow).
+= 80 + fala 6 (renty wedlug potrzeby, kasy kupcow - gersuma, weglarze kopaln, browary/garbarnie) + fala 7 (pozyczka miejska 10%, sakiewka turniejowa, niewola za dlugi, bandy x12 z suwakiem)
++ f12 odsiecz tylko gdy osiagalna + f9 przyciski x1/x4/x8 + f13 log w tle + f14 (mieso BK, K4 cena skory/plotna, ryby Essos, miary) + f10 wioski v7 + zajazdy + f11 drogi boczne (NIE,
+wygladzone) + f15 W5c (skarbiec doplaca srednim w wojnie).
+TESTY: fin92 (fale 6/7 + f12; 160 dob, 0 ERROR), fin93 (scalenie6 c5933072; 160 dob, 0 ERROR, glod 0), fin94 (10beef63; 51 dob - przerwany na prosbe Jeffa; 0 ERROR, nsrednim 13/13),
+foto1/drogi2 (v7 + drogi w grze, 0 ERROR). NIE ZROBIONE przed wgraniem: test 5 dob + bitwa tej wersji (od WGRANIA 80 brak zmian w kodzie bitwy); sciezka "zapis z KS juz
+zastosowanym + nowy plik ziemi v7" (ponowne uzbrojenie KS od zera) - nie byla w zadnym autotescie -> SPRAWDZIC W PIERWSZYM LOGU JEFFA: linie KS (uzbrojenie od zera, dzien),
+"Przysiolki ... uklad v7 (f10-uklad)" (migracja v6 -> v7 po uid), ERROR, zajazdy (przerwany nocleg), "Predkosc mapy (f9)", W5c.
+CZEKA (w tle, bez gry): f16-fin93 (wf_6598e0b6-c3e) - akumulatory/KS polki/ksiega/drobne -> nastepne wgranie. DO DECYZJI JEFFA: W5 dla rodow ponad 2R; welna Essos; dar BK herszta;
+rozlozenie gospodarki doby (Jeff: pozniej).
