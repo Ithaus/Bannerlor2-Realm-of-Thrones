@@ -37,7 +37,7 @@ namespace Armoury
     /// KS-R4 r4-kupcy (noc 17/18.10, PLAN-KS-RUNDA4 rozdz. 3 H1-H8, T9/T9b; Jeff 17.10 "dowoz jak w ksiazkach"; klucze w Settings.cs blok "KS-R4 r4-kupcy"):
     ///  - H1 statek wedlug dob (KsShipByDays): morzem, gdy statek szybszy w dobach (droga ladem i morzem / (4 x tempo wozu) + doba portu < doby wozu); tabela "T" liczona
     ///    w pierwszej dobie naraz (straznik 20 ms, potem 200 wywolan na dobe), zmiana klucza - tabela od nowa; Plan czyta ta sama tabele;
-    ///  - H5 kredyt kupcow (KsFoodCartsConsign): przy wyjezdzie cel NIE placi (Paid 0 = woz na kredyt), fracht placi kasa ZRODLA (ladem - wsie zrodla, morzem - zaloga
+    ///  - H5 kredyt kupcow (KsFoodCartsConsign): przy wyjezdzie cel NIE placi (woz na kredyt: zaplata 0, znacznik Cons, w zapisie 10. pole), fracht placi kasa ZRODLA (ladem - wsie zrodla, morzem - zaloga
     ///    zrodla); przy dostawie cel placi wartosc lotu u siebie (H4) z kasy ponad 0.5 x zapas kupcow, reszta - rachunek (KsFoodCredit), splata codziennie od najstarszego;
     ///    zwloka > 30 dni = bez nowych dostaw; wojna = rachunek przepada; zawrocony woz na kredyt - towar wraca na polke zrodla bez zwrotu (nic nie zaplacono), fracht stracony;
     ///    miejsce kredytu zrodla = 0.5 x kasa - (rachunki otwarte + wozy na kredyt w drodze: wartosc zrodla + fracht);
@@ -102,7 +102,7 @@ namespace Armoury
         private static Dictionary<int, List<KeyValuePair<Village, float>>> _vilOf;   // zrodlo -> wsie (ogniska), najwyzej 8 + reszta najwiekszej
         private static int _vilDay = -1;
 
-        private sealed class Cart { internal Settlement Src, Dst; internal int Z, N, DayBought, DayDue; internal long Paid, Freight; internal bool Sea; internal long Val = -1; }   // Val (r4-kupcy): wartosc zrodla lotu przy wyjezdzie (-1 nieznana)
+        private sealed class Cart { internal Settlement Src, Dst; internal int Z, N, DayBought, DayDue; internal long Paid, Freight; internal bool Sea; internal long Val = -1; internal bool Cons; }   // r4-kupcy: Cons - woz na kredyt (zaplata 0, rachunek przy dostawie), Val - wartosc zrodla lotu przy wyjezdzie
         private static readonly List<Cart> _carts = new List<Cart>();
         private static int[] _inc;                    // [nt * NZ] w drodze do celu
         private static string _pending;
@@ -480,9 +480,9 @@ namespace Armoury
                         int sp = Math.Min(n, (int)Math.Floor(n * Math.Min(0.5, SpoilPerDay * dd)));
                         if (sp > 0) { GoodsLedger.NoteKsLoss(it, sp, "psucie w drodze"); _dSpoil += sp; n -= sp; }
                     }
-                    // KS-R4 r4-kupcy H5: woz na kredyt (zaplata 0) - rachunek = wartosc lotu u celu (H4: cena polki celu tej chwili, przed polozeniem towaru, schodzi z kazda
+                    // KS-R4 r4-kupcy H5: woz na kredyt (Cons, zaplata 0) - rachunek = wartosc lotu u celu (H4: cena polki celu tej chwili, przed polozeniem towaru, schodzi z kazda
                     // sztuka, najwyzej 3 x cena startu, x 0.97; bez klucza Ks Dest Value - cena polki x sztuki x 0.97)
-                    bool cons = c.Paid == 0;
+                    bool cons = c.Cons;
                     long bill = 0;
                     if (cons && n > 0)
                     {
@@ -686,7 +686,7 @@ namespace Armoury
                     foreach (var kv in KsFoodCredit.OwedBySource()) { int i; if (kv.Key != null && _ix.TryGetValue(kv.Key, out i)) exp[i] += kv.Value; }
                     foreach (var c in _carts)
                     {
-                        if (c.Paid != 0 || c.N <= 0 || c.Src == null) continue;
+                        if (!c.Cons || c.N <= 0 || c.Src == null) continue;
                         int i; if (!_ix.TryGetValue(c.Src, out i)) continue;
                         long v = c.Val;
                         if (v < 0) { int up = StartCalibration.ZPrice(_t[i], Z[c.Z]); v = (long)c.N * Math.Max(1, up); }
@@ -895,7 +895,7 @@ namespace Armoury
                     long pv; pendFreight.TryGetValue(s, out pv); pendFreight[s] = pv + frPaid;
                 }
             }
-            var c = new Cart { Src = src, Dst = dstS, Z = k, N = n, DayBought = today, DayDue = today + (int)Math.Max(1f, L), Paid = paidG, Freight = frPaid, Sea = sea, Val = consign ? cost : paidG };
+            var c = new Cart { Src = src, Dst = dstS, Z = k, N = n, DayBought = today, DayDue = today + (int)Math.Max(1f, L), Paid = paidG, Freight = frPaid, Sea = sea, Val = consign ? cost : paidG, Cons = consign };
             _carts.Add(c);
             AddInc(c, +1);
             _dLots++; if (sea) _dSea++; else _dLand++;
@@ -1101,7 +1101,7 @@ namespace Armoury
                 if (c.Src == null || c.Dst == null || c.N <= 0) continue;
                 sb.Append(c.Src.StringId).Append('|').Append(c.Dst.StringId).Append('|').Append(KsBasket.Ids[Z[c.Z]]).Append('|').Append(c.N).Append('|').Append(c.DayBought).Append('|')
                   .Append(c.DayDue).Append('|').Append(c.Paid).Append('|').Append(c.Freight).Append('|').Append(c.Sea ? 1 : 0);
-                if (c.Paid == 0 && c.Val >= 0) sb.Append('|').Append(c.Val);   // KS-R4 r4-kupcy: woz na kredyt - wartosc zrodla lotu (10. pole; starsza DLL czyta 9 pol i pomija reszte)
+                if (c.Cons) sb.Append('|').Append(Math.Max(0, c.Val));   // KS-R4 r4-kupcy: woz na kredyt - 10. pole wartosc zrodla lotu (jest = woz na kredyt; starsza DLL czyta 9 pol i pomija reszte)
                 sb.Append('~');
             }
             string res = sb.ToString();
@@ -1187,7 +1187,7 @@ namespace Armoury
                     if (src == null || dst == null || k < 0 || !int.TryParse(a[3], out n) || n <= 0 || !int.TryParse(a[4], out d0) || !int.TryParse(a[5], out d1)
                         || !long.TryParse(a[6], out paid) || !long.TryParse(a[7], out fr)) { lost++; continue; }
                     var c = new Cart { Src = src, Dst = dst, Z = k, N = n, DayBought = d0, DayDue = d1, Paid = Math.Max(0, paid), Freight = Math.Max(0, fr), Sea = a[8] == "1" };
-                    long vv; if (a.Length >= 10 && long.TryParse(a[9], out vv) && vv >= 0) c.Val = vv;
+                    long vv; if (a.Length >= 10 && long.TryParse(a[9], out vv) && vv >= 0) { c.Val = vv; c.Cons = true; }
                     _carts.Add(c);
                     if (_t != null) AddInc(c, +1);
                     ok++; pcs += n;
