@@ -6116,13 +6116,13 @@ namespace Armoury
         [SettingPropertyGroup("Old loose ends (A17)")]
         public bool A17ShipyardBuildsFromTimber { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Shipyard Timber Per1000", 0.00f, 10.00f, "0.0", HintText = "logs of timber a shipyard uses for every 1,000 of a hull's worth (a plank counts as a fifth of a log) - a light boat worth 8,000 takes 16 logs, a heavy war galley worth 80,000 takes 160")]
+        [SettingPropertyFloatingInteger("Shipyard Timber Per1000", 0.00f, 10.00f, "0.0", HintText = "logs of timber a shipyard uses for every 1,000 of a hull's worth (a plank counts as a fifth of a log) - a light boat worth 8,000 takes 8 logs, a heavy war galley worth 80,000 takes 80")]
         [SettingPropertyGroup("Old loose ends (A17)")]
-        public float ShipyardTimberPer1000 { get; set; } = 2f;
+        public float ShipyardTimberPer1000 { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Shipyard Labour Share", 0.00f, 1.00f, "0.00", HintText = "share of a hull's worth the town pays its shipwrights for building it (paid from the town's purse above the merchants' reserve to the townsfolk)")]
         [SettingPropertyGroup("Old loose ends (A17)")]
-        public float ShipyardLabourShare { get; set; } = 0.2f;
+        public float ShipyardLabourShare { get; set; } = 0.1f;
 
         [SettingPropertyBool("A17 Author Lines", HintText = "with the horse and fish diagnostics: also write which game or mod behaviour adds or removes horses and fish outside the known flows (read from the call stack, at most 2,000 times a day) - written to the log only, changes nothing in the game; off = not traced")]
         [SettingPropertyGroup("Old loose ends (A17)")]
