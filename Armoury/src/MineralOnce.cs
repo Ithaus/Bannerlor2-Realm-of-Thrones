@@ -109,6 +109,34 @@ namespace Armoury
             return res;
         }
 
+        /// <summary>f5-zajecia (klucz Side Village Craft Crop Filter): filtr klimatu upraw (Crop Climate Filter) nie pozwala tej wsi rodzic tego towaru - papirus we wsi spoza
+        /// goracego poludnia (ta sama decyzja co CropFilter wyzej: kultura wsi, znane kultury poludnia). Zajecia wiosek (VillageCrafts.ListStep) dopisywaly papirus zajecia zboza
+        /// na koniec listy PO filtrze - farma zboza na Polnocy go nie rodzila, a wioska poboczna z zajeciem zboza w tym samym okregu tak. Sam odczyt, nie rzuca.</summary>
+        internal static bool CropBlocks(Village v, ItemObject it)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.CropClimateFilter || v == null || !IsPapyrus(it)) return false;
+                var c = v.Settlement != null ? v.Settlement.Culture : null;
+                string cid = c != null ? c.StringId : null;
+                if (string.IsNullOrEmpty(cid) || HotSouth.Contains(cid)) return false;
+                if (_hotKnown < 0)
+                {
+                    int k = 0;
+                    try
+                    {
+                        var om = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
+                        if (om != null) foreach (var id in HotSouth) if (om.GetObject<CultureObject>(id) != null) k++;
+                    }
+                    catch { k = 0; }
+                    _hotKnown = k;
+                }
+                return _hotKnown != 0;
+            }
+            catch { return false; }
+        }
+
         /// <summary>Ile razy liczyc wynik modelu produkcji dla tego przedmiotu w tej wsi: 1 + powtorzenia zdjete z listy BK.
         /// 1, gdy latka nie jest wpieta, jest wylaczona albo wies nie miala powtorzen.</summary>
         internal static int Times(Village v, ItemObject item)
