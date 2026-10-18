@@ -1291,8 +1291,8 @@ Uzycie (Python 3, tylko odczyt):
                     skrzynie wsi DS - INFO), NAKUM-4 lepszy stol przy KS (oferta otwarta i kupione > 0; bez KS INFO), NAKUM-5 kiesy wsi <= +0.2%/d (pieniadz robot zostaje we
                     wsi), NAKUM-6 jednorazowe korony do zapasu (INFO), NAKUM-7 kazdy posiadacz 'Pieniadz swiata' <= +30 tys./d w 28 dobach (f19-e4: skarbce
                     krolestw poza bramka - pomiar w wierszu, decyzja Jeffa 18.10 14:20; NAKUM-7s: te same doby - ksiega 'Pieniadz swiata (bilans - przyczyny)' ARYTMETYKA OK,
-                    reszta 28 dob ponizej progu, zloto spoza swiata przez nasze moduly 0 - bramka tylko przy skarbcach ponad +30 tys./d, inaczej INFO; odszkodowania z gory do
-                    skarbcow INFO), NAKUM-8 czas <= 5 ms, NAKUM-9
+                    reszta 28 dob ponizej progu, zloto spoza swiata przez nasze moduly 0 - zamkniecie ksiegi, nie slad wplywow do skarbcow; bramka tylko przy skarbcach
+                    ponad +30 tys./d, inaczej INFO; odszkodowania z gory do skarbcow INFO), NAKUM-8 czas <= 5 ms, NAKUM-9
                     potkniecia i ERROR 0. Log bez paczki: NAKUM-1/5/7 z linii niezaleznych, reszta INFO (pola dopisane po recenzji - brak pola = INFO, nie NIE).
                     f4-place-ludu (noc 17/18.10; place W wedlug koszyka KS zamiast danin 3%/d; linia "Place W wedlug koszyka (f4-place-ludu)"): okno - ostatnie 28 dob, nie
                     wczesniej niz 28 dob od pierwszej linii f4 (kappa schodzi 3%/d). NAKUM-10 kiesa W miast ('Kiesa ludu') - przyrost <= +15 tys./d (W stoi; fin86 przed
@@ -39044,7 +39044,8 @@ def nakum_main(logp, until=None):
     NAKUM-4 lepszy stol z oszczednosci przy KS
     (oferta otwarta > 0 i 'lepszy stol' kupione > 0; bez KS - INFO); NAKUM-5 kiesy wsi w oknie - dryf <= +0.2%/d (pieniadz robot zostaje we wsi: nowy akumulator?);
     NAKUM-6 jednorazowe 'inne' korony do zapasu (INFO); NAKUM-7 kazdy posiadacz z 'Pieniadz swiata' (bez licznikow w drodze) - przyrost ostatnich 28 dob <= +30 tys./d
-    (f19-e4: skarbce krolestw poza bramka - pomiar; NAKUM-7s ich warunek: ksiega bilansu domknieta, zloto spoza swiata przez nasze moduly 0);
+    (f19-e4: skarbce krolestw poza bramka - pomiar; NAKUM-7s: ksiega bilansu swiata domknieta, zloto spoza swiata przez nasze moduly 0 - zamkniecie ksiegi, wplywow do
+    skarbcow nie sledzi);
     NAKUM-8 czas linii (mediana) <= 5 ms; NAKUM-9 potkniecia i ERROR paczki 0. Log bez paczki: wiersze z linii niezaleznych licza sie dalej (NAKUM-1, 5, 7), reszta
     "brak linii" (INFO), nigdy wyjatek. f7-kasy: NAKUM-24..29 z linii "Gersuma kas miast (f7-kasy)" (opis w naglowku pliku; bez linii - INFO)."""
     rep = Report()
@@ -39242,17 +39243,20 @@ def nakum_main(logp, until=None):
             # bramka tylko przy skarbcach ponad prog NAKUM-7 (tam, gdzie dawna bramka dawala NIE, a decyzja Jeffa ja zastepuje); ponizej progu - INFO (werdykt jak dawny NAKUM-7)
             over = any(g_ > 30000 for _k, g_, _v in free)
             meas = len(rest_m) < len(lw_) and len(dead_m) < len(lw_)   # starszy log bez pol reszty / N5 w kazdej dobie - nie da sie zmierzyc (INFO, nie NIE)
-            rep.add(f"NAKUM-7s: skarbce krolestw rosna bez doplat z niczego - ksiega 'Pieniadz swiata (bilans - przyczyny)' domknieta (doby {lw_[0]}-{lw_[-1]})",
+            # scalenie f19 (recenzja f19-e4): wiersz mowi, co mierzy - zamkniecie calej ksiegi swiata (ARYTMETYKA OK jest z budowy zawsze prawda, reszta < 10000/d to prog
+            # wszystkich posiadaczy razem, N5 widzi tylko ChangeHeroGold na bohaterach spoza swiata); wplywow do skarbcow NIE sledzi - TAK nie jest dowodem "bez doplat z niczego"
+            rep.add(f"NAKUM-7s: ksiega 'Pieniadz swiata (bilans - przyczyny)' domknieta przy wzroscie skarbcow krolestw (doby {lw_[0]}-{lw_[-1]}) - wplywy do skarbcow nie sledzone",
                     f"{gtxt} | dob ksiegi {len(lw_)}: ARYTMETYKA BLAD {len(bad_a)}" + (f" (dzien {bad_a[0]})" if bad_a else "")
                     + f", reszta niezmierzona - srednia 28 dob ponad prog 10000 w {len(bad_r)} dobach" + (f" (dzien {bad_r[0]})" if bad_r else "")
                     + (f", bez pola reszty {len(rest_m)}" if rest_m else "") + (f" (najwieksza |srednia| {max(avgs)})" if avgs else "")
                     + f", zloto spoza swiata przez nasze moduly (korona, Bank, budowy) {dead_in:+d} w {len(dead_d)} dobach" + (f" (bez pola {len(dead_m)})" if dead_m else "")
                     + f" | INFO: odszkodowania Diplomacy z gory do skarbcow {rep_in} (dlug trybutu placacych - splacaja go rody)",
-                    "przy skarbcach ponad +30 tys./d: ARYTMETYKA OK i reszta 28 dob 'OK' kazdej doby, zloto spoza swiata przez nasze moduly 0 (wzrost skarbca = przelew od"
-                    " posiadaczy swiata); skarbce ponizej progu - INFO" + ("" if over else " (tu ponizej progu)") + ("" if meas else " (log bez pol ksiegi - INFO)"),
+                    "przy skarbcach ponad +30 tys./d: ARYTMETYKA OK i reszta 28 dob 'OK' kazdej doby (prog 10000/d dla calego swiata), zloto spoza swiata przez nasze moduly"
+                    " (N5) 0; to zamkniecie ksiegi, nie slad wplywow do skarbcow; skarbce ponizej progu - INFO" + ("" if over else " (tu ponizej progu)")
+                    + ("" if meas else " (log bez pol ksiegi - INFO)"),
                     okl if over and meas else None)
         else:
-            rep.add("NAKUM-7s: skarbce krolestw bez doplat z niczego", "brak linii 'Pieniadz swiata (bilans - przyczyny)' w oknie NAKUM-7", "INFO (log bez ksiegi bilansu)", None)
+            rep.add("NAKUM-7s: ksiega 'Pieniadz swiata (bilans - przyczyny)' domknieta przy wzroscie skarbcow krolestw", "brak linii 'Pieniadz swiata (bilans - przyczyny)' w oknie NAKUM-7", "INFO (log bez ksiegi bilansu)", None)
     else:
         rep.add("NAKUM-7: posiadacze pieniadza", f"dob z 'Pieniadz swiata' {len(hw)}", "INFO (za malo dob)", None)
     # NAKUM-10..13 f4-place-ludu (place W wedlug koszyka zamiast danin 3%/d): okno ostatnie 28 dob, nie wczesniej niz 28 dob od pierwszej linii f4

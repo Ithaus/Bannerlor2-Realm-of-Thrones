@@ -593,6 +593,23 @@ namespace Armoury
             return Math.Max(0.0, (s + (Days - filled) * saved) / Days);
         }
 
+        /// <summary>Scalenie f19 (recenzja f19-e3, uwaga wazna): srednia zatrzymanych wedlug potrzeby do zapisu (arm_stabled). Rod z pamiecia z zapisu - to samo mieszanie
+        /// co miara (doby zmierzone + brakujace ze sredniej z zapisu). Rod BEZ pamieci z zapisu (pierwszy zapis po wgraniu - zapis sprzed f19-e3 nie ma klucza; rod mierzony
+        /// pierwszy raz w tej sesji) - srednia dob zmierzonych (suma / zmierzone, jak Avg pierscieni czesci D), nie suma / 28: inaczej zapis po sesji 12 dob trzymal
+        /// ok. 12/28 prawdziwej sredniej i rampa miary potrzeby wracala przez kolejne ok. 4 sesje. Miara w sesji (NeedCutAdd) bez zmian. Tylko odczyt; nie rzuca.</summary>
+        private static double NeedCutForSave(Clan c)
+        {
+            try
+            {
+                double[] sv;
+                if (c == null) return 0;
+                if (c.StringId != null && _stSaved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0) return NeedCutMean(c, true);
+                Ring r;
+                return _rNeedCut.TryGetValue(c, out r) && r.Filled > 0 ? Math.Max(0.0, r.Avg()) : 0;
+            }
+            catch { return 0; }
+        }
+
         /// <summary>f19-e3 (przeglad 18.10, uwaga 1): ziemia D stalego rodu z zapisu (StableLand z chwili zapisu) - tylko gdy D staly wlaczony, klucz Stable D First Day
         /// From Save i rod nie ma jeszcze pomiaru w tej sesji (pierwsza doba po wczytaniu: powinnosci i Bank biegna przed ksiega rodow). -1 - brak (wolajacy: stara droga).
         /// Tylko odczyt; nie rzuca.</summary>
@@ -628,7 +645,7 @@ namespace Armoury
                     if (c == null || c.StringId == null || c.StringId.IndexOfAny(StBad) >= 0 || kv.Value == null || kv.Value.Filled <= 0) continue;
                     double land = StableLand(c);
                     if (land < 0) continue;
-                    double cut = NeedCutMean(c, true);
+                    double cut = NeedCutForSave(c);   // scalenie f19 (recenzja f19-e3): bez pamieci z zapisu - srednia dob zmierzonych, nie suma / 28
                     if (!first) sb.Append(';'); first = false;
                     sb.Append(c.StringId).Append(':').Append(Math.Round(cut).ToString(inv)).Append(':').Append(Math.Round(land).ToString(inv));
                     done.Add(c.StringId);

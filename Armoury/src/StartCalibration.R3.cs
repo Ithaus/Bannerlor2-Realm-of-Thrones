@@ -57,6 +57,7 @@ namespace Armoury
             Array.Clear(_p2, 0, _p2.Length); Array.Clear(_p2Mk, 0, _p2Mk.Length); _mfStage = null; _r3Pending = null; _r3Keep = null;
             _ownCov.Clear(); Array.Clear(_ovDay, 0, _ovDay.Length); Array.Clear(_ovTown, 0, _ovTown.Length); Array.Clear(_ov28, 0, _ov28.Length);   // f14-rynek (recenzja)
             Array.Clear(_ownIn28, 0, _ownIn28.Length); Array.Clear(_ownAll28, 0, _ownAll28.Length);   // f19-e2
+            _ownN = 0;   // scalenie f19 (recenzja f19-e2): licznik dob srednich "od wczytania" (_ov28, _ownIn28, _ownAll28)
         }
 
         // ------------------------------------------------------------ kraina miasta (kultura z kalibracji - jak Plan)
@@ -256,11 +257,16 @@ namespace Armoury
             for (int i = 0; i < c.Length; i++) { _c28[i] = _cN <= 1 ? c[i] : _c28[i] + (c[i] - _c28[i]) * w; _u28[i] = _cN <= 1 ? u[i] : _u28[i] + (u[i] - _u28[i]) * w; }
             Array.Clear(_ovTown, 0, _ovTown.Length);
             try { R4cUnmetDaily(w, _cN <= 1); } catch (Exception e) { Stumble("R4cUnmetDaily", e); }   // KS r4 C1 (r4-ceny, klucz Ks Ctl Per Town): brak miasto po miescie
-            for (int m = 0; m < 2; m++) { double v = SwCtlPerTown ? _ovTown[m] : ovMk[m]; _ov28[m] = _cN <= 1 ? v : _ov28[m] + (v - _ov28[m]) * w; }
-            for (int m = 0; m < 2; m++)   // f19-e2: srednie 28 dob do linii sterowania (tylko pomiar)
+            // scalenie f19 (recenzja f19-e2): srednie linii sterowania (tylko pomiar, poza zapisem) z WLASNYM licznikiem dob od wczytania - _cN wraca z zapisu (do 28),
+            // wiec po wczytaniu srednia ruszala od 0 z waga 1/28 (po 7 dobach ok. 22% prawdziwej wartosci); teraz pierwsza doba po wczytaniu ustawia wartosc, dalej zwykla
+            // srednia, od 28 doby srednia kroczaca 1/28 jak sterowanie. Sterowanie (_c28/_u28, czynnik) bez zmian
+            _ownN++;
+            double wo = 1.0 / Math.Min(28, _ownN);
+            for (int m = 0; m < 2; m++) { double v = SwCtlPerTown ? _ovTown[m] : ovMk[m]; _ov28[m] = _ownN <= 1 ? v : _ov28[m] + (v - _ov28[m]) * wo; }
+            for (int m = 0; m < 2; m++)   // f19-e2: srednie do linii sterowania (tylko pomiar)
             {
-                _ownIn28[m] = _cN <= 1 ? ownIn[m] : _ownIn28[m] + (ownIn[m] - _ownIn28[m]) * w;
-                _ownAll28[m] = _cN <= 1 ? ownAll[m] : _ownAll28[m] + (ownAll[m] - _ownAll28[m]) * w;
+                _ownIn28[m] = _ownN <= 1 ? ownIn[m] : _ownIn28[m] + (ownIn[m] - _ownIn28[m]) * wo;
+                _ownAll28[m] = _ownN <= 1 ? ownAll[m] : _ownAll28[m] + (ownAll[m] - _ownAll28[m]) * wo;
             }
         }
 
@@ -273,7 +279,8 @@ namespace Armoury
         private static readonly Dictionary<Village, OwnCov> _ownCov = new Dictionary<Village, OwnCov>();   // wies -> pokryte swoim z ostatnich zakupow (szt./d wedlug pozycji)
         private static readonly double[] _ovDay = new double[2 * KsBasket.N];   // to samo wedlug rynku od ostatniej doby sterowania (szt.) - odejmowane od _uDay
         private static readonly double[] _ovTown = new double[2], _ov28 = new double[2];   // odjete od braku doby (szt./d) i srednia 28 dob - linia sterowania
-        private static readonly double[] _ownIn28 = new double[2], _ownAll28 = new double[2];   // f19-e2: wies je swoje W/E w zuzyciu sterowania i cale (srednie 28 dob, od wczytania)
+        private static readonly double[] _ownIn28 = new double[2], _ownAll28 = new double[2];   // f19-e2: wies je swoje W/E w zuzyciu sterowania i cale (srednie z dob od wczytania, najwyzej 28)
+        private static int _ownN;   // scalenie f19 (recenzja f19-e2): doby srednich _ov28 / _ownIn28 / _ownAll28 od wczytania (poza zapisem)
 
         /// <summary>TownFolk.Zc4BuyVillage (G3, kazde zakupy z koszykiem zaplaconym): brak drabiny 1 (miss) i zjedzone swoje (own, null - nic) wedlug pozycji koszyka;
         /// pokryte = min(brak, swoje) tego samego towaru jedzenia. Zakupy co `days` dob - na dobe dzielone przez days. Nie rzuca.</summary>
@@ -410,11 +417,11 @@ namespace Armoury
             sb.Append(!SwCtlOwnFood ? " (towar: zuzycie bez drabiny 2 wsi / brak / podaz targu Planu szt./d, czynnik)"
                 : sameF ? " (towar: zuzycie bez drabiny 2 wsi + wies je swoje G3 tylko w miejsce braku tego samego towaru (Ks Ctl Own Same Food) / brak bez czesci pokrytej swoim tym samym towarem / podaz targu Planu szt./d, czynnik)"
                 : " (towar: zuzycie bez drabiny 2 wsi + wies je swoje G3 (Ks Ctl Own Food) / brak bez czesci pokrytej swoim tym samym towarem / podaz targu Planu szt./d, czynnik)");
-            if (SwCtlOwnFood) sb.Append(" | brak wsi pokryty swoim tym samym towarem (G3, w zuzyciu - odjety od braku): W ").Append(F0(_ov28[0])).Append(", E ").Append(F0(_ov28[1])).Append(" szt./d (srednia 28 dob od wczytania)");   // f14-rynek (recenzja)
+            if (SwCtlOwnFood) sb.Append(" | brak wsi pokryty swoim tym samym towarem (G3, w zuzyciu - odjety od braku): W ").Append(F0(_ov28[0])).Append(", E ").Append(F0(_ov28[1])).Append(" szt./d (srednia z ").Append(Math.Min(28, _ownN)).Append(" dob od wczytania, najwyzej 28)");   // f14-rynek (recenzja); scalenie f19: liczba dob sredniej
             // f19-e2: ile "wies je swoje" weszlo do zuzycia sterowania wobec calego (z kluczem Ks Ctl Own Same Food reszta to kcal zastepcze za inny brakujacy towar)
             if (SwCtlOwnFood) sb.Append(" | wies je swoje w zuzyciu sterowania (").Append(sameF ? "tylko w miejsce braku tego samego towaru, Ks Ctl Own Same Food" : "cale, bez Ks Ctl Own Same Food")
                                 .Append("): W ").Append(F0(_ownIn28[0])).Append(" z ").Append(F0(_ownAll28[0])).Append(", E ").Append(F0(_ownIn28[1])).Append(" z ").Append(F0(_ownAll28[1]))
-                                .Append(" szt./d (srednia 28 dob od wczytania)");
+                                .Append(" szt./d (srednia z ").Append(Math.Min(28, _ownN)).Append(" dob od wczytania, najwyzej 28)");
             sb.Append(R4cCtlNote(day));                            // KS r4 (r4-ceny): C1-C3
             _mfStage = stage;                                  // do _mf przy Planie bez bledu (PlanCollect)
             LandGlutWeekly(day, true);
