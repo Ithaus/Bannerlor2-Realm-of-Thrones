@@ -208,6 +208,7 @@ namespace Armoury
             inp.MoneyMeasured = MoneyMeasuredNow(info.Towns, info.Budgets);
             inp.MarketMargin = _state != StateApplied || (DDay >= 0 && day < DDay + ShelfMarginDays) ? ShelfMargin : 1.0;
             try { R3PlanInputs(inp, day, tst, distMk); } catch (Exception e) { Stumble("R3PlanInputs", e); }   // KS-R3: krok 5, P2, P3, P4
+            inp.CheapBasket = SwCheapBasket;   // r4-koszyk: drabina tanszego koszyka klas miast (klucz Ks Cheap Basket)
             EnsureItems();                                        // C2: tabele towarow gotowe przed plikiem ks-plan.csv na watku roboczym
             return inp;
         }

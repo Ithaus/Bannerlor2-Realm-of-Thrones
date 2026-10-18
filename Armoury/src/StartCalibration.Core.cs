@@ -61,6 +61,7 @@ namespace Armoury
         public double MarketFactorMax = 1.10;
         // KS r4 (r4-ceny P8, klucz Ks Cloth Demand): 1:1 plotna, sukna i skory takze z odziezy wojska, warsztatow zbrojnych i napraw kowali (kolumna ksiegi KsCloth)
         public bool ClothDemand;
+        public bool CheapBasket;                                      // r4-koszyk (klucz KsCheapBasket): klasy miast - drabina tanszego koszyka (KsCheap.PlanLadder); false - jak dotad
     }
 
     /// <summary>Towar gry: kg sztuki, wartosc, zuzycie dnia w sztukach (wojsko, zamki, dwory, budowy, warsztaty, razem, mieszczanie).</summary>
@@ -129,6 +130,7 @@ namespace Armoury
         public Dictionary<string, double> DistHome = new Dictionary<string, double>(StringComparer.Ordinal);
         public Dictionary<string, float[]> DistPaid = new Dictionary<string, float[]>(StringComparer.Ordinal);
         public Dictionary<string, float[]> TownPaid = new Dictionary<string, float[]>(StringComparer.Ordinal);
+        public Dictionary<string, float[]> TownExtra = new Dictionary<string, float[]>(StringComparer.Ordinal);   // r4-koszyk: dokupiona podstawa miasta (czesc koszyka ponad 1)
         public KsMoney Money;
         public double HomeWorkLabour;
         // recenzja 17.10: czesc kcal pelnego koszyka wsi, ktora praca domowa okregu naprawde robi (pozycje HomeMask x czesc pokryta) - gra: racje spichlerza najwyzej tyle;
@@ -181,6 +183,9 @@ namespace Armoury
         // rak (i ile kcal zastepczych zabraklo z braku ziemi); bez pokrycia Planu wedlug krainy (kraina: kcal pelne, bez pokrycia)
         public int[] SubPhysOver = new int[2]; public double[] SubLandShort = new double[2];
         public Dictionary<string, double[]> LandKcal = new Dictionary<string, double[]>(StringComparer.Ordinal);
+        // r4-koszyk (P9): drabina tanszego koszyka klas miast, statystyka klas [(m * 3 + klasa) * KsCheap.StatN + k] i dokupiona podstawa [m * N + z] (kg/d) - ostatnia runda
+        public bool Cheap;
+        public double[] P9 = new double[6 * KsCheap.StatN], ExtraT = new double[2 * KsBasket.N];
     }
 
     /// <summary>
@@ -1237,6 +1242,7 @@ namespace Armoury
             var sumSur = new double[NM]; var sumHv = new double[NM]; var tot0 = new double[NM * 3];
             var tq = new double[3][]; for (int c = 0; c < 3; c++) tq[c] = new double[NZ];
             var tqs = new double[NZ]; var tus = new double[NZ];
+            var tex = new double[NZ]; var tex1 = new double[NZ]; var p9 = new double[KsCheap.StatN];   // r4-koszyk: podstawa dokupiona ponad koszyk (miasto, klasa), statystyka klasy P9
             int[] live = { KsDeliver.ICow, KsDeliver.IHog, KsDeliver.ISheep }; int[] liveG = { KsTab.GCow, KsTab.GHog, KsTab.GSheep };
             // krok 8d w punkcie stalym: od tej rundy (ubocze nad popytem zaplaconym targu ostatniej rownowagi zostaje na stole okregu), najwyzej TableRounds razy co 2 rundy
             int tableFrom = Math.Max(1, iters - 2 * Math.Max(1, TableRounds) - 2), tableDone = 0;
@@ -1315,6 +1321,7 @@ namespace Armoury
                 Array.Clear(M.VHands, 0, NM); Array.Clear(M.VHomeHands, 0, NM); Array.Clear(M.VShort, 0, NM); Array.Clear(M.VN, 0, NM); Array.Clear(M.VHorse, 0, NM);
                 Array.Clear(M.TBudget, 0, M.TBudget.Length); Array.Clear(M.TBasket, 0, M.TBasket.Length); Array.Clear(M.TPaid, 0, M.TPaid.Length); Array.Clear(M.TUnRaw, 0, NM);
                 Array.Clear(M.UnpaidV, 0, M.UnpaidV.Length); Array.Clear(M.UnpaidT, 0, M.UnpaidT.Length); Array.Clear(M.VUnmetRaw, 0, NM);
+                Array.Clear(M.P9, 0, M.P9.Length); Array.Clear(M.ExtraT, 0, M.ExtraT.Length); M.Cheap = inp.CheapBasket;   // r4-koszyk (P9): ostatnia runda
                 Array.Clear(eat, 0, NGm);
                 view.BlockStart = x.BStart; view.X = xs; view.PairCraft = x.Pc; view.BlockW = x.W; view.RegHands = x.RegHands; view.Rent = x.Rent;
                 // ---- wsie
@@ -1533,7 +1540,7 @@ namespace Armoury
                         continue;
                     }
                     int m = t.Market == 0 ? 0 : 1;
-                    Array.Clear(tqs, 0, NZ); Array.Clear(tus, 0, NZ);
+                    Array.Clear(tqs, 0, NZ); Array.Clear(tus, 0, NZ); Array.Clear(tex, 0, NZ);
                     bool[] tcut = null; if (x.ReachT != null) x.ReachT.TryGetValue(t.Id, out tcut);
                     // recenzja runda 3: koszyk klas przy cenie krainy miasta (jak wsie)
                     int lt = x.GradOn && R4LandPrice && x.TownLand != null && ti < x.TownLand.Length ? x.TownLand[ti] : -1;
@@ -1546,28 +1553,40 @@ namespace Armoury
                         double fk; KsBasket.TownKg(t.ClassNeed[c], 0.0, qc, out fk);
                         double cost = 0; for (int z = 0; z < NZ; z++) cost += qc[z] * tpz[tpo + z];
                         double pv;
+                        // r4-koszyk: drabina klasy przez KsCheap.PlanLadder - przy kluczu Ks Cheap Basket wylaczonym ta sama KsBasket.Ladder co dotad (co do liczby), plus podzial
+                        // P9 (kcal jedzenia / rzeczy); przy kluczu - drabina tanszego koszyka (paid 0..1, podstawa ponad koszyk w tex1)
+                        Array.Clear(p9, 0, p9.Length);
                         if (tcut != null)
                         {
                             // KS-R3 regula zasiegu: psujace sie bez zrodla w 7 dobach - poza drabina miasta (budzet na reszte), czesc zaplacona 0 (odpada z popytu)
                             Array.Copy(qc, qq, NZ);
                             for (int z = 0; z < NZ && z < tcut.Length; z++) if (tcut[z]) qq[z] = 0.0;
-                            pv = KsBasket.Ladder(qq, tpz, tpo, Math.Max(0.0, t.Budget[c]), paid);
+                            pv = KsCheap.PlanLadder(inp.CheapBasket, qq, qc, tpz, tpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
                             for (int z = 0; z < NZ && z < tcut.Length; z++) if (tcut[z]) paid[z] = 0.0;
                         }
-                        else pv = KsBasket.Ladder(qc, tpz, tpo, Math.Max(0.0, t.Budget[c]), paid);
+                        else pv = KsCheap.PlanLadder(inp.CheapBasket, qc, qc, tpz, tpo, Math.Max(0.0, t.Budget[c]), paid, tex1, p9);
                         M.TBudget[m * 3 + c] += Math.Max(0.0, t.Budget[c]); M.TBasket[m * 3 + c] += cost; M.TPaid[m * 3 + c] += pv;
-                        for (int z = 0; z < NZ; z++) { tqs[z] += qc[z]; tus[z] += (1.0 - paid[z]) * qc[z]; }
+                        for (int k9 = 0; k9 < KsCheap.StatN; k9++) M.P9[(m * 3 + c) * KsCheap.StatN + k9] += p9[k9];
+                        for (int z = 0; z < NZ; z++) { tqs[z] += qc[z]; tus[z] += (1.0 - paid[z]) * qc[z]; tex[z] += tex1[z]; M.ExtraT[m * NZ + z] += tex1[z]; }
                     }
                     for (int z = 0; z < NZ; z++) { M.UnpaidT[m * NZ + z] += tus[z]; M.TUnRaw[m] += tus[z] * RawZ(sz, m * NZ, z); }
                     if (last)
                     {
                         var fp = new float[NZ]; for (int z = 0; z < NZ; z++) fp[z] = tqs[z] > 1e-12 ? (float)Math.Max(0.0, Math.Min(1.0, 1.0 - tus[z] / tqs[z])) : 1f;
                         R.TownPaid[t.Id] = fp;
+                        // r4-koszyk: dokupiona podstawa jako czesc koszyka ponad 1 (gra - Zc4Build: popyt ceny, slownik budzetu, koszt klas)
+                        if (inp.CheapBasket)
+                        {
+                            float[] fx = null;
+                            for (int z = 0; z < NZ; z++) if (tex[z] > 1e-12 && tqs[z] > 1e-12) { if (fx == null) fx = new float[NZ]; fx[z] = (float)Math.Min(50.0, tex[z] / tqs[z]); }
+                            if (fx != null) R.TownExtra[t.Id] = fx;
+                        }
                     }
                     else
                     {
                         Array.Copy(t.NeedR8, t.Need, KsTab.NN);
                         UnpaidToNeed(t.Need, tus, true);
+                        if (inp.CheapBasket) KsCheap.ExtraToNeed(t.Need, tex);   // r4-koszyk: popyt Planu = koszyk naprawde kupiony (zboze, ryby ponad koszyk)
                     }
                 }
                 if (last) break;

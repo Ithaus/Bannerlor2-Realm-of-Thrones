@@ -793,6 +793,7 @@ namespace Armoury
                 }
             }
             try { Villages(d); } catch (Exception e) { Stumble("Villages", e); }
+            try { KsWageHands.DayLine(day); } catch (Exception e) { Stumble("KsWageHands.DayLine", e); }   // r4-koszyk: linia "Place za brak rak" (po miastach)
             try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             try { HoardDay(day); } catch (Exception e) { HoardStumble("HoardDay", e); }   // kiesa2: linia doby i liczby dla "Obieg" (po miastach i zamkach)
@@ -935,6 +936,10 @@ namespace Armoury
             double turnBase = (1 - svc) * life + (1 - cs) * court + sale + fp + f.VillWin + f.GmMatWin + f.CarBuy;
             double turn = Math.Max(0f, Math.Min(0.2f, s.TownFolkMerchantDraw)) * turnBase;
             double top = Math.Max(0, Unit(s.TownFolkCraftWageShare) * f.ProdV - f.Win[KCraftPaid]);
+            // r4-koszyk (klucz Ks Wage By Hands): tam, gdzie pracodawcom brakuje rak, kasa miasta placi wiecej za te sama prace (robocizna i doplata do wyrobow x wskaznik
+            // plac za brak rak, KsWageHands) - zloto z kasy do kies W i R, najwyzej stan kasy (to samo przyciecie nizej); bez klucza i poza KS - 1 (jak dotad)
+            double hwF = KsWageHands.Day(st, _liveDay);
+            if (hwF > 1.0) { lab *= hwF; skupLab *= hwF; top *= hwF; }
             d.BaseFolk += fp; d.BaseVill += f.VillWin; d.BaseLife += (1 - svc) * life; d.BaseCourt += (1 - cs) * court; d.BaseSale += sale; d.BaseCar += car; d.BaseGm += f.GmMatWin;
             // DS F3 (M7): sprzedaz WLASNA kasy w oknie - recenzja 17.10: bez czesci uslug ludu z zycia (svc) i ludu z dworu (cs), ktore ida prosto do kies ludu (te same liczby co
             // BaseLife / BaseCourt podstawy robocizny), plus sprzedaz, zaplata ludu i wsie - podstawa pomocy od sprzedazy (kasa nie placi od pieniedzy, ktorych nie dostala)
@@ -944,18 +949,23 @@ namespace Armoury
             double all = lab + turn + top, k = 1;
             long gold = Math.Max(0, town.Gold);
             if (all > gold && all > 0) { k = gold / all; d.Cut++; }
+            bool hwOn = KsWageHands.On && StartCalibration.KsTownApplied(town);   // r4-koszyk: tozsamosc plac (kasa -> kiesy) w miastach z KS - tylko odczyt
+            long hwG0 = hwOn ? town.Gold : 0, hwK0 = hwOn ? f.KW + f.KR + f.KP : 0;
             d.LabT += FromCoffer(f, (long)(lab * k), ELabour);
+            long hwG1 = hwOn ? town.Gold : 0, hwK1 = hwOn ? f.KW + f.KR + f.KP : 0;
             if (skupLab > 0) d.LabS += (long)(skupLab * k);              // 11c: czesc robocizny od skupu (po przycieciu do kasy) - do linii
             d.TurnT += FromCoffer(f, (long)(turn * k), ETurn);
+            long hwG2 = hwOn ? town.Gold : 0, hwK2 = hwOn ? f.KW + f.KR + f.KP : 0;
             long topPaid = FromCoffer(f, (long)(top * k), ETopUp);
             d.TopT += topPaid;
+            if (hwOn) { try { KsWageHands.NotePaid((hwG0 - hwG1) + (hwG2 - town.Gold), (hwK1 - hwK0) + (f.KW + f.KR + f.KP - hwK2), hwF); } catch (Exception e) { Stumble("KsWageHands.NotePaid", e); } }
             // N4 (FolkCraftWageOnSale, tylko licznik linii NE): doplata zaplacona i wedlug starej reguly (wartosc wykonana w oknie, to samo przyciecie do kasy)
             try
             {
                 N4TopUp += topPaid;
                 if (CraftSaleOn)
                 {
-                    double topOld = Math.Max(0, Unit(s.TownFolkCraftWageShare) * CsMadeOf(st) - f.Win[KCraftPaid]), allOld = lab + turn + topOld;
+                    double topOld = Math.Max(0, Unit(s.TownFolkCraftWageShare) * CsMadeOf(st) - f.Win[KCraftPaid]) * hwF, allOld = lab + turn + topOld;   // r4-koszyk: ten sam wskaznik plac
                     N4TopUpOld += (long)(topOld * (allOld > gold && allOld > 0 ? gold / allOld : 1));
                 }
                 else N4TopUpOld += topPaid;

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- r4-koszyk (noc 17/18.10): uprzaz kroku 8 Planu (kopia kmoney/h4 + KS_CHEAP=1 - drabina tanszego koszyka, statystyka P9, dokupiona podstawa w tozsamosci).
+       Zrodla Armoury wzgledem tego katalogu (repo albo worktree). Uruchomienie: patrz docs/noc-1718/r4-koszyk-CHANGELOG.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <LangVersion>latest</LangVersion>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Tables.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Core.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Deliver.cs" />
+    <Compile Include="../../../../Armoury/src/StartCalibration.Corridors.cs" />
+    <Compile Include="../../../../Armoury/src/KsCheap.cs" />
+  </ItemGroup>
+</Project>

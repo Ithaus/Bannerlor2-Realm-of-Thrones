@@ -343,6 +343,9 @@ RANGES = {
     'KsBkRichChests': (1.0, 20.0, "0.0"),
     'VillageNeedCoverDays': (1, 91, "0"),
     'KsGranaryEmergencyDays': (0, 364, "0"),
+    # r4-koszyk (17.10 noc): place za brak rak - zgodnie z przycieciem w kodzie (KsWageHands: krok 0..10%, sufit 1..2)
+    'KsWageHandsStepPercent': (0.0, 10.0, "0.0"),
+    'KsWageHandsMax': (1.0, 2.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

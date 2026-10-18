@@ -94,6 +94,8 @@ namespace Armoury
             MoneyReset();
             R3Reset();
             R4cReset();                                           // KS r4 (r4-ceny): ceny i sterowanie rynku
+            CheapReset();          // r4-koszyk: dokupiona podstawa z Planu i liczniki drabiny tanszego koszyka
+            KsWageHands.Reset();   // r4-koszyk: wskazniki plac za brak rak (pamiec i zapis arm_ks_koszyk)
         }
 
         private static void Stumble(string where, Exception e)

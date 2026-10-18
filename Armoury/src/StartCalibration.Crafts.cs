@@ -152,7 +152,7 @@ namespace Armoury
                 double[] acc;
                 if (!_kAcc.TryGetValue(town, out acc) || acc == null || acc.Length != n * 3) { acc = new double[n * 3]; _kAcc[town] = acc; }   // [pi*2+j] ulamki wsadu, [2n+pi] ulamek ubocznego
                 float wage = Math.Max(0.5f, s != null ? s.WorkshopWagePerDay : 3f);
-                double pay = wage * TownCrafts.WageIndex(town);
+                double pay = wage * TownCrafts.WageIndex(town) * KsWageHands.Factor(town.Settlement);   // r4-koszyk: placa za brak rak (Ks Wage By Hands; inaczej 1)
                 double margin = 1.0 + Math.Max(0f, s != null ? s.SmithProfitPercent : 20f) / 100.0;
                 double hands = 2.0 * zt.Hands, lam = zt.Lam;
                 bool real = SwRealOfftake;
@@ -238,6 +238,7 @@ namespace Armoury
                     catch (Exception e) { _kStum++; Stumble("TownCraftsDay(zdarzenia)", e); }
                 }
                 _kUsed += 2.0 * zt.Hands - hands;
+                KsWageHands.NoteCraft(town.Settlement, 2.0 * zt.Hands, 2.0 * zt.Hands - hands);   // r4-koszyk: zajecie rak przetworow - sygnal braku rak (decyzja tygodnia)
             }
             catch (Exception e) { _kStum++; Stumble("TownCraftsDay", e); }
             finally { _kTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; }

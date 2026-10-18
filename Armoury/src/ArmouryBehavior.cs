@@ -822,6 +822,10 @@ namespace Armoury
             // brak klucza (stary zapis) = stan od zera (po D+14 srednie cen uznane za juz zerowane)
             try { string k4 = dataStore.IsSaving ? StartCalibration.ExportR4c() : null; SaveText.Sync(dataStore, "arm_ks_r4c", ref k4); if (dataStore.IsLoading) StartCalibration.ImportR4c(k4); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_r4c", e); }
+            // r4-koszyk (17.10 noc): wskazniki plac za brak rak (KsWageHands) i dokupiona podstawa koszyka miast z Planu (Ks Cheap Basket) - "k1|miasto:wskaznik:doba,...|miasto:z=v/...";
+            // wlasny try; brak klucza (stary zapis, Ironman Jeffa) = wskazniki 1 i bez dokupionej podstawy do pierwszego Planu; starszy DLL ignoruje klucz
+            try { string kk = dataStore.IsSaving ? KsWageHands.ExportAll() : null; SaveText.Sync(dataStore, "arm_ks_koszyk", ref kk); if (dataStore.IsLoading) KsWageHands.ImportAll(kk); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_koszyk", e); }
         }
 
         public override void RegisterEvents()
