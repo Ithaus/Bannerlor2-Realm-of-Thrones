@@ -1265,9 +1265,10 @@ Uzycie (Python 3, tylko odczyt):
                     NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
                     jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
                     f14-miary (18.10, decyzje Jeffa 18.10 "zwrot wedlug potrzeby" f6 i "renty wedlug potrzeby ... reszta zostaje w skarbcu krolestwa" f7): bramki z czescia
-                    wedlug potrzeby DODANA Z POWROTEM, surowe liczby INFO - NDS-7b: wplyw dnia + min(roznica zwrotu f6 tej doby, pojemnosc nadania wojennego DS po ostatniej
-                    sesji = suma (g max - g) x plon przy g=1) - nadanie idzie za potrzeba korony, a potrzeba zawiera zwrot nalezny; przed pierwsza sesja 0 (NDS-7r surowy);
-                    NDS-9: D staly + srednia 28 dob z roznicy zwrotu f6 i rent zatrzymanych f7 (te same kwoty co Need Reserve Uncut - gorna granica; NDS-9r surowy i dolna
+                    wedlug potrzeby DODANA Z POWROTEM, surowe liczby INFO - NDS-7b: wplyw dnia + min(roznica zwrotu f6 tej doby, pojemnosc nadania wojennego DS tej doby =
+                    suma (g max - g teraz) x plon przy g=1 z ostatniej sesji krolestw w wojnie z wierszem w linii 'Daniny korony (DS)' - bez wyeliminowanych i "(pokoj)") -
+                    nadanie idzie za potrzeba korony, a potrzeba zawiera zwrot nalezny; przed pierwsza sesja 0 (NDS-7r surowy);
+                    NDS-9: D staly + srednia z dob zmierzonych (do 28, jak pierscien D) z roznicy zwrotu f6 i rent zatrzymanych f7 (te same kwoty co Need Reserve Uncut - gorna granica; NDS-9r surowy i dolna
                     granica - tylko f7); obie bramki: TAK dopiero, gdy spelnia tez wartosc bez dodania (NDS-7b) / dolna granica (NDS-9), z dodaniem tak, bez niego nie -
                     DECYZJA (brak moze byc w calosci skutkiem decyzji), z dodaniem nie - NIE; NDS-9c zalegly zold <= 2% (cel planu 166) z INFO: zold naliczony wobec bazy,
                     pulap, zwolnieni, nowe partie wstrzymane, ponizej R.
@@ -37479,6 +37480,7 @@ NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy 
 NDS_AK = "Akumulator kies (ds-akumulator): "
 NDS_GRANT = re.compile(r"^(.*?) (przelaczenie|kwartal|po rampie|pokoj \d+ dob|nowa wojna \d+ dob): g ([\d.]+) -> ([\d.]+)(?: \(War Tax \+krok\))?"   # f14-miary (NDS-7b)
                        r"(?:, potrzeba (-?\d+), zwykle wplywy (-?\d+), brak (-?\d+), plon nadania przy g=1 (-?\d+))?")
+NDS_GROW = re.compile(r"^(.*?): g ([\d.]+)( \(pokoj\))?, firmy ")   # poprawka recenzji f14-miary (NDS-7b): wiersz krolestwa w linii "Daniny korony (DS)" - g teraz, pokoj
 NDS_AKMED = re.compile(r"mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+|-)")
 _NDS_KSPLIT = re.compile(r", (?=[^,]*? -?\d+\+-?\d+(?: |,|$))")
 _NDS_KPART = re.compile(r"^(.*?) (-?\d+)\+(-?\d+)(?: |$)")
@@ -37526,7 +37528,8 @@ def _nds_scan(path, full):
          "vil": {}, "hv": {}, "vkor": {}, "w7v": {}, "extra": {}, "titheold": {}, "tithedsrest": {}, "ut": {}, "utbez": {}, "tw1": {}, "fee": {}, "firmy": {}, "zal": {}, "korona": {},
          "incK": {}, "ksend": None, "akmed": {},   # ds-akumulator: wplyw dnia na krolestwo (jednorazowe), koniec rampy KS (NDS-3a), mediany kiesa / skrzynia (NDS-3c)
          "f6cut": {}, "f7kept": {}, "b166": {}, "bsuch": {},   # f14-miary: roznica zwrotu f6 i renty zatrzymane f7 (czynne), budzet 166 i linia na sucho (NDS-9c)
-         "gcap": {}, "gk": {}}   # f14-miary (NDS-7b): pojemnosc nadania wojennego DS po sesji - suma (g max - g) x plon przy g=1 krolestw w wojnie; gk - stan krolestw
+         "gcap": {}, "gk": {}, "gm": 2.0}   # f14-miary (NDS-7b): pojemnosc nadania wojennego DS tej doby - suma (g max - g) x plon przy g=1 krolestw w wojnie z linii doby;
+                                            # gk - plon przy g=1 z ostatniej sesji krolestwa, gm - g max siatki
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -37591,14 +37594,15 @@ def _nds_scan(path, full):
                     D["bankkd"][day] = (nb, nk_due)
             elif s.startswith("Korona: nadanie wojenne (DS)"):
                 # f14-miary (NDS-7b): nadanie wojenne (K2 - pomoc od sprzedazy, 184, dziesiata, W4) idzie za potrzeba korony; o ile wiecej mogloby zebrac przy wiekszej
-                # potrzebie (pelny zwrot) - najwyzej do g max: (g max - g po sesji) x plon przy g=1, krolestwo po krolestwie (stan z ostatniej sesji krolestwa)
-                gm = num(r"siatka g co [\d.]+ do ([\d.]+)", s, float) or 2.0
+                # potrzebie (pelny zwrot) - najwyzej do g max: (g max - g) x plon przy g=1, krolestwo po krolestwie. Tu tylko plon przy g=1 z ostatniej sesji krolestwa
+                # (sesja pokoju - 0); poprawka recenzji: pojemnosc liczy linia doby "Daniny korony (DS)" - tylko krolestwa z wierszem tej doby (bez wyeliminowanych)
+                # i bez "(pokoj)" (koniec wojny przed sesja pokoju po Ds Session Days), g z tego wiersza - nie stan z ostatniej sesji, ktory trwal do konca logu
+                D["gm"] = num(r"siatka g co [\d.]+ do ([\d.]+)", s, float) or 2.0
                 i = s.find(") | ")
                 for seg in (s[i + 4:].rstrip(".").split(" ; ") if i > 0 else []):
                     mm = NDS_GRANT.match(seg.strip())
                     if mm:
-                        D["gk"][mm.group(1)] = (float(mm.group(4)), float(mm.group(8)) if mm.group(8) else 0.0)
-                D["gcap"][day] = sum(max(0.0, gm - g) * y for g, y in D["gk"].values())
+                        D["gk"][mm.group(1)] = float(mm.group(8)) if mm.group(8) else 0.0
             elif s.startswith("Korona: zwrot wedlug potrzeby (f6)"):
                 # f14-miary (decyzja Jeffa 18.10 "zwrot wedlug potrzeby"): roznica zwrotu tylko przy czynnym kluczu ("; zwrot mniejszy o"; na sucho - "bylby mniejszy")
                 v = num(r"; zwrot mniejszy o (\d+)", s)
@@ -37688,6 +37692,15 @@ def _nds_scan(path, full):
                 mm = re.search(r"\| zwrot (\d+)/(\d+) \([^)]*\), brak zwrotu pokryty: skarbiec ponad zapas (\d+), zaliczki mieszczan (\d+), Bank (\d+)", s)
                 if mm:
                     D["korona"][day] = tuple(int(x) for x in mm.groups())
+                if D["gk"]:   # f14-miary (NDS-7b, poprawka recenzji): pojemnosc nadania tej doby - krolestwa z wierszem, w wojnie, g teraz; przed pierwsza sesja - brak wpisu (0)
+                    i = s.find("| na krolestwo: ")
+                    if i > 0:
+                        cap = 0.0
+                        for row in s[i + len("| na krolestwo: "):].split(" ; "):
+                            mr = NDS_GROW.match(row.strip())
+                            if mr and not mr.group(3) and mr.group(1) in D["gk"]:
+                                cap += max(0.0, D["gm"] - float(mr.group(2))) * D["gk"][mr.group(1)]
+                        D["gcap"][day] = cap
     return D
 
 
@@ -38322,15 +38335,26 @@ def nds_main(logp, bdp=None, until=120):
     # krolestwa" (f7)): czesc wedlug potrzeby DODANA Z POWROTEM - bramki NDS-7b / NDS-9 mierza DS (daniny), nie skutek tych decyzji; surowe liczby - INFO (NDS-7r, NDS-9r).
     #  - NDS-7b: wplyw dnia + pobor, ktorego korona nie zebrala, bo zwrot jest wedlug potrzeby: nadanie wojenne DS (K2 - 184, dziesiata M9, pomoc M7, W4) idzie za
     #    POTRZEBA korony, a potrzeba zawiera zwrot nalezny (fin88 -> fin91: 184 -37 tys./d, M9 -26 tys./d przy roznicy zwrotu ok. 250 tys./d). Dodane tej doby =
-    #    min(roznica zwrotu f6, pojemnosc nadania po ostatniej sesji: suma (g max - g) x plon przy g=1 krolestw w wojnie) - wiecej nadanie zebrac nie moze; przed
+    #    min(roznica zwrotu f6, pojemnosc nadania tej doby: suma (g max - g teraz) x plon przy g=1 z ostatniej sesji krolestw w wojnie - wiersze linii 'Daniny korony
+    #    (DS)' bez "(pokoj)"; wyeliminowanych tam nie ma) - wiecej nadanie zebrac nie moze; przed
     #    pierwsza sesja nadania (DS bez firm) 0 (stary pobor P1/184 nie zalezal od f6: fin91 -> fin92 w dobach 1-56 bez zmiany). Nadal GORNA granica (krok g najwyzej
     #    0.5 na kwartal). Renty zatrzymane f7 sa juz we wplywie dnia (wplynely; zostaja w skarbcu i wracaja 1/450) - nic do dodania.
     #  - NDS-9: D staly + srednia 28 dob (to samo okno co D staly) z roznicy zwrotu f6 i rent zatrzymanych f7 - te same kwoty, ktore gra dodaje z powrotem do D miary
     #    potrzeby (Need Reserve Uncut, ClanIncomeBook.NeedCutAdd). To GORNA granica (roznica zwrotu f6 przechodzi tego samego dnia w reszte wplywow i w renty -
     #    przy rentach bez udzialow wstrzymanych prawie cala); dolna granica (tylko renty zatrzymane f7) - INFO w NDS-9r. NIE na bramce = brak D, ktorego nie tlumaczy
     #    nawet wszystko, co korona zatrzymala wedlug potrzeby (np. skutki wtorne: mniej wojska -> mniejszy pelny zwrot, wiecej W5 przed rentami).
+    #    Poprawka recenzji f14-miary: D staly to srednia z dob ZMIERZONYCH (ClanIncomeBook Ring.Avg dzieli przez Filled - pierscien od poczatku sesji, linia "krocej niz
+    #    28 dob"), wiec dodanie = srednia z tych samych dob: od pierwszej doby logu (pierwsza linia D albo f6/f7) do d, najwyzej 28 - nie suma / 28 (w pierwszych dobach
+    #    DS odniesienie bez bazy dostawalo k/28 dodania, a okno mierzone cale - fin92 bez bazy NDS-9 1.202 DECYZJA zamiast NIE). Okno pelne (ostatnie 28 dob) - bez zmian.
     def _nadd(X, src):
-        return {d: X[d] + sum(src.get(x, 0) for x in range(d - 27, d + 1)) / 28.0 for d in sorted(X)}
+        if not X:
+            return {}
+        s0 = min(min(X), min(src)) if src else min(X)
+        out = {}
+        for d in sorted(X):
+            lo = max(d - 27, s0)
+            out[d] = X[d] + sum(src.get(x, 0) for x in range(lo, d + 1)) / float(d - lo + 1)
+        return out
     def _needs(Z):
         f6, f7 = Z.get("f6cut") or {}, Z.get("f7kept") or {}
         return {d: f6.get(d, 0) + f7.get(d, 0) for d in set(f6) | set(f7)}, f7, f6

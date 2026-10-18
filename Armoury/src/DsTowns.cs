@@ -1091,7 +1091,9 @@ namespace Armoury
                 long gL = pL > 0 ? ToLord(st, t, lord, pL) : 0;
                 long gC = pC > 0 && k != null ? ToCrown(t, k, pC) : 0;
                 f.AL = Math.Max(0, wantL - gL); f.AC = Math.Max(0, wantC - gC);
-                if (gL + gC + 0.5 < tot) { _shortN++; if (town) _shortNT++; }   // f14-miary: kasa nie starczyla na zaleglosc i rate (tylko licznik linii)
+                // f14-miary: kasa nie starczyla na zaleglosc i rate (tylko licznik linii). Poprawka recenzji: brak to kasa ponizej czesci calkowitej (pay < floor(tot)) albo
+                // przelew niepelny - nie ulamek: przy pelnej kasie pay = floor(tot), a ulamek tot (reszta po floor z zeszlego tygodnia) zostaje w AL/AC i nie jest brakiem
+                if (pay < (long)Math.Floor(tot) || gL + gC < pay) { _shortN++; if (town) _shortNT++; }
                 avail -= gL + gC;
                 lordPay += (int)gL; crownFarm += (int)gC;
                 _paidL += gL; _paidC += gC;
@@ -1416,7 +1418,8 @@ namespace Armoury
 
         /// <summary>
         /// f14-miary (NKA-1, test fin92: zaleglosci firm +10.9 tys./d po pierwszym przegladzie, linia dotad bez rozbicia na osady): segment linii doby - zaleglosci firm
-        /// miast i zamkow osobno (razem, osad, w tym z zaleglosci >= jednej raty), raty niezaplacone w calosci tej doby (kasa przy podlodze Ds Farm Floor Share zapasu
+        /// miast i zamkow osobno (razem, osad z zaleglosci >= 2 zl - mniej to reszty ulamkowe po floor, w tym z zaleglosci >= jednej raty), raty niezaplacone w calosci
+        /// tej doby (kasa ponizej czesci calkowitej zaleglosci i raty albo przelew niepelny; kasa przy podlodze Ds Farm Floor Share zapasu
         /// kupcow) i 5 osad z najwieksza zaleglosc: rodzaj, zaleglosc w ratach (panu / koronie / z oszczednosci ludu), kasa wobec podlogi, dni kwartalu z zaleglosciami.
         /// Tylko odczyt (zloto i stan firm bez zmian); petla po firmach (ok. 230) raz na dobe.
         /// </summary>
@@ -1428,7 +1431,7 @@ namespace Armoury
             {
                 if (f == null || f.St == null || f.St.Town == null) continue;
                 double arr = f.AL + f.AC + f.ALf;
-                if (arr < 1) continue;
+                if (arr < 2) continue;   // poprawka recenzji: reszty ulamkowe po floor z kroku 2 (pan + korona) i 2b (lud) - kazda < 1 (pan/korona osobno: wyjatkowo do 2 przy podziale floor), razem zwykle < 2 - to nie zaleglosc
                 double inst = (f.FL + f.FC + f.FLf) / Weeks;
                 bool town = f.St.IsTown;
                 if (town) { aT += arr; nT++; if (arr >= Math.Max(1.0, inst)) rT++; }
