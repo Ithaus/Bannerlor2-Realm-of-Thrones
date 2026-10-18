@@ -90,6 +90,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || Campaign.Current == null) return;
+                if (MapSpeed.BetterTimeActive) return;   // f17: Better Time ustawia mnoznik swoimi przyciskami - nie nadpisujemy go co godzine gry
                 // f9-predkosc: przy przyciskach biegu (MapSpeedButtons) - wybrany bieg szybki (MapSpeedFast / MapSpeedVeryFast); bez nich FastForwardMultiplier 1..64 jak dotad
                 float m = MapSpeed.FfMultiplier(s);
                 if (Math.Abs(Campaign.Current.SpeedUpMultiplier - m) > 0.01f) Campaign.Current.SpeedUpMultiplier = m;
