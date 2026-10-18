@@ -2920,3 +2920,5 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
   f5-zajecia dff070cd (neutralny start: pomiar pomijal wsie z pelnym magazynem; SideVillageCrafts/DistrictIconFromSum z powrotem TAK), f5-koszt 1db490b9 (szczyt A7: diagnoza na watku, KsCostFast2),
   f5-bitwa 8ffc7695 (przegrane w testach = UKLAD TESTU: czempioni bez kompletu, piescia i bez zbroi, kara DTE morale 20; AutotestBattleKit - tylko autotest). Galezie na GitHub.
 - 05:27 PDT: workflow wf_d01b4c76-eca (scalenie4: 6 galezi fali 5 do noc-ks4 od ac03aa25 + 3 recenzje). Test roczny fin90 (WGRANIE 79) w toku.
+- DECYZJA JEFFA 18.10 ok. 05:40 PDT (po wyjasnieniu na przykladzie): "tak, zwrot wedlug potrzeby" - ODWOLUJE decyzje 15.10 "zwrot zoldu bez zmian". Zwrot zoldu z korony: rod ponad 2 x
+  rezerwa wojny - 0; miedzy 1 x a 2 x - liniowo; ponizej rezerwy - pelne 70% (dotyczy tez rodu gracza). Paczka f6-zwrot.
