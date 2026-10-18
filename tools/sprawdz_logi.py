@@ -37259,7 +37259,7 @@ def _nz1_market_info(rep, D):
     rep.add("ZC1-16c: jedwab - z pol mieszczan KS (bez wozu wsi), wozy wsi i polki miast (7 pierwszych / 28 ostatnich dob)",
             f"produkcja {pa:.1f} -> {pb:.1f}/d, z pol mieszczan {fa:.1f} -> {fb:.1f}/d ({(fb / pb if pb else 0):.0%}); wozy wsi {ua:.1f} -> {ub:.1f} szt./d po {ga:.0f} -> {gb:.0f} d/szt.; "
             f"polki miast {avg('cotton', shelf, first):.0f} -> {avg('cotton', shelf, last):.0f} szt.",
-            "INFO (przy KS czesc jedwabiu rosnie na polach mieszczan - prosto na polke miasta, bez utargu wozow wsi; ZC1-16b porownuje z dobami 2-8 sprzed wlaczenia)", None)
+            "INFO (przy KS czesc jedwabiu rosnie na polach mieszczan - prosto na polke miasta, bez utargu wozow wsi; ZC1-16b porownuje z dobami 2-29 biegu (f16-ks; krotki bieg - najmniej 2-8))", None)
 
 
 def nzc1_main(logp, bdp=None):
@@ -37270,7 +37270,7 @@ def nzc1_main(logp, bdp=None):
     pierwszych), ZC1-6/7 jedzenie "bez nazwy" i RemoveParty <= 2 szt./d na towar, ZC1-8 kontrola z ksiega rudy i drewna, ZC1-9a marmur 0.7-1.3, ZC1-9b miod lesny
     0.7-1.3, ZC1-9c produkcja miodu pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego nie wyzszy niz baza (x1.10), ZC1-10 konwoje DTE i karawany BK (je 0),
     ZC1-10c cele karawan zywnosci bez zapasu <= 10% celodob, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zboze (zapas wobec bazy),
-    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza, ZC1-17 'nie do wydania' <= 1.05 x baza,
+    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza (bez bazy: doby 2-29 biegu, f16-ks), ZC1-17 'nie do wydania' <= 1.05 x baza,
     ZC1-18 reszta bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu, reszta INFO. Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -37509,14 +37509,20 @@ def nzc1_main(logp, bdp=None):
         wg = {d: v[gid][1] for d, v in D["wagon"].items()}
         wk = sorted(wg)
         if len(wk) >= 14:
-            if B and B["wagon"]:
-                bw = {d: v[gid][1] for d, v in B["wagon"].items()}
-                com = [d for d in wk[-28:] if d in bw]
+            bw = {d: v[gid][1] for d, v in B["wagon"].items()} if B and B["wagon"] else {}
+            com = [d for d in wk[-28:] if d in bw]
+            if com:
                 a, b = _nz1_mean([bw[d] for d in com]), _nz1_mean([wg[d] for d in com])
                 how = f"baza tych samych dob ({len(com)})"
             else:
-                a, b = _nz1_mean([wg[d] for d in wk[1:8]]), _nz1_mean([wg[d] for d in wk[-28:]])
-                how = "doby 2-8 tego biegu"
+                # f16-ks (18.10): bez biegu bazowego albo bez wspolnych dob z 28 ostatnimi (bieg bazowy krotszy - np. 16.10 121 dob przy biegu 160 dob; dotad
+                # wyjatek TypeError, b = None) - baza z tego biegu. Baza = srednia tylu dob od doby 2, ile ma okno porownania (28), a nie 7. Utarg wozow jedwabiu i srebra to kilka wozow na dobe
+                # (woz wiezie zbior wielu dob - fin93 doba 109082: jeden przyjazd 128 szt. jedwabiu za 121509 d = 37% bazy 2-8), a pierwszy tydzien sesji
+                # sprzedaje wozy i zapasy wsi sprzed wczytania: w 4 z 4 biegow (16.10, fin91, fin92, fin93) baza 2-8 > baza 2-29 dla jedwabiu i srebra
+                # (jedwab 50898/40788, 35689/33627, 36941/35397, 46479/37974). Krotki bieg (< 36 dob) - najmniej 7 dob jak dotad.
+                nb = max(7, min(28, len(wk) - 29))
+                a, b = _nz1_mean([wg[d] for d in wk[1:1 + nb]]), _nz1_mean([wg[d] for d in wk[-28:]])
+                how = f"doby 2-{1 + nb} tego biegu"
             rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d)", f"{b:.0f} / {a:.0f} ({how})" if a else f"{b:.0f} / 0",
                     ">= 0.80 x baza (wsie jedwabne i kopalnie srebra nie traca rynku)", (b >= 0.8 * a) if a and a > 0 else None)
     _nz1_market_info(rep, D)   # fix-ksiega: ZC1-4b, ZC1-9e, ZC1-16c (INFO - przyczyny rynkowe)
