@@ -29,7 +29,8 @@ namespace Armoury
     ///   S &gt; 2T - rynek pelny: x0.95;  T..2T - bez zmian;
     ///   kopalnia z dymarka bez drewna przez pol tygodnia (&gt;= 50%) - x0.95 niezaleznie od rynku (rece, ktore nie wytopia lup, wracaja do pola);
     ///   10-50% albo brak danych wytopu - bez zmian. Sufit jak RegaleCycle: suma rak przy zlozach bloku &lt;= polowa rak bloku poza domem. Bez nowych zloz (tylko wpisy
-    ///   z Planu wlaczenia). Wpisy zelaza nie biora juz progu indeksu w RegaleCycle (inne zloza bez zmian). Pola mieszczan (bez dymarki) - sam rynek.
+    ///   z Planu wlaczenia). Wpisy zelaza nie biora juz progu indeksu w RegaleCycle (inne zloza bez zmian). Pola mieszczan (zelazo bez dymarki, fin88 0 szt./d) -
+    ///   bez wzrostu, w dol tylko przy rynku pelnym; kampania bez wytopu przy kopalni (Bloomery nieczynne) - wsie sam rynek.
     /// Rece przesuwaja sie tylko w bloku (rece zelaza + rece reszty zajec = rece bloku) - zadnego zlota ani towaru (produkcja z prawdziwych rak i ziemi, jedna tabela
     /// swiata). RF jest w zapisie KS (arm_ks, Live.cs) - bez nowego klucza zapisu. Klucz NIE - RegaleCycle jak dotad co do bitu, krok tygodniowy nie biegnie.
     /// Linia "Ruda KS (f5-ruda): dzien N" co 7 dob. Koszt: 97 miast + bloki z zelazem (ok. 550) raz na 7 dob (czas w linii).
@@ -84,8 +85,9 @@ namespace Armoury
                 try
                 {
                     int m = ld.Market == 0 ? 0 : 1;
-                    float starv = -2f, model7; int days;
-                    if (!ld.TF && ld.V != null) starv = Bloomery.F5Starved(ld.V, out model7, out days);   // pola mieszczan - bez dymarki (sam rynek)
+                    // pola mieszczan: zelazo bez dymarki (bez wegla) - bez wzrostu (jak brak danych wytopu), w dol tylko przy rynku pelnym; fin88: zelaza z pol mieszczan 0
+                    float starv = -1f, model7; int days;
+                    if (!ld.TF && ld.V != null) starv = Bloomery.F5Starved(ld.V, out model7, out days);
                     foreach (var b in ld.B)
                     {
                         if (b == null || b.RC == null || b.RF == null) continue;
