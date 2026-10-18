@@ -85,6 +85,9 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         // migawka spichlerzy (Famine.Daily) i ZC (DailyLife) - kontrola "nikt dwa razy"
         private static bool _famHas; private static int _famDay = -1; private static double _famGuests, _famShelter, _famLost, _famTown, _famLedger;
+        // fix-uchodzcy (RT-5): czesc kont "bez wsi z przelicznikiem" Famine (np. 2 wsie ROT ze wspolnym obiektem Village - klucz konta to druga osada), ktora mieszka
+        // w miescie pobytu - liczona juz w "w miastach"; _famLost to od teraz tylko reszta (poza miastem)
+        private static double _famLostTown;
         private static bool _zcHas; private static int _zcDay = -1, _zcTowns; private static double _zcLabour, _zcGuests, _zcPresent;
         // sesja
         private static bool _sessionLogged, _offLogged, _firstShare = true;
@@ -296,8 +299,10 @@ namespace Armoury
         }
 
         // ============================================================ hooki kontroli (Famine, DailyLife)
-        /// <summary>Famine.Daily (po gosciach regionow): jedzacy ze spichlerzy (goscie regionow i schronieni w murach) wobec konta i czesci w miastach - kontrola "nikt dwa razy".</summary>
-        internal static void NoteFamine(double guests, double shelter, double lost)
+        /// <summary>Famine.Daily (po gosciach regionow): jedzacy ze spichlerzy (goscie regionow i schronieni w murach) wobec konta i czesci w miastach - kontrola "nikt dwa razy".
+        /// fix-uchodzcy (RT-5): lost - ludzie kont bez wsi z przelicznikiem Famine POZA miastem pobytu, lostInTown - ich czesc w miescie (jest juz w "w miastach";
+        /// tylko do linii - dotad lost liczyl cale konto i ta czesc szla do sumy dwa razy, choc nikt jej dwa razy nie karmil: Famine i tak pomija takie konto).</summary>
+        internal static void NoteFamine(double guests, double shelter, double lost, double lostInTown = 0.0)
         {
             try
             {
@@ -307,6 +312,7 @@ namespace Armoury
                 lock (Gate) l = _acc.Where(kv => kv.Value.Town != null).ToList();
                 foreach (var kv in l) { var v = VillageOf(kv.Value, kv.Key); if (v != null) town += Derived(v); }
                 _famGuests = guests; _famShelter = shelter; _famLost = lost; _famTown = town; _famLedger = PeopleBook.RefugeesWorld();
+                _famLostTown = lostInTown > 0.0 && !double.IsInfinity(lostInTown) ? lostInTown : 0.0;
                 _famDay = (int)CampaignTime.Now.ToDays - 1; _famHas = true;
             }
             catch (Exception e) { _famHas = false; Stumble("NoteFamine", e); }
@@ -780,7 +786,8 @@ namespace Armoury
                     sb.Append(" | kiesa ludu ").Append(TownFolk.Live ? "czynna" : "NIECZYNNA - kiesa zostaje we wsi");
                     if (_famHas && _famDay == day)
                         sb.Append(" | spichlerze (E4/6): w regionach ").Append(F1(_famGuests)).Append(" + w murach ").Append(F1(_famShelter)).Append(" + w miastach ").Append(F1(_famTown))
-                          .Append(" + konta bez wsi ").Append(F1(_famLost)).Append(" = ").Append(F1(_famGuests + _famShelter + _famTown + _famLost)).Append(" wobec konta ").Append(F1(_famLedger))
+                          .Append(" + konta bez wsi ").Append(F1(_famLost)).Append(" (bez czesci w miastach ").Append(F1(_famLostTown)).Append(')')   // fix-uchodzcy (RT-5)
+                          .Append(" = ").Append(F1(_famGuests + _famShelter + _famTown + _famLost)).Append(" wobec konta ").Append(F1(_famLedger))
                           .Append(" (roznica ").Append(Sg(_famGuests + _famShelter + _famTown + _famLost - _famLedger)).Append(')');
                     else sb.Append(" | spichlerze (E4/6): brak migawki tej doby");
                     if (_sgHas && _sgDay == day)
@@ -1070,7 +1077,9 @@ namespace Armoury
         private static string F0(double v) { return Math.Round(v).ToString("0", Inv); }
         private static string F1(double v) { return v.ToString("0.#", Inv); }
         private static string F3(double v) { return v.ToString("0.###", Inv); }
-        private static string Sg(double v) { return (v >= 0 ? "+" : "") + v.ToString("0.###", Inv); }
+        // fix-uchodzcy (RT-1): najpierw zaokraglenie - szum -1e-11 dawal na .NET Framework "0" bez znaku (v < 0, a "0.###" gubi minus przy zerze), np. "(roznica 0)",
+        // i linia doby nie pasowala do wzoru narzedzia; -0.0 -> +0.0, wiec zero zawsze "+0"
+        private static string Sg(double v) { double r = Math.Round(v, 3, MidpointRounding.AwayFromZero); if (r == 0.0) r = 0.0; return (r >= 0 ? "+" : "") + r.ToString("0.###", Inv); }
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "?" : s.Replace('|', '/').Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }
     }
 }

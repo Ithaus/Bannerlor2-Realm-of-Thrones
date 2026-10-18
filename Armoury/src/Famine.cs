@@ -109,6 +109,8 @@ namespace Armoury
         }
         private static bool FleeOn { get { var s = Settings.Current; return On && s.FamineFleeEnabled && Devastation.On; } }
         private static bool ShelterOn { get { var s = Settings.Current; return On && s.FamineSiegeShelter && _shelterPatched; } }
+        // fix-uchodzcy: konta uchodzcow wsi ROT ze wspolnym obiektem Village (dwie osady, jedna wies) w slowniku kont doby (krok 3) - karmione ze spichlerzy jak kazde konto
+        private static bool SharedOn { get { var s = Settings.Current; return On && s.FamineSharedVillageRefugees; } }
 
         /// <summary>Prog glodu (brak jedzenia, ponizej ktorego nikt nie umiera), 0..0.9.</summary>
         internal static float ThresholdNow
@@ -731,6 +733,26 @@ namespace Armoury
             }
 
             // 3. uchodzcy obecni w regionach (miejsce pobytu konta; oblezona warownia - w murach) jedza po gospodarzach z tego, co zostalo w regionie
+            // fix-uchodzcy (FamineSharedVillageRefugees): ROT - dwie osady z jednym obiektem Village (fin83: Kurbok, Thupak). Wies bierzemy raz (pierwsza osada w Settlement.All,
+            // x.Id - klucz spichlerza), a konto UCHODZCY ma klucz osady samej wsi (v.Settlement.StringId, PeopleBook.VillageId) - bez tego wpisu konto "bez wsi z przelicznikiem":
+            // spichlerze go nie karmia i nikt z niego nie gloduje (ludzie zywi bez jedzenia). Drugi klucz tej samej wsi tylko w slowniku kont tej doby (krok 3 i glod oblezonego
+            // miasta, krok 7) - spichlerz, klucz zapisu, odczyty po id i brama powrotu bez zmian. Wylaczone - jak dotad
+            int sharedV = 0, sharedAcc = 0;
+            double sharedGuest = 0, sharedTown = 0;
+            bool sharedOn = SharedOn;
+            if (sharedOn)
+            {
+                foreach (var x in vils)
+                {
+                    try
+                    {
+                        string vid = x.V != null && x.V.Settlement != null ? x.V.Settlement.StringId : null;
+                        if (vid == null || vid == x.Id || byId.ContainsKey(vid)) continue;
+                        byId[vid] = x; sharedV++;
+                    }
+                    catch (Exception e) { Stumble("Famine.Daily(wies wspolna)", e); }
+                }
+            }
             var accounts = new List<KeyValuePair<string, double>>();
             PeopleBook.RefugeesSnapshot(accounts);
             var nodeById = new Dictionary<string, Settlement>();
@@ -740,15 +762,34 @@ namespace Armoury
             var shelter = new Dictionary<Town, double>();
             int lostAcc = 0;
             double lostPeople = 0;                               // sw-uchodzcy: ludzie kont bez wsi z przelicznikiem (kontrola "nikt dwa razy" linii RT)
+            double lostTown = 0;                                 // fix-uchodzcy (RT-5): ich czesc w miescie pobytu (RaidRefugees) - jest juz w "w miastach" linii RT
+            bool rtOn = RaidRefugees.On;
             foreach (var kv in accounts)
             {
                 try
                 {
                     Vil x;
-                    if (!byId.TryGetValue(kv.Key, out x)) { lostAcc++; lostPeople += kv.Value; continue; }
+                    if (!byId.TryGetValue(kv.Key, out x))
+                    {
+                        // konto bez wsi z przelicznikiem (fin83: 2 wsie ROT, Kurbok i Thupak - jeden obiekt Village dla dwoch osad, klucz konta = druga osada) - spichlerze go
+                        // nie karmia (jak dotad). fix-uchodzcy (RT-5): RaidRefugees znajduje wies po kluczu i przenosi czesc z najazdu do miasta - ta czesc jest w "w miastach",
+                        // wiec tu tylko reszta (dotad cale konto: roznica linii RT = konta bez wsi od doby przydzialu, pomiar, nie podwojne jedzenie). Klucz RT wylaczony - jak dotad
+                        lostAcc++;
+                        double lp = kv.Value, lt = 0.0;
+                        if (rtOn)
+                        {
+                            try { var lst = Settlement.Find(kv.Key); var lv = lst != null ? lst.Village : null; if (lv != null) lt = Math.Min(lp, Math.Max(0.0, RaidRefugees.InTown(lv))); }
+                            catch (Exception e) { lt = 0.0; Stumble("Famine.Daily(RT konto bez wsi)", e); }
+                        }
+                        lostPeople += lp - lt; lostTown += lt;
+                        continue;
+                    }
                     // sw-uchodzcy (RaidRefugeesToTowns): czesc konta w miescie pobytu je z targu miasta (biedota, kiesa ludu) - spichlerze karmia tylko reszte (wylaczone: 0)
                     double gAway = kv.Value, inTown = RaidRefugees.InTown(x.V);
+                    bool shared = sharedOn && kv.Key != x.Id;            // fix-uchodzcy: konto wsi wspolnej (drugi klucz) - licznik linii
+                    if (shared) { sharedAcc++; sharedTown += Math.Min(kv.Value, Math.Max(0.0, inTown)); }
                     if (inTown > 0.0) { gAway -= inTown; if (!(gAway > 1e-9)) continue; }
+                    if (shared) sharedGuest += gAway;
                     var stay = StayNode(x, nodeById);
                     var g = new Guest { Acc = x, Away = gAway };
                     if (shelterOn && stay.Town != null && stay.IsUnderSiege)
@@ -771,7 +812,7 @@ namespace Armoury
             {
                 double gp = 0, gs = 0;
                 foreach (var g in guests) { if (g.R != null) gp += g.Away; else if (g.Shelter != null) gs += g.Away; }
-                RaidRefugees.NoteFamine(gp, gs, lostPeople);
+                RaidRefugees.NoteFamine(gp, gs, lostPeople, lostTown);
             }
             catch (Exception e) { Stumble("Famine.Daily(RT)", e); }
             double eatRef = 0, presentAll = 0;
@@ -1039,6 +1080,10 @@ namespace Armoury
                 StockPart(sb, nodeById, regs, shelter, qWorld, day, e46);
                 sb.Append(" | zima: ").Append(winterDay > 0 ? "TAK, doba zimy " + winterDay : "NIE").Append(", pierwsza doba glodu warowni AI w tej zimie: ").Append(_firstStarve >= 0 ? _firstStarve.ToString(Inv) : "-");
                 if (lostAcc > 0) sb.Append(" | konta uchodzcow bez wsi z przelicznikiem ").Append(lostAcc);
+                // fix-uchodzcy (FamineSharedVillageRefugees): tozsamosc ludzi kont wsi wspolnych: goscie spichlerzy (regiony i w murach) + w miastach (RaidRefugees) = ich konta
+                if (sharedOn)
+                    sb.Append(" | wsie wspolne ROT (dwie osady, jeden obiekt Village): wsi ").Append(sharedV).Append(", konta ").Append(sharedAcc).Append(" karmione ze spichlerzy - goscie ")
+                      .Append(F(sharedGuest, "0.0")).Append(" + w miastach ").Append(F(sharedTown, "0.0")).Append(" ludzi");
                 // R2-1: potkniecia od poprzedniej linii (takze ReturnGate, Burn, HungerOf, postfiks i Import miedzy dobami), nie tylko z samego Daily
                 int all = _stumblesAll, since = all - _stumblesMark;
                 _stumblesMark = all;
