@@ -53,8 +53,11 @@ namespace Armoury
 
         /// <summary>
         /// Rdzen drabiny (czysta arytmetyka, bez obiektow gry): need - zloto pelnego koszyka pozycji, kcal - kcal pelnego koszyka pozycji, rung - szczebel, staple - podstawa
-        /// kalorii, key - klucz kolejnosci (bialko: zl za kcal, napoj: zl za litr; null - zl za kcal), cap - zloto najwyzej na podstawe (polka w grze; null - bez sufitu),
+        /// kalorii, key - klucz kolejnosci (bialko: zl za kcal, napoj: zl za litr; null - zl za kcal), cap - zloto najwyzej na pozycje (polka w grze; null - bez sufitu - Plan),
         /// extraK - kcal pozycji poza drabina (regula zasiegu - pokrywa je tylko podstawa). give - zloto na pozycje. Zwraca wydane zloto.
+        /// Poprawka recenzji (noc 17/18.10): sufit polki obejmuje KAZDY szczebel, nie tylko pule kalorii - podniesienie pozycji (1b, 1c, 2, 3, 4) najwyzej do tego, co lezy
+        /// (podstawa: razem z jej pula), wiec podstawa traci tylko te kcal, ktore naprawde zastapil towar z polki, a kcal kupione licza sie tylko z polki (BK kupuje
+        /// min(budzet / cena, polka) - pusta kategoria nie zabiera kalorii zbozu). Plan (cap null) - co do liczby jak dotad.
         /// </summary>
         internal static double Core(int n, double[] need, double[] kcal, int[] rung, bool[] staple, double[] key, double[] cap, double extraK, double budget, double[] give,
                                     out double kcalNeed, out double kcalGot)
@@ -98,6 +101,17 @@ namespace Armoury
             }
             left -= pc;
             var u = new double[n];
+            var lmv = new double[n];
+            // sufit podniesienia pozycji (czesc koszyka pozycji 0..1): Plan - 1; gra - polka (cap) minus to, co juz bierze pula kalorii podstawy; nigdy ponizej juz kupionego
+            double Lim(int i)
+            {
+                if (cap == null) return 1.0;
+                double c = cap[i];
+                if (double.IsPositiveInfinity(c)) return 1.0;
+                if (!(c > 0) || !(nd[i] > 0)) return u[i];
+                double room = c - (staple[i] && pool[i] > 0 && kc[i] > 0 ? pool[i] * nd[i] / kc[i] : 0.0), l = room / nd[i];
+                return l >= 1.0 ? 1.0 : (l > u[i] ? l : u[i]);
+            }
             // odliczenie podstawy za kcal pozycji: kcal pozycji spoza podstawy najpierw zapelniaja brak (D), reszta zdejmuje podstawe od najdrozszej za kcal
             double Refund(double dkN, double dkS, bool apply)
             {
@@ -115,9 +129,10 @@ namespace Armoury
             double GroupCost(List<int> items, double f, bool apply)
             {
                 double dg = 0, dkN = 0, dkS = 0;
-                foreach (int i in items) { double x = f * (1.0 - u[i]); dg += x * nd[i]; if (staple[i]) dkS += x * kc[i]; else dkN += x * kc[i]; }
+                foreach (int i in items) lmv[i] = Lim(i);                                   // sufit przed odliczeniem (pula podstawy tylko maleje - sufit zostaje dotrzymany)
+                foreach (int i in items) { double x = f * (lmv[i] - u[i]); dg += x * nd[i]; if (staple[i]) dkS += x * kc[i]; else dkN += x * kc[i]; }
                 double r = Refund(dkN, dkS, apply);
-                if (apply) foreach (int i in items) u[i] += f * (1.0 - u[i]);
+                if (apply) foreach (int i in items) u[i] += f * (lmv[i] - u[i]);
                 return dg - r;
             }
             void Upgrade(List<int> items)
@@ -130,7 +145,7 @@ namespace Armoury
                 for (int it = 0; it < 30; it++) { double mid = 0.5 * (lo + hi); if (GroupCost(items, mid, false) <= left) lo = mid; else hi = mid; }
                 if (lo > 0) { left -= GroupCost(items, lo, true); if (left < 0) left = 0; }
             }
-            bool Open(int i) { return nd[i] > 0 && u[i] < 1.0 && !(staple[i] && D > 1e-9); }   // podstawa bez polki (brak D) - nie podnoszona
+            bool Open(int i) { return nd[i] > 0 && u[i] < 1.0 && !(staple[i] && D > 1e-9) && (cap == null || Lim(i) > u[i] + 1e-12); }   // podstawa bez polki (brak D) i pozycja z pusta polka (gra) - nie podnoszona
             var one = new List<int>(1);
             // (1b) zamiany oplacalne: pozycja jedzenia tansza za kcal od podstawy, ktora zastepuje
             for (int i = 0; i < n; i++)

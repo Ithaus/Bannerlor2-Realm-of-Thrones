@@ -971,7 +971,9 @@ Uzycie (Python 3, tylko odczyt):
                     "stara drabina lepsza w kcal" (INFO), NKO-5 drabina w grze - kcal kupione >= 95% potrzebnych w miasto-dobach drabiny (bez drabiny INFO), NKO-6 tozsamosc drabiny
                     (budzet = wydane + niewydane, wydane <= budzet, +-2 zl), NKO-7 dokupiona podstawa Planu w popycie miast (INFO), NKO-8 potkniecia 0, NKO-9 place: zaplacone z kas =
                     przyjete w kiesach kazdej doby (roznica 0), NKO-10 wskaznik plac w [1, sufit], NKO-11 krok miasta miedzy dobami <= krok tygodnia, NKO-12 wskaznik wedlug miast i udzial
-                    plac ponad stawke (INFO), NKO-13 potkniecia 0, NKO-14 ERROR paczki 0. Brak linii (log sprzed r4-koszyk) = INFO, nigdy wyjatek.
+                    plac ponad stawke (INFO; liczby decyzji - ostatnia decyzja kazdego miasta z KS, bo miasta maja wlasne 7-dobowe terminy), NKO-13 potkniecia 0, NKO-14 ERROR
+                    paczki 0 (KsWageHands, StartCalibration.Zc4LadderCheap/CheapLine/P9Line, TownFolk.KsWageHands.*, SyncData.arm_ks_koszyk). NKO-5 po poprawce recenzji: drabina
+                    w grze liczy kcal tylko z towaru na polce (kazdy szczebel najwyzej polka). Brak linii (log sprzed r4-koszyk) = INFO, nigdy wyjatek.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -33952,11 +33954,13 @@ NKO_CHMK = re.compile(r"(?P<mk>Westeros|Essos): drabina w (?P<n>\d+) miasto-doba
 NKO_STUM = re.compile(r"\| potkniecia (?P<s>\d+)\.\s*$")
 NKO_PLANX = re.compile(r"\| Plan: dokupiona podstawa w popycie miast \(szt\./d przy lambdzie\) w (?P<n>\d+) miastach:(?P<x>[^|]*)")
 NKO_WG = re.compile(r"Place za brak rak \(r4-koszyk\): dzien (?P<day>-?\d+) \| klucz Ks Wage By Hands (?P<key>TAK|NIE), krok (?P<step>[\d.]+)%/7 dob, sufit x(?P<max>[\d.]+) \| miasta z KS (?P<n>\d+), "
-                    r"decyzja tygodnia dnia (?P<dd>-?\d+): brak rak (?P<sh>\d+) \(wolne rece regionu a >= f (?P<shf>\d+), przetwory ZC5 zajete >= 90% (?P<shc>\d+)\), duzo wolnych rak (?P<sl>\d+), "
-                    r"bez zmiany (?P<ho>\d+) \| wskaznik plac min (?P<mn>[\d.]+) / mediana (?P<md>[\d.]+) / max (?P<mx>[\d.]+), miasta > 1: (?P<up>\d+)(?: \((?P<list>[^)]*)\))? \| "
+                    r"decyzj(?:a tygodnia dnia (?P<dd0>-?\d+)|e tygodnia \(ostatnia kazdego miasta, najnowsza dnia (?P<dd>-?\d+)\)): brak rak (?P<sh>\d+) "
+                    r"\(wolne rece regionu a >= f (?P<shf>\d+), przetwory ZC5 zajete >= 90% (?P<shc>\d+)\), duzo wolnych rak (?P<sl>\d+), "
+                    r"bez zmiany (?P<ho>\d+)(?:, bez decyzji jeszcze (?P<nd>\d+))? \| wskaznik plac min (?P<mn>[\d.]+) / mediana (?P<md>[\d.]+) / max (?P<mx>[\d.]+), miasta > 1: (?P<up>\d+)(?: \((?P<list>[^)]*)\))? \| "
                     r"doba: kasy miast zaplacily robocizne i doplate (?P<paid>-?\d+) zl, kiesy ludu przyjely (?P<recv>-?\d+) zl \(roznica (?P<diff>-?\d+)\), z tego ponad stawke \(place za brak rak\) "
                     r"(?P<ex>-?\d+) zl w (?P<exn>\d+) miastach \(miast z placami (?P<tn>\d+)\) \| potkniecia (?P<st>\d+)")
-NKO_ERR = ("ERROR in KsWageHands", "ERROR in StartCalibration.Zc4LadderCheap", "ERROR in StartCalibration.CheapLine", "ERROR in StartCalibration.P9Line")
+NKO_ERR = ("ERROR in KsWageHands", "ERROR in StartCalibration.Zc4LadderCheap", "ERROR in StartCalibration.CheapLine", "ERROR in StartCalibration.P9Line",
+           "ERROR in TownFolk.KsWageHands", "ERROR in SyncData.arm_ks_koszyk")   # recenzja: opakowania TownFolk.Stumble (NotePaid, DayLine) i zapisu
 
 
 def nkoszyk_main(logp, until=120):
@@ -34122,13 +34126,13 @@ def nkoszyk_main(logp, until=120):
         rep.add("NKO-11: krok wskaznika miasta miedzy dobami <= krok tygodnia", f"zmian ponad krok {len(badstep)}" + (f" ({', '.join(badstep[:5])})" if badstep else ""),
                 "<= krok (miasta z lista > 1)", len(badstep) == 0)
         rep.add("NKO-12: wskaznik plac wedlug miast (ostatnia doba)",
-                f"dzien {wd[-1]}, klucz {last['key']}, miasta z KS {last['n']}, decyzja dnia {last['dd']}: brak rak {last['sh']} (wolne rece {last['shf']}, ZC5 {last['shc']}), "
-                f"duzo wolnych rak {last['sl']}, bez zmiany {last['ho']}; min/mediana/max {last['mn']}/{last['md']}/{last['mx']}, > 1: {last['up']} ({last.get('list') or '-'}); "
+                f"dzien {wd[-1]}, klucz {last['key']}, miasta z KS {last['n']}, decyzje (ostatnia kazdego miasta, najnowsza dnia {last['dd'] or last['dd0']}): brak rak {last['sh']} "
+                f"(wolne rece {last['shf']}, ZC5 {last['shc']}), duzo wolnych rak {last['sl']}, bez zmiany {last['ho']}, bez decyzji {last['nd'] or '-'}; min/mediana/max {last['mn']}/{last['md']}/{last['mx']}, > 1: {last['up']} ({last.get('list') or '-'}); "
                 f"ponad stawke razem {ex} zl z {paid} zl plac ({(100.0 * ex / paid) if paid else 0:.2f}%)", "INFO", None)
         rep.add("NKO-13: potkniecia linii plac", str(stum), "0", stum == 0)
     else:
         rep.add("NKO-9: place za brak rak", "BRAK linii 'Place za brak rak (r4-koszyk)'", "zaplacone = przyjete", None)
-    rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line)", str(errs), "0", errs == 0)
+    rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line, TownFolk.KsWageHands, SyncData.arm_ks_koszyk)", str(errs), "0", errs == 0)
     rep.show()
     return 0
 

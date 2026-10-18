@@ -26,14 +26,14 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private sealed class W
         {
-            public float Idx = 1f; public int Last = -1; public byte State;         // 0 bez zmiany, 1 brak rak, 2 duzo wolnych rak, 3 pierwszy tydzien
+            public float Idx = 1f; public int Last = -1; public byte State;         // 0 bez zmiany, 1 brak rak, 2 duzo wolnych rak, 3 bez decyzji (pierwszy tydzien, po wczytaniu)
             public double Avail, Used;                                                // rece przetworow ZC5 w tygodniu (roboczodni) - dostepne / zajete
             public float A = -1f, F = -1f, Use = -1f; public bool ByFree, ByCraft;   // ostatnia decyzja: obciazenie i prog regionu, zajecie przetworow, przyczyna
         }
         private static readonly Dictionary<string, W> _w = new Dictionary<string, W>(StringComparer.Ordinal);
         // liczniki doby: place z kas (robocizna + doplata) zaplacone / przyjete w kiesach, ponad stawke (za brak rak), miasta z wskaznikiem > 1
         private static long _dPaid, _dRecv; private static double _dExtra; private static int _dTowns, _dUp, _stum;
-        private static int _decDay = -1, _nShort, _nShortFree, _nShortCraft, _nSlack, _nHold;
+        private static int _decDay = -1;                                              // najnowsza doba decyzji (linia); liczby decyzji - z ostatniej decyzji kazdego miasta (W.State)
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.KsWageByHands; } }
@@ -43,7 +43,7 @@ namespace Armoury
         internal static void Reset()
         {
             _w.Clear(); _dPaid = _dRecv = 0; _dExtra = 0; _dTowns = _dUp = 0; _stum = 0; _err.Clear();
-            _decDay = -1; _nShort = _nShortFree = _nShortCraft = _nSlack = _nHold = 0;
+            _decDay = -1;
         }
 
         private static void Stumble(string where, Exception e)
@@ -93,8 +93,9 @@ namespace Armoury
             w.Idx = (float)idx; w.State = (byte)(shortH ? 1 : slack ? 2 : 0);
             w.A = fh ? (float)a : -1f; w.F = fh ? (float)f : -1f; w.Use = craft ? (float)use : -1f; w.ByFree = byFree; w.ByCraft = byCraft;
             w.Avail = w.Used = 0;
-            if (_decDay != day) { _decDay = day; _nShort = _nShortFree = _nShortCraft = _nSlack = _nHold = 0; }
-            if (shortH) { _nShort++; if (byFree) _nShortFree++; if (byCraft) _nShortCraft++; } else if (slack) _nSlack++; else _nHold++;
+            if (day > _decDay) _decDay = day;
+            // poprawka recenzji (noc 17/18.10): liczby decyzji w linii licza sie z W.State kazdego miasta (DayLine) - miasta maja wlasne 7-dobowe terminy (wejscie do mapy ZC4,
+            // zapis), wiec zerowanie licznikow przy kazdej nowej dobie decyzji pokazywalo tylko miasta z tej jednej doby
         }
 
         /// <summary>Przetwory ZC5 (StartCalibration.TownCraftsDay, co 2 doby): rece dostepne i zajete tej przerobki (roboczodni) - do decyzji tygodnia.</summary>
@@ -123,12 +124,17 @@ namespace Armoury
             {
                 if (_w.Count == 0 && _dTowns == 0) return;                               // bez KS zastosowanego (gra Jeffa bez KS) - bez linii
                 var ix = new List<KeyValuePair<string, float>>();
-                int n = 0;
+                int n = 0, nShort = 0, nShortFree = 0, nShortCraft = 0, nSlack = 0, nHold = 0, nNone = 0;
                 foreach (var kv in _w)
                 {
                     var st = Settlement.Find(kv.Key);
                     if (st == null || st.Town == null || !StartCalibration.KsTownApplied(st.Town)) continue;
                     n++;
+                    var w0 = kv.Value;   // ostatnia decyzja miasta (okno 7 dob - kazde miasto decyduje raz na 7 dob)
+                    if (w0.State == 1) { nShort++; if (w0.ByFree) nShortFree++; if (w0.ByCraft) nShortCraft++; }
+                    else if (w0.State == 2) nSlack++;
+                    else if (w0.State == 0) nHold++;
+                    else nNone++;
                     ix.Add(new KeyValuePair<string, float>(st.Name != null ? st.Name.ToString().Replace(';', ',').Replace('|', '/') : kv.Key, Math.Max(1f, kv.Value.Idx)));
                 }
                 ix.Sort((x, y) => y.Value.CompareTo(x.Value));
@@ -139,8 +145,9 @@ namespace Armoury
                 var sb = new StringBuilder(900);
                 sb.Append("Place za brak rak (r4-koszyk): dzien ").Append(day).Append(" | klucz Ks Wage By Hands ").Append(On ? "TAK" : "NIE")
                   .Append(", krok ").Append((100 * Step).ToString("0.0", Inv)).Append("%/7 dob, sufit x").Append(Max.ToString("0.00", Inv))
-                  .Append(" | miasta z KS ").Append(n).Append(", decyzja tygodnia dnia ").Append(_decDay).Append(": brak rak ").Append(_nShort).Append(" (wolne rece regionu a >= f ").Append(_nShortFree)
-                  .Append(", przetwory ZC5 zajete >= 90% ").Append(_nShortCraft).Append("), duzo wolnych rak ").Append(_nSlack).Append(", bez zmiany ").Append(_nHold)
+                  .Append(" | miasta z KS ").Append(n).Append(", decyzje tygodnia (ostatnia kazdego miasta, najnowsza dnia ").Append(_decDay).Append("): brak rak ").Append(nShort)
+                  .Append(" (wolne rece regionu a >= f ").Append(nShortFree).Append(", przetwory ZC5 zajete >= 90% ").Append(nShortCraft).Append("), duzo wolnych rak ").Append(nSlack)
+                  .Append(", bez zmiany ").Append(nHold).Append(", bez decyzji jeszcze ").Append(nNone)
                   .Append(" | wskaznik plac min ").Append(mn.ToString("0.000", Inv)).Append(" / mediana ").Append(md.ToString("0.000", Inv)).Append(" / max ").Append(mx.ToString("0.000", Inv))
                   .Append(", miasta > 1: ").Append(up);
                 if (up > 0)
@@ -184,7 +191,7 @@ namespace Armoury
                 var f = ent.Split(':');
                 float v; int d;
                 if (f.Length != 3 || f[0].Length == 0 || !float.TryParse(f[1], NumberStyles.Float, Inv, out v) || !(v >= 1f && v <= 2f) || !int.TryParse(f[2], NumberStyles.Integer, Inv, out d)) continue;
-                _w[f[0]] = new W { Idx = v, Last = d };
+                _w[f[0]] = new W { Idx = v, Last = d, State = 3 };   // bez decyzji w tej sesji (linia: "bez decyzji jeszcze" do pierwszej decyzji po wczytaniu)
             }
         }
 

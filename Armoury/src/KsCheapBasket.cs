@@ -48,7 +48,7 @@ namespace Armoury
 
         /// <summary>
         /// Drabina tanszego koszyka w grze (klucz Ks Cheap Basket; TownFolk.AnchorDict, kiesy nie stac na caly koszyk jedzenia): budzet B = ff x suma kategorii jedzenia
-        /// koszyka - KsCheap.Core na kategoriach (pozycja = najtanszy za kg towar kategorii z polka; kcal = zloto kategorii x kcal na zl; podstawa najwyzej to, co lezy na polce).
+        /// koszyka - KsCheap.Core na kategoriach (pozycja = najtanszy za kg towar kategorii z polka; kcal = zloto kategorii x kcal na zl; KAZDA pozycja - pula podstawy i kazde podniesienie - najwyzej to, co lezy na polce: cap, poprawka recenzji).
         /// Zwraca sume slownika albo -1 (zadna podstawa nie lezy na polce - dotychczasowa drabina).
         /// </summary>
         private static double Zc4LadderCheap(Town town, ZTown zt, Dictionary<ItemCategory, float> dict, List<ItemCategory> keys, double ff, double tot)
