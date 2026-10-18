@@ -1549,6 +1549,13 @@ Uzycie (Python 3, tylko odczyt):
                     czy plik zimy dzialal (recenzja: tylko w autotescie - w grze "nie autotest - bez skutku"). Bazy: fin87 Armoury-2026-10-18_00-26-23.log (f5fd0ae3), fin86 Armoury-2026-10-17_23-22-37.log,
                     fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin87): NOP-5..8 jako liczby bazowe
                     (INFO), reszta brak linii (INFO), bez wyjatku.
+--grupa nboczne   : (18.10, paczka f11-drogi - Jeff: "drogi do wiosek odchodzace od glownego traktu ... tylko dalsze wioski"; Armoury/src/MapSideRoads.cs,
+                    MapSideRoads.Plan.cs, klucz Map Side Roads, plik-przelacznik autotestu armoury-drogi-boczne.flag) python -I tools/sprawdz_logi.py --grupa nboczne <Armoury-*.log>
+                    (strumieniowo). NBC-0 linie paczki (INFO), NBC-1 tryb wedlug OSTATNIEJ linii startu sesji: "wylaczone" - przy kazdym starcie wylaczone i 0 linii
+                    "postawione" (bieg A, klucz NIE); "wlaczone" (bieg zdjec) - NBC-2 plan udany: drog > 0, stempli > 0, bez "plan NIEUDANY"; NBC-3 postawione N z M
+                    (N > 0, N >= 80% M - reszta nad woda / brodem / mostem, zle 0, potkniecia 0); NBC-4 czas planu na watku z puli <= 5000 ms i wejscia na watku glownym
+                    <= 50 ms; NBC-5 stawianie: najdluzszy tick <= 15 ms (bieg zdjec bez budzetu - INFO); NBC-6 klatki z drogami widocznymi / schowanymi (INFO - koszt
+                    rysowania); NBC-7 potkniecia (najwiecej w linii pomiaru) i linie "ERROR in MapSideRoads*" 0; NBC-8 miejsca z najgestsza siecia (INFO - cele zdjec).
 --grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
                     najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
                     WageRefund, CourtFull.Goods, CourtGoods.Gear, ClanBudget.Court - klucze Crown Refund By Need, Lapsed Gear Buys Goods) python -I tools/sprawdz_logi.py
@@ -10453,6 +10460,7 @@ _E7C_ALLOWED = {
     "QuartermasterLaw.cs": (4, "dlawienie okrzyku kwatermistrza"),
     "MapVillagesView.cs": (2, "widok mapy wsi (OnVisualTick realDt)"),
     "MapRoadsProbe.cs": (3, "widok proby drog E7/D0 (OnVisualTick realDt: czas klatki do histogramu, dlawienie 4 x na sekunde, podsumowanie; klucz MapRoadsProbeEnabled domyslnie false)"),
+    "MapSideRoads.cs": (3, "widok bocznych drog f11-drogi (OnVisualTick realDt: czas klatki do histogramu, dlawienie 4 x na sekunde, podsumowanie; klucz MapSideRoads domyslnie NIE)"),
     "CrossingLaw.cs": (3, "etap 8 (rozdz. 7): komunikat co 5 s i akumulator _acc"),
     "HideoutPurge.cs": (4, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne (PursuitDue, 2) i E8/S: odstep ponownej proby otwarcia menu gracza (OnTick, 2)"),
 }
@@ -46445,6 +46453,104 @@ def nrenty_main(logp, bdp=None, csvp=None):
     return 0
 
 
+# ============================================================ nboczne (18.10, paczka f11-drogi): boczne drogi do dalszych wiosek (MapSideRoads.cs, MapSideRoads.Plan.cs)
+NBC_HEAD = "Drogi boczne (f11): "
+
+
+def nboczne_main(logp):
+    """nboczne (18.10, paczka f11-drogi): boczne drogi od traktow ROT do dalszych wiosek - sam widok (decale bez encji), klucz MapSideRoads domyslnie NIE,
+    w biegu zdjec autotestu plik-przelacznik armoury-drogi-boczne.flag. Progi NBC-0..NBC-8 - opis w naglowku pliku (--grupa nboczne). Log bez paczki: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NBC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ses, plans, fails, built, rows, spots, errs = [], [], [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NBC_HEAD):
+                r = s[len(NBC_HEAD):]
+                if r.startswith(("wylaczone (klucz", "wlaczone (")):
+                    ses.append(s)
+                elif r.startswith("plan NIEUDANY"):
+                    fails.append(s)
+                elif r.startswith("plan - "):
+                    plans.append(s)
+                elif r.startswith("postawione decale"):
+                    built.append(s)
+                elif r.startswith(("decali ", "koniec mapy")):
+                    rows.append(s)
+                elif r.startswith("miejsca z najgestsza siecia"):
+                    spots.append(s)
+            elif s.startswith("ERROR in MapSideRoads"):
+                errs.append(s)
+    print(f"plik: {logp} | startow sesji {len(ses)}, planow {len(plans)} (nieudanych {len(fails)}), linii 'postawione' {len(built)}, pomiaru {len(rows)}, ERROR {len(errs)}")
+    if not ses and not plans and not built and not errs:
+        rep.add("NBC-0: linie 'Drogi boczne (f11)'", "brak w logu", "INFO (log sprzed paczki f11-drogi)", None)
+        rep.show()
+        return 0
+    rep.add("NBC-0: linie paczki", f"startow sesji {len(ses)}, planow {len(plans)}, nieudanych {len(fails)}, postawionych {len(built)}, pomiaru {len(rows)}", "INFO", None)
+    on = bool(ses) and ses[-1].startswith(NBC_HEAD + "wlaczone")
+    if not on:
+        off_ok = bool(ses) and all(x.startswith(NBC_HEAD + "wylaczone") for x in ses)
+        n_off = sum(1 for x in ses if x.startswith(NBC_HEAD + "wylaczone"))
+        rep.add("NBC-1: bieg A - drogi boczne wylaczone (klucz NIE, bez pliku-przelacznika)", f"linii 'wylaczone' {n_off} z {len(ses)} startow sesji, linii 'postawione' {len(built)}",
+                "'wylaczone' przy kazdym starcie sesji, nic nie postawione", off_ok and not built)
+    else:
+        last = ses[-1]
+        rep.add("NBC-1: bieg zdjec - drogi boczne wlaczone (ostatni start sesji)", last[len(NBC_HEAD):][:200], "INFO (klucz albo plik-przelacznik autotestu)", None)
+        if plans:
+            pl = plans[-1]
+            roads = num(r"-> drog (\d+)", pl, int, 0) or 0
+            stamps = num(r"\| stempli (\d+)", pl, int, 0) or 0
+            length = num(r"\| dlugosc ([0-9.]+) jedn\.", pl, float, 0.0) or 0.0
+            rep.add("NBC-2: plan (ostatnia mapa)", f"drog {roads}, stempli {stamps}, dlugosc {length:.0f} jedn.; nieudanych planow {len(fails)}", "drog > 0, stempli > 0, nieudanych 0",
+                    roads > 0 and stamps > 0 and not fails)
+            work = num(r"plan \(watek z puli\) ([0-9.]+) ms", pl, float, -1.0)
+            main = num(r"wejscie \(watek glowny\) ([0-9.]+) ms", pl, float, -1.0)
+            rep.add("NBC-4: czas planu (watek z puli) i wejscia (watek glowny)", f"plan {work:.0f} ms, wejscie {main:.1f} ms", "plan <= 5000 ms, wejscie <= 50 ms",
+                    0 <= work <= 5000 and 0 <= main <= 50)
+            rep.add("NBC-2b: rozklad wiosek (ostatni plan)", pl[len(NBC_HEAD) + len("plan - "):][:420], "INFO", None)
+        else:
+            rep.add("NBC-2: plan", ("NIEUDANY: " + fails[-1][len(NBC_HEAD):][:200]) if fails else "brak linii 'plan - ' (widok mapy sie nie zarejestrowal?)", "linia planu po wejsciu na mape", False)
+        if built:
+            bl = built[-1]
+            mm = re.search(r"postawione decale (\d+) z (\d+) stempli \(drog (\d+); pominiete nad woda / brodem / mostem (\d+), zle (\d+), potkniecia (\d+)\)", bl)
+            if mm:
+                made, tot, nr, water, bad, st = (int(x) for x in mm.groups())
+                rep.add("NBC-3: decale postawione (ostatnia mapa)", f"{made} z {tot} (nad woda / brodem / mostem {water}, zle {bad}, potkniecia {st})",
+                        "N > 0, N >= 80% M, zle 0, potkniecia 0", made > 0 and made >= 0.8 * tot and bad == 0 and st == 0)
+            else:
+                rep.add("NBC-3: linia 'postawione'", bl[:160], "format linii f11", False)
+            ms = num(r"\) w ([0-9.]+) ms \(", bl, float, 0.0) or 0.0
+            mx = num(r"najdluzszy tick ([0-9.]+) ms", bl, float, 0.0) or 0.0
+            us = num(r"\(([0-9.]+) us na decal\)", bl, float, 0.0) or 0.0
+            photo = "bieg zdjec - bez budzetu" in bl
+            rep.add("NBC-5: stawianie (ostatnia mapa)", f"{ms:.1f} ms w sumie ({us:.1f} us na decal), najdluzszy tick {mx:.1f} ms" + (" (bieg zdjec - bez budzetu)" if photo else ""),
+                    "najdluzszy tick <= 15 ms (bieg zdjec - INFO)", None if photo else mx <= 15.0)
+        else:
+            rep.add("NBC-3: linia 'postawione'", "brak", "jest po planie przy wlaczonych drogach", False)
+        if rows:
+            r = rows[-1]
+            fv = re.search(r"klatki z drogami widocznymi: (\d+)(?: \(srednio ([0-9.]+) ms, mediana (\d+), p95 (\d+))?", r)
+            fs = re.search(r"; schowanymi: (\d+)(?: \(srednio ([0-9.]+) ms, mediana (\d+), p95 (\d+))?", r)
+            txt = (f"widoczne {fv.group(1)} klatek" + (f" (sr. {fv.group(2)} ms, p95 {fv.group(4)})" if fv.group(2) else "")) if fv else "widoczne -"
+            txt += (f"; schowane {fs.group(1)}" + (f" (sr. {fs.group(2)} ms, p95 {fs.group(4)})" if fs.group(2) else "")) if fs else "; schowane -"
+            rep.add("NBC-6: klatki z drogami widocznymi i schowanymi (ostatnia linia pomiaru)", txt, "INFO (koszt rysowania decali - porownanie sr. / p95)", None)
+        if spots:
+            rep.add("NBC-8: miejsca z najgestsza siecia (cele zdjec)", spots[-1][len(NBC_HEAD):][:300], "INFO (do pliku tools/drogi/zdjecia-drogi-boczne.json)", None)
+    st = 0
+    for s in rows:
+        mm = re.search(r"potkniecia: stawianie (\d+), widocznosc (\d+), zdejmowanie (\d+), tick (\d+), bez materialu (\d+)", s)
+        if mm:
+            st = max(st, sum(int(x) for x in mm.groups()))
+    rep.add("NBC-7: potkniecia (najwiecej w linii pomiaru) i linie ERROR in MapSideRoads*", f"potkniecia {st}, linii ERROR {len(errs)}", "0", st == 0 and not errs)
+    rep.show()
+    return 0
+
+
 # ============================================================ f5-ruda (noc 18.10, fala 5): ruda/zelazo pod KS - grupa nruda
 # Armoury/src/StartCalibration.Ruda.cs (linia "Ruda KS (f5-ruda): dzien N" co 7 dob od D - rece przy zlozach zelaza za ruda rynku), Bloomery.F5.cs (linia doby
 # "Ruda kredyt drewna (f5-ruda): dzien N" - kredyt kupcow na drewno dymarek), VillageTakings.F5WoodCredit; skutki z linii "Zelazo (lupy) (214)", "Ceny surowcow",
@@ -47860,6 +47966,8 @@ def main(argv):
         return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
     if group == "nbandy" and logp:
         return nbandy_main(logp, bdp)   # nbandy (noc 18.10, f8-bandy): limit band ROT x2 z ludzi puli wyrzutkow, puste narodziny, koszt AI band, doba realna wobec bazy (BanditLimit)
+    if group == "nboczne" and logp:
+        return nboczne_main(logp)   # nboczne (18.10, paczka f11-drogi): boczne drogi do dalszych wiosek - plan, decale, czas, klatki, potkniecia (MapSideRoads.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

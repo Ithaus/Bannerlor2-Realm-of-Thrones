@@ -371,6 +371,17 @@ namespace Armoury
                     Log.Error("MapRoadsProbe: komponent widoku nie laduje sie (proba " + _mapRoadsLoadFails + "/3)", e);
                 }
             }
+            // f11-drogi: boczne drogi do dalszych wiosek (klucz MapSideRoads domyslnie NIE albo plik-przelacznik autotestu) - osobna rejestracja przed wylacznikiem
+            // wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach drogi boczne nie startuja do konca sesji); przy NIE typ widoku sie nie laduje
+            if (_sideRoadsLoadFails < 3 && MapSideRoads.On)
+            {
+                try { SideRoadsTick(); }
+                catch (Exception e)
+                {
+                    _sideRoadsLoadFails++;
+                    Log.Error("MapSideRoads: komponent widoku nie laduje sie (proba " + _sideRoadsLoadFails + "/3)", e);
+                }
+            }
             // sw-zajazdy: zajazdy przy szlakach - osobna rejestracja widoku przed wylacznikiem wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach
             // zajazdy na mapie nie startuja do konca sesji; menu i plotki dzialaja dalej); przy kluczu RoadsideInns = off typ widoku sie nie laduje
             if (_innsLoadFails < 3 && Settings.Current.RoadsideInns)
@@ -407,6 +418,14 @@ namespace Armoury
         private static void RoadsideInnsTick()
         {
             RoadsideInnsView.EnsureRegistered();
+        }
+
+        private static int _sideRoadsLoadFails;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void SideRoadsTick()
+        {
+            MapSideRoadsView.EnsureRegistered();
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
