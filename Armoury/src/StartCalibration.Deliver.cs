@@ -24,12 +24,13 @@ namespace Armoury
         }
         // pamiec przydatnosci ziemi bloku (ziemia sie nie zmienia): L zajecia c (NaN - jeszcze nie liczone), L zboza; klucz - blok ziemi K (nowy K = od nowa)
         internal double[] LC; internal double LG = double.NaN; internal object LKey;
+        internal int LGen;                                 // r4-polnoc: KsTab.LandGen pamieci (zmiana klucza Ks Cold Land = przydatnosc od nowa)
 
         /// <summary>Przydatnosc ziemi zajecia c w tym bloku (LandEff zajec pola; regale - land2, a w bloku wsi gry przy typie wsi LandEff) - z pamieci bloku.</summary>
         internal double L(int c, string type)
         {
             var kb = K;
-            if (!ReferenceEquals(LKey, kb)) { LKey = kb; LC = null; LG = double.NaN; }
+            if (!ReferenceEquals(LKey, kb) || LGen != KsTab.LandGen) { LKey = kb; LC = null; LG = double.NaN; LGen = KsTab.LandGen; }
             if (LC == null) { LC = new double[KsTab.NC]; for (int i = 0; i < LC.Length; i++) LC[i] = double.NaN; }
             double v = LC[c];
             if (double.IsNaN(v))
@@ -44,7 +45,7 @@ namespace Armoury
         internal double LGrain(string type)
         {
             var kb = K;
-            if (!ReferenceEquals(LKey, kb)) { LKey = kb; LC = null; LG = double.NaN; }
+            if (!ReferenceEquals(LKey, kb) || LGen != KsTab.LandGen) { LKey = kb; LC = null; LG = double.NaN; LGen = KsTab.LandGen; }
             if (double.IsNaN(LG)) LG = KsTab.Land2(KsTab.CWheat, kb.O, type);
             return LG;
         }

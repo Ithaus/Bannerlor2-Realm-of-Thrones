@@ -6724,6 +6724,18 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationTownCrafts { get; set; } = true;
 
+        [SettingPropertyBool("Ks Self Feed First", HintText = "with Start Calibration: in the cold lands (the North, beyond the Wall, the Night's Watch lands, Skagos, the Iron Islands, Ib) a village first puts its hands to the food work that feeds the most mouths per hand on its own land - barley and oats, the byre, sheep and goats, fishing, the hunt - until its own people are fed, as far as its land and hands allow; only the hands left over follow the market (furs, wool, timber). What is still missing comes by cart and ship, as tribute to the Wall, or not at all. Off = every hand follows the price")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsSelfFeedFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ks Self Feed Everywhere", HintText = "with Ks Self Feed First: the same rule for every village in the world, not only in the cold lands (a silk, flax or horse village grows its own bread first); off = villages of the warm lands sell their crop and buy their bread at market")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsSelfFeedEverywhere { get; set; } = false;
+
+        [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt). Off = the old table")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsColdLand { get; set; } = true;
+
         [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: step by step over 60 days, up to about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool WhaleMeatFromWhalersOnly { get; set; } = true;
@@ -8616,6 +8628,9 @@ namespace Armoury
             s.KsVillageBuyEvery2 = KsVillageBuyEvery2;
             s.KsGranaryRelease = KsGranaryRelease;
             s.StartCalibrationTownCrafts = StartCalibrationTownCrafts;
+            s.KsSelfFeedFirst = KsSelfFeedFirst;
+            s.KsSelfFeedEverywhere = KsSelfFeedEverywhere;
+            s.KsColdLand = KsColdLand;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;

@@ -276,6 +276,7 @@ namespace Armoury
         {
             try
             {
+                SyncColdLand();                                       // r4-polnoc: tabela swiata (zimna ziemia) przed rozwiazaniem stanu zastosowanego
                 EnsureLand();
                 ResolvePending();
                 if (_state == StateApplied) ResolveLive();
@@ -332,6 +333,7 @@ namespace Armoury
                 }
                 _offLogged = false;
                 if (Campaign.Current == null) return;
+                SyncColdLand();                                       // r4-polnoc: klucz Ks Cold Land do tabeli swiata przed Planem i produkcja okregow
                 EnsureLand();
                 if (!LandReady) { KeysIdle(day); return; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
