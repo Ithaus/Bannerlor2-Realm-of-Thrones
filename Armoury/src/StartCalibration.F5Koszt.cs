@@ -27,6 +27,10 @@ namespace Armoury
     ///    na tych samych danych - linia bez czasu ta sama.
     /// Linia "KS: koszt f5 dzien N" co 7 dob (D+7k+3, stan zastosowany, linie): czas ostatniej diagnozy na watku glownym i na watku, bloki reguly z dochodem z diagnozy,
     /// probka zgodne/rozne, bledy watku, kontrola. Zamknieta ekonomia: zadnej monety ani towaru - tylko mniej i gdzie indziej liczone te same liczby. Zapis: bez zmian.
+    /// Recenzja (18.10): siatka bezpieczenstwa dziala tez w grze Jeffa (ciche logi daja linie tylko w dobie dzien % 7 == 0, a doba D+7k+3 trafiala w nia tylko przy
+    /// D % 7 == 5): kontrola diagnozy raz na sesje i bledy watku - co dobe, niezaleznie od cichych logow; linia "KS: koszt f5" przy cichych logach w dobie linii co 7 dob;
+    /// roznica (probka 1/64 reguly albo kontrola diagnozy) - blok bierze liczby starego rachunku, do konca sesji diagnoza i regula starym rachunkiem (F5Fallback, jak klucz
+    /// NIE) i jednorazowa linia "KS: koszt f5 ROZNICA dzien N" bez wzgledu na ciche logi.
     /// </summary>
     internal static partial class StartCalibration
     {
@@ -39,6 +43,10 @@ namespace Armoury
         private static bool _f5Checked; private static string _f5Check = "jeszcze nie (pierwsza doba D+7k+3 po diagnozie)";
         // watek z puli: pokolenie sesji (linia z poprzedniej sesji odrzucona), praca w toku, bledy i linie zrobione na watku glownym (poprzednia jeszcze w toku)
         private static int _f5Gen, _f5Busy, _f5Err, _f5Inline; private static string _f5ErrMsg;
+        // recenzja f5-koszt: roznica (probka reguly albo kontrola diagnozy) - do konca sesji stary rachunek diagnozy i reguly (doba roznicy, -1 = szybki); bledy watku od
+        // ostatniej linii; doba ostatniej linii "KS: koszt f5" (ciche logi - linia w dobie linii co 7 dob)
+        private static int _f5OffDay = -1, _f5ErrLine, _f5LineDay = -1; private static double _f5ChkMs = -1;
+        private static bool F5Off { get { return _f5OffDay >= 0; } }
 
         /// <summary>f5-koszt: nowa kampania / wczytanie (z RuleReset).</summary>
         private static void F5Reset()
@@ -47,6 +55,22 @@ namespace Armoury
             _f5RuleReuse = _f5RuleOk = _f5RuleBad = _f5RuleSample = 0;
             _f5DiagMs = -1; _f5WorkMs = -1; _f5DiagDay = -1; _f5DiagFast = false; _f5Inline = 0;
             _f5Checked = false; _f5Check = "jeszcze nie (pierwsza doba D+7k+3 po diagnozie)";
+            _f5OffDay = -1; _f5ErrLine = 0; _f5LineDay = -1; _f5ChkMs = -1;
+        }
+
+        /// <summary>Recenzja f5-koszt: roznica szybkiego rachunku wobec starego - od tej chwili do konca sesji diagnoza A7 i regula A7 starym rachunkiem (dokladnie jak klucz
+        /// Ks Cost Fast2 NIE: te same wyniki co przed paczka, tylko dluzsza doba kroku) i jedna linia od razu, niezaleznie od cichych logow (Jeff widzi ja w swoim logu).
+        /// Funkcja gry dziala dalej - wylaczony jest tylko skrot liczenia.</summary>
+        private static void F5Fallback(int today, string why)
+        {
+            if (F5Off) return;
+            _f5OffDay = today;
+            try
+            {
+                Log.Info(PK + "koszt f5 ROZNICA dzien " + today + " | " + why + " | do konca sesji diagnoza A7 i regula A7 liczone starym rachunkiem (jak klucz Ks Cost Fast2 NIE)"
+                         + " - te same wyniki co przed paczka f5-koszt, tylko dluzsza doba kroku A7; zglosic (test NKS-9f).");
+            }
+            catch { }
         }
 
         /// <summary>Leniwy wiersz wartosci zajec przy zestawie cen px (NaN - jeszcze nie liczone) - ten sam, co rowOf w F4A7Old.</summary>
@@ -425,57 +449,76 @@ namespace Armoury
         }
 
         // ============================================================ F2: regula A7 - dochody z diagnozy tej doby
-        /// <summary>RuleDaily (doba kroku, dochody z diagnozy): licznik i probka 1/64 - stary rachunek (IncomeV / Income, kandydaci w kolejnosci listy) wobec pamieci bloku.</summary>
-        private static void F5RuleNote(LiveBlock b, string type, int cur, double[] px, double[] vRow, double incCur, double incBest, int best)
+        /// <summary>RuleDaily (doba kroku, dochody z diagnozy): licznik i probka 1/64 - stary rachunek (IncomeV / Income, kandydaci w kolejnosci listy) wobec pamieci bloku.
+        /// Recenzja: przy roznicy regula bierze dla tego bloku liczby starego rachunku (ref), a od nastepnego bloku do konca sesji liczy starym rachunkiem (F5Fallback).</summary>
+        private static void F5RuleNote(LiveBlock b, string type, int cur, double[] px, double[] vRow, int today, ref double incCur, ref double incBest, ref int best)
         {
             _f5RuleReuse++;
             if ((++_f5RuleSample & 63) != 0) return;
+            double ic, ib = double.NegativeInfinity; int bs = -1;
             try
             {
-                double ic = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px), ib = double.NegativeInfinity; int bs = -1;
+                ic = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px);
                 foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > ib) { ib = v; bs = c; } }
-                if (SameD(ic, incCur) && SameD(ib, incBest) && bs == best) _f5RuleOk++; else _f5RuleBad++;
             }
-            catch (Exception e) { _f5RuleBad++; Stumble("F5RuleNote", e); }
+            catch (Exception e)
+            {
+                _f5RuleBad++; Stumble("F5RuleNote", e);
+                F5Fallback(today, "regula A7: probka 1/64 - stary rachunek rzucil " + e.GetType().Name + " (blok zostal z dochodem z diagnozy)");
+                return;
+            }
+            if (SameD(ic, incCur) && SameD(ib, incBest) && bs == best) { _f5RuleOk++; return; }
+            _f5RuleBad++;
+            string why = "regula A7: probka 1/64 - dochod z diagnozy biezacy " + incCur.ToString("R", Inv) + " / najlepszy inny " + incBest.ToString("R", Inv) + " (zajecie " + best + ")"
+                         + ", stary rachunek " + ic.ToString("R", Inv) + " / " + ib.ToString("R", Inv) + " (zajecie " + bs + ") - blok wzial liczby starego rachunku";
+            incCur = ic; incBest = ib; best = bs;
+            F5Fallback(today, why);
         }
 
         // ============================================================ kontrola i linia "KS: koszt f5"
-        /// <summary>Po linii doby KS (poza czasem doby KS), stan zastosowany, linie, klucz, doba D+7k+3: raz na sesje stary rachunek diagnozy A7 wobec szybkiego na tych
-        /// samych danych (tylko odczyt; linia bez czasu ta sama) i linia "KS: koszt f5 dzien N" (liczniki od ostatniej linii).</summary>
+        /// <summary>Po linii doby KS (poza czasem doby KS), stan zastosowany, klucz - CO DOBE (recenzja: niezaleznie od cichych logow, ktore w grze Jeffa daja linie tylko
+        /// w dobie (dzien % 7 == 0) i z doba D+7k+3 trafialy razem tylko przy D % 7 == 5): bledy watku z puli od razu jako potkniecie; w dobie D+7k+3 raz na sesje stary rachunek
+        /// diagnozy A7 wobec szybkiego na tych samych danych (tylko odczyt; linia bez czasu ta sama; ROZNA - stary rachunek do konca sesji, F5Fallback); linia
+        /// "KS: koszt f5 dzien N" (liczniki od ostatniej linii) przy liniach w dobie D+7k+3, a przy cichych logach w dobie linii co najmniej 7 dob po poprzedniej.</summary>
         private static void F5Check(int today, int day)
         {
-            if (!SwCostFast2 || _state != StateApplied || !LogGate.Lines) return;
+            if (!SwCostFast2 || _state != StateApplied) return;
             int d0 = DDay;
-            if (d0 < 0 || today <= d0 || ((today - d0) % StepDays) != 3) return;
+            if (d0 < 0 || today <= d0) return;
             try
             {
-                double chkMs = -1;
-                if (!_f5Checked && F4A7On && _f5DiagFast)
+                int err = Interlocked.Exchange(ref _f5Err, 0);
+                if (err > 0) { _f5ErrLine += err; Stumble("F4A7Async(watek)", null); }   // linia potkniecia raz na sesje (Stumble), niezaleznie od cichych logow
+                bool ckDay = ((today - d0) % StepDays) == 3;
+                if (ckDay && !_f5Checked && F4A7On && _f5DiagFast && !F5Off)
                 {
                     _f5Checked = true;
                     long q0 = Stopwatch.GetTimestamp();
                     var s = Settings.Current; bool rule = s != null && s.StartCalibrationSwitchRule;
                     string a = F4A7Old(today, d0, rule, true), b = F4A7Fast(today, d0, rule, true, false);
-                    chkMs = (Stopwatch.GetTimestamp() - q0) * 1000.0 / Stopwatch.Frequency;
+                    _f5ChkMs = (Stopwatch.GetTimestamp() - q0) * 1000.0 / Stopwatch.Frequency;
                     string na = F5NoTime(a), nb = F5NoTime(b);
                     if (na == nb) _f5Check = "zgodna TAK (doba " + today + ", znakow " + na.Length + ")";
                     else
                     {
                         int i = 0; while (i < na.Length && i < nb.Length && na[i] == nb[i]) i++;
                         _f5Check = "ROZNA (doba " + today + ", pierwsza roznica na znaku " + i + ": stary '" + F5Cut(na, i) + "' / szybki '" + F5Cut(nb, i) + "')";
+                        F5Fallback(today, "kontrola diagnozy A7: " + _f5Check);
                     }
                 }
-                int err = Volatile.Read(ref _f5Err);
-                if (err > 0) Stumble("F4A7Async(watek)", null);
-                double wm = Volatile.Read(ref _f5WorkMs);
+                if (!LogGate.Lines) return;
+                if (!ckDay && !(LogGate.On && (_f5LineDay < 0 || today - _f5LineDay >= StepDays))) return;
+                _f5LineDay = today;
+                double wm = Volatile.Read(ref _f5WorkMs), chkMs = _f5ChkMs;
                 Log.Info(PK + "koszt f5 dzien " + day + " | klucz Ks Cost Fast2 TAK | diagnoza A7 (f4-pomiary): ostatnia doba " + (_f5DiagDay >= 0 ? _f5DiagDay.ToString() : "-")
                          + ", watek glowny " + (_f5DiagMs >= 0 ? _f5DiagMs.ToString("0.00", Inv) : "-") + " ms, watek z puli " + (wm >= 0 ? wm.ToString("0.00", Inv) : "-") + " ms"
-                         + " (" + (_f5DiagFast ? "szybka" : "stara") + ", na miejscu - poprzednia w toku " + _f5Inline + ", bledy watku " + err + (err > 0 && _f5ErrMsg != null ? " - " + _f5ErrMsg : "") + ")"
+                         + " (" + (_f5DiagFast ? "szybka" : "stara") + ", na miejscu - poprzednia w toku " + _f5Inline + ", bledy watku " + _f5ErrLine + (_f5ErrLine > 0 && _f5ErrMsg != null ? " - " + _f5ErrMsg : "") + ")"
                          + " | regula A7: dochody z diagnozy tej doby " + _f5RuleReuse + " blokow, probka 1/64 starym rachunkiem: zgodne " + _f5RuleOk + ", rozne " + _f5RuleBad
                          + " | kontrola diagnozy (stary rachunek wobec szybkiego na tych samych danych, raz na sesje): " + _f5Check
                          + (chkMs >= 0 ? ", czas kontroli " + chkMs.ToString("0.0", Inv) + " ms poza czasem doby KS" : "")
+                         + (F5Off ? " | po roznicy stary rachunek od doby " + _f5OffDay : "")
                          + " | tylko szybsze liczenie tych samych liczb - zadnej zmiany gry.");
-                _f5RuleReuse = _f5RuleOk = _f5RuleBad = 0; Interlocked.Exchange(ref _f5Err, 0); _f5Inline = 0;
+                _f5RuleReuse = _f5RuleOk = _f5RuleBad = 0; _f5ErrLine = 0; _f5Inline = 0; _f5ChkMs = -1;
             }
             catch (Exception e) { Stumble("F5Check", e); }
         }

@@ -236,7 +236,8 @@ namespace Armoury
                         double incCur, incBest = double.NegativeInfinity; int best = -1;
                         // f5-koszt (klucz Ks Cost Fast2): te same dochody przy cenach gry policzyla dzis diagnoza A7 (ten sam wiersz cen miasta, to samo zajecie biezace, ta sama
                         // lista kandydatow i kolejnosc) - bez liczenia drugi raz; probka 1/64 sprawdza je starym rachunkiem (linia "KS: koszt f5")
-                        if (f5g && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, incCur, incBest, best); }
+                        // (recenzja: po roznicy w probce F5Fallback - od nastepnego bloku do konca sesji starym rachunkiem; blok z roznica bierze liczby starego rachunku)
+                        if (f5g && !F5Off && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, today, ref incCur, ref incBest, ref best); }
                         else
                         {
                             incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px);

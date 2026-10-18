@@ -57,7 +57,7 @@ namespace Armoury
             _f4A7Day = today;
             // f5-koszt (klucz Ks Cost Fast2): ten sam rachunek i ta sama linia (poza czasem) - na watku glownym przeglad blokow, L i renta x ha kazdego kandydata raz i zestaw G
             // (dochody zapamietane w bloku dla reguly A7 tej doby), reszta pomiaru i linia na watku z puli (StartCalibration.F5Koszt.cs). Wylaczony - stary rachunek co do linii.
-            if (SwCostFast2) F4A7Async(today, d0, rule, step);
+            if (SwCostFast2 && !F5Off) F4A7Async(today, d0, rule, step);       // recenzja: po roznicy (F5Fallback) stary rachunek do konca sesji
             else Log.Info(F4A7Old(today, d0, rule, step));
         }
 
