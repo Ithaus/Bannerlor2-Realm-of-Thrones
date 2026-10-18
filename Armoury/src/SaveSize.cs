@@ -32,7 +32,8 @@ namespace Armoury
     ///     nie zna: stary klucz ma "" = jak zapis bez danych tego klucza (arm_aiwear: sztuki AI bez zapisu obicia - sprawne; arm_recruitkit: notable bez
     ///     zapisanych kompletow - ochotnik "z tym, co ma"). Dlatego na liscie tylko te dwa klucze (lacznie ok. 57% naszego tekstu), a nie ksiega ludzi,
     ///     kiesy czy zbrojownie zalog (starszy DLL zgubilby ludzi, zloto i sztuki). Przed cofnieciem DLL ponizej tej paczki: wylaczyc Save Compact,
-    ///     zapisac gre, dopiero potem podmienic DLL (CHANGELOG).
+    ///     zapisac gre, dopiero potem podmienic DLL (CHANGELOG). Recenzja: klucz DOMYSLNIE WYLACZONY - wgranie zbiorcze nocy moze wymagac cofniecia DLL
+    ///     do .bak, a w Ironman nie ma zapisu do powrotu; wlaczyc, gdy cofniecie ponizej tej paczki nie bedzie juz potrzebne.
     ///     Zysk w pliku (pomiar na tym samym zapisie): oba klucze 705 KB pliku -> ok. 500 KB (gra kompresuje szybko, my dokladniej); napisy zapisu w pamieci
     ///     4.2 MB -> 0.65 MB (mniej kawalkow po 8000 znakow do skrotow, kodowania i dekodowania gry).
     ///  3. QuietLogMore (LogGate.DropMore) - patrz LogGate.cs.

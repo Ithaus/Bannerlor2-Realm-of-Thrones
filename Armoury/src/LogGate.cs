@@ -131,23 +131,27 @@ namespace Armoury
         // tylko wpis w pliku. Tylko linia doby (przedrostki z ": dzien" itp.) - linie startu sesji i wczytania o tych samych nazwach zostaja. Cadencja jak
         // zestaw 1 (Lines: takt doby S+1 za dobe S, S podzielne przez QuietLogEveryDays); autotest i tryb nie rozpoznany - zawsze pelne; linie z "ERROR"
         // albo "BLAD" nigdy nie znikaja.
+        // Recenzja zapis-d4: na liscie TYLKO linie pisane CODZIENNIE - filtr zna jedna doba S+1 na N dob, wiec linia z wlasna rzadsza kadencja ginie prawie zawsze:
+        // "Skale ludzi wedlug krolestw (GL0)" (PeopleScale - doba % 7 == 0, a takt S+1 to doba % 7 == 1 - nie wychodzila nigdy) i "Zatkane wsie (przyklad)"
+        // (VillageClogDiag co 5 dob - zgodnosc z taktem raz na 35 dob) wypadly; obie i tak rzadkie, zysk zaden. 43 przedrostki; checker nzapis ZAP-Q3 pilnuje
+        // na logu pelnym, ze kazdy przedrostek listy jest dzienny.
         private static readonly string[] More =
         {
             "Kiesy rozbitych (3.2): dzien", "Wedrowcy BK - prawdziwy towar (36b): dzien", "Wedrowcy BK - towar (3.6): dzien", "Wedrowcy BK: dzien",
             "Wozy w miastach: dzien", "Zaopatrzenie zamkow (171): dzien", "Spoils - klan najemnikow: dzien",
             "Spoils - naprawa u kwatermistrza: dzien", "Spoils of War (128): dzien", "Dosypka z niczego (RealisticBannerlord): dzien", "Zold konnych (160",
-            "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Skale ludzi wedlug krolestw (GL0): dzien", "Balans krolestw (175): dzien",
+            "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Balans krolestw (175): dzien",
             "Zaopatrzenie BK - kara morale (W1): dzien", "Rzemieslnicy BK (147): dzien", "Morale AI (183d): dzien",
             "ROT szczelnosc (3.7): dzien", "Rynek surowcow: zapasy na targach miast", "Rezerwa napraw AI - pamiec dopasowania (F6): dzien",
             "Pule ochotnikow (171): dzien", "PodazPopyt: kupcy wywiezli", "Miasta bez strzal - powod (172): dzien", "Warsztaty wedlug krainy (E6/0",
             "Drobne z niczego (3.10): dzien", "Konie rekrutow (160", "Ceny hurtu (09.10", "Stajnia AI (sklad7b-p): dzien", "Wierzchowce kanonu (208): dzien",
             "Cwiczenia (171): dzien", "Kara za przegrana (D11-1): dzien", "Mineraly (dubel BK): dzien", "Papirus wedlug klimatu (T8): dzien",
             "HouseLevies: dzien", "WPLYW: stan", "Karawany (kierunek): dzien", "Ludzie (regiony): dzien", "Dezercja AI (183): dzien",
-            "Zatkane wsie (wozy w drodze): dzien", "Zatkane wsie (przyklad): dzien", "Spojnosc armii (AC wiek): dzien", "Ochotnicy (diagnoza):",
+            "Zatkane wsie (wozy w drodze): dzien", "Spojnosc armii (AC wiek): dzien", "Ochotnicy (diagnoza):",
             "Musztra (gracz): dzien", "Dowoz (wozy): dzien"
         };
         private static long _moreDropped;
-        // przedrostki zestawu 2 wedlug pierwszej litery - Log.Info sprawdza tylko te kilka, nie wszystkie 45 (wolane przy kazdej linii logu)
+        // przedrostki zestawu 2 wedlug pierwszej litery - Log.Info sprawdza tylko te kilka, nie wszystkie 43 (wolane przy kazdej linii logu)
         private static readonly Dictionary<char, string[]> MoreByFirst = BuildMoreByFirst();
 
         private static Dictionary<char, string[]> BuildMoreByFirst()

@@ -1167,8 +1167,10 @@ Uzycie (Python 3, tylko odczyt):
                     spakowaniu <= 5120 KB (ostatni zapis; tekst przed spakowaniem INFO), ZAP-5 spakowanie >= x3.0, ZAP-6 czas pakowania <= 500 ms (najwiecej), ZAP-7 bledy:
                     "ERROR in SaveSize"/"ERROR in SaveText" 0, potkniecia 0, "BLAD probnego odczytu" 0, ZAP-8 klucze spakowane wczytane z zapisu bez bledu (brak - INFO),
                     ZAP-9 najwieksze klucze (INFO), ZAP-10 plik zapisu i czas zapisu (INFO), ZAP-Q0 ciche logi wiecej zgodne z trybem (autotest - "dzialaja: nie - pelne"),
-                    ZAP-Q1 tryb pelny: pominietych linii 0 w kazdej linii zapisu, ZAP-Q2 tryb gry: linie zestawu 2 rzadziej niz codziennie (INFO). Log sprzed paczki
-                    (np. Armoury-2026-10-17_17-55-14.log): wszystkie wiersze INFO / brak linii, bez wyjatku.
+                    ZAP-Q1 tryb pelny: pominietych linii 0 w kazdej linii zapisu, ZAP-Q2 tryb gry: linie zestawu 2 rzadziej niz codziennie (INFO), ZAP-Q3 (recenzja) tryb
+                    pelny, bieg >= 14 dob: kazdy przedrostek ZAP_MORE z liniami w >= 80% dob (dob = linie "Profil doby"; rzadsza linia na liscie - NIE, bo filtr doby S+1
+                    gubi ja prawie zawsze; mniej dob - INFO). Save Compact domyslnie [wyl] (recenzja: cofniecie DLL) - ZAP-3/5 wtedy INFO. Log sprzed paczki
+                    (np. Armoury-2026-10-17_17-55-14.log): wiersze INFO / brak linii (ZAP-Q3 liczy sie i tam - lista wobec linii logu pelnego), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -39342,22 +39344,24 @@ def nherby_main(logp):
 
 # ============================================================ zapis-d4 (noc 17/18.10, CO-ZOSTALO D4): rozmiar zapisu i cichsze logi - grupa nzapis
 # Armoury/src/SaveSize.cs (linie "Zapis (D4)" i "Zapis i logi (D4)"), SaveText.cs (pakowanie pod "<klucz>_z"), LogGate.cs (zestaw 2 cichych logow - lista ZAP_MORE
-# MUSI byc ta sama co LogGate.More).
+# MUSI byc ta sama co LogGate.More; recenzja: bez linii o wlasnej rzadszej kadencji - "Skale ludzi wedlug krolestw (GL0)", "Zatkane wsie (przyklad)").
 ZAP_SESSION = "Zapis i logi (D4): "
 ZAP_SAVE = "Zapis (D4): "
 ZAP_SAVE_MARK = "Zbrojownie zalog (171): zapis - "   # linia GarrisonArmory.Export przy kazdym zapisie (nie linie wczytania "zapis zrobiony bez ..." / "zapis ma ...")
 ZAP_MORE = ("Kiesy rozbitych (3.2): dzien", "Wedrowcy BK - prawdziwy towar (36b): dzien", "Wedrowcy BK - towar (3.6): dzien", "Wedrowcy BK: dzien",
             "Wozy w miastach: dzien", "Zaopatrzenie zamkow (171): dzien", "Spoils - klan najemnikow: dzien",
             "Spoils - naprawa u kwatermistrza: dzien", "Spoils of War (128): dzien", "Dosypka z niczego (RealisticBannerlord): dzien", "Zold konnych (160",
-            "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Skale ludzi wedlug krolestw (GL0): dzien", "Balans krolestw (175): dzien",
+            "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Balans krolestw (175): dzien",
             "Zaopatrzenie BK - kara morale (W1): dzien", "Rzemieslnicy BK (147): dzien", "Morale AI (183d): dzien",
             "ROT szczelnosc (3.7): dzien", "Rynek surowcow: zapasy na targach miast", "Rezerwa napraw AI - pamiec dopasowania (F6): dzien",
             "Pule ochotnikow (171): dzien", "PodazPopyt: kupcy wywiezli", "Miasta bez strzal - powod (172): dzien", "Warsztaty wedlug krainy (E6/0",
             "Drobne z niczego (3.10): dzien", "Konie rekrutow (160", "Ceny hurtu (09.10", "Stajnia AI (sklad7b-p): dzien", "Wierzchowce kanonu (208): dzien",
             "Cwiczenia (171): dzien", "Kara za przegrana (D11-1): dzien", "Mineraly (dubel BK): dzien", "Papirus wedlug klimatu (T8): dzien",
             "HouseLevies: dzien", "WPLYW: stan", "Karawany (kierunek): dzien", "Ludzie (regiony): dzien", "Dezercja AI (183): dzien",
-            "Zatkane wsie (wozy w drodze): dzien", "Zatkane wsie (przyklad): dzien", "Spojnosc armii (AC wiek): dzien", "Ochotnicy (diagnoza):",
+            "Zatkane wsie (wozy w drodze): dzien", "Spojnosc armii (AC wiek): dzien", "Ochotnicy (diagnoza):",
             "Musztra (gracz): dzien", "Dowoz (wozy): dzien")
+# recenzja zapis-d4: w zestawie 2 tylko linie DZIENNE (filtr zna jedna dobe na N) - ZAP-Q3 na logu pelnym: kazdy przedrostek z liniami w >= tylu dobach
+ZAP_MIN_DAILY = 0.8
 ZAP_MAX_WRITTEN_KB = 5120.0
 ZAP_MIN_RATIO = 3.0
 ZAP_MAX_PACK_MS = 500.0
@@ -39366,7 +39370,7 @@ ZAP_MAX_PACK_MS = 500.0
 def nzapis_main(logp):
     """nzapis (noc 17/18.10, paczka zapis-d4): rozmiar naszych kluczy w zapisie (linia "Zapis (D4)" po kazdym zapisie gry), pakowanie dwoch najwiekszych kluczy
     pod "<klucz>_z" z probnym odczytem (Save Compact), wczytanie spakowanych kluczy (linia startu "Zapis i logi (D4)") i zestaw 2 cichych logow (Quiet Log More).
-    Wejscie: log Armoury (strumieniowo). Progi ZAP-0..ZAP-10, ZAP-Q0..Q2 - opis w naglowku pliku (--grupa nzapis). Log bez linii paczki: INFO, bez wyjatku."""
+    Wejscie: log Armoury (strumieniowo). Progi ZAP-0..ZAP-10, ZAP-Q0..Q3 - opis w naglowku pliku (--grupa nzapis). Log bez linii paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("ZAP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -39376,6 +39380,7 @@ def nzapis_main(logp):
     errs, bad_probe = [], 0
     more_cnt = {p: 0 for p in ZAP_MORE}
     more_days = {p: set() for p in ZAP_MORE}
+    more_di = {p: set() for p in ZAP_MORE}   # ZAP-Q3: indeks doby (ile linii "Profil doby" przed linia) - takze dla linii bez "dzien N"
     prof_days = set()
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -39407,6 +39412,7 @@ def nzapis_main(logp):
             for p in ZAP_MORE:
                 if s.startswith(p):
                     more_cnt[p] += 1
+                    more_di[p].add(len(prof_days))
                     d = num(r"dzien (\d+)", s)
                     if d is not None:
                         more_days[p].add(d)
@@ -39427,7 +39433,7 @@ def nzapis_main(logp):
         keys = re.findall(r"\((Save Size Log|Save Compact|Quiet Log More)\) (\[WL\]|\[wyl\])", st)
         thr = g(r"od (\d+) KB", st)
         rep.add("ZAP-1: stan kluczy (ostatnia sesja)", ", ".join(f"{k} {v}" for k, v in keys) + (f"; prog {thr} KB" if thr is not None else ""),
-                "INFO (domyslnie wszystkie [WL])", None)
+                "INFO (domyslnie Save Size Log [WL], Save Compact [wyl] - recenzja, Quiet Log More [WL])", None)
     log_on = st is not None and "(Save Size Log) [WL]" in st
     # ZAP-2 linia przy kazdym zapisie
     if not saves:
@@ -39515,6 +39521,13 @@ def nzapis_main(logp):
         else:
             rep.add("ZAP-Q1: tryb pelny - linie zestawu 2", f"linii {sum(more_cnt.values())} ({seen} z {len(ZAP_MORE)} przedrostkow, {nd} dob)", "INFO (bez linii zapisu D4)", None)
         rep.add("ZAP-Q2: tryb gry - linie zestawu 2 rzadziej", "tryb pelny", "INFO", None)
+        # ZAP-Q3 (recenzja): lista zestawu 2 = tylko linie dzienne; linia z wlasna rzadsza kadencja (np. co 7 albo co 5 dob) w trybie gry ginelaby prawie zawsze
+        if nd >= 14 and seen > 0:
+            sparse = [f"{p} ({len(more_di[p])}/{nd})" for p in ZAP_MORE if more_cnt[p] > 0 and len(more_di[p]) < ZAP_MIN_DAILY * nd]
+            rep.add("ZAP-Q3: tryb pelny - kazdy przedrostek zestawu 2 jest dzienny", f"przedrostkow z liniami {seen} z {len(ZAP_MORE)}, rzadszych niz "
+                    f"{ZAP_MIN_DAILY:.0%} dob: {len(sparse)}" + (f" ({', '.join(sparse[:4])})" if sparse else ""), "0 (rzadsza linia nie moze byc w LogGate.More)", not sparse)
+        else:
+            rep.add("ZAP-Q3: tryb pelny - kazdy przedrostek zestawu 2 jest dzienny", f"dob {nd}, przedrostkow z liniami {seen}", "INFO (bieg < 14 dob albo brak linii)", None)
     else:
         rep.add("ZAP-Q1: tryb pelny", f"tryb {mode}", "INFO", None)
         daily = [p for p in ZAP_MORE if len(more_days[p]) > 0.5 * nd and nd >= 14]

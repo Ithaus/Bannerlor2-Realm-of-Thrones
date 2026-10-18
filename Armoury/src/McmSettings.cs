@@ -4924,20 +4924,20 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public int QuietLogEveryDays { get; set; } = 7;
 
-        [SettingPropertyBool("Quiet Log More", HintText = "with quiet measurement logs: 45 more daily diagnostic-only lines that no test tool reads (village woodlots, wandering Banner Kings parties, castle supplies, craftsmen, drill of the player, deserters, clogged villages and the like) are also written on one day in every N; errors and all lines the tests read stay daily, automatic tests always write everything (off = these lines every day, as before)")]
+        [SettingPropertyBool("Quiet Log More", HintText = "with quiet measurement logs: 43 more daily diagnostic-only lines that no test tool reads (village woodlots, wandering Banner Kings parties, castle supplies, craftsmen, drill of the player, deserters, clogged villages and the like) are also written on one day in every N; errors and all lines the tests read stay daily, automatic tests always write everything (off = these lines every day, as before)")]
         [SettingPropertyGroup("Grateful villages")]
         public bool QuietLogMore { get; set; } = true;
 
         [SettingPropertyBool("Save Size Log", HintText = "after every save the log gets one line with the size of every piece of Armoury data in the save, the size of the save file and how long saving took (off = no such line)")]
-        [SettingPropertyGroup("Grateful villages")]
+        [SettingPropertyGroup("Save files")]
         public bool SaveSizeLog { get; set; } = true;
 
-        [SettingPropertyBool("Save Compact", HintText = "the two largest pieces of Armoury data in the save - wear of the AI lords' gear and the kits that notables hold for their volunteers - are written compressed (about 6 times smaller in memory, a little smaller on disk); every compressed piece is read back and compared before it is written, and anything that does not match is written the old way. Saves made with it still load when it is off. Before going back to an Armoury version older than this one, turn it off and save first - an older version does not read the compressed pieces (AI gear would count as unworn, notables would hold no kits)")]
-        [SettingPropertyGroup("Grateful villages")]
-        public bool SaveCompact { get; set; } = true;
+        [SettingPropertyBool("Save Compact", HintText = "off by default. The two largest pieces of Armoury data in the save - wear of the AI lords' gear and the kits that notables hold for their volunteers - are written compressed (about 6 times smaller in memory, a little smaller on disk); every compressed piece is read back and compared before it is written, and anything that does not match is written the old way. Saves made with it still load when it is off. Turn it on only once you no longer expect to go back to an older Armoury version: an older version does not read the compressed pieces (AI gear would count as unworn, notables would hold no kits). To go back anyway, turn it off and save first")]
+        [SettingPropertyGroup("Save files")]
+        public bool SaveCompact { get; set; } = false;
 
         [SettingPropertyInteger("Save Compact Min Kb", 8, 4096, "0", HintText = "with Save Compact: only a piece of data larger than this many kilobytes of text is compressed (8 to 4096)")]
-        [SettingPropertyGroup("Grateful villages")]
+        [SettingPropertyGroup("Save files")]
         public int SaveCompactMinKb { get; set; } = 64;
 
         [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
