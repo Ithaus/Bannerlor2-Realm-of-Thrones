@@ -3136,13 +3136,21 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int RaidRefugeesMessageMin { get; set; } = 500;
 
-        [SettingPropertyFloatingInteger("Raid Refugees Town Intake", 0.000f, 0.200f, "0.000", HintText = "how many new raid refugees a town takes in a day, as a share of its own people (0.01 = one in a hundred); the people of the first village that comes to it in a day are always taken in, the rest wait in their own land and come on the following days, so that refugees who gathered over a whole season do not all move into the towns on the one day the towns first can take them in. People driven from a village whose refugees already live in the town join them at once. 0 = no limit (all on one day)")]
+        [SettingPropertyFloatingInteger("Raid Refugees Town Intake", 0.000f, 0.200f, "0.000", HintText = "how many new raid refugees a town takes in a day, as a share of its own people (0.01 = one in a hundred); the people of the first village that comes to it in a day are always taken in, the rest wait in their own land and come on the following days, so that refugees who gathered over a whole season do not all move into the towns on the one day the towns first can take them in. People driven from a village whose refugees already live in the town join them at once. With Raid Refugees Intake Meter on (the default) this daily intake counts everyone who comes, the first village comes whole only up to Raid Refugees Intake First Mult times the intake and newly driven people wait for room like the rest. 0 = no limit (all on one day)")]
         [SettingPropertyGroup("Iron Bank")]
         public float RaidRefugeesTownIntake { get; set; } = 0.01f;
 
         [SettingPropertyBool("Famine Shared Village Refugees", HintText = "Realm of Thrones places a few villages on the map twice (two settlements share one village). The refugees of such a village eat from the granaries of the land they stay in and go hungry when those granaries run out, like the refugees of every other village. Works only with Famine Enabled. Off = the granaries never feed them and they never starve (as before)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool FamineSharedVillageRefugees { get; set; } = true;
+
+        [SettingPropertyBool("Raid Refugees Intake Meter", HintText = "raid refugees move into a town no faster than Raid Refugees Town Intake a day, counting everyone who comes that day: the people of new villages, the rest of a village that came only in part, and the people newly driven from a village whose refugees already live there. A village whose people do not all fit comes in part and the rest wait in their own land (eating from its granaries) and follow on the next days, the longest waiting first; the first village that comes to a town in a day is taken in whole only when it is no larger than Raid Refugees Intake First Mult times the daily intake. Those waiting go home first when their land is quiet again, and a siege of the town keeps in its walls only those already inside. A town too small to take in even one person a day is passed over and the village goes to the next town within reach. Off = the first village of a day always comes in whole and newly driven people join their kin in the town at once (as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool RaidRefugeesIntakeMeter { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Raid Refugees Intake First Mult", 1.00f, 10.00f, "0.0", HintText = "the first village that comes to a town in a day is taken in whole when its people are at most this many times the town's daily intake (2 = twice Raid Refugees Town Intake); a larger village comes in parts over the following days. Works only with Raid Refugees Intake Meter")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float RaidRefugeesIntakeFirstMult { get; set; } = 2f;
 
         [SettingPropertyBool("People Origin Enabled", HintText = "every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before")]
         [SettingPropertyGroup("Iron Bank")]
@@ -8349,6 +8357,8 @@ namespace Armoury
             s.RaidRefugeesMessageMin = RaidRefugeesMessageMin;
             s.RaidRefugeesTownIntake = RaidRefugeesTownIntake;
             s.FamineSharedVillageRefugees = FamineSharedVillageRefugees;
+            s.RaidRefugeesIntakeMeter = RaidRefugeesIntakeMeter;
+            s.RaidRefugeesIntakeFirstMult = RaidRefugeesIntakeFirstMult;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;

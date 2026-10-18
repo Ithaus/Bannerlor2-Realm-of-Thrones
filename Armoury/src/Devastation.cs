@@ -782,7 +782,7 @@ namespace Armoury
                         {
                             double died = PeopleBook.RefugeesDie(v, away * q);
                             _dDied += died; away -= died;
-                            if (died > 0.0) RaidRefugees.Track(v, RaidRefugees.CDied);   // sw-uchodzcy: smierc w drodze takze w miescie pobytu (ta sama stopa)
+                            if (died > 0.0) RaidRefugees.Track(v, RaidRefugees.CDied, died);   // sw-uchodzcy: smierc w drodze takze w miescie pobytu (ta sama stopa); f4-uchodzcy: zmarli (odmierzanie)
                         }
                         if (!(away > 0.0)) continue;
                         var region = OutlawLaw.RegionFor(v.Settlement);
@@ -799,7 +799,14 @@ namespace Armoury
                         if (region != null && region.IsUnderSiege) { _dStopSiege++; NoteStop(kv.Key, StopSiege); continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
                         double raidAway = Math.Max(0.0, away - famAway), backR = 0.0, backF = 0.0;
                         // sw-uchodzcy (RaidRefugeesToTowns): miasto pobytu oblezone - czesc z najazdu siedzi w jego murach (wzor dogania po oblezeniu jak HR 2.8)
-                        if (raidAway > 0.0 && RaidRefugees.HostBesieged(v)) { raidAway = 0.0; NoteStop(kv.Key, StopSiege); }
+                        if (raidAway > 0.0 && RaidRefugees.HostBesieged(v))
+                        {
+                            // f4-uchodzcy (RaidRefugeesIntakeMeter): czekajacy na wpuszczenie do miasta pobytu sa w regionie, nie w jego murach - wracaja jak dotad (wzor
+                            // na nich); w murach siedzi tylko czesc w miescie. Bez odmierzania WaitingOf = 0 - jak dotad
+                            double waitR = RaidRefugees.WaitingOf(v);
+                            if (waitR > 0.0) raidAway = Math.Min(raidAway, waitR);
+                            else { raidAway = 0.0; NoteStop(kv.Key, StopSiege); }
+                        }
                         if (raidAway > 0.0)
                         {
                             if (!clock) { last = today - Q; _dNoClock++; }                             // nie powinno sie zdarzyc (zegar rusza razem z kontem rabunku)

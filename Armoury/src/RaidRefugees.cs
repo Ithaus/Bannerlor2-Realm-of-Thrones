@@ -41,6 +41,15 @@ namespace Armoury
     /// Oblezone miasto pobytu: jedza z jego Food jak schronieni (Famine, ta sama stopa ludzie / Q) i gloduja z mieszczanami. Nalezne powracajacym, ktorych kiesa W nie oddala,
     /// czekaja (OwedTown) - sufit kiesy W obejmuje saldo i nalezne, wiec zwrot ma pokrycie.
     /// Linia doby "Uchodzcy do miast (RT): dzien N" (sprawdz_logi --grupa nuchodzcy). Wyjatki per konto liczone (potkniecia), bez globalnych wylacznikow.
+    /// f4-uchodzcy (noc 17/18.10, przeglad koncowy ekonomii - P3; klucz RaidRefugeesIntakeMeter): ODMIERZANIE PRZYBYC. Dotad dobowy limit (RaidRefugeesTownIntake) dzialal
+    /// tylko na nowe konta i pierwsze konto doby wchodzilo w calosci, a dopiski uderzen do kont z miastem szly bez limitu (fin86: Sharp Point 9 tys. -> 73 tys. ludzi
+    /// w tydzien, 50,7 tys. przeprowadzek jednego dnia). Odtad konto z miastem ma PRZYJETYCH (Acc.Cap): w miescie jest min(czesc z najazdu, przyjeci); reszta czesci
+    /// z najazdu CZEKA w regionie (jedza ze spichlerzy jak dotad - Famine, AwayInRegion licza ja z regionem, bo InTown jest mniejsze). Przyjeci rosna TYLKO w Daily
+    /// (krok 4): najpierw czekajacy kont z miastem (kolejnosc doby przydzialu), potem nowe konta - razem najwyzej intake x ludzie miasta na dobe (jeden licznik dobowy
+    /// na miasto: przybyli od ostatniej doby + przyjeci w tym kroku); pierwsze konto doby (nikt jeszcze nie przybyl) w calosci tylko do RaidRefugeesIntakeFirstMult
+    /// x limit, wieksze - czesc (reszta czeka, konto ma juz miasto). Ubytek (smierc, powrot, pojmani) schodzi najpierw z czekajacych; przyjeci ida za nim w dol
+    /// (Cap = ludzie w miescie po rozliczeniu), wiec dopiski uderzen nie wchodza do miasta bez limitu. Zapis bez nowego klucza: przyjeci = ludzie przy ostatnim
+    /// rozliczeniu (N, juz w "arm_raidref"). Klucz wylaczony - Cap pomijany, krok 4 i linia jak przed paczka (co do bitu).
     /// </summary>
     internal static class RaidRefugees
     {
@@ -62,6 +71,7 @@ namespace Armoury
             public double NSnap;         // ludzie w miescie przy migawce kiesy (udzial glow w zmianie kiesy W)
             public Village V;            // wies (bez zapisu - leniwie)
             public string OwedTown;      // recenzja: konto zamkniete (nikt w miescie), a nalezne jeszcze nie oddane - miasto, ktorego kiesa W je trzyma (Town = null)
+            public double Cap = double.NaN;  // f4-uchodzcy: przyjeci do miasta (gorna granica ludzi w miescie przy odmierzaniu); NaN - bez odmierzania (klucz wylaczony, konto bez miasta)
         }
 
         /// <summary>Miasto, z ktorego kiesy W idzie zwrot konta (pobyt albo konto zamkniete z naleznymi).</summary>
@@ -102,6 +112,13 @@ namespace Armoury
         private static bool _sgHas; private static int _sgDay = -1, _sgTowns; private static double _sgPeople, _sgDead;
         // recenzja (drobne 5): nalezne powracajacym, ktorych kiesa W nie oddala w dobie - czekaja na nastepna (zostaja w koncie, nie przepadaja)
         private static long _owedCarry;
+        // f4-uchodzcy (odmierzanie przybyc): uchodzcy dopisani przez uderzenia kontom z miastem, ktorzy CZEKAJA w regionie (doba; bez zapisu) i okno 7 dob przybylych
+        // na miasto (id miasta -> przybyli w dobach day % 7; tylko linia i narzedzie - bez zapisu, po wczytaniu buduje sie od nowa)
+        private static double _hitWait;
+        // recenzja f4 (uwaga 3): tablica miasta ma 14 miejsc - [0..6] przybyli w dobie day % 7, [7..13] ludzie miasta tej doby (ten sam mianownik co limit przyjec tej
+        // doby), wiec okno 7 dob porownuje sie ze srednia ludzi miasta z dob przybyc (spadek ludzi w tygodniu - oblezenie, glod - nie daje falszywego przekroczenia)
+        private static readonly Dictionary<string, double[]> _win7 = new Dictionary<string, double[]>(StringComparer.Ordinal);
+        private static int _win7Day = int.MinValue;
 
         private static void Stumble(string where, Exception e)
         {
@@ -115,10 +132,16 @@ namespace Armoury
             get { var s = Settings.Current; return s != null && s.RaidRefugeesToTowns && Devastation.On; }
         }
 
+        /// <summary>f4-uchodzcy: odmierzanie przybyc czynne (klucz RaidRefugeesIntakeMeter przy czynnym RT) - w miescie najwyzej przyjeci konta (Acc.Cap).</summary>
+        internal static bool Meter
+        {
+            get { var s = Settings.Current; return s != null && s.RaidRefugeesIntakeMeter && s.RaidRefugeesToTowns && Devastation.On; }
+        }
+
         /// <summary>PeopleBook.Reset (konstruktor ArmouryBehavior): stan jednej kampanii nie przecieka do drugiej (zapis wczytuje Import po konstruktorze).</summary>
         internal static void Reset()
         {
-            lock (Gate) { _acc.Clear(); _kwSnap.Clear(); _n = 0; _zcNoted.Clear(); _zcBuild.Clear(); _zcBuildDay = -1; _zcRedoRT = 0; _zcUnknownRun = 0; _owedCarry = 0; }
+            lock (Gate) { _acc.Clear(); _kwSnap.Clear(); _n = 0; _zcNoted.Clear(); _zcBuild.Clear(); _zcBuildDay = -1; _zcRedoRT = 0; _zcUnknownRun = 0; _owedCarry = 0; _win7.Clear(); _win7Day = int.MinValue; }
             NewDay();
             _stumbles = _stumblesAll = 0; lock (_err) _err.Clear();
             _famHas = false; _famDay = -1; _zcHas = false; _zcDay = -1; _sgHas = false; _sgDay = -1;
@@ -133,6 +156,7 @@ namespace Armoury
                 Array.Clear(_in, 0, CKinds); Array.Clear(_out, 0, CKinds);
                 _arrTown.Clear(); _arrFrom.Clear(); _arrFromN.Clear();
                 _dOwedMoved = 0; _dHold = 0; _dHoldPeople = 0; _depHit = _depAssign = 0;
+                _hitWait = 0;                                                    // f4-uchodzcy
             }
         }
 
@@ -163,19 +187,75 @@ namespace Armoury
                 if (!On) return 0.0;
                 string id = IdOf(v);
                 if (id == null) return 0.0;
-                lock (Gate) { Acc a; if (!_acc.TryGetValue(id, out a) || a.Town == null) return 0.0; }
-                return Derived(v);
+                double cap;
+                lock (Gate) { Acc a; if (!_acc.TryGetValue(id, out a) || a.Town == null) return 0.0; cap = a.Cap; }
+                return Derived(v, cap);
             }
             catch (Exception e) { Stumble("InTown", e); return 0.0; }
         }
 
-        private static double Derived(Village v)
+        /// <summary>Czesc z najazdu konta wsi v (konto - czesc z glodu) - bez odmierzania.</summary>
+        private static double Raw(Village v)
         {
             double away = PeopleBook.RefugeesOf(v);
             if (!(away > 0.0)) return 0.0;
             double fam = Famine.FamPartOf(v, away);
             double r = away - Math.Max(0.0, fam);
             return r > 1e-9 && !double.IsInfinity(r) ? r : 0.0;
+        }
+
+        /// <summary>Ludzie konta w miescie: czesc z najazdu, a przy odmierzaniu (f4-uchodzcy) najwyzej przyjeci konta (cap; NaN - bez granicy). Klucz wylaczony - jak dotad.</summary>
+        private static double Derived(Village v, double cap)
+        {
+            double r = Raw(v);
+            if (!(r > 0.0) || double.IsNaN(cap) || !Meter) return r;
+            return Math.Min(r, Math.Max(0.0, cap));
+        }
+
+        /// <summary>f4-uchodzcy: konta z miastem town - (wies, przyjeci); kopia pod Gate (wolajacy moze ruszac konta).</summary>
+        private static List<KeyValuePair<Village, double>> AccsIn(string townId)
+        {
+            var res = new List<KeyValuePair<Village, double>>();
+            if (_n == 0 || townId == null) return res;
+            List<KeyValuePair<string, Acc>> l;
+            lock (Gate) l = _acc.Where(kv => kv.Value.Town == townId).ToList();
+            foreach (var kv in l)
+            {
+                var v = VillageOf(kv.Value, kv.Key);
+                double cap; lock (Gate) cap = kv.Value.Cap;
+                if (v != null) res.Add(new KeyValuePair<Village, double>(v, cap));
+            }
+            return res;
+        }
+
+        /// <summary>f4-uchodzcy (Devastation.Daily przy oblezonym miescie pobytu): czesc z najazdu konta wsi v, ktora CZEKA w regionie na wpuszczenie do miasta (nie siedzi
+        /// w jego murach - wraca jak dotad). 0 - klucz wylaczony, konto bez miasta albo nikt nie czeka. Nie rzuca.</summary>
+        internal static double WaitingOf(Village v)
+        {
+            if (_n == 0 || v == null) return 0.0;
+            try
+            {
+                if (!Meter) return 0.0;
+                string id = IdOf(v);
+                if (id == null) return 0.0;
+                double cap;
+                lock (Gate) { Acc a; if (!_acc.TryGetValue(id, out a) || a.Town == null) return 0.0; cap = a.Cap; }
+                if (double.IsNaN(cap)) return 0.0;
+                double r = Raw(v);
+                double w = r - Math.Min(r, Math.Max(0.0, cap));
+                return w > 1e-9 ? w : 0.0;
+            }
+            catch (Exception e) { Stumble("WaitingOf", e); return 0.0; }
+        }
+
+        /// <summary>f4-uchodzcy (Famine.Daily, smierc gosci regionu i schronionych w murach konta z ludzmi w miescie): czesc zgonow z czesci z glodu. Goscie konta z miastem
+        /// = czesc z glodu + czekajacy na wpuszczenie (odmierzanie) - zgony z obu po rowno (jedna regula: smierc schodzi z obu czesci proporcjonalnie). Bez odmierzania
+        /// goscie = czesc z glodu - dokladnie 1 (jak dotad).</summary>
+        internal static double GuestFamShare(double famB, double guests)
+        {
+            if (double.IsNaN(famB) || !(guests > famB) || !Meter) return 1.0;
+            double q = famB > 0.0 ? famB / guests : 0.0;
+            return q < 0.0 ? 0.0 : (q > 1.0 ? 1.0 : q);
         }
 
         /// <summary>Uchodzcy wsi v w jej regionie (konto - czesc w miescie) - potrzeba jedzenia okregu KS. Wylaczone - cale konto (jak dotad).</summary>
@@ -196,9 +276,9 @@ namespace Armoury
             try
             {
                 if (!On) return 0.0;
-                var vs = VillagesIn(town);
+                var vs = AccsIn(town.StringId);                 // f4-uchodzcy: z przyjetymi konta (odmierzanie); klucz wylaczony - jak dotad
                 double t = 0.0;
-                foreach (var v in vs) t += Derived(v);
+                foreach (var v in vs) t += Derived(v.Key, v.Value);
                 return t;
             }
             catch (Exception e) { Stumble("PresentIn", e); return 0.0; }
@@ -222,12 +302,12 @@ namespace Armoury
             try
             {
                 if (!On) return false;
-                string id = IdOf(v), town;
+                string id = IdOf(v), town; double cap;
                 if (id == null) return false;
-                lock (Gate) { Acc a; if (!_acc.TryGetValue(id, out a) || a.Town == null) return false; town = a.Town; }
+                lock (Gate) { Acc a; if (!_acc.TryGetValue(id, out a) || a.Town == null) return false; town = a.Town; cap = a.Cap; }
                 var st = TownOf(town);
                 if (st == null || !st.IsUnderSiege) return false;
-                double n = Derived(v);
+                double n = Derived(v, cap);
                 if (!(n > 0.0)) return false;
                 lock (Gate) { _dHold++; _dHoldPeople += n; }
                 return true;
@@ -248,13 +328,33 @@ namespace Armoury
                 if (!On) return;
                 string id = IdOf(v);
                 if (id == null) return;
-                lock (Gate) { Acc a0; if (!_acc.TryGetValue(id, out a0) || a0.Town == null) return; }
-                double now = Derived(v);
+                double cap;
+                double awDied = cause == CDied && expected > 0.0 ? PeopleBook.RefugeesOf(v) : 0.0;   // f4-uchodzcy: konto po smierci w drodze (poza zamkiem Gate)
+                lock (Gate)
+                {
+                    Acc a0; if (!_acc.TryGetValue(id, out a0) || a0.Town == null) return;
+                    // f4-uchodzcy (odmierzanie): ubytek, ktory dotyczy ludzi W MIESCIE, zdejmuje przyjetych (inaczej min(czesc z najazdu, przyjeci) wzialby go z czekajacych):
+                    // glod oblezonego miasta pobytu (Famine: zmarli = obecni w miescie x stopa; expected = zmarli) - cali z miasta; smierc w drodze (Devastation, ta sama
+                    // stopa dla calego konta; expected = zmarli) - przyjeci w tej samej proporcji co konto. Powrot, podloga 10 i pojmani schodza najpierw z czekajacych
+                    // (najblizej domu / swiezo trafieni). Klucz wylaczony - nic (Cap NaN)
+                    if (expected > 0.0 && !double.IsInfinity(expected) && !double.IsNaN(a0.Cap) && (cause == CStarve || cause == CDied) && Meter)
+                    {
+                        if (cause == CStarve) a0.Cap = Math.Max(0.0, a0.Cap - expected);
+                        else if (awDied + expected > 0.0) a0.Cap = Math.Max(0.0, a0.Cap * (awDied / (awDied + expected)));
+                    }
+                    cap = a0.Cap;
+                }
+                double now = Derived(v, cap);
                 lock (Gate)
                 {
                     Acc a;
                     if (!_acc.TryGetValue(id, out a) || a.Town == null) return;
-                    if (cause == CArrive && expected > 0.0 && !double.IsInfinity(expected)) _depHit += expected;   // niezalezny licznik: uchodzcy dopisani kontu z miastem (Devastated)
+                    if (cause == CArrive && expected > 0.0 && !double.IsInfinity(expected))
+                    {
+                        // f4-uchodzcy: przy odmierzaniu dopisani kontu z przyjetymi czekaja w regionie (do miasta tylko przez przyjecie w Daily) - osobny licznik
+                        if (!double.IsNaN(a.Cap) && Meter) _hitWait += expected;
+                        else _depHit += expected;   // niezalezny licznik: uchodzcy dopisani kontu z miastem (Devastated)
+                    }
                     Apply(a, id, now, cause);
                 }
             }
@@ -264,6 +364,8 @@ namespace Armoury
         /// <summary>Pod Gate: ludzie w miescie a.N -> now z przyczyny cause (liczniki, przybyli bez kiesy, saldo odchodzacych).</summary>
         private static void Apply(Acc a, string id, double now, int cause)
         {
+            // f4-uchodzcy (odmierzanie): przyjeci ida za ubytkiem ludzi w miescie (now <= Cap) - kto odszedl z miasta, tego miejsce nie czeka na dopiski uderzen
+            if (!double.IsNaN(a.Cap) && a.Cap > now && Meter) a.Cap = Math.Max(0.0, now);
             double d = now - a.N;
             if (Math.Abs(d) < 1e-9) { a.N = now; return; }
             double before = a.N;
@@ -310,7 +412,7 @@ namespace Armoury
                 double town = 0.0;
                 List<KeyValuePair<string, Acc>> l;
                 lock (Gate) l = _acc.Where(kv => kv.Value.Town != null).ToList();
-                foreach (var kv in l) { var v = VillageOf(kv.Value, kv.Key); if (v != null) town += Derived(v); }
+                foreach (var kv in l) { var v = VillageOf(kv.Value, kv.Key); if (v != null) town += Derived(v, kv.Value.Cap); }
                 _famGuests = guests; _famShelter = shelter; _famLost = lost; _famTown = town; _famLedger = PeopleBook.RefugeesWorld();
                 _famLostTown = lostInTown > 0.0 && !double.IsInfinity(lostInTown) ? lostInTown : 0.0;
                 _famDay = (int)CampaignTime.Now.ToDays - 1; _famHas = true;
@@ -328,7 +430,7 @@ namespace Armoury
                 {
                     List<KeyValuePair<string, Acc>> l;
                     lock (Gate) l = _acc.Where(kv => kv.Value.Town != null).ToList();
-                    foreach (var kv in l) { var v = VillageOf(kv.Value, kv.Key); if (v != null && TownOf(kv.Value.Town) != null) present += Derived(v); }
+                    foreach (var kv in l) { var v = VillageOf(kv.Value, kv.Key); if (v != null && TownOf(kv.Value.Town) != null) present += Derived(v, kv.Value.Cap); }
                 }
                 _zcLabour = labourTowns; _zcGuests = guests; _zcPresent = present; _zcTowns = towns; _zcDay = day; _zcHas = true;
             }
@@ -376,7 +478,7 @@ namespace Armoury
                 {
                     var v = VillageOf(kv.Value, kv.Key); var t = TownOf(kv.Value.Town);
                     if (v == null || t == null) continue;
-                    double x = Derived(v);
+                    double x = Derived(v, kv.Value.Cap);
                     if (!(x > 0.0)) continue;
                     double p; into.TryGetValue(t, out p); into[t] = p + x;
                 }
@@ -416,6 +518,7 @@ namespace Armoury
             int today = (int)CampaignTime.Now.ToDays, day = today - 1;
             if (!On) { Off(s, day); return; }
             _offLogged = false;
+            bool meter = Meter;                                                // f4-uchodzcy: odmierzanie przybyc (klucz RaidRefugeesIntakeMeter)
             if (_sStart == long.MinValue) { long b = 0; lock (Gate) foreach (var a in _acc.Values) b += a.Bal + a.Owed; _sStart = b; }
             if (!_sessionLogged) SessionLine(s);
 
@@ -533,10 +636,10 @@ namespace Armoury
                 try
                 {
                     var a = kv.Value;
-                    string townId; lock (Gate) townId = a.Town;
+                    string townId; double cap0; lock (Gate) { townId = a.Town; cap0 = a.Cap; }
                     var v = townId != null ? VillageOf(a, kv.Key) : null;
                     var town = TownOf(townId);
-                    double now = v != null && town != null ? Derived(v) : 0.0;
+                    double now = v != null && town != null ? Derived(v, cap0) : 0.0;
                     int why = 0;
                     if (v != null && town != null)
                     {
@@ -562,6 +665,9 @@ namespace Armoury
                         }
                         double d = now - a.N;
                         if (Math.Abs(d) > 1e-9) { if (d > 0) _in[COther] += d; else _out[COther] += -d; a.N = now; if (a.ArrPend > now) a.ArrPend = now; }
+                        // f4-uchodzcy: przyjeci = ludzie w miescie po uzgodnieniu (pierwsza doba odmierzania albo konto sprzed klucza - obecni zostaja, dopiski czekaja);
+                        // klucz wylaczony - bez granicy (NaN), ponowne wlaczenie zaczyna od obecnych
+                        if (meter) { if (double.IsNaN(a.Cap) || a.Cap > a.N) a.Cap = a.N; } else a.Cap = double.NaN;
                         if (v.Settlement != null && now > PeopleBook.RefugeesOf(v) + 1e-6) nOver++;
                         if (why != 0)
                         {
@@ -636,6 +742,16 @@ namespace Armoury
             float rad = Math.Max(0f, s.RaidRefugeesTownRadius);
             float intake = Math.Max(0f, Math.Min(1f, s.RaidRefugeesTownIntake));
             var taken = new Dictionary<string, double>(StringComparer.Ordinal);       // id miasta -> ludzie nowych kont przyjeci dzis
+            // f4-uchodzcy (klucz RaidRefugeesIntakeMeter): odmierzanie przybyc - wspolny licznik dobowy miasta dla czekajacych kont z miastem, nowych kont i dopiskow Track;
+            // pierwsze konto doby w calosci tylko w progu RaidRefugeesIntakeFirstMult x limit (Step4Meter). Klucz wylaczony - petla nizej jak przed paczka (co do bitu)
+            var mt = meter ? new MeterDay() : null;
+            if (mt != null)
+            {
+                try { Step4Meter(today, snapList, rad, intake, s.RaidRefugeesIntakeFirstMult, hostOk, hostPeople, mt); } catch (Exception e) { Stumble("Daily(odmierzanie)", e); }
+                nAssign = mt.NNew; nSame = mt.NSame; nFriend = mt.NFriend; nWaitOwed = mt.NWaitOwed; nNoHost = mt.NNoHost; noHostPeople = mt.NoHost;
+                nNoTown = mt.NNoTown; ruPeople = mt.NoTown; nSpread = mt.NSpread; spreadPeople = mt.Spread; spreadTowns.UnionWith(mt.SpreadTowns); intakePeople = mt.AdmNew;
+            }
+            else
             foreach (var kv in snapList)
             {
                 try
@@ -687,15 +803,15 @@ namespace Armoury
                 try
                 {
                     var a = kv.Value;
-                    double pend; string townId;
-                    lock (Gate) { pend = a.ArrPend; townId = a.Town; a.ArrPend = 0.0; }
+                    double pend, cap5; string townId;
+                    lock (Gate) { pend = a.ArrPend; townId = a.Town; cap5 = a.Cap; a.ArrPend = 0.0; }
                     if (!(pend > 1e-9) || townId == null || !(share > 0f)) continue;
                     var v = VillageOf(a, kv.Key);
                     var town = TownOf(townId);
                     if (v == null || town == null || v.Settlement == null) continue;
                     float k = PopulationLaw.KFor(v.Settlement);
                     double home = k > 0f ? (double)Math.Max(0f, v.Hearth) * k : 0.0;
-                    double region = Math.Max(0.0, PeopleBook.RefugeesOf(v) - Derived(v));
+                    double region = Math.Max(0.0, PeopleBook.RefugeesOf(v) - Derived(v, cap5));   // f4-uchodzcy: czekajacy na wpuszczenie sa w regionie
                     double denom = home + region + pend;
                     long gold = Math.Max(0, v.Gold);
                     if (!(denom > 0.0) || gold <= 0) continue;
@@ -721,6 +837,29 @@ namespace Armoury
                 accN++; tNow += a.N;
                 double p0; present.TryGetValue(a.Town, out p0); present[a.Town] = p0 + a.N;
                 int c0; vilCount.TryGetValue(a.Town, out c0); vilCount[a.Town] = c0 + 1;
+            }
+            // f4-uchodzcy: czekajacy na wpuszczenie do przydzielonego miasta (czesc z najazdu ponad przyjetych - sa w regionie) i okno 7 dob przybylych na miasto
+            double waitW = 0.0; int waitWAcc = 0; var waitWTowns = new HashSet<string>(StringComparer.Ordinal);
+            var arrDay = new Dictionary<string, double>(StringComparer.Ordinal);
+            if (meter)
+            {
+                foreach (var kv in accs)
+                {
+                    try
+                    {
+                        string tid; double cap;
+                        lock (Gate) { tid = kv.Value.Town; cap = kv.Value.Cap; }
+                        if (tid == null || double.IsNaN(cap)) continue;
+                        var v = VillageOf(kv.Value, kv.Key);
+                        if (v == null) continue;
+                        double raw = Raw(v), w = raw - Math.Min(raw, Math.Max(0.0, cap));
+                        if (!(w > 1e-6)) continue;
+                        waitW += w; waitWAcc++; waitWTowns.Add(tid);
+                    }
+                    catch (Exception e) { Stumble("Daily(czekajacy-migawka)", e); }
+                }
+                lock (Gate) foreach (var kv in _arrTown) arrDay[kv.Key] = kv.Value;
+                try { Win7Note(day, arrDay, hostPeople); } catch (Exception e) { Stumble("Daily(okno7)", e); }
             }
             lock (Gate)
             {
@@ -772,8 +911,10 @@ namespace Armoury
                     sb.Append(" | przydzialy: nowe ").Append(nAssign).Append(" (wlasne krolestwo ").Append(nSame).Append(", niewrogie ").Append(nFriend).Append("), bez miasta w promieniu ")
                       .Append(F0(rad)).Append(' ').Append(nNoTown).Append(" kont (zostaja w regionie ").Append(F1(ruPeople)).Append(" ludzi), zamkniete ").Append(nCleared)
                       .Append(", miasta w zasiegu nie moga przyjac ").Append(nNoHost).Append(" kont (").Append(F1(noHostPeople)).Append(" ludzi), czekaja na zwrot naleznych ").Append(nWaitOwed).Append(" kont");
+                    if (mt == null)
                     sb.Append(" | dobowy limit przyjec (Raid Refugees Town Intake ").Append((100.0 * intake).ToString("0.0#", Inv)).Append("% ludzi miasta, pierwsze konto doby zawsze): przyjeci w nowych kontach ")
                       .Append(F1(intakePeople)).Append(", czekaja na kolejne doby ").Append(nSpread).Append(" kont (").Append(F1(spreadPeople)).Append(" ludzi, miast ").Append(spreadTowns.Count).Append(')');
+                    else MeterSegment(sb, s, intake, mt, arrDay, hostPeople, waitW, waitWAcc, waitWTowns.Count);   // f4-uchodzcy: odmierzanie przybyc
                     sb.Append(" | kiesa W miast (saldo uchodzcow): wczoraj ").Append(bal0).Append(" + przyniesione z kies wsi ").Append(bIn).Append(" + udzial glow w zmianie kiesy W ").Append(bShare)
                       .Append(" + doplata ludu miasta ").Append(bSub).Append(" - przyciete do kiesy W ").Append(bTrim).Append(" - z powracajacymi ").Append(owedMoved).Append(" = ").Append(balNow)
                       .Append(" (kontrola ").Append(balCheck).Append(')');
@@ -835,6 +976,223 @@ namespace Armoury
             if (a.Bal > 0) { a.Owed += a.Bal; _dOwedMoved += a.Bal; a.Bal = 0; }
             if (a.Town != null) a.OwedTown = a.Town;
             a.Town = null; a.N = 0.0; a.NSnap = 0.0; a.ArrPend = 0.0;
+            a.Cap = double.NaN;                                                // f4-uchodzcy: konto bez miasta - bez przyjetych
+        }
+
+        // ============================================================ f4-uchodzcy: odmierzanie przybyc (krok 4 Daily przy kluczu RaidRefugeesIntakeMeter)
+        /// <summary>Liczniki kroku 4 przy odmierzaniu (doba; linia "odmierzanie przybyc").</summary>
+        private sealed class MeterDay
+        {
+            public double Before, AdmWait, AdmNew, PartRest, Spread, NoHost, NoTown, FirstOver;
+            public int NAdmWait, NNew, NSame, NFriend, NPart, NSpread, NNoHost, NNoTown, NWaitOwed, NFirst;
+            public int NTiny;            // recenzja f4 (uwaga 1): miasta zdolne przyjac, ktore przy limicie nie wpuszcza nikogo (intake x ludzie < 1) - nie sa celem nowych kont
+            public readonly HashSet<string> SpreadTowns = new HashSet<string>(StringComparer.Ordinal);
+            public readonly Dictionary<string, double> Used = new Dictionary<string, double>(StringComparer.Ordinal);    // id miasta -> przybyli dzis (licznik dobowy)
+        }
+
+        /// <summary>
+        /// Krok 4 przy odmierzaniu przybyc. Licznik dobowy miasta = przybyli od ostatniej doby (dopiski Track kont bez przyjetych - doba wlaczenia klucza; przy odmierzaniu
+        /// dopiski czekaja) + przyjeci w tym kroku. Przyjecie: miesci sie w limicie (intake x ludzie miasta - przybyli dzis) - w calosci; pierwsze przyjecie doby w miescie
+        /// (nikt jeszcze nie przybyl) w calosci takze do firstMult x limit; inaczej czesc rowna reszcie limitu (najmniej 1 czlowiek), reszta czeka w regionie.
+        /// (a) czekajacy kont z miastem (dopiski uderzen, reszta konta przyjetego w czesci) - wedlug doby przydzialu, potem id; miasto oblezone albo bez pelnego ZC4 - czekaja;
+        /// (b) nowe konta (jak dotad: najblizsze miasto, ktore moze przyjac) - przydzial z przyjetymi; konto bez miejsca dzis - bez przydzialu (czeka bez miasta jak dotad).
+        /// intake 0 - bez limitu. Wyjatki per konto liczone (Stumble).
+        /// </summary>
+        private static void Step4Meter(int today, List<KeyValuePair<string, double>> snapList, float rad, float intake, float firstMult,
+                                       HashSet<string> hostOk, Dictionary<string, double> hostPeople, MeterDay m)
+        {
+            lock (Gate) foreach (var kv in _arrTown) { m.Used[kv.Key] = kv.Value; m.Before += kv.Value; }
+            double fm = Math.Max(1.0, double.IsNaN(firstMult) || double.IsInfinity(firstMult) ? 1.0 : firstMult);
+            // recenzja f4 (uwaga 1): miasto, ktore przy limicie nie wpusci nikogo (intake x ludzie < 1 czlowiek na dobe - np. Hardhome z 0 ludzi, kultura spoza tabeli k),
+            // nie jest celem nowych kont: FindTown wybiera nastepne miasto w promieniu, ktore moze przyjac (inaczej wies stalaby w "czekaja bez miasta" na zawsze; bez
+            // innego miasta - "miasta w zasiegu nie moga przyjac", zostaja w regionie jak dotad). Miasto pelne NA DZIS zostaje celem (regula najblizszego miasta jak
+            // w dawnej petli - czekaja na jutro). Konta juz przydzielone takiemu miastu (sprzed odmierzania) zostaja: obecni w miescie, czekajacy w regionie wracaja wedlug powrotu
+            HashSet<string> findOk = hostOk;
+            if (intake > 0f)
+            {
+                findOk = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var tid in hostOk) { double tp; hostPeople.TryGetValue(tid, out tp); if (intake * tp >= 1.0) findOk.Add(tid); else m.NTiny++; }
+            }
+
+            // ile miasto tid wpusci dzis z want ludzi (jedna regula dla czekajacych i nowych kont)
+            Func<string, double, double> admit = (tid, want) =>
+            {
+                if (!(intake > 0f)) return want;
+                double tp, u;
+                hostPeople.TryGetValue(tid, out tp);
+                m.Used.TryGetValue(tid, out u);
+                double lim = intake * Math.Max(0.0, tp), rm = Math.Max(0.0, lim - u);
+                if (want <= rm) return want;
+                if (u <= 1e-9 && want <= fm * lim) { m.NFirst++; m.FirstOver += want - rm; return want; }   // pierwsze konto doby w progu
+                return rm;
+            };
+
+            // (a) czekajacy kont z miastem
+            var wl = new List<KeyValuePair<string, Acc>>();
+            lock (Gate) foreach (var kv in _acc) if (kv.Value.Town != null && !double.IsNaN(kv.Value.Cap)) wl.Add(kv);
+            wl.Sort((x, y) => { int c = x.Value.Since.CompareTo(y.Value.Since); return c != 0 ? c : string.CompareOrdinal(x.Key, y.Key); });
+            foreach (var kv in wl)
+            {
+                try
+                {
+                    var a = kv.Value; string tid; double cap;
+                    lock (Gate) { tid = a.Town; cap = a.Cap; }
+                    if (tid == null || double.IsNaN(cap) || !hostOk.Contains(tid)) continue;   // ZC4 nieznany - obecni zostaja, nikt nowy nie wchodzi
+                    var v = VillageOf(a, kv.Key);
+                    var town = TownOf(tid);
+                    if (v == null || town == null || town.IsUnderSiege) continue;              // do oblezonego miasta nikt nie wchodzi
+                    double raw = Raw(v), inT = Math.Min(raw, Math.Max(0.0, cap));
+                    double want = raw - inT;
+                    if (!(want > 1e-6)) continue;
+                    double x = admit(tid, want);
+                    if (!(x > 1e-9) || x < Math.Min(1.0, want)) continue;                      // miasto pelne na dzis - czekaja
+                    lock (Gate) a.Cap = inT + x;
+                    double u; m.Used.TryGetValue(tid, out u); m.Used[tid] = u + x;
+                    m.AdmWait += x; m.NAdmWait++;
+                    lock (Gate) _depAssign += x;
+                    Settle(a, kv.Key, v, CAssign);
+                }
+                catch (Exception e) { Stumble("Daily(czekajacy)", e); }
+            }
+
+            // (b) nowe konta
+            foreach (var kv in snapList)
+            {
+                try
+                {
+                    Acc a; bool has, wait;
+                    lock (Gate) { has = _acc.TryGetValue(kv.Key, out a); wait = has && a.Town == null && a.Owed > 0; has = has && a.Town != null; }
+                    if (has) continue;
+                    var st = Settlement.Find(kv.Key);
+                    var v = st != null ? st.Village : null;
+                    if (v == null) continue;
+                    double fam = Famine.FamPartOf(v, kv.Value);
+                    double raid = kv.Value - Math.Max(0.0, fam);
+                    if (!(raid >= 1.0)) continue;
+                    if (wait) { m.NWaitOwed++; continue; }                   // konto czeka na zwrot naleznych z poprzedniego miasta - przydzial po zwrocie
+                    bool same; int seen;
+                    var town = FindTown(v, rad, findOk, out same, out seen);      // recenzja f4 (uwaga 1): bez miast, ktore przy limicie nie wpuszcza nikogo
+                    if (town == null)
+                    {
+                        if (seen > 0) { m.NNoHost++; m.NoHost += raid; } else { m.NNoTown++; m.NoTown += raid; }
+                        continue;
+                    }
+                    string tid = town.StringId;
+                    double x = admit(tid, raid);
+                    if (!(x > 1e-9) || x < Math.Min(1.0, raid)) { m.NSpread++; m.Spread += raid; m.SpreadTowns.Add(tid); continue; }
+                    lock (Gate)
+                    {
+                        if (!_acc.TryGetValue(kv.Key, out a)) _acc[kv.Key] = a = new Acc();
+                        a.Town = tid; a.OwedTown = null; a.V = v; a.N = 0.0; a.ArrPend = 0.0; a.NSnap = 0.0; a.Since = today; a.Cap = x;
+                        Recount();
+                    }
+                    double u; m.Used.TryGetValue(tid, out u); m.Used[tid] = u + x;
+                    m.NNew++; if (same) m.NSame++; else m.NFriend++;
+                    if (x < raid - 1e-9) { m.NPart++; m.PartRest += raid - x; }
+                    m.AdmNew += x;
+                    lock (Gate) _depAssign += x;
+                    Settle(a, kv.Key, v, CAssign);
+                }
+                catch (Exception e) { Stumble("Daily(przydzial)", e); }
+            }
+        }
+
+        /// <summary>f4-uchodzcy: segment linii doby RT przy odmierzaniu (narzedzie: sprawdz_logi --grupa nuchodzcy RT-17). Tozsamosc: przybyli dzis (licznik dobowy po kroku 4)
+        /// = przed przydzialem + z czekajacych + w nowych kontach = "przybyli" linii; najwiecej wobec limitu dzis <= pierwsze konto doby (xM); 7 dob <= 7 x M x limit
+        /// (wobec sredniej ludzi miasta z dob przybyc - recenzja f4, uwaga 3); na koncu miasta za male na limit (recenzja f4, uwaga 1).</summary>
+        private static void MeterSegment(StringBuilder sb, Settings s, float intake, MeterDay m, Dictionary<string, double> arrDay, Dictionary<string, double> hostPeople,
+                                         double waitW, int waitAcc, int waitTowns)
+        {
+            float fm0 = s.RaidRefugeesIntakeFirstMult;
+            double fm = Math.Max(1.0, float.IsNaN(fm0) || float.IsInfinity(fm0) ? 1.0 : fm0);
+            Func<string, double> tpOf = tid => TpOf(tid, hostPeople);
+            double arrToday = 0.0, mxArr = 0.0, mxLim = 0.0, mxR = 0.0; string mxName = "-";
+            foreach (var kv in arrDay)
+            {
+                if (!(kv.Value > 0.0)) continue;
+                arrToday += kv.Value;
+                if (!(intake > 0f)) continue;
+                double lim = intake * tpOf(kv.Key);
+                double r = lim > 0.0 ? kv.Value / lim : 999.99;
+                if (mxName == "-" || r > mxR) { var t = TownOf(kv.Key); mxName = Clean(t != null && t.Name != null ? t.Name.ToString() : kv.Key); mxArr = kv.Value; mxLim = lim; mxR = Math.Min(999.99, r); }
+            }
+            // recenzja f4 (uwaga 3): okno 7 dob wobec SREDNIEJ ludzi miasta z dob przybyc (ludzie zapisani w dobie przybycia - ten sam mianownik co limit tej doby).
+            // Kazda doba: przybyli <= M x limit x ludzie tej doby, wiec suma 7 dob <= M x limit x suma ludzi dob przybyc <= 7 x M x limit x srednia - prog linii trzyma
+            // sie takze wtedy, gdy miasto traci ludzi w tygodniu (oblezenie, glod), a dzisiejsze ludzie byly mniejszym mianownikiem
+            double w7 = 0.0, w7Share = 0.0; string w7Name = "-";
+            var win = new List<KeyValuePair<string, double[]>>();
+            lock (Gate)
+                foreach (var kv in _win7)
+                {
+                    double sa = 0.0, sp = 0.0; int nd = 0;
+                    for (int k = 0; k < 7; k++) if (kv.Value[k] > 0.0) { sa += kv.Value[k]; sp += kv.Value[7 + k]; nd++; }
+                    win.Add(new KeyValuePair<string, double[]>(kv.Key, new[] { sa, nd > 0 ? sp / nd : 0.0 }));
+                }
+            foreach (var kv in win)
+            {
+                double tp = kv.Value[1];
+                double sh = tp > 0.0 ? kv.Value[0] / tp : 9.9999;
+                if (w7Name == "-" || sh > w7Share) { var t = TownOf(kv.Key); w7Name = Clean(t != null && t.Name != null ? t.Name.ToString() : kv.Key); w7 = kv.Value[0]; w7Share = Math.Min(9.9999, sh); }
+            }
+            double hitWait; lock (Gate) hitWait = _hitWait;
+            sb.Append(" | odmierzanie przybyc (Raid Refugees Intake Meter, limit ").Append((100.0 * intake).ToString("0.0#", Inv))
+              .Append("% ludzi miasta na dobe dla wszystkich kont i dopiskow uderzen, pierwsze konto doby w calosci do x").Append(fm.ToString("0.0#", Inv)).Append("): przybyli dzis ")
+              .Append(F1(arrToday)).Append(" = przed przydzialem ").Append(F1(m.Before)).Append(" + z czekajacych ").Append(F1(m.AdmWait)).Append(" (kont ").Append(m.NAdmWait)
+              .Append(") + w nowych kontach ").Append(F1(m.AdmNew)).Append(" (kont ").Append(m.NNew).Append(", w czesci ").Append(m.NPart).Append(" - reszta czeka ").Append(F1(m.PartRest))
+              .Append("); w progu pierwszego konta ").Append(m.NFirst).Append(" (ponad limit ").Append(F1(m.FirstOver)).Append("); czekaja przydzieleni miastu ").Append(F1(waitW))
+              .Append(" (kont ").Append(waitAcc).Append(", miast ").Append(waitTowns).Append("; dopisani dzis przez uderzenia ").Append(F1(hitWait)).Append("), czekaja bez miasta ")
+              .Append(m.NSpread).Append(" kont (").Append(F1(m.Spread)).Append(" ludzi, miast ").Append(m.SpreadTowns.Count).Append("); najwiecej wobec limitu dzis ").Append(mxName)
+              .Append(' ').Append(F1(mxArr)).Append(" / ").Append(F1(mxLim)).Append(" (x").Append(mxR.ToString("0.00", Inv)).Append("); 7 dob najwiecej ").Append(w7Name).Append(' ')
+              .Append(F1(w7)).Append(" = ").Append((100.0 * w7Share).ToString("0.00", Inv)).Append("% ludzi miasta (srednia dob przybyc; prog ").Append((700.0 * fm * intake).ToString("0.00", Inv)).Append("%)")
+              .Append("; miasta za male na limit (ponizej 1 czlowieka na dobe, nie sa celem nowych kont) ").Append(m.NTiny);   // recenzja f4 (uwaga 1)
+        }
+
+        /// <summary>f4-uchodzcy: ludzie miasta tid - mianownik limitu przyjec doby (hostPeople z kroku 0; miasto spoza niego - PopulationLaw.PeopleOf). Nie rzuca.</summary>
+        private static double TpOf(string tid, Dictionary<string, double> hostPeople)
+        {
+            double tp;
+            if (tid == null) return 0.0;
+            if (hostPeople != null && hostPeople.TryGetValue(tid, out tp)) return tp;
+            try { var st = TownOf(tid); double pp = st != null ? PopulationLaw.PeopleOf(st) : 0.0; return pp > 0.0 && !double.IsInfinity(pp) ? pp : 0.0; }
+            catch { return 0.0; }
+        }
+
+        /// <summary>f4-uchodzcy: rozliczenie konta, ktore wolajacy trzyma (jak Track, ale po kluczu konta). Nie rzuca na zewnatrz (wolajacy lapie).</summary>
+        private static void Settle(Acc a, string id, Village v, int cause)
+        {
+            double cap; lock (Gate) cap = a.Cap;
+            double now = Derived(v, cap);
+            lock (Gate) { if (a.Town == null) return; Apply(a, id, now, cause); }
+        }
+
+        /// <summary>f4-uchodzcy: okno 7 dob przybylych na miasto i ludzi miasta w dobie przybycia (linia i narzedzie). Doba bez wpisow czysci swoje miejsce; przerwa >= 7 dob -
+        /// okno od zera.</summary>
+        private static void Win7Note(int day, Dictionary<string, double> arrivedToday, Dictionary<string, double> hostPeople)
+        {
+            // recenzja f4 (uwaga 3): ludzie miasta tej doby (mianownik limitu) poza zamkiem - TpOf moze siegnac do PopulationLaw
+            var tpDay = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (var kv in arrivedToday) if (kv.Value > 0.0) tpDay[kv.Key] = TpOf(kv.Key, hostPeople);
+            lock (Gate)
+            {
+                int gap = _win7Day == int.MinValue ? 7 : day - _win7Day;
+                if (gap < 0 || gap >= 7) _win7.Clear();
+                else if (gap > 0)
+                    foreach (var w in _win7.Values)
+                        for (int k = 1; k <= gap; k++) { int sl = (((_win7Day + k) % 7) + 7) % 7; w[sl] = 0.0; w[7 + sl] = 0.0; }
+                _win7Day = day;
+                int slot = ((day % 7) + 7) % 7;
+                foreach (var kv in arrivedToday)
+                {
+                    if (!(kv.Value > 0.0)) continue;
+                    double[] w;
+                    if (!_win7.TryGetValue(kv.Key, out w)) _win7[kv.Key] = w = new double[14];
+                    w[slot] = kv.Value;
+                    double tp; tpDay.TryGetValue(kv.Key, out tp); w[7 + slot] = tp;
+                }
+                var drop = new List<string>();
+                foreach (var kv in _win7) { double t = 0; for (int k = 0; k < 7; k++) t += kv.Value[k]; if (!(t > 0.0)) drop.Add(kv.Key); }
+                foreach (var k in drop) _win7.Remove(k);
+            }
         }
 
         /// <summary>Recenzja: krolestwo wsi w wojnie z krolestwem miasta pobytu (uchodzcy nie mieszkaja u wroga). Nie rzuca.</summary>
@@ -953,7 +1311,10 @@ namespace Armoury
             foreach (var kv in l) { bal += kv.Value.Bal; owed += kv.Value.Owed; ppl += kv.Value.N; if (kv.Value.Town != null) towns.Add(kv.Value.Town); }
             Log.Info(P + "start sesji | klucze: Raid Refugees To Towns tak, promien " + F0(s.RaidRefugeesTownRadius) + ", kiesa z wsi x" + Math.Max(0f, Math.Min(1f, s.RaidRefugeesPurseShare)).ToString("0.00", Inv)
                      + ", komunikat od " + s.RaidRefugeesMessageMin + ", dobowy limit przyjec nowych kont " + (100.0 * Math.Max(0f, Math.Min(1f, s.RaidRefugeesTownIntake))).ToString("0.0#", Inv)
-                     + "% ludzi miasta (0 = bez limitu) | spustoszenie " + (Devastation.On ? "CZYNNE" : "nieczynne") + ", spichlerze " + (Famine.On ? "CZYNNE" : "nieczynne")
+                     + "% ludzi miasta (0 = bez limitu)"
+                     + (s.RaidRefugeesIntakeMeter ? ", odmierzanie przybyc TAK (wszystkie konta i dopiski uderzen, pierwsze konto doby w calosci do x"
+                        + Math.Max(1f, s.RaidRefugeesIntakeFirstMult).ToString("0.0#", Inv) + " limitu)" : ", odmierzanie przybyc NIE (pierwsze konto doby zawsze, dopiski bez limitu)")   // f4-uchodzcy
+                     + " | spustoszenie " + (Devastation.On ? "CZYNNE" : "nieczynne") + ", spichlerze " + (Famine.On ? "CZYNNE" : "nieczynne")
                      + ", kiesa ludu " + (TownFolk.LiveKey ? "czynna" : "NIECZYNNA") + ", KS " + (StartCalibration.Applied ? "zastosowany" : "NIEZASTOSOWANY")
                      + " (miasto przyjmuje tylko przy kiesie ludu i pelnym koszyku stanow ZC4 - inaczej uchodzcy zostaja w regionie jak dotad)"
                      + " | z zapisu: kont " + n + " (miast " + towns.Count + ", ludzi przy ostatnim rozliczeniu " + F1(ppl) + ", saldo " + bal + " zl, nalezne " + owed + " zl).");
@@ -966,9 +1327,9 @@ namespace Armoury
             try
             {
                 if (town == null || !town.IsTown || !On || _n == 0) return null;
-                var vs = VillagesIn(town);
+                var vs = AccsIn(town.StringId);                 // f4-uchodzcy: z przyjetymi konta (odmierzanie)
                 double t = 0.0; int c = 0;
-                foreach (var v in vs) { double x = Derived(v); if (x >= 0.5) { t += x; c++; } }
+                foreach (var v in vs) { double x = Derived(v.Key, v.Value); if (x >= 0.5) { t += x; c++; } }
                 if (!(t >= 1.0)) return null;
                 return "Refugees from raided lands living in this town: " + Math.Round(t).ToString("N0", Inv) + " from " + c + (c == 1 ? " village" : " villages")
                        + " - they work and buy their bread here among the labourers and will go home when their land is quiet again.";
@@ -1020,6 +1381,8 @@ namespace Armoury
             lock (Gate) { _acc.Clear(); _kwSnap.Clear(); _n = 0; _owedCarry = 0; }
             _sStart = long.MinValue; _firstShare = true; _tYesterday = double.NaN;
             if (string.IsNullOrEmpty(data)) return;
+            // f4-uchodzcy: same klucze (latki spustoszenia moga jeszcze nie byc wpiete przy wczytaniu - Meter liczy je w grze; Cap bez nich i tak nieczytany)
+            bool meterAtLoad = false; try { var sl = Settings.Current; meterAtLoad = sl != null && sl.RaidRefugeesIntakeMeter && sl.RaidRefugeesToTowns; } catch { meterAtLoad = false; }
             try
             {
                 var parts = data.Split('|');
@@ -1045,6 +1408,9 @@ namespace Armoury
                             var a = new Acc { Town = f[0].Length > 0 ? f[0] : null, N = Fin(nn), Bal = Math.Max(0, bal), ArrPend = Fin(pend), Owed = Math.Max(0, owed), Since = since };
                             if (a.Town == null && f.Length >= 7 && f[6].Length > 0) a.OwedTown = f[6];
                             a.NSnap = a.N;
+                            // f4-uchodzcy: przyjeci = ludzie przy ostatnim rozliczeniu (bez nowego pola w zapisie: przy odmierzaniu po kazdym rozliczeniu Cap = N);
+                            // zapis sprzed klucza - obecni zostaja, dopiski czekaja. Klucz wylaczony - NaN (bez granicy, jak dotad)
+                            if (a.Town != null && meterAtLoad) a.Cap = a.N;
                             lock (Gate) _acc[item.Substring(0, eq)] = a;
                         }
                     }
