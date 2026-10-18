@@ -1119,6 +1119,8 @@ Uzycie (Python 3, tylko odczyt):
                     NKO-18 podloga przezycia - miast z kappa < 1 nie wiecej niz miast w pasmie + ponad pasmem + bez potrzeby W (miasto ponizej pasma ma pelna stawke),
                     NKO-19 skutek (INFO): zostalo w kasach na dobe, kappa i zapas dni W (mediana) pierwsza / ostatnia doba, kasy miast z KS, NKO-20 czas linii (mediana)
                     <= 1 ms i potkniecia 0. NKO-14 liczy tez ERROR KsFolkWage, TownFolk.F4HoardRate, TownFolk.KsFolkWage.*, SyncData.arm_ks_place.
+                    Recenzja f4 (18.10): "zaplacone" w NKO-16 to czesc W, ktora naprawde zeszla z kas (FromCofferWR), wiec kontrola = zlecone - zeszlo moze sie nie zgodzic;
+                    dopisek "w dol" mowi "czynne TAK/NIE (przeglad firm DS co kwartal - Ds Farm Review Days N)" - (a) czynne tylko z P5 (bez niego podloga x1.00).
 --grupa npolnoc   : (r4-polnoc, noc 17/18.10, Jeff 17.10 "Polnoc i za Murem - najpierw wyzywic siebie (hodowla, ryby, owies)"; Armoury/src/StartCalibration.Feed.cs,
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
                     NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
@@ -1182,6 +1184,14 @@ Uzycie (Python 3, tylko odczyt):
                     danina), NAKUM-12 kasy miast z KS (linia f4) - przyrost <= max(60 tys./d, 0.5 x srednia "zostalo w kasach miast") (pieniadz plynie dalej: wyplata kupcom M6,
                     firmy, skup), NAKUM-13 kiesa P miast - przyrost <= +30 tys./d (nowy akumulator u patrycjatu?; R - INFO). Bez linii f4 (log sprzed paczki, klucze
                     wylaczone, bez KS) - NAKUM-10..13 INFO, bez wyjatku.
+                    Recenzja f4 (18.10; model zamkniety tools/ekonomia-symulatory-2026-10-17/f4/simw3.py - obieg miasta kasy -> P/R -> W opuszcza pieniadz tylko danina od
+                    skarbca, firmy DS, P1 i M9, wiec zatrzymane place W koncza w kasach i u P/R, a danina P/R przejmuje dawna danine W): NAKUM-12 zaostrzone - kasy miast z KS
+                    <= max(30 tys., 0.2 x zostalo)/d; NAKUM-14 danina od skarbca R+P ('Akumulator kies') - srednia w oknie <= 1.5 x cala danina W+R+P z 28 dob przed pierwsza
+                    linia f4 (gdy danina W przed < 20 tys./d - odniesienie fin86 207 719 zl/d; dawna pompa W przechodzi do P/R - wolno, byle nie wieksza), NAKUM-15 danina od
+                    skarbca do panow (razem) - srednia w oknie <= 1.3 x przed (odniesienie fin86 155 921), NAKUM-16 kasy ponad 1.5 x zapas kupcow (linia f4 'nadwyzka ponad
+                    1.5 x zapas' - zapas, z ktorego idzie M6) - przyrost w oknie <= max(30 tys., 0.15 x zostalo)/d i od pierwszej linii f4 <= max(1 mln, 28 x srednia
+                    zostalo) (M6 1/28 dziennie musi ja oprozniac), NAKUM-17 skutek (INFO): danina W / R+P / do panow i wyplata kupcom M6 ('Firmy miast', miasta) przed
+                    i w oknie - gdzie poszla dawna pompa W. Pola dopisane po recenzji - brak pola (stara linia f4) = INFO.
 --grupa nglod     : (noc 17/18.10, r4-glodbunt; Jeff "jak nie ma jedzenia to bedzie bunt; w interesie miasta lorda jest aby dowiesc jedzenie"; Armoury/src/KsHunger.cs,
                     KsLordFood.cs, StartCalibration.Glod.cs) python -I tools/sprawdz_logi.py --grupa nglod [--do-doby N] <Armoury-*.log> (strumieniowo). NGL-0 linie doby
                     "Glod miast (KS)" i "Pan miasta placi za dowoz (KS)" bez luk, NGL-1 latki (lojalnosc i bezpieczenstwo czynnego modelu, posilek), NGL-2 pomiar w miastach KS,
@@ -36001,16 +36011,20 @@ NKO_ERR = ("ERROR in KsWageHands", "ERROR in StartCalibration.Zc4LadderCheap", "
            "ERROR in TownFolk.KsWageHands", "ERROR in SyncData.arm_ks_koszyk",   # recenzja: opakowania TownFolk.Stumble (NotePaid, DayLine) i zapisu
            "ERROR in KsFolkWage", "ERROR in TownFolk.KsFolkWage", "ERROR in TownFolk.F4HoardRate", "ERROR in SyncData.arm_ks_place")   # f4-place-ludu
 # f4-place-ludu: dopisek linii "Place za brak rak" (wskazniki ponizej 1) i linia "Place W wedlug koszyka"
-NKO_WGDN = re.compile(r"\| w dol \(f4-place-ludu\): klucz Ks Wage Hands Down (?P<key>TAK|NIE), podloga x(?P<fl>[\d.]+), tylko place W, miasta < 1: (?P<dn>\d+)(?: \((?P<list>[^)]*)\))?")
-NKO_F4 = re.compile(r"Place W wedlug koszyka \(f4-place-ludu\): dzien (?P<day>-?\d+) \| klucze: Ks Labour To Basket (?P<kb>TAK|NIE), Ks Wage Hands Down (?P<ka>TAK|NIE) \(podloga x(?P<fl>[\d.]+)\) "
-                    r"\| pasmo (?P<lo>[\d.]+)-(?P<hi>[\d.]+) dni koszyka KS, najnizej x(?P<mn>[\d.]+), krok (?P<st>[\d.]+)%/d, danina od skarbca W w tych miastach (?P<hr>[\d.]+)%/d \(Ds Hoard Due Rate (?P<dr>[\d.]+)%\) "
+NKO_WGDN = re.compile(r"\| w dol \(f4-place-ludu\): klucz Ks Wage Hands Down (?P<key>TAK|NIE)(?:, czynne (?P<act>TAK|NIE) \(przeglad firm DS co kwartal - Ds Farm Review Days (?:\d+|brak klucza \(bez P5\))\))?, "
+                      r"podloga x(?P<fl>[\d.]+), tylko place W, miasta < 1: (?P<dn>\d+)(?: \((?P<list>[^)]*)\))?")   # recenzja f4: 'czynne' (P5) - stara linia bez pola tez pasuje
+NKO_F4 = re.compile(r"Place W wedlug koszyka \(f4-place-ludu\): dzien (?P<day>-?\d+) \| klucze: Ks Labour To Basket (?P<kb>TAK|NIE), Ks Wage Hands Down (?P<ka>TAK|NIE) \(podloga x(?P<fl>[\d.]+)"
+                    r"(?:; klucz (?P<kakey>TAK|NIE), przeglad firm DS co kwartal - Ds Farm Review Days (?P<frd>\d+|brak klucza \(bez P5\)))?\) "
+                    r"\| pasmo (?P<lo>[\d.]+)-(?P<hi>[\d.]+) dni koszyka KS, najnizej x(?P<mn>[\d.]+), krok (?P<st>[\d.]+)%/d, danina od skarbca W w tych miastach (?P<hr>[\d.]+)%/d "
+                    r"\((?:dzis srednio (?P<hrd>[\d.]+|-)%, schodzi razem z kappa; )?Ds Hoard Due Rate (?P<dr>[\d.]+)%\) "
                     r"\| miasta z regula (?P<n>\d+) \(b: (?P<nb>\d+)\): ponizej pasma \(pelna placa\) (?P<below>\d+), w pasmie (?P<inb>\d+), ponad pasmem (?P<above>\d+), bez potrzeby W \(pelna placa\) (?P<non>\d+) "
                     r"\| \(a\) wskaznik < 1: miast (?P<na>\d+), podloga przezycia \(bez ciecia\) (?P<prot>\d+) "
                     r"\| kappa min (?P<kmin>[\d.]+|-) / mediana (?P<kmed>[\d.]+|-) / max (?P<kmax>[\d.]+|-), miast z kappa < 1: (?P<klow>\d+) "
                     r"\| zapas dni W \(koszyk KS\) mediana (?P<dmed>[\d.]+|-), kiesy W/R/P miast z regula (?P<kw>-?\d+)/(?P<kr>-?\d+)/(?P<kp>-?\d+) \(dni W/R/P (?P<dw>[\d.]+|-)/(?P<dr2>[\d.]+|-)/(?P<dp>[\d.]+|-)\) "
                     r"\| doba: place W z kas pelne (?P<full>-?\d+) = zaplacone (?P<paid>-?\d+) \+ zostalo w kasach miast (?P<cut>-?\d+) \(kontrola pelne - zaplacone - zostalo = (?P<ctl>-?\d+)\), "
                     r"z tego \(a\) wskaznik ponizej 1: (?P<ca>-?\d+), \(b\) stawka wedlug koszyka: (?P<cb>-?\d+); place z nadwyzki R/P dla W \(Ks Labour Basket Households (?P<kh>TAK|NIE)\) pelne (?P<sf>-?\d+) = "
-                    r"zaplacone (?P<sp>-?\d+) \+ zostalo u R/P \(na towar\) (?P<sc>-?\d+) \| kasy miast z KS razem (?P<gold>-?\d+) \(miast (?P<nt>\d+), ponad 1\.5 x zapas kupcow (?P<nover>\d+)\) "
+                    r"zaplacone (?P<sp>-?\d+) \+ zostalo (?:u R/P \(na towar\)|w kiesach R/P) (?P<sc>-?\d+) \| kasy miast z KS razem (?P<gold>-?\d+) \(miast (?P<nt>\d+), ponad 1\.5 x zapas kupcow (?P<nover>\d+)"
+                    r"(?:, nadwyzka ponad 1\.5 x zapas (?P<over>-?\d+))?\) "
                     r"\| czas (?P<ms>[\d.]+) ms \| potkniecia (?P<stum>\d+)")
 
 
@@ -36610,7 +36624,7 @@ NAK_TRANSIT = ("razem", "cla miast i zamkow", "podatek wsi", "portfele wezwan do
 def _nak_scan(path):
     """Jeden przebieg po logu: linia 'Akumulator kies', posiadacze 'Pieniadz swiata', 'Kiesa ludu' (W/R/P, podzamcze, zapas dni W), firmy F3 (doba ustalenia),
     'Zbytki ludu' (lepszy stol), linia 'KS: rampa' (bieg z KS), ERROR paczki."""
-    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None, "f4": {}}
+    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None, "f4": {}, "m6": {}}
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -36664,6 +36678,9 @@ def _nak_scan(path):
                 v = num(r"firmy od doby (-?\d+)", s)
                 if v is not None and v >= 0:
                     D["fix"] = v
+                dm = num(r"dzien (\d+)", s[:60]); m6 = num(r"wyplata kupcom M6: miasta (\d+)", s)   # recenzja f4: dokad idzie pieniadz zatrzymany w kasach
+                if dm is not None and m6 is not None:
+                    D["m6"][dm] = m6
             elif s.startswith("Zbytki ludu (P3-P5): dzien"):
                 day = num(r"dzien (\d+)", s[:40])
                 o = num(r"lepszy stol (\d+), dom", s); b = num(r"kupione z oferty \d+ zl \([\d.]+%; grupy: [^)]*?lepszy stol (\d+)", s)
@@ -36896,9 +36913,9 @@ def nakum_main(logp, until=None):
         gk = _nak_growth({d: int(F4[d]["gold"]) for d in fd}, [d for d in fd if d in w4])
         cuts = [int(F4[d]["cut"]) for d in fd if d in w4]
         if gk is not None and cuts:
-            mc = sum(cuts) / len(cuts); lim = max(60000.0, 0.5 * mc)
+            mc = sum(cuts) / len(cuts); lim = max(30000.0, 0.2 * mc)        # recenzja f4: bylo max(60 tys., 0.5 x zostalo) - przepuszczalo ok. 70% dawnej nadwyzki W
             rep.add("NAKUM-12 (f4): kasy miast z KS (linia f4) - przyrost na dobe wobec 'zostalo w kasach miast'", f"{gk:+.0f}/d przy zostalo {mc:.0f}/d (ponad 1.5 x zapas kupcow: {F4[fd[-1]]['nover']} miast)",
-                    f"<= {lim:.0f}/d (max(60 tys., 0.5 x zostalo) - pieniadz plynie dalej: M6, firmy, skup)", gk <= lim)
+                    f"<= {lim:.0f}/d (max(30 tys., 0.2 x zostalo) - pieniadz plynie dalej: M6, firmy, skup)", gk <= lim)
         else:
             rep.add("NAKUM-12 (f4): kasy miast z KS", "za malo dob linii f4 w oknie", "INFO", None)
         gp4 = _nak_growth({d: v[2] for d, v in D["kl"].items()}, w4); gr4 = _nak_growth({d: v[1] for d, v in D["kl"].items()}, w4)
@@ -36906,8 +36923,47 @@ def nakum_main(logp, until=None):
             rep.add("NAKUM-13 (f4): kiesa P miast - przyrost na dobe (R - INFO)", f"P {gp4:+.0f}/d, R {gr4:+.0f}/d", "P <= +30 000/d (bez nowego akumulatora u patrycjatu)", gp4 <= 30000)
         else:
             rep.add("NAKUM-13 (f4): kiesa P miast", "brak linii 'Kiesa ludu' w oknie", "INFO", None)
+        # NAKUM-14..17 (recenzja f4, 18.10): dokad poszla dawna pompa W - danina od skarbca R+P i do panow, nadwyzka kas ponad 1.5 x zapas (M6)
+        bf = [d for d in ad if fd[0] - 28 <= d < fd[0] and "take" in A[d]]
+        aw4 = [d for d in w4 if d in A and "take" in A[d]]
+        if aw4:
+            def _av(days, i):
+                return sum(float(A[d]["take"][i]) for d in days) / max(1, len(days))
+            wB, rpB, lB, allB = (_av(bf, 1), _av(bf, 2) + _av(bf, 3), _av(bf, 6), _av(bf, 1) + _av(bf, 2) + _av(bf, 3)) if bf else (0.0, 0.0, 0.0, 0.0)
+            refd = len(bf) >= 7 and wB >= 20000
+            refAll = allB if refd else 207719.0; refL = lB if refd else 155921.0
+            src = f"28 dob przed f4 ({len(bf)} dob)" if refd else "odniesienie fin86 (przed f4 danina W < 20 tys./d albo < 7 dob)"
+            wN, rpN, lN = _av(aw4, 1), _av(aw4, 2) + _av(aw4, 3), _av(aw4, 6)
+            rep.add("NAKUM-14 (f4): danina od skarbca R+P - srednia w oknie wobec calej daniny W+R+P przed",
+                    f"R+P {rpN:.0f}/d (przed {rpB:.0f}), W {wN:.0f}/d (przed {wB:.0f}); odniesienie {refAll:.0f}/d - {src}",
+                    f"<= {1.5 * refAll:.0f}/d (1.5 x dawna pompa - danina P/R przejmuje dawna danine W, byle nie wieksza)", rpN <= 1.5 * refAll)
+            rep.add("NAKUM-15 (f4): danina od skarbca do panow (razem) - srednia w oknie", f"{lN:.0f}/d (przed {lB:.0f}); odniesienie {refL:.0f}/d - {src}",
+                    f"<= {1.3 * refL:.0f}/d (1.3 x przed - bez wiekszej pompy do panow)", lN <= 1.3 * refL)
+        else:
+            rep.add("NAKUM-14/15 (f4): danina od skarbca R+P i do panow", "brak linii 'Akumulator kies' w oknie", "INFO", None)
+        ov = {d: int(F4[d]["over"]) for d in fd if F4[d].get("over") is not None}
+        if len(ov) >= 2:
+            od = sorted(ov)
+            go = _nak_growth(ov, [d for d in od if d in w4])
+            allc = [int(F4[d]["cut"]) for d in fd]; mca = sum(allc) / max(1, len(allc))
+            mc = sum(cuts) / len(cuts) if cuts else 0.0
+            lim16, lim16b = max(30000.0, 0.15 * mc), max(1e6, 28.0 * mca)
+            dst = ov[od[-1]] - ov[od[0]]
+            ok16 = (go is None or go <= lim16) and dst <= lim16b
+            rep.add("NAKUM-16 (f4): kasy ponad 1.5 x zapas kupcow (linia f4, zrodlo M6) - zapas",
+                    f"{ov[od[0]] / 1e6:.2f} -> {ov[od[-1]] / 1e6:.2f} mln (od pierwszej linii {dst:+.0f}), w oknie " + (f"{go:+.0f}/d" if go is not None else "-")
+                    + f"; zostalo w kasach srednio {mca:.0f}/d (w oknie {mc:.0f}/d)",
+                    f"w oknie <= {lim16:.0f}/d i od pierwszej linii <= {lim16b:.0f} (M6 1/28 dziennie oproznia nadwyzke)", ok16)
+        else:
+            rep.add("NAKUM-16 (f4): kasy ponad 1.5 x zapas kupcow", "brak pola 'nadwyzka ponad 1.5 x zapas' (linia f4 sprzed recenzji)", "INFO", None)
+        M6 = D["m6"]
+        m6b = [M6[d] for d in M6 if fd[0] - 28 <= d < fd[0]]; m6w = [M6[d] for d in M6 if d in w4]
+        if aw4:
+            rep.add("NAKUM-17 (f4): skutek (INFO) - danina W / R+P / do panow i wyplata kupcom M6 (miasta) przed f4 i w oknie",
+                    f"danina W {wB:.0f} -> {wN:.0f}, R+P {rpB:.0f} -> {rpN:.0f}, do panow {lB:.0f} -> {lN:.0f} zl/d; M6 "
+                    + (f"{sum(m6b) / len(m6b):.0f}" if m6b else "-") + " -> " + (f"{sum(m6w) / len(m6w):.0f}" if m6w else "-") + " zl/d", "INFO", None)
     else:
-        rep.add("NAKUM-10..13 (f4): place W wedlug koszyka", f"linii f4 {len(fd)}" + (f" od doby {fd[0]} (za krotko - potrzeba 35 dob)" if fd else ""),
+        rep.add("NAKUM-10..17 (f4): place W wedlug koszyka", f"linii f4 {len(fd)}" + (f" od doby {fd[0]} (za krotko - potrzeba 35 dob)" if fd else ""),
                 "INFO (log sprzed f4-place-ludu, klucze wylaczone albo KS niezastosowany)", None)
     # NAKUM-8 czas, NAKUM-9 potkniecia i ERROR
     if ad:
