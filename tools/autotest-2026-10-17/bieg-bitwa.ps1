@@ -29,9 +29,14 @@ $rel = @(
     'CrashScribe\ModuleData\CrashScribe.settings.xml'
 )
 # 16.10 uklad wiosek v5 (noc-wioski): pliki _v4 obowiazkowe przy drzewie v5 (jak tools/wgranie/wgraj.ps1 d5c37b2f)
+# 17/18.10 sw-przysiolki: uklad v6 (przysiolki) - arm_map_villages.tsv to v6, pliki _v5 (stary uklad v5: klucz VillageLayoutV6 = false i zapis v5 Jeffa
+# przechodzacy na v6 po uid - VillageBook.OldLayout) i _v4 obowiazkowe przy drzewie v6
 $lay = Join-Path $Tree 'Armoury\ModuleData\arm_map_villages.tsv'
-$v5tree = (Test-Path -LiteralPath $lay -PathType Leaf) -and ((Get-Content -LiteralPath $lay -TotalCount 1) -like '*layout v5*')
+$layHead = $(if (Test-Path -LiteralPath $lay -PathType Leaf) { [string](Get-Content -LiteralPath $lay -TotalCount 1) } else { '' })
+$v6tree = $layHead -like '*layout v6*'
+$v5tree = ($layHead -like '*layout v5*') -or $v6tree
 if ($v5tree) { $rel += 'Armoury\ModuleData\arm_map_villages_v4.tsv'; $rel += 'Armoury\ModuleData\arm_map_village_lore_v4.tsv' }
+if ($v6tree) { $rel += 'Armoury\ModuleData\arm_map_villages_v5.tsv'; $rel += 'Armoury\ModuleData\arm_map_village_lore_v5.tsv' }
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_houses_canon.tsv')) { $rel += 'Armoury\ModuleData\arm_houses_canon.tsv' }   # 16.10 herby kanon (noc-herby)
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv')) { $rel += 'Armoury\ModuleData\arm_ks_land.tsv' }   # 16.10 KS kalibracja startu
 $ef = @()

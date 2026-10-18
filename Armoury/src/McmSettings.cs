@@ -6072,6 +6072,14 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV5 { get; set; } = true;
 
+        [SettingPropertyBool("Village Layout V6", HintText = "some villages of the most crowded clusters move out to the empty land of their own district as small hamlets - shepherds and goatherds in the hills and on the steppe, woodcutters and charcoal burners in the forest, trappers, fishers on a lonely shore. The people of every district stay the same. It takes effect when a campaign is loaded. Off = the layout before the hamlets")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageLayoutV6 { get; set; } = true;
+
+        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet work the land where the hamlet stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Off = they count as working the fields of the village they came from")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageHamletKsLand { get; set; } = true;
+
         [SettingPropertyBool("Map Roads Probe Enabled", HintText = "TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn")]
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
@@ -8453,6 +8461,8 @@ namespace Armoury
             s.VillageCanonHouses = VillageCanonHouses;
             s.VillageTwoPennants = VillageTwoPennants;
             s.VillageLayoutV5 = VillageLayoutV5;
+            s.VillageLayoutV6 = VillageLayoutV6;
+            s.VillageHamletKsLand = VillageHamletKsLand;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.StateHygieneEnabled = StateHygieneEnabled;
             s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;

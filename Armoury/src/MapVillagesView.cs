@@ -87,6 +87,11 @@ namespace Armoury
         public bool ModelUnknown;         // v4: w kolumnie "model" nieznana wartosc (obrazek village, liczone w logu)
         public int Line;                  // numer wiersza w pliku (do logu)
         public float RoadDist = -1f;      // E4/11 (krytyka K1): odleglosc drogi od wsi gry z kolumny road_dist (opcjonalna; -1 = brak - linia prosta); widok jej nie czyta
+        // sw-przysiolki (uklad v6): przysiolek na pustkowiu - zajecie (kolumna hamlet; "" = zwykla wioska) i ziemia punktu dla KS (kolumny ks_*; tylko przysiolki).
+        // Kolumny opcjonalne: plik v5 / v4 bez nich = wszystko puste. Widok ich nie czyta; ksiega (VillageBook.HamletRecords) i KS (VillageHamlets.OverlayKs).
+        public string Hamlet = "";        // shepherds / goatherds / drovers / swineherds / woodcutters / charcoal / trappers / hunters / fishers
+        public string KsStart = "", KsTerr = "", KsKind = "", KsModel = "";
+        public float KsDSea = -1f, KsDRiver = -1f, KsDMount = -1f;
     }
 
     /// <summary>Wynik wczytania pliku: wiersze, naglowek, odrzucone wiersze z powodami.</summary>
@@ -140,14 +145,16 @@ namespace Armoury
     /// <summary>Czyste funkcje danych wiosek (bez gry): wczytanie, CRC, lancuch ognia, obrys, przerzedzenie, os domow.</summary>
     internal static class MapVillageData
     {
-        internal const string FileName = "arm_map_villages.tsv";              // uklad v5 (Jeff 16.10: 20% mniej wiosek, osady wedlug miejsca)
-        internal const string FileNameV4 = "arm_map_villages_v4.tsv";         // uklad v4 (2446 wiosek po ok. 16 osad) - klucz VillageLayoutV5 = false
+        internal const string FileName = "arm_map_villages.tsv";              // sw-przysiolki: uklad v6 (przysiolki na pustkowiach; dotad v5 - Jeff 16.10: 20% mniej wiosek, osady wedlug miejsca)
+        internal const string FileNameV5 = "arm_map_villages_v5.tsv";         // sw-przysiolki: uklad v5 (1957 wiosek) - klucz VillageLayoutV6 = false (i VillageLayoutV5 = true)
+        internal const string FileNameV4 = "arm_map_villages_v4.tsv";         // uklad v4 (2446 wiosek po ok. 16 osad) - klucze VillageLayoutV6 = false i VillageLayoutV5 = false
         internal const int CheckNoCrc = 0, CheckMatch = 1, CheckMismatch = 2;
 
         // Jeff 16.10 (VillageLayoutV5): wybor ukladu RAZ NA SESJE - pierwszy odczyt pliku w sesji (VillageBook.Resolve albo widok mapy, kto pierwszy) czyta klucz z MCM
         // (McmSettings.Apply idzie dopiero po Resolve w OnSessionLaunched, wiec Settings.Current moze byc jeszcze z pliku ustawien); ksiega, widok i lore biora ten sam
         // plik do konca sesji (zmiana klucza w trakcie - od nastepnego wczytania). ResetChoice - VillageBook.Reset (konstruktor ArmouryBehavior, kazda kampania).
         private static bool _chosen, _v5 = true;
+        private static int _ver = 6;                // sw-przysiolki: uklad tej sesji 6 / 5 / 4
         private static string _choiceNote = "";
 
         internal static void ResetChoice() { _chosen = false; _choiceNote = ""; }
@@ -155,11 +162,17 @@ namespace Armoury
         /// <summary>Opis wyboru do linii startowych ("" - plik wybrany kluczem jest w module).</summary>
         internal static string ChoiceNote { get { EnsureChosen(); return _choiceNote; } }
 
-        /// <summary>Uklad v5 w tej sesji (wybor przy pierwszym odczycie).</summary>
+        /// <summary>Uklad v5 albo nowszy w tej sesji (wybor przy pierwszym odczycie) - false tylko przy v4. sw-przysiolki: v6 tez "nie v4".</summary>
         internal static bool LayoutV5 { get { EnsureChosen(); return _v5; } }
 
-        /// <summary>Nazwa pliku ukladu tej sesji (v5 albo v4).</summary>
-        internal static string LayoutFileName { get { return LayoutV5 ? FileName : FileNameV4; } }
+        /// <summary>sw-przysiolki: numer ukladu tej sesji - 6 (przysiolki), 5 albo 4.</summary>
+        internal static int LayoutVersion { get { EnsureChosen(); return _ver; } }
+
+        /// <summary>Nazwa pliku ukladu tej sesji (v6, v5 albo v4).</summary>
+        internal static string LayoutFileName { get { return FileOfVersion(LayoutVersion); } }
+
+        /// <summary>sw-przysiolki: plik ukladu danej wersji (6 - arm_map_villages.tsv, 5 - _v5, 4 - _v4).</summary>
+        internal static string FileOfVersion(int v) { return v >= 6 ? FileName : (v == 5 ? FileNameV5 : FileNameV4); }
 
         private static void EnsureChosen()
         {
@@ -168,13 +181,22 @@ namespace Armoury
             var s = Settings.Current;
             bool v = s == null || s.VillageLayoutV5;
             try { v = McmLayoutV5(v); } catch { }
-            // wgranie bez jednego z plikow (np. sam arm_map_villages.tsv bez _v4) - drugi uklad zamiast braku wiosek; lore idzie za ukladem (bramka crc i tak pilnuje)
-            if (!ModuleFileExists(v ? FileName : FileNameV4) && ModuleFileExists(v ? FileNameV4 : FileName))
+            // sw-przysiolki: klucz VillageLayoutV6 (domyslnie TAK) wybiera v6; wylaczony - jak dotad VillageLayoutV5 (v5 albo v4)
+            bool v6 = s == null || s.VillageLayoutV6;
+            try { v6 = McmLayoutV6(v6); } catch { }
+            int want = v6 ? 6 : (v ? 5 : 4);
+            int ver = want;
+            // wgranie bez pliku wybranego ukladu - inny uklad zamiast braku wiosek (najpierw starszy, potem nowszy); lore idzie za ukladem (bramka crc i tak pilnuje).
+            // Wgranie sprzed v6 (arm_map_villages.tsv = v5, bez _v5) przy kluczu v6 wylaczonym: v5 z arm_map_villages.tsv - ksiega i lore rozpoznaja uklad po crc.
+            if (!ModuleFileExists(FileOfVersion(want)))
             {
-                _choiceNote = "BRAK pliku " + (v ? FileName : FileNameV4) + " - uklad " + (v ? "v4" : "v5") + " mimo klucza Village Layout V5 " + (v ? "TAK" : "NIE");
-                v = !v;
+                int[] order = want == 6 ? new[] { 5, 4 } : (want == 5 ? new[] { 6, 4 } : new[] { 5, 6 });
+                foreach (int o in order) if (ModuleFileExists(FileOfVersion(o))) { ver = o; break; }
+                if (ver != want)
+                    _choiceNote = "BRAK pliku " + FileOfVersion(want) + " - uklad v" + ver + " mimo kluczy Village Layout V6 " + (v6 ? "TAK" : "NIE") + " / V5 " + (v ? "TAK" : "NIE");
             }
-            _v5 = v;
+            _ver = ver;
+            _v5 = ver >= 5;
         }
 
         private static bool ModuleFileExists(string name)
@@ -194,6 +216,13 @@ namespace Armoury
         private static bool McmLayoutV5(bool dflt)
         {
             try { var i = McmSettings.Instance; return i != null ? i.VillageLayoutV5 : dflt; }
+            catch { return dflt; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool McmLayoutV6(bool dflt)
+        {
+            try { var i = McmSettings.Instance; return i != null ? i.VillageLayoutV6 : dflt; }
             catch { return dflt; }
         }
 
@@ -307,6 +336,19 @@ namespace Armoury
             r.Model = ParseModel(Get(c, col, "model"), out r.ModelUnknown);   // v4; brak kolumny = village
             string uid = Get(c, col, "uid");
             r.Uid = string.IsNullOrEmpty(uid) || uid == "-" ? r.VillageId + "#" + r.Id.ToString(CultureInfo.InvariantCulture) : uid;
+            // sw-przysiolki (v6): kolumny opcjonalne przysiolka - "-" albo brak = zwykla wioska; zly wiersz ziemi KS = przysiolek bez ziemi KS (KS bierze wiersz z arm_ks_land.tsv)
+            string hm = Get(c, col, "hamlet");
+            if (!string.IsNullOrEmpty(hm) && hm != "-")
+            {
+                r.Hamlet = hm;
+                string ks = Get(c, col, "ks_start"), kt = Get(c, col, "ks_terr"), kk = Get(c, col, "ks_kind"), km = Get(c, col, "ks_model");
+                float a, b, d;
+                if (!string.IsNullOrEmpty(ks) && ks != "-" && !string.IsNullOrEmpty(kt) && kt != "-" && !string.IsNullOrEmpty(kk) && kk != "-" && !string.IsNullOrEmpty(km) && km != "-"
+                    && Num(Get(c, col, "ks_dsea"), out a) && Num(Get(c, col, "ks_driver"), out b) && Num(Get(c, col, "ks_dmount"), out d) && a >= 0f && b >= 0f && d >= 0f)
+                {
+                    r.KsStart = ks; r.KsTerr = kt; r.KsKind = kk; r.KsModel = km; r.KsDSea = a; r.KsDRiver = b; r.KsDMount = d;
+                }
+            }
             return null;
         }
 
@@ -1691,7 +1733,7 @@ namespace Armoury
             var file = MapVillageData.Parse(Encoding.UTF8.GetString(bytes));
             file.FileCrc32 = MapVillageData.Crc32(bytes);
             string head = "Wioski: plik '" + file.Title + "' (crc32 " + file.FileCrc32.ToString("X8") + ", " + bytes.Length + " B, wierszy danych "
-                          + file.DataLines + "; " + MapVillageData.LayoutFileName + ", uklad " + (MapVillageData.LayoutV5 ? "v5" : "v4")
+                          + file.DataLines + "; " + MapVillageData.LayoutFileName + ", uklad v" + MapVillageData.LayoutVersion
                           + (MapVillageData.ChoiceNote.Length > 0 ? " - " + MapVillageData.ChoiceNote : "") + ")";
             if (file.MissingColumns.Length > 0)
             {

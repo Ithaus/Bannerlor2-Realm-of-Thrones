@@ -277,6 +277,7 @@ namespace Armoury
             try
             {
                 EnsureLand();
+                try { VillageHamlets.OverlayKs(_landVil); } catch (Exception he) { Stumble("VillageHamlets.OverlayKs", he); }   // sw-przysiolki: ziemia punktu przysiolka (uklad v6) w wierszu S - PRZED ResolveLive (bloki z row.O)
                 ResolvePending();
                 if (_state == StateApplied) ResolveLive();
                 uint lay; bool lm = LandReady && LayoutMatches(out lay);

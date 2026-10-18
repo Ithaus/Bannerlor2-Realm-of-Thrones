@@ -24,11 +24,20 @@ foreach ($r in 'Armoury\GUI\Prefabs\ArmBurnedVillageLabels.xml', 'Armoury\GUI\Pr
 }
 # Jeff 16.10 (uklad wiosek v5, galaz w-toku/noc-wioski): uklad wiosek i lore ida PARAMI (bramka layout_crc). arm_map_villages.tsv zawsze (wyzej); pliki _v4
 # obowiazkowe, gdy uklad w drzewie to v5 (klucz VillageLayoutV5 = false i zapis v4 wczytany na v5 - VillageBook.OldLayout); starsze drzewo bez v5 - pomijane
+# 17/18.10 sw-przysiolki: uklad v6 (przysiolki) - arm_map_villages.tsv to v6; pliki _v5 (stary uklad v5: klucz VillageLayoutV6 = false i zapis v5 Jeffa na v6 po uid)
+# i _v4 obowiazkowe przy drzewie v6; drzewo v5 - jak dotad tylko _v4
 $lay = Join-Path $Tree 'Armoury\ModuleData\arm_map_villages.tsv'
-$v5tree = (Test-Path -LiteralPath $lay -PathType Leaf) -and ((Get-Content -LiteralPath $lay -TotalCount 1) -like '*layout v5*')
+$layHead = $(if (Test-Path -LiteralPath $lay -PathType Leaf) { [string](Get-Content -LiteralPath $lay -TotalCount 1) } else { '' })
+$v6tree = $layHead -like '*layout v6*'
+$v5tree = ($layHead -like '*layout v5*') -or $v6tree
 foreach ($r in 'Armoury\ModuleData\arm_map_villages_v4.tsv', 'Armoury\ModuleData\arm_map_village_lore_v4.tsv') {
     $src = Join-Path $Tree $r
     if (-not $v5tree -and -not (Test-Path -LiteralPath $src -PathType Leaf)) { continue }
+    $items += [pscustomobject]@{ name = $r; src = $src; dst = (Join-Path $GameDir ('Modules\' + $r)); dll = $false }
+}
+foreach ($r in 'Armoury\ModuleData\arm_map_villages_v5.tsv', 'Armoury\ModuleData\arm_map_village_lore_v5.tsv') {
+    $src = Join-Path $Tree $r
+    if (-not $v6tree -and -not (Test-Path -LiteralPath $src -PathType Leaf)) { continue }
     $items += [pscustomobject]@{ name = $r; src = $src; dst = (Join-Path $GameDir ('Modules\' + $r)); dll = $false }
 }
 # 16.10 herby kanon (noc-herby): plik rodow idzie z DLL, gdy jest w drzewie

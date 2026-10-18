@@ -28,9 +28,11 @@ namespace Armoury
     /// </summary>
     internal static class MapVillageLore
     {
-        internal const string FileName = "arm_map_village_lore.tsv";            // lore ukladu v5 (bramka = crc ukladu v5)
-        internal const string FileNameV4 = "arm_map_village_lore_v4.tsv";       // Jeff 16.10: lore ukladu v4 (VillageLayoutV5 = false)
-        private static string LoreFileName { get { return MapVillageData.LayoutV5 ? FileName : FileNameV4; } }
+        internal const string FileName = "arm_map_village_lore.tsv";            // sw-przysiolki: lore ukladu v6 (bramka = crc ukladu v6; dotad v5)
+        internal const string FileNameV5 = "arm_map_village_lore_v5.tsv";       // sw-przysiolki: lore ukladu v5 (VillageLayoutV6 = false)
+        internal const string FileNameV4 = "arm_map_village_lore_v4.tsv";       // Jeff 16.10: lore ukladu v4 (VillageLayoutV6 = false i VillageLayoutV5 = false)
+        private static string LoreFileName { get { int v = MapVillageData.LayoutVersion; return v >= 6 ? FileName : (v == 5 ? FileNameV5 : FileNameV4); } }
+        private static string _loreUsed;                                         // sw-przysiolki: plik lore naprawde wczytany (zapas po bramce - nizej)
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly string[] NoIds = new string[0];
 
@@ -128,9 +130,23 @@ namespace Armoury
             {
                 _layoutCrc = crc; _layoutUids = uids; _layoutN = uids.Count;
                 string name = LoreFileName;
+                _loreUsed = name;
                 string path = MapVillageTooltip.ModulePath("ModuleData", name);
-                if (path == null || !System.IO.File.Exists(path)) { _note = "brak pliku " + name; return; }
-                Parse(System.IO.File.ReadAllText(path, Encoding.UTF8), uids);
+                string text = path != null && System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path, Encoding.UTF8) : null;
+                // sw-przysiolki: plik ukladu wybrany zapasem (wgranie bez pliku wybranego ukladu) albo lore innego ukladu - pierwszy plik lore modulu z bramka = crc ukladu ksiegi
+                if (text == null || HeadCrc(text) != crc)
+                {
+                    foreach (var alt in new[] { FileName, FileNameV5, FileNameV4 })
+                    {
+                        if (alt == name) continue;
+                        string ap = MapVillageTooltip.ModulePath("ModuleData", alt);
+                        if (ap == null || !System.IO.File.Exists(ap)) continue;
+                        string at = System.IO.File.ReadAllText(ap, Encoding.UTF8);
+                        if (HeadCrc(at) == crc) { text = at; _loreUsed = alt; break; }
+                    }
+                }
+                if (text == null) { _note = "brak pliku " + name; return; }
+                Parse(text, uids);
             }
             catch (Exception e) { _rows.Clear(); _gateOk = false; _note = "blad wczytania (" + e.GetType().Name + ")"; Log.Error("MapVillageLore.Load", e); }
             finally { _loadMs = sw.Elapsed.TotalMilliseconds; }
@@ -191,6 +207,25 @@ namespace Armoury
             if (_fileCrc != _layoutCrc) { _note = "inny uklad wiosek (bramka pliku " + _fileCrc.ToString("X8") + ", uklad ksiegi " + _layoutCrc.ToString("X8") + ") - lore wylaczone"; _rows.Clear(); return; }
             _gateOk = true;
             _note = "";
+        }
+
+        /// <summary>sw-przysiolki: crc z naglowka "# layout_crc:" pliku lore (0 - brak) - wybor pliku lore zgodnego z ukladem ksiegi.</summary>
+        private static uint HeadCrc(string text)
+        {
+            int n = 0;
+            foreach (string raw in text.Split('\n'))
+            {
+                string line = raw.TrimEnd('\r');
+                if (line.Length == 0) continue;
+                if (line[0] != '#' || ++n > 40) break;
+                string body = line.Substring(1).Trim();
+                if (!body.StartsWith("layout_crc:", StringComparison.Ordinal)) continue;
+                string v = body.Substring("layout_crc:".Length).Trim();
+                if (v.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) v = v.Substring(2);
+                uint c;
+                return uint.TryParse(v, NumberStyles.HexNumber, Inv, out c) ? c : 0u;
+            }
+            return 0u;
         }
 
         private static string Get(string[] f, Dictionary<string, int> col, string name)
@@ -364,7 +399,7 @@ namespace Armoury
             EnsureLoaded();
             ResolveBk();
             string lore = _gateOk
-                ? "lore " + _rows.Count + "/" + _layoutN + " (bramka " + _fileCrc.ToString("X8") + " zgodna, odrzucone " + _rejected + ", bez lore " + _missing + ", wczytanie " + _loadMs.ToString("0", Inv) + " ms raz na uklad, plik " + LoreFileName + ")"
+                ? "lore " + _rows.Count + "/" + _layoutN + " (bramka " + _fileCrc.ToString("X8") + " zgodna, odrzucone " + _rejected + ", bez lore " + _missing + ", wczytanie " + _loadMs.ToString("0", Inv) + " ms raz na uklad, plik " + (_loreUsed ?? LoreFileName) + ")"
                 : "lore WYLACZONE: " + _note + (_layoutN > 0 ? " (wiosek ukladu " + _layoutN + ", odrzucone " + _rejected + ")" : "") + " - dymek bez linii lore";
             Log.Info("Dymek wioski (E7/W2): start | " + lore + ", dymek " + MapVillageTooltip.Movie + " " + MapVillageTooltip.StatusText
                      + " | BK: wiara " + (BkFaithOk ? "tak" : "nie") + ", tytuly " + (BkTitleOk ? "tak" : "nie")
