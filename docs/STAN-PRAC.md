@@ -3128,3 +3128,6 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
 - 15:30 PDT: f18-mcm GOTOWE (wf_0e0e0567-597) 12e53b8e: gen_mcm daje RequireRestart = false wszystkim polom (Armoury 1975, RC 112, GT 40) poza MapSpeedButtons; dopiski "(takes effect after
   loading a save)" / startowe; recenzja: SlowMuster (VolunteerRegenPercent) i BkArmourList bez bramki startowej (dzialaja na zywo), BattleStaminaEnabled - opis "read once at game start".
   Scalone do noc-ks4 **6478f861**. W toku: f19-drogi, f19-ekonomia-audyt, f19-kanon (wf_449079c2-612: kanon-a sojusze/Tyrellowie/bieda, kanon-b przywrocenie 8 twierdz).
+- 15:25 PDT: f19-drogi GOTOWE (wf_65af1d03-cd5): MapSideRoads.All.cs (nowy klucz MapSideRoadsAllVillages TAK) - jedno pole Dijkstry z wielu zrodel (trakty, bramy miast/zamkow, drogi, wsie gry),
+  kolejnosc Prima, laczki Beziera przy trakcie (~25 st., bez kikutow); podglad v7: 2450 drog, 30 500 jedn., 73 962 decali (odstep x2.72 - limit 80k), plan ~610 ms; wiosek ukladu BEZ DROGI 0
+  (bylo 1109), 4 wsie gry na wyspach bez trasy. Podglady scratchpad img/1..6-*.png. Do zdjec w grze: tools/drogi/zdjecia-drogi-f19.json.
