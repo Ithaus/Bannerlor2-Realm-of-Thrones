@@ -2732,3 +2732,9 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   pana miasta dowiezc jedzenie, kupcy przywoza, bo duzo zarobia, chyba ze glod globalny - ustawia to ekonomia podazy i popytu" (-> fala 2: glod miasta -> niepokoj/bunt + pan
   miasta finansuje dowoz, bez regul jednej krainy); NA KONIEC: pelny przeglad logiki calej ekonomii - akumulatory pieniadza (kto zarabia, a nie wydaje i wchlonie kase),
   realizm z malymi poprawkami dla grywalnosci.
+- 17:00 PDT: TEST fin80 (efbbf0dc, 120 dob bez bitwy, Armoury-2026-10-17_16-26-10.log + CSV Modules/Armoury/Logs/2026-10-17_16-26-10, kopia logi-testow): kod 0, ERROR 0
+  (CrashScribe 22 = te same pierwsze wyjatki Harmony/BKROTPatch przy starcie co zawsze), flagi usuniete, gra przywrocona (d84f7b66). nks 17 NIE + 5 ETAP z 53 (fin78: 24);
+  nds 37/41. Dobre: zgony z glodu 0 (NKS-15), KsRecipes czynne (32 linie), KS-H 1.29M szt., zwroty 0.02%. NIE: kiesy wsi -0.28%/d (NDS-3a, mediana 0.80), D staly rodow
+  0.865 (fin78 0.948) i korona 0.914 (0.945) - prawdopodobnie KsRecipes (mniej wyrobow z wsadu), SOL dziwna (S/C 2.5-4.5, cena 5.5x, 160% zuzycia bez rynku), ceny 2-3x
+  przy S/C > 1 (NKS-7), podloga spichlerza 99% (NKS-26 liczy STAN FloorOn, nie podloge dana - _granNoFloor nie w linii; do poprawy linii i progu), wlna/len 0.2-0.6,
+  KS-H kasa celu za mala 37.8% (kredyt w r4-kupcy), koszt 4.45/14.3 ms (q95 33.5). Diagnoza: workflow wf_2165d530-0b5 (4 agenci, tylko odczyt: dochod, sol, kiesy, ceny).
