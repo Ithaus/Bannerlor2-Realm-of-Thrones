@@ -7956,6 +7956,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsRampMineralTimes { get; set; } = true;
 
+        [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public bool KsFoodHandsFollowMarket { get; set; } = true;
+
+        [SettingPropertyBool("Ks Food Hands Grow Groves", HintText = "with Ks Food Hands Follow Market: vineyards, olive groves, citrus orchards and date groves take more hands when the market lacks their fruit, like any other work - the new trees bear at once (the switch rule plants trees over 364 days and charges for it). Off = trees only give hands up under this rule, they never gain", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public bool KsFoodHandsGrowGroves { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Colliers", HintText = "under the start calibration, with Bloomery At Mine: when a mine's bloomery has too little wood for the day's ore, the miners who would stand idle burn charcoal instead - they cut the district's own wood (the world's woodcutter output times how fit the mine's land is for timber: 0 in deserts and on the steppe) and char it for the bloomery. The mine smelts fewer blooms than with bought wood (part of its hands make charcoal), but no hands stand idle and no gold changes hands; bought, forest and credited wood still come first. Off = idle hands, as before", RequireRestart = false)]
         [SettingPropertyGroup("Charcoal for bloomeries under the start calibration (night 18.10)")]
         public bool BloomeryColliers { get; set; } = true;
@@ -9964,6 +9972,8 @@ namespace Armoury
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
             s.BloomeryWoodCredit = BloomeryWoodCredit;
             s.KsRampMineralTimes = KsRampMineralTimes;
+            s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
+            s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;
             s.BanditLimitPerHideout = BanditLimitPerHideout;
             s.BanditBirthsWherePeople = BanditBirthsWherePeople;

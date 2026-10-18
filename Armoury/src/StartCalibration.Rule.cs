@@ -58,6 +58,7 @@ namespace Armoury
             _pxRestartDay = -1; _pxRestartEnd = -1;               // KS r4 P7 (r4-ceny): restart srednich cen od nowa przy wlaczeniu
             _f4A7Day = -1;                                        // f4-pomiary: doba ostatniej diagnozy A7 (nowa kampania / wczytanie)
             F5Reset();                                            // f5-koszt: liczniki linii "KS: koszt f5" i kontrola raz na sesje
+            F20Reset();                                           // f20-d4: pamiec polek rynku (tempo) i wagi zajec od nowa
             A7sReset();                                           // f5-a7: sygnal KS reguly (srednie cen miast, rodzaj Held, sezon) od nowa
         }
 
@@ -219,6 +220,15 @@ namespace Armoury
                 long irt = sig ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 try { F5IronWeek(today, d0); } catch (Exception e) { Stumble("F5IronWeek", e); }
                 if (sig) a7t0 += System.Diagnostics.Stopwatch.GetTimestamp() - irt;   // recenzja calosci fali 5: czas reguly A7 (f5-a7) bez kroku zelaza f5-ruda (jak bez diagnozy f4)
+            }
+            // f20-d4 (klucz Ks Food Hands Follow Market): po D+49 RegaleCycle nie rusza soli i daktyli (jedna regula) i co 7 dob rece zajec jedzenia i soli za polkami rynku -
+            // przed wczesnym wyjsciem K4a (wlasny try; doba kroku jest doba kroku A7, wiec K4a i tak nie wychodzi)
+            _f20RegSkip = F20Active(today, d0);
+            if (F20Day(today, d0))
+            {
+                long frt = sig ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+                try { F20Week(today, d0); } catch (Exception e) { Stumble("F20Week", e); }
+                if (sig) a7t0 += System.Diagnostics.Stopwatch.GetTimestamp() - frt;   // czas reguly A7 (f5-a7) bez kroku jedzenia f20-d4 (ma wlasny czas w swojej linii)
             }
             double sigma = Math.Max(1, DailyLife.KsSigma);
             int active = 0;
@@ -395,6 +405,8 @@ namespace Armoury
                 // f5-ruda (klucz Ks Iron Hands Follow Market): zelazo - krok co 7 dob za ruda rynku (StartCalibration.Ruda.cs); przed pomiarem f4 - linia "regale wobec polki"
                 // i licznik regali linii produkcji licza te same wpisy (NF4-5b)
                 if (F5IronSkip(b.RC[j])) { sum += b.RF[j]; continue; }
+                // f20-d4 (klucz Ks Food Hands Follow Market): sol i daktyle po D+49 - krok co 7 dob za polkami rynku (StartCalibration.Jedzenie.cs); przed pomiarem f4 jak zelazo
+                if (F20RegSkipOf(b.RC[j])) { sum += b.RF[j]; continue; }
                 if (f4) { try { F4RegNote(b, j, g, ix, mt); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
                 if (ix > 1.2) { b.RF[j] *= 1.1f; _rUp++; }
                 else if (ix < 0.8) { b.RF[j] *= 0.9f; _rDown++; }

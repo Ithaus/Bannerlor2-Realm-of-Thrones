@@ -2314,7 +2314,14 @@ namespace Armoury
         /// linia A7 "regula: WYLACZONA - sam pomiar"). Linia mowi to wprost. Bez nawiasow w tekscie (wzorzec NZW_DAY checkera czyta do pierwszego ')'). Tylko napis.</summary>
         private static string KsWorksText(int ks)
         {
-            try { if (ks > 0 && !StartCalibration.A7RuleOn) return " - zajecia z blokow KS; regula A7 WYLACZONA - zajecia pod KS zamrozone"; }
+            // scalenie f20-d4: po D+49 z kluczem Ks Food Hands Follow Market rece jedzenia i soli ida co 7 dob za polkami rynku - napis nie mowi wtedy "zamrozone"
+            // (bez nawiasow - NZW_DAY; poczatek "regula A7 WYLACZONA" bez zmian)
+            try
+            {
+                if (ks > 0 && !StartCalibration.A7RuleOn)
+                    return StartCalibration.F20ActiveToday ? " - zajecia z blokow KS; regula A7 WYLACZONA - rece jedzenia i soli co 7 dob za polkami rynku f20-d4, reszta zamrozona"
+                                                           : " - zajecia z blokow KS; regula A7 WYLACZONA - zajecia pod KS zamrozone";
+            }
             catch (Exception e) { Stumble("KsWorksText", e); }
             return " - zajecia z blokow KS i reguly A7";
         }
