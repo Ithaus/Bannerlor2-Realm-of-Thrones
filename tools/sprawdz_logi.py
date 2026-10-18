@@ -1031,6 +1031,14 @@ Uzycie (Python 3, tylko odczyt):
                     Recenzja r4-bkwies: NKS-26 INFO - zejscie spichlerzy wedlug krain (dopisek "wedlug krain (dni)": najwiekszy spadek w oknie, najnizszy zapas);
                     NKS-29b INFO - krok 5 DS z linii B1 (wsi ZC4: czesc listy wsi w kiesach; wsi do potrzeby: sol + narzedzia, odmowione, w kiesach, kategorie pokryte);
                     nds NDS-17 - skladnik "zostalo w kiesie (potrzeba pokryta)" poza progiem niewydanego, P5 plan - (towar + roboty + niewydane + w kiesie) INFO.
+                    KS-R4 ks-koszt (noc 17/18.10, PLAN-KS-RUNDA4 rozdz. 9 T0-T13; StartCalibration.Koszt.cs, klucze Ks Cost Fast i Ks Town Fields Every2): progi bez zmian
+                    (NKS-9 mediana <= 3 ms i q95 <= 15 ms, NKS-9b <= 10 ms, NKS-28 <= 1.5 ms); nowe wiersze: NKS-9t pod-czasy doby KS z linii "KS: koszt doby (T0)"
+                    (mediany dob zastosowanych: ksiega, odbior, sterowanie, ceny, plan_odbior, bramki, plan_start, zastosowany - w nim stany, okregi przeliczone i bez
+                    przeliczenia, rampa, pola mieszczan, regula A7, mapa koszyka, polki i pliki, linie logu; odbior Planu: na targ, lepszy stol, linie, pliki - INFO), NKS-9d
+                    doba KS wedlug rodzaju doby (zwykla / odbior Planu / start Planu / krok A7 z pod-czasow T0 - INFO), NKS-9k kontrola szybkich drog (linia "KS: koszt -
+                    kontrola szybkich drog" co 7 dob: szybkie drogi wobec starych na tych samych danych, rozne = 0; bez linii - INFO), NKS-28t pod-czasy KS-H z linii
+                    "Kupcy zywnosci (KS-H) koszt" (wstep, decyzje z probka 1/8: ceny lotow, wartosc u celu, indeks, wysylka; fracht wsi, przyjazdy - INFO). Log sprzed
+                    ks-koszt - INFO, nigdy wyjatek.
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -36386,6 +36394,11 @@ NKS_BKV = re.compile(r"\| rynek wsi BK \([^)]*\): Westeros (?P<w>-?\d+) zl w (?P
 NKS_CORRFREE = re.compile(r"\| korytarze bez sufitu dowozu >= 20 szt\./d:(?P<body>[^|]*)")
 NKS_CORRNOOUT = re.compile(r"\| bez ujscia \([^)]*\): (?P<body>[^|]*)")
 NKS_DAYTAB = re.compile(r"\| tabela dob KS-H (?P<t>[\d.]+) ms")
+# ks-koszt (noc 17/18.10, PLAN-KS-RUNDA4 rozdz. 9 T0-T13): pod-czasy doby KS (linia "KS: koszt doby (T0)"), kontrola szybkich drog, pod-czasy KS-H
+NKS_T0 = re.compile(r"KS: koszt doby \(T0\) dzien (?P<day>-?\d+) \| razem (?P<ms>[\d.]+) ms \(stan (?P<st>\w+)\)(?P<body>.*)$")
+NKS_T0ITEM = re.compile(r"(?P<k>[a-z][a-z0-9_]*) (?P<v>\d+\.\d+)(?=[,|)( ]|$)")
+NKS_KCHK = re.compile(r"KS: koszt - kontrola szybkich drog dzien (?P<day>-?\d+) \| zgodne (?P<ok>\d+), rozne (?P<bad>\d+) \((?P<body>[^|]*)\)(?: \| na targ Planu T1 \(raz na proces\) (?P<t1>[^|]*))?")
+NKS_KSHC = re.compile(r"Kupcy zywnosci \(KS-H\) koszt dzien (?P<day>-?\d+) \| czas doby (?P<ms>[\d.]+) ms \(NKS-28\)(?P<body>.*)$")
 NKS_SAVEKH = re.compile(r"KS: zapis arm_ks_kupcy doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB")
 NKS_SAVER3 = re.compile(r"arm_ks_r3 \(stan rundy 3, osobny klucz\) (?P<kb>[\d.]+) KB, razem (?P<tot>[\d.]+) KB")
 # KS-R4 r4-kupcy (noc 17/18.10): kredyt kupcow KS-H, probka wyceny (srednia i najwiekszy blad), zablokowane wedlug towaru, glod pierwszy, Polnoc i Mur, wersja tabeli dob
@@ -36923,6 +36936,57 @@ def nks_side(logp):
     return out
 
 
+def nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day):
+    """ks-koszt (noc 17/18.10, PLAN-KS-RUNDA4 rozdz. 9): NKS-9t pod-czasy doby KS z linii "KS: koszt doby (T0)" (mediany dob zastosowanych - INFO), NKS-9d doba KS wedlug rodzaju
+    doby (zwykla, odbior Planu, start Planu, krok A7 - mediana i max; rodzaj z pod-czasow T0 - INFO), NKS-9k kontrola szybkich drog (linia "KS: koszt - kontrola szybkich drog":
+    rozne = 0 w kazdej kontroli; bez linii - INFO), NKS-28t pod-czasy KS-H z linii "Kupcy zywnosci (KS-H) koszt" (mediany - INFO). Log bez tych linii (sprzed ks-koszt) - INFO."""
+    ap = {d: v for d, v in t0rows.items() if v[1] == "ZASTOSOWANY" and (on_day is None or d >= on_day)}
+    if ap:
+        keys = ["ksiega", "odbior", "sterowanie", "ceny", "plan_odbior", "bramki", "plan_start", "zastosowany", "stany", "okregi_przeliczone", "okregi_bez_przeliczenia",
+                "rampa", "pola_mieszczan", "regula_a7", "mapa_koszyka", "polki_pliki", "linie_logu", "inne_zastosowany", "na_targ", "lepszy_stol", "linie_planu", "pliki_planu", "reszta"]
+        parts = []
+        for k in keys:
+            vals = [v[2][k] for v in ap.values() if k in v[2]]
+            if vals:
+                parts.append(f"{k} {nks_med(vals):.2f}")
+        rep.add("NKS-9t: pod-czasy doby KS (T0, mediany ms dob zastosowanych)", f"{', '.join(parts)} ({len(ap)} dob)", "INFO (gdzie ida milisekundy doby KS)", None)
+        cls = {"zwykla": [], "odbior Planu": [], "start Planu": [], "krok A7": []}
+        for d, v in ap.items():
+            t = v[2]
+            if t.get("plan_odbior", 0.0) >= 1.0:
+                cls["odbior Planu"].append(v[0])
+            elif t.get("plan_start", 0.0) >= 1.0:
+                cls["start Planu"].append(v[0])
+            elif t.get("regula_a7", 0.0) >= 1.0:
+                cls["krok A7"].append(v[0])
+            else:
+                cls["zwykla"].append(v[0])
+        txt = "; ".join(f"{k}: mediana {nks_med(x):.2f} ms, max {max(x):.2f} ms ({len(x)} dob)" for k, x in cls.items() if x)
+        rep.add("NKS-9d: doba KS wedlug rodzaju doby (T0)", txt, "INFO (q95 <= 15 ms wymaga dob odbioru i startu Planu < 15 ms; mediana <= 3 ms - doby zwykle)", None)
+    else:
+        rep.add("NKS-9t: pod-czasy doby KS (T0)", "brak linii 'KS: koszt doby (T0)' w stanie zastosowanym (log sprzed ks-koszt)", "INFO", None)
+    if kchk:
+        bad = sum(x[2] for x in kchk)
+        ok = sum(x[1] for x in kchk)
+        worst = max(kchk, key=lambda x: x[2])
+        t1 = [x[4] for x in kchk if x[4] not in ("-", "")]
+        rep.add("NKS-9k: kontrola szybkich drog ks-koszt (te same wyniki co stare drogi)",
+                f"kontroli {len(kchk)}, zgodne {ok}, rozne {bad}" + (f" (najwiecej roznych: doba {worst[0]}: {worst[3]})" if bad else "") + (f"; na targ Planu T1: {t1[-1]}" if t1 else ""),
+                "rozne = 0", bad == 0)
+    else:
+        rep.add("NKS-9k: kontrola szybkich drog ks-koszt", "brak linii 'KS: koszt - kontrola szybkich drog' (co 7 dob w stanie zastosowanym; log sprzed ks-koszt)", "INFO (prog: rozne = 0)", None)
+    if kshc:
+        keys = ["wstep", "decyzje", "ceny_lotow", "wartosc_u_celu", "indeks_ceny", "wysylka", "reszta_decyzji", "fracht_wsi", "przyjazdy"]
+        parts = []
+        for k in keys:
+            vals = [v[1][k] for v in kshc.values() if k in v[1]]
+            if vals:
+                parts.append(f"{k} {nks_med(vals):.2f}")
+        rep.add("NKS-28t: pod-czasy kupcow zywnosci KS-H (mediany ms)", f"czas doby {nks_med([v[0] for v in kshc.values()]):.2f} ms; {', '.join(parts)} ({len(kshc)} dob)", "INFO (decyzje: probka 1/8 wywolan)", None)
+    else:
+        rep.add("NKS-28t: pod-czasy kupcow zywnosci KS-H", "brak linii 'Kupcy zywnosci (KS-H) koszt' (log sprzed ks-koszt)", "INFO", None)
+
+
 def nks_med(v):
     v = sorted(v)
     if not v:
@@ -36979,6 +37043,9 @@ def nks_main(logp, until=120, bdp=None):
     p1zl = {}          # doba -> {rynek: zl kupione w drabinie 1}
     bkv = {}           # doba -> {rynek: zl rynku wsi BK u wsi z koszykiem ZC4}
     daytab = {}        # doba -> ms tabeli dob KS-H (linia doby KS)
+    t0rows = {}        # ks-koszt: doba -> (razem ms, stan, {pod-czas: ms})
+    kchk = []          # ks-koszt: (doba, zgodne, rozne, opis, T1)
+    kshc = {}          # ks-koszt: doba -> (czas doby ms, {pod-czas: ms})
     saves_kh, saves_r3 = [], []
     planunc = {}       # doba Planu -> {rynek: (zastepcze %, bez pokrycia %)}
     goods = {}         # (dzien, towar) -> (zapas, produkcja, zuzycie) - swiat
@@ -36998,6 +37065,21 @@ def nks_main(logp, until=120, bdp=None):
             if s.startswith("ERROR in "):
                 if s.startswith(NKS_ERR):
                     errs += 1
+                continue
+            if s.startswith("KS: koszt "):
+                # ks-koszt: pod-czasy doby KS (T0) i kontrola szybkich drog
+                mm = NKS_T0.match(s)
+                if mm:
+                    t0rows[int(mm.group("day"))] = (float(mm.group("ms")), mm.group("st"), {k: float(v) for k, v in NKS_T0ITEM.findall(mm.group("body"))})
+                    continue
+                mm = NKS_KCHK.match(s)
+                if mm:
+                    kchk.append((int(mm.group("day")), int(mm.group("ok")), int(mm.group("bad")), mm.group("body"), (mm.group("t1") or "-").strip()))
+                    continue
+            if s.startswith("Kupcy zywnosci (KS-H) koszt dzien "):
+                mm = NKS_KSHC.match(s)
+                if mm:
+                    kshc[int(mm.group("day"))] = (float(mm.group("ms")), {k: float(v) for k, v in NKS_T0ITEM.findall(mm.group("body"))})
                 continue
             if s.startswith("Towary: dzien "):
                 mm = NKS_GOODS.match(s)
@@ -37983,6 +38065,7 @@ def nks_main(logp, until=120, bdp=None):
         rep.add("NKS-28: czas kupcow zywnosci KS-H (doby czynne)", f"mediana {mk28:.2f} ms, max {km[-1]:.2f} ms ({len(km)} dob)", "mediana <= 1.5 ms", mk28 <= 1.5)
     else:
         rep.add("NKS-28: czas kupcow zywnosci KS-H", "brak linii 'Kupcy zywnosci (KS-H)' w stanie czynnym", "mediana <= 1.5 ms", None)
+    nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day)
     # NKS-21 modele popytu HistoricalPrices (DemandPostfix z parametrem int __2)
     if side["hpm"] is not None:
         if base and base["hpm"] is not None:
