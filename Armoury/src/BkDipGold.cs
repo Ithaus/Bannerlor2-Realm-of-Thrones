@@ -45,6 +45,20 @@ namespace Armoury
     ///    KROLESTWA DRUGIEJ STRONY (KingdomBudgetWallet - w sumie ksiegi "skarbce krolestw"). Druga strona wyeliminowana albo brak - nic nie pobrane (nic
     ///    w nicosc). Recenzja: takze druga strona, ktora upada RAZEM z tym pokojem (EliminationOnPeace.OtherKingdom - AcceptPeace wola ApplyCost PRZED
     ///    SoftlyDestroyKingdomAction, a skarbiec upadlego krolestwa wypada ze swiata) - nic nie pobrane. Koszt poslanca (tylko gracz, poza oknami) i koszty z odbiorca - bez zmian; odszkodowania (KingdomWalletCost) - CrownIncome (165).
+    /// 5. ZAKUPY DWORU BK (f19-e1, CourtShoppingPaysTown; przeglad 18.10 uwaga 1): BK CourtGrace.Update (1. dzien pory roku, rody z rada; co 7 dob przy AutoPurchase)
+    ///    wola BuyGoodsAction.BuyBestToWorst(schowek siedziby, miasto targu, glowa rodu, towary, budzet = kiesa glowy) -> BuyGoods: towar schodzi z polki miasta do schowka,
+    ///    glowa placi ChangeHeroGold(-suma), a miasto NIE dostaje nic (brak market.ChangeGold) - zloto w nicosc, towar za darmo (fin93: 109110 -249 283, 109201 -235 486;
+    ///    tak samo w kazdym logu 160/364 dob od 17.10). Teraz prefiks zapamietuje kiese glowy, finalizer daje kasie miasta targu (parametr market) dokladnie to, co zeszlo
+    ///    glowie (migawka), z ta sama podstawa robocizny handlu co kazda sprzedaz z polki (TownFolk.Sale, MixGoods - jak dwor krola CourtGoods.Crown) i pozycja ksiegi
+    ///    kas osad poza tickiem (Note169 N169BkCourt). Towar idzie do schowka siedziby (Settlement.Stash - zapas ksiegi towarow), wiec ramki ksiegi towarow nie dokladamy
+    ///    (przewoz polka -> schowek znosi sie do zera). Gracz tak samo. Zakup BK dalej biegnie obok naszego dworu E3-P1 (decyzja Jeffa, czy go zostawic).
+    /// 6. UGODA Z GRUPA INTERESU BK (f19-e1, GroupCompromisePaysGroup; przeglad 18.10 uwaga 2): lambda Demand.FinancialCompromise (fulfil; w BK instancyjna metoda
+    ///    &lt;get_FinancialCompromise&gt;b__30_2 typu Demand) robi fulfiller.ChangeHeroGold(-koszt) i nikomu nie placi, choc tekst BK mowi "paid out to the group, mostly
+    ///    to the leader" (fin93 133 188 w 160 dob; sesja Jeffa 81b: 60 600 + 15 944 + 9 944 w 11 dob = reszta swiata poza tickiem co do zlotowki). Teraz finalizer:
+    ///    to, co zeszlo platnikowi (migawka) - 2/3 przywodcy grupy (Group.Leader), reszta po rowno pozostalym czlonkom (Group.Members bez przywodcy i platnika; ostatni
+    ///    bierze reszte z dzielenia); bez czlonkow - calosc przywodcy; bez zywego przywodcy - calosc czlonkom; bez nikogo - kasa siedziby rodu platnika (ClanBudget.Seat,
+    ///    Note169 "inne"), bez siedziby - wraca platnikowi (nic nie znika). Bezposrednio ChangeHeroGold (+ CirculationWindows.NoteHeroGold - jak DsTowns), bez zdarzenia
+    ///    gry: platnik juz zaplacil bez zdarzenia, wiec swiat w tej metodzie ma zmiane 0.
     /// Wyjatek per zdarzenie - licznik potkniec, bez globalnego wylacznika. Nic do zapisu (stan doby od zera po wczytaniu).
     /// </summary>
     internal static class BkDipGold
@@ -55,6 +69,8 @@ namespace Armoury
         internal static bool BanditOn { get { var s = Settings.Current; return s != null && s.BanditHeroPurseFromHideout; } }
         internal static bool FeastOn { get { var s = Settings.Current; return s != null && s.FeastTownGetsPaid; } }
         internal static bool PactOn { get { var s = Settings.Current; return s != null && s.PactCostToOtherRealm; } }
+        internal static bool CourtShopOn { get { var s = Settings.Current; return s != null && s.CourtShoppingPaysTown; } }       // f19-e1 (5)
+        internal static bool CompromiseOn { get { var s = Settings.Current; return s != null && s.GroupCompromisePaysGroup; } }   // f19-e1 (6)
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private const int KGentryGift = 15000;      // BK BKGentryBehavior.cs:522
@@ -64,6 +80,10 @@ namespace Armoury
         internal sealed class HeroCtx { public Hero H; public int G0; }
         internal sealed class PackCtx { public List<KeyValuePair<EquipmentElement, int>> Stash; public int G0; public bool Off; }
         internal sealed class FeastCtx { public Hero H; public Town T; public long H0, T0; public MercFeast.Snap G; }   // G - E8/G2 (261): stan rynku i spizarni sprzed zakupow
+        internal sealed class ShopCtx { public Hero H; public Town T; public int G0; }        // f19-e1 (5): glowa rodu i miasto targu zakupu dworu BK
+        internal sealed class CompCtx { public Hero H; public object D; public int G0; }      // f19-e1 (6): platnik ugody i zadanie BK (Demand)
+
+        private const double GroupLeaderShare = 2.0 / 3.0;   // f19-e1 (6): "mostly to the leader" (tekst BK) - 2/3 przywodcy, reszta czlonkom
 
         // okna paktow Diplomacy: druga strona traktatu
         private static readonly Kingdom[] _pact = new Kingdom[4];
@@ -72,6 +92,8 @@ namespace Armoury
         // odczyt typow BK i Diplomacy (bez referencji kompilacji)
         private static PropertyInfo _estOwner, _feastHost, _feastTown, _gcValue, _gcGiver, _gcReceiver;
         private static FieldInfo _elimOther;        // Diplomacy EliminationOnPeace.OtherKingdom (recenzja)
+        private static Type _demandT;               // f19-e1 (6): BK Demand
+        private static PropertyInfo _dGroup, _gLeader, _gMembers;   // f19-e1 (6): Demand.Group, DiplomacyGroup.Leader / Members
 
         // liczniki doby
         private static long _gDue, _gPaid, _gCost, _gOff, _gOwnedCost;
@@ -84,6 +106,10 @@ namespace Armoury
         private static int _fN, _fCutN, _fOffN;
         private static long _kDue, _kPaid, _kPlayer, _kNoRecv, _kOff;
         private static int _kN, _kNoRecvN, _kOffN, _kFallsN;
+        private static long _sPaid, _sToTown, _sPlayer, _sOff;                  // f19-e1 (5)
+        private static int _sCalls, _sN, _sOffN, _sBroke;
+        private static long _cPaid, _cPlayer, _cLeader, _cMembers, _cSeat, _cKept, _cOff, _cToPlayer;   // f19-e1 (6)
+        private static int _cN, _cMembersN, _cSeatN, _cKeptN, _cOffN, _cNoLeaderN;
         private static int _overflow, _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
@@ -106,6 +132,8 @@ namespace Armoury
             _pkValue = _pkOff = _pkPaid = 0; _pkLeft = _pkUnits = _pkOffN = _pkSold = _pkNoFence = 0;
             _fHostPaid = _fTownGot = _fCut = _fOff = 0; _fN = _fCutN = _fOffN = 0;
             _kDue = _kPaid = _kPlayer = _kNoRecv = _kOff = 0; _kN = _kNoRecvN = _kOffN = _kFallsN = 0;
+            _sPaid = _sToTown = _sPlayer = _sOff = 0; _sCalls = _sN = _sOffN = _sBroke = 0;
+            _cPaid = _cPlayer = _cLeader = _cMembers = _cSeat = _cKept = _cOff = _cToPlayer = 0; _cN = _cMembersN = _cSeatN = _cKeptN = _cOffN = _cNoLeaderN = 0;
             _overflow = 0;
         }
 
@@ -373,6 +401,149 @@ namespace Armoury
             catch (Exception e) { Stumble("CostPre", e); return true; }
         }
 
+        // ------------------------------------------------------------ 5. zakupy dworu BK: BuyGoodsAction.BuyGoods(ItemRoster stash, Town market, Hero buyer, ...)
+        public static void ShopPre(Town __1, Hero __2, out ShopCtx __state)
+        {
+            __state = null;
+            try
+            {
+                if (!Live || __1 == null || __2 == null) return;
+                __state = new ShopCtx { H = __2, T = __1, G0 = __2.Gold };
+            }
+            catch (Exception e) { __state = null; Stumble("ShopPre", e); }
+        }
+
+        /// <summary>Finalizer (biegnie takze po wyjatku BK): kasa miasta targu dostaje to, co naprawde zeszlo glowie rodu (BK placi ChangeHeroGold(-suma) w nicosc).</summary>
+        public static void ShopFin(ShopCtx __state)
+        {
+            if (__state == null) return;
+            try
+            {
+                _sCalls++;
+                if (__state.G0 <= 0) _sBroke++;                            // BK: budzet = kiesa glowy, przy 0 bez limitu - towar schodzi, zaplata obcieta do 0 (tylko licznik)
+                long paid = (long)__state.G0 - __state.H.Gold;
+                if (paid <= 0) return;                                     // nic nie kupil (albo kiesa pusta - BK obcina zaplate do 0)
+                _sN++; _sPaid += paid;
+                if (__state.H == Hero.MainHero) _sPlayer += paid;
+                if (!CourtShopOn) { _sOffN++; _sOff += paid; return; }     // klucz wylaczony - jak dotad (zloto w nicosc)
+                var t = __state.T;
+                var st = t.Settlement;
+                int x = (int)Math.Min(int.MaxValue, paid);
+                int had = t.Gold;
+                t.ChangeGold(x);
+                long got = (long)t.Gold - had;
+                if (got <= 0) return;
+                _sToTown += got;
+                int g = (int)Math.Min(int.MaxValue, got);
+                MoneyLedger.Note169(MoneyLedger.N169BkCourt, st, g);        // "Przeplywy osad (przyczyny)": kasa miasta poza tickiem - nazwane
+                try { TownFolk.Sale(st, g, TownFolk.MixGoods); } catch { }  // sprzedaz kupcow z polki - podstawa robocizny handlu (jak CourtGoods.Crown)
+            }
+            catch (Exception e) { Stumble("ShopFin", e); }
+        }
+
+        // ------------------------------------------------------------ 6. ugoda z grupa interesu BK: lambda Demand.FinancialCompromise (Hero fulfiller) -> bool
+        public static void CompPre(object __instance, Hero __0, out CompCtx __state)
+        {
+            __state = null;
+            try
+            {
+                if (!Live || __0 == null) return;
+                __state = new CompCtx { H = __0, D = __instance, G0 = __0.Gold };
+            }
+            catch (Exception e) { __state = null; Stumble("CompPre", e); }
+        }
+
+        private static bool Takes(Hero h) { return h != null && h.IsAlive && !CirculationWindows.OutOfWorld(h); }
+
+        /// <summary>Grupa zadania BK: przywodca i czlonkowie (refleksja; lambda jest metoda instancji Demand, w innym razie pole &lt;&gt;4__this).</summary>
+        private static object GroupOf(object d)
+        {
+            if (d == null || _dGroup == null) return null;
+            if (_demandT != null && !_demandT.IsInstanceOfType(d))
+            {
+                var f = AccessTools.Field(d.GetType(), "<>4__this");
+                d = f != null ? f.GetValue(d) : null;
+                if (d == null || !_demandT.IsInstanceOfType(d)) return null;
+            }
+            return _dGroup.GetValue(d, null);
+        }
+
+        /// <summary>Wplata czlonkowi grupy; zwraca, ile dostal gracz (0 - inny bohater).</summary>
+        private static long GiveHero(Hero h, long amt)
+        {
+            int x = (int)Math.Min(int.MaxValue, amt);
+            h.ChangeHeroGold(x);
+            CirculationWindows.NoteHeroGold(h, x);                         // bohater w swiecie - nic (jak DsTowns); poza swiatem nie trafia (Takes)
+            if (h != Hero.MainHero) return 0;
+            _cToPlayer += x;
+            return x;
+        }
+
+        /// <summary>Finalizer: to, co zeszlo platnikowi (BK ChangeHeroGold(-koszt) bez odbiorcy) - grupie: 2/3 przywodcy, reszta czlonkom (ostatni bierze reszte z dzielenia).</summary>
+        public static void CompFin(CompCtx __state)
+        {
+            if (__state == null) return;
+            try
+            {
+                var payer = __state.H;
+                long paid = (long)__state.G0 - payer.Gold;
+                if (paid <= 0) return;
+                _cN++; _cPaid += paid;
+                if (payer == Hero.MainHero) _cPlayer += paid;
+                if (!CompromiseOn) { _cOffN++; _cOff += paid; return; }    // klucz wylaczony - jak dotad (zloto w nicosc)
+                Hero leader = null; var others = new List<Hero>();
+                var grp = GroupOf(__state.D);
+                if (grp != null)
+                {
+                    leader = _gLeader != null ? _gLeader.GetValue(grp, null) as Hero : null;
+                    var ms = _gMembers != null ? _gMembers.GetValue(grp, null) as System.Collections.IEnumerable : null;
+                    if (ms != null)
+                        foreach (var o in ms)
+                        {
+                            var h = o as Hero;
+                            if (Takes(h) && h != payer && h != leader && !others.Contains(h)) others.Add(h);
+                        }
+                }
+                bool lead = Takes(leader) && leader != payer;
+                if (!lead) _cNoLeaderN++;
+                long toLeader = lead ? (others.Count > 0 ? (long)Math.Floor(paid * GroupLeaderShare) : paid) : 0;
+                long rest = paid - toLeader, mine = 0;
+                if (toLeader > 0) { mine += GiveHero(leader, toLeader); _cLeader += toLeader; }
+                if (rest > 0 && others.Count > 0)
+                {
+                    long each = rest / others.Count;
+                    for (int i = 0; i < others.Count; i++)
+                    {
+                        long amt = i == others.Count - 1 ? rest - each * (others.Count - 1) : each;
+                        if (amt <= 0) continue;
+                        mine += GiveHero(others[i], amt); _cMembers += amt; _cMembersN++;
+                    }
+                    rest = 0;
+                }
+                if (mine > 0)
+                {
+                    string gname = null;
+                    try { var pn = AccessTools.Property(grp.GetType(), "Name"); var nm = pn != null ? pn.GetValue(grp, null) : null; gname = nm != null ? nm.ToString() : null; } catch { gname = null; }
+                    Log.Player("You receive " + mine + " denars as your share of the financial compromise paid to " + (string.IsNullOrEmpty(gname) ? "your interest group" : "the " + gname) + ".");
+                }
+                if (rest > 0)
+                {
+                    // nikt z grupy nie moze wziac - kasa siedziby rodu platnika; bez siedziby wraca platnikowi (nic nie znika)
+                    Settlement seat = null;
+                    try { seat = payer.Clan != null ? ClanBudget.Seat(payer.Clan) : null; } catch { seat = null; }
+                    int x = (int)Math.Min(int.MaxValue, rest);
+                    if (seat != null && seat.Town != null)
+                    {
+                        seat.Town.ChangeGold(x);
+                        MoneyLedger.Note169(MoneyLedger.N169Other, seat, x);   // kasa osady poza tickiem - nazwane ("inne")
+                        _cSeat += x; _cSeatN++;
+                    }
+                    else { payer.ChangeHeroGold(x); _cKept += x; _cKeptN++; }
+                }
+            }
+            catch (Exception e) { Stumble("CompFin", e); }
+        }
+
         // ------------------------------------------------------------ wpiecia (SubModuleMain - po SmallGold)
         private static void Patch(Harmony h, string label, MethodBase m, string pre, string fin)
         {
@@ -420,6 +591,22 @@ namespace Armoury
             Patch(h, "okno pokoju (Diplomacy KingdomPeaceAction.AcceptPeace)", gcOk && peaceOk ? peaceM : null, _elimOther != null ? nameof(PeacePre) : nameof(PactPre), nameof(PactFin));
             if (gcOk && peaceOk && _elimOther == null) _missing.Add("upadek drugiej strony przy pokoju (Diplomacy EliminationOnPeace.OtherKingdom)");
             Patch(h, "koszt bez odbiorcy (Diplomacy GoldCost.ApplyCost)", gcOk && (napOk || peaceOk) ? AccessTools.Method(gc, "ApplyCost") : null, nameof(CostPre), null);
+            // f19-e1 (5): zakupy dworu BK - prywatna statyczna BuyGoods(ItemRoster stash, Town market, Hero buyer, ...); ta sama metoda co pomiar E8/P3 (Stage8World.BuyPre/BuyPost)
+            var ba = AccessTools.TypeByName("BannerKings.Actions.BuyGoodsAction");
+            var buy = ba != null ? AccessTools.DeclaredMethod(ba, "BuyGoods") : null;
+            var bp = buy != null ? buy.GetParameters() : null;
+            if (bp == null || bp.Length < 3 || bp[1].ParameterType != typeof(Town) || bp[2].ParameterType != typeof(Hero)) buy = null;
+            Patch(h, "zakupy dworu (BK BuyGoodsAction.BuyGoods)", buy, nameof(ShopPre), nameof(ShopFin));
+            // f19-e1 (6): ugoda z grupa interesu - lambda Demand.FinancialCompromise (ta sama metoda co pomiar E8/P3: Stage8World.FindCompromise - po IL)
+            _demandT = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.Demands.Demand");
+            var dgT = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.DiplomacyGroup");
+            _dGroup = _demandT != null ? AccessTools.Property(_demandT, "Group") : null;
+            _gLeader = dgT != null ? AccessTools.Property(dgT, "Leader") : null;
+            _gMembers = dgT != null ? AccessTools.Property(dgT, "Members") : null;
+            if (_gLeader != null && _gLeader.PropertyType != typeof(Hero)) _gLeader = null;
+            MethodBase comp = null;
+            if (_dGroup != null && _gLeader != null && _gMembers != null) { try { comp = Stage8World.FindCompromise(); } catch { comp = null; } }
+            Patch(h, "ugoda z grupa interesu (BK lambda Demand.FinancialCompromise)", comp, nameof(CompPre), nameof(CompFin));
             _wiredText = _wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-";
             _missingText = _missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-";
             Log.Info("BK i Diplomacy (E5/A8): latki przy starcie gry - wpiete: " + _wiredText + "; BRAK: " + _missingText + ".");
@@ -437,7 +624,9 @@ namespace Armoury
                 {
                     _startLogged = true;
                     Log.Info("BK i Diplomacy (E5/A8): start | wylaczniki: Gentry Purse From Town " + (GentryOn ? "tak" : "nie") + " (start rodu: " + (GentryTownPays ? "z kasy miasta" : "0") + ")" + ", Bandit Hero Purse From Hideout " + (BanditOn ? "tak" : "nie")
-                             + ", Feast Town Gets Paid " + (FeastOn ? "tak" : "nie") + ", Pact Cost To Other Realm " + (PactOn ? "tak" : "nie") + " | latki: " + _wiredText + "; BRAK: " + _missingText + ".");
+                             + ", Feast Town Gets Paid " + (FeastOn ? "tak" : "nie") + ", Pact Cost To Other Realm " + (PactOn ? "tak" : "nie")
+                             + ", Court Shopping Pays Town " + (CourtShopOn ? "tak" : "nie") + ", Group Compromise Pays Group " + (CompromiseOn ? "tak" : "nie")   // f19-e1
+                             + " | latki: " + _wiredText + "; BRAK: " + _missingText + ".");
                 }
                 var sb = new StringBuilder(900);
                 sb.Append("BK i Diplomacy (E5/A8): dzien ").Append(day);
@@ -459,6 +648,15 @@ namespace Armoury
                   .Append(", koszt ").Append(_kDue).Append(", do skarbcow drugiej strony ").Append(_kPaid).Append(" (w tym gracz ").Append(_kPlayer).Append("), bez drugiej strony nie pobrane ")
                   .Append(_kNoRecv).Append(" (").Append(_kNoRecvN).Append("), w tym okna pokoju z upadkiem drugiej strony ").Append(_kFallsN);
                 if (_kOffN > 0) sb.Append("; w nicosc jak dotad ").Append(_kOff).Append(" (").Append(_kOffN).Append(')');
+                // f19-e1 (5, 6): po paktach, przed kontrola (zadna fraza wierszy E5/A8 sprawdzarki nie powtarza sie tu - "bez odbiorcy (klucz wylaczony)" zamiast "w nicosc jak dotad")
+                sb.Append(" | zakupy dworu BK (BuyGoods)").Append(CourtShopOn ? "" : " WYLACZONE (Court Shopping Pays Town)").Append(": wywolan ").Append(_sCalls)
+                  .Append(", glowy rodow zaplacily ").Append(_sPaid).Append(" (").Append(_sN).Append(" zakupow; gracz ").Append(_sPlayer).Append(") -> do kas miast targu ").Append(_sToTown).Append("; wywolan przy pustej kiesie glowy (BK bierze towar bez zaplaty - tylko licznik) ").Append(_sBroke);
+                if (_sOffN > 0) sb.Append(", bez odbiorcy (klucz wylaczony) ").Append(_sOff).Append(" (").Append(_sOffN).Append(')');
+                sb.Append(" | ugoda z grupa interesu BK (FinancialCompromise)").Append(CompromiseOn ? "" : " WYLACZONE (Group Compromise Pays Group)").Append(": ").Append(_cN)
+                  .Append(", platnicy zaplacili ").Append(_cPaid).Append(" (gracz ").Append(_cPlayer).Append(") -> przywodcom grup ").Append(_cLeader).Append(", czlonkom ").Append(_cMembers)
+                  .Append(" (").Append(_cMembersN).Append(" wyplat; gracz dostal ").Append(_cToPlayer).Append("), kasom siedzib platnika ").Append(_cSeat).Append(" (").Append(_cSeatN)
+                  .Append("), zostalo u platnika ").Append(_cKept).Append(" (").Append(_cKeptN).Append("); grup bez przywodcy-odbiorcy (martwy, brak albo sam platnik) ").Append(_cNoLeaderN);
+                if (_cOffN > 0) sb.Append(", bez odbiorcy (klucz wylaczony) ").Append(_cOff).Append(" (").Append(_cOffN).Append(')');
                 sb.Append(" | kontrola (prog 0): stos paktow przepelniony ").Append(_overflow).Append(", otwarte okna paktow ").Append(_pactDepth);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
                 Stage8World.BkSegment(sb);   // E8/P3 (245): dopisek pomiaru - zywnosc BK dla band hersztow i ujscia BK bez odbiorcy (tylko log; klucz Stage8WorldLog wylaczony = linia jak dotad)

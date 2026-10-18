@@ -1112,6 +1112,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PactCostToOtherRealm { get; set; } = true;
 
+        [SettingPropertyBool("Court Shopping Pays Town", HintText = "when a Banner Kings court buys its seasonal goods from a town market, the town gets the price the lord paid for them - before, the lord's gold vanished and the town gave its goods for nothing. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool CourtShoppingPaysTown { get; set; } = true;
+
+        [SettingPropertyBool("Group Compromise Pays Group", HintText = "when a ruler (or you) settles a Banner Kings interest group's demand with a Financial Compromise, the gold goes to the group as Banner Kings says - two thirds to its leader, the rest shared by its other members - instead of vanishing. Without a living leader the members share it all; with nobody to take it, the ruler's seat gets it. Off = the gold vanishes, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool GroupCompromisePaysGroup { get; set; } = true;
+
         [SettingPropertyBool("Merc Clans Real Soldiers", HintText = "the sellsword clans of the world keep their captains and get no men out of thin air from Banner Kings: every day Banner Kings threw each hero of a hired mercenary clan out of his own warband and put a soldier made from nothing in his place, and it would hand a clan without a contract 3 to 5 free men per warband. With this on the heroes stay, hired men of other stock are still turned one for one into the clan's own troops as Banner Kings does, and Banner Kings adds nobody from nothing. The few recruits a clan without a contract picks up and pays for on the road are the game's own rule and are left as they are. Your Spoils of War company has its own switch. Off = as Banner Kings does", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool MercClansRealSoldiers { get; set; } = true;
@@ -2095,6 +2103,10 @@ namespace Armoury
         [SettingPropertyBool("Circulation Probe Enabled", HintText = "check the circulation ledger against the whole world: at most 8 times a day count all gold in the world just before and just after one measured game action and compare the change with the causes the ledger named for it - log only, costs two full counts of the world per check", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public bool CirculationProbeEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Ledger Segment Bisect Log", HintText = "with the circulation ledger: also write one daily line that splits the gold our own daily tick leaves unexplained into smaller steps (one count of all the gold in the world at each step, about 50 a day, a few milliseconds) - log only, changes nothing in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool LedgerSegmentBisectLog { get; set; } = true;
 
         [SettingPropertyBool("Clan Income Book Enabled", HintText = "keep every clan's steady income (average of its last 28 days, saved with the game) and write a dry run of the planned clan budget and debt rules: wage ceiling against wages paid, clans over the ceiling, men who would be released, clans that would borrow or face seizure - log only, changes nothing in the game", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
@@ -8205,6 +8217,8 @@ namespace Armoury
             s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
             s.FeastTownGetsPaid = FeastTownGetsPaid;
             s.PactCostToOtherRealm = PactCostToOtherRealm;
+            s.CourtShoppingPaysTown = CourtShoppingPaysTown;
+            s.GroupCompromisePaysGroup = GroupCompromisePaysGroup;
             s.MercClansRealSoldiers = MercClansRealSoldiers;
             s.FeastNoFreeGoods = FeastNoFreeGoods;
             s.FieldCraftEnabled = FieldCraftEnabled;
@@ -8451,6 +8465,7 @@ namespace Armoury
             s.OreLedgerTownCraftsColumn = OreLedgerTownCraftsColumn;
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
+            s.LedgerSegmentBisectLog = LedgerSegmentBisectLog;
             s.ClanIncomeBookEnabled = ClanIncomeBookEnabled;
             s.ClanIncomeBookStableD = ClanIncomeBookStableD;
             s.PaidConstruction = PaidConstruction;
