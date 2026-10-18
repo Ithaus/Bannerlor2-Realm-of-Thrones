@@ -38769,10 +38769,12 @@ def nks_main(logp, until=120, bdp=None):
             # (segment f4b: oblezona / po najezdzie / bez przyczyny). Log sprzed segmentu: mieszczanie doby = oblezenie, gdy kazda warownia przy Food 0 tej doby jest
             # w linii OB5 tej chwili (OB5 "dzien d+1" pisze ten sam takt co Spichlerze "dzien d"; lista nazw pelna), inaczej jak dotad (doba bez oblezonych i spustoszonych
             # okregow = bez przyczyny). Dotad mieszczanie oblezonego miasta, ktorego okregi nie glodowaly, liczyli sie "poza oblezeniami" (fin87: Sharp Point 163).
+            # Recenzja f4b: tylko OB5 TEJ chwili (d+1) - OB5 "dzien d" to takt POPRZEDNI (oblezenie skonczone dobe wczesniej nie jest przyczyna; segment f4b liczy tak samo:
+            # IsUnderSiege w chwili zgonu). OB5 poprzedniego taktu tylko jako INFO (doby, w ktorych warownie przy Food 0 byly oblezone takt wczesniej, a teraz nie).
             vil_all = sum(v["g"] + v["u"] for v in fw.values())
             vil_cause = sum(v["g"] + v["u"] for v in fw.values() if v["o"] + v["s"] == 0)
             nocause = sum(v["b"] for v in fw.values())
-            t_sg, t_rd, t_no, t_dc, walls, n_seg, n_fb = 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0
+            t_sg, t_rd, t_no, t_dc, walls, n_seg, n_fb, n_prev = 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0
             n_sg, n_no = set(), set()
             for d in sorted(fw):
                 v, c, x = fw[d], famc.get(d), famx.get(d)
@@ -38785,16 +38787,21 @@ def nks_main(logp, until=120, bdp=None):
                 walls += x["walls"] if x else 0.0
                 if not (v["m"] > 0):
                     continue
-                sieged = ob5.get(d + 1, set()) | ob5.get(d, set())
-                if x and x["names"] and len(x["names"]) == x["n"] and all(nm in sieged for nm in x["names"]):
+                sieged = ob5.get(d + 1, set())
+                full = bool(x and x["names"] and len(x["names"]) == x["n"])
+                if full and all(nm in sieged for nm in x["names"]):
                     t_sg += v["m"]; n_fb += 1; n_sg.update(x["names"])
-                elif v["o"] + v["s"] == 0:
+                    continue
+                if full and all(nm in sieged or nm in ob5.get(d, set()) for nm in x["names"]):
+                    n_prev += 1
+                if v["o"] + v["s"] == 0:
                     t_no += v["m"]; n_no.update(x["names"] if x else [])
                 else:
                     t_dc += v["m"]
             dead_all = vil_all + t_sg + t_rd + t_no + t_dc
             dead_cause = vil_cause + t_no
             src = (f"przyczyna mieszczan z segmentu f4b {n_seg} dob" if n_seg else "log bez segmentu f4b") + (f", z linii OB5 {n_fb} dob" if n_fb else "")
+            src += (f"; INFO: oblezone tylko takt wczesniej (OB5 dnia d, nie d+1) {n_prev} dob - liczone jak bez oblezenia" if n_prev else "")
             rep.add("NKS-15: glod po wlaczeniu (projekt 14.5)", f"zmarli z glodu {dead_all:.0f} (wsie {vil_all:.0f}; mieszczanie warowni przy Food 0: oblezone {t_sg:.0f}"
                     + (f" [{', '.join(sorted(n_sg)[:5])}]" if n_sg else "") + f", po najezdzie {t_rd:.0f}, bez przyczyny {t_no:.0f}"
                     + (f" [{', '.join(sorted(n_no)[:5])}]" if n_no else "") + (f", w dobach z oblezonymi lub spustoszonymi okregami {t_dc:.0f}" if t_dc else "")
