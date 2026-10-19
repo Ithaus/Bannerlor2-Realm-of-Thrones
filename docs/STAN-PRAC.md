@@ -3241,3 +3241,4 @@ Pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw 
   scalone -> noc-ks4 a8d380d6 (Armoury 283509af, 2008 ustawien). TEST fin99 160 dob x20 w toku. f26-wolni (c5aa3874, klucz Ks Home Work Trade Prices) NIE SCALONE:
   po recenzji (sufit fizyczny plonu) w fin98 zero zmian - Wolni Ludzie 0.727 bez poprawy; dom Wolnych Ludzi juz na granicy plonu zimnej ziemi; fin95 0.79 bylo za hojne.
   Bramka 5C: Wolni Ludzie wracaja do starych zasad plonu ok. d+129 od wlaczenia KS (A i C tak samo). -> pytanie do Jeffa o 1a (dalsza droga).
+- 19.10: Jeff "zostawnmy a" (Wolni Ludzie): f26-wolni NIE scalone (galaz zostaje), checker NKS-30b Wolni Ludzie prog 0.60 (podloga) na noc-ks4.
