@@ -213,7 +213,7 @@ namespace Armoury
             {
                 AnRow a;
                 if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays || !_an.TryGetValue(c, out a) || a == null || a.Full <= 0) return ";;;;;";
-                return ";" + a.F.ToString("0.0000", WtInv) + ";" + a.Line.ToString(WtInv) + ";" + a.Full.ToString(WtInv) + ";" + a.Paid.ToString(WtInv) + ";" + (a.Full - a.Paid).ToString(WtInv);
+                return ";" + NeedFCsv(a.F) + ";" + a.Line.ToString(WtInv) + ";" + a.Full.ToString(WtInv) + ";" + a.Paid.ToString(WtInv) + ";" + (a.Full - a.Paid).ToString(WtInv);
             }
             catch { return ";;;;;"; }
         }

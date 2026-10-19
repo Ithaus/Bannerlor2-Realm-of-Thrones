@@ -321,7 +321,7 @@ namespace Armoury
                 long p; double b, f;
                 bool hp = _mcPaid.TryGetValue(c, out p), hb = _mcBoost.TryGetValue(c, out b), hf = _mcF.TryGetValue(c, out f);
                 if (!hp && !hb && !hf) return ";;;";
-                return ";" + (hp ? p : 0).ToString(WtInv) + ";" + Math.Round(hb ? b : 0).ToString("0", WtInv) + ";" + (hf ? f.ToString("0.0000", WtInv) : "");
+                return ";" + (hp ? p : 0).ToString(WtInv) + ";" + Math.Round(hb ? b : 0).ToString("0", WtInv) + ";" + (hf ? NeedFCsv(f) : "");
             }
             catch { return ";;;"; }
         }

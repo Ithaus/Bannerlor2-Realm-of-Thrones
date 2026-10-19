@@ -225,6 +225,34 @@ namespace Armoury
             catch (Exception e) { Stumble("TreasuryForRefund", e); return 0; }
         }
 
+        /// <summary>f24-korona: klucz Ds War Grant Treasury Pays Dues (czynny tylko z Ds War Grant Treasury First).</summary>
+        internal static bool PaysDuesOn(Settings s) { return s != null && s.DsWarGrantTreasuryPaysDues && TreasuryFirstOn(s); }
+
+        /// <summary>
+        /// f24-korona (Jeff 19.10 "popraw te drobiazgi od razu"; NKR-5d testu fin97 - 73 krolestwo-doby z niedoplata, 28 551 zl w 160 dobach, np. Lys d109157: kontrakty 185
+        /// 344/580 przy nadwyzce 209 564): krolestwo w wojnie przy nadaniu 0 dzieki skarbcowi (HoldTf, g = 0 - stan ostatniej sesji, ten sam co "przy nadaniu 0" linii f23)
+        /// - czego wplywy dnia nie maja na rate Banku 186, kontrakty 185 albo czesc dnia wezwania 168, daje skarbiec ponad zapas wojny i dlugi (TA SAMA miara co nadanie 0
+        /// i pula W5b: KingdomTreasury.TreasurySurplusFor; najpierw skarbiec - odpowiedz 8a). Zwraca 0..lack - SAM RACHUNEK: przelew, Spent (tylko czesc z wplywow) i liczniki
+        /// KDay robi placacy przy prawdziwej wyplacie. Nadwyzka mniejsza niz brak - znacznik doby KDay.DuesTrDry (linia f23; skarbiec doszedl do zapasu - nadanie wraca sesja
+        /// "skarbiec do zapasu"). Klucz wylaczony, poza F3, bez nadania 0 dzieki skarbcowi albo w pokoju - 0 (jak dotad). Nie rzuca.
+        /// </summary>
+        internal static long TreasuryForDues(Kingdom k, long lack)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!Live || !PaysDuesOn(s) || k == null || lack <= 0) return 0;
+                var g = GkOf(k, false);
+                if (g == null || !g.HoldTf || g.G > 0 || !KingdomTreasury.AtWar(k)) return 0;
+                long res;
+                double sur = KingdomTreasury.TreasurySurplusFor(k, out res);
+                long x = res < 0 ? 0 : (long)Math.Floor(Math.Min((double)lack, sur));
+                if (x < lack) { var d = CrownIncome.DayOf(k); if (d != null) d.DuesTrDry = true; }
+                return x > 0 ? x : 0;
+            }
+            catch (Exception e) { Stumble("TreasuryForDues", e); return 0; }
+        }
+
         internal static void NoteAnticipation(Kingdom k, long x)
         {
             if (x <= 0) return;
@@ -499,6 +527,9 @@ namespace Armoury
                 long tfResN = 0, tfResF = 0, tfWal = 0; double tfSur = 0; int tfK = 0, tfLess = 0, tfWarK = 0, tfSurK = 0, tfZero = 0;
                 // recenzja: pozycje placone tylko z wplywow dnia (186, 185, 168) w krolestwach, ktore te doby przeszly przy nadaniu 0 dzieki skarbcowi (stan sprzed sesji doby)
                 long tfPreDue = 0, tfPrePaid = 0, tfPreShort = 0; int tfPreK = 0, tfPreShortK = 0;
+                // f24-korona: ze skarbca ponad zapas (Ds War Grant Treasury Pays Dues) - razem, krolestwa z niedoplata przy nadaniu 0 mimo nadwyzki (oczekiwane 0), krolestwa, ktorym
+                // nadwyzka nie starczyla, ze skarbca bez nadania 0 (kontrola - oczekiwane 0)
+                long tfPreTr = 0; int tfPreShortWet = 0, tfPreDryK = 0, tfPreTrOut = 0;
                 var tfZeroNames = new List<string>();
                 var tfRows = new List<KeyValuePair<double, string>>();
                 foreach (var k in Kingdom.All)
@@ -551,9 +582,15 @@ namespace Armoury
                                     {
                                         long pDue = d.LoanDue + d.ContractDue + d.CallToWarDue, pPaid = d.LoanOut + d.Contract + d.CallToWar;
                                         long pShort = Math.Max(0, d.LoanDue - d.LoanOut) + Math.Max(0, d.ContractDue - d.Contract) + Math.Max(0, d.CallToWarDue - d.CallToWar);
+                                        // f24-korona: zaplacone = z wplywow dnia + ze skarbca ponad zapas (Ds War Grant Treasury Pays Dues); dopisek NA KONCU wiersza (klucz wylaczony i 0 - jak dotad)
+                                        long pTr = d.LoanTr + d.ContractTr + d.CallToWarTr;
                                         preSeg = ", tylko z wplywow dnia nalezne " + pDue + " zaplacone " + pPaid + " niedoplata " + pShort + " (186 " + d.LoanOut + "/" + d.LoanDue + ", 185 "
-                                                 + d.Contract + "/" + d.ContractDue + ", 168 " + d.CallToWar + "/" + d.CallToWarDue + ")" + (heldDay ? " przy nadaniu 0" : "");
-                                        if (heldDay) { tfPreK++; tfPreDue += pDue; tfPrePaid += pPaid; tfPreShort += pShort; if (pShort > 0) tfPreShortK++; }
+                                                 + d.Contract + "/" + d.ContractDue + ", 168 " + d.CallToWar + "/" + d.CallToWarDue + ")" + (heldDay ? " przy nadaniu 0" : "")
+                                                 + (pTr > 0 || d.DuesTrDry ? ", f24 ze skarbca ponad zapas " + pTr + " (186 " + d.LoanTr + ", 185 " + d.ContractTr + ", 168 " + d.CallToWarTr + ")"
+                                                    + (d.DuesTrDry ? ", nadwyzka nie starczyla" : "") : "");
+                                        if (heldDay) { tfPreK++; tfPreDue += pDue; tfPrePaid += pPaid; tfPreShort += pShort; if (pShort > 0) tfPreShortK++; if (pShort > 0 && !d.DuesTrDry) tfPreShortWet++; }
+                                        tfPreTr += pTr; if (pTr > 0 && !heldDay) tfPreTrOut++;
+                                        if (d.DuesTrDry) tfPreDryK++;
                                     }
                                     tfRows.Add(new KeyValuePair<double, string>(sur, g.Name + ": skarbiec " + wal + ", zapas wojny " + rN + " (z pelnego zwrotu " + rF + "), nadwyzka "
                                                + N0(sur) + ", g " + G2(g.G) + (g.HoldTf ? " (najpierw skarbiec)" : "") + preSeg));
@@ -612,6 +649,9 @@ namespace Armoury
                            .Append(" | nadanie 0 w wojnie: ").Append(tfZero).Append(tfZeroNames.Count > 0 ? " (" + string.Join(", ", tfZeroNames.ToArray()) + ")" : "")
                            .Append(" | tylko z wplywow dnia (rata 186, kontrakty 185, wezwania 168) w krolestwach przy nadaniu 0 dzieki skarbcowi: krolestw ").Append(tfPreK)
                            .Append(", nalezne ").Append(tfPreDue).Append(", zaplacone ").Append(tfPrePaid).Append(", niedoplata ").Append(tfPreShort).Append(" (krolestw ").Append(tfPreShortK).Append(')')
+                           // f24-korona: klucz wylaczony i 0 - napis jak dotad (czytnik NKR_RX_F23PRE bierze poczatek pola)
+                           .Append(PaysDuesOn(s) || tfPreTr > 0 ? "; f24 Ds War Grant Treasury Pays Dues " + (PaysDuesOn(s) ? "tak" : "NIE") + ": ze skarbca ponad zapas wojny " + tfPreTr
+                                   + ", niedoplata przy nadwyzce (krolestw) " + tfPreShortWet + ", nadwyzka nie starczyla (krolestw) " + tfPreDryK + ", ze skarbca bez nadania 0 (krolestw) " + tfPreTrOut : "")
                            .Append(" | na krolestwo (w wojnie): ").Append(tft.Count > 0 ? string.Join(" ; ", tft.ToArray()) : "-")
                            .Append(" | potkniecia ").Append(_stumbles).Append('.');
                         Log.Info(sbt.ToString());

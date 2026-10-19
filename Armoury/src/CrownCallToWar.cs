@@ -58,6 +58,8 @@ namespace Armoury
         private static long _dHeld, _dOverRes; private static int _dHeldN; private static readonly HashSet<string> _dHeldK = new HashSet<string>();
         // M2c (CallToWarNoBreak): czesci dnia, ktore przepadly z braku wplywow (zamiast zerwania)
         private static long _dLapsed; private static int _dLapsedN;
+        // f24-korona (Ds War Grant Treasury Pays Dues): czesci dnia zaplacone ze skarbca ponad zapas wojny przy nadaniu 0 dzieki skarbcowi (w _dPaid)
+        private static long _dTr; private static int _dTrN;
         private static readonly List<Agr> _agr = new List<Agr>();
 
         internal static long LastPaid, LastEnded, LastUnpaid, LastLegacyPaid; internal static int LastEndedN;
@@ -73,7 +75,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.CrownPaysCallToWar && CrownIncome.On; } }
 
         internal static void Reset() { _agr.Clear(); ZeroDay(); ZeroEvents(); _legacyScan = false; LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
-        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = _dNoWarHeld = _dFreed = 0; _dNoWarN = _dExpiredN = _dFreedN = 0; _dHeld = _dOverRes = 0; _dHeldN = 0; _dHeldK.Clear(); _dLapsed = 0; _dLapsedN = 0; }
+        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = _dNoWarHeld = _dFreed = 0; _dNoWarN = _dExpiredN = _dFreedN = 0; _dHeld = _dOverRes = 0; _dHeldN = 0; _dHeldK.Clear(); _dLapsed = 0; _dLapsedN = 0; _dTr = 0; _dTrN = 0; }
         /// <summary>P3/W4: liczniki zdarzen miedzy dobami (nowe porozumienia - StartPostfix, skreslenia przez gre - EndPostfix) zerowane PO linii doby.
         /// Dotad zerowal je poczatek Daily, zanim linia je wypisala - "nowe dzis" i "skreslone: koniec porozumienia przez gre" pokazywaly zawsze 0.</summary>
         private static void ZeroEvents() { _dCancelled = 0; _dNewN = 0; }
@@ -261,12 +263,23 @@ namespace Armoury
                         // dnia (recenzja: garnek daniny + niepokryta potrzeba przed M1; garnek siedzi w tej samej reszcie wplywow - rata przed nim go zjadala)
                         long res;
                         if (!resv.TryGetValue(calling, out res)) { res = CrownIncome.RefundDueYesterday(calling) + KingdomTreasury.NeedAidFromIncomeYesterday(calling); resv[calling] = res; }
-                        if (avail >= due && (!m2b || avail - res >= due))
+                        bool pay0 = avail >= due && (!m2b || avail - res >= due);
+                        // f24-korona (klucz Ds War Grant Treasury Pays Dues): wzywajacy przy nadaniu 0 dzieki skarbcowi - czego wplywy dnia (przy M2b: po rezerwie wlasnych
+                        // zolnierzy) nie maja na czesc dnia, daje skarbiec ponad zapas wojny i dlugi; tylko cala czesc dnia (jak z wplywow). Z wplywow schodzi tylko reszta
+                        // (Pay - fromTr), rezerwa M2b zostaje w wplywach. Klucz wylaczony / bez nadania 0 dzieki skarbcowi - tr 0, warunek i zachowanie jak dotad
+                        long tr = 0;
+                        if (!pay0)
+                        {
+                            long room = Math.Max(0L, Math.Min(avail, m2b ? avail - res : avail));
+                            long t0 = DsSeason.TreasuryForDues(calling, due - room);
+                            if (t0 > 0 && t0 >= due - room) tr = t0;
+                        }
+                        if (pay0 || tr > 0)
                         {
                             if (!atWar) _dPaidNoWar += Math.Min(due, Math.Max(0L, (long)calling.KingdomBudgetWallet));   // M2a: kontrolka (klucz wylaczony - rata za dobe bez wojny jak dotad)
-                            if (avail - res < due) _dOverRes += due;                                                      // M2b: kontrolka (klucz wylaczony - rata kosztem wlasnych zolnierzy)
+                            if (due - tr > Math.Max(0L, avail - res)) _dOverRes += due;                                    // M2b: kontrolka (klucz wylaczony - rata kosztem wlasnych zolnierzy); f24: tylko czesc z wplywow
                             a.Unpaid = 0;
-                            Pay(calling, called, a, due, kd);
+                            Pay(calling, called, a, due, kd, tr);
                             if (a.Left <= 0) _agr.Remove(a);
                             continue;
                         }
@@ -335,17 +348,20 @@ namespace Armoury
             }
         }
 
-        private static void Pay(Kingdom calling, Kingdom called, Agr a, long x, CrownIncome.KDay kd)
+        /// <summary>fromTr - f24-korona: czesc x ze skarbca ponad zapas wojny (DsSeason.TreasuryForDues) - poza wplywami dnia: Spent tylko reszty, licznik KDay.CallToWarTr.</summary>
+        private static void Pay(Kingdom calling, Kingdom called, Agr a, long x, CrownIncome.KDay kd, long fromTr = 0)
         {
             int ix = (int)Math.Min(int.MaxValue, Math.Min(x, (long)Math.Max(0, calling.KingdomBudgetWallet)));
             if (ix <= 0) return;
+            long tr = Math.Max(0L, Math.Min(fromTr, (long)ix));
             int wc0 = calling.CallToWarWallet, wd0 = called.CallToWarWallet;   // 3.1 (31, E3/0): pole netto portfeli przed wplata (ksiega)
             calling.KingdomBudgetWallet -= ix;    // skarbiec wzywajacego
             calling.CallToWarWallet += ix;        // dlug korony za wezwanie maleje
             called.CallToWarWallet += ix;         // portfel wezwanego - gra rozdziela go na jego rody (AddIncomeFromCallToWarAgrements)
             a.Left -= ix;
-            CrownIncome.Spent(calling, ix);
+            CrownIncome.Spent(calling, ix - tr);
             kd.CallToWar += ix;
+            if (tr > 0) { kd.CallToWarTr += tr; _dTr += tr; _dTrN++; }   // f24-korona
             _dPaid += ix; _dPaidN++;
             Measure31.CtwPay(calling, wc0, called, wd0, ix);   // 3.1 (31, E3/0): wplata do ujemnego portfela - ujscie, reszta to przelew (portfel jest posiadaczem)
         }
@@ -393,6 +409,7 @@ namespace Armoury
             sb.Append("Wezwania do wojny (168): dzien ").Append((int)CampaignTime.Now.ToDays)
               .Append(" | porozumien w toku ").Append(_agr.Count).Append(" (nowe dzis ").Append(_dNewN).Append("), reszta cen do zaplaty przez korony ").Append(left)
               .Append(" | zaplacone dzis ze skarbcow wzywajacych do portfeli wezwanych ").Append(_dPaid).Append(" (").Append(_dPaidN).Append(" czesci dnia)")
+              .Append((DsTowns.FarmsLive && DsSeason.PaysDuesOn(s)) || _dTr > 0 ? " (f24: w tym ze skarbca ponad zapas wojny przy nadaniu 0 dzieki skarbcowi " + _dTr + " - czesci " + _dTrN + ")" : "")   // f24-korona: klucz wylaczony i 0 - napis jak dotad
               .Append(" | zerwane z braku wplywow dnia ").Append(_dEndedN).Append(" (reszta ceny skreslona ").Append(_dEnded).Append(", pokoj sojusznika ").Append(_dPeaceN).Append(")")
               .Append(", niedoplata (bez zachowania gry) ").Append(_dUnpaid)
               .Append(" | skreslone: koniec porozumienia przez gre ").Append(_dCancelled)
