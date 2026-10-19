@@ -3202,3 +3202,11 @@ RAPORT DLA JEFFA: docs/RAPORT-NOC-2026-10-19.md (decyzje 1-8 do podjecia).
   NKS-30b Wolni Ludzie jedzenie 0.68 (prog 0.70; mozliwe psucie spichlerzy), NZR-5 1 wiersz zaokraglenia (1173 vs 1175), NDP-3 drobny rozjazd, NKR-5d niedoplaty pozycji z wplywow dnia przy
   nadaniu 0: 73 krolestwo-doby / 28.5k zl w 160 dobach, ZC1-4/16b (aksamit/jedwab - zmienne). Kontrola wczesna KS D+7 "PRZERWAC" jak w fin93/fin95 (stara diagnoza, plik armoury-ks-przerwij.flag
   usuniety). -> test 5 dob + bitwa, WGRANIE 84; drobne NIE do paczki pozniej.
+
+### 90. WGRANIE 84 (19.10 rano) - DECYZJE JEFFA 3/4/5/7/8 - START TUTAJ
+W grze: `w-toku/noc-wgranie-84` = noc-ks4 **f8faeade** | Armoury **ea61c428**, CrashScribe **f98aac55**, RealisticCaptivity **8dbedff3**, GrandTourney **87465d27** (reszta jak 83).
+Kopie *.bak-2026-10-19-wgranie84-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie84-przed; zapisy Jeffa bez zmian od kopii po-sesji-81b (Jeff nie gral 83).
+= 83 + f23-korona (ScutageByNeed, NeedMeasureAll, WarReserveByNeed, DsWarGrantTreasuryFirst) + f23-spichlerze (GranarySpoilage 6%/rok, BookHoldingsFreeOwnPrisoners).
+TESTY: fin97 160 dob (Armoury-2026-10-19_02-02-06.log) 0 ERROR (drobne NIE w ### 89), 5 dob + bitwa (Armoury-2026-10-19_03-07-01.log) 0 ERROR, bitwa wygrana.
+OTWARTE: drobne NIE z fin97 (NKR-5d niedoplaty pozycji z wplywow dnia przy nadaniu 0, NKS-30b Wolni Ludzie 0.68, NZR-5 zaokraglenie, NDP-3); A7 - osobny test (decyzja 6b);
+pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw skarbiec (f23)". Testy odtad z -Speed 16 (Jeff: testy jak najszybciej).
