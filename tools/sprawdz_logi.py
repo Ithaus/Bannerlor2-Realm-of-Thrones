@@ -1394,6 +1394,11 @@ Uzycie (Python 3, tylko odczyt):
                     juczne - suma towarow z tickami partii - INFO, bramka na towar to ARM-15c), ARM-15c twarde bramki - zrodla bez nazwy
                     w ostatniej linii pomiaru 7/7 bez towaru ponad 2 szt./d (samo wlaczenie = TAK). Bez klucza w linii PackSources (log sprzed poprawki) - INFO z liczbami.
                     Log sprzed paczki: wiersze INFO "brak linii".
+                    f26-bramka (Jeff 19.10 "5. c", klucz Ks Land Gate Exact Loss): ARM-16a odcinek "miara straty (f26 ...)" w kazdej linii bramki (obie miary: A - caly
+                    spadek w doby z racjami KS krainy ponizej wzoru gry, WGRANIE 85; C - na wies min(spadek, wzor gry - racje KS)), ARM-16b "strata spichlerzy z winy KS ...
+                    najwieksza" = miara decydujaca (TAK - C, NIE - A), ARM-16c C doba do doby wobec A (C <= A w kazdej linii; dA > 0: 0 <= dC <= dA; dA <= 0: dC <= 0;
+                    +-0.1 d - C rosnie tylko w doby z racjami KS krainy ponizej wzoru gry, jak A; recenzja f26), ARM-16d A/C
+                    w ostatniej linii (INFO), ARM-16e powrot ze spichlerzy przy C - spadek z winy KS > 1%/d. Log sprzed paczki - INFO.
 --grupa nprzysiolki: (17/18.10, Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja"; paczka sw-przysiolki, Armoury/src/VillageHamlets.cs, uklad
                     wiosek v6 z tools/wioski-v6/v6_przysiolki.py) python -I tools/sprawdz_logi.py --grupa nprzysiolki <Armoury-*.log> (strumieniowo). NPR-0 linia
                     "Przysiolki (sw-przysiolki): start sesji", NPR-1 uklad v6 wczytany (crc ukladu F5456602 - plik generatora; klucz Village Layout V6 NIE = INFO), NPR-2 wiosek
@@ -43089,6 +43094,13 @@ KA_NAMED_F = re.compile(r"ryby z perku Night Raider \(Ks No Fish From Perk\) naz
 KA_NAMED_G = re.compile(r"zboze patroli miast \(Ks Patrol Grain From Town\) nazwane (?P<n>\d+) szt\.")
 KA_NAMED_P = re.compile(r"ryby portow BK miast \(Ks Bk Ports In Ledger\) nazwane (?P<n>\d+) szt\.")
 KA_BACK_LOSS = re.compile(r"zapas (?P<days>\d+) dni, strata pod KS (?P<loss>[\d.]+) dni(?P<rest>[^;]*)")
+# f26-bramka (Jeff 19.10 "5. c"): obie miary straty spichlerzy krain w linii bramki - A (caly spadek w doby z racjami KS krainy ponizej wzoru gry, WGRANIE 85)
+# i C (na wies min(spadek, wzor gry - racje KS)); klucz Ks Land Gate Exact Loss wybiera, ktora decyduje (odcinek "strata spichlerzy z winy KS" = miara decydujaca)
+KA_MEAS = re.compile(r"\| miara straty \(f26, Ks Land Gate Exact Loss (?P<k>TAK|NIE) - decyduje (?P<dec>[AC])\): A \([^)]*\) najwieksza (?P<a>[\d.]+) d - (?P<aland>\S+), krain (?P<an>\d+); "
+                     r"C \([^)]*\) najwieksza (?P<c>[\d.]+) d - (?P<cland>\S+), krain (?P<cn>\d+), ze spadkiem z winy KS > 1% potrzeby/d dzis (?P<kd>\d+); A/C: (?P<list>[^|]*)")
+KA_MEAS_ONE = re.compile(r"(?P<land>\S+) (?P<a>[\d.]+)/(?P<c>[\d.]+)")
+KA_MEAS_START = re.compile(r"miara straty krain \(f26, Ks Land Gate Exact Loss\) (?P<k>TAK|NIE)")
+KA_BACK_KS = re.compile(r"z winy KS (?P<ks>[\d.]+)% \(f26")
 KA_RETRY = re.compile(r"KS: druga proba krain doba (?P<day>-?\d+) .*?wracaja do KS (?P<n>\d+)")
 # fix-ksarm (noc 17/18.10): juczne z niczego konwojow DTE (jedyny towar ponad 2 szt./d w twardej bramce fin85 - sumpter_horse 12-59 szt./d)
 KA_PS_START = "PackSources (m6b):"
@@ -43106,7 +43118,7 @@ def nksarm_scan(logp):
     D = {"start": [], "perk": [], "arm": None, "waits": [], "auto": None, "auto_txt": None, "on": None, "on_src": None, "on_auto": False,
          "lg": [], "back": [], "save": [], "err": 0, "ticks": {}, "first_day": None, "last_day": None,
          "loss": [], "named_f": None, "named_g": None, "named_p": None, "retry": [],
-         "ps_key": None, "m6b": [], "hpack": {}}
+         "ps_key": None, "m6b": [], "hpack": {}, "meas": [], "meas_start": None}
     if not logp or not os.path.isfile(logp):
         return D
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -43161,6 +43173,9 @@ def nksarm_scan(logp):
                 continue
             if s.startswith(KA_START):
                 D["start"].append(s)
+                ms_ = KA_MEAS_START.search(s)   # f26-bramka: klucz Ks Land Gate Exact Loss w linii startu ks-arm
+                if ms_:
+                    D["meas_start"] = ms_.group("k")
             elif s.startswith("KS: uzbrojony zapis"):
                 mm = KA_ARM.match(s)
                 if mm and D["arm"] is None:
@@ -43201,6 +43216,11 @@ def nksarm_scan(logp):
                     ml = KA_LOSS.search(s)
                     if ml:
                         D["loss"].append((int(mm.group("day")), float(ml.group("loss")), ml.group("land"), int(ml.group("n")), int(ml.group("lim"))))
+                    me = KA_MEAS.search(s)   # f26-bramka
+                    if me:
+                        lst = {x.group("land"): (float(x.group("a")), float(x.group("c"))) for x in KA_MEAS_ONE.finditer(me.group("list"))}
+                        D["meas"].append((int(mm.group("day")), me.group("k"), me.group("dec"), float(me.group("a")), me.group("aland"), float(me.group("c")), me.group("cland"),
+                                          int(me.group("kd")), lst, (float(ml.group("loss")), ml.group("land")) if ml else None))
             elif s.startswith("KS: powrot krainy"):
                 mm = KA_BACK.match(s)
                 if mm:
@@ -43346,8 +43366,75 @@ def nksarm_rows(rep, D, pfx="ARM"):
                 "powrot ze spichlerzy tylko po stracie >= progu albo przy zapasie < 364 d", not bad)
     else:
         rep.add(f"{pfx}-13: strata spichlerzy krain pod KS", "brak liczb w liniach bramki krainy (log sprzed recenzji ks-arm albo bez wlaczenia)", "INFO", None)
+    nksarm_meas_rows(rep, D, pfx)   # f26-bramka
     rep.add(f"{pfx}-14: druga proba krain (Start Calibration off i znow on)", f"{len(D['retry'])} razy" + (" (" + "; ".join(f"doba {d}: krain {n}" for d, n in D["retry"][:5]) + ")" if D["retry"] else ""), "INFO", None)
     nksarm_packs_rows(rep, D, pfx)
+
+
+def nksarm_meas_rows(rep, D, pfx="ARM"):
+    """f26-bramka (Jeff 19.10 "5. c"): miara straty spichlerzy krain - A (WGRANIE 85: caly spadek w doby z racjami KS krainy ponizej wzoru gry) i C (na wies
+    min(spadek, wzor gry - racje KS); klucz Ks Land Gate Exact Loss). ARM-16a odcinek "miara straty (f26 ...)" w liniach bramki (log sprzed paczki - INFO),
+    ARM-16b odcinek "strata spichlerzy z winy KS ... najwieksza" = najwieksza strata miary decydujacej (TAK - C, NIE - A; +-0.05 d), ARM-16c miara C doba do doby
+    zgodna z A dla krain z listy "A/C": w kazdej linii C <= A (+0.05 d zaokraglenia), w kolejnych dobach dA > 0 - spadek przy racjach KS krainy ponizej wzoru:
+    0 <= dC <= dA; dA <= 0 - napelnianie albo doba z racjami KS krainy >= wzoru gry (A stoi): dC <= 0; +-0.1 d zaokraglenia linii (recenzja f26: C liczy sie
+    tylko w te same doby co A - kraina karmiona przez KS w sumie lepiej niz wzor gry nie zbiera straty C), ARM-16d porownanie
+    A i C w ostatniej linii (INFO: krainy, gdzie C < A - psucie, zima, slaba ziemia nie licza sie w C), ARM-16e powroty "spichlerz krainy spada" przy kluczu TAK:
+    spadek z winy KS > 1% potrzeby/d (seria liczy ta sama miara)."""
+    M = D.get("meas") or []
+    if not M:
+        rep.add(f"{pfx}-16a: miara straty krain (f26, Ks Land Gate Exact Loss)", "brak odcinka w liniach bramki krainy (log sprzed f26-bramka albo bez wlaczenia KS)"
+                + (f"; linia startu: klucz {D.get('meas_start')}" if D.get("meas_start") else ""), "INFO", None)
+        return
+    keys = sorted({x[1] for x in M})
+    rep.add(f"{pfx}-16a: miara straty krain (f26, Ks Land Gate Exact Loss)", f"{len(M)} linii z odcinkiem, klucz w liniach {'/'.join(keys)}"
+            + (f", w linii startu {D.get('meas_start')}" if D.get("meas_start") else ""), "odcinek w kazdej linii bramki po paczce", len(M) == len([x for x in D["lg"] if x[0] >= M[0][0]]))
+    bad = []
+    for day, k, dec, a, aland, c, cland, kd, lst, old in M:
+        if old is None:
+            bad.append(f"dzien {day}: brak odcinka strata")
+            continue
+        want, wland = (c, cland) if dec == "C" else (a, aland)
+        if (dec == "C") != (k == "TAK") or abs(old[0] - want) > 0.05 or (want > 0.05 and old[1] != wland):
+            bad.append(f"dzien {day}: strata {old[0]:.1f} ({old[1]}) wobec {dec} {want:.1f} ({wland})")
+    rep.add(f"{pfx}-16b: strata decydujaca = miara klucza (TAK - C, NIE - A)", f"{len(M)} linii, rozjazdow {len(bad)}" + (" (" + "; ".join(bad[:4]) + ")" if bad else ""),
+            "0 rozjazdow", not bad)
+    pairs, viol = 0, []
+    for prev, cur in zip(M, M[1:]):
+        if cur[0] - prev[0] != 1:
+            continue
+        for land, (a1, c1) in cur[8].items():
+            if land not in prev[8]:
+                continue
+            a0, c0 = prev[8][land]
+            da, dc = a1 - a0, c1 - c0
+            pairs += 1
+            tol = 0.1 + 1e-6   # zaokraglenie linii 0.1 d (liczby z linii - wielokrotnosci 0.1) + szum odejmowania float
+            if da > tol and not (-tol <= dc <= da + tol):
+                viol.append(f"{land} dzien {cur[0]}: dA {da:+.1f}, dC {dc:+.1f}")
+            elif da <= tol and dc > max(da, 0.0) + tol:
+                viol.append(f"{land} dzien {cur[0]}: A stoi albo spada (dA {da:+.1f}), C rosnie (dC {dc:+.1f})")
+    # recenzja f26: C <= A w kazdej linii (C rosnie tylko w doby A, najwyzej o caly spadek; napelnianie oddaje obu)
+    over = [f"{land} dzien {x[0]}: A {a:.1f}, C {c:.1f}" for x in M for land, (a, c) in x[8].items() if c > a + 0.05]
+    viol += over
+    if pairs or over:
+        rep.add(f"{pfx}-16c: miara C wobec A (C <= A; spadek: 0 <= dC <= dA; A stoi albo spada: dC <= 0)", f"par kraina-doba {pairs}, linii {len(M)}, niezgodnych {len(viol)}"
+                + f" (w tym C > A: {len(over)})" + (" (" + "; ".join(viol[:4]) + ")" if viol else ""), "0 niezgodnych (+-0.1 d zaokraglenia)", not viol)
+    else:
+        rep.add(f"{pfx}-16c: miara C doba do doby wobec A", "brak kolejnych dob z ta sama kraina na liscie A/C (w grze linia co 7 dob)", "INFO", None)
+    last = M[-1]
+    diff = sorted(((a - c, land, a, c) for land, (a, c) in last[8].items()), reverse=True)
+    rep.add(f"{pfx}-16d: miara A wobec C w ostatniej linii (dzien {last[0]}, decyduje {last[2]})",
+            f"A najwieksza {last[3]:.1f} d ({last[4]}), C najwieksza {last[5]:.1f} d ({last[6]}), krain ze spadkiem z winy KS > 1%/d dzis {last[7]}; "
+            + ("A/C: " + ", ".join(f"{land} {a:.1f}/{c:.1f}" for _, land, a, c in diff[:6]) if diff else "lista A/C pusta"),
+            "INFO (C < A: psucie, zima i slaba ziemia, ktorych wzor gry tez nie pokrywa, nie licza sie w C)", None)
+    bk = [(land, day, why) for land, day, why in D["back"] if why.startswith("spichlerz")]
+    kb = [(land, day, KA_BACK_KS.search(why)) for land, day, why in bk if "Ks Land Gate Exact Loss" in why]
+    if kb:
+        low = [f"{land} doba {day}" for land, day, mk in kb if not mk or float(mk.group("ks")) <= 1.0]
+        rep.add(f"{pfx}-16e: powroty ze spichlerzy przy mierze C - spadek z winy KS > 1% potrzeby/d", f"powrotow {len(kb)}" + (f", ponizej progu: {', '.join(low)}" if low else ""),
+                "spadek z winy KS > 1%/d w dobie powrotu", not low)
+    else:
+        rep.add(f"{pfx}-16e: powroty ze spichlerzy przy mierze C", f"brak (powrotow ze spichlerzy {len(bk)})", "INFO", None)
 
 
 def nksarm_packs_rows(rep, D, pfx="ARM"):
