@@ -41,6 +41,8 @@ namespace Armoury
         private static MethodInfo _mFactor, _mHiring, _mWage;
         private static PropertyInfo _pSet, _pBaseWage;
         private static float _baseWage = 1f;
+        /// <summary>BaseWage BK tej sesji (CompanionWage: czesc zoldu bohatera, ktora BK liczy od TroopWage).</summary>
+        internal static float BkBaseWage { get { return _baseWage; } }
         private static string _hook = "nie wpiete", _check = "-";
         [ThreadStatic] private static bool _bypass;   // linia doby i samosprawdzenie: cena BK bez naszych latek (C1 i C2)
         [ThreadStatic] private static bool _stat;     // linia doby: wyceny statystyki nie licza sie do "wycen w grze"
@@ -90,7 +92,7 @@ namespace Armoury
 
         public static void WageFallbackPostfix(Hero __0, ref int __result)
         {
-            try { if (_bypass || !_fbWage || __0 == null || !NavalOn) return; __result = Math.Max(0, __result - (int)Math.Round(NavalCut(__0) * 0.005f)); }
+            try { if (_bypass || !_fbWage || __0 == null || !NavalOn || CompanionWage.Applies(__0)) return; __result = Math.Max(0, __result - (int)Math.Round(NavalCut(__0) * 0.005f)); }
             catch (Exception e) { Stumble("WageFallbackPostfix", e); }
         }
 
@@ -147,7 +149,7 @@ namespace Armoury
             float perk = raw0 > 0.5f ? noGear / raw0 : 1f;
             if (!(perk > 0.05f) || perk > 5f) perk = 1f;
             float gear = Math.Max(0f, withGear - noGear);
-            wage = WageOf(level, skills);
+            wage = CompanionWage.WageFor(level, WageOf(level, skills));   // CW (19.10): przy CompanionWageByLevel zold z tabeli Jeffa wedlug poziomu
             return Math.Max(1, (int)Math.Round(gear + Math.Max(0f, s.CompanionHireDays) * wage * perk));
         }
 
@@ -250,7 +252,7 @@ namespace Armoury
                 float best = 0f;
                 foreach (var h in Hero.AllAliveHeroes)
                 {
-                    if (h == null || !h.IsWanderer) continue;
+                    if (h == null || !h.IsWanderer || h.IsPlayerCompanion) continue;   // CW: towarzysz gracza ma zold z tabeli - probka mierzy BK
                     float c = NavalCut(h);
                     if (c > best) { best = c; probe = h; }
                 }
@@ -362,7 +364,7 @@ namespace Armoury
                             try { ours = model.GetCompanionHiringPrice(h); }
                             finally { _stat = false; }
                             int level = h.CharacterObject != null ? h.CharacterObject.Level : h.Level;
-                            float w = WageOf(level, SkillSum(model, h));
+                            float w = CompanionWage.WageFor(level, WageOf(level, SkillSum(model, h)));
                             n++;
                             bkL.Add(bkPrice); ourL.Add(ours); wL.Add(w); lvL.Add(level);
                             if (bkPrice > 0) rL.Add(ours / (float)bkPrice);
@@ -375,6 +377,7 @@ namespace Armoury
             int sd, pr;
             lock (Gate) { sd = _stDay; pr = _priced; _stDay = 0; _priced = 0; }
             Log.Info("Towarzysze (C): dzien " + (int)CampaignTime.Now.ToDays + " | umiejetnosci morskie wedlug rol " + (NavalOn ? "tak" : "nie") + ", cena wedlug zoldu " + (HireOn ? "tak (" + Math.Max(0f, s.CompanionHireDays).ToString("0", Inv) + " dni)" : "nie")
+                     + ", zold wedlug poziomu " + (CompanionWage.On ? "tak" : "nie")
                      + (_fbWage || _fbHire ? ", ZAPAS C1 czynny (" + (_fbWage ? "zold" : "") + (_fbWage && _fbHire ? " i " : "") + (_fbHire ? "cena" : "") + ")" : "") + " | wedrowcy w osadach " + n + " | cena BK mediana " + Med(bkL, "0") + " -> nasza " + Med(ourL, "0")
                      + " | zold/d mediana " + Med(wL, "0.0") + " (poziom mediana " + Med(lvL, "0") + ") | nasza/BK mediana " + Med(rL, "0.00")
                      + " | wycen w grze od wczoraj " + pr + " | gracz: zloto " + (Hero.MainHero != null ? Hero.MainHero.Gold : 0) + " | czas " + ms.ToString("0.0", Inv) + " ms | potkniecia " + sd + " (sesja " + _stumbles + ").");

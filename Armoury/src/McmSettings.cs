@@ -2848,6 +2848,18 @@ namespace Armoury
         [SettingPropertyGroup("Hiring companions")]
         public float CompanionHireDays { get; set; } = 20f;
 
+        [SettingPropertyBool("Companion Wage By Level", HintText = "your companions' daily pay follows their level and climbs steeply: about 1 at level 1, 3 at level 5, 8 at 10, 15 at 15, 25 at 20, 40 at 25 and 60 at level 30 (in between in a straight line), instead of the Banner Kings pay of about 100 a day for a level 19 companion. The pay is taken from your purse as before and goes into the companion's own purse, not into thin air; a wanderer's hiring price stays Companion Hire Days of this pay plus half his gear", RequireRestart = false)]
+        [SettingPropertyGroup("Hiring companions")]
+        public bool CompanionWageByLevel { get; set; } = true;
+
+        [SettingPropertyBool("Companion Buys Own Gear", HintText = "in a town your companions spend their own coin on better gear from the market, as your soldiers do: only empty armour slots, armour at least one tier worse than what is on sale, or a weapon of the same kind at least one tier better; never a unique piece. They pay the town, keep Companion Gear Reserve Days of their pay, and the piece they take off goes into your inventory - nothing is lost. One message per town visit", RequireRestart = false)]
+        [SettingPropertyGroup("Hiring companions")]
+        public bool CompanionBuysOwnGear { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Companion Gear Reserve Days", 0.00f, 120.00f, "0.00", HintText = "days of his own daily pay a companion always keeps in his purse when he buys gear", RequireRestart = false)]
+        [SettingPropertyGroup("Hiring companions")]
+        public float CompanionGearReserveDays { get; set; } = 30f;
+
         [SettingPropertyBool("Ammo Recovery Enabled", HintText = "arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool AmmoRecoveryEnabled { get; set; } = true;
@@ -8771,6 +8783,9 @@ namespace Armoury
             s.CompanionNavalSkillsPriced = CompanionNavalSkillsPriced;
             s.CompanionHireByWage = CompanionHireByWage;
             s.CompanionHireDays = CompanionHireDays;
+            s.CompanionWageByLevel = CompanionWageByLevel;
+            s.CompanionBuysOwnGear = CompanionBuysOwnGear;
+            s.CompanionGearReserveDays = CompanionGearReserveDays;
             s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;
             s.AmmoRecoverPercent = AmmoRecoverPercent;
             s.AmmoRepairPercent = AmmoRepairPercent;

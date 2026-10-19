@@ -1291,6 +1291,7 @@ namespace Armoury
             CampaignEvents.TournamentStarted.AddNonSerializedListener(this, WorldClock7.OnTournamentStarted);
             CampaignEvents.TournamentFinished.AddNonSerializedListener(this, TourneyFolkPurse.OnTournamentFinished);   // f8-sakiewka (18.10): sakiewka mieszczan miasta-gospodarza dla zwyciezcy (klucz TourneyFolkPurse; po GivePrizeToWinner - poza RealPayer i oknem O11)
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("MenPurse.OnEntered", MenPurse.OnEntered));   // wpis 84: nadwyzki ludzi PRZED zakupami
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CompanionGear.OnEntered", CompanionGear.OnEntered));   // CG (19.10): towarzysze gracza kupuja sprzet za swoje - PO zakupach ludzi
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("AiGear.OnSettlementEntered", AiGear.OnSettlementEntered));
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanAmmo.OnEntered", CaravanAmmo.OnEntered));   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanGoods.OnEntered", CaravanGoods.OnEntered));   // E3-T1 (noc-ekonomia3): towar handlowy tam, gdzie karawana ma zysk - dopisany PO CaravanAmmo, PRZED CaravanBulk, wiec biegnie PO surowcach masowych, PRZED amunicja i BK
@@ -1313,6 +1314,7 @@ namespace Armoury
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("MenPurse.OnDailyTickParty", MenPurse.OnDailyTickParty));   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("CompanionGear.OnDailyTickParty", CompanionGear.OnDailyTickParty));   // CG (19.10): doba postoju druzyny gracza w miescie - towarzysze za swoje
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("UniqueSpoils.OnDailyTickParty", UniqueSpoils.OnDailyTickParty));
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("QohorMasters.OnDailyTickParty", QohorMasters.OnDailyTickParty));   // 177-3: lord AI w Qohorze - ta sama regula przekucia (gotowe odsyla QohorMasters.Daily)
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("QohorMasters.OnEntered", QohorMasters.OnEntered));           // 177-3: "Your Valyrian steel is ready" przy wejsciu do Qohoru
@@ -1997,6 +1999,8 @@ namespace Armoury
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
             try { BanditLimit.SessionStart(); } catch (Exception e) { Log.Error("BanditLimit.SessionStart", e); }   // f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band ROT x2 z ludzi puli wyrzutkow, stopery kosztu band - latki W KAMPANII (raz na proces), linia "Bandy i limit (f8-bandy): start sesji"
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
+            try { CompanionWage.SessionStart(); } catch (Exception e) { Log.Error("CompanionWage.SessionStart", e); }   // CW (19.10): zold towarzyszy gracza wedlug poziomu - latki TroopWage i GetHeroWage, PO CompanionPay (BaseWage BK)
+            try { CompanionGear.SessionStart(); } catch (Exception e) { Log.Error("CompanionGear.SessionStart", e); }   // CG (19.10): bramka doby od nowa
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
             try { PregnancyYear.SessionStart(); } catch (Exception e) { Log.Error("PregnancyYear.SessionStart", e); }   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): start sesji" - klucze z MCM (PO McmSettings.Apply), rok i mnoznik, czynny model, ciaze w toku
             try { SmithCoal.SessionStart(); } catch (Exception e) { Log.Error("SmithCoal.SessionStart", e); }   // N2 po recenzji (noc 16.10): wegiel broni i przetopu z ekranu kuzni w kg z otwartej bryly (po SmithWood - te same cele, wlasna instancja Harmony)
@@ -2465,6 +2469,7 @@ namespace Armoury
             try { NoMakerBudget.Daily(); } catch (Exception e) { Log.Error("NoMakerBudget.Daily", e); } DayProfile.Lap("NoMakerBudget.Daily");   // N2-E2: linia "Budzet bez producenta (N2-E2)" (tylko log)
             try { FoodThrift.Daily(); } catch (Exception e) { Log.Error("FoodThrift.Daily", e); } DayProfile.Lap("FoodThrift.Daily");           // placek i marchew (B3): linia "Lordowie a drogie jedzenie (B3)" (tylko log)
             try { CompanionPay.Daily(); } catch (Exception e) { Log.Error("CompanionPay.Daily", e); } DayProfile.Lap("CompanionPay.Daily");       // towarzysze (C): linia "Towarzysze (C): dzien" (tylko log; ok. 3 wyceny na wolnego wedrowca)
+            try { CompanionWage.Daily(); } catch (Exception e) { Log.Error("CompanionWage.Daily", e); } DayProfile.Lap("CompanionWage.Daily");   // CW (19.10): linia "Towarzysze (CW): dzien" (zold druzyny gracza przed/po, 2 liczenia zoldu)
             try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); } DayProfile.Lap("MineralOnce.Daily");   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
             // NW O4: linie "Dowoz" tylko w dobie pomiaru; w innej dobie samo zerowanie licznikow (Daily konczy sie Reset - bez tego linia probna liczylaby N dob)
             try { if (LogGate.Lines) MarketRoad.Daily(); else MarketRoad.Reset(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); } DayProfile.Lap("MarketRoad.Daily");   // wpis 100: dowoz wsi zamkowych na targi (log)
