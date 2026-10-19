@@ -29,6 +29,7 @@ namespace Armoury
         internal static bool SwFoodCarts { get { var s = S3; return s == null || s.KsFoodCarts; } }
         internal static bool SwLandGradient { get { var s = S3; return s == null || s.KsLandGradient; } }
         internal static bool SwAlphaNet { get { var s = S3; return s == null || s.KsAlphaNet; } }
+        internal static bool SwHomeTradePrice { get { var s = S3; return s == null || (s.KsAlphaNet && s.KsHomeWorkTradePrices); } }   // f26-wolni
         internal static bool SwPaidFirst { get { var s = S3; return s == null || s.KsVillagePaidFirst; } }
         internal static bool SwOwnFirst { get { var s = S3; return s == null || s.KsOwnFoodFirst; } }
         internal static bool SwPerishReach { get { var s = S3; return s == null || s.KsPerishReach; } }
@@ -550,6 +551,7 @@ namespace Armoury
         private static void R3PlanInputs(KsInput inp, int day, List<Settlement> tst, Dictionary<string, Settlement> distMk)
         {
             inp.Corridors = SwLandGradient; inp.Reach = SwPerishReach; inp.HomeSub = SwAlphaNet;
+            inp.HomeTradePrice = SwHomeTradePrice;                    // f26-wolni: czesc pokryta pracy domowej takze w cenach handlu kroku 8
             inp.ApplyPlan = _state != StateApplied;
             inp.AfterD = _state == StateApplied && DDay >= 0 && day >= DDay;
             int nt = inp.Towns.Count;

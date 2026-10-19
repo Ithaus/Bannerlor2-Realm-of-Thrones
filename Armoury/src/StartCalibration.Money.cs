@@ -328,6 +328,8 @@ namespace Armoury
                   .Append(", stol 8d ").Append(F0(M.TableKg[m])).Append(" kg Planu/d w ").Append(M.TableN[m]).Append(" okregach (lepszy stol: potrzeba i wlasny stol w gore, bez zaliczenia do pracy domowej; krok 8 liczony ponownie)")
                   // recenzja runda 3: towar zastepczy 8b/8c z plonu rak (okregi, gdzie parytet wartosci dawal wiecej niz plon; kcal zastepcze bez wolnej ziemi)
                   .Append(", 8b z plonu: parytet wartosci > plon w ").Append(M.SubPhysOver[m]).Append(" okregach, kcal bez ziemi ").Append(P1(100 * M.SubLandShort[m] / fk)).Append('%');
+                // f26-wolni (klucz Ks Home Work Trade Prices): czesc pokryta pracy domowej w cenach handlu kroku 8 (okregi, kcal dodane w % kcal koszyka)
+                if (M.TradeCov) sb.Append(", praca domowa w cenach handlu (Ks Home Work Trade Prices) TAK: wieksza czesc pokryta w ").Append(M.TradeCovN[m]).Append(" okregach, kcal +").Append(P1(100 * M.TradeCovKcal[m] / fk)).Append('%');
             }
             double vo, vf; int vn; VilOutTotals(out vo, out vf, out vn);
             sb.Append(" | alfa ").Append(SwAlphaNet ? "NETTO (wplyw + fracht KS-H - wydatki spoza koszyka)" : "z utargu (klucz Ks Alpha Net wylaczony)").Append(": wydatki wsi spoza koszyka ").Append(F0(vo))
