@@ -1656,8 +1656,10 @@ Uzycie (Python 3, tylko odczyt):
                     g = 0 tylko przy nadwyzce i braku po skarbcu <= 0; wtedy swobodna - 0, kwartalna - krok w dol; War Tax +krok), NKR-5c krol bez nadwyzki nie siedzi
                     przy nadaniu 0 dzieki skarbcowi (sesja "skarbiec do zapasu" nastepnej doby; poza 14 dobami przed kwartalem), NKR-5d krolestwa przy nadaniu 0 dzieki skarbcowi
                     bez niedoplat rat Banku 186, kontraktow 185 i wezwan 168 (recenzja; f24-korona - klucz Ds War Grant Treasury Pays Dues: brak wplywow dnia
-                    placi skarbiec ponad zapas wojny, niedoplata tylko przy wyczerpanej nadwyzce - INFO), NKR-5e f24 pieniadz zamkniety (ze skarbca tylko przy nadaniu 0,
-                    najwyzej zaplacone, suma wierszy (+ krolestwa bez wiersza - pokoj z zerwanego wezwania 168 po wyplacie) = pole doby = dopisek linii 165),
+                    placi skarbiec ponad zapas wojny, niedoplata tylko przy wyczerpanej nadwyzce - INFO), NKR-5e f24 pieniadz zamkniety (ze skarbca tylko przy nadaniu 0
+                    albo przy nadaniu > 0 ze znacznikiem f25, najwyzej zaplacone, suma wierszy (+ krolestwa bez wiersza - pokoj z zerwanego wezwania 168 po wyplacie) = pole
+                    doby = dopisek linii 165), NKR-5f (f25-korona, recenzja) krolestwa przy nadaniu > 0 po sesji, ktora dala 186/185/168 skarbcowi - bez niedoplat przy nadwyzce
+                    (niedoplata przy wyczerpanej nadwyzce - INFO; wiersze ze znacznikiem = pole f25 linii doby),
                     NKR-6 co placi lud i zmiana skarbcow w wojnie (INFO), NKR-6b tempo nadwyzki krolestw przy
                     nadaniu 0 wobec nadwyzka / 91 (INFO), NKR-D5 najpierw skarbiec na sucho z ostatniej sesji kwartalnej - "do zapasu" i "na kwartal" (INFO, liczy tez log
                     sprzed paczki), NKR-8 ERROR paczki 0 i potkniecia linii f23 0.
@@ -47600,6 +47602,8 @@ NKR_RX_F23 = re.compile(r"^Korona: najpierw skarbiec \(f23\): dzien (\d+) \| Ds 
                         r" (-?\d+), nadwyzka ponad zapas wojny i dlugi (-?\d+) u (\d+) krolestw \(na kwartal (-?\d+) zl/d\) \| nadanie 0 w wojnie: (\d+)")
 NKR_RX_F23K = re.compile(r"^(.*?): skarbiec (-?\d+), zapas wojny (-?\d+) \(z pelnego zwrotu (-?\d+)\), nadwyzka (-?\d+), g ([\d.]+)( \(najpierw skarbiec\))?"
                          r"(?:, tylko z wplywow dnia (?:-|nalezne (\d+) zaplacone (\d+) niedoplata (\d+) \(186 (\d+)/(\d+), 185 (\d+)/(\d+), 168 (\d+)/(\d+)\)( przy nadaniu 0)?"
+                         # f25-korona (recenzja): znacznik "przy nadaniu > 0 (f25 ze skarbca)" - nadanie > 0 po sesji, ktora dala 186/185/168 skarbcowi (grupa 18; log bez niego - None)
+                         r"( przy nadaniu > 0 \(f25 ze skarbca\))?"
                          # f24-korona: dopisek "ze skarbca ponad zapas" (Ds War Grant Treasury Pays Dues) - czesc zaplaconych ze skarbca i znacznik "nadwyzka nie starczyla"
                          r"(?:, f24 ze skarbca ponad zapas (\d+) \(186 (\d+), 185 (\d+), 168 (\d+)\)(, nadwyzka nie starczyla)?)?))?$")
 # recenzja f23: suma pozycji placonych tylko z wplywow dnia w krolestwach przy nadaniu 0 dzieki skarbcowi (linia f23)
@@ -47610,6 +47614,10 @@ NKR_RX_F24 = re.compile(r"; f24 Ds War Grant Treasury Pays Dues (tak|NIE): ze sk
                         r" nadwyzka nie starczyla \(krolestw\) (\d+), ze skarbca bez nadania 0 \(krolestw\) (\d+)"
                         # recenzja f24: czesc krolestw bez wiersza (zaplacily ze skarbca w wojnie, pokoj z zerwanego wezwania 168 w tym samym kroku korony) - tylko przy kwocie > 0
                         r"(?:, w tym krolestwa bez wiersza \(pokoj tej doby po wyplacie\) (\d+) \(krolestw (\d+)\))?")
+# f25-korona (recenzja): pole linii f23 - krolestwa przy nadaniu > 0 z 186/185/168 ze skarbca (klucz Covers Dues): krolestw, ze skarbca, niedoplata przy nadwyzce (krolestw),
+# nadwyzka nie starczyla (krolestw); log bez pola - None
+NKR_RX_F25 = re.compile(r"; f25 przy nadaniu > 0 \(186/185/168 ze skarbca\): krolestw (\d+), ze skarbca (\d+), niedoplata przy nadwyzce \(krolestw\) (\d+),"
+                        r" nadwyzka nie starczyla \(krolestw\) (\d+)")
 NKR_RX_165F24 = re.compile(r"; f24 w tym ze skarbca ponad zapas wojny przy nadaniu 0 \(Ds War Grant Treasury Pays Dues (tak|NIE), poza wplywami dnia\) (\d+)"
                            r" \(186 (\d+), 185 (\d+), 168 (\d+)\)")
 NKR_RX_ST = re.compile(r"\| potkniecia (\d+)\.\s*$")
@@ -47660,7 +47668,11 @@ def _nkr_scan(logp):
                 r = {"tf": g[1] == "tak", "wr": g[2] == "tak", "k": int(g[3]), "resN": int(g[4]), "resF": int(g[5]), "less": int(g[6]), "lessk": int(g[7]),
                      "wark": int(g[8]), "wal": int(g[9]), "sur": int(g[10]), "surk": int(g[11]), "zero": int(g[13]), "st": int(st_.group(1)), "rows": {},
                      "tores": None if "(To Reserve " not in s else ("(To Reserve tak" in s), "pre": None, "f24": None,
-                     "f25": "; f25 Covers Dues tak" in s}   # f25-korona: klucz Ds War Grant Treasury Covers Dues czynny (log sprzed paczki - False)
+                     "f25": "; f25 Covers Dues tak" in s,   # f25-korona: klucz Ds War Grant Treasury Covers Dues czynny (log sprzed paczki - False)
+                     "f25k": None}
+                m25 = NKR_RX_F25.search(s)
+                if m25:   # f25-korona (recenzja): krolestw, ze skarbca, niedoplata przy nadwyzce (krolestw), nadwyzka nie starczyla (krolestw)
+                    r["f25k"] = tuple(int(x) for x in m25.groups())
                 mp = NKR_RX_F23PRE.search(s)
                 if mp:
                     r["pre"] = tuple(int(x) for x in mp.groups())   # krolestw, nalezne, zaplacone, niedoplata, krolestw z niedoplata
@@ -47675,9 +47687,9 @@ def _nkr_scan(logp):
                     for row in seg.split(" ; "):
                         mk = NKR_RX_F23K.match(row.strip())
                         if mk:
-                            # nalezne, zaplacone, niedoplata, przy nadaniu 0; f24: ze skarbca (0 bez dopisku), nadwyzka nie starczyla
+                            # nalezne, zaplacone, niedoplata, przy nadaniu 0; f24: ze skarbca (0 bez dopisku), nadwyzka nie starczyla; f25 (recenzja): przy nadaniu > 0 ze skarbca
                             pre = None if mk.group(8) is None else (int(mk.group(8)), int(mk.group(9)), int(mk.group(10)), bool(mk.group(17)),
-                                                                    int(mk.group(18)) if mk.group(18) else 0, bool(mk.group(22)))
+                                                                    int(mk.group(19)) if mk.group(19) else 0, bool(mk.group(23)), bool(mk.group(18)))
                             r["rows"][mk.group(1)] = (int(mk.group(2)), int(mk.group(3)), int(mk.group(4)), int(mk.group(5)), float(mk.group(6)), bool(mk.group(7)), pre)
                 D["f23"][int(g[0])] = r
                 continue
@@ -48107,7 +48119,7 @@ def nkorona_main(logp, bdp=None, csvp=None):
                     # w osobnej czesci pola (f[5]); suma wierszy + ta czesc = pole doby (= linia 165)
                     if sum(p[4] for _n, p in rows_tr) + f[5] != f[1] or f[5] < 0:
                         e.append("suma wierszy != pole doby")
-                    if f[4] != 0 or any(not p[3] for _n, p in rows_tr):
+                    if f[4] != 0 or any(not (p[3] or p[6]) for _n, p in rows_tr):   # f25 (recenzja): albo przy nadaniu > 0 ze znacznikiem f25
                         e.append("ze skarbca bez nadania 0")
                     if any(p[4] > p[1] for _n, p in rows_tr):
                         e.append("ze skarbca > zaplacone")
@@ -48122,7 +48134,8 @@ def nkorona_main(logp, bdp=None, csvp=None):
                             why24[t_] = why24.get(t_, 0) + 1
                 tot = sum(f23[d]["f24"][1] for d in d24)
                 totp = sum(f23[d]["f24"][5] for d in d24)
-                rep.add("NKR-5e: f24 pieniadz zamkniety - ze skarbca ponad zapas tylko przy nadaniu 0 dzieki skarbcowi, najwyzej zaplacone; suma wierszy krolestw (+ krolestwa"
+                rep.add("NKR-5e: f24 pieniadz zamkniety - ze skarbca ponad zapas tylko przy nadaniu 0 dzieki skarbcowi (f25: albo przy nadaniu > 0 ze znacznikiem f25), najwyzej"
+                        " zaplacone; suma wierszy krolestw (+ krolestwa"
                         " bez wiersza - pokoj tej doby po wyplacie) = pole doby linii f23 = dopisek linii 165",
                         f"dob {len(d24)} (z dopiskiem 165 {sum(1 for d in d24 if d in D['k165f24'])}), ze skarbca razem {tot} zl ({tot / max(1, len(d24)):.0f} zl/d;"
                         f" w tym krolestwa bez wiersza {totp} zl w {sum(1 for d in d24 if f23[d]['f24'][5] > 0)} dobach), rozjazdow {len(e24)}"
@@ -48131,6 +48144,22 @@ def nkorona_main(logp, bdp=None, csvp=None):
             pre_k = sum(f23[d]["pre"][0] for d in days23 if f23[d]["pre"])
             rep.add("NKR-5d: krolestwa przy nadaniu 0 dzieki skarbcowi bez niedoplat 186 / 185 / 168", f"krolestwo-dob przy nadaniu 0 z polami {pre_k} (log bez pol recenzji albo bez nadania 0)",
                     "INFO", None)
+        # NKR-5f (f25-korona, recenzja): nadanie > 0 po sesji, ktora dala 186/185/168 skarbcowi (krok w dol na kwartal, War Tax +krok, dary i reparacje ponad wplywy) - braki
+        # dnia tych pozycji placi skarbiec ponad zapas (TreasuryForDues); niedoplata dopuszczalna tylko przy wyczerpanej nadwyzce (INFO); wiersze ze znacznikiem = pole f25 doby
+        d25 = [d for d in days23 if f23[d].get("f25k") is not None]
+        if d25:
+            crow = [(d, n, v[6]) for d in d25 for n, v in f23[d]["rows"].items() if v[6] is not None and v[6][6]]
+            wet = [(d, n, p[2]) for d, n, p in crow if p[2] > 0 and not p[5]]
+            dry = [(d, n, p[2]) for d, n, p in crow if p[2] > 0 and p[5]]
+            bad25 = [d for d in d25 if f23[d]["f25k"][0] != sum(1 for v in f23[d]["rows"].values() if v[6] is not None and v[6][6])
+                     or f23[d]["f25k"][1] != sum(v[6][4] for v in f23[d]["rows"].values() if v[6] is not None and v[6][6])
+                     or f23[d]["f25k"][2] != sum(1 for v in f23[d]["rows"].values() if v[6] is not None and v[6][6] and v[6][2] > 0 and not v[6][5])]
+            rep.add("NKR-5f: f25 Covers Dues - krolestwa przy nadaniu > 0 po sesji, ktora dala 186/185/168 skarbcowi, bez niedoplat (braki dnia placi skarbiec ponad zapas; niedoplata"
+                    " tylko przy wyczerpanej nadwyzce - INFO); wiersze ze znacznikiem = pole f25 linii doby",
+                    f"dob z polem {len(d25)}, krolestwo-dob {len(crow)}, nalezne {sum(p[0] for _d, _n, p in crow)}, zaplacone {sum(p[1] for _d, _n, p in crow)}"
+                    f" (w tym ze skarbca {sum(p[4] for _d, _n, p in crow)}), z niedoplata przy nadwyzce {len(wet)} (razem {sum(x[2] for x in wet)} zl)"
+                    + (f" (np. {wet[:3]})" if wet else "") + f"; przy wyczerpanej nadwyzce {len(dry)} (razem {sum(x[2] for x in dry)} zl - INFO)"
+                    + f", rozjazdow wierszy z polem {len(bad25)}" + (f" (d{bad25[:5]})" if bad25 else ""), "0", len(wet) == 0 and len(bad25) == 0)
         # NKR-6b (INFO, recenzja): tempo nadwyzki krolestw przy nadaniu 0 dzieki skarbcowi (dwie doby z rzedu) wobec nadwyzka / 91 - DS zaklada kwartal, W5b / W5c wydaja do 1/30
         drops, plan = [], []
         for i, d in enumerate(days23[:-1]):
