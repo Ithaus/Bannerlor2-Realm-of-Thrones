@@ -7108,6 +7108,10 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public int KsLandGateLossDays { get; set; } = 91;
 
+        [SettingPropertyBool("Ks Land Gate Exact Loss", HintText = "with Ks Land Gate: count as a land's granary loss under the calibration only what the calibration itself took - in each village, the fall of its granary up to how much less the calibration fed it that day than the old harvest rule would have; spoilage, winter and poor soil that the old rule would not have covered either do not count, and the fall of more than 1% a day over 7 days uses the same measure. Off = the whole fall of the land's granaries on days the calibration fed the land less than the old rule (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsLandGateExactLoss { get; set; } = true;
+
         [SettingPropertyBool("Ks Hard Gates", HintText = "with Start Calibration: before the calibration starts in a campaign (by itself or with Confirm) the goods ledger must show at most 2 pieces a day of any good appearing from nowhere (daily ticks of unknown origin) and of food lost with removed parties over the last 7 full days, and the free food of supply convoys and Banner Kings parties must be shut off; until then it keeps waiting and the log says why. Off = only the older checks", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsHardGates { get; set; } = true;
@@ -9812,6 +9816,7 @@ namespace Armoury
             s.KsLandGate = KsLandGate;
             s.KsLandGateReserveDays = KsLandGateReserveDays;
             s.KsLandGateLossDays = KsLandGateLossDays;
+            s.KsLandGateExactLoss = KsLandGateExactLoss;
             s.KsHardGates = KsHardGates;
             s.KsNoFishFromPerk = KsNoFishFromPerk;
             s.StartCalibrationAutoArmAutotest = StartCalibrationAutoArmAutotest;
