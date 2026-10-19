@@ -3173,3 +3173,7 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   kod 0, ERROR 0 - Cape Wrath (Selmy -> Seaworth) i Fellwood (Mertyns -> Fell) przekazane: zaloga starego pana 328/336 do partii Stormlands, nowa zaloga 200/200 z partii Dragonstone
   (dawcy zostawili polowe), wiadomosc gracza, KONIEC zmienione 2 / bez zmian 5, flaga zrobione. Sciezka KL (Polnoc pod Harrenhal, zwrot skarbca) niesprawdzona w grze (w zapisie testu KL u
   Joffreya). noc-ks4 04e805dc. Czekam na f22-drogi-perf.
+- 19:45 PDT: f22-drogi-perf GOTOWE (wf_957eb0eb-89d) ca90d5a3: komorki 32x32 wokol kamery (kolo z rogow ekranu, histereza, budzet 8 ms, zdejmowanie decali ze sceny - natywnego kosztu
+  schowanych nie da sie udowodnic); w scenie mediana ~1.6k (kamera z10) - 4k (z110) decali zamiast 73.5k; klucze MapSideRoadsChunks, MapSideRoadsChunkRadiusCap (min ~140). WAZNE: fin95 szedl
+  z Better Time aktywnym (autotest bierze liste modow z LauncherData) - nasz mnoznik wylaczony, czas x4 zamiast x8 -> 58.6 min to glownie predkosc czasu, nie decale. Scalone: noc-ks4
+  **d14efe4d** (1997 ustawien). Bieg zdjec drog fin96 w toku, potem 5 dob + bitwa -> WGRANIE 83.
