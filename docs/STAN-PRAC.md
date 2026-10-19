@@ -3159,3 +3159,7 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
 - 18:20 PDT: f21-zaloga GOTOWE (wf_29d79f73-e6a) cf7ffeb0: BookHoldingsGarrison (TAK) - po zmianie pana przywrocona twierdza dostaje zaloge z partii krolestwa nowego pana (najpierw jego rodu,
   od najblizszej; dawca zostawia >= max(20, 50%); bez gracza/najemnikow/partii w bitwie); cel min(miasto 400 / zamek 200, limit, cel gry); ludzie + ksiega ludzi + sprzet przenoszeni, nic z
   niczego; linia "obsada ..." z BRAK do celu. Ryzyko: Stannis ma ~2.6k w polu - Sharp Point + 4 zamki wezma do polowy. Do scalenia po scaleniu8.
+- 18:45 PDT: SCALENIE8 GOTOWE (wf_c1920bb1-cb5): f20-d1..d4 + recenzja calosci (f20-d4 tylko przy A7 wylaczonej; zwrot nadwyzki kapitalu wlasnego Banku do puli dywidend; Obieg/168 widza
+  dywidende; W6 tarczowe dla > 2R - tylko pomiar, do decyzji) -> dd91695b; + f21-zaloga -> noc-ks4 **b7b93a35** (1995 ustawien, Armoury/CrashScribe/RC/GT build rc 0).
+- 18:45 PDT: TEST fin95 = b7b93a35 (test/fin95, CsAt test/CrashScribe-at-83.dll = e32c2ea0 + at1), armoury-ks-auto.flag (USUNAC!), 160 dob, at-fin95-noc.out.txt. Potem: bieg zdjec drog f19
+  (tools/drogi/zdjecia-drogi-f19.json), 5 dob + bitwa, WGRANIE 83 (Armoury + CrashScribe + RC + GT + CrashScribe.settings.xml), raport docs/RAPORT-NOC-2026-10-19.md.
