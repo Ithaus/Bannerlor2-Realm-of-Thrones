@@ -19,7 +19,8 @@ namespace Armoury
     /// TradeGoodsTotalValue = suma Value x ilosc sztuk IsTradeGood (ItemRoster.OnRosterUpdated) - po cenach historycznych towary wsi i karawan sa
     /// 3-20 x tansze, wiec Lotrostwo rosnie tyle razy wolniej (gracz i lordowie AI). Czesc "za zwierze" bez zmian (sztuki, nie wartosc).
     /// Postfiks na trzech metodach (AccessTools.DeclaredMethod na klasie deklarujacej - pulapka 15.10; NavalDLC przekazuje do niej przez pole):
-    /// delta = suma (Orig - Value) x ilosc po sztukach IsTradeGood, ktore przeliczono (Orig != Value), razy TEN SAM mnoznik co gra; dodawana ta sama
+    /// delta = suma (OrigUnit - Value) x ilosc po sztukach IsTradeGood, ktore przeliczono (OrigUnit != Value; OrigUnit = Orig x CountScale - ladunek
+    /// rudy/drewna to 10 starych sztuk), razy TEN SAM mnoznik co gra; dodawana ta sama
     /// droga co gra (HeroDeveloper.AddSkillXp(Roguery, xp, true, true) = OnPersonalSkillExercised). Delta <= 0 (towar drozszy niz dawniej) - nic:
     /// nigdy mniej niz gra. Latki W KAMPANII, raz na proces, tylko przy wlaczonym kluczu (bez klucza - sciezka WGRANIA 87).
     /// Log: linia startu "w N/3 metodach", linia na zdarzenie gracza (do 40 na dobe), linia doby (wszyscy).
@@ -80,7 +81,7 @@ namespace Armoury
                     var el = loot.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (it == null || !it.IsTradeGood || el.Amount <= 0) continue;
-                    int v = it.Value, o = HistoricalPrices.Orig(it);
+                    int v = it.Value, o = HistoricalPrices.OrigUnit(it);   // poprawka: ladunek rudy/drewna = 10 starych sztuk (CountScale)
                     if (o <= 0 || o == v) continue;   // tylko sztuki przeliczone
                     sv += (long)v * el.Amount; so += (long)o * el.Amount;
                 }

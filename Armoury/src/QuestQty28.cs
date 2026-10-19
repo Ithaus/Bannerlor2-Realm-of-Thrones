@@ -92,14 +92,15 @@ namespace Armoury
 
         // ------------------------------------------------------------ pomocniki wolane z IL gry (te same stosy co podmienione instrukcje)
 
-        /// <summary>Zamiast ItemObject.get_Value przy stalej: wartosc sprzed przeliczenia (Orig; nieprzeliczone - Value). Null - ten sam wyjatek co gra.</summary>
+        /// <summary>Zamiast ItemObject.get_Value przy stalej: wartosc sprzed przeliczenia (OrigUnit - Orig x CountScale: ladunek rudy/drewna = 10 starych
+        /// sztuk; nieprzeliczone - Value). Null - ten sam wyjatek co gra.</summary>
         public static int Old(ItemObject it)
         {
             int v = it.Value;
             if (!On) return v;
             try
             {
-                int o = HistoricalPrices.Orig(it);
+                int o = HistoricalPrices.OrigUnit(it);   // poprawka: ladunek 100 kg liczy sie jak 10 starych sztuk 10 kg (inaczej 10 x towaru)
                 if (o <= 0) return v;
                 _lItem = it; _lGame = v; _lOld = o;
                 return o;
@@ -107,14 +108,14 @@ namespace Armoury
             catch (Exception e) { Stumble("Old", e); return v; }
         }
 
-        /// <summary>Zamiast SettlementComponent.GetItemPrice przy stalej: cena w starej monecie = cena x Orig / Value.</summary>
+        /// <summary>Zamiast SettlementComponent.GetItemPrice przy stalej: cena w starej monecie = cena x OrigUnit / Value.</summary>
         public static int OldPrice(SettlementComponent sc, ItemObject item, MobileParty party, bool isSelling)
         {
             int p = sc.GetItemPrice(item, party, isSelling);
             if (!On || item == null) return p;
             try
             {
-                int v = item.Value, o = HistoricalPrices.Orig(item), r = p;
+                int v = item.Value, o = HistoricalPrices.OrigUnit(item), r = p;
                 if (v > 0 && o > 0 && o != v) r = Math.Max(1, (int)Math.Round(p * (double)o / v));
                 _lItem = item; _lGame = p; _lOld = r;
                 return r;
