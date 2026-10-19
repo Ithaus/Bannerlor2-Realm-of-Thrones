@@ -3261,3 +3261,4 @@ D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie87-przed; zapisy Jeffa po sesji 86
 = 86 + f27-badania (Hist Research From Old Value: punkty badan czesci od wartosci sprzed przeliczenia). Test 5 dob + bitwa (Armoury-2026-10-19_10-36-38.log) 0 ERROR.
 Sesja Jeffa na 86 (Armoury-2026-10-19_09-52-41.log, kopia jeff-* na D:): przywrocenie wlosci 7/7 OK (KL -> Joffrey, armia Robba 9455 pod Harrenhal, zwrot 1 125 434),
 sojusze Dragonstone+Riverlands i Straz+Skagos zerwane, 0 ERROR. Do sprawdzenia w nastepnym logu: "badania czesci (f27" przy kuciu, sesja kwartalna DS z f25.
+- 19.10 (Jeff gra): Jeff "co mozesz z tej listy robic kiedy ja gram" -> W TOKU f28-wyceny (przeglad wzorow gry liczonych z ItemObject.Value po cenach historycznych; galaz w-toku/f28-wyceny od 665d79dd, raport docs/AUDYT-WYCENY-2026-10-19.md). Testy/wgrania dopiero po zamknieciu gry.
