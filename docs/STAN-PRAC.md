@@ -3189,3 +3189,5 @@ Fellwood do Stannisa z zaloga 200, 0 ERROR; bieg zdjec drog f19 w trybie komorek
 w scenie 452-1946 decali; 5 dob + bitwa (fin96 = d14efe4d): kod 0, ERROR 0, bitwa WYGRANA.
 NIESPRAWDZONE W GRZE: sciezka KL w przywroceniu (Polnoc pod Harrenhal, zaloga Polnocy z KL, zwrot 1.125 mln) - SPRAWDZIC W PIERWSZYM LOGU JEFFA ("Wlosci z kronik").
 RAPORT DLA JEFFA: docs/RAPORT-NOC-2026-10-19.md (decyzje 1-8 do podjecia).
+- 19:40 PDT: CHANGELOG na noc-ks4 9b160103 (wpis WGRANIA 83 + f21/f22, historia cala 32 956 linii). Limit tygodniowy 83% (reset za 5 dni), kontekst sesji 90% - NOC ZAMKNIETA: zadania Jeffa
+  zrobione i wgrane; nic wiecej nie uruchamiam bez Jeffa. Rano: log pierwszego wczytania Jeffa (Wlosci z kronik - sciezka KL, Sojusze kanonu, drogi/komorki, f20) i jego decyzje z raportu.
