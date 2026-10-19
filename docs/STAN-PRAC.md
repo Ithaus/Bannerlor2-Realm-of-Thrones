@@ -3228,3 +3228,7 @@ ksiega domknieta), NKA-1 zaleglosci DS 1.11 mln (fin97 0.5) - obserwowac. Bieg x
 DO DECYZJI JEFFA (pytania 1-4 w czacie 19.10): 1 Wolni Ludzie 0.65-0.68 (a paczka Planu / b prog 0.65), 2 jedwab pola mieszczan (a ok / b paczka), 3 aksamit (a/b/c),
 4 "8a doslownie" w sesji DS (a zostawic / b ze skarbca). Rada: 1a 2a 3c 4b; duze paczki po resecie limitu (tydzien 89%, reset 23.10 ok. 20:00 PDT).
 Pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw skarbiec (f23)" z polem f24.
+- 19.10 ok. 13:45 UTC: DECYZJE JEFFA (doslownie "1.a 2.a 3.c 4. b 5. c 6. tak 7. tak"): 1a paczka Planu KS (Wolni Ludzie) - PO RESECIE LIMITU; 2a jedwab pola mieszczan ok -> ZC1-16b
+  baza x czesc produkcji wsi; 3c aksamit -> ZC1-4 w miastach z tkalnia i okolicy; 4b skarbiec placi tez stale rachunki 186/185/168 w sesji DS (nowy klucz) -> paczka f25-korona;
+  5C bramka krainy KS: strata = min(spadek, wzor gry - racje KS), nowy klucz - PO RESECIE LIMITU; 6 War Reserve By Need tak (bez zmian); 7 Ds War Grant Treasury To Reserve tak (bez zmian).
+  Limit tygodniowy 92% (reset 23.10 ok. 20:00 PDT) - teraz tylko f25 (4b + checker 2a/3c), test x20, WGRANIE 86.
