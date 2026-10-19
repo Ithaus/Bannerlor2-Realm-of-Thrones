@@ -323,7 +323,8 @@ static class Program
             {
                 var ll = new List<KeyValuePair<string, double[]>>(M0.LandKcal); ll.Sort((a, b) => b.Value[1].CompareTo(a.Value[1]));
                 Console.WriteLine("  bez pokrycia wedlug krainy (kcal mln): " + string.Join(", ", ll.Take(14).Select(kv => (kv.Value[2] == 0 ? "W " : "E ") + kv.Key + " " + (kv.Value[1] / 1e6).ToString("0", Inv) + "/" + (kv.Value[0] / 1e6).ToString("0", Inv) + " (" + (100 * kv.Value[1] / Math.Max(1, kv.Value[0])).ToString("0", Inv) + "%)"))
-                                  + " | 8b z plonu: parytet > plon W/E " + M0.SubPhysOver[0] + "/" + M0.SubPhysOver[1] + ", kcal zastepcze bez ziemi " + (M0.SubLandShort[0] / 1e6).ToString("0", Inv) + "/" + (M0.SubLandShort[1] / 1e6).ToString("0", Inv) + " mln, stol 8d okregow " + M0.TableN[0] + "/" + M0.TableN[1]);
+                                  + " | 8b z plonu: parytet > plon W/E " + M0.SubPhysOver[0] + "/" + M0.SubPhysOver[1] + ", kcal zastepcze bez ziemi " + (M0.SubLandShort[0] / 1e6).ToString("0", Inv) + "/" + (M0.SubLandShort[1] / 1e6).ToString("0", Inv) + " mln, stol 8d okregow " + M0.TableN[0] + "/" + M0.TableN[1]
+                                  + (M0.TradeCov ? " | HTP W/E: okregow " + M0.TradeCovN[0] + "/" + M0.TradeCovN[1] + ", kT max " + M0.TradeKMax[0].ToString("0.00", Inv) + "/" + M0.TradeKMax[1].ToString("0.00", Inv) + ", sufit fizyczny " + M0.TradeCapN[0] + "/" + M0.TradeCapN[1] : ""));
             }
             if (M0 != null) for (int m = 0; m < 2; m++) { double fk = Math.Max(1e-9, M0.VFullKcal[m]); Console.WriteLine("  " + (m == 0 ? "W" : "E") + ": Plan bez pokrycia " + (100 * Math.Max(0.0, M0.VUnpaidKcal[m] - M0.VHomeKcal[m]) / fk).ToString("0.0", Inv) + "%, zastepcze " + (100 * M0.VSubKcal[m] / fk).ToString("0.0", Inv) + "%, sprzedaz " + M0.VSalesB[m].ToString("0", Inv) + ", stol 8d " + M0.TableKg[m].ToString("0", Inv) + " kg/d (" + (100 * M0.TableKcal[m] / fk).ToString("0.0", Inv) + "% kcal)"); }
             for (int m = 0; m < 2; m++)
@@ -348,7 +349,7 @@ static class Program
         }
         if (eqw != null) eqw.Close();
         for (int m = 0; m < 2; m++) Console.WriteLine("CENY " + (m == 0 ? "W" : "E") + ": " + string.Join(", ", Enumerable.Range(0, KsTab.NG).Where(g => !KsTab.RegGoodMask[g]).Select(g => KsTab.Goods[g] + " " + R.P[m * KsTab.NG + g].ToString("0.000", Inv))));
-        { var p2 = Environment.GetEnvironmentVariable("KS_D2"); if (!string.IsNullOrEmpty(p2)) File.WriteAllLines(p2, new[] { "id;land;typ;alfa;budzet;koszyk;zapl;hw;HwV;G;cel;V0;raw;rawF;cov;fk;paidk;uk;okU;nokU;subK;subKeff;stK;hkc;unc;diet;subZ;V0T;cov0" }.Concat(d2.Values)); }
+        { var p2 = Environment.GetEnvironmentVariable("KS_D2"); if (!string.IsNullOrEmpty(p2)) File.WriteAllLines(p2, new[] { "id;land;typ;alfa;budzet;koszyk;zapl;hw;HwV;G;cel;V0;raw;rawF;cov;fk;paidk;uk;okU;nokU;subK;subKeff;stK;hkc;unc;diet;subZ;V0T;cov0;ySub;capSub;kcSub;hkcBase;hwS" }.Concat(d2.Values)); }
         if (!string.IsNullOrEmpty(dbgPath)) { var all = new List<string> { "it;id;typ;m;hw;cel;HwV;G;surowiec;V0;budzet;sprzedaz;koszyk;zaplacone" }; foreach (var kv in dbg) all.AddRange(kv.Value); File.WriteAllLines(dbgPath, all); }
         Console.WriteLine("Solve: " + (R.Error ?? "OK") + " rund " + R.Rounds + " (pierwsza " + R.RoundsFirst + ", R8 " + R.R8Rounds + ", R8b " + R.R8bRounds + ") czas " + sw.Elapsed.TotalSeconds.ToString("0.0", Inv) + " s; blokow " + R.NB + ", par " + R.NP
                           + " | alfa " + alpha.ToString("0.00", Inv) + ", miasta " + scen + ", krok 8 " + (money ? "TAK" : "NIE"));

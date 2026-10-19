@@ -7196,7 +7196,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsAlphaNet { get; set; } = true;
 
-        [SettingPropertyBool("Ks Home Work Trade Prices", HintText = "with Ks Alpha Net: the weekly plan counts the food a village makes at home also at the prices it trades at - its hands' goods at the price it sells them for and its food at the price it would pay - and keeps the larger of that and the old reckoning, so when other villages flood the market with the same furs or fish, the hands that stay at home do not make less food from the same land; how many hands work at home does not change; off = home food at the plan's market prices only, as before", RequireRestart = false)]
+        [SettingPropertyBool("Ks Home Work Trade Prices", HintText = "with Ks Alpha Net: the weekly plan counts the food a village makes at home also at the prices it trades at - its hands' goods at the price it sells them for and its food at the price it would pay - and keeps the larger of that and the old reckoning, but never more than its home hands could hunt, fish or grow of its best staple on its free land; so when other villages flood the market with the same furs or fish, the hands that stay at home do not make less food than their land yields; how many hands work at home does not change; off = home food at the plan's market prices only, as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsHomeWorkTradePrices { get; set; } = true;
 

@@ -186,6 +186,8 @@ namespace Armoury
         public Dictionary<string, double[]> LandKcal = new Dictionary<string, double[]>(StringComparer.Ordinal);
         // f26-wolni (klucz Ks Home Work Trade Prices): okregi, w ktorych parytet pracy domowej w cenach handlu kroku 8 dal wieksza czesc pokryta, i kcal/d dodane do robionych w domu
         public bool TradeCov; public int[] TradeCovN = new int[2]; public double[] TradeCovKcal = new double[2];
+        // recenzja f26: najwiekszy kT (przed sufitem) i okregi, w ktorych sufit fizyczny (plon towaru zastepczego na wolnej ziemi; bez towaru zastepczego - 0) obcial parytet handlu
+        public double[] TradeKMax = new double[2]; public int[] TradeCapN = new int[2];
         // r4-koszyk (P9): drabina tanszego koszyka klas miast, statystyka klas [(m * 3 + klasa) * KsCheap.StatN + k] i dokupiona podstawa [m * N + z] (kg/d) - ostatnia runda
         public bool Cheap;
         public double[] P9 = new double[6 * KsCheap.StatN], ExtraT = new double[2 * KsBasket.N];
@@ -1238,6 +1240,7 @@ namespace Armoury
             var prod = new double[NI]; var prod2 = new double[NI]; var own = new double[NI]; var own2 = new double[NI];
             var q = new double[NZ]; var paid = new double[NZ]; var u = new double[NZ];
             var cvZ = new int[NZ]; var cvP = new double[NZ];                 // KS-R3 krok 8c: pozycje do zamiany na towar zastepczy (wedlug surowca za kcal)
+            var cvFr = new double[NZ];                                       // f26-wolni (recenzja): czesc pozycji zamieniona przez 8c (ta sama mieszanka w parytecie handlu co rece pOk)
             var keep = new double[KsTab.NN]; var full = new double[KsTab.NN];
             var pz = new double[NM * NZ]; var pi = new double[NM * NI]; var bi = new double[NM * NI];
             var sz = new double[NM * NZ]; var si = new double[NM * NI];   // ceny cienia (praca) - rachunek pracy domowej
@@ -1458,6 +1461,7 @@ namespace Armoury
                         else rawNo += r;
                     }
                     double subKeff = 0, hwSFin = 0;                        // hwSFin (f26-wolni): rece towaru zastepczego z plonu (8b + 8c) - fizyczne, bez parytetu
+                    if (tp) Array.Clear(cvFr, 0, NZ);
                     if (phys)
                     {
                         // rece (czesc rak zajec) w jednostkach pracy domowej: pozycje okregu z parytetu wartosci (V0 - jak dotad), towar zastepczy z plonu
@@ -1490,6 +1494,7 @@ namespace Armoury
                                 hwOk -= fr * kz * cvP[j]; hwOkF -= fr * kz * cvP[j];
                                 kgS += fr * kz / kcSub; hwS = kgS / ySub;
                                 stK += fr * kz;
+                                if (tp) cvFr[z] = fr;
                             }
                         }
                         raw = (hwOk + hwS) * v0; rawF = (hwOkF + hwS) * v0;                 // w jednostkach V0 (cel = raw / V0)
@@ -1520,22 +1525,6 @@ namespace Armoury
                         // pokrycia 13% -> 24%). Rece pracy domowej (cel, punkt staly) - bez zmian (rynek Planu ten sam co do liczby); czesc pokryta nigdy mniejsza niz bez
                         // klucza. Towar zastepczy z plonu (8b/8c) - fizyczny, bez zmian.
                         double hkcBase = 0, cov0 = cov;
-                        if (tp && cov < 1.0 && covBase > 0 && v0 > 0 && v0T > 0)
-                        {
-                            double rS = 0, rT = 0;
-                            for (int z = 0; z < NZ; z++)
-                            {
-                                if (!v.Ok[z] || !(u[z] > 0) || (inp.HomeSub && !(KsBasket.Kcal[z] > 0))) continue;
-                                rS += u[z] * RawZ(sz, m * NZ, z); rT += u[z] * RawZ(pz, m * NZ, z);
-                            }
-                            double need = covBase / v0, pS = Math.Min(need, hwSFin), pOk = need - pS;
-                            double kT = rS > 0 && rT > 0 ? (v0T / rT) / (v0 / rS) : 0.0;   // ile razy wiecej jedzenia z reki w cenach handlu niz w cenach cienia
-                            if (kT > 1.0)
-                            {
-                                double needT = pOk / kT + pS, cT = needT > 0 ? Math.Min(1.0, hwc / needT) : 1.0;
-                                if (cT > cov) { cov = cT; M.TradeCovN[m]++; }
-                            }
-                        }
                         for (int z = 0; z < NZ; z++)
                         {
                             double kc = KsBasket.Kcal[z]; if (!(kc > 0)) continue;
@@ -1543,6 +1532,32 @@ namespace Armoury
                             if (v.Ok[z]) hkc += u[z] * kc;
                         }
                         hkcBase = hkc + subKeff;
+                        if (tp && cov < 1.0 && covBase > 0 && v0 > 0 && v0T > 0 && hkcBase > 0)
+                        {
+                            // recenzja f26 (drobne): mieszanka pozycji okregu po 8c - pozycja zamieniona na towar zastepczy liczy sie tylko w czesci niezamienionej (cvFr),
+                            // tak jak rece pOk (= rS / V0); dotad pelne u[z] - kT ze sredniej po innej mieszance niz ta, ktora skaluje
+                            double rS = 0, rT = 0;
+                            for (int z = 0; z < NZ; z++)
+                            {
+                                if (!v.Ok[z] || !(u[z] > 0) || (inp.HomeSub && !(KsBasket.Kcal[z] > 0))) continue;
+                                double uz = u[z] * (1.0 - cvFr[z]);
+                                rS += uz * RawZ(sz, m * NZ, z); rT += uz * RawZ(pz, m * NZ, z);
+                            }
+                            double need = covBase / v0, pS = Math.Min(need, hwSFin), pOk = need - pS;
+                            double kT = rS > 0 && rT > 0 ? (v0T / rT) / (v0 / rS) : 0.0;   // ile razy wiecej jedzenia z reki w cenach handlu niz w cenach cienia
+                            if (kT > M.TradeKMax[m]) M.TradeKMax[m] = kT;
+                            if (kT > 1.0)
+                            {
+                                double needT = pOk / kT + pS, cT = needT > 0 ? Math.Min(1.0, hwc / needT) : 1.0;
+                                // recenzja f26 (wazne): SUFIT FIZYCZNY - ceny startu sa w 0.7-1.5 (psujace sie >= 1), ceny cienia nie (towar zbity 0.05), wiec kT bywa duze;
+                                // dom nie zrobi wiecej kcal, niz rece pracy domowej urodza najlepszego wlasnego towaru zastepczego (8b: plon rak x ziemia bloku), najwyzej
+                                // z wolnej ziemi bloku - ta sama regula i ten sam sufit ziemi co towar zastepczy 8b/8c (recenzja runda 3, oliwnik w Reach). Stary rachunek
+                                // (cov0) zostaje, nawet gdy byl ponad plon. Okreg bez towaru zastepczego z plonu (phys = false) - brak miary fizycznej: bez parytetu handlu
+                                double capK = phys ? Math.Min(hwc * ySub, capSub) * kcSub : 0.0;
+                                if (cT * hkcBase > capK) { cT = Math.Max(cov0, capK / hkcBase); M.TradeCapN[m]++; }
+                                if (cT > cov) { cov = cT; M.TradeCovN[m]++; }
+                            }
+                        }
                         hkc = cov * (hkc + subKeff);                              // KS-R3 krok 8b: kcal zastepcze tez robione w domu (ta sama czesc pokryta; z plonu - recenzja runda 3)
                         if (cov > cov0) M.TradeCovKcal[m] += (cov - cov0) * hkcBase;   // f26-wolni: kcal/d dodane cenami handlu
                         R.DistHomeKcal[d.Id] = fk > 0 ? (float)Math.Max(0.0, Math.Min(1.0, hkc / fk)) : 0f;
