@@ -238,6 +238,17 @@ namespace Armoury
             return MaterialLaw.Orig(it);
         }
 
+        /// <summary>f28-wyceny (poprawka): wartosc JEDNEJ dzisiejszej sztuki w starej monecie - Orig (stara sztuka gry, 10 kg surowca) x CountScale
+        /// (ruda, drewno, przy ZC1 glina i wapien: ladunek = HistBulkUnitFactor starych sztuk; lupa - jak ladunek rudy; reszta x1). Do kwot
+        /// nie-cenowych liczonych na sztuki (ilosci w zadaniach, XP Lotrostwa) - ta sama ilosc towaru co w zamysle gry.</summary>
+        internal static int OrigUnit(ItemObject it)
+        {
+            int o = Orig(it);
+            if (o <= 0) return o;
+            float k = CountScale(it);
+            return k > 1.001f || k < 0.999f ? Math.Max(1, (int)Math.Round(o * (double)k)) : o;
+        }
+
         private static float MetalPerKg(CraftingMaterials g)
         {
             var s = Settings.Current;
