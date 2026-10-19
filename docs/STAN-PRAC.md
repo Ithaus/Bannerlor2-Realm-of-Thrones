@@ -3211,3 +3211,9 @@ TESTY: fin97 160 dob (Armoury-2026-10-19_02-02-06.log) 0 ERROR (drobne NIE w ###
 OTWARTE: drobne NIE z fin97 (NKR-5d niedoplaty pozycji z wplywow dnia przy nadaniu 0, NKS-30b Wolni Ludzie 0.68, NZR-5 zaokraglenie, NDP-3); A7 - osobny test (decyzja 6b);
 pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw skarbiec (f23)". Testy odtad z -Speed 16 (Jeff: testy jak najszybciej).
 - 19.10: Jeff (verbatim): "popraw te drobiazgi od razu" -> paczki f24-korona (NKR-5d, NZR-5, NDP-3) i f24-rynek (NKS-30b, NAKUM-18, ZC1-4, ZC1-16b) od f8faeade; testy z -Speed 16.
+- 19.10 ok. 04:00 PDT: f24 gotowe (workflow kod -> recenzja -> poprawki). f24-korona c5c796e1: NKR-5d - nowy klucz Ds War Grant Treasury Pays Dues (skarbiec ponad zapas
+  doplaca dobowe braki 186/185/168 przy nadaniu 0), NZR-5/NDP-3 - mnoznik f w budzet-rodow.csv dokladnie (G17; kwoty gry bez zmian), NKR-5e nowy. f24-rynek 8e1de592: tylko
+  checker - NAKUM-18 mierzy przyrost BEZ UJSCIA (prog 3000/d; P i R wydaja: koszyk P ok. 119 tys./d); recenzja COFNELA zmiany NKS-30b i ZC1-16b (chowaly prawdziwy spadek).
+  DO DECYZJI JEFFA (docs/noc-1718/f24-rynek-CHANGELOG.md): Wolni Ludzie 0.68 (A paczka Planu krok 8 / B prog 0.65), jedwab -28% wsi na rzecz pol mieszczan KS (A ok / B paczka),
+  aksamit ZC1-4 (A tkalnie przed mieszczanami / B kontrakty surowca / C zmienic cel); korona: "8a doslownie" dla 186/185/168 w sesji DS (f24-korona CHANGELOG).
+  Scalone noc-ks4 2a76d3c6 (Armoury aefc0ee7, reszta jak 84). TEST fin98 160 dob -Speed 16 w toku. Limit tygodniowy 89% (reset 24.10).
