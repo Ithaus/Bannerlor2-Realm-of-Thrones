@@ -1225,7 +1225,7 @@ Uzycie (Python 3, tylko odczyt):
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
                     NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
                     wsi + pola mieszczan + praca domowa) / potrzeba jedzenia wsi i miast w kcal surowca), NKS-30b jedzenie wsi (1 - kcal koszyka bez pokrycia kroku 8 /
-                    pelna potrzeba kcal ludzi wsi w tej samej mierze - kcal koszyka, potrzeby R8; ostatni Plan, 4 ostatnie - INFO): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93,
+                    pelna potrzeba kcal ludzi wsi w tej samej mierze - kcal koszyka, potrzeby R8; ostatni Plan, 4 ostatnie - INFO): Polnoc >= 0.90, Wolni Ludzie >= 0.60 (Jeff 19.10 a), Skagos >= 0.80, Ib >= 0.93,
                     Zelazne Wyspy >= 0.90 (Nocna Straz, Lorath - INFO); progi z harnessu Planu (jedzenie przed -> po, po recenzji: Polnoc 0.92 -> 0.97, Wolni 0.56 -> 0.79,
                     Straz 0.33 -> 0.43, Skagos 0.92 -> 0.98, Ib 1.00 -> 0.99, Wyspy 0.93 -> 0.97) ok. 5-10% nizej; NKS-30c prog przesuwa rece tam, gdzie rynek nie
                     wyzywia, NKS-30d tozsamosc rak (suma udzialow bloku = 1 - nic z niczego), NKS-30e Plany zbiezne (mediana niezbieznych <= 10; z --baza-doby <= mediana
@@ -51625,7 +51625,10 @@ def main(argv):
 NPN_LINE = re.compile(r"KS: wyzywienie krain \(plan doba (?P<day>\d+); najpierw wyzywic siebie (?P<sf>[^,]+), zimna ziemia (?P<cl>[A-Z]+)\)")
 NPN_LAND = re.compile(r"(?P<m>[WE]) (?P<land>[a-z_]+) jedzenie (?P<d>[\d.]+|-) wsie (?P<v>[\d.]+) kraina (?P<a>[\d.]+) \((?P<rest>[^|]*)\)")
 NPN_REST = re.compile(r"(?P<m>[WE]) (?P<land>[a-z_]+) (?P<d>[\d.]+|-)/(?P<v>[\d.]+)/(?P<a>[\d.]+)")
-NPN_THR = (("battania", 0.90, "Polnoc"), ("freefolk", 0.70, "Wolni Ludzie"), ("skagosi", 0.80, "Skagos"), ("ibbenese", 0.93, "Ib"), ("sturgia", 0.90, "Zelazne Wyspy"))
+# Wolni Ludzie 0.60 (dotad 0.70) - decyzja Jeffa 19.10 "zostawnmy a": dom Wolnych Ludzi jest juz na sufitku plonu zimnej ziemi (f26-wolni, harness h5-wolni:
+# po sufitku fizycznym zero zmian w fin98; fin95 0.79 bylo za hojne), a bramka krainy KS przywraca im stare zasady plonu (ok. d+129 od wlaczenia KS). Prog 0.60
+# to podloga ponizej fin98 (4 ostatnie Plany 0.68/0.65/0.64/0.65) - lapie dalszy spadek, nie obecny stan ziemi.
+NPN_THR = (("battania", 0.90, "Polnoc"), ("freefolk", 0.60, "Wolni Ludzie"), ("skagosi", 0.80, "Skagos"), ("ibbenese", 0.93, "Ib"), ("sturgia", 0.90, "Zelazne Wyspy"))
 NPN_INFO = (("nightswatch", 0.35, "Nocna Straz"), ("nord", 0.95, "Lorath/Nord"))
 
 
@@ -51757,7 +51760,7 @@ def npolnoc_feedswiat(rep, feed, clr, plans):
 def npolnoc_main(logp, bdp=None):
     """npolnoc (r4-polnoc, noc 17/18.10; Armoury/src/StartCalibration.Feed.cs, Tables.cs, Polnoc.cs; klucze Ks Self Feed First, Ks Self Feed Everywhere, Ks Cold Land):
     [--baza-doby <log biegu bez r4-polnoc>] NKS-30-0 linie "KS: wyzywienie krain" przy Planach (klucze TAK), NKS-30a Polnoc kraina (kcal wlasne) >= 0.85,
-    NKS-30b jedzenie wsi (1 - kcal bez pokrycia / potrzeba; ostatni Plan): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93, Zelazne Wyspy >= 0.90 (Nocna Straz i Lorath - INFO), NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia (z progu > 0), NKS-30d tozsamosc rak (odchylenie sumy
+    NKS-30b jedzenie wsi (1 - kcal bez pokrycia / potrzeba; ostatni Plan): Polnoc >= 0.90, Wolni Ludzie >= 0.60 (Jeff 19.10 a), Skagos >= 0.80, Ib >= 0.93, Zelazne Wyspy >= 0.90 (Nocna Straz i Lorath - INFO), NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia (z progu > 0), NKS-30d tozsamosc rak (odchylenie sumy
     udzialow bloku od 1 <= 1e-6 - nic z niczego), NKS-30e Plany zbiezne (mediana niezbieznych towarow Planow po pierwszym <= 10; z --baza-doby <= baza + 2), NKS-30f bilans
     jedzenia NA TARG ostatniego Planu (INFO - wiaze NKS-3 w --grupa nks), NKS-30g A7 przy progu (INFO), NKS-30h Plan bez pokrycia wedlug krainy (INFO), NKS-30i rece przesuniete
     do jedzenia (INFO), NKS-30j ziemia - prog nie bierze ziemi ponad 0.98 powierzchni bloku (przyrost <= 1e-6; recenzja). Brak linii - INFO, nigdy wyjatek."""
