@@ -3254,3 +3254,10 @@ TESTY: fin99 160 dob x20 (Armoury-2026-10-19_07-51-11.log) 0 ERROR - lud w wojni
 OTWARTE: okolica tkalni aksamitu (3c) - log nie ma indeksu aksamitu wedlug miasta (nowa linia logu - osobno); pierwszy log Jeffa ("Wlosci z kronik", "Sojusze kanonu",
 "Korona: najpierw skarbiec (f23)" z f24/f25, "KS: bramka krainy" z "miara straty (f26"). Limit tygodniowy ok. 95% (reset 23.10 ok. 20:00 PDT).
 - 19.10 ok. 17:40 UTC: Jeff: "wogole nie ucze sie nowych elementow miecza ... 30 znanych" -> f27-badania na noc-ks4 (Armoury 3468643a, klucz Hist Research From Old Value): punkty badan czesci od wartosci sprzed przeliczenia (PriceOne przed AddResearchPoints: 1105 -> 21 d. = 3 pkt zamiast 122). Czeka na zamkniecie gry: autotest 5 dob -Speed 20 + WGRANIE 87.
+
+### 93. WGRANIE 87 (19.10 ok. 10:45 PDT) - BADANIA CZESCI KUZNI - START TUTAJ
+W grze: `w-toku/noc-wgranie-87` = noc-ks4 fe9704aa (+ CHANGELOG) | Armoury **3468643a** (2009 ustawien), reszta jak 86. Kopie *.bak-2026-10-19-wgranie87-przed +
+D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie87-przed; zapisy Jeffa po sesji 86: D:/Backup-Bannerlord/zapisy-jeffa/2026-10-19-po-sesji-86 (md5 zgodne).
+= 86 + f27-badania (Hist Research From Old Value: punkty badan czesci od wartosci sprzed przeliczenia). Test 5 dob + bitwa (Armoury-2026-10-19_10-36-38.log) 0 ERROR.
+Sesja Jeffa na 86 (Armoury-2026-10-19_09-52-41.log, kopia jeff-* na D:): przywrocenie wlosci 7/7 OK (KL -> Joffrey, armia Robba 9455 pod Harrenhal, zwrot 1 125 434),
+sojusze Dragonstone+Riverlands i Straz+Skagos zerwane, 0 ERROR. Do sprawdzenia w nastepnym logu: "badania czesci (f27" przy kuciu, sesja kwartalna DS z f25.
