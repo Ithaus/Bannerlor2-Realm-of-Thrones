@@ -3210,3 +3210,4 @@ Kopie *.bak-2026-10-19-wgranie84-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-
 TESTY: fin97 160 dob (Armoury-2026-10-19_02-02-06.log) 0 ERROR (drobne NIE w ### 89), 5 dob + bitwa (Armoury-2026-10-19_03-07-01.log) 0 ERROR, bitwa wygrana.
 OTWARTE: drobne NIE z fin97 (NKR-5d niedoplaty pozycji z wplywow dnia przy nadaniu 0, NKS-30b Wolni Ludzie 0.68, NZR-5 zaokraglenie, NDP-3); A7 - osobny test (decyzja 6b);
 pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw skarbiec (f23)". Testy odtad z -Speed 16 (Jeff: testy jak najszybciej).
+- 19.10: Jeff (verbatim): "popraw te drobiazgi od razu" -> paczki f24-korona (NKR-5d, NZR-5, NDP-3) i f24-rynek (NKS-30b, NAKUM-18, ZC1-4, ZC1-16b) od f8faeade; testy z -Speed 16.
