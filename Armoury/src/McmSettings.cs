@@ -5040,6 +5040,10 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public int BanditCheerRelation { get; set; } = 2;
 
+        [SettingPropertyBool("Bandit Relief Relation Summary", HintText = "after you beat bandits, the thanks of nearby villages comes as ONE message - how much relation, with how many notables and which villages - instead of a popup for every notable; the relation you gain is the same. Off: one popup per notable, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Grateful villages")]
+        public bool BanditReliefRelationSummary { get; set; } = true;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder", RequireRestart = false)]
         [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
@@ -9319,6 +9323,7 @@ namespace Armoury
             s.BanditCheerEnabled = BanditCheerEnabled;
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
+            s.BanditReliefRelationSummary = BanditReliefRelationSummary;
             s.LogEnabled = LogEnabled;
             s.LogKeepOpen = LogKeepOpen;
             s.QuietLog = QuietLog;

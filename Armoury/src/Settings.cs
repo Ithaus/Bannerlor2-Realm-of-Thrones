@@ -1804,6 +1804,9 @@ namespace Armoury
         public bool BanditCheerEnabled = true;             // villages near your victory over bandits thank you - relations with their notables improve
         public int BanditCheerRadius = 50;                 // how far from the battlefield a village still hears the good news (map distance)
         public int BanditCheerRelation = 2;                // relation gained with each notable of those villages
+        // n20-relacje (Jeff 19.10: "nie wyskakiwalo mi 30 powiadomien ... zbiorczo"): showQuickNotification = false przy BanditCheer i jedno okienko
+        // zbiorcze (BanditCheer.BuildText); relacja i XP Charm bez zmian; linia logu "BanditCheer (zbiorczo):" przy kazdej wygranej z banda
+        public bool BanditReliefRelationSummary = true;    // after you beat bandits, the thanks of nearby villages comes as ONE message - how much relation, with how many notables and which villages - instead of a popup for every notable; the relation you gain is the same. Off: one popup per notable, as before
 
         public bool LogEnabled = true;                     // write a log file in the module folder
         // E8/O6 (270, PLAN 8.17; RD8 O5 bez utraty linii; krytyka K2-5): pliki logu otwarte na czas sesji - jeden slownik pisarzy dla Info (glowny i tematyczne),
