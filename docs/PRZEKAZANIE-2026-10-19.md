@@ -5,7 +5,7 @@ Limit tygodniowy pierwszego konta: 98% (reset 23.10 ok. 20:00 PDT). Ten plik + `
 ## Co jest w grze Jeffa
 
 - **WGRANIE 87** (19.10 ok. 10:45 PDT) = `w-toku/noc-wgranie-87` (noc-ks4 fe9704aa + CHANGELOG), Armoury **3468643a**, CrashScribe f98aac55, RealisticCaptivity 8dbedff3, GrandTourney 87465d27.
-- **WGRANIE 88** - w toku w chwili pisania: `w-toku/noc-ks4` **855a9b61** (Armoury **6d0fd3e4**, 2012 ustawien) = 87 + f28-wyceny (ilosci w zadaniach gry i XP Lotrostwa od wartosci sprzed przeliczenia cen; klucze Hist Quest Qty Old Coin, Hist Roguery Xp Old Value) + f29-arakh (pary krewne GearFit na poziomie przedmiotu; klucz Gear Fit Kin Item Level). Test 5 dob + bitwa x20 (fin101) w toku. Jesli w STAN-PRAC nie ma wpisu "WGRANIE 88" - sprawdzic md5 Armoury.dll w grze (6d0fd3e4 = wgrane, 3468643a = nie).
+- **WGRANIE 88 - WGRANE** 19.10 ok. 13:00 PDT (test 5 dob + bitwa 0 ERROR, latki 11/11, 3/3, arakh 5 -> 0; galaz `w-toku/noc-wgranie-88`): `w-toku/noc-ks4` **855a9b61** (Armoury **6d0fd3e4**, 2012 ustawien) = 87 + f28-wyceny (ilosci w zadaniach gry i XP Lotrostwa od wartosci sprzed przeliczenia cen; klucze Hist Quest Qty Old Coin, Hist Roguery Xp Old Value) + f29-arakh (pary krewne GearFit na poziomie przedmiotu; klucz Gear Fit Kin Item Level). Test 5 dob + bitwa x20 (fin101) w toku. Jesli w STAN-PRAC nie ma wpisu "WGRANIE 88" - sprawdzic md5 Armoury.dll w grze (6d0fd3e4 = wgrane, 3468643a = nie).
 - Kopie: `*.bak-<data>-wgranieNN-przed` obok plikow + `D:\Backup-Bannerlord\wgrane\<data>-wgranieNN-przed`; zapisy Jeffa `D:\Backup-Bannerlord\zapisy-jeffa\2026-10-19-po-sesji-86` i `-po-sesji-87`.
 
 ## Dzisiejsze wgrania (84-88) w skrocie
