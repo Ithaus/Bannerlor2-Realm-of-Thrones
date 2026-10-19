@@ -3253,3 +3253,4 @@ TESTY: fin99 160 dob x20 (Armoury-2026-10-19_07-51-11.log) 0 ERROR - lud w wojni
 (fin97 x8 TAK) - do sprawdzenia, czy tempo testu zmienia przebieg (nastepny bieg porownawczy x8 po resecie limitu).
 OTWARTE: okolica tkalni aksamitu (3c) - log nie ma indeksu aksamitu wedlug miasta (nowa linia logu - osobno); pierwszy log Jeffa ("Wlosci z kronik", "Sojusze kanonu",
 "Korona: najpierw skarbiec (f23)" z f24/f25, "KS: bramka krainy" z "miara straty (f26"). Limit tygodniowy ok. 95% (reset 23.10 ok. 20:00 PDT).
+- 19.10 ok. 17:40 UTC: Jeff: "wogole nie ucze sie nowych elementow miecza ... 30 znanych" -> f27-badania na noc-ks4 (Armoury 3468643a, klucz Hist Research From Old Value): punkty badan czesci od wartosci sprzed przeliczenia (PriceOne przed AddResearchPoints: 1105 -> 21 d. = 3 pkt zamiast 122). Czeka na zamkniecie gry: autotest 5 dob -Speed 20 + WGRANIE 87.
