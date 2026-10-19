@@ -36,6 +36,8 @@ namespace Armoury
     ///    poziomie (f20 na W5/W5b/M1, wlasne f W5c - ta sama miara). Podloga przydzialu (nb >= juz dane) i "bez gotowki z daniny" w W6 - tez od uprawnienia: przydzial i
     ///    linia W6 co do zlotowki jak bez paczki. Klucz wylaczony - baza = _naPaid (kod jak dotad).
     ///  - NIE TNIE: W6 (tarczowe - przelew miedzy rodami tej samej doby, pobor = wyplata; poza decyzja), W5c (wlasne f, ta sama miara), W7 (pobor pana z wlasnych lenn).
+    ///    f23-korona (klucz Scutage By Need, decyzja Jeffa 19.10 odpowiedz 3a): W6 tez x f odbiorcy - ale niepobrane zostaje u platnikow (KingdomTreasury.Scutage.cs: pobor =
+    ///    wyplata po cieciu); uprawnienie W6 w pamieci doby pelne (AnNote), wiec plastry M1 / W5c / W7 bez zmian.
     ///    Potrzeba W5, garnek, UncovPre (W5b regula 1 - danina z ludu, rezerwa wezwan M2b) i DsW5Need (nadanie DS) - bez zmian (licza pelna potrzebe - CHANGELOG).
     ///  - GRACZ: ta sama regula, gdy W5 go mierzy (W6b); komunikat (po angielsku) przy zmianie pasma z martwa strefa 5% R (CrownRents.MsgBand), tylko w dobie z
     ///    uprawnieniem; bez zapisu - po wczytaniu pierwszy komunikat pasma R-2R / ponad 2R wraca (raz).
@@ -58,6 +60,8 @@ namespace Armoury
             // (danina, W5b, M1): pelne uprawnienie, czesc wedlug potrzeby (floor(e x f) na szczebel), gotowka naprawde wyplacona
             public long Base, Full, Need, Paid;
             public long W6;   // recenzja calosci noc-ks4: gotowka W6 (tarczowe) tej doby - bez ciecia f20, tylko do linii (decyzja Jeffa, czy tarczowe to "pomoc koronna")
+                              // f23-korona: UPRAWNIENIE W6 (z kluczem Scutage By Need - przed cieciem; bez klucza = gotowka, jak dotad)
+            public long W6Paid;   // f23-korona: gotowka W6 naprawde wyplacona (po cieciu wedlug potrzeby; bez klucza = W6)
         }
 
         private static readonly Dictionary<Clan, AnRow> _an = new Dictionary<Clan, AnRow>();   // pamiec doby kroku W5 (czyszczona z NaRoll)
@@ -82,6 +86,7 @@ namespace Armoury
             _an.Clear(); _anPlMsg = null;
             for (int i = 0; i < _anKeptT.Length; i++) _anKeptT[i] = 0;
             try { _anApply = AidCashByNeedOn; } catch { _anApply = false; }
+            try { _scByNeed = _anApply && ScutageByNeedOn; } catch { _scByNeed = false; }   // f23-korona: W6 wedlug potrzeby odbiorcy - raz na dobe, razem z kluczem f20
         }
 
         private static void AnStumble(string where, Exception e)
@@ -109,11 +114,12 @@ namespace Armoury
             a.F = 1; a.Band = NbNone; a.Line = 4; a.Debt = false; a.G = 0; a.R = 0;
             try
             {
-                double f, G, R;
-                int band = NeedOfClan(x.C, out f, out G, out R);
+                double f, G, R; int kind;
+                int band = NeedOfClan(x.C, out f, out G, out R, out kind);
                 if (band >= NbBelow && band <= NbAbove)
                 {
                     a.F = Math.Max(0.0, Math.Min(1.0, f)); a.Band = band; a.Line = band; a.G = G; a.R = R;
+                    if (kind == ClanBudget.NkDebt) { a.Line = 3; a.Debt = true; }   // f23 (Need Measure All): dluznik juz zmierzony w pamieci doby - ten sam G, R i f co McDebtMeasure; wiersz linii jak dotad
                     return;
                 }
                 if (McDebtMeasure(x.C, out G, out R))
@@ -150,7 +156,7 @@ namespace Armoury
                 if (p < 0) p = 0;
                 if (p > e) p = e;
                 a.Base += e;
-                if (tier == AnTierW6) { a.W6 += e; return 0; }   // recenzja calosci noc-ks4: W6 jak AnTierX (uprawnienie bez ciecia) + licznik linii
+                if (tier == AnTierW6) { a.W6 += e; a.W6Paid += p; return 0; }   // recenzja calosci noc-ks4: W6 jak AnTierX (uprawnienie) + licznik linii; f23: wyplata po cieciu (niepobrane zostaje u platnikow)
                 if (tier < AnTierD || tier > AnTierM) return 0;
                 a.Full += e; a.Paid += p;
                 a.Need += a.F >= 1.0 ? e : (long)Math.Floor(e * a.F);
@@ -219,7 +225,7 @@ namespace Armoury
             {
                 var pc = Clan.PlayerClan;
                 AnRow p;
-                if (!_anApply || pc == null || !_an.TryGetValue(pc, out p) || p == null || p.Full <= 0 || p.Line == 4 || p.Band < NbBelow || p.Band > NbAbove) return;
+                if (!_anApply || pc == null || !_an.TryGetValue(pc, out p) || p == null || (p.Full <= 0 && !(_scByNeed && p.W6 > 0)) || p.Line == 4 || p.Band < NbBelow || p.Band > NbAbove) return;   // f23: takze sama gotowka W6
                 int band = CrownRents.MsgBand(_anPlBand, p.G, p.R, p.Band);   // martwa strefa 5% R (jak komunikaty f6/f7); zloto liczy f bez strefy
                 if (band == _anPlBand) return;
                 string msg = null;
@@ -246,13 +252,15 @@ namespace Armoury
                 var debtB = new int[3];
                 int richPaidN = 0, offNeed = 0; long richPaid = 0;
                 int w6N = 0, w6RichN = 0, w6MidN = 0; long w6Sum = 0, w6Rich = 0, w6Mid = 0;   // recenzja calosci noc-ks4: W6 (tarczowe, bez ciecia) wedlug pasma rodu
+                long w6Paid = 0, w6RichP = 0, w6MidP = 0; int w6Off = 0;                         // f23-korona: W6 wyplacone po cieciu; kontrola wyplacone = floor(uprawnienie x f)
                 foreach (var kv in _an)
                 {
                     var a = kv.Value;
                     if (kv.Key != null && a != null && a.W6 > 0)
                     {
-                        w6N++; w6Sum += a.W6;
-                        if (a.Band == NbAbove) { w6RichN++; w6Rich += a.W6; } else if (a.Band == NbMid) { w6MidN++; w6Mid += a.W6; }
+                        w6N++; w6Sum += a.W6; w6Paid += a.W6Paid;
+                        if (a.Band == NbAbove) { w6RichN++; w6Rich += a.W6; w6RichP += a.W6Paid; } else if (a.Band == NbMid) { w6MidN++; w6Mid += a.W6; w6MidP += a.W6Paid; }
+                        if (a.W6Paid > a.W6 || (_scByNeed ? a.Band == NbAbove && a.W6Paid > 0 : a.W6Paid != a.W6)) w6Off++;   // f23: nigdy ponad uprawnienie, ponad 2R nic (na sucho - rowne)
                     }
                     if (kv.Key == null || a == null || a.Full <= 0) continue;
                     int l = a.Line < 0 || a.Line >= AnLines ? 4 : a.Line;
@@ -284,7 +292,8 @@ namespace Armoury
                   .Append(" | klucz Crown War Aid Cash By Need ").Append(_anApply ? "tak (czynny)" : (s.CrownWarAidCashByNeed ? "tak, ale W5 dzis nieczynne - 0" : "NIE (na sucho - gotowka pelna, jak przed paczka)"))
                   .Append(" | regula: gotowka szczebla daniny (W5), skarbca ponad zapas (W5b) i reszty wplywow dnia (M1) = uprawnienie x f, f = (2R - G) / R w 0..1 - ta sama miara i pamiec doby")
                   .Append(" co zwrot f6, renty f7 i W5c; dluznik 168 - f z jego G i R, bez G i R - bez ciecia; miejsce w pulapie (przydzial W5) bez zmian - reszte zoldu rod placi sam;")
-                  .Append(" W6 i W5c bez tego ciecia; zatrzymane zostaje w skarbcu (nie do innych rodow, nie w renty)");
+                  .Append(_scByNeed ? " W6 (tarczowe) tym samym cieciem - niepobrane zostaje u platnikow (f23), W5c - wlasne f;" : " W6 i W5c bez tego ciecia;")
+                  .Append(" zatrzymane zostaje w skarbcu (nie do innych rodow, nie w renty)");
                 for (int b = 0; b < AnLines; b++)
                 {
                     sb.Append(" | ").Append(nm[b]).Append(": rodow ").Append(n[b]);
@@ -302,8 +311,13 @@ namespace Armoury
                   .Append(" | kontrola: ponad 2R wyplacone ").Append(richPaidN).Append(" rodow (").Append(richPaid).Append(" zl), wyplacone inne niz wedlug potrzeby ").Append(offNeed)
                   .Append(" rodow, sumy rodow inne niz krolestw (wyplacone ").Append(paidOff).Append(", zatrzymane ").Append(keptOff).Append(") (oczekiwane 0)")
                   // recenzja calosci noc-ks4: W6 jest poza decyzja 1.b (bez ciecia) - ile poszlo do rodow ponad 2R i R-2R (do decyzji Jeffa, czy tarczowe to "pomoc koronna")
-                  .Append(" | W6 tarczowe (bez ciecia f20 - poza decyzja 1.b): wyplacone ").Append(w6Sum).Append(" zl do ").Append(w6N).Append(" rodow, w tym ponad 2R ").Append(w6Rich)
-                  .Append(" zl do ").Append(w6RichN).Append(" rodow, R-2R ").Append(w6Mid).Append(" zl do ").Append(w6MidN).Append(" rodow");
+                  .Append(_scByNeed
+                      // f23-korona (decyzja Jeffa 19.10, odpowiedz 3a): W6 ta sama miara - wyplacone = floor(uprawnienie x f), niepobrane zostaje u platnikow (nie w skarbcu)
+                      ? " | W6 tarczowe wedlug potrzeby (f23): uprawnienie " + w6Sum + " zl do " + w6N + " rodow, wyplacone " + w6Paid + ", niepobrane (zostalo u platnikow) " + (w6Sum - w6Paid)
+                        + "; ponad 2R uprawnienie " + w6Rich + " wyplacone " + w6RichP + " (rodow " + w6RichN + "), R-2R uprawnienie " + w6Mid + " wyplacone " + w6MidP + " (rodow " + w6MidN + ")"
+                        + "; kontrola: wyplacone ponad uprawnienie albo ponad 2R z wyplata " + w6Off + " rodow (oczekiwane 0)"
+                      : " | W6 tarczowe (bez ciecia f20 - poza decyzja 1.b): wyplacone " + w6Sum + " zl do " + w6N + " rodow, w tym ponad 2R " + w6Rich
+                        + " zl do " + w6RichN + " rodow, R-2R " + w6Mid + " zl do " + w6MidN + " rodow");
                 AnRow p; var pc = Clan.PlayerClan;
                 if (pc != null && _an.TryGetValue(pc, out p) && p != null && p.Full > 0)
                     sb.Append(" | gracz: ").Append(nm[p.Line < 0 || p.Line >= AnLines ? 4 : p.Line]).Append(", f ").Append(p.F.ToString("0.00", WtInv))

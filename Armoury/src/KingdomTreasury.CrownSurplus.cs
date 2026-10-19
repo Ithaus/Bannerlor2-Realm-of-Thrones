@@ -59,15 +59,59 @@ namespace Armoury
 
         /// <summary>Zapas wojny krolestwa - ta sama liczba co w regule 184 (WarTaxDaily): wieksze z CrownReserveGold i WarTaxReserveDays x sredni nalezny zwrot
         /// zoldu z 28 dob (pierscien 184; tu stan do wczoraj - krok 184 dopisuje dzisiejsza dobe pozniej). Krolestwo bez pierscienia - sama podloga.
-        /// f6-zwrot (recenzja): pierscien niesie PELNY zwrot (KDay.RefundFull, przed mnoznikiem potrzeby rodu) - zapas wojny i jego czytelnicy jak przed f6.</summary>
-        private static long WarReserveOf(Kingdom k, Settings s)
+        /// f6-zwrot (recenzja): pierscien niesie PELNY zwrot (KDay.RefundFull, przed mnoznikiem potrzeby rodu) - zapas wojny i jego czytelnicy jak przed f6.
+        /// f23-korona (klucz War Reserve By Need): sredni pelny zwrot x udzial naleznego po f6 w pelnym z dob tej sesji (WtNeedShare) - przy 28 dobach sesji to
+        /// dokladnie sredni nalezny zwrot; po wczytaniu (bez dob sesji) udzial 1 - zapas jak z pelnego. Jedna liczba dla wszystkich czytelnikow (184, W5b, W5c, K5, DS,
+        /// L5b-1, korona2). full = true - zapas z pelnego zwrotu (tylko do linii f23: o ile zapas wedlug potrzeby jest mniejszy).</summary>
+        private static long WarReserveOf(Kingdom k, Settings s, bool full = false)
         {
             long floor = Math.Max(0, s.CrownReserveGold);
             var w = WtOf(k, false);
             if (w == null || w.F28 <= 0) return floor;
             long dsum = 0;
             for (int i = 0; i < WtRing28; i++) dsum += w.Due[i];
-            return Math.Max(floor, (long)(WtClamp(s.WarTaxReserveDays, 0, 728) * ((double)dsum / w.F28)));
+            double share = !full && WarReserveByNeedOn ? WtNeedShare(w) : 1.0;
+            return Math.Max(floor, (long)(WtClamp(s.WarTaxReserveDays, 0, 728) * ((double)dsum / w.F28) * share));
+        }
+
+        /// <summary>f23-korona: klucz War Reserve By Need (zapas wojny z naleznego zwrotu po mierze potrzeby rodu). Bez zwrotu wedlug potrzeby (Crown Refund By Need
+        /// wylaczony) nalezny = pelny - udzial 1, zapas co do zlotowki jak dotad.</summary>
+        internal static bool WarReserveByNeedOn { get { var s = Settings.Current; return s != null && s.WarReserveByNeed; } }
+
+        /// <summary>f23-korona: udzial naleznego zwrotu (KDay.RefundDue - po mierze potrzeby rodu f6) w pelnym (KDay.RefundFull) z dob TEJ SESJI w pierscieniu 184 (ostatnie
+        /// FN miejsc przed glowa H28 - te same doby w obu pierscieniach). 1 - brak dob sesji (po wczytaniu) albo bez zwrotu w tych dobach (zapas jak z pelnego). 0..1.</summary>
+        private static double WtNeedShare(WarTaxK w)
+        {
+            if (w == null || w.FN <= 0) return 1.0;
+            long sn = 0, sf = 0;
+            int n = Math.Min(w.FN, WtRing28);
+            for (int j = 1; j <= n; j++) { int i = (w.H28 - j + WtRing28 * 2) % WtRing28; sn += w.DueN[i]; sf += w.Due[i]; }
+            if (sf <= 0) return 1.0;
+            return Math.Max(0.0, Math.Min(1.0, (double)sn / sf));
+        }
+
+        /// <summary>f23-korona (linia "Korona: najpierw skarbiec (f23)"): zapas wojny z PELNEGO zwrotu - jak przed paczka (porownanie). -1 = nieczytelny.</summary>
+        internal static long WarReserveFullFor(Kingdom k)
+        {
+            try { var s = Settings.Current; return s != null && k != null ? WarReserveOf(k, s, true) : -1; }
+            catch (Exception e) { CsStumble("WarReserveFullFor", e); return -1; }
+        }
+
+        /// <summary>f23-korona (DsSeason - "najpierw skarbiec", klucz Ds War Grant Treasury First): nadwyzka skarbca krolestwa ponad zapas wojny - TA SAMA miara co pula W5b
+        /// (CrownSurplusPlan): skarbiec - reszta wplywow dnia (pojdzie dzis na wydatki dnia) - zapas wojny - dlug w Banku (186) - dlug u miast (korona2); nigdy z kredytu.
+        /// reserve - zapas wojny (WarReserveOf). Zwraca nadwyzke >= 0 (0 - brak albo nieczytelne). Tylko odczyt.</summary>
+        internal static double TreasurySurplusFor(Kingdom k, out long reserve)
+        {
+            reserve = -1;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || k == null) return 0;
+                reserve = WarReserveOf(k, s);
+                double sur = Math.Floor((double)k.KingdomBudgetWallet - CrownIncome.LeftFor(k) - reserve - CrownBorrow.DebtOf(k) - TownFolk.CrownTownDebt(k));
+                return sur >= 1 ? sur : 0;
+            }
+            catch (Exception e) { CsStumble("TreasurySurplusFor", e); return 0; }
         }
 
         /// <summary>L5b-1 (skarbiec stolicy, CapitalTreasury): zapas wojny krolestwa - ta sama liczba co W5b i 184 (tylko odczyt). -1 = nieczytelny (wolajacy nic nie bierze).</summary>

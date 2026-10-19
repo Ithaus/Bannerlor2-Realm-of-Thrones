@@ -40,6 +40,13 @@ namespace Armoury
     /// tarczowe_w6, podstawa_tarczowego_w6, doplata_z_tarczowego_w6, nadwyzka_ponad_rezerwe_w6 (recenzja: nadwyzka kiesy platnika ponad rezerwe BUDZETU przed
     /// poborem - kolumna R tego pliku to rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza niz rezerwa budzetu od dochodu stalego, wiec nie jest miara reguly).
     /// Wyjatek per krolestwo / per rod - licznik potkniec (pierwszy do pliku), bez globalnych wylacznikow (CLAUDE.md 7).
+    /// f23-korona (klucz ScutageByNeed; decyzja Jeffa 19.10, odpowiedz 3: "Tarczowe W6 (pomoc lennikow zbierana przez korone) ... a) objac zasada 'bogaty nic, sredni czesc,
+    /// biedny calosc'"): gotowka W6 odbiorcy = floor(uprawnienie x f) - f to ta sama miara potrzeby co zwrot f6, renty f7, W5c i gotowka W5 (AnMeasure -> NeedOfClan, pamiec doby
+    /// _rbn); uprawnienie (gotowka W5 przy nowym poziomie ponad szczebel daniny) i poziom wyrownania - bez zmian. POBOR = suma wyplat po cieciu: czego odbiorca nie dostaje, tego
+    /// korona nie pobiera - zostaje u platnikow (W6 nie ma czesci "w skarbcu": pobrane = wyplacone, jak dotad). Pamiec doby f20 (AnNote) dostaje PELNE uprawnienie W6, wiec M1,
+    /// W5c i W7 nie dopelniaja czesci niepobranej (jedno uprawnienie na dobe - jak f20). Miejsce w pulapie (przydzial) bez zmian. Czynne tylko z kluczem f20 Crown War Aid Cash
+    /// By Need (pamiec uprawnien _an - bez niej M1/W5c/W7 dopelnialyby niepobrane). Linia W6: dopisek "wedlug potrzeby odbiorcy (f23)"; linia f20: pole "W6 tarczowe wedlug
+    /// potrzeby (f23)". Klucz wylaczony - W6 co do zlotowki jak dotad.
     /// </summary>
     internal static partial class KingdomTreasury
     {
@@ -48,6 +55,7 @@ namespace Armoury
         {
             public string Name = ""; public readonly List<ScP> P = new List<ScP>();
             public long Due, Room, Got, Paid; public double Base, Sur, Uncovered, Level0 = -1, Level1 = -1, Boost;
+            public long Ent, Kept;   // f23-korona: uprawnienie odbiorcow W6 (gotowka bez ciecia) i czesc niepobrana wedlug potrzeby odbiorcy (zostaje u platnikow)
             public int PayN, PaidN, RecN, NewN, NeedN;   // platnicy z naleznym / z poborem; odbiorcy z gotowka tarczowego / w tym bez gotowki z daniny; rody z potrzeba W5
         }
 
@@ -65,6 +73,25 @@ namespace Armoury
         internal static long LastScutageIn, LastScutageOut;
 
         internal static bool ScutageOn { get { var s = Settings.Current; return s != null && s.Scutage && NeedAidOn; } }
+
+        /// <summary>f23-korona: klucz Scutage By Need (gotowka W6 x f odbiorcy) - tylko z W6 i z gotowka W5 wedlug potrzeby (f20, pamiec uprawnien doby).</summary>
+        internal static bool ScutageByNeedOn { get { var s = Settings.Current; return s != null && s.ScutageByNeed && ScutageOn && AidCashByNeedOn; } }
+
+        private static bool _scByNeed;   // f23-korona: klucz czynny w tej dobie (ustawiany raz na dobe w AnClearDay - razem z kluczem f20)
+
+        /// <summary>f23-korona: gotowka W6 odbiorcy z uprawnienia e - klucz czynny: floor(e x f) (f z AnMeasure, ta sama miara co f6/f7/W5c/f20), inaczej e (co do zlotowki
+        /// jak dotad). Nie rzuca.</summary>
+        private static long ScPay(NaClan x, long e)
+        {
+            if (e <= 0) return 0;
+            try
+            {
+                if (!_scByNeed || x == null || x.A == null || x.A.F >= 1.0) return e;
+                long p = (long)Math.Floor(e * x.A.F);
+                return p < 0 ? 0 : (p > e ? e : p);
+            }
+            catch (Exception ex) { ScStumble("ScPay", ex); return e; }
+        }
 
         private static double ScRate(Settings s) { return WtClamp(s.ScutageRate, 0, 1); }
 
@@ -242,8 +269,9 @@ namespace Armoury
                 if (level1 < level0) level1 = level0;
                 sc.Level1 = level1;
                 // plan: gotowka rodu przy nowym poziomie ponad gotowke szczebla daniny (tylko za ludzi, ktorzy dzis sa) - razem najwyzej `room`
-                var extra = new long[cand.Count]; var boost1 = new double[cand.Count];
-                long want = 0;
+                // f23-korona: extra - uprawnienie (bez ciecia), pay - gotowka wedlug potrzeby odbiorcy (ScPay; klucz wylaczony - pay = extra)
+                var extra = new long[cand.Count]; var pay = new long[cand.Count]; var boost1 = new double[cand.Count];
+                long want = 0, wantPay = 0;
                 for (int i = 0; i < cand.Count; i++)
                 {
                     double a0, b0, a1, b1; long c0, c1;
@@ -252,9 +280,12 @@ namespace Armoury
                     long e = Math.Max(0, c1 - c0);
                     if (e > room - want) e = room - want;
                     extra[i] = e; want += e; boost1[i] = b1;
+                    pay[i] = ScPay(cand[i], e); wantPay += pay[i];
                 }
+                sc.Ent = want; sc.Kept = want - wantPay;   // f23: niepobrane - zostaje u platnikow (klucz wylaczony - 0)
                 // pobor: dokladnie tyle, ile W5 wyplaci ponad danine (za ludzi, ktorych jeszcze nie ma, nic nie jest pobierane - rod dostaje samo miejsce w pulapie)
-                if (want > 0) got = ScCollect(k, sc, want);
+                // f23-korona: tylko gotowka po cieciu wedlug potrzeby odbiorcy - czesci, ktorej odbiorca nie dostaje, korona nie pobiera
+                if (wantPay > 0) got = ScCollect(k, sc, wantPay);
                 long left = got;
                 for (int i = 0; i < cand.Count; i++)
                 {
@@ -263,7 +294,11 @@ namespace Armoury
                     {
                         long had; _naPaid.TryGetValue(x.C, out had);
                         long base0 = AnBase(x.C);   // f20-d1: "bez gotowki z daniny" wedlug uprawnienia (klucz wylaczony - gotowka, jak dotad): linia W6 jak bez paczki
-                        long e = Math.Min(extra[i], left);
+                        long e = Math.Min(pay[i], left);
+                        // f23-korona: uprawnienie W6 do pamieci doby f20 - PELNE (takze przy wyplacie 0: ponad 2R), wiec M1, W5c i W7 nie dopelniaja czesci niepobranej; pobor krotszy
+                        // niz plan (wyjatek u platnika) - uprawnienie = wyplata, jak dotad. Klucz wylaczony: pay = extra, eNote = e - jak dotad co do zlotowki
+                        long eNote = e >= pay[i] ? extra[i] : e;
+                        if (eNote > 0 && e <= 0) AnNote(x, eNote, 0, AnTierW6);
                         if (e > 0)
                         {
                             int ip = (int)Math.Min(int.MaxValue, e);
@@ -277,7 +312,7 @@ namespace Armoury
                             if (x.W <= x.Pc0) _scNotAtCap++;              // kontrola: gotowka tylko rodom, ktorych zold druzyn przekracza pulap wlasny (oczekiwane 0)
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
-                            AnNote(x, ip, ip, AnTierW6);                  // f20-d1: W6 bez ciecia - tylko do uprawnienia doby (baza M1, W5c, W7); recenzja calosci noc-ks4: licznik W6 linii f20
+                            AnNote(x, ip >= pay[i] ? extra[i] : ip, ip, AnTierW6);   // f20-d1: W6 do uprawnienia doby (baza M1, W5c, W7); f23: uprawnienie pelne, wyplata po cieciu
                         }
                         // przydzial w pulapie przy nowym poziomie (gotowka + miejsce na krok werbunku), nigdy ponizej gotowki; tylko gdy rosnie
                         // f20-d1: podloga - pelne uprawnienie (AnBase; klucz wylaczony - gotowka, jak dotad)
@@ -326,6 +361,20 @@ namespace Armoury
         }
 
         private static string ScPct(double level) { return level >= 0 ? (100 * level).ToString("0.0", WtInv) + "%" : "-"; }
+
+        /// <summary>f23-korona: dopisek linii W6 - uprawnienie odbiorcow, wyplacone (po cieciu wedlug potrzeby odbiorcy) i niepobrane (zostalo u platnikow). Klucz wylaczony - "".</summary>
+        private static string ScNeedSeg()
+        {
+            try
+            {
+                if (!_scByNeed) return "";
+                long ent = 0, kept = 0, paid = 0; int kk = 0;
+                for (int i = 0; i < _scRows.Count; i++) { var r = _scRows[i]; ent += r.Ent; kept += r.Kept; paid += r.Paid; if (r.Kept > 0) kk++; }
+                return " | wedlug potrzeby odbiorcy (f23, Scutage By Need tak - gotowka W6 x f odbiorcy, ta sama miara co f6/f7/W5c/f20): uprawnienie odbiorcow " + ent
+                       + " = wyplacone " + paid + " + niepobrane (zostalo u platnikow) " + kept + " (krolestw z niepobranym " + kk + ")";
+            }
+            catch (Exception e) { ScStumble("ScNeedSeg", e); return ""; }
+        }
 
         // ------------------------------------------------------------ doba: linia "Tarczowe (W6)" - z ArmouryBehavior, zaraz po linii W5
         internal static void ScutageDay()
@@ -381,6 +430,7 @@ namespace Armoury
                       .Append(" | pobrane ").Append(got).Append(" od ").Append(paidN).Append(" rodow = dopisane do garnka W5 ").Append(got)
                       .Append(", wyplacone przez W5 ponad danine ").Append(paid).Append(" (rodow ").Append(recN).Append(", w tym bez gotowki z daniny ").Append(newN)
                       .Append("), zostalo w skarbcach ").Append(got - paid).Append(" (oczekiwane 0)")
+                      .Append(ScNeedSeg())                                              // f23: " | wedlug potrzeby odbiorcy (f23): ..." (klucz wylaczony - pusty, linia jak dotad)
                       .Append(" | podniesienie pulapu druzyn ponad szczebel daniny ").Append(Math.Round(boost).ToString("0", WtInv))
                       .Append(" (w tym miejsce na krok werbunku bez gotowki ").Append(Math.Round(Math.Max(0, boost - paid)).ToString("0", WtInv)).Append(')')
                       .Append(" | kontrola: platnik z doplata W5 ").Append(_scPayerAided).Append(", platnik ponizej rezerwy po poborze ").Append(_scBelowReserve)

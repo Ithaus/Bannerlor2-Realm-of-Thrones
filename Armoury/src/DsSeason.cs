@@ -26,6 +26,14 @@ namespace Armoury
     ///  - K5 brak na zwrot zoldu (KingdomTreasury.WageRefund, przed Bankiem 186): skarbiec ponad zapas wojny (TreasuryForRefund; bez zlota winnego Bankowi i miastom),
     ///    potem zaliczka mieszczan pod nadanie (L1, TownFolk.Anticipate - limit AnticipationRoom: niezebrane raty dziesiatej + prognoza W4 do konca kwartalu), na koncu Bank.
     ///    Zwrot zoldu nietkniety i dalej pierwszy z wydatkow wojska; kolejnosc wydatkow korony bez zmian.
+    ///  - f23-korona NAJPIERW SKARBIEC (klucz DsWarGrantTreasuryFirst; decyzja Jeffa 19.10, odpowiedz 8: "a) najpierw skarbiec: krol z pelnym skarbcem placi wojne z wlasnych
+    ///    pieniedzy, a podatek bierze dopiero, gdy skarbiec spadnie do rezerwy"): w sesji wojennej brak = potrzeba - zwykle wplywy - NADWYZKA / 91, nadwyzka = skarbiec - reszta
+    ///    wplywow dnia - zapas wojny - dlug w Banku - dlug u miast (KingdomTreasury.TreasurySurplusFor - ta sama miara co pula W5b). Brak po skarbcu <= 0 przy nadwyzce >= 1 -
+    ///    nadanie 0 (w wojnie dotad najmniej krok); zmiana dalej najwyzej o krok na kwartal (z 2.0 do 0 w czterech kwartalach), War Tax +krok jak dotad. Nadanie 0 dzieki
+    ///    skarbcowi (HoldTf, pamiec sesji) nie odpala co dobe sesji "nowa wojna"; gdy nadwyzka spadnie ponizej 1 zl przed kwartalem (dalej niz DsGrantSessionDays od niego) -
+    ///    sesja "skarbiec do zapasu" (swobodna, jak pierwsze nadanie wojny). Brak pokrywaja istniejace drogi skarbca: K5 (zwrot), W5b/W5c (doplata W5), 1/450 zapasu. Zapas wojny
+    ///    (luka w potrzebie i nadwyzka) - jedna liczba KingdomTreasury.WarReserveFor (z kluczem War Reserve By Need - z naleznego zwrotu po f6). Linia doby "Korona: najpierw
+    ///    skarbiec (f23): dzien N" i dopisek sesji "najpierw skarbiec (f23): ...". Klucz wylaczony - sesja co do znaku jak dotad.
     /// Linie: "Daniny korony (DS): dzien N" (co dobe, krolestwa) i "Korona: nadanie wojenne (DS): dzien N" (w dobie sesji). Zapis w arm_daniny_miasta (DsTowns.Export):
     /// g~krolestwo~g~numer~doba~pokoj~wojna~zwykle renty~suma~n i v~osada~klasa~krolestwo~reszta~rata~numer. Brak = zera.
     /// </summary>
@@ -48,6 +56,8 @@ namespace Armoury
             public long MovWin;                               // dziesiata od ostatniego CrownIncome.End (wplyw dnia)
             public long DMovPaid, DTreas, DAnt; public double DMovRemit, DMovShort, DMovAssess;
             public double LNeed, LInc, LY, LG0; public int LDays;
+            // f23-korona (najpierw skarbiec): nadanie 0 dzieki skarbcowi w ostatniej sesji (pamiec sesji - po wczytaniu false: jedna sesja "nowa wojna" przelicza od nowa)
+            public bool HoldTf;
         }
         private sealed class Mov { public string K; public double Left, Per, Cur; public int Serial; }   // Cur - wymiar biezacej sesji nadania (limit L1, recenzja 17.10)
 
@@ -71,6 +81,8 @@ namespace Armoury
         private static double StepOf(Settings s) { double x = Cl(s.DsGrantStep, 0.1, 1.0); return x; }
         private static double MaxOf(Settings s) { return Math.Max(StepOf(s), Cl(s.DsGrantMax, 0.5, 4.0)); }
         private static int SessionDays(Settings s) { return Math.Max(1, Math.Min(91, s.DsGrantSessionDays)); }
+        /// <summary>f23-korona: klucz Ds War Grant Treasury First (najpierw skarbiec).</summary>
+        private static bool TreasuryFirstOn(Settings s) { return s != null && s.DsWarGrantTreasuryFirst; }
 
         private static Kingdom KOf(Settlement st)
         {
@@ -392,6 +404,12 @@ namespace Armoury
             double g0 = g.G, g1;
             int n = 0;
             double need = 0, inc = 0, y1 = 0;
+            // f23-korona (najpierw skarbiec): nadwyzka skarbca ponad zapas wojny i dlugi (ta sama miara co pula W5b) rozlozona na kwartal pomniejsza brak PRZED nadaniem od ludu;
+            // nadanie 0 w wojnie - tylko krol z nadwyzka (bez klucza w wojnie najmniej krok, jak dotad)
+            bool tf = war && TreasuryFirstOn(s);
+            double sur = 0, def2 = double.NaN; long res = -1;
+            if (tf) sur = KingdomTreasury.TreasurySurplusFor(k, out res);
+            bool zeroOk = tf && sur >= 1;
             if (!war) g1 = 0;
             else
             {
@@ -407,20 +425,26 @@ namespace Armoury
                 else
                 {
                     double deficit = need - inc;
+                    def2 = tf ? deficit - sur / DsTowns.Quarter : deficit;          // f23: brak po skarbcu (klucz wylaczony - brak jak dotad)
                     g1 = max;
-                    for (double x = step; x <= max + 1e-9; x += step) if (Yield(k, s, x, S, E, M, V) >= deficit) { g1 = x; break; }
+                    if (zeroOk && def2 <= 0) g1 = 0;                                // f23: skarbiec pokrywa brak kwartalu - lud nie daje nadania
+                    else for (double x = step; x <= max + 1e-9; x += step) if (Yield(k, s, x, S, E, M, V) >= def2) { g1 = x; break; }
                     if (!free && g0 > 0) g1 = Math.Max(g0 - step, Math.Min(g0 + step, g1));
                     if (WarTaxPolicy(k)) g1 = Math.Min(max, g1 + step);
-                    g1 = Math.Max(step, Math.Min(max, g1));
+                    g1 = Math.Max(zeroOk ? 0 : step, Math.Min(max, g1));
                 }
             }
             g1 = Math.Round(g1, 3);
             g.LG0 = g0; g.LNeed = need; g.LInc = inc; g.LY = y1; g.LDays = n;
+            g.HoldTf = tf && !(g1 > 0);                                             // f23: nadanie 0 dzieki skarbcowi - bez codziennej sesji "nowa wojna"
             g.G = g1; g.Day = Today;
             if (war && g1 > 0) g.Serial++;
             if (!war && !(g0 > 0)) return null;   // pokoj bez nadania - bez wiersza
+            // f23: dopisek NA KONCU wiersza (czytniki biora poczatek: g, potrzeba, zwykle wplywy, brak, plon); klucz wylaczony - wiersz co do znaku jak dotad
+            string tfSeg = tf ? ", najpierw skarbiec (f23): nadwyzka " + N0(sur) + " ponad zapas wojny " + res + " i dlugi / " + DsTowns.Quarter + " = " + N0(sur / DsTowns.Quarter)
+                                + " zl/d, brak po skarbcu " + (double.IsNaN(def2) ? "-" : N0(def2)) + (!(g1 > 0) ? " -> nadanie 0 (krol placi wojne ze skarbca)" : "") : "";
             return g.Name + " " + why + ": g " + G2(g0) + " -> " + G2(g1) + (WarTaxPolicy(k) && war ? " (War Tax +krok)" : "") + (war ? ", potrzeba " + N0(need) + ", zwykle wplywy " + N0(inc)
-                   + ", brak " + N0(need - inc) + ", plon nadania przy g=1 " + N0(y1) + " (dob wojny w pomiarze " + n + ")" : ", pokoj");
+                   + ", brak " + N0(need - inc) + ", plon nadania przy g=1 " + N0(y1) + " (dob wojny w pomiarze " + n + ")" + tfSeg : ", pokoj");
         }
 
         /// <summary>ArmouryBehavior (po CrownRents/W5 i LordsEvenUp, przed WarTaxDaily - CrownIncome.DayOf czynne): probki doby, zwykle renty przy przelaczeniu, sesje nadan
@@ -440,6 +464,10 @@ namespace Armoury
                 var sess = new List<string>();
                 double wNeed = 0, wInc = 0, wFarm = 0, wCust = 0, wVa = 0, wAid = 0, wTal = 0, wMov = 0, wW4 = 0, wTr = 0, wAnt = 0, wBank = 0, wRefG = 0, wRefD = 0;
                 int warK = 0, gK0 = 0, gK1 = 0, gK2 = 0;
+                // f23-korona: linia "Korona: najpierw skarbiec (f23)" - zapas wojny wedlug potrzeby i z pelnego zwrotu, nadwyzka skarbcow krolestw w wojnie, nadanie 0 w wojnie
+                long tfResN = 0, tfResF = 0, tfWal = 0; double tfSur = 0; int tfK = 0, tfLess = 0, tfWarK = 0, tfSurK = 0, tfZero = 0;
+                var tfZeroNames = new List<string>();
+                var tfRows = new List<KeyValuePair<double, string>>();
                 foreach (var k in Kingdom.All)
                 {
                     try
@@ -457,13 +485,38 @@ namespace Armoury
                         {
                             if (quarter) { try { TownFolk.AntToNormal(k); } catch (Exception e) { Stumble("Daily(zaliczki)", e); } }
                             bool peaceEnd = g.G > 0 && !war && g.Peace >= sd;
-                            bool warStart = !(g.G > 0) && war && g.War >= sd && DsTowns.Quarter - today % DsTowns.Quarter > sd;   // dzien kwartalu blisko - nadanie w nim (bez dwoch wymiarow dziesiatej naraz)
+                            if (!war) g.HoldTf = false;                                     // f23: pokoj konczy nadanie 0 dzieki skarbcowi
+                            bool tfHold = g.HoldTf && TreasuryFirstOn(s);                   // f23: klucz wylaczony - jak dotad (sesja "nowa wojna" przelicza nadanie)
+                            bool farQ = DsTowns.Quarter - today % DsTowns.Quarter > sd;      // dzien kwartalu blisko - nadanie w nim (bez dwoch wymiarow dziesiatej naraz)
+                            bool warStart = !(g.G > 0) && war && g.War >= sd && farQ && !tfHold;
+                            // f23: krol placacy wojne ze skarbca (nadanie 0) - nadanie od razu, gdy nadwyzka skarbca spadla ponizej 1 zl (nie czeka na kwartal)
+                            bool tfEnd = false;
+                            if (tfHold && war && !(g.G > 0) && farQ) { long r0; tfEnd = KingdomTreasury.TreasurySurplusFor(k, out r0) < 1; }
                             int rampD = Math.Max(0, Math.Min(364, s.DsRampDays));
                             bool postRamp = DsTowns.FixDay >= 0 && today == DsTowns.FixDay + rampD + PostRampSample;   // fin74: sesja swobodna po rampie, z probek po rampie
-                            string why = sw ? "przelaczenie" : quarter ? "kwartal" : postRamp ? "po rampie" : peaceEnd ? "pokoj " + g.Peace + " dob" : warStart ? "nowa wojna " + g.War + " dob" : null;
+                            string why = sw ? "przelaczenie" : quarter ? "kwartal" : postRamp ? "po rampie" : peaceEnd ? "pokoj " + g.Peace + " dob" : warStart ? "nowa wojna " + g.War + " dob"
+                                         : tfEnd ? "skarbiec do zapasu" : null;
                             if (why != null) { string line = Session(k, g, war, sw || postRamp || !(g.G > 0), why, s, postRamp ? PostRampSample : 0); if (line != null) sess.Add(line); }
                         }
                         if (g.G <= 0) gK0++; else if (g.G < 1.25) gK1++; else gK2++;
+                        if (s.LogEnabled)
+                        {
+                            try
+                            {
+                                long rN, rF = KingdomTreasury.WarReserveFullFor(k), wal = k.KingdomBudgetWallet;
+                                double sur = KingdomTreasury.TreasurySurplusFor(k, out rN);
+                                if (rN >= 0 && rF >= 0) { tfResN += rN; tfResF += rF; tfK++; if (rN < rF) tfLess++; }
+                                if (war)
+                                {
+                                    tfWarK++; tfWal += wal;
+                                    if (sur >= 1) { tfSurK++; tfSur += sur; }
+                                    if (live && !(g.G > 0)) { tfZero++; tfZeroNames.Add(g.Name + (g.HoldTf ? "" : " (bez nadania ze skarbca - czeka na sesje)")); }
+                                    tfRows.Add(new KeyValuePair<double, string>(sur, g.Name + ": skarbiec " + wal + ", zapas wojny " + rN + " (z pelnego zwrotu " + rF + "), nadwyzka "
+                                               + N0(sur) + ", g " + G2(g.G) + (g.HoldTf ? " (najpierw skarbiec)" : "")));
+                                }
+                            }
+                            catch (Exception e) { Stumble("Daily(f23)", e); }
+                        }
                         if (d != null && (war || g.G > 0 || d.DsTreas > 0 || d.DsAnt > 0))
                         {
                             long farmT, farmC; TownPurse.CrownToday.TryGetValue(k, out farmT); CastlePurse.CrownToday.TryGetValue(k, out farmC);
@@ -498,6 +551,25 @@ namespace Armoury
                                  + (100 * Cl(s.DsAidesMax, 0, 0.3)).ToString("0.#", Inv) + "%, g x " + (100 * Cl(s.DsAidesRate, 0, 0.1)).ToString("0.#", Inv) + "%), 184 min(pulap, g x "
                                  + (100 * Cl(s.DsTallageRate, 0, 0.1)).ToString("0.#", Inv) + "%), dziesiata g x " + (100 * Cl(s.DsMovablesRate, 0, 0.3)).ToString("0.#", Inv)
                                  + "% oszczednosci ponad zapas na kwartal, W4 g x czesc wsi) | " + string.Join(" ; ", sess.ToArray()) + ".");
+                    // f23-korona: linia doby "Korona: najpierw skarbiec (f23)" (zawsze przy DS i logu - klucze wylaczone: liczby na sucho, jak dotad w grze)
+                    try
+                    {
+                        tfRows.Sort((x, y) => y.Key.CompareTo(x.Key));
+                        var tft = new List<string>(); foreach (var r in tfRows) tft.Add(r.Value);
+                        var sbt = new StringBuilder(1024 + 120 * tft.Count);
+                        sbt.Append("Korona: najpierw skarbiec (f23): dzien ").Append(day)
+                           .Append(" | Ds War Grant Treasury First ").Append(TreasuryFirstOn(s) ? "tak" : "NIE (nadanie bez skarbca - jak dotad)")
+                           .Append(", War Reserve By Need ").Append(KingdomTreasury.WarReserveByNeedOn ? "tak" : "NIE (zapas z pelnego zwrotu - jak dotad)")
+                           .Append(" | zapas wojny razem (krolestw ").Append(tfK).Append("): wedlug potrzeby ").Append(tfResN).Append(", z pelnego zwrotu ").Append(tfResF)
+                           .Append(" (mniejszy o ").Append(tfResF - tfResN).Append(", krolestw z mniejszym ").Append(tfLess).Append(')')
+                           .Append(" | krolestwa w wojnie ").Append(tfWarK).Append(": skarbce ").Append(tfWal).Append(", nadwyzka ponad zapas wojny i dlugi ").Append(N0(tfSur))
+                           .Append(" u ").Append(tfSurK).Append(" krolestw (na kwartal ").Append(N0(tfSur / DsTowns.Quarter)).Append(" zl/d)")
+                           .Append(" | nadanie 0 w wojnie: ").Append(tfZero).Append(tfZeroNames.Count > 0 ? " (" + string.Join(", ", tfZeroNames.ToArray()) + ")" : "")
+                           .Append(" | na krolestwo (w wojnie): ").Append(tft.Count > 0 ? string.Join(" ; ", tft.ToArray()) : "-")
+                           .Append(" | potkniecia ").Append(_stumbles).Append('.');
+                        Log.Info(sbt.ToString());
+                    }
+                    catch (Exception e) { Stumble("Daily(f23 linia)", e); }
                     if (live || DsTowns.InWindow)
                     {
                         rows.Sort((x, y) => y.Key.CompareTo(x.Key));

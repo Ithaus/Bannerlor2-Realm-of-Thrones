@@ -34,13 +34,16 @@ namespace Armoury
     /// JEDEN wspolny komunikat, inaczej osobno (najpozniej na koncu CrownRents.Daily - NeedFlushWageMsg). Pasmo komunikatu (zwrot i renta) ma martwa strefe 5% R
     /// przy progach R i 2R (MsgBand) - bez migania dzien po dniu; zloto bez zmian (f ciagle w R i 2R). Pole linii f7 'komunikat gracza' (checker NRN-9).
     /// Klucz wylaczony - komunikat zwrotu f6 jak dotad co do znaku. Bez zapisu: po wczytaniu pierwszy komunikat pasma R-2R / ponad 2R wraca (raz, jeden).
+    /// f23-korona (klucz NeedMeasureAll, decyzja Jeffa 19.10 odpowiedz 4a): dluznik 168 i rod bez zoldu (Straz, Wolni Ludzie) mierzone wlasnym zlotem w TYM SAMYM wierszu
+    /// pamieci doby co zwrot f6 (NeedOfClan -> RbnOf -> ClanBudget.NeedChestAllOf); rod gracza dluznik (nie w zajeciu) tez - takze w pokoju (PlayerReserve). Linia f7: pole
+    /// "f23 miara wszystkich". Klucz wylaczony - jak dotad.
     /// </summary>
     internal static partial class CrownRents
     {
         internal static bool NeedOn { get { var s = Settings.Current; return s != null && s.CrownRentsByNeed && ClanBudget.On && On; } }   // On: renty 180 czynne (napisy linii f6 / W5 tylko wtedy)
 
         private const int RnBelow = 0, RnMid = 1, RnAbove = 2, RnNone = 3;   // pasma jak f6: ponizej R, R-2R, ponad 2R, bez miary
-        private sealed class RnRow { public double F = 1, G, R; public int Band = RnNone; public long Full, Need, Paid, Fail; public bool Counted; }
+        private sealed class RnRow { public double F = 1, G, R; public int Band = RnNone; public long Full, Need, Paid, Fail; public bool Counted; public int Kind; }   // Kind - f23 (1 bez zoldu, 2 dluznik)
         private static readonly Dictionary<Clan, RnRow> _rn = new Dictionary<Clan, RnRow>();
         private static int _rnDay = int.MinValue;
         private static bool _rnApply, _rnMeasure;          // klucz czynny dzis / pomiar mozliwy (budzet 166 wlaczony)
@@ -50,6 +53,11 @@ namespace Armoury
         private static long _rnFail, _rnW0, _rnW1; private static int _rnWK;
         private static int _rnStumbles, _rnStumblesSess; private static bool _rnErr;
         private static int _rnPlayerBand = -1;              // pasmo renty gracza przy ostatnim kroku (komunikat tylko przy zmianie)
+        // f23-korona: rody zmierzone wlasnym zlotem dzieki Need Measure All (1 bez zoldu, 2 dluznik) - linia f7
+        private static readonly int[] _rnKN = new int[3];
+        private static readonly long[] _rnKFull = new long[3], _rnKNeed = new long[3];
+        private static readonly int[,] _rnKB = new int[3, 3];
+        private static bool _rnAll;
         // recenzja f7 (dwa komunikaty jednego dnia): komunikat zwrotu f6 odlozony do kroku rent tej doby (QueueWageMsg) - to samo pasmo renty = jeden wspolny
         private static int _rnWageMsgDay = int.MinValue, _rnWageMsgBand = -1; private static string _rnWageMsg;
         private const double MsgDeadBand = 0.05;            // martwa strefa pasma komunikatu: 5% R przy progach R i 2R (bez migania komunikatow dzien po dniu)
@@ -63,6 +71,7 @@ namespace Armoury
         {
             for (int i = 0; i < 4; i++) { _rnFull[i] = 0; _rnNeed[i] = 0; _rnPaidB[i] = 0; _rnN[i] = 0; _rnG[i] = 0; }
             _rnFail = 0; _rnW0 = 0; _rnW1 = 0; _rnWK = 0; _rnStumbles = 0;
+            for (int i = 0; i < 3; i++) { _rnKN[i] = 0; _rnKFull[i] = 0; _rnKNeed[i] = 0; for (int j = 0; j < 3; j++) _rnKB[i, j] = 0; }   // f23
         }
 
         private static void NeedStumble(string where, Exception e)
@@ -80,6 +89,7 @@ namespace Armoury
                 _rnDay = Campaign.Current != null ? (int)CampaignTime.Now.ToDays : int.MinValue;
                 _rnMeasure = ClanBudget.On;
                 _rnApply = NeedOn;
+                _rnAll = KingdomTreasury.NeedMeasureAllOn;   // f23-korona: tylko do linii (miare liczy wiersz f6 - RbnOf)
             }
             catch (Exception e) { _rnApply = false; _rnMeasure = false; NeedStumble("Begin", e); }
         }
@@ -97,8 +107,8 @@ namespace Armoury
             if (!_rnMeasure) return n;
             try
             {
-                double f, G, R;
-                int b = KingdomTreasury.NeedOfClan(c, out f, out G, out R);
+                double f, G, R; int kind;
+                int b = KingdomTreasury.NeedOfClan(c, out f, out G, out R, out kind);   // f23: z rodzajem miary (dluznik i rod bez zoldu - wlasnym zlotem przy Need Measure All)
                 // rod gracza w pokoju: PlayerCaps (miara f6 / W5 / W6) liczy tylko w wojnie - ta sama rezerwa R z PlayerReserve; dluznik albo w zajeciu (168) - bez miary jak AI
                 if (b == RnNone && c == Clan.PlayerClan && !(DebtLadder.On && (DebtLadder.IsDebtor(c) || DebtLadder.IsSeized(c))))
                 {
@@ -109,7 +119,7 @@ namespace Armoury
                         if (!double.IsNaN(G) && !double.IsInfinity(G)) b = KingdomTreasury.NeedBand(G, R, out f);
                     }
                 }
-                if (b >= RnBelow && b <= RnAbove && R > 0) { n.F = Math.Max(0.0, Math.Min(1.0, f)); n.G = G; n.R = R; n.Band = b; }
+                if (b >= RnBelow && b <= RnAbove && R > 0) { n.F = Math.Max(0.0, Math.Min(1.0, f)); n.G = G; n.R = R; n.Band = b; n.Kind = kind; }
             }
             catch (Exception e) { n.F = 1; n.Band = RnNone; NeedStumble("Of", e); }
             return n;
@@ -143,7 +153,13 @@ namespace Armoury
                 if (_rnApply && need < x) ClanIncomeBook.NoteNeedCut(c, x - need);   // recenzja calosci 18.10: zatrzymane wedlug potrzeby - do miary R (nie do D)
                 _rnFull[b] += x; _rnNeed[b] += need;
                 n.Full += x; n.Need += need;
+                bool first = !n.Counted;
                 if (!n.Counted) { n.Counted = true; _rnN[b]++; _rnG[b] += Math.Max(0, n.G); }
+                if (n.Kind > 0 && n.Kind < 3 && b >= RnBelow && b <= RnAbove)   // f23: zmierzone wlasnym zlotem (dotad bez miary)
+                {
+                    _rnKFull[n.Kind] += x; _rnKNeed[n.Kind] += need;
+                    if (first) { _rnKN[n.Kind]++; _rnKB[n.Kind, b]++; }
+                }
                 return _rnApply ? need : x;
             }
             catch (Exception e) { NeedStumble("Cut", e); return x; }
@@ -182,7 +198,8 @@ namespace Armoury
                 long full = 0, need = 0, paidB = 0; int cut = 0;
                 for (int i = 0; i < 4; i++) { full += _rnFull[i]; need += _rnNeed[i]; paidB += _rnPaidB[i]; }
                 foreach (var kv in _rn) if (kv.Value != null && kv.Value.Counted && kv.Value.Need < kv.Value.Full) cut++;
-                string[] name = { "ponizej R (cala)", "R-2R (czesc, liniowo)", "ponad 2R (nic)", "bez miary (cala: bez budzetu, dluznik, zajecie, Straz bez zoldu, gracz bez pomiaru)" };
+                string[] name = { "ponizej R (cala)", "R-2R (czesc, liniowo)", "ponad 2R (nic)",
+                                  _rnAll ? "bez miary (cala: bez budzetu, zajecie, najemnik, gracz bez pomiaru)" : "bez miary (cala: bez budzetu, dluznik, zajecie, Straz bez zoldu, gracz bez pomiaru)" };
                 string[] shortName = { "ponizej R", "R-2R", "ponad 2R", "bez miary" };
                 // komunikat gracza - tylko przy zmianie pasma (klucz czynny, rod gracza z renta dzis); recenzja f7: pasmo komunikatu z martwa strefa (MsgBand),
                 // decyzja i wysylka przed linia (pole 'komunikat gracza' linii - checker NRN-9)
@@ -235,6 +252,7 @@ namespace Armoury
                     for (int b = 0; b < 4; b++)
                         sb.Append(" | ").Append(name[b]).Append(": rodow ").Append(_rnN[b]).Append(" (zloto rodzin ").Append((_rnG[b] / 1e6).ToString("0.00", inv)).Append(" mln)")
                           .Append(", pelna ").Append(_rnFull[b]).Append(", wedlug potrzeby ").Append(_rnNeed[b]).Append(", wyplacone ").Append(_rnPaidB[b]);
+                    sb.Append(KingdomTreasury.NeedAllSeg(_rnAll, _rnKN, _rnKFull, _rnKNeed, _rnKB, "pelna"));   // f23: " | f23 miara wszystkich (...)" - klucz wylaczony: pusty
                     sb.Append(" | razem pelna ").Append(full).Append(", wedlug potrzeby ").Append(need).Append(", wyplacone ").Append(paidB)
                       .Append(" (renty 180 ").Append(LastPaid).Append("), nieudane wyplaty ").Append(_rnFail)
                       .Append(_rnApply ? "; zatrzymane w skarbcach " : "; zatrzymane bylyby (na sucho) ").Append(full - need)
