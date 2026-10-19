@@ -2612,6 +2612,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistTournamentScale { get; set; } = 4f;
 
+        [SettingPropertyBool("Hist Quest Qty Old Coin", HintText = "quest quantities the game computes as a fixed sum divided by an item's price (gang axes and the guards' toll at the town gate, village crafting iron, The Art of the Trade, the overpriced artisan's goods, village tools, herds, draught animals and the meat offered for them, the gang's stolen goods, the smugglers' cargo) count from the piece's worth before the historical repricing - otherwise a quest asks for hundreds of pieces instead of a dozen. Rewards stay as they are. Applies to quests offered after loading; switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistQuestQtyOldCoin { get; set; } = true;
+
+        [SettingPropertyBool("Hist Roguery Xp Old Value", HintText = "Roguery XP for raiding villages, looting villagers and caravans and forcing supplies counts the trade goods at their worth before the historical repricing, with the game's own factors (never less than the game gives) - otherwise cheaper goods slow Roguery 3-20 times, for you and for the AI lords. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistRogueryXpOldValue { get; set; } = true;
+
         [SettingPropertyBool("Hist Research From Old Value", HintText = "smithing part research (new parts for a weapon class) counts from a piece's worth before the historical repricing, as smithing XP already does - otherwise a forged sword worth 21 pence instead of 1105 gives almost no research and no new parts unlock", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistResearchFromOldValue { get; set; } = true;
@@ -8700,6 +8708,8 @@ namespace Armoury
             s.TownWageRefProsperity = TownWageRefProsperity;
             s.HistAmmoLaborMultiplier = HistAmmoLaborMultiplier;
             s.HistTournamentScale = HistTournamentScale;
+            s.HistQuestQtyOldCoin = HistQuestQtyOldCoin;
+            s.HistRogueryXpOldValue = HistRogueryXpOldValue;
             s.HistResearchFromOldValue = HistResearchFromOldValue;
             s.HistUniquePrestige = HistUniquePrestige;
             s.HistBulkUnitFactor = HistBulkUnitFactor;
