@@ -64,6 +64,11 @@ namespace Armoury
             public int H7, F7;
             public readonly long[] Due = new long[WtRing28];                         // 28 dob naleznego zwrotu zoldu (f6-zwrot: pelnego - KDay.RefundFull, przed mnoznikiem potrzeby)
             public int H28, F28;
+            // f23-korona (War Reserve By Need): nalezny zwrot PO mierze potrzeby rodu (KDay.RefundDue) w tych samych miejscach pierscienia co Due; FN - ile dob z DueN jest
+            // w pierscieniu. Recenzja: w zapisie za lista Due (29. liczba SN zawsze, potem 28 x DueN i FN) - po wczytaniu udzial jak przed zapisem; zapis sprzed recenzji -
+            // FN 0, pierwsza doba udzial 1 (zapas jak z pelnego). Due z zapisu zostaje pelny - stara DLL czyta go jak dotad
+            public readonly long[] DueN = new long[WtRing28];
+            public int FN;
             public string Name = "";
             // doba (linia)
             public long DTaken, DHeld; public double DMove; public bool DStep;
@@ -276,12 +281,14 @@ namespace Armoury
                         var kd = CrownIncome.DayOf(k);
                         bool loan = kd != null && kd.LoanIn > 0, over = kd != null && kd.RefundDue > kd.Measured;
                         w.Loan[w.H7] = loan; w.Over[w.H7] = over; w.H7 = (w.H7 + 1) % WtRing7; if (w.F7 < WtRing7) w.F7++;
-                        w.Due[w.H28] = kd != null ? Math.Max(0, kd.RefundFull) : 0; w.H28 = (w.H28 + 1) % WtRing28; if (w.F28 < WtRing28) w.F28++;
+                        w.Due[w.H28] = kd != null ? Math.Max(0, kd.RefundFull) : 0;
+                        w.DueN[w.H28] = kd != null ? Math.Max(0, kd.RefundDue) : 0; if (w.FN < WtRing28) w.FN++;   // f23: nalezny po f6 w tym samym miejscu (pamiec sesji)
+                        w.H28 = (w.H28 + 1) % WtRing28; if (w.F28 < WtRing28) w.F28++;
                         bool loan7 = false, over7 = false; long dsum = 0;
                         for (int i = 0; i < WtRing7; i++) { if (w.Loan[i]) loan7 = true; if (w.Over[i]) over7 = true; }
                         for (int i = 0; i < WtRing28; i++) dsum += w.Due[i];
                         double davg = w.F28 > 0 ? (double)dsum / w.F28 : 0;
-                        long reserve = Math.Max(reserveBase, (long)(reserveDays * davg));
+                        long reserve = Math.Max(reserveBase, (long)(reserveDays * davg * (WarReserveByNeedOn ? WtNeedShare(w) : 1.0)));   // f23: ta sama liczba co WarReserveOf (davg dalej z pelnego - prog W5b regula 1 bez zmian)
                         long wallet = k.KingdomBudgetWallet;
                         bool low = wallet < reserve;
                         bool war = AtWar(k);
@@ -401,7 +408,7 @@ namespace Armoury
                       .Append(", kiesa ludu (B1) ").Append(folk ? "czynna" : "nieczynna (s = 0, pobor 0 - K3: 184 tylko z czynna kiesa)")
                       .Append(" | pulap ").Append((100 * WtClamp(s.WarTaxMax, 0, 0.2)).ToString("0.0", WtInv)).Append("% (z polityka War Tax ").Append((100 * capHi).ToString("0.0", WtInv))
                       .Append("%), krok ").Append((100 * stepV).ToString("0.00", WtInv)).Append(" pkt co 7 dob, w pokoju -").Append((100 * fall).ToString("0.00", WtInv))
-                      .Append(" pkt; zapas wojny max(").Append(reserveBase).Append(", ").Append(reserveDays.ToString("0", WtInv)).Append(" dob naleznego zwrotu z 28 dob); wagi W 0.5 / R 1.0 / P 1.5 / podzamcze 1.0")
+                      .Append(" pkt; zapas wojny max(").Append(reserveBase).Append(", ").Append(reserveDays.ToString("0", WtInv)).Append(WarReserveByNeedOn ? " dob naleznego zwrotu z 28 dob - wedlug potrzeby rodu, f23" : " dob naleznego zwrotu z 28 dob").Append("); wagi W 0.5 / R 1.0 / P 1.5 / podzamcze 1.0")
                       .Append(" | s krolestw w wojnie (srednia, max): ").Append(warK > 0 ? (100 * sumS / warK).ToString("0.00", WtInv) : "0.00").Append("%, ").Append((100 * maxS).ToString("0.00", WtInv))
                       .Append("% - krolestw w wojnie ").Append(warK).Append(", z s > 0 ").Append(posK).Append(", na pulapie ").Append(capK).Append("; s > 0 w pokoju (spada, bez poboru) ").Append(peaceK)
                       .Append(" | pobrano ").Append(taken).Append(" zl (ludzie miast ").Append(_wtCls[WtW] + _wtCls[WtR] + _wtCls[WtP]).Append(": W ").Append(_wtCls[WtW]).Append(", R ").Append(_wtCls[WtR])
@@ -462,7 +469,15 @@ namespace Armoury
                     for (int i = 0; i < WtRing28; i++) { if (i > 0) sb.Append(','); sb.Append(w.Due[i].ToString(WtInv)); }
                     // W5b regula 1: stawka z braku wojska u panow (milionowe) - 29. liczba listy, tylko gdy > 0. Starsza wersja moda czyta pierwsze 28 liczb i reszte
                     // pomija (WarTaxImport: petla do WtRing28), wiec format pola sie nie zmienia; zapis bez niej = 0
-                    if (w.SN > 0) sb.Append(',').Append(((long)Math.Round(w.SN * 1e6)).ToString(WtInv));
+                    // f23-korona (recenzja): pierscien naleznego zwrotu po mierze potrzeby rodu (DueN) i FN - po 28 liczbach Due ZAWSZE 29. (SN, takze 0), potem 28 liczb DueN
+                    // i FN (razem 58 liczb). Starsza DLL czyta 28 liczb i 29. jako SN (0 = jak zapis bez stawki), reszte pomija; zapis bez nich - FN 0 (udzial z dob sesji)
+                    if (w.FN > 0)
+                    {
+                        sb.Append(',').Append(((long)Math.Round(Math.Max(0, w.SN) * 1e6)).ToString(WtInv));
+                        for (int i = 0; i < WtRing28; i++) sb.Append(',').Append(w.DueN[i].ToString(WtInv));
+                        sb.Append(',').Append(Math.Min(WtRing28, w.FN).ToString(WtInv));
+                    }
+                    else if (w.SN > 0) sb.Append(',').Append(((long)Math.Round(w.SN * 1e6)).ToString(WtInv));
                 }
                 return sb.ToString();
             }
@@ -498,6 +513,14 @@ namespace Armoury
                         for (int i = 0; i < WtRing28; i++) { long v; if (i < dd.Length && long.TryParse(dd[i], NumberStyles.Integer, WtInv, out v)) w.Due[i] = Math.Max(0, v); }
                         long sn;   // W5b regula 1: 29. liczba listy (zapis sprzed paczki - brak, stawka 0)
                         if (dd.Length > WtRing28 && long.TryParse(dd[WtRing28], NumberStyles.Integer, WtInv, out sn)) w.SN = WtClamp(sn / 1e6, 0, 0.2);
+                        // f23-korona (recenzja): 30.-57. liczba - pierscien DueN, 58. - FN (zapis sprzed recenzji: brak - FN 0, udzial z dob sesji); jedna zla liczba - FN 0
+                        if (dd.Length >= 2 * WtRing28 + 2)
+                        {
+                            bool okN = true; long vn; int fn;
+                            for (int i = 0; i < WtRing28 && okN; i++) { if (long.TryParse(dd[WtRing28 + 1 + i], NumberStyles.Integer, WtInv, out vn)) w.DueN[i] = Math.Max(0, vn); else okN = false; }
+                            if (okN && int.TryParse(dd[2 * WtRing28 + 1], NumberStyles.Integer, WtInv, out fn)) w.FN = Math.Max(0, Math.Min(Math.Min(WtRing28, w.F28), fn));
+                            else { w.FN = 0; Array.Clear(w.DueN, 0, WtRing28); }
+                        }
                         _wt[kv[0]] = w; _wtImportN++;
                     }
                     catch { _wtImportBad++; }

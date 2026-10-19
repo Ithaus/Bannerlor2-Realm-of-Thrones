@@ -1635,7 +1635,25 @@ Uzycie (Python 3, tylko odczyt):
                     komunikaty), NDP-8 ERROR KingdomTreasury.AidNeed 0 i potkniecia 0, NDP-D regula na sucho z CSV (f z f6 / f7 / G i R; INFO). Log sprzed paczki (np. fin93
                     Armoury-2026-10-18_12-18-40.log): NDP-0 INFO, NDP-D z liczbami, bez wyjatku. Paczka zmienila tez W5-1 (garnek = wyplacono + zatrzymane + reszta; wzor
                     wiersza krolestwa zna "lup WW2" i "zatrzymane f20"). Recenzja calosci noc-ks4: NDP-9 W6 tarczowe (bez ciecia f20 - poza decyzja 1.b) do rodow ponad 2R
-                    i R-2R srednio na dobe (INFO - do decyzji Jeffa, czy tarczowe to "pomoc koronna"; linia sprzed poprawki bez pola - INFO).
+                    i R-2R srednio na dobe (INFO - do decyzji Jeffa, czy tarczowe to "pomoc koronna"; linia sprzed poprawki bez pola - INFO). f23-korona: NDP-9 czyta tez pole
+                    "W6 tarczowe wedlug potrzeby (f23)" (uprawnienie).
+--grupa nkorona   : (19.10, paczka f23-korona - decyzje Jeffa 19.10: "3. a" tarczowe W6 wedlug zasady "bogaty nic, sredni czesc, biedny calosc", "4. a" Straz, Wolni Ludzie
+                    i dluznicy Banku mierzeni wlasnym zlotem, "8. a" najpierw skarbiec; klucze Scutage By Need, Need Measure All, Ds War Grant Treasury First, War Reserve By Need)
+                    python -I tools/sprawdz_logi.py --grupa nkorona <Armoury-*.log> [--csv budzet-rodow.csv] (strumieniowo; bez --csv budzet-rodow.csv obok logu). NKR-0 linie
+                    paczki (INFO), NKR-0b linia "Korona: najpierw skarbiec (f23)" nieczytelna 0; W6: NKR-3 PIENIADZ ZAMKNIETY (linia W6: uprawnienie odbiorcow = wyplacone +
+                    niepobrane - zostalo u platnikow, pobrane = wyplacone, zostalo w skarbcach 0; pole f20 te same liczby, ponad 2R wyplacone 0, kontrola 0), NKR-3b srednie (INFO),
+                    NKR-3c CSV: odbiorca gotowki W6 nigdy w pasmie ponad 2R; Need Measure All: NKR-4 pole "f23 miara wszystkich" i nowy napis pasma 3 w f6/f7, NKR-4b CSV:
+                    Straz / Wolni Ludzie (bez najemnikow) i dluznicy (kredyt, zaleglosc) z pelnym zwrotem albo renta > 0 - pasmo 0..2, mnoznik = clamp((2R - G) / R), NKR-4c ten
+                    sam mnoznik i R w f6 i f7 (jedna pamiec doby), NKR-4d/4e srednie (INFO), NKR-D4 (log bez pola) na sucho z CSV (R bez zoldu z kosztow 0.47 x D staly + zold
+                    w monecie; INFO); DS: NKR-5 zapas wojny wedlug potrzeby <= z pelnego (klucz wylaczony - rowny), NKR-5b sesje nadania (recenzja: brak z wplywow =
+                    min(brak, tylko z wplywow dnia - zwykle wplywy), brak ze skarbca = max(0, brak - max(0, brak z wplywow)); "do zapasu" (Ds War Grant Treasury To Reserve):
+                    brak po skarbcu = brak z wplywow przy nadwyzce >= max(1, 14 x brak ze skarbca), inaczej brak; "na kwartal": max(brak z wplywow, brak - nadwyzka / 91);
+                    g = 0 tylko przy nadwyzce i braku po skarbcu <= 0; wtedy swobodna - 0, kwartalna - krok w dol; War Tax +krok), NKR-5c krol bez nadwyzki nie siedzi
+                    przy nadaniu 0 dzieki skarbcowi (sesja "skarbiec do zapasu" nastepnej doby; poza 14 dobami przed kwartalem), NKR-5d krolestwa przy nadaniu 0 dzieki skarbcowi
+                    bez niedoplat rat Banku 186, kontraktow 185 i wezwan 168 (recenzja), NKR-6 co placi lud i zmiana skarbcow w wojnie (INFO), NKR-6b tempo nadwyzki krolestw przy
+                    nadaniu 0 wobec nadwyzka / 91 (INFO), NKR-D5 najpierw skarbiec na sucho z ostatniej sesji kwartalnej - "do zapasu" i "na kwartal" (INFO, liczy tez log
+                    sprzed paczki), NKR-8 ERROR paczki 0 i potkniecia linii f23 0.
+                    Log sprzed paczki (test 18.10 Armoury-2026-10-18_17-11-11.log): NKR-0 INFO, NKR-D4 i NKR-D5 z liczbami, bez wyjatku.
 --grupa nruda     : (noc 18.10, fala 5 paczka f5-ruda - ruda/zelazo pod KS; Armoury/src/StartCalibration.Ruda.cs, Bloomery.F5.cs, VillageTakings.F5WoodCredit; klucze
                     Ks Iron Hands Follow Market, Bloomery Wood Credit) python -I tools/sprawdz_logi.py --grupa nruda <Armoury-*.log> (strumieniowo). Linie "Ruda KS (f5-ruda):
                     dzien N" (co 7 dob od D - rece przy zlozach zelaza za ruda rynku: polki S / cel T = suma zapasow rzemiosla CaravanBulk; S < T brak - kopalnie z drewnem
@@ -37709,7 +37727,7 @@ NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy 
 
 
 NDS_AK = "Akumulator kies (ds-akumulator): "
-NDS_GRANT = re.compile(r"^(.*?) (przelaczenie|kwartal|po rampie|pokoj \d+ dob|nowa wojna \d+ dob): g ([\d.]+) -> ([\d.]+)(?: \(War Tax \+krok\))?"   # f14-miary (NDS-7b)
+NDS_GRANT = re.compile(r"^(.*?) (przelaczenie|kwartal|po rampie|pokoj \d+ dob|nowa wojna \d+ dob|skarbiec do zapasu): g ([\d.]+) -> ([\d.]+)(?: \(War Tax \+krok\))?"   # f14-miary (NDS-7b)
                        r"(?:, potrzeba (-?\d+), zwykle wplywy (-?\d+), brak (-?\d+), plon nadania przy g=1 (-?\d+))?")
 NDS_GROW = re.compile(r"^(.*?): g ([\d.]+)( \(pokoj\))?, firmy ")   # poprawka recenzji f14-miary (NDS-7b): wiersz krolestwa w linii "Daniny korony (DS)" - g teraz, pokoj
 NDS_AKMED = re.compile(r"mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+|-)")
@@ -47218,6 +47236,11 @@ def _ndp_scan(logp):
                      "pl": pl.group(1), "msg": pl.group(2).strip(), "st": int(pl.group(3))}
                 dm = NDP_RX_DRY.search(s); r["dry"] = int(dm.group(1)) if dm else None
                 wm = NDP_RX_W6.search(s); r["w6"] = tuple(int(x) for x in wm.groups()) if wm else None   # recenzja calosci noc-ks4: W6 wedlug pasma (zl, rodow x3)
+                if wm is None:   # f23-korona: pole "W6 tarczowe wedlug potrzeby (f23)" - uprawnienie (zl, rodow) razem, ponad 2R, R-2R
+                    wf = NKR_RX_F20W6.search(s)
+                    if wf:
+                        g6 = [int(x) for x in wf.groups()]
+                        r["w6"] = (g6[0], g6[1], g6[4], g6[6], g6[7], g6[9])
                 D["f"][day] = r
                 continue
             if s.startswith(NDP_W5):
@@ -47454,6 +47477,506 @@ def ndoplata_main(logp, bdp=None, csvp=None):
                     f"pelna {tf:.0f}, zatrzymane byloby {tk:.0f} zl/d:" + ", ".join(f" {b} pelna {dry[b][0]:.0f} -> wedlug potrzeby {dry[b][1]:.0f} (zatrzymane {dry[b][2]:.0f})"
                                                                           for b in NDP_BANDS if b in dry),
                     "INFO - w logu z paczka CSV jest juz po cieciu (szacunek ponizej wyplaty linii)", None)
+    rep.show()
+    return 0
+
+
+# ============================================================ nkorona (19.10, paczka f23-korona - decyzje Jeffa 19.10: "3. a" tarczowe W6 wedlug zasady "bogaty nic, sredni czesc,
+# biedny calosc", "4. a" Straz, Wolni Ludzie i dluznicy Banku mierzeni wlasnym zlotem, "8. a" najpierw skarbiec: krol z pelnym skarbcem placi wojne z wlasnych pieniedzy).
+# Armoury/src: KingdomTreasury.Scutage.cs + AidNeed.cs (klucz Scutage By Need), KingdomTreasury.RefundNeed.cs + ClanBudget.NeedChestAllOf + CrownRents.Need.cs (Need Measure
+# All), DsSeason.cs (Ds War Grant Treasury First), KingdomTreasury.CrownSurplus.cs + WarTax.cs (War Reserve By Need - zapas wojny z naleznego zwrotu po f6).
+NKR_F23 = "Korona: najpierw skarbiec (f23): dzien "
+NKR_RX_F23 = re.compile(r"^Korona: najpierw skarbiec \(f23\): dzien (\d+) \| Ds War Grant Treasury First (tak|NIE[^,]*?)(?: \(To Reserve (?:tak|NIE)[^)]*\))?, War Reserve By Need (tak|NIE[^|]*) \| zapas wojny razem"
+                        r" \(krolestw (\d+)\): wedlug potrzeby (-?\d+), z pelnego zwrotu (-?\d+) \(mniejszy o (-?\d+), krolestw z mniejszym (\d+)\) \| krolestwa w wojnie (\d+): skarbce"
+                        r" (-?\d+), nadwyzka ponad zapas wojny i dlugi (-?\d+) u (\d+) krolestw \(na kwartal (-?\d+) zl/d\) \| nadanie 0 w wojnie: (\d+)")
+NKR_RX_F23K = re.compile(r"^(.*?): skarbiec (-?\d+), zapas wojny (-?\d+) \(z pelnego zwrotu (-?\d+)\), nadwyzka (-?\d+), g ([\d.]+)( \(najpierw skarbiec\))?"
+                         r"(?:, tylko z wplywow dnia (?:-|nalezne (\d+) zaplacone (\d+) niedoplata (\d+) \(186 (\d+)/(\d+), 185 (\d+)/(\d+), 168 (\d+)/(\d+)\)( przy nadaniu 0)?))?$")
+# recenzja f23: suma pozycji placonych tylko z wplywow dnia w krolestwach przy nadaniu 0 dzieki skarbcowi (linia f23)
+NKR_RX_F23PRE = re.compile(r"\| tylko z wplywow dnia \(rata 186, kontrakty 185, wezwania 168\) w krolestwach przy nadaniu 0 dzieki skarbcowi: krolestw (\d+), nalezne (\d+),"
+                           r" zaplacone (\d+), niedoplata (\d+) \(krolestw (\d+)\)")
+NKR_RX_ST = re.compile(r"\| potkniecia (\d+)\.\s*$")
+NKR_RX_SESS = re.compile(r"^(.*?) (przelaczenie|kwartal|po rampie|pokoj \d+ dob|nowa wojna \d+ dob|skarbiec do zapasu): g ([\d.]+) -> ([\d.]+)( \(War Tax \+krok\))?"
+                         r"(?:, potrzeba (-?\d+), zwykle wplywy (-?\d+), brak (-?\d+), plon nadania przy g=1 (-?\d+))?")
+NKR_RX_TF = re.compile(r", najpierw skarbiec \(f23\): nadwyzka (-?\d+) ponad zapas wojny (-?\d+) i dlugi / (\d+) = (-?\d+) zl/d, brak po skarbcu (-?\d+|-)( -> nadanie 0)?")   # sprzed recenzji
+# recenzja f23: tryb (do zapasu / na kwartal), pozycje tylko z wplywow dnia, brak z wplywow, brak ze skarbca, prog Ds Grant Session Days
+NKR_RX_TF2 = re.compile(r", najpierw skarbiec \(f23, (do zapasu|na kwartal)\): nadwyzka (-?\d+) ponad zapas wojny (-?\d+) i dlugi / (\d+) = (-?\d+) zl/d, tylko z wplywow dnia (-?\d+)"
+                        r" \(brak z wplywow (-?\d+|-)\), brak ze skarbca (-?\d+|-) zl/d \(prog (\d+) dob (-?\d+|-)\), brak po skarbcu (-?\d+|-)( \(po wczytaniu dob pomiaru \d+ < \d+ - bez zmian\))?"
+                        r"( -> nadanie 0)?")
+NKR_RX_W6SEG = re.compile(r"\| wedlug potrzeby odbiorcy \(f23, Scutage By Need tak[^)]*\): uprawnienie odbiorcow (\d+) = wyplacone (\d+) \+ niepobrane \(zostalo u platnikow\) (-?\d+)")
+NKR_RX_W6 = re.compile(r"\| pobrane (\d+) od \d+ rodow = dopisane do garnka W5 \d+, wyplacone przez W5 ponad danine (\d+) .*?zostalo w skarbcach (-?\d+)")
+NKR_RX_F20W6 = re.compile(r"\| W6 tarczowe wedlug potrzeby \(f23\): uprawnienie (\d+) zl do (\d+) rodow, wyplacone (\d+), niepobrane \(zostalo u platnikow\) (-?\d+); ponad 2R uprawnienie"
+                          r" (\d+) wyplacone (\d+) \(rodow (\d+)\), R-2R uprawnienie (\d+) wyplacone (\d+) \(rodow (\d+)\); kontrola: wyplacone ponad uprawnienie albo ponad 2R z wyplata (\d+) rodow")
+NKR_RX_ALL = re.compile(r"\| f23 miara wszystkich \(Need Measure All tak[^)]*\): bez zoldu \([^)]*\) (\d+) rodow \(ponizej R (\d+), R-2R (\d+), ponad 2R (\d+)\), (?:pelny|pelna) (\d+),"
+                        r" wedlug potrzeby (\d+); dluznicy 168 \([^)]*\) (\d+) rodow \(ponizej R (\d+), R-2R (\d+), ponad 2R (\d+)\), (?:pelny|pelna) (\d+), wedlug potrzeby (\d+)")
+NKR_RX_DSW = re.compile(r"\| swiat: firmy korony (-?\d+), clo (-?\d+), pomoc lennikow (-?\d+), pomoc od sprzedazy (-?\d+), 184 (-?\d+), dziesiata (-?\d+), W4 (-?\d+)")
+NKR_RX_DSK = re.compile(r"^(.*?): g ([\d.]+)( \(pokoj\))?, firmy -?\d+, clo -?\d+, pomoc lennikow -?\d+, pomoc od sprzedazy (-?\d+), 184 (-?\d+), dziesiata (-?\d+), W4 (-?\d+),"
+                        r" inne -?\d+, zapas 1/450 -?\d+ \| potrzeba -?\d+, luka -?\d+ \| zwrot (\d+)/(\d+)")
+NKR_RX_SKR = re.compile(r"^Skarbce: dzien (\d+) - (.*?) \(([A-Z]+)\): skarbiec (-?\d+)(.*)$")
+NKR_RX_184K = re.compile(r"(?:^| ; )([^;:|]+?): s [\d.]+% / pulap [\d.]+%, [^;]*?skarbiec (-?\d+) / zapas wojny (\d+)")
+NKR_ERR = ("NeedChestAllOf", "ZeroNeedReserve", "TreasurySurplusFor", "WarReserveFullFor", "ScPay", "ScNeedSeg", "Daily(f23", "ERROR in DsSeason.")
+NKR_FREE = ("przelaczenie", "po rampie", "skarbiec do zapasu")   # sesje swobodne (bez ograniczenia kroku); "nowa wojna" swobodna tylko przy g0 = 0
+NKR_UNPAID = ("Nights Watch", "Free Folk")
+
+
+def _nkr_scan(logp):
+    """nkorona: strumieniowo linia f23 (DS, zapas wojny), sesje DS z dopiskiem f23, linia W6 (dopisek f23), pole W6 linii f20, pola f23 linii f6 i f7, linie DS (swiat
+    i krolestwa), "Skarbce:" i 184 (do szacunku na sucho) oraz bledy paczki."""
+    D = {"f23": {}, "f23bad": [], "sess": {}, "w6": {}, "f20w6": {}, "f6": {}, "f7": {}, "dsw": {}, "dsk": {}, "skr": {}, "z184": {}, "err": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if any(e in s for e in NKR_ERR):
+                    D["err"].append(s[:200])
+                continue
+            if s.startswith(NKR_F23):
+                mm = NKR_RX_F23.search(s)
+                st_ = NKR_RX_ST.search(s)
+                if not mm or not st_:
+                    D["f23bad"].append(s[:200]); continue
+                g = mm.groups()
+                r = {"tf": g[1] == "tak", "wr": g[2] == "tak", "k": int(g[3]), "resN": int(g[4]), "resF": int(g[5]), "less": int(g[6]), "lessk": int(g[7]),
+                     "wark": int(g[8]), "wal": int(g[9]), "sur": int(g[10]), "surk": int(g[11]), "zero": int(g[13]), "st": int(st_.group(1)), "rows": {},
+                     "tores": None if "(To Reserve " not in s else ("(To Reserve tak" in s), "pre": None}
+                mp = NKR_RX_F23PRE.search(s)
+                if mp:
+                    r["pre"] = tuple(int(x) for x in mp.groups())   # krolestw, nalezne, zaplacone, niedoplata, krolestw z niedoplata
+                i = s.find("| na krolestwo (w wojnie): ")
+                if i > 0:
+                    seg = s[i + len("| na krolestwo (w wojnie): "):]
+                    seg = seg[:seg.rfind(" | potkniecia")]
+                    for row in seg.split(" ; "):
+                        mk = NKR_RX_F23K.match(row.strip())
+                        if mk:
+                            pre = None if mk.group(8) is None else (int(mk.group(8)), int(mk.group(9)), int(mk.group(10)), bool(mk.group(17)))   # nalezne, zaplacone, niedoplata, przy nadaniu 0
+                            r["rows"][mk.group(1)] = (int(mk.group(2)), int(mk.group(3)), int(mk.group(4)), int(mk.group(5)), float(mk.group(6)), bool(mk.group(7)), pre)
+                D["f23"][int(g[0])] = r
+                continue
+            if s.startswith("Korona: nadanie wojenne (DS): dzien"):
+                day = num(r"dzien (\d+)", s)
+                i = s.find(") | ")
+                out = []
+                for seg in (s[i + 4:].rstrip(".").split(" ; ") if i > 0 else []):
+                    mm = NKR_RX_SESS.match(seg.strip())
+                    if not mm:
+                        continue
+                    tf, tf2 = NKR_RX_TF.search(seg), NKR_RX_TF2.search(seg)
+                    nn = lambda v: None if v == "-" else int(v)
+                    if tf2:
+                        tfd = {"mode": tf2.group(1), "sur": int(tf2.group(2)), "res": int(tf2.group(3)), "q": int(tf2.group(4)), "perd": int(tf2.group(5)), "pre": int(tf2.group(6)),
+                               "dpre": nn(tf2.group(7)), "tday": nn(tf2.group(8)), "sd": int(tf2.group(9)), "thr": nn(tf2.group(10)), "d2": nn(tf2.group(11)),
+                               "keep": bool(tf2.group(12)), "zero": bool(tf2.group(13))}
+                    elif tf:
+                        tfd = {"mode": None, "sur": int(tf.group(1)), "res": int(tf.group(2)), "q": int(tf.group(3)), "perd": int(tf.group(4)),
+                               "d2": nn(tf.group(5)), "zero": bool(tf.group(6)), "keep": False}
+                    else:
+                        tfd = None
+                    out.append({"name": mm.group(1), "why": mm.group(2), "g0": float(mm.group(3)), "g1": float(mm.group(4)), "wt": bool(mm.group(5)),
+                                "inc": int(mm.group(7)) if mm.group(7) else None, "brak": int(mm.group(8)) if mm.group(8) else None,
+                                "y1": int(mm.group(9)) if mm.group(9) else None, "tf": tfd})
+                if day is not None:
+                    D["sess"][day] = out
+                continue
+            if s.startswith("Tarczowe (W6): dzien"):
+                day = num(r"dzien (\d+)", s)
+                a, b = NKR_RX_W6.search(s), NKR_RX_W6SEG.search(s)
+                if day is not None and a:
+                    D["w6"][day] = {"got": int(a.group(1)), "paid": int(a.group(2)), "left": int(a.group(3)), "seg": tuple(int(x) for x in b.groups()) if b else None}
+                continue
+            if s.startswith("Doplata wedlug potrzeby rodu (f20): dzien"):
+                day = num(r"dzien (\d+)", s)
+                mm = NKR_RX_F20W6.search(s)
+                if day is not None:
+                    D["f20w6"][day] = tuple(int(x) for x in mm.groups()) if mm else None
+                continue
+            if s.startswith("Korona: zwrot wedlug potrzeby (f6): dzien") or s.startswith("Korona: renty wedlug potrzeby (f7): dzien"):
+                day = num(r"dzien (\d+)", s)
+                key = "f6" if "(f6)" in s[:40] else "f7"
+                mm = NKR_RX_ALL.search(s)
+                if day is not None:
+                    D[key][day] = {"all": tuple(int(x) for x in mm.groups()) if mm else None, "on": ("By Need tak (czynny)" in s),
+                                   "lbl_new": ("bez miary (pelny: bez budzetu, zajecie, najemnik" in s) or ("bez miary (cala: bez budzetu, zajecie, najemnik" in s)}
+                continue
+            if s.startswith("Daniny korony (DS): dzien"):
+                day = num(r"dzien (\d+)", s)
+                mm = NKR_RX_DSW.search(s)
+                if day is None:
+                    continue
+                if mm:
+                    D["dsw"][day] = int(mm.group(4)) + int(mm.group(5)) + int(mm.group(6)) + int(mm.group(7))   # pomoc od sprzedazy + 184 + dziesiata + W4
+                i = s.find("| na krolestwo: ")
+                if i > 0:
+                    kk = {}
+                    for row in s[i + 16:].rstrip(".").split(" ; "):
+                        mk = NKR_RX_DSK.match(row.strip())
+                        if mk:
+                            kk[mk.group(1)] = {"g": float(mk.group(2)), "paid": int(mk.group(4)) + int(mk.group(5)) + int(mk.group(6)) + int(mk.group(7)), "rd": int(mk.group(9))}
+                    D["dsk"][day] = kk
+                continue
+            if s.startswith("Skarbce: dzien"):
+                mm = NKR_RX_SKR.match(s)
+                if mm:
+                    debt = re.search(r"dlug w Banku \(186\) (\d+)", mm.group(5))
+                    D["skr"].setdefault(int(mm.group(1)), {})[mm.group(2)] = (int(mm.group(4)), int(debt.group(1)) if debt else 0, mm.group(3) == "WOJNA")
+                continue
+            if s.startswith("Korona: podatek wojenny ludu (184): dzien"):
+                day = num(r"dzien (\d+)", s)
+                i = s.find("| na krolestwo: ")
+                if day is not None and i > 0:
+                    D["z184"][day] = {mm.group(1).strip(): (int(mm.group(2)), int(mm.group(3))) for mm in NKR_RX_184K.finditer(s[i + 16:])}
+    return D
+
+
+def _nkr_dry_ds(D, floor=500000, days=60, q=91, step=0.5, gmax=2.0):
+    """NKR-D5: szacunek na sucho z logu (takze sprzed paczki) - ostatnia sesja kwartalna DS: nadwyzka skarbca ponad zapas wojny (wedlug potrzeby: 60 x sredni nalezny zwrot
+    po f6 z 28 dob DS, najmniej 500000) i dlug Banku / 91 odjete od braku; nowe g tym samym wzorem co DsSeason.Session (siatka 0.5, krok na kwartal, 0 przy nadwyzce);
+    lud placil (srednia pomocy od sprzedazy + 184 + dziesiatej + W4 po sesji) x g nowe / g stare. None - brak sesji kwartalnej z liczbami."""
+    qs = [d for d in sorted(D["sess"]) if any(x["why"] == "kwartal" and x["brak"] is not None for x in D["sess"][d])]
+    if not qs:
+        return None
+    sd = qs[-1]
+    skd = D["skr"].get(sd + 1) or D["skr"].get(sd) or {}
+    zd = D["z184"].get(sd + 1) or D["z184"].get(sd) or {}
+    t = {"paid": 0.0, "new1": 0.0, "goal": 0.0, "zf": 0, "zn": 0, "sur": 0.0, "k": 0, "k0": 0, "k0g": 0, "day": sd, "new1q": 0.0, "goalq": 0.0, "k0q": 0, "k0gq": 0}
+    for x in D["sess"][sd]:
+        if x["why"] != "kwartal" or x["brak"] is None or x["name"] not in skd:
+            continue
+        W, debt, _war = skd[x["name"]]
+        zf = zd.get(x["name"], (0, floor))[1]
+        v = [D["dsk"][d][x["name"]]["rd"] for d in range(sd - 27, sd + 1) if d in D["dsk"] and x["name"] in D["dsk"][d]]
+        zn = min(zf, max(floor, int(days * sum(v) / len(v)))) if v else zf
+        sur = max(0, W - zn - debt)
+
+        def rule(g0, free, tores=True):
+            # recenzja: bez pozycji tylko z wplywow (stary log ich nie ma - brak z wplywow 0); do zapasu: nadwyzka na >= 14 dob braku -> 0, inaczej caly brak
+            if tores:
+                z_ok = sur >= 1 and sur >= 14 * max(0, x["brak"])
+                d2 = min(0, x["brak"]) if z_ok else x["brak"]
+            else:
+                z_ok = sur >= 1
+                d2 = max(min(0, x["brak"]), x["brak"] - sur / q)
+            if z_ok and d2 <= 0:
+                g1 = 0.0
+            else:
+                g1 = gmax
+                k = 1
+                while k * step <= gmax + 1e-9:
+                    if k * step * x["y1"] >= d2:
+                        g1 = k * step; break
+                    k += 1
+            if not free and g0 > 0:
+                g1 = max(g0 - step, min(g0 + step, g1))
+            if x["wt"]:
+                g1 = min(gmax, g1 + step)
+            return max(0.0 if z_ok else step, min(gmax, g1))
+        g1n, gg = rule(x["g0"], False), rule(0.0, True)
+        g1q, ggq = rule(x["g0"], False, False), rule(0.0, True, False)
+        post = [D["dsk"][d][x["name"]]["paid"] for d in range(sd + 1, sd + 37) if d in D["dsk"] and x["name"] in D["dsk"][d]]
+        paid = sum(post) / len(post) if post else x["g1"] * (x["y1"] or 0)
+        sc = (lambda gn: gn / x["g1"]) if x["g1"] > 0 else (lambda gn: 0.0)
+        t["paid"] += paid; t["new1"] += paid * sc(g1n); t["goal"] += paid * sc(gg)
+        t["new1q"] += paid * sc(g1q); t["goalq"] += paid * sc(ggq); t["k0q"] += g1q == 0; t["k0gq"] += ggq == 0
+        t["zf"] += zf; t["zn"] += zn; t["sur"] += sur; t["k"] += 1; t["k0"] += g1n == 0; t["k0g"] += gg == 0
+    return t
+
+
+def nkorona_main(logp, bdp=None, csvp=None):
+    """nkorona (19.10, paczka f23-korona): W6 wedlug potrzeby odbiorcy (niepobrane zostaje u platnikow), dluznicy i rody bez zoldu mierzone wlasnym zlotem w f6/f7,
+    najpierw skarbiec w sesji nadania DS i zapas wojny z naleznego zwrotu. Wejscie: log Armoury (strumieniowo), budzet-rodow.csv (--csv albo obok logu). Progi NKR-0..NKR-8
+    i NKR-D - opis w naglowku pliku (--grupa nkorona). Log bez paczki: linie INFO, szacunek na sucho (NKR-D), bez wyjatku."""
+    rep = Report()
+    D = _nkr_scan(logp)
+    if csvp is None:
+        csvp = csv_path_of(logp)
+    csvd, _h = _nsk_csv(csvp)
+    f23 = D["f23"]
+    days23 = sorted(f23)
+    sess_tf = [(d, x) for d in sorted(D["sess"]) for x in D["sess"][d] if x["tf"] is not None]
+    w6on = [d for d in sorted(D["w6"]) if D["w6"][d]["seg"] is not None]
+    f6on = [d for d in sorted(D["f6"]) if D["f6"][d]["all"] is not None]
+    f7on = [d for d in sorted(D["f7"]) if D["f7"][d]["all"] is not None]
+    rep.add("NKR-0: linie paczki f23 (INFO)",
+            f"linia 'najpierw skarbiec (f23)' dob {len(days23)} (Ds War Grant Treasury First tak {sum(1 for d in days23 if f23[d]['tf'])}, War Reserve By Need tak"
+            f" {sum(1 for d in days23 if f23[d]['wr'])}); sesje DS z dopiskiem f23 {len(sess_tf)}; W6 z dopiskiem f23 dob {len(w6on)}; f6 / f7 z polem 'f23 miara wszystkich'"
+            f" dob {len(f6on)} / {len(f7on)}; CSV {'jest' if csvd else 'brak'}", "INFO (log sprzed paczki - 0 linii)", None)
+    rep.add("NKR-0b: linie f23 nieczytelne", f"{len(D['f23bad'])}" + (f" (np. {D['f23bad'][0][:120]})" if D["f23bad"] else ""), "0", len(D["f23bad"]) == 0 if days23 or D["f23bad"] else None)
+    # ---------------------------------------------------------------- (3) W6 wedlug potrzeby odbiorcy
+    if w6on:
+        bad, why = [], {}
+        for d in w6on:
+            w = D["w6"][d]; ent, paid, kept = w["seg"]
+            e = []
+            if ent != paid + kept or paid != w["paid"]:
+                e.append("uprawnienie = wyplacone + niepobrane")
+            if w["got"] != w["paid"] or w["left"] != 0:
+                e.append("pobrane = wyplacone (nic w skarbcu)")
+            f = D["f20w6"].get(d)
+            if f is not None:
+                if f[2] != w["paid"] or f[0] - f[2] != f[3] or f[0] != ent:
+                    e.append("f20 = W6")
+                if f[5] != 0 or f[10] != 0:
+                    e.append("ponad 2R z wyplata / kontrola")
+            if e:
+                bad.append(d)
+                for x in e:
+                    why[x] = why.get(x, 0) + 1
+        rep.add("NKR-3: W6 wedlug potrzeby odbiorcy - pieniadz zamkniety (linia W6: uprawnienie = wyplacone + niepobrane, pobrane = wyplacone, zostalo w skarbcach 0; pole f20:"
+                " te same liczby, ponad 2R wyplacone 0, kontrola 0)", f"dob {len(w6on)}, rozjazdow {len(bad)}" + (f" (d{bad[:5]}; {why})" if bad else ""), "0", len(bad) == 0)
+        t = w6on[-28:]
+        ent = sum(D["w6"][d]["seg"][0] for d in t) / len(t); kept = sum(D["w6"][d]["seg"][2] for d in t) / len(t)
+        rich = [D["f20w6"][d] for d in t if D["f20w6"].get(d)]
+        rep.add(f"NKR-3b: W6 wedlug potrzeby srednio na dobe (ostatnie {len(t)} dob; INFO)",
+                f"uprawnienie {ent:.0f}, niepobrane - zostalo u platnikow {kept:.0f}" + (f"; ponad 2R uprawnienie {sum(r[4] for r in rich) / len(rich):.0f} wyplacone {sum(r[5] for r in rich) / len(rich):.0f},"
+                                                                                     f" R-2R uprawnienie {sum(r[7] for r in rich) / len(rich):.0f} wyplacone {sum(r[8] for r in rich) / len(rich):.0f}" if rich else ""),
+                "INFO (test 18.10 przed paczka: W6 ok. 110 zl/d - male kwoty)", None)
+        # CSV: odbiorca gotowki W6 nie jest w pasmie ponad 2R (f20 / f6 / f7 tej doby)
+        cbad, cn, cfirst = 0, 0, None
+        for d in w6on:
+            for r in csvd.get(d, []):
+                if _nsk_fv(r, "doplata_z_tarczowego_w6") <= 0:
+                    continue
+                cn += 1
+                bands = [(r.get(k) or "").strip() for k in ("doplata_w5_f20_pasmo", "zwrot_f6_pasmo", "renta_f7_pasmo")]
+                if "2" in bands:
+                    cbad += 1; cfirst = cfirst or (d, r.get("rod_id"))
+        rep.add("NKR-3c: CSV - zaden rod ponad 2R (pasmo f20 / f6 / f7 = 2) nie dostaje gotowki W6 w dobie z kluczem", f"rodo-dob z gotowka W6 {cn}, ponad 2R {cbad}" + (f" (np. {cfirst})" if cfirst else ""),
+                "0", (cbad == 0) if cn else None)
+    else:
+        rep.add("NKR-3: W6 wedlug potrzeby odbiorcy", "brak dopisku f23 w linii W6 (log sprzed paczki albo klucz Scutage By Need / Crown War Aid Cash By Need wylaczony)", "INFO", None)
+    # ---------------------------------------------------------------- (4) Need Measure All
+    if f6on or f7on:
+        lbl = sum(1 for d in f6on if not D["f6"][d]["lbl_new"]) + sum(1 for d in f7on if not D["f7"][d]["lbl_new"])
+        rep.add("NKR-4: f6 i f7 - pole 'f23 miara wszystkich' i pasmo 'bez miary' bez dluznikow i Strazy (napis pasma 3 przy kluczu)", f"dob f6 {len(f6on)}, f7 {len(f7on)}, ze starym napisem pasma 3 {lbl}",
+                "0", lbl == 0)
+        cand, bad3, fbad, same, diff, cfirst, ffirst = 0, 0, 0, 0, [], None, None
+        on6 = set(f6on); on7 = set(f7on)
+        for d in sorted(on6 | on7):
+            for r in csvd.get(d, []):
+                unpaid = (r.get("krolestwo") or "") in NKR_UNPAID and (r.get("rodzaj") or "") != "najemnik"
+                debt = (r.get("szczebel") or "").strip() in ("kredyt", "zaleglosc")
+                if not (unpaid or debt) or (r.get("rodzaj") or "") == "najemnik":
+                    continue
+                for pk, fk, gk, rk, key, on in (("zwrot_f6_pasmo", "zwrot_f6_pelny", "zwrot_f6_g", "zwrot_f6_r", "zwrot_f6_mnoznik", d in on6),
+                                                ("renta_f7_pasmo", "renta_f7_pelna", "renta_f7_g", "renta_f7_r", "renta_f7_mnoznik", d in on7)):
+                    if not on or _nsk_fv(r, fk) <= 0:
+                        continue
+                    cand += 1
+                    b = (r.get(pk) or "").strip()
+                    if b == "3":
+                        bad3 += 1; cfirst = cfirst or (d, r.get("rod_id"), pk)
+                        continue
+                    G, R, f = _ndp_f(r, gk), _ndp_f(r, rk), _ndp_f(r, key)
+                    if G is None or not R or f is None:
+                        continue
+                    fx = 1.0 if G <= R else (0.0 if G >= 2 * R else (2 * R - G) / R)
+                    if abs(fx - f) > 2e-3:
+                        fbad += 1; ffirst = ffirst or (d, r.get("rod_id"), pk, f, round(fx, 4))
+                # ta sama pamiec doby: f6 i f7 w tym samym wierszu - ten sam mnoznik i R
+                b6, b7 = (r.get("zwrot_f6_pasmo") or "").strip(), (r.get("renta_f7_pasmo") or "").strip()
+                if b6 in ("0", "1", "2") and b7 in ("0", "1", "2"):
+                    f6v, f7v, r6, r7 = _ndp_f(r, "zwrot_f6_mnoznik"), _ndp_f(r, "renta_f7_mnoznik"), _ndp_f(r, "zwrot_f6_r"), _ndp_f(r, "renta_f7_r")
+                    if None not in (f6v, f7v, r6, r7):
+                        if abs(f6v - f7v) <= 1e-3 and abs(r6 - r7) <= 1.0:
+                            same += 1
+                        else:
+                            diff.append((d, r.get("rod_id")))
+        rep.add("NKR-4b: CSV - Straz / Wolni Ludzie (bez najemnikow) i dluznicy 168 (kredyt, zaleglosc) z pelnym zwrotem albo renta > 0 w dobie z kluczem: pasmo 0..2 (nie 'bez miary'),"
+                " mnoznik = clamp((2R - G) / R) z G i R wiersza", f"rodo-pozycji {cand}, w pasmie 3 {bad3}" + (f" (np. {cfirst})" if cfirst else "") + f", mnoznik inny niz wzor {fbad}"
+                + (f" (np. {ffirst})" if ffirst else ""), "0 / 0", (bad3 == 0 and fbad == 0) if cand else None)
+        rep.add("NKR-4c: ta sama pamiec doby - u tych rodow mnoznik i R zwrotu f6 = renty f7 w tym samym wierszu CSV", f"porownan {same + len(diff)}, innych {len(diff)}" + (f" (np. {diff[:2]})" if diff else ""),
+                "0", (len(diff) == 0) if same or diff else None)
+        t = f6on[-28:]
+        if t:
+            a6 = [D["f6"][d]["all"] for d in t]
+            n = len(t)
+            rep.add(f"NKR-4d: zmierzone wlasnym zlotem srednio na dobe - zwrot f6 (ostatnie {n} dob; INFO)",
+                    f"bez zoldu {sum(a[0] for a in a6) / n:.1f} rodow, pelny {sum(a[4] for a in a6) / n:.0f} -> wedlug potrzeby {sum(a[5] for a in a6) / n:.0f}; dluznicy"
+                    f" {sum(a[6] for a in a6) / n:.1f} rodow, pelny {sum(a[10] for a in a6) / n:.0f} -> wedlug potrzeby {sum(a[11] for a in a6) / n:.0f}",
+                    "INFO (test 18.10 przed paczka, pasmo 3: zwrot ok. 36 tys./d, renty ok. 43 tys./d u ok. 37-51 rodow)", None)
+        t = f7on[-28:]
+        if t:
+            a7 = [D["f7"][d]["all"] for d in t]
+            n = len(t)
+            rep.add(f"NKR-4e: zmierzone wlasnym zlotem srednio na dobe - renty f7 (ostatnie {n} dob; INFO)",
+                    f"bez zoldu {sum(a[0] for a in a7) / n:.1f} rodow, pelna {sum(a[4] for a in a7) / n:.0f} -> wedlug potrzeby {sum(a[5] for a in a7) / n:.0f}; dluznicy"
+                    f" {sum(a[6] for a in a7) / n:.1f} rodow, pelna {sum(a[10] for a in a7) / n:.0f} -> wedlug potrzeby {sum(a[11] for a in a7) / n:.0f}", "INFO", None)
+    else:
+        rep.add("NKR-4: Need Measure All", "brak pola f23 w liniach f6 / f7 (log sprzed paczki albo klucz wylaczony)", "INFO", None)
+        # NKR-D4: na sucho z CSV - pasmo 3 tych rodow wedlug ich zlota (R dluznika z budzetu, R bez zoldu z kosztow: 0.47 D stalego + zold w monecie)
+        if csvd:
+            dd = sorted(csvd)[-28:]
+            acc = {"zero": [0.0, 0.0], "debt": [0.0, 0.0]}
+            for d in dd:
+                for r in csvd[d]:
+                    if (r.get("rodzaj") or "") == "najemnik":
+                        continue
+                    unpaid = (r.get("krolestwo") or "") in NKR_UNPAID
+                    debt = (r.get("szczebel") or "").strip() in ("kredyt", "zaleglosc")
+                    if not (unpaid or debt):
+                        continue
+                    full = (_nsk_fv(r, "zwrot_f6_pelny") if (r.get("zwrot_f6_pasmo") or "").strip() == "3" else 0) + (_nsk_fv(r, "renta_f7_pelna") if (r.get("renta_f7_pasmo") or "").strip() == "3" else 0)
+                    if full <= 0:
+                        continue
+                    G, Dl, Rl, ds_ = _nsk_fv(r, "G"), _nsk_fv(r, "D"), _nsk_fv(r, "R"), _nsk_fv(r, "d_staly")
+                    adults = max(1, round((Rl - max(20000, 20 * Dl)) / 5000)) if Rl > 0 else 1
+                    if unpaid:
+                        R = max(20000, 20 * (0.47 * ds_ + _nsk_fv(r, "zold_partii") + _nsk_fv(r, "zold_zalog") + _nsk_fv(r, "zold_karawan"))) + 5000 * adults
+                    else:
+                        R = max(20000, 20 * ds_) + 5000 * adults
+                    f = 1.0 if G <= R else (0.0 if G >= 2 * R else (2 * R - G) / R)
+                    a = acc["zero" if unpaid else "debt"]
+                    a[0] += full; a[1] += full * f
+            n = max(1, len(dd))
+            rep.add(f"NKR-D4: Need Measure All na sucho z CSV (ostatnie {len(dd)} dob; zwrot f6 + renty f7 w pasmie 3; R bez zoldu z kosztow 0.47 x D staly + zold w monecie,"
+                    " dluznik - R z D stalego; dorosli z kolumny R; INFO)",
+                    f"bez zoldu (Straz, Wolni Ludzie) pelne {acc['zero'][0] / n:.0f} -> wedlug potrzeby {acc['zero'][1] / n:.0f} zl/d; dluznicy pelne {acc['debt'][0] / n:.0f} -> {acc['debt'][1] / n:.0f} zl/d",
+                    "INFO - roznica zostaje w skarbcach (f6 w reszcie wplywow dnia, f7 w skarbcu)", None)
+    # ---------------------------------------------------------------- (5) najpierw skarbiec w nadaniu DS i zapas wojny wedlug potrzeby
+    if days23:
+        rbad = [d for d in days23 if f23[d]["resN"] > f23[d]["resF"] or (not f23[d]["wr"] and f23[d]["resN"] != f23[d]["resF"])
+                or any(v[1] > v[2] for v in f23[d]["rows"].values())]
+        rep.add("NKR-5: zapas wojny wedlug potrzeby nie wiekszy niz z pelnego zwrotu (razem i na krolestwo); klucz War Reserve By Need wylaczony - rowne",
+                f"dob {len(days23)}, rozjazdow {len(rbad)}" + (f" (d{rbad[:5]})" if rbad else "") + f"; ostatnia doba: zapas {f23[days23[-1]]['resF']} -> {f23[days23[-1]]['resN']}"
+                f" (krolestw z mniejszym {f23[days23[-1]]['lessk']})", "0", len(rbad) == 0)
+    if sess_tf:
+        bad, why = [], {}
+        for d, x in sess_tf:
+            tf = x["tf"]; e = []
+            mode = tf["mode"]
+            if mode is None:   # dopisek sprzed recenzji (nadwyzka na kwartal bez pozycji tylko z wplywow)
+                if x["brak"] is not None and tf["d2"] is not None and abs((x["brak"] - tf["sur"] / tf["q"]) - tf["d2"]) > 1.01:
+                    e.append("brak po skarbcu = brak - nadwyzka / 91")
+                zok = tf["sur"] >= 1
+            else:
+                zok = tf["sur"] >= 1
+                if x["brak"] is not None and x["inc"] is not None and tf["dpre"] is not None:
+                    if abs(min(x["brak"], tf["pre"] - x["inc"]) - tf["dpre"]) > 2.01:
+                        e.append("brak z wplywow = min(brak, tylko z wplywow - zwykle wplywy)")
+                    if tf["tday"] is not None and abs(max(0, x["brak"] - max(0, tf["dpre"])) - tf["tday"]) > 2.01:
+                        e.append("brak ze skarbca = brak - brak z wplywow")
+                    if tf["tday"] is not None and tf["thr"] is not None and abs(tf["sd"] * tf["tday"] - tf["thr"]) > tf["sd"] + 1:
+                        e.append("prog = Ds Grant Session Days x brak ze skarbca")
+                    if tf["d2"] is not None:
+                        if mode == "do zapasu":
+                            thr = tf["thr"] if tf["thr"] is not None else 0
+                            if abs(tf["sur"] - thr) > tf["sd"] + 1:   # z dala od progu (zaokraglenia w wierszu)
+                                zok = tf["sur"] >= 1 and tf["sur"] >= thr
+                                want = tf["dpre"] if zok else x["brak"]
+                                if abs(want - tf["d2"]) > 2.01:
+                                    e.append("do zapasu: brak po skarbcu = brak z wplywow (nadwyzka >= prog) albo brak")
+                            else:
+                                zok = tf["d2"] == tf["dpre"] and tf["sur"] >= 1
+                        else:
+                            want = max(tf["dpre"], x["brak"] - tf["sur"] / tf["q"])
+                            if abs(want - tf["d2"]) > 2.01:
+                                e.append("na kwartal: brak po skarbcu = max(brak z wplywow, brak - nadwyzka / 91)")
+                if tf["dpre"] is not None and x["brak"] is not None and tf["dpre"] > x["brak"] + 1:
+                    e.append("brak z wplywow > brak (nadanie wieksze niz bez paczki)")
+            if abs(tf["sur"] / tf["q"] - tf["perd"]) > 1.01:
+                e.append("nadwyzka / 91")
+            if x["g1"] == 0 and not tf.get("keep") and not (tf["sur"] >= 1 and (tf["d2"] is None or tf["d2"] <= 0)):
+                e.append("g 0 bez nadwyzki pokrywajacej brak")
+            if tf.get("keep") and not (x["g0"] == 0 and tf["sur"] >= 1 and (x["g1"] == 0 or x["wt"])):
+                e.append("po wczytaniu bez zmian tylko przy g 0 i nadwyzce")
+            if (x["g1"] == 0) != tf["zero"]:
+                e.append("dopisek 'nadanie 0'")
+            if tf["d2"] is not None and tf["d2"] <= 0 and tf["sur"] >= 1 and zok and not x["wt"]:
+                free = x["why"] in NKR_FREE or (x["why"].startswith("nowa wojna") and x["g0"] == 0) or x["g0"] == 0
+                want = 0.0 if free else max(0.0, x["g0"] - 0.5)
+                if abs(x["g1"] - want) > 1e-6:
+                    e.append("g przy pokrytym braku (0 albo krok w dol)")
+            if tf["sur"] < 1 and x["g1"] == 0:
+                e.append("g 0 bez nadwyzki")
+            if e:
+                bad.append((d, x["name"]))
+                for t_ in e:
+                    why[t_] = why.get(t_, 0) + 1
+        z = sum(1 for _d, x in sess_tf if x["g1"] == 0)
+        modes = {}
+        for _d, x in sess_tf:
+            modes[x["tf"]["mode"] or "sprzed recenzji"] = modes.get(x["tf"]["mode"] or "sprzed recenzji", 0) + 1
+        rep.add("NKR-5b: sesja nadania DS - najpierw skarbiec (brak z wplywow = min(brak, tylko z wplywow dnia - zwykle wplywy) zostaje dla nadania; 'do zapasu': brak po skarbcu ="
+                " brak z wplywow przy nadwyzce >= max(1, 14 x brak ze skarbca), inaczej brak; 'na kwartal': max(brak z wplywow, brak - nadwyzka / 91); g = 0 tylko przy nadwyzce"
+                " i braku po skarbcu <= 0 - wtedy swobodna 0, kwartalna krok w dol; War Tax +krok jak dotad)",
+                f"sesji z dopiskiem {len(sess_tf)} ({modes}), z nadaniem 0 {z}, po wczytaniu bez zmian {sum(1 for _d, x in sess_tf if x['tf'].get('keep'))}, rozjazdow {len(bad)}"
+                + (f" ({bad[:3]}; {why})" if bad else ""), "0", len(bad) == 0)
+    if days23:
+        # krol bez nadwyzki nie siedzi przy nadaniu 0 dzieki skarbcowi dluzej niz dobe (sesja 'skarbiec do zapasu'), poza oknem DsGrantSessionDays przed kwartalem
+        stuck = []
+        for i, d in enumerate(days23[:-1]):
+            d2 = days23[i + 1]
+            if d2 != d + 1 or not f23[d2]["tf"]:
+                continue
+            today2 = d2 + 1
+            if 91 - today2 % 91 <= 14:
+                continue
+            for name, v in f23[d]["rows"].items():
+                w = f23[d2]["rows"].get(name)
+                if v[5] and v[4] == 0 and v[3] < 1 and w and w[5] and w[4] == 0 and w[3] < 1:
+                    stuck.append((d2, name))
+        held = sum(1 for d in days23 for v in f23[d]["rows"].values() if v[5])
+        rep.add("NKR-5c: nadanie 0 dzieki skarbcowi tylko przy nadwyzce - krol, ktorego skarbiec spadl do zapasu wojny, dostaje nadanie nastepnej doby (sesja 'skarbiec do zapasu'), poza"
+                " 14 dobami przed kwartalem", f"krolestwo-dob z nadaniem 0 dzieki skarbcowi {held}, bez nadwyzki dwie doby z rzedu {len(stuck)}" + (f" (np. {stuck[:3]})" if stuck else ""),
+                "0", len(stuck) == 0 if held else None)
+        st_ = sum(f23[d]["st"] for d in days23)
+        # NKR-5d (recenzja): krolestwa przy nadaniu 0 dzieki skarbcowi placa raty Banku 186, kontrakty 185 i wezwania 168 w calosci z wplywow dnia (skarbiec ich nie doplaca -
+        # nadanie 0 dopuszczalne tylko, gdy zwykle wplywy je pokrywaja); wiersze "przy nadaniu 0" (stan sprzed sesji doby)
+        prow = [(d, n, v[6]) for d in days23 for n, v in f23[d]["rows"].items() if v[6] is not None and v[6][3]]
+        if prow:
+            shortr = [(d, n, p[2]) for d, n, p in prow if p[2] > 0]
+            due = sum(p[0] for _d, _n, p in prow); paid = sum(p[1] for _d, _n, p in prow)
+            rep.add("NKR-5d: krolestwa przy nadaniu 0 dzieki skarbcowi bez niedoplat pozycji placonych tylko z wplywow dnia (rata Banku 186, kontrakty 185, wezwania 168)",
+                    f"krolestwo-dob {len(prow)}, nalezne {due}, zaplacone {paid}, z niedoplata {len(shortr)} (razem {sum(x[2] for x in shortr)} zl)"
+                    + (f" (np. {shortr[:3]})" if shortr else ""), "0", len(shortr) == 0)
+        else:
+            pre_k = sum(f23[d]["pre"][0] for d in days23 if f23[d]["pre"])
+            rep.add("NKR-5d: krolestwa przy nadaniu 0 dzieki skarbcowi bez niedoplat 186 / 185 / 168", f"krolestwo-dob przy nadaniu 0 z polami {pre_k} (log bez pol recenzji albo bez nadania 0)",
+                    "INFO", None)
+        # NKR-6b (INFO, recenzja): tempo nadwyzki krolestw przy nadaniu 0 dzieki skarbcowi (dwie doby z rzedu) wobec nadwyzka / 91 - DS zaklada kwartal, W5b / W5c wydaja do 1/30
+        drops, plan = [], []
+        for i, d in enumerate(days23[:-1]):
+            d2 = days23[i + 1]
+            if d2 != d + 1:
+                continue
+            for name, v in f23[d]["rows"].items():
+                w = f23[d2]["rows"].get(name)
+                if v[5] and v[4] == 0 and w and w[5] and w[4] == 0 and v[3] >= 1:
+                    drops.append(v[3] - w[3]); plan.append(v[3] / 91.0)
+        if drops:
+            a, b = sum(drops) / len(drops), sum(plan) / len(plan)
+            rep.add("NKR-6b: nadwyzka krolestw przy nadaniu 0 dzieki skarbcowi - spadek na dobe wobec nadwyzka / 91 (INFO; 'na kwartal' zaklada 1/91, W5b / W5c wydaja do 1/30)",
+                    f"krolestwo-dob {len(drops)}: nadwyzka spada srednio {a:.0f} zl/d, nadwyzka / 91 {b:.0f} zl/d ({(a / b) if b > 0 else 0:.2f} x)",
+                    "INFO - przy 'do zapasu' tempo nie jest planem (nadanie wraca, gdy nadwyzka dojdzie do 0)", None)
+    else:
+        st_ = 0
+    # NKR-6 (INFO): co placi lud i skarbce w wojnie - ostatnie 28 dob linii DS
+    dsd = sorted(D["dsw"])[-28:]
+    if dsd:
+        lud = sum(D["dsw"][d] for d in dsd) / len(dsd)
+        skd = sorted(d for d in D["skr"] if d - 1 in dsd or d in dsd)
+        dw = None
+        if len(skd) >= 2:
+            ks = None
+            for d in skd:
+                k_ = {k for k, v in D["skr"][d].items() if v[2]}
+                ks = k_ if ks is None else ks & k_
+            if ks:
+                dw = (sum(D["skr"][skd[-1]][k][0] for k in ks) - sum(D["skr"][skd[0]][k][0] for k in ks)) / max(1, skd[-1] - skd[0])
+        rep.add(f"NKR-6: lud w wojnie (pomoc od sprzedazy + 184 + dziesiata + W4) i skarbce krolestw w wojnie przez cale okno (ostatnie {len(dsd)} dob linii DS; INFO)",
+                f"lud placi {lud:.0f} zl/d" + (f"; skarbce {dw:+.0f} zl/d" if dw is not None else "") + (f"; krolestw z nadaniem 0 dzieki skarbcowi (ostatnia doba f23) {f23[days23[-1]]['zero']}" if days23 else ""),
+                "INFO - test 18.10 przed paczka (d109200-109236): lud ok. 143.6 tys. zl/d, skarbce w wojnie +2.9 tys. zl/d", None)
+    # NKR-D5 szacunek na sucho (zawsze, gdy jest sesja kwartalna z liczbami)
+    t = _nkr_dry_ds(D)
+    if t:
+        rep.add(f"NKR-D5: najpierw skarbiec na sucho - ostatnia sesja kwartalna d{t['day']} ({t['k']} krolestw; zapas wojny wedlug potrzeby z naleznego zwrotu DS; INFO)",
+                f"lud placil {t['paid']:.0f} zl/d -> od tej sesji (krok na kwartal) {t['new1']:.0f} (mniej o {t['paid'] - t['new1']:.0f}; nadanie 0 u {t['k0']}), w celu po 1-4 kwartalach"
+                f" {t['goal']:.0f} (mniej o {t['paid'] - t['goal']:.0f}; nadanie 0 u {t['k0g']}); zapas wojny {t['zf']} -> {t['zn']}, nadwyzka ponad zapas i dlug {t['sur']:.0f}"
+                f" (wystarczy na ok. {t['sur'] / max(1.0, t['paid'] - t['goal']):.0f} dob przy celu) - 'do zapasu' (domyslnie); 'na kwartal' (To Reserve NIE): od sesji {t['new1q']:.0f}"
+                f" (nadanie 0 u {t['k0q']}), w celu {t['goalq']:.0f} (nadanie 0 u {t['k0gq']}); bez pozycji tylko z wplywow dnia (stary log)",
+                "INFO - w logu z paczka sesje juz po regule (porownac z NKR-6)", None)
+    rep.add("NKR-8: ERROR paczki f23 (DsSeason, NeedChestAllOf, ZeroNeedReserve, TreasurySurplusFor, ScPay, ...) 0 i potkniecia linii f23 0",
+            f"bledow {len(D['err'])}, potkniec {st_}" + (f" ({D['err'][0][:120]})" if D["err"] else ""), "0 / 0", len(D["err"]) == 0 and st_ == 0)
     rep.show()
     return 0
 
@@ -49756,6 +50279,8 @@ def main(argv):
         return nsrednim_main(logp, bdp, csvp)   # nsrednim (18.10, paczka f15-skarbiec; recenzja - dawniej "nskarbiec", zajete przez skarbiec kryjowki): skarbiec krolestwa w wojnie doplaca takze srednim rodom - W5c ponad W5, f jak f6/f7 (KingdomTreasury.MidAid.cs)
     if group == "ndoplata" and logp:
         return ndoplata_main(logp, bdp, csvp)   # ndoplata (18.10, paczka f20-d1 - decyzja Jeffa "1.b"): gotowka W5/W5b/M1 wedlug potrzeby rodu - ta sama miara co f6/f7/W5c, reszta w skarbcu (KingdomTreasury.AidNeed.cs)
+    if group == "nkorona" and logp:
+        return nkorona_main(logp, bdp, csvp)   # nkorona (19.10, paczka f23-korona - decyzje Jeffa 3a/4a/8a): W6 x f odbiorcy, dluznicy i Straz wlasnym zlotem w f6/f7, najpierw skarbiec w nadaniu DS, zapas wojny z naleznego zwrotu
     if group == "npozyczka" and logp:
         return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
     if group == "nbandy" and logp:

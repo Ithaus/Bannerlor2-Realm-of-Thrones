@@ -400,6 +400,113 @@ namespace Armoury
             catch (Exception e) { Stumble("NeedChestAnyOf", e); G = 0; R = 0; return false; }
         }
 
+        /// <summary>f23-korona: rodzaj miary NeedChestAllOf - rod bez zoldu (Straz, Wolni Ludzie na pulapie w ludziach) i dluznik 168.</summary>
+        internal const int NkZero = 1, NkDebt = 2;
+
+        /// <summary>
+        /// f23-korona (klucz NeedMeasureAll; decyzja Jeffa 19.10, odpowiedz 4: "Nocna Straz, Wolni Ludzie i dluznicy Banku ... a) mierzyc ich wlasnym zlotem jak wszystkich
+        /// innych") - G i R MIARY POTRZEBY (f6 zwrot, f7 renty - KingdomTreasury.RbnOf) dla rodow, ktore NeedChestOf / PendingNeedChestOf pomija i ktore dotad dostawaly "bez miary"
+        /// (f = 1). Wolajacy pyta tylko po nieudanej zwyklej drodze.
+        ///  - kind NkDebt - dluznik 168 (kredyt Banku, takze KW, zaleglosc, dlug zoldu albo wobec korony): G i R jak NeedChestAnyOf (W5c, f20 - ta sama liczba), rod gracza - R jak
+        ///    PlayerReserve (wzor PlayerCaps, takze w pokoju).
+        ///  - kind NkZero - rod bez zoldu (b.Zero / IsUnpaidClan - Straz, Wolni Ludzie): R z PRAWDZIWYCH KOSZTOW (ZeroNeedReserve), bo zwykle R = War Reserve Days x D zaklada,
+        ///    ze rod w wojnie wydaje caly dochod (pulap zoldu 0.6 D + dwor 0.2 + sprzet 0.17 + budowy 0.1 = ok. 1.07 D), a rod bez zoldu wydaje tylko dwor, sprzet i budowy z D
+        ///    (0.47 D) i monete, ktora naprawde placi (rycerze 179, zalogi, karawany - wczorajszy zold budzetu: WPar + WGar + WCar).
+        ///  - pierwsza doba sesji (Pending, budzet jeszcze nie policzony): ten sam wzor z D z zapisu albo G/60 (jak PendingNeedChestOf); rod bez zoldu - bez monety (budzetu brak).
+        /// false: rod w zajeciu (168 - kiese bierze wierzyciel, jak W5c i f20), kompania najemna, rod bez budzetu (Eligible), 166 wylaczone, rod nie dluznik i nie bez zoldu.
+        /// Sprzezenie D -> R -> f (Need Reserve Uncut): R z D z cieciami f6/f7 dodanymi z powrotem (dluznik - b.RNeed; bez zoldu - D + NeedCutAdd w czesci z D). Tylko odczyt.
+        /// </summary>
+        internal static bool NeedChestAllOf(Clan c, out double G, out double R, out int kind)
+        {
+            G = 0; R = 0; kind = 0;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || c == null || !On || c.IsUnderMercenaryService) return false;
+                if (DebtLadder.On && DebtLadder.IsSeized(c)) return false;
+                bool unpaid = s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c);
+                bool debtor = DebtLadder.On && DebtLadder.IsDebtor(c);
+                if (c == Clan.PlayerClan)
+                {
+                    if (Pending || c.Leader == null || c.Kingdom == null || (!unpaid && !debtor)) return false;
+                    long g = ClanIncomeBook.FamilyGoldOf(c);
+                    if (unpaid) { R = ZeroNeedReserve(c, PlayerD(c, s, g), AdultsOf(c), PlayerCoinWages(c), NeedUncutOn); kind = NkZero; }
+                    else { if (!PlayerReserve(c, out R)) return false; kind = NkDebt; }   // PlayerReserve: wzor PlayerCaps + NeedReserve (jak McDebtMeasure W5c)
+                    G = g;
+                }
+                else
+                {
+                    var b = Of(c);
+                    if (b != null)
+                    {
+                        if (b.Seized) return false;
+                        if (b.Zero) { G = b.G; R = ZeroNeedReserve(c, b.D, b.Adults, b.WPar + b.WGar + b.WCar, NeedUncutOn); kind = NkZero; }
+                        else if (b.Debtor) { G = b.G; R = b.R; if (NeedUncutOn && b.RNeed > R) R = b.RNeed; kind = NkDebt; }   // = NeedChestAnyOf
+                        else return false;
+                    }
+                    else
+                    {
+                        if (!Pending || !Eligible(c) || (!unpaid && !debtor)) return false;
+                        long g = ClanIncomeBook.FamilyGoldOf(c);
+                        double[] sv;
+                        double D = _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0 && sv[0] >= 0 ? sv[0] : Math.Max(0, g / 60.0);
+                        if (unpaid) { R = ZeroNeedReserve(c, D, AdultsOf(c), 0, NeedUncutOn && s.NeedReserveUncutSaved); kind = NkZero; }
+                        else
+                        {
+                            double f, chest;
+                            Ceiling(D, g, AtWar(c), AdultsOf(c), out R, out f, out chest);
+                            if (s.NeedReserveUncutSaved) R = NeedReserve(c, R, D);   // jak PendingNeedChestOf
+                            kind = NkDebt;
+                        }
+                        G = g;
+                    }
+                }
+                return R > 0 && !double.IsNaN(G) && !double.IsInfinity(G) && !double.IsNaN(R) && !double.IsInfinity(R);
+            }
+            catch (Exception e) { Stumble("NeedChestAllOf", e); G = 0; R = 0; kind = 0; return false; }
+        }
+
+        /// <summary>f23-korona: R miary potrzeby rodu bez zoldu - War Reserve Days x PRAWDZIWE koszty dnia (dwor, sprzet i budowy z D udzialami wojny Household Share War +
+        /// Gear Share War + Build Income Share - te same udzialy, ktorymi budzet 166 je liczy - plus zold w monecie, ktory rod naprawde placi), najmniej War Reserve Floor,
+        /// plus War Reserve Per Adult x dorosli (jak Ceiling). addCuts - D z cieciami f6/f7 dodanymi z powrotem (Need Reserve Uncut - jak NeedReserve). Nie rzuca.</summary>
+        private static double ZeroNeedReserve(Clan c, double D, int adults, double coinWages, bool addCuts)
+        {
+            var s = Settings.Current;
+            double d = Math.Max(0, D);
+            try { if (addCuts && c != null) { double add = ClanIncomeBook.NeedCutAdd(c); if (add > 0) d += add; } }
+            catch (Exception e) { Stumble("ZeroNeedReserve", e); }
+            double sh = Math.Max(0f, s.HouseholdShareWar) + Math.Max(0f, s.GearShareWar) + Math.Max(0f, s.BuildIncomeShare);
+            double cost = sh * d + Math.Max(0, coinWages);
+            return Math.Max(Math.Max(0f, s.WarReserveFloor), Math.Max(0f, s.WarReserveDays) * cost) + Math.Max(0f, s.WarReservePerAdult) * Math.Max(1, adults);
+        }
+
+        /// <summary>f23-korona: zold w monecie rodu gracza w chwili pomiaru - druzyny (z rycerzami 179), zalogi twierdz i karawany (ta sama miara co WPar + WGar + WCar rodu AI).</summary>
+        private static double PlayerCoinWages(Clan c)
+        {
+            double w = 0;
+            var wps = c.WarPartyComponents;
+            if (wps != null)
+                for (int i = 0; i < wps.Count; i++)
+                {
+                    var mp = wps[i] != null ? wps[i].MobileParty : null;
+                    if (mp == null || !mp.IsActive || !mp.IsLordParty) continue;
+                    w += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
+                }
+            var fiefs = c.Fiefs;
+            if (fiefs != null)
+                for (int i = 0; i < fiefs.Count; i++)
+                {
+                    var gp = fiefs[i] != null ? fiefs[i].GarrisonParty : null;
+                    if (gp != null && gp.IsActive) w += Math.Max(0, gp.TotalWage);
+                }
+            foreach (var mp in MobileParty.All)
+            {
+                if (mp == null || !mp.IsActive || !mp.IsCaravan || mp.IsMainParty || OwnerOf(mp) != c) continue;
+                w += Math.Max(0, mp.TotalWage);
+            }
+            return w;
+        }
+
         /// <summary>Recenzja calosci 18.10: klucz Need Reserve Uncut i miara potrzeby wlaczona (zwrot albo renty wedlug potrzeby).</summary>
         private static bool NeedUncutOn { get { var s = Settings.Current; return s != null && s.NeedReserveUncut && (s.CrownRefundByNeed || s.CrownRentsByNeed); } }
 

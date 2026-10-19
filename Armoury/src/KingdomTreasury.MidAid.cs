@@ -126,10 +126,16 @@ namespace Armoury
                     try
                     {
                         if (x == null || x.C == null || x.C.Leader == null || !x.C.Leader.IsAlive) continue;
-                        double f, G, R;
-                        int band = NeedOfClan(x.C, out f, out G, out R);              // ta sama miara i pamiec doby co zwrot f6 i renty f7
+                        double f, G, R; int kind;
+                        int band = NeedOfClan(x.C, out f, out G, out R, out kind);    // ta sama miara i pamiec doby co zwrot f6 i renty f7
                         bool debt = false;
-                        if (band == NbNone)
+                        if (band != NbNone && kind == ClanBudget.NkDebt)
+                        {
+                            // f23 (Need Measure All): dluznik zmierzony juz w pamieci doby (te same G i R co McDebtMeasure) - wiersz linii "dluznik" jak dotad
+                            debt = true;
+                            if (band == NbAbove) _mcDebtRich++;
+                        }
+                        else if (band == NbNone)
                         {
                             // recenzja f15: "bez miary" f6/f7 (w W5 - dluznik 168: kredyt Banku, takze KW, zaleglosc) znaczy tam tylko "bez ciecia"; W5c to nowa wyplata -
                             // pasmo i f z G i R miary rodu (budzet 166 z wczoraj bez wykluczenia dluznika) tym samym wzorem; bez G i R - nic

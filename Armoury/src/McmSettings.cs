@@ -4112,6 +4112,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool NeedReserveUncutSaved { get; set; } = true;
 
+        [SettingPropertyBool("Need Measure All", HintText = "with Crown Refund By Need or Crown Rents By Need: the houses that kept their full wage refund and fief rents because the crown had no measure of them are now judged by their own gold like everyone else. A house in debt to the Iron Bank is judged on its gold against its war reserve. The houses of the Night's Watch and the Free Folk, who pay their men no wages, are judged against a reserve of War Reserve Days of what they really spend - their court, arms and building out of their steady income and the few wages they do pay in coin - at least War Reserve Floor, plus War Reserve Per Adult for each grown member. Houses under seizure, hired companies and houses without a budget keep the full share. Your house the same way. Off = houses in debt and the houses of the Watch and the Free Folk keep the full share, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool NeedMeasureAll { get; set; } = true;
+
         [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once", RequireRestart = false)]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownPaysCallToWar { get; set; } = true;
@@ -5644,6 +5648,10 @@ namespace Armoury
         [SettingPropertyGroup("The war tax on the people (stage 5)")]
         public int WarTaxReserveDays { get; set; } = 60;
 
+        [SettingPropertyBool("War Reserve By Need", HintText = "the crown's war reserve is reckoned from the wage refunds it really owes - after the refund by need (Crown Refund By Need) - not from the full refunds it would owe if every house were poor. The crown keeps untouched War Tax Reserve Days of what it actually pays (at least Crown Reserve Gold); everything above is its treasure for war. One reserve for the war tax, the war aid from the treasury, the refunds, the war grant, the treasure taken with a fallen capital and the loans from the towns. Off = the reserve is reckoned from the full refunds, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public bool WarReserveByNeed { get; set; } = true;
+
         [SettingPropertyBool("Castle Lords Even Up", HintText = "while the townsfolk's purse is live, the crown evens up what it costs the lords of castles (the villagers then keep most of their market takings and spend them in the towns): a town's lord shares the town's daily dues half and half with the crown (Town Rent Lord Share With Folk) instead of keeping two thirds, and the crown shares out its rents by fixed fief weights that favour castles - a town 2, a castle 1.5, a village a quarter (Crown Rent Weight Town and Castle With Folk) instead of 3, 1 and a quarter. Never by the size of a garrison. You and the AI alike. Without the townsfolk's purse, or off = Town Rent Lord Share and the Crown Rent Weights, as before", RequireRestart = false)]
         [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
         public bool CastleLordsEvenUp { get; set; } = true;
@@ -5979,6 +5987,10 @@ namespace Armoury
         [SettingPropertyBool("Crown War Aid Cash By Need", HintText = "in war the crown pays the coin of its war aid by need (Crown War Aid By Need - from the people's war aid, from its spare treasure with Crown Surplus Feeds Need Aid and from the rest of its daily income with Need Aid From Rents) by the same measure as the wage refund and the fief rents: a house whose family gold is below its war reserve gets the whole coin, a house holding more than twice its war reserve gets none, and in between the share falls evenly the richer the house is. The room in the wage ceiling stays as before - such a house keeps its companies and pays the rest of their wages from its own gold. What a house does not get stays in the realm's treasury for war - it is never shared out to the other houses nor paid out as rents. A house in debt is judged on its own gold; your house the same way. The shield money and the aid for houses of modest means keep their own rules. Off = every helped house gets the whole coin, as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidCashByNeed { get; set; } = true;
+
+        [SettingPropertyBool("Scutage By Need", HintText = "the shield money the crown passes on to the houses it helps is paid by the same measure as the rest of its war aid: a helped house whose family gold is below its war reserve gets the whole coin, a house holding more than twice its war reserve gets none, and in between the share falls evenly the richer the house is. What a helped house does not get is never collected - it stays with the houses that would have paid the shield money. The room in the wage ceiling stays as before. Needs Scutage and Crown War Aid Cash By Need. Off = every helped house gets the whole shield money coin, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool ScutageByNeed { get; set; } = true;
 
         [SettingPropertyBool("Lord War Levy", HintText = "in war a lord whose own wage ceiling cannot keep his field companies up to Crown War Aid Fill Target of their size, and whom the crown's war aid by need (the people's war aid, the spare treasure and the shield money) did not fully help that day, raises a war levy in his own towns, castles and villages: up to Lord War Levy Rate a day of the coin the townsfolk, castle folk and villagers still hold above their reserve after the crown's war aid and war subsidy. The coin goes to his purse for the wages of the men already in his companies and raises his wage ceiling by as much; for men he has yet to recruit he gets only room in his ceiling, as with the crown's aid. Never more than the house still lacks, never from the reserve, never in peace, and these wages are not repaid by the crown a second time. Each fief pays in loyalty and prosperity in proportion to how hard it is taxed; a town or castle with loyalty under Lord War Levy Min Loyalty, in revolt or under siege pays nothing (nor do its villages), nor does a looted village. Not your house - see Player War Levy. Needs Crown War Aid By Need and the people's purses (Town Folk Live). Off = no war levy, as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -7508,6 +7520,14 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsRefundTreasuryFirst { get; set; } = true;
 
+        [SettingPropertyBool("Ds War Grant Treasury First", HintText = "with Ds Towns: a king with a full treasury first pays for his war from his own treasure. What the treasury holds above its war reserve and above its debts to the Iron Bank and the towns pays the wage refunds and the war aid to the houses before the people are taxed (how it is spent - Ds War Grant Treasury To Reserve); while it does, the war grant may be nothing and the people pay no war aids, war tax on earnings or tenth that quarter (with the War Tax policy one step is still granted). Mercenary contracts, the Iron Bank's instalments, gifts, reparations and the price of allies called to war are paid only from the day's income, so the people still grant what that income lacks for them. A grant changes by at most one step a quarter as before. When such a treasury falls to its war reserve, the realm grants a war grant the next day - unless the quarter day is no more than Ds Grant Session Days away, then on the quarter day. Off = the war grant follows the lack alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsWarGrantTreasuryFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ds War Grant Treasury To Reserve", HintText = "with Ds War Grant Treasury First: the king pays for his war from his treasure for as long as it holds more than his war reserve and his debts, and the people give no war grant until the treasury falls to that reserve. A treasure that would not last Ds Grant Session Days of what the crown lacks counts as already at the reserve. Off = the treasure above the reserve is spread over the quarter, and each quarter the people pay the part of the lack it does not cover", RequireRestart = false)]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsWarGrantTreasuryToReserve { get; set; } = true;
+
         [SettingPropertyBool("Ds Anticipation Loans", HintText = "with Ds Towns: then the burghers of the realm lend the crown against the instalments of the war grant not yet paid (Crown Town Loan Rate Year a year); the loan is repaid first from those instalments, and what is left after the quarter becomes ordinary crown debt to the towns (needs Crown Town Loans)", RequireRestart = false)]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsAnticipationLoans { get; set; } = true;
@@ -9027,6 +9047,7 @@ namespace Armoury
             s.NeedReserveUncut = NeedReserveUncut;
             s.StableDFirstDayFromSave = StableDFirstDayFromSave;
             s.NeedReserveUncutSaved = NeedReserveUncutSaved;
+            s.NeedMeasureAll = NeedMeasureAll;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
             s.CallToWarPaysForWar = CallToWarPaysForWar;
@@ -9410,6 +9431,7 @@ namespace Armoury
             s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;
             s.WarTaxStep = WarTaxStep;
             s.WarTaxReserveDays = WarTaxReserveDays;
+            s.WarReserveByNeed = WarReserveByNeed;
             s.CastleLordsEvenUp = CastleLordsEvenUp;
             s.TownRentLordShareWithFolk = TownRentLordShareWithFolk;
             s.CrownRentWeightTownWithFolk = CrownRentWeightTownWithFolk;
@@ -9494,6 +9516,7 @@ namespace Armoury
             s.CrownSurplusAidDays = CrownSurplusAidDays;
             s.CrownWarAidMiddle = CrownWarAidMiddle;
             s.CrownWarAidCashByNeed = CrownWarAidCashByNeed;
+            s.ScutageByNeed = ScutageByNeed;
             s.LordWarLevy = LordWarLevy;
             s.PlayerWarLevy = PlayerWarLevy;
             s.LordWarLevyRate = LordWarLevyRate;
@@ -9876,6 +9899,8 @@ namespace Armoury
             s.DsGrantRentsKeep = DsGrantRentsKeep;
             s.DsGrantSessionDays = DsGrantSessionDays;
             s.DsRefundTreasuryFirst = DsRefundTreasuryFirst;
+            s.DsWarGrantTreasuryFirst = DsWarGrantTreasuryFirst;
+            s.DsWarGrantTreasuryToReserve = DsWarGrantTreasuryToReserve;
             s.DsAnticipationLoans = DsAnticipationLoans;
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;

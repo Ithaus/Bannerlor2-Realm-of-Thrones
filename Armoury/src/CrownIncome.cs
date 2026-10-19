@@ -64,6 +64,9 @@ namespace Armoury
             public long DsMov;            // DS F3 (M9): dziesiata od ruchomosci od wczorajszego zamkniecia korony (kiesy ludu i kasy -> skarbiec) - w Own
             public long DsTreas, DsAnt;   // DS F3 (K5): brak zwrotu zoldu pokryty ze skarbca ponad zapas wojny (poza wplywami dnia) i zaliczka mieszczan pod nadanie (L1)
             public long Windfall;         // ds-akumulator (CrownWindfallToReserve): czesc "inne" ponad 3 x mediana 28 dob krolestwa - do zapasu (Stock, 1/450), nie wplyw dnia
+            // f23-korona (recenzja): NALEZNE tej doby z pozycji placonych TYLKO z wplywow dnia (skarbiec ich nie doplaca) - kontrakty 185, rata Banku 186, czesc dnia wezwan 168
+            // (zaplacone: Contract, LoanOut, CallToWar). Tylko liczniki: prog nadania 0 w DsSeason (najpierw skarbiec) i linia "Korona: najpierw skarbiec (f23)"
+            public long ContractDue, LoanDue, CallToWarDue;
             public bool Snap;
         }
 

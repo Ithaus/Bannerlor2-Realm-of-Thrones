@@ -255,6 +255,7 @@ namespace Armoury
                             if (a.NoWar >= NoWarEndDays && beh != null) Release(beh, calling, called, against, a, false);
                             continue;   // dzis bez raty - zloto zostaje w skarbcu wzywajacego (zwrot, W5, renty tej doby)
                         }
+                        kd.CallToWarDue += due;   // f23-korona (recenzja): czesc dnia nalezna (doba wojny wezwanego) - tylko licznik (prog nadania 0 w DsSeason, linia f23)
                         long avail = CrownIncome.LeftFor(calling);
                         // M2b (CallToWarAfterOwnWages): najpierw wlasni zolnierze - rezerwa = wczorajszy zwrot nalezny + wszystko, czego W5 wczoraj potrzebowalo z wplywow
                         // dnia (recenzja: garnek daniny + niepokryta potrzeba przed M1; garnek siedzi w tej samej reszcie wplywow - rata przed nim go zjadala)
