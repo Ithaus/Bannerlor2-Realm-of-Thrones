@@ -3268,3 +3268,12 @@ sojusze Dragonstone+Riverlands i Straz+Skagos zerwane, 0 ERROR. Do sprawdzenia w
 - 19.10: Jeff: "masa zolnierzy biega z arakhami - bron khalow, a nie Westeros" -> trop: GearFit.CultureOk przepuszcza przez Kin (pary krewne na poziomie KULTURY, 95 par) cala kulture khuzait dla wojsk Westeros; arakh (culture khuzait, merchandise, w XML ROT tylko u wedrowcow) idzie do wojsk przez Dozbrajanie/DTE. W TOKU f29-arakh (galaz od noc-ks4 b48678ec).
 - 19.10 ok. 20:00 UTC: f29-arakh gotowe (b7fd1925; zamyka droge przez pary krewne; decyzje Jeffa w CHANGELOG f29), scalone noc-ks4 855a9b61 (Armoury 6d0fd3e4). Test fin101 (5 dob + bitwa) w toku -> WGRANIE 88. Jeff: towarzysze maja kupowac sprzet za wlasne zloto (nowe zadanie). PRZEKAZANIE: docs/PRZEKAZANIE-2026-10-19.md. Limit tygodniowy 98%.
 - 19.10 ok. 13:00 PDT: WGRANIE 88 - noc-ks4 855a9b61 (+CHANGELOG), Armoury 6d0fd3e4 w grze (md5 OK); kopie *.bak-2026-10-19-wgranie88-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie88-przed; zapisy Jeffa D:/Backup-Bannerlord/zapisy-jeffa/2026-10-19-po-sesji-87. Test 5 dob + bitwa (Armoury-2026-10-19_12-51-48.log) 0 ERROR. Dalej: docs/PRZEKAZANIE-2026-10-19.md.
+
+### 94. NOC 19/20.10 - LISTA JEFFA + ZAWIESZENIE 16:09 - START TUTAJ
+W grze bez zmian: WGRANIE 88 (Armoury 6d0fd3e4). Jeff gral 14:41-16:09 (Ironman zapis 15:48:20, kopia D:/Backup-Bannerlord/zawieszenie-2026-10-19-1609/zapis, md5 662b1ff8).
+- 16:09:23 PDT gra zamarzla (proces zyl, watek glowny Suspended). Stosy z symbolami MS: deadlock GC - zob. docs/PLAN-NOC-2026-10-20.md (zawieszenie); proces zamkniety 16:27.
+  Dowody i narzedzie (ClrMD) w D:/Backup-Bannerlord/zawieszenie-2026-10-19-1609/ (stosy-2-sym.txt, skan.txt: 16104 metod z detourem, 142 z kodem < 5 B).
+- Jeff (doslownie): "Zaplanuj prace nocna popraw tez rzeczy ktore miales dokonczyc i rano chce miewc juz finalna rozgrywke, masz zgode na wszytko byle to skonczyc."
+  Plan: docs/PLAN-NOC-2026-10-20.md (12 galezi w-toku/n20-* od 934cc039). TEST fin102 (WGRANIE 88, 160 dob x8, ks-auto.flag) w toku od 16:45 - NAKUM-7/NKA-1 porownanie.
+  Limit: drugie konto, tydzien 0%, 5 h 1% (16:40).
+
