@@ -3232,3 +3232,8 @@ Pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw 
   baza x czesc produkcji wsi; 3c aksamit -> ZC1-4 w miastach z tkalnia i okolicy; 4b skarbiec placi tez stale rachunki 186/185/168 w sesji DS (nowy klucz) -> paczka f25-korona;
   5C bramka krainy KS: strata = min(spadek, wzor gry - racje KS), nowy klucz - PO RESECIE LIMITU; 6 War Reserve By Need tak (bez zmian); 7 Ds War Grant Treasury To Reserve tak (bez zmian).
   Limit tygodniowy 92% (reset 23.10 ok. 20:00 PDT) - teraz tylko f25 (4b + checker 2a/3c), test x20, WGRANIE 86.
+- 19.10 ok. 14:00 UTC: Jeff (verbatim): "1a i5c tez rob" -> W TOKU rownolegle (galezie od 6d577536, worktree scratchpad zb\<nazwa>, lancuch repo):
+  w-toku/f25-korona (4b, klucz nowy), w-toku/f25-sprawdz (2a/3c checker nzc1), w-toku/f26-wolni (1a: Plan KS krok 8 - wiecej pieniedzy wsi = mniej jedzenia; harness
+  MoneyDebug na okregach Wolnych Ludzi, alfa fin95 vs fin97; nowy klucz), w-toku/f26-bramka (5C: StartCalibration.Arm.LandGateDaily - strata KS doby = min(spadek, wzor gry -
+  racje KS) z _gHarv; nowy klucz). PRZEKAZANIE gdyby limit sie skonczyl: kazda galaz -> recenzja -> scalic do noc-ks4 (6d577536; McmSettings przez gen_mcm) -> test
+  bieg-bitwa.ps1 -Days 160 -Speed 20 (+ ks-auto.flag) i -Days 5 -Battles 1 -> WGRANIE 86 (wgraj-v5.ps1, gra zamknieta). -Speed nigdy 16 (Better Time Ctrl+Spacja).
