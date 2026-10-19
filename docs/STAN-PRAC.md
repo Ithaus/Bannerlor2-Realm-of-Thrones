@@ -3197,3 +3197,8 @@ RAPORT DLA JEFFA: docs/RAPORT-NOC-2026-10-19.md (decyzje 1-8 do podjecia).
 - 19.10: f23 GOTOWE (wf_647385ce-342): f23-korona ba5546e5 (ScutageByNeed, NeedMeasureAll - Straz/Wolni Ludzie/dluznicy mierzeni G/R, WarReserveByNeed, DsWarGrantTreasuryFirst -
   szacunek: lud placi 143.6k -> 47.8k/d w celu, skarbce w wojnie -67..-93k/d; HoldTf w zapisie; kontrakty/wezwania/raty Banku nie traca wplywow), f23-spichlerze 954ab7fe (GranarySpoilage
   6%/rok, cap 2 lata bez zmian; BookHoldingsFreeOwnPrisoners). Scalone: noc-ks4 **f8faeade** (2005 ustawien, build rc 0). TEST fin97 160 dob w toku (ks-auto.flag usuwany po biegu).
+- 19.10: TEST fin97 (f8faeade; Armoury-2026-10-19_02-02-06.log + CSV na D:; wyniki scratchpad fin97/*.txt): kod 0, ERROR 0, zapisy nietkniete. nkasy 1 -> 0 (NKA-1), nsrednim 1 -> 0;
+  nkorona/nspichlerze/nbank/njedz/ndoplata nowe grupy - NIE drobne: NAKUM-18 P +24k/d (skutek 8a: lud placi mniej podatku wojennego - P ma ujscia, wedlug zasady Jeffa nie blad),
+  NKS-30b Wolni Ludzie jedzenie 0.68 (prog 0.70; mozliwe psucie spichlerzy), NZR-5 1 wiersz zaokraglenia (1173 vs 1175), NDP-3 drobny rozjazd, NKR-5d niedoplaty pozycji z wplywow dnia przy
+  nadaniu 0: 73 krolestwo-doby / 28.5k zl w 160 dobach, ZC1-4/16b (aksamit/jedwab - zmienne). Kontrola wczesna KS D+7 "PRZERWAC" jak w fin93/fin95 (stara diagnoza, plik armoury-ks-przerwij.flag
+  usuniety). -> test 5 dob + bitwa, WGRANIE 84; drobne NIE do paczki pozniej.
