@@ -3177,3 +3177,15 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   schowanych nie da sie udowodnic); w scenie mediana ~1.6k (kamera z10) - 4k (z110) decali zamiast 73.5k; klucze MapSideRoadsChunks, MapSideRoadsChunkRadiusCap (min ~140). WAZNE: fin95 szedl
   z Better Time aktywnym (autotest bierze liste modow z LauncherData) - nasz mnoznik wylaczony, czas x4 zamiast x8 -> 58.6 min to glownie predkosc czasu, nie decale. Scalone: noc-ks4
   **d14efe4d** (1997 ustawien). Bieg zdjec drog fin96 w toku, potem 5 dob + bitwa -> WGRANIE 83.
+
+### 89. WGRANIE 83 (18.10 ok. 19:25 PDT) - NOC 18/19.10 - START TUTAJ
+W grze: `w-toku/noc-wgranie-83` = noc-ks4 **d14efe4d** | Armoury **ea276fdb**, CrashScribe **b88901d9** (razem - BookHoldings -> PovertyPeace.ShiftHistory), RealisticCaptivity **293ba089**,
+GrandTourney **f181fc51** (McmSettings RequireRestart=false), CrashScribe/ModuleData/CrashScribe.settings.xml afb44559 (4 nowe klucze). Kopie *.bak-2026-10-18-wgranie83-przed +
+D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie83-przed; zapisy Jeffa D:/Backup-Bannerlord/zapisy-jeffa/2026-10-18-po-sesji-81b.
+= 82 + f18-mcm + scalenie7 (f19-e1..e4 audyt, f19-kanon-a sojusze/Tyrellowie/bieda, f19-kanon-b przywrocenie wlosci, f19-drogi kazda wioska) + scalenie8 (f20-d1..d4 decyzje Jeffa)
++ f21-zaloga + plik autotestu wlosci + f22-drogi-perf (komorki).
+TESTY: fin95 160 dob (b7b93a35) 0 ERROR, nakum 0 NIE, nowe grupy 0 NIE, sojusze Dragonstone+Riverlands i Straz+Skagos zerwane; test przywrocenia (armoury-wlosci-test.flag) - Cape Wrath i
+Fellwood do Stannisa z zaloga 200, 0 ERROR; bieg zdjec drog f19 w trybie komorek (Armoury-2026-10-18_19-04-50.log): 18/18 zdjec, klatki z drogami sr. 8.5-10.6 ms (p95 10-30) zamiast 21.4/60,
+w scenie 452-1946 decali; 5 dob + bitwa (fin96 = d14efe4d): kod 0, ERROR 0, bitwa WYGRANA.
+NIESPRAWDZONE W GRZE: sciezka KL w przywroceniu (Polnoc pod Harrenhal, zaloga Polnocy z KL, zwrot 1.125 mln) - SPRAWDZIC W PIERWSZYM LOGU JEFFA ("Wlosci z kronik").
+RAPORT DLA JEFFA: docs/RAPORT-NOC-2026-10-19.md (decyzje 1-8 do podjecia).
