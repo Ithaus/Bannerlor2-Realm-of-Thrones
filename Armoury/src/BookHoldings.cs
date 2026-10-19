@@ -48,7 +48,8 @@ namespace Armoury
     ///      ze zbrojowni zalogi (GarrisonArmory.KitsWithMen - ta sama regula co nowa druzyna z zalogi) ida z ludzmi. Gracz i jego partie nigdy nie sa odbiorca.
     ///      Stary pan z krolestwa docelowego (inny rod tego samego krolestwa; po recenzji) - zaloga zostaje z osada i nie ma korekty fabuly (e): to wlasni ludzie nowego pana.
     ///      Zwykli jency w lochu - zostaja przy osadzie (jency osady; ChangeOwnerOfSettlementAction ich nie rusza), linia podaje ich liczbe; bohaterow strony nowego
-    ///      pana wypuszcza sama gra (PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged). Uwolnienie zwyklych "swoich" do zalogi - decyzja Jeffa (CHANGELOG).
+    ///      pana wypuszcza sama gra (PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged). Uwolnienie zwyklych "swoich" do zalogi - decyzja Jeffa 19.10 "7. a"
+    ///      (f23-spichlerze, klucz BookHoldingsFreeOwnPrisoners) - punkt (g0) nizej.
     ///  (d) ChangeOwnerOfSettlementAction.ApplyByDefault(glowa rodu docelowego, osada) - NIE BySiege (niszczy zaloge, kary relacji i wplywu, ekspansjonizm Diplomacy,
     ///      nasze L5b-1 / KingdomBalance / WarLedger / Rumours / SmallGold / CitySack), NIE ByGift / ByBarter (BKTitleBehavior przenosi wtedy tytuly). Default: bez
     ///      glosowania o lenno (openToClaim false), decyzje o tej osadzie gra usuwa sama, kolejka budow czyszczona, zarzadca zdjety. King's Landing tylko jako
@@ -64,6 +65,17 @@ namespace Armoury
     ///      Polnocy do skarbca krolestwa nowego pana; zdjete = dopisane (kontrola w linii); migawka korony 165 przesunieta u obu stron (CrownIncome.ShiftSnapshot - jak
     ///      L5b-1: to nie "wplyw dnia" ani "ujemny wplyw"), po recenzji tak samo historia skarbca miary biedy E1 w CrashScribe (PovertyPeace.ShiftHistory - inaczej
     ///      Polnoc przez 7 dob w falszywej biedzie). Raz na zapis (stan w zapisie).
+    ///  (g0) f23-spichlerze (decyzja Jeffa 19.10 "7. a": jency z Korony od razu wracaja do zalogi miasta; klucz BookHoldingsFreeOwnPrisoners, domyslnie TAK): zaraz po
+    ///      zmianie pana, dla kazdej twierdzy, ktora zmienila pana w tej probie (osada i blizniak ROT; kazdy wiersz tabeli), PRZED obsada (g) - zwykli jency z lochu osady
+    ///      (Settlement.Party.PrisonRoster; takze loch partii zalogi, gdyby gra cos w nim trzymala), ktorzy sa zolnierzami krolestwa nowego pana, do zalogi. "Zolnierz
+    ///      krolestwa" = kultura oddzialu jest kultura krolestwa, rodu nowego pana albo jednego z rodow krolestwa (bez najemnikow i wyeliminowanych) - z tych drzew
+    ///      oddzialow lordowie krolestwa werbuja; nigdy bandyci (kultura IsBandit), wighty (Inni) ani bohaterowie (tych wypuszcza gra). Reszta zostaje w lochu.
+    ///      Cale stosy (ranni z nimi), TroopRoster.AddToCounts loch -> zaloga; ksiega ludzi: Take z lochu i Give do zalogi z ta sama przyczyna FLooted ("odbici jency" -
+    ///      ta sama droga, ktora gra uwalnia jencow zwyciezcy przy zdobyciu twierdzy). Bez sprzetu (zabrany przy pojmaniu) - zbrojownia zalogi dokupi braki jak
+    ///      kazdemu nowemu. Ponad limit zalogi gry - nadmiar odejdzie przepelnieniem W4c do domu (linia mowi ile). Linia: wypuszczeni, zaloga przed -> po, loch przed ->
+    ///      po, kto zostal (obcy, bandyci, Inni), kontrola zdjete z lochu - dodane do zalogi = 0. Klucz NIE - jak dotad (zwykli zostaja w lochu).
+    ///      Po recenzji: twierdza, ktorej stary pan juz byl w krolestwie nowego pana (inny rod; migawka przed zmiana, ten sam test co zaloga) - loch bez zmian:
+    ///      to jency wzieci przez krolestwo nowego pana (wrogowie, takze tej samej kultury), odcinek "stary pan z krolestwa nowego pana - loch bez zmian".
     ///  (g) zaloga nowego pana - zadnych ludzi z niczego. f21-zaloga (klucz BookHoldingsGarrison, domyslnie TAK; decyzja Jeffa po recenzji calosci: obsadzic pusta
     ///      zaloge ludzmi krolestwa nowego pana): zaraz po zmianie pana, dla kazdej twierdzy, ktora zmienila pana w tej probie (osada i blizniak ROT), szeregowi
     ///      z partii lordow - najpierw rodu nowego pana, potem pozostalych rodow jego krolestwa, kazda grupa od najblizszej bramy - do zalogi az do celu: miasto 400,
@@ -137,6 +149,7 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.BookHoldingsRestore; } }
         private static bool GarrisonOn { get { var s = Settings.Current; return s != null && s.BookHoldingsGarrison; } }
+        private static bool FreeOn { get { var s = Settings.Current; return s != null && s.BookHoldingsFreeOwnPrisoners; } }
 
         internal static void Reset()
         {
@@ -207,7 +220,7 @@ namespace Armoury
                           : _state == "done" ? "zrobione (dzien " + _doneDay + ": " + ResText() + ", zwrot skarbca " + (_refund.Length > 0 ? _refund : "-") + ")"
                           : "czeka (zapis sprzed paczki) - ruszy w pierwszej godzinie na mapie" + (_res.Count > 0 ? "; juz rozstrzygniete: " + ResText() : "");
                 Log.Info(Prefix + "start sesji | klucz Book Holdings Restore " + (On ? "TAK" : "NIE") + ", Book Holdings Garrison (f21-zaloga) " + (GarrisonOn ? "TAK" : "NIE")
-                         + " | stan zapisu: " + st + ".");
+                         + ", Book Holdings Free Own Prisoners (f23) " + (FreeOn ? "TAK" : "NIE") + " | stan zapisu: " + st + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -458,6 +471,10 @@ namespace Armoury
             }
 
             // --- od tej chwili zmiana ---
+            // f23-spichlerze (recenzja): twierdze, ktorych stary pan juz jest w krolestwie nowego pana (inny rod) - migawka PRZED zmiana, ten sam test co zaloga wyzej;
+            // ich loch to jency wzieci przez krolestwo nowego pana (wlasnych zolnierzy zwyciezcy gra uwalnia przy zdobyciu), wiec (g0) ich nie rusza
+            var sameRealm = new HashSet<Settlement>();
+            foreach (var s in sites) if (s.MapFaction == newF) sameRealm.Add(s);
             var sb = new StringBuilder(1500);
             sb.Append(Prefix).Append("dzien ").Append(day).Append(" | ").Append(Nm(st)).Append(" (").Append(st.StringId).Append(')');
             foreach (var s in sites)
@@ -507,7 +524,8 @@ namespace Armoury
                 catch (Exception e) { Stumble("Prison(" + row.Id + ")", e); }
                 sb.Append(" | loch ").Append(Nm(s)).Append(": zwykli ").Append(reg).Append(", bohaterowie ").Append(her);
             }
-            sb.Append(" (zwykli zostaja przy osadzie; bohaterow strony nowego pana wypuszcza gra)");
+            sb.Append(FreeOn ? " (zwykli zolnierze krolestwa nowego pana - do zalogi zaraz po zmianie pana (f23), reszta zostaje przy osadzie; bohaterow strony nowego pana wypuszcza gra)"
+                             : " (zwykli zostaja przy osadzie; bohaterow strony nowego pana wypuszcza gra)");
 
             // roszczenia Strategic Campaign AI krolestw starych panow - migawka przed zmiana
             var sca = ScaClaims();
@@ -544,6 +562,23 @@ namespace Armoury
                 if (twinOk) _batchDone.Add(twin.StringId);
             }
             for (int i = 0; i < scaK.Count; i++) ScaRestore(sca, scaK[i], scaHad[i], scaPrev[i], sb);
+
+            // (g0) f23-spichlerze: zwykli jency - zolnierze krolestwa nowego pana - z lochu do zalogi; tylko twierdze, ktore zmienily pana w tej probie (ten sam warunek co
+            // obsada (g) - nieudana zmiana czeka na ponowna probe), PRZED obsada: cel obsady liczy sie od zalogi z uwolnionymi (mniej ludzi od dawcow). Kazda twierdza we wlasnym try
+            if (FreeOn)
+                foreach (var s in sites)
+                {
+                    bool changed = s == st ? stOk : twinOk;
+                    if (!changed || s.MapFaction != newF || s.OwnerClan == null) continue;
+                    if (sameRealm.Contains(s))
+                    {
+                        // f23-spichlerze (recenzja): loch juz byl lochem krolestwa nowego pana - jency to wrogowie tego krolestwa (tez tej samej kultury), zostaja
+                        sb.Append(" | jency do zalogi ").Append(Nm(s)).Append(": stary pan z krolestwa nowego pana - loch bez zmian (jency wzieci przez krolestwo nowego pana)");
+                        continue;
+                    }
+                    try { sb.Append(" | ").Append(FreeOwnPrisoners(s, row.Id)); }
+                    catch (Exception e) { Stumble("Free(" + s.StringId + ")", e); sb.Append(" | jency do zalogi ").Append(Nm(s)).Append(": BLAD (log wyzej)"); }
+                }
 
             // (g) f21-zaloga: obsada zalogi nowego pana ludzmi jego krolestwa - tylko twierdze, ktore zmienily pana w tej probie (stOk / twinOk);
             // zmiana, ktora nie weszla, czeka na ponowna probe (wtedy obsada razem z nia). Kazda twierdza we wlasnym try - potkniecie nie zatrzymuje reszty wiersza.
@@ -1008,6 +1043,131 @@ namespace Armoury
             catch (Exception e) { Stumble("Fill.Kits(" + rowId + ")", e); }
             return total;
         }
+
+        // ------------------------------------------------------------ (g0) f23-spichlerze: jency - zolnierze krolestwa nowego pana - z lochu do zalogi
+        /// <summary>Kultury krolestwa nowego pana: kultura krolestwa, rodu nowego pana i kazdego rodu krolestwa (bez wyeliminowanych i najemnikow) - drzewa oddzialow,
+        /// z ktorych lordowie krolestwa werbuja. Bez kultur bandytow (IsBandit).</summary>
+        private static List<CultureObject> RealmCultures(Clan owner)
+        {
+            var res = new List<CultureObject>(6);
+            Action<CultureObject> add = c => { if (c != null && !c.IsBandit && !res.Contains(c)) res.Add(c); };
+            add(owner.Culture);
+            var k = owner.Kingdom;
+            if (k != null)
+            {
+                add(k.Culture);
+                foreach (var c in k.Clans)
+                    if (c != null && !c.IsEliminated && !c.IsUnderMercenaryService) add(c.Culture);
+            }
+            return res;
+        }
+
+        private static string CultureId(CultureObject c) { try { return c != null ? c.StringId : "-"; } catch { return "?"; } }
+
+        private static int Regulars(TroopRoster r)
+        {
+            if (r == null) return 0;
+            int n = 0;
+            for (int i = 0; i < r.Count; i++) { var c = r.GetCharacterAtIndex(i); if (c != null && !c.IsHero) n += r.GetElementNumber(i); }
+            return n;
+        }
+
+        /// <summary>Twierdza `s` (pan juz zmieniony): zwykli jency, ktorzy sa zolnierzami krolestwa nowego pana (kultura z RealmCultures; bez bandytow, wightow
+        /// i bohaterow), z lochu osady (i lochu partii zalogi) do zalogi - cale stosy z rannymi, ksiega ludzi FLooted (Take z lochu, Give do zalogi). Reszta zostaje.
+        /// Zwraca opis do linii (kontrola: zdjete z lochu - dodane do zalogi = 0).</summary>
+        private static string FreeOwnPrisoners(Settlement s, string rowId)
+        {
+            var owner = s.OwnerClan;
+            var town = s.Town;
+            var cult = RealmCultures(owner);
+            var sb = new StringBuilder(500);
+            sb.Append("jency do zalogi ").Append(Nm(s)).Append(" (f23, kultury krolestwa nowego pana: ");
+            for (int i = 0; i < cult.Count; i++) sb.Append(i > 0 ? ", " : "").Append(CultureId(cult[i]));
+            sb.Append(cult.Count == 0 ? "brak" : "").Append("): ");
+
+            // rostery: loch osady (tam gra trzyma jencow osady) i loch partii zalogi, gdyby cos w nim bylo
+            var rosters = new List<TroopRoster>(2);
+            if (s.Party != null && s.Party.PrisonRoster != null) rosters.Add(s.Party.PrisonRoster);
+            var g = town.GarrisonParty;
+            if (g != null && g.PrisonRoster != null && !rosters.Contains(g.PrisonRoster)) rosters.Add(g.PrisonRoster);
+
+            // plan - nic jeszcze nie rusza
+            var plan = new List<KeyValuePair<TroopRoster, TroopRosterElement>>();
+            int own = 0, ownW = 0, foreign = 0, bandits = 0, wights = 0, reg0 = 0;
+            foreach (var pr in rosters)
+            {
+                reg0 += Regulars(pr);
+                for (int i = 0; i < pr.Count; i++)
+                {
+                    var el = pr.GetElementCopyAtIndex(i);
+                    var c = el.Character;
+                    if (c == null || c.IsHero || el.Number <= 0) continue;
+                    if (Undead.Character(c)) { wights += el.Number; continue; }
+                    var cc = c.Culture;
+                    if (cc == null || cc.IsBandit) { bandits += el.Number; continue; }
+                    if (!cult.Contains(cc)) { foreign += el.Number; continue; }
+                    plan.Add(new KeyValuePair<TroopRoster, TroopRosterElement>(pr, el));
+                    own += el.Number; ownW += Math.Max(0, Math.Min(el.WoundedNumber, el.Number));
+                }
+            }
+            string stay = "obcy " + foreign + ", bandyci " + bandits + ", Inni " + wights;
+            if (own <= 0)
+            {
+                sb.Append("brak zolnierzy krolestwa nowego pana w lochu (zwykli ").Append(reg0).Append(" zostaja: ").Append(stay).Append(')');
+                return sb.ToString();
+            }
+            if (g == null)
+            {
+                // zaloga bez partii (po ApplyByDefault zawsze jest - zabezpieczenie, ta sama droga co FillGarrison)
+                s.AddGarrisonParty();
+                g = town.GarrisonParty;
+                if (g != null) sb.Append("partia zalogi utworzona (AddGarrisonParty); ");
+            }
+            if (g == null || g.MemberRoster == null || g.Party == null)
+            {
+                sb.Append("brak partii zalogi - ").Append(own).Append(" zolnierzy krolestwa zostaje w lochu (zwykli ").Append(reg0).Append(", poza nimi ").Append(stay).Append(')');
+                return sb.ToString();
+            }
+
+            int g0 = Men(g);
+            var movedBy = new Dictionary<TroopRoster, int>();
+            var types = new Dictionary<CharacterObject, int>();
+            int moved = 0, movedW = 0;
+            foreach (var kv in plan)
+            {
+                var pr = kv.Key; var el = kv.Value; var c = el.Character;
+                int n = el.Number, w = Math.Max(0, Math.Min(el.WoundedNumber, el.Number));
+                pr.AddToCounts(c, -n, false, -w);
+                g.MemberRoster.AddToCounts(c, n, false, w);
+                int v; movedBy.TryGetValue(pr, out v); movedBy[pr] = v + n;
+                types.TryGetValue(c, out v); types[c] = v + n;
+                moved += n; movedW += w;
+            }
+            // ksiega ludzi: udzialy pochodzenia z lochu do zalogi (te same ludzie; przyczyna "odbici jency" - wejscie i wyjscie tej samej przenosiny)
+            foreach (var kv in movedBy)
+            {
+                try { PeopleBook.Give(g.MemberRoster, PeopleBook.Take(kv.Key, kv.Value, PeopleBook.FLooted), PeopleBook.FLooted); }
+                catch (Exception e) { Stumble("Free.PeopleBook(" + rowId + ")", e); }
+            }
+            int g1 = Men(g), reg1 = 0;
+            foreach (var pr in rosters) reg1 += Regulars(pr);
+            int outD = reg0 - reg1, inD = g1 - g0;
+
+            var tl = new List<KeyValuePair<CharacterObject, int>>(types);
+            tl.Sort((a, b) => b.Value.CompareTo(a.Value));
+            var tp = new List<string>();
+            for (int i = 0; i < tl.Count && i < 6; i++) tp.Add(Nm(tl[i].Key) + " " + tl[i].Value);
+            if (tl.Count > 6) tp.Add("i " + (tl.Count - 6) + " innych typow");
+            sb.Append("wypuszczeni do zalogi ").Append(moved).Append(" (ranni ").Append(movedW).Append(") [").Append(string.Join(", ", tp.ToArray())).Append(']')
+              .Append(", zaloga ").Append(g0).Append(" -> ").Append(g1).Append(", loch zwykli ").Append(reg0).Append(" -> ").Append(reg1).Append(" (zostaja: ").Append(stay).Append(')')
+              .Append("; kontrola jencow do zalogi: zdjete z lochu ").Append(outD).Append(" - dodane do zalogi ").Append(inD).Append(" = ").Append(outD - inD)
+              .Append(", bez sprzetu (zabrany przy pojmaniu - zbrojownia zalogi dokupi braki)");
+            int lim = g.Party.PartySizeLimit, all = g.MemberRoster.TotalManCount;
+            if (all > lim) sb.Append(", ponad limit zalogi gry ").Append(lim).Append(" o ").Append(all - lim).Append(" (przepelnienie W4c odesle nadmiar do domu)");
+            return sb.ToString();
+        }
+
+        private static string Nm(CharacterObject c) { try { return c != null && c.Name != null ? c.Name.ToString() : "-"; } catch { return "?"; } }
 
         // ------------------------------------------------------------ (e) korekta fabuly: partie starego krolestwa przy osadzie
         private static bool LandParty(MobileParty mp) { return mp != null && mp.IsActive && !mp.IsMainParty && !mp.IsDisbanding; }

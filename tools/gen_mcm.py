@@ -106,6 +106,7 @@ RANGES = {
     'FamineThresholdPercent': (0, 90, "0"),
     'FamineDeathMaxPercent': (0, 100, "0"),
     'FamineBarnYears': (0.05, 8.0, "0.00"),
+    'GranarySpoilagePercentPerYear': (0.0, 30.0, "0.0"),     # f23-spichlerze: lekkie psucie zapasu spichlerza (domyslnie 6%/rok)
     'FamineYieldPerPerson': (0.5, 3.0, "0.00"),
     'FamineRefugeRadius': (0.0, 1000.0, "0"),
     # E4/7 (164b-1): wolne rece - udzialy przycinane w kodzie do 0..1, elastycznosc 0..2 (FreeHands.Update)

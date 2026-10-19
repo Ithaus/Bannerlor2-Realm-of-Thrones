@@ -3160,6 +3160,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool FamineSharedVillageRefugees { get; set; } = true;
 
+        [SettingPropertyBool("Granary Spoilage", HintText = "the grain stored in the countryside granaries slowly spoils (damp, mould, weevils, rats): each day a small share of what lies in a granary is lost, Granary Spoilage Percent Per Year in a year, so a granary no longer keeps its food untouched for ever. In an ordinary year the harvest surplus still fills it up to Famine Barn Years; in winter, after raids or in a siege it empties a little faster than its people eat. Works only with Famine Enabled; off = stored grain never spoils (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool GranarySpoilage { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Granary Spoilage Percent Per Year", 0.00f, 30.00f, "0.0", HintText = "with Granary Spoilage: the share of the stored grain lost in a year, in percent (6 = a well-kept village or manor granary; traditional farm stores lose about 5-10% of their grain a year), counted day by day over the game's year", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GranarySpoilagePercentPerYear { get; set; } = 6f;
+
         [SettingPropertyBool("Raid Refugees Intake Meter", HintText = "raid refugees move into a town no faster than Raid Refugees Town Intake a day, counting everyone who comes that day: the people of new villages, the rest of a village that came only in part, and the people newly driven from a village whose refugees already live there. A village whose people do not all fit comes in part and the rest wait in their own land (eating from its granaries) and follow on the next days, the longest waiting first; the first village that comes to a town in a day is taken in whole only when it is no larger than Raid Refugees Intake First Mult times the daily intake. Those waiting go home first when their land is quiet again, and a siege of the town keeps in its walls only those already inside. A town too small to take in even one person a day is passed over and the village goes to the next town within reach. Off = the first village of a day always comes in whole and newly driven people join their kin in the town at once (as before); those still waiting when it is switched off (or when a save is loaded with it off) are not let in all at once - they keep coming in at Raid Refugees Town Intake a day, without the first-village exception, and only then the old rule applies", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool RaidRefugeesIntakeMeter { get; set; } = true;
@@ -8020,6 +8028,10 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsGarrison { get; set; } = true;
 
+        [SettingPropertyBool("Book Holdings Free Own Prisoners", HintText = "with Book Holdings Restore: right after each returned keep changes hands, the common prisoners in its dungeon who are soldiers of the new lord's realm (troops of the culture of the realm or of one of its houses, never bandits) are set free and join its garrison - the same men, none made or lost; every other prisoner stays in the dungeon (lords of the new lord's side are freed by the game itself). The freed men come without their arms, which their captors took; the garrison buys what is missing as for any new man. Only on the one-time restore - a save already restored is not touched; off = all common prisoners stay in the dungeon as before", RequireRestart = false)]
+        [SettingPropertyGroup("Book holdings (night 18.10)")]
+        public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8809,6 +8821,8 @@ namespace Armoury
             s.RaidRefugeesMessageMin = RaidRefugeesMessageMin;
             s.RaidRefugeesTownIntake = RaidRefugeesTownIntake;
             s.FamineSharedVillageRefugees = FamineSharedVillageRefugees;
+            s.GranarySpoilage = GranarySpoilage;
+            s.GranarySpoilagePercentPerYear = GranarySpoilagePercentPerYear;
             s.RaidRefugeesIntakeMeter = RaidRefugeesIntakeMeter;
             s.RaidRefugeesIntakeFirstMult = RaidRefugeesIntakeFirstMult;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
@@ -10024,6 +10038,7 @@ namespace Armoury
             s.BanditCostLog = BanditCostLog;
             s.BookHoldingsRestore = BookHoldingsRestore;
             s.BookHoldingsGarrison = BookHoldingsGarrison;
+            s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
         }
 
         internal static void Apply()
