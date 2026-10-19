@@ -58,6 +58,8 @@ namespace Armoury
         // poprawki po recenzji (noc 15/16.10): drugie przejscie podlogi (bron obcej kultury) osobnym kluczem - to zasada Jeffa (16.09: obca bron zdejmowana),
         // nie decyzja techniczna; bez niego czlowiek bez innej broni moze dostac z polki te sama bron zza morza, ktora RealmWard chwile wczesniej zdjal
         internal static bool FloorForeignOn { get { var s = Settings.Current; return s != null && s.GearFitFloorForeign; } }
+        // f29-arakh (Jeff 19.10): krewna para dopuszcza tylko sztuki, ktore wzorce kultury zolnierza naprawde nosza (off = cala kultura przedmiotu, jak dotad)
+        internal static bool KinItemOn { get { var s = Settings.Current; return s != null && s.GearFitKinItemLevel; } }
 
         internal const int WhySkill = 1, WhySaddle = 2, WhyCulture = 3;
         internal const int KinMinSlots = 3;
@@ -65,8 +67,15 @@ namespace Armoury
         internal const int PathAi = 0, PathPlayer = 1, PathGarrison = 2;
 
         private static readonly object _lock = new object();
-        // kultura wojska -> kultury przedmiotow z DRUGIEJ strony morza, ktore ROT sam daje tej kulturze (krewne); null - jeszcze nie zbudowane
-        private static Dictionary<string, HashSet<string>> _kin;
+        // pary krewne i (f29-arakh) spis sztuk w JEDNEJ niezmiennej migawce: jeden zapis w BuildKin, jeden odczyt w KinOk - watek DTE (DoAssignAsync)
+        // nie zlapie par z jednej budowy, a sztuk z innej (poprawka z przegladu f29); null - jeszcze nie zbudowane
+        private sealed class KinSnap
+        {
+            internal readonly Dictionary<string, HashSet<string>> Pairs;     // kultura wojska -> kultury przedmiotow z DRUGIEJ strony morza, ktore ROT sam daje tej kulturze
+            internal readonly Dictionary<string, HashSet<ItemObject>> Items; // f29-arakh: kultura wojska -> sztuki z DRUGIEJ strony morza z jej zywych wzorcow (te same sloty)
+            internal KinSnap(Dictionary<string, HashSet<string>> pairs, Dictionary<string, HashSet<ItemObject>> items) { Pairs = pairs; Items = items; }
+        }
+        private static volatile KinSnap _kin;
         private static readonly List<KeyValuePair<string, int>> _kinTop = new List<KeyValuePair<string, int>>();
         private static readonly Dictionary<CharacterObject, HashSet<ItemObject>> _tpl = new Dictionary<CharacterObject, HashSet<ItemObject>>();
         private static bool _census;
@@ -188,7 +197,7 @@ namespace Armoury
                 string tc = troop.Culture != null ? troop.Culture.StringId : null;
                 if (string.IsNullOrEmpty(ic) || string.IsNullOrEmpty(tc) || ic == "neutral_culture" || ic == tc) return true;
                 if (IsEssos(ic) == IsEssos(tc)) return true;   // w obrebie jednej strony morza domy dziela sie lupem (Jeff 16.09)
-                if (CultureOn && Kin(tc, ic)) return true;
+                if (CultureOn && KinOk(tc, ic, it)) return true;   // f29-arakh: przy GearFitKinItemLevel - sztuka po sztuce (wylaczony = sama para, jak dotad)
                 return TemplateHas(troop, it);
             }
             catch (Exception e) { Stumble("CultureOk", e); return true; }
@@ -288,7 +297,22 @@ namespace Armoury
             var k = _kin;
             if (k == null) return true;   // przed startem gry (wzorce jeszcze bez praw CrashScribe) - bez odrzucen za kulture
             HashSet<string> s;
-            return k.TryGetValue(tc, out s) && s.Contains(ic);
+            return k.Pairs.TryGetValue(tc, out s) && s.Contains(ic);
+        }
+
+        /// <summary>f29-arakh (Jeff 19.10, arakh u Dornijczykow): para krewna (tc, ic), a przy GearFitKinItemLevel dodatkowo TA sztuka we wzorcach kultury tc
+        /// (sloty jak pary krewne). Pary i sztuki z jednej migawki (jeden odczyt _kin). Przed zbudowaniem - true, jak Kin (bez odrzucen przed startem gry).
+        /// Klucz wylaczony = dokladnie Kin(tc, ic).</summary>
+        private static bool KinOk(string tc, string ic, ItemObject it)
+        {
+            EnsureKin();
+            var k = _kin;
+            if (k == null) return true;
+            HashSet<string> s;
+            if (!k.Pairs.TryGetValue(tc, out s) || !s.Contains(ic)) return false;
+            if (!KinItemOn) return true;
+            HashSet<ItemObject> hs;
+            return k.Items.TryGetValue(tc, out hs) && hs.Contains(it);
         }
 
         private static void EnsureKin()
@@ -309,6 +333,7 @@ namespace Armoury
         {
             var n = new Dictionary<string, Dictionary<string, int>>();
             var tot = new Dictionary<string, int>();
+            var kinItems = new Dictionary<string, HashSet<ItemObject>>();   // f29-arakh
             try
             {
                 foreach (var c in MBObjectManager.Instance.GetObjectTypeList<CharacterObject>())
@@ -328,6 +353,11 @@ namespace Armoury
                             if (string.IsNullOrEmpty(ic) || ic == "neutral_culture" || ic == tc) continue;
                             Dictionary<string, int> d; if (!n.TryGetValue(tc, out d)) n[tc] = d = new Dictionary<string, int>();
                             int v; d.TryGetValue(ic, out v); d[ic] = v + 1;
+                            if (IsEssos(ic) != IsEssos(tc))
+                            {
+                                HashSet<ItemObject> hs; if (!kinItems.TryGetValue(tc, out hs)) kinItems[tc] = hs = new HashSet<ItemObject>();
+                                hs.Add(it);
+                            }
                         }
                     }
                 }
@@ -348,7 +378,7 @@ namespace Armoury
                 }
             }
             _kinTop.Sort((a, b) => b.Value.CompareTo(a.Value));
-            _kin = kin;
+            _kin = new KinSnap(kin, kinItems);   // jeden zapis - pary i spis sztuk razem
         }
 
         // ------------------------------------------------------------ liczniki z innych plikow
@@ -797,6 +827,7 @@ namespace Armoury
                     }
             }
             catch (Exception e) { Stumble("Census(gracz)", e); }
+            string kinItem = KinItemCensus();
             var ex = new List<string>();
             int pairs = 0;
             lock (_lock)
@@ -811,7 +842,47 @@ namespace Armoury
                      + " | wzorce wojsk po prawach CS: jednostek " + units + ", slotow " + slots + ", ponad umiejetnosc " + over + " (ma byc 0), dopuszczone tylko wyjatkiem wlasnego wzorca "
                      + ownOnly + " | kultury krewne (przez Waskie Morze, prog " + KinMinSlots + " sloty i " + (int)(KinMinShare * 100f) + "%): " + pairs + " par"
                      + (ex.Count > 0 ? ", np. " + string.Join(", ", ex.ToArray()) : "")
+                     + " | " + kinItem
                      + " | druzyna gracza: ludzi " + men + ", sztuk zbrojowni " + pcs + ", nieuzywalnych dla kogokolwiek " + unusable + "; potkniecia " + _stumAll + ".");
+        }
+
+        /// <summary>f29-arakh: ile dopuszczen (kultura wojska x sztuka zza morza) daja pary krewne calej kultury przedmiotu, a ile sztuka po sztuce
+        /// (GearFitKinItemLevel), i u ilu kultur arakh przechodzi przez pare krewna - przed i po. Raz na sesje (Census, po BuildKin).</summary>
+        private static string KinItemCensus()
+        {
+            int pairAll = 0, itemAll = 0, arB = 0, arA = 0;
+            var arWho = new List<string>();
+            try
+            {
+                var snap = _kin;   // jedna migawka - pary i sztuki z tej samej budowy
+                var k = snap != null ? snap.Pairs : null; var ki = snap != null ? snap.Items : null;
+                if (k == null || ki == null) return "krewne sztuka po sztuce (Gear Fit Kin Item Level " + Yes(KinItemOn) + "): pary jeszcze nie zbudowane";
+                ItemObject arakh = null;
+                try { arakh = MBObjectManager.Instance.GetObject<ItemObject>("arakh"); } catch { }
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || it.Culture == null) continue;
+                    var t = it.ItemType;
+                    if (t == ItemObject.ItemTypeEnum.Horse || t == ItemObject.ItemTypeEnum.HorseHarness || t == ItemObject.ItemTypeEnum.Banner) continue;
+                    string ic = it.Culture.StringId;
+                    if (string.IsNullOrEmpty(ic) || ic == "neutral_culture") continue;
+                    foreach (var kv in k)
+                    {
+                        if (!kv.Value.Contains(ic)) continue;
+                        pairAll++;
+                        HashSet<ItemObject> hs;
+                        bool has = ki.TryGetValue(kv.Key, out hs) && hs.Contains(it);
+                        if (has) itemAll++;
+                        if (it == arakh) { arB++; if (has) arA++; arWho.Add(kv.Key); }
+                    }
+                }
+                arWho.Sort(StringComparer.Ordinal);
+            }
+            catch (Exception e) { Stumble("KinItemCensus", e); }
+            return "krewne sztuka po sztuce (Gear Fit Kin Item Level " + Yes(KinItemOn) + "): dopuszczen kultura x sztuka przez pare krewna " + pairAll
+                   + ", z tego noszonych przez wzorce tej kultury " + itemAll + " (przy kluczu tak odpada " + (pairAll - itemAll) + ")"
+                   + "; arakh przez pare krewna: kultur " + arB + (arWho.Count > 0 ? " [" + string.Join(", ", arWho.ToArray()) + "]" : "")
+                   + " -> " + (KinItemOn ? arA : arB) + " (ma byc 0 przy kluczu tak)";
         }
 
         private static void Flush()

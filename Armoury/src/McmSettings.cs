@@ -5288,6 +5288,10 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitCulture { get; set; } = true;
 
+        [SettingPropertyBool("Gear Fit Kin Item Level", HintText = "with Gear Fit Culture: a piece from across the Narrow Sea fits a soldier's people only if their own troops wear that very piece in Realm of Thrones - Dornish troops who wear Dothraki boots and javelins no longer take every Dothraki item, the arakh above all, which stays a khalasar's weapon (off = as before: one shared style opens all items of that foreign people)", RequireRestart = false)]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitKinItemLevel { get; set; } = true;
+
         [SettingPropertyBool("Gear Fit Weapon Floor", HintText = "in battle no soldier fights bare-handed while his party's stores hold a weapon he can use: a man left without any weapon after the skill and culture checks takes the best melee weapon he can wield from the stores, of his people's kind first (from across the sea only with Gear Fit Floor Foreign) - nothing from thin air (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitWeaponFloor { get; set; } = true;
@@ -9377,6 +9381,7 @@ namespace Armoury
             s.ArmsCoverageLog = ArmsCoverageLog;
             s.GearFitKits = GearFitKits;
             s.GearFitCulture = GearFitCulture;
+            s.GearFitKinItemLevel = GearFitKinItemLevel;
             s.GearFitWeaponFloor = GearFitWeaponFloor;
             s.GearFitFloorForeign = GearFitFloorForeign;
             s.GearFitFloorOverSkill = GearFitFloorOverSkill;
