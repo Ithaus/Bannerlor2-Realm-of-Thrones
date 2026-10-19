@@ -1649,7 +1649,9 @@ Uzycie (Python 3, tylko odczyt):
                     Straz / Wolni Ludzie (bez najemnikow) i dluznicy (kredyt, zaleglosc) z pelnym zwrotem albo renta > 0 - pasmo 0..2, mnoznik = clamp((2R - G) / R), NKR-4c ten
                     sam mnoznik i R w f6 i f7 (jedna pamiec doby), NKR-4d/4e srednie (INFO), NKR-D4 (log bez pola) na sucho z CSV (R bez zoldu z kosztow 0.47 x D staly + zold
                     w monecie; INFO); DS: NKR-5 zapas wojny wedlug potrzeby <= z pelnego (klucz wylaczony - rowny), NKR-5b sesje nadania (recenzja: brak z wplywow =
-                    min(brak, tylko z wplywow dnia - zwykle wplywy), brak ze skarbca = max(0, brak - max(0, brak z wplywow)); "do zapasu" (Ds War Grant Treasury To Reserve):
+                    min(brak, tylko z wplywow dnia - zwykle wplywy), brak ze skarbca = max(0, brak - max(0, brak z wplywow)); f25-korona - klucz Ds War Grant Treasury
+                    Covers Dues: tylko z wplywow dnia = dary i reparacje, 186/185/168 w braku ze skarbca - dopisek "(f25: 186/185/168 ze skarbca Y)" tylko przy kluczu
+                    czynnym w linii doby i w trybie "do zapasu"; "do zapasu" (Ds War Grant Treasury To Reserve):
                     brak po skarbcu = brak z wplywow przy nadwyzce >= max(1, 14 x brak ze skarbca), inaczej brak; "na kwartal": max(brak z wplywow, brak - nadwyzka / 91);
                     g = 0 tylko przy nadwyzce i braku po skarbcu <= 0; wtedy swobodna - 0, kwartalna - krok w dol; War Tax +krok), NKR-5c krol bez nadwyzki nie siedzi
                     przy nadaniu 0 dzieki skarbcowi (sesja "skarbiec do zapasu" nastepnej doby; poza 14 dobami przed kwartalem), NKR-5d krolestwa przy nadaniu 0 dzieki skarbcowi
@@ -47615,7 +47617,10 @@ NKR_RX_SESS = re.compile(r"^(.*?) (przelaczenie|kwartal|po rampie|pokoj \d+ dob|
                          r"(?:, potrzeba (-?\d+), zwykle wplywy (-?\d+), brak (-?\d+), plon nadania przy g=1 (-?\d+))?")
 NKR_RX_TF = re.compile(r", najpierw skarbiec \(f23\): nadwyzka (-?\d+) ponad zapas wojny (-?\d+) i dlugi / (\d+) = (-?\d+) zl/d, brak po skarbcu (-?\d+|-)( -> nadanie 0)?")   # sprzed recenzji
 # recenzja f23: tryb (do zapasu / na kwartal), pozycje tylko z wplywow dnia, brak z wplywow, brak ze skarbca, prog Ds Grant Session Days
+# f25-korona (klucz Ds War Grant Treasury Covers Dues): po "tylko z wplywow dnia X" dopisek "(f25: 186/185/168 ze skarbca Y)" (X - tylko dary i reparacje; grupa 7) albo
+# "(f25: skarbiec ponizej progu P - jak f23)" (skarbiec nie starczy na 14 dob calego braku - regula f23, X jak dotad; grupa 8); log bez dopisku: None
 NKR_RX_TF2 = re.compile(r", najpierw skarbiec \(f23, (do zapasu|na kwartal)\): nadwyzka (-?\d+) ponad zapas wojny (-?\d+) i dlugi / (\d+) = (-?\d+) zl/d, tylko z wplywow dnia (-?\d+)"
+                        r"(?: \(f25: (?:186/185/168 ze skarbca (-?\d+)|skarbiec ponizej progu (-?\d+) - jak f23)\))?"
                         r" \(brak z wplywow (-?\d+|-)\), brak ze skarbca (-?\d+|-) zl/d \(prog (\d+) dob (-?\d+|-)\), brak po skarbcu (-?\d+|-)( \(po wczytaniu dob pomiaru \d+ < \d+ - bez zmian\))?"
                         r"( -> nadanie 0)?")
 NKR_RX_W6SEG = re.compile(r"\| wedlug potrzeby odbiorcy \(f23, Scutage By Need tak[^)]*\): uprawnienie odbiorcow (\d+) = wyplacone (\d+) \+ niepobrane \(zostalo u platnikow\) (-?\d+)")
@@ -47654,7 +47659,8 @@ def _nkr_scan(logp):
                 g = mm.groups()
                 r = {"tf": g[1] == "tak", "wr": g[2] == "tak", "k": int(g[3]), "resN": int(g[4]), "resF": int(g[5]), "less": int(g[6]), "lessk": int(g[7]),
                      "wark": int(g[8]), "wal": int(g[9]), "sur": int(g[10]), "surk": int(g[11]), "zero": int(g[13]), "st": int(st_.group(1)), "rows": {},
-                     "tores": None if "(To Reserve " not in s else ("(To Reserve tak" in s), "pre": None, "f24": None}
+                     "tores": None if "(To Reserve " not in s else ("(To Reserve tak" in s), "pre": None, "f24": None,
+                     "f25": "; f25 Covers Dues tak" in s}   # f25-korona: klucz Ds War Grant Treasury Covers Dues czynny (log sprzed paczki - False)
                 mp = NKR_RX_F23PRE.search(s)
                 if mp:
                     r["pre"] = tuple(int(x) for x in mp.groups())   # krolestw, nalezne, zaplacone, niedoplata, krolestw z niedoplata
@@ -47693,8 +47699,10 @@ def _nkr_scan(logp):
                     nn = lambda v: None if v == "-" else int(v)
                     if tf2:
                         tfd = {"mode": tf2.group(1), "sur": int(tf2.group(2)), "res": int(tf2.group(3)), "q": int(tf2.group(4)), "perd": int(tf2.group(5)), "pre": int(tf2.group(6)),
-                               "dpre": nn(tf2.group(7)), "tday": nn(tf2.group(8)), "sd": int(tf2.group(9)), "thr": nn(tf2.group(10)), "d2": nn(tf2.group(11)),
-                               "keep": bool(tf2.group(12)), "zero": bool(tf2.group(13))}
+                               "f25": None if tf2.group(7) is None else int(tf2.group(7)),   # f25: 186/185/168 ze skarbca (pre = wtedy dary i reparacje)
+                               "f25low": None if tf2.group(8) is None else int(tf2.group(8)),   # f25: prog, ktorego skarbiec nie osiagnal (regula f23)
+                               "dpre": nn(tf2.group(9)), "tday": nn(tf2.group(10)), "sd": int(tf2.group(11)), "thr": nn(tf2.group(12)), "d2": nn(tf2.group(13)),
+                               "keep": bool(tf2.group(14)), "zero": bool(tf2.group(15))}
                     elif tf:
                         tfd = {"mode": None, "sur": int(tf.group(1)), "res": int(tf.group(2)), "q": int(tf.group(3)), "perd": int(tf.group(4)),
                                "d2": nn(tf.group(5)), "zero": bool(tf.group(6)), "keep": False}
@@ -48001,6 +48009,25 @@ def nkorona_main(logp, bdp=None, csvp=None):
                                 e.append("na kwartal: brak po skarbcu = max(brak z wplywow, brak - nadwyzka / 91)")
                 if tf["dpre"] is not None and x["brak"] is not None and tf["dpre"] > x["brak"] + 1:
                     e.append("brak z wplywow > brak (nadanie wieksze niz bez paczki)")
+                if tf.get("f25") is not None or tf.get("f25low") is not None:
+                    # f25-korona (Covers Dues): tylko 'do zapasu'; klucz czynny w linii f23 tej doby (sesja przed linia); "ze skarbca": pozycje nieujemne i skarbiec na >= 14 dob
+                    # calego braku (prog z wiersza; zaokraglenia - tolerancja sd + 1); "ponizej progu": nadwyzka < prog f25 i prog f25 >= prog f23 (brak f25 >= brak f23)
+                    if mode != "do zapasu":
+                        e.append("f25 poza trybem do zapasu")
+                    if d in f23 and not f23[d].get("f25"):
+                        e.append("f25 w sesji bez klucza w linii doby")
+                    if tf.get("f25") is not None:
+                        if tf["pre"] < 0 or tf["f25"] < -1:
+                            e.append("f25 pozycje ujemne")
+                        if tf["thr"] is not None and not (tf["sur"] >= 1 and tf["sur"] >= tf["thr"] - tf["sd"] - 1):
+                            e.append("f25 ze skarbca bez nadwyzki na 14 dob calego braku")
+                    else:
+                        if not (tf["sur"] < 1 or tf["sur"] < tf["f25low"] + tf["sd"] + 1):
+                            e.append("f25 ponizej progu przy nadwyzce nad progiem")
+                        if tf["thr"] is not None and tf["f25low"] < tf["thr"] - tf["sd"] - 1:
+                            e.append("f25 prog mniejszy niz prog f23")
+                elif mode == "do zapasu" and d in f23 and f23[d].get("f25") and tf["dpre"] is not None:
+                    e.append("klucz f25 czynny, a sesja bez dopisku f25")
             if abs(tf["sur"] / tf["q"] - tf["perd"]) > 1.01:
                 e.append("nadwyzka / 91")
             if x["g1"] == 0 and not tf.get("keep") and not (tf["sur"] >= 1 and (tf["d2"] is None or tf["d2"] <= 0)):
@@ -48024,10 +48051,14 @@ def nkorona_main(logp, bdp=None, csvp=None):
         modes = {}
         for _d, x in sess_tf:
             modes[x["tf"]["mode"] or "sprzed recenzji"] = modes.get(x["tf"]["mode"] or "sprzed recenzji", 0) + 1
-        rep.add("NKR-5b: sesja nadania DS - najpierw skarbiec (brak z wplywow = min(brak, tylko z wplywow dnia - zwykle wplywy) zostaje dla nadania; 'do zapasu': brak po skarbcu ="
+        f25s = [x for _d, x in sess_tf if x["tf"].get("f25") is not None]
+        rep.add("NKR-5b: sesja nadania DS - najpierw skarbiec (brak z wplywow = min(brak, tylko z wplywow dnia - zwykle wplywy) zostaje dla nadania; f25 Covers Dues: tylko z wplywow"
+                " = dary i reparacje, 186/185/168 w braku ze skarbca; 'do zapasu': brak po skarbcu ="
                 " brak z wplywow przy nadwyzce >= max(1, 14 x brak ze skarbca), inaczej brak; 'na kwartal': max(brak z wplywow, brak - nadwyzka / 91); g = 0 tylko przy nadwyzce"
                 " i braku po skarbcu <= 0 - wtedy swobodna 0, kwartalna krok w dol; War Tax +krok jak dotad)",
-                f"sesji z dopiskiem {len(sess_tf)} ({modes}), z nadaniem 0 {z}, po wczytaniu bez zmian {sum(1 for _d, x in sess_tf if x['tf'].get('keep'))}, rozjazdow {len(bad)}"
+                f"sesji z dopiskiem {len(sess_tf)} ({modes}), z nadaniem 0 {z}, po wczytaniu bez zmian {sum(1 for _d, x in sess_tf if x['tf'].get('keep'))}"
+                f", z dopiskiem f25 ze skarbca {len(f25s)} (z nadaniem 0 {sum(1 for x in f25s if x['g1'] == 0)}), f25 ponizej progu (regula f23)"
+                f" {sum(1 for _d, x in sess_tf if x['tf'].get('f25low') is not None)}, rozjazdow {len(bad)}"
                 + (f" ({bad[:3]}; {why})" if bad else ""), "0", len(bad) == 0)
     if days23:
         # krol bez nadwyzki nie siedzi przy nadaniu 0 dzieki skarbcowi dluzej niz dobe (sesja 'skarbiec do zapasu'), poza oknem DsGrantSessionDays przed kwartalem
@@ -48060,7 +48091,8 @@ def nkorona_main(logp, bdp=None, csvp=None):
             due = sum(p[0] for _d, _n, p in prow); paid = sum(p[1] for _d, _n, p in prow); trp = sum(p[4] for _d, _n, p in prow)
             n24 = sum(1 for d in days23 if on24(d))
             rep.add("NKR-5d: krolestwa przy nadaniu 0 dzieki skarbcowi bez niedoplat rat Banku 186, kontraktow 185 i wezwan 168 (f24 - Ds War Grant Treasury Pays Dues: brak wplywow"
-                    " dnia placi skarbiec ponad zapas wojny; niedoplata tylko, gdy nadwyzka nie starczyla)",
+                    " dnia placi skarbiec ponad zapas wojny; niedoplata tylko, gdy nadwyzka nie starczyla; f25 Covers Dues - takze krolestwa, ktorym zwykle wplywy tych pozycji nie"
+                    " pokrywaja)",
                     f"krolestwo-dob {len(prow)} (dob z kluczem f24 {n24}), nalezne {due}, zaplacone {paid} (w tym ze skarbca {trp}), z niedoplata {len(shortr)}"
                     f" (razem {sum(x[2] for x in shortr)} zl)" + (f" (np. {shortr[:3]})" if shortr else "")
                     + f"; niedoplata przy wyczerpanej nadwyzce {len(dryr)} (razem {sum(x[2] for x in dryr)} zl - INFO)", "0", len(shortr) == 0)

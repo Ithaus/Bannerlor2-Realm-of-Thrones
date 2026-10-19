@@ -40,6 +40,11 @@ namespace Armoury
     ///    zmienia nadania, dopoki nie ma MinDays dob pomiaru. Brak pokrywaja istniejace drogi skarbca: K5 (zwrot), W5b/W5c (doplata W5), 1/450 zapasu. Zapas wojny (luka w
     ///    potrzebie i nadwyzka) - jedna liczba KingdomTreasury.WarReserveFor (z kluczem War Reserve By Need - z naleznego zwrotu po f6). Linia doby "Korona: najpierw skarbiec
     ///    (f23): dzien N" i dopisek sesji "najpierw skarbiec (f23, ...): ...". Klucz wylaczony - sesja co do znaku jak dotad.
+    ///  - f25-korona (klucz DsWarGrantTreasuryCoversDues, odpowiedz Jeffa 4b; czynny z First, To Reserve i Pays Dues): raty Banku 186, kontrakty 185 i wezwania 168 (z rezerwa
+    ///    M2b) nie zostaja dla nadania - "brak z wplywow" liczy tylko dary 182 i raty reparacji (pierscien RPreK), reszta braku idzie do braku ze skarbca (prog DsGrantSessionDays
+    ///    jak To Reserve); braki dnia 186/185/168 przy nadaniu 0 placi TreasuryForDues (f24). Skarbiec, ktory nie starczy na DsGrantSessionDays calego braku - regula f23
+    ///    (nadanie nigdy wieksze niz bez klucza). Dopisek sesji "tylko z wplywow dnia X (f25: 186/185/168 ze skarbca Y)" albo "(f25: skarbiec ponizej progu P - jak f23)",
+    ///    linia doby "(To Reserve tak ...; f25 Covers Dues tak ...)". Klucz wylaczony - sesja i linie co do znaku jak w WGRANIU 85.
     /// Linie: "Daniny korony (DS): dzien N" (co dobe, krolestwa) i "Korona: nadanie wojenne (DS): dzien N" (w dobie sesji). Zapis w arm_daniny_miasta (DsTowns.Export):
     /// g~krolestwo~g~numer~doba~pokoj~wojna~zwykle renty~suma~n[~najpierw skarbiec 0/1 - f23] i v~osada~klasa~krolestwo~reszta~rata~numer. Brak = zera.
     /// </summary>
@@ -66,6 +71,8 @@ namespace Armoury
             public bool HoldTf;
             // f23-korona (recenzja): pozycje placone TYLKO z wplywow dnia (nalezne raty 186, dary, reparacje, kontrakty 185, wezwania 168 [+ rezerwa M2b]) - pierscien probek
             public readonly double[] RPre = new double[Ring];
+            // f25-korona (klucz DsWarGrantTreasuryCoversDues): z tych pozycji tylko dary 182 i raty reparacji (bez 186, 185, 168 i rezerwy M2b - te niesie skarbiec) - pierscien probek
+            public readonly double[] RPreK = new double[Ring];
         }
         private sealed class Mov { public string K; public double Left, Per, Cur; public int Serial; }   // Cur - wymiar biezacej sesji nadania (limit L1, recenzja 17.10)
 
@@ -93,6 +100,8 @@ namespace Armoury
         private static bool TreasuryFirstOn(Settings s) { return s != null && s.DsWarGrantTreasuryFirst; }
         /// <summary>f23-korona (recenzja): klucz Ds War Grant Treasury To Reserve - skarbiec placi wojne do zapasu (TAK) albo nadwyzka rozlozona na kwartal (NIE).</summary>
         private static bool ToReserveOn(Settings s) { return s != null && s.DsWarGrantTreasuryToReserve; }
+        /// <summary>f25-korona: klucz Ds War Grant Treasury Covers Dues - czynny tylko z First, To Reserve i Pays Dues (bez Pays Dues nadanie 0 zostawiloby braki dnia niezaplacone).</summary>
+        internal static bool CoversDuesOn(Settings s) { return s != null && s.DsWarGrantTreasuryCoversDues && ToReserveOn(s) && PaysDuesOn(s); }
 
         private static Kingdom KOf(Settlement st)
         {
@@ -438,6 +447,7 @@ namespace Armoury
             double inc = farmT + farmC + cust + vav + d.Release;   // fin75: bez 'inne' (osobno w ROth, mediana w sesji)
             int h = g.H;
             g.ROth[h] = oth;
+            g.RPreK[h] = d.GiftOut + d.RepOut;   // f25-korona: dary i reparacje - placone tylko z wplywow dnia takze przy kluczu Covers Dues
             g.RNeed[h] = need; g.RInc[h] = inc; g.RPre[h] = pre; g.RS[h] = g.DSales; g.RE[h] = g.DEarn; g.RM[h] = g.DMov; g.RV[h] = g.DVil; g.RRent[h] = d.Rent; g.RW[h] = war;
             g.H = (g.H + 1) % Ring; if (g.F < Ring) g.F++;
         }
@@ -451,7 +461,11 @@ namespace Armoury
             // To Reserve) albo rozlozona na kwartal; pozycje placone tylko z wplywow dnia zostaja dla nadania (recenzja); nadanie 0 w wojnie - tylko krol z nadwyzka
             // (bez klucza w wojnie najmniej krok, jak dotad)
             bool tf = war && TreasuryFirstOn(s), toRes = tf && ToReserveOn(s), keepHold = false;
-            double sur = 0, def2 = double.NaN, pre = 0, dPre = double.NaN, tday = double.NaN; long res = -1;
+            // f25-korona (klucz Covers Dues, odpowiedz Jeffa 4b): raty Banku 186, kontrakty 185 i wezwania 168 (z rezerwa M2b) tez ze skarbca - dla nadania zostaja dary i reparacje
+            bool cov = toRes && CoversDuesOn(s);
+            // covUsed - skarbiec niesie tez 186/185/168 (starczy na sd dob calego braku); covLow - prog f25, gdy nie starczy (wtedy regula f23 - nadanie nigdy wieksze niz bez f25)
+            bool covUsed = false; double covLow = double.NaN;
+            double sur = 0, def2 = double.NaN, pre = 0, preK = 0, dPre = double.NaN, tday = double.NaN; long res = -1;
             int sd = SessionDays(s);
             if (tf) sur = KingdomTreasury.TreasurySurplusFor(k, out res);
             bool zeroOk = false;
@@ -467,6 +481,7 @@ namespace Armoury
                        M = last > 0 ? AvgLast(g.RM, g, last, out n2) : Avg(g.RM, g.RW, g.F, true, out n2), V = last > 0 ? AvgLast(g.RV, g, last, out n2) : Avg(g.RV, g.RW, g.F, true, out n2);
                 y1 = Yield(k, s, 1.0, S, E, M, V);
                 if (tf) { int n3; pre = last > 0 ? AvgLast(g.RPre, g, last, out n3) : Avg(g.RPre, g.RW, g.F, true, out n3); }
+                if (cov) { int n4; preK = last > 0 ? AvgLast(g.RPreK, g, last, out n4) : Avg(g.RPreK, g.RW, g.F, true, out n4); }
                 keepHold = tf && g.HoldTf && !(g0 > 0) && sur >= 1 && n < MinDays;   // f23 (recenzja): po wczytaniu krol ze skarbcem - bez zmiany do MinDays dob pomiaru
                 if (n < MinDays && !free) g1 = Math.Max(step, g0);                 // za malo dob pomiaru (po wczytaniu) - nadanie bez zmian
                 else if (keepHold) { g1 = WarTaxPolicy(k) ? step : 0; zeroOk = true; }   // War Tax +krok jak dotad
@@ -477,6 +492,14 @@ namespace Armoury
                     {
                         dPre = Math.Min(deficit, pre - inc);                       // f23 (recenzja): czego zwykle wplywy nie pokryja z pozycji placonych tylko z nich - zawsze z nadania
                         tday = Math.Max(0, deficit - Math.Max(0, dPre));            // brak, ktory skarbiec naprawde pokrywa (K5 zwrot, W5b/W5c)
+                        if (cov)
+                        {
+                            // f25 (Covers Dues): z wplywow tylko dary i reparacje - 186/185/168 w braku ze skarbca (braki dnia placi TreasuryForDues); skarbiec, ktory nie starczy
+                            // na sd dob takiego braku, zostaje przy regule f23 (186/185/168 z nadania, reszta ze skarbca) - nadanie nigdy wieksze niz bez klucza
+                            double dK = Math.Min(deficit, preK - inc), tK = Math.Max(0, deficit - Math.Max(0, dK));
+                            if (sur >= 1 && sur >= sd * tK) { dPre = dK; tday = tK; covUsed = true; }
+                            else covLow = sd * tK;
+                        }
                         if (toRes) { zeroOk = sur >= 1 && sur >= sd * tday; def2 = zeroOk ? dPre : deficit; }   // do zapasu: skarbiec na < sd dob braku = przy zapasie
                         else { zeroOk = sur >= 1; def2 = Math.Max(dPre, deficit - sur / DsTowns.Quarter); }  // na kwartal (wersja sprzed recenzji + brak z wplywow)
                     }
@@ -497,7 +520,9 @@ namespace Armoury
             if (!war && !(g0 > 0)) return null;   // pokoj bez nadania - bez wiersza
             // f23: dopisek NA KONCU wiersza (czytniki biora poczatek: g, potrzeba, zwykle wplywy, brak, plon); klucz wylaczony - wiersz co do znaku jak dotad
             string tfSeg = tf ? ", najpierw skarbiec (f23, " + (toRes ? "do zapasu" : "na kwartal") + "): nadwyzka " + N0(sur) + " ponad zapas wojny " + res + " i dlugi / "
-                                + DsTowns.Quarter + " = " + N0(sur / DsTowns.Quarter) + " zl/d, tylko z wplywow dnia " + N0(pre) + " (brak z wplywow "
+                                + DsTowns.Quarter + " = " + N0(sur / DsTowns.Quarter) + " zl/d, tylko z wplywow dnia " + N0(covUsed ? preK : pre)
+                                + (covUsed ? " (f25: 186/185/168 ze skarbca " + N0(pre - preK) + ")"
+                                   : cov && !double.IsNaN(covLow) ? " (f25: skarbiec ponizej progu " + N0(covLow) + " - jak f23)" : "") + " (brak z wplywow "
                                 + (double.IsNaN(dPre) ? "-" : N0(dPre)) + "), brak ze skarbca " + (double.IsNaN(tday) ? "-" : N0(tday)) + " zl/d (prog " + sd + " dob "
                                 + (double.IsNaN(tday) ? "-" : N0(sd * tday)) + "), brak po skarbcu " + (double.IsNaN(def2) ? "-" : N0(def2))
                                 + (keepHold ? " (po wczytaniu dob pomiaru " + n + " < " + MinDays + " - bez zmian)" : "")
@@ -650,7 +675,8 @@ namespace Armoury
                         var sbt = new StringBuilder(1024 + 120 * tft.Count);
                         sbt.Append("Korona: najpierw skarbiec (f23): dzien ").Append(day)
                            .Append(" | Ds War Grant Treasury First ").Append(TreasuryFirstOn(s) ? "tak" : "NIE (nadanie bez skarbca - jak dotad)")
-                           .Append(" (To Reserve ").Append(ToReserveOn(s) ? "tak - skarbiec placi do zapasu" : "NIE - nadwyzka na kwartal").Append(')')
+                           .Append(" (To Reserve ").Append(ToReserveOn(s) ? "tak - skarbiec placi do zapasu" : "NIE - nadwyzka na kwartal")
+                           .Append(CoversDuesOn(s) ? "; f25 Covers Dues tak - raty 186, kontrakty 185 i wezwania 168 tez ze skarbca" : "").Append(')')
                            .Append(", War Reserve By Need ").Append(KingdomTreasury.WarReserveByNeedOn ? "tak" : "NIE (zapas z pelnego zwrotu - jak dotad)")
                            .Append(" | zapas wojny razem (krolestw ").Append(tfK).Append("): wedlug potrzeby ").Append(tfResN).Append(", z pelnego zwrotu ").Append(tfResF)
                            .Append(" (mniejszy o ").Append(tfResF - tfResN).Append(", krolestw z mniejszym ").Append(tfLess).Append(')')
