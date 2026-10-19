@@ -3237,3 +3237,7 @@ Pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw 
   MoneyDebug na okregach Wolnych Ludzi, alfa fin95 vs fin97; nowy klucz), w-toku/f26-bramka (5C: StartCalibration.Arm.LandGateDaily - strata KS doby = min(spadek, wzor gry -
   racje KS) z _gHarv; nowy klucz). PRZEKAZANIE gdyby limit sie skonczyl: kazda galaz -> recenzja -> scalic do noc-ks4 (6d577536; McmSettings przez gen_mcm) -> test
   bieg-bitwa.ps1 -Days 160 -Speed 20 (+ ks-auto.flag) i -Days 5 -Battles 1 -> WGRANIE 86 (wgraj-v5.ps1, gra zamknieta). -Speed nigdy 16 (Better Time Ctrl+Spacja).
+- 19.10 ok. 15:00 UTC: f25-korona (fabede86, klucz Ds War Grant Treasury Covers Dues), f25-sprawdz (47a3b31b), f26-bramka (4b5d90d2, klucz Ks Land Gate Exact Loss)
+  scalone -> noc-ks4 a8d380d6 (Armoury 283509af, 2008 ustawien). TEST fin99 160 dob x20 w toku. f26-wolni (c5aa3874, klucz Ks Home Work Trade Prices) NIE SCALONE:
+  po recenzji (sufit fizyczny plonu) w fin98 zero zmian - Wolni Ludzie 0.727 bez poprawy; dom Wolnych Ludzi juz na granicy plonu zimnej ziemi; fin95 0.79 bylo za hojne.
+  Bramka 5C: Wolni Ludzie wracaja do starych zasad plonu ok. d+129 od wlaczenia KS (A i C tak samo). -> pytanie do Jeffa o 1a (dalsza droga).
