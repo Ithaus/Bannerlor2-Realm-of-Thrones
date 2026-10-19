@@ -3194,3 +3194,6 @@ RAPORT DLA JEFFA: docs/RAPORT-NOC-2026-10-19.md (decyzje 1-8 do podjecia).
 - 19.10 rano: DECYZJE JEFFA (verbatim "1. b 2. c 3. a 4. a 5. dwa lata i lekkie psucie 6. b 7. a 8. a"): 1 termin wojen fabularnych bez zmian; 2 regula skarbca stolicy zostaje;
   3 tarczowe W6 wedlug potrzeby; 4 Straz/Wolni Ludzie/dluznicy Banku mierzeni zlotem (koniec f=1 "bez miary" w f6/f7); 5 spichlerze 2 lata + lekkie psucie; 6 A7 po osobnym tescie;
   7 jency Korony z lochu KL -> zaloga przy przywroceniu; 8 nadanie wojenne DS: najpierw skarbiec ponad rezerwe. -> paczki f23-korona (3, 4, 8) i f23-spichlerze (5, 7) od 9b160103.
+- 19.10: f23 GOTOWE (wf_647385ce-342): f23-korona ba5546e5 (ScutageByNeed, NeedMeasureAll - Straz/Wolni Ludzie/dluznicy mierzeni G/R, WarReserveByNeed, DsWarGrantTreasuryFirst -
+  szacunek: lud placi 143.6k -> 47.8k/d w celu, skarbce w wojnie -67..-93k/d; HoldTf w zapisie; kontrakty/wezwania/raty Banku nie traca wplywow), f23-spichlerze 954ab7fe (GranarySpoilage
+  6%/rok, cap 2 lata bez zmian; BookHoldingsFreeOwnPrisoners). Scalone: noc-ks4 **f8faeade** (2005 ustawien, build rc 0). TEST fin97 160 dob w toku (ks-auto.flag usuwany po biegu).
