@@ -2612,6 +2612,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistTournamentScale { get; set; } = 4f;
 
+        [SettingPropertyBool("Hist Research From Old Value", HintText = "smithing part research (new parts for a weapon class) counts from a piece's worth before the historical repricing, as smithing XP already does - otherwise a forged sword worth 21 pence instead of 1105 gives almost no research and no new parts unlock", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistResearchFromOldValue { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Hist Unique Prestige", 0.00f, 16.00f, "0.00", HintText = "named pieces of the great houses cost this many times their making (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistUniquePrestige { get; set; } = 4f;
@@ -8696,6 +8700,7 @@ namespace Armoury
             s.TownWageRefProsperity = TownWageRefProsperity;
             s.HistAmmoLaborMultiplier = HistAmmoLaborMultiplier;
             s.HistTournamentScale = HistTournamentScale;
+            s.HistResearchFromOldValue = HistResearchFromOldValue;
             s.HistUniquePrestige = HistUniquePrestige;
             s.HistBulkUnitFactor = HistBulkUnitFactor;
             s.HistTradeGoods = HistTradeGoods;

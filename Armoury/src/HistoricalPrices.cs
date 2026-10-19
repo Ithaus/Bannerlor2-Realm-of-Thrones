@@ -1164,6 +1164,48 @@ namespace Armoury
             catch { }
         }
 
+        // ------------------------------------------------------------ badania czesci kuzni od wartosci sprzed zmiany
+        // f27 (Jeff 19.10: "wogole nie ucze sie nowych elementow miecza ... nadal mam tyle samo 30 znanych rzeczy"): gra liczy punkty badan czesci
+        // z Value tak jak XP (DefaultSmithingModel 1.4.8: kucie 1 + floor(0.1 x Value x (1 + CuriousSmith + 0.1 w wolnym kuciu)), przetop
+        // (1 + round(0.02 x Value)) x (1 + CuriousSmelter)), a CraftingCampaignBehavior.CreateCraftedWeaponInternal wola OnNewItemCrafted (PriceOne -
+        // cena historyczna) PRZED AddResearchPoints. Log Jeffa: wykuty crafted_item_66 1105 -> 21 d. = 3 pkt zamiast 122, prog nowej czesci przy 30
+        // otwartych ok. 300-400 pkt. Liczymy ten sam wzor gry od wartosci sprzed przeliczenia (jedna zasada z XpPostfix); postfiks siedzi na metodzie
+        // DefaultSmithingModel (BKSmithingModel jej nie nadpisuje - sprawdzone), wiec biegnie tylko tam, gdzie gra liczy tym wzorem. Nigdy mniej niz gra.
+        public static void ResearchSmithPostfix(ItemObject item, Hero hero, bool isFreeBuild, ref int __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!_applied || s == null || !s.HistResearchFromOldValue || item == null || item.Value <= 0) return;
+                int orig = Orig(item);
+                if (orig <= 0 || orig == item.Value) return;
+                float f = 1f;
+                if (hero != null && hero.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.CuriousSmith))
+                    f += TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.CuriousSmith.PrimaryBonus;
+                if (isFreeBuild) f += 0.1f;
+                int r = 1 + (int)Math.Floor(0.1f * (float)orig * f);
+                if (r > __result) { Log.Info("HistoricalPrices: badania czesci (f27, kucie) " + item.StringId + " wartosc sprzed przeliczenia " + orig + " d. -> " + r + " pkt (gra od " + item.Value + " d. dala " + __result + ")"); __result = r; }
+            }
+            catch { }
+        }
+
+        public static void ResearchSmeltPostfix(ItemObject item, Hero hero, ref int __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!_applied || s == null || !s.HistResearchFromOldValue || item == null || item.Value <= 0) return;
+                int orig = Orig(item);
+                if (orig <= 0 || orig == item.Value) return;
+                float f = 1f;
+                if (hero != null && hero.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.CuriousSmelter))
+                    f += TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.CuriousSmelter.PrimaryBonus;
+                int r = (int)((1f + (float)Math.Round(0.02f * (float)orig)) * f);
+                if (r > __result) { Log.Info("HistoricalPrices: badania czesci (f27, przetop) " + item.StringId + " wartosc sprzed przeliczenia " + orig + " d. -> " + r + " pkt (gra od " + item.Value + " d. dala " + __result + ")"); __result = r; }
+            }
+            catch { }
+        }
+
         // ------------------------------------------------------------ nagrody turniejowe
         // FightTournamentGame szuka nagrody o wartosci 1600-5000 (stale w kodzie gry); po przeliczeniu takich sztuk moze
         // nie byc, a pusta lista = losowanie z pustej listy = CRASH. Przedzial dzielimy przez HistTournamentScale (4),
@@ -1218,6 +1260,12 @@ namespace Armoury
                     var m = AccessTools.Method(t, name, new[] { typeof(ItemObject) });
                     if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(XpPostfix)) { priority = Priority.High }); n++; }   // poprawka po audycie TOWARY 3: przeliczenie przed sufitami SmithAudit.SmeltXpPostfix / WeaponXpPatch (p400)
                 }
+                int rp = 0;
+                var mrs = AccessTools.DeclaredMethod(t, "GetPartResearchGainForSmithingItem", new[] { typeof(ItemObject), typeof(Hero), typeof(bool) });
+                if (mrs != null) { h.Patch(mrs, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(ResearchSmithPostfix))); rp++; }
+                var mrm = AccessTools.DeclaredMethod(t, "GetPartResearchGainForSmeltingItem", new[] { typeof(ItemObject), typeof(Hero) });
+                if (mrm != null) { h.Patch(mrm, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(ResearchSmeltPostfix))); rp++; }
+                Log.Info("HistoricalPrices: badania czesci kuzni od wartosci sprzed przeliczenia (f27, klucz Hist Research From Old Value) w " + rp + "/2 metodach.");
                 var tm = typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultTournamentModel);
                 int p = 0;
                 foreach (var name in new[] { "GetRegularRewardItems", "GetEliteRewardItems" })
