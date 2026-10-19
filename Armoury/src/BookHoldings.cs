@@ -231,15 +231,53 @@ namespace Armoury
             var me = Hero.MainHero; var mp = MobileParty.MainParty;
             if (me == null || mp == null || !me.IsAlive) { why = "brak gracza"; return false; }
             if (me.IsPrisoner || PlayerCaptivity.IsCaptive) { why = "gracz w niewoli"; return false; }
-            if (mp.CurrentSettlement != null) { why = "gracz w osadzie (" + Nm(mp.CurrentSettlement) + ")"; return false; }
+            // Autotest (tylko LogGate 1/2, plik armoury-wlosci-test.flag): gracz w osadzie spoza tabeli (i nie blizniaku) nie blokuje proby - w autotescie druzyna stoi
+            // caly czas w miescie, a sciezka zmiany pana musi byc sprawdzona przed gra Jeffa. W grze Jeffa (bez pliku) warunek jak dotad.
+            bool testInTown = mp.CurrentSettlement != null && AutotestFlag && !IsTableSite(mp.CurrentSettlement);
+            if (mp.CurrentSettlement != null && !testInTown) { why = "gracz w osadzie (" + Nm(mp.CurrentSettlement) + ")"; return false; }
             if (mp.MapEvent != null) { why = "gracz w bitwie"; return false; }
             if (mp.SiegeEvent != null || mp.BesiegerCamp != null || mp.BesiegedSettlement != null) { why = "gracz w oblezeniu"; return false; }
             if (mp.Army != null) { why = "gracz w armii"; return false; }
             if (PlayerEncounter.Current != null) { why = "spotkanie w toku"; return false; }
-            if (c.CurrentMenuContext != null) { why = "menu otwarte"; return false; }
+            if (c.CurrentMenuContext != null && !testInTown) { why = "menu otwarte"; return false; }
             var cm = c.ConversationManager;
             if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) { why = "rozmowa w toku"; return false; }
             return true;
+        }
+
+        /// <summary>Osada z tabeli albo jej blizniak (Red Keep) - przy niej gracz zawsze blokuje probe (takze w autotescie).</summary>
+        private static bool IsTableSite(Settlement s)
+        {
+            if (s == null) return false;
+            foreach (var row in Rows) if (row.Id == s.StringId || (row.Twin != null && row.Twin == s.StringId)) return true;
+            return false;
+        }
+
+        private static int _testFlag = -1;
+        /// <summary>Plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-wlosci-test.flag - tylko w trybie autotestu CrashScribe (LogGate 1/2), nigdy w grze Jeffa;
+        /// sprawdzany raz na proces po starcie kampanii.</summary>
+        private static bool AutotestFlag
+        {
+            get
+            {
+                if (_testFlag >= 0) return _testFlag == 1;
+                if (Campaign.Current == null) return false;
+                int f = 0;
+                try
+                {
+                    int m = LogGate.Mode;
+                    if (m == 1 || m == 2)
+                    {
+                        string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        string path = System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), "armoury-wlosci-test.flag");
+                        if (System.IO.File.Exists(path)) f = 1;
+                    }
+                }
+                catch { f = 0; }
+                _testFlag = f;
+                if (f == 1) Log.Info(Prefix + "AUTOTEST: plik armoury-wlosci-test.flag - gracz w osadzie spoza tabeli nie blokuje przywrocenia (tylko ten bieg).");
+                return f == 1;
+            }
         }
 
         // ------------------------------------------------------------ godzina
