@@ -476,10 +476,13 @@ namespace Armoury
                 // recenzja 16.10: okno lupu w rachunku menu tak samo jak przy zaplacie (bramka bez licznika doby postoju)
                 var b = Plan(st, q, false, SackedHere(st, MobileParty.MainParty));
                 int men = b.Foot + b.Mounted;
-                MBTextManager.SetTextVariable("ARM_INN_Q" + q, QName[q] + " (" + QWhat[q] + ") - " + b.Total + " d: you " + b.PlayerCost
-                                                             + (men > 0 ? ", the men " + (b.Sacked ? "nothing (the sack)" : b.MenCost.ToString(Inv)) : "")
-                                                             + (b.Comp.Count > 0 ? ", companions " + b.CompCostSum : ""));
+                string split = b.Total + " d: you " + b.PlayerCost
+                               + (men > 0 ? ", the men " + (b.Sacked ? "nothing (the sack)" : b.MenCost.ToString(Inv)) : "")
+                               + (b.Comp.Count > 0 ? ", companions " + b.CompCostSum : "");
+                // n20-napisy: na przycisku rodzaj noclegu i suma; co daje i kto ile placi - pierwsza linia podpowiedzi
+                MBTextManager.SetTextVariable("ARM_INN_Q" + q, ShortLabels.Pick(QName[q] + " - " + b.Total + " d", QName[q] + " (" + QWhat[q] + ") - " + split));
                 var t = new StringBuilder();
+                if (ShortLabels.On) t.Append(QName[q]).Append(" (").Append(QWhat[q]).Append(") - ").Append(split).Append(".\n");
                 t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(PRoom[q]).Append(" d your room.");
                 if (men > 0)
                 {

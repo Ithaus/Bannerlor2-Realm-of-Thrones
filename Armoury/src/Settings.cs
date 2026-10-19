@@ -196,6 +196,8 @@ namespace Armoury
 
         // --- The finished piece ---
         public bool CraftResultPopup = true;               // forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons
+        // n20-napisy (Jeff 19.10 "za duzo tekstu na buttonie"): krotkie napisy opcji menu i wierszy okien wyboru, kwoty i wyjasnienia w podpowiedzi (ShortLabels.cs)
+        public bool ShortButtonLabels = true;              // short text on this mod's menu buttons and in its pick-one windows (investing in the district's works, inn beds, the forge, Qohor, the order ledger, raids): one line that fits the button; prices, sums and explanations move into the tooltip you see when you point at it. Menu buttons change after loading a save, window rows at once. Off = the old long text on the buttons
         public bool RichQualityModifiers = true;           // fine/masterwork/legendary touch MORE than one stat (RBM strips them to bare damage): melee gains speed, ranged gains missile speed, botched work loses both
         public bool TroopSelfMendEnabled = true;           // each day in a town the men pay the smith from their own wages to mend the worst pieces in the company stores
         public bool MenPurseEnabled = true;                // the men's share of the spoils is theirs: in a town they sell the spare kit to the merchants, mend their gear at the smiths, buy what they lack and spend the rest there; you buy from them what you take from the stores
