@@ -238,7 +238,7 @@ namespace Armoury
             if (mp.MapEvent != null) { why = "gracz w bitwie"; return false; }
             if (mp.SiegeEvent != null || mp.BesiegerCamp != null || mp.BesiegedSettlement != null) { why = "gracz w oblezeniu"; return false; }
             if (mp.Army != null) { why = "gracz w armii"; return false; }
-            if (PlayerEncounter.Current != null) { why = "spotkanie w toku"; return false; }
+            if (PlayerEncounter.Current != null && !testInTown) { why = "spotkanie w toku"; return false; }   // autotest: spotkanie z osada spoza tabeli (menu miasta)
             if (c.CurrentMenuContext != null && !testInTown) { why = "menu otwarte"; return false; }
             var cm = c.ConversationManager;
             if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) { why = "rozmowa w toku"; return false; }
