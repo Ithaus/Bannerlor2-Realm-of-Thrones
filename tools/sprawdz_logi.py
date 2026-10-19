@@ -1758,8 +1758,11 @@ Uzycie (Python 3, tylko odczyt):
                     ulamek doby (+-max(2, 1e-9 stanu)), NSP-1b ulamek doby = 1 - (1 - p)^(1 / dni roku gry), NSP-2 kontrola spichlerzy z zepsutymi jako nazwanym ujsciem,
                     NSP-3 'od wczytania' = suma zepsutych sesji, NSP-4 skala psucia (INFO), NSP-5 glod i zapas swiata (INFO), NSP-6 ERROR Famine / WallTribute / FreeFolkRaids 0,
                     NSP-7 linie Muru i Wolnych Ludzi (INFO; progi w --grupa nmur); NWL-0 klucz w linii startu sesji (INFO), NWL-1 jency do zalogi: zdjete z lochu = dodane do
-                    zalogi = wypuszczeni (kontrola 0), loch i zaloga przed/po, zostaja = obcy + bandyci + Inni, NWL-2 kazda zmieniona twierdza ma segment f23 (klucz TAK),
-                    NWL-3 BLAD i ERROR in BookHoldings.Free 0, NWL-4 wypuszczeni i pozostali (INFO). Log sprzed paczki albo bez przywrocenia: INFO, bez wyjatku.
+                    zalogi = wypuszczeni (kontrola 0), loch i zaloga przed/po, zostaja = obcy + bandyci + Inni, NWL-2 kazda zmieniona twierdza ma segment f23 (klucz TAK;
+                    po recenzji takze "stary pan z krolestwa nowego pana - loch bez zmian" - loch juz byl lochem krolestwa nowego pana, jency zostaja), NWL-3 BLAD
+                    i ERROR in BookHoldings.Free 0, NWL-4 wypuszczeni i pozostali (INFO), NWL-5 twierdza, ktorej stary pan byl juz w krolestwie nowego pana (naglowek
+                    linii "X: rod (krolestwo) -> rod (to samo krolestwo)"), ma odcinek "loch bez zmian" i zadnego wypuszczenia; inne twierdze - nigdy "loch bez zmian".
+                    Log sprzed paczki albo bez przywrocenia: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -49522,6 +49525,9 @@ NWL_NONE = re.compile(r"jency do zalogi (?P<n>[^|]+?) \(f23, kultury krolestwa n
                       r"zostaja: obcy (?P<f>\d+), bandyci (?P<b>\d+), Inni (?P<u>\d+)\)")
 NWL_NOGAR = re.compile(r"jency do zalogi (?P<n>[^|]+?) \(f23, [^|]*?brak partii zalogi - (?P<own>\d+) zolnierzy krolestwa zostaje w lochu")
 NWL_ERR = re.compile(r"jency do zalogi [^|]*?: BLAD")
+# recenzja f23: stary pan juz w krolestwie nowego pana (inny rod) - loch bez zmian (BookHoldings.TryRow, sameRealm - migawka przed zmiana pana)
+NWL_SAME = re.compile(r"jency do zalogi (?P<n>[^|]+?): stary pan z krolestwa nowego pana - loch bez zmian")
+NWL_HEAD = re.compile(r"\| (?P<n>[^|:]+): (?P<a>[^|()]+) \((?P<f1>[^()|]*)\) -> (?P<b>[^|()]+) \((?P<f2>[^()|]*)\)")
 
 
 def nspichlerze_main(logp):
@@ -49648,10 +49654,10 @@ def nspichlerze_main(logp):
     flag = next((x for x in reversed(sess_flags) if x is not None), None)
     rep.add("NWL-0: start sesji - klucz Book Holdings Free Own Prisoners (f23)", f"{flag or 'brak w linii (log sprzed paczki)'}; linii startu sesji {len(sess_flags)}, linii zmian osad {len(bh_lines)}",
             "INFO - przywrocenie biegnie raz na zapis (stan 'czeka')", None)
-    moved, none_, nogar, errs_seg, bad_id, bad_cov, sites = [], [], [], 0, [], [], []
+    moved, none_, nogar, errs_seg, bad_id, bad_cov, sites, same, heads, bad_same = [], [], [], 0, [], [], [], [], [], []
     for r in bh_lines:
         d = num(r"^dzien (\d+)", r)
-        segm = list(NWL_MOVED.finditer(r)); segn = list(NWL_NONE.finditer(r)); segg = list(NWL_NOGAR.finditer(r))
+        segm = list(NWL_MOVED.finditer(r)); segn = list(NWL_NONE.finditer(r)); segg = list(NWL_NOGAR.finditer(r)); segs = list(NWL_SAME.finditer(r))
         nerr = len(NWL_ERR.findall(r))
         errs_seg += nerr
         for x in segm:
@@ -49669,20 +49675,44 @@ def nspichlerze_main(logp):
                 bad_id.append(f"d{d} {g['n'].strip()} (brak)")
         for x in segg:
             nogar.append((d, x.group("n").strip(), int(x.group("own"))))
-        nj = len(segm) + len(segn) + len(segg) + nerr
+        for x in segs:
+            same.append((d, x.group("n").strip()))
+            sites.append(x.group("n").strip() + " (loch bez zmian)")
+        # NWL-5: naglowek osad (przed "bohaterowie bez druzyny") - stare i nowe krolestwo kazdej twierdzy
+        head = r.split(" | bohaterowie bez druzyny", 1)[0]
+        samen = {x.group("n").strip() for x in segs}
+        freen = {x.group("n").strip() for x in segm} | {x.group("n").strip() for x in segn} | {x.group("n").strip() for x in segg}
+        for x in NWL_HEAD.finditer(head):
+            nm, same_f = x.group("n").strip(), x.group("f1").strip() == x.group("f2").strip()
+            if " | po zmianie " + nm + ":" not in r or flag != "TAK":     # klucz NIE albo log sprzed paczki (bez klucza w linii startu) - bez reguly
+                continue
+            heads.append((d, nm, same_f))
+            if same_f and (nm not in samen or nm in freen) and "ZMIANA NIE WESZLA" not in r:
+                bad_same.append(f"d{d} {nm}: stare krolestwo = nowe, a " + ("wypuszczenie z lochu" if nm in freen else "brak odcinka 'loch bez zmian'"))
+            if not same_f and nm in samen:
+                bad_same.append(f"d{d} {nm}: 'loch bez zmian' przy zmianie krolestwa ({x.group('f1').strip()} -> {x.group('f2').strip()})")
+        nj = len(segm) + len(segn) + len(segg) + len(segs) + nerr
         npo = r.count(" | po zmianie ")
-        if flag != "NIE" and (nj > npo or ("ZMIANA NIE WESZLA" not in r and nj != npo)):
+        if flag == "TAK" and (nj > npo or ("ZMIANA NIE WESZLA" not in r and nj != npo)):     # recenzja f23: log sprzed paczki (klucza brak w linii startu) - INFO, nie NIE
             bad_cov.append(f"d{d}: segmentow {nj}, twierdz po zmianie {npo}")
     if not bh_lines:
         rep.add("NWL-1: jency do zalogi - tozsamosci", "brak przywrocenia w logu", "zdjete z lochu = dodane do zalogi = wypuszczeni; loch przed - po = wypuszczeni; zostaja = obcy + bandyci + Inni", None)
         rep.add("NWL-2: kazda zmieniona twierdza ma segment f23", "brak przywrocenia w logu", "segmentow 'jency do zalogi' = odcinkow 'po zmianie' (zmiana nie weszla: <=)", None)
     else:
-        rep.add("NWL-1: jency do zalogi - tozsamosci (ludzie prawdziwi, kontrola 0)", f"segmentow z wypuszczonymi {len(moved)}, bez zolnierzy krolestwa {len(none_)}, bez partii zalogi {len(nogar)}; poza regula {len(bad_id)}"
+        rep.add("NWL-1: jency do zalogi - tozsamosci (ludzie prawdziwi, kontrola 0)", f"segmentow z wypuszczonymi {len(moved)}, bez zolnierzy krolestwa {len(none_)}, bez partii zalogi {len(nogar)}, "
+                f"stary pan z krolestwa nowego pana (loch bez zmian) {len(same)}; poza regula {len(bad_id)}"
                 + (f" ({'; '.join(bad_id[:4])})" if bad_id else ""),
                 "zdjete z lochu = dodane do zalogi = wypuszczeni, kontrola 0; loch przed - po = wypuszczeni; zaloga po - przed = wypuszczeni; zostaja = obcy + bandyci + Inni", not bad_id)
         rep.add("NWL-2: kazda zmieniona twierdza ma segment f23 (klucz TAK)", f"linii z niezgodnoscia {len(bad_cov)}" + (f" ({'; '.join(bad_cov[:3])})" if bad_cov else "") + f"; twierdze: {', '.join(sites[:10]) or '-'}",
-                "segmentow 'jency do zalogi' = odcinkow 'po zmianie' (zmiana nie weszla: <=); klucz NIE - INFO", (not bad_cov) if flag != "NIE" else None)
+                "segmentow 'jency do zalogi' (takze 'stary pan z krolestwa nowego pana - loch bez zmian') = odcinkow 'po zmianie' (zmiana nie weszla: <=); klucz NIE albo log sprzed paczki - INFO",
+                (not bad_cov) if flag == "TAK" else None)
     rep.add("NWL-3: bledy jencow do zalogi", f"segmenty BLAD {errs_seg}, ERROR in BookHoldings.Free {errs_bh}", "0", errs_seg + errs_bh == 0)
+    if heads:
+        ns = sum(1 for _, _, sf in heads if sf)
+        rep.add("NWL-5: stary pan z krolestwa nowego pana - loch bez zmian (jency tego krolestwa zostaja)",
+                f"twierdz w naglowkach {len(heads)}, w tym ze starym panem z krolestwa nowego pana {ns}; poza regula {len(bad_same)}" + (f" ({'; '.join(bad_same[:4])})" if bad_same else "")
+                + (f"; loch bez zmian: {', '.join(n for _, n in same[:6])}" if same else ""),
+                "stare krolestwo = nowe -> odcinek 'loch bez zmian' i zadnego wypuszczenia; zmiana krolestwa -> nigdy 'loch bez zmian'", not bad_same)
     if moved or none_:
         tot = sum(g["m"] for _, g in moved)
         stay = sum(g["r1"] for _, g in moved) + sum(g["r0"] for _, g in none_)

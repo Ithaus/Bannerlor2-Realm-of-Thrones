@@ -74,6 +74,8 @@ namespace Armoury
     ///      ta sama droga, ktora gra uwalnia jencow zwyciezcy przy zdobyciu twierdzy). Bez sprzetu (zabrany przy pojmaniu) - zbrojownia zalogi dokupi braki jak
     ///      kazdemu nowemu. Ponad limit zalogi gry - nadmiar odejdzie przepelnieniem W4c do domu (linia mowi ile). Linia: wypuszczeni, zaloga przed -> po, loch przed ->
     ///      po, kto zostal (obcy, bandyci, Inni), kontrola zdjete z lochu - dodane do zalogi = 0. Klucz NIE - jak dotad (zwykli zostaja w lochu).
+    ///      Po recenzji: twierdza, ktorej stary pan juz byl w krolestwie nowego pana (inny rod; migawka przed zmiana, ten sam test co zaloga) - loch bez zmian:
+    ///      to jency wzieci przez krolestwo nowego pana (wrogowie, takze tej samej kultury), odcinek "stary pan z krolestwa nowego pana - loch bez zmian".
     ///  (g) zaloga nowego pana - zadnych ludzi z niczego. f21-zaloga (klucz BookHoldingsGarrison, domyslnie TAK; decyzja Jeffa po recenzji calosci: obsadzic pusta
     ///      zaloge ludzmi krolestwa nowego pana): zaraz po zmianie pana, dla kazdej twierdzy, ktora zmienila pana w tej probie (osada i blizniak ROT), szeregowi
     ///      z partii lordow - najpierw rodu nowego pana, potem pozostalych rodow jego krolestwa, kazda grupa od najblizszej bramy - do zalogi az do celu: miasto 400,
@@ -469,6 +471,10 @@ namespace Armoury
             }
 
             // --- od tej chwili zmiana ---
+            // f23-spichlerze (recenzja): twierdze, ktorych stary pan juz jest w krolestwie nowego pana (inny rod) - migawka PRZED zmiana, ten sam test co zaloga wyzej;
+            // ich loch to jency wzieci przez krolestwo nowego pana (wlasnych zolnierzy zwyciezcy gra uwalnia przy zdobyciu), wiec (g0) ich nie rusza
+            var sameRealm = new HashSet<Settlement>();
+            foreach (var s in sites) if (s.MapFaction == newF) sameRealm.Add(s);
             var sb = new StringBuilder(1500);
             sb.Append(Prefix).Append("dzien ").Append(day).Append(" | ").Append(Nm(st)).Append(" (").Append(st.StringId).Append(')');
             foreach (var s in sites)
@@ -564,6 +570,12 @@ namespace Armoury
                 {
                     bool changed = s == st ? stOk : twinOk;
                     if (!changed || s.MapFaction != newF || s.OwnerClan == null) continue;
+                    if (sameRealm.Contains(s))
+                    {
+                        // f23-spichlerze (recenzja): loch juz byl lochem krolestwa nowego pana - jency to wrogowie tego krolestwa (tez tej samej kultury), zostaja
+                        sb.Append(" | jency do zalogi ").Append(Nm(s)).Append(": stary pan z krolestwa nowego pana - loch bez zmian (jency wzieci przez krolestwo nowego pana)");
+                        continue;
+                    }
                     try { sb.Append(" | ").Append(FreeOwnPrisoners(s, row.Id)); }
                     catch (Exception e) { Stumble("Free(" + s.StringId + ")", e); sb.Append(" | jency do zalogi ").Append(Nm(s)).Append(": BLAD (log wyzej)"); }
                 }
