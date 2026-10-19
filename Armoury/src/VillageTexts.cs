@@ -76,6 +76,7 @@ namespace Armoury.Villages
         public const string RaidStepBody = "{=arm_raid_step_body}Your men have searched and burned a settlement of {VILLAGE} ({PEOPLE} souls). Killed: {K}. Taken captive: {C}. Fled to the castle and the neighbours: {R}. Gone to the woods: {O}. Loot: {ITEMS}; {GOLD} denars from the villagers' purse. The granary lost {DAYS_FOOD} days of food; your men ate {FOOD} of it. {STANDING} of {N} settlements of {VILLAGE} still stand.";
         public const string RaidVillageDown = "{=arm_raid_village_down}{VILLAGE} has been burned. {LEFT} villages of the {DISTRICT} district still stand; the nearest is {NEXT}, about {KM} km away.";
         public const string RaidNext = "{=arm_raid_next}Raid the next settlement (about {DAYS} days)";
+        public const string RaidNextShort = "{=arm_raid_next_short}Raid on";   // n20-napisy: przycisk okna rabunku (klucz Short Button Labels)
         public const string RaidEnd = "{=arm_raid_end}End the raid";
         public const string RaidSummary = "{=arm_raid_summary}{X} settlements burned in {D} days: {VILLAGES}.";
         // E7/R2 (236, R15): okienko gracza po kazdej osadzie - krok kilku oddzialow naraz, lup w sztukach, brak osad w zasiegu - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
@@ -104,6 +105,7 @@ namespace Armoury.Villages
         // E7/W3 (234, R13): okno okregu "Look over the district" - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
         public const string DistHearMore = "{=arm_dist_hear_more}Hear more";
         public const string DistBack = "{=arm_dist_back}Back to the villages";
+        public const string DistBackShort = "{=arm_dist_back_short}Back";   // n20-napisy: przycisk okna wioski (164 px; klucz Short Button Labels)
         public const string DistPick = "{=arm_dist_pick}Pick a village to hear more about it.";
         public const string DistRowDamaged = "{=arm_dist_row_damaged}{VILLAGE}, some homes empty";
         public const string VilArms = "{=arm_vil_arms}Arms of {HOUSE}: {ARMS}.";
