@@ -994,7 +994,7 @@ Uzycie (Python 3, tylko odczyt):
                     ZC1-7 RemoveParty w jedzeniu <= 2/d, ZC1-8 kontrola z ksiega rudy i drewna ZGODNA, ZC1-9a/b przejscie BK (marmur i miod), ZC1-9c produkcja miodu
                     pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego <= 1.10 x poczatek, ZC1-10 konwoje DTE i karawany BK bez jedzenia z niczego, ZC1-10c cele karawan
                     zywnosci bez zapasu <= 10%, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zapas zboza >= 0.95 x baza, ZC1-16 przyrost zapasu
-                    jedwabiu i rudy srebra <= 10% produkcji, ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza x (czesc produkcji wsi w oknie / w bazie - f24-rynek: bez pol mieszczan KS), ZC1-17 'nie do wydania' <= 1.05 x baza, ZC1-18 reszta
+                    jedwabiu i rudy srebra <= 10% produkcji, ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza (czesc produkcji wsi bez pol mieszczan KS - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza, ZC1-18 reszta
                     bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu; reszta INFO. Bez --baza-doby progi "wobec bazy" - wobec poczatku biegu
                     albo INFO. Log bez paczki: INFO.
                     fix-ksiega (noc 17/18.10, klucz OreLedgerTownCraftsColumn): ZC1-8a kolumna "przetwory miast" kontroli (wsad rzemiosla miasta - przetwory ZC5 i 148 -
@@ -1222,8 +1222,7 @@ Uzycie (Python 3, tylko odczyt):
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
                     NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
                     wsi + pola mieszczan + praca domowa) / potrzeba jedzenia wsi i miast w kcal surowca), NKS-30b jedzenie wsi (1 - kcal koszyka bez pokrycia kroku 8 /
-                    pelna potrzeba kcal ludzi wsi w tej samej mierze - kcal koszyka, potrzeby R8; f24-rynek: na MEDIANIE Planow po pierwszym jak NKS-30e/m/n - ostatni
-                    Plan biegu 160 dob to jeden tydzien w dolku pory roku, ostatni i najnizszy w wierszu): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93,
+                    pelna potrzeba kcal ludzi wsi w tej samej mierze - kcal koszyka, potrzeby R8; ostatni Plan, 4 ostatnie - INFO): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93,
                     Zelazne Wyspy >= 0.90 (Nocna Straz, Lorath - INFO); progi z harnessu Planu (jedzenie przed -> po, po recenzji: Polnoc 0.92 -> 0.97, Wolni 0.56 -> 0.79,
                     Straz 0.33 -> 0.43, Skagos 0.92 -> 0.98, Ib 1.00 -> 0.99, Wyspy 0.93 -> 0.97) ok. 5-10% nizej; NKS-30c prog przesuwa rece tam, gdzie rynek nie
                     wyzywia, NKS-30d tozsamosc rak (suma udzialow bloku = 1 - nic z niczego), NKS-30e Plany zbiezne (mediana niezbieznych <= 10; z --baza-doby <= mediana
@@ -1312,8 +1311,9 @@ Uzycie (Python 3, tylko odczyt):
                     f5-lud (noc 17/18.10; kazda klasa ludu miast z KS zarabia wedlug swojego koszyka - W2 / R / P - a czego lud nie przyjal, zostaje w kasach i idzie firma
                     do panow i korony przez przeglad wedlug nadwyzki kasy; model tools/ekonomia-symulatory-2026-10-17/f5/simlud.py; linia "Dochod ludu wedlug koszyka
                     (f5-lud)"): okno - ostatnie 28 dob, nie wczesniej niz 28 dob od pierwszej linii f5 (kappy schodza 3%/d; bez linii albo < 35 dob - INFO). NAKUM-18 kiesy
-                    R i P miast ('Kiesa ludu') - przyrost BEZ UJSCIA <= +15 tys./d kazda (f24-rynek: miasta, w ktorych klasa stoi ponad pasmem dni koszyka f5 albo nie ma
-                    koszyka - kiesa-obieg.csv obok logu; przyrost w pasmie i ponizej hamuje kappa f5 - w wierszu jako czesc; bez CSV - caly przyrost; fin88 +19.2 / +17.5),
+                    R i P miast ('Kiesa ludu') - przyrost BEZ UJSCIA <= +3 tys./d kazda (f24-rynek: miasta, w ktorych klasa stoi ponad pasmem dni koszyka f5 albo nie ma
+                    koszyka - kiesa-obieg.csv obok logu, poczatek najwyzej 7 dob przed oknem; przyrost w pasmie i ponizej hamuje kappa f5 - w wierszu jako czesc, razem - INFO;
+                    bez CSV albo za krotkie okno - caly przyrost <= +15 tys./d jak dotad; fin88 +19.2 / +17.5),
                     NAKUM-19 zapas dni koszyka W/R/P (mediana miast z regula, ostatnia doba)
                     <= 1.1 x gorna granica pasma klasy (fin88: W 60.2 przy 15-30), NAKUM-20 kasy miast z KS i ich nadwyzka ponad 1.5 x zapas kupcow (linia f5) - przyrost
                     w oknie <= max(30 tys., 0.15 x 'niezaplacone ludowi w kasach') (placacy nie jest nowym akumulatorem), NAKUM-21 danina od skarbca W/R/P miast z regula -
@@ -37379,9 +37379,10 @@ def _nz1_market_info(rep, D):
         return (u / len(v) if v else 0.0), (g / u if u else 0.0)
     (ua, ga), (ub, gb) = wav(wf), wav(wl)
     rep.add("ZC1-16c: jedwab - z pol mieszczan KS (bez wozu wsi), wozy wsi i polki miast (7 pierwszych / 28 ostatnich dob)",
-            f"produkcja {pa:.1f} -> {pb:.1f}/d, z pol mieszczan {fa:.1f} -> {fb:.1f}/d ({(fb / pb if pb else 0):.0%}); wozy wsi {ua:.1f} -> {ub:.1f} szt./d po {ga:.0f} -> {gb:.0f} d/szt.; "
+            f"produkcja {pa:.1f} -> {pb:.1f}/d, z pol mieszczan {fa:.1f} -> {fb:.1f}/d ({(fb / pb if pb else 0):.0%}), wsie {pa - fa:.1f} -> {pb - fb:.1f}/d"
+            f" ({((pb - fb) / (pa - fa) - 1 if pa - fa > 0 else 0):+.0%}); wozy wsi {ua:.1f} -> {ub:.1f} szt./d po {ga:.0f} -> {gb:.0f} d/szt.; "
             f"polki miast {avg('cotton', shelf, first):.0f} -> {avg('cotton', shelf, last):.0f} szt.",
-            "INFO (przy KS czesc jedwabiu rosnie na polach mieszczan - prosto na polke miasta, bez utargu wozow wsi; ZC1-16b porownuje z dobami 2-29 biegu, baza x czesc produkcji wsi - f24-rynek (f16-ks; krotki bieg - najmniej 2-8))", None)
+            "INFO (przy KS czesc jedwabiu rosnie na polach mieszczan - prosto na polke miasta, bez utargu wozow wsi; ZC1-16b porownuje z dobami 2-29 biegu (f16-ks; krotki bieg - najmniej 2-8))", None)
 
 
 def nzc1_main(logp, bdp=None):
@@ -37392,7 +37393,7 @@ def nzc1_main(logp, bdp=None):
     pierwszych), ZC1-6/7 jedzenie "bez nazwy" i RemoveParty <= 2 szt./d na towar, ZC1-8 kontrola z ksiega rudy i drewna, ZC1-9a marmur 0.7-1.3, ZC1-9b miod lesny
     0.7-1.3, ZC1-9c produkcja miodu pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego nie wyzszy niz baza (x1.10), ZC1-10 konwoje DTE i karawany BK (je 0),
     ZC1-10c cele karawan zywnosci bez zapasu <= 10% celodob, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zboze (zapas wobec bazy),
-    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza x czesc produkcji wsi okno/baza (f24-rynek; bez bazy: doby 2-29 biegu, f16-ks), ZC1-17 'nie do wydania' <= 1.05 x baza,
+    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza (bez bazy: doby 2-29 biegu, f16-ks; czesc produkcji wsi bez pol mieszczan KS - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza,
     ZC1-18 reszta bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu, reszta INFO. Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -37654,20 +37655,16 @@ def nzc1_main(logp, bdp=None):
                 a, b = _nz1_mean([wg[d] for d in wk[1:1 + nb]]), _nz1_mean([wg[d] for d in wk[-28:]])
                 va, vb = vprod(goods, wk[1:1 + nb]), vprod(goods, wk[-28:])
                 how = f"doby 2-{1 + nb} tego biegu"
-            # f24-rynek: baza x (czesc produkcji wsi w oknie / w bazie) - przy KS czesc jedwabiu (fin97 0 -> 8.3 z 35.6/d, 23%) rosnie na polach mieszczan
-            # i nie jedzie wozem wsi, wiec utarg wozow spada o tyle, choc wsie nie traca rynku (fin95 i fin97 - ten sam utarg ostatnich 28 dob 29951 / 29924,
-            # rozne bazy dob 2-29 35917 / 38357). Zdjety TYLKO kanal pol mieszczan: spadek produkcji samych wsi (np. 16.10 17-46-14 z Silk To Weavers: wsie
-            # 37.6 -> 28.8/d, pol 0) dalej obniza utarg wobec bazy. Brak ksiegi towarow - jak dotad (sam utarg)
-            per = va is not None and vb is not None and va > 0 and vb > 0 and a and a > 0
+            # f24-rynek po recenzji: prog dalej na samym utargu wozow wsi (jak f16-ks - spadek przy polach mieszczan KS to uczciwy spadek rynku wsi, nie blad
+            # miary). Baza x czesc produkcji wsi (bez "pola mieszczan (KS)") tylko jako INFO w napisie - ile spadku to jedwab przeniesiony z wsi na pola
+            # mieszczan (fin97: wsie 37.7 -> 27.3/d, pola 0 -> 8.3/d) - do decyzji Jeffa. Brak ksiegi towarow albo czesc bez zmiany - bez dopisku
+            per = va is not None and vb is not None and va > 0 and vb > 0 and a and a > 0 and abs(vb - va) >= 0.005
+            info = ""
             if per:
                 ab = a * vb / va
-                rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d)",
-                        f"{b:.0f} / {a:.0f} ({how}); baza x czesc produkcji wsi {vb:.2f} / {va:.2f} (bez pol mieszczan KS) = {ab:.0f} -> {b / ab:.2f}",
-                        ">= 0.80 x baza x (czesc produkcji wsi w oknie / w bazie) (f24-rynek: jedwab z pol mieszczan KS bez wozu wsi; wsie jedwabne i kopalnie srebra nie traca rynku)",
-                        b >= 0.8 * ab)
-            else:
-                rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d)", f"{b:.0f} / {a:.0f} ({how})" if a else f"{b:.0f} / 0",
-                        ">= 0.80 x baza (wsie jedwabne i kopalnie srebra nie traca rynku)", (b >= 0.8 * a) if a and a > 0 else None)
+                info = f"; INFO: czesc produkcji wsi (bez pol mieszczan KS) {vb:.2f} / {va:.2f} - baza x czesc {ab:.0f} -> {b / ab:.2f} (jedwab z wsi na polach mieszczan - do decyzji)"
+            rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d)", (f"{b:.0f} / {a:.0f} ({how})" if a else f"{b:.0f} / 0") + info,
+                    ">= 0.80 x baza (wsie jedwabne i kopalnie srebra nie traca rynku)", (b >= 0.8 * a) if a and a > 0 else None)
     _nz1_market_info(rep, D)   # fix-ksiega: ZC1-4b, ZC1-9e, ZC1-16c (INFO - przyczyny rynkowe)
     # ZC1-17 'nie do wydania' mieszczan
     nd = {d: v for d, v in D["nd"].items() if v > 0}
@@ -39166,12 +39163,16 @@ def _nak_growth(series, days):
     return (series[d[-1]] - series[d[0]]) / max(1, d[-1] - d[0])
 
 
+NAK18_NOOUT = 3000   # recenzja f24-rynek: NAKUM-18 - przyrost kies R i P bez ujscia (zl/d kazda klasa); ok. 1.7 x najwiekszy z 4 biegow f5 z CSV (fin95 P +1751)
+
+
 def _nak_noout(logp, days, bands):
     """f24-rynek (NAKUM-18): przyrost kies R i P MIAST wedlug miejsca klasy w pasmie dni koszyka f5 (kiesa-obieg.csv, wiersze co 7 dob; ta sama potrzeba co
     KsFolkIncome.Day - f.Need). Stan klasy na koniec okna: ponizej pasma (pelna stawka - zapas przezycia), w pasmie (kappa schodzi liniowo do podlogi -
     regula sama hamuje dochod), ponad pasmem (kappa na podlodze - zostaja tylko oferta zbytkow i danina od skarbca), bez koszyka (potrzeba 0, kiesa > 0 -
     Zero Need: jak ponad pasmem). "Bez ujscia" = ponad pasmem + bez koszyka. Koniec = ostatni wiersz <= ostatniej doby okna, poczatek = wiersz najblizej
-    28 dob wczesniej (najmniej 14 dob przed koncem). bands = (lo R, hi R, lo P, hi P). None - brak pliku albo za malo wierszy."""
+    28 dob wczesniej (najmniej 14 dob przed koncem i nie wczesniej niz 7 dob przed pierwsza doba okna - wiersze co 7 dob; recenzja f24: krotkie okno f5
+    nie siega w rampe kapp). bands = (lo R, hi R, lo P, hi P). None - brak pliku albo za malo wierszy w oknie (wolajacy - stara regula)."""
     p = ww_csv_find(logp, "kiesa-obieg.csv")
     if not p or not days:
         return None
@@ -39190,7 +39191,7 @@ def _nak_noout(logp, days, bands):
     if not ds:
         return None
     d1 = ds[-1]
-    cand = [d for d in ds if d <= d1 - 14]
+    cand = [d for d in ds if days[0] - 7 <= d <= d1 - 14]
     if not cand:
         return None
     d0 = min(cand, key=lambda d: abs((d1 - d) - 28))
@@ -39526,6 +39527,8 @@ def nakum_main(logp, until=None):
         # w pasmie i ponizej to zapas, ktory regula f5 sama hamuje (kappa schodzi liniowo od dolnej do gornej granicy pasma, ponad nim podloga); po f23
         # (8a - lud placi mniej podatku wojennego, danina z oszczednosci P1 ok. 14 -> 2 tys. zl/d) R i P trzymaja wiecej, ale przyrost idzie do kies w pasmie
         # (fin97: P w pasmie +17.9 tys./d, ponad pasmem +0.7 tys./d). Bez pliku CSV - stara regula na calym przyroscie
+        # Recenzja f24: prog na mierze, ktora wiersz liczy - przyrost bez ujscia <= NAK18_NOOUT (4 biegi f5 z CSV: 09-33-39 R -629 / P +444, 12-18-40
+        # R +867 / P -140, fin95 R +873 / P +1751, fin97 R +165 / P +869 zl/d); stare 15 000/d dotyczylo przyrostu RAZEM (fin88) - razem tylko INFO w napisie
         try:
             nb = _nak_noout(logp, w5, (float(b5["rlo"]), float(b5["rhi"]), float(b5["plo"]), float(b5["phi"])))
         except (OSError, ValueError, KeyError):
@@ -39537,10 +39540,11 @@ def nakum_main(logp, until=None):
             rep.add(f"NAKUM-18 (f5): kiesy R i P miast ('Kiesa ludu') - przyrost na dobe (doby {w5[0]}-{w5[-1]})",
                     f"bez ujscia (ponad pasmem f5 + bez koszyka; kiesa-obieg.csv doby {nb['d0']}-{nb['d1']}): R {nr:+.0f}/d ({cnt('R')} miast), P {np_:+.0f}/d ({cnt('P')} miast); "
                     f"razem R {gr5:+.0f}/d, P {gp5:+.0f}/d | R: {part('R')} | P: {part('P')}",
-                    f"R <= +15 000/d i P <= +15 000/d BEZ UJSCIA (f24-rynek: w pasmie R {b5['rlo']}-{b5['rhi']} / P {b5['plo']}-{b5['phi']} dni i ponizej - zapas hamowany "
-                    "kappa f5, nie akumulator; fin88 przed f5 razem: R +19.2 tys., P +17.5 tys./d)", nr <= 15000 and np_ <= 15000)
+                    f"R <= +{NAK18_NOOUT}/d i P <= +{NAK18_NOOUT}/d BEZ UJSCIA (f24-rynek: w pasmie R {b5['rlo']}-{b5['rhi']} / P {b5['plo']}-{b5['phi']} dni i ponizej - zapas "
+                    "hamowany kappa f5, nie akumulator; biegi f5 z CSV najwyzej +1.8 tys./d; razem - INFO, fin88 przed f5 razem: R +19.2 tys., P +17.5 tys./d)",
+                    nr <= NAK18_NOOUT and np_ <= NAK18_NOOUT)
         elif gr5 is not None and gp5 is not None:
-            rep.add(f"NAKUM-18 (f5): kiesy R i P miast ('Kiesa ludu') - przyrost na dobe (doby {w5[0]}-{w5[-1]})", f"R {gr5:+.0f}/d, P {gp5:+.0f}/d (brak kiesa-obieg.csv - przyrost razem)",
+            rep.add(f"NAKUM-18 (f5): kiesy R i P miast ('Kiesa ludu') - przyrost na dobe (doby {w5[0]}-{w5[-1]})", f"R {gr5:+.0f}/d, P {gp5:+.0f}/d (brak kiesa-obieg.csv albo za malo jego wierszy w oknie - przyrost razem)",
                     "R <= +15 000/d i P <= +15 000/d (bez CSV - caly przyrost; fin88 przed f5: R +19.2 tys., P +17.5 tys./d - trzymala je danina 3%/d)", gr5 <= 15000 and gp5 <= 15000)
         else:
             rep.add("NAKUM-18 (f5): kiesy R i P miast", "brak linii 'Kiesa ludu' w oknie", "INFO", None)
@@ -51476,7 +51480,7 @@ def npolnoc_feedswiat(rep, feed, clr, plans):
 def npolnoc_main(logp, bdp=None):
     """npolnoc (r4-polnoc, noc 17/18.10; Armoury/src/StartCalibration.Feed.cs, Tables.cs, Polnoc.cs; klucze Ks Self Feed First, Ks Self Feed Everywhere, Ks Cold Land):
     [--baza-doby <log biegu bez r4-polnoc>] NKS-30-0 linie "KS: wyzywienie krain" przy Planach (klucze TAK), NKS-30a Polnoc kraina (kcal wlasne) >= 0.85,
-    NKS-30b jedzenie wsi (1 - kcal bez pokrycia / potrzeba; f24-rynek: mediana Planow po pierwszym, jak NKS-30e/m/n): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93, Zelazne Wyspy >= 0.90 (Nocna Straz i Lorath - INFO), NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia (z progu > 0), NKS-30d tozsamosc rak (odchylenie sumy
+    NKS-30b jedzenie wsi (1 - kcal bez pokrycia / potrzeba; ostatni Plan): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93, Zelazne Wyspy >= 0.90 (Nocna Straz i Lorath - INFO), NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia (z progu > 0), NKS-30d tozsamosc rak (odchylenie sumy
     udzialow bloku od 1 <= 1e-6 - nic z niczego), NKS-30e Plany zbiezne (mediana niezbieznych towarow Planow po pierwszym <= 10; z --baza-doby <= baza + 2), NKS-30f bilans
     jedzenia NA TARG ostatniego Planu (INFO - wiaze NKS-3 w --grupa nks), NKS-30g A7 przy progu (INFO), NKS-30h Plan bez pokrycia wedlug krainy (INFO), NKS-30i rece przesuniete
     do jedzenia (INFO), NKS-30j ziemia - prog nie bierze ziemi ponad 0.98 powierzchni bloku (przyrost <= 1e-6; recenzja). Brak linii - INFO, nigdy wyjatek."""
@@ -51588,19 +51592,14 @@ def npolnoc_main(logp, bdp=None):
             first = feed[0]["lands"].get(name)
             hist = f" (pierwszy Plan {first['d']:.2f})" if first is not None and first.get("d") is not None and len(feed) > 1 else ""
             dv = x.get("d")
-            # f24-rynek: prog na MEDIANIE Planow po pierwszym (jak NKS-30e/m/n tej grupy), nie na ostatnim Planie - jedzenie wsi krainy waha sie Plan do Planu
-            # bardziej niz zapas do progu (fin97 Wolni Ludzie 23 Plany 0.68-0.90, fin95 0.72-0.90), a ostatni Plan biegu 160 dob wypada w dolku pory roku
-            # (bieg 53 Planow 18.10 04-41-44: 0.68-0.72 w Planach 20-31 i 0.74-0.80 po nich) - jedna probka tygodnia konca biegu, nie stan biegu.
-            # Ostatni Plan i najnizszy zostaja w wierszu (nic nie ginie); jeden Plan w logu - mediana = ten Plan
-            ser = [f["lands"][name]["d"] for f in feed[1:] if name in f["lands"] and f["lands"][name].get("d") is not None]
-            if not ser and dv is not None:
-                ser = [dv]
-            med = st.median(ser) if ser else None
+            # f24-rynek po recenzji: prog dalej na OSTATNIM Planie (mediana wszystkich Planow chowala koniec biegu - fin97 Wolni Ludzie 4 ostatnie Plany
+            # 0.70/0.69/0.71/0.68 przy fin95 0.73/0.72/0.73/0.72 w tych samych dobach). 4 ostatnie Plany tylko jako INFO w napisie (czy to jeden tydzien)
+            l4 = [f["lands"][name]["d"] for f in feed[-4:] if name in f["lands"] and f["lands"][name].get("d") is not None]
             rep.add(f"NKS-30b: {pl} ({name}) jedzenie wsi (wlasne + kupione + dom)",
-                    (f"jedzenie: mediana {med:.2f} (Planow {len(ser)}; ostatni " + (f"{dv:.2f}" if dv is not None else "-") + f", najnizej {min(ser):.2f}){hist}"
-                     if med is not None else "jedzenie - (brak kroku 8)") + f"; ostatni Plan - kcal wlasne: wsie {x['v']:.2f}, kraina {x['a']:.2f}"
-                    + (f"; rece przesuniete do jedzenia {x['rece']:.1f}%" if x.get("rece") is not None else ""),
-                    f">= {thr:.2f} na medianie (harness przed/po w komentarzu grupy; reszta - dowoz, danina Muru, glod)", (med >= thr) if (on and med is not None) else None)
+                    (f"jedzenie {dv:.2f}{hist}" if dv is not None else "jedzenie - (brak kroku 8)") + f"; kcal wlasne: wsie {x['v']:.2f}, kraina {x['a']:.2f}"
+                    + (f"; rece przesuniete do jedzenia {x['rece']:.1f}%" if x.get("rece") is not None else "")
+                    + (f"; 4 ostatnie Plany {'/'.join(f'{v:.2f}' for v in l4)}" if len(l4) > 1 else ""),
+                    f">= {thr:.2f} (harness przed/po w komentarzu grupy; reszta - dowoz, danina Muru, glod)", (dv >= thr) if (on and dv is not None) else None)
         for name, thr, pl in NPN_INFO:
             x = L.get(name)
             rep.add(f"NKS-30b: {pl} ({name}) jedzenie wsi", (f"jedzenie {x['d']:.2f}, " if x and x.get("d") is not None else "") + (f"wsie {x['v']:.2f}, kraina {x['a']:.2f}" if x else "brak krainy w linii"),
