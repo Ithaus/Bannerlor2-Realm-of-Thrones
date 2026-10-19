@@ -64,7 +64,19 @@ namespace Armoury
     ///      Polnocy do skarbca krolestwa nowego pana; zdjete = dopisane (kontrola w linii); migawka korony 165 przesunieta u obu stron (CrownIncome.ShiftSnapshot - jak
     ///      L5b-1: to nie "wplyw dnia" ani "ujemny wplyw"), po recenzji tak samo historia skarbca miary biedy E1 w CrashScribe (PovertyPeace.ShiftHistory - inaczej
     ///      Polnoc przez 7 dob w falszywej biedzie). Raz na zapis (stan w zapisie).
-    ///  (g) pusta zaloga nowego pana - zadnych ludzi z niczego: zostaje werbunkowi korony i naszym regulom zalog (linia podaje zaloge po zmianie).
+    ///  (g) zaloga nowego pana - zadnych ludzi z niczego. f21-zaloga (klucz BookHoldingsGarrison, domyslnie TAK; decyzja Jeffa po recenzji calosci: obsadzic pusta
+    ///      zaloge ludzmi krolestwa nowego pana): zaraz po zmianie pana, dla kazdej twierdzy, ktora zmienila pana w tej probie (osada i blizniak ROT), szeregowi
+    ///      z partii lordow - najpierw rodu nowego pana, potem pozostalych rodow jego krolestwa, kazda grupa od najblizszej bramy - do zalogi az do celu: miasto 400,
+    ///      zamek 200, nie ponad limit zalogi gry (PartySizeLimit zalogi - ponad nim nadmiar odszedlby przepelnieniem W4c) i nie ponad cel zalogi wedlug gry
+    ///      (GarrisonTroopsCampaignBehavior.CalculateSettlementGarrisonPartySizeLimitWithFoodAndWage w widelkach gry 125-750 / 75-500 - ile osada wyzywi i ile
+    ///      krolestwo i kiesy jego rodow udzwigna; ta sama miara, wedlug ktorej lordowie gry zostawiaja ludzi w zalodze). Dawca: partia lorda na ladzie z wodzem,
+    ///      nie gracz i nie rod gracza, nie najemnicy, nie w bitwie, oblezeniu (oblegajacy i obleganej osadzie), przejsciu lad-morze ani rozwiazaniu; zostawia
+    ///      >= 50% i >= 20 szeregowych wzgledem liczby z pierwszego uzycia w sesji (kilka twierdz z rzedu nie tnie jej po 50% od nowa). Z kazdego stosu proporcjonalnie
+    ///      (ranni proporcjonalnie, sklad dawcy zostaje), wight (Inni) nie idzie. Ksiega ludzi (PeopleBook Take/Give, FToGarrison - jak latka LeaveTroopsToGarrison)
+    ///      i sprzet (GarrisonArmory.KitsToGarrison - MoveKits "leave", jak LeavePostfix) ida z ludzmi. Bez wplywu za ludzi dla dawcy (gra daje go w LeaveTroopsToGarrison
+    ///      - tu to nie decyzja lorda) i bez zdarzenia OnTroopGivenToSettlement (tylko pomiary). Za malo ludzi - zaloga dostaje tyle, ile jest, linia podaje brak.
+    ///      Linia osady: cel, limit gry, zaloga przed -> po, dawcy (rod, odleglosc, ludzie), brak, pominieci dawcy; potem zaloga i milicja po zmianie.
+    ///      Klucz NIE - jak dotad: pusta zaloga zostaje werbunkowi pana i naszym regulom zalog.
     ///  (h) wiadomosc dla gracza po angielsku raz na partie zmian (zwykle jedna: wszystko w pierwszej godzinie).
     ///  (i) linia na osade + linia konca; Essos nietkniete (nie ma go w tabeli); idempotentne - flaga w zapisie, osada juz u rodu docelowego = "bez zmian".
     /// </summary>
@@ -77,6 +89,10 @@ namespace Armoury
         private const int MaxRowErrors = 3;         // wyjatki na jednej osadzie - potem pominieta ("blad"); nic nie gasnie globalnie
         private const float BattleNear = 5f;        // bitwa w tym promieniu od bramy = osada czeka
         private const float ThreatRadius = 40f;     // recenzja calosci 18/19.10: promien pomiaru sil przy przywroconej twierdzy (tylko log; wiersz z wiekszym promieniem korekty - jego promien)
+        private const int GarTownTarget = 400;      // f21-zaloga: cel obsady miasta (nie ponad limit zalogi gry)
+        private const int GarCastleTarget = 200;    // f21-zaloga: cel obsady zamku
+        private const double DonorKeepShare = 0.5;  // f21-zaloga: dawca zostawia co najmniej tyle swoich szeregowych (wzgledem pierwszego uzycia w sesji)
+        private const int DonorKeepMin = 20;        // f21-zaloga: i nigdy mniej niz tylu
 
         /// <summary>Wiersz tabeli: osada -> rod docelowy (i krolestwo, w ktorym rod ma byc), blizniak ROT, promien korekty fabuly, zwrot skarbca.</summary>
         private sealed class Row
@@ -117,14 +133,17 @@ namespace Armoury
         private static readonly List<string> _batchMoved = new List<string>();     // korekta fabuly w tej godzinie (wiadomosc)
         private static long _batchRefund;
         private static string _batchRefundText;
+        private static readonly Dictionary<MobileParty, int> _donorBase = new Dictionary<MobileParty, int>();   // f21-zaloga: szeregowi dawcy przy pierwszym uzyciu w sesji
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.BookHoldingsRestore; } }
+        private static bool GarrisonOn { get { var s = Settings.Current; return s != null && s.BookHoldingsGarrison; } }
 
         internal static void Reset()
         {
             _state = ""; _res.Clear(); _refund = ""; _firstDay = -1; _doneDay = -1;
             _stumbles = 0; _rowErr.Clear(); _errSites.Clear(); _waitLogDay = -1; _waitLogText = null;
             _batchDone.Clear(); _batchMoved.Clear(); _batchRefund = 0; _batchRefundText = null;
+            _donorBase.Clear();
         }
 
         private static void Stumble(string where, Exception e)
@@ -187,7 +206,8 @@ namespace Armoury
                 string st = _state == "new" ? "nowa kampania z ta paczka - nic do przywracania"
                           : _state == "done" ? "zrobione (dzien " + _doneDay + ": " + ResText() + ", zwrot skarbca " + (_refund.Length > 0 ? _refund : "-") + ")"
                           : "czeka (zapis sprzed paczki) - ruszy w pierwszej godzinie na mapie" + (_res.Count > 0 ? "; juz rozstrzygniete: " + ResText() : "");
-                Log.Info(Prefix + "start sesji | klucz Book Holdings Restore " + (On ? "TAK" : "NIE") + " | stan zapisu: " + st + ".");
+                Log.Info(Prefix + "start sesji | klucz Book Holdings Restore " + (On ? "TAK" : "NIE") + ", Book Holdings Garrison (f21-zaloga) " + (GarrisonOn ? "TAK" : "NIE")
+                         + " | stan zapisu: " + st + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -487,9 +507,30 @@ namespace Armoury
             }
             for (int i = 0; i < scaK.Count; i++) ScaRestore(sca, scaK[i], scaHad[i], scaPrev[i], sb);
 
+            // (g) f21-zaloga: obsada zalogi nowego pana ludzmi jego krolestwa - tylko twierdze, ktore zmienily pana w tej probie (stOk / twinOk);
+            // zmiana, ktora nie weszla, czeka na ponowna probe (wtedy obsada razem z nia). Kazda twierdza we wlasnym try - potkniecie nie zatrzymuje reszty wiersza.
+            // Po recenzji: samo "osada w krolestwie docelowym" nie wystarcza - stary pan z tego samego krolestwa (inny rod) jest w nim juz przed zmiana,
+            // wiec nieudane ApplyByDefault obsadzaloby co godzine twierdze starego pana (dawcy liczeni wzgledem starego rodu)
+            bool fill = GarrisonOn;
+            if (fill)
+                foreach (var s in sites)
+                {
+                    bool changed = s == st ? stOk : twinOk;
+                    if (!changed || s.MapFaction != newF || s.OwnerClan == null) continue;
+                    try { sb.Append(" | ").Append(FillGarrison(s, row.Id)); }
+                    catch (Exception e) { Stumble("Fill(" + s.StringId + ")", e); sb.Append(" | obsada ").Append(Nm(s)).Append(": BLAD (log wyzej)"); }
+                }
+
             foreach (var s in sites)
+            {
+                bool changed = s == st ? stOk : twinOk;
                 sb.Append(" | po zmianie ").Append(Nm(s)).Append(": pan ").Append(s.OwnerClan != null ? s.OwnerClan.Name.ToString() : "-")
-                  .Append(", zaloga ").Append(Men(s.Town.GarrisonParty)).Append(" (pusta zostaje werbunkowi pana - bez ludzi z niczego), milicja ").Append((int)s.Militia);
+                  .Append(", zaloga ").Append(Men(s.Town.GarrisonParty))
+                  .Append(!fill ? " (pusta zostaje werbunkowi pana - bez ludzi z niczego)"
+                          : changed ? " (obsada z krolestwa nowego pana - przeniesieni, bez ludzi z niczego)"
+                          : " (zmiana pana nie weszla - bez obsady, obsada razem z ponowna proba)")
+                  .Append(", milicja ").Append((int)s.Militia);
+            }
 
             if (stNeeds && stOk)
             {
@@ -506,7 +547,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Refund(" + row.Id + ")", e); sb.Append(" | zwrot skarbca: BLAD (log wyzej)"); }
                 }
             }
-            // recenzja calosci 18/19.10 (tylko pomiar, decyzja Jeffa w CHANGELOG): zaloga nowego pana jest pusta (g), a korekta fabuly (e) jest tylko pod KL i tylko wobec
+            // recenzja calosci 18/19.10 (tylko pomiar, decyzja Jeffa w CHANGELOG): zaloga nowego pana jest pusta albo obsadzona z krolestwa (g, f21-zaloga), a korekta fabuly (e) jest tylko pod KL i tylko wobec
             // krolestwa starego pana - linia mowi, jakie sily wrogow nowego pana (wszystkie krolestwa w wojnie z nim) i jakie jego wlasne stoja przy bramie po zmianie
             if (st.MapFaction == newF)
             {
@@ -712,6 +753,224 @@ namespace Armoury
             return "[do domu " + gone + " - wies " + Nm(village) + " (droga przepelnienia W4c)" + (kept > 0 ? ", wies nie przyjela " + kept : "") + "]";
         }
 
+        // ------------------------------------------------------------ (g) f21-zaloga: obsada zalogi nowego pana ludzmi jego krolestwa
+        /// <summary>Dawca: partia lorda na ladzie z wodzem; nie gracz, nie rod gracza, nie najemnicy; nie w bitwie, oblezeniu (oblegajacy - BesiegerCamp, broniacy -
+        /// osada oblegana), przejsciu lad-morze ani rozwiazaniu. `why` - powod pominiecia do licznikow linii (null = dawca).</summary>
+        private static bool DonorOk(MobileParty mp, out string why)
+        {
+            why = null;
+            if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.IsDisbanding || mp.MemberRoster == null || mp.Party == null || mp.LeaderHero == null) { why = "-"; return false; }
+            if (mp.IsMainParty || mp.ActualClan == null || mp.ActualClan == Clan.PlayerClan) { why = "gracz"; return false; }
+            if (mp.ActualClan.IsUnderMercenaryService) { why = "najemni"; return false; }
+            var cs = mp.CurrentSettlement;
+            var al = mp.Army != null ? mp.Army.LeaderParty : null;      // partia armii, ktorej wodz walczy albo oblega - tez nie (ludzie przy wodzu)
+            if (mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegerCamp != null || mp.BesiegedSettlement != null || (cs != null && (cs.IsUnderSiege || cs.SiegeEvent != null))
+                || (al != null && al != mp && (al.MapEvent != null || al.BesiegerCamp != null)))
+            { why = "bitwa/oblezenie"; return false; }
+            if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress) { why = "morze"; return false; }
+            return true;
+        }
+
+        /// <summary>Szeregowi do przeniesienia (bez bohaterow i wightow).</summary>
+        private static int Movable(MobileParty mp)
+        {
+            if (mp == null || mp.MemberRoster == null) return 0;
+            int n = 0;
+            var r = mp.MemberRoster;
+            for (int i = 0; i < r.Count; i++) { var c = r.GetCharacterAtIndex(i); if (c != null && !c.IsHero && !Undead.Character(c)) n += r.GetElementNumber(i); }
+            return n;
+        }
+
+        /// <summary>Ile dawca moze oddac: szeregowi teraz minus to, co zostaje (>= 50% i >= 20 wzgledem liczby z pierwszego uzycia w sesji - kolejne twierdze
+        /// tego samego przywrocenia nie tna go po polowie od nowa), nie wiecej niz do przeniesienia.</summary>
+        private static int Spare(MobileParty mp)
+        {
+            int cur = Men(mp);
+            int b;
+            if (!_donorBase.TryGetValue(mp, out b)) { b = cur; _donorBase[mp] = cur; }
+            int keep = Math.Max(DonorKeepMin, (int)Math.Ceiling(b * DonorKeepShare));
+            return Math.Max(0, Math.Min(cur - keep, Movable(mp)));
+        }
+
+        /// <summary>Lista dawcow: partie rodu nowego pana (od najblizszej bramy), potem pozostale partie lordow jego krolestwa (od najblizszej). Liczniki pominietych.</summary>
+        private static List<MobileParty> Donors(Settlement s, Clan owner, Kingdom k, Dictionary<string, int> skipped)
+        {
+            var p = s.GatePosition.ToVec2();
+            var own = new List<KeyValuePair<float, MobileParty>>();
+            var rest = new List<KeyValuePair<float, MobileParty>>();
+            var seen = new HashSet<MobileParty>();
+            IEnumerable<WarPartyComponent> src = k != null ? (IEnumerable<WarPartyComponent>)k.WarPartyComponents : owner.WarPartyComponents;
+            foreach (var w in src)
+            {
+                var mp = w != null ? w.MobileParty : null;
+                if (mp == null || !seen.Add(mp)) continue;
+                string why;
+                if (!DonorOk(mp, out why))
+                {
+                    if (why != "-") { int v; skipped.TryGetValue(why, out v); skipped[why] = v + 1; }
+                    continue;
+                }
+                var kv = new KeyValuePair<float, MobileParty>(mp.Position.ToVec2().Distance(p), mp);
+                if (mp.ActualClan == owner) own.Add(kv); else rest.Add(kv);
+            }
+            own.Sort((a, b) => a.Key.CompareTo(b.Key));
+            rest.Sort((a, b) => a.Key.CompareTo(b.Key));
+            var res = new List<MobileParty>(own.Count + rest.Count);
+            foreach (var kv in own) res.Add(kv.Value);
+            foreach (var kv in rest) res.Add(kv.Value);
+            return res;
+        }
+
+        /// <summary>Obsada twierdzy `s` (pan juz zmieniony): szeregowi dawcow do zalogi az do celu (miasto 400, zamek 200, nie ponad limit zalogi gry ani cel zalogi wedlug gry). Zwraca opis do linii.</summary>
+        private static string FillGarrison(Settlement s, string rowId)
+        {
+            var owner = s.OwnerClan;
+            var k = owner.Kingdom;
+            var town = s.Town;
+            var g = town.GarrisonParty;
+            int n0 = Men(g);
+            int cap = s.IsTown ? GarTownTarget : GarCastleTarget;
+            var sb = new StringBuilder(400);
+            sb.Append("obsada ").Append(Nm(s)).Append(" (f21-zaloga, ").Append(k != null ? Nm(k) : owner.Name.ToString()).Append("): cel ").Append(cap);
+            var skipped = new Dictionary<string, int>(StringComparer.Ordinal);
+            var donors = Donors(s, owner, k, skipped);
+            int avail = 0;
+            foreach (var d in donors) avail += Spare(d);
+            if (g == null && avail > 0)
+            {
+                // zaloga bez partii (ROT/gra jej nie maja) - ta sama droga, ktora gra tworzy ja w LeaveTroopsToGarrison
+                s.AddGarrisonParty();
+                g = town.GarrisonParty;
+                if (g != null) sb.Append(", partia zalogi utworzona (AddGarrisonParty)");
+            }
+            if (g == null || g.MemberRoster == null || g.Party == null)
+            {
+                sb.Append(", zaloga ").Append(n0).Append(" - ").Append(avail > 0 ? "brak partii zalogi, bez obsady" : "brak partii zalogi i wolnych ludzi u dawcow");
+                return sb.ToString();
+            }
+            int lim = g.Party.PartySizeLimit;
+            int game = GameGarrisonTarget(s);
+            int target = Math.Max(0, Math.Min(cap, lim));
+            if (game >= 0) target = Math.Min(target, game);
+            sb.Append(", limit zalogi gry ").Append(lim).Append(", cel zalogi wedlug gry ")
+              .Append(game >= 0 ? game.ToString(Inv) + " (zywnosc, sila krolestwa, kiesy rodow; widelki gry " + (s.IsTown ? "125-750" : "75-500") + ")" : "brak (metoda gry nieczytelna - tylko limit)")
+              .Append(" -> cel ").Append(target);
+            int need = Math.Max(0, target - g.MemberRoster.TotalManCount);
+            var parts = new List<string>();
+            int got = 0, usedDonors = 0;
+            foreach (var d in donors)
+            {
+                if (need <= 0) break;
+                int sp = Spare(d);
+                if (sp <= 0) continue;
+                int before = Men(d);
+                int m = MoveToGarrison(s, d, g, Math.Min(sp, need), rowId);
+                if (m <= 0) continue;
+                need -= m; got += m; usedDonors++;
+                parts.Add(Nm(d) + " (" + (d.ActualClan == owner ? "rod pana" : d.ActualClan.Name.ToString()) + ", odl. " + d.Position.ToVec2().Distance(s.GatePosition.ToVec2()).ToString("0", Inv)
+                          + ") " + m + " z " + before);
+            }
+            sb.Append(", zaloga przed ").Append(n0).Append(" -> po ").Append(Men(g)).Append(" (przeniesieni ").Append(got).Append(" od ").Append(usedDonors).Append(" partii");
+            sb.Append(parts.Count > 0 ? ": " + string.Join("; ", parts.ToArray()) : "").Append(')');
+            if (need > 0)
+                sb.Append(", BRAK ").Append(need).Append(" do celu (dawcow ").Append(donors.Count).Append(", wolnych ludzi u nich bylo ").Append(avail)
+                  .Append(" - kazdy zostawia >= ").Append((int)(DonorKeepShare * 100)).Append("% i >= ").Append(DonorKeepMin).Append(')');
+            if (skipped.Count > 0)
+            {
+                var sk = new List<string>();
+                foreach (var kv in skipped) sk.Add(kv.Key + " " + kv.Value);
+                sb.Append(", pominiete partie: ").Append(string.Join(", ", sk.ToArray()));
+            }
+            sb.Append(", milicja ").Append((int)s.Militia).Append(", zywnosc ").Append((int)town.FoodStocks);
+            return sb.ToString();
+        }
+
+        private static bool _gtTried;
+        private static MethodInfo _gtIdeal;
+
+        /// <summary>Cel zalogi wedlug gry: GarrisonTroopsCampaignBehavior.CalculateSettlementGarrisonPartySizeLimitWithFoodAndWage (prywatna, dekompilacja 1.4.8 - min z limitu
+        /// zalogi, zalogi, ktora osada wyzywi, i sily krolestwa na twierdze x zamoznosc rodow krolestwa x dobrobyt x wsie) w widelkach, ktorych gra uzywa, gdy lord zostawia
+        /// ludzi (CollectPartyGarrisonTransferData: miasto 125-750, zamek 75-500). -1 = brak metody, zachowania albo wyjatek (wtedy sam limit). Nie rzuca.</summary>
+        private static int GameGarrisonTarget(Settlement s)
+        {
+            try
+            {
+                if (!_gtTried)
+                {
+                    _gtTried = true;
+                    _gtIdeal = typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.GarrisonTroopsCampaignBehavior).GetMethod("CalculateSettlementGarrisonPartySizeLimitWithFoodAndWage",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly, null, new[] { typeof(Settlement) }, null);
+                }
+                var c = Campaign.Current;
+                var beh = c != null ? c.GetCampaignBehavior<TaleWorlds.CampaignSystem.CampaignBehaviors.GarrisonTroopsCampaignBehavior>() : null;
+                if (_gtIdeal == null || beh == null) return -1;
+                object r = _gtIdeal.Invoke(beh, new object[] { s });
+                if (!(r is int)) return -1;
+                int lo = s.IsTown ? 125 : 75, hi = s.IsTown ? 750 : 500;
+                return Math.Max(lo, Math.Min(hi, (int)r));
+            }
+            catch (Exception e) { Stumble("GameGarrisonTarget", e); return -1; }
+        }
+
+        /// <summary>Do `max` szeregowych z partii `from` do zalogi `g` - z kazdego stosu proporcjonalnie (sklad dawcy zostaje), ranni proporcjonalnie w stosie;
+        /// wight nie idzie. Ksiega ludzi (FToGarrison, jak latka LeaveTroopsToGarrison) i sprzet (KitsToGarrison - jak LeavePostfix) ida z ludzmi. Zwraca przeniesionych.</summary>
+        private static int MoveToGarrison(Settlement s, MobileParty from, MobileParty g, int max, string rowId)
+        {
+            if (max <= 0 || from == null || g == null) return 0;
+            var fr = from.MemberRoster;
+            var chars = new List<CharacterObject>();
+            var num = new List<int>();
+            var wnd = new List<int>();
+            int tot = 0;
+            for (int i = 0; i < fr.Count; i++)
+            {
+                var el = fr.GetElementCopyAtIndex(i);
+                var c = el.Character;
+                if (c == null || c.IsHero || el.Number <= 0 || Undead.Character(c)) continue;
+                chars.Add(c); num.Add(el.Number); wnd.Add(Math.Max(0, Math.Min(el.WoundedNumber, el.Number))); tot += el.Number;
+            }
+            if (tot <= 0) return 0;
+            int want = Math.Min(max, tot);
+            var take = new int[chars.Count];
+            var frac = new double[chars.Count];
+            int sum = 0;
+            for (int j = 0; j < chars.Count; j++)
+            {
+                double x = (double)num[j] * want / tot;
+                take[j] = Math.Min(num[j], (int)Math.Floor(x));
+                frac[j] = x - take[j];
+                sum += take[j];
+            }
+            for (int rest = want - sum; rest > 0; rest--)                       // reszta po najwiekszych ulamkach
+            {
+                int best = -1; double bf = -1.0;
+                for (int j = 0; j < chars.Count; j++) if (take[j] < num[j] && frac[j] > bf) { bf = frac[j]; best = j; }
+                if (best < 0) break;
+                take[best]++; frac[best] = -1.0;
+            }
+            var moved = new Dictionary<CharacterObject, int>();
+            int total = 0;
+            for (int j = 0; j < chars.Count; j++)
+            {
+                int k = take[j];
+                if (k <= 0) continue;
+                int n = num[j], w = wnd[j];
+                int wk = (int)Math.Round((double)k * w / n);
+                wk = Math.Max(0, Math.Min(wk, Math.Min(w, k)));
+                if (k - wk > n - w) wk = k - (n - w);                         // zdrowych nie wiecej niz jest
+                fr.AddToCounts(chars[j], -k, false, -wk);
+                g.MemberRoster.AddToCounts(chars[j], k, false, wk);
+                int v; moved.TryGetValue(chars[j], out v); moved[chars[j]] = v + k;
+                total += k;
+            }
+            if (total <= 0) return 0;
+            try { PeopleBook.Give(g.MemberRoster, PeopleBook.Take(fr, total, PeopleBook.FToGarrison), PeopleBook.FToGarrison); }
+            catch (Exception e) { Stumble("Fill.PeopleBook(" + rowId + ")", e); }
+            try { GarrisonArmory.KitsToGarrison(from, g, moved); }
+            catch (Exception e) { Stumble("Fill.Kits(" + rowId + ")", e); }
+            return total;
+        }
+
         // ------------------------------------------------------------ (e) korekta fabuly: partie starego krolestwa przy osadzie
         private static bool LandParty(MobileParty mp) { return mp != null && mp.IsActive && !mp.IsMainParty && !mp.IsDisbanding; }
 
@@ -854,7 +1113,7 @@ namespace Armoury
             }
             string big = "-"; int bigM = -1;
             foreach (var kv in groups) if (kv.Value > bigM) { bigM = kv.Value; big = names[kv.Key] + " " + kv.Value + " ludzi"; }
-            return "sily w promieniu " + r.ToString("0", Inv) + " po zmianie (tylko pomiar - ryzyko odbicia pustej twierdzy): wrogowie " + Nm(newF) + " " + eP + " partii lordow, "
+            return "sily w promieniu " + r.ToString("0", Inv) + " po zmianie (tylko pomiar - ryzyko odbicia twierdzy): wrogowie " + Nm(newF) + " " + eP + " partii lordow, "
                    + eM + " ludzi zdrowych (najwieksza grupa: " + big + "), wlasne partie " + Nm(newF) + " " + oP + ", " + oM + " ludzi";
         }
 
