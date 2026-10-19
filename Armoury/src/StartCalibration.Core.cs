@@ -1512,12 +1512,13 @@ namespace Armoury
                         // kcal z surowca jedzenia; bez klucza - jak dotad (surowiec calego niezaplaconego koszyka)
                         double covBase = inp.HomeSub ? rawF : raw;
                         double cov = covBase > 0 ? Math.Min(1.0, hwc * v0 / covBase) : 0.0, hkc = 0, fk = 0, uk = 0;
-                        // f26-wolni (Jeff 19.10 "1a", klucz Ks Home Work Trade Prices): czesc pokryta takze z parytetu w CENACH HANDLU kroku 8 - reka w domu wart tyle, ile jej
-                        // towar przy cenie, po ktorej wies go sprzedaje (cena startu - linia sprzedazy), a jedzenie tyle, ile wies za nie placi (cena koszyka drabiny - krainy);
-                        // wieksza z dwoch czesci pokrytych. Dowod (harness, fin95 / fin98): wsie, ktorych pieniadze kupuja caly koszyk, schodza z pracy domowej do zajec
-                        // (futra, ryby) - cena cienia futer spada 0.17 -> 0.10, V0 sasiadow przy suficie pracy domowej (HomeMax) spada o ok. 40%, a parytet w cenach
-                        // cienia robi im mniej jedzenia z tych samych rak i ziemi (Wolni Ludzie bez pokrycia 13% -> 24%). Rece pracy domowej (cel, punkt staly) - bez zmian
-                        // (rynek Planu ten sam co do liczby); czesc pokryta nigdy mniejsza niz bez klucza. Towar zastepczy z plonu (8b/8c) - fizyczny, bez zmian.
+                        // f26-wolni (Jeff 19.10 "1a", klucz Ks Home Work Trade Prices): czesc pokryta takze z parytetu w CENACH HANDLU kroku 8 - jedna cena na towar po obu
+                        // stronach: reka w domu wart tyle, ile jej towar po cenie startu (ta sama co linia sprzedazy wsi), jedzenie robione w domu tez po cenie startu (bez kosztu
+                        // drogi krainy - nie jest wiezione); wieksza z dwoch czesci pokrytych. Dowod (harness, fin95 / fin98): wsie, ktorych pieniadze kupuja caly koszyk,
+                        // schodza z pracy domowej do zajec (futra, ryby) - cena cienia futer 0.17 -> 0.10 (w grze mieso 0.56 -> 0.06, zboze 1.66 -> 2.34), V0 sasiadow
+                        // przy suficie pracy domowej (HomeMax) spada o ok. 40%, a parytet w cenach cienia robi im mniej jedzenia z tych samych rak i ziemi (Wolni Ludzie bez
+                        // pokrycia 13% -> 24%). Rece pracy domowej (cel, punkt staly) - bez zmian (rynek Planu ten sam co do liczby); czesc pokryta nigdy mniejsza niz bez
+                        // klucza. Towar zastepczy z plonu (8b/8c) - fizyczny, bez zmian.
                         double hkcBase = 0, cov0 = cov;
                         if (tp && cov < 1.0 && covBase > 0 && v0 > 0 && v0T > 0)
                         {
@@ -1525,7 +1526,7 @@ namespace Armoury
                             for (int z = 0; z < NZ; z++)
                             {
                                 if (!v.Ok[z] || !(u[z] > 0) || (inp.HomeSub && !(KsBasket.Kcal[z] > 0))) continue;
-                                rS += u[z] * RawZ(sz, m * NZ, z); rT += u[z] * RawZ(pzu, po, z);
+                                rS += u[z] * RawZ(sz, m * NZ, z); rT += u[z] * RawZ(pz, m * NZ, z);
                             }
                             double need = covBase / v0, pS = Math.Min(need, hwSFin), pOk = need - pS;
                             double kT = rS > 0 && rT > 0 ? (v0T / rT) / (v0 / rS) : 0.0;   // ile razy wiecej jedzenia z reki w cenach handlu niz w cenach cienia
