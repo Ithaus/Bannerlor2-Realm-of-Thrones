@@ -7540,6 +7540,10 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsWarGrantTreasuryPaysDues { get; set; } = true;
 
+        [SettingPropertyBool("Ds War Grant Treasury Covers Dues", HintText = "with Ds War Grant Treasury To Reserve and Ds War Grant Treasury Pays Dues: the treasure above the war reserve and the debts also carries the Iron Bank's instalments, the mercenary contracts and the price of allies called to war, so a king whose ordinary income does not cover them still asks the people for no war grant while his treasury can carry them; the war grant comes back when the treasury falls to the war reserve. Gifts and reparations are still paid only from the day's income. Off = these dues are left to the war grant whenever the ordinary income does not cover them, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsWarGrantTreasuryCoversDues { get; set; } = true;
+
         [SettingPropertyBool("Ds Anticipation Loans", HintText = "with Ds Towns: then the burghers of the realm lend the crown against the instalments of the war grant not yet paid (Crown Town Loan Rate Year a year); the loan is repaid first from those instalments, and what is left after the quarter becomes ordinary crown debt to the towns (needs Crown Town Loans)", RequireRestart = false)]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsAnticipationLoans { get; set; } = true;
@@ -9920,6 +9924,7 @@ namespace Armoury
             s.DsWarGrantTreasuryFirst = DsWarGrantTreasuryFirst;
             s.DsWarGrantTreasuryToReserve = DsWarGrantTreasuryToReserve;
             s.DsWarGrantTreasuryPaysDues = DsWarGrantTreasuryPaysDues;
+            s.DsWarGrantTreasuryCoversDues = DsWarGrantTreasuryCoversDues;
             s.DsAnticipationLoans = DsAnticipationLoans;
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;
