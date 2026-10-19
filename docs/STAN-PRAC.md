@@ -3217,3 +3217,14 @@ pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw 
   DO DECYZJI JEFFA (docs/noc-1718/f24-rynek-CHANGELOG.md): Wolni Ludzie 0.68 (A paczka Planu krok 8 / B prog 0.65), jedwab -28% wsi na rzecz pol mieszczan KS (A ok / B paczka),
   aksamit ZC1-4 (A tkalnie przed mieszczanami / B kontrakty surowca / C zmienic cel); korona: "8a doslownie" dla 186/185/168 w sesji DS (f24-korona CHANGELOG).
   Scalone noc-ks4 2a76d3c6 (Armoury aefc0ee7, reszta jak 84). TEST fin98 160 dob -Speed 16 w toku. Limit tygodniowy 89% (reset 24.10).
+
+### 91. WGRANIE 85 (19.10 ok. 05:00 PDT) - DROBIAZGI f24 - START TUTAJ
+W grze: `w-toku/noc-wgranie-85` = noc-ks4 2a76d3c6 (+ 6d577536 CHANGELOG) | Armoury **aefc0ee7**, reszta jak 84 (CrashScribe f98aac55, RC 8dbedff3, GT 87465d27).
+Kopie *.bak-2026-10-19-wgranie85-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie85-przed; Jeff nie gral 84 (zapisy bez zmian od kopii po-sesji-81b).
+= 84 + f24-korona (klucz Ds War Grant Treasury Pays Dues; mnoznik f w CSV dokladnie) + f24-rynek (checker NAKUM-18 bez ujscia).
+TESTY: fin98 160 dob x20 (Armoury-2026-10-19_04-16-45.log, 31 min) 0 ERROR; nzwrot/ndoplata/nkorona 0 NIE (ze skarbca f24 razem 44 849 zl); 5 dob + bitwa
+(Armoury-2026-10-19_04-54-53.log) 0 ERROR, bitwa wygrana. Nowe NIE fin98 (przebieg, nie f24): NAKUM-7 glowy rodow +50 tys./d (skoki 450-550 tys. w 4 dobach,
+ksiega domknieta), NKA-1 zaleglosci DS 1.11 mln (fin97 0.5) - obserwowac. Bieg x16 padl: Better Time CtrlSpaceMultiplier=16 cofa mnoznik do 0 -> testy -Speed 20.
+DO DECYZJI JEFFA (pytania 1-4 w czacie 19.10): 1 Wolni Ludzie 0.65-0.68 (a paczka Planu / b prog 0.65), 2 jedwab pola mieszczan (a ok / b paczka), 3 aksamit (a/b/c),
+4 "8a doslownie" w sesji DS (a zostawic / b ze skarbca). Rada: 1a 2a 3c 4b; duze paczki po resecie limitu (tydzien 89%, reset 23.10 ok. 20:00 PDT).
+Pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw skarbiec (f23)" z polem f24.
