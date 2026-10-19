@@ -134,6 +134,7 @@ namespace CrashScribe
         {
             base.OnApplicationTick(dt);
             Watchdog.Beat();
+            GcPulse.Tick();   // UW: linia "GC (UW)" raz na minute (Config.GcPulseLog)
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)

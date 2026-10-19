@@ -11,6 +11,13 @@ namespace CrashScribe
         public static bool CatchFirstChance = true;    // bledy zlapane gdzies dalej - czesto prawdziwa przyczyna
         public static bool OnlyModdedFirstChance = true; // ...ale tylko te, w ktorych widac jakiegos moda
         public static bool WrapModMethods = true;      // siec Harmony na metodach naszych modow
+        // UW (zawieszenie 19.10 16:09, docs/noc-1920/zawieszenie-CHANGELOG.md): siec i straz miejsc gry NIE zakladaja sie na metody o ciele IL
+        // do NetTinyIlBytes bajtow (puste SyncData, lambdy "() => { }", "x => x.Pole"). Kod JIT takiej metody ma 1-4 bajty, 5-bajtowy skok Harmony
+        // nachodzi na opis stosu (UNWIND_INFO) zaraz za kodem; GC, ktory zastanie watek na tym skoku, zakleszcza gre. Wyjatek z takiej metody
+        // i tak lapie siec metody, ktora ja wola (lambdy wolaja nasze metody). false = siec na wszystkich metodach jak dotad.
+        public static bool NetSkipTinyMethods = true;
+        public static int NetTinyIlBytes = 12;         // prog rozmiaru ciala IL (bajty); w grze 19.10 wszystkie 95 nasze metody z kodem JIT < 5 B mialy IL <= 9 B
+        public static bool GcPulseLog = true;          // UW: linia "GC (UW)" raz na minute zegara (liczba odsmiecan pamieci gen0/1/2 i ich przyrost) - pomiar, jak czesto GC zatrzymuje watki gry
         public static bool SwallowModErrors = true;    // zlapany blad w modzie: zapisz i jedz dalej zamiast CTD
         public static bool WrapCampaignHotspots = true;// dodatkowa siec na newralgicznych miejscach gry
         public static bool ShowInGame = true;          // krotka czerwona notka na ekranie, ze cos poszlo nie tak
@@ -176,6 +183,9 @@ namespace CrashScribe
                         case "CatchFirstChance": CatchFirstChance = B(v); break;
                         case "OnlyModdedFirstChance": OnlyModdedFirstChance = B(v); break;
                         case "WrapModMethods": WrapModMethods = B(v); break;
+                        case "NetSkipTinyMethods": NetSkipTinyMethods = B(v); break;
+                        case "NetTinyIlBytes": NetTinyIlBytes = I(v, NetTinyIlBytes); break;
+                        case "GcPulseLog": GcPulseLog = B(v); break;
                         case "SwallowModErrors": SwallowModErrors = B(v); break;
                         case "WrapCampaignHotspots": WrapCampaignHotspots = B(v); break;
                         case "ShowInGame": ShowInGame = B(v); break;

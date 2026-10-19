@@ -17,6 +17,7 @@ namespace CrashScribe
     {
         [ThreadStatic] private static bool _inside;
         private static int _wrapped;
+        private static int _skippedTiny;   // UW: metody pominiete przez Patchable jako za male na skok Harmony (licznik od startu gry)
 
         // AUDYT 13.10 (siec): oba finalizatory BEZ parametru "MethodBase __originalMethod". Harmony wyliczal go przy
         // KAZDYM wywolaniu zalatanej metody (ldtoken + MethodBase.GetMethodFromHandle: nowy RuntimeMethodInfo 240 B,
@@ -122,6 +123,8 @@ namespace CrashScribe
             var fin = new HarmonyMethod(typeof(Net).GetMethod("ModFinalizer",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public));
 
+            int tinyStart = _skippedTiny;
+            var tinyBy = new System.Text.StringBuilder();
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 string asmName;
@@ -132,10 +135,38 @@ namespace CrashScribe
                 if (mod == null || mod == "Native") continue;
                 if (wanted.Count > 0 && !wanted.Contains(mod)) continue;
 
-                int before = _wrapped;
+                int before = _wrapped, tinyBefore = _skippedTiny;
                 WrapAssembly(harmony, asm, fin);
                 Scribe.Line("Net cast over " + mod + " (" + asmName + "): " + (_wrapped - before) + " methods.");
+                if (tinyBy.Length > 0) tinyBy.Append(", ");
+                tinyBy.Append(mod).Append(' ').Append(_skippedTiny - tinyBefore);
             }
+            TinyLine("siec modow", _skippedTiny - tinyStart, tinyBy.ToString());
+        }
+
+        /// <summary>UW: jedna linia po zalozeniu sieci - ile metod pominieto jako za male na skok Harmony.</summary>
+        private static void TinyLine(string what, int n, string detail)
+        {
+            try
+            {
+                Scribe.Line("Net (UW): " + what + " - male metody bez sieci (IL <= " + Config.NetTinyIlBytes + " B): " + n
+                            + (string.IsNullOrEmpty(detail) ? "" : " (" + detail + ")")
+                            + (Config.NetSkipTinyMethods && Config.NetTinyIlBytes > 0 ? "" : " - REGULA WYLACZONA (NetSkipTinyMethods / NetTinyIlBytes)") + ".");
+            }
+            catch { }
+        }
+
+        /// <summary>UW: rozmiar ciala IL metody w bajtach (int.MaxValue, gdy nie da sie odczytac - wtedy metoda nie jest "mala").
+        /// Tylko przy zakladaniu sieci (start gry) - alokuje kopie IL.</summary>
+        private static int IlSize(MethodInfo m)
+        {
+            try
+            {
+                var body = m.GetMethodBody();
+                var il = body != null ? body.GetILAsByteArray() : null;
+                return il != null ? il.Length : int.MaxValue;
+            }
+            catch { return int.MaxValue; }
         }
 
         private static void WrapAssembly(Harmony harmony, Assembly asm, HarmonyMethod fin)
@@ -179,6 +210,8 @@ namespace CrashScribe
                 if (m.IsSpecialName && (m.Name.StartsWith("get_") || m.Name.StartsWith("set_") ||
                                         m.Name.StartsWith("add_") || m.Name.StartsWith("remove_"))) return false;
                 if (m.Name == "Finalize" || m.Name == "GetHashCode" || m.Name == "Equals" || m.Name == "ToString") return false;
+                // UW (zawieszenie 19.10 16:09): za mala metoda - kod JIT 1-4 B, skok Harmony psuje jej opis stosu; patrz Config.NetSkipTinyMethods
+                if (Config.NetSkipTinyMethods && Config.NetTinyIlBytes > 0 && IlSize(m) <= Config.NetTinyIlBytes) { _skippedTiny++; return false; }
                 return true;
             }
             catch { return false; }
@@ -201,7 +234,7 @@ namespace CrashScribe
             var fin = new HarmonyMethod(typeof(Net).GetMethod("WatchFinalizer",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public));
 
-            int n = 0;
+            int n = 0, tinyStart = _skippedTiny;
             foreach (var name in Hotspots)
             {
                 var t = FindType(name);
@@ -219,6 +252,7 @@ namespace CrashScribe
                 }
             }
             Scribe.Line("Watch over the game's hotspots: " + n + " methods.");
+            TinyLine("straz miejsc gry", _skippedTiny - tinyStart, null);
         }
 
         private static IEnumerable<Type> Concretes(Type baseType)

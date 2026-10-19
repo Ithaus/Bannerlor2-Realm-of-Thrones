@@ -51,14 +51,22 @@ namespace Armoury
         /// BkSupplyMaxPieces / BkSupplyDaysCap, wiec CALY zapas nigdy nie
         /// przekroczy BkSupplyMaxPieces sztuk danego dobra. Gracz nietkniety.
         /// </summary>
+        // UW (zawieszenie 19.10 16:09): NeedCapPostfix idzie na watkach AI partii (MobilePartyAi.Tick) - Traverse alokowal przy kazdym wywolaniu
+        // (2 obiekty Traverse + szukanie wlasciwosci + pudelko bool), a ta alokacja wywolala GC, od ktorego zaczelo sie zawieszenie gry.
+        // Getter AutoBuying skompilowany raz w ApplyAll (ta sama wlasciwosc, ten sam wynik); brak gettera = stara droga Traverse.
+        private static Func<object, bool> _autoGet;
+
         public static void NeedCapPostfix(object __0, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
         {
             try
             {
                 var c = Settings.Current;
                 if (c == null || c.BkSupplyMaxPieces <= 0) return;
+                if (__0 == null) return;   // jak dotad: Traverse na null dawal false - bez czapki
                 bool auto = false;
-                try { auto = HarmonyLib.Traverse.Create(__0).Property("AutoBuying").GetValue<bool>(); } catch { }
+                var ag = _autoGet;
+                if (ag != null) { try { auto = ag(__0); } catch { } }
+                else { try { auto = HarmonyLib.Traverse.Create(__0).Property("AutoBuying").GetValue<bool>(); } catch { } }
                 if (!auto) return;   // gracz kupuje recznie - bez czapki
                 float perDay = (float)c.BkSupplyMaxPieces / Math.Max(1, c.BkSupplyDaysCap > 0 ? c.BkSupplyDaysCap : 4);
                 __result.LimitMax(perDay);
@@ -476,6 +484,8 @@ namespace Armoury
                 var tModel = QuartermasterLaw.FindType("BannerKings.Models.BKModels.BKPartyNeedsModel");
                 if (tModel != null)
                 {
+                    try { _autoGet = Getter<bool>(t, "AutoBuying"); } catch (Exception e) { _autoGet = null; Log.Error("BkSupplyTemper.ApplyAll(AutoBuying)", e); }
+                    Log.Info("BkSupplyTemper (UW): czapka potrzeb BK czyta AutoBuying " + (_autoGet != null ? "skompilowanym getterem (bez alokacji na watkach AI)" : "przez Traverse (BRAK gettera - alokacja jak dotad)") + ".");
                     var capPost = new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "NeedCapPostfix");
                     foreach (var mm in tModel.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly))
                     {

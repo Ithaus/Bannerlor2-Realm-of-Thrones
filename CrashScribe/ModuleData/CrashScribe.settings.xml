@@ -16,6 +16,12 @@
 
   <!-- a Harmony net over every method of the listed mods -->
   <WrapModMethods>true</WrapModMethods>
+  <!-- the net skips very small methods (IL body up to NetTinyIlBytes bytes): a Harmony jump on a 1-4 byte method breaks the
+       stack description Windows needs, and a garbage collection that catches the game thread there freezes the game for good -->
+  <NetSkipTinyMethods>true</NetSkipTinyMethods>
+  <NetTinyIlBytes>12</NetTinyIlBytes>
+  <!-- one line a minute in the session log: how many garbage collections ran (diagnostics only) -->
+  <GcPulseLog>true</GcPulseLog>
   <!-- caught an error inside one of our mods: write it down and carry on instead of a crash to desktop.
        Set to false if you would rather the game die loudly at the exact spot. -->
   <SwallowModErrors>true</SwallowModErrors>
