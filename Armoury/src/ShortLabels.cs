@@ -105,8 +105,12 @@ namespace Armoury
                         {
                             if (o == null || o.IdString == null || !o.IdString.StartsWith("arm_", StringComparison.Ordinal)) continue;
                             n++;
+                            // surowy tekst bez przedrostka "{=id}": zmienna w srodku = napis liczony na zywo (np. nocleg), mierzony nie jest
+                            string src = o.Text != null ? o.Text.Value ?? "" : "";
+                            if (src.StartsWith("{=", StringComparison.Ordinal)) { int e = src.IndexOf('}'); src = e >= 0 ? src.Substring(e + 1) : src; }
+                            if (src.IndexOf('{') >= 0) { live++; continue; }
                             string raw = o.Text != null ? o.Text.ToString() : "";
-                            if (raw.Length == 0 || raw.IndexOf('{') >= 0) { live++; continue; }
+                            if (raw.Length == 0) { live++; continue; }
                             int w = MenuWidth(raw);
                             if (w > MenuPx) over++;
                             if (w > maxW) { maxW = w; maxT = raw; }
