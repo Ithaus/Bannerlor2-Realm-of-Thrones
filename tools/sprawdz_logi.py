@@ -989,12 +989,15 @@ Uzycie (Python 3, tylko odczyt):
                     noclegi, plotki (INFO). Autotest nie klika zajazdow - bez noclegu i sluchania te progi INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa nzc1      : (16.10, projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md paczka ZC1 "drogi towarow"; galaz w-toku/noc-zc1, Armoury/src/GoodsPaths.cs)
                     python -I tools/sprawdz_logi.py --grupa nzc1 [--baza-doby <log biegu bazowego bez ZC1>] <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie
-                    doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast, ZC1-5 sol: cena wozu / cena miasta
+                    doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu (f25-sprawdz,
+                    decyzja Jeffa 3c: dolna granica ze sredniej 'cena u wytworcy' linii 'Zbytki ludu (P3-P5)'; ZC1-4a wszystkie miasta - INFO; ZC1-4o okolica tkalni -
+                    INFO, log nie ma indeksu wedlug miasta ani odleglosci), ZC1-5 sol: cena wozu / cena miasta
                     0.6-1.2 (doby po przejsciu woza), ZC1-5c kasy miast targowych wsi solnych >= 0.8 x poczatek, ZC1-6 zrodla "bez nazwy" w jedzeniu <= 2 szt./d na towar,
                     ZC1-7 RemoveParty w jedzeniu <= 2/d, ZC1-8 kontrola z ksiega rudy i drewna ZGODNA, ZC1-9a/b przejscie BK (marmur i miod), ZC1-9c produkcja miodu
                     pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego <= 1.10 x poczatek, ZC1-10 konwoje DTE i karawany BK bez jedzenia z niczego, ZC1-10c cele karawan
                     zywnosci bez zapasu <= 10%, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zapas zboza >= 0.95 x baza, ZC1-16 przyrost zapasu
-                    jedwabiu i rudy srebra <= 10% produkcji, ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza (czesc produkcji wsi bez pol mieszczan KS - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza, ZC1-18 reszta
+                    jedwabiu i rudy srebra <= 10% produkcji, ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza x czesc produkcji wsi bez pol mieszczan KS (f25-sprawdz,
+                    decyzja Jeffa 2a; sam stosunek do bazy - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza, ZC1-18 reszta
                     bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu; reszta INFO. Bez --baza-doby progi "wobec bazy" - wobec poczatku biegu
                     albo INFO. Log bez paczki: INFO.
                     fix-ksiega (noc 17/18.10, klucz OreLedgerTownCraftsColumn): ZC1-8a kolumna "przetwory miast" kontroli (wsad rzemiosla miasta - przetwory ZC5 i 148 -
@@ -37169,6 +37172,9 @@ NZ1_CTLN = re.compile(r"(?P<g>ruda|drewno) (?P<ok>ZGODNA|NIEZGODNA) \(wsie (\d+)
                       r"(?:, przetwory miast (?P<ca>\d+)/(?P<cb>\d+))?, zapas (\d+)/(\d+)")
 NZ1_ZC5IRON = re.compile(r"^Przetwory miast \(ZC5\): dzien (?P<day>-?\d+) .*?zelazo -> narzedzia \d+ szt\. \(wsad (?P<iron>\d+);")
 NZ1_VELREC = re.compile(r"velvet_weavery cotton->velvet (\d+):(\d+)")
+# f25-sprawdz (decyzja Jeffa 3c): srednia indeksu aksamitu w miastach z tkalnia (linia 'Zbytki ludu (P3-P5)', MakerPrices) i lista tkalni (tygodniowa 'Warsztaty zbytkow (P1)')
+NZ1_MKV = re.compile(r"cena u wytworcy \([^)]*\): [^|]*?\bvelvet ([\d.]+|-) w (\d+)")
+NZ1_VELW = re.compile(r"(?:; |: )velvet: miast (\d+), linii produkcji \d+ \(([^)]*)\)")
 # fix-ksiega recenzja: stan reguly "rzemioslo pierwsze" jedwabiu (SilkToWeavers) z linii doby ZC1 - tak/nie, miast z zapasem, polka <= zapas
 NZ1_SILKON = re.compile(r"jedwab (tak|nie) - miast z zapasem (\d+), zapas \d+ szt\., polki \d+, polka <= zapas (\d+)")
 NZ1_K4F = re.compile(r"; jedzenie (\d+) z wlasnym limitem \d+, ponad limit (\d+)\)")
@@ -37186,7 +37192,8 @@ def _nz1_wagon(s, gid):
 def _nz1_scan(path, full):
     """Jeden przebieg logu: linie wspolne z biegiem bazowym (Towary, utarg wozow, Ceny surowcow, bilans pieniadza) i - przy full - linie paczki ZC1."""
     D = {"hooks": [], "days": [], "bad": [], "goods": {}, "ctl": [], "unknown_food": 0, "horses": 0, "n_err": 0, "k4f": [], "wagon": {}, "nd": {}, "reszta": {}, "fishauth": "", "a17f2": [],
-         "ctln": [], "zc5iron": {}, "velrec": None}   # fix-ksiega: liczby kontroli wedlug doby, wsad zelaza ZC5 wedlug doby, receptura aksamitu KS
+         "ctln": [], "zc5iron": {}, "velrec": None,   # fix-ksiega: liczby kontroli wedlug doby, wsad zelaza ZC5 wedlug doby, receptura aksamitu KS
+         "mkv": {}, "velw": None}   # f25-sprawdz: srednia indeksu aksamitu w miastach z tkalnia wedlug doby (M, N), ostatnia lista tkalni aksamitu (N, nazwy)
     with open(path, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -37251,6 +37258,14 @@ def _nz1_scan(path, full):
                 D["a17f2"].append(s)
             elif s.startswith("Towary (konie jako kapital, ZC1): dzien "):
                 D["horses"] += 1
+            elif s.startswith("Zbytki ludu (P3-P5): dzien "):
+                mm, md = NZ1_MKV.search(s), NZ1_DAY.search(s)
+                if mm and md:
+                    D["mkv"][int(md.group(1))] = (float(mm.group(1)) if mm.group(1) != "-" else None, int(mm.group(2)))
+            elif s.startswith("Warsztaty zbytkow (P1): dzien "):
+                mm = NZ1_VELW.search(s)
+                if mm:
+                    D["velw"] = (int(mm.group(1)), mm.group(2))
             elif s.startswith(NZ1_ERR):
                 D["n_err"] += 1
     return D
@@ -37267,6 +37282,11 @@ def _nz1_ramp(s, name):
 def _nz1_mean(v):
     v = [x for x in v if x is not None]
     return sum(v) / len(v) if v else None
+
+
+def _nz1_ceil(v):
+    """f25-sprawdz: sufit liczby (bez modulu math), z tolerancja 1e-9 (5.0000000001 -> 5)."""
+    return -int(-(v - 1e-9) // 1)
 
 
 def _nz1_ctl_fix(rep, D):
@@ -37391,12 +37411,13 @@ def _nz1_market_info(rep, D):
 def nzc1_main(logp, bdp=None):
     """nzc1 (16.10; projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 13-14, paczka ZC1; Armoury/src/GoodsPaths.cs): drogi towarow. Wejscie: log Armoury
     (strumieniowo), opcjonalnie --baza-doby <log biegu bazowego bez ZC1> (progi "nie gorzej niz baza"; bez bazy - wobec poczatku biegu albo INFO).
-    ZC1-0 latki, ZC1-1 linie doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast (mediana 28 dob),
+    ZC1-0 latki, ZC1-1 linie doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu
+    (f25-sprawdz, decyzja Jeffa 3c: dolna granica ze sredniej indeksu tych miast, mediana 28 dob; ZC1-4a wszystkie miasta i ZC1-4o okolica tkalni - INFO),
     ZC1-5 sol: cena wozu / cena miasta 0.6-1.2 (doby z przejsciem woza 1.00; bez nich - INFO), ZC1-5c kasy miast targowych wsi solnych (7 ostatnich dob >= 0.8 x 7
     pierwszych), ZC1-6/7 jedzenie "bez nazwy" i RemoveParty <= 2 szt./d na towar, ZC1-8 kontrola z ksiega rudy i drewna, ZC1-9a marmur 0.7-1.3, ZC1-9b miod lesny
     0.7-1.3, ZC1-9c produkcja miodu pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego nie wyzszy niz baza (x1.10), ZC1-10 konwoje DTE i karawany BK (je 0),
     ZC1-10c cele karawan zywnosci bez zapasu <= 10% celodob, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zboze (zapas wobec bazy),
-    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza (bez bazy: doby 2-29 biegu, f16-ks; czesc produkcji wsi bez pol mieszczan KS - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza,
+    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza x czesc produkcji wsi bez pol mieszczan KS (f25-sprawdz, decyzja Jeffa 2a; bez bazy: doby 2-29 biegu, f16-ks; sam stosunek - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza,
     ZC1-18 reszta bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu, reszta INFO. Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -37438,11 +37459,53 @@ def nzc1_main(logp, bdp=None):
         rep.add("ZC1-3: mieso wieloryba w produkcji miesa (ksiega towarow, doby 2..)", f"WhaleMeat {wp}, meat {mp} -> {share:.1%}", "<= 10%", share <= 0.10)
     else:
         rep.add("ZC1-3: mieso wieloryba", "za malo dob ksiegi towarow", "INFO", None)
-    # ZC1-4 aksamit
+    # ZC1-4 aksamit (f25-sprawdz, decyzja Jeffa 3c z 19.10: "aksamit ma byc tani w miastach z tkalnia i w ich okolicy, dalej drogi jak luksus - w grze nic sie
+    # nie zmienia, tylko pomiar"). Prog na miastach z tkalnia aksamitu. Log podaje dla nich tylko SREDNIA indeksu: linia 'Zbytki ludu (P3-P5)', pole 'cena u
+    # wytworcy ... velvet M w N' (TownFolk.Luxury MakerPrices - ten sam Town.GetItemCategoryPriceIndex co licznik linii ZC1). Indeks >= 0, a miasto drogie
+    # (nie tanie) ma indeks >= 9.99 (GoodsPaths: tanie = ix < 9.99), wiec N x M >= (N - c) x 9.99, czyli tanich c >= N x (1 - M / 9.99); M w linii zaokraglone
+    # do 0.01 - liczymy z M + 0.005. To DOLNA granica: prog zalicza tylko, gdy sama srednia dowodzi >= 50% tanich miast z tkalnia. Drogi aksamit w miescie z
+    # tkalnia (indeks ~10) podnosi M i obniza granice - wiersz nie jest slepy. Koszt ostroznosci: tanie miasta z tkalnia, ale tylko lekko tanie (indeks 5-9),
+    # tez obnizaja granice (prog moze odrzucic bieg, w ktorym naprawde jest 50% - nigdy nie zaliczy biegu, w ktorym jest mniej). Gorna granica - min(N, tanich
+    # w calym swiecie tej doby z linii ZC1).
+    # Okolica tkalni: log nie ma indeksu aksamitu wedlug miasta ani odleglosci miast (ks-miasta.csv - tylko 'kraina', region kultury) - ZC1-4o INFO.
+    vday = {}
+    for s in days:
+        md, mv = NZ1_DAY.search(s), NZ1_VELVET.search(s)
+        if md and mv:
+            vday[int(md.group(1))] = (int(mv.group("n")), int(mv.group("low")))
+    mkd = [d for d in sorted(D["mkv"]) if D["mkv"][d][0] is not None and D["mkv"][d][1] > 0]
+    vrow = None
+    if mkd:
+        vrows = []
+        for d in mkd[-28:]:
+            m, n = D["mkv"][d]
+            lo = min(n, max(0, _nz1_ceil(n * (1.0 - (m + 0.005) / 9.99))))
+            hi = max(lo, min(n, vday[d][1])) if d in vday else n   # linia ZC1 i 'Zbytki ludu' licza o innej porze doby - gorna nie ponizej dolnej
+            vrows.append((lo / n, m, n, lo, hi, d))
+        vmed = st.median([r[0] for r in vrows])
+        vrow = vrows[-1]
+        vw = D["velw"]
+        rep.add("ZC1-4: aksamit tani (indeks < 10) w miastach z tkalnia aksamitu - decyzja Jeffa 3c (19.10); dolna granica ze sredniej indeksu, mediana ostatnich do 28 dob",
+                f"co najmniej {vmed:.0%} (ostatnia doba: srednia indeksu {vrow[1]:.2f} w {vrow[2]} miastach z tkalnia -> tanich co najmniej {vrow[3]}, najwyzej {vrow[4]})"
+                + (f"; tkalnie aksamitu (ostatni tydzien): {vw[1]}" if vw else ""),
+                ">= 50% miast z tkalnia (okolica tkalni - ZC1-4o)", vmed >= 0.5)
+    else:
+        rep.add("ZC1-4: aksamit tani w miastach z tkalnia aksamitu (decyzja Jeffa 3c)", "brak pola 'cena u wytworcy ... velvet M w N' w linii 'Zbytki ludu (P3-P5)'",
+                "INFO (log bez paczki P3-P5 albo swiat bez tkalni aksamitu)", None)
     vel = [int(NZ1_VELVET.search(s).group("low")) / int(NZ1_VELVET.search(s).group("n")) for s in days if int(NZ1_VELVET.search(s).group("n")) > 0]
     if vel:
         med = st.median(vel[-28:])
-        rep.add("ZC1-4: indeks aksamitu < 10 (czesc miast, mediana ostatnich do 28 dob)", f"{med:.0%} (pierwsza doba {vel[0]:.0%}, ostatnia {vel[-1]:.0%})", ">= 50% miast", med >= 0.5)
+        rep.add("ZC1-4a: indeks aksamitu < 10 we wszystkich miastach (czesc miast, mediana ostatnich do 28 dob)", f"{med:.0%} (pierwsza doba {vel[0]:.0%}, ostatnia {vel[-1]:.0%})",
+                "INFO (dawny prog >= 50% miast; decyzja 3c: poza tkalniami i ich okolica aksamit ma zostac drogi)", None)
+    if vrow is not None and vrow[5] in vday:
+        tn, tk = vday[vrow[5]]
+        rest = tn - vrow[2]
+        a0, a1 = max(0, tk - vrow[4]), max(0, tk - vrow[3])
+        rep.add("ZC1-4o: aksamit w okolicy tkalni (ostatnia doba)",
+                f"nie do zmierzenia z logu - brak indeksu aksamitu wedlug miasta i odleglosci miast (linia ZC1: tylko liczba tanich w swiecie, 'Zbytki ludu': tylko srednia "
+                f"miast z tkalnia, ks-miasta.csv: tylko 'kraina' - region kultury); poza {vrow[2]} miastami z tkalnia ({rest}): tanich od {min(a0, rest)} do {min(a1, rest)}, "
+                f"drogich (indeks >= 9.99) od {max(0, rest - a1)} do {max(0, rest - a0)} - czy tanie leza przy tkalniach, log nie mowi",
+                "INFO (okolica - potrzebne pole w logu gry: indeks aksamitu w miastach z tkalnia i w ich sasiadach; osobna paczka kodu, decyzja Jeffa)", None)
     # ZC1-5 sol: cena wozu / cena miasta przy wjezdzie - doby z pelnym przejsciem woza
     full_d = [s for s in days if (_nz1_ramp(s, "woz") or 0.0) >= 0.999]
     for label, sel, judge in (("doby z przejsciem woza 1.00", full_d, True), ("wszystkie doby", days, False)):
@@ -37658,16 +37721,20 @@ def nzc1_main(logp, bdp=None):
                 a, b = _nz1_mean([wg[d] for d in wk[1:1 + nb]]), _nz1_mean([wg[d] for d in wk[-28:]])
                 va, vb = vprod(goods, wk[1:1 + nb]), vprod(goods, wk[-28:])
                 how = f"doby 2-{1 + nb} tego biegu"
-            # f24-rynek po recenzji: prog dalej na samym utargu wozow wsi (jak f16-ks - spadek przy polach mieszczan KS to uczciwy spadek rynku wsi, nie blad
-            # miary). Baza x czesc produkcji wsi (bez "pola mieszczan (KS)") tylko jako INFO w napisie - ile spadku to jedwab przeniesiony z wsi na pola
-            # mieszczan (fin97: wsie 37.7 -> 27.3/d, pola 0 -> 8.3/d) - do decyzji Jeffa. Brak ksiegi towarow albo czesc bez zmiany - bez dopisku
+            # f25-sprawdz (decyzja Jeffa 2a z 19.10: "w porzadku - zmieniam tylko pomiar"): prog na bazie x czesc produkcji wsi (bez "pola mieszczan (KS)")
+            # - przy KS czesc jedwabiu rosnie na polach mieszczan i idzie prosto na polke miasta, bez wozu wsi; wsie jedwabne sprzedaja mniej, bo mniej rodza,
+            # nie dlatego, ze traca rynek (fin97: wsie 37.7 -> 27.3/d, pola 0 -> 8.3/d). Sam stosunek utargu do bazy (dawny prog f16-ks / f24-rynek) i ZC1-16c
+            # (produkcja samych wsi) - INFO. Wsie traca rynek przy tej samej produkcji -> utarg spada wobec bazy x czesc -> NIE (wiersz nie jest slepy).
+            # Brak ksiegi towarow albo czesc bez zmiany (ruda srebra, bieg bez KS) - baza bez przeliczenia, jak dotad
             per = va is not None and vb is not None and va > 0 and vb > 0 and a and a > 0 and abs(vb - va) >= 0.005
-            info = ""
+            ab, info = a, ""
             if per:
                 ab = a * vb / va
-                info = f"; INFO: czesc produkcji wsi (bez pol mieszczan KS) {vb:.2f} / {va:.2f} - baza x czesc {ab:.0f} -> {b / ab:.2f} (jedwab z wsi na polach mieszczan - do decyzji)"
-            rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d)", (f"{b:.0f} / {a:.0f} ({how})" if a else f"{b:.0f} / 0") + info,
-                    ">= 0.80 x baza (wsie jedwabne i kopalnie srebra nie traca rynku)", (b >= 0.8 * a) if a and a > 0 else None)
+                info = (f" = {b / ab:.2f}; INFO: sam stosunek {b:.0f} / {a:.0f} = {b / a:.2f} (dawny prog), czesc produkcji wsi (bez pol mieszczan KS) {vb:.2f} / {va:.2f}"
+                        " - decyzja Jeffa 2a: jedwab z pol mieszczan KS nie jest strata rynku wsi")
+            rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d) wobec bazy x czesc produkcji wsi",
+                    (f"{b:.0f} / {ab:.0f} ({how}{' x czesc produkcji wsi' if per else ''})" if a else f"{b:.0f} / 0") + info,
+                    ">= 0.80 x baza x czesc produkcji wsi (wsie jedwabne i kopalnie srebra nie traca rynku)", (b >= 0.8 * ab) if a and a > 0 else None)
     _nz1_market_info(rep, D)   # fix-ksiega: ZC1-4b, ZC1-9e, ZC1-16c (INFO - przyczyny rynkowe)
     # ZC1-17 'nie do wydania' mieszczan
     nd = {d: v for d, v in D["nd"].items() if v > 0}
