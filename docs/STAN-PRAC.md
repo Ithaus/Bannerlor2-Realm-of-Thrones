@@ -3168,3 +3168,8 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   w grze, wezwanie przeciw Koronie zamkniete) i Nights Watch + Skagos. Drogi: 0 wiosek bez drogi, 73 535 decali, ALE klatki z drogami sr. 21.4 ms / p95 60, test trwal 58.6 min zamiast ~40
   -> paczka f22-drogi-perf (wf_957eb0eb-89d: widocznosc po kawalkach wokol kamery). Wlosci z kronik: w autotescie gracz caly czas w Eyrie - przywrocenie NIE ruszylo (czeka); w zapisie
   testu roznia sie Cape Wrath (Selmy) i Fellwood (Mertyns) -> test 5 dob + bitwa (gracz wychodzi na mape) wf b4qa67fb9 sprawdza sciezke przywrocenia.
+- 19:20 PDT: TEST BITWY fin95 (5 dob + bitwa, Armoury-2026-10-18_18-17-48.log): kod 0, ERROR 0, bitwa WYGRANA; przywrocenie nie ruszylo (gracz po bitwie w Driftwood Hall). Dodany plik autotestu
+  armoury-wlosci-test.flag (743d63d2, 04e805dc: gracz w osadzie spoza tabeli / spotkanie z nia nie blokuje - TYLKO autotest). TEST PRZYWROCENIA (3 doby, Armoury-2026-10-18_18-31-58.log):
+  kod 0, ERROR 0 - Cape Wrath (Selmy -> Seaworth) i Fellwood (Mertyns -> Fell) przekazane: zaloga starego pana 328/336 do partii Stormlands, nowa zaloga 200/200 z partii Dragonstone
+  (dawcy zostawili polowe), wiadomosc gracza, KONIEC zmienione 2 / bez zmian 5, flaga zrobione. Sciezka KL (Polnoc pod Harrenhal, zwrot skarbca) niesprawdzona w grze (w zapisie testu KL u
+  Joffreya). noc-ks4 04e805dc. Czekam na f22-drogi-perf.
