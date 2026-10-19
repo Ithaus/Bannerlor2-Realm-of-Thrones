@@ -83,6 +83,11 @@ internal static class Podglad
         var r = SideRoadPlan.Build(g, m, nodes, obst, p);
         Console.WriteLine(r.Text());
         Console.WriteLine("miejsca z najgestsza siecia: " + SideRoadPlan.DenseSpots(r, 8));
+        // f22-drogi-perf: podzial na komorki i oczekiwane decale w scenie (ten sam kod co w grze - MapSideRoads.ChunkPlan.cs; najdalej 160 jedn. od kamery jak domyslny klucz)
+        var cg = MapSideRoads.GroupChunks(r, nodes, MapSideRoads.ChunkCapDefault);
+        if (cg != null)
+            Console.WriteLine("komorki f22: " + cg.Cells + " po " + cg.Cell.ToString("0", inv) + " jedn. (na komorke srednio " + cg.PerAvg.ToString("0", inv) + ", mediana " + cg.PerMed + ", p90 " + cg.PerP90
+                              + ", najwiecej " + cg.PerMax + "); " + cg.Expect);
         Directory.CreateDirectory(wyj);
         using (var w = new StreamWriter(Path.Combine(wyj, "roads.tsv")))
             for (int k = 0; k < r.Roads.Count; k++)

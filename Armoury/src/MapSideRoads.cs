@@ -25,6 +25,9 @@
 // f19-drogi (Jeff 18.10 wieczorem: "kazda wioska powinna miec droge do siebie"): klucz MapSideRoadsAllVillages (DOMYSLNIE TAK) - plan MapSideRoads.All.cs: kazda
 // wioska ukladu dostaje droge (siec od traktow, miast, zamkow i wsi gry, kolejnosc jak u Prima, laczka pod katem przy trakcie); NIE = plan f11. Wejscie to samo
 // (+ obrys obrazka i nazwa wioski z ukladu); przelaczenie klucza na mapie = decale zdjete i plan od nowa (raz na zmiane).
+// f22-drogi-perf (Jeff 18.10: "przy max x8 predkosci strasznie gra zwalnia i sie przycina tam gdzie jest duzo jednostek"): klucz MapSideRoadsChunks (DOMYSLNIE TAK) -
+// MapSideRoads.Chunks.cs: w scenie tylko komorki 32 x 32 jedn. w kole widoku kamery (zamiast ok. 74 tys. decali caly czas - zwykle 1.5-3.5 tys.); podzial na komorki
+// liczy watek z puli razem z planem; NIE = droga ponizej co do znaku (wszystkie decale, chowane z wioskami). Przelaczenie na mapie - decale od nowa, plan ten sam.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -44,7 +47,7 @@ using TaleWorlds.Library;
 namespace Armoury
 {
     /// <summary>Dane i wejscie bocznych drog (bez typow SandBox.View - bezpieczne do wolania co klatke z SubModuleMain i z ArmouryBehavior).</summary>
-    internal static class MapSideRoads
+    internal static partial class MapSideRoads
     {
         internal const string GridFile = "arm_map_side_roads_grid.tsv";
         internal const string MainFile = "arm_map_roads_geo.tsv";
@@ -133,7 +136,10 @@ namespace Armoury
             string note = ApplyFlag(p, look);
             p.Clamp();
             Log.Info(P + "wlaczone (" + (key ? "klucz MapSideRoads = TAK" : "klucz NIE") + (flag ? ", plik-przelacznik autotestu " + FlagName + " jest" + (note.Length > 0 ? " (" + note + ")" : " (bez zmian parametrow)") : "")
-                     + ") - plan: " + p.Text() + "; wyglad: " + look.Text() + ". Drogi postawi widok mapy (raz), tylko widok - bez zmian predkosci, tras i zapisu gry.");
+                     + ") - plan: " + p.Text() + "; wyglad: " + look.Text() + "; komorki f22 (klucz MapSideRoadsChunks): "
+                     + (KeyChunks ? "TAK - w scenie tylko komorki " + ChunkCell.ToString("0", Inv) + " jedn. wokol widoku kamery, najdalej " + ChunkCap.ToString("0", Inv) + " jedn. od kamery (nie blizej niz rog ekranu przy zwyklym pochyleniu)"
+                                  : "NIE - wszystkie decale w scenie, chowane z wioskami")
+                     + ". Drogi postawi widok mapy (raz), tylko widok - bez zmian predkosci, tras i zapisu gry.");
         }
 
         /// <summary>Parametry planu i wyglad z tresci pliku-przelacznika (linie klucz=wartosc, '#' - komentarz); zwraca opis zmian ("" - bez zmian).</summary>
@@ -198,13 +204,15 @@ namespace Armoury
             public bool KeyAll;                 // f19: klucz MapSideRoadsAllVillages przy starcie planu (zmiana na mapie - plan od nowa)
             public SideRoadPlan.Params Params;
             public Look Look;
+            public ChunkGrid Grid;              // f22: podzial stempli na komorki (watek z puli, po planie); null - plan nieudany albo podzial nieudany
+            public float ChunkCap;              // f22: klucz MapSideRoadsChunkRadiusCap przy starcie planu (do linii oczekiwanych decali)
         }
 
         /// <summary>Zbiera wejscie (watek glowny: wioski ukladu sesji, wsie gry, miasta i zamki) i puszcza plan na watek z puli. Wioski ukladu tylko przy
         /// wlaczonych wioskach na mapie (MapVillagesEnabled - bez obrazkow droga prowadzilaby donikad).</summary>
         internal static Job Start()
         {
-            var job = new Job { Params = new SideRoadPlan.Params(), Look = new Look(), KeyAll = KeyAll };
+            var job = new Job { Params = new SideRoadPlan.Params(), Look = new Look(), KeyAll = KeyAll, ChunkCap = ChunkCap };
             job.Params.AllVillages = job.KeyAll ? 1 : 0;   // f19: regula z klucza; plik-przelacznik autotestu (ApplyFlag, AllVillages=0/1) moze nadpisac
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string fl = ApplyFlag(job.Params, job.Look);
@@ -306,6 +314,12 @@ namespace Armoury
                 job.Note = "siatka v" + g.Version + " " + g.Nx + " x " + g.Ny + " po " + g.Cell.ToString("0.#", Inv) + " jedn. (lad " + g.Land + ", zle wiersze " + g.BadRows + "), trakty: lamanych "
                            + m.Lines + ", odcinkow " + m.Segments + " (zle wiersze " + m.BadRows + "); " + guard;
                 job.Res = SideRoadPlan.Build(g, m, nodes, obst, job.Params);
+                // f22: podzial na komorki i oczekiwane decale w scenie (czysta geometria, tu - nie na watku glownym); nieudany = komorek nie ma, widok idzie stara droga
+                if (job.Res != null)
+                {
+                    try { job.Grid = GroupChunks(job.Res, nodes, job.ChunkCap); }
+                    catch (Exception e) { job.Grid = null; job.Error = (job.Error.Length > 0 ? job.Error + "; " : "") + "komorki f22: " + e.GetType().Name + ": " + e.Message; }
+                }
             }
             catch (Exception e) { job.Error = (job.Error.Length > 0 ? job.Error + "; " : "") + e.GetType().Name + ": " + e.Message; job.Res = null; }
             finally { job.WorkMs = sw.Elapsed.TotalMilliseconds; job.Done = true; }
@@ -326,7 +340,7 @@ namespace Armoury
     }
 
     /// <summary>Widok bocznych drog (komponent mapy SandBox.View; zyje z MapScreen). Rejestracja: SubModuleMain.OnApplicationTick (tylko przy MapSideRoads.On).</summary>
-    public sealed class MapSideRoadsView : EntityVisualManagerBase
+    public sealed partial class MapSideRoadsView : EntityVisualManagerBase
     {
         public override int Priority => 106;   // po wioskach (100), zajazdach (101) i probie drog (105); nic nie trafia myszka
 
@@ -399,7 +413,7 @@ namespace Armoury
             try
             {
                 bool sceneAlive = _screen != null && ReferenceEquals(MapScreen.Instance, _screen);
-                if (_decals.Count > 0 || _job != null)
+                if (_decals.Count > 0 || _active.Count > 0 || _job != null)
                 {
                     string sum = SummaryText();
                     int removed = sceneAlive ? RemoveAll() : DropAll();
@@ -428,6 +442,7 @@ namespace Armoury
                 int k = _visible ? 1 : 0;
                 _hist[k][b]++;
                 _sumMs[k] += realDt * 1000.0;
+                if (_mode == 1) CountChunkFrame(b, realDt);   // f22: klatki wedlug liczby komorek w scenie
             }
             _acc += realDt;
             _sinceSummary += realDt;
@@ -464,10 +479,18 @@ namespace Armoury
                 // nie stawia juz starego planu (wczesniej ok. 74 tys. decali szlo na mape i zaraz z niej schodzilo); takze po planie NIEUDANYM (inna regula = inny plan)
                 if (KeyChanged()) return;
                 if (_job.Res == null) return;
-                // widocznosc takze PRZED kazda porcja stawiania: kamera wysoko = nowe decale od razu schowane (bez kilku sekund drog przy oddalonej kamerze);
-                // przelacza tylko juz postawione i tylko przy przejsciu progu
-                if (!_built) { UpdateVisibility(screen); Build(); }
-                if (_built) { UpdateVisibility(screen); CheckLayout(); }
+                // f22: tryb komorek (klucz MapSideRoadsChunks, podzial z watku z puli); przelaczony klucz - wszystko ze sceny i stawianie od nowa w nowym trybie
+                bool chunks = MapSideRoads.KeyChunks && _job.Grid != null;
+                if (_mode >= 0 && _mode != (chunks ? 1 : 0)) ModeChanged(chunks);
+                if (chunks) { ChunkTick(screen); if (_built) CheckLayout(); }
+                else
+                {
+                    _mode = 0;
+                    // widocznosc takze PRZED kazda porcja stawiania: kamera wysoko = nowe decale od razu schowane (bez kilku sekund drog przy oddalonej kamerze);
+                    // przelacza tylko juz postawione i tylko przy przejsciu progu
+                    if (!_built) { UpdateVisibility(screen); Build(); }
+                    if (_built) { UpdateVisibility(screen); CheckLayout(); }
+                }
                 if (_sinceSummary >= SummaryEvery)
                 {
                     _sinceSummary = 0f;
@@ -656,6 +679,7 @@ namespace Armoury
             Log.Info(MapSideRoads.P + "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE") + " - zdjete decale " + n0
                      + (j.Res == null ? " (plan byl NIEUDANY)" : "") + ", plan od nowa.");
             _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f; _failedPlan = false;
+            ResetChunks();
             return true;
         }
 
@@ -671,6 +695,7 @@ namespace Armoury
             _replans++;
             Log.Info(MapSideRoads.P + "uklad wiosek zmieniony (crc " + j.LayoutCrc.ToString("X8", Inv) + " -> " + crc.ToString("X8", Inv) + ") - zdjete decale " + n + ", plan od nowa.");
             _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f;
+            ResetChunks();
         }
 
         // ---------- zdejmowanie ----------
@@ -691,7 +716,8 @@ namespace Armoury
                 catch (Exception ex) { _stRemove++; if (_stRemove <= 3) Log.Error("MapSideRoadsView.Remove", ex); }
             }
             _decals.Clear();
-            _next = 0; _built = false;
+            if (_active.Count > 0) n += RemoveCells(scene, rend);   // f22: komorki w scenie (tryb komorek)
+            _next = 0; _built = false; _mode = -1;
             return n;
         }
 
@@ -699,6 +725,8 @@ namespace Armoury
         {
             int n = _decals.Count;
             _decals.Clear();
+            n += DropCells();   // f22
+            _mode = -1;
             return n;
         }
 
@@ -707,13 +735,14 @@ namespace Armoury
         {
             var sb = new StringBuilder();
             var r = _job != null ? _job.Res : null;
-            sb.Append("decali ").Append(_decals.Count).Append(r != null ? " (drog " + r.Roads.Count + ", dlugosc " + r.Length.ToString("0", Inv) + " jedn.)" : "")
+            sb.Append("decali ").Append(_mode == 1 ? _liveDecals : _decals.Count).Append(_mode == 1 ? " w scenie (tryb komorek f22)" : "").Append(r != null ? " (drog " + r.Roads.Count + ", dlugosc " + r.Length.ToString("0", Inv) + " jedn.)" : "")
               .Append("; stawianie ").Append(Ms(_buildTicks)).Append(" ms w ").Append(_buildTickCount).Append(" tickach (najdluzszy ").Append(Ms(_maxTickTicks)).Append(" ms)")
               .Append("; widoczne ").Append(_visible ? "tak" : "nie").Append(", zmiany widocznosci ").Append(_visChanges)
               .Append("; plan od nowa (zmiana ukladu) ").Append(_replans)
               .Append("; czyszczenie pamieci GPU ").Append(_clearMem)
-              .Append("; klatki z drogami widocznymi: ").Append(HistText(1)).Append("; schowanymi: ").Append(HistText(0))
-              .Append("; potkniecia: stawianie ").Append(_stCreate).Append(", widocznosc ").Append(_stVis).Append(", zdejmowanie ").Append(_stRemove)
+              .Append("; klatki z drogami widocznymi: ").Append(HistText(1)).Append("; schowanymi: ").Append(HistText(0));
+            if (_mode == 1 || _grid != null) ChunkSummary(sb);   // f22: komorki i klatki wedlug liczby komorek w scenie
+            sb.Append("; potkniecia: stawianie ").Append(_stCreate).Append(", widocznosc ").Append(_stVis).Append(", zdejmowanie ").Append(_stRemove)
               .Append(", tick ").Append(_stTick).Append(", bez materialu ").Append(_noMat).Append('.');
             return sb.ToString();
         }

@@ -1564,6 +1564,12 @@ Uzycie (Python 3, tylko odczyt):
                     f19-drogi (Jeff 18.10 wieczorem: "kazda wioska powinna miec droge do siebie"; klucz Map Side Roads All Villages, MapSideRoads.All.cs): NBC-9 plan
                     "regula f19": wioski ukladu bez drogi = tylko bez trasy po ladzie (ponad limit drog 0; nazwy w linii planu - INFO), stemple ponad limit 0 (droga nigdy
                     urwana), potkniecia planu (koniec trasy bez celu, zerwana trasa) 0; wsie gry bez zadnej drogi - INFO z nazwami. Plan f11 (klucz NIE) - NBC-9 INFO.
+                    f22-drogi-perf (Jeff 18.10: "przy max x8 predkosci strasznie gra zwalnia i sie przycina tam gdzie jest duzo jednostek"; klucz Map Side Roads Chunks,
+                    MapSideRoads.Chunks.cs): gdy ostatnia mapa szla w trybie komorek (linia "komorki (f22)" po ostatniej "postawione") - NBC-3 zamiast "postawione N z M":
+                    komorki z drogami > 0 i linia "pierwsze wypelnienie komorek" z decalami > 0; NBC-5: najdluzszy tick pracy komorek (linia pomiaru) <= 15 ms (po
+                    recenzji takze w biegu zdjec - budzet jak w grze; log sprzed poprawki z "bez budzetu" w linii "komorki" - INFO); linia "komorki" pisana przy kazdym
+                    wejsciu w tryb komorek (takze NIE -> TAK na mapie), wiec tryb ostatniej mapy = ktora z linii "komorki" / "postawione" jest pozniej; NBC-10 klatki wedlug liczby komorek w scenie, najwiecej decali w scenie, promien kola (INFO - porownanie kosztu klatki z f19);
+                    NBC-10b oczekiwane decale w scenie przy kamerze z 10 / 20 / 40 / 80 (INFO, z linii "komorki").
 --grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
                     najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
                     WageRefund, CourtFull.Goods, CourtGoods.Gear, ClanBudget.Court - klucze Crown Refund By Need, Lapsed Gear Buys Goods) python -I tools/sprawdz_logi.py
@@ -46662,8 +46668,10 @@ def nboczne_main(logp):
         rep.show()
         return 0
     ses, plans, fails, built, rows, spots, errs = [], [], [], [], [], [], []
+    chunks, fills = [], []          # f22-drogi-perf: linie "komorki (f22)" i "pierwsze wypelnienie komorek"
+    last_built = last_chunk = -1    # numer linii (kolejnosc w logu) - ktory tryb szedl na ostatniej mapie
     with open(logp, encoding="utf-8", errors="replace") as fh:
-        for ln in fh:
+        for lno, ln in enumerate(fh):
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
             if s.startswith(NBC_HEAD):
@@ -46676,13 +46684,19 @@ def nboczne_main(logp):
                     plans.append(s)
                 elif r.startswith("postawione decale"):
                     built.append(s)
+                    last_built = lno
+                elif r.startswith("komorki (f22)"):
+                    chunks.append(s)
+                    last_chunk = lno
+                elif r.startswith("pierwsze wypelnienie komorek"):
+                    fills.append((lno, s))
                 elif r.startswith(("decali ", "koniec mapy")):
                     rows.append(s)
                 elif r.startswith("miejsca z najgestsza siecia"):
                     spots.append(s)
             elif s.startswith("ERROR in MapSideRoads"):
                 errs.append(s)
-    print(f"plik: {logp} | startow sesji {len(ses)}, planow {len(plans)} (nieudanych {len(fails)}), linii 'postawione' {len(built)}, pomiaru {len(rows)}, ERROR {len(errs)}")
+    print(f"plik: {logp} | startow sesji {len(ses)}, planow {len(plans)} (nieudanych {len(fails)}), linii 'postawione' {len(built)}, 'komorki (f22)' {len(chunks)}, pomiaru {len(rows)}, ERROR {len(errs)}")
     if not ses and not plans and not built and not errs:
         rep.add("NBC-0: linie 'Drogi boczne (f11)'", "brak w logu", "INFO (log sprzed paczki f11-drogi)", None)
         rep.show()
@@ -46692,8 +46706,8 @@ def nboczne_main(logp):
     if not on:
         off_ok = bool(ses) and all(x.startswith(NBC_HEAD + "wylaczone") for x in ses)
         n_off = sum(1 for x in ses if x.startswith(NBC_HEAD + "wylaczone"))
-        rep.add("NBC-1: bieg A - drogi boczne wylaczone (klucz NIE, bez pliku-przelacznika)", f"linii 'wylaczone' {n_off} z {len(ses)} startow sesji, linii 'postawione' {len(built)}",
-                "'wylaczone' przy kazdym starcie sesji, nic nie postawione", off_ok and not built)
+        rep.add("NBC-1: bieg A - drogi boczne wylaczone (klucz NIE, bez pliku-przelacznika)", f"linii 'wylaczone' {n_off} z {len(ses)} startow sesji, linii 'postawione' {len(built)}, 'komorki (f22)' {len(chunks)}",
+                "'wylaczone' przy kazdym starcie sesji, nic nie postawione", off_ok and not built and not chunks)
     else:
         last = ses[-1]
         rep.add("NBC-1: bieg zdjec - drogi boczne wlaczone (ostatni start sesji)", last[len(NBC_HEAD):][:200], "INFO (klucz albo plik-przelacznik autotestu)", None)
@@ -46728,7 +46742,30 @@ def nboczne_main(logp):
                 rep.add("NBC-9: regula f19", "plan f11 (klucz Map Side Roads All Villages = NIE albo log sprzed f19)", "INFO", None)
         else:
             rep.add("NBC-2: plan", ("NIEUDANY: " + fails[-1][len(NBC_HEAD):][:200]) if fails else "brak linii 'plan - ' (widok mapy sie nie zarejestrowal?)", "linia planu po wejsciu na mape", False)
-        if built:
+        chunk_mode = last_chunk > last_built
+        if chunk_mode:
+            cl = chunks[-1]
+            stamps = num(r"komorki \(f22\) - stempli (\d+) w", cl, int, 0) or 0
+            cells = num(r" w (\d+) komorkach po ", cl, int, 0) or 0
+            fl = [x for (n, x) in fills if n > last_chunk]
+            fdec = num(r", decali (\d+) \(stawianie", fl[0], int, 0) if fl else 0
+            fcell = num(r"w scenie komorek (\d+), decali", fl[0], int, 0) if fl else 0
+            rep.add("NBC-3: tryb komorek f22 (ostatnia mapa)", f"stempli {stamps} w {cells} komorkach; pierwsze wypelnienie: " + (f"komorek {fcell}, decali {fdec}" if fl else "BRAK linii"),
+                    "komorek > 0, pierwsze wypelnienie z decalami > 0 (kamera nad ladem z drogami)", stamps > 0 and cells > 0 and bool(fl) and (fdec or 0) > 0)
+            photo = "bieg zdjec - bez budzetu" in cl   # tylko log sprzed poprawki recenzji f22 (bieg zdjec bez budzetu); po niej budzet jak w grze - prog
+            if rows:
+                r = rows[-1]
+                ms = num(r"; stawianie ([0-9.]+) ms w", r, float, 0.0) or 0.0
+                ticks = num(r" ms w (\d+) tickach", r, int, 0) or 0
+                mx = num(r"tickach \(najdluzszy ([0-9.]+) ms\)", r, float, 0.0) or 0.0
+                rep.add("NBC-5: praca komorek (ostatnia linia pomiaru)", f"{ms:.1f} ms w {ticks} tickach z praca, najdluzszy tick {mx:.1f} ms" + (" (bieg zdjec - bez budzetu)" if photo else ""),
+                        "najdluzszy tick <= 15 ms (takze w biegu zdjec; log sprzed poprawki 'bez budzetu' - INFO)", None if photo else mx <= 15.0)
+                cm = re.search(r"; tryb komorek f22: (.*?); klatki wedlug komorek w scenie \([^)]*\): ([^;]*)", r)
+                rep.add("NBC-10: tryb komorek - klatki wedlug liczby komorek w scenie (komorki: klatek / sr. ms / p95 / sr. decali)",
+                        (cm.group(2) + " | " + cm.group(1)[:260]) if cm else "brak kawalka 'tryb komorek f22' w linii pomiaru", "INFO (koszt klatki wedlug liczby decali w scenie)", None)
+            ex = re.search(r"(oczekiwane decale w scenie [^;]*(?:; z \d+ [^;]*)*)", cl)
+            rep.add("NBC-10b: oczekiwane decale w scenie (z planu)", ex.group(1)[:400] if ex else "-", "INFO", None)
+        elif built:
             bl = built[-1]
             mm = re.search(r"postawione decale (\d+) z (\d+) stempli \(drog (\d+); pominiete nad woda / brodem / mostem (\d+), zle (\d+), potkniecia (\d+)\)", bl)
             if mm:

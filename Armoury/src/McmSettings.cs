@@ -6352,6 +6352,14 @@ namespace Armoury
         [SettingPropertyGroup("Side roads to far villages")]
         public bool MapSideRoadsAllVillages { get; set; } = true;
 
+        [SettingPropertyBool("Map Side Roads Chunks", HintText = "with Map Side Roads on, only the lanes around the part of the map the camera is looking at are laid on the map: the map is split into squares, the lanes of a square are laid down as it comes into view and taken away when the camera leaves it behind - the same lanes where you look, far less for the game to draw every frame. Off = every lane of the whole map stays laid down all the time and is only hidden when the camera rises high, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Side roads to far villages")]
+        public bool MapSideRoadsChunks { get; set; } = true;
+
+        [SettingPropertyInteger("Map Side Roads Chunk Radius Cap", 40, 400, "0", HintText = "with Map Side Roads Chunks on, the farthest distance from the camera, in map units, at which lanes are laid down when the camera is tilted lower than usual. At the game's usual camera angles the whole screen is always covered whatever the value - the limit never comes closer than the farthest corner of the screen; it only cuts the lanes far towards the horizon when the camera is tilted low. Higher = lanes reach farther towards the horizon, more to draw (40 to 400)", RequireRestart = false)]
+        [SettingPropertyGroup("Side roads to far villages")]
+        public int MapSideRoadsChunkRadiusCap { get; set; } = 160;
+
         [SettingPropertyBool("Perf Valyrian Census", HintText = "the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfValyrianCensus { get; set; } = true;
@@ -9579,6 +9587,8 @@ namespace Armoury
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.MapSideRoads = MapSideRoads;
             s.MapSideRoadsAllVillages = MapSideRoadsAllVillages;
+            s.MapSideRoadsChunks = MapSideRoadsChunks;
+            s.MapSideRoadsChunkRadiusCap = MapSideRoadsChunkRadiusCap;
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
