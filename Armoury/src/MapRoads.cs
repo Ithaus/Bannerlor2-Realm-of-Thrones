@@ -60,8 +60,21 @@ namespace Armoury
     /// Ciche logi (recenzja, uwaga 2): liczniki predkosci i potkniec zerowane takze w dobie bez linii - linia mowi o tej samej dobie co spis godzinny.
     /// Podloga gry (recenzja, uwaga 3): partia na LimitMin (MinimumSpeed 1, np. dlug snu 3 = -90% w NightRest po nas) traci premie i w modelu, i u nas -
     /// audyt liczy ja osobno ("na podlodze LimitMin"), poza srednia premii i "zjedzona przez sufit".
-    /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (15), MapRoadMargin (0.4). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
+    /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (15), MapRoadMargin (0.4; od n20-drogi 1.0). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
     /// pamieci wychodza od razu; plik nie jest wczytywany).
+    ///
+    /// n20-drogi (noc 19/20.10, Jeff: "rozszerz nieco pole +15% do predkosci na drodze glownej i daj +7.5% na drogach pobocznych ... bo teraz te drogi nic
+    /// nie daja" / "czasami jak lekko sie zejdzie z drogi to juz nie lapie predkosc"):
+    ///  - SZERSZE POLE: domyslny MapRoadMargin 0.4 -> 1.0 jedn. (1 jedn. = ok. 4.75 km, Wayfinder.KmPerUnit); symulacja na trasach AI sondy (80 526 punktow,
+    ///    n20-drogi-tmp/sym_margin.py): na drodze 4.9% punktow przy 0.4, 9.2% przy 1.0. Ten sam margines dla traktow i drog bocznych;
+    ///  - DROGI BOCZNE: drogi do wiosek z planu MapSideRoads (te same lamane, ktore widac na mapie - MapSideRoadsView po skonczonym planie wola SidePublish)
+    ///    dokladane do siatki jako odcinki co ok. 1 jedn. (os planu co 0.25 - blad cieciwy ok. 0.06), pol-szerokosc = szerokosc pasa planu / 2.
+    ///    Siatka wspolna: w kazdej komorce najpierw odcinki traktow, potem bocznych (indeksy rosnace) - Kind() zwraca 2 trakt, 1 boczna, 0 nic; trakt
+    ///    wygrywa. Partia na bocznej dostaje +MapSideRoadSpeedPercent% (domyslnie 7.5) jako wpis "Side road" i sufit kolumny w gore o ten sam procent.
+    ///    Siatke wspolna buduje watek z puli (raz na plan), publikacja jedna referencja pod blokada (_pubLock - tylko watek glowny i watek budowy;
+    ///    sciezka predkosci czyta bez blokad). Drogi boczne wylaczone na mapie / plan od nowa / koniec mapy -> SideClear (wraca siatka samych traktow).
+    ///    Pamiec partii: stan 1 poza droga, 2 trakt, 3 boczna - zmiana rodzaju drogi = przeliczenie predkosci (postfiks pamieci).
+    ///    Klucze nowe: MapSideRoadSpeedBonus (TAK), MapSideRoadSpeedPercent (7.5); oba wymagaja MapRoadSpeedBonus i widocznych drog bocznych (MapSideRoads).
     /// </summary>
     internal static class MapRoads
     {
@@ -76,6 +89,10 @@ namespace Armoury
         private const int AuditMax = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly TextObject _txtRoad = new TextObject("{=!}Road");
+        private static readonly TextObject _txtSide = new TextObject("{=!}Side road");   // n20-drogi: wpis drogi bocznej w podpowiedzi predkosci
+        private const float SideStep = 1f;            // n20-drogi: odcinek drogi bocznej w siatce (os planu co 0.25 jedn.)
+        private const float SideHalfMin = 0.1f, SideHalfMax = 1f;
+        private const int SideMaxPercent = 50;
 
         // ------------------------------------------------------------------ siatka (niezmienna po budowie)
         private sealed class Grid
@@ -83,13 +100,37 @@ namespace Armoury
             public float X0, Y0, Inv;
             public int Nx, Ny;
             public int[] Start;       // Nx * Ny + 1
-            public int[] Seg;         // odcinki komorek
+            public int[] Seg;         // odcinki komorek (w komorce rosnaco: najpierw trakty 0..MainSegs-1, potem drogi boczne)
             public float[] Ax, Ay, Dx, Dy, InvL2, Half;
             public int Lines, Points, Segments, CellsUsed, Entries, MaxPerCell;
             public double Length;
             public int Version;
             public string Md5 = "-";
             public long TerrainSize;
+            // n20-drogi: odcinki o indeksie >= MainSegs to drogi boczne (siatka samych traktow: MainSegs = Segments, SideSegs = 0)
+            public int MainSegs, SideSegs, SideRoads;
+            public double SideLength;
+            public float SideHalf;
+
+            /// <summary>n20-drogi: rodzaj drogi w punkcie - 2 trakt (wygrywa), 1 droga boczna (tylko przy side), 0 poza droga. W komorce trakty sa przed
+            /// bocznymi, wiec pierwszy trafiony odcinek boczny znaczy, ze zaden trakt nie siega punktu.</summary>
+            internal int Kind(int c, float x, float y, float margin, bool side)
+            {
+                if (c < 0) return 0;
+                int k1 = Start[c + 1], ms = MainSegs;
+                for (int k = Start[c]; k < k1; k++)
+                {
+                    int s = Seg[k];
+                    if (s >= ms && !side) return 0;   // dalej same drogi boczne
+                    float px = x - Ax[s], py = y - Ay[s];
+                    float t = (px * Dx[s] + py * Dy[s]) * InvL2[s];
+                    if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
+                    float ex = px - t * Dx[s], ey = py - t * Dy[s];
+                    float r = Half[s] + margin;
+                    if (ex * ex + ey * ey <= r * r) return s < ms ? 2 : 1;
+                }
+                return 0;
+            }
 
             internal int CellOf(float x, float y)
             {
@@ -102,26 +143,9 @@ namespace Armoury
 
             internal bool Empty(int c) { return c < 0 || Start[c] == Start[c + 1]; }
 
-            /// <summary>Na drodze w komorce c: odleglosc punktu od ktoregos odcinka <= pol-szerokosc + margines.</summary>
-            internal bool OnRoad(int c, float x, float y, float margin)
-            {
-                if (c < 0) return false;
-                int k1 = Start[c + 1];
-                for (int k = Start[c]; k < k1; k++)
-                {
-                    int s = Seg[k];
-                    float px = x - Ax[s], py = y - Ay[s];
-                    float t = (px * Dx[s] + py * Dy[s]) * InvL2[s];
-                    if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
-                    float ex = px - t * Dx[s], ey = py - t * Dy[s];
-                    float r = Half[s] + margin;
-                    if (ex * ex + ey * ey <= r * r) return true;
-                }
-                return false;
-            }
-
-            /// <summary>Odleglosc od krawedzi farby (odleglosc - pol-szerokosc) najblizszego odcinka komorki; float.MaxValue = brak odcinka w zasiegu.</summary>
-            internal float EdgeDist(int c, float x, float y)
+            /// <summary>Odleglosc od krawedzi pasa (odleglosc - pol-szerokosc) najblizszego odcinka komorki danego rodzaju (side: false trakty, true drogi
+            /// boczne); float.MaxValue = brak odcinka w zasiegu.</summary>
+            internal float EdgeDist(int c, float x, float y, bool side)
             {
                 float best = float.MaxValue;
                 if (c < 0) return best;
@@ -129,6 +153,7 @@ namespace Armoury
                 for (int k = Start[c]; k < k1; k++)
                 {
                     int s = Seg[k];
+                    if ((s >= MainSegs) != side) continue;
                     float px = x - Ax[s], py = y - Ay[s];
                     float t = (px * Dx[s] + py * Dy[s]) * InvL2[s];
                     if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
@@ -140,7 +165,16 @@ namespace Armoury
             }
         }
 
-        private static volatile Grid _grid;
+        private static volatile Grid _grid;            // siatka sciezki predkosci: same trakty (_main) albo trakty + drogi boczne
+        private static volatile Grid _main;            // n20-drogi: siatka samych traktow (Load)
+        private static readonly object _pubLock = new object();   // n20-drogi: publikacja _grid / _main / stanu drog bocznych (watek glowny i watek budowy)
+        private static SideRoadPlan.Result _sideRes;   // plan drog bocznych podany przez widok (pod _pubLock)
+        private static float _sideHalf;
+        private static int _sideVer;                    // numer zamowienia siatki wspolnej (pod _pubLock); stara budowa nie publikuje
+        private static string _sideNote = "brak planu drog bocznych";
+        private static volatile string _sidePending;    // linia logu z watku budowy - wypisuje watek glowny (FlushSideNote)
+        /// <summary>n20-drogi: numer sesji (Reset) - widok drog bocznych podaje plan od nowa, gdy sie zmieni.</summary>
+        internal static int Epoch;
         private static string _note = "nie wczytany";
         private static bool _cacheHooked;
         private static string _hookNote = "nie wpinana";
@@ -157,17 +191,18 @@ namespace Armoury
         internal static int SpeedModels;
 
         // liczniki z watkow roboczych (przyblizone - bez blokad, jak HorseState): przeliczenia wymuszone, wywolania postfiksu pamieci, probka czasu
-        private static long _flips, _cacheCalls, _cacheTicks, _cacheSampled, _speedCalls, _speedOn, _recSkipped;
+        private static long _flips, _cacheCalls, _cacheTicks, _cacheSampled, _speedCalls, _speedOn, _speedSide, _recSkipped;
         private static int _parStumbles, _parStumblesAll;
         private static int _stumbles, _stumblesAll;
         private static Exception _firstPar;
 
         // spis partio-godzin (watek glowny): 0 rody, 1 karawany, 2 wozy wsi, 3 bandy, 4 inne, 5 gracz
-        private static readonly int[] _hN = new int[6], _hOn = new int[6];
+        private static readonly int[] _hN = new int[6], _hOn = new int[6], _hSide = new int[6];
         private static int _hours;
         private static long _censusTicks;
         private static readonly Random _rng = new Random(1718);
         private static readonly List<MobileParty> _cand = new List<MobileParty>();
+        private static readonly List<MobileParty> _candSide = new List<MobileParty>();
         private static AccessTools.FieldRef<MobileParty, float> _lastSpeedRef;
         private static bool _lastSpeedTried;
 
@@ -184,6 +219,23 @@ namespace Armoury
             int p = s.MapRoadSpeedPercent;
             return (p < 0 ? 0 : p > MaxPercent ? MaxPercent : p) / 100f;
         }
+
+        /// <summary>n20-drogi: premia drogi bocznej (MapSideRoadSpeedPercent przyciete do 0..50, NaN = 0).</summary>
+        private static float SidePctOf(Settings s)
+        {
+            float p = s.MapSideRoadSpeedPercent;
+            if (!(p > 0f)) return 0f;
+            return (p > SideMaxPercent ? SideMaxPercent : p) / 100f;
+        }
+
+        /// <summary>n20-drogi: drogi boczne licza sie w premii - klucz MapSideRoadSpeedBonus, premia > 0 i siatka z drogami bocznymi.</summary>
+        private static bool SideOn(Settings s, Grid g)
+        {
+            return g.SideSegs > 0 && s.MapSideRoadSpeedBonus && SidePctOf(s) > 0f;
+        }
+
+        /// <summary>Stan pamieci partii z rodzaju drogi: 1 poza droga, 2 trakt, 3 droga boczna.</summary>
+        private static int StOf(int kind) { return kind == 2 ? 2 : kind == 1 ? 3 : 1; }
 
         private static void ParStumble(Exception e)
         {
@@ -215,30 +267,34 @@ namespace Armoury
                 var p = mp.Position;
                 float x = p.X, y = p.Y;
                 int c = g.CellOf(x, y);
-                bool on = !g.Empty(c) && g.OnRoad(c, x, y, MarginOf(s));
+                // n20-drogi: rodzaj drogi (2 trakt, 1 droga boczna, 0 nic) - trakt wygrywa, premie sie nie sumuja
+                int kind = g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
                 // stan do pamieci partii tylko z liczenia, ktore gra zapisuje do _lastCalculatedSpeed (straznik zapisu); bez straznika - jak przed recenzja
-                if (!_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp))) Record(mp, c, on);
+                if (!_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp))) Record(mp, c, StOf(kind));
                 else _recSkipped++;
                 _speedCalls++;
-                if (!on) return;
-                _speedOn++;
-                float pct = PctOf(s);
+                if (kind == 0) return;
+                float pct;
+                TextObject txt;
+                if (kind == 2) { _speedOn++; pct = PctOf(s); txt = _txtRoad; }
+                else { _speedSide++; pct = SidePctOf(s); txt = _txtSide; }
                 if (pct <= 0f) return;
                 float res = r.ResultNumber;
                 if (res <= 0f) return;
                 float f = 1f + r.SumOfFactors;
                 float add = res * pct;
-                r.Add(f > 0.01f ? add / f : add, _txtRoad);
+                r.Add(f > 0.01f ? add / f : add, txt);
                 float lim = r.LimitMaxValue;
                 if (lim > 0f && lim < float.MaxValue * 0.5f) r.LimitMax(lim * (1f + pct) + 0.001f);   // zapas 0.001 - bez linii "Maximum -0.00"
             }
             catch (Exception e) { ParStumble(e); }
         }
 
-        private static void Record(MobileParty mp, int cell, bool on)
+        /// <summary>Pamiec partii: Party.Index | komorka + 1 (tylko do logu zmian, porownanie idzie po stanie) | stan (1 poza droga, 2 trakt, 3 boczna).</summary>
+        private static void Record(MobileParty mp, int cell, int st)
         {
             int idx = mp.Party.Index;
-            long v = ((long)idx << 32) | ((long)((cell + 1) & 0xFFFFFF) << 2) | (on ? 2L : 1L);
+            long v = ((long)idx << 32) | ((long)((cell + 1) & 0xFFFFFF) << 2) | (long)(st & 3);
             Volatile.Write(ref _slots[idx & SlotMask], v);
         }
 
@@ -264,11 +320,10 @@ namespace Armoury
                 var p = mp.Position;
                 float x = p.X, y = p.Y;
                 int c = g.CellOf(x, y);
-                int prevCell = (int)((v >> 2) & 0xFFFFFF) - 1;
-                bool on;
-                if (c == prevCell && g.Empty(c)) on = false;   // ta sama komorka bez drog - O(1)
-                else on = !g.Empty(c) && g.OnRoad(c, x, y, MarginOf(s));
-                if (on != (st == 2)) { __result = true; _flips++; }
+                // komorka bez drog - O(1); n20-drogi: porownanie rodzaju drogi (trakt / boczna / nic) z biezacej siatki - po podmianie siatki (drogi boczne
+                // dolozone albo zdjete) inny rodzaj = przeliczenie, tak samo jak wejscie na droge
+                int kind = g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
+                if (StOf(kind) != st) { __result = true; _flips++; }
             }
             catch (Exception e) { ParStumble(e); }
             finally { if (t0 != 0) { _cacheTicks += Stopwatch.GetTimestamp() - t0; _cacheSampled++; } }
@@ -372,7 +427,16 @@ namespace Armoury
         // ------------------------------------------------------------------ plik i siatka (watek glowny)
         internal static void Reset()
         {
-            _grid = null;
+            lock (_pubLock)
+            {
+                _grid = null;
+                _main = null;
+                _sideRes = null;   // n20-drogi: plan drog bocznych z poprzedniej sesji nieaktualny; budowa w toku nie opublikuje (numer zamowienia)
+                _sideVer++;
+                Epoch++;
+                _sideNote = "brak planu drog bocznych";
+            }
+            _sidePending = null;
             _note = "nie wczytany";
             Array.Clear(_slots, 0, _slots.Length);
             ZeroDay();
@@ -382,7 +446,7 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            for (int i = 0; i < _hN.Length; i++) { _hN[i] = 0; _hOn[i] = 0; }
+            for (int i = 0; i < _hN.Length; i++) { _hN[i] = 0; _hOn[i] = 0; _hSide[i] = 0; }
             _hours = 0; _censusTicks = 0;
             ZeroSpeed();
         }
@@ -390,7 +454,7 @@ namespace Armoury
         /// <summary>Liczniki sciezki predkosci i potkniec doby (bez spisu godzinnego - ten zbiera tylko w dobach pomiaru i zeruje sie po linii).</summary>
         private static void ZeroSpeed()
         {
-            _flips = 0; _cacheCalls = 0; _cacheTicks = 0; _cacheSampled = 0; _speedCalls = 0; _speedOn = 0; _recSkipped = 0;
+            _flips = 0; _cacheCalls = 0; _cacheTicks = 0; _cacheSampled = 0; _speedCalls = 0; _speedOn = 0; _speedSide = 0; _recSkipped = 0;
             _parStumbles = 0; _stumbles = 0;
         }
 
@@ -422,7 +486,9 @@ namespace Armoury
                                     + ", maks. odcinkow na komorke " + g.MaxPerCell : "")
                      + " | latka pamieci predkosci " + _hookNote + " | straznik zapisu stanu " + _writerHooks + "/2 | latka predkosci MarchPace w " + SpeedModels + " modelach"
                      + " | wczytanie " + ms.ToString("0.0", Inv) + " ms"
-                     + " | premia " + Status(g) + ".");
+                     + " | premia " + Status(g)
+                     + " | drogi boczne: klucz MapSideRoadSpeedBonus " + (s.MapSideRoadSpeedBonus ? "tak" : "nie") + ", premia " + (SidePctOf(s) * 100f).ToString("0.0", Inv)
+                     + "% - czekaja na plan drog bocznych z widoku mapy (klucz MapSideRoads " + (s.MapSideRoads ? "tak" : "nie") + ").");
         }
 
         private static void Load()
@@ -484,11 +550,11 @@ namespace Armoury
                 else tnote = tsize > 0 ? "terrain.bin ROT-Map nie znaleziony - bez straznika mapy" : "naglowek bez terrain_size - bez straznika mapy";
                 var g = Build(ids, xs, ys, ws);
                 g.Version = version; g.Md5 = md5; g.TerrainSize = tsize;
-                _grid = g;
+                lock (_pubLock) { _main = g; _grid = g; }   // n20-drogi: siatka samych traktow; drogi boczne dokladane osobno (SidePublish)
                 _note = "plik " + FileName + " v" + version + ": lamanych " + g.Lines + ", punktow " + g.Points + ", odcinkow " + g.Segments + ", dlugosc "
                         + g.Length.ToString("0.0", Inv) + " jedn., zle wiersze " + bad + "; " + tnote;
             }
-            catch (Exception e) { _grid = null; _note = "blad wczytania " + FileName + " (" + e.GetType().Name + ") - premia drog nieczynna"; Stumble("Load", e); }
+            catch (Exception e) { lock (_pubLock) { _grid = null; _main = null; } _note = "blad wczytania " + FileName + " (" + e.GetType().Name + ") - premia drog nieczynna"; Stumble("Load", e); }
         }
 
         private static int Col(Dictionary<string, int> cols, string name, int def)
@@ -526,7 +592,6 @@ namespace Armoury
             int m = sa.Count;
             g.Lines = lines; g.Segments = m;
             g.Ax = new float[m]; g.Ay = new float[m]; g.Dx = new float[m]; g.Dy = new float[m]; g.InvL2 = new float[m]; g.Half = new float[m];
-            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
             double len = 0;
             for (int k = 0; k < m; k++)
             {
@@ -537,15 +602,30 @@ namespace Armoury
                 if (half < HalfMin) half = HalfMin; else if (half > HalfMax) half = HalfMax;
                 g.Ax[k] = ax; g.Ay[k] = ay; g.Dx[k] = dx; g.Dy[k] = dy; g.InvL2[k] = l2 > 1e-8f ? 1f / l2 : 0f; g.Half[k] = half;
                 len += Math.Sqrt(l2);
+            }
+            g.Length = len;
+            g.MainSegs = m;
+            Index(g, m);
+            return g;
+        }
+
+        /// <summary>Siatka komorek CellSize x CellSize z odcinkow g.Ax..g.Half [0, m): odcinek wpisany do kazdej komorki, ktora siega prostokat jego kapsuly
+        /// (pol-szerokosc + MaxMargin). Odcinki wpisywane rosnaco - w kazdej komorce najpierw trakty (0..MainSegs-1), potem drogi boczne (n20-drogi).</summary>
+        private static void Index(Grid g, int m)
+        {
+            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+            for (int k = 0; k < m; k++)
+            {
+                float ax = g.Ax[k], ay = g.Ay[k], dx = g.Dx[k], dy = g.Dy[k];
                 minX = Math.Min(minX, Math.Min(ax, ax + dx)); maxX = Math.Max(maxX, Math.Max(ax, ax + dx));
                 minY = Math.Min(minY, Math.Min(ay, ay + dy)); maxY = Math.Max(maxY, Math.Max(ay, ay + dy));
             }
-            g.Length = len;
             float pad = HalfMax + MaxMargin + CellSize;
             if (m == 0) { minX = minY = 0f; maxX = maxY = 1f; }
             g.X0 = minX - pad; g.Y0 = minY - pad; g.Inv = 1f / CellSize;
             g.Nx = Math.Max(1, (int)Math.Ceiling((maxX + pad - g.X0) / CellSize));
             g.Ny = Math.Max(1, (int)Math.Ceiling((maxY + pad - g.Y0) / CellSize));
+            if ((long)g.Nx * g.Ny >= 0xFFFFFFL) throw new InvalidOperationException("siatka drog za duza: " + g.Nx + " x " + g.Ny);   // komorka + 1 w 24 bitach pamieci partii
             int cells = g.Nx * g.Ny;
             var count = new int[cells + 1];
             for (int pass = 0; pass < 2; pass++)
@@ -564,9 +644,17 @@ namespace Armoury
                     float y0 = Math.Min(g.Ay[k], g.Ay[k] + g.Dy[k]) - reach, y1 = Math.Max(g.Ay[k], g.Ay[k] + g.Dy[k]) + reach;
                     int cx0 = Math.Max(0, (int)((x0 - g.X0) * g.Inv)), cx1 = Math.Min(g.Nx - 1, (int)((x1 - g.X0) * g.Inv));
                     int cy0 = Math.Max(0, (int)((y0 - g.Y0) * g.Inv)), cy1 = Math.Min(g.Ny - 1, (int)((y1 - g.Y0) * g.Inv));
+                    // n20-drogi: komorka, ktorej srodek jest dalej od odcinka niz zasieg + pol przekatnej komorki, nie ma punktu w zasiegu - bez wpisu
+                    // (rogi prostokata ukosnego odcinka; wynik zapytan bez zmian, krotsze listy komorek)
+                    float rc = reach + CellSize * 0.7072f, rc2 = rc * rc;
                     for (int cy = cy0; cy <= cy1; cy++)
                         for (int cx = cx0; cx <= cx1; cx++)
                         {
+                            float qx = g.X0 + (cx + 0.5f) * CellSize - g.Ax[k], qy = g.Y0 + (cy + 0.5f) * CellSize - g.Ay[k];
+                            float t = (qx * g.Dx[k] + qy * g.Dy[k]) * g.InvL2[k];
+                            if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
+                            float ox = qx - t * g.Dx[k], oy = qy - t * g.Dy[k];
+                            if (ox * ox + oy * oy > rc2) continue;
                             int c = cy * g.Nx + cx;
                             if (pass == 0) count[c]++;
                             else g.Seg[g.Start[c] + fill[c]++] = k;
@@ -576,7 +664,150 @@ namespace Armoury
             int used = 0, maxc = 0;
             for (int c = 0; c < cells; c++) { int q = count[c]; if (q > 0) used++; if (q > maxc) maxc = q; }
             g.CellsUsed = used; g.Entries = g.Seg.Length; g.MaxPerCell = maxc;
+        }
+
+        // ------------------------------------------------------------------ n20-drogi: drogi boczne w premii (plan z widoku mapy)
+        /// <summary>Widok drog bocznych (watek glowny, MapSideRoadsView po skonczonym planie): plan do premii predkosci. Siatke wspolna (trakty + drogi boczne)
+        /// buduje watek z puli; publikuje ja tylko najnowsze zamowienie przy tej samej siatce traktow. Bez siatki traktow (premia drog wylaczona albo plik
+        /// niewczytany) plan czeka - Daily po wczytaniu traktow zamawia budowe.</summary>
+        internal static void SidePublish(SideRoadPlan.Result res, float width)
+        {
+            if (res == null) return;
+            int ver;
+            Grid main;
+            float half = width * 0.5f;
+            if (!(half >= SideHalfMin)) half = SideHalfMin; else if (half > SideHalfMax) half = SideHalfMax;
+            lock (_pubLock)
+            {
+                _sideRes = res;
+                _sideHalf = half;
+                ver = ++_sideVer;
+                main = _main;
+                if (main == null) _sideNote = "plan jest (drog " + res.Roads.Count + "), czeka na siatke traktow";
+            }
+            if (main == null) return;
+            QueueSide(ver, main, res, half);
+        }
+
+        /// <summary>Widok drog bocznych (watek glowny): drogi boczne zdjete z mapy (wylaczone w MCM, plan od nowa, koniec mapy) - z premii tez; wraca siatka
+        /// samych traktow. Tylko gdy w premii jest wlasnie ten plan (stary widok nie zdejmuje planu nowego).</summary>
+        internal static void SideClear(SideRoadPlan.Result res, string why)
+        {
+            if (res == null) return;
+            bool was;
+            lock (_pubLock)
+            {
+                if (!ReferenceEquals(_sideRes, res)) return;
+                was = _grid != null && _grid.SideSegs > 0;
+                _sideRes = null;
+                _sideVer++;
+                if (_main != null) _grid = _main;
+                _sideNote = "zdjete (" + why + ")";
+            }
+            if (was) Log.Info(P + "drogi boczne zdjete z premii predkosci (" + why + ") - premia tylko na traktach ROT do nastepnego planu drog bocznych.");
+        }
+
+        /// <summary>Watek glowny (tick widoku drog bocznych i Daily): linia logu z watku budowy siatki wspolnej.</summary>
+        internal static void FlushSideNote()
+        {
+            string n = _sidePending;
+            if (n == null) return;
+            _sidePending = null;
+            Log.Info(n);
+        }
+
+        private static void QueueSide(int ver, Grid main, SideRoadPlan.Result res, float half)
+        {
+            try { ThreadPool.QueueUserWorkItem(_ => SideWork(ver, main, res, half)); }
+            catch (Exception e) { Stumble("QueueSide", e); SideWork(ver, main, res, half); }
+        }
+
+        private static void SideWork(int ver, Grid main, SideRoadPlan.Result res, float half)
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                var g = Combine(main, res, half);
+                double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+                bool done = false;
+                lock (_pubLock)
+                {
+                    if (ver == _sideVer && ReferenceEquals(main, _main) && ReferenceEquals(res, _sideRes))
+                    {
+                        _grid = g;
+                        done = true;
+                        _sideNote = "w premii (drog " + g.SideRoads + ", odcinkow " + g.SideSegs + ")";
+                    }
+                }
+                var s = Settings.Current;
+                _sidePending = P + "drogi boczne w premii predkosci " + (done ? "TAK" : "NIE (nowsze zamowienie albo inna siatka traktow - zostaje biezaca)")
+                               + " - drog " + g.SideRoads + ", odcinkow " + g.SideSegs + " (co ok. " + SideStep.ToString("0.0", Inv) + " jedn.), dlugosc "
+                               + g.SideLength.ToString("0", Inv) + " jedn., pol-szerokosc " + g.SideHalf.ToString("0.00", Inv) + " + margines "
+                               + (s != null ? MarginOf(s).ToString("0.00", Inv) : "-") + " jedn. | siatka wspolna: " + g.Nx + " x " + g.Ny + " komorek po "
+                               + CellSize.ToString("0", Inv) + " jedn., z drogami " + g.CellsUsed + ", wpisow " + g.Entries + ", maks. odcinkow na komorke " + g.MaxPerCell
+                               + " | budowa " + ms.ToString("0.0", Inv) + " ms (watek z puli) | premia drog bocznych " + (s != null ? (SidePctOf(s) * 100f).ToString("0.0", Inv) : "-")
+                               + "% (klucz MapSideRoadSpeedBonus " + (s != null && s.MapSideRoadSpeedBonus ? "tak" : "nie") + "), trakty " + (s != null ? (PctOf(s) * 100f).ToString("0", Inv) : "-")
+                               + "% (trakt wygrywa, premie sie nie sumuja).";
+            }
+            catch (Exception e)
+            {
+                lock (_pubLock) { if (ver == _sideVer) _sideNote = "budowa nieudana (" + e.GetType().Name + ")"; }
+                _sidePending = P + "drogi boczne w premii predkosci NIE - budowa siatki wspolnej nieudana (" + e.GetType().Name + ": " + (e.Message ?? "") + ") - premia tylko na traktach.";
+            }
+        }
+
+        /// <summary>Siatka wspolna: kopie odcinkow traktow (indeksy 0..M-1, bez zmian) + odcinki drog bocznych planu (os co 0.25 jedn. przerzedzona do
+        /// punktow co >= SideStep, ostatni punkt zawsze). Czysta geometria - watek z puli; plan i siatka traktow tylko czytane.</summary>
+        private static Grid Combine(Grid main, SideRoadPlan.Result res, float half)
+        {
+            int m = main.MainSegs;
+            var sx = new List<float>(32000); var sy = new List<float>(32000); var ex = new List<float>(32000); var ey = new List<float>(32000);
+            int roads = 0;
+            double len = 0;
+            foreach (var rd in res.Roads)
+            {
+                if (rd == null || rd.X == null || rd.Y == null) continue;
+                int n = Math.Min(rd.X.Length, rd.Y.Length);
+                if (n < 2) continue;
+                float lx = rd.X[0], ly = rd.Y[0];
+                int before = sx.Count;
+                for (int i = 1; i < n; i++)
+                {
+                    float x = rd.X[i], y = rd.Y[i];
+                    if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y)) continue;
+                    float dx = x - lx, dy = y - ly;
+                    float d2 = dx * dx + dy * dy;
+                    if (d2 < SideStep * SideStep && i < n - 1) continue;
+                    if (d2 > 1e-8f) { sx.Add(lx); sy.Add(ly); ex.Add(x); ey.Add(y); len += Math.Sqrt(d2); }
+                    lx = x; ly = y;
+                }
+                if (sx.Count > before) roads++;
+            }
+            int sn = sx.Count, all = m + sn;
+            var g = new Grid
+            {
+                Lines = main.Lines, Points = main.Points, Segments = main.Segments, Length = main.Length, Version = main.Version, Md5 = main.Md5,
+                TerrainSize = main.TerrainSize, MainSegs = m, SideSegs = sn, SideRoads = roads, SideLength = len, SideHalf = half
+            };
+            g.Ax = new float[all]; g.Ay = new float[all]; g.Dx = new float[all]; g.Dy = new float[all]; g.InvL2 = new float[all]; g.Half = new float[all];
+            Array.Copy(main.Ax, g.Ax, m); Array.Copy(main.Ay, g.Ay, m); Array.Copy(main.Dx, g.Dx, m); Array.Copy(main.Dy, g.Dy, m);
+            Array.Copy(main.InvL2, g.InvL2, m); Array.Copy(main.Half, g.Half, m);
+            for (int j = 0; j < sn; j++)
+            {
+                int k = m + j;
+                float ax = sx[j], ay = sy[j], dx = ex[j] - ax, dy = ey[j] - ay;
+                float l2 = dx * dx + dy * dy;
+                g.Ax[k] = ax; g.Ay[k] = ay; g.Dx[k] = dx; g.Dy[k] = dy; g.InvL2[k] = l2 > 1e-8f ? 1f / l2 : 0f; g.Half[k] = half;
+            }
+            Index(g, all);
             return g;
+        }
+
+        private static string SideText(Grid g)
+        {
+            string note;
+            lock (_pubLock) note = _sideNote;
+            return g != null && g.SideSegs > 0 ? "w premii (drog " + g.SideRoads + ", odcinkow " + g.SideSegs + ")" : "NIE w premii - " + note;
         }
 
         // ------------------------------------------------------------------ pomiar (watek glowny)
@@ -590,6 +821,7 @@ namespace Armoury
             try
             {
                 float margin = MarginOf(s);
+                bool side = SideOn(s, g);
                 var all = MobileParty.All;
                 var main = MobileParty.MainParty;
                 for (int i = 0; i < all.Count; i++)
@@ -601,9 +833,10 @@ namespace Armoury
                         int k = mp == main ? 5 : mp.IsLordParty ? 0 : mp.IsCaravan ? 1 : mp.IsVillager ? 2 : mp.IsBandit ? 3 : 4;
                         var p = mp.Position;
                         int c = g.CellOf(p.X, p.Y);
-                        bool on = !g.Empty(c) && g.OnRoad(c, p.X, p.Y, margin);
+                        int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
                         _hN[k]++;
-                        if (on) _hOn[k]++;
+                        if (kind == 2) _hOn[k]++;
+                        else if (kind == 1) _hSide[k]++;   // n20-drogi: na drodze bocznej (nie na trakcie)
                     }
                     catch (Exception e) { Stumble("Hourly", e); }
                 }
@@ -622,7 +855,15 @@ namespace Armoury
             if (s == null) return;
             try
             {
-                if (s.MapRoadSpeedBonus && _grid == null && _note == "nie wczytany") Load();   // klucz wlaczony w MCM w trakcie sesji - plik wczytany tu (watek glowny)
+                FlushSideNote();
+                if (s.MapRoadSpeedBonus && _grid == null && _note == "nie wczytany")
+                {
+                    Load();   // klucz wlaczony w MCM w trakcie sesji - plik wczytany tu (watek glowny)
+                    // n20-drogi: plan drog bocznych podany, gdy trakty nie byly wczytane - budowa siatki wspolnej teraz
+                    SideRoadPlan.Result res; float half; int ver; Grid main;
+                    lock (_pubLock) { res = _sideRes; half = _sideHalf; main = _main; ver = res != null && main != null ? ++_sideVer : 0; }
+                    if (res != null && main != null) QueueSide(ver, main, res, half);
+                }
                 if (!s.MapRoadSpeedBonus) { ZeroDay(); return; }
                 // ciche logi: doba bez linii - spis godzinny zostaje (zbiera tylko w dobie pomiaru, LogGate.Today), liczniki predkosci i potkniec od zera,
                 // zeby linia w takcie S+1 mowila o tej samej dobie S co spis (recenzja, uwaga 2); potkniecia z dob bez linii zostaja w "od wczytania"
@@ -637,13 +878,15 @@ namespace Armoury
         {
             var g = _grid;
             var ci = Inv;
-            var sb = new StringBuilder(900);
-            float pct = PctOf(s);
+            var sb = new StringBuilder(1400);
+            float pct = PctOf(s), spct = SidePctOf(s);
             sb.Append(P).Append("dzien ").Append(day)
               .Append(" | klucz MapRoadSpeedBonus tak, premia ").Append((pct * 100f).ToString("0", ci)).Append("%, margines ").Append(MarginOf(s).ToString("0.00", ci))
-              .Append(" | plik ").Append(g != null ? "v" + g.Version + ": lamanych " + g.Lines + ", punktow " + g.Points + ", odcinkow " + g.Segments : "NIECZYNNY (" + _note + ")");
-            int tot = 0, totOn = 0;
-            for (int k = 0; k < 5; k++) { tot += _hN[k]; totOn += _hOn[k]; }
+              .Append(" | plik ").Append(g != null ? "v" + g.Version + ": lamanych " + g.Lines + ", punktow " + g.Points + ", odcinkow " + g.Segments : "NIECZYNNY (" + _note + ")")
+              .Append(" | drogi boczne: klucz MapSideRoadSpeedBonus ").Append(s.MapSideRoadSpeedBonus ? "tak" : "nie").Append(", premia ").Append((spct * 100f).ToString("0.0", ci))
+              .Append("%, ").Append(SideText(g));
+            int tot = 0, totOn = 0, totSide = 0;
+            for (int k = 0; k < 5; k++) { tot += _hN[k]; totOn += _hOn[k]; totSide += _hSide[k]; }
             sb.Append(" | partio-godziny w ruchu na ladzie (AI, godzin spisu ").Append(_hours).Append("): ").Append(tot).Append(", na drodze ").Append(totOn)
               .Append(" (").Append(Pct(totOn, tot)).Append("%)")
               .Append(" | rody ").Append(_hOn[0]).Append('/').Append(_hN[0]).Append(" (").Append(Pct(_hOn[0], _hN[0])).Append("%)")
@@ -652,12 +895,21 @@ namespace Armoury
               .Append(", bandy ").Append(_hOn[3]).Append('/').Append(_hN[3]).Append(" (").Append(Pct(_hOn[3], _hN[3])).Append("%)")
               .Append(", inne ").Append(_hOn[4]).Append('/').Append(_hN[4]).Append(" (").Append(Pct(_hOn[4], _hN[4])).Append("%)")
               .Append(" | gracz godzin w ruchu ").Append(_hN[5]).Append(", na drodze ").Append(_hOn[5]);
-            long sc = _speedCalls, so = _speedOn;
+            // n20-drogi: na drodze bocznej (poza traktem) - ten sam spis godzinny
+            sb.Append(" | drogi boczne: partio-godziny AI na drodze bocznej ").Append(totSide).Append(" (").Append(Pct(totSide, tot)).Append("%)")
+              .Append(" - rody ").Append(_hSide[0]).Append(" (").Append(Pct(_hSide[0], _hN[0])).Append("%)")
+              .Append(", karawany ").Append(_hSide[1]).Append(" (").Append(Pct(_hSide[1], _hN[1])).Append("%)")
+              .Append(", wozy wsi ").Append(_hSide[2]).Append(" (").Append(Pct(_hSide[2], _hN[2])).Append("%)")
+              .Append(", bandy ").Append(_hSide[3]).Append(" (").Append(Pct(_hSide[3], _hN[3])).Append("%)")
+              .Append(", inne ").Append(_hSide[4]).Append(" (").Append(Pct(_hSide[4], _hN[4])).Append("%)")
+              .Append(", gracz godzin na bocznej ").Append(_hSide[5]);
+            long sc = _speedCalls, so = _speedOn, ss = _speedSide;
             sb.Append(" | liczenia predkosci (ok.) ").Append(sc).Append(", z premia drogi ").Append(so).Append(" (").Append(sc > 0 ? (100.0 * so / sc).ToString("0.0", ci) : "-").Append("%)")
+              .Append(", z premia drogi bocznej ").Append(ss).Append(" (").Append(sc > 0 ? (100.0 * ss / sc).ToString("0.0", ci) : "-").Append("%)")
               .Append(", przeliczenia wymuszone zmiana drogi (ok.) ").Append(_flips).Append(", latka pamieci ").Append(_cacheHooked ? "wpieta" : "NIE")
               .Append(", straznik zapisu ").Append(_writerHooks).Append("/2, liczenia bez zapisu stanu (model wprost, ok.) ").Append(_recSkipped)
               .Append(", premia ").Append(Status(g));
-            Audit(s, g, sb, pct);
+            Audit(s, g, sb, pct, spct);
             double censusMs = _censusTicks * 1000.0 / Stopwatch.Frequency;
             double cacheUs = _cacheSampled > 0 ? _cacheTicks * 1e6 / Stopwatch.Frequency / _cacheSampled : 0;
             sb.Append(" | koszt: spis ").Append(censusMs.ToString("0.000", ci)).Append(" ms/dobe, postfiks pamieci ").Append(cacheUs.ToString("0.000", ci))
@@ -668,10 +920,10 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
-        /// <summary>Audyt w takcie linii: do 8 losowych partii AI w ruchu na drodze + gracz na ladzie - model predkosci wprost (bez zapisu do pamieci partii):
-        /// bez premii drogi (r0) i z premia (r1, z opisami): premia rzeczywista r1/r0 - 1, wpis "Road", wynik na suficie LimitMax, premia zjedzona przez sufit
-        /// (r1 < r0 x (1 + premia) x 0.995), pamiec gry (_lastCalculatedSpeed) zgodna z r1 +-2%.</summary>
-        private static void Audit(Settings s, Grid g, StringBuilder sb, float pct)
+        /// <summary>Audyt w takcie linii: do 8 losowych partii AI w ruchu na trakcie i (n20-drogi) do 8 na drodze bocznej + gracz na ladzie - model predkosci
+        /// wprost (bez zapisu do pamieci partii): bez premii drogi (r0) i z premia (r1, z opisami): premia rzeczywista r1/r0 - 1, wpis "Road" / "Side road",
+        /// wynik na suficie LimitMax, premia zjedzona przez sufit (r1 < r0 x (1 + premia) x 0.995), pamiec gry (_lastCalculatedSpeed) zgodna z r1 +-2%.</summary>
+        private static void Audit(Settings s, Grid g, StringBuilder sb, float pct, float spct)
         {
             var ci = Inv;
             if (g == null || Campaign.Current == null) { sb.Append(" | audyt: brak siatki | gracz: -"); return; }
@@ -683,7 +935,9 @@ namespace Armoury
                 try { _lastSpeedRef = AccessTools.FieldRefAccess<MobileParty, float>("_lastCalculatedSpeed"); } catch { _lastSpeedRef = null; }
             }
             float margin = MarginOf(s);
+            bool side = SideOn(s, g);
             _cand.Clear();
+            _candSide.Clear();
             var all = MobileParty.All;
             var main = MobileParty.MainParty;
             for (int i = 0; i < all.Count; i++)
@@ -694,22 +948,61 @@ namespace Armoury
                     if (mp == null || mp == main || !mp.IsActive || mp.AttachedTo != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || !mp.IsMoving) continue;
                     var p = mp.Position;
                     int c = g.CellOf(p.X, p.Y);
-                    if (!g.Empty(c) && g.OnRoad(c, p.X, p.Y, margin)) _cand.Add(mp);
+                    int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
+                    if (kind == 2) _cand.Add(mp);
+                    else if (kind == 1) _candSide.Add(mp);
                 }
                 catch (Exception e) { Stumble("Audit.Scan", e); }
             }
+            sb.Append(" | audyt AI na drodze: ");
+            AuditList(model, _cand, pct, false, sb);
+            sb.Append(" | audyt AI na drodze bocznej: ");
+            AuditList(model, _candSide, spct, true, sb);
+            _cand.Clear();
+            _candSide.Clear();
+            // gracz (na ladzie): zawsze, z flaga drogi
+            try
+            {
+                if (main != null && main.IsActive && !main.IsCurrentlyAtSea && !main.IsTransitionInProgress)
+                {
+                    var p = main.Position;
+                    int c = g.CellOf(p.X, p.Y);
+                    int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
+                    float ed = g.EdgeDist(c, p.X, p.Y, false), es = g.EdgeDist(c, p.X, p.Y, true);
+                    float r0, r1, lim, lmin, cached;
+                    bool line, lineS;
+                    if (Probe(model, main, out r0, out r1, out lim, out lmin, out line, out lineS, out cached))
+                        sb.Append(" | gracz: na drodze ").Append(kind == 2 ? "tak" : kind == 1 ? "bocznej" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2")
+                          .Append(" jedn., od krawedzi drogi bocznej ").Append(es < 1e30f ? es.ToString("0.00", ci) : ">2").Append(" jedn.)")
+                          .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
+                          .Append(", LimitMax ").Append(lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak")
+                          .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", wpis Side road ").Append(lineS ? "tak" : "nie")
+                          .Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
+                          .Append(", na podlodze LimitMin ").Append(r0 <= lmin + 0.001f ? "tak" : "nie");
+                    else sb.Append(" | gracz: audyt nieudany");
+                }
+                else sb.Append(" | gracz: na morzu / w przejsciu / nieczynny");
+            }
+            catch (Exception e) { Stumble("Audit.Player", e); sb.Append(" | gracz: blad audytu"); }
+        }
+
+        /// <summary>Audyt jednego rodzaju drogi (side: false trakt, true droga boczna): do AuditMax losowych kandydatow (lista mieszana w miejscu), premia
+        /// rzeczywista sr./min/maks, brak wpisu, zjedzona przez sufit, na suficie, pamiec gry zgodna, na podlodze LimitMin (poza srednia - recenzja, uwaga 3).</summary>
+        private static void AuditList(PartySpeedModel model, List<MobileParty> cand, float pct, bool side, StringBuilder sb)
+        {
+            var ci = Inv;
             int n = 0, nb = 0, noLine = 0, eaten = 0, atCap = 0, atFloor = 0, cacheOk = 0, cacheN = 0;
             double sum = 0, mn = double.MaxValue, mx = double.MinValue;
-            int k = Math.Min(AuditMax, _cand.Count);
+            int k = Math.Min(AuditMax, cand.Count);
             for (int i = 0; i < k; i++)
             {
-                int j = i + _rng.Next(_cand.Count - i);
-                var tmp = _cand[i]; _cand[i] = _cand[j]; _cand[j] = tmp;
+                int j = i + _rng.Next(cand.Count - i);
+                var tmp = cand[i]; cand[i] = cand[j]; cand[j] = tmp;
                 float r0, r1, lim, lmin, cached;
-                bool line;
-                if (!Probe(model, _cand[i], out r0, out r1, out lim, out lmin, out line, out cached)) continue;
+                bool line, lineS;
+                if (!Probe(model, cand[i], out r0, out r1, out lim, out lmin, out line, out lineS, out cached)) continue;
                 n++;
-                if (!line) noLine++;
+                if (!(side ? lineS : line)) noLine++;
                 if (cached > 0f) { cacheN++; if (Math.Abs(cached - r1) <= 0.02f * r1) cacheOk++; }
                 // podloga gry (LimitMin, MinimumSpeed 1): wynik bez premii na podlodze = premia ginie w modelu gry (np. dlug snu 3 w NightRest po nas) -
                 // osobny licznik, poza srednia premii i "zjedzona przez sufit" (recenzja, uwaga 3)
@@ -720,41 +1013,17 @@ namespace Armoury
                 if (r1 < r0 * (1f + pct) * 0.995f) eaten++;
                 if (lim < float.MaxValue * 0.5f && r1 >= lim - 0.0015f) atCap++;
             }
-            int candN = _cand.Count;
-            _cand.Clear();
-            sb.Append(" | audyt AI na drodze: kandydatow ").Append(candN).Append("; probek ").Append(n)
+            sb.Append("kandydatow ").Append(cand.Count).Append("; probek ").Append(n)
               .Append(", premia rzeczywista sr. ").Append(nb > 0 ? (100.0 * sum / nb).ToString("0.00", ci) : "-").Append("% (min ").Append(nb > 0 ? (100.0 * mn).ToString("0.00", ci) : "-")
               .Append(", maks ").Append(nb > 0 ? (100.0 * mx).ToString("0.00", ci) : "-").Append(')')
-              .Append(", bez wpisu Road ").Append(noLine).Append(", zjedzona przez sufit ").Append(eaten).Append(", na suficie LimitMax ").Append(atCap)
+              .Append(side ? ", bez wpisu Side road " : ", bez wpisu Road ").Append(noLine).Append(", zjedzona przez sufit ").Append(eaten).Append(", na suficie LimitMax ").Append(atCap)
               .Append(", pamiec gry zgodna ").Append(cacheOk).Append('/').Append(cacheN)
               .Append(", na podlodze LimitMin (poza srednia) ").Append(atFloor);
-            // gracz (na ladzie): zawsze, z flaga drogi
-            try
-            {
-                if (main != null && main.IsActive && !main.IsCurrentlyAtSea && !main.IsTransitionInProgress)
-                {
-                    var p = main.Position;
-                    int c = g.CellOf(p.X, p.Y);
-                    bool on = !g.Empty(c) && g.OnRoad(c, p.X, p.Y, margin);
-                    float ed = g.EdgeDist(c, p.X, p.Y);
-                    float r0, r1, lim, lmin, cached;
-                    bool line;
-                    if (Probe(model, main, out r0, out r1, out lim, out lmin, out line, out cached))
-                        sb.Append(" | gracz: na drodze ").Append(on ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
-                          .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
-                          .Append(", LimitMax ").Append(lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak")
-                          .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
-                          .Append(", na podlodze LimitMin ").Append(r0 <= lmin + 0.001f ? "tak" : "nie");
-                    else sb.Append(" | gracz: audyt nieudany");
-                }
-                else sb.Append(" | gracz: na morzu / w przejsciu / nieczynny");
-            }
-            catch (Exception e) { Stumble("Audit.Player", e); sb.Append(" | gracz: blad audytu"); }
         }
 
-        private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out float lmin, out bool line, out float cached)
+        private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out float lmin, out bool line, out bool lineS, out float cached)
         {
-            r0 = r1 = lim = cached = 0f; lmin = float.MinValue; line = false;
+            r0 = r1 = lim = cached = 0f; lmin = float.MinValue; line = false; lineS = false;
             try
             {
                 _noRecord = true;
@@ -764,8 +1033,12 @@ namespace Armoury
                 var en = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, true));
                 r1 = en.ResultNumber;
                 lim = en.LimitMaxValue;
-                string road = _txtRoad.ToString();
-                foreach (var l in en.GetLines()) if (l.Item1 == road) { line = true; break; }
+                string road = _txtRoad.ToString(), sideRoad = _txtSide.ToString();
+                foreach (var l in en.GetLines())
+                {
+                    if (l.Item1 == road) line = true;
+                    else if (l.Item1 == sideRoad) lineS = true;
+                }
                 if (_lastSpeedRef != null) cached = _lastSpeedRef(mp);
                 return true;
             }

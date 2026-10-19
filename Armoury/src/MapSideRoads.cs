@@ -1,6 +1,7 @@
 // f11-drogi (Jeff 18.10, ok. 09:40 PDT: "a drogi do wiosek odchodzace od glownego traktu, jesli wioska jest blisko traktu to nie rob do niej drogi, bo to bedzie
 // wygladalo jak jakas krotka kreska, tylko dalsze wioski, chyba ze potrafisz to tak namalowac na mapie, aby to dobrze wygladalo?") - BOCZNE DROGI NA MAPIE.
-// TYLKO WIDOK: drogi nie zmieniaja predkosci (premia drog MapRoads dotyczy tylko traktow ROT), tras partii, ekonomii ani zapisu gry.
+// WIDOK: drogi nie zmieniaja tras partii, ekonomii ani zapisu gry. n20-drogi (noc 19/20.10): plan drog bocznych idzie tez do premii predkosci MapRoads
+// (MapRoads.SidePublish / SideClear; klucz MapSideRoadSpeedBonus) - partia na drodze bocznej +7.5% (wpis "Side road").
 //
 // Co i dlaczego tak (proba 14.10 - decale sciezek osad na 2 oknach, Jeff: "drogi wygladaja fatalnie" - zdjecia D:\Backup-Bannerlord\zdjecia-drogi-2026-10-14:
 // cienkie, jasne, prawie biale kreski z twardym brzegiem (material sciezki osady: alpha test, bez mieszania), lamane zygzaki z rastra, droga do kazdej wioski):
@@ -139,7 +140,7 @@ namespace Armoury
                      + ") - plan: " + p.Text() + "; wyglad: " + look.Text() + "; komorki f22 (klucz MapSideRoadsChunks): "
                      + (KeyChunks ? "TAK - w scenie tylko komorki " + ChunkCell.ToString("0", Inv) + " jedn. wokol widoku kamery, najdalej " + ChunkCap.ToString("0", Inv) + " jedn. od kamery (nie blizej niz rog ekranu przy zwyklym pochyleniu)"
                                   : "NIE - wszystkie decale w scenie, chowane z wioskami")
-                     + ". Drogi postawi widok mapy (raz), tylko widok - bez zmian predkosci, tras i zapisu gry.");
+                     + ". Drogi postawi widok mapy (raz) - bez zmian tras i zapisu gry; premia predkosci drog bocznych (klucz MapSideRoadSpeedBonus " + (Settings.Current != null && Settings.Current.MapSideRoadSpeedBonus ? "TAK" : "NIE") + ") po planie (linia Drogi (DR): drogi boczne w premii).");
         }
 
         /// <summary>Parametry planu i wyglad z tresci pliku-przelacznika (linie klucz=wartosc, '#' - komentarz); zwraca opis zmian ("" - bez zmian).</summary>
@@ -356,6 +357,8 @@ namespace Armoury
         private bool _finalized, _wasOff, _built, _visible = true, _visKnown, _loggedPlan, _failedPlan;
         private float _acc, _sinceSummary, _waited;
         private MapSideRoads.Job _job;
+        private MapSideRoads.Job _speedJob;             // n20-drogi: plan, ktory widok podal do premii predkosci (MapRoads.SidePublish)
+        private int _speedEpoch;                        // n20-drogi: MapRoads.Epoch przy podaniu (nowa sesja - podac od nowa)
         private Material _mat;
         private string _matName = "", _matNote = "";
         private readonly List<Decal> _decals = new List<Decal>(16000);
@@ -419,6 +422,7 @@ namespace Armoury
                     int removed = sceneAlive ? RemoveAll() : DropAll();
                     Log.Info(MapSideRoads.P + "koniec mapy - zdjete decale " + removed + (sceneAlive ? "" : " (scena juz nie ta - same odwolania)") + "; " + sum);
                 }
+                SpeedClear("koniec mapy");   // n20-drogi: tylko gdy w premii jest plan tego widoku
             }
             catch (Exception e) { Log.Error("MapSideRoadsView.OnFinalize", e); }
             _job = null;
@@ -451,9 +455,10 @@ namespace Armoury
             _acc = 0f;
             try
             {
+                MapRoads.FlushSideNote();   // n20-drogi: linia logu z watku budowy siatki premii drog bocznych
                 if (!MapSideRoads.On)
                 {
-                    if (!_wasOff) { int n = RemoveAll(); _wasOff = true; Log.Info(MapSideRoads.P + "wylaczone w MCM - zdjete decale " + n + "."); }
+                    if (!_wasOff) { int n = RemoveAll(); _wasOff = true; Log.Info(MapSideRoads.P + "wylaczone w MCM - zdjete decale " + n + "."); SpeedClear("drogi boczne wylaczone w MCM"); }
                     return;
                 }
                 if (_wasOff)
@@ -479,6 +484,13 @@ namespace Armoury
                 // nie stawia juz starego planu (wczesniej ok. 74 tys. decali szlo na mape i zaraz z niej schodzilo); takze po planie NIEUDANYM (inna regula = inny plan)
                 if (KeyChanged()) return;
                 if (_job.Res == null) return;
+                // n20-drogi: drogi boczne do premii predkosci - raz na plan i raz na sesje (MapRoads.Reset przy starcie sesji zdejmuje plan); siatke buduje watek z puli
+                if (!ReferenceEquals(_speedJob, _job) || _speedEpoch != MapRoads.Epoch)
+                {
+                    _speedJob = _job;
+                    _speedEpoch = MapRoads.Epoch;
+                    MapRoads.SidePublish(_job.Res, _job.Params != null ? _job.Params.Width : 0.5f);
+                }
                 // f22: tryb komorek (klucz MapSideRoadsChunks, podzial z watku z puli); przelaczony klucz - wszystko ze sceny i stawianie od nowa w nowym trybie
                 bool chunks = MapSideRoads.KeyChunks && _job.Grid != null;
                 if (_mode >= 0 && _mode != (chunks ? 1 : 0)) ModeChanged(chunks);
@@ -678,6 +690,7 @@ namespace Armoury
             _replans++;
             Log.Info(MapSideRoads.P + "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE") + " - zdjete decale " + n0
                      + (j.Res == null ? " (plan byl NIEUDANY)" : "") + ", plan od nowa.");
+            SpeedClear("regula 'kazda wioska' zmieniona - plan od nowa");   // n20-drogi
             _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f; _failedPlan = false;
             ResetChunks();
             return true;
@@ -694,8 +707,17 @@ namespace Armoury
             int n = RemoveAll();
             _replans++;
             Log.Info(MapSideRoads.P + "uklad wiosek zmieniony (crc " + j.LayoutCrc.ToString("X8", Inv) + " -> " + crc.ToString("X8", Inv) + ") - zdjete decale " + n + ", plan od nowa.");
+            SpeedClear("uklad wiosek zmieniony - plan od nowa");   // n20-drogi
             _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f;
             ResetChunks();
+        }
+
+        /// <summary>n20-drogi: drogi boczne tego widoku zdjete z premii predkosci (MapRoads.SideClear zdejmuje tylko plan, ktory jest w premii).</summary>
+        private void SpeedClear(string why)
+        {
+            var sj = _speedJob;
+            _speedJob = null;
+            if (sj != null && sj.Res != null) MapRoads.SideClear(sj.Res, why);
         }
 
         // ---------- zdejmowanie ----------
