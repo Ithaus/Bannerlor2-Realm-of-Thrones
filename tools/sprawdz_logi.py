@@ -1652,7 +1652,8 @@ Uzycie (Python 3, tylko odczyt):
                     przy nadaniu 0 dzieki skarbcowi (sesja "skarbiec do zapasu" nastepnej doby; poza 14 dobami przed kwartalem), NKR-5d krolestwa przy nadaniu 0 dzieki skarbcowi
                     bez niedoplat rat Banku 186, kontraktow 185 i wezwan 168 (recenzja; f24-korona - klucz Ds War Grant Treasury Pays Dues: brak wplywow dnia
                     placi skarbiec ponad zapas wojny, niedoplata tylko przy wyczerpanej nadwyzce - INFO), NKR-5e f24 pieniadz zamkniety (ze skarbca tylko przy nadaniu 0,
-                    najwyzej zaplacone, suma wierszy = pole doby = dopisek linii 165), NKR-6 co placi lud i zmiana skarbcow w wojnie (INFO), NKR-6b tempo nadwyzki krolestw przy
+                    najwyzej zaplacone, suma wierszy (+ krolestwa bez wiersza - pokoj z zerwanego wezwania 168 po wyplacie) = pole doby = dopisek linii 165),
+                    NKR-6 co placi lud i zmiana skarbcow w wojnie (INFO), NKR-6b tempo nadwyzki krolestw przy
                     nadaniu 0 wobec nadwyzka / 91 (INFO), NKR-D5 najpierw skarbiec na sucho z ostatniej sesji kwartalnej - "do zapasu" i "na kwartal" (INFO, liczy tez log
                     sprzed paczki), NKR-8 ERROR paczki 0 i potkniecia linii f23 0.
                     Log sprzed paczki (test 18.10 Armoury-2026-10-18_17-11-11.log): NKR-0 INFO, NKR-D4 i NKR-D5 z liczbami, bez wyjatku.
@@ -47511,7 +47512,9 @@ NKR_RX_F23PRE = re.compile(r"\| tylko z wplywow dnia \(rata 186, kontrakty 185, 
                            r" zaplacone (\d+), niedoplata (\d+) \(krolestw (\d+)\)")
 # f24-korona: pole sumy linii f23 (klucz Ds War Grant Treasury Pays Dues) i dopisek linii 165 (ta sama kwota ze skarbca - linia 165 ma dzien o 1 wiekszy)
 NKR_RX_F24 = re.compile(r"; f24 Ds War Grant Treasury Pays Dues (tak|NIE): ze skarbca ponad zapas wojny (\d+), niedoplata przy nadwyzce \(krolestw\) (\d+),"
-                        r" nadwyzka nie starczyla \(krolestw\) (\d+), ze skarbca bez nadania 0 \(krolestw\) (\d+)")
+                        r" nadwyzka nie starczyla \(krolestw\) (\d+), ze skarbca bez nadania 0 \(krolestw\) (\d+)"
+                        # recenzja f24: czesc krolestw bez wiersza (zaplacily ze skarbca w wojnie, pokoj z zerwanego wezwania 168 w tym samym kroku korony) - tylko przy kwocie > 0
+                        r"(?:, w tym krolestwa bez wiersza \(pokoj tej doby po wyplacie\) (\d+) \(krolestw (\d+)\))?")
 NKR_RX_165F24 = re.compile(r"; f24 w tym ze skarbca ponad zapas wojny przy nadaniu 0 \(Ds War Grant Treasury Pays Dues (tak|NIE), poza wplywami dnia\) (\d+)"
                            r" \(186 (\d+), 185 (\d+), 168 (\d+)\)")
 NKR_RX_ST = re.compile(r"\| potkniecia (\d+)\.\s*$")
@@ -47563,8 +47566,9 @@ def _nkr_scan(logp):
                 if mp:
                     r["pre"] = tuple(int(x) for x in mp.groups())   # krolestw, nalezne, zaplacone, niedoplata, krolestw z niedoplata
                 m24 = NKR_RX_F24.search(s)
-                if m24:   # f24-korona: klucz tak, ze skarbca, niedoplata przy nadwyzce (krolestw), nadwyzka nie starczyla (krolestw), ze skarbca bez nadania 0 (krolestw)
-                    r["f24"] = (m24.group(1) == "tak",) + tuple(int(x) for x in m24.groups()[1:])
+                if m24:   # f24-korona: klucz tak, ze skarbca, niedoplata przy nadwyzce (krolestw), nadwyzka nie starczyla (krolestw), ze skarbca bez nadania 0 (krolestw),
+                    # recenzja: z tego krolestwa bez wiersza (pokoj tej doby po wyplacie) - kwota i krolestw (0 bez czesci)
+                    r["f24"] = (m24.group(1) == "tak",) + tuple(int(x) if x is not None else 0 for x in m24.groups()[1:])
                 i = s.find("| na krolestwo (w wojnie): ")
                 if i > 0:
                     seg = s[i + len("| na krolestwo (w wojnie): "):]
@@ -47974,7 +47978,9 @@ def nkorona_main(logp, bdp=None, csvp=None):
                 for d in d24:
                     f = f23[d]["f24"]; e = []
                     rows_tr = [(n, v[6]) for n, v in f23[d]["rows"].items() if v[6] is not None and v[6][4] > 0]
-                    if sum(p[4] for _n, p in rows_tr) != f[1]:
+                    # recenzja f24: krolestwa, ktore wyszly z wojny w kroku korony po wyplacie ze skarbca (pokoj z zerwanego wezwania 168), nie maja wiersza - ich kwota
+                    # w osobnej czesci pola (f[5]); suma wierszy + ta czesc = pole doby (= linia 165)
+                    if sum(p[4] for _n, p in rows_tr) + f[5] != f[1] or f[5] < 0:
                         e.append("suma wierszy != pole doby")
                     if f[4] != 0 or any(not p[3] for _n, p in rows_tr):
                         e.append("ze skarbca bez nadania 0")
@@ -47990,9 +47996,11 @@ def nkorona_main(logp, bdp=None, csvp=None):
                         for t_ in e:
                             why24[t_] = why24.get(t_, 0) + 1
                 tot = sum(f23[d]["f24"][1] for d in d24)
-                rep.add("NKR-5e: f24 pieniadz zamkniety - ze skarbca ponad zapas tylko przy nadaniu 0 dzieki skarbcowi, najwyzej zaplacone; suma wierszy krolestw = pole doby"
-                        " linii f23 = dopisek linii 165",
-                        f"dob {len(d24)} (z dopiskiem 165 {sum(1 for d in d24 if d in D['k165f24'])}), ze skarbca razem {tot} zl ({tot / max(1, len(d24)):.0f} zl/d), rozjazdow {len(e24)}"
+                totp = sum(f23[d]["f24"][5] for d in d24)
+                rep.add("NKR-5e: f24 pieniadz zamkniety - ze skarbca ponad zapas tylko przy nadaniu 0 dzieki skarbcowi, najwyzej zaplacone; suma wierszy krolestw (+ krolestwa"
+                        " bez wiersza - pokoj tej doby po wyplacie) = pole doby linii f23 = dopisek linii 165",
+                        f"dob {len(d24)} (z dopiskiem 165 {sum(1 for d in d24 if d in D['k165f24'])}), ze skarbca razem {tot} zl ({tot / max(1, len(d24)):.0f} zl/d;"
+                        f" w tym krolestwa bez wiersza {totp} zl w {sum(1 for d in d24 if f23[d]['f24'][5] > 0)} dobach), rozjazdow {len(e24)}"
                         + (f" (d{e24[:5]}; {why24})" if e24 else ""), "0", len(e24) == 0)
         else:
             pre_k = sum(f23[d]["pre"][0] for d in days23 if f23[d]["pre"])

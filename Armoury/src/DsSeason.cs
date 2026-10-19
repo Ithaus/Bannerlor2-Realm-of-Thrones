@@ -530,6 +530,9 @@ namespace Armoury
                 // f24-korona: ze skarbca ponad zapas (Ds War Grant Treasury Pays Dues) - razem, krolestwa z niedoplata przy nadaniu 0 mimo nadwyzki (oczekiwane 0), krolestwa, ktorym
                 // nadwyzka nie starczyla, ze skarbca bez nadania 0 (kontrola - oczekiwane 0)
                 long tfPreTr = 0; int tfPreShortWet = 0, tfPreDryK = 0, tfPreTrOut = 0;
+                // f24-korona (recenzja): czesc tfPreTr krolestw bez wiersza - zaplacily ze skarbca w wojnie, a przed ta linia wyszly z wojny tej samej doby (pokoj z zerwanego
+                // wezwania 168: CrownCallToWar.Daily po CrownBorrow i MercContract) - suma pola = suma linii 165 (wszystkie krolestwa doby)
+                long tfPreTrPeace = 0; int tfPreTrPeaceK = 0;
                 var tfZeroNames = new List<string>();
                 var tfRows = new List<KeyValuePair<double, string>>();
                 foreach (var k in Kingdom.All)
@@ -595,6 +598,13 @@ namespace Armoury
                                     tfRows.Add(new KeyValuePair<double, string>(sur, g.Name + ": skarbiec " + wal + ", zapas wojny " + rN + " (z pelnego zwrotu " + rF + "), nadwyzka "
                                                + N0(sur) + ", g " + G2(g.G) + (g.HoldTf ? " (najpierw skarbiec)" : "") + preSeg));
                                 }
+                                else if (d != null)
+                                {
+                                    // f24-korona (recenzja): skarbiec dal ponad zapas, gdy krolestwo bylo w wojnie (TreasuryForDues - tylko w wojnie), a pokoj przyszedl w tym samym kroku
+                                    // korony - bez wiersza (wiersze tylko w wojnie), kwota w sumie pola (jak w linii 165) i w osobnej czesci pola; heldDay - stan sprzed sesji, jak w wierszach
+                                    long pTrP = d.LoanTr + d.ContractTr + d.CallToWarTr;
+                                    if (pTrP > 0) { tfPreTr += pTrP; tfPreTrPeace += pTrP; tfPreTrPeaceK++; if (!heldDay) tfPreTrOut++; }
+                                }
                             }
                             catch (Exception e) { Stumble("Daily(f23)", e); }
                         }
@@ -651,7 +661,9 @@ namespace Armoury
                            .Append(", nalezne ").Append(tfPreDue).Append(", zaplacone ").Append(tfPrePaid).Append(", niedoplata ").Append(tfPreShort).Append(" (krolestw ").Append(tfPreShortK).Append(')')
                            // f24-korona: klucz wylaczony i 0 - napis jak dotad (czytnik NKR_RX_F23PRE bierze poczatek pola)
                            .Append(PaysDuesOn(s) || tfPreTr > 0 ? "; f24 Ds War Grant Treasury Pays Dues " + (PaysDuesOn(s) ? "tak" : "NIE") + ": ze skarbca ponad zapas wojny " + tfPreTr
-                                   + ", niedoplata przy nadwyzce (krolestw) " + tfPreShortWet + ", nadwyzka nie starczyla (krolestw) " + tfPreDryK + ", ze skarbca bez nadania 0 (krolestw) " + tfPreTrOut : "")
+                                   + ", niedoplata przy nadwyzce (krolestw) " + tfPreShortWet + ", nadwyzka nie starczyla (krolestw) " + tfPreDryK + ", ze skarbca bez nadania 0 (krolestw) " + tfPreTrOut
+                                   // f24-korona (recenzja): czesc bez wiersza tylko przy kwocie > 0 (zwykla doba - pole co do znaku jak dotad)
+                                   + (tfPreTrPeace > 0 ? ", w tym krolestwa bez wiersza (pokoj tej doby po wyplacie) " + tfPreTrPeace + " (krolestw " + tfPreTrPeaceK + ")" : "") : "")
                            .Append(" | na krolestwo (w wojnie): ").Append(tft.Count > 0 ? string.Join(" ; ", tft.ToArray()) : "-")
                            .Append(" | potkniecia ").Append(_stumbles).Append('.');
                         Log.Info(sbt.ToString());
