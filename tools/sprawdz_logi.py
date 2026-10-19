@@ -1752,6 +1752,14 @@ Uzycie (Python 3, tylko odczyt):
                     max(0, kapital wlasny - Iron Bank Capital) / Bank Profit To Braavos Days (+-1 zl) i kapital wlasny = kapital + koszt pozyczek (rody + korony) - pula + zwrot
                     (+-3 zl; linia sprzed poprawki bez pola - INFO).
                     Log sprzed paczki (fin93 Armoury-2026-10-18_12-18-40.log): NBK-B z liczbami, NBK-0 "brak w logu" (INFO), bez wyjatku.
+--grupa nspichlerze: (19.10, paczka f23-spichlerze - decyzje Jeffa "5. dwa lata i lekkie psucie" i "7. a"; Armoury/src/Famine.cs klucze Granary Spoilage,
+                    Granary Spoilage Percent Per Year; Armoury/src/BookHoldings.cs klucz Book Holdings Free Own Prisoners) python -I tools/sprawdz_logi.py --grupa nspichlerze
+                    <Armoury-*.log> (strumieniowo). NSP-0 linie paczki (INFO), NSP-0b segment psucia w kazdej dobie CZYNNE, NSP-1 zepsute dzis = w spichlerzu po dobie x
+                    ulamek doby (+-max(2, 1e-9 stanu)), NSP-1b ulamek doby = 1 - (1 - p)^(1 / dni roku gry), NSP-2 kontrola spichlerzy z zepsutymi jako nazwanym ujsciem,
+                    NSP-3 'od wczytania' = suma zepsutych sesji, NSP-4 skala psucia (INFO), NSP-5 glod i zapas swiata (INFO), NSP-6 ERROR Famine / WallTribute / FreeFolkRaids 0,
+                    NSP-7 linie Muru i Wolnych Ludzi (INFO; progi w --grupa nmur); NWL-0 klucz w linii startu sesji (INFO), NWL-1 jency do zalogi: zdjete z lochu = dodane do
+                    zalogi = wypuszczeni (kontrola 0), loch i zaloga przed/po, zostaja = obcy + bandyci + Inni, NWL-2 kazda zmieniona twierdza ma segment f23 (klucz TAK),
+                    NWL-3 BLAD i ERROR in BookHoldings.Free 0, NWL-4 wypuszczeni i pozostali (INFO). Log sprzed paczki albo bez przywrocenia: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -4329,7 +4337,7 @@ def etap4_e46(rep, lines, start, win, until):
     rep.add("E4/6 F3: linia dzienna CZYNNE", f"czynne {len(on)} dob, WYLACZONE {len(off)} dob z {len(win)}", "czynne kazdej doby", (len(off) == 0 and len(on) == len(win)) if win else None)
     if not on:
         return
-    # F4 kontrola spichlerzy (racje: stan = wczoraj + plon - zjedli - nadwyzka)
+    # F4 kontrola spichlerzy (racje: stan = wczoraj + plon - zjedli - nadwyzka; f23-spichlerze: - zepsute w spichlerzach, regula psucia w --grupa nspichlerze NSP-1)
     bad = []
     for d in on:
         c = fnum(r"kontrola spichlerzy " + SF, fam[d])
@@ -49491,6 +49499,199 @@ def nbank_main(logp):
     return 0
 
 
+# f23-spichlerze (19.10, decyzje Jeffa "5. dwa lata i lekkie psucie" i "7. a"): psucie zapasu spichlerzy okregow (Famine.cs, klucze Granary Spoilage,
+# Granary Spoilage Percent Per Year) i jency - zolnierze krolestwa nowego pana - z lochu do zalogi przy przywroceniu wlosci (BookHoldings.cs, klucz
+# Book Holdings Free Own Prisoners). Wiersze NSP (spichlerze) i NWL (wlosci) - opis w naglowku pliku (--grupa nspichlerze).
+NSP_FAM = "Spichlerze (E4/6): dzien "
+NSP_DAYN = re.compile(r"^Spichlerze \(E4/6\): dzien (?P<d>-?\d+) \| CZYNNE")
+NSP_SPOIL = re.compile(r"\| psucie w spichlerzach \(f23\): zepsute dzis (?P<s>\d+) racji z (?P<b>\d+) w spichlerzu po dobie \((?P<p>\d+(?:\.\d+)?)%/rok = ulamek doby "
+                       r"(?P<dd>\d+(?:\.\d+)?) na (?P<y>\d+) dni roku gry\); od wczytania (?P<t>\d+) racji")
+NSP_SPOFF = re.compile(r"\| psucie w spichlerzach \(f23\): (?P<why>WYLACZONE w MCM|0%/rok)")
+NSP_CTL = re.compile(r"\| kontrola spichlerzy ([+-]?\d+(?:\.\d+)?)")
+NSP_TOT = re.compile(r"\| spichlerze swiata (\d+(?:\.\d+)?) mln racji = (\d+) dni potrzeby \(gospodarze (\d+(?:\.\d+)?) mln")
+NSP_HUNG = re.compile(r"\| glod: wsi (\d+)")
+NSP_DEAD = re.compile(r"\| zmarli z glodu: gospodarze (\d+(?:\.\d+)?), uchodzcy (\d+(?:\.\d+)?), mieszczanie (\d+(?:\.\d+)?)")
+NSP_START = re.compile(r"^Famine \(E4/6\): .*?, psucie zapasu \(f23\) (?P<v>NIE|\d+(?:\.\d+)?%/rok),")
+NWL_PFX = "Wlosci z kronik (f19-kanon-b): "
+NWL_SESS = re.compile(r"Book Holdings Free Own Prisoners \(f23\) (TAK|NIE)")
+NWL_MOVED = re.compile(r"jency do zalogi (?P<n>[^|]+?) \(f23, kultury krolestwa nowego pana: (?P<c>[^)]*)\): (?:partia zalogi utworzona \(AddGarrisonParty\); )?"
+                       r"wypuszczeni do zalogi (?P<m>\d+) \(ranni (?P<w>\d+)\) \[(?P<t>[^\]]*)\], zaloga (?P<g0>\d+) -> (?P<g1>\d+), loch zwykli (?P<r0>\d+) -> (?P<r1>\d+) "
+                       r"\(zostaja: obcy (?P<f>\d+), bandyci (?P<b>\d+), Inni (?P<u>\d+)\); kontrola jencow do zalogi: zdjete z lochu (?P<o>-?\d+) - dodane do zalogi "
+                       r"(?P<i>-?\d+) = (?P<k>-?\d+)")
+NWL_NONE = re.compile(r"jency do zalogi (?P<n>[^|]+?) \(f23, kultury krolestwa nowego pana: (?P<c>[^)]*)\): brak zolnierzy krolestwa nowego pana w lochu \(zwykli (?P<r0>\d+) "
+                      r"zostaja: obcy (?P<f>\d+), bandyci (?P<b>\d+), Inni (?P<u>\d+)\)")
+NWL_NOGAR = re.compile(r"jency do zalogi (?P<n>[^|]+?) \(f23, [^|]*?brak partii zalogi - (?P<own>\d+) zolnierzy krolestwa zostaje w lochu")
+NWL_ERR = re.compile(r"jency do zalogi [^|]*?: BLAD")
+
+
+def nspichlerze_main(logp):
+    """nspichlerze (19.10, paczka f23-spichlerze): NSP-0..NSP-7 - linia "Spichlerze (E4/6)" (segment "psucie w spichlerzach (f23)", kontrola spichlerzy) i linia
+    startowa "Famine (E4/6)"; NWL-0..NWL-4 - linie "Wlosci z kronik (f19-kanon-b)" (segment "jency do zalogi ... (f23"). Wejscie: log Armoury (strumieniowo).
+    Log sprzed paczki (brak segmentow) i log bez przywrocenia - INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NSP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    start_v, days, offs, nolabel, errs_f, errs_w, errs_ff, errs_bh = None, {}, [], [], 0, 0, 0, 0
+    wall_n, raid_n, sess_flags, bh_lines = 0, 0, [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("Famine (E4/6):"):
+                ms = NSP_START.search(s)
+                if ms:
+                    start_v = ms.group("v")
+                continue
+            if s.startswith(NSP_FAM):
+                md = NSP_DAYN.match(s)
+                if not md:
+                    continue
+                d = int(md.group("d"))
+                mc, mt = NSP_CTL.search(s), NSP_TOT.search(s)
+                mh, mz = NSP_HUNG.search(s), NSP_DEAD.search(s)
+                rec = {"c": float(mc.group(1)) if mc else None, "tot": float(mt.group(1)) * 1e6 if mt else None, "dn": int(mt.group(2)) if mt else None,
+                       "hosts": float(mt.group(3)) * 1e6 if mt else None, "hung": int(mh.group(1)) if mh else 0,
+                       "dead": sum(float(x) for x in mz.groups()) if mz else 0.0, "sp": None}
+                sp = NSP_SPOIL.search(s)
+                if sp:
+                    rec["sp"] = {k: (float(v) if k in ("p", "dd") else int(v)) for k, v in sp.groupdict().items()}
+                elif NSP_SPOFF.search(s):
+                    offs.append(d)
+                else:
+                    nolabel.append(d)
+                days[d] = rec
+                continue
+            if s.startswith("ERROR in Famine"):
+                errs_f += 1
+                continue
+            if s.startswith("ERROR in WallTribute"):
+                errs_w += 1
+                continue
+            if s.startswith("ERROR in FreeFolkRaids"):
+                errs_ff += 1
+                continue
+            if s.startswith("ERROR in BookHoldings.Free"):
+                errs_bh += 1
+                continue
+            if s.startswith("Danina Muru (r4-mur): dzien "):
+                wall_n += 1
+                continue
+            if s.startswith("Najazdy Wolnych Ludzi (r4-mur): dzien "):
+                raid_n += 1
+                continue
+            if s.startswith(NWL_PFX):
+                r = s[len(NWL_PFX):]
+                if r.startswith("start sesji"):
+                    mf = NWL_SESS.search(r)
+                    sess_flags.append(mf.group(1) if mf else None)
+                elif r.startswith("dzien ") and " | po zmianie " in r:
+                    bh_lines.append(r)
+    ld = sorted(days)
+    lab = [d for d in ld if days[d]["sp"] is not None]
+    # NSP-0 linie i segmenty
+    rep.add("NSP-0: linie paczki (start Famine z 'psucie zapasu (f23)', doby z segmentem psucia)",
+            f"start: {start_v or 'brak segmentu'}; dob linii Spichlerze {len(ld)}, z psuciem {len(lab)}, WYLACZONE/0% {len(offs)}, bez segmentu {len(nolabel)}",
+            "INFO - log sprzed paczki: brak segmentu (bez wyjatku); z paczka: segment w kazdej dobie CZYNNE", None)
+    if ld and (lab or offs):
+        rep.add("NSP-0b: segment psucia w kazdej dobie CZYNNE (log z paczka)", f"bez segmentu {len(nolabel)} dob" + (f" (d{nolabel[:5]})" if nolabel else ""), "0", not nolabel)
+    # NSP-1 zepsute = w spichlerzu po dobie x ulamek doby
+    bad1, bad1b, worst1 = [], [], 0.0
+    for d in lab:
+        sp = days[d]["sp"]
+        exp = sp["b"] * sp["dd"]
+        err = abs(sp["s"] - exp)
+        worst1 = max(worst1, err)
+        if err > max(2.0, 1e-9 * sp["b"]):     # zaokraglenia: zepsute i stan do 0.5 racji, ulamek doby do 14 miejsc
+            bad1.append(d)
+        dexp = 1.0 - (1.0 - sp["p"] / 100.0) ** (1.0 / sp["y"]) if sp["y"] > 0 else 0.0
+        if abs(dexp - sp["dd"]) > max(1e-12, 1e-6 * dexp):
+            bad1b.append(d)
+    rep.add("NSP-1: zepsute dzis = w spichlerzu po dobie x ulamek doby (regula psucia)", f"poza tolerancja {len(bad1)} z {len(lab)} dob (max |roznica| {worst1:.1f} racji)" if lab else "brak dob z psuciem",
+            "|zepsute - w spichlerzu x ulamek| <= max(2, 1e-9 stanu) kazdej doby", (not bad1) if lab else None)
+    rep.add("NSP-1b: ulamek doby = 1 - (1 - p)^(1 / dni roku gry)", f"poza tolerancja {len(bad1b)} dob" + (f"; p {lab and days[lab[-1]]['sp']['p']}%/rok, rok {days[lab[-1]]['sp']['y']} dni" if lab else ""),
+            "|roznica| <= 1e-6 wzgledna kazdej doby (ten sam rok gry co sufit spichlerza)", (not bad1b) if lab else None)
+    # NSP-2 kontrola spichlerzy z zepsutymi jako ujscie
+    bad2 = [d for d in lab if days[d]["c"] is not None and days[d]["tot"] is not None and abs(days[d]["c"]) > max(1.0, 1e-9 * days[d]["tot"])]
+    rep.add("NSP-2: kontrola spichlerzy (stan = wczoraj + plon - zjedli - nadwyzka - zepsute)", f"poza tolerancja {len(bad2)} z {len(lab)} dob" if lab else "brak dob z psuciem",
+            "|kontrola| <= max(1, 1e-9 stanu) kazdej doby z psuciem (nazwane ujscie - zadnej zmiany bez przyczyny)", (not bad2) if lab else None)
+    # NSP-3 od wczytania = suma zepsutych w sesji
+    bad3, prev = [], None
+    for d in lab:
+        sp = days[d]["sp"]
+        if prev is not None and abs(sp["t"] - (prev + sp["s"])) <= 2:
+            pass
+        elif abs(sp["t"] - sp["s"]) <= 1:
+            pass        # nowa sesja (pierwsza doba po wczytaniu)
+        else:
+            bad3.append(d)
+        prev = sp["t"]
+    rep.add("NSP-3: 'od wczytania' = suma zepsutych dob sesji", f"nieciaglosci {len(bad3)}" + (f" (d{bad3[:5]})" if bad3 else ""), "0 (+-2 racje zaokraglenia)", (not bad3) if lab else None)
+    # NSP-4 skala psucia (INFO): racje na dobe wobec potrzeby i dni zapasu
+    if lab:
+        a, b = lab[0], lab[-1]
+        sa, sb_ = days[a]["sp"], days[b]["sp"]
+        need = days[b]["hosts"] or 0.0
+        rep.add("NSP-4: skala psucia (INFO)", f"d{a}: zepsute {sa['s']} racji ({100.0 * sa['s'] / days[a]['hosts']:.1f}% potrzeby gospodarzy)" if days[a]["hosts"] else f"d{a}: {sa['s']}",
+                f"INFO - przy pelnych spichlerzach (728 dni) i 6%/rok ok. 12% potrzeby dziennie; d{b}: {sb_['s']} racji, zapas swiata {days[b]['dn']} dni, od wczytania {sb_['t']}", None)
+    # NSP-5 glod dziala dalej (INFO) i bledy
+    hung = sum(1 for d in ld if days[d]["hung"] > 0)
+    dead = sum(days[d]["dead"] for d in ld)
+    dn = [days[d]["dn"] for d in ld if days[d]["dn"] is not None]
+    rep.add("NSP-5: glod i spichlerze swiata (INFO)", f"dob z glodnymi wsiami {hung}, zmarli z glodu razem {dead:.1f}; zapas swiata dni {dn[0] if dn else '-'} -> {dn[-1] if dn else '-'} (min {min(dn) if dn else '-'})",
+            "INFO - reguly glodu bez zmian (progi E4/6 w --grupa etap4)", None)
+    rep.add("NSP-6: bledy Famine, WallTribute, FreeFolkRaids", f"ERROR in Famine {errs_f}, WallTribute {errs_w}, FreeFolkRaids {errs_ff}", "0", errs_f + errs_w + errs_ff == 0)
+    rep.add("NSP-7: przeplywy zboza Muru i Wolnych Ludzi czynne (INFO)", f"linie 'Danina Muru (r4-mur)' {wall_n}, 'Najazdy Wolnych Ludzi (r4-mur)' {raid_n}",
+            "INFO - progi tych regul w --grupa nmur (czytaja te same spichlerze, po psuciu)", None)
+    # NWL - przywrocenie wlosci
+    flag = next((x for x in reversed(sess_flags) if x is not None), None)
+    rep.add("NWL-0: start sesji - klucz Book Holdings Free Own Prisoners (f23)", f"{flag or 'brak w linii (log sprzed paczki)'}; linii startu sesji {len(sess_flags)}, linii zmian osad {len(bh_lines)}",
+            "INFO - przywrocenie biegnie raz na zapis (stan 'czeka')", None)
+    moved, none_, nogar, errs_seg, bad_id, bad_cov, sites = [], [], [], 0, [], [], []
+    for r in bh_lines:
+        d = num(r"^dzien (\d+)", r)
+        segm = list(NWL_MOVED.finditer(r)); segn = list(NWL_NONE.finditer(r)); segg = list(NWL_NOGAR.finditer(r))
+        nerr = len(NWL_ERR.findall(r))
+        errs_seg += nerr
+        for x in segm:
+            g = {k: (int(v) if k not in ("n", "c", "t") else v) for k, v in x.groupdict().items()}
+            moved.append((d, g))
+            sites.append(g["n"].strip())
+            if not (g["k"] == 0 and g["o"] == g["m"] and g["i"] == g["m"] and g["r0"] - g["r1"] == g["m"] and g["g1"] - g["g0"] == g["m"] and g["r1"] == g["f"] + g["b"] + g["u"]
+                    and g["w"] <= g["m"]):
+                bad_id.append(f"d{d} {g['n'].strip()}")
+        for x in segn:
+            g = {k: (int(v) if k not in ("n", "c") else v) for k, v in x.groupdict().items()}
+            none_.append((d, g))
+            sites.append(g["n"].strip())
+            if g["r0"] != g["f"] + g["b"] + g["u"]:
+                bad_id.append(f"d{d} {g['n'].strip()} (brak)")
+        for x in segg:
+            nogar.append((d, x.group("n").strip(), int(x.group("own"))))
+        nj = len(segm) + len(segn) + len(segg) + nerr
+        npo = r.count(" | po zmianie ")
+        if flag != "NIE" and (nj > npo or ("ZMIANA NIE WESZLA" not in r and nj != npo)):
+            bad_cov.append(f"d{d}: segmentow {nj}, twierdz po zmianie {npo}")
+    if not bh_lines:
+        rep.add("NWL-1: jency do zalogi - tozsamosci", "brak przywrocenia w logu", "zdjete z lochu = dodane do zalogi = wypuszczeni; loch przed - po = wypuszczeni; zostaja = obcy + bandyci + Inni", None)
+        rep.add("NWL-2: kazda zmieniona twierdza ma segment f23", "brak przywrocenia w logu", "segmentow 'jency do zalogi' = odcinkow 'po zmianie' (zmiana nie weszla: <=)", None)
+    else:
+        rep.add("NWL-1: jency do zalogi - tozsamosci (ludzie prawdziwi, kontrola 0)", f"segmentow z wypuszczonymi {len(moved)}, bez zolnierzy krolestwa {len(none_)}, bez partii zalogi {len(nogar)}; poza regula {len(bad_id)}"
+                + (f" ({'; '.join(bad_id[:4])})" if bad_id else ""),
+                "zdjete z lochu = dodane do zalogi = wypuszczeni, kontrola 0; loch przed - po = wypuszczeni; zaloga po - przed = wypuszczeni; zostaja = obcy + bandyci + Inni", not bad_id)
+        rep.add("NWL-2: kazda zmieniona twierdza ma segment f23 (klucz TAK)", f"linii z niezgodnoscia {len(bad_cov)}" + (f" ({'; '.join(bad_cov[:3])})" if bad_cov else "") + f"; twierdze: {', '.join(sites[:10]) or '-'}",
+                "segmentow 'jency do zalogi' = odcinkow 'po zmianie' (zmiana nie weszla: <=); klucz NIE - INFO", (not bad_cov) if flag != "NIE" else None)
+    rep.add("NWL-3: bledy jencow do zalogi", f"segmenty BLAD {errs_seg}, ERROR in BookHoldings.Free {errs_bh}", "0", errs_seg + errs_bh == 0)
+    if moved or none_:
+        tot = sum(g["m"] for _, g in moved)
+        stay = sum(g["r1"] for _, g in moved) + sum(g["r0"] for _, g in none_)
+        rep.add("NWL-4: wypuszczeni i pozostali w lochach (INFO)", f"wypuszczeni do zalog {tot}, zostali w lochach {stay}; " + "; ".join(f"{g['n'].strip()} {g['m']} (zaloga {g['g0']} -> {g['g1']}; kultury {g['c']})" for _, g in moved[:8]),
+                "INFO - kultury krolestwa nowego pana w segmencie (Jeff: 'jency z Korony od razu wracaja do zalogi')", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -49766,6 +49967,8 @@ def main(argv):
         return ndothraki_main(logp, csvp)   # ndothraki (18.10, paczka f20-d2): danina Wolnych Miast dla Dothrakow wylaczona (klucz Gift Free Cities To Dothraki NIE), dary Strazy bez zmian (CrownGifts.cs)
     if group == "nbank" and logp:
         return nbank_main(logp)   # nbank (18.10, paczka f20-d3): zysk zrealizowany Banku ponad rezerwe do klucznikow i miasta Braavos (IronBank.Dividends.cs)
+    if group == "nspichlerze" and logp:
+        return nspichlerze_main(logp)   # nspichlerze (19.10, paczka f23-spichlerze): psucie zapasu spichlerzy (Famine, Granary Spoilage) i jency krolestwa nowego pana do zalogi przy przywroceniu wlosci (BookHoldings)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

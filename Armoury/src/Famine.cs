@@ -44,7 +44,14 @@ namespace Armoury
     ///    i schronieni uchodzcy wedlug u_f = niedobor / spozycie;
     ///    zaloge zabija gra (jak dotad);
     ///  - spustoszenie (Devastation.Strike) pali spichlerzowi ten sam ulamek, ktory trafil ludzi okregu (Burn, GL 2.2 pkt 6);
-    ///  - czlon H przyrostu naturalnego (E4/4): brak jedzenia gospodarzy wczoraj (HungerOf) - w miejsce ciecia zimy; w glodzie dodatni przyrost = 0 (GL 2.10).
+    ///  - czlon H przyrostu naturalnego (E4/4): brak jedzenia gospodarzy wczoraj (HungerOf) - w miejsce ciecia zimy; w glodzie dodatni przyrost = 0 (GL 2.10);
+    ///  - PSUCIE ZAPASU (f23-spichlerze, decyzja Jeffa 19.10 "5. dwa lata i lekkie psucie"; klucze GranarySpoilage, GranarySpoilagePercentPerYear): co dobe z tego,
+    ///    co zostaje w spichlerzu po jedzeniu i po sufice, ginie ulamek d = 1 - (1 - p)^(1 / dni roku gry) (p = 6%/rok - tradycyjne spichlerze wiejskie traca
+    ///    ok. 5-10% ziarna rocznie: wilgoc, plesn, wolek, gryzonie; dobrze utrzymany spichlerz dworski - dolna polowa). Nazwane ujscie "zepsute w spichlerzach"
+    ///    w kontroli spichlerzy (stan = wczoraj + plon - zjedli - nadwyzka - zepsute); racje spichlerza nie sa towarem w rosterach, wiec ksiega towarow ich nie
+    ///    widzi (jak dotad). Sufit (FamineBarnYears, 2 lata) bez zmian: w zwyklym roku nadwyzka plonu (ok. 0.2 potrzeby dziennie) jest wieksza od psucia
+    ///    pelnego spichlerza (ok. 0.12 potrzeby dziennie przy 6%/rok i 728 dniach) - spichlerz dalej dochodzi do sufitu, a zima, spustoszenie, oblezenie i kraina KS
+    ///    z racjami ponizej potrzeby oprozniaja go o psucie szybciej niz samo jedzenie (bramka krainy KS widzi ten spadek jak kazdy inny - CHANGELOG f23).
     /// Stan (spichlerze, miejsce pobytu kont, zegary) w zapisie przez PeopleBook ("arm_people" sekcja "f:", SaveText.Sync). Start i stary zapis: spichlerz
     /// FamineStartShare (1 = pelny) sufitu (GL 2.2 pkt 7). Wymaga People Unit Enabled i Natural Growth Enabled; uchodzcy z glodu - takze Devastation Enabled
     /// (konto UCHODZCY obsluguje E4/5). Wylaczone: spichlerze zamrozone, nikt nie umiera z glodu, uchodzcy z glodu wracaja w rok od dnia wylaczenia.
@@ -94,6 +101,7 @@ namespace Armoury
         private static double _dBurned; private static int _dBurnN;    // spalone przy spustoszeniu od ostatniego Daily
         private static double _dEaten;                                  // E7/R1 (K4): zjedzone przez napastnikow rabunku osada po osadzie od ostatniego Daily (racje)
         private static double _sessDead, _sessFled;
+        private static double _sessSpoiled;                             // f23-spichlerze: zepsute w spichlerzach od wczytania (racje)
         private static int _stumblesAll, _stumblesMark;                 // potkniecia razem; stan przy ostatniej linii (linia pokazuje przyrost - R2-1)
         // poprawka po recenzji E4/6 (R2-4): wsie, ktorym ReturnGate (Devastation.Daily tej doby) zmienil powrot wobec samej reguly E4/5 - do kolumny konto_e46 CSV
         private static readonly HashSet<string> _gateTouched = new HashSet<string>();
@@ -143,7 +151,7 @@ namespace Armoury
         internal static void Reset()
         {
             Clear();
-            _sessDead = _sessFled = 0; _stumblesAll = _stumblesMark = 0;
+            _sessDead = _sessFled = 0; _sessSpoiled = 0; _stumblesAll = _stumblesMark = 0;
             lock (_errSites) _errSites.Clear();
             _winterCount = 0; _firstStarve = -1; _warned.Clear(); _offLogged = false;
         }
@@ -655,6 +663,9 @@ namespace Armoury
             int yd = YearDays();
             double yield = Math.Max(0f, s.FamineYieldPerPerson), years = Math.Max(0.05f, s.FamineBarnYears), start = Clamp01(s.FamineStartShare);
             double rationDays = Math.Max(0, s.FamineRationDays), T = ThresholdNow, dmax = Clamp01(s.FamineDeathMaxPercent / 100.0);
+            // f23-spichlerze: psucie zapasu - roczny ulamek p rozlozony na doby roku gry (ten sam rok co sufit: years x yd); klucz wylaczony albo 0% - nic (jak dotad)
+            double spoilP = s.GranarySpoilage ? Math.Max(0.0, Math.Min(0.5, s.GranarySpoilagePercentPerYear / 100.0)) : 0.0;
+            double spoilD = spoilP > 0.0 ? 1.0 - Math.Pow(1.0 - spoilP, 1.0 / yd) : 0.0;
             var model = Campaign.Current.Models.VillageProductionCalculatorModel;
 
             // 1. wsie: ludzie, plon, sufit, spichlerz (zalozenie przy pierwszej dobie)
@@ -830,13 +841,21 @@ namespace Armoury
                 r.URef = Clamp01(1.0 - got / r.Present);
             }
 
-            // 4. spichlerze: reszta (najwyzej sufit; nadwyzka to towar na wozy, jak dotad)
-            double food1 = 0, overflow = 0;
+            // 4. spichlerze: reszta (najwyzej sufit; nadwyzka to towar na wozy, jak dotad); f23-spichlerze: z tego, co zostaje w spichlerzu (po sufice), ginie
+            // ulamek spoilD doby - nazwane ujscie "zepsute w spichlerzach" w kontroli (nadwyzka ponad sufit sie nie psuje - nie lezy w spichlerzu)
+            double food1 = 0, overflow = 0, spoiled = 0, stored = 0;
             foreach (var x in vils)
             {
                 double left = Math.Max(0.0, x.Rem - x.Taken);
                 double cap = Math.Max(0.0, x.Cap);
                 if (left > cap) { overflow += left - cap; left = cap; }
+                stored += left;
+                if (spoilD > 0.0 && left > 0.0)
+                {
+                    double sp = left * spoilD;
+                    if (sp > left) sp = left;
+                    left -= sp; spoiled += sp;
+                }
                 lock (Gate) x.B.Food = left;
                 food1 += left;
                 regs[x.Node].Food += left;
@@ -1012,6 +1031,7 @@ namespace Armoury
 
             _sessDead += deadHosts + deadRef + deadTown + deadShelter + deadTownRef;
             _sessFled += fled;
+            _sessSpoiled += spoiled;
             try { RaidRefugees.NoteSiege(townRefPeople, townRef.Count, deadTownRef); } catch (Exception e) { Stumble("Famine.Daily(RT oblezenie)", e); }   // sw-uchodzcy: linia RT
 
             // 9. komunikat gracza: glod w jego wlasnym regionie (raz na glod)
@@ -1023,7 +1043,7 @@ namespace Armoury
             {
                 var sb = new StringBuilder(3200);
                 double eaters = hostsAll + presentAll + shelterPeople;
-                double control = food1 - (food0 + harvestAll - eatHosts - eatRef - overflow);
+                double control = food1 - (food0 + harvestAll - eatHosts - eatRef - overflow - spoiled);     // f23-spichlerze: zepsute - nazwane ujscie
                 sb.Append("Spichlerze (E4/6): dzien ").Append(day).Append(" | CZYNNE");
                 sb.Append(" | wsie ").Append(vils.Count).Append(" (bez przelicznika ").Append(noK).Append("), regiony z wsiami ").Append(regs.Values.Count(r => r.Vs.Count > 0));
                 sb.Append(" | spichlerze swiata ").Append(M(food1)).Append(" mln racji = ").Append(F(eaters > 0 ? food1 / eaters : 0, "0")).Append(" dni potrzeby (gospodarze ")
@@ -1034,6 +1054,13 @@ namespace Armoury
                 sb.Append(" | zjedli: gospodarze ").Append(M(eatHosts)).Append(" mln, uchodzcy ").Append(F0(eatRef)).Append(" | nadwyzka ponad sufit ").Append(M(overflow))
                   .Append(" mln | spalone przy spustoszeniu od wczoraj ").Append(F0(burned)).Append(" racji (").Append(burnN).Append(" razy)").Append(", zjedzone przez napastnikow (E7/R1) ").Append(F0(eaten)).Append(" racji")
                   .Append(" | kontrola spichlerzy ").Append(Sg(control, "0.###"));
+                // f23-spichlerze: psucie zapasu - zepsute = w spichlerzu po dobie (po sufice, przed psuciem) x ulamek doby; kontrola wyzej liczy je jako ujscie
+                if (spoilD > 0.0)
+                    sb.Append(" | psucie w spichlerzach (f23): zepsute dzis ").Append(F0(spoiled)).Append(" racji z ").Append(F0(stored)).Append(" w spichlerzu po dobie (")
+                      .Append(F(100.0 * spoilP, "0.##")).Append("%/rok = ulamek doby ").Append(spoilD.ToString("0.##############", Inv)).Append(" na ").Append(yd).Append(" dni roku gry); od wczytania ")
+                      .Append(F0(_sessSpoiled)).Append(" racji");
+                else
+                    sb.Append(" | psucie w spichlerzach (f23): ").Append(s.GranarySpoilage ? "0%/rok - nic sie nie psuje" : "WYLACZONE w MCM (Granary Spoilage) - zapas sie nie psuje");
                 sb.Append(" | przednowek (90%): wsi ").Append(rationedV).Append(", regionow z uchodzcami ").Append(regs.Values.Count(r => r.Present > 0.0 && r.Rationed));
                 sb.Append(" | glod: wsi ").Append(hungryV);
                 if (hungryV > 0) sb.Append(" (brak srednio ").Append(F(100.0 * uSum / hungryV, "0.#")).Append("%, najgorsza ").Append(NameOf(worst.V.Settlement)).Append(' ').Append(F(100.0 * worst.U, "0.#")).Append("%)");
@@ -1394,7 +1421,9 @@ namespace Armoury
                 if (s != null)
                 {
                     sb.Append(" - plon ").Append(F(Math.Max(0f, s.FamineYieldPerPerson), "0.##")).Append(" x ludzie okregu x (zywnosc wsi z modelu gry / (poziom + 1)), sufit ")
-                      .Append(F(Math.Max(0.05f, s.FamineBarnYears), "0.##")).Append(" lat potrzeby, start ").Append(F(100.0 * Clamp01(s.FamineStartShare), "0")).Append("% sufitu, przednowek ponizej ")
+                      .Append(F(Math.Max(0.05f, s.FamineBarnYears), "0.##")).Append(" lat potrzeby, start ").Append(F(100.0 * Clamp01(s.FamineStartShare), "0")).Append("% sufitu")
+                      .Append(", psucie zapasu (f23) ").Append(s.GranarySpoilage ? F(Math.Max(0.0, Math.Min(50.0, (double)s.GranarySpoilagePercentPerYear)), "0.##") + "%/rok" : "NIE")
+                      .Append(", przednowek ponizej ")
                       .Append(Math.Max(0, s.FamineRationDays)).Append(" dni (90%), prog glodu ").Append(F(100.0 * ThresholdNow, "0")).Append("%, zgony do ")
                       .Append(Math.Max(0, Math.Min(100, s.FamineDeathMaxPercent))).Append("%/rok; uchodzcy z glodu ").Append(s.FamineFleeEnabled ? "TAK" : "NIE")
                       .Append(" (region tego samego albo niewrogiego krolestwa ze spichlerzem ponad ").Append(Math.Max(0, s.FamineRefugeMinDays)).Append(" dni w promieniu ")
