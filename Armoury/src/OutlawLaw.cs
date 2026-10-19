@@ -1375,7 +1375,9 @@ namespace Armoury
                                 }
                                 continue;
                             }
+                            DothrakiArms.BandToPack(p);   // n20-drobne: bron Dothrakow, ktorej nikt w bandzie nie nosi - ze zbrojowni DTE do jukow (paser ja skupi)
                             FenceSell(p, fenceShare, reserve);
+                            DothrakiArms.AfterFence(p);
                         }
                         catch (Exception e)
                         {
@@ -2402,8 +2404,9 @@ namespace Armoury
             bool cargo = false, beasts = false;
             for (int i = 0; i < pack.Count; i++)
             {
-                int k = LootKind(pack.GetElementCopyAtIndex(i), food);
-                if (k == LootCargo) cargo = true; else if (k == LootMount || k == LootPack) beasts = true;
+                var e0 = pack.GetElementCopyAtIndex(i);
+                int k = LootKind(e0, food);
+                if (k == LootCargo || (k == LootArms && DothrakiArms.FenceTakes(p, e0))) cargo = true; else if (k == LootMount || k == LootPack) beasts = true;   // n20-drobne: bron Dothrakow jak ladunek
             }
             if (!cargo && !(spare && beasts)) return;
             if (cargo) _sellBands++;
@@ -2432,7 +2435,17 @@ namespace Armoury
                 {
                     if (i >= pack.Count) continue;
                     var el = pack.GetElementCopyAtIndex(i);
-                    if (LootKind(el, food) != LootCargo) continue;
+                    int lk = LootKind(el, food);
+                    if (lk == LootArms && DothrakiArms.FenceTakes(p, el))
+                    {
+                        // n20-drobne: bron Dothrakow, ktorej nikt w bandzie nie nosi - paser skupuje jak ladunek (zaplata w SellStack, licznik z kiesy bandy)
+                        int g0 = p.PartyTradeGold;
+                        int dn = SellStack(p, pack, el, bids, reserve, false, 0f, ref poor);
+                        units += dn;
+                        DothrakiArms.NoteFenceSold(dn, p.PartyTradeGold - g0);
+                        continue;
+                    }
+                    if (lk != LootCargo) continue;
                     units += SellStack(p, pack, el, bids, reserve, false, 0f, ref poor);
                 }
                 if (spare && beasts) units += SellSpare(p, pack, bids, reserve, ref poor);
