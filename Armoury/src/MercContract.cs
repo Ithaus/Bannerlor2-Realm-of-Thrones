@@ -257,7 +257,7 @@ namespace Armoury
                             }
                         }
                         CrownIncome.Spent(k, paidK);
-                        var cd = CrownIncome.DayOf(k); if (cd != null) cd.Contract += paidK;
+                        var cd = CrownIncome.DayOf(k); if (cd != null) { cd.Contract += paidK; cd.ContractDue += dueK; }   // f23 (recenzja): nalezne - tylko licznik
                         LastDue += dueK; LastPaid += paidK;
                     }
                     catch (Exception e) { Stumble("Daily(krolestwo)", e); }

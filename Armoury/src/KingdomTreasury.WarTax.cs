@@ -64,8 +64,9 @@ namespace Armoury
             public int H7, F7;
             public readonly long[] Due = new long[WtRing28];                         // 28 dob naleznego zwrotu zoldu (f6-zwrot: pelnego - KDay.RefundFull, przed mnoznikiem potrzeby)
             public int H28, F28;
-            // f23-korona (War Reserve By Need): PAMIEC SESJI - nalezny zwrot PO mierze potrzeby rodu (KDay.RefundDue) w tych samych miejscach pierscienia co Due; FN - ile dob
-            // tej sesji jest w pierscieniu (po wczytaniu 0 - udzial 1, zapas jak z pelnego zwrotu). Bez zapisu (Due z zapisu zostaje pelny - stara DLL czyta go jak dotad)
+            // f23-korona (War Reserve By Need): nalezny zwrot PO mierze potrzeby rodu (KDay.RefundDue) w tych samych miejscach pierscienia co Due; FN - ile dob z DueN jest
+            // w pierscieniu. Recenzja: w zapisie za lista Due (29. liczba SN zawsze, potem 28 x DueN i FN) - po wczytaniu udzial jak przed zapisem; zapis sprzed recenzji -
+            // FN 0, pierwsza doba udzial 1 (zapas jak z pelnego). Due z zapisu zostaje pelny - stara DLL czyta go jak dotad
             public readonly long[] DueN = new long[WtRing28];
             public int FN;
             public string Name = "";
@@ -468,7 +469,15 @@ namespace Armoury
                     for (int i = 0; i < WtRing28; i++) { if (i > 0) sb.Append(','); sb.Append(w.Due[i].ToString(WtInv)); }
                     // W5b regula 1: stawka z braku wojska u panow (milionowe) - 29. liczba listy, tylko gdy > 0. Starsza wersja moda czyta pierwsze 28 liczb i reszte
                     // pomija (WarTaxImport: petla do WtRing28), wiec format pola sie nie zmienia; zapis bez niej = 0
-                    if (w.SN > 0) sb.Append(',').Append(((long)Math.Round(w.SN * 1e6)).ToString(WtInv));
+                    // f23-korona (recenzja): pierscien naleznego zwrotu po mierze potrzeby rodu (DueN) i FN - po 28 liczbach Due ZAWSZE 29. (SN, takze 0), potem 28 liczb DueN
+                    // i FN (razem 58 liczb). Starsza DLL czyta 28 liczb i 29. jako SN (0 = jak zapis bez stawki), reszte pomija; zapis bez nich - FN 0 (udzial z dob sesji)
+                    if (w.FN > 0)
+                    {
+                        sb.Append(',').Append(((long)Math.Round(Math.Max(0, w.SN) * 1e6)).ToString(WtInv));
+                        for (int i = 0; i < WtRing28; i++) sb.Append(',').Append(w.DueN[i].ToString(WtInv));
+                        sb.Append(',').Append(Math.Min(WtRing28, w.FN).ToString(WtInv));
+                    }
+                    else if (w.SN > 0) sb.Append(',').Append(((long)Math.Round(w.SN * 1e6)).ToString(WtInv));
                 }
                 return sb.ToString();
             }
@@ -504,6 +513,14 @@ namespace Armoury
                         for (int i = 0; i < WtRing28; i++) { long v; if (i < dd.Length && long.TryParse(dd[i], NumberStyles.Integer, WtInv, out v)) w.Due[i] = Math.Max(0, v); }
                         long sn;   // W5b regula 1: 29. liczba listy (zapis sprzed paczki - brak, stawka 0)
                         if (dd.Length > WtRing28 && long.TryParse(dd[WtRing28], NumberStyles.Integer, WtInv, out sn)) w.SN = WtClamp(sn / 1e6, 0, 0.2);
+                        // f23-korona (recenzja): 30.-57. liczba - pierscien DueN, 58. - FN (zapis sprzed recenzji: brak - FN 0, udzial z dob sesji); jedna zla liczba - FN 0
+                        if (dd.Length >= 2 * WtRing28 + 2)
+                        {
+                            bool okN = true; long vn; int fn;
+                            for (int i = 0; i < WtRing28 && okN; i++) { if (long.TryParse(dd[WtRing28 + 1 + i], NumberStyles.Integer, WtInv, out vn)) w.DueN[i] = Math.Max(0, vn); else okN = false; }
+                            if (okN && int.TryParse(dd[2 * WtRing28 + 1], NumberStyles.Integer, WtInv, out fn)) w.FN = Math.Max(0, Math.Min(Math.Min(WtRing28, w.F28), fn));
+                            else { w.FN = 0; Array.Clear(w.DueN, 0, WtRing28); }
+                        }
                         _wt[kv[0]] = w; _wtImportN++;
                     }
                     catch { _wtImportBad++; }

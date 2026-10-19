@@ -355,6 +355,7 @@ namespace Armoury
                     double want = Math.Min(Math.Min(l.Peak / days, share * TaxAvg(kv.Key)), l.Principal);
                     long due = (long)Math.Ceiling(Math.Max(0, want));
                     long pay = 0;
+                    if (due > 0) cd.LoanDue += due;   // f23-korona (recenzja): rata nalezna tej doby - tylko licznik (prog nadania 0 w DsSeason, linia f23)
                     if (due > 0)
                     {
                         pay = Math.Min(due, Math.Min(CrownIncome.LeftFor(k), (long)Math.Max(0, k.KingdomBudgetWallet)));

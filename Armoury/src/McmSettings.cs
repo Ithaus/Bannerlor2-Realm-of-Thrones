@@ -7520,9 +7520,13 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsRefundTreasuryFirst { get; set; } = true;
 
-        [SettingPropertyBool("Ds War Grant Treasury First", HintText = "with Ds Towns: a king with a full treasury first pays for his war from his own treasure. When the realm sets the quarter's war grant, what the treasury holds above its war reserve and above its debts to the Iron Bank and the towns, spread over the quarter, is taken off what the crown lacks before the people are taxed; if it covers the lack the grant is nothing and the people pay no war aids, war tax on earnings or tenth that quarter (with the War Tax policy one step is still granted). A grant changes by at most one step a quarter as before. When such a treasury falls to its war reserve before the quarter day, the realm grants a war grant at once. Off = the war grant follows the lack alone, as before", RequireRestart = false)]
+        [SettingPropertyBool("Ds War Grant Treasury First", HintText = "with Ds Towns: a king with a full treasury first pays for his war from his own treasure. What the treasury holds above its war reserve and above its debts to the Iron Bank and the towns pays the wage refunds and the war aid to the houses before the people are taxed (how it is spent - Ds War Grant Treasury To Reserve); while it does, the war grant may be nothing and the people pay no war aids, war tax on earnings or tenth that quarter (with the War Tax policy one step is still granted). Mercenary contracts, the Iron Bank's instalments, gifts, reparations and the price of allies called to war are paid only from the day's income, so the people still grant what that income lacks for them. A grant changes by at most one step a quarter as before. When such a treasury falls to its war reserve, the realm grants a war grant the next day - unless the quarter day is no more than Ds Grant Session Days away, then on the quarter day. Off = the war grant follows the lack alone, as before", RequireRestart = false)]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsWarGrantTreasuryFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ds War Grant Treasury To Reserve", HintText = "with Ds War Grant Treasury First: the king pays for his war from his treasure for as long as it holds more than his war reserve and his debts, and the people give no war grant until the treasury falls to that reserve. A treasure that would not last Ds Grant Session Days of what the crown lacks counts as already at the reserve. Off = the treasure above the reserve is spread over the quarter, and each quarter the people pay the part of the lack it does not cover", RequireRestart = false)]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsWarGrantTreasuryToReserve { get; set; } = true;
 
         [SettingPropertyBool("Ds Anticipation Loans", HintText = "with Ds Towns: then the burghers of the realm lend the crown against the instalments of the war grant not yet paid (Crown Town Loan Rate Year a year); the loan is repaid first from those instalments, and what is left after the quarter becomes ordinary crown debt to the towns (needs Crown Town Loans)", RequireRestart = false)]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
@@ -9896,6 +9900,7 @@ namespace Armoury
             s.DsGrantSessionDays = DsGrantSessionDays;
             s.DsRefundTreasuryFirst = DsRefundTreasuryFirst;
             s.DsWarGrantTreasuryFirst = DsWarGrantTreasuryFirst;
+            s.DsWarGrantTreasuryToReserve = DsWarGrantTreasuryToReserve;
             s.DsAnticipationLoans = DsAnticipationLoans;
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;

@@ -60,8 +60,9 @@ namespace Armoury
         /// <summary>Zapas wojny krolestwa - ta sama liczba co w regule 184 (WarTaxDaily): wieksze z CrownReserveGold i WarTaxReserveDays x sredni nalezny zwrot
         /// zoldu z 28 dob (pierscien 184; tu stan do wczoraj - krok 184 dopisuje dzisiejsza dobe pozniej). Krolestwo bez pierscienia - sama podloga.
         /// f6-zwrot (recenzja): pierscien niesie PELNY zwrot (KDay.RefundFull, przed mnoznikiem potrzeby rodu) - zapas wojny i jego czytelnicy jak przed f6.
-        /// f23-korona (klucz War Reserve By Need): sredni pelny zwrot x udzial naleznego po f6 w pelnym z dob tej sesji (WtNeedShare) - przy 28 dobach sesji to
-        /// dokladnie sredni nalezny zwrot; po wczytaniu (bez dob sesji) udzial 1 - zapas jak z pelnego. Jedna liczba dla wszystkich czytelnikow (184, W5b, W5c, K5, DS,
+        /// f23-korona (klucz War Reserve By Need): sredni pelny zwrot x udzial naleznego po f6 w pelnym z dob pierscienia DueN (WtNeedShare) - przy 28 dobach to
+        /// dokladnie sredni nalezny zwrot; DueN i FN sa w zapisie (recenzja), wiec po wczytaniu udzial jak przed zapisem (zapis sprzed recenzji: pierwsza doba udzial 1 -
+        /// zapas jak z pelnego). Jedna liczba dla wszystkich czytelnikow (184, W5b, W5c, K5, DS,
         /// L5b-1, korona2). full = true - zapas z pelnego zwrotu (tylko do linii f23: o ile zapas wedlug potrzeby jest mniejszy).</summary>
         private static long WarReserveOf(Kingdom k, Settings s, bool full = false)
         {
@@ -78,8 +79,9 @@ namespace Armoury
         /// wylaczony) nalezny = pelny - udzial 1, zapas co do zlotowki jak dotad.</summary>
         internal static bool WarReserveByNeedOn { get { var s = Settings.Current; return s != null && s.WarReserveByNeed; } }
 
-        /// <summary>f23-korona: udzial naleznego zwrotu (KDay.RefundDue - po mierze potrzeby rodu f6) w pelnym (KDay.RefundFull) z dob TEJ SESJI w pierscieniu 184 (ostatnie
-        /// FN miejsc przed glowa H28 - te same doby w obu pierscieniach). 1 - brak dob sesji (po wczytaniu) albo bez zwrotu w tych dobach (zapas jak z pelnego). 0..1.</summary>
+        /// <summary>f23-korona: udzial naleznego zwrotu (KDay.RefundDue - po mierze potrzeby rodu f6) w pelnym (KDay.RefundFull) z dob pierscienia DueN (ostatnie FN miejsc
+        /// przed glowa H28 - te same doby w obu pierscieniach; DueN i FN w zapisie od recenzji). 1 - brak dob DueN (zapis sprzed recenzji, pierwsza doba) albo bez zwrotu
+        /// w tych dobach (zapas jak z pelnego). 0..1.</summary>
         private static double WtNeedShare(WarTaxK w)
         {
             if (w == null || w.FN <= 0) return 1.0;
