@@ -3191,3 +3191,6 @@ NIESPRAWDZONE W GRZE: sciezka KL w przywroceniu (Polnoc pod Harrenhal, zaloga Po
 RAPORT DLA JEFFA: docs/RAPORT-NOC-2026-10-19.md (decyzje 1-8 do podjecia).
 - 19:40 PDT: CHANGELOG na noc-ks4 9b160103 (wpis WGRANIA 83 + f21/f22, historia cala 32 956 linii). Limit tygodniowy 83% (reset za 5 dni), kontekst sesji 90% - NOC ZAMKNIETA: zadania Jeffa
   zrobione i wgrane; nic wiecej nie uruchamiam bez Jeffa. Rano: log pierwszego wczytania Jeffa (Wlosci z kronik - sciezka KL, Sojusze kanonu, drogi/komorki, f20) i jego decyzje z raportu.
+- 19.10 rano: DECYZJE JEFFA (verbatim "1. b 2. c 3. a 4. a 5. dwa lata i lekkie psucie 6. b 7. a 8. a"): 1 termin wojen fabularnych bez zmian; 2 regula skarbca stolicy zostaje;
+  3 tarczowe W6 wedlug potrzeby; 4 Straz/Wolni Ludzie/dluznicy Banku mierzeni zlotem (koniec f=1 "bez miary" w f6/f7); 5 spichlerze 2 lata + lekkie psucie; 6 A7 po osobnym tescie;
+  7 jency Korony z lochu KL -> zaloga przy przywroceniu; 8 nadanie wojenne DS: najpierw skarbiec ponad rezerwe. -> paczki f23-korona (3, 4, 8) i f23-spichlerze (5, 7) od 9b160103.
