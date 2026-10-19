@@ -3242,3 +3242,14 @@ Pierwszy log Jeffa: "Wlosci z kronik" (KL), "Sojusze kanonu", "Korona: najpierw 
   po recenzji (sufit fizyczny plonu) w fin98 zero zmian - Wolni Ludzie 0.727 bez poprawy; dom Wolnych Ludzi juz na granicy plonu zimnej ziemi; fin95 0.79 bylo za hojne.
   Bramka 5C: Wolni Ludzie wracaja do starych zasad plonu ok. d+129 od wlaczenia KS (A i C tak samo). -> pytanie do Jeffa o 1a (dalsza droga).
 - 19.10: Jeff "zostawnmy a" (Wolni Ludzie): f26-wolni NIE scalone (galaz zostaje), checker NKS-30b Wolni Ludzie prog 0.60 (podloga) na noc-ks4.
+
+### 92. WGRANIE 86 (19.10 ok. 15:45 UTC) - DECYZJE 4b, 5C, 2a, 3c - START TUTAJ
+W grze: `w-toku/noc-wgranie-86` = noc-ks4 6964ad31 (+ CHANGELOG) | Armoury **283509af** (2008 ustawien), reszta jak 85 (CrashScribe f98aac55, RC 8dbedff3, GT 87465d27).
+Kopie *.bak-2026-10-19-wgranie86-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie86-przed; Jeff nie gral od 18.10 14:13 (Ironman zapis bez zmian).
+= 85 + f25-korona (Ds War Grant Treasury Covers Dues) + f25-sprawdz (nzc1: ZC1-16b baza x czesc wsi, ZC1-4 miasta z tkalnia) + f26-bramka (Ks Land Gate Exact Loss)
++ NKS-30b Wolni Ludzie prog 0.60. f26-wolni NIE scalone (Jeff "zostawnmy a"). 6 i 7 bez zmian.
+TESTY: fin99 160 dob x20 (Armoury-2026-10-19_07-51-11.log) 0 ERROR - lud w wojnie 36.4 tys./d (fin98 44.2), 22 krolestwa przy nadaniu 0 (17), ARM-16 TAK;
+5 dob + bitwa (Armoury-2026-10-19_08-31-35.log) 0 ERROR, wygrana. NIE jak fin98: NAKUM-7 glowy rodow +44.7 tys./d, NKA-1 zaleglosci DS - oba tylko w biegach x20
+(fin97 x8 TAK) - do sprawdzenia, czy tempo testu zmienia przebieg (nastepny bieg porownawczy x8 po resecie limitu).
+OTWARTE: okolica tkalni aksamitu (3c) - log nie ma indeksu aksamitu wedlug miasta (nowa linia logu - osobno); pierwszy log Jeffa ("Wlosci z kronik", "Sojusze kanonu",
+"Korona: najpierw skarbiec (f23)" z f24/f25, "KS: bramka krainy" z "miara straty (f26"). Limit tygodniowy ok. 95% (reset 23.10 ok. 20:00 PDT).
