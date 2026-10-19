@@ -1566,8 +1566,9 @@ Uzycie (Python 3, tylko odczyt):
                     urwana), potkniecia planu (koniec trasy bez celu, zerwana trasa) 0; wsie gry bez zadnej drogi - INFO z nazwami. Plan f11 (klucz NIE) - NBC-9 INFO.
                     f22-drogi-perf (Jeff 18.10: "przy max x8 predkosci strasznie gra zwalnia i sie przycina tam gdzie jest duzo jednostek"; klucz Map Side Roads Chunks,
                     MapSideRoads.Chunks.cs): gdy ostatnia mapa szla w trybie komorek (linia "komorki (f22)" po ostatniej "postawione") - NBC-3 zamiast "postawione N z M":
-                    komorki z drogami > 0 i linia "pierwsze wypelnienie komorek" z decalami > 0; NBC-5: najdluzszy tick pracy komorek (linia pomiaru) <= 15 ms (bieg
-                    zdjec - INFO); NBC-10 klatki wedlug liczby komorek w scenie, najwiecej decali w scenie, promien kola (INFO - porownanie kosztu klatki z f19);
+                    komorki z drogami > 0 i linia "pierwsze wypelnienie komorek" z decalami > 0; NBC-5: najdluzszy tick pracy komorek (linia pomiaru) <= 15 ms (po
+                    recenzji takze w biegu zdjec - budzet jak w grze; log sprzed poprawki z "bez budzetu" w linii "komorki" - INFO); linia "komorki" pisana przy kazdym
+                    wejsciu w tryb komorek (takze NIE -> TAK na mapie), wiec tryb ostatniej mapy = ktora z linii "komorki" / "postawione" jest pozniej; NBC-10 klatki wedlug liczby komorek w scenie, najwiecej decali w scenie, promien kola (INFO - porownanie kosztu klatki z f19);
                     NBC-10b oczekiwane decale w scenie przy kamerze z 10 / 20 / 40 / 80 (INFO, z linii "komorki").
 --grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
                     najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
@@ -46751,14 +46752,14 @@ def nboczne_main(logp):
             fcell = num(r"w scenie komorek (\d+), decali", fl[0], int, 0) if fl else 0
             rep.add("NBC-3: tryb komorek f22 (ostatnia mapa)", f"stempli {stamps} w {cells} komorkach; pierwsze wypelnienie: " + (f"komorek {fcell}, decali {fdec}" if fl else "BRAK linii"),
                     "komorek > 0, pierwsze wypelnienie z decalami > 0 (kamera nad ladem z drogami)", stamps > 0 and cells > 0 and bool(fl) and (fdec or 0) > 0)
-            photo = "bieg zdjec - bez budzetu" in cl
+            photo = "bieg zdjec - bez budzetu" in cl   # tylko log sprzed poprawki recenzji f22 (bieg zdjec bez budzetu); po niej budzet jak w grze - prog
             if rows:
                 r = rows[-1]
                 ms = num(r"; stawianie ([0-9.]+) ms w", r, float, 0.0) or 0.0
                 ticks = num(r" ms w (\d+) tickach", r, int, 0) or 0
                 mx = num(r"tickach \(najdluzszy ([0-9.]+) ms\)", r, float, 0.0) or 0.0
                 rep.add("NBC-5: praca komorek (ostatnia linia pomiaru)", f"{ms:.1f} ms w {ticks} tickach z praca, najdluzszy tick {mx:.1f} ms" + (" (bieg zdjec - bez budzetu)" if photo else ""),
-                        "najdluzszy tick <= 15 ms (bieg zdjec - INFO)", None if photo else mx <= 15.0)
+                        "najdluzszy tick <= 15 ms (takze w biegu zdjec; log sprzed poprawki 'bez budzetu' - INFO)", None if photo else mx <= 15.0)
                 cm = re.search(r"; tryb komorek f22: (.*?); klatki wedlug komorek w scenie \([^)]*\): ([^;]*)", r)
                 rep.add("NBC-10: tryb komorek - klatki wedlug liczby komorek w scenie (komorki: klatek / sr. ms / p95 / sr. decali)",
                         (cm.group(2) + " | " + cm.group(1)[:260]) if cm else "brak kawalka 'tryb komorek f22' w linii pomiaru", "INFO (koszt klatki wedlug liczby decali w scenie)", None)

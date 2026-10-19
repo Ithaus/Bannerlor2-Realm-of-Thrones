@@ -6356,7 +6356,7 @@ namespace Armoury
         [SettingPropertyGroup("Side roads to far villages")]
         public bool MapSideRoadsChunks { get; set; } = true;
 
-        [SettingPropertyInteger("Map Side Roads Chunk Radius Cap", 40, 400, "0", HintText = "with Map Side Roads Chunks on, the farthest distance from the camera, in map units, at which lanes are laid down. At the usual camera angles the whole screen is always covered; it only cuts the lanes far towards the horizon when the camera is tilted low. Higher = lanes reach farther towards the horizon, more to draw (40 to 400)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Side Roads Chunk Radius Cap", 40, 400, "0", HintText = "with Map Side Roads Chunks on, the farthest distance from the camera, in map units, at which lanes are laid down when the camera is tilted lower than usual. At the game's usual camera angles the whole screen is always covered whatever the value - the limit never comes closer than the farthest corner of the screen; it only cuts the lanes far towards the horizon when the camera is tilted low. Higher = lanes reach farther towards the horizon, more to draw (40 to 400)", RequireRestart = false)]
         [SettingPropertyGroup("Side roads to far villages")]
         public int MapSideRoadsChunkRadiusCap { get; set; } = 160;
 

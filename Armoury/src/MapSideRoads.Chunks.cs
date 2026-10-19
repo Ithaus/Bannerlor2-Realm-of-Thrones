@@ -11,7 +11,8 @@
 // Zasady:
 //  - komorki 32 x 32 jedn. (plan: 870 komorek z drogami, srednio 85 stempli, najwiecej 231); podzial liczy watek z puli razem z planem (czysta geometria);
 //  - KOLO WIDOKU: 4 promienie rogow ekranu (kamera mapy: pion 40 st., proporcje ekranu) przeciete z ziemia pod srodkiem ekranu; rog dalej niz klucz
-//    MapSideRoadsChunkRadiusCap (160 jedn., poziomo od kamery) albo nad horyzontem - na tej odleglosci. Srodek = srednia rogow, promien = najdalszy rog + 8 jedn.
+//    MapSideRoadsChunkRadiusCap (160 jedn., poziomo od kamery; po recenzji: nigdy blizej niz najdalszy rog ekranu w zwyklym pochyleniu gry przy tej wysokosci
+//    kamery - DefaultFar, wiec klucz tnie tylko przy kamerze pochylonej nizej niz zwykle) albo nad horyzontem - na tej odleglosci. Srodek = srednia rogow, promien = najdalszy rog + 8 jedn.
 //    + 0.1 x wysokosc kamery (stempel i ruch kamery przez cwierc sekundy); ziemia = najnizsza z 4 probek terenu (pod kamera, pod srodkiem ekranu, pod
 //    srodkiem gornej i dolnej krawedzi) minus 1 jedn. Przy zwyklym pochyleniu kamery (bez przechylu) kolo obejmuje caly ekran: promien ok. 61 jedn. przy
 //    kamerze z 10, 68 przy 20, 81 przy 40, 103 przy 80, 118 przy 110 (plan v7: w scenie mediana 1.6 / 1.8 / 2.3 / 3.3 tys. decali zamiast 73.5 tys.);
@@ -19,8 +20,9 @@
 //    tylko przy przejsciu granic komorek, bez migania przy drganiu kamery);
 //  - kamera wyzej niz prog chowania (ten sam co dotad: min(MapVillagesHideAboveCameraHeight, 110), histereza 10) - zadna komorka w scenie;
 //  - praca 4 razy na sekunde (jak dotad), budzet 8 ms na cwierc sekundy wspolny dla zdejmowania i stawiania, najpierw zdejmowanie, potem stawianie od
-//    komorek najblizszych srodka kola; bieg zdjec autotestu (plik-przelacznik) - bez budzetu: kamera ustawiona na cel zdjecia ma drogi w nastepnej cwierci
-//    sekundy (autotest czeka 6 s i 30 klatek), wiec drogi sa na zdjeciach bez osobnej listy celow;
+//    komorek najblizszych srodka kola; budzet takze w biegu zdjec autotestu (po recenzji: plik-przelacznik jest przez caly bieg, wiec "bez budzetu" mierzylo
+//    inna droge niz w grze Jeffa) - kolo przy celu zdjecia staje w kilku cwierciach sekundy (1.5-7.7 tys. decali, ok. 1.1 us na decal), a autotest czeka
+//    na nowym celu 6 s i 30 klatek, wiec drogi sa na zdjeciach bez osobnej listy celow;
 //  - ramki stempli (lad / woda, wysokosc i normalna terenu) liczone raz na komorke przy pierwszym wejsciu i trzymane (nastepne wejscia - samo stawianie);
 //  - nic co klatke poza licznikiem czasu klatki (CLAUDE.md 7); potkniecia liczone (stempel pominiety, komorka po 20 potknieciach wylaczona do konca mapy),
 //    nigdy globalny wylacznik.
@@ -42,14 +44,15 @@ namespace Armoury
         /// <summary>f22: klucz MapSideRoadsChunks (bez ustawien - TAK, domyslna klucza).</summary>
         internal static bool KeyChunks { get { var s = Settings.Current; return s == null || s.MapSideRoadsChunks; } }
 
-        /// <summary>f22: najdalsza odleglosc komorek od kamery (poziomo), klucz MapSideRoadsChunkRadiusCap przyciety do 40..400.</summary>
+        /// <summary>f22: najdalsza odleglosc komorek od kamery (poziomo), klucz MapSideRoadsChunkRadiusCap przyciety do 40..400 (w kole widoku nigdy blizej niz
+        /// najdalszy rog ekranu w zwyklym pochyleniu - DefaultFar).</summary>
         internal static float ChunkCap
         {
             get
             {
                 var s = Settings.Current;
                 int v = s != null ? s.MapSideRoadsChunkRadiusCap : ChunkCapDefault;
-                if (v < 40) v = 40; else if (v > 400) v = 400;
+                if (v < ChunkCapMin) v = ChunkCapMin; else if (v > ChunkCapMax) v = ChunkCapMax;
                 return v;
             }
         }
@@ -122,6 +125,9 @@ namespace Armoury
         /// <summary>Praca trybu komorek (4 razy na sekunde): kolo widoku, wybor komorek, zdejmowanie i stawianie z budzetem.</summary>
         private void ChunkTick(MapScreen screen)
         {
+            // po recenzji: kazde wejscie w tryb komorek (start mapy, klucz MapSideRoadsChunks NIE -> TAK, drogi wylaczone i wlaczone w MCM - RemoveAll zeruje _mode)
+            // pisze od nowa linie "komorki (f22)" i "pierwsze wypelnienie" - checker nboczne poznaje tryb ostatniej mapy po kolejnosci "komorki" / "postawione"
+            if (_mode != 1) { _gridLogged = false; _firstFillLogged = false; _lastHave = false; }
             _mode = 1;
             if (_matBad) return;
             Scene scene = MapScene;
@@ -137,6 +143,7 @@ namespace Armoury
             }
             if (_cells == null) MakeCells();
             if (_cells == null) return;
+            if (!_gridLogged) LogCells();
             _built = true;
             ChunkVisibility(screen);
             int gen = ++_gen;
@@ -164,7 +171,7 @@ namespace Armoury
             ProcessCells(scene, gen);
         }
 
-        /// <summary>Komorki z podzialu planu (watek z puli): obiekty raz na plan i linia "komorki".</summary>
+        /// <summary>Komorki z podzialu planu (watek z puli): obiekty raz na plan.</summary>
         private void MakeCells()
         {
             var g = _job.Grid;
@@ -177,14 +184,20 @@ namespace Armoury
                 cells[k] = new Cell { Cx = k % g.W + g.X0, Cy = k / g.W + g.Y0, Idx = a };
             }
             _cells = cells; _grid = g;
-            if (_gridLogged) return;
+        }
+
+        /// <summary>Linia "komorki" - przy kazdym wejsciu w tryb komorek (ChunkTick zeruje _gridLogged, gdy tryb byl inny).</summary>
+        private void LogCells()
+        {
             _gridLogged = true;
+            var g = _grid;
             var r = _job.Res;
             Log.Info(MapSideRoads.P + "komorki (f22) - stempli " + r.Stamps.Count + " w " + g.Cells + " komorkach po " + g.Cell.ToString("0", Inv) + " jedn. (na komorke srednio "
                      + g.PerAvg.ToString("0", Inv) + ", mediana " + g.PerMed + ", p90 " + g.PerP90 + ", najwiecej " + g.PerMax + (g.Lost > 0 ? "; zle stemple " + g.Lost : "")
-                     + "); w scenie tylko komorki w kole widoku kamery (najdalej " + MapSideRoads.ChunkCap.ToString("0", Inv) + " jedn. od kamery - klucz MapSideRoadsChunkRadiusCap; histereza "
-                     + MapSideRoads.ChunkHyst.ToString("0", Inv) + " jedn.), stawiane i zdejmowane przy przejsciu granic komorek, budzet 8 ms na cwierc sekundy"
-                     + (MapSideRoads.AutotestFlag ? " (bieg zdjec - bez budzetu)" : "") + "; " + g.Expect + "; " + _matName + _matNote + ", " + _job.Look.Text() + ".");
+                     + "); w scenie tylko komorki w kole widoku kamery (najdalej " + MapSideRoads.ChunkCap.ToString("0", Inv) + " jedn. od kamery - klucz MapSideRoadsChunkRadiusCap, nie blizej "
+                     + "niz najdalszy rog ekranu przy zwyklym pochyleniu kamery; histereza " + MapSideRoads.ChunkHyst.ToString("0", Inv)
+                     + " jedn.), stawiane i zdejmowane przy przejsciu granic komorek, budzet 8 ms na cwierc sekundy (takze w biegu zdjec); " + g.Expect + "; "
+                     + _matName + _matNote + ", " + _job.Look.Text() + ".");
         }
 
         /// <summary>Chowanie z wioskami w trybie komorek: ten sam prog i histereza co UpdateVisibility, ale bez przelaczania decali (powyzej progu kolo jest puste -
@@ -214,20 +227,23 @@ namespace Armoury
             float fov = MapSideRoads.MapFovV, asp = 16f / 9f;
             try { float v = cam.GetFovVertical(); if (v > fov && v < 2.5f) fov = v; } catch { }   // mniejszy / dziwny odczyt - pion gry (wiecej komorek, nie mniej)
             try { float a = cam.GetAspectRatio(); if (a > asp && a < 5f) asp = a; } catch { }
-            float tanV = (float)Math.Tan(fov * 0.5f);
+            float tanV = (float)Math.Tan(fov * 0.5f), tanH = tanV * asp;
             Vec3 p = fr.origin;
-            float cap = MapSideRoads.ChunkCap;
             Vec3 s = fr.rotation.s, f = fr.rotation.f, u = fr.rotation.u;
             // ziemia: NAJNIZSZA z probek pod kamera, pod srodkiem ekranu i pod srodkiem gornej / dolnej krawedzi (znak osi f bez znaczenia - obie) minus 1 jedn. -
             // nizsza ziemia = dalsze rogi = wieksze kolo (dolina przed kamera nie zostaje bez drog na gorze ekranu)
             float z0 = Ground(ms, p.x, p.y, p.z - 10f);
+            // po recenzji: granica z klucza nigdy blizej niz najdalszy rog ekranu w zwyklym pochyleniu gry przy tej wysokosci kamery (i tych proporcjach ekranu) -
+            // klucz tnie drogi tylko przy kamerze pochylonej nizej niz zwykle (przy 40 jedn. i kamerze z 80 cial dotad gore ekranu, rog jest tam 125 jedn. od kamery)
+            float cap = Math.Max(MapSideRoads.ChunkCap, MapSideRoads.DefaultFar(p.z - z0, tanV, tanH));
             float zg = z0;
             zg = Math.Min(zg, GroundAlong(ms, p, -u.x, -u.y, -u.z, z0, cap));
             zg = Math.Min(zg, GroundAlong(ms, p, -u.x + f.x * tanV, -u.y + f.y * tanV, -u.z + f.z * tanV, z0, cap));
             zg = Math.Min(zg, GroundAlong(ms, p, -u.x - f.x * tanV, -u.y - f.y * tanV, -u.z - f.z * tanV, z0, cap));
             zg -= 1f;
             if (zg > p.z - 1f) zg = p.z - 1f;
-            return MapSideRoads.ViewCircle(p.x, p.y, p.z, s.x, s.y, s.z, f.x, f.y, f.z, u.x, u.y, u.z, tanV, tanV * asp, zg, cap, MapSideRoads.MarginFor(p.z - zg), out cx, out cy, out r);
+            cap = Math.Max(cap, MapSideRoads.DefaultFar(p.z - zg, tanV, tanH));   // ziemia nizej = kamera wyzej nad nia = rog dalej
+            return MapSideRoads.ViewCircle(p.x, p.y, p.z, s.x, s.y, s.z, f.x, f.y, f.z, u.x, u.y, u.z, tanV, tanH, zg, cap, MapSideRoads.MarginFor(p.z - zg), out cx, out cy, out r);
         }
 
         /// <summary>Wysokosc terenu tam, gdzie promien z kamery (dx, dy, dz) przecina wysokosc z0 (najdalej cap poziomo; promien nad horyzontem - na cap).</summary>
@@ -283,17 +299,16 @@ namespace Armoury
                 }
         }
 
-        /// <summary>Zdejmowanie komorek spoza kola, potem stawianie od najblizszych - wspolny budzet czasu (bieg zdjec bez budzetu).</summary>
+        /// <summary>Zdejmowanie komorek spoza kola, potem stawianie od najblizszych - wspolny budzet czasu (po recenzji: takze w biegu zdjec - jak w grze).</summary>
         private void ProcessCells(Scene scene, int gen)
         {
-            bool now = MapSideRoads.AutotestFlag;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             int removed = 0, made = 0, unloaded = 0;
             for (int i = _active.Count - 1; i >= 0; i--)
             {
                 var c = _active[i];
                 if (c.Gen == gen) continue;
-                if (!now && (removed > 0 || unloaded > 0) && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) break;
+                if ((removed > 0 || unloaded > 0) && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) break;
                 removed += UnloadCell(scene, c);
                 _active.RemoveAt(i);
                 unloaded++;
@@ -303,10 +318,10 @@ namespace Armoury
             for (int w = 0; w < _want.Count; w++)
             {
                 var c = _want[w];
-                if (!now && (removed > 0 || unloaded > 0 || made > 0) && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) break;
+                if ((removed > 0 || unloaded > 0 || made > 0) && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) break;
                 if (!c.Prepared) PrepareCell(c);
                 bool wasEmpty = c.Next == 0;
-                LoadCell(scene, c, now, t0, ref made);
+                LoadCell(scene, c, t0, ref made);
                 if (wasEmpty && c.Next > 0) { _active.Add(c); loaded++; }
                 if (_matBad) break;
                 if (c.Next < c.Valid && !c.Failed) break;   // budzet skonczyl sie w tej komorce - reszta w nastepnej cwierci sekundy
@@ -326,7 +341,7 @@ namespace Armoury
             {
                 _firstFillLogged = true;
                 Log.Info(MapSideRoads.P + "pierwsze wypelnienie komorek - w scenie komorek " + _active.Count + ", decali " + _liveDecals + " (stawianie " + Ms(_buildTicks) + " ms w "
-                         + _buildTickCount + " tickach, najdluzszy " + Ms(_maxTickTicks) + " ms" + (now ? ", bieg zdjec - bez budzetu" : "") + "); kolo widoku: srodek ("
+                         + _buildTickCount + " tickach, najdluzszy " + Ms(_maxTickTicks) + " ms); kolo widoku: srodek ("
                          + _lastCx.ToString("0", Inv) + ", " + _lastCy.ToString("0", Inv) + "), promien " + _lastR.ToString("0", Inv) + " jedn.; komorek przygotowanych " + _prepCells
                          + " (stempli " + _prepStamps + ", pominiete nad woda / brodem / mostem " + _skipWater + ", zle " + _skipBad + ").");
             }
@@ -381,12 +396,12 @@ namespace Armoury
         }
 
         /// <summary>Stawianie decali komorki od c.Next (ta sama kolejnosc wywolan co Build starej drogi: material przed dodaniem do sceny, ramka i alfa po).</summary>
-        private void LoadCell(Scene scene, Cell c, bool now, long t0, ref int made)
+        private void LoadCell(Scene scene, Cell c, long t0, ref int made)
         {
             var look = _job.Look;
             while (c.Next < c.Valid && !c.Failed)
             {
-                if (!now && made > 0 && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) return;
+                if (made > 0 && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) return;
                 int k = c.Next++;
                 try
                 {

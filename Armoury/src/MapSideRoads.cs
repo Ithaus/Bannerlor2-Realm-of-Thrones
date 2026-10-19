@@ -137,7 +137,7 @@ namespace Armoury
             p.Clamp();
             Log.Info(P + "wlaczone (" + (key ? "klucz MapSideRoads = TAK" : "klucz NIE") + (flag ? ", plik-przelacznik autotestu " + FlagName + " jest" + (note.Length > 0 ? " (" + note + ")" : " (bez zmian parametrow)") : "")
                      + ") - plan: " + p.Text() + "; wyglad: " + look.Text() + "; komorki f22 (klucz MapSideRoadsChunks): "
-                     + (KeyChunks ? "TAK - w scenie tylko komorki " + ChunkCell.ToString("0", Inv) + " jedn. wokol widoku kamery, najdalej " + ChunkCap.ToString("0", Inv) + " jedn. od kamery"
+                     + (KeyChunks ? "TAK - w scenie tylko komorki " + ChunkCell.ToString("0", Inv) + " jedn. wokol widoku kamery, najdalej " + ChunkCap.ToString("0", Inv) + " jedn. od kamery (nie blizej niz rog ekranu przy zwyklym pochyleniu)"
                                   : "NIE - wszystkie decale w scenie, chowane z wioskami")
                      + ". Drogi postawi widok mapy (raz), tylko widok - bez zmian predkosci, tras i zapisu gry.");
         }

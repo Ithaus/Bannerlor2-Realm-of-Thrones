@@ -16,6 +16,8 @@ namespace Armoury
         internal const float ChunkHyst = 16f;      // komorka w scenie schodzi dopiero dalej niz promien + tyle (pol komorki)
         internal const float MapFovV = 0.6981317f; // pion kamery mapy (MapCameraView: Camera.SetFovVertical(0.6981317f, Screen.AspectRatio, ...))
         internal const int ChunkCapDefault = 160;
+        internal const int ChunkCapMin = 40, ChunkCapMax = 400;   // przyciecie klucza MapSideRoadsChunkRadiusCap (suwak MCM 40..400)
+        internal const float MapCamMinH = 1.62f;   // kamera najblizej (MapCameraView: TargetCameraDistance >= 2.5) - (2.5 + 2) sin(0.0075 * 2.5 + 0.35)
 
         /// <summary>Podzial stempli planu na komorki (czysta geometria - watek z puli, razem z planem).</summary>
         internal sealed class ChunkGrid
@@ -191,9 +193,9 @@ namespace Armoury
         /// <summary>Zapas promienia kola ponad najdalszy rog ekranu przy kamerze h nad ziemia.</summary>
         internal static float MarginFor(float h) { return ChunkMargin + ChunkMarginPerH * (h > 0f ? (h < 400f ? h : 400f) : 0f); }
 
-        /// <summary>Promien kola przy kamerze z h nad ziemia w zwyklym pochyleniu gry (MapCameraView: wzniesienie e = 0.0075 d + 0.35, kamera (d + 2) od celu),
-        /// pion 40 st., ekran 16:9 - do linii oczekiwanych decali.</summary>
-        internal static float DefaultRadius(float h, float cap)
+        /// <summary>Wzniesienie kamery w zwyklym pochyleniu gry przy kamerze z h nad celem (MapCameraView: e = 0.0075 d + 0.35, kamera (d + 2) od celu;
+        /// d z h bisekcja).</summary>
+        internal static float DefaultElevation(float h)
         {
             float lo = 0f, hi = 160f, d = 0f;
             for (int i = 0; i < 60; i++)
@@ -202,12 +204,40 @@ namespace Armoury
                 double e = Math.Min(0.0075 * d + 0.35, Math.PI * 99.0 / 200.0);
                 if ((d + 2f) * Math.Sin(e) < h) lo = d; else hi = d;
             }
-            float el = (float)Math.Min(0.0075 * d + 0.35, Math.PI * 99.0 / 200.0);
+            return (float)Math.Min(0.0075 * d + 0.35, Math.PI * 99.0 / 200.0);
+        }
+
+        /// <summary>Poprawka po recenzji f22: odleglosc (poziomo od kamery) najdalszego rogu ekranu w zwyklym pochyleniu gry przy kamerze z h nad ziemia -
+        /// granica kola nigdy nie jest blizej (klucz MapSideRoadsChunkRadiusCap tnie tylko przy kamerze pochylonej nizej niz zwykle). Przy 40 st. i 16:9:
+        /// 81 jedn. z 10, 92 z 20, 108 z 40, 125 z 80, 128 z 110 (z 1.6 - kamera najblizej - 98); ekran szerszy - dalej (21:9 z 110: 148). h ponizej kamery
+        /// najblizej gry liczone jak kamera najblizej (nizej gorna krawedz ekranu idzie w horyzont); wynik najwyzej ChunkCapMax.</summary>
+        internal static float DefaultFar(float h, float tanV, float tanH)
+        {
+            if (float.IsNaN(h) || float.IsNaN(tanV) || float.IsNaN(tanH)) return 0f;
+            if (h < MapCamMinH) h = MapCamMinH;
+            float el = DefaultElevation(h);
+            float c = (float)Math.Cos(el), s = (float)Math.Sin(el);
+            // gorne rogi ekranu (jak w ViewCircle: -u + f tgV +- s tgH; u = (-c, 0, s), f = (s, 0, c), s = (0, 1, 0))
+            float dz = -s + c * tanV;
+            if (!(dz < -1e-4f)) return ChunkCapMax;   // gorna krawedz ekranu w horyzoncie
+            float dx = c + s * tanV;
+            float far = h / -dz * (float)Math.Sqrt(dx * dx + tanH * tanH);
+            if (float.IsNaN(far) || far > ChunkCapMax) return ChunkCapMax;
+            return far;
+        }
+
+        /// <summary>Promien kola przy kamerze z h nad ziemia w zwyklym pochyleniu gry (MapCameraView: wzniesienie e = 0.0075 d + 0.35, kamera (d + 2) od celu),
+        /// pion 40 st., ekran 16:9 - do linii oczekiwanych decali. Granica jak w grze: klucz, ale nie blizej niz najdalszy rog ekranu (DefaultFar).</summary>
+        internal static float DefaultRadius(float h, float cap)
+        {
+            float el = DefaultElevation(h);
             float c = (float)Math.Cos(el), s = (float)Math.Sin(el);
             // kamera patrzy w +x w dol pod katem el: u (do tylu) = (-c, 0, s), f (gora ekranu) = (s, 0, c), s (bok) = (0, 1, 0)
             float tanV = (float)Math.Tan(MapFovV * 0.5f);
+            float tanH = tanV * 16f / 9f;
+            cap = Math.Max(cap, DefaultFar(h, tanV, tanH));
             float cx, cy, r;
-            if (!ViewCircle(0f, 0f, h, 0f, 1f, 0f, s, 0f, c, -c, 0f, s, tanV, tanV * 16f / 9f, 0f, cap, MarginFor(h), out cx, out cy, out r)) return cap;
+            if (!ViewCircle(0f, 0f, h, 0f, 1f, 0f, s, 0f, c, -c, 0f, s, tanV, tanH, 0f, cap, MarginFor(h), out cx, out cy, out r)) return cap;
             return r;
         }
     }
