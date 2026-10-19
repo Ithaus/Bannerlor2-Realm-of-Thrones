@@ -67,6 +67,10 @@ namespace Armoury
             // f23-korona (recenzja): NALEZNE tej doby z pozycji placonych TYLKO z wplywow dnia (skarbiec ich nie doplaca) - kontrakty 185, rata Banku 186, czesc dnia wezwan 168
             // (zaplacone: Contract, LoanOut, CallToWar). Tylko liczniki: prog nadania 0 w DsSeason (najpierw skarbiec) i linia "Korona: najpierw skarbiec (f23)"
             public long ContractDue, LoanDue, CallToWarDue;
+            // f24-korona (klucz DsWarGrantTreasuryPaysDues): czesc zaplaconych Contract / LoanOut / CallToWar, ktora przy nadaniu 0 dzieki skarbcowi dal skarbiec ponad zapas wojny
+            // i dlugi (DsSeason.TreasuryForDues) - POZA wplywami dnia (bez Spent, jak K5 i W5b); DuesTrDry - tej doby nadwyzka nie starczyla na brak (linia f23, NKR-5d)
+            public long LoanTr, ContractTr, CallToWarTr;
+            public bool DuesTrDry;
             public bool Snap;
         }
 
@@ -458,10 +462,12 @@ namespace Armoury
                 long mAid = 0;   // f15 W5c: skarbiec dla srednich (poza wplywami dnia)
                 long vKept = 0; int vKeptN = 0; double vR = 0;   // E3-G5
                 long court = 0; int courtN = 0;   // E3-P1 (b)
+                long loanTr = 0, conTr = 0, ctwTr = 0;   // f24-korona: ze skarbca ponad zapas wojny przy nadaniu 0 (w loanOut / con / ctw)
                 var parts = new List<KeyValuePair<long, string>>();
                 foreach (var kv in _day)
                 {
                     var k = kv.Key; var d = kv.Value;
+                    loanTr += d.LoanTr; conTr += d.ContractTr; ctwTr += d.CallToWarTr;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
                     loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; dmov += d.DsMov; dtre += d.DsTreas; dant += d.DsAnt; naid += d.NeedAid; naRent += d.NeedAidRent; naKept += d.NeedAidKept; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid; mAid += d.MidAid;
@@ -488,6 +494,7 @@ namespace Armoury
                 LastRent = rent; LastRentHeld = rentH; LastCallToWar = ctw; LastLoanIn = loanIn; LastLoanOut = loanOut;
                 LastDebtRepaid = _dDebtRepaid; _dDebtRepaid = 0; LastNewDebt = _dNewDebt; LastNewDebtN = _dNewDebtN; _dNewDebt = 0; _dNewDebtN = 0;
                 var s = Settings.Current;
+                long duesTr = loanTr + conTr + ctwTr;   // f24-korona
                 if (s != null && s.LogEnabled)
                 {
                     var sb = new StringBuilder(2048);
@@ -505,6 +512,10 @@ namespace Armoury
                       .Append(", kontrakty najemnikow (185) ").Append(con)
                       .Append(", wezwania sojusznikow do wojny (168) ").Append(ctw).Append(" (porozumien zerwanych z braku wplywow ").Append(CrownCallToWar.LastEndedN)
                       .Append(", niedoplata ").Append(CrownCallToWar.LastUnpaid).Append(CrownCallToWar.On ? ")" : "; wylaczone - placa rody jak w grze)")
+                      // f24-korona: czesc rat 186, kontraktow 185 i wezwan 168 (kwoty wyzej) ze skarbca ponad zapas wojny przy nadaniu 0 dzieki skarbcowi - poza wplywami dnia, jak K5;
+                      // klucz wylaczony i 0 - napis jak dotad
+                      .Append((DsTowns.FarmsLive && DsSeason.PaysDuesOn(s)) || duesTr > 0 ? "; f24 w tym ze skarbca ponad zapas wojny przy nadaniu 0 (Ds War Grant Treasury Pays Dues " + (DsSeason.PaysDuesOn(s) ? "tak" : "NIE")
+                              + ", poza wplywami dnia) " + duesTr + " (186 " + loanTr + ", 185 " + conTr + ", 168 " + ctwTr + ")" : "")
                       .Append(", zwrot zoldu ").Append(refG).Append(" (nalezny ").Append(refD).Append(refD > 0 ? ", wyplacone " + (100.0 * refG / refD).ToString("0.0", Inv) + "%" : "")
                       .Append("; w tym z kredytu Banku (186) ").Append(loanIn).Append(DsTowns.FarmsLive || DsVillage.Live || dtre > 0 ? ", ze skarbca ponad zapas wojny (DS K5) " + dtre : "")
                       .Append(DsTowns.FarmsLive || dant > 0 ? ", z zaliczek mieszczan (DS L1) " + dant : "").Append(")")

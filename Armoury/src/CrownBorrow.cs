@@ -369,6 +369,21 @@ namespace Armoury
                             CrownIncome.Spent(k, ip);
                             cd.LoanOut += ip;
                         }
+                        // f24-korona (klucz Ds War Grant Treasury Pays Dues): krolestwo przy nadaniu 0 dzieki skarbcowi - brak raty ze skarbca ponad zapas wojny i dlugi (poza
+                        // wplywami dnia - bez Spent); skarbiec -> kapital Banku jak rata. Klucz wylaczony / bez nadania 0 dzieki skarbcowi - TreasuryForDues 0, jak dotad
+                        if (pay < due)
+                        {
+                            long tr = DsSeason.TreasuryForDues(k, due - pay);
+                            int it = (int)Math.Min(int.MaxValue, Math.Min(tr, (long)Math.Max(0, k.KingdomBudgetWallet)));
+                            if (it > 0)
+                            {
+                                k.KingdomBudgetWallet -= it;     // najpierw skarbiec, potem Bank
+                                IronBank.CapitalAdd(it);
+                                l.Principal -= it; l.Repaid += it;
+                                cd.LoanOut += it; cd.LoanTr += it;
+                                pay += it;
+                            }
+                        }
                     }
                     long seized = l.Seized; l.Seized = 0;          // DS F3 (L3): clo wziete przez Bank od ostatniego kroku - zaplacone w oknie (dlug juz zmniejszony)
                     l.DDue = due; l.DPaid = pay + seized;

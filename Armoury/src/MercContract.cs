@@ -63,6 +63,7 @@ namespace Armoury
         private static long _dTierOff, _dGameOff;
         // P3/W3-A: zadatek BK wstrzymany - najmy i kwota, ktora BK przelalby z kiesy krola (od poprzedniej linii doby)
         private static int _dBkDownN; private static long _dBkDownGold;
+        private static long _dTr;   // f24-korona: kontrakty zaplacone ze skarbca ponad zapas wojny przy nadaniu 0 dzieki skarbcowi (doba; w LastPaid)
         private static string _bkDownWire = "BRAK";
         private static System.Reflection.PropertyInfo _bkCfgInst, _bkDipModel;
         private static System.Reflection.MethodInfo _bkDownAmount;
@@ -138,7 +139,7 @@ namespace Armoury
         // ------------------------------------------------------------ raz na dobe (krok korony po ratach reparacji, przed zwrotem)
         internal static void Daily()
         {
-            ZeroLast();
+            ZeroLast(); _dTr = 0;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             if (!On) { return; }
@@ -235,7 +236,11 @@ namespace Armoury
                         var due = new int[list.Count];
                         for (int i = 0; i < list.Count; i++) due[i] = (int)Math.Min(int.MaxValue, list[i].Value);
                         long have = CrownIncome.LeftFor(k);
-                        var give = KingdomTreasury.Split(due, have);
+                        // f24-korona (klucz Ds War Grant Treasury Pays Dues): krolestwo przy nadaniu 0 dzieki skarbcowi - brak wplywow dnia na kontrakty ze skarbca ponad zapas
+                        // wojny i dlugi (poza wplywami dnia: Spent tylko czesci z wplywow). Klucz wylaczony / bez nadania 0 dzieki skarbcowi - haveTr 0, jak dotad
+                        long dueAll = 0; for (int i = 0; i < due.Length; i++) dueAll += due[i];
+                        long haveTr = have < dueAll ? DsSeason.TreasuryForDues(k, dueAll - have) : 0;
+                        var give = KingdomTreasury.Split(due, have + haveTr);
                         long paidK = 0, dueK = 0;
                         for (int i = 0; i < list.Count; i++)
                         {
@@ -256,9 +261,10 @@ namespace Armoury
                                 if (d.Unpaid >= leaveDays) leave.Add(c);
                             }
                         }
-                        CrownIncome.Spent(k, paidK);
-                        var cd = CrownIncome.DayOf(k); if (cd != null) { cd.Contract += paidK; cd.ContractDue += dueK; }   // f23 (recenzja): nalezne - tylko licznik
-                        LastDue += dueK; LastPaid += paidK;
+                        long paidTr = Math.Max(0, paidK - Math.Max(0, have));   // f24: ponad wplywy dnia - ze skarbca (bez klucza 0: paidK <= have)
+                        CrownIncome.Spent(k, paidK - paidTr);
+                        var cd = CrownIncome.DayOf(k); if (cd != null) { cd.Contract += paidK; cd.ContractDue += dueK; cd.ContractTr += paidTr; }   // f23 (recenzja): nalezne - tylko licznik
+                        LastDue += dueK; LastPaid += paidK; _dTr += paidTr;
                     }
                     catch (Exception e) { Stumble("Daily(krolestwo)", e); }
                 }
@@ -282,7 +288,9 @@ namespace Armoury
                 long wallet = 0; foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated) wallet += k.MercenaryWallet;
                 if (s.LogEnabled)
                     Log.Info("Kontrakty najemnikow (185): dzien " + today + " | kompanii AI w sluzbie " + LastClans + " (nowe umowy " + LastNew + ", przeglad w dol " + LastCut + ", odeszly po niedoplacie " + LastLeft + ")"
-                             + " | kontrakty nalezne " + LastDue + ", zaplacone z wplywow dnia " + LastPaid + ", niedoplata " + (LastDue - LastPaid)
+                             + " | kontrakty nalezne " + LastDue + ", zaplacone z wplywow dnia " + LastPaid
+                             + ((DsTowns.FarmsLive && DsSeason.PaysDuesOn(s)) || _dTr > 0 ? " (f24: w tym ze skarbca ponad zapas wojny przy nadaniu 0 dzieki skarbcowi " + _dTr + ")" : "")   // f24-korona: klucz wylaczony i 0 - napis jak dotad
+                             + ", niedoplata " + (LastDue - LastPaid)
                              + " | ludzie najemnikow AI " + menNow + " / z umowy (w pokoju polowa) " + menDeal
                              + " | gra dla AI w sluzbie: \"za tier\" wylaczone " + LastTierOff + " zl, kontrakt gry wylaczony " + LastGameOff + " zl (od wczoraj; AI dostaje 0 z gry)"
                              + " | MercenaryWallet krolestw razem " + wallet + " (zmienia sie tylko o kontrakt gracza)"

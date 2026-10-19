@@ -311,6 +311,12 @@ namespace Armoury
             catch { return ""; }
         }
 
+        /// <summary>f24-korona (NZR-5 i NDP-3 testu fin97): mnoznik potrzeby f w budzet-rodow.csv (zwrot f6, renty f7, gotowka f20, W5c) - TA SAMA liczba double, ktora mnozy
+        /// kod ("G17" wraca zawsze do tego samego bitu; "R" w .NET Framework x64 nie zawsze), zamiast "0.0000". Dotad f 0,99994 (dluznik G 53 704, R 53 701) szlo do CSV jako
+        /// 1.0000 - wiersz wygladal na "bez ciecia", choc kod slusznie zatrzymal 1 zl; a f 0,393862 jako 0,3939 dawalo w CSV pelny x f o 1 zl wiecej niz floor kodu.
+        /// Kwoty, pasma i linie bez zmian - tylko zapis liczby. Czytniki (checker) biora float - "1", "0.5" i "0.39386194418848662" czytaja tak samo.</summary>
+        internal static string NeedFCsv(double f) { return f.ToString("G17", CultureInfo.InvariantCulture); }
+
         /// <summary>Kolumny budzet-rodow.csv (za lup_na_zaloge_ww2 - czytniki po nazwach): krok zwrotu tej doby.</summary>
         internal const string RefundNeedCsvHeader = ";zwrot_f6_mnoznik;zwrot_f6_g;zwrot_f6_r;zwrot_f6_pasmo;zwrot_f6_pelny;zwrot_f6_wedlug_potrzeby";
 
@@ -321,7 +327,7 @@ namespace Armoury
                 NeedRow n;
                 if (c == null || Campaign.Current == null || _rbnDay != (int)CampaignTime.Now.ToDays || !_rbn.TryGetValue(c, out n) || n == null || !n.Counted) return ";;;;;;";
                 var inv = CultureInfo.InvariantCulture;
-                return ";" + n.F.ToString("0.0000", inv) + ";" + Math.Round(n.G).ToString("0", inv) + ";" + Math.Round(n.R).ToString("0", inv) + ";" + n.Band.ToString(inv)
+                return ";" + NeedFCsv(n.F) + ";" + Math.Round(n.G).ToString("0", inv) + ";" + Math.Round(n.R).ToString("0", inv) + ";" + n.Band.ToString(inv)
                        + ";" + n.Full.ToString(inv) + ";" + n.Need.ToString(inv);
             }
             catch { return ";;;;;;"; }

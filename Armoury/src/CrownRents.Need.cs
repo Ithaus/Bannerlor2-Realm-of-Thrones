@@ -330,7 +330,8 @@ namespace Armoury
                 RnRow n;
                 if (c == null || Campaign.Current == null || _rnDay != (int)CampaignTime.Now.ToDays || !_rn.TryGetValue(c, out n) || n == null || !n.Counted) return ";;;;;;";
                 var inv = CultureInfo.InvariantCulture;
-                return ";" + n.F.ToString("0.0000", inv) + ";" + Math.Round(n.G).ToString("0", inv) + ";" + Math.Round(n.R).ToString("0", inv) + ";" + n.Band.ToString(inv)
+                // f24-korona: mnoznik - ta sama liczba co w kodzie (KingdomTreasury.NeedFCsv, G17)
+                return ";" + KingdomTreasury.NeedFCsv(n.F) + ";" + Math.Round(n.G).ToString("0", inv) + ";" + Math.Round(n.R).ToString("0", inv) + ";" + n.Band.ToString(inv)
                        + ";" + n.Full.ToString(inv) + ";" + n.Need.ToString(inv);
             }
             catch { return ";;;;;;"; }
