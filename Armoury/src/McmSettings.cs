@@ -7108,7 +7108,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public int KsLandGateLossDays { get; set; } = 91;
 
-        [SettingPropertyBool("Ks Land Gate Exact Loss", HintText = "with Ks Land Gate: count as a land's granary loss under the calibration only what the calibration itself took - in each village, the fall of its granary up to how much less the calibration fed it that day than the old harvest rule would have; spoilage, winter and poor soil that the old rule would not have covered either do not count, and the fall of more than 1% a day over 7 days uses the same measure. Off = the whole fall of the land's granaries on days the calibration fed the land less than the old rule (as before)", RequireRestart = false)]
+        [SettingPropertyBool("Ks Land Gate Exact Loss", HintText = "with Ks Land Gate: on days the calibration fed a land less than the old harvest rule would have, count as the land's granary loss only what the calibration itself took - in each village, the fall of its granary up to how much less the calibration fed it that day than the old harvest rule would have; spoilage, winter and poor soil that the old rule would not have covered either do not count, and the fall of more than 1% a day over 7 days uses the same measure. Off = the whole fall of the land's granaries on days the calibration fed the land less than the old rule (as before)", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsLandGateExactLoss { get; set; } = true;
 

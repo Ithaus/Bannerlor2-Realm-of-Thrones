@@ -514,7 +514,7 @@ namespace Armoury
             topAC.Sort((x, y) => y.Key.CompareTo(x.Key));
             var t = new List<string>(); for (int i = 0; i < topAC.Count && i < 8; i++) t.Add(topAC[i].Value);
             return " | miara straty (f26, Ks Land Gate Exact Loss " + (exact ? "TAK - decyduje C" : "NIE - decyduje A") + "): A (caly spadek w doby z racjami KS krainy ponizej wzoru gry) najwieksza "
-                   + bestA.ToString("0.0", Inv) + " d - " + bestALand + ", krain " + _landLoss.Count + "; C (na wies najwyzej wzor gry - racje KS) najwieksza " + bestC.ToString("0.0", Inv) + " d - " + bestCLand
+                   + bestA.ToString("0.0", Inv) + " d - " + bestALand + ", krain " + _landLoss.Count + "; C (te same doby, na wies najwyzej wzor gry - racje KS) najwieksza " + bestC.ToString("0.0", Inv) + " d - " + bestCLand
                    + ", krain " + _landLossC.Count + ", ze spadkiem z winy KS > 1% potrzeby/d dzis " + ksDrawN + "; A/C: " + (t.Count > 0 ? string.Join(", ", t.ToArray()) : "-");
         }
 
@@ -523,7 +523,7 @@ namespace Armoury
         {
             int reserve = ReserveDaysKey, loss = LossDaysKey;
             return "glod wsi z winy KS: brak u > " + (100 * LandHungerU).ToString("0.#", Inv) + "% (polowa progu zgonow Famine - racjonowanie przy spichlerzu ponizej FamineRationDays), poza wojna TERAZ, racje KS ponizej wzoru gry"
-                   + (ExactLossKey ? "; albo spadek spichlerzy krainy z winy KS (f26: na wies najwyzej wzor gry - racje KS) > 1% potrzeby/d przez " + LandDrawDays + " dob"   // f26-bramka
+                   + (ExactLossKey ? "; albo spadek spichlerzy krainy z winy KS (f26: na wies najwyzej wzor gry - racje KS) > 1% potrzeby/d przez " + LandDrawDays + " dob przy racjach KS krainy ponizej wzoru gry"   // f26-bramka
                                    : "; albo spadek spichlerzy krainy > 1% potrzeby/d przez " + LandDrawDays + " dob przy racjach KS ponizej wzoru gry")
                    + (test ? " (autotest: plik " + GateTestFlagName + " - bez progow straty i zapasu)"
                            : (loss == 0 || reserve == 0 ? " (bez progu - doslownie projekt 16.10)" : " po stracie pod KS >= " + loss + " dni potrzeby albo przy zapasie ponizej " + reserve + " dni"));
@@ -626,8 +626,10 @@ namespace Armoury
                 int st; _drawStreak.TryGetValue(kv.Key, out st);
                 double loss; _landLoss.TryGetValue(kv.Key, out loss);
                 double lossC; _landLossC.TryGetValue(kv.Key, out lossC);
-                // f26-bramka (C): spadek krainy z winy KS dzis - suma wsi min(spadek, wzor gry - racje KS), najwyzej caly spadek krainy (wsie rosnace oddaja)
-                double ksDay = a.NeedD > 0 && draw > 0 ? Math.Min(draw, a.KsDrop / a.NeedD) : 0.0;
+                // f26-bramka (C): spadek krainy z winy KS dzis - suma wsi min(spadek, wzor gry - racje KS), najwyzej caly spadek krainy (wsie rosnace oddaja);
+                // tylko w doby z racjami KS calej krainy ponizej wzoru gry, jak A (recenzja f26: Jeff 5C zmienia sama miare, nie warunek krainy - kraina, ktora KS
+                // karmi w sumie lepiej niz wzor gry, powrotem by stracila, wiec C jej nie liczy). Stad C <= A zawsze (ten sam warunek, dzienny przyrost <= spadek).
+                double ksDay = ksLess && a.NeedD > 0 && draw > 0 ? Math.Min(draw, a.KsDrop / a.NeedD) : 0.0;
                 if (a.NeedD > 0)
                 {
                     // recenzja ks-arm (wazne): strata netto od wlaczenia - spadek liczy sie tylko w doby, gdy KS karmi kraine gorzej niz wzor gry; napelnianie oddaje
@@ -636,8 +638,8 @@ namespace Armoury
                     // f26-bramka (C): napelnianie oddaje jak w A (strata C nigdy wieksza niz prawdziwy spadek od wlaczenia), spadek liczy sie tylko w czesci z winy KS
                     if (draw < 0) lossC = Math.Max(0.0, lossC + draw);
                     else lossC += ksDay;
-                    // seria: klucz TAK - ta sama miara co strata (spadek z winy KS > 1% potrzeby/d; spadek, ktory bylby i przy wzorze gry, powrotem sie nie cofnie);
-                    // NIE - jak WGRANIE 85 (caly spadek > 1% przy racjach KS krainy ponizej wzoru gry)
+                    // seria: klucz TAK - ta sama miara co strata (spadek z winy KS > 1% potrzeby/d, ksDay - tylko przy racjach KS krainy ponizej wzoru gry; spadek,
+                    // ktory bylby i przy wzorze gry, powrotem sie nie cofnie); NIE - jak WGRANIE 85 (caly spadek > 1% przy racjach KS krainy ponizej wzoru gry)
                     bool fall = exact ? ksDay > LandDrawShare : draw > LandDrawShare && ksLess;
                     bool count = fall && (test || reserve == 0 || lossKey == 0 || (exact ? lossC : loss) >= lossKey || days < reserve);
                     st = count ? st + 1 : 0;      // doba bez pomiaru (pierwsza po wczytaniu, spichlerze wylaczone) - seria i strata bez zmian
@@ -745,10 +747,11 @@ namespace Armoury
         /// swiata od nowa) - krainy wrocone wracaja do KS razem z rampa, strata i serie od zera.</summary>
         private static void LandRetry(int today)
         {
-            if (_back.Count == 0 && _landLoss.Count == 0 && _landLossC.Count == 0 && _drawStreak.Count == 0) return;
+            _landLossC.Clear();   // f26-bramka: C <= A (krainy C to podzbior krain A) - czyszczona zawsze; warunek wyjscia i linia jak WGRANIE 85 (recenzja f26)
+            if (_back.Count == 0 && _landLoss.Count == 0 && _drawStreak.Count == 0) return;
             var names = new List<string>(); foreach (var kv in _back) names.Add(kv.Key + " (od doby " + kv.Value.Day + ")");
             int n = _back.Count;
-            _back.Clear(); _drawStreak.Clear(); _landLoss.Clear(); _landLossC.Clear(); _gPrev.Clear();
+            _back.Clear(); _drawStreak.Clear(); _landLoss.Clear(); _gPrev.Clear();
             RebuildBackSet();
             Log.Info(PK + "druga proba krain doba " + today + " | Start Calibration znow wlaczony (rampa od nowa): krainy wrocone wracaja do KS " + n + (names.Count > 0 ? " (" + string.Join(", ", names.ToArray()) + ")" : "")
                      + ", strata spichlerzy i serie spadku od zera | pieniadze: przelewow 0 zl, towar: 0 szt.");
@@ -809,7 +812,7 @@ namespace Armoury
             {
                 if (_keepRaw != null) return _armKeep ?? "";
                 bool ema = AutoArmKey && KeyOn && _emaDays > 0;
-                if (!ema && !_autoArm && _matureSince < 0 && _back.Count == 0 && _drawStreak.Count == 0 && _gateRing.Count == 0 && _landLoss.Count == 0 && _landLossC.Count == 0) return "";
+                if (!ema && !_autoArm && _matureSince < 0 && _back.Count == 0 && _drawStreak.Count == 0 && _gateRing.Count == 0 && _landLoss.Count == 0) return "";   // f26-bramka: _landLossC bez _landLoss niemozliwa (C <= A) - warunek jak WGRANIE 85
                 var sb = new StringBuilder(16 * 1024);
                 sb.Append("V=").Append(ArmVersion).Append('\n');
                 sb.Append("C=").Append(Clean(CampaignId())).Append('\n');
@@ -977,8 +980,9 @@ namespace Armoury
             if (_state == StateApplied)
             {
                 // f26-bramka: strata miara C. Zapis bez wiersza "K=" (DLL sprzed f26 albo zapis tej DLL zapisany potem starsza) - C przejeta z A (gorne oszacowanie:
-                // w doby z racjami KS krainy ponizej wzoru gry dzienna strata C <= A; fin98: krainy tracace spichlerz C ~ A, bo wzor gry daje 1.2 potrzeby, wiecej niz
-                // psucie). Zero daloby krainie drugi pelny budzet Ks Land Gate Loss Days (do 2x straty rezerwy), a przeliczenie wstecz wymaga plonow, ktorych zapis nie ma.
+                // C rosnie tylko w te same doby co A - racje KS krainy ponizej wzoru gry - i najwyzej o caly spadek, napelnianie oddaje obu tyle samo, wiec C <= A zawsze;
+                // fin98/fin97: krainy tracace spichlerz C ~ A, bo wzor gry daje 1.2 potrzeby, wiecej niz psucie). Zero daloby krainie drugi pelny budzet Ks Land Gate
+                // Loss Days (do 2x straty rezerwy), a przeliczenie wstecz wymaga plonow, ktorych zapis nie ma.
                 if (map.TryGetValue('K', out v))
                 {
                     foreach (var e in v.Split(';'))
