@@ -12,5 +12,6 @@
     <Compile Include="Program.cs" />
     <Compile Include="../../../Armoury/src/MapSideRoads.Plan.cs" />
     <Compile Include="../../../Armoury/src/MapSideRoads.All.cs" />
+    <Compile Include="../../../Armoury/src/MapSideRoads.ChunkPlan.cs" />
   </ItemGroup>
 </Project>

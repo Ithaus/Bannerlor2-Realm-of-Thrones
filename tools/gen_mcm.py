@@ -29,6 +29,8 @@ RANGES = {
     # SW-DROGI (noc 17/18.10): premia drogi ROT - kod przycina procent do 0..50 i margines do 0..2 jedn. (MapRoads.PctOf / MarginOf)
     'MapRoadSpeedPercent': (0, 50, "0"),
     'MapRoadMargin': (0.0, 2.0, "0.00"),
+    # f22-drogi-perf (noc 17/18.10): najdalsza odleglosc komorek bocznych drog od kamery - kod przycina do 40..400 (MapSideRoads.ChunkCap)
+    'MapSideRoadsChunkRadiusCap': (40, 400, "0"),
     # A17 F5 (noc 17/18.10): stocznia z drewna i za place - pnie na 1000 wartosci kadluba (0..10), udzial plac w wartosci kadluba (kod przycina do 0..1)
     'ShipyardTimberPer1000': (0.0, 10.0, "0.0"),
     'ShipyardLabourShare': (0.0, 1.0, "0.00"),
