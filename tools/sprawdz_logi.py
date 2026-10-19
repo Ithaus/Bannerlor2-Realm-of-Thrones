@@ -1393,7 +1393,8 @@ Uzycie (Python 3, tylko odczyt):
                     Log sprzed paczki: wiersze INFO "brak linii".
                     f26-bramka (Jeff 19.10 "5. c", klucz Ks Land Gate Exact Loss): ARM-16a odcinek "miara straty (f26 ...)" w kazdej linii bramki (obie miary: A - caly
                     spadek w doby z racjami KS krainy ponizej wzoru gry, WGRANIE 85; C - na wies min(spadek, wzor gry - racje KS)), ARM-16b "strata spichlerzy z winy KS ...
-                    najwieksza" = miara decydujaca (TAK - C, NIE - A), ARM-16c C doba do doby wobec A (dA > 0: 0 <= dC <= dA; dA < 0: dC <= 0; +-0.1 d), ARM-16d A/C
+                    najwieksza" = miara decydujaca (TAK - C, NIE - A), ARM-16c C doba do doby wobec A (C <= A w kazdej linii; dA > 0: 0 <= dC <= dA; dA <= 0: dC <= 0;
+                    +-0.1 d - C rosnie tylko w doby z racjami KS krainy ponizej wzoru gry, jak A; recenzja f26), ARM-16d A/C
                     w ostatniej linii (INFO), ARM-16e powrot ze spichlerzy przy C - spadek z winy KS > 1%/d. Log sprzed paczki - INFO.
 --grupa nprzysiolki: (17/18.10, Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja"; paczka sw-przysiolki, Armoury/src/VillageHamlets.cs, uklad
                     wiosek v6 z tools/wioski-v6/v6_przysiolki.py) python -I tools/sprawdz_logi.py --grupa nprzysiolki <Armoury-*.log> (strumieniowo). NPR-0 linia
@@ -43303,8 +43304,9 @@ def nksarm_meas_rows(rep, D, pfx="ARM"):
     """f26-bramka (Jeff 19.10 "5. c"): miara straty spichlerzy krain - A (WGRANIE 85: caly spadek w doby z racjami KS krainy ponizej wzoru gry) i C (na wies
     min(spadek, wzor gry - racje KS); klucz Ks Land Gate Exact Loss). ARM-16a odcinek "miara straty (f26 ...)" w liniach bramki (log sprzed paczki - INFO),
     ARM-16b odcinek "strata spichlerzy z winy KS ... najwieksza" = najwieksza strata miary decydujacej (TAK - C, NIE - A; +-0.05 d), ARM-16c miara C doba do doby
-    zgodna z A dla krain z listy "A/C" w kolejnych dobach (dA > 0 - spadek przy racjach KS ponizej wzoru: 0 <= dC <= dA; dA < 0 - napelnianie: dC <= 0; +-0.1 d
-    zaokraglenia linii; inne doby bez warunku - C moze rosnac w dobie z racjami KS krainy >= wzoru gry, gdy wies z racjami ponizej wzoru traci), ARM-16d porownanie
+    zgodna z A dla krain z listy "A/C": w kazdej linii C <= A (+0.05 d zaokraglenia), w kolejnych dobach dA > 0 - spadek przy racjach KS krainy ponizej wzoru:
+    0 <= dC <= dA; dA <= 0 - napelnianie albo doba z racjami KS krainy >= wzoru gry (A stoi): dC <= 0; +-0.1 d zaokraglenia linii (recenzja f26: C liczy sie
+    tylko w te same doby co A - kraina karmiona przez KS w sumie lepiej niz wzor gry nie zbiera straty C), ARM-16d porownanie
     A i C w ostatniej linii (INFO: krainy, gdzie C < A - psucie, zima, slaba ziemia nie licza sie w C), ARM-16e powroty "spichlerz krainy spada" przy kluczu TAK:
     spadek z winy KS > 1% potrzeby/d (seria liczy ta sama miara)."""
     M = D.get("meas") or []
@@ -43335,13 +43337,17 @@ def nksarm_meas_rows(rep, D, pfx="ARM"):
             a0, c0 = prev[8][land]
             da, dc = a1 - a0, c1 - c0
             pairs += 1
-            if da > 0.1 and not (-0.1 <= dc <= da + 0.1):
+            tol = 0.1 + 1e-6   # zaokraglenie linii 0.1 d (liczby z linii - wielokrotnosci 0.1) + szum odejmowania float
+            if da > tol and not (-tol <= dc <= da + tol):
                 viol.append(f"{land} dzien {cur[0]}: dA {da:+.1f}, dC {dc:+.1f}")
-            elif da < -0.1 and dc > 0.1:
-                viol.append(f"{land} dzien {cur[0]}: napelnianie dA {da:+.1f}, dC {dc:+.1f}")
-    if pairs:
-        rep.add(f"{pfx}-16c: miara C doba do doby wobec A (spadek: 0 <= dC <= dA; napelnianie: dC <= 0)", f"par kraina-doba {pairs}, niezgodnych {len(viol)}"
-                + (" (" + "; ".join(viol[:4]) + ")" if viol else ""), "0 niezgodnych (+-0.1 d zaokraglenia)", not viol)
+            elif da <= tol and dc > max(da, 0.0) + tol:
+                viol.append(f"{land} dzien {cur[0]}: A stoi albo spada (dA {da:+.1f}), C rosnie (dC {dc:+.1f})")
+    # recenzja f26: C <= A w kazdej linii (C rosnie tylko w doby A, najwyzej o caly spadek; napelnianie oddaje obu)
+    over = [f"{land} dzien {x[0]}: A {a:.1f}, C {c:.1f}" for x in M for land, (a, c) in x[8].items() if c > a + 0.05]
+    viol += over
+    if pairs or over:
+        rep.add(f"{pfx}-16c: miara C wobec A (C <= A; spadek: 0 <= dC <= dA; A stoi albo spada: dC <= 0)", f"par kraina-doba {pairs}, linii {len(M)}, niezgodnych {len(viol)}"
+                + f" (w tym C > A: {len(over)})" + (" (" + "; ".join(viol[:4]) + ")" if viol else ""), "0 niezgodnych (+-0.1 d zaokraglenia)", not viol)
     else:
         rep.add(f"{pfx}-16c: miara C doba do doby wobec A", "brak kolejnych dob z ta sama kraina na liscie A/C (w grze linia co 7 dob)", "INFO", None)
     last = M[-1]
