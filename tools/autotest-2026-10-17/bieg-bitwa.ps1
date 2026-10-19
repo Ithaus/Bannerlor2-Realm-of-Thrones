@@ -14,7 +14,8 @@ param(
     [int]$BattleSec = 150,                              # AT5: sekundy rzeczywiste na jedna bitwe
     [switch]$NoArena,                                   # AT5: bez walki cwiczebnej na arenie przed bitwami
     [int]$SwitchWaitSec = 0,                            # 16.10: dluzsze czekanie na przelacznik (bank BA 600 MB laduje sie ok. 4 min); 0 = domyslne skryptu (480 s)
-    [string]$ExtraAdd = ''                                # 16.10: dodatkowe pliki 'wzgledna\sciezka=zrodlo' (np. sonda geografii - test only)
+    [string]$ExtraAdd = '',                                # 16.10: dodatkowe pliki 'wzgledna\sciezka=zrodlo' (np. sonda geografii - test only)
+    [double]$Speed = 0                                    # 19.10 (Jeff: testy jak najszybciej): wymuszony mnoznik czasu autotestu (0 = jak w grze; max 64)
 )
 # kod wyjscia jak autotest-bitwa.ps1: 0 OK (przy -Battles misje sprawdzone), 1 nie dotarl / wywrotka, 2 stop przed testem,
 # 3 przywracanie nieudane, 4 doby OK - misje NIE sprawdzone (takiego DLL nie wgrywac jako sprawdzonego w misjach)
@@ -57,5 +58,6 @@ if ($PhotosFile) { $a.PhotosFile = $PhotosFile }
 if ($Photos.Count -gt 0) { $a.Photos = $Photos }
 if ($Battles -gt 0) { $a.Battles = $Battles; $a.BattleSec = $BattleSec; if ($NoArena) { $a.NoArena = $true } }
 if ($SwitchWaitSec -gt 0) { $a.SwitchWaitSec = $SwitchWaitSec }
+if ($Speed -gt 0) { $a.Speed = $Speed }
 & $AT @a *>&1 | Tee-Object -FilePath $Out
 exit $LASTEXITCODE
