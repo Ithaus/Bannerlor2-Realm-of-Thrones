@@ -3163,3 +3163,8 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   dywidende; W6 tarczowe dla > 2R - tylko pomiar, do decyzji) -> dd91695b; + f21-zaloga -> noc-ks4 **b7b93a35** (1995 ustawien, Armoury/CrashScribe/RC/GT build rc 0).
 - 18:45 PDT: TEST fin95 = b7b93a35 (test/fin95, CsAt test/CrashScribe-at-83.dll = e32c2ea0 + at1), armoury-ks-auto.flag (USUNAC!), 160 dob, at-fin95-noc.out.txt. Potem: bieg zdjec drog f19
   (tools/drogi/zdjecia-drogi-f19.json), 5 dob + bitwa, WGRANIE 83 (Armoury + CrashScribe + RC + GT + CrashScribe.settings.xml), raport docs/RAPORT-NOC-2026-10-19.md.
+- 19:00 PDT: TEST fin95 (b7b93a35; Armoury-2026-10-18_17-11-11.log + CSV na D:; wyniki scratchpad fin95/*.txt): kod 0, ERROR 0, zapisy nietkniete. LEPIEJ: nakum 3 -> 0 NIE, nskory 1 -> 0
+  (mieso), nbandy 1 -> 0, nzc1 2 -> 1, nks 23 -> 22; nowe grupy ndoplata/ndothraki/nbank/njedz 0 NIE; nsrednim 1 (NSK-4 CSV 1 rodo-doba). Sojusze: ZERWANE Dragonstone + Riverlands (potwierdzony
+  w grze, wezwanie przeciw Koronie zamkniete) i Nights Watch + Skagos. Drogi: 0 wiosek bez drogi, 73 535 decali, ALE klatki z drogami sr. 21.4 ms / p95 60, test trwal 58.6 min zamiast ~40
+  -> paczka f22-drogi-perf (wf_957eb0eb-89d: widocznosc po kawalkach wokol kamery). Wlosci z kronik: w autotescie gracz caly czas w Eyrie - przywrocenie NIE ruszylo (czeka); w zapisie
+  testu roznia sie Cape Wrath (Selmy) i Fellwood (Mertyns) -> test 5 dob + bitwa (gracz wychodzi na mape) wf b4qa67fb9 sprawdza sciezke przywrocenia.
