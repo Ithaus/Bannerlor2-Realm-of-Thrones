@@ -45,7 +45,7 @@ namespace Armoury
         internal static int LastLent, LastPaidN, LastMissed, LastDefaults;
         internal static long LastLentSum, LastPaidSum;
 
-        internal static void ZeroLast() { LastLent = LastPaidN = LastMissed = LastDefaults = 0; LastLentSum = LastPaidSum = 0; }
+        internal static void ZeroLast() { LastLent = LastPaidN = LastMissed = LastDefaults = 0; LastLentSum = LastPaidSum = 0; LastDividend = 0; }   // LastDividend - f20-d3 (recenzja calosci noc-ks4)
 
         /// <summary>Paczka 169: dlug rodu (odczyt O(1)); false, gdy brak albo ponizej 1.</summary>
         internal static bool TryGetDebt(Clan c, out double principal, out int missed, out bool defaulted, out int dueDay)

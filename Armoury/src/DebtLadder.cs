@@ -1306,6 +1306,7 @@ namespace Armoury
                   .Append(")").Append(s.DebtorHomeNearestVillage ? ", w tym do najblizszej wsi (rod bez twierdzy, wsi i krolestwa; drobne2) " + OverflowHome.LastDebtNearest : ", do najblizszej wsi [Debtor Home Nearest Village wylaczone]")
                   .Append(", zwolnieni 166 rodow w zajeciu ").Append(ClanBudget.LastReleasedSeized).Append(s.DebtorDisbandsHome ? "" : " [Debtor Disbands Home wylaczone]")
                   .Append(" | Bank: kapital ").Append((long)IronBank.FreeCapital).Append(", prog wolnego kapitalu ").Append(s.BankFreeCapitalFloor).Append(", zysk do kasy Braavos ").Append(_dProfit)
+                  .Append(", dywidenda f20-d3 do Braavos ").Append(IronBank.LastDividend)   // recenzja calosci noc-ks4: przy Iron Bank Dividends zysk wychodzi ta droga (stara regula - 0)
                   .Append(" | latki: ").Append(_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-").Append("; BRAK: ").Append(_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
                   .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
                 if (_importN >= 0) { sb.Append(" Wczytano z zapisu: rodow ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }

@@ -47,7 +47,8 @@ namespace Armoury
     /// </summary>
     internal static partial class KingdomTreasury
     {
-        private const int AnTierD = 0, AnTierB = 1, AnTierM = 2, AnTierX = 3;   // szczebel daniny, W5b, M1 (z cieciem f20); W6 i W5c (bez ciecia - tylko do uprawnienia)
+        private const int AnTierD = 0, AnTierB = 1, AnTierM = 2, AnTierX = 3;   // szczebel daniny, W5b, M1 (z cieciem f20); W5c (bez ciecia - tylko do uprawnienia)
+        private const int AnTierW6 = 4;   // recenzja calosci noc-ks4: W6 (tarczowe) - bez ciecia jak AnTierX, ale liczone osobno (linia f20: ile W6 poszlo do rodow ponad 2R)
         private const int AnLines = 5;   // wiersze linii: 0 ponizej R, 1 R-2R, 2 ponad 2R, 3 dluznik 168 (f z jego G i R), 4 bez miary (bez ciecia)
 
         private sealed class AnRow
@@ -56,6 +57,7 @@ namespace Armoury
             // Base - uprawnienie rodu ze WSZYSTKICH szczebli tej doby (baza planu nastepnych szczebli i W7, podloga przydzialu); Full / Need / Paid - szczeble z cieciem
             // (danina, W5b, M1): pelne uprawnienie, czesc wedlug potrzeby (floor(e x f) na szczebel), gotowka naprawde wyplacona
             public long Base, Full, Need, Paid;
+            public long W6;   // recenzja calosci noc-ks4: gotowka W6 (tarczowe) tej doby - bez ciecia f20, tylko do linii (decyzja Jeffa, czy tarczowe to "pomoc koronna")
         }
 
         private static readonly Dictionary<Clan, AnRow> _an = new Dictionary<Clan, AnRow>();   // pamiec doby kroku W5 (czyszczona z NaRoll)
@@ -148,6 +150,7 @@ namespace Armoury
                 if (p < 0) p = 0;
                 if (p > e) p = e;
                 a.Base += e;
+                if (tier == AnTierW6) { a.W6 += e; return 0; }   // recenzja calosci noc-ks4: W6 jak AnTierX (uprawnienie bez ciecia) + licznik linii
                 if (tier < AnTierD || tier > AnTierM) return 0;
                 a.Full += e; a.Paid += p;
                 a.Need += a.F >= 1.0 ? e : (long)Math.Floor(e * a.F);
@@ -242,9 +245,15 @@ namespace Armoury
                 var n = new int[AnLines]; var full = new long[AnLines]; var need = new long[AnLines]; var paid = new long[AnLines];
                 var debtB = new int[3];
                 int richPaidN = 0, offNeed = 0; long richPaid = 0;
+                int w6N = 0, w6RichN = 0, w6MidN = 0; long w6Sum = 0, w6Rich = 0, w6Mid = 0;   // recenzja calosci noc-ks4: W6 (tarczowe, bez ciecia) wedlug pasma rodu
                 foreach (var kv in _an)
                 {
                     var a = kv.Value;
+                    if (kv.Key != null && a != null && a.W6 > 0)
+                    {
+                        w6N++; w6Sum += a.W6;
+                        if (a.Band == NbAbove) { w6RichN++; w6Rich += a.W6; } else if (a.Band == NbMid) { w6MidN++; w6Mid += a.W6; }
+                    }
                     if (kv.Key == null || a == null || a.Full <= 0) continue;
                     int l = a.Line < 0 || a.Line >= AnLines ? 4 : a.Line;
                     n[l]++; full[l] += a.Full; need[l] += a.Need; paid[l] += a.Paid;
@@ -291,7 +300,10 @@ namespace Armoury
                   .Append(" = wyplacono W5 + W5b + M1 + tarczowe netto ").Append(outT).Append(" (tarczowe wyplacone - pobrane ").Append(scNet).Append("); rozjazd krolestw ").Append(kBad)
                   .Append(", bez pomiaru ").Append(kNo)
                   .Append(" | kontrola: ponad 2R wyplacone ").Append(richPaidN).Append(" rodow (").Append(richPaid).Append(" zl), wyplacone inne niz wedlug potrzeby ").Append(offNeed)
-                  .Append(" rodow, sumy rodow inne niz krolestw (wyplacone ").Append(paidOff).Append(", zatrzymane ").Append(keptOff).Append(") (oczekiwane 0)");
+                  .Append(" rodow, sumy rodow inne niz krolestw (wyplacone ").Append(paidOff).Append(", zatrzymane ").Append(keptOff).Append(") (oczekiwane 0)")
+                  // recenzja calosci noc-ks4: W6 jest poza decyzja 1.b (bez ciecia) - ile poszlo do rodow ponad 2R i R-2R (do decyzji Jeffa, czy tarczowe to "pomoc koronna")
+                  .Append(" | W6 tarczowe (bez ciecia f20 - poza decyzja 1.b): wyplacone ").Append(w6Sum).Append(" zl do ").Append(w6N).Append(" rodow, w tym ponad 2R ").Append(w6Rich)
+                  .Append(" zl do ").Append(w6RichN).Append(" rodow, R-2R ").Append(w6Mid).Append(" zl do ").Append(w6MidN).Append(" rodow");
                 AnRow p; var pc = Clan.PlayerClan;
                 if (pc != null && _an.TryGetValue(pc, out p) && p != null && p.Full > 0)
                     sb.Append(" | gracz: ").Append(nm[p.Line < 0 || p.Line >= AnLines ? 4 : p.Line]).Append(", f ").Append(p.F.ToString("0.00", WtInv))

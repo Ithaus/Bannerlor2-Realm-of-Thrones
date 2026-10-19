@@ -277,7 +277,7 @@ namespace Armoury
                             if (x.W <= x.Pc0) _scNotAtCap++;              // kontrola: gotowka tylko rodom, ktorych zold druzyn przekracza pulap wlasny (oczekiwane 0)
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
-                            AnNote(x, ip, ip, AnTierX);                   // f20-d1: W6 bez ciecia - tylko do uprawnienia doby (baza M1, W5c, W7)
+                            AnNote(x, ip, ip, AnTierW6);                  // f20-d1: W6 bez ciecia - tylko do uprawnienia doby (baza M1, W5c, W7); recenzja calosci noc-ks4: licznik W6 linii f20
                         }
                         // przydzial w pulapie przy nowym poziomie (gotowka + miejsce na krok werbunku), nigdy ponizej gotowki; tylko gdy rosnie
                         // f20-d1: podloga - pelne uprawnienie (AnBase; klucz wylaczony - gotowka, jak dotad)

@@ -1628,7 +1628,8 @@ Uzycie (Python 3, tylko odczyt):
                     (doplata_w5 = f20 wyplacona + W6 + W5c co do zlotowki), NDP-5 sumy kolumn f20 = linia, NDP-6 srednie 28 dob (INFO), NDP-7 rod gracza (ponad 2R bez wyplaty,
                     komunikaty), NDP-8 ERROR KingdomTreasury.AidNeed 0 i potkniecia 0, NDP-D regula na sucho z CSV (f z f6 / f7 / G i R; INFO). Log sprzed paczki (np. fin93
                     Armoury-2026-10-18_12-18-40.log): NDP-0 INFO, NDP-D z liczbami, bez wyjatku. Paczka zmienila tez W5-1 (garnek = wyplacono + zatrzymane + reszta; wzor
-                    wiersza krolestwa zna "lup WW2" i "zatrzymane f20").
+                    wiersza krolestwa zna "lup WW2" i "zatrzymane f20"). Recenzja calosci noc-ks4: NDP-9 W6 tarczowe (bez ciecia f20 - poza decyzja 1.b) do rodow ponad 2R
+                    i R-2R srednio na dobe (INFO - do decyzji Jeffa, czy tarczowe to "pomoc koronna"; linia sprzed poprawki bez pola - INFO).
 --grupa nruda     : (noc 18.10, fala 5 paczka f5-ruda - ruda/zelazo pod KS; Armoury/src/StartCalibration.Ruda.cs, Bloomery.F5.cs, VillageTakings.F5WoodCredit; klucze
                     Ks Iron Hands Follow Market, Bloomery Wood Credit) python -I tools/sprawdz_logi.py --grupa nruda <Armoury-*.log> (strumieniowo). Linie "Ruda KS (f5-ruda):
                     dzien N" (co 7 dob od D - rece przy zlozach zelaza za ruda rynku: polki S / cel T = suma zapasow rzemiosla CaravanBulk; S < T brak - kopalnie z drewnem
@@ -1741,6 +1742,9 @@ Uzycie (Python 3, tylko odczyt):
                     kapitalu (kapital wczoraj + zmiana kapitalu dzis - wyplacone dzis, +-2 zl); NBK-11b skarbiec upadlego krolestwa bez odbiorcy (linia G14 "reszta M -> kapital
                     Banku (brak zywego odbiorcy)") to kapital wlasny, nie zysk: suma M od poprzedniej linii doby = "kapital wlasny" nastepnej linii doby (+-1 zl; brak takich
                     upadkow - INFO); NBK-8c wyplata klucznikom w ksiedze dochodu jako jednorazowa (okup KRansom): "w ksiedze dochodu jako jednorazowe" = klucznicy - udzial gracza.
+                    Recenzja calosci noc-ks4 (zwrot nadwyzki kapitalu wlasnego): NBK-3 pula wczoraj + zysk dzis + zwrot nadwyzki dzis - wyplacone dzis; NBK-12 zwrot nadwyzki =
+                    max(0, kapital wlasny - Iron Bank Capital) / Bank Profit To Braavos Days (+-1 zl) i kapital wlasny = kapital + koszt pozyczek (rody + korony) - pula + zwrot
+                    (+-3 zl; linia sprzed poprawki bez pola - INFO).
                     Log sprzed paczki (fin93 Armoury-2026-10-18_12-18-40.log): NBK-B z liczbami, NBK-0 "brak w logu" (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -47143,6 +47147,7 @@ NDP_RX_WAL = re.compile(r"\| skarbce w krokach W5 \(danina, W5b, W6, M1; krolest
 NDP_RX_CTL = re.compile(r"\| kontrola: ponad 2R wyplacone (\d+) rodow \((\d+) zl\), wyplacone inne niz wedlug potrzeby (\d+) rodow, sumy rodow inne niz krolestw \(wyplacone (\d+), zatrzymane (\d+)\) \(oczekiwane 0\)")
 NDP_RX_PL = re.compile(r"\| gracz: (.*?), komunikat: ([^|]*?) \| potkniecia (\d+)\.\s*$")
 NDP_RX_DRY = re.compile(r"; na sucho zatrzymane byloby (-?\d+)")
+NDP_RX_W6 = re.compile(r"\| W6 tarczowe \(bez ciecia f20 - poza decyzja 1\.b\): wyplacone (\d+) zl do (\d+) rodow, w tym ponad 2R (\d+) zl do (\d+) rodow, R-2R (\d+) zl do (\d+) rodow")   # recenzja calosci noc-ks4
 NDP_RX_165 = re.compile(r", zatrzymane wedlug potrzeby rodu z wplywow dnia \(f20 - szczebel daniny W5 i M1; zostaje w skarbcu, nie idzie w renty\) (\d+)")
 NDP_BANDS = ("ponizej", "R-2R", "ponad", "dluznik", "bez")
 
@@ -47175,6 +47180,7 @@ def _ndp_scan(logp):
                      "richn": int(ctl.group(1)), "richzl": int(ctl.group(2)), "offneed": int(ctl.group(3)), "offp": int(ctl.group(4)), "offk": int(ctl.group(5)),
                      "pl": pl.group(1), "msg": pl.group(2).strip(), "st": int(pl.group(3))}
                 dm = NDP_RX_DRY.search(s); r["dry"] = int(dm.group(1)) if dm else None
+                wm = NDP_RX_W6.search(s); r["w6"] = tuple(int(x) for x in wm.groups()) if wm else None   # recenzja calosci noc-ks4: W6 wedlug pasma (zl, rodow x3)
                 D["f"][day] = r
                 continue
             if s.startswith(NDP_W5):
@@ -47389,6 +47395,16 @@ def ndoplata_main(logp, bdp=None, csvp=None):
         st = sum(fd[d]["st"] for d in days)
         rep.add("NDP-8: ERROR KingdomTreasury.AidNeed 0 i potkniecia f20 0", f"bledow {len(D['err'])}, potkniec {st}" + (f" ({D['err'][0][:120]})" if D["err"] else ""), "0 / 0",
                 len(D["err"]) == 0 and st == 0)
+        # NDP-9 (recenzja calosci noc-ks4): W6 tarczowe bez ciecia f20 - ile do rodow ponad 2R i R-2R (decyzja Jeffa, czy tarczowe to "pomoc koronna")
+        w6d = [d for d in days if fd[d].get("w6")][-28:]
+        if w6d:
+            n = len(w6d)
+            t = [sum(fd[d]["w6"][i] for d in w6d) / n for i in range(6)]
+            rep.add(f"NDP-9: W6 tarczowe (bez ciecia f20 - poza decyzja 1.b) wedlug pasma rodu (ostatnie {n} dob linii, srednio na dobe)",
+                    f"razem {t[0]:.0f} zl do {t[1]:.1f} rodow; ponad 2R {t[2]:.0f} zl do {t[3]:.1f} rodow, R-2R {t[4]:.0f} zl do {t[5]:.1f} rodow",
+                    "INFO - do decyzji Jeffa (fin93 przed paczka: W6 do rodow ponad 2R ok. 41 zl/d); pobor tarczowego = wyplata, zloto sie zgadza", None)
+        else:
+            rep.add("NDP-9: W6 tarczowe wedlug pasma rodu", "linie f20 bez pola 'W6 tarczowe' (sprzed recenzji calosci noc-ks4)", "INFO", None)
     else:
         rep.add("NDP-1..8: linie f20", "brak linii (log sprzed paczki)", "INFO", None)
     # NDP-D skutek na sucho z CSV (zawsze - w logu z paczka porownanie z wyplata linii)
@@ -49128,10 +49144,12 @@ NBK_DAY = "Bank Zelazny - zysk (f20-d3): "
 NBK_PAY = "Bank Zelazny - wyplata do Braavos (f20-d3): dzien "
 NBK_LINE = re.compile(
     r"dzien (?P<d>\d+) \| wplywy (?P<cin>-?\d+) \(zmiana kapitalu (?P<dcap>-?\d+)(?: - kapital wlasny (?P<own>-?\d+))? \+ pozyczone (?P<lent>-?\d+)\), zwrot kosztu pozyczek (?P<back>-?\d+) "
-    r"\(rody (?P<bc>-?\d+), korony (?P<bk>-?\d+)\), zysk zrealizowany dzis (?P<prof>-?\d+) \| pula (?P<pool>-?\d+) \| kapital (?P<cap>-?\d+), rezerwa (?P<res>-?\d+) "
+    r"\(rody (?P<bc>-?\d+), korony (?P<bk>-?\d+)\), zysk zrealizowany dzis (?P<prof>-?\d+)"
+    r"(?:, zwrot nadwyzki kapitalu wlasnego (?P<rel>-?\d+) \(kapital wlasny (?P<eq>-?\d+) - Iron Bank Capital (?P<eqb>-?\d+), 1/(?P<rdays>[\d.]+) dziennie\))?"
+    r" \| pula (?P<pool>-?\d+) \| kapital (?P<cap>-?\d+), rezerwa (?P<res>-?\d+) "
     r"\(prog (?P<floor>-?\d+) \+ pozyczone w (?P<rn>\d+) dobach (?P<rl>-?\d+)\), ponad rezerwe (?P<room>-?\d+) \| koszt pozyczek: rody (?P<cc>-?\d+) \((?P<ncc>\d+)\), "
     r"korony (?P<ck>-?\d+) \((?P<nck>\d+)\); dlug: rody (?P<dc>-?\d+), korony (?P<dk>-?\d+) \| od startu \(dzien (?P<d0>-?\d+)\): zysk (?P<pall>-?\d+), "
-    r"wyplacone (?P<wall>-?\d+) \| wyplata co (?P<every>\d+) dob, nastepna dzien (?P<next>-?\d+) \| potkniecia (?P<st>\d+)\.")
+    r"(?:zwrot nadwyzki (?P<rall>-?\d+), )?wyplacone (?P<wall>-?\d+) \| wyplata co (?P<every>\d+) dob, nastepna dzien (?P<next>-?\d+) \| potkniecia (?P<st>\d+)\.")
 NBK_PAYHEAD = re.compile(r"dzien (?P<d>\d+) \| pula przed (?P<pool0>-?\d+), ponad rezerwe (?P<room>-?\d+) \(kapital (?P<cap0>-?\d+), rezerwa (?P<res>-?\d+)\) -> do wyplaty (?P<x>\d+)")
 NBK_PAYBODY = re.compile(
     r"\| wyplacone (?P<paid>\d+): klucznicy (?P<keys>\d+) \(krolestwo (?P<kn>[^,]*), rodow (?P<nk>\d+)(?:: (?P<names>.*?))?(?:; w ksiedze dochodu jako jednorazowe (?P<noted>\d+))?\), miasto Braavos (?P<town>\d+) "
@@ -49173,7 +49191,9 @@ def nbank_main(logp):
                 if not mm:
                     bad.append(s[:160])
                     continue
-                v = {k: (int(x) if x is not None else 0) for k, x in mm.groupdict().items()}
+                v = {k: (int(x) if x is not None else 0) for k, x in mm.groupdict().items() if k != "rdays"}
+                v["rdays"] = float(mm.group("rdays")) if mm.group("rdays") is not None else 0.0
+                v["has_rel"] = mm.group("rel") is not None   # recenzja calosci noc-ks4: zwrot nadwyzki kapitalu wlasnego
                 v["has_own"] = mm.group("own") is not None
                 if v["has_own"]:
                     ownpairs.append((v["d"], v["own"], g14acc))
@@ -49284,11 +49304,11 @@ def nbank_main(logp):
             continue
         n3 += 1
         paid = pays[b]["paid"] if b in pays else 0
-        if abs(days[b]["pool"] - (days[a]["pool"] + days[b]["prof"] - paid)) > 2:
+        if abs(days[b]["pool"] - (days[a]["pool"] + days[b]["prof"] + days[b]["rel"] - paid)) > 3:
             e3.append(b)
     if n3:
-        rep.add("NBK-3: pula zysku - ciaglosc (pula wczoraj + zysk dzis - wyplacone dzis)", f"dob z bledem {len(e3)} z {n3}" + (f" (np. {e3[:5]})" if e3 else ""),
-                "0 (+-2 zl zaokraglenia)", not e3)
+        rep.add("NBK-3: pula zysku - ciaglosc (pula wczoraj + zysk dzis + zwrot nadwyzki kapitalu wlasnego dzis - wyplacone dzis)", f"dob z bledem {len(e3)} z {n3}" + (f" (np. {e3[:5]})" if e3 else ""),
+                "0 (+-3 zl zaokraglenia; linia sprzed recenzji calosci - zwrot 0)", not e3)
     else:
         rep.add("NBK-3: pula zysku - ciaglosc", "mniej niz 2 kolejne doby", "INFO", None)
 
@@ -49397,6 +49417,25 @@ def nbank_main(logp):
     else:
         rep.add("NBK-11b: skarbiec upadlego krolestwa bez odbiorcy -> kapital wlasny", f"linie doby bez pola 'kapital wlasny' (sprzed recenzji f20-d3); linii G14 bez odbiorcy {g14n}", "INFO", None)
 
+    # NBK-12 (recenzja calosci noc-ks4): zwrot nadwyzki kapitalu wlasnego ponad Iron Bank Capital - tempo dawnej reguly 168 (1/Bank Profit To Braavos Days dziennie)
+    lr = [d for d in ld if days[d]["has_rel"]]
+    if lr:
+        e12, e12q = [], []
+        for d in lr:
+            v = days[d]
+            want = max(0.0, v["eq"] - v["eqb"]) / max(1.0, v["rdays"])
+            if abs(v["rel"] - want) > 1:
+                e12.append(d)
+            if abs(v["eq"] - (v["cap"] + v["cc"] + v["ck"] - v["pool"] + v["rel"])) > 3:
+                e12q.append(d)
+        a, b = days[lr[0]], days[lr[-1]]
+        rep.add("NBK-12: zwrot nadwyzki kapitalu wlasnego = max(0, kapital wlasny - Iron Bank Capital) / Bank Profit To Braavos Days; kapital wlasny = kapital + koszt pozyczek - pula (przed zwrotem)",
+                f"dob {len(lr)}, z bledem zwrotu {len(e12)}" + (f" (np. {e12[:5]})" if e12 else "") + f", z bledem kapitalu wlasnego {len(e12q)}" + (f" (np. {e12q[:5]})" if e12q else "")
+                + f"; kapital wlasny d{a['d']} {a['eq']} -> d{b['d']} {b['eq']} (Iron Bank Capital {b['eqb']}), zwrot dzis {a['rel']} -> {b['rel']} zl/d, od startu {b['rall']}",
+                "0 i 0 (+-1 / +-3 zl zaokraglenia)", not e12 and not e12q)
+    elif ld:
+        rep.add("NBK-12: zwrot nadwyzki kapitalu wlasnego", "linie doby bez pola 'zwrot nadwyzki kapitalu wlasnego' (sprzed recenzji calosci noc-ks4)", "INFO", None)
+
     # NBK-9 potkniecia i ERROR
     stum = max((days[d]["st"] for d in ld), default=0)
     rep.add("NBK-9: ERROR in IronBank.Dividends i potkniecia (najwiecej w linii doby)", f"ERROR {len(errs)}" + (f" (np. {errs[0]})" if errs else "") + f", potkniecia {stum}",
@@ -49408,7 +49447,7 @@ def nbank_main(logp):
         rep.add("NBK-10: Bank - kapital, rezerwa, koszt i dlug pozyczek (pierwsza i ostatnia doba linii) oraz od startu",
                 f"kapital {a['cap']} -> {b['cap']}, rezerwa {a['res']} -> {b['res']}, koszt rody/korony {a['cc']}/{a['ck']} -> {b['cc']}/{b['ck']}, dlug rody/korony {a['dc']}/{a['dk']} -> {b['dc']}/{b['dk']};"
                 f" od startu (d{b['d0']}): zysk {b['pall']}, wyplacone {b['wall']}",
-                "INFO (kapital wlasny zostaje w Banku - wychodzi tylko zysk; koszt <= dlug)", None)
+                "INFO (kapital wlasny do Iron Bank Capital zostaje w Banku - wychodzi zysk i zwrot nadwyzki ponad Iron Bank Capital, NBK-12; koszt <= dlug)", None)
         over = [d for d in ld if days[d]["cc"] > days[d]["dc"] + 1 or days[d]["ck"] > days[d]["dk"] + 1]
         rep.add("NBK-10b: koszt pozyczek nigdy ponad dlug (rody, korony)", f"dob z kosztem ponad dlug {len(over)}" + (f" (np. {over[:5]})" if over else ""), "0", not over)
     rep.show()

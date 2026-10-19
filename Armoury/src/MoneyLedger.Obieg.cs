@@ -833,6 +833,7 @@ namespace Armoury
               .Append(", do sakiewek ludzi (dlug zoldu) ").Append(DebtLadder.LastMenPaid).Append(", do skarbcow (stary dlug wobec korony) ").Append(DebtLadder.LastCrownPaid)
               .Append(", zaliczka gry w nicosc (OBIEG-1) ").Append(DebtLadder.LastAdvNothing).Append(", okupy do porywaczy ").Append(DebtLadder.LastRansomPaid)
               .Append(", portfele gry ponownie otwarte (bez zaliczki) ").Append(DebtLadder.LastReopened).Append(", zysk Banku do kasy Braavos ").Append(DebtLadder.LastProfit)
+              .Append(", dywidenda Banku do Braavos (f20-d3: klucznicy i miasto) ").Append(IronBank.LastDividend)   // recenzja calosci noc-ks4: przy Iron Bank Dividends stara regula daje 0
               // 186: kredyt koron (kapital -> skarbce, raty skarbce -> kapital); dlug zniszczonego krolestwa przepada (zloto nie rusza - tylko licznik)
               .Append("; 186: kredyt koron kapital -> skarbce ").Append(CrownBorrow.LastLent).Append(" (krolestw ").Append(CrownBorrow.LastLentN).Append("), raty skarbce -> kapital ")
               .Append(CrownBorrow.LastRepaid).Append(", Bank stracil dzis (krolestwa zniszczone, zloto nie rusza) ").Append(CrownBorrow.LastLost).Append('.');

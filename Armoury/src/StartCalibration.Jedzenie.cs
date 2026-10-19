@@ -41,7 +41,7 @@ namespace Armoury
     /// Pieniadze i towar: bez przelewow - zmiana tylko podzialu rak bloku (produkcja z prawdziwych rak i ziemi). Bez regul krain (tylko caly rynek). A7 bez zmian.
     /// Udzialy zajec i rece przy zlozach sa w zapisie KS (arm_ks) - bez nowego klucza zapisu; regula nie ma pamieci sesji (decyzja z dzisiejszych polek).
     /// Linia "Jedzenie KS (f20-d4): dzien N" co 7 dob (tools/sprawdz_logi.py --grupa njedz).
-    /// Klucz NIE - nic z tego (RegaleCycle jak dotad co do bitu).
+    /// Klucz NIE albo regula A7 czynna (A7RuleOn) - nic z tego (RegaleCycle jak dotad co do bitu; recenzja calosci noc-ks4: jedna regula zajec naraz).
     /// </summary>
     internal static partial class StartCalibration
     {
@@ -70,8 +70,11 @@ namespace Armoury
                        : "WYLACZONA - zajecia zamrozone na Planie wlaczenia (sam pomiar nacisku)";
         }
 
-        /// <summary>Regula czynna (klucz, po oknie sterowania rynku D+49).</summary>
-        private static bool F20Active(int today, int d0) { return d0 >= 0 && today > d0 + CtlEnd && F20On; }
+        /// <summary>Regula czynna (klucz, po oknie sterowania rynku D+49, regula A7 wylaczona). Recenzja calosci noc-ks4: przy czynnej A7 (A7RuleOn - Start Calibration
+        /// Switch Rule, Ks Switch Signal + Ks Switch Signal Rule albo plik autotestu) zajecia przesuwa TYLKO A7 (z kosztem i 60/364 dobami) - f20-d4 bez kosztu i od razu
+        /// w tych samych blokach bylaby druga regula na to samo zjawisko. Ten sam warunek: krok F20Week, RegaleCycle bez soli i daktyli (_f20RegSkip - przy A7 regale
+        /// wracaja do soli i daktyli jak przed paczka), napisy linii A7 / KS: produkcja / ZW (te i tak pisza f20 tylko przy A7 wylaczonej).</summary>
+        private static bool F20Active(int today, int d0) { return d0 >= 0 && today > d0 + CtlEnd && F20On && !A7RuleOn; }
 
         /// <summary>Scalenie f20-d4 z f19-e4: regula czynna dzis - linia ZW (VillageCrafts.KsWorksText) mowi "zamrozone" tylko wtedy, gdy rece jedzenia i soli
         /// nie ida za polkami rynku (ten sam warunek co dopisek linii "KS: produkcja" F4FrozenText). Tylko odczyt.</summary>
