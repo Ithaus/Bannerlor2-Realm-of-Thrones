@@ -428,7 +428,7 @@ namespace Armoury
         [SettingPropertyGroup("Learning patterns")]
         public bool XbowPatternTierByPower { get; set; } = true;
 
-        [SettingPropertyBool("Rare Bows Not Forged", HintText = "bows and arrows of a stuff no smith can get (dragonbone, weirwood, Summer Isles goldenheart, a giant's bow, the Ravens' Teeth arrows - priced as a scarce treasure in Hist Exotic Bows) cannot be forged: no pattern, no bench, the tile reads RARE STUFF - CANNOT BE FORGED; the ones in the world stay and can be melted down for study points. Off: forged like any bow from wood and iron (a 5000 denar Ravens' Teeth longbow out of a few ingots)", RequireRestart = false)]
+        [SettingPropertyBool("Rare Bows Not Forged", HintText = "bows of a stuff no smith can get (dragonbone, weirwood - the game has no such raw material to buy) cannot be forged: no pattern, no bench, the tile reads RARE STUFF - CANNOT BE FORGED; the ones in the world stay and can be melted down for study points. Off: forged like any bow from wood and iron (a 5000 denar Ravens' Teeth longbow out of a few ingots)", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool RareBowsNotForged { get; set; } = true;
 
