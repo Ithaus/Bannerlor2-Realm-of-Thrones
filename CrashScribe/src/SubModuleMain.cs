@@ -102,6 +102,7 @@ namespace CrashScribe
                 Army175.Install(_harmony);       // 175: dopisek pieszych Dothrakow do puli ROT (postfiks ROTTroopRecruiter.Settings)
                 UniqueCompanions.Install(_harmony);   // 14.10: unikaty ROT - zmarly zostaje martwy, przeprowadzki zamiast usuniecia, dzieci
                 Scribe.Line("Net ready.");
+                UnwindRepair.Request("menu");   // UW: naprawa opisu stosu malych zalatanych metod - na pierwszym ticku, gdy WSZYSTKIE mody skoncza swoje OnBeforeInitialModuleScreenSetAsRoot
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
                 // zakleszczyc watek glowny zlapany w srodku locka (freeze Jeffa 08:06,
@@ -134,6 +135,8 @@ namespace CrashScribe
         {
             base.OnApplicationTick(dt);
             Watchdog.Beat();
+            GcPulse.Tick();   // UW: linia "GC (UW)" raz na minute (Config.GcPulseLog)
+            UnwindRepair.Tick();   // UW: zlecone skany (menu/sesja), pelny skan co 5 min, straz bajtow co 30 s - poza tym bez alokacji w klatce
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
@@ -165,6 +168,7 @@ namespace CrashScribe
                 if (cgs != null && Config.RotEventFx) cgs.AddBehavior(new RotEventFxBehavior());   // noc 17/18.10 (rot-wydarzenia): skutki wydarzen ROT - smierc odroczona, nastepca z tytulami BK, tron w krolestwie, linie "ROT wydarzenie"
                 if (cgs != null) cgs.AddBehavior(new BkrotSelfCallBehavior());   // P2 audytu 14.10: samowywolania BKROT (wpiecie raz na proces przy starcie sesji, linia "BKROT self call fix")
                 if (cgs != null) cgs.AddBehavior(new CanonAlliancesBehavior());   // noc 17/18.10 (f19-kanon-a): sojusze jak w kronikach, zrywanie spoza listy w 1. godzinie, wojna Reach - Polnoc po smierci Renly'ego, linia "Sojusze kanonu (SK)"
+                if (cgs != null) cgs.AddBehavior(new UnwindRepairBehavior());   // UW (zawieszenie 19.10 16:09): pelny skan naprawy opisu stosu na starcie sesji i raz na dobe
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }

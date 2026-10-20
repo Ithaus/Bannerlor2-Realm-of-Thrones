@@ -16,6 +16,19 @@
 
   <!-- a Harmony net over every method of the listed mods -->
   <WrapModMethods>true</WrapModMethods>
+  <!-- the net skips very small methods (compiled code of 1-4 bytes; only methods with an IL body up to NetTinyIlBytes bytes are checked):
+       a Harmony jump on a 1-4 byte method breaks the stack description Windows needs, and a garbage collection that catches
+       the game thread there freezes the game for good -->
+  <NetSkipTinyMethods>true</NetSkipTinyMethods>
+  <NetTinyIlBytes>12</NetTinyIlBytes>
+  <!-- one line a minute in the session log: how many garbage collections ran (diagnostics only) -->
+  <GcPulseLog>true</GcPulseLog>
+  <!-- repair the stack description (UNWIND_INFO) of tiny Harmony-patched methods (ours and others': game, BLSE, ButterLib, BK).
+       Works on its own: does not depend on NetSkipTinyMethods / NetTinyIlBytes.
+       A 5-byte patch jump on a 1-4 byte method corrupts the first unwind byte; a garbage collection that catches a thread
+       there freezes the game. We re-route the jump so that byte reads correct again, without changing what the patch does.
+       Memory is written only on an exact pattern match, otherwise the method is left untouched and counted. Line "Opis stosu (UW)". -->
+  <UnwindRepair>true</UnwindRepair>
   <!-- caught an error inside one of our mods: write it down and carry on instead of a crash to desktop.
        Set to false if you would rather the game die loudly at the exact spot. -->
   <SwallowModErrors>true</SwallowModErrors>
