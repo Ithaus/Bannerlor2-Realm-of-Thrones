@@ -168,13 +168,9 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public int MaxNoblesInBracket { get; set; } = 15;
 
-        [SettingPropertyBool("Tourney Ransom", HintText = "whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions and the AI lords alike - a common soldier fights in borrowed kit and has nothing to wager, and kin never ransom kin (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyBool("Tourney Ransom", HintText = "whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions (only when you ride in the lists yourself) and the AI knights alike - a common soldier fights in borrowed kit, ladies and townsfolk wager nothing, kin never ransom kin, a tourney called off costs nobody; an AI lord pays only from what his house can spare beyond its war chest, the victor wears what is better than his own, and the vanquished buys plain kit at the market (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
         public bool TourneyRansom { get; set; } = true;
-
-        [SettingPropertyInteger("Ransom Ai Keep Wage Days", 0, 28, "0", HintText = "an AI lord pays a ransom only from gold beyond this many days of his men's wages; what he cannot pay for, he yields (takes effect after loading a save)", RequireRestart = false)]
-        [SettingPropertyGroup("The lists themselves")]
-        public int RansomAiKeepWageDays { get; set; } = 7;
 
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
@@ -222,7 +218,6 @@ namespace GrandTourney
             s.NoblesIgnoreSkillGate = NoblesIgnoreSkillGate;
             s.MaxNoblesInBracket = MaxNoblesInBracket;
             s.TourneyRansom = TourneyRansom;
-            s.RansomAiKeepWageDays = RansomAiKeepWageDays;
             s.LogEnabled = LogEnabled;
         }
 
