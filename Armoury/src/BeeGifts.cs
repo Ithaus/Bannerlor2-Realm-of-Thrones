@@ -202,7 +202,7 @@ namespace Armoury
             {
                 string why;
                 bool ok = CanPay(st, me, amt, castle, out why);
-                opts.Add(new InquiryElement(amt, "Pay " + amt + " gold" + (ok ? "" : " - " + why), null, ok, ok ? tip : why));
+                opts.Add(new InquiryElement(amt, ShortLabels.Pick("Pay " + amt + " gold", "Pay " + amt + " gold" + (ok ? "" : " - " + why)), null, ok, ok ? tip : why));   // n20-napisy: powod tylko w podpowiedzi
             }
             string body = "Pay into the purse of " + Name(st) + ".\n\n" + tip + "\n\nYour gold: " + me.Gold + "\n" + (castle ? "Castle" : "Town") + " purse: " + st.SettlementComponent.Gold;
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(

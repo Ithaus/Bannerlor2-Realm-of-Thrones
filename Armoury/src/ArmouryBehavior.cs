@@ -1353,6 +1353,8 @@ namespace Armoury
             // O1: oblezenie wbrew rozejmowi po okupie - tylko linia i licznik; wykonanie umow okupu w ticku kampanii (plynacy czas, wewnatrz Campaign.Tick - P5)
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, SiegeRansom.OnSiegeStarted);
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeRansom.Tick(); });
+            // n20-napisy: linia kontrolna napisow przyciskow menu - dopisana PRZED SiegeRansom.AddMenus, wiec gra wola ja PO nim (sluchacze od ostatnio dopisanego)
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, ShortLabels.Audit);
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)

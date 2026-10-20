@@ -608,6 +608,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool CraftResultPopup { get; set; } = true;
 
+        [SettingPropertyBool("Short Button Labels", HintText = "short text on this mod's menu buttons and in its pick-one windows (investing in the district's works, inn beds, the forge, Qohor, the order ledger, the muster book, raids): one line that fits the button; prices, sums and explanations move into the tooltip you see when you point at it. Most menu buttons change after loading a save; inn beds and window rows change at once. Off = the old long text on the buttons", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool ShortButtonLabels { get; set; } = true;
+
         [SettingPropertyBool("Rich Quality Modifiers", HintText = "fine/masterwork/legendary touch MORE than one stat (RBM strips them to bare damage): melee gains speed, ranged gains missile speed, botched work loses both (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool RichQualityModifiers { get; set; } = true;
@@ -8339,6 +8343,7 @@ namespace Armoury
             s.AutoSortParty = AutoSortParty;
             s.MusterBookEnabled = MusterBookEnabled;
             s.CraftResultPopup = CraftResultPopup;
+            s.ShortButtonLabels = ShortButtonLabels;
             s.RichQualityModifiers = RichQualityModifiers;
             s.TroopSelfMendEnabled = TroopSelfMendEnabled;
             s.MenPurseEnabled = MenPurseEnabled;

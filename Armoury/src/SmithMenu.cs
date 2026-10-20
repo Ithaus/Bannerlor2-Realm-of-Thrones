@@ -70,7 +70,7 @@ namespace Armoury
             // nauczone wzory na liste, RangedLore.KnownOf je otwiera
 
             starter.AddGameMenuOption(Menu, "arm_orders",
-                "{=!}The order book - commissions from the lords", OrdersCondition,
+                ShortLabels.Menu("{=!}The order book", "{=!}The order book - commissions from the lords"), ShortLabels.Tip(OrdersCondition, "Commissions from the lords."),
                 delegate (MenuCallbackArgs a) { Orders.Show(); }, false, 1);
 
             starter.AddGameMenuOption(Menu, "arm_progress",
@@ -80,14 +80,14 @@ namespace Armoury
             // trafia do rak od razu - bez doczekiwania zwyklym "Wait" (i bez
             // odpoczywania: mlot to nie drzemka)
             starter.AddGameMenuOption(Menu, "arm_proj_wait_opt",
-                "{=!}Stay at the forge until the work is done", ProjWaitCondition,
+                ShortLabels.Menu("{=!}Stay until the work is done", "{=!}Stay at the forge until the work is done"), ShortLabels.Tip(ProjWaitCondition, "Stay at the forge until the work is done."),
                 delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_project_wait"); }, false, 1);
 
             // JEDNO wejscie dla wszystkich napraw (Jeff: "sprawdz czy opcje maja
             // sens i czy czegos nie wywalic" - piec pozycji naprawczych na glownym
             // menu mylilo, teraz siedza pod warsztatem)
             starter.AddGameMenuOption(Menu, "arm_mend_bench",
-                "{=!}The mending bench - your gear and the men's", MendBenchCondition,
+                ShortLabels.Menu("{=!}The mending bench", "{=!}The mending bench - your gear and the men's"), ShortLabels.Tip(MendBenchCondition, "Mend your own gear and the men's."),
                 delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(MendMenu); }, false, 2);
 
             // tygiel WYPADL z tego menu (Jeff 27.08: "smelt mozna robic
@@ -95,10 +95,10 @@ namespace Armoury
             // (SmeltTab z nasza nauka wzorow). Kod zostaje na zapas.
 
             starter.AddGameMenuOption(Menu, "arm_takeapart",
-                "{=!}Take a piece apart to copy its pattern", TakeApartCondition, TakeApartConsequence, false, 4);
+                ShortLabels.Menu("{=!}Take a piece apart to copy it", "{=!}Take a piece apart to copy its pattern"), ShortLabels.Tip(TakeApartCondition, "Take a piece apart to copy its pattern."), TakeApartConsequence, false, 4);
 
             starter.AddGameMenuOption(Menu, "arm_order_kit",
-                "{=!}Order kit for the men - the smith procures it", OrderKitCondition, OrderKitConsequence, false, 6);
+                ShortLabels.Menu("{=!}Order kit for the men", "{=!}Order kit for the men - the smith procures it"), ShortLabels.Tip(OrderKitCondition, "The smith procures it."), OrderKitConsequence, false, 6);
 
             // ---- warsztat naprawczy ----
             starter.AddGameMenu(MendMenu,
@@ -106,22 +106,22 @@ namespace Armoury
                 OnMenuInit, GameMenu.MenuOverlayType.SettlementWithBoth);
 
             starter.AddGameMenuOption(MendMenu, "arm_kit_report",
-                "{=!}Muster the men's kit - the quartermaster's report", KitReportCondition, KitReportConsequence, false, 0);
+                ShortLabels.Menu("{=!}The quartermaster's report", "{=!}Muster the men's kit - the quartermaster's report"), ShortLabels.Tip(KitReportCondition, "Muster the men's kit."), KitReportConsequence, false, 0);
 
             starter.AddGameMenuOption(MendMenu, "arm_mend_pick",
                 "{=!}Pick a damaged piece to mend", MendPickCondition, MendPickConsequence, false, 0);
 
             starter.AddGameMenuOption(MendMenu, "arm_selfrepair",
-                "{=!}Mend everything you wear - your own hands", SelfRepairCondition, SelfRepairConsequence, false, 1);
+                ShortLabels.Menu("{=!}Mend all you wear yourself", "{=!}Mend everything you wear - your own hands"), ShortLabels.Tip(SelfRepairCondition, "Mend everything you wear with your own hands."), SelfRepairConsequence, false, 1);
 
             starter.AddGameMenuOption(MendMenu, "arm_repair",
-                "{=!}Mend everything you wear - the smith's price", RepairCondition, RepairConsequence, false, 1);
+                ShortLabels.Menu("{=!}Mend all you wear at the smith", "{=!}Mend everything you wear - the smith's price"), ShortLabels.Tip(RepairCondition, "Mend everything you wear at the smith's price."), RepairConsequence, false, 1);
 
             starter.AddGameMenuOption(MendMenu, "arm_mend_loot",
-                "{=!}Restore ALL battle-worn loot from your bags", MendLootCondition, MendLootConsequence, false, 2);
+                ShortLabels.Menu("{=!}Restore worn loot in your bags", "{=!}Restore ALL battle-worn loot from your bags"), ShortLabels.Tip(MendLootCondition, "Restore ALL battle-worn loot from your bags."), MendLootConsequence, false, 2);
 
             starter.AddGameMenuOption(MendMenu, "arm_mend_troops",
-                "{=!}Send the men's worn gear to the smith", MendTroopsCondition, MendTroopsConsequence, false, 3);
+                ShortLabels.Menu("{=!}Mend the men's worn gear", "{=!}Send the men's worn gear to the smith"), ShortLabels.Tip(MendTroopsCondition, "Send the men's worn gear to the smith."), MendTroopsConsequence, false, 3);
 
             starter.AddGameMenuOption(MendMenu, "arm_mend_back",
                 "{=!}Back to the forge", LeaveCondition,
@@ -134,8 +134,8 @@ namespace Armoury
                 GameMenu.MenuAndOptionType.WaitMenuHideProgressAndHoursOption,
                 GameMenu.MenuOverlayType.SettlementWithBoth);
             starter.AddGameMenuOption("arm_work_wait", "arm_work_stop",
-                "{=!}Put the work aside (pay only for what is finished)",
-                delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
+                ShortLabels.Menu("{=!}Put the work aside", "{=!}Put the work aside (pay only for what is finished)"),
+                ShortLabels.Tip(delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; }, "You pay only for what is finished."),
                 // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD, CLAUDE.md),
                 // a ExitToLast NISZCZY MenuContext (stosu menu nie ma - w miescie
                 // laduje sie w town_outside). Opcja tylko podnosi flage,
@@ -1572,14 +1572,19 @@ namespace Armoury
                     bool horse = type == ItemObject.ItemTypeEnum.Horse;
                     string label = type + "   (racks " + have + " / need " + need + ")"
                                  + (have < need ? "  - SHORT " + (need - have) : "");
+                    // n20-napisy: krotszy zapis stanu stojakow, pelne slowa w podpowiedzi
+                    label = ShortLabels.Pick(type + ": " + have + " of " + need + (have < need ? " - short " + (need - have) : ""), label);
                     elements.Add(new InquiryElement(type, label, null, !horse,
+                        ShortLabels.Hint("On the racks " + have + ", the men need " + need + ".",
                         horse ? "The smith does not deal in horseflesh - see the stables."
-                              : (have < need ? "The men lack " + (need - have) + " of these." : "Fully stocked - spares never hurt.")));
+                              : (have < need ? "The men lack " + (need - have) + " of these." : "Fully stocked - spares never hurt."))));
                 }
                 if (elements.Count == 0) { Log.Player("The men need nothing - there is no one to outfit.", true); return; }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
-                    "The Order Ledger", "What shall the smith procure for the men? Racks / need counts what the armoury holds against what they carry.",
+                    // n20-napisy (recenzja): opis zgodny z nowym zapisem wierszy "X: 12 of 100"
+                    "The Order Ledger", ShortLabels.Pick("What shall the smith procure for the men? \"12 of 100\" is what the armoury holds of what the men need.",
+                                                         "What shall the smith procure for the men? Racks / need counts what the armoury holds against what they carry."),
                     elements, true, 1, 1, "Choose", "Leave",
                     delegate (List<InquiryElement> sel)
                     {
@@ -1639,8 +1644,8 @@ namespace Armoury
                     var item = CheapestOf(type, t);
                     if (item == null) continue;
                     int per = OrderPieceCost(item);
-                    elements.Add(new InquiryElement(item, "Tier " + t + " - " + item.Name + ", " + per + " gold apiece",
-                        ItemPic(item), true, "The plainest sound piece of its grade. Market worth plus the smith's fee."));
+                    elements.Add(new InquiryElement(item, ShortLabels.Pick("Tier " + t + " - " + item.Name + ", " + per + " gold", "Tier " + t + " - " + item.Name + ", " + per + " gold apiece"),   // n20-napisy
+                        ItemPic(item), true, ShortLabels.Hint(per + " gold apiece.", "The plainest sound piece of its grade. Market worth plus the smith's fee.")));
                 }
                 if (elements.Count == 0) { Log.Player("No such kit is traded at any market the smith knows.", true); return; }
 
@@ -1673,8 +1678,10 @@ namespace Armoury
                     int total = per * n;
                     string label = n + " x " + item.Name + " - " + total + " gold"
                                  + (n == shortage ? "  (fills the shortage)" : "");
+                    // n20-napisy: nazwa sztuki jest w tytule okna; "fills the shortage" do podpowiedzi
+                    label = ShortLabels.Pick((n == 1 ? "1 piece" : n + " pieces") + " - " + total + " gold", label);
                     elements.Add(new InquiryElement(n, label, null, gold >= total,
-                        gold >= total ? "Straight onto the men's racks." : "Your purse comes up short."));
+                        ShortLabels.Hint(n == shortage ? "Fills the shortage." : null, gold >= total ? "Straight onto the men's racks." : "Your purse comes up short.")));
                 }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
@@ -1927,12 +1934,15 @@ namespace Armoury
                     if (rep == null) continue;                       // takiego tieru nie ma w handlu nigdzie
                     EquipmentElement first; int price;
                     int stock = ShelfStock(st, type, t, out first, out price);
+                    // n20-napisy: na przycisku tier, sztuka i cena; ile na straganach - w podpowiedzi
                     if (stock > 0)
-                        elements.Add(new InquiryElement(t, "Tier " + t + " - " + first.Item.Name + ", " + price + " gold off the stall (" + stock + " on the stalls)",
-                            ItemPic(first.Item), true, "The cheapest sound piece of its grade on the stalls of " + town + ", at the stall's own price - every further piece "
-                            + "at the price of the emptier stall. The smith asks " + fee + " gold a piece for his legwork."));
+                        elements.Add(new InquiryElement(t, ShortLabels.Pick("Tier " + t + " - " + first.Item.Name + ", " + price + " gold",
+                                                                            "Tier " + t + " - " + first.Item.Name + ", " + price + " gold off the stall (" + stock + " on the stalls)"),
+                            ItemPic(first.Item), true, ShortLabels.Hint(price + " gold off the stall, " + stock + " on the stalls.",
+                            "The cheapest sound piece of its grade on the stalls of " + town + ", at the stall's own price - every further piece "
+                            + "at the price of the emptier stall. The smith asks " + fee + " gold a piece for his legwork.")));
                     else
-                        elements.Add(new InquiryElement(t, "Tier " + t + " - none on the stalls of " + town,
+                        elements.Add(new InquiryElement(t, ShortLabels.Pick("Tier " + t + " - none on the stalls", "Tier " + t + " - none on the stalls of " + town),
                             ItemPic(rep), true, "Nothing of this grade lies on the stalls here. Ask anyway and the smith passes word of the want to the town's workshops - you pay nothing."));
                 }
                 if (elements.Count == 0) { Log.Player("No such kit is traded at any market the smith knows.", true); return; }
@@ -1977,6 +1987,9 @@ namespace Armoury
                     string hint = Pieces(k) + " for " + total + " gold - " + goods + " for the goods off the stall and " + fee + " for the smith's legwork: "
                                 + PickNames(plan, k, false) + "." + (k < n ? " The stalls hold no more - word of the other " + (n - k) + " goes to the workshops." : "")
                                 + (gold >= total ? "" : " Your purse comes up short.");
+                    // n20-napisy: rodzaj i tier sa w tytule okna; "fills the shortage" do podpowiedzi
+                    label = ShortLabels.Pick((n == 1 ? "1 piece" : n + " pieces") + " - " + total + " gold" + (k < n ? " (only " + k + ")" : ""), label);
+                    hint = ShortLabels.Hint(n == shortage ? "Fills the shortage." : null, hint);
                     elements.Add(new InquiryElement(n, label, null, gold >= total, hint));
                 }
 
@@ -2753,6 +2766,9 @@ namespace Armoury
                                   (legendLocked ? "\n" + legendWhy : "");
                     string label = (legend ? "LEGEND - " : "") + item.Name + "   (tier " + RangedLore.TierOf(item) + ")" +
                                    (unknown ? "  - pattern unknown" : (locked ? "  - needs Smithing " + r.SkillNeeded : ""));
+                    // n20-napisy: wiersz z obrazkiem ma 333 px - krotszy zapis tieru i progu (pelne zdania sa juz w podpowiedzi)
+                    label = ShortLabels.Pick((legend ? "LEGEND - " : "") + item.Name + " (t" + RangedLore.TierOf(item) + ")"
+                                             + (unknown ? " - unknown" : (locked ? " - Smithing " + r.SkillNeeded : "")), label);
                     elements.Add(new InquiryElement(item, label, ItemPic(item),
                         !locked && hasMats && hasStamina && !legendLocked && !unknown, hint));
                 }

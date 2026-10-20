@@ -207,7 +207,7 @@ namespace Armoury
                 if (mem != null) more.Add(mem);
                 more.AddRange(DistrictWorks.PartLines(st, it.R.Main ? null : it.R.Uid, false));   // inwest (ui_text 4): zajecie i prace w "Hear more"
                 if (more.Count > 0) sb.Append("\n\n").Append(string.Join("\n", more.ToArray()));
-                InformationManager.ShowInquiry(new InquiryData(it.R.Name ?? "?", sb.ToString(), true, true, VillageTexts.Make(VillageTexts.DistBack).ToString(),
+                InformationManager.ShowInquiry(new InquiryData(it.R.Name ?? "?", sb.ToString(), true, true, VillageTexts.Make(ShortLabels.Pick(VillageTexts.DistBackShort, VillageTexts.DistBack)).ToString(),   // n20-napisy
                     VillageTexts.Make(VillageTexts.DistClose).ToString(), delegate { Open(st); }, null), true);
             }
             catch (Exception e) { Stumble("HearMore " + (it != null && it.R != null ? (it.R.Uid ?? it.R.Name) : "?"), e); }

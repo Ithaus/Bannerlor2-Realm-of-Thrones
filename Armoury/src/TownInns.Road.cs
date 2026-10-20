@@ -134,16 +134,18 @@ namespace Armoury
                 string why;
                 if (!RoadAllowed(inn, out why))
                 {
-                    MBTextManager.SetTextVariable("ARM_ROADINN_Q" + q, QName[q] + " (" + QWhat[q] + ")");
+                    MBTextManager.SetTextVariable("ARM_ROADINN_Q" + q, ShortLabels.Pick(QName[q], QName[q] + " (" + QWhat[q] + ")"));   // n20-napisy
                     args.IsEnabled = false;
-                    args.Tooltip = new TextObject("{=!}" + why);
+                    args.Tooltip = new TextObject("{=!}" + why + (ShortLabels.On ? "\n" + QName[q] + ": " + QWhat[q] + "." : ""));
                     return true;
                 }
                 var b = Plan(null, q, false, false);
                 int men = b.Foot + b.Mounted;
-                MBTextManager.SetTextVariable("ARM_ROADINN_Q" + q, QName[q] + " (" + QWhat[q] + ") - " + b.Total + " d: you " + b.PlayerCost
-                                                                 + (men > 0 ? ", the men " + b.MenCost : "") + (b.Comp.Count > 0 ? ", companions " + b.CompCostSum : ""));
+                string split = b.Total + " d: you " + b.PlayerCost + (men > 0 ? ", the men " + b.MenCost : "") + (b.Comp.Count > 0 ? ", companions " + b.CompCostSum : "");
+                // n20-napisy: na przycisku rodzaj noclegu i suma; co daje i kto ile placi - pierwsza linia podpowiedzi
+                MBTextManager.SetTextVariable("ARM_ROADINN_Q" + q, ShortLabels.Pick(QName[q] + " - " + b.Total + " d", QName[q] + " (" + QWhat[q] + ") - " + split));
                 var t = new StringBuilder();
+                if (ShortLabels.On) t.Append(QName[q]).Append(" (").Append(QWhat[q]).Append(") - ").Append(split).Append(".\n");
                 t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(PRoom[q]).Append(" d your room.");
                 if (men > 0)
                 {

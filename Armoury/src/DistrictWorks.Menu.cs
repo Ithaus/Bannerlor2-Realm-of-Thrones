@@ -155,6 +155,14 @@ namespace Armoury
                                    + Math.Round(100 * q.ShareDist).ToString("0", Inv) + "%";
                     if (q.Allowed) title += " - full kit " + Math.Round(q.KitPer * q.S).ToString("N0", Inv) + " - first coins about " + Math.Round(100 * ret).ToString("0", Inv) + "% a year" + (q.Main ? ", burns last" : "");
                     else title += " - " + q.Why;
+                    // n20-napisy: na przycisku wioska, zajecie i zysk pierwszych monet (albo "closed"); reszta dawnego napisu na gorze podpowiedzi;
+                    // recenzja: "up to" - to zysk krancowy pierwszych monet (najwyzszy), nie calej wplaty
+                    string shortTitle = (q.Name ?? "?") + " - " + (m != null ? m.Name : "?") + (q.Allowed ? " - up to " + Math.Round(100 * ret).ToString("0", Inv) + "% a year" : " - closed");
+                    string moved = (q.Main ? "Main village" : place.Length > 0 ? "Side village, " + place : "Side village") + ": " + Math.Round(q.N) + " homesteads, "
+                                   + Math.Round(100 * q.ShareDist).ToString("0", Inv) + "% of the district."
+                                   + (q.Allowed ? " Full kit " + Math.Round(q.KitPer * q.S).ToString("N0", Inv) + "; the first coins earn about " + Math.Round(100 * ret).ToString("0", Inv) + "% a year"
+                                                  + (q.Main ? "; burns last." : ".") : "");
+                    title = ShortLabels.Pick(shortTitle, title);
                     var hint = new StringBuilder();
                     hint.Append(q.Name).Append(q.Main ? ", the main village: " : ", a side village: ").Append(m != null ? m.GoodsText : "?").Append(". ")
                         .Append(Math.Round(q.S)).Append(" of ").Append(Math.Round(q.N)).Append(" homesteads standing, ").Append(Math.Round(q.Home).ToString("N0", Inv)).Append(" people. Makes ")
@@ -162,7 +170,7 @@ namespace Armoury
                     if (q.WKind >= 0) hint.Append(" Works: ").Append(KindName[q.WKind]).Append(", ready in ").Append(KReady[q.WKind]).Append(" days.");
                     hint.Append(" Works here now: ").Append(q.UEff > 0 ? Math.Round(100 * Math.Min(1, q.S > 0 ? q.UEff / q.S : 0)) + "% of a full kit (yours " + Math.Round(100 * Math.Min(1, q.S > 0 ? q.UMine / q.S : 0)) + "%)." : "none.");
                     if (!q.Allowed && q.Why != null) hint.Append("\n").Append(q.Why);
-                    list.Add(new InquiryElement(new Pick { Kind = 0, Uid = q.Uid }, title, null, q.Allowed && v.VillageState != Village.VillageStates.Looted, hint.ToString()));
+                    list.Add(new InquiryElement(new Pick { Kind = 0, Uid = q.Uid }, title, null, q.Allowed && v.VillageState != Village.VillageStates.Looted, ShortLabels.Hint(moved, hint.ToString())));
                 }
                 // odbudowy gracza (ui_text 2: "Rebuild 3 homesteads: 1,500")
                 string pid = PlayerClanId();
@@ -177,12 +185,17 @@ namespace Armoury
                         if (cost <= 0) continue;
                         int dl = int.MaxValue; foreach (var rb in r.Rebs) dl = Math.Min(dl, rb.Deadline);
                         bool ok = me != null && me.Gold >= cost;
-                        list.Add(new InquiryElement(new Pick { Kind = 1, Uid = q.Uid, Units = u, Amount = cost }, "Rebuild your " + KindShort[r.Kind] + " in " + q.Name + ": " + cost.ToString("N0", Inv) + " (by day " + dl + ")",
-                                                    null, ok, ok ? "People are back in " + Math.Round(u, 1) + " homesteads. Same split as buying: wages to the villagers, materials at the market." : "You have " + (me != null ? me.Gold : 0).ToString("N0", Inv) + "."));
+                        // n20-napisy: termin odbudowy z napisu do podpowiedzi
+                        list.Add(new InquiryElement(new Pick { Kind = 1, Uid = q.Uid, Units = u, Amount = cost },
+                                                    ShortLabels.Pick("Rebuild " + KindShort[r.Kind] + " in " + q.Name + ": " + cost.ToString("N0", Inv),
+                                                                     "Rebuild your " + KindShort[r.Kind] + " in " + q.Name + ": " + cost.ToString("N0", Inv) + " (by day " + dl + ")"),
+                                                    null, ok, ShortLabels.Hint("Rebuild by day " + dl + ".", ok ? "People are back in " + Math.Round(u, 1) + " homesteads. Same split as buying: wages to the villagers, materials at the market." : "You have " + (me != null ? me.Gold : 0).ToString("N0", Inv) + ".")));
                     }
                 bool auto = AutoRebuild();
-                list.Add(new InquiryElement(new Pick { Kind = 2 }, "Automatic rebuilding: " + (auto ? "ON - click to switch off" : "OFF - click to switch on"), null, true,
-                                            "When people return to homesteads where your works burned, pay for them at once, as long as 30 days of your party's wages stay in your purse."));
+                // n20-napisy: "click to switch ..." z napisu do podpowiedzi
+                list.Add(new InquiryElement(new Pick { Kind = 2 }, ShortLabels.Pick("Automatic rebuilding: " + (auto ? "ON" : "OFF"), "Automatic rebuilding: " + (auto ? "ON - click to switch off" : "OFF - click to switch on")), null, true,
+                                            ShortLabels.Hint(auto ? "Choose it to switch it off." : "Choose it to switch it on.",
+                                                             "When people return to homesteads where your works burned, pay for them at once, as long as 30 days of your party's wages stay in your purse.")));
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Works in the " + dname + " district", sb.ToString(), list, true, 1, 1, "Choose", GameTexts.FindText("str_cancel").ToString(),
                     delegate (List<InquiryElement> sel)
                     {
@@ -267,7 +280,16 @@ namespace Armoury
                     if (k > gold) why = "You have " + gold.ToString("N0", Inv);
                     else if (k > q.Room + 0.5) why = "There is room for " + Math.Floor(q.Room).ToString("N0", Inv) + " more";
                     else if (k < min) why = "At least " + min.ToString("N0", Inv);
-                    list.Add(new InquiryElement(k, text, null, why == null, why ?? text));
+                    // n20-napisy: na przycisku kwota i dochod; przyrost towaru, rok i udzial w podpowiedzi (przy kwocie niedostepnej powod na gorze)
+                    // recenzja: kwota "still 12% on the last coin" to najwiecej przy 12% na ostatniej monecie, nie "najlepszy zakup" (mniejsze kwoty maja wyzszy procent)
+                    string tag = a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? " (all)" : a.Value == " (full kit)" ? " (full kit)" : " (last coin 12%)";
+                    string shortText = k.ToString("N0", Inv) + tag + " - " + inc.ToString("0.0", Inv) + " a day (" + Math.Round(100 * inc * 364 / Math.Max(1, k)) + "% a year)";
+                    string details = (a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? "All the gold you have. " : a.Value == " (full kit)" ? "Enough for the full kit. "
+                                      : "The most that still earns 12% a year on the last coin. ")
+                                   + "+" + (100 * b1).ToString("0.0", Inv) + "% " + craft + " in " + q.Name + ". About " + inc.ToString("0.0", Inv) + " a day, " + Math.Round(inc * 364).ToString("N0", Inv)
+                                   + " a year (" + Math.Round(100 * inc * 364 / Math.Max(1, k)) + "% of what you pay). " + (100 * myShare).ToString("0.0", Inv) + "% of its " + craft + " yours.";
+                    string rowHint = ShortLabels.On ? (why != null ? why + ".\n" + details : details) : (why ?? text);
+                    list.Add(new InquiryElement(k, ShortLabels.Pick(shortText, text), null, why == null, rowHint));
                 }
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(q.Name + " - " + KindName[q.WKind], sb.ToString(), list, true, 1, 1, "Pay", GameTexts.FindText("str_cancel").ToString(),
                     delegate (List<InquiryElement> sel)

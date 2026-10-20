@@ -314,7 +314,9 @@ namespace Armoury
                         string whyW; bool okW = MeetsReq(ch, ee.Item, out whyW);
                         int needW = NeedFor(ee.Item, men);
                         rows.Add(new InquiryElement(1000 + ws,
-                            ee.Item.Name + "  x1/" + needW + "  (t" + ((int)ee.Item.Tier + 1) + ")  [WORN BY YOU]",
+                            // n20-napisy (recenzja): wiersz z obrazkiem 333 px, najwyzej 2 linie - najdluzsza nazwa ROT z dopiskiem miala 3; krotszy dopisek
+                            ShortLabels.Pick(ee.Item.Name + " x1/" + needW + " (t" + ((int)ee.Item.Tier + 1) + ") [WORN]",
+                                             ee.Item.Name + "  x1/" + needW + "  (t" + ((int)ee.Item.Tier + 1) + ")  [WORN BY YOU]"),
                             SmithMenu.ItemPic(ee.Item), okW,
                             okW ? "You wear this now - assigning takes it OFF your back into the stores. "
                                   + SupplyLine(1, needW)
@@ -335,7 +337,8 @@ namespace Armoury
                         string why2; bool ok2 = MeetsReq(ch, it, out why2);
                         int needB = NeedFor(it, men);
                         rows.Add(new InquiryElement(it,
-                            it.Name + "  x" + el.Amount + "/" + needB + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
+                            ShortLabels.Pick(it.Name + " x" + el.Amount + "/" + needB + " (t" + ((int)it.Tier + 1) + ") [BAGGAGE]",   // n20-napisy j.w.
+                                             it.Name + "  x" + el.Amount + "/" + needB + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]"),
                             SmithMenu.ItemPic(it), ok2,
                             ok2 ? "In YOUR baggage - assigning moves them to the stores. " + SupplyLine(el.Amount, needB) : why2));
                     }

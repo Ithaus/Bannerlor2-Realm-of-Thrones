@@ -129,8 +129,9 @@ namespace Armoury
         {
             try
             {
-                starter.AddGameMenuOption("town", "arm_qohor_enter", "{=!}Seek out the Valyrian steel masters of Qohor",
-                    delegate (MenuCallbackArgs a)
+                // n20-napisy: krotkie napisy (ShortLabels), dawny pelny napis w podpowiedzi
+                starter.AddGameMenuOption("town", "arm_qohor_enter", ShortLabels.Menu("{=!}Seek out the masters of Qohor", "{=!}Seek out the Valyrian steel masters of Qohor"),
+                    ShortLabels.Tip(delegate (MenuCallbackArgs a)
                     {
                         a.optionLeaveType = GameMenuOption.LeaveType.Craft;
                         if (!InQohor()) return false;
@@ -138,20 +139,20 @@ namespace Armoury
                         int run = PlayerOrders().Count(o => !o.Ready), ready = PlayerOrders().Count(o => o.Ready);
                         if (run + ready > 0) a.Tooltip = new TextObject("{=!}" + (run > 0 ? run + " order(s) at the forge" : "") + (run > 0 && ready > 0 ? ", " : "") + (ready > 0 ? ready + " ready to collect" : "") + ".");
                         return true;
-                    },
+                    }, "The Valyrian steel masters of Qohor."),
                     delegate { GameMenu.SwitchToMenu(Menu); }, false, 5);
                 starter.AddGameMenu(Menu, "{=!}{ARM_QOHOR_TEXT}", delegate (MenuCallbackArgs a) { MBTextManager.SetTextVariable("ARM_QOHOR_TEXT", MastersText()); });
                 starter.AddGameMenuOption(Menu, "arm_qohor_one", "{=!}Have a blade reforged in a new form",
                     delegate (MenuCallbackArgs a) { return OrderCondition(a, 1); },
                     delegate { ChooseBlade(1); }, false, 0);
-                starter.AddGameMenuOption(Menu, "arm_qohor_two", "{=!}Have a greatsword reforged into two blades",
-                    delegate (MenuCallbackArgs a) { return OrderCondition(a, 2); },
+                starter.AddGameMenuOption(Menu, "arm_qohor_two", ShortLabels.Menu("{=!}Split a greatsword into two blades", "{=!}Have a greatsword reforged into two blades"),
+                    ShortLabels.Tip(delegate (MenuCallbackArgs a) { return OrderCondition(a, 2); }, "Have a greatsword reforged into two blades."),
                     delegate { ChooseBlade(2); }, false, 1);
-                starter.AddGameMenuOption(Menu, "arm_qohor_own", "{=!}Have a blade forged to your own design and name",
-                    delegate (MenuCallbackArgs a) { return OwnCondition(a); },
+                starter.AddGameMenuOption(Menu, "arm_qohor_own", ShortLabels.Menu("{=!}Forge a blade of your own design", "{=!}Have a blade forged to your own design and name"),
+                    ShortLabels.Tip(delegate (MenuCallbackArgs a) { return OwnCondition(a); }, "Have a blade forged to your own design and name."),
                     delegate { OwnChooseBlade(); }, false, 1);
-                starter.AddGameMenuOption(Menu, "arm_qohor_waitopt", "{=!}Wait in Qohor until the masters are done",
-                    delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Wait; return PlayerOrders().Any(o => !o.Ready); },
+                starter.AddGameMenuOption(Menu, "arm_qohor_waitopt", ShortLabels.Menu("{=!}Wait until the masters are done", "{=!}Wait in Qohor until the masters are done"),
+                    ShortLabels.Tip(delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Wait; return PlayerOrders().Any(o => !o.Ready); }, "Wait in Qohor until the masters are done."),
                     delegate { GameMenu.SwitchToMenu(WaitMenu); }, false, 2);
                 starter.AddGameMenuOption(Menu, "arm_qohor_collect", "{=!}Collect your reforged steel",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Trade; return PlayerOrders().Any(o => o.Ready); },
@@ -444,8 +445,14 @@ namespace Armoury
             {
                 var run = PlayerOrders().Where(o => !o.Ready).ToList();
                 if (run.Count == 0) return;
-                var els = run.Select(o => new InquiryElement(o, Describe(o) + " - " + o.DaysLeft + " day(s) left", SmithMenu.ItemPic(ValyrianBlades.Item(o.InIds[0])), true,
-                                                             "The fee of " + o.Fee + " gold is not returned.")).ToList();
+                // n20-napisy (recenzja): wiersz z obrazkiem ma 333 px i najwyzej 2 linie - "X into Y and Z" z nazwami ROT mialo 3 linie;
+                // na przycisku klinga oddana mistrzom i dni, pelny opis zlecenia na gorze podpowiedzi
+                var els = run.Select(o => new InquiryElement(o,
+                                                             ShortLabels.Pick(NameOf(o.InIds[0]) + (o.InIds.Count > 1 ? " +" + (o.InIds.Count - 1) : "") + " - "
+                                                                              + (o.DaysLeft == 1 ? "1 day left" : o.DaysLeft + " days left"),
+                                                                              Describe(o) + " - " + o.DaysLeft + " day(s) left"),
+                                                             SmithMenu.ItemPic(ValyrianBlades.Item(o.InIds[0])), true,
+                                                             ShortLabels.Hint(Describe(o) + ".", "The fee of " + o.Fee + " gold is not returned."))).ToList();
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "The Masters of Qohor", "Which blade do you take back as it was?", els, true, 1, 1, "Take it back", "Leave it with them",
                     delegate (List<InquiryElement> sel)

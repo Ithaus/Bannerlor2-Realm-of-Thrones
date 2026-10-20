@@ -775,6 +775,8 @@ namespace Armoury
             {
                 int pm = Math.Max(1, (int)Math.Round(p.M));
                 nxt = VillageTexts.Make(pm >= 2 ? VillageTexts.RaidNextMany : VillageTexts.RaidNext, "M", pm, "DAYS", DaysText(p.Work / rate)).ToString();
+                // n20-napisy: przycisk okna ma 164 px - dawny napis ("Raid the next settlement (about N days)") idzie do tekstu okna, na przycisku "Raid on"
+                if (ShortLabels.On) { body += "\n\n" + nxt + "."; nxt = VillageTexts.Make(VillageTexts.RaidNextShort).ToString(); }
             }
             if (ss.Shown) _dShownAgain++; else { _dShown++; if (!next) _dNoNext++; }
             ss.Shown = true;
