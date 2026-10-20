@@ -158,7 +158,7 @@ namespace Armoury
 
             starter.AddGameMenuOption(Menu, "arm_leave",
                 "{=!}Wipe your hands and step out", LeaveCondition,
-                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("town"); }, true, 9);
+                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(TownMenus.BackTo("arm_enter")); }, true, 9);   // m95-menu: do "Go to the smithy", gdy wejscie tam przeniesione
 
             starter.AddWaitGameMenu("arm_project_wait",
                 "{=!}{ARM_PROJ_TEXT}",

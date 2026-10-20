@@ -168,7 +168,7 @@ namespace Armoury
                     delegate { TakeBack(); }, false, 4);
                 starter.AddGameMenuOption(Menu, "arm_qohor_leave", "{=!}Leave",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate { GameMenu.SwitchToMenu("town"); }, true, 9);
+                    delegate { GameMenu.SwitchToMenu(TownMenus.BackTo("arm_qohor_enter")); }, true, 9);   // m95-menu: do "Go to the smithy", gdy wejscie tam przeniesione
 
                 starter.AddWaitGameMenu(WaitMenu, "{=!}{ARM_QOHOR_WAIT_TEXT}", WaitInit, delegate (MenuCallbackArgs a) { return true; }, null, WaitTick,
                     GameMenu.MenuAndOptionType.WaitMenuShowProgressAndHoursOption, GameMenu.MenuOverlayType.SettlementWithBoth);

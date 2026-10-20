@@ -520,6 +520,19 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnMissionBehaviorInitialize", e); }
         }
 
+        /// <summary>m95-menu: po OnSessionLaunched i OnAfterSessionLaunched wszystkich zachowan (Campaign.DoLoadingForGameType -> GameManager), przed pierwszym
+        /// pokazaniem menu - porzadek menu miasta (TownMenus.Apply, klucz TownMenuTidy). Nowa kampania i wczytanie zapisu - ta sama droga.</summary>
+        public override void OnAfterGameInitializationFinished(Game game, object starterObject)
+        {
+            base.OnAfterGameInitializationFinished(game, starterObject);
+            try
+            {
+                if (game != null && game.GameType is Campaign && Campaign.Current != null)
+                    TownMenus.Apply(starterObject as CampaignGameStarter);
+            }
+            catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (TownMenus)", e); }
+        }
+
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             base.OnGameStart(game, gameStarterObject);

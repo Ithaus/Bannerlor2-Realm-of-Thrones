@@ -409,7 +409,7 @@ namespace Armoury
                 starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}Listen to the gossip", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
                 starter.AddGameMenuOption(Menu, "arm_inn_back", "{=!}Back to the town",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("town"); }, true, 9);
+                    delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(TownMenus.BackTo("arm_inn_enter")); }, true, 9);   // m95-menu: do dzielnicy karczm, gdy wejscie tam przeniesione
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }

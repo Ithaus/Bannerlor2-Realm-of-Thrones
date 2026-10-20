@@ -3738,6 +3738,15 @@ namespace Armoury
         // krolestwa albo jednego z jego rodow), do zalogi. Ludzie prawdziwi - przeniesienie loch -> zaloga. Nowy klucz (MCM Jeffa trzyma stare). Zapis juz przywrocony - nic.
         public bool BookHoldingsFreeOwnPrisoners = true;   // with Book Holdings Restore: right after each returned keep changes hands, the common prisoners in its dungeon who are soldiers of the new lord's realm (troops of the culture of the realm or of one of its houses, never bandits) are set free and join its garrison - the same men, none made or lost; every other prisoner stays in the dungeon (lords of the new lord's side are freed by the game itself). The freed men come without their arms, which their captors took; the garrison buys what is missing as for any new man. Only on the one-time restore - a save already restored is not touched; off = all common prisoners stay in the dungeon as before
 
+        // --- The town menu ---
+        // m95-menu (Jeff 20.10, zrzut menu miasta Seagard: "czy nie mozemy jakos posegregowac te opcje w miescie ... spanie w tawernie powinno byc go to inn district
+        // i wszystko tam powinno byc. Forge powinno byc w forge ... Trzeba to uporzadkowac."): TownMenus.cs - raz na sesje, po rejestracji menu wszystkich modow
+        // (SubModuleMain.OnAfterGameInitializationFinished), opcje menu miasta przechodza (te same obiekty, warunki i skutki bez zmian) do podmenu: nocleg i informatorzy
+        // -> "Go to the tavern district" (gra); kuznia gry, nasza kuznia, naprawa RB, zbrojownia DTE, Qohor -> "Go to the smithy"; dniowka i warta RC -> "Look for paid
+        // work"; ksiegi, Living Economy, Banner Kings, dom, pozyczka, turniej, sprzet zalogi -> "Town affairs". Wylaczony = menu jak dotad (od nastepnego wczytania).
+        // Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
+        public bool TownMenuTidy = true;                   // the town menu is put in order: the inn and the local informants move into "Go to the tavern district"; the game's smithy, your forge, the local blacksmith's repairs, the armory and the masters of Qohor into a new "Go to the smithy"; day labour and the night watch into "Look for paid work"; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into "Town affairs". Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");
