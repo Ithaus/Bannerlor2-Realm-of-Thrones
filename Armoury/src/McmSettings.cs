@@ -932,11 +932,11 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsNoFreeGold { get; set; } = true;
 
-        [SettingPropertyBool("Hist Fence Min Old Coin", HintText = "the Spoils of War fence's lowest item worth (Fence Min Item Value) is compared with a piece's worth before the historical repricing - otherwise he refuses almost every ordinary weapon. The price he pays stays the same", RequireRestart = false)]
+        [SettingPropertyBool("Hist Fence Min Old Coin", HintText = "the Spoils of War fence's lowest item worth (Fence Min Item Value) is compared with a piece's worth before the historical repricing, or with today's worth when that is higher - the same in the fence menu, in his offer and in the sale - otherwise he refuses almost every ordinary weapon. The price he pays stays the same", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool HistFenceMinOldCoin { get; set; } = true;
 
-        [SettingPropertyBool("Hist Donate Renown Old Coin", HintText = "renown for gear you give to your Spoils of War company counts the pieces sold at their worth before the historical repricing - otherwise it is 20-30 times smaller. The coin paid stays the same", RequireRestart = false)]
+        [SettingPropertyBool("Hist Donate Renown Old Coin", HintText = "renown for gear you give to your Spoils of War company counts each piece sold at its worth before the historical repricing, or at today's worth when that is higher - otherwise it is 20-30 times smaller. The coin paid stays the same", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool HistDonateRenownOldCoin { get; set; } = true;
 
@@ -2640,9 +2640,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistBanditHideoutScoreOldCoin { get; set; } = true;
 
-        [SettingPropertyBool("Hist Hideout Loot Old Coin", HintText = "the extra goods you find after a night raid on a hideout are counted at their worth before the historical repricing - otherwise the game's sum buys many times more goods out of nothing. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyBool("Hist Hideout Loot Old Coin", HintText = "the extra goods you find after a night raid on a hideout are counted at their worth before the historical repricing, never as worth less than the game counts them (so never more goods than without it) - otherwise the game's sum buys many times more goods out of nothing. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistHideoutLootOldCoin { get; set; } = true;
+
+        [SettingPropertyBool("Hist Old Coin From Definition", HintText = "for every rule that counts in the old coin (quest quantities, Roguery and Trade XP, the AI's and bandits' loot weights, hideout goods, the fence, company renown) the worth before the historical repricing of the Banner Kings goods that a Realm of Thrones patch divides by 100 (fur 125 becomes 1, gold ingot 1000 becomes 10, ink 200 becomes 2) is taken from the worth they were defined with - otherwise these goods count as worth 1-10 and, for one, the gang's stolen-goods quest can ask for thousands of furs. Off = the worth at load, as before. Switching it mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistOldCoinFromDefinition { get; set; } = true;
 
         [SettingPropertyBool("Hist Research From Old Value", HintText = "smithing part research (new parts for a weapon class) counts from a piece's worth before the historical repricing, as smithing XP already does - otherwise a forged sword worth 21 pence instead of 1105 gives almost no research and no new parts unlock", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -8748,6 +8752,7 @@ namespace Armoury
             s.HistAiLootScoreOldCoin = HistAiLootScoreOldCoin;
             s.HistBanditHideoutScoreOldCoin = HistBanditHideoutScoreOldCoin;
             s.HistHideoutLootOldCoin = HistHideoutLootOldCoin;
+            s.HistOldCoinFromDefinition = HistOldCoinFromDefinition;
             s.HistResearchFromOldValue = HistResearchFromOldValue;
             s.HistUniquePrestige = HistUniquePrestige;
             s.HistBulkUnitFactor = HistBulkUnitFactor;

@@ -525,8 +525,9 @@ namespace Armoury
             {
                 var el = bag.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
-                if (it == null || el.Amount <= 0 || !IsLooted(el.EquipmentElement.ItemModifier) || Wyceny20.FenceWorth(it, el.Amount, min) < min) continue;   // n20-wyceny (klucz Hist Fence Min Old Coin): prog Spoils w starej monecie wobec wartosci sprzed przeliczenia; bez klucza - Value
+                if (it == null || el.Amount <= 0 || !IsLooted(el.EquipmentElement.ItemModifier) || Wyceny20.FenceWorth(it) < min) continue;   // n20-wyceny (klucz Hist Fence Min Old Coin): prog Spoils w starej monecie wobec wartosci sprzed przeliczenia (albo dzisiejszej, gdy wyzsza) - ta sama funkcja co w menu Spoils (transpiler Wyceny20.HookF); bez klucza - Value
                 if (cat != FenceAll && Convert.ToInt32(_mFenceCat.Invoke(null, new object[] { it })) != cat) continue;
+                Wyceny20.FenceNote(it, el.Amount, min);                    // recenzja 20.10: licznik linii "Paser (n20)" PO filtrze kategorii
                 float r = rate * (float)_mTypeCoef.Invoke(null, new object[] { it }) * bulk;
                 if (bargain) r += bonus;
                 r = MathF.Clamp(r * 0.22f, 0.05f, 0.95f);

@@ -243,10 +243,32 @@ namespace Armoury
         /// nie-cenowych liczonych na sztuki (ilosci w zadaniach, XP Lotrostwa) - ta sama ilosc towaru co w zamysle gry.</summary>
         internal static int OrigUnit(ItemObject it)
         {
-            int o = Orig(it);
+            int o;
+            if (it != null && _orig.TryGetValue(it, out o)) { if (OldCoinFromDef) o = DemandBase(it, o); }   // n20-wyceny (recenzja, klucz HistOldCoinFromDefinition): towar BK podzielony przez BKROTPatch (futro 125 -> 1) - stara moneta z definicji
+            else o = MaterialLaw.Orig(it);
             if (o <= 0) return o;
             float k = CountScale(it);
             return k > 1.001f || k < 0.999f ? Math.Max(1, (int)Math.Round(o * (double)k)) : o;
+        }
+
+        /// <summary>n20-wyceny (recenzja 20.10): BKROTPatch dzieli wartosc kazdego towaru BK przez 100 (liczby calkowite) ZANIM przeliczymy ceny, wiec
+        /// wartosc z chwili Apply (Orig) to dla nich artefakt (futro 1, sztaba zlota 10, atrament 2, miod pitny 1). Przy kluczu OrigUnit bierze dla
+        /// przedmiotow przeliczonych (_orig) wartosc z definicji - ta sama regula i te same dane co popyt (DemandBase: definicja, jesli od niej nikt
+        /// wartosci nie zmienil inaczej). Przedmioty nieprzeliczone - bez zmian (OrigUnit = Value, reguly starej monety ich nie ruszaja).
+        /// Odczyt slownikow wypelnionych przed Apply (watki AI partii tylko czytaja).</summary>
+        internal static bool OldCoinFromDef { get { var s = Settings.Current; return s != null && s.HistOldCoinFromDefinition; } }
+
+        /// <summary>Linia startu Wyceny20: przedmioty, ktorym stara moneta idzie z definicji (wartosc z chwili Apply -> z definicji).</summary>
+        internal static string OldCoinFromDefList(out int count)
+        {
+            var l = new List<string>();
+            foreach (var kv in _orig)
+            {
+                int d = DemandBase(kv.Key, kv.Value);
+                if (d != kv.Value) l.Add(kv.Key.StringId + " " + kv.Value + " -> " + d);
+            }
+            count = l.Count;
+            return string.Join(", ", l.ToArray());
         }
 
         private static float MetalPerKg(CraftingMaterials g)

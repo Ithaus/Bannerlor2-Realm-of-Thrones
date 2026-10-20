@@ -35,13 +35,18 @@ namespace Armoury
     ///  D (pkt 16) HistHideoutLootOldCoin: HideoutCampaignBehavior.OnCollectLootItems (nocny atak gracza na kryjowke) doklada towar z niczego do celu
     ///    min(lup x populacja x 135, 4750) w starej monecie, liczac kazda sztuke jako GetTheoreticalMaxItemMarketValue + 1 (Value x 10 albo x 1.3) - po
     ///    nowych cenach kilka-kilkadziesiat razy wiecej sztuk. Transpiler: wywolania GetItemValueForHideoutLoot w metodzie i w lambdzie wyboru -> HideoutValue
-    ///    (wynik gry x OrigUnit / Value). Lista towarow gry (_potentialLootItems) powstaje w OnSessionLaunched gry - bez zmian.
+    ///    (wynik gry x OrigUnit / Value), NIGDY mniej niz wynik gry (recenzja 20.10: sztuka tansza dawniej niz dzis liczylaby sie taniej i gra
+    ///    dokladalaby WIECEJ towaru z niczego niz bez klucza). Lista towarow gry (_potentialLootItems) powstaje w OnSessionLaunched gry - bez zmian.
     ///  E (pkt 18) BookGoalTrade: cel BK "Acquire Book" (AcquireBookDecision) bral Value x 30 (ksiazka 1 000 -> 30 000; u ksiegarza po Book Price Fix 1 000),
     ///    zloto w nicosc, ksiazka z niczego. Transpiler ShowInquiry / ApplyGoal: stala 30 -> BookMul() (1 przy kluczu); prefiks ApplyGoal - to samo kupno co
     ///    u ksiegarza (CraftOrders8.BookBuyPrefix): cena z listy, zloto do ksiegarza, ksiazka z jego oferty. Tylko przy Book Price Fix (inaczej Value x 1000
     ///    u ksiegarza i x1 bylby za tani).
     ///  F (pkt 22) HistFenceMinOldCoin i G (pkt 23) HistDonateRenownOldCoin - nasz kod SpoilsSeal (FenceSale, Donate): prog pasera i slawa daru od wartosci
-    ///    sprzed przeliczenia (pomocniki FenceWorth / OldWorth tutaj).
+    ///    sprzed przeliczenia, a gdy dzisiejsza wyzsza - od dzisiejszej (pomocniki FenceWorth / OldWorth tutaj). Recenzja 20.10: menu pasera Spoils
+    ///    (CalculateFenceOffer - oferta, kategorie, licznik do rabatu ilosciowego; CalculateMerchantEstimate; ExecuteFenceSale Spoils, gdy SpoilsSeal
+    ///    go nie przejmuje) liczylo prog dalej od Value - transpiler podmienia TYLKO odczyt wartosci stojacy w porownaniu z progiem
+    ///    (get_Value, ldloc prog, blt/bge) na FenceWorth; cena Value x stawka bez zmian. Menu, oferta i sprzedaz licza te same sztuki.
+    ///  Stara moneta towarow BK (klucz HistOldCoinFromDefinition, HistoricalPrices.OrigUnit): wartosc z definicji zamiast artefaktu BKROTPatch (/100).
     ///  Pkt 13 (Spoils: niszczenie drogich sztuk w bitwie > 5000) - NIE zmieniane: u Jeffa DestructionChanceMultiplier = 0.0 (RealisticLootSettings.json),
     ///  szansa = min(0.95, 0.3/0.5/0.7 x 0) = 0 - nic nie ginie, prog bez znaczenia.
     /// Log: start sesji "Wyceny (n20, klucz ...)" z "wpiete N/M"; doba "Handel z warsztatu (n20)", "Lup AI (n20)", "Kryjowki band (n20)"; zdarzenia
@@ -294,8 +299,9 @@ namespace Armoury
             try
             {
                 int v = item.Value, o = HistoricalPrices.OrigUnit(item);
-                if (v <= 0 || o <= 0 || o == v) return g;
-                return Math.Max(1, (int)Math.Round((g - 1) * (double)o / v) + 1);
+                if (v <= 0 || o <= v) return g;                               // recenzja 20.10: dawniej tansza (albo bez zapisu) - wynik gry, nigdy wiecej towaru niz bez klucza
+                long c = (long)Math.Round((g - 1) * (double)o / v) + 1;
+                return c > g ? (int)Math.Min(c, int.MaxValue) : g;
             }
             catch (Exception e) { Stumble(ref _stD, "HideoutValue", e); return g; }
         }
@@ -536,19 +542,79 @@ namespace Armoury
         // ============================================================ F, G. paser i dar dla kompanii Spoils (pkt 22, 23 - nasz SpoilsSeal)
 
         private static int _fExtra, _fLines, _gLines;
+        private static bool _triedF; private static int _hookedF, _swapsF; private static string _statusF = "";
 
-        /// <summary>SpoilsSeal.FenceSale: wartosc sztuki do progu Fence Min Item Value (stara moneta Spoils) - sprzed przeliczenia przy kluczu.</summary>
-        internal static int FenceWorth(ItemObject it, int amount, int min)
+        /// <summary>Wartosc sztuki do progu Fence Min Item Value (stara moneta Spoils): przy kluczu wieksza z wartosci sprzed przeliczenia i dzisiejszej
+        /// (paser nie odrzuca niczego, co bral bez klucza); bez klucza - Value. Wolane z SpoilsSeal.FenceSale i z IL Spoils (menu, oferta, sprzedaz Spoils)
+        /// zamiast ItemObject.get_Value przy porownaniu z progiem. Null - ten sam wyjatek co Spoils.</summary>
+        public static int FenceWorth(ItemObject it)
         {
             int v = it.Value;
             if (!FenceOn) return v;
             try
             {
                 int o = OldUnit(it);
-                if (v < min && o >= min) _fExtra += Math.Max(0, amount);
-                return o;
+                return o > v ? o : v;
             }
             catch (Exception e) { Stumble(ref _stFG, "FenceWorth", e); return v; }
+        }
+
+        /// <summary>SpoilsSeal.FenceSale po filtrze kategorii: sztuka w ofercie, ktora dzisiejsza wartosc by odrzucila (do linii "Paser (n20)").</summary>
+        internal static void FenceNote(ItemObject it, int amount, int min)
+        {
+            try { if (FenceOn && it != null && it.Value < min) _fExtra += Math.Max(0, amount); }
+            catch (Exception e) { Stumble(ref _stFG, "FenceNote", e); }
+        }
+
+        public static IEnumerable<CodeInstruction> FenceIl(IEnumerable<CodeInstruction> instructions)
+        {
+            var list = new List<CodeInstruction>(instructions);
+            var to = AccessTools.Method(typeof(Wyceny20), nameof(FenceWorth));
+            int n = 0;
+            for (int i = 0; i + 2 < list.Count; i++)
+            {
+                if (_getValue == null || to == null || !IsGetValue(list[i], _getValue) || !list[i + 1].IsLdloc()) continue;
+                var op = list[i + 2].opcode;   // IL Spoils 1.4.8: get_Value, ldloc prog, blt / bge (porownanie z progiem); cena: get_Value, conv.r4 - nie ruszana
+                if (op != OpCodes.Blt && op != OpCodes.Blt_S && op != OpCodes.Bge && op != OpCodes.Bge_S && op != OpCodes.Clt && op != OpCodes.Cgt) continue;
+                list[i].opcode = OpCodes.Call; list[i].operand = to; n++;
+            }
+            _swapsF = n;
+            return list;
+        }
+
+        private static void HookF()
+        {
+            var s = Settings.Current;
+            const string K = "Wyceny (n20, klucz Hist Fence Min Old Coin, menu Spoils): ";
+            if (_triedF) { Log.Info(K + (FenceOn ? "CZYNNE" : "NIECZYNNE (klucz albo ceny historyczne wylaczone)") + " - " + _statusF + "."); return; }
+            if (s == null || !s.HistFenceMinOldCoin || !HistoricalPrices.On)
+            {
+                Log.Info(K + (s != null && s.HistFenceMinOldCoin ? "ceny historyczne wylaczone" : "WYLACZONE (MCM)") + " - nic nie wpiete, prog pasera w menu Spoils od dzisiejszej wartosci.");
+                return;
+            }
+            var t = AccessTools.TypeByName("RealisticLoot.Behaviors.LootCollectionBehavior");
+            if (t == null) { Log.Info(K + "Spoils of War nieobecny - nic do wpiecia."); return; }
+            _triedF = true;
+            var miss = new List<string>(); int swaps = 0;
+            var want = new[] { new KeyValuePair<string, int>("CalculateFenceOffer", 2), new KeyValuePair<string, int>("CalculateMerchantEstimate", 1), new KeyValuePair<string, int>("ExecuteFenceSale", 1) };
+            foreach (var w in want)
+            {
+                try
+                {
+                    MethodInfo m = null;
+                    foreach (var mm in t.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                        if (mm.Name == w.Key) { if (m != null) { m = null; miss.Add(w.Key + " (kilka przeciazen)"); break; } m = mm; }
+                    if (m == null) { if (!miss.Exists(x => x.StartsWith(w.Key, StringComparison.Ordinal))) miss.Add(w.Key + " BRAK"); continue; }
+                    _swapsF = 0;
+                    _h.Patch(m, transpiler: new HarmonyMethod(typeof(Wyceny20), nameof(FenceIl)));
+                    swaps += _swapsF;
+                    if (_swapsF == w.Value) _hookedF++; else miss.Add(w.Key + " (porownan z progiem " + _swapsF + "/" + w.Value + ")");
+                }
+                catch (Exception e) { miss.Add(w.Key + " BLAD (" + e.GetType().Name + ")"); Stumble(ref _stFG, "HookF(" + w.Key + ")", e); }
+            }
+            _statusF = "wpiete " + _hookedF + "/3 (LootCollectionBehavior.CalculateFenceOffer / CalculateMerchantEstimate / ExecuteFenceSale: prog od wartosci sprzed przeliczenia, podmian " + swaps + ", oczekiwane 4)"
+                       + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "");
+            Log.Info(K + "menu, oferta i sprzedaz pasera licza te same sztuki - " + _statusF + ".");
         }
 
         /// <summary>Koniec FenceSale: linia, gdy prog sprzed przeliczenia wpuscil do oferty sztuki, ktore Value by odrzucilo.</summary>
@@ -573,9 +639,9 @@ namespace Armoury
             if (it == null) return 0;
             try
             {
-                int o = OldUnit(it);
-                if (el.ItemModifier != null) o = (int)((float)o * el.ItemModifier.PriceMultiplier);
-                return o;
+                int o = OldUnit(it), v = it.Value;
+                if (el.ItemModifier != null) { o = (int)((float)o * el.ItemModifier.PriceMultiplier); v = (int)((float)v * el.ItemModifier.PriceMultiplier); }
+                return o > v ? o : v;   // recenzja 20.10: nigdy mniej niz dzisiejsza wartosc (ten sam wzor co Donate)
             }
             catch (Exception e) { Stumble(ref _stFG, "OldWorth", e); return it.Value; }
         }
@@ -618,12 +684,21 @@ namespace Armoury
             try { HookC(); } catch (Exception e) { Stumble(ref _stC, "HookC", e); }
             try { HookD(); } catch (Exception e) { Stumble(ref _stD, "HookD", e); }
             try { HookE(); } catch (Exception e) { Stumble(ref _stE, "HookE", e); }
+            try { HookF(); } catch (Exception e) { Stumble(ref _stFG, "HookF", e); }
+            try
+            {
+                int nd; string ld = HistoricalPrices.OldCoinFromDefList(out nd);
+                Log.Info("Wyceny (n20, klucz Hist Old Coin From Definition): stara moneta towarow BK podzielonych przez BKROTPatch z definicji "
+                         + (HistoricalPrices.OldCoinFromDef ? "CZYNNE" : "WYLACZONE (MCM) - wartosc z chwili przeliczenia, jak w WGRANIU 88") + " - przedmiotow " + nd
+                         + (nd > 0 ? " [" + ld + "]" : "") + " (dotyczy regul f28 i n20: ilosci zadan, Lotrostwo, A-D, F, G).");
+            }
+            catch (Exception e) { Stumble(ref _stFG, "SessionStart(def)", e); }
             try
             {
                 var s = Settings.Current;
                 Log.Info("Wyceny (n20, klucze Hist Fence Min Old Coin / Hist Donate Renown Old Coin): paser Spoils - prog od wartosci sprzed przeliczenia "
                          + (FenceOn ? "CZYNNE" : "NIECZYNNE") + "; slawa daru dla kompanii Spoils od wartosci sprzed przeliczenia " + (RenownOn ? "CZYNNE" : "NIECZYNNE")
-                         + " (nasz kod SpoilsSeal, bez latek; Spoils No Free Gold " + (s != null && s.SpoilsNoFreeGold ? "wlaczone" : "WYLACZONE - SpoilsSeal nie przejmuje pasera i daru") + ").");
+                         + " (sprzedaz i dar - nasz kod SpoilsSeal; menu pasera Spoils - linia \"menu Spoils\" wyzej; Spoils No Free Gold " + (s != null && s.SpoilsNoFreeGold ? "wlaczone" : "WYLACZONE - SpoilsSeal nie przejmuje pasera i daru") + ").");
             }
             catch (Exception e) { Stumble(ref _stFG, "SessionStart(FG)", e); }
         }
