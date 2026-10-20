@@ -2691,7 +2691,7 @@ namespace Armoury
             // E5/A3 (163): markietani - ludzie partii rodow w polu wydaja czesc wolnej sakiewki: kasa najblizszego niewrogiego miasta i kiesa wsi; osobna pozycja ksiegi
             // (MSutlers); po zwrocie korony i Banku (K3 licznik na jutro, jak OnLeft), przed budzetem rodow (projekt etapu 5, rozdz. 5.2 pkt 6)
             try { Sutlers.Daily(); } catch (Exception e) { Log.Error("Sutlers.Daily", e); } DayProfile.Lap("Sutlers.Daily");   // linia "Markietani (E5/A3)"
-            try { SavingsByNeed.Daily(); } catch (Exception e) { Log.Error("SavingsByNeed.Daily", e); }   // m96: zalogi wydaja wolna sakiewke w osadzie - ta sama pozycja ksiegi (MSutlers); linia "Sakiewki wedlug potrzeby (m96)"
+            try { SavingsByNeed.Daily(); } catch (Exception e) { Log.Error("SavingsByNeed.Daily", e); } DayProfile.Lap("SavingsByNeed.Daily");   // m96: zalogi wydaja wolna sakiewke w osadzie - ta sama pozycja ksiegi (MSutlers); linia "Sakiewki wedlug potrzeby (m96)"
             try { MoneyLedger.Mark(MoneyLedger.MSutlers); } catch { }
             // E5/B6 (201): pula sakiewek weteranow wydana w miastach karczm (zycie, SutlerDailyShare; pule bez weteranow - cale); osobna pozycja ksiegi (MVetPurse);
             // przed budzetem rodow - sakiewki zwolnionych 166 tej doby wchodza do puli jutro wydawane

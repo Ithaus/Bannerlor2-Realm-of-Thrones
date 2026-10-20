@@ -991,8 +991,9 @@ Uzycie (Python 3, tylko odczyt):
                     noclegi, plotki (INFO). Autotest nie klika zajazdow - bez noclegu i sluchania te progi INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa m96sakiewki : (20.10, m96-sakiewki - PLAN 5 "sakiewki zolnierzy najwyzej 15 dni zoldu"; Armoury/src/SavingsByNeed.cs, klucz Savings By Need)
                     python -I tools/sprawdz_logi.py --grupa m96sakiewki <Armoury-*.log> (strumieniowo). SN-0 linia doby, SN-1 rozruch (INFO), SN-2 kontrola
-                    obiegu 0 i potkniecia 0, SN-3 sakiewki <= 15 dni zoldu (Obieg), SN-4 oszczednosci K1 <= 3 dni, SN-5 zalogi <= 10 dni, SN-6 bez wzrostu w 28 dob,
-                    SN-7 "za malo w sakiewce" <= 2% "brak lepszej", SN-8 koszt, SN-9 przeplywy (INFO). Progi SN-3..7 po 14 dobach pelnej reguly. Log bez paczki: INFO.
+                    obiegu z odczytow przed/po 0 i potkniecia 0, SN-3 sakiewki <= 15 dni zoldu (Obieg), SN-4 oszczednosci K1 <= 3 dni, SN-5 zalogi <= 10 dni,
+                    SN-6 bez wzrostu w 28 dob, SN-7 "za malo w sakiewce" <= 2% "brak lepszej", SN-8 koszt, SN-9 przeplywy (INFO), SN-10 zakupy AI (braki +
+                    lepsze) >= 80% bazy, SN-11 pokrycie korpusu lordow >= baza - 2 pp. Progi SN-3..7, 10, 11 po 14 dobach pelnej reguly. Log bez paczki: INFO.
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
                     python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
                     (klucz, plik drog, rozstaje traktu >= 100), SZB-1 linie doby rozpoznane, SZB-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy
@@ -52162,33 +52163,43 @@ def p6spichlerz_main(logp):
 # Armoury/src/SavingsByNeed.cs, klucz Savings By Need; PLAN 5 "Skonczone, gdy": sakiewki zolnierzy najwyzej 15 dni zoldu)
 m96sakiewki_HEAD = "Sakiewki wedlug potrzeby (m96): "
 m96sakiewki_DAY = re.compile(r"Sakiewki wedlug potrzeby \(m96\): dzien (?P<day>-?\d+) \| udzial nowej reguly (?P<sh>[\d.]+) \((?P<ramp>[^)]*)\)"
-                             r" \| cele: przegladow dozbrajania (?P<vis>\d+), z celem (?P<visw>\d+) \(koszykow za malo w sakiewce (?P<bask>\d+), suma celow (?P<wsum>\d+)\),"
+                             r" \| cele: przegladow (?P<vis>\d+) \(wezszych - zamek bez targu (?P<visn>\d+), cel z targu zostal (?P<keptn>\d+)\), z celem (?P<visw>\d+)"
+                             r" \(koszykow: lepsze za malo w sakiewce (?P<bask>\d+), braki za malo pieniedzy (?P<gapb>\d+); suma celow (?P<wsum>\d+)\),"
                              r" partii z celem razem (?P<wn>\d+) \| limit oszczednosci partii: wywolan (?P<capn>\d+), dotad (?P<cap0>\d+), teraz (?P<cap1>\d+)"
                              r" \| zalogi: (?P<gn>\d+) z sakiewka (?P<gp>\d+) \(zold dnia zalog (?P<gw>\d+) = (?P<gd>[\d.]+|-) dni\), chronione \(naprawy i cel\) (?P<gprot>\d+),"
                              r" wolne (?P<gfree>\d+), wydaly na zycie w osadzie (?P<gtak>\d+) \((?P<gpaid>\d+) zalog; stawka [\d.]+% x min\(3, dni wolnej / 10\)\)"
-                             r" -> kasy miast (?P<gtown>\d+), kasy zamkow (?P<gcas>\d+), w tym do kies ludu (?P<gfolk>\d+); kontrola: zdjete = do osad \(roznica (?P<ctl>-?\d+)\)"
-                             r", pominiete: oblezone (?P<gsg>\d+), lupione \(L3\) (?P<gsk>\d+) \| koszt (?P<ms>[\d.]+) ms(?: \| potkniecia (?P<stum>\d+))?")
+                             r" -> kasy miast (?P<gtown>\d+), kasy zamkow (?P<gcas>\d+), w tym do kies ludu (?P<gfolk>\d+); kontrola: zeszlo z sakiewek (?P<gout>\d+)"
+                             r" = przybylo w kasach osad (?P<gcof>-?\d+) \+ do kies ludu \d+ \(roznica (?P<ctl>-?\d+)\)"
+                             r", pominiete: oblezone (?P<gsg>\d+), lupione \(L3; w linii lupu jako zycie\) (?P<gsk>\d+) \| koszt (?P<ms>[\d.]+) ms(?: \| potkniecia (?P<stum>\d+))?")
 m96sakiewki_OBIEG = re.compile(r"\| rody wydaly \[P\]: zold partii (?P<zp>\d+) .*?\), zold zalog (?P<zz>\d+) .*?\| sakiewki ludzi \[P\]: stan (?P<st>\d+)")
 m96sakiewki_MAR = re.compile(r"sakiewki partii rodow (?P<lp>\d+) = (?P<ld>[\d.]+) dni zoldu \(zold dnia (?P<lw>\d+); w tym oszczednosci K1 (?P<k>\d+) = (?P<kd>[\d.]+) dni")
 m96sakiewki_DOZ = re.compile(r"Dozbrajanie: dzien (?P<day>\d+) - gracz \d+/\d+, lordowie (?P<ln>\d+)/(?P<lg>\d+), zalogi (?P<gn>\d+)/(?P<gg>\d+).*?brak lepszej na polce (?P<nb>\d+)"
                              r".*?za malo w sakiewce (?P<nm>\d+).*?odlozone przy wyjazdach (?P<sv>\d+), ponad limit na zycie (?P<ov>\d+).*?braki zalog z ich sakiewek (?P<gap>\d+)")
+m96sakiewki_ZAK = re.compile(r"ZakupyAI: dzien (?P<day>\d+) - \d+ wizyt, \d+ szt\. kupionych za (?P<g>\d+) zlota")
+m96sakiewki_POK = re.compile(r"Pokrycie zbrojowni AI \(171\): dzien (?P<day>\d+) - partie rodow AI \(\d+ ludzi\): korpus (?P<k>\d+)%")
+# baza bez paczki (6 biegow 20.10, srednia ostatnich 28 dob; najnizsza z biegow): zakupy AI = braki (ZakupyAI) + lepsze lordow i zalog (Dozbrajanie), pokrycie korpusu
+# partii rodow (171) w ostatniej dobie. 160 dob z zapisu d240 (12-25-19, 09-14-49, 04-01-39, 00-44-29): 116-130 tys. zl/d, korpus 55-58%;
+# nowa kampania 120 dob (08-45-54, 03-32-17): 72-75 tys. zl/d, korpus 57-61%
+m96sakiewki_BASE = {"d240": (116238, 55), "nowa": (71953, 57)}
 
 
 def m96sakiewki_main(logp):
-    """m96sakiewki (20.10, WGRANIE 96; klucz Savings By Need): ludzie odkladaja na sprzet tylko to, na co na targu ich nie bylo stac (cel = najtansza lepsza
-    sztuka w kazdym koszyku "za malo w sakiewce"); reszta sakiewki jak dotad do markietanow / na zycie; zalogi wydaja wolna sakiewke w swojej osadzie ta sama
-    miara co markietani N6. Wejscie: log Armoury (strumieniowo). SN-0 linia doby codziennie, SN-1 rozruch (INFO), SN-2 kontrola obiegu 0, potkniecia i ERROR
-    paczki 0, SN-3 sakiewki <= 15 dni zoldu (Obieg, ostatnia doba po rozruchu; oczekiwane 8-13), SN-4 oszczednosci K1 partii rodow <= 3 dni (oczekiwane 0.3-2),
-    SN-5 sakiewki zalog <= 10 dni ich zoldu (oczekiwane 4-8), SN-6 sakiewki nie rosna (ostatnie 28 dob <= +1 dzien), SN-7 koszyki "za malo w sakiewce" <= 2%
-    koszykow "brak lepszej na polce" (sprzet nie staje przez brak pieniedzy), SN-8 koszt <= 30 ms srednio i <= 60 ms najwiecej, SN-9 przeplywy i cele (INFO).
-    Progi SN-3..SN-7 dopiero 14 dob po pelnej regule (inaczej INFO). Log bez paczki: INFO, bez wyjatku."""
+    """m96sakiewki (20.10, WGRANIE 96; klucz Savings By Need): ludzie odkladaja na sprzet tylko to, na co na targu ich nie bylo stac (cel = w jednej wizycie
+    najtansza sztuka w kazdym koszyku dozbrajania "za malo w sakiewce" i w kazdym koszyku brakow, w ktorym pasujaca sztuka byla za droga); reszta sakiewki jak
+    dotad do markietanow / na zycie; zalogi wydaja wolna sakiewke w swojej osadzie ta sama miara co markietani N6. Wejscie: log Armoury (strumieniowo).
+    SN-0 linia doby codziennie, SN-1 rozruch (INFO), SN-2 kontrola obiegu z odczytow przed/po (zeszlo z sakiewek = przybylo w kasach + do kies ludu), potkniecia
+    i ERROR paczki 0, SN-3 sakiewki <= 15 dni zoldu (Obieg, ostatnia doba po rozruchu; oczekiwane 8-13), SN-4 oszczednosci K1 partii rodow <= 3 dni (oczekiwane
+    0.3-2), SN-5 sakiewki zalog <= 10 dni ich zoldu (oczekiwane 4-8), SN-6 sakiewki nie rosna (ostatnie 28 dob <= +1 dzien), SN-7 koszyki "za malo w sakiewce"
+    <= 2% koszykow "brak lepszej na polce", SN-8 koszt <= 30 ms srednio i <= 60 ms najwiecej, SN-9 przeplywy i cele (INFO), SN-10 zakupy AI (braki + lepsze)
+    >= 80% bazy bez paczki, SN-11 pokrycie korpusu partii rodow (171) >= baza - 2 pp (SN-10/11 tylko w biegach testu: 160 dob z zapisu d240 albo nowa kampania
+    120 dob; inaczej INFO). Progi SN-3..SN-7 i SN-10/11 dopiero 14 dob po pelnej regule (inaczej INFO). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("SN-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     days, bad, ramp, off = {}, [], [], 0
-    obg, mar, doz = {}, {}, {}
+    obg, mar, doz, zak, pok = {}, {}, {}, {}, {}
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -52219,6 +52230,14 @@ def m96sakiewki_main(logp):
                 mm = m96sakiewki_DOZ.match(s)
                 if mm:
                     doz[int(mm.group("day"))] = {k: int(v) for k, v in mm.groupdict().items()}
+            elif s.startswith("ZakupyAI: dzien "):
+                mm = m96sakiewki_ZAK.match(s)
+                if mm:
+                    zak[int(mm.group("day"))] = int(mm.group("g"))
+            elif s.startswith("Pokrycie zbrojowni AI (171): dzien "):
+                mm = m96sakiewki_POK.match(s)
+                if mm:
+                    pok[int(mm.group("day"))] = int(mm.group("k"))
             elif s.startswith("ERROR in SavingsByNeed"):
                 n_err += 1
     if not days:
@@ -52231,17 +52250,24 @@ def m96sakiewki_main(logp):
         if mar:
             dl = sorted(mar)[-1]
             rep.add("SN-4: oszczednosci K1 partii rodow (ostatnia doba)", f"{mar[dl][1]:.1f} dni; partie rodow razem {mar[dl][0]:.1f} dni", "INFO (bez paczki 10.6-14.2)", None)
+        zl = sorted(zak)[-28:]
+        dl2 = sorted(doz)[-28:]
+        if zl and dl2:
+            tot = sum(zak[d] for d in zl) / len(zl) + sum(doz[d]["lg"] + doz[d]["gg"] for d in dl2) / len(dl2)
+            rep.add("SN-10: zakupy AI - braki + lepsze lordow i zalog (srednia ostatnich 28 dob)", f"{tot:.0f} zl/d" + (f"; pokrycie korpusu partii rodow {pok[sorted(pok)[-1]]}%" if pok else ""),
+                    "INFO (baza bez paczki: d240 116-130 tys., korpus 55-58%; nowa kampania 72-75 tys., korpus 57-61%)", None)
         rep.show()
         return 0
     ds = sorted(days)
     span = ds[-1] - ds[0] + 1
     rep.add("SN-0: linia doby codziennie", f"{len(ds)} linii na {span} dob, nieczytelnych {len(bad)}", ">= 95% dob, nieczytelnych 0",
             len(ds) >= 0.95 * span and not bad)
-    rep.add("SN-1: rozruch (pierwsza doba z kluczem)", (ramp[0][len(m96sakiewki_HEAD):][:220] if ramp else "brak linii (rozruch rozstrzygniety w zapisie)") + (f"; linii rozruchu {len(ramp)}" if len(ramp) > 1 else ""),
-            "INFO (stary zapis > 15 dni: rozruch Sutler Ramp Days; nowa kampania: od razu)", None)
+    rep.add("SN-1: rozruch (pierwsza doba z kluczem)", (ramp[0][len(m96sakiewki_HEAD):][:300] if ramp else "brak linii (rozruch rozstrzygniety w zapisie)") + (f"; linii rozruchu {len(ramp)}" if len(ramp) > 1 else ""),
+            "INFO (nowa regula uwolni > 1 dzien zoldu - trwajaca kampania: rozruch Sutler Ramp Days; nowa kampania: od razu)", None)
     ctl = [d for d in ds if int(days[d]["ctl"]) != 0]
     stum = max((int(days[d]["stum"]) for d in ds if days[d]["stum"]), default=0)
-    rep.add("SN-2: kontrola obiegu (zdjete = do osad), potkniecia, ERROR in SavingsByNeed", f"roznica != 0 w {len(ctl)} dobach, potkniecia {stum}, ERROR {n_err}", "0 / 0 / 0",
+    rep.add("SN-2: kontrola obiegu (zeszlo z sakiewek = przybylo w kasach osad + do kies ludu), potkniecia, ERROR in SavingsByNeed",
+            f"roznica != 0 w {len(ctl)} dobach" + (f" (np. d{ctl[0]}: {days[ctl[0]]['ctl']})" if ctl else "") + f", potkniecia {stum}, ERROR {n_err}", "0 / 0 / 0",
             not ctl and stum == 0 and n_err == 0)
     full = [d for d in ds if float(days[d]["sh"]) >= 0.999]
     last = ds[-1]
@@ -52272,7 +52298,7 @@ def m96sakiewki_main(logp):
         nm, nb = av("nm"), av("nb")
         rep.add("SN-7: koszyki 'za malo w sakiewce' wobec 'brak lepszej na polce' (srednia ostatnich 28 dob pelnej reguly)",
                 f"{nm:.0f}/d wobec {nb:.0f}/d ({100.0 * nm / nb if nb else 0:.2f}%); lepsze: lordowie {av('lg'):.0f} zl/d, zalogi {av('gg'):.0f} zl/d; braki zalog z sakiewek {av('gap'):.0f} zl/d;"
-                f" odlozone przy wyjazdach {av('sv'):.0f} zl/d", "<= 2% (bez paczki 0.2-0.6%: 44-120 wobec 19.6-21.5 tys.; lepsze lordow 14-16 tys. zl/d, zalog 22-32 tys.)",
+                f" odlozone przy wyjazdach {av('sv'):.0f} zl/d", "<= 2% (bez paczki 0.2-0.6%: 39-124 wobec 19.3-22.5 tys.; lepsze lordow 13-17 tys. zl/d, zalog 19-37 tys.)",
                 ((nm <= 0.02 * nb) if nb else None) if ready else None)
     ms = [float(days[d]["ms"]) for d in ds]
     rep.add("SN-8: koszt doby (srednia / najwiecej)", f"{sum(ms) / len(ms):.1f} / {max(ms):.1f} ms", "<= 30 / <= 60 ms", sum(ms) / len(ms) <= 30.0 and max(ms) <= 60.0)
@@ -52280,7 +52306,28 @@ def m96sakiewki_main(logp):
     av2 = lambda k: sum(int(days[d][k]) for d in t28) / len(t28)
     rep.add("SN-9: zalogi na zycie w osadzie i cele oszczedzania (srednia ostatnich 28 dob)",
             f"zalogi {av2('gtak'):.0f} zl/d (miasta {av2('gtown'):.0f}, zamki {av2('gcas'):.0f}, do ludu {av2('gfolk'):.0f}); partii z celem {av2('wn'):.0f}, przegladow z celem {av2('visw'):.0f}/d"
-            f" z {av2('vis'):.0f}, suma celow {av2('wsum'):.0f} zl/d", "INFO (stary zapis: zalogi ok. 4 mln w 28 dob rozruchu, potem ok. 20-40 tys./d)", None)
+            f" z {av2('vis'):.0f} (wezszych {av2('visn'):.0f}, cel z targu zostal {av2('keptn'):.0f}); koszykow lepsze {av2('bask'):.0f}/d, braki {av2('gapb'):.0f}/d; suma celow {av2('wsum'):.0f} zl/d",
+            "INFO (zapis d240: w rozruchu zalogi do ok. 340 tys./d, potem ok. 120 tys./d; nowa kampania ok. 80-120 tys./d)", None)
+    # SN-10/11: braki i lepsze nie staja przez mniejsze sakiewki (recenzja: oszczednosci K1 finansowaly tez braki) - tylko w biegach testu z baza
+    kind = None
+    rl = ramp[0] if ramp else ""
+    if "nowa regula wchodzi" in rl and ds[0] >= 109000 and span >= 150:
+        kind = "d240"
+    elif "bez rozruchu" in rl and ds[0] <= 108850 and span >= 110:
+        kind = "nowa"
+    zl = [d for d in sorted(zak) if (full[0] if full else ds[0]) <= d <= last][-28:]
+    if zl and zd:
+        tot = sum(zak[d] for d in zl) / len(zl) + sum(doz[d]["lg"] + doz[d]["gg"] for d in zd) / len(zd)
+        base = m96sakiewki_BASE.get(kind)
+        rep.add("SN-10: zakupy AI - braki (ZakupyAI) + lepsze lordow i zalog (Dozbrajanie), srednia ostatnich 28 dob pelnej reguly",
+                f"{tot:.0f} zl/d" + (f" wobec bazy {base[0]} ({100.0 * tot / base[0]:.0f}%; bieg {kind})" if base else " (bieg bez bazy)"),
+                ">= 80% bazy (d240 116-130 tys., nowa kampania 72-75 tys.)", (tot >= 0.8 * base[0]) if (base and ready) else None)
+    pl = [d for d in sorted(pok) if ds[0] <= d <= last]
+    if pl:
+        base = m96sakiewki_BASE.get(kind)
+        kv = pok[pl[-1]]
+        rep.add("SN-11: pokrycie korpusu partii rodow AI (171, ostatnia doba)", f"{kv}%" + (f" wobec bazy {base[1]}% (bieg {kind})" if base else " (bieg bez bazy)"),
+                ">= baza - 2 pp (d240 55-58%, nowa kampania 57-61%)", (kv >= base[1] - 2) if (base and ready) else None)
     rep.show()
     return 0
 

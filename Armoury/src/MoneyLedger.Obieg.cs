@@ -755,6 +755,7 @@ namespace Armoury
               .Append(", z rozbitych partii ").Append(_purseGoneWin + _purseGoneTown).Append(" (do zwyciezcow ").Append(_purseGoneWin).Append(", do miast ").Append(_purseGoneTown)
               .Append("), markietani ").Append(Sutlers.ObiegNote()).Append(", ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
               .Append(", ze zwolnionymi do puli weteranow w karczmach (E5/B6) ").Append(ClanBudget.LastReleasedPurseVet)
+              .Append(SavingsByNeed.ObiegNote())   // m96: zalogi na zycie w osadzie (klucz wylaczony - pusto)
               .Append(TownFolk.On ? ", = " + (lordAcc + garAcc > 0 ? ((double)now[HPurses] / (lordAcc + garAcc)).ToString("0.0", Inv) : "-") + " dni zoldu naliczonego (partie i zalogi; E5/0)" : "")
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")

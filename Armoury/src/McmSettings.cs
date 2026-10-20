@@ -7320,7 +7320,7 @@ namespace Armoury
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool FolkCraftWageOnSale { get; set; } = true;
 
-        [SettingPropertyBool("Savings By Need", HintText = "the men put coin by only for kit they have seen on the stalls and could not afford: their savings for better kit (Men Gear Save Days at most) shrink to the mending they owe plus the price of those pieces, and the rest is spent as before - with the sutlers in the field, on food and drink in town. Garrisons spend what they hold beyond that in their own town or castle, at the sutlers' pace. Starts gently over Sutler Ramp Days in a running campaign (off = savings up to Men Gear Save Days, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Savings By Need", HintText = "the men put coin by only for kit they have seen on the stalls and could not afford - a better piece, or a missing one they could not pay for: their savings for kit (Men Gear Save Days at most) shrink to the mending they owe plus the price of those pieces, and the rest is spent as before - with the sutlers in the field, on food and drink in town. Garrisons spend what they hold beyond that in their own town or castle, at the sutlers' pace. Where this would free more than a day of the men's pay at once (a running campaign), it starts gently over Sutler Ramp Days (off = savings up to Men Gear Save Days, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool SavingsByNeed { get; set; } = true;
 

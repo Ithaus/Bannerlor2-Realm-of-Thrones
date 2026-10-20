@@ -200,9 +200,8 @@ namespace Armoury
                     return;
                 }
                 int nb0 = _dNoBetter, nm0 = _dNoMoney, nl0 = _dNoLift, nh0 = _dHeld;   // liczniki doby przed wizyta - roznica = powody tej wizyty (tylko log)
-                SavingsByNeed.VisitBegin();   // m96: cel oszczedzania z tego przegladu (koszyki "za malo w sakiewce")
+                SavingsByNeed.Saw(false);   // m96: przeglad w wizycie na targu (okno MenPurse) - cel z koszykow "za malo w sakiewce"
                 var v = Run(main, new PlayerKit(armory), st, null, st, budget, true);
-                SavingsByNeed.VisitEnd(main);
                 if (v.N <= 0)
                 {
                     Log.Info("Dozbrajanie: gracz w " + st.Name + " - bez zakupow: budzet " + budget + ", sloty z pelnych koszykow " + v.Cands
@@ -256,9 +255,8 @@ namespace Armoury
                     if (market != null) { shop2 = market; cartFrom = market; }
                 }
                 var cart = cartFrom != null ? new List<GarrisonCarts.Line>() : null;
-                SavingsByNeed.VisitBegin();   // m96: cel oszczedzania z tego przegladu (koszyki "za malo w sakiewce")
+                SavingsByNeed.Saw(garrison && st.IsCastle && shop2 == null);   // m96: przeglad w wizycie (okno AiGear.TryBuy); zamek bez targu miasta - wezszy
                 var v = Run(mp, new AiKit(mp, arm, garrison), shop1, shop2, sellTo, budget, false, cartFrom, cart);
-                SavingsByNeed.VisitEnd(mp);
                 if (cart != null && cart.Count > 0)
                 {
                     GarrisonCarts.MarkTried(st);
@@ -597,7 +595,7 @@ namespace Armoury
                 if (best != null) return best;
             }
             why = !better ? (lowTier ? 5 : 0) : (!lift ? 1 : (!priced && heldAt != null ? 3 : (!priced && shortage ? 4 : 2)));
-            if (why == 2) SavingsByNeed.NoteWant(poorMin);   // m96: koszyk "za malo w sakiewce" - cel oszczedzania (tylko suma przegladu, nie rzuca)
+            if (why == 2) SavingsByNeed.NoteWant(poorMin, false);   // m96: koszyk "za malo w sakiewce" - cel oszczedzania (tylko suma wizyty, nie rzuca)
             return null;
         }
 

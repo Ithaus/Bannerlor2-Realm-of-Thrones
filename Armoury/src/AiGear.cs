@@ -631,6 +631,7 @@ namespace Armoury
                         int bestI = -1; float bestScore = 0f; int bestPrice = 0;
                         bool resHit = false;   // 174b.4: kandydat pominiety, bo zostala sama rezerwa kramu
                         int zFine = 0, zDress = 0, zCap = 0; bool zBudget = false;   // E8/Z (251): sztuki nie dla AI w tym przegladzie (tylko licznik "nie kupione przez regule")
+                        int zPoor = int.MaxValue;   // m96: najtansza pasujaca sztuka za droga na reszte budzetu
                         for (int i = 0; i < shelf.Count; i++)
                         {
                             var el = shelf.GetElementCopyAtIndex(i);
@@ -650,7 +651,7 @@ namespace Armoury
                             else { price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party); if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; } }
                             if (price <= 0) continue;
                             if (AiBuyRules.OverCap(el.EquipmentElement, price)) { zCap += el.Amount; continue; }   // E8/Z (251): cena ponad sufit - to nie "za malo budzetu" (bez _lastBudgetStop)
-                            if (price > budget - spent) { _lastBudgetStop = true; zBudget = true; continue; }
+                            if (price > budget - spent) { _lastBudgetStop = true; zBudget = true; if (price < zPoor) zPoor = price; continue; }
                             float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
                             float score = XbowPrice.BuyScore(it, eff, price);   // kusze wedlug luku (XbowBuyByPower): kusza skutecznosc^2 / cena, reszta skutecznosc / cena
                             if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
@@ -659,6 +660,7 @@ namespace Armoury
                         {
                             if (resHit) Measure174b.NoteHeld(who, 1);
                             if (!zBudget) AiBuyRules.NoteUnbought(Math.Min(deficit, maxPieces - pieces), zFine, zDress, zCap);   // E8/Z: brak zostal, a na polce lezala sztuka nie dla AI (tylko licznik)
+                            else SavingsByNeed.NoteWant(zPoor, true);   // m96: brak zostal, bo nie bylo ich stac - cel oszczedzania (tylko suma wizyty, nie rzuca)
                             break;
                         }
                         var pick = shelf.GetElementCopyAtIndex(bestI);
@@ -823,6 +825,7 @@ namespace Armoury
             if (!core && !MenUpgrade.On) return;
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
             int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CAiGear;   // E8/0 (242): wolajacy cen - AiGear (braki i lepsze; tylko pomiar)
+            SavingsByNeed.VisitBegin();   // m96: jedna wizyta na targu - cel oszczedzania z brakow i lepszych, na ktore nie bylo ich stac (nie rzuca)
             try
             {
                 if (core)
@@ -833,7 +836,7 @@ namespace Armoury
                 }
                 MenUpgrade.ForAi(mp, st);
             }
-            finally { DayProfile.Caller = pc; GoodsLedger.End(gf); }
+            finally { DayProfile.Caller = pc; GoodsLedger.End(gf); SavingsByNeed.VisitEnd(mp); }
         }
 
         /// <summary>174b.5 F5: te same wczesne wyjscia co TryBuyCore az do stempla doby (bez stempla i bez zmian stanu) - false = TryBuyCore i tak nic nie zrobi.
@@ -915,6 +918,7 @@ namespace Armoury
                 int purse = (!garrison || gPurse) ? Math.Max(0, MenPurse.Get(mp) - mendHold) : 0;   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
                 budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
+                SavingsByNeed.Saw(castleCart && !orderDay);   // m96: przeglad brakow w tej wizycie; zamek bez zamowienia w miescie - wezszy (sama polka zamku)
                 if (orderDay) GarrisonCarts.MarkTried(st);   // jedno zamowienie (i jeden budzet D dob) na D dob, takze gdy proba sie nie uda
 
                 var all = _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>>;
