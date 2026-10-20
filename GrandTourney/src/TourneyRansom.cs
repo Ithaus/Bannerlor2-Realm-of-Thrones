@@ -529,6 +529,8 @@ namespace GrandTourney
                 R = Math.Max(20000.0, 20.0 * ClanWage(c)) + 5000.0 * adults;
             }
             long spent; _clanSpent.TryGetValue(c, out spent);
+            // scalenie z p5-rody (posag, pomoc na okup): budzet z rana minus wykupy dzis albo kiesy dzis - mniejsze (jak VassalRansomAid/AiDowry)
+            if (ok) { int a; double live = FamilyGold(c, out a); return Math.Max(0, (long)(Math.Min(G - spent, live) - R)); }
             return Math.Max(0, (long)(G - R) - spent);
         }
 

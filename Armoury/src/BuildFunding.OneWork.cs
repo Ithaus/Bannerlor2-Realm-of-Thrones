@@ -237,7 +237,7 @@ namespace Armoury
         {
             int cost = b.GetConstructionCost();
             if (cost <= 0) return 0f;
-            double rem = cost - b.BuildingProgress - Boost(st.Town);
+            double rem = EngPaidNeed(st.Town, cost - b.BuildingProgress);   // scalenie z p5-inzynieria: przyspieszenie zlotem i premia zarzadcy (Inzynieria) odjete
             if (rem <= 0) return 0f;
             var s = Settings.Current;
             double ms = MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
