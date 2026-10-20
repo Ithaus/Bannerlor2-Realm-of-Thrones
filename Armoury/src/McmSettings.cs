@@ -8350,11 +8350,15 @@ namespace Armoury
 
         [SettingPropertyBool("Ks Switch Signal Rule", HintText = "with Ks Switch Signal: village parts really change their work by that reckoning, with the same brake as Start Calibration Switch Rule - another work must pay at least 25% better for about 60 days, one part of a district at a time, within what its land allows, at most 5% of the region's hands a season; the village pays for timber, tools and stone really bought at its market town's stall and for the town craftsmen, and the hands move over 60 days (vineyards, groves, orchards and date palms a year). AI villages and the player's villages alike. Off = works stay as the calibration set them (only the pressure to change is written to the log), unless Start Calibration Switch Rule is on", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
-        public bool KsSwitchSignalRule { get; set; } = false;
+        public bool KsSwitchSignalRule { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Ks Switch Market Band", 0.00f, 0.50f, "0.00", HintText = "with Ks Switch Signal: how far a good's shortage or glut at the market town may move its price in the reckoning, compared with the town's other goods (0.15 = at most 15% up or down; 0 = the calibration's own prices only)", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public float KsSwitchMarketBand { get; set; } = 0.15f;
+
+        [SettingPropertyBool("Town Works Hire District", HintText = "a town whose purse grows above the coin it held on the day this rule began (once town farms are set) - or above its merchants' working coin, its dues and its open food bills, if that is higher - spends a 28th of the extra each day on its walls, streets, bridges and wells, hiring carts and hands from the villages of its market district - the coin goes to those villages' purses by their households (raided or looted villages get nothing). Not while besieged or just taken, nor while its craftsmen or patricians are short. A town below that mark keeps all it earns. Every town, the player's too. Off = the coin stays in the town purse, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool TownWorksHireDistrict { get; set; } = true;
 
         [SettingPropertyBool("Side Village Craft Ks Signal", HintText = "with Side Village Crafts and Ks Switch Signal: a side village outside the calibration weighs its crafts by the same reckoning as the calibrated village parts (land suitability x output x the calibration's prices at its market town, minus costs and land rent) instead of land suitability x the square root of the game price index, while the calibration has a plan to price from - but only while the calibrated village parts really change their work by that reckoning (Ks Switch Signal Rule or Start Calibration Switch Rule on), so side villages never move by a reckoning the calibration itself only measures. Off = land suitability x price index, as before", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
@@ -10496,6 +10500,7 @@ namespace Armoury
             s.KsSwitchSignal = KsSwitchSignal;
             s.KsSwitchSignalRule = KsSwitchSignalRule;
             s.KsSwitchMarketBand = KsSwitchMarketBand;
+            s.TownWorksHireDistrict = TownWorksHireDistrict;
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
             s.BloomeryWoodCredit = BloomeryWoodCredit;

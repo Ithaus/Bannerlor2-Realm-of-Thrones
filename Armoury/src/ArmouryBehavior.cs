@@ -746,6 +746,9 @@ namespace Armoury
         // p5-urodzaj (R3-05e/f, recenzja): rok urodzaju i uboj jesienny - stan i przedmioty od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p5UrodzajReset = P5UrodzajReset();
         private static bool P5UrodzajReset() { try { HarvestYear.Reset(); HerdCull.Reset(); } catch (Exception e) { Log.Error("P5UrodzajReset", e); } return true; }
+        // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
+        private readonly bool _p6a7Reset = P6a7Reset();
+        private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1305,6 +1308,10 @@ namespace Armoury
             // Ironman Jeffa) = brak jarmarkow w toku (kalendarz otworzy nastepne); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P5HandelReset)
             try { string hf = dataStore.IsSaving ? HarvestFairs.Export() : null; if (!dataStore.IsSaving || hf != null) SaveText.Sync(dataStore, "arm_fairs", ref hf); if (dataStore.IsLoading) HarvestFairs.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_fairs", e); }
+            // p6-a7: pulapy kas miast robot z rak okregu ("th1|doba startu|id:H;..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis, kampania Jeffa) = start
+            // reguly od pierwszej doby z firmami DS po wczytaniu (H = kasa tej doby); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
+            try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
+            catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
         }
 
         public override void RegisterEvents()
@@ -2710,6 +2717,9 @@ namespace Armoury
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
             try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
+            // p6-a7: roboty miast z rak okregu - PO KS i VillageCrafts (przebudowy A7 tej doby juz w kasach): miasto ponad pulapem 1/28 nadwyzki do kies wsi okregu; wlasna pozycja (MTownHire)
+            try { TownHire.Daily(); TownHire.Line(); } catch (Exception e) { Log.Error("TownHire.Daily", e); } DayProfile.Lap("TownHire.Daily");
+            try { MoneyLedger.Mark(MoneyLedger.MTownHire); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)
             try { VassalRansomAid.Report(); AiDowry.Report(); } catch (Exception e) { Log.Error("R3-01cd.Report", e); }   // R3-01d/R3-01c: linie "Pomoc wasali (R3-01d)" i "Posagi AI (R3-01c)"
