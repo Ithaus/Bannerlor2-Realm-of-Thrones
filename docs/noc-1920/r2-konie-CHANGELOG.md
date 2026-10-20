@@ -72,3 +72,47 @@ DO SPRAWDZENIA (build Release kod 0, 0 bledow; autotestu nie uruchamialem - zaka
 - Autotest 30+ dob: `grep "Egzotyczne wierzchowce (r2-konie)"` - "skasowane 0", liczby kupionych i zostajacych;
   `grep -c "egzotycznych wierzchowcow zdjetych z polek"` = 0; `grep "Stajnia AI (r2-konie)"` - lordowie Qarthu kupuja wielblady w Qarthu;
   `grep "wielblady 7 dob"` dalej "poza Qarthem 0".
+- Recenzja (dopisane): `grep "Mends: wielblady w przydziale DTE (r2-konie)"` w logu CrashScribe - pierwsza linia "PODPIETY
+  (Armoury.MountLaw.AllowedForParty)", potem (tylko w bitwach, najwyzej 12 linii) partie Qarthu "zostaje N, wyciete 0";
+  `grep "do taboru partii jako towar"` w Armoury - "w nicosc 0"; `grep "CleanseTrashInBags (r2-konie)"` - "skasowane 0" (tylko gdy gracz
+  mial egzotyk nie u swoich w zbrojowni DTE). Bitwa z lordem Qarthu (bieg-bitwa.ps1 -Battles albo gracz): jezdzcy Qarthu na wielbladach.
+
+## Recenzja (19.10, po 96f50cbd) - co poprawione
+- WAZNE, prawdziwe - CrashScribe `Mends.CamelCulling` (postfiks DTE `GenerateHorseAndHarnessList`, wpiety bez wylacznika od WGRANIA 89)
+  wycinal z przydzialu DTE kazdy wielblad, ktorego kultura z XML (aserai) jest inna niz kultura partii. Sprawdzone w kodzie (Mends.cs, petla
+  `ic == pc`) i w dekompilacji DTE: `DoAssignAsync` jest synchroniczne (watek glowny, start misji), `AssignHorseAndHarness` bierze konie tylko
+  z `_horseAndHarnesses` po kolei dla jezdzcow. Zakupy z punktu (3) nie mialy wiec efektu w bitwie, a CrashScribe mial regule przeciwna do MountLaw.
+  POPRAWKA (commit 33056eed): przy wlaczonym kluczu Armoury `CamelsOnlyQarth` CamelCulling pyta o wielblada Armoury `MountLaw.AllowedForParty`
+  (refleksja, delegat wiazany raz, jak `ArmouryUniqueIs`) - jedna regula w obu modach, bez lustra do pilnowania. Bez Armoury, przy innej
+  sygnaturze albo przy wylaczonym kluczu - stara regula. Rydwany i slonie - stara regula (poza zakresem). Linie: "Mends: wielblady w przydziale
+  DTE (r2-konie): PODPIETY/BRAK" (raz) i do 12 linii z partiami.
+- DROBNE, prawdziwe - `CamelsOnlyQarth` dzialal tez bez CamelLaw (stary zapis, CamelLaw.On=false): Dorne rodzi wtedy wielblady, nie moglby ich
+  ani dosiasc, ani trzymac, a kazdy jechalby do Qarthu. POPRAWKA (33056eed): `MountLaw.CamelsQarthOnly = klucz && CamelLaw.On`; opis klucza
+  w MCM mowi, ze dziala razem z "Sand Steeds In Dorne" w nowej kampanii. CrashScribe dostaje to samo przez delegata (bez CamelLaw - aserai i qartheen).
+  Kampania Jeffa ma CamelLaw (log 14:41 "poza Qarthem 0") - dla niej bez zmian.
+- DROBNE, prawdziwe - `LegendaryLaw.SweepAiArmories` kasowal egzotyk nie u swoich ze zbrojowni DTE AI (po CamelsOnlyQarth takze wielblady
+  partii aserai). POPRAWKA (0a62d659): przy `ExoticMountsNeverVanish` sztuka schodzi ze zbrojowni do TABORU partii jako towar. Nie wraca
+  do zbrojowni: DTE przenosi z taboru tylko bron i pancerz (dekompilacja EveryoneCampaignBehavior :400-422), Stajnia/MenPurse/Remount tylko
+  `IsPlainMount`. Sprzedany w miescie trafi na polke, a SweepMarkets odda go targowi, ktory go trzyma. Lista `kill` bez zmian (kontrola R9
+  starej drogi `KillListOld` porownuje te same sztuki). Linia "magazyny AI ... (r2-konie: do taboru partii jako towar N, w nicosc 0)".
+- DROBNE, prawdziwe - `CleanseTrashInBags` (przy kazdym menu) kasowal egzotyk nie u swoich z sakw i zbrojowni gracza: gracz placil miastu,
+  a zwierze znikalo; po CamelsOnlyQarth dotyczyloby to tez wielbladow gracza z kultury aserai. POPRAWKA (0a62d659): przy `ExoticMountsNeverVanish`
+  egzotyk zostaje w sakwach jako towar, ze zbrojowni DTE gracza schodzi do sakw (DTE i tak go nie przydzieli - CamelCulling). Slonie-towar
+  wedlug id (Jeff 29.08 "slonie ma Zlota Kompania") - jak dotad, poza zakresem.
+- NIE ZMIENIONE (decyzja): `BattlefieldLaw.CleanseTrash` - to sito ekranu lupu, nie zabieranie wlasnosci: egzotyk nie u swoich nie trafia
+  do lupu gracza, tak jak wraki ponizej progu zostaja na polu (decyzje Jeffa 29.08 i 14.09). Nikt za niego nie placi, wiec to nie jest
+  "zloto za nic"; zmiana wpuscilaby do lupu gracza wielblady, rydwany i mamuty z kazdej bitwy.
+- Piate znalezisko recenzji (plik "Armoury/src/St...", zapewne Stables.cs) dotarlo uciete - nie znam tresci; nie poprawiane. Przejrzalem
+  `Stables.CamelBuy` ponownie: kupno tylko do braku, zloto pan -> miasto, odmowa DTE oddaje sztuki na polke - bez zmian.
+
+## Ryzyko po recenzji
+- CamelCulling przez delegata: partia Qarthu z wielbladami w zbrojowni dostaje je w przydziale DTE; DTE rozdaje konie po kolei jezdzcom (nie
+  per jednostka), wiec wielblad moze trafic tez jezdzcowi konnemu Qarthu - regula MountLaw jest na poziomie partii (kultura qartheen), wiec to
+  zgodne. W bitwie `DragonUnmount` (MountLaw.Allowed per zolnierz) dalej zdejmuje z wielblada obcego najemnika w partii Qarthu.
+- Tabor AI: egzotyki w taborze licza sie do stada partii (predkosc mapy) - skala mala (w biegu 160 dob 0 linii "egzotycznych wierzchowcow nie u swoich").
+- Sakwy gracza: gracz moze teraz trzymac i sprzedac wielblada/rydwan/mamuta; sprzedany na polce obcego miasta - SweepMarkets odwiezie go do targu,
+  ktory go trzyma, albo zostanie na polce.
+
+## Status po recenzji
+DO SPRAWDZENIA. Build Release: Armoury kod 0 (0 bledow, 4 stare ostrzezenia), CrashScribe kod 0 (0 bledow, 0 ostrzezen); gen_mcm uruchomiony
+po zmianie Settings.cs. Autotestu nie uruchamialem (zakaz w tym zadaniu). Do wgrania razem: Armoury.dll i CrashScribe.dll (CamelCulling).
