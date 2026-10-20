@@ -934,8 +934,11 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { DayZero(); }
-            SideVillageHome.Daily();   // r4-dom: linia doby domu, handlu i spaceru
+            finally
+            {
+                DayZero();
+                SideVillageHome.Daily();   // r4-dom: linia doby domu, handlu i spaceru - w finally, bo "return" w try (bez wioski) pomijal ja (recenzja)
+            }
         }
     }
 }

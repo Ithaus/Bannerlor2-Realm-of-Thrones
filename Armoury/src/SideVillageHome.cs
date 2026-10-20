@@ -63,13 +63,15 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
         private static bool _testDone;
         private static int _dTradeMap, _dTradeVil, _dBuyG, _dSellG, _dNights, _dCamp, _dChest, _dChestBack, _dWalk, _dWalkNo;
+        private static string _savedLogged;   // recenzja r4-dom: sklad skrzyni ostatnio wypisany do logu przy zapisie (null - jeszcze nie w tej sesji)
+        private static bool _quiet;           // samotest D4: Import na kopii bez linii "skrzynia z zapisu"
 
         /// <summary>SideVillageFief.Reset (konstruktor ArmouryBehavior, kazda kampania): stan od zera (zapis wczyta Import).</summary>
         internal static void Reset()
         {
             _chestUid = null; _chest = null; _chestRaw.Clear();
             _st = _stDay = 0; lock (_err) _err.Clear();
-            _testDone = false;
+            _testDone = false; _savedLogged = null;
             DayZero();
         }
 
@@ -148,7 +150,9 @@ namespace Armoury
                     {
                         a.optionLeaveType = GameMenuOption.LeaveType.Manage;
                         if (!SideVillageFief.HasFief) return false;
-                        a.Tooltip = new TextObject("{=!}Put things away in the chest of your house, or take them out. What lies here stays here until you come back for it.");
+                        // recenzja r4-dom: skrzynia zyje tylko w kluczu zapisu arm_side_home - starsza DLL Armoury albo wylaczony Armoury go nie zapisze (rzeczy przepadna)
+                        a.Tooltip = new TextObject("{=!}Put things away in the chest of your house, or take them out. What lies here stays here until you come back for it."
+                                                   + " (Mod note: empty the chest before you switch Armoury off or go back to an older Armoury - older versions do not know this chest, and what is in it would be lost on the next save.)");
                         return true;
                     },
                     delegate (MenuCallbackArgs a) { try { OpenChest(); } catch (Exception e) { Stumble("Chest", e); } }, false, 1);
@@ -368,7 +372,7 @@ namespace Armoury
             state.InventoryLogic = logic;
             state.DoneLogicExtrasDelegate = delegate { ChestDone(); };
             _dChest++;
-            Log.Info(P + "skrzynia domu w " + SideVillageFief.Name + " otwarta (" + Count(chest) + " sztuk, " + chest.Count + " rodzajow).");
+            Log.Info(P + "skrzynia domu otwarta w " + SideVillageFief.Name + " (" + Count(chest) + " sztuk, " + chest.Count + " rodzajow).");
             gsm.PushState(state);
         }
 
@@ -432,7 +436,9 @@ namespace Armoury
                     a.Tooltip = new TextObject("{=!}" + why);
                     return true;
                 }
-                a.Tooltip = new TextObject("{=!}Walk the lanes and fields of your village. (Your village has no scene of its own - you walk the lands of " + dn + ".)");
+                // recenzja r4-dom: zadania gry przypiete do menu "village" (np. Family Feud) rozstawiaja sie tylko przy spacerze z menu wsi okregu
+                a.Tooltip = new TextObject("{=!}Walk the lanes and fields of your village. (Your village has no scene of its own - you walk the lands of " + dn + ".)"
+                                           + " For quest business in " + dn + ", take the walk from " + dn + "'s own menu.");
                 return true;
             }
             catch (Exception e) { Stumble("WalkCondition", e); return false; }
@@ -493,6 +499,26 @@ namespace Armoury
             return sb.ToString();
         }
 
+        /// <summary>ArmouryBehavior.SyncData (zapis): Export i linia logu ze skladem skrzyni - przy pierwszym zapisie sesji i przy kazdej zmianie. Recenzja r4-dom:
+        /// skrzynia zyje tylko w kluczu arm_side_home (rzeczy zdjete z taboru) - starsza DLL Armoury albo wylaczony Armoury nie zapisze klucza i rzeczy przepadna;
+        /// z tej linii da sie je odtworzyc recznie (przedmiot~modyfikator~sztuk).</summary>
+        internal static string ExportSave()
+        {
+            string x = Export();
+            try
+            {
+                if (_savedLogged == null && x.Length == 0) { _savedLogged = x; return x; }   // pusta skrzynia od poczatku sesji - bez linii
+                if (!string.Equals(x, _savedLogged, StringComparison.Ordinal))
+                {
+                    _savedLogged = x;
+                    Log.Info(P + "skrzynia w zapisie (" + Count(_chest) + " sztuk, " + (_chest != null ? _chest.Count : 0) + " rodzajow, " + _chestRaw.Count
+                             + " wpisow spoza gry; przedmiot~modyfikator~sztuk): " + (x.Length == 0 ? "pusta" : x) + ".");
+                }
+            }
+            catch (Exception e) { Stumble("ExportSave", e); }
+            return x;
+        }
+
         private static string Clean(string s) { return (s ?? "").Replace("|", "/").Replace(";", ",").Replace("~", "-"); }
 
         internal static void Import(string data)
@@ -518,7 +544,9 @@ namespace Armoury
                     _chest.AddToCounts(new EquipmentElement(it, mod), n);
                     ok++;
                 }
-                if (lost > 0) Log.Info(P + "skrzynia z zapisu: " + ok + " rodzajow, " + lost + " wpisow bez przedmiotu w grze (zostaja w zapisie).");
+                if (!_quiet && (ok > 0 || lost > 0))
+                    Log.Info(P + "skrzynia z zapisu: " + ok + " rodzajow (" + Count(_chest) + " sztuk)" + (_chestRaw.Count > 0 ? ", " + _chestRaw.Count + " wpisow bez przedmiotu w grze (zostaja w zapisie)" : "")
+                             + (lost > _chestRaw.Count ? ", " + (lost - _chestRaw.Count) + " wpisow uszkodzonych (pominiete)" : "") + ".");
             }
             catch (Exception e) { Stumble("Import", e); }
         }
@@ -596,7 +624,7 @@ namespace Armoury
                     if (probe == null) probe = MBObjectManager.Instance.GetObject<ItemObject>("grain");
                     _chest = new ItemRoster(); _chestUid = SideVillageFief.Uid; _chestRaw.Clear();
                     if (probe != null) _chest.AddToCounts(probe, 3);
-                    string e1 = Export(); Import(e1); string e2 = Export();
+                    string e1 = Export(); _quiet = true; try { Import(e1); } finally { _quiet = false; } string e2 = Export();
                     bool same = e1 == e2 && (probe == null || (_chest != null && _chest.GetItemNumber(probe) == 3));
                     _chest = ch0; _chestUid = u0; _chestRaw.Clear(); _chestRaw.AddRange(raw0);
                     add("D4 skrzynia: zapis tam i z powrotem", same && Export() == c0, e1.Length > 120 ? e1.Substring(0, 120) : e1);

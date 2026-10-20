@@ -8124,7 +8124,7 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefTrade { get; set; } = true;
 
-        [SettingPropertyBool("Side Village Fief House", HintText = "with Side Village Fief Menu: 'Your house' in your village - sleep in your own bed for free (the best rest there is: like the good house of an inn, wounded heal faster while you sleep) and keep things in the house chest. Needs Town Inns and Night Rest for the bed. Off = no house", RequireRestart = false)]
+        [SettingPropertyBool("Side Village Fief House", HintText = "with Side Village Fief Menu: 'Your house' in your village - sleep in your own bed for free (the best rest there is: like the good house of an inn, wounded heal faster while you sleep) and keep things in the house chest. Needs Town Inns and Night Rest for the bed. Empty the chest before switching Armoury off or going back to an older version - only this version keeps it in the save. Off = no house (the chest stays in the save)", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefHouse { get; set; } = true;
 
