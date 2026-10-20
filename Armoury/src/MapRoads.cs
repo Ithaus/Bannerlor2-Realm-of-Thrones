@@ -1164,7 +1164,9 @@ namespace Armoury
                 {
                     var p = main.Position;
                     int c = g.CellOf(p.X, p.Y);
-                    int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
+                    int eff;   // m96-valyria (recenzja): "na drodze tak" tylko na zwyklym trakcie - droga Valyrii / szlak maja inna premie (NDR-6 porownuje z traktem)
+                    int kind = KindEff(g, c, p.X, p.Y, margin, side, s, out eff);
+                    bool other = kind == 2 && eff != MapRoadKinds.Trakt;
                     float ed = g.EdgeDist(c, p.X, p.Y, false), es = g.EdgeDist(c, p.X, p.Y, true);
                     float r0, r1, lim, lmin, cached;
                     bool line, lineS;
@@ -1172,11 +1174,12 @@ namespace Armoury
                     {
                         string limT = lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak";
                         string floorT = r0 <= lmin + 0.001f ? "tak" : "nie";
-                        sb.Append(" | gracz: na drodze ").Append(kind == 2 ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
+                        sb.Append(" | gracz: na drodze ").Append(kind == 2 && !other ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
                           .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
                           .Append(", LimitMax ").Append(limT)
                           .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
-                          .Append(", na podlodze LimitMin ").Append(floorT);
+                          .Append(", na podlodze LimitMin ").Append(floorT)
+                          .Append(other ? (eff == MapRoadKinds.Valyrian ? ", rodzaj: droga Valyrii (premia w linii VR)" : ", rodzaj: szlak karawan (premia w linii VR)") : "");
                         sd.Append(" | gracz: na drodze bocznej ").Append(kind == 1 ? "tak" : kind == 2 ? "nie (na trakcie)" : "nie").Append(" (od krawedzi drogi bocznej ")
                           .Append(es < 1e30f ? es.ToString("0.00", ci) : ">2").Append(" jedn.)")
                           .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))

@@ -1088,7 +1088,7 @@ Uzycie (Python 3, tylko odczyt):
                     NNW-10 z CSV liczony, bez wyjatku.
 --grupa m96valyria: (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; galaz w-toku/m96-valyria, Armoury/src/MapRoadKinds.cs, plik Armoury/ModuleData/arm_map_roads_valyria.tsv)
                     python -I tools/sprawdz_logi.py --grupa m96valyria <Armoury-*.log> (strumieniowo). VR-0 start sesji CZYNNE, plik zgodny (V 800..850 jedn., mosty 7 /
-                    20..35 jedn., szlaki 150..170 jedn.); VR-1 linie doby; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia > 0; VR-3 audyt Valyrii premia =
+                    20..35 jedn., szlaki 185..205 jedn.); VR-1 linie doby; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia > 0; VR-3 audyt Valyrii premia =
                     oczekiwana +-1.5 pp z wpisem; VR-4 audyt szlaku (INFO); VR-5 siec AI: mosty >= 1, klasy tak; VR-6 potkniecia i ERROR 0.
 --grupa ndrogi    : (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, plik
                     Armoury/ModuleData/arm_map_roads_geo.tsv) python -I tools/sprawdz_logi.py --grupa ndrogi <Armoury-*.log> (strumieniowo). NDR-0 start sesji: plik drog
@@ -52177,7 +52177,7 @@ def m96valyria_main(logp):
     """m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; Armoury/src/MapRoadKinds.cs, klucze MapValyrianRoads / MapValyrianRoadSpeedPercent /
     MapEssosCaravanTrails): drogi Valyrii (demon road Volantis - Mantarys - Meereen z odnoga do Tolos; Pentos - Ghoyan Drohe - Norvos - Qohor) +25% (co najmniej
     trakt), mosty przez przerwy farby; farba w glebi Essos (Sarnor) = szlak karawan jak droga boczna. Progi: VR-0 start sesji CZYNNE, plik zgodny (V 800..850 jedn.,
-    mosty 7 / 20..35 jedn., szlaki 150..170 jedn., zle 0, poza plikiem 0); VR-1 linie doby rozpoznane; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia
+    mosty 7 / 20..35 jedn., szlaki 185..205 jedn., zle 0, poza plikiem 0); VR-1 linie doby rozpoznane; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia
     > 0 (udzial INFO; oczekiwane ok. 0.3-2% partio-godzin w marszu); VR-3 audyt Valyrii: premia rzeczywista sr. = oczekiwana +-1.5 pp, wpis 'Valyrian road' w
     kazdej probce; VR-4 audyt szlaku (INFO przy 0 probek); VR-5 siec AI: mosty >= 1, klasy tak; VR-6 potkniecia 0 i "ERROR in MapRoadKinds." 0."""
     rep = Report()
@@ -52211,11 +52211,11 @@ def m96valyria_main(logp):
         fm = M96VALYRIA_FILE.search(st["note"])
         if fm:
             lv, lb, lc = float(fm["lv"]), float(fm["lb"]), float(fm["lc"])
-            ok0 = (st["st"] == "CZYNNE" and st["grid"] == "wczytana" and 800 <= lv <= 850 and int(fm["sb"]) == 7 and 20 <= lb <= 35 and 150 <= lc <= 170
+            ok0 = (st["st"] == "CZYNNE" and st["grid"] == "wczytana" and 800 <= lv <= 850 and int(fm["sb"]) == 7 and 20 <= lb <= 35 and 185 <= lc <= 205
                    and int(fm["bad"]) == 0 and int(fm["miss"]) == 0)
             rep.add("VR-0: start sesji - rodzaje drog wczytane, stan CZYNNE", f"Valyria {st['kv']} ({st['vp']}%), szlaki {st['kc']}; V {fm['sv']} odcinkow {lv:.1f} jedn., mosty "
                     f"{fm['sb']} ({lb:.1f}), C {fm['sc']} ({lc:.1f}), zle {fm['bad']}, poza plikiem {fm['miss']}; stan {st['st']}",
-                    "CZYNNE, V 800..850 jedn., mosty 7 / 20..35 jedn., C 150..170 jedn., zle 0, poza plikiem 0", ok0)
+                    "CZYNNE, V 800..850 jedn., mosty 7 / 20..35 jedn., C 185..205 jedn., zle 0, poza plikiem 0", ok0)
         else:
             rep.add("VR-0: start sesji - plik rodzajow", st["note"][:220] + f"; stan {st['st']}", "plik wczytany i zgodny z plikiem drog", False)
     else:

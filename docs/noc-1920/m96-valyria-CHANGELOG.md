@@ -3,8 +3,8 @@
 **Dla Jeffa (prosto):** w Essos dawne drogi Valyrii - demon road z Volantis przez Mantarys do Meereen (z odnoga do Tolos) oraz droga z Pentos przez
 Ghoyan Drohe i Norvos do Qohor - sa teraz osobnym rodzajem drogi: kazda partia ladowa jedzie po nich o **25%** szybciej (zwykly trakt +15%), a w
 podpowiedzi predkosci widac wpis **Valyrian road**. Tam, gdzie farba ROT na tych trasach sie urywa (pod miastami, przy brodach), premia idzie dalej
-prosto przez przerwe (7 krotkich "mostow", razem ok. 27 jedn.). Malowany trakt w glebi Essos (Sarnor: Kyth - Saath) liczy sie jak szlak karawan
-(+7.5%, wpis **Caravan trail**), bo lore nie zna tam drog; Westeros bez zmian. Wyglad drog sie nie zmienia (farba ROT to warstwa terenu - opis nizej).
+prosto przez przerwe (7 krotkich "mostow", razem ok. 27 jedn.). Malowany trakt w glebi Essos (Sarnor: Kyth - Saath, cala droga od miasta do miasta) liczy
+sie jak szlak karawan (+7.5%, wpis **Caravan trail**), bo lore nie zna tam drog; Westeros bez zmian. Wyglad drog sie nie zmienia (farba ROT to warstwa terenu - opis nizej).
 Wylaczniki: MCM Armoury -> **Map Valyrian Roads** (i **Map Valyrian Road Speed Percent**), **Map Essos Caravan Trails** - wylaczone = jak dzis.
 
 **Problem:** Jeff 20.10: "Rob drogi Valyrii i trakty Essos"; PLAN 7.5 "drogi do wiosek i Valyrii"; audyt `docs/audyt-2026-10-09/08-drogi-wioski-widok.md`
@@ -13,7 +13,8 @@ rozdz. 2 (lore) i 3.8 ("gesta siec traktow takze na stepach i w glebi Essos - gr
 
 **Dowod (liczby, nie zalozenia):**
 - Plik drog moda `arm_map_roads_geo.tsv` (farba ROT, 311 lamanych, 10016.3 jedn.) - w Essos 2797 jedn.; po kulturze najblizszej twierdzy (ROT-Map
-  `settlements.xml`): khuzait (stepy Dothrakow) **0** jedn. farby, ibbenese / yiti / qartheen **0**, sarnor **161** (lamana 45 Kyth - Saath, 166 jedn.).
+  `settlements.xml`): khuzait (stepy Dothrakow) **0** jedn. farby, ibbenese / yiti / qartheen **0**, sarnor **161** (lamana 45 Kyth - Saath, 166 jedn.;
+  srodek 34.8 jedn. ma najblizszy zamek Sambandos kultury norvos - stad v2 reguly C po calej lamanej, nizej).
   "Graf twierdz na stepach" z audytu 3.8 to prototyp `arm_map_roads.tsv` z 08.10 - w grze go nie ma.
 - Drogi boczne (plan f19, podglad `tools/drogi/boczne-podglad` = ten sam kod co gra; w logu 12-25-19 WGRANIA 95: drog 2446, 30463 jedn.): w stepie khuzait
   783 jedn. w 37 drogach do wiosek, sarnor 699, ibbenese 502 - to drogi do wiosek z premia +7.5% ("Side road"), czyli juz dzis poziom szlaku karawan.
@@ -33,8 +34,9 @@ odcinkami premii.
 
 **Zmiana (Armoury):**
 - NOWY plik danych `Armoury/ModuleData/arm_map_roads_valyria.tsv` z generatora `tools/drogi/drogi_valyria.py` (python -I, biblioteka standardowa): odcinki V
-  (droga Valyrii: najkrotsza trasa po farbie miedzy miastami trasy), C (szlak karawan: odcinek farby, ktorego najblizsza twierdza ma kulture glebi Essos -
-  khuzait, sarnor, ibbenese, yiti, qartheen; 162 odcinki, 160.7 jedn.) i B (most Valyrii przez przerwe farby do 8 jedn.). Naglowek `roads_md5` = md5
+  (droga Valyrii: najkrotsza trasa po farbie miedzy miastami trasy), C (szlak karawan: CALA lamana farby poza V, gdy co najmniej polowa jej dlugosci ma
+  najblizsza twierdze kultury glebi Essos - khuzait, sarnor, ibbenese, yiti, qartheen; plik v2: lamane 45 Kyth - Saath, 84 i 236 pod Saath - 198 odcinkow,
+  195.5 jedn.) i B (most Valyrii przez przerwe farby do 8 jedn.). Naglowek `roads_md5` = md5
   tekstu pliku drog bez '\r' - inny plik drog w grze = rodzaje nieczynne z powodem w linii startu (wszystko trakt).
 - NOWY `Armoury/src/MapRoadKinds.cs`: wczytanie (raz na sesje, watek glowny, w `MapRoads.Load`), kolejnosc odcinkow siatki V, mosty, trakty, szlaki
   (w komorce wygrywa pierwszy trafiony - droga Valyrii wygrywa na rozstajach, trakt nad szlakiem), rodzaj czynny z kluczy (`Eff`), linie logu, audyt.
@@ -48,7 +50,9 @@ odcinkami premii.
   `KindClassAt` (Valyria / szlak licza sie do "drogi na trasie" jak trakt).
 - Klucze NOWE (domyslnie TAK, `Settings.cs`, `gen_mcm.py` - suwak 0..50): **MapValyrianRoads**, **MapValyrianRoadSpeedPercent** (25), **MapEssosCaravanTrails**.
   Wylaczone = sciezka sprzed zmiany (trakt, bez mostow - most bez klucza jest pomijany w KindS; w sieci AI waga poza droga).
-- `ArmouryBehavior.cs`: jedna linia `MapRoadKinds.Daily()` po `MapRoads.Daily()`. `tools/sprawdz_logi.py`: grupa **m96valyria** (VR-0..VR-6).
+- `ArmouryBehavior.cs`: jedna linia `MapRoadKinds.Daily()` po `MapRoads.Daily()` z `DayProfile.Lap("MapRoadKinds.Daily")`. `DayProfile.cs`: `LMax` 256 -> 320
+  (WGRANIE 95 ma juz 258 wywolan Lap na takt doby - log 12-25-19 "wywolan 258" - wiec dwa ostatnie odcinki z "reszta taktu" wypadaly z profilu; nowy Lap
+  tej galezi i m96-dlugi dokladaja kolejne). `tools/sprawdz_logi.py`: grupa **m96valyria** (VR-0..VR-6).
 - Uzasadnienie 25%: trakt +15% to zwykla droga sredniowieczna; audyt 08 rozdz. 2: w suchy dzien droga daje +10-25%, brukowana rzymska trzyma tempo w
   kazda pogode (legion 20-25 mil na dobe po bruku, ok. 8 po drodze gruntowej). Droga Valyrii (topiony kamien, nad gruntem) to najlepsza droga swiata -
   gorna granica suchego dnia, 25%; po deszczu przewaga rosnie sama (bloto MapMud tylko poza droga). Ponizej traktu nigdy (max z MapRoadSpeedPercent).
@@ -61,7 +65,9 @@ kolor na plan) i zdjec w autotescie (Jeff 14.10 o pierwszej probie drog: "drogi 
 **Ryzyko / co sprawdzic (kontrola calosci):**
 - Regresje: `KindAt` bez zmian (bloto, AI spis "na trakcie", MapMud audyt); linie `Drogi (DR)` bez zmian formatu (ndrogi: NDR-0 "odcinkow 10565" =
   odcinki farby, mosty poza ta liczba; siatka "wpisow" / "maks. na komorke" rosnie o mosty). NDR-5 audyt tylko zwyklych traktow. NDR-6 (gracz na drodze):
-  gracz na drodze Valyrii pokaze 25% zamiast 15% - w autotescie gracz stoi w Westeros (ryzyko male; wpis "Valyrian road" liczony jako wpis drogi).
+  po recenzji gracz na drodze Valyrii / szlaku karawan pisany jako "na drodze nie" z dopiskiem ", rodzaj: droga Valyrii / szlak karawan (premia w linii VR)" -
+  NDR-6 porownuje tylko zwykly trakt (inaczej falszywe NIE, takze w logach z gry Jeffa). Linia AI drog (AD): "rozstajow" +7 (mosty to krawedzie jak rozstaje),
+  "skladowych" moze spasc (mosty lacza kawalki sieci) - zaden prog na tym nie stoi.
 - Kolizje: premia drogi Valyrii i drogi bocznej sie nie sumuja (pierwszy trafiony odcinek; trakty przed bocznymi jak dotad). Karczmy / sen (TownInns,
   NightRest) dalej po nas - procent od wyniku jak przy trakcie. Szubienice (rozstaje z pliku drog), zajazdy (plik `arm_roadside_inns*.tsv`), pola (p6-pola)
   i plan drog bocznych - ta sama farba, bez zmian.
@@ -73,9 +79,23 @@ kolor na plan) i zdjec w autotescie (Jeff 14.10 o pierwszej probie drog: "drogi 
 **Status:** DO SPRAWDZENIA (build Armoury kod 0; gra nieuruchomiona - Jeff gra; nic nie wgrane).
 
 **Test w grze (autotest WGRANIA 96, 120 / 160 dob):** `python -I tools/sprawdz_logi.py --grupa m96valyria <Armoury-*.log>` - oczekiwane: VR-0 TAK
-(`Drogi Valyrii (VR): start sesji ... drogi Valyrii 831 odcinkow (823.4 jedn.) + mosty 7 (26.8 jedn.), szlaki karawan 162 odcinkow (160.7 jedn.) ... stan
-CZYNNE`), VR-2 partio-godziny na drodze Valyrii > 0 (szacunek 0.3-2% partio-godzin w marszu: V to 8.2% farby, na farbie lezy ok. 9% punktow tras AI),
+(`Drogi Valyrii (VR): start sesji ... plik arm_map_roads_valyria.tsv v2: wierszy V 25, C 3, mosty 7 ... drogi Valyrii 831 odcinkow (823.4 jedn.) + mosty 7
+(26.8 jedn.), szlaki karawan 198 odcinkow (195.5 jedn.) ... stan CZYNNE`), VR-2 partio-godziny na drodze Valyrii > 0 (szacunek 0.3-2% partio-godzin w marszu: V to 8.2% farby, na farbie lezy ok. 9% punktow tras AI),
 VR-3 premia rzeczywista sr. 25.0 +-1.5 pp z wpisem "Valyrian road", VR-5 `siec AI drog: mosty Valyrii 7` (albo mniej, gdy silnik nie znalazl sciezki przez
 przerwe), VR-6 0. Do tego `--grupa ndrogi` bez nowych NIE. W grze: podpowiedz predkosci na demon road (np. miedzy Volantis a Mantarys) - wpis "Valyrian road
-+25%"; na Kyth - Saath "Caravan trail".
++25%"; na calej drodze Kyth - Saath "Caravan trail" (takze kolo zamku Sambandos).
 Linia do grep: `Drogi Valyrii (VR): dzien` (doba) i `Drogi Valyrii (VR): start sesji`.
+
+**Poprawki po recenzjach (20.10, recenzje "gra" i "technika" commitu 1a1c8df0):**
+- WAZNE (prawdziwe): szlak karawan Kyth - Saath byl pociety - regula C brala kulture najblizszej twierdzy dla srodka kazdego odcinka, a odcinki 92..127
+  lamanej 45 (34.8 z 166.3 jedn., 21%) maja najblizszy zamek Sambandos (ROT_castle52, norvos, ok. 1118, 541) - zostawaly traktem +15% miedzy kawalkami +7.5%.
+  Sprawdzone przeliczeniem po wszystkich lamanych (glab Essos ma tylko 45: 79%, 84: 100%, 236: 100%). Poprawka: generator v2 klasyfikuje cala lamana
+  (glab Essos >= 50% dlugosci poza V -> cala lamana C; ponizej 50% - cala trakt, z notatka w naglowku pliku). Plik po przebiegu: wiersz `45 0 176 C`, C 198
+  odcinkow, 195.5 jedn. (bylo 162 / 160.7); V i mosty bez zmian. Prog VR-0 C 150..170 -> 185..205 jedn.
+- drobne (prawdziwe): brak `DayProfile.Lap` po `MapRoadKinds.Daily()` - koszt audytu VR szedl na konto `MapMud.Daily`. Dopisane; przy okazji `LMax` 320 (wyzej).
+- drobne (prawdziwe): "klasy tak" w linii VR zawsze (AdjCls przydzielane bezwarunkowo). Nowe pole `Graph.Classes = pcls != null` - log mowi "nie", gdy plik
+  rodzajow brak albo straznik md5 go wylaczyl; prog VR-5 moze teraz zawiesc.
+- drobne (prawdziwe): audyt gracza w linii DR uzywal `g.Kind` - gracz na drodze Valyrii / szlaku = "na drodze tak" i NDR-6 porownywal 25% / 7.5% z 15%
+  (falszywe NIE). Teraz `KindEff`: "tak" tylko na zwyklym trakcie, dla V / C dopisek rodzaju. Sprawdzone na wycinku linii DR z logu 12-25-19: linia z
+  nowym zapisem - NDR-6 INFO, kontrola w starym zapisie ("tak", 25%) - NDR-6 NIE.
+- Prosba Jeffa "menu zamku tez uporzadkuj": nie w tej galezi - robi ja galaz w-toku/m96-zamek (09f65934, klucz CastleMenuTidy).

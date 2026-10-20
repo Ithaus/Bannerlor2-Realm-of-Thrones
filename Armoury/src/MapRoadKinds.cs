@@ -21,7 +21,8 @@ namespace Armoury
     /// demon road Volantis - Mantarys - (ruiny Bhorash) - Meereen z odnoga do Tolos; Pentos - Ghoyan Drohe - Norvos - Qohor.
     ///
     /// DANE: ModuleData/arm_map_roads_valyria.tsv (tools/drogi/drogi_valyria.py): odcinki farby V (droga Valyrii - najkrotsza trasa po farbie miedzy miastami
-    /// trasy; 823 jedn.), C (szlak karawan - farba w glebi Essos: najblizsza twierdza kultury khuzait / sarnor / ibbenese / yiti / qartheen; 161 jedn.) i B
+    /// trasy; 823 jedn.), C (szlak karawan - cala lamana farby w glebi Essos: co najmniej polowa jej dlugosci ma najblizsza twierdze kultury khuzait / sarnor /
+    /// ibbenese / yiti / qartheen; v2 po recenzji - v1 brala odcinki osobno i ciela Kyth - Saath; 195.5 jedn.) i B
     /// (most Valyrii przez przerwe farby do 8 jedn. - lamane sondy urywaja sie pod miastami i przy brodach; 7 mostow, 26.8 jedn.). Bez wiersza = trakt.
     /// STRAZNIK: naglowek roads_md5 = md5 tekstu pliku drog (bez '\r'); inny plik drog = rodzaje nieczynne z powodem w linii startu (wszystko trakt).
     ///

@@ -106,6 +106,7 @@ namespace Armoury
             public bool[] AdjDirect;   // prosta cieciwa przechodzi po siatce gry (sprawdzone raz przy budowie) - bez wywolania silnika w planowaniu
             public byte[] AdjCls;      // m96-valyria: klasa krawedzi (MapRoadKinds: trakt, Valyria, szlak karawan, most Valyrii) - waga w Dijkstrze z Eff
             public int Bridges;        // m96-valyria: mosty Valyrii w sieci
+            public bool Classes;       // m96-valyria: rodzaje drog wczytane (PointClasses != null) - bez nich wszystkie krawedzie to Trakt (tylko log)
             public double ValLength, CarLength;   // m96-valyria: dlugosc krawedzi Valyrii (z mostami) i szlakow karawan (tylko log)
             public float GX0, GY0, GInv;
             public int GNx, GNy;
@@ -814,7 +815,7 @@ namespace Armoury
                 _g = g;
                 _note = "siec z pliku " + MapRoads.FileName;
                 MapRoadKinds.AiNote = "siec AI drog: mosty Valyrii " + g.Bridges + ", krawedzie Valyrii " + g.ValLength.ToString("0", Inv) + " jedn., szlakow karawan "
-                                      + g.CarLength.ToString("0", Inv) + " jedn. (klasy " + (g.AdjCls != null ? "tak" : "nie") + ")";   // m96-valyria: do linii VR
+                                      + g.CarLength.ToString("0", Inv) + " jedn. (klasy " + (g.Classes ? "tak" : "nie") + ")";   // m96-valyria: do linii VR
             }
             catch (Exception e) { _g = null; _note = "blad budowy sieci (" + e.GetType().Name + ")"; Log.Error("AiRoadRoutes.Build", e); }
             return (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
@@ -961,6 +962,7 @@ namespace Armoury
             for (int i = 0; i < np; i++) nodeOf[i] = keep[i] ? nn++ : -1;
             var g = new Graph();
             g.Nodes = nn; g.Points = np; g.Lines = lines; g.Joins = joinA.Count;
+            g.Classes = pcls != null;   // m96-valyria (recenzja: AdjCls jest zawsze - "klasy" z pliku rodzajow)
             g.X = new float[nn]; g.Y = new float[nn]; g.Face = new PathFaceRecord[nn]; g.Ok = new bool[nn]; g.Island = new int[nn];
             for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { g.X[nodeOf[i]] = xs[i]; g.Y[nodeOf[i]] = ys[i]; }
             // krawedzie: kolejne wezly lamanej + rozstaje

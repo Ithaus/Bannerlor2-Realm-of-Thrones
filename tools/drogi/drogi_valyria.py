@@ -11,16 +11,17 @@
 # Pentos - Ghoyan Drohe - Norvos - Qohor. Zadnej innej trasy zrodlo nie potwierdza (Selhorys - Volantis: brak potwierdzenia - zwykly trakt).
 # REGULA V: najkrotsza trasa po sieci farby ROT miedzy kolejnymi miastami trasy (Dijkstra po punktach lamanych; konce lamanych laczone z najblizszym
 # punktem innej lamanej do JOIN_R jedn. - jak siec AI drog w AiRoadRoutes.cs). Odcinki na trasie = V (dokladnie te odcinki, nie cale lamane).
-# REGULA C: odcinek farby (nie V), ktorego srodek ma najblizsza twierdze (miasto / zamek) kultury glebi Essos - stepy Dothrakow (khuzait), Sarnor,
-# Ibben, Yi Ti, Qarth (DEEP) - lore nie zna tam drog, tylko szlaki karawan. Reszta Essos (Wolne Miasta, Rhoyne, Zatoka Niewolnicza, Valyria) i
-# caly Westeros - zwykly trakt (bez wiersza).
+# REGULA C (v2, recenzja 20.10): CALA lamana farby (poza odcinkami V), gdy odcinki, ktorych srodek ma najblizsza twierdze (miasto / zamek) kultury glebi
+# Essos - stepy Dothrakow (khuzait), Sarnor, Ibben, Yi Ti, Qarth (DEEP) - to co najmniej DEEP_SHARE jej dlugosci poza V; lore nie zna tam drog, tylko szlaki
+# karawan. (v1 brala kazdy odcinek osobno - zamek innej kultury przy drodze cial szlak Kyth - Saath na trzy kawalki.) Reszta Essos (Wolne Miasta, Rhoyne,
+# Zatoka Niewolnicza, Valyria) i caly Westeros - zwykly trakt (bez wiersza).
 # Wyjscie: naglowek (wersja, roads_md5 = md5 tekstu pliku drog bez '\r' - straznik w grze: inny plik drog = rodzaje nieczynne) i wiersze
 # road, seq0, seq1, kind, route, road2, seq2: V / C - odcinki lamanej road od punktu seq0 do seq1 (odcinek k laczy punkt k-1 z k, k w (seq0, seq1]),
 # road2 = seq2 = -1; B (most Valyrii przez przerwe farby do GAP_R jedn.) - prosty odcinek Valyrii od punktu (road, seq0) do punktu (road2, seq2).
 import argparse, hashlib, heapq, math, os, re, sys
 from collections import defaultdict
 
-VERSION = 1
+VERSION = 2          # v2: regula C po calej lamanej (v1 po odcinku)
 JOIN_R = 0.6
 GAP_R = 8.0          # przerwa farby (pod miastem, przy brodzie - lamane sondy urywaja sie) do tylu jedn. = MOST trasy Valyrii (odcinek prosty)
 GAP_COST = 1.5       # most w Dijkstrze drozszy od farby (trasa woli farbe)
@@ -32,6 +33,7 @@ ROUTES = [
     ('ghoyan_drohe_norvos_qohor', ['Ghoyan Drohe', 'Norvos', 'Qohor']),
 ]
 DEEP = {'khuzait', 'sarnor', 'ibbenese', 'yiti', 'qartheen'}
+DEEP_SHARE = 0.5     # lamana = szlak karawan, gdy glab Essos to co najmniej polowa jej dlugosci poza V (regula C po calej lamanej)
 
 
 def read_roads(path):
@@ -160,16 +162,27 @@ def main():
                             bridges[key] = route; nb += 1; lb += g
             notes.append('%s: %s - %s trasa %.1f jedn. (prosta %.1f), odcinkow farby %d, mostow przez przerwy farby %d (%.1f jedn.), miasto od farby %.1f / %.1f' % (
                 route, c0, c1, d, math.hypot(f1[1] - f0[1], f1[2] - f0[2]), n, nb, lb, ds, dt))
-    # C: glab Essos (najblizsza twierdza kultury DEEP), poza V
+    # C: glab Essos, poza V - CALA lamana (recenzja 20.10: regula po odcinku ciela Kyth - Saath - srodek lamanej 45, 34.8 jedn., ma najblizszy zamek
+    # Sambandos kultury norvos i zostawal traktem: szlak / trakt / szlak na jednej drodze miedzy dwoma miastami Sarnoru). Lamana jest szlakiem, gdy
+    # odcinki z najblizsza twierdza kultury DEEP to wiekszosc (>= DEEP_SHARE) jej dlugosci poza V; wtedy wszystkie jej odcinki poza V = C.
     def cult(x, y):
         return min(forts, key=lambda f: (f[1] - x) ** 2 + (f[2] - y) ** 2)[3]
     for r in L:
         p = L[r]
-        for k in range(1, len(p)):
-            if (r, k) in seg_kind:
-                continue
+        free = [k for k in range(1, len(p)) if (r, k) not in seg_kind]
+        tot = deep = 0.0
+        for k in free:
+            d = math.hypot(p[k][1] - p[k - 1][1], p[k][2] - p[k - 1][2])
+            tot += d
             if cult((p[k][1] + p[k - 1][1]) / 2, (p[k][2] + p[k - 1][2]) / 2) in DEEP:
+                deep += d
+        if tot > 0 and deep >= DEEP_SHARE * tot:
+            for k in free:
                 seg_kind[(r, k)] = ('C', 'deep_essos')
+            if deep < tot:
+                notes.append('szlak karawan: lamana %d - glab Essos %.1f z %.1f jedn. (%.0f%%) - cala lamana szlakiem' % (r, deep, tot, 100 * deep / tot))
+        elif deep > 0:
+            notes.append('trakt: lamana %d - glab Essos tylko %.1f z %.1f jedn. (%.0f%%) - zostaje traktem' % (r, deep, tot, 100 * deep / tot))
     # wiersze: ciagle przedzialy tego samego rodzaju i trasy w lamanej
     rows = []
     lenk = defaultdict(float)
@@ -194,7 +207,8 @@ def main():
     out.append('# version: %d' % VERSION)
     out.append('# roads_md5: %s' % md5)
     out.append('# routes (lore - awoiaf Valyrian roads): ' + '; '.join(rt + ' = ' + ' - '.join(cs) for rt, cs in ROUTES))
-    out.append('# caravan trails: segments whose nearest town / castle has a deep Essos culture (' + ', '.join(sorted(DEEP)) + ')')
+    out.append('# caravan trails: whole polylines (outside V) where segments whose nearest town / castle has a deep Essos culture (' + ', '.join(sorted(DEEP))
+               + ') make at least %d%% of the length' % round(100 * DEEP_SHARE))
     out.append('# rows: %d, valyrian: %.1f, caravan: %.1f, all painted: %.1f map units' % (len(rows), lenk['V'], lenk['C'], total))
     for nline in notes:
         out.append('# ' + nline)
