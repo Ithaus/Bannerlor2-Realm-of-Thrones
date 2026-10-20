@@ -4673,7 +4673,10 @@ namespace CrashScribe
                     for (int gi = 0; gi < guarded.Length; gi++)
                     {
                         var mg = AccessTools.Method(tVm, guarded[gi]);
-                        if (mg != null) harmony.Patch(mg, prefix: new HarmonyMethod(typeof(Mends), "VmNeedsItem"));
+                        // m96-kuznia (crash Jeffa 2026-10-20 14:27, Eyrie, kuznia z podmenu Go to the smithy): przedmiot jest, ale bez czesci broni
+                        // (ItemObject.Weapons => WeaponComponent?.Weapons = null) -> DoesCurrentItemHaveSecondaryUsage robi Weapons.Count i pada;
+                        // prefiks sprawdza teraz takze czesci broni, a finalizer polyka NullReference w tych odswiezeniach UI (bool -> false)
+                        if (mg != null) harmony.Patch(mg, prefix: new HarmonyMethod(typeof(Mends), "VmNeedsItem"), finalizer: new HarmonyMethod(typeof(Mends), mg.ReturnType == typeof(bool) ? "VmSafeBool" : "VmSafeVoid"));
                     }
                 }
             }
@@ -6437,9 +6440,39 @@ namespace CrashScribe
                 if (_fVmCrafting == null) _fVmCrafting = AccessTools.Field(__instance.GetType(), "_crafting");
                 var cr = _fVmCrafting != null ? _fVmCrafting.GetValue(__instance) as TaleWorlds.Core.Crafting : null;
                 if (cr == null) return true;
-                return cr.GetCurrentCraftedItemObject() != null;
+                var it = cr.GetCurrentCraftedItemObject();
+                // m96-kuznia: bez czesci broni (WeaponComponent / Weapons puste) odswiezenia UI nie maja czego liczyc
+                return it != null && it.WeaponComponent != null && it.Weapons != null && it.Weapons.Count > 0;
             }
             catch { return true; }
+        }
+
+        private static int _vmSwallowed;
+
+        /// <summary>m96-kuznia: finalizer odswiezen projektowania broni - NullReference przy przedmiocie bez czesci broni nie wywraca gry (wynik bool = false).</summary>
+        public static Exception VmSafeBool(Exception __exception, ref bool __result)
+        {
+            if (__exception == null) return null;
+            if (__exception is NullReferenceException || __exception is ArgumentOutOfRangeException)
+            {
+                __result = false; _vmSwallowed++;
+                if (_vmSwallowed <= 5) { try { Scribe.Line("Mends: kuznia - odswiezenie projektu broni bez czesci broni pominiete (" + __exception.GetType().Name + ", razem " + _vmSwallowed + ")."); } catch { } }
+                return null;
+            }
+            return __exception;
+        }
+
+        /// <summary>m96-kuznia: jak VmSafeBool dla metod bez wyniku.</summary>
+        public static Exception VmSafeVoid(Exception __exception)
+        {
+            if (__exception == null) return null;
+            if (__exception is NullReferenceException || __exception is ArgumentOutOfRangeException)
+            {
+                _vmSwallowed++;
+                if (_vmSwallowed <= 5) { try { Scribe.Line("Mends: kuznia - odswiezenie projektu broni bez czesci broni pominiete (" + __exception.GetType().Name + ", razem " + _vmSwallowed + ")."); } catch { } }
+                return null;
+            }
+            return __exception;
         }
 
         public static Exception SafeContribution(Exception __exception, ref float __result)
