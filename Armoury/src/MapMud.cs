@@ -104,10 +104,10 @@ namespace Armoury
             if (_suppress) return;
             var s = Settings.Current;
             if (!On(s)) return;
+            if (mp == null || !SpeedDepth.OutermostFinal) return;   // lancuch modeli - liczymy raz, na poziomie zewnetrznym
             long t0 = (++_calls & 63) == 1 ? Stopwatch.GetTimestamp() : 0L;
             try
             {
-                if (mp == null || !SpeedDepth.OutermostFinal) return;
                 if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress) return;   // morze i przejscie lad-morze - prawa morza
                 var c = Campaign.Current;
                 if (c == null) return;
