@@ -133,5 +133,5 @@ Qohor - wybor klingi `... (Masterwork)  x2` 0. Jedyne wyjatki byly w Qohor "Take
 - **Drobne - linia kontrolna nie mierzy wierszy okien: prawda, NIE zmieniane.** Autotest (5 dob + bitwa / 160 dob) nie otwiera okien wyboru (nikt nie klika),
   wiec licznik w `Pick` pokazalby 0 - nic by nie dowiodl. Szerokosc wierszy sprawdzona zamiast tego na pelnych spisach nazw ROT (metryki .fnt gry, skrypty
   pomiaru w `scratchpad/zb/n20-napisy-tmp`: `miara.py`, `linie.py`, `wiersze_mb.py`, `mody.py`). Okna zostaja do sprawdzenia na oko (Test w grze).
-- md5 DLL inne niz u autora: przyczyna nieustalona (recenzent budowal sam, mozliwie z innego katalogu albo stanu plikow); md5 i tak zmienia sie z kazda poprawka -
-  dla wgrania liczy sie build z tego HEAD: kod wyjscia 0 i 0 Error(s) (md5 ponizej, w raporcie).
+- md5 DLL inne niz u autora: build nie jest bajtowo powtarzalny - dwa buildy tego samego kodu (etap 4, bez zmian miedzy nimi) daly aef19090... i e601d2bc...
+  Dla wgrania liczy sie build z HEAD galezi: kod wyjscia 0 i 0 Error(s); md5 porownywac tylko miedzy plikiem zbudowanym a wgranym.
