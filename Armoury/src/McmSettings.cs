@@ -2924,6 +2924,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool OutlawNoUndead { get; set; } = true;
 
+        [SettingPropertyBool("Band Shields Stolen Arms", HintText = "bandits in battle no longer carry a bandit banner on their shields. A deserter or a soldier who fled a battle keeps the arms of the lord whose land he was raised from (else the nearest house of his own people, else his realm); a born outlaw carries shields stolen from the houses that hold the villages, castles and towns nearest the fight, a different one for each man. Never your own arms. Off = the bandit banner, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool BandShieldsStolenArms { get; set; } = true;
+
         [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles fought on the field are not touched (auto-resolved ones: Losers Flee Player Auto)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleeEnabled { get; set; } = true;
@@ -8810,6 +8814,7 @@ namespace Armoury
             s.OutlawReturnPeacePercent = OutlawReturnPeacePercent;
             s.OutlawRoutedShare = OutlawRoutedShare;
             s.OutlawNoUndead = OutlawNoUndead;
+            s.BandShieldsStolenArms = BandShieldsStolenArms;
             s.LosersFleeEnabled = LosersFleeEnabled;
             s.LosersFleePlayerAuto = LosersFleePlayerAuto;
             s.LosersFleeBesiegers = LosersFleeBesiegers;

@@ -264,6 +264,8 @@ namespace Armoury
                 ArmourQuality.ApplyAll(_harmony); // zbroja z zakladki CRAFT jak bron: prog, pekniecie i jakosc z kowalstwa (PO FletchForge i ForgeClock)
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
+                // n20-herby (Jeff 19.10): ludzie band w bitwie z herbami prawdziwych rodow na tarczach (prefiks High na Mission.SpawnAgent; klucz Band Shields Stolen Arms)
+                try { BandShields.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BandShields.ApplyAll", e); }
                 UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki
                 try { UniqueSpoils.ApplyAll(_harmony); } catch (Exception e) { Log.Error("UniqueSpoils.ApplyAll", e); }     // 177-2: przebranie bohatera przez gre zostawia unikaty i stal valyrianska w rekach
                 try { ValyrianBlades.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ValyrianBlades.ApplyAll", e); } // 177-2: przetop VS zablokowany, karawana DTE i nagroda turniejowa bez legend z niczego
@@ -446,6 +448,9 @@ namespace Armoury
                 if (Campaign.Current != null && mission != null) HorseFate.OnMissionInit(mission);
                 if (Settings.Current.FieldCraftEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FieldCraft());
+                // n20-herby: linia "Tarcze band (herby):" po rozstawieniu i na koniec misji (sam herb idzie w prefiksie SpawnAgent)
+                if (Settings.Current.BandShieldsStolenArms && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new BandShieldsWatch());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
