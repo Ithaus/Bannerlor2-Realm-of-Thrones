@@ -6924,6 +6924,10 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float FreeFolkLevyShare { get; set; } = 0.018f;
 
+        [SettingPropertyBool("Free Folk All Adults Fight", HintText = "with Free Folk Men From People: every grown man and woman of the Free Folk can fight - the spearwives too. Their host may hold as many as half of all their grown men and women at once (as many as all their men of fighting age, about 27% of their people - some 80,000 of 293,000); the other half hunt, herd and mind the young. Their numbers are then held by what holds every host: how many men the chiefs can lead, food, and the losses of war. Their garrisons grow only while they hold less than Free Folk Garrison Pool Share of all the Free Folk under arms, so most of them stay in the field. Off = at most Free Folk Levy Share of their people, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool FreeFolkAllAdultsFight { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Free Folk Garrison Pool Share", 0.00f, 1.00f, "0.00", HintText = "with Free Folk Men From People: the garrisons of the Free Folk grow only while all of them hold less than this share of the host (0.50 = half; garrisons above it stay, they only stop growing)", RequireRestart = false)]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float FreeFolkGarrisonPoolShare { get; set; } = 0.50f;
@@ -9966,6 +9970,7 @@ namespace Armoury
             s.FreeFolkUnpaid = FreeFolkUnpaid;
             s.FreeFolkMenFromPeople = FreeFolkMenFromPeople;
             s.FreeFolkLevyShare = FreeFolkLevyShare;
+            s.FreeFolkAllAdultsFight = FreeFolkAllAdultsFight;
             s.FreeFolkGarrisonPoolShare = FreeFolkGarrisonPoolShare;
             s.FreeFolkRecruitNeedsFood = FreeFolkRecruitNeedsFood;
             s.FairFiefGrants = FairFiefGrants;

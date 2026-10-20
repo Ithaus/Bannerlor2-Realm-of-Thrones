@@ -1977,6 +1977,9 @@ namespace Armoury
         /// <summary>WL2 czynne: klucz FreeFolkMenFromPeople przy WL1.</summary>
         internal static bool FfFromPeopleOn { get { var s = Settings.Current; return s != null && s.FreeFolkMenFromPeople && CrownGifts.FreeFolkUnpaidOn; } }
         private static double FfLevyShare(Settings s) { return Math.Max(0f, Math.Min(0.05f, s.FreeFolkLevyShare)); }
+        /// <summary>4.17: udzial ludzi regionow WL w puli - FreeFolkAllAdultsFight: polowa doroslych 16-60 (mezczyzni i wlocznice) = PeopleBook.MenShare
+        /// (jedna stala modelu demografii, REGULY-KRAIN 3.2); bez klucza - FreeFolkLevyShare (stan 1ffbd891).</summary>
+        private static double FfPoolShare(Settings s) { return s != null && s.FreeFolkAllAdultsFight ? PeopleBook.MenShare : FfLevyShare(s); }
         private static double FfGarShare(Settings s) { return Math.Max(0f, Math.Min(1f, s.FreeFolkGarrisonPoolShare)); }
 
         /// <summary>WL2: ludzie regionow krolestwa Wolnych Ludzi (warownia + jej wsie, region nalezy do krolestwa freefolk - ta sama liczba co "ludzie" w
@@ -2008,7 +2011,7 @@ namespace Armoury
             {
                 double people = FfPeople();
                 _ff.People = people;
-                if (people > 0) return (int)Math.Round(FfLevyShare(s) * people);
+                if (people > 0) return (int)Math.Round(FfPoolShare(s) * people);   // 4.17: przy FreeFolkAllAdultsFight polowa doroslych (MenShare)
             }
             return Math.Max(0, _ff.DCap);
         }
@@ -2210,12 +2213,15 @@ namespace Armoury
                 }
                 int cap = PoolCap(ff);   // WL1: pula rodu (Straz albo Wolni Ludzie)
                 if (cap < 0) return true;
-                if (PoolLiveMen(ff) < cap)   // 2: pula calej Strazy
+                int live = PoolLiveMen(ff);
+                if (live < cap)   // 2: pula calej Strazy
                 {
                     // WL2: zalogi Wolnych Ludzi rosna tylko, dopoki wszystkie razem < FreeFolkGarrisonPoolShare puli ([L] walcza w polu, nie w murach); ponad - stoja (bez zwolnien)
                     if (!ff || !FfFromPeopleOn) return true;
                     var s = Settings.Current;
-                    if (s == null || FfLiveGarrisons() < FfGarShare(s) * cap) return true;
+                    // 4.17 (FreeFolkAllAdultsFight): pula ok. 80 tys. nie trzyma zalog - udzial liczony od zywego wojska WL (min(pula, pod bronia)), jak opis klucza
+                    double gBase = s != null && s.FreeFolkAllAdultsFight ? Math.Min(cap, live) : cap;
+                    if (s == null || FfLiveGarrisons() < FfGarShare(s) * gBase) return true;
                     if (countFf) _ff.GarShareBlock++;
                     return false;
                 }
@@ -2231,10 +2237,10 @@ namespace Armoury
             var sb = new StringBuilder(400);
             sb.Append(" | Wolni Ludzie bez zoldu (WL1, Free Folk Unpaid ").Append(CrownGifts.FreeFolkUnpaidOn ? "tak" : "nie").Append("): w ludziach ").Append(_ff.Men)
               .Append(" (zalogi ").Append(_ff.Gar).Append(") / pula ").Append(_ff.Cap < 0 ? "-" : _ff.Cap.ToString(Inv))
-              .Append(" (").Append(FfFromPeopleOn && _ff.People > 0 ? "z ludu (WL2, Free Folk Men From People tak): " + (100.0 * FfLevyShare(s)).ToString("0.0", Inv) + "% x ludzie "
+              .Append(" (").Append(FfFromPeopleOn && _ff.People > 0 ? "z ludu (WL2, Free Folk Men From People tak): " + (100.0 * FfPoolShare(s)).ToString("0.0", Inv) + "% x ludzie "
                       + Math.Round(_ff.People).ToString("0", Inv) + "; " : (FfFromPeopleOn ? "WL2 tak, ludzi jeszcze nie policzono - pula ze zlota; " : "WL2 nie; "))
               .Append("ze zlota ").Append(_ff.DCap < 0 ? "-" : _ff.DCap.ToString(Inv)).Append(')')
-              .Append(", zalogi ").Append(_ff.Cap > 0 ? (100.0 * _ff.Gar / _ff.Cap).ToString("0", Inv) + "% puli" : "-").Append(" (rosna do ").Append((100.0 * FfGarShare(s)).ToString("0", Inv)).Append("%)")
+              .Append(", zalogi ").Append(_ff.Cap > 0 ? (100.0 * _ff.Gar / _ff.Cap).ToString("0", Inv) + "% puli" : "-").Append(" (rosna do ").Append((100.0 * FfGarShare(s)).ToString("0", Inv)).Append(s != null && s.FreeFolkAllAdultsFight ? "% wojska WL - 4.17)" : "%)")
               .Append("; werbunek wstrzymany: pula ").Append(_ff.RecruitBlock).Append(", jedzenie (WL3) ").Append(_ff.FoodBlock)
               .Append("; przyrost zalog wstrzymany: pula ").Append(_ff.GarBlock).Append(", zalogi ponad udzial puli (WL2) ").Append(_ff.GarShareBlock)
               .Append("; nowe partie wstrzymane ").Append(_ff.SpawnBlock)
@@ -2246,6 +2252,22 @@ namespace Armoury
               .Append(", zalogi ").Append(_ff.InGar).Append(", nowe partie ").Append(_ff.InSpawn).Append(", netto ponad znane drogi ").Append(Math.Max(0L, _ff.Net - known))
               .Append("; jency AI wstrzymani pula ").Append(_ff.PrisonBlock).Append(", WL3 przepuscil i po werbunku jedzenie ponizej progu ").Append(_ff.FoodMiss)
               .Append("; gracz-wasal WL: ").Append(CrownGifts.PlayerFreeFolkVassal ? "ludzi " + _ff.PlayerMen.ToString(Inv) + " (zalogi " + _ff.PlayerGar.ToString(Inv) + "), zold " + (_ffPlayerUnpaid ? "0 (w puli)" : "zwykly (armia WL ponad 1.05 x pula)") : "nie");
+            // 4.17: pula z doroslych, pod bronia i to, co naprawde trzyma wojsko WL tej doby (liczniki sprzed zerowania nizej)
+            bool adults = s != null && s.FreeFolkAllAdultsFight;
+            sb.Append(" | Wolni Ludzie - walcza wszyscy dorosli (4.17, Free Folk All Adults Fight ").Append(adults ? (FfFromPeopleOn ? "tak" : "tak, ale bez WL2 - nieczynne") : "nie").Append("): ");
+            if (_ff.People > 0)
+            {
+                double adultsN = 2.0 * PeopleBook.MenShare * _ff.People;   // dorosli 16-60, mezczyzni i wlocznice (2 x MenShare, model demografii)
+                sb.Append("ludzie ").Append(Math.Round(_ff.People).ToString("0", Inv)).Append(", dorosli 16-60 ok. ").Append(Math.Round(adultsN).ToString("0", Inv))
+                  .Append(" (mezczyzni i wlocznice, 2 x ").Append((100.0 * PeopleBook.MenShare).ToString("0", Inv)).Append("% ludzi)");
+            }
+            else sb.Append("ludzi jeszcze nie policzono");
+            sb.Append(", pula ").Append(_ff.Cap < 0 ? "-" : _ff.Cap.ToString(Inv)).Append(adults ? " (polowa doroslych)" : " (Free Folk Levy Share)")
+              .Append(", pod bronia ").Append(_ff.Men).Append(" (druzyny ").Append(_ff.Men - _ff.Gar).Append(", zalogi ").Append(_ff.Gar).Append(')')
+              .Append(" = ").Append(_ff.Cap > 0 ? (100.0 * _ff.Men / _ff.Cap).ToString("0.0", Inv) + "% puli" : "-")
+              .Append("; trzyma dzis: pula (werbunek ").Append(_ff.RecruitBlock).Append(", jency ").Append(_ff.PrisonBlock).Append(", nowe partie ").Append(_ff.SpawnBlock)
+              .Append(", zalogi ").Append(_ff.GarBlock).Append("), jedzenie WL3 ").Append(_ff.FoodBlock).Append(", zalogi ponad ").Append((100.0 * FfGarShare(s)).ToString("0", Inv))
+              .Append(adults ? "% wojska " : "% puli ").Append(_ff.GarShareBlock).Append("; reszte trzymaja limity druzyn gry, liczba wodzow, jedzenie i straty");
             _ff.RecruitBlock = _ff.GarBlock = _ff.SpawnBlock = _ff.FoodBlock = _ff.GarShareBlock = 0;
             _ff.PrisonBlock = _ff.FoodMiss = 0; _ff.InRecruit = _ff.InPrison = _ff.InGar = _ff.InSpawn = 0;
             return sb.ToString();
