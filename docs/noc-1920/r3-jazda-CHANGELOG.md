@@ -71,8 +71,8 @@ nowa kampania d120):
   jezdzcow - zabieramy wylacznie ponad nich i luz, wiec nic sie nie odkupuje. Sprawdzic w logu: "Zbrojownie zalog (171)" bez nowych odmow;
   "Stajnia AI (sklad7b-p)" - "jezdzcy bez konia po dosadzeniu" (Remount jest PRZED krokiem zalogi, wiec ta liczba zostaje, spada dopiero stan doby).
 - Zloto: wlasny rod - zero zlota; inny rod - przelew miedzy bohaterami (suma swiata bez zmian), w "Pieniadz swiata" jako przelew gry miedzy
-  postaciami; budzet F5 pomniejszony jak przy zakupie. Wyjatek w srodku przenoszenia od innego rodu przed zaplata zostawilby konie bez zaplaty -
-  licznik potkniec w linii (ma byc 0).
+  postaciami; budzet F5 pomniejszony jak przy zakupie. Zaplata w `finally` - za to, co naprawde przeszlo, takze gdy przenoszenie przerwie
+  wyjatek (licznik potkniec w linii ma byc 0). Kwota "za ... zl" w linii obejmuje konie i uprzaz.
 - Targi: nie dotykane bezposrednio; posrednio mniej zakupow z polek - polki koni (SZ-A8-2, "Konie (E6/0)") nie powinny spasc; regulator hodowli
   moze ciac dalej (mniejsze zuzycie z targu) - to zgodne z zasada "hodowla wedlug popytu".
 - Koszt: tylko przy postoju lorda w twierdzy swojego krolestwa: Balance zalogi (jeden przebieg slownika i rostera), patrole BK z mapy doby (bez
