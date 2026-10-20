@@ -3428,5 +3428,6 @@ przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok
   kopia logow co 10 min do D:/Backup-Bannerlord/logi-jeffa/2026-10-20). Jeff: "gram dalej monitoruj sesje i wyciagaj bledy jesli sa aby potem poprawic".
   NOWE ZADANIA (Jeff ze zrzutem menu Seagard, "robic w tle i potem wgramy"): (1) MENU MIASTA uporzadkowac - za duzo opcji; nocleg w karczmie pod "Go to the tavern district",
   wszystko kuzni pod jedna zakladka kuzni (wyjasnione po kolei), reszta pogrupowana; (2) ZAJAZD: po wejsciu gracz znika z mapy jak we wsi + odglosy karczmy.
-  Galezie w-toku/m95-menu, w-toku/m95-zajazd od e35e6f99 (= WGRANIE 94), workflow -> test po zamknieciu gry -> WGRANIE 95.
+  Galezie w-toku/m95-menu, w-toku/m95-zajazd od e35e6f99 (= WGRANIE 94), workflow -> test po zamknieciu gry -> WGRANIE 95.- 11:10 PDT Jeff: "4 denary za nocleg to nie za duzo? sprawdz czy stawki sa realne" -> ceny ludzi/koni realne (lozko ok. 1/3 dniowki rzemieslnika 3 d, jak w sredniowieczu);
+  zawyzony pokoj gracza we wspolnej izbie (3 d) -> w-toku/m95-nocleg 943cc411 (InnCommonRoomSharedBed: gracz jak czlowiek 1 d; sam z koniem 2 d zamiast 4), build 0 -> do 95.
 
