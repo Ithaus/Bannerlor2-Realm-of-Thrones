@@ -145,6 +145,7 @@ namespace Armoury
                 var r = new ExplainedNumber(f, includeDescriptions, _txt);
                 float b = Boost(town);
                 if (b > 0f) r.Add(b, _boostTxt);
+                EngAdd(town, f, b, ref r);   // R3-10b (BuildFunding.Engineering.cs): premia zarzadcy z Inzynierii i perki budowy do punktow pana i przyspieszenia zlotem
                 if (fl > 0f) r.Add(fl, _folkTxt);
                 __result = r;
             }
@@ -155,7 +156,7 @@ namespace Armoury
             if (_depth > 1 || !On || town == null) return;
             float fl = FolkHead(town);   // P2: punkty robot ludu (jak wyzej; recenzja 6 - tylko na budowle, za ktora lud zaplacil)
             if (!Covered(town)) { if (fl > 0f) __result += (int)fl; return; }
-            float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl);
+            float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl + EngExtra(town, f, 0f, false));   // R3-10b: premia zarzadcy (bez przyspieszenia zlotem)
         }
 
         // ------------------------------------------------------------ materialy BK wylaczone
@@ -201,7 +202,7 @@ namespace Armoury
         internal static void Daily()
         {
             if (!On || Campaign.Current == null) return;
-            _funded.Clear();
+            _funded.Clear(); EngDayStart();   // R3-10b: liczniki doby
             _paidTowns = _stalledNoMat = _warSkipped = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
             {
@@ -299,6 +300,7 @@ namespace Armoury
                     float pts = PointsFor(matSpent, labourI, ppp, market);
                     _wageIdxSum += WageIdx(market); _wageIdxN++;
                     _funded[st.Town] = pts;
+                    EngPaid(st.Town, pts);   // R3-10b: XP Inzynierii zarzadcy na miejscu i liczniki
                     _paidTowns++; _spent += matSpent + labourI; _toMarkets += matSpent; _toPurses += labourI; _points += pts;
                 }
             }
@@ -307,6 +309,7 @@ namespace Armoury
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
                      + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + WarFront.LineTail());
+            EngLine();   // R3-10b: linia "Inzynieria przy budowach"
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
         }

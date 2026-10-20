@@ -2224,6 +2224,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWagesByTown { get; set; } = true;
 
+        [SettingPropertyBool("Engineering On Paid Work", HintText = "a governor in his town speeds up the works his lord pays for, as in the base game: +0.25% for each point of his Engineering, and his Carpenters, Military Planner, Stonecutters and Clockwork perks count again; he gains 10 Engineering experience for each construction point the lord paid for. The townsfolk's own works are not sped up. Needs Paid Construction. Off = the paid works ignore the governor, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool EngineeringOnPaidWork { get; set; } = true;
+
         [SettingPropertyBool("Build Wood Above Craft Stock", HintText = "building works (the lord's and the townsfolk's) take timber off the market only above the stock the town keeps for its own smiths, bloomeries, workshops and households, never less than 40 loads (the same stock caravans fill for it - Caravan Bulk Stock Days of their use, building works not counted); below it the works buy the other materials or wait, so the armourers and fletchers are not left without wood. Off = the works buy timber down to the last piece (the townsfolk's works leave 50), as before", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWoodAboveCraftStock { get; set; } = true;
@@ -8823,6 +8827,7 @@ namespace Armoury
             s.BuildMaterialPriceCap = BuildMaterialPriceCap;
             s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
+            s.EngineeringOnPaidWork = EngineeringOnPaidWork;
             s.BuildWoodAboveCraftStock = BuildWoodAboveCraftStock;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
