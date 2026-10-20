@@ -999,6 +999,10 @@ Uzycie (Python 3, tylko odczyt):
                     obiegu z odczytow przed/po 0 i potkniecia 0, SN-3 sakiewki <= 15 dni zoldu (Obieg), SN-4 oszczednosci K1 <= 3 dni, SN-5 zalogi <= 10 dni,
                     SN-6 bez wzrostu w 28 dob, SN-7 "za malo w sakiewce" <= 2% "brak lepszej", SN-8 koszt, SN-9 przeplywy (INFO), SN-10 zakupy AI (braki +
                     lepsze) >= 80% bazy, SN-11 pokrycie korpusu lordow >= baza - 2 pp. Progi SN-3..7, 10, 11 po 14 dobach pelnej reguly. Log bez paczki: INFO.
+--grupa m96jakosc : (20.10, Jeff "za duzo jest legendary ... w sklepach za latwo mozna znalezc legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity)
+                    python -I tools/sprawdz_logi.py --grupa m96jakosc <Armoury-*.log> (strumieniowo). JQ-0 latki bez BRAK, JQ-1 linie doby rozpoznane,
+                    JQ-2/JQ-3 legendarne i mistrzowskie po wyrownaniu w limicie swiata (ponad limit tylko poza polkami albo w wyrobach gracza na polkach), JQ-4 obnizki tylko przesuwaja jakosc,
+                    JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO).
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
                     python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
                     (klucz, plik drog, rozstaje traktu >= 100), SZB-1 linie doby rozpoznane, SZB-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy
@@ -36508,6 +36512,139 @@ def nkarczmy_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96jakosc (20.10, Jeff "za duzo jest legendary przedmiotow ... w sklepach za latwo mozna znalezc
+# legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity). Progi JQ-x.
+M96JAKOSC_HEAD = "Jakosc przedmiotow (m96jakosc): "
+M96JAKOSC_ERR = "ERROR in QualityScarcity"
+M96JAKOSC_RX = {
+    "day": re.compile(r"dzien (\d+)"),
+    "rule": re.compile(r"\| regula (TAK|NIE)"),
+    "caps": re.compile(r"limit swiata: legendarne (\d+), mistrzowskie (\d+)"),
+    "before": re.compile(r"spis przed wyrownaniem: legendarne (\d+) \(polki (\d+)\), mistrzowskie (\d+) \(polki (\d+)\)"),
+    "after": re.compile(r"swiat po: legendarne (\d+) \(polki (\d+), juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), mistrzowskie (\d+) \(polki (\d+), "
+                        r"juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), dobre (\d+)"),
+    "new": re.compile(r"nowe od wczoraj: legendarne (\d+) \[([^\]]*)\], mistrzowskie (\d+) \[([^\]]*)\] z sztuk z jakoscia (\d+)"),
+    "game": re.compile(r"rzut gry odebrany: legendarne (\d+) \[[^\]]*\], mistrzowskie (\d+)"),
+    "capped": re.compile(r"zatrzymane limitem swiata: legendarne (\d+), mistrzowskie (\d+); przed pierwszym spisem (\d+)"),
+    "dem": re.compile(r"obnizki na polkach: legendarne->mistrzowskie (\d+), legendarne->dobre (\d+), mistrzowskie->dobre (\d+), do zwyklej \([^)]*\) (\d+)"),
+    "cost": re.compile(r"koszt ([\d.,]+) ms \| potkniecia (\d+)"),
+}
+
+
+def m96jakosc_parse(s):
+    """Linia doby 'Jakosc przedmiotow (m96jakosc): dzien N' -> slownik liczb albo None (nierozpoznana)."""
+    d = {}
+    for k, rx in M96JAKOSC_RX.items():
+        m = rx.search(s)
+        if not m:
+            return None
+        d[k] = m.groups()
+    I = lambda k, i: int(d[k][i] or 0)
+    # poprawki po recenzjach (20.10): wyroby gracza L/MW osobno (nietykalne - zostaja na polkach ponad limit), pociski bez celu, nieudane zdjecie;
+    # pola opcjonalne - linia sprzed poprawek ma tylko sume wyrobow
+    cr = re.search(r"wyroby gracza na polkach nietykalne (\d+)(?: \(legendarne (\d+), mistrzowskie (\d+)\))?", s)
+    sk = re.search(r"pominiete \(pociski bez celu\) (\d+), nieudane zdjecie z polki (\d+)", s)
+    crL = int(cr.group(2)) if cr and cr.group(2) else (int(cr.group(1)) if cr else 0)   # stara linia: suma wyrobow jako tolerancja dla L i MW
+    crM = int(cr.group(3)) if cr and cr.group(3) else (int(cr.group(1)) if cr else 0)
+    return {
+        "crL": crL, "crM": crM, "skip": int(sk.group(1)) if sk else 0, "fail": int(sk.group(2)) if sk else 0,
+        "day": I("day", 0), "on": d["rule"][0] == "TAK", "capL": I("caps", 0), "capM": I("caps", 1),
+        "L0": I("before", 0), "L0s": I("before", 1), "M0": I("before", 2), "M0s": I("before", 3),
+        "L": I("after", 0), "Ls": I("after", 1), "Lfix": I("after", 2) + I("after", 3) + I("after", 4) + I("after", 5),
+        "M": I("after", 6), "Ms": I("after", 7), "Mfix": I("after", 8) + I("after", 9) + I("after", 10) + I("after", 11), "F": I("after", 12),
+        "nL": I("new", 0), "nLsrc": d["new"][1], "nM": I("new", 2), "nMsrc": d["new"][3], "pieces": I("new", 4),
+        "gL": I("game", 0), "gM": I("game", 1), "cL": I("capped", 0), "cM": I("capped", 1), "pre": I("capped", 2),
+        "LM": I("dem", 0), "LF": I("dem", 1), "MF": I("dem", 2), "plain": I("dem", 3),
+        "ms": float(d["cost"][0].replace(",", ".")), "stum": int(d["cost"][1]),
+    }
+
+
+def m96jakosc_main(logp):
+    """m96jakosc (20.10; Armoury/src/QualityScarcity.cs, klucz QualityScarcity): rzut gry Legendary/Masterwork przy powstaniu sztuki przepada, wlasny rzut
+    (legendarna z tieru 5-6, mistrzowska z tieru 4-6) w limicie swiata ze spisu raz na dobe; nadmiar na polkach osad schodzi o stopien (nic nie znika).
+    JQ-0 linie startu i latek, JQ-1 linie doby rozpoznane, JQ-2/JQ-3 swiat po wyrownaniu w limicie (albo polki puste, gdy limit zajmuja juki, bohaterowie
+    i gracz), JQ-4 obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol), JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO, udzialy),
+    JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 pierwsze wyrownanie i zrodla nowych (INFO). Wejscie: log Armoury (strumieniowo)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("JQ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, wired, days, bad = [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96JAKOSC_HEAD):
+                rest = s[len(M96JAKOSC_HEAD):]
+                if rest.startswith("start sesji"):
+                    starts.append(rest)
+                elif rest.startswith("wpiete"):
+                    wired.append(rest)
+                elif rest.startswith("dzien "):
+                    p = m96jakosc_parse(s)
+                    (days.append(p) if p else bad.append(s))
+            elif s.startswith(M96JAKOSC_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, latek {len(wired)}, doby {len(days)} (nierozpoznanych {len(bad)}), ERROR {n_err}")
+    if not starts and not days and not bad and not wired and n_err == 0:
+        rep.add("JQ-0: linie 'Jakosc przedmiotow (m96jakosc)'", "brak w logu", "INFO (log sprzed paczki m96-jakosc)", None)
+        rep.show()
+        return 0
+    if wired:
+        rep.add("JQ-0: latki (droga gry, lup gracza, nagroda zaciagu ROT)", wired[-1][:220], "bez slowa BRAK", "BRAK" not in wired[-1])
+    else:
+        rep.add("JQ-0: latki", "brak linii 'wpiete'", "linia z menu glownego", None)
+    if starts:
+        rep.add("JQ-0b: start sesji (klucz, limity, spis przy wczytaniu)", starts[-1][:300], "INFO", None)
+    rep.add("JQ-1: linie doby rozpoznane", f"rozpoznane {len(days)}, nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""),
+            "nierozpoznane 0, rozpoznane > 0", len(bad) == 0 and len(days) > 0)
+    on_days = [d for d in days if d["on"]]
+    if on_days:
+        # ponad limit dopuszczalne tylko poza polkami - albo na polkach w sztukach, ktorych regula nie rusza (wyroby gracza, pociski bez celu)
+        badL = [d["day"] for d in on_days if d["L"] > d["capL"] and d["Ls"] - d["crL"] - d["skip"] > 0]
+        badM = [d["day"] for d in on_days if d["M"] > d["capM"] and d["Ms"] - d["crM"] - d["skip"] > 0]
+        last = on_days[-1]
+        rep.add("JQ-2: legendarne na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['L']} (polki {last['Ls']}, w tym wyroby gracza {last['crL']}, poza polkami {last['Lfix']}) przy limicie {last['capL']}; "
+                f"dob ponad limitem z polkami niepustymi {len(badL)}" + (f" (np. {badL[0]})" if badL else ""), "0 dob (ponad limit tylko poza polkami)", not badL)
+        rep.add("JQ-3: mistrzowskie na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['M']} (polki {last['Ms']}, w tym wyroby gracza {last['crM']}, poza polkami {last['Mfix']}) przy limicie {last['capM']}; "
+                f"dob ponad limitem z polkami niepustymi {len(badM)}" + (f" (np. {badM[0]})" if badM else ""), "0 dob", not badM)
+        cons = [d["day"] for d in on_days if (d["L0"] + d["M0"]) - (d["L"] + d["M"]) != d["LF"] + d["MF"] + d["plain"]]
+        rep.add("JQ-4: obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol, sztuk tyle samo)", f"dob z rozjazdem {len(cons)}" + (f" (np. {cons[0]})" if cons else ""),
+                "0", not cons)
+        over = []
+        prev = None
+        for d in days:
+            if prev is not None and d["on"] and d["day"] == prev["day"] + 1:
+                if d["nL"] > max(0, d["capL"] - prev["L"]) or d["nM"] > max(0, d["capM"] - prev["M"]):
+                    over.append(d["day"])
+            prev = d
+        rep.add("JQ-5: nowe legendarne i mistrzowskie w granicy miejsca z wczoraj", f"dob ponad miejsce {len(over)}" + (f" (np. {over[0]})" if over else ""),
+                "0 (nowe <= limit - swiat po wyrownaniu doby wczesniej)", not over)
+        pcs = sum(d["pieces"] for d in on_days)
+        gL = sum(d["gL"] for d in on_days)
+        gM = sum(d["gM"] for d in on_days)
+        nL = sum(d["nL"] for d in on_days)
+        nM = sum(d["nM"] for d in on_days)
+        rep.add("JQ-6: rzut gry odebrany / nowe z reguly (cala sesja)", f"sztuk z jakoscia {pcs}: rzut gry legendarne {gL} ({(100.0 * gL / pcs) if pcs else 0:.2f}%), mistrzowskie {gM} "
+                f"({(100.0 * gM / pcs) if pcs else 0:.2f}%); z reguly legendarne {nL}, mistrzowskie {nM}; zatrzymane limitem {sum(d['cL'] for d in on_days)}/{sum(d['cM'] for d in on_days)}",
+                "INFO (gra RBM: ok. 4.3% i 8.7% sztuk warsztatu - teraz zwykle)", None)
+        f0 = on_days[0]
+        rep.add("JQ-9: pierwsze wyrownanie (stary swiat)", f"doba {f0['day']}: legendarne {f0['L0']} (polki {f0['L0s']}) -> {f0['L']}, mistrzowskie {f0['M0']} (polki {f0['M0s']}) -> {f0['M']}; "
+                f"obnizki L->MW {f0['LM']}, L->dobre {f0['LF']}, MW->dobre {f0['MF']}, do zwyklej {f0['plain']}", "INFO", None)
+        rep.add("JQ-9b: zrodla nowych (ostatnia doba)", f"legendarne [{last['nLsrc']}], mistrzowskie [{last['nMsrc']}]", "INFO", None)
+    else:
+        rep.add("JQ-2..6: regula", "brak dob z regula TAK", "INFO (klucz Quality Scarcity wylaczony - sam spis)", None)
+    stum = days[-1]["stum"] if days else 0
+    rep.add("JQ-7: potkniecia i ERROR paczki", f"potkniecia {stum}, ERROR {n_err}", "0 i 0", stum == 0 and n_err == 0)
+    if days:
+        mx = max(d["ms"] for d in days)
+        rep.add("JQ-8: koszt doby (spis + wyrownanie)", f"najwiecej {mx:.1f} ms, srednio {sum(d['ms'] for d in days) / len(days):.1f} ms", "<= 250 ms", mx <= 250.0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ p6szubienice (20.10, p6-szubienice R3-07a: szubienice przy rozstajach po rozbitej bandzie / kryjowce;
 # Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows). Progi SZB-x (SZ-x to grupa szturm).
 P6SZUBIENICE_HEAD = "Szubienice (p6): "
@@ -53135,6 +53272,8 @@ def main(argv):
         return p6szubienice_main(logp)   # p6szubienice (20.10, p6-szubienice R3-07a): szubienice przy rozstajach po rozbitej bandzie / kryjowce (Gallows, GallowsView)
     if group == "m96zamek" and logp:
         return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
+    if group == "m96jakosc" and logp:
+        return m96jakosc_main(logp)   # m96jakosc (20.10, Jeff "za duzo legendary"): rzadkosc legendarnych i mistrzowskich - limit swiata, wyrownanie polek (QualityScarcity)
     if group == "nzajazdy" and logp:
         return nzajazdy_main(logp)   # nzajazdy (17.10, sw-zajazdy): zajazdy przy szlakach wedlug ludzi, nocleg -> kiesa wsi, plotki bez wyjatkow, obrazek raz na mape (RoadsideInns, Rumours)
     if group == "m96sakiewki" and logp:

@@ -5208,6 +5208,26 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiHarnessSurplusSell { get; set; } = true;
 
+        [SettingPropertyBool("Quality Scarcity", HintText = "legendary and masterwork pieces are rare: the town workshops, the loot you strip from the fallen and the other ways the world makes kit no longer turn out a legendary piece every twenty-odd and a masterwork every dozen - such a roll now gives a plain piece. Only a piece someone truly makes - in a town workshop, or a tournament prize the town's craftsmen make for you - can still come out legendary (from a top-tier 5-6 piece) or masterwork (tier 4 and up), and only while the world holds fewer than its limit (Quality Legendary World Cap / Quality Masterwork World Cap, counted once a day: shop stalls, packs, merchants' carts on the road, every hero's gear and yours). Pieces beyond the limit lying on the stalls of towns, castles and villages drop one step at the end of the day - legendary to masterwork while there is room, else to fine; masterwork to fine; the finest are kept. Nothing vanishes and no coin moves. Your bags, your stash, your clan's heroes and weapons you forged yourself are never touched; your own forge works as before (off = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool QualityScarcity { get; set; } = true;
+
+        [SettingPropertyInteger("Quality Legendary World Cap", 0, 200, "0", HintText = "how many legendary pieces the whole world may hold (with Quality Scarcity): stalls, packs, heroes' gear and yours together; beyond it no new one is made and the extra ones on the stalls drop to masterwork or fine", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityLegendaryWorldCap { get; set; } = 6;
+
+        [SettingPropertyInteger("Quality Masterwork World Cap", 0, 2000, "0", HintText = "how many masterwork pieces the whole world may hold (with Quality Scarcity); beyond it no new one is made and the extra ones on the stalls drop to fine", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityMasterworkWorldCap { get; set; } = 60;
+
+        [SettingPropertyFloatingInteger("Quality Legendary Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one top-tier piece (tier 5-6) made in a town workshop (or a tournament prize the town's craftsmen make) comes out legendary, while the world limit has room (0.001 = one in a thousand)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public float QualityLegendaryChance { get; set; } = 0.001f;
+
+        [SettingPropertyFloatingInteger("Quality Masterwork Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one piece of tier 4 or higher made in a town workshop (or a tournament prize the town's craftsmen make) comes out masterwork, while the world limit has room (0.004 = one in two hundred and fifty)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public float QualityMasterworkChance { get; set; } = 0.004f;
+
         [SettingPropertyBool("Mend Fraction Memory", HintText = "with Self Repair Same Rule on: the bit of each material that a repair at your own anvil uses but that does not make a whole piece is not lost - it is tallied (one tally per material in your bags, kept in the save) and a whole piece comes off your bags once the tally reaches one (several at once if more); when the pieces due are not in your bags the repair waits, as for any missing material (off = as before: each material rounded to whole pieces per repair, a light repair may take none at all)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendFractionMemory { get; set; } = true;
@@ -9881,6 +9901,11 @@ namespace Armoury
             s.AiSkipTownsfolkDress = AiSkipTownsfolkDress;
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
             s.AiHarnessSurplusSell = AiHarnessSurplusSell;
+            s.QualityScarcity = QualityScarcity;
+            s.QualityLegendaryWorldCap = QualityLegendaryWorldCap;
+            s.QualityMasterworkWorldCap = QualityMasterworkWorldCap;
+            s.QualityLegendaryChance = QualityLegendaryChance;
+            s.QualityMasterworkChance = QualityMasterworkChance;
             s.MendFractionMemory = MendFractionMemory;
             s.MendTakeByKind = MendTakeByKind;
             s.SmallFixes8 = SmallFixes8;

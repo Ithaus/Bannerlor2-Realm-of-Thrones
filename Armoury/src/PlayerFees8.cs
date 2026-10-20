@@ -595,6 +595,7 @@ namespace Armoury
             // Pieniadz bez zrodla z niczego (kasa -> kiesa ludu); gdy kasy brak - rzemieslnicy dostaja, ile jest, przedmiot i tak (obiecany w szrankach).
             if (Settings.Current != null && Settings.Current.TourneyPrizeCommissioned)
             {
+                QualityScarcity.Commissioned(mine, ref el, st);   // m96-jakosc: miasto placi cene zwyklej - jakosc z rzutu RBMTournament przez regule warsztatow
                 int paidC = 0;
                 try
                 {
