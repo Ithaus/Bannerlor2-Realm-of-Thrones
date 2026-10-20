@@ -422,6 +422,13 @@ namespace Armoury
                     Log.Error("Gallows: komponent widoku nie laduje sie (proba " + _gallowsLoadFails + "/3)", e);
                 }
             }
+            // m95-zajazd: straznik pobytu w zajezdzie (4 razy na sekunde; poza pobytem i przy wylaczonym kluczu - nic; bez typow SandBox.View, wlasny try w srodku) -
+            // tu tylko blad ladowania typu, liczony (po 3 straznik nie startuje do konca sesji, gra bez zmian)
+            if (_innStayFails < 3)
+            {
+                try { RoadsideInnStay.AppTick(); }
+                catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -442,6 +449,7 @@ namespace Armoury
 
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
+        private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RoadsideInnsTick()

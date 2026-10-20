@@ -69,6 +69,13 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>m95-zajazd (RoadsideInnStay): uid zajazdu, w ktorym gracz spi teraz po oplaconym noclegu (faza 1, partia przy zajezdzie - RoadNear); inaczej null.</summary>
+        internal static string RoadSleepUid()
+        {
+            var r = _rest;
+            return r != null && r.Phase == 1 && r.RoadUid != null && RoadNear(r) ? r.RoadUid : null;
+        }
+
         /// <summary>NightRest.SleepInit poza osada po oplaconym noclegu w zajezdzie: poczatek snu, pobudka nie przed switem (gdy swit w 12 h), tlo wsi, tekst.
         /// null = to nie sen w zajezdzie (tekst NightRest jak dotad).</summary>
         private static string RoadSleepInit(MenuCallbackArgs args, Rest r)
@@ -91,6 +98,7 @@ namespace Armoury
                 if (!string.IsNullOrEmpty(mesh)) args.MenuContext.SetBackgroundMeshName(mesh);
             }
             catch { }
+            RoadsideInnStay.OnSleepInit(args, r.RoadUid);   // m95-zajazd: sen w zajezdzie - partia schowana (po wczytaniu w trakcie snu tez; wlasny try); dzwiek - RoadsideInnStay.InnSleepSound
             string bed = r.Q == 2 ? "The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds"
                        : r.Q == 1 ? "The men drink their ale by the hearth of " + r.Town + " and sleep in beds"
                        : "The men bed down on the straw of the common room of " + r.Town + ", the horses in the yard";

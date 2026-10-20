@@ -4868,6 +4868,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipLeaderNames { get; set; } = true;
 
+        [SettingPropertyBool("Roadside Inn Hide Party", HintText = "while you are inside a roadside inn - in its menu or asleep in its beds - your party disappears from the map, as it does when you enter a village: no rider, no horse and no name over the inn, nor the parties of an army you lead. It comes back when you ride on, wake, or a fight or anything else draws you out. Off = your party stays on the map next to the inn, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnHideParty { get; set; } = true;
+
+        [SettingPropertyBool("Roadside Inn Tavern Sound", HintText = "a roadside inn sounds like one: inside you hear the hubbub of a tavern (the game's own sound of the town taverns) and the door as you go in, and it goes on while you sleep there. Off = a silent inn menu, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnTavernSound { get; set; } = true;
+
         [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
@@ -9736,6 +9744,8 @@ namespace Armoury
             s.InnGossip = InnGossip;
             s.InnGossipLootWords = InnGossipLootWords;
             s.InnGossipLeaderNames = InnGossipLeaderNames;
+            s.RoadsideInnHideParty = RoadsideInnHideParty;
+            s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.InnGossipPages = InnGossipPages;
             s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
