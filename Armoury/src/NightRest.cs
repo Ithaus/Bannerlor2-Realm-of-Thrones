@@ -137,7 +137,7 @@ namespace Armoury
                 MasterSwitch(s);   // T10 poprawka recenzji: przelacznik glowny wylaczony w trakcie gry - jednorazowo wszystko na stare
                 // noc 15/16.10 (NightLedgerClock): godzina ksiegi z terminu ticku godzinowego gry - raz na tick, przed ksiega AI i gracza (NightClock.cs)
                 NightClock.Tick(s);
-                if (s == null || !s.NightRestEnabled) return;
+                if (s == null || !s.NightRestEnabled) { ForcedMarch.Cancel("ksiega snu wylaczona"); return; }   // R3-08c recenzja: bez ksiegi rozkaz schodzi
                 // noc 15/16.10 (PlayerSleepGuard): sen w menu przerwany atakiem albo innym menu (gra przelacza menu na spotkanie, a _sleeping zdejmowal tylko
                 // LeaveSleep) - koniec snu bez wywolan menu; PRZED ksiega AI, bo doczepieni do gracza czytaja _sleeping (SleepsWithLeader)
                 if (_sleeping && s.PlayerSleepGuard)
@@ -150,10 +150,10 @@ namespace Armoury
                 // ponizsze wyjscia dotycza juz tylko ksiegi gracza
                 try { AiHourly(s, NightClock.Hour); } catch (Exception e) { Log.Error("NightRest.AiHourly", e); }
                 var mp = MobileParty.MainParty;
-                if (mp == null || Hero.MainHero == null || !Hero.MainHero.IsAlive) return;
+                if (mp == null || Hero.MainHero == null || !Hero.MainHero.IsAlive) { ForcedMarch.Cancel("bohater gracza nie zyje"); return; }   // R3-08c recenzja
                 // umarli nie spia: armia Innych nie zna dlugu snu
                 if (Undead.Party(mp) || Undead.Character(Hero.MainHero.CharacterObject))
-                { Debt = 0; DawnDebt = 0; _restTonight = 0f; return; }
+                { Debt = 0; DawnDebt = 0; _restTonight = 0f; ForcedMarch.Cancel("Nieumarli"); return; }
 
                 var pos = mp.GetPosition2D;
                 bool hadPos = _hadPos;   // noc 15/16.10: przed nadpisaniem - tick nadrabiany powtarza godzine tylko przy znanej poprzedniej pozycji
@@ -189,7 +189,7 @@ namespace Armoury
                 if (s.NightLedgerClock && NightClock.CatchUp && hadPos) { resting = _lastRestPlayer; movedH = _lastMovedPlayer; }
                 _lastRestPlayer = resting; _lastMovedPlayer = movedH;
                 // R3-08c (ForcedMarch.cs): godzina marszu forsownego - konce same, licznik zmeczenia; odpoczynek tej godziny sie nie liczy
-                bool forced = ForcedMarch.Hour(s, mp, h);
+                bool forced = ForcedMarch.Hour(s, mp, movedH);
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
                 if (resting && !forced) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
@@ -317,6 +317,7 @@ namespace Armoury
                     int debtBefore = Debt; float restBefore = _restTonight; bool sleepingNow = _sleeping, creditedBefore = _credited;
                     int marchH = _marchHoursDay, autoCamps = _autoCampDay, cuts = _sleepCutDay;
                     _lastDawnMsg = null;
+                    ForcedMarch.Dawn(s, restBefore, sleepingNow);   // R3-08c recenzja: zanik zmeczenia z odpoczynkiem doby PO godzinie 5-6, przed zerowaniem doby
                     SettleNight(s);
                     LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts);
                     _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0;

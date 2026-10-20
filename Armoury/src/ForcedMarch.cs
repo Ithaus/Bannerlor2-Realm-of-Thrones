@@ -20,8 +20,11 @@ namespace Armoury
     ///     jedna noc dlugu. Przy marszu bez przerwy daje to 2 noce na dobe (co 12 h); krotszy zryw zostawia "zmeczenie" (licznik godzin), ktore przechodzi na
     ///     nastepny marsz forsowny i schodzi o 2 h za kazda dobe zwyklego wypoczynku (baza snu i zero godzin marszu forsownego) - nie ma darmowych zrywow
     ///     przez wylaczanie przed 24 h. Kary dlugu juz sa (NightRest: predkosc -25/-40/-90%, morale -25/-40/-95%); dlug 3 = zapasc, rozkaz sie konczy.
-    ///   Koniec sam: oboz (klawisz O, menu, oboz BK), sen w menu, wejscie do osady, niewola, sluzba ROT, doczepienie do cudzej armii, morze, dlug 3,
-    ///   wylaczenie klucza albo ksiegi snu. Stan w zapisie (arm_forcedmarch przez SaveText.Sync): wlaczony, licznik zmeczenia, godziny w biezacej dobie.
+    ///   Koniec sam: oboz (klawisz O, menu, oboz BK), sen w menu, wejscie do osady, oboz obleznikow, 3 h postoju bez ruchu, niewola, sluzba ROT,
+    ///   doczepienie do cudzej armii, morze, dlug 3, Nieumarli, smierc bohatera, wylaczenie klucza albo ksiegi snu.
+    ///   Stan w zapisie (arm_forcedmarch przez SaveText.Sync): wlaczony, licznik zmeczenia, godziny w biezacej dobie.
+    ///   Recenzja 20.10: zanik zmeczenia liczony w galezi switu NightRest (Dawn) z odpoczynkiem doby PO doliczeniu ostatniej godziny nocy (5-6) i snem
+    ///   w menu (jak sleptBase w SettleNightCore) - wczesniej zwykla noc 0-6 dawala tu 5 h i zanik nigdy nie zachodzil.
     /// Watki: SpeedBonus wolany z liczenia predkosci (rownolegle) czyta tylko pole volatile i ustawienia, bez alokacji; reszta z watku glownego.
     /// Log: "Marsz forsowny (R3-08c):" - wlaczenie, koniec (powod), krok dlugu i linia switu gracza z licznikami doby.
     /// </summary>
@@ -29,7 +32,9 @@ namespace Armoury
     {
         private const float DebtHours = 24f;      // godziny marszu forsownego na jedna dodatkowa noc dlugu (razem ze switem: co 12 h przy marszu bez przerwy)
         private const float FadePerDay = 2f;      // o tyle godzin schodzi zmeczenie za dobe zwyklego wypoczynku
+        private const int StillHoursEnd = 3;      // tyle godzin z rzedu bez ruchu (poza bitwa) = rozkaz sie konczy (stoja i nie spia - sam koszt)
         private static volatile bool _on;
+        private static int _stillH;               // godziny z rzedu bez ruchu w trakcie rozkazu (bez zapisu)
         private static float _hours;              // zmeczenie marszem forsownym (godziny do nastepnego kroku dlugu)
         private static int _dayHours;             // godziny marszu forsownego w biezacej dobie (swit-swit)
         private static int _lastDawnDay = -1;
@@ -54,7 +59,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _on = false; _hours = 0f; _dayHours = 0; _lastDawnDay = -1;
+            _on = false; _hours = 0f; _dayHours = 0; _lastDawnDay = -1; _stillH = 0;
             _dStarts = 0; _dEnds = 0; _dSteps = 0; _dEndWhy = "";
         }
 
@@ -95,6 +100,7 @@ namespace Armoury
                     return;
                 }
                 NightRest.StrikeCampForMarch();   // oboz zwiniety raz, przy zmianie stanu (nie co klatke)
+                _stillH = 0;
                 _on = true;
                 _dStarts++;
                 int pct = (int)Math.Round(Pct(s) * 100f);
@@ -111,6 +117,7 @@ namespace Armoury
             if (TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive) return "you are a captive";
             if (NightRest.EnlistedNow) return "your lord decides the marches";
             if (mp.CurrentSettlement != null) return "the column is inside a settlement";
+            if (mp.BesiegerCamp != null) return "the army is encamped for a siege";
             if (mp.IsCurrentlyAtSea) return "the crews already sail in watches";
             if (mp.AttachedTo != null) return "you march in another lord's army";
             if (NightRest.SleepingNow) return "the men are asleep";
@@ -129,27 +136,41 @@ namespace Armoury
             Log.Info("Marsz forsowny (R3-08c): koniec - " + why + "; zmeczenie " + F1(_hours) + "/" + F1(DebtHours) + " h, dlug " + NightRest.Debt + ".");
         }
 
+        /// <summary>Recenzja 20.10: wyjscia NightRest.OnHourly przed ksiega gracza (ksiega snu wylaczona, bohater martwy, Nieumarli) - rozkaz schodzi bez
+        /// komunikatu; inaczej premia predkosci zostawala bez kosztu (Hour juz nie przychodzi). Bez rozkazu nic nie robi (wolane co godzine).</summary>
+        internal static void Cancel(string why)
+        {
+            if (!_on) return;
+            try { Stop(why, false); } catch (Exception e) { _on = false; Log.Error("ForcedMarch.Cancel", e); }
+        }
+
         /// <summary>
-        /// NightRest.OnHourly (ksiega gracza, przed dodaniem odpoczynku godziny): konce same, licznik zmeczenia i krok dlugu, zanik zmeczenia i linia o swicie.
-        /// Zwraca true, gdy ta godzina jest godzina marszu forsownego (odpoczynek sie nie liczy).
+        /// NightRest.OnHourly (ksiega gracza, przed dodaniem odpoczynku godziny): konce same, licznik zmeczenia i krok dlugu.
+        /// movedH = godzina z ruchem (ten sam pomiar co ksiega snu, z tickiem nadrabianym). Zwraca true, gdy ta godzina jest godzina marszu forsownego
+        /// (odpoczynek sie nie liczy). Zanik zmeczenia i linia switu - Dawn (galaz switu NightRest, po doliczeniu godziny).
         /// </summary>
-        internal static bool Hour(Settings s, MobileParty mp, int h)
+        internal static bool Hour(Settings s, MobileParty mp, bool movedH)
         {
             try
             {
                 if (_on && !KeyOn(s)) Stop("klucz Forced March albo Night Rest wylaczony", true);
                 if (_on && mp != null)
                 {
+                    // recenzja 20.10: kolumna stoi (gracz zapomnial wylaczyc) - stoja i nie spia, sam koszt; bitwa i spotkanie nie licza sie jako postoj
+                    if (movedH || mp.MapEvent != null) _stillH = 0; else _stillH++;
                     string why = null;
                     if (NightRest.PlayerCamped) why = "oboz";
                     else if (NightRest.SleepingNow) why = "sen w menu";
                     else if (mp.CurrentSettlement != null) why = "osada " + mp.CurrentSettlement.Name;
+                    else if (mp.BesiegerCamp != null) why = "oboz obleznikow";   // recenzja 20.10: oboz oblezenia to postoj - bez snu dlug rosl do 3
+                    else if (_stillH >= StillHoursEnd) why = StillHoursEnd + " h postoju bez ruchu";
                     else if (TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive) why = "niewola";
                     else if (NightRest.EnlistedNow) why = "sluzba ROT";
                     else if (mp.AttachedTo != null) why = "cudza armia";
                     else if (mp.IsCurrentlyAtSea) why = "morze";
                     else if (Undead.Party(mp)) why = "Nieumarli";
                     else if (NightRest.Debt >= 3) why = "dlug 3 (zapasc o swicie)";
+                    if (why != null && _stillH >= StillHoursEnd) Msg("The column has stood still for " + _stillH + " hours.", Colors.White);
                     if (why != null) Stop(why, true);
                 }
                 bool counted = false;
@@ -175,24 +196,6 @@ namespace Armoury
                         else Msg("A whole day of forced march - the men owe one more night's sleep (sleep debt " + d + ").", Colors.Yellow);
                     }
                 }
-                int dawn = NightRest.PlayerDawn;
-                int day = (int)CampaignTime.Now.ToDays;
-                if (h == dawn && day != _lastDawnDay)
-                {
-                    _lastDawnDay = day;
-                    var ss = s;
-                    float baza = ss != null ? Math.Max(1f, ss.SleepHoursNeeded) : 6f;
-                    float rest = NightRest.RestTonightNow;
-                    float before = _hours;
-                    // zanik: doba bez marszu forsownego i z przespana baza
-                    if (!_on && _dayHours == 0 && rest >= baza && _hours > 0f) _hours = Math.Max(0f, _hours - FadePerDay);
-                    if (_dayHours > 0 || _dStarts + _dEnds + _dSteps > 0 || before > 0f || _on)
-                        Log.Info("Marsz forsowny (R3-08c): swit gracza dzien " + day + " | wlaczony " + (_on ? "tak" : "nie") + " | godzin marszu forsownego w dobie " + _dayHours
-                                 + " | zmeczenie " + F1(before) + " -> " + F1(_hours) + "/" + F1(DebtHours) + " h | odpoczynek doby " + F1(rest) + " h | dlug " + NightRest.Debt
-                                 + " | wlaczenia " + _dStarts + ", konce " + _dEnds + (_dEndWhy.Length > 0 ? " (" + _dEndWhy + ")" : "") + ", kroki dlugu " + _dSteps
-                                 + " | potkniecia " + _stumbles + ".");
-                    _dayHours = 0; _dStarts = 0; _dEnds = 0; _dSteps = 0; _dEndWhy = "";
-                }
                 return counted;
             }
             catch (Exception e)
@@ -200,6 +203,37 @@ namespace Armoury
                 _stumbles++;
                 if (_stumbles <= 3 || _stumbles % 100 == 0) Log.Error("ForcedMarch.Hour (potkniecie " + _stumbles + ")", e);
                 return _on;
+            }
+        }
+
+        /// <summary>
+        /// Galaz switu NightRest.OnHourly (raz na swit, PRZED SettleNight): restDay = odpoczynek doby z doliczona godzina, ktora wlasnie minela (tick 6:00
+        /// liczy godzine 5-6 - T1), sleeping = sen w menu przez swit (jak sleptBase w SettleNightCore). Zanik zmeczenia: doba bez marszu forsownego i z przespana
+        /// baza. Linia switu gracza z licznikami doby.
+        /// </summary>
+        internal static void Dawn(Settings s, float restDay, bool sleeping)
+        {
+            try
+            {
+                int day = (int)CampaignTime.Now.ToDays;
+                if (day == _lastDawnDay) return;
+                _lastDawnDay = day;
+                float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
+                bool slept = sleeping || restDay + 0.01f >= baza;   // zapas 0.01 h na zaokraglenie float (jak SettleNightCore)
+                float before = _hours;
+                if (!_on && _dayHours == 0 && slept && _hours > 0f) _hours = Math.Max(0f, _hours - FadePerDay);
+                if (_dayHours > 0 || _dStarts + _dEnds + _dSteps > 0 || before > 0f || _on)
+                    Log.Info("Marsz forsowny (R3-08c): swit gracza dzien " + day + " | wlaczony " + (_on ? "tak" : "nie") + " | godzin marszu forsownego w dobie " + _dayHours
+                             + " | zmeczenie " + F1(before) + " -> " + F1(_hours) + "/" + F1(DebtHours) + " h | odpoczynek doby " + F1(restDay) + " h z bazy " + F1(baza)
+                             + (sleeping ? " (sen w menu)" : "") + " | dlug " + NightRest.Debt
+                             + " | wlaczenia " + _dStarts + ", konce " + _dEnds + (_dEndWhy.Length > 0 ? " (" + _dEndWhy + ")" : "") + ", kroki dlugu " + _dSteps
+                             + " | potkniecia " + _stumbles + ".");
+                _dayHours = 0; _dStarts = 0; _dEnds = 0; _dSteps = 0; _dEndWhy = "";
+            }
+            catch (Exception e)
+            {
+                _stumbles++;
+                if (_stumbles <= 3 || _stumbles % 100 == 0) Log.Error("ForcedMarch.Dawn (potkniecie " + _stumbles + ")", e);
             }
         }
 
@@ -251,9 +285,6 @@ namespace Armoury
 
     internal static partial class NightRest
     {
-        /// <summary>R3-08c: odpoczynek biezacej doby gracza (odczyt do linii switu i zaniku zmeczenia marszu forsownego).</summary>
-        internal static float RestTonightNow { get { return _restTonight; } }
-
         /// <summary>R3-08c: wlaczenie marszu forsownego zwija oboz gracza (raz, przy zmianie stanu - jak ruch w OnHourly).</summary>
         internal static void StrikeCampForMarch()
         {

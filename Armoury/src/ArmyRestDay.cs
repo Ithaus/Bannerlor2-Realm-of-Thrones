@@ -22,8 +22,11 @@ namespace Armoury
     ///   my nie ruszamy): AI wodza wstrzymane na godzine (DisableForHours(1), odnawiane co godzine), rozkaz Hold, straznik co 0.1 h gry cofa cudzy rozkaz
     ///   i zjazd (StrategicCampaignAI daje rozkazy co 4 h). Rozkaz sprzed postoju nie wraca - po postoju AI decyduje od nowa (jak swit obozu przy Hold).
     ///   Nie staje (odklada do nastepnego switu): bitwa, oblezenie (oboz obleznikow, oblezona osada), morze, odsiecz/obrona (DefendSettlement), szturm, cel
-    ///   oblezenia/najazdu blizej niz promien zagrozenia, cudza blokada AI (uczta / gentry BK), alarm nocy, Nieumarli, licznik bezczynnosci gry >= 44 z 48,
-    ///   silniejszy wrog blisko, oblezona albo lupiona osada wlasnego krolestwa w 3 x promieniu. Te same powody (bez celu) przerywaja postoj co godzine.
+    ///   oblezenia/najazdu blizej niz promien zagrozenia, cudza blokada AI (uczta / gentry BK - termin > 1.5 h, jak NightRest.ForeignHold), alarm nocy,
+    ///   Nieumarli, licznik bezczynnosci gry >= InactLimit (46 - godziny nocy obozu, sufit 44; oboz 0-6 = 40: noc w srodku postoju dolicza sie do licznika),
+    ///   silniejszy wrog blisko, oblezona albo lupiona osada wlasnego krolestwa w 3 x promieniu, w polu jedzenie na < 3 dni u wodza albo doczepionej druzyny
+    ///   (AI jest wylaczone - armia nie pojdzie po zywnosc; w osadzie zakupy ida co godzine bez AI). Te same powody (bez celu, jedzenie < 2 dni) przerywaja
+    ///   postoj co godzine.
     ///   Sen dlugu (NightRest T10) to tez odpoczynek - wtedy nic nie trzymamy, doba liczy sie z pozycji jak kazda.
     ///   BEZCZYNNOSC GRY [K Army.CheckInactivity]: kazda godzina wodza na Hold to +1 do licznika, 48 = rozwiazanie armii (Inactivity). Dzienny postoj dalby +18;
     ///   licznik z chwili poczatku postoju jest przywracany w godzinach, w ktorych to my trzymamy armie (noc liczy sie jak zawsze) - odpoczynek nie jest bezczynnoscia.
@@ -40,7 +43,9 @@ namespace Armoury
     {
         private const int MarchHoursMin = 4;       // godzin marszu w dobie = doba marszu
         private const int RestMovedMax = 2;        // najwyzej tyle godzin ruchu w dobie odpoczynku (straznik cofa zjazd do 0.1 h - godzina z przesunieciem > 0.35 to wyjatek)
-        private const int InactSkip = 44;          // licznik bezczynnosci gry (prog 48) - od tylu armia i tak sie rozwiaze, postoju nie zaczynamy
+        private const int InactSkip = 44;          // licznik bezczynnosci gry (prog 48) - od tylu armia i tak sie rozwiaze, postoju nie zaczynamy (sufit; minus noc obozu - InactLimit)
+        private const float FoodDaysStart = 3f;    // recenzja 20.10: w polu postoj zaczyna sie tylko z jedzeniem na >= 3 dni u wodza i kazdej doczepionej druzyny (prog BK uczty)
+        private const float FoodDaysKeep = 2f;     // ... i trwa, dopoki kazda ma >= 2 dni (doba postoju zjada 1 dzien - przerwanie tylko przy nowych gebach albo stracie)
         private const float ThreatRadiusMin = 6f;  // promien zagrozenia (jedn. mapy, 1 jedn. ok. 4.75 km) - co najmniej tyle, albo AiCampDangerRadius
         private const float ThreatRatio = 0.8f;    // wrog co najmniej 0.8 sily armii = zagrozenie (armia AI sama ocenia walke albo ucieczke)
         private const double GuardStep = 0.1;      // przeglad straznika w h gry
@@ -286,13 +291,40 @@ namespace Armoury
                     return "cel blisko";
                 if (lead.IsFleeing()) return "ucieczka";
                 if (NightRest.NightAlarmed(lead)) return "alarm nocy";
-                if (lead.Ai != null && lead.Ai.IsDisabled && !NightRest.NightHolds(lead)) return "cudza blokada AI";
+                // recenzja 20.10: wylaczone AI z terminem <= 1.5 h to nasz albo NightRest termin (oboz swiata - pobudka w ticku AI po zdarzeniach godzinowych)
+                if (!NightRest.NightHolds(lead) && NightRest.ForeignAiHold(lead)) return "cudza blokada AI";
                 int ic = Inact(a);
-                if (ic >= InactSkip) return "bezczynnosc";
+                if (ic >= InactLimit()) return "bezczynnosc";
             }
+            if (lead.CurrentSettlement == null && Hungry(lead, atStart ? FoodDaysStart : FoodDaysKeep)) return "jedzenie";
             if (Threat(a, lead, s)) return "wrog";
             if (KinInDanger(a, lead, s)) return "osada w potrzebie";
             return null;
+        }
+
+        /// <summary>Prog licznika bezczynnosci gry na starcie postoju: noc obozu w srodku postoju idzie do licznika (Keep przyjmuje ja jak zawsze), wiec
+        /// start <= 48 - noc - 2 (zapas na godzine przejscia); bez obozu swiata sufit InactSkip.</summary>
+        private static int InactLimit()
+        {
+            int st = NightRest.CampStart, e = NightRest.CampEnd;
+            int night = st == e ? 0 : ((e - st) % 24 + 24) % 24;
+            return Math.Max(24, Math.Min(InactSkip, 46 - night));
+        }
+
+        /// <summary>Wodz albo ktoras doczepiona druzyna ma jedzenia na mniej niz days dni (jak MobileParty.GetNumDaysForFoodToLast, bez dzielenia przez 0).</summary>
+        private static bool Hungry(MobileParty lead, float days)
+        {
+            if (FoodShort(lead, days)) return true;
+            var att = lead.AttachedParties;
+            for (int i = 0; i < att.Count; i++) { var p = att[i]; if (p != null && p.IsActive && FoodShort(p, days)) return true; }
+            return false;
+        }
+
+        private static bool FoodShort(MobileParty p, float days)
+        {
+            float ch = p.FoodChange;   // ujemne = zjadaja
+            if (ch > -0.01f) return false;
+            return p.ItemRoster.TotalFood < days * -ch;
         }
 
         /// <summary>Silniejszy (>= 0.8 sily armii) wrogi lord albo armia w promieniu, poza osada.</summary>
@@ -447,6 +479,8 @@ namespace Armoury
                     {
                         var lead = a.LeaderParty;
                         if (lead == null || !lead.IsActive || lead.MapEvent != null || lead == MobileParty.MainParty) continue;
+                        // recenzja 20.10: armia rozwiazana w srodku godziny (wpis znika dopiero w Hourly) - byly wodz nie stoi do konca godziny
+                        if (lead.Army != a || lead.AttachedTo != null) { End(a, r, "armia rozwiazana", false); continue; }
                         if (NightRest.NightHolds(lead)) continue;
                         Hold(a, lead, r, false);
                     }
@@ -508,6 +542,8 @@ namespace Armoury
         {
             try
             {
+                // recenzja 20.10: zapis przed pierwszym tickiem godzinowym po wczytaniu (szybki zapis, autozapis) - wpisy jeszcze nieprzypisane, idzie stary napis
+                if (_pending != null) return _pending;
                 var sb = new StringBuilder();
                 foreach (var kv in _recs)
                 {
@@ -584,5 +620,14 @@ namespace Armoury
 
         /// <summary>R3-08a: wodz w alarmie nocy (AI ocenia ucieczke) - postoj nie zaczyna sie.</summary>
         internal static bool NightAlarmed(MobileParty mp) { return mp != null && _alarmed.ContainsKey(mp); }
+
+        /// <summary>R3-08a (recenzja 20.10): AI wylaczone cudzym terminem (> 1.5 h - uczta / gentry BK, ForeignHold); termin <= 1.5 h to nasz albo oboz swiata.
+        /// Bez odczytu terminu (brak wlasciwosci gry) ostroznie: kazde wylaczone AI jest cudze (jak przed recenzja).</summary>
+        internal static bool ForeignAiHold(MobileParty mp)
+        {
+            if (mp == null || mp.Ai == null || !mp.Ai.IsDisabled) return false;
+            if (ForeignHold(mp)) return true;
+            return _enableAtProp == null;
+        }
     }
 }
