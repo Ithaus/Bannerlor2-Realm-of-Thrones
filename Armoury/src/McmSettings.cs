@@ -7332,6 +7332,10 @@ namespace Armoury
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool SilkToWeavers { get; set; } = false;
 
+        [SettingPropertyBool("Velvet Town Log", HintText = "every seventh day write a line to the log with velvet town by town: whether the town has a velvet weavery, the price and how much lies on its stall, and how far the nearest weavery is - only a measure, nothing in the game changes (off = no such line)", RequireRestart = false)]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool VelvetTownLog { get; set; } = true;
+
         [SettingPropertyBool("Silver Ore To Smiths", HintText = "craftsmen first: the townsfolk buy silver ore only from what lies on the stall beyond two days of work for the town's workshops that work it, so they find their ore first. Comes in step by step over 60 days. Where no workshop works silver ore (there is no mint or silversmith line yet in most towns), the townsfolk buy it as before, so the silver mines keep their market; the coin they do not spend stays in their purse (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool SilverOreToSmiths { get; set; } = true;
@@ -9900,6 +9904,7 @@ namespace Armoury
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;
+            s.VelvetTownLog = VelvetTownLog;
             s.SilverOreToSmiths = SilverOreToSmiths;
             s.PlanksToBuilding = PlanksToBuilding;
             s.CharcoalBurners = CharcoalBurners;
