@@ -787,11 +787,11 @@ namespace Armoury
             {
                 var r = Recipes.For(el.Item);
                 float share = Math.Max(0f, Settings.Current.MendMaterialMaxShare) * MendShare(el);
-                foreach (var p in r.Parts)
+                foreach (var p in Recipes.ExactUnits(r))   // m96-receptury: przy przepisie z masy dokladne sztuki (kg / waga sztuki), nie sztuki do otwarcia
                 {
-                    int need = (int)Math.Round(p.Count * share);
+                    int need = (int)Math.Round(p.Value * share);
                     if (need <= 0) continue;
-                    list.Add(new Recipes.Part(p.Item, need));
+                    list.Add(new Recipes.Part(p.Key, need));
                 }
             }
             catch (Exception e) { Log.Error("SelfMendParts", e); }

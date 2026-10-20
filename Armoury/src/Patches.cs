@@ -163,7 +163,8 @@ namespace Armoury
                 // wczesniej z punktow ochrony x0.5 (plyta t6 ~8 sztabek wobec ~50 w kuzni i ~63 w cenie rynku: kucie 5-10x na plus)
                 bool metalArmour = item.HasArmorComponent && (item.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Plate
                                                              || item.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Chainmail);
-                if (metalArmour || item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow
+                // m96-receptury: przy RecipesByMass kazdy pancerz (takze skora i tkanina) bierze kwit z przepisu z masy - jeden kwit w CRAFT BK, w naszej kuzni i w zapisie kg
+                if (metalArmour || (Recipes.MassOn && Recipes.MassCovers(item)) || item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow
                     || item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                 {
                     var rr = Recipes.For(item);

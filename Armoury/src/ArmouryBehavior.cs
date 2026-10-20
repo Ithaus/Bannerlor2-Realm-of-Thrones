@@ -743,6 +743,9 @@ namespace Armoury
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
+        // m96-receptury: otwarte ladunki lnu i skory od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
+        private readonly bool _m96RecepturyReset = M96RecepturyReset();
+        private static bool M96RecepturyReset() { try { SmithStock.Reset(); } catch (Exception e) { Log.Error("M96RecepturyReset", e); } return true; }
         // m96-czaskuzni: sesja ekranu kuzni, powrot z paska i liczniki robot gracza od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
         private readonly bool _m96CzasKuzniReset = M96CzasKuzniReset();
         private static bool M96CzasKuzniReset() { try { ForgeJob.Reset(); } catch (Exception e) { Log.Error("M96CzasKuzniReset", e); } return true; }
@@ -938,6 +941,9 @@ namespace Armoury
             // r4-przetop: skrzynka resztek przetopu kuzni gracza (tysiaczne sztaby 6 gatunkow, format "1|"); wlasny try; brak klucza (stary zapis) = pusta skrzynka
             try { string sc = dataStore.IsSaving ? SmeltScraps.Export() : null; SaveText.Sync(dataStore, "arm_smeltscraps", ref sc); if (dataStore.IsLoading) SmeltScraps.Import(sc); }
             catch (Exception e) { Log.Error("SyncData.arm_smeltscraps", e); }
+            // m96-receptury: otwarte ladunki lnu i skory kuzni gracza w kg (SmithStock, format "1|id:kg"); wlasny try; brak klucza (stary zapis) = nic otwartego
+            try { string st = dataStore.IsSaving ? SmithStock.Export() : null; SaveText.Sync(dataStore, "arm_smith_stock", ref st); if (dataStore.IsLoading) SmithStock.Import(st); }
+            catch (Exception e) { Log.Error("SyncData.arm_smith_stock", e); }
             // GL-0: odniesienia skal "ludzie okregu" (srednia wies, sredni rynek, srednie podzamcze) i zamrozone przypisanie wsi do targu (format "1|"); wlasny try;
             // brak klucza (stary zapis), inny format albo blad = kalibracja przy pierwszym spisie po wczytaniu (PeopleScale.Import)
             try { string ps = dataStore.IsSaving ? PeopleScale.Export() : null; SaveText.Sync(dataStore, "arm_peoplescale", ref ps); if (dataStore.IsLoading) PeopleScale.Import(ps); }
@@ -1468,6 +1474,7 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
             // m96-wzory: rozdanie wzorow tieru 1, sanacja, naprawa zapisu i ksiega PO OnSessionLaunched wszystkich modow (ROT-RBM przepisuje luki po nas); nowa kampania - ksiegi od zera
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => LoreSeedFix.AfterSessionLaunched(LorePurgeOnce));
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => Recipes.MassStartLine());   // m96-receptury: przepisy z masy po ostatecznych statystykach (ROT-RBM)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),

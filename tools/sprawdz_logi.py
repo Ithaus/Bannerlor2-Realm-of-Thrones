@@ -1003,6 +1003,9 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m96jakosc <Armoury-*.log> (strumieniowo). JQ-0 latki bez BRAK, JQ-1 linie doby rozpoznane,
                     JQ-2/JQ-3 legendarne i mistrzowskie po wyrownaniu w limicie swiata (ponad limit tylko poza polkami albo w wyrobach gracza na polkach), JQ-4 obnizki tylko przesuwaja jakosc,
                     JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO).
+--grupa m96receptury : (20.10, w-toku/m96-receptury - Jeff "strzaly 14 najlepszej stali, luki 8 lnu"; Armoury/src/Recipes.Mass.cs, SmithStock.cs; klucz RecipesByMass)
+                    python -I tools/sprawdz_logi.py --grupa m96receptury <Armoury-*.log> (strumieniowo). R96-0 linia startu, R96-1 metal w lukach 0, R96-2 mediana masy
+                    surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0. Log bez paczki: INFO.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -36855,6 +36858,68 @@ def m96zamek_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96receptury (20.10, w-toku/m96-receptury: przepisy kuzni z masy przedmiotu, otwarte ladunki lnu,
+# skory i metalu, przetop z masy minus straty; Armoury/src/Recipes.Mass.cs, SmithStock.cs; klucz RecipesByMass)
+M96REC_HEAD = "Przepisy z masy (m96-receptury): start sesji"
+M96REC_USE = "Surowce w kuzni (kg) (m96-receptury): "
+M96REC_N = re.compile(r"policzone (\d+) \(pancerze (\d+), luki (\d+), kusze (\d+), strzaly i belty (\d+); legendy (\d+)\), stary przepis bez receptury wartosci (\d+), metal w lukach (\d+)")
+M96REC_MED = re.compile(r"mediana x([0-9.]+)")
+M96REC_STUMB = re.compile(r"potkniecia (\d+)")
+
+
+def m96receptury_main(logp):
+    """m96receptury (20.10, w-toku/m96-receptury; Jeff: "strzaly wymagaja 14 najlepszej stali albo luki 8 lnu - bez sensu", "len jest drogi - zasada wagi surowca
+    jak w drewnie", "przetapianie odda najwyzej tyle, ile przepis bierze"): przepisy w kg z masy przedmiotu, otwarte ladunki, przetop z masy minus straty.
+    R96-0 linia startu sesji (klucz TAK, policzone > 0), R96-1 metal w lukach 0, R96-2 mediana masy surowca / masy wyrobu 1.0-2.5, R96-3 kucia z kg (INFO: ile,
+    ile sztuk z sakw), R96-4 kwit CRAFT BK zgodny z przepisem (linii 'kwit BK inny' 0), R96-5 potkniecia i ERROR paczki 0. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("R96-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    heads, uses, mism, n_err, stumb = [], 0, 0, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96REC_HEAD):
+                heads.append(s)
+                mm = M96REC_STUMB.findall(s)
+                if mm:
+                    stumb = max(stumb, int(mm[-1]))
+            elif s.startswith(M96REC_USE):
+                if "kwit BK inny niz przepis z masy" in s:
+                    mism += 1
+                else:
+                    uses += 1
+                    mm = M96REC_STUMB.findall(s)
+                    if mm:
+                        stumb = max(stumb, int(mm[-1]))
+            elif s.startswith("ERROR in Recipes.Mass") or s.startswith("ERROR in SmithStock") or s.startswith("ERROR in BkMassSpend"):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(heads)}, kuc z kg {uses}, kwitow BK niezgodnych {mism}, ERROR {n_err}")
+    if not heads and uses == 0 and n_err == 0:
+        rep.add("R96-0: linia 'Przepisy z masy (m96-receptury): start sesji'", "brak w logu", "INFO (log sprzed paczki m96-receptury albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = heads[-1] if heads else ""
+    on = "klucz RecipesByMass TAK" in last
+    mm = M96REC_N.search(last)
+    rep.add("R96-0: linia startu sesji (klucz, policzone)", (last[:160] + "...") if last else "brak", "klucz TAK, policzone > 0",
+            bool(on and mm and int(mm.group(1)) > 0) if on else None)
+    if on and mm:
+        rep.add("R96-1: metal w lukach", mm.group(8), "0", int(mm.group(8)) == 0)
+        rep.add("R96-1b: stary przepis bez receptury wartosci", mm.group(7), "INFO (0 oczekiwane)", None)
+        md = M96REC_MED.search(last)
+        med = float(md.group(1)) if md else -1.0
+        rep.add("R96-2: mediana masy surowca / masy wyrobu", f"x{med:.2f}" if md else "brak", "1.0-2.5", 1.0 <= med <= 2.5 if md else False)
+    rep.add("R96-3: kucia z kg (otwarte ladunki)", str(uses), "INFO", None)
+    rep.add("R96-4: kwit CRAFT BK inny niz przepis z masy", str(mism), "0", mism == 0)
+    rep.add("R96-5: potkniecia i ERROR paczki", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96wzory (20.10, w-toku/m96-wzory: wzory kuzni po ostatecznych statystykach, naprawa zapisu, bramy wiedzy;
 # Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs; klucze LoreSeedAfterFinalStats, PatternDrawBySkill, ShieldCraftSkillGate, ForgeUniquesByStudy,
 # PatternTileShowsSkill, XbowPatternTierByPower, RareBowsNotForged, LegendTwinPiecesHidden)
@@ -53436,6 +53501,8 @@ def main(argv):
         return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group == "nkarczmy" and logp:
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
+    if group == "m96receptury" and logp:
+        return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
     if group == "m96wzory" and logp:
         return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:

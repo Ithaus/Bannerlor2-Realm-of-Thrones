@@ -321,6 +321,34 @@ namespace Armoury
             catch (Exception e) { Log.Error("BkShieldSpend", e); }
         }
 
+        /// <summary>m96-receptury (RecipesByMass): pancerz wykuty w CRAFT BK - sztuki do otwarcia zdjal kwit (BkSpendMaterialsPrefix albo oryginal BK, kwit =
+        /// Recipes.For), tu kg schodza z otwartych ladunkow (skrzynka metalu, len, skora). Bez tego reszta otwartej sztuki nie zmalalaby - surowiec za darmo.</summary>
+        private static string _massHook = "nie wpiete";
+        private static int _massMismatch;
+
+        public static void BkMassSpendPostfix(object __instance)
+        {
+            try
+            {
+                if (!Recipes.MassOn) return;
+                var item = BkCurrentItem(__instance);
+                if (item == null || !item.HasArmorComponent || !Recipes.MassCovers(item)) return;
+                // kwit, ktory BK wlasnie zdjal (ta sama metoda, otwarte ladunki jeszcze nie ruszone), musi byc kwitem przepisu z masy - inaczej (latki kwitu
+                // wylaczone) zapis kg dalby otwartym ladunkom metal, ktorego nikt nie zdjal z sakw
+                var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
+                var model = cfg != null ? Traverse.Create(cfg).Property("SmithingModel").GetValue() : null;
+                var bill = model != null ? Traverse.Create(model).Method("GetCraftingInputForArmor", item).GetValue<int[]>() : null;
+                if (!Recipes.BillMatches(Recipes.For(item), bill))
+                {
+                    _massMismatch++;
+                    if (_massMismatch <= 5) Log.Info("Surowce w kuzni (kg) (m96-receptury): CRAFT BK " + item.StringId + " - kwit BK inny niz przepis z masy, kg nie zapisane (razy " + _massMismatch + ", latki kwitu " + _massHook + ").");
+                    return;
+                }
+                Recipes.MassCommitBk(item, item.StringId + " (CRAFT BK)");
+            }
+            catch (Exception e) { Log.Error("BkMassSpend", e); }
+        }
+
         public static void BkHasMaterialsPostfix(object __instance, ref bool __result)
         {
             try
@@ -400,6 +428,15 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                // m96-receptury: kg z otwartych ladunkow za pancerz z CRAFT BK - wpiete zawsze (klucz i zgodnosc kwitu sprawdza postfiks)
+                try
+                {
+                    var tMm = QuartermasterLaw.FindType("BannerKings.UI.Extensions.CraftingMixin");
+                    var mMm = tMm != null ? AccessTools.DeclaredMethod(tMm, "SpendMaterials") : null;
+                    if (mMm != null) h.Patch(mMm, postfix: new HarmonyMethod(typeof(FletchForge), "BkMassSpendPostfix"));
+                    _massHook = mMm != null ? "wpiete" : "BRAK SpendMaterials";
+                }
+                catch (Exception e3) { _massHook = "wyjatek " + e3.GetType().Name; Log.Error("FletchForge.ApplyAll(masa)", e3); }
                 // kwit pancerzy BK ma byc spojny z Prawem Wagi NIEZALEZNIE od
                 // tego, czy luczarnia jest wlaczona - patch przed gatingiem
                 if (c != null && c.CraftingEnabled)
