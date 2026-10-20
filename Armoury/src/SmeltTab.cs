@@ -65,7 +65,12 @@ namespace Armoury
             {
                 if (s.SmeltCapToCraftCost)
                 {
-                    int u = Recipes.ArmourUnits(it);
+                    // n20-kuznia (klucz SmeltCapFromForgeBill): od 04.10 (audyt K1, FletchForge) kwit CRAFT BK pancerza = Recipes.For (z WAGI), wiec sufit od
+                    // punktow ochrony (ArmourUnits) cial przetop do ok. 1/10 metalu kucia (lannister_light_armor: 30 -> 5 przy kwicie ok. 60). Sufit od prawdziwego
+                    // kwitu: metal receptury (tarcza - tylko gdy CRAFT BK liczy ja ta sama receptura, BkShieldBillByRecipe; inaczej jak dotad bez sufitu).
+                    int u = s.SmeltCapFromForgeBill
+                        ? (it.HasArmorComponent || s.BkShieldBillByRecipe ? MetalOf(r) : 0)
+                        : Recipes.ArmourUnits(it);
                     if (u > 0)
                     {
                         int total = 0; foreach (var p in y) total += p.Count;
@@ -99,12 +104,17 @@ namespace Armoury
             return -1;
         }
 
+        /// <summary>Typy modeli, w ktorych wpielismy OutputPostfix (SmeltTruth.IsOuter - wywolanie zewnetrzne to metoda najbardziej pochodnego z nich).</summary>
+        internal static readonly HashSet<Type> PatchedTypes = new HashSet<Type>();
+
         /// <summary>Wyjscie przetopu dla przedmiotow bez WeaponDesign - z naszej receptury.</summary>
-        public static void OutputPostfix(ItemObject item, ref int[] __result)
+        public static void OutputPostfix(ItemObject item, ref int[] __result, MethodBase __originalMethod)
         {
             try
             {
                 if (item == null || __result == null) return;
+                // n20-kuznia: postfiks siedzi w metodzie bazy (DefaultSmithingModel) i BK (wola baze) - liczymy tylko w wywolaniu zewnetrznym
+                bool outer = SmeltTruth.IsOuter(__originalMethod);
                 if (item.WeaponDesign != null)
                 {
                     // Jeff 15.10 ("za duzo drewna - z topora 2-3 drewna"): gra oddaje z przetopu broni materialy czesci projektu, takze drewno trzonka
@@ -114,9 +124,16 @@ namespace Armoury
                         int w = (int)CraftingMaterials.Wood;
                         if (w >= 0 && w < __result.Length && __result[w] > 0) __result[w] = 0;
                     }
+                    // n20-kuznia (klucz SmeltWeaponByParts): metal wedlug gatunkow czesci, bez surowki z niczego (po BK - stad tylko zewnetrzne)
+                    if (outer) SmeltTruth.ApplyWeapon(item, __result);
                     return;
                 }
                 if (!OurSmeltable(item)) return;
+                // n20-kuznia (klucz SmeltArmourOnce): odzysk raz - wewnetrzne wywolanie (baza wolana przez BK) nic nie dodaje, zewnetrzne PRZYPISUJE metal
+                // (BK dokladal tarczy sztabe surowki z niczego: "if (out[1] == 0) out[1]++" przy klasie z sufitem)
+                bool once = SmeltTruth.ArmourOnceOn;
+                if (once && !outer) return;
+                if (once) for (int g = 1; g <= 6 && g < __result.Length; g++) __result[g] = 0;
                 foreach (var p in YieldFor(item))
                 {
                     int idx = MaterialIndex(p.Item);
@@ -124,6 +141,19 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("SmeltTab.Output", e); }
+        }
+
+        /// <summary>Sztaby metalu w recepturze (Iron1..Iron6) - kwit kucia pancerza w CRAFT BK i w naszej kuzni (FletchForge.BkArmorBillPostfix = Recipes.For).</summary>
+        private static int MetalOf(Recipes.Recipe r)
+        {
+            int n = 0;
+            if (r.Parts == null) return 0;
+            foreach (var p in r.Parts)
+            {
+                int idx = MaterialIndex(p.Item);
+                if (idx >= 1 && idx <= 6 && p.Count > 0) n += p.Count;
+            }
+            return n;
         }
 
         /// <summary>Przetop przedmiotu bez WeaponDesign - nasza sciezka zamiast vanilla (tam czeka NullReference).</summary>
@@ -169,7 +199,7 @@ namespace Armoury
                     if (mEv != null) mEv.Invoke(disp, new object[] { currentCraftingHero, equipmentElement });
                 }
                 catch { }
-                Log.Info("Przetop (zakladka Smelt): " + item.StringId);
+                Log.Info("Przetop (zakladka Smelt): " + item.StringId + " | metal: " + SmeltTruth.Metal(outp));   // n20-kuznia: wynik w linii (pancerz liczony raz)
                 return false;
             }
             catch (Exception e) { Log.Error("SmeltTab.DoSmelting", e); return true; }
@@ -192,6 +222,7 @@ namespace Armoury
                 // 177-2 (krytyka pkt 5): Harmony wola postfiks takze, gdy prefiks zablokowal przetop (ValyrianBlades.SmeltPrefix) - bez przetopu nic
                 // nie odkrywamy; stali valyrianskiej nigdy (jej czesci ukryte zawsze - jedyna droga to przekucie w Qohorze)
                 if (!__runOriginal || ValyrianBlades.Is(item)) return;
+                SmeltTruth.OnWeaponSmelted(item);   // n20-kuznia: linia "Przetop broni (n20-kuznia)" - czesci -> wynik (raz na wzor w sesji)
                 if (!LegendaryLaw.IsLegend(item)) return;
                 var design = item.WeaponDesign;
                 var template = AccessTools.Field(typeof(WeaponDesign), "Template").GetValue(design) as CraftingTemplate;
@@ -295,7 +326,7 @@ namespace Armoury
                         var m = t.GetMethod("GetSmeltingOutputForItem", BindingFlags.Public | BindingFlags.NonPublic |
                                                                         BindingFlags.Instance | BindingFlags.DeclaredOnly);
                         if (m == null || m.IsAbstract) continue;
-                        try { h.Patch(m, postfix: post); outs++; } catch { }
+                        try { h.Patch(m, postfix: post); outs++; PatchedTypes.Add(t); } catch { }
                     }
                 }
                 Log.Info("SmeltTab: zakladka Smelt przyjmuje pancerze i luki (lista=" + (mRefresh != null)

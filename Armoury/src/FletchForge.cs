@@ -190,6 +190,31 @@ namespace Armoury
         /// "sie nie zgadzaly" (Jeff, 26.08). Przejmujemy calosc: twarde surowce
         /// 1:1 jak oryginal, miekkie przez Recipes.Take - kategoria, nigdy minus.
         /// </summary>
+        private static int _shieldBills;   // n20-kuznia: tarcze wykute w CRAFT BK z kwitu Recipes.For (od startu procesu; linia startu sesji SmeltTruth)
+
+        /// <summary>n20-kuznia: kwit tarczy z modelu BK (z naszymi latkami) wobec receptury - do linii startu sesji "Kuznia przetop (n20-kuznia)".</summary>
+        internal static string ShieldBillCheck(ItemObject shield)
+        {
+            try
+            {
+                if (shield == null) return "brak proby";
+                var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
+                var model = cfg != null ? Traverse.Create(cfg).Property("SmithingModel").GetValue() : null;
+                var bill = model != null ? Traverse.Create(model).Method("GetCraftingInputForArmor", shield).GetValue<int[]>() : null;
+                if (bill == null || bill.Length < 9) return "brak kwitu BK";
+                int metal = 0; for (int g = 1; g <= 6; g++) metal += Math.Max(0, bill[g]);
+                var r = Recipes.For(shield);
+                int rm = 0;
+                if (r.Parts != null)
+                    foreach (var p in r.Parts)
+                        for (int g = 1; g <= 6; g++)
+                            if (p.Item != null && p.Item == Recipes.MaterialItem((CraftingMaterials)g)) { rm += p.Count; break; }
+                return shield.StringId + " metal " + metal + " (receptura " + rm + "), drewno " + bill[(int)CraftingMaterials.Wood]
+                       + (metal == rm ? " = z receptury" : " = kwit BK") + ", wykutych tak tarcz od startu " + _shieldBills;
+            }
+            catch (Exception e) { return "wyjatek " + e.GetType().Name; }
+        }
+
         public static bool BkSpendMaterialsPrefix(object __instance)
         {
             try
@@ -213,6 +238,14 @@ namespace Armoury
                         roster.AddToCounts(Recipes.MaterialItem((CraftingMaterials)l), -bill[l]);
                 if (bill[9] > 0) Recipes.Take(roster, Recipes.SoftLeather, bill[9]);
                 if (bill[10] > 0) Recipes.Take(roster, Recipes.SoftLinen, bill[10]);
+                // n20-kuznia (BkShieldBillByRecipe): tarcza z Recipes.For ma drewno w kg (SmithWood) - kwit zdjal tylko ladunki do otwarcia, kg schodza z otwartego
+                // ladunku tak jak przy kuciu w naszej kuzni (Recipes.TakeMaterials); bez tego drewno z otwartego ladunku byloby za darmo
+                if (item.ItemType == ItemObject.ItemTypeEnum.Shield && Settings.Current != null && Settings.Current.BkShieldBillByRecipe && SmithWood.On)
+                {
+                    var r = Recipes.For(item);
+                    if (r.WoodKg > 0f) SmithWood.Use(r.WoodKg, Math.Max(0, bill[(int)CraftingMaterials.Wood]), item.Name != null ? item.Name.ToString() : "a shield");
+                    _shieldBills++;
+                }
                 return false;
             }
             catch (Exception e) { Log.Error("BkSpendMaterials", e); return true; }
@@ -232,7 +265,11 @@ namespace Armoury
             try
             {
                 if (item == null || __result == null || __result.Length < 11) return;
-                if (!item.HasArmorComponent) return;   // bron biala liczy sie po staremu
+                // n20-kuznia (klucz BkShieldBillByRecipe): tarcza w CRAFT BK brala kwit BK (BKSmithingModel.GetCraftingInputForArmor: 2 drewna, zelazo Iron4
+                // tylko przy physics "shield_metal") - drewniana tarcza bez grama zelaza, a przetop (SmeltTab, Recipes.For z wagi) oddawal z niej sztaby metalu:
+                // petla "metal z niczego". Teraz ten sam kwit co nasza kuznia (Recipes.For: okucia z wagi x ClassCostShield, drewno, wegiel, skora/len).
+                bool shield = item.ItemType == ItemObject.ItemTypeEnum.Shield && Settings.Current != null && Settings.Current.BkShieldBillByRecipe;
+                if (!item.HasArmorComponent && !shield) return;   // bron biala liczy sie po staremu
                 var r = Recipes.For(item);
                 if (r.Parts == null || r.Parts.Count == 0) return;
                 var bill = new int[11];
