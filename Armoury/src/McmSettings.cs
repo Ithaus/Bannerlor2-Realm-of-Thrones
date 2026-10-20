@@ -1504,6 +1504,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float NightSpeedPenalty { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Night Scout Enabled", HintText = "a good scout leads the march at night and through forest: the party's scout takes Scouting/400 of the night and forest speed penalty away, at most half (Scouting 200: night -0.5 becomes -0.25), at night he sees further (Scouting 200 lifts the night sight factor from 0.65 to about 0.82) and every hour of night march teaches him 5 Scouting (caravans half). One rule for you and the AI; needs the flat terrain penalties and the sun-following sight on; off = Scouting does not touch night and forest, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool NightScoutEnabled { get; set; } = true;
+
         [SettingPropertyBool("Ammo Tracer Enabled", HintText = "diagnostic: log every change in the troop armoury's stock of arrows, bolts and harnesses, with time and place", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool AmmoTracerEnabled { get; set; } = true;
@@ -8763,6 +8767,7 @@ namespace Armoury
             s.SwampSpeedPenalty = SwampSpeedPenalty;
             s.FordSpeedPenalty = FordSpeedPenalty;
             s.NightSpeedPenalty = NightSpeedPenalty;
+            s.NightScoutEnabled = NightScoutEnabled;
             s.AmmoTracerEnabled = AmmoTracerEnabled;
             s.PlagueWatchEnabled = PlagueWatchEnabled;
             s.InfluenceWatchEnabled = InfluenceWatchEnabled;

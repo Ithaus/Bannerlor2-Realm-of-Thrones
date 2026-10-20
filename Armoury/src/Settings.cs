@@ -519,6 +519,8 @@ namespace Armoury
         public float SwampSpeedPenalty = 0.30f;            // flat speed lost crossing swamp and marshland (vanilla: nothing at all)
         public float FordSpeedPenalty = 0.5f;              // flat speed lost fording rivers and crossing bridges (vanilla: 30%)
         public float NightSpeedPenalty = 0.5f;             // flat speed lost at night on land (vanilla: 25%)
+        // R3-10a (POMYSLY-35 nr 31, Jeff 20.10): NightScout.cs - zwiadowca zdejmuje min(0.5, Zwiad/400) kary nocy i lasu (TerrainEase), wzrok noca (SightRange), +5 XP za godzine nocnego marszu
+        public bool NightScoutEnabled = true;              // a good scout leads the march at night and through forest: the party's scout takes Scouting/400 of the night and forest speed penalty away, at most half (Scouting 200: night -0.5 becomes -0.25), at night he sees further (Scouting 200 lifts the night sight factor from 0.65 to about 0.82) and every hour of night march teaches him 5 Scouting (caravans half). One rule for you and the AI; needs the flat terrain penalties and the sun-following sight on; off = Scouting does not touch night and forest, as before
         public bool AmmoTracerEnabled = true;              // diagnostic: log every change in the troop armoury's stock of arrows, bolts and harnesses, with time and place
         public bool PlagueWatchEnabled = true;             // a daily word when YOU are the one who is ill - the disease mod tells the player nothing outside a town hospital
         public bool InfluenceWatchEnabled = true;          // diagnostic: log the full daily breakdown of your clan influence - the game itself never shows it anywhere
