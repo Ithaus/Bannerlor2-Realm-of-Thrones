@@ -3387,4 +3387,8 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   DO ZBADANIA: NKS-30n mediana Planow 8 > 6 (trend biegow nowa 1, nowa88 1, r2 4, r3 5, n22a 8 - stada/urodzaj/ziemia zmieniaja produkcje KS tylko w grze, Plan bez nich?),
   P3W3-3 najemnicy AI 1679 < 2000 (r3nowa 2142). Fala 1 dokonczenie wf_2ece39db-763: naprawy f858f3a1 i kruki b40c4cc8 gotowe po recenzji, jednostki - poprawki w toku.
   Limit 5 h 99% (odnowienie 07:10) - pauza nowych agentow do odnowienia.
+- 07:15 PDT (limit odnowiony): scalone naprawy f858f3a1, jednostki d2c97199, kruki b40c4cc8 -> n22-calosc 4885ae75 (2107 ustawien, 5 modow kod 0).
+  Poprawki fali 1: wf_11c6ab8f-17b, drzewa zb/n22f-{plany (NKS-30n), najemnicy (P3W3-3), ruda (ZC1-16, D2K-7), scalenie (naprawy/jednostki/kruki z reszta)}
+  od 4885ae75 - diagnoza z poprawka -> 2 recenzje -> poprawki. Logi testow 19/20.10: D:/Backup-Bannerlord/logi-testow/2026-10-20.
+  Rownolegle test n22b (18 galezi, 4885ae75): testy-n22b.ps1, DLL test/n22b, CrashScribe-at-n22b.dll (zb/n22-at + 4885ae75).
 
