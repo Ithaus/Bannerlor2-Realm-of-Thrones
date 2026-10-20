@@ -3284,4 +3284,8 @@ W grze bez zmian: WGRANIE 88 (Armoury 6d0fd3e4). Jeff gral 14:41-16:09 (Ironman 
   koszt 3.2 ms/d). ALE ekonomia gorzej niz fin102 (bez A7): nakum NIE 6 (NAKUM-7 kasy miast +69 tys./d, NAKUM-12 +65 tys./d > 43 tys., NAKUM-16/18/22/26), nkasy NKA-1 NIE (10215 > 10000).
   DECYZJA (moja, Jeff "masz zgode na wszystko"): KsSwitchSignalRule zostaje WYLACZONE (jak w Armoury.json Jeffa: false). A7 do ponownego wlaczenia dopiero z odplywem kas miast
   (wsie na jedwab -> wiecej pieniedzy u kupcow miast KS bez ujscia) - osobna paczka po nocy.
+- 18:40 PDT: workflow wf_b622165f-a20: 11 galezi gotowe (kod -> recenzja -> poprawki), zawieszenie w poprawkach. SCALENIE w-toku/n20-calosc (drzewo zb/n20-calosc, lancuch):
+  plotki, relacje, herby, niewola, drobne, drogi, kuznia, wyceny, towarzysze, napisy, wioska - bez konfliktow tekstowych; gen_mcm bez zmian (Armoury 2049 ustawien, RC 114, GT 40);
+  build 5 modow kod 0; sprawdz_narzedzie OK; stary dubel NSP_CTL (f23) -> NSPI_CTL (7c5d5c54). TEST n20a (5 dob, 4 bitwy x20, armoury-wioska-gracza.flag) w toku;
+  przeglad calosci wf_76ff09fd-a3e (5 wymiarow + 1 poprawiajacy) w toku. Dalej: scalic zawieszenie (CrashScribe -> nowa DLL autotestu z at1-cs-bitwa.diff).
 
