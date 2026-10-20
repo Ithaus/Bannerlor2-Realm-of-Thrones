@@ -335,9 +335,39 @@ namespace Armoury
                         || !int.TryParse(a[4], NumberStyles.Integer, Inv, out n) || kind < NWar || kind > NSiege) { bad++; continue; }
                     if (_news.Count < NewsMax) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });
                 }
-                _importNote = "band " + _bands.Count + " (z imieniem herszta " + named + "), wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "");
+                int fixedOld = NamesOn ? OldBandNames() : 0;
+                _importNote = "band " + _bands.Count + " (z imieniem herszta " + named + "), wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "")
+                              + (fixedOld > 0 ? ", przerobione stare wiesci z nazwa bandy " + fixedOld : "");
             }
             catch (Exception e) { _bands.Clear(); _news.Clear(); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
+        }
+
+        /// <summary>Przeglad calosci 20.10: wiesci zapisane przed n20-plotki (WGRANIE 88) maja w A/B nazwe klanu band (BanditPartyComponent.Name = MapFaction.Name,
+        /// np. "Broken Men") - przy InnGossipLeaderNames zamiana na "a band of outlaws" (spalone wsie i bitwy). Zwraca liczbe przerobionych. Wyjatek - bez zmian.</summary>
+        private static int OldBandNames()
+        {
+            int n = 0;
+            try
+            {
+                if (Campaign.Current == null || _news.Count == 0) return 0;
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var c in Clan.BanditFactions) if (c != null && c.Name != null) names.Add(c.Name.ToString());
+                if (names.Count == 0) return 0;
+                const string Band = "a band of outlaws";
+                foreach (var w in _news)
+                {
+                    if (w.Kind == NRaided && (names.Contains(w.A ?? "") || names.Contains(w.B ?? ""))) { w.A = Band; w.B = ""; n++; }
+                    else if (w.Kind == NBattle)
+                    {
+                        bool ch = false;
+                        if (names.Contains(w.A ?? "")) { w.A = Band; ch = true; }
+                        if (names.Contains(w.B ?? "")) { w.B = Band; ch = true; }
+                        if (ch) n++;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("OldBandNames", e); }
+            return n;
         }
 
         // ------------------------------------------------------------ menu

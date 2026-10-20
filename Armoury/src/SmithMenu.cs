@@ -1570,10 +1570,10 @@ namespace Armoury
                     if (need <= 0) continue;
                     int have = QuartermasterLaw.HaveFor(armory, type);
                     bool horse = type == ItemObject.ItemTypeEnum.Horse;
-                    string label = type + "   (racks " + have + " / need " + need + ")"
+                    string label = KitName(type) + "   (racks " + have + " / need " + need + ")"
                                  + (have < need ? "  - SHORT " + (need - have) : "");
                     // n20-napisy: krotszy zapis stanu stojakow, pelne slowa w podpowiedzi
-                    label = ShortLabels.Pick(type + ": " + have + " of " + need + (have < need ? " - short " + (need - have) : ""), label);
+                    label = ShortLabels.Pick(KitName(type) + ": " + have + " of " + need + (have < need ? " - short " + (need - have) : ""), label);
                     elements.Add(new InquiryElement(type, label, null, !horse,
                         ShortLabels.Hint("On the racks " + have + ", the men need " + need + ".",
                         horse ? "The smith does not deal in horseflesh - see the stables."
@@ -1633,6 +1633,31 @@ namespace Armoury
             return Math.Max(1, (int)(item.Value * mk));
         }
 
+        /// <summary>Przeglad calosci 20.10: nazwa rodzaju sprzetu dla gracza (zamiast nazwy typu z kodu gry, np. "OneHandedWeapon").</summary>
+        private static string KitName(ItemObject.ItemTypeEnum type)
+        {
+            switch (type)
+            {
+                case ItemObject.ItemTypeEnum.HeadArmor: return "Helmets";
+                case ItemObject.ItemTypeEnum.BodyArmor: return "Body armour";
+                case ItemObject.ItemTypeEnum.LegArmor: return "Boots";
+                case ItemObject.ItemTypeEnum.HandArmor: return "Gloves";
+                case ItemObject.ItemTypeEnum.Cape: return "Capes";
+                case ItemObject.ItemTypeEnum.OneHandedWeapon: return "One-handed weapons";
+                case ItemObject.ItemTypeEnum.TwoHandedWeapon: return "Two-handed weapons";
+                case ItemObject.ItemTypeEnum.Polearm: return "Polearms";
+                case ItemObject.ItemTypeEnum.Shield: return "Shields";
+                case ItemObject.ItemTypeEnum.Bow: return "Bows";
+                case ItemObject.ItemTypeEnum.Crossbow: return "Crossbows";
+                case ItemObject.ItemTypeEnum.Arrows: return "Arrows";
+                case ItemObject.ItemTypeEnum.Bolts: return "Bolts";
+                case ItemObject.ItemTypeEnum.Thrown: return "Throwing weapons";
+                case ItemObject.ItemTypeEnum.Horse: return "Mounts";
+                case ItemObject.ItemTypeEnum.HorseHarness: return "Horse harness";
+                default: return type.ToString();
+            }
+        }
+
         private static void OrderKitTiers(ItemObject.ItemTypeEnum type, int shortage)
         {
             if (Settings.Current.TroopOrderFromShelf) { OrderShelfTiers(type, shortage); return; }   // paczka 145: z polki tego miasta
@@ -1650,7 +1675,7 @@ namespace Armoury
                 if (elements.Count == 0) { Log.Player("No such kit is traded at any market the smith knows.", true); return; }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
-                    "The Order Ledger", "Which grade of " + type + "?" + (shortage > 0 ? " The men are short " + shortage + "." : ""),
+                    "The Order Ledger", "Which grade of " + KitName(type).ToLowerInvariant() + "?" + (shortage > 0 ? " The men are short " + shortage + "." : ""),
                     elements, true, 1, 1, "Choose", "Back",
                     delegate (List<InquiryElement> sel)
                     {
@@ -1948,7 +1973,7 @@ namespace Armoury
                 if (elements.Count == 0) { Log.Player("No such kit is traded at any market the smith knows.", true); return; }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
-                    "The Order Ledger", "Which grade of " + type + "? The smith buys off the stalls of " + town + " at the stall's own price and asks " + fee
+                    "The Order Ledger", "Which grade of " + KitName(type).ToLowerInvariant() + "? The smith buys off the stalls of " + town + " at the stall's own price and asks " + fee
                     + " gold a piece for his legwork." + (shortage > 0 ? " The men are short " + shortage + "." : ""),
                     elements, true, 1, 1, "Choose", "Back",
                     delegate (List<InquiryElement> sel)
@@ -1976,7 +2001,7 @@ namespace Armoury
                 bool sp;
                 var plan = ShelfPlan(st, type, tier, counts[counts.Count - 1], -1, out sp);   // wycena - polki nie ruszamy
                 if (plan.Count == 0) { OrderNoGoods(st, type, tier, Math.Max(1, shortage)); return; }
-                string what = type + " (tier " + tier + ")";
+                string what = KitName(type).ToLowerInvariant() + " (tier " + tier + ")";
                 int gold = Hero.MainHero.Gold;
                 var elements = new List<InquiryElement>();
                 foreach (var n in counts)
@@ -2052,7 +2077,7 @@ namespace Armoury
                 int unmet = shortPurse ? lackOnShelf : n - k;   // za drogo to nie brak towaru (jak u lordow, wpis 81); E8/B: brak na polce liczy sie takze przy pustej kiesie
                 if (shortPurse && unmet > 0) SmallFixes8.NoteOrderLack(unmet);
                 NoteOrderUnmet(st, type, tier, unmet);
-                Log.Player(Pieces(k) + " of " + type + " (tier " + tier + ") delivered to the " + (yours ? "armoury as your pieces" : "men's racks") + " for " + total + " gold - " + goods
+                Log.Player(Pieces(k) + " of " + KitName(type).ToLowerInvariant() + " (tier " + tier + ") delivered to the " + (yours ? "armoury as your pieces" : "men's racks") + " for " + total + " gold - " + goods
                            + " for the goods off the stall and " + fee + " for the smith's legwork."
                            + (unmet > 0 ? (shortPurse ? " The stalls of " + st.Name + " hold " + unmet + " fewer than you asked for: word of those goes to the workshops."   // E8/B: brak na polce przy pustej kiesie
                                                       : " The stalls of " + st.Name + " had no more: word of the other " + unmet + " goes to the workshops.") : "")
@@ -2071,7 +2096,7 @@ namespace Armoury
         private static void OrderNoGoods(Settlement st, ItemObject.ItemTypeEnum type, int tier, int n)
         {
             NoteOrderUnmet(st, type, tier, n);
-            Log.Player("Not a single sound " + type + " of tier " + tier + " lies on the stalls of " + (st != null ? st.Name.ToString() : "this town")
+            Log.Player("Not a single sound piece of " + KitName(type).ToLowerInvariant() + " of tier " + tier + " lies on the stalls of " + (st != null ? st.Name.ToString() : "this town")
                        + ". The smith passes word of the want of " + n + " to the town's workshops - you pay nothing.", true);
             LogShelfOrder(st, type, tier, n, null, 0, 0, n, false);
         }

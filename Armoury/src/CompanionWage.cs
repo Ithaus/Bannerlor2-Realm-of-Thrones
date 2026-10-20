@@ -283,6 +283,7 @@ namespace Armoury
             try
             {
                 _dPaid = _dDue = 0; _dPayN = _dParties = 0; _stDay = 0; _checkedDay = false;
+                _stumbles = 0; _errLogged = false;   // przeglad calosci 20.10: potkniecia i pierwszy ERROR - na sesje (kampanie), nie na proces
                 if (_h == null) _h = new Harmony("com.jeff.armoury.companionwage");
                 if (!_troopHooked)
                 {

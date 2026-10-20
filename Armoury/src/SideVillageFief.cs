@@ -55,7 +55,8 @@ namespace Armoury
         private static int _day0 = -1;
         private static long _paidAll;
         private static double _avg;
-        // oczekujace nadanie (start BK przed czynna ksiega) - tylko sesja; zapis w toku czekania = brak wioski, BK nie wola drugi raz (wtedy linia doby mowi "brak")
+        // oczekujace nadanie (start BK przed czynna ksiega) - w zapisie jako "sfp|krolestwo|doba" (Export/Import); po wczytaniu proba co godzine (TryPending),
+        // po FallbackDays bez kandydata - tytul BK jak dotad
         private static string _pendKingdom; private static int _pendDay = -1; private static string _pendHow;
 
         // ------------------------------------------------------------ sesja
@@ -165,6 +166,17 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { _bkWired = false; Stumble("EnsureHooks(BK)", e); }
+                // przeglad calosci 20.10: okno wyboru startu BK obiecuje przy "Indebted Lord" tytul Lordship ({=CiWCMaQV}), a przy kluczu jest wioska poboczna.
+                // BK odtwarza opcje startu w swoim OnSessionLaunched (DefaultStartOptions.Initialize - kolejnosc wobec nas nieznana), wiec nie podmieniamy obiektu,
+                // tylko wynik gettera StartOptionVM.ShortDescription (czyta go wiazanie okna przy pokazaniu, po OnSessionLaunched; metoda z wywolaniami, nie 1-bajtowy ret)
+                try
+                {
+                    var vm = AccessTools.TypeByName("BannerKings.UI.CampaignStart.StartOptionVM");
+                    var g = vm != null ? AccessTools.DeclaredPropertyGetter(vm, "ShortDescription") : null;
+                    _vmOption = vm != null ? AccessTools.DeclaredPropertyGetter(vm, "Option") : null;
+                    if (g != null && _vmOption != null) { h.Patch(g, postfix: new HarmonyMethod(typeof(SideVillageFief), nameof(StartTextPostfix))); _startTxtWired = true; }
+                }
+                catch (Exception e) { _startTxtWired = false; Stumble("EnsureHooks(opis startu BK)", e); }
             }
             var fin = Campaign.Current.Models != null ? Campaign.Current.Models.ClanFinanceModel : null;
             if (fin != null && !ReferenceEquals(fin, _finTriedFor))
@@ -185,6 +197,23 @@ namespace Armoury
                 }
                 catch (Exception e) { _finWired = false; Stumble("EnsureHooks(model finansow)", e); }
             }
+        }
+
+        private static MethodInfo _vmOption;
+        private static bool _startTxtWired;
+        private const string StartText = "Start as a lord in a kingdom, holding one of its side villages - it flies your banner and pays you a share of the lord's tax. Reduced influence for 5 years. Gain Scholarship skill.";
+
+        /// <summary>Postfiks StartOptionVM.ShortDescription (BK): opcja "start_lord" przy kluczu SideVillageFiefStart - opis wioski pobocznej zamiast tytulu Lordship.</summary>
+        public static void StartTextPostfix(object __instance, ref string __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.SideVillageFiefStart || __instance == null || _vmOption == null) return;
+                var so = _vmOption.Invoke(__instance, null) as TaleWorlds.ObjectSystem.MBObjectBase;
+                if (so != null && so.StringId == "start_lord") __result = StartText;
+            }
+            catch { }   // tylko napis - przy bledzie zostaje tekst BK
         }
 
         // ============================================================ W1: start BK "Indebted Lord"
@@ -745,7 +774,30 @@ namespace Armoury
                     .Append((100 * _share).ToString("0", Inv)).Append("% - is yours. At war with the lord's realm you get nothing.");
                 body += "\n" + more.ToString();
             }
-            InformationManager.ShowInquiry(new InquiryData(_name ?? "Your village", body, true, false, "Done", null, null, null), false);
+            // przeglad calosci 20.10: ramka okna (SingleQueryPopup ROT) nie przewija - ok. 19 linii (Rumours.PageLines z zapasem). Przy wojnie, spaleniu i odbudowie
+            // naraz tekst ma ok. 22 linie - wtedy strony po akapitach (jak plotki): "More" i "Done"
+            var pages = new List<string>();
+            var cur = new StringBuilder();
+            int n = 0;
+            foreach (string para in body.Split('\n'))
+            {
+                int need = Math.Max(1, Rumours.EstLines(para));
+                if (cur.Length > 0 && n + need > Rumours.PageLines) { pages.Add(cur.ToString().TrimEnd('\n')); cur.Length = 0; n = 0; }
+                if (cur.Length == 0 && para.Length == 0) continue;   // pusta linia na poczatku strony - zbedna
+                if (cur.Length > 0) cur.Append('\n');
+                cur.Append(para); n += need;
+            }
+            if (cur.Length > 0 || pages.Count == 0) pages.Add(cur.ToString());
+            LookPage(pages, 0);
+        }
+
+        private static void LookPage(List<string> pages, int i)
+        {
+            bool more = i + 1 < pages.Count;
+            string title = (_name ?? "Your village") + (pages.Count > 1 ? " (" + (i + 1).ToString(Inv) + "/" + pages.Count.ToString(Inv) + ")" : "");
+            Action next = null;
+            if (more) { int k = i + 1; next = () => { try { LookPage(pages, k); } catch (Exception e) { Stumble("LookPage", e); } }; }
+            InformationManager.ShowInquiry(new InquiryData(title, pages[i], true, more, more ? "More" : "Done", more ? "Done" : null, next, null), false);
         }
 
         // ============================================================ godzina, doba, test
@@ -858,7 +910,8 @@ namespace Armoury
                 sb.Append(P).Append("dzien ").Append(day).Append(start ? " (start sesji)" : "")
                   .Append(" | klucze: start ").Append(s.SideVillageFiefStart ? "WL" : "WYL").Append(", dochod ").Append(s.SideVillageFiefIncome ? "WL" : "WYL").Append(", menu ").Append(s.SideVillageFiefMenu ? "WL" : "WYL")
                   .Append(", nocleg pod dachem ").Append(s.SideVillageFiefLodging ? (TownInns.On ? "WL" : "WL (karczmy WYL)") : "WYL")
-                  .Append(" | latki: BK GiveLordshipOnKingdomJoin ").Append(_bkWired ? "wpieta" : "BRAK").Append(", podpowiedz zlota ").Append(_finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK");
+                  .Append(" | latki: BK GiveLordshipOnKingdomJoin ").Append(_bkWired ? "wpieta" : "BRAK").Append(", podpowiedz zlota ").Append(_finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK")
+                  .Append(", opis startu BK (StartOptionVM.ShortDescription) ").Append(_startTxtWired ? "wpiety" : "BRAK");
                 if (HasFief)
                 {
                     sb.Append(" | wioska ").Append(_name).Append(" (").Append(_uid).Append(", okreg ").Append(_dist).Append(", od doby ").Append(_day0).Append(')')

@@ -67,6 +67,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !s.CompanionAutotestHire || Campaign.Current == null || !AutotestActive()) return;
+            // przeglad calosci 20.10: bieg profilu (LogGate.Mode 2) mierzy gre jak u Jeffa - bez najmu i wyplat probnych; tylko zwykly autotest (1)
+            if (LogGate.Mode != 1) return;
             var main = MobileParty.MainParty;
             if (main == null || Hero.MainHero == null || Clan.PlayerClan == null) return;
             string hire = "";

@@ -254,6 +254,9 @@ namespace RealisticCaptivity
         /// gra jej nie bierze). Unikaty (spis ROT, stal valyrianska) - tylko zwyczaj wojny Armoury (UniqueSpoils.Take: bierze je
         /// zdobywca-bohater, sluchacz Armoury biegnie PRZED RC - zarejestrowany pozniej); RC ich nie rusza. Sztuka, ktora nie weszla do jukow, zostaje
         /// na graczu (nic nie znika). Bez pojmujacego z jukami - nic nie zabrane. Ksiega _warGear - tylko do odebrania przy odbiciu sila.</summary>
+        /// <summary>Przeglad calosci 20.10: "1 piece" / "3 pieces" w komunikatach dla gracza.</summary>
+        private static string Count(int n, string one, string many) { return n + " " + (n == 1 ? one : many); }
+
         private void TakeWarGear(PartyBase capturer)
         {
             try
@@ -294,10 +297,10 @@ namespace RealisticCaptivity
                          + " szt., pusty korpus to bielizna)"
                          + " | w tej sesji pojman " + _n20Taken + ", sztuk " + _n20Items + ".");
                 if (taken > 0)
-                    Log.Player("Your captors strip you of your war gear - " + taken + " pieces" + (horse > 0 ? ", your horse among them" : "") + " - and put it in their "
+                    Log.Player("Your captors strip you of your war gear - " + Count(taken, "piece", "pieces") + (horse > 0 ? ", your horse among them" : "") + " - and put it in their "
                                + (at.StartsWith("s:") ? "stores" : "packs") + (leftOn == 0
                                    ? ". You keep your town clothes, but on the road and in battle you have only your smallclothes" + (horse > 0 ? " and go on foot" : "") + " until you get new gear."
-                                   : ". You keep your town clothes and the " + leftOn + " pieces they left you" + (horse > 0 ? ", but you go on foot" : "") + "."), true);
+                                   : ". You keep your town clothes and the " + (leftOn == 1 ? "one piece" : leftOn + " pieces") + " they left you" + (horse > 0 ? ", but you go on foot" : "") + "."), true);
             }
             catch (Exception e) { Log.Error("TakeWarGear", e); }
         }
@@ -386,11 +389,11 @@ namespace RealisticCaptivity
                 // przy wylaczonym kluczu brakujace sztuki po bitwie to zwykle lup zwyciezcow; przy wlaczonym - sprzedane / zalozone przed bitwa
                 string goneWhy = (!keyVictors && detail == EndCaptivityDetail.ReleasedAfterBattle) ? "plunder of the victors, sold or worn" : "sold or worn before you were freed";
                 if (back > 0 && gone == 0)
-                    Log.Player("Your captors are broken, and your war gear comes back to you - all " + back + " pieces"
-                               + (fromVictors > 0 ? ", some of them handed back by the men who freed you." : "."), false);
+                    Log.Player("Your captors are broken, and your war gear comes back to you" + (back == 1 ? "" : " - all " + back + " pieces")
+                               + (fromVictors > 0 ? (back == 1 ? ", handed back by the men who freed you." : ", some of them handed back by the men who freed you.") : "."), false);
                 else if (back > 0)
-                    Log.Player("Your captors are broken, and you take back " + back + " pieces of your war gear"
-                               + (fromVictors > 0 ? ", some of them handed back by the men who freed you" : "") + ". The other " + gone + " are gone - " + goneWhy + ".", false);
+                    Log.Player("Your captors are broken, and you take back " + Count(back, "piece", "pieces") + " of your war gear"
+                               + (fromVictors > 0 ? (back == 1 ? ", handed back by the men who freed you" : ", some of them handed back by the men who freed you") : "") + (gone == 1 ? ". The other one is gone - " : ". The other " + gone + " are gone - ") + goneWhy + ".", false);
                 else if (from != null)
                     Log.Player("Your war gear is no longer with those who held you - " + goneWhy + ".", true);
                 else
@@ -922,15 +925,15 @@ namespace RealisticCaptivity
                          + (all ? (likeAi ? " C4 (PlayerLosesLikeAiLord): zloto -> " : " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> ") + to + "; ladunek " + pct + "%" + (allBag ? (likeAi ? " (caly tabor, jak lord AI)" : " (cale juki, CaptorTakesAllBaggage)") : "") + " -> "
                                 + (dest != null ? (bagHome != null && dest == bagHome.ItemRoster ? "zapas osady " + bagHome.Name : (capturer.IsSettlement ? "zapas osady " : "juki partii ") + capturer.Name) : "nikt (nic nie zabrano)") : ""));
                 if (armsPurse)
-                    Log.Player((goldTaken > 0 ? "They emptied your purse - every one of your " + goldTaken + " gold is theirs now" : "They found your purse empty")
-                               + (itemsTaken > 0 ? ", and your whole baggage train with it (" + itemsTaken + " items)." : "."), true);
+                    Log.Player((goldTaken > 1 ? "They emptied your purse - every one of your " + goldTaken + " gold is theirs now" : goldTaken == 1 ? "They emptied your purse - your last coin is theirs now" : "They found your purse empty")
+                               + (itemsTaken > 0 ? ", and your whole baggage train with it (" + Count(itemsTaken, "item", "items") + ")." : "."), true);
                 else if (likeAi)
-                    Log.Player((itemsTaken > 0 ? "Your captors take your whole baggage train (" + itemsTaken + " items), as from any beaten lord. " : "")
+                    Log.Player((itemsTaken > 0 ? "Your captors take your whole baggage train (" + Count(itemsTaken, "item", "items") + "), as from any beaten lord. " : "")
                                + "You keep your arms and your purse - your purse pays only the battle's toll, as any lord's does.", true);
                 else if (all && goldTaken > 0)
-                    Log.Player("They emptied your purse - every one of your " + goldTaken + " gold is theirs now" + (itemsTaken > 0 ? (allBag ? ", and your whole baggage train with it (" + itemsTaken + " items)." : ", and " + itemsTaken + " items from your baggage with it.") : "."), true);
+                    Log.Player("They emptied your purse - every one of your " + goldTaken + " gold is theirs now" + (itemsTaken > 0 ? (allBag ? ", and your whole baggage train with it (" + Count(itemsTaken, "item", "items") + ")." : ", and " + Count(itemsTaken, "item", "items") + " from your baggage with it.") : "."), true);
                 else if (itemsTaken > 0 || goldTaken > 0)
-                    Log.Player("They went through your baggage: " + itemsTaken + " items and " + goldTaken + " gold are gone.", true);
+                    Log.Player("They went through your baggage: " + Count(itemsTaken, "item", "items") + " and " + goldTaken + " gold are gone.", true);
             }
             catch (Exception e) { Log.Error("LootBaggage", e); }
         }

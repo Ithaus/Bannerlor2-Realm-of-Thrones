@@ -338,10 +338,14 @@ namespace Armoury
         {
             try
             {
+                // przeglad calosci 20.10: napis tylko z HasMaterials TEGO wywolania (BK wola je tylko w trybie pancerza i po HasEnergy) - zabrany i wyczyszczony,
+                // zeby stary napis nie zastepowal "You must rest" ani nie przechodzil na przycisk kucia broni
                 string text = _velvetShort;
+                _velvetShort = null;
                 if (text == null) return;
+                if (!Traverse.Create(__instance).Property("IsInArmorMode").GetValue<bool>()) return;
                 var crafting = Traverse.Create(__instance).Field("crafting").GetValue<TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.CraftingVM>();
-                if (crafting == null || crafting.MainActionHint == null) return;
+                if (crafting == null || crafting.MainActionHint == null || crafting.IsMainActionEnabled) return;
                 crafting.MainActionHint = new TaleWorlds.Core.ViewModelCollection.Information.BasicTooltipViewModel(() => text);
             }
             catch (Exception e) { Log.Error("BkMainAction", e); }

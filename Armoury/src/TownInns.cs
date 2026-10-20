@@ -722,7 +722,7 @@ namespace Armoury
                 if (!ok)
                 {
                     _rest = null; _dNoRest++;
-                    Log.Player("The men were up before they had slept in their beds - the lodging is paid, but nobody wakes rested.", true);
+                    Log.Player(r.HostUid != null ? "The men were up before they had slept their fill under your villagers' roofs - nobody wakes rested." : "The men were up before they had slept in their beds - the lodging is paid, but nobody wakes rested.", true);
                     Log.Info(P + how + " w " + r.Town + " " + When(now) + " - w menu " + F1(menuRest) + " h z bazy " + F1(baseH) + " h, pelny pasek nie -> bez premii.");
                     return;
                 }
@@ -734,7 +734,7 @@ namespace Armoury
                 _rest = n; _dWoke++;
                 var msg = new StringBuilder((n.HostUid != null ? "Rested under your villagers' roofs: until " : "Rested in a bed: until ") + Clock(n.UntilMin) + " the column marches " + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
                 if (n.Price && PriceKey) msg.Append(" The good house's name opens doors - you trade up to 3% better in ").Append(n.Town).Append(" until ").Append(Clock(n.UntilMin)).Append(".");
-                if (NightRest.Debt > 0) msg.Append(" Old weariness still lingers - the bed's comfort shows once the sleep debt is paid off.");
+                if (NightRest.Debt > 0) msg.Append(n.HostUid != null ? " Old weariness still lingers - the night's rest shows once the sleep debt is paid off." : " Old weariness still lingers - the bed's comfort shows once the sleep debt is paid off.");
                 Log.Player(msg.ToString());
                 Log.Info(P + how + " w " + n.Town + " " + When(now) + " - w menu " + F1(menuRest) + " h, pelny pasek " + (full ? "tak" : "nie") + " -> wypoczeci do "
                          + When(n.UntilMin) + " (predkosc +" + F1(n.Speed) + "%, morale +" + F1(n.Morale) + ", cena " + (n.Price && PriceKey ? "tak" : "nie")
@@ -746,6 +746,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ premie (predkosc i morale z NightRest, gojenie, ceny)
         private static readonly TextObject _txtBed = new TextObject("{=!}Slept in a bed");
+        private static readonly TextObject _txtRoof = new TextObject("{=!}Slept under a roof");   // przeglad calosci 20.10: nocleg we wlasnej wiosce (HostUid) - slome, nie lozko
         private static readonly TextObject _txtBath = new TextObject("{=!}A good bed and a bath");
 
         /// <summary>Wypoczety teraz (faza 2, przed zmierzchem, klucz). Bez wyjatku - czytane rownolegle (predkosc).</summary>
@@ -772,7 +773,7 @@ namespace Armoury
                 float add = r.ResultNumber * pct;
                 float f = 1f + r.SumOfFactors;
                 if (add <= 0f) return;
-                r.Add(f > 0.01f ? add / f : add, _txtBed);
+                r.Add(f > 0.01f ? add / f : add, x.HostUid != null ? _txtRoof : _txtBed);
                 if (lim > 0f && lim < float.MaxValue * 0.5f) r.LimitMax(lim * (1f + pct) + 0.001f);
             }
             catch { ParStumble(); }
@@ -784,7 +785,7 @@ namespace Armoury
             try
             {
                 var x = Live();
-                if (x != null && x.Morale > 0f) r.Add(x.Morale, _txtBed);
+                if (x != null && x.Morale > 0f) r.Add(x.Morale, x.HostUid != null ? _txtRoof : _txtBed);
             }
             catch { ParStumble(); }
         }
@@ -919,7 +920,8 @@ namespace Armoury
                 if (r.Phase == 2 && now >= r.UntilMin)
                 {
                     _rest = null;
-                    if (On) Log.Player(Mod(r.UntilMin, 1440) == DuskHour * 60 ? "Dusk - the comfort of the inn wears off." : "The comfort of the inn wears off.");
+                    if (On) Log.Player(r.HostUid != null ? (Mod(r.UntilMin, 1440) == DuskHour * 60 ? "Dusk - the night's rest under your villagers' roofs wears off." : "The night's rest under your villagers' roofs wears off.")
+                                                          : Mod(r.UntilMin, 1440) == DuskHour * 60 ? "Dusk - the comfort of the inn wears off." : "The comfort of the inn wears off.");
                     Log.Info(P + "koniec premii o " + When(now) + " (wypoczeci od noclegu w " + r.Town + ").");
                 }
                 // recenzja 16.10: samo id menu snu (bez flagi NightRest - po wczytaniu w srodku snu gra odtwarza menu oczekiwania bez init, flaga jest wtedy false)

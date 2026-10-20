@@ -503,8 +503,18 @@ namespace Armoury
                 if (mp.IsMainParty) _dPlayer += amt;
                 MoneyLedger.NoteWageRouted(true, amt);
             }
-            else if (Seal31B.CaravanWage(mp, amt)) { }                  // 3.1/3.3 (31b) E3/4: karawana lorda - zold do sakiewki jej ludzi (CaravanWageToPurse)
-            else _dOther += amt;                                        // karawany i inne partie: bez zmian
+            else
+            {
+                // przeglad calosci 20.10 (CW): bohater rodu gracza prowadzacy karawane rodu ma zold z tabeli (TotalPostfix, TroopWage) - placi go rod gracza,
+                // wiec jego czesc idzie do jego kiesy, jak w partii lorda; reszta jak dotad (karawany AI - od razu dalej)
+                if (mp.IsCaravan && Clan.PlayerClan != null && ReferenceEquals(mp.ActualClan, Clan.PlayerClan))
+                {
+                    int comp = CompanionWage.PayFromWage(mp, amt, r.Wage);
+                    if (comp > 0) { _dComp += comp; _dCompN++; amt -= comp; if (amt <= 0) return; }
+                }
+                if (Seal31B.CaravanWage(mp, amt)) { }                   // 3.1/3.3 (31b) E3/4: karawana lorda - zold do sakiewki jej ludzi (CaravanWageToPurse)
+                else _dOther += amt;                                    // karawany i inne partie: bez zmian
+            }
         }
 
         /// <summary>K1 (A2): czesc zaplaconego zoldu zalogi do jej sakiewki - MenGearSavePercent, do limitu MenGearSaveDays dni zoldu; trup nie wyda.</summary>

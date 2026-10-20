@@ -38,6 +38,7 @@ namespace Armoury
         private static int _gateDay = -1;
         private static int _stumbles, _sessN; private static long _sessGold;
         private static bool _errLogged;
+        private static int _swapped;   // zdjete sztuki w biezacej wizycie (komunikat "The pieces they took off ..." tylko, gdy cos zdjeli)
 
         private sealed class Ware { public EquipmentElement El; public int Left, Tier, Price = -1; public long Power; }
 
@@ -50,6 +51,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             _gateDay = -1; _sessN = 0; _sessGold = 0;
+            _stumbles = 0; _errLogged = false;   // przeglad calosci 20.10: potkniecia i pierwszy ERROR - na sesje (kampanie), nie na proces
             try { Probe(); } catch (Exception e) { Stumble("Probe", e); }
         }
 
@@ -147,6 +149,7 @@ namespace Armoury
             long purse0 = 0, purse1 = 0;
             var lines = new List<string>();
             var said = new List<string>();
+            _swapped = 0;
             foreach (var h in heroes)
             {
                 purse0 += h.Gold;
@@ -171,7 +174,7 @@ namespace Armoury
             foreach (var h in heroes) if (!h.IsPlayerCompanion) kin = true;
             if (n > 0)
                 Log.Player((kin ? "Your companions and kin" : "Your companions") + " bought better gear with their own coin in " + st.Name + " for " + gold + " denars: " + string.Join("; ", said.ToArray())
-                           + (said.Count < heroes.Count - poor - nothing ? "; ..." : "") + ". The pieces they took off are in your inventory.");
+                           + (said.Count < heroes.Count - poor - nothing ? "; ..." : "") + "." + (_swapped > 0 ? " The pieces they took off are in your inventory." : ""));
             Log.Info("Towarzysze (CG): " + st.Name + " (" + why + ") dzien " + day + " | klucz CompanionBuysOwnGear TAK, rezerwa " + Math.Max(0f, s.CompanionGearReserveDays).ToString("0", Inv)
                      + " dni zoldu | towarzysze w druzynie " + heroes.Count + ", kupili " + n + " szt. za " + gold + " d" + (lines.Count > 0 ? " (" + string.Join("; ", lines.ToArray()) + ")" : "")
                      + " | bez zakupow: za malo zlota ponad rezerwe " + poor + ", nic lepszego na targu na ich kiese " + nothing
@@ -232,10 +235,11 @@ namespace Armoury
             MoneyLedger.Note169(MoneyLedger.N169Kit, st, price);   // kasy miast - zakup sprzetu z polki (jak braki ludzi gracza)
             try { TownFolk.Sale(st, price, TownFolk.MixGear); } catch { }
             eq[slot] = best.El;
-            if (oldIt != null) main.ItemRoster.AddToCounts(old, 1);   // zdjeta sztuka do ekwipunku druzyny gracza - nic nie ginie
+            if (oldIt != null) { main.ItemRoster.AddToCounts(old, 1); _swapped++; }   // zdjeta sztuka do ekwipunku druzyny gracza - nic nie ginie
             foreach (var w in Wares(wares, type, st)) w.Price = -1;    // polka sie zmienila - ceny tego typu od nowa
             budget -= price; hn++; hg += price;
-            bought.Add(best.El.Item.Name + (oldIt != null ? " for " + oldIt.Name : "") + " (" + price + ")");
+            // przeglad calosci 20.10: "X (300, instead of Y)" - zakup w miejsce starej sztuki, nie wymiana jednej za druga
+            bought.Add(best.El.Item.Name + " (" + price + (oldIt != null ? ", instead of " + oldIt.Name : "") + ")");
             if (lines.Count < 8) lines.Add(h.Name + ": " + type + " t" + oldTier + "->t" + best.Tier + " " + (oldIt != null ? oldIt.StringId : "pusty") + "->" + best.El.Item.StringId + " " + price);
         }
 
