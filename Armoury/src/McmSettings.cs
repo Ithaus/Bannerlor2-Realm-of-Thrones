@@ -5468,6 +5468,10 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public bool MillOnBank { get; set; } = true;
 
+        [SettingPropertyBool("Map Gallows", HintText = "gallows at the crossroads: when your party, a lord, a patrol or a garrison beats a band of outlaws - or clears a hideout - a gallows with the hanged stands for 7 to 14 days at the nearest crossroads (or by the nearest road), at most one in a district and 40 in the world. Only a sight on the map - nothing else changes. Off = no new gallows, the standing ones are hidden", RequireRestart = false)]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapGallows { get; set; } = true;
+
         [SettingPropertyBool("Village Tip Held By", HintText = "the map village tooltip names who holds the land, live from the game: 'A village of the Tumbledown lands, held by House Stark of Winterfell' ('your fief' for your own). Off = 'A village of the X district', as before", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool VillageTipHeldBy { get; set; } = true;
@@ -9774,6 +9778,7 @@ namespace Armoury
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
             s.MillOnBank = MillOnBank;
+            s.MapGallows = MapGallows;
             s.VillageTipHeldBy = VillageTipHeldBy;
             s.RotSwapSameMan = RotSwapSameMan;
             s.RecruitBringsWhatHeHas = RecruitBringsWhatHeHas;
