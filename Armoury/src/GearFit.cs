@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -60,6 +61,8 @@ namespace Armoury
         internal static bool FloorForeignOn { get { var s = Settings.Current; return s != null && s.GearFitFloorForeign; } }
         // f29-arakh (Jeff 19.10): krewna para dopuszcza tylko sztuki, ktore wzorce kultury zolnierza naprawde nosza (off = cala kultura przedmiotu, jak dotad)
         internal static bool KinItemOn { get { var s = Settings.Current; return s != null && s.GearFitKinItemLevel; } }
+        // n20-drobne (Jeff 19.10 "masa zolnierzy biega z arakhami - bron khalow"): bron Dothrakow, ktorej ROT nie daje zadnemu zolnierzowi innej kultury - tylko Dothrakom
+        internal static bool DothOn { get { var s = Settings.Current; return s != null && s.GearFitDothrakiOnly; } }
 
         internal const int WhySkill = 1, WhySaddle = 2, WhyCulture = 3;
         internal const int KinMinSlots = 3;
@@ -73,7 +76,10 @@ namespace Armoury
         {
             internal readonly Dictionary<string, HashSet<string>> Pairs;     // kultura wojska -> kultury przedmiotow z DRUGIEJ strony morza, ktore ROT sam daje tej kulturze
             internal readonly Dictionary<string, HashSet<ItemObject>> Items; // f29-arakh: kultura wojska -> sztuki z DRUGIEJ strony morza z jej zywych wzorcow (te same sloty)
-            internal KinSnap(Dictionary<string, HashSet<string>> pairs, Dictionary<string, HashSet<ItemObject>> items) { Pairs = pairs; Items = items; }
+            internal readonly HashSet<ItemObject> Doth;                      // n20-drobne: bron Dothrakow, ktorej nie nosi zaden zolnierz innej kultury (DothBar)
+            internal readonly int DothShared;                                // n20-drobne: bron kultury Dothrakow noszona tez przez inne kultury (wolna, jak dotad) - do linii startu
+            internal KinSnap(Dictionary<string, HashSet<string>> pairs, Dictionary<string, HashSet<ItemObject>> items, HashSet<ItemObject> doth, int dothShared)
+            { Pairs = pairs; Items = items; Doth = doth; DothShared = dothShared; }
         }
         private static volatile KinSnap _kin;
         private static readonly List<KeyValuePair<string, int>> _kinTop = new List<KeyValuePair<string, int>>();
@@ -106,6 +112,9 @@ namespace Armoury
         private static int _dPlan, _dTpl, _dDrop;
         private static int _dMis, _dBare, _dB1, _dB2, _dB3, _dNone, _dNoSlot, _dKept;
         private static int _stum, _stumAll;
+        private static int _dDothDeny;   // n20-drobne: odmowy reguly broni Dothrakow w CultureOk (watki DTE - Interlocked)
+        /// <summary>n20-drobne (recenzja): pytanie pomiarowe (DothrakiArms.NobodyMay) - odmowa reguly broni Dothrakow bez licznika linii doby. Na watek.</summary>
+        [ThreadStatic] internal static bool Quiet;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         // liczniki jednej misji (dopisek linii "Bitwa gracza (sklad7b-p, start)"): Twoi ludzie (P) i wszystkie partie
         private static WeakReference _mMission;
@@ -126,6 +135,7 @@ namespace Armoury
         {
             lock (_lock) { _kin = null; _kinTop.Clear(); _tpl.Clear(); _floorKept.Clear(); }
             _census = false; _stumAll = 0; _errSites.Clear(); _mMission = null;
+            _dDothDeny = 0; DothrakiArms.Reset();   // n20-drobne
             _live = false; _preSkip = 0; _pendKeep = 0; _gapBuy.Clear();
             ClearDay(); ClearMission();
             _plPcs = _plMen = _plMenGold = _plNotGold = _plShelf = 0;
@@ -196,6 +206,8 @@ namespace Armoury
                 string ic = it.Culture != null ? it.Culture.StringId : null;
                 string tc = troop.Culture != null ? troop.Culture.StringId : null;
                 if (string.IsNullOrEmpty(ic) || string.IsNullOrEmpty(tc) || ic == "neutral_culture" || ic == tc) return true;
+                // n20-drobne: bron Dothrakow tylko u Dothrakow - PRZED regula strony morza (Braavos, Lys, Ghis tez nie); wlasny wzorzec i bohaterowie bez zmian
+                if (IsDoth(ic) && DothBar(troop, it)) { if (!Quiet) Interlocked.Increment(ref _dDothDeny); return false; }
                 if (IsEssos(ic) == IsEssos(tc)) return true;   // w obrebie jednej strony morza domy dziela sie lupem (Jeff 16.09)
                 if (CultureOn && KinOk(tc, ic, it)) return true;   // f29-arakh: przy GearFitKinItemLevel - sztuka po sztuce (wylaczony = sama para, jak dotad)
                 return TemplateHas(troop, it);
@@ -315,6 +327,43 @@ namespace Armoury
             return k.Items.TryGetValue(tc, out hs) && hs.Contains(it);
         }
 
+        // ------------------------------------------------------------ n20-drobne: bron Dothrakow
+        /// <summary>Kultury Dothrakow w ROT: khuzait (khalasary) i steppe_bandits ("Rogue Dothraki").</summary>
+        internal static bool IsDoth(string c) { return c == "khuzait" || c == "steppe_bandits"; }
+
+        /// <summary>Czy to bron Dothrakow, ktorej w ROT nie nosi zaden zolnierz innej kultury (spis z zywych wzorcow w migawce KinSnap; przed zbudowaniem - false,
+        /// bez odrzucen przed startem gry, jak Kin). Watkobezpieczne: jeden odczyt migawki, HashSet tylko do odczytu.</summary>
+        internal static bool DothOnly(ItemObject it)
+        {
+            if (it == null || it.Culture == null || !IsDoth(it.Culture.StringId)) return false;
+            EnsureKin();
+            var k = _kin;
+            return k != null && k.Doth != null && k.Doth.Contains(it);
+        }
+
+        /// <summary>Regula Gear Fit Dothraki Only: zolnierz (nie bohater) kultury innej niz Dothrakowie nie bierze broni Dothrakow (DothOnly), chyba ze ma ja we
+        /// wlasnym wzorcu (TemplateHas - jak kazda regula kultury). Klucz wylaczony - false (jak dotad).</summary>
+        internal static bool DothBar(CharacterObject troop, ItemObject it)
+        {
+            if (troop == null || it == null || troop.IsHero || !DothOn) return false;
+            string tc = troop.Culture != null ? troop.Culture.StringId : null;
+            if (string.IsNullOrEmpty(tc) || IsDoth(tc) || !DothOnly(it)) return false;
+            return !TemplateHas(troop, it);
+        }
+
+        private static bool DothArm(ItemObject it)
+        {
+            if (it == null || !it.HasWeaponComponent || it.HasArmorComponent) return false;
+            var t = it.ItemType;
+            return t != ItemObject.ItemTypeEnum.Horse && t != ItemObject.ItemTypeEnum.HorseHarness && t != ItemObject.ItemTypeEnum.Banner;
+        }
+
+        private static bool SoldierOcc(CharacterObject c)
+        {
+            var o = c.Occupation;
+            return o == Occupation.Soldier || o == Occupation.Mercenary || o == Occupation.Bandit || o == Occupation.CaravanGuard || o == Occupation.Guard || o == Occupation.PrisonGuard;
+        }
+
         private static void EnsureKin()
         {
             if (_kin != null) return;
@@ -334,17 +383,25 @@ namespace Armoury
             var n = new Dictionary<string, Dictionary<string, int>>();
             var tot = new Dictionary<string, int>();
             var kinItems = new Dictionary<string, HashSet<ItemObject>>();   // f29-arakh
+            var dothOther = new HashSet<ItemObject>();   // n20-drobne: bron Dothrakow noszona przez zolnierzy innych kultur
             try
             {
                 foreach (var c in MBObjectManager.Instance.GetObjectTypeList<CharacterObject>())
                 {
                     if (!Troop(c)) continue;
                     string tc = c.Culture.StringId;
+                    // n20-drobne: tylko zolnierze (cywile Yi Ti nosza arakh w strojach miasta - to nie wojsko)
+                    bool otherSoldier = !IsDoth(tc) && SoldierOcc(c);
                     foreach (var eq in c.BattleEquipments)
                     {
                         if (eq == null) continue;
                         for (int s = 0; s < 10; s++)
                         {
+                            if (otherSoldier && s < 4)
+                            {
+                                var w = eq[(EquipmentIndex)s].Item;
+                                if (w != null && w.Culture != null && IsDoth(w.Culture.StringId)) dothOther.Add(w);
+                            }
                             if (s == 4) continue;
                             var it = eq[(EquipmentIndex)s].Item;
                             if (it == null) continue;
@@ -378,7 +435,20 @@ namespace Armoury
                 }
             }
             _kinTop.Sort((a, b) => b.Value.CompareTo(a.Value));
-            _kin = new KinSnap(kin, kinItems);   // jeden zapis - pary i spis sztuk razem
+            // n20-drobne: bron kultury Dothrakow (bez unikatow) poza spisem noszonej przez innych - tylko dla Dothrakow
+            var doth = new HashSet<ItemObject>();
+            int dothShared = 0;
+            try
+            {
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || it.Culture == null || !IsDoth(it.Culture.StringId) || !DothArm(it)) continue;
+                    if (UniqueGear.Is(it)) continue;
+                    if (dothOther.Contains(it)) dothShared++; else doth.Add(it);
+                }
+            }
+            catch (Exception e) { Stumble("BuildKin(doth)", e); }
+            _kin = new KinSnap(kin, kinItems, doth, dothShared);   // jeden zapis - pary, spis sztuk i bron Dothrakow razem
         }
 
         // ------------------------------------------------------------ liczniki z innych plikow
@@ -639,6 +709,7 @@ namespace Armoury
                     try { FloorOne(__instance, a, pool, ref stock, count, main, foot); }
                     catch (Exception e) { Stumble("FloorOne", e); }
                 }
+                if (count && DothOn) DothCheck(list);   // n20-drobne: kontrola po strazach i podlodze - bron Dothrakow u nie-Dothrakow (ma byc 0 poza ostatnia deska)
             }
             catch (Exception e) { Stumble("FloorPostfix", e); }
         }
@@ -665,10 +736,33 @@ namespace Armoury
             pick.Left--;
             if (pass == 3) Keep(eq, slot);
             if (!count) return;
+            if (DothBar(co, pick.El.Item)) DothrakiArms.NoteFloorLastResort();   // n20-drobne: bron Dothrakow tylko, gdy w polce nie bylo innej
             _mGot++;
             if (pass == 1) { _dB1++; if (main) _mB1P++; }
             else if (pass == 2) { _dB2++; if (main) _mB2P++; }
             else { _dB3++; if (main) _mB3P++; }
+        }
+
+        /// <summary>n20-drobne: po strazach (SkillLawWard, RealmWard) i podlodze - ile sztuk broni Dothrakow zostalo na nie-Dothrakach (sloty 0-3) w tej misji.
+        /// Tylko licznik (linia "Bron Dothrakow: dzien N"); ma byc rowne liczbie z ostatniej deski podlogi.</summary>
+        private static void DothCheck(IEnumerable list)
+        {
+            int left = 0, men = 0;
+            foreach (var a in list)
+            {
+                if (a == null) continue;
+                try
+                {
+                    var co = _getChar.Invoke(a, null) as CharacterObject;
+                    if (co == null || co.IsHero) continue;
+                    var eq = _fEq.GetValue(a) as Equipment;
+                    if (eq == null) continue;
+                    men++;
+                    for (int i = 0; i < 4; i++) { var it = eq[(EquipmentIndex)i].Item; if (it != null && DothBar(co, it)) left++; }
+                }
+                catch (Exception e) { Stumble("DothCheck", e); }
+            }
+            DothrakiArms.NoteMission(men, left);
         }
 
         private static List<Piece> Melee(IDictionary pool)
@@ -715,6 +809,7 @@ namespace Armoury
                         if (!FloorForeignOn && !CultureOk(co, it)) continue;   // bez GearFitFloorForeign obca nie wraca takze z ostatniej deski
                         key = -(long)Math.Max(0, it.Difficulty);   // ostatnia deska: najlzejsza
                     }
+                    if (p > 1 && DothBar(co, it)) key -= 1L << 50;   // n20-drobne: bron Dothrakow u nie-Dothraka - dopiero, gdy nie ma zadnej innej (lepsza niz piesci)
                     if (best == null || key > bk) { best = pc; bk = key; }
                 }
                 if (best != null) { pass = p; return best; }
@@ -756,6 +851,7 @@ namespace Armoury
         {
             if (!_census) { _census = true; Census(); }
             Flush();
+            DothrakiArms.Daily(Today(), Interlocked.Exchange(ref _dDothDeny, 0));   // n20-drobne: linia "Bron Dothrakow: dzien N"
         }
 
         private static string Yes(bool b) { return b ? "tak" : "nie"; }
@@ -844,6 +940,30 @@ namespace Armoury
                      + (ex.Count > 0 ? ", np. " + string.Join(", ", ex.ToArray()) : "")
                      + " | " + kinItem
                      + " | druzyna gracza: ludzi " + men + ", sztuk zbrojowni " + pcs + ", nieuzywalnych dla kogokolwiek " + unusable + "; potkniecia " + _stumAll + ".");
+            DothCensus();
+        }
+
+        /// <summary>n20-drobne: linia startu sesji - spis broni Dothrakow (tylko dla Dothrakow) i stan kluczy. Raz na sesje (Census, po BuildKin).</summary>
+        private static void DothCensus()
+        {
+            try
+            {
+                var snap = _kin;
+                var ids = new List<string>();
+                bool arakh = false;
+                int n = 0, shared = 0;
+                if (snap != null && snap.Doth != null)
+                {
+                    n = snap.Doth.Count; shared = snap.DothShared;
+                    foreach (var it in snap.Doth) { if (it.StringId == "arakh") arakh = true; ids.Add(it.StringId); }
+                    ids.Sort(StringComparer.Ordinal);
+                }
+                Log.Info("Bron Dothrakow (start sesji): Gear Fit Dothraki Only " + Yes(DothOn) + ", Outlaw Fence Dothraki Arms " + Yes(DothrakiArms.BandOn)
+                         + " | kultury Dothrakow: khuzait, steppe_bandits | " + (snap == null ? "spis jeszcze nie zbudowany" :
+                           "bron tylko dla Dothrakow (nie nosi jej w ROT zaden zolnierz innej kultury) " + n + " szt.: " + string.Join(", ", ids.ToArray())
+                           + " | bron kultury Dothrakow noszona tez przez inne kultury (wolna jak dotad) " + shared + " | arakh na liscie: " + Yes(arakh) + " (ma byc tak)") + ".");
+            }
+            catch (Exception e) { Stumble("DothCensus", e); }
         }
 
         /// <summary>f29-arakh: ile dopuszczen (kultura wojska x sztuka zza morza) daja pary krewne calej kultury przedmiotu, a ile sztuka po sztuce

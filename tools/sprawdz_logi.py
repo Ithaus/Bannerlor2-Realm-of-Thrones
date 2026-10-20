@@ -991,7 +991,8 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa nzc1 [--baza-doby <log biegu bazowego bez ZC1>] <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie
                     doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu (f25-sprawdz,
                     decyzja Jeffa 3c: dolna granica ze sredniej 'cena u wytworcy' linii 'Zbytki ludu (P3-P5)'; ZC1-4a wszystkie miasta - INFO; ZC1-4o okolica tkalni -
-                    INFO, log nie ma indeksu wedlug miasta ani odleglosci), ZC1-5 sol: cena wozu / cena miasta
+                    >= 50% tanich z linii 'Aksamit wedlug miasta (ZC1-4o)' co 7 dob (n20-drobne, klucz Velvet Town Log; ZC1-4w tkalnie dokladnie i ZC1-4r reszta - INFO;
+                    log bez tej linii - INFO jak dotad)), ZC1-5 sol: cena wozu / cena miasta
                     0.6-1.2 (doby po przejsciu woza), ZC1-5c kasy miast targowych wsi solnych >= 0.8 x poczatek, ZC1-6 zrodla "bez nazwy" w jedzeniu <= 2 szt./d na towar,
                     ZC1-7 RemoveParty w jedzeniu <= 2/d, ZC1-8 kontrola z ksiega rudy i drewna ZGODNA, ZC1-9a/b przejscie BK (marmur i miod), ZC1-9c produkcja miodu
                     pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego <= 1.10 x poczatek, ZC1-10 konwoje DTE i karawany BK bez jedzenia z niczego, ZC1-10c cele karawan
@@ -37184,6 +37185,9 @@ NZ1_VELREC = re.compile(r"velvet_weavery cotton->velvet (\d+):(\d+)")
 # f25-sprawdz (decyzja Jeffa 3c): srednia indeksu aksamitu w miastach z tkalnia (linia 'Zbytki ludu (P3-P5)', MakerPrices) i lista tkalni (tygodniowa 'Warsztaty zbytkow (P1)')
 NZ1_MKV = re.compile(r"cena u wytworcy \([^)]*\): [^|]*?\bvelvet ([\d.]+|-) w (\d+)")
 NZ1_VELW = re.compile(r"(?:; |: )velvet: miast (\d+), linii produkcji \d+ \(([^)]*)\)")
+# n20-drobne (PRZEKAZANIE-2026-10-19 p. 6): linia "Aksamit wedlug miasta (ZC1-4o): dzien N" (Armoury GoodsPaths.VelvetTowns, klucz Velvet Town Log, co 7 dob)
+NZ1_VELTOWN_HEAD = "Aksamit wedlug miasta (ZC1-4o): dzien "
+NZ1_VELTOWN_ROW = re.compile(r"(?:: |; )(?P<id>[^\s;|]+) (?P<ring>[WSR]) ix=(?P<ix>[\d.]+) c=(?P<c>-?\d+) z=(?P<z>\d+) d=(?P<d>[\d.]+|-)")
 # fix-ksiega recenzja: stan reguly "rzemioslo pierwsze" jedwabiu (SilkToWeavers) z linii doby ZC1 - tak/nie, miast z zapasem, polka <= zapas
 NZ1_SILKON = re.compile(r"jedwab (tak|nie) - miast z zapasem (\d+), zapas \d+ szt\., polki \d+, polka <= zapas (\d+)")
 NZ1_K4F = re.compile(r"; jedzenie (\d+) z wlasnym limitem \d+, ponad limit (\d+)\)")
@@ -37202,6 +37206,7 @@ def _nz1_scan(path, full):
     """Jeden przebieg logu: linie wspolne z biegiem bazowym (Towary, utarg wozow, Ceny surowcow, bilans pieniadza) i - przy full - linie paczki ZC1."""
     D = {"hooks": [], "days": [], "bad": [], "goods": {}, "ctl": [], "unknown_food": 0, "horses": 0, "n_err": 0, "k4f": [], "wagon": {}, "nd": {}, "reszta": {}, "fishauth": "", "a17f2": [],
          "ctln": [], "zc5iron": {}, "velrec": None,   # fix-ksiega: liczby kontroli wedlug doby, wsad zelaza ZC5 wedlug doby, receptura aksamitu KS
+         "veltown": {},   # n20-drobne: doba -> [(miasto, pas W/S/R, indeks, cena, zapas, odleglosc)] z linii "Aksamit wedlug miasta (ZC1-4o)"
          "mkv": {}, "velw": None}   # f25-sprawdz: srednia indeksu aksamitu w miastach z tkalnia wedlug doby (M, N), ostatnia lista tkalni aksamitu (N, nazwy)
     with open(path, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -37275,6 +37280,12 @@ def _nz1_scan(path, full):
                 mm = NZ1_VELW.search(s)
                 if mm:
                     D["velw"] = (int(mm.group(1)), mm.group(2))
+            elif s.startswith(NZ1_VELTOWN_HEAD):
+                md = NZ1_DAY.search(s)
+                tail = s.split(" | miasta ", 1)[1] if " | miasta " in s else ""
+                rows = [(m.group("id"), m.group("ring"), float(m.group("ix")), int(m.group("c")), int(m.group("z")), m.group("d")) for m in NZ1_VELTOWN_ROW.finditer(tail)]
+                if md and rows:
+                    D["veltown"][int(md.group(1))] = rows
             elif s.startswith(NZ1_ERR):
                 D["n_err"] += 1
     return D
@@ -37421,7 +37432,7 @@ def nzc1_main(logp, bdp=None):
     """nzc1 (16.10; projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 13-14, paczka ZC1; Armoury/src/GoodsPaths.cs): drogi towarow. Wejscie: log Armoury
     (strumieniowo), opcjonalnie --baza-doby <log biegu bazowego bez ZC1> (progi "nie gorzej niz baza"; bez bazy - wobec poczatku biegu albo INFO).
     ZC1-0 latki, ZC1-1 linie doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu
-    (f25-sprawdz, decyzja Jeffa 3c: dolna granica ze sredniej indeksu tych miast, mediana 28 dob; ZC1-4a wszystkie miasta i ZC1-4o okolica tkalni - INFO),
+    (f25-sprawdz, decyzja Jeffa 3c: dolna granica ze sredniej indeksu tych miast, mediana 28 dob; ZC1-4a wszystkie miasta - INFO; ZC1-4o okolica tkalni >= 50% tanich z linii 'Aksamit wedlug miasta (ZC1-4o)', bez niej INFO),
     ZC1-5 sol: cena wozu / cena miasta 0.6-1.2 (doby z przejsciem woza 1.00; bez nich - INFO), ZC1-5c kasy miast targowych wsi solnych (7 ostatnich dob >= 0.8 x 7
     pierwszych), ZC1-6/7 jedzenie "bez nazwy" i RemoveParty <= 2 szt./d na towar, ZC1-8 kontrola z ksiega rudy i drewna, ZC1-9a marmur 0.7-1.3, ZC1-9b miod lesny
     0.7-1.3, ZC1-9c produkcja miodu pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego nie wyzszy niz baza (x1.10), ZC1-10 konwoje DTE i karawany BK (je 0),
@@ -37506,7 +37517,34 @@ def nzc1_main(logp, bdp=None):
         med = st.median(vel[-28:])
         rep.add("ZC1-4a: indeks aksamitu < 10 we wszystkich miastach (czesc miast, mediana ostatnich do 28 dob)", f"{med:.0%} (pierwsza doba {vel[0]:.0%}, ostatnia {vel[-1]:.0%})",
                 "INFO (dawny prog >= 50% miast; decyzja 3c: poza tkalniami i ich okolica aksamit ma zostac drogi)", None)
-    if vrow is not None and vrow[5] in vday:
+    vt = D.get("veltown") or {}
+    if vt:
+        # n20-drobne: dokladny pomiar miasto po miescie (linia "Aksamit wedlug miasta (ZC1-4o)", co 7 dob) - pas W (tkalnia), S (3 najblizsze miasta bez tkalni
+        # kazdego miasta z tkalnia), R (reszta); tanie = indeks < 9.99 (jak licznik linii ZC1). Mediana ostatnich do 4 linii (4 tygodnie).
+        vdays = sorted(vt)[-4:]
+        def ring_share(rg):
+            sh = []
+            for d in vdays:
+                r = [x for x in vt[d] if x[1] == rg]
+                if r:
+                    sh.append(sum(1 for x in r if x[2] < 9.99) / len(r))
+            return (st.median(sh) if sh else None), len(sh)
+        lw = vt[vdays[-1]]
+        def cnt(rg):
+            r = [x for x in lw if x[1] == rg]
+            return len(r), sum(1 for x in r if x[2] < 9.99), (st.median([x[2] for x in r]) if r else None)
+        (vwn, vwc, vwm), (vsn, vsc, vsm), (vrn, vrc, vrm) = cnt("W"), cnt("S"), cnt("R")
+        vws, _ = ring_share("W"); vss, vsl = ring_share("S"); vrs, _ = ring_share("R")
+        vf2 = lambda v: "-" if v is None else f"{v:.2f}"
+        vf0 = lambda v: "-" if v is None else f"{v:.0%}"
+        rep.add("ZC1-4w: aksamit tani w miastach z tkalnia - dokladnie, miasto po miescie (linia 'Aksamit wedlug miasta', mediana ostatnich do 4 linii)",
+                f"{vf0(vws)} (ostatnia linia d{vdays[-1]}: {vwc} z {vwn}, mediana indeksu {vf2(vwm)})", "INFO (prog - ZC1-4; tu bez dolnej granicy ze sredniej)", None)
+        rep.add("ZC1-4o: aksamit tani w okolicy tkalni (3 najblizsze miasta bez tkalni kazdego miasta z tkalnia) - decyzja Jeffa 3c (19.10)",
+                f"{vf0(vss)} (ostatnia linia d{vdays[-1]}: {vsc} z {vsn}, mediana indeksu {vf2(vsm)}; linii {vsl})",
+                ">= 50% miast okolicy", (vss >= 0.5) if vss is not None else None)
+        rep.add("ZC1-4r: aksamit poza tkalniami i okolica (decyzja 3c: dalej drogi jak luksus)", f"tanich {vf0(vrs)} (ostatnia linia: {vrc} z {vrn}, mediana indeksu {vf2(vrm)})",
+                "INFO", None)
+    elif vrow is not None and vrow[5] in vday:
         tn, tk = vday[vrow[5]]
         rest = tn - vrow[2]
         a0, a1 = max(0, tk - vrow[4]), max(0, tk - vrow[3])

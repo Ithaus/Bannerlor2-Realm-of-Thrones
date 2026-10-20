@@ -3432,6 +3432,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceLootShareFar { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Outlaw Fence Dothraki Arms", HintText = "with Gear Fit Dothraki Only: an arakh or other Dothraki weapon in the stores of a band led by a chief (only such bands keep stores) that none of its men may carry goes into its packs, and the band sells it to a fence like the rest of its loot - the town pays and the piece goes on its stall (off = it stays in the band's stores, and whoever beats the band takes it)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool OutlawFenceDothrakiArms { get; set; } = true;
+
         [SettingPropertyBool("Outlaw Fence Buys Spare Animals", HintText = "bands also sell the animals they have no use for: pack beasts beyond what their remaining packs weigh, and riding horses beyond one for every man on foot", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool OutlawFenceBuysSpareAnimals { get; set; } = true;
@@ -5315,6 +5319,14 @@ namespace Armoury
         [SettingPropertyBool("Gear Fit Kin Item Level", HintText = "with Gear Fit Culture: a piece from across the Narrow Sea fits a soldier's people only if their own troops wear that very piece in Realm of Thrones - Dornish troops who wear Dothraki boots and javelins no longer take every Dothraki item, the arakh above all, which stays a khalasar's weapon (off = as before: one shared style opens all items of that foreign people)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitKinItemLevel { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Dothraki Only", HintText = "the arakh and the other Dothraki weapons no other people's troops carry in Realm of Thrones are for Dothraki soldiers only: Free Cities, Ghis, Yi Ti and every army of Westeros no longer buy or wear them, battle takes them off such men and gives them a weapon from the stores instead, and a bare-handed man gets one only when the stores hold no other weapon he can wield; lords, wanderers and named items are not touched (off = as before: anyone from the Essos side may carry an arakh)", RequireRestart = false)]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitDothrakiOnly { get; set; } = true;
+
+        [SettingPropertyBool("Dothraki Arms Census Log", HintText = "log only: in each of your battles write who carries a Dothraki weapon (troop, people, party, side of the sea), and once a week how many Dothraki soldiers serve in parties, sit in outlaw pools and how many Dothraki weapons lie in stores in Westeros - nothing in the game changes (off = no such lines)", RequireRestart = false)]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool DothrakiArmsCensusLog { get; set; } = true;
 
         [SettingPropertyBool("Gear Fit Weapon Floor", HintText = "in battle no soldier fights bare-handed while his party's stores hold a weapon he can use: a man left without any weapon after the skill and culture checks takes the best melee weapon he can wield from the stores, of his people's kind first (from across the sea only with Gear Fit Floor Foreign) - nothing from thin air (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
@@ -7348,6 +7360,10 @@ namespace Armoury
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool SilkToWeavers { get; set; } = false;
 
+        [SettingPropertyBool("Velvet Town Log", HintText = "every seventh day write a line to the log with velvet town by town: whether the town has a velvet weavery, the price and how much lies on its stall, and how far the nearest weavery is - only a measure, nothing in the game changes (off = no such line)", RequireRestart = false)]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool VelvetTownLog { get; set; } = true;
+
         [SettingPropertyBool("Silver Ore To Smiths", HintText = "craftsmen first: the townsfolk buy silver ore only from what lies on the stall beyond two days of work for the town's workshops that work it, so they find their ore first. Comes in step by step over 60 days. Where no workshop works silver ore (there is no mint or silversmith line yet in most towns), the townsfolk buy it as before, so the silver mines keep their market; the coin they do not spend stays in their purse (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool SilverOreToSmiths { get; set; } = true;
@@ -8941,6 +8957,7 @@ namespace Armoury
             s.OutlawFenceBuysLoot = OutlawFenceBuysLoot;
             s.OutlawFenceLootShare = OutlawFenceLootShare;
             s.OutlawFenceLootShareFar = OutlawFenceLootShareFar;
+            s.OutlawFenceDothrakiArms = OutlawFenceDothrakiArms;
             s.OutlawFenceBuysSpareAnimals = OutlawFenceBuysSpareAnimals;
             s.OutlawNoFreeFood = OutlawNoFreeFood;
             s.OutlawNoHideoutGold = OutlawNoHideoutGold;
@@ -9412,6 +9429,8 @@ namespace Armoury
             s.GearFitKits = GearFitKits;
             s.GearFitCulture = GearFitCulture;
             s.GearFitKinItemLevel = GearFitKinItemLevel;
+            s.GearFitDothrakiOnly = GearFitDothrakiOnly;
+            s.DothrakiArmsCensusLog = DothrakiArmsCensusLog;
             s.GearFitWeaponFloor = GearFitWeaponFloor;
             s.GearFitFloorForeign = GearFitFloorForeign;
             s.GearFitFloorOverSkill = GearFitFloorOverSkill;
@@ -9920,6 +9939,7 @@ namespace Armoury
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;
+            s.VelvetTownLog = VelvetTownLog;
             s.SilverOreToSmiths = SilverOreToSmiths;
             s.PlanksToBuilding = PlanksToBuilding;
             s.CharcoalBurners = CharcoalBurners;

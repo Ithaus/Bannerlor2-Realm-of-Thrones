@@ -281,6 +281,28 @@ namespace Armoury
         internal static float PoolIn(Settlement region) { return region != null ? Count(region) : 0f; }
         /// <summary>E4/3: konto WYRZUTKI ksiegi ludzi (PeopleBook) - cala pula (z wightami starych zapisow, jak linia "Wyrzutki:").</summary>
         internal static float PoolTotal() { return Total(); }
+
+        /// <summary>n20-drobne (pomiar, recenzja): ludzie kultury Dothrakow (bez bohaterow) w pulach wyrzutkow regionow - Westeros i Essos (strona morza
+        /// regionu - DothrakiArms.EssosOf). Tylko odczyt, watek glowny (takt doby).</summary>
+        internal static void DothPool(out float west, out float essos, out int westRegions)
+        {
+            west = essos = 0f; westRegions = 0;
+            foreach (var kv in _pool)
+            {
+                if (kv.Value == null || kv.Value.Count == 0) continue;
+                float n = 0f;
+                foreach (var e in kv.Value)
+                {
+                    if (e.Key == Commoner || e.Value <= 0f) continue;
+                    var ch = MBObjectManager.Instance.GetObject<CharacterObject>(e.Key);
+                    if (ch != null && !ch.IsHero && ch.Culture != null && GearFit.IsDoth(ch.Culture.StringId)) n += e.Value;
+                }
+                if (n <= 0f) continue;
+                var region = Settlement.Find(kv.Key);
+                if (region == null) continue;
+                if (DothrakiArms.EssosOf(region)) essos += n; else { west += n; westRegions++; }
+            }
+        }
         /// <summary>f8-bandy (BanditLimit, narodziny przy celu podniesionym): ludzie, ktorych RosterPostfix moze dac nowej bandzie z kryjowki `home` - ten sam region
         /// (RegionOf domu bandy) i ci sami sasiedzi co Draw, bez starych wightow. Recenzja: liczone jak Draw - kazda pozycja puli (region x klucz) w dol do
         /// calych ludzi (Draw bierze (int)Math.Floor(d[key])), wiec pula rozbita na ulamki (np. 8 kluczy po 0.9) nie przechodzi, a Draw dalby 0 (pusta banda).
@@ -1375,7 +1397,9 @@ namespace Armoury
                                 }
                                 continue;
                             }
+                            DothrakiArms.BandToPack(p);   // n20-drobne: bron Dothrakow, ktorej nikt w bandzie nie nosi - ze zbrojowni DTE do jukow (paser ja skupi)
                             FenceSell(p, fenceShare, reserve);
+                            DothrakiArms.AfterFence(p);
                         }
                         catch (Exception e)
                         {
@@ -2402,8 +2426,9 @@ namespace Armoury
             bool cargo = false, beasts = false;
             for (int i = 0; i < pack.Count; i++)
             {
-                int k = LootKind(pack.GetElementCopyAtIndex(i), food);
-                if (k == LootCargo) cargo = true; else if (k == LootMount || k == LootPack) beasts = true;
+                var e0 = pack.GetElementCopyAtIndex(i);
+                int k = LootKind(e0, food);
+                if (k == LootCargo || (k == LootArms && DothrakiArms.FenceTakes(p, e0))) cargo = true; else if (k == LootMount || k == LootPack) beasts = true;   // n20-drobne: bron Dothrakow jak ladunek
             }
             if (!cargo && !(spare && beasts)) return;
             if (cargo) _sellBands++;
@@ -2432,7 +2457,17 @@ namespace Armoury
                 {
                     if (i >= pack.Count) continue;
                     var el = pack.GetElementCopyAtIndex(i);
-                    if (LootKind(el, food) != LootCargo) continue;
+                    int lk = LootKind(el, food);
+                    if (lk == LootArms && DothrakiArms.FenceTakes(p, el))
+                    {
+                        // n20-drobne: bron Dothrakow, ktorej nikt w bandzie nie nosi - paser skupuje jak ladunek (zaplata w SellStack, licznik z kiesy bandy)
+                        int g0 = p.PartyTradeGold;
+                        int dn = SellStack(p, pack, el, bids, reserve, false, 0f, ref poor);
+                        units += dn;
+                        DothrakiArms.NoteFenceSold(dn, p.PartyTradeGold - g0);
+                        continue;
+                    }
+                    if (lk != LootCargo) continue;
                     units += SellStack(p, pack, el, bids, reserve, false, 0f, ref poor);
                 }
                 if (spare && beasts) units += SellSpare(p, pack, bids, reserve, ref poor);

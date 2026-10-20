@@ -174,6 +174,7 @@ namespace Armoury
             _looked = false; _whale = _meat = _fish = _honey = _mead = _marble = _coal = _wood = _iron = _clay = _lime = _grain = null; _clayCat = _limeCat = null; _ingots = null;
             _stumbles = 0; _errSites.Clear(); _foodTargets.Clear(); _need.Clear(); _needDay = -1; _saltMk = null;
             _sHeroNamed = _sHeroGate = 0;   // f14-ksiega (recenzja): dar herszta - liczniki sesji
+            _velDay = int.MinValue;          // n20-drobne: linia aksamitu wedlug miasta - pierwsza w sesji od razu
             DayReset();
         }
 
@@ -986,6 +987,7 @@ namespace Armoury
                 }
                 long carts, cartFirst, cartFair, cartOld, ironN, ironFirst, ironFair, ironOld, cartMis;
                 MarketCarts.TakeZc1(out carts, out cartFirst, out cartFair, out cartOld, out ironN, out ironFirst, out ironFair, out ironOld, out cartMis);
+                try { VelvetTowns(day, s, velvet); } catch (Exception e) { Stumble("Daily(aksamit)", e); }   // n20-drobne: linia "Aksamit wedlug miasta (ZC1-4o)"
                 var sb = new StringBuilder(2600);
                 double f = 1000.0 / Stopwatch.Frequency;
                 sb.Append("Towary (ZC1): dzien ").Append(day)
@@ -1039,6 +1041,89 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily(linia)", e); }
             DayReset();
         }
+
+        // ------------------------------------------------------------ n20-drobne: aksamit wedlug miasta (decyzja Jeffa 3c, PRZEKAZANIE-2026-10-19 p. 6)
+        // Jeff 19.10 (3c): "aksamit ma byc tani w miastach z tkalnia i w ich okolicy, dalej drogi jak luksus - w grze nic sie nie zmienia, tylko pomiar".
+        // Checker nzc1 (ZC1-4o) nie mial danych: linia ZC1 podaje tylko liczbe tanich w swiecie, linia 'Zbytki ludu' - srednia miast z tkalnia. Tu: raz na
+        // VelvetEveryDays dob (pierwsza doba sesji od razu) kazde miasto - czy ma tkalnie (warsztat, ktorego linia produkcji wydaje kategorie aksamitu - jak
+        // TownFolk.MakerPrices), indeks kategorii (Town.GetItemCategoryPriceIndex - ten sam co linia ZC1, tanie = < 9.99), cena kupna sztuki, zapas na polce,
+        // odleglosc bramy od bramy najblizszego miasta z tkalnia; okolica = 3 najblizsze miasta bez tkalni kazdego miasta z tkalnia. Tylko odczyt.
+        private const int VelvetEveryDays = 7;
+        private const int VelvetNeighbours = 3;
+        private static int _velDay = int.MinValue;
+
+        private sealed class VelTown { internal Town T; internal string Id; internal bool Weave; internal float Ix; internal int Price, Stock; internal float Dist; internal char Ring; internal TaleWorlds.Library.Vec2 Pos; internal bool Es; }
+
+        private static bool Weaves(Town t, ItemCategory cat)
+        {
+            if (t == null || t.Workshops == null || cat == null) return false;
+            foreach (var w in t.Workshops)
+            {
+                var type = w != null ? w.WorkshopType : null;
+                if (type == null || type.IsHidden || type.Productions == null) continue;
+                foreach (var pr in type.Productions)
+                {
+                    if (pr.Outputs == null) continue;
+                    foreach (var o in pr.Outputs) if (o.Item1 == cat) return true;
+                }
+            }
+            return false;
+        }
+
+        private static void VelvetTowns(int day, Settings s, ItemObject velvet)
+        {
+            if (s == null || !s.VelvetTownLog || velvet == null || velvet.ItemCategory == null) return;
+            if (_velDay != int.MinValue && day - _velDay < VelvetEveryDays && day >= _velDay) return;
+            _velDay = day;
+            var cat = velvet.ItemCategory;
+            var list = new List<VelTown>();
+            foreach (var t in Town.AllTowns)
+            {
+                if (t == null || !t.IsTown || t.Owner == null || t.Settlement == null) continue;
+                var v = new VelTown { T = t, Id = t.Settlement.StringId, Weave = Weaves(t, cat), Ix = t.GetItemCategoryPriceIndex(cat), Dist = -1f, Ring = 'R' };
+                try { v.Price = t.GetItemPrice(new EquipmentElement(velvet), null, false); } catch { v.Price = -1; }
+                v.Stock = t.Owner.ItemRoster != null ? t.Owner.ItemRoster.GetItemNumber(velvet) : 0;
+                v.Pos = t.Settlement.GatePosition.ToVec2();
+                try { v.Es = DothrakiArms.EssosOf(t.Settlement); } catch { v.Es = false; }   // recenzja: okolica tylko po tej samej stronie morza
+                list.Add(v);
+            }
+            var weave = list.FindAll(x => x.Weave);
+            foreach (var v in list)
+            {
+                if (v.Weave) { v.Dist = 0f; v.Ring = 'W'; continue; }
+                foreach (var w in weave) { if (w.Es != v.Es) continue; float d = v.Pos.Distance(w.Pos); if (v.Dist < 0f || d < v.Dist) v.Dist = d; }
+            }
+            foreach (var w in weave)
+            {
+                var near = list.FindAll(x => !x.Weave && x.Es == w.Es);
+                near.Sort((a, b) => a.Pos.Distance(w.Pos).CompareTo(b.Pos.Distance(w.Pos)));
+                for (int i = 0; i < near.Count && i < VelvetNeighbours; i++) near[i].Ring = 'S';
+            }
+            int[] n = new int[3], cheap = new int[3];
+            foreach (var v in list)
+            {
+                int r = v.Ring == 'W' ? 0 : (v.Ring == 'S' ? 1 : 2);
+                n[r]++;
+                if (v.Ix < 9.99f) cheap[r]++;
+            }
+            list.Sort((a, b) => a.Ring != b.Ring ? RingOrder(a.Ring).CompareTo(RingOrder(b.Ring)) : string.CompareOrdinal(a.Id, b.Id));
+            var sb = new StringBuilder(64 * list.Count + 300);
+            sb.Append("Aksamit wedlug miasta (ZC1-4o): dzien ").Append(day).Append(" | co ").Append(VelvetEveryDays).Append(" dob, tanie = indeks < 9.99 | miast ").Append(list.Count)
+              .Append(", z tkalnia ").Append(n[0]).Append(" (tanich ").Append(cheap[0]).Append("), okolica tkalni (").Append(VelvetNeighbours).Append(" najblizsze miasta bez tkalni po tej samej stronie morza, w linii prostej) ")
+              .Append(n[1]).Append(" (tanich ").Append(cheap[1]).Append("), reszta ").Append(n[2]).Append(" (tanich ").Append(cheap[2]).Append(")")
+              .Append(" | miasta (pas W tkalnia / S okolica / R reszta, ix indeks, c cena kupna, z zapas na polce, d odleglosc do tkalni): ");
+            for (int i = 0; i < list.Count; i++)
+            {
+                var v = list[i];
+                if (i > 0) sb.Append("; ");
+                sb.Append(v.Id).Append(' ').Append(v.Ring).Append(" ix=").Append(v.Ix.ToString("0.00", Inv)).Append(" c=").Append(v.Price).Append(" z=").Append(v.Stock)
+                  .Append(" d=").Append(v.Dist < 0f ? "-" : v.Dist.ToString("0", Inv));
+            }
+            sb.Append('.');
+            Log.Info(sb.ToString());
+        }
+
+        private static int RingOrder(char c) { return c == 'W' ? 0 : (c == 'S' ? 1 : 2); }
 
         private static string BulkText()
         {

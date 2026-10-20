@@ -446,6 +446,8 @@ namespace Armoury
                 if (Campaign.Current != null) LosersFlee.NoteMission();
                 // E6/K1 (211): zgony koni w misji (agent konia zabity) - zdjete ze zbrojowni wlasciciela po zwrotach DTE; bitwa z misja bez reguly W autobitwy
                 if (Campaign.Current != null && mission != null) HorseFate.OnMissionInit(mission);
+                // n20-drobne (recenzja): pomiar - kto w bitwie gracza nosi bron Dothrakow (klucz Dothraki Arms Census Log; tylko log)
+                if (Campaign.Current != null && mission != null) DothrakiArms.OnMissionInit(mission);
                 if (Settings.Current.FieldCraftEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FieldCraft());
                 // n20-herby: linia "Tarcze band (herby):" po rozstawieniu i na koniec misji (sam herb idzie w prefiksie SpawnAgent)
