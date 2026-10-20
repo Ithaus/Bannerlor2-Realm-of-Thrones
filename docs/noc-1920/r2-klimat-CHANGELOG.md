@@ -1,0 +1,45 @@
+## 2026-10-19 (noc 19/20.10, r2-klimat: klimat wsi przed warsztatami miast w nowej kampanii - PLAN 6.10, krok C1 audytu 02)
+
+**Mod:** Armoury | **Galaz:** `w-toku/r2-klimat` (od `bc5a1e0d` = WGRANIE 89) | **Commity:** `76233ad8` (kod) | **Tor:** S (bez gry - zakaz uruchamiania; build Armoury kod 0, 0 bledow, gen_mcm uruchomiony - 2050 ustawien) | **Klucz (nowy, domyslnie TAK; w Armoury.json Jeffa go nie ma - wchodzi domyslny z kodu):** `ClimateBeforeWorkshops` ("Climate Before Workshops", grupa "Northern fare", tuz pod Village Climate Fix) | **Zapis:** bez zmian (typ wsi nie idzie do zapisu gry; nowy stan tylko w pamieci sesji, nic w SyncData) | **Pliki:** `Armoury/src/VillageClimate.cs`, `ArmouryBehavior.cs` (2 nasluchy), `Settings.cs`, `McmSettings.cs` (gen_mcm).
+
+**Po ludzku (dla Jeffa):** 28 wsi ma wedlug klimatu inny towar niz na mapie ROT (np. bawelna przy Murze, w Sarnorze i w gorach Doliny -> owce, bydlo, len; cieple wsie Qarthu, Rhoyne i Reach -> bawelna). Dotad mod przestawial je dopiero wtedy, gdy gra juz rozdala warsztaty miast - wiec w NOWEJ kampanii miasta dostawaly warsztaty pod stare wsie (np. tkalnie aksamitu tam, gdzie bawelny juz nie ma), a mod naprawial to powoli (warsztat tracacy 60 dob zmienia branze). Teraz w nowej kampanii wsie dostaja swoj towar ZANIM gra rozda warsztaty, wiec miasta zaczynaja z warsztatami pod to, co rosnie wokol nich. Wczytany zapis (Twoja kampania) - bez zmian: warsztaty, ktore juz stoja, zostaja.
+
+### Problem (z dowodem)
+- Dekompilacja gry (TaleWorlds.CampaignSystem 1.4.8): `WorkshopsCampaignBehavior.OnNewGameCreatedPartialFollowUp` przy `i == 10` wola `InitializeWorkshops()` + `BuildWorkshopsAtGameStart()`; typ warsztatu wybiera `DecideBestWorkshopType` z produkcji `VillageType.Productions` wsi z `TradeBound == miasto` (zboze tylko z farmy zboza, krowa = skory, owca = welna). `CampaignEvents.OnNewGameCreated` (dispatcher) wola: caly `OnNewGameCreatedEvent`, potem petle `OnNewGameCreatedPartialFollowUpEvent` i = 0..99, potem `OnNewGameCreatedPartialFollowUpEndEvent`; dopiero potem `Campaign.DoLoadingForGameType` wola `OnSessionStart` (= `OnSessionLaunched`).
+- Armoury: `VillageClimate.Apply()` biegnie w `ArmouryBehavior.OnSessionLaunched` (ArmouryBehavior.cs ok. 2029) - czyli PO budowie warsztatow. Wlasny komentarz klasy mowil wprost: "nowej kampanii przed rozdaniem warsztatow ... to krok C1 audytu 02 na pozniej".
+- Log testu 160 dob na WGRANIU 89 (`Modules\Armoury\Armoury-2026-10-19_19-25-02.log`, wczytany zapis): linia 413 `[19:26:56] Klimat wsi (T8): podmienione 28 z 28 wsi z tabeli` - przestawienie wsi przy kazdym starcie sesji (typ nie idzie do zapisu), juz po `[19:26:34] Behavior dodany do kampanii`; ostatnia linia "Warsztaty za cena (E3-D3)" (doba 109235): `zmian w sesji 37` - tyle warsztatow regula WorkshopRetoolByPrice przestawiala w 160 dob (lagodzenie skutku, nie przyczyny). Bieg nowej kampanii po zmianie - nie bylo (zakaz uruchamiania gry); dowod dzialania zmiany = linie logu nizej w autotescie.
+- Inne mody: tylko BannerKings odwoluje sie do `DecideBestWorkshopType` (postfiks `EconomyPatches.WorkshopsCampaignBehaviorPatches.DecideBestWorkshopTypePostfix` - podmienia DUPLIKAT typu w miescie na kopalnie albo kuznie; typow wsi nie czyta). Zaden inny mod w Modules nie ma `BuildWorkshopsAtGameStart` / `InitializeWorkshops`.
+
+### Przyczyna
+Kolejnosc zdarzen: warsztaty miast powstaja w `OnNewGameCreatedPartialFollowUp` (i == 10), a tabela klimatu T8 szla dopiero w `OnSessionLaunched`.
+
+### Zmiana
+1. `VillageClimate.BeforeWorkshops()` - nasluch `CampaignEvents.OnNewGameCreatedEvent` (tylko nowa kampania; caly ten event biegnie przed petla follow-up, wiec przed budowa warsztatow). Ta sama tabela i ta sama regula co `Apply` (podmiana tylko, gdy wies ma typ "bylo"; inny typ - nie ruszamy). Bez klasy wsi BK (dane BK moga jeszcze nie istniec) - klase wyrownuje `Apply` przy starcie sesji. Dziala tylko przy `VillageClimateFix` i `ClimateBeforeWorkshops`. Ustawienia: `McmSettings.Apply` biegnie juz w `SubModuleMain.OnGameStart` (przed tworzeniem kampanii), wiec `Settings.Current` ma wartosci z MCM.
+2. `VillageClimate.Apply()` (start sesji) - bez drugiej podmiany: wsie przestawione wczesniej maja typ "jest" -> istniejaca galaz "juz z nowym typem" (tylko wyrownanie klasy BK z klasy typu "bylo" na "jest"). Linia "Klimat wsi (T8)" dostaje dopisek `przed warsztatami miast (nowa kampania, C1) przestawiono N - tu juz z nowym typem`; licznik C1 zerowany przy kazdym starcie sesji (wczytany zapis w tym samym procesie - bez dopisku).
+3. `VillageClimate.WorkshopsFit()` - nasluch `OnNewGameCreatedPartialFollowUpEndEvent` (warsztaty juz zbudowane), TYLKO LOG: dla kazdego miasta wsad okolicy jak w `DecideBestWorkshopType`; warsztat (bez ukrytych typow) "pasuje", gdy ktoras jego produkcja z wyrobem handlowym ma wsad z tej listy. Liczone dla tych samych warsztatow wedlug typow klimatu i wedlug typow z mapy ROT, osobno dla wszystkich miast i dla miast z wsia z tabeli T8.
+
+### Ryzyko / co sprawdzic (kontrola calosci w kodzie)
+- **Regresje / drugi raz:** jedyne miejsca piszace `Village.VillageType` w Armoury: `VillageClimate` (Apply + nowe BeforeWorkshops), `GoodsRates.Apply` (len), `VineOlive.Apply` (winnice) - te dwa dalej przy starcie sesji, PO VillageClimate, jak dotad (wsie z ich tabel sprawdzaja typ "bylo"; T8 jest i tak wczesniej - kolejnosc bez zmian). `GoodsRates.MapTypeBefore` czyta tylko tabele (przy wylaczonym T8). Brak testow/skryptow parsujacych "podmienione 28" (tools/sprawdz_logi.py - brak).
+- **Co widzi wczesniej nowy typ:** wszystko, co w nowej kampanii czyta typ wsi miedzy OnNewGameCreated a OnSessionLaunched (wybor warsztatow - cel zmiany; startowa praca warsztatow `RunTownShopsAtGameStart` i ewentualne startowe zapasy wsi; BK, jesli zaklada dane wsi w tym oknie - klasa wsi od razu z nowego typu, Apply zobaczy "juz zgodna"). Kalibracje Armoury (KS, P1 plon, VillageFruit) biegna przy starcie sesji / w 1. dobie - typy w tym momencie takie same jak dotad.
+- **Zamknieta ekonomia:** bez zmian - zmienia sie tylko moment przestawienia typu (nic nie powstaje i nie znika); liczenie WorkshopsFit tylko czyta.
+- **Watki / alokacje:** wszystko raz, na watku glownym, przy tworzeniu kampanii (poza goracymi sciezkami). Potkniecia liczone per wies / per miasto (bez globalnego wylacznika).
+- **Zapis:** nic nowego w zapisie; wczytany zapis - nasluchy nie biegna (OnNewGameCreated tylko w nowej kampanii), linia T8 jak dotad.
+- **Czego NIE obejmuje:** wsie lnu `GoodsRates` (16 wsi) i winnice `VineOlive` (8 wsi) dalej zmieniaja typ przy starcie sesji, czyli po budowie warsztatow - to inne reguly (kampania zaczeta z kluczem, flagi w zapisie), poza zadaniem 6.10. Warsztaty juz stojace w wczytanym zapisie - tylko WorkshopRetoolByPrice jak dotad.
+- **Wylacznik:** `Climate Before Workshops` = nie -> warsztaty nowej kampanii jak dotad z typow z mapy (linia C1 "klucz Climate Before Workshops wylaczony"); `Village Climate Fix` = nie -> C1 nie robi nic.
+
+### Status
+DO SPRAWDZENIA (zbudowane, nie uruchomione w grze; nie wgrane).
+
+### Decyzje (podjete samodzielnie, Jeff spi)
+- Moment: `OnNewGameCreatedEvent` zamiast latki Harmony na `BuildWorkshopsAtGameStart` - zdarzenie gry na pewno biegnie przed petla follow-up, bez latki na cudzy kod.
+- Klasa wsi BK nie w BeforeWorkshops, tylko jak dotad w Apply (istniejaca galaz "juz z nowym typem") - jedno miejsce wyrownania klasy.
+- "Pasuje do wsadu okolicy" = ta sama definicja co gra (DecideBestWorkshopType + FindTotalInputDensityScore), liczona binarnie na warsztat; przed/po = typy z mapy / typy klimatu dla tych samych warsztatow (rzetelne A/B = dwie nowe kampanie z kluczem tak/nie).
+- Zakres tylko tabela T8 (zadanie); len i winnice - zapisane w "Czego NIE obejmuje".
+
+### Test w grze
+Autotest nowej kampanii: `tools\autotest-2026-10-17\autotest-bitwa.ps1` BEZ `-LoadSave` (np. `-ArmouryDll <drzewo>\Armoury\bin\Release\Armoury.dll -Days 5`). W `Modules\Armoury\Armoury.log`:
+1. `Klimat wsi przed warsztatami (C1): nowa kampania | przestawiono 28 z 28 wsi z tabeli T8 PRZED budowa warsztatow miast` ... `potkniecia 0.` (oczekiwane 28; "inny typ" / "brak" - pusto).
+2. `Klimat wsi przed warsztatami (C1): warsztaty miast po budowie startowej | zbudowane wedlug typow wsi KLIMATU (przestawiono przed warsztatami 28 wsi)` ... w czesci `miasta z wsia z tabeli T8`: `pasuje wedlug klimatu` >= `wedlug mapy` (warsztaty wybrane pod nowe wsie); `potkniecia 0.`
+3. Pozniej (start sesji): `Klimat wsi (T8): podmienione 0 z 28 wsi z tabeli; przed warsztatami miast (nowa kampania, C1) przestawiono 28 - tu juz z nowym typem; juz z nowym typem: ...` (28 nazw) - dowod, ze T8 nie podmienil drugi raz; BILANS bawelny jak dotad (zabrano 10, dodano 11).
+4. Wczytany zapis (`-LoadSave`): brak linii C1, linia T8 jak dotad `podmienione 28 z 28` (bez dopisku C1).
+5. A/B (opcjonalnie): ta sama komenda z MCM `ClimateBeforeWorkshops` = false -> linia C1 "klucz Climate Before Workshops wylaczony", linia warsztatow "Z MAPY ROT", `pasuje wedlug klimatu` w miastach z tabeli nizsze niz w biegu z kluczem; linia T8 `podmienione 28 z 28`.
