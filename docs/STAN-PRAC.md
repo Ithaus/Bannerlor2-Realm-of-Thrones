@@ -3315,7 +3315,7 @@ nowa kampania 113 NIE (88/89: 118). Obserwowac NO-4. Raport dla Jeffa: docs/RAPO
   checker R3J-1..3 (--grupa szybkie). Hodowla dla kolejki (punkt 2) OTWARTE; miara 219 liczy jazde wedlug typu - krok konni-bez-konia jej nie rusza (wiecej koni w bitwie).
   Scalone n20-calosc db85ef2d (Armoury 8ea6c892, 2056 ustawien; CrashScribe bez zmian). Testy n20r3-bitwa / n20r3-160 / n20r3-nowa w toku -> WGRANIE 91 jesli czyste.
 
-### 97. WGRANIE 91 (20.10 ok. 01:45 PDT) - RUNDA 3 NOCY - START TUTAJ
+### 97. WGRANIE 91 (20.10 ok. 01:30 PDT) - RUNDA 3 NOCY - START TUTAJ
 W grze: `w-toku/noc-wgranie-91` = n20-calosc 1ffbd891 | Armoury **8ea6c892** (2056 ustawien), CrashScribe 4aff74db, RealisticCaptivity e55869a2, GrandTourney 87465d27, ForgeView 19aa052a.
 Kopie *.bak-2026-10-20-wgranie91-przed + D:/Backup-Bannerlord/wgrane/2026-10-20-wgranie91-przed. = 90 + r3-jazda (GarrisonHorsesToLords, GarrisonHarnessToLords).
 TESTY: n20r3-bitwa / n20r3-nowa / n20r3-160 kod 0, 0 ERROR; R3J-1 TAK, R3J-3 (160) TAK 78.2%, SZ-A8-2 TAK; R3J-2 NIE (-7%); A17-11e 737 ludzi w jednej dobie bitew (109200).

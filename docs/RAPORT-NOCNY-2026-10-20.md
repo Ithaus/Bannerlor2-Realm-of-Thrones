@@ -1,7 +1,7 @@
 # RAPORT NOCNY 19/20.10 - dla Jeffa
 
-Dzien dobry. W grze jest **WGRANIE 91** (wgrane 20.10 ok. 01:45 zegara komputera, po autotestach). Po drodze: WGRANIE 89 (19.10 20:15 - Twoje punkty
-z wieczora i naprawa zawieszenia), 90 (23:25 - runda 2 z planu do konca moda), 91 (01:45 - runda 3). Gra nie zapyta Cie o tryb awaryjny ("Safe Mode"). Twoj zapis Ironman z 15:48 jest caly
+Dzien dobry. W grze jest **WGRANIE 91** (wgrane 20.10 ok. 01:30 zegara komputera, po autotestach). Po drodze: WGRANIE 89 (19.10 20:15 - Twoje punkty
+z wieczora i naprawa zawieszenia), 90 (23:25 - runda 2 z planu do konca moda), 91 (01:30 - runda 3). Gra nie zapyta Cie o tryb awaryjny ("Safe Mode"). Twoj zapis Ironman z 15:48 jest caly
 (kopie: `D:\Backup-Bannerlord\zapisy-jeffa\2026-10-19-po-sesji-88` i `D:\Backup-Bannerlord\zawieszenie-2026-10-19-1609\zapis`).
 
 ## 1. Zawieszenie z 16:09 - naprawione
