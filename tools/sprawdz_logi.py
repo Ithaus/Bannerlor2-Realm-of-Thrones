@@ -1107,6 +1107,11 @@ Uzycie (Python 3, tylko odczyt):
                     ERROR in SeaStorms* 0; MS-12 karawany na morzu zima > 0 (burza nie zamyka szlaku) i stan kadlubow w burzy (INFO).
                     Po recenzji 20.10: znacznik (MS) zamiast (SZ) (SZ = bitwa szturmu); kara pod sufitem NavalDLC wzgledem celu; MS-13 ladunki "w dobach" przez
                     morze (klucz Sea Storm Winter Carts): poza zima opoznionych 0, zima opoznione wszystkie morskie (+doby = opoznione x doby portu), INFO bez zimy.
+--grupa p6drogi   : (R3-07d, Jeff 20.10 "pozostale tak"; galaz w-toku/p6-drogi, Armoury/src/AiRoadRoutes.cs) python -I tools/sprawdz_logi.py --grupa p6drogi <Armoury-*.log>
+                    (strumieniowo). AD-0 latka ComputePath wpieta; AD-1 siec CZYNNA (>= 1000 wezlow, wyciete <= 25%, przeprawy 3/3); AD-2 budowa <= 1000 ms; AD-3 linie
+                    doby; AD-4 objazdy u rodow, karawan, wozow wsi; AD-5 objazd sredni z konstrukcji (INFO - te same warunki co przyjecie); AD-6 na objezdzie na
+                    drodze >= 30%; AD-7 udzial na drodze (INFO); AD-8 koszt planowania <= 50 ms/dobe; AD-9 potkniecia i ERROR 0; AD-10 odrzucone (INFO); AD-11 dojazd
+                    ZMIERZONY: objazdy sr. <= proba porownawcza + 5 pp (po >= 30 dojazdow w obu grupach). Log bez paczki: INFO.
 --grupa nks       : (16.10, Jeff "produkcja tylko z prawdziwych rak i ziemi, start zbilansowany"; galaz w-toku/noc-ks, Armoury/src/StartCalibration*.cs; projekt
                     docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14; poprawki po recenzji 16.10) python -I tools/sprawdz_logi.py --grupa nks <Armoury-*.log>
                     [--baza-doby <Armoury-*.log bazy>] (strumieniowo). NKS-0 start sesji, NKS-1 Plany bez bledu, NKS-1b Plan wlaczenia z ksiega >= 28 dob, NKS-2 czas Planu
@@ -35998,6 +36003,173 @@ NZB_CS_WARD = re.compile(r"\| ZB: zamiennik pominal legendy (\d+), sprzet olbrzy
 NZB_CS_LEG = "Mends: zamiennik RealmWard (ZB-4) - legendy "
 
 
+P6DROGI_HEAD = "AI drogi (AD): "
+P6DROGI_ERR = "ERROR in AiRoadRoutes."
+
+
+def p6drogi_main(logp):
+    """p6drogi (R3-07d, Jeff 20.10 "pozostale tak"; galaz w-toku/p6-drogi, Armoury/src/AiRoadRoutes.cs, klucze MapRoadAiRoutes / MapRoadAiMinDistance /
+    MapRoadAiDetourPercent): lordowie, karawany i wozy wsi dostaja objazd traktem (punkty posrednie po ComputePath), gdy trasa droga jest najwyzej o nadklad
+    dluzsza od trasy gry i droga to co najmniej polowa trasy. Wejscie: log Armoury (strumieniowo).
+    AD-0 latka MobileParty.ComputePath wpieta (bez cudzych latek); AD-1 start sesji CZYNNE, siec >= 1000 wezlow, wyciete <= 25% krawedzi, przeprawy 3/3;
+    AD-2 budowa sieci <= 1000 ms; AD-3 linie doby rozpoznane; AD-4 objazdy > 0 u rodow, karawan i wozow wsi; AD-5 objazd sr.: nadklad, droga, czas szac.
+    (INFO - recenzja p6-drogi: kod wymusza te warunki przy przyjeciu, wiec to nie jest pomiar); AD-11 dojazd ZMIERZONY (godziny od planu do celu / godziny
+    trasy gry wg predkosci bazowej z planu): objazdy sr. <= proba porownawcza (trasa gry, choc droga w zasiegu) + 5 pp, po >= 30 dojazdow w obu grupach;
+    AD-6 partie na objezdzie: na drodze >= 30% partio-godzin (bez objazdu WGRANIE 91: 7-10%); AD-7 udzial na drodze rodow,
+    karawan i wozow wsi (INFO, porownanie z linia Drogi (DR) WGRANIA 91: rody 7.3%, karawany 9.8%, wozy wsi 8.4%); AD-8 koszt: planowanie mediana <= 50 ms/dobe,
+    spis <= 5 ms/dobe; AD-9 potkniecia i ERROR in AiRoadRoutes.* 0; AD-10 odrzucone wedlug powodu (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("AD-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    hooks, starts, days = [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(P6DROGI_HEAD):
+                r = s[len(P6DROGI_HEAD):]
+                if r.startswith("latka"):
+                    hooks.append(r)
+                elif r.startswith("start sesji"):
+                    starts.append(r)
+                elif r.startswith("dzien "):
+                    days.append(r)
+            elif s.startswith(P6DROGI_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii latki {len(hooks)}, startu sesji {len(starts)}, doby {len(days)}, ERROR {n_err}")
+    if not hooks and not starts and not days:
+        rep.add("AD-0: linie 'AI drogi (AD)'", "brak w logu", "INFO (log sprzed paczki p6-drogi)", None)
+        rep.show()
+        return 0
+    # AD-0
+    if hooks:
+        h = hooks[-1]
+        ok = "latka MobileParty.ComputePath wpieta" in h
+        oth = num(r"cudzych latek na ComputePath (\d+)", h, int, None)
+        rep.add("AD-0: latka MobileParty.ComputePath + straznik ucieczki", h[:160], "wpieta, cudzych latek 0", ok and oth == 0)
+    else:
+        rep.add("AD-0: latka MobileParty.ComputePath + straznik ucieczki", "brak linii latki", "linia przy starcie gry", False)
+    # AD-1 / AD-2
+    if starts:
+        st0 = starts[-1]
+        if "klucz MapRoadAiRoutes nie" in st0:
+            rep.add("AD-1: start sesji", "klucz MapRoadAiRoutes nie", "INFO (klucz wylaczony)", None)
+        else:
+            act = st0.rstrip(".").endswith("CZYNNE")
+            nodes = num(r"wezlow (\d+)", st0, int, 0) or 0
+            dr = num(r"proste (\d+)", st0, int, 0) or 0
+            bn = num(r"z objazdem (\d+)", st0, int, 0) or 0
+            cut = num(r"wyciete (\d+)", st0, int, 0) or 0
+            cr = num(r"przeprawy CrossingLaw (\d+)/", st0, int, 0) or 0
+            tot = dr + bn + cut
+            cutp = 100.0 * cut / tot if tot else 100.0
+            rep.add("AD-1: start sesji - siec drog dla tras AI",
+                    f"{'CZYNNE' if act else 'NIECZYNNE'}; wezlow {nodes}; krawedzie proste {dr}, z objazdem {bn}, wyciete {cut} ({cutp:.1f}%); przeprawy {cr}/3",
+                    "CZYNNE, wezlow >= 1000, wyciete <= 25%, przeprawy 3/3", act and nodes >= 1000 and cutp <= 25.0 and cr == 3)
+            ms = num(r"budowa ([\d.]+) ms", st0, float, None)
+            rep.add("AD-2: budowa sieci (raz na sesje)", f"{ms} ms" if ms is not None else "-", "<= 1000 ms", (ms <= 1000.0) if ms is not None else None)
+    else:
+        rep.add("AD-1: start sesji", "brak linii startu sesji", "linia przy OnSessionLaunched", False)
+    # AD-3
+    if not days:
+        rep.add("AD-3..10: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba albo klucz wylaczony)", None)
+        rep.show()
+        return 0
+    parsed = []
+    for d in days:
+        g = {
+            "acc": num(r"\| objazdy droga (\d+)", d, int, None),
+            "r": num(r"; rody (\d+), karawany \d+, wozy wsi \d+\)", d, int, 0),
+            "k": num(r"; rody \d+, karawany (\d+), wozy wsi \d+\)", d, int, 0),
+            "w": num(r"; rody \d+, karawany \d+, wozy wsi (\d+)\)", d, int, 0),
+            "over": num(r"nadklad drogi \+?(-?[\d.]+)%", d, float, None),   # znak z liczby (bywa ujemny); stary zapis "+-1.2" tez
+            "adn": num(r"dojazd zmierzony .*?: objazdy (\d+) sr\.", d, int, None),
+            "adr": num(r"dojazd zmierzony .*?: objazdy \d+ sr\. ([\d.]+)%", d, float, None),
+            "acn": num(r"proba \(trasa gry, droga w zasiegu\) (\d+) sr\.", d, int, 0),
+            "acr": num(r"proba \(trasa gry, droga w zasiegu\) \d+ sr\. ([\d.]+)%", d, float, None),
+            "aab": num(r"dojazd zmierzony .*?, przerwane (\d+)", d, int, 0),
+            "aout": num(r"dojazd zmierzony .*?, poza pomiarem (\d+)", d, int, 0),
+            "road": num(r"trasy gry, droga ([\d.]+)% trasy", d, float, None),
+            "time": num(r"czas szac\. ([\d.]+)%", d, float, None),
+            "n": num(r"\(godzin \d+\): (\d+), na drodze", d, int, 0),
+            "on": num(r"\(godzin \d+\): \d+, na drodze (\d+)", d, int, 0),
+            "hr": [num(rf"{lab} (\d+)/\d+ \(", d, int, 0) for lab in ("rody", "karawany", "wozy wsi")],
+            "hn": [num(rf"{lab} \d+/(\d+) \(", d, int, 0) for lab in ("rody", "karawany", "wozy wsi")],
+            "det": num(r"na objezdzie (\d+), z tego", d, int, 0),
+            "deton": num(r"na objezdzie \d+, z tego na drodze (\d+)", d, int, 0),
+            "plan": num(r"koszt: planowanie ([\d.]+) ms/dobe", d, float, None),
+            "spis": num(r"spis ([\d.]+) ms/dobe", d, float, None),
+            "stum": num(r"potkniecia dzis (\d+)", d, int, 0),
+            "stall": num(r"\(od wczytania (\d+)\)", d, int, 0),
+            "rej": d,
+        }
+        if g["acc"] is not None:
+            parsed.append(g)
+    rep.add("AD-3: linie doby 'AI drogi (AD): dzien N'", f"{len(parsed)} z {len(days)} rozpoznanych", "> 0 i wszystkie", len(parsed) > 0 and len(parsed) == len(days))
+    if not parsed:
+        rep.show()
+        return 0
+    acc = sum(g["acc"] for g in parsed)
+    ar, ak, aw = sum(g["r"] for g in parsed), sum(g["k"] for g in parsed), sum(g["w"] for g in parsed)
+    rep.add("AD-4: objazdy droga (suma dob)", f"{acc} (rody {ar}, karawany {ak}, wozy wsi {aw}; dob {len(parsed)})", "> 0 u kazdego z trzech rodzajow",
+            ar > 0 and ak > 0 and aw > 0)
+    det = int(num(r"nadklad do (\d+)%", parsed[-1]["rej"], int, 15) or 15)
+    wsum = sum(g["acc"] for g in parsed if g["over"] is not None)
+    if wsum > 0:
+        over = sum(g["over"] * g["acc"] for g in parsed if g["over"] is not None) / wsum
+        road = sum(g["road"] * g["acc"] for g in parsed if g["road"] is not None) / wsum
+        tm = sum(g["time"] * g["acc"] for g in parsed if g["time"] is not None) / wsum
+        bad = not (over <= det + 0.5 and road >= 50.0 and tm <= 100.5)
+        rep.add("AD-5: objazd sredni (wazony objazdami; konstrukcja, nie pomiar)", f"nadklad {over:+.1f}%, droga {road:.1f}% trasy, czas szac. {tm:.1f}% czasu trasy gry",
+                f"INFO (kod wymusza: nadklad <= {det}%, droga >= 50%, czas szac. <= 100%; czas zmierzony - AD-11)" + (" - UWAGA: poza warunkami przyjecia" if bad else ""), None)
+    else:
+        rep.add("AD-5: objazd sredni", "brak objazdow", "INFO", None)
+    dt, dto = sum(g["det"] for g in parsed), sum(g["deton"] for g in parsed)
+    rep.add("AD-6: partie na objezdzie - partio-godziny na drodze", f"{dto}/{dt} = " + (f"{100.0 * dto / dt:.1f}%" if dt else "-"),
+            ">= 30% (bez objazdu WGRANIE 91: 7-10%)", (100.0 * dto / dt >= 30.0) if dt else None)
+    parts = []
+    for i, lab in enumerate(("rody", "karawany", "wozy wsi")):
+        a, b = sum(g["hr"][i] or 0 for g in parsed), sum(g["hn"][i] or 0 for g in parsed)
+        parts.append(f"{lab} {a}/{b} = " + (f"{100.0 * a / b:.1f}%" if b else "-"))
+    rep.add("AD-7: udzial partio-godzin w marszu na drodze (suma dob)", "; ".join(parts), "INFO (WGRANIE 91 linia Drogi (DR): rody 7.3%, karawany 9.8%, wozy wsi 8.4%)", None)
+    pl = [g["plan"] for g in parsed if g["plan"] is not None]
+    sp = [g["spis"] for g in parsed if g["spis"] is not None]
+    if pl:
+        pm, sm = st.median(pl), (st.median(sp) if sp else 0.0)
+        rep.add("AD-8: koszt (mediana dob)", f"planowanie {pm:.2f} ms/dobe (maks. {max(pl):.2f}), spis {sm:.3f} ms/dobe", "planowanie <= 50, spis <= 5 ms/dobe",
+                pm <= 50.0 and sm <= 5.0)
+    stum = sum(g["stum"] for g in parsed)
+    stall = max(g["stall"] for g in parsed)
+    rep.add("AD-9: potkniecia i bledy", f"potkniecia w dobach linii {stum} (od wczytania maks. {stall}), ERROR in AiRoadRoutes.* {n_err}", "0", stum == 0 and stall == 0 and n_err == 0)
+    rj = {}
+    for lab in ("bez drogi w zasiegu", "droga sie nie oplaca", "malo drogi", "za dlugie", r"siatka gry \(odcinek bez sciezki\)", "ponad 128 punktow",
+                r"plany partii na godzine", "powtorka celu", r"objazd utracony - limit planow albo trasa gry bez planu, np\. krotka reszta trasy:", "ponowione po objezdzie",
+                r"z AI wylaczonym przez inny mod - uczta / majatek BK:"):
+        rj[lab.replace("\\", "")] = sum(num(lab + r" (\d+)", g["rej"], int, 0) or 0 for g in parsed)
+    rep.add("AD-10: odrzucone wedlug powodu, ponowienia, AI wylaczone (suma dob)", ", ".join(f"{k} {v}" for k, v in rj.items()), "INFO", None)
+    # AD-11: dojazd zmierzony - srednie wazone liczba dojazdow
+    md = [g for g in parsed if g["adn"] is not None]
+    if md:
+        dn = sum(g["adn"] for g in md)
+        cn = sum(g["acn"] or 0 for g in md)
+        dr = sum(g["adr"] * g["adn"] for g in md if g["adr"] is not None) / dn if dn else None
+        cr = sum(g["acr"] * g["acn"] for g in md if g["acr"] is not None and g["acn"]) / cn if cn else None
+        ab, ou = sum(g["aab"] or 0 for g in md), sum(g["aout"] or 0 for g in md)
+        txt = (f"objazdy {dn} sr. " + (f"{dr:.1f}%" if dr is not None else "-") + f", proba {cn} sr. " + (f"{cr:.1f}%" if cr is not None else "-")
+               + f", przerwane {ab}, poza pomiarem {ou}")
+        if dn >= 30 and cn >= 30 and dr is not None and cr is not None:
+            rep.add("AD-11: dojazd zmierzony - objazd wobec trasy gry", txt, "objazdy sr. <= proba + 5 pp (po >= 30 w obu grupach)", dr <= cr + 5.0)
+        else:
+            rep.add("AD-11: dojazd zmierzony - objazd wobec trasy gry", txt, "INFO (mniej niz 30 dojazdow w grupie)", None)
+    else:
+        rep.add("AD-11: dojazd zmierzony", "brak czesci 'dojazd zmierzony' w liniach doby", "INFO (log sprzed poprawki po recenzji)", None)
+    rep.show()
+    return 0
+
+
 def nzbroj_main(logp, csp=None):
     """nzbroj (noc 17/18.10; przeglad 16.10 STAN-PRAC 46 - zbrojownia gracza; Armoury/src/ArmouryZb.cs, ArmouryBehavior.cs ZB-1, QuartermasterLaw.cs, MenPurse.cs,
     NightRest.cs, GearFit.cs; CrashScribe/src/Mends.cs StoreSub/RealmWard). Klucze: ArmouryBookPerModifier (ZB-1 ksiega per id + modyfikator), ArmouryListSpareHorsesWhenKept
@@ -51871,6 +52043,8 @@ def main(argv):
         return ndrogi_main(logp)   # ndrogi (noc 17/18.10, Jeff "szybsze poruszanie po drogach"): +15% na drogach ROT, plik drog, latka pamieci predkosci, audyt premii i sufitu (MapRoads)
     if group == "p6sztormy" and logp:
         return p6sztormy_main(logp)   # p6sztormy (20.10, galaz p6-sztormy - R3-05d): zimowe sztormy na morzu - regula zimy, burze zima / poza zima, audyt kary predkosci (SeaStorms.cs)
+    if group == "p6drogi" and logp:
+        return p6drogi_main(logp)   # p6drogi (R3-07d, p6-drogi): AI wybiera drogi - objazdy traktem rodow, karawan i wozow wsi (AiRoadRoutes)
     if group == "nzbroj" and logp:
         return nzbroj_main(logp, csp)   # nzbroj (noc 17/18.10, przeglad 16.10): zbrojownia gracza - ksiega per modyfikator, konie zapasu, nadwyzki kazdej grupy, zamiennik RealmWard, jezdziec pieszo, pytanie o nocleg (ArmouryZb)
     if group == "nbitwa" and logp:

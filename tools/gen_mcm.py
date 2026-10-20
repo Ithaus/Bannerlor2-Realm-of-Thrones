@@ -46,6 +46,9 @@ RANGES = {
     # p6-sztormy (R3-05d): mnoznik zimowych burz - kod przycina do 1..2.3 (SeaStorms.FactorOf); kara statku w burzy - kod przycina do 0..50 (SeaStorms.PctOf)
     'SeaStormWinterFactor': (1.0, 2.3, "0.00"),
     'SeaStormShipSpeedPercent': (0.0, 50.0, "0.0"),
+    # p6-drogi (R3-07d): AI wybiera drogi - kod przycina marsz do 10..200 jedn. i nadklad do 0..50% (AiRoadRoutes.MinDist / Detour)
+    'MapRoadAiMinDistance': (10, 200, "0"),
+    'MapRoadAiDetourPercent': (0, 50, "0"),
     # f22-drogi-perf (noc 17/18.10): najdalsza odleglosc komorek bocznych drog od kamery - kod przycina do 40..400 (MapSideRoads.ChunkCap)
     'MapSideRoadsChunkRadiusCap': (40, 400, "0"),
     # A17 F5 (noc 17/18.10): stocznia z drewna i za place - pnie na 1000 wartosci kadluba (0..10), udzial plac w wartosci kadluba (kod przycina do 0..1)

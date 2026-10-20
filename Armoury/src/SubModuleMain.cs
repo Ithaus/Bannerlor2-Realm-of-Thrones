@@ -261,6 +261,8 @@ namespace Armoury
                 try { MapRoads.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapRoads.ApplyAll", e); }
                 // p6-sztormy (R3-05d): zima wiecej burz NavalDLC - postfiksy szansy narodzin i sufitu burz na NavalDLCStormModel, gettery listy burz (kara predkosci w latce MarchPace)
                 try { SeaStorms.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SeaStorms.ApplyAll", e); }
+                // p6-drogi (R3-07d): AI wybiera drogi - postfiks MobileParty.ComputePath (objazd droga) i straznik ucieczki RecalculateLongTermPath; wpiete zawsze, dziala przy kluczu MapRoadAiRoutes
+                try { AiRoadRoutes.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AiRoadRoutes.ApplyAll", e); }
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze
