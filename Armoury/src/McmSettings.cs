@@ -4832,6 +4832,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
 
+        [SettingPropertyBool("Raven News", HintText = "news of far-off wars, battles and sieges reaches you as fast as a raven flies: wars declared and peace, alliances or non-aggression pacts made between other realms, sieges, raids and assaults, lords slain in battle or executed, taken captive, set free or risen as White Walkers come to you later the farther away they happened - about three days from King's Landing to Winterfell, four and a half from Pentos, a week from Qarth, never more than twelve days - with a note saying where the raven came from (e.g. 'A raven from Winterfell, 3 days on the wing: ...'). Tavern gossip about such news waits for the same raven. News about you, your clan, your close kin or your fiefs (on either side of a fight), wars, peace or alliances of your own realm, your realm's hosts gathering and deaths in its ruling house still come at once, and so does anything less than a day's ride away. Only your messages wait - the lords of the world know what they knew before. Ravens in flight are kept in the save. Off = all news at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RavenNews { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -9643,6 +9647,7 @@ namespace Armoury
             s.InnGossipLootWords = InnGossipLootWords;
             s.InnGossipLeaderNames = InnGossipLeaderNames;
             s.InnGossipPages = InnGossipPages;
+            s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;

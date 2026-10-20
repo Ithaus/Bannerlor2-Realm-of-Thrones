@@ -746,6 +746,9 @@ namespace Armoury
         // p5-urodzaj (R3-05e/f, recenzja): rok urodzaju i uboj jesienny - stan i przedmioty od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p5UrodzajReset = P5UrodzajReset();
         private static bool P5UrodzajReset() { try { HarvestYear.Reset(); HerdCull.Reset(); } catch (Exception e) { Log.Error("P5UrodzajReset", e); } return true; }
+        // p5-kruki (R3-05c): kruki w drodze od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _p5RavensReset = P5RavensReset();
+        private static bool P5RavensReset() { try { Ravens.Reset(); } catch (Exception e) { Log.Error("P5RavensReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1261,6 +1264,9 @@ namespace Armoury
             // "od dawna", wiesci od zera; starsza DLL klucza nie czyta. Klucz wylaczony - "" (nic). Reset przed SyncData (konstruktor)
             try { string pl = dataStore.IsSaving ? Rumours.Export() : null; SaveText.Sync(dataStore, "arm_rumours", ref pl); if (dataStore.IsLoading) Rumours.Import(pl); }
             catch (Exception e) { Log.Error("SyncData.arm_rumours", e); }
+            // p5-kruki (R3-05c): kruki w drodze (wiesci wojenne z opoznieniem) - wlasny klucz, starsza DLL go pomija; brak klucza = brak krukow w drodze
+            try { string rv = dataStore.IsSaving ? Ravens.Export() : null; SaveText.Sync(dataStore, "arm_ravens", ref rv); if (dataStore.IsLoading) Ravens.Import(rv); }
+            catch (Exception e) { Log.Error("SyncData.arm_ravens", e); }
             // KS r4 (r4-ceny): stan cen i sterowania rynku (doba restartu srednich cen, czynnik popytu targu do 1.25, brak miast C1) - osobny klucz, starsza DLL go pomija;
             // brak klucza (stary zapis) = stan od zera (po D+14 srednie cen uznane za juz zerowane)
             try { string k4 = dataStore.IsSaving ? StartCalibration.ExportR4c() : null; SaveText.Sync(dataStore, "arm_ks_r4c", ref k4); if (dataStore.IsLoading) StartCalibration.ImportR4c(k4); }
@@ -1372,6 +1378,7 @@ namespace Armoury
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, Rumours.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, Rumours.OnMapEventEnded);
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
+            Ravens.RegisterEvents(this);   // p5-kruki (R3-05c): latka czatu w starcie sesji, doreczenie krukow co godzine, linia doby
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
             // CG (19.10, recenzja - kolejnosc odwrotna): doba postoju druzyny gracza w miescie - bohaterowie rodu za swoje PO ludziach (rejestracja PRZED MenPurse)
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("CompanionGear.OnDailyTickParty", CompanionGear.OnDailyTickParty));
