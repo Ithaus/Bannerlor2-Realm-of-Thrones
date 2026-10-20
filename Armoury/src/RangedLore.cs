@@ -55,7 +55,7 @@ namespace Armoury
             }
         }
 
-        private const string SeedMark = "#seeded2";
+        internal const string SeedMark = "#seeded2";
 
         /// <summary>Ktora szkola uczy sie tego wyrobu. 0 = wyrob poza nauka (amunicja, bron biala).</summary>
         internal static int SchoolOf(ItemObject it)
@@ -96,19 +96,21 @@ namespace Armoury
         internal static int TierOf(ItemObject it) { return Recipes.Grade(it); }
 
         /// <summary>Wzor nadaje sie do nauki? Machiny, sprzet cwiczebny i smiecie - nie.</summary>
-        private static bool Teachable(ItemObject it)
+        internal static bool Teachable(ItemObject it)
         {
             if (it == null || !IsProgressClass(it)) return false;
+            if (PatternGate.StudyOnly(it)) return false;   // m96-wzory: unikat ROT (wielkie luki, imienne zbroje) - tylko z przetopu/rozbiorki oryginalu (UniqueLore)
             if (IsArmourBranch(SchoolOf(it))) return !it.NotMerchandise;   // pancerz spoza kramow to legenda
             return !SmithMenu.BannedRanged(it);
         }
 
-        private const string SeedMarkAmmo = "__seed_ammo_v1";   // migracja: kampanie sprzed 02.09 dostaja T1 amunicji
+        internal const string SeedMarkAmmo = "__seed_ammo_v1";   // migracja: kampanie sprzed 02.09 dostaja T1 amunicji
 
-        private static void Seed()
+        internal static void Seed()
         {
             try
             {
+                if (!LoreSeedFix.SeedAllowed) return;   // m96-wzory: rozdanie dopiero po ostatecznych statystykach (OnAfterSessionLaunched)
                 if (!Known.Contains(SeedMark))
                 {
                     Known.Add(SeedMark);
@@ -146,7 +148,7 @@ namespace Armoury
         {
             try
             {
-                if (UniqueGear.Is(it))
+                if (PatternGate.IsForgeUnique(it))   // m96-wzory: UniqueGear albo (klucz ForgeUniquesByStudy) unikat ROT z klasy nauki
                     return ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(it.StringId);
                 if (!IsProgressClass(it)) return true;
                 Seed();
@@ -198,7 +200,7 @@ namespace Armoury
             {
                 if (it == null) return false;
                 // unikat imienny: nauczalny ze zdobytego egzemplarza, poki nieopanowany
-                if (UniqueGear.Is(it))
+                if (PatternGate.IsForgeUnique(it))
                     return ArmouryBehavior.UniqueLore == null || !ArmouryBehavior.UniqueLore.Contains(it.StringId);
                 return Teachable(it) && !KnownOf(it);
             }
@@ -218,7 +220,7 @@ namespace Armoury
                 // unikat imienny idzie do WLASNEJ ksiegi (UniqueLore) - obie
                 // drogi Jeffa: przetop (OnSmelted) i rozbiorka u kowala
                 // (TakeApart) trafiaja tutaj
-                if (UniqueGear.Is(it))
+                if (PatternGate.IsForgeUnique(it))
                 {
                     if (ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(it.StringId)) return false;
                     ArmouryBehavior.LearnUnique(it);
@@ -373,7 +375,10 @@ namespace Armoury
         /// danej dziedziny lub wyzej, jak przy broniach"). Kolejny wzor kosztuje
         /// 3 x jego tier punktow. Strzaly ucza lucznictwa, belty kusznictwa.
         /// </summary>
-        internal static void OnCrafted(ItemObject item)
+        internal static void OnCrafted(ItemObject item) { OnCrafted(item, null); }
+
+        /// <summary>m96-wzory: kowal przy kowadle (null = gracz) - gorna granica losowania wedlug jego reki (PatternGate.DrawCap).</summary>
+        internal static void OnCrafted(ItemObject item, TaleWorlds.CampaignSystem.Hero smith)
         {
             try
             {
@@ -383,7 +388,7 @@ namespace Armoury
                 if (sc == SchoolNone) return;
                 Research[sc] += pts;
                 int tThis = Math.Max(1, TierOf(item));
-                TryUnlockRandom(sc, tThis, 6, tThis);
+                TryUnlockRandom(sc, tThis, PatternGate.DrawCap(tThis, smith), tThis, smith);
                 // po kazdej robocie mowimy, ile jeszcze do nastepnego wzoru
                 if (sc != SchoolNone)
                 {
@@ -403,12 +408,13 @@ namespace Armoury
         /// szly "od dolu jeden po drugim" (Jeff 27.08); teraz kazdy wzor
         /// z zakresu ma ROWNA szanse. MBRandom, spojnie z reszta kampanii.
         /// </summary>
-        private static void TryUnlockRandom(int school, int minTier, int maxTier, int costTier)
+        private static void TryUnlockRandom(int school, int minTier, int maxTier, int costTier, TaleWorlds.CampaignSystem.Hero smith = null)
         {
             try
             {
                 Seed();
                 float cost = 3f * Math.Max(1, costTier);
+                int reach = PatternGate.LegendReach(smith);   // m96-wzory: legenda w puli dopiero blisko LegendarySkillNeeded (int.MaxValue = bez filtra)
                 var pool = new List<ItemObject>();
                 while (true)
                 {
@@ -420,6 +426,7 @@ namespace Armoury
                         if (Known.Contains(item.StringId)) continue;
                         int ti = TierOf(item);
                         if (ti < minTier || ti > maxTier) continue;
+                        if (reach != int.MaxValue && PatternGate.LegendOutOfReach(item, reach)) continue;
                         pool.Add(item);
                     }
                     if (pool.Count == 0) return;                    // nic do odkrycia w tym zakresie

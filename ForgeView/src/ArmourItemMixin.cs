@@ -55,10 +55,60 @@ namespace ForgeView
             get { try { return ViewModel != null && ViewModel.Item != null && !KnownOf(ViewModel.Item); } catch { return false; } }
         }
 
+        // ---- m96-wzory: znany, ale kowadlo odmowi (Armoury.PatternGate.BlockText: prog umiejetnosci kowala z ekranu, jedyna legenda) ----
+        private static MethodInfo _blockText;
+        private static FieldInfo _fCrafting;
+        private static bool _blockLooked;
+        private bool _blockDone;
+        private string _block;
+
+        /// <summary>Napis blokady albo null. Raz na kafelek (VM listy BK powstaje od nowa przy zmianie kowala - stamina w konstruktorze).</summary>
+        private string Block()
+        {
+            if (_blockDone) return _block;
+            _blockDone = true;
+            _block = null;
+            try
+            {
+                if (!_blockLooked)
+                {
+                    _blockLooked = true;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        var t = asm.GetType("Armoury.PatternGate", false);
+                        if (t != null) { _blockText = t.GetMethod("BlockText", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static); break; }
+                    }
+                    _fCrafting = typeof(ArmorItemVM).GetField("armorCrafting", BindingFlags.NonPublic | BindingFlags.Instance);
+                    Log.Info("Armoury PatternGate (kafelek: znany, ale za trudny - m96-wzory): " + (_blockText != null ? "PODPIETY (Armoury.PatternGate.BlockText)"
+                             : "BRAK (Armoury.PatternGate.BlockText) - zostaje: znany wzor zawsze PATTERN KNOWN")
+                             + ", kowal z ekranu " + (_fCrafting != null ? "tak (ArmorItemVM.armorCrafting.Hero)" : "nie - gracz") + ".");
+                }
+                if (_blockText == null || ViewModel == null || ViewModel.Item == null) return null;
+                TaleWorlds.CampaignSystem.Hero smith = null;
+                try { var ac = _fCrafting != null ? _fCrafting.GetValue(ViewModel) as ArmorCraftingVM : null; if (ac != null) smith = ac.Hero; } catch { }
+                _block = _blockText.Invoke(null, new object[] { ViewModel.Item, smith }) as string;
+            }
+            catch { _block = null; }
+            return _block;
+        }
+
+        /// <summary>m96-wzory: znany wzor, ktorego kowal przy kowadle jeszcze nie moze zaczac - bursztynowy napis i lzejsza plachta.</summary>
+        [DataSourceProperty]
+        public bool FvBlocked
+        {
+            get { try { return !FvLocked && Block() != null; } catch { return false; } }
+        }
+
+        [DataSourceProperty]
+        public string FvBlockText
+        {
+            get { try { return Block() ?? ""; } catch { return ""; } }
+        }
+
         [DataSourceProperty]
         public bool FvKnown
         {
-            get { return !FvLocked; }
+            get { return !FvLocked && !FvBlocked; }
         }
     }
 }

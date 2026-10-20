@@ -124,6 +124,16 @@ namespace Armoury
         public float SmeltingReturnShare = 0.45f;          // share of the metal that comes back when you break a piece down
         public float SmeltingSkillBonus = 0.002f;          // extra recovery per point of Smithing
 
+        // --- Learning patterns ---
+        // m96-wzory (20.10, Jeff: "moge stworzyc luki tier 6 od poczatku gry"): wzory tieru 1 rozdawane dopiero po ostatecznych statystykach (ROT-RBM
+        // przepisuje luki w OnSessionLaunched po nas), jednorazowa naprawa ksiegi w zapisie, ksiega czyszczona przy nowej kampanii, klik w zamkniety wzor nie uczy.
+        // Wylaczone = stara kolejnosc (rozdanie przy pierwszym odczycie ksiegi) bez naprawy zapisu (LoreSeedFix.cs)
+        public bool LoreSeedAfterFinalStats = true;        // your starting patterns (every tier 1 piece) are handed out only after all mods have set the final stats of their items. Before, Realm of Thrones raised the draw of its great bows a moment after the patterns were dealt, so the Goldenheart, Giant Bow and Ravens' Teeth bow and arrows came known from day one as tier 6. A saved game is mended once: those wrongly dealt patterns are struck out, missing tier 1 patterns are added, and patterns you really learned stay. A new campaign no longer inherits patterns or forged legends from the previous one, and clicking Craft on a pattern you do not know no longer teaches you anything
+        public bool PatternDrawBySkill = true;             // a new pattern found at the bench is drawn only up to one tier above what your smith's hand can already forge (Smithing Skill Per Tier), and legends only near Legendary Skill Needed. Off: any tier from the piece you made up to tier 6 (three tier 1 jobs could reveal a tier 6 pattern)
+        public bool ShieldCraftSkillGate = true;           // shields in the CRAFT tab ask the same Smithing as at your own forge (Smithing Skill Per Tier) - below it the anvil refuses and nothing is spent. Off: any known shield could be tried at any skill, only Banner Kings' botching chance stood in the way
+        public bool ForgeUniquesByStudy = true;            // the famed pieces of Westeros (the great bows and arrows of the legends, the named armours) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned
+        public bool PatternTileShowsSkill = true;          // the CRAFT tab tells a known pattern you cannot forge yet apart from one you can: "PATTERN KNOWN - NEEDS 165 SMITHING" (or "LEGEND ALREADY FORGED") in amber and a lighter shade on the tile, for the smith chosen at the anvil. Off: every known pattern reads PATTERN KNOWN
+
         // --- Wear and tear ---
         public bool TroopWearEnabled = true;               // the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith
         public float TroopWearPercent = 4f;               // this share of pieces IN USE takes one step of wear per battle

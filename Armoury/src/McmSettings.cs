@@ -400,6 +400,26 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float SmeltingSkillBonus { get; set; } = 0.002f;
 
+        [SettingPropertyBool("Lore Seed After Final Stats", HintText = "your starting patterns (every tier 1 piece) are handed out only after all mods have set the final stats of their items. Before, Realm of Thrones raised the draw of its great bows a moment after the patterns were dealt, so the Goldenheart, Giant Bow and Ravens' Teeth bow and arrows came known from day one as tier 6. A saved game is mended once: those wrongly dealt patterns are struck out, missing tier 1 patterns are added, and patterns you really learned stay. A new campaign no longer inherits patterns or forged legends from the previous one, and clicking Craft on a pattern you do not know no longer teaches you anything", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool LoreSeedAfterFinalStats { get; set; } = true;
+
+        [SettingPropertyBool("Pattern Draw By Skill", HintText = "a new pattern found at the bench is drawn only up to one tier above what your smith's hand can already forge (Smithing Skill Per Tier), and legends only near Legendary Skill Needed. Off: any tier from the piece you made up to tier 6 (three tier 1 jobs could reveal a tier 6 pattern)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool PatternDrawBySkill { get; set; } = true;
+
+        [SettingPropertyBool("Shield Craft Skill Gate", HintText = "shields in the CRAFT tab ask the same Smithing as at your own forge (Smithing Skill Per Tier) - below it the anvil refuses and nothing is spent. Off: any known shield could be tried at any skill, only Banner Kings' botching chance stood in the way", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool ShieldCraftSkillGate { get; set; } = true;
+
+        [SettingPropertyBool("Forge Uniques By Study", HintText = "the famed pieces of Westeros (the great bows and arrows of the legends, the named armours) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool ForgeUniquesByStudy { get; set; } = true;
+
+        [SettingPropertyBool("Pattern Tile Shows Skill", HintText = "the CRAFT tab tells a known pattern you cannot forge yet apart from one you can: 'PATTERN KNOWN - NEEDS 165 SMITHING' (or 'LEGEND ALREADY FORGED') in amber and a lighter shade on the tile, for the smith chosen at the anvil. Off: every known pattern reads PATTERN KNOWN", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool PatternTileShowsSkill { get; set; } = true;
+
         [SettingPropertyBool("Troop Wear Enabled", HintText = "the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool TroopWearEnabled { get; set; } = true;
@@ -8627,6 +8647,11 @@ namespace Armoury
             s.LegendarySkillNeeded = LegendarySkillNeeded;
             s.SmeltingReturnShare = SmeltingReturnShare;
             s.SmeltingSkillBonus = SmeltingSkillBonus;
+            s.LoreSeedAfterFinalStats = LoreSeedAfterFinalStats;
+            s.PatternDrawBySkill = PatternDrawBySkill;
+            s.ShieldCraftSkillGate = ShieldCraftSkillGate;
+            s.ForgeUniquesByStudy = ForgeUniquesByStudy;
+            s.PatternTileShowsSkill = PatternTileShowsSkill;
             s.TroopWearEnabled = TroopWearEnabled;
             s.TroopWearPercent = TroopWearPercent;
             s.TroopWearPerHit = TroopWearPerHit;

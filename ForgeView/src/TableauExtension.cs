@@ -40,6 +40,11 @@ namespace ForgeView
                       "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvKnown\" " +
                       "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#8FBF71FF\" " +
                       "Text=\"PATTERN KNOWN\"/>" +
+                      // m96-wzory: znany, ale za trudny dla kowala przy kowadle (prog, jedyna legenda) - bursztyn, napis z Armoury.PatternGate
+                      "<TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                      "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvBlocked\" " +
+                      "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#E0A040FF\" " +
+                      "Text=\"@FvBlockText\"/>" +
                     "</Children></ListPanel>" +
                   "</Children></Widget>" +
                 "</Children></Widget>" +

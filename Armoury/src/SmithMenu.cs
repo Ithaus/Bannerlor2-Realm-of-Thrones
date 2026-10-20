@@ -2386,7 +2386,7 @@ namespace Armoury
                 // w partactwie. Rozbiorka wymaga Smithing 200 - ponizej progu
                 // NIC sie nie dzieje (sztuka zostaje w sakwach); mistrz uczy sie
                 // ZAWSZE (zadnego rzutu), sztuka przepada jak przy kazdej rozbiorce.
-                if (UniqueGear.Is(item))
+                if (PatternGate.IsForgeUnique(item))   // m96-wzory: takze unikaty ROT z klasy nauki (ForgeUniquesByStudy) - wzor tylko z oryginalu
                 {
                     int smithing = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                     if (smithing < 200)

@@ -119,6 +119,7 @@ namespace Armoury
                 var ac = tr.Field("armorCrafting").GetValue();
                 var cur = ac != null ? Traverse.Create(ac).Property("CurrentItem").GetValue() : null;
                 var item = cur != null ? Traverse.Create(cur).Property("Item").GetValue<ItemObject>() : null;
+                if (item != null && item.ItemType == ItemObject.ItemTypeEnum.Shield) return PatternGate.ShieldCraftPrefix(__instance, item);   // m96-wzory: prog tarcz (ShieldCraftSkillGate), kosci BK bez zmian
                 if (item == null || !item.HasArmorComponent) return true;      // tarcze, luki, amunicja - nie ta regula
                 Hero smith = null;
                 try

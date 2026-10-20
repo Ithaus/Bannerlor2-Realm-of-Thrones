@@ -54,7 +54,7 @@ namespace Armoury
                 {
                     // unikat imienny NIE wpada z nauki przy kowadle - trzeba
                     // zdobyc oryginal i go rozlozyc albo przetopic
-                    if (UniqueGear.Is(item))
+                    if (PatternGate.IsForgeUnique(item))   // m96-wzory: takze unikaty ROT (ForgeUniquesByStudy)
                     {
                         Log.Player("This famed piece cannot be worked out at the anvil. Seize the original and study it - melt it down, or take it apart at the smith.", true);
                         return false;
@@ -140,7 +140,7 @@ namespace Armoury
         /// wlasne kucie. Postfix biegnie po KAZDEJ robocie (takze gdy prefix
         /// przejal strzeleckie) - tu tez odswiezamy liczniki ekranu.
         /// </summary>
-        public static void BkCraftPostfix(object __instance)
+        public static void BkCraftPostfix(object __instance, bool __runOriginal)
         {
             RefreshCraftScreen(__instance);
             try
@@ -157,7 +157,10 @@ namespace Armoury
                 if (item == null || RangedType(item)) return;      // strzeleckie licza sie w Forge.Smith
                 // zbroja z kuzni jak bron: brama progu odmowila - nic sie nie kulo, wiec ani nauki wzorow, ani okna wyniku
                 if (ArmourQuality.Refused) return;
-                RangedLore.OnCrafted(item);
+                // m96-wzory: prefiks odmowil (wzor nieznany - BkCraftPrefix, brama progu tarcz itp.) - BK nic nie kul, wiec ani nauki, ani okna wyniku
+                // (bylo: ArmourQuality.CraftPrefix przy __runOriginal false zerowal Refused, a ten postfiks dawal punkty za klik w zamkniety wzor)
+                if (!__runOriginal && LoreSeedFix.On) { LoreSeedFix.NoteRefusedClick(item); return; }
+                RangedLore.OnCrafted(item, PatternGate.SmithOf(__instance));   // m96-wzory: losowanie wedlug reki kowala z ekranu
                 // okno wyniku takze dla pancerza kutego w BK CRAFT: jakosc
                 // czytamy z OSTATNIEGO stacka tego itemu w sakwach (rostery
                 // dokladaja swieze na koniec)
