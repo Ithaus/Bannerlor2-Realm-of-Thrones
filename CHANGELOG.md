@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-20 (WGRANIE 90 - runda 2 nocy 19/20.10: PLAN 6.10 klimat przed warsztatami, 6.9 wierzchowce egzotyczne, 1.7 ladry wedlug Jazdy)
+
+**Zakres:** audyt PLAN-DO-KONCA-MODA-2026-10-09 wobec WGRANIA 89 (212 pozycji: 137 wgrane, 35 czeka na Jeffa, 21 czesciowo, 12 porzucone, 5 otwarte, 2 nieznane);
+z otwartych wziete te, ktore dotycza startu NOWEJ kampanii albo sa male (Jeff rano zaczyna finalna gre). Wpisy: docs/noc-1920/r2-{klimat,konie,pancerz}-CHANGELOG.md.
+**Zmiana:** `w-toku/n20-calosc` fc46a483 = WGRANIE 89 + r2-klimat (ClimateBeforeWorkshops: w nowej kampanii 45 wsi dostaje typ ostateczny T8 + len GL5 + winnice B6
+PRZED budowa warsztatow miast) + r2-konie (CamelsOnlyQarth, ExoticMountsNeverVanish - egzotyczne wierzchowce nie znikaja z polek ani zbrojowni, tylko ida do targu,
+ktory je trzyma, albo do taboru; QarthStablesBuyCamels w granicach targu koni i przydzialu rodu; CrashScribe Mends.CamelCulling wedlug MountLaw) + r2-pancerz
+(HeroBardingNeedsRiding - ladry bohaterow wedlug Jazdy jak ekran gry z latka ROT; CrashScribe Mends.CanUseHero lustro). Armoury 2054 ustawien.
+**Testy:** n20r2-bitwa (5 dob + 4 bitwy x20) kod 0, 4/4 bitwy; n20r2-nowa (nowa kampania 120 dob x8) kod 0 - "Klimat wsi przed warsztatami (C1): przestawiono 45 wsi";
+n20r2-160 (160 dob x8 z zapisu) kod 0; we wszystkich 0 ERROR w logu Armoury, Z16 samotest 500/500, egzotyczne "skasowane 0", zawieszenia tylko po QuitGame.
+Porownanie wszystkich 119 grup: 160 dob - 3 nowe NIE wobec trzech biegow 88/89 (D14-1, NKR-4b, NO-4 47 > 40), nowa kampania 113 NIE (88: 118, 89: 118), 6 nowych przy progu.
+**Ryzyko / co sprawdzic:** NO-4 (nowy dlug snu AI na swit) maks. 47 / 41 przy progu 40 w obu biegach rundy 2 - obserwowac (egzotyki w taborze AI licza sie do stada);
+klimat C1 dziala tylko w nowej kampanii.
+**Status:** WGRANE 90 - DO SPRAWDZENIA w grze Jeffa.
+
 ## 2026-10-20 (WGRANIE 89 - noc 19/20.10: lista Jeffa, zawieszenie GC 16:09 i 142 male metody, dokonczenie PRZEKAZANIA)
 
 **Zakres (Jeff 19.10 wieczor, doslownie):** "Zaplanuj prace nocna popraw tez rzeczy ktore miales dokonczyc i rano chce miewc juz finalna rozgrywke, masz zgode na wszytko byle to skonczyc."
