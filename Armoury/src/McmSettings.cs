@@ -116,6 +116,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmeltArmourOnce { get; set; } = true;
 
+        [SettingPropertyBool("Smelt Keeps Scraps", HintText = "smelting gives back exactly its share of the metal, with no rounding up to a whole bar: the leftover of each metal goes into your forge's scrap box (kept in your save), and when the box holds a full bar of that metal you get it at your next smelt of that metal - one simple pike puts half a bar into the box, a second pike gives you the whole bar. Off = as before: a weapon or armour piece with metal always gives at least one bar", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmeltKeepsScraps { get; set; } = true;
+
         [SettingPropertyBool("Smith No Crude Input", HintText = "crude iron is only for refining: a weapon part that the game lists with crude iron costs the same number of wrought iron bars at the anvil, and with Smelt Weapon By Parts smelting such a weapon gives wrought iron back, never crude. Off = as in the game (those parts eat crude iron and smelting can give it back)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmithNoCrudeInput { get; set; } = true;
@@ -8264,6 +8268,7 @@ namespace Armoury
             s.SmeltNoWood = SmeltNoWood;
             s.SmeltWeaponByParts = SmeltWeaponByParts;
             s.SmeltArmourOnce = SmeltArmourOnce;
+            s.SmeltKeepsScraps = SmeltKeepsScraps;
             s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
