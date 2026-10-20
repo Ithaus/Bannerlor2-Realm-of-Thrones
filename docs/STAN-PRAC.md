@@ -3462,5 +3462,8 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   Jeff: "za duzo legendary ... w sklepach za latwo legendary i masterwork" -> wf_be7a1543-8a3, w-toku/m96-jakosc (pomiar jakosci w swiecie, zrodla, rzadkosc).
   W tle do 96: m96-{valyria, sakiewki, koszyk, len, bandy, zamek} (wf_20350c06-11f), m96-{wzory, dlugi} (wf_c0a7b77f-584), m96-kuznia, m96-jakosc.- 14:50 PDT Jeff: czas kuzni - "ma liczyc calkowity czas: wytapiam, potem kuje miecz i wychodzi 23 godziny, to odpala sie pasek i leci 23 h; jak wyjde i nie skoncze,
   biore tylko to, co wykulem, a reszta czeka, az wroce" -> wf_cfcc67c5-e15, w-toku/m96-czaskuzni. Limity 14:50: 5 h 24% (reset 17:10), tydzien 68% (reset 26.10 10:00) -
-  w tle 11 galezi m96; pauza przy 90% 5 h.
+  w tle 11 galezi m96; pauza przy 90% 5 h.- 15:20 PDT Turniej Jeffa w Riverrun (15:13): 1 okup - wygral 4083 zlota (lord, ktorego powalil), 0 zaplacil, nagroda blackwood_helmet (zamowiony u rzemieslnikow miasta) -
+  dziala zgodnie z regula. Drobne: licznik "bez powalajacego" liczy tez zwyklych zolnierzy (14) - poprawic przy 96.
+  Jeff dopisal do nocy: TABLICA OGLOSZEN (zadania, kapitan strazy - wybij bande, nagrody realne, lista zleceniodawcow, klik -> rozmowa) i PLOTKI (turnieje, swaty,
+  sluchanie za piwo) -> docs/ZADANIA-NOC-2026-10-20.md (lista calej nocy).
 
