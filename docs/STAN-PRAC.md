@@ -3474,5 +3474,10 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   -> scalone do n25 4ea8dfd3 (2142 ustawien, build 0). DO DECYZJI JEFFA: czy noc ma zatrzymywac kucie, czy od wytopu da sie odejsc.- 16:05 PDT Jeff potwierdzil czas kuzni: "wytapianie zatem jest zablokowane i leci czas wytapiania najpierw, a potem czas kucia i mozna wtedy kucie przerwac";
   "noca spia" -> m96-czaskuzni bez zmian (zgodne z kodem).- 16:10 PDT m96-jakosc 4a662ce0 gotowe (QualityScarcity: przyczyna - warsztaty AI losuja jakosc rzutem gry, RBM 4.3% L / 8.7% MW, AI ich nie kupuje -> zalegaja; limit swiata
   L 6 / MW 60, szanse 0.1% / 0.4% w warsztatach, rzut gry odebrany na drodze gry i lupie, nadmiar obnizany na polkach (wartosc, nie zloto), wyroby gracza nietykalne)
-  -> scalone do n25. Czeka tylko wf_c0a7b77f-584 (m96-wzory, m96-dlugi).
+  -> scalone do n25. Czeka tylko wf_c0a7b77f-584 (m96-wzory, m96-dlugi).- 16:30 PDT wf_c0a7b77f-584 GOTOWE: m96-wzory 54f5a9f6 (przyczyna: wzory rozdawane PRZED podbiciem sily lukow przez ROT-RBM + kusze liczone tierem gry; LoreSeedAfterFinalStats,
+  XbowPatternTierByPower, RareBowsNotForged - Goldenheart/Giant/Ravens Teeth/czardrzewo/smocza kosc nie do wykucia, LegendTwinPiecesHidden - ok. 21 czesci-blizniakow
+  kling legend ukrytych; zapis Jeffa naprawi sie raz przy wczytaniu: -4 luki/strzaly t6, -6 kusz), m96-dlugi 3a711c55 CZESCIOWO (TownDebt: dlug rady u mieszczan i Banku,
+  splata z nadwyzki, dobrobyt -0.5/d, podatek nadzwyczajny; brak podpowiedzi kasy - menu Town affairs -> The council's debts; przeglady wymuszone dopiero po 240+ dobach).
+  Scalone do n25 45f3efa7 + licznik "bez powalajacego" tylko rycerze; 2167 ustawien, 5 modow build 0. W toku: m96-wies (menu wsi + komunikaty platnosci, wf_72028594-b56).
+  Jeff: "You paid 2 - powinno byc, za co (nocleg)"; "menu wsi tez jak miasto i zamek".
 
