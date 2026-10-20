@@ -158,19 +158,19 @@ namespace Armoury
                 {
                     // recenzja 20.10: kolumna stoi (gracz zapomnial wylaczyc) - stoja i nie spia, sam koszt; bitwa i spotkanie nie licza sie jako postoj
                     if (movedH || mp.MapEvent != null) _stillH = 0; else _stillH++;
-                    string why = null;
+                    string why = null; bool still = false;
                     if (NightRest.PlayerCamped) why = "oboz";
                     else if (NightRest.SleepingNow) why = "sen w menu";
                     else if (mp.CurrentSettlement != null) why = "osada " + mp.CurrentSettlement.Name;
                     else if (mp.BesiegerCamp != null) why = "oboz obleznikow";   // recenzja 20.10: oboz oblezenia to postoj - bez snu dlug rosl do 3
-                    else if (_stillH >= StillHoursEnd) why = StillHoursEnd + " h postoju bez ruchu";
+                    else if (_stillH >= StillHoursEnd) { why = StillHoursEnd + " h postoju bez ruchu"; still = true; }
                     else if (TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive) why = "niewola";
                     else if (NightRest.EnlistedNow) why = "sluzba ROT";
                     else if (mp.AttachedTo != null) why = "cudza armia";
                     else if (mp.IsCurrentlyAtSea) why = "morze";
                     else if (Undead.Party(mp)) why = "Nieumarli";
                     else if (NightRest.Debt >= 3) why = "dlug 3 (zapasc o swicie)";
-                    if (why != null && _stillH >= StillHoursEnd) Msg("The column has stood still for " + _stillH + " hours.", Colors.White);
+                    if (still) Msg("The column has stood still for " + _stillH + " hours.", Colors.White);
                     if (why != null) Stop(why, true);
                 }
                 bool counted = false;
