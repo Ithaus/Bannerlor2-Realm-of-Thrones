@@ -3429,5 +3429,6 @@ przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok
   NOWE ZADANIA (Jeff ze zrzutem menu Seagard, "robic w tle i potem wgramy"): (1) MENU MIASTA uporzadkowac - za duzo opcji; nocleg w karczmie pod "Go to the tavern district",
   wszystko kuzni pod jedna zakladka kuzni (wyjasnione po kolei), reszta pogrupowana; (2) ZAJAZD: po wejsciu gracz znika z mapy jak we wsi + odglosy karczmy.
   Galezie w-toku/m95-menu, w-toku/m95-zajazd od e35e6f99 (= WGRANIE 94), workflow -> test po zamknieciu gry -> WGRANIE 95.- 11:10 PDT Jeff: "4 denary za nocleg to nie za duzo? sprawdz czy stawki sa realne" -> ceny ludzi/koni realne (lozko ok. 1/3 dniowki rzemieslnika 3 d, jak w sredniowieczu);
-  zawyzony pokoj gracza we wspolnej izbie (3 d) -> w-toku/m95-nocleg 943cc411 (InnCommonRoomSharedBed: gracz jak czlowiek 1 d; sam z koniem 2 d zamiast 4), build 0 -> do 95.
+  zawyzony pokoj gracza we wspolnej izbie (3 d) -> w-toku/m95-nocleg 943cc411 (InnCommonRoomSharedBed: gracz jak czlowiek 1 d; sam z koniem 2 d zamiast 4), build 0 -> do 95.- 11:55 PDT Jeff: "blad w turniejach ... zaplacilem ponad 1k ... dostalem ponad 8k" -> nie blad kodu: R3-04a pelna wartosc konia i zbroi pokonanego (gracz pokonal lorda w 1. rundzie);
+  swiat AI 330-410 tys./d. -> w-toku/m95-turniej (TourneyRansomShare 0.25, w obie strony), build 0 -> do 95. Zloto Jeffa z tej walki zostaje.
 
