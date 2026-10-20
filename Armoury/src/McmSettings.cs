@@ -1928,6 +1928,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool BkShieldBillByRecipe { get; set; } = true;
 
+        [SettingPropertyBool("Shield No Velvet", HintText = "shields need no velvet: a tier 5-6 shield is faced with leather instead (the same count) - one piece of velvet costs many times the shield itself, and armour takes none either. Off = tier 5-6 shields also take velvet, at your anvil and on the Banner Kings screen", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool ShieldNoVelvet { get; set; } = true;
+
         [SettingPropertyBool("Start Stock In Loads", HintText = "new campaign only: the ore and timber the world starts with are counted by the load too - the game hands out the starting stock before the 100 kg load comes into force, so every storehouse, stall and pack train held ten times the intended weight and choked village storehouses stopped all work; done once, at the first launch of a new campaign (saves older than a day are left as they are)", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool StartStockInLoads { get; set; } = true;
@@ -8561,6 +8565,7 @@ namespace Armoury
             s.SmeltCapToCraftCost = SmeltCapToCraftCost;
             s.SmeltCapFromForgeBill = SmeltCapFromForgeBill;
             s.BkShieldBillByRecipe = BkShieldBillByRecipe;
+            s.ShieldNoVelvet = ShieldNoVelvet;
             s.StartStockInLoads = StartStockInLoads;
             s.ArmsCostPricingEnabled = ArmsCostPricingEnabled;
             s.ArmsPriceBand = ArmsPriceBand;

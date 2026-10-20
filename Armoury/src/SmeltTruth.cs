@@ -293,6 +293,7 @@ namespace Armoury
                   .Append(", Smelt Cap From Forge Bill ").Append(s != null && s.SmeltCapFromForgeBill ? "TAK" : "NIE")
                   .Append(", Bk Shield Bill By Recipe ").Append(s != null && s.BkShieldBillByRecipe ? "TAK" : "NIE")
                   .Append(", Smith No Crude Input ").Append(NoCrudeOn ? "TAK" : "NIE")
+                  .Append(", Shield No Velvet ").Append(s != null && s.ShieldNoVelvet ? "TAK" : "NIE")
                   .Append(" | model ").Append(model != null ? model.GetType().Name : "brak")
                   .Append(", wyjscie wpiete w ").Append(SmeltTab.PatchedTypes.Count.ToString(Inv)).Append(" modelach");
                 if (model == null) { Log.Info(sb.ToString()); return; }
@@ -300,12 +301,13 @@ namespace Armoury
                 string exHigher = null, exCrude = null;
                 ItemObject crudeProbe = null;
                 var samples = new List<string>();
-                ItemObject armourProbe = null, shieldProbe = null;
+                ItemObject armourProbe = null, shieldProbe = null, shieldTopProbe = null;
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null) continue;
                     if (it.WeaponDesign == null)
                     {
+                        if (shieldTopProbe == null && it.ItemType == ItemObject.ItemTypeEnum.Shield && Recipes.Grade(it) >= 5) shieldTopProbe = it;
                         if (armourProbe == null && it.HasArmorComponent && SmeltTab.OurSmeltable(it)) armourProbe = it;
                         else if (shieldProbe == null && it.ItemType == ItemObject.ItemTypeEnum.Shield && it.WeaponComponent != null && it.WeaponComponent.PrimaryWeapon != null
                                  && it.WeaponComponent.PrimaryWeapon.PhysicsMaterial != "shield_metal" && SmeltTab.OurSmeltable(it)) shieldProbe = it;   // drewniana - kwit BK bez zelaza
@@ -343,11 +345,34 @@ namespace Armoury
                   .Append(" | przyklady: ").Append(samples.Count > 0 ? string.Join("; ", samples.ToArray()) : "-");
                 sb.Append(" | pancerz: ").Append(Once(model, armourProbe)).Append(" | tarcza: ").Append(Once(model, shieldProbe));
                 sb.Append(" | kwit tarczy w CRAFT BK: ").Append(FletchForge.ShieldBillCheck(shieldProbe));
+                sb.Append(" | tarcza t5+: ").Append(ShieldFacing(shieldTopProbe));
                 sb.Append(" | kucie bez surowki: latki ").Append(_costHook).Append(", czesci z surowka ").Append(CrudePieces().ToString(Inv))
                   .Append(", bronie z surowka w czesciach ").Append(crudeWeapons.ToString(Inv)).Append(", ").Append(CostProbe(model, crudeProbe));
             }
             catch (Exception e) { sb.Append(" | wyjatek ").Append(e.GetType().Name); Stumble("SessionStart", e); }
             Log.Info(sb.ToString());
+        }
+
+        /// <summary>Obicie tarczy t5-t6 z receptury (Recipes.For): aksamit i skora - przy ShieldNoVelvet aksamit 0.</summary>
+        private static string ShieldFacing(ItemObject it)
+        {
+            try
+            {
+                if (it == null) return "brak proby";
+                var r = Recipes.For(it);
+                int vel = 0, lea = 0;
+                if (r.Parts != null)
+                    foreach (var p in r.Parts)
+                    {
+                        if (p.Item == null) continue;
+                        if (p.Item == Recipes.SoftVelvet) vel += p.Count;
+                        else if (p.Item == Recipes.SoftLeather) lea += p.Count;
+                    }
+                var s = Settings.Current;
+                return it.StringId + " t" + Recipes.Grade(it).ToString(Inv) + ": aksamit " + vel.ToString(Inv) + ", skora " + lea.ToString(Inv)
+                       + " (klucz Shield No Velvet " + (s != null && s.ShieldNoVelvet ? "TAK, aksamit ma byc 0" : "NIE") + ")";
+            }
+            catch (Exception e) { Stumble("ShieldFacing", e); return "wyjatek " + e.GetType().Name; }
         }
 
         /// <summary>Czesci kuzni (CraftingPiece.All) z surowka w MaterialsUsed - w danych Jeffa 25 (Native, RBM, RBM_WS, ROT).</summary>

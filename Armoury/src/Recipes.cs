@@ -458,7 +458,11 @@ namespace Armoury
                 else
                 {
                     Add(r, _leather, Math.Min(softCap, MathF.Max(1, MathF.Ceiling(weight * 0.5f))));
-                    Add(r, _velvet, Math.Min(softCap, MathF.Max(1, MathF.Ceiling(weight * 0.3f))));
+                    int facing = Math.Min(softCap, MathF.Max(1, MathF.Ceiling(weight * 0.3f)));
+                    // n20-kuznia po recenzji (ShieldNoVelvet): tarcza t5-t6 obita skora zamiast aksamitu (ta sama liczba) - aksamit 4000 d za sztuke przy tarczy za 50-100 d;
+                    // pancerze aksamitu nie biora od 01.09 (Jeff: "to nie suknia"). Ten sam kwit w naszej kuzni, w CRAFT BK (FletchForge) i w naprawie (MendMaterial.SelfParts)
+                    if (item.ItemType == ItemObject.ItemTypeEnum.Shield && s.ShieldNoVelvet) Add(r, _leather, facing);
+                    else Add(r, _velvet, facing);
                 }
 
                 if (item.ItemType == ItemObject.ItemTypeEnum.Shield ||
