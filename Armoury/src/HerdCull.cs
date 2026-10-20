@@ -26,7 +26,14 @@ namespace Armoury
     ///  - sol: 0.1 kg soli na kg miesa (solenie na sucho); wies kupuje cale worki w miescie targowym (Village.TradeBound, inaczej Bound) po cenie targu,
     ///    najpierw zloto (kiesa wsi -> kasa miasta), potem towar z polki; polka zostawia 5 workow (jak koszyk wsi). Bez soli albo bez zlota zwierzeta zyja
     ///    (nie ma uboju bez solenia - i nie ma dlugu stada); resztka soli z worka czeka w beczce wsi na nastepna dobe.
-    /// Wies spladrowana / opuszczona - bez uboju i bez splaty tej doby (gra i tak nic nie dopisuje).
+    /// Wies spladrowana: uboj i splata ida za jej przyrostem - gdy Devastation pozwala jej produkowac (na czas ticku stan Normal, mniej rak), jak w zwyklej;
+    /// bez tego gra nic nie dopisuje, wiec i nic sie nie dzieje. Wies opuszczona - nic.
+    /// REGULATOR WSI (HarvestValve E6/W3, recenzja): zmiany magazynu wsi w jej ticku produkcji zglaszamy regulatorowi (HarvestValve.OffTick) - skory i welna
+    /// z uboju to inne zrodlo (jak warsztaty, nie produkcja wsi pod mnoznikiem), zwierzeta splaty to produkcja gry, ktora zniknela nie przez zuzycie swiata
+    /// (jak gnicie) - regulator widzi produkcje i zuzycie zwierzat jak bez uboju i nie goni sezonowego braku zima.
+    /// SCALANIE z p5-stada (VillageHerds R3-06c, stan stada H po rabunkach): dwa rozne zjawiska - H to majatek stada (rabunek i odrost), dlug uboju to
+    /// zaliczka na przychowek; uboj i splata licza sie od przyrostu, ktory gra wlasnie dopisala (juz x H), wiec sie nie dubluja; dlug w sztukach - wies
+    /// zlupiona splaca dluzej (mniej zwierzat), dalej bez sztuki z niczego. Kroki w MaterialLaw i StartCalibration.Live dotycza roznych towarow (plony / stado).
     /// Linia logu "Uboj jesienny (R3-05f):" w kazdej dobie okna albo splaty, inaczej co 28 dob. Wyjatki per obiekt (potkniecia), bez wylacznikow.
     /// Watek: OnItemProduced i Daily - watek glowny (dzienny tick osad); bez odczytow z watkow AI.
     /// </summary>
@@ -44,7 +51,7 @@ namespace Armoury
         private static readonly Dictionary<string, Herd> _herds = new Dictionary<string, Herd>(StringComparer.Ordinal);
         private static Campaign _camp;
         private static ItemObject _meat, _hides, _wool, _salt;
-        private static bool _looked;
+        private static Campaign _itemsCamp;                  // kampania, dla ktorej szukano przedmiotow (gra tworzy przedmioty od nowa przy kazdym wczytaniu)
         private static bool _window, _repay;
         private static int _lastLog = -1;
         private static bool _firstLine, _lastWindow;
@@ -64,10 +71,17 @@ namespace Armoury
             try { if (_errOnce.Add(where)) Log.Error("HerdCull." + where, e); } catch { }
         }
 
+        /// <summary>Konstruktor ArmouryBehavior (nowa kampania, przed wczytaniem): stan i przedmioty od zera.</summary>
+        internal static void Reset()
+        {
+            _camp = null; _itemsCamp = null; _meat = _hides = _wool = _salt = null;
+            ResetIfNewCampaign();
+        }
+
         private static void ResetIfNewCampaign()
         {
             var cur = Campaign.Current;
-            if (ReferenceEquals(cur, _camp)) return;
+            if (_camp != null && ReferenceEquals(cur, _camp)) return;
             _camp = cur; _herds.Clear(); _window = false; _repay = false; _lastLog = -1; _firstLine = false; _lastWindow = false;
             _stumbles = 0; _errOnce.Clear(); ZeroDay();
         }
@@ -78,15 +92,22 @@ namespace Armoury
             _meatN = _hidesN = _woolN = _saltN = _saltGold = _noSalt = _cullVills = 0; _vToday.Clear();
         }
 
+        /// <summary>Przedmioty biezacej kampanii (recenzja: po drugim wczytaniu w tym samym uruchomieniu stare przedmioty nie pasowaly do polek - sol "znikala").
+        /// Szukane raz na kampanie, gdy menedzer obiektow jest gotowy (bez niego - nastepna proba).</summary>
         private static bool Items()
         {
-            if (!_looked)
+            var cur = Campaign.Current;
+            if (cur != null && !ReferenceEquals(cur, _itemsCamp))
             {
-                _looked = true;
+                _meat = _hides = _wool = _salt = null;
                 try
                 {
                     var om = MBObjectManager.Instance;
-                    if (om != null) { _meat = om.GetObject<ItemObject>("meat"); _hides = om.GetObject<ItemObject>("hides"); _wool = om.GetObject<ItemObject>("wool"); _salt = om.GetObject<ItemObject>("salt"); }
+                    if (om != null)
+                    {
+                        _meat = om.GetObject<ItemObject>("meat"); _hides = om.GetObject<ItemObject>("hides"); _wool = om.GetObject<ItemObject>("wool"); _salt = om.GetObject<ItemObject>("salt");
+                        _itemsCamp = cur;
+                    }
                 }
                 catch (Exception e) { Stumble("Items", e); }
             }
@@ -199,9 +220,10 @@ namespace Armoury
                     if (ok <= 0) return;
                     h.Salt = Math.Max(0.0, h.Salt - ok * saltPc);
                     var roster = st.ItemRoster;
-                    roster.AddToCounts(_meat, ok * MeatPer[idx]); _meatN += ok * MeatPer[idx];
-                    roster.AddToCounts(_hides, ok * HidesPer[idx]); _hidesN += ok * HidesPer[idx];
-                    if (WoolPer[idx] > 0 && _wool != null) { roster.AddToCounts(_wool, ok * WoolPer[idx]); _woolN += ok * WoolPer[idx]; }
+                    // HarvestValve.OffTick: towar uboju to nie produkcja wsi pod regulatorem (inne zrodlo) - poza pomiarem przyrostu magazynu w tym ticku
+                    roster.AddToCounts(_meat, ok * MeatPer[idx]); _meatN += ok * MeatPer[idx]; HarvestValve.OffTick(v, _meat, ok * MeatPer[idx], 0);
+                    roster.AddToCounts(_hides, ok * HidesPer[idx]); _hidesN += ok * HidesPer[idx]; HarvestValve.OffTick(v, _hides, ok * HidesPer[idx], 0);
+                    if (WoolPer[idx] > 0 && _wool != null) { roster.AddToCounts(_wool, ok * WoolPer[idx]); _woolN += ok * WoolPer[idx]; HarvestValve.OffTick(v, _wool, ok * WoolPer[idx], 0); }
                     h.Debt[idx] += ok; _culled[idx] += ok;
                     if (_vToday.Add(id)) _cullVills++;
                 }
@@ -216,6 +238,7 @@ namespace Armoury
                     k = Math.Min(k, have);
                     if (k <= 0) return;
                     roster.AddToCounts(item, -k);
+                    HarvestValve.OffTick(v, item, 0, k);   // splata: produkcja gry byla, zniknela nie przez zuzycie swiata - regulator jak bez uboju
                     h.Debt[idx] = Math.Max(0f, h.Debt[idx] - k); _repaid[idx] += k;
                     if (h.Debt[idx] <= 0f) h.RepAcc[idx] = 0f;
                 }
@@ -256,7 +279,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis
-        /// <summary>Zapis: "1|wies:krowy,swinie,owce;..." - tylko wsie z dlugiem stada. Pusty - brak dlugu.</summary>
+        /// <summary>Zapis: "2|okno|wies:krowy,swinie,owce;..." - okno uboju w chwili zapisu (1/0; recenzja: wczytanie w oknie nie zaczyna od splaty)
+        /// i tylko wsie z dlugiem stada. Pusty - brak dlugu i poza oknem. Odczyt zna tez "1|wiersze" (pierwsza wersja galezi, bez okna).</summary>
         internal static string Export()
         {
             try
@@ -267,9 +291,11 @@ namespace Armoury
                 {
                     var d = kv.Value.Debt;
                     if (!(d[0] > 0 || d[1] > 0 || d[2] > 0)) continue;
-                    sb.Append(sb.Length == 0 ? "1|" : ";").Append(kv.Key).Append(':').Append(d[0].ToString("0.##", Inv)).Append(',').Append(d[1].ToString("0.##", Inv)).Append(',').Append(d[2].ToString("0.##", Inv));
+                    if (sb.Length > 0) sb.Append(';');
+                    sb.Append(kv.Key).Append(':').Append(d[0].ToString("0.##", Inv)).Append(',').Append(d[1].ToString("0.##", Inv)).Append(',').Append(d[2].ToString("0.##", Inv));
                 }
-                return sb.ToString();
+                if (sb.Length == 0 && !_window) return "";
+                return "2|" + (_window ? "1" : "0") + "|" + sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
         }
@@ -278,12 +304,22 @@ namespace Armoury
         {
             try
             {
-                _camp = Campaign.Current; _herds.Clear(); _firstLine = false; _lastLog = -1; _window = false; _repay = false;
-                if (string.IsNullOrEmpty(data) || !data.StartsWith("1|", StringComparison.Ordinal)) return;
-                foreach (var row in data.Substring(2).Split(';'))
+                _camp = Campaign.Current; _herds.Clear(); _firstLine = false; _lastLog = -1; _window = false; _repay = false; _lastWindow = false;
+                if (string.IsNullOrEmpty(data)) return;
+                string rows; bool w = false;
+                if (data.StartsWith("2|", StringComparison.Ordinal))
+                {
+                    int bar = data.IndexOf('|', 2); if (bar < 0) return;
+                    w = data.Substring(2, bar - 2) == "1";
+                    rows = data.Substring(bar + 1);
+                }
+                else if (data.StartsWith("1|", StringComparison.Ordinal)) rows = data.Substring(2);
+                else return;
+                foreach (var row in rows.Split(';'))
                 {
                     try
                     {
+                        if (row.Length == 0) continue;
                         int c = row.IndexOf(':'); if (c <= 0) continue;
                         var p = row.Substring(c + 1).Split(','); if (p.Length < 3) continue;
                         var h = new Herd();
@@ -293,8 +329,11 @@ namespace Armoury
                     catch (Exception e) { Stumble("Import(wiersz)", e); }
                 }
                 bool any = false; foreach (var h in _herds.Values) if (h.Debt[0] > 0 || h.Debt[1] > 0 || h.Debt[2] > 0) { any = true; break; }
-                // splata od razu po wczytaniu (przyrost doby moze biec przed Daily); okno uboju ustala pierwsza Daily (w SyncData bez odczytow czasu i klimatu)
-                _repay = any && KeyOn;
+                // stan doby z chwili zapisu (zegar ten sam): w oknie - uboj, poza oknem z dlugiem - splata, od razu po wczytaniu (przyrost doby moze biec przed
+                // Daily); dalej rozstrzyga pierwsza Daily (w SyncData bez odczytow czasu i klimatu)
+                bool on = KeyOn;
+                _window = w && on; _lastWindow = _window;
+                _repay = !_window && any && on;
             }
             catch (Exception e) { _herds.Clear(); Stumble("Import", e); }
         }

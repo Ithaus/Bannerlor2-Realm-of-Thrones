@@ -740,6 +740,9 @@ namespace Armoury
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
+        // p5-urodzaj (R3-05e/f, recenzja): rok urodzaju i uboj jesienny - stan i przedmioty od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _p5UrodzajReset = P5UrodzajReset();
+        private static bool P5UrodzajReset() { try { HarvestYear.Reset(); HerdCull.Reset(); } catch (Exception e) { Log.Error("P5UrodzajReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {

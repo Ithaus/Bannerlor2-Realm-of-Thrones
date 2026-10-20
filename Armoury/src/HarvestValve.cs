@@ -324,6 +324,22 @@ namespace Armoury
             catch (Exception e) { Stumble("MadeOffRoster", e); }
         }
 
+        /// <summary>R3-05f (HerdCull, uboj jesienny; recenzja p5-urodzaj): zmiana magazynu wsi W JEJ TICKU produkcji, ktora nie jest produkcja wsi pod regulatorem.
+        /// added - towar z uboju (skory, welna; mieso to zywnosc - poza zakresem): inne zrodlo, jak warsztaty - poza przyrostem magazynu (stan "przed" o tyle wyzej);
+        /// removed - zwierzeta splaty dlugu stada zdjete zaraz po dopisaniu przez gre: produkcja gry byla (P1) i zniknela nie przez zuzycie swiata (D1, jak gnicie) -
+        /// regulator widzi produkcje i zuzycie zwierzat jak bez uboju. Tylko watek glowny w ticku tej wsi w pomiarze; poza nim nic. Nie rzuca.</summary>
+        internal static void OffTick(Village v, ItemObject item, int added, int removed)
+        {
+            if (v == null || item == null || (added <= 0 && removed <= 0) || !ReferenceEquals(_tv, v)
+                || System.Threading.Thread.CurrentThread.ManagedThreadId != _tvThread || !Eligible(item)) return;
+            try
+            {
+                if (added > 0) { int b; _before.TryGetValue(item, out b); _before[item] = b + added; }
+                if (removed > 0) { var g = Get(item); if (g != null) { g.P1 += removed; g.D1 += removed; } }
+            }
+            catch (Exception e) { Stumble("OffTick", e); }
+        }
+
         /// <summary>RawNoRot.Prefix: sztuki skasowane przez gnicie (przed pierwsza decyzja) - nie sa zuzyciem.</summary>
         internal static void NoteDecay(ItemObject item, int n)
         {

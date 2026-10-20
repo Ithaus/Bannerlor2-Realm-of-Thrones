@@ -20,16 +20,21 @@ namespace Armoury
     ///
     /// LOSOWANIE: raz na rok kalendarza, w pierwszej dobie okna zniw (FreeHands.HarvestWindow - dni 196-252 roku 364 i pora Westeros lato albo jesien;
     /// w latach zimy okna nie ma, wiec i losowania). POGODA JAKO POLE NA MAPIE: siatka wezlow co 1/8 dluzszego boku mapy (prostokat wszystkich osad);
-    /// kazdy wezel losuje swoj rok - zwykly x(1 + 0.2 x (u1 + u2 - 1)) (rozklad trojkatny 0.8..1.2, srednia 1), z szansa 1/20 rok glodu x0.6 (1315-17:
-    /// plon 2:1 wobec do 7:1 w dobre lata; szansa - szacunek audytu "ok. raz na 20 lat"). Region (okreg warowni wsi - Village.Bound) bierze wartosc pola
-    /// w polozeniu swojej warowni (interpolacja dwuliniowa z wygladzeniem) - caly okreg ten sam rok, sasiednie okregi podobny, dalekie niezalezne.
+    /// kazdy wezel losuje swoj rok - zwykly x(c + 0.2 x (u1 + u2 - 1)) (rozklad trojkatny c-0.2..c+0.2), z szansa 1/20 rok glodu x0.6 (1315-17:
+    /// plon 2:1 wobec do 7:1 w dobre lata; szansa - szacunek audytu "ok. raz na 20 lat"). Srodek zwyklego roku c = (1 - 0.05 x 0.6) / 0.95 = 1.021 - srednia
+    /// swiata dokladnie 1 (start neutralny; recenzja: z c = 1 swiat tracil 2% plonu). Okreg (warownia wsi - Village.Bound) bierze wartosc pola w polozeniu
+    /// swojej warowni: zwykly rok - interpolacja dwuliniowa z wygladzeniem (caly okreg ten sam rok, sasiednie okregi podobny, dalekie niezalezne);
+    /// ROK GLODU - CALY REGION najblizszego wezla (kwadrat o boku kroku siatki wokol wezla) x0.6, bez rozmycia (recenzja: rozmyty glod trafial okreg
+    /// raz na ok. 50 lat i prawie nigdy w pelni) - kazde miejsce ma rok glodu z szansa 1/20. W interpolacji zwyklego roku wezel glodu liczy sie jako c.
     /// Pola mieszczan (KS) - wartosc pola w polozeniu miasta.
     ///
     /// GDZIE MNOZY (jeden czynnik, wszystkie drogi plonu pol):
     ///  - lancuch produkcji wsi gry (MaterialLaw.ProdPostfix, po rekach E4/5 i E4/7, tym samym wzorem "czynnik x suma") i jego odczyt ChainFactor - tylko
-    ///    plony pol i sadow: zboze, len, winogrona, oliwki, daktyle, bawelna, papirus, jablka, pomarancze, marchew (zwierzeta, kopaliny, ryby, las - bez zmian);
+    ///    plony pol i sadow: zboze, len, winogrona, oliwki, daktyle, bawelna, papirus, jablka, pomarancze, marchew (zywe zwierzeta, kopaliny, ryby wsi, las -
+    ///    bez zmian). Swiadomie: ryby przysiolkow W2 (HamletKinds.Step przerabia u x zboze PO tym kroku na ryby) ida za rokiem - to praca z ziemi przysiolka;
     ///  - zywnosc wsi gry (postfiks DefaultVillageProductionCalculatorModel.CalculateDailyFoodProductionAmount - mnozy sie z zima, rekami E4/5 i E4/7) -
-    ///    to plon spichlerza okregu (Famine); bez wsi rybackich, wielorybniczych i lowcow morsow (ich zywnosc to morze);
+    ///    to plon spichlerza okregu (Famine) i koszyk zywnosci wsi gry (TickFoodProduction: zboze, ser, maslo) - swiadomie ser i maslo tez: zly rok = gorsze
+    ///    pastwiska i siano, mniej mleka; bez wsi rybackich, wielorybniczych i lowcow morsow (ich zywnosc to morze);
     ///  - rachunek KS wsi i pol mieszczan po wlaczeniu kalibracji (StartCalibration.ComputeDistrict z czynnikami gry) - te same towary.
     /// ZIMA: w zimie Westeros (WesterosClimate.Now) czynnik = 1 - plon tnie zima (WinterBite), dwie reguly na jedno zjawisko nie nakladaja sie
     /// (ryzyko audytu: zly rok na wieloletniej zimie). Rok wazny 364 doby od losowania (rok gry); potem 1 do nastepnego okna.
@@ -44,6 +49,8 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly TextObject _txt = new TextObject("{=!}Harvest year");
         private const float Famine = 0.6f, Spread = 0.2f, FamineChance = 1f / 20f;
+        private const float Center = (1f - FamineChance * Famine) / (1f - FamineChance);   // srodek zwyklego roku 1.021 - srednia swiata 1
+        private const float Max = 1.25f;                     // gorna granica pola (zwykly rok najwyzej c + 0.2 = 1.221)
         private const int Cells = 8;                         // wezly co 1/8 dluzszego boku mapy
 
         private static readonly HashSet<string> Crops = new HashSet<string>(StringComparer.Ordinal)
@@ -76,10 +83,17 @@ namespace Armoury
             try { lock (_errOnce) { if (!_errOnce.Add(where)) return; } Log.Error("HarvestYear." + where, e); } catch { }
         }
 
+        /// <summary>Konstruktor ArmouryBehavior (nowa kampania, przed wczytaniem): stan od zera.</summary>
+        internal static void Reset()
+        {
+            _camp = null;
+            ResetIfNewCampaign();
+        }
+
         private static void ResetIfNewCampaign()
         {
             var cur = Campaign.Current;
-            if (ReferenceEquals(cur, _camp)) return;
+            if (_camp != null && ReferenceEquals(cur, _camp)) return;
             _camp = cur;
             _drawDay = -1; _drawYear = -1; _nodes = null; _nx = _ny = 0; _cell = 0f;
             _snap = null; _active = false; _lastLogDay = -1; _lastActive = false; _firstLine = false; _stumbles = 0;
@@ -157,17 +171,25 @@ namespace Armoury
         // ------------------------------------------------------------ pole pogody
         private static float Smooth(float t) { t = MBMath.ClampFloat(t, 0f, 1f); return t * t * (3f - 2f * t); }
 
+        private static bool IsFamine(float v) { return v <= Famine + 1e-4f; }
+
+        /// <summary>Wezel w interpolacji zwyklego roku: wezel glodu liczy sie jako srodek zwyklego roku (glod nie rozlewa sie na sasiadow).</summary>
+        private static float Normal(float v) { return IsFamine(v) ? Center : v; }
+
         private static float FieldAt(float x, float y)
         {
             var nodes = _nodes;
             if (nodes == null || _cell <= 0f || _nx < 2 || _ny < 2) return 1f;
             float gx = (x - _minX) / _cell, gy = (y - _minY) / _cell;
+            // rok glodu: caly region najblizszego wezla
+            int nx0 = Math.Max(0, Math.Min(_nx - 1, (int)Math.Round(gx))), ny0 = Math.Max(0, Math.Min(_ny - 1, (int)Math.Round(gy)));
+            if (IsFamine(nodes[ny0 * _nx + nx0])) return Famine;
             int ix = (int)Math.Floor(gx), iy = (int)Math.Floor(gy);
             ix = Math.Max(0, Math.Min(_nx - 2, ix)); iy = Math.Max(0, Math.Min(_ny - 2, iy));
             float tx = Smooth(gx - ix), ty = Smooth(gy - iy);
-            float a = nodes[iy * _nx + ix], b = nodes[iy * _nx + ix + 1], c = nodes[(iy + 1) * _nx + ix], d = nodes[(iy + 1) * _nx + ix + 1];
+            float a = Normal(nodes[iy * _nx + ix]), b = Normal(nodes[iy * _nx + ix + 1]), c = Normal(nodes[(iy + 1) * _nx + ix]), d = Normal(nodes[(iy + 1) * _nx + ix + 1]);
             float v = (a * (1f - tx) + b * tx) * (1f - ty) + (c * (1f - tx) + d * tx) * ty;
-            return MBMath.ClampFloat(v, Famine, 1f + Spread);
+            return MBMath.ClampFloat(v, Famine, Max);
         }
 
         /// <summary>Migawka osada -> czynnik z pola (wsie - polozenie warowni okregu, miasta - wlasne). Pod blokada; publikacja jednej referencji.</summary>
@@ -222,7 +244,7 @@ namespace Armoury
             for (int i = 0; i < nodes.Length; i++)
             {
                 if (rnd.NextDouble() < FamineChance) nodes[i] = Famine;
-                else nodes[i] = 1f + Spread * (float)(rnd.NextDouble() + rnd.NextDouble() - 1.0);
+                else nodes[i] = Center + Spread * (float)(rnd.NextDouble() + rnd.NextDouble() - 1.0);
             }
             lock (Gate)
             {
@@ -252,6 +274,7 @@ namespace Armoury
                 if (window && year != _drawYear) { Draw(today, year); drew = _drawYear == year; }
                 bool winter = WesterosClimate.Now() == CampaignTime.Seasons.Winter;
                 _active = _nodes != null && _drawDay >= 0 && today - _drawDay < yd && !winter;
+                if (_active && _snap == null) EnsureSnap();   // recenzja: po wczytaniu migawke buduje watek glowny (nie pierwszy odczyt z watku AI)
                 if (drew || _active != _lastActive || !_firstLine || today - _lastLogDay >= 28)
                 {
                     _lastLogDay = today; _firstLine = true;
@@ -272,7 +295,7 @@ namespace Armoury
             var sn = _snap;
             if (_nodes != null && sn != null)
             {
-                int famN = 0; foreach (var v in _nodes) if (v <= Famine + 1e-4f) famN++;
+                int famN = 0; foreach (var v in _nodes) if (IsFamine(v)) famN++;
                 sb.Append(" | siatka ").Append(_nx).Append('x').Append(_ny).Append(" co ").Append(_cell.ToString("0", Inv)).Append(" jedn., wezly glodu ").Append(famN);
                 int nv = 0, good = 0, bad = 0, fam = 0; double sum = 0; float mn = 9f, mx = 0f;
                 var byK = new Dictionary<string, double[]>(StringComparer.Ordinal);
@@ -280,20 +303,20 @@ namespace Armoury
                 {
                     if (kv.Key == null || !kv.Key.IsVillage) continue;
                     float f = kv.Value; nv++; sum += f; if (f < mn) mn = f; if (f > mx) mx = f;
-                    if (f >= 1.1f) good++; else if (f <= 0.75f) fam++; else if (f <= 0.9f) bad++;
+                    if (f >= 1.1f) good++; else if (IsFamine(f)) fam++; else if (f <= 0.9f) bad++;
                     string k = "?"; try { var mf = kv.Key.MapFaction; if (mf != null && mf.Name != null) k = mf.Name.ToString(); } catch { }
                     double[] a; if (!byK.TryGetValue(k, out a)) byK[k] = a = new double[2];
                     a[0] += f; a[1]++;
                 }
                 sb.Append(" | wsie ").Append(nv).Append(": srednio x").Append(nv > 0 ? (sum / nv).ToString("0.000", Inv) : "-").Append(", min x").Append(mn.ToString("0.00", Inv))
-                  .Append(", max x").Append(mx.ToString("0.00", Inv)).Append(", urodzaj (>= 1.10) ").Append(good).Append(", zly rok (0.76-0.90) ").Append(bad).Append(", glod (<= 0.75) ").Append(fam);
+                  .Append(", max x").Append(mx.ToString("0.00", Inv)).Append(", urodzaj (>= 1.10) ").Append(good).Append(", zly rok (<= 0.90) ").Append(bad).Append(", nieurodzaj (x0.6) ").Append(fam);
                 var list = new List<KeyValuePair<string, double>>();
                 foreach (var kv in byK) if (kv.Value[1] > 0) list.Add(new KeyValuePair<string, double>(kv.Key, kv.Value[0] / kv.Value[1]));
                 list.Sort((p, q) => p.Value.CompareTo(q.Value));
                 sb.Append(" | krolestwa (srednia wsi): ");
                 for (int i = 0; i < list.Count; i++) { if (i > 0) sb.Append(", "); sb.Append(list[i].Key).Append(" x").Append(list[i].Value.ToString("0.00", Inv)); }
             }
-            sb.Append(" | plony: zboze, len, winogrona, oliwki, daktyle, bawelna, papirus, jablka, pomarancze, marchew + zywnosc wsi (bez wsi morskich) | potkniecia ").Append(_stumbles).Append('.');
+            sb.Append(" | plony: zboze, len, winogrona, oliwki, daktyle, bawelna, papirus, jablka, pomarancze, marchew (+ ryby przysiolkow W2 ze zboza) + zywnosc wsi (zboze, ser, maslo; bez wsi morskich) | potkniecia ").Append(_stumbles).Append('.');
             return sb.ToString();
         }
 
@@ -304,27 +327,35 @@ namespace Armoury
             {
                 var sn = _snap; if (sn == null) return;
                 var byK = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                var famine = new List<string>(); var famSeen = new HashSet<Settlement>(); int famVil = 0;
                 foreach (var kv in sn.F)
                 {
                     if (kv.Key == null || !kv.Key.IsVillage) continue;
+                    if (IsFamine(kv.Value))
+                    {
+                        famVil++;
+                        // region nieurodzaju po warowniach okregow (do 5 nazw)
+                        try { var b = kv.Key.Village != null ? kv.Key.Village.Bound : null; if (b != null && b.Name != null && famSeen.Add(b) && famine.Count < 5) famine.Add(b.Name.ToString()); } catch { }
+                    }
                     string k = null; try { var mf = kv.Key.MapFaction; if (mf != null && mf.Name != null) k = mf.Name.ToString(); } catch { }
                     if (string.IsNullOrEmpty(k)) continue;
-                    double[] a; if (!byK.TryGetValue(k, out a)) byK[k] = a = new double[3];
-                    a[0] += kv.Value; a[1]++; if (kv.Value <= 0.75f) a[2]++;
+                    double[] a; if (!byK.TryGetValue(k, out a)) byK[k] = a = new double[2];
+                    a[0] += kv.Value; a[1]++;
                 }
-                string best = null, worst = null; double bv = 0, wv = 9; var famine = new List<string>();
+                string best = null, worst = null; double bv = 0, wv = 9;
                 foreach (var kv in byK)
                 {
                     if (kv.Value[1] < 3) continue;
                     double m = kv.Value[0] / kv.Value[1];
                     if (m > bv) { bv = m; best = kv.Key; }
                     if (m < wv) { wv = m; worst = kv.Key; }
-                    if (kv.Value[2] >= Math.Max(2, kv.Value[1] / 4)) famine.Add(kv.Key);
                 }
                 if (best != null && worst != null && best != worst)
                     Log.Player("Harvest is in: a rich year in " + best + ", a poor one in " + worst + ".", false);
+                // bez obietnicy glodu: spichlerze okregow (do 2 lat) zwykle przetrwaja jeden zly rok - glod przychodzi, gdy dolozy sie wojna, rabunek albo drugi zly rok
                 if (famine.Count > 0)
-                    Log.Player("The harvest failed in " + string.Join(", ", famine.ToArray()) + " - famine will follow.", true);
+                    Log.Player("The harvest failed around " + string.Join(", ", famine.ToArray()) + (famSeen.Count > famine.Count ? " and beyond" : "") + " - grain will be short and dear.", true);
+                Log.Info("Rok urodzaju (R3-05e): wiesc - urodzaj " + (best ?? "-") + ", zly rok " + (worst ?? "-") + "; nieurodzaj x" + Famine.ToString("0.0", Inv) + " w " + famVil + " wsiach wokol " + famSeen.Count + " warowni.");
             }
             catch (Exception e) { Stumble("Tell", e); }
         }
@@ -372,7 +403,7 @@ namespace Armoury
                 var vals = f[8].Split(',');
                 if (nx < 2 || ny < 2 || vals.Length != nx * ny) return;
                 var nodes = new float[nx * ny];
-                for (int i = 0; i < nodes.Length; i++) nodes[i] = MBMath.ClampFloat(float.Parse(vals[i], Inv), Famine, 1f + Spread);
+                for (int i = 0; i < nodes.Length; i++) nodes[i] = MBMath.ClampFloat(float.Parse(vals[i], Inv), Famine, Max);
                 lock (Gate)
                 {
                     _drawDay = int.Parse(f[1], Inv); _drawYear = int.Parse(f[2], Inv);
