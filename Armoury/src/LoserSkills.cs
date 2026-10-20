@@ -27,6 +27,10 @@ namespace Armoury
     ///
     /// Wylacznik LosersFleeSkills (off = p jak dotad). Watek: prefiks wyniku bitwy (watek glowny), bez alokacji w liczeniu; napisy tylko w linii
     /// bitwy i linii doby. Zapisu nie ma (liczniki doby). Blad w liczeniu partii = p bez zmian i potkniecie (bez gaszenia funkcji).
+    ///
+    /// Liczniki (poprawka po recenzji): plan partii (Note, faza planu H3) czeka w buforze bitwy; do licznikow doby i dopisku bitwy wchodzi
+    /// dopiero partia zastosowana bez bledu (Applied - LosersFlee.Apply, lp.Applied). Bitwa i Taktyka licza sie przy pierwszej zastosowanej
+    /// partii tej bitwy - bitwa z samymi taborami wsi (albo z partiami po staremu) idzie do licznika "bez zmiany", nie do Taktyki.
     /// </summary>
     internal static class LoserSkills
     {
@@ -39,15 +43,21 @@ namespace Armoury
         // ostatnia bitwa (prefiks -> BattleLine w postfiksie tej samej bitwy)
         private static MapEvent _me;
         private static int _tw, _tp, _bParties, _bMedParties, _bMedMax;
-        private static bool _twHero, _tpHero;
+        private static bool _twHero, _tpHero, _plWin;
         private static float _shift, _bP2Min, _bP2Max;
+        private static bool _bOpen, _bCounted;                      // bitwa po Shift / juz wliczona (pierwsza partia zastosowana)
         // partia w toku (PartyP -> Note po planie tej partii; inna partia albo blad planu = brak liczenia)
         private static MobileParty _pendMp;
         private static float _pendP0, _pendP1, _pendP2;
         private static int _pendMed;
+        // bufor planu bitwy (Note -> Applied); tablice rosna rzadko (wiecej partii przegranych niz dotad), bez alokacji w zwyklej bitwie
+        private static MobileParty[] _qMp = new MobileParty[16];
+        private static int[] _qN = new int[16], _qMed = new int[16];
+        private static float[] _qP0 = new float[16], _qP1 = new float[16], _qP2 = new float[16];
+        private static int _qCount;
 
         // liczniki doby
-        private static int _battles, _tacUp, _tacDown, _tacEven, _noHeroW, _noHeroL;
+        private static int _battles, _noEffect, _tacUp, _tacDown, _tacEven, _noHeroW, _noHeroL;
         private static double _sumUp, _sumDown;
         private static int _parties, _men, _medParties, _medMen, _medFull;
         private static long _sumMed;
@@ -61,12 +71,26 @@ namespace Armoury
         internal static void Reset()
         {
             ClearDay();
-            _me = null; _pendMp = null; _err = false;
+            _me = null; _pendMp = null; _err = false; _bOpen = _bCounted = false;
+            ClearQueue();
+        }
+
+        private static void ClearQueue()
+        {
+            for (int i = 0; i < _qCount; i++) _qMp[i] = null;     // bez trzymania partii po bitwie
+            _qCount = 0;
+        }
+
+        /// <summary>Zamyka poprzednia bitwe: bez zadnej partii zastosowanej (same tabory wsi albo partie po staremu) = licznik "bez zmiany".</summary>
+        private static void Flush()
+        {
+            if (_bOpen && !_bCounted) _noEffect++;
+            _bOpen = false;
         }
 
         private static void ClearDay()
         {
-            _battles = _tacUp = _tacDown = _tacEven = _noHeroW = _noHeroL = 0;
+            _battles = _noEffect = _tacUp = _tacDown = _tacEven = _noHeroW = _noHeroL = 0;
             _sumUp = _sumDown = 0;
             _parties = _men = _medParties = _medMen = _medFull = 0; _sumMed = 0;
             _e0 = _e1 = _e2 = 0; _p2Min = 1f; _p2Max = 0f;
@@ -102,7 +126,10 @@ namespace Armoury
         /// </summary>
         internal static float Shift(MapEvent me, MapEventSide win, MapEventSide lose)
         {
-            _me = null; _pendMp = null;
+            Flush();
+            _me = null; _pendMp = null; _bCounted = false;
+            ClearQueue();
+            _bParties = _bMedParties = _bMedMax = 0; _bP2Min = 1f; _bP2Max = 0f;
             if (!On || me == null) return 0f;
             try
             {
@@ -111,20 +138,10 @@ namespace Armoury
                 float d = (tw - tp) / TacSpan;
                 d = d < -1f ? -1f : (d > 1f ? 1f : d);
                 float shift = TacW * d;
-                _me = me; _tw = tw; _tp = tp; _twHero = hw; _tpHero = hl; _shift = shift;
-                _bParties = _bMedParties = _bMedMax = 0; _bP2Min = 1f; _bP2Max = 0f;
-                _battles++;
-                if (!hw) _noHeroW++;
-                if (!hl) _noHeroL++;
-                if (shift > 0f) { _tacUp++; _sumUp += shift; }
-                else if (shift < 0f) { _tacDown++; _sumDown += shift; }
-                else _tacEven++;
-                try
-                {
-                    var lp = win != null ? win.LeaderParty : null;
-                    if (lp != null && lp == PartyBase.MainParty) { _plWinBattles++; _plWinShift += shift; }
-                }
-                catch { }
+                bool plWin = false;
+                try { var lp = win != null ? win.LeaderParty : null; plWin = lp != null && lp == PartyBase.MainParty; } catch { }
+                _me = me; _tw = tw; _tp = tp; _twHero = hw; _tpHero = hl; _shift = shift; _plWin = plWin;
+                _bOpen = true;                    // bitwa i Taktyka licza sie dopiero przy pierwszej partii zastosowanej (Applied)
                 return shift;
             }
             catch (Exception e)
@@ -133,6 +150,20 @@ namespace Armoury
                 if (!_err) { _err = true; Log.Error("LoserSkills.Shift", e); }
                 return 0f;
             }
+        }
+
+        /// <summary>Liczniki bitwy i Taktyki - raz na bitwe, przy pierwszej partii przegranej zastosowanej z p R3-10c.</summary>
+        private static void CountBattle()
+        {
+            if (!_bOpen || _bCounted) return;
+            _bCounted = true;
+            _battles++;
+            if (!_twHero) _noHeroW++;
+            if (!_tpHero) _noHeroL++;
+            if (_shift > 0f) { _tacUp++; _sumUp += _shift; }
+            else if (_shift < 0f) { _tacDown++; _sumDown += _shift; }
+            else _tacEven++;
+            if (_plWin) { _plWinBattles++; _plWinShift += _shift; }
         }
 
         /// <summary>Smiertelnosc partii przegranej (nie taboru wsi) z Taktyka i chirurgiem; przy wylaczonym kluczu - p bez zmian.</summary>
@@ -158,26 +189,66 @@ namespace Armoury
             }
         }
 
-        /// <summary>Po planie partii (LosersFlee.Plan, partia dodana do planu): liczniki doby i bitwy. n - szeregowi przegranej partii.</summary>
+        /// <summary>Po planie partii (LosersFlee.Plan, partia dodana do planu): plan partii do bufora bitwy (liczy sie dopiero w Applied). n - szeregowi przegranej partii.</summary>
         internal static void Note(MobileParty mp, int n)
         {
             if (_pendMp == null || mp != _pendMp || n <= 0) { _pendMp = null; return; }
             _pendMp = null;
-            _parties++; _men += n;
-            _e0 += n * (double)_pendP0; _e1 += n * (double)_pendP1; _e2 += n * (double)_pendP2;
-            if (_pendP2 < _p2Min) _p2Min = _pendP2;
-            if (_pendP2 > _p2Max) _p2Max = _pendP2;
-            _bParties++;
-            if (_pendP2 < _bP2Min) _bP2Min = _pendP2;
-            if (_pendP2 > _bP2Max) _bP2Max = _pendP2;
-            if (_pendMed > 0)
+            try
             {
-                _medParties++; _medMen += n; _sumMed += _pendMed;
-                if (_pendMed >= MedFull) _medFull++;
-                _bMedParties++;
-                if (_pendMed > _bMedMax) _bMedMax = _pendMed;
+                if (_qCount >= _qMp.Length)
+                {
+                    int cap = _qMp.Length * 2;
+                    Array.Resize(ref _qMp, cap); Array.Resize(ref _qN, cap); Array.Resize(ref _qMed, cap);
+                    Array.Resize(ref _qP0, cap); Array.Resize(ref _qP1, cap); Array.Resize(ref _qP2, cap);
+                }
+                int i = _qCount++;
+                _qMp[i] = mp; _qN[i] = n; _qMed[i] = _pendMed; _qP0[i] = _pendP0; _qP1[i] = _pendP1; _qP2[i] = _pendP2;
             }
-            if (mp == MobileParty.MainParty) { _plMen += n; _plE1 += n * (double)_pendP1; _plE2 += n * (double)_pendP2; }
+            catch (Exception e)
+            {
+                _stumble++;
+                if (!_err) { _err = true; Log.Error("LoserSkills.Note", e); }
+            }
+        }
+
+        /// <summary>
+        /// Partia przegrana zastosowana bez bledu (LosersFlee.Apply, zaraz po lp.Applied = true): jej plan z bufora do licznikow doby i dopisku
+        /// bitwy; pierwsza taka partia wlicza bitwe i Taktyke. Tabor wsi i partia spoza bufora - nic. Nie rzuca (blad = potkniecie).
+        /// </summary>
+        internal static void Applied(MobileParty mp)
+        {
+            if (mp == null || _qCount == 0) return;
+            try
+            {
+                int i = 0;
+                while (i < _qCount && _qMp[i] != mp) i++;
+                if (i >= _qCount) return;
+                _qMp[i] = null;                   // raz na partie
+                int n = _qN[i], med = _qMed[i];
+                float p0 = _qP0[i], p1 = _qP1[i], p2 = _qP2[i];
+                CountBattle();
+                _parties++; _men += n;
+                _e0 += n * (double)p0; _e1 += n * (double)p1; _e2 += n * (double)p2;
+                if (p2 < _p2Min) _p2Min = p2;
+                if (p2 > _p2Max) _p2Max = p2;
+                _bParties++;
+                if (p2 < _bP2Min) _bP2Min = p2;
+                if (p2 > _bP2Max) _bP2Max = p2;
+                if (med > 0)
+                {
+                    _medParties++; _medMen += n; _sumMed += med;
+                    if (med >= MedFull) _medFull++;
+                    _bMedParties++;
+                    if (med > _bMedMax) _bMedMax = med;
+                }
+                if (mp == MobileParty.MainParty) { _plMen += n; _plE1 += n * (double)p1; _plE2 += n * (double)p2; }
+            }
+            catch (Exception e)
+            {
+                _stumble++;
+                if (!_err) { _err = true; Log.Error("LoserSkills.Applied", e); }
+            }
         }
 
         private static string Pts(double v) { return (v >= 0 ? "+" : "") + (100.0 * v).ToString("0.#", CultureInfo.InvariantCulture); }
@@ -187,6 +258,7 @@ namespace Armoury
         internal static string BattleText(MapEvent me)
         {
             if (me == null || me != _me || !On) return "";
+            if (_bParties == 0) return " | chirurg i taktyka (R3-10c): nie dotyczy (bez partii przegranych poza taborami wsi zastosowanych przez H3)";
             var ci = CultureInfo.InvariantCulture;
             var sb = new StringBuilder();
             sb.Append(" | chirurg i taktyka (R3-10c): Taktyka zwyciezcy ").Append(_twHero ? _tw.ToString(ci) : "brak wodza (0)")
@@ -202,6 +274,7 @@ namespace Armoury
         {
             try
             {
+                Flush();                          // ostatnia bitwa doby (bitwa konczy sie w jednym prefiksie - przy linii doby juz zamknieta)
                 var ci = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder();
                 sb.Append("Przegrani - chirurg i taktyka (R3-10c): dzien ").Append(day);
@@ -211,7 +284,9 @@ namespace Armoury
                     Log.Info(sb.ToString());
                     return;
                 }
-                sb.Append(" - bitew ").Append(_battles).Append(": Taktyka zwyciezcy lepsza ").Append(_tacUp);
+                // bitew + bez zmiany = "bitew objetych" w linii "Przegrani (H3)" (przy 0 potkniec liczenia H3)
+                sb.Append(" - bitew ").Append(_battles).Append(" (bez zmiany - same tabory wsi albo partie po staremu: ").Append(_noEffect)
+                  .Append("): Taktyka zwyciezcy lepsza ").Append(_tacUp);
                 if (_tacUp > 0) sb.Append(" (srednio ").Append(Pts(_sumUp / _tacUp)).Append(" pkt)");
                 sb.Append(", gorsza ").Append(_tacDown);
                 if (_tacDown > 0) sb.Append(" (srednio ").Append(Pts(_sumDown / _tacDown)).Append(" pkt)");
