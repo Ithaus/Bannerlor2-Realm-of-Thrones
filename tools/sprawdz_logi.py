@@ -50933,10 +50933,13 @@ P6OKUP_PRE = "Okup okolicy (R3-03a): "
 P6OKUP_R1 = "Rabunek osada po osadzie (E7/R1): dzien"
 P6OKUP_RX = {
     "start": re.compile(r"latki (\d+)/(\d+).*opcja menu wsi (tak|nie)"),
+    "save": re.compile(r"\(z zapisu (\d+), bledne"),
     "aiT": re.compile(r"okupy: AI (\d+) \((-?\d+) zl\), gracz (\d+) \((-?\d+) zl\)"),
     "rate": re.compile(r"stawka srednio ([\d.]+)%"),
-    "raid": re.compile(r"rabunki AI zaczete (\d+) \(najezdzcy (\d+), opor wsi (\d+), glod (\d+), rod w potrzebie (\d+), okup ponizej doby zoldu (\d+), rabunek oplaca sie bardziej (\d+)"),
-    "guard": re.compile(r"odprawione u wsi (\d+), opcje rabunku AI wyciete (\d+), gracz zablokowany (\d+), par wies-krolestwo (\d+)"),
+    "raid": re.compile(r"rabunki AI zaczete (\d+) \(najezdzcy (\d+), opor wsi (\d+), glod (\d+), rod w potrzebie (\d+), okup ponizej doby zoldu wodza (\d+), rabunek oplaca sie bardziej (\d+)"),
+    "army": re.compile(r"\| armie AI: decyzji (\d+), okupy (\d+)"),
+    "war": re.compile(r"\| liczniki wojny gry: okupy jako udane rabunki \+(\d+)"),
+    "guard": re.compile(r"odprawione u wsi (\d+) \(z ochron z zapisu (\d+)\), opcje rabunku AI wyciete (\d+), gracz zablokowany (\d+), okup gracza po wrogim czynie \(10 dob\) zablokowany (\d+), par wies-krolestwo (\d+)"),
     "bal": re.compile(r"kontrola: zloto wodzow - kiesy wsi (-?\d+)"),
     "st": re.compile(r"\| potkniecia (\d+) \(razem (\d+)\)"),
     "r1sess": re.compile(r"sesji (\d+) \(AI"),
@@ -50947,7 +50950,9 @@ def p6okup_main(logp):
     """p6okup (R3-03a, p6-okup): okup okolicy zamiast palenia wsi (RaidTribute). Log Armoury strumieniowo. Progi:
     PO-0 linia startu (latki 4/4, opcja menu), PO-1 linie doby, PO-2 okupy AI > 0 (regula dziala), PO-3 kontrola zlota 0 kazdego dnia, PO-4 potkniecia 0,
     PO-5 udzial okupow wsrod decyzji AI (INFO; DECYZJA, gdy rabunkow zostaje < 10% - 'wojna prawie bez palenia'), PO-6 stawka srednia w 10-20%,
-    PO-7 odprawione u wsi <= okupy (inaczej wyciecie w mysli nie dziala), PO-8 rabunki E7/R1 dalej sa (sesje > 0). Log bez paczki: INFO, bez wyjatku."""
+    PO-7 odprawione u wsi (bez ochron z zapisu) <= 3 x okupy (kilku lordow moglo juz isc na te wies; wiecej - wyciecie w mysli nie dziala; INFO, gdy start sesji
+    wczytal ochrony z zapisu), PO-8 rabunki E7/R1 dalej sa (sesje > 0), PO-9 okupy armii > 0 przy >= 5 decyzjach wodzow armii (recenzja 20.10: bramka zoldu
+    calej armii), PO-10 liczniki wojny gry = okupy (kazdy okup jako udany rabunek). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     start, days, r1 = [], [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
@@ -50971,7 +50976,9 @@ def p6okup_main(logp):
     rep.add("PO-1: linie doby", f"{len(days)}", ">= 1", len(days) >= 1)
     ait = aig = pt = pg = 0
     raids = reav = resist = hung = need = small = better = 0
-    guard = cut = block = 0
+    guard = guard_save = cut = block = recent = 0
+    army_dec = army_t = war = 0
+    days_war = 0
     bal_bad = []
     rates = []
     st_day = 0
@@ -50988,7 +50995,13 @@ def p6okup_main(logp):
             raids += g[0]; reav += g[1]; resist += g[2]; hung += g[3]; need += g[4]; small += g[5]; better += g[6]
         gg = P6OKUP_RX["guard"].search(s)
         if gg:
-            guard += int(gg.group(1)); cut += int(gg.group(2)); block += int(gg.group(3))
+            guard += int(gg.group(1)); guard_save += int(gg.group(2)); cut += int(gg.group(3)); block += int(gg.group(4)); recent += int(gg.group(5))
+        ar = P6OKUP_RX["army"].search(s)
+        if ar:
+            army_dec += int(ar.group(1)); army_t += int(ar.group(2))
+        wr = P6OKUP_RX["war"].search(s)
+        if wr:
+            war += int(wr.group(1)); days_war += 1
         b = P6OKUP_RX["bal"].search(s)
         if b and int(b.group(1)) != 0:
             bal_bad.append(num(r"dzien (\d+)", s))
@@ -51014,10 +51027,25 @@ def p6okup_main(logp):
         rep.add("PO-6: stawka srednia okupu", f"{avg:.1f}% ({len(rates)} dob z okupem)", "10-20% (domyslne stawki)", 10.0 - 1e-6 <= avg <= 20.0 + 1e-6)
     else:
         rep.add("PO-6: stawka srednia okupu", "brak dob z okupem", "INFO", None)
-    rep.add("PO-7: odprawione u wsi chronionej wobec okupow", f"odprawione {guard}, wyciete opcje w mysli {cut}, gracz zablokowany {block}",
-            "odprawione <= okupy (wyciecie w mysli dziala)", guard <= max(ait + pt, 0) or guard == 0)
+    saved = max([int(m.group(1)) for m in (P6OKUP_RX["save"].search(x) for x in start) if m] or [0])
+    g_new = guard - guard_save
+    txt7 = (f"odprawione {guard} (z ochron z zapisu {guard_save}), wyciete opcje w mysli {cut}, gracz zablokowany {block}, "
+            f"okup gracza po wrogim czynie zablokowany {recent}; okupy {ait + pt}, ochron z zapisu przy starcie {saved}")
+    if saved > 0 and ait + pt == 0:
+        rep.add("PO-7: odprawione u wsi chronionej wobec okupow", txt7, "INFO (ochrony z zapisu, okupow w tym logu brak)", None)
+    else:
+        rep.add("PO-7: odprawione u wsi chronionej wobec okupow", txt7,
+                "odprawione (bez ochron z zapisu) <= 3 x okupy (wyciecie w mysli dziala)", g_new <= 3 * (ait + pt))
     sess = sum(int(m.group(1)) for m in (P6OKUP_RX["r1sess"].search(s) for s in r1) if m)
     rep.add("PO-8: rabunki E7/R1 dalej sa", f"sesji {sess} w {len(r1)} dobach", "> 0 (INFO przy braku linii E7/R1)", (sess > 0) if r1 else None)
+    if army_dec >= 5:
+        rep.add("PO-9: okupy armii", f"decyzji wodzow armii {army_dec}, okupy {army_t}", "okupy armii > 0 (przy >= 5 decyzjach)", army_t > 0)
+    else:
+        rep.add("PO-9: okupy armii", f"decyzji wodzow armii {army_dec}, okupy {army_t}", "INFO (< 5 decyzji armii)", None)
+    if days_war:
+        rep.add("PO-10: okupy w licznikach wojny gry", f"+{war} udanych rabunkow, okupy {ait + pt}", "liczniki wojny = okupy", war == ait + pt)
+    else:
+        rep.add("PO-10: okupy w licznikach wojny gry", "brak pola w liniach doby", "INFO (log sprzed poprawki 20.10)", None)
     rep.show()
     return 0
 
@@ -51302,7 +51330,7 @@ def main(argv):
     if group == "nspichlerze" and logp:
         return nspichlerze_main(logp)   # nspichlerze (19.10, paczka f23-spichlerze): psucie zapasu spichlerzy (Famine, Granary Spoilage) i jency krolestwa nowego pana do zalogi przy przywroceniu wlosci (BookHoldings)
     if group == "p6okup" and logp:
-        return p6okup_main(logp)   # p6-okup (R3-03a, noc 20.10): okup okolicy zamiast palenia wsi (RaidTribute) - progi PO-0..PO-8
+        return p6okup_main(logp)   # p6-okup (R3-03a, noc 20.10): okup okolicy zamiast palenia wsi (RaidTribute) - progi PO-0..PO-10
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

@@ -19,7 +19,8 @@ namespace Armoury
     /// (patis / appatis wojny stuletniej: zalogi i kompanie zyly z oplat okolicy "za ochrone" zamiast palic). Klucz RaidTributeEnabled.
     ///
     /// REGULA (jedna dla AI i gracza):
-    ///  - sila: q = ludzie napastnika (partia albo cala armia, zdrowi) / obroncy wsi (milicja + zdrowi ludzie partii stojacych we wsi, wrogich napastnikowi).
+    ///  - sila: q = ludzie napastnika (zdrowi: partia albo wodz armii z druzynami PRZYCZEPIONYMI - te, ktore stoja z nim u wsi, jak rabunek gry G EncounterManager
+    ///    :295-303; recenzja 20.10) / obroncy wsi (milicja + zdrowi ludzie partii stojacych we wsi, wrogich napastnikowi).
     ///    q &lt; 1 - wies stawia opor, okupu nie ma (rabunek idzie jak w grze: najpierw bitwa z milicja);
     ///  - stawka r = RaidTributeShareLow + (High - Low) x min(1, (q - 1) / 4): przewaga 1:1 - 10%, 3:1 - 15%, 5:1 i wiecej - 20% kiesy wsi (Village.Gold - ta sama
     ///    kiesa, z ktorej placi lup rabunku SmallGold.LootPayer: utarg wsi zostaje we wsi, paczka 112);
@@ -28,7 +29,10 @@ namespace Armoury
     ///  - po okupie wies jest CHRONIONA przed krolestwem napastnika (MapFaction - krolestwo albo rod bez krolestwa) RaidTributeSpareDays dob: jego lordowie jej nie
     ///    rabuja (opcja rabunku AI wycieta w mysli, a partia, ktora i tak dojdzie - staje i mysli od nowa) i nie zadaja drugi raz okupu; gracz z tego krolestwa
     ///    nie moze jej spladrowac ani zabrac zapasow (opcje gry zablokowane z dymkiem). Inne krolestwa w wojnie - bez zmian;
-    ///  - relacja: wodz z panem wsi -2, z notablami -1 (rabunek gry: -6 i -3 - CharacterRelationCampaignBehavior.OnRaidCompleted; ta sama wyjatkowosc wsi rodu gracza).
+    ///  - relacja: wodz z panem wsi -2, z notablami -1 (rabunek gry: -6 i -3 - CharacterRelationCampaignBehavior.OnRaidCompleted; ta sama wyjatkowosc wsi rodu gracza);
+    ///  - wojna: okup liczy sie jak udany rabunek w licznikach wojny gry (StanceLink.SuccessfulRaids1/2 strony napastnika - jak G CampaignWarManagerBehavior
+    ///    .OnRaidCompleted; czyta je postep wojny gry DefaultDiplomacyModel.GetWarProgressScore "Raids", BK BKWarModel, Diplomacy w rozbiciu "po staremu").
+    ///    Wyczerpanie wojna Diplomacy (zdarzenie RaidCompleted, wpisy VillageStateChanged) - nie: wies nie jest spustoszona (recenzja 20.10, CHANGELOG galezi).
     ///
     /// AI (lord albo wodz armii AI, wojna z panem wsi): chwila decyzji = przybycie do wsi z rozkazem rabunku - prefiks EncounterManager.StartSettlementEncounter
     /// z tym samym warunkiem co galaz rabunku gry (G EncounterManager:221 -&gt; StartBattleAction.ApplyStartRaid). Okup (spotkanie nie zachodzi, partia SetMoveModeHold
@@ -37,11 +41,14 @@ namespace Armoury
     ///  - wies stawia opor (q &lt; 1) - rabunek;
     ///  - armia glodna (jedzenia na mniej niz HungryDays dob, srednio na druzyne jak gra) - rabunek (spichlerz okregu karmi napastnikow, E7/R1 K4);
     ///  - rod w potrzebie (CitySack.NeedOf.InNeed - ta sama miara co okup oblezenia: zalegly zold albo kiesa rodu ponizej 14 dob zoldu druzyn rodu) - rabunek;
-    ///  - okup ponizej doby zoldu armii (NeedOf.ArmyWage) - za malo, zeby oszczedzac wies - rabunek;
+    ///  - okup ponizej doby zoldu WLASNEJ druzyny wodza (NeedOf.LeadWage) - grosze, biedna wies plonie - rabunek (recenzja 20.10: miara zoldu calej armii - 8-13 tys./d
+    ///    w logu wzorcowym wobec mediany kiesy wsi 7317 - wycinala okup armiom prawie zawsze, zanim policzono zysk);
     ///  - rabunek oplaca sie bardziej: T &lt; E - C x D, gdzie E = s x (kiesa + wartosc magazynu wsi) - lup kroku, D - doby kroku (DistrictRaid.StepEstimate - ta sama
-    ///    arytmetyka co krok R1), C = doba zoldu armii - rabunek; inaczej OKUP (pewny i od razu, bez spustoszenia i uchodzcow).
+    ///    arytmetyka co krok R1), C = doba zoldu armii (wszystkie jej druzyny sa w tym czasie zajete) - rabunek; inaczej OKUP (pewny i od razu, bez spustoszenia i uchodzcow).
     /// GRACZ: opcja "Demand tribute" w menu "village_hostile_action" (tylko w wojnie z panem wsi) - dymek z kwota, stawka, sila i dniami ochrony; zablokowana z powodem,
-    /// gdy wies stawia opor, ma pusta kiese albo juz zaplacila krolestwu gracza. Wynik: zloto do gracza, ochrona, relacja, komunikat, powrot do menu wsi
+    /// gdy wies stawia opor, ma pusta kiese, juz zaplacila krolestwu gracza albo gracz w ostatnich 10 dobach zabral z niej zapasy lub rekrutow (pamiec wrogich czynow
+    /// gry VillageHostileActionCampaignBehavior._villageLastHostileActionTimeDictionary - okup tez sie w niej zapisuje, wiec po okupie gra blokuje zapasy i rekrutow
+    /// na 10 dob, a nasze postfiksy - rabunek, zapasy i rekrutow na czas ochrony). Wynik: zloto do gracza, ochrona, relacja, komunikat, powrot do menu wsi
     /// (zwykle menu, nie oczekiwania - GameMenu.SwitchToMenu wolno, jak "Forget it" gry).
     /// WATKI: postfiks mysli AI (CampaignEventDispatcher.AiHourlyTick) czyta tylko migawke ochrony (slownik podmieniany w calosci - publikacja jednym zapisem
     /// referencji, bez blokad i bez alokacji), liczniki Interlocked. Reszta - watek kampanii.
@@ -71,7 +78,7 @@ namespace Armoury
         private static string Nm(IFaction f) { try { return f != null && f.Name != null ? f.Name.ToString() : "-"; } catch { return "?"; } }
 
         // ------------------------------------------------------------ ochrona: rekordy (watek kampanii) i migawka do odczytu z mysli AI
-        private sealed class Rec { public string Vid, Fid; public int Until, Day; public long Gold; }
+        private sealed class Rec { public string Vid, Fid; public int Until, Day; public long Gold; public bool FromSave; }   // FromSave - z zapisu, nie odnowiona w tej sesji
         private struct Prot { public IFaction F; public int Until; }
         private static readonly List<Rec> _recs = new List<Rec>();
         private static readonly Dictionary<Settlement, Prot[]> Empty = new Dictionary<Settlement, Prot[]>();
@@ -80,7 +87,8 @@ namespace Armoury
         private static int _importN = -1, _importBad, _unresolved;
 
         // ------------------------------------------------------------ liczniki doby
-        private static int _dAiT, _dPT, _dRaid, _rReaver, _rResist, _rHungry, _rNeed, _rSmall, _rBetter, _dNoEst, _dGuard, _dPBlock, _dRel, _dExpired, _dStumbles;
+        private static int _dAiT, _dPT, _dRaid, _rReaver, _rResist, _rHungry, _rNeed, _rSmall, _rBetter, _dNoEst, _dGuard, _dGuardSave, _dPBlock, _dPRecent, _dRel, _dExpired, _dStumbles;
+        private static int _dArmyDec, _dArmyT, _dWar;                 // decyzje wodzow armii, ich okupy; okupy doliczone do licznikow wojny gry
         private static long _dAiGold, _dPGold, _dRaidE, _dTribE, _dBal, _dPurse;
         private static double _dRateSum;
         private static int _dCut;                                      // Interlocked (mysl AI)
@@ -89,6 +97,9 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _hooked;
         private static string _wired = "nie probowano";
+        // pamiec wrogich czynow gracza w grze (zapasy, rekruci - 10 dob, G VillageHostileActionCampaignBehavior :263/:301); okup sie w niej zapisuje (recenzja 20.10)
+        private static AccessTools.FieldRef<VillageHostileActionCampaignBehavior, Dictionary<string, CampaignTime>> _hostileRef;
+        private const float HostileDays = 10f;          // G IntervalForHostileActionAsDay
         private static bool _menuAdded;
 
         internal static void Reset()
@@ -101,7 +112,8 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            _dAiT = _dPT = _dRaid = _rReaver = _rResist = _rHungry = _rNeed = _rSmall = _rBetter = _dNoEst = _dGuard = _dPBlock = _dRel = _dExpired = _dStumbles = 0;
+            _dAiT = _dPT = _dRaid = _rReaver = _rResist = _rHungry = _rNeed = _rSmall = _rBetter = _dNoEst = _dGuard = _dGuardSave = _dPBlock = _dPRecent = _dRel = _dExpired = _dStumbles = 0;
+            _dArmyDec = _dArmyT = _dWar = 0;
             _dAiGold = _dPGold = _dRaidE = _dTribE = _dBal = _dPurse = 0;
             _dRateSum = 0.0;
             Interlocked.Exchange(ref _dCut, 0);
@@ -140,6 +152,7 @@ namespace Armoury
             }
             Rebuild();
             Log.Info(P + "start sesji | klucz Raid Tribute Enabled " + (On ? "tak" : "nie") + " | latki " + _wired + " | opcja menu wsi " + (_menuAdded ? "tak" : "nie")
+                     + " | pamiec wrogich czynow gry " + (_hostileRef != null && HostileMemory() != null ? "tak" : "nie")
                      + " | ochron " + _recs.Count + (_importN >= 0 ? " (z zapisu " + _importN + ", bledne " + _importBad + ")" : " (brak klucza arm_raidtribute - nowa kampania albo stary zapis)")
                      + (_unresolved > 0 ? ", nierozpoznane wsie/frakcje " + _unresolved : "")
                      + " | stawka " + F(Low * 100.0, "0") + "-" + F(High * 100.0, "0") + "% kiesy wsi (przewaga 1:1 - " + F(FullAt, "0") + ":1), ochrona " + SpareDays + " dob.");
@@ -161,8 +174,13 @@ namespace Armoury
                       null, nameof(PlunderCondPostfix), Priority.Low, ok, miss);
                 Patch(h, "VillageHostileAction.take_food_on_condition", AccessTools.DeclaredMethod(typeof(VillageHostileActionCampaignBehavior), "game_menu_village_hostile_action_take_food_on_condition"),
                       null, nameof(PlunderCondPostfix), Priority.Low, ok, miss);
+                // recenzja 20.10: "Force notables to give you recruits" tez zablokowane na czas ochrony (inaczej okup + rekruci po 10 dobach = darmowy dodatek)
+                Patch(h, "VillageHostileAction.force_volunteers_condition", AccessTools.DeclaredMethod(typeof(VillageHostileActionCampaignBehavior), "game_menu_village_hostile_action_force_volunteers_condition"),
+                      null, nameof(PlunderCondPostfix), Priority.Low, ok, miss);
             }
             catch (Exception e) { miss.Add("Harmony (" + e.GetType().Name + ")"); Stumble("EnsureHooks", e); }
+            try { _hostileRef = AccessTools.FieldRefAccess<VillageHostileActionCampaignBehavior, Dictionary<string, CampaignTime>>("_villageLastHostileActionTimeDictionary"); }
+            catch (Exception e) { _hostileRef = null; Stumble("HostileRef", e); }
             _wired = ok.Count + "/" + (ok.Count + miss.Count) + (miss.Count > 0 ? " (BRAK: " + string.Join(", ", miss) + ")" : "");
         }
 
@@ -183,18 +201,21 @@ namespace Armoury
 
         private static int Healthy(MobileParty p) { try { return p != null && p.MemberRoster != null ? Math.Max(0, p.MemberRoster.TotalHealthyCount) : 0; } catch { return 0; } }
 
-        /// <summary>Ludzie napastnika: partia albo cala armia, ktorej jest wodzem (zdrowi).</summary>
+        /// <summary>Ludzie napastnika (zdrowi): partia albo wodz armii z druzynami przyczepionymi - tylko te stoja z nim u wsi i rabuja (G EncounterManager :295-303,
+        /// jak FoodDays); druzyny w drodze do wodza - nie (recenzja 20.10). Gracz jako wodz armii - tak samo.</summary>
         private static int MenOf(MobileParty mp)
         {
             if (mp == null) return 0;
-            var a = mp.Army;
-            if (a != null && a.LeaderParty == mp && a.Parties != null)
+            int n = Healthy(mp);
+            try
             {
-                int n = 0;
-                for (int i = 0; i < a.Parties.Count; i++) n += Healthy(a.Parties[i]);
-                return Math.Max(n, Healthy(mp));
+                var a = mp.Army;
+                var ap = mp.AttachedParties;
+                if (a != null && a.LeaderParty == mp && ap != null)
+                    for (int i = 0; i < ap.Count; i++) if (ap[i] != null && ap[i] != mp) n += Healthy(ap[i]);
             }
-            return Healthy(mp);
+            catch (Exception e) { Stumble("MenOf", e); }
+            return n;
         }
 
         /// <summary>Obroncy wsi: milicja + zdrowi ludzie partii stojacych we wsi, ktore sa w wojnie z napastnikiem (stanelyby w obronie).</summary>
@@ -254,8 +275,55 @@ namespace Armoury
             Rec rec = null;
             for (int i = 0; i < _recs.Count; i++) { var r = _recs[i]; if (r.Vid == st.StringId && r.Fid == f.StringId) { rec = r; break; } }
             if (rec == null) { rec = new Rec { Vid = st.StringId, Fid = f.StringId }; _recs.Add(rec); }
-            rec.Day = today; rec.Until = today + SpareDays; rec.Gold = gold;
+            rec.Day = today; rec.Until = today + SpareDays; rec.Gold = gold; rec.FromSave = false;
             Rebuild();
+        }
+
+        /// <summary>Czy ochrona (wies, frakcja) pochodzi z zapisu i nie byla odnowiona w tej sesji (watek kampanii).</summary>
+        private static bool FromSaveOnly(Settlement st, IFaction f)
+        {
+            if (st == null || f == null) return false;
+            for (int i = 0; i < _recs.Count; i++) { var r = _recs[i]; if (r.Vid == st.StringId && r.Fid == f.StringId) return r.FromSave; }
+            return false;
+        }
+
+        /// <summary>Okup jak udany rabunek w licznikach wojny gry (G CampaignWarManagerBehavior.OnRaidCompleted: StanceLink.SuccessfulRaids1/2 strony napastnika;
+        /// bez band i bez tej samej frakcji). Czyta to postep wojny gry (DefaultDiplomacyModel "Raids"), BK (BKWarModel) i Diplomacy (rozbicie "po staremu").
+        /// Recenzja 20.10: bez tego okup zastepujacy rabunek znikal z oceny wojny.</summary>
+        private static void WarTally(IFaction att, Settlement st)
+        {
+            try
+            {
+                var def = st != null ? st.MapFaction : null;
+                if (att == null || def == null || att.IsBanditFaction || def.IsBanditFaction || att.MapFaction == def.MapFaction) return;
+                var sl = att.GetStanceWith(def);
+                if (sl == null) return;
+                if (att == sl.Faction1) sl.SuccessfulRaids1++;
+                else sl.SuccessfulRaids2++;
+                _dWar++;
+            }
+            catch (Exception e) { Stumble("WarTally", e); }
+        }
+
+        /// <summary>Pamiec wrogich czynow gracza w grze (slownik behavioru VillageHostileActionCampaignBehavior) albo null (behavior wymieniony / pole zmienione).</summary>
+        private static Dictionary<string, CampaignTime> HostileMemory()
+        {
+            try
+            {
+                var c = Campaign.Current;
+                if (_hostileRef == null || c == null) return null;
+                var b = c.GetCampaignBehavior<VillageHostileActionCampaignBehavior>();
+                return b != null ? _hostileRef(b) : null;
+            }
+            catch (Exception e) { Stumble("HostileMemory", e); return null; }
+        }
+
+        /// <summary>Czy gracz w ostatnich 10 dobach zabral z wsi zapasy albo rekrutow (albo wzial okup) - ta sama pamiec i ten sam prog co gra.</summary>
+        private static bool RecentlyHostile(Settlement st)
+        {
+            var mem = HostileMemory();
+            CampaignTime t;
+            return mem != null && st != null && st.StringId != null && mem.TryGetValue(st.StringId, out t) && t.ElapsedDaysUntilNow <= HostileDays;
         }
 
         /// <summary>Migawka od nowa z rekordow (watek kampanii): wies -&gt; [frakcja, do doby]. Rekordy z nierozpoznana wsia albo frakcja zostaja (licznik).</summary>
@@ -313,25 +381,30 @@ namespace Armoury
                 if (Spared(st, mp.MapFaction, today))
                 {
                     _dGuard++;                                                                                  // wies juz zaplacila temu krolestwu - nie rabuje, mysli od nowa
+                    if (FromSaveOnly(st, mp.MapFaction)) _dGuardSave++;                                         // ochrona z zapisu (okupu nie ma w tym logu - PO-7)
                     Hold(mp);
                     return false;
                 }
+                bool army = mp.Army != null && mp.Army.LeaderParty == mp;
+                if (army) _dArmyDec++;
                 if (ReaverLaw.IsReaver(mp.MapFaction)) { _rReaver++; _dRaid++; return true; }
                 var q = QuoteOf(mp, st);
                 if (q.Q < 1.0) { _rResist++; _dRaid++; return true; }
                 if (FoodDays(mp) < HungryDays) { _rHungry++; _dRaid++; return true; }
                 var need = CitySack.NeedOf(mp);
                 if (need.InNeed) { _rNeed++; _dRaid++; return true; }
-                long wage = Math.Max(1L, need.ArmyWage);
-                if (q.T < wage) { _rSmall++; _dRaid++; return true; }
+                // grosze: okup mniejszy niz doba zoldu WLASNEJ druzyny wodza - biedna wies plonie. Recenzja 20.10: nie doba zoldu calej armii - ta rosnie z wielkoscia
+                // armii, nie z bogactwem wsi (8-13 tys./d wobec mediany kiesy 7317), i rozstrzygala za armie przed rachunkiem zysku; armie prawie nigdy nie braly okupu
+                long wage = Math.Max(1L, need.ArmyWage), lead = Math.Max(1L, need.LeadWage);
+                if (q.T < lead) { _rSmall++; _dRaid++; return true; }
                 double share, days, e = 0.0;
                 if (DistrictRaid.StepEstimate(st.Village, q.Men, out share, out days))
                 {
                     e = share * (q.Purse + StockValue(st));
-                    if (q.T < e - wage * days) { _rBetter++; _dRaid++; _dRaidE += (long)e; return true; }
+                    if (q.T < e - wage * days) { _rBetter++; _dRaid++; _dRaidE += (long)e; return true; }   // C = zold calej armii: wszystkie jej druzyny stoja te doby
                 }
                 else { _dNoEst++; days = 0.0; }
-                if (!Pay(mp, leader, st, q, e, days)) { _dRaid++; return true; }                              // nic nie przeszlo (kiesa pusta w miedzyczasie) - rabunek jak w grze
+                if (!Pay(mp, leader, st, q, e, days, army)) { _dRaid++; return true; }                        // nic nie przeszlo (kiesa pusta w miedzyczasie) - rabunek jak w grze
                 Hold(mp);
                 return false;
             }
@@ -372,7 +445,7 @@ namespace Armoury
         }
 
         /// <summary>Okup AI: przelew kiesa wsi -&gt; wodz (najwyzej tyle, ile w kiesie), ochrona, relacja, komunikat graczowi (jego wies albo jego armia).</summary>
-        private static bool Pay(MobileParty mp, Hero leader, Settlement st, Quote q, double e, double days)
+        private static bool Pay(MobileParty mp, Hero leader, Settlement st, Quote q, double e, double days, bool army)
         {
             var v = st.Village;
             long v0 = v.Gold, g0 = leader.Gold;
@@ -383,8 +456,10 @@ namespace Armoury
             _dBal += got - paid;
             if (paid <= 0) return false;
             _dAiT++; _dAiGold += paid; _dRateSum += q.Rate; _dTribE += (long)e; _dPurse += v0;
+            if (army) _dArmyT++;
             Protect(st, mp.MapFaction, paid);
             Relations(leader, st);
+            WarTally(mp.MapFaction, st);
             if (_ex.Count < MaxExamples)
                 _ex.Add(Nm(leader) + " <- " + Nm(st) + " " + paid + " zl (" + F(q.Rate * 100.0, "0") + "% z " + v0 + ", sila " + q.Men + ":" + q.Def
                         + ", rabunek szac. " + F(e, "0") + " zl w " + F(days, "0.0") + " dob)");
@@ -469,6 +544,14 @@ namespace Armoury
                     args.Tooltip = new TextObject("{=!}This village has already paid tribute to your realm. It is spared for " + (until - today) + " more days.");
                     return true;
                 }
+                if (RecentlyHostile(st))
+                {
+                    // recenzja 20.10: zapasy albo rekruci w ostatnich 10 dobach (pamiec gry) - okup nie bylby darmowym dodatkiem do grabiezy
+                    args.IsEnabled = false;
+                    args.Tooltip = new TextObject("{=!}You have already taken hostile action against this village recently.");
+                    _dPRecent++;
+                    return true;
+                }
                 var q = QuoteOf(main, st);
                 if (q.Q < 1.0)
                 {
@@ -500,7 +583,7 @@ namespace Armoury
                 var pf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null;
                 if (st == null || st.Village == null || main == null || me == null || pf == null) return;
                 var q = QuoteOf(main, st);
-                if (!On || q.Q < 1.0 || q.T < 1 || SpareUntil(st, pf) > Today) return;
+                if (!On || q.Q < 1.0 || q.T < 1 || SpareUntil(st, pf) > Today || RecentlyHostile(st)) return;
                 var v = st.Village;
                 long v0 = v.Gold, g0 = me.Gold;
                 int due = (int)Math.Min(int.MaxValue, Math.Min(q.T, Math.Max(0, v.Gold)));
@@ -511,6 +594,10 @@ namespace Armoury
                 _dPT++; _dPGold += paid; _dRateSum += q.Rate; _dPurse += v0;
                 Protect(st, pf, paid);
                 Relations(me, st);
+                WarTally(pf, st);
+                // okup to wrogi czyn w pamieci gry (jak zapasy i rekruci) - gra sama blokuje potem zapasy i rekrutow na 10 dob
+                try { var mem = HostileMemory(); if (mem != null && st.StringId != null) mem[st.StringId] = CampaignTime.Now; }
+                catch (Exception e) { Stumble("MenuConsequence(pamiec)", e); }
                 if (_ex.Count < MaxExamples)
                     _ex.Add("gracz <- " + Nm(st) + " " + paid + " zl (" + F(q.Rate * 100.0, "0") + "% z " + v0 + ", sila " + q.Men + ":" + q.Def + ")");
                 Log.Player("The elders of " + Nm(st) + " paid you " + paid + " denars of tribute. Your realm will spare the village for " + SpareDays + " days.");
@@ -519,7 +606,8 @@ namespace Armoury
             catch (Exception e) { Stumble("MenuConsequence", e); }
         }
 
-        /// <summary>Postfiks warunkow gry "Raid the village" i "Force peasants to give you goods": wies chroniona przed krolestwem gracza - opcja zablokowana z dymkiem.</summary>
+        /// <summary>Postfiks warunkow gry "Raid the village", "Force peasants to give you goods" i "Force notables to give you recruits": wies chroniona przed krolestwem
+        /// gracza - opcja zablokowana z dymkiem.</summary>
         public static void PlunderCondPostfix(MenuCallbackArgs args, bool __result)
         {
             try
@@ -553,9 +641,13 @@ namespace Armoury
               .Append(", stawka srednio ").Append(t > 0 ? F(_dRateSum / t * 100.0, "0.0") + "%" : "-")
               .Append(", kiesy tych wsi ").Append(N(_dPurse)).Append(" zl, szac. lup rabunku tych wsi ").Append(N(_dTribE)).Append(" zl")
               .Append(" | rabunki AI zaczete ").Append(_dRaid).Append(" (najezdzcy ").Append(_rReaver).Append(", opor wsi ").Append(_rResist).Append(", glod ").Append(_rHungry)
-              .Append(", rod w potrzebie ").Append(_rNeed).Append(", okup ponizej doby zoldu ").Append(_rSmall).Append(", rabunek oplaca sie bardziej ").Append(_rBetter)
+              .Append(", rod w potrzebie ").Append(_rNeed).Append(", okup ponizej doby zoldu wodza ").Append(_rSmall).Append(", rabunek oplaca sie bardziej ").Append(_rBetter)
               .Append(" - szac. lup ").Append(N(_dRaidE)).Append(" zl; lup naprawde - linia Rabunek osada po osadzie)")
-              .Append(" | ochrona: odprawione u wsi ").Append(_dGuard).Append(", opcje rabunku AI wyciete ").Append(cut).Append(", gracz zablokowany ").Append(_dPBlock)
+              .Append(" | armie AI: decyzji ").Append(_dArmyDec).Append(", okupy ").Append(_dArmyT)
+              .Append(" | liczniki wojny gry: okupy jako udane rabunki +").Append(_dWar)
+              .Append(" | ochrona: odprawione u wsi ").Append(_dGuard).Append(" (z ochron z zapisu ").Append(_dGuardSave).Append(")")
+              .Append(", opcje rabunku AI wyciete ").Append(cut).Append(", gracz zablokowany ").Append(_dPBlock)
+              .Append(", okup gracza po wrogim czynie (10 dob) zablokowany ").Append(_dPRecent)
               .Append(", par wies-krolestwo ").Append(_recs.Count).Append(" (wygaslo ").Append(_dExpired).Append(")")
               .Append(" | relacja zmieniona ").Append(_dRel).Append(" razy, bez szacunku rabunku (R1 nieczynne) ").Append(_dNoEst)
               .Append(" | kontrola: zloto wodzow - kiesy wsi ").Append(N(_dBal))
@@ -591,7 +683,7 @@ namespace Armoury
                 if (f.Length < 5 || f[0].Length == 0 || f[1].Length == 0
                     || !int.TryParse(f[2], NumberStyles.Integer, Inv, out until) || !int.TryParse(f[3], NumberStyles.Integer, Inv, out day)
                     || !long.TryParse(f[4], NumberStyles.Integer, Inv, out gold)) { _importBad++; continue; }
-                _recs.Add(new Rec { Vid = f[0], Fid = f[1], Until = until, Day = day, Gold = gold });
+                _recs.Add(new Rec { Vid = f[0], Fid = f[1], Until = until, Day = day, Gold = gold, FromSave = true });
                 _importN++;
             }
             _dirty = true;                                                 // migawka przy starcie sesji (obiekty swiata juz sa)
