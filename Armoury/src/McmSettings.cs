@@ -2968,9 +2968,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool StartKitEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Start Gold Adventurer", 0, 400, "0", HintText = "coins an Adventurer starts with in the Banner Kings start (Banner Kings gives 1000 - over a year of a labourer's pay); -1 leaves Banner Kings as it is", RequireRestart = false)]
+        [SettingPropertyInteger("Start Gold Adventurer", 0, 400, "0", HintText = "coins an Adventurer starts with in the Banner Kings start (Banner Kings gives 1000 - over a year of a labourer's pay); with Start Gold Cut it also sets the cut for every other start (this / 1000); -1 leaves Banner Kings as it is", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public int StartGoldAdventurer { get; set; } = 100;
+
+        [SettingPropertyBool("Start Gold Cut", HintText = "new campaigns only: every coin you are handed at the start - the game's own 1000 and each Banner Kings start (Mariner 10000, Mercenary 250, Outlaw 50, Adventurer 1000) - is cut by the same ratio as the Adventurer (Start Gold Adventurer / 1000), so each start keeps its place against the others but in this world's coin; the rest was nobody's and is gone. Off = only the Adventurer is cut, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool StartGoldCut { get; set; } = true;
 
         [SettingPropertyBool("Outlaw Law Enabled", HintText = "outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -8978,6 +8982,7 @@ namespace Armoury
             s.KeepWearThroughBattle = KeepWearThroughBattle;
             s.StartKitEnabled = StartKitEnabled;
             s.StartGoldAdventurer = StartGoldAdventurer;
+            s.StartGoldCut = StartGoldCut;
             s.OutlawLawEnabled = OutlawLawEnabled;
             s.OutlawSeedPerHearth = OutlawSeedPerHearth;
             s.OutlawDailyPerThousandHearth = OutlawDailyPerThousandHearth;
