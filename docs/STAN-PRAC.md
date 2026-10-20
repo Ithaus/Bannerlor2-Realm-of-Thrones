@@ -3361,3 +3361,14 @@ TESTY: n21-bitwa (dochod wioski 10/9/7/7/7/7, wioska 11/11, dom 7/7), n21-nowa (
 W TOKU: fala 1 pomyslow (wf_072a888e-e95, 18 galezi p5-* od 5189c0fe); potem fala 2 (okup okolicy, zakladnicy, sztormy, spichlerz miasta, szubienice, pola, AI drogi,
 napad na oboz, A7 + odplyw kas miast) -> WGRANIE 93+.
 
+### 99. FALA 1 POMYSLOW -> n22-calosc (20.10 ok. 05:30 PDT)
+wf_072a888e-e95: 15/18 galezi p5-* gotowe z recenzja i poprawkami (rody, turniej, handel, urodzaj, stada, bloto, armia, zalogi, tarcze, regale, zwiad,
+inzynieria, medycyna, budowy, warsztaty); 3 przerwane bledem API -> wf_2ece39db-763 dokancza naprawy (commit efe7f9ed byl), jednostki (zmiany niezacommitowane),
+recenzja kruki. Scalenie 15 do `w-toku/n22-calosc` od 3957fa13 (lancuch, drzewo zb/n22-calosc) -> 91bf9c63; konflikty tylko dopisy (oba zachowane:
+ArmouryBehavior Reset, MaterialLaw/StartCalibration.Live stado+urodzaj); gen_mcm bez zmian (2099 ustawien); build Armoury/CrashScribe/GrandTourney kod 0.
+Recenzja scalenia (agent): stado x2 (HerdCull vs VillageHerds), BuildFunding (Inzynieria vs jedna budowa), predkosc (bloto/armia/zwiad), ekonomia handlu/regale.
+TESTY n22a (15 galezi): testy-n22a.ps1 (bitwa 5 dob x4, nowa 120 start-zloto, 160 ks-auto), DLL test/n22a, CrashScribe-at-n22a.dll (zb/n22-at = n22 + 9bfa434f).
+DALEJ: 3 galezie + poprawki scalenia -> n22 -> testy -> WGRANIE 93. Fala 2 (p6-*, od n22) po odnowieniu limitu 5 h (07:10 PDT): okup okolicy 03a, zakladnicy 03c,
+sztormy 05d, spichlerz miasta 06f, szubienice 07a, pola 07b, AI drogi 07d, napad na oboz 08b, A7 (KsSwitchSignalRule) + odplyw kas miast (fin103: NAKUM-7 +69 tys./d).
+Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
+
