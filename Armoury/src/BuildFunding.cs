@@ -32,7 +32,7 @@ namespace Armoury
         private static int[] MatOrder { get { return GoodsPaths.PlanksOn ? OrderPlanksFirst : OrderNatural; } }
         internal static bool On { get { var s = Settings.Current; return s != null && s.PaidConstruction; } }
 
-        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); WoodReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs); K1: liczniki drewna
+        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); WoodReset(); OneReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs); K1: liczniki drewna
 
         // ------------------------------------------------------------ Towary 2 / K1 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A7-10, klucz BuildWoodAboveCraftStock)
         // Budowy braly 65% drewna swiata (1 350 ladunkow/d, linia "Drewno") i kupowaly je do 0 sztuk na polce w ticku dobowym, przed rzemioslem miasta - warsztaty
@@ -245,6 +245,7 @@ namespace Armoury
                         int nc; count.TryGetValue(clan, out nc); count[clan] = nc + 1;
                     }
                 }
+                OnePlan(jobs, count);   // R3-11a (BuildFunding.OneWork.cs): kolejka rodu - jedna budowa naraz (klucz wylaczony - tylko zerowanie doby)
                 var income = new Dictionary<Clan, float>();
                 var model = Campaign.Current.Models.ClanFinanceModel;
                 foreach (var kv in jobs)
@@ -259,15 +260,17 @@ namespace Armoury
                         int rent; PopulationLaw.RentToday.TryGetValue(clan, out rent); inc += rent;
                         income[clan] = inc;
                     }
-                    float budget = Math.Max(0f, inc) * Math.Max(0f, s.BuildIncomeShare) / Math.Max(1, count[clan]);
+                    float all = Math.Max(0f, inc) * Math.Max(0f, s.BuildIncomeShare);   // R3-11a: caly przydzial doby rodu (podzial po rowno ponizej - jak dotad)
                     float share;
                     // 166: przydzial budow budzetu rodu (0.10 D); w wojnie tylko wojskowe - cywilne odciete wyzej (recenzja C1, W5: Jeff 05.10 "chyba ze mury - tak")
-                    if (ClanBudget.BuildShare(clan, out share)) budget = share / Math.Max(1, count[clan]);
-                    budget = Math.Min(budget, Math.Max(0, lord.Gold));
-                    if (budget < 1f) continue;
+                    if (ClanBudget.BuildShare(clan, out share)) all = share;
+                    float budget = all / Math.Max(1, count[clan]);
                     float ppp = military ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
+                    budget = OneBudget(st, b, clan, all, budget, ppp, market);   // R3-11a: rod AI z kilkoma budowami - reszta przydzialu na te budowe albo 0 (czeka w kolejce); reszta - budget bez zmian
+                    budget = Math.Min(budget, Math.Max(0, lord.Gold));
+                    if (budget < 1f) continue;
                     float matBudget = budget * MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
                     // KS-R3 G7: material budow ksiegowany na osade targu (ramka FBuild z osada - rynek osady w linii "KS: rynki"; dotad ramka bez osady - "bez rynku")
                     int matSpent;
@@ -302,13 +305,14 @@ namespace Armoury
                     _funded[st.Town] = pts;
                     EngPaid(st.Town, pts);   // R3-10b: XP Inzynierii zarzadcy na miejscu i liczniki
                     _paidTowns++; _spent += matSpent + labourI; _toMarkets += matSpent; _toPurses += labourI; _points += pts;
+                    OnePaid(st, clan, matSpent + labourI, pts);   // R3-11a: reszta przydzialu rodu na nastepna budowe kolejki (rod spoza regul - nic)
                 }
             }
             catch (Exception e) { Log.Error("BuildFunding", e); }
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
-                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + WarFront.LineTail());
+                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
             EngLine();   // R3-10b: linia "Inzynieria przy budowach" (na koncu doby budow - z dala od linii "Budowy oplacone", ktora zmienia R3-11a)

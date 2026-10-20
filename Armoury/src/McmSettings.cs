@@ -2212,6 +2212,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float BuildIncomeShare { get; set; } = 0.10f;
 
+        [SettingPropertyBool("Build One Work Per House", HintText = "an AI lord puts his whole daily building allowance into one work at a time instead of splitting it evenly over all his fiefs: in war first the walls, towers or barracks of the town or castle nearest the enemy, in peace the work nearest its finish (the smallest share of its present stage still to do); at most what the present stage still needs, and whatever that work cannot use (stage paid off, no materials at the market) goes to the next one if it buys at least one load of materials, the rest wait their turn. Civil works still stop near the front, the townsfolk still pay for their own buildings. Your own fiefs share your allowance evenly as before. Off = every fief with works gets an even share, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool BuildOneWorkPerHouse { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Build Material Share", 0.00f, 1.00f, "0.00", HintText = "of that money, this share buys materials (limestone, timber, clay, tools, marble) at the market; the rest pays masons, labourers and carters", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public float BuildMaterialShare { get; set; } = 0.25f;
@@ -8952,6 +8956,7 @@ namespace Armoury
             s.PaidConstruction = PaidConstruction;
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;
+            s.BuildOneWorkPerHouse = BuildOneWorkPerHouse;
             s.BuildMaterialShare = BuildMaterialShare;
             s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
             s.BuildPencePerPointCivil = BuildPencePerPointCivil;

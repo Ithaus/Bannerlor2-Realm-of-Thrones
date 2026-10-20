@@ -26,6 +26,7 @@ namespace Armoury
                 if (!Settings.Current.BuildDiaryEnabled) return;
                 int day = (int)CampaignTime.Now.ToDays;
                 int going = 0, stuck = 0, done = 0, idle = 0, towns = 0;
+                int oneQ = 0, oneQStuck = 0;   // R3-11a: osady czekajace wczoraj w kolejce rodu (i z nich stojace)
                 double power = 0;
                 var lines = new List<string>();
                 foreach (var st in Settlement.All)
@@ -52,6 +53,8 @@ namespace Armoury
                         state = "STOI " + (sd + 1) + " dni";
                     }
                     else { _stuckDays.Remove(key); going++; state = "idzie +" + (had ? (prog - prev).ToString("0.#") : "?"); }
+                    if (BuildFunding.OneWaitedLastDay(st))   // R3-11a: przydzial pana poszedl wczoraj na inna budowe rodu (z tych punktow jest dzisiejszy postep)
+                    { oneQ++; if (state.StartsWith("STOI", StringComparison.Ordinal)) oneQStuck++; state += " (wczoraj czekala w kolejce rodu - R3-11a)"; }
                     _sig[key] = sig; _last[key] = prog;
                     power += pw;
                     int daysLeft = pw > 0.01f && cost > 0 ? (int)Math.Ceiling((cost - prog) / pw) : -1;
@@ -60,7 +63,7 @@ namespace Armoury
                 }
                 foreach (var l in lines) Log.Info("Budowa: dzien " + day + " - " + l);
                 Log.Info("Budowy: dzien " + day + " - osad " + towns + ": w budowie " + (going + stuck + done) + " (idzie " + going + ", stoi " + stuck + ", ukonczonych poziomow " + done
-                         + "), bez budowy " + idle + "; srednia moc " + (going + stuck + done > 0 ? (power / (going + stuck + done)).ToString("0.#") : "-") + " pkt/dzien.");
+                         + "), bez budowy " + idle + ", w kolejce rodu (R3-11a) " + oneQ + " (z tego stoi " + oneQStuck + "); srednia moc " + (going + stuck + done > 0 ? (power / (going + stuck + done)).ToString("0.#") : "-") + " pkt/dzien.");
             }
             catch (Exception e) { Log.Error("BuildDiary", e); }
         }
