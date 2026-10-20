@@ -4516,6 +4516,10 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool PeaceReleaseAfterDay { get; set; } = true;
 
+        [SettingPropertyBool("Wards Of Peace", HintText = "when a lost war ends in a peace that still holds a day later, a young member of the defeated realm's ruling house (aged 10 to 20, unmarried, not the head of the house nor its only heir, leading no party) goes to the seat of the victor's ruling house as a ward for two years, then returns home on better terms. He stays in his own house and keeps his rights; the AI does not take him into a party meanwhile. If his realm declares war on the victor, the ward becomes the victor's prisoner; if the victor declares war, he goes home free. A realm whose blood is held as a ward is slower to break the peace. Realm of Thrones story wars never send wards. You and the AI alike (off = no wards; wards already away return home)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool WardsOfPeace { get; set; } = true;
+
         [SettingPropertyBool("Vassal Ransom Aid", HintText = "with Lord Ransom By Income: when the head of an AI house or an AI king is ransomed and the family (for a king - the treasury) cannot pay all of it in coin, the realm's other landed houses chip in - each gives its share by its fiefs (a town counts as two castles), but never more than Vassal Ransom Aid Share of what its family holds above its reserve. Their coin goes with the rest of the cash to whoever is owed the ransom (the captor, or you when you sell the captive to a ransom broker), and the ransom debt is that much smaller. Your house is never asked, and a house in debt to the bank or below its reserve gives nothing. Off = the family pays alone, the rest is a debt as before", RequireRestart = false)]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool VassalRansomAid { get; set; } = true;
@@ -9536,6 +9540,7 @@ namespace Armoury
             s.RansomRepeatDays = RansomRepeatDays;
             s.RansomRepeatFloor = RansomRepeatFloor;
             s.PeaceReleaseAfterDay = PeaceReleaseAfterDay;
+            s.WardsOfPeace = WardsOfPeace;
             s.VassalRansomAid = VassalRansomAid;
             s.VassalRansomAidShare = VassalRansomAidShare;
             s.AiDowry = AiDowry;

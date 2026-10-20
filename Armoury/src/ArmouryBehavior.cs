@@ -746,6 +746,9 @@ namespace Armoury
         // p5-urodzaj (R3-05e/f, recenzja): rok urodzaju i uboj jesienny - stan i przedmioty od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p5UrodzajReset = P5UrodzajReset();
         private static bool P5UrodzajReset() { try { HarvestYear.Reset(); HerdCull.Reset(); } catch (Exception e) { Log.Error("P5UrodzajReset", e); } return true; }
+        // p6-zakladnicy (R3-03c): wychowankowie i pokoje czekajace na dobe od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _p6WardsReset = P6WardsReset();
+        private static bool P6WardsReset() { try { PeaceWards.Reset(); } catch (Exception e) { Log.Error("P6WardsReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1305,6 +1308,10 @@ namespace Armoury
             // Ironman Jeffa) = brak jarmarkow w toku (kalendarz otworzy nastepne); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P5HandelReset)
             try { string hf = dataStore.IsSaving ? HarvestFairs.Export() : null; if (!dataStore.IsSaving || hf != null) SaveText.Sync(dataStore, "arm_fairs", ref hf); if (dataStore.IsLoading) HarvestFairs.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_fairs", e); }
+            // p6-zakladnicy (R3-03c): wychowankowie i pokoje czekajace na dobe ("w1|pokoje|wychowankowie|liczniki"); pisany tylko z danymi; wlasny try; brak klucza
+            // (stary zapis, kampania save040 Jeffa) = brak wychowankow; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6WardsReset)
+            try { string pw = dataStore.IsSaving ? PeaceWards.Export() : null; if (!dataStore.IsSaving || pw != null) SaveText.Sync(dataStore, "arm_wards", ref pw); if (dataStore.IsLoading) PeaceWards.Import(pw); }
+            catch (Exception e) { Log.Error("SyncData.arm_wards", e); }
         }
 
         public override void RegisterEvents()
@@ -1545,6 +1552,7 @@ namespace Armoury
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
             Measure169c.RegisterEvents(this);   // 169c: niewola lordow, dezercja, sluby AI, Bliznaki - same liczniki (tylko log)
             AiDowry.RegisterEvents(this);       // R3-01c: posag przy slubach AI z AI (BeforeHeroesMarried)
+            PeaceWards.RegisterEvents(this);    // R3-03c: wychowankowie - wojna pary, godzina, doba, blokady partii / przenosin / urzedu wychowanka
             ArmyCohesionYear.RegisterEvents(this);   // AC (Jeff 14.10): armie zalozone / rozwiazane - wiek armii i przyczyny do linii doby
             PregnancyYear.RegisterEvents(this);   // CR (zasada Jeffa 14.10): poczecia i porody (OnChildConceived / OnGivenBirth) - same liczniki do linii doby
             FiefGrants.RegisterEvents(this);   // PROJEKT-LENNA (14.10): uczestnicy zwycieskiego szturmu (MapEventEnded), rodzaj zmiany pana twierdzy, decyzje "Owner of X" rozstrzygniete / anulowane
@@ -2176,6 +2184,7 @@ namespace Armoury
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { RaceLaw.OnSessionLaunched(); } catch (Exception e) { Log.Error("RaceLaw.OnSessionLaunched", e); }   // Jeff 10.10: postfiks rasy takze na nadpisaniu w modelu slubu, ktory gra uzywa (ROT); linia "Rasy: start sesji"
             try { AiDowry.OnSessionLaunched(); } catch (Exception e) { Log.Error("AiDowry.OnSessionLaunched", e); }   // R3-01c: latka kontraktu BK i przechyl swatow na modelu slubu, ktory gra uzywa (ROT)
+            try { PeaceWards.OnSessionLaunched(); } catch (Exception e) { Log.Error("PeaceWards.OnSessionLaunched", e); }   // R3-03c: latki pokoju, dowodcy partii i oceny wojny BK (raz na proces), linia "Wychowankowie (R3-03c): start sesji"
             try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
