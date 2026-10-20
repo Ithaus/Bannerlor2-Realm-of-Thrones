@@ -3487,5 +3487,8 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
 
 ### 102. NOC 20/21.10 - START (ok. 17:00 PDT) - plan: docs/PLAN-NOC-2026-10-21.md
 Jeff: "Ok skonczylem grac, masz cala noc, aby teraz wszystko wdrozyc, wgrac etc., rano za 12 godzin czekam na raport, ze wszystko gotowe."
-Zapisy Jeffa (Ironman*.sav, saveauto*) skopiowane do D:/Backup-Bannerlord/zapisy-jeffa/2026-10-20-wieczor; logi dnia do D:/Backup-Bannerlord/logi-jeffa/2026-10-20 (27 plikow).
+Zapisy Jeffa (Ironman*.sav, saveauto*) skopiowane do D:/Backup-Bannerlord/zapisy-jeffa/2026-10-20-wieczor; logi dnia do D:/Backup-Bannerlord/logi-jeffa/2026-10-20 (27 plikow).- 17:35 PDT W TOKU (workflows): m96-wies wf_72028594-b56 (menu wsi + platnosci), m96-wzory2 wf_39026e72-fa6 (naprawa zapisu 2), m96-receptury wf_3eb8bfa3-879 (receptury-kuzni-2.js,
+  kg + ladunki + przetop ze stratami), m96-jakosc2 wf_f0791615-a57 (limit na rodzaj L 1-6 / MW 6-60), m97-wioski wf_a63458ba-100 (wioski poboczne jak wsie). n25-calosc 25f24c17
+  (Ravens Teeth/Goldenheart/luk olbrzymow do wykucia). Po skonczeniu m96-*: scalenie do n25, testy, WGRANIE 96. Potem oboz etap 1, surowce czardrzewo/smocza kosc,
+  tablica ogloszen i plotki, optymalizacja. Limity 17:35: tydzien 80%, 5 h 68% (reset 17:10->18:10?).
 
