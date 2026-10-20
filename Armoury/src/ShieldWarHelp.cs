@@ -17,7 +17,7 @@ namespace Armoury
     /// &lt; 35% (szczebel): wojenna pomoc ciesli jako nowy klucz wagi"), PLAN-DO-KONCA-MODA 6.8, ROZPOZNANIE-TOWARY-2 A7-5 (14.10: 36% - bez zmian).
     ///
     /// Regula (warunkowa - bez braku nic sie nie zmienia):
-    ///  - POMIAR co 5 dob (i w pierwszej dobie sesji): miejsca na tarcze w zestawach zolnierzy partii rodow AI (te same partie i ta sama miara co tarcza
+    ///  - POMIAR co 5 dob (doby podzielne przez 5 jak linia 171 i pierwsza doba sesji): miejsca na tarcze w zestawach zolnierzy partii rodow AI (te same partie i ta sama miara co tarcza
     ///    w linii "Pokrycie zbrojowni AI (171)": AiGear.Deficit - potrzeba wedlug wzorca do sufitu szczebla, brak po zbrojowni DTE i zastepstwie tierow),
     ///    osobno dla kazdego krolestwa (partie wedlug ActualClan.Kingdom) i dla swiata. Pokrycie = (potrzeba - brak) / potrzeba.
     ///  - DECYZJA raz na dobe dla kazdego krolestwa: w wojnie (KingdomTreasury.AtWar - ta sama miara wojny co danina wojenna i zwrot zoldu) i przy
@@ -97,7 +97,8 @@ namespace Armoury
                 ZeroDay(); _stumbles = 0; _errLogged = false;
             }
             var s = Settings.Current;
-            if (_measDay < 0 || day < _measDay || day - _measDay >= MeasureEveryDays)
+            // co 5 dob w te same doby co linia "Pokrycie zbrojowni AI (171)" (dzien podzielny przez 5 - do porownania w logu) i w pierwszej dobie sesji
+            if (_measDay < 0 || day < _measDay || day - _measDay >= MeasureEveryDays || (day % MeasureEveryDays == 0 && day != _measDay))
                 try { Measure(day); } catch (Exception e) { Stumble("Measure", e); _measOk = false; }
             _help.Clear();
             int warK = 0, helpK = 0;

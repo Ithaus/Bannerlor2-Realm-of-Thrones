@@ -1,0 +1,44 @@
+## 2026-10-20 (p5-tarcze: R3-09a - w wojnie ciesle miasta pomagaja tarczownikom, gdy brakuje tarcz)
+
+**Mod:** Armoury (CrashScribe, RC, GT, ForgeView bez zmian) | **Galaz:** `w-toku/p5-tarcze` (od `5189c0fe` = kandydat WGRANIA 92) | **Tor:** S (bez gry - zakaz uruchamiania; build Armoury kod 0, 0 bledow; gen_mcm 2064 -> 2067 ustawien) | **Klucze (nowe, nie ma ich w Armoury.json Jeffa - sprawdzone grep):** `ShieldWarCarpenters` = TAK ("Shield War Carpenters"), `ShieldWarCoverageBelow` = 0.35 ("Shield War Coverage Below", suwak 0-1), `ShieldWarCarpenterHands` = 1 ("Shield War Carpenter Hands", suwak 0-4) - grupa MCM "Workshops", zaraz pod Guild Share Shieldwright | **Pliki:** `ShieldWarHelp.cs` (nowy), `WorkshopLaw.cs` (5 linii w `BuildPlan`), `Settings.cs`, `McmSettings.cs` (gen_mcm), `tools/gen_mcm.py` (zakres suwaka progu) | **Status:** DO SPRAWDZENIA
+
+**Dla Jeffa (prosto):**
+W czasie wojny ciesle z miast pomagaja tarczownikom - ale tylko tam, gdzie naprawde brakuje tarcz. Co 5 dni mod liczy, ilu zolnierzy w druzynach lordow AI danego krolestwa ma tarcze swojego poziomu; jesli krolestwo jest w wojnie i ma mniej niz 35%, w jego miastach przy kazdym tarczowniku staje drugi czlowiek (ciesla), wiec tarcze robia sie dwa razy szybciej. Ciesle nie zabieraja rak kowalom ani innym cechom, tarcza dalej potrzebuje drewna, skory i zelaza z targu i robi sie tylko wtedy, gdy targ za nia zaplaci - nic z niczego. W pokoju albo gdy tarcz jest dosc, wszystko zostaje jak bylo. Dzis (test 160 dob WGRANIA 91) tarcze swojego poziomu ma 56% zolnierzy w calym swiecie, wiec regula wlaczy sie tylko w krolestwach, ktorym ich wyraznie brakuje.
+
+**Problem / zrodlo pomyslu:** Jeff 20.10 na liste `docs/POMYSLY-35-2026-10-20.md` (poz. 27, R3-09a): "28 - nie, 29 - nie. POzostale tak, zacznij te zmiany i daj znac jak wgrasz." Pomysl z `docs/PROJEKT-174-PRODUKCJA-UZBROJENIA-2026-10-09.md:1032` ("Tarczownicy 5% - jesli po 120 dobach pokrycie tarcz partii AI < 35% (szczebel): wojenna pomoc ciesli jako nowy klucz wagi"), PLAN-DO-KONCA-MODA 6.8, `docs/towary-2/ROZPOZNANIE-TOWARY-2.md` A7-5 (14.10: 36.3% - "bez zmian, prog niespelniony"). Stan dzis - log testu 160 dob na WGRANIU 91 (`Modules/Armoury/Armoury-2026-10-20_00-44-29.log`):
+- `Pokrycie zbrojowni AI (171): dzien 109235 - partie rodow AI (105584 ludzi): ... tarcza 56%` (dni 109215-109235: 56-57%; dowolny szczebel 59-61%) - swiat ponad progiem 35%; linii wedlug krolestw w logu nie ma (dlatego nowy pomiar liczy krolestwa osobno).
+- `Warsztaty: dzien` - cechy `tarczownik 423/196`, `432/186`, `425/139`, `432/158` (rece przydzielone / w zrobionych sztukach) - tarczownicy nie wykorzystuja dzis wszystkich swoich rak (czekaja na zysk i zloto kupcow, jak w A7-5), wiec ciesle zmienia cos tylko tam, gdzie tarcze sa w robocie i placa.
+
+**Zmiana:**
+1. `ShieldWarHelp.cs` (nowy):
+   - POMIAR w dobach podzielnych przez 5 (te same co linia 171) i w pierwszej dobie sesji: partie rodow AI z tymi samymi filtrami co `ArmsDrill.Coverage` (bez gracza, jego rodu, Innych), `AiGear.Deficit` - miejsca na tarcze we wzorcach do sufitu szczebla i brak po zbrojowni DTE (z zastepstwem tierow). Sumy wedlug krolestwa (`ActualClan.Kingdom`) i swiata. Liczba swiata = tarcza z linii 171 (ta sama miara).
+   - DECYZJA raz na dobe dla kazdego krolestwa: `KingdomTreasury.AtWar` (ta sama miara wojny co danina wojenna i zwrot zoldu) i pokrycie < `ShieldWarCoverageBelow`. Krolestwo z potrzeba < 50 miejsc na tarcze - wedlug swiata. Miasto rodu bez krolestwa - wojna z jakimkolwiek krolestwem i pokrycie swiata. Bez pomiaru (zbrojownie DTE niedostepne, swiat bez potrzeby) - bez pomocy.
+   - SKUTEK: `ExtraHands(town, own)` = `ShieldWarCarpenterHands` x wlasne rece cechu tarczownikow warsztatu (rece warsztatu x waga 5% / suma wag cechow) - 0, gdy krolestwo miasta nie ma pomocy.
+   - Linia logu raz na dobe (pierwszy plan warsztatu doby).
+2. `WorkshopLaw.BuildPlan` (plan rak warsztatu na dobe): cech tarczownikow (tylko czynny - ma sztuke w robocie albo oplacalny start) dostaje rece ciesli do swoich rak `h` (takze w sprawdzeniu planu (E) - linia, ktora z ciesla skonczy sztuke w planie, jest czynna). Rece ciesli liczone w `_hands` linii "Warsztaty" (bezczynne % bez przeklaman) i w "tarczownik przydzielone". Nikomu nie odejmowane: rece H, zwolnione rece, naprawy kowali (`SmithHours`), `ColdStart` i `GuildWeight` bez zmian.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: klucz wylaczony albo `ShieldWarCarpenterHands` 0 - `ExtraHands` zwraca 0 przed czymkolwiek, plan bajt w bajt jak dotad (carp = 0, `_hands += H + 0`). Cech inny niz tarczownik - bez zmian. `GuildWeight` nietkniety - `SmithHours` (rece kowali do napraw) i `ColdStart` (zapas startowy) licza jak dotad.
+- Zamknieta ekonomia: nowego zlota ani towaru nie ma. Rece to czas pracy, nie pieniadz: placa sztuki = dni sztuki x dniowka, z kapitalu warsztatu do kasy miasta przy oddaniu (jak dotad, ciesle z tej samej placy); surowce z polek miasta (TryStart); gotowa tarcza na targ tylko, gdy kasa miasta zaplaci z nadwyzki ponad zapas kupcow. Gdy pomoc gasnie, bank roboty linii jest przycinany do nowego planu (jak przy kazdej zmianie rak) - przepada tylko czas, nie zloto.
+- "Wiecej rak = niesprzedane tarcze" (ryzyko z listy): sztuka zaczyna sie tylko przy zysku po cenie polki (cena spada, gdy polka sie zapelnia), a konczy tylko przy zlocie miasta - ciesle przyspieszaja oplacalne tarcze, nie robia tarcz bez kupca.
+- Drewno: wiecej tarcz w wojnie = wiecej drewna z targu; prognoza zamowien drewna (`CaravanBulk` z rak) nie wie o cieslach - braki ida sygnalem braku surowca (`MaterialOrders.NoteMissMask`) jak dotad.
+- Zamki: BK wola cykle warsztatow takze dla zamkow (DayProfile:113) - ta sama regula wedlug krolestwa zamku.
+- Watki i koszt: wszystko w ticku warsztatow (watek glowny), poza PartiesThink. Pomiar ok. 30 ms raz na 5 dob (jak przeglad 171: "czas przegladu 30-32 ms"), liczy sie w profilu jako "CyclePrefix z planem doby" tej doby. Plan: slownik decyzji doby, bez alokacji.
+- Potkniecia liczone (na partie w pomiarze, na wywolanie w planie), pierwszy blad sesji w logu ze sladem - regula sie nie gasi.
+- Zapis: brak (pomiar i decyzja od nowa w pierwszej dobie po wczytaniu; stan czyszczony przy zmianie kampanii przez porownanie `Campaign.Current`). Stare zapisy bez zmian.
+- Scalanie 18 galezi: w plikach wspolnych tylko 3 klucze w `Settings.cs` (pod `GuildShareShieldwright`), wpis w `RANGES` gen_mcm (pod `WorkshopPlanDays`) i 5 linii w `WorkshopLaw.BuildPlan`; reszta w nowym pliku.
+
+**Status:** DO SPRAWDZENIA (build kod 0, 0 bledow; w grze nie sprawdzone - zakaz uruchamiania gry w tej pracy).
+
+**Decyzje (moje, z wylacznikiem):**
+1. Pomiar wedlug KROLESTWA, nie tylko swiata: swiat ma 56%, wiec sama srednia nigdy by nie wlaczyla pomocy, a brak moze byc w jednym krolestwie (rozwiazanie ma objac 100% przypadkow). Krolestwo z mala potrzeba (< 50 miejsc) - wedlug swiata.
+2. Rece ciesli = tyle samo co tarczownikow (x1) - pomoc "drugiego czlowieka przy tarczy"; ciesle sa poza rekami rzemieslnikow broni (to inny cech miasta), wiec nie odejmuje ich kowalom.
+3. Prog bez histerezy, decyzja co dobe z pomiaru co 5 dob - prosto i bez stanu w zapisie; przelaczenie najwyzej raz na 5 dob.
+4. Pomoc dla kazdego warsztatu z tarczami w krolestwie (rzemieslnicy miasta i warsztaty notabli, proporcjonalnie do ich tarczownikow) - jedna regula; warsztaty gracza zostaja na zasadach gry (jak cala regula cechow).
+5. Bez wymogu "po 120 dobach" z projektu - pomiar dziala od pierwszej doby (pusta zbrojownia DTE = brak pomiaru = bez pomocy).
+
+**Test w grze:**
+- log_grep (autotest): `Tarcze w wojnie (R3-09a): dzien` - codziennie (gdy jakis warsztat ma tarcze w planie); w dobie podzielnej przez 5 `pomiar z dnia N: swiat X%` powinno byc rowne (co do zaokraglenia) `tarcza X%` z linii `Pokrycie zbrojowni AI (171): dzien N - partie rodow AI`. `krolestwa w wojnie K, z pomoca ciesli P [Nazwa X% (miejsc) POMOC|bez ...]`; przy P > 0 nastepna linia: `ciesle przy tarczach w T miastach / W warsztatach, R roboczodni (wlasne rece tarczownikow tam O)` z R ok. O (x1). Potkniecia 0, 0 `ERROR in ShieldWarHelp`.
+- W linii `Warsztaty: dzien` przy P > 0: `tarczownik` przydzielone wyzej niz 423-432 z WGRANIA 91; "w zrobionych sztukach" rosnie tylko, jesli tarcze w robocie mialy zysk i kupca.
+- Przy P = 0 (wszystkie krolestwa w wojnie >= 35%) - plan warsztatow i linia "Warsztaty" jak na WGRANIU 91 (regula czeka na brak).
+- Probe progu mozna zrobic suwakiem `Shield War Coverage Below` (np. 0.6 - wtedy krolestwa w wojnie z 56% dostana pomoc) - tylko do testu.
