@@ -1122,9 +1122,13 @@ namespace Armoury
             return plan;
         }
 
-        /// <summary>n22f-naprawy2 (GuildMend, MendIdleHandsFirst): rece cechow z planu doby ukrytego warsztatu - [0..4] rece cechu bez czynnej linii
-        /// (przeniesione do innych cechow), [5..9] rece przy liniach cechu, [10] = 1 caly warsztat bez czynnej linii. Cech bez linii w tym warsztacie
-        /// (nie ma go w planie) - jego czesc rak liczona jak rece linii (ostroznie: naprawy automatyczne biora z niej najwyzej limit linii). Raz na dobe.</summary>
+        /// <summary>n22f-naprawy2 (GuildMend, MendIdleHandsFirst): WLASNE rece cechow z planu doby ukrytego warsztatu - [0..4] rece cechu bez czynnej
+        /// linii (przeniesione do linii innych cechow - pracuja, nie sa bezczynne), [5..9] wlasne rece cechu przy jego liniach, [10] = 1 caly warsztat
+        /// bez czynnej linii (rece bezczynne). Poprawka po recenzji n22f-naprawy2: rece linii = wlasna czesc cechu (H x waga / wagi cechow planu), nie hg -
+        /// hg zawiera rece przeniesione z innych cechow (liczone juz w [0..4] tamtych cechow) i ciesli przy tarczach (R3-09a; naprawy robia rzemieslnicy
+        /// cechu, nie ciesle). Ta sama czesc co "own" w BuildPlan, wiec limit napraw automatycznych (procent [0..9]) i jutrzejsze ciecie wedlug wag
+        /// platnerz/miecznik (repairPool) licza od tych samych rak. Cech bez linii w tym warsztacie (nie ma go w planie) - jego czesc jak rece linii
+        /// (ostroznie: naprawy automatyczne biora z niej najwyzej limit). Raz na dobe.</summary>
         private static void NotePlanForMend(float[] row, Dictionary<string, LinePlan> plan, Dictionary<string, float> hg, float H)
         {
             if (row == null || row.Length < 11) return;
@@ -1142,9 +1146,7 @@ namespace Armoury
                 string g = GuildOrder[i];
                 int k = GuildMend.TradeOfGuild(g);
                 if (k < 0) continue;
-                float h;
-                if (hg.TryGetValue(g, out h)) row[5 + k] += h;
-                else if ((present & (1 << i)) != 0) { if (wAll > 0f) row[k] += H * GuildWeight(g) / wAll; }
+                if ((present & (1 << i)) != 0) { if (wAll > 0f) row[(hg.ContainsKey(g) ? 5 : 0) + k] += H * GuildWeight(g) / wAll; }
                 else if (wSum > 0f) row[5 + k] += H * GuildWeight(g) / wSum;
             }
         }

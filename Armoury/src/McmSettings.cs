@@ -5056,7 +5056,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AutoMendHalfGuild { get; set; } = true;
 
-        [SettingPropertyBool("Mend Idle Hands First", HintText = "with Mend Hours By Guild on: repairs take first the hands of a trade that have no work today - a town workshop with nothing to make, a trade with no line of its own, a line whose work is going to waste - and only then hands busy making new arms; the repairs nobody orders by hand (the AI lords' men and your own men paying from their purse) take at most a tenth of those busy hands a day and the rest waits, while your own orders may still take every free hour. Hours from idle hands are not taken off tomorrow's workshop work (off = the half-of-each-trade rule of Auto Mend Half Guild, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Mend Idle Hands First", HintText = "with Mend Hours By Guild on: repairs take first the hands of a trade that have no work today - a town workshop with nothing to make, a line whose work is going to waste (its store of work is full) - and only then the trade's own hands that are busy making new arms, at its own lines or lent to another trade's lines; the repairs nobody orders by hand (the AI lords' men and your own men paying from their purse) take at most 15% of those busy hands a day and the rest waits, while your own orders may still take every free hour. Hours from idle hands are not taken off tomorrow's workshop work (off = the half-of-each-trade rule of Auto Mend Half Guild, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendIdleHandsFirst { get; set; } = true;
 
