@@ -26,7 +26,8 @@ namespace Armoury
     ///    (HeroDeveloper.AddSkillXp z mnoznikiem nauki, jak XP zarzadcy w grze).
     /// Premia to wiecej pracy z tych samych pieniedzy (lepsza organizacja robot) - zloto i material bez zmian, ekonomia zamknieta jak dotad.
     /// Liczenie premii jest czyste (bez stanu, bez alokacji) - PowerPostfix wolaja tez dymki i GetDaysToComplete. Liczniki doby tylko w bloku dobowym
-    /// (watek glowny); potkniecia liczone (Interlocked), blad do logu raz na sesje. Linia logu "Inzynieria przy budowach (R3-10b)" po "Budowy oplacone".
+    /// (watek glowny); potkniecia liczone (Interlocked), blad do logu raz na kampanie. Linia logu "Inzynieria przy budowach (R3-10b)" na koncu doby budow
+    /// (po "Budowy oplacone" i robotach ludu). EngPaidNeed - odwrotnosc premii dla liczenia "ile pan musi doplacic do konca poziomu" (R3-11a OneNeed przy scalaniu).
     /// </summary>
     internal static partial class BuildFunding
     {
@@ -34,6 +35,7 @@ namespace Armoury
         private const float EngXpPerPoint = 10f;   // XP Inzynierii zarzadcy za punkt oplacony przez pana (pomysl R3-10b)
         private static TextObject _engTxt;
         private static int _engErrN; private static bool _engErr;
+        private static WeakReference _engErrCamp;   // kampania, w ktorej blad juz trafil do logu (recenzja: nowa kampania/wczytanie - znow do logu; bez wpiecia w BuildFunding.Reset)
         // liczniki doby (blok dobowy, watek glowny)
         private static int _engTowns, _engGov, _engGovTown, _engGovCastle, _engSkilled, _engSkillMax, _engCarp, _engPlan, _engStone, _engClock, _engXpHeroes;
         private static long _engSkillSum; private static double _engBase, _engExtra, _engXp;
@@ -81,12 +83,37 @@ namespace Armoury
                 float extra = e.ResultNumber - paid - boost;
                 return extra > 0f && !float.IsNaN(extra) && !float.IsInfinity(extra) ? extra : 0f;
             }
-            catch (Exception ex)
+            catch (Exception ex) { EngErr("BuildFunding.EngExtra", ex); return 0f; }
+        }
+
+        /// <summary>Potkniecie: licznik (Interlocked) i blad do logu raz na kampanie (CLAUDE.md 7). Alokacja tylko przy bledzie.</summary>
+        private static void EngErr(string where, Exception ex)
+        {
+            Interlocked.Increment(ref _engErrN);
+            try
             {
-                Interlocked.Increment(ref _engErrN);
-                if (!_engErr) { _engErr = true; Log.Error("BuildFunding.EngExtra", ex); }   // licznik potkniec, blad raz na sesje (CLAUDE.md 7)
-                return 0f;
+                var c = Campaign.Current;
+                var w = _engErrCamp;
+                if (_engErr && w != null && ReferenceEquals(w.Target, c)) return;
+                _engErr = true; _engErrCamp = new WeakReference(c);
+                Log.Error(where, ex);
             }
+            catch { }
+        }
+
+        /// <summary>
+        /// Punkty, ktore pan musi oplacic, zeby przy ticku osady postep budowli na czole kolejki urosl o `rem` (koszt poziomu - postep), przy dzisiejszym
+        /// przyspieszeniu zlotem i zarzadcy: postep doby = pana + przyspieszenie + EngExtra(pana, przyspieszenie), a EngExtra jest liniowe:
+        /// EngExtra(p, b) = EngExtra(0, b) + p x EngExtra(1, 0). Klucz wylaczony / brak zarzadcy = rem - przyspieszenie (jak dotad). Czyste, bez alokacji.
+        /// Dla R3-11a (p5-budowy, OneNeed): "double rem = cost - b.BuildingProgress - Boost(st.Town);" -> "double rem = EngPaidNeed(st.Town, cost - b.BuildingProgress);".
+        /// </summary>
+        internal static double EngPaidNeed(Town town, double rem)
+        {
+            float b = town != null ? Boost(town) : 0f;
+            double left = rem - b - EngExtra(town, 0f, b, false);
+            if (!(left > 0)) return 0;
+            double f = 1.0 + EngExtra(town, 1f, 0f, false);
+            return f > 1.0 ? left / f : left;
         }
 
         /// <summary>PowerPostfix: pozycja dymku zarzadcy (dodana do wyniku osady objetej rozliczeniem).</summary>
@@ -128,14 +155,10 @@ namespace Armoury
                     _engXp += xp; _engXpHeroes++;
                 }
             }
-            catch (Exception ex)
-            {
-                Interlocked.Increment(ref _engErrN);
-                if (!_engErr) { _engErr = true; Log.Error("BuildFunding.EngPaid", ex); }
-            }
+            catch (Exception ex) { EngErr("BuildFunding.EngPaid", ex); }
         }
 
-        /// <summary>Daily, po linii "Budowy oplacone": linia R3-10b.</summary>
+        /// <summary>Daily, na koncu doby budow (po "Budowy oplacone" i robotach ludu): linia R3-10b.</summary>
         private static void EngLine()
         {
             try

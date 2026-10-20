@@ -309,9 +309,9 @@ namespace Armoury
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
                      + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + WarFront.LineTail());
-            EngLine();   // R3-10b: linia "Inzynieria przy budowach"
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
+            EngLine();   // R3-10b: linia "Inzynieria przy budowach" (na koncu doby budow - z dala od linii "Budowy oplacone", ktora zmienia R3-11a)
         }
 
         /// <summary>
