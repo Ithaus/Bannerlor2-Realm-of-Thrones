@@ -76,7 +76,7 @@ public static class Program
         }
         Console.WriteLine("Tiny przed latka " + Bytes(AccessTools.DeclaredMethod(typeof(Target), nameof(Target.Tiny)), 16));
         var h = new Harmony("uw.harness");
-        if (v == "A")
+        if (v == "A" || v == "D")
             h.Patch(AccessTools.DeclaredMethod(typeof(Target), nameof(Target.Tiny)), postfix: new HarmonyMethod(typeof(Patches), nameof(Patches.Post)));
         else if (v == "B")
             h.Patch(AccessTools.DeclaredMethod(typeof(Target), nameof(Target.NonTiny)), postfix: new HarmonyMethod(typeof(Patches), nameof(Patches.PostInt)));
@@ -86,6 +86,15 @@ public static class Program
         if (System.Runtime.InteropServices.Marshal.ReadByte(tp) == 0xE9) { long dst = tp.ToInt64() + 5 + System.Runtime.InteropServices.Marshal.ReadInt32(tp, 1); Console.WriteLine("skok Tiny -> " + dst.ToString("X") + " (roznica " + (dst - tp.ToInt64()) / 1048576.0 + " MB)"); }
         Console.WriteLine("Tiny " + Bytes(AccessTools.DeclaredMethod(typeof(Target), nameof(Target.Tiny)), 24));
         Console.WriteLine("NonTiny " + Bytes(AccessTools.DeclaredMethod(typeof(Target), nameof(Target.NonTiny)), 24));
+        if (v == "D")
+        {
+            var tmd = AccessTools.DeclaredMethod(typeof(Target), nameof(Target.Tiny));
+            RuntimeHelpers.PrepareMethod(tmd.MethodHandle);
+            IntPtr st = tmd.MethodHandle.GetFunctionPointer();
+            string why;
+            IntPtr resolved; var r = UnwindRepairCore.Repair(st, tmd.MethodHandle.Value, out why, out resolved);
+            Console.WriteLine("NAPRAWA " + r + " (" + (why ?? "ok") + ") | Tiny po naprawie " + Bytes(tmd, 12));
+        }
         Console.WriteLine("START wariant " + v + " czas " + seconds + " s, watki alokujace " + allocThreads + ", Environment.OSVersion " + Environment.OSVersion + ", CLR " + Environment.Version);
         Console.Out.Flush();
 
