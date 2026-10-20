@@ -1091,14 +1091,16 @@ Uzycie (Python 3, tylko odczyt):
                     predkosci MarchPace niewpietej na starcie gry, NDR-5/6 probki na podlodze LimitMin poza srednia premii, NDR-8 takze "od wczytania" (ciche logi).
 --grupa p6sztormy : (20.10, galaz p6-sztormy - R3-05d, POMYSLY-35 pkt 11; Armoury/src/SeaStorms.cs, klucze Sea Storm Winter / Winter Factor / Slows Ships / Ship Speed
                     Percent) zimowe sztormy na morzu: zima Westeros szansa narodzin burzy NavalDLC i sufit burz x2 (6 -> 12, granica 14), statek w burzy -15% predkosci.
-                    python -I tools/sprawdz_logi.py --grupa p6sztormy <Armoury-*.log> (strumieniowo). SZ-0 linie "Sztormy (SZ)" (brak - INFO); SZ-1 latki NavalDLC
-                    (szansa wpieta, sufit wpiety, gettery gotowe); SZ-2 start sesji: lista burz jest, kara CZYNNA; SZ-3 linie doby rozpoznane; SZ-4 regula zimy: mnoznik
-                    i sufit zgodne z flaga zimy w kazdej linii, w pelnych dobach zimy szansa podniesiona w kazdym wywolaniu (poza zima w zadnym); SZ-5 burze aktywne
-                    na godzine zima > poza zima (po 5 dob obu por, inaczej INFO); SZ-6 udzial partio-godzin AI na morzu w burzy zima >= poza zima (po 500, inaczej INFO);
-                    SZ-7 audyt: sredni mnoznik predkosci statkow AI w burzy = 1 - kara +-0.010, SZ-7b bez wpisu Storm 0, kara zjedzona <= 5%, pamiec gry >= 80%;
-                    SZ-8 kara liczona (w burzy z kara > 0, gdy statki AI w burzy), SZ-8b predkosc z pamieci gry w burzy / poza (INFO - wiatr burzy pcha); SZ-9 gracz w
-                    burzy (z kara / bez = 1 - kara, wpis Storm; brak - INFO); SZ-10 koszt: mediana spisu <= 5 ms/dobe, sciezki predkosci <= 2 us; SZ-11 potkniecia i
-                    ERROR in SeaStorms* 0; SZ-12 karawany na morzu zima > 0 (burza nie zamyka szlaku) i stan kadlubow w burzy (INFO).
+                    python -I tools/sprawdz_logi.py --grupa p6sztormy <Armoury-*.log> (strumieniowo). MS-0 linie "Sztormy (MS)" (brak - INFO); MS-1 latki NavalDLC
+                    (szansa wpieta, sufit wpiety, gettery gotowe); MS-2 start sesji: lista burz jest, kara CZYNNA; MS-3 linie doby rozpoznane; MS-4 regula zimy: mnoznik
+                    i sufit zgodne z flaga zimy w kazdej linii, w pelnych dobach zimy szansa podniesiona w kazdym wywolaniu (poza zima w zadnym); MS-5 burze aktywne
+                    na godzine zima > poza zima (po 5 dob obu por, inaczej INFO); MS-6 udzial partio-godzin AI na morzu w burzy zima >= poza zima (po 500, inaczej INFO);
+                    MS-7 audyt: sredni mnoznik predkosci statkow AI w burzy = 1 - kara +-0.010, MS-7b bez wpisu Storm 0, kara zjedzona <= 5%, pamiec gry >= 80%;
+                    MS-8 kara liczona (w burzy z kara > 0, gdy statki AI w burzy), MS-8b predkosc z pamieci gry w burzy / poza (INFO - wiatr burzy pcha); MS-9 gracz w
+                    burzy (z kara / bez = 1 - kara, wpis Storm; brak - INFO); MS-10 koszt: mediana spisu <= 5 ms/dobe, sciezki predkosci <= 2 us; MS-11 potkniecia i
+                    ERROR in SeaStorms* 0; MS-12 karawany na morzu zima > 0 (burza nie zamyka szlaku) i stan kadlubow w burzy (INFO).
+                    Po recenzji 20.10: znacznik (MS) zamiast (SZ) (SZ = bitwa szturmu); kara pod sufitem NavalDLC wzgledem celu; MS-13 ladunki "w dobach" przez
+                    morze (klucz Sea Storm Winter Carts): poza zima opoznionych 0, zima opoznione wszystkie morskie (+doby = opoznione x doby portu), INFO bez zimy.
 --grupa nks       : (16.10, Jeff "produkcja tylko z prawdziwych rak i ziemi, start zbilansowany"; galaz w-toku/noc-ks, Armoury/src/StartCalibration*.cs; projekt
                     docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14; poprawki po recenzji 16.10) python -I tools/sprawdz_logi.py --grupa nks <Armoury-*.log>
                     [--baza-doby <Armoury-*.log bazy>] (strumieniowo). NKS-0 start sesji, NKS-1 Plany bez bledu, NKS-1b Plan wlaczenia z ksiega >= 28 dob, NKS-2 czas Planu
@@ -35613,8 +35615,8 @@ def ndrogi_main(logp):
 
 
 # ------------------------------------------------------------ p6sztormy (20.10, galaz p6-sztormy - R3-05d, POMYSLY-35 pkt 11): zimowe sztormy na morzu (Armoury/src/SeaStorms.cs)
-P6SZTORMY_HEAD = "Sztormy (SZ): "
-P6SZTORMY_DAY = re.compile(r"Sztormy \(SZ\): dzien (-?\d+) \| ")
+P6SZTORMY_HEAD = "Sztormy (MS): "
+P6SZTORMY_DAY = re.compile(r"Sztormy \(MS\): dzien (-?\d+) \| ")
 P6SZTORMY_RX = {
     "keys": re.compile(r"klucze: wiecej burz zima SeaStormWinter (tak|nie) \(x([0-9.]+)\), statki wolniej w burzy SeaStormSlowsShips (tak|nie) \(-([0-9.]+)%\)"),
     "season": re.compile(r"\| pora Westeros (\S+) \(zima (tak|nie)\) - mnoznik czynny x([0-9.]+), sufit burz (-?\d+) \(NavalDLC 6, granica (\d+)\)"),
@@ -35632,11 +35634,16 @@ P6SZTORMY_RX = {
     "pl": re.compile(r"\| gracz: na morzu, w burzy (tak|nie), bez kary ([0-9.]+), z kara ([0-9.]+), wpis Storm (tak|nie)"),
     "cost": re.compile(r"\| koszt: spis ([0-9.]+) ms/dobe, sciezka predkosci ([0-9.]+) us/wywolanie \(probka (\d+)\) \| kara (\S+)"),
     "stumb": re.compile(r"\| potkniecia dzis (\d+) \(od wczytania (\d+)\), w predkosci dzis (\d+) \(od wczytania (\d+)\)"),
+    # recenzja 20.10: ladunki "w dobach" przez morze (KS-H, materialy, hurt kupcow, zamki, dymarki) - zima czekaja w porcie
+    "carts": re.compile(r"\| ladunki w dobach przez morze: klucz SeaStormWinterCarts (tak|nie) \(zima \+(\d+) dob w porcie\), teraz \+(\d+); w dobie morskich (\d+), "
+                        r"opoznionych (\d+) \(\+(\d+) dob\) - jedzenie KS-H (\d+)/(\d+), materialy (\d+)/(\d+), hurt kupcow (\d+)/(\d+), zamki (\d+)/(\d+), "
+                        r"dymarki (\d+)/(\d+) \(opoznionych/morskich\); od wczytania: zima morskich (\d+), opoznionych (\d+) \(\+(\d+) dob\), "
+                        r"poza zima morskich (\d+), opoznionych (\d+); par sprawdzonych (\d+)"),
 }
 
 
 def p6sztormy_day(s):
-    """Linia "Sztormy (SZ): dzien N" -> slownik pol (brak fragmentu = klucz bez wartosci)."""
+    """Linia "Sztormy (MS): dzien N" -> slownik pol (brak fragmentu = klucz bez wartosci)."""
     d = {"day": int(P6SZTORMY_DAY.match(s).group(1))}
     for k, rx in P6SZTORMY_RX.items():
         m = rx.search(s)
@@ -35647,10 +35654,10 @@ def p6sztormy_day(s):
 def p6sztormy_main(logp):
     """p6sztormy (20.10, galaz p6-sztormy - R3-05d, POMYSLY-35 pkt 11; Armoury/src/SeaStorms.cs, klucze SeaStormWinter / SeaStormWinterFactor / SeaStormSlowsShips /
     SeaStormShipSpeedPercent): zima Westeros szansa narodzin burzy NavalDLC i sufit burz naraz x mnoznik (6 -> 12, granica 14); statek na morzu w aktywnej burzy
-    -15% predkosci (wpis "Storm", latka MarchPace). Wejscie: log Armoury (strumieniowo). Progi SZ-0..SZ-12 - opis w naglowku pliku (--grupa p6sztormy). Log bez galezi: INFO."""
+    -15% predkosci (wpis "Storm", latka MarchPace). Wejscie: log Armoury (strumieniowo). Progi MS-0..MS-12 - opis w naglowku pliku (--grupa p6sztormy). Log bez galezi: INFO."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
-        rep.add("SZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("MS-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     hooks, starts, days, bad, errs = [], [], [], [], []
@@ -35671,22 +35678,22 @@ def p6sztormy_main(logp):
                 errs.append(s)
     print(f"plik: {logp} | linii latek {len(hooks)}, startow sesji {len(starts)}, linii doby {len(days)} (nierozpoznanych {len(bad)}), ERROR {len(errs)}")
     if not hooks and not starts and not days and not errs:
-        rep.add("SZ-0: linie 'Sztormy (SZ)'", "brak w logu", "INFO (log sprzed galezi p6-sztormy)", None)
+        rep.add("MS-0: linie 'Sztormy (MS)'", "brak w logu", "INFO (log sprzed galezi p6-sztormy)", None)
         rep.show()
         return 0
-    rep.add("SZ-0: linie galezi", f"latek {len(hooks)}, startow sesji {len(starts)}, dob {len(days)}, nierozpoznanych {len(bad)}", "INFO", None)
-    # SZ-1 latki NavalDLC (menu glowne)
+    rep.add("MS-0: linie galezi", f"latek {len(hooks)}, startow sesji {len(starts)}, dob {len(days)}, nierozpoznanych {len(bad)}", "INFO", None)
+    # MS-1 latki NavalDLC (menu glowne)
     if hooks:
         h = hooks[-1]
         if "brak NavalDLC" in h:
-            rep.add("SZ-1: latki NavalDLC", h[len(P6SZTORMY_HEAD):][:200], "INFO (gra bez NavalDLC - regula nieczynna)", None)
+            rep.add("MS-1: latki NavalDLC", h[len(P6SZTORMY_HEAD):][:200], "INFO (gra bez NavalDLC - regula nieczynna)", None)
         else:
             ok = ("szansa narodzin (GetHourlyStormSpawnChanceForPosition) wpieta" in h and "sufit burz (MaximumNumberOfStorms) wpiety" in h
                   and "gettery burz NavalDLC gotowe" in h)
-            rep.add("SZ-1: latki NavalDLC (szansa, sufit, gettery burz)", h[len(P6SZTORMY_HEAD) + 7:][:260], "szansa wpieta, sufit wpiety, gettery gotowe", ok)
+            rep.add("MS-1: latki NavalDLC (szansa, sufit, gettery burz)", h[len(P6SZTORMY_HEAD) + 7:][:260], "szansa wpieta, sufit wpiety, gettery gotowe", ok)
     else:
-        rep.add("SZ-1: linia 'latki'", "brak", "jest przy starcie gry (menu glowne)", False)
-    # SZ-2 start sesji
+        rep.add("MS-1: linia 'latki'", "brak", "jest przy starcie gry (menu glowne)", False)
+    # MS-2 start sesji
     if starts:
         st0 = starts[-1]
         slow = "SeaStormSlowsShips tak" in st0
@@ -35694,17 +35701,17 @@ def p6sztormy_main(logp):
         kara = re.search(r"\| kara (.+?)\.$", st0)
         val = f"lista burz {lst.group(1) if lst else '?'}, kara {kara.group(1) if kara else '?'}"
         if slow:
-            rep.add("SZ-2: start sesji - lista burz i kara", val, "lista jest, kara CZYNNA", bool(lst and lst.group(2) is not None and kara and kara.group(1) == "CZYNNA"))
+            rep.add("MS-2: start sesji - lista burz i kara", val, "lista jest, kara CZYNNA", bool(lst and lst.group(2) is not None and kara and kara.group(1) == "CZYNNA"))
         else:
-            rep.add("SZ-2: start sesji - lista burz i kara", val + " (SeaStormSlowsShips nie)", "INFO", None)
+            rep.add("MS-2: start sesji - lista burz i kara", val + " (SeaStormSlowsShips nie)", "INFO", None)
     else:
-        rep.add("SZ-2: linia 'start sesji'", "brak", "jest w kazdej sesji kampanii", False)
-    rep.add("SZ-3: linie 'dzien N' rozpoznane", f"{len(days)} (nierozpoznanych {len(bad)})", "> 0 i nierozpoznanych 0", len(days) > 0 and not bad)
+        rep.add("MS-2: linia 'start sesji'", "brak", "jest w kazdej sesji kampanii", False)
+    rep.add("MS-3: linie 'dzien N' rozpoznane", f"{len(days)} (nierozpoznanych {len(bad)})", "> 0 i nierozpoznanych 0", len(days) > 0 and not bad)
     if not days:
-        rep.add("SZ-11: potkniecia i ERROR in SeaStorms*", f"ERROR {len(errs)}", "0", not errs)
+        rep.add("MS-11: potkniecia i ERROR in SeaStorms*", f"ERROR {len(errs)}", "0", not errs)
         rep.show()
         return 0
-    # SZ-4 regula zimy: mnoznik i sufit wedlug flagi zimy z pamieci godziny (ta sama migawka), szansa podniesiona w kazdym wywolaniu w pelnej dobie zimy
+    # MS-4 regula zimy: mnoznik i sufit wedlug flagi zimy z pamieci godziny (ta sama migawka), szansa podniesiona w kazdym wywolaniu w pelnej dobie zimy
     wrong, wrong_ch, checked = [], [], 0
     prev_w = None
     for d in days:
@@ -35722,10 +35729,10 @@ def p6sztormy_main(logp):
             if (want_mul > 1.0 and raised != calls) or (want_mul <= 1.0 and raised != 0):
                 wrong_ch.append(f"d{d['day']} wywolan {calls}, podniesionych {raised}")
         prev_w = w
-    rep.add("SZ-4: regula zimy (mnoznik i sufit wedlug flagi zimy; szansa w pelnych dobach)",
+    rep.add("MS-4: regula zimy (mnoznik i sufit wedlug flagi zimy; szansa w pelnych dobach)",
             f"dob {checked}, zlych {len(wrong)}{': ' + '; '.join(wrong[:4]) if wrong else ''}; szansa zla {len(wrong_ch)}{': ' + '; '.join(wrong_ch[:3]) if wrong_ch else ''}",
             "0 / 0", not wrong and not wrong_ch)
-    # SZ-5 burze zima / poza zima (srednia aktywnych na godzine, wazona godzinami doby)
+    # MS-5 burze zima / poza zima (srednia aktywnych na godzine, wazona godzinami doby)
     acc = {True: [0.0, 0, 0, 0, 0, 0], False: [0.0, 0, 0, 0, 0, 0]}   # suma aktywnych x godziny, godziny, przy suficie, nowe, dob, partio-godz. AI na morzu
     sea = {True: [0, 0, 0, 0], False: [0, 0, 0, 0]}   # partio-godziny AI na morzu, w burzy, karawany na morzu, karawany w burzy
     for d in days:
@@ -35754,10 +35761,10 @@ def p6sztormy_main(logp):
           (f" | poza zima: dob {acc[False][4]}, aktywnych sr. {an:.2f}" if an is not None else f" | poza zima: dob {acc[False][4]}, -") + \
           (f", przy suficie {acc[False][2]}/{acc[False][1]} h, nowych {acc[False][3]}" if acc[False][1] else "")
     if aw is not None and an is not None and acc[True][4] >= 5 and acc[False][4] >= 5:
-        rep.add("SZ-5: burze aktywne na godzine - zima wobec poza zima", f"{txt}; zima / poza {aw / an if an > 0 else 0:.2f}", "zima > poza zima (cel ok. x2 do sufitu)", aw > an)
+        rep.add("MS-5: burze aktywne na godzine - zima wobec poza zima", f"{txt}; zima / poza {aw / an if an > 0 else 0:.2f}", "zima > poza zima (cel ok. x2 do sufitu)", aw > an)
     else:
-        rep.add("SZ-5: burze aktywne na godzine - zima wobec poza zima", txt, "INFO (w biegu nie ma po 5 dob obu por - porownanie nieczynne)", None)
-    # SZ-6 udzial burzy na morzu (spis w dobach pomiaru)
+        rep.add("MS-5: burze aktywne na godzine - zima wobec poza zima", txt, "INFO (w biegu nie ma po 5 dob obu por - porownanie nieczynne)", None)
+    # MS-6 udzial burzy na morzu (spis w dobach pomiaru)
 
     def share(a, b):
         return a / b if b else None
@@ -35765,10 +35772,10 @@ def p6sztormy_main(logp):
     txt = (f"zima {sea[True][1]}/{sea[True][0]} ({sw:.1%})" if sw is not None else "zima -") + \
           (f", poza zima {sea[False][1]}/{sea[False][0]} ({sn:.1%})" if sn is not None else ", poza zima -")
     if sw is not None and sn is not None and sea[True][0] >= 500 and sea[False][0] >= 500:
-        rep.add("SZ-6: udzial partio-godzin AI na morzu w burzy - zima wobec poza zima", txt, "zima >= poza zima", sw >= sn)
+        rep.add("MS-6: udzial partio-godzin AI na morzu w burzy - zima wobec poza zima", txt, "zima >= poza zima", sw >= sn)
     else:
-        rep.add("SZ-6: udzial partio-godzin AI na morzu w burzy - zima wobec poza zima", txt, "INFO (po 500 partio-godzin obu por - porownanie nieczynne)", None)
-    # SZ-7 audyt mnoznika predkosci statkow w burzy
+        rep.add("MS-6: udzial partio-godzin AI na morzu w burzy - zima wobec poza zima", txt, "INFO (po 500 partio-godzin obu por - porownanie nieczynne)", None)
+    # MS-7 audyt mnoznika predkosci statkow w burzy
     n = nr = noline = eaten = cok = cn = floor = cand = 0
     sm = 0.0
     exp = None
@@ -35790,58 +35797,93 @@ def p6sztormy_main(logp):
             nr += k - fl
     if nr:
         mavg = sm / nr
-        rep.add("SZ-7: audyt - sredni mnoznik predkosci statkow w burzy", f"{mavg:.3f} (oczekiwany {exp:.3f}; probek {n}, w sredniej {nr}, na podlodze {floor}, kandydatow {cand})",
+        rep.add("MS-7: audyt - sredni mnoznik predkosci statkow w burzy", f"{mavg:.3f} (oczekiwany {exp:.3f}; probek {n}, w sredniej {nr}, na podlodze {floor}, kandydatow {cand})",
                 "oczekiwany +-0.010", abs(mavg - exp) <= 0.010)
-        rep.add("SZ-7b: audyt - wpis Storm, kara zjedzona, pamiec gry", f"bez wpisu {noline}, zjedzona {eaten} z {nr}, pamiec zgodna {cok}/{cn}",
+        rep.add("MS-7b: audyt - wpis Storm, kara zjedzona, pamiec gry", f"bez wpisu {noline}, zjedzona {eaten} z {nr}, pamiec zgodna {cok}/{cn}",
                 "bez wpisu 0, zjedzona <= 5%, pamiec >= 80%", noline == 0 and eaten <= 0.05 * nr and (cn == 0 or cok >= 0.8 * cn))
     else:
-        rep.add("SZ-7: audyt - sredni mnoznik predkosci statkow w burzy", f"probek {n}, kandydatow {cand}", "INFO (zaden statek AI w ruchu w burzy w dobach linii)", None)
-    # SZ-8 kara naprawde liczona; predkosc z pamieci gry w burzy / poza (INFO - wiatr burzy pcha)
+        rep.add("MS-7: audyt - sredni mnoznik predkosci statkow w burzy", f"probek {n}, kandydatow {cand}", "INFO (zaden statek AI w ruchu w burzy w dobach linii)", None)
+    # MS-8 kara naprawde liczona; predkosc z pamieci gry w burzy / poza (INFO - wiatr burzy pcha)
     kcalls = sum(int(d["calls"][0]) for d in days if d["calls"])
     kin = sum(int(d["calls"][1]) for d in days if d["calls"])
     klow = sum(int(d["calls"][2]) for d in days if d["calls"])
     insea = sea[True][1] + sea[False][1]
     slow_on = any(d["keys"] and d["keys"][2] == "tak" for d in days)
-    rep.add("SZ-8: kara liczona (liczenia na morzu / w burzy z kara / sufit obnizony)", f"{kcalls} / {kin} / {klow}; partio-godzin AI w burzy w spisie {insea}",
+    rep.add("MS-8: kara liczona (liczenia na morzu / w burzy z kara / sufit obnizony)", f"{kcalls} / {kin} / {klow}; partio-godzin AI w burzy w spisie {insea}",
             "w burzy z kara > 0, gdy statki AI w burzy w spisie" if slow_on else "INFO (SeaStormSlowsShips nie)", (kin > 0 or insea == 0) if slow_on else None)
     vi = [(float(d["speed"][0]), int(d["speed"][1])) for d in days if d["speed"] and d["speed"][0] != "-"]
     vo = [(float(d["speed"][2]), int(d["speed"][3])) for d in days if d["speed"] and d["speed"][2] != "-"]
     svi, nvi = sum(a * b for a, b in vi), sum(b for _, b in vi)
     svo, nvo = sum(a * b for a, b in vo), sum(b for _, b in vo)
-    rep.add("SZ-8b: predkosc statkow w ruchu z pamieci gry - w burzy / poza burza", (f"{svi / nvi:.2f} (n {nvi}) / {svo / nvo:.2f} (n {nvo}) = {svi / nvi / (svo / nvo):.3f}"
+    rep.add("MS-8b: predkosc statkow w ruchu z pamieci gry - w burzy / poza burza", (f"{svi / nvi:.2f} (n {nvi}) / {svo / nvo:.2f} (n {nvo}) = {svi / nvi / (svo / nvo):.3f}"
             if nvi and nvo and svo > 0 else f"n {nvi} / {nvo}"), "INFO (wiatr burzy NavalDLC pcha statek z wiatrem - surowy iloraz, nie sama kara)", None)
-    # SZ-9 gracz na morzu (audyt w dobach linii)
+    # MS-9 gracz na morzu (audyt w dobach linii)
     pls = [d["pl"] for d in days if d["pl"]]
     plin = [g for g in pls if g[0] == "tak" and float(g[1]) > 0.0001]
     if plin and exp is not None:
         badp = [g for g in plin if g[3] != "tak" or abs(float(g[2]) / float(g[1]) - exp) > 0.011]
-        rep.add("SZ-9: gracz w burzy - z kara / bez kary i wpis Storm", f"dob {len(plin)}, zlych {len(badp)}", f"z kara / bez = {exp:.3f} +-0.011, wpis Storm tak", not badp)
+        rep.add("MS-9: gracz w burzy - z kara / bez kary i wpis Storm", f"dob {len(plin)}, zlych {len(badp)}", f"z kara / bez = {exp:.3f} +-0.011, wpis Storm tak", not badp)
     else:
-        rep.add("SZ-9: gracz w burzy", f"dob z graczem na morzu {len(pls)}, w burzy {len(plin)}", "INFO", None)
-    # SZ-10 koszt
+        rep.add("MS-9: gracz w burzy", f"dob z graczem na morzu {len(pls)}, w burzy {len(plin)}", "INFO", None)
+    # MS-10 koszt
     cs = [float(d["cost"][0]) for d in days if d["cost"]]
     cu = [float(d["cost"][1]) for d in days if d["cost"] and int(d["cost"][2]) > 0]
     mcs = st.median(cs) if cs else 0.0
     mcu = st.median(cu) if cu else 0.0
-    rep.add("SZ-10: koszt (mediana spisu ms/dobe, sciezki predkosci us/wywolanie)", f"{mcs:.3f} ms / {mcu:.3f} us (maks. {max(cs) if cs else 0:.3f} / {max(cu) if cu else 0:.3f})",
+    rep.add("MS-10: koszt (mediana spisu ms/dobe, sciezki predkosci us/wywolanie)", f"{mcs:.3f} ms / {mcu:.3f} us (maks. {max(cs) if cs else 0:.3f} / {max(cu) if cu else 0:.3f})",
             "<= 5 ms / <= 2 us", mcs <= 5.0 and mcu <= 2.0)
-    # SZ-11 potkniecia i ERROR
+    # MS-11 potkniecia i ERROR
     sd = sum(int(d["stumb"][0]) for d in days)
     sa = max(int(d["stumb"][1]) for d in days)
     pd = sum(int(d["stumb"][2]) for d in days)
     pa = max(int(d["stumb"][3]) for d in days)
-    rep.add("SZ-11: potkniecia (watek glowny, predkosc) i ERROR in SeaStorms*", f"w dobach linii {sd} (od wczytania maks. {sa}), w predkosci {pd} (od wczytania maks. {pa}), "
+    rep.add("MS-11: potkniecia (watek glowny, predkosc) i ERROR in SeaStorms*", f"w dobach linii {sd} (od wczytania maks. {sa}), w predkosci {pd} (od wczytania maks. {pa}), "
             f"ERROR {len(errs)}{' - ' + errs[0][:160] if errs else ''}", "0", sd == 0 and sa == 0 and pd == 0 and pa == 0 and not errs)
-    # SZ-12 wyspy i handel morski plyna: karawany na morzu zima (burza tylko spowalnia), stan kadlubow w burzy
+    # MS-12 wyspy i handel morski plyna: karawany na morzu zima (burza tylko spowalnia), stan kadlubow w burzy
     hn = sum(int(d["hull"][0]) for d in days if d["hull"])
     hl = sum(int(d["hull"][2]) for d in days if d["hull"])
     hs = [(float(d["hull"][1]), int(d["hull"][0])) for d in days if d["hull"] and d["hull"][1]]
     hav = sum(a * b for a, b in hs) / sum(b for _, b in hs) if hs and sum(b for _, b in hs) else None
-    rep.add("SZ-12: karawany na morzu (w burzy / na morzu) i kadluby w burzy",
+    rep.add("MS-12: karawany na morzu (w burzy / na morzu) i kadluby w burzy",
             f"zima {sea[True][3]}/{sea[True][2]}, poza zima {sea[False][3]}/{sea[False][2]}; kadluby w burzy statko-godzin {hn}, stan sr. "
             f"{f'{hav:.1f}%' if hav is not None else '-'}, ponizej 25% {hl}",
             "karawany na morzu zima > 0, gdy jest zima ze spisem (burza nie zamyka szlaku)" if sea[True][0] > 0 else "INFO",
             (sea[True][2] > 0) if sea[True][0] > 0 else None)
+    # MS-13 (recenzja 20.10) ladunki "w dobach" przez morze: "od wczytania" sumowane po sesjach (spadek licznika = nowa sesja), w dobie - wedlug systemu
+    cl = [d["carts"] for d in days if d["carts"]]
+    if not cl:
+        rep.add("MS-13: ladunki w dobach przez morze (zima czekaja w porcie)", "brak fragmentu w liniach doby", "jest w kazdej linii doby", False)
+    else:
+        tot = [0, 0, 0, 0, 0]   # zima morskich, zima opoznionych, zima dob, poza zima morskich, poza zima opoznionych
+        prev = None
+        for g in cl:
+            cur = [int(g[16]), int(g[17]), int(g[18]), int(g[19]), int(g[20])]
+            if prev is not None and any(c < p for c, p in zip(cur, prev)):
+                tot = [a + b for a, b in zip(tot, prev)]
+            prev = cur
+        tot = [a + b for a, b in zip(tot, prev)]
+        per = [0] * 10
+        for g in cl:
+            for i in range(10):
+                per[i] += int(g[6 + i])
+        names = ["jedzenie KS-H", "materialy", "hurt kupcow", "zamki", "dymarki"]
+        txt_per = ", ".join(f"{names[i]} {per[2 * i]}/{per[2 * i + 1]}" for i in range(5))
+        key_on = cl[-1][0] == "tak"
+        cfg = int(cl[-1][1])
+        val = (f"zima: morskich {tot[0]}, opoznionych {tot[1]} (+{tot[2]} dob); poza zima: morskich {tot[3]}, opoznionych {tot[4]} | w dobach linii (opoznionych/morskich): "
+               f"{txt_per} | klucz {'tak' if key_on else 'nie'}, zima +{cfg} dob")
+        if tot[4] != 0:
+            rep.add("MS-13: ladunki w dobach przez morze (zima czekaja w porcie)", val, "poza zima opoznionych 0", False)
+        elif tot[0] + tot[3] == 0:
+            rep.add("MS-13: ladunki w dobach przez morze (zima czekaja w porcie)", val, "ladunki przez morze > 0 (wpiecia wolane; KS-H wozi dzis prawie wszystko statkiem)",
+                    False if len(cl) >= 5 else None)
+        elif tot[0] == 0:
+            rep.add("MS-13: ladunki w dobach przez morze (zima czekaja w porcie)", val, "poza zima morskich > 0 i opoznionych 0 (bez zimy w biegu - zima nie sprawdzona)", True)
+        elif key_on and cfg > 0:
+            rep.add("MS-13: ladunki w dobach przez morze (zima czekaja w porcie)", val, "zima opoznione = morskie, doby >= opoznione; poza zima 0",
+                    tot[1] == tot[0] and tot[2] >= tot[1])
+        else:
+            rep.add("MS-13: ladunki w dobach przez morze (zima czekaja w porcie)", val, "INFO (klucz SeaStormWinterCarts / SeaStormWinter nie albo mnoznik < 1.5)", None)
     rep.show()
     return 0
 

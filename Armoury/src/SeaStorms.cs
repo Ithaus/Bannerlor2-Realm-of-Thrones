@@ -49,15 +49,18 @@ namespace Armoury
     ///     PAMIEC PREDKOSCI GRY: na morzu gra przelicza predkosc przy kazdej zmianie wiatru w punkcie (MobileParty.IsLastSpeedCacheInvalid: kierunek > 0.06 rad
     ///     albo kwadrat dlugosci > 0.0001), a wiatr burzy skacze o >= 0.1 na granicy EffectRadius - wejscie i wyjscie z burzy przelicza predkosc samo
     ///     (bez latki pamieci, inaczej niz bloto).
-    ///  WYSPY (Pyke, Lys, Braavos): wozy jedzenia KS-H i hurt TradeCarts plyna "w dobach" (tabela dob, bez partii na morzu) - burze ich nie dotycza, dowoz na
-    ///  wyspy plynie zima jak latem; partie na morzu (lordowie, karawany, piraci, gracz) tylko zwalniaja w burzy - szlak zostaje otwarty.
+    ///  3. LADUNKI "W DOBACH" PRZEZ MORZE (recenzja 20.10; wyspy Pyke, Lys, Braavos): wozy jedzenia KS-H, materialy, hurt kupcow, zaopatrzenie zamkow i drewno
+    ///     dymarek nie sa partiami na morzu (burza ich nie widzi) - zima (SeaStormWinterCarts) kazdy taki ladunek przez morze czeka w porcie na pogode:
+    ///     + doba portu x (mnoznik zimy - 1) = 1 doba przy x2. Tylko pozniejsza dostawa: ilosc, cena, fracht i przeplyw na dobe bez zmian - szlak otwarty,
+    ///     wieloletnia zima nie odcina wysp od zboza. Partie na morzu (lordowie, karawany, piraci, gracz) tylko zwalniaja w burzy.
     ///
     /// KOSZT: postfiksy NavalDLC - mnozenie przez liczbe z pamieci (watek glowny, raz na wezel morza na godzine); predkosc (watki robocze gry, PartiesThink)
     /// - tylko partie na morzu: przeglad listy burz NavalDLC (najwyzej 14) przez skompilowane gettery, bez alokacji i bez blokad (NavalDLC czyta te sama liste
     /// z tych samych watkow - wiatr w swoim modelu predkosci). Pora roku i mnoznik zimy - raz na godzine w watku glownym (pamiec). Spis partii na morzu
     /// tylko w dobach pomiaru (LogGate.Today), linia "Sztormy (MS): dzien N" w dobie linii (LogGate.Lines). Potkniecia liczone, nigdy wylacznik calej funkcji.
     /// STAN: brak zapisu (burze zapisuje NavalDLC; regula wynika z pory roku); liczniki tylko w pamieci, od zera przy nowej kampanii / wczytaniu (Reset).
-    /// Klucze NOWE: SeaStormWinter (TAK), SeaStormWinterFactor (2, przyciete 1..2.3), SeaStormSlowsShips (TAK), SeaStormShipSpeedPercent (15, przyciete 0..50).
+    /// Klucze NOWE: SeaStormWinter (TAK), SeaStormWinterFactor (2, przyciete 1..2.3), SeaStormSlowsShips (TAK), SeaStormShipSpeedPercent (15, przyciete 0..50),
+    /// SeaStormWinterCarts (TAK; dziala tylko z SeaStormWinter).
     /// Wylaczony klucz = jak przed zmiana (postfiksy oddaja wynik NavalDLC, predkosc wychodzi od razu).
     /// </summary>
     internal static class SeaStorms
