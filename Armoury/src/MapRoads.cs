@@ -303,6 +303,18 @@ namespace Armoury
             catch (Exception e) { ParStumble(e); }
         }
 
+        /// <summary>p5-bloto (MapMud): rodzaj drogi w punkcie - 2 trakt, 1 droga boczna (przy MapSideRoadSpeedBonus), 0 poza droga, -1 brak siatki albo
+        /// MapRoadSpeedBonus wylaczony. Ta sama siatka i ten sam margines co premia drogi; bez zapisu do pamieci partii (czyta watek roboczy i glowny).</summary>
+        internal static int KindAt(float x, float y)
+        {
+            var g = _grid;
+            if (g == null) return -1;
+            var s = Settings.Current;
+            if (s == null || !s.MapRoadSpeedBonus) return -1;
+            int c = g.CellOf(x, y);
+            return g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
+        }
+
         /// <summary>Pamiec partii: Party.Index | komorka + 1 (tylko do logu zmian, porownanie idzie po stanie) | stan (1 poza droga, 2 trakt, 3 boczna).</summary>
         private static void Record(MobileParty mp, int cell, int st)
         {

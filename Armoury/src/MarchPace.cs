@@ -90,6 +90,7 @@ namespace Armoury
         {
             ColumnPostfix(__0, ref __result);
             MapRoads.SpeedRoad(__0, ref __result);
+            MapMud.Speed(__0, ref __result);   // p5-bloto (R3-07c): poza droga w deszczu -MapMudSpeedPercent% (wpis "Mud"); klucz wylaczony = wychodzi od razu
         }
 
         /// <summary>Kolumna marszowa (tresc dawnego SpeedPostfix bez zmian).</summary>
