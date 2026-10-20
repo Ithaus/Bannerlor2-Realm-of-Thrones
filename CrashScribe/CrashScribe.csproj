@@ -21,6 +21,8 @@
   <ItemGroup>
     <!-- P1 (AM-27): plik tytulow BK dla mapy ROT 8.1.8 z tools/bk_titles_rot818.py; w grze zapisywany do Documents\...\CrashScribe -->
     <EmbeddedResource Include="res\bk_titles_rot818.xml" LogicalName="CrashScribe.bk_titles_rot818.xml" />
+    <!-- [AT2] tryb zdjec autotestu: BMP -> PNG i zrzut okna gry (System.Drawing z .NET Framework, w GAC) -->
+    <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="MCMv5"><HintPath>$(GameLibs)/MCMv5.dll</HintPath><Private>false</Private></Reference>

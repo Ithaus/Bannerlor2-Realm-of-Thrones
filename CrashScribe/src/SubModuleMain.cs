@@ -29,6 +29,7 @@ namespace CrashScribe
                 Config.Load(Path.Combine(moduleRoot, "ModuleData"));
                 Blame.Map();
                 Scribe.Init();
+                Autotest.Arm(Scribe.ReportDir);   // przelacznik autotest.json: bez pliku nic sie nie zmienia
                 Trail.Init(Scribe.ReportDir);
                 Scribe.Line("Scribe ready. Reports: " + Scribe.ReportDir);
                 Watchdog.Init(Thread.CurrentThread);
@@ -86,6 +87,8 @@ namespace CrashScribe
             try
             {
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
+                // autotest PIERWSZY: wywrotka ponizej nie moze zostawic gry bez ochrony zapisow Jeffa
+                if (Autotest.Active) Autotest.Install(_harmony);
                 Watch.Install(_harmony);
                 Net.WrapModules(_harmony);
                 Net.WrapHotspots(_harmony);
@@ -137,6 +140,14 @@ namespace CrashScribe
             Watchdog.Beat();
             GcPulse.Tick();   // UW: linia "GC (UW)" raz na minute (Config.GcPulseLog)
             UnwindRepair.Tick();   // UW: zlecone skany (menu/sesja), pelny skan co 5 min, straz bajtow co 30 s - poza tym bez alokacji w klatce
+            if (Autotest.Active) { FrameProfiler.Frame(); Autotest.Tick(dt); }
+        }
+
+        /// <summary>[AT5] Tylko w autotescie z bitwami: liczniki bitwy (AutotestBattleLog) do misji otwartej przez "Attack" autotestu.</summary>
+        public override void OnMissionBehaviorInitialize(Mission mission)
+        {
+            base.OnMissionBehaviorInitialize(mission);
+            if (Autotest.Active) AutotestBattle.OnMissionInit(mission);
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
@@ -169,6 +180,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new BkrotSelfCallBehavior());   // P2 audytu 14.10: samowywolania BKROT (wpiecie raz na proces przy starcie sesji, linia "BKROT self call fix")
                 if (cgs != null) cgs.AddBehavior(new CanonAlliancesBehavior());   // noc 17/18.10 (f19-kanon-a): sojusze jak w kronikach, zrywanie spoza listy w 1. godzinie, wojna Reach - Polnoc po smierci Renly'ego, linia "Sojusze kanonu (SK)"
                 if (cgs != null) cgs.AddBehavior(new UnwindRepairBehavior());   // UW (zawieszenie 19.10 16:09): pelny skan naprawy opisu stosu na starcie sesji i raz na dobe
+                if (cgs != null && Autotest.Active) cgs.AddBehavior(new AutotestBehavior());   // tylko w autotescie
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }
