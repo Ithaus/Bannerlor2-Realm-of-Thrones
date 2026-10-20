@@ -10,23 +10,28 @@
 //  - decale BEZ encji (ten sam wzor co drogi boczne / piana statkow NavalDLC: Decal.CreateDecal -> SetMaterial -> Scene.AddDecalInstance(decal, "editor_set")
 //    -> Frame; zdjecie Scene.RemoveDecalInstance). Kolor zmienia SetFactor1 na zywym decalu (tak gra barwi tropy partii: MapTracksVisualManager
 //    .ParallelUpdateTrackColors) - TYLKO przy zmianie wygladu pola, nie co klatke;
-//  - KTO MA POLA (100% wsi rolniczych): kazda wies gry (ok. 570; rybacka i gornicza mniej pol) i kazda wioska ukladu Armoury (ok. 1 950) poza przysiolkami na
-//    pustkowiach (pasterze, drwale, weglarze, mysliwi, rybacy - kolumna hamlet: oni nie oraja); liczba pol z wielkosci wioski (poziom 1/2/3 = 2/3/4 pola,
-//    mlyn / wiatrak / zagroda / spichlerz +1, rybacka -2, najmniej 1);
+//  - KTO MA POLA (plan dla kazdej wsi rolniczej): kazda wies gry (ok. 570; rybacka i gornicza mniej pol) i kazda wioska ukladu Armoury (ok. 1 950) poza
+//    przysiolkami na pustkowiach (pasterze, drwale, weglarze, mysliwi, rybacy - kolumna hamlet: oni nie oraja); liczba pol z wielkosci wioski (poziom 1/2/3 =
+//    2/3/4 pola, mlyn / wiatrak / zagroda / spichlerz +1, rybacka -2, najmniej 1). Wies bez ladu uprawnego wokol (woda, bagno, stok, gesto sasiedzi) zostaje
+//    bez pol - linia "stan" liczy takie wsie ("bez zadnego pola");
 //  - GDZIE: pierscien wokol obrazka wioski (pol obrysu + pol pola + 0.2 jedn.), katy rowno co 360/K st. od frontu wioski (+ hash), pole wzdluz pierscienia.
 //    Pole odrzucone (probuje 6 miejsc, potem bez tego pola): za blisko miasta / zamku, nachodzi na inne pole wioski, nie po swojej stronie granicy z sasiednia
 //    wioska (polplaszczyzna Voronoi z zapasem pol pola - pola dwoch wiosek nigdy na siebie nie wchodza) albo na jej obrazek, nie na ladzie uprawnym (sciana
-//    siatki: Plain / Desert / Forest / Steppe / RuralArea - bez sniegu wiecznego, bagna, wydm i plazy), na drodze (MapRoads.KindAt - trakt albo droga boczna
-//    w siatce premii), na stoku (rozrzut wysokosci rogow > 0.7 jedn. albo normalna < 0.85);
+//    siatki: Plain / Desert / Forest / Steppe / RuralArea - bez sniegu wiecznego, bagna, wydm i plazy), na farbie drogi (MapRoads.PaintNear - prostokat pola
+//    wobec pasa traktu albo drogi bocznej: pol-szerokosc farby + RoadGap 0.2 jedn.; recenzja: NIE margines premii predkosci 1.0, ktory zabieral pola z pasa
+//    1.25 jedn. od osi kazdej drogi przy wioskach), na stoku (rozrzut wysokosci rogow > 0.7 jedn. albo normalna < 0.85). Wioska bez zadnego pola po 6 probach
+//    (recenzja) - pierscien zapasowy: 24 katy x 3 odleglosci, do K pol;
 //  - PORA POL (raz na dobe gry, ta sama dla calego swiata; dni w roku 364-dniowym, inny rok - proporcjonalnie): dni 0-69 zaorane (siew), 70-195 zielone,
 //    okno zniw FreeHands (dni 196-252, ta sama regula co rece do zniw i plon - lato albo jesien Westeros): 196-223 dojrzale zolte, 224-252 sciernisko;
 //    253-299 sciernisko (w roku wiosny Westeros, bez zniw - zielone), od 300 zaorane. ZIMA Westeros (pora nieba - ta sama, ktora pokrywa mape sniegiem):
-//    kraina zimna (WinterRealm 1.0) - pola znikaja pod sniegiem (decal zdjety ze sceny), kraina ciepla (Dorne i Essos, czynnik < 1) - zaorany ugor,
+//    kraina zimna (WinterRealm 1.0) - pola znikaja pod sniegiem (decal zdjety ze sceny), kraina ciepla (Dorne i Essos, czynnik < 1) - zaorane i puste (LPlough),
 //    Wyspy Letnie (0) - zielone;
 //  - STAN WSI (co godzine gry, tylko wsie w scenie): wies gry rabowana albo zlupiona (VillageState BeingRaided / Looted) - wszystkie pola spalone (ciemne);
-//    wioska ukladu - ksiega wiosek (VillageBook.LookOf): spalona - pola spalone, puste osady (rabunek + glod) - tyle pol odlogiem (szarobure), ile osad pustych;
+//    wioska ukladu - ksiega wiosek (VillageBook.LookOf): spalona - pola spalone, puste osady (rabunek + glod) - taki udzial POSTAWIONYCH pol odlogiem (szarobure),
+//    jaki udzial osad pusty;
 //    bez ksiegi - stan wsi gry okregu. Odczyt ksiegi tylko przy zmianie jej numeru wygladu (LookVersion) albo przy wejsciu wioski do sceny;
-//  - WYDAJNOSC: plan pol wioski dopiero, gdy jej komorka (32 x 32 jedn.) pierwszy raz wchodzi w kolo widoku kamery (do 6 prob miejsca x 16 sond terenu i drogi na pole), potem w
+//  - WYDAJNOSC: plan pol wioski dopiero, gdy jej komorka (32 x 32 jedn.) pierwszy raz wchodzi w kolo widoku kamery (do 6 prob miejsca x 5 sond terenu + test pasa drogi
+//    na pole; pierscien zapasowy najwyzej 72 proby na wies bez pola), potem w
 //    pamieci; w scenie tylko pola komorek w kole widoku (to samo kolo co drogi boczne - MapSideRoads.ViewCircle, histereza 16 jedn.), kamera wyzej niz
 //    min(MapVillagesHideAboveCameraHeight, 110) - zadnego pola (jak wioski i drogi); praca 4 razy na sekunde, budzet 4 ms na cwierc sekundy; co klatke nic
 //    (CLAUDE.md 7). Zmiana siatki drog (start premii, drogi boczne opublikowane / zdjete) - pola od nowa (raz na zmiane);
@@ -80,10 +85,10 @@ namespace Armoury
         private static void Reg() { MapFieldsView.EnsureRegistered(); }
 
         /// <summary>Pora pol swiata (raz na dobe gry): wyglad z dnia roku i pory Westeros; LSnow = zima nieba (wies wybiera wedlug krainy - LookFor).</summary>
-        internal static byte Phase(out int doy, out int season, out bool harvest)
+        internal static byte Phase(out int doy, out int season, out bool harvest, out int y)
         {
             doy = 0; season = -1; harvest = false;
-            int y = Math.Max(28, CampaignTime.DaysInYear);
+            y = Math.Max(28, CampaignTime.DaysInYear);   // recenzja: dlugosc roku do logu - sprawdz_logi przelicza dzien na rok 364 jak tu
             int d = (int)CampaignTime.Now.ToDays % y; if (d < 0) d += y;
             doy = d;
             int d364 = (int)Math.Round(d * 364.0 / y);
@@ -121,7 +126,7 @@ namespace Armoury
         public float Realm = 1f;
         public int BookVer = int.MinValue;
         public bool BookBurned, BookKnown;
-        public int BookFallow;
+        public double BookQ;                   // udzial pustych osad z ksiegi (0..1); odlogiem = round(postawione pola * BookQ) - recenzja: nie od planowanego K
     }
 
     internal sealed class FieldPatch
@@ -148,6 +153,9 @@ namespace Armoury
         private const float MaxSpread = 0.7f;        // rozrzut wysokosci rogow pola (stok)
         private const float MinNormalZ = 0.85f;
         private const float Alpha = 0.92f;
+        private const float RoadGap = 0.2f;          // zapas poza pol-szerokoscia farby drogi (cieciwa osi drogi bocznej ok. 0.06 + miekki brzeg stempla)
+        private const int RingAngles = 24;           // pierscien zapasowy wioski bez pola: co 15 st.
+        private static readonly float[] RingDd = { 0f, 0.7f, 1.4f };
         private const string DecalSet = "editor_set";
         private static readonly string[] MatNames = { "decal_production_farm_wheat_a", "decal_production_farm_wheat_b", "decal_production_farm_wheat_c", "decal_production_farm_wheat_d" };
         private static readonly float[,] MatArg = { { 0.490f, 0.490f, -0.010f, -0.040f }, { 0.490f, 0.490f, 0.500f, 0.040f }, { 0.490f, 0.510f, -0.020f, 0.450f }, { 0.520f, 0.510f, 0.470f, 0.560f } };
@@ -188,14 +196,15 @@ namespace Armoury
         private string _matNote = "";
         // pora i stan
         private byte _phase = MapFields.LNone;
-        private int _lastDay = int.MinValue, _lastHour = int.MinValue, _doy, _season = -1;
+        private int _lastDay = int.MinValue, _lastHour = int.MinValue, _doy, _season = -1, _ylen = 364;
         private bool _harvest;
         private object _gridRef;
         private bool _gridKnown;
         // pomiar
-        private long _buildTicks, _maxTickTicks, _planTicks;
+        private long _buildTicks, _maxTickTicks, _planTicks, _planCalls;
         private int _buildTickCount, _live, _made, _removed, _plannedV, _plannedF, _noField, _replans, _phaseChanges, _stateRefresh, _lookChanges, _clearMem;
         private int _rTown, _rOwn, _rNeighbor, _rLand, _rRoad, _rSlope;
+        private int _zeroV, _ringV, _ringF;   // recenzja: wsi z planem bez zadnego pola, wsi i pol uratowanych pierscieniem zapasowym
         private int _stPlan, _stCreate, _stLook, _stRemove, _stTick, _stState;
         private double _startMs;
         private string _startText = "", _lastSummary = "";
@@ -399,13 +408,13 @@ namespace Armoury
                 }
             }
             _startMs = sw.Elapsed.TotalMilliseconds;
-            int doy, season; bool harvest;
-            byte ph = MapFields.Phase(out doy, out season, out harvest);
+            int doy, season, ylen; bool harvest;
+            byte ph = MapFields.Phase(out doy, out season, out harvest, out ylen);
             _startText = "wsi z polami " + _vill.Count + " (wsie gry " + game + ", w tym rybackich / gorniczych z 2 polami " + gameFew + "; wioski ukladu " + layout
                          + (recs == null ? " - uklad wiosek " + (s != null && s.MapVillagesEnabled ? "NIEWCZYTANY" : "wylaczony (MapVillagesEnabled)") : "") + ", w tym rybackich " + layoutFew
                          + "; bez pol: przysiolki na pustkowiach " + hamlets + (bad > 0 ? ", zle wiersze " + bad : "") + "), pol w planie najwyzej " + fieldsPlan
                          + ", komorek " + cellsUsed + " po " + CellSize.ToString("0", Inv) + " jedn., miasta i zamki " + _tx.Count + "; czas " + _startMs.ToString("0.0", Inv) + " ms";
-            Log.Info(MapFields.P + "start - " + _startText + "; pora pol teraz: " + MapFields.LookName[ph] + " (dzien roku " + doy + ", pora Westeros " + MapFields.SeasonName(season)
+            Log.Info(MapFields.P + "start - " + _startText + "; pora pol teraz: " + MapFields.LookName[ph] + " (dzien roku " + doy + ", rok " + ylen + " dni, pora Westeros " + MapFields.SeasonName(season)
                      + ", okno zniw " + (harvest ? "TAK" : "NIE") + "). Pola stawia widok mapy wokol kamery - bez zmian ekonomii, tras i zapisu gry.");
         }
 
@@ -494,6 +503,9 @@ namespace Armoury
             int n = RemoveAll();
             int vp = 0;
             foreach (var v in _vill) { if (v.Planned) vp++; v.Planned = false; v.Fields = null; }
+            // recenzja: liczniki planu od zera - stary plan wyrzucony (inaczej po publikacji drog bocznych wsie liczone dwa razy); czas planu dalej narasta
+            _plannedV = _plannedF = _noField = _zeroV = _ringV = _ringF = 0;
+            _rTown = _rOwn = _rNeighbor = _rLand = _rRoad = _rSlope = 0;
             _replans++;
             if (_replans <= 5 || _replans % 50 == 0)
                 Log.Info(MapFields.P + "siatka drog zmieniona (premia drog / drogi boczne) - zdjete pola " + n + ", plan " + vp + " wsi od nowa przy kamerze (zmiana " + _replans + ").");
@@ -505,9 +517,9 @@ namespace Armoury
             int day = (int)Math.Floor(CampaignTime.Now.ToDays);
             if (day == _lastDay) return;
             _lastDay = day;
-            int doy, season; bool harvest;
-            byte ph = MapFields.Phase(out doy, out season, out harvest);
-            _doy = doy; _season = season; _harvest = harvest;
+            int doy, season, ylen; bool harvest;
+            byte ph = MapFields.Phase(out doy, out season, out harvest, out ylen);
+            _doy = doy; _season = season; _harvest = harvest; _ylen = ylen;
             // kraina (zima) - czynnik krainy wsi w scenie raz na dobe
             foreach (var c in _active) foreach (var v in c.V) if (v.Fields != null) RefreshRealm(v);
             if (ph == _phase) return;
@@ -516,7 +528,7 @@ namespace Armoury
             if (old != MapFields.LNone)
             {
                 _phaseChanges++;
-                Log.Info(MapFields.P + "pora pol " + MapFields.LookName[old] + " -> " + MapFields.LookName[ph] + " (dzien roku " + doy + ", pora Westeros " + MapFields.SeasonName(season)
+                Log.Info(MapFields.P + "pora pol " + MapFields.LookName[old] + " -> " + MapFields.LookName[ph] + " (dzien roku " + doy + ", rok " + ylen + " dni, pora Westeros " + MapFields.SeasonName(season)
                          + ", okno zniw " + (harvest ? "TAK" : "NIE") + "); zmiany pory od wczytania " + _phaseChanges + ", pol w scenie " + _live + ".");
             }
             ApplyActive();
@@ -561,14 +573,15 @@ namespace Armoury
                     double n, e; bool b;
                     v.BookKnown = VillageBook.LookOf(v.Uid, out n, out e, out b);
                     v.BookBurned = v.BookKnown && b;
-                    v.BookFallow = 0;
+                    v.BookQ = 0;
                     if (v.BookKnown && !b && n > 1e-6)
                     {
                         double q = e / n; if (q < 0) q = 0; else if (q > 1) q = 1;
-                        v.BookFallow = (int)Math.Round(v.K * q);
+                        v.BookQ = q;
                     }
                 }
-                if (v.BookKnown) { v.Burned = v.BookBurned; v.Fallow = v.BookFallow; }
+                // recenzja: odlogiem udzial POSTAWIONYCH pol (lista bywa krotsza od K - pola bez miejsca; po planie od nowa inna dlugosc)
+                if (v.BookKnown) { v.Burned = v.BookBurned; v.Fallow = v.Fields != null ? (int)Math.Round(v.Fields.Length * v.BookQ) : 0; }
                 else { v.Burned = vanilla; v.Fallow = 0; }   // bez ksiegi - stan wsi gry okregu
             }
             catch (Exception e) { _stState++; if (_stState <= 3 || _stState % 500 == 0) Log.Error("MapFieldsView.RefreshState (potkniecie " + _stState + ")", e); }
@@ -580,7 +593,7 @@ namespace Armoury
             if (ph == MapFields.LSnow)
             {
                 if (v.Realm >= 0.99f) return MapFields.LSnow;               // kraina zimna - pod sniegiem
-                if (v.Realm > 0.001f) return v.Burned ? MapFields.LBurned : MapFields.LPlough;   // ciepla - zaorany ugor
+                if (v.Realm > 0.001f) return v.Burned ? MapFields.LBurned : MapFields.LPlough;   // ciepla - zaorane i puste do wiosennego siewu (napis MCM: "ploughed and bare")
                 ph = MapFields.LGreen;                                       // Wyspy Letnie - bez zimy
             }
             if (v.Burned) return MapFields.LBurned;
@@ -748,6 +761,7 @@ namespace Armoury
         {
             v.Planned = true;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            _planCalls++;
             try
             {
                 var list = new List<FieldPatch>(v.K);
@@ -778,11 +792,33 @@ namespace Armoury
                     }
                     if (!done)
                     {
-                        _noField++;
                         switch (why) { case 1: _rTown++; break; case 2: _rOwn++; break; case 3: _rNeighbor++; break; case 4: _rLand++; break; case 5: _rRoad++; break; default: _rSlope++; break; }
                     }
                 }
+                // recenzja: zadne pole nie znalazlo miejsca w 6 probach (lad tylko w luce miedzy katami) - pierscien zapasowy: 24 katy x 3 odleglosci, najblizej
+                // najpierw, do K pol (wymiary i material pola o numerze n jak wyzej; pola obok siebie nie nachodza - Check 2)
+                if (n == 0 && v.K > 0)
+                {
+                    for (int dd = 0; dd < RingDd.Length && n < v.K; dd++)
+                        for (int t = 0; t < RingAngles && n < v.K; t++)
+                        {
+                            double a = v.A0 + t * Math.PI * 2.0 / RingAngles;
+                            float ha = v.Rf * (float)(0.85 + 0.15 * Hash01(v.Key, 31 + n * 7));
+                            float hb = v.Rf * (float)(1.0 + 0.3 * Hash01(v.Key, 32 + n * 7));
+                            float rad = (float)Math.Sqrt(ha * ha + hb * hb);
+                            float dist = v.D + RingDd[dd] * v.Rf;
+                            float x = v.X + (float)Math.Cos(a) * dist, y = v.Y + (float)Math.Sin(a) * dist;
+                            float yaw = (float)(a + Math.PI * 0.5 + (Hash01(v.Key, 34 + n * 7) - 0.5) * 0.5);
+                            MatrixFrame fr;
+                            if (Check(v, x, y, ha, hb, rad, yaw, px, py, pr, n, ms, out fr) != 0) continue;
+                            list.Add(new FieldPatch { Fr = fr, Mat = (int)(Hash01(v.Key, 33 + n * 7) * 4.0) & 3 });
+                            px[n] = x; py[n] = y; pr[n] = Math.Max(ha, hb); n++;
+                        }
+                    if (n > 0) { _ringV++; _ringF += n; }
+                }
                 v.Fields = list.ToArray();
+                _noField += v.K - v.Fields.Length;   // pola planu, ktore ostatecznie nie maja miejsca
+                if (v.Fields.Length == 0) _zeroV++;
                 _plannedV++;
                 _plannedF += v.Fields.Length;
             }
@@ -795,7 +831,7 @@ namespace Armoury
             finally { _planTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; }
         }
 
-        /// <summary>0 - pole dobre (fr - ramka decala); 1 miasto / zamek, 2 inne pole wioski, 3 sasiednia wioska, 4 nie lad uprawny, 5 droga, 6 stok / zly teren.</summary>
+        /// <summary>0 - pole dobre (fr - ramka decala); 1 miasto / zamek, 2 inne pole wioski, 3 sasiednia wioska, 4 nie lad uprawny, 5 farba drogi, 6 stok / zly teren.</summary>
         private int Check(FieldVillage v, float x, float y, float ha, float hb, float rad, float yaw, float[] px, float[] py, float[] pr, int n,
                           TaleWorlds.CampaignSystem.Map.IMapScene ms, out MatrixFrame fr)
         {
@@ -824,8 +860,10 @@ namespace Armoury
                 if (ab < 1e-3f) return 3;
                 if ((db2 - da2) / (2f * ab) < rad * 0.9f) return 3;   // nie po swojej stronie granicy z sasiadem (z zapasem)
             }
-            // teren: srodek i 4 rogi - lad uprawny, bez drogi, bez stoku
+            // droga (recenzja): prostokat pola wobec pasa farby traktu / drogi bocznej (pol-szerokosc + RoadGap), siatka z chwili planu - bez marginesu premii
             float c = (float)Math.Cos(yaw), s = (float)Math.Sin(yaw);
+            if (MapRoads.PaintNear(_gridRef, x, y, c, s, ha, hb, RoadGap)) return 5;
+            // teren: srodek i 4 rogi - lad uprawny, bez stoku
             float zmin = float.MaxValue, zmax = float.MinValue;
             for (int k = 0; k < 5; k++)
             {
@@ -838,8 +876,6 @@ namespace Armoury
                 var cv = new CampaignVec2(new Vec2(qx, qy), true);
                 PathFaceRecord f = ms.GetFaceIndex(in cv);
                 if (!f.IsValid() || !Arable(f.FaceGroupIndex)) return 4;
-                int kind = MapRoads.KindAt(qx, qy);
-                if (kind > 0) return 5;
                 float z; Vec3 nn;
                 ms.GetTerrainHeightAndNormal(new Vec2(qx, qy), out z, out nn);
                 if (float.IsNaN(z) || float.IsInfinity(z)) return 6;
@@ -953,16 +989,18 @@ namespace Armoury
             }
             var sb = new StringBuilder();
             sb.Append("w scenie pol ").Append(_live).Append(" (komorek ").Append(inCells).Append(", widoczne ").Append(_visible ? "tak" : "nie - kamera wysoko").Append(")");
-            sb.Append("; wsi z planem ").Append(_plannedV).Append(" z ").Append(_vill != null ? _vill.Count : 0).Append(", pol w planie ").Append(_plannedF)
-              .Append(" (bez miejsca: ").Append(_noField).Append(" - miasto/zamek ").Append(_rTown).Append(", inne pole ").Append(_rOwn).Append(", sasiad ").Append(_rNeighbor)
-              .Append(", nie lad uprawny ").Append(_rLand).Append(", droga ").Append(_rRoad).Append(", stok ").Append(_rSlope).Append(")");
+            sb.Append("; wsi z planem ").Append(_plannedV).Append(" z ").Append(_vill != null ? _vill.Count : 0).Append(" (bez zadnego pola ").Append(_zeroV)
+              .Append("), pol w planie ").Append(_plannedF)
+              .Append(" (bez miejsca: ").Append(_noField).Append("; odrzucone w 6 probach - miasto/zamek ").Append(_rTown).Append(", inne pole ").Append(_rOwn).Append(", sasiad ").Append(_rNeighbor)
+              .Append(", nie lad uprawny ").Append(_rLand).Append(", farba drogi ").Append(_rRoad).Append(", stok ").Append(_rSlope)
+              .Append("; pierscien zapasowy: wsi ").Append(_ringV).Append(", pol ").Append(_ringF).Append(")");
             sb.Append("; wyglad pol komorek w scenie:");
             for (int i = 0; i < MapFields.LCount; i++) sb.Append(i == 0 ? " " : ", ").Append(MapFields.LookName[i]).Append(' ').Append(cnt[i]);
-            sb.Append("; pora pol ").Append(_phase < MapFields.LCount ? MapFields.LookName[_phase] : "-").Append(" (dzien roku ").Append(_doy).Append(", pora Westeros ")
+            sb.Append("; pora pol ").Append(_phase < MapFields.LCount ? MapFields.LookName[_phase] : "-").Append(" (dzien roku ").Append(_doy).Append(", rok ").Append(_ylen).Append(" dni, pora Westeros ")
               .Append(MapFields.SeasonName(_season)).Append(", okno zniw ").Append(_harvest ? "TAK" : "NIE").Append("), zmiany pory ").Append(_phaseChanges)
               .Append(", zmiany wygladu pol ").Append(_lookChanges).Append(", odswiezenia stanu ").Append(_stateRefresh);
             sb.Append("; stawianie ").Append(Ms(_buildTicks)).Append(" ms w ").Append(_buildTickCount).Append(" tickach (najdluzszy ").Append(Ms(_maxTickTicks)).Append(" ms), plan wsi ")
-              .Append(Ms(_planTicks)).Append(" ms").Append(_plannedV > 0 ? " (" + (_planTicks * 1000000.0 / System.Diagnostics.Stopwatch.Frequency / _plannedV).ToString("0", Inv) + " us na wies)" : "")
+              .Append(Ms(_planTicks)).Append(" ms").Append(_planCalls > 0 ? " (" + (_planTicks * 1000000.0 / System.Diagnostics.Stopwatch.Frequency / _planCalls).ToString("0", Inv) + " us na wies)" : "")
               .Append(", postawione ").Append(_made).Append(", zdjete ").Append(_removed).Append(", plan od nowa (siatka drog) ").Append(_replans)
               .Append("; ").Append(_matCount).Append(" materialy pola").Append(_matNote).Append("; czyszczenie pamieci GPU ").Append(_clearMem);
             sb.Append("; potkniecia: plan ").Append(_stPlan).Append(", stawianie ").Append(_stCreate).Append(", wyglad ").Append(_stLook).Append(", stan ").Append(_stState)

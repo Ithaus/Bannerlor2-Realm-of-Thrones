@@ -6700,7 +6700,7 @@ namespace Armoury
         [SettingPropertyGroup("Side roads to far villages")]
         public int MapSideRoadsChunkRadiusCap { get; set; } = 160;
 
-        [SettingPropertyBool("Map Village Fields", HintText = "fields around the villages of the campaign map that change with the time of the year: ploughed in early spring, green while the crop grows, golden in the harvest weeks and stubble after the reaping (only in a summer or autumn of Westeros - the same harvest the villages live on), and under snow through a Westeros winter in the cold lands (the warm south lies fallow). A raided village shows burnt fields, a half-deserted one leaves part of its fields untilled. Only a picture - nothing in the economy, the routes or the save changes. Off = no fields are drawn", RequireRestart = false)]
+        [SettingPropertyBool("Map Village Fields", HintText = "fields around the villages of the campaign map that change with the time of the year: ploughed at the start of every year, green while the crop grows, golden in the harvest weeks and stubble after the reaping (only in a summer or autumn of Westeros - the same harvest the villages live on). Through a Westeros winter the fields of the cold lands lie under snow and those of the warm south lie ploughed and bare. A raided village shows burnt fields, a half-deserted one leaves part of its fields untilled. Only a picture - nothing in the economy, the routes or the save changes. Off = no fields are drawn", RequireRestart = false)]
         [SettingPropertyGroup("Fields around villages")]
         public bool MapVillageFields { get; set; } = true;
 

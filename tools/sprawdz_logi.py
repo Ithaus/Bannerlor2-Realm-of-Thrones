@@ -1587,8 +1587,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa p6pola    : (20.10, galaz p6-pola - R3-07b, POMYSLY-35 pkt 18; Armoury/src/MapFields.cs, klucz Map Village Fields) pola wokol wiosek na mapie wedlug pory
                     roku. python -I tools/sprawdz_logi.py --grupa p6pola <Armoury-*.log> (strumieniowo). PP-0 linie "Pola (p6)" (brak - INFO: log sprzed galezi albo klucz
                     NIE); PP-1 start: wsi z polami > 0 i czas startu <= 100 ms; PP-2 ostatnia linia "stan": wsi z planem > 0, pol w planie > 0, przy kamerze nisko pol w
-                    scenie > 0; PP-3 udzial pol bez miejsca <= 60% (INFO z rozkladem przyczyn); PP-4 najdluzszy tick stawiania <= 15 ms (budzet 4 ms + jedna wioska);
-                    PP-5 pora pol (linie "pora pol A -> B" - INFO z lista) i zgodnosc pory z dniem roku w linii startu; PP-6 potkniecia (najwiecej w linii "stan") i
+                    scenie > 0; PP-3 udzial pol bez miejsca <= 60% (INFO z rozkladem przyczyn); PP-3b (recenzja) wsi z planem bez zadnego pola <= 5%; PP-3c
+                    (recenzja) pola odrzucone przez farbe drogi <= 10% pol planu (log sprzed recenzji z przyczyna "droga" - INFO); PP-4 najdluzszy tick stawiania
+                    <= 15 ms (budzet 4 ms + jedna wioska); PP-5 pora pol (linie "pora pol A -> B" - INFO z lista) i zgodnosc pory z dniem roku w linii startu (dzien
+                    przeliczony na rok 364 jak MapFields.Phase, dlugosc roku z linii - "rok N dni"; bez niej 364); PP-6 potkniecia (najwiecej w linii "stan") i
                     linie "ERROR in MapFields*" 0.
 --grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
                     najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
@@ -47407,11 +47409,14 @@ def nboczne_main(logp):
 P6POLA_HEAD = "Pola (p6): "
 
 
-def p6pola_phase(doy, season, harvest):
-    """Pora pol z dnia roku (rok 364), pory Westeros i okna zniw - ta sama regula co MapFields.Phase (do sprawdzenia linii startu)."""
+def p6pola_phase(doy, season, harvest, ylen=364):
+    """Pora pol z dnia roku, pory Westeros i okna zniw - ta sama regula co MapFields.Phase (do sprawdzenia linii startu). Recenzja: dzien przeliczony na rok
+    364 jak w C# (Math.Round - zaokraglenie do parzystej, jak round() w Pythonie); ylen z linii logu ("rok N dni")."""
     if season == "Winter":
         return "pod sniegiem"
     crops = season in ("Summer", "Autumn")
+    ylen = max(28, ylen or 364)
+    doy = int(round(doy * 364.0 / ylen))
     if doy < 70:
         return "zaorane"
     if doy < 196:
@@ -47459,11 +47464,12 @@ def p6pola_main(logp):
         nv = num(r"wsi z polami (\d+)", st, int, 0) or 0
         ms = num(r"; czas ([0-9.]+) ms", st, float, -1.0)
         rep.add("PP-1: start (ostatnia mapa)", f"wsi z polami {nv}, czas {ms:.1f} ms; {st[len(P6POLA_HEAD) + 8:][:260]}", "wsi z polami > 0, czas <= 100 ms", nv > 0 and 0 <= ms <= 100)
-        mp = re.search(r"pora pol teraz: (.+?) \(dzien roku (\d+), pora Westeros (\w+), okno zniw (TAK|NIE)\)", st)
+        mp = re.search(r"pora pol teraz: (.+?) \(dzien roku (\d+)(?:, rok (\d+) dni)?, pora Westeros (\w+), okno zniw (TAK|NIE)\)", st)
         if mp:
-            want = p6pola_phase(int(mp.group(2)), mp.group(3), mp.group(4) == "TAK")
-            rep.add("PP-5: pora pol przy starcie wobec dnia roku", f"{mp.group(1)} (dzien {mp.group(2)}, {mp.group(3)}, okno zniw {mp.group(4)}); regula: {want}",
-                    "zgodna z regula (rok 364 dni)", mp.group(1) == want)
+            ylen = int(mp.group(3)) if mp.group(3) else 364
+            want = p6pola_phase(int(mp.group(2)), mp.group(4), mp.group(5) == "TAK", ylen)
+            rep.add("PP-5: pora pol przy starcie wobec dnia roku", f"{mp.group(1)} (dzien {mp.group(2)} z {ylen}, {mp.group(4)}, okno zniw {mp.group(5)}); regula: {want}",
+                    "zgodna z regula (dzien przeliczony na rok 364)", mp.group(1) == want)
     else:
         rep.add("PP-1: start (ostatnia mapa)", "brak linii 'start'", "jest przy wlaczonych polach", False)
     if rows:
@@ -47476,8 +47482,21 @@ def p6pola_main(logp):
         rep.add("PP-2: pola w planie i w scenie (ostatnia linia stanu)", f"wsi z planem {pv}, pol w planie {pf}, w scenie {live} (kamera {'nisko' if vis else 'wysoko'})",
                 "wsi z planem > 0, pol w planie > 0, w scenie > 0 przy kamerze nisko", pv > 0 and pf > 0 and (live > 0 or not vis))
         share = nofield / (nofield + pf) if nofield + pf > 0 else 0.0
-        why = re.search(r"\(bez miejsca: \d+ - ([^)]*)\)", r)
+        why = re.search(r"\(bez miejsca: \d+(?: - |; odrzucone w 6 probach - )([^)]*)\)", r)
         rep.add("PP-3: pola bez miejsca (udzial)", f"{nofield} z {nofield + pf} ({share:.0%}); {why.group(1) if why else '-'}", "<= 60%", share <= 0.60)
+        zero = num(r"\(bez zadnego pola (\d+)\)", r, int, -1)
+        if zero is not None and zero >= 0:
+            zs = zero / pv if pv > 0 else 0.0
+            rep.add("PP-3b: wsi z planem bez zadnego pola (recenzja)", f"{zero} z {pv} ({zs:.1%})", "<= 5%", zs <= 0.05)
+        else:
+            rep.add("PP-3b: wsi z planem bez zadnego pola (recenzja)", "brak licznika w linii stanu", "INFO (log sprzed recenzji)", None)
+        road = num(r", farba drogi (\d+)", r, int, -1)
+        if road is not None and road >= 0:
+            rs = road / (nofield + pf) if nofield + pf > 0 else 0.0
+            rep.add("PP-3c: pola odrzucone przez farbe drogi (recenzja)", f"{road} z {nofield + pf} pol planu ({rs:.1%})", "<= 10%", rs <= 0.10)
+        else:
+            old = num(r", droga (\d+), stok", r, int, -1)
+            rep.add("PP-3c: pola odrzucone przez farbe drogi (recenzja)", f"przyczyna 'droga' (margines premii) {old}", "INFO (log sprzed recenzji)", None)
         look = re.search(r"wyglad pol komorek w scenie: ([^;]*);", r)
         rep.add("PP-5b: wyglad pol w scenie (ostatnia linia stanu)", look.group(1) if look else "-", "INFO", None)
         tick = num(r"tickach \(najdluzszy ([0-9.]+) ms\)", r, float, -1.0)
