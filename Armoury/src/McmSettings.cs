@@ -3528,7 +3528,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool TownFoodByVillagePeople { get; set; } = true;
 
-        [SettingPropertyBool("Town Granary From Villages", HintText = "towns get from their villages only the grain the villages can spare (above two years of their own food, one year when the town runs short), paid from the town's money at its grain price; a town with food in store or at its market does not starve. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Town Granary From Villages", HintText = "towns get from their villages only the grain the villages can spare (above two years of their own food, a year and a quarter when the town runs short - the famine gate's reserve and its loss allowance), paid from the town's money at its grain price; a town with food in store or at its market does not starve. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownGranaryFromVillages { get; set; } = true;
 
@@ -6688,7 +6688,7 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public float RaidTributeShareHigh { get; set; } = 0.20f;
 
-        [SettingPropertyInteger("Raid Tribute Spare Days", 1, 84, "0", HintText = "with Raid Tribute Enabled: for how many days a village that paid tribute is spared by the realm it paid - its lords do not raid it and do not ask again, and neither can you", RequireRestart = false)]
+        [SettingPropertyInteger("Raid Tribute Spare Days", 1, 364, "0", HintText = "with Raid Tribute Enabled: for how many days a village that paid tribute is spared by the realm it paid - its lords do not raid it and do not ask again, and neither can you", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public int RaidTributeSpareDays { get; set; } = 30;
 

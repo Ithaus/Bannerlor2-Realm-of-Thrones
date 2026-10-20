@@ -58,6 +58,10 @@ namespace Armoury
         private static bool AutoTestKey { get { var s = Settings.Current; return s != null && s.StartCalibrationAutoArmAutotest; } }
         // recenzja ks-arm (noc 17/18.10): budzet straty spichlerzy krainy pod KS, zboze patroli, bramka bez wylacznika w kampanii
         private static int LossDaysKey { get { var s = Settings.Current; int d = s != null ? s.KsLandGateLossDays : 91; return d < 0 ? 0 : (d > 364 ? 364 : d); } }
+        /// <summary>Recenzja n23 (p6-spichlerz): prog zapasu bramki krainy w dniach potrzeby razem z jej budzetem straty (Ks Land Gate Reserve Days + Ks Land Gate Loss
+        /// Days, domyslnie 364 + 91 = 455) - TownGranary nie sprzedaje miastu w niedoborze zboza wsi ponizej tego zapasu. 0 - ktorys klucz 0 (projekt 16.10 doslownie:
+        /// spadek liczy sie zawsze, wiec podloga nie ma czego chronic). Sam odczyt kluczy.</summary>
+        internal static int LandGateFloorDays { get { int r = ReserveDaysKey, l = LossDaysKey; return r == 0 || l == 0 ? 0 : r + l; } }
         private static bool PatrolKey { get { var s = Settings.Current; return s != null && s.KsPatrolGrainFromTown; } }
         private static bool BkPortsKey { get { var s = Settings.Current; return s != null && s.KsBkPortsInLedger; } }
         // f26-bramka (Jeff 19.10 "5. c"): strata spichlerzy z winy KS dokladnie (C) - na wies min(spadek, wzor gry - racje KS); NIE = miara A (WGRANIE 85)
@@ -589,6 +593,9 @@ namespace Armoury
                         if (_gPrev.TryGetValue(v, out prev))
                         {
                             double dv = prev - food;
+                            // recenzja n23 (p6-spichlerz): zboze sprzedane dzis miastu (TownGranary.Daily, ta sama doba przed bramka) to targ, nie spadek - spadek
+                            // najwyzej do zera (sprzedaz nie udaje napelniania: bez niej nadwyzka ponad sufit i tak przepadala)
+                            if (dv > 0) dv = Math.Max(0.0, dv - TownGranary.SoldToday(v, today));
                             a.Drop += dv; a.NeedD += need;
                             // f26-bramka (C): spadek tej wsi z winy KS = najwyzej tyle, ile KS dal jej dzis mniej niz wzor gry (psucie, zima, danina - reszta spadku
                             // bylaby i przy wzorze gry); wies bez plonu z Famine.Daily tej doby (hasH NIE) - 0

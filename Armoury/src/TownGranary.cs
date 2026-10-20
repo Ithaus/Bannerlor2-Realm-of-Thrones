@@ -25,8 +25,11 @@ namespace Armoury
     ///     to, czego i tak by nie zmiescila (nadwyzka ponad sufit przepadala w Famine jako "towar na wozy"). Gdy okreg zjada wlasny zapas (spichlerz ponizej 98%) - nic.
     ///     Miasto w niedoborze (zapas ponizej ShortDays dni wlasnego spozycia: mieszczanie + zaloga, albo ponizej ShortCapShare sufitu zapasu - nad alarmem BK
     ///     ClusterFoodTracker: bilans &lt; 0 i zapas &lt; 25% sufitu przez 14 dob = okreg "w zastoju", BK tnie plon wsi i sle wozy jedzenia z innych miast) placi
-    ///     drozej (cena kupna targu, nie sprzedazy), wiec wies sprzedaje takze z zapasu ponad KeepShareShort (rok wlasnej potrzeby) - do podwojnego progu niedoboru.
-    ///     Glod przychodzi do miasta dopiero wtedy, gdy wsie maja juz tylko swoj rok, a targ jest pusty (BK przy zapasie &lt;= 10% sufitu dokupuje jedzenie z polki
+    ///     drozej (cena kupna targu, nie sprzedazy), wiec wies sprzedaje takze z zapasu ponad ShortKeepShare - do podwojnego progu niedoboru. ShortKeepShare = rok
+    ///     wlasnej potrzeby (KeepShareShort), ale nie mniej niz prog zapasu bramki krainy KS z jej budzetem straty (Ks Land Gate Reserve Days + Ks Land Gate Loss
+    ///     Days, domyslnie 364 + 91 = 455 dni = 62.5% sufitu; recenzja n23: podloga 50% = dokladnie prog zapasu bramki - kraina sprzedajaca miastu w niedoborze
+    ///     tracila budzet straty 91 dni). Sprzedaz tej doby bramka krainy liczy jako targ, nie spadek spichlerza (SoldToday -> StartCalibration.LandGateDaily).
+    ///     Glod przychodzi do miasta dopiero wtedy, gdy wsie maja juz tylko swoj zapas, a targ jest pusty (BK przy zapasie &lt;= 10% sufitu dokupuje jedzenie z polki
     ///     na brak - EconomyPatches.ItemConsumptionPatch).
     ///     Jednostki: racje spichlerza (1 racja = jedzenie 1 czlowieka na dobe) / Q miasta (mieszczan na jednostke Food = ludzie ksiegi / (dobrobyt / 40) -
     ///     ta sama skala co Famine QOf), wiec racje wsi karmia tylu mieszczan, ilu ludzi wykarmilyby na wsi.
@@ -63,7 +66,7 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double KeepShare = 0.98;        // wies trzyma do 98% sufitu spichlerza (2 lata potrzeby) - ponad to sprzedaje miastu (WallTribute CapFill)
-        private const double KeepShareShort = 0.5;    // miasto w niedoborze: wies sprzedaje takze z zapasu ponad rok wlasnej potrzeby (polowa sufitu 2 lat)
+        private const double KeepShareShort = 0.5;    // miasto w niedoborze: wies sprzedaje takze z zapasu ponad rok wlasnej potrzeby (polowa sufitu 2 lat) - najmniej; ShortKeepShare
         private const double ShortDays = 30.0;        // miasto w niedoborze: zapas Food ponizej tylu dni spozycia (mieszczanie + zaloga)
         private const double ShortCapShare = 0.30;    // ... albo ponizej 30% sufitu zapasu (nad alarmem zastoju BK - 25% sufitu przy ujemnym bilansie)
         private const double MinUnits = 0.05;         // mniej jednostek Food sie nie kupuje
@@ -74,13 +77,14 @@ namespace Armoury
         private static readonly TextObject _txtBought = new TextObject("{=!}Grain from village barns");
         private static readonly TextObject _txtStore = new TextObject("{=!}Food in store");
 
-        /// <summary>Zakup dnia (jednostki Food na miasto) i doba zakupu - podmieniany w calosci w Daily, czytany w postfiksie (takze z watkow AI).</summary>
+        /// <summary>Zakup dnia (jednostki Food na miasto) i doba zakupu - podmieniany w calosci w Daily, czytany w postfiksie (takze z watkow AI).
+        /// Sold: racje sprzedane dzis ze spichlerza kazdej wsi (recenzja n23 - bramka krainy KS, tylko watek glowny).</summary>
         private sealed class DayBook
         {
-            internal readonly Dictionary<Town, float> Map; internal readonly int Day;
-            internal DayBook(Dictionary<Town, float> map, int day) { Map = map; Day = day; }
+            internal readonly Dictionary<Town, float> Map; internal readonly Dictionary<Village, double> Sold; internal readonly int Day;
+            internal DayBook(Dictionary<Town, float> map, Dictionary<Village, double> sold, int day) { Map = map; Sold = sold; Day = day; }
         }
-        private static readonly DayBook Empty = new DayBook(new Dictionary<Town, float>(), int.MinValue);
+        private static readonly DayBook Empty = new DayBook(new Dictionary<Town, float>(), new Dictionary<Village, double>(), int.MinValue);
         private static volatile DayBook _today = Empty;
         [ThreadStatic] private static bool _inTownTick;                   // wnetrze Town.DailyTick - zakup juz w zapasie
         [ThreadStatic] private static bool _noTerm;                       // nasz pomiar bilansu bez zakupu dnia
@@ -383,6 +387,31 @@ namespace Armoury
         /// <summary>Prog niedoboru miasta (jednostki Food): ShortDays dni spozycia albo ShortCapShare sufitu zapasu - wiekszy. Wyjatek leci do wolajacego.</summary>
         private static double ShortAt(Town t, double cons) { return Math.Max(ShortDays * cons, ShortCapShare * t.FoodStocksUpperLimit()); }
 
+        /// <summary>
+        /// Recenzja n23 (wazne): udzial sufitu spichlerza, ktory wies zostawia sobie, gdy jej miasto jest w niedoborze - rok wlasnej potrzeby (KeepShareShort),
+        /// ale nie mniej niz prog zapasu bramki krainy KS razem z jej budzetem straty (StartCalibration.LandGateFloorDays: Ks Land Gate Reserve Days + Ks Land Gate
+        /// Loss Days, domyslnie 364 + 91 = 455 dni = 62.5% sufitu 2 lat) i nie wiecej niz KeepShare. Dotad podloga 50% = dokladnie 364 dni = prog zapasu bramki:
+        /// kraina, ktora sprzedala miastu w niedoborze, liczyla spadek od pierwszej doby (bez budzetu 91 dni), wiec 7 dob spadku z winy KS (zima, A7) wracalo ja
+        /// do starych zasad. Sufit w dniach jak Famine.Daily (FamineBarnYears x dni roku). Bez alokacji.
+        /// </summary>
+        private static double ShortKeepShare(Settings s)
+        {
+            double capDays = Math.Max(0.05f, s.FamineBarnYears) * (double)Math.Max(28, CampaignTime.DaysInYear);
+            int gate = StartCalibration.LandGateFloorDays;
+            double share = gate > 0 && capDays > 0.0 ? gate / capDays : 0.0;
+            if (double.IsNaN(share) || double.IsInfinity(share)) share = 0.0;
+            return Math.Min(KeepShare, Math.Max(KeepShareShort, share));
+        }
+
+        /// <summary>Recenzja n23: racje sprzedane dzis miastu ze spichlerza wsi (Daily tej doby; 0 - nic, inna doba albo klucz wylaczony). Bramka krainy KS
+        /// (StartCalibration.LandGateDaily, ta sama doba po Daily) liczy je jako targ, nie spadek spichlerza. Tylko watek glowny. Nie rzuca.</summary>
+        internal static double SoldToday(Village v, int day)
+        {
+            var b = _today;
+            double x;
+            return v != null && b.Day == day && b.Sold.Count > 0 && b.Sold.TryGetValue(v, out x) && x > 0.0 ? x : 0.0;
+        }
+
         /// <summary>Miasto w niedoborze (zapas ponizej progu niedoboru). Bez alokacji. Wyjatek leci do wolajacego.</summary>
         private static bool IsShort(Town t)
         {
@@ -435,6 +464,8 @@ namespace Armoury
             int today = (int)CampaignTime.Now.ToDays;
             bool live = Live;
             var next = new Dictionary<Town, float>();
+            var soldV = new Dictionary<Village, double>();   // recenzja n23: racje sprzedane dzis z kazdej wsi (bramka krainy KS)
+            double keepShort = ShortKeepShare(s);           // recenzja n23: podloga sprzedazy w niedoborze nad progiem zapasu bramki krainy z budzetem straty
             int towns = 0, besieged = 0, walkers = 0, fedTowns = 0, fedVills = 0, shortTowns = 0, shortVills = 0, fullTown = 0, tinyVills = 0, noGold = 0, surplusVills = 0;
             double units = 0.0, rations = 0.0, barnDrop = 0.0, priceSum = 0.0, stockIn = 0.0; long gold = 0, townOut = 0, vilIn = 0; int priceN = 0;
             foreach (var town in Town.AllTowns)
@@ -474,7 +505,7 @@ namespace Armoury
                         if (v == null || v.Settlement == null || v.VillageState != Village.VillageStates.Normal || v.Settlement.IsUnderRaid) continue;
                         double home, harv, food, vcap; float u; int d;
                         if (!Famine.DayOf(v, out home, out harv, out food, out vcap, out u, out d) || d != today || u > 0f || !(vcap > 0.0)) continue;
-                        double sur = food - (shortT ? KeepShareShort : KeepShare) * vcap;
+                        double sur = food - (shortT ? keepShort : KeepShare) * vcap;
                         if (!(sur > 0.0)) continue;
                         surplusVills++;
                         double want = Math.Min(sur / q, room - got);
@@ -490,6 +521,7 @@ namespace Armoury
                         if (want < MinUnits) continue;
                         double took = Famine.TributeTake(v, want * q);   // racje ze spichlerza wsi (nie wiecej niz lezy)
                         if (!(took > 0.0)) continue;
+                        { double was; soldV.TryGetValue(v, out was); soldV[v] = was + took; }   // recenzja n23: zdjete ze spichlerza wsi od razu (zanim cos rzuci dalej)
                         double fAfter;   // kontrola: prawdziwy ubytek stodoly wsi (stan przed - stan po), nie z tych samych zmiennych co zakup
                         if (Famine.FoodOf(v, out fAfter)) barnDrop += food - fAfter;
                         double gu = took / q;
@@ -510,7 +542,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Daily(miasto)", e); }
             }
-            _today = new DayBook(next, today);
+            _today = new DayBook(next, soldV, today);
             _sessUnits += units; _sessRations += rations; _sessGold += gold;
             if (!s.LogEnabled) { NewDay(); return; }
             // pomiar po zakupie: pelny bilans (z naszymi skladnikami), Food 0, skladnik wsi zdjety
@@ -538,7 +570,7 @@ namespace Armoury
               .Append(" wsi do ").Append(fedTowns).Append(" miast; wsi z nadwyzka ").Append(surplusVills).Append(", bez miejsca w miescie ").Append(fullTown)
               .Append(", nadwyzka ponizej ").Append(F(MinUnits, "0.##")).Append(" Food ").Append(tinyVills).Append(", bez zaplaty (kasa miasta) ").Append(noGold)
               .Append(" | zloto miasto->wies ").Append(gold).Append(" zl (cena zboza srednio ").Append(priceN > 0 ? F(priceSum / priceN, "0.#") : "-").Append(" zl/szt.)")
-              .Append(" | miasta w niedoborze (zapas < ").Append(F(ShortDays, "0")).Append(" dni albo ").Append(F(ShortCapShare * 100.0, "0")).Append("% sufitu): ").Append(shortTowns).Append(", wsie sprzedaly z zapasu ponizej 98% sufitu ").Append(shortVills)
+              .Append(" | miasta w niedoborze (zapas < ").Append(F(ShortDays, "0")).Append(" dni albo ").Append(F(ShortCapShare * 100.0, "0")).Append("% sufitu; wsie zostawiaja sobie ").Append(F(keepShort * 100.0, "0.#")).Append("% sufitu spichlerza): ").Append(shortTowns).Append(", wsie sprzedaly z zapasu ponizej 98% sufitu ").Append(shortVills)
               .Append(" | skladnik wsi gry zdjety -").Append(F(termSum, "0.#")).Append("/d w ").Append(termTowns).Append(" miastach")
               .Append(" | miasta z bilansem < ").Append(F(_beThr, "0.##")).Append(": ").Append(neg).Append(" (bez oblezenia ").Append(negPeace).Append("; najnizszy ").Append(lowName).Append(' ')
               .Append(low == double.MaxValue ? "-" : F(low, "0.#")).Append(')')
