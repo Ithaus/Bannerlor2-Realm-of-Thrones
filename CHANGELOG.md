@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-20 (WGRANIE 92 - decyzje Jeffa 20.10 rano: wioska poboczna placi i dziala jak wies, przetop czesc, zloto startu, Wolni Ludzie, zlecenia z kiesy rodu)
+
+**Zakres (Jeff 20.10, doslownie):** "NIe ma poakzanego moje thiefts i mam na minusie, wioska nic nie zarabia?"; "okay olej to w senise zrob wersje fnalna"; "i do wioski ktora
+nalezy do mnie ja moge do niej wjechac, tak jak do normlanej wioski i tam dokonac sen, inwestycje, zakup rzeczy z tej wioski, przepsacerowanie sie po wiosce i w tej wiosce
+jest moj dom wtedy."; "1. tylko czesc"; "1. obciamy kazde zloto w staarcie ... 3. walcza wszyscy dorosli ... 5. Nie tylko ze swojej kiesy, kiesa rodu zarzadza szef rodu."
+**Zmiana:** `w-toku/n21-calosc` = WGRANIE 91 + r4-przetop (Smelt Keeps Scraps), r4-zloto (Start Gold Cut x0.1, okno BK z kwotami po cieciu), r4-zlecenia (Craft Order
+Clan Purse), r4-wolni (Free Folk All Adults Fight), r4-wioska (dochod wioski co dobe z podatku pana, linia w podpowiedzi zlota i w Total Income, blok w zakladce Fiefs -
+klucz Side Village Fief Clan Tab), r4-dom (Trade, Your house: lozko + skrzynia arm_side_home, Take a walk przez "Visit X"). Wpisy: docs/noc-1920/r4-*-CHANGELOG.md.
+Armoury 97c94eaf (2064 ustawien); CrashScribe, RealisticCaptivity bez zmian.
+**Testy:** n21-bitwa (5 dob + 4 bitwy, armoury-wioska-gracza.flag) - dochod wioski 10/9/7/7/7/7 d co dobe, test wioski 11/11, test domu 7/7; n21-nowa (nowa kampania
+120 dob, armoury-start-zloto.flag) - start_mariner 10000 -> 1000; n21-160 (160 dob z zapisu) - Wolni Ludzie: pula 155 tys., pod bronia 5.3 -> 8.8 tys. (druzyny lordow
+5610 / limity 5807); wszystkie kod 0, 0 ERROR w logu Armoury, 0 zawieszen; progi 160 dob 82 NIE (zakres biegow 78-94), 2 nowe (JK-GB-3 luki AI 74.7%).
+**Ryzyko / co sprawdzic:** zakladka Fiefs i ekrany Trade / skrzyni / spaceru nie widziane w grze (autotest nie klika); skrzynia domu przepada przy cofnieciu Armoury ponizej
+92 - najpierw oproznic; Wolni Ludzie dalej trzymani limitami druzyn lordow; checker WL-7 nie rozpoznaje odcinka 4.17 (tylko narzedzie).
+**Status:** WGRANE 92 - DO SPRAWDZENIA w grze Jeffa.
+
 ## 2026-10-20 (WGRANIE 91 - runda 3 nocy 19/20.10: PLAN 6.14 konie zalog dla lordow AI)
 
 **Zmiana:** `w-toku/n20-calosc` db85ef2d = WGRANIE 90 + `w-toku/r3-jazda` 9bc09019 (wpis docs/noc-1920/r3-jazda-CHANGELOG.md): klucze GarrisonHorsesToLords i
