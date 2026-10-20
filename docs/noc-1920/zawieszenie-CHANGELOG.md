@@ -104,6 +104,17 @@ Wybrano sposob C naprawy (przepisanie skoku), bo nie wymaga zmiany struktur CLR 
 - Specjalny plik/flaga: nie potrzeba. Klucz awaryjny: `UnwindRepair=false` w CrashScribe.settings.xml cofa calosc
   naprawy (pomiar GC i siec-bez-malych zostaja).
 
+## Crash 19.10 10:55 - czy to samo?
+
+Gra stanela 1-2 s po zamknieciu 3. okna CraftPopup, proces zyl 2 min, bez raportu. Brak zrzutu stosu z tego
+zawieszenia (straznik zawieszen CrashScribe tez nie dal zrzutu - w obu zawieszeniach 10:55 i 16:09 jego linia zrzutu
+nie powstala; zgodne z zakleszczeniem GC, bo straznik to watek ZARZADZANY, wiec GC zamroziby i jego). Bez stosu
+nie da sie tego potwierdzic. PRZESLANKA, ze to ta sama rodzina bledu: w sciezce CraftPopup jest mala lambda
+`Armoury.CraftPopup+<>c.<ShowGauntlet>b__9_1` (na liscie 142 TINY), a zamykanie okna zostawia watek glowny na krotko
+w takim kodzie - gdy GC trafi w ten moment, objaw jest identyczny. Obejscie Jeffa (MCM "Craft Result Popup" off) ma
+sens jako doraznie, ale gdy UnwindRepair naprawi tez te lambde, CraftPopup powinien przestac byc grozny. Do
+potwierdzenia dopiero w grze (linia `Opis stosu (UW)` policzy, czy ta lambda zostala naprawiona).
+
 ## Status: DO SPRAWDZENIA
 Zbudowane (CrashScribe, Armoury - 0 Error). Mechanizm naprawy potwierdzony w uprzezy (A wisi, B/C/D nie). W grze
 Jeffa jeszcze nie uruchomione.
