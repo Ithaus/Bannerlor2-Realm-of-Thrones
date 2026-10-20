@@ -3056,6 +3056,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
+        [SettingPropertyBool("Losers Flee Skills", HintText = "in the same rule, a good surgeon of the beaten host saves some of the men who would die in the flight - up to a quarter of the slain, in full at Medicine 250 - and the commanders' Tactics count in the pursuit: a victor who is the better tactician slays up to 10 points more of the beaten, a worse one up to 10 points fewer (in full at a gap of 300). Still 5-65%. Villagers on the road are not touched. Off = as before (needs Losers Flee Enabled)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LosersFleeSkills { get; set; } = true;
+
         [SettingPropertyBool("Destroyed Party Men Routed", HintText = "when the game strikes off a beaten host that still has men in it - caught while fleeing, left with only its wounded when the enemy broke off the fight, or a beaten besieger the victors did not take - those men no longer vanish with it: the victors take the same few as from any beaten host (seasoned men first), the rest scatter like any routed men (back to their lord's banner, home or to the woods), and the captives it held go free. Off = they vanish with the host, as before (needs Losers Flee Enabled)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool DestroyedPartyMenRouted { get; set; } = true;
@@ -9031,6 +9035,7 @@ namespace Armoury
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
             s.NonCombatantDeathPercent = NonCombatantDeathPercent;
+            s.LosersFleeSkills = LosersFleeSkills;
             s.DestroyedPartyMenRouted = DestroyedPartyMenRouted;
             s.PrisonerLawEnabled = PrisonerLawEnabled;
             s.PlayerRansomToCaptor = PlayerRansomToCaptor;

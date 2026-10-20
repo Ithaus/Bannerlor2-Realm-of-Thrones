@@ -202,6 +202,7 @@ namespace Armoury
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _updateType = null; _typeCount = null; _isRetinue = null; _totalPop = null; _serfs = null; _nobles = null; _slavesT = null;
             _lastWorldPop = -1; _ownersLogged = false; _csvPath = null; _cur = null; _lastAutoMe = null; _fieldMe = null;
             _errCalc = _errApply = _errHome = _errPost = false;
+            LoserSkills.Reset();                                         // R3-10c
             _a17Note.Clear(); _a17Left.Clear();
         }
 
@@ -1166,6 +1167,7 @@ namespace Armoury
             float p = PBase + WC * bp.C + WT * bp.T + WO * bp.O + WQ * bp.Q - WF * bp.F * (1f - bp.T);
             bp.P = p < PMin ? PMin : (p > PMax ? PMax : p);
             if (float.IsNaN(bp.P)) bp.P = PBase;
+            float tacShift = LoserSkills.Shift(me, win, lose);       // R3-10c: Taktyka wodzow (0 przy wylaczonym LosersFleeSkills)
 
             // 2. kto moze brac jencow (raz na bitwe), kultura zwyciezcy
             MBList<KeyValuePair<MapEventParty, float>> wch, hch;
@@ -1192,7 +1194,7 @@ namespace Armoury
                         continue;
                     }
                     var lp = new LP { Mep = mep, Mp = mp, Kind = KindOf(mp) };
-                    lp.P = lp.Kind == KVillager ? nonComb : bp.P;
+                    lp.P = lp.Kind == KVillager ? nonComb : LoserSkills.PartyP(bp.P, tacShift, mp);   // R3-10c: Taktyka i chirurg (tabory wsi bez zmian)
                     var map = new Dictionary<CharacterObject, TP>();
                     Collect(map, mep.Party.MemberRoster, 0);
                     Collect(map, mep.DiedInBattle, 1);
@@ -1216,7 +1218,7 @@ namespace Armoury
                         if (gameTakes) lp.J0 += tp.W + 0.25 * (tp.M - tp.W);
                         bp.G_W += tp.W; bp.G_R += tp.R; bp.G_Stand += tp.M - tp.W;
                     }
-                    if (lp.Types.Count > 0) bp.Losers.Add(lp);
+                    if (lp.Types.Count > 0) { bp.Losers.Add(lp); LoserSkills.Note(mp, lp.N); }
                 }
                 catch (Exception e)
                 {
@@ -1589,7 +1591,8 @@ namespace Armoury
               .Append(" | H3: zabici ").Append(k).Append(" (").Append(Pc(k, n)).Append("), jency ").Append(j).Append(" (").Append(Pc(j, n)).Append("), rozbici ").Append(f).Append(" (").Append(Pc(f, n)).Append(')')
               .Append(" | zwyciezca: zabici gry ").Append(wd0).Append(" (").Append(Pc(wd0, wn)).Append(") -> ").Append(wdNow).Append(" (").Append(Pc(wdNow, wn)).Append("), +").Append(rev).Append(" rannych")
               .Append(" | jency wzieci ").Append(got).Append(bp.Covered ? " (zgubieni przez gre " + (bp.SumJ - got) + ")" : " (bez sprawdzenia - partia przegrana poza planem)")
-              .Append(", uwolnieni bez odbiorcy ").Append(bp.FreedN);
+              .Append(", uwolnieni bez odbiorcy ").Append(bp.FreedN)
+              .Append(LoserSkills.BattleText(bp.Me));                 // R3-10c: Taktyka wodzow i chirurdzy przegranych (p wyzej - sama sytuacja)
             if (bp.Auto) sb.Append(" | komunikat w grze: ").Append(msg ?? "brak (przegrani bez szeregowych albo blad zastosowania)");
             sb.Append('.');
             Log.Info(sb.ToString());
@@ -1762,6 +1765,7 @@ namespace Armoury
                 sb.Append(TimeText(sw.ElapsedTicks)).Append('.');
                 Log.Info(sb.ToString());
                 try { WallsLine(day); } catch (Exception e) { Log.Error("LosersFlee.WallsLine", e); }
+                try { LoserSkills.Daily(day); } catch (Exception e) { Log.Error("LoserSkills.Daily", e); }   // R3-10c: linia "Przegrani - chirurg i taktyka"
                 WriteCsv(day - 1);
             }
             catch (Exception e) { Log.Error("LosersFlee.Daily", e); }
