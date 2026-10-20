@@ -310,7 +310,7 @@ namespace Armoury
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
-                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + WarFront.LineTail() + OneTail());
+                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
         }

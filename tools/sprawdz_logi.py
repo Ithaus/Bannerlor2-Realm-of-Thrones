@@ -1843,6 +1843,15 @@ def num(pat, s, cast=int, default=None):
         return default
 
 
+def r311_go(s):
+    """R3-11a (p5-budowy, BuildOneWorkPerHouse): linia "Budowy: dzien" - osady, w ktorych budowa idzie, plus osady, ktore stoja tylko dlatego, ze wczoraj czekaly
+    w kolejce rodu (przydzial pana poszedl na inna budowe rodu - z zalozenia reguly). Log bez dopisku "(z tego stoi N)" - samo "idzie", jak dotad; brak - None."""
+    go = num(r"\(idzie (\d+), stoi", s)
+    if go is None:
+        return None
+    return go + (num(r"w kolejce rodu \(R3-11a\) \d+ \(z tego stoi (\d+)\)", s, int, 0) or 0)
+
+
 def by_day(lines, prefix):
     """Ostatnia linia z prefiksem na kazda dobe gry -> {dzien: linia}."""
     d = {}
@@ -16260,7 +16269,7 @@ def etap8_n5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 
     # ---- N5-5 budowy cywilne
     bd = {d: s for d, s in by_day(lines, "Budowy: dzien").items() if inwin(d - 1)}
-    go = mean([num(r"\(idzie (\d+), stoi", s) for s in tail(bd)])
+    go = mean([r311_go(s) for s in tail(bd)])   # R3-11a: + osady stojace tylko w kolejce rodu (jedna budowa na rod naraz); log bez R3-11a - jak dotad
     stay = mean([num(r", stoi (\d+), ukonczonych", s) for s in tail(bd)])
     lev = sum(num(r"ukonczonych poziomow (\d+)", s, int, 0) or 0 for s in bd.values())
     spent = mean([num(r", wydano (\d+) \(", s) for s in tail(bo)])
@@ -16272,7 +16281,7 @@ def etap8_n5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     e_wa = mean([num(r"rod buduje mury (\d+);", s) for s in seg])
     e_ft = mean([num(r"warownie przy froncie (\d+) z", s) for s in seg])
     e_st = sum(num(r"potkniecia (\d+)\.$", s, int, 0) or 0 for s in seg[-1:])
-    val = (f"osad z budowa: idzie {fmt(go, '{:.1f}')}, stoi {fmt(stay, '{:.1f}')} (srednio ostatnie 28 dob); ukonczonych poziomow w oknie {lev}; wydane {fmt(spent)} zl/d; "
+    val = (f"osad z budowa: idzie (z czekajacymi w kolejce rodu R3-11a) {fmt(go, '{:.1f}')}, stoi {fmt(stay, '{:.1f}')} (srednio ostatnie 28 dob); ukonczonych poziomow w oknie {lev}; wydane {fmt(spent)} zl/d; "
            f"wstrzymane brakiem materialow {fmt(nomat, '{:.1f}')}" + (f"; N5-E: cywilne w wojnie dopuszczone {fmt(e_go, '{:.1f}')}, przy froncie {fmt(e_fr, '{:.1f}')}, pan bez luzu zoldu {fmt(e_pu, '{:.1f}')}, "
            f"rod buduje mury {fmt(e_wa, '{:.1f}')}; warownie przy froncie {fmt(e_ft, '{:.1f}')}; potkniecia {e_st}" if seg else ""))
     # recenzja N5: bieg roczny BEZ paczki ma w dobach 93-120 juz 55 osad z budowa (mury i koszary) i 10.8 wstrzymanych brakiem materialow (16% oplacanych),
@@ -22453,9 +22462,11 @@ def towary2_main(logp, start_arg, until=120):
             g1(v <= 100) if v is not None else None)
     v, n = avg(dr, r"miast bez towaru (\d+) z")
     rep.add("T2-K1-2: miast bez drewna (Drewno, koniec doby, srednia)", f"{fx_(v)} ({n} dob)", "<= 20 z 97 (N 29.4, B 39.3)" + tail1, g1(v <= 20) if v is not None else None)
-    v, n = avg(bd, r"\(idzie (\d+), stoi")
+    vv = [r311_go(bd[k]) for k in sorted(bd) if inwin(k)]   # R3-11a: + osady stojace tylko w kolejce rodu (log bez R3-11a - samo "idzie")
+    vv = [a for a in vv if a is not None]
+    v, n = (sum(vv) / len(vv), len(vv)) if vv else (None, 0)
     v2, _ = avg(bo, r"wstrzymane: brak materialow (\d+)")
-    rep.add("T2-K1-3: budowa idzie (Budowy, srednia)", f"idzie {fx_(v)} osad ({n} dob), wstrzymane brakiem materialow {fx_(v2)}",
+    rep.add("T2-K1-3: budowa idzie (Budowy, srednia)", f"idzie (z czekajacymi w kolejce rodu R3-11a) {fx_(v)} osad ({n} dob), wstrzymane brakiem materialow {fx_(v2)}",
             ">= 80 osad (N 98.1, brak materialow 24.7; prog N5-5)" + tail1, g1(v >= 80) if v is not None else None)
     made34 = None
     try:
