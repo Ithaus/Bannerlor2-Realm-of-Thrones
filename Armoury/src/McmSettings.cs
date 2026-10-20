@@ -4444,7 +4444,7 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool PeaceReleaseAfterDay { get; set; } = true;
 
-        [SettingPropertyBool("Vassal Ransom Aid", HintText = "with Lord Ransom By Income: when the head of an AI house or an AI king is ransomed and the family (for a king - the treasury) cannot pay all of it in coin, the realm's other landed houses chip in - each gives its share by its fiefs (a town counts as two castles), but never more than Vassal Ransom Aid Share of what its family holds above its reserve. Their coin goes to the captor with the rest of the cash, and the ransom debt is that much smaller. Your house is never asked (Banner Kings asks you itself), and a house in debt to the bank or below its reserve gives nothing. Off = the family pays alone, the rest is a debt as before", RequireRestart = false)]
+        [SettingPropertyBool("Vassal Ransom Aid", HintText = "with Lord Ransom By Income: when the head of an AI house or an AI king is ransomed and the family (for a king - the treasury) cannot pay all of it in coin, the realm's other landed houses chip in - each gives its share by its fiefs (a town counts as two castles), but never more than Vassal Ransom Aid Share of what its family holds above its reserve. Their coin goes with the rest of the cash to whoever is owed the ransom (the captor, or you when you sell the captive to a ransom broker), and the ransom debt is that much smaller. Your house is never asked, and a house in debt to the bank or below its reserve gives nothing. Off = the family pays alone, the rest is a debt as before", RequireRestart = false)]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool VassalRansomAid { get; set; } = true;
 
@@ -4452,7 +4452,7 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public float VassalRansomAidShare { get; set; } = 0.05f;
 
-        [SettingPropertyBool("Ai Dowry", HintText = "when two AI houses wed and the bride leaves her house for her husband's, her house pays his house a dowry in coin: the smallest of the Banner Kings dowry for her, Ai Dowry Wealth Share of her family's gold and Ai Dowry Income Days of its steady income - and only from what the family holds above its reserve, so a poor house gives its daughter without a dowry. Weddings of your own house are left alone (Banner Kings settles those in its marriage contract). Off = AI weddings without gold, as before", RequireRestart = false)]
+        [SettingPropertyBool("Ai Dowry", HintText = "when two AI houses wed and the bride leaves her house for her husband's, her house pays his house a dowry in coin: the smallest of the Banner Kings dowry value for her, Ai Dowry Wealth Share of her family's gold (her own purse not counted) and Ai Dowry Income Days of its steady income - and only from what the family holds above its reserve, so a poor house gives its daughter without a dowry. Weddings of your own house are left alone. Off = AI weddings without gold, as before", RequireRestart = false)]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool AiDowry { get; set; } = true;
 

@@ -10,11 +10,16 @@ namespace Armoury
     /// R3-01c - POSAG PRZY SLUBACH AI (POMYSLY-35 nr 1, Jeff 20.10 "tak"; audyt 05 D2, L9). Klucze AiDowry (+ AiDowryWealthShare, AiDowryIncomeDays) i AiDowryMatchTilt.
     ///  - KIEDY: zdarzenie gry BeforeHeroesMarried (MarriageAction.ApplyInternal - po ustaleniu rodu po slubie, PRZED zmiana rodu; gra zamienia kolejnosc tak, ze
     ///    pierwszy bohater jest w rodzie po slubie, drugi odchodzi). Wszystkie sluby AI z AI (ROT CheckNPCMarriages i nasza droga CrashScribe MarriageFast koncza na
-    ///    MarriageAction.Apply). Pominiete: slub z udzialem rodu gracza (BK rozlicza posag w kontrakcie z rozmowy - BKMarriageBehavior.ApplyMarriageContract ->
-    ///    GiveGoldAction) i kazdy slub wewnatrz ApplyMarriageContract (flaga z prefiksu/finalizera - drugi bezpiecznik, zeby posag nie byl placony dwa razy).
-    ///  - KTO PLACI: rod panny mlodej, gdy to ona odchodzi do rodu meza (pan mlody przechodzacy do rodu zony - bez posagu; ten sam rod - bez posagu).
-    ///  - ILE: min(wycena BK GetDowryValue(panna), AiDowryWealthShare x G, AiDowryIncomeDays x D) i najwyzej G - R (tylko ponad rezerwe rodu 166). G = min(zloto
-    ///    rodziny z budzetu, kiesy rodziny dzis); R i warunek budzetu - ClanBudget.ChestOf (dluznik, rod w zajeciu, Straz bez zoldu, najemnik, rod bez budzetu -
+    ///    MarriageAction.Apply). Pominiete: slub z udzialem rodu gracza (Jeff 20.10: "sluby Twojego rodu zostaja jak sa") i kazdy slub wewnatrz
+    ///    BKMarriageBehavior.ApplyMarriageContract (flaga z prefiksu/finalizera; kontrakt BK jest zawsze z rodem gracza, wiec to tylko bezpiecznik). UWAGA
+    ///    (recenzja 20.10, sprawdzone w dekompilacji BK Redux): kontrakt BK w tej wersji zlota przy zwyklym slubie NIE przenosi - MarriageAction.Apply przenosi
+    ///    oboje do FinalClan, zanim BK sprawdzi "Clan != finalClan" przed GiveGoldAction. Podwojnego posagu wiec nie ma.
+    ///  - KTO PLACI: rod panny mlodej, gdy to ona odchodzi do rodu meza (kierunek sredniowieczny, opis R3-01c, na ktory Jeff powiedzial "tak"; pan mlody przechodzacy
+    ///    do rodu zony - bez posagu; ten sam rod - bez posagu). BK w rozmowie gracza liczy odwrotnie (placi rod, ktory bierze nowego czlonka) - u nas wycena BK
+    ///    sluzy tylko jako gorny pulap wielkosci posagu (stan rodu panny: tier, poziom, dziedziczka +50%), nie jako kierunek.
+    ///  - ILE: min(wycena BK GetDowryValue(panna), AiDowryWealthShare x g, AiDowryIncomeDays x D) i najwyzej g - R (tylko ponad rezerwe rodu 166). g = min(zloto
+    ///    rodziny z budzetu, kiesy rodziny dzis) BEZ kiesy panny (odchodzi z nia; R bez zmian - rezerwa przed slubem nie mniejsza od tej po slubie, wiec rod po
+    ///    posagu zostaje co najmniej na rezerwie); R i warunek budzetu - ClanBudget.ChestOf (dluznik, rod w zajeciu, Straz bez zoldu, najemnik, rod bez budzetu -
     ///    bez posagu); D - DebtLadder.DebtD (D budzetu). Brak nadwyzki = slub bez posagu.
     ///  - SKAD -> DOKAD: kiesy rodziny panny (glowa, potem dorosli; kazdy do podlogi FamilyPurseFloor) -> kiesa glowy rodu meza (ClanIncomeBook KRansom -
     ///    jednorazowe od prawdziwego platnika, nie wchodzi w D staly). Zadnego zlota z niczego.
@@ -161,7 +166,8 @@ namespace Armoury
                 if (payer.IsBanditFaction || recv.IsBanditFaction || payer.Leader == bride || to == null || !to.IsAlive || to == Hero.MainHero) { _dOtherN++; return; }
                 double G, R; bool war;
                 if (!ClanBudget.ChestOf(payer, out G, out R, out war)) { _dNoBudgetN++; return; }
-                double g = Math.Min(G, ClanIncomeBook.FamilyGoldOf(payer));
+                // recenzja 20.10: kiesa panny nie liczy sie do zlota rodu panny (ona nie placi i odchodzi z nia) - posag tylko z tego, co zostaje rodowi
+                double g = Math.Min(G, ClanIncomeBook.FamilyGoldOf(payer)) - Math.Max(0, bride.Gold);
                 double above = g - R;
                 if (above <= 0) { _dPoorN++; return; }
                 var s = Settings.Current;
@@ -182,7 +188,7 @@ namespace Armoury
                 _dPaidN++; _dPaid += got;
                 if (got > _dMaxV) { _dMaxV = got; _dMax = Name(payer) + " -> " + Name(recv) + " " + got + " (" + Name(bride) + ")"; }
                 Log.Info("Posag (R3-01c): " + Name(bride) + " (" + Name(payer) + ") wychodzi za " + Name(a) + " (" + Name(recv) + ") - posag " + got + " zl do " + Name(to)
-                         + " (BK " + (bk >= 0 ? Math.Round(bk).ToString() : "-") + ", " + Math.Round(s.AiDowryWealthShare * 100) + "% zlota rodu " + Math.Round(byWealth) + ", "
+                         + " (BK " + (bk >= 0 ? Math.Round(bk).ToString() : "-") + ", " + Math.Round(s.AiDowryWealthShare * 100) + "% zlota rodu bez kiesy panny " + Math.Round(byWealth) + ", "
                          + Math.Round(s.AiDowryIncomeDays) + " dni D " + Math.Round(byIncome) + ", ponad rezerwe " + Math.Round(above) + ").");
             }
             catch (Exception e) { Stumble("OnBeforeMarried", e); }
