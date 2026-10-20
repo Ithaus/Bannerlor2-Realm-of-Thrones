@@ -7956,6 +7956,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefMenu { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Fief Lodging", HintText = "with Side Village Fief Menu: 'Rest the night here' in your own village puts the men under your villagers' roofs for free - like the common room of an inn: nobody stirs before dawn and the men wake rested (a little faster and in better spirits until dusk). Needs Town Inns. Off = the men camp by the village, as anywhere on the map", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefLodging { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -10060,6 +10064,7 @@ namespace Armoury
             s.SideVillageFiefStart = SideVillageFiefStart;
             s.SideVillageFiefIncome = SideVillageFiefIncome;
             s.SideVillageFiefMenu = SideVillageFiefMenu;
+            s.SideVillageFiefLodging = SideVillageFiefLodging;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;

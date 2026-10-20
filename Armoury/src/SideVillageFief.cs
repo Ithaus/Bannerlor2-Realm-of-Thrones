@@ -31,8 +31,10 @@ namespace Armoury
     ///     pieniadze ida przy wozie, nie z modelu finansow - bez podwojnej wyplaty).
     ///  W4 MAPA: VillageHolders.Of - gospodarzem tej wioski jest gracz (herb rodu gracza na proporczyku i w dymku, linia "This village is yours").
     ///  W5 MENU (klucz SideVillageFiefMenu): klik na wioske na mapie = jazda do niej (MapState.ProcessTravel, wzor zajazdow) i menu po dojechaniu; postoj przy niej - pytanie
-    ///     raz na postoj; w menu wsi gry okregu "Visit X (your village)". Menu arm_side_fief (zwykle, nie oczekiwania): nocleg za darmo (NightRest.BeginInnSleep - sen
-    ///     w menu jak w karczmie), prace okregu tej wioski (DistrictWorks.OpenPartFor), przeglad, wyjazd.
+    ///     raz na postoj; w menu wsi gry okregu "Visit X (your village)". Menu arm_side_fief (zwykle, nie oczekiwania): nocleg za darmo - pod dachem (recenzja: klucz
+    ///     SideVillageFiefLodging, TownInns.HostSleep - stan noclegu jak wspolna izba karczmy: czekanie do switu i premia "wypoczeci"; bez klucza, karczm, w wojnie z krolestwem
+    ///     okregu, przy rabunku albo spalonej wiosce - sen jak w obozie, podpowiedz mowi dlaczego), prace okregu tej wioski (DistrictWorks.OpenPartFor; opcja wylaczona z powodem,
+    ///     gdy prac nie da sie kupic), przeglad, wyjazd.
     ///  Furtka autotestu: DLL autotestu CrashScribe (LogGate.Mode 1/2) + plik Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-wioska-gracza.flag - w pierwszej
     ///     godzinie z czynna ksiega wiosek proba wola TE SAMA metode BK (odbiciem, force: true) dla krolestwa najblizszej wsi - prefiks, nadanie, herb, zapis, menu - linia "test".
     /// Linie logu: "Wioska gracza (n20): ..." (start sesji, nadanie, doba, test). Bledy liczone (potkniecia), nic nie gasimy globalnie.
@@ -72,7 +74,9 @@ namespace Armoury
         private static long _lastCheck;
         private static TextObject _tipTxt; private static string _tipName;
         // liczniki doby
-        private static int _dCarts, _dWar, _dSelf, _dNoShare, _dIntercept, _dOpen, _dClick, _dAsk, _dRest, _dInvest, _dTip;
+        private static int _dCarts, _dWar, _dSelf, _dNoShare, _dIntercept, _dOpen, _dClick, _dAsk, _dRest, _dRoof, _dInvest, _dTip;
+        // recenzja (drobne): czy prace tej wioski da sie dzis kupic - wycena DistrictWorks.QuotesOf raz na godzine gry (warunek opcji menu, nie co klatke)
+        private static int _invHour = -1; private static string _invUid; private static bool _invOk; private static string _invWhy;
         private static long _dPaid, _dTax;
 
         internal static void SetHarmony(Harmony h) { _harmony = h; }
@@ -87,10 +91,11 @@ namespace Armoury
             _holder = null; _holderLord = null; _holderBanner = null;
             _shareDay = -1; _share = 0; _shareNote = "-";
             _posSet = false; _pendingClick = _askedUid = null;
+            _invHour = -1; _invUid = null; _invOk = false; _invWhy = null;
             DayZero();
         }
 
-        private static void DayZero() { _dCarts = _dWar = _dSelf = _dNoShare = _dIntercept = _dOpen = _dClick = _dAsk = _dRest = _dInvest = _dTip = 0; _dPaid = _dTax = 0; _stDay = 0; }
+        private static void DayZero() { _dCarts = _dWar = _dSelf = _dNoShare = _dIntercept = _dOpen = _dClick = _dAsk = _dRest = _dRoof = _dInvest = _dTip = 0; _dPaid = _dTax = 0; _stDay = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -196,6 +201,12 @@ namespace Armoury
                 _pendKingdom = __0.StringId; _pendDay = Today(); _pendHow = "start BK (Indebted Lord)";
                 Log.Info(P + "BK GiveLordshipOnKingdomJoin(" + __0.StringId + ", gracz, force " + __2 + ") - tytul Lordship wsi gry POMINIETY (wies gry zostaje przy panu), gracz dostanie wioske poboczna krolestwa " + Txt(__0.Name) + ".");
                 TryPending();
+                // recenzja (drobne): wyjatek w nadaniu (TryPending lapie go i kasuje oczekiwanie) - bez wioski i bez czekania; wtedy tytul BK jak dotad, nie nic
+                if (!HasFief && _pendKingdom == null)
+                {
+                    Log.Info(P + "nadanie wioski pobocznej nie powiodlo sie (blad, linia wyzej) - tytul BK jak dotad.");
+                    return true;
+                }
                 return false;
             }
             catch (Exception e) { Stumble("GiveLordshipPrefix", e); return true; }   // blad - BK jak dotad
@@ -268,6 +279,9 @@ namespace Armoury
             Vec2 pos = mp.GetPosition2D;
             MapVillageRecord best = null; Settlement bestSt = null; float bestD = float.MaxValue;
             int seen = 0;
+            // recenzja (drobne): w nowej kampanii n okregu liczy sie leniwie (EnsureN), a StateOf zwraca false dla okregu bez n - lista kandydatow przy "Finish" bywala
+            // niepelna; VillageBook.PartsOf wola EnsureN (raz na okreg, wynik w slowniku tego wyboru)
+            var parts = new Dictionary<string, List<VillageBook.PartView>>(StringComparer.Ordinal);
             for (int pass = 0; pass < 2 && best == null; pass++)
             {
                 foreach (var r in recs)
@@ -281,9 +295,9 @@ namespace Armoury
                     if (lord == null || ReferenceEquals(lord, Clan.PlayerClan) || lord.IsEliminated) continue;
                     if (!ReferenceEquals(lord.Kingdom, k) && !ReferenceEquals(st.MapFaction, k)) continue;
                     if (test && Clan.PlayerClan.MapFaction != null && st.MapFaction != null && FactionManager.IsAtWarAgainstFaction(st.MapFaction, Clan.PlayerClan.MapFaction)) continue;
-                    VillageBook.VState vs;
-                    if (!VillageBook.StateOf(r.Uid, out vs)) continue;
-                    if (vs.State != VillageBook.SStanding && (pass == 0 || vs.State != VillageBook.SDamaged)) continue;
+                    int state;
+                    if (!PartState(st.Village, r.VillageId, r.Uid, parts, out state)) continue;
+                    if (state != VillageBook.SStanding && (pass == 0 || state != VillageBook.SDamaged)) continue;
                     seen++;
                     float dx = r.X - pos.x, dy = r.Y - pos.y, d = dx * dx + dy * dy;
                     if (d < bestD) { bestD = d; best = r; bestSt = st; }
@@ -308,6 +322,21 @@ namespace Armoury
                 try { InformationManager.ShowInquiry(new InquiryData("Your village", body, true, false, "Done", null, null, null), true); } catch (Exception e) { Stumble("Grant.Okno", e); }
             }
             return true;
+        }
+
+        /// <summary>Stan wioski pobocznej uid w okregu wsi gry v (VillageBook.PartsOf - z EnsureN; jeden odczyt na okreg w slowniku cache). false - ksiega jej nie zna.</summary>
+        private static bool PartState(Village v, string dist, string uid, Dictionary<string, List<VillageBook.PartView>> cache, out int state)
+        {
+            state = -1;
+            List<VillageBook.PartView> pv;
+            if (!cache.TryGetValue(dist, out pv))
+            {
+                pv = new List<VillageBook.PartView>();
+                if (!VillageBook.PartsOf(v, pv)) pv.Clear();
+                cache[dist] = pv;
+            }
+            foreach (var p in pv) if (p != null && !p.Main && string.Equals(p.Uid, uid, StringComparison.Ordinal)) { state = p.State; return true; }
+            return false;
         }
 
         private static string Txt(TextObject t) { try { return t != null ? t.ToString() : "?"; } catch { return "?"; } }
@@ -487,6 +516,16 @@ namespace Armoury
             catch (Exception e) { Stumble("Tick", e); }
         }
 
+        /// <summary>TownInns.Host: odleglosc partii gracza od obrazka jego wioski (float.MaxValue - brak wioski albo polozenia). Watek glowny.</summary>
+        internal static float PlayerDist()
+        {
+            var mp = MobileParty.MainParty;
+            if (!HasFief || mp == null) return float.MaxValue;
+            if (!_posSet) PosFromBook();
+            if (!_posSet) return float.MaxValue;
+            return mp.GetPosition2D.Distance(new Vec2(_px, _py));
+        }
+
         private static void PosFromBook()
         {
             var recs = VillageBook.LayoutRecords();
@@ -529,27 +568,62 @@ namespace Armoury
             {
                 starter.AddGameMenuOption("village", OptVillage, "{=!}{ARM_SIDE_FIEF_VISIT}", VisitCondition,
                     delegate (MenuCallbackArgs a) { try { _dOpen++; Log.Info(P + "wjazd do " + _name + " z menu wsi gry."); GameMenu.SwitchToMenu(Menu); } catch (Exception e) { Stumble("Visit", e); } }, false, 9);
-                starter.AddGameMenu(Menu, "{=!}{ARM_SIDE_FIEF_TEXT}", delegate (MenuCallbackArgs a) { try { MBTextManager.SetTextVariable("ARM_SIDE_FIEF_TEXT", MenuText()); } catch (Exception e) { Stumble("MenuInit", e); } }, GameMenu.MenuOverlayType.None);
+                starter.AddGameMenu(Menu, "{=!}{ARM_SIDE_FIEF_TEXT}", delegate (MenuCallbackArgs a)
+                    {
+                        try { MBTextManager.SetTextVariable("ARM_SIDE_FIEF_TEXT", MenuText()); } catch (Exception e) { Stumble("MenuInit", e); }
+                        // recenzja (drobne): menu otwarte z mapy (nowy MenuContext) mialo tlo domyslne gry ("wait_guards_stop") - tlo wsi gry okregu jak sen w zajezdzie
+                        try
+                        {
+                            var st = _dist != null ? Settlement.Find(_dist) : null;
+                            string mesh = st != null && st.SettlementComponent != null ? st.SettlementComponent.WaitMeshName : null;
+                            a.MenuContext.SetBackgroundMeshName(string.IsNullOrEmpty(mesh) ? "wait_fallback" : mesh);
+                        }
+                        catch (Exception e) { Stumble("MenuInit.Tlo", e); }
+                    }, GameMenu.MenuOverlayType.None);
                 starter.AddGameMenuOption(Menu, "arm_side_fief_rest", "{=!}Rest the night here",
                     delegate (MenuCallbackArgs a)
                     {
                         a.optionLeaveType = GameMenuOption.LeaveType.Wait;
-                        if (NightRest.EnlistedNow) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Your lord decides when the men sleep."); }
-                        else a.Tooltip = new TextObject("{=!}Your own people put you up for the night - no charge. The men sleep under roofs and wake rested.");
-                        return HasFief;
+                        if (!HasFief) return false;
+                        var mp = MobileParty.MainParty;
+                        if (NightRest.EnlistedNow) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Your lord decides when the men sleep."); return true; }
+                        if (mp != null && mp.Army != null && mp.Army.LeaderParty != mp) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You march in another lord's army - he decides where the host sleeps."); return true; }
+                        string why;
+                        // recenzja (WAZNE): podpowiedz mowi prawde - pod dachem (stan noclegu karczmy, TownInns.Host) albo jak w obozie z powodem
+                        if (RoofOk(out why))
+                            a.Tooltip = new TextObject("{=!}Your villagers take the men in for the night - no charge. They sleep on straw under roofs, by night until dawn, and wake rested if they sleep their fill: "
+                                                       + TownInns.HostBonusText() + " (like the common room of an inn).");
+                        else a.Tooltip = new TextObject("{=!}The men camp by the village for the night, as anywhere on the map: " + why);
+                        return true;
                     },
-                    delegate (MenuCallbackArgs a) { try { _dRest++; Log.Info(P + "nocleg w " + _name + "."); NightRest.BeginInnSleep(); } catch (Exception e) { Stumble("Rest", e); } }, false, 0);
+                    delegate (MenuCallbackArgs a)
+                    {
+                        try
+                        {
+                            _dRest++;
+                            string why;
+                            bool roof = RoofOk(out why) && TownInns.HostSleep(_dist, _uid, _name);
+                            if (roof) _dRoof++;
+                            Log.Info(P + "nocleg w " + _name + (roof ? " - pod dachem (stan noclegu jak wspolna izba karczmy, bez oplaty)" : " - jak w obozie (" + why + ")") + ".");
+                            NightRest.BeginInnSleep();
+                        }
+                        catch (Exception e) { Stumble("Rest", e); }
+                    }, false, 0);
                 starter.AddGameMenuOption(Menu, "arm_side_fief_invest", "{=!}Invest in its works",
                     delegate (MenuCallbackArgs a)
                     {
                         a.optionLeaveType = GameMenuOption.LeaveType.Trade;
+                        if (!HasFief) return false;
+                        string why;
+                        // recenzja (drobne): opcja martwa, gdy prac tej wioski nie da sie kupic (konie, gift villages Strazy, spalona, zmiana zajecia) - wylaczona z powodem
                         if (!DistrictWorks.On) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}District works are switched off (mod settings)."); }
+                        else if (!InvestOk(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); }
                         else a.Tooltip = new TextObject("{=!}Pay your villagers for boats, herds, ploughs or tools. Your village makes more of its own goods, and half of what the extra sells for is yours.");
-                        return HasFief;
+                        return true;
                     },
                     delegate (MenuCallbackArgs a)
                     {
-                        try { _dInvest++; var st = Settlement.Find(_dist); if (st != null) DistrictWorks.OpenPartFor(st, _uid); }
+                        try { _dInvest++; _invHour = -1; var st = Settlement.Find(_dist); if (st != null) DistrictWorks.OpenPartFor(st, _uid); }   // po oknie prac wycena od nowa
                         catch (Exception e) { Stumble("Invest", e); }
                     }, false, 1);
                 starter.AddGameMenuOption(Menu, "arm_side_fief_look", "{=!}Look over your village",
@@ -585,6 +659,53 @@ namespace Armoury
                 return true;
             }
             catch { return false; }
+        }
+
+        /// <summary>Recenzja (WAZNE): nocleg pod dachem we wlasnej wiosce - klucz SideVillageFiefLodging, karczmy czynne (TownInns.On), partia u wioski, bez wojny z krolestwem
+        /// okregu, wies gry nie rabowana teraz, wioska nie spalona. why - powod po angielsku (podpowiedz "jak w obozie: ..."). Watek glowny (warunek menu).</summary>
+        private static bool RoofOk(out string why)
+        {
+            why = null;
+            var s = Settings.Current;
+            if (s == null || !s.SideVillageFiefLodging) { why = "lodging in your village is switched off (mod settings)."; return false; }
+            if (!TownInns.On) { why = "lodgings need Town Inns and Night Rest (mod settings)."; return false; }
+            if (!HasFief) { why = "this village is not yours."; return false; }
+            var st = Settlement.Find(_dist);
+            if (st == null || st.Village == null) { why = "the village is not known."; return false; }
+            if (!TownInns.HostNearNow(_dist, _uid)) { why = "you are not at the village."; return false; }
+            IFaction mf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null, df = st.MapFaction;
+            if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { why = "while you are at war with its lord's realm, your villagers dare not take your men in."; return false; }
+            if (st.Village.VillageState == Village.VillageStates.BeingRaided) { why = "raiders are on these lands and your villagers have fled."; return false; }
+            VillageBook.VState vs;
+            if (VillageBook.StateOf(_uid, out vs) && (vs.State == VillageBook.SBurned || vs.State == VillageBook.SBurning || vs.State == VillageBook.SAbandoned))
+            { why = "your village is burned - there are no roofs left to sleep under."; return false; }
+            return true;
+        }
+
+        /// <summary>Recenzja (drobne): prace tej wioski da sie kupic (DistrictWorks.QuotesOf: Allowed i rodzaj prac) - wycena raz na godzine gry i po oknie prac. why - powod gry.</summary>
+        private static bool InvestOk(out string why)
+        {
+            int h = (int)CampaignTime.Now.ToHours;
+            if (h != _invHour || !string.Equals(_invUid, _uid, StringComparison.Ordinal))
+            {
+                _invHour = h; _invUid = _uid; _invOk = false; _invWhy = "No works here.";
+                try
+                {
+                    var st = _dist != null ? Settlement.Find(_dist) : null;
+                    var qs = new List<DistrictWorks.Quote>();
+                    if (st == null || st.Village == null || !DistrictWorks.QuotesOf(st.Village, qs, Clan.PlayerClan)) _invWhy = "The villages of this district are not known yet.";
+                    else
+                    {
+                        DistrictWorks.Quote q = null;
+                        foreach (var x in qs) if (x != null && string.Equals(x.Uid, _uid, StringComparison.Ordinal)) { q = x; break; }
+                        if (q != null && q.Allowed && q.WKind >= 0) { _invOk = true; _invWhy = null; }
+                        else if (q != null && !string.IsNullOrEmpty(q.Why)) _invWhy = q.Why;
+                    }
+                }
+                catch (Exception e) { _invOk = false; _invWhy = "No works here."; Stumble("InvestOk", e); }
+            }
+            why = _invWhy;
+            return _invOk;
         }
 
         /// <summary>Tekst menu: wioska, okreg, pan, ludzie, zajecie, udzial w produkcji, dochod.</summary>
@@ -703,6 +824,16 @@ namespace Armoury
                     add("T8 model finansow (linia podpowiedzi)", _finWired, _finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK");
                     double sh = st != null && st.Village != null ? ShareOf(st.Village) : 0;
                     add("T9 udzial wioski w okregu", sh > 0 && sh < 1, (100 * sh).ToString("0.0", Inv) + "% (" + _shareNote + ")");
+                    // T10 (recenzja, WAZNE): nocleg pod dachem - stan noclegu karczmy z uid wioski i zapis arm_inns tam i z powrotem; stan noclegu gracza przywrocony
+                    string i0 = TownInns.Export();
+                    bool made = TownInns.HostSleep(_dist, _uid, _name);
+                    string i1 = TownInns.Export();
+                    TownInns.Import(i1); string i2 = TownInns.Export();
+                    TownInns.Import(i0);
+                    bool f17 = i1.EndsWith(";" + _uid, StringComparison.Ordinal);
+                    add("T10 nocleg pod dachem (stan i zapis)", made ? i1 == i2 && f17 : !TownInns.On,
+                        made ? (i1 == i2 ? "zapis tam i z powrotem" : "zapis ROZNY") + ", pole 17 " + (f17 ? "uid wioski" : "BRAK") + ", stan gracza przywrocony (" + (i0.Length > 0 ? "byl" : "brak") + ")"
+                             : "bez stanu (karczmy " + (TownInns.On ? "WL" : "WYL") + ")");
                 }
             }
             catch (Exception e) { add("wyjatek", false, e.GetType().Name + ": " + e.Message); Stumble("Test", e); }
@@ -725,6 +856,7 @@ namespace Armoury
                 var sb = new StringBuilder(500);
                 sb.Append(P).Append("dzien ").Append(day).Append(start ? " (start sesji)" : "")
                   .Append(" | klucze: start ").Append(s.SideVillageFiefStart ? "WL" : "WYL").Append(", dochod ").Append(s.SideVillageFiefIncome ? "WL" : "WYL").Append(", menu ").Append(s.SideVillageFiefMenu ? "WL" : "WYL")
+                  .Append(", nocleg pod dachem ").Append(s.SideVillageFiefLodging ? (TownInns.On ? "WL" : "WL (karczmy WYL)") : "WYL")
                   .Append(" | latki: BK GiveLordshipOnKingdomJoin ").Append(_bkWired ? "wpieta" : "BRAK").Append(", podpowiedz zlota ").Append(_finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK");
                 if (HasFief)
                 {
@@ -735,7 +867,7 @@ namespace Armoury
                 }
                 else sb.Append(" | brak wioski gracza").Append(_pendKingdom != null ? " (nadanie czeka: krolestwo " + _pendKingdom + " od doby " + _pendDay + ")" : "");
                 sb.Append(" | przejecia startu BK ").Append(_dIntercept).Append(", wjazdy ").Append(_dOpen).Append(" (klik ").Append(_dClick).Append(", pytania ").Append(_dAsk).Append(")")
-                  .Append(", noclegi ").Append(_dRest).Append(", okna prac ").Append(_dInvest).Append(", linie podpowiedzi ").Append(_dTip)
+                  .Append(", noclegi ").Append(_dRest).Append(" (pod dachem ").Append(_dRoof).Append(")").Append(", okna prac ").Append(_dInvest).Append(", linie podpowiedzi ").Append(_dTip)
                   .Append(" | potkniecia doby ").Append(_stDay).Append(", sesji ").Append(_st).Append('.');
                 Log.Info(sb.ToString());
             }

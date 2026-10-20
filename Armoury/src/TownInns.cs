@@ -98,6 +98,7 @@ namespace Armoury
             internal bool Price;                                    // gracz spal w dobrym domu - ceny w tym miescie (klucz TownInnPriceBonus czytany na zywo)
             internal long PriceGain;                                // szacowany zysk gracza z premii cen w tym noclegu (limit PriceGainCap)
             internal string RoadUid;                                // sw-zajazdy: nocleg w zajezdzie przy szlaku (uid z arm_roadside_inns.tsv; TownId = wies okregu); null = karczma miasta
+            internal string HostUid;                                // n20-wioska: nocleg we wlasnej wiosce pobocznej gracza (uid wioski; TownId = wies gry okregu) - TownInns.Host.cs
 
             /// <summary>Nazwa miasta do logu i komunikatow (po wczytaniu szukana przy pierwszym uzyciu, na watku glownym).</summary>
             internal string Town
@@ -118,7 +119,7 @@ namespace Armoury
             {
                 return new Rest { Phase = phase, Q = Q, PlayerQ = PlayerQ, TownId = TownId, TownName = TownName, CommitMin = CommitMin, StartMin = StartMin,
                                   WakeMin = WakeMin, UntilMin = UntilMin, Speed = Speed, Morale = Morale, Sleep = Sleep, Heal = Heal, Price = Price, PriceGain = PriceGain,
-                                  RoadUid = RoadUid };
+                                  RoadUid = RoadUid, HostUid = HostUid };
             }
         }
         private static volatile Rest _rest;
@@ -621,6 +622,7 @@ namespace Armoury
                 var r = _rest;
                 var mp = MobileParty.MainParty;
                 var st = mp != null ? mp.CurrentSettlement : null;
+                if (r != null && r.HostUid != null) return HostSleepInit(args, r);   // n20-wioska: sen we wlasnej wiosce pobocznej (TownInns.Host.cs)
                 if (r != null && r.RoadUid != null) return RoadSleepInit(args, r);   // sw-zajazdy: sen w zajezdzie przy szlaku (TownInns.Road.cs)
                 if (r == null || r.Phase != 1 || st == null || st.StringId != r.TownId) return null;
                 long now = NowMin();
@@ -657,6 +659,7 @@ namespace Armoury
             if (r == null || r.Phase != 1 || r.StartMin <= 0 || !On) return null;
             try
             {
+                if (r.HostUid != null) return HostNear(r) ? r : null;   // n20-wioska: wlasna wioska - partia przy niej albo w wsi gry okregu
                 if (r.RoadUid != null) return RoadNear(r) ? r : null;   // sw-zajazdy: zajazd przy szlaku - partia poza osada, przy zajezdzie
                 var mp = MobileParty.MainParty;
                 var st = mp != null ? mp.CurrentSettlement : null;
@@ -722,7 +725,7 @@ namespace Armoury
                 n.UntilMin = RestedUntil(now);
                 n.Price = r.Price && r.WakeMin > 0;
                 _rest = n; _dWoke++;
-                var msg = new StringBuilder("Rested in a bed: until " + Clock(n.UntilMin) + " the column marches " + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
+                var msg = new StringBuilder((n.HostUid != null ? "Rested under your villagers' roofs: until " : "Rested in a bed: until ") + Clock(n.UntilMin) + " the column marches " + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
                 if (n.Price && PriceKey) msg.Append(" The good house's name opens doors - you trade up to 3% better in ").Append(n.Town).Append(" until ").Append(Clock(n.UntilMin)).Append(".");
                 if (NightRest.Debt > 0) msg.Append(" Old weariness still lingers - the bed's comfort shows once the sleep debt is paid off.");
                 Log.Player(msg.ToString());
@@ -934,7 +937,7 @@ namespace Armoury
         {
             var r = _rest;
             if (r == null) return "brak";
-            if (r.Phase == 1) return "sen oplacony (" + QLog[Math.Max(0, r.Q)] + ", " + r.Town + ", od " + When(Math.Max(r.CommitMin, r.StartMin)) + ")";
+            if (r.Phase == 1) return (r.HostUid != null ? "nocleg we wlasnej wiosce bez oplaty (" : "sen oplacony (") + QLog[Math.Max(0, r.Q)] + ", " + r.Town + ", od " + When(Math.Max(r.CommitMin, r.StartMin)) + ")";
             return "wypoczeci do " + When(r.UntilMin) + " (predkosc +" + F1(r.Speed) + "%, morale +" + F1(r.Morale) + ", cena " + (r.Price && PriceKey ? "tak w " + r.Town : "nie")
                    + (r.PriceGain > 0 ? ", zysk z cen ok. " + r.PriceGain + " z " + PriceGainCap : "") + ")";
         }
@@ -1014,7 +1017,8 @@ namespace Armoury
             var f = new List<string> { "v1", r.Phase.ToString(Inv), r.Q.ToString(Inv), r.PlayerQ.ToString(Inv), r.TownId ?? "", r.CommitMin.ToString(Inv), r.StartMin.ToString(Inv),
                                        r.WakeMin.ToString(Inv), r.UntilMin.ToString(Inv), r.Speed.ToString("R", Inv), r.Morale.ToString("R", Inv), r.Sleep.ToString("R", Inv),
                                        r.Heal.ToString("R", Inv), r.Price ? "1" : "0", r.PriceGain.ToString(Inv) };
-            if (r.RoadUid != null) f.Add(r.RoadUid);
+            if (r.RoadUid != null || r.HostUid != null) f.Add(r.RoadUid ?? "");
+            if (r.HostUid != null) f.Add(r.HostUid);   // n20-wioska: pole 17 - uid wlasnej wioski (starsza DLL czyta 15/16 pol: sen poza wsia gry okregu = stan zdjety bez premii)
             return string.Join(";", f.ToArray());
         }
 
@@ -1035,6 +1039,8 @@ namespace Armoury
                 if (a.Length > 14 && long.TryParse(a[14], NumberStyles.Integer, Inv, out pg)) r.PriceGain = Math.Max(0, pg);
                 // sw-zajazdy: pole 16 - uid zajazdu przy szlaku (straznik dlugosci; zly - stan zdjety); bez pola - karczma miasta jak dotad
                 if (a.Length > 15 && a[15].Length > 0) { if (a[15].Length > 64) return; r.RoadUid = a[15]; r.Price = false; }
+                // n20-wioska: pole 17 - uid wlasnej wioski pobocznej (nocleg bez oplaty); oba pola naraz - zly zapis, stan zdjety
+                if (a.Length > 16 && a[16].Length > 0) { if (a[16].Length > 64 || r.RoadUid != null) return; r.HostUid = a[16]; r.Price = false; }
                 if (r.Phase < 1 || r.Phase > 2 || r.Q < 0 || r.Q > 2) return;
                 // czasy (UntilMin, WakeMin) sprawdza start sesji (CheckTimes) - tu CampaignTime.Now bywa jeszcze niepewny
                 // premie przyciete do projektu (zly zapis nie robi z noclegu dopalacza)
