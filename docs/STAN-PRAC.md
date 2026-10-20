@@ -3449,5 +3449,8 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   propozycja oboz 21-3 (CampStartHour/CampEndHour + NightMarch.cs:61 20:00 na sztywno + SightRange noc 21-4:59; Armoury.json Jeffa ma 0/6 - zmienic przy zamknietej grze).
   Mod Practice Drills (Nexus 14005, 1.4.8, uprawnienia otwarte) - wejscie i chodzenie po obozie; jako wzor (pobranie tylko za zgoda Jeffa). Tanie: juki +20 kg, trening
   z wyboru (Drill the men), field hospital RB, czas zwijania wedlug armii, wiekszy oboz armii na mapie, sklep markietanow. Scena obozu - tor L, kilka nocy. 4 pytania do Jeffa w raporcie.- 14:20 PDT Jeff odpowiedzial na 4 pytania obozu + pytanie o bandy -> docs/ZADANIA-OBOZ-NOC.md "DECYZJE JEFFA PO RAPORCIE" (chodzenie po obozie najpierw; woz + kon juczny,
-  siodla bojowe/transportowe; markietani uslugi/rozrywka/sklep w duzych obozach; bandy i armie z zywnoscia i zlotem). Practice Drills rozpakowany do zb/practicedrills-1.3.
+  siodla bojowe/transportowe; markietani uslugi/rozrywka/sklep w duzych obozach; bandy i armie z zywnoscia i zlotem). Practice Drills rozpakowany do zb/practicedrills-1.3.- 14:35 PDT Jeff: "Rob drogi Valyrii i trakty Essos"; "zyznosc nie, bo to zaburzy gospodarke"; "Punkt 3 (otwarte z planu) rob w tle, jak skoncze grac, w nocy zrobisz wielki test
+  i wgranie"; "menu zamku tez uporzadkuj"; pyta, co to dlugi miast i podatek nadzwyczajny (wyjasnione w czacie, czeka na slowo). -> wf_20350c06-11f (6 galezi w-toku/m96-*
+  od 848b2e80 = 95: valyria, sakiewki, koszyk, len, bandy, zamek) -> scalenie, wielki test w nocy (gdy Jeff skonczy), WGRANIE 96. ZYZNOSC KRAIN - ODRZUCONA przez Jeffa.
+  Jeff gra od 13:28 na 95 (obserwator straz-jeffa.sh od znacznika 13:12).
 
