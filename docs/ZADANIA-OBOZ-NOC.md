@@ -33,3 +33,21 @@ Potwierdzenia Jeffa z gry (20.10): start "Indebted Lord" DZIALA; premia na drodz
 
 ## Kolejnosc nocy
 Najpierw oboz (rozpoznanie -> 22:00 i najtansze realne czesci -> raport), optymalizacja (docs/PLAN-OPTYMALIZACJA-NOC.md) NA KONIEC - po zamrozeniu nowych funkcji.
+
+## DECYZJE JEFFA PO RAPORCIE (20.10 ok. 14:20)
+Doslownie: "1. pobrane 2. tak 3. woz do kupienia + kon juczny do powozenia, daje tyle ile w wozie kg mozna przewiezc, juki nie, juki to siodlo, mamy juz siodla, tylko dajmy
+siodla bojowe i siodla transportowe, ale to chyba juz jest 4. uslugi, rozrywka i sklep, ale to w duzych obozach 5. jak pokonuje bande czy ogolnie armie, to oni powinni miec
+tez zloto i jedzenie, bandyci chodza bez jedzenia czy zlota?"
+1. Practice Drills 1.3 pobrany przez Jeffa (Downloads/PracticeDrills 1.3 14005 ...zip; licencja public domain - LICENSE "free and unencumbered software released into
+   the public domain"); rozpakowany TYLKO do odczytu: scratchpad zb/practicedrills-1.3 (PracticeDrills.dll, 7 dzwiekow .wav, tarp_canvas.jpg, SubModule.xml) - wzor sceny obozu.
+2. CHODZENIE PO OBOZIE NA POCZATKU kolejki (tor L, 2-3 noce): etap 1 scena z miejsca postoju, namioty ROT wedlug liczby ludzi, ogniska, wejscie/wyjscie; etap 2 ludzie i konie;
+   etap 3 zycie obozu.
+3. WOZ do kupienia + KON JUCZNY do ciagniecia: udzwig = ladownosc wozu (kg); bez osobnych jukow (juki = siodlo); siodla bojowe i siodla transportowe (juczne) -
+   sprawdzic, co juz jest (PackMarket, uprzaz, siodla w grze/ROT), dolozyc brakujace.
+4. MARKIETANI: uslugi, rozrywka i sklep - tylko w duzych obozach (armia).
+5. BANDY I ARMIE: pokonani maja miec zloto i jedzenie. Dzis (kod): bandy nie jedza (gra: DoesPartyConsumeFood false dla IsBandit), zywnosc z niczego zamknieta
+   (OutlawNoFreeFood) - jedza tylko w lupie; kiesa bandy w polu to drobne, bo co dobe odnosza czesc do kryjowki (HideoutDailyStash), zwyciezca bierze cala kiese
+   (BeatenPurseToVictor). Do zrobienia: bandy jedza (zapas na kilka dni z rabunku/zakupu u pasera, glod -> rozpad do puli wyrzutkow), noszą zapas zywnosci i kiese
+   na kilka dni zycia - po pokonaniu do zwyciezcy; sprawdzic to samo dla armii lordow (zywnosc w jukach, zloto lorda i kiesy ludzi).
+6. Oboz 21-3 (noc gry 22-2) - zgodnie z raportem.
+

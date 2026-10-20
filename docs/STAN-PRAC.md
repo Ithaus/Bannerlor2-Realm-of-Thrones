@@ -3448,5 +3448,6 @@ Jeff gra kampanie z 94 (Seagard) - zapis 94 wczytuje 95 (test 160 z zapisu). NOC
 nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS przy spichlerzu, naprawy AI, lukarze) - gdy Jeff nie gra.- 14:00 PDT ROZPOZNANIE OBOZU gotowe (wf_b7cbf8a7-dc3): docs/ROZPOZNANIE-OBOZ-2026-10-20.md. Noc gry i ROT 22:00-2:00 (oboz swiata dzis 0-6 -> 2 h jazdy z kara);
   propozycja oboz 21-3 (CampStartHour/CampEndHour + NightMarch.cs:61 20:00 na sztywno + SightRange noc 21-4:59; Armoury.json Jeffa ma 0/6 - zmienic przy zamknietej grze).
   Mod Practice Drills (Nexus 14005, 1.4.8, uprawnienia otwarte) - wejscie i chodzenie po obozie; jako wzor (pobranie tylko za zgoda Jeffa). Tanie: juki +20 kg, trening
-  z wyboru (Drill the men), field hospital RB, czas zwijania wedlug armii, wiekszy oboz armii na mapie, sklep markietanow. Scena obozu - tor L, kilka nocy. 4 pytania do Jeffa w raporcie.
+  z wyboru (Drill the men), field hospital RB, czas zwijania wedlug armii, wiekszy oboz armii na mapie, sklep markietanow. Scena obozu - tor L, kilka nocy. 4 pytania do Jeffa w raporcie.- 14:20 PDT Jeff odpowiedzial na 4 pytania obozu + pytanie o bandy -> docs/ZADANIA-OBOZ-NOC.md "DECYZJE JEFFA PO RAPORCIE" (chodzenie po obozie najpierw; woz + kon juczny,
+  siodla bojowe/transportowe; markietani uslugi/rozrywka/sklep w duzych obozach; bandy i armie z zywnoscia i zlotem). Practice Drills rozpakowany do zb/practicedrills-1.3.
 
