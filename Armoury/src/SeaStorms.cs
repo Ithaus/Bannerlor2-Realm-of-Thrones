@@ -67,6 +67,7 @@ namespace Armoury
         private const int MaxPercent = 50;
         private const int AuditMax = 8;
         private const int SnapMax = 32;
+        private const float RMax2 = 48.5f * 48.5f;   // EffectRadius NavalDLC najwyzej 40 x (1 + 0.2) = 48 - dalsze burze bez wolania getterow
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly TextObject _txtStorm = new TextObject("{=!}Storm");
         private static readonly string[] TypeName = { "Storm", "ThunderStorm", "Hurricane" };
@@ -108,6 +109,7 @@ namespace Armoury
         private static readonly int[] _hSea = new int[6], _hIn = new int[6];
         private static int _censusHours;
         private static double _spInSum, _spOutSum; private static int _spInN, _spOutN;
+        private static double _hullSum; private static int _hullN, _hullLow;   // kadluby statkow partii w burzy: suma HP/MaxHP, liczba, ponizej 25%
         private static long _censusTicks;
         // od wczytania wedlug pory: [0] poza zima, [1] zima
         private static readonly long[] _sHours = new long[2], _sActiveH = new long[2], _sNew = new long[2], _sSea = new long[2], _sIn = new long[2], _sCensusH = new long[2];
@@ -172,7 +174,7 @@ namespace Armoury
             _dHours = 0; _dStormH = 0; _dActiveH = 0; _dCapH = 0; _dNew = 0;
             for (int i = 0; i < 3; i++) _dNewType[i] = 0;
             for (int i = 0; i < 6; i++) { _hSea[i] = 0; _hIn[i] = 0; }
-            _censusHours = 0; _spInSum = 0; _spOutSum = 0; _spInN = 0; _spOutN = 0; _censusTicks = 0;
+            _censusHours = 0; _spInSum = 0; _spOutSum = 0; _spInN = 0; _spOutN = 0; _censusTicks = 0; _hullSum = 0; _hullN = 0; _hullLow = 0;
             _calls = 0; _inStorm = 0; _capLowered = 0; _ticks = 0; _sampled = 0;
             _chanceCalls = 0; _chanceRaised = 0; _capCalls = 0; _capRaised = 0;
             _parStumbles = 0; _stumbles = 0;
@@ -303,8 +305,10 @@ namespace Armoury
                 if (o == null) continue;
                 Vec2 c = _pos(o);
                 float dx = c.x - x, dy = c.y - y;
+                float d2 = dx * dx + dy * dy;
+                if (d2 >= RMax2) continue;
                 float r = _radius(o);
-                if (dx * dx + dy * dy < r * r && _isActive(o)) return true;
+                if (d2 < r * r && _isActive(o)) return true;
             }
             return false;
         }
@@ -469,7 +473,19 @@ namespace Armoury
                         var p = mp.Position;
                         bool inS = InStorm(list, p.X, p.Y);
                         _hSea[c]++; _sSea[k]++;
-                        if (inS) { _hIn[c]++; _sIn[k]++; }
+                        if (inS)
+                        {
+                            _hIn[c]++; _sIn[k]++;
+                            var ships = mp.Ships;
+                            if (ships != null)
+                                for (int j = 0; j < ships.Count; j++)
+                                {
+                                    var sh = ships[j];
+                                    if (sh == null || !(sh.MaxHitPoints > 0f)) continue;
+                                    float q = sh.HitPoints / sh.MaxHitPoints;
+                                    _hullSum += q; _hullN++; if (q < 0.25f) _hullLow++;
+                                }
+                        }
                         if (mp.IsMoving && _lastSpeedRef != null)
                         {
                             float v = _lastSpeedRef(mp);
@@ -571,7 +587,7 @@ namespace Armoury
               .Append(", statki wolniej w burzy SeaStormSlowsShips ").Append(SlowOn(s) ? "tak" : "nie").Append(" (-").Append((PctOf(s) * 100f).ToString("0.#", ci)).Append("%)")
               .Append(" | pora Westeros ").Append(SafeSeason()).Append(" (zima ").Append(_winter ? "tak" : "nie").Append(") - mnoznik czynny x").Append(_mul.ToString("0.00", ci))
               .Append(", sufit burz ").Append(cap).Append(" (NavalDLC 6, granica ").Append(CapCeiling).Append(')')
-              .Append(", szansa narodzin na wezel/h ").Append(_lastChanceBase >= 0f && _mul > 1f ? (_lastChanceBase * _mul).ToString("0.0000", ci) + " (NavalDLC " + _lastChanceBase.ToString("0.0000", ci) + ")" : "jak NavalDLC")
+              .Append(", szansa narodzin na wezel/h ").Append(_mul > 1f ? "x" + _mul.ToString("0.00", ci) + (_lastChanceBase >= 0f ? " (NavalDLC " + _lastChanceBase.ToString("0.0000", ci) + " -> " + _lastChance.ToString("0.0000", ci) + ")" : "") : "jak NavalDLC")
               .Append(", wezly pelnego morza ").Append(nodes >= 0 ? nodes.ToString(ci) : "?")
               .Append(" (wywolan szansy w dobie ").Append(_chanceCalls).Append(", podniesionych ").Append(_chanceRaised).Append("; sufit czytany ").Append(_capCalls).Append(", podniesiony ").Append(_capRaised).Append(')');
             sb.Append(" | burze: teraz ").Append(now).Append(" (aktywnych ").Append(nowAct).Append(')')
@@ -586,7 +602,9 @@ namespace Armoury
               .Append(", wozy wsi ").Append(_hIn[2]).Append('/').Append(_hSea[2])
               .Append(", bandy ").Append(_hIn[3]).Append('/').Append(_hSea[3])
               .Append(", inne ").Append(_hIn[4]).Append('/').Append(_hSea[4])
-              .Append(" | gracz godzin na morzu ").Append(_hSea[5]).Append(", w burzy ").Append(_hIn[5]);
+              .Append(" | gracz godzin na morzu ").Append(_hSea[5]).Append(", w burzy ").Append(_hIn[5])
+              .Append(" | kadluby w burzy (statko-godziny) ").Append(_hullN).Append(", stan sr. ").Append(_hullN > 0 ? (100.0 * _hullSum / _hullN).ToString("0.0", ci) + "%" : "-")
+              .Append(", ponizej 25% ").Append(_hullLow);
             double vin = _spInN > 0 ? _spInSum / _spInN : 0, vout = _spOutN > 0 ? _spOutSum / _spOutN : 0;
             sb.Append(" | predkosc na morzu w ruchu (pamiec gry): w burzy sr. ").Append(_spInN > 0 ? vin.ToString("0.00", ci) : "-").Append(" (n ").Append(_spInN).Append(')')
               .Append(", poza burza sr. ").Append(_spOutN > 0 ? vout.ToString("0.00", ci) : "-").Append(" (n ").Append(_spOutN).Append(')')
