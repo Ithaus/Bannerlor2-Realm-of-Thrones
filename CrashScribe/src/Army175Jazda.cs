@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -16,9 +18,13 @@ namespace CrashScribe
     /// - vale_rider t3, vale_lancer t4, reach_rider t4: +20 Jazdy i +20 broni glownej (jak NorthHardy: ponad
     ///   max(obecna, wymog wlasnego sprzetu), bron glowna = MainMelee, sufit bez przeskoku tieru TierCap jak NorthHardy;
     ///   Jazda bez sufitu jak DothrakiRiders). Po SkillSinew (ten tylko podnosi - wczesniej dodatek bylby wchloniety).
-    /// - vale_rider i vale_lancer: korpus o stopien ciezszy W GRANICY TIERU (decyzja 8b - nic ponad tier jednostki):
-    ///   najciezszy korpus (suma ochrony) sposrod ciezszych niz dzis, tier od dzisiejszego do tieru jednostki,
-    ///   kultura jednostki albo ta sama strona Waskiego Morza / bez kultury (bez zbroi z Essos), najpierw kultura jednostki.
+    /// - vale_rider i vale_lancer: zbroja o stopien ciezsza W GRANICY TIERU (decyzja 8b - nic ponad tier jednostki), TYLKO
+    ///   rzeczy Doliny (kultura vale albo noszone przez zolnierzy Doliny - SameTroopCult; bez obcych barw): w kazdym slocie
+    ///   pancerza 5-9 (glowa, korpus, nogi, rece, ramiona) najciezsza czesc w tierze jednostki ciezsza niz dzis (wiecej ochrony
+    ///   i nie lzejsza w kg), pusty slot (rece, ramiona) dostaje czesc Doliny; najpierw rzeczy z targu (lord je kupi).
+    ///   Korpusu Doliny ciezszego w tierze nie ma (t3: najwyzej 104, t4: tylko grafton_armor 123, nastepny royce_armor t5) -
+    ///   korpus zostaje, a linia logu podaje najblizszy ciezszy ponad tier. Recenzja 20.10: poprzednia wersja (dowolna
+    ///   kultura Westeros) dawala kolczuge Polnocy i dornijska zbroje lzejsza w kg - odrzucona.
     ///   Jak Qohor (QohorHeavier): w SESJI, po ArmorSanity, przed prawami i SkillSinew (Atletyke pod nowa wage podniesie SkillSinew).
     ///
     /// R3-08f KONNI LUCZNICY FREYOW (klucz Army175FreyHorseArchers, dom. TAK):
@@ -26,10 +32,17 @@ namespace CrashScribe
     ///   (DefaultFormationClass/Group, _isRanged - tak gra czyta default_group z XML), zestaw: krotki luk do jazdy
     ///   (MountOk, nie "long") i strzaly z kaskady 175.2 w tierze jednostki (BestOfType), 2 kolczany, bron zapasowa =
     ///   bron reczna z wlasnego zestawu uzywalna z siodla (Mends.MountOk = DTE IsSuitableForMount), najpierw klasy najwyzszej
-    ///   umiejetnosci recznej (MainMelee), inaczej pierwsza inna (frey_rider: kopia przy Drzewcach 110, gdy MountOk, inaczej miecz),
+    ///   umiejetnosci recznej (MainMelee), inaczej pierwsza inna; frey_rider: zawsze miecz (narrow_sword_t3) - kopia nie przechodzi
+    ///   MountOk (uzycie polearm_bracing ma requires_no_mount), wiec wzorzec i zakupy AI (AiGear.Deficit z 1. zestawu) to miecz;
     ///   bez tarczy. Nowy roster (InstallRoster) - stary roster i inne postacie nietkniete (DTE jak przy 175.2).
-    ///   W bitwie z graczem bron i tak dobiera Armoury SkillsDecide (glowna = najwyzsza umiejetnosc, stad Luk ponad bron reczna),
-    ///   a DTE daje jezdzcowi tylko bron uzywalna z siodla (PartyEquipmentDistributor.IsWeaponSuitable: !IsMounted | IsSuitableForMount).
+    ///   W bitwie z graczem bron i tak dobiera Armoury SkillsDecide (glowna = najwyzsza umiejetnosc, stad Luk ponad bron reczna;
+    ///   zapas = druga umiejetnosc, Drzewce 110 > 1H, czyli w bitwie drzewce zamiast miecza ze wzorca), a DTE daje jezdzcowi
+    ///   tylko bron uzywalna z siodla (PartyEquipmentDistributor.IsWeaponSuitable: !IsMounted | IsSuitableForMount).
+    /// - Cel skladu ROT (recenzja 20.10): ROTTroopRecruiter.GetTemplateComposition liczy cel rodu z DefaultFormationClass stosow,
+    ///   a sklad partii (GetPartyComposition, ShouldRecruit, szansa awansu ROTTroopUpgradeModel, zamiany ExchangeClanTroops)
+    ///   z klasy NAJWYZSZEGO awansu w szablonie - frey_rider liczy sie tam jako frey_horseman (Cavalry). Bez poprawki cel Freyow
+    ///   Cav 21% -> 7%, KL 14% (nigdy do wypelnienia) i ROT odciagalby Freyow od jazdy. Postfiks RotTemplateFrey liczy stos
+    ///   frey_rider w klasie jego najwyzszego awansu, tak jak ROT liczy sklad partii - cel jak przed zmiana (Cav 21%, KL 0).
     /// - Luk: max(obecny, wymog wlasnego luku i strzal, najwyzsza inna bron + 10), sufit bez przeskoku tieru; zawsze
     ///   co najmniej najwyzsza inna bron + 1 - SkillsDecide wybiera bron glowna po najwyzszej umiejetnosci (inaczej kopia).
     /// - Zestaw przy wczytaniu (AfterRegister, gdy 175.2 zadzialalo - TroopFit/ColdStart widza juz luk), zapasowo w sesji.
@@ -54,10 +67,27 @@ namespace CrashScribe
         private static readonly System.Reflection.FieldInfo FIsRanged = AccessTools.Field(typeof(BasicCharacterObject), "_isRanged");
         private static readonly System.Reflection.MethodInfo MSetFormationClass = AccessTools.PropertySetter(typeof(BasicCharacterObject), "DefaultFormationClass");
 
+        // sloty pancerza 5-9 i rodzaj dla pustego slotu (R3-08e)
+        private static readonly int[] ValeSlots = { 5, 6, 7, 8, 9 };
+        private static readonly ItemObject.ItemTypeEnum[] ValeSlotTypes = { ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.BodyArmor,
+            ItemObject.ItemTypeEnum.LegArmor, ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.Cape };
+        private static readonly string[] ValeSlotNames = { "glowa", "korpus", "nogi", "rece", "ramiona" };
+
+        // R3-08f: cel skladu ROT - frey_rider liczony w klasie najwyzszego awansu (ustawiane w FreyGear, na watku glownym)
+        private static CharacterObject _freyCo;
+        private static FormationClass _freyTopClass = FormationClass.Cavalry;
+        private static string _freyTopId = "";
+        private static bool _rotTplPatched;
+        private static Type _rotCompType;
+        private static System.Reflection.PropertyInfo _pCompHa, _pCompTop;
+        private static int _rotTplCalls, _rotTplFixed, _rotTplStumbles, _rotTplLastCalls, _rotTplLastStumbles, _rotTplFirst, _rotTplStumbleLogged;
+
         /// <summary>Stan sesji (z Reset).</summary>
         internal static void ResetJazda()
         {
             _freyGearDone = false; _valeArmorDone = false; _knightsSkillsDone = false; _freySkillsDone = false; _freyConverted = false; _valeArmorNote = "";
+            _freyCo = null; _freyTopClass = FormationClass.Cavalry; _freyTopId = "";
+            _rotTplCalls = _rotTplFixed = _rotTplStumbles = _rotTplLastCalls = _rotTplLastStumbles = _rotTplFirst = _rotTplStumbleLogged = 0;
         }
 
         /// <summary>Zestawy: Freyowie przy wczytaniu i w sesji (pierwszy udany przebieg), korpus Doliny tylko w sesji (po ArmorSanity).
@@ -138,28 +168,120 @@ namespace CrashScribe
             co.DefaultFormationGroup = (int)FormationClass.HorseArcher;
             FIsRanged.SetValue(co, true);
             _freyConverted = co.IsRanged && co.IsMounted && co.GetFormationClass() == FormationClass.HorseArcher;
+            // cel skladu ROT: klasa najwyzszego awansu (jak ROT GetPartyComposition) - frey_rider -> frey_horseman (Cavalry)
+            var top = co;
+            for (int d = 0; d < 8 && top.UpgradeTargets != null && top.UpgradeTargets.Length > 0 && top.UpgradeTargets[0] != null; d++) top = top.UpgradeTargets[0];
+            _freyTopClass = top != co ? top.DefaultFormationClass.FallbackClass() : FormationClass.HorseArcher;
+            _freyTopId = top.StringId ?? "";
+            _freyCo = _freyConverted ? co : null;
             Scribe.Line(P + FreyArcherId + " t" + u.T + " (" + co.Name + "): szyk " + co.GetFormationClass() + " (IsMounted " + co.IsMounted + ", IsRanged " + co.IsRanged
                         + "), zestawow bojowych zmienionych " + changed + " z " + sets + (already > 0 ? " (juz z lukiem " + already + ")" : "")
                         + "; luk " + bow.StringId + " t" + TierOf(bow) + " (z siodla), strzaly " + arrows.StringId + " t" + TierOf(arrows) + " x2, bron zapasowa "
                         + (keptSide != null ? keptSide.StringId + " (" + mainMelee.StringId + ")" : "brak") + "; zdjete: " + (removed.Count > 0 ? string.Join(", ", removed.ToArray()) : "-")
-                        + "; awans do frey_horseman (kopijnik t5) bez zmian" + (_freyConverted ? "." : " - OSTRZEZENIE: szyk nie przyjal sie."));
+                        + "; awans do frey_horseman (kopijnik t5) bez zmian" + (_freyConverted ? "" : " - OSTRZEZENIE: szyk nie przyjal sie")
+                        + "; cel skladu ROT: stos " + FreyArcherId + " liczony jako " + _freyTopClass + " (najwyzszy awans " + _freyTopId + "), postfiks "
+                        + (_rotTplPatched ? "wpiety" : "NIE wpiety - OSTRZEZENIE: cel jazdy Freyow w ROT spadnie z ok. 21% do 7%") + ".");
         }
 
-        // ---------------- R3-08e: korpus Doliny o stopien ciezszy (w tierze) ----------------
+        // ---------------- R3-08f: cel skladu ROT (postfiks ROTTroopRecruiter.GetTemplateComposition) ----------------
+
+        /// <summary>Wpiecie postfiksu (raz na proces, z Army175.Install). Typ ROT po nazwie (internal), metoda na klasie deklarujacej.</summary>
+        internal static void InstallJazda(Harmony harmony)
+        {
+            const string P = "Mends: konni lucznicy Freyow (R3-08f) - ";
+            try
+            {
+                if (_rotTplPatched) return;
+                var t = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTTroopRecruiter");
+                var m = t != null ? AccessTools.DeclaredMethod(t, "GetTemplateComposition", new[] { typeof(PartyTemplateObject) }) : null;
+                if (m == null) { Scribe.Line(P + "ROTTroopRecruiter.GetTemplateComposition nieznaleziony - cel skladu ROT bez poprawki (frey_rider liczony jako konny lucznik)."); return; }
+                harmony.Patch(m, postfix: new HarmonyMethod(typeof(Army175), "RotTemplateFrey"));
+                _rotTplPatched = true;
+                Scribe.Line(P + "postfiks celu skladu ROT (ROTTroopRecruiter.GetTemplateComposition) wpiety: stos frey_rider liczony w klasie najwyzszego awansu, jak sklad partii ROT.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.InstallJazda", null); } catch { } }
+        }
+
+        /// <summary>Postfiks: cel rodu (udzialy P/S/J/KL stosow t3+, wagi MaxValue) - stos przerobionego frey_rider przenosi swoj
+        /// udzial z HorseArcher do klasy najwyzszego awansu (Cavalry). Wynik ROT liczy raz na bohatera/osade (pamiec Settings), wiec
+        /// to nie goraca sciezka; bez alokacji poza refleksja wlasciwosci. Liczniki Interlocked; potkniecia licz, nie gas.</summary>
+        public static void RotTemplateFrey(PartyTemplateObject template, object __result)
+        {
+            try
+            {
+                var frey = _freyCo;
+                if (!_freyConverted || frey == null || template == null || __result == null || _freyTopClass == FormationClass.HorseArcher) return;
+                var stacks = template.Stacks;
+                if (stacks == null) return;
+                int mine = 0; float num = 0f;
+                for (int i = 0; i < stacks.Count; i++)
+                {
+                    var ch = stacks[i].Character;
+                    if (ch == null || ch.Tier < 3) continue;   // jak ROT: tylko stosy t3+
+                    num += stacks[i].MaxValue;
+                    if (ch == frey) mine += stacks[i].MaxValue;
+                }
+                if (mine <= 0 || num <= 0f) return;
+                Interlocked.Increment(ref _rotTplCalls);
+                if (frey.DefaultFormationClass != FormationClass.HorseArcher) return;   // ROT liczy go juz w dawnej klasie
+                var rt = __result.GetType();
+                if (rt != _rotCompType)
+                {
+                    _pCompHa = AccessTools.Property(rt, "HorseArcher");
+                    _pCompTop = AccessTools.Property(rt, _freyTopClass == FormationClass.Infantry ? "Infantry" : _freyTopClass == FormationClass.Ranged ? "Ranged" : "Cavalry");
+                    _rotCompType = rt;
+                }
+                if (_pCompHa == null || _pCompTop == null) { RotTplStumble("brak wlasciwosci HorseArcher/Cavalry w " + rt.FullName); return; }
+                float d = mine / num;
+                float ha = (float)_pCompHa.GetValue(__result, null), tp = (float)_pCompTop.GetValue(__result, null);
+                _pCompHa.SetValue(__result, ha - d > 0f ? ha - d : 0f, null);
+                _pCompTop.SetValue(__result, tp + d, null);
+                Interlocked.Increment(ref _rotTplFixed);
+                if (Interlocked.CompareExchange(ref _rotTplFirst, 1, 0) == 0)
+                    Scribe.Line("Mends: konni lucznicy Freyow (R3-08f) - cel skladu ROT " + template.StringId + ": stos " + FreyArcherId + " (" + mine + " z " + num
+                                + " ludzi t3+) przeniesiony z HorseArcher do " + _freyTopClass + " - " + _freyTopClass + " " + Math.Round(100.0 * tp) + "% -> "
+                                + Math.Round(100.0 * (tp + d)) + "%, HorseArcher " + Math.Round(100.0 * ha) + "% -> " + Math.Round(100.0 * (ha - d > 0f ? ha - d : 0f)) + "%.");
+            }
+            catch (Exception e) { RotTplStumble(e.GetType().Name); }
+        }
+
+        private static void RotTplStumble(string why)
+        {
+            Interlocked.Increment(ref _rotTplStumbles);
+            if (Interlocked.CompareExchange(ref _rotTplStumbleLogged, 1, 0) != 0) return;
+            try
+            {
+                Scribe.Line("Mends: konni lucznicy Freyow (R3-08f) - OSTRZEZENIE: postfiks celu skladu ROT potknal sie (" + why
+                            + ") - cel jazdy Freyow w ROT moze spasc; dalsze potkniecia tylko w liczniku dobowym.");
+            }
+            catch { }
+        }
+
+        /// <summary>Raz na dobe (z JazdaSkills), gdy przybylo wywolan albo potkniec: licznik postfiksu celu skladu ROT.</summary>
+        private static void FreyRotDaily()
+        {
+            if (!_freyConverted) return;
+            int calls = _rotTplCalls, st = _rotTplStumbles;
+            if (calls == _rotTplLastCalls && st == _rotTplLastStumbles) return;
+            _rotTplLastCalls = calls; _rotTplLastStumbles = st;
+            Scribe.Line("Mends: konni lucznicy Freyow (R3-08f) - cel skladu ROT od startu sesji: szablonow z " + FreyArcherId + " " + calls
+                        + ", poprawionych (" + FreyArcherId + " jako " + _freyTopClass + ") " + _rotTplFixed + ", potkniecia " + st + ".");
+        }
+
+        // ---------------- R3-08e: zbroja Doliny o stopien ciezsza (w tierze, tylko rzeczy Doliny) ----------------
 
         private static void ValeArmor()
         {
             const string P = "Mends: jazda Doliny i Reach (R3-08e) - ";
-            if (!Wanted("Army175ValeReachKnights", 1f)) { _valeArmorDone = true; _valeArmorNote = "korpus wyl."; return; }   // linie "wylaczone" pisze JazdaSkills
-            if (!TierGearWanted()) { _valeArmorDone = true; _valeArmorNote = "korpus pominiety (" + _tgOffWhy + ")"; Scribe.Line(P + "korpus pominiety (" + _tgOffWhy + "; ciezszy korpus w granicy tieru - tylko razem z 175.2)."); return; }
+            if (!Wanted("Army175ValeReachKnights", 1f)) { _valeArmorDone = true; _valeArmorNote = "zbroja wyl."; return; }   // linie "wylaczone" pisze JazdaSkills
+            if (!TierGearWanted()) { _valeArmorDone = true; _valeArmorNote = "zbroja pominieta (" + _tgOffWhy + ")"; Scribe.Line(P + "zbroja pominieta (" + _tgOffWhy + "; ciezsza zbroja w granicy tieru - tylko razem z 175.2)."); return; }
             if (!TierGearApplied) return;   // zestawy jeszcze puste - przebieg zapasowy zawola ponownie
             _valeArmorDone = true;
             if (_pool == null || _choice == null) PreparePass();
             _tierCache = new Dictionary<ItemObject, int>();   // tiery po rozsadku (jak QohorHeavier)
-            List<ItemObject> lst;
-            if (!_pool.TryGetValue(((int)ItemObject.ItemTypeEnum.BodyArmor).ToString(), out lst)) { _valeArmorNote = "korpus: brak puli"; Scribe.Line(P + "korpus: brak puli korpusow - pominiete."); return; }
-            int slots = 0, sets = 0, stumbles = 0;
+            int pieces = 0, setsChanged = 0, sets = 0, stumbles = 0;
             var ex = new List<string>();
+            var bodyNote = new List<string>();
             foreach (var id in ValeHeavyIds)
             {
                 try
@@ -167,44 +289,65 @@ namespace CrashScribe
                     var co = MBObjectManager.Instance.GetObject<CharacterObject>(id);
                     if (co == null) { ex.Add(id + " brak"); continue; }
                     var u = MakeUnit(co, true);
-                    int T = u.T, before = slots;
-                    string side = Side(u.Cult);
+                    int T = u.T, before = pieces;
+                    if (u.Cult.Length == 0) { ex.Add(id + " bez kultury - pominiete"); continue; }
                     Rewrite(co, eq =>
                     {
-                        var it = eq[6].Item;   // korpus
-                        if (it == null || it.ItemType != ItemObject.ItemTypeEnum.BodyArmor) return null;
-                        int curSum = ArmorSum(it), curT = TierOf(it);
-                        ItemObject best = null; bool bestOwn = false; int bestSum = -1; float bestW = -1f;
-                        foreach (var c in lst)
+                        Equipment clone = null;
+                        for (int k = 0; k < ValeSlots.Length; k++)
                         {
-                            if (c == it) continue;
-                            int g = TierOf(c);
-                            if (g > T || g < curT) continue;                 // w granicy tieru jednostki, nie nizszy tier niz dzis
-                            int sum = ArmorSum(c);
-                            if (sum <= curSum) continue;                     // tylko ciezszy niz dzis
-                            if (Reject(it, c, u, 2) != 0) continue;           // plec, bandyckie, cywilne
-                            bool own = SameTroopCult(c, u.Cult);
-                            string sc = Side(CultOf(c));
-                            if (!own && sc != "" && sc != side) continue;    // bez zbroi z drugiej strony Waskiego Morza
-                            float w = c.Weight;
-                            bool better = best == null || (own && !bestOwn)
-                                || (own == bestOwn && (sum > bestSum || (sum == bestSum && (w > bestW || (w == bestW && string.CompareOrdinal(c.StringId, best.StringId) < 0)))));
-                            if (better) { best = c; bestOwn = own; bestSum = sum; bestW = w; }
+                            int s = ValeSlots[k];
+                            var it = eq[s].Item;
+                            if (it != null && Cat(it) != 3) continue;
+                            var ty = it != null ? it.ItemType : ValeSlotTypes[k];
+                            List<ItemObject> lst;
+                            if (_pool == null || !_pool.TryGetValue(((int)ty).ToString(), out lst)) continue;
+                            int curSum = it != null ? ArmorSum(it) : 0;
+                            float curW = it != null ? it.Weight : 0f;
+                            ItemObject best = null, up = null; bool bestMerch = false; int bestSum = -1, upT = 99, upSum = -1; float bestW = -1f;
+                            foreach (var c in lst)
+                            {
+                                if (c == it) continue;
+                                int sum = ArmorSum(c); float w = c.Weight;
+                                if (sum <= curSum || w < curW) continue;         // ciezsza = wiecej ochrony i nie lzejsza w kg
+                                if (!SameTroopCult(c, u.Cult)) continue;          // tylko rzeczy Doliny (kultura albo noszone przez zolnierzy Doliny)
+                                if (Reject(it, c, u, 2) != 0) continue;          // plec, bandyckie, cywilne
+                                int g = TierOf(c);
+                                if (g > T)
+                                {
+                                    if (s == 6 && (g < upT || (g == upT && sum > upSum))) { up = c; upT = g; upSum = sum; }   // tylko do logu
+                                    continue;                                    // decyzja 8b: nic ponad tier jednostki
+                                }
+                                bool merch = !c.NotMerchandise;                  // najpierw rzeczy z targu - lord je kupi
+                                bool better = best == null || (merch && !bestMerch)
+                                    || (merch == bestMerch && (sum > bestSum || (sum == bestSum && (w > bestW || (w == bestW && string.CompareOrdinal(c.StringId, best.StringId) < 0)))));
+                                if (better) { best = c; bestMerch = merch; bestSum = sum; bestW = w; }
+                            }
+                            if (best == null)
+                            {
+                                if (s == 6 && it != null && bodyNote.Count < 4)
+                                    bodyNote.Add(id + " " + it.StringId + " t" + TierOf(it) + " (" + curSum + ")" + (up != null ? ", najblizszy ciezszy " + up.StringId + " t" + upT + " (" + upSum + ")" : ""));
+                                continue;
+                            }
+                            if (clone == null) clone = new Equipment(eq);
+                            clone[s] = new EquipmentElement(best);
+                            pieces++;
+                            if (ex.Count < 12)
+                                ex.Add(id + " t" + T + " " + ValeSlotNames[k] + ": " + (it != null ? it.StringId + " t" + TierOf(it) + " (" + curSum + ")" : "pusto")
+                                       + " -> " + best.StringId + " t" + TierOf(best) + " (" + bestSum + ")");
                         }
-                        if (best == null) return null;
-                        var clone = new Equipment(eq);
-                        clone[6] = new EquipmentElement(best);
-                        slots++;
-                        if (ex.Count < 6) ex.Add(id + " t" + T + ": " + it.StringId + " t" + curT + " (ochrona " + curSum + ") -> " + best.StringId + " t" + TierOf(best) + " (" + bestSum + ")");
+                        if (clone != null) setsChanged++;
                         return clone;
                     }, ref sets);
-                    if (slots == before) ex.Add(id + " t" + T + ": bez ciezszego korpusu w tierze");
+                    if (pieces == before) ex.Add(id + " t" + T + ": bez ciezszych rzeczy Doliny w tierze");
                 }
                 catch { stumbles++; }
             }
-            _valeArmorNote = "korpus ciezszy " + slots + " zestawow";
-            Scribe.Line(P + "korpus o stopien ciezszy w granicy tieru (kultura jednostki, potem Westeros/bez kultury): " + slots + " zestawow z " + sets
-                        + "; " + string.Join("; ", ex.ToArray()) + "; potkniecia " + stumbles + ".");
+            _valeArmorNote = "zbroja ciezsza " + pieces + " czesci w " + setsChanged + " zestawach";
+            Scribe.Line(P + "zbroja o stopien ciezsza w granicy tieru (tylko rzeczy Doliny, glowa-ramiona): " + pieces + " czesci w " + setsChanged + " z " + sets
+                        + " zestawow; " + string.Join("; ", ex.ToArray())
+                        + (bodyNote.Count > 0 ? "; korpus bez zmian - brak ciezszego korpusu Doliny w tierze (decyzja 8b): " + string.Join(", ", bodyNote.ToArray()) : "")
+                        + "; potkniecia " + stumbles + ".");
         }
 
         // ---------------- umiejetnosci (po SkillSinew) ----------------
@@ -225,6 +368,7 @@ namespace CrashScribe
                 _freySkillsDone = true;
                 try { FreySkills(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.FreySkills", null); } catch { } }
             }
+            try { FreyRotDaily(); } catch { }   // licznik postfiksu celu skladu ROT (tylko gdy cos sie dzialo)
         }
 
         private static float WeaponStep()
@@ -265,7 +409,7 @@ namespace CrashScribe
                 catch { stumbles++; }
             }
             Scribe.Line(P + done + " z " + KnightsSkillIds.Length + " jednostek +" + KnightsBonus + " Jazdy i +" + KnightsBonus + " broni glownej (ponad wymog wlasnego sprzetu; bron z sufitem bez przeskoku tieru, przyciete "
-                        + capped + "): " + string.Join(", ", ex.ToArray()) + "; " + (_valeArmorNote.Length > 0 ? _valeArmorNote : "korpus nie liczony (175.2 nie zadzialalo)")
+                        + capped + "): " + string.Join(", ", ex.ToArray()) + "; " + (_valeArmorNote.Length > 0 ? _valeArmorNote : "zbroja nie liczona (175.2 nie zadzialalo)")
                         + "; wspolne umiejetnosci pominiete " + shared + ", potkniecia " + stumbles + ".");
         }
 

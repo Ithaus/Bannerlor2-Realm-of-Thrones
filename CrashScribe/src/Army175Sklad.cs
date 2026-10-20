@@ -261,6 +261,7 @@ namespace CrashScribe
         /// <summary>Wpiecie postfiksu na ROT ROTTroopRecruiter.Settings(Hero, Settlement) (internal; refleksja po nazwie typu).</summary>
         internal static void Install(Harmony harmony)
         {
+            InstallJazda(harmony);   // R3-08f: cel skladu ROT dla konnych lucznikow Freyow (Army175Jazda.cs)
             try
             {
                 var t = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTTroopRecruiter");
