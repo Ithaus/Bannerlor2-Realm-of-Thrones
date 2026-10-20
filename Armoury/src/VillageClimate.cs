@@ -51,6 +51,10 @@ namespace Armoury
     /// (follow-up i == 10), przed OnSessionLaunched - dlatego BeforeWorkshops przestawia te same wsie juz w OnNewGameCreatedEvent, a Apply przy
     /// starcie sesji widzi je "juz z nowym typem" (tylko klasa BK). Warsztatow juz stojacych (wczytany zapis) nie ruszamy - te zmienia
     /// WorkshopRetoolByPrice (warsztat tracacy 60 dob).
+    /// Poprawka po recenzji C1: przed warsztatami idzie typ OSTATECZNY nowej kampanii, nie posredni - caly lancuch startu sesji w tej samej
+    /// kolejnosci: T8 (ta tabela), potem len GL5 (GoodsRates, przy Goods Rates By Pattern) i winnice B6 (VineOlive, przy Vine Olive By Climate).
+    /// 6 wsi T8 z bawelna konczy jako len (GL5) - warsztaty ich miast powstaja pod len, nie pod bawelne; Cider Hall wraca do lnu z mapy (bez
+    /// zmiany typu). Stan GL5 / B6 nowej kampanii przypiety w tej samej chwili (PinNewGame) - start sesji go nie liczy drugi raz z klucza.
     /// </summary>
     internal static class VillageClimate
     {
@@ -115,7 +119,8 @@ namespace Armoury
         internal static void Apply()
         {
             int beforeWorkshops = _beforeWorkshops;   // C1: przestawione w tej sesji przed warsztatami (nowa kampania), -1 = nie
-            _beforeWorkshops = -1;
+            var plan = _planApplied ? _plan : null;   // C1: typy ostateczne ustawione przed warsztatami (id wsi -> typ z mapy, typ ostateczny, reguly, nazwa)
+            Reset();
             var s = Settings.Current;
             if (s == null) return;
             var bk = new BkClass();
@@ -156,6 +161,15 @@ namespace Armoury
                     if (st == null || st.Village == null) { missing.Add(row[0]); continue; }
                     var cur = st.Village.VillageType;
                     string curId = cur != null ? cur.StringId : "null";
+                    string[] pe;
+                    if (plan != null && plan.TryGetValue(row[0], out pe) && curId == pe[1])
+                    {
+                        // C1: typ ostateczny lancucha (T8, potem len GL5) ustawiony przed warsztatami - bez drugiej podmiany; klasa BK z klasy typu z mapy
+                        already.Add(row[3] + (pe[1] != row[2] ? " (" + pe[1] + " - " + pe[2] + ")" : ""));
+                        applied.Add(row);
+                        bk.Align(st, row[3], Type(row[1]), cur);
+                        continue;
+                    }
                     if (curId == row[2]) { already.Add(row[3]); applied.Add(row); bk.Align(st, row[3], Type(row[1]), cur); continue; }   // klasa BK takze tu (stary zapis, nowa kampania)
                     if (curId != row[1]) { other.Add(row[3] + " ma " + curId); continue; }   // ktos juz zmienil - nie ruszamy
                     var vt = Type(row[2]);
@@ -173,7 +187,7 @@ namespace Armoury
             }
             var line = "Klimat wsi (T8): podmienione " + done.Count + " z " + Table.Length + " wsi z tabeli"
                        + (done.Count > 0 ? " - " + string.Join("; ", done.ToArray()) : "");
-            if (beforeWorkshops >= 0) line += "; przed warsztatami miast (nowa kampania, C1) przestawiono " + beforeWorkshops + " - tu juz z nowym typem";
+            if (beforeWorkshops >= 0) line += "; przed warsztatami miast (nowa kampania, C1) przestawiono " + beforeWorkshops + " wsi (T8 z lnem GL5 i winnicami B6) - tu juz z typem ostatecznym";
             if (already.Count > 0) line += "; juz z nowym typem: " + string.Join(", ", already.ToArray());
             if (other.Count > 0) line += "; inny typ niz w tabeli (NIE ruszane): " + string.Join(", ", other.ToArray());
             if (missing.Count > 0) line += "; brak w tej kampanii: " + string.Join(", ", missing.ToArray());
@@ -183,81 +197,167 @@ namespace Armoury
             Log.Info(line);
         }
 
-        // C1 (PLAN 6.10, klucz ClimateBeforeWorkshops): ile wsi z tabeli przestawiono w OnNewGameCreatedEvent, przed budowa warsztatow miast
+        // C1 (PLAN 6.10, klucz ClimateBeforeWorkshops): ile wsi przestawiono w OnNewGameCreatedEvent, przed budowa warsztatow miast
         // (-1 = krok nie biegl w tej sesji: wczytany zapis albo klucz wylaczony). Tylko watek glowny (tworzenie kampanii, start sesji); Apply zeruje.
         private static int _beforeWorkshops = -1;
+        // C1 (poprawka po recenzji): plan typow nowej kampanii z OnNewGameCreatedEvent - id wsi -> { typ z mapy, typ ostateczny, reguly, nazwa }.
+        // Liczony takze przy wylaczonym kluczu (tylko do linii WorkshopsFit); _planApplied = typy z planu ustawione przed warsztatami.
+        // Tylko watek glowny; Apply (start sesji) i Reset (konstruktor ArmouryBehavior, kazda kampania) zeruja.
+        private static Dictionary<string, string[]> _plan;
+        private static bool _planApplied;
+
+        /// <summary>ArmouryBehavior (konstruktor) i Apply: stan C1 tylko dla jednej kampanii (przerwane tworzenie kampanii nie przechodzi na wczytany zapis).</summary>
+        internal static void Reset() { _beforeWorkshops = -1; _plan = null; _planApplied = false; }
 
         /// <summary>C1 (PLAN 6.10): CampaignEvents.OnNewGameCreatedEvent - tylko NOWA kampania. Gra buduje warsztaty miast w
         /// WorkshopsCampaignBehavior.OnNewGameCreatedPartialFollowUp (i == 10: InitializeWorkshops + BuildWorkshopsAtGameStart, typ z
         /// DecideBestWorkshopType wedlug produkcji wsi z TradeBound == miasto; BK tylko podmienia duplikat na kopalnie / kuznie), a
         /// CampaignEvents.OnNewGameCreated wola najpierw caly OnNewGameCreatedEvent, potem petle i = 0..99 i OnNewGameCreatedPartialFollowUpEnd,
-        /// a dopiero potem Campaign.OnSessionStart (OnSessionLaunched, gdzie biegnie Apply). Ta sama tabela i ta sama regula co Apply (podmiana
-        /// tylko z typu "bylo"); klasy wsi BK tu nie ruszamy (dane BK moga jeszcze nie istniec) - wyrowna ja Apply przy starcie sesji (wies ma juz
-        /// typ "jest" -> galaz "juz z nowym typem", bez drugiej podmiany). Ustawienia: McmSettings.Apply biegnie w SubModuleMain.OnGameStart,
-        /// przed tworzeniem kampanii - Settings.Current ma juz wartosci z MCM. Typ wsi nie idzie do zapisu gry - wczytany zapis jak dotad.</summary>
+        /// a dopiero potem Campaign.OnSessionStart (OnSessionLaunched, gdzie biegna Apply T8, GL5 i B6). Poprawka po recenzji: przed warsztatami
+        /// typ OSTATECZNY - lancuch startu sesji w tej samej kolejnosci i z tymi samymi regulami (T8: typ "bylo" -> "jest"; GL5: GoodsRates.PlanType;
+        /// B6: VineOlive.PlanType), stan GL5 / B6 nowej kampanii przypiety tu (PinNewGame - start sesji bierze go zamiast klucza). Klasa wsi BK:
+        /// BK zaklada dane ludnosci wsi wczesniej w tym samym zdarzeniu (z typow z mapy), a klase ustawia z typu dopiero przy starcie sesji albo
+        /// przy pierwszym odczycie - wyrownanie tu (klasa typu z mapy -> klasa typu ostatecznego; Unset zostaje dla BK) i jeszcze raz w Apply.
+        /// Ustawienia: McmSettings.Apply biegnie w SubModuleMain.OnGameStart, przed tworzeniem kampanii. Typ wsi nie idzie do zapisu gry.</summary>
         internal static void BeforeWorkshops()
         {
-            _beforeWorkshops = -1;
+            Reset();
             var s = Settings.Current;
             if (s == null) return;
+            bool gl5 = GoodsRates.KeyOn, b6 = VineOlive.KeyOn;   // ten sam odczyt, ktory start sesji zrobilby dla nowej kampanii
+            int stumbles = 0, t8Already = 0;
+            var other = new List<string>();
+            var missing = new List<string>();
+            _plan = BuildPlan(s.VillageClimateFix, gl5, b6, ref t8Already, other, missing, ref stumbles);
             if (!s.VillageClimateFix || !s.ClimateBeforeWorkshops)
             {
                 Log.Info("Klimat wsi przed warsztatami (C1): nowa kampania | " + (!s.VillageClimateFix ? "Village Climate Fix wylaczone" : "klucz Climate Before Workshops wylaczony")
-                         + " - warsztaty miast gra buduje z typow wsi z mapy ROT (jak dotad); tabela T8 przy starcie sesji wedlug Village Climate Fix.");
+                         + " - warsztaty miast gra buduje z typow wsi z mapy ROT (jak dotad); T8, len GL5 i winnice B6 przy starcie sesji wedlug swoich kluczy"
+                         + " (plan typow do porownania: " + _plan.Count + " wsi); potkniecia " + stumbles + ".");
                 return;
             }
-            int done = 0, already = 0, stumbles = 0;
-            var other = new List<string>();
-            var missing = new List<string>();
-            foreach (var row in Table)
+            GoodsRates.PinNewGame(gl5);
+            VineOlive.PinNewGame(b6);
+            var bk = new BkClass();
+            int done = 0, nT8 = 0, nGl5 = 0, nB6 = 0;
+            var chain = new List<string>();
+            foreach (var kv in _plan)
+            {
+                var pe = kv.Value;
+                try
+                {
+                    if (pe[0] == pe[1]) { chain.Add(pe[3] + " " + pe[0] + " zostaje (" + pe[2] + " - typ ostateczny = typ z mapy)"); continue; }
+                    var st = Settlement.Find(kv.Key);
+                    if (st == null || st.Village == null) { missing.Add(kv.Key); continue; }
+                    var cur = st.Village.VillageType;
+                    string curId = cur != null ? cur.StringId : "null";
+                    if (curId != pe[0]) { other.Add(pe[3] + " ma " + curId); continue; }
+                    var vt = Type(pe[1]);
+                    if (vt == null) { missing.Add("typ " + pe[1]); continue; }
+                    st.Village.VillageType = vt;
+                    bk.Align(st, pe[3], cur, vt);
+                    done++;
+                    if (pe[2].StartsWith("T8", StringComparison.Ordinal)) nT8++;
+                    if (pe[2].IndexOf("GL5", StringComparison.Ordinal) >= 0) nGl5++;
+                    if (pe[2].IndexOf("B6", StringComparison.Ordinal) >= 0) nB6++;
+                    if (pe[2].IndexOf('+') >= 0) chain.Add(pe[3] + ": " + pe[0] + " -> " + pe[1] + " (" + pe[2] + ")");
+                }
+                catch (Exception e) { stumbles++; if (stumbles <= 3) Log.Error("VillageClimate.BeforeWorkshops(" + kv.Key + ")", e); }
+            }
+            _planApplied = true;
+            _beforeWorkshops = done;
+            Log.Info("Klimat wsi przed warsztatami (C1): nowa kampania | przestawiono " + done + " wsi PRZED budowa warsztatow miast, od razu na typ ostateczny startu sesji: "
+                     + "z tabeli T8 " + nT8 + " z " + Table.Length + (t8Already > 0 ? " (juz z nowym typem " + t8Already + ")" : "")
+                     + ", len GL5 " + nGl5 + " (Goods Rates By Pattern " + (gl5 ? "tak" : "nie") + ")"
+                     + ", winnice i gaje B6 " + nB6 + " (Vine Olive By Climate " + (b6 ? "tak" : "nie") + ")"
+                     + (chain.Count > 0 ? "; lancuch kilku regul: " + string.Join("; ", chain.ToArray()) : "")
+                     + (other.Count > 0 ? "; inny typ niz w tabeli (NIE ruszane): " + string.Join(", ", other.ToArray()) : "")
+                     + (missing.Count > 0 ? "; brak w tej kampanii: " + string.Join(", ", missing.ToArray()) : "")
+                     + "; " + bk.Summary() + "; potkniecia " + (stumbles + bk.Stumbles) + ".");
+        }
+
+        /// <summary>C1: typy nowej kampanii po lancuchu startu sesji (T8, potem GL5, potem B6 - kolejnosc OnSessionLaunched), bez zmian w swiecie.
+        /// Wpis tylko dla wsi, ktora zmienia typ choc jedna regula (typ ostateczny moze wrocic do typu z mapy - Cider Hall: len -> bawelna -> len).</summary>
+        private static Dictionary<string, string[]> BuildPlan(bool t8, bool gl5, bool b6, ref int t8Already, List<string> other, List<string> missing, ref int stumbles)
+        {
+            var plan = new Dictionary<string, string[]>(StringComparer.Ordinal);
+            if (t8)
+                foreach (var row in Table)
+                {
+                    try
+                    {
+                        var st = Settlement.Find(row[0]);
+                        if (st == null || st.Village == null) { missing.Add(row[0]); continue; }
+                        var cur = st.Village.VillageType;
+                        string curId = cur != null ? cur.StringId : "null";
+                        if (curId == row[2]) { t8Already++; continue; }
+                        if (curId != row[1]) { other.Add(row[3] + " ma " + curId); continue; }   // ktos juz zmienil - nie ruszamy (jak Apply)
+                        if (Type(row[2]) == null) { missing.Add("typ " + row[2]); continue; }
+                        plan[row[0]] = new[] { curId, row[2], "T8", row[3] };
+                    }
+                    catch (Exception e) { stumbles++; if (stumbles <= 3) Log.Error("VillageClimate.BuildPlan(" + row[0] + ")", e); }
+                }
+            if (gl5) PlanStep(plan, GoodsRates.PlanIds(), true, ref stumbles);
+            if (b6) PlanStep(plan, VineOlive.PlanIds(), false, ref stumbles);
+            return plan;
+        }
+
+        private static void PlanStep(Dictionary<string, string[]> plan, string[] ids, bool gl5, ref int stumbles)
+        {
+            string tag = gl5 ? "GL5" : "B6";
+            foreach (var id in ids)
             {
                 try
                 {
-                    var st = Settlement.Find(row[0]);
-                    if (st == null || st.Village == null) { missing.Add(row[0]); continue; }
-                    var cur = st.Village.VillageType;
-                    string curId = cur != null ? cur.StringId : "null";
-                    if (curId == row[2]) { already++; continue; }
-                    if (curId != row[1]) { other.Add(row[3] + " ma " + curId); continue; }   // ktos juz zmienil - nie ruszamy (jak Apply)
-                    var vt = Type(row[2]);
-                    if (vt == null) { missing.Add("typ " + row[2]); continue; }
-                    st.Village.VillageType = vt;
-                    done++;
+                    string[] pe;
+                    plan.TryGetValue(id, out pe);
+                    string curId = pe != null ? pe[1] : null;
+                    Settlement st = null;
+                    if (curId == null)
+                    {
+                        st = Settlement.Find(id);
+                        if (st == null || st.Village == null || st.Village.VillageType == null) continue;   // brak - linia startu sesji GL5 / B6 to pokaze
+                        curId = st.Village.VillageType.StringId;
+                    }
+                    string to = gl5 ? GoodsRates.PlanType(id, curId) : VineOlive.PlanType(id, curId);
+                    if (to == null || to == curId) continue;
+                    if (pe != null) { pe[1] = to; pe[2] = pe[2] + "+" + tag; }
+                    else plan[id] = new[] { curId, to, tag, st.Name != null ? st.Name.ToString() : id };
                 }
-                catch (Exception e) { stumbles++; if (stumbles <= 3) Log.Error("VillageClimate.BeforeWorkshops(" + row[0] + ")", e); }
+                catch (Exception e) { stumbles++; if (stumbles <= 3) Log.Error("VillageClimate.PlanStep(" + id + ")", e); }
             }
-            _beforeWorkshops = done;
-            Log.Info("Klimat wsi przed warsztatami (C1): nowa kampania | przestawiono " + done + " z " + Table.Length + " wsi z tabeli T8 PRZED budowa warsztatow miast"
-                     + (already > 0 ? "; juz z nowym typem " + already : "")
-                     + (other.Count > 0 ? "; inny typ niz w tabeli (NIE ruszane): " + string.Join(", ", other.ToArray()) : "")
-                     + (missing.Count > 0 ? "; brak w tej kampanii: " + string.Join(", ", missing.ToArray()) : "")
-                     + "; klasa wsi BK wyrownana przy starcie sesji (linia Klimat wsi (T8)); potkniecia " + stumbles + ".");
         }
 
         /// <summary>C1: CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent (nowa kampania, warsztaty miast juz zbudowane w i == 10) - tylko log.
         /// Wsad okolicy miasta jak w DecideBestWorkshopType gry: produkcje typow wsi z TradeBound == miasto (zboze tylko z wsi, ktorej towarem
         /// glownym jest zboze; krowa = skory, owca = welna). Warsztat (bez ukrytych typow) "pasuje", gdy ktoras jego produkcja z wyrobem handlowym
-        /// ma wsad z tej listy. Te same warsztaty liczone dwa razy: wedlug typow wsi z klimatu (tabela T8, "jest") i wedlug typow z mapy ROT
-        /// ("bylo") - przy kluczu gra stawiala je wedlug pierwszych, bez klucza wedlug drugich (porownanie A/B: dwie nowe kampanie).</summary>
+        /// ma choc jeden wsad z tej listy (miara gry z FindTotalInputDensityScore; bramka Armoury WorkshopInputs.HasInput chce calego wsadu linii -
+        /// jej miara to linia "Warsztaty wedlug surowca (208)" w 1. dobie, "przy starcie gry"). Te same warsztaty liczone dwa razy: wedlug typow
+        /// ostatecznych wsi (plan C1: T8, len GL5, winnice B6) i wedlug typow z mapy ROT - przy kluczu gra stawiala je wedlug pierwszych, bez
+        /// klucza wedlug drugich (porownanie A/B: dwie nowe kampanie).</summary>
         internal static void WorkshopsFit()
         {
             try
             {
                 var s = Settings.Current;
+                var plan = _plan;
                 var mapT = new Dictionary<Village, VillageType>();
-                var climT = new Dictionary<Village, VillageType>();
-                foreach (var row in Table)
-                {
-                    var st = Settlement.Find(row[0]);
-                    if (st == null || st.Village == null || st.Village.VillageType == null) continue;
-                    string id = st.Village.VillageType.StringId;
-                    if (id != row[1] && id != row[2]) continue;   // inny typ niz w tabeli - w obu rachunkach typ biezacy
-                    var a = Type(row[1]);
-                    var b = Type(row[2]);
-                    if (a == null || b == null) continue;
-                    mapT[st.Village] = a;
-                    climT[st.Village] = b;
-                }
+                var finT = new Dictionary<Village, VillageType>();
+                if (plan != null)
+                    foreach (var kv in plan)
+                    {
+                        var pe = kv.Value;
+                        if (pe[0] == pe[1]) continue;   // typ ostateczny = typ z mapy - w obu rachunkach typ biezacy
+                        var st = Settlement.Find(kv.Key);
+                        if (st == null || st.Village == null || st.Village.VillageType == null) continue;
+                        string id = st.Village.VillageType.StringId;
+                        if (id != pe[0] && id != pe[1]) continue;   // inny typ niz w planie - w obu rachunkach typ biezacy
+                        var a = Type(pe[0]);
+                        var b = Type(pe[1]);
+                        if (a == null || b == null) continue;
+                        mapT[st.Village] = a;
+                        finT[st.Village] = b;
+                    }
                 var all = Village.All;
                 if (all == null) return;
                 int towns = 0, shops = 0, fitC = 0, fitM = 0, aTowns = 0, aShops = 0, aFitC = 0, aFitM = 0, stumbles = 0;
@@ -275,7 +375,7 @@ namespace Armoury
                         {
                             if (v == null || v.TradeBound != town.Settlement) continue;
                             VillageType tc, tm;
-                            if (climT.TryGetValue(v, out tc)) { tm = mapT[v]; aff = true; }
+                            if (finT.TryGetValue(v, out tc)) { tm = mapT[v]; aff = true; }
                             else { tc = v.VillageType; tm = tc; }
                             AddSupply(tc, supC);
                             AddSupply(tm, supM);
@@ -296,11 +396,12 @@ namespace Armoury
                 }
                 bool early = _beforeWorkshops >= 0;
                 Log.Info("Klimat wsi przed warsztatami (C1): warsztaty miast po budowie startowej | zbudowane wedlug typow wsi "
-                         + (early ? "KLIMATU (przestawiono przed warsztatami " + _beforeWorkshops + " wsi)" : "Z MAPY ROT (klucz Climate Before Workshops albo Village Climate Fix wylaczone)")
+                         + (early ? "OSTATECZNYCH (przestawiono przed warsztatami " + _beforeWorkshops + " wsi: T8, len GL5, winnice B6)" : "Z MAPY ROT (klucz Climate Before Workshops albo Village Climate Fix wylaczone)")
+                         + " | wsi z innym typem ostatecznym niz na mapie " + finT.Count
                          + " | miast " + towns + ", warsztatow (bez ukrytych) " + shops
-                         + " | pasuje do wsadu okolicy (wsie handlowe miasta, regula DecideBestWorkshopType): wedlug typow klimatu " + fitC + " (" + Pct(fitC, shops) + "), wedlug typow z mapy " + fitM + " (" + Pct(fitM, shops) + ")"
-                         + " | miasta z wsia z tabeli T8 " + aTowns + ": warsztatow " + aShops + ", pasuje wedlug klimatu " + aFitC + " (" + Pct(aFitC, aShops) + "), wedlug mapy " + aFitM + " (" + Pct(aFitM, aShops) + ")"
-                         + (s != null && !s.VillageClimateFix ? " | Village Climate Fix wylaczone - w grze zostaja typy z mapy" : "")
+                         + " | pasuje do wsadu okolicy (wsie handlowe miasta, regula DecideBestWorkshopType, choc jeden wsad): wedlug typow ostatecznych " + fitC + " (" + Pct(fitC, shops) + "), wedlug typow z mapy " + fitM + " (" + Pct(fitM, shops) + ")"
+                         + " | miasta ze zmieniona wsia " + aTowns + ": warsztatow " + aShops + ", pasuje wedlug typow ostatecznych " + aFitC + " (" + Pct(aFitC, aShops) + "), wedlug mapy " + aFitM + " (" + Pct(aFitM, aShops) + ")"
+                         + (s != null && !s.VillageClimateFix ? " | Village Climate Fix wylaczone - typy ostateczne bez T8" : "")
                          + "; potkniecia " + stumbles + ".");
             }
             catch (Exception e) { Log.Error("VillageClimate.WorkshopsFit", e); }
