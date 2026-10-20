@@ -315,6 +315,12 @@ namespace Armoury
             return g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
         }
 
+        /// <summary>p5-bloto (MapMud): czy to liczenie gra zapisuje do pamieci predkosci (_lastCalculatedSpeed) - ten sam straznik zapisu co stan drogi.</summary>
+        internal static bool Recording(MobileParty mp)
+        {
+            return !_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp));
+        }
+
         /// <summary>Pamiec partii: Party.Index | komorka + 1 (tylko do logu zmian, porownanie idzie po stanie) | stan (1 poza droga, 2 trakt, 3 boczna).</summary>
         private static void Record(MobileParty mp, int cell, int st)
         {
@@ -445,6 +451,7 @@ namespace Armoury
                          + " (premia drogi przeliczana przy wejsciu na droge i zejsciu z niej, nie tylko przy zmianie sciany siatki).");
                 // straznik zapisu (recenzja, uwaga 1) potrzebny tylko postfiksowi pamieci - bez niego latki straznika bylyby samym kosztem
                 if (ok) HookWriters(h);
+                MapMud.ApplyCache(h, m);   // p5-bloto (R3-07c): postfiks pamieci stopnia pogody (ulewa <-> mokro, snieg <-> deszcz) na tej samej metodzie
             }
             catch (Exception e) { _hookNote = "NIE wpieta (" + e.GetType().Name + ")"; Log.Error("MapRoads.ApplyAll", e); }
         }

@@ -1864,13 +1864,17 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MapSideRoadSpeedPercent { get; set; } = 7.5f;
 
-        [SettingPropertyBool("Map Mud Speed Penalty", HintText = "mud off the roads: in rain - wet ground after rain or a downpour on the campaign map - every land party (yours, the lords', caravans, villagers, bandits) travels slower by Map Mud Speed Percent when it is off the road; on a painted main road, and on a village lane with Map Side Road Speed Bonus, there is no mud. The speed tooltip shows a 'Mud' line. Snow keeps its own penalty and ships at sea are not affected. Needs Map Road Speed Bonus. Off = no mud penalty, as before", RequireRestart = false)]
+        [SettingPropertyBool("Map Mud Speed Penalty", HintText = "mud off the roads: while it rains on the campaign map, and for about a day after the rain stops, every land party (yours, the lords', caravans, villagers, bandits) travels slower when it is off the road - by Map Mud Speed Percent in a downpour ('Mud' line in the speed tooltip) and by Map Mud Wet Speed Percent on wet ground after rain ('Wet ground' line). On a painted main road, and on a village lane with Map Side Road Speed Bonus, there is no mud. Snow keeps its own penalty and ships at sea are not affected. Needs Map Road Speed Bonus. Off = no mud penalty, as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool MapMudSpeedPenalty { get; set; } = true;
 
-        [SettingPropertyInteger("Map Mud Speed Percent", 0, 50, "0", HintText = "how much slower a land party travels off the road in rain, in percent of its speed (15 = -15%; at most 50)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Mud Speed Percent", 0, 50, "0", HintText = "how much slower a land party travels off the road while it rains (a downpour, or a sea storm over the coast), in percent of its speed (15 = -15%; at most 50)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int MapMudSpeedPercent { get; set; } = 15;
+
+        [SettingPropertyFloatingInteger("Map Mud Wet Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much slower a land party travels off the road on wet ground after rain (up to about a day after the rain stops), in percent of its speed (7.5 = -7.5%; at most 50)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float MapMudWetSpeedPercent { get; set; } = 7.5f;
 
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
@@ -8743,6 +8747,7 @@ namespace Armoury
             s.MapSideRoadSpeedPercent = MapSideRoadSpeedPercent;
             s.MapMudSpeedPenalty = MapMudSpeedPenalty;
             s.MapMudSpeedPercent = MapMudSpeedPercent;
+            s.MapMudWetSpeedPercent = MapMudWetSpeedPercent;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;
