@@ -592,7 +592,7 @@ namespace Armoury
                            .Append(" (kiesa ").Append(paid).Append(", sakiewka ludzi ").Append(b.CompPurse[i]).Append(')');
                 }
                 int compPaid = compGoldPaid + compPursePaid;
-                int playerFolk, playerPaid = HeroPays(me, st, b.PlayerCost, false, out playerFolk);
+                int playerFolk, playerPaid = HeroPays(me, st, b.PlayerCost, PayNotes.Quiet(false), out playerFolk);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons (InnNote)
                 long diff = World(st, b.Comp) - w0;
                 int paidAll = menPaid + compPaid + playerPaid, folkAll = purseFolk + compFolk + playerFolk;
                 float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
@@ -618,8 +618,9 @@ namespace Armoury
                          + " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%"
                          + ", cena " + (q == 2 && PriceKey ? "tak" : "nie") + ".");
                 string men = b.Foot + b.Mounted == 0 ? "" : b.Sacked ? " Your men take their beds by right of the sack and pay nothing." : " Your men paid " + menPaid + " from their purses" + (b.MenStable > 0 ? ", " + b.MenStable + " of them sleep in the stable." : ".");
-                Log.Player("You take lodgings at a " + QualityOf(q) + " in " + st.Name + " - " + paidAll + " denars in all, " + playerPaid + " of them yours." + men
-                           + (compPaid > 0 ? " Your companions paid " + compPaid + (compPursePaid > 0 ? " (" + compPursePaid + " of it from the men's purse, where their pay goes)." : ".") : ""));
+                string comps = compPaid > 0 ? " Your companions paid " + compPaid + (compPursePaid > 0 ? " (" + compPursePaid + " of it from the men's purse, where their pay goes)." : ".") : "";
+                InnNote("inn", q, st.Name.ToString(), b, playerPaid, men + comps,   // m96-wies: jeden komunikat z powodem i rozbiciem (klucz wylaczony - jak dotad)
+                        "You take lodgings at a " + QualityOf(q) + " in " + st.Name + " - " + paidAll + " denars in all, " + playerPaid + " of them yours." + men + comps);
                 NightRest.BeginInnSleep();
             }
             catch (Exception e) { Stumble("Commit", e); }

@@ -63,6 +63,12 @@ namespace GrandTourney
         // Jeff 20.10 ok. 12:00: "nie musisz sztucznie zmniejszac ... jak nie maja kasy, to ich zbroje, bo nie moga placic z czego czego nie maja" -> domyslnie 1 (pelna wartosc)
         public float TourneyRansomShare = 1f;              // with Tourney Ransom: the ransom of the lists as a share of the worth of the horse and armour in their present state (1 = the full worth); the vanquished pays only from what he and his house really have, and yields the pieces he cannot pay for
 
+        // --- Payment messages ---
+        // m96-wies (Jeff 20.10: "You paid w miescie 2 - powinno byc, za co"): PayNotes.cs - przy przelewach gracza z tego moda komunikat gry "You paid N" /
+        // "You received N" wylaczony; zostaje jeden komunikat z powodem (dotychczasowy albo nowy: zwrot oplaty odwolanego turnieju). Kwoty bez zmian.
+        // Wylaczony = komunikaty gry jak dotad (od razu). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony). Ten sam klucz w Armoury i RealisticCaptivity.
+        public bool PlayerPaymentReasons = true;           // when you pay or receive gold for a tourney (hosting fee, takings, the champion's purse, refunds), the game's bare "You paid N" / "You received N" is replaced by one message that says what for. Only the message changes - sums and payers stay the same. Off = the game's message as before
+
         public bool LogEnabled = true;                     // write a log file in the module folder
 
         public static void Load(string moduleDataDir)

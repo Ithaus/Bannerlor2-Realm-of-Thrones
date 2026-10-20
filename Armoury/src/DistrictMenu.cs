@@ -258,6 +258,7 @@ namespace Armoury
             var ids = new List<string>();
             foreach (var o in menu.MenuOptions) ids.Add(o != null ? o.IdString : "?");
             int at = ids.IndexOf(opt);
+            if (at < 0 && menuId == "village") { var mv = VillageMenus.MovedTo(opt); if (mv != null) return "village -> " + mv; }   // m96-wies: pozycja w "Village affairs"
             if (at < 0) return menuId + " BRAK pozycji (" + ids.Count + " opcji)";
             return menuId + " index " + at + " z " + ids.Count + " (przed: " + (at > 0 ? ids[at - 1] : "-") + ", po: " + (at + 1 < ids.Count ? ids[at + 1] : "-") + ")";
         }

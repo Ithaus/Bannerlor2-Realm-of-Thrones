@@ -100,6 +100,10 @@ namespace Armoury
 
         private const int FBribe = 0, FBreak = 1, FBarber = 2, FClanInfo = 3, FTun = 4, FDrink = 5, Fees = 6;
         private static readonly string[] FName = { "lapowka strazy", "odbicie wieznia", "golibroda", "wiesci karczmarza", "kolejka dla druzyny", "napitek" };
+        // m96-wies (PayNotes): klucz do logu i powod w komunikacie gracza, ta sama kolejnosc co FName
+        private static readonly string[] FKey = { "bribe", "prisonbreak", "barber", "claninfo", "round", "drink" };
+        private static readonly string[] FWhy = { " to bribe the guards.", " to the dungeon guards for the prison break.", " to the barber.",
+                                                  " to the innkeeper for news of the clans.", " for a round of drinks for your men.", " for a drink at the tavern." };
         private static readonly int[] _fN = new int[Fees];
         private static readonly long[] _fSum = new long[Fees], _fGame = new long[Fees];
         private static long _toGuards, _toChest, _toTown, _toFolk, _feeVoid;
@@ -273,15 +277,18 @@ namespace Armoury
             if (!mine) { GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn); return; }
             var me = Hero.MainHero;
             int had = me.Gold;
+            bool pn = !dn && PayNotes.On; dn = dn || pn;   // m96-wies: gdy gra pokazalaby "You paid N" - nasz komunikat z powodem (FWhy)
             if (!on || st == null)
             {
                 GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn);   // jak gra (w nicosc), licznik
                 int lost = Math.Max(0, had - me.Gold);
                 _fN[kind]++; _fSum[kind] += lost; _fGame[kind] += lost; _feeVoid += lost;
+                if (pn) PayNotes.Paid(FKey[kind], lost, FWhy[kind]);
                 return;
             }
             GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount, dn);
             int paid = Math.Max(0, had - me.Gold), folk = 0;
+            if (pn) PayNotes.Paid(FKey[kind], paid, FWhy[kind]);
             try
             {
                 if (paid > 0 && st.IsTown && st.Town != null)
@@ -350,16 +357,19 @@ namespace Armoury
             if (!mine) { GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn); return; }
             var me = Hero.MainHero;
             int had = me.Gold;
+            bool pn = !dn && PayNotes.On; dn = dn || pn;   // m96-wies: gdy gra pokazalaby "You paid N" - nasz komunikat z powodem (FWhy)
             if (!on || st == null)
             {
                 GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn);   // jak gra (w nicosc), licznik
                 int lost = Math.Max(0, had - me.Gold);
                 _fN[kind]++; _fSum[kind] += lost; _fGame[kind] += lost; _feeVoid += lost;
+                if (pn) PayNotes.Paid(FKey[kind], lost, FWhy[kind]);
                 return;
             }
             if (gar != null) GiveGoldAction.ApplyForCharacterToParty(me, gar.Party, amount, dn);
             else GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount, dn);
             int paid = Math.Max(0, had - me.Gold), purse = 0;
+            if (pn) PayNotes.Paid(FKey[kind], paid, FWhy[kind]);
             try
             {
                 if (gar != null && paid > 0 && MenPurse.On)

@@ -1180,12 +1180,14 @@ namespace Armoury
                 int num = Math.Max(0, __0.PartyTradeGold - 10000);         // ta sama kwota co BK
                 if (num <= 0) return;
                 int before = __0.PartyTradeGold;
-                GiveGoldAction.ApplyForPartyToCharacter(__0.Party, owner, num, false);
+                bool pn = owner == Hero.MainHero && PayNotes.On;   // m96-wies: graczowi jeden komunikat z powodem zamiast "You received N" gry
+                GiveGoldAction.ApplyForPartyToCharacter(__0.Party, owner, num, pn);
                 int moved = before - __0.PartyTradeGold;
                 if (moved <= 0) return;
                 _profitPaid += moved; _profitN++;
                 // te same skutki co wplata BK: komunikat dla gracza, doswiadczenie handlu dowodcy, slawa za perk Great Investor
-                if (owner == Hero.MainHero) Log.Player("The " + __0.Name + " has deposited " + moved + " denars with you in " + __1.Name + ".");
+                if (pn) PayNotes.Got("caravan", moved, ": the " + __0.Name + " deposited its profit with you in " + __1.Name + ".");
+                else if (owner == Hero.MainHero) Log.Player("The " + __0.Name + " has deposited " + moved + " denars with you in " + __1.Name + ".");
                 if (__0.LeaderHero != null) SkillLevelingManager.OnTradeProfitMade(__0.LeaderHero, moved);
                 var leader = owner.Clan.Leader;
                 if (leader != null && leader.GetPerkValue(DefaultPerks.Trade.GreatInvestor)) owner.Clan.AddRenown(DefaultPerks.Trade.GreatInvestor.PrimaryBonus, true);

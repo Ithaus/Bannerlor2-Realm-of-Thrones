@@ -473,7 +473,9 @@ namespace Armoury
                 if (buyer.Gold < price) { _ePoor++; Log.Player("You cannot afford " + item.Name + " (" + price + ").", true); return false; }
                 roster.AddToCounts(item, -1);
                 party.ItemRoster.AddToCounts(item, 1);
-                if (price > 0) GiveGoldAction.ApplyBetweenCharacters(buyer, seller, price, false);
+                bool pn = buyer == Hero.MainHero && PayNotes.On;   // m96-wies: graczowi jeden komunikat z powodem zamiast "You paid N" gry
+                if (price > 0) GiveGoldAction.ApplyBetweenCharacters(buyer, seller, price, pn);
+                if (pn) PayNotes.Paid("bkbook", price, " for " + item.Name + " (" + sn + ").");
                 _eSold++; _eGold += price;
                 Log.Info("Ksiazka z celu BK (n20): " + buyer.Name + " kupil " + item.StringId + " od " + sn + " (" + (buyer.CurrentSettlement != null ? buyer.CurrentSettlement.StringId : "?")
                          + ") za " + price + " (BK bral " + ((long)item.Value * 30) + " w nicosc, ksiazka z niczego); kiesa ksiegarza " + seller.Gold + ", w ofercie zostalo " + roster.Count + " pozycji"

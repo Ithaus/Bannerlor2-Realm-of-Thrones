@@ -126,8 +126,10 @@ namespace Armoury
             if (me == null || amount <= 0) return false;
             Hero h; Settlement st; int route;
             ResolveRecipient(captor, out h, out st, out route);
-            if (h != null) GiveGoldAction.ApplyBetweenCharacters(me, h, amount);
-            else if (st != null) GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount);
+            bool pn = PayNotes.On;   // m96-wies: jeden komunikat z powodem zamiast "You paid N" gry
+            int had = me.Gold;
+            if (h != null) GiveGoldAction.ApplyBetweenCharacters(me, h, amount, pn);
+            else if (st != null) GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount, pn);
             else { _dNoRecipientN++; _dNoRecipientGold += amount; return false; }
             // przelew zrobiony - liczniki i log we wlasnym try (przeglad 2.14: wyjatek po przelewie nie moze puscic oryginalu, ktory zabralby drugi raz)
             try
@@ -135,6 +137,7 @@ namespace Armoury
                 to = h != null ? Name(h) + " (" + RouteName[route] + ")" : "kasa " + st.Name + " (" + RouteName[route] + ")";
                 _dToCaptor += amount; _dToCaptorN++; _dRoute[route]++;
                 Log.Info("Okupy (2.14): okup gracza " + amount + " zl (" + why + ") -> " + to + "; porywacz: " + Describe(captor) + "; w nicosc 0.");
+                if (pn) PayNotes.Paid("ransom", Math.Max(0, had - me.Gold), " as your ransom, to " + (h != null ? Name(h) : st.Name.ToString()) + ".");
             }
             catch (Exception e) { Stumbles++; Log.Error("RansomFlows.PayPlayerRansom(log)", e); }
             return true;

@@ -256,10 +256,12 @@ namespace Armoury
             if (pay <= 0) { Log.Player(lord.Name + " cannot pay for the piece right now.", true); return; }
             roster.AddToCounts(delivered, -1);
             try { var lp = lord.PartyBelongedTo; if (lp != null && lp.ItemRoster != null) lp.ItemRoster.AddToCounts(delivered, 1); } catch { }
-            GiveGoldAction.ApplyBetweenCharacters(lord, Hero.MainHero, pay);
+            bool pn = PayNotes.On;   // m96-wies: jeden komunikat z powodem zamiast "You received N" gry
+            GiveGoldAction.ApplyBetweenCharacters(lord, Hero.MainHero, pay, pn);
             ChangeRelationAction.ApplyPlayerRelation(lord, s.OrderRelationReward);
             Board.Remove(line);
-            Log.Player(lord.Name + " pays " + pay + " gold for the " + item.Name +
+            if (pn) PayNotes.Got("order", pay, " from " + lord.Name + " for the " + item.Name + ". Word of your craft spreads.");
+            else Log.Player(lord.Name + " pays " + pay + " gold for the " + item.Name +
                        ". Word of your craft spreads.", false);
             Log.Info("Dostarczono: " + line + " za " + pay);
         }

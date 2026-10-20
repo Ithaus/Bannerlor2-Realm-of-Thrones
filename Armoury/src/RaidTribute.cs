@@ -588,7 +588,8 @@ namespace Armoury
                 long v0 = v.Gold, g0 = me.Gold;
                 int due = (int)Math.Min(int.MaxValue, Math.Min(q.T, Math.Max(0, v.Gold)));
                 if (due <= 0) return;
-                GiveGoldAction.ApplyForPartyToCharacter(st.Party, me, due, false);
+                bool pn = PayNotes.On;   // m96-wies: jeden komunikat z powodem zamiast "You received N" gry
+                GiveGoldAction.ApplyForPartyToCharacter(st.Party, me, due, pn);
                 long paid = v0 - v.Gold, got = me.Gold - g0;
                 _dBal += got - paid;
                 _dPT++; _dPGold += paid; _dRateSum += q.Rate; _dPurse += v0;
@@ -600,7 +601,8 @@ namespace Armoury
                 catch (Exception e) { Stumble("MenuConsequence(pamiec)", e); }
                 if (_ex.Count < MaxExamples)
                     _ex.Add("gracz <- " + Nm(st) + " " + paid + " zl (" + F(q.Rate * 100.0, "0") + "% z " + v0 + ", sila " + q.Men + ":" + q.Def + ")");
-                Log.Player("The elders of " + Nm(st) + " paid you " + paid + " denars of tribute. Your realm will spare the village for " + SpareDays + " days.");
+                if (pn) PayNotes.Got("tribute", (int)Math.Max(0, got), ": tribute from the elders of " + Nm(st) + ". Your realm will spare the village for " + SpareDays + " days.");
+                else Log.Player("The elders of " + Nm(st) + " paid you " + paid + " denars of tribute. Your realm will spare the village for " + SpareDays + " days.");
                 GameMenu.SwitchToMenu("village");                                                        // zwykle menu (jak "Forget it" gry), nie menu oczekiwania
             }
             catch (Exception e) { Stumble("MenuConsequence", e); }

@@ -181,6 +181,12 @@ namespace RealisticCaptivity
         // 3.7 ROT: wycena lorda w lupie zaciagnietego gracza - min(nasz okup, cena gry) (RotEnlistLoot37.cs)
         public bool RotEnlistLootGamePrice = true;         // while you serve enlisted under a lord, a captured lord in your share of the loot is valued at the game's ransom price or at the ransom his house would pay you, whichever is lower - nobody pays that ransom here, the value only turns into goods for you (off = valued at the ransom his house would pay you, as before)
 
+        // --- Payment messages ---
+        // m96-wies (Jeff 20.10: "You paid w miescie 2 - powinno byc, za co"): PayNotes.cs - przy przelewach gracza z tego moda komunikat gry "You paid N" /
+        // "You received N" wylaczony; zostaje jeden komunikat z powodem (dotychczasowy albo nowy: rata dlugu okupu, kupno i sprzedaz domu). Kwoty bez zmian.
+        // Wylaczony = komunikaty gry jak dotad (od razu). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony). Ten sam klucz w Armoury i GrandTourney.
+        public bool PlayerPaymentReasons = true;           // when you pay or receive gold in captivity, for your ransom or your house, the game's bare "You paid N" / "You received N" is replaced by one message that says what for. Only the message changes - sums and payers stay the same. Off = the game's message as before
+
         // --- Other ---
         public bool LogEnabled = true;                     // write a log file in the module folder
 
