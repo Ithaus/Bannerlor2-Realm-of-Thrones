@@ -3276,4 +3276,8 @@ W grze bez zmian: WGRANIE 88 (Armoury 6d0fd3e4). Jeff gral 14:41-16:09 (Ironman 
 - Jeff (doslownie): "Zaplanuj prace nocna popraw tez rzeczy ktore miales dokonczyc i rano chce miewc juz finalna rozgrywke, masz zgode na wszytko byle to skonczyc."
   Plan: docs/PLAN-NOC-2026-10-20.md (12 galezi w-toku/n20-* od 934cc039). TEST fin102 (WGRANIE 88, 160 dob x8, ks-auto.flag) w toku od 16:45 - NAKUM-7/NKA-1 porownanie.
   Limit: drugie konto, tydzien 0%, 5 h 1% (16:40).
+- 17:29 PDT: fin102 (WGRANIE 88, 160 dob x8, Armoury-2026-10-19_16-43-11.log, 41 min biegu) kod 0, 22 x "ERROR CAUGHT FURTHER UP" (start, Harmony - jak zawsze).
+  NKA-1 TAK (po przegladzie 7148 zl/d, prog 10000) - w x20 NIE = artefakt tempa. NAKUM-7 NIE tylko "kasy miast +32019/d" (prog 30 tys.; glow rodow brak - x20 artefakt),
+  NAKUM-12 (wlasciwy prog kas miast KS) TAK +32455/d <= 43344. Wniosek: bez zmian kodu; testy ekonomii na x8 (x20 przeklamuje NAKUM-7/NKA-1).
+  Bieg zatrzymal sie 9 min na oknie "Safe Mode" po zabiciu zamarznietej gry - klikniete No. Dalej: fin103 = A7 (armoury-a7-wlacz.flag + ks-auto), 160 dob x8, w toku od 17:32.
 
