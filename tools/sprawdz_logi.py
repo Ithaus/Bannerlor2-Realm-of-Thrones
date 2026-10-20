@@ -777,6 +777,10 @@ Uzycie (Python 3, tylko odczyt):
                     NK-4 kontrola k = 0 (twardy), NK-5 kontrola r = 0 (twardy; przelewy gry - okup, RC - to kategoria), NK-6 od doby 28 kryjowki z bandami z kasa >= skarbiec srednio >= 0.5 (P),
                     NK-7 stan kas (INFO), NK-8 kiesy startowe z kas kryjowek (INFO, wobec bazy), NK-9 zdarzenia: przeszukanie, bitwa gracza, zwyciezca AI (INFO),
                     NK-10 Pieniadz swiata - bandy i kryjowki (INFO), NK-11 linia Paser: stan = doplyw - odplyw (twardy). Log bez paczki: INFO, bez wyjatku.
+--grupa m96bandy  : (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"; galaz w-toku/m96-bandy, BandFood.cs) python -I tools/sprawdz_logi.py --grupa m96bandy
+                    [--baza-doby <log Armoury bazy>] <Armoury-*.log>. MB-0 linia doby, MB-1 potkniecia 0, MB-2 zjedzone/potrzeba >= 0.85 (P), MB-3 glodne <= 25% (P),
+                    MB-4 rozpady z glodu <= 2% band/d (P), MB-5 zapas >= 2 dob (P), MB-6 lup jedzenia i zlota band > 0, MB-7 zrodla (INFO), MB-8 bandy wobec bazy >= 0.80 (P),
+                    MB-9 paser zywnosc (INFO), MB-10 kiesy band (INFO).
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -52317,6 +52321,8 @@ def main(argv):
         return korona2_main(logp)   # korona2 (15.10, Jeff "korony pozyczaja od miast"): pozyczki koron od miast i mieszczan, czesc korony podatku do zapasu korony
     if group == "nskarbiec" and logp:
         return nskarbiec_main(logp, bdp)   # nskarbiec (noc 15/16.10, Jeff "skarbiec kryjowki - TAK"): dola dzienna band do kryjowek, wyplata zwyciezcy AI, komunikaty o zlocie
+    if group == "m96bandy" and logp:
+        return m96bandy_main(logp, bdp)   # m96bandy (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"): bandy jedza, zapas jedzenia i kiesy, glod, lup u zwyciezcow
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "nharmony" and logp:
@@ -53484,6 +53490,130 @@ def npolnoc_main(logp, bdp=None):
     rep.add("NKS-30g: A7 przy progu - zmiany z jedzenia na zajecie tylko na targ wstrzymane", f"{sum(a7)} (linii {len(a7)})" if a7 else "brak linii (KS nie zastosowany albo log sprzed r4-polnoc)",
             "INFO (regula A7 domyslnie wylaczona - sam pomiar)", None)
     rep.add("NKS-30h: Plan bez pokrycia wedlug krainy (krok 8, ostatni Plan)", unc if unc else "brak linii", "INFO - koszyk wsi niezaplacony i nie robiony w domu", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96bandy (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"; Armoury/src/BandFood.cs, OutlawLaw.FenceSell/StashDay)
+M96BANDY_HEAD = "Bandy - jedzenie i kiesy (m96-bandy): dzien "
+M96BANDY_RX = re.compile(
+    r"bandy jedzace (\d+) .*?\| potrzeba doby ([\d.]+) szt\., zjedzone (\d+), kupione u pasera (\d+) szt\. za (\d+) zl \(band (\d+), miast (\d+)\), "
+    r"zabrane wsiom (\d+) szt\. warte (\d+) zl \(band (\d+), wsi (\d+)\) \| najedzone (\d+), glodne (\d+) \(bez jedzenia (\d+), ponad \d+ doby (\d+), "
+    r"na morzu (\d+), z jencem-bohaterem bez odejsc (\d+)\), morale z glodu -(\d+) \| odeszli z glodu (\d+) ludzi z (\d+) band \(do puli wyrzutkow\), "
+    r"rozpady z glodu (\d+) \| zapas w jukach (\d+) szt\. \(([\d.]+|-) dob potrzeby; band z pelnym zapasem (\d+)\) \| kiesy band w polu (\d+) zl \(band (\d+), "
+    r"z kiesa (\d+), mediana (\d+) zl\); dola: zapas zostal w (\d+) kiesach \((\d+) zl\) \| lup u zwyciezcow \(od wczoraj\): jedzenie z band AI (\d+) szt\. "
+    r"\((\d+) przydzialow\), gracz (\d+) szt\. \((\d+)\); zloto z kies band (\d+) zl, gracz (\d+) zl; jedzenie z druzyn lordow AI (\d+) szt\., gracz (\d+) szt\..*?"
+    r"\| potkniecia (\d+) \(sesja (\d+)\)")
+M96BANDY_KEYS = ("bands", "need", "eaten", "bought", "boughtGold", "buyBands", "buyTowns", "robbed", "robbedWorth", "robBands", "robVill", "fed", "hungry",
+                 "starving", "long", "sea", "hero", "morale", "left", "leftBands", "broken", "stock", "stockDays", "stockOk", "purse", "field", "withPurse",
+                 "median", "kept", "keptGold", "lootAi", "lootAiN", "lootPl", "lootPlN", "gold", "goldPl", "lordAi", "lordPl", "stum", "stumS")
+
+
+def m96bandy_rows(path):
+    """Linie doby m96-bandy, "Paser:" (zywnosc sprzedana) i "Wyrzutki:" (band, ludzi) -> slowniki wedlug doby (strumieniowo)."""
+    rows, pas, wyr, errs = {}, {}, {}, 0
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and "BandFood" in s:
+                errs += 1
+            if s.startswith(M96BANDY_HEAD):
+                d = num(r"dzien (\d+)", s)
+                if d is None:
+                    continue
+                mm = M96BANDY_RX.search(s)
+                if mm is None:
+                    rows[d] = {"on": "| CZYNNE" in s, "bad": True}
+                    continue
+                r = {"on": "| CZYNNE" in s, "bad": False}
+                for k, v in zip(M96BANDY_KEYS, mm.groups()):
+                    r[k] = (float(v) if v != "-" else 0.0) if k in ("need", "stockDays") else int(v)
+                rows[d] = r
+            elif s.startswith("Paser: dzien "):
+                d = num(r"Paser: dzien (\d+)", s)
+                if d is not None:
+                    pas[d] = num(r"zywnosc (\d+), zwierzeta", s)
+            elif s.startswith("Wyrzutki: dzien "):
+                d = num(r"Wyrzutki: dzien (\d+)", s)
+                b = re.search(r"\| band (\d+), ludzi (\d+)", s)
+                if d is not None and b:
+                    wyr[d] = (int(b.group(1)), int(b.group(2)))
+    return rows, pas, wyr, errs
+
+
+def m96bandy_main(logp, bdp=None):
+    """m96bandy (Jeff 20.10 "jak pokonuje bande czy ogolnie armie, to oni powinni miec tez zloto i jedzenie"): bandy jedza (BandFood.cs). Wejscie: log Armoury
+    (strumieniowo), opcjonalnie --baza-doby <log Armoury bazy bez paczki> (MB-8). MB-0 linia doby w kazdej dobie z linia Paser (format), MB-1 potkniecia i ERROR 0,
+    MB-2 zjedzone / potrzeba >= 0.85 (P), MB-3 glodne <= 25% band jedzacych srednio (P), MB-4 rozpady z glodu <= 2% band na dobe srednio (P), MB-5 zapas w jukach
+    >= 2 dob potrzeby od doby 10 (P), MB-6 lup jedzenia z band u zwyciezcow > 0 i zloto z kies band > 0 (bieg >= 20 dob), MB-7 zakupy i rabunek (INFO), MB-8 bandy
+    i ludzie w bandach - koniec biegu wobec bazy >= 0.80 (P, z --baza-doby; bez - INFO), MB-9 paser - zywnosc sprzedana (INFO), MB-10 kiesy band (INFO).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("MB-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    rows, pas, wyr, errs = m96bandy_rows(logp)
+    if not rows:
+        rep.add("MB-0: linia doby m96-bandy", "brak linii", "INFO (log sprzed m96-bandy albo prawo wyrzutkow wylaczone)", None)
+        rep.show()
+        return 0
+    bad = [d for d in rows if rows[d].get("bad")]
+    miss = [d for d in pas if d not in rows]
+    rep.add("MB-0: linia doby w kazdej dobie z linia Paser (format)", f"dob {len(rows)}, nierozpoznanych {len(bad)} {bad[:5]}, dob Paser bez linii {len(miss)} {miss[:5]}",
+            "0 nierozpoznanych, 0 brakow", not bad and not miss)
+    ok = [rows[d] for d in sorted(rows) if not rows[d].get("bad") and rows[d]["on"]]
+    st = max((r["stumS"] for r in ok), default=0)
+    rep.add("MB-1: potkniecia BandFood i ERROR", f"potkniecia sesji (max) {st}, linii ERROR z BandFood {errs}", "0 i 0", st == 0 and errs == 0)
+    if not ok:
+        rep.add("MB-2..MB-10", "klucz Bands Eat Food wylaczony w calym biegu", "INFO", None)
+        rep.show()
+        return 0
+    n = len(ok)
+    need = sum(r["need"] for r in ok)
+    eaten = sum(r["eaten"] for r in ok)
+    q = eaten / need if need > 0 else None
+    rep.add("MB-2: zjedzone / potrzeba (caly bieg)", f"{eaten} / {need:.0f} = {q:.3f}" if q is not None else "potrzeba 0", ">= 0.85 (P - pierwszy prog)",
+            (q >= 0.85) if q is not None else None)
+    bands = sum(r["bands"] for r in ok)
+    hq = sum(r["hungry"] for r in ok) / bands if bands else 0.0
+    rep.add("MB-3: glodne bandy (srednio na dobe)", f"{hq:.3f} band jedzacych; bez jedzenia {sum(r['starving'] for r in ok) / n:.1f}/d, ponad 2 doby {sum(r['long'] for r in ok) / n:.1f}/d",
+            "<= 0.25 (P)", hq <= 0.25)
+    bq = sum(r["broken"] for r in ok) / bands if bands else 0.0
+    rep.add("MB-4: rozpady z glodu i odejscia", f"rozpady {sum(r['broken'] for r in ok)} ({bq:.4f} band jedzacych na dobe), odeszli {sum(r['left'] for r in ok)} ludzi "
+            f"z {sum(r['leftBands'] for r in ok)} band", "rozpady <= 0.02 band na dobe (P)", bq <= 0.02)
+    d0 = min(rows)
+    late = [rows[d] for d in sorted(rows) if d - d0 >= 10 and not rows[d].get("bad") and rows[d]["on"]]
+    if late:
+        sd = sum(r["stock"] for r in late) / max(1e-9, sum(r["need"] for r in late))
+        rep.add("MB-5: zapas jedzenia w jukach band (od doby 10)", f"{sd:.2f} dob potrzeby; band z pelnym zapasem srednio {sum(r['stockOk'] for r in late) / len(late):.0f} "
+                f"z {sum(r['bands'] for r in late) / len(late):.0f}", ">= 2 dob (P)", sd >= 2.0)
+    else:
+        rep.add("MB-5: zapas jedzenia w jukach band", "bieg krotszy niz 10 dob", "INFO", None)
+    la = sum(r["lootAi"] + r["lootPl"] for r in ok)
+    gd = sum(r["gold"] for r in ok)
+    span = max(rows) - d0 + 1
+    rep.add("MB-6: lup u zwyciezcow band - jedzenie i zloto", f"jedzenie {la} szt. (gracz {sum(r['lootPl'] for r in ok)}), zloto z kies band {gd} zl (gracz {sum(r['goldPl'] for r in ok)}); "
+            f"jedzenie z druzyn lordow {sum(r['lordAi'] + r['lordPl'] for r in ok)} szt.", "> 0 i > 0 (bieg >= 20 dob)", (la > 0 and gd > 0) if span >= 20 else None)
+    rep.add("MB-7: skad jedzenie (srednio na dobe)", f"kupione {sum(r['bought'] for r in ok) / n:.1f} szt. za {sum(r['boughtGold'] for r in ok) / n:.0f} zl, zabrane wsiom "
+            f"{sum(r['robbed'] for r in ok) / n:.1f} szt. ({sum(r['robVill'] for r in ok) / n:.1f} wsi), zjedzone {eaten / n:.1f}", "INFO", None)
+    if wyr:
+        b1, m1 = wyr[max(wyr)]
+        bw = m96bandy_rows(bdp)[2] if (bdp and os.path.isfile(bdp)) else None
+        if bw:
+            b0, m0 = bw[max(bw)]
+            okb = b0 > 0 and m0 > 0 and b1 / b0 >= 0.8 and m1 / m0 >= 0.8
+            rep.add("MB-8: bandy i ludzie w bandach - koniec biegu wobec bazy", f"band {b1} / {b0}, ludzi {m1} / {m0}", ">= 0.80 obu (P)", okb)
+        else:
+            f0 = wyr[min(wyr)]
+            rep.add("MB-8: bandy i ludzie w bandach (poczatek -> koniec biegu)", f"band {f0[0]} -> {b1}, ludzi {f0[1]} -> {m1}", "INFO (prog z --baza-doby)", None)
+    fs = [v for v in pas.values() if v is not None]
+    rep.add("MB-9: paser - zywnosc sprzedana miastom (srednio na dobe)", f"{sum(fs) / len(fs):.1f} szt." if fs else "brak",
+            "INFO (przed paczka: bieg 160 dob ok. 900/d, nowa kampania 120 dob ok. 200/d)", None)
+    L = ok[-1]
+    rep.add("MB-10: kiesy band w polu (ostatnia doba)", f"{L['purse']} zl w {L['field']} bandach, z kiesa {L['withPurse']}, mediana {L['median']} zl; "
+            f"dola zostawila zapas w {L['kept']} kiesach ({L['keptGold']} zl)", "INFO", None)
     rep.show()
     return 0
 

@@ -1483,6 +1483,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CalendarText.Hourly", delegate { try { CalendarText.Hourly(); } catch (Exception e) { Log.Error("CalendarText.Hourly", e); } }));
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
+            CampaignEvents.OnLootDistributedToPartyEvent.AddNonSerializedListener(this, BandFood.OnLoot);   // m96-bandy: lup jedzenia z band i druzyn lordow (pomiar)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("OutlawLaw.OnMapEventEnded", OutlawLaw.OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("BattleChronicle.OnMapEventEnded", BattleChronicle.OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85

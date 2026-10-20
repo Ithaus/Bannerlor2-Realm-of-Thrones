@@ -3656,6 +3656,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawLifeSpendShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Bands Eat Food", HintText = "bands eat: each day one load of food for every twenty men, as an army does - from their packs, bought through a fence with their own purse, or taken from a village within a day's ride; a starving band loses heart and after two days its men begin to slip away to the outlaws of the region; a band keeps a few days of food (the fence buys only the rest) and a few days' coin (only the rest goes home to the hideout). Off = bands do not eat (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BandsEatFood { get; set; } = true;
+
+        [SettingPropertyInteger("Band Food Keep Days", 0, 20, "0", HintText = "with Bands Eat Food: days of food a band keeps in its packs - the fence buys only what lies above that, and a band below it buys more", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public int BandFoodKeepDays { get; set; } = 5;
+
+        [SettingPropertyInteger("Band Purse Keep Days", 0, 12, "0", HintText = "with Bands Eat Food: days of food money (at the fence's price) a band keeps in its purse - its daily coin for the hideout comes only from what lies above that (0 = from the whole purse, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public int BandPurseKeepDays { get; set; } = 3;
+
+        [SettingPropertyFloatingInteger("Band Hunger Leave Share", 0.00f, 1.00f, "0.00", HintText = "with Bands Eat Food: share of a starving band's men who walk off each day after two days without food (fewer when half fed) - to the outlaws of the region, not into thin air", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float BandHungerLeaveShare { get; set; } = 0.1f;
+
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ('Year 299, Day 256, Autumn')", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
@@ -9441,6 +9457,10 @@ namespace Armoury
             s.OutlawHideoutStashShare = OutlawHideoutStashShare;
             s.OutlawHoardCirculates = OutlawHoardCirculates;
             s.OutlawLifeSpendShare = OutlawLifeSpendShare;
+            s.BandsEatFood = BandsEatFood;
+            s.BandFoodKeepDays = BandFoodKeepDays;
+            s.BandPurseKeepDays = BandPurseKeepDays;
+            s.BandHungerLeaveShare = BandHungerLeaveShare;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;
