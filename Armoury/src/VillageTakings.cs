@@ -235,6 +235,7 @@ namespace Armoury
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
+            SideFief(__state);                               // n20-wioska: udzial wioski pobocznej gracza w podatku pana z tego okna (licznik pana -> gracz; po pracach okregu, przed danina DS)
             DsDues(__state, works);
             F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
             CartCsv(__state);                                // f14-wsie: utarg wozu wies po wsi do wsie-kiesy.csv (tylko licznik, po wszystkich krokach okna)
@@ -302,6 +303,19 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("VillageTakings.WorksPay", e); }
             return Math.Max(0, paid);
+        }
+
+        /// <summary>n20-wioska: woz wrocil do wsi MACIERZYSTEJ - przyrost licznika pana w oknie (BK + 112 - F4b - prace okregu) to podstawa udzialu wioski gracza
+        /// (SideVillageFief.AtCart, wlasny try - nie rzuca). Woz w obcej wsi - nic. Kiesa wsi bez zmian (podstawa daniny DS ta sama).</summary>
+        private static void SideFief(Entry st)
+        {
+            try
+            {
+                if (st == null || st.Here != null || st.Home == null || st.Party == null || !SideVillageFief.HasFief) return;
+                if (st.Gold - st.Party.PartyTradeGold <= 0) return;
+                SideVillageFief.AtCart(st.Party, st.Home, (long)st.Home.TradeTaxAccumulated - st.HomeTax);
+            }
+            catch (Exception e) { Stumble("VillageTakings.SideFief", e); }
         }
 
         /// <summary>112 pkt 1 (bez zmian): reszta utargu do kiesy wsi. Zwraca true, gdy okno bylo nasze i krok przeszedl bez wyjatku; estates = wyplaty

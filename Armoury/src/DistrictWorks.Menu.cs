@@ -215,6 +215,9 @@ namespace Armoury
         /// <summary>Odbudowa samoczynna gracza: klucz MCM i przelacznik okna.</summary>
         internal static bool AutoRebuild() { var s = Settings.Current; return (s == null || s.DistrictWorksAutoRebuild) && !_autoOff; }
 
+        /// <summary>n20-wioska: menu wioski gracza (SideVillageFief) - okno 2 tej jednej wioski (te same warunki i zaplata co z okna okregu; czesc niedozwolona - komunikat z powodem).</summary>
+        internal static void OpenPartFor(Settlement st, string uid) { if (st != null && st.Village != null && uid != null) OpenPart(st, uid); }
+
         /// <summary>Okno 2: "{wioska} - {rodzaj}" z kwotami (ui_text 3).</summary>
         private static void OpenPart(Settlement st, string uid)
         {

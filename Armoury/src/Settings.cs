@@ -3404,6 +3404,11 @@ namespace Armoury
         public int DistrictWorksAiReserveDays = 60;        // with District Works Ai: a lord keeps this many days of his party's wages ...
         public int DistrictWorksAiReserveFlat = 20000;     // with District Works Ai: ... plus this much gold, before he invests
         public float DistrictWorksAiWorldPace = 0.005f;    // with District Works Ai: all AI works together at most this share of the world's yearly village production every 28 days
+        // n20-wioska (noc 19/20.10, Jeff: "zaczynam jako lord jakiejs wioski pobocznej ... jest ona moja i daje mi jakis dochod"). SideVillageFief.cs; zapis arm_side_fief
+        // (brak klucza = brak wioski gracza). Klucze wylaczone = start BK jak dotad (tytul wsi gry), bez udzialu i bez menu wioski.
+        public bool SideVillageFiefStart = true;           // Banner Kings start 'Indebted Lord': instead of the lordship title of a main village (which stays with its lord), you are given one side village of the realm you join, close to where you start - it is yours, it flies your banner on the map and pays you its share of the lord's taxes. Off = Banner Kings gives the main village title, as before
+        public bool SideVillageFiefIncome = true;          // with a side village of your own: each time the district's carts come back from market, the side village's share of the lord's tax (its share of what the district makes) goes to you instead of the lord - shown as a line in your daily gold tooltip. Off = the lord keeps it all
+        public bool SideVillageFiefMenu = true;            // with a side village of your own: click it on the map (or choose 'Visit ... (your village)' in its main village) to ride in - rest the night there for free, invest in its works, look over what it makes and pays you. Off = no menu
 
         // --- District crafts: neutral start and icon (18.10) ---
         // Paczka f4b-inwest (noc 17/18.10, fin87: NZW-1 bawelna +27.6% w dobie wlaczenia, NZW-3 362 ikony pod KS). VillageCrafts.cs (neutralny start na towarach, poprawka

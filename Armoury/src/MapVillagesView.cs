@@ -4819,6 +4819,12 @@ namespace Armoury
                 {
                     if (best.V == null) best.V = new Visual(best);
                     hoveredVisual = best.V;
+                    // n20-wioska: wioska gracza - klik idzie do niej (jazda i menu po dojechaniu, SideVillageFief), nie w teren; inne wioski jak dotad
+                    if (SideVillageFief.Clickable(best.R.Uid))
+                    {
+                        SideVillageFief.NotePos(best.R.Uid, best.Placed ? best.Cx : best.R.X, best.Placed ? best.Cy : best.R.Y);
+                        if (selectedVisual == null) selectedVisual = best.V;
+                    }
                 }
             }
             catch (Exception e)
@@ -4837,8 +4843,12 @@ namespace Armoury
 
             public override CampaignVec2 InteractionPositionForPlayer => new CampaignVec2(_s.Placed ? new Vec2(_s.Cx, _s.Cy) : new Vec2(_s.R.X, _s.R.Y), true);
             public override MapEntityVisual AttachedTo => null;
-            public override bool IsMobileEntity => true;            // MapScreen.cs:1608 - bez kursora "raczki", wioski nie da sie kliknac
-            public override bool OnMapClick(bool followModifierUsed) { return false; }
+            public override bool IsMobileEntity => !SideVillageFief.Clickable(_s.R.Uid);   // MapScreen.cs:1608 - bez kursora "raczki"; n20-wioska: wioska gracza z raczka (klik = wjazd)
+            public override bool OnMapClick(bool followModifierUsed)
+            {
+                try { return SideVillageFief.Clickable(_s.R.Uid) && SideVillageFief.OnClick(_s.R.Uid, _s.Placed ? _s.Cx : _s.R.X, _s.Placed ? _s.Cy : _s.R.Y); }
+                catch (Exception e) { Log.Error("MapVillagesView.OnMapClick " + _s.R.Uid, e); return false; }
+            }
             public override void OnOpenEncyclopedia() { }
             public override bool IsVisibleOrFadingOut() { return _s.Shown; }
             public override Vec3 GetVisualPosition() { return _s.Placed ? new Vec3(_s.Cx, _s.Cy, _s.Z) : new Vec3(_s.R.X, _s.R.Y, _s.Z); }

@@ -222,6 +222,11 @@ namespace Armoury
                 holder = VillageHolders.Of(district, uid);
                 if (holder != null && holder.Banner != null) t.Banner = holder.Banner;
             }
+            else
+            {
+                var mine = SideVillageFief.HolderOf(district, uid);     // n20-wioska: wioska gracza - herb gracza i linia "This village is yours" takze bez herbow gospodarzy
+                if (mine != null) { holder = mine; t.Banner = mine.Banner; }
+            }
             t.Mode = ModeOf(district);
             t.Add(name, TooltipProperty.TooltipPropertyFlags.Title);
             t.Add(held, TooltipProperty.TooltipPropertyFlags.None, MapVillageTip.Always, 0, heldIsLord && lord != null ? lord.Color : 0u);
