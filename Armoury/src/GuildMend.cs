@@ -20,7 +20,9 @@ namespace Armoury
     ///  2) AutoMendHalfGuild: naprawy automatyczne (lordowie AI + sakiewka Twoich ludzi) biora razem najwyzej polowe dziennych godzin kazdego cechu
     ///     w miescie - warsztaty zawsze maja co najmniej pol rak. Zlecenia gracza (lawa, sztuka, polki) moga brac wszystko, co wolne.
     ///  3) MendBulkEveryOrder: rabat hurtowy z polek wojska (TroopMendBulkDiscountPP/Max: 0.5% za sztuke, do 30%) przy kazdym zleceniu - od robocizny,
-    ///     nie od materialu i nie od godzin. Zlecenie: jedno klikniecie gracza; jeden dzien lorda w miescie; u Twoich ludzi - sztuki czekajace rano.
+    ///     nie od materialu i nie od godzin. Zlecenie: jedno klikniecie gracza (lup z sakw, polki wojska, uprzaz "Mend everything you wear" -
+    ///     ArmouryBehavior.RepairCost/PlanRepair); jeden dzien lorda w miescie; u Twoich ludzi - sztuki czekajace rano. Pojedyncza sztuka ("Pick a piece")
+    ///     bez rabatu (0.5% od kilku pensow znika w zaokragleniu). Uprzaz i sztuka na grzbiecie: godziny ze stanu w ksiedze zuzycia (procenty).
     ///     Zamknieta ekonomia: placacy placi mniej i kasa miasta dostaje mniej o te sama kwote.
     /// Wylaczone klucze - jak dotad co do godziny i pensa. Stan tylko dzienny (pule jak SmithHours) - nic do zapisu.
     /// </summary>
@@ -136,7 +138,7 @@ namespace Armoury
         {
             _used.Clear(); _yesterday.Clear(); _auto.Clear(); _day = -1;
             Array.Clear(_menBench, 0, Trades); _menTown = null; _menLastHour = -999; _bulkDay = -1; _bulkTown = null; _bulkN = 0;
-            ResetStats(); _statDay = -1;
+            ResetStats();
             FieldArmourer.Reset();
         }
 
@@ -252,6 +254,16 @@ namespace Armoury
             public void Add(EquipmentElement ee, int n) { if (n <= 0 || ee.Item == null) return; H[TradeOf(ee.Item)] += Hours(ee) * n; Pieces += n; }
             public void AddHours(ItemObject it, float hours) { if (it == null || hours <= 0f) return; H[TradeOf(it)] += hours; Pieces++; }
             public float Total { get { float x = 0f; for (int k = 0; k < Trades; k++) x += H[k]; return x; } }
+            /// <summary>Czesc zlecenia (done z planned sztuk) - godziny proporcjonalnie; done >= planned - cale.</summary>
+            public Tally Scaled(int done, int planned)
+            {
+                if (planned <= 0 || done >= planned) return this;
+                float f = Math.Max(0f, done) / (float)planned;
+                var t = new Tally();
+                for (int k = 0; k < Trades; k++) t.H[k] = H[k] * f;
+                t.Pieces = Math.Max(0, done);
+                return t;
+            }
 
             public float Clock(Town t)
             {
@@ -295,6 +307,77 @@ namespace Armoury
             if (!On || t == null || st == null || st.Town == null) return;
             t.Use(st.Town);
         }
+
+        // ------------------------------------------------------------ uprzaz gracza i sztuka na grzbiecie: stan z ksiegi zuzycia (procenty), nie z modyfikatora
+        private static float SlotLoss(ArmouryBehavior b, int slot, EquipmentElement el)
+        {
+            float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
+            float loss = 1f - Math.Max(0f, Math.Min(1f, pm));
+            if (b != null && slot >= 0 && slot < 12)
+            {
+                float cond = b.ConditionQuietOf(slot);
+                if (cond < 100f) loss = Math.Max(loss, (100f - Math.Max(0f, cond)) / 100f);
+            }
+            return loss;
+        }
+
+        /// <summary>Ile czesci uprzezy wezma kowale jednym zleceniem "Mend everything you wear" (stan ponizej 100, bez wrakow) - do rabatu hurtowego;
+        /// 0 przy wylaczonym MendBulkEveryOrder (ArmouryBehavior.RepairCost / PlanRepair - robocizna jak dotad).</summary>
+        internal static int HarnessBulkN(ArmouryBehavior b)
+        {
+            if (!BulkOn || b == null || Hero.MainHero == null) return 0;
+            int n = 0;
+            try
+            {
+                var eq = Hero.MainHero.BattleEquipment;
+                for (int slot = 0; slot < 12; slot++)
+                {
+                    var el = eq[slot];
+                    if (el.Item == null) continue;
+                    float cond = b.ConditionQuietOf(slot);
+                    if (cond >= 100f || LootPrices.HarnessWreck(el.ItemModifier, cond)) continue;
+                    n++;
+                }
+            }
+            catch (Exception e) { if (++_errHarness <= 3) Log.Error("GuildMend.HarnessBulkN (potkniecie " + _errHarness + ")", e); return 0; }
+            return n;
+        }
+        private static int _errHarness;
+
+        /// <summary>Godziny cechow zlecenia uprzezy: czesci z listy slots (plan kowali z materialem) albo - bez listy - kazda obita czesc bez wraku.</summary>
+        internal static Tally HarnessTally(ArmouryBehavior b, List<int> slots)
+        {
+            var t = new Tally();
+            if (!On || b == null || Hero.MainHero == null) return t;
+            try
+            {
+                var eq = Hero.MainHero.BattleEquipment;
+                for (int slot = 0; slot < 12; slot++)
+                {
+                    var el = eq[slot];
+                    if (el.Item == null) continue;
+                    if (slots != null) { if (!slots.Contains(slot)) continue; }
+                    else { float cond = b.ConditionQuietOf(slot); if (cond >= 100f || LootPrices.HarnessWreck(el.ItemModifier, cond)) continue; }
+                    t.AddHours(el.Item, HoursFor(el.Item, SlotLoss(b, slot, el)));
+                }
+            }
+            catch (Exception e) { if (++_errHarness <= 3) Log.Error("GuildMend.HarnessTally (potkniecie " + _errHarness + ")", e); }
+            return t;
+        }
+
+        /// <summary>Godziny jednej sztuki "Pick a piece": z sakw i magazynu - stan modyfikatora; na grzbiecie (slot >= 0) - gorszy z modyfikatora i ksiegi.</summary>
+        internal static Tally PieceTally(EquipmentElement ee, int slot)
+        {
+            var t = new Tally();
+            if (ee.Item == null) return t;
+            if (slot >= 0 && On) { t.AddHours(ee.Item, HoursFor(ee.Item, SlotLoss(ArmouryBehavior.Instance, slot, ee))); return t; }
+            t.Add(ee, 1);
+            return t;
+        }
+
+        /// <summary>Robota kowala w tabeli godzin (bron, kolczuga, plyta, helm, metalowy kropierz) - platnerz w taborze; amunicja, sztandary,
+        /// skora, sukno, luki i tarcze - nie.</summary>
+        internal static bool IsSmithWork(ItemObject it) { int t; return KindOf(it, out t) >= 0 && t == Smith; }
 
         // ------------------------------------------------------------ AI: zlecenie lorda na jeden dzien w miescie
         /// <summary>Budzet godzin cechow na zlecenie lorda AI (naprawa automatyczna - limit polowy rak): Fits/HowMany przed zaplata, Take po zaplanowaniu,
@@ -459,7 +542,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ linia doby (log_grep: "Naprawy wg cechow (R3-02)")
         private static readonly float[] _stAiH = new float[Trades], _stMenH = new float[Trades], _stPlayerH = new float[Trades];
-        private static int _stAiPieces, _stAiCapN, _stAiCapVisits, _stMenPieces, _stPlayerPieces, _stBulkGold, _statDay = -1;
+        private static int _stAiPieces, _stAiCapN, _stAiCapVisits, _stMenPieces, _stPlayerPieces, _stBulkGold;
 
         private static void ResetStats()
         {

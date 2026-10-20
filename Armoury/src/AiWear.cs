@@ -967,13 +967,14 @@ namespace Armoury
                 int bulkN = GuildMend.BulkOn ? jobs.Count : 0;   // R3-02: rabat hurtowy - zlecenie to dzien lorda w miescie
                 if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece, q, gb, bulkN); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int done = 0, paid = 0, poorN = 0, afterPoor = 0;
+                bool brokeP = false;   // R3-02: sakiewka przerwala zlecenie (licznik powodu stania przy godzinach cechow)
                 foreach (var j in jobs)
                 {
                     if (done >= cap) break;
                     var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
                     if (gb != null && gb.HowMany(new EquipmentElement(item, Mod(j.Value)), 1) < 1) continue;   // R3-02: cech tej sztuki nie ma dzis godzin - czeka, inne cechy dalej
                     int unit = GuildMend.Bulk(UnitCost(item, Mod(j.Value), st), bulkN);
-                    if (MenPurse.Get(mp) < unit) { if (!q) break; poorN++; continue; }   // E8/W (R5): sztuka, na ktora nie stac, czeka - nastepna probuje (dotad koniec na dzis)
+                    if (MenPurse.Get(mp) < unit) { if (!q) { brokeP = true; break; } poorN++; continue; }   // E8/W (R5): sztuka, na ktora nie stac, czeka - nastepna probuje (dotad koniec na dzis)
                     if (gb != null) gb.Take(new EquipmentElement(item, Mod(j.Value)), 1);
                     if (bulkN > 0) GuildMend.NoteBulk(unit, bulkN);
                     MenPurse.Take(mp, unit);
@@ -986,7 +987,7 @@ namespace Armoury
                 _dayMended += done; _dayPaid += paid;
                 if (q) WMend(poorN, afterPoor);   // E8/W: linia doby (tylko licznik)
                 bool capHit = gb != null ? gb.CapHit : done >= cap;
-                P2Mend(mp, jobs.Count, done, 0, 0, q ? poorN > 0 : !capHit && done < jobs.Count, capHit, q ? poorN : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
+                P2Mend(mp, jobs.Count, done, 0, 0, q ? poorN > 0 : (gb != null ? brokeP : done < cap), capHit, q ? poorN : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik); R3-02 wylaczony - jak dotad
             }
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }
         }

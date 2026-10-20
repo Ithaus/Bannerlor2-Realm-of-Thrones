@@ -3778,6 +3778,7 @@ namespace Armoury
             try
             {
                 var eq = Hero.MainHero.BattleEquipment;
+                int bulkN = GuildMend.HarnessBulkN(this);   // R3-02: rabat hurtowy zlecenia (0 = jak dotad)
                 for (int slot = 0; slot < 12; slot++)
                 {
                     var el = eq[slot];
@@ -3785,7 +3786,7 @@ namespace Armoury
                     float cond = GetConditionQuiet(slot);
                     if (cond >= 100f) continue;
                     if (LootPrices.HarnessWreck(el.ItemModifier, cond)) continue;   // paczka 158: wrak na zlom - kowale miasta go nie odnawiaja
-                    cost += HarnessLabor(el.Item, cond);
+                    cost += GuildMend.Bulk(HarnessLabor(el.Item, cond), bulkN);
                 }
             }
             catch (Exception e) { Log.Error("RepairCost", e); }
@@ -3890,6 +3891,8 @@ namespace Armoury
             return -1f;
         }
 
+        internal float ConditionQuietOf(int slot) { return GetConditionQuiet(slot); }   // R3-02 (GuildMend): stan czesci uprzezy - godziny cechow i rabat zlecenia
+
         private float GetConditionQuiet(int slot)
         {
             string id = "";
@@ -3966,6 +3969,7 @@ namespace Armoury
             try
             {
                 var eq = Hero.MainHero.BattleEquipment;
+                int bulkN = GuildMend.HarnessBulkN(this);   // R3-02: rabat hurtowy zlecenia (0 = jak dotad)
                 for (int slot = 0; slot < 12; slot++)
                 {
                     var el = eq[slot];
@@ -3974,7 +3978,7 @@ namespace Armoury
                     if (cond >= 100f) continue;
                     if (LootPrices.HarnessWreck(el.ItemModifier, cond)) { o.Wrecks++; continue; }   // paczka 158: wrak na zlom (AddLot widzi sztuke bez modyfikatora)
                     float missing = (100f - cond) / 100f;
-                    int labor = HarnessLabor(el.Item, cond);   // ta sama robocizna co RepairCost
+                    int labor = GuildMend.Bulk(HarnessLabor(el.Item, cond), bulkN);   // ta sama robocizna co RepairCost (R3-02: po rabacie hurtowym)
                     if (o.AddLot(new EquipmentElement(el.Item), MendMaterial.NeedsFor(el.Item, missing), labor, 1, long.MaxValue, int.MaxValue) > 0 && slots != null)
                         slots.Add(slot);
                 }

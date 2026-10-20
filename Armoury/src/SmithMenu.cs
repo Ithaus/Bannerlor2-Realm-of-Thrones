@@ -534,7 +534,6 @@ namespace Armoury
         }
 
         // R3-02 (GuildMend): godziny zlecenia gracza wedlug cechow (MendHoursByGuild) i rabat hurtowy przy kazdym zleceniu (MendBulkEveryOrder)
-        private static GuildMend.Tally OneTally(EquipmentElement ee) { var t = new GuildMend.Tally(); t.Add(ee, 1); return t; }
         private static GuildMend.Tally TallyOf(MendMaterial.Order o) { var t = new GuildMend.Tally(); if (o != null) foreach (var j in o.Jobs) t.Add(j.El, j.N); return t; }
 
         /// <summary>Robocizna lupu z sakw: przy MendBulkEveryOrder po rabacie hurtowym za liczbe sztuk zlecenia (plan bez rabatu), inaczej PieceCost jak dotad.</summary>
@@ -703,7 +702,7 @@ namespace Armoury
                     }
                     int doneM, paidM;
                     ApplyRoster(o, bag, out doneM, out paidM);
-                    if (doneM == o.Pieces) GuildMend.PlayerDone(TallyOf(o));   // R3-02: godziny cechow z pul miasta (warsztaty jutro maja mniej rak)
+                    if (doneM > 0) GuildMend.PlayerDone(TallyOf(o).Scaled(doneM, o.Pieces));   // R3-02: godziny cechow z pul miasta za zrobione sztuki (warsztaty jutro maja mniej rak)
                     Log.Player("The smiths of " + town + " restored " + doneM + " battle-worn pieces for " + paidM + " gold, paid into the town's coffers: "
                                + o.Labor + " for their work and " + o.MatGold + " for materials from its market." + o.LeftEn(town));
                     Log.Info("Lawa naprawcza (lup z sakw) - kowale " + town + ": " + o.LogPl());
@@ -1078,9 +1077,15 @@ namespace Armoury
                             if (sel == null || sel.Count == 0) return;
                             int mode = (int)sel[0].Identifier;
                             if (mode == 0)
-                                StartTimedWork(GuildMend.PlayerClock(OneTally(ee), Settings.Current.MendLootHoursPerPiece),   // R3-02: godziny cechu tej sztuki
+                                StartTimedWork(GuildMend.PlayerClock(GuildMend.PieceTally(ee, slot), Settings.Current.MendLootHoursPerPiece),   // R3-02: godziny cechu tej sztuki (na grzbiecie - stan z ksiegi)
                                     "The smith takes the " + ee.Item.Name + " to his bench.",
-                                    delegate { DoMendOne(ee, slot, true, smith, null, 0); GuildMend.PlayerDone(OneTally(ee)); });
+                                    delegate
+                                    {
+                                        var pt = GuildMend.PieceTally(ee, slot);   // przed naprawa - potem stan jest pelny
+                                        int g0 = Hero.MainHero.Gold;
+                                        DoMendOne(ee, slot, true, smith, null, 0);
+                                        if (Hero.MainHero.Gold < g0) GuildMend.PlayerDone(pt);   // godziny cechu tylko za naprawe, ktora sie odbyla (zaplacona)
+                                    });
                             else
                                 StartTimedWork(Settings.Current.SelfRepairHoursPerPiece,
                                     "You lay the " + ee.Item.Name + " on the anvil and set to work.",
@@ -1402,7 +1407,7 @@ namespace Armoury
                     }
                     int doneM, paidM;
                     ApplyRoster(o, armory, out doneM, out paidM);
-                    if (doneM == o.Pieces) GuildMend.PlayerDone(TallyOf(o));   // R3-02: godziny cechow z pul miasta
+                    if (doneM > 0) GuildMend.PlayerDone(TallyOf(o).Scaled(doneM, o.Pieces));   // R3-02: godziny cechow z pul miasta za zrobione sztuki
                     Log.Player("The smiths of " + town + " made " + doneM + " pieces of the men's gear whole for " + paidM + " gold, paid into the town's coffers: "
                                + o.Labor + " for the work (bulk discount " + dp + "%) and " + o.MatGold + " for materials from its market." + o.LeftEn(town));
                     Log.Info("Lawa naprawcza (zbrojownia wojska) - kowale " + town + ": rabat " + dp + "%, " + o.LogPl());
@@ -2570,11 +2575,13 @@ namespace Armoury
             {
                 int pieces = ArmouryBehavior.Instance != null ? ArmouryBehavior.Instance.WornPieces() : 0;
                 if (pieces == 0) return;
-                if (MarketRule) pieces = Math.Max(1, ArmouryBehavior.Instance.PlanRepair(null).Pieces);   // godziny za czesci, ktore kowale wezma
+                List<int> planned = MarketRule ? new List<int>() : null;   // R3-02: czesci, ktore kowale wezma (godziny cechow tylko za nie)
+                if (MarketRule) pieces = Math.Max(1, ArmouryBehavior.Instance.PlanRepair(planned).Pieces);   // godziny za czesci, ktore kowale wezma
                 else pieces = Math.Max(1, pieces - ArmouryBehavior.Instance.HarnessWrecks());           // paczka 158: wrakow kowal nie bierze
-                StartTimedWork(pieces * Settings.Current.SmithRepairHoursPerPiece,
+                var tally = GuildMend.On ? GuildMend.HarnessTally(ArmouryBehavior.Instance, planned) : null;   // R3-02: godziny wedlug cechu i stanu czesci
+                StartTimedWork(GuildMend.PlayerClock(tally, pieces * Settings.Current.SmithRepairHoursPerPiece),
                     "The smith lays your harness out and mends it piece by piece.",
-                    delegate { ArmouryBehavior.Instance.RepairAll(); });
+                    delegate { int g0 = Hero.MainHero.Gold; ArmouryBehavior.Instance.RepairAll(); if (tally != null && Hero.MainHero.Gold < g0) GuildMend.PlayerDone(tally); });
             }
             catch (Exception e) { Log.Error("RepairConsequence", e); }
         }

@@ -52,6 +52,8 @@ namespace Armoury
             return skill >= MinSkill ? best : null;
         }
 
+        private static string KeyOf(EquipmentElement ee) { return ee.Item.StringId + "|" + (ee.ItemModifier != null ? ee.ItemModifier.StringId : ""); }
+
         internal static void Hourly()
         {
             try
@@ -59,10 +61,10 @@ namespace Armoury
                 if (!On) return;
                 var s = Settings.Current;
                 var main = MobileParty.MainParty;
-                if (main == null || Hero.MainHero == null) return;
+                if (main == null || Hero.MainHero == null || Hero.MainHero.IsPrisoner || !main.IsActive) return;   // w niewoli tabor nie pracuje
                 FlushDay();
                 var st = main.CurrentSettlement;
-                if (st != null && st.IsTown) { _bench = 0f; return; }   // w miescie lataja kowale miasta
+                if (st != null && st.IsTown) return;   // w miescie lataja kowale miasta (zaczeta sztuka czeka na kowadle; naprawiona przez kowali - lawa od nowa)
                 if (main.IsMoving || main.MapEvent != null) return;      // w marszu i w bitwie nikt nie kuje (lawa czeka)
                 if (s.WorkshopNightRest) { int hh = CampaignTime.Now.GetHourOfDay; if (hh >= 23 || hh < 5) return; }
                 int skill;
@@ -70,13 +72,22 @@ namespace Armoury
                 if (who == null) { _bench = 0f; return; }
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
+                // tylko robota kowala z tabeli godzin (bron, kolczuga, plyta, helm, metalowy kropierz) z receptura kowala - jak kowale miasta (MendMaterial.Needs:
+                // bez receptury "nie robota kowala"); wraki i konie odpadaja juz w MenWorn (Mendable); amunicja i sztandary - nie
                 var worn = new List<ItemRosterElement>();
                 foreach (var el in TroopSelfMend.MenWorn(armory))   // tylko czesc ludzi (Twoja czesc kazdego id pomijana - jak kowale miasta)
-                    if (el.EquipmentElement.Item != null && GuildMend.TradeOf(el.EquipmentElement.Item) == GuildMend.Smith) worn.Add(el);
-                if (worn.Count == 0) { _bench = 0f; return; }
+                    if (el.EquipmentElement.Item != null && GuildMend.IsSmithWork(el.EquipmentElement.Item)) worn.Add(el);
+                if (worn.Count == 0) { _bench = 0f; _benchKey = null; return; }
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));   // najgorsze najpierw
-                var head = worn[0].EquipmentElement;
-                string key = head.Item.StringId + "|" + (head.ItemModifier != null ? head.ItemModifier.StringId : "");
+                // sztuka zaczeta zostaje na kowadle do konca (nowy, gorszy lup po bitwie nie kasuje godzin juz przepracowanych); inaczej najgorsza z receptura
+                int pick = -1;
+                if (_benchKey != null)
+                    for (int i = 0; i < worn.Count; i++) if (KeyOf(worn[i].EquipmentElement) == _benchKey) { pick = i; break; }
+                if (pick < 0)
+                    for (int i = 0; i < worn.Count; i++) if (MendMaterial.Needs(worn[i].EquipmentElement) != null) { pick = i; break; }
+                if (pick < 0) { _bench = 0f; _benchKey = null; return; }
+                var head = worn[pick].EquipmentElement;
+                string key = KeyOf(head);
                 if (key != _benchKey) { _bench = 0f; _benchKey = key; }   // inna sztuka na kowadle - zaczyna od nowa
                 var mats = MendMaterial.SelfPartsOf(head);
                 foreach (var p in mats)

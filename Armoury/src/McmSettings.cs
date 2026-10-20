@@ -4908,7 +4908,7 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public float TroopMendMaxHours { get; set; } = 24f;
 
-        [SettingPropertyBool("Camp Armourer", HintText = "the companion with the best Smithing in your party works as the company armourer: while you camp, besiege or rest outside a town (not on the march, not at night) he mends your men's worn metal kit from the stores - weapons, mail, plate, helms - worst first, slower than a town workshop (more Smithing, quicker hands), with the materials from your baggage (iron, charcoal, leather...) as when you mend it yourself; he learns Smithing only for the hours he really works, at most 100 a day; wrecks and horses are not his work", RequireRestart = false)]
+        [SettingPropertyBool("Camp Armourer", HintText = "the companion with the best Smithing in your party works as the company armourer: while you camp, besiege or rest outside a town (not on the march, not at night) he mends your men's worn metal kit from the stores - weapons, mail, plate, helms - worst first, slower than a town workshop (more Smithing, quicker hands), with the materials from your baggage (iron, charcoal, leather...) as when you mend it yourself; he learns Smithing only for the hours he really works (8 experience an hour, at most 100 a day); a piece he has begun stays on his anvil until it is done; wrecks, horses, leather, cloth, bows and shields are not his work", RequireRestart = false)]
         [SettingPropertyGroup("The men's gear")]
         public bool CampArmourer { get; set; } = true;
 
@@ -4936,7 +4936,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public float MendLootHoursPerPiece { get; set; } = 0.6f;
 
-        [SettingPropertyBool("Mend Hours By Guild", HintText = "a repair in town takes as many working hours as it really would, and the right trade does it: smiths for metal, saddlers for leather and saddles, tailors for cloth and padded coats, bowyers for bows and crossbows, shieldmakers for shields. A lightly worn sword is an hour or two, a battered brigandine about 140 hours, so a big haul of loot takes a day or two; hours spent mending yesterday are missing from that trade's workshop work today. The price of the repair does not change (off = every piece 0.6 hours at the smiths, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Mend Hours By Guild", HintText = "a repair in town takes as many working hours as it really would, and the right trade does it: smiths for metal, saddlers for leather and saddles, tailors for cloth and padded coats, bowyers for bows and crossbows, shieldmakers for shields. A lightly worn sword is an hour or two, a battered brigandine about 140 hours, so a big haul of loot takes a day or two; hours spent mending yesterday are missing from that trade's workshop work today. Your orders (loot, a single piece, your harness, the men's racks) take as long as the trade's free hands need - what does not fit today goes on tomorrow, so Troop Mend Max Hours no longer cuts the men's racks short. The price of the repair does not change (off = every piece 0.6 hours at the smiths, your harness 1.5 hours a piece, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendHoursByGuild { get; set; } = true;
 
@@ -4944,7 +4944,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AutoMendHalfGuild { get; set; } = true;
 
-        [SettingPropertyBool("Mend Bulk Every Order", HintText = "the bulk rate of the men's racks (Troop Mend Bulk Discount: 0.5% off the work per piece, up to 30%) applies to every repair order in a town: your loot from the bags, a single piece, your men's daily mending and each AI lord's day at the smiths - off the work only, not the materials (off = only on the men's racks, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Mend Bulk Every Order", HintText = "the bulk rate of the men's racks (Troop Mend Bulk Discount: 0.5% off the work per piece, up to 30%) applies to every repair order in a town: your loot from the bags, your harness, your men's daily mending and each AI lord's day at the smiths - the more pieces in one order, the bigger the rate; off the work only, not the materials or the hours (off = only on the men's racks, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendBulkEveryOrder { get; set; } = true;
 
