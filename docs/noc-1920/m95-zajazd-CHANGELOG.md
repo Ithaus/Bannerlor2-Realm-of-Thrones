@@ -76,8 +76,8 @@ dzielnica karczmy (`town_backstreet`) `event:/map/ambient/node/settlements/2d/ta
   wylaczonym kluczu ukrycia, niczym schowanym i bez naszego tla w otwartym menu nic, inaczej 4 razy na sekunde odczyt id menu (w zajezdzie plus sprawdzenie sluzby ROT przez odbicie).
   Male metody pod Harmony (zawieszenie GC 19.10): latamy dwie duze metody gry, nie male.
 - Kolizje: `w-toku/m95-nocleg` (943cc411) zmienia `Settings.cs`, `McmSettings.cs`, `RoadsideInns.cs`, `TownInns.Road.cs` - sprawdzone `git merge-tree`
-  c4ddeba9 x 943cc411: bez konfliktow (drzewo 3eb0f53c; McmSettings.cs po scaleniu i tak od nowa z gen_mcm). `w-toku/m95-menu` bez commitow
-  (= baza e35e6f99). Uruchomione tylko budowanie (kod 0), bez gry i autotestu (zakaz w tej pracy).
+  c4ddeba9 x 943cc411: bez konfliktow (drzewo 3eb0f53c; McmSettings.cs po scaleniu i tak od nowa z gen_mcm). Po poprawkach (20aa6e1d) `git merge-tree` bez konfliktow
+  z `w-toku/m95-nocleg` (943cc411), `w-toku/m95-menu` (62a57f8a) i `w-toku/m95-turniej` (4e61eae0). Uruchomione tylko budowanie (kod 0), bez gry i autotestu (zakaz w tej pracy).
 
 **Poprawki po recenzjach (gracz, technika) - c656d5b1 -> ten commit.**
 - WAZNE (gracz) - PRAWDA, poprawione: gwar cichl przy zasnieciu w zajezdzie (i po powrocie z ekwipunku / koncu rozmowy). Dowod (dekompilacja 1.4.8):
