@@ -28,5 +28,6 @@
     <Reference Include="TaleWorlds.MountAndBlade"><HintPath>$(GameLibs)/TaleWorlds.MountAndBlade.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.SaveSystem"><HintPath>$(GameLibs)/TaleWorlds.SaveSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Engine"><HintPath>$(GameLibs)/TaleWorlds.Engine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.DotNet"><HintPath>$(GameLibs)/TaleWorlds.DotNet.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>

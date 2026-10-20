@@ -54,8 +54,16 @@ namespace GrandTourney
                 NoEarlyEndPatch.ApplyAll(_harmony);
                 ClosedListsPatch.ApplyAll(_harmony);
                 NoblesFightPatch.ApplyAll(_harmony);
+                TourneyRansom.ApplyAll(_harmony);   // R3-04a: wykup konia i zbroi pokonanego
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
+        }
+
+        /// <summary>R3-04a: rozliczenie walk z misji turnieju i okna wykupu gracza - po misji, na mapie (pusta kolejka = jedno porownanie).</summary>
+        protected override void OnApplicationTick(float dt)
+        {
+            base.OnApplicationTick(dt);
+            TourneyRansom.AppTick();
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
@@ -67,6 +75,7 @@ namespace GrandTourney
                 if (starter == null || !(game.GameType is Campaign)) return;
                 McmSettings.Apply();
                 starter.AddBehavior(new TourneyBehavior());
+                starter.AddBehavior(new TourneyRansomBehavior());   // R3-04a
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

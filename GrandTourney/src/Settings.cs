@@ -55,6 +55,8 @@ namespace GrandTourney
         public bool NoblesFightInTournaments = true;       // lords present in town take their rightful places in the bracket - troops only fill what remains
         public bool NoblesIgnoreSkillGate = true;          // a lord enters even below the games' skill bar - pride before prudence
         public int MaxNoblesInBracket = 15;                // at most this many of the sixteen places go to lords
+        public bool TourneyRansom = true;                  // whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions and the AI lords alike - a common soldier fights in borrowed kit and has nothing to wager, and kin never ransom kin
+        public int RansomAiKeepWageDays = 7;               // an AI lord pays a ransom only from gold beyond this many days of his men's wages; what he cannot pay for, he yields
 
         public bool LogEnabled = true;                     // write a log file in the module folder
 
