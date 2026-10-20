@@ -643,6 +643,8 @@ Uzycie (Python 3, tylko odczyt):
                     zalogi, nowe partie, netto ponad znane drogi; jency wstrzymani); WL-4b twierdze Strazy < baza = NIE; WL-4c ludzie regionow Strazy i ludzie
                     Strazy >= 0.9 x baza; WL-5 trupy Innych <= 1.2 x baza (--crashscribe-baza <session-*.log bazy>); WL-6 lud WL: ludzie regionow WL >= 0.98 x
                     baza (okno >= 60 dob), miasta WL bez pieniedzy na jedzenie (kiesa-ludu.csv stac_jedzenie < 0.95, sr. 28 dob) <= baza, z_wojska WL (INFO).
+                    WL-7 (4.17, r4-wolni) walcza wszyscy dorosli: udzial puli 54% (+-0.5), pula = udzial x ludzie +-1, bramki puli 0, pod bronia koniec >= start;
+                    druzyny lordow WL pelne / bez zlota (prog werbunku gry) / w glodzie - INFO. Przy 4.17 WL-5 moze wyjsc ponad 1.2 x baza (wiecej poleglych WL).
                     T3-N-2 skory surowe zuzycie / produkcja >= 0.90, T3-N-3 narzedzia budowy / produkcja <= 25%.
 --grupa drobne2   : (14.10, galaz drobne2-gracz: A13 reszta, A14, B5) python -I tools/sprawdz_logi.py --grupa drobne2 [--do-doby N] [--crashscribe <session-*.log>]
                     [--baza-doby <log biegu bez paczki>] <Armoury-*.log>. D2-1 komunikat 'is yours' (gracz 6, INFO), D2-2 podpowiedz L5 z towarem L7 (gracz 9, INFO),
@@ -25672,6 +25674,7 @@ WW_FFSTATE = re.compile(r"\| Wolni Ludzie: stan (\d+) \(partie (\d+), zalogi (\d
 WW_WL2 = re.compile(r"\| Wolni Ludzie bez zoldu \(WL1, Free Folk Unpaid (tak|nie)\): w ludziach (\d+) \(zalogi (\d+)\) / pula (-|\d+) \((?:z ludu \(WL2, Free Folk Men From People tak\): ([\d.]+)% x ludzie (\d+); )?(?:WL2 [^;]*; )?ze zlota (-|\d+)\)")
 WW_WL2C = re.compile(r"przyrost WL \(doba\): netto (-?\d+), drogi: werbunek (\d+), jency (\d+), zalogi (\d+), nowe partie (\d+), netto ponad znane drogi (\d+); jency AI wstrzymani pula (\d+), WL3 przepuscil i po werbunku jedzenie ponizej progu (\d+)")
 WW_WL2B = re.compile(r"werbunek wstrzymany: pula (\d+), jedzenie \(WL3\) (\d+); przyrost zalog wstrzymany: pula (\d+), zalogi ponad udzial puli \(WL2\) (\d+); nowe partie wstrzymane (\d+)")
+WW_WL7 = re.compile(r"\| Wolni Ludzie - walcza wszyscy dorosli \(4\.17, Free Folk All Adults Fight (tak|nie|tak, ale bez WL2 - nieczynne)\): (?:ludzie (\d+), dorosli 16-60 (\d+) \(mezczyzni i wlocznice, 2 x \d+% ludzi\)|ludzi jeszcze nie policzono), pula (-|\d+) \(([\d.]+)% x ludzie - [^)]*\), pod bronia (\d+) \(druzyny (-?\d+), zalogi (\d+)\) = [^;]*; trzyma dzis: pula \(werbunek (\d+), jency (\d+), nowe partie (\d+), zalogi (\d+)\), jedzenie WL3 (\d+), zalogi ponad \d+% puli (\d+); druzyny lordow WL (\d+) \(ludzie (\d+) / limity druzyn (\d+)\): pelne (\d+), bez zlota na werbunek \(prog gry\) (\d+), w glodzie (\d+), moga werbowac (\d+)")   # 4.17 (r4-wolni)
 WW_WATCH = re.compile(r"\| Straz w ludziach (\d+) / pulap w ludziach (-|\d+)")
 WW_GIFT = re.compile(r"Westeros -> Straz (\d+) zl")
 WW_HUNG = re.compile(r"brak pieniedzy \(Afford jedzenia < 0\.95 przez 7 dob\): (\d+) \(miasta (\d+)")
@@ -25859,6 +25862,9 @@ def ww_measures(path, start_arg, until, lo_arg=None):
         cap = None if x.group(4) == "-" else int(x.group(4))
         rows.append((d, x.group(1), int(x.group(2)), int(x.group(3)), cap, float(x.group(5)) if x.group(5) else None, int(x.group(6)) if x.group(6) else None))
     m["wl2"] = rows
+    # 4.17 (r4-wolni): walcza wszyscy dorosli - pula z doroslych, pod bronia, bramki puli i bramki werbunku gry w druzynach lordow WL
+    wl7 = {d: WW_WL7.search(s) for d, s in b166.items()}
+    m["wl7"] = [(d,) + tuple(wl7[d].groups()) for d in sorted(wl7) if wl7[d]]
     bl = [WW_WL2B.search(s) for s in b166.values()]
     bl = [x for x in bl if x]
     m["wl2block"] = tuple(sum(int(x.group(i)) for x in bl) for i in range(1, 6)) if bl else None
@@ -26200,6 +26206,24 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None)
     else:
         rep.add("WL-2c drogi przyrostu ludzi WL (166, sumy okna)", f"netto {g2[0]}; werbunek {g2[1]}, jency {g2[2]}, zalogi {g2[3]}, nowe partie {g2[4]}; netto ponad znane drogi {g2[5]} "
                 f"(dob ponad 1.05 x pula z doplywem inna droga: {m['wl2c_over']}); jency AI wstrzymani pula {g2[6]}", "INFO (doby ponad pula z doplywem inna droga - szukac drogi)", None)
+    # WL-7 (4.17, r4-wolni): walcza wszyscy dorosli - pula = 54% x ludzie (+-1), bramki puli 0, pod bronia nie spada; bramki werbunku gry w druzynach - INFO
+    r7 = [r for r in m.get("wl7", []) if r[1] == "tak"]
+    if not r7:
+        rep.add("WL-7 Wolni Ludzie - walcza wszyscy dorosli (4.17, 166)", f"brak odcinka 4.17 z kluczem tak (dob z odcinkiem {len(m.get('wl7', []))})",
+                "pula = 54% x ludzie +-1; bramki puli 0; pod bronia koniec >= start", None)
+    else:
+        c7 = [abs(int(r[4]) - round(float(r[5]) / 100.0 * int(r[2]))) for r in r7 if r[2] and r[4] != "-"]
+        sh7 = [float(r[5]) for r in r7]
+        blk = sum(int(r[i]) for r in r7 for i in (9, 10, 11, 12))
+        men0, men1 = int(r7[0][6]), int(r7[-1][6])
+        t7 = r7[-28:]
+        g7 = tuple(sum(int(r[i]) for r in t7) / len(t7) for i in (15, 16, 17, 18, 19, 20, 21))
+        rep.add("WL-7 Wolni Ludzie - walcza wszyscy dorosli (4.17, 166)",
+                f"dob {len(r7)}; udzial puli {min(sh7):.1f}-{max(sh7):.1f}%; pula - udzial x ludzie: najwiecej {max(c7) if c7 else '-'}; pula koniec {r7[-1][4]}; "
+                f"bramki puli (werbunek+jency+partie+zalogi) {blk}; pod bronia {men0} -> {men1} (druzyny {r7[-1][7]}, zalogi {r7[-1][8]}); jedzenie WL3 (suma) {sum(int(r[13]) for r in r7)}; "
+                f"druzyny lordow WL sr. 28 dob: {g7[0]:.1f} (ludzie {g7[1]:.0f} / limity {g7[2]:.0f}), pelne {g7[3]:.1f}, bez zlota {g7[4]:.1f}, w glodzie {g7[5]:.1f}, moga werbowac {g7[6]:.1f}",
+                "udzial 53.5-54.5%; pula - udzial x ludzie <= 1; bramki puli 0; pod bronia koniec >= start (druzyny bez zlota - INFO)",
+                all(53.5 <= v <= 54.5 for v in sh7) and (not c7 or max(c7) <= 1) and blk == 0 and men1 >= men0)
     # WL-3
     sv, sb = m["starve"], (b["starve"] if b else None)
     rep.add("WL-3 druzyny WL w glodzie (4.15, sr. 28 dob)", f"{'-' if sv is None else f'{sv:.1f}'} (baza {'-' if sb is None else f'{sb:.1f}'}); werbunek wstrzymany z braku jedzenia (wywolan) {m['wl2block'][1] if m['wl2block'] else '-'}"

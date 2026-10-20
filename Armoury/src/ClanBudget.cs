@@ -2008,6 +2008,11 @@ namespace Armoury
         /// <summary>WL2 czynne: klucz FreeFolkMenFromPeople przy WL1.</summary>
         internal static bool FfFromPeopleOn { get { var s = Settings.Current; return s != null && s.FreeFolkMenFromPeople && CrownGifts.FreeFolkUnpaidOn; } }
         private static double FfLevyShare(Settings s) { return Math.Max(0f, Math.Min(0.05f, s.FreeFolkLevyShare)); }
+        /// <summary>4.17 (Jeff 20.10 "walcza wszyscy dorosli"): udzial doroslych 16-60 w ludziach - mezczyzni i wlocznice = 2 x PeopleBook.MenShare (model
+        /// demografii: mezczyzni 16-60 = 27% ludzi, plec 49:51 - kobiet 16-60 tyle samo; dzieci 37.5%, ponad 60 lat ok. 7.5%) = 54%.</summary>
+        private static double FfAdultsShare { get { return 2.0 * PeopleBook.MenShare; } }
+        /// <summary>4.17: udzial ludzi regionow WL w puli - FreeFolkAllAdultsFight: wszyscy dorosli 16-60 (FfAdultsShare); bez klucza - FreeFolkLevyShare (stan 1ffbd891).</summary>
+        private static double FfPoolShare(Settings s) { return s != null && s.FreeFolkAllAdultsFight ? FfAdultsShare : FfLevyShare(s); }
         private static double FfGarShare(Settings s) { return Math.Max(0f, Math.Min(1f, s.FreeFolkGarrisonPoolShare)); }
 
         /// <summary>WL2: ludzie regionow krolestwa Wolnych Ludzi (warownia + jej wsie, region nalezy do krolestwa freefolk - ta sama liczba co "ludzie" w
@@ -2039,7 +2044,7 @@ namespace Armoury
             {
                 double people = FfPeople();
                 _ff.People = people;
-                if (people > 0) return (int)Math.Round(FfLevyShare(s) * people);
+                if (people > 0) return (int)Math.Round(FfPoolShare(s) * people);   // 4.17: przy FreeFolkAllAdultsFight wszyscy dorosli 16-60 (2 x MenShare)
             }
             return Math.Max(0, _ff.DCap);
         }
@@ -2243,7 +2248,8 @@ namespace Armoury
                 if (cap < 0) return true;
                 if (PoolLiveMen(ff) < cap)   // 2: pula calej Strazy
                 {
-                    // WL2: zalogi Wolnych Ludzi rosna tylko, dopoki wszystkie razem < FreeFolkGarrisonPoolShare puli ([L] walcza w polu, nie w murach); ponad - stoja (bez zwolnien)
+                    // WL2: zalogi Wolnych Ludzi rosna tylko, dopoki wszystkie razem < FreeFolkGarrisonPoolShare puli ([L] walcza w polu, nie w murach); ponad - stoja (bez zwolnien).
+                    // 4.17 bez zmian (recenzja): przy puli z doroslych zalogi trzyma pulap zalogi gry (PartySizeLimit, FoodChange > 0 - GarrisonRecruitmentCampaignBehavior)
                     if (!ff || !FfFromPeopleOn) return true;
                     var s = Settings.Current;
                     if (s == null || FfLiveGarrisons() < FfGarShare(s) * cap) return true;
@@ -2262,7 +2268,7 @@ namespace Armoury
             var sb = new StringBuilder(400);
             sb.Append(" | Wolni Ludzie bez zoldu (WL1, Free Folk Unpaid ").Append(CrownGifts.FreeFolkUnpaidOn ? "tak" : "nie").Append("): w ludziach ").Append(_ff.Men)
               .Append(" (zalogi ").Append(_ff.Gar).Append(") / pula ").Append(_ff.Cap < 0 ? "-" : _ff.Cap.ToString(Inv))
-              .Append(" (").Append(FfFromPeopleOn && _ff.People > 0 ? "z ludu (WL2, Free Folk Men From People tak): " + (100.0 * FfLevyShare(s)).ToString("0.0", Inv) + "% x ludzie "
+              .Append(" (").Append(FfFromPeopleOn && _ff.People > 0 ? "z ludu (WL2, Free Folk Men From People tak): " + (100.0 * FfPoolShare(s)).ToString("0.0", Inv) + "% x ludzie "
                       + Math.Round(_ff.People).ToString("0", Inv) + "; " : (FfFromPeopleOn ? "WL2 tak, ludzi jeszcze nie policzono - pula ze zlota; " : "WL2 nie; "))
               .Append("ze zlota ").Append(_ff.DCap < 0 ? "-" : _ff.DCap.ToString(Inv)).Append(')')
               .Append(", zalogi ").Append(_ff.Cap > 0 ? (100.0 * _ff.Gar / _ff.Cap).ToString("0", Inv) + "% puli" : "-").Append(" (rosna do ").Append((100.0 * FfGarShare(s)).ToString("0", Inv)).Append("%)")
@@ -2277,9 +2283,67 @@ namespace Armoury
               .Append(", zalogi ").Append(_ff.InGar).Append(", nowe partie ").Append(_ff.InSpawn).Append(", netto ponad znane drogi ").Append(Math.Max(0L, _ff.Net - known))
               .Append("; jency AI wstrzymani pula ").Append(_ff.PrisonBlock).Append(", WL3 przepuscil i po werbunku jedzenie ponizej progu ").Append(_ff.FoodMiss)
               .Append("; gracz-wasal WL: ").Append(CrownGifts.PlayerFreeFolkVassal ? "ludzi " + _ff.PlayerMen.ToString(Inv) + " (zalogi " + _ff.PlayerGar.ToString(Inv) + "), zold " + (_ffPlayerUnpaid ? "0 (w puli)" : "zwykly (armia WL ponad 1.05 x pula)") : "nie");
+            // 4.17: pula z doroslych, pod bronia i to, co naprawde trzyma wojsko WL tej doby (liczniki sprzed zerowania nizej)
+            bool adults = s != null && s.FreeFolkAllAdultsFight;
+            sb.Append(" | Wolni Ludzie - walcza wszyscy dorosli (4.17, Free Folk All Adults Fight ").Append(adults ? (FfFromPeopleOn ? "tak" : "tak, ale bez WL2 - nieczynne") : "nie").Append("): ");
+            if (_ff.People > 0)
+            {
+                double adultsN = FfAdultsShare * _ff.People;   // dorosli 16-60, mezczyzni i wlocznice (2 x MenShare, model demografii)
+                sb.Append("ludzie ").Append(Math.Round(_ff.People).ToString("0", Inv)).Append(", dorosli 16-60 ").Append(Math.Round(adultsN).ToString("0", Inv))
+                  .Append(" (mezczyzni i wlocznice, 2 x ").Append((100.0 * PeopleBook.MenShare).ToString("0", Inv)).Append("% ludzi)");
+            }
+            else sb.Append("ludzi jeszcze nie policzono");
+            sb.Append(", pula ").Append(_ff.Cap < 0 ? "-" : _ff.Cap.ToString(Inv));
+            if (FfFromPeopleOn && _ff.People > 0)
+                sb.Append(" (").Append((100.0 * FfPoolShare(s)).ToString("0.0", Inv)).Append(adults ? "% x ludzie - wszyscy dorosli 16-60)" : "% x ludzie - Free Folk Levy Share)");
+            else sb.Append(" (ze zlota - WL2 nie albo ludzi jeszcze nie policzono)");
+            sb
+              .Append(", pod bronia ").Append(_ff.Men).Append(" (druzyny ").Append(_ff.Men - _ff.Gar).Append(", zalogi ").Append(_ff.Gar).Append(')')
+              .Append(" = ").Append(_ff.Cap > 0 ? (100.0 * _ff.Men / _ff.Cap).ToString("0.0", Inv) + "% puli" : "-")
+              .Append(", ").Append(_ff.People > 0 ? (100.0 * _ff.Men / _ff.People).ToString("0.0", Inv) + "% ludzi" : "-")
+              .Append("; trzyma dzis: pula (werbunek ").Append(_ff.RecruitBlock).Append(", jency ").Append(_ff.PrisonBlock).Append(", nowe partie ").Append(_ff.SpawnBlock)
+              .Append(", zalogi ").Append(_ff.GarBlock).Append("), jedzenie WL3 ").Append(_ff.FoodBlock).Append(", zalogi ponad ").Append((100.0 * FfGarShare(s)).ToString("0", Inv))
+              .Append("% puli ").Append(_ff.GarShareBlock);
+            FfLordGates(sb);
+            sb.Append("; reszte trzymaja liczba wodzow, cel zalog gry i straty");
             _ff.RecruitBlock = _ff.GarBlock = _ff.SpawnBlock = _ff.FoodBlock = _ff.GarShareBlock = 0;
             _ff.PrisonBlock = _ff.FoodMiss = 0; _ff.InRecruit = _ff.InPrison = _ff.InGar = _ff.InSpawn = 0;
             return sb.ToString();
+        }
+
+        /// <summary>4.17 (recenzja): co trzyma druzyny lordow AI Wolnych Ludzi tej doby wedlug bramek werbunku gry (RecruitmentCampaignBehavior.CheckRecruiting 1.4.8):
+        /// pelne (limit druzyny), bez zlota (PartyTradeGold nie ponad HeroHelper.StartRecruitingMoneyLimit albo kiesa rodu nie ponad StartRecruitingMoneyLimitForClanLeader
+        /// u lorda, ktory nie jest glowa rodu), w glodzie (IsStarving); kazda druzyna w jednej kategorii, w tej kolejnosci. Tylko odczyt, raz na dobe (linia 166).</summary>
+        private static void FfLordGates(StringBuilder sb)
+        {
+            int n = 0, full = 0, poor = 0, hungry = 0, free = 0, men = 0, lim = 0;
+            try
+            {
+                for (int i = 0; i < _ff.Clans.Count; i++)
+                {
+                    var c = _ff.Clans[i];
+                    if (c == null || c.IsEliminated || c == Clan.PlayerClan) continue;
+                    var wps = c.WarPartyComponents;
+                    if (wps == null) continue;
+                    for (int k = 0; k < wps.Count; k++)
+                    {
+                        var mp = wps[k] != null ? wps[k].MobileParty : null;
+                        var h = mp != null ? mp.LeaderHero : null;
+                        if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.IsMainParty || mp.IsDisbanding || h == null || mp.Party == null) continue;
+                        n++;
+                        int all = mp.Party.NumberOfAllMembers, size = mp.Party.PartySizeLimit;
+                        men += all; lim += size;
+                        if (all + 0.5f > size) full++;
+                        else if (mp.PartyTradeGold <= Helpers.HeroHelper.StartRecruitingMoneyLimit(h)
+                                 || (h != c.Leader && c.Gold <= Helpers.HeroHelper.StartRecruitingMoneyLimitForClanLeader(h))) poor++;
+                        else if (mp.Party.IsStarving) hungry++;
+                        else free++;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("FfLordGates", e); }
+            sb.Append("; druzyny lordow WL ").Append(n).Append(" (ludzie ").Append(men).Append(" / limity druzyn ").Append(lim).Append("): pelne ").Append(full)
+              .Append(", bez zlota na werbunek (prog gry) ").Append(poor).Append(", w glodzie ").Append(hungry).Append(", moga werbowac ").Append(free);
         }
 
         /// <summary>WL1: odcinek linii "Straz i Wolni Ludzie (4.15)" - zold Wolnych Ludzi na czlowieka (druzyny, zalogi), zold przyciety z braku w kiesie (SoldierPay,

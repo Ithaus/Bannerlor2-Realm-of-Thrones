@@ -6928,13 +6928,17 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool FreeFolkUnpaid { get; set; } = true;
 
-        [SettingPropertyBool("Free Folk Men From People", HintText = "with Free Folk Unpaid: the whole host of the Free Folk is held by their people, not by gold - at most Free Folk Levy Share of the people of the lands they hold, so it shrinks when their people die or flee. Their garrisons grow only while all of them hold less than Free Folk Garrison Pool Share of the host; the rest of it goes into the field. Nobody is sent home: the limit only stops recruiting, new companies and the growth of garrisons. Off = their numbers are held by gold, as for the Night's Watch", RequireRestart = false)]
+        [SettingPropertyBool("Free Folk Men From People", HintText = "with Free Folk Unpaid: the whole host of the Free Folk is held by their people, not by gold - at most all their grown men and women (with Free Folk All Adults Fight; off: Free Folk Levy Share) of the people of the lands they hold, so it shrinks when their people die or flee. Their garrisons grow only while all of them hold less than Free Folk Garrison Pool Share of the host; the rest of it goes into the field. Nobody is sent home: the limit only stops recruiting, new companies and the growth of garrisons. Off = their numbers are held by gold, as for the Night's Watch", RequireRestart = false)]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool FreeFolkMenFromPeople { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Free Folk Levy Share", 0.000f, 0.050f, "0.000", HintText = "with Free Folk Men From People: the Free Folk under arms at most, as a share of the people of their lands (0.018 = about 5,000 of 280,000 - as many as they kept in their first half year, before gold began to hold them back)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Free Folk Levy Share", 0.000f, 0.050f, "0.000", HintText = "only with Free Folk All Adults Fight off (on: all their grown men and women may fight, this share is not used): the Free Folk under arms at most, as a share of the people of their lands (0.018 = about 5,000 of 280,000 - as many as they kept in their first half year, before gold began to hold them back)", RequireRestart = false)]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float FreeFolkLevyShare { get; set; } = 0.018f;
+
+        [SettingPropertyBool("Free Folk All Adults Fight", HintText = "with Free Folk Men From People: every grown man and woman of the Free Folk can fight - the spearwives too. Their host may hold all their grown men and women between 16 and 60 (about 54% of their people - some 158,000 of 293,000), so their numbers no longer hold it back. It is then held by what holds every host: how many men each chief can lead, the gold a chief needs before he takes on recruits, food, the number of chiefs and the losses of war - in practice far fewer take up arms. Their garrisons grow as before (Free Folk Garrison Pool Share). Off = at most Free Folk Levy Share of their people, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool FreeFolkAllAdultsFight { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Free Folk Garrison Pool Share", 0.00f, 1.00f, "0.00", HintText = "with Free Folk Men From People: the garrisons of the Free Folk grow only while all of them hold less than this share of the host (0.50 = half; garrisons above it stay, they only stop growing)", RequireRestart = false)]
         [SettingPropertyGroup("Reavers and the Free Folk")]
@@ -9981,6 +9985,7 @@ namespace Armoury
             s.FreeFolkUnpaid = FreeFolkUnpaid;
             s.FreeFolkMenFromPeople = FreeFolkMenFromPeople;
             s.FreeFolkLevyShare = FreeFolkLevyShare;
+            s.FreeFolkAllAdultsFight = FreeFolkAllAdultsFight;
             s.FreeFolkGarrisonPoolShare = FreeFolkGarrisonPoolShare;
             s.FreeFolkRecruitNeedsFood = FreeFolkRecruitNeedsFood;
             s.FairFiefGrants = FairFiefGrants;
