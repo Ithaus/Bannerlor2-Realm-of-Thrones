@@ -229,6 +229,10 @@ namespace Armoury
                   .Append(", zdjete z kary nocy ").Append(F(_nEase[r], "0.00")).Append(" jedn.")
                   .Append(", XP Zwiadu +").Append(F(_xp[r], "0")).Append(')');
             }
+            // suma do porownania ksiag: E8/P1 Scouting "marsz" ~ E8/X zwiad "po" (suma wierszy) + ta liczba (nocne XP nie przechodzi przez XpFair)
+            double xpAll = 0.0;
+            for (int r = 0; r < Rows; r++) xpAll += _xp[r];
+            sb.Append(" | XP Zwiadu noca razem +").Append(F(xpAll, "0")).Append(" (E8/P1 marsz ~ E8/X zwiad po + to)");
             sb.Append(" | las w marszu (partio-godziny, dzien i noc): ");
             for (int r = 0; r < Rows; r++)
                 sb.Append(r == 0 ? "" : ", ").Append(RowNames[r]).Append(' ').Append(_fH[r])
