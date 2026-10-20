@@ -76,10 +76,12 @@ namespace Armoury
         // WSZYSTKICH czynnosci ekranu (stamina / 6: kucie, przetop, rafinacja). Kolejka bierze tylko kute sztuki - reszta godzin przepadala.
         // Licznik godzin BK sztuk wzietych do kolejki od ostatniego zamkniecia ekranu; SkipBkWait odejmuje je i zostawia BK odsiadke za reszte.
         private static float _bkQueued;
+        internal static void ResetBkQueued() { _bkQueued = 0f; }   // m96-czaskuzni: nowa sesja ekranu (Esc zamykal ekran bez StartCraftingMenu - stary licznik zjadal godziny wytopu)
 
         internal static void NoteQueued(ItemObject item, int count, float hours, float oldHours)
         {
             _bkQueued += Math.Max(0f, oldHours);
+            ForgeJob.NotePiece(Math.Max(1, count), hours, oldHours);   // m96-czaskuzni: sztuka z ekranu kuzni w jednej robocie tej kuzni
             if (!LikeTown || item == null || TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement == null || ArmouryBehavior.Instance == null) return;   // bez osady Queue daje sztuke od razu
             try
             {
@@ -187,14 +189,15 @@ namespace Armoury
             b.StartProject(item, 1, hours / 24f, here, "bk", mod != null ? mod.StringId : "", Math.Max(1, count));
             float queued = b.ProjectHoursLeftHere(here);
             Log.Player("On the bench: " + (count > 1 ? count + " x " : "") + item.Name + " - " + Project.TimeLabel(hours / 24f)
-                       + " of work. Your queue here: " + Project.TimeLabel(queued / 24f) + ". The work goes on only while you stay in "
-                       + here.Name + "; each piece comes off the anvil when it is done.");
+                       + " of work. Your queue here: " + Project.TimeLabel(queued / 24f) + ". " + (ForgeJob.QueueNote() ?? ("The work goes on only while you stay in "
+                       + here.Name + "; each piece comes off the anvil when it is done.")));   // m96-czaskuzni: robota tylko na pasku przy kowadle
         }
 
         /// <summary>BK StartCraftingMenu: zamiast odsiadki wszystkich godzin naraz - nasze czekanie przy kowadle.</summary>
         public static bool SkipBkWait(ref float totalHours)
         {
             if (!On) return true;
+            if (ForgeJob.TookOverBkWait()) { _bkQueued = 0f; return false; }   // m96-czaskuzni: zamkniecie ekranu otworzylo juz jeden pasek na cala robote
             float queued = _bkQueued;
             _bkQueued = 0f;
             try

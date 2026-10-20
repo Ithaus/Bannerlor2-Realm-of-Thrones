@@ -273,6 +273,7 @@ namespace Armoury
                 try { NightRest.ApplySleepGate(_harmony); } catch (Exception e) { Log.Error("NightRest.ApplySleepGate", e); }
                 FletchForge.ApplyAll(_harmony);
                 ForgeClock.ApplyAll(_harmony);   // wpis 83: jeden zegar kuzni
+                try { ForgeJob.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ForgeJob.ApplyAll", e); }   // m96-czaskuzni: jedna robota na ekran kuzni, jeden pasek po wyjsciu
                 ArmourQuality.ApplyAll(_harmony); // zbroja z zakladki CRAFT jak bron: prog, pekniecie i jakosc z kowalstwa (PO FletchForge i ForgeClock)
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);

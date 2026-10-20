@@ -743,6 +743,9 @@ namespace Armoury
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
+        // m96-czaskuzni: sesja ekranu kuzni, powrot z paska i liczniki robot gracza od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
+        private readonly bool _m96CzasKuzniReset = M96CzasKuzniReset();
+        private static bool M96CzasKuzniReset() { try { ForgeJob.Reset(); } catch (Exception e) { Log.Error("M96CzasKuzniReset", e); } return true; }
         // p5-handel (R3-05a/b): jarmarki i barki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
         private readonly bool _p5HandelReset = P5HandelReset();
         private static bool P5HandelReset() { try { HarvestFairs.Reset(); RiverBarges.Reset(); } catch (Exception e) { Log.Error("P5HandelReset", e); } return true; }
@@ -2289,14 +2292,14 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) continue;
+                    if (!p.Valid) continue;   // m96-czaskuzni: praca bez sztuki (IsPrep) tez w spisie
                     if (sb.Length > 0) sb.Append("\n");
                     if (p.DaysLeft <= 0f)
-                        sb.Append(p.Item.Name + " - READY, waiting for collection at the forge");
+                        sb.Append(p.Name + " - READY, waiting for collection at the forge");
                     else
-                        sb.Append(p.Item.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
-                                  + (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)")
-                                  + ", worked " + p.TempoName);
+                        sb.Append(p.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
+                                  + (ForgeJob.ClockNote(p) ?? (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)"))   // m96-czaskuzni: robota gracza tylko na pasku
+                                  + (p.IsPrep ? "" : ", worked " + p.TempoName));
                 }
                 return sb.ToString();
             }
@@ -2305,8 +2308,12 @@ namespace Armoury
 
         internal bool HasProjects { get { return _projects.Count > 0; } }
 
+        /// <summary>m96-czaskuzni: kolejka robot gracza dla ForgeJob (wstawienie pracy bez sztuki przed sztuki z ekranu, spis do logu).</summary>
+        internal List<string> ProjectLines { get { return _projects; } }
+
         private static void HandOver(Project p)
         {
+            if (p.IsPrep) return;   // m96-czaskuzni: praca bez sztuki - nic do wydania (material dal ekran kuzni od razu)
             if (p.Kind == "van" || p.Kind == "bk") Forge.Deliver(p.Item, p.ModifierId, Math.Max(1, p.Count));   // sukces zapadl przy kowadle
             else Forge.Finish(p.Item, p.Tempo);
         }
@@ -2346,10 +2353,11 @@ namespace Armoury
                 // tyka TYLKO najstarszy niegotowy projekt - reszta czeka na
                 // swoja kolej. Rozne miasta = rozni kowale, pracuja niezaleznie.
                 var busyForge = new HashSet<string>();
+                var spare = new Dictionary<string, float>();   // m96-czaskuzni: reszta godziny taktu po skonczonym wpisie - na nastepny wpis tej kuzni
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (!p.Valid) { _projects.Remove(line); continue; }   // m96-czaskuzni: praca bez sztuki (IsPrep) zostaje
 
                     bool atForge = here != null && here.StringId == p.SettlementId;
 
@@ -2360,10 +2368,13 @@ namespace Armoury
                         continue;
                     }
 
+                    // m96-czaskuzni: praca bez sztuki czeka na rece gracza i nie blokuje kowala, ktory kuje bez ciebie (remote)
+                    if (p.IsPrep && remote && !ForgeJob.HandsAt(p.SettlementId)) continue;
+
                     // kowal tej osady juz kuje wczesniejszy projekt - ten czeka
                     if (!busyForge.Add(p.SettlementId)) continue;
 
-                    if (!atForge && !remote)
+                    if (!atForge && (!remote || p.IsPrep))   // m96-czaskuzni: wytop i rafinacja to twoje rece - tylko na miejscu
                     {
                         if (!idleWarned && Today - _lastIdleLogDay > 0.99f)
                         {
@@ -2373,6 +2384,8 @@ namespace Armoury
                         }
                         continue;
                     }
+                    // m96-czaskuzni: przy Forge One Job robota gracza idzie tylko na pasku przy kowadle - po "Step away" czeka, takze w miescie
+                    if (atForge && !(remote && !p.IsPrep) && !ForgeJob.HandsAt(p.SettlementId)) continue;
 
                     // CZELADZ TEZ SPI (Jeff 31.08): warsztat stoi noca 23-5 -
                     // zadnego postepu przez szesc ciemnych godzin. "Dni pracy"
@@ -2397,8 +2410,12 @@ namespace Armoury
 
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
-                    p.DaysLeft -= 1f / 24f;
-                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van")) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    float stepH = 1f, sp;   // m96-czaskuzni: reszta godziny po wczesniejszym wpisie tej kuzni (bez klucza zawsze pelna godzina)
+                    if (spare.TryGetValue(p.SettlementId, out sp)) { stepH = sp; spare.Remove(p.SettlementId); }
+                    p.DaysLeft -= stepH / 24f;
+                    if (ForgeJob.On && p.DaysLeft < -0.0001f) { busyForge.Remove(p.SettlementId); spare[p.SettlementId] = -p.DaysLeft * 24f; }   // m96-czaskuzni: wpis skonczony w trakcie godziny - reszta dla nastepnego
+                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van" || p.IsPrep)) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    if (p.IsPrep) { ForgeJob.TickedPrep(_projects, line, p); continue; }   // m96-czaskuzni: praca bez sztuki - same godziny, bez XP i bez wydania
                     var rr = Recipes.For(p.Item);
                     // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
                     // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
@@ -2413,7 +2430,7 @@ namespace Armoury
                         totalDays = MathF.Max(1f / 24f, ForgeClock.WorkHours(p.Item, 1, totalDays * 24f) / 24f * (p.Kind == "van" ? 1f : Project.TimeFactor(p.Tempo)));
                     if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
-                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy
+                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * stepH * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy; m96: XP za przepracowana czesc godziny
 
                     // wpis 89 (audyt): zapis W MIEJSCU - dotad Remove + Add przesuwal tykajaca sztuke na koniec listy,
                     // wiec "najstarsza" zmieniala sie co godzine i cala kolejka szla na zmiane, konczac sie razem
@@ -2446,7 +2463,7 @@ namespace Armoury
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (!p.Valid) { _projects.Remove(line); continue; }   // m96-czaskuzni: praca bez sztuki (IsPrep) zostaje
                     if (p.DaysLeft <= 0f && p.SettlementId == here.StringId)
                     { _projects.Remove(line); HandOver(p); }
                 }
@@ -2892,7 +2909,7 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item != null && p.SettlementId == here.StringId) return true;
+                    if (p.Valid && p.SettlementId == here.StringId) return true;   // m96-czaskuzni: z praca bez sztuki
                 }
             }
             catch { }
@@ -2908,7 +2925,7 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item != null && p.SettlementId == here.StringId) h += p.DaysLeft * 24f;
+                    if (p.Valid && p.SettlementId == here.StringId) h += p.DaysLeft * 24f;   // m96-czaskuzni: z praca bez sztuki
                 }
             }
             catch { }
@@ -2962,7 +2979,7 @@ namespace Armoury
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
                 ForgeClock.NoteQueued(item, 1, days * 24f, oldDays * 24f);
                 Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at "
-                           + here.Name + (ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));
+                           + here.Name + (ForgeJob.QueueNote() != null ? " - " + ForgeJob.QueueNote() : ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));   // m96-czaskuzni: tylko na pasku
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
                 // baneru wyglada to na zniknieciecie miecza
                 try

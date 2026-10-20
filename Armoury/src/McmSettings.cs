@@ -132,6 +132,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOnlyWhileThere { get; set; } = true;
 
+        [SettingPropertyBool("Forge One Job", HintText = "the forge screen is one job: smelting, refining, weapons, armour, bows and orders all add their hours to one job at that forge, and leaving the screen (Done or Esc) always opens one wait with one bar for all of it - the hours the screen shows. Pieces come off the anvil in turn as the bar passes them; step away and you keep what is finished, the rest waits at that forge until you come back. Off = as before (a Banner Kings wait for smelting and refining, the bench queue for pieces)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeOneJob { get; set; } = true;
+
         [SettingPropertyBool("Forge Like Town Smith", HintText = "your work at the anvil takes as long as a town smith's: the same days of work his workshop gives the piece, each a smith's day of hours (Work Hours Per Man Day) - a mail shirt is weeks, not an afternoon; the pay stays as it was, and a lord's order gives you the days of work on top of its deadline (off = the hours of the Banner Kings screen, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeLikeTownSmith { get; set; } = false;
@@ -8608,6 +8612,7 @@ namespace Armoury
             s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
+            s.ForgeOneJob = ForgeOneJob;
             s.ForgeLikeTownSmith = ForgeLikeTownSmith;
             s.ForgeTakesTime = ForgeTakesTime;
             s.DaysPerTier = DaysPerTier;
