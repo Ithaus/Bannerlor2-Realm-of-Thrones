@@ -189,8 +189,8 @@ namespace Armoury
             b.StartProject(item, 1, hours / 24f, here, "bk", mod != null ? mod.StringId : "", Math.Max(1, count));
             float queued = b.ProjectHoursLeftHere(here);
             Log.Player("On the bench: " + (count > 1 ? count + " x " : "") + item.Name + " - " + Project.TimeLabel(hours / 24f)
-                       + " of work. Your queue here: " + Project.TimeLabel(queued / 24f) + ". The work goes on only while you stay in "
-                       + here.Name + "; each piece comes off the anvil when it is done.");
+                       + " of work. Your queue here: " + Project.TimeLabel(queued / 24f) + ". " + (ForgeJob.QueueNote() ?? ("The work goes on only while you stay in "
+                       + here.Name + "; each piece comes off the anvil when it is done.")));   // m96-czaskuzni: robota tylko na pasku przy kowadle
         }
 
         /// <summary>BK StartCraftingMenu: zamiast odsiadki wszystkich godzin naraz - nasze czekanie przy kowadle.</summary>

@@ -174,7 +174,8 @@ namespace Armoury
                 // sami - ratunek z deadlocka po load w srodku menu (White Harbor)
                 delegate (MenuCallbackArgs a)
                 {
-                    _projLeave = true;
+                    string hold = ForgeJob.HoldAtAnvil();   // m96-czaskuzni: od wytopu i rafinacji (metal juz w sakwach) odejsc nie mozna - tylko od sztuk
+                    if (hold == null) _projLeave = true; else Log.Player(hold, true);
                     try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
                 }, true, 9);
         }
@@ -321,6 +322,10 @@ namespace Armoury
                 AnvilShift((float)dt.ToHours);
                 var b = ArmouryBehavior.Instance;
                 float left = b != null ? b.ProjectHoursLeftHere(Settlement.CurrentSettlement) : 0f;
+                // m96-czaskuzni: oblezenie / bitwa przerywa pasek (menu ze stanu gry, SwitchToMenu z ticku jak NightRest); reszta roboty czeka w kuzni
+                string trouble = ForgeJob.Interrupt();
+                if (trouble != null) { _projLeave = false; ForgeJob.WaitEnded(false, left, trouble); ForgeJob.ReturnMenu = null; GameMenu.SwitchToMenu(trouble); return; }
+                ForgeJob.WaitTick(left, (float)dt.ToHours);
                 // m96-czaskuzni: powrot tam, skad gracz wszedl do ekranu kuzni (podmenu kuzni), i linia logu o koncu albo przerwaniu roboty
                 if (_projLeave) { _projLeave = false; ForgeJob.WaitEnded(false, left); GameMenu.SwitchToMenu(ForgeJob.BackMenu(Menu)); return; }
                 if (left <= 0.01f)
@@ -2221,7 +2226,7 @@ namespace Armoury
                     "How will you work?",
                     item.Name + (Settings.Current.ForgeHireHistorical ? ". Forge hire " + Forge.ForgeFee(r) + " gold for every day of work. " : ". Forge fee " + Forge.ForgeFee(r) + " gold. ") +
                     (ForgeClock.LikeTown ? "It takes you as long as it takes a town smith: " + Project.TimeLabel(baseDays) + " of work at a steady pace. " : "") + "Materials and stamina are spent now; " +
-                    "the piece is finished only when the work is done - and only while you remain in this settlement.",
+                    "the piece is finished only when the work is done - and only while you " + (ForgeJob.AnvilOnly ? "wait at the anvil." : "remain in this settlement."),   // m96-czaskuzni
                     opts, true, 1, 1, "Set to work", "Step back",
                     delegate (List<InquiryElement> sel)
                     {
@@ -2233,7 +2238,7 @@ namespace Armoury
                             if (!Forge.Begin(item, tempo, out days)) return;
                             ArmouryBehavior.Instance.StartProject(item, tempo, days, Settlement.CurrentSettlement);
                             Log.Player("You set to work on " + item.Name + ". " + Project.TimeLabel(days) +
-                                       " at the anvil, and you must stay here to see it through.");
+                                       (ForgeJob.AnvilOnly ? " at the anvil - stay at the forge until the work is done." : " at the anvil, and you must stay here to see it through."));   // m96-czaskuzni
                         }
                         catch (Exception ex) { Log.Error("AskTempo.Selected", ex); }
                     },
@@ -2452,7 +2457,7 @@ namespace Armoury
             {
                 var b = ArmouryBehavior.Instance;
                 InformationManager.ShowInquiry(new InquiryData("At the Forge",
-                    b.ProjectSummary() + "\n\nWork advances only on days you spend in this settlement.",
+                    b.ProjectSummary() + (ForgeJob.AnvilOnly ? "\n\nWork goes on only while you wait at the anvil." : "\n\nWork advances only on days you spend in this settlement."),   // m96-czaskuzni
                     true, false, "Good", "", null, null), true);
             }
             catch (Exception e) { Log.Error("ProgressConsequence", e); }

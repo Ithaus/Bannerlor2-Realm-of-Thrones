@@ -2294,8 +2294,8 @@ namespace Armoury
                         sb.Append(p.Name + " - READY, waiting for collection at the forge");
                     else
                         sb.Append(p.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
-                                  + (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)")
-                                  + ", worked " + p.TempoName);
+                                  + (ForgeJob.ClockNote(p) ?? (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)"))   // m96-czaskuzni: robota gracza tylko na pasku
+                                  + (p.IsPrep ? "" : ", worked " + p.TempoName));
                 }
                 return sb.ToString();
             }
@@ -2349,6 +2349,7 @@ namespace Armoury
                 // tyka TYLKO najstarszy niegotowy projekt - reszta czeka na
                 // swoja kolej. Rozne miasta = rozni kowale, pracuja niezaleznie.
                 var busyForge = new HashSet<string>();
+                var spare = new Dictionary<string, float>();   // m96-czaskuzni: reszta godziny taktu po skonczonym wpisie - na nastepny wpis tej kuzni
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
@@ -2363,6 +2364,9 @@ namespace Armoury
                         continue;
                     }
 
+                    // m96-czaskuzni: praca bez sztuki czeka na rece gracza i nie blokuje kowala, ktory kuje bez ciebie (remote)
+                    if (p.IsPrep && remote && !ForgeJob.HandsAt(p.SettlementId)) continue;
+
                     // kowal tej osady juz kuje wczesniejszy projekt - ten czeka
                     if (!busyForge.Add(p.SettlementId)) continue;
 
@@ -2376,6 +2380,8 @@ namespace Armoury
                         }
                         continue;
                     }
+                    // m96-czaskuzni: przy Forge One Job robota gracza idzie tylko na pasku przy kowadle - po "Step away" czeka, takze w miescie
+                    if (atForge && !(remote && !p.IsPrep) && !ForgeJob.HandsAt(p.SettlementId)) continue;
 
                     // CZELADZ TEZ SPI (Jeff 31.08): warsztat stoi noca 23-5 -
                     // zadnego postepu przez szesc ciemnych godzin. "Dni pracy"
@@ -2400,7 +2406,10 @@ namespace Armoury
 
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
-                    p.DaysLeft -= 1f / 24f;
+                    float stepH = 1f, sp;   // m96-czaskuzni: reszta godziny po wczesniejszym wpisie tej kuzni (bez klucza zawsze pelna godzina)
+                    if (spare.TryGetValue(p.SettlementId, out sp)) { stepH = sp; spare.Remove(p.SettlementId); }
+                    p.DaysLeft -= stepH / 24f;
+                    if (ForgeJob.On && p.DaysLeft < -0.0001f) { busyForge.Remove(p.SettlementId); spare[p.SettlementId] = -p.DaysLeft * 24f; }   // m96-czaskuzni: wpis skonczony w trakcie godziny - reszta dla nastepnego
                     if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van" || p.IsPrep)) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
                     if (p.IsPrep) { ForgeJob.TickedPrep(_projects, line, p); continue; }   // m96-czaskuzni: praca bez sztuki - same godziny, bez XP i bez wydania
                     var rr = Recipes.For(p.Item);
@@ -2417,7 +2426,7 @@ namespace Armoury
                         totalDays = MathF.Max(1f / 24f, ForgeClock.WorkHours(p.Item, 1, totalDays * 24f) / 24f * (p.Kind == "van" ? 1f : Project.TimeFactor(p.Tempo)));
                     if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
-                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy
+                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * stepH * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy; m96: XP za przepracowana czesc godziny
 
                     // wpis 89 (audyt): zapis W MIEJSCU - dotad Remove + Add przesuwal tykajaca sztuke na koniec listy,
                     // wiec "najstarsza" zmieniala sie co godzine i cala kolejka szla na zmiane, konczac sie razem
@@ -2964,7 +2973,7 @@ namespace Armoury
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
                 ForgeClock.NoteQueued(item, 1, days * 24f, oldDays * 24f);
                 Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at "
-                           + here.Name + (ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));
+                           + here.Name + (ForgeJob.QueueNote() != null ? " - " + ForgeJob.QueueNote() : ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));   // m96-czaskuzni: tylko na pasku
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
                 // baneru wyglada to na zniknieciecie miecza
                 try
