@@ -18,6 +18,21 @@ namespace Armoury
         internal string ModifierId;  // jakosc z rzutu przy kowadle - wraca na wyrobie przy dostawie
         internal int Count;          // wpis 83: ile sztuk wydac (seria amunicji); 0/brak = 1
 
+        // m96-czaskuzni (ForgeJob): praca przy kowadle BEZ sztuki do wydania (wytop, rafinacja, zlecenie, spartaczone) - same godziny w kolejce
+        // tej kuzni. Zapis "~prep|dni|1|osada|prep||1": starszy DLL nie znajdzie przedmiotu "~prep" (GetObject = null) i wpis po cichu wyrzuci.
+        internal const string PrepKind = "prep", PrepId = "~prep";
+        internal bool IsPrep { get { return Item == null && Kind == PrepKind; } }
+        internal bool Valid { get { return Item != null || IsPrep; } }
+        internal string Name
+        {
+            get
+            {
+                if (Item != null) return Item.Name.ToString();
+                var st = TaleWorlds.CampaignSystem.Settlements.Settlement.Find(SettlementId ?? "");
+                return "Bench work (smelting, refining, orders)" + (st != null ? " at " + st.Name : "");
+            }
+        }
+
         internal static Project Parse(string line)
         {
             var p = new Project();
@@ -38,7 +53,7 @@ namespace Armoury
 
         internal string Serialize()
         {
-            return (Item != null ? Item.StringId : "") + "|" +
+            return (Item != null ? Item.StringId : (Kind == PrepKind ? PrepId : "")) + "|" +
                    DaysLeft.ToString("0.#####", CultureInfo.InvariantCulture) + "|" +
                    Tempo + "|" + SettlementId + "|" + (Kind ?? "") + "|" + (ModifierId ?? "") + "|" + Math.Max(1, Count);
         }

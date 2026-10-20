@@ -743,6 +743,9 @@ namespace Armoury
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
+        // m96-czaskuzni: sesja ekranu kuzni, powrot z paska i liczniki robot gracza od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
+        private readonly bool _m96CzasKuzniReset = M96CzasKuzniReset();
+        private static bool M96CzasKuzniReset() { try { ForgeJob.Reset(); } catch (Exception e) { Log.Error("M96CzasKuzniReset", e); } return true; }
         // p5-handel (R3-05a/b): jarmarki i barki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
         private readonly bool _p5HandelReset = P5HandelReset();
         private static bool P5HandelReset() { try { HarvestFairs.Reset(); RiverBarges.Reset(); } catch (Exception e) { Log.Error("P5HandelReset", e); } return true; }
@@ -2285,12 +2288,12 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) continue;
+                    if (!p.Valid) continue;   // m96-czaskuzni: praca bez sztuki (IsPrep) tez w spisie
                     if (sb.Length > 0) sb.Append("\n");
                     if (p.DaysLeft <= 0f)
-                        sb.Append(p.Item.Name + " - READY, waiting for collection at the forge");
+                        sb.Append(p.Name + " - READY, waiting for collection at the forge");
                     else
-                        sb.Append(p.Item.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
+                        sb.Append(p.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
                                   + (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)")
                                   + ", worked " + p.TempoName);
                 }
@@ -2301,8 +2304,12 @@ namespace Armoury
 
         internal bool HasProjects { get { return _projects.Count > 0; } }
 
+        /// <summary>m96-czaskuzni: kolejka robot gracza dla ForgeJob (wstawienie pracy bez sztuki przed sztuki z ekranu, spis do logu).</summary>
+        internal List<string> ProjectLines { get { return _projects; } }
+
         private static void HandOver(Project p)
         {
+            if (p.IsPrep) return;   // m96-czaskuzni: praca bez sztuki - nic do wydania (material dal ekran kuzni od razu)
             if (p.Kind == "van" || p.Kind == "bk") Forge.Deliver(p.Item, p.ModifierId, Math.Max(1, p.Count));   // sukces zapadl przy kowadle
             else Forge.Finish(p.Item, p.Tempo);
         }
@@ -2345,7 +2352,7 @@ namespace Armoury
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (!p.Valid) { _projects.Remove(line); continue; }   // m96-czaskuzni: praca bez sztuki (IsPrep) zostaje
 
                     bool atForge = here != null && here.StringId == p.SettlementId;
 
@@ -2359,7 +2366,7 @@ namespace Armoury
                     // kowal tej osady juz kuje wczesniejszy projekt - ten czeka
                     if (!busyForge.Add(p.SettlementId)) continue;
 
-                    if (!atForge && !remote)
+                    if (!atForge && (!remote || p.IsPrep))   // m96-czaskuzni: wytop i rafinacja to twoje rece - tylko na miejscu
                     {
                         if (!idleWarned && Today - _lastIdleLogDay > 0.99f)
                         {
@@ -2394,7 +2401,8 @@ namespace Armoury
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
                     p.DaysLeft -= 1f / 24f;
-                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van")) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van" || p.IsPrep)) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    if (p.IsPrep) { ForgeJob.TickedPrep(_projects, line, p); continue; }   // m96-czaskuzni: praca bez sztuki - same godziny, bez XP i bez wydania
                     var rr = Recipes.For(p.Item);
                     // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
                     // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
@@ -2442,7 +2450,7 @@ namespace Armoury
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (!p.Valid) { _projects.Remove(line); continue; }   // m96-czaskuzni: praca bez sztuki (IsPrep) zostaje
                     if (p.DaysLeft <= 0f && p.SettlementId == here.StringId)
                     { _projects.Remove(line); HandOver(p); }
                 }
@@ -2886,7 +2894,7 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item != null && p.SettlementId == here.StringId) return true;
+                    if (p.Valid && p.SettlementId == here.StringId) return true;   // m96-czaskuzni: z praca bez sztuki
                 }
             }
             catch { }
@@ -2902,7 +2910,7 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item != null && p.SettlementId == here.StringId) h += p.DaysLeft * 24f;
+                    if (p.Valid && p.SettlementId == here.StringId) h += p.DaysLeft * 24f;   // m96-czaskuzni: z praca bez sztuki
                 }
             }
             catch { }

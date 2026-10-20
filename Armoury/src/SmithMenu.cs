@@ -81,7 +81,7 @@ namespace Armoury
             // odpoczywania: mlot to nie drzemka)
             starter.AddGameMenuOption(Menu, "arm_proj_wait_opt",
                 ShortLabels.Menu("{=!}Stay until the work is done", "{=!}Stay at the forge until the work is done"), ShortLabels.Tip(ProjWaitCondition, "Stay at the forge until the work is done."),
-                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_project_wait"); }, false, 1);
+                delegate (MenuCallbackArgs a) { ForgeJob.ReturnMenu = null; GameMenu.SwitchToMenu("arm_project_wait"); }, false, 1);   // m96-czaskuzni: powrot tu, do "Work the forge"
 
             // JEDNO wejscie dla wszystkich napraw (Jeff: "sprawdz czy opcje maja
             // sens i czy czegos nie wywalic" - piec pozycji naprawczych na glownym
@@ -303,11 +303,12 @@ namespace Armoury
                 // JEDNA PRAWDA GODZIN (Jeff 29.08: "inne godziny w smith, inne jak
                 // czekam - balagan"): to jest SUMA wszystkich zlecen u tego kowala
                 // (pracuje po kolei), a robota idzie takze bez ciebie
-                MBTextManager.SetTextVariable("ARM_PROJ_TEXT",
+                MBTextManager.SetTextVariable("ARM_PROJ_TEXT", ForgeJob.On ? ForgeJob.WaitText(_projInitialHours) :   // m96-czaskuzni: jedna robota, jeden pasek
                     "The smith works the jobs one by one - about " +
                     ((int)Math.Ceiling(_projInitialHours)) + " hours until ALL your work here is done. " +
                     (ForgeClock.On ? "Each piece comes off the anvil when it is done. Leave, and the work waits for you."
                                    : "He needs no watching: leave, and the clock still runs."));
+                ForgeJob.WaitOpened(_projInitialHours);
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("ProjWaitInit", e); }
@@ -318,12 +319,14 @@ namespace Armoury
             try
             {
                 AnvilShift((float)dt.ToHours);
-                if (_projLeave) { _projLeave = false; GameMenu.SwitchToMenu(Menu); return; }
                 var b = ArmouryBehavior.Instance;
                 float left = b != null ? b.ProjectHoursLeftHere(Settlement.CurrentSettlement) : 0f;
+                // m96-czaskuzni: powrot tam, skad gracz wszedl do ekranu kuzni (podmenu kuzni), i linia logu o koncu albo przerwaniu roboty
+                if (_projLeave) { _projLeave = false; ForgeJob.WaitEnded(false, left); GameMenu.SwitchToMenu(ForgeJob.BackMenu(Menu)); return; }
                 if (left <= 0.01f)
                 {
-                    GameMenu.SwitchToMenu(Menu);   // wyroby juz wydane przez Forge.Finish
+                    ForgeJob.WaitEnded(true, 0f);
+                    GameMenu.SwitchToMenu(ForgeJob.BackMenu(Menu));   // wyroby juz wydane przez Forge.Finish
                     return;
                 }
                 args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(1f - left / Math.Max(1f, _projInitialHours));
