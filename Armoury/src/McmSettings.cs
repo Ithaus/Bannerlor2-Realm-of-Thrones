@@ -3656,15 +3656,15 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawLifeSpendShare { get; set; } = 0.1f;
 
-        [SettingPropertyBool("Bands Eat Food", HintText = "bands eat: each day one load of food for every twenty men, as an army does - from their packs, bought through a fence with their own purse, or taken from a village within a day's ride; a starving band loses heart and after two days its men begin to slip away to the outlaws of the region; a band keeps a few days of food (the fence buys only the rest) and a few days' coin (only the rest goes home to the hideout). Off = bands do not eat (as before)", RequireRestart = false)]
+        [SettingPropertyBool("Bands Eat Food", HintText = "bands eat: each day one load of food for every twenty men, as an army does - from their packs, bought through a fence with their own purse, or taken from a village within a day's ride; a starving band loses heart and after two days its men begin to slip away to the outlaws of the region; a band keeps a few days of food (the fence buys only the rest) and a few days' coin (only the rest is spent in town or goes home to the hideout). Off = bands do not eat (as before)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool BandsEatFood { get; set; } = true;
 
-        [SettingPropertyInteger("Band Food Keep Days", 0, 20, "0", HintText = "with Bands Eat Food: days of food a band keeps in its packs - the fence buys only what lies above that, and a band below it buys more", RequireRestart = false)]
+        [SettingPropertyInteger("Band Food Keep Days", 0, 20, "0", HintText = "with Bands Eat Food: days of food a band keeps in its packs - the fence buys only what lies above that, and a band below it buys more through a fence (at sea too) or takes it from villages within a day's ride", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public int BandFoodKeepDays { get; set; } = 5;
 
-        [SettingPropertyInteger("Band Purse Keep Days", 0, 12, "0", HintText = "with Bands Eat Food: days of food money (at the fence's price) a band keeps in its purse - its daily coin for the hideout comes only from what lies above that (0 = from the whole purse, as before)", RequireRestart = false)]
+        [SettingPropertyInteger("Band Purse Keep Days", 0, 12, "0", HintText = "with Bands Eat Food: days of living a band keeps in its purse - a recruit's pay for each man and the day's food at the fence's price; it spends in town and carries coin home to the hideout only from what lies above that, and a band below it is topped up from what its hideout holds above the kept hoard (0 = from the whole purse, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public int BandPurseKeepDays { get; set; } = 3;
 

@@ -779,8 +779,8 @@ Uzycie (Python 3, tylko odczyt):
                     NK-10 Pieniadz swiata - bandy i kryjowki (INFO), NK-11 linia Paser: stan = doplyw - odplyw (twardy). Log bez paczki: INFO, bez wyjatku.
 --grupa m96bandy  : (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"; galaz w-toku/m96-bandy, BandFood.cs) python -I tools/sprawdz_logi.py --grupa m96bandy
                     [--baza-doby <log Armoury bazy>] <Armoury-*.log>. MB-0 linia doby, MB-1 potkniecia 0, MB-2 zjedzone/potrzeba >= 0.85 (P), MB-3 glodne <= 25% (P),
-                    MB-4 rozpady z glodu <= 2% band/d (P), MB-5 zapas >= 2 dob (P), MB-6 lup jedzenia i zlota band > 0, MB-7 zrodla (INFO), MB-8 bandy wobec bazy >= 0.80 (P),
-                    MB-9 paser zywnosc (INFO), MB-10 kiesy band (INFO).
+                    MB-4 rozpady z glodu <= 20% nowych band (P), MB-5 zapas >= 2 dob (P), MB-6 lup jedzenia i zlota band > 0, MB-7 zrodla (INFO), MB-8 bandy wobec bazy >= 0.80 (P),
+                    MB-9 paser zywnosc (INFO), MB-10 kiesy band (INFO), MB-11 bandy z kryjowka z pusta kiesa - mniej niz w bazie (P), MB-12 morze (INFO).
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -30245,7 +30245,7 @@ def nmisje_main(logp):
 NS_HEAD = "Skarbce kryjowek (nskarbiec): "
 NS_SHARE = re.compile(r"\| dola tak \(udzial ([\d.]+) kiesy")
 NS_BANDS = re.compile(r"\| band z kryjowka (\d+) z (\d+), dola dalo (\d+) \(pominiete: bitwa (\d+), zadanie (\d+), nieumarli (\d+), czeka na przeszukanie (\d+), "
-                      r"pusta kiesa (\d+), kiesa ponizej zlotowki doli (\d+), w ticku gry (\d+)\)")
+                      r"pusta kiesa (\d+), kiesa ponizej zlotowki doli (\d+), w ticku gry (\d+)(?:, kiesa w calosci zapasem (\d+))?\)")
 NS_PURSE = re.compile(r"\| kiesy band z kryjowka przed dola (\d+) zl, dola (\d+) zl")
 NS_IN = re.compile(r"\| wplaty (\d+) zl \(dola (\d+), wejscia do kryjowek (\d+)(?:, przelewy gry do kryjowek (\d+) w (\d+))?\)")
 NS_OUT = re.compile(r"\| wyplaty (\d+) zl \(kiesy startowe (\d+), sprzet (\d+), herszt BK (\d+), zycie w miastach (\d+), przeszukanie gracza (\d+) w (\d+), "
@@ -53497,21 +53497,29 @@ def npolnoc_main(logp, bdp=None):
 # ------------------------------------------------------------ m96bandy (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"; Armoury/src/BandFood.cs, OutlawLaw.FenceSell/StashDay)
 M96BANDY_HEAD = "Bandy - jedzenie i kiesy (m96-bandy): dzien "
 M96BANDY_RX = re.compile(
-    r"bandy jedzace (\d+) .*?\| potrzeba doby ([\d.]+) szt\., zjedzone (\d+), kupione u pasera (\d+) szt\. za (\d+) zl \(band (\d+), miast (\d+)\), "
-    r"zabrane wsiom (\d+) szt\. warte (\d+) zl \(band (\d+), wsi (\d+)\) \| najedzone (\d+), glodne (\d+) \(bez jedzenia (\d+), ponad \d+ doby (\d+), "
-    r"na morzu (\d+), z jencem-bohaterem bez odejsc (\d+)\), morale z glodu -(\d+) \| odeszli z glodu (\d+) ludzi z (\d+) band \(do puli wyrzutkow\), "
-    r"rozpady z glodu (\d+) \| zapas w jukach (\d+) szt\. \(([\d.]+|-) dob potrzeby; band z pelnym zapasem (\d+)\) \| kiesy band w polu (\d+) zl \(band (\d+), "
-    r"z kiesa (\d+), mediana (\d+) zl\); dola: zapas zostal w (\d+) kiesach \((\d+) zl\) \| lup u zwyciezcow \(od wczoraj\): jedzenie z band AI (\d+) szt\. "
-    r"\((\d+) przydzialow\), gracz (\d+) szt\. \((\d+)\); zloto z kies band (\d+) zl, gracz (\d+) zl; jedzenie z druzyn lordow AI (\d+) szt\., gracz (\d+) szt\..*?"
+    r"bandy jedzace (\d+) .*?\| potrzeba doby ([\d.]+) szt\., zjedzone (\d+), kupione u pasera (\d+) szt\. za (\d+) zl \(band (\d+), z morza (\d+), miast (\d+)\), "
+    r"zabrane wsiom (\d+) szt\. warte (\d+) zl \(band (\d+), wsi (\d+), wsi gracza (\d+): (\d+) szt\.\) \| najedzone (\d+), glodne (\d+) \(bez jedzenia (\d+), "
+    r"ponad \d+ doby (\d+), na morzu (\d+) z (\d+), z jencem-bohaterem bez odejsc (\d+)\), morale z glodu -(\d+) \| odeszli z glodu (\d+) ludzi z (\d+) band "
+    r"\(do puli wyrzutkow\), rozpady z glodu (\d+) \| zapas w jukach (\d+) szt\. \(([\d.]+|-) dob potrzeby; band z pelnym zapasem (\d+)\) \| kiesy band w polu (\d+) zl "
+    r"\(band (\d+), z kiesa (\d+), mediana (\d+) zl; z kryjowka (\d+), z kiesa (\d+), razem (\d+) zl\); dola: zapas zostal w (\d+) kiesach \((\d+) zl; w calosci "
+    r"zapasem (\d+)\); zycie w miastach: zapas nietkniety w (\d+) kiesach \((\d+) zl; w calosci zapasem (\d+)\); kieszonkowe z nadwyzki kryjowek (\d+) zl dla (\d+) "
+    r"band \(brakowalo (\d+) zl, nie starczylo (\d+) bandom;.*?\) \| lup u zwyciezcow \(od wczoraj\): jedzenie z band AI (\d+) szt\. \((\d+) przydzialow\), "
+    r"gracz (\d+) szt\. \((\d+)\); zloto z kies band (\d+) zl, gracz (\d+) zl; jedzenie z druzyn lordow AI (\d+) szt\., gracz (\d+) szt\..*?"
     r"\| potkniecia (\d+) \(sesja (\d+)\)")
-M96BANDY_KEYS = ("bands", "need", "eaten", "bought", "boughtGold", "buyBands", "buyTowns", "robbed", "robbedWorth", "robBands", "robVill", "fed", "hungry",
-                 "starving", "long", "sea", "hero", "morale", "left", "leftBands", "broken", "stock", "stockDays", "stockOk", "purse", "field", "withPurse",
-                 "median", "kept", "keptGold", "lootAi", "lootAiN", "lootPl", "lootPlN", "gold", "goldPl", "lordAi", "lordPl", "stum", "stumS")
+M96BANDY_KEYS = ("bands", "need", "eaten", "bought", "boughtGold", "buyBands", "seaBuy", "buyTowns", "robbed", "robbedWorth", "robBands", "robVill",
+                 "plVill", "plRob", "fed", "hungry", "starving", "long", "seaHungry", "sea", "hero", "morale", "left", "leftBands", "broken", "stock",
+                 "stockDays", "stockOk", "purse", "field", "withPurse", "median", "home", "homeWith", "homePurse", "kept", "keptGold", "keptWhole",
+                 "lifeKept", "lifeKeptGold", "lifeWhole", "pocket", "pocketBands", "pocketWant", "pocketShort", "lootAi", "lootAiN", "lootPl", "lootPlN",
+                 "gold", "goldPl", "lordAi", "lordPl", "stum", "stumS")
 
 
-def m96bandy_rows(path):
-    """Linie doby m96-bandy, "Paser:" (zywnosc sprzedana) i "Wyrzutki:" (band, ludzi) -> slowniki wedlug doby (strumieniowo)."""
+def m96bandy_rows(path, extra=None):
+    """Linie doby m96-bandy, "Paser:" (zywnosc sprzedana) i "Wyrzutki:" (band, ludzi) -> slowniki wedlug doby (strumieniowo). extra (slownik) dostaje
+    "nowe" {doba: bandy nowe} z linii Wyrzutki i "ns" {doba: (band z kryjowka, pusta kiesa)} z linii nskarbiec."""
     rows, pas, wyr, errs = {}, {}, {}, 0
+    if extra is not None:
+        extra.setdefault("nowe", {})
+        extra.setdefault("ns", {})
     with open(path, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -53539,6 +53547,14 @@ def m96bandy_rows(path):
                 b = re.search(r"\| band (\d+), ludzi (\d+)", s)
                 if d is not None and b:
                     wyr[d] = (int(b.group(1)), int(b.group(2)))
+                nw = re.search(r"bandy nowe (\d+)", s)
+                if extra is not None and d is not None and nw:
+                    extra["nowe"][d] = int(nw.group(1))
+            elif extra is not None and s.startswith(NS_HEAD):
+                d = num(r"dzien (\d+)", s)
+                a = NS_BANDS.search(s)
+                if d is not None and a:
+                    extra["ns"][d] = (int(a.group(1)), int(a.group(8)))
     return rows, pas, wyr, errs
 
 
@@ -53554,7 +53570,8 @@ def m96bandy_main(logp, bdp=None):
         rep.add("MB-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    rows, pas, wyr, errs = m96bandy_rows(logp)
+    ex = {}
+    rows, pas, wyr, errs = m96bandy_rows(logp, ex)
     if not rows:
         rep.add("MB-0: linia doby m96-bandy", "brak linii", "INFO (log sprzed m96-bandy albo prawo wyrzutkow wylaczone)", None)
         rep.show()
@@ -53581,8 +53598,15 @@ def m96bandy_main(logp, bdp=None):
     rep.add("MB-3: glodne bandy (srednio na dobe)", f"{hq:.3f} band jedzacych; bez jedzenia {sum(r['starving'] for r in ok) / n:.1f}/d, ponad 2 doby {sum(r['long'] for r in ok) / n:.1f}/d",
             "<= 0.25 (P)", hq <= 0.25)
     bq = sum(r["broken"] for r in ok) / bands if bands else 0.0
-    rep.add("MB-4: rozpady z glodu i odejscia", f"rozpady {sum(r['broken'] for r in ok)} ({bq:.4f} band jedzacych na dobe), odeszli {sum(r['left'] for r in ok)} ludzi "
-            f"z {sum(r['leftBands'] for r in ok)} band", "rozpady <= 0.02 band na dobe (P)", bq <= 0.02)
+    brk = sum(r["broken"] for r in ok)
+    okd = [d for d in sorted(rows) if not rows[d].get("bad") and rows[d]["on"]]
+    born = sum(ex["nowe"].get(d, 0) for d in okd)
+    if born > 0:
+        rep.add("MB-4: rozpady z glodu wobec nowych band i odejscia", f"rozpady {brk} / bandy nowe {born} = {brk / born:.3f} ({bq:.4f} band jedzacych na dobe), "
+                f"odeszli {sum(r['left'] for r in ok)} ludzi z {sum(r['leftBands'] for r in ok)} band", "rozpady <= 0.20 nowych band (P)", brk <= 0.2 * born)
+    else:
+        rep.add("MB-4: rozpady z glodu i odejscia", f"rozpady {brk} ({bq:.4f} band jedzacych na dobe), odeszli {sum(r['left'] for r in ok)} ludzi "
+                f"z {sum(r['leftBands'] for r in ok)} band (bez 'bandy nowe' w linii Wyrzutki)", "rozpady <= 0.002 band jedzacych na dobe (P)", bq <= 0.002)
     d0 = min(rows)
     late = [rows[d] for d in sorted(rows) if d - d0 >= 10 and not rows[d].get("bad") and rows[d]["on"]]
     if late:
@@ -53612,8 +53636,31 @@ def m96bandy_main(logp, bdp=None):
     rep.add("MB-9: paser - zywnosc sprzedana miastom (srednio na dobe)", f"{sum(fs) / len(fs):.1f} szt." if fs else "brak",
             "INFO (przed paczka: bieg 160 dob ok. 900/d, nowa kampania 120 dob ok. 200/d)", None)
     L = ok[-1]
-    rep.add("MB-10: kiesy band w polu (ostatnia doba)", f"{L['purse']} zl w {L['field']} bandach, z kiesa {L['withPurse']}, mediana {L['median']} zl; "
-            f"dola zostawila zapas w {L['kept']} kiesach ({L['keptGold']} zl)", "INFO", None)
+    rep.add("MB-10: kiesy band w polu (ostatnia doba)", f"{L['purse']} zl w {L['field']} bandach, z kiesa {L['withPurse']}, mediana {L['median']} zl; z kryjowka {L['home']}, "
+            f"z kiesa {L['homeWith']} ({L['homePurse']} zl); dola zostawila zapas w {L['kept']} kiesach ({L['keptGold']} zl, w calosci {L['keptWhole']}), zycie w "
+            f"{L['lifeKept']} ({L['lifeKeptGold']} zl); kieszonkowe z kryjowek srednio {sum(r['pocket'] for r in ok) / n:.0f} zl/d dla "
+            f"{sum(r['pocketBands'] for r in ok) / n:.0f} band/d (brakowalo {sum(r['pocketWant'] for r in ok) / n:.0f} zl/d)", "INFO", None)
+
+    # MB-11 bandy z kryjowka z pusta kiesa (linia nskarbiec - ta sama miara w bazie i w biegu)
+    def empty_share(ns):
+        if not ns:
+            return None
+        h, e = ns[max(ns)]
+        return (e / h, e, h) if h > 0 else None
+    e1 = empty_share(ex["ns"])
+    exb = {}
+    if bdp and os.path.isfile(bdp):
+        m96bandy_rows(bdp, exb)
+    e0 = empty_share(exb.get("ns"))
+    if e1 and e0:
+        rep.add("MB-11: bandy z kryjowka z pusta kiesa (ostatnia doba, linia nskarbiec) wobec bazy", f"{e1[1]} z {e1[2]} = {e1[0]:.3f}; baza {e0[1]} z {e0[2]} = {e0[0]:.3f}",
+                "mniej niz w bazie (P)", e1[0] < e0[0])
+    else:
+        rep.add("MB-11: bandy z kryjowka z pusta kiesa (ostatnia doba)", (f"{e1[1]} z {e1[2]} = {e1[0]:.3f}" if e1 else "brak linii nskarbiec"), "INFO (prog z --baza-doby)", None)
+    # MB-12 bandy na morzu (piraci NavalDLC nie schodza na lad - jedzenie tylko z pasera i lupu)
+    sb_ = sum(r["sea"] for r in ok)
+    rep.add("MB-12: bandy na morzu (srednio na dobe)", f"{sb_ / n:.1f} band, glodne {sum(r['seaHungry'] for r in ok) / n:.1f}"
+            + (f" ({sum(r['seaHungry'] for r in ok) / sb_:.3f})" if sb_ else "") + f", kupily z morza {sum(r['seaBuy'] for r in ok) / n:.1f}", "INFO", None)
     rep.show()
     return 0
 

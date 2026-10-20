@@ -131,6 +131,7 @@ namespace Armoury
         // i z kryjowka, ktore dola objela, pominiete wedlug przyczyny; kiesy przed dola i sama dola. Wyplaty kas kryjowek: herszt BK (TakeHoardSurplus),
         // przeszukanie gracza i zwyciezca AI (HoardTakeAll). _hoardNet = suma NASZYCH zmian kas kryjowek (HoardChange + wplata przy wejsciu) - kontrola k
         private static int _stashBands, _stashAll, _stashHome, _stashSkipBattle, _stashSkipQuest, _stashSkipUndead, _stashSkipHeld, _stashSkipEmpty, _stashSkipSmall, _stashInTick;
+        private static int _stashSkipKept;                         // m96-bandy: dola pominieta - cala kiesa to zapas (BandFood.PurseKeep)
         private static int _paySearchN, _payAiN, _aiHideBattles, _aiHideCleared, _carryN, _searchMsgN, _hoardStumbles;
         private static long _stashPurse, _stashDaily, _hoardBk, _paySearch, _payAi, _payAiLord, _payAiParty, _payAiTown, _hoardNet, _carryGold;
         // nskarbiec (poprawka po recenzji): przelewy gry (GiveGoldAction) z kasa kryjowki po jednej stronie - okup gracza do kryjowki bandy (RansomFlows 2.14),
@@ -184,6 +185,7 @@ namespace Armoury
             _foodBands = _foodTaken = 0;
             // nskarbiec: licznik dnia linii "Skarbce kryjowek (nskarbiec)" (linia biegnie tuz przed FenceLog, ktory zeruje w finally)
             _stashBands = _stashAll = _stashHome = _stashSkipBattle = _stashSkipQuest = _stashSkipUndead = _stashSkipHeld = _stashSkipEmpty = _stashSkipSmall = _stashInTick = 0;
+            _stashSkipKept = 0;                                        // m96-bandy
             _paySearchN = _payAiN = _aiHideBattles = _aiHideCleared = _carryN = _searchMsgN = _hoardStumbles = 0;
             _stashPurse = _stashDaily = _hoardBk = _paySearch = _payAi = _payAiLord = _payAiParty = _payAiTown = _hoardNet = _carryGold = 0;
             _giveIn = _giveOut = 0; _giveInN = _giveOutN = 0;
@@ -2076,15 +2078,23 @@ namespace Armoury
                     if (p.IsCurrentlyUsedByAQuest) { _stashSkipQuest++; continue; }
                     if (Undead.Party(p)) { _stashSkipUndead++; continue; }
                     if (HideoutPurge.Holds(home)) { _stashSkipHeld++; continue; }
-                    int purse = p.PartyTradeGold;
-                    if (purse <= 0) { _stashSkipEmpty++; continue; }
-                    // m96-bandy: drobne na BandPurseKeepDays dni jedzenia zostaja w kiesie, dola tylko z reszty (klucz off - 0, cala kiesa jak dotad);
+                    // m96-bandy: drobne na BandPurseKeepDays dni zycia zostaja w kiesie, dola tylko z reszty (klucz off - 0, cala kiesa jak dotad);
                     // "kiesy przed dola" w linii nskarbiec = kiesy ponad zapas (podstawa doli - NK-3 dola / kiesy bez zmian)
                     int keep = BandFood.PurseKeep(p);
+                    if (keep > Math.Max(0, p.PartyTradeGold) && s.OutlawHoardCirculates)
+                    {
+                        // m96-bandy: kieszonkowe - brak do zapasu z nadwyzki kasy kryjowki ponad skarbiec (ta sama regula i kategoria co kiesy startowe)
+                        int lack = keep - Math.Max(0, p.PartyTradeGold);
+                        int got = Math.Min(lack, HoardSurplus(home));
+                        if (got > 0) { HoardChange(home, -got); p.PartyTradeGold += got; _hoardStart += got; _hoardStartWant += got; }
+                        BandFood.NotePocket(lack, got);
+                    }
+                    int purse = p.PartyTradeGold;
+                    if (purse <= 0) { _stashSkipEmpty++; continue; }
                     if (keep > 0)
                     {
                         BandFood.NoteStashKept(purse, keep);
-                        if (keep >= purse) continue;                 // cala kiesa to zapas - bez doli
+                        if (keep >= purse) { _stashSkipKept++; continue; }   // cala kiesa to zapas - bez doli
                         purse -= keep;
                         if ((int)(purse * share) <= 0) { _stashSkipSmall++; continue; }   // nadwyzka ponizej zlotowki doli - poza "kiesami przed dola" (NK-3)
                     }
@@ -2143,7 +2153,7 @@ namespace Armoury
                 sb.Append(" | band z kryjowka ").Append(_stashHome).Append(" z ").Append(_stashAll).Append(", dola dalo ").Append(_stashBands)
                   .Append(" (pominiete: bitwa ").Append(_stashSkipBattle).Append(", zadanie ").Append(_stashSkipQuest).Append(", nieumarli ").Append(_stashSkipUndead)
                   .Append(", czeka na przeszukanie ").Append(_stashSkipHeld).Append(", pusta kiesa ").Append(_stashSkipEmpty).Append(", kiesa ponizej zlotowki doli ").Append(_stashSkipSmall)
-                  .Append(", w ticku gry ").Append(_stashInTick).Append(")")
+                  .Append(", w ticku gry ").Append(_stashInTick).Append(BandFood.On ? ", kiesa w calosci zapasem " + _stashSkipKept : "").Append(")")   // m96-bandy
                   .Append(" | kiesy band z kryjowka przed dola ").Append(_stashPurse).Append(" zl, dola ").Append(_stashDaily).Append(" zl")
                   .Append(" | wplaty ").Append(inn).Append(" zl (dola ").Append(_stashDaily).Append(", wejscia do kryjowek ").Append(_hideStash).Append(", przelewy gry do kryjowek ").Append(_giveIn).Append(" w ").Append(_giveInN).Append(")")
                   .Append(" | wyplaty ").Append(outw).Append(" zl (kiesy startowe ").Append(_hoardStart).Append(", sprzet ").Append(_hoardGear).Append(", herszt BK ").Append(_hoardBk)
@@ -2334,6 +2344,8 @@ namespace Armoury
                     if (p.IsCurrentlyUsedByAQuest || Undead.Party(p)) continue;
                     int purse = p.PartyTradeGold;
                     if (purse <= 0) continue;
+                    purse -= BandFood.LifeKeep(p);                // m96-bandy: zapas kiesy (dni zycia) zycie zostawia - wydatek tylko z reszty (klucz off - 0, jak dotad)
+                    if (purse <= 0) continue;
                     int spend = Math.Min(purse, Math.Max(1, (int)(purse * share)));      // co najmniej moneta - drobna kiesa tez sie rozchodzi
                     var town = ReferenceEquals(p.CurrentSettlement, null) || !p.CurrentSettlement.IsTown ? NearestOpenTown(p.Position.ToVec2()) : p.CurrentSettlement;
                     // WW4 (wyspy-wolni): banda Sea Raiders poza miastem wydaje w najblizszym porcie Wysp do 600 (dom korsarza) zamiast w najblizszym miescie
@@ -2345,7 +2357,7 @@ namespace Armoury
                     }
                     if (town == null || town.Town == null || spend <= 0) continue;
                     if (harb || (ReaverLaw.IsSeaRaider(p) && town.MapFaction != null && town.MapFaction.StringId == ReaverLaw.IronId)) _ww4Life += spend;
-                    p.PartyTradeGold = purse - spend;
+                    p.PartyTradeGold -= spend;                    // m96-bandy: purse to kiesa ponad zapas - zdejmujemy sam wydatek
                     int folk = TownFolk.EarnService(town, spend, TownFolk.KLifeBand);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca)
                     town.Town.ChangeGold(spend - folk);
                     MoneyLedger.Note169(MoneyLedger.N169Other, town, spend - folk);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
