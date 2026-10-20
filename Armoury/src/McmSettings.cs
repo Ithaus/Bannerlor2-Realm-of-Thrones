@@ -2396,7 +2396,7 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int WorkshopTradeProfitDays { get; set; } = 30;
 
-        [SettingPropertyBool("Workshop Price Forgets Startup", HintText = "the first month of a new campaign is the markets' start-up: stalls are still empty or overfull, so for some days or weeks a workshop can earn many times its usual profit. On: when that month is over, each workshop starts its price memories afresh from the settled market (as on the first day of a campaign), so a start-up windfall does not keep its price high for half a year; during the start-up month the price follows its takings as before. A campaign already past its start-up is not changed (off = the start-up days stay in the month and year memories)", RequireRestart = false)]
+        [SettingPropertyBool("Workshop Price Forgets Startup", HintText = "the first month of a new campaign is the markets' start-up: stalls are still empty or overfull, so for some days or weeks a workshop can earn many times its usual profit. On: during that month a workshop's price is reckoned only from what it made over its last 7 days (a notable buying from you pays by the worst of that week, its month and its year), and when the month is over its month and year memories keep only those last 7 days - so a start-up windfall stops raising the price a week after it ends instead of keeping it high for half a year. A campaign already past its start-up is not changed, nor is one where this is turned on more than a week after the start-up month (off = the start-up days stay in the month and year memories)", RequireRestart = false)]
         [SettingPropertyGroup("Workshops")]
         public bool WorkshopPriceForgetsStartup { get; set; } = true;
 
