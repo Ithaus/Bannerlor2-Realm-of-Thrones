@@ -53,11 +53,13 @@ namespace Armoury
                 else if (m == null) miss = "brak metody Consequences.RewardHelpers";
                 else
                 {
-                    h.Patch(m, prefix: new HarmonyMethod(typeof(ReinforcementThanks), nameof(Prefix)),
+                    var res = h.Patch(m, prefix: new HarmonyMethod(typeof(ReinforcementThanks), nameof(Prefix)),
                             transpiler: new HarmonyMethod(typeof(ReinforcementThanks), nameof(Transpiler)),
                             finalizer: new HarmonyMethod(typeof(ReinforcementThanks), nameof(Finalizer)));
-                    _wired = _swapped > 0;
-                    if (!_wired) miss = "w RewardHelpers nie ma wywolania ChangeRelationAction.ApplyPlayerRelation (inna wersja DR) - okienka DR bez zmian";
+                    _wired = res != null && _swapped > 0;
+                    // null = wyjatek Harmony polkniety przez finalizer BKROTPatch (PatchTarget.cs) - slad w Modules/BKROTPatch/BKROTLog.txt
+                    if (res == null) miss = "Harmony.Patch zwrocil null (blad latki polkniety - BKROTLog) - okienka DR bez zmian";
+                    else if (!_wired) miss = "w RewardHelpers nie ma wywolania ChangeRelationAction.ApplyPlayerRelation (inna wersja DR) - okienka DR bez zmian";
                 }
             }
             catch (Exception e) { Log.Error("ReinforcementThanks.ApplyAll", e); miss = "wyjatek przy latce"; }
