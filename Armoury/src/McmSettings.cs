@@ -2444,6 +2444,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int WorkshopTradeProfitDays { get; set; } = 30;
 
+        [SettingPropertyBool("Workshop Price Forgets Startup", HintText = "the first month of a new campaign is the markets' start-up: stalls are still empty or overfull, so for some days or weeks a workshop can earn many times its usual profit. On: during that month a workshop's price is reckoned only from what it made over its last 7 days (a notable buying from you pays by the worst of that week, its month and its year), and when the month is over its month and year memories keep only those last 7 days - so a start-up windfall stops raising the price a week after it ends instead of keeping it high for half a year. A campaign already past its start-up is not changed, nor is one where this is turned on more than a week after the start-up month (off = the start-up days stay in the month and year memories)", RequireRestart = false)]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopPriceForgetsStartup { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Workshop Trade Resale Share", 0.00f, 3.20f, "0.00", HintText = "a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has (0 to 1 - anything above 1 counts as 1)", RequireRestart = false)]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradeResaleShare { get; set; } = 0.8f;
@@ -9014,6 +9018,7 @@ namespace Armoury
             s.WorkshopTradeEquipmentScale = WorkshopTradeEquipmentScale;
             s.WorkshopTradePriceYears = WorkshopTradePriceYears;
             s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
+            s.WorkshopPriceForgetsStartup = WorkshopPriceForgetsStartup;
             s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
             s.ArtisanOwnInputs = ArtisanOwnInputs;
             s.ArtisanByproductsFull = ArtisanByproductsFull;
