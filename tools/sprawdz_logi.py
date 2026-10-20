@@ -1850,8 +1850,9 @@ Uzycie (Python 3, tylko odczyt):
                     ktorej klasy z pelna kiesa nie przyjely (f5/f4, glownie W - zostaje w kasie), do R i P tego miasta w biedzie (jedzenie na 2 dni, potem koszyk na 7 dni). python -I tools/sprawdz_logi.py
                     --grupa m96koszyk <Armoury-*.log> (strumieniowo). Okno - ostatnie 28 pelnych dob z kotwica KS (ZC4 lambda >= 0.99). MK-0 start sesji, MK-1 linie doby,
                     MK-2 kontrola (zeszlo <= zlecone, R + P, ponad placa zatrzymana 0), MK-3 potkniecia 0, MK-4 stac jedzenie W/R/P >= 95% kazdej doby, MK-5 miast ze stac
-                    jedzenie < 95% srednio <= 1 i max <= 3, MK-6 pelny koszyk swiata >= 98%, MK-7 zjedzone bez zaplaty < 1%, MK-8 przelane (INFO), MK-9 chleb M3 (INFO),
-                    MK-10 czas <= 2 ms. Bez kotwicy KS albo log sprzed galezi - INFO.
+                    jedzenie < 95% - TAK przy 0, srednio <= 1 i max <= 3 DECYZJA (z nazwami), inaczej NIE; MK-6 pelny koszyk swiata >= 98%, MK-7 zjedzone bez zaplaty < 1%,
+                    MK-8 przelane (INFO), MK-9 chleb M3 (INFO), MK-10 czas <= 2 ms, MK-11 Plan KS - czesc zaplacona R/P (INFO), MK-12 f5 - odmowa W, kappa W2, dni
+                    koszyka (INFO). Bez kotwicy KS albo log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -52170,11 +52171,20 @@ M96KOSZYK_RX = {
     "bread": re.compile(r"zaplacono (\d+): korona (\d+) .*?nie stac nikogo (\d+) zl w (\d+) osadach"),
     "start": re.compile(r"start sesji \| klucz Ks Folk Wage To Short Classes (TAK|NIE), cel: jedzenie na (\d+) dni, potem pelny koszyk R/P na ([\d.]+) dni"),
     "towns": re.compile(r"miasta z kotwica (\d+) \(z placa zatrzymana w kasie (\d+): (\d+) zl\)"),
+    "uncut": re.compile(r"zdjete z okna - placa przebudowy wsi A7 \(zwrot TownHire\) (\d+) zl"),
     "gap": re.compile(r"z luka R/P (\d+) \(jedzenie na 2 dni (\d+) zl, razem z koszykiem (\d+) zl\)"),
     "paid": re.compile(r"przelane z kas do kies (\d+) zl \(R (\d+) / P (\d+); jedzenie (\d+), reszta koszyka (\d+)\) w (\d+) miastach"),
     "left": re.compile(r"bez pokrycia: bez placy zatrzymanej (\d+) miast \((\d+) zl\), kasa pusta (\d+) miast, luka po przelewie (\d+) zl"),
+    "hungry": re.compile(r"R/P bez jedzenia na jutro po przelewie (\d+) miast(?:: ([^|]*?))? \| kontrola"),
     "ctl": re.compile(r"kontrola: zlecone (\d+), zeszlo z kas (\d+), przelane = R \+ P: (tak|NIE), ponad placa zatrzymana (\d+)"),
     "tail": re.compile(r"czas ([\d.]+) ms \| potkniecia (\d+) \(sesja (\d+)\)"),
+    # recenzja m96 (wazne): sprzezenie przez Plan KS - czesc zaplacona koszyka R/P w Planie (krok 8) i zrodlo przelewu (f5: placa W nieprzyjeta, kappa W2, dni koszyka)
+    "plan": re.compile(r"\| (Westeros|Essos): .*?miasta: W ([\d.]+)% \(budzet (\d+) / koszyk (\d+)\) R ([\d.]+)% \(budzet (\d+) / koszyk (\d+)\) "
+                       r"P ([\d.]+)% \(budzet (\d+) / koszyk (\d+)\)"),
+    "f5k": re.compile(r"kappa W2/R/P mediana ([\d.]+)/([\d.]+)/([\d.]+)"),
+    "f5d": re.compile(r"dni koszyka W/R/P \(kiesy / potrzeba miast z regula\) ([\d.]+)/([\d.]+)/([\d.]+)"),
+    "f5x": re.compile(r"oddane kasom miast -?\d+ \(W (\d+)/(\d+),"),
+    "f5c": re.compile(r"zaplacone -?\d+ \(kontrola zlecone - zaplacone = -?\d+; W (\d+)/(\d+),"),
 }
 
 
@@ -52189,13 +52199,15 @@ def m96koszyk_main(logp):
     """m96koszyk (20.10, galaz m96-koszyk, PLAN 5.5 "kazdego dnia w kazdym miescie co najmniej 95% ludzi stac na jedzenie, 98% na pelny koszyk, zjedzone bez
     zaplaty ponizej 1%"). Log Armoury strumieniowo. Okno = ostatnie 28 pelnych dob linii "Kiesa ludu" z kotwica KS (linia ZC4 lambda >= 0.99 w obu rynkach;
     bez linii ZC4 albo lambda 0 - wiersze skutku INFO: bez kotwicy KS stac jest 100% i regula nie ma czego przelac). Progi:
-    MK-0 linia startu sesji (klucz TAK), MK-1 linie doby w oknie (kazda doba Kiesa ludu z KS), MK-2 kontrola co dobe (zlecone >= zeszlo, R + P = przelane,
-    ponad placa zatrzymana 0), MK-3 potkniecia 0, MK-4 stac jedzenie W/R/P swiata - kazda doba okna >= 95%, MK-5 miast ze stac jedzenie < 95% - srednio
-    <= 1 i najwiecej <= 3 (prog projektu 0: oblezone i odciete miasta zostaja chlebowi M3), MK-6 pelny koszyk swiata sr28 >= 98% (PLAN 5.5), MK-7 zjedzone bez
-    zaplaty sr28 i max < 1%, MK-8 przelane i bez pokrycia (INFO), MK-9 chleb M3 - korona i "nie stac nikogo" sr28 (INFO; po paczce w dol), MK-10 czas linii
-    max <= 2 ms. Log bez galezi: INFO, bez wyjatku."""
+    MK-0 linia startu sesji (klucz TAK), MK-1 linie doby w oknie (kazda doba Kiesa ludu z KS; klucz NIE - INFO), MK-2 kontrola co dobe (zlecone >= zeszlo,
+    R + P = przelane, ponad placa zatrzymana 0), MK-3 potkniecia 0, MK-4 stac jedzenie W/R/P swiata - kazda doba okna >= 95%, MK-5 miast ze stac jedzenie
+    < 95% - TAK tylko przy 0 w kazdej dobie (prog projektu); srednio <= 1 i najwiecej <= 3 - DECYZJA z nazwami miast, ktorym regula nie pomogla (linia m96:
+    "R/P bez jedzenia na jutro po przelewie", [oblezone]); inaczej NIE; MK-6 pelny koszyk swiata sr28 >= 98% (PLAN 5.5), MK-7 zjedzone bez zaplaty sr28 i
+    max < 1%, MK-8 przelane i bez pokrycia (INFO), MK-9 chleb M3 - korona i "nie stac nikogo" sr28 (INFO; po paczce w dol), MK-10 czas linii max <= 2 ms,
+    MK-11 Plan KS: czesc zaplacona koszyka R/P (Westeros, Essos) - pierwsza i ostatnia linia okna (INFO; sprzezenie przelewu przez budzet Planu - w gore),
+    MK-12 f5: placa W nieprzyjeta (zrodlo przelewu), kappa W2 i dni koszyka W/R/P sr okna (INFO). Log bez galezi: INFO, bez wyjatku."""
     rep = Report()
-    start, mk, kie, lam, bread = [], {}, {}, {}, {}
+    start, mk, kie, lam, bread, plan, f5 = [], {}, {}, {}, {}, {}, {}
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
@@ -52222,21 +52234,37 @@ def m96koszyk_main(logp):
                 d = num(r"dzien (\d+)", s)
                 if d is not None:
                     bread[d] = s
-    print(f"plik: {logp} | start {len(start)}, doby m96 {len(mk)}, doby Kiesa ludu {len(kie)}, doby ZC4 {len(lam)}, doby chleba M3 {len(bread)}")
+            elif s.startswith("KS: pieniadze planu (krok 8) doba"):
+                d = num(r"doba (\d+)", s)
+                if d is not None:
+                    rg = {}
+                    for g in M96KOSZYK_RX["plan"].finditer(s):
+                        rg[g.group(1)] = (float(g.group(5)), float(g.group(8)), int(g.group(6)), int(g.group(7)), int(g.group(9)), int(g.group(10)))
+                    if rg:
+                        plan[d] = rg
+            elif s.startswith("Dochod ludu wedlug koszyka (f5-lud): dzien"):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    f5[d] = s
+    print(f"plik: {logp} | start {len(start)}, doby m96 {len(mk)}, doby Kiesa ludu {len(kie)}, doby ZC4 {len(lam)}, doby chleba M3 {len(bread)}, "
+          f"linie Planu {len(plan)}, doby f5 {len(f5)}")
+    key_on = None
     if start:
         g = M96KOSZYK_RX["start"].search(start[-1])
+        key_on = (g.group(1) == "TAK") if g else None
         rep.add("MK-0: linia startu sesji - klucz i cel", start[-1][:260], "klucz TAK, cel 2 dni jedzenia + 2-20 dni koszyka", bool(g) and g.group(1) == "TAK")
     else:
         rep.add("MK-0: linia startu sesji", "brak linii", "INFO (log sprzed galezi m96-koszyk)", None)
     ks = sorted(d for d in kie if lam.get(d, 0.0) >= 0.99)
     win = ks[-28:]
     if not win:
-        rep.add("MK-1..MK-7: okno z kotwica KS", f"dob z ZC4 lambda >= 0.99: 0 (dob Kiesa ludu {len(kie)})",
-                "INFO - bez kotwicy KS (nowa kampania do ok. 120 dob) stac jest 100% i regula nie ma czego przelac", None)
+        rep.add("MK-1..MK-12: okno z kotwica KS", f"dob z ZC4 lambda >= 0.99: 0 (dob Kiesa ludu {len(kie)}, linii doby m96 {len(mk)})",
+                "INFO - bez kotwicy KS (nowa kampania do ok. 120 dob) stac jest 100% i regula nie ma czego przelac; linii doby m96 0 (sama linia startu)", None)
     else:
         miss = [d for d in win if d not in mk]
         rep.add("MK-1: linie doby m96 w oknie (doby Kiesa ludu z KS)", f"okno {win[0]}-{win[-1]} ({len(win)} dob), bez linii m96 {len(miss)}"
-                + (f" (np. {miss[:5]})" if miss else ""), "0 brakow (przy kluczu NIE - INFO)", (len(miss) == 0) if start else None)
+                + (f" (np. {miss[:5]})" if miss else "") + ("" if key_on is not False else " - klucz NIE (linii doby nie ma)"),
+                "0 brakow (przy kluczu NIE albo bez linii startu - INFO)", (len(miss) == 0) if key_on else None)
         bad, over, st_sum, ms_max = [], 0, 0, 0.0
         for d in sorted(mk):
             s = mk[d]
@@ -52272,8 +52300,22 @@ def m96koszyk_main(logp):
                 + (f", najnizej {worst[1]:.1f}% (doba {worst[0]})" if worst else "")
                 + f"; ostatnia doba W/R/P {rows[-1][0][0]} / {rows[-1][0][1]} / {rows[-1][0][2]}", ">= 95% kazdej doby (PLAN 5.5)", len(lowc) == 0)
         nf = [r[1] for r in rows]
-        rep.add("MK-5: miast ze stac jedzenie < 95% (najbiedniejsza klasa miasta)", f"srednio {sum(nf) / len(nf):.1f}, najwiecej {max(nf)}",
-                "srednio <= 1 i najwiecej <= 3 (prog projektu 0; oblezone - chleb M3)", sum(nf) / len(nf) <= 1.0 and max(nf) <= 3)
+        avg_nf, max_nf = sum(nf) / len(nf), max(nf)
+        names = {}
+        for d in win:
+            if d not in mk:
+                continue
+            h = M96KOSZYK_RX["hungry"].search(mk[d])
+            if h and h.group(2):
+                for nm in h.group(2).split("; "):
+                    nm = nm.strip()
+                    if nm and nm != "...":
+                        names[nm] = names.get(nm, 0) + 1
+        top = sorted(names.items(), key=lambda x: -x[1])[:8]
+        ntxt = (", miasta R/P bez jedzenia po przelewie (dob w oknie): " + ", ".join(f"{k} {v}" for k, v in top)) if top else ""
+        rep.add("MK-5: miast ze stac jedzenie < 95% (najbiedniejsza klasa miasta)", f"srednio {avg_nf:.1f}, najwiecej {max_nf}{ntxt}",
+                "0 w kazdej dobie (PLAN 5.5: w kazdym miescie); srednio <= 1 i najwiecej <= 3 - DECYZJA (nazwy i [oblezone] w wierszu: chleb M3 albo przyczyna poza krokiem)",
+                max_nf == 0, decide=(avg_nf <= 1.0 and max_nf <= 3))
         fw = [r[0][6] for r in rows if r[0][6] is not None]
         nfl = [r[2] for r in rows]
         rep.add("MK-6: pelny koszyk swiata (sr okna) i miast z pelnym < 95%", (f"{sum(fw) / len(fw):.1f}%" if fw else "-") + f"; miast srednio {sum(nfl) / len(nfl):.1f}",
@@ -52287,6 +52329,8 @@ def m96koszyk_main(logp):
             lf = [M96KOSZYK_RX["left"].search(s) for s in mw]
             tw = [M96KOSZYK_RX["towns"].search(s) for s in mw]
             gp = [M96KOSZYK_RX["gap"].search(s) for s in mw]
+            uc = [M96KOSZYK_RX["uncut"].search(s) for s in mw]
+            hg = [M96KOSZYK_RX["hungry"].search(s) for s in mw]
             pv = [int(x.group(1)) for x in pd if x]
             pr = [int(x.group(2)) for x in pd if x]
             pp = [int(x.group(3)) for x in pd if x]
@@ -52296,11 +52340,16 @@ def m96koszyk_main(logp):
             nc = [int(x.group(1)) for x in lf if x]
             ncz = [int(x.group(2)) for x in lf if x]
             la = [int(x.group(4)) for x in lf if x]
+            ucv = [int(x.group(1)) for x in uc if x]
+            hgv = [int(x.group(1)) for x in hg if x]
             n = max(1, len(pv))
             rep.add("MK-8: przelane z placy zatrzymanej (sr okna) i bez pokrycia (INFO)",
                     f"przelane {sum(pv) / n:.0f} zl/d (R {sum(pr) / n:.0f} / P {sum(pp) / n:.0f}) w {sum(pn) / n:.1f} miastach z {sum(gn) / max(1, len(gn)):.1f} z luka; "
-                    f"placa zatrzymana {sum(cv) / max(1, len(cv)):.0f} zl/d; bez placy zatrzymanej {sum(nc) / max(1, len(nc)):.1f} miast ({sum(ncz) / max(1, len(ncz)):.0f} zl/d), "
-                    f"luka po przelewie {sum(la) / max(1, len(la)):.0f} zl/d", "INFO (spodziewane: przelane << placa zatrzymana, bez pokrycia ok. 0 miast)", None)
+                    f"placa zatrzymana {sum(cv) / max(1, len(cv)):.0f} zl/d (zdjete A7 {sum(ucv) / max(1, len(ucv)):.0f}); bez placy zatrzymanej "
+                    f"{sum(nc) / max(1, len(nc)):.1f} miast ({sum(ncz) / max(1, len(ncz)):.0f} zl/d), luka po przelewie {sum(la) / max(1, len(la)):.0f} zl/d; "
+                    f"R/P bez jedzenia na jutro po przelewie srednio {sum(hgv) / max(1, len(hgv)):.1f} miast (max {max(hgv) if hgv else '-'})",
+                    "INFO (spodziewane: przelane 30-80 tys./d, w ok. 4 tygodnie do ok. 50-110 tys./d przez sprzezenie Planu - MK-11; placa zatrzymana razem z M6 "
+                    "bogatych miast 380-560 tys./d, z tego odmowa W 120-190 tys./d - MK-12; bez pokrycia ok. 0-2 miast)", None)
         else:
             rep.add("MK-8: przelane (INFO)", "brak linii m96 w oknie", "INFO", None)
         bw = [M96KOSZYK_RX["bread"].search(bread[d]) for d in win if d in bread]
@@ -52313,6 +52362,38 @@ def m96koszyk_main(logp):
         else:
             rep.add("MK-9: chleb M3 (INFO)", "brak linii w oknie", "INFO", None)
         rep.add("MK-10: czas linii m96 (max doby)", f"{ms_max:.2f} ms", "<= 2 ms", (ms_max <= 2.0) if mk else None)
+        pw = sorted(d for d in plan if win[0] - 7 <= d <= win[-1])
+        if pw:
+            def ptxt(d):
+                rg = plan[d]
+                return ", ".join(f"{k} R {rg[k][0]:.1f}% / P {rg[k][1]:.1f}%" for k in ("Westeros", "Essos") if k in rg)
+            rep.add("MK-11: Plan KS - czesc zaplacona koszyka R/P (pierwsza -> ostatnia linia okna)",
+                    f"doba {pw[0]}: {ptxt(pw[0])} -> doba {pw[-1]}: {ptxt(pw[-1])} ({len(pw)} linii)",
+                    "INFO (recenzja m96 - sprzezenie: przelew jest zarobkiem okna R/P, wiec budzet Planu i czesc zaplacona rosna, a z nia potrzeba W/R/P biednych "
+                    "miast; baza WGRANIE 91-95, ostatnia linia: Westeros R 92.1-96.5% / P 90.2-96.8%, Essos R 74.8-82.8% / P 78.6-87.9%; po paczce w gore)", None)
+        else:
+            rep.add("MK-11: Plan KS - czesc zaplacona R/P (INFO)", "brak linii 'KS: pieniadze planu' w oknie", "INFO", None)
+        fwn = [f5[d] for d in win if d in f5]
+        if fwn:
+            ref, kw, dd = [], [], []
+            for s in fwn:
+                x = M96KOSZYK_RX["f5x"].search(s)
+                c = M96KOSZYK_RX["f5c"].search(s)
+                k = M96KOSZYK_RX["f5k"].search(s)
+                g = M96KOSZYK_RX["f5d"].search(s)
+                if x:
+                    ref.append(int(x.group(1)) - int(x.group(2)) + ((int(c.group(1)) - int(c.group(2))) if c else 0))
+                if k:
+                    kw.append(float(k.group(1)))
+                if g:
+                    dd.append((float(g.group(1)), float(g.group(2)), float(g.group(3))))
+            dtx = ("/".join(f"{sum(v[i] for v in dd) / len(dd):.1f}" for i in range(3))) if dd else "-"
+            rep.add("MK-12: f5 - placa W nieprzyjeta (zrodlo przelewu), kappa W2 mediana, dni koszyka W/R/P (sr okna, INFO)",
+                    (f"odmowa W {sum(ref) / len(ref):.0f} zl/d (pierwsza {ref[0]}, ostatnia {ref[-1]})" if ref else "odmowa W -")
+                    + (f", kappa W2 {sum(kw) / len(kw):.3f}" if kw else "") + f", dni W/R/P {dtx}",
+                    "INFO (baza WGRANIE 91-95 - wiersz w CHANGELOG galezi; po paczce: dni R/P w gore, dni W i odmowa W moga spasc - Plan podnosi potrzebe W)", None)
+        else:
+            rep.add("MK-12: f5 (INFO)", "brak linii f5 w oknie", "INFO", None)
     rep.show()
     return 0
 

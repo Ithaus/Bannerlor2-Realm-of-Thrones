@@ -478,6 +478,7 @@ namespace Armoury
                     // przebudowy (Paid) w calosci - bez materialu ponad koszt
                     long fin, cof, back;
                     PayVillageWage(vil, mk, wagePaid, out fin, out cof, out back);
+                    M96Uncut(mf, cof);                                          // m96-koszyk (recenzja): ta placa wraca do wsi robotami miasta (TownHire) - nie do okna R/P
                     if (back > 0) got -= back;
                     wageCof = cof; wagePaid = fin;
                 }
