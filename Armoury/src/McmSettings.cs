@@ -4444,6 +4444,30 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool PeaceReleaseAfterDay { get; set; } = true;
 
+        [SettingPropertyBool("Vassal Ransom Aid", HintText = "with Lord Ransom By Income: when the head of an AI house or an AI king is ransomed and the family (for a king - the treasury) cannot pay all of it in coin, the realm's other landed houses chip in - each gives its share by its fiefs (a town counts as two castles), but never more than Vassal Ransom Aid Share of what its family holds above its reserve. Their coin goes with the rest of the cash to whoever is owed the ransom (the captor, or you when you sell the captive to a ransom broker), and the ransom debt is that much smaller. Your house is never asked, and a house in debt to the bank or below its reserve gives nothing. Off = the family pays alone, the rest is a debt as before", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool VassalRansomAid { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Vassal Ransom Aid Share", 0.00f, 1.00f, "0.00", HintText = "with Vassal Ransom Aid: the most one vassal house gives toward one ransom, as a share of its family gold above its reserve (0.05 = 5%)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float VassalRansomAidShare { get; set; } = 0.05f;
+
+        [SettingPropertyBool("Ai Dowry", HintText = "when two AI houses wed and the bride leaves her house for her husband's, her house pays his house a dowry in coin: the smallest of the Banner Kings dowry value for her, Ai Dowry Wealth Share of her family's gold (her own purse not counted) and Ai Dowry Income Days of its steady income - and only from what the family holds above its reserve, so a poor house gives its daughter without a dowry. Weddings of your own house are left alone. Off = AI weddings without gold, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool AiDowry { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ai Dowry Wealth Share", 0.00f, 1.00f, "0.00", HintText = "with Ai Dowry: the dowry is at most this share of the bride's family gold (0.25 = a quarter)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float AiDowryWealthShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Ai Dowry Income Days", 0.00f, 360.00f, "0.00", HintText = "with Ai Dowry: the dowry is at most this many days of the bride's house's steady income", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float AiDowryIncomeDays { get; set; } = 90f;
+
+        [SettingPropertyBool("Ai Dowry Match Tilt", HintText = "with Ai Dowry: AI matchmaking leans a little toward money - a poor suitor (his house below its reserve) and a rich bride (her house holding over 60 days of its income) of the same realm are 1.5 times as likely to wed, the other way round (rich suitor, poor bride) 0.8 times. The number of AI weddings a year stays the same (the Crash Scribe yearly target still sets it). Off = matchmaking as before", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool AiDowryMatchTilt { get; set; } = true;
+
         [SettingPropertyBool("Gentry No Parties", HintText = "Banner Kings gentry - knights who hold one estate and no town or castle - no longer lead parties of their own. When the banners are called, the knight rides in his lord's party (the lord who holds the village of his estate) as a member of it; if the lord has no party or is not in an army, in the party of the realm's nearest army leader. AI knights answer when their realm is at war and an army of the realm is in the field; your own knights ride only when you call your banners. The men of the estate stay at home - the knight comes alone. When the army breaks up, in peace or if the party changes sides, he goes back to his estate. A knight's party left from before is not reinforced and Banner Kings disbands it at the estate (its men return to the estate village). Off = Banner Kings raises the knight's own party, as before", RequireRestart = false)]
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
         public bool GentryNoParties { get; set; } = true;
@@ -9378,6 +9402,12 @@ namespace Armoury
             s.RansomRepeatDays = RansomRepeatDays;
             s.RansomRepeatFloor = RansomRepeatFloor;
             s.PeaceReleaseAfterDay = PeaceReleaseAfterDay;
+            s.VassalRansomAid = VassalRansomAid;
+            s.VassalRansomAidShare = VassalRansomAidShare;
+            s.AiDowry = AiDowry;
+            s.AiDowryWealthShare = AiDowryWealthShare;
+            s.AiDowryIncomeDays = AiDowryIncomeDays;
+            s.AiDowryMatchTilt = AiDowryMatchTilt;
             s.GentryNoParties = GentryNoParties;
             s.GentryBannersNeedVassalParty = GentryBannersNeedVassalParty;
             s.GentryKnightWage = GentryKnightWage;

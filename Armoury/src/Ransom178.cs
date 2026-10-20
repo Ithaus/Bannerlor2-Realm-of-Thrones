@@ -310,6 +310,8 @@ namespace Armoury
                 cash = CrownCash(k, price);
                 if (cash > 0) { k.KingdomBudgetWallet -= (int)Math.Min(int.MaxValue, cash); }
                 debt = price - cash;
+                long aidK = VassalRansomAid.Help(captive, captorClan, debt);   // R3-01d: wasale krolestwa doplacaja do braku skarbca (zloto z ich kies, nie ze skarbca)
+                if (aidK > 0) { cash += aidK; debt -= aidK; }
                 Pay(rcv, cash);
                 if (debt > 0) CrownIncome.AddCrownDebt(k, rcv.Crown != null ? rcv.Crown.StringId : "h:" + rcv.Hero.StringId, debt);
                 _dKingN++; _dKingCash += cash; _dKingDebt += debt;
@@ -322,6 +324,8 @@ namespace Armoury
                 debt = price - cash;
                 long cap = (long)(Math.Max(0f, s.RansomDebtCapDays) * D) - have;
                 if (debt > Math.Max(0, cap)) { long cut = debt - Math.Max(0, cap); _dCapCut += cut; _dCapN++; debt = Math.Max(0, cap); price = cash + debt; }
+                long aid = VassalRansomAid.Help(captive, captorClan, debt);   // R3-01d: pomoc wasali na okup glowy rodu - po pulapie, do dlugu, ktory rod bylby winien
+                if (aid > 0) { cash += aid; debt -= aid; }
                 Pay(rcv, cash);
                 if (debt > 0) DebtLadder.AddRansomDebt(payerClan, rcv.Crown != null, rcv.Crown != null ? rcv.Crown.StringId : rcv.Hero.StringId, "", debt);
             }
@@ -531,13 +535,14 @@ namespace Armoury
                     var s = Settings.Current;
                     bool byCrown; double D;
                     PriceOf(h, out byCrown, out D);
-                    long cash, debt;
+                    long cash, debt, aid = 0;
                     if (byCrown)
                     {
                         var k = (Kingdom)h.MapFaction;
                         cash = CrownCash(k, price);
                         if (cash > 0) k.KingdomBudgetWallet -= (int)Math.Min(int.MaxValue, cash);   // gra zaplacila graczowi z niczego - skarbiec krola oddaje (w nicosc)
                         debt = price - cash;
+                        aid = VassalRansomAid.Help(h, Clan.PlayerClan, debt); debt -= aid;   // R3-01d: wasale krolestwa jenca doplacaja graczowi do braku skarbca
                         if (debt > 0) CrownIncome.AddCrownDebt(k, "h:" + Hero.MainHero.StringId, debt);
                     }
                     else
@@ -556,13 +561,16 @@ namespace Armoury
                         long cap = (long)(Math.Max(0f, s.RansomDebtCapDays) * D) - have;
                         debt += want - cash;
                         if (debt > Math.Max(0, cap)) { _dCapCut += debt - Math.Max(0, cap); _dCapN++; debt = Math.Max(0, cap); }
+                        aid = VassalRansomAid.Help(h, Clan.PlayerClan, debt); debt -= aid;   // R3-01d: pomoc wasali na okup glowy rodu - po pulapie, zloto wasali do gracza
                         if (debt > 0) DebtLadder.AddRansomDebt(h.Clan, false, Hero.MainHero.StringId, "", debt);
                     }
-                    NoteRansomIn(Hero.MainHero, cash);
-                    _dBrokerN++; _dPrice += cash + debt; _dCash += cash; _dDebt += debt;
+                    if (aid > 0) { Hero.MainHero.ChangeHeroGold((int)Math.Min(int.MaxValue, aid)); CirculationWindows.NoteHeroGold(Hero.MainHero, aid); }   // R3-01d: kiesy wasali -> gracz (prawdziwe zloto, nie z gry)
+                    NoteRansomIn(Hero.MainHero, cash + aid);
+                    _dBrokerN++; _dPrice += cash + aid + debt; _dCash += cash + aid; _dDebt += debt;
                     Log.Info("Okupy (178): posrednik - gracz sprzedal " + Name(h) + " (" + Name(h.Clan) + "): gotowka " + cash + " (gra wyplacila graczowi, " + (byCrown ? "skarbiec krola" : "rodzina jenca")
-                             + " oddala ja - w nicosc 0 netto), dlug wobec gracza " + debt + ".");
-                    if (debt > 0) Log.Player(Name(h.Clan) + " pays " + cash + " denars now for " + Name(h) + " and owes you " + debt + " more, paid off from their income.");
+                             + " oddala ja - w nicosc 0 netto)" + (aid > 0 ? ", od wasali (R3-01d) " + aid : "") + ", dlug wobec gracza " + debt + ".");
+                    if (debt > 0 || aid > 0) Log.Player(Name(h.Clan) + " pays " + cash + " denars now for " + Name(h) + (aid > 0 ? ", its vassals add " + aid : "")
+                                                        + (debt > 0 ? ", and it owes you " + debt + " more, paid off from their income." : "."));
                 }
                 catch (Exception e) { Stumble("SalePostfix", e); }
             }
