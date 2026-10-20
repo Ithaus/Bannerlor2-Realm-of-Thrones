@@ -990,10 +990,11 @@ Uzycie (Python 3, tylko odczyt):
                     raz na mape (przebudowy 0, postawione <= zajazdy), ZJ-7 koszt sprawdzania dojazdu <= 0.05 ms, ZJ-8 potkniecia i ERROR paczki 0, ZJ-9 wejscia,
                     noclegi, plotki (INFO). Autotest nie klika zajazdow - bez noclegu i sluchania te progi INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
-                    python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). SZ-0 linia startu (klucz, plik drog, rozstaje traktu >= 100),
-                    SZ-1 linie doby rozpoznane, SZ-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy bitwach z panem), SZ-3 najwyzej 40 naraz i jedna
-                    na okreg (okregow = aktywnych), SZ-4 bez drogi <= 50% bitw z panem, SZ-5 wybor miejsca <= 2 ms, SZ-6 potkniecia, pominiete obrazki i ERROR 0,
-                    SZ-7 obrazki i probki linii 'postawiona' (INFO). Log bez paczki: INFO, bez wyjatku.
+                    python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
+                    (klucz, plik drog, rozstaje traktu >= 100), SZB-1 linie doby rozpoznane, SZB-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy
+                    bitwach z panem), SZB-3 najwyzej 'maks.' naraz (200) i jedna na okreg (okregow = aktywnych), SZB-3b limit nie skraca czasu (zastapione + odrzucone
+                    przez limit <= 25% nowych, szubienice gracza nie zastapione), SZB-4 bez drogi <= 50% bitw z panem, SZB-5 wybor miejsca <= 2 ms, SZB-6 potkniecia,
+                    pominiete obrazki i ERROR 0, SZB-7 obrazki i probki linii 'postawiona' (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa nzc1      : (16.10, projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md paczka ZC1 "drogi towarow"; galaz w-toku/noc-zc1, Armoury/src/GoodsPaths.cs)
                     python -I tools/sprawdz_logi.py --grupa nzc1 [--baza-doby <log biegu bazowego bez ZC1>] <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie
                     doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu (f25-sprawdz,
@@ -35927,30 +35928,35 @@ def nkarczmy_main(logp):
 
 
 # ------------------------------------------------------------ p6szubienice (20.10, p6-szubienice R3-07a: szubienice przy rozstajach po rozbitej bandzie / kryjowce;
-# Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
+# Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows). Progi SZB-x (SZ-x to grupa szturm).
 P6SZUBIENICE_HEAD = "Szubienice (p6): "
 P6SZUBIENICE_START = re.compile(r"Szubienice \(p6\): start sesji - klucz MapGallows (?P<key>tak|NIE)[^|]*\| (?:plik arm_map_roads_geo\.tsv: lamanych (?P<lines>\d+), odcinkow (?P<segs>\d+), "
                                 r"wezlow (?P<nodes>\d+), rozstajow traktu (?P<cross>\d+))?")
 P6SZUBIENICE_DAY = re.compile(r"Szubienice \(p6\): dzien (?P<day>-?\d+) \| klucz MapGallows (?P<key>tak|NIE) \| aktywne (?P<act>\d+) \(maks\. (?P<max>\d+)\), okregow (?P<dist>\d+), "
-                              r".*?\| od ostatniej linii: bitwy z bandami (?P<ev>\d+) \(gracza (?P<pl>\d+), kryjowki (?P<hid>\d+)\), postawione (?P<placed>\d+) \(rozstaje traktu (?P<cross>\d+), "
-                              r"droga do wsi (?P<lane>\d+), rozwidlenie (?P<fork>\d+), przy drodze (?P<road>\d+)\), odnowione (?P<ref>\d+), zastapione (?P<rep>\d+), zdjete (?P<rem>\d+) "
-                              r"\(koniec czasu\), pominiete: bez drogi (?P<noroad>\d+), bez pana \(karawana / wozy\) (?P<nolaw>\d+), Nieumarli (?P<und>\d+) "
+                              r".*?, gracza (?P<plact>\d+) "
+                              r"\| od ostatniej linii: bitwy z bandami (?P<ev>\d+) \(gracza (?P<pl>\d+), kryjowki (?P<hid>\d+)\), postawione (?P<placed>\d+) \(rozstaje traktu (?P<cross>\d+), "
+                              r"droga do wsi (?P<lane>\d+), rozwidlenie (?P<fork>\d+), przy drodze (?P<road>\d+)\), odnowione (?P<ref>\d+) \(w tym sasiednia do \d+ jedn\. z innego okregu "
+                              r"(?P<near>\d+)\), zastapione (?P<rep>\d+) \(limit; srednio po (?P<repage>[\d.]+|-) dob, w tym gracza (?P<repl>\d+)\), odrzucone przez limit (?P<skip>\d+), "
+                              r"zdjete (?P<rem>\d+) \(koniec czasu, srednio po (?P<remage>[\d.]+|-) dob\), pominiete: bez drogi (?P<noroad>\d+), bez pana \(karawana / wozy\) (?P<nolaw>\d+), "
+                              r"Nieumarli (?P<und>\d+) "
                               r"\| wybor miejsca srednio (?P<ms>[\d.]+|-) ms \((?P<pickn>\d+)\) .*?\| widok: obrazki postawione (?P<vmade>\d+), zdjete (?P<vrem>\d+), "
                               r"pokazane najwiecej naraz (?P<vmax>\d+), .*?brak siatek (?P<miss>\d+), pominiete (?P<vfail>\d+), potkniecia widoku: tworzenie (?P<vc>\d+), "
                               r"widocznosc (?P<vv>\d+) \| potkniecia (?P<st>\d+) \(od wczytania (?P<stall>\d+)\)\.$")
 P6SZUBIENICE_ERR = ("ERROR in Gallows", "ERROR in GallowsView", "ERROR in SyncData.arm_gallows", "ERROR in P6SzubieniceReset")
-P6SZUBIENICE_MAX = 40
+P6SZUBIENICE_MAX = 200        # Gallows.MaxActive (linia doby podaje "maks. N" - prog bierze liczbe z logu, ta jest zapasem)
 P6SZUBIENICE_MS = 2.0
+P6SZUBIENICE_CAP_SHARE = 0.25  # zastapione + odrzucone przez limit / (postawione + odrzucone) - recenzja: limit nie moze skracac czasu wiekszosci szubienic
 
 
 def p6szubienice_main(logp):
     """p6szubienice (20.10, p6-szubienice R3-07a; klucz MapGallows): rozbita banda (gracz, lord, patrol, zaloga, milicja) albo oczyszczona kryjowka -> szubienica przy
-    najblizszych rozstajach (trakty ROT + wloty drog bocznych), inaczej przy drodze; 7-14 dob, jedna na okreg, najwyzej 40 naraz; czysty wyglad.
-    SZ-0 linia startu, SZ-1 linie doby, SZ-2 szubienice z bitw, SZ-3 limit 40 i jedna na okreg, SZ-4 bez drogi <= 50%, SZ-5 koszt wyboru <= 2 ms, SZ-6 potkniecia 0,
-    SZ-7 obrazki (INFO). Wejscie: log Armoury (strumieniowo). Log bez paczki: INFO, bez wyjatku."""
+    najblizszych rozstajach (trakty ROT + wloty drog bocznych), inaczej przy drodze; 7-14 dob, jedna na okreg (i do 3 jedn.), najwyzej 200 naraz (pelna lista: zwalnia
+    AI najdalej od gracza, szubienice gracza stoja swoj czas); czysty wyglad.
+    SZB-0 linia startu, SZB-1 linie doby, SZB-2 szubienice z bitw, SZB-3 limit i jedna na okreg, SZB-3b udzial limitu <= 25% i szubienice gracza nie zastapione,
+    SZB-4 bez drogi <= 50%, SZB-5 koszt wyboru <= 2 ms, SZB-6 potkniecia 0, SZB-7 obrazki (INFO). Wejscie: log Armoury (strumieniowo). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
-        rep.add("SZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("SZB-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     sess, days, bad, samples = [], [], [], []
@@ -35971,42 +35977,58 @@ def p6szubienice_main(logp):
                 n_err += 1
     print(f"plik: {logp} | linii startu {len(sess)}, doby {len(days)} (nierozpoznanych {len(bad)}), probek postawienia {len(samples)}, ERROR {n_err}")
     if not sess and not days and not bad and n_err == 0:
-        rep.add("SZ-0: linie 'Szubienice (p6)'", "brak w logu", "INFO (log sprzed paczki p6-szubienice)", None)
+        rep.add("SZB-0: linie 'Szubienice (p6)'", "brak w logu", "INFO (log sprzed paczki p6-szubienice)", None)
         rep.show()
         return 0
     if sess:
         ms = P6SZUBIENICE_START.match(sess[-1])
         key = ms.group("key") if ms else "?"
         cross = int(ms.group("cross")) if ms and ms.group("cross") else None
-        rep.add("SZ-0: linia startu - klucz i plik drog", sess[-1][len(P6SZUBIENICE_HEAD):][:220],
+        rep.add("SZB-0: linia startu - klucz i plik drog", sess[-1][len(P6SZUBIENICE_HEAD):][:220],
                 "klucz tak, rozstajow traktu >= 100 (plik 16.10: ok. 119)", None if key == "NIE" else (cross is not None and cross >= 100))
     else:
-        rep.add("SZ-0: linia startu", "brak", "linia 'Szubienice (p6): start sesji'", False)
-    rep.add("SZ-1: linie doby rozpoznane", f"rozpoznane {len(days)}, nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""),
+        rep.add("SZB-0: linia startu", "brak", "linia 'Szubienice (p6): start sesji'", False)
+    rep.add("SZB-1: linie doby rozpoznane", f"rozpoznane {len(days)}, nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""),
             "nierozpoznane 0, rozpoznane > 0", len(bad) == 0 and len(days) > 0)
     if days:
         I = lambda k: sum(int(d[k]) for d in days)
         ev, nolaw, und, noroad = I("ev"), I("nolaw"), I("und"), I("noroad")
-        placed, refr, repl, rem = I("placed"), I("ref"), I("rep"), I("rem")
+        placed, refr, repl, rem, skip = I("placed"), I("ref"), I("rep"), I("rem"), I("skip")
         withlaw = ev - nolaw
-        rep.add("SZ-2: rozbite bandy daja szubienice", f"bitwy z bandami {ev} (z panem {withlaw}, gracza {I('pl')}, kryjowki {I('hid')}), postawione {placed} "
-                f"(rozstaje traktu {I('cross')}, droga do wsi {I('lane')}, rozwidlenie {I('fork')}, przy drodze {I('road')}), odnowione {refr}, zastapione {repl}, zdjete {rem}",
+        rep.add("SZB-2: rozbite bandy daja szubienice", f"bitwy z bandami {ev} (z panem {withlaw}, gracza {I('pl')}, kryjowki {I('hid')}), postawione {placed} "
+                f"(rozstaje traktu {I('cross')}, droga do wsi {I('lane')}, rozwidlenie {I('fork')}, przy drodze {I('road')}), odnowione {refr} (sasiednia z innego okregu "
+                f"{I('near')}), zastapione {repl}, odrzucone przez limit {skip}, zdjete {rem}",
                 "postawione + odnowione > 0, gdy bitwy z panem > 0", None if withlaw <= 0 else (placed + refr) > 0)
         amax = max(int(d["act"]) for d in days)
+        cap = max(int(d["max"]) for d in days) if days else P6SZUBIENICE_MAX
         multi = [d["day"] for d in days if int(d["dist"]) != int(d["act"])]
-        rep.add("SZ-3: najwyzej 40 naraz, jedna na okreg", f"aktywne najwiecej {amax}, dob z okregami != aktywnym {len(multi)}" + (f" (np. dzien {multi[0]})" if multi else ""),
-                f"aktywne <= {P6SZUBIENICE_MAX}, okregow = aktywnych", amax <= P6SZUBIENICE_MAX and not multi)
+        rep.add("SZB-3: limit naraz, jedna na okreg", f"aktywne najwiecej {amax} (limit {cap}), dob z okregami != aktywnym {len(multi)}" + (f" (np. dzien {multi[0]})" if multi else ""),
+                f"aktywne <= limit, okregow = aktywnych", amax <= cap and not multi)
+        # recenzja: przy pelnej liscie limit skracal czas szubienic; udzial limitu (zastapione + odrzucone) wsrod nowych i wiek zastapionych
+        tried = placed + skip
+        cshare = (repl + skip) / tried if tried > 0 else 0.0
+        repp = I("repl")
+        ages = [(float(d["repage"]), int(d["rep"])) for d in days if d["repage"] != "-"]
+        rages = [(float(d["remage"]), int(d["rem"])) for d in days if d["remage"] != "-"]
+        wavg = lambda xs: (sum(a * n for a, n in xs) / sum(n for _, n in xs)) if xs and sum(n for _, n in xs) > 0 else None
+        ra, ma = wavg(ages), wavg(rages)
+        ra_s = f"{ra:.1f}" if ra is not None else "-"
+        ma_s = f"{ma:.1f}" if ma is not None else "-"
+        rep.add("SZB-3b: limit nie skraca czasu", f"zastapione {repl} + odrzucone {skip} z {tried} nowych ({cshare * 100:.1f}%), zastapione gracza {repp}; "
+                f"wiek zastapionych srednio {ra_s} dob, zdjetych po czasie {ma_s} dob",
+                f"<= {P6SZUBIENICE_CAP_SHARE * 100:.0f}% i szubienice gracza nie zastapione (wiek zdjetych po czasie 7-14 dob - INFO)",
+                None if tried <= 0 else (cshare <= P6SZUBIENICE_CAP_SHARE and repp == 0))
         share = noroad / withlaw if withlaw > 0 else 0.0
-        rep.add("SZ-4: bez drogi (za daleko od rozstajow i drogi)", f"bez drogi {noroad} z {withlaw} bitw z panem ({share * 100:.1f}%), Nieumarli pominieci {und}",
+        rep.add("SZB-4: bez drogi (za daleko od rozstajow i drogi)", f"bez drogi {noroad} z {withlaw} bitw z panem ({share * 100:.1f}%), Nieumarli pominieci {und}",
                 "<= 50% (bandy z dala od drog: gory, za Murem, morze)", None if withlaw <= 0 else share <= 0.5)
         mss = [float(d["ms"]) for d in days if d["ms"] != "-"]
-        rep.add("SZ-5: koszt wyboru miejsca", f"srednio na dobe linii maks. {max(mss):.2f} ms" if mss else "brak wyborow",
+        rep.add("SZB-5: koszt wyboru miejsca", f"srednio na dobe linii maks. {max(mss):.2f} ms" if mss else "brak wyborow",
                 f"<= {P6SZUBIENICE_MS} ms", None if not mss else max(mss) <= P6SZUBIENICE_MS)
         st = I("st"); vfail = max(int(d["vfail"]) for d in days); vst = max(int(d["vc"]) + int(d["vv"]) for d in days)
-        rep.add("SZ-6: potkniecia i ERROR paczki", f"potkniecia {st}, pominiete obrazki {vfail}, potkniecia widoku {vst}, ERROR {n_err}", "wszystko 0",
+        rep.add("SZB-6: potkniecia i ERROR paczki", f"potkniecia {st}, pominiete obrazki {vfail}, potkniecia widoku {vst}, ERROR {n_err}", "wszystko 0",
                 st == 0 and vfail == 0 and vst == 0 and n_err == 0)
         vmade = max(int(d["vmade"]) for d in days); miss = max(int(d["miss"]) for d in days)
-        rep.add("SZ-7: obrazki na mapie i probki", f"obrazki postawione {vmade}, pokazane najwiecej naraz {max(int(d['vmax']) for d in days)}, brak siatek {miss} (zapas z listy); "
+        rep.add("SZB-7: obrazki na mapie i probki", f"obrazki postawione {vmade}, pokazane najwiecej naraz {max(int(d['vmax']) for d in days)}, brak siatek {miss} (zapas z listy); "
                 f"probek 'postawiona/odnowiona' {len(samples)}" + (f" - {samples[0][len(P6SZUBIENICE_HEAD):][:200]}" if samples else ""),
                 "INFO (obrazki tylko przy kamerze; brak siatki wisielca = worek)", None)
     rep.show()

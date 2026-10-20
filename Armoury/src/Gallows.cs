@@ -26,12 +26,17 @@ namespace Armoury
     /// nic (licznik "bez drogi"). Szubienica stoi obok drogi, nie na farbie: 0.6 (albo 0.9) jedn. od srodka rozstajow / osi drogi, w kierunku najdalszym od drog,
     /// na ladzie, z dala od osad gry (miasto 3, zamek 2, wies 1.5, kryjowka 1 jedn.), wiosek na mapie (1.3) i zajazdow (1.2); belka bokiem do rozstajow.
     ///
-    /// OKREG = wies gry najblizsza szubienicy. Jedna szubienica na okreg: nowe rozbicie bandy w okregu z szubienica przedluza jej czas (i doklada wisielca), nie
-    /// stawia drugiej. Czas: bitwa w polu 7 + ludzie bandy / 6 dob (najwyzej 14), kryjowka 14 dob. Wisielcy: do 9 ludzi bandy 1, do 24 - 2, wiecej i kryjowka - 3.
-    /// Najwyzej 40 naraz w swiecie: przy pelnej liscie nowa zastepuje te, ktorej czas konczy sie najwczesniej (licznik "zastapione"). Koniec czasu = zdjeta (Daily).
+    /// OKREG = wies gry najblizsza szubienicy. Jedna szubienica na okreg i w okolicy (do 3 jedn. - rozstaje na granicy dwoch okregow): nowe rozbicie bandy tam
+    /// przedluza czas stojacej (i doklada wisielca), nie stawia drugiej. Czas: bitwa w polu 7 + ludzie bandy / 6 dob (najwyzej 14), kryjowka 14 dob. Wisielcy: do 9
+    /// ludzi bandy 1, do 24 - 2, wiecej i kryjowka - 3. Koniec czasu = zdjeta (Daily).
+    /// LIMIT 200 naraz w swiecie (recenzja: w biegu 160 dob ok. 14 band znika na dobe, szubienica stoi srednio ok. 10 dob - 40 bylo stale pelne i skracalo czas
+    /// wszystkim). Przy pelnej liscie miejsce zwalnia szubienica AI NAJDALEJ od druzyny gracza (tam nikt nie patrzy); nowa szubienica AI dalej niz kazda stojaca
+    /// AI - nie staje (licznik "odrzucone przez limit"). Szubienic gracza nie zdejmuje limit przed czasem (chyba ze cala lista to szubienice gracza - wtedy ta
+    /// najblizsza konca). Liczniki "zastapione" (ze srednim wiekiem) i "odrzucone" w linii doby - prog w sprawdz_logi (SZB-3b).
     ///
-    /// ZAPIS: SaveText.Sync "arm_gallows" ("g1|x;y;yaw;koniec;okreg;wisielcy;rodzaj;kryjowka~..."), pisany tylko z danymi; brak klucza (stary zapis, nowa kampania
-    /// save040 Jeffa na WGRANIU 92) = brak szubienic. Reset (nowa kampania / przed wczytaniem) - osobna linia _p6SzubieniceReset w ArmouryBehavior.
+    /// ZAPIS: SaveText.Sync "arm_gallows" ("g1|x;y;yaw;koniec;okreg;wisielcy;rodzaj;kryjowka;start;gracza~..."; start i gracza dopisane na koncu - czytnik bierze
+    /// 8 pol i wiecej), pisany tylko z danymi; brak klucza (stary zapis, nowa kampania save040 Jeffa na WGRANIU 92) = brak szubienic. Reset (nowa kampania / przed
+    /// wczytaniem) - osobna linia _p6SzubieniceReset w ArmouryBehavior.
     /// WIDOK: GallowsView (kopie siatek jak zajazdy - bez fizyki, skryptow, czastek; obrazek raz przy kamerze, potem tylko pokaz / schowaj, zdjecie przy zmianie
     /// listy - nic co klatke). Wszystko na watku glownym (zdarzenie bitwy, doba, widok) - bez blokad, poza goraca sciezka.
     /// Linie logu: "Szubienice (p6): start sesji", "Szubienice (p6): postawiona ..." (kazda przy gracza bitwie, z AI pierwsze 5 na sesje),
@@ -40,7 +45,8 @@ namespace Armoury
     internal static class Gallows
     {
         private const string P = "Szubienice (p6): ";
-        internal const int MaxActive = 40;
+        internal const int MaxActive = 200;   // zapas nad ok. 100-145 z biegu 160 dob (wiecej - wiecej zapisu i ukrytych obrazkow; zapis w kawalkach SaveText)
+        private const float NearSame = 3f;             // druga szubienica blizej niz tyle od stojacej = ta sama (odnowienie), niezaleznie od okregu
         private const float CrossR = 10f, CrossRHideout = 15f, RoadR = 8f, RoadRHideout = 12f;
         private const float LaneForkWeight = 1.4f;     // rozwidlenie drog bocznych - dalej w kolejce niz rozstaje traktu
         private const float NodeJoin = 0.6f;           // konce lamanych traktu blizej niz tyle = ten sam wezel (szkielet farby)
@@ -55,6 +61,8 @@ namespace Armoury
         {
             public float X, Y, Yaw;        // polozenie (jedn. mapy) i obrot (rad; lokalna +Y ku rozstajom, belka wzdluz lokalnej X)
             public double End;             // doba konca (CampaignTime.ToDays)
+            public double Start;           // doba postawienia (wiek przy zdjeciu - linia doby; stary wpis bez pola: koniec - 7)
+            public bool Player;            // postawiona albo odnowiona po bitwie gracza - limit jej nie zdejmuje przed czasem
             public string District = "";   // StringId wsi gry okregu
             public int Bodies = 1;         // 1..3
             public int Kind;               // 0 rozstaje traktu, 1 droga boczna do traktu, 2 rozwidlenie drog bocznych, 3 przy drodze
@@ -92,7 +100,9 @@ namespace Armoury
 
         // liczniki od ostatniej linii doby
         private static int _dPlaced, _dCross, _dLane, _dFork, _dRoad, _dRefresh, _dReplaced, _dRemoved, _dNoRoad, _dNoLaw, _dUndead, _dPlayer, _dHideout, _dEvents;
-        private static int _aPlaced, _aRemoved, _aRefresh, _aReplaced, _aiLines;
+        private static int _dCapSkip, _dRepPlayer, _dNear;   // odrzucone przez limit (AI najdalej od gracza), zastapione szubienice gracza, odnowione przez bliskosc (inny okreg)
+        private static double _dRepAge, _dRemAge;            // suma wieku (dob) zastapionych i zdjetych po czasie - srednie w linii doby
+        private static int _aPlaced, _aRemoved, _aRefresh, _aReplaced, _aCapSkip, _aiLines;
         private static int _stumbles, _stumblesAll;
         private static double _pickMs;
         private static int _pickN;
@@ -116,7 +126,7 @@ namespace Armoury
             _blk.Clear(); _blkCells.Clear(); _villages.Clear(); _blkBuilt = false; _blkNote = "-"; _blkMv = 0;
             _netMs = _loadMs = 0; _netBuilds = _blkBuilds = 0;
             ZeroDay();
-            _aPlaced = _aRemoved = _aRefresh = _aReplaced = _aiLines = 0;
+            _aPlaced = _aRemoved = _aRefresh = _aReplaced = _aCapSkip = _aiLines = 0;
             _stumbles = _stumblesAll = 0;
             _loadedFromSave = _expiredOnLoad = 0;
             VCreated = VRemoved = VShownMax = VMeshMiss = VFailed = VStCreate = VStVis = 0;
@@ -125,6 +135,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dPlaced = _dCross = _dLane = _dFork = _dRoad = _dRefresh = _dReplaced = _dRemoved = _dNoRoad = _dNoLaw = _dUndead = _dPlayer = _dHideout = _dEvents = 0;
+            _dCapSkip = _dRepPlayer = _dNear = 0; _dRepAge = _dRemAge = 0;
             _pickMs = 0; _pickN = 0;
             VShowDay = VHideDay = VPiecesDay = 0;
             _stumbles = 0;
@@ -148,7 +159,7 @@ namespace Armoury
                 if (i > 0) sb.Append('~');
                 sb.Append(e.X.ToString("0.###", Inv)).Append(';').Append(e.Y.ToString("0.###", Inv)).Append(';').Append(e.Yaw.ToString("0.###", Inv)).Append(';')
                   .Append(e.End.ToString("0.###", Inv)).Append(';').Append(e.District).Append(';').Append(e.Bodies).Append(';').Append(e.Kind).Append(';')
-                  .Append(e.Hideout ? '1' : '0');
+                  .Append(e.Hideout ? '1' : '0').Append(';').Append(e.Start.ToString("0.###", Inv)).Append(';').Append(e.Player ? '1' : '0');
             }
             return sb.ToString();
         }
@@ -170,6 +181,9 @@ namespace Armoury
                         X = float.Parse(c[0], Inv), Y = float.Parse(c[1], Inv), Yaw = float.Parse(c[2], Inv), End = double.Parse(c[3], Inv), District = c[4],
                         Bodies = Math.Max(1, Math.Min(3, int.Parse(c[5], Inv))), Kind = Math.Max(0, Math.Min(3, int.Parse(c[6], Inv))), Hideout = c[7] == "1"
                     };
+                    double st;
+                    e.Start = c.Length > 8 && double.TryParse(c[8], NumberStyles.Float, Inv, out st) && !double.IsNaN(st) ? st : e.End - 7.0;
+                    e.Player = c.Length > 9 && c[9] == "1";
                     if (float.IsNaN(e.X) || float.IsNaN(e.Y) || _active.Count >= MaxActive) continue;
                     _active.Add(e);
                     _loadedFromSave++;
@@ -193,8 +207,9 @@ namespace Armoury
                 Log.Info(P + "start sesji - klucz MapGallows " + (s != null && s.MapGallows ? "tak" : "NIE (szubienic nie przybywa, stojace schowane)") + " | " + _fileNote
                          + " | z zapisu aktywnych " + _active.Count + " (wczytanych " + _loadedFromSave + ", po czasie zdjetych " + _expiredOnLoad + ")"
                          + " | regula: rozbita banda (gracz, lord, patrol, zaloga, milicja) albo oczyszczona kryjowka -> rozstaje do " + CrossR.ToString("0", Inv) + " jedn. (kryjowka "
-                         + CrossRHideout.ToString("0", Inv) + "), inaczej droga do " + RoadR.ToString("0", Inv) + " (" + RoadRHideout.ToString("0", Inv) + "); 7-14 dob, jedna na okreg, najwyzej "
-                         + MaxActive + " naraz; czysty wyglad (nic do ksiegi Obieg).");
+                         + CrossRHideout.ToString("0", Inv) + "), inaczej droga do " + RoadR.ToString("0", Inv) + " (" + RoadRHideout.ToString("0", Inv) + "); 7-14 dob, jedna na okreg (i do "
+                         + NearSame.ToString("0", Inv) + " jedn.), najwyzej " + MaxActive + " naraz (pelna lista: miejsce zwalnia szubienica AI najdalej od gracza, szubienice gracza stoja"
+                         + " swoj czas); czysty wyglad (nic do ksiegi Obieg).");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -580,28 +595,30 @@ namespace Armoury
             double now = Now(), end = now + days;
             string what;
             Entry e = null;
+            // jedna na okreg, a takze jedna w okolicy NearSame (rozstaje na granicy dwoch okregow - bitwy z dwoch stron nie stawiaja dubla)
             if (did.Length > 0) foreach (var a in _active) if (a.District == did) { e = a; break; }
+            if (e == null)
+                foreach (var a in _active)
+                {
+                    float dx = a.X - px, dy = a.Y - py;
+                    if (dx * dx + dy * dy < NearSame * NearSame) { e = a; _dNear++; break; }
+                }
             if (e != null)
             {
-                // jedna na okreg: przedluzenie czasu i wisielcy dokladani (najwyzej 3) - bez drugiej szubienicy
+                // przedluzenie czasu i wisielcy dokladani (najwyzej 3) - bez drugiej szubienicy
                 if (end > e.End) e.End = end;
                 int nb = Math.Min(3, Math.Max(e.Bodies + 1, bodies));   // kazda nastepna rozbita banda okregu - jeden wisielec wiecej
                 if (nb != e.Bodies) { e.Bodies = nb; Version++; }
                 if (hideout) e.Hideout = true;
+                if (player) e.Player = true;
                 if (e.Village == null) e.Village = dist;
                 _dRefresh++; _aRefresh++;
                 what = "odnowiona";
             }
             else
             {
-                if (_active.Count >= MaxActive)
-                {
-                    int oi = 0;
-                    for (int i = 1; i < _active.Count; i++) if (_active[i].End < _active[oi].End) oi = i;
-                    _active.RemoveAt(oi);
-                    _dReplaced++; _aReplaced++;
-                }
-                e = new Entry { X = px, Y = py, Yaw = yaw, End = end, District = did, Bodies = bodies, Kind = kind, Hideout = hideout, Village = dist };
+                if (_active.Count >= MaxActive && !FreeSlot(px, py, player, now)) { _dCapSkip++; _aCapSkip++; return; }
+                e = new Entry { X = px, Y = py, Yaw = yaw, End = end, Start = now, Player = player, District = did, Bodies = bodies, Kind = kind, Hideout = hideout, Village = dist };
                 _active.Add(e);
                 Version++;
                 _dPlaced++; _aPlaced++;
@@ -620,6 +637,45 @@ namespace Armoury
             }
         }
 
+        /// <summary>Pelna lista: zwalnia miejsce dla nowej szubienicy w (px, py). Odchodzi szubienica AI najdalej od druzyny gracza; nowa AI dalej niz kazda stojaca AI -
+        /// false (nie staje). Szubienice gracza limit zdejmuje tylko wtedy, gdy cala lista to szubienice gracza, a nowa tez jest gracza (ta najblizsza konca).
+        /// Bez druzyny gracza (np. przed startem mapy) - jak dawniej: ta, ktorej czas konczy sie najwczesniej.</summary>
+        private static bool FreeSlot(float px, float py, bool player, double now)
+        {
+            bool hasMe = false;
+            float mx = 0f, my = 0f;
+            try { var mp = MobileParty.MainParty; if (mp != null) { var p = mp.GetPosition2D; mx = p.x; my = p.y; hasMe = true; } } catch { hasMe = false; }
+            int oi = -1;
+            float od = -1f;
+            for (int i = 0; i < _active.Count; i++)
+            {
+                var a = _active[i];
+                if (a.Player) continue;
+                float d;
+                if (hasMe) { float dx = a.X - mx, dy = a.Y - my; d = dx * dx + dy * dy; }
+                else d = (float)(1e6 - a.End);   // bez gracza: najblizsza konca = "najdalej"
+                if (d > od) { od = d; oi = i; }
+            }
+            if (oi >= 0)
+            {
+                if (!player && hasMe) { float dx = px - mx, dy = py - my; if (dx * dx + dy * dy >= od) return false; }
+            }
+            else
+            {
+                if (!player) return false;
+                oi = 0;
+                for (int i = 1; i < _active.Count; i++) if (_active[i].End < _active[oi].End) oi = i;
+                _dRepPlayer++;
+            }
+            _dRepAge += Math.Max(0.0, now - _active[oi].Start);
+            _active.RemoveAt(oi);
+            _dReplaced++; _aReplaced++;
+            Version++;
+            return true;
+        }
+
+        private static string Avg(double sum, int n) { return n > 0 ? (sum / n).ToString("0.0", Inv) : "-"; }
+
         private static string KindText(int k)
         {
             return k == 0 ? "przy rozstajach traktu" : k == 1 ? "przy rozstajach (droga do wsi)" : k == 2 ? "przy rozwidleniu drog wiejskich" : "przy drodze";
@@ -632,28 +688,32 @@ namespace Armoury
             {
                 double now = Now();
                 for (int i = _active.Count - 1; i >= 0; i--)
-                    if (_active[i].End <= now) { _active.RemoveAt(i); _dRemoved++; _aRemoved++; Version++; }
+                    if (_active[i].End <= now) { _dRemAge += Math.Max(0.0, now - _active[i].Start); _active.RemoveAt(i); _dRemoved++; _aRemoved++; Version++; }
                 if (!LogGate.Lines) return;
                 int day = (int)now - 1;   // doba zakonczona (jak linie drog i blota)
-                int k0 = 0, k1 = 0, k2 = 0, k3 = 0, hid = 0, b = 0;
+                int k0 = 0, k1 = 0, k2 = 0, k3 = 0, hid = 0, b = 0, pl = 0;
                 var districts = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var e in _active)
                 {
                     if (e.Kind == 0) k0++; else if (e.Kind == 1) k1++; else if (e.Kind == 2) k2++; else k3++;
                     if (e.Hideout) hid++;
+                    if (e.Player) pl++;
                     b += e.Bodies;
                     districts.Add(e.District);
                 }
                 Log.Info(P + "dzien " + day + " | klucz MapGallows " + (On ? "tak" : "NIE") + " | aktywne " + _active.Count + " (maks. " + MaxActive + "), okregow " + districts.Count
                          + ", przy rozstajach traktu " + k0 + ", przy rozstajach drogi do wsi " + k1 + ", przy rozwidleniu " + k2 + ", przy drodze " + k3 + ", po kryjowkach " + hid + ", wisielcow " + b
+                         + ", gracza " + pl
                          + " | od ostatniej linii: bitwy z bandami " + _dEvents + " (gracza " + _dPlayer + ", kryjowki " + _dHideout + "), postawione " + _dPlaced + " (rozstaje traktu " + _dCross
-                         + ", droga do wsi " + _dLane + ", rozwidlenie " + _dFork + ", przy drodze " + _dRoad + "), odnowione " + _dRefresh + ", zastapione " + _dReplaced + ", zdjete " + _dRemoved
-                         + " (koniec czasu), pominiete: bez drogi " + _dNoRoad + ", bez pana (karawana / wozy) " + _dNoLaw + ", Nieumarli " + _dUndead
+                         + ", droga do wsi " + _dLane + ", rozwidlenie " + _dFork + ", przy drodze " + _dRoad + "), odnowione " + _dRefresh + " (w tym sasiednia do " + NearSame.ToString("0", Inv)
+                         + " jedn. z innego okregu " + _dNear + "), zastapione " + _dReplaced + " (limit; srednio po " + Avg(_dRepAge, _dReplaced) + " dob, w tym gracza " + _dRepPlayer
+                         + "), odrzucone przez limit " + _dCapSkip + ", zdjete " + _dRemoved + " (koniec czasu, srednio po " + Avg(_dRemAge, _dRemoved) + " dob)"
+                         + ", pominiete: bez drogi " + _dNoRoad + ", bez pana (karawana / wozy) " + _dNoLaw + ", Nieumarli " + _dUndead
                          + " | wybor miejsca srednio " + (_pickN > 0 ? (_pickMs / _pickN).ToString("0.00", Inv) : "-") + " ms (" + _pickN + ")"
                          + " | siec: rozstaje traktu " + _mainCross.Count + ", drogi boczne " + _lanes + " (wloty do traktu " + _laneCross + ", rozwidlenia " + _laneFork + ")"
                          + ", przebudowy " + _netBuilds + (_netBuilds > 0 ? " (ostatnia " + _netMs.ToString("0.0", Inv) + " ms)" : "")
                          + (_planRef == null ? " - plan drog bocznych niedostepny" : "") + "; przeszkody: " + _blkNote
-                         + " | od wczytania: postawione " + _aPlaced + ", odnowione " + _aRefresh + ", zastapione " + _aReplaced + ", zdjete " + _aRemoved
+                         + " | od wczytania: postawione " + _aPlaced + ", odnowione " + _aRefresh + ", zastapione " + _aReplaced + ", odrzucone przez limit " + _aCapSkip + ", zdjete " + _aRemoved
                          + " | widok: obrazki postawione " + VCreated + ", zdjete " + VRemoved + ", pokazane najwiecej naraz " + VShownMax + ", pokaz/schowaj " + VShowDay + "/" + VHideDay
                          + ", elementow " + VPiecesDay + ", brak siatek " + VMeshMiss + ", pominiete " + VFailed + ", potkniecia widoku: tworzenie " + VStCreate + ", widocznosc " + VStVis
                          + " | potkniecia " + _stumbles + " (od wczytania " + _stumblesAll + ").");

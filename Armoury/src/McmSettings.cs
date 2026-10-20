@@ -5468,7 +5468,7 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public bool MillOnBank { get; set; } = true;
 
-        [SettingPropertyBool("Map Gallows", HintText = "gallows at the crossroads: when your party, a lord, a patrol or a garrison beats a band of outlaws - or clears a hideout - a gallows with the hanged stands for 7 to 14 days at the nearest crossroads (or by the nearest road), at most one in a district and 40 in the world. Only a sight on the map - nothing else changes. Off = no new gallows, the standing ones are hidden", RequireRestart = false)]
+        [SettingPropertyBool("Map Gallows", HintText = "gallows at the crossroads: when your party, a lord, a patrol or a garrison beats a band of outlaws - or clears a hideout - a gallows with the hanged stands for 7 to 14 days at the nearest crossroads (or by the nearest road), at most one in a district and 200 in the world (when full, the one farthest from you makes way; yours stand their time). Only a sight on the map - nothing else changes. Off = no new gallows, the standing ones are hidden", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool MapGallows { get; set; } = true;
 
