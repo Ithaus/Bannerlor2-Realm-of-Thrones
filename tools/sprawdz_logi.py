@@ -23456,6 +23456,37 @@ def szybkie_main(logp, start_arg, until=120):
     except Exception as e:
         rep.add("blok SZ-A8", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
 
+    # ---------------- r3-jazda (PLAN 6.14): wolne konie zalog pod jezdzcow i do kolejki awansow lordow AI (GarrisonHorsesToLords)
+    try:
+        gh = win("Konie zalog dla lordow (r3-jazda): dzien")
+        if gh:
+            n = len(gh)
+            tot = sum(num(r"dostali konia z zalogi (\d+)", s, default=0) + num(r"do kolejki awansow na jezdnego \(tabor\) (\d+)", s, default=0) for s in gh.values())
+            bef = sum(num(r"przed (\d+), po", s, default=0) for s in gh.values())
+            aft = sum(num(r", po (\d+) \(dostali", s, default=0) for s in gh.values())
+            gold = sum(num(r"od innych rodow krolestwa \d+ za (\d+) zl", s, default=0) for s in gh.values())
+            stum = num(r"potkniecia dzis \d+ \(razem (\d+)\)", gh[max(gh)], default=0)
+            rep.add("R3J-1: konie zalog dla lordow AI (linia Konie zalog dla lordow r3-jazda)",
+                    f"{tot / n:.1f} koni/d ({n} dob); jezdzcy bez konia przy postojach przed {bef / n:.1f}/d, po {aft / n:.1f}/d; od innych rodow {gold / n:.0f} zl/d; potkniecia razem {stum}",
+                    "linia codziennie, konie > 0/d, po < przed, potkniecia 0", tot > 0 and aft < bef and stum == 0)
+        else:
+            rep.add("R3J-1: konie zalog dla lordow AI", "brak linii Konie zalog dla lordow (r3-jazda) w oknie", "linia przy kluczu GarrisonHorsesToLords", False)
+        ha2 = win("Konie AI (175): dzien")
+        m2 = re.search(r"r3-jazda: partie lordow - bez konia (\d+), wolne (\d+); zalogi - bez konia (\d+), wolne (\d+)", ha2[max(ha2)]) if ha2 else None
+        hh = win("Jezdzcy i uprzaz (E8/H): dzien")
+        lu = num(r"partie rodow AI:.*?bez konia (\d+)", hh[max(hh)]) if hh else None
+        base_lu = 1642 if until <= 240 else 1898   # WGRANIE 90 (E8/H, partie rodow AI, bez konia, ostatnia doba okna): nowa kampania d120 1642, bieg 160 dob z zapisu d400 1898
+        if m2 or lu is not None:
+            txt = (f"partie lordow bez konia {m2.group(1)}, wolne {m2.group(2)}; zalogi bez konia {m2.group(3)}, wolne {m2.group(4)} (Konie AI 175); " if m2 else "") \
+                  + (f"E8/H partie rodow AI bez konia {lu} wobec WGRANIA 90 {base_lu}" if lu is not None else "")
+            fac = 0.8 if until <= 240 else 0.7   # nowa kampania: zalogi d120 maja mniej wolnych koni (WGRANIE 90: wolne razem 1540) niz zapis d240+ (2975)
+            rep.add("R3J-2: konni bez konia w partiach lordow AI, ostatnia doba okna", txt,
+                    f"E8/H bez konia <= {int(fac * 100)}% WGRANIA 90 ({int(fac * base_lu)})", (lu <= fac * base_lu) if lu is not None else None)
+        else:
+            rep.add("R3J-2: konni bez konia w partiach lordow AI", "brak linii Konie AI (175) z podzialem r3-jazda i E8/H", "INFO", None)
+    except Exception as e:
+        rep.add("blok R3J", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+
     # ---------------- A9a: amunicja AI
     try:
         wl = win(E8_W_LINE)
