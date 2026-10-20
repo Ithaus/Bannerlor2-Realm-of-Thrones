@@ -96,6 +96,8 @@ namespace Armoury
                 _decDay = _measDay = -1; _measOk = false; _cov.Clear(); _help.Clear();
                 ZeroDay(); _stumbles = 0; _errLogged = false;
             }
+            int prevDec = _decDay;
+            _decDay = day;   // od razu - wyjatek nizej nie moze powtarzac pomiaru przy kazdym planie tej doby
             var s = Settings.Current;
             // co 5 dob w te same doby co linia "Pokrycie zbrojowni AI (171)" (dzien podzielny przez 5 - do porownania w logu) i w pierwszej dobie sesji
             if (_measDay < 0 || day < _measDay || day - _measDay >= MeasureEveryDays || (day % MeasureEveryDays == 0 && day != _measDay))
@@ -123,15 +125,18 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Decide", e); }
             float thr = Threshold(s);
-            Log.Info("Tarcze w wojnie (R3-09a): dzien " + day + " | CZYNNE, prog pokrycia "
-                     + (100f * thr).ToString("0", inv) + "%, ciesle x" + MBMath.ClampFloat(s.ShieldWarCarpenterHands, 0f, 4f).ToString("0.00", inv) + " rak tarczownikow"
-                     + " | pomiar z dnia " + _measDay + (_measOk ? ": swiat " + Pct(_wNeed, _wLack) + " (miejsc na tarcze " + _wNeed + ", brak " + _wLack + ", partii " + _wParties + ", " + _measMs + " ms)" : ": BRAK (zbrojownie DTE niedostepne albo swiat bez potrzeby tarcz) - bez pomocy")
-                     + " | krolestwa w wojnie " + warK + ", z pomoca ciesli " + helpK + (sb.Length > 0 ? " [" + sb + "]" : "")
-                     + " | poprzednia doba decyzji (dzien " + (_decDay >= 0 ? _decDay.ToString() : "-") + "): ciesle przy tarczach w " + _dTowns.Count + " miastach / " + _dShops + " warsztatach, "
-                     + _dCarp.ToString("0", inv) + " roboczodni (wlasne rece tarczownikow tam " + _dOwn.ToString("0", inv) + ")"
-                     + " | potkniecia " + _stumbles + ".");
+            try
+            {
+                Log.Info("Tarcze w wojnie (R3-09a): dzien " + day + " | CZYNNE, prog pokrycia "
+                         + (100f * thr).ToString("0", inv) + "%, ciesle x" + MBMath.ClampFloat(s.ShieldWarCarpenterHands, 0f, 4f).ToString("0.00", inv) + " rak tarczownikow"
+                         + " | pomiar z dnia " + _measDay + (_measOk ? ": swiat " + Pct(_wNeed, _wLack) + " (miejsc na tarcze " + _wNeed + ", brak " + _wLack + ", partii " + _wParties + ", " + _measMs + " ms)" : ": BRAK (zbrojownie DTE niedostepne albo swiat bez potrzeby tarcz) - bez pomocy")
+                         + " | krolestwa w wojnie " + warK + ", z pomoca ciesli " + helpK + (sb.Length > 0 ? " [" + sb + "]" : "")
+                         + " | poprzednia doba decyzji (dzien " + (prevDec >= 0 ? prevDec.ToString() : "-") + "): ciesle przy tarczach w " + _dTowns.Count + " miastach / " + _dShops + " warsztatach, "
+                         + _dCarp.ToString("0", inv) + " roboczodni (wlasne rece tarczownikow tam " + _dOwn.ToString("0", inv) + ")"
+                         + " | potkniecia " + _stumbles + ".");
+            }
+            catch (Exception e) { Stumble("Line", e); }
             ZeroDay(); _stumbles = 0;
-            _decDay = day;
         }
 
         private static void ZeroDay() { _dCarp = _dOwn = 0f; _dShops = 0; _dTowns.Clear(); }
