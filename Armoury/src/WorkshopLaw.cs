@@ -1045,9 +1045,11 @@ namespace Armoury
                             float cut = Math.Min(h, repairPool * GuildWeight(g) / smithW);
                             h -= cut; repairs += cut;
                         }
-                        if (ShieldWarHelp.IsShieldGuild(g)) { carpOwn = own; carp = ShieldWarHelp.ExtraHands(town, own); h += carp; }   // R3-09a
                         hg[g] = h; extraG[g] = extra;
                     }
+                    // R3-09a: rece ciesli PO petli cechow, czyli po wszystkich cieciach napraw (naprawy robia rzemieslnicy cechu, nie ciesle); own jak wyzej
+                    foreach (var g in nG.Keys)
+                        if (ShieldWarHelp.IsShieldGuild(g)) { carpOwn = H * GuildWeight(g) / wAll; carp = ShieldWarHelp.ExtraHands(town, carpOwn); hg[g] += carp; }
                     if (!follow || round == 2) break;
                     // (E) plan: linia bez sztuki w robocie jest czynna, gdy cos skonczy w planie z rownego podzialu jako podloga
                     bool changed = false;

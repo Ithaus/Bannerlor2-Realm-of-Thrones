@@ -27,6 +27,9 @@ namespace Armoury
     ///  - SKUTEK (WorkshopLaw.BuildPlan, plan rak warsztatu na dobe): cech tarczownikow czynnego warsztatu dostaje do rak wlasnych (rece warsztatu x waga
     ///    cechu 5%) jeszcze ShieldWarCarpenterHands (1) tyle samo rak ciesli. Rece ciesli sa POZA rekami rzemieslnikow broni (nikomu ich nie zabieraja -
     ///    kowale, naprawy i pozostale cechy bez zmian). Pomagaja tylko, gdy cech ma robote (linia czynna: surowiec, zysk i kapital jak dotad).
+    ///  - ROZRUCH (recenzja: doslownie "jesli po 120 dobach" z zatwierdzonego opisu): pomoc dopiero od doby ShieldWarAfterDays (120) kampanii - w pierwszych
+    ///    miesiacach zbrojownie lordow dopiero sie zapelniaja (ROZPOZNANIE-TOWARY-2 A7-5: 35.7% w d91-120, 53% pod koniec roku 1, 70% w roku 2), wiec brak tarcz w rozruchu nie jest
+    ///    trwalym brakiem, a start ma byc neutralny. Pomiar i linia logu ida tez w rozruchu (widac liczby), decyzja = bez pomocy.
     ///  - Zamknieta ekonomia: nowego pieniadza ani towaru nie ma. Sztuka placi place za swoje dni pracy jak dotad (kapital warsztatu -> kasa miasta przy
     ///    oddaniu sztuki - ciesle sa oplaceni z tej samej placy), drewno, skora i zelazo z polek miasta jak dotad, gotowa tarcza idzie na targ tylko, gdy
     ///    miasto zaplaci z nadwyzki ponad zapas kupcow. Wiecej rak = szybciej skonczona sztuka, nie sztuka z niczego.
@@ -42,7 +45,8 @@ namespace Armoury
 
         private static Campaign _campaign;
         private static int _decDay = -1, _measDay = -1;
-        private static bool _measOk;
+        private static bool _measOk, _warm;   // _warm: kampania starsza niz ShieldWarAfterDays (decyzja doby)
+        private static double _age;
         private static long _wNeed, _wLack, _measMs;
         private static int _wParties;
         private static readonly Dictionary<IFaction, long[]> _cov = new Dictionary<IFaction, long[]>();   // krolestwo -> [potrzeba, brak]
@@ -102,6 +106,9 @@ namespace Armoury
             // co 5 dob w te same doby co linia "Pokrycie zbrojowni AI (171)" (dzien podzielny przez 5 - do porownania w logu) i w pierwszej dobie sesji
             if (_measDay < 0 || day < _measDay || day - _measDay >= MeasureEveryDays || (day % MeasureEveryDays == 0 && day != _measDay))
                 try { Measure(day); } catch (Exception e) { Stumble("Measure", e); _measOk = false; }
+            int after = Math.Max(0, s != null ? s.ShieldWarAfterDays : 120);
+            _age = Hunger.CampaignAge();
+            _warm = _age >= after;
             _help.Clear();
             int warK = 0, helpK = 0;
             var sb = new StringBuilder();
@@ -112,7 +119,7 @@ namespace Armoury
                 {
                     if (k == null || k.IsEliminated) continue;
                     bool war = KingdomTreasury.AtWar(k);
-                    bool h = war && Below(Coverage(k), s);
+                    bool h = _warm && war && Below(Coverage(k), s);
                     _help[k] = h;
                     if (!war) continue;
                     warK++; if (h) helpK++;
@@ -120,7 +127,7 @@ namespace Armoury
                     if (sb.Length > 0) sb.Append(", ");
                     sb.Append(k.Name != null ? k.Name.ToString() : k.StringId).Append(' ')
                       .Append(own ? Pct(a[0], a[1]) + " (" + a[0] + ")" : "wedlug swiata (" + (a != null ? a[0] : 0) + ")")
-                      .Append(h ? " POMOC" : " bez");
+                      .Append(h ? " POMOC" : (_warm || !Below(Coverage(k), s) ? " bez" : " bez (rozruch)"));
                 }
             }
             catch (Exception e) { Stumble("Decide", e); }
@@ -129,6 +136,7 @@ namespace Armoury
             {
                 Log.Info("Tarcze w wojnie (R3-09a): dzien " + day + " | CZYNNE, prog pokrycia "
                          + (100f * thr).ToString("0", inv) + "%, ciesle x" + MBMath.ClampFloat(s.ShieldWarCarpenterHands, 0f, 4f).ToString("0.00", inv) + " rak tarczownikow"
+                         + ", wiek kampanii " + _age.ToString("0", inv) + " dob" + (_warm ? " (pomoc od doby " + after + ")" : " - ROZRUCH: pomoc dopiero od doby " + after + ", dzis bez pomocy")
                          + " | pomiar z dnia " + _measDay + (_measOk ? ": swiat " + Pct(_wNeed, _wLack) + " (miejsc na tarcze " + _wNeed + ", brak " + _wLack + ", partii " + _wParties + ", " + _measMs + " ms)" : ": BRAK (zbrojownie DTE niedostepne albo swiat bez potrzeby tarcz) - bez pomocy")
                          + " | krolestwa w wojnie " + warK + ", z pomoca ciesli " + helpK + (sb.Length > 0 ? " [" + sb + "]" : "")
                          + " | poprzednia doba decyzji (dzien " + (prevDec >= 0 ? prevDec.ToString() : "-") + "): ciesle przy tarczach w " + _dTowns.Count + " miastach / " + _dShops + " warsztatach, "
@@ -145,6 +153,7 @@ namespace Armoury
         private static bool Decide(IFaction f, Settings s)
         {
             var k = f as Kingdom;
+            if (!_warm) return false;   // rozruch kampanii (NewDay)
             if (k != null) return !k.IsEliminated && KingdomTreasury.AtWar(k) && Below(Coverage(k), s);
             bool war = false;
             var list = f.FactionsAtWarWith;
