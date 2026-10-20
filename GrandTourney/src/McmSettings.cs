@@ -176,9 +176,9 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public bool TourneyRansomKnockerOnly { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Tourney Ransom Share", 0.05f, 1.00f, "0.00", HintText = "with Tourney Ransom: the ransom of the lists is this share of the worth of the horse and armour in their present state (0.25 = a quarter - blunted arms are for honour, not for war); the pieces go to the victor only when the vanquished cannot pay even that. 1 = the full worth, as before (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Tourney Ransom Share", 0.05f, 1.00f, "0.00", HintText = "with Tourney Ransom: the ransom of the lists as a share of the worth of the horse and armour in their present state (1 = the full worth); the vanquished pays only from what he and his house really have, and yields the pieces he cannot pay for (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
-        public float TourneyRansomShare { get; set; } = 0.25f;
+        public float TourneyRansomShare { get; set; } = 1f;
 
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
