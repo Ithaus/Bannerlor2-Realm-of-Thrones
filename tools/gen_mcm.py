@@ -42,6 +42,11 @@ RANGES = {
     'AiNightsAwakeInChase': (0.0, 4.0, "0"),
     # T10-R: noce forsownego marszu z rzedu (dlug konczy sie na 3, dalej liczy juz tylko seria) - 0 = bez limitu
     'MaxForcedNights': (0, 5, "0"),
+    # R3-08c / R3-08a (20.10): marsz forsowny (kod przycina 0..50) i dzien odpoczynku armii (kod przycina 2..14, 0..20, 0..30)
+    'ForcedMarchSpeedPercent': (0, 50, "0"),
+    'ArmyRestDayAfterMarchDays': (2, 14, "0"),
+    'ArmyRestDayCohesion': (0.0, 20.0, "0.0"),
+    'ArmyRestDayMorale': (0.0, 30.0, "0.0"),
     # paczka 175: suwaki z projektu (rozdz. 5)
     'NorthHardyWeaponBonus': (0, 50, "0"),
     'NorthHardyAthleticsBonus': (0, 50, "0"),

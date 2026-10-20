@@ -4700,6 +4700,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightMarchNotice { get; set; } = true;
 
+        [SettingPropertyBool("Forced March", HintText = "a forced march for your column: pick 'Forced march' with the O key or when night falls - your party (and the army you lead) moves this much faster, but nobody sleeps while it lasts (halts do not count as rest and no camp is pitched on its own), and on top of the nights they miss, every 24 hours of it costs one more sleepless night - so the sleep debt grows every 12 hours instead of once a day, and its penalties soon eat the gain. A shorter dash leaves weariness that counts toward the next one and fades by 2 hours a day of proper rest. It ends when you make camp, bed down, enter a settlement or put to sea. Needs Night Rest. Off = only the old 'March on'", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool ForcedMarch { get; set; } = true;
+
+        [SettingPropertyInteger("Forced March Speed Percent", 0, 50, "0", HintText = "the speed gained on a forced march, in % of your current map speed (0 to 50)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int ForcedMarchSpeedPercent { get; set; } = 25;
+
         [SettingPropertyBool("Town Inns", HintText = "in a town you can take lodgings at an inn: a common room (straw - 1 a man, 1 a horse, 3 for your own room), a decent inn (beds, a warm hearth, ale - 2/2/8) or a good house (rooms, wine, a bath - 4/3/20); the men still eat from their own wagons. Every soldier pays for himself and his horse from his own purse; companions pay from their own purses (with Companion Wage By Level off, the rest from the men's purse, where their pay then goes) (who cannot afford it takes a cheaper bed or the stable, free); you pay for yourself, your horse and the horses that carry nobody (in the baggage or the armoury). Taken in the evening or at night (from 18:00 with the usual camp hours) you sleep until dawn, by day until the men have slept; you wake rested until dusk, at most 12 hours: +5/+10/+12% speed on the map and +2/+5/+8 morale, weighted by how many slept in each kind of bed (only with no sleep debt); a decent inn or a good house also pays off sleep debt a quarter faster, and a good house heals the wounded half again as fast that night. The coin goes to the townsfolk who keep the inns. Needs Night Rest. Off = no inns, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool TownInns { get; set; } = true;
@@ -5283,6 +5291,22 @@ namespace Armoury
         [SettingPropertyBool("Army Cohesion Year Scale", HintText = "An army's cohesion falls each day at the pace the game meant for its 84-day year, scaled to the long year (84 / 364 = 0.23): a lord's army of five parties holds together about 80 days instead of about 19, and about 45 days instead of 12 deep in enemy land; your own army likewise. Starving, low-morale and weak parties still drain it faster, and a commander can still spend influence to restore it. Off = the game's daily loss", RequireRestart = false)]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool ArmyCohesionYearScale { get; set; } = true;
+
+        [SettingPropertyBool("Army Rest Day", HintText = "armies keep a day of rest: after this many days of marching in a row (Army Rest Day After March Days) a lord's army halts for a whole day, and a clean day of rest after such a march gives the army cohesion and every party in its camp morale (Army Rest Day Cohesion / Morale). Your own army gets the same if you hold it still for a day after such a march - you are told when it is due. A host does not halt while besieging, raiding, fighting, riding to defend or relieve, or with a stronger foe near, and breaks the rest if danger comes. Off = armies march on, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool ArmyRestDay { get; set; } = true;
+
+        [SettingPropertyInteger("Army Rest Day After March Days", 2, 14, "0", HintText = "days of marching in a row (4 or more hours on the move in a day) after which the next day is a day of rest (2 to 14)", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int ArmyRestDayAfterMarchDays { get; set; } = 6;
+
+        [SettingPropertyFloatingInteger("Army Rest Day Cohesion", 0.00f, 20.00f, "0.0", HintText = "cohesion an army gains for a day of rest after such a march (at the long year's slower loss about 2 days of what it loses at home, 1 deep in enemy land)", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public float ArmyRestDayCohesion { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Army Rest Day Morale", 0.00f, 30.00f, "0.0", HintText = "morale every party in the army's camp gains for a day of rest after such a march (it fades by a tenth each day, like any lift from events)", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public float ArmyRestDayMorale { get; set; } = 5f;
 
         [SettingPropertyBool("Army175 Golden Bows", HintText = "Golden Company crossbowmen split into thirds as in the books - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Their lords buy, keep and train with bows and arrows for two thirds of these men and crossbows and bolts for one third (only these three Golden Company crossbow troops; every other troop counts its first kit, as before). The kits are made by CrashScribe on the next load; the Armoury part acts at once. Off: one kit of crossbows for all of them", RequireRestart = false)]
         [SettingPropertyGroup("Armies of the realms (175)")]
@@ -9442,6 +9466,8 @@ namespace Armoury
             s.NightLedgerClock = NightLedgerClock;
             s.PlayerSleepGuard = PlayerSleepGuard;
             s.NightMarchNotice = NightMarchNotice;
+            s.ForcedMarch = ForcedMarch;
+            s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;
             s.TownInnPriceBonus = TownInnPriceBonus;
             s.RoadsideInns = RoadsideInns;
@@ -9588,6 +9614,10 @@ namespace Armoury
             s.Army175VolantisNorvos = Army175VolantisNorvos;
             s.Army175MinorLore = Army175MinorLore;
             s.ArmyCohesionYearScale = ArmyCohesionYearScale;
+            s.ArmyRestDay = ArmyRestDay;
+            s.ArmyRestDayAfterMarchDays = ArmyRestDayAfterMarchDays;
+            s.ArmyRestDayCohesion = ArmyRestDayCohesion;
+            s.ArmyRestDayMorale = ArmyRestDayMorale;
             s.Army175GoldenBows = Army175GoldenBows;
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;

@@ -188,9 +188,11 @@ namespace Armoury
                 bool movedH = moved;
                 if (s.NightLedgerClock && NightClock.CatchUp && hadPos) { resting = _lastRestPlayer; movedH = _lastMovedPlayer; }
                 _lastRestPlayer = resting; _lastMovedPlayer = movedH;
+                // R3-08c (ForcedMarch.cs): godzina marszu forsownego - konce same, licznik zmeczenia; odpoczynek tej godziny sie nie liczy
+                bool forced = ForcedMarch.Hour(s, mp, h);
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
-                if (resting) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                if (resting && !forced) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);
@@ -199,7 +201,7 @@ namespace Armoury
 
                 // NAMIOT SAM SIE STAWIA (Jeff 31.08: "jak spie, to czasami sie
                 // nie uruchamia") - nocny postoj w polu to oboz, takze bez menu
-                if (InCamp(h) && resting && !PlayerCamped && s.CampTentIcon
+                if (InCamp(h) && resting && !PlayerCamped && s.CampTentIcon && !forced
                     && mp.CurrentSettlement == null && mp.MapEvent == null
                     && mp.AttachedTo == null && !mp.IsCurrentlyAtSea)
                 {
@@ -235,6 +237,7 @@ namespace Armoury
                 bool promptHour = s.NightMarchNotice
                     ? InCamp(h) && Mod24(CampEnd - h) >= 2 && _promptNight != nightId
                     : h == CampStart && _promptDay != (int)CampaignTime.Now.ToDays;
+                if (forced) promptHour = false;   // R3-08c: marsz forsowny - bez pytania o nocleg i bez obozu z rozkazu "always make camp"
                 bool promptNow = false;
                 // ZB-6 (przeglad 16.10, klucz NightPromptSkipWhenRested): ludzie juz sie wyspali tej doby (np. sen w menu skonczony w godzinach obozu - pobudka
                 // o 3:00 i ruch kolumny dawaly zaraz "Night Falls - make camp?"): odpoczynek doby bez braku odlozonego >= NeededHours (baza + odsetki dlugu - ten sam
@@ -1848,6 +1851,8 @@ namespace Armoury
                 var mobileParty = __0;
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
+                // R3-08c (ForcedMarch.cs): marsz forsowny gracza +% od wyniku, raz na lancuch - PRZED kara dlugu (kara liczy sie od predkosci z premia)
+                if (mobileParty == MobileParty.MainParty && ForcedMarch.Active && SpeedDepth.OutermostFinal) ForcedMarch.SpeedBonus(ref __result);
                 int d = DebtFor(mobileParty);
                 if (d < 1)
                 {
@@ -2034,6 +2039,9 @@ namespace Armoury
                     new InquiryElement(3, "Nightfall orders: never ask" + cur2, null, true,
                         "March freely at night; camp only when you press O.")
                 };
+                // R3-08c (ForcedMarch.cs): przelacznik marszu forsownego
+                if (ForcedMarch.Offerable())
+                    copts.Add(new InquiryElement(4, ForcedMarch.Active ? "End the forced march" : "Forced march", null, true, ForcedMarch.Hint()));
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "Camp", "Pitch the tents - or set the standing orders for nightfall.",
                     copts, true, 1, 1, "Choose", GameTexts.FindText("str_cancel").ToString(),
@@ -2049,6 +2057,7 @@ namespace Armoury
                                 case 1: CampPromptMode = 0; Msg("Nightfall orders: the column will ask at dusk.", Colors.White); break;
                                 case 2: CampPromptMode = 1; Msg("Nightfall orders: the column will camp at dusk on its own.", Colors.White); break;
                                 case 3: CampPromptMode = 2; Msg("Nightfall orders: no questions - march at will.", Colors.White); break;
+                                case 4: ForcedMarch.Toggle("klawisz O"); break;   // R3-08c
                             }
                         }
                         catch (Exception e) { Log.Error("NightRest.CampPanel", e); }
@@ -2073,6 +2082,9 @@ namespace Armoury
                     new InquiryElement(3, "Never ask again", null, true,
                         "March freely at night; you can still camp with the O key.")
                 };
+                // R3-08c (ForcedMarch.cs): marsz forsowny zamiast zwyklego "March on"
+                if (ForcedMarch.Offerable() && !ForcedMarch.Active)
+                    opts.Add(new InquiryElement(4, "Forced march", null, true, ForcedMarch.Hint()));
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "Night Falls",
                     "Darkness gathers over the column and the road ahead disappears. Make camp?",
@@ -2088,6 +2100,7 @@ namespace Armoury
                                 case 2: CampPromptMode = 1; MakeCampNow(); break;
                                 case 3: CampPromptMode = 2;
                                         Msg("The nightfall question will trouble you no more.", Colors.White); break;
+                                case 4: ForcedMarch.Start("pytanie Night Falls"); break;   // R3-08c
                             }
                         }
                         catch (Exception ex) { Log.Error("NightfallAsk.Selected", ex); }
