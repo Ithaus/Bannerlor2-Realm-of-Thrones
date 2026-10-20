@@ -45,7 +45,7 @@ namespace Armoury
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
         private static long _dayCamp;          // E5/A3 (163): markietani - wydane w polu (CampTake; odbiorcy w Sutlers)
 
-        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; }
+        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; SavingsByNeed.Reset(); }
 
         internal static string Export()
         {
@@ -107,7 +107,7 @@ namespace Armoury
             try
             {
                 if (mp == null) return;
-                AiWear.Forget(mp); AiGear.Forget(mp); MenUpgrade.Forget(mp); SetSaved(mp, 0);
+                AiWear.Forget(mp); AiGear.Forget(mp); MenUpgrade.Forget(mp); SetSaved(mp, 0); SavingsByNeed.Forget(mp);   // m96: bez celu oszczedzania
                 int purse = Get(mp);
                 if (purse <= 0) return;
                 Take(mp, purse);
@@ -222,7 +222,12 @@ namespace Armoury
             {
                 if (!On || mp == null || st == null || !st.IsTown || st.Town == null) return;
                 Day();
-                if (mp.IsMainParty) { SettlePlayerBook(); SellPlayerSurplus(st); BuyPlayerGaps(st); MenUpgrade.ForPlayer(st); }
+                if (mp.IsMainParty)
+                {
+                    SettlePlayerBook(); SellPlayerSurplus(st);
+                    SavingsByNeed.VisitBegin();   // m96: jedna wizyta na targu - cel oszczedzania z brakow i lepszych, na ktore nie bylo ich stac (nie rzuca)
+                    try { BuyPlayerGaps(st); MenUpgrade.ForPlayer(st); } finally { SavingsByNeed.VisitEnd(mp); }
+                }
                 else if (mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero.IsAlive && mp.MapEvent == null)
                 {
                     long p0 = DayProfile.On ? DayProfile.MpBegin() : 0L;   // E8/0 (242): rozbicie wejscia lorda, probka 1/16 (tylko pomiar)
@@ -248,7 +253,8 @@ namespace Armoury
                 Day();
                 SettlePlayerBook();
                 if (CitySack.NoSpendStay(st, mp)) return;   // lup miast L3 (poprawka po audycie): w oknie lupu ludzie gracza nie kupuja z polki lupionej osady (wlasny try)
-                BuyPlayerGaps(st); MenUpgrade.ForPlayer(st);
+                SavingsByNeed.VisitBegin();   // m96: doba postoju - jedna wizyta na targu (nie rzuca)
+                try { BuyPlayerGaps(st); MenUpgrade.ForPlayer(st); } finally { SavingsByNeed.VisitEnd(mp); }
             }
             catch (Exception e) { Log.Error("MenPurse.OnDailyTickParty", e); }
         }
@@ -301,6 +307,7 @@ namespace Armoury
                 {
                     var s = Settings.Current;
                     long cap = (long)Math.Max(0, s.MenGearSaveDays) * MenWage(mp);   // CW (recenzja): bez zoldu bohaterow rodu - ich zold do sakiewki ludzi nie idzie
+                    cap = SavingsByNeed.Cap(mp, cap, reserve);   // m96 (SavingsByNeed): najwyzej naprawy + cel oszczedzania (sprzet widziany, na ktory nie bylo ich stac)
                     int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - reserve));
                     kept = Math.Min(Math.Min(SavedOf(mp), avail), room);      // dawne oszczednosci: nie wiecej, niz jest w sakiewce i niz limit
                     int want = (int)((long)(avail - kept) * Math.Max(0, Math.Min(100, s.MenGearSavePercent)) / 100);
@@ -503,6 +510,7 @@ namespace Armoury
             int avail = (int)Math.Max(0L, purse - res);
             long cap = (long)Math.Max(0, s.MenGearSaveDays) * MenWage(mp);   // CW (recenzja): bez zoldu bohaterow rodu - ich zold do sakiewki ludzi nie idzie
             if (capShare < 1f) cap = (long)(cap * (double)Math.Max(0f, capShare));
+            cap = SavingsByNeed.Cap(mp, cap, mend);   // m96 (SavingsByNeed): ta sama regula co OnLeft - w polu chronione najwyzej naprawy + cel
             int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - mend));
             kept = Math.Min(Math.Min(SavedOf(mp), avail), room);
         }
@@ -615,6 +623,7 @@ namespace Armoury
             if (armory == null || QuartermasterEscrow.Active) return;
             int budget = Get(main) - TroopSelfMend.OutstandingCost(st);   // naprawy maja pierwszenstwo (z materialem - szacunek z tej polki)
             if (budget <= 0) return;
+            SavingsByNeed.Saw(false);   // m96: przeglad brakow w tej wizycie (okno w OnEntered / OnDailyTickParty)
             int spent = 0, pieces = 0, maxPieces = Math.Max(1, Settings.Current.AiGearMaxPiecesPerVisit);
             var shelf = st.ItemRoster;
             foreach (var type in QuartermasterLaw.KitTypes)
@@ -636,6 +645,7 @@ namespace Armoury
                     int best = -1, bestPrice = 0; float bestScore = 0f;
                     int maxTier = ceils.Count > 0 ? ceils[Math.Min(gap0 - gap, ceils.Count - 1)] : int.MaxValue;
                     bool resHit = false;
+                    int poor = int.MaxValue;   // m96: najtansza pasujaca sztuka za droga na reszte sakiewki
                     for (int i = 0; i < shelf.Count; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
@@ -649,11 +659,12 @@ namespace Armoury
                         if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;   // K1 (przeglad): ksiega per id - zakup ludzi przesunalby Twoja czesc na gorszy egzemplarz
                         if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }   // 174b.4: ludzie gracza kupuja hurtem jak ludzie lorda - ostatnia sztuka pasma zostaje
                         int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
-                        if (price <= 0 || price > budget - spent) continue;
+                        if (price <= 0) continue;
+                        if (price > budget - spent) { if (price < poor) poor = price; continue; }   // m96: za droga - kandydat na cel oszczedzania
                         float score = XbowPrice.BuyScore(it, it.Effectiveness > 0f ? it.Effectiveness : 1f, price);   // kusze wedlug luku (XbowBuyByPower): kusza skutecznosc^2 / cena
                         if (score > bestScore) { bestScore = score; best = i; bestPrice = price; }
                     }
-                    if (best < 0) { if (resHit) Measure174b.NoteHeld(Measure174b.BPlayerMen, 1); break; }
+                    if (best < 0) { if (resHit) Measure174b.NoteHeld(Measure174b.BPlayerMen, 1); SavingsByNeed.NoteWant(poor, true); break; }   // m96: brak bez pieniedzy - cel (int.MaxValue = nic, nie rzuca)
                     var pick = shelf.GetElementCopyAtIndex(best).EquipmentElement;
                     shelf.AddToCounts(pick, -1);
                     armory.AddToCounts(pick, 1);

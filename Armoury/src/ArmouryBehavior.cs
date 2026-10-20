@@ -1202,6 +1202,9 @@ namespace Armoury
             // E5/A3 (163): markietani - stan rozruchu (doba startu albo "bez rozruchu") - wlasny try; brak klucza (stary zapis) = rozruch rozstrzyga pierwsza doba
             try { string su = dataStore.IsSaving ? Sutlers.Export() : null; SaveText.Sync(dataStore, "arm_sutlers", ref su); if (dataStore.IsLoading) Sutlers.Import(su); }
             catch (Exception e) { Log.Error("SyncData.arm_sutlers", e); }
+            // m96 (SavingsByNeed): cele oszczedzania partii i rozruch - wlasny try; brak klucza (stary zapis) = cele 0, rozruch rozstrzyga pierwsza doba
+            try { string sbn = dataStore.IsSaving ? SavingsByNeed.Export() : null; SaveText.Sync(dataStore, "arm_m96sak", ref sbn); if (dataStore.IsLoading) SavingsByNeed.Import(sbn); }
+            catch (Exception e) { Log.Error("SyncData.arm_m96sak", e); }
             // E6/M2 (208): flaga nowej kampanii dla wielbladow tylko w Qarthu - wlasny try; brak klucza (stary zapis) = stadniny jak w grze
             try { string cm = dataStore.IsSaving ? CamelLaw.Export() : null; SaveText.Sync(dataStore, "arm_e6_camels", ref cm); if (dataStore.IsLoading) CamelLaw.Import(cm); }
             catch (Exception e) { Log.Error("SyncData.arm_e6_camels", e); }
@@ -2688,6 +2691,7 @@ namespace Armoury
             // E5/A3 (163): markietani - ludzie partii rodow w polu wydaja czesc wolnej sakiewki: kasa najblizszego niewrogiego miasta i kiesa wsi; osobna pozycja ksiegi
             // (MSutlers); po zwrocie korony i Banku (K3 licznik na jutro, jak OnLeft), przed budzetem rodow (projekt etapu 5, rozdz. 5.2 pkt 6)
             try { Sutlers.Daily(); } catch (Exception e) { Log.Error("Sutlers.Daily", e); } DayProfile.Lap("Sutlers.Daily");   // linia "Markietani (E5/A3)"
+            try { SavingsByNeed.Daily(); } catch (Exception e) { Log.Error("SavingsByNeed.Daily", e); } DayProfile.Lap("SavingsByNeed.Daily");   // m96: zalogi wydaja wolna sakiewke w osadzie - ta sama pozycja ksiegi (MSutlers); linia "Sakiewki wedlug potrzeby (m96)"
             try { MoneyLedger.Mark(MoneyLedger.MSutlers); } catch { }
             // E5/B6 (201): pula sakiewek weteranow wydana w miastach karczm (zycie, SutlerDailyShare; pule bez weteranow - cale); osobna pozycja ksiegi (MVetPurse);
             // przed budzetem rodow - sakiewki zwolnionych 166 tej doby wchodza do puli jutro wydawane
