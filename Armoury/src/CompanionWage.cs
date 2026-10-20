@@ -167,9 +167,9 @@ namespace Armoury
                     given += pay; _dPaid += pay; _dPayN++; any = true;
                 }
                 if (any) _dParties++;
-                if (given > 0) MoneyLedger.NoteWageRouted(true, given);   // zold oddany do obiegu (jak sakiewki ludzi)
             }
             catch (Exception e) { Stumble("PayFromWage", e); }
+            if (given > 0) MoneyLedger.NoteWageRouted(true, given);   // zold oddany do obiegu (jak sakiewki ludzi) - takze czesc wyplacona przed wyjatkiem
             return given;
         }
 
