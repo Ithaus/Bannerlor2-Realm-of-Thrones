@@ -3331,4 +3331,9 @@ OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 
   -> workflow wf_bc7a8672-3eb: w-toku/r4-zloto (PLAN 3.10 - kazde zloto startu przeliczone na ceny historyczne), w-toku/r4-wolni (PLAN 4.17 - walcza wszyscy dorosli),
   w-toku/r4-zlecenia (PLAN 8.3 - brak zlota lorda doplaca glowa rodu); 2 (zyznosc krain) i 4 (drogi Valyrii) - wyjasnic jeszcze raz; A7 i 35 pomyslow - praca nocna.
   Opis 35 pomyslow: workflow wf_c92f06fe-cab -> docs/POMYSLY-35-2026-10-20.md.
+- 20.10 ok. 02:25: Jeff ZACZAL NOWA KAMPANIE na WGRANIU 91 (start BK "Indebted Lord", rod Whent, Dorzecze; log Armoury-2026-10-20_02-17-13.log, kopia D:/Backup-Bannerlord/logi-jeffa/2026-10-20).
+  Wioska poboczna nadana: Seven Elms (okreg Mudgrave, pan Paege). Jeff: "NIe ma poakzanego moje thiefts i mam na minusie, wioska nic nie zarabia?" - PRAWDA: dochod wioski zawsze 0
+  (tez w autotestach 5 dob: "wozy okregu 0, podatek pana w oknach 0, do gracza 0" - przeoczone; test sprawdzal nadanie/herb/menu, nie dochod). Przyczyna: dochod z licznika podatku
+  handlowego pana (TradeTaxAccumulated) przy powrocie wozu - przy daninach DS licznik stoi. Zloto startu 0 (BK start_lord). NAPRAWA: workflow wf_83abfd2a-d83, galaz w-toku/r4-wioska
+  (dochod codziennie, linia w podpowiedzi zlota, wioska w zakladce Fiefs). Wgranie dopiero po zamknieciu gry przez Jeffa (dziala na jego zapisie po wczytaniu).
 
