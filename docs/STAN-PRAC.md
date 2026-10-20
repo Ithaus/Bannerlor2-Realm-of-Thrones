@@ -3415,3 +3415,13 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   Jeffa ma A7 false do czasu wgrania) - bez biegu z zapisu (Jeff zaczyna nowa gre; test zapisu wraca przy nocnych wersjach). n22c: bitwa 0, nowa 0 (NKS-30n TAK
   mediana 2, P3W3-3 TAK 2130, 0 ERROR), 160 w toku do ok. 10:00 (baza porownania).
 
+### 100. WGRANIE 94 (20.10 ok. 10:10 PDT) - fala 1 + fala 2 + poprawki - START TUTAJ
+W grze: `w-toku/noc-wgranie-94` = n23-calosc e35e6f99 | Armoury **b72d558e** (2125 ustawien), CrashScribe e5ffb849, GrandTourney a16e14ec (oba = testy n22b/n22c),
+RealisticCaptivity e55869a2, ForgeView 19aa052a, nowy arm_rivers.tsv. Kopie *.bak-2026-10-20-wgranie94-przed + D:/Backup-Bannerlord/wgrane/2026-10-20-wgranie94-przed.
+Armoury.json Jeffa: "KsSwitchSignalRule": false -> true (kopia Armoury.json.bak-2026-10-20-wgranie94-przed + D:). engine_config safely_exited = 1.
+Jeff: NOWA KAMPANIA na 94 (opcja 2); "wgrywamy 94 i dopiero wtedy zrob test" -> fala 2 + naprawy2 + poprawki scalenia fali 2 BEZ dlugiego autotestu przed wgraniem;
+szybki test po wgraniu: testy-94q.ps1 (bitwa 5 dob x4 + nowa 8 dob, DLL test/n23 = wgrane). Testy przed: n22a/n22b/n22c kod 0 (fala 1 + n22f).
+DO ZROBIENIA: dlugi autotest 94 (bitwa + nowa ok. 180 dob z A7, porownanie progow z n22c) - gdy Jeff zamknie gre albo w nocy; grupy p6* (PO-*, SP-*, SZB-*, PP-*, AD-*,
+MS-*, p6a7), bramka krainy KS przy spichlerzu (Vaes Diaf, New Ghys, Vaes Dothrak, Yronwood), naprawy AI ok. 1100/d i zaleglosc obitych, lukarze/krawcy (n22b nizej -
+przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok. 40 dobach). NOC 20/21.10: docs/ZADANIA-OBOZ-NOC.md, potem docs/PLAN-OPTYMALIZACJA-NOC.md.
+
