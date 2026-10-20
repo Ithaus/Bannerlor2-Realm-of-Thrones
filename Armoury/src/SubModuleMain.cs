@@ -394,6 +394,7 @@ namespace Armoury
                     Log.Error("MapSideRoads: komponent widoku nie laduje sie (proba " + _sideRoadsLoadFails + "/3)", e);
                 }
             }
+            MapFields.AppTick();   // p6-pola (R3-07b): pola wokol wiosek wedlug pory roku - wlasna ochrona przed bledem ladowania typu (MapFields.cs); osobno od dopisow innych widokow (scalenie fali 2)
             // sw-zajazdy: zajazdy przy szlakach - osobna rejestracja widoku przed wylacznikiem wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach
             // zajazdy na mapie nie startuja do konca sesji; menu i plotki dzialaja dalej); przy kluczu RoadsideInns = off typ widoku sie nie laduje
             if (_innsLoadFails < 3 && Settings.Current.RoadsideInns)
@@ -405,7 +406,6 @@ namespace Armoury
                     Log.Error("RoadsideInns: komponent widoku nie laduje sie (proba " + _innsLoadFails + "/3)", e);
                 }
             }
-            MapFields.AppTick();   // p6-pola (R3-07b): pola wokol wiosek wedlug pory roku - wlasna ochrona przed bledem ladowania typu (MapFields.cs)
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
