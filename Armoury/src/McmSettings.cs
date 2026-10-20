@@ -8516,6 +8516,10 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
 
+        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory and the masters of Qohor into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("The town menu")]
+        public bool TownMenuTidy { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -10644,6 +10648,7 @@ namespace Armoury
             s.BookHoldingsRestore = BookHoldingsRestore;
             s.BookHoldingsGarrison = BookHoldingsGarrison;
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
+            s.TownMenuTidy = TownMenuTidy;
         }
 
         internal static void Apply()
