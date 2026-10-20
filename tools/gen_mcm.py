@@ -453,6 +453,8 @@ RANGES = {
     'DistrictWorksAiReserveDays': (0, 364, "0"),
     'DistrictWorksAiReserveFlat': (0, 200000, "0"),
     'DistrictWorksAiWorldPace': (0.0, 0.1, "0.000"),
+    # R3-09f (noc 20/21.10): regale gornicze - kod przycina stawke do 0..0.5 (MineRegale.Share); 0.125 = 1/8 wymaga 3 miejsc
+    'MineRegaleShare': (0.0, 0.5, "0.000"),
     # f5-a7 (noc 17/18.10): pasmo odchylenia rynku w sygnale A7 - kod przycina do 0..0.5 (StartCalibration.A7sBand)
     'KsSwitchMarketBand': (0.0, 0.5, "0.00"),
     # f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band na zajeta kryjowke - kod przycina do 48, a <= 12 (ROT) to cel gry bez zmian (BanditLimit.RaisedTarget)
