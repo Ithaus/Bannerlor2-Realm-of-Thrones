@@ -995,6 +995,13 @@ Uzycie (Python 3, tylko odczyt):
                     bitwach z panem), SZB-3 najwyzej 'maks.' naraz (200) i jedna na okreg (okregow = aktywnych), SZB-3b limit nie skraca czasu (zastapione + odrzucone
                     przez limit <= 25% nowych, szubienice gracza nie zastapione), SZB-4 bez drogi <= 50% bitw z panem, SZB-5 wybor miejsca <= 2 ms, SZB-6 potkniecia,
                     pominiete obrazki i ERROR 0, SZB-7 obrazki i probki linii 'postawiona' (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa m96zamek  : (20.10, m96-zamek - Jeff 20.10 "menu zamku tez uporzadkuj"; Armoury/src/CastleMenus.cs; klucz CastleMenuTidy)
+                    python -I tools/sprawdz_logi.py --grupa m96zamek <Armoury-*.log> (strumieniowo). ZM-0 linie 'Menu zamku (m96-zamek): start' (kazde wczytanie
+                    i nowa kampania; blad/brak 0; ERROR paczki bez linii startu - NIE), ZM-1 przeniesione = znalezione z planu, naszych nie znalezionych 0 (pelny
+                    zestaw modow 10 z 10; ZM-1b cudze bez wpisu - INFO), ZM-2 wejscia 'Go to the barracks' i 'Castle affairs' wpiete i w menu zamku, ZM-3 nic nie
+                    zginelo (przed - przeniesione + wejscia = teraz; opcji planu w zamku 0; leave, Manage castle i Banner Kings zostaja), ZM-3b menu zamku po zmianie
+                    (INFO), ZM-4 'ERROR in CastleMenus', 'ERROR in OnAfterGameInitializationFinished (CastleMenus)' i linie BLAD/BRAK 0. Klucz wylaczony: ZM-1 INFO.
+                    Autotest nie klika menu. Log bez paczki: INFO, bez wyjatku.
 --grupa nzc1      : (16.10, projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md paczka ZC1 "drogi towarow"; galaz w-toku/noc-zc1, Armoury/src/GoodsPaths.cs)
                     python -I tools/sprawdz_logi.py --grupa nzc1 [--baza-doby <log biegu bazowego bez ZC1>] <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie
                     doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu (f25-sprawdz,
@@ -36588,6 +36595,96 @@ def p6szubienice_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96zamek (20.10, m96-zamek: porzadek menu zamku jak menu miasta; Armoury/src/CastleMenus.cs, klucz CastleMenuTidy)
+M96ZAMEK_HEAD = "Menu zamku (m96-zamek): start | "
+M96ZAMEK_PLAN = ("manage_garrison", "leave_troops_to_garrison", "arm_garrison_kit_castle", "repair_equipment_castle", "arm_people_castle", "arm_estates_castle",
+                 "arm_realm_ledger_castle", "bee_castle_root", "arm_townloan_borrow_castle", "arm_townloan_repay_castle")
+# opcje, ktore MUSZA zostac w menu zamku (jesli byly): wyjazd, Manage castle (GameMenuEventHandler "castle"), Banner Kings (werbunek zamku - poprawka po recenzji)
+M96ZAMEK_KEEP = ("leave", "manage_production", "bannerkings_castle_submenu")
+# blad z zewnetrznego catch w SubModuleMain (Apply wywrocone przy wywolaniu - JIT/TypeLoad, linii startu wtedy nie ma; recenzja technika)
+M96ZAMEK_ERR = ("ERROR in CastleMenus", "ERROR in OnAfterGameInitializationFinished (CastleMenus)")
+M96ZAMEK_HUBS = ("arm_cm_barracks", "arm_cm_affairs")
+M96ZAMEK_BEFORE = re.compile(r"\| menu zamku przed (?P<n>\d+) opcji: (?P<ids>[^|]*) \|")
+M96ZAMEK_MOVED = re.compile(r"\| przeniesione (?P<n>\d+) z (?P<plan>\d+) w planie: ")
+M96ZAMEK_HUBSIN = re.compile(r"\| wejscia podmenu wpiete (?P<n>\d+) \(")
+M96ZAMEK_MISS = re.compile(r"\| nie znaleziono cudzych (?P<f>\d+)(?: \[(?P<fl>[^\]]*)\])?, naszych (?P<o>\d+)(?: \[(?P<ol>[^\]]*)\])?")
+M96ZAMEK_AFTER = re.compile(r"\| menu zamku teraz (?P<n>\d+) opcji: (?P<ids>.*)$")
+
+
+def m96zamek_ids(s):
+    return [x.strip() for x in s.split(",") if x.strip()]
+
+
+def m96zamek_main(logp):
+    """m96zamek (20.10, m96-zamek; klucz CastleMenuTidy): porzadek menu zamku - zaloga gry, sprzet zalogi i kowal RB do "Go to the barracks", ksiegi Armoury, BEE
+    i pozyczka do "Castle affairs" (te same obiekty opcji); Banner Kings (werbunek zamku) zostaje na wierzchu. Wejscie: log Armoury (strumieniowo). ZM-0 linie
+    startu sesji (kazde wczytanie; brak linii przy bledzie paczki - NIE), ZM-1 przeniesione wszystkie znalezione z planu (naszych nie znalezionych 0; cudzych -
+    INFO, mod bez opcji), ZM-2 wejscia wpiete (2 przy pelnym zestawie), ZM-3 nic nie zginelo (przed - przeniesione + wejscia = teraz), zadna opcja planu nie
+    zostala w menu zamku, "leave", "manage_production" i "bannerkings_castle_submenu" (jesli byly) zostaly, ZM-4 bledy (BLAD w linii startu, ERROR in CastleMenus,
+    ERROR in OnAfterGameInitializationFinished (CastleMenus)) 0. Autotest nie klika menu - samo menu w grze sprawdza Jeff. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ZM-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, n_err = [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96ZAMEK_HEAD):
+                starts.append(s)
+            elif s.startswith(M96ZAMEK_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu menu zamku {len(starts)}, ERROR in CastleMenus (z wywolaniem w SubModuleMain) {n_err}")
+    if not starts and n_err == 0:
+        rep.add("ZM-0: linia 'Menu zamku (m96-zamek): start'", "brak w logu", "INFO (log sprzed paczki m96-zamek)", None)
+        rep.show()
+        return 0
+    on = [s for s in starts if s.startswith(M96ZAMEK_HEAD + "WLACZONY (Castle Menu Tidy)")]
+    off = [s for s in starts if s.startswith(M96ZAMEK_HEAD + "WYLACZONY w MCM")]
+    bad = [s for s in starts if s.startswith((M96ZAMEK_HEAD + "BLAD", M96ZAMEK_HEAD + "BRAK", M96ZAMEK_HEAD + "WLACZONY, ale"))]
+    rep.add("ZM-0: linie startu sesji (kazde wczytanie / nowa kampania)", f"{len(starts)} (wlaczony {len(on)}, wylaczony {len(off)}, blad/brak {len(bad)})",
+            ">= 1, blad/brak 0 (wylaczony - INFO)", None if off and not bad else (len(starts) >= 1 and not bad))
+    if not on:
+        rep.add("ZM-1: przeniesienie", "brak linii WLACZONY", "INFO (klucz Castle Menu Tidy wylaczony)" if off else "INFO (bez linii startu - blad paczki, patrz ZM-4)",
+                None if not bad else False)
+        rep.add("ZM-4: bledy paczki", f"ERROR in CastleMenus (z wywolaniem) {n_err}, linii BLAD/BRAK {len(bad)}", "0", n_err == 0 and not bad)
+        rep.show()
+        return 0
+    s0 = on[-1]
+    mb, mm, mh, mi, ma = (r.search(s0) for r in (M96ZAMEK_BEFORE, M96ZAMEK_MOVED, M96ZAMEK_HUBSIN, M96ZAMEK_MISS, M96ZAMEK_AFTER))
+    if not (mb and mm and mh and mi and ma):
+        rep.add("ZM-1: linia startu rozpoznana", s0[len(M96ZAMEK_HEAD):][:240], "format paczki m96-zamek", False)
+        rep.show()
+        return 0
+    before, after = m96zamek_ids(mb.group("ids")), m96zamek_ids(ma.group("ids"))
+    moved, plan, hubs = int(mm.group("n")), int(mm.group("plan")), int(mh.group("n"))
+    miss_f, miss_o = int(mi.group("f")), int(mi.group("o"))
+    in_plan_before = [x for x in M96ZAMEK_PLAN if x in before]
+    rep.add("ZM-1: przeniesione opcje planu (wszystkie znalezione)", f"{moved} z {plan} w planie; w menu przed: {len(in_plan_before)}; nie znaleziono cudzych {miss_f}"
+            + (f" [{mi.group('fl')}]" if mi.group("fl") else "") + f", naszych {miss_o}" + (f" [{mi.group('ol')}]" if mi.group("ol") else ""),
+            "przeniesione = znalezione w menu przed, naszych nie znalezionych 0 (pelny zestaw modow: 10 z 10)", moved == len(in_plan_before) and miss_o == 0)
+    if miss_f:
+        rep.add("ZM-1b: cudze opcje bez wpisu w menu zamku", mi.group("fl") or str(miss_f), "INFO (mod wylaczony albo zmienil id opcji - nie ma jej w grze)", None)
+    want_hubs = int(any(x in before for x in M96ZAMEK_PLAN[:4])) + int(any(x in before for x in M96ZAMEK_PLAN[4:]))
+    hubs_now = [x for x in M96ZAMEK_HUBS if x in after]
+    rep.add("ZM-2: wejscia podmenu wpiete (Go to the barracks, Castle affairs)", f"{hubs} (w menu teraz: {', '.join(hubs_now) or 'brak'})",
+            f"= {want_hubs} i wszystkie w menu zamku", hubs == want_hubs and len(hubs_now) == hubs)
+    left = [x for x in M96ZAMEK_PLAN if x in after]
+    lost = [x for x in before if x not in after and x not in M96ZAMEK_PLAN]
+    keep = [x for x in M96ZAMEK_KEEP if x in before and x not in after]
+    sums_ok = len(before) - moved + hubs == len(after) and int(mb.group("n")) == len(before) and int(ma.group("n")) == len(after)
+    rep.add("ZM-3: nic nie zginelo (przed - przeniesione + wejscia = teraz)", f"przed {len(before)}, przeniesione {moved}, wejscia {hubs}, teraz {len(after)}"
+            + (f"; opcje planu dalej w zamku: {', '.join(left)}" if left else "") + (f"; ZNIKNELY: {', '.join(lost)}" if lost else "")
+            + (f"; brak w zamku (musza zostac): {', '.join(keep)}" if keep else ""),
+            "rowne, opcji planu w zamku 0, zniknietych 0, leave, Manage castle i Banner Kings zostaja", sums_ok and not left and not lost and not keep)
+    rep.add("ZM-3b: menu zamku po zmianie (kolejnosc)", ", ".join(after)[:400], "INFO - miejsca, Banner Kings, Manage castle, schowek, wejscia przed 'town_wait', wyjazd", None)
+    rep.add("ZM-4: bledy paczki", f"ERROR in CastleMenus (z wywolaniem) {n_err}, linii BLAD/BRAK {len(bad)}", "0", n_err == 0 and not bad)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ nzajazdy (17.10, sw-zajazdy: zajazdy przy szlakach + noclegi + plotki; Armoury/src/RoadsideInns.cs, RoadsideInnsView.cs,
 # TownInns.Road.cs, Rumours.cs; klucze RoadsideInns / InnGossip)
 NZJ_HEAD = "Zajazdy (ZJ): "
@@ -52357,6 +52454,8 @@ def main(argv):
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
     if group == "p6szubienice" and logp:
         return p6szubienice_main(logp)   # p6szubienice (20.10, p6-szubienice R3-07a): szubienice przy rozstajach po rozbitej bandzie / kryjowce (Gallows, GallowsView)
+    if group == "m96zamek" and logp:
+        return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
     if group == "nzajazdy" and logp:
         return nzajazdy_main(logp)   # nzajazdy (17.10, sw-zajazdy): zajazdy przy szlakach wedlug ludzi, nocleg -> kiesa wsi, plotki bez wyjatkow, obrazek raz na mape (RoadsideInns, Rumours)
     if group == "nzc1" and logp:
