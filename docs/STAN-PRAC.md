@@ -3479,5 +3479,6 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   kling legend ukrytych; zapis Jeffa naprawi sie raz przy wczytaniu: -4 luki/strzaly t6, -6 kusz), m96-dlugi 3a711c55 CZESCIOWO (TownDebt: dlug rady u mieszczan i Banku,
   splata z nadwyzki, dobrobyt -0.5/d, podatek nadzwyczajny; brak podpowiedzi kasy - menu Town affairs -> The council's debts; przeglady wymuszone dopiero po 240+ dobach).
   Scalone do n25 45f3efa7 + licznik "bez powalajacego" tylko rycerze; 2167 ustawien, 5 modow build 0. W toku: m96-wies (menu wsi + komunikaty platnosci, wf_72028594-b56).
-  Jeff: "You paid 2 - powinno byc, za co (nocleg)"; "menu wsi tez jak miasto i zamek".
+  Jeff: "You paid 2 - powinno byc, za co (nocleg)"; "menu wsi tez jak miasto i zamek".- 16:35 PDT Jeff: "przejrzyj kucie strzal i lukow i pancerzy, bo niektore strzaly wymagaja 14 najlepszej stali albo luki 8 lnu, to bez sensu" -> wf_48e51b44-1b9,
+  w-toku/m96-receptury od n25 4fa764dc (audyt wszystkich przepisow + regula z masy przedmiotu i budowy, przetop nie wiecej niz przepis).
 
