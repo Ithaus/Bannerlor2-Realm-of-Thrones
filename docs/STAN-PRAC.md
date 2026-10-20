@@ -3289,3 +3289,15 @@ W grze bez zmian: WGRANIE 88 (Armoury 6d0fd3e4). Jeff gral 14:41-16:09 (Ironman 
   build 5 modow kod 0; sprawdz_narzedzie OK; stary dubel NSP_CTL (f23) -> NSPI_CTL (7c5d5c54). TEST n20a (5 dob, 4 bitwy x20, armoury-wioska-gracza.flag) w toku;
   przeglad calosci wf_76ff09fd-a3e (5 wymiarow + 1 poprawiajacy) w toku. Dalej: scalic zawieszenie (CrashScribe -> nowa DLL autotestu z at1-cs-bitwa.diff).
 
+### 95. WGRANIE 89 (19.10 ok. 20:15 PDT) - NOC 19/20.10: 12 GALEZI + PRZEGLAD CALOSCI - START TUTAJ
+W grze: `w-toku/noc-wgranie-89` = n20-calosc bc5a1e0d | Armoury **870557da** (2049 ustawien), CrashScribe **2e6a801e**, RealisticCaptivity **e55869a2**, GrandTourney 87465d27, ForgeView 19aa052a
+(bez zmian). Kopie *.bak-2026-10-19-wgranie89-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie89-przed; zapis Jeffa D:/Backup-Bannerlord/zapisy-jeffa/2026-10-19-po-sesji-88 (md5 662b1ff8).
+= 88 + n20-zawieszenie (UnwindRepair - naprawa UNWIND_INFO malych metod z detourem; siec bez malych metod; GC (UW)), relacje, kuznia, plotki, herby, napisy, drogi, wioska, towarzysze,
+niewola (RC), drobne, wyceny + przeglad calosci (17/18 poprawione). Wpisy: docs/noc-1920/*-CHANGELOG.md w galezi; zbiorczo CHANGELOG.md (2026-10-20, WGRANIE 89). Autotestowy CrashScribe:
+test/CrashScribe-at-n20.dll (drzewo zb/n20-at, at1-cs-bitwa.diff na f0059cd8).
+TESTY: n20b 5 dob + 4 bitwy x20 kod 0 (UW 44/44 naprawione, 0 pominietych; wioska gracza 10/10); n20b-160 160 dob x8 kod 0, 0 ERROR naszych, 0 zawieszen. Porownanie 119 grup z fin102:
+16 nowych NIE/ETAP (zmiennosc biegu albo nowy pomiar ZC1-4o); drugi bieg n20c (160 dob x8) w toku - rozstrzygnie NZC6-5 (rozrzut Dostatku 14.4x) i reszte.
+OTWARTE (do raportu): niewola sprawdzona tylko w kodzie (autotest - ucieczka z pola, nie niewola); start "Indebted Lord" sprawdzony furtka (nie kreatorem); aksamit 3c - 32% miast okolicy
+tanie (cel 50%); przetop broni z 1 sztaby oddaje cala sztabe (decyzja Jeffa); A7 wylaczone (kasy miast x2); GC ok. 4000 gen0/min przy x8 (optymalizacja - pozniej).
+PO OSTATNIM TESCIE: engine_config.txt safely_exited = 1 (inaczej Jeff dostanie okno Safe Mode).
+
