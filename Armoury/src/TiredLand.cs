@@ -9,7 +9,9 @@ namespace Armoury
     /// <summary>
     /// R3-06d (noc 20.10, galaz p5-stada; POMYSLY-35 poz. 15, audyt 02 rozdz. 2.1 i E pkt 5, 10-pomysly F6) - UGOR I ZMECZONA ZIEMIA. Klucz TiredLandYield.
     /// KS liczy plon okregu liniowo od rak (rece bloku x P0 x przydatnosc ziemi), a ziemie zajeta bloku (KsPart.LandUse: dom, zboze wlasne, rece zajec x ha na pracujacego
-    /// - ha zajec juz z ugorem trojpolowki) tylko pilnuje regula zmiany zajec. Gdy ludzi przybywa, ziemia zajeta rosnie ponad ziemie okregu i kazdy chlop dawal dotad tyle samo.
+    /// z tabeli KS) tylko pilnuje regula zmiany zajec. Gdy ludzi przybywa, ziemia zajeta rosnie ponad ziemie okregu i kazdy chlop dawal dotad tyle samo.
+    /// Recenzja (drobne): to HAMULEC PRZYROSTU ponad ziemie startu, bez osobnego modelu ugoru (odlogu 1/3 - 1/2 nie liczymy osobno; tabela KS nie mowi, czy jej ha
+    /// na pracujacego zawieraja odlog). Okreg przeludniony juz na starcie (rho startu > 1) zachowuje plon; dziala tylko w stanie zastosowanym KS.
     /// Odtad (KS, gra - ComputeDistrict z czynnikami; Plan bez zmian): rho = ziemia zajeta okregu / ziemia okregu (suma blokow). Baza okregu b = max(1, rho przy pierwszym
     /// rachunku w grze) - w zapisie (start neutralny: okreg, ktory na starcie juz siedzial na calej ziemi, nie traci ani grama). Gdy rho > b, towary ziemi (zboze, owoce,
     /// warzywa, winogrona, oliwki, daktyle, przyprawy, len, bawelna, welna, nabial i zywiec) x (b / rho)^Elast - kazdy chlop ponad ziemie dorzuca mniej niz poprzedni
@@ -42,7 +44,8 @@ namespace Armoury
             if (_stumbles <= 3) { try { Log.Error("TiredLand." + where, e); } catch { } }
         }
 
-        /// <summary>StartCalibration.ComputeDistrict (gra, z czynnikami; po Produce, zimie i rekach): towary ziemi okregu x (b / rho)^Elast, gdy rho > b.</summary>
+        /// <summary>StartCalibration.ComputeDistrict (gra, z czynnikami; po Produce, stadzie, pracach okregu, zimie i rekach - StartCalibration.LandKs): towary ziemi okregu
+        /// x (b / rho)^Elast, gdy rho > b.</summary>
         internal static void KsStep(string id, KsPart[] parts, double[] prod)
         {
             if (id == null || parts == null || prod == null || !KeyOn) return;

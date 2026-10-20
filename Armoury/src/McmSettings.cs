@@ -6476,11 +6476,11 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidPlayerStepPopup { get; set; } = true;
 
-        [SettingPropertyBool("Village Herds As Loot", HintText = "raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth", RequireRestart = false)]
+        [SettingPropertyBool("Village Herds As Loot", HintText = "raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth. Raiders keep at most one animal for every two men", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool VillageHerdsAsLoot { get; set; } = true;
 
-        [SettingPropertyBool("Tired Land Yield", HintText = "when a district has more people than its land can hold, they sow the fallow and the soil tires: each extra farmer adds less than the last (fields, orchards and pastures; not mines, fishing or forest)", RequireRestart = false)]
+        [SettingPropertyBool("Tired Land Yield", HintText = "when a district grows beyond the land it farmed at the start, the newcomers sow the fallow and the soil tires: each extra farmer adds less than the last (fields, orchards and pastures; not mines, fishing or forest). Only with the start calibration applied; a district already crowded at the start keeps its yield", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool TiredLandYield { get; set; } = true;
 

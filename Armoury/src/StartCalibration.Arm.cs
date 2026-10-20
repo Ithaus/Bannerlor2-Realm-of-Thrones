@@ -534,6 +534,7 @@ namespace Armoury
         internal static void NoteGranary(Village v, double formula, double given)
         {
             if (v == null || _state != StateApplied || !LandGateActive) return;
+            formula = HerdLandFormula(v, formula, given);   // R3-06c/d (p5-stada, recenzja): wzor gry z tym samym ubytkiem stada i ziemi (to wojna i ludnosc, nie blad KS)
             try { _gHarv[v] = new[] { (float)formula, (float)given }; } catch { }
         }
 

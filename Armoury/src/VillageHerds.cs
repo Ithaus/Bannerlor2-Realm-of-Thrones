@@ -16,13 +16,14 @@ namespace Armoury
     /// R3-06c (noc 20.10, galaz p5-stada; POMYSLY-35 poz. 14, audyt 02 rozdz. 2.2, 2.3 i E pkt 2) - STADA JAKO LUP. Klucz VillageHerdsAsLoot.
     /// Stado wsi to majatek okregu, nie towar w magazynie: dwie czesci - drobne (owce i swinie: sheep, hog, wool) i bydlo (cow, cheese, butter). Stan H w [Floor, 1]
     /// (1 = pelne stado - wsi z pelnym stadem nie ma w slowniku).
-    ///  - PRODUKCJA: towary stada x H swojej czesci. Wies pod KS - w StartCalibration.ComputeDistrict (gra, z czynnikami: po zimie i rekach E4/5, E4/7; Plan - nie);
+    ///  - PRODUKCJA: towary stada x H swojej czesci. Wies pod KS - w StartCalibration.ComputeDistrict (gra, z czynnikami: zaraz po Produce, przed pracami okregu; Plan - nie);
     ///    lancuch gry (wies poza KS, rampa) - w MaterialLaw.ProdPostfix po rekach wojny E4/7 (ten sam wzor czynnik x suma) i w ChainFactor.
     ///  - RABUNEK: DistrictRaid.Loot (rabunek osada po osadzie, AI i gracz) - udzial s (trafieni / ludzie w domu) - stado traci l = min(MaxLoss, TakeMult x s) swojej
     ///    obecnej wielkosci (stado to lup nr 1 - ginie szybciej niz ludzie uciekaja), nie mniej niz do Floor. Ubytek w sztukach gry = ubytek H x stado wsi w sztukach
     ///    (stawka zwierzat przy pelnym stadzie x dni roku / przyrost roczny - ile zwierzat trzeba, zeby co rok dawac taki przychowek). Napastnik pedzi z tego najwyzej
     ///    DrivePerMan sztuk na czlowieka (owce i swinie najpierw, potem bydlo) - do taboru wodza w ramce "produkcja wsi" ksiegi towarow (prawdziwe zwierzeta okregu);
-    ///    reszta ubytku - zabite i rozproszone (licznik w linii, bez sztuk). Rabunek bez DistrictRaid (klucz rabunku osada po osadzie wylaczony, zdarzenie gry
+    ///    reszta ubytku - zabite i rozproszone (licznik w linii, bez sztuk). Bramka krainy KS (ks-arm, f26) nie liczy kcal zabranych przez stado i ziemie jako
+    ///    "glod z winy KS" (StartCalibration.Stada.cs). Rabunek bez DistrictRaid (klucz rabunku osada po osadzie wylaczony, zdarzenie gry
     ///    VillageLooted bez naszego lupu w ostatnich 3 dobach) - ubytek jak za pelny rabunek gry (s = GameRaidShare), bez zwierzat do taboru (gra daje swoj lup).
     ///  - ODROST: co dobe wies w stanie Normal: H x (1 + r)^(1 / dni roku), r: drobne GrowSmall, bydlo GrowCattle (kalendarz Armoury - rok 364 dni); do 1.
     /// Zapis: klucz arm_herds (SaveText.Sync, "v1|id:drobne:bydlo;..."); brak klucza (stary zapis) = pelne stada. Klucz wylaczony - czynnik 1 i bez ubytku (stan zostaje).
@@ -51,7 +52,7 @@ namespace Armoury
         private static ItemObject _sheep, _hog, _cow, _wool, _cheese, _butter;
         private static readonly TextObject _txt = new TextObject("{=!}Armoury: herd of the district (raids)");
         // liczniki doby i sesji
-        private static int _dRaids, _dGame, _dDriveS, _dDriveC, _sRaids, _sDrive, _stumbles, _dStumbles;
+        private static int _dRaids, _dGame, _dDriveS, _dDriveC, _sRaids, _sDrive, _stumbles, _dStumbles, _dZero;
         private static long _dKilled, _sKilled;
         private static string _dWorst; private static float _dWorstLoss;
 
@@ -60,7 +61,8 @@ namespace Armoury
             _herd = new Dictionary<Village, float[]>();
             _rate.Clear(); _takeDay.Clear(); _pending = null;
             _sheep = _hog = _cow = _wool = _cheese = _butter = null;
-            _dRaids = _dGame = _dDriveS = _dDriveC = _sRaids = _sDrive = _stumbles = _dStumbles = 0; _dKilled = _sKilled = 0; _dWorst = null; _dWorstLoss = 0f;
+            _dRaids = _dGame = _dDriveS = _dDriveC = _sRaids = _sDrive = _stumbles = _dStumbles = _dZero = 0; _dKilled = _sKilled = 0; _dWorst = null; _dWorstLoss = 0f;
+            try { StartCalibration.HerdLandReset(); } catch (Exception e) { Stumble("Reset(bramka)", e); }
         }
 
         private static void Stumble(string where, Exception e)
@@ -136,8 +138,9 @@ namespace Armoury
             a[k] = full;
         }
 
-        /// <summary>StartCalibration.ComputeDistrict (KS, gra - z czynnikami; watek glowny): pamiec stawek zwierzat przy pelnym stadzie (sztuki gry na dobe) i towary stada
-        /// x H swojej czesci (kg okregu - przed tym, co okreg zje sam).</summary>
+        /// <summary>StartCalibration.ComputeDistrict (KS, gra - z czynnikami; watek glowny; zaraz po Produce): pamiec stawek zwierzat przy pelnym stadzie (sztuki gry na dobe,
+        /// bez zimy i rak - wielkosc stada, nie przychowek sezonu) i towary stada x H swojej czesci (kg okregu - przed tym, co okreg zje sam). Recenzja (drobne): PRZED dodatkiem
+        /// prac okregu (DistrictWorks, rodzaj KHerd) - kupione stado prac nie jest stadem wsi (DistrictWorks sam pedzi je przy rabunku i tnie jednostki prac).</summary>
         internal static void KsStep(Village v, double[] prod, double[] kg)
         {
             if (v == null || prod == null || kg == null || !KeyOn) return;
@@ -158,17 +161,21 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ rabunek
-        /// <summary>DistrictRaid.Loot (przed towarem z magazynu wsi): ubytek stada za udzial s; zwierzeta do taboru wodza (najwyzej DrivePerMan na czlowieka).</summary>
-        internal static void OnRaid(Village v, double s, MobileParty leader, int men)
+        /// <summary>DistrictRaid.Loot (na poczatku lupu kroku, PRZED wyjsciem przy udziale 0): ubytek stada za udzial s; zwierzeta do taboru wodza (najwyzej
+        /// DrivePerMan na czlowieka partii wodza i doczepionych, bez przekraczania liczby ludzi stadem - kara predkosci gry). Zwraca liczbe pedzonych zwierzat (okienko gracza).
+        /// Recenzja (wazne): wies oznaczona jako "rabunek DistrictRaid" ZAWSZE, takze przy s = 0 (okreg wypalony, nikogo w domu) i stadzie na dnie - inaczej zdarzenie gry
+        /// VillageLooted po takim rabunku bralo 60% stada drogi zapasowej (OnLooted), choc regula E7/R1 nic nie zabiera.</summary>
+        internal static int OnRaid(Village v, double s, MobileParty leader)
         {
-            if (v == null || !(s > 0) || !KeyOn) return;
+            if (v == null || !KeyOn) return 0;
             try
             {
+                _takeDay[v] = Today();
+                if (!(s > 0)) { _dZero++; return 0; }
                 EnsureItems();
                 double l = Math.Min(MaxLoss, TakeMult * s);
                 float[] lost = Shrink(v, l);
-                if (lost == null) return;
-                _takeDay[v] = Today();
+                if (lost == null) return 0;
                 _dRaids++; _sRaids++;
                 // stado w sztukach gry: stawka przy pelnym stadzie x dni roku / przyrost roczny
                 float[] rate; _rate.TryGetValue(v, out rate);
@@ -180,7 +187,7 @@ namespace Armoury
                     gone[1] = lost[SmallPart] * rate[1] * year / GrowSmall;
                     gone[2] = lost[CattlePart] * rate[2] * year / GrowCattle;
                 }
-                double cap = leader != null && leader.ItemRoster != null ? Math.Max(0, men) * DrivePerMan : 0.0;
+                double cap = DriveCap(leader);
                 var items = new[] { _sheep, _hog, _cow };
                 int[] drive = new int[3];
                 double left = cap, all = 0;
@@ -203,8 +210,30 @@ namespace Armoury
                 _dKilled += killed; _sKilled += killed;
                 float worst = Math.Max(lost[SmallPart], lost[CattlePart]);
                 if (worst > _dWorstLoss) { _dWorstLoss = worst; _dWorst = v.Settlement != null ? v.Settlement.Name.ToString() : "?"; }
+                return total;
             }
-            catch (Exception e) { Stumble("OnRaid", e); }
+            catch (Exception e) { Stumble("OnRaid", e); return 0; }
+        }
+
+        /// <summary>Recenzja (drobne): ile zwierzat moze pedzic wodz - DrivePerMan x ludzie partii wodza i doczepionych, ale stado taboru (juczne, zywiec, wolne wierzchowce
+        /// ponad pieszych - jak DefaultPartySpeedCalculatingModel) nie wiecej niz ludzie (gra karze predkosc dopiero przy stadzie ponad ludzi). Bez partii - 0.</summary>
+        private static double DriveCap(MobileParty leader)
+        {
+            if (leader == null || leader.ItemRoster == null || leader.MemberRoster == null) return 0.0;
+            int men = 0, herd = 0, mounts = 0, foot = 0;
+            AddParty(leader, ref men, ref herd, ref mounts, ref foot);
+            var att = leader.AttachedParties;
+            if (att != null) foreach (var mp in att) if (mp != null && mp != leader) AddParty(mp, ref men, ref herd, ref mounts, ref foot);
+            herd += Math.Max(0, mounts - foot);
+            return Math.Max(0.0, Math.Min(men * DrivePerMan, men - herd));
+        }
+
+        private static void AddParty(MobileParty mp, ref int men, ref int herd, ref int mounts, ref int foot)
+        {
+            if (mp.MemberRoster != null) men += mp.MemberRoster.TotalManCount;
+            var ir = mp.ItemRoster;
+            if (ir != null) { herd += ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals; mounts += ir.NumberOfMounts; }
+            if (mp.Party != null) foot += mp.Party.NumberOfMenWithoutHorse;
         }
 
         /// <summary>Zdarzenie gry VillageLooted: rabunek bez naszego lupu stada w ostatnich 3 dobach (rabunek gry) - ubytek jak za pelny rabunek gry, bez zwierzat.</summary>
@@ -276,7 +305,7 @@ namespace Armoury
                 _herd = nd;
             }
             int left = _herd.Count;
-            bool any = _dRaids > 0 || _dGame > 0;
+            bool any = _dRaids > 0 || _dGame > 0 || _dZero > 0;
             if (any || LogGate.Lines)
             {
                 var sb = new StringBuilder(500);
@@ -285,15 +314,19 @@ namespace Armoury
                 if (left > 0) sb.Append(" | srednio drobne (owce, swinie) ").Append((100 * sumS / left).ToString("0", Inv)).Append("%, bydlo ").Append((100 * sumC / left).ToString("0", Inv))
                                 .Append("%, najnizej ").Append((100 * low).ToString("0", Inv)).Append("% (").Append(lowName ?? "-").Append(')');
                 sb.Append(" | dzis rabunki ze stratami stada ").Append(_dRaids).Append(" (osada po osadzie) + ").Append(_dGame).Append(" (rabunek gry)")
+                  .Append(", rabunki osada po osadzie bez lupu (udzial 0 - bez straty stada) ").Append(_dZero)
                   .Append(", zwierzat do taborow ").Append(_dDriveS + _dDriveC).Append(" (owce i swinie ").Append(_dDriveS).Append(", bydlo ").Append(_dDriveC).Append(')')
                   .Append(", zabite i rozproszone ").Append(_dKilled).Append(" szt.");
                 if (_dWorst != null) sb.Append(", najwiekszy ubytek ").Append((100 * _dWorstLoss).ToString("0", Inv)).Append(" pkt stada (").Append(_dWorst).Append(')');
                 sb.Append(" | sesja: rabunki ").Append(_sRaids).Append(", do taborow ").Append(_sDrive).Append(", zabite i rozproszone ").Append(_sKilled)
                   .Append(" | odrost: drobne ").Append((100 * GrowSmall).ToString("0", Inv)).Append("%/rok, bydlo ").Append((100 * GrowCattle).ToString("0", Inv)).Append("%/rok")
-                  .Append(" | wsie ze stawka zwierzat w pamieci ").Append(_rate.Count).Append(" | potkniecia dzis ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
+                  .Append(" | wsie ze stawka zwierzat w pamieci ").Append(_rate.Count)
+                  .Append(" | bramka krainy KS: ").Append(StartCalibration.HerdLandGateText())
+                  .Append(" | potkniecia dzis ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
             }
-            _dRaids = _dGame = _dDriveS = _dDriveC = _dStumbles = 0; _dKilled = 0; _dWorst = null; _dWorstLoss = 0f;
+            _dRaids = _dGame = _dDriveS = _dDriveC = _dStumbles = _dZero = 0; _dKilled = 0; _dWorst = null; _dWorstLoss = 0f;
+            try { StartCalibration.HerdLandGateDayClose(); } catch (Exception e) { Stumble("Daily(bramka)", e); }
         }
 
         // ------------------------------------------------------------ zapis

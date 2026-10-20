@@ -491,6 +491,8 @@ namespace Armoury
             bool first = ss.Steps == 0;
             double u = ss.Work > 0.0 ? Clamp01(Math.Min(ss.Prog, ss.Work) / ss.Work) : 0.0;
             double s = first ? ReaverLaw.IronShare(rg, s0, u) : s0;
+            // R3-06c (p5-stada): stado okregu najpierw - ubytek stada za udzial s, zwierzeta do taboru wodza (liczba do okienka gracza); znacznik rabunku takze przy s = 0 (VillageHerds; wlasny try w srodku)
+            try { ss.STake += VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null); } catch (Exception e) { Stumble("Loot(stado)", e); }
             if (!(s > 0.0)) return;
             // Recenzja R1-1: rabunek z morza jak w grze i NavalDLC - napastnik na morzu (MapEvent.IsNavalMapEvent dla rabunku jest zawsze false: pozycja wsi na ladzie)
             bool sea = rg >= 0 && first && ReaverLaw.RaiderAtSea(att);
@@ -523,8 +525,6 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Loot(zloto)", e); }
-            // R3-06c (p5-stada): stado okregu najpierw - ubytek stada za ten sam udzial s, zwierzeta do taboru wodza (VillageHerds; wlasny try w srodku)
-            try { VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null, att != null ? att.TroopCount : 0); } catch (Exception e) { Stumble("Loot(stado)", e); }
             // towar z magazynu wsi
             try
             {
