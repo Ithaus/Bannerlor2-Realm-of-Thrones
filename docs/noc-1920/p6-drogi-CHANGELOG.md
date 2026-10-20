@@ -2,8 +2,10 @@
 
 **Dla Jeffa (prosto).** Dotad lordowie, karawany i wozy wsi szly prosto przez pola i lasy, a na droge trafialy tylko przypadkiem.
 Teraz, gdy taka partia rusza w drozsza droge (od ok. 140 km), sprawdza, czy oplaca sie wjechac na trakt: jedzie do najblizszego dobrego kawalka drogi,
-jedzie nim i zjezdza blisko celu. Robi to tylko wtedy, gdy droga jest najwyzej o 15% dluzsza, a dzieki premii drogi dojedzie mniej wiecej tak samo
-szybko albo szybciej. W pogoni, ucieczce, przy oblezeniu, najezdzie, odsieczy i w bitwie AI dalej idzie jak w grze. Twoja partia i bandy bez zmian.
+jedzie nim i zjezdza blisko celu. Robi to tylko wtedy, gdy droga jest najwyzej o 15% dluzsza, a dzieki premii drogi dojedzie tak samo szybko
+albo szybciej (liczone z ta sama premia, ktora daje gra, takze na kawalkach drogi, ktore lezaly juz na starej trasie). Dotyczy tez lordow jadacych
+na uczte albo do majatku (Banner Kings). W pogoni, ucieczce, przy oblezeniu, najezdzie, odsieczy i w bitwie AI dalej idzie jak w grze. Twoja partia
+i bandy bez zmian. W logu jest tez prawdziwy pomiar: ile godzin partie z objazdem jechaly do celu w porownaniu z partiami bez objazdu.
 Uwaga: ROT namalowal drogi tylko na czesci mapy (glownie Westeros) - tam, gdzie drogi nie ma, nic sie nie zmienia.
 
 **Problem / zrodlo pomyslu.** POMYSLY-35 pkt 20 (R3-07d), Jeff 20.10: "28 - nie, 29 - nie. Pozostale tak" i "Rob od razu fale 2".
@@ -22,7 +24,8 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
   a jedyne pokretla to lista scian zakazanych i mnoznik calej trasy. Tanszej drogi po siatce nie da sie dac bez przebudowy siatki mapy ROT. Wybrane:
   PUNKTY POSREDNIE w trasie po jej wyznaczeniu przez gre (postfiks ComputePath).
 - KTO: lord (takze wodz armii; czlonkowie armii nie licza tras), karawana, woz wsi. Nie gracz, nie bandy/patrole/milicja. Marsz ladem (`NavigationType.Default`,
-  partia na ladzie, bez przejscia lad-morze i tratwy), ruch do punktu (`MoveModeType.Point`), AI czynne, bez `ForceAiNoPathMode`.
+  partia na ladzie, bez przejscia lad-morze i tratwy), ruch do punktu (`MoveModeType.Point`), bez `ForceAiNoPathMode`; AI czynne albo wylaczone przez
+  inny mod przy rozkazie do osady / punktu (uczta BK `DisableAi` + `SetMoveGoToSettlement`, majatek gentry BK `DisableForHours(72)` - po recenzji).
   Zachowanie dlugie `GoToSettlement` / `GoToPoint` / `PatrolAroundPoint`, krotkie to samo albo `None`. Bez pogoni (`EngageParty`, `GoAroundParty`,
   `EscortParty`), ucieczki (`IsFleeing`; liczenie ucieczki `RecalculateLongTermPath` - prefiks/finalizer z licznikiem [ThreadStatic]), oblezenia
   (`BesiegeSettlement`, `AssaultSettlement`, `SiegeEvent`, `BesiegedSettlement`), najazdu (`RaidSettlement`), odsieczy (`DefendSettlement`), bitwy (`MapEvent`).
@@ -35,8 +38,10 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
   (kazdy punkt do 0.02 jedn. od niej) -> PROSTA (w planowaniu bez silnika); objazd do 3 x cieciwa + 2 -> dlugosc objazdu, silnik w planowaniu; bez sciezki
   albo dalej (np. rzeka bez mostu pod farba) -> krawedz WYCIETA.
 - WYBOR (watek roboczy, bez alokacji - pamiec [ThreadStatic] raz na watek): Dijkstra z wielu zrodel - wezly w promieniu R (1/4 trasy gry, 3..40 jedn.) od
-  startu, koszt = odcinek poza droga x 1 + droga x 1/(1 + nadklad); zejscie w promieniu R od celu. Najtanszy wariant "start -> wejscie -> trakt -> zejscie -> cel"
-  przyjety, gdy: koszt <= dlugosc trasy gry (przy nadkladzie 15% = premii 15%: "dojdzie nie pozniej"), droga >= 50% trasy, dlugosc <= trasa gry x 1.15.
+  startu, koszt = odcinek poza droga x 1 + droga x 1/(1 + premia traktu `MapRoadSpeedPercent`); zejscie w promieniu R od celu. Najtanszy wariant
+  "start -> wejscie -> trakt -> zejscie -> cel" przyjety (po policzeniu trasy przez silnik), gdy: koszt przejazdu objazdu <= koszt przejazdu trasy gry
+  (oba z probek co 1 jedn. ta sama miara co premia - `MapRoads.KindAt`: trakt / (1 + premia), droga boczna / (1 + premia boczna), reszta x 1), trakt
+  z probek >= 50% trasy, dlugosc <= trasa gry x (1 + `MapRoadAiDetourPercent`/100) - nadklad to tylko sufit dlugosci (po recenzji).
   Wejscie / zejscie to najlepszy wezel w zasiegu, nie slepo najblizszy (najblizszy bywa na drodze w bok).
 - TRASA: start -> wejscie i zejscie -> cel (oraz krawedzie z objazdem) liczy silnik tym samym wywolaniem co gra (promien 0.3, te same sciany zakazane,
   mnoznik 2, koszty przejscia lad-morze z `GetRegionSwitchCost...` w tej samej kolejnosci). Ponad 128 punktow / odcinek bez sciezki / dlugosc albo udzial drogi
@@ -45,8 +50,9 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
 - PRZEPRAWY: lord w wojnie z panem przeprawy CrossingLaw (Twins, Moat Cailin, Bloody Gate - te same id) nie dostaje objazdu przez strefe (CrossingRadius + 1
   jedn.) - inaczej droga wiodlaby go pod most, straz odbija, po 3 h przerwy znow objazd.
 - POWTORKA CELU: pamiec partii bez blokad (1 << 17 slotow long: Party.Index | skrot celu | stan; godzina i liczba planow osobno) - ten sam cel w tej samej
-  godzinie = bez planowania; cel ruchomy (nowa sciana celu kilka razy na godzine) - najwyzej 3 plany partii na godzine, dalej trasa gry do konca godziny
-  (licznik `ponad 3 plany partii na godzine`).
+  godzinie po ODRZUCONYM objezdzie = bez planowania; po PRZYJETYM objezdzie planowanie od nowa (gra nadpisala trase, a bez zmiany celu nie przeliczy
+  jej do konca marszu); najwyzej 3 plany partii na godzine, dalej trasa gry do konca marszu albo nastepnego planu - wtedy stan slotu "odrzucony" (licznik
+  `objazd utracony`), tak samo gdy gra liczy trase do celu objazdu bez planu (np. reszta trasy krotsza od progu).
 - POMIAR (tylko log): `AI drogi (AD): latka MobileParty.ComputePath ...` (start gry), `AI drogi (AD): start sesji ...` (siec, krawedzie, przeprawy, czas budowy,
   CZYNNE/powod), `AI drogi (AD): dzien N | ...` (liczone, krotsze, powtorki, planowane, objazdy wg rodzaju, odrzucone z powodem, ominiete strefy przepraw,
   sredni nadklad / udzial drogi / czas szac., spis partio-godzin w marszu na drodze - TA SAMA MIARA co `Drogi (DR)`: `MapRoads.KindAt == 2` (trakt) w punkcie
@@ -70,13 +76,14 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
   plan liczony w widoku) NIE sa w sieci - tylko trakty z pliku.
 - WOJNA: marsze wojenne (oblezenie, najazd, odsiecz) bez objazdu - swiadomie (zadanie: "bez oblezenia"); armie w pokoju i lordowie do osad tak.
   Czasy wojen i oblezen nie zmieniaja sie przez objazd.
-- CZASY DOSTAW: objazd przyjety tylko przy koszcie <= trasa gry (droga liczona z waga 1/1.15) - karawany i wozy nie dochodza pozniej o wiecej niz brzeg
-  szacunku (premia drogi liczy sie tylko na drodze; czas szac. w linii doby). Sprawdzic w linii `czas szac.` (oczekiwane <= 100%).
+- CZASY DOSTAW: objazd przyjety tylko przy koszcie przejazdu <= trasa gry (czynna premia drogi na obu trasach). Szacunek pomija teren (las -30%, snieg)
+  i bloto - dlatego pomiar `dojazd zmierzony` (AD-11): sredni czas dojazdu objazdow wobec proby porownawczej (trasa gry, choc droga w zasiegu), obie
+  grupy wzgledem czasu trasy gry przy predkosci bazowej z planu. `czas szac.` (AD-5) to tylko konstrukcja (INFO).
 - UTKNIECIE: trasa sklada sie z odcinkow silnika (jak trasa gry) albo z cieciw, ktore silnik sam poprowadzil prosto (sprawdzone przy budowie) - partia nie idzie
   po prostej przez sciane innej wyspy. Ryzyko szczatkowe: brzeg sciany na tolerancji 0.02 jedn. Sprawdzic w autotescie: partie stojace w miejscu z celem
   (linie BLAD / FailedAssert "Path finding target is not valid", kronika ruchu), "na objezdzie" partio-godziny rosna z dniem.
-- POWTORKA CELU: gdy cos wymusi ponowne ComputePath do tego samego celu w tej samej godzinie (np. koniec przejscia lad-morze), zostaje trasa gry do konca
-  godziny - liczone w `powtorka celu`.
+- POWTORKA CELU: po przyjetym objezdzie ponowne ComputePath do tego samego celu planuje od nowa (licznik `ponowione po objezdzie`); po limicie 3 planow
+  na godzine albo bez planu zostaje trasa gry do konca marszu (licznik `objazd utracony`) - spis nie liczy wtedy partii jako objazdu.
 - WATKI: graf niezmienny (volatile), pamiec robocza na watek, liczniki Interlocked, sloty long atomowe; `IsAtWarWith` czytany w ruchu rownoleglym
   (dyplomacja zmienia sie tylko na watku glownym poza `TWParallel.For`). Bez alokacji w planowaniu (poza pierwsza pamiecia watku).
 - KOSZT: budowa sieci - ok. 1900 wywolan silnika raz na sesje (oczekiwane dziesiatki ms, w linii startu); planowanie: Dijkstra po <= 1819 wezlach + silnik
@@ -108,10 +115,40 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
 - `AI drogi (AD): start sesji - klucz MapRoadAiRoutes tak` ... `| CZYNNE.` - siec: `wezlow` ok. 1800-1900, `poza siatka gry` maly ulamek, `krawedzie po siatce gry:
   proste` wiekszosc, `wyciete` mala liczba, `przeprawy CrossingLaw 3/3`, `budowa` < ok. 300 ms.
 - `AI drogi (AD): dzien` - `objazdy droga N` > 0 z rodami, karawanami i wozami wsi > 0; `odrzucone` z powodami (najwiecej `bez drogi w zasiegu` - Essos);
-  `objazd sr.: nadklad drogi` <= +15%, `droga` >= 50%, `czas szac.` <= 100%; `na objezdzie K, z tego na drodze J` z udzialem wyraznie ponad 9% (oczekiwane > 50%);
+  `objazd sr.: nadklad drogi` <= +15% (bywa ujemny - znak z liczby), `droga` >= 50%, `czas szac.` <= 100% (konstrukcja); `dojazd zmierzony ... objazdy N sr. X%,
+  proba ... M sr. Y%` - X <= Y + 5 pp; `na objezdzie K, z tego na drodze J` z udzialem wyraznie ponad 9% (oczekiwane > 50%);
   `koszt: planowanie` < ok. 50 ms/dobe; `potkniecia dzis 0`.
 - Porownanie z WGRANIEM 91: w `Drogi (DR): dzien` udzial `rody`, `karawany`, `wozy wsi` powinien wzrosnac ponad 7-10% (bandy bez zmian ok. 2-3%);
   NDR-3 (`--grupa ndrogi`, udzial calego AI 1-25%) moze wzrosnac z ok. 6.5% - nadal w progu.
-- `python -I tools/sprawdz_logi.py --grupa p6drogi <Armoury-*.log>` - AD-0..AD-9 TAK (AD-7, AD-10 INFO).
+- `python -I tools/sprawdz_logi.py --grupa p6drogi <Armoury-*.log>` - AD-0..AD-4, AD-6, AD-8, AD-9, AD-11 TAK (AD-5, AD-7, AD-10 INFO; AD-11 INFO, gdy
+  mniej niz 30 dojazdow w grupie).
 - Brak nowych bledow w CrashScribe (FailedAssert sciezki, NullReference w ComputePath / DoAiPathMode) i brak partii stojacych z celem (np. karawany bez
   handlu przez wiele dni) - porownac liczbe kursow wozow/karawan z linii ekonomii.
+
+**Recenzja (dwie soczewki, gra i technika; wszystkie uwagi drobne, wszystkie prawdziwe - poprawione).**
+1. Waga drogi z klucza nadkladu, nie z premii (obie soczewki). PRAWDA: przy `MapRoadAiDetourPercent` 30 i premii 15% objazd 1.3 L w calosci droga
+   przechodzil (1.3 L / 1.3 = L), a jechal 1.13 trasy gry. POPRAWKA: waga = 1 / (1 + `MapRoadSpeedPercent`) (przyciete 0..50, jak `MapRoads.PctOf`);
+   warunek czasu po policzeniu trasy z probek obu tras co 1 jedn. (`MapRoads.KindAt`: trakt, droga boczna z premia boczna, reszta) - trasa gry tez bywa
+   czesciowo na drodze; nadklad tylko sufitem dlugosci; premia 0 = bez objazdow (`NIECZYNNE (MapRoadSpeedPercent 0 ...)`). Teren (las, snieg) i bloto
+   dalej poza szacunkiem - stad pomiar z pkt 2. Podpowiedzi MCM `MapRoadAiRoutes` / `MapRoadAiDetourPercent` poprawione (gen_mcm).
+2. AD-5 tautologia (obie soczewki). PRAWDA: trzy warunki AD-5 kod wymusza przy przyjeciu. POPRAWKA: AD-5 = INFO (konstrukcja); nowy pomiar
+   `dojazd zmierzony` w linii doby i prog AD-11: przy nowym celu godzina planu, cel i czas trasy gry przy predkosci bazowej (`LastCalculatedBaseSpeed`);
+   dojazd = partia do 2 jedn. od celu albo w osadzie celu (spis co godzine albo nastepny plan, blad do 1 h w obu grupach); kazda trasa do innego celu
+   przed dojazdem (takze pogon) = `przerwane`; ponad 10 dob albo 5 x szacunek = `poza pomiarem`. Grupy: objazdy i proba porownawcza (plan odrzucony
+   mimo drogi w zasiegu: nie oplaca sie / malo drogi / za dlugie) - te same noce, postoje, teren. AD-11 TAK, gdy srednia objazdow <= srednia proby
+   + 5 pp (po >= 30 dojazdow w obu grupach); mniej - INFO.
+3. Powtorka celu po przyjetym objezdzie zostawiala trase gry do konca marszu i spis liczyl partie jako objazd (obie soczewki). PRAWDA (DoAIMove:
+   `_pathMode` + ta sama sciana celu = bez ponownego liczenia). POPRAWKA: powtorka pomijana tylko po odrzuconym; po przyjetym planowanie od nowa
+   (`ponowione po objezdzie`); po limicie 3 planow albo gdy trasa do celu objazdu liczy sie bez planu (krotka reszta trasy, inny rodzaj nawigacji,
+   zmiana zachowania) stan slotu "odrzucony" (`objazd utracony`). Komentarz w kodzie i ten wpis poprawione ("do konca godziny" bylo nieprawda).
+4. Lordowie z AI wylaczonym przez BK (uczta, majatek gentry) bez objazdu (soczewka gra). PRAWDA (BKFeastBehavior: `DisableAi` + `SetMoveGoToSettlement`;
+   BKGentryBehavior: `DisableForHours(72)`). POPRAWKA: przy rozkazie `GoToSettlement` / `GoToPoint` dopuszczone (patrol wokol punktu - nie, to wlasne
+   myslenie AI). Nasze uspienia (NightRest / NightMarch / SleepGate / ArmyRestDay) daja rozkaz `Hold` - dalej poza regula (sprawdzone grepem w n22-calosc).
+   Licznik w linii: `z AI wylaczonym przez inny mod - uczta / majatek BK`.
+5. Ujemny nadklad psul AD-5 ("+-1.2%") (soczewka technika). PRAWDA. POPRAWKA: znak z liczby (format `+0.0;-0.0;0.0`), regex przyjmuje oba zapisy
+   (sprawdzone na `p6-drogi-tmp/fake.log` z "+-1.2": AD-5 czyta -1.2).
+
+Sprawdzenie poprawek: build Armoury Release kod 0, 0 Error(s); `sprawdz_logi --grupa p6drogi` na sztucznym logu nowej postaci (`p6-drogi-tmp/rec2/ok.log`:
+12 progow, NIE 0, ujemny nadklad czytany; `bad.log`: AD-11 NIE przy objazdach 150% wobec proby 130%) i na logu WGRANIA 91 (INFO, bez wyjatku).
+Koszt: probki ok. 2 x dlugosc trasy wywolan `KindAt` (dziesiatki ns) tylko dla wariantu po silniku; sprawdzanie dojazdu co godzine - ta sama petla
+po partiach co spis, takze poza dobami pomiaru (bez alokacji). Pamiec: 5 tablic po 1 << 17 slotow (ok. 2.2 MB, raz na proces).

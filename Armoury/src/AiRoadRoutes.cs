@@ -30,7 +30,9 @@ namespace Armoury
     ///
     /// ZMIANA: postfiks MobileParty.ComputePath (DeclaredMethod, prywatna). Gdy gra wyznaczyla trase (wynik true) partii, ktorej to dotyczy:
     ///  - lord (takze wodz armii; czlonkowie armii nie licza tras), karawana, woz wsi; nie gracz, nie bandy, nie patrole, nie milicja;
-    ///  - marsz LADEM (rodzaj Default, partia na ladzie, bez przejscia lad-morze i tratwy), ruch do punktu (MoveModeType.Point - nie za partia), AI czynne;
+    ///  - marsz LADEM (rodzaj Default, partia na ladzie, bez przejscia lad-morze i tratwy), ruch do punktu (MoveModeType.Point - nie za partia), AI czynne
+    ///    albo wylaczone przez inny mod przy rozkazie do osady / punktu (uczta BK: DisableAi + SetMoveGoToSettlement, majatek gentry BK: DisableForHours(72);
+    ///    recenzja p6-drogi - to zwykle dlugie marsze pokojowe; objazd zmienia tylko punkty trasy, nie cel);
     ///  - zachowanie: GoToSettlement / GoToPoint / PatrolAroundPoint (krotkoterminowe takze None); bez pogoni (EngageParty, GoAroundParty, EscortParty),
     ///    ucieczki (IsFleeing, a RecalculateLongTermPath z liczenia ucieczki - prefiks/finalizer), oblezen (BesiegeSettlement, AssaultSettlement, SiegeEvent,
     ///    BesiegedSettlement), najazdow (RaidSettlement), obrony (DefendSettlement) i bitwy (MapEvent);
@@ -38,17 +40,28 @@ namespace Armoury
     /// SIEC: plik drog ROT (ModuleData/arm_map_roads_geo.tsv, ten sam co premia drogi) -> graf raz na sesje (watek glowny): lamane uproszczone Douglas-Peucker
     /// 0.5 jedn. (cieciwa najwyzej 0.5 od osi drogi - w polu premii: pol-szerokosc >= 0.15 + margines 1.0 / 0.4), konce lamanych laczone z najblizszym
     /// wierzcholkiem innej lamanej do 0.6 jedn. (rozstaje), sciana siatki gry kazdego wezla policzona raz (wezel na scianie zakazanej / bez sciany = poza siecia).
-    /// WYBOR: Dijkstra z wielu zrodel po wezlach w promieniu R (1/4 trasy gry, 3..40 jedn.) od startu; koszt = odcinek poza droga x 1 + droga x 1/(1 + nadklad);
-    /// wyjscie w promieniu R od celu. Najtanszy wariant "start -> wejscie na trakt -> trakt -> zejscie -> cel" przyjety, gdy:
-    ///  - koszt <= dlugosc trasy gry (z nadkladem 15% i premia drogi 15% to tyle, co "dojdzie nie pozniej"),
-    ///  - droga >= polowa trasy, dlugosc <= trasa gry x (1 + MapRoadAiDetourPercent/100).
+    /// WYBOR: Dijkstra z wielu zrodel po wezlach w promieniu R (1/4 trasy gry, 3..40 jedn.) od startu; koszt = odcinek poza droga x 1 + droga x 1/(1 + premia),
+    /// premia = czynna premia traktu (MapRoadSpeedPercent, jak MapRoads.PctOf; recenzja p6-drogi: nie klucz nadkladu); wyjscie w promieniu R od celu.
+    /// Najtanszy wariant "start -> wejscie na trakt -> trakt -> zejscie -> cel" przyjety, gdy (po policzeniu trasy przez silnik):
+    ///  - CZAS: koszt przejazdu objazdu <= koszt przejazdu trasy gry, OBA z probek co 1 jedn. ta sama miara co premia (MapRoads.KindAt: trakt 1/(1 + premia),
+    ///    droga boczna 1/(1 + premia boczna), reszta 1) - trasa gry tez bywa czesciowo na drodze; teren (las, snieg) i bloto poza szacunkiem - czas
+    ///    zmierzony osobno (dojazd do celu, nizej);
+    ///  - droga (trakt z probek) >= polowa trasy, dlugosc <= trasa gry x (1 + MapRoadAiDetourPercent/100) - nadklad to tylko sufit dlugosci.
+    /// Premia traktu 0 albo MapRoadSpeedBonus NIE = bez objazdow (droga nic nie daje).
     /// TRASA: odcinki liczy silnik tym samym wywolaniem co gra (GetPathBetweenAIFaces, promien 0.3, te same sciany zakazane, ten sam mnoznik 2 i koszty
     /// przejscia lad-morze): start -> wejscie, kazda cieciwa drogi, zejscie -> cel (w obrebie jednej sciany - prosta, sciana siatki jest wypukla). Odcinek
     /// bez sciezki, ponad 128 punktow albo dlugosc / udzial drogi po policzeniu poza progiem = trasa gry bez zmian. Przyjeta trasa zastepuje punkty
     /// NavigationPath (Size, PathPoints; PathBegin = 0 juz ustawil ComputePath), NextLongTermPathPoint jak w grze. Cel trasy bez zmian (ostatni punkt = cel).
-    /// POWTORKA CELU: pamiec partii bez blokad (1 << 17 slotow long: Party.Index | skrot celu | stan, osobno godzina) - ten sam cel liczony ponownie w tej
-    /// samej godzinie = bez planowania (inna latka przesuwajaca cel co klatke nie zrobi z tego kosztu co klatke); cel ruchomy - najwyzej PlansPerHour (3) plany
-    /// partii na godzine, dalej trasa gry.
+    /// POWTORKA CELU: pamiec partii bez blokad (1 << 17 slotow long: Party.Index | skrot celu | stan, osobno godzina) - ten sam cel po ODRZUCONYM objezdzie
+    /// liczony ponownie w tej samej godzinie = bez planowania (inna latka przesuwajaca cel co klatke nie zrobi z tego kosztu co klatke); po PRZYJETYM objezdzie
+    /// planowanie od nowa (recenzja p6-drogi: gra nadpisala Path trasa gry, a bez zmiany celu nie przeliczy jej do konca marszu - np. powrot po krotkiej
+    /// ucieczce albo przerwie); najwyzej PlansPerHour (3) plany partii na godzine, dalej trasa gry - wtedy stan slotu "odrzucony" (spis nie liczy partii
+    /// jako objazdu, licznik "objazd utracony po limicie").
+    /// DOJAZD ZMIERZONY (tylko log; recenzja p6-drogi: "czas szac." to ta sama formula co warunek przyjecia): przy nowym celu godzina planu, cel i czas
+    /// szacowany trasy gry (dlugosc trasy gry / predkosc bazowa partii LastCalculatedBaseSpeed) - osobno partie z objazdem i proba porownawcza (trasa gry,
+    /// choc droga byla w zasiegu: "droga sie nie oplaca", "malo drogi", "za dlugie"). Dojazd: partia do 2 jedn. od celu albo w osadzie celu (spis godzinny
+    /// albo nastepny plan) - stosunek czasu zmierzonego do szacowanego, srednia osobno dla obu grup; nowy cel przed dojazdem = przerwany; ponad 10 dob albo
+    /// ponad 5 x szacunek = poza pomiarem. Obie grupy maja te same noce, postoje i teren, wiec objazd "nie pozniej" = srednia objazdow <= srednia proby.
     /// WATKI: graf niezmienny po budowie (jedna referencja volatile); pamiec robocza [ThreadStatic] na watek (raz na watek), bez alokacji w planowaniu;
     /// liczniki Interlocked; potkniecia liczone (pierwsze zapamietane do linii), nigdy wylacznik funkcji.
     /// POMIAR (tylko log): linia "AI drogi (AD): start sesji" i "AI drogi (AD): dzien N" (liczone / przyjete / odrzucone z powodem, sredni nadklad, udzial drogi,
@@ -69,6 +82,14 @@ namespace Armoury
         private const float AgentRadius = 0.3f;   // MobileParty.ComputePath na ladzie
         private const int SlotBits = 17, SlotMask = (1 << SlotBits) - 1;
         private const long StRejected = 1, StAccepted = 2;
+        private const float SampleStep = 1f;      // probki drogi na trasie co 1 jedn. (pole traktu ma ok. 2.3 jedn. szerokosci)
+        private const int MaxSamples = 600;       // dluzsza trasa - rzadsze probki
+        private const int MaxPercent = 50;        // jak MapRoads (premia traktu i drogi bocznej przycieta do 0..50)
+        private const float ArriveR = 2f;         // dojazd: partia do 2 jedn. od celu (albo w osadzie celu)
+        private const float MaxMarchHours = 240f; // marsz ponad 10 dob - poza pomiarem
+        private const float RatioCap = 5f;        // ponad 5 x czas szacowany - poza pomiarem (oblezenie, dlugi postoj po drodze)
+        private const int RouteOk = 0, RouteCtl = 1, RouteOther = 2;   // wynik planu: objazd / odrzucony mimo drogi w zasiegu (proba) / inny powod
+        private const byte GrpDet = 1, GrpCtl = 2;
 
         // ------------------------------------------------------------------ graf (niezmienny po budowie)
         private sealed class Graph
@@ -171,9 +192,16 @@ namespace Armoury
         private static readonly int[] _slotHour = new int[1 << SlotBits];
         private static readonly int[] _slotCnt = new int[1 << SlotBits];   // planow tej partii w godzinie _slotHour
         private const int PlansPerHour = 3;
+        // dojazd zmierzony (tylko log): marsz partii do celu ze slotu - grupa (0 brak pomiaru, 1 objazd, 2 proba porownawcza; zapisywana ostatnia, czytana
+        // pierwsza), godzina planu wzgledem startu sesji, czas szacowany trasy gry (h), cel
+        private static readonly byte[] _slotGrp = new byte[1 << SlotBits];
+        private static readonly float[] _slotT0 = new float[1 << SlotBits], _slotPred = new float[1 << SlotBits];
+        private static readonly float[] _slotTx = new float[1 << SlotBits], _slotTy = new float[1 << SlotBits];
+        private static double _hour0;
 
         // liczniki doby (watki robocze - Interlocked)
-        private static long _capped;
+        private static long _capped, _replan, _lost, _aiOff;
+        private static long _arrDetN, _arrDetPm, _arrCtlN, _arrCtlPm, _arrAbort, _arrOut;
         private static long _seen, _short, _repeat, _planned, _noRoad, _notWorth, _fewRoad, _tooLong, _navFail, _tooMany, _legCalls, _ticks;
         private static readonly long[] _acc = new long[3];
         private static long _overPm, _roadPm, _timePm;
@@ -194,6 +222,26 @@ namespace Armoury
         {
             int v = s.MapRoadAiDetourPercent;
             return (v < 0 ? 0 : v > 50 ? 50 : v) / 100f;
+        }
+
+        /// <summary>Czynna premia traktu - jak MapRoads.PctOf (MapRoadSpeedPercent przyciete do 0..50).</summary>
+        private static float RoadPct(Settings s)
+        {
+            int p = s.MapRoadSpeedPercent;
+            return (p < 0 ? 0 : p > MaxPercent ? MaxPercent : p) / 100f;
+        }
+
+        /// <summary>Premia drogi bocznej - jak MapRoads.SidePctOf (MapRoads.KindAt oddaje 1 tylko przy czynnych drogach bocznych).</summary>
+        private static float SidePct(Settings s)
+        {
+            float p = s.MapSideRoadSpeedPercent;
+            if (!(p > 0f)) return 0f;
+            return (p > MaxPercent ? MaxPercent : p) / 100f;
+        }
+
+        private static float NowRel()
+        {
+            return (float)(CampaignTime.Now.ToHours - _hour0);
         }
 
         private static void ParStumble(Exception e)
@@ -270,7 +318,7 @@ namespace Armoury
             var g = _g;
             if (g == null) return;
             var s = Settings.Current;
-            if (s == null || !s.MapRoadAiRoutes || !s.MapRoadSpeedBonus) return;
+            if (s == null || !s.MapRoadAiRoutes || !s.MapRoadSpeedBonus || s.MapRoadSpeedPercent <= 0) return;
             try { Plan(g, s, __instance, newTargetPosition, navigationType, cacheNextLongTermPathPoint); }
             catch (Exception e) { ParStumble(e); }
         }
@@ -278,71 +326,190 @@ namespace Armoury
         // ------------------------------------------------------------------ planowanie (watek roboczy)
         private static void Plan(Graph g, Settings s, MobileParty mp, CampaignVec2 target, MobileParty.NavigationType nav, bool cacheNext)
         {
-            if (mp == null || nav != MobileParty.NavigationType.Default || !target.IsOnLand || mp.IsMainParty) return;
+            if (mp == null) return;
+            int ix = mp.Party.Index, sl = ix & SlotMask;
+            long k = ((long)ix << 32) | (long)TargetHash(target.ToVec2());
+            // dojazd zmierzony: KAZDA trasa do innego celu (takze pogon, morze, krotki marsz) konczy otwarty marsz tej partii - dojazd albo przerwany
+            if (Volatile.Read(ref _slotGrp[sl]) != 0 && (Volatile.Read(ref _slotKey[sl]) & ~3L) != k) CloseMarch(sl, ix, mp, mp.Position.ToVec2());
+            if (PlanCore(g, s, mp, target, nav, cacheNext)) return;
+            // trasa gry do celu przyjetego objazdu bez planowania (reszta trasy krotsza od progu, inny rodzaj nawigacji, zmiana zachowania) - objazd przepadl:
+            // stan slotu "odrzucony" (spis nie liczy partii jako objazdu)
+            long old = Volatile.Read(ref _slotKey[sl]);
+            if (old == (k | StAccepted)) { Volatile.Write(ref _slotKey[sl], k | StRejected); Interlocked.Increment(ref _lost); }
+        }
+
+        /// <summary>Planowanie objazdu; false = partia / trasa poza regula (slot nietkniety), true = slot obsluzony (powtorka, limit, plan).</summary>
+        private static bool PlanCore(Graph g, Settings s, MobileParty mp, CampaignVec2 target, MobileParty.NavigationType nav, bool cacheNext)
+        {
+            if (nav != MobileParty.NavigationType.Default || !target.IsOnLand || mp.IsMainParty) return false;
             int cat = Cat(mp);
-            if (cat < 0) return;
-            if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || mp.IsInRaftState) return;
-            if (mp.PartyMoveMode != MoveModeType.Point || mp.ForceAiNoPathMode) return;
-            if (mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegedSettlement != null || mp.AttachedTo != null) return;
-            if (mp.Army != null && mp.Army.LeaderParty != mp) return;
+            if (cat < 0) return false;
+            if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || mp.IsInRaftState) return false;
+            if (mp.PartyMoveMode != MoveModeType.Point || mp.ForceAiNoPathMode) return false;
+            if (mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegedSettlement != null || mp.AttachedTo != null) return false;
+            if (mp.Army != null && mp.Army.LeaderParty != mp) return false;
             var ai = mp.Ai;
-            if (ai == null || ai.IsDisabled) return;
+            if (ai == null) return false;
             var db = mp.DefaultBehavior;
-            if (db != AiBehavior.GoToSettlement && db != AiBehavior.GoToPoint && db != AiBehavior.PatrolAroundPoint) return;
+            if (db != AiBehavior.GoToSettlement && db != AiBehavior.GoToPoint && db != AiBehavior.PatrolAroundPoint) return false;
+            // AI wylaczone przez inny mod (uczta BK, majatek gentry BK) - tylko rozkaz do osady / punktu (patrol wokol punktu to wlasne myslenie AI)
+            bool aiOff = ai.IsDisabled;
+            if (aiOff && db == AiBehavior.PatrolAroundPoint) return false;
             var sb = mp.ShortTermBehavior;
-            if (sb != AiBehavior.GoToSettlement && sb != AiBehavior.GoToPoint && sb != AiBehavior.PatrolAroundPoint && sb != AiBehavior.None) return;
-            if (mp.IsFleeing()) return;
+            if (sb != AiBehavior.GoToSettlement && sb != AiBehavior.GoToPoint && sb != AiBehavior.PatrolAroundPoint && sb != AiBehavior.None) return false;
+            if (mp.IsFleeing()) return false;
             var path = mp.Path;
-            if (path == null) return;
+            if (path == null) return false;
             int n0 = path.Size;
-            if (n0 <= 0 || n0 > PathCap) return;
+            if (n0 <= 0 || n0 > PathCap) return false;
             var pts = path.PathPoints;
             Vec2 S = mp.Position.ToVec2(), T = target.ToVec2();
             float L = 0f;
             Vec2 pv = S;
             for (int i = 0; i < n0; i++) { L += (pts[i] - pv).Length; pv = pts[i]; }
             Interlocked.Increment(ref _seen);
-            if (!(L >= MinDist(s))) { Interlocked.Increment(ref _short); return; }
+            if (!(L >= MinDist(s))) { Interlocked.Increment(ref _short); return false; }
 
-            // powtorka celu w tej samej godzinie - bez planowania; cel ruchomy (np. patrol wokol partii - nowa sciana celu kilka razy na godzine) - najwyzej
-            // PlansPerHour planow na partie na godzine (dalej trasa gry do konca godziny). Jedna partia = jeden watek naraz (ruch partii raz na klatke).
+            // ten sam cel po ODRZUCONYM objezdzie w tej samej godzinie - bez planowania (trasa gry i tak ta sama); po PRZYJETYM - planowanie od nowa: gra
+            // nadpisala Path trasa gry, a bez zmiany celu nie przeliczy jej do konca marszu (powrot po ucieczce / przerwie, koniec przejscia). Cel ruchomy (patrol
+            // wokol partii - nowa sciana celu kilka razy na godzine) - najwyzej PlansPerHour planow na partie na godzine, dalej trasa gry; przyjety objazd
+            // tego celu przepada - stan slotu "odrzucony" (spis nie liczy partii jako objazdu). Jedna partia = jeden watek naraz (ruch partii raz na klatke).
             int idx = mp.Party.Index;
             long key = ((long)idx << 32) | (long)TargetHash(T);
             int slot = idx & SlotMask;
             int hour = (int)CampaignTime.Now.ToHours;
             long old = Volatile.Read(ref _slotKey[slot]);
+            bool sameKey = (old & ~3L) == key;
+            bool wasAcc = sameKey && (old & 3L) == StAccepted;
             bool sameHour = hour == Volatile.Read(ref _slotHour[slot]);
-            if (sameHour && (old & ~3L) == key) { Interlocked.Increment(ref _repeat); return; }
-            if (sameHour && Volatile.Read(ref _slotCnt[slot]) >= PlansPerHour) { Interlocked.Increment(ref _capped); return; }
+            if (sameHour && sameKey && !wasAcc) { Interlocked.Increment(ref _repeat); return true; }
+            if (sameHour && Volatile.Read(ref _slotCnt[slot]) >= PlansPerHour)
+            {
+                Interlocked.Increment(ref _capped);
+                if (wasAcc) { Volatile.Write(ref _slotKey[slot], key | StRejected); Interlocked.Increment(ref _lost); }
+                return true;
+            }
+            if (wasAcc) Interlocked.Increment(ref _replan);
 
             long t0 = Stopwatch.GetTimestamp();
             long st = StRejected;
+            int res = RouteOther;
             try
             {
                 Interlocked.Increment(ref _planned);
-                if (Route(g, s, mp, target, S, T, L, path, cacheNext, cat)) st = StAccepted;
+                res = Route(g, s, mp, target, S, T, L, path, cacheNext, cat);
+                if (res == RouteOk) { st = StAccepted; if (aiOff) Interlocked.Increment(ref _aiOff); }
             }
             finally
             {
                 Volatile.Write(ref _slotCnt[slot], sameHour ? _slotCnt[slot] + 1 : 1);
                 Volatile.Write(ref _slotHour[slot], hour);
                 Volatile.Write(ref _slotKey[slot], key | st);
+                if (!sameKey) OpenMarch(slot, mp, res, L, T);
                 Interlocked.Add(ref _ticks, Stopwatch.GetTimestamp() - t0);
             }
+            return true;
         }
 
-        private static bool Route(Graph g, Settings s, MobileParty mp, CampaignVec2 target, Vec2 S, Vec2 T, float L, NavigationPath path, bool cacheNext, int cat)
+        // ------------------------------------------------------------------ dojazd zmierzony (tylko log)
+        /// <summary>Nowy marsz (nowy cel): grupa pomiaru z wyniku pierwszego planu - objazd albo proba porownawcza (droga w zasiegu, trasa gry).</summary>
+        private static void OpenMarch(int slot, MobileParty mp, int res, float L, Vec2 T)
+        {
+            byte gp = res == RouteOk ? GrpDet : res == RouteCtl ? GrpCtl : (byte)0;
+            if (gp == 0) return;
+            float v = mp.LastCalculatedBaseSpeed;
+            if (!(v > 0.1f)) return;
+            _slotT0[slot] = NowRel();
+            _slotPred[slot] = L / v;
+            _slotTx[slot] = T.x; _slotTy[slot] = T.y;
+            Volatile.Write(ref _slotGrp[slot], gp);
+        }
+
+        /// <summary>Koniec marszu w slocie: partia przy celu (do ArriveR albo w osadzie celu) = dojazd, inaczej przerwany. Watek roboczy albo glowny.</summary>
+        private static void CloseMarch(int slot, int idx, MobileParty mp, Vec2 pos)
+        {
+            byte gp = Volatile.Read(ref _slotGrp[slot]);
+            if (gp == 0) return;
+            Volatile.Write(ref _slotGrp[slot], (byte)0);
+            if ((Volatile.Read(ref _slotKey[slot]) >> 32) != idx) return;   // slot innej partii (indeks ponad 1 << 17)
+            if (AtTarget(slot, mp, pos)) Arrive(gp, NowRel() - _slotT0[slot], _slotPred[slot]);
+            else Interlocked.Increment(ref _arrAbort);
+        }
+
+        private static bool AtTarget(int slot, MobileParty mp, Vec2 pos)
+        {
+            float tx = _slotTx[slot], ty = _slotTy[slot];
+            if (Len(pos.x - tx, pos.y - ty) <= ArriveR) return true;
+            var st = mp.CurrentSettlement;
+            if (st == null) return false;
+            Vec2 a = st.GetPosition2D, b = st.GatePosition.ToVec2();
+            return Len(a.x - tx, a.y - ty) <= ArriveR + 1f || Len(b.x - tx, b.y - ty) <= ArriveR + 1f;
+        }
+
+        private static void Arrive(byte gp, float hours, float pred)
+        {
+            if (!(pred > 0f) || !(hours > 0f) || hours > MaxMarchHours) { Interlocked.Increment(ref _arrOut); return; }
+            float r = hours / pred;
+            if (r > RatioCap) { Interlocked.Increment(ref _arrOut); return; }
+            long pm = (long)Math.Round(r * 1000f);
+            if (gp == GrpDet) { Interlocked.Increment(ref _arrDetN); Interlocked.Add(ref _arrDetPm, pm); }
+            else { Interlocked.Increment(ref _arrCtlN); Interlocked.Add(ref _arrCtlPm, pm); }
+        }
+
+        /// <summary>Spis godzinny (watek glowny, co godzine): partia przy celu otwartego marszu = dojazd; marsz ponad 10 dob = poza pomiarem.</summary>
+        private static void CheckArrival(MobileParty mp, int slot, int idx, float now)
+        {
+            if ((Volatile.Read(ref _slotKey[slot]) >> 32) != idx) return;
+            if (now - _slotT0[slot] > MaxMarchHours) { Volatile.Write(ref _slotGrp[slot], (byte)0); Interlocked.Increment(ref _arrOut); return; }
+            if (AtTarget(slot, mp, mp.Position.ToVec2())) CloseMarch(slot, idx, mp, mp.Position.ToVec2());
+        }
+
+        /// <summary>Koszt przejazdu lamanej start -> pts[0..n) w jednostkach "poza droga": probki co SampleStep, ta sama miara co premia (MapRoads.KindAt:
+        /// 2 trakt / (1 + premia), 1 droga boczna / (1 + premia boczna), reszta 1). trakt = dlugosc probek na trakcie. Bez alokacji, watek roboczy.</summary>
+        private static float RideCost(Vec2 start, Vec2[] pts, int n, float len, float pct, float spct, out float trakt)
+        {
+            float step = len / MaxSamples;
+            if (step < SampleStep) step = SampleStep;
+            float wr = 1f / (1f + pct), ws = 1f / (1f + spct);
+            float cost = 0f, tr = 0f;
+            Vec2 a = start;
+            for (int i = 0; i < n; i++)
+            {
+                Vec2 b = pts[i];
+                float dx = b.x - a.x, dy = b.y - a.y, d = (float)Math.Sqrt(dx * dx + dy * dy);
+                if (d > 1e-4f)
+                {
+                    int m = (int)Math.Ceiling(d / step);
+                    if (m < 1) m = 1;
+                    float sl = d / m;
+                    for (int j = 0; j < m; j++)
+                    {
+                        float t = (j + 0.5f) / m;
+                        int k = MapRoads.KindAt(a.x + dx * t, a.y + dy * t);
+                        if (k == 2) { cost += sl * wr; tr += sl; }
+                        else if (k == 1) cost += sl * ws;
+                        else cost += sl;
+                    }
+                }
+                a = b;
+            }
+            trakt = tr;
+            return cost;
+        }
+
+        private static int Route(Graph g, Settings s, MobileParty mp, CampaignVec2 target, Vec2 S, Vec2 T, float L, NavigationPath path, bool cacheNext, int cat)
         {
             var startFace = mp.CurrentNavigationFace;
             var endFace = target.Face;
-            if (!startFace.IsValid() || !endFace.IsValid() || startFace.FaceIslandIndex != endFace.FaceIslandIndex) { Interlocked.Increment(ref _noRoad); return false; }
+            if (!startFace.IsValid() || !endFace.IsValid() || startFace.FaceIslandIndex != endFace.FaceIslandIndex) { Interlocked.Increment(ref _noRoad); return RouteOther; }
             int island = startFace.FaceIslandIndex;
             var scr = _scr;
             if (scr == null) { scr = new Scratch(); _scr = scr; }
             scr.Ensure(g);
             scr.Begin();
-            float detour = Detour(s);
-            float w = 1f / (1f + detour);
+            float detour = Detour(s);   // sufit dlugosci objazdu
+            float pct = RoadPct(s);     // waga drogi w koszcie = czynna premia traktu (recenzja p6-drogi: nie klucz nadkladu)
+            float w = 1f / (1f + pct);
             float R = L * RadiusShare;
             if (R < RadiusMin) R = RadiusMin; else if (R > RadiusMax) R = RadiusMax;
             float R2 = R * R;
@@ -371,7 +538,7 @@ namespace Armoury
                         if (scr.Push(n, cost)) seeds++;
                     }
                 }
-            if (seeds == 0) { Interlocked.Increment(ref _noRoad); return false; }
+            if (seeds == 0) { Interlocked.Increment(ref _noRoad); return RouteOther; }
 
             float best = float.MaxValue;
             int bestN = -1;
@@ -399,14 +566,14 @@ namespace Armoury
                     scr.Push(m, nk);
                 }
             }
-            if (bestN < 0) { Interlocked.Increment(ref _noRoad); return false; }
-            if (best > L) { Interlocked.Increment(ref _notWorth); return false; }
+            if (bestN < 0) { Interlocked.Increment(ref _noRoad); return RouteOther; }
+            if (best > L) { Interlocked.Increment(ref _notWorth); return RouteCtl; }
 
             // lancuch wezlow wejscie -> zejscie
             int cn = 0;
             for (int v = bestN; v >= 0; v = scr.Prev[v])
             {
-                if (cn >= scr.Chain.Length) { Interlocked.Increment(ref _navFail); return false; }
+                if (cn >= scr.Chain.Length) { Interlocked.Increment(ref _navFail); return RouteOther; }
                 scr.Chain[cn++] = v;
             }
             for (int i = 0, j = cn - 1; i < j; i++, j--) { int t = scr.Chain[i]; scr.Chain[i] = scr.Chain[j]; scr.Chain[j] = t; }
@@ -415,8 +582,8 @@ namespace Armoury
             for (int i = 1; i < cn; i++) road += g.AdjLen[scr.PrevA[scr.Chain[i]]];
             float off1 = Len(g.X[c0] - S.x, g.Y[c0] - S.y), off2 = Len(T.x - g.X[cl], T.y - g.Y[cl]);
             float est = off1 + road + off2;
-            if (road < MinRoadShare * est) { Interlocked.Increment(ref _fewRoad); return false; }
-            if (est > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return false; }
+            if (road < MinRoadShare * est) { Interlocked.Increment(ref _fewRoad); return RouteCtl; }
+            if (est > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return RouteCtl; }
 
             // trasa po siatce gry: start -> wejscie, cieciwy drogi, zejscie -> cel
             var camp = Campaign.Current;
@@ -426,24 +593,24 @@ namespace Armoury
             Vec2 last = S;
             float total = 0f;
             int r = Leg(scene, scr, startFace, S, g.Face[c0], new Vec2(g.X[c0], g.Y[c0]), inv, s2l, l2s, ref last, ref total);
-            float roadReal = 0f;
             for (int i = 1; i < cn && r == 0; i++)
             {
                 int a = scr.Chain[i - 1], b = scr.Chain[i];
-                float before = total;
                 // krawedz prosta po siatce gry (sprawdzona przy budowie) - sam punkt; inaczej silnik jak w ComputePath
                 if (g.AdjDirect[scr.PrevA[b]]) r = AddPoint(scr, new Vec2(g.X[b], g.Y[b]), ref last, ref total) ? 0 : -2;
                 else r = Leg(scene, scr, g.Face[a], new Vec2(g.X[a], g.Y[a]), g.Face[b], new Vec2(g.X[b], g.Y[b]), inv, s2l, l2s, ref last, ref total);
-                roadReal += total - before;
             }
             if (r == 0) r = Leg(scene, scr, g.Face[cl], new Vec2(g.X[cl], g.Y[cl]), endFace, T, inv, s2l, l2s, ref last, ref total);
             if (r == 0 && scr.Size == 0) r = -1;
-            if (r == -1) { Interlocked.Increment(ref _navFail); return false; }
-            if (r == -2) { Interlocked.Increment(ref _tooMany); return false; }
-            if (total > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return false; }
-            if (roadReal < MinRoadShare * total) { Interlocked.Increment(ref _fewRoad); return false; }
-            float realCost = (total - roadReal) + roadReal * w;
-            if (realCost > L) { Interlocked.Increment(ref _notWorth); return false; }
+            if (r == -1) { Interlocked.Increment(ref _navFail); return RouteOther; }
+            if (r == -2) { Interlocked.Increment(ref _tooMany); return RouteOther; }
+            if (total > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return RouteCtl; }
+            // czas: koszt przejazdu objazdu i trasy gry z probek ta sama miara co premia (trasa gry tez bywa czesciowo na drodze); droga = trakt z probek
+            float spct = SidePct(s), detTrakt, gameTrakt;
+            float costDet = RideCost(S, scr.Out, scr.Size, total, pct, spct, out detTrakt);
+            float costGame = RideCost(S, path.PathPoints, path.Size, L, pct, spct, out gameTrakt);
+            if (detTrakt < MinRoadShare * total) { Interlocked.Increment(ref _fewRoad); return RouteCtl; }
+            if (!(costDet <= costGame)) { Interlocked.Increment(ref _notWorth); return RouteCtl; }
 
             // zapis trasy do NavigationPath partii (PathBegin = 0 ustawil ComputePath)
             var pp = path.PathPoints;
@@ -451,10 +618,10 @@ namespace Armoury
             path.Size = scr.Size;
             if (cacheNext) mp.NextLongTermPathPoint = new CampaignVec2(scr.Out[0], true);
             Interlocked.Increment(ref _acc[cat]);
-            Interlocked.Add(ref _overPm, (long)Math.Round((total / L - 1f) * 1000f));
-            Interlocked.Add(ref _roadPm, (long)Math.Round(roadReal / total * 1000f));
-            Interlocked.Add(ref _timePm, (long)Math.Round(realCost / L * 1000f));
-            return true;
+            Interlocked.Add(ref _overPm, (long)Math.Round((total / L - 1f) * 1000f));   // bywa ujemny: trasa gry liczona z mnoznikiem 2, cieciwy bez niego
+            Interlocked.Add(ref _roadPm, (long)Math.Round(detTrakt / total * 1000f));
+            Interlocked.Add(ref _timePm, (long)Math.Round(costDet / costGame * 1000f));
+            return RouteOk;
         }
 
         private static float Len(float dx, float dy) { return (float)Math.Sqrt(dx * dx + dy * dy); }
@@ -545,6 +712,8 @@ namespace Armoury
             Array.Clear(_slotKey, 0, _slotKey.Length);
             Array.Clear(_slotHour, 0, _slotHour.Length);
             Array.Clear(_slotCnt, 0, _slotCnt.Length);
+            Array.Clear(_slotGrp, 0, _slotGrp.Length);
+            _hour0 = 0;
             ZeroDay();
             _stumblesAll = 0; _first = null;
         }
@@ -555,7 +724,8 @@ namespace Armoury
             for (int i = 0; i < _acc.Length; i++) _acc[i] = 0;
             _overPm = _roadPm = _timePm = 0;
             _crossAvoid = 0;
-            _capped = 0;
+            _capped = _replan = _lost = _aiOff = 0;
+            _arrDetN = _arrDetPm = _arrCtlN = _arrCtlPm = _arrAbort = _arrOut = 0;
             _stumbles = 0;
         }
 
@@ -572,6 +742,7 @@ namespace Armoury
             if (!_hooked) return "NIECZYNNE (latka ComputePath " + _hookNote + ")";
             if (s == null || !s.MapRoadAiRoutes) return "WYLACZONE (MapRoadAiRoutes)";
             if (!s.MapRoadSpeedBonus) return "NIECZYNNE (MapRoadSpeedBonus wylaczony - bez premii drogi objazd nic nie daje)";
+            if (s.MapRoadSpeedPercent <= 0) return "NIECZYNNE (MapRoadSpeedPercent 0 - trakt bez premii, objazd nic nie daje)";
             if (_g == null) return "NIECZYNNE (" + _note + ")";
             return "CZYNNE";
         }
@@ -580,6 +751,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             Reset();
+            try { _hour0 = CampaignTime.Now.ToHours; } catch { _hour0 = 0; }
             var s = Settings.Current;
             if (s == null || !s.MapRoadAiRoutes)
             {
@@ -590,7 +762,8 @@ namespace Armoury
             var g = _g;
             int cross = FindCrossings();
             Log.Info(P + "start sesji - klucz MapRoadAiRoutes tak, marsz od " + MinDist(s).ToString("0", Inv) + " jedn., nadklad do " + (Detour(s) * 100f).ToString("0", Inv)
-                     + "%, droga >= " + (MinRoadShare * 100f).ToString("0", Inv) + "% trasy, tylko rody / karawany / wozy wsi | " + _note
+                     + "% (sufit dlugosci), premia traktu w koszcie " + (RoadPct(s) * 100f).ToString("0", Inv) + "% (MapRoadSpeedPercent; droga boczna "
+                     + (SidePct(s) * 100f).ToString("0.0", Inv) + "%), droga >= " + (MinRoadShare * 100f).ToString("0", Inv) + "% trasy, tylko rody / karawany / wozy wsi | " + _note
                      + (g != null ? " | siec: wezlow " + g.Nodes + " (poza siatka gry " + g.BadNodes + "), polaczen " + (g.AdjCount / 2) + ", rozstajow " + g.Joins + ", skladowych " + g.Comps
                                     + ", lamanych " + g.Lines + ", punktow pliku " + g.Points + ", dlugosc " + g.Length.ToString("0.0", Inv) + " jedn.; krawedzie po siatce gry: proste " + g.EdgesDirect
                                     + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut : "")
@@ -888,30 +1061,35 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------------ pomiar (watek glowny)
-        /// <summary>Godzina w dobie pomiaru (LogGate.Today): partie rodow, karawan i wozow wsi w marszu ladem - na trakcie (MapRoads.KindAt == 2, ta sama miara
+        /// <summary>Co godzine (watek glowny): dojazd zmierzony - partia przy celu otwartego marszu (zawsze, gdy klucz czynny; samo porownanie pozycji).
+        /// W dobie pomiaru (LogGate.Today) takze spis: partie rodow, karawan i wozow wsi w marszu ladem - na trakcie (MapRoads.KindAt == 2, ta sama miara
         /// co "na drodze" w linii "Drogi (DR)": ten sam filtr partii, ta sama siatka i margines), osobno na objezdzie (przyjety objazd do biezacego celu).</summary>
         internal static void Hourly()
         {
             var s = Settings.Current;
-            if (_g == null || s == null || !s.MapRoadAiRoutes || Campaign.Current == null || !LogGate.Today) return;
+            if (_g == null || s == null || !s.MapRoadAiRoutes || Campaign.Current == null) return;
+            bool census = LogGate.Today;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
+                float now = NowRel();
                 var all = MobileParty.All;
                 for (int i = 0; i < all.Count; i++)
                 {
                     var mp = all[i];
                     try
                     {
-                        if (mp == null || !mp.IsActive || mp.IsMainParty || mp.AttachedTo != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || !mp.IsMoving) continue;
+                        if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
                         int k = Cat(mp);
                         if (k < 0) continue;
+                        int idx = mp.Party.Index, slot = idx & SlotMask;
+                        if (Volatile.Read(ref _slotGrp[slot]) != 0) CheckArrival(mp, slot, idx, now);
+                        if (!census || mp.AttachedTo != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || !mp.IsMoving) continue;
                         var p = mp.Position;
                         bool on = MapRoads.KindAt(p.X, p.Y) == 2;   // trakt (2), jak "na drodze" w MapRoads.Hourly - droga boczna (1) nie liczy sie (siec objazdow to same trakty)
                         _hN[k]++;
                         if (on) _hOn[k]++;
-                        int idx = mp.Party.Index;
-                        long v = Volatile.Read(ref _slotKey[idx & SlotMask]);
+                        long v = Volatile.Read(ref _slotKey[slot]);
                         if ((v & 3L) == StAccepted && (v & ~3L) == (((long)idx << 32) | (long)TargetHash(mp.MoveTargetPoint.ToVec2())))
                         {
                             _hDet[k]++;
@@ -920,7 +1098,7 @@ namespace Armoury
                     }
                     catch (Exception e) { ParStumble(e); }
                 }
-                _hours++;
+                if (census) _hours++;
             }
             catch (Exception e) { ParStumble(e); }
             finally { _censusTicks += Stopwatch.GetTimestamp() - t0; }
@@ -942,7 +1120,7 @@ namespace Armoury
                     Log.Info(P + "budowa sieci w trakcie sesji (klucz wlaczony w MCM): " + _note + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
                 }
                 if (!s.MapRoadAiRoutes) { ZeroDay(); return; }
-                if (!LogGate.Lines) { ZeroCounters(); return; }
+                if (!LogGate.Lines) { ZeroDay(); return; }   // spis godzinny (dojazd) biegnie co godzine - zerowany razem z licznikami
                 Line(s, (int)CampaignTime.Now.ToDays - 1);
             }
             catch (Exception e) { _stumbles++; _stumblesAll++; if (_stumblesAll <= 3) Log.Error("AiRoadRoutes.Daily", e); }
@@ -960,17 +1138,26 @@ namespace Armoury
               .Append(" | trasy AI (rody, karawany, wozy wsi; ladem do osady / punktu): liczone ").Append(_seen.ToString(ci))
               .Append(", krotsze od progu ").Append(_short.ToString(ci)).Append(", powtorka celu ").Append(_repeat.ToString(ci))
               .Append(", ponad ").Append(PlansPerHour.ToString(ci)).Append(" plany partii na godzine ").Append(_capped.ToString(ci))
+              .Append(" (objazd utracony - limit planow albo trasa gry bez planu, np. krotka reszta trasy: ").Append(_lost.ToString(ci))
+              .Append("), ponowione po objezdzie ").Append(_replan.ToString(ci))
               .Append(", planowane ").Append(_planned.ToString(ci))
               .Append(" | objazdy droga ").Append(acc.ToString(ci)).Append(" (").Append(Pct(acc, _planned)).Append("% planowanych; rody ").Append(_acc[0].ToString(ci))
               .Append(", karawany ").Append(_acc[1].ToString(ci)).Append(", wozy wsi ").Append(_acc[2].ToString(ci)).Append(')')
+              .Append(" (z AI wylaczonym przez inny mod - uczta / majatek BK: ").Append(_aiOff.ToString(ci)).Append(')')
               .Append(" | odrzucone ").Append(rej.ToString(ci)).Append(": bez drogi w zasiegu ").Append(_noRoad.ToString(ci)).Append(", droga sie nie oplaca ").Append(_notWorth.ToString(ci))
               .Append(", malo drogi ").Append(_fewRoad.ToString(ci)).Append(", za dlugie ").Append(_tooLong.ToString(ci)).Append(", siatka gry (odcinek bez sciezki) ").Append(_navFail.ToString(ci))
               .Append(", ponad 128 punktow ").Append(_tooMany.ToString(ci))
               .Append("; ominiete wezly / krawedzie w strefie przepraw wrogiego pana ").Append(_crossAvoid.ToString(ci));
             if (acc > 0)
-                sb.Append(" | objazd sr.: nadklad drogi +").Append((_overPm / (double)acc / 10.0).ToString("0.0", ci)).Append("% trasy gry, droga ")
+                sb.Append(" | objazd sr.: nadklad drogi ").Append((_overPm / (double)acc / 10.0).ToString("+0.0;-0.0;0.0", ci)).Append("% trasy gry, droga ")
                   .Append((_roadPm / (double)acc / 10.0).ToString("0.0", ci)).Append("% trasy, czas szac. ").Append((_timePm / (double)acc / 10.0).ToString("0.0", ci)).Append("% czasu trasy gry");
             else sb.Append(" | objazd sr.: -");
+            // dojazd zmierzony: srednia (godziny od planu do celu) / (trasa gry / predkosc bazowa z planu) - objazdy i proba porownawcza (droga w zasiegu, trasa gry)
+            sb.Append(" | dojazd zmierzony (godziny do celu / godziny trasy gry wg predkosci bazowej z planu): objazdy ").Append(_arrDetN.ToString(ci))
+              .Append(" sr. ").Append(_arrDetN > 0 ? (_arrDetPm / (double)_arrDetN / 10.0).ToString("0.0", ci) : "-")
+              .Append("%, proba (trasa gry, droga w zasiegu) ").Append(_arrCtlN.ToString(ci))
+              .Append(" sr. ").Append(_arrCtlN > 0 ? (_arrCtlPm / (double)_arrCtlN / 10.0).ToString("0.0", ci) : "-")
+              .Append("%, przerwane ").Append(_arrAbort.ToString(ci)).Append(", poza pomiarem ").Append(_arrOut.ToString(ci));
             int n = _hN[0] + _hN[1] + _hN[2], on = _hOn[0] + _hOn[1] + _hOn[2], det = _hDet[0] + _hDet[1] + _hDet[2], deton = _hDetOn[0] + _hDetOn[1] + _hDetOn[2];
             sb.Append(" | spis partio-godzin w marszu ladem (godzin ").Append(_hours.ToString(ci)).Append("): ").Append(n.ToString(ci)).Append(", na drodze ").Append(on.ToString(ci))
               .Append(" (").Append(Pct(on, n)).Append("%; rody ").Append(_hOn[0].ToString(ci)).Append('/').Append(_hN[0].ToString(ci)).Append(" (").Append(Pct(_hOn[0], _hN[0]))

@@ -1888,7 +1888,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MapMudWetSpeedPercent { get; set; } = 7.5f;
 
-        [SettingPropertyBool("Map Road Ai Routes", HintText = "lords, caravans and villagers choose the painted roads: on a march over land to a settlement or a spot at least Map Road Ai Min Distance away, the party rides to the nearest good stretch of main road, follows it and leaves it near its goal - whenever that way is at most Map Road Ai Detour Percent longer than the game's own route and the road makes up at least half of it, so with the road bonus it gets there about as fast or faster. Not for your party, bandits, a chase, a flight, a siege or a battle. Needs Map Road Speed Bonus. Off = the game's own routes, as before", RequireRestart = false)]
+        [SettingPropertyBool("Map Road Ai Routes", HintText = "lords, caravans and villagers choose the painted roads: on a march over land to a settlement or a spot at least Map Road Ai Min Distance away, the party rides to the nearest good stretch of main road, follows it and leaves it near its goal - whenever that way is at most Map Road Ai Detour Percent longer than the game's own route, the road makes up at least half of it and, with the road bonus (Map Road Speed Percent), the ride takes no longer than the game's own route. Lords riding to a feast or to their estate count too. Not for your party, bandits, a chase, a flight, a siege or a battle. Needs Map Road Speed Bonus. Off = the game's own routes, as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool MapRoadAiRoutes { get; set; } = true;
 
@@ -1896,7 +1896,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int MapRoadAiMinDistance { get; set; } = 30;
 
-        [SettingPropertyInteger("Map Road Ai Detour Percent", 0, 50, "0", HintText = "how much longer than the game's own route a way along the road may be, in percent (15 = up to 15% longer, which the +15% road bonus pays back; at most 50)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Road Ai Detour Percent", 0, 50, "0", HintText = "how much longer than the game's own route a way along the road may be, in percent (15 = up to 15% longer; a longer way is taken only when the road bonus still makes it no slower; at most 50)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int MapRoadAiDetourPercent { get; set; } = 15;
 

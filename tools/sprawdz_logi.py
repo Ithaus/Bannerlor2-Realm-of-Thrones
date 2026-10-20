@@ -1091,8 +1091,9 @@ Uzycie (Python 3, tylko odczyt):
                     predkosci MarchPace niewpietej na starcie gry, NDR-5/6 probki na podlodze LimitMin poza srednia premii, NDR-8 takze "od wczytania" (ciche logi).
 --grupa p6drogi   : (R3-07d, Jeff 20.10 "pozostale tak"; galaz w-toku/p6-drogi, Armoury/src/AiRoadRoutes.cs) python -I tools/sprawdz_logi.py --grupa p6drogi <Armoury-*.log>
                     (strumieniowo). AD-0 latka ComputePath wpieta; AD-1 siec CZYNNA (>= 1000 wezlow, wyciete <= 25%, przeprawy 3/3); AD-2 budowa <= 1000 ms; AD-3 linie
-                    doby; AD-4 objazdy u rodow, karawan, wozow wsi; AD-5 nadklad <= prog, droga >= 50%, czas <= 100.5%; AD-6 na objezdzie na drodze >= 30%; AD-7 udzial
-                    na drodze (INFO); AD-8 koszt planowania <= 50 ms/dobe; AD-9 potkniecia i ERROR 0; AD-10 odrzucone (INFO). Log bez paczki: INFO.
+                    doby; AD-4 objazdy u rodow, karawan, wozow wsi; AD-5 objazd sredni z konstrukcji (INFO - te same warunki co przyjecie); AD-6 na objezdzie na
+                    drodze >= 30%; AD-7 udzial na drodze (INFO); AD-8 koszt planowania <= 50 ms/dobe; AD-9 potkniecia i ERROR 0; AD-10 odrzucone (INFO); AD-11 dojazd
+                    ZMIERZONY: objazdy sr. <= proba porownawcza + 5 pp (po >= 30 dojazdow w obu grupach). Log bez paczki: INFO.
 --grupa nks       : (16.10, Jeff "produkcja tylko z prawdziwych rak i ziemi, start zbilansowany"; galaz w-toku/noc-ks, Armoury/src/StartCalibration*.cs; projekt
                     docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14; poprawki po recenzji 16.10) python -I tools/sprawdz_logi.py --grupa nks <Armoury-*.log>
                     [--baza-doby <Armoury-*.log bazy>] (strumieniowo). NKS-0 start sesji, NKS-1 Plany bez bledu, NKS-1b Plan wlaczenia z ksiega >= 28 dob, NKS-2 czas Planu
@@ -35637,8 +35638,10 @@ def p6drogi_main(logp):
     MapRoadAiDetourPercent): lordowie, karawany i wozy wsi dostaja objazd traktem (punkty posrednie po ComputePath), gdy trasa droga jest najwyzej o nadklad
     dluzsza od trasy gry i droga to co najmniej polowa trasy. Wejscie: log Armoury (strumieniowo).
     AD-0 latka MobileParty.ComputePath wpieta (bez cudzych latek); AD-1 start sesji CZYNNE, siec >= 1000 wezlow, wyciete <= 25% krawedzi, przeprawy 3/3;
-    AD-2 budowa sieci <= 1000 ms; AD-3 linie doby rozpoznane; AD-4 objazdy > 0 u rodow, karawan i wozow wsi; AD-5 objazd sr.: nadklad <= prog + 0.5 pp,
-    droga >= 50%, czas szac. <= 100.5%; AD-6 partie na objezdzie: na drodze >= 30% partio-godzin (bez objazdu WGRANIE 91: 7-10%); AD-7 udzial na drodze rodow,
+    AD-2 budowa sieci <= 1000 ms; AD-3 linie doby rozpoznane; AD-4 objazdy > 0 u rodow, karawan i wozow wsi; AD-5 objazd sr.: nadklad, droga, czas szac.
+    (INFO - recenzja p6-drogi: kod wymusza te warunki przy przyjeciu, wiec to nie jest pomiar); AD-11 dojazd ZMIERZONY (godziny od planu do celu / godziny
+    trasy gry wg predkosci bazowej z planu): objazdy sr. <= proba porownawcza (trasa gry, choc droga w zasiegu) + 5 pp, po >= 30 dojazdow w obu grupach;
+    AD-6 partie na objezdzie: na drodze >= 30% partio-godzin (bez objazdu WGRANIE 91: 7-10%); AD-7 udzial na drodze rodow,
     karawan i wozow wsi (INFO, porownanie z linia Drogi (DR) WGRANIA 91: rody 7.3%, karawany 9.8%, wozy wsi 8.4%); AD-8 koszt: planowanie mediana <= 50 ms/dobe,
     spis <= 5 ms/dobe; AD-9 potkniecia i ERROR in AiRoadRoutes.* 0; AD-10 odrzucone wedlug powodu (INFO). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
@@ -35708,7 +35711,13 @@ def p6drogi_main(logp):
             "r": num(r"; rody (\d+), karawany \d+, wozy wsi \d+\)", d, int, 0),
             "k": num(r"; rody \d+, karawany (\d+), wozy wsi \d+\)", d, int, 0),
             "w": num(r"; rody \d+, karawany \d+, wozy wsi (\d+)\)", d, int, 0),
-            "over": num(r"nadklad drogi \+([\d.]+)%", d, float, None),
+            "over": num(r"nadklad drogi \+?(-?[\d.]+)%", d, float, None),   # znak z liczby (bywa ujemny); stary zapis "+-1.2" tez
+            "adn": num(r"dojazd zmierzony .*?: objazdy (\d+) sr\.", d, int, None),
+            "adr": num(r"dojazd zmierzony .*?: objazdy \d+ sr\. ([\d.]+)%", d, float, None),
+            "acn": num(r"proba \(trasa gry, droga w zasiegu\) (\d+) sr\.", d, int, 0),
+            "acr": num(r"proba \(trasa gry, droga w zasiegu\) \d+ sr\. ([\d.]+)%", d, float, None),
+            "aab": num(r"dojazd zmierzony .*?, przerwane (\d+)", d, int, 0),
+            "aout": num(r"dojazd zmierzony .*?, poza pomiarem (\d+)", d, int, 0),
             "road": num(r"trasy gry, droga ([\d.]+)% trasy", d, float, None),
             "time": num(r"czas szac\. ([\d.]+)%", d, float, None),
             "n": num(r"\(godzin \d+\): (\d+), na drodze", d, int, 0),
@@ -35739,8 +35748,9 @@ def p6drogi_main(logp):
         over = sum(g["over"] * g["acc"] for g in parsed if g["over"] is not None) / wsum
         road = sum(g["road"] * g["acc"] for g in parsed if g["road"] is not None) / wsum
         tm = sum(g["time"] * g["acc"] for g in parsed if g["time"] is not None) / wsum
-        rep.add("AD-5: objazd sredni (wazony objazdami)", f"nadklad +{over:.1f}%, droga {road:.1f}% trasy, czas szac. {tm:.1f}% czasu trasy gry",
-                f"nadklad <= {det}.5%, droga >= 50%, czas <= 100.5%", over <= det + 0.5 and road >= 50.0 and tm <= 100.5)
+        bad = not (over <= det + 0.5 and road >= 50.0 and tm <= 100.5)
+        rep.add("AD-5: objazd sredni (wazony objazdami; konstrukcja, nie pomiar)", f"nadklad {over:+.1f}%, droga {road:.1f}% trasy, czas szac. {tm:.1f}% czasu trasy gry",
+                f"INFO (kod wymusza: nadklad <= {det}%, droga >= 50%, czas szac. <= 100%; czas zmierzony - AD-11)" + (" - UWAGA: poza warunkami przyjecia" if bad else ""), None)
     else:
         rep.add("AD-5: objazd sredni", "brak objazdow", "INFO", None)
     dt, dto = sum(g["det"] for g in parsed), sum(g["deton"] for g in parsed)
@@ -35762,9 +35772,26 @@ def p6drogi_main(logp):
     rep.add("AD-9: potkniecia i bledy", f"potkniecia w dobach linii {stum} (od wczytania maks. {stall}), ERROR in AiRoadRoutes.* {n_err}", "0", stum == 0 and stall == 0 and n_err == 0)
     rj = {}
     for lab in ("bez drogi w zasiegu", "droga sie nie oplaca", "malo drogi", "za dlugie", r"siatka gry \(odcinek bez sciezki\)", "ponad 128 punktow",
-                r"plany partii na godzine", "powtorka celu"):
+                r"plany partii na godzine", "powtorka celu", r"objazd utracony - limit planow albo trasa gry bez planu, np\. krotka reszta trasy:", "ponowione po objezdzie",
+                r"z AI wylaczonym przez inny mod - uczta / majatek BK:"):
         rj[lab.replace("\\", "")] = sum(num(lab + r" (\d+)", g["rej"], int, 0) or 0 for g in parsed)
-    rep.add("AD-10: odrzucone wedlug powodu (suma dob)", ", ".join(f"{k} {v}" for k, v in rj.items()), "INFO", None)
+    rep.add("AD-10: odrzucone wedlug powodu, ponowienia, AI wylaczone (suma dob)", ", ".join(f"{k} {v}" for k, v in rj.items()), "INFO", None)
+    # AD-11: dojazd zmierzony - srednie wazone liczba dojazdow
+    md = [g for g in parsed if g["adn"] is not None]
+    if md:
+        dn = sum(g["adn"] for g in md)
+        cn = sum(g["acn"] or 0 for g in md)
+        dr = sum(g["adr"] * g["adn"] for g in md if g["adr"] is not None) / dn if dn else None
+        cr = sum(g["acr"] * g["acn"] for g in md if g["acr"] is not None and g["acn"]) / cn if cn else None
+        ab, ou = sum(g["aab"] or 0 for g in md), sum(g["aout"] or 0 for g in md)
+        txt = (f"objazdy {dn} sr. " + (f"{dr:.1f}%" if dr is not None else "-") + f", proba {cn} sr. " + (f"{cr:.1f}%" if cr is not None else "-")
+               + f", przerwane {ab}, poza pomiarem {ou}")
+        if dn >= 30 and cn >= 30 and dr is not None and cr is not None:
+            rep.add("AD-11: dojazd zmierzony - objazd wobec trasy gry", txt, "objazdy sr. <= proba + 5 pp (po >= 30 w obu grupach)", dr <= cr + 5.0)
+        else:
+            rep.add("AD-11: dojazd zmierzony - objazd wobec trasy gry", txt, "INFO (mniej niz 30 dojazdow w grupie)", None)
+    else:
+        rep.add("AD-11: dojazd zmierzony", "brak czesci 'dojazd zmierzony' w liniach doby", "INFO (log sprzed poprawki po recenzji)", None)
     rep.show()
     return 0
 
