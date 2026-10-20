@@ -29,7 +29,7 @@ namespace Armoury
         private const int CreatePerTick = 6;
         private const int StrikesPer = 3;
         // wymiary (jedn. mapy; zajazd ~0.8, wioska ~2): szubienica wyolbrzymiona jak ikony mapy, zeby byla widoczna z kamery
-        private const float H = 0.40f, W = 0.36f, PostT = 0.028f, BeamT = 0.026f, RopeL = 0.045f, RopeT = 0.006f, BodyL = 0.15f, Sink = 0.03f;
+        private const float H = 0.40f, W = 0.36f, PostT = 0.028f, BeamT = 0.026f, RopeL = 0.045f, RopeT = 0.006f, BodyL = 0.15f, BodyW = 0.10f, Sink = 0.03f;
         private static readonly string[] WoodMeshes = { "wooden_platform_plank_f_column", "wooden_platform_plank_a" };
         private static readonly string[] BodyMeshes = { "burnt_corpse", "bd_sack_b", "mi_sack_a" };
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -364,14 +364,15 @@ namespace Armoury
                     if (Stick(scene, root, wood, true, RopeL, RopeT, new Vec3(x, 0f, top - RopeL * 0.5f))) pieces++;
                     if (body == null) continue;
                     BoundingBox bb = body.GetBoundingBox();
-                    float bz = bb.max.z - bb.min.z, bmax = Math.Max(bz, Math.Max(bb.max.x - bb.min.x, bb.max.y - bb.min.y));
-                    float ext = bz > 0.0005f ? bz : bmax;
-                    if (!(ext > 0.0005f) || ext > 1000f) continue;
-                    // wisielec: siatka stojaca (jak na krzyzu Boltonow), tylko obrot wokol pionu dla rozmaitosci i skala do BodyL
+                    float bz = bb.max.z - bb.min.z, bw = Math.Max(bb.max.x - bb.min.x, bb.max.y - bb.min.y);
+                    if (!(bz > 0.0005f) || !(bw > 0.0005f) || bz > 1000f || bw > 1000f) continue;
+                    // wisielec: siatka stojaca (jak na krzyzu Boltonow), tylko obrot wokol pionu dla rozmaitosci; skala do wysokosci BodyL, ale nie szerzej niz BodyW
+                    // (rozlozone rece albo siatka lezaca nie wychodza poza swoje miejsce na belce); gora siatki przy koncu liny
+                    float sc = Math.Min(BodyL / bz, BodyW / bw);
                     Mat3 m = Mat3.Identity;
                     m.RotateAboutUp(((h >> (i * 5)) & 31u) / 31f * 0.9f - 0.45f);
-                    m.ApplyScaleLocal(BodyL / ext);
-                    if (Piece(scene, root, body, m, bb, new Vec3(x, 0f, top - RopeL - BodyL * 0.5f))) pieces++;
+                    m.ApplyScaleLocal(sc);
+                    if (Piece(scene, root, body, m, bb, new Vec3(x, 0f, top - RopeL - bz * sc * 0.5f))) pieces++;
                 }
                 root.EntityFlags = root.EntityFlags | EntityFlags.DoNotTick;
                 root.SetReadyToRender(true);
