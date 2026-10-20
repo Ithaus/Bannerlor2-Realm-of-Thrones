@@ -13,6 +13,8 @@ namespace Armoury
     /// otwiera kontekst (Open: kto naprawde placi), finalizer go zamyka (Close - takze po wyjatku). W kontekscie z czynnym kluczem i znanym platnikiem:
     ///   placi platnik ze swojej kiesy, najwyzej tyle, ile ma (GiveGoldAction tez tnie do kiesy bohatera - liczymy sami, zeby znac niedoplate);
     ///   brak = mniej, komunikat gracza "X could pay only N of the agreed M." i licznik; bez doplat (regula Jeffa: "jesli ubywa, to ubywa").
+    ///   r4-zlecenia (20.10, klucz CraftOrderClanPurse, tylko kontekst zlecen kowalskich - Ctx.ClanPurse): zleceniodawca-lord, ktory nie jest glowa rodu -
+    ///   brak doplaca glowa rodu (kiesa rodu, Jeff "kiesa rodu zarzadza szef rodu") w granicach CraftOrderClanPurse.Room; komunikat mowi, kto zaplacil ile.
     /// Bez kontekstu, przy wylaczonym kluczu albo gdy dajacy nie jest "nikim" - wywolanie gry bez zmian (stan sprzed), kwota "z niczego" liczona w kontekscie.
     /// Zdarzenie gry (HeroOrPartyTradedGold) idzie juz z prawdziwym platnikiem - ksiega pieniadza widzi przelew bohater -> bohater, RealPayer.GivePrefix
     /// (stos kontekstow E3/1) nie ma tu nic do zrobienia (jego stos jest pusty, a dajacy nie jest juz null).
@@ -30,6 +32,9 @@ namespace Armoury
             public int Short;            // wyplaty nizsze niz obiecane (pusta kiesa)
             public long Seq;             // E8/D1: kolejnosc otwarcia wobec ramek zadan (QuestPay8) - wyplate bierze kontekst otwarty pozniej
             public long FromNothing;     // wyplacone "z niczego" (klucz wylaczony albo brak platnika)
+            public bool ClanPurse;       // r4-zlecenia (CraftOrderClanPurse): brak zleceniodawcy-lorda doplaca glowa rodu (tylko kontekst zlecen kowalskich)
+            public long FromHead;        // r4-zlecenia: doplacone przez glowe rodu
+            public int HeadN, HeadFull;  // r4-zlecenia: wyplaty z doplata glowy / w tym doplacone do pelna
             internal Ctx Prev;
         }
 
@@ -74,9 +79,27 @@ namespace Armoury
             if (pay > 0) GiveGoldAction.ApplyBetweenCharacters(payer, recipient, pay, disableNotification);
             if (pay < amount)
             {
-                c.Short++;
+                // r4-zlecenia (Craft Order Clan Purse): lord, ktory nie jest glowa rodu - brak doplaca glowa rodu (kiesa rodu) w granicach CraftOrderClanPurse.Room
+                Hero head = null; int help = 0;
+                if (c.ClanPurse) help = CraftOrderClanPurse.TopUp(payer, recipient, amount, pay, disableNotification, out head);
+                if (help > 0) { c.HeadN++; c.FromHead += help; }
+                int got = pay + help;
+                if (got < amount) c.Short++; else c.HeadFull++;
                 if (ReferenceEquals(recipient, Hero.MainHero))
-                    Log.Player((payer.Name != null ? payer.Name.ToString() : "The client") + " could pay only " + pay + " of the agreed " + amount + ".", true);
+                {
+                    string who = payer.Name != null ? payer.Name.ToString() : "The client";
+                    if (help <= 0)
+                        Log.Player(who + " could pay only " + pay + " of the agreed " + amount + ".", true);
+                    else
+                    {
+                        string hn = head != null && head.Name != null ? head.Name.ToString() : "the head of the clan";
+                        if (got >= amount)
+                            Log.Player(who + " paid " + pay + " and " + hn + ", head of the clan, paid the remaining " + help + " of the agreed " + amount + ".");
+                        else
+                            Log.Player(who + " and " + hn + ", head of the clan, could pay only " + got + " of the agreed " + amount
+                                       + " (" + who + ": " + pay + ", " + hn + ": " + help + ").", true);
+                    }
+                }
             }
         }
 

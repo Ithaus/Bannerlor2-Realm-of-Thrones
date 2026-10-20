@@ -46,6 +46,9 @@ namespace Armoury
     ///       zlecenia miejskie zmarlego (albo bez zleceniodawcy) zdjete; dla zywego - najpierw do sumy ida zlecenia zadan i zlecenia spod otwartej kuzni
     ///       (tych nie zdejmujemy), potem zlecenia miejskie po kolei (miasta, sloty): zostaje, gdy kiesa pokrywa sume zostawionych z nim wlacznie, inaczej
     ///       zdjete ta sama droga (pozniejsze, mniejsze zlecenie moze sie jeszcze zmiescic);
+    ///   r4-zlecenia (klucz CraftOrderClanPurse, CraftOrderClanPurse.cs): u lorda, ktory nie jest glowa rodu, "kiesa" w (1) i (2) = jego kiesa + to, co moze
+    ///       doplacic glowa rodu (kiesa glowy ponad AiGearGoldReserve, w rodzie z budzetem 166 najwyzej niewydany przydzial sprzetu); w (2) doplata glowy
+    ///       rozdzielana na zlecenia wszystkich czlonkow rodu (Pass.Pledged), w (1) bez tego podzialu (przeglad doby go poprawia);
     ///   (3) oddanie bez zmian (GiverPay: placi, ile ma - komunikat zostaje na wypadek, gdy kiesa spadla po ostatnim przegladzie, premia przekroczyla zapas
     ///       albo zlecenie zadania szefa gangu bez pokrycia - tych nie zdejmujemy, licznik "zlecen zadan bez pokrycia").
     /// Klucz wylaczony: nic nie zdejmujemy, przeglad liczy "w cieniu", ile by zdjal.
@@ -179,6 +182,7 @@ namespace Armoury
         // ------------------------------------------------------------ (1) nowe zlecenie miejskie
 
         private static int _made, _rejected, _rejectedSum, _early, _madeOff, _madeOpen, _madeKept;   // _rejectedSum: kiesa na to jedno zlecenie, nie na sume z innymi
+        private static int _madeClan;   // r4-zlecenia: zlecenia lorda, ktory nie jest glowa rodu, zostawione dzieki temu, co moze doplacic glowa (Craft Order Clan Purse)
         private static long _rejectedDue;
 
         /// <summary>Prefiks CreateTownOrder(Hero orderOwner, int orderSlot): zlecenie, ktore stoi w slocie przed wywolaniem (zwykle null).</summary>
@@ -213,9 +217,14 @@ namespace Armoury
                 var owner = o.OrderOwner;
                 if (owner == null) return;
                 long r = Reward(o);
-                int gold = owner.Gold;
-                bool alone = gold < Need(r);                                     // kiesa nie pokrywa nawet tego jednego zlecenia
-                if (!alone && gold >= Need(r + OtherDue(__instance, owner, o))) return;
+                long gold = owner.Gold;
+                long room = CraftOrderClanPurse.RoomFor(owner);                  // r4-zlecenia: ile moze doplacic glowa rodu (0 - klucz wylaczony / bez glowy)
+                bool alone = gold + room < Need(r);                              // kiesa (z doplata glowy) nie pokrywa nawet tego jednego zlecenia
+                if (!alone)
+                {
+                    long need = Need(r + OtherDue(__instance, owner, o));
+                    if (gold + room >= need) { if (gold < need) _madeClan++; return; }
+                }
                 Town here;
                 if (ForgeOpen(out here) && (here == null || ReferenceEquals(here, town))) { _madeOpen++; return; }
                 if (Remove(slots, o)) { _rejected++; _rejectedDue += r; if (!alone) _rejectedSum++; }
@@ -232,10 +241,14 @@ namespace Armoury
             public int Seen, Poor, Dead, Hang, Uncovered, Open, Mismatch, Custom, CustomUncovered, ShPoor, ShDead, PoorSum, Multi, MaxN;
             public long PoorDue;
             public readonly List<int> Gold = new List<int>(64);
+            // r4-zlecenia (Craft Order Clan Purse): zlecenia lordow, ktorzy nie sa glowa rodu; zostawione dzieki doplacie glowy i jej suma; bez pokrycia mimo glowy;
+            // w cieniu (klucz wylaczony) - ile pokrylaby glowa
+            public int ClanLords, ClanCovered, ClanShort, ClanShadow; public long ClanHelp;
+            public readonly Dictionary<Hero, long> Pledged = new Dictionary<Hero, long>(64);   // glowa -> doplata juz przypisana zleceniom czlonkow w tym przegladzie
         }
 
         /// <summary>Zostawione zlecenia jednego zleceniodawcy w przegladzie: suma nagrod i liczba (miejskie + zadan).</summary>
-        private sealed class Acc { public long Due; public int N; }
+        private sealed class Acc { public long Due; public int N; public long Pledged; }   // Pledged (r4-zlecenia): czesc sumy pokryta doplata glowy rodu
 
         private struct Entry { public Town Town; public CraftingCampaignBehavior.CraftingOrderSlots Slots; public CraftingOrder Order; public bool Locked; }
 
@@ -308,6 +321,27 @@ namespace Armoury
             long r = Reward(o);
             Acc a = dead ? null : AccOf(due, owner);
             bool poor = !dead && owner.Gold < Need(a.Due + r);
+            // r4-zlecenia (Craft Order Clan Purse): brak lorda, ktory nie jest glowa rodu, pokrywa to, co moze doplacic glowa - jedna kiesa glowy na zlecenia
+            // wszystkich czlonkow (p.Pledged), przyrost braku tego zleceniodawcy (a.Pledged - juz przypisane jego wczesniejszym zleceniom)
+            Hero head = dead ? null : CraftOrderClanPurse.HeadOf(owner);
+            long help = 0;
+            if (head != null)
+            {
+                p.ClanLords++;
+                if (poor)
+                {
+                    bool cap; int gl;
+                    long inc = Need(a.Due + r) - owner.Gold - a.Pledged;
+                    long used; p.Pledged.TryGetValue(head, out used);
+                    long room = CraftOrderClanPurse.Room(head, out cap, out gl) - used;
+                    if (inc <= 0 || inc <= room)
+                    {
+                        if (CraftOrderClanPurse.On) { poor = false; help = Math.Max(0L, inc); }
+                        else p.ClanShadow++;
+                    }
+                    else p.ClanShort++;
+                }
+            }
             bool bad = dead || poor;
             if (bad)
             {
@@ -320,7 +354,16 @@ namespace Armoury
                     return;
                 }
             }
-            if (a != null && (act || !bad)) { a.Due += r; a.N++; }          // zostaje w grze; cien (klucz wylaczony): zlecenie bez pokrycia liczone jak zdjete
+            if (a != null && (act || !bad))                                   // zostaje w grze; cien (klucz wylaczony): zlecenie bez pokrycia liczone jak zdjete
+            {
+                a.Due += r; a.N++;
+                if (help > 0)
+                {
+                    a.Pledged += help;
+                    long used; p.Pledged.TryGetValue(head, out used); p.Pledged[head] = used + help;
+                    p.ClanCovered++; p.ClanHelp += help;
+                }
+            }
             p.Hang++;
             if (bad) p.Uncovered++;                                           // = ekran kuzni + niezgodny slot / brak drogi + cien (klucz wylaczony)
             if (owner != null) p.Gold.Add(owner.Gold);
@@ -343,6 +386,9 @@ namespace Armoury
                    + " | zostawione mimo braku: ekran kuzni otwarty " + p.Open + ", niezgodny slot albo brak drogi gry " + p.Mismatch
                    + " | w cieniu (klucz wylaczony): bez kiesy " + p.ShPoor + ", bez zywego zleceniodawcy " + p.ShDead
                    + " | zlecen zadan (pominiete) " + p.Custom + ", bez pokrycia " + p.CustomUncovered
+                   + " | kiesa rodu (Craft Order Clan Purse " + OnOff(CraftOrderClanPurse.KeyOn) + "): zlecen lordow, ktorzy nie sa glowa rodu " + p.ClanLords
+                   + ", pokryte dopiero doplata glowy " + p.ClanCovered + " (doplata glowy na nie razem " + p.ClanHelp + ", glow " + p.Pledged.Count + ")"
+                   + ", bez pokrycia mimo glowy " + p.ClanShort + ", w cieniu (klucz wylaczony) pokrylaby glowa " + p.ClanShadow
                    + " | klucz Craft Orders Giver Can Pay " + OnOff(KeyOn) + ", placi zleceniodawca (Craft Orders Historical) " + OnOff(CraftOrders8.PayOn)
                    + ", dziala " + (on ? "TAK" : "NIE");
         }
@@ -382,6 +428,7 @@ namespace Armoury
                   .Append(" | przy tworzeniu bez sprawdzenia: klucz albo platnik wylaczony ").Append(_madeOff).Append(", przed przeliczeniem cen ").Append(_early)
                   .Append(", ekran kuzni otwarty ").Append(_madeOpen).Append(", zostawione (niezgodny slot albo brak drogi gry) ").Append(_madeKept)
                   .Append(" | odrzucone przy tworzeniu przez sume zlecen zleceniodawcy ").Append(_rejectedSum)
+                  .Append(", zostawione przy tworzeniu dzieki doplacie glowy rodu ").Append(_madeClan)
                   .Append(" | nagrody: odrzuconych razem ").Append(_rejectedDue).Append(", usunietych w dobie razem ").Append(p.PoorDue)
                   .Append(" | koszt ").Append(Ms(_ticks + Stopwatch.GetTimestamp() - t0)).Append(" ms/dobe")
                   .Append(" | potkniecia ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(").");
@@ -405,6 +452,7 @@ namespace Armoury
         {
             _stumblesDay = 0; _ticks = 0; _mismatchDay = 0;
             _made = _rejected = _rejectedSum = _madeOff = _madeOpen = _madeKept = _early = 0; _rejectedDue = 0;
+            _madeClan = 0;
         }
 
         // ------------------------------------------------------------ start gry (SubModuleMain - po CraftOrders8.ApplyAll)

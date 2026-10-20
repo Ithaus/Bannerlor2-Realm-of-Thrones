@@ -5056,6 +5056,10 @@ namespace Armoury
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersGiverCanPay { get; set; } = true;
 
+        [SettingPropertyBool("Craft Order Clan Purse", HintText = "a lord who is not the head of his clan pays a smithing order from the clan purse too: what he cannot pay himself is paid by the head of his clan, from the coin he holds above Ai Gear Gold Reserve (wages come first) and, in a clan with a budget, no more than the clan's unspent allowance for gear - the same purse that buys the clan's horses and arms. You are told who paid how much; only when the head cannot pay either do you get less ('... could pay only N of the agreed M'). The same purse counts when such a lord places an order and when waiting orders are checked (Craft Orders Giver Can Pay). Works together with Craft Orders Historical. Off = the lord pays only from his own purse, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The forge gate")]
+        public bool CraftOrderClanPurse { get; set; } = true;
+
         [SettingPropertyBool("Craft Orders Opened Only", HintText = "new smithing orders ask only for weapon classes you can actually forge - every slot of the class must have a part you have unlocked - and for parts at most one tier above your best unlocked part of that class, so no order is impossible because of the forge gate. In a new campaign the starting orders are redrawn once on the first day by the same rule. Off = any class and tier, as before", RequireRestart = false)]
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersOpenedOnly { get; set; } = true;
@@ -9499,6 +9503,7 @@ namespace Armoury
             s.BookGoalTrade = BookGoalTrade;
             s.CraftOrdersHistorical = CraftOrdersHistorical;
             s.CraftOrdersGiverCanPay = CraftOrdersGiverCanPay;
+            s.CraftOrderClanPurse = CraftOrderClanPurse;
             s.CraftOrdersOpenedOnly = CraftOrdersOpenedOnly;
             s.QuestRewardFromGiver = QuestRewardFromGiver;
             s.QuestRewardInWageDays = QuestRewardInWageDays;
