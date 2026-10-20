@@ -405,6 +405,7 @@ namespace Armoury
                     Log.Error("RoadsideInns: komponent widoku nie laduje sie (proba " + _innsLoadFails + "/3)", e);
                 }
             }
+            MapFields.AppTick();   // p6-pola (R3-07b): pola wokol wiosek wedlug pory roku - wlasna ochrona przed bledem ladowania typu (MapFields.cs)
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)

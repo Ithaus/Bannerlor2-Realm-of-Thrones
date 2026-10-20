@@ -6700,6 +6700,10 @@ namespace Armoury
         [SettingPropertyGroup("Side roads to far villages")]
         public int MapSideRoadsChunkRadiusCap { get; set; } = 160;
 
+        [SettingPropertyBool("Map Village Fields", HintText = "fields around the villages of the campaign map that change with the time of the year: ploughed in early spring, green while the crop grows, golden in the harvest weeks and stubble after the reaping (only in a summer or autumn of Westeros - the same harvest the villages live on), and under snow through a Westeros winter in the cold lands (the warm south lies fallow). A raided village shows burnt fields, a half-deserted one leaves part of its fields untilled. Only a picture - nothing in the economy, the routes or the save changes. Off = no fields are drawn", RequireRestart = false)]
+        [SettingPropertyGroup("Fields around villages")]
+        public bool MapVillageFields { get; set; } = true;
+
         [SettingPropertyBool("Perf Valyrian Census", HintText = "the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfValyrianCensus { get; set; } = true;
@@ -10082,6 +10086,7 @@ namespace Armoury
             s.MapSideRoadsAllVillages = MapSideRoadsAllVillages;
             s.MapSideRoadsChunks = MapSideRoadsChunks;
             s.MapSideRoadsChunkRadiusCap = MapSideRoadsChunkRadiusCap;
+            s.MapVillageFields = MapVillageFields;
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;

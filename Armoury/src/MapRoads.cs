@@ -168,6 +168,7 @@ namespace Armoury
         }
 
         private static volatile Grid _grid;            // siatka sciezki predkosci: same trakty (_main) albo trakty + drogi boczne
+        internal static object GridNow { get { return _grid; } }   // p6-pola: widok pol poznaje zmiane siatki (pola nie na drodze - plan od nowa)
         private static volatile Grid _main;            // n20-drogi: siatka samych traktow (Load)
         private static readonly object _pubLock = new object();   // n20-drogi: publikacja _grid / _main / stanu drog bocznych (watek glowny i watek budowy)
         private static SideRoadPlan.Result _sideRes;   // plan drog bocznych podany przez widok (pod _pubLock)
