@@ -220,6 +220,7 @@ namespace Armoury
             public double[] W, WH, Sub;                                // rece bloku, dom, zboze wlasne
             public double[] Dm;                                        // popyt rynku
             public Dictionary<string, double[]> DL;                    // popyt krainy
+            public double[] LevT;                                      // n22f-plany: cel kroku 8 rynku (podaz / popyt, wartosciowo) - pasmo testu zbieznosci; null - bez kroku 8
         }
         private sealed class RegRow { public int B, C; public double L, Cap; public string Land; }
 
@@ -888,10 +889,6 @@ namespace Armoury
             double[] eta = null; sbyte[] esg = null;                   // feed-swiat (Ks Plan Markets Clear): krok ceny towaru (maleje, gdy cena skacze w kolko)
             if (x.In.MarketsClear && ClearEta) { eta = new double[n]; esg = new sbyte[n]; for (int i = 0; i < n; i++) eta[i] = Eta; }
             bool conv = false;
-            // n22f-plany (klucz Ks Plan Converge Shelf Level): zapas polek kroku 8 (margines popytu targu) poza testem zbieznosci - wspolny poziom S/D rynku w [1, margines];
-            // margines 1 albo klucz wylaczony - poziom 1 (test jak dotad, bit w bit)
-            double lcap = x.In.ConvShelfLevel && x.In.MarketMargin > 1.0 && x.In.MarketMargin <= 1.10 ? x.In.MarketMargin : 1.0;
-            var lev = new double[NM]; for (int m = 0; m < NM; m++) lev[m] = 1.0;
             int it = 0;
             for (it = 0; it < rounds; it++)
             {
@@ -927,12 +924,13 @@ namespace Armoury
                 if (EqDebug != null) EqDebug(it, p, S, x.Dm, xs);              // feed-swiat: harness (przebieg rownowagi); w grze null
                 if (it % 50 == 49)
                 {
-                    if (lcap > 1.0) ShelfLevel(x, p, S, act, lcap, lev);
+                    // n22f-plany (recenzja): punkt kontrolny, wyjscie "zbiezna" i "stoi" - stara miara |S/D - 1| (przebieg rownowagi bez zmian); pasmo zapasu polek
+                    // (klucz Ks Plan Converge Shelf Level) tylko w ocenie stanu oddanego ponizej
                     bool bad = false; double mt = 0;
                     for (int i = 0; i < n; i++)
                     {
                         if (!act[i]) continue;
-                        double dev = Math.Abs(S[i] / (Math.Max(1.0, x.Dm[i]) * lev[i / KsTab.NG]) - 1.0);
+                        double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0);
                         bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
                         if (dev > Tol && !atb) bad = true;
                         if (!atb) mt += dev;
@@ -969,17 +967,29 @@ namespace Armoury
             }
             x.Rent = rr;
             // stan zbieznosci do wyniku
-            x.R.Open.Clear(); x.R.Bounds.Clear();
-            if (lcap > 1.0) ShelfLevel(x, p, S, act, lcap, lev);           // n22f-plany: poziom stanu oddanego (najlepszy punkt kontrolny albo ostatni)
-            for (int m = 0; m < NM && m < x.R.ConvLev.Length; m++) x.R.ConvLev[m] = lev[m];
+            x.R.Open.Clear(); x.R.Bounds.Clear(); Array.Clear(x.R.OpenAbsM, 0, x.R.OpenAbsM.Length);
+            // n22f-plany (klucz Ks Plan Converge Shelf Level, po recenzji): towar niezbiezny wobec pasma [1, wspolny poziom S/D rynku] - poziom zmierzony (towary, ktore
+            // krok 8 steruje), uciety do celu kroku 8 tego rynku (x.LevT: ten sam czynnik towaru mfac co nadwyzka rynku - luka zapasu P4 1.00-1.25, sterowanie 0.85-1.25,
+            // margines 1.03); bez kroku 8 (rownowagi przed nim) albo klucz wylaczony - pasmo [1, 1], test jak dotad (bit w bit). Tylko miara: przebieg rownowagi i stan
+            // oddany bez zmian; OpenAbs (stara miara) steruje rundami pierwszej rownowagi nastepnego Planu jak dotad
+            bool lvOn = x.In.ConvShelfLevel && x.LevT != null;
+            var lev = new double[NM]; for (int m = 0; m < NM; m++) lev[m] = 1.0;
+            if (lvOn) ShelfLevel(x, p, S, act, x.LevT, lev);
+            for (int m = 0; m < NM && m < x.R.ConvLev.Length; m++) { x.R.ConvLev[m] = lev[m]; x.R.ConvLevT[m] = lvOn && m < x.LevT.Length ? x.LevT[m] : 1.0; }
             for (int i = 0; i < n; i++)
             {
                 if (!act[i]) continue;
-                double dev = Math.Abs(S[i] / (Math.Max(1.0, x.Dm[i]) * lev[i / KsTab.NG]) - 1.0);
+                double r = S[i] / Math.Max(1.0, x.Dm[i]);
+                double dev0 = Math.Abs(r - 1.0);
+                double dev = lvOn ? BandDev(r, lev[i / KsTab.NG]) : dev0;
                 bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
                 string nm = x.R.Markets[i / KsTab.NG] + " " + KsTab.Goods[i % KsTab.NG];
                 if (atb) x.R.Bounds.Add(nm + " " + p[i].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
-                else if (dev > Tol) x.R.Open.Add(nm);
+                else
+                {
+                    if (dev > Tol) x.R.Open.Add(nm);
+                    if (dev0 > Tol && i / KsTab.NG < x.R.OpenAbsM.Length) x.R.OpenAbsM[i / KsTab.NG]++;
+                }
             }
             Array.Clear(dem, 0, dem.Length);
             for (int k = 0; k < x.NP; k++) dem[x.Pb[k]] += xs[k] * x.LandP[k];
@@ -991,26 +1001,36 @@ namespace Armoury
 
         private static double[] Ones(int n) { var a = new double[n]; for (int i = 0; i < n; i++) a[i] = 1.0; return a; }
 
-        /// <summary>n22f-plany (klucz Ks Plan Converge Shelf Level): wspolny poziom podazy / popytu rynku m = srednia geometryczna S/D wazona wartoscia popytu (te same wagi co
-        /// normalizacja cen) towarow czynnych poza granica ceny, ucieta do [1, cap]. Normalizacja cen na rynek zdejmuje wspolny poziom cen, wiec nadwyzki wspolnej wszystkim
-        /// towarom (zapas polek kroku 8: podaz targu = margines x popyt targu) ceny wzgledne nie zbijaja - test zbieznosci mierzy odchylenie towaru od tego poziomu.
-        /// Brak (poziom ponizej 1) zostaje w tescie jak dotad; poziom ponad margines - tylko do marginesu.</summary>
-        private static void ShelfLevel(Ctx x, double[] p, double[] S, bool[] act, double cap, double[] lev)
+        /// <summary>n22f-plany (klucz Ks Plan Converge Shelf Level, po recenzji): wspolny poziom podazy / popytu rynku m = srednia geometryczna S/D wazona wartoscia popytu (te
+        /// same wagi co normalizacja cen) towarow, ktore krok 8 steruje (czynne, poza granica ceny, bez regale, koni i ExcessSkip - jak nadwyzka rynku kroku 8), ucieta do
+        /// pasma [min(1, cel), max(1, cel)], cel = tgt[m] (cel kroku 8 tego rynku). Normalizacja cen na rynek zdejmuje wspolny poziom cen, wiec nadwyzki (albo braku)
+        /// wspolnej wszystkim towarom - zapasu polek, ktory krok 8 zamawia rekami z pracy domowej - ceny wzgledne nie zbijaja. Poziom ponad cel - tylko do celu (reszta
+        /// liczy sie jako nadwyzka); brak, ktorego krok 8 nie planowal (poziom ponizej 1 przy celu >= 1) - poziom 1, brak jak dotad.</summary>
+        private static void ShelfLevel(Ctx x, double[] p, double[] S, bool[] act, double[] tgt, double[] lev)
         {
             for (int m = 0; m < NM; m++)
             {
+                double t = tgt != null && m < tgt.Length && tgt[m] > 0 && !double.IsNaN(tgt[m]) && !double.IsInfinity(tgt[m]) ? tgt[m] : 1.0;
+                double lo = Math.Min(1.0, t), hi = Math.Max(1.0, t);
                 double ws = 0, wl = 0;
                 for (int g = 0; g < KsTab.NG; g++)
                 {
                     int i = m * KsTab.NG + g;
-                    if (!act[i] || !(S[i] > 0) || p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999) continue;
+                    if (!act[i] || g == KsTab.GHorse || ExcessSkip(g) || !(S[i] > 0) || p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999) continue;
                     double w = x.Dm[i] * x.Val[g];
                     if (!(w > 0)) continue;
                     ws += w; wl += w * Math.Log(S[i] / Math.Max(1.0, x.Dm[i]));
                 }
                 double c = ws > 0 ? Math.Exp(wl / ws) : 1.0;
-                lev[m] = !(c > 1.0) ? 1.0 : (c > cap ? cap : c);
+                lev[m] = double.IsNaN(c) ? 1.0 : (c < lo ? lo : (c > hi ? hi : c));
             }
+        }
+
+        /// <summary>n22f-plany: odchylenie S/D towaru od pasma [min(1, lv), max(1, lv)] (0 w pasmie). Przy lv = 1 wynik = |r - 1| (bit w bit jak dotad: dzielenie przez 1.0 dokladne, 1 - r = -(r - 1) w IEEE).</summary>
+        private static double BandDev(double r, double lv)
+        {
+            double lo = Math.Min(1.0, lv), hi = Math.Max(1.0, lv);
+            return r > hi ? r / hi - 1.0 : (r < lo ? 1.0 - r / lo : 0.0);
         }
 
         private static Dictionary<string, double[]> DistrictProd(Ctx x, double[] xs)
@@ -1230,6 +1250,7 @@ namespace Armoury
             var inp = x.In; var R = x.R;
             var M = new KsMoney { On = true };
             R.Money = M;
+            x.LevT = null;                                             // n22f-plany: cel kroku 8 liczony od pierwszej rundy z nadwyzka rynku (RYNEK ponizej)
             MuInit(x);                                                 // feed-swiat (Ks Plan Markets Clear): narzut niedoboru towarow dla mieszczan
             foreach (var d in x.D) d.NeedR8 = (double[])d.Need.Clone();
             foreach (var t in inp.Towns) t.NeedR8 = (double[])t.Need.Clone();
@@ -1325,9 +1346,10 @@ namespace Armoury
                 {
                     // RYNEK: nadwyzka podazy nad popytem towarow rak (bez regale, ubocznych i koni) z ostatniej rownowagi w cenach cienia; popyt targu (popyt - zjedzone
                     // w okregach) x margines; towary w nadmiarze - do udzialu okregu w poprawce w gore
+                    if (x.LevT == null) x.LevT = new double[NM];
                     for (int m = 0; m < NM; m++)
                     {
-                        double e = 0, dm = 0;
+                        double e = 0, dm = 0, tk = 0, tm = 0;
                         for (int k = 0; k < KsTab.NG; k++)
                         {
                             int i = m * KsTab.NG + k;
@@ -1337,9 +1359,11 @@ namespace Armoury
                             double pk = ZlPerKg(inp, KsTab.Goods[k], ShadowIndex(KsTab.Goods[k], p, m));
                             double dmk = Math.Max(0.0, x.Dm[i] - eatPrev[i]), dk = x.Dm[i] + (mfac[i] - 1.0) * dmk;
                             e += (S[i] - dk) * pk; dm += dmk * pk;
+                            tk += dk * pk; tm += x.Dm[i] * pk;                // n22f-plany: cel kroku 8 = popyt z zapasem polek / popyt (te same towary, ceny i mfac)
                             sur[i] = S[i] > dk;
                         }
                         M.Excess[m] = e; M.ExcessRel[m] = dm > 0 ? e / dm : 0.0;
+                        x.LevT[m] = tm > 0 ? tk / tm : 1.0;
                     }
                     // poprawka okregu G (bez nawijania): + wedlug udzialu w towarach w nadmiarze, - wedlug pracy domowej DODANEJ przez '+'; G w [0, HomeMax - HwV]
                     // KS-R3 (port symulatora 17.10, runda 1): brak rynku (G '-') oddaje rynkowi tylko prace domowa ponad wlasny niezaplacony koszyk okregu (G > 0);

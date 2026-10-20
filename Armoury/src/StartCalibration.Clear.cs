@@ -61,9 +61,10 @@ namespace Armoury
         public double FeedStep;
         /// <summary>uid bloku rachunku -&gt; udzial przesuniety progiem w poprzednim Planie (null - pierwszy Plan sesji: bez tlumienia).</summary>
         public Dictionary<string, double> WarmFloor;
-        /// <summary>n22f-plany (klucz Ks Plan Converge Shelf Level): test zbieznosci rownowagi wobec wspolnego poziomu podazy / popytu rynku w [1, MarketMargin] - zapas polek
-        /// kroku 8 (margines popytu targu 1.03 w stanie Plan i do D+28) to nadwyzka wspolna wszystkim towarom, ktorej ceny wzgledne nie zbijaja (normalizacja cen na rynek).
-        /// false albo margines 1 - jak dotad (bit w bit).</summary>
+        /// <summary>n22f-plany (klucz Ks Plan Converge Shelf Level, po recenzji): ocena zbieznosci stanu oddanego rownowagi wobec pasma [1, wspolny poziom podazy / popytu rynku],
+        /// poziom uciety do celu kroku 8 tego rynku (czynnik towaru mfac: luka zapasu P4 1.00-1.25 w stanie Plan, sterowanie 0.85-1.25 od D+14, margines 1.03) - zapas polek,
+        /// ktory krok 8 zamawia rekami z pracy domowej, to nadwyzka wspolna wszystkim towarom, ktorej ceny wzgledne nie zbijaja (normalizacja cen na rynek). Tylko miara
+        /// (lista towarow niezbieznych, linia rynkow Planu) - przebieg rownowagi bez zmian. false - jak dotad (bit w bit).</summary>
         public bool ConvShelfLevel;
     }
 
@@ -75,6 +76,8 @@ namespace Armoury
         public double[] ExRel0 = { double.NaN, double.NaN };           // nadwyzka targu / popyt targu w pierwszej rundzie kroku 8 z nadwyzka (przed narzutem)
         public int EqN, EqConv;                                         // rownowagi Planu: razem, zbiezne
         public double[] ConvLev = { 1.0, 1.0 };                         // n22f-plany: wspolny poziom podazy / popytu rynku ostatniej rownowagi (1 - bez; Ks Plan Converge Shelf Level)
+        public double[] ConvLevT = { 1.0, 1.0 };                        // n22f-plany (recenzja): cel kroku 8 rynku, do ktorego uciety jest poziom (1 - bez kroku 8 albo klucz wylaczony)
+        public int[] OpenAbsM = new int[2];                             // n22f-plany (recenzja): towary niezbiezne rynku stara miara |S/D - 1| > 2% (rundy pierwszej rownowagi nastepnego Planu)
         public int[] EtaCut = new int[2];                               // krok ceny towaru: towary z krokiem ponizej 0.05 na koncu ostatniej rownowagi
         public Dictionary<string, double> FloorLam;                     // uid bloku -> udzial przesuniety progiem (cieply start kroku progu nastepnego Planu)
         public int FeedStepHi, FeedStepLo; public double FeedStepGap, FeedStepDown;   // krok progu: bloki uciete w gore, trzymane w dol; najwiekszy wzrost Lam wobec poprzedniego
@@ -398,9 +401,13 @@ namespace Armoury
                 int open = 0; string pre = mk[m] + " ";
                 foreach (var o in r.Open) if (o.StartsWith(pre, StringComparison.Ordinal)) open++;
                 sb.Append(", towary niezbiezne ").Append(open);
-                // n22f-plany: niezbiezne wobec wspolnego poziomu podazy / popytu rynku (zapas polek kroku 8 - Ks Plan Converge Shelf Level); x1.000 - test jak dotad
-                double lv = r.ConvLev != null && m < r.ConvLev.Length ? r.ConvLev[m] : 1.0;
-                sb.Append(" (wobec wspolnego poziomu podazy/popytu x").Append(lv.ToString("0.000", inv)).Append(" - zapas polek kroku 8, ceny wzgledne go nie zbijaja)");
+                // n22f-plany (recenzja): niezbiezne wobec pasma [1, wspolny poziom podazy / popytu rynku], poziom uciety do celu kroku 8 (Ks Plan Converge Shelf Level);
+                // x1.000 - test jak dotad
+                double lv = r.ConvLev != null && m < r.ConvLev.Length ? r.ConvLev[m] : 1.0, lt = r.ConvLevT != null && m < r.ConvLevT.Length ? r.ConvLevT[m] : 1.0;
+                sb.Append(" (wobec wspolnego poziomu podazy/popytu x").Append(lv.ToString("0.000", inv)).Append(", cel kroku 8 x").Append(lt.ToString("0.000", inv))
+                  .Append(" - zapas polek, ktorego ceny wzgledne nie zbijaja; towar w pasmie od 1 do poziomu zbiezny; stara miara |S/D - 1| > 2%: ");
+                int oa = r.OpenAbsM != null && m < r.OpenAbsM.Length ? r.OpenAbsM[m] : open;
+                sb.Append(oa).Append(")");
                 // recenzja: towary na granicy ceny (podloga 0.05 / sufit) rownowaga liczy jako zbiezne - te z odchyleniem podazy od popytu ponad 2% osobno (nadmiar przy
                 // cenie zero to tez rynek bez rownowagi: gaj rodzi, nikt nie kupuje)
                 var bnd = new List<string>();
