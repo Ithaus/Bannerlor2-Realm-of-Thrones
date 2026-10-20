@@ -424,6 +424,8 @@ RANGES = {
     'KsFolkIncomeStepPercent': (0.5, 20.0, "0.0"),
     'KsFarmSurplusReviewDays': (7, 91, "0"),
     'KsFarmSurplusReviewMax': (0.0, 1.0, "0.00"),
+    # m96-koszyk (20.10): dni pelnego koszyka R/P z placy W zatrzymanej - kod przycina do 2..20 (TownFolk.M96Days)
+    'KsFolkShortBasketDays': (2.0, 20.0, "0"),
     # f7-kasy (noc 17/18.10): gersuma z zapasu kas miast - zgodnie z przycieciem w kodzie (DsTowns: udzial 0.05..1, dni firmy 0..182)
     'KsFarmCatchUpShare': (0.05, 1.0, "0.00"),
     'KsFarmCatchUpKeepDays': (0, 182, "0"),
