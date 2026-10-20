@@ -39,6 +39,8 @@ namespace Armoury
     ///      wsie lniane zostaja NA STALE, takze po wylaczeniu klucza (recenzja GL-B: powrot typow przy g z kalibracji dawal ryby +55%, len -62%) - klucz
     ///      decyduje wtedy tylko o soli. Stary zapis (brak pola) i kampania zaczeta z kluczem wylaczonym - nigdy (sama sol x2 przy kluczu).
     /// Klucz wylaczony: krok soli nic nie dopisuje (stan 97dd474); wsie lniane tylko w kampanii zaczetej z kluczem (mapa tej kampanii).
+    /// C1 (PLAN 6.10, klucz ClimateBeforeWorkshops): w NOWEJ kampanii VillageClimate.BeforeWorkshops daje wsiom len juz przed budowa warsztatow miast
+    /// (PlanType - ta sama regula) i przypina stan (PinNewGame); Apply przy starcie sesji widzi je "juz z lnem" (klasa BK, dymek lore jak dotad).
     /// Obieg: zloto nie rusza; towar z pracy ludzi wsi (inny towar tych samych ludzi), sprzedaz wozem jak dotad.
     /// </summary>
     internal static class GoodsRates
@@ -97,8 +99,13 @@ namespace Armoury
         // wsie podmienione w tej sesji: id wsi -> typ przed (dymek lore); jedna referencja, slownik nie zmieniany po publikacji
         private static volatile Dictionary<string, string> _swapped = new Dictionary<string, string>(StringComparer.Ordinal);
 
+        // C1 (PLAN 6.10, VillageClimate.BeforeWorkshops): stan lnu nowej kampanii przypiety przed budowa warsztatow (0 = nie, 1 / 2 jak _flax) - wsie z
+        // planu dostaly juz len (albo nie); start sesji bierze ten stan zamiast klucza, zeby typy i stan sie zgadzaly. Tylko watek glowny.
+        private static int _c1Flax;
+
         internal static void Reset()
         {
+            _c1Flax = 0;
             _flax = 0; _flaxDay = -1; _newGame = false; _applied = 0; _stumbles = 0; _readStumbles = 0; _loreN = 0; _loreStumbles = 0; _start = ""; _offLogged = false; _saltCalls = 0;
             _swapped = new Dictionary<string, string>(StringComparer.Ordinal);
         }
@@ -109,6 +116,34 @@ namespace Armoury
 
         /// <summary>OnNewGameCreatedEvent: nowa kampania - stan lnu ustali start sesji (klucz w tej chwili).</summary>
         internal static void OnNewGame() { _newGame = true; }
+
+        /// <summary>C1 (VillageClimate.BeforeWorkshops, OnNewGameCreatedEvent - po OnNewGame): stan lnu nowej kampanii ustalony juz teraz (klucz w tej chwili).</summary>
+        internal static void PinNewGame(bool on) { if (_newGame) _c1Flax = on ? 1 : 2; }
+
+        /// <summary>C1: id wsi z tabeli lnu (plan typow przed warsztatami). Nowa tablica - raz przy tworzeniu kampanii.</summary>
+        internal static string[] PlanIds()
+        {
+            var ids = new string[Table.Length];
+            for (int i = 0; i < Table.Length; i++) ids[i] = Table[i][0];
+            return ids;
+        }
+
+        /// <summary>C1: typ, ktory Apply da tej wsi w kampanii zaczetej z kluczem, gdy ma typ curId (len albo null) - ta sama regula co Apply (typ z tabeli,
+        /// G22: typ z mapy przy wylaczonym VillageClimateFix i FlaxVillagesWithoutClimateFix). Tylko odczyt.</summary>
+        internal static string PlanType(string villageId, string curId)
+        {
+            if (curId == null || curId == Flax) return null;
+            var s0 = Settings.Current;
+            bool mapOk = s0 != null && s0.FlaxVillagesWithoutClimateFix && !s0.VillageClimateFix;
+            foreach (var row in Table)
+            {
+                if (row[0] != villageId) continue;
+                if (curId == row[1]) return Flax;
+                string map = mapOk ? VillageClimate.MapTypeBefore(row[0], row[1]) : null;
+                return map != null && curId == map ? Flax : null;
+            }
+            return null;
+        }
 
         internal static string Export() { return "1|" + _flax.ToString(Inv) + "|" + _flaxDay.ToString(Inv); }
 
@@ -215,7 +250,8 @@ namespace Armoury
         {
             try
             {
-                if (_newGame) { _newGame = false; _flax = KeyOn ? 1 : 2; _flaxDay = Today(); }
+                if (_newGame) { _newGame = false; _flax = _c1Flax != 0 ? _c1Flax : (KeyOn ? 1 : 2); _flaxDay = Today(); }   // C1: stan przypiety przed warsztatami
+                _c1Flax = 0;
                 bool swap = _flax == 1;                             // kampania zaczeta z kluczem: na stale (P1 ma g typow z tymi wsiami), klucz juz nie decyduje
                 var bk = new VillageClimate.BkClass();
                 var flax = Type(Flax);

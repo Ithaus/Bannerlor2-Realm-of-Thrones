@@ -5140,6 +5140,10 @@ namespace Armoury
         [SettingPropertyGroup("Northern fare")]
         public bool VillageClimateFix { get; set; } = true;
 
+        [SettingPropertyBool("Climate Before Workshops", HintText = "with Village Climate Fix: in a NEW campaign the villages take their final produce (the climate fix, and also the new flax villages and the southern vineyards and olive groves when Goods Rates By Pattern and Vine Olive By Climate are on) before the game sets up the town workshops, so each town starts with workshops that use what its own villages grow (no velvet looms waiting for cotton the hills around no longer give). A loaded save is not touched; off = the town workshops of a new campaign are chosen from the map's own village types as before (the villages change at session start)", RequireRestart = false)]
+        [SettingPropertyGroup("Northern fare")]
+        public bool ClimateBeforeWorkshops { get; set; } = true;
+
         [SettingPropertyBool("Bandit Cheer Enabled", HintText = "villages near your victory over bandits thank you - relations with their notables improve", RequireRestart = false)]
         [SettingPropertyGroup("Grateful villages")]
         public bool BanditCheerEnabled { get; set; } = true;
@@ -9492,6 +9496,7 @@ namespace Armoury
             s.CropClimateFilter = CropClimateFilter;
             s.WoodlotByClimate = WoodlotByClimate;
             s.VillageClimateFix = VillageClimateFix;
+            s.ClimateBeforeWorkshops = ClimateBeforeWorkshops;
             s.BanditCheerEnabled = BanditCheerEnabled;
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;

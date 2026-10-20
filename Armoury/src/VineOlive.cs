@@ -46,7 +46,9 @@ namespace Armoury
     /// podmiana na starym zapisie zmienilaby sume swiata typow; w kampanii zaczetej z kluczem podmiana NA STALE (takze po wylaczeniu klucza - jak len GL-5).
     /// Stary zapis (brak pola) i kampania zaczeta bez klucza - nigdy. Wies z innym typem niz w tabeli (inny mod, T8 wylaczone) - nie ruszamy.
     /// Dymek przysiolka: zdanie zajecia starego typu (gaj, palmy) -> zdanie nowego typu (plik lore zajecia.csv: winnica Reach, Dorne, niewolnicy Essos; gaj ogolny).
-    /// Warsztaty miast nowej kampanii gra buduje przed startem sesji (z typow mapy) - tlocznie wina przy nowych winnicach nie powstaja; winogrona ida na targ.
+    /// Warsztaty miast nowej kampanii gra buduje przed startem sesji - dotad z typow mapy (tlocznie wina przy nowych winnicach nie powstawaly). C1 (PLAN 6.10,
+    /// klucz ClimateBeforeWorkshops): VillageClimate.BeforeWorkshops daje tym wsiom nowy typ juz przed budowa warsztatow (PlanType - ta sama regula) i przypina
+    /// stan nowej kampanii (PinNewGame); Apply przy starcie sesji widzi je "juz z nowym typem" (klasa BK, dymek lore jak dotad).
     /// Obieg: zloto nie rusza; inny towar tych samych ludzi wsi (plon P1 od ludzi), sprzedaz wozem jak dotad.
     /// </summary>
     internal static class VineOlive
@@ -78,8 +80,12 @@ namespace Armoury
         // wsie podmienione w tej sesji: id wsi -> (typ przed, typ nowy, zdanie nowego typu); jedna referencja, slownik nie zmieniany po publikacji
         private static volatile Dictionary<string, string[]> _swapped = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
+        // C1 (VillageClimate.BeforeWorkshops): stan nowej kampanii przypiety przed budowa warsztatow (0 = nie, 1 / 2 jak _state); tylko watek glowny
+        private static int _c1State;
+
         internal static void Reset()
         {
+            _c1State = 0;
             _state = 0; _stateDay = -1; _newGame = false; _applied = 0; _stumbles = 0; _loreN = 0; _loreStumbles = 0;
             _swapped = new Dictionary<string, string[]>(StringComparer.Ordinal);
         }
@@ -90,6 +96,25 @@ namespace Armoury
 
         /// <summary>OnNewGameCreatedEvent: nowa kampania - stan ustali start sesji (klucz w tej chwili).</summary>
         internal static void OnNewGame() { _newGame = true; }
+
+        /// <summary>C1 (VillageClimate.BeforeWorkshops, OnNewGameCreatedEvent - po OnNewGame): stan nowej kampanii ustalony juz teraz (klucz w tej chwili).</summary>
+        internal static void PinNewGame(bool on) { if (_newGame) _c1State = on ? 1 : 2; }
+
+        /// <summary>C1: id wsi z tabeli (plan typow przed warsztatami). Nowa tablica - raz przy tworzeniu kampanii.</summary>
+        internal static string[] PlanIds()
+        {
+            var ids = new string[Table.Length];
+            for (int i = 0; i < Table.Length; i++) ids[i] = Table[i][0];
+            return ids;
+        }
+
+        /// <summary>C1: typ, ktory Apply da tej wsi w kampanii zaczetej z kluczem, gdy ma typ curId (albo null) - ta sama regula co Apply. Tylko odczyt.</summary>
+        internal static string PlanType(string villageId, string curId)
+        {
+            foreach (var row in Table)
+                if (row[0] == villageId) return curId == row[1] ? row[2] : null;
+            return null;
+        }
 
         internal static string Export() { return "1|" + _state.ToString(Inv) + "|" + _stateDay.ToString(Inv); }
 
@@ -116,7 +141,8 @@ namespace Armoury
         {
             try
             {
-                if (_newGame) { _newGame = false; _state = KeyOn ? 1 : 2; _stateDay = Today(); }
+                if (_newGame) { _newGame = false; _state = _c1State != 0 ? _c1State : (KeyOn ? 1 : 2); _stateDay = Today(); }   // C1: stan przypiety przed warsztatami
+                _c1State = 0;
                 bool swap = _state == 1;
                 var bk = new VillageClimate.BkClass();
                 var done = new List<string>();
