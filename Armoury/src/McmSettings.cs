@@ -116,6 +116,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmeltArmourOnce { get; set; } = true;
 
+        [SettingPropertyBool("Smith No Crude Input", HintText = "crude iron is only for refining: a weapon part that the game lists with crude iron costs the same number of wrought iron bars at the anvil, and with Smelt Weapon By Parts smelting such a weapon gives wrought iron back, never crude. Off = as in the game (those parts eat crude iron and smelting can give it back)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmithNoCrudeInput { get; set; } = true;
+
         [SettingPropertyBool("Forge One Clock", HintText = "one forge clock: Craft puts the piece on the smith's bench for the hours the Banner Kings screen shows (stamina spent / 6); pieces come off one by one when done - no lump wait afterwards", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOneClock { get; set; } = true;
@@ -8104,6 +8108,7 @@ namespace Armoury
             s.SmeltNoWood = SmeltNoWood;
             s.SmeltWeaponByParts = SmeltWeaponByParts;
             s.SmeltArmourOnce = SmeltArmourOnce;
+            s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
             s.ForgeLikeTownSmith = ForgeLikeTownSmith;

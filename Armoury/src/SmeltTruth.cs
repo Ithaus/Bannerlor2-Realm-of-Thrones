@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -14,8 +15,14 @@ namespace Armoury
     /// DOWOD (dekompilacja BannerKings.dll, BKSmithingModel.GetSmeltingOutputForItem): BK bierze wynik gry (DefaultSmithingModel - materialy czesci,
     /// najwyzszy gatunek traci stopien, 1 wegiel), potem przycina metal do GetMetalMax(klasa broni) = 1-3 sztaby, odejmujac po jednej sztabie OD NAJNIZSZEGO
     /// gatunku (petla j = 2..6) - z broni z czesciami z zelaza kutego i jednym okuciem ze stali zostaje stal; na koniec "if (out[1] == 0) out[1]++" - sztaba
-    /// surowki z niczego przy kazdej broni (takze przy palce bez metalu i przy sztyletcie z 1 sztaby). Log Jeffa 19.10 15:22 / 15:56: przetop Arakh (czesci:
-    /// 3 stal szlachetna + 1 zelazo kute) -> BK: 1 surowka + 2 stal szlachetna; Broad Kaskara (1 zelazo, 4 stal, 5 stal szl.) -> 1 surowka + 2 stal + 1 stal szl.
+    /// surowki z niczego przy kazdej broni (takze przy palce bez metalu i przy sztyletcie z 1 sztaby). Log Jeffa 19.10 15:22 / 15:56 potwierdza tylko, ze te bronie
+    /// przetopiono (linie f27 i wegla, bez wyniku metalu); wynik BK z symulacji (n20-kuznia-tmp/py/sim.py na danych czesci Native + RBM + RBM_WS + ROT): Arakh
+    /// (czesci: 3 stal szlachetna + 1 zelazo kute) -> BK: 1 surowka + 2 stal szlachetna; Broad Kaskara (1 zelazo, 4 stal, 5 stal szl.) -> 1 surowka + 2 stal + 1 stal szl.
+    /// KUCIE BEZ SUROWKI (klucz SmithNoCrudeInput, po recenzji): 25 czesci gry/RBM/RBM_WS/ROT (jelce, rekojesci, glowice toporow, grot, sierp, m.in. ROT stark_guard_1,
+    /// needle_guard) ma w MaterialsUsed surowke (Iron1); DefaultSmithingModel.GetSmithingCostsForWeaponDesign odejmuje ja z sakw (BK tej metody nie nadpisuje) - 32 bronie
+    /// z projektem (np. vlandia_sword_1_t2, peasant_2haxe_1_t1) zjadaly surowke przy kuciu. Zasada Jeffa 01.09 (Recipes.IronForTier): surowka do wyrobu nie wchodzi,
+    /// najnizszy metal wyrobu to zelazo kute. Teraz koszt surowki w kuciu = tyle samo sztab zelaza kutego (postfiks metody klasy deklarujacej, pulapka 15.10),
+    /// a przetop takiej broni liczy te czesci jako zelazo kute (PartsMetal) - surowka tylko do rafinacji.
     /// REGULA (klucz SmeltWeaponByParts): metal wraca w GATUNKACH czesci broni i w ich proporcji (najwieksze reszty, remis - nizszy gatunek), w ilosci jak przy
     /// przetopie pancerza (udzial SmeltingReturnShare + Smithing x SmeltingSkillBonus, najwyzej polowa - Jeff 30.08), nie wiecej niz sufit BK dla tej klasy broni
     /// (GetMetalMax, gdy czynny model go ma); co najmniej 1 sztaba, gdy bron ma metal. Bez surowki z niczego i bez obnizania gatunku. Reszta metalu idzie w zgorzeline
@@ -37,6 +44,73 @@ namespace Armoury
 
         internal static bool WeaponOn { get { var s = Settings.Current; return s != null && s.SmeltWeaponByParts; } }
         internal static bool ArmourOnceOn { get { var s = Settings.Current; return s != null && s.SmeltArmourOnce; } }
+        internal static bool NoCrudeOn { get { var s = Settings.Current; return s != null && s.SmithNoCrudeInput; } }
+
+        // ------------------------------------------------------------ kucie bez surowki (SmithNoCrudeInput)
+        private static Harmony _h;
+        private static readonly HashSet<MethodBase> _patched = new HashSet<MethodBase>();
+        private static string _costHook = "nie wpiete";
+        private static bool _inSpend; private static int _spendSwap;   // SpendMaterials -> koszt modelu w srodku (watek glowny, ekran kuzni)
+        private static int _forgeSwaps, _forgeLines;                   // kucia z zamiana surowki od startu sesji, linie logu
+
+        /// <summary>Postfiks GetSmithingCostsForWeaponDesign (metoda klasy deklarujacej): koszt surowki (indeks 1, ujemny) przechodzi na zelazo kute (indeks 2) 1:1.
+        /// Ten sam wynik widzi licznik na ekranie, "czy stac" (CraftingVM.HaveMaterialsNeeded) i zdjecie z sakw (CraftingCampaignBehavior.SpendMaterials).</summary>
+        public static void CrudeCostPostfix(ref int[] __result)
+        {
+            try
+            {
+                if (__result == null || __result.Length <= 2 || __result[1] >= 0 || !NoCrudeOn) return;
+                if (_inSpend) _spendSwap = -__result[1];
+                __result[2] += __result[1];
+                __result[1] = 0;
+            }
+            catch (Exception e) { Stumble("CrudeCostPostfix", e); }
+        }
+
+        public static void SpendPrefix() { _inSpend = true; _spendSwap = 0; }
+
+        /// <summary>Po prawdziwym kuciu broni z ekranu gry: linia "Kucie bez surowki (n20-kuznia)" (20 pierwszych w sesji, potem co 25.).</summary>
+        public static void SpendPostfix(WeaponDesign weaponDesign)
+        {
+            int swapped = _spendSwap;
+            _inSpend = false; _spendSwap = 0;
+            try
+            {
+                if (swapped <= 0) return;
+                _forgeSwaps++;
+                if (_forgeLines >= 20 && _forgeSwaps % 25 != 0) return;
+                _forgeLines++;
+                string name = null;
+                try { name = weaponDesign != null && weaponDesign.WeaponName != null ? weaponDesign.WeaponName.ToString() : null; } catch { }
+                Log.Info("Kucie bez surowki (n20-kuznia): " + (string.IsNullOrEmpty(name) ? "-" : name)
+                         + (weaponDesign != null && weaponDesign.Template != null ? " (" + weaponDesign.Template.StringId + ")" : "")
+                         + " | surowka czesci " + swapped.ToString(Inv) + " -> zdjete zelazo kute " + swapped.ToString(Inv)
+                         + " | kuc z zamiana w sesji " + _forgeSwaps.ToString(Inv));
+            }
+            catch (Exception e) { Stumble("SpendPostfix", e); }
+        }
+
+        /// <summary>Raz na proces (start sesji): postfiks na koszt czynnego modelu (PatchTarget - klasa deklarujaca) i na SpendMaterials gry (linia logu).</summary>
+        private static void EnsureHooks(object model)
+        {
+            try
+            {
+                if (_h == null) _h = new Harmony("com.jeff.armoury.smelttruth");
+                var parts = new List<string>();
+                var mc = model != null ? PatchTarget.OfActive(model, "GetSmithingCostsForWeaponDesign", new[] { typeof(WeaponDesign) }, "kuznia: surowka do kucia") : null;
+                if (mc != null && !_patched.Contains(mc)) { _h.Patch(mc, postfix: new HarmonyMethod(typeof(SmeltTruth), nameof(CrudeCostPostfix))); _patched.Add(mc); }
+                parts.Add(mc != null ? "koszt " + mc.DeclaringType.Name : "koszt BRAK");
+                var ms = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.CraftingCampaignBehavior), "SpendMaterials", new[] { typeof(WeaponDesign) });
+                if (ms != null && !_patched.Contains(ms))
+                {
+                    _h.Patch(ms, prefix: new HarmonyMethod(typeof(SmeltTruth), nameof(SpendPrefix)), postfix: new HarmonyMethod(typeof(SmeltTruth), nameof(SpendPostfix)));
+                    _patched.Add(ms);
+                }
+                parts.Add(ms != null ? "pobranie SpendMaterials" : "pobranie BRAK");
+                _costHook = string.Join(", ", parts.ToArray());
+            }
+            catch (Exception e) { _costHook = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks", e); }
+        }
 
         private static void Stumble(string where, Exception e)
         {
@@ -65,7 +139,17 @@ namespace Armoury
         }
 
         /// <summary>Metal czesci broni wedlug gatunku (0 ruda .. 6 stal zamkowa) - to, co kosztowalo wykucie (GetSmithingCostsForWeaponDesign).</summary>
-        internal static int[] PartsMetal(ItemObject item)
+        internal static int[] PartsMetal(ItemObject item) { return PartsMetal(item, NoCrudeOn); }
+
+        /// <summary>crudeAsWrought (SmithNoCrudeInput): surowka czesci liczona jako zelazo kute - tak ja teraz kosztuje kucie (CrudeCostPostfix).</summary>
+        internal static int[] PartsMetal(ItemObject item, bool crudeAsWrought)
+        {
+            var raw = PartsMetalRaw(item);
+            if (crudeAsWrought && raw[1] > 0) { raw[2] += raw[1]; raw[1] = 0; }
+            return raw;
+        }
+
+        private static int[] PartsMetalRaw(ItemObject item)
         {
             var raw = new int[7];
             if (item == null || item.WeaponDesign == null || item.WeaponDesign.UsedPieces == null) return raw;
@@ -177,9 +261,11 @@ namespace Armoury
                 WeaponsDone++;
                 if (!_logged.Add(item.StringId ?? "")) return;
                 var model = Campaign.Current.Models.SmithingModel;
-                var raw = PartsMetal(item);
+                var raw = PartsMetal(item, false);
                 var o = model.GetSmeltingOutputForItem(item);
-                Log.Info("Przetop broni (n20-kuznia): " + item.StringId + " | czesci: " + Fmt(raw, 1, 6) + " -> wynik: " + Fmt(o, 1, 6)
+                Log.Info("Przetop broni (n20-kuznia): " + item.StringId + " | czesci: " + Fmt(raw, 1, 6)
+                         + (raw[1] > 0 ? (NoCrudeOn ? " (surowka czesci liczona jako zelazo kute)" : " (surowka czesci jak w grze)") : "")
+                         + " -> wynik: " + Fmt(o, 1, 6)
                          + " | udzial " + (Share() * 100f).ToString("0", Inv) + "%, sufit klasy " + ClassCap(model, item).ToString(Inv)
                          + " | przetopow broni w sesji " + WeaponsDone.ToString(Inv) + " (kolejne sztuki tego wzoru bez linii)");
             }
@@ -189,7 +275,8 @@ namespace Armoury
         /// <summary>
         /// Start sesji (po SmithCoal.SessionStart): samosprawdzenie na wszystkich broniach z projektem - wynik czynnego modelu (z naszymi latkami) wobec czesci:
         /// gatunek wyzszy niz najwyzszy w czesciach (ma byc 0), surowka bez surowki w czesciach (ma byc 0), wiecej metalu niz polowa czesci (ma byc 0 poza
-        /// broniami z 1 sztaba); pancerz i tarcza: odzysk z modelu = odzysk z naszej receptury (liczony raz).
+        /// broniami z 1 sztaba - te oddaja te 1 sztabe, osobny licznik); pancerz i tarcza: odzysk z modelu = odzysk z naszej receptury (liczony raz); kucie: czesci
+        /// i bronie z surowka w MaterialsUsed, koszt czynnego modelu dla jednej takiej broni (przy SmithNoCrudeInput surowka 0, zelazo kute wiecej o tyle samo).
         /// </summary>
         internal static void SessionStart()
         {
@@ -199,15 +286,19 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SmithingModel : null;
+                _forgeSwaps = _forgeLines = 0; _inSpend = false; _spendSwap = 0;
+                EnsureHooks(model);
                 sb.Append("Kuznia przetop (n20-kuznia): start sesji | klucze Smelt Weapon By Parts ").Append(WeaponOn ? "TAK" : "NIE")
                   .Append(", Smelt Armour Once ").Append(ArmourOnceOn ? "TAK" : "NIE")
                   .Append(", Smelt Cap From Forge Bill ").Append(s != null && s.SmeltCapFromForgeBill ? "TAK" : "NIE")
                   .Append(", Bk Shield Bill By Recipe ").Append(s != null && s.BkShieldBillByRecipe ? "TAK" : "NIE")
+                  .Append(", Smith No Crude Input ").Append(NoCrudeOn ? "TAK" : "NIE")
                   .Append(" | model ").Append(model != null ? model.GetType().Name : "brak")
                   .Append(", wyjscie wpiete w ").Append(SmeltTab.PatchedTypes.Count.ToString(Inv)).Append(" modelach");
                 if (model == null) { Log.Info(sb.ToString()); return; }
-                int weapons = 0, higher = 0, crudeFromNothing = 0, overHalf = 0, noMetal = 0; long partsSum = 0, outSum = 0;
+                int weapons = 0, higher = 0, crudeFromNothing = 0, overHalf = 0, noMetal = 0, oneBar = 0, crudeWeapons = 0, crudeOut = 0; long partsSum = 0, outSum = 0;
                 string exHigher = null, exCrude = null;
+                ItemObject crudeProbe = null;
                 var samples = new List<string>();
                 ItemObject armourProbe = null, shieldProbe = null;
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
@@ -222,6 +313,8 @@ namespace Armoury
                     }
                     if (it.WeaponDesign.UsedPieces == null || ValyrianBlades.Is(it)) continue;
                     var raw = PartsMetal(it);
+                    var raw0 = PartsMetal(it, false);
+                    if (raw0[1] > 0) { crudeWeapons++; if (crudeProbe == null) crudeProbe = it; }
                     int pTot = 0, pTop = 0;
                     for (int g = 1; g <= 6; g++) { pTot += raw[g]; if (raw[g] > 0) pTop = g; }
                     var o = model.GetSmeltingOutputForItem(it);
@@ -234,6 +327,8 @@ namespace Armoury
                     if (oTop > pTop) { higher++; if (exHigher == null) exHigher = it.StringId + " [" + Fmt(raw, 1, 6) + " -> " + Fmt(o, 1, 6) + "]"; }
                     if (o[1] > 0 && raw[1] == 0) { crudeFromNothing++; if (exCrude == null) exCrude = it.StringId + " [" + Fmt(raw, 1, 6) + " -> " + Fmt(o, 1, 6) + "]"; }
                     if (pTot >= 2 && oTot * 2 > pTot) overHalf++;
+                    if (pTot == 1 && oTot == 1) oneBar++;
+                    if (o[1] > 0) crudeOut++;
                     if (samples.Count < 4 && pTot >= 4) samples.Add(it.StringId + " [" + Fmt(raw, 1, 6) + " -> " + Fmt(o, 1, 6) + "]");
                 }
                 sb.Append(" | bronie z projektem ").Append(weapons.ToString(Inv))
@@ -241,14 +336,52 @@ namespace Armoury
                   .Append(", surowka bez surowki w czesciach ").Append(crudeFromNothing.ToString(Inv)).Append(exCrude != null ? " (np. " + exCrude + ")" : "")
                   .Append(", ponad polowe metalu czesci ").Append(overHalf.ToString(Inv))
                   .Append(", bez metalu w czesciach ").Append(noMetal.ToString(Inv))
+                  .Append(", z 1 sztaby oddaja ja cala (minimum 1 jak pancerz) ").Append(oneBar.ToString(Inv))
+                  .Append(", surowka w wyniku ").Append(crudeOut.ToString(Inv))
                   .Append(", metal wyniku / czesci ").Append(outSum.ToString(Inv)).Append('/').Append(partsSum.ToString(Inv))
-                  .Append(" (przy kluczu TAK: 0, 0, 0)")
+                  .Append(" (przy kluczach TAK: 0, 0, 0; surowka w wyniku 0)")
                   .Append(" | przyklady: ").Append(samples.Count > 0 ? string.Join("; ", samples.ToArray()) : "-");
                 sb.Append(" | pancerz: ").Append(Once(model, armourProbe)).Append(" | tarcza: ").Append(Once(model, shieldProbe));
                 sb.Append(" | kwit tarczy w CRAFT BK: ").Append(FletchForge.ShieldBillCheck(shieldProbe));
+                sb.Append(" | kucie bez surowki: latki ").Append(_costHook).Append(", czesci z surowka ").Append(CrudePieces().ToString(Inv))
+                  .Append(", bronie z surowka w czesciach ").Append(crudeWeapons.ToString(Inv)).Append(", ").Append(CostProbe(model, crudeProbe));
             }
             catch (Exception e) { sb.Append(" | wyjatek ").Append(e.GetType().Name); Stumble("SessionStart", e); }
             Log.Info(sb.ToString());
+        }
+
+        /// <summary>Czesci kuzni (CraftingPiece.All) z surowka w MaterialsUsed - w danych Jeffa 25 (Native, RBM, RBM_WS, ROT).</summary>
+        private static int CrudePieces()
+        {
+            int n = 0;
+            try
+            {
+                foreach (var cp in CraftingPiece.All)
+                {
+                    if (cp == null || cp.MaterialsUsed == null) continue;
+                    foreach (var m in cp.MaterialsUsed) if (m.Item1 == CraftingMaterials.Iron1 && m.Item2 > 0) { n++; break; }
+                }
+            }
+            catch (Exception e) { Stumble("CrudePieces", e); return -1; }
+            return n;
+        }
+
+        /// <summary>Koszt kucia jednej broni z surowka w czesciach z czynnego modelu (z latkami) wobec czesci: surowka i zelazo kute.</summary>
+        private static string CostProbe(TaleWorlds.CampaignSystem.ComponentInterfaces.SmithingModel model, ItemObject it)
+        {
+            try
+            {
+                if (model == null || it == null || it.WeaponDesign == null) return "brak proby";
+                var raw0 = PartsMetal(it, false);
+                var c = model.GetSmithingCostsForWeaponDesign(it.WeaponDesign);
+                if (c == null || c.Length < 3) return "brak kosztu";
+                bool swapped = c[1] == 0 && -c[2] == raw0[1] + raw0[2];
+                bool game = -c[1] == raw0[1] && -c[2] == raw0[2];
+                return "proba " + it.StringId + ": czesci crude " + raw0[1].ToString(Inv) + ", wrought " + raw0[2].ToString(Inv)
+                       + " -> koszt modelu crude " + (-c[1]).ToString(Inv) + ", wrought " + (-c[2]).ToString(Inv)
+                       + (swapped ? " = zelazo kute zamiast surowki" : (game ? " = surowka (jak w grze)" : " = INNE"));
+            }
+            catch (Exception e) { Stumble("CostProbe", e); return "wyjatek " + e.GetType().Name; }
         }
 
         /// <summary>Odzysk z modelu wobec naszej receptury (SmeltTab.YieldFor) - przy kluczu ma byc rowny (x1), bez klucza bywal x2.</summary>
