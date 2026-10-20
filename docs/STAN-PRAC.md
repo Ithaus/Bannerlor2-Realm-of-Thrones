@@ -3340,4 +3340,9 @@ OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 
   tak jak do normlanej wioski i tam dokonac sen, inwestycje, zakup rzeczy z tej wioski, przepsacerowanie sie po wiosce i w tej wiosce jest moj dom wtedy."
   -> workflow wf_54e11bb8-44b, galaz w-toku/r4-dom: handel towarem wsi okregu, Twoj dom (nocleg, skrzynia - domy klanowe RC jesli pasuja), spacer po scenie wsi.
   WGRANIE 92 = r4-wioska + r4-dom + r4-przetop + r4-zloto + r4-wolni + r4-zlecenia po recenzjach, scalenie, testy (5 dob + bitwy + wioska, nowa kampania, 160 dob).
+- 20.10 ok. 03:30: SCALENIE w-toku/n21-calosc (zb/n21-calosc) od 1ffbd891 (WGRANIE 91): r4-przetop 8e26d49a (Smelt Keeps Scraps), r4-zloto 77a55e9f (Start Gold Cut x0.1),
+  r4-zlecenia 532b208b (Craft Order Clan Purse), r4-wolni 08588ea2 (Free Folk All Adults Fight - pula 54% ludu, realnie ok. 10-12 tys. pod bronia: hamulec zloto
+  i limity druzyn), r4-wioska 5ff1ffe2 (dochod wioski co dobe ok. 5-15 d z podatku pana, linia w podpowiedzi zlota i w Total Income, blok w Fiefs), r4-dom b4723c7d
+  (Trade, Your house: lozko + skrzynia, Take a walk tylko przez "Visit X"). Armoury 97c94eaf (2064 ustawien); CrashScribe/RC bez zmian. Kopie logow Jeffa sesji 02:17
+  (Armoury, CrashScribe, RC) i save040.sav na D:. TESTY n21-bitwa / n21-nowa (armoury-start-zloto.flag) / n21-160 w toku -> WGRANIE 92.
 
