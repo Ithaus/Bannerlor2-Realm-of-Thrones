@@ -7620,6 +7620,10 @@ namespace Armoury
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsPlanMarketsClearVillages { get; set; } = false;
 
+        [SettingPropertyBool("Ks Plan Converge Shelf Level", HintText = "with Start Calibration: how the weekly plan reports, in the log, which goods its markets have not settled. The plan's villages make a little more than the towns buy - the stock it orders for the town stalls (before the calibration is switched on and in the first weeks after) - and that surplus spreads evenly over every good of the market, which relative prices cannot and should not remove. With this on, a good counts as settled when its supply lies between its demand and that common stall level of its market (never above what the plan ordered for the stalls); a shortage counts as before. Only the report changes - the plan, its hands, prices, coin and goods are exactly as before. Off = every good must be within 2 in 100 of its demand", RequireRestart = false)]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsPlanConvergeShelfLevel { get; set; } = true;
+
         [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter in the cold lands needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt; hunters of the warm lands as before). Off = the old table", RequireRestart = false)]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsColdLand { get; set; } = true;
@@ -10344,6 +10348,7 @@ namespace Armoury
             s.KsSelfFeedSlow = KsSelfFeedSlow;
             s.KsPlanMarketsClear = KsPlanMarketsClear;
             s.KsPlanMarketsClearVillages = KsPlanMarketsClearVillages;
+            s.KsPlanConvergeShelfLevel = KsPlanConvergeShelfLevel;
             s.KsColdLand = KsColdLand;
             s.KsHungerUnrest = KsHungerUnrest;
             s.KsHungerLoyaltyMax = KsHungerLoyaltyMax;

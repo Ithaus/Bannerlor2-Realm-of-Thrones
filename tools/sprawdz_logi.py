@@ -52015,7 +52015,13 @@ def npolnoc_feedswiat(rep, feed, clr, plans):
             opn = [sum((c["mk"].get(mk) or {}).get("open") or 0 for mk in ("Westeros", "Essos")) for c in on]
             o1 = opn[1:] or opn
             med = sorted(o1)[len(o1) // 2]
-            rep.add("NKS-30n: Plany zbiezne przy Ks Plan Markets Clear (towary niezbiezne W + E, mediana Planow po pierwszym)", f"mediana {med} (Planow {len(o1)}; " + ", ".join(str(v) for v in opn[-8:]) + ")",
+            # n22f-plany (20.10, po recenzji): od klucza Ks Plan Converge Shelf Level towar jest niezbiezny poza pasmem [1, wspolny poziom S/D rynku] - zapas polek, ktory krok 8
+            # zamawia rekami z pracy domowej (czynnik towaru: luka zapasu P4 1.00-1.25, 1.03 reszta, sterowanie 0.85-1.25), ok. +2% S/D wszystkich towarow; dotad towary
+            # stawaly na 1.02 przy progu 2% i liczba skakala 2 -> 12 miedzy Planami. Prog bez zmian; poziom, cel kroku 8 i liczba stara miara - INFO.
+            lv = [f"{mk[0]} x{last['mk'][mk]['lev']:.3f}" + (f" (cel x{last['mk'][mk]['levt']:.3f}, stara miara {last['mk'][mk]['oabs']})" if last["mk"][mk].get("levt") is not None else "")
+                  for mk in ("Westeros", "Essos") if mk in last["mk"] and last["mk"][mk].get("lev") is not None]
+            rep.add("NKS-30n: Plany zbiezne przy Ks Plan Markets Clear (towary niezbiezne W + E, mediana Planow po pierwszym)", f"mediana {med} (Planow {len(o1)}; " + ", ".join(str(v) for v in opn[-8:]) + ")"
+                    + (f"; wspolny poziom S/D ostatniego Planu {' '.join(lv)}" if lv else "; wspolny poziom S/D - brak w logu (test bez poziomu, log sprzed n22f)"),
                     "<= 6 (harness swiat + klucze scalenia: przed 20, po 3-4; gra fin83 18)", med <= 6)
         else:
             rep.add("NKS-30m: narzut niedoboru", "klucz Ks Plan Markets Clear WYLACZONY", "INFO", None)
@@ -52130,6 +52136,10 @@ def npolnoc_main(logp, bdp=None):
                                            spent=num(r"wydane ([\d.]+) zl/d", part, float, None), bud=num(r"<= budzet ([\d.]+) zl/d", part, float, None),
                                            wrp=num(r"W/R/P zaplacone ([-\d./]+)%", part, str, None), eta=num(r"krok ceny zmniejszony (\d+)", part),
                                            open=num(r"towary niezbiezne (\d+)", part),
+                                           # n22f-plany: wspolny poziom S/D rynku, wobec ktorego liczone sa towary niezbiezne (Ks Plan Converge Shelf Level; brak - log sprzed n22f)
+                                           lev=num(r"wobec wspolnego poziomu podazy/popytu x([\d.]+)", part, float, None),
+                                           levt=num(r"wobec wspolnego poziomu podazy/popytu x[\d.]+, cel kroku 8 x([\d.]+)", part, float, None),
+                                           oabs=num(r"stara miara \|S/D - 1\| > 2%: (\d+)", part),
                                            # recenzja: drabina miast przy narzucie (Plan) i przy cenach startu (do gry), koszyk wsi z narzutem, towary na granicy ceny
                                            spentm=num(r"przy narzucie Planu wydane ([\d.]+) zl/d", part, float, None),
                                            k0=num(r"kcal jedzenia W/R/P przy cenach startu ([-\d./]+)%", part, str, None),

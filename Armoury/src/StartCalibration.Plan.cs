@@ -207,7 +207,7 @@ namespace Armoury
                 inp.WarmPrices = (double[])_plan.P.Clone();
                 inp.WarmRent = new Dictionary<string, double>(StringComparer.Ordinal);
                 for (int b = 0; b < _plan.NB; b++) if (_plan.Blocks[b].Uid != null) inp.WarmRent[_plan.Blocks[b].Uid] = _plan.Rent[b];
-                inp.RoundsFirst = _plan.Open.Count > 0 ? 6000 : 3000;     // recenzja 16.10 (drobne): poprzedni Plan niezbiezny - wiecej rund rownowagi
+                inp.RoundsFirst = _plan.OpenAbsM[0] + _plan.OpenAbsM[1] > 0 ? 6000 : 3000;   // recenzja 16.10 (drobne): poprzedni Plan niezbiezny - wiecej rund rownowagi; n22f-plany: stara miara (bez pasma zapasu polek - jak dotad)
                 if (_plan.DistHome != null && _plan.DistHome.Count > 0) inp.WarmHome = new Dictionary<string, double>(_plan.DistHome, StringComparer.Ordinal);   // krok 8: cieply start pracy domowej
             }
             if (inp.Districts.Count == 0) { note = "zaden okreg z ziemia z pliku (plik ziemi nie pasuje do wsi gry)"; return null; }
