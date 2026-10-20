@@ -1587,7 +1587,7 @@ Uzycie (Python 3, tylko odczyt):
 --grupa p6pola    : (20.10, galaz p6-pola - R3-07b, POMYSLY-35 pkt 18; Armoury/src/MapFields.cs, klucz Map Village Fields) pola wokol wiosek na mapie wedlug pory
                     roku. python -I tools/sprawdz_logi.py --grupa p6pola <Armoury-*.log> (strumieniowo). PP-0 linie "Pola (p6)" (brak - INFO: log sprzed galezi albo klucz
                     NIE); PP-1 start: wsi z polami > 0 i czas startu <= 100 ms; PP-2 ostatnia linia "stan": wsi z planem > 0, pol w planie > 0, przy kamerze nisko pol w
-                    scenie > 0; PP-3 udzial pol bez miejsca <= 25% (po recenzji; symulacja na rastrze terenu z drogami 8-11%; z rozkladem przyczyn); PP-3b (recenzja) wsi z planem bez zadnego pola <= 5%; PP-3c
+                    scenie > 0; PP-3 udzial pol bez miejsca <= 25% przy >= 500 polach planu, inaczej <= 60% (po recenzji; symulacja na rastrze terenu z drogami 8-11%; z rozkladem przyczyn); PP-3b (recenzja) wsi z planem bez zadnego pola <= 5% (przy < 100 wsiach z planem <= 15%); PP-3c
                     (recenzja) pola odrzucone przez farbe drogi <= 10% pol planu (log sprzed recenzji z przyczyna "droga" - INFO); PP-4 najdluzszy tick stawiania
                     <= 15 ms (budzet 4 ms + jedna wioska); PP-5 pora pol (linie "pora pol A -> B" - INFO z lista) i zgodnosc pory z dniem roku w linii startu (dzien
                     przeliczony na rok 364 jak MapFields.Phase, dlugosc roku z linii - "rok N dni"; bez niej 364); PP-6 potkniecia (najwiecej w linii "stan") i
@@ -47483,11 +47483,14 @@ def p6pola_main(logp):
                 "wsi z planem > 0, pol w planie > 0, w scenie > 0 przy kamerze nisko", pv > 0 and pf > 0 and (live > 0 or not vis))
         share = nofield / (nofield + pf) if nofield + pf > 0 else 0.0
         why = re.search(r"\(bez miejsca: \d+(?: - |; odrzucone w \d+ probach - )([^)]*)\)", r)
-        rep.add("PP-3: pola bez miejsca (udzial)", f"{nofield} z {nofield + pf} ({share:.0%}); {why.group(1) if why else '-'}", "<= 25%", share <= 0.25)
+        lim3 = 0.25 if nofield + pf >= 500 else 0.60   # mala probka (kilka komorek przy kamerze, np. wybrzeze) - luzniej
+        rep.add("PP-3: pola bez miejsca (udzial)", f"{nofield} z {nofield + pf} ({share:.0%}); {why.group(1) if why else '-'}",
+                f"<= {lim3:.0%}" + (" (pol planu >= 500)" if lim3 < 0.5 else " (mniej niz 500 pol planu)"), share <= lim3)
         zero = num(r"\(bez zadnego pola (\d+)\)", r, int, -1)
         if zero is not None and zero >= 0:
             zs = zero / pv if pv > 0 else 0.0
-            rep.add("PP-3b: wsi z planem bez zadnego pola (recenzja)", f"{zero} z {pv} ({zs:.1%})", "<= 5%", zs <= 0.05)
+            lim3b = 0.05 if pv >= 100 else 0.15
+            rep.add("PP-3b: wsi z planem bez zadnego pola (recenzja)", f"{zero} z {pv} ({zs:.1%})", f"<= {lim3b:.0%}" + (" (wsi z planem >= 100)" if pv >= 100 else " (mniej niz 100 wsi z planem)"), zs <= lim3b)
         else:
             rep.add("PP-3b: wsi z planem bez zadnego pola (recenzja)", "brak licznika w linii stanu", "INFO (log sprzed recenzji)", None)
         road = num(r", farba drogi (\d+)", r, int, -1)
