@@ -119,13 +119,16 @@ namespace Armoury
             return outp;
         }
 
+        /// <summary>Udzial z float (0.45f + Smithing x 0.002f) bez szumu float: (double)0.45f = 0.4499999881 dawalo 0.449 sztaby zamiast 0.450 (recenzja r4).</summary>
+        private static double Exact(float share) { return Math.Round((double)share, 6); }
+
         /// <summary>Bron: metal czesci x udzial (bez minimum 1), nie wiecej niz sufit klasy BK (cap &gt; 0) i niz metal czesci - w tysiacznych, gatunki czesci.</summary>
         internal static int[] WeaponMilli(int[] raw, int cap, float share)
         {
             long total = 0;
             for (int g = 1; g <= 6; g++) total += Math.Max(0, raw[g]);
             if (total <= 0) return new int[7];
-            double n = total * (double)share;
+            double n = total * Exact(share);
             if (cap > 0 && n > cap) n = cap;
             if (n > total) n = total;
             return Spread(raw, (long)Math.Floor(n * Unit + 1e-6));
@@ -149,13 +152,13 @@ namespace Armoury
                             if (Recipes.MaterialItem((CraftingMaterials)g) == p.Item) { w[g] += p.Count; total += p.Count; break; }
                     }
                 if (total <= 0) return new int[7];
-                float share = SmeltTruth.Share();
-                double n = total * (double)share;
+                double share = Exact(SmeltTruth.Share());
+                double n = total * share;
                 if (s.SmeltCapToCraftCost)
                 {
                     // ten sam sufit co SmeltTab.YieldFor: kwit kucia (SmeltCapFromForgeBill) albo punkty ochrony - tylko bez "co najmniej 1"
                     long u = s.SmeltCapFromForgeBill ? (it.HasArmorComponent || s.BkShieldBillByRecipe ? total : 0) : Recipes.ArmourUnits(it);
-                    if (u > 0 && n > u * (double)share) n = u * (double)share;
+                    if (u > 0 && n > u * share) n = u * share;
                 }
                 return Spread(w, (long)Math.Floor(n * Unit + 1e-6));
             }
@@ -278,7 +281,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ napisy
-        private static string Num(int milli) { return (milli / (double)Unit).ToString("0.##", Inv); }
+        // po recenzji r4: 3 miejsca (tysiaczne sa dokladne) - "0.##" pokazywalo 999 tysiecznych jako "1" (pelnej sztaby nie ma), a 1-4 tysiaczne jako "+0"
+        private static string Num(int milli) { return (milli / (double)Unit).ToString("0.###", Inv); }
 
         private static string MatName(TaleWorlds.CampaignSystem.ComponentInterfaces.SmithingModel model, int g)
         {

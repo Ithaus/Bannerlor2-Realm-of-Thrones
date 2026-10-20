@@ -87,7 +87,9 @@ namespace Armoury
                                 capped.Add(new Recipes.Part(p.Item, n));
                                 left -= n;
                             }
-                            if (_capLogged.Add(it.StringId ?? "")) Log.Info("SmeltTab: przetop " + it.StringId + " przyciety do kosztu wykucia: " + total + " -> " + (cap - left) + " szt. metalu (wykucie " + u + ").");
+                            if (_capLogged.Add(it.StringId ?? "")) Log.Info("SmeltTab: przetop " + it.StringId + " przyciety do kosztu wykucia: " + total + " -> " + (cap - left) + " szt. metalu (wykucie " + u + ")."
+                                    // po recenzji r4: przy Smelt Keeps Scraps (i liczeniu raz) to tylko regula listy Smelt - prawdziwy wynik liczy SmeltScraps.ArmourMilli
+                                    + (SmeltScraps.On && SmeltTruth.ArmourOnceOn ? " (regula listy Smelt; wynik przetopu przy Smelt Keeps Scraps: dokladny udzial, linia 'Przetop resztki')" : ""));
                             y = capped;
                         }
                     }

@@ -349,7 +349,7 @@ namespace Armoury
                   .Append(", surowka bez surowki w czesciach ").Append(crudeFromNothing.ToString(Inv)).Append(exCrude != null ? " (np. " + exCrude + ")" : "")
                   .Append(", ponad polowe metalu czesci ").Append(overHalf.ToString(Inv))
                   .Append(", bez metalu w czesciach ").Append(noMetal.ToString(Inv))
-                  .Append(", z 1 sztaby oddaja ja cala ").Append(oneBar.ToString(Inv)).Append(SmeltScraps.On ? " (Smelt Keeps Scraps TAK - ma byc 0)" : " (minimum 1 jak pancerz)")
+                  .Append(", z 1 sztaby oddaja ja cala ").Append(oneBar.ToString(Inv)).Append(SmeltScraps.On && WeaponOn ? " (Smelt Keeps Scraps TAK - ma byc 0)" : (SmeltScraps.On ? " (Smelt Keeps Scraps nieczynny dla broni: Smelt Weapon By Parts NIE)" : " (minimum 1 jak pancerz)"))
                   .Append(", z wynikiem 0 sztab (calosc do resztek) ").Append(zeroBars.ToString(Inv))
                   .Append(", surowka w wyniku ").Append(crudeOut.ToString(Inv))
                   .Append(", metal wyniku / czesci ").Append(outSum.ToString(Inv)).Append('/').Append(partsSum.ToString(Inv))
@@ -360,8 +360,11 @@ namespace Armoury
                 finally { SmeltScraps.Ignore = false; }
                 sb.Append(" | resztki przetopu (r4-przetop): klucz Smelt Keeps Scraps ").Append(SmeltScraps.On ? "TAK" : "NIE (skrzynka nieuzywana)")
                   .Append(", skrzynka: ").Append(SmeltScraps.BoxLog())
-                  .Append(", proba broni ").Append(scrapProbe != null ? scrapProbe.StringId + ": " + SmeltScraps.TwoSmelts(SmeltScraps.WeaponMilli(PartsMetal(scrapProbe), ClassCap(model, scrapProbe), Share())) : "brak")
-                  .Append(", proba pancerza ").Append(armourProbe != null ? armourProbe.StringId + ": " + SmeltScraps.TwoSmelts(SmeltScraps.ArmourMilli(armourProbe)) : "brak")
+                  // po recenzji r4: proba tylko tam, gdzie klucz naprawde dziala (bron - Smelt Weapon By Parts, pancerz - Smelt Armour Once), bez falszywego alarmu
+                  .Append(", proba broni ").Append(!WeaponOn ? "klucz nieczynny dla broni (Smelt Weapon By Parts NIE)"
+                        : scrapProbe != null ? scrapProbe.StringId + ": " + SmeltScraps.TwoSmelts(SmeltScraps.WeaponMilli(PartsMetal(scrapProbe), ClassCap(model, scrapProbe), Share())) : "brak")
+                  .Append(", proba pancerza ").Append(!ArmourOnceOn ? "klucz nieczynny dla pancerza (Smelt Armour Once NIE)"
+                        : armourProbe != null ? armourProbe.StringId + ": " + SmeltScraps.TwoSmelts(SmeltScraps.ArmourMilli(armourProbe)) : "brak")
                   .Append(" (przy kluczu TAK bron z 1 sztaba: 1. przetop 0 szt., 2. przetop 1 szt.)");
                 sb.Append(" | kwit tarczy w CRAFT BK: ").Append(FletchForge.ShieldBillCheck(shieldProbe));
                 sb.Append(" | tarcza t5+: ").Append(ShieldFacing(shieldTopProbe));
