@@ -6248,6 +6248,18 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SandSteedsInDorne { get; set; } = true;
 
+        [SettingPropertyBool("Camels Only Qarth", HintText = "camels belong to Qarth alone: only the men of Qarth (and troops whose own kit has a camel) ride them and only the markets of Qarth keep them - Dorne rides its sand steeds; works together with Sand Steeds In Dorne in a new campaign (off, or an older campaign = Dorne may ride and sell camels too, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool CamelsOnlyQarth { get; set; } = true;
+
+        [SettingPropertyBool("Exotic Mounts Never Vanish", HintText = "camels, chariots, elephants and mammoths are never struck off a market shelf: merchants do not haul them to a market that does not keep them, and one that a caravan or a lord sold there is bought by the nearest market that keeps it - that market pays the price and the beast goes there by the merchants' cart - or stays on the shelf; one in a troops' armoury of men who may not ride it goes to the party's baggage as goods, and the player keeps such beasts in the bags as goods (off = struck off, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ExoticMountsNeverVanish { get; set; } = true;
+
+        [SettingPropertyBool("Qarth Stables Buy Camels", HintText = "a lord whose camel riders have no camel in the troops' armoury buys camels for them at a market that keeps camels (Qarth), with his own gold - no bigger share of his purse than he spends on horses at one stop, and no more head than he buys at one stop (off = camel riders get no camels from the market, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool QarthStablesBuyCamels { get; set; } = true;
+
         [SettingPropertyBool("Spare Horses Carry Footmen", HintText = "every spare horse in the baggage - also a worn or lame one from the spoils - and every free horse in the troops' armoury carries a footman on the march; the game counts such horses the same way everywhere", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpareHorsesCarryFootmen { get; set; } = true;
@@ -9777,6 +9789,9 @@ namespace Armoury
             s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;
             s.WorkshopsFollowInputs = WorkshopsFollowInputs;
             s.SandSteedsInDorne = SandSteedsInDorne;
+            s.CamelsOnlyQarth = CamelsOnlyQarth;
+            s.ExoticMountsNeverVanish = ExoticMountsNeverVanish;
+            s.QarthStablesBuyCamels = QarthStablesBuyCamels;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;
             s.HamletKindsInDistrict = HamletKindsInDistrict;

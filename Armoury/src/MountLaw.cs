@@ -21,6 +21,9 @@ namespace Armoury
     /// (giganci); WIELBLAD - kultura Dorne (aserai) albo wlasny szablon
     /// (Qartheen); RYDWAN - wylacznie kultury Essos; SLON - Volantis albo
     /// wlasny szablon. Smoki maja swoje prawo (DragonUnmount).
+    /// r2-konie (PLAN 6.9, D 09.10 I/J "Dorne - piaskowe rumaki", klucz CamelsOnlyQarth): WIELBLAD - tylko kultura Qarthu (qartheen)
+    /// albo wlasny szablon; jezdzcy na wielbladach sa w ROT tylko w Qarthu (qartheen_camel_rider, qartheen_cameleer - ROT-Troops.xml),
+    /// targ trzyma wielblady tylko w Qarthu (kultura osady albo kultura z kalibracji - ta sama, ktora CamelLaw wybiera stadniny Qarthu).
     /// </summary>
     internal static class MountLaw
     {
@@ -101,12 +104,25 @@ namespace Armoury
             return mask;
         }
 
+        /// <summary>r2-konie: klucz CamelsOnlyQarth - wielblad tylko qartheen (wylaczony - takze aserai, jak dotad). Recenzja: tylko gdy dziala
+        /// CamelLaw (nowa kampania, stadniny Dorne nie rodza wielbladow) - inaczej Dorne rodzi wielblady i dalej ich uzywa, jak dotad
+        /// (bez tego kazdy wielblad z Dorne jechalby przez pol mapy do Qarthu).</summary>
+        private static bool CamelsQarthOnly { get { var s = Settings.Current; return s != null && s.CamelsOnlyQarth && CamelLaw.On; } }
+
+        /// <summary>Kultura, ktorej wielblad przysluguje (wolne od alokacji - porownania napisow).</summary>
+        private static bool CamelCulture(string culture)
+        {
+            if (culture == null) return false;
+            if (culture == "qartheen") return true;
+            return culture == "aserai" && !CamelsQarthOnly;
+        }
+
         private static bool AllowedFor(string culture, bool ownTemplate, Fam f)
         {
             switch (f)
             {
                 case Fam.Mammoth: return ownTemplate;
-                case Fam.Camel: return culture == "aserai" || ownTemplate;
+                case Fam.Camel: return CamelCulture(culture) || ownTemplate;
                 case Fam.Chariot: return culture != null && Essos.Contains(culture);
                 case Fam.Elephant: return culture == "volantine" || ownTemplate;
                 default: return true;
@@ -168,7 +184,13 @@ namespace Armoury
                 if (f == Fam.Horse || f == Fam.Other || f == Fam.Dragon) return true;
                 if (f == Fam.Mammoth) return false;
                 string cul = st != null && st.Culture != null ? st.Culture.StringId : null;
-                if (f == Fam.Camel) return cul == "aserai" || cul == "qartheen";
+                if (f == Fam.Camel)
+                {
+                    // r2-konie: przy CamelsOnlyQarth - targ Qarthu wedlug kultury osady albo kultury z kalibracji (BK zmienia kultury osad;
+                    // CamelLaw wybiera stadniny Qarthu ta sama kultura z kalibracji) - wielblad z Qarthu nie schodzi z polki Qarthu
+                    if (CamelCulture(cul)) return true;
+                    return CamelsQarthOnly && st != null && PeopleBook.CultureAtCalibration(st) == "qartheen";
+                }
                 return AllowedFor(cul, false, f);
             }
             catch { return true; }

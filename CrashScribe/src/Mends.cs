@@ -144,6 +144,8 @@ namespace CrashScribe
         /// ktorych kultura (aserai=Dorne, volantine=Essos) nie zgadza sie
         /// z kultura partii. Zwierze NIE znika - zostaje w taborze jako towar
         /// na sprzedaz (karawany moga handlowac); po prostu nikt nie wsiada.
+        /// r2-konie (PLAN 6.9, recenzja): WIELBLAD - przy kluczu Armoury CamelsOnlyQarth wedlug Armoury.MountLaw.AllowedForParty (jedna
+        /// regula w obu modach: Qarth albo wlasny szablon); wielblady maja w XML kulture aserai, wiec stara regula wycinala je Qarthowi.
         /// </summary>
         /// <summary>
         /// TOWAR TO NIE LUP BITEWNY (Jeff 02.09: "co to znaczy damaged grapes,
@@ -1056,6 +1058,9 @@ namespace CrashScribe
                 var list = tr.Field("_horseAndHarnesses").GetValue() as System.Collections.IList;
                 if (party == null || list == null || list.Count == 0) return;
                 string pc = PartyCultureId(party);
+                Func<MobileParty, ItemObject, bool> camelLaw = null;   // r2-konie: lazy - przy wylaczonym kluczu/bez Armoury null
+                bool camelAsked = false;
+                int camelKept = 0, camelCut = 0;
                 for (int i = list.Count - 1; i >= 0; i--)
                 {
                     var horse = Traverse.Create(list[i]).Property("Horse").GetValue();
@@ -1063,12 +1068,62 @@ namespace CrashScribe
                     if (item == null) continue;
                     var id = (item.StringId ?? "").ToLowerInvariant();
                     if (!id.Contains("camel") && !id.Contains("chariot") && !id.Contains("elephant")) continue;
+                    if (id.Contains("camel"))
+                    {
+                        if (!camelAsked) { camelAsked = true; camelLaw = ArmouryCamelLaw(); }
+                        if (camelLaw != null)
+                        {
+                            // r2-konie (PLAN 6.9, recenzja): wielblad wedlug TEGO SAMEGO prawa co Armoury (MountLaw.AllowedForParty,
+                            // klucz CamelsOnlyQarth): Qarth (qartheen) albo ktos z wielbladem we wlasnym szablonie. Wielblady maja w XML
+                            // kulture aserai, wiec stara regula "kultura przedmiotu = kultura partii" wycinala je Qarthowi.
+                            if (camelLaw(party, item)) { camelKept++; continue; }
+                            list.RemoveAt(i); camelCut++;
+                            continue;
+                        }
+                    }
                     var ic = item.Culture != null ? item.Culture.StringId : null;
                     if (ic == null || ic == pc) continue;   // wlasna kultura (albo bezpanski) - wolno
                     list.RemoveAt(i);
                 }
+                if ((camelKept > 0 || camelCut > 0) && _camelLawSaid < 12)
+                {
+                    _camelLawSaid++;
+                    Scribe.Line("Mends: wielblady w przydziale DTE (r2-konie): " + party.Name + " (kultura " + pc + ") - zostaje " + camelKept
+                                + ", wyciete " + camelCut + " (prawo Armoury MountLaw, CamelsOnlyQarth)" + (_camelLawSaid == 12 ? " - dalej bez linii." : "."));
+                }
             }
             catch { }
+        }
+
+        private static int _camelLawSaid;
+        private static bool _camelLawBound;
+        private static Func<MobileParty, ItemObject, bool> _camelLawFn;
+
+        /// <summary>r2-konie (PLAN 6.9, recenzja): Armoury.MountLaw.AllowedForParty (refleksja, wiazane raz), gdy klucz Armoury
+        /// CamelsOnlyQarth jest wlaczony; null bez Armoury, przy innej sygnaturze albo przy wylaczonym kluczu - wtedy stara regula
+        /// (kultura przedmiotu = kultura partii). Watek glowny (przydzial DTE na starcie misji).</summary>
+        private static Func<MobileParty, ItemObject, bool> ArmouryCamelLaw()
+        {
+            if (ArmouryFloat("CamelsOnlyQarth", 0f) < 0.5f) return null;
+            if (_camelLawBound) return _camelLawFn;
+            _camelLawBound = true;
+            try
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "Armoury") continue;
+                    var t = asm.GetType("Armoury.MountLaw");
+                    var m = t != null ? t.GetMethod("AllowedForParty", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static,
+                                                    null, new[] { typeof(MobileParty), typeof(ItemObject) }, null) : null;
+                    if (m != null && m.ReturnType == typeof(bool))
+                        _camelLawFn = (Func<MobileParty, ItemObject, bool>)Delegate.CreateDelegate(typeof(Func<MobileParty, ItemObject, bool>), m);
+                    break;
+                }
+            }
+            catch { _camelLawFn = null; }
+            LinkLine("wielblady w przydziale DTE (r2-konie)", _camelLawFn != null, "Armoury.MountLaw.AllowedForParty",
+                     "stara regula: kultura wielblada = kultura partii");
+            return _camelLawFn;
         }
 
         // ===== UNIKATY SA UNIKATOWE (Jeff 30.08: "nie moze byc 25 pancerzy
