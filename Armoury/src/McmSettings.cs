@@ -5280,6 +5280,14 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175MinorLore { get; set; } = true;
 
+        [SettingPropertyBool("Army175 Vale Reach Knights", HintText = "As in the books, the knights of the Vale and the Reach ride and fight better: the Vale Rider (tier 3), the Vale Lancer (tier 4) and the Reach Rider (tier 4) get 20 more Riding and 20 more of their main weapon skill on top of what their own gear demands (the weapon skill stays one point below the next tier's requirement, so no man outgrows his tier), and the two Vale riders wear body armour one step heavier, within their tier (the armour part works only together with Army 175 Tier Gear). Only your own battles feel it: auto-resolve counts a soldier by his tier, not his skills, and pay does not change. Applied by CrashScribe, takes effect on the next load", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175ValeReachKnights { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Frey Horse Archers", HintText = "As in the books, House Frey rides out with mounted archers: the Frey Rider (tier 4, upgraded from the Frey Cutthroat) becomes a horse archer - a short bow usable from the saddle, two quivers of arrows of his tier and one melee weapon he can use on horseback, no shield; Bow becomes his best skill and he forms up with the horse archers. The Frey Horseman (tier 5) stays a lancer. Lords buy bows and arrows for him instead of lances, and in auto-resolve he counts as a horse archer (stronger on open plains, weaker in forests and sieges). Works only together with Army 175 Tier Gear. Applied by CrashScribe, takes effect on the next load", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175FreyHorseArchers { get; set; } = true;
+
         [SettingPropertyBool("Army Cohesion Year Scale", HintText = "An army's cohesion falls each day at the pace the game meant for its 84-day year, scaled to the long year (84 / 364 = 0.23): a lord's army of five parties holds together about 80 days instead of about 19, and about 45 days instead of 12 deep in enemy land; your own army likewise. Starving, low-morale and weak parties still drain it faster, and a commander can still spend influence to restore it. Off = the game's daily loss", RequireRestart = false)]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool ArmyCohesionYearScale { get; set; } = true;
@@ -9587,6 +9595,8 @@ namespace Armoury
             s.Army175NorthFoot = Army175NorthFoot;
             s.Army175VolantisNorvos = Army175VolantisNorvos;
             s.Army175MinorLore = Army175MinorLore;
+            s.Army175ValeReachKnights = Army175ValeReachKnights;
+            s.Army175FreyHorseArchers = Army175FreyHorseArchers;
             s.ArmyCohesionYearScale = ArmyCohesionYearScale;
             s.Army175GoldenBows = Army175GoldenBows;
             s.OthersSteelRule = OthersSteelRule;

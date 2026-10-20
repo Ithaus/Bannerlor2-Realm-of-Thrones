@@ -97,6 +97,7 @@ namespace CrashScribe
             CompositionApplied = false; DothrakiPoolActive = false; _poolFirstLogged = false;
             ResetPoolCounters();
             ResetMeasure();
+            ResetJazda();   // R3-08e/f
         }
 
         /// <summary>AfterRegisterSubModuleObjects (CS): sklad, migawka valyrianska, sprzet wedlug tieru,
@@ -120,6 +121,7 @@ namespace CrashScribe
             try { TierGear("przy wczytaniu, przed sesja"); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.TierGear", null); } catch { } }
             try { LoreArmor(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.LoreArmor", null); } catch { } }
             try { GoldenBows(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.GoldenBows", null); } catch { } }
+            JazdaGear(false);   // R3-08f: konni lucznicy Freyow (zestaw przy wczytaniu)
         }
 
         private static bool IsSavedCampaign()
@@ -186,6 +188,7 @@ namespace CrashScribe
                     LoreArmor();
                     GoldenBows();
                     QohorHeavier();
+                    JazdaGear(true);   // R3-08e/f
                     _tierCache = new Dictionary<ItemObject, int>();
                     string s0; int o0 = CountOver(out s0);
                     ControlLine("doba " + _catchUpTries + " (zapas)", o0, s0, -1, -1);
@@ -1132,6 +1135,7 @@ namespace CrashScribe
                     LoreArmor();
                     GoldenBows();
                     QohorHeavier();
+                    JazdaGear(true);   // R3-08e/f
                     _tierCache = new Dictionary<ItemObject, int>();
                     string s0; int o0 = CountOver(out s0);
                     ControlLine("start sesji (zapas)", o0, s0, -1, -1);
@@ -1152,6 +1156,7 @@ namespace CrashScribe
                     over = CountOver(out sample);
                 }
                 QohorHeavier();
+                JazdaGear(true);   // R3-08e/f
                 ControlLine("po rozsadku", over, sample, q, noReplFirst);
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.TierGearCheck", null); } catch { } }

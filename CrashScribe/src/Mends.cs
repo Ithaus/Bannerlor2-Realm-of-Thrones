@@ -6539,7 +6539,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.HeroSinewAll("wczytanie"); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.JazdaSkills(); Army175.OldArmouries(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.HeroSinewAll("wczytanie"); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); OthersSteel.OnMapEventEnded(m); });
             // 175c: Wedrowcy obecni od poczatku bitwy (do linii "Inni (175c): bitwa")
@@ -6556,7 +6556,7 @@ namespace CrashScribe
                     Mends.BkEducationCheck();   // E8/M (247): jezyk gracza w BK, raz na gre (tylko odczyt)
                     Army175.DailyCatchUp();   // 175: zamiana wedlug tieru, gdy przy wczytaniu zestawy byly puste
                     if (!Mends.SinewApplied) Mends.SkillSinew();
-                    if (Mends.SinewApplied) { Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); }   // raz (znacznik), potem nic
+                    if (Mends.SinewApplied) { Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.JazdaSkills(); Army175.OldArmouries(); }   // raz (znacznik), potem nic
                     Army175.PoolDaily();      // 175: stan postfiksu puli ROT (Dothrakowie), gdy cos sie dzialo
                     Army175.RespawnDaily();   // 175: partie lordow AI z szablonu (konni bez konia z odrodzenia)
                     OthersSteel.Daily();      // 175c: suwaki zasady stali Innych, linia dobowa bitew z Innymi
