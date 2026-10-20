@@ -539,6 +539,12 @@ namespace Armoury
                     TownMenus.Apply(starterObject as CampaignGameStarter);
             }
             catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (TownMenus)", e); }
+            try
+            {
+                if (game != null && game.GameType is Campaign && Campaign.Current != null)
+                    CastleMenus.Apply(starterObject as CampaignGameStarter);   // m96-zamek: porzadek menu zamku (klucz CastleMenuTidy), ta sama chwila co miasto
+            }
+            catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (CastleMenus)", e); }
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
