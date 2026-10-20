@@ -3485,3 +3485,7 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   drewno/wegiel - ile wazy jednostka i na ile starcza" + "przetop mniej, straty, madrze" -> wf_48e51b44-1b9 PRZERWANY, nowy wf_3eb8bfa3-879 (receptury-kuzni-2.js: surowce w kg z
   otwartymi ladunkami jak drewno, przetop = masa metalu minus zgar/zuzel, czesci niemetalowe przepadaja, bez zysku). Stara proba: m96-receptury-tmp/przerwana-proba-Recipes.diff.
 
+### 102. NOC 20/21.10 - START (ok. 17:00 PDT) - plan: docs/PLAN-NOC-2026-10-21.md
+Jeff: "Ok skonczylem grac, masz cala noc, aby teraz wszystko wdrozyc, wgrac etc., rano za 12 godzin czekam na raport, ze wszystko gotowe."
+Zapisy Jeffa (Ironman*.sav, saveauto*) skopiowane do D:/Backup-Bannerlord/zapisy-jeffa/2026-10-20-wieczor; logi dnia do D:/Backup-Bannerlord/logi-jeffa/2026-10-20 (27 plikow).
+
