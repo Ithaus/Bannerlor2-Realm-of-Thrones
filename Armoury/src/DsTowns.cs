@@ -673,6 +673,23 @@ namespace Armoury
             return OverReserve * Math.Max(0, reserve) + CatchUpKeepDays(s) * Math.Max(0, f.FL + f.FC) / YearDays;
         }
 
+        /// <summary>p6-a7 (TownHire): czego kasa miasta nie oddaje na roboty z rak okregu - 1.5 x zapas kupcow, z firma DS ten sam prog co gersuma (CatchUpKeep) plus reszta
+        /// gersumy do zaplaty i zaleglosci firm z kasy (pan i korona najpierw). Bez firmy - 1.5 x zapas. Tylko odczyt; NaN = brak danych (wolajacy nie placi).</summary>
+        internal static double HireKeep(Settlement st, Town t)
+        {
+            try
+            {
+                if (st == null || t == null) return double.NaN;
+                var s = Settings.Current;
+                int reserve = TownPurse.Reserve(t);
+                double keep = OverReserve * Math.Max(0, reserve);
+                var f = FarmOf(st, false);
+                if (f != null && s != null) keep = Math.Max(keep, CatchUpKeep(f, reserve, s)) + Math.Max(0, f.CLeft) + Math.Max(0, f.AL) + Math.Max(0, f.AC) + Math.Max(0, f.AidArr);
+                return keep;
+            }
+            catch (Exception e) { Stumble("HireKeep", e); return double.NaN; }
+        }
+
         // ------------------------------------------------------------ scalenie fal 6/7 (18.10): gersuma f7-kasy i pozyczka miejska f8-pozyczka na tej samej kasie kupcow
         // Obie biora z kasy kupcow miasta ponad 1.5 x zapas kupcow. JEDNA KOLEJNOSC: gersuma postanowiona w przegladzie to zobowiazanie miasta wobec pana i korony -
         // idzie pierwsza; pozyczka miejska nie pozycza reszty gersumy jeszcze do zaplaty (CLeft). JEDEN PROG: w miescie z KS przy Ks Farm Catch Up pozyczka bierze z kasy

@@ -286,6 +286,7 @@ namespace Armoury
                 {
                     t.Vil += r; t.Town += matIn; t.Folk += wage; t.Cof += wageCof; t.Mat += mat; t.Wage += wage + wageCof; t.Pcs += pcs;
                     if (r == 0) t.NoMat++;
+                    TownHire.NoteRebuild(mt, r, matIn + wageCof);   // p6-a7: wydatek wsi na przebudowe w miescie targowym; do kasy targu material i placa nieprzyjeta przez lud (zwrot robotami miasta - TownHire)
                     return r;
                 }
                 int had = v.Gold;
@@ -295,6 +296,7 @@ namespace Armoury
                 int th = mt.Gold;
                 mt.ChangeGold((int)got);
                 t.Vil += got; t.Town += (long)mt.Gold - th; t.Old += got;
+                TownHire.NoteRebuild(mt, got, (long)mt.Gold - th);  // p6-a7: jak wyzej (droga dawna bez towaru - cale do kasy, zmierzone na kasie)
                 return got;
             }
             catch (Exception e) { Stumble("PayRebuild", e); return 0; }

@@ -764,6 +764,9 @@ namespace Armoury
         // p6-spichlerz (R3-06f): zakup dnia i liczniki spichlerza miejskiego od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p6SpichlerzReset = P6SpichlerzReset();
         private static bool P6SpichlerzReset() { try { TownGranary.Reset(); } catch (Exception e) { Log.Error("P6SpichlerzReset", e); } return true; }
+        // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
+        private readonly bool _p6a7Reset = P6a7Reset();
+        private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1333,6 +1336,10 @@ namespace Armoury
             // save040 Jeffa) = brak szubienic; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6SzubieniceReset)
             try { string gw = dataStore.IsSaving ? Gallows.Export() : null; if (!dataStore.IsSaving || gw != null) SaveText.Sync(dataStore, "arm_gallows", ref gw); if (dataStore.IsLoading) Gallows.Import(gw); }
             catch (Exception e) { Log.Error("SyncData.arm_gallows", e); }
+            // p6-a7: roboty miast z rak okregu ("th2|doba startu|pulap startu|S|doba S|id:zwrot,..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis,
+            // kampania Jeffa) = pomiar od pierwszej doby z firmami DS, start przy pierwszych przebudowach A7; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
+            try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
+            catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
         }
 
         public override void RegisterEvents()
@@ -2750,6 +2757,9 @@ namespace Armoury
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
             try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
+            // p6-a7: roboty miast z rak okregu - PO KS i VillageCrafts (przebudowy A7 tej doby juz w kasach): miasto ponad pulapem 1/28 nadwyzki do kies wsi okregu; wlasna pozycja (MTownHire)
+            try { TownHire.Daily(); TownHire.Line(); } catch (Exception e) { Log.Error("TownHire.Daily", e); } DayProfile.Lap("TownHire.Daily");
+            try { MoneyLedger.Mark(MoneyLedger.MTownHire); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)
             try { VassalRansomAid.Report(); AiDowry.Report(); } catch (Exception e) { Log.Error("R3-01cd.Report", e); }   // R3-01d/R3-01c: linie "Pomoc wasali (R3-01d)" i "Posagi AI (R3-01c)"
