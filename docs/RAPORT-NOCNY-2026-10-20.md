@@ -128,6 +128,6 @@ minute przy x8).
 
 - Stan: `docs/STAN-PRAC.md` ### 94-97, plan nocy `docs/PLAN-NOC-2026-10-20.md`, wspolny `CHANGELOG.md` w galezi `w-toku/noc-wgranie-91`.
 - Kopie: poprzednie DLL obok plikow gry (`*.bak-2026-10-19-wgranie89-przed`, `...wgranie90-przed`, `*.bak-2026-10-20-wgranie91-przed`) i w
-  `D:\Backup-Bannerlord\wgrane\`; Twoj zapis w `D:\Backup-Bannerlord\zapisy-jeffa6-10-19-po-sesji-88`.
-- Cofniecie calej nocy: wgrac DLL z `D:\Backup-Bannerlord\wgrane6-10-19-wgranie89-przed` (to WGRANIE 88).
+  `D:\Backup-Bannerlord\wgrane\`; Twoj zapis w `D:\Backup-Bannerlord\zapisy-jeffa\2026-10-19-po-sesji-88`.
+- Cofniecie calej nocy: wgrac DLL z `D:\Backup-Bannerlord\wgrane\2026-10-19-wgranie89-przed` (to WGRANIE 88).
 
