@@ -1,9 +1,10 @@
 ## r4-wioska (20.10) - wioska poboczna gracza: dochod co dobe, linia w podpowiedzi zlota, wioska w zakladce Fiefs (Armoury)
 
-**Dla Jeffa (prosto).** Twoja wioska (Seven Elms) placi teraz codziennie, od pierwszej doby: dostajesz podatek pana od tego, co wioska wytwarza (jej towary po cenach
-targu razy stawka podatku pana) - mniej wiecej 5-15 denarow na dobe przy zwyklej wiosce (w autotescie Greenton: wartosc dnia 25 denarow, pan bierze ok. 35%, czyli
-ok. 9 na dobe). To zloto nie bierze sie znikad: zabieramy je panu okregu (Paege) - najpierw z podatku, ktory pan ma jeszcze do zebrania z okregu, a gdy ten jest
-pusty, z jego sakiewki; pan ma dokladnie o tyle mniej. W "Expected change" (podpowiedz zlota) jest linia "Seven Elms (your side village: ...)" z kwota dnia, a w
+**Dla Jeffa (prosto).** Twoja wioska (Seven Elms) placi teraz codziennie, od pierwszej doby: dostajesz podatek pana od tego, co wioska sprzedaje (jej towary po cenach
+targu, z czego ok. 87% wraca jako utarg wozow, razy stawka podatku pana) - mniej wiecej 5-12 denarow na dobe przy zwyklej wiosce (w autotescie Greenton: wartosc
+dnia 25 denarow x 0,87 x ok. 35%, czyli ok. 8 na dobe). To zloto nie bierze sie znikad: zabieramy je panu okregu (Paege) - z podatku, ktory pan ma jeszcze do
+zebrania z okregu, a w praktyce (Banner Kings zbiera go codziennie) glownie z jego sakiewki; pan ma dokladnie o tyle mniej. Gdyby pan nie mial zlota, ekran pokaze
+mniej albo "none today" z powodem - nie obiecuje kwoty, ktorej nie bedzie. W "Expected change" (podpowiedz zlota) jest linia "Seven Elms (your side village: ...)" z kwota dnia, a w
 ekranie rodu w zakladce Fiefs pod zamkami - "Side villages (1)" z nazwa, okregiem i dochodem dnia. Nic nie dostaniesz tylko w wojnie z krolestwem pana okregu, gdy
 okreg jest rabowany albo twoja wioska spalona - wtedy powod widac w zakladce Fiefs i w menu wioski.
 
@@ -26,19 +27,26 @@ gracza 0".
 **Zmiana.**
 - `SideVillageFief.cs`:
   - `Due(out why, fresh)` - naleznosc dnia: wartosc dnia produkcji wioski (VillageCrafts.PartsOf - ta sama co okno prac i T9; zapas: udzial ludzi w domu x wartosc
-    okregu) x stawka pana z utargu (1 - `DsVillage.VillageShareOfTakings` = czynny model podatku wsi, ta sama regula co BK, 112 i "udzial pana" DS przy wozie).
-    Liczona od razu (takze w 1. dobie), raz na dobe (cache), od nowa przy wyplacie. 0 tylko: klucz wylaczony, gracz panem okregu, wojna z krolestwem okregu,
-    wies gry okregu BeingRaided / Looted (gra tez nie daje wtedy panu podatku - DefaultClanFinanceModel.CalculateVillageIncome), wioska gracza spalona; powod po
-    angielsku (Fiefs, menu) i po polsku (log).
+    okregu) x H okregu (utarg oddany / wartosc produkcji - `DistrictWorks.HandedRatio`, ta sama liczba co okno prac: zmierzona albo 0.868; po recenzji) x stawka pana
+    z utargu (`LordRate`: czynny model podatku wsi `CalculateVillageTaxFromIncome`, ta sama regula co BK, 112 i "udzial pana" DS przy wozie; po recenzji we wlasnym
+    try - wyjatek = stawka nieznana, dochod 0, a nie 100%). Liczona od razu (takze w 1. dobie), raz na dobe (cache; po recenzji od nowa takze przy zmianie podpisu
+    bramek `DueSig`: klucz, pan, wojna, rabunek), od nowa przy wyplacie. 0 tylko: klucz wylaczony, gracz panem okregu, wojna z krolestwem okregu,
+    wies gry okregu BeingRaided / Looted (gra tez nie daje wtedy panu podatku - DefaultClanFinanceModel.CalculateVillageIncome), wioska gracza spalona, pan nie bierze podatku, wioska
+    wytwarza dzis za malo (< 0,5 - np. zima; po recenzji osobny powod), stawka nieznana; powod po angielsku (Fiefs, menu) i po polsku (log).
+  - `Expect` (po recenzji) - widok dochodu (podpowiedz zlota, Fiefs, menu): naleznosc obcieta do tego, co pan ma teraz (`LordCanPay`: licznik podatku wsi + kiesa
+    glowy rodu), z powodem "Its lord has only N to give today." / "Its lord has no money to pay it today." Pieniadze plyna tylko z Pay.
   - `Pay()` w `Daily()` (OnDailyTick, przed srednia i linia doby): naleznosc z licznika podatku pana wsi gry okregu (`TradeTaxAccumulated` - podatek z wozow, ktorego
-    pan jeszcze nie zebral; gra zbiera z niego 1/5 dziennie, wiec zwykle jest tam kilka dob podatku), reszta z kiesy glowy rodu pana; brak u obu - "brak u pana"
-    (nic z niczego). `ChangeHeroGold` gracza o sume.
+    pan jeszcze nie zebral), reszta z kiesy glowy rodu pana; brak u obu - "brak u pana" (nic z niczego). `ChangeHeroGold` gracza o sume. POPRAWKA PO RECENZJI: z BK
+    pan zbiera licznik wsi codziennie w 80-100% (BannerKings EconomyPatches -> BKTaxModel.CalculateVillageTaxFromIncome: `TradeTaxAccumulated * num`, num 1.0 albo
+    0.8, potem pobranie), a nie 1/5 jak waniliowe DefaultClanFinanceModel - wiec zwykle placi glownie KIESA pana ("z kiesy pana" w linii doby), licznik to resztka.
   - `AtCart` - BEZ przelewu (inaczej podwojnie), tylko licznik wozow okregu i podatku z ich okien (teraz liczony zawsze - log odroznia "brak wozu"). Zwraca 0.
   - `GoldTipPostfix` - linia "<wioska> (your side village: its share of the lord's tax)" z naleznoscia dnia (nie srednia).
   - Menu wioski i "Look over" - dochod dnia albo powod; opis "How it pays" i okno nadania - "every day" zamiast "when the carts come back".
-  - Linia doby: `| dochod dnia (r4): nalezne N (wartosc wioski V x stawka pana R%), z licznika podatku pana A, z kiesy pana B, brak u pana C, do gracza D ...`;
+  - Linia doby: `| dochod dnia (r4): nalezne N (wartosc wioski V x H h x stawka pana R%), z licznika podatku pana A, z kiesy pana B, brak u pana C, do gracza D ...`;
     w czesci latek: `zakladka Fiefs: tekst wpiety/BRAK, lista - <stan UIExtenderEx>, klucz WL/WYL`.
-  - Test autotestu: nowy T11 "dochod dnia i zakladka Fiefs" (naleznosc > 0 od razu i tekst zakladki).
+  - Test autotestu: nowy T11 "dochod dnia i zakladka Fiefs" (naleznosc > 0 od razu, tekst zakladki i - po recenzji - rejestracja wstawki i mixinu UIExtenderEx
+    przy kluczu WL; wygladu bloku test nie sprawdza).
+  - `DistrictWorks.cs` (po recenzji): `HandedRatio(v, vd)` - wewnetrzny dostep do HOf (H okregu), bez zmiany zachowania prac okregu.
   - `NoFiefsPostfix` (Harmony, EnsureHooks): postfiks `ClanFiefsVM.RefreshValues` (metoda bazowa - takze NavalClanFiefsVM, ktory jej nie nadpisuje) - przy wiosce
     gracza prawa czesc zakladki (widoczna tylko bez miast i zamkow) mowi "Your clan holds no towns or castles. Your side village: X - lands of Y, sworn to House Z.
     Income: about N a day ..." zamiast "Clan Does Not Own Any Fiefs". Bez UIExtenderEx.
@@ -61,8 +69,8 @@ gracza 0".
   panie (swiadomie - patrz decyzje). Model finansow: linia podpowiedzi tylko przy includeDescriptions i bez pobrania (jak dotad), saldo doby gry bez zmian.
 - Zamknieta ekonomia: licznik podatku wsi i kiesy bohaterow sa w "Pieniadz swiata" (MoneyLedger.Holders: HVillageTax, HLeaders, HPlayer) - przelew poza oknem wozu,
   suma swiata bez zmian; brak pieniedzy u pana = brak wyplaty (licznik "brak u pana"), nie zloto z niczego.
-- Cudzy kod sprawdzony w dekompilacji: DefaultClanFinanceModel.CalculateVillageIncome (1/5 licznika dziennie, Looted/BeingRaided = 0), ROTClanFinanceModel (przekazuje
-  do BK), BKClanFinanceModel (bez CalculateVillageIncome), ClanFiefsVM (konstruktor, RefreshValues, NoFiefsText, RefreshAllLists), NavalClanFiefsVM (tylko
+- Cudzy kod sprawdzony w dekompilacji: DefaultClanFinanceModel.CalculateVillageIncome (1/5 licznika dziennie, Looted/BeingRaided = 0) - z BK zastapione przez
+  EconomyPatches (AddSettlementIncome -> CalculateVillageTaxFromIncome, 80-100% licznika dziennie; sprawdzone po recenzji), ROTClanFinanceModel (przekazuje do BK), BKClanFinanceModel (bez CalculateVillageIncome), ClanFiefsVM (konstruktor, RefreshValues, NoFiefsText, RefreshAllLists), NavalClanFiefsVM (tylko
   CreateSettlementItem), ClanFiefs.xml (CastlesList, NoFiefsText), UIExtenderEx ViewModelComponent (handleDerived), ViewModelWithMixinPatch (OnRefresh po RefreshValues
   i z konstruktora), UIExtender.Register (osobna nazwa = osobna instancja), ExplainedNumber.Add (0 = bez linii - dlatego powod zera nie w podpowiedzi zlota).
 - UI (najwieksze ryzyko): wstawka i mixin NIE byly widziane w grze. Gauntlet przy zlej nazwie pedzla / wiazaniu loguje, nie wywraca; mixin w try. Jesli UIExtenderEx
@@ -73,10 +81,12 @@ gracza 0".
 **Status: DO SPRAWDZENIA** (zbudowane: Armoury 0 bledow, kod wyjscia 0; autotest nie uruchamiany - Jeff gra; nic nie wgrane).
 
 **Decyzje (podjete samodzielnie; wylaczniki `Side Village Fief Income`, `Side Village Fief Clan Tab`).**
-1. Podstawa dochodu: podatek pana od wartosci produkcji wioski (wartosc dnia x stawka modelu podatku wsi) - "to, co pan bierze z tej wioski" w naszej ekonomii, znane od
-   1. doby. Nie mierzony podatek z wozow (woz okregu co ok. 8 dob - dochod skakalby i zaczynal sie po tygodniu).
+1. Podstawa dochodu: podatek pana od utargu z produkcji wioski (wartosc dnia x H okregu x stawka modelu podatku wsi) - "to, co pan bierze z tej wioski" w naszej
+   ekonomii, znane od 1. doby. Nie mierzony podatek z wozow (woz okregu co ok. 8 dob - dochod skakalby i zaczynal sie po tygodniu). Po recenzji z H (podatek nalicza
+   sie od utargu oddanego przez woz, ok. 87% wartosci) - bez H gracz dostawalby ok. 15% wiecej, niz pan ma z tej wioski.
 2. Zrodlo: najpierw licznik podatku pana wsi gry okregu (pieniadz z utargow okregu, jeszcze nie zebrany), potem kiesa glowy rodu pana (tam trafia zebrany podatek) - tak,
-   by dochod plynal codziennie takze w pierwszych dobach nowej kampanii, gdy licznik bywa pusty. Kiesa wsi okregu NIE (wtedy placilaby wies, a nie pan).
+   by dochod plynal codziennie. Z BK licznik jest zwykle prawie pusty (pan zbiera go codziennie), wiec w praktyce placi kiesa pana - to ten sam pieniadz (zebrany
+   podatek okregu), decyzja bez zmian. Kiesa wsi okregu NIE (wtedy placilaby wies, a nie pan).
 3. Czynsz staly DS (W3, ok. 20 zl na wies na dobe) i daniny DS (dziesiecina, korona) zostaja przy panie / wsi - udzial gracza bylby ok. 2 zl, a liczylby drugi raz te sama
    wioske.
 4. Bez zaleglosci: dzien bez pieniedzy u pana przepada (licznik "brak u pana"), nie roszczenie na pozniej.
@@ -86,10 +96,24 @@ gracza 0".
 **Test w grze.**
 - Autotest 5 dob na zapisie autotest-F-d240 z plikiem `Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-wioska-gracza.flag` (usunac po biegu):
   - `Wioska gracza (n20): zakladka Fiefs (UIExtenderEx) - wstawka ClanFiefs i mixin ClanFiefsVM (z pochodnymi) zarejestrowane (...)` przy starcie gry;
-  - linia testu `wynik TAK 11, NIE 0` - w tym `T11 dochod dnia i zakladka Fiefs TAK (nalezne N (wartosc wioski V x stawka pana R%), Fiefs: Side villages (1) | ... | Income: about N a day ...)`;
-  - KAZDA linia doby `Wioska gracza (n20): dzien N | ...` z wioska: `dochod dnia (r4): nalezne N > 0 (...)`, `do gracza D` z D > 0 (D = A + B, "brak u pana 0"),
+  - linia testu `wynik TAK 11, NIE 0` - w tym `T11 dochod dnia i zakladka Fiefs TAK (nalezne N (wartosc wioski V x H 0.87 x stawka pana R%), Fiefs: Side villages (1) | ... | Income: about N a day ..., lista - wstawka ClanFiefs i mixin ClanFiefsVM (z pochodnymi) zarejestrowane (...))`;
+  - KAZDA linia doby `Wioska gracza (n20): dzien N | ...` z wioska: `dochod dnia (r4): nalezne N > 0 (wartosc wioski V x H h x stawka pana R%)`, `do gracza D` z D > 0
+    (D = A + B, "brak u pana 0"; z BK zwykle A male, B prawie calosc), dla Greenton ok. 8,
     `zakladka Fiefs: tekst wpiety, lista - wstawka ... zarejestrowane, klucz WL`; potkniecia 0;
   - "Pieniadz swiata" i "Utarg wsi (112)" bez nowego "zniklo".
 - U Jeffa po wgraniu (gra zamknieta, kopia): wczytac zapis z Seven Elms - po pierwszym nowym dniu linia doby z "do gracza" > 0; podpowiedz zlota "Seven Elms (your side
   village: its share of the lord's tax) +N"; ekran rodu -> Fiefs: po prawej "Your clan holds no towns or castles. Your side village: Seven Elms - lands of Mudgrave, sworn
-  to House Paege. Income: about N a day ...", po lewej pod "Castles (0)" blok "Side villages (1)" z ta sama nazwa i dochodem.
+  to House Paege. Income: about N a day ...", po lewej pod "Castles (0)" blok "Side villages (1)" z ta sama nazwa i dochodem. Wyglad bloku (i czy przyklejony
+  przycisk Castles nie wisi nad nim przy przewijaniu) - tylko recznie, autotest go nie widzi.
+
+**Recenzja (20.10, HEAD 9c7db590: 0 krytycznych, 0 waznych, 6 drobnych) - wszystkie prawdziwe, wszystkie poprawione.**
+1. Zrodlo wyplaty z BK (sprawdzone w dekompilacji BannerKings: EconomyPatches `village.TradeTaxAccumulated -= MathF.Min(village.TradeTaxAccumulated, income)`,
+   BKTaxModel `TradeTaxAccumulated * num`): opis poprawiony (glownie kiesa pana); widok dochodu `Expect` obciety do tego, co pan ma (licznik + kiesa), z powodem;
+   cache Due liczony od nowa przy zmianie podpisu bramek (`DueSig` - wojna wypowiedziana w ciagu dnia nie pokazuje juz +N).
+2. Dwie kropki w prawej czesci Fiefs: `i.TrimEnd('.', ' ') + "."`.
+3. Mylny powod przy malej produkcji: osobno "stawka pana 0" / "brak wartosci" / "za mala wartosc dnia" ("Your village makes too little today to owe the lord
+   anything.").
+4. Stawka 100% przy wyjatku modelu (DsVillage.VillageShareOfTakings daje 0 przy wyjatku): `LordRate` we wlasnym try, wyjatek = stawka nieznana, dochod 0 ("Its
+   lord's tax is not known today.", w logu "stawka pana nieznana").
+5. Podstawa od wartosci, nie od utargu: x H okregu (`DistrictWorks.HandedRatio` = HOf, ta sama liczba co okno prac), w linii doby "x H h".
+6. T11 obiecywal za duzo: warunek takze `SideVillageFiefUi.State` = "wstawka ..." (przy kluczu WL), stan w szczegolach testu; wyglad - tylko recznie.

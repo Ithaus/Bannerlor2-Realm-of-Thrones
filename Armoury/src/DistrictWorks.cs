@@ -325,6 +325,9 @@ namespace Armoury
             catch (Exception e) { Stumble("QuotesOf", e); into.Clear(); return false; }
         }
 
+        /// <summary>r4-wioska (recenzja): H okregu dla dochodu wioski pobocznej gracza (SideVillageFief.Due) - ta sama liczba co okno prac (QuotesOf: vd = suma ValDay czesci).</summary>
+        internal static double HandedRatio(Village v, double vd) { return v != null && v.Settlement != null ? HOf(v, vd) : DefaultH; }
+
         /// <summary>H okregu (F10): utarg oddany przy wozach / wartosc produkcji dnia - zmierzone (okreg z pracami), inaczej srednia swiata 0.868.</summary>
         private static double HOf(Village v, double vd)
         {
