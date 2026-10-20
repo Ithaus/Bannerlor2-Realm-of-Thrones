@@ -129,6 +129,8 @@ namespace Armoury
                 }
 
                 int gold = 0, movedArm = 0, movedBag = 0;
+                try
+                {
                 // (1) jezdzcy bez konia - do zbrojowni DTE partii
                 if (lack > 0)
                 {
@@ -165,22 +167,18 @@ namespace Armoury
                         avail[k] -= got; cap -= got; movedBag += got;
                     }
                 }
+                }
+                finally
+                {
+                    // zaplata za to, co naprawde przeszlo - takze gdy przenoszenie przerwal wyjatek (zamknieta ekonomia: kon od innego rodu zawsze oplacony)
+                    if (!own && gold > 0) Pay(lord, payee, clan, gearRule, gold);
+                }
                 _dToQueue += movedBag;
 
                 int moved = movedArm + movedBag;
                 if (moved > 0)
                 {
-                    if (own) _dOwn += moved;
-                    else
-                    {
-                        _dPaidN += moved;
-                        if (gold > 0)
-                        {
-                            TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(lord, payee, gold, true);
-                            _dGold += gold;
-                            if (gearRule) ClanBudget.GearSpent(clan, gold);
-                        }
-                    }
+                    if (own) _dOwn += moved; else _dPaidN += moved;
                     HorseState.Refresh(party);
                     HorseState.Refresh(gar);
                 }
@@ -241,6 +239,8 @@ namespace Armoury
                     if (budget < 50) { _dNoBudget++; return; }
                 }
                 int done = 0, gold = 0;
+                try
+                {
                 while (done < n)
                 {
                     ItemObject best = null; int bestCnt = 0;
@@ -266,21 +266,32 @@ namespace Armoury
                     if (!own) { budget -= price * take; gold += price * take; }
                     done += take;
                 }
+                }
+                finally
+                {
+                    if (!own && gold > 0) { Pay(lord, payee, clan, gearRule, gold); _dHGold += gold; }
+                }
                 if (done <= 0) return;
                 _dHarness += done;
                 if (own) _dHOwn += done;
-                else if (gold > 0)
-                {
-                    TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(lord, payee, gold, true);
-                    _dHGold += gold; _dGold += gold;
-                    if (gearRule) ClanBudget.GearSpent(clan, gold);
-                }
             }
             catch (Exception e)
             {
                 _stumbles++; _stumblesAll++;
                 if (_stumbles == 1) Log.Error("GarrisonHorses.GiveHarness", e);
             }
+        }
+
+        /// <summary>Inny rod krolestwa: pan partii placi glowie rodu pana twierdzy (przelew miedzy bohaterami), kwota schodzi z przydzialu sprzetu rodu (F5).</summary>
+        private static void Pay(Hero lord, Hero payee, Clan clan, bool gearRule, int gold)
+        {
+            try
+            {
+                TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(lord, payee, gold, true);
+                _dGold += gold;
+                if (gearRule) ClanBudget.GearSpent(clan, gold);
+            }
+            catch (Exception e) { _stumbles++; _stumblesAll++; if (_stumbles == 1) Log.Error("GarrisonHorses.Pay", e); }
         }
 
         private static int Pick(int[] avail, int[] order)
