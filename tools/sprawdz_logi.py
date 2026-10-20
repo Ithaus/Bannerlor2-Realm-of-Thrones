@@ -15714,17 +15714,13 @@ def etap8_p3woj(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         elif p3:
             rep.add("P3W3-2: kontrakty najemnikow: nalezne za ludzi pod bronia", "klucz Merc Contract Pays Men Under Arms wylaczony albo brak pola", "klucz wlaczony", False)
         mn = avg([num(r"ludzie najemnikow AI (\d+) / z umowy", k185[d]) for d in tail(k185)])
-        # n22f-najemnicy (poprawki fali 1, 20.10): prog 2 000 jest z biegu rocznego (2 531 w d337-364, srednia roku 2 231) - wiaze przy oknie >= 337 dob,
-        # jak inne liczby "d337-364" tej funkcji (docstring). W krotszym oknie kompanie dopiero rosna (d1-28 ok. 1 000), a sr28 to stan wojen i werbunku,
-        # nie marzy: 24 biegi 120-160 dob (17-20.10) daja 1 679 - 2 421 (nowa kampania 120 dob: 2 236, 2 114, 2 153, 2 142, 1 869 WGRANIE 92, 1 679 fala 1;
-        # z zapisu d240, 120 dob, 6 buildow 17.10: 1 763 - 2 326; z zapisu d240, 160 dob, 12 buildow: ok. 2 130 - 2 420, srednia d29-161 2 071 +-105,
-        # fala 1 2 081), przy kiesach kompanii ok. 200 tys. zl i zoldzie 55-65% pulapu 166 (zloto nie wiaze - wiersz P3W3-3b). W krotszym oknie wiaze
-        # podloga 1 500: ponizej kazdego z 24 biegow, a zalamanie kompanii
-        # (C1-m: -79%) albo marza, ktora nie starcza, daje duzo mniej.
-        mfloor = 2000 if year else 1500
-        rep.add("P3W3-3: ludzie najemnikow AI (sr28)", fmt(mn), ">= 2 000 w biegu rocznym (przed paczka 2 531 w d337-364; mniej = marza 0.30 nie starcza kompaniom);"
-                " krotsze okno >= 1 500 (zmiennosc biegow 120-160 dob: 1 679 - 2 421 - wojny i werbunek, nie marza)",
-                (mn >= mfloor) if (p3 and mn is not None) else None)
+        # n22f-najemnicy (recenzja 20.10): prog 2 000 wiaze w kazdym oknie, takze w biegu 120 dob - tak zamierzyl wpis P3/W3-B (CHANGELOG: "Sprawdzic w
+        # biegu: ... 'ludzie najemnikow AI' >= 2 000" obok liczb d1-120); to nie jest liczba "d337-364" z docstringu, wiec bez warunku year. Pojedynczy bieg
+        # ma duzy rozrzut: z tego samego zapisu d240 przy kodzie WGRANIA 92 n21160 i n22a160 roznily sie w oknach 28 dob d29-112 o 260-510 ludzi; nowa kampania
+        # 120 dob: 2 236, 2 114, 2 153, 2 142 (przed 92), 1 869 i 1 679 (92, oba z plikiem armoury-start-zloto.flag). NIE czytac razem z P3W3-3b i P3W3-4.
+        rep.add("P3W3-3: ludzie najemnikow AI (sr28)", fmt(mn), ">= 2 000 (przed paczka 2 531 w d337-364; mniej = marza 0.30 nie starcza kompaniom albo straty"
+                " w wojnach i werbunek - czytac P3W3-3b i P3W3-4)",
+                (mn >= 2000) if (p3 and mn is not None) else None)
 
     # ---- W4: wezwania do wojny (168)
     if c168:
@@ -15805,15 +15801,24 @@ def etap8_p3woj(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     rate = (mg1 - mg0) / max(1, len(days) - 1)
     rep.add(f"P3W3-4: kiesy {len(mids)} kompanii najemnych: pierwsza -> ostatnia doba okna (przyrost na dobe)", f"{mg0} -> {mg1} ({rate:+.0f} zl/d)",
             "<= +10 000 zl/d (przed paczka 2.87 -> 20.60 mln w roku = +48.7 tys. zl/d; rachunek po A i B ok. +4.5 tys. zl/d)", (rate <= 10000) if p3 else None)
-    # n22f-najemnicy: czy kompanie hamuje zloto (marza 0.30), czy wojna i werbunek - ludzie wobec limitu partii, zold wobec pulapu 166 (CapOf = zold z umowy),
-    # kiesa na kompanie (sr28 wierszy "najemnik"). Biegi 19-20.10: ludzie 23-35% limitu, zold 55-65% pulapu, kiesa ok. 200 tys. zl - zloto nie wiaze.
+    # n22f-najemnicy (recenzja 20.10): co trzyma kompanie (sr28 wierszy "najemnik") - ludzie wobec limitu partii i wobec ludzi z umowy (linia 185);
+    # kompanie przy pulapie SWOJEJ umowy (zold partii >= 0.9 pulapu 166; pulap = zold ludzi z umowy, przeglad co 28 dob tnie go tylko w dol - kompania
+    # po stratach moze stac na pulapie mimo luzu w sumie); zold / pulap razem; kiesa na kompanie. Biegi 19-20.10: ludzie 25-32% limitu, 0.64-0.79 ludzi
+    # z umowy, 22-33% wierszy przy pulapie umowy (tyle samo w biegach niskich i wysokich), zold 62-78% pulapu razem, kiesa ok. 200-290 tys. zl.
     mt = [r for d in t for r in byd[d] if r.get("rodzaj") == "najemnik"]
     if mt:
         mm, ml = sum(ival(r, "ludzi_partie") for r in mt), sum(ival(r, "limit_partii") for r in mt)
         mw, mc, mgs = sum(ival(r, "zold_partii") for r in mt), sum(ival(r, "pulap") for r in mt), sum(ival(r, "G") for r in mt)
-        rep.add("P3W3-3b: kompanie w sluzbie (sr28): ludzie / limit partii, zold / pulap 166, kiesa na kompanie",
-                f"{mm / len(t):.0f} / {ml / len(t):.0f} ({100.0 * mm / max(1, ml):.0f}%), {mw / len(t):.0f} / {mc / len(t):.0f} zl ({100.0 * mw / max(1, mc):.0f}%), {mgs / len(mt):.0f} zl ({len(mt) / len(t):.1f} kompanii)",
-                "INFO (przy P3W3-3 NIE: zold blisko pulapu albo kiesy na wyczerpaniu = marza; luz w obu = wojny i werbunek - zmiennosc biegu)", None)
+        atc = [r for r in mt if ival(r, "pulap") > 0 and ival(r, "zold_partii") >= 0.9 * ival(r, "pulap")]
+        kn = avg([num(r"ludzie najemnikow AI (\d+) / z umowy", k185[d]) for d in tail(k185)]) if k185 else None
+        ku = avg([num(r"z umowy \(w pokoju polowa\) (\d+)", k185[d]) for d in tail(k185)]) if k185 else None
+        rep.add("P3W3-3b: kompanie w sluzbie (sr28): ludzie / limit partii, ludzie / z umowy (185), przy pulapie umowy (zold >= 90%), zold / pulap 166, kiesa na kompanie",
+                f"{mm / len(t):.0f} / {ml / len(t):.0f} ({100.0 * mm / max(1, ml):.0f}%), "
+                + (f"{kn:.0f} / {ku:.0f} ({kn / ku:.2f}), " if (kn is not None and ku) else "- / -, ")
+                + f"przy pulapie {len(atc)} z {len(mt)} wierszy ({100.0 * len(atc) / len(mt):.0f}%, ludzi {sum(ival(r, 'ludzi_partie') for r in atc) / len(t):.0f}), "
+                f"{mw / len(t):.0f} / {mc / len(t):.0f} zl ({100.0 * mw / max(1, mc):.0f}%), {mgs / len(mt):.0f} zl ({len(mt) / len(t):.1f} kompanii)",
+                "INFO (przy P3W3-3 NIE: kiesy na wyczerpaniu albo zold przy pulapie w sumie = marza; duzo wierszy przy pulapie umowy przy luzie w sumie = pulap"
+                " po przegladzie w dol trzyma te kompanie; luz we wszystkim = straty w wojnach i werbunek - porownac z biegiem bazowym tego samego startu)", None)
 def etap8_p3_zelazo(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """P3/ZELAZO (TRIAZ-3 bieg roczny 13.10, obszar "zelazo": O2-1 kontrakt wozem Z1 + pomiary P2, O2-2 bezpiecznik regulatora Z2, O2-3 zamki Z3-A / Z3-B,
     O2-7 towar kasowany lordom Z4). Linie: "Kontrakty surowca (174)" (wstawka "wozem kupcow (P3/Z1)"), "Zelazo wedlug ladow (P3/P2a)", "Miasta bez rudy i
