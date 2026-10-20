@@ -3424,5 +3424,9 @@ szybki test po wgraniu: testy-94q.ps1 (bitwa 5 dob x4 + nowa 8 dob, DLL test/n23
 DO ZROBIENIA: dlugi autotest 94 (bitwa + nowa ok. 180 dob z A7, porownanie progow z n22c) - gdy Jeff zamknie gre albo w nocy; grupy p6* (PO-*, SP-*, SZB-*, PP-*, AD-*,
 MS-*, p6a7), bramka krainy KS przy spichlerzu (Vaes Diaf, New Ghys, Vaes Dothrak, Yronwood), naprawy AI ok. 1100/d i zaleglosc obitych, lukarze/krawcy (n22b nizej -
 przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok. 40 dobach). NOC 20/21.10: docs/ZADANIA-OBOZ-NOC.md, potem docs/PLAN-OPTYMALIZACJA-NOC.md.- 10:21 PDT szybki test 94 (na wgranych DLL): 94q-bitwa 4/4 bitwy kod 0, 94q-nowa 8/8 dob kod 0; Armoury 0 ERROR w obu; linie fali 2 sa (okup start, spichlerz,
-  szubienice, pola, AI drogi, sztormy, A7); zawieszenia tylko przy wyjsciu z gry. safely_exited = 1. -> Jeff: "graj" (nowa kampania na 94).
+  szubienice, pola, AI drogi, sztormy, A7); zawieszenia tylko przy wyjsciu z gry. safely_exited = 1. -> Jeff: "graj" (nowa kampania na 94).- 10:55 PDT Jeff gra nowa kampanie na 94 (Seagard). Obserwator sesji: scratchpad f59fb043 straz-jeffa.sh (bledy naszych modow, zawieszenia w kampanii, wywrotki;
+  kopia logow co 10 min do D:/Backup-Bannerlord/logi-jeffa/2026-10-20). Jeff: "gram dalej monitoruj sesje i wyciagaj bledy jesli sa aby potem poprawic".
+  NOWE ZADANIA (Jeff ze zrzutem menu Seagard, "robic w tle i potem wgramy"): (1) MENU MIASTA uporzadkowac - za duzo opcji; nocleg w karczmie pod "Go to the tavern district",
+  wszystko kuzni pod jedna zakladka kuzni (wyjasnione po kolei), reszta pogrupowana; (2) ZAJAZD: po wejsciu gracz znika z mapy jak we wsi + odglosy karczmy.
+  Galezie w-toku/m95-menu, w-toku/m95-zajazd od e35e6f99 (= WGRANIE 94), workflow -> test po zamknieciu gry -> WGRANIE 95.
 
