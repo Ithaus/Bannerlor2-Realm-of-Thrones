@@ -60,9 +60,79 @@ public static class Program
     // bajty kodu natywnego od startu metody (tylko odczyt, diagnoza ukladu)
     static string Bytes(System.Reflection.MethodBase m, int n) { var sb = new System.Text.StringBuilder(); IntPtr p = m.MethodHandle.GetFunctionPointer(); for (int i = 0; i < n; i++) sb.Append(System.Runtime.InteropServices.Marshal.ReadByte(p, i).ToString("X2")).Append(' '); return "@" + p.ToString("X") + ": " + sb; }
 
+    // wariant L: rdzen UnwindCore na swiezych metodach (bez wywolania), naprawa, zdjecie i ponowne zalozenie latki, wspolny blok trampolin
+    static int Lambda(int x) { return x; }
+    [MethodImpl(MethodImplOptions.NoInlining)] public static void StaticTiny() { }
+    static Target _lt;
+    // cel skoku E9 na starcie metody; jesli prowadzi do naszej trampoliny (FF 25 00000000 + adres) - adres z trampoliny
+    static long FinalTarget(IntPtr st)
+    {
+        long t = st.ToInt64() + 5 + System.Runtime.InteropServices.Marshal.ReadInt32(st, 1);
+        if (System.Runtime.InteropServices.Marshal.ReadByte((IntPtr)t) == 0xFF && System.Runtime.InteropServices.Marshal.ReadByte((IntPtr)t, 1) == 0x25 && System.Runtime.InteropServices.Marshal.ReadInt32((IntPtr)t, 2) == 0)
+            t = System.Runtime.InteropServices.Marshal.ReadInt64((IntPtr)t, 6);
+        return t;
+    }
+    static string Line(string what, System.Reflection.MethodBase m)
+    {
+        IntPtr st; int off, n;
+        int nt = CrashScribe.UnwindCore.NativeTiny(m);   // najpierw - kompiluje metode
+        bool ok = CrashScribe.UnwindCore.Locate(m.MethodHandle.GetFunctionPointer(), m.MethodHandle.Value, out st, out off, out n);
+        return what + ": NativeTiny " + nt + ", naglowek " + ok + ", opis stosu +" + off + ", RUNTIME_FUNCTION " + n + " | " + Bytes(m, 12);
+    }
+    static int LocateTest()
+    {
+        var tiny = AccessTools.DeclaredMethod(typeof(Target), nameof(Target.Tiny));
+        var stat = AccessTools.DeclaredMethod(typeof(Program), nameof(StaticTiny));
+        var lam = AccessTools.DeclaredMethod(typeof(Program), nameof(Lambda));
+        var non = AccessTools.DeclaredMethod(typeof(Target), nameof(Target.NonTiny));
+        Console.WriteLine(Line("Tiny (wirtualna, nie wolana)", tiny));
+        Console.WriteLine(Line("StaticTiny (statyczna, nie wolana)", stat));
+        Console.WriteLine(Line("Lambda x=>x", lam));
+        Console.WriteLine(Line("NonTiny", non));
+        var h = new Harmony("uw.L");
+        var post = new HarmonyMethod(typeof(Patches), nameof(Patches.Post));
+        int bad = 0;
+        _lt = Make("");   // wywolanie wirtualne przez pole - JIT nie zinlinuje
+        foreach (var m in new System.Reflection.MethodBase[] { tiny, stat })
+        {
+            h.Patch(m, postfix: post);
+            IntPtr st; int off, n; string why;
+            CrashScribe.UnwindCore.Locate(m.MethodHandle.GetFunctionPointer(), m.MethodHandle.Value, out st, out off, out n);
+            var s = new CrashScribe.UnwindCore.Small { Name = m.Name, Start = st, Off = off, NUnw = n };
+            Console.WriteLine(m.Name + " z latka: " + Bytes(m, 12) + " | NeedsCheck " + CrashScribe.UnwindCore.NeedsCheck(s));
+            long before = FinalTarget(st);
+            var r1 = CrashScribe.UnwindCore.Check(s, out why);
+            long after = FinalTarget(st);
+            Console.WriteLine(m.Name + " cel skoku przed " + before.ToString("X") + ", po naprawie (przez trampoline) " + after.ToString("X") + (before == after ? " - TEN SAM" : " - ROZNY!"));
+            if (before != after) bad++;
+            var r2 = CrashScribe.UnwindCore.Check(s, out why);
+            Console.WriteLine(m.Name + " naprawa " + r1 + " (" + (why ?? "ok") + "), drugi raz " + r2 + ", NeedsCheck " + CrashScribe.UnwindCore.NeedsCheck(s) + " | " + Bytes(m, 12));
+            if (r1 != CrashScribe.UnwindCore.R.Repaired || r2 != CrashScribe.UnwindCore.R.AlreadyOk) bad++;
+            long hits = Patches.Hits;
+            if (m == tiny) _lt.Tiny(); else StaticTiny();
+            Console.WriteLine(m.Name + " wywolanie po naprawie: postfix trafien +" + (Patches.Hits - hits));
+            if (Patches.Hits - hits != 1) bad++;
+            // zdjecie latki (MonoMod przywraca kopie oryginalnych bajtow) i ponowne zalozenie
+            h.Unpatch(m, HarmonyPatchType.All, h.Id);
+            Console.WriteLine(m.Name + " po zdjeciu latki: " + Bytes(m, 12) + " | NeedsCheck " + CrashScribe.UnwindCore.NeedsCheck(s) + ", Check " + CrashScribe.UnwindCore.Check(s, out why));
+            h.Patch(m, postfix: post);
+            Console.WriteLine(m.Name + " latka ponownie: " + Bytes(m, 12) + " | NeedsCheck " + CrashScribe.UnwindCore.NeedsCheck(s));
+            var r3 = CrashScribe.UnwindCore.Check(s, out why);
+            hits = Patches.Hits;
+            if (m == tiny) _lt.Tiny(); else StaticTiny();
+            Console.WriteLine(m.Name + " naprawa po ponownej latce " + r3 + " (" + (why ?? "ok") + "), postfix trafien +" + (Patches.Hits - hits) + " | " + Bytes(m, 12));
+            if (r3 != CrashScribe.UnwindCore.R.Repaired || Patches.Hits - hits != 1) bad++;
+        }
+        h.UnpatchAll(h.Id);
+        Console.WriteLine("UnpatchAll bez wyjatku; Tiny " + Bytes(tiny, 12) + "; blokow trampolin " + CrashScribe.UnwindCore.Blocks);
+        Console.WriteLine(bad == 0 ? "L: WSZYSTKO ZGODNE" : "L: NIEZGODNOSCI " + bad);
+        return bad == 0 ? 0 : 4;
+    }
+
     public static int Main(string[] args)
     {
         string v = args.Length > 0 ? args[0] : "A";
+        if (v == "L") return LocateTest();
         int seconds = args.Length > 1 ? int.Parse(args[1]) : 300;
         int allocThreads = args.Length > 2 ? int.Parse(args[2]) : 3;
         Target t = Make(args.Length > 3 ? args[3] : "");
@@ -90,10 +160,12 @@ public static class Program
         {
             var tmd = AccessTools.DeclaredMethod(typeof(Target), nameof(Target.Tiny));
             RuntimeHelpers.PrepareMethod(tmd.MethodHandle);
-            IntPtr st = tmd.MethodHandle.GetFunctionPointer();
-            string why;
-            IntPtr resolved; var r = UnwindRepairCore.Repair(st, tmd.MethodHandle.Value, out why, out resolved);
-            Console.WriteLine("NAPRAWA " + r + " (" + (why ?? "ok") + ") | Tiny po naprawie " + Bytes(tmd, 12));
+            IntPtr st; int off, n; string why;
+            bool found = CrashScribe.UnwindCore.Locate(tmd.MethodHandle.GetFunctionPointer(), tmd.MethodHandle.Value, out st, out off, out n);
+            var sm = new CrashScribe.UnwindCore.Small { Name = "Tiny", Start = st, Off = off, NUnw = n };
+            var r = found ? CrashScribe.UnwindCore.Check(sm, out why) : CrashScribe.UnwindCore.R.SkipError;
+            var r2 = found ? CrashScribe.UnwindCore.Check(sm, out why) : CrashScribe.UnwindCore.R.SkipError;
+            Console.WriteLine("NAPRAWA naglowek " + found + " off " + off + " n " + n + " -> " + r + ", drugi raz " + r2 + " | Tiny po naprawie " + Bytes(tmd, 12));
         }
         Console.WriteLine("START wariant " + v + " czas " + seconds + " s, watki alokujace " + allocThreads + ", Environment.OSVersion " + Environment.OSVersion + ", CLR " + Environment.Version);
         Console.Out.Flush();

@@ -17,7 +17,8 @@ namespace CrashScribe
     {
         [ThreadStatic] private static bool _inside;
         private static int _wrapped;
-        private static int _skippedTiny;   // UW: metody pominiete przez Patchable jako za male na skok Harmony (licznik od startu gry)
+        private static int _skippedTiny;   // UW: metody pominiete przez Patchable - kod JIT 1-4 B (skok Harmony nakrylby opis stosu); licznik od startu gry
+        private static int _skippedIlOnly; // UW: male IL, ale naglowka kodu nie dalo sie odczytac - pominiete ostroznie wedlug samego IL (jak w etapie 1)
 
         // AUDYT 13.10 (siec): oba finalizatory BEZ parametru "MethodBase __originalMethod". Harmony wyliczal go przy
         // KAZDYM wywolaniu zalatanej metody (ldtoken + MethodBase.GetMethodFromHandle: nowy RuntimeMethodInfo 240 B,
@@ -123,7 +124,7 @@ namespace CrashScribe
             var fin = new HarmonyMethod(typeof(Net).GetMethod("ModFinalizer",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public));
 
-            int tinyStart = _skippedTiny;
+            int tinyStart = _skippedTiny, ilStart = _skippedIlOnly;
             var tinyBy = new System.Text.StringBuilder();
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -135,21 +136,26 @@ namespace CrashScribe
                 if (mod == null || mod == "Native") continue;
                 if (wanted.Count > 0 && !wanted.Contains(mod)) continue;
 
-                int before = _wrapped, tinyBefore = _skippedTiny;
+                int before = _wrapped, tinyBefore = _skippedTiny, ilBefore = _skippedIlOnly;
                 WrapAssembly(harmony, asm, fin);
                 Scribe.Line("Net cast over " + mod + " (" + asmName + "): " + (_wrapped - before) + " methods.");
+                int t = _skippedTiny - tinyBefore, u = _skippedIlOnly - ilBefore;
+                if (t == 0 && u == 0) continue;
                 if (tinyBy.Length > 0) tinyBy.Append(", ");
-                tinyBy.Append(mod).Append(' ').Append(_skippedTiny - tinyBefore);
+                tinyBy.Append(mod).Append(' ').Append(t);
+                if (u > 0) tinyBy.Append(" (+").Append(u).Append(" wg IL)");
             }
-            TinyLine("siec modow", _skippedTiny - tinyStart, tinyBy.ToString());
+            TinyLine("siec modow", _skippedTiny - tinyStart, _skippedIlOnly - ilStart, tinyBy.ToString());
         }
 
-        /// <summary>UW: jedna linia po zalozeniu sieci - ile metod pominieto jako za male na skok Harmony.</summary>
-        private static void TinyLine(string what, int n, string detail)
+        /// <summary>UW: jedna linia po zalozeniu sieci - ile metod pominieto jako za male na skok Harmony (kod JIT 1-4 B)
+        /// i ile ostroznie wedlug samego IL (naglowek kodu nieczytelny).</summary>
+        private static void TinyLine(string what, int n, int ilOnly, string detail)
         {
             try
             {
-                Scribe.Line("Net (UW): " + what + " - male metody bez sieci (IL <= " + Config.NetTinyIlBytes + " B): " + n
+                Scribe.Line("Net (UW): " + what + " - male metody bez sieci (kod JIT 1-4 B, sprawdzane IL <= " + Config.NetTinyIlBytes + " B): " + n
+                            + ", wg samego IL (naglowek nieczytelny): " + ilOnly
                             + (string.IsNullOrEmpty(detail) ? "" : " (" + detail + ")")
                             + (Config.NetSkipTinyMethods && Config.NetTinyIlBytes > 0 ? "" : " - REGULA WYLACZONA (NetSkipTinyMethods / NetTinyIlBytes)") + ".");
             }
@@ -210,8 +216,14 @@ namespace CrashScribe
                 if (m.IsSpecialName && (m.Name.StartsWith("get_") || m.Name.StartsWith("set_") ||
                                         m.Name.StartsWith("add_") || m.Name.StartsWith("remove_"))) return false;
                 if (m.Name == "Finalize" || m.Name == "GetHashCode" || m.Name == "Equals" || m.Name == "ToString") return false;
-                // UW (zawieszenie 19.10 16:09): za mala metoda - kod JIT 1-4 B, skok Harmony psuje jej opis stosu; patrz Config.NetSkipTinyMethods
-                if (Config.NetSkipTinyMethods && Config.NetTinyIlBytes > 0 && IlSize(m) <= Config.NetTinyIlBytes) { _skippedTiny++; return false; }
+                // UW (zawieszenie 19.10 16:09): za mala metoda - kod JIT 1-4 B, 5-bajtowy skok Harmony nakrylby jej opis stosu; patrz Config.NetSkipTinyMethods.
+                // IL to tylko tani filtr wstepny; decyduje rozmiar kodu JIT z naglowka (UnwindCore.NativeTiny). Metoda z kodem >= 5 B dostaje siec jak dotad.
+                if (Config.NetSkipTinyMethods && Config.NetTinyIlBytes > 0 && IlSize(m) <= Config.NetTinyIlBytes)
+                {
+                    int tiny = UnwindCore.NativeTiny(m);
+                    if (tiny == 1) { _skippedTiny++; return false; }
+                    if (tiny < 0) { _skippedIlOnly++; return false; }   // nie umiem sprawdzic - ostroznie, jak w etapie 1 (po IL)
+                }
                 return true;
             }
             catch { return false; }
@@ -234,7 +246,7 @@ namespace CrashScribe
             var fin = new HarmonyMethod(typeof(Net).GetMethod("WatchFinalizer",
                 BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public));
 
-            int n = 0, tinyStart = _skippedTiny;
+            int n = 0, tinyStart = _skippedTiny, ilStart = _skippedIlOnly;
             foreach (var name in Hotspots)
             {
                 var t = FindType(name);
@@ -252,7 +264,7 @@ namespace CrashScribe
                 }
             }
             Scribe.Line("Watch over the game's hotspots: " + n + " methods.");
-            TinyLine("straz miejsc gry", _skippedTiny - tinyStart, null);
+            TinyLine("straz miejsc gry", _skippedTiny - tinyStart, _skippedIlOnly - ilStart, null);
         }
 
         private static IEnumerable<Type> Concretes(Type baseType)

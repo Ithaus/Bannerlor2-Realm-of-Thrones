@@ -102,7 +102,7 @@ namespace CrashScribe
                 Army175.Install(_harmony);       // 175: dopisek pieszych Dothrakow do puli ROT (postfiks ROTTroopRecruiter.Settings)
                 UniqueCompanions.Install(_harmony);   // 14.10: unikaty ROT - zmarly zostaje martwy, przeprowadzki zamiast usuniecia, dzieci
                 Scribe.Line("Net ready.");
-                UnwindRepair.Scan("menu");   // UW: naprawa opisu stosu malych zalatanych metod (po zalozeniu sieci - ostatnie latki tej chwili)
+                UnwindRepair.Request("menu");   // UW: naprawa opisu stosu malych zalatanych metod - na pierwszym ticku, gdy WSZYSTKIE mody skoncza swoje OnBeforeInitialModuleScreenSetAsRoot
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
                 // zakleszczyc watek glowny zlapany w srodku locka (freeze Jeffa 08:06,
@@ -136,7 +136,7 @@ namespace CrashScribe
             base.OnApplicationTick(dt);
             Watchdog.Beat();
             GcPulse.Tick();   // UW: linia "GC (UW)" raz na minute (Config.GcPulseLog)
-            UnwindRepair.LightTick();   // UW: raz na ok. 30 s porownanie bajtow znanych metod, bez alokacji w klatce
+            UnwindRepair.Tick();   // UW: zlecone skany (menu/sesja), pelny skan co 5 min, straz bajtow co 30 s - poza tym bez alokacji w klatce
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)

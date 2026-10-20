@@ -8,6 +8,13 @@
     <Prefer32Bit>false</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- rdzen naprawy kompilowany prosto z CrashScribe - uprzaz testuje dokladnie ten kod, ktory idzie do gry -->
+    <CoreSrc Condition="'$(CoreSrc)' == ''">..\..\CrashScribe\src\UnwindCore.cs</CoreSrc>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(CoreSrc)" Link="UnwindCore.cs" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
