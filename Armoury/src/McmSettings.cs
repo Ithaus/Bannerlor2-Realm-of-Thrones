@@ -1712,6 +1712,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float AutumnStockMultiplier { get; set; } = 2f;
 
+        [SettingPropertyBool("Harvest Year Enabled", HintText = "every year at harvest time each region gets its own harvest: fields and orchards yield from 0.8 to 1.2 times the usual, neighbouring regions alike, and about once in twenty years a whole region's harvest fails at 0.6 - granaries run down and grain grows dear (hunger comes when war or a second bad year adds to it). Grain, flax, grapes, olives, dates, cotton, papyrus, fruit and carrots and the villages' own food (grain, cheese, butter; not fishing villages); the year holds until the next harvest, and in winter the winter cut alone applies. Grain prices then differ by year and region and carts and caravans carry grain to where it is short. Off = every harvest as usual", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool HarvestYearEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Herd Cull Enabled", HintText = "in the last four weeks of autumn the herding villages slaughter part of their herds before the winter: more meat and hides go to market, the village buys salt in its market town to salt the meat (salt grows dearer in autumn; without salt or money the animals are kept), and after it the village sends half of its new animals less to market until the slaughtered ones are made up (the village regulator does not chase this winter shortage). Off = herds as usual", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool HerdCullEnabled { get; set; } = true;
+
         [SettingPropertyInteger("North Gradient Percent", 0, 100, "0", HintText = "how much harder winter bites in the far north (and softer in Dorne)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int NorthGradientPercent { get; set; } = 25;
@@ -8727,6 +8735,8 @@ namespace Armoury
             s.WinterVillageOutputCutPercent = WinterVillageOutputCutPercent;
             s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;
             s.AutumnStockMultiplier = AutumnStockMultiplier;
+            s.HarvestYearEnabled = HarvestYearEnabled;
+            s.HerdCullEnabled = HerdCullEnabled;
             s.NorthGradientPercent = NorthGradientPercent;
             s.WinterByRealm = WinterByRealm;
             s.WinterWarmRealmFactor = WinterWarmRealmFactor;

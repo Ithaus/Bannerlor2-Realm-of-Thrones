@@ -231,6 +231,8 @@ namespace Armoury
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((war - 1f) * sum, FreeHands.HandsText);
                 }
+                // R3-05e: rok urodzaju - plony pol i sadow x czynnik regionu (0.6..1.2), tym samym wzorem (czynnik x suma), po rekach E4/5 i E4/7; poza zima i rokiem - nic
+                HarvestYear.ProdStep(village, item, ref __result);
                 // E6/W3 (221): regulator wsi - mnoznik towaru (bez zywnosci; zwierzeta rzezne tylko z AnimalsUnderValve - T3-K2) wedlug zuzycia swiata, decyzja co 28 dob (HarvestValve); ten sam wzor
                 // (czynnik x suma po E4), przemienny z R1/K4, PRZED W2 (ostatni krok) i sufitem dymarki R1; 1 = nic nie dopisujemy
                 float valve = HarvestValve.Factor(item);
@@ -287,6 +289,7 @@ namespace Armoury
                 if (vt != null) m *= GoodsRates.TypeRateFactor(vt.StringId, id);   // ten sam czynnik co GoodsRates.ProdStep (sol wsi solnych, futra trapperow)
                 m *= Devastation.YieldFactor(village);
                 m *= FreeHands.YieldFactor(village);
+                m *= HarvestYear.Factor(village, item);   // R3-05e: ten sam czynnik co HarvestYear.ProdStep
                 m *= HarvestValve.Factor(item);
                 if (vt != null && GoodsPaths.SideOn)
                 {
