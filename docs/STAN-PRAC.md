@@ -3423,5 +3423,6 @@ Jeff: NOWA KAMPANIA na 94 (opcja 2); "wgrywamy 94 i dopiero wtedy zrob test" -> 
 szybki test po wgraniu: testy-94q.ps1 (bitwa 5 dob x4 + nowa 8 dob, DLL test/n23 = wgrane). Testy przed: n22a/n22b/n22c kod 0 (fala 1 + n22f).
 DO ZROBIENIA: dlugi autotest 94 (bitwa + nowa ok. 180 dob z A7, porownanie progow z n22c) - gdy Jeff zamknie gre albo w nocy; grupy p6* (PO-*, SP-*, SZB-*, PP-*, AD-*,
 MS-*, p6a7), bramka krainy KS przy spichlerzu (Vaes Diaf, New Ghys, Vaes Dothrak, Yronwood), naprawy AI ok. 1100/d i zaleglosc obitych, lukarze/krawcy (n22b nizej -
-przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok. 40 dobach). NOC 20/21.10: docs/ZADANIA-OBOZ-NOC.md, potem docs/PLAN-OPTYMALIZACJA-NOC.md.
+przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok. 40 dobach). NOC 20/21.10: docs/ZADANIA-OBOZ-NOC.md, potem docs/PLAN-OPTYMALIZACJA-NOC.md.- 10:21 PDT szybki test 94 (na wgranych DLL): 94q-bitwa 4/4 bitwy kod 0, 94q-nowa 8/8 dob kod 0; Armoury 0 ERROR w obu; linie fali 2 sa (okup start, spichlerz,
+  szubienice, pola, AI drogi, sztormy, A7); zawieszenia tylko przy wyjsciu z gry. safely_exited = 1. -> Jeff: "graj" (nowa kampania na 94).
 
