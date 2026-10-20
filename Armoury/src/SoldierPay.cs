@@ -80,6 +80,7 @@ namespace Armoury
         private static long _dLordAcc, _dLordTaken, _dGarAcc, _dGarTaken, _dToPurse, _dPlayer, _dToTowns, _dToCastles;
         private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
         private static long _dGarToPurse; private static int _dGarToPurseN;   // K1 (A2): zold zalog do ich sakiewek
+        private static long _dComp; private static int _dCompN;               // CW (19.10): zold towarzyszy gracza do ich kies (CompanionWage.PayFromWage)
         private static long _dGarHome; private static int _dGarHomeN;         // 114-p / B-2 (Z8): zold zalog zamkow, ktory wrocil panu zaworem - bez zwrotu korony (rody)
         // B-4 (Z8): rody z krolestwem w wojnie (zwrot korony) i zoldem zalog we wlasnych zamkach - zold do kas tych zamkow, zawor panom, nalezny zwrot od reszty
         private static long _dZ8Pay, _dZ8Dues, _dZ8Refund, _dZ8Own; private static int _dZ8N;
@@ -136,6 +137,7 @@ namespace Armoury
             _dLordAcc = _dLordTaken = _dGarAcc = _dGarTaken = _dToPurse = _dPlayer = _dToTowns = _dToCastles = 0;
             _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
             _dGarToPurse = 0; _dGarToPurseN = 0;
+            _dComp = 0; _dCompN = 0;
             _dGarHome = 0; _dGarHomeN = 0;
             _dZ8Pay = _dZ8Dues = _dZ8Refund = _dZ8Own = 0; _dZ8N = 0;
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
@@ -490,6 +492,9 @@ namespace Armoury
                 var payer = clan.Leader;
                 if (!r.Balance && r.Payer != null && r.Payer != payer && r.Payer.Gold < r.PayerGold) payer = r.Payer;
                 AddPaid(payer, amt, s);
+                // CW (19.10, CompanionWageByLevel): zold towarzyszy gracza w tej partii (tabela wedlug poziomu x odsetek zaplaconego) do ich kies - reszta jak dotad
+                int comp = CompanionWage.PayFromWage(mp, amt, r.Wage);
+                if (comp > 0) { _dComp += comp; _dCompN++; amt -= comp; if (amt <= 0) return; }
                 if (!s.SoldierPayToPurse || !MenPurse.On) { _dOff += amt; return; }
                 if (Undead.Party(mp)) { _dUndead += amt; return; }      // trup zoldu nie wyda - bez sakiewki (jak dotad)
                 MenPurse.NoteWage(amt);                                 // licznik linii "Sakiewka ludzi:" (najpierw - zamyka poprzednia dobe przed wplata)
@@ -873,6 +878,7 @@ namespace Armoury
                     Log.Info("Zold: dzien " + (int)CampaignTime.Now.ToDays
                              + " | partie rodow: naliczony " + _dLordAcc + ", z kies zeszlo " + _dLordTaken + " (" + _dLordN + " partii) -> do sakiewek ludzi " + _dToPurse
                              + " (" + _dToPurseN + " partii, w tym ludzie gracza " + _dPlayer + ")"
+                             + (_dComp > 0 || CompanionWage.On ? ", towarzyszom gracza do ich kies (CW) " + _dComp + " (" + _dCompN + " partii)" : "")
                              + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
                              + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + "), zalogi do sakiewek " + _dGarToPurse + " (" + _dGarToPurseN + ")"
                              + ", zold zalog zamkow, ktory wrocil panom zaworem - bez zwrotu korony (Z8, B-2; B-4: tylko rody w wojnie) " + _dGarHome + " (" + _dGarHomeN + " rodow)"
