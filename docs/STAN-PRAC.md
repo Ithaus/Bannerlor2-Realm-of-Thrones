@@ -3465,5 +3465,9 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   w tle 11 galezi m96; pauza przy 90% 5 h.- 15:20 PDT Turniej Jeffa w Riverrun (15:13): 1 okup - wygral 4083 zlota (lord, ktorego powalil), 0 zaplacil, nagroda blackwood_helmet (zamowiony u rzemieslnikow miasta) -
   dziala zgodnie z regula. Drobne: licznik "bez powalajacego" liczy tez zwyklych zolnierzy (14) - poprawic przy 96.
   Jeff dopisal do nocy: TABLICA OGLOSZEN (zadania, kapitan strazy - wybij bande, nagrody realne, lista zleceniodawcow, klik -> rozmowa) i PLOTKI (turnieje, swaty,
-  sluchanie za piwo) -> docs/ZADANIA-NOC-2026-10-20.md (lista calej nocy).
+  sluchanie za piwo) -> docs/ZADANIA-NOC-2026-10-20.md (lista calej nocy).- 15:50 PDT wf_20350c06-11f GOTOWE (24 agentow): m96-valyria f1ed9699 (drogi Valyrii +25%, szlaki karawan Essos +7.5%, arm_map_roads_valyria.tsv; wyglad - osobna
+  paczka decali), m96-sakiewki e9ad39a9 (SavingsByNeed), m96-koszyk 95ad02e2 (KsFolkWageToShortClasses), m96-len 617b2018 CZESCIOWO (KsVillageClothBuysInPlan; jesli
+  M96LEN dalej NIE - rece lnu i owiec), m96-bandy f4efd80c (BandsEatFood - bandy jedza, zapas 5 dob, kiesa 3 doby, glod -> odchodza; piraci NavalDLC), m96-zamek 4358d771
+  (CastleMenuTidy). Wstepnie scalone z m96-kuznia do `w-toku/n25-calosc` (zb/n25-calosc) od 848b2e80 -> 83867f5d + gen_mcm (2141 ustawien), 5 modow build 0.
+  Czekaja: m96-wzory, m96-dlugi (wf_c0a7b77f-584), m96-jakosc (wf_be7a1543-8a3), m96-czaskuzni (wf_cfcc67c5-e15).
 
