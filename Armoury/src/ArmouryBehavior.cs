@@ -1278,6 +1278,10 @@ namespace Armoury
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => GoodsRates.OnNewGame());   // GL-5 (P5): wsie lniane tylko w kampanii zaczetej z kluczem (flaga w zapisie arm_goodsrates)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => GoodsPaths.OnNewGame());   // ZC1: glina i wapien w ladunkach tylko w kampanii zaczetej z kluczem (flaga w zapisie arm_zc1)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => VineOlive.OnNewGame());   // B6: winnice i gaje tylko w kampanii zaczetej z kluczem (flaga w zapisie arm_vineolive)
+            // C1 (PLAN 6.10, klucz ClimateBeforeWorkshops): typy wsi T8 PRZED budowa warsztatow miast (gra: OnNewGameCreatedPartialFollowUp i == 10 -
+            // caly OnNewGameCreatedEvent biegnie przed petla follow-up), linia warsztatow po budowie startowej (FollowUpEnd, tylko log)
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => { try { VillageClimate.BeforeWorkshops(); } catch (Exception e) { Log.Error("VillageClimate.BeforeWorkshops", e); } });
+            CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent.AddNonSerializedListener(this, _ => { try { VillageClimate.WorkshopsFit(); } catch (Exception e) { Log.Error("VillageClimate.WorkshopsFit", e); } });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, GoodsPaths.OnItemProduced);   // ZC1 (BkSideGoodsOrigin): miod pitny zrobiony w miastach - o tyle drwale robia go mniej
