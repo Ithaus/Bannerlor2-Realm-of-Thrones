@@ -91,6 +91,7 @@ namespace Armoury
             ColumnPostfix(__0, ref __result);
             MapRoads.SpeedRoad(__0, ref __result);
             MapMud.Speed(__0, ref __result);   // p5-bloto (R3-07c): poza droga w deszczu -MapMudSpeedPercent% (wpis "Mud"); klucz wylaczony = wychodzi od razu
+            SeaStorms.Speed(__0, ref __result);   // p6-sztormy (R3-05d): statek na morzu w burzy -SeaStormShipSpeedPercent% (wpis "Storm"); klucz wylaczony = wychodzi od razu
         }
 
         /// <summary>Kolumna marszowa (tresc dawnego SpeedPostfix bez zmian).</summary>
@@ -166,7 +167,7 @@ namespace Armoury
                 var c = Settings.Current;
                 // SW-DROGI: ta sama latka niesie premie drogi (MapRoads.SpeedRoad) - wpinana takze przy wylaczonej kolumnie, gdy MapRoadSpeedBonus wlaczony
                 // (kolumna sprawdza wtedy swoj klucz w ColumnPostfix i wychodzi); oba klucze wylaczone = jak przed zmiana
-                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus)) { Log.Info("MarchPace: wylaczony."); return; }
+                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus && !c.SeaStormSlowsShips)) { Log.Info("MarchPace: wylaczony."); return; }   // p6-sztormy: latka niesie tez kare burzy na morzu
 
                 var post = new HarmonyMethod(typeof(MarchPace).GetMethod("SpeedPostfix",
                     BindingFlags.Public | BindingFlags.Static)) { priority = Priority.Last };
