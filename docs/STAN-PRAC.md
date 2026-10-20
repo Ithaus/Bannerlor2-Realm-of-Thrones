@@ -3469,5 +3469,7 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   paczka decali), m96-sakiewki e9ad39a9 (SavingsByNeed), m96-koszyk 95ad02e2 (KsFolkWageToShortClasses), m96-len 617b2018 CZESCIOWO (KsVillageClothBuysInPlan; jesli
   M96LEN dalej NIE - rece lnu i owiec), m96-bandy f4efd80c (BandsEatFood - bandy jedza, zapas 5 dob, kiesa 3 doby, glod -> odchodza; piraci NavalDLC), m96-zamek 4358d771
   (CastleMenuTidy). Wstepnie scalone z m96-kuznia do `w-toku/n25-calosc` (zb/n25-calosc) od 848b2e80 -> 83867f5d + gen_mcm (2141 ustawien), 5 modow build 0.
-  Czekaja: m96-wzory, m96-dlugi (wf_c0a7b77f-584), m96-jakosc (wf_be7a1543-8a3), m96-czaskuzni (wf_cfcc67c5-e15).
+  Czekaja: m96-wzory, m96-dlugi (wf_c0a7b77f-584), m96-jakosc (wf_be7a1543-8a3), m96-czaskuzni (wf_cfcc67c5-e15).- 16:00 PDT m96-czaskuzni ea73b600 gotowe (ForgeOneJob: ekran kuzni = jedna robota, po Done/Esc zawsze pasek arm_project_wait na lacznym czasie; wytop najpierw i od
+  niego nie mozna odejsc - metal juz w sakwach; od sztuk mozna odejsc, reszta czeka w kuzni i idzie tylko przy kowadle; noc 23-5 kuznia stoi; oblezenie/bitwa przerywa)
+  -> scalone do n25 4ea8dfd3 (2142 ustawien, build 0). DO DECYZJI JEFFA: czy noc ma zatrzymywac kucie, czy od wytopu da sie odejsc.
 
