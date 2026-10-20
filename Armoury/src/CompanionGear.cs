@@ -46,7 +46,45 @@ namespace Armoury
             if (!_errLogged) { _errLogged = true; Log.Error("CompanionGear." + where, e); }
         }
 
-        internal static void SessionStart() { _gateDay = -1; _sessN = 0; _sessGold = 0; }
+        internal static void SessionStart()
+        {
+            _gateDay = -1; _sessN = 0; _sessGold = 0;
+            try { Probe(); } catch (Exception e) { Stumble("Probe", e); }
+        }
+
+        /// <summary>Linia startu sesji: probka BEZ ZAKUPU - wolny wedrowiec w miescie (jak przyszly towarzysz), jego kiesa minus rezerwa (przy pustej - budzet
+        /// probny 2500, jak w przykladzie Jeffa), co kupilby z polki tego miasta ta sama regula (nic sie nie zmienia: polka, kiesa, ekwipunek).</summary>
+        private static void Probe()
+        {
+            var s = Settings.Current;
+            if (s == null || Campaign.Current == null) return;
+            var main = MobileParty.MainParty;
+            Hero probe = null; Settlement at = null;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !st.IsTown || st.Town == null || st.ItemRoster == null) continue;
+                foreach (var h in st.HeroesWithoutParty)
+                    if (h != null && h.IsWanderer && h.Clan == null && h.IsAlive && h.BattleEquipment != null && !ReferenceEquals(h.BattleEquipment, Campaign.Current.DeadBattleEquipment)) { probe = h; break; }
+                if (probe != null) { at = st; break; }
+            }
+            string txt;
+            if (probe == null || main == null) txt = "probka: brak wolnego wedrowca w miescie";
+            else
+            {
+                int reserve = (int)Math.Ceiling(Math.Max(0f, s.CompanionGearReserveDays) * CompanionWage.DailyOf(probe.Level));
+                int budget = probe.Gold - reserve; bool trial = false;
+                if (budget <= 0) { budget = 2500; trial = true; }
+                var wares = new Dictionary<ItemObject.ItemTypeEnum, List<Ware>>();
+                var bought = new List<string>(); var lines = new List<string>();
+                int hn = 0, hg = 0;
+                foreach (var slot in ArmorSlots) TrySlot(probe, slot, true, at, main, wares, ref budget, ref hn, ref hg, bought, lines, true);
+                foreach (var slot in WeaponSlots) TrySlot(probe, slot, false, at, main, wares, ref budget, ref hn, ref hg, bought, lines, true);
+                txt = "probka bez zakupu: " + probe.Name + " poz. " + probe.Level + " w " + at.Name + ", kiesa " + probe.Gold + ", rezerwa " + reserve
+                      + (trial ? " (budzet probny 2500)" : "") + " -> kupilby " + hn + " szt. za " + hg + " d" + (lines.Count > 0 ? " (" + string.Join("; ", lines.ToArray()) + ")" : "");
+            }
+            Log.Info("Towarzysze (CG): start sesji | klucz CompanionBuysOwnGear " + (On ? "TAK" : "NIE (WYLACZONE)") + ", rezerwa " + Math.Max(0f, s.CompanionGearReserveDays).ToString("0", Inv)
+                     + " dni zoldu | " + txt + " | potkniecia " + _stumbles + ".");
+        }
 
         // ------------------------------------------------------------ wejscia (sluchacze ArmouryBehavior)
         internal static void OnEntered(MobileParty mp, Settlement st, Hero h)
@@ -88,7 +126,9 @@ namespace Armoury
                 var ch = r.GetCharacterAtIndex(i);
                 if (ch == null || !ch.IsHero) continue;
                 var h = ch.HeroObject;
-                if (h != null && h != Hero.MainHero && h.IsPlayerCompanion && h.IsAlive && !h.IsPrisoner && h.BattleEquipment != null) heroes.Add(h);
+                // BattleEquipment bez wlasnego zestawu oddaje wspolny Campaign.DeadBattleEquipment - tego nie wolno ruszac
+                if (h != null && h != Hero.MainHero && h.IsPlayerCompanion && h.IsAlive && !h.IsPrisoner && h.BattleEquipment != null
+                    && !ReferenceEquals(h.BattleEquipment, Campaign.Current.DeadBattleEquipment)) heroes.Add(h);
             }
             if (heroes.Count == 0) return;
             int day = (int)CampaignTime.Now.ToDays;
@@ -110,8 +150,8 @@ namespace Armoury
                     if (budget <= 0) { poor++; continue; }
                     var bought = new List<string>();
                     int hn = 0, hg = 0;
-                    foreach (var slot in ArmorSlots) TrySlot(h, slot, true, st, main, wares, ref budget, ref hn, ref hg, bought, lines);
-                    foreach (var slot in WeaponSlots) TrySlot(h, slot, false, st, main, wares, ref budget, ref hn, ref hg, bought, lines);
+                    foreach (var slot in ArmorSlots) TrySlot(h, slot, true, st, main, wares, ref budget, ref hn, ref hg, bought, lines, false);
+                    foreach (var slot in WeaponSlots) TrySlot(h, slot, false, st, main, wares, ref budget, ref hn, ref hg, bought, lines, false);
                     if (hn == 0) { nothing++; continue; }
                     n += hn; gold += hg;
                     if (said.Count < 4) said.Add(h.Name + " - " + string.Join(", ", bought.ToArray()));
@@ -130,7 +170,7 @@ namespace Armoury
         }
 
         private static void TrySlot(Hero h, EquipmentIndex slot, bool armor, Settlement st, MobileParty main, Dictionary<ItemObject.ItemTypeEnum, List<Ware>> wares,
-                                    ref int budget, ref int hn, ref int hg, List<string> bought, List<string> lines)
+                                    ref int budget, ref int hn, ref int hg, List<string> bought, List<string> lines, bool dry)
         {
             if (budget <= 0) return;
             var eq = h.BattleEquipment;
@@ -170,6 +210,13 @@ namespace Armoury
             }
             if (best == null) return;
             int price = best.Price;
+            if (dry)
+            {
+                // probka: nic sie nie zmienia (polka, kiesa, ekwipunek) - tylko wynik wyboru
+                budget -= price; hn++; hg += price; best.Left--;
+                if (lines.Count < 8) lines.Add(type + " t" + oldTier + "->t" + best.Tier + " " + (oldIt != null ? oldIt.StringId : "pusty") + "->" + best.El.Item.StringId + " " + price);
+                return;
+            }
             st.ItemRoster.AddToCounts(best.El, -1); best.Left--;
             h.ChangeHeroGold(-price);
             st.Town.ChangeGold(price);

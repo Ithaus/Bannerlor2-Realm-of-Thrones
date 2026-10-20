@@ -142,7 +142,7 @@ namespace Armoury
             {
                 var r = mp.MemberRoster;
                 if (r == null) return 0;
-                double k = wage > 0 ? Math.Min(1.0, amt / (double)wage) : 1.0;
+                double k = -1.0;   // odsetek zaplaconego zoldu partii - liczony przy pierwszym towarzyszu
                 bool any = false;
                 for (int i = 0; i < r.Count; i++)
                 {
@@ -150,6 +150,15 @@ namespace Armoury
                     if (ch == null || !ch.IsHero) continue;
                     var h = ch.HeroObject;
                     if (!Applies(h)) continue;
+                    if (k < 0.0)
+                    {
+                        // naliczone (wage) bywa juz przyciete do budzetu rodu (CalculatePartyWage = min(zold, budzet)) - odsetek od PELNEGO zoldu partii,
+                        // zeby przy pustej kiesie towarzysze nie brali przed zolnierzami
+                        int tw = 0;
+                        try { tw = mp.TotalWage; } catch { tw = 0; }
+                        int full = Math.Max(wage, tw);
+                        k = full > 0 ? Math.Min(1.0, amt / (double)full) : 1.0;
+                    }
                     int due = DueOf(h);
                     int pay = Math.Min(amt - given, (int)Math.Round(due * k));
                     _dDue += due;
