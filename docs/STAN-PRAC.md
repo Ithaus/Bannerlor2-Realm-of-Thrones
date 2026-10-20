@@ -3352,3 +3352,12 @@ OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 
   budowy (11a), warsztaty (11b). FALA 2 (po fali 1): okup okolicy (03a), zakladnicy (03c), sztormy (05d), spichlerz miasta (06f), szubienice (07a), pola (07b),
   AI wybiera drogi (07d), napad na spiacy oboz (08b), A7 + odplyw kas miast. Pytania 2 (zyznosc krain) i 4 (drogi Valyrii) - bez odpowiedzi po drugim wyjasnieniu.
 
+### 98. WGRANIE 92 (20.10 ok. 04:55 PDT) - DECYZJE JEFFA 20.10 RANO - START TUTAJ
+W grze: `w-toku/noc-wgranie-92` = n21-calosc 3957fa13 | Armoury **97c94eaf** (2064 ustawien), CrashScribe 4aff74db, RealisticCaptivity e55869a2, GrandTourney 87465d27,
+ForgeView 19aa052a. Kopie *.bak-2026-10-20-wgranie92-przed + D:/Backup-Bannerlord/wgrane/2026-10-20-wgranie92-przed. Zapis Jeffa nowej kampanii: save040.sav (kopia
+D:/Backup-Bannerlord/zapisy-jeffa/2026-10-20-nowa-kampania). = 91 + r4-przetop, r4-zloto, r4-zlecenia, r4-wolni, r4-wioska (+ Total Income prowadzacego), r4-dom.
+TESTY: n21-bitwa (dochod wioski 10/9/7/7/7/7, wioska 11/11, dom 7/7), n21-nowa (mariner 10000 -> 1000), n21-160 (WL pula 155 tys., pod bronia 5.3 -> 8.8 tys.) - kod 0,
+0 ERROR; progi 160 dob 82 NIE, 2 nowe (JK-GB-3). Autotestowy CrashScribe: test/CrashScribe-at-n21.dll (= at-n20r2). engine_config safely_exited = 1.
+W TOKU: fala 1 pomyslow (wf_072a888e-e95, 18 galezi p5-* od 5189c0fe); potem fala 2 (okup okolicy, zakladnicy, sztormy, spichlerz miasta, szubienice, pola, AI drogi,
+napad na oboz, A7 + odplyw kas miast) -> WGRANIE 93+.
+
