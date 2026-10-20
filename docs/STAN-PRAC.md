@@ -3452,5 +3452,7 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   siodla bojowe/transportowe; markietani uslugi/rozrywka/sklep w duzych obozach; bandy i armie z zywnoscia i zlotem). Practice Drills rozpakowany do zb/practicedrills-1.3.- 14:35 PDT Jeff: "Rob drogi Valyrii i trakty Essos"; "zyznosc nie, bo to zaburzy gospodarke"; "Punkt 3 (otwarte z planu) rob w tle, jak skoncze grac, w nocy zrobisz wielki test
   i wgranie"; "menu zamku tez uporzadkuj"; pyta, co to dlugi miast i podatek nadzwyczajny (wyjasnione w czacie, czeka na slowo). -> wf_20350c06-11f (6 galezi w-toku/m96-*
   od 848b2e80 = 95: valyria, sakiewki, koszyk, len, bandy, zamek) -> scalenie, wielki test w nocy (gdy Jeff skonczy), WGRANIE 96. ZYZNOSC KRAIN - ODRZUCONA przez Jeffa.
-  Jeff gra od 13:28 na 95 (obserwator straz-jeffa.sh od znacznika 13:12).
+  Jeff gra od 13:28 na 95 (obserwator straz-jeffa.sh od znacznika 13:12).- 14:45 PDT Jeff (zrzut kuzni): "jest blad, ze moge stworzyc luki tier 6 od poczatku gry, zobacz, czy nie ma wiecej takich bledow" + "dlugi miast tak, robimy" ->
+  wf_c0a7b77f-584: w-toku/m96-wzory (przyczyna lukow [VI] PATTERN KNOWN - RangedLore/ForgeView + audyt calego katalogu wzorow) i w-toku/m96-dlugi (dlugi miast u mieszczan
+  i Banku Zelaznego, splata z nadwyzek kosztem renty pana, podatek nadzwyczajny miasta przy niewyplacalnosci) od 848b2e80 -> do 96 (wielki test w nocy).
 
