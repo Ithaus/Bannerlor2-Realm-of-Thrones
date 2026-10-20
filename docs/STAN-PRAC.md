@@ -3457,5 +3457,8 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   i Banku Zelaznego, splata z nadwyzek kosztem renty pana, podatek nadzwyczajny miasta przy niewyplacalnosci) od 848b2e80 -> do 96 (wielki test w nocy).- 14:30 PDT CRASH JEFFA 14:27 (Eyrie, kuznia z podmenu Go to the smithy, projektowanie broni): WeaponDesignVM.DoesCurrentItemHaveSecondaryUsage NullReference -
   przedmiot bez czesci broni (ItemObject.Weapons => WeaponComponent?.Weapons null); NASZ straznik CrashScribe Mends.VmNeedsItem sprawdzal tylko item != null.
   -> w-toku/m96-kuznia 7cc2b323 (prefiks sprawdza WeaponComponent/Weapons + finalizer NRE). Jeff: "wgraj jako wersje, ja bede dalej gral i testowal" -> WGRANIE 95a
-  (= 95 + CrashScribe 76ec2034), test 95a-bitwa (CrashScribe-at-n95a.dll = n22-at + 848b2e80 + m96-kuznia).
+  (= 95 + CrashScribe 76ec2034), test 95a-bitwa (CrashScribe-at-n95a.dll = n22-at + 848b2e80 + m96-kuznia).- 14:40 PDT WGRANIE 95a wgrane (CrashScribe 76ec2034 = m96-kuznia; test 95a-bitwa przerwany na prosbe Jeffa "zaczynam gre, sam przetestuje" - pliki gry przywrocone
+  wgraj-v5 -Tag 2026-10-20-wgranie95a, flaga wioska-gracza usunieta, zapisy Jeffa nietkniete (Ironman 14:06), safely_exited = 1). Obserwator od znacznika 14:35.
+  Jeff: "za duzo legendary ... w sklepach za latwo legendary i masterwork" -> wf_be7a1543-8a3, w-toku/m96-jakosc (pomiar jakosci w swiecie, zrodla, rzadkosc).
+  W tle do 96: m96-{valyria, sakiewki, koszyk, len, bandy, zamek} (wf_20350c06-11f), m96-{wzory, dlugi} (wf_c0a7b77f-584), m96-kuznia, m96-jakosc.
 
