@@ -3434,5 +3434,8 @@ przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok
   (gracz zbieral okupy lordow powalonych przez innych -> 8k w 1. rundzie). m95-turniej 4e61eae0: TourneyRansomKnockerOnly (okup tylko dla powalajacego, takze gdy potem
   odpadl; bez powalajacego - bez okupu) + pokretlo TourneyRansomShare domyslnie 1 (Jeff: "nie musisz sztucznie zmniejszac ... jak nie maja kasy, to ich zbroje" -
   placi tylko z tego, co ma, reszta sztuk do zwyciezcy - bez zmian). Sesja Jeffa 10:24-11:50: zamknieta normalnie, 0 bledow naszych modow (CrashScribe 0 ERROR IN A MOD,
-  Armoury 0 ERROR); logi na D:/Backup-Bannerlord/logi-jeffa/2026-10-20. Galezie do 95: m95-menu, m95-zajazd (workflow w toku), m95-nocleg, m95-turniej.
+  Armoury 0 ERROR); logi na D:/Backup-Bannerlord/logi-jeffa/2026-10-20. Galezie do 95: m95-menu, m95-zajazd (workflow w toku), m95-nocleg, m95-turniej.- 12:20 PDT Jeff: "wgrywaj 95" ... "az skonczysz prace i wgramy od razu" ... "za jednym razem z testem 160 dni i daj mi znac, czekam" -> n24-calosc 848b2e80 =
+  94 + m95-nocleg 943cc411 + m95-turniej 4e61eae0 + m95-menu ba49db40 + m95-zajazd 68382394 (bez konfliktow), 2129 ustawien, 5 modow build 0. Szybki test 95q (turniej+nocleg)
+  kod 0. Testy calosci testy-95.ps1 (DLL test/n24b: Armoury edd0c0f8, GrandTourney e7caa02f, RealisticCaptivity 9e72fc80, CrashScribe e5ffb849, ForgeView 19aa052a):
+  bitwa, nowa 8, 160 z zapisu - w toku od 12:15 -> WGRANIE 95 (wgraj-v5 -Tree zb/n24-calosc -Tag 2026-10-20-wgranie95).
 
