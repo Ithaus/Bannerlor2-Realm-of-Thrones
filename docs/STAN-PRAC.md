@@ -3375,4 +3375,10 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   napad, a7}, drzewa zb/p6-*; kazda: kod -> 2 recenzje (gra, technika) -> poprawki. A7: domyslna KsSwitchSignalRule = true w galezi, Armoury.json Jeffa ma false -
   zmienic przy wgraniu (kopia .bak); test A7 = 160 dob + armoury-a7-wlacz.flag + ks-auto, porownanie NAKUM-7/12, NKA-1 z n22a-160 (bez A7).
   Log wzorcowy WGRANIA 91 (160 dob) skopiowany do zb/logi-wzorcowe (rotacja logow).
+- ok. 06:00 PDT Jeff: "wstrzymaj fala 2, zastopuj" / "nie pozostaly limit idzie na poprawki fali 1" -> FALA 2 ZATRZYMANA (wf_37c5a03f-75f, TaskStop),
+  bez scalania i testow. Stan drzew p6-* (od 91bf9c63, niedokonczone, NIE do scalenia bez dokonczenia): okup 0 commitow, zakladnicy 2, sztormy 1 (+1 plik niezacommit.),
+  spichlerz 1 (+1), szubienice 0 (+8 plikow niezacommit.), pola 2, drogi 3, napad 0, a7 1 (+4). Wznowienie: Workflow resumeFromRunId wf_37c5a03f-75f albo nowy bieg
+  "dokoncz od stanu drzewa" - tylko na slowo Jeffa.
+  Recenzja scalenia n22 (agent): 2 znaleziska poprawione w 161e099c (OneNeed z EngPaidNeed - inzynieria + jedna budowa; wykup turniejowy min(G - wydane, kiesy) - R).
+  n22a-bitwa kod 0 (4/4 bitwy, 0 ERROR). GrandTourney.log nadpisywany przy starcie gry - straz scratchpadu f59fb043 gt-straz.sh kopiuje do gt-logi/.
 
