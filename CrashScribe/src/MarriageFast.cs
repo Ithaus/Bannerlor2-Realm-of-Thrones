@@ -426,6 +426,8 @@ namespace CrashScribe
                     if (p == null || p.owner == OurOwner) continue;
                     var pm = p.PatchMethod;
                     if (raceLawOk && k == 1 && pm != null && pm.DeclaringType != null && pm.DeclaringType.FullName == "Armoury.RaceLaw" && pm.Name == "CouplePostfix") continue;
+                    // R3-01c (Armoury AiDowry, przechyl swatow): postfiks NpcCoupleMarriageChance tylko mnozy szanse > 0 (x1.5 / x0.8) - 0 zostaje 0, skrot dla zonatych wazny
+                    if (k == 1 && pm != null && pm.DeclaringType != null && pm.DeclaringType.FullName == "Armoury.AiDowry" && pm.Name == "ChancePostfix") continue;
                     return Who(p) + " na " + (m.DeclaringType != null ? m.DeclaringType.Name + "." : "") + m.Name;
                 }
             }

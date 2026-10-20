@@ -310,6 +310,8 @@ namespace Armoury
                 cash = CrownCash(k, price);
                 if (cash > 0) { k.KingdomBudgetWallet -= (int)Math.Min(int.MaxValue, cash); }
                 debt = price - cash;
+                long aidK = VassalRansomAid.Help(captive, captorClan, debt);   // R3-01d: wasale krolestwa doplacaja do braku skarbca (zloto z ich kies, nie ze skarbca)
+                if (aidK > 0) { cash += aidK; debt -= aidK; }
                 Pay(rcv, cash);
                 if (debt > 0) CrownIncome.AddCrownDebt(k, rcv.Crown != null ? rcv.Crown.StringId : "h:" + rcv.Hero.StringId, debt);
                 _dKingN++; _dKingCash += cash; _dKingDebt += debt;
@@ -322,6 +324,8 @@ namespace Armoury
                 debt = price - cash;
                 long cap = (long)(Math.Max(0f, s.RansomDebtCapDays) * D) - have;
                 if (debt > Math.Max(0, cap)) { long cut = debt - Math.Max(0, cap); _dCapCut += cut; _dCapN++; debt = Math.Max(0, cap); price = cash + debt; }
+                long aid = VassalRansomAid.Help(captive, captorClan, debt);   // R3-01d: pomoc wasali na okup glowy rodu - po pulapie, do dlugu, ktory rod bylby winien
+                if (aid > 0) { cash += aid; debt -= aid; }
                 Pay(rcv, cash);
                 if (debt > 0) DebtLadder.AddRansomDebt(payerClan, rcv.Crown != null, rcv.Crown != null ? rcv.Crown.StringId : rcv.Hero.StringId, "", debt);
             }
