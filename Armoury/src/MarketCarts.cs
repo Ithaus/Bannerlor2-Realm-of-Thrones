@@ -460,7 +460,7 @@ namespace Armoury
                     if (!isOwn && (d <= 0f || (max > 0f && d > max))) continue;
                     float d0 = d; bool byp = isOwn && (d <= 0f || (max > 0f && d > max));   // f19-e2 (pomiar): wlasne miasto bez testu zasiegu
                     if (d < 0f) d = 0f;
-                    double T = 2.0 * d / perDay + wait;
+                    double T = 2.0 * d * RiverBarges.CartFactor(home, st) / perDay + wait;   // R3-05b: kurs nad ta sama rzeka liczy sie jak polowa drogi (barka); zasieg - droga ladowa
                     bool useFull = full != null && (whole || T > tfree);
                     var news = s.VillageCartRoadNews ? NewsFor(t) : null;
                     var ld = useFull ? full : load;
@@ -521,6 +521,7 @@ namespace Armoury
                     _sumOwn += ReferenceEquals(ownC, best) ? bestVal : Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk);
                 }
                 OreNote(best.T, best.Load);
+                RiverBarges.NoteCartPick(home, best.T.Settlement);                    // R3-05b: licznik linii "Barki rzeczne"
                 NotePick(cart, best.T.Settlement, best.D0, best.Byp, movedN, null);   // f19-e2 (pomiar)
                 return best.T.Settlement;
             }

@@ -740,6 +740,9 @@ namespace Armoury
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
+        // p5-handel (R3-05a/b): jarmarki i barki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
+        private readonly bool _p5HandelReset = P5HandelReset();
+        private static bool P5HandelReset() { try { HarvestFairs.Reset(); RiverBarges.Reset(); } catch (Exception e) { Log.Error("P5HandelReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1266,6 +1269,10 @@ namespace Armoury
             // starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> StartCalibration.Reset -> RuleReset -> A7sReset)
             try { string a7 = dataStore.IsSaving ? StartCalibration.ExportA7s() : null; if (!dataStore.IsSaving || a7 != null) SaveText.Sync(dataStore, "arm_ks_a7", ref a7); if (dataStore.IsLoading) StartCalibration.ImportA7s(a7); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_a7", e); }
+            // p5-handel (R3-05a): jarmarki w toku i z ostatniego roku ("hf1|kraina,miasto,start,pominiety;..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis,
+            // Ironman Jeffa) = brak jarmarkow w toku (kalendarz otworzy nastepne); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P5HandelReset)
+            try { string hf = dataStore.IsSaving ? HarvestFairs.Export() : null; if (!dataStore.IsSaving || hf != null) SaveText.Sync(dataStore, "arm_fairs", ref hf); if (dataStore.IsLoading) HarvestFairs.Import(hf); }
+            catch (Exception e) { Log.Error("SyncData.arm_fairs", e); }
         }
 
         public override void RegisterEvents()
@@ -2037,6 +2044,8 @@ namespace Armoury
             try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
+            try { HarvestFairs.SessionStart(); } catch (Exception e) { Log.Error("HarvestFairs.SessionStart", e); }   // R3-05a: latka popytu (raz na proces), kalendarz krain, linia "Jarmarki po zniwach (R3-05a): start sesji"
+            try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
             try { BanditLimit.SessionStart(); } catch (Exception e) { Log.Error("BanditLimit.SessionStart", e); }   // f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band ROT x2 z ludzi puli wyrzutkow, stopery kosztu band - latki W KAMPANII (raz na proces), linia "Bandy i limit (f8-bandy): start sesji"
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
@@ -2529,6 +2538,8 @@ namespace Armoury
             try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); } DayProfile.Lap("CaravanAmmo.Daily");   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
             try { CaravanGoods.Daily(); } catch (Exception e) { Log.Error("CaravanGoods.Daily", e); } DayProfile.Lap("CaravanGoods.Daily");   // E3-T1: linia "Karawany - towar tam, gdzie maja zysk (E3-T1)", porzadki ksiegi kosztu i blokad odkupienia
             try { TownToll.Daily(); } catch (Exception e) { Log.Error("TownToll.Daily", e); } DayProfile.Lap("TownToll.Daily");   // E3-G3: linia "Myto targowe (E3-G3)" - PRZED MoneyLedger.Daily (Pompy F czyta Last*)
+            try { HarvestFairs.Daily(); } catch (Exception e) { Log.Error("HarvestFairs.Daily", e); } DayProfile.Lap("HarvestFairs.Daily");   // R3-05a: otwarcie/zamkniecie jarmarkow, linia "Jarmarki po zniwach (R3-05a)"
+            try { RiverBarges.Daily(); } catch (Exception e) { Log.Error("RiverBarges.Daily", e); }   // R3-05b: linia "Barki rzeczne (R3-05b)"
             // 179 (projekt etapu 2, krok C3): rycerze bez lenna - zold za dobe w druzynie pana (przed zwrotem korony - w jego podstawie), powroty i wezwania;
             // linia "Rycerze (179)"; przed budzetem 166 (pulap pana liczy zold rycerzy w jego druzynie)
             try { GentryService.Daily(); } catch (Exception e) { Log.Error("GentryService.Daily", e); } DayProfile.Lap("GentryService.Daily");

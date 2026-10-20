@@ -101,11 +101,13 @@ namespace Armoury
             {
                 if (cart == null || !ReferenceEquals(_cart, cart)) return;
                 _cart = null;
-                if (!On || st == null || st.Town == null || !Live) return;
+                if (st == null || st.Town == null || !Live) return;
                 int net = cart.PartyTradeGold - _cart0;
                 if (net <= 0) return;
+                int fee = HarvestFairs.CartFee(st, cart, net);            // R3-05a: oplata targowa jarmarku (1% do kasy miasta) - dziala takze bez myta
+                if (!On) { MoneyLedger.CartTollInWindow(cart, fee); return; }
                 int t = Take(st, cart, net, RateCart);
-                MoneyLedger.CartTollInWindow(cart, t);                    // poprawki (uwaga recenzji 1): okno ksiegi kas osad liczy zaplate taborom brutto
+                MoneyLedger.CartTollInWindow(cart, t + fee);              // poprawki (uwaga recenzji 1): okno ksiegi kas osad liczy zaplate taborom brutto (R3-05a: z oplata jarmarku)
                 LastToTown = 0;                                            // licznik kontroli T1 dotyczy tylko karawan
                 _cN++; _cGross += net; _cToll += t;
                 if (Players(cart)) { _plN++; _plToll += t; }
@@ -119,13 +121,17 @@ namespace Armoury
         {
             try
             {
-                if (!On || mp == null || st == null || st.Town == null || gross <= 0 || !Live) return 0;
-                if (_exempt > 0) { _exFlowN++; _exFlowGross += gross; return 0; }
-                if (MaterialOrders.HasContract(mp)) { _exN++; _exGross += gross; return 0; }
+                if (mp == null || st == null || st.Town == null || gross <= 0 || !Live) return 0;
+                if (_exempt > 0) { if (On) { _exFlowN++; _exFlowGross += gross; } return 0; }
+                if (MaterialOrders.HasContract(mp)) { if (On) { _exN++; _exGross += gross; } return 0; }
+                // R3-05a: oplata targowa jarmarku (1% do kasy miasta) - te same zwolnienia co myto; czesc wracajaca do kasy osady (kontrola T1 w CaravanGoods.Sell)
+                int fee = HarvestFairs.CaravanFee(st, mp, gross);
+                if (fee > 0) LastToTown += fee;
+                if (!On) return fee;
                 int t = Take(st, mp, gross, RateCaravan);
                 _kN++; _kGross += gross; _kToll += t;
                 if (Players(mp)) { _plN++; _plToll += t; }
-                return t;
+                return t + fee;
             }
             catch (Exception e) { Stumble("TakeCaravan", e); return 0; }
         }

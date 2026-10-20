@@ -1,0 +1,35 @@
+# Armoury: river barges (R3-05b, RiverBarges.cs) - strongholds on the same navigable river (Realm of Thrones 8.1.8 map, by hand from A Song of Ice and Fire).
+# One row = one town or castle: river<TAB>settlement id<TAB>name. A river system with its forks counts as one river (the Trident with the Red, Blue and Green Fork;
+# the Rhoyne with the Little Rhoyne, the Noyne and the Qhoyne; the Mander with the Cockleswhent). A village belongs to the river of its town or castle.
+# Only places sure from the canon are listed; a wrong pair gives odd trade, so leave a place out when unsure.
+#river	settlement_id	name
+Trident	town_V2	Riverrun
+Trident	castle_EN8	Stone Hedge
+Trident	town_B1	Fairmarket
+Trident	ROT_town3	The Twins
+Trident	ROT_town4	Harroway
+Trident	ROT_castle16	Darry
+Trident	town_EN3	Saltpans
+Mander	town_V5	Highgarden
+Mander	town_V1	Ashford
+Mander	castle_EW1	Bitterbridge
+Mander	town_ES7	Tumbleton
+Mander	ROT_town27	Lord Hewett's Town
+Honeywine	town_V6	Oldtown
+Honeywine	castle_ES8	Honeyholt
+Blackwater	town_EW4	King's Landing
+Blackwater	ROT_castle61	Red Keep
+Greenblood	town_A7	Planky Town
+Greenblood	castle_A3	Godsgrace
+Greenblood	town_A6	Vaith
+Rhoyne	town_ES2	Volantis
+Rhoyne	town_ES3	Volon Therys
+Rhoyne	town_ES4	Valysar
+Rhoyne	town_ES5	Selhorys
+Rhoyne	castle_A9	Sar Mell
+Rhoyne	castle_A8	Chroyane
+Rhoyne	castle_ES1	Ghoyan Drohe
+Rhoyne	castle_ES3	Ar Noy
+Rhoyne	town_ES6	Qohor
+Rhoyne	castle_ES2	Ny Sar
+Rhoyne	town_ES1	Norvos
