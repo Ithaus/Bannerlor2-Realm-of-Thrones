@@ -2336,6 +2336,18 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float GuildShareShieldwright { get; set; } = 0.05f;
 
+        [SettingPropertyBool("Shield War Carpenters", HintText = "in war the town carpenters help the shield makers, but only where shields are lacking: every 5 days the soldiers of each realm's AI lords' companies are counted (the same count as the shield in the AI armoury coverage line) and while a realm is at war and fewer than Shield War Coverage Below of their shield places hold a shield of the soldier's own rank, every shield maker in that realm's towns gets Shield War Carpenter Hands carpenters at his side. The carpenters take no hands from the other crafts; a shield still takes its wood, leather and iron from the town's stalls, is begun only while the market pays for it and is paid for with the same wages as before. A realm with few shield bearers is judged by the whole world. In peace, or with enough shields, nothing changes. Off = the shield makers work alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Workshops")]
+        public bool ShieldWarCarpenters { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Shield War Coverage Below", 0.00f, 1.00f, "0.00", HintText = "the carpenters help a realm at war only while the share of its AI soldiers' shield places filled with a shield of their rank is below this (0-1)", RequireRestart = false)]
+        [SettingPropertyGroup("Workshops")]
+        public float ShieldWarCoverageBelow { get; set; } = 0.35f;
+
+        [SettingPropertyFloatingInteger("Shield War Carpenter Hands", 0.00f, 4.00f, "0.00", HintText = "carpenters helping each shield maker in war while shields are lacking (1 = twice the hands at the shields; 0-4)", RequireRestart = false)]
+        [SettingPropertyGroup("Workshops")]
+        public float ShieldWarCarpenterHands { get; set; } = 1f;
+
         [SettingPropertyFloatingInteger("Workshop Forge Wood Per Metal Kg", 0.00f, 50.00f, "0.00", HintText = "kilograms of wood (as charcoal) the forge burns for each kilogram of metal worked, on top of the bloomery", RequireRestart = false)]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopForgeWoodPerMetalKg { get; set; } = 12.5f;
@@ -8851,6 +8863,9 @@ namespace Armoury
             s.GuildShareSaddler = GuildShareSaddler;
             s.GuildShareBowyer = GuildShareBowyer;
             s.GuildShareShieldwright = GuildShareShieldwright;
+            s.ShieldWarCarpenters = ShieldWarCarpenters;
+            s.ShieldWarCoverageBelow = ShieldWarCoverageBelow;
+            s.ShieldWarCarpenterHands = ShieldWarCarpenterHands;
             s.WorkshopForgeWoodPerMetalKg = WorkshopForgeWoodPerMetalKg;
             s.WorkshopWagePerDay = WorkshopWagePerDay;
             s.WorkshopWageByTier = WorkshopWageByTier;
