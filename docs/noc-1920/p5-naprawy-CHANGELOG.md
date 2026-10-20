@@ -1,11 +1,11 @@
 ## p5-naprawy (20.10) - naprawy wedlug cechow (R3-02) i platnerz w taborze (R3-04c) (Armoury)
 
-**Dla Jeffa (prosto).** Cena naprawy zostaje taka jak dzis (Twoja decyzja z 07.10). Zmienia sie czas i to, kto pracuje: lekko obity miecz to godzina-dwie, ciezko obita
-brygantyna ok. 140 roboczogodzin, wiec duzy lup po bitwie kowale i siodlarze robia dzien albo dwa, a buty i kaftany czekaja na siodlarzy i krawcow, nie na kowali.
-Lordowie AI i Twoi ludzie (naprawy z ich sakiewki) biora razem najwyzej polowe rak kazdego cechu w miescie, wiec warsztaty nigdy nie stoja, a dla Ciebie zostaja wolne
-rece. Kazde zlecenie ma rabat hurtowy 0,5% za sztuke, do 30% (lup z sakw, Twoja uprzaz, polki wojska, dzien lorda w miescie), tylko od robocizny. Nowosc w polu:
-towarzysz z najlepszym Kowalstwem lata metalowy sprzet Twoich ludzi z magazynu wojska, gdy stoisz poza miastem (oboz, oblezenie, zamek, wies), z materialu z taboru,
-wolniej niz warsztat miasta - i za kazda przepracowana godzine dostaje doswiadczenie Kowalstwa (najwyzej 100 na dobe).
+**Dla Jeffa (prosto).** Cena naprawy zostaje taka jak dzis (Twoja decyzja z 07.10), zmienia sie czas i to, kto pracuje: lekko obity miecz to godzina-dwie,
+ciezko obita brygantyna ok. 140 roboczogodzin, a buty i kaftany robia siodlarze i krawcy, nie kowale. Lordowie AI i Twoi ludzie biora razem najwyzej polowe rak
+kazdego cechu w miescie, a Twoje duze zlecenie zajmuje rece cechu od pierwszej godziny czekania, wiec nikt nie dostaje pracy "z powietrza". Kazde zlecenie
+(takze u kwatermistrza Spoils) ma rabat hurtowy 0,5% za sztuke, do 30%, tylko od robocizny. W polu towarzysz z najlepszym Kowalstwem lata metalowy sprzet
+Twoich ludzi z materialu z taboru (gdy czegos brak, bierze nastepna sztuke), a kwatermistrz druzyny z dobrym Zarzadzaniem przyspiesza mu robote do 25%
+- obaj ucza sie tylko za godziny naprawde przepracowane.
 
 **Problem / zrodlo pomyslu.** Lista 35 pomyslow (docs/POMYSLY-35-2026-10-20.md, poz. 3 = R3-02 i poz. 7 = R3-04c); Jeff 20.10: "28 - nie, 29 - nie. POzostale tak".
 Projekt: docs/PROJEKT-KOSZT-NAPRAWY-2026-10-07.md (decyzja Jeffa na gorze: cena bez zmian; Regula pkt 5 godziny, 6 rabat, 9 czas; Tabela godzin).
@@ -37,9 +37,15 @@ rabat uprzezy w RepairCost/PlanRepair, dostep do stanu czesci).
   Godziny sztuki te same co u kowali miasta (`GuildMend.Hours`). Zaczeta sztuka zostaje na kowadle do konca (nowy lup nie kasuje pracy). Material jak przy "Mend it
   yourself" dla magazynu (`MendMaterial.SelfPartsOf`, pamiec ulamkow, `MendTakeByKind`) - zdejmowany z taboru przy ukonczeniu; brak materialu = nie pracuje i nie dostaje XP.
   Robocizna 0 zl (towarzysz bierze zold). XP Kowalstwa 8 na przepracowana godzine, sufit 100 na dobe.
+- (5) `CampQuartermasterSteward` (TAK, dziala przy (4)) - drugi czlon R3-04c, "kwatermistrz zbrojowni wedlug Zarzadzania": kwatermistrz druzyny (rola gry
+  `MobileParty.EffectiveQuartermaster`; bez przydzialu - dowodca) wydaje platnerzowi sztuki z magazynu, odmierza material i sortuje robote. Robota platnerza
+  x (1 + Steward/800), najwyzej +25% (Steward 200); razem najwyzej 0.94 roboczogodziny na godzine - wciaz wolniej niz warsztat. XP Zarzadzania 2 za godzine,
+  w ktorej kuznia naprawde pracowala, sufit 25 na dobe. Kwatermistrz bedacy platnerzem, ranny albo w niewoli - bez premii i bez XP. Material bez zmian.
 - Linie logu (log_grep): `Naprawy wg cechow (R3-02): doba N | AI: X szt., godz. k/s/k/l/t, stop na polowie rak cechu Y szt. w Z wizytach | ludzie gracza: ... | gracz
   (zlecenia): ... | rabat hurtowy razem G zl`; `GuildMend ludzie: <miasto> - naprawiono ...` (22:00 w miescie); `Platnerz w taborze (R3-04c): doba N | <imie> - naprawil
-  X szt. metalu ludzi, przepracowal H roboczogodz., XP Kowalstwa P (sufit 100/dobe), godzin bez materialu W.`
+  X szt. metalu ludzi, przepracowal H roboczogodz., XP Kowalstwa P (sufit 100/dobe), godzin bez materialu W | kwatermistrz (Steward): <imie> - G godz. pomocy,
+  premia do +B%, XP Zarzadzania Z (sufit 25/dobe).`; w linii R3-02 na koncu `| dlug cechow: splacono H h, zostaje R h w M miastach`; u kwatermistrza Spoils
+  `Kwatermistrz (Spoils) - naprawa (...) ...; godziny cechow (R3-02): kowale X h, ..., bez wolnych rak N, rabat hurtowy P% przy S szt.`
 - Klucze wylaczone - jak dotad co do godziny i pensa (stare sciezki nietkniete; licznik P2Mend przy wylaczonym (1) - stary wzor).
 
 **Ryzyko / co sprawdzic (kontrola calosci).**
@@ -57,9 +63,32 @@ rabat uprzezy w RepairCost/PlanRepair, dostep do stanu czesci).
   zdejmowany przy ukonczeniu - gracz moze sprzedac zelazo w trakcie; wtedy sztuka czeka (bez XP).
 - Kolizje z galeziami: ArmouryBehavior.cs - 3 linie (RepairCost, PlanRepair, nowy `ConditionQuietOf`); Settings.cs - 4 pola w dwoch blokach; SmithMenu, AiWear,
   TroopSelfMend, WorkshopLaw, SmithHours - wpiecia z komentarzem R3-02 / R3-04c.
-- Poza zakresem (jak dotad): kwatermistrz Spoils (`SpoilsSeal`) - bez godzin cechow i rabatu; naprawa wlasnymi rekami - czas z SelfRepairHoursPerPiece.
+- Poza zakresem (jak dotad): naprawa wlasnymi rekami - czas z SelfRepairHoursPerPiece (to nie robota cechu). Kwatermistrz Spoils jest juz w zakresie (ponizej).
 
-**Status.** DO SPRAWDZENIA (build Release 0 bledow; gra nieuruchamiana - zakaz w zadaniu).
+**Poprawki po recenzji (20.10, commit a5cc517f).**
+- Platnerz (wazne): brak materialu na najgorsza NIEZACZETA sztuke - bierze nastepna, na ktora material w taborze jest (najwyzej 60 sztuk sprawdzanych na godzine,
+  najgorsze najpierw); "godzina bez materialu" liczy sie tylko, gdy zadna sztuka nie ma materialu. Zaczeta sztuka (postep > 0) czeka na swoj material.
+  Platnerz ranny albo brak towarzysza z Kowalstwem 20+: postep na kowadle zostaje (dotad zerowany).
+- Zlecenia gracza wielodniowe (wazne): `GuildMend.PlayerStart` (zamiast PlayerClock w 4 wywolaniach StartTimedWork: lup, sztuka, polki wojska, uprzaz) zaczyna
+  rezerwacje; co godzine czekania (HourTick, przed naprawami ludzi) kazdy cech zlecenia bierze swoje wolne godziny (najwyzej rece cechu na godzine), wiec AI
+  i sakiewka ludzi widza zajete rece od razu. Koniec roboty: godziny gotowych sztuk minus juz zarezerwowane. Czego dzis juz nie ma (AI wzielo rece w tym czasie,
+  koniec przed rezerwacja) - dlug cechu (`_carry`), ktory nowego dnia zajmuje rece cechu przed wszystkimi innymi (najwyzej cala zmiana; reszta dalej). Zegar bez
+  zmian. Przerwanie: zarezerwowane godziny byly przepracowane - nie wracaja; doliczana jest tylko roznica. Praca na czas ma numer (`SmithMenu.WorkSerial`), wiec
+  inna praca (przetop, wlasne rece) nie przedluza rezerwacji.
+- Pelny zakres R3-02/R3-04c (wazne): kwatermistrz Spoils (`SpoilsSeal.MakePlan/Apply`) - godziny cechow (bierze wolne godziny dzis, bez limitu polowy; reszta
+  "waits for free hands"), rabat hurtowy od liczby sztuk zlecenia (przy budzecie - najwyzej jego limit sztuk), godziny z pul za zrobione sztuki, ta sama wycena
+  w menu. Stara regula ludzi (`TroopSelfMend.Run`, sakiewki wylaczone): godziny cechow jako naprawa automatyczna (polowa rak) i rabat. Drugi czlon R3-04c -
+  kwatermistrz wedlug Steward, punkt (5) wyzej.
+- Rabat AI (czesc "wazne" o warsztatach): liczony od sztuk, na ktore cechy maja dzis godziny (`Budget.Preview`), nie od calej zaleglosci partii; przy wylaczonych
+  godzinach cechow - od tylu sztuk, ile zmieszcza godziny kowali (cap).
+- Drobne: okno "How will it be made whole?" pokazuje godziny cechu (te same co praca na czas) i nazwe cechu; "Pick a piece" na grzbiecie - godziny ze stanu ksiegi;
+  stara sciezka ludzi (MendHoursByGuild NIE) - z rabatem hurtowym zlecenia dnia (`GuildMend.MenBulkN`); lup z sakw - procent rabatu w dymku z tej samej liczby
+  sztuk, od ktorej liczona robocizna; opisy MCM zgodne z tym.
+
+**Recenzja - co uznane, co nie.** Wszystkie cztery "wazne" i piec "drobnych" uznane za prawdziwe i poprawione jak wyzej. Uwaga o warsztatach siodlarzy jest
+szacunkiem (nie pomiarem) - poprawiony rabat AI; spadek produkcji siodlarzy do sprawdzenia w autotescie (punkt 6 testu), bez zmiany udzialu AI na zapas.
+
+**Status.** DO SPRAWDZENIA (build Release 0 bledow po poprawkach; gen_mcm stabilny; gra nieuruchamiana - zakaz w zadaniu).
 
 **Decyzje (Claude, wedlug projektu; wylaczniki w nawiasach).**
 - Godziny wedlug tabeli projektu i dni wykonania sztuki (`MendHoursByGuild`); cena bez zmian (decyzja Jeffa 07.10).
@@ -67,6 +96,10 @@ rabat uprzezy w RepairCost/PlanRepair, dostep do stanu czesci).
 - Rabat przy kazdym zleceniu, z kluczy rabatu polek wojska (`MendBulkEveryOrder`); pojedyncza sztuka bez rabatu.
 - Platnerz: tylko metal (robota kowala), tylko poza miastem i na postoju, 0.25 + Kowalstwo/400 roboczogodz. na godzine (max 0.75), XP 8/h, sufit 100/dobe, min. Kowalstwo 20
   (`CampArmourer`).
+- Kwatermistrz wedlug Steward: premia do robot platnerza (nie do ceny, nie do materialu), bo jedyna robota "naszego kwatermistrza zbrojowni" bez rak cechu to oboz;
+  w miescie rece ludzi ogranicza polowa rak cechu i Steward jej nie podnosi (`CampQuartermasterSteward`).
+- Zlecenie gracza ponad wolne rece: rezerwacja co godzine + dlug cechu na nastepne dni (bez nowego klucza - czesc `MendHoursByGuild`).
+- Kwatermistrz Spoils robi od reki, wiec bierze tylko wolne godziny dzis (bez czekania), reszta czeka (`MendHoursByGuild`).
 
 **Test w grze.**
 1. W miescie po bitwie: "Restore worn loot in your bags" (kuznia miasta) - dymek pokazuje "About X hours (Y work-hours of the town's trades). Bulk rate for N pieces: P% off the work.";
@@ -77,3 +110,11 @@ rabat uprzezy w RepairCost/PlanRepair, dostep do stanu czesci).
    w logu `Platnerz w taborze (R3-04c): doba ...`, XP Kowalstwa towarzysza rosnie.
 5. Autotest 120+ dob: linia `Naprawy wg cechow (R3-02): doba` co dobe z `AI: X szt.` > 0; porownac z `Zuzycie AI: ... naprawione w miastach` (powinny sie zgadzac
    co do sztuk) i trend `obitych razem`.
+6. Warsztaty po cechach: w `Warsztaty: dzien N` porownac segment `cechy [krawiec .../..., ..., siodlarz .../..., lucznik, tarczownik]` z biegiem na WGRANIU 91
+   (doba 109235: `siodlarz 1121/1054`, `krawiec 2326/561`, `lucznik 645/309`, `tarczownik 432/158`). Spadek ponad 10% u siodlarzy - pierwszy krok
+   `AutoMendHalfGuild` NIE albo mniejszy udzial AI u siodlarzy (osobna zmiana).
+7. Duze zlecenie gracza (lup 40+ szt.) w miescie: w czasie czekania `Available` cechow spada co godzine (lordowie AI w tym miescie dostaja mniej - licznik
+   `stop na polowie rak cechu`); po skonczeniu w linii doby `dlug cechow: zostaje 0 h` albo splacany nastepnego dnia.
+8. Kwatermistrz Spoils: dymek i komunikat z `Bulk rate for N pieces` i ewentualnie `pieces wait for free hands`; w logu `godziny cechow (R3-02)`.
+9. Oboz z platnerzem i kwatermistrzem (inny towarzysz, Steward 50+): w linii platnerza `kwatermistrz (Steward): <imie> - ... premia do +6%` i XP Zarzadzania
+   <= 25/dobe; sztuka bez materialu (np. t5 bez zelaza t5) nie blokuje lzejszych.
