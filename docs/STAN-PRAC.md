@@ -3460,5 +3460,7 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   (= 95 + CrashScribe 76ec2034), test 95a-bitwa (CrashScribe-at-n95a.dll = n22-at + 848b2e80 + m96-kuznia).- 14:40 PDT WGRANIE 95a wgrane (CrashScribe 76ec2034 = m96-kuznia; test 95a-bitwa przerwany na prosbe Jeffa "zaczynam gre, sam przetestuje" - pliki gry przywrocone
   wgraj-v5 -Tag 2026-10-20-wgranie95a, flaga wioska-gracza usunieta, zapisy Jeffa nietkniete (Ironman 14:06), safely_exited = 1). Obserwator od znacznika 14:35.
   Jeff: "za duzo legendary ... w sklepach za latwo legendary i masterwork" -> wf_be7a1543-8a3, w-toku/m96-jakosc (pomiar jakosci w swiecie, zrodla, rzadkosc).
-  W tle do 96: m96-{valyria, sakiewki, koszyk, len, bandy, zamek} (wf_20350c06-11f), m96-{wzory, dlugi} (wf_c0a7b77f-584), m96-kuznia, m96-jakosc.
+  W tle do 96: m96-{valyria, sakiewki, koszyk, len, bandy, zamek} (wf_20350c06-11f), m96-{wzory, dlugi} (wf_c0a7b77f-584), m96-kuznia, m96-jakosc.- 14:50 PDT Jeff: czas kuzni - "ma liczyc calkowity czas: wytapiam, potem kuje miecz i wychodzi 23 godziny, to odpala sie pasek i leci 23 h; jak wyjde i nie skoncze,
+  biore tylko to, co wykulem, a reszta czeka, az wroce" -> wf_cfcc67c5-e15, w-toku/m96-czaskuzni. Limity 14:50: 5 h 24% (reset 17:10), tydzien 68% (reset 26.10 10:00) -
+  w tle 11 galezi m96; pauza przy 90% 5 h.
 
