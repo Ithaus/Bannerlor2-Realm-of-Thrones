@@ -44,17 +44,24 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
   `NextLongTermPathPoint` jak w grze. Cel bez zmian - `DoAIMove` porownuje cel, nie punkty trasy.
 - PRZEPRAWY: lord w wojnie z panem przeprawy CrossingLaw (Twins, Moat Cailin, Bloody Gate - te same id) nie dostaje objazdu przez strefe (CrossingRadius + 1
   jedn.) - inaczej droga wiodlaby go pod most, straz odbija, po 3 h przerwy znow objazd.
-- POWTORKA CELU: pamiec partii bez blokad (1 << 17 slotow long: Party.Index | skrot celu | stan; godzina osobno) - ten sam cel w tej samej godzinie = bez planowania.
+- POWTORKA CELU: pamiec partii bez blokad (1 << 17 slotow long: Party.Index | skrot celu | stan; godzina i liczba planow osobno) - ten sam cel w tej samej
+  godzinie = bez planowania; cel ruchomy (nowa sciana celu kilka razy na godzine) - najwyzej 3 plany partii na godzine, dalej trasa gry do konca godziny
+  (licznik `ponad 3 plany partii na godzine`).
 - POMIAR (tylko log): `AI drogi (AD): latka MobileParty.ComputePath ...` (start gry), `AI drogi (AD): start sesji ...` (siec, krawedzie, przeprawy, czas budowy,
   CZYNNE/powod), `AI drogi (AD): dzien N | ...` (liczone, krotsze, powtorki, planowane, objazdy wg rodzaju, odrzucone z powodem, ominiete strefy przepraw,
-  sredni nadklad / udzial drogi / czas szac., spis partio-godzin w marszu na drodze - TA SAMA MIARA co `Drogi (DR)`: `MapRoads.KindAt` w punkcie partii -
+  sredni nadklad / udzial drogi / czas szac., spis partio-godzin w marszu na drodze - TA SAMA MIARA co `Drogi (DR)`: `MapRoads.KindAt == 2` (trakt) w punkcie
+  partii, ten sam filtr partii -
   osobno partie na objezdzie i ile z nich na drodze, koszt ms/dobe, odcinki silnika, potkniecia). Linia w dobach pomiaru (`LogGate`, jak MapRoads).
 - KLUCZE NOWE (grupa MCM "The marching column", po kluczach blota): `MapRoadAiRoutes` (TAK), `MapRoadAiMinDistance` (30, 10..200), `MapRoadAiDetourPercent`
   (15, 0..50; zakresy w `tools/gen_mcm.py`). Latki wpinane zawsze przy starcie gry (klucz dziala na zywo), postfiks wychodzi od razu przy kluczu NIE albo
-  `MapRoadSpeedBonus` NIE. Wlaczenie w trakcie sesji - siec budowana w nastepnej dobie.
+  `MapRoadSpeedBonus` NIE. Wlaczenie w trakcie sesji (MapRoadAiRoutes albo MapRoadSpeedBonus) - siec budowana w nastepnej dobie.
 - Wpiecia: `ArmouryBehavior.cs` (linia `_p6DrogiReset`, godzina po MapMud.Hourly, start sesji po MapMud.SessionStart, doba po MapMud.Daily),
   `SubModuleMain.cs` (ApplyAll po MapRoads.ApplyAll), `Settings.cs` (3 pola po MapMudWetSpeedPercent), `McmSettings.cs` (gen_mcm), `tools/gen_mcm.py` (2 zakresy).
-  `tools/sprawdz_logi.py` bez zmian (wzorce ponizej).
+  `tools/sprawdz_logi.py`: nowa grupa `--grupa p6drogi` (funkcja `p6drogi_main`, progi AD-0..AD-10; dopis pomocy przed `--grupa nks`, wywolanie po `ndrogi`).
+- WZNOWIENIE (20.10, po "zacznij fale 2"): kod poprzedniego agenta (3 commity) przejrzany wobec dekompilacji 1.4.8 i n22-calosc (MapRoads / MapMud /
+  CrossingLaw / MarchPace bez zmian od bazy; nikt inny nie latkuje ComputePath / RecalculateLongTermPath / NavigationPath; BK, NavalDLC, SCAI, Diplomacy,
+  RealisticBannerlord nie czytaja Path / NextLongTermPathPoint). Poprawki: spis "na drodze" liczy tylko trakt (jak `Drogi (DR)`, wczesniej takze droga boczna),
+  limit 3 planow partii na godzine, ponowna budowa sieci po wlaczeniu `MapRoadSpeedBonus` w trakcie sesji, grupa `p6drogi` w sprawdz_logi.py.
 
 **Ryzyko / co sprawdzic (kontrola calosci).**
 - ZASIEG: drogi sa tylko tam, gdzie ROT je namalowal. Symulacja (L = prosta x 1.15): polowa miast/zamkow nie ma wezla drogi w promieniu 20 jedn.
@@ -103,6 +110,8 @@ karawany 7.9-9.8%, wozy wsi 7.6-8.4% (bandy 1.7-3.0%) - przy szerszym polu drogi
 - `AI drogi (AD): dzien` - `objazdy droga N` > 0 z rodami, karawanami i wozami wsi > 0; `odrzucone` z powodami (najwiecej `bez drogi w zasiegu` - Essos);
   `objazd sr.: nadklad drogi` <= +15%, `droga` >= 50%, `czas szac.` <= 100%; `na objezdzie K, z tego na drodze J` z udzialem wyraznie ponad 9% (oczekiwane > 50%);
   `koszt: planowanie` < ok. 50 ms/dobe; `potkniecia dzis 0`.
-- Porownanie z WGRANIEM 91: w `Drogi (DR): dzien` udzial `rody`, `karawany`, `wozy wsi` powinien wzrosnac ponad 7-10% (bandy bez zmian ok. 2-3%).
+- Porownanie z WGRANIEM 91: w `Drogi (DR): dzien` udzial `rody`, `karawany`, `wozy wsi` powinien wzrosnac ponad 7-10% (bandy bez zmian ok. 2-3%);
+  NDR-3 (`--grupa ndrogi`, udzial calego AI 1-25%) moze wzrosnac z ok. 6.5% - nadal w progu.
+- `python -I tools/sprawdz_logi.py --grupa p6drogi <Armoury-*.log>` - AD-0..AD-9 TAK (AD-7, AD-10 INFO).
 - Brak nowych bledow w CrashScribe (FailedAssert sciezki, NullReference w ComputePath / DoAiPathMode) i brak partii stojacych z celem (np. karawany bez
   handlu przez wiele dni) - porownac liczbe kursow wozow/karawan z linii ekonomii.

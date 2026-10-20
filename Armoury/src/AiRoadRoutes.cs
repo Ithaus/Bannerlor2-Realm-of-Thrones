@@ -47,11 +47,12 @@ namespace Armoury
     /// bez sciezki, ponad 128 punktow albo dlugosc / udzial drogi po policzeniu poza progiem = trasa gry bez zmian. Przyjeta trasa zastepuje punkty
     /// NavigationPath (Size, PathPoints; PathBegin = 0 juz ustawil ComputePath), NextLongTermPathPoint jak w grze. Cel trasy bez zmian (ostatni punkt = cel).
     /// POWTORKA CELU: pamiec partii bez blokad (1 << 17 slotow long: Party.Index | skrot celu | stan, osobno godzina) - ten sam cel liczony ponownie w tej
-    /// samej godzinie = bez planowania (inna latka przesuwajaca cel co klatke nie zrobi z tego kosztu co klatke).
+    /// samej godzinie = bez planowania (inna latka przesuwajaca cel co klatke nie zrobi z tego kosztu co klatke); cel ruchomy - najwyzej PlansPerHour (3) plany
+    /// partii na godzine, dalej trasa gry.
     /// WATKI: graf niezmienny po budowie (jedna referencja volatile); pamiec robocza [ThreadStatic] na watek (raz na watek), bez alokacji w planowaniu;
     /// liczniki Interlocked; potkniecia liczone (pierwsze zapamietane do linii), nigdy wylacznik funkcji.
     /// POMIAR (tylko log): linia "AI drogi (AD): start sesji" i "AI drogi (AD): dzien N" (liczone / przyjete / odrzucone z powodem, sredni nadklad, udzial drogi,
-    /// spis partio-godzin w marszu - ta sama miara co MapRoads: MapRoads.KindAt w punkcie partii - osobno partie na objezdzie, koszt ms/dobe). Nic w zapisie
+    /// spis partio-godzin w marszu - ta sama miara co MapRoads: MapRoads.KindAt == 2 (trakt) w punkcie partii - osobno partie na objezdzie, koszt ms/dobe). Nic w zapisie
     /// gry: trasa liczy sie od nowa po wczytaniu (ComputePathAfterLoad / nowy cel), stary zapis bez zmian; Reset przy nowej kampanii i przed wczytaniem.
     /// Klucze NOWE: MapRoadAiRoutes (TAK), MapRoadAiMinDistance (30), MapRoadAiDetourPercent (15). Wylaczony klucz albo MapRoadSpeedBonus = trasy gry.
     /// </summary>
@@ -168,8 +169,11 @@ namespace Armoury
 
         private static readonly long[] _slotKey = new long[1 << SlotBits];
         private static readonly int[] _slotHour = new int[1 << SlotBits];
+        private static readonly int[] _slotCnt = new int[1 << SlotBits];   // planow tej partii w godzinie _slotHour
+        private const int PlansPerHour = 3;
 
         // liczniki doby (watki robocze - Interlocked)
+        private static long _capped;
         private static long _seen, _short, _repeat, _planned, _noRoad, _notWorth, _fewRoad, _tooLong, _navFail, _tooMany, _legCalls, _ticks;
         private static readonly long[] _acc = new long[3];
         private static long _overPm, _roadPm, _timePm;
@@ -300,13 +304,16 @@ namespace Armoury
             Interlocked.Increment(ref _seen);
             if (!(L >= MinDist(s))) { Interlocked.Increment(ref _short); return; }
 
-            // powtorka celu w tej samej godzinie - bez planowania
+            // powtorka celu w tej samej godzinie - bez planowania; cel ruchomy (np. patrol wokol partii - nowa sciana celu kilka razy na godzine) - najwyzej
+            // PlansPerHour planow na partie na godzine (dalej trasa gry do konca godziny). Jedna partia = jeden watek naraz (ruch partii raz na klatke).
             int idx = mp.Party.Index;
             long key = ((long)idx << 32) | (long)TargetHash(T);
             int slot = idx & SlotMask;
             int hour = (int)CampaignTime.Now.ToHours;
             long old = Volatile.Read(ref _slotKey[slot]);
-            if ((old & ~3L) == key && hour - Volatile.Read(ref _slotHour[slot]) < 1) { Interlocked.Increment(ref _repeat); return; }
+            bool sameHour = hour == Volatile.Read(ref _slotHour[slot]);
+            if (sameHour && (old & ~3L) == key) { Interlocked.Increment(ref _repeat); return; }
+            if (sameHour && Volatile.Read(ref _slotCnt[slot]) >= PlansPerHour) { Interlocked.Increment(ref _capped); return; }
 
             long t0 = Stopwatch.GetTimestamp();
             long st = StRejected;
@@ -317,6 +324,7 @@ namespace Armoury
             }
             finally
             {
+                Volatile.Write(ref _slotCnt[slot], sameHour ? _slotCnt[slot] + 1 : 1);
                 Volatile.Write(ref _slotHour[slot], hour);
                 Volatile.Write(ref _slotKey[slot], key | st);
                 Interlocked.Add(ref _ticks, Stopwatch.GetTimestamp() - t0);
@@ -536,6 +544,7 @@ namespace Armoury
             _crossPos = new Vec2[0];
             Array.Clear(_slotKey, 0, _slotKey.Length);
             Array.Clear(_slotHour, 0, _slotHour.Length);
+            Array.Clear(_slotCnt, 0, _slotCnt.Length);
             ZeroDay();
             _stumblesAll = 0; _first = null;
         }
@@ -546,6 +555,7 @@ namespace Armoury
             for (int i = 0; i < _acc.Length; i++) _acc[i] = 0;
             _overPm = _roadPm = _timePm = 0;
             _crossAvoid = 0;
+            _capped = 0;
             _stumbles = 0;
         }
 
@@ -611,7 +621,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!s.MapRoadSpeedBonus) { _note = "MapRoadSpeedBonus wylaczony - siec niezbudowana"; return 0; }
+                if (!s.MapRoadSpeedBonus) { _tried = false; _note = "MapRoadSpeedBonus wylaczony - siec niezbudowana"; return 0; }   // wlaczenie premii w MCM - budowa w nastepnej dobie
                 if (!MapRoads.Ready) { _note = "premia drog nieczynna (MapRoads bez siatki: brak pliku albo inna mapa) - siec niezbudowana"; return 0; }
                 string path = MapVillageData.DataPathFor(MapRoads.FileName);
                 if (path == null || !File.Exists(path)) { _note = "BRAK pliku ModuleData\\" + MapRoads.FileName; return 0; }
@@ -878,8 +888,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------------ pomiar (watek glowny)
-        /// <summary>Godzina w dobie pomiaru (LogGate.Today): partie rodow, karawan i wozow wsi w marszu ladem - na drodze (MapRoads.KindAt, ta sama miara co
-        /// linia "Drogi (DR)"), osobno na objezdzie (przyjety objazd do biezacego celu).</summary>
+        /// <summary>Godzina w dobie pomiaru (LogGate.Today): partie rodow, karawan i wozow wsi w marszu ladem - na trakcie (MapRoads.KindAt == 2, ta sama miara
+        /// co "na drodze" w linii "Drogi (DR)": ten sam filtr partii, ta sama siatka i margines), osobno na objezdzie (przyjety objazd do biezacego celu).</summary>
         internal static void Hourly()
         {
             var s = Settings.Current;
@@ -897,7 +907,7 @@ namespace Armoury
                         int k = Cat(mp);
                         if (k < 0) continue;
                         var p = mp.Position;
-                        bool on = MapRoads.KindAt(p.X, p.Y) > 0;
+                        bool on = MapRoads.KindAt(p.X, p.Y) == 2;   // trakt (2), jak "na drodze" w MapRoads.Hourly - droga boczna (1) nie liczy sie (siec objazdow to same trakty)
                         _hN[k]++;
                         if (on) _hOn[k]++;
                         int idx = mp.Party.Index;
@@ -925,11 +935,11 @@ namespace Armoury
             if (s == null) return;
             try
             {
-                if (s.MapRoadAiRoutes && _g == null && !_tried)
+                if (s.MapRoadAiRoutes && s.MapRoadSpeedBonus && _g == null && !_tried)
                 {
                     double ms = TryBuild();   // klucz wlaczony w MCM w trakcie sesji - siec budowana tu (watek glowny)
                     if (_cross.Length == 0) FindCrossings();
-                    Log.Info(P + "siec zbudowana w trakcie sesji: " + _note + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
+                    Log.Info(P + "budowa sieci w trakcie sesji (klucz wlaczony w MCM): " + _note + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
                 }
                 if (!s.MapRoadAiRoutes) { ZeroDay(); return; }
                 if (!LogGate.Lines) { ZeroCounters(); return; }
@@ -949,6 +959,7 @@ namespace Armoury
               .Append(" | ").Append(Status()).Append(", marsz od ").Append(MinDist(s).ToString("0", ci)).Append(" jedn., nadklad do ").Append((Detour(s) * 100f).ToString("0", ci)).Append('%')
               .Append(" | trasy AI (rody, karawany, wozy wsi; ladem do osady / punktu): liczone ").Append(_seen.ToString(ci))
               .Append(", krotsze od progu ").Append(_short.ToString(ci)).Append(", powtorka celu ").Append(_repeat.ToString(ci))
+              .Append(", ponad ").Append(PlansPerHour.ToString(ci)).Append(" plany partii na godzine ").Append(_capped.ToString(ci))
               .Append(", planowane ").Append(_planned.ToString(ci))
               .Append(" | objazdy droga ").Append(acc.ToString(ci)).Append(" (").Append(Pct(acc, _planned)).Append("% planowanych; rody ").Append(_acc[0].ToString(ci))
               .Append(", karawany ").Append(_acc[1].ToString(ci)).Append(", wozy wsi ").Append(_acc[2].ToString(ci)).Append(')')
