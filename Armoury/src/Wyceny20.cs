@@ -426,7 +426,7 @@ namespace Armoury
             for (int i = 1; i + 1 < list.Count; i++)
             {
                 var ci = list[i];
-                bool k30 = (ci.opcode == OpCodes.Ldc_I4_S && ci.operand is sbyte && (sbyte)ci.operand == 30) || (ci.opcode == OpCodes.Ldc_I4 && ci.operand is int && (int)ci.operand == 30);
+                bool k30 = ci.LoadsConstant(30L);   // ldc.i4.s 30 (IL BK 1.4.8: ShowInquiry get_Value, 30, mul; ApplyGoal get_Value, neg, 30, mul)
                 if (!k30 || list[i + 1].opcode != OpCodes.Mul) continue;
                 bool afterValue = (_getValue != null && IsGetValue(list[i - 1], _getValue)) || (list[i - 1].opcode == OpCodes.Neg && i >= 2 && _getValue != null && IsGetValue(list[i - 2], _getValue));
                 if (!afterValue || to == null) continue;
