@@ -666,6 +666,9 @@ namespace Armoury
         public float SeaStormWinterFactor = 2f;            // in winter: how many times more often storms are born at sea, and how many times more of them can rage at once (2 = twice, 12 storms instead of 6; 1 = as in summer; at most 2.3 - 14 storms)
         public bool SeaStormSlowsShips = true;             // ships caught in a storm at sea sail slower by Sea Storm Ship Speed Percent - yours, the lords', caravans, pirates alike ('Storm' line in the speed tooltip), in every season. The storm's strong wind still drives on a ship that runs before it. A storm only slows ships down, it never stops them. Off = storms do not slow ships, as before
         public float SeaStormShipSpeedPercent = 15f;       // how much slower a ship sails inside a storm at sea, in percent of its speed (15 = -15%; at most 50)
+        // p6-sztormy (recenzja 20.10, POMYSLY pkt 11 "wyspy trudniej zaopatrzyc"): zima ladunek "w dobach" przez morze (wozy jedzenia KS-H, materialy, hurt kupcow,
+        // zaopatrzenie zamkow, drewno dymarek) czeka w porcie na pogode: + doba portu x (SeaStormWinterFactor - 1) = 1 doba przy x2. Tylko opoznienie, nic nie ginie
+        public bool SeaStormWinterCarts = true;            // winter sea crossings for goods: while there are more storms at sea in winter (Sea Storm Winter), every load of goods that crosses the sea - food for the islands, smithing materials, merchants' wares, castle supplies, wood for bloomeries - waits in port for a weather window and arrives later (1 extra day at Winter Factor 2). Goods are never lost and no route is closed. Off = sea loads take as long in winter as in summer, as before
 
         // --- Smithing materials ---
         public bool MaterialLawEnabled = true;             // charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal

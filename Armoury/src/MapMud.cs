@@ -169,12 +169,16 @@ namespace Armoury
                 if (res <= 0f) return;
                 float f = 1f + r.SumOfFactors;
                 float cut = res * pct;
+                float target = res - cut;   // cel: wynik przed kara x (1 - procent)
                 r.Add(f > 0.01f ? -cut / f : -cut, lvl == 2 ? _txtMud : _txtWet);
-                // inny model trzyma wynik samym LimitMax (bez Add) - kara zginelaby pod sufitem: sufit w dol o ten sam procent
+                // inny model trzyma wynik samym LimitMax (bez Add) - kara zginelaby pod sufitem. Recenzja p6-sztormy 20.10: decyzja wzgledem celu PO Add
+                // (dotad: tylko gdy wynik PO Add stal na suficie - wynik bez obciecia tuz nad sufitem gubil czesc kary); nie nizej niz LimitMin. Na ladzie
+                // gra ma tylko LimitMin (NavalDLC LimitMax 10 - tylko morze), wiec dzis ta galaz praktycznie nie wchodzi
                 float lim = r.LimitMaxValue;
-                if (lim > 0f && lim < float.MaxValue * 0.5f && r.ResultNumber >= lim - 0.0005f && lim > res - cut + 0.001f)
+                if (lim > 0f && lim < float.MaxValue * 0.5f && res >= lim - 0.0005f && r.ResultNumber > target + 0.001f)
                 {
-                    r.LimitMax(lim * (1f - pct));
+                    float lo = r.LimitMinValue;
+                    r.LimitMax(target > lo ? target : lo);
                     _capLowered++;
                 }
                 if (lvl == 2) _mudHeavy++; else _mudLight++;

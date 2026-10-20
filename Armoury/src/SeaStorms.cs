@@ -10,6 +10,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -54,14 +55,14 @@ namespace Armoury
     /// KOSZT: postfiksy NavalDLC - mnozenie przez liczbe z pamieci (watek glowny, raz na wezel morza na godzine); predkosc (watki robocze gry, PartiesThink)
     /// - tylko partie na morzu: przeglad listy burz NavalDLC (najwyzej 14) przez skompilowane gettery, bez alokacji i bez blokad (NavalDLC czyta te sama liste
     /// z tych samych watkow - wiatr w swoim modelu predkosci). Pora roku i mnoznik zimy - raz na godzine w watku glownym (pamiec). Spis partii na morzu
-    /// tylko w dobach pomiaru (LogGate.Today), linia "Sztormy (SZ): dzien N" w dobie linii (LogGate.Lines). Potkniecia liczone, nigdy wylacznik calej funkcji.
+    /// tylko w dobach pomiaru (LogGate.Today), linia "Sztormy (MS): dzien N" w dobie linii (LogGate.Lines). Potkniecia liczone, nigdy wylacznik calej funkcji.
     /// STAN: brak zapisu (burze zapisuje NavalDLC; regula wynika z pory roku); liczniki tylko w pamieci, od zera przy nowej kampanii / wczytaniu (Reset).
     /// Klucze NOWE: SeaStormWinter (TAK), SeaStormWinterFactor (2, przyciete 1..2.3), SeaStormSlowsShips (TAK), SeaStormShipSpeedPercent (15, przyciete 0..50).
     /// Wylaczony klucz = jak przed zmiana (postfiksy oddaja wynik NavalDLC, predkosc wychodzi od razu).
     /// </summary>
     internal static class SeaStorms
     {
-        private const string P = "Sztormy (SZ): ";
+        private const string P = "Sztormy (MS): ";
         private const int CapCeiling = 14;       // bufor kosci okludera NavalDLC: 16 = 14 burz + 2 burze fabuly
         private const float FactorMax = 2.3f;    // 6 x 2.3 = 13.8 -> 14
         private const int MaxPercent = 50;
@@ -167,6 +168,8 @@ namespace Armoury
             _snapN = 0; _snapInit = false;
             _parStumblesAll = 0; _stumblesAll = 0; _firstPar = null;
             _lastCap = -1; _lastCapBase = -1; _lastChance = -1f; _lastChanceBase = -1f;
+            for (int i = 0; i < 2; i++) { _sCartSea[i] = 0; _sCartLate[i] = 0; _sCartDays[i] = 0; }
+            lock (_seaPair) { _seaPair.Clear(); _pairCalls = 0; }   // pary osad poprzedniej kampanii (inna mapa / inne osady)
         }
 
         private static void ZeroDay()
@@ -178,6 +181,7 @@ namespace Armoury
             _calls = 0; _inStorm = 0; _capLowered = 0; _ticks = 0; _sampled = 0;
             _chanceCalls = 0; _chanceRaised = 0; _capCalls = 0; _capRaised = 0;
             _parStumbles = 0; _stumbles = 0;
+            for (int i = 0; i < _dCartSea.Length; i++) { _dCartSea[i] = 0; _dCartLate[i] = 0; _dCartDays[i] = 0; }
         }
 
         // ------------------------------------------------------------------ latki (menu glowne, SubModuleMain - po MapRoads.ApplyAll)
@@ -335,18 +339,100 @@ namespace Armoury
                 if (res <= 0f) return;
                 float f = 1f + r.SumOfFactors;
                 float cut = res * pct;
+                float target = res - cut;   // cel: wynik przed kara x (1 - procent)
                 r.Add(f > 0.01f ? -cut / f : -cut, _txtStorm);
-                // sufit NavalDLC na morzu (LimitMax 10) albo inny sam LimitMax - kara zginelaby pod nim: sufit w dol o ten sam procent
+                // recenzja 20.10 (wazne): sufit NavalDLC na morzu (LimitMax 10) albo inny sam LimitMax trzymal wynik PRZED kara - wynik bez obciecia byl nad
+                // sufitem, wiec Add zjada czesc kary (bez obciecia 11.0: 11.0 - 1.5 = 9.5 zamiast 8.5). Decyzja wzgledem celu PO Add: wynik nadal ponad
+                // celem = sufit w dol do celu (nie nizej niz LimitMin - podloga gry wygrywa jak dotad)
                 float lim = r.LimitMaxValue;
-                if (lim > 0f && lim < float.MaxValue * 0.5f && r.ResultNumber >= lim - 0.0005f && lim > res - cut + 0.001f)
+                if (lim > 0f && lim < float.MaxValue * 0.5f && res >= lim - 0.0005f && r.ResultNumber > target + 0.001f)
                 {
-                    r.LimitMax(lim * (1f - pct));
+                    float lo = r.LimitMinValue;
+                    r.LimitMax(target > lo ? target : lo);
                     _capLowered++;
                 }
                 _inStorm++;
             }
             catch (Exception e) { ParStumble(e); }
             finally { if (t0 != 0) { _ticks += Stopwatch.GetTimestamp() - t0; _sampled++; } }
+        }
+
+        // ------------------------------------------------------------------ ladunki "w dobach" przez morze (watek glowny - takty doby systemow wozow)
+        // Recenzja 20.10 (wazne): POMYSLY pkt 11 obiecuje "statki z towarem kursuja na Zelazne Wyspy rzadziej i trudniej je zaopatrzyc". Glowny dowoz wysp
+        // to ladunki liczone w dobach (bez partii na morzu - burza ich nie widzi): wozy jedzenia KS-H (KsFoodCarts), materialy kowali (MaterialCarts), hurt
+        // kupcow (TradeCarts), zaopatrzenie zamkow (GarrisonCarts), drewno dymarek (Bloomery). Zima (ta sama flaga co szansa burz) kazdy taki ladunek przez
+        // morze czeka w porcie na okno pogody: + doba portu KS (KsCore.PortDays = 1) x (mnoznik zimy - 1) = 1 doba przy x2. Tylko opoznienie w chwili wysylki:
+        // ilosc, cena i fracht bez zmian, przeplyw na dobe ten sam (woz na pare na dobe), wiec dluga zima przesuwa dostawy, a nie odcina wysp od zboza.
+        // Morze: flaga systemu (KS-H "sea", materialy "naval") albo para bez drogi ladowej (MapDistanceModel ladem, ten sam prog co wozy - CartTownExit.BkLimit).
+        internal const int CKs = 0, CMat = 1, CTrade = 2, CCastle = 3, CBloom = 4;
+        private static readonly string[] CartName = { "jedzenie KS-H", "materialy", "hurt kupcow", "zamki", "dymarki" };
+        private static readonly int[] _dCartSea = new int[5], _dCartLate = new int[5], _dCartDays = new int[5];
+        private static readonly long[] _sCartSea = new long[2], _sCartLate = new long[2], _sCartDays = new long[2];   // od wczytania wedlug pory wysylki: [0] poza zima, [1] zima
+        private static readonly System.Collections.Generic.Dictionary<long, bool> _seaPair = new System.Collections.Generic.Dictionary<long, bool>();   // para osad -> bez drogi ladowej
+        private static int _pairCalls;
+
+        private static bool CartsOn(Settings s) { return s != null && s.SeaStormWinterCarts && s.SeaStormWinter; }
+
+        /// <summary>Doby czekania w porcie dla ladunku przez morze wyslanego teraz: zima i klucze wlaczone - round(PortDays x (mnoznik - 1)), inaczej 0.</summary>
+        internal static int WinterPortDays()
+        {
+            var s = Settings.Current;
+            if (!_winter || !CartsOn(s)) return 0;
+            int d = (int)Math.Round(KsCore.PortDays * (FactorOf(s) - 1f), MidpointRounding.AwayFromZero);
+            return d > 0 ? d : 0;
+        }
+
+        /// <summary>Wpiecie w chwili wysylki ladunku (sys = CKs..CBloom): sea - system wie, ze plynie morzem; inaczej para a-b bez drogi ladowej = morze.
+        /// Zwraca doby do dodania do terminu dostawy (0 - lad, poza zima, klucz wylaczony). Nigdy wyjatek na zewnatrz.</summary>
+        internal static int CartDays(int sys, bool sea, Settlement a, Settlement b)
+        {
+            try
+            {
+                if (!sea && a != null && b != null) sea = SeaPair(a, b);
+                if (!sea) return 0;
+                int extra = WinterPortDays();
+                int k = _winter ? 1 : 0;
+                if (sys < 0 || sys >= _dCartSea.Length) sys = CKs;
+                _dCartSea[sys]++; _sCartSea[k]++;
+                if (extra > 0) { _dCartLate[sys]++; _dCartDays[sys] += extra; _sCartLate[k]++; _sCartDays[k] += extra; }
+                return extra;
+            }
+            catch (Exception e) { Stumble("CartDays", e); return 0; }
+        }
+
+        private static bool SeaPair(Settlement a, Settlement b)
+        {
+            uint ia = a.Id.InternalValue, ib = b.Id.InternalValue;
+            long key = ia < ib ? ((long)ia << 32) | ib : ((long)ib << 32) | ia;
+            bool sea;
+            lock (_seaPair) { if (_seaPair.TryGetValue(key, out sea)) return sea; }
+            float d = -1f;
+            try
+            {
+                var c = Campaign.Current;
+                var m = c != null ? c.Models.MapDistanceModel : null;
+                if (m == null) return false;
+                d = m.GetDistance(a, b, false, false, MobileParty.NavigationType.Default);
+            }
+            catch { d = -1f; }
+            sea = !(d >= 0f && d < CartTownExit.BkLimit);   // jak TradeCarts.Road / GarrisonCarts.MarketFor: brak drogi ladowej = ladem i morzem
+            lock (_seaPair) { _seaPair[key] = sea; _pairCalls++; }
+            return sea;
+        }
+
+        private static void CartLine(Settings s, StringBuilder sb)
+        {
+            int sea = 0, late = 0, days = 0;
+            for (int i = 0; i < _dCartSea.Length; i++) { sea += _dCartSea[i]; late += _dCartLate[i]; days += _dCartDays[i]; }
+            sb.Append(" | ladunki w dobach przez morze: klucz SeaStormWinterCarts ").Append(s.SeaStormWinterCarts ? "tak" : "nie")
+              .Append(" (zima +").Append(CartsOn(s) ? (int)Math.Round(KsCore.PortDays * (FactorOf(s) - 1f), MidpointRounding.AwayFromZero) : 0).Append(" dob w porcie)")
+              .Append(", teraz +").Append(WinterPortDays())
+              .Append("; w dobie morskich ").Append(sea).Append(", opoznionych ").Append(late).Append(" (+").Append(days).Append(" dob) - ");
+            for (int i = 0; i < CartName.Length; i++)
+                sb.Append(i > 0 ? ", " : "").Append(CartName[i]).Append(' ').Append(_dCartLate[i]).Append('/').Append(_dCartSea[i]);
+            sb.Append(" (opoznionych/morskich); od wczytania: zima morskich ").Append(_sCartSea[1]).Append(", opoznionych ").Append(_sCartLate[1]).Append(" (+").Append(_sCartDays[1]).Append(" dob)")
+              .Append(", poza zima morskich ").Append(_sCartSea[0]).Append(", opoznionych ").Append(_sCartLate[0])
+              .Append("; par sprawdzonych ").Append(_pairCalls);
         }
 
         // ------------------------------------------------------------------ godzina i doba (watek glowny)
@@ -560,7 +646,7 @@ namespace Armoury
         private static string Pct(long a, long b) { return b > 0 ? (100.0 * a / b).ToString("0.0", Inv) : "-"; }
         private static string Avg(double sum, long n, string fmt) { return n > 0 ? (sum / n).ToString(fmt, Inv) : "-"; }
 
-        /// <summary>Takt doby (po MapMud.Daily): w dobie linii (LogGate.Lines) linia "Sztormy (SZ): dzien N" za dobe; potem zerowanie doby.</summary>
+        /// <summary>Takt doby (po MapMud.Daily): w dobie linii (LogGate.Lines) linia "Sztormy (MS): dzien N" za dobe; potem zerowanie doby.</summary>
         internal static void Daily()
         {
             var s = Settings.Current;
@@ -619,6 +705,7 @@ namespace Armoury
             }
             sb.Append(" | liczenia predkosci na morzu (ok.) ").Append(_calls).Append(", w burzy z kara ").Append(_inStorm).Append(", sufit obnizony ").Append(_capLowered);
             Audit(s, sb);
+            CartLine(s, sb);   // recenzja 20.10: ladunki w dobach przez morze (zima czekaja w porcie)
             double censusMs = _censusTicks * 1000.0 / Stopwatch.Frequency;
             double us = _sampled > 0 ? _ticks * 1e6 / Stopwatch.Frequency / _sampled : 0;
             sb.Append(" | koszt: spis ").Append(censusMs.ToString("0.000", ci)).Append(" ms/dobe, sciezka predkosci ").Append(us.ToString("0.000", ci))

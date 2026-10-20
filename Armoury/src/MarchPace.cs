@@ -194,7 +194,9 @@ namespace Armoury
                 }
                 MapRoads.SpeedModels = done;   // SW-DROGI (recenzja, uwaga 4): linie "Drogi (DR)" mowia NIECZYNNA, gdy ta latka nie weszla przy starcie gry
                 if (c.MarchPaceEnabled) Log.Info("MarchPace: kolumna marszowa wpieta w " + done + " modeli predkosci.");
-                else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla premii drog (MapRoadSpeedBonus).");
+                else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla "   // p6-sztormy (recenzja): ktore klucze niosa latke
+                              + (c.MapRoadSpeedBonus && c.SeaStormSlowsShips ? "premii drog (MapRoadSpeedBonus) i kary burzy na morzu (SeaStormSlowsShips)"
+                                 : c.SeaStormSlowsShips ? "kary burzy na morzu (SeaStormSlowsShips)" : "premii drog (MapRoadSpeedBonus)") + ".");
             }
             catch (Exception e) { Log.Error("MarchPace.ApplyAll", e); }
         }

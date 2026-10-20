@@ -156,7 +156,7 @@ namespace Armoury
                 if (!_today.TryGetValue(pk, out c))
                 {
                     int today = Today();
-                    int days = Days(src, dst, straight);
+                    int days = Days(src, dst, straight) + SeaStorms.CartDays(SeaStorms.CTrade, false, src, dst);   // p6-sztormy (recenzja): zima przez morze - czekanie w porcie
                     c = new Cart { Src = src, Dst = dst, DayBought = today, DayDue = today + days };
                     _today[pk] = c; _carts.Add(c);
                     _dCarts++; _dDaysSum += days;

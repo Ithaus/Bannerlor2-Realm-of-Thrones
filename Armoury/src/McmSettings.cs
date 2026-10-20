@@ -1904,6 +1904,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SeaStormShipSpeedPercent { get; set; } = 15f;
 
+        [SettingPropertyBool("Sea Storm Winter Carts", HintText = "winter sea crossings for goods: while there are more storms at sea in winter (Sea Storm Winter), every load of goods that crosses the sea - food for the islands, smithing materials, merchants' wares, castle supplies, wood for bloomeries - waits in port for a weather window and arrives later (1 extra day at Winter Factor 2). Goods are never lost and no route is closed. Off = sea loads take as long in winter as in summer, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormWinterCarts { get; set; } = true;
+
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool MaterialLawEnabled { get; set; } = true;
@@ -8899,6 +8903,7 @@ namespace Armoury
             s.SeaStormWinterFactor = SeaStormWinterFactor;
             s.SeaStormSlowsShips = SeaStormSlowsShips;
             s.SeaStormShipSpeedPercent = SeaStormShipSpeedPercent;
+            s.SeaStormWinterCarts = SeaStormWinterCarts;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;

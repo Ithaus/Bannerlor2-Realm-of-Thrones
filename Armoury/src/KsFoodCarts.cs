@@ -1150,7 +1150,7 @@ namespace Armoury
                     long pv; pendFreight.TryGetValue(s, out pv); pendFreight[s] = pv + frPaid;
                 }
             }
-            var c = new Cart { Src = src, Dst = dstS, Z = k, N = n, DayBought = today, DayDue = today + (int)Math.Max(1f, L), Paid = paidG, Freight = frPaid, Sea = sea, Val = consign ? cost : paidG, Cons = consign, Dep = depPaid };
+            var c = new Cart { Src = src, Dst = dstS, Z = k, N = n, DayBought = today, DayDue = today + (int)Math.Max(1f, L) + SeaStorms.CartDays(SeaStorms.CKs, sea, null, null), Paid = paidG, Freight = frPaid, Sea = sea, Val = consign ? cost : paidG, Cons = consign, Dep = depPaid };
             _carts.Add(c);
             AddInc(c, +1);
             _dLots++; if (sea) _dSea++; else _dLand++;
