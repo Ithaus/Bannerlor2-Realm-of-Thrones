@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-20 (WGRANIE 95 - po pierwszej grze Jeffa na 94: turniej, nocleg, menu miasta, zajazd)
+
+**Zakres (Jeff 20.10, doslownie):** "jest blad w turniejach odpadlem w drugiej rundzie ... zaplacilem ponad 1k ... dostalem w tym samym czasie ponad 8k zlota";
+"ale jak to mozliwe ze doszedlem do drugiej rundy i tyle kasy?"; "nie musisz sztucznie zmniejszac ... jak nie maja kasy to ich zbroje, bo nie moga placic z czego czego
+nie maja"; "4 denary za nocleg to nie za duzo? Sprawdz czy stawki sa realne"; "czy nie mozemy jakos posegregowac te opcje w miescie ... Forge powinno byc w forge";
+"Jak wchodze do zajazdu to powinienem znikac z mapy ... i powinny byc odglosy karczmy"; "za jednym razem z testem 160 dni".
+**Zmiana:** `w-toku/n24-calosc` = WGRANIE 94 (e35e6f99) + m95-turniej (GrandTourney: TourneyRansomKnockerOnly - okup tylko dla tego, kto powalil, takze gdy potem odpadl;
+dotad w walce grupowej przegrany powalony przez kogos spoza zwyciezcow placil zwyciezcy z najlepszym wynikiem - gracz zbieral okupy cudzych; TourneyRansomShare
+pokretlo, domyslnie 1 = pelna wartosc, placi tylko z tego, co ma) + m95-nocleg (InnCommonRoomSharedBed: we wspolnej izbie gracz placi jak czlowiek 1 d, sam z koniem
+2 d zamiast 4) + m95-menu (TownMenuTidy: podmenu "Go to the tavern district" (nocleg, informatorzy), "Go to the smithy" (kuznia gry, naprawa, praca w kuzni,
+zbrojownia, opisy), "Look for paid work", "Town affairs"; RealisticCaptivity Homes.Outside - wyjscie z domu wedlug osady, naprawa NullReference przy domu we wsi)
++ m95-zajazd (RoadsideInnHideParty - druzyna gracza znika z mapy w zajezdzie; RoadsideInnTavernSound - gwar karczmy w menu i w czasie snu). Wpisy:
+docs/noc-1920/m95-*-CHANGELOG.md. Armoury 2129 ustawien, GrandTourney 43, RealisticCaptivity 114 (zmiana Homes.cs); CrashScribe, ForgeView bez zmian.
+**Testy:** 95q (turniej + nocleg): bitwa 4/4, nowa 8/8 - kod 0; 95 (calosc): bitwa, nowa 8 dob, 160 dob z zapisu - w toku przy wpisie (wynik w STAN-PRAC).
+Sesja Jeffa na 94 (10:24-11:50): 0 bledow naszych modow.
+**Ryzyko / co sprawdzic:** menu miasta i zajazd tylko w kodzie i dekompilacji (autotest nie klika menu): kazda opcja dostepna, Back, nocleg, napisy; opcje innych modow
+dodane po starcie sesji zostaja w glownym menu; pobudka po nocy w karczmie wraca do menu miasta.
+**Status:** DO WGRANIA 95 po tescie.
+
 ## 2026-10-20 (WGRANIE 94 - fala 1 (18 pomyslow) + fala 2 (7 pomyslow) z listy 35 Jeffa, poprawki po testach; WGRANIE 93 pominiete)
 
 **Zakres (Jeff 20.10, doslownie):** "28 - nie 29 - nie POzostale tak, zacznij te zmiany i daj znac jak wgrasz."; "Rob od razu fale 2"; "wychownakowie - wywal,
