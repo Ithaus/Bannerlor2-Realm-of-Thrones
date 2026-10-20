@@ -331,7 +331,7 @@ namespace Armoury
                     if (q.T < e - wage * days) { _rBetter++; _dRaid++; _dRaidE += (long)e; return true; }
                 }
                 else { _dNoEst++; days = 0.0; }
-                Pay(mp, leader, st, q, e, days);
+                if (!Pay(mp, leader, st, q, e, days)) { _dRaid++; return true; }                              // nic nie przeszlo (kiesa pusta w miedzyczasie) - rabunek jak w grze
                 Hold(mp);
                 return false;
             }
@@ -372,15 +372,16 @@ namespace Armoury
         }
 
         /// <summary>Okup AI: przelew kiesa wsi -&gt; wodz (najwyzej tyle, ile w kiesie), ochrona, relacja, komunikat graczowi (jego wies albo jego armia).</summary>
-        private static void Pay(MobileParty mp, Hero leader, Settlement st, Quote q, double e, double days)
+        private static bool Pay(MobileParty mp, Hero leader, Settlement st, Quote q, double e, double days)
         {
             var v = st.Village;
             long v0 = v.Gold, g0 = leader.Gold;
             int due = (int)Math.Min(int.MaxValue, Math.Min(q.T, Math.Max(0, v.Gold)));
-            if (due <= 0) return;
+            if (due <= 0) return false;
             GiveGoldAction.ApplyForPartyToCharacter(st.Party, leader, due, true);
             long paid = v0 - v.Gold, got = leader.Gold - g0;
             _dBal += got - paid;
+            if (paid <= 0) return false;
             _dAiT++; _dAiGold += paid; _dRateSum += q.Rate; _dTribE += (long)e; _dPurse += v0;
             Protect(st, mp.MapFaction, paid);
             Relations(leader, st);
@@ -396,6 +397,7 @@ namespace Armoury
                     Log.Player("Your army took " + paid + " denars of tribute from " + Nm(st) + " and spared it.");
             }
             catch (Exception ex) { Stumble("Pay(komunikat)", ex); }
+            return true;
         }
 
         /// <summary>Relacja jak rabunek gry, ale mniejsza: pan wsi -2, notable -1; wies rodu gracza - bez zmiany (jak G CharacterRelationCampaignBehavior.OnRaidCompleted).</summary>
@@ -502,6 +504,7 @@ namespace Armoury
                 var v = st.Village;
                 long v0 = v.Gold, g0 = me.Gold;
                 int due = (int)Math.Min(int.MaxValue, Math.Min(q.T, Math.Max(0, v.Gold)));
+                if (due <= 0) return;
                 GiveGoldAction.ApplyForPartyToCharacter(st.Party, me, due, false);
                 long paid = v0 - v.Gold, got = me.Gold - g0;
                 _dBal += got - paid;
