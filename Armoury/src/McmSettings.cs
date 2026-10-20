@@ -4728,6 +4728,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
 
+        [SettingPropertyBool("Raven News", HintText = "news of far-off wars, battles and sieges reaches you as fast as a raven flies: wars declared and peace or alliances made between other realms, sieges, raids and assaults, lords slain in battle or executed, taken captive or set free, and your realm's hosts gathering come to you later the farther away they happened - about three and a half days from Pentos to Winterfell, at most twelve days - with a note saying where the raven came from (e.g. 'A raven from Winterfell, 3 days on the wing: ...'). News about you, your clan or your fiefs, and wars, peace or alliances of your own realm, still come at once, and so does anything within half a day's ride. Only your messages wait - the lords of the world know what they knew before. Ravens in flight are kept in the save. Off = all news at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RavenNews { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -9449,6 +9453,7 @@ namespace Armoury
             s.InnGossipLootWords = InnGossipLootWords;
             s.InnGossipLeaderNames = InnGossipLeaderNames;
             s.InnGossipPages = InnGossipPages;
+            s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
