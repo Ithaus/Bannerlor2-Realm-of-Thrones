@@ -6660,6 +6660,22 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidPlayerStepPopup { get; set; } = true;
 
+        [SettingPropertyBool("Raid Tribute Enabled", HintText = "instead of burning an enemy village, a lord or army may demand tribute from it: the elders pay a share of the village purse (Raid Tribute Share Low when the raiders barely outnumber the militia, up to Raid Tribute Share High at five to one) and the village is not burned - its people and crops stay. The lords weigh it against the loot of a raid: they take tribute when it pays as well as the raid less the wages of the days it would take, and raid anyway when their men are hungry, their house cannot pay its men, the tribute is less than a day's wages, the villagers would fight, or they are Ironborn or Free Folk. You get Demand tribute in the hostile action menu of an enemy village. After paying, the village is spared by that realm (its lords and you) for Raid Tribute Spare Days and does not pay it again; its lord and elders think a little less of the raider, less than after a raid. Off = villages are raided as before", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidTributeEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Raid Tribute Share Low", 0.00f, 0.50f, "0.00", HintText = "with Raid Tribute Enabled: the share of the village purse paid as tribute when the raiders barely outnumber its defenders (0.10 = a tenth)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidTributeShareLow { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Raid Tribute Share High", 0.00f, 0.50f, "0.00", HintText = "with Raid Tribute Enabled: the share of the village purse paid as tribute when the raiders outnumber its defenders five to one or more (0.20 = a fifth)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidTributeShareHigh { get; set; } = 0.20f;
+
+        [SettingPropertyInteger("Raid Tribute Spare Days", 1, 84, "0", HintText = "with Raid Tribute Enabled: for how many days a village that paid tribute is spared by the realm it paid - its lords do not raid it and do not ask again, and neither can you", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidTributeSpareDays { get; set; } = 30;
+
         [SettingPropertyBool("Village Herds As Loot", HintText = "raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth. Raiders keep at most one animal for every two men", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool VillageHerdsAsLoot { get; set; } = true;
@@ -10136,6 +10152,10 @@ namespace Armoury
             s.RaidDetachmentMen = RaidDetachmentMen;
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
+            s.RaidTributeEnabled = RaidTributeEnabled;
+            s.RaidTributeShareLow = RaidTributeShareLow;
+            s.RaidTributeShareHigh = RaidTributeShareHigh;
+            s.RaidTributeSpareDays = RaidTributeSpareDays;
             s.VillageHerdsAsLoot = VillageHerdsAsLoot;
             s.TiredLandYield = TiredLandYield;
             s.TwinsCrossingCount = TwinsCrossingCount;

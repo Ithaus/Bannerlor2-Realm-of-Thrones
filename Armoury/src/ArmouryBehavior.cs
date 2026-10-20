@@ -719,6 +719,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("ReconcileStock", e); }
         }
         private Dictionary<string,int> _prisonerBaseline;
+        // p6-okup (R3-03a): ochrony wsi po okupie od zera przy nowej kampanii / przed wczytaniem (osobna linia z dala od linii fali 1 - scalenie fali 2 bez konfliktu)
+        private readonly bool _p6OkupReset = P6OkupReset();
+        private static bool P6OkupReset() { try { RaidTribute.Reset(); } catch (Exception e) { Log.Error("P6OkupReset", e); } return true; }
 
         // r4-mur (danina zbozowa Muru, glod Wolnych Ludzi -> najazdy): reset stanu kampanii w inicjalizatorze pola (biegnie przy kazdym konstruktorze ArmouryBehavior,
         // przed jego cialem) - osobna linia zamiast dopisku do jednolinijkowego konstruktora (scalenia paczek nocy)
@@ -906,6 +909,9 @@ namespace Armoury
             // R3-06c / R3-06d (p5-stada): stada wsi po rabunkach i baza ziemi okregow; brak klucza (stary zapis) = pelne stada, baza od pierwszego rachunku
             try { string hd = dataStore.IsSaving ? VillageHerds.Export() : null; SaveText.Sync(dataStore, "arm_herds", ref hd); if (dataStore.IsLoading) VillageHerds.Import(hd); }
             catch (Exception e) { Log.Error("SyncData.arm_herds", e); }
+            // p6-okup (R3-03a): wsie po okupie chronione przed krolestwem napastnika; brak klucza = brak ochron (stary zapis, nowa kampania)
+            try { string rt = dataStore.IsSaving ? RaidTribute.Export() : null; SaveText.Sync(dataStore, "arm_raidtribute", ref rt); if (dataStore.IsLoading) RaidTribute.Import(rt); }
+            catch (Exception e) { Log.Error("SyncData.arm_raidtribute", e); }
             try { string tl = dataStore.IsSaving ? TiredLand.Export() : null; SaveText.Sync(dataStore, "arm_tiredland", ref tl); if (dataStore.IsLoading) TiredLand.Import(tl); }
             catch (Exception e) { Log.Error("SyncData.arm_tiredland", e); }
             // E6/K1 (211): obserwacje W (zgony koni / zgony jezdzcow w misjach) i pula koni weteranow w karczmach (Import odklada napis - przedmioty przy pierwszym uzyciu)
@@ -1469,6 +1475,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
             VillageHerds.RegisterEvents(this);   // R3-06c (p5-stada): reset nowej kampanii, Resolve zapisu, rabunek gry (VillageLooted)
+            RaidTribute.RegisterEvents(this);    // R3-03a (p6-okup): latki i opcja "Demand tribute" w starcie sesji, linia doby "Okup okolicy (R3-03a)"
             TiredLand.RegisterEvents(this);      // R3-06d (p5-stada): reset nowej kampanii
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PackSources.OnDestroyed", PackSources.OnDestroyed));   // m6b: znacznik "RemoveParty po zdarzeniu zniszczenia" (konie przy RemoveParty, towar partii usunietych bez zniszczenia)

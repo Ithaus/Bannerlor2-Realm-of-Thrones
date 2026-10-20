@@ -37,6 +37,10 @@ RANGES = {
     'MapSideRoadSpeedPercent': (0.0, 50.0, "0.0"),
     # p5-bloto (R3-07c): kara blota poza droga w deszczu - kod przycina do 0..50 (MapMud.PctOf)
     'MapMudSpeedPercent': (0, 50, "0"),
+    # p6-okup (R3-03a): stawki okupu wsi (kod przycina do 0..1, gorna >= dolnej) i dni ochrony (kod przycina do 1..364)
+    'RaidTributeShareLow': (0.0, 0.5, "0.00"),
+    'RaidTributeShareHigh': (0.0, 0.5, "0.00"),
+    'RaidTributeSpareDays': (1, 84, "0"),
     # p5-bloto (recenzja 20.10): kara na mokrym po deszczu (LightRain) - kod przycina do 0..50 (MapMud.Clip)
     'MapMudWetSpeedPercent': (0.0, 50.0, "0.0"),
     # p6-sztormy (R3-05d): mnoznik zimowych burz - kod przycina do 1..2.3 (SeaStorms.FactorOf); kara statku w burzy - kod przycina do 0..50 (SeaStorms.PctOf)

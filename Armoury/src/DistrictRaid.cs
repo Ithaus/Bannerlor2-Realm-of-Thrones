@@ -331,6 +331,26 @@ namespace Armoury
             catch (Exception e) { Stumble("BurnedOutNow", e); return false; }
         }
 
+        /// <summary>p6-okup (R3-03a, RaidTribute): szacunek jednego kroku rabunku AI TERAZ dla `men` napastnikow - ta sama arytmetyka co Start (Plan): udzial lupu
+        /// s = praca kroku / ludzie w domu, doby kroku = praca / (DevastationPerRaiderDay x men x u), mnoznik modelu rabunku 1 (perki znane dopiero w zdarzeniu).
+        /// Okreg wypalony - s = 0, doby 0. false - regula E7/R1 nieczynna, wies poza spustoszeniem albo R = 0 (rabunek gry - lup z innej reguly). Tylko odczyt.</summary>
+        internal static bool StepEstimate(Village v, int men, out double share, out double days)
+        {
+            share = 0.0; days = 0.0;
+            var s = Settings.Current;
+            if (!On || v == null || men <= 0 || s == null || !(s.DevastationPerRaiderDay > 0f) || !Devastation.CoversQuiet(v)) return false;
+            try
+            {
+                var p = Plan(v, men);
+                if (p.BurnedOut || !(p.Work > 0.0)) return true;
+                share = p.Home > 0.0 ? Clamp01(p.Work / p.Home) : 0.0;
+                days = p.Work / (s.DevastationPerRaiderDay * (double)men * Math.Max(UFloor, p.U));
+                if (double.IsNaN(days) || double.IsInfinity(days)) days = 0.0;
+                return true;
+            }
+            catch (Exception e) { Stumble("StepEstimate", e); return false; }
+        }
+
         /// <summary>Poczatek kroku: plan (Plan) do sesji i punkty startu.</summary>
         private static void Start(Sess ss, RaidEventComponent comp, int men)
         {
