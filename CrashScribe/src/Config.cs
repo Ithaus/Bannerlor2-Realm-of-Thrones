@@ -18,6 +18,10 @@ namespace CrashScribe
         public static bool NetSkipTinyMethods = true;
         public static int NetTinyIlBytes = 12;         // prog rozmiaru ciala IL (bajty); w grze 19.10 wszystkie 95 nasze metody z kodem JIT < 5 B mialy IL <= 9 B
         public static bool GcPulseLog = true;          // UW: linia "GC (UW)" raz na minute zegara (liczba odsmiecan pamieci gen0/1/2 i ich przyrost) - pomiar, jak czesto GC zatrzymuje watki gry
+        // UW (zawieszenie 19.10 16:09): naprawa opisu stosu malych zalatanych metod (nasze i cudze: gra, BLSE, ButterLib, BK). Skok Harmony na metodzie o kodzie 1-4 B
+        // psuje pierwszy bajt UNWIND_INFO (0x19); GC na tym skoku zakleszcza gre. Przepisujemy skok przez trampoline tak, by ten bajt znow byl 0x19 - bez zmiany dzialania latki.
+        // Piszemy do pamieci tylko przy dokladnym wzorcu, inaczej pomijamy i liczymy (metoda zostaje jak byla). Linia "Opis stosu (UW)". false = nic nie ruszamy (metody zostaja zepsute).
+        public static bool UnwindRepair = true;
         public static bool SwallowModErrors = true;    // zlapany blad w modzie: zapisz i jedz dalej zamiast CTD
         public static bool WrapCampaignHotspots = true;// dodatkowa siec na newralgicznych miejscach gry
         public static bool ShowInGame = true;          // krotka czerwona notka na ekranie, ze cos poszlo nie tak
@@ -186,6 +190,7 @@ namespace CrashScribe
                         case "NetSkipTinyMethods": NetSkipTinyMethods = B(v); break;
                         case "NetTinyIlBytes": NetTinyIlBytes = I(v, NetTinyIlBytes); break;
                         case "GcPulseLog": GcPulseLog = B(v); break;
+                        case "UnwindRepair": UnwindRepair = B(v); break;
                         case "SwallowModErrors": SwallowModErrors = B(v); break;
                         case "WrapCampaignHotspots": WrapCampaignHotspots = B(v); break;
                         case "ShowInGame": ShowInGame = B(v); break;

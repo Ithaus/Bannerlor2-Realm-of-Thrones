@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>CrashScribe</AssemblyName>
     <RootNamespace>CrashScribe</RootNamespace>
     <Configuration>Release</Configuration>
