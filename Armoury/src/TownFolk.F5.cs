@@ -69,6 +69,7 @@ namespace Armoury
             long aW = (long)(fW * Clamp01(kw2)), aR = (long)(fR * Clamp01(kr)), aP = (long)(fP * Clamp01(kp));
             long slave = (long)(sR * Clamp01(kr) + sP * Clamp01(kp));
             CreditParts(f, aW, aR, aP, kind, slave);
+            M96NoteCut(f, amt, aW + aR + aP);                           // m96-koszyk: czego klasy z pelna kiesa nie przyjely (zostaje w kasie) - okno doby dla R/P w biedzie
             try { KsFolkIncome.NoteExt(fW, fR, fP, aW, aR, aP); } catch (Exception e) { Stumble("KsFolkIncome.NoteExt", e); }
             _f5Cut = Math.Max(0, amt - (aW + aR + aP));                 // recenzja f5 (uwaga 1): dla EarnBack (placacy spoza miasta - czesc do kasy targu)
             return aW + aR + aP;
@@ -83,6 +84,7 @@ namespace Armoury
             SplitF5(f, x, kind, out fW, out fR, out fP, out sR, out sP);
             long gW = (long)(fW * Clamp01(kw2)), gR = (long)(fR * Clamp01(kr)), gP = (long)(fP * Clamp01(kp));
             long ask0 = gW + gR + gP;
+            M96NoteCut(f, x, ask0);                                     // m96-koszyk: czesc, ktora nie schodzi z kasy (klasy z pelna kiesa) - okno doby dla R/P w biedzie
             var town = f.St.Town;
             long got = 0;
             if (ask0 > 0)

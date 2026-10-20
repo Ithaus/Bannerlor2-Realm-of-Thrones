@@ -170,6 +170,7 @@ namespace Armoury
             ResetLadder();   // P3-P5 (zbytki): kategorie listy dostatku, liczniki linii (podzial osady jest w Folk - czysci go Reset)
             ResetBread();    // M3: indeks doby, liczniki linii i komunikatu gracza (stan osady jest w Folk - pamiec sesji)
             ResetHoard();    // kiesa2: liczniki doby i linia startu sesji podatku od nadwyzki
+            M96Reset();      // m96-koszyk: liczniki linii i linia startu sesji (okno placy zatrzymanej jest w Folk - czysci je Reset)
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -804,6 +805,7 @@ namespace Armoury
             try { KsWageHands.DayLine(day); } catch (Exception e) { Stumble("KsWageHands.DayLine", e); }   // r4-koszyk: linia "Place za brak rak" (po miastach)
             try { KsFolkWage.DayLine(day); } catch (Exception e) { Stumble("KsFolkWage.DayLine", e); }     // f4-place-ludu: linia "Place W wedlug koszyka" (bez kluczy i bez KS - nic)
             try { KsFolkIncome.DayLine(day); } catch (Exception e) { Stumble("KsFolkIncome.DayLine", e); } // f5-lud: linia "Dochod ludu wedlug koszyka" (bez kluczy i bez KS - nic)
+            M96DayLine(day);                                                                                // m96-koszyk: linia "Placa dla klas w biedzie" (nie rzuca)
             try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             try { HoardDay(day); } catch (Exception e) { HoardStumble("HoardDay", e); }   // kiesa2: linia doby i liczby dla "Obieg" (po miastach i zamkach)
@@ -1019,6 +1021,10 @@ namespace Armoury
                 else N4TopUpOld += topPaid;
             }
             catch (Exception e) { N4Stumbles++; Stumble("TownLive(N4)", e); }
+            // m96-koszyk (TownFolk.M96Koszyk.cs, klucz Ks Folk Wage To Short Classes): placa zatrzymana w kasie tej doby (okno f5 + czesci f4 / f5 placone tutaj:
+            // robocizna i doplata wedlug czynnikow 1 wobec zaplaconych, obrot P pelny wobec zaplaconego) do R i P w biedzie
+            M96Short(f, ((f4Split || f5Cut) ? (long)((f4LabFW + f5LabFR) * k) + (long)((f4TopFW + f5TopFR) * k) - labPaid - topPaid : 0)
+                      + ((f5RP && f5P < 1.0 - 1e-9) ? (long)(f5TurnF * k) - turnPaid : 0));
             // ---- 3. wewnatrz ludu z wczorajszych zakupow: czynsz W 8% / R 13% wydatku (x 1/keep) -> P (plan pkt 0.14), leczenie -> R, sluzba P -> W
             double spW = f.PaidG[0] / KeepW, spR = f.PaidG[1] / KeepR, spP = f.PaidG[2] / KeepP;
             long rentW = (long)Math.Round(RentW * spW), rentR = (long)Math.Round(RentR * spR);

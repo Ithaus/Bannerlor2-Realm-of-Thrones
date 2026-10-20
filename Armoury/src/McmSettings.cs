@@ -8128,6 +8128,14 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public float KsFarmSurplusReviewMax { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Ks Folk Wage To Short Classes", HintText = "with the start calibration applied in a town: the pay its townsfolk did not take because their purses are already full (mostly the labourers') goes to the craftsmen and patricians of that town who are short - first food for two days, then their full basket for Ks Folk Short Basket Days days; never more than that pay and never more than the town's purse. Off = that pay stays with the merchants", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFolkWageToShortClasses { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Folk Short Basket Days", 2.00f, 20.00f, "0", HintText = "with Ks Folk Wage To Short Classes: up to how many days of their full basket the craftsmen and patricians of a town are topped up from that unclaimed pay (2-20, below their 21 / 30 days of reserve)", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkShortBasketDays { get; set; } = 7f;
+
         [SettingPropertyBool("Ks Farm Surplus Net Of Dues", HintText = "with Ks Farm Follows Surplus: the regular review counts a town's purse as holding a surplus only above the coin it already holds for its dues: the part of the next farm instalment gathered since the last payday (the whole instalment on payday, a seventh of it the day after), unpaid farm and sales aid, the next war tithe instalment and the rest of a catch-up. So the coin gathered for the next instalment does not keep a farm the town cannot carry from being lowered. Off = the whole purse counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public bool KsFarmSurplusNetOfDues { get; set; } = true;
@@ -10559,6 +10567,8 @@ namespace Armoury
             s.KsFarmFollowsSurplus = KsFarmFollowsSurplus;
             s.KsFarmSurplusReviewDays = KsFarmSurplusReviewDays;
             s.KsFarmSurplusReviewMax = KsFarmSurplusReviewMax;
+            s.KsFolkWageToShortClasses = KsFolkWageToShortClasses;
+            s.KsFolkShortBasketDays = KsFolkShortBasketDays;
             s.KsFarmSurplusNetOfDues = KsFarmSurplusNetOfDues;
             s.KsFarmCatchUp = KsFarmCatchUp;
             s.KsFarmCatchUpShare = KsFarmCatchUpShare;

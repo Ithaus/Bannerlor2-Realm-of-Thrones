@@ -144,6 +144,7 @@ namespace Armoury
             public double LxPhi = -1;                                 // ostatnia konsumpcja: kupione z oferty / oferta (poprawka Share); -1 nieznane
             public double LxOut;                                      // miasto targowe: oferta podzamczy i wsi z listy ostatniej doby ludu (sygnal popytu P4)
             public double DLxOff, DLxBuy; public int LxSeen = -1;     // ostatnia oferta i zakup z listy (okno People of this land) i jej doba
+            public long M96Cut;                                       // m96-koszyk (TownFolk.M96Koszyk.cs): okno doby - placa zatrzymana w kasie regula f5/f4 (klasy z pelna kiesa); bez zapisu
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();
