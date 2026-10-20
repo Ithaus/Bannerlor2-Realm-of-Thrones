@@ -48,6 +48,7 @@ namespace Armoury
             Interlocked.Increment(ref _gen);
             _plan = null; _planIn = null; _planDay = -1; _wOut = null; _wIn = null; _wBusy = false; _waitNote = null;   // _worker zostaje - PlanStart czeka, az stary watek sie skonczy
             _ema.Clear(); _emaDays = 0; _emaLastDay = -1; _wEma = _planEma = 0;
+            M96LenReset();                                             // m96-len: srednia zakupow plotna i sukna przez wsie od zera
         }
 
         private static void PlanCancel() { Interlocked.Increment(ref _gen); }
@@ -116,6 +117,7 @@ namespace Armoury
                     Cloth = Ema(id, GoodsLedger.KsCloth)                  // KS r4 P8: odziez wojska, warsztaty zbrojne, naprawy kowali (popyt 1:1 przy kluczu Ks Cloth Demand)
                 };
             }
+            M96LenApply(inp, day);                                    // m96-len: plotno i sukno kupowane przez wsie w miastach (E5/B1) ponad koszyk zaplacony - popyt 1:1
             uint lay;
             info.Layout = LayoutMatches(out lay);
             bool fields = s == null || s.StartCalibrationTownFields;
