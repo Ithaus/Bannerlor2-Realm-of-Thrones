@@ -3336,4 +3336,8 @@ OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 
   (tez w autotestach 5 dob: "wozy okregu 0, podatek pana w oknach 0, do gracza 0" - przeoczone; test sprawdzal nadanie/herb/menu, nie dochod). Przyczyna: dochod z licznika podatku
   handlowego pana (TradeTaxAccumulated) przy powrocie wozu - przy daninach DS licznik stoi. Zloto startu 0 (BK start_lord). NAPRAWA: workflow wf_83abfd2a-d83, galaz w-toku/r4-wioska
   (dochod codziennie, linia w podpowiedzi zlota, wioska w zakladce Fiefs). Wgranie dopiero po zamknieciu gry przez Jeffa (dziala na jego zapisie po wczytaniu).
+- 20.10 ok. 02:35: Jeff (doslownie): "okay olej to w senise zrob wersje fnalna" (bez szybkiej latki - pelna wersja) oraz "i do wioski ktora nalezy do mnie ja moge do niej wjechac,
+  tak jak do normlanej wioski i tam dokonac sen, inwestycje, zakup rzeczy z tej wioski, przepsacerowanie sie po wiosce i w tej wiosce jest moj dom wtedy."
+  -> workflow wf_54e11bb8-44b, galaz w-toku/r4-dom: handel towarem wsi okregu, Twoj dom (nocleg, skrzynia - domy klanowe RC jesli pasuja), spacer po scenie wsi.
+  WGRANIE 92 = r4-wioska + r4-dom + r4-przetop + r4-zloto + r4-wolni + r4-zlecenia po recenzjach, scalenie, testy (5 dob + bitwy + wioska, nowa kampania, 160 dob).
 
