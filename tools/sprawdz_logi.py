@@ -1802,6 +1802,11 @@ Uzycie (Python 3, tylko odczyt):
                     i ERROR in BookHoldings.Free 0, NWL-4 wypuszczeni i pozostali (INFO), NWL-5 twierdza, ktorej stary pan byl juz w krolestwie nowego pana (naglowek
                     linii "X: rod (krolestwo) -> rod (to samo krolestwo)"), ma odcinek "loch bez zmian" i zadnego wypuszczenia; inne twierdze - nigdy "loch bez zmian".
                     Log sprzed paczki albo bez przywrocenia: INFO, bez wyjatku.
+--grupa p6zakladnicy: (20.10, fala 2, galaz p6-zakladnicy - R3-03c, POMYSLY-35 nr 5; Armoury/src/PeaceWards.cs, klucz Wards Of Peace) python -I tools/sprawdz_logi.py
+                    --grupa p6zakladnicy <Armoury-*.log>. PZK-0 linia startu sesji: latka pokoju wpieta, PZK-0b dowodca partii i ocena wojny BK (INFO), PZK-1 linia doby
+                    w kazdej dobie z kluczem, PZK-2 wyjazdy z linii zdarzen = suma 'wyjazdy' linii doby, PZK-3 wyjazdy <= pokoje trwale po dobie (fabularne i krotsze
+                    niz doba nie wysylaja), PZK-4 bilans 'od poczatku' (aktywni = wyjazdy - powroty - jency - wolni - wyczyszczone), PZK-5 potkniecia i ERROR
+                    PeaceWards 0, PZK-6 liczby (INFO: pokoje, remisy, fabularne, powroty, jency, kara oceny wojny). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -51011,6 +51016,8 @@ def main(argv):
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group == "jeff14s" and logp:
         return jeff14s_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
+    if group == "p6zakladnicy" and logp:
+        return p6zakladnicy_main(logp)   # R3-03c (fala 2, p6-zakladnicy): wychowankowie po przegranej wojnie
     if group == "a16" and logp:
         return a16_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csvp)   # A16: progi sygnalow z logow (ROZPOZNANIE-A16; log strumieniowo)
     if group == "drobne2" and logp:
@@ -52234,6 +52241,58 @@ def npolnoc_main(logp, bdp=None):
     rep.add("NKS-30g: A7 przy progu - zmiany z jedzenia na zajecie tylko na targ wstrzymane", f"{sum(a7)} (linii {len(a7)})" if a7 else "brak linii (KS nie zastosowany albo log sprzed r4-polnoc)",
             "INFO (regula A7 domyslnie wylaczona - sam pomiar)", None)
     rep.add("NKS-30h: Plan bez pokrycia wedlug krainy (krok 8, ostatni Plan)", unc if unc else "brak linii", "INFO - koszyk wsi niezaplacony i nie robiony w domu", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ p6-zakladnicy (R3-03c): wychowankowie po przegranej wojnie
+P6ZAK_DAY = "Wychowankowie (R3-03c): dzien "
+
+
+def p6zakladnicy_num(pat, s):
+    v = num(pat, s)
+    return v if v is not None else 0
+
+
+def p6zakladnicy_main(logp):
+    """R3-03c (fala 2, galaz p6-zakladnicy; Armoury/src/PeaceWards.cs, klucz WardsOfPeace). Wiersze PZK-0..PZK-6 - opis w pomocy. Log bez paczki: INFO."""
+    lines = read(logp)
+    rep = Report()
+    starts = [s for s in lines if s.startswith("Wychowankowie (R3-03c): start sesji")]
+    days = [s for s in lines if s.startswith(P6ZAK_DAY) and " | klucz Wards Of Peace " in s]
+    last_i = max([i for i, s in enumerate(lines) if s.startswith(P6ZAK_DAY) and " | klucz Wards Of Peace " in s] or [-1])
+    ev_out = [s for i, s in enumerate(lines) if i < last_i and s.startswith(P6ZAK_DAY) and " | wyjazd: " in s and " powrot dnia " in s]   # do ostatniej linii doby
+    errs = [s for s in lines if s.startswith("ERROR in PeaceWards.")]
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)}, wyjazdow (zdarzenia) {len(ev_out)}, ERROR {len(errs)}")
+    if not starts and not days:
+        rep.add("PZK-0: linie paczki R3-03c", "brak linii", "INFO (log bez paczki)", None)
+        rep.show()
+        return 0
+    st0 = starts[-1] if starts else ""
+    rep.add("PZK-0: latka pokoju (MakePeaceAction.ApplyInternal)", "wpiety" if "pokoj (MakePeaceAction.ApplyInternal) wpiety" in st0 else (st0[:200] or "brak linii startu"),
+            "wpiety", "pokoj (MakePeaceAction.ApplyInternal) wpiety" in st0)
+    rep.add("PZK-0b: dowodca partii i ocena wojny BK", ("dowodca wpiety" if "dowodca partii (GetBestAvailableCommander) wpiety" in st0 else "dowodca BRAK")
+            + ", " + ("ocena wojny BK wpieta" if "ocena wojny BK (" in st0 else "ocena wojny BRAK"), "INFO", None)
+    on_days = [s for s in days if " | klucz Wards Of Peace tak" in s]
+    dnums = sorted({num(r"dzien (\d+)", s) for s in days if num(r"dzien (\d+)", s) is not None})
+    gaps = sum(1 for a, b in zip(dnums, dnums[1:]) if b - a > 1)
+    rep.add("PZK-1: linia doby w kazdej dobie (klucz tak)", f"dob {len(dnums)}, z kluczem tak {len(on_days)}, dziury {gaps}", "dziury 0", gaps == 0 and len(days) > 0)
+    sent = sum(p6zakladnicy_num(r"\| wyjazdy (\d+) \(", s) for s in days)
+    lasting = sum(p6zakladnicy_num(r"pokoj trwa (\d+)", s) for s in days)
+    rep.add("PZK-2: wyjazdy - zdarzenia = suma linii doby", f"zdarzenia {len(ev_out)}, linie doby {sent}", "rowne", len(ev_out) == sent)
+    rep.add("PZK-3: wyjazdy <= pokoje trwale po dobie", f"wyjazdy {sent}, pokoje trwale {lasting}", "<= (pokoj fabularny ROT i krotszy niz doba nie wysyla)", sent <= lasting)
+    last = days[-1] if days else ""
+    act = p6zakladnicy_num(r"\| aktywni (\d+)", last)
+    t = [p6zakladnicy_num(pat, last) for pat in (r"od poczatku: wyjazdy (\d+)", r"od poczatku: wyjazdy \d+, powroty (\d+)", r", jency (\d+), wolni", r"wolni po wojnie (\d+), wyczyszczone",
+                                                  r"wyczyszczone (\d+) \| pokojow")]
+    rep.add("PZK-4: bilans od poczatku (ostatnia doba)", f"aktywni {act}; wyjazdy {t[0]} - powroty {t[1]} - jency {t[2]} - wolni {t[3]} - wyczyszczone {t[4]} = {t[0] - t[1] - t[2] - t[3] - t[4]}",
+            "aktywni = bilans", act == t[0] - t[1] - t[2] - t[3] - t[4])
+    stum = sum(p6zakladnicy_num(r"\| potkniecia (\d+)", s) for s in days)
+    rep.add("PZK-5: potkniecia i ERROR PeaceWards", f"potkniecia (suma dob) {stum}, ERROR {len(errs)}", "0 i 0", stum == 0 and not errs)
+    keys = (("pokoje krolestw", r"dzis pokoje krolestw (\d+)"), ("fabularne ROT", r"wojna fabularna ROT (\d+), remis"), ("remis", r", remis (\d+), przegrany"),
+            ("znow wojna po dobie", r"znow wojna (\d+)"), ("powroty po 2 latach", r"koniec pobytu (\d+)"), ("jency", r"zamiany w jencow (\d+)"),
+            ("wolni po wojnie zwyciezcy", r"wolni po wojnie zwyciezcy (\d+)"), ("kara oceny wojny", r"oceny wojny z kara (\d+)"), ("przywroceni do siedziby", r"przywroceni do siedziby (\d+)"))
+    rep.add("PZK-6: liczby paczki (suma dob)", ", ".join(f"{n} {sum(p6zakladnicy_num(pat, s) for s in days)}" for n, pat in keys), "INFO", None)
     rep.show()
     return 0
 

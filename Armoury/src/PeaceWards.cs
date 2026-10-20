@@ -423,10 +423,11 @@ namespace Armoury
         private static Hero PickWard(Clan c)
         {
             Hero best = null; int heirs = 0;
+            var lsp = c.Leader != null ? c.Leader.Spouse : null;
             foreach (var h in c.Heroes)
             {
-                if (h == null || !h.IsAlive || h == c.Leader || h.CharacterObject == null || h.CharacterObject.Occupation != Occupation.Lord) continue;
-                heirs++;
+                if (h == null || !h.IsAlive || h == c.Leader || h == lsp || h.CharacterObject == null || h.CharacterObject.Occupation != Occupation.Lord) continue;
+                heirs++;   // potomstwo i krewni glowy (malzonek glowy sie nie liczy)
                 if (h == Hero.MainHero || h.IsPrisoner || h.PartyBelongedTo != null || h.PartyBelongedToAsPrisoner != null || h.GovernorOf != null || h.Spouse != null) continue;
                 if (h.HeroState != Hero.CharacterStates.Active && h.HeroState != Hero.CharacterStates.NotSpawned) continue;
                 if (h.IsNotable || h.IsWanderer || h.Age < MinAge || h.Age > MaxAge || IsWard(h)) continue;
@@ -555,7 +556,7 @@ namespace Armoury
                 if (!On && (_wards.Count > 0 || _peaces.Count > 0))
                 {
                     _peaces.Clear();
-                    foreach (var w in _wards.ToArray()) { _dKeyOff++; try { ReturnHome(w, "klucz Wards Of Peace wylaczony", false); } catch (Exception e) { Stumble("KeyOff", e); _wards.Remove(w); } }
+                    foreach (var w in _wards.ToArray()) { _dKeyOff++; try { ReturnHome(w, "klucz Wards Of Peace wylaczony", false); } catch (Exception e) { Stumble("KeyOff", e); _wards.Remove(w); _tDrop++; } }
                 }
                 foreach (var w in _wards.ToArray())
                 {
