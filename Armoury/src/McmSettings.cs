@@ -3428,7 +3428,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceLootShareFar { get; set; } = 0.25f;
 
-        [SettingPropertyBool("Outlaw Fence Dothraki Arms", HintText = "with Gear Fit Dothraki Only: an arakh or other Dothraki weapon a band took as plunder and none of its men may carry goes from its stores into its packs, and the band sells it to a fence like the rest of its loot - the town pays and the piece goes on its stall (off = it stays in the band's stores until someone beats the band)", RequireRestart = false)]
+        [SettingPropertyBool("Outlaw Fence Dothraki Arms", HintText = "with Gear Fit Dothraki Only: an arakh or other Dothraki weapon in the stores of a band led by a chief (only such bands keep stores) that none of its men may carry goes into its packs, and the band sells it to a fence like the rest of its loot - the town pays and the piece goes on its stall (off = it stays in the band's stores, and whoever beats the band takes it)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool OutlawFenceDothrakiArms { get; set; } = true;
 
@@ -5299,6 +5299,10 @@ namespace Armoury
         [SettingPropertyBool("Gear Fit Dothraki Only", HintText = "the arakh and the other Dothraki weapons no other people's troops carry in Realm of Thrones are for Dothraki soldiers only: Free Cities, Ghis, Yi Ti and every army of Westeros no longer buy or wear them, battle takes them off such men and gives them a weapon from the stores instead, and a bare-handed man gets one only when the stores hold no other weapon he can wield; lords, wanderers and named items are not touched (off = as before: anyone from the Essos side may carry an arakh)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitDothrakiOnly { get; set; } = true;
+
+        [SettingPropertyBool("Dothraki Arms Census Log", HintText = "log only: in each of your battles write who carries a Dothraki weapon (troop, people, party, side of the sea), and once a week how many Dothraki soldiers serve in parties, sit in outlaw pools and how many Dothraki weapons lie in stores in Westeros - nothing in the game changes (off = no such lines)", RequireRestart = false)]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool DothrakiArmsCensusLog { get; set; } = true;
 
         [SettingPropertyBool("Gear Fit Weapon Floor", HintText = "in battle no soldier fights bare-handed while his party's stores hold a weapon he can use: a man left without any weapon after the skill and culture checks takes the best melee weapon he can wield from the stores, of his people's kind first (from across the sea only with Gear Fit Floor Foreign) - nothing from thin air (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
@@ -9396,6 +9400,7 @@ namespace Armoury
             s.GearFitCulture = GearFitCulture;
             s.GearFitKinItemLevel = GearFitKinItemLevel;
             s.GearFitDothrakiOnly = GearFitDothrakiOnly;
+            s.DothrakiArmsCensusLog = DothrakiArmsCensusLog;
             s.GearFitWeaponFloor = GearFitWeaponFloor;
             s.GearFitFloorForeign = GearFitFloorForeign;
             s.GearFitFloorOverSkill = GearFitFloorOverSkill;

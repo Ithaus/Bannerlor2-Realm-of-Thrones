@@ -1052,7 +1052,7 @@ namespace Armoury
         private const int VelvetNeighbours = 3;
         private static int _velDay = int.MinValue;
 
-        private sealed class VelTown { internal Town T; internal string Id; internal bool Weave; internal float Ix; internal int Price, Stock; internal float Dist; internal char Ring; internal TaleWorlds.Library.Vec2 Pos; }
+        private sealed class VelTown { internal Town T; internal string Id; internal bool Weave; internal float Ix; internal int Price, Stock; internal float Dist; internal char Ring; internal TaleWorlds.Library.Vec2 Pos; internal bool Es; }
 
         private static bool Weaves(Town t, ItemCategory cat)
         {
@@ -1084,17 +1084,18 @@ namespace Armoury
                 try { v.Price = t.GetItemPrice(new EquipmentElement(velvet), null, false); } catch { v.Price = -1; }
                 v.Stock = t.Owner.ItemRoster != null ? t.Owner.ItemRoster.GetItemNumber(velvet) : 0;
                 v.Pos = t.Settlement.GatePosition.ToVec2();
+                try { v.Es = DothrakiArms.EssosOf(t.Settlement); } catch { v.Es = false; }   // recenzja: okolica tylko po tej samej stronie morza
                 list.Add(v);
             }
             var weave = list.FindAll(x => x.Weave);
             foreach (var v in list)
             {
                 if (v.Weave) { v.Dist = 0f; v.Ring = 'W'; continue; }
-                foreach (var w in weave) { float d = v.Pos.Distance(w.Pos); if (v.Dist < 0f || d < v.Dist) v.Dist = d; }
+                foreach (var w in weave) { if (w.Es != v.Es) continue; float d = v.Pos.Distance(w.Pos); if (v.Dist < 0f || d < v.Dist) v.Dist = d; }
             }
             foreach (var w in weave)
             {
-                var near = list.FindAll(x => !x.Weave);
+                var near = list.FindAll(x => !x.Weave && x.Es == w.Es);
                 near.Sort((a, b) => a.Pos.Distance(w.Pos).CompareTo(b.Pos.Distance(w.Pos)));
                 for (int i = 0; i < near.Count && i < VelvetNeighbours; i++) near[i].Ring = 'S';
             }
@@ -1108,7 +1109,7 @@ namespace Armoury
             list.Sort((a, b) => a.Ring != b.Ring ? RingOrder(a.Ring).CompareTo(RingOrder(b.Ring)) : string.CompareOrdinal(a.Id, b.Id));
             var sb = new StringBuilder(64 * list.Count + 300);
             sb.Append("Aksamit wedlug miasta (ZC1-4o): dzien ").Append(day).Append(" | co ").Append(VelvetEveryDays).Append(" dob, tanie = indeks < 9.99 | miast ").Append(list.Count)
-              .Append(", z tkalnia ").Append(n[0]).Append(" (tanich ").Append(cheap[0]).Append("), okolica tkalni (").Append(VelvetNeighbours).Append(" najblizsze miasta bez tkalni) ")
+              .Append(", z tkalnia ").Append(n[0]).Append(" (tanich ").Append(cheap[0]).Append("), okolica tkalni (").Append(VelvetNeighbours).Append(" najblizsze miasta bez tkalni po tej samej stronie morza, w linii prostej) ")
               .Append(n[1]).Append(" (tanich ").Append(cheap[1]).Append("), reszta ").Append(n[2]).Append(" (tanich ").Append(cheap[2]).Append(")")
               .Append(" | miasta (pas W tkalnia / S okolica / R reszta, ix indeks, c cena kupna, z zapas na polce, d odleglosc do tkalni): ");
             for (int i = 0; i < list.Count; i++)

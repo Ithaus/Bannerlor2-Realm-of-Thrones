@@ -113,6 +113,8 @@ namespace Armoury
         private static int _dMis, _dBare, _dB1, _dB2, _dB3, _dNone, _dNoSlot, _dKept;
         private static int _stum, _stumAll;
         private static int _dDothDeny;   // n20-drobne: odmowy reguly broni Dothrakow w CultureOk (watki DTE - Interlocked)
+        /// <summary>n20-drobne (recenzja): pytanie pomiarowe (DothrakiArms.NobodyMay) - odmowa reguly broni Dothrakow bez licznika linii doby. Na watek.</summary>
+        [ThreadStatic] internal static bool Quiet;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         // liczniki jednej misji (dopisek linii "Bitwa gracza (sklad7b-p, start)"): Twoi ludzie (P) i wszystkie partie
         private static WeakReference _mMission;
@@ -205,7 +207,7 @@ namespace Armoury
                 string tc = troop.Culture != null ? troop.Culture.StringId : null;
                 if (string.IsNullOrEmpty(ic) || string.IsNullOrEmpty(tc) || ic == "neutral_culture" || ic == tc) return true;
                 // n20-drobne: bron Dothrakow tylko u Dothrakow - PRZED regula strony morza (Braavos, Lys, Ghis tez nie); wlasny wzorzec i bohaterowie bez zmian
-                if (IsDoth(ic) && DothBar(troop, it)) { Interlocked.Increment(ref _dDothDeny); return false; }
+                if (IsDoth(ic) && DothBar(troop, it)) { if (!Quiet) Interlocked.Increment(ref _dDothDeny); return false; }
                 if (IsEssos(ic) == IsEssos(tc)) return true;   // w obrebie jednej strony morza domy dziela sie lupem (Jeff 16.09)
                 if (CultureOn && KinOk(tc, ic, it)) return true;   // f29-arakh: przy GearFitKinItemLevel - sztuka po sztuce (wylaczony = sama para, jak dotad)
                 return TemplateHas(troop, it);
