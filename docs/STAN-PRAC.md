@@ -3406,4 +3406,8 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   w rekach linii. Test koncowy n22c (3c3a7ad9 bez tej poprawki) w toku od 08:37; po poprawce: test 160 + nowa -> WGRANIE 93 ok. 11:30-12:00.
 - 08:50 PDT Jeff z gry: start "Indebted Lord" DZIALA, premia na drodze bocznej DZIALA. Nowe zadanie na noc: OBOZ ARMII (oboz od 22:00, wejscie i chodzenie po obozie,
   trening, wyglad wedlug druzyny, udzwig konia/juk, przedmioty obozowe i wozy, miasteczko obozowe) + rozpoznanie modow -> docs/ZADANIA-OBOZ-NOC.md. Noc: oboz, potem optymalizacja.
+- 09:05 PDT FALA 2b gotowa (wf_3d53bfb8-a50, 25 agentow, 0 bledow): p6-okup cbf27121, p6-sztormy 599566a9, p6-spichlerz f3df2751, p6-szubienice 6cf36fd7,
+  p6-pola 6beee076, p6-drogi 173d5aff, p6-a7 c2ffc1f1 (KsSwitchSignalRule domyslnie TAK + TownWorksHireDistrict). Scalone do `w-toku/n23-calosc` od 3c3a7ad9
+  (zb/n23-calosc) -> 5f2c89e2, konflikty tylko dopisy (oba zachowane), 2124 ustawien, build 0. Recenzja scalenia fali 2: wf_ecb2cb57-6d5 (ekonomia + technika -> poprawki w n23).
+  PRZY WGRANIU 94: Armoury.json Jeffa "KsSwitchSignalRule": false -> true (kopia .bak). Dalej: naprawy2 do n22 (93) i do n23; testy n23 (bitwa, nowa, 160) -> WGRANIE 94.
 
