@@ -3756,10 +3756,10 @@ namespace Armoury
 
         // --- The castle menu ---
         // m96-zamek (Jeff 20.10: "menu zamku tez uporzadkuj"): CastleMenus.cs - ten sam wzor co TownMenus, raz na sesje (SubModuleMain.OnAfterGameInitializationFinished,
-        // po TownMenus): zaloga gry (Manage garrison, Donate troops), sprzet zalogi i naprawa u kowala RB -> "Go to the barracks"; ksiegi, Living Economy, Banner Kings,
-        // pozyczka u ludzi zamku -> "Castle affairs". Loch, sala lorda, kasztelan ROT, spacer, Manage castle, schowek, czekanie, wyjazd zostaja. Wylaczony = menu jak dotad
-        // (od nastepnego wczytania). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
-        public bool CastleMenuTidy = true;                 // the castle menu is put in order like the town menu: managing and donating to the garrison, kit for the garrison and the castle smith's repairs move into a new "Go to the barracks"; the castle's books and dealings (People of this land, Estates and livelihood, Realm ledger, Living Economy, Banner Kings - with its recruits - and the castle folk's loan) into "Castle affairs". The dungeon, the lord's hall, the walk, Manage castle, the stash, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the castle menu as before
+        // po TownMenus): zaloga gry (Manage garrison, Donate troops), sprzet zalogi i naprawa u kowala RB -> "Go to the barracks"; ksiegi, Living Economy,
+        // pozyczka u ludzi zamku -> "Castle affairs". Loch, sala lorda, kasztelan ROT, spacer, Banner Kings (werbunek zamku - po recenzji na wierzchu), Manage castle,
+        // schowek, czekanie, wyjazd zostaja. Wylaczony = menu jak dotad (od nastepnego wczytania). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
+        public bool CastleMenuTidy = true;                 // the castle menu is put in order like the town menu: managing and donating to the garrison, kit for the garrison and the castle smith's repairs move into a new "Go to the barracks"; the castle's books and dealings (People of this land, Estates and livelihood, Realm ledger, Living Economy and the castle folk's loan) into "Castle affairs". The dungeon, the lord's hall, the walk, Banner Kings (where the castle's recruits are), Manage castle, the stash, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the castle menu as before
 
         public static void Load(string moduleDataDir)
         {

@@ -8528,7 +8528,7 @@ namespace Armoury
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
 
-        [SettingPropertyBool("Castle Menu Tidy", HintText = "the castle menu is put in order like the town menu: managing and donating to the garrison, kit for the garrison and the castle smith's repairs move into a new 'Go to the barracks'; the castle's books and dealings (People of this land, Estates and livelihood, Realm ledger, Living Economy, Banner Kings - with its recruits - and the castle folk's loan) into 'Castle affairs'. The dungeon, the lord's hall, the walk, Manage castle, the stash, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the castle menu as before", RequireRestart = false)]
+        [SettingPropertyBool("Castle Menu Tidy", HintText = "the castle menu is put in order like the town menu: managing and donating to the garrison, kit for the garrison and the castle smith's repairs move into a new 'Go to the barracks'; the castle's books and dealings (People of this land, Estates and livelihood, Realm ledger, Living Economy and the castle folk's loan) into 'Castle affairs'. The dungeon, the lord's hall, the walk, Banner Kings (where the castle's recruits are), Manage castle, the stash, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the castle menu as before", RequireRestart = false)]
         [SettingPropertyGroup("The castle menu")]
         public bool CastleMenuTidy { get; set; } = true;
 

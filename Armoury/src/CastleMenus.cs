@@ -18,14 +18,16 @@ namespace Armoury
     /// (warunek, skutek, napis, id bez zmian) do dwoch nowych podmenu:
     ///  - "Go to the barracks" (koszary i zbrojownia): zarzadzanie zaloga i oddanie ludzi do zalogi (gra - w miescie te dwie opcje gra trzyma w "Go to the keep"),
     ///    sprzet dla zalogi (Armoury), naprawa u kowala zamku (RB);
-    ///  - "Castle affairs" (sprawy zamku): ksiegi Armoury (People of this land, Estates and livelihood, Realm ledger), Living Economy (BEE), Banner Kings (BK - w
-    ///    zamku takze werbunek), pozyczka i splata u ludzi zamku (Armoury).
-    /// W menu zamku zostaja miejsca i rzeczy pana: loch, sala lorda, rozmowa z kasztelanem (ROT), spacer, "Manage castle" (skutek w GameMenuEventHandler("castle") -
-    /// nieprzenaszalne, straznik CastleOnly), schowek, czekanie, powrot do armii, wyjazd i opcje zadan.
+    ///  - "Castle affairs" (sprawy zamku): ksiegi Armoury (People of this land, Estates and livelihood, Realm ledger), Living Economy (BEE), pozyczka i splata
+    ///    u ludzi zamku (Armoury).
+    /// W menu zamku zostaja miejsca i rzeczy pana: loch, sala lorda, rozmowa z kasztelanem (ROT), spacer, Banner Kings (BK - poprawka po recenzji: w zamku jedyna
+    /// droga werbunku to "Recruit troops" w menu BK; w miescie "Recruit troops" gry zostaje na wierzchu, wiec w zamku BK tez - werbunek dalej dwa klikniecia, a "Leave"
+    /// z BK wraca tam, skad gracz wszedl), "Manage castle" (skutek w GameMenuEventHandler("castle") - nieprzenaszalne, straznik CastleOnly), schowek, czekanie,
+    /// powrot do armii, wyjazd i opcje zadan.
     /// Wejscia podmenu stoja przed "Wait here for some time" i sa widoczne, gdy choc jedna opcja w srodku jest widoczna (warunki opcji wolane jak w grze, na swiezym
     /// MenuCallbackArgs - znaczniki zadan "!" przechodza na wejscie). Opis podmenu wymienia tylko opcje widoczne w tej chwili. Kazde podmenu ma "Back to the castle".
     /// Skutki przeniesionych opcji sprawdzone w dekompilacji: ekrany gry (oddzialy, zaloga, ekwipunek), okna (ShowInquiry) albo SwitchToMenu do wlasnych menu
-    /// (BK "bannerkings" i BEE "bee_castle_menu" wracaja SwitchToMenu("castle"); RB po zaplacie SwitchToMenu("town") - stary blad RB, jak dotad) - zadna nie zaklada
+    /// (BEE "bee_castle_menu" wraca SwitchToMenu("castle"); RB po zaplacie SwitchToMenu("town") - stary blad RB, jak dotad) - zadna nie zaklada
     /// menu nadrzednego, zaden warunek nie patrzy na id biezacego menu. Zadna nasza opcja w zamku nie otwiera naszego menu - BackTo jak w miescie nie jest potrzebne.
     /// Klucz CastleMenuTidy (wylaczony = nic sie nie rusza, menu jak dotad; od nastepnego wczytania). Dwa podmenu rejestrowane zawsze, takze przy wylaczonym kluczu
     /// (zapis zrobiony w podmenu wczyta sie normalnie - puste podmenu z "Back to the castle"). Bez stanu w zapisie, bez latek Harmony (tylko odczyt prywatnego pola
@@ -68,7 +70,7 @@ namespace Armoury
             new Move("arm_estates_castle", MenuAffairs, "Armoury", "Estates and livelihood - the estates of this place and how well they live."),
             new Move("arm_realm_ledger_castle", MenuAffairs, "Armoury", "Realm ledger - the estates and plenty of the realm, its regions and the world."),
             new Move("bee_castle_root", MenuAffairs, "BEE", "Living Economy - the castle's purse, stores and works, and the men it trains."),
-            new Move("bannerkings_castle_submenu", MenuAffairs, "BK", "Banner Kings - demesne, titles, the castle's people and its recruits."),
+            // "bannerkings_castle_submenu" (BK) NIE w planie - zostaje w menu zamku: tam jest werbunek zamku (BK "Recruit troops"), jak "Recruit troops" w miescie
             new Move("arm_townloan_borrow_castle", MenuAffairs, "Armoury", "Borrow from the castle folk - a loan from the castle folk's purse."),
             new Move("arm_townloan_repay_castle", MenuAffairs, "Armoury", "Repay the castle folk - pay back what you owe."),
         };
