@@ -3381,4 +3381,10 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   "dokoncz od stanu drzewa" - tylko na slowo Jeffa.
   Recenzja scalenia n22 (agent): 2 znaleziska poprawione w 161e099c (OneNeed z EngPaidNeed - inzynieria + jedna budowa; wykup turniejowy min(G - wydane, kiesy) - R).
   n22a-bitwa kod 0 (4/4 bitwy, 0 ERROR). GrandTourney.log nadpisywany przy starcie gry - straz scratchpadu f59fb043 gt-straz.sh kopiuje do gt-logi/.
+- 06:50 PDT TESTY n22a (15 galezi, DLL test/n22a) - wszystkie kod 0: bitwa 4/4, nowa 120/120, 160 dob; 0 ERROR Armoury, CrashScribe tylko stale bledy startu BK/BKROT.
+  Progi (progi/n22a160, n22anowa): 160 dob 93 NIE, nowe wzgledem 6 biegow 2 (D2K-7 konie bojowe 1 przypadek, ZC1-16 ruda srebra +27/d = 13% produkcji);
+  reszta roznic byla w starszych biegach (zmiennosc). Nowa: R2-0 "166 B4 BRAK" = narzedzie (dopisek R3-08g w odcinku B4) -> poprawione 5254dacc;
+  DO ZBADANIA: NKS-30n mediana Planow 8 > 6 (trend biegow nowa 1, nowa88 1, r2 4, r3 5, n22a 8 - stada/urodzaj/ziemia zmieniaja produkcje KS tylko w grze, Plan bez nich?),
+  P3W3-3 najemnicy AI 1679 < 2000 (r3nowa 2142). Fala 1 dokonczenie wf_2ece39db-763: naprawy f858f3a1 i kruki b40c4cc8 gotowe po recenzji, jednostki - poprawki w toku.
+  Limit 5 h 99% (odnowienie 07:10) - pauza nowych agentow do odnowienia.
 
