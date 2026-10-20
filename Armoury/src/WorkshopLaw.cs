@@ -1005,9 +1005,10 @@ namespace Armoury
                 float H = Hands(workshop, town);
                 var hg = new Dictionary<string, float>(); var extraG = new Dictionary<string, float>(); var nG = new Dictionary<string, int>();
                 float repairs = 0f;
+                float carp = 0f, carpOwn = 0f;   // R3-09a: rece ciesli przy tarczach w wojnie (ShieldWarHelp) - poza rekami H
                 for (int round = 0; round < 3; round++)
                 {
-                    hg.Clear(); extraG.Clear(); nG.Clear(); repairs = 0f;
+                    hg.Clear(); extraG.Clear(); nG.Clear(); repairs = 0f; carp = carpOwn = 0f;
                     var shortG = new Dictionary<string, float>();
                     float wAll = 0f, wAct = 0f, shortAll = 0f;
                     var guilds = new HashSet<string>();
@@ -1046,6 +1047,9 @@ namespace Armoury
                         }
                         hg[g] = h; extraG[g] = extra;
                     }
+                    // R3-09a: rece ciesli PO petli cechow, czyli po wszystkich cieciach napraw (naprawy robia rzemieslnicy cechu, nie ciesle); own jak wyzej
+                    foreach (var g in nG.Keys)
+                        if (ShieldWarHelp.IsShieldGuild(g)) { carpOwn = H * GuildWeight(g) / wAll; carp = ShieldWarHelp.ExtraHands(town, carpOwn); hg[g] += carp; }
                     if (!follow || round == 2) break;
                     // (E) plan: linia bez sztuki w robocie jest czynna, gdy cos skonczy w planie z rownego podzialu jako podloga
                     bool changed = false;
@@ -1091,7 +1095,8 @@ namespace Armoury
                     int gi = Array.IndexOf(GuildOrder, g);
                     if (gi >= 0) { _gAssigned[gi] += h; _gFreed[gi] += extraG[g]; }
                 }
-                _hands += H; _handsLines += toLines; _handsRepair += repairs;
+                _hands += H + carp; _handsLines += toLines; _handsRepair += repairs;
+                if (carp > 0f) ShieldWarHelp.Note(town, carp, carpOwn);   // R3-09a
             }
             catch (Exception e) { _planStumbles++; if (!_planErrLogged) { _planErrLogged = true; Log.Error("WorkshopLaw.BuildPlan", e); } }   // recenzja 174: raz w logu, reszta w liczniku potkniec
             return plan;

@@ -11,6 +11,8 @@ RANGES = {
     'WorkshopMunitionShare': (0.0, 1.0, "0.00"),
     'WorkshopLineShortageShare': (0.0, 1.0, "0.00"),
     'WorkshopPlanDays': (14.0, 120.0, "0"),
+    # R3-09a (p5-tarcze): prog pokrycia tarcz - kod przycina do 0..1 (ShieldWarHelp.Threshold)
+    'ShieldWarCoverageBelow': (0.0, 1.0, "0.00"),
     'WorkshopMunitionMaxTier': (1, 6, "0"),
     'TownMaterialOrderDays': (1, 30, "0"),
     'CarterPencePerKgPer100': (0.0, 0.15, "0.0000"),
