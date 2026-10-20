@@ -3,7 +3,7 @@
 Uzycie (Python 3, tylko odczyt):
     python -I tools/sprawdz_logi.py --grupa etap2 <Armoury-*.log> [--baza baza.json] [--zapisz-baze baza.json] [--csv budzet-rodow.csv] [--start-kampanii N]
 --grupa etap2     : progi etapu 2.
---grupa m96len    : (m96-len, 20.10) Plan KS liczy plotno kupowane przez wsie w miastach (KsLinenVillageBuysInPlan); zapas lnu i plotna swiata od D+28.
+--grupa m96len    : (m96-len, 20.10) Plan KS liczy plotno i sukno kupowane przez wsie w miastach (KsVillageClothBuysInPlan); zapas lnu, plotna i sukna od D+28.
 --grupa etap3     : (3.1, E3/0) progi fali 1 etapu 3 (reszta ksiegi, RB3, linia "Szczelnosc (164a)") i kontrolki "prog 0" fali 2 tego drzewa.
 --grupa etap4     : (E4/0, paczka 188) progi T1-T10 pomiaru ludzi, jencow i zimy (projekt etapu 4, rozdz. 3 "E4/0" Test) w oknie dob kampanii 1-120
                     (--do-doby N zmienia okno); T9 (bieg zimowy) i baza konca etapu (d300-364) - INFO. Gdy w logu jest linia startowa
@@ -52156,42 +52156,50 @@ def p6spichlerz_main(logp):
 
 
 def m96len_main(logp):
-    """m96len (20.10, galaz w-toku/m96-len; Armoury/src/StartCalibration.M96Len.cs, klucz KsLinenVillageBuysInPlan): Plan KS liczy plotno kupowane przez wsie
-    w miastach (ramka E5/B1) ponad koszyk zaplacony Planu. Wejscie: log Armoury (strumieniowo).
-    M96LEN-0 linie "Len KS (m96-len): plan doba" sa (log bez paczki - NIE) i potkniecia 0;
-    M96LEN-1 przy kluczu TAK co najmniej jeden Plan z dopiskiem > 0 (INFO, gdy wszystkie Plany mowia "bez dopisku" z podanym powodem);
-    M96LEN-2 / M96LEN-3 zapas lnu / plotna swiata (ksiega towarow "Towary: ... flax / linen") od D+28 do konca biegu (D = pierwsza doba "KS: produkcja
-    (zastosowane)" + 14) - nachylenie >= -10 szt./d (PLAN etap 6: "plotna w swiecie nie ubywa szybciej niz 10 dziennie"); bez KS zastosowanego - INFO
-    (cale okno biegu); baza WGRANIE 95 (12-25-19): len -79/d, plotno -21/d;
+    """m96len (20.10, galaz w-toku/m96-len; Armoury/src/StartCalibration.M96Len.cs, klucz KsVillageClothBuysInPlan): Plan KS liczy plotno i sukno kupowane
+    przez wsie w miastach (ramka E5/B1) ponad koszyk zaplacony Planu (KsMoney.PaidV). Wejscie: log Armoury (strumieniowo).
+    M96LEN-0 linie "Len KS (m96-len): plan doba" sa (log bez paczki - NIE), w kazdej plotno i sukno, potkniecia 0;
+    M96LEN-1 przy kluczu TAK co najmniej jeden Plan z dopiskiem plotna > 0 (INFO, gdy wszystkie Plany mowia "bez dopisku" z podanym powodem); w tekscie zakupy wsi,
+    zaplacone (szt./d) i dopisek plotna i sukna przy Planie wlaczenia KS (ostatni Plan przed pierwsza doba "KS: produkcja (zastosowane)");
+    M96LEN-2 / M96LEN-3 / M96LEN-6 zapas lnu / plotna / sukna swiata (ksiega towarow "Towary: ... flax / linen / felt") od D+28 do konca biegu (D = pierwsza doba
+    "KS: produkcja (zastosowane)" + 14) - nachylenie >= -10 szt./d (PLAN etap 6: "plotna w swiecie nie ubywa szybciej niz 10 dziennie"); bez KS zastosowanego - INFO
+    (cale okno biegu); baza WGRANIE 95 (12-25-19): len -79/d, plotno -21/d, sukno -23/d;
     M96LEN-4 len w oknie: produkcja / zuzycie >= 0.90 (baza 0.78);
-    M96LEN-5 (INFO) zakupy plotna przez wsie (E5/B1) i plon lnu wsi w oknie."""
+    M96LEN-5 (INFO) zakupy plotna przez wsie (E5/B1), plon lnu wsi, plotno produkcja / zuzycie w oknie;
+    M96LEN-7 (INFO) welna i sukno w oknie: produkcja / zuzycie, zakupy sukna przez wsie."""
     import re as _re
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("M96LEN-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    pl = _re.compile(r"Len KS \(m96-len\): plan doba (\d+) \| klucz Ks Linen Village Buys In Plan (TAK|NIE) .*?srednia ([0-9.]+) szt\./d.*?zaplacony w poprzednim Planie ([0-9.-]+) szt\./d"
-                     r".*?dopisek do popytu 1:1 plotna ([0-9.]+) szt\./d.*? - ([^|]*)\|.*?potkniecia (\d+)")
-    pt = _re.compile(r"Towary: dzien (\d+) - (flax|linen) \(\d+ d\): zapas (\d+)[^|]*\| produkcja (\d+) \[([^\]]*)\] \| zuzycie (\d+) \[([^\]]*)\]")
+    ph = _re.compile(r"Len KS \(m96-len\): plan doba (\d+) \| klucz Ks Village Cloth Buys In Plan (TAK|NIE)")
+    pg = _re.compile(r"\| (plotno|sukno) \((linen|felt)\): zakupy wsi w miastach \(E5/B1\) srednia ([0-9.]+) szt\./d.*?zaplacony w poprzednim Planie ([0-9.-]+) szt\./d"
+                     r", dopisek do popytu 1:1 ([0-9.]+) szt\./d.*? - ([^|]*)")
+    ps = _re.compile(r"potkniecia (\d+) \(sesja")
+    pt = _re.compile(r"Towary: dzien (\d+) - (flax|linen|felt|wool) \(\d+ d\): zapas (\d+)[^|]*\| produkcja (\d+) \[([^\]]*)\] \| zuzycie (\d+) \[([^\]]*)\]")
     pa = _re.compile(r"KS: produkcja \(zastosowane\) dzien (\d+) \| od doby (\d+)")
     plans, stum = [], 0
-    rows = {"flax": {}, "linen": {}}
+    rows = {"flax": {}, "linen": {}, "felt": {}, "wool": {}}
     apply_day = None
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             if "Len KS (m96-len)" in ln:
-                m = pl.search(ln)
+                m = ph.search(ln)
                 if m:
-                    plans.append((int(m.group(1)), m.group(2), float(m.group(3)), float(m.group(4)) if m.group(4) != "-" else -1.0, float(m.group(5)), m.group(6).strip()))
-                    stum += int(m.group(7))
+                    seg = {}
+                    for mg in pg.finditer(ln):
+                        seg[mg.group(2)] = (float(mg.group(3)), float(mg.group(4)) if mg.group(4) != "-" else -1.0, float(mg.group(5)), mg.group(6).strip())
+                    plans.append((int(m.group(1)), m.group(2), seg))
+                    ms = ps.search(ln)
+                    stum += int(ms.group(1)) if ms else 1
                 continue
             if apply_day is None and "KS: produkcja (zastosowane)" in ln:
                 m = pa.search(ln)
                 if m:
                     apply_day = int(m.group(2))
                 continue
-            if "Towary: dzien" in ln and (" - flax (" in ln or " - linen (" in ln):
+            if "Towary: dzien" in ln and (" - flax (" in ln or " - linen (" in ln or " - felt (" in ln or " - wool (" in ln):
                 m = pt.search(ln)
                 if not m:
                     continue
@@ -52204,16 +52212,32 @@ def m96len_main(logp):
                 if mw:
                     vil = int(mw.group(1))
                 rows[m.group(2)][int(m.group(1))] = (int(m.group(3)), int(m.group(4)), int(m.group(6)), vb, vil)
-    rep.add("M96LEN-0: linie Planu m96-len, potkniecia", f"Planow {len(plans)}, potkniecia {stum}", "Planow >= 1 i potkniecia 0", len(plans) >= 1 and stum == 0)
-    on = [p for p in plans if p[1] == "TAK"]
+    bad = sum(1 for p in plans if "linen" not in p[2] or "felt" not in p[2])
+    rep.add("M96LEN-0: linie Planu m96-len, potkniecia", f"Planow {len(plans)} (bez obu towarow w linii {bad}), potkniecia {stum}", "Planow >= 1, oba towary i potkniecia 0",
+            len(plans) >= 1 and stum == 0 and bad == 0)
+    on = [p for p in plans if p[1] == "TAK" and "linen" in p[2]]
     if on:
-        added = [p for p in on if p[4] > 0]
-        last = on[-1]
-        txt = (f"z dopiskiem {len(added)} z {len(on)}; ostatni: doba {last[0]}, zakupy wsi {last[2]:.1f}, zaplacone {last[3]:.1f}, dopisek {last[4]:.1f} szt./d plotna"
-               + (f"; najwiekszy {max(p[4] for p in added):.1f}" if added else f"; powod: {last[5]}"))
-        rep.add("M96LEN-1: dopisek plotna wsi w Planie", txt, ">= 1 Plan z dopiskiem > 0 (INFO, gdy zakupy w koszyku zaplaconym)", True if added else None)
+        added = [p for p in on if p[2]["linen"][2] > 0]
+        pick = on[-1]
+        if apply_day is not None:
+            pre = [p for p in on if p[0] < apply_day]
+            if pre:
+                pick = pre[-1]
+
+        def seg_txt(p, g, nm):
+            s = p[2].get(g)
+            if not s:
+                return f"{nm} -"
+            pd = "-" if s[1] < 0 else f"{s[1]:.1f}"
+            return f"{nm}: zakupy wsi {s[0]:.1f}, zaplacone {pd}, dopisek {s[2]:.1f} szt./d ({s[3]})"
+        txt = (f"plotno z dopiskiem w {len(added)} z {len(on)} Planow; "
+               + ("Plan wlaczenia" if apply_day is not None and pick[0] < apply_day else "ostatni Plan") + f" doba {pick[0]}: "
+               + seg_txt(pick, "linen", "plotno") + "; " + seg_txt(pick, "felt", "sukno")
+               + (f"; najwiekszy dopisek plotna {max(p[2]['linen'][2] for p in added):.1f}" if added else ""))
+        rep.add("M96LEN-1: dopisek plotna i sukna wsi w Planie", txt, ">= 1 Plan z dopiskiem plotna > 0 (INFO, gdy zakupy w koszyku zaplaconym); zaplacone wsi ok. 3-6 szt./d",
+                True if added else None)
     else:
-        rep.add("M96LEN-1: dopisek plotna wsi w Planie", "brak Planow z kluczem TAK", ">= 1 Plan z dopiskiem > 0", None if plans else False)
+        rep.add("M96LEN-1: dopisek plotna i sukna wsi w Planie", "brak Planow z kluczem TAK", ">= 1 Plan z dopiskiem > 0", None if plans else False)
     days = sorted(set(rows["flax"]) & set(rows["linen"]))
     if not days:
         rep.add("M96LEN-2: zapas lnu swiata", "brak linii ksiegi towarow", "nachylenie >= -10 szt./d", None)
@@ -52232,23 +52256,35 @@ def m96len_main(logp):
         return 0
 
     def slope(g):
-        xs = win; ys = [rows[g][d][0] for d in xs]
+        xs = [d for d in win if d in rows[g]]
+        if len(xs) < 2:
+            return 0.0, 0, 0, False
+        ys = [rows[g][d][0] for d in xs]
         n = len(xs); mx = sum(xs) / n; my = sum(ys) / n
         den = sum((x - mx) ** 2 for x in xs)
-        return (sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den) if den > 0 else 0.0, ys[0], ys[-1]
+        return (sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den) if den > 0 else 0.0, ys[0], ys[-1], True
+
+    def avg(g, k):
+        xs = [d for d in win if d in rows[g]]
+        return (sum(rows[g][d][k] for d in xs) / len(xs)) if xs else 0.0
 
     lab = (f"doby {win[0]}-{win[-1]} (D+28 = {apply_day + 42} - KS od {apply_day})" if ks else f"doby {win[0]}-{win[-1]} (KS niezastosowany - INFO)")
-    for k, g, nm in ((2, "flax", "lnu"), (3, "linen", "plotna")):
-        s, a, b = slope(g)
-        rep.add(f"M96LEN-{k}: zapas {nm} swiata (ksiega towarow)", f"{a} -> {b}, nachylenie {s:+.1f} szt./d; {lab}", "nachylenie >= -10 szt./d (baza W95 12-25-19: len -79, plotno -21)",
+    for k, g, nm, base in ((2, "flax", "lnu", "len -79"), (3, "linen", "plotna", "plotno -21"), (6, "felt", "sukna", "sukno -23")):
+        s, a, b, okd = slope(g)
+        if not okd:
+            rep.add(f"M96LEN-{k}: zapas {nm} swiata (ksiega towarow)", "brak linii ksiegi", "nachylenie >= -10 szt./d", None)
+            continue
+        rep.add(f"M96LEN-{k}: zapas {nm} swiata (ksiega towarow)", f"{a} -> {b}, nachylenie {s:+.1f} szt./d; {lab}", f"nachylenie >= -10 szt./d (baza W95 12-25-19: {base})",
                 (s >= -10.0) if ks else None)
-    pr = sum(rows["flax"][d][1] for d in win) / len(win); us = sum(rows["flax"][d][2] for d in win) / len(win)
+    pr = avg("flax", 1); us = avg("flax", 2)
     rep.add("M96LEN-4: len produkcja / zuzycie w oknie", f"{pr:.0f} / {us:.0f} szt./d = {pr / us if us > 0 else 0:.2f}", ">= 0.90 (baza W95 0.78: 281 / 362)",
             (us > 0 and pr / us >= 0.90) if ks else None)
-    vb = sum(rows["linen"][d][3] for d in win) / len(win); vil = sum(rows["flax"][d][4] for d in win) / len(win)
-    lp = sum(rows["linen"][d][1] for d in win) / len(win); lu = sum(rows["linen"][d][2] for d in win) / len(win)
+    vb = avg("linen", 3); vil = avg("flax", 4); lp = avg("linen", 1); lu = avg("linen", 2)
     rep.add("M96LEN-5: plotno wsi E5/B1, plon lnu wsi, plotno produkcja / zuzycie", f"wsie kupuja {vb:.0f} szt./d, len wsi {vil:.0f} szt./d, plotno {lp:.0f} / {lu:.0f} szt./d",
             "INFO (baza W95 12-25-19: wsie 53, len wsi 154, plotno 279 / 296)", None)
+    wp = avg("wool", 1); wu = avg("wool", 2); fp = avg("felt", 1); fu = avg("felt", 2); fv = avg("felt", 3)
+    rep.add("M96LEN-7: welna i sukno w oknie", f"welna {wp:.0f} / {wu:.0f} szt./d, sukno {fp:.0f} / {fu:.0f} szt./d, wsie kupuja sukna {fv:.0f} szt./d",
+            "INFO (baza W95 12-25-19: welna 267 / 263, sukno 175 / 201, wsie kupuja sukna 43)", None)
     rep.show()
     return 0
 

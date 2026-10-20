@@ -8176,9 +8176,9 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsCtlOwnSameFood { get; set; } = true;
 
-        [SettingPropertyBool("Ks Linen Village Buys In Plan", HintText = "with Start Calibration: the Plan also counts the linen that villages really buy in their market towns beyond the basket the Plan already pays for (the Plan took that part as woven at home, but villages buy it), so villages grow enough flax for the weavers; off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ks Village Cloth Buys In Plan", HintText = "with Start Calibration: the Plan also counts the linen and felt that villages really buy in their market towns beyond the basket the Plan already pays for (the Plan took that part as woven at home, but villages buy it), so villages grow enough flax and shear enough wool for the weavers; off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
-        public bool KsLinenVillageBuysInPlan { get; set; } = true;
+        public bool KsVillageClothBuysInPlan { get; set; } = true;
 
         [SettingPropertyBool("Ks Cloth Demand", HintText = "with Start Calibration applied: the Plan counts the linen, felt and leather that army clothing, arms workshops and smiths' repairs use up, so villages grow enough flax and wool and keep enough hides for them (the town weavers' own flax and wool are already counted in the cloth); off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
@@ -10575,7 +10575,7 @@ namespace Armoury
             s.KsMade7Derived = KsMade7Derived;
             s.KsCtlOwnFood = KsCtlOwnFood;
             s.KsCtlOwnSameFood = KsCtlOwnSameFood;
-            s.KsLinenVillageBuysInPlan = KsLinenVillageBuysInPlan;
+            s.KsVillageClothBuysInPlan = KsVillageClothBuysInPlan;
             s.KsClothDemand = KsClothDemand;
             s.WallGrainTribute = WallGrainTribute;
             s.WallTributeTargetDays = WallTributeTargetDays;
