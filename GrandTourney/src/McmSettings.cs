@@ -168,6 +168,10 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public int MaxNoblesInBracket { get; set; } = 15;
 
+        [SettingPropertyBool("Tourney Ransom", HintText = "whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions (only when you ride in the lists yourself) and the AI knights alike - a common soldier fights in borrowed kit, ladies and townsfolk wager nothing, kin never ransom kin, a tourney called off costs nobody; an AI lord pays only from what his house can spare beyond its war chest, the victor wears what is better than his own, and the vanquished buys plain kit at the market (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("The lists themselves")]
+        public bool TourneyRansom { get; set; } = true;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
         public bool LogEnabled { get; set; } = true;
@@ -213,6 +217,7 @@ namespace GrandTourney
             s.NoblesFightInTournaments = NoblesFightInTournaments;
             s.NoblesIgnoreSkillGate = NoblesIgnoreSkillGate;
             s.MaxNoblesInBracket = MaxNoblesInBracket;
+            s.TourneyRansom = TourneyRansom;
             s.LogEnabled = LogEnabled;
         }
 

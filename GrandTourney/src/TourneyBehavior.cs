@@ -147,7 +147,7 @@ namespace GrandTourney
                 if (Settings.Current.PeaceOnly && WarAtTheGates(town))
                 {
                     var g = Campaign.Current.TournamentManager.GetTournamentGame(town);
-                    if (g != null) Campaign.Current.TournamentManager.ResolveTournament(g, town);
+                    if (g != null) TourneyRansom.CallOff(g, town);   // R3-04a: odwolanie bez wykupu (gra symuluje odwolany turniej)
                     Log.Info("Turniej w " + town.Name + " odwolany od razu - wrog u bram.");
                     return;
                 }
@@ -406,7 +406,7 @@ namespace GrandTourney
                     // odwolali, a lordowie dostaliby rozkaz jazdy donikad.
                     if (s.PeaceOnly && WarAtTheGates(town))
                     {
-                        mgr.ResolveTournament(game, town);
+                        TourneyRansom.CallOff(game, town);   // R3-04a: odwolanie bez wykupu
                         SilenceAdoption(town.Settlement);
                         Log.Info("Turniej w " + town.Name + " zdjety - wrog u bram.");
                         continue;
@@ -467,7 +467,7 @@ namespace GrandTourney
                     if (s.PeaceOnly && WarAtTheGates(town))
                     {
                         _events.Remove(line);
-                        Campaign.Current.TournamentManager.ResolveTournament(game, town);
+                        TourneyRansom.CallOff(game, town);   // R3-04a: odwolanie bez wykupu
                         if (fee > 0)
                         {
                             int back = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);   // pula czekala na zwyciezce - wraca cala
