@@ -124,7 +124,7 @@ namespace Armoury
         {
             if (!DrawOn) return 6;
             int skill = SkillOf(smith);
-            int cap = skill / PerTier() + 2;
+            int cap = SkillCap(skill);
             if (cap < minTier) cap = minTier;
             if (cap > 6) cap = 6;
             Draws++;
@@ -140,6 +140,16 @@ namespace Armoury
             }
             return cap;
         }
+
+        /// <summary>Gorna granica losowania dla reki o tym Smithing (bez dolnej granicy tieru wykutej sztuki): skill / prog na tier + 2, najwyzej 6.
+        /// Jedna regula dla DrawCap i naprawy zapisu 2 (LoreSeedFix.RepairReach, m96-wzory2).</summary>
+        internal static int SkillCap(int skill)
+        {
+            int cap = (skill < 0 ? 0 : skill) / PerTier() + 2;
+            return cap > 6 ? 6 : cap;
+        }
+
+        internal static int PerTierNow() { return PerTier(); }
 
         /// <summary>Smithing kowala dla filtra legend w puli (int.MaxValue = bez filtra: klucz wylaczony albo nauka z cudzej sztuki).</summary>
         internal static int LegendReach(Hero smith)
