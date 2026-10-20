@@ -29,9 +29,11 @@ namespace Armoury
     ///    firm; do tego otwarte rachunki zywnosci miasta - KsFoodCredit);
     ///  - S ponad pulapem: miasta wydaja dzis razem najwyzej (S - pulap) / 28 (ok. miesiac - jak M6), najwyzej tyle, o ile suma kas jest ponad suma progow, i najwyzej
     ///    R = suma zwrotow wszystkich miast (to, co przebudowy wplacily do kas swiata). Recenzja p6-a7: ZWROT ZBIORCZY - najpierw kazde miasto ponad wlasnym progiem
-    ///    za swoj okreg (najwyzej swoj r i kasa ponad progiem); reszta R (miasta pod progiem, oblezone, z "domami najpierw", bez wsi) - miasta ponad progiem w stosunku
-    ///    swojej pozostalej kasy ponad progiem. Zadne miasto nie schodzi ponizej swojego progu. Dawniej kazde miasto tylko swoj r: pieniadz przebudow w miastach pod
-    ///    progiem zostawal w kasach (model rev_model_pertown.py: +12..+52 tys./d w oknie); zbiorczo kasy razem nie zaleza od tego, gdzie A7 wplaca (model9.py);
+    ///    za swoj okreg (najwyzej swoj r i kasa ponad progiem); reszta R (miasta pod progiem, oblezone, z "domami najpierw", bez wsi) - miasta ponad progiem wedlug
+    ///    ognisk swojego okregu (ta sama placa na dom w kazdym okregu; w stosunku kasy model9b.py dawal najbogatszemu miastu 8-14% calego zwrotu do kilku wsi),
+    ///    kazde najwyzej pozostala kasa ponad progiem (wyrownanie, najwyzej 4 przebiegi). Zadne miasto nie schodzi ponizej swojego progu. Dawniej kazde miasto tylko
+    ///    swoj r: pieniadz przebudow w miastach pod progiem zostawal w kasach (model rev_model_pertown.py: +12..+52 tys./d w oknie); zbiorczo kasy razem nie zaleza
+    ///    od tego, gdzie A7 wplaca (model9.py / model10.py: doplyw +35 tys./d -> kasy w oknie -0.2 tys./d, +70 tys./d -> +2.7 tys./d; bez A7 -3.2 tys./d jak log);
     ///  - zloto z kasy miasta do kies wsi, ktorych miastem targowym jest (TradeBound, inaczej Bound - te same wsie, ktore placa mu przebudowe A7), wedlug ognisk; wies
     ///    spladrowana / najezdzana nie bierze. Bez wyplaty: oblezenie / swiezo zdobyte (DsTowns.RemitOf), "domy najpierw" (KsFolkIncome.HousesFirst - R/P zbiedniali,
     ///    nadwyzka najpierw do ich domow przez M6, jak gersuma), miasto bez wsi do najecia;
@@ -65,6 +67,8 @@ namespace Armoury
         private static readonly List<Town> _payT = new List<Town>(128);
         private static readonly List<double> _payW = new List<double>(128);
         private static readonly List<double> _payE = new List<double>(128);
+        private static readonly List<double> _payH = new List<double>(128);   // ogniska zdrowych wsi okregu (reszta zwrotu wedlug rak)
+        private static readonly List<double> _payA = new List<double>(128);   // reszta zwrotu dzis (za miasta pod progiem)
         private static readonly List<Settlement> _loopT = new List<Settlement>(128);
         private static readonly List<long> _loopX = new List<long>(128);
         private static readonly Dictionary<Settlement, long> _bills = new Dictionary<Settlement, long>();
@@ -91,7 +95,7 @@ namespace Armoury
         internal static void Reset()
         {
             _start = -1; _lastDay = -1; _sDay = -1; _g0 = 0; _s = double.NaN; _vil.Clear(); _vilDay = -1;
-            _payT.Clear(); _payW.Clear(); _payE.Clear(); _loopT.Clear(); _loopX.Clear(); _bills.Clear(); _billsOld.Clear();
+            _payT.Clear(); _payW.Clear(); _payE.Clear(); _payH.Clear(); _payA.Clear(); _loopT.Clear(); _loopX.Clear(); _bills.Clear(); _billsOld.Clear();
             lock (_rebLock) { _rebToday.Clear(); _vilToday = 0; }
             _rebAvg.Clear(); _rebLoad = null;
             _dG = _dKeep = _dCap = _dPlan = 0; _dS = 0; _dTowns = _dOver = 0; _dA7 = false; _dReb = _dVil = 0; _dRebAvg = _dOwn = _dEx = 0;
@@ -199,12 +203,14 @@ namespace Armoury
             }
         }
 
-        private static bool HasVillages(Settlement st)
+        /// <summary>Ogniska zdrowych wsi okregu miasta (spladrowana / najezdzana - nie; kazda najmniej 1); 0 - miasto bez wsi do najecia.</summary>
+        private static double DistrictHearths(Settlement st)
         {
             List<Village> l;
-            if (!_vil.TryGetValue(st, out l)) return false;
-            foreach (var v in l) if (v != null && v.VillageState == Village.VillageStates.Normal) return true;
-            return false;
+            if (!_vil.TryGetValue(st, out l)) return 0;
+            double h = 0;
+            foreach (var v in l) if (v != null && v.VillageState == Village.VillageStates.Normal) h += Math.Max(1.0, v.Hearth);
+            return h;
         }
 
         /// <summary>Prog wydatkow miasta: DsTowns.HireKeep + otwarte rachunki zywnosci miasta (jeden przebieg na dobe - _bills, te same filtry co gersuma). NaN - brak danych.</summary>
@@ -241,7 +247,7 @@ namespace Armoury
             {
                 Villages(today);
                 _days++;
-                _payT.Clear(); _payW.Clear(); _payE.Clear(); _loopT.Clear(); _loopX.Clear();
+                _payT.Clear(); _payW.Clear(); _payE.Clear(); _payH.Clear(); _payA.Clear(); _loopT.Clear(); _loopX.Clear();
                 try { KsFoodCredit.OlderThanByDst(-1, _bills, _billsOld); } catch (Exception e) { _bills.Clear(); Stumble("Bills", e); }
                 bool gap = double.IsNaN(_s) || _sDay < 0 || today - _sDay > GapDays;
                 long gSum = 0, reb = 0, vil = 0; double keepSum = 0, own = 0, exSum = 0, rebAvg = 0; int n = 0, nOver = 0, nSiege = 0, nHouses = 0, nNoVil = 0;
@@ -276,9 +282,10 @@ namespace Armoury
                             nOver++;
                             if (DsTowns.RemitOf(st) != 0) { nSiege++; continue; }
                             if (KsFolkIncome.HousesFirst(st)) { nHouses++; continue; }
-                            if (!HasVillages(st)) { nNoVil++; continue; }
+                            double hh = DistrictHearths(st);
+                            if (!(hh > 0)) { nNoVil++; continue; }
                             double w = Math.Min(r, ex);                              // najpierw za swoj okreg
-                            _payT.Add(t); _payW.Add(w); _payE.Add(ex); own += w; exSum += ex;
+                            _payT.Add(t); _payW.Add(w); _payE.Add(ex); _payH.Add(hh); _payA.Add(0); own += w; exSum += ex;
                         }
                         catch (Exception e) { Stumble("Town", e); }
                     }
@@ -305,15 +312,32 @@ namespace Armoury
                 _siege += nSiege; _houses += nHouses; _noVil += nNoVil;
                 if (_dPlan < 1 || !(exSum > 0)) return;
                 _payDays++;
-                // najpierw za swoj okreg (w stosunku zwrotow, gdy pulap tnie); reszta (za miasta pod progiem i bez wyplaty) w stosunku pozostalej kasy ponad progiem
-                double k1, k2;
-                if (_dPlan <= own) { k1 = own > 0 ? _dPlan / own : 0; k2 = 0; }
-                else { k1 = 1.0; double ex2 = exSum - own; k2 = ex2 > 0 ? Math.Min(1.0, (_dPlan - own) / ex2) : 0; }
+                // najpierw za swoj okreg (w stosunku zwrotow, gdy pulap tnie); reszta (za miasta pod progiem i bez wyplaty) - miasta ponad progiem wedlug ognisk swojego
+                // okregu (ta sama placa na dom w kazdym okregu - bez skupienia pieniedzy we wsiach najbogatszego miasta), kazde najwyzej pozostala kasa ponad progiem
+                // (wyrownanie: miasto, ktoremu brakuje kasy, placi swoja reszte, a jego czesc dziela inne - najwyzej 4 przebiegi)
+                double k1 = _dPlan <= own ? (own > 0 ? _dPlan / own : 0) : 1.0;
+                double left = _dPlan > own ? _dPlan - own : 0;
+                for (int it = 0; it < 4 && left >= 1; it++)
+                {
+                    double hs = 0;
+                    for (int i = 0; i < _payT.Count; i++) if (_payE[i] - _payW[i] * k1 - _payA[i] >= 1) hs += _payH[i];
+                    if (!(hs > 0)) break;
+                    double used = 0;
+                    for (int i = 0; i < _payT.Count; i++)
+                    {
+                        double room = _payE[i] - _payW[i] * k1 - _payA[i];
+                        if (!(room >= 1)) continue;
+                        double add = Math.Min(room, left * _payH[i] / hs);
+                        _payA[i] += add; used += add;
+                    }
+                    left -= used;
+                    if (!(used >= 1)) break;
+                }
                 for (int i = 0; i < _payT.Count; i++)
                 {
                     try
                     {
-                        double a = _payW[i] * k1, b = (_payE[i] - _payW[i]) * k2;
+                        double a = _payW[i] * k1, b = _payA[i];
                         long x = (long)Math.Floor(Math.Min(_payE[i], a + b));
                         if (x < 1) continue;
                         long took = Pay(_payT[i].Settlement, _payT[i], x);
@@ -327,7 +351,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             finally
             {
-                _payT.Clear(); _payW.Clear(); _payE.Clear(); _loopT.Clear(); _loopX.Clear();
+                _payT.Clear(); _payW.Clear(); _payE.Clear(); _payH.Clear(); _payA.Clear(); _loopT.Clear(); _loopX.Clear();
                 double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 _msSum += ms; if (ms > _msMax) _msMax = ms;
             }
