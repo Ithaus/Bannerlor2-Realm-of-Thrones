@@ -486,9 +486,11 @@ namespace Armoury
                                     + ", maks. odcinkow na komorke " + g.MaxPerCell : "")
                      + " | latka pamieci predkosci " + _hookNote + " | straznik zapisu stanu " + _writerHooks + "/2 | latka predkosci MarchPace w " + SpeedModels + " modelach"
                      + " | wczytanie " + ms.ToString("0.0", Inv) + " ms"
-                     + " | premia " + Status(g)
-                     + " | drogi boczne: klucz MapSideRoadSpeedBonus " + (s.MapSideRoadSpeedBonus ? "tak" : "nie") + ", premia " + (SidePctOf(s) * 100f).ToString("0.0", Inv)
-                     + "% - czekaja na plan drog bocznych z widoku mapy (klucz MapSideRoads " + (s.MapSideRoads ? "tak" : "nie") + ").");
+                     + " | premia " + Status(g) + ".");
+            // n20-drogi: osobna linia (linia startu sesji bez zmian - czyta ja sprawdz_logi.py, grupa ndrogi)
+            Log.Info(P + "drogi boczne - start sesji: klucz MapSideRoadSpeedBonus " + (s.MapSideRoadSpeedBonus ? "tak" : "nie") + ", premia " + (SidePctOf(s) * 100f).ToString("0.0", Inv)
+                     + "%, margines " + MarginOf(s).ToString("0.00", Inv) + " jedn. (wspolny z traktami) - czekaja na plan drog bocznych z widoku mapy (klucz MapSideRoads "
+                     + (s.MapSideRoads ? "tak" : "nie") + ").");
         }
 
         private static void Load()
@@ -878,13 +880,12 @@ namespace Armoury
         {
             var g = _grid;
             var ci = Inv;
-            var sb = new StringBuilder(1400);
+            var sb = new StringBuilder(900);
+            var sd = new StringBuilder(700);   // n20-drogi: osobna linia drog bocznych (linia doby bez zmian - czyta ja sprawdz_logi.py, grupa ndrogi)
             float pct = PctOf(s), spct = SidePctOf(s);
             sb.Append(P).Append("dzien ").Append(day)
               .Append(" | klucz MapRoadSpeedBonus tak, premia ").Append((pct * 100f).ToString("0", ci)).Append("%, margines ").Append(MarginOf(s).ToString("0.00", ci))
-              .Append(" | plik ").Append(g != null ? "v" + g.Version + ": lamanych " + g.Lines + ", punktow " + g.Points + ", odcinkow " + g.Segments : "NIECZYNNY (" + _note + ")")
-              .Append(" | drogi boczne: klucz MapSideRoadSpeedBonus ").Append(s.MapSideRoadSpeedBonus ? "tak" : "nie").Append(", premia ").Append((spct * 100f).ToString("0.0", ci))
-              .Append("%, ").Append(SideText(g));
+              .Append(" | plik ").Append(g != null ? "v" + g.Version + ": lamanych " + g.Lines + ", punktow " + g.Points + ", odcinkow " + g.Segments : "NIECZYNNY (" + _note + ")");
             int tot = 0, totOn = 0, totSide = 0;
             for (int k = 0; k < 5; k++) { tot += _hN[k]; totOn += _hOn[k]; totSide += _hSide[k]; }
             sb.Append(" | partio-godziny w ruchu na ladzie (AI, godzin spisu ").Append(_hours).Append("): ").Append(tot).Append(", na drodze ").Append(totOn)
@@ -895,21 +896,24 @@ namespace Armoury
               .Append(", bandy ").Append(_hOn[3]).Append('/').Append(_hN[3]).Append(" (").Append(Pct(_hOn[3], _hN[3])).Append("%)")
               .Append(", inne ").Append(_hOn[4]).Append('/').Append(_hN[4]).Append(" (").Append(Pct(_hOn[4], _hN[4])).Append("%)")
               .Append(" | gracz godzin w ruchu ").Append(_hN[5]).Append(", na drodze ").Append(_hOn[5]);
-            // n20-drogi: na drodze bocznej (poza traktem) - ten sam spis godzinny
-            sb.Append(" | drogi boczne: partio-godziny AI na drodze bocznej ").Append(totSide).Append(" (").Append(Pct(totSide, tot)).Append("%)")
-              .Append(" - rody ").Append(_hSide[0]).Append(" (").Append(Pct(_hSide[0], _hN[0])).Append("%)")
-              .Append(", karawany ").Append(_hSide[1]).Append(" (").Append(Pct(_hSide[1], _hN[1])).Append("%)")
-              .Append(", wozy wsi ").Append(_hSide[2]).Append(" (").Append(Pct(_hSide[2], _hN[2])).Append("%)")
-              .Append(", bandy ").Append(_hSide[3]).Append(" (").Append(Pct(_hSide[3], _hN[3])).Append("%)")
-              .Append(", inne ").Append(_hSide[4]).Append(" (").Append(Pct(_hSide[4], _hN[4])).Append("%)")
-              .Append(", gracz godzin na bocznej ").Append(_hSide[5]);
             long sc = _speedCalls, so = _speedOn, ss = _speedSide;
             sb.Append(" | liczenia predkosci (ok.) ").Append(sc).Append(", z premia drogi ").Append(so).Append(" (").Append(sc > 0 ? (100.0 * so / sc).ToString("0.0", ci) : "-").Append("%)")
-              .Append(", z premia drogi bocznej ").Append(ss).Append(" (").Append(sc > 0 ? (100.0 * ss / sc).ToString("0.0", ci) : "-").Append("%)")
               .Append(", przeliczenia wymuszone zmiana drogi (ok.) ").Append(_flips).Append(", latka pamieci ").Append(_cacheHooked ? "wpieta" : "NIE")
               .Append(", straznik zapisu ").Append(_writerHooks).Append("/2, liczenia bez zapisu stanu (model wprost, ok.) ").Append(_recSkipped)
               .Append(", premia ").Append(Status(g));
-            Audit(s, g, sb, pct, spct);
+            // n20-drogi: linia drog bocznych - ten sam spis godzinny i te same liczniki doby
+            sd.Append(P).Append("drogi boczne, dzien ").Append(day)
+              .Append(" | klucz MapSideRoadSpeedBonus ").Append(s.MapSideRoadSpeedBonus ? "tak" : "nie").Append(", premia ").Append((spct * 100f).ToString("0.0", ci))
+              .Append("%, margines ").Append(MarginOf(s).ToString("0.00", ci)).Append(" | ").Append(SideText(g))
+              .Append(" | partio-godziny AI w ruchu na ladzie ").Append(tot).Append(", na drodze bocznej ").Append(totSide).Append(" (").Append(Pct(totSide, tot)).Append("%)")
+              .Append(" - rody ").Append(_hSide[0]).Append('/').Append(_hN[0]).Append(" (").Append(Pct(_hSide[0], _hN[0])).Append("%)")
+              .Append(", karawany ").Append(_hSide[1]).Append('/').Append(_hN[1]).Append(" (").Append(Pct(_hSide[1], _hN[1])).Append("%)")
+              .Append(", wozy wsi ").Append(_hSide[2]).Append('/').Append(_hN[2]).Append(" (").Append(Pct(_hSide[2], _hN[2])).Append("%)")
+              .Append(", bandy ").Append(_hSide[3]).Append('/').Append(_hN[3]).Append(" (").Append(Pct(_hSide[3], _hN[3])).Append("%)")
+              .Append(", inne ").Append(_hSide[4]).Append('/').Append(_hN[4]).Append(" (").Append(Pct(_hSide[4], _hN[4])).Append("%)")
+              .Append(" | gracz godzin w ruchu ").Append(_hN[5]).Append(", na drodze bocznej ").Append(_hSide[5])
+              .Append(" | liczenia predkosci (ok.) ").Append(sc).Append(", z premia drogi bocznej ").Append(ss).Append(" (").Append(sc > 0 ? (100.0 * ss / sc).ToString("0.0", ci) : "-").Append("%)");
+            Audit(s, g, sb, sd, pct, spct);
             double censusMs = _censusTicks * 1000.0 / Stopwatch.Frequency;
             double cacheUs = _cacheSampled > 0 ? _cacheTicks * 1e6 / Stopwatch.Frequency / _cacheSampled : 0;
             sb.Append(" | koszt: spis ").Append(censusMs.ToString("0.000", ci)).Append(" ms/dobe, postfiks pamieci ").Append(cacheUs.ToString("0.000", ci))
@@ -917,18 +921,21 @@ namespace Armoury
               .Append(" | potkniecia dzis ").Append(_stumbles).Append(" (od wczytania ").Append(_stumblesAll).Append("), w predkosci dzis ").Append(_parStumbles)
               .Append(" (od wczytania ").Append(_parStumblesAll).Append(")")
               .Append(_firstPar != null ? " pierwsze: " + _firstPar.GetType().Name + " " + (_firstPar.Message ?? "") : "").Append('.');
+            sd.Append('.');
             Log.Info(sb.ToString());
+            Log.Info(sd.ToString());
         }
 
-        /// <summary>Audyt w takcie linii: do 8 losowych partii AI w ruchu na trakcie i (n20-drogi) do 8 na drodze bocznej + gracz na ladzie - model predkosci
-        /// wprost (bez zapisu do pamieci partii): bez premii drogi (r0) i z premia (r1, z opisami): premia rzeczywista r1/r0 - 1, wpis "Road" / "Side road",
-        /// wynik na suficie LimitMax, premia zjedzona przez sufit (r1 < r0 x (1 + premia) x 0.995), pamiec gry (_lastCalculatedSpeed) zgodna z r1 +-2%.</summary>
-        private static void Audit(Settings s, Grid g, StringBuilder sb, float pct, float spct)
+        /// <summary>Audyt w takcie linii: do 8 losowych partii AI w ruchu na trakcie (sb) i (n20-drogi) do 8 na drodze bocznej (sd) + gracz na ladzie - model
+        /// predkosci wprost (bez zapisu do pamieci partii): bez premii drogi (r0) i z premia (r1, z opisami): premia rzeczywista r1/r0 - 1, wpis "Road" /
+        /// "Side road", wynik na suficie LimitMax, premia zjedzona przez sufit (r1 < r0 x (1 + premia) x 0.995), pamiec gry (_lastCalculatedSpeed) zgodna z r1 +-2%.
+        /// Czesc linii traktow w tym samym ksztalcie co przed n20-drogi (gracz "na drodze" = na trakcie).</summary>
+        private static void Audit(Settings s, Grid g, StringBuilder sb, StringBuilder sd, float pct, float spct)
         {
             var ci = Inv;
-            if (g == null || Campaign.Current == null) { sb.Append(" | audyt: brak siatki | gracz: -"); return; }
+            if (g == null || Campaign.Current == null) { sb.Append(" | audyt: brak siatki | gracz: -"); sd.Append(" | audyt: brak siatki"); return; }
             var model = Campaign.Current.Models.PartySpeedCalculatingModel;
-            if (model == null) { sb.Append(" | audyt: brak modelu predkosci | gracz: -"); return; }
+            if (model == null) { sb.Append(" | audyt: brak modelu predkosci | gracz: -"); sd.Append(" | audyt: brak modelu predkosci"); return; }
             if (!_lastSpeedTried)
             {
                 _lastSpeedTried = true;
@@ -956,8 +963,8 @@ namespace Armoury
             }
             sb.Append(" | audyt AI na drodze: ");
             AuditList(model, _cand, pct, false, sb);
-            sb.Append(" | audyt AI na drodze bocznej: ");
-            AuditList(model, _candSide, spct, true, sb);
+            sd.Append(" | audyt AI na drodze bocznej: ");
+            AuditList(model, _candSide, spct, true, sd);
             _cand.Clear();
             _candSide.Clear();
             // gracz (na ladzie): zawsze, z flaga drogi
@@ -972,18 +979,26 @@ namespace Armoury
                     float r0, r1, lim, lmin, cached;
                     bool line, lineS;
                     if (Probe(model, main, out r0, out r1, out lim, out lmin, out line, out lineS, out cached))
-                        sb.Append(" | gracz: na drodze ").Append(kind == 2 ? "tak" : kind == 1 ? "bocznej" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2")
-                          .Append(" jedn., od krawedzi drogi bocznej ").Append(es < 1e30f ? es.ToString("0.00", ci) : ">2").Append(" jedn.)")
+                    {
+                        string limT = lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak";
+                        string floorT = r0 <= lmin + 0.001f ? "tak" : "nie";
+                        sb.Append(" | gracz: na drodze ").Append(kind == 2 ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
                           .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
-                          .Append(", LimitMax ").Append(lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak")
-                          .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", wpis Side road ").Append(lineS ? "tak" : "nie")
-                          .Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
-                          .Append(", na podlodze LimitMin ").Append(r0 <= lmin + 0.001f ? "tak" : "nie");
-                    else sb.Append(" | gracz: audyt nieudany");
+                          .Append(", LimitMax ").Append(limT)
+                          .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
+                          .Append(", na podlodze LimitMin ").Append(floorT);
+                        sd.Append(" | gracz: na drodze bocznej ").Append(kind == 1 ? "tak" : kind == 2 ? "nie (na trakcie)" : "nie").Append(" (od krawedzi drogi bocznej ")
+                          .Append(es < 1e30f ? es.ToString("0.00", ci) : ">2").Append(" jedn.)")
+                          .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
+                          .Append(", LimitMax ").Append(limT)
+                          .Append(", wpis Side road ").Append(lineS ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
+                          .Append(", na podlodze LimitMin ").Append(floorT);
+                    }
+                    else { sb.Append(" | gracz: audyt nieudany"); sd.Append(" | gracz: audyt nieudany"); }
                 }
-                else sb.Append(" | gracz: na morzu / w przejsciu / nieczynny");
+                else { sb.Append(" | gracz: na morzu / w przejsciu / nieczynny"); sd.Append(" | gracz: na morzu / w przejsciu / nieczynny"); }
             }
-            catch (Exception e) { Stumble("Audit.Player", e); sb.Append(" | gracz: blad audytu"); }
+            catch (Exception e) { Stumble("Audit.Player", e); sb.Append(" | gracz: blad audytu"); sd.Append(" | gracz: blad audytu"); }
         }
 
         /// <summary>Audyt jednego rodzaju drogi (side: false trakt, true droga boczna): do AuditMax losowych kandydatow (lista mieszana w miejscu), premia
