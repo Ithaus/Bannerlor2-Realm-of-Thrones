@@ -27,3 +27,13 @@ corki jakis lord czy ktos, i jak biore gossip, to musze kupic piwo lub ale cokol
 Zmiana: Rumours.cs (plotki) - nowe rodzaje: turnieje (gdzie, kiedy, nagroda - z GrandTourney, tylko gdy trwaja/ogloszone), swaty (lord szuka meza dla corki / zony dla
 syna - z kandydatow malzenstw BK/gry, tylko prawdziwe); sluchanie plotek kosztuje: kupno piwa/ale (cena z polki miasta, do karczmarza - kiesa ludu miasta), bez
 napitku - nie sluchasz (opcja szara z podpowiedzia). W zajezdzie tak samo. Kruki (R3-05c) - dalekie wiesci jak dotad.
+
+### 3c. Piwo, plotki i kac (Jeff 20.10 ok. 15:25)
+Doslownie: "za kazde wypite piwo moge dostac tyle plotek, ile moja charyzma; jak mam slaba charyzme w sensie przekonywanie, to dostane 1 plotke, potem moge kupic kolejne
+piwo i dostane 1; max moge dostac wszystkie plotki po jednym piwie, ale to zalezne od mojego przekonywania, taki system; i jak wypije za duzo piwa, mam minus do predkosci
+i musze dospac, i nastepny dzien kac, to bylaby fajna mechanika."
+Projekt (do dopracowania w nocy, liczby dobiera Claude): plotki na jedno piwo = 1 + Urok (Charm) / X (np. Urok 0-49 = 1, ... wysoki = wszystkie plotki karczmy na raz);
+kazde piwo kupione po cenie z polki (do karczmarza - kiesa ludu); licznik wypitych w tej nocy: ponad prog (np. 3-4 kufle, mniej przy niskiej Wytrzymalosci/Atletyce -
+opisac) -> pijany: kara predkosci na mapie do snu, potrzeba dospania (dlug snu NightRest rosnie), nastepny dzien kac (mniejsza kara predkosci/morale/wzroku do poludnia);
+XP Uroku za wysluchane plotki (male). Te same zasady w zajezdzie. Tylko gracz.
+
