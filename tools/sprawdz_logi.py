@@ -23702,7 +23702,7 @@ def r2_selftest():
     return None
 
 
-R2_B4 = re.compile(r"\| zalogi w pokoju \(B4\): udzial ([\d.]+) zalogi wojennej, zalog z celem (\d+), na celu \(zold >= 95% celu\) (\d+), ponizej celu (\d+); zold zalog (\d+)"
+R2_B4 = re.compile(r"\| zalogi w pokoju \(B4\): udzial ([\d.]+) zalogi wojennej(?: \([^)]*\))?, zalog z celem (\d+), na celu \(zold >= 95% celu\) (\d+), ponizej celu (\d+); zold zalog (\d+)"
                    r" wobec celu (\d+); rodow z celem przycietym do [\d.]+ pulapu (\d+)")
 R2_ZP = re.compile(r"\| pokoj \(Z\.1\): rody w pokoju (\d+), .*?ludzie w partiach (\d+), w zalogach (\d+)")
 R2_ERR = ("CrownCallToWar", "KingdomTreasury.NeedAid", "KingdomTreasury.RentAid", "TownFolk.Bread", "TownFolk.BreadRest", "CrownIncome.End", "ClanBudget.ChestOf")
