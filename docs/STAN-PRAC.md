@@ -3300,4 +3300,14 @@ TESTY: n20b 5 dob + 4 bitwy x20 kod 0 (UW 44/44 naprawione, 0 pominietych; wiosk
 OTWARTE (do raportu): niewola sprawdzona tylko w kodzie (autotest - ucieczka z pola, nie niewola); start "Indebted Lord" sprawdzony furtka (nie kreatorem); aksamit 3c - 32% miast okolicy
 tanie (cel 50%); przetop broni z 1 sztaby oddaje cala sztabe (decyzja Jeffa); A7 wylaczone (kasy miast x2); GC ok. 4000 gen0/min przy x8 (optymalizacja - pozniej).
 PO OSTATNIM TESCIE: engine_config.txt safely_exited = 1 (inaczej Jeff dostanie okno Safe Mode).
+- 19.10 wieczor: n20c (drugi bieg 160 dob x8 na 89) kod 0; w obu biegach n20 wobec fin102 trwale 9 roznic - zmiennosc albo nowy pomiar (ZC1-4o), ruda 43.5 miasta bez rudy (fin87-88 53-57).
+  Nowa kampania 120 dob: 88 (fin104) 118 NIE, 89 (n20d) 118 NIE - 10 w jedna, 10 w druga strone. Audyt PLAN-DO-KONCA-MODA (wf_097b8e5a-b67): 212 pozycji - 137 wgrane, 35 czeka na Jeffa,
+  21 czesciowo, 12 porzucone, 5 otwarte, 2 nieznane -> runda 2 (6.10, 6.9, 1.7).
+
+### 96. WGRANIE 90 (19.10 ok. 23:25 PDT) - RUNDA 2 NOCY - START TUTAJ
+W grze: `w-toku/noc-wgranie-90` = n20-calosc 0c86ae9a | Armoury **3901b139** (2054 ustawien), CrashScribe **4aff74db**, RealisticCaptivity e55869a2, GrandTourney 87465d27,
+ForgeView 19aa052a. Kopie *.bak-2026-10-19-wgranie90-przed + D:/Backup-Bannerlord/wgrane/2026-10-19-wgranie90-przed. Autotestowy CrashScribe: test/CrashScribe-at-n20r2.dll (zb/n20-at 5ae290d5).
+= 89 + r2-klimat (ClimateBeforeWorkshops), r2-konie (CamelsOnlyQarth, ExoticMountsNeverVanish, QarthStablesBuyCamels + recenzja 5/6 prowadzacego), r2-pancerz (HeroBardingNeedsRiding).
+TESTY: n20r2-bitwa / n20r2-nowa / n20r2-160 kod 0, 0 ERROR Armoury; Z16 500/500; egzotyczne skasowane 0; C1 45 wsi. Porownanie grup: 160 dob 3 nowe NIE (D14-1, NKR-4b, NO-4 47>40),
+nowa kampania 113 NIE (88/89: 118). Obserwowac NO-4. Raport dla Jeffa: docs/RAPORT-NOCNY-2026-10-20.md.
 
