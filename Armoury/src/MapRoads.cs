@@ -60,13 +60,15 @@ namespace Armoury
     /// Ciche logi (recenzja, uwaga 2): liczniki predkosci i potkniec zerowane takze w dobie bez linii - linia mowi o tej samej dobie co spis godzinny.
     /// Podloga gry (recenzja, uwaga 3): partia na LimitMin (MinimumSpeed 1, np. dlug snu 3 = -90% w NightRest po nas) traci premie i w modelu, i u nas -
     /// audyt liczy ja osobno ("na podlodze LimitMin"), poza srednia premii i "zjedzona przez sufit".
-    /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (15), MapRoadMargin (0.4; od n20-drogi 1.0). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
+    /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (15), MapRoadMargin (0.4; od n20-drogi tylko przy MapRoadWideField NIE). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
     /// pamieci wychodza od razu; plik nie jest wczytywany).
     ///
     /// n20-drogi (noc 19/20.10, Jeff: "rozszerz nieco pole +15% do predkosci na drodze glownej i daj +7.5% na drogach pobocznych ... bo teraz te drogi nic
     /// nie daja" / "czasami jak lekko sie zejdzie z drogi to juz nie lapie predkosc"):
-    ///  - SZERSZE POLE: domyslny MapRoadMargin 0.4 -> 1.0 jedn. (1 jedn. = ok. 4.75 km, Wayfinder.KmPerUnit); symulacja na trasach AI sondy (80 526 punktow,
-    ///    n20-drogi-tmp/sym_margin.py): na drodze 4.9% punktow przy 0.4, 9.2% przy 1.0. Ten sam margines dla traktow i drog bocznych;
+    ///  - SZERSZE POLE: NOWE klucze MapRoadWideField (TAK) + MapRoadWideMargin (1.0 jedn.; 1 jedn. = ok. 4.75 km, Wayfinder.KmPerUnit) zamiast zmiany
+    ///    domyslnej MapRoadMargin (Jeff ma 0.4 zapisane w MCM - zmiana domyslnej by nie dotarla; recenzja, uwaga 1). NIE = MapRoadMargin jak dotad.
+    ///    Symulacja na trasach AI sondy (80 526 punktow, n20-drogi-tmp/sym_margin.py): na drodze 4.9% punktow przy 0.4, 9.2% przy 1.0. Ten sam margines
+    ///    dla traktow i drog bocznych (MarginOf);
     ///  - DROGI BOCZNE: drogi do wiosek z planu MapSideRoads (te same lamane, ktore widac na mapie - MapSideRoadsView po skonczonym planie wola SidePublish)
     ///    dokladane do siatki jako odcinki co ok. 1 jedn. (os planu co 0.25 - blad cieciwy ok. 0.06), pol-szerokosc = szerokosc pasa planu / 2.
     ///    Siatka wspolna: w kazdej komorce najpierw odcinki traktow, potem bocznych (indeksy rosnace) - Kind() zwraca 2 trakt, 1 boczna, 0 nic; trakt
@@ -81,7 +83,7 @@ namespace Armoury
         internal const string FileName = "arm_map_roads_geo.tsv";
         private const string P = "Drogi (DR): ";
         private const float CellSize = 2f;
-        internal const float MaxMargin = 2f;           // MCM i kod przycinaja MapRoadMargin do 0..2 (siatka budowana na ten zasieg)
+        internal const float MaxMargin = 2f;           // MCM i kod przycinaja MapRoadMargin / MapRoadWideMargin do 0..2 (siatka budowana na ten zasieg)
         private const float HalfMin = 0.15f, HalfMax = 1.5f;
         private const int MaxPercent = 50;
         private const int SlotBits = 17;
@@ -208,10 +210,21 @@ namespace Armoury
 
         internal static bool Ready { get { return _grid != null; } }
 
+        /// <summary>Margines pola drogi (jedn. mapy poza krawedzia): n20-drogi - przy MapRoadWideField (domyslnie TAK, klucz NOWY) MapRoadWideMargin (1.0),
+        /// inaczej dawny MapRoadMargin (0.4). Przyciete do 0..MaxMargin (siatka budowana na ten zasieg), NaN = 0. Sciezka predkosci - dwa odczyty pol.</summary>
         private static float MarginOf(Settings s)
         {
-            float m = s.MapRoadMargin;
-            return m < 0f ? 0f : m > MaxMargin ? MaxMargin : m;
+            float m = s.MapRoadWideField ? s.MapRoadWideMargin : s.MapRoadMargin;
+            if (!(m > 0f)) return 0f;
+            return m > MaxMargin ? MaxMargin : m;
+        }
+
+        /// <summary>n20-drogi: opis pola do linii logu (ktory klucz wyznacza margines).</summary>
+        private static string FieldText(Settings s)
+        {
+            return s.MapRoadWideField
+                ? "szerokie pole MapRoadWideField tak (MapRoadWideMargin " + s.MapRoadWideMargin.ToString("0.00", Inv) + "; waskie MapRoadMargin " + s.MapRoadMargin.ToString("0.00", Inv) + " nieuzywane)"
+                : "szerokie pole MapRoadWideField NIE - waskie MapRoadMargin " + s.MapRoadMargin.ToString("0.00", Inv);
         }
 
         private static float PctOf(Settings s)
@@ -489,7 +502,7 @@ namespace Armoury
                      + " | premia " + Status(g) + ".");
             // n20-drogi: osobna linia (linia startu sesji bez zmian - czyta ja sprawdz_logi.py, grupa ndrogi)
             Log.Info(P + "drogi boczne - start sesji: klucz MapSideRoadSpeedBonus " + (s.MapSideRoadSpeedBonus ? "tak" : "nie") + ", premia " + (SidePctOf(s) * 100f).ToString("0.0", Inv)
-                     + "%, margines " + MarginOf(s).ToString("0.00", Inv) + " jedn. (wspolny z traktami) - czekaja na plan drog bocznych z widoku mapy (klucz MapSideRoads "
+                     + "%, margines " + MarginOf(s).ToString("0.00", Inv) + " jedn. (wspolny z traktami; " + FieldText(s) + ") - czekaja na plan drog bocznych z widoku mapy (klucz MapSideRoads "
                      + (s.MapSideRoads ? "tak" : "nie") + ").");
         }
 
