@@ -17,19 +17,26 @@ namespace Armoury
     /// (zamek albo miasto) ma udzial GarrisonPeaceShareBorder (0.75), kazda inna - GarrisonPeaceShare (0.70) jak dotad. Graniczna nigdy mniej niz
     /// glab kraju (max z obu), udzial graniczny przyciety do 0..1. W wojnie bez zmian (GarrisonWarFull - pulap gry), Straz i Wolni Ludzie bez zoldu
     /// (b.Zero) i gracz - poza budzetem, wiec poza regula.
+    /// Limit rodu (recenzja): cele 0.70 wszystkich twierdz rodu przycinane do GarrisonMaxShareOfBudgetPeace (0.80) pulapu jak dotad; nadwyzka graniczna
+    /// (0.05 x srednia wojenna) dostaje tylko miejsce, ktore zostaje do tego limitu - glab kraju nigdy nie traci, rod na limicie nie ma nadwyzki wcale.
     ///
     /// GRANICA: w promieniu BorderGarrisonRadius (60 jedn. mapy, w linii prostej) stoi zamek albo miasto INNEJ frakcji mapy (inne krolestwo albo rod
-    /// niezalezny), ktora nie jest sojusznikiem (Kingdom.IsAllyWith - sojusze gry 1.3+). Pomiar mapy ROT (ROT-Map settlements.xml, 227 twierdz):
-    /// mediana odleglosci do najblizszej twierdzy 44 jedn., u 3/4 twierdz ponizej 60 - promien 60 = "sasiad za miedza"; przy wlascicielach startowych
-    /// graniczne 77 z 227 (34%): Dorzecze 8 z 14, Zachod 17 z 21, Polnoc 2 z 22 (75 jedn. dawalo 52%, 90 - 69%). Ok. pol doby marszu armii.
+    /// niezalezny), ktora nie jest sojusznikiem (Kingdom.IsAllyWith - sojusze gry 1.3+). Pomiar mapy ROT (ROT-Map settlements.xml, 227 twierdz,
+    /// wlasciciele z XML -> krolestwo z spclans.xml, Surusbec przez pana do rodu Swyft = Zachod): mediana odleglosci do najblizszej twierdzy 44 jedn.,
+    /// u 3/4 twierdz ponizej 60 - promien 60 = "sasiad za miedza"; graniczne 71 z 227 (31%): Dorzecze 8 z 14, Zachod 12 z 22, Polnoc 2 z 22
+    /// (75 jedn. dawalo 49%, 90 - 67%). 60 jedn. to ok. doby marszu armii (gra 1.4.8: predkosc bazowa 4 jedn. na 1.2 h, mniej dla armii i noca).
     /// Morze: odleglosc w linii prostej - wyspa w promieniu od obcego brzegu jest graniczna (najazd z morza, NavalDLC); Morze Waskie jest szersze.
     /// Straz Nocy to osobna frakcja - zamek Polnocy przy Murze jest graniczny wobec Strazy (sasiad innej frakcji; zalogi Strazy same bez zmian).
     /// Zmiana wlasciciela: mapa granic liczona od nowa raz na dobe (pierwsze wolanie doby) - zdobyty zamek od razu robi z sasiadow twierdze graniczne,
-    /// koniec sojuszu tez. Mapa trzyma id twierdz (napisy), nie obiekty - nic nie trzyma starej kampanii po wczytaniu innej.
+    /// koniec sojuszu tez. Mapa trzyma id twierdz (napisy), nie obiekty - nic nie trzyma starej kampanii po wczytaniu innej; Reset przy kazdej kampanii.
     ///
-    /// Zloto (zamknieta ekonomia): platnik - rod pana (pulap pokoju 166, razem z limitem GarrisonMaxShareOfBudgetPeace 0.8 pulapu - cel wszystkich zalog
-    /// rodu jest przycinany do tej czesci, wiec biedny rod nie wyda ponad swoj pulap), odbiorca - zolnierze zalogi (zold gry). Nic nie powstaje z niczego:
-    /// wyzszy cel to tylko wyzszy limit zoldu zalogi (Settlement.SetGarrisonWagePaymentLimit), werbunek zalogi gry i zwolnienia 166 jak dotad.
+    /// Co robi wyzszy cel W POKOJU (recenzja): BK wylacza w pokoju autowerbunek zalog AI (krolestwo bez wrogow), wiec nikt zalogi nie dobiera.
+    /// Wyzszy cel dziala dwiema drogami: (a) mniej zwolnien - zaloga ponad cel jest cieta tylko do celu (ClanBudget.Releases krok 1, gdy rod ponad
+    /// pulapem) i limit zoldu zalogi (SetGarrisonWagePaymentLimit, tylko w dol) jest wyzszy; (b) wiekszy "idealny rozmiar", przy ktorym lord zostawia
+    /// ludzi w zalodze (model gry dzieli limit zoldu przez sredni zold). Zaloga graniczna, ktora weszla w pokoj ponizej celu (swiezo zdobyty zamek),
+    /// sama nie podrosnie - tak jak przy 0.70. Linia logu pokazuje zold zalog granicznych i w glebi kraju wobec ich celow.
+    ///
+    /// Zloto (zamknieta ekonomia): platnik - rod pana (pulap pokoju 166), odbiorca - zolnierze zalogi (zold gry). Nic nie powstaje z niczego.
     /// Watek: wolane tylko z ClanBudget.Daily (watek glowny, raz na dobe); bez wolan z watkow AI.
     /// Potkniecia liczone per twierdza (udzial jak dotad dla tej jednej), funkcja nigdy sie nie gasi.
     /// </summary>
@@ -49,15 +56,31 @@ namespace Armoury
         private static float _mapR = -1f;
         private static int _mapForts, _mapBorder;
 
-        // liczniki doby (rody AI w pokoju z celem zalogi)
-        private static int _dDay = int.MinValue, _dBorderN, _dInlandN;
-        private static double _dExtra;
+        // liczniki doby (rody AI w pokoju z celem zalogi; po przycieciu do limitu rodu - jak B4)
+        private static int _dDay = int.MinValue;
+        private static double _dExtra, _dKept;                       // nadwyzka graniczna przed i po przycieciu (zl/d)
+        private static int _dBorderN, _dBorderAt, _dInlandN, _dInlandAt;
+        private static long _dBorderTgt, _dBorderWage, _dInlandTgt, _dInlandWage;
         private static readonly List<string> _dNames = new List<string>();
         private static int _dNamesMore;
 
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static WeakReference _realmCamp;   // pierwsza linia sesji - z podzialem wedlug frakcji
+
+        /// <summary>Stan kampanii od zera (ClanBudget.Reset - konstruktor ArmouryBehavior przy kazdej kampanii).</summary>
+        internal static void Reset()
+        {
+            _border.Clear(); _ids.Clear(); _pos.Clear(); _fac.Clear(); _realm.Clear();
+            _camp = null; _mapDay = int.MinValue; _mapR = -1f; _mapForts = _mapBorder = 0;
+            _dDay = int.MinValue; ClearDay();
+            _stumbles = 0; _err.Clear(); _realmCamp = null;
+        }
+
+        private static float BorderShare(Settings s)
+        {
+            return Math.Max(Math.Max(0f, s.GarrisonPeaceShare), Math.Min(1f, Math.Max(0f, s.GarrisonPeaceShareBorder)));
+        }
 
         /// <summary>Udzial pokojowy zalogi twierdzy st (ClanBudget.Garrisons, dla kazdej twierdzy rodu w pokoju; wr - srednia zoldu zalogi z dob wojny).</summary>
         internal static float PeaceShare(Settlement st, Settings s, float wr)
@@ -69,11 +92,9 @@ namespace Armoury
                 int today = (int)CampaignTime.Now.ToDays;
                 EnsureMap(today, s);
                 NoteDay(today);
-                // liczniki tylko dla zalog z celem (srednia wojenna > 0) - jak B4
-                if (!_border.Contains(st.StringId)) { if (wr > 0) _dInlandN++; return baseShare; }
-                float b = Math.Max(baseShare, Math.Min(1f, Math.Max(0f, s.GarrisonPeaceShareBorder)));
+                if (!_border.Contains(st.StringId)) return baseShare;
+                float b = BorderShare(s);
                 if (wr <= 0) return b;
-                _dBorderN++;
                 _dExtra += (b - baseShare) * (double)wr;
                 if (_dNames.Count < MaxNames)
                 {
@@ -86,10 +107,39 @@ namespace Armoury
             catch (Exception e) { Stumble("PeaceShare", e); return baseShare; }
         }
 
+        /// <summary>Pomiar: zaloga z celem po przycieciu do limitu rodu (ClanBudget.Garrisons, te same zalogi co "zalog z celem" w B4).
+        /// kept - nadwyzka graniczna, ktora zostala po przycieciu; t - cel; cur - zold zalogi dzis.</summary>
+        internal static void NoteTarget(Settlement st, Settings s, double kept, int t, float cur)
+        {
+            if (!s.BorderGarrisonsPeace || st == null || st.StringId == null) return;
+            try
+            {
+                NoteDay((int)CampaignTime.Now.ToDays);
+                bool at = cur >= 0.95f * t;
+                if (_border.Contains(st.StringId)) { _dBorderN++; _dBorderTgt += t; _dBorderWage += (long)cur; if (at) _dBorderAt++; _dKept += kept; }
+                else { _dInlandN++; _dInlandTgt += t; _dInlandWage += (long)cur; if (at) _dInlandAt++; }
+            }
+            catch (Exception e) { Stumble("NoteTarget", e); }
+        }
+
+        /// <summary>Dopisek do odcinka B4 linii "Budzet rodow (166)": drugi udzial, gdy regula wlaczona (pusty, gdy wylaczona - B4 jak przed zmiana).</summary>
+        internal static string B4Note(Settings s)
+        {
+            if (s == null || !s.BorderGarrisonsPeace) return "";
+            return " (graniczne " + BorderShare(s).ToString("0.00", Inv) + " - linia R3-08g)";
+        }
+
+        private static void ClearDay()
+        {
+            _dExtra = _dKept = 0; _dBorderN = _dBorderAt = _dInlandN = _dInlandAt = 0;
+            _dBorderTgt = _dBorderWage = _dInlandTgt = _dInlandWage = 0;
+            _dNames.Clear(); _dNamesMore = 0;
+        }
+
         private static void NoteDay(int today)
         {
             if (_dDay == today) return;
-            _dDay = today; _dBorderN = _dInlandN = 0; _dExtra = 0; _dNames.Clear(); _dNamesMore = 0;
+            _dDay = today; ClearDay();
         }
 
         private static bool SameCampaign(WeakReference w)
@@ -145,6 +195,12 @@ namespace Armoury
             finally { _pos.Clear(); _fac.Clear(); _ids.Clear(); }   // bez obiektow kampanii po przeliczeniu
         }
 
+        private static void AppendAt(StringBuilder sb, string what, int at, int n, long wage, long tgt)
+        {
+            sb.Append(what).Append(' ').Append(at).Append(" z ").Append(n).Append(" (zold ").Append(wage).Append(" wobec celu ").Append(tgt)
+              .Append(tgt > 0 ? ", " + (100.0 * wage / tgt).ToString("0", Inv) + "%" : "").Append(')');
+        }
+
         /// <summary>Linia "Zalogi graniczne (R3-08g)" - po linii "Budzet rodow (166)" (ClanBudget.Daily); pomiar, ciche logi (LogGate) jak inne pomiary.</summary>
         internal static void Report(Settings s, int today)
         {
@@ -160,15 +216,19 @@ namespace Armoury
                 EnsureMap(today, s);
                 NoteDay(today);
                 float baseShare = Math.Max(0f, s.GarrisonPeaceShare);
-                float b = Math.Max(baseShare, Math.Min(1f, Math.Max(0f, s.GarrisonPeaceShareBorder)));
-                var sb = new StringBuilder(512);
+                float b = BorderShare(s);
+                var sb = new StringBuilder(640);
                 sb.Append("Zalogi graniczne (R3-08g): dzien ").Append(today)
                   .Append(" | twierdze graniczne na mapie ").Append(_mapBorder).Append(" z ").Append(_mapForts)
                   .Append(" (zamek albo miasto innej frakcji, nie sojusznika, w promieniu ").Append(_mapR.ToString("0", Inv)).Append(" jedn.)")
                   .Append(" | rody AI w pokoju: zalog granicznych z celem ").Append(_dBorderN).Append(" (udzial ").Append(b.ToString("0.00", Inv))
                   .Append("), w glebi kraju ").Append(_dInlandN).Append(" (udzial ").Append(baseShare.ToString("0.00", Inv)).Append(")")
-                  .Append("; cel granicznych wyzej o ").Append(_dExtra.ToString("0", Inv)).Append(" zl/d (przed przycieciem do ")
-                  .Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu rodu)");
+                  .Append("; cel granicznych wyzej o ").Append(_dExtra.ToString("0", Inv)).Append(" zl/d, po przycieciu ").Append(_dKept.ToString("0", Inv))
+                  .Append(" zl/d (nadwyzka tylko z miejsca do ").Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu rodu - glab kraju bez zmian)")
+                  .Append(" | na celu (zold >= 95% celu): ");
+                AppendAt(sb, "graniczne", _dBorderAt, _dBorderN, _dBorderWage, _dBorderTgt);
+                AppendAt(sb, ", w glebi kraju", _dInlandAt, _dInlandN, _dInlandWage, _dInlandTgt);
+                sb.Append(" - w pokoju zalog nikt nie dobiera (BK), cel to mniej zwolnien");
                 if (_dNames.Count > 0)
                 {
                     sb.Append(" | graniczne w pokoju: ");

@@ -4004,7 +4004,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float GarrisonPeaceShare { get; set; } = 0.7f;
 
-        [SettingPropertyBool("Border Garrisons Peace", HintText = "in peace an AI castle or town on the border (a castle or town of another realm, not an ally, within Border Garrison Radius) keeps Garrison Peace Share Border of its war garrison instead of Garrison Peace Share, so it has defenders on the first day of a war; fiefs deeper inland are unchanged. Paid from the house's own peace ceiling as before. Off = every fief at Garrison Peace Share", RequireRestart = false)]
+        [SettingPropertyBool("Border Garrisons Peace", HintText = "in peace an AI castle or town on the border (a castle or town of another realm, not an ally, within Border Garrison Radius) is held at Garrison Peace Share Border of its war garrison instead of Garrison Peace Share: fewer of its men are sent home and lords leave more men there, so it has defenders on the first day of a war. Nobody recruits into garrisons in peace, so a garrison already below this share is not filled up. The extra comes only from room left under Garrison Max Share Of Budget Peace, so fiefs deeper inland never lose. Off = every fief at Garrison Peace Share", RequireRestart = false)]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool BorderGarrisonsPeace { get; set; } = true;
 
@@ -4012,7 +4012,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float GarrisonPeaceShareBorder { get; set; } = 0.75f;
 
-        [SettingPropertyFloatingInteger("Border Garrison Radius", 0.00f, 240.00f, "0.00", HintText = "a fief is on the border when a castle or town of another realm (not an ally) stands within this many map units in a straight line; 60 is about half a day's march - on the Realm of Thrones map the nearest castle is usually 30 to 60 away", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Border Garrison Radius", 0.00f, 240.00f, "0.00", HintText = "a fief is on the border when a castle or town of another realm (not an ally) stands within this many map units in a straight line; 60 is about a day's march - on the Realm of Thrones map the nearest castle is usually 30 to 60 away", RequireRestart = false)]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float BorderGarrisonRadius { get; set; } = 60f;
 

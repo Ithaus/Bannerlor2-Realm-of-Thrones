@@ -165,6 +165,7 @@ namespace Armoury
         {
             _b.Clear(); _saved.Clear(); _warGar.Clear(); _garTarget.Clear(); _day = -1; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
             CourtFull.Reset();   // E5/A2 (recenzja): potkniecia, bledy i zapas "wlasnego" miedzy kampaniami
+            BorderGarrisons.Reset();   // R3-08g (recenzja): mapa granic, liczniki doby i potkniecia od zera przy kazdej kampanii
             ZeroLast(); ClearDay();
             // recenzja C1 (C1-G4): uchwyty BK i obiekty poprzedniej sesji (jak LosersFlee.Reset, PopulationLaw.Reset "wpis 87") - BK tworzy przy kazdym
             // wczytaniu nowy PopulationManager kluczowany obiektami Settlement; stary menedzer nie zna nowych osad, wiec po wczytaniu innego zapisu w tym
@@ -1101,7 +1102,9 @@ namespace Armoury
             if (fiefs == null) return;
             var tgt = new List<KeyValuePair<Settlement, double>>();
             var curs = new List<float>();   // B4 (pomiar): zold zalogi dzis obok celu
-            double sum = 0;
+            var ext = new List<double>();   // R3-08g: nadwyzka graniczna ponad udzial glebi kraju (BorderGarrisons.cs) - tylko z miejsca, ktore zostaje do limitu rodu
+            double sum = 0, sumX = 0;
+            float bs = Math.Max(0f, s.GarrisonPeaceShare);
             for (int i = 0; i < fiefs.Count; i++)
             {
                 var f = fiefs[i];
@@ -1113,18 +1116,21 @@ namespace Armoury
                 if (!_warGar.TryGetValue(st.StringId, out wr)) { wr = cur; _warGar[st.StringId] = wr; }   // przed pierwsza wojna - stan z pierwszej doby
                 else if (b.War) { wr += (cur - wr) / Days28; _warGar[st.StringId] = wr; }                 // srednia z dob wojny (28 dob)
                 if (full) continue;
-                double t = BorderGarrisons.PeaceShare(st, s, wr) * wr;   // R3-08g: twierdza graniczna GarrisonPeaceShareBorder (0.75), reszta GarrisonPeaceShare (BorderGarrisons.cs)
-                tgt.Add(new KeyValuePair<Settlement, double>(st, t)); curs.Add(cur); sum += t;
+                double t = bs * wr;
+                double x = Math.Max(0f, BorderGarrisons.PeaceShare(st, s, wr) - bs) * (double)wr;   // R3-08g: twierdza graniczna GarrisonPeaceShareBorder (0.75) - nadwyzka ponad bs
+                tgt.Add(new KeyValuePair<Settlement, double>(st, t)); curs.Add(cur); ext.Add(x); sum += t; sumX += x;
             }
             if (full || tgt.Count == 0) return;
             double lim = Math.Max(0f, s.GarrisonMaxShareOfBudgetPeace) * b.Cap;
             double k = sum > lim && sum > 0 ? lim / sum : 1.0;
-            if (k < 1.0) _dB4Scaled++;
+            double room = Math.Max(0.0, lim - sum * k);                   // R3-08g: nadwyzka graniczna tylko z tego miejsca - glab kraju nigdy nie traci
+            double kx = sumX > room && sumX > 0 ? room / sumX : 1.0;
+            if (k < 1.0 || kx < 1.0) _dB4Scaled++;
             for (int i = 0; i < tgt.Count; i++)
             {
                 var kv = tgt[i];
-                int t = (int)(kv.Value * k); _garTarget[kv.Key] = t; b.GarTarget += t;
-                if (t > 0) { _dB4N++; _dB4Tgt += t; _dB4Wage += (long)curs[i]; if (curs[i] >= 0.95f * t) _dB4At++; else _dB4Below++; }
+                int t = (int)(kv.Value * k + ext[i] * kx); _garTarget[kv.Key] = t; b.GarTarget += t;
+                if (t > 0) { _dB4N++; _dB4Tgt += t; _dB4Wage += (long)curs[i]; if (curs[i] >= 0.95f * t) _dB4At++; else _dB4Below++; BorderGarrisons.NoteTarget(kv.Key, s, ext[i] * kx, t, curs[i]); }
             }
         }
 
@@ -2374,7 +2380,7 @@ namespace Armoury
               .Append(s.PeaceChestShare > 0f ? "" : " - skrzynia pokoju wylaczona").Append("), w tym skrzynia pokoju ").Append(_dPzChest).Append(" u ").Append(_dPzChestN)
               .Append(" rodow, zold naliczony ").Append(_dPzWage).Append(", ludzie w partiach ").Append(_dPzMenPar).Append(", w zalogach ").Append(_dPzMenGar)
               // B4 (pieniadze roku 2): czy w pokoju wiaze cel zalogi (zold na celu), czy tempo werbunku zalog gry (ponizej celu)
-              .Append(" | zalogi w pokoju (B4): udzial ").Append(s.GarrisonPeaceShare.ToString("0.00", Inv)).Append(" zalogi wojennej, zalog z celem ").Append(_dB4N)
+              .Append(" | zalogi w pokoju (B4): udzial ").Append(s.GarrisonPeaceShare.ToString("0.00", Inv)).Append(" zalogi wojennej").Append(BorderGarrisons.B4Note(s)).Append(", zalog z celem ").Append(_dB4N)
               .Append(", na celu (zold >= 95% celu) ").Append(_dB4At).Append(", ponizej celu ").Append(_dB4Below).Append("; zold zalog ").Append(_dB4Wage).Append(" wobec celu ").Append(_dB4Tgt)
               .Append("; rodow z celem przycietym do ").Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu ").Append(_dB4Scaled)
               .Append(" | lup na zalogi (WW2, Reaver Loot To Crews ").Append(ReaverLaw.LootToCrewsOn ? "tak" : "nie").Append("): rodow ").Append(_dLootN)
