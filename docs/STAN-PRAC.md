@@ -3445,5 +3445,8 @@ CrashScribe e5ffb849, ForgeView 19aa052a. Kopie *.bak-2026-10-20-wgranie95-przed
 = 94 + m95-turniej (okup tylko dla powalajacego, pelna wartosc), m95-nocleg (wspolna izba 1 d dla gracza), m95-menu (19/19 opcji w 4 podmenu: karczma, kuznia, praca,
 sprawy miasta), m95-zajazd (druzyna znika z mapy, gwar karczmy). TESTY 95: bitwa 4/4, nowa 8/8, 160/160 z zapisu - kod 0, Armoury 0 ERROR, zawieszenia tylko przy wyjsciu.
 Jeff gra kampanie z 94 (Seagard) - zapis 94 wczytuje 95 (test 160 z zapisu). NOC 20/21.10: docs/ZADANIA-OBOZ-NOC.md, potem docs/PLAN-OPTYMALIZACJA-NOC.md; dlugi bieg
-nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS przy spichlerzu, naprawy AI, lukarze) - gdy Jeff nie gra.
+nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS przy spichlerzu, naprawy AI, lukarze) - gdy Jeff nie gra.- 14:00 PDT ROZPOZNANIE OBOZU gotowe (wf_b7cbf8a7-dc3): docs/ROZPOZNANIE-OBOZ-2026-10-20.md. Noc gry i ROT 22:00-2:00 (oboz swiata dzis 0-6 -> 2 h jazdy z kara);
+  propozycja oboz 21-3 (CampStartHour/CampEndHour + NightMarch.cs:61 20:00 na sztywno + SightRange noc 21-4:59; Armoury.json Jeffa ma 0/6 - zmienic przy zamknietej grze).
+  Mod Practice Drills (Nexus 14005, 1.4.8, uprawnienia otwarte) - wejscie i chodzenie po obozie; jako wzor (pobranie tylko za zgoda Jeffa). Tanie: juki +20 kg, trening
+  z wyboru (Drill the men), field hospital RB, czas zwijania wedlug armii, wiekszy oboz armii na mapie, sklep markietanow. Scena obozu - tor L, kilka nocy. 4 pytania do Jeffa w raporcie.
 
