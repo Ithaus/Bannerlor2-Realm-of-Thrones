@@ -30,7 +30,8 @@ namespace Armoury
     /// z bliska (do 40 jedn. mapy - pol dnia jazdy, "close by" plotek: widac dym, mowia okoliczni); wiesc bez znanego miejsca; klucz wylaczony.
     /// Opoznienie: 3 h (maester pisze list) + odleglosc w linii prostej / 6.25 jedn. na godzine (kruk ok. 150 jedn. mapy na dobe = ok. 2.5 x dzien jazdy
     /// z plotek, 3 x list BK - BKTelepathyBehavior: 0.5 h na jedn. drogi), najwyzej 12 dob. Mapa ROT ok. 1570 x 1020 jedn. (wsie z arm_map_villages.tsv):
-    /// Pentos - Winterfell ok. 500 jedn. = ok. 3.5 doby, poprzek mapy ok. 10 dob. Miejsce wiesci: osada (oblezenie, szturm, loch), siedziba pana krolestwa
+    /// (pozycje z ROT-Map/ModuleData/settlements.xml) Krolewska Przystan - Winterfell 465 jedn. = 77 h (3.2 doby), Pentos - Winterfell 643 = 106 h (4.4),
+    /// Qarth - Krolewska Przystan 1062 = 173 h (7.2); poprzek mapy ok. 11 dob. Miejsce wiesci: osada (oblezenie, szturm, loch), siedziba pana krolestwa
     /// (wojna, pokoj, sojusz - HomeSettlement wodza, jak plotki Rumours.FactionPos; z dwoch stron blizsza graczowi), miejsce bohatera (smierc, niewola).
     /// Gracz: osada, w ktorej jest, druzyna, w ktorej jest jencem, albo druzyna gracza. Odleglosc liczona w chwili zdarzenia.
     /// Kolejnosc: wiesc o tym samym (osada / bohater / para krolestw / wodz armii) nigdy nie przychodzi przed wczesniejsza wiescia o tym samym.
