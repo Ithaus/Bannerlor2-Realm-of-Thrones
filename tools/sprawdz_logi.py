@@ -1584,6 +1584,12 @@ Uzycie (Python 3, tylko odczyt):
                     recenzji takze w biegu zdjec - budzet jak w grze; log sprzed poprawki z "bez budzetu" w linii "komorki" - INFO); linia "komorki" pisana przy kazdym
                     wejsciu w tryb komorek (takze NIE -> TAK na mapie), wiec tryb ostatniej mapy = ktora z linii "komorki" / "postawione" jest pozniej; NBC-10 klatki wedlug liczby komorek w scenie, najwiecej decali w scenie, promien kola (INFO - porownanie kosztu klatki z f19);
                     NBC-10b oczekiwane decale w scenie przy kamerze z 10 / 20 / 40 / 80 (INFO, z linii "komorki").
+--grupa p6pola    : (20.10, galaz p6-pola - R3-07b, POMYSLY-35 pkt 18; Armoury/src/MapFields.cs, klucz Map Village Fields) pola wokol wiosek na mapie wedlug pory
+                    roku. python -I tools/sprawdz_logi.py --grupa p6pola <Armoury-*.log> (strumieniowo). PP-0 linie "Pola (p6)" (brak - INFO: log sprzed galezi albo klucz
+                    NIE); PP-1 start: wsi z polami > 0 i czas startu <= 100 ms; PP-2 ostatnia linia "stan": wsi z planem > 0, pol w planie > 0, przy kamerze nisko pol w
+                    scenie > 0; PP-3 udzial pol bez miejsca <= 60% (INFO z rozkladem przyczyn); PP-4 najdluzszy tick stawiania <= 15 ms (budzet 4 ms + jedna wioska);
+                    PP-5 pora pol (linie "pora pol A -> B" - INFO z lista) i zgodnosc pory z dniem roku w linii startu; PP-6 potkniecia (najwiecej w linii "stan") i
+                    linie "ERROR in MapFields*" 0.
 --grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
                     najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
                     WageRefund, CourtFull.Goods, CourtGoods.Gear, ClanBudget.Court - klucze Crown Refund By Need, Lapsed Gear Buys Goods) python -I tools/sprawdz_logi.py
@@ -47397,6 +47403,99 @@ def nboczne_main(logp):
     return 0
 
 
+# ============================================================ p6pola (20.10, galaz p6-pola - R3-07b): pola wokol wiosek wedlug pory roku (MapFields.cs)
+P6POLA_HEAD = "Pola (p6): "
+
+
+def p6pola_phase(doy, season, harvest):
+    """Pora pol z dnia roku (rok 364), pory Westeros i okna zniw - ta sama regula co MapFields.Phase (do sprawdzenia linii startu)."""
+    if season == "Winter":
+        return "pod sniegiem"
+    crops = season in ("Summer", "Autumn")
+    if doy < 70:
+        return "zaorane"
+    if doy < 196:
+        return "zielone"
+    if doy <= 252:
+        return ("dojrzale" if doy < 224 else "sciernisko") if harvest else "zielone"
+    if doy < 300:
+        return "sciernisko" if crops else "zielone"
+    return "zaorane"
+
+
+def p6pola_main(logp):
+    """p6pola (20.10, galaz p6-pola - R3-07b): pola wokol wiosek na mapie - sam widok (decale pola pszenicy gry), klucz MapVillageFields domyslnie TAK.
+    Progi PP-0..PP-6 - opis w naglowku pliku (--grupa p6pola). Log bez galezi: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("PP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, rows, phases, ends, errs = [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(P6POLA_HEAD):
+                r = s[len(P6POLA_HEAD):]
+                if r.startswith("start - "):
+                    starts.append(s)
+                elif r.startswith("stan - "):
+                    rows.append(s)
+                elif r.startswith("pora pol "):
+                    phases.append(s)
+                elif r.startswith("koniec mapy"):
+                    ends.append(s)
+            elif s.startswith(("ERROR in MapFields", "ERROR in MapFieldsView")):
+                errs.append(s)
+    print(f"plik: {logp} | startow {len(starts)}, linii stanu {len(rows)}, zmian pory {len(phases)}, koncow mapy {len(ends)}, ERROR {len(errs)}")
+    if not starts and not rows and not errs:
+        rep.add("PP-0: linie 'Pola (p6)'", "brak w logu", "INFO (log sprzed galezi p6-pola albo klucz Map Village Fields = NIE)", None)
+        rep.show()
+        return 0
+    rep.add("PP-0: linie galezi", f"startow {len(starts)}, stanu {len(rows)}, zmian pory {len(phases)}, koncow mapy {len(ends)}", "INFO", None)
+    if starts:
+        st = starts[-1]
+        nv = num(r"wsi z polami (\d+)", st, int, 0) or 0
+        ms = num(r"; czas ([0-9.]+) ms", st, float, -1.0)
+        rep.add("PP-1: start (ostatnia mapa)", f"wsi z polami {nv}, czas {ms:.1f} ms; {st[len(P6POLA_HEAD) + 8:][:260]}", "wsi z polami > 0, czas <= 100 ms", nv > 0 and 0 <= ms <= 100)
+        mp = re.search(r"pora pol teraz: (.+?) \(dzien roku (\d+), pora Westeros (\w+), okno zniw (TAK|NIE)\)", st)
+        if mp:
+            want = p6pola_phase(int(mp.group(2)), mp.group(3), mp.group(4) == "TAK")
+            rep.add("PP-5: pora pol przy starcie wobec dnia roku", f"{mp.group(1)} (dzien {mp.group(2)}, {mp.group(3)}, okno zniw {mp.group(4)}); regula: {want}",
+                    "zgodna z regula (rok 364 dni)", mp.group(1) == want)
+    else:
+        rep.add("PP-1: start (ostatnia mapa)", "brak linii 'start'", "jest przy wlaczonych polach", False)
+    if rows:
+        r = rows[-1]
+        live = num(r"w scenie pol (\d+)", r, int, 0) or 0
+        vis = " widoczne tak" in r
+        pv = num(r"wsi z planem (\d+)", r, int, 0) or 0
+        pf = num(r"pol w planie (\d+)", r, int, 0) or 0
+        nofield = num(r"\(bez miejsca: (\d+)", r, int, 0) or 0
+        rep.add("PP-2: pola w planie i w scenie (ostatnia linia stanu)", f"wsi z planem {pv}, pol w planie {pf}, w scenie {live} (kamera {'nisko' if vis else 'wysoko'})",
+                "wsi z planem > 0, pol w planie > 0, w scenie > 0 przy kamerze nisko", pv > 0 and pf > 0 and (live > 0 or not vis))
+        share = nofield / (nofield + pf) if nofield + pf > 0 else 0.0
+        why = re.search(r"\(bez miejsca: \d+ - ([^)]*)\)", r)
+        rep.add("PP-3: pola bez miejsca (udzial)", f"{nofield} z {nofield + pf} ({share:.0%}); {why.group(1) if why else '-'}", "<= 60%", share <= 0.60)
+        look = re.search(r"wyglad pol komorek w scenie: ([^;]*);", r)
+        rep.add("PP-5b: wyglad pol w scenie (ostatnia linia stanu)", look.group(1) if look else "-", "INFO", None)
+        tick = num(r"tickach \(najdluzszy ([0-9.]+) ms\)", r, float, -1.0)
+        rep.add("PP-4: najdluzszy tick stawiania", f"{tick:.1f} ms", "<= 15 ms", 0 <= tick <= 15)
+    else:
+        rep.add("PP-2: linia 'stan'", "brak", "co 2 minuty przy zmianie (mapa dluzej niz 2 minuty)", None)
+    if phases:
+        rep.add("PP-5c: zmiany pory pol", "; ".join(x[len(P6POLA_HEAD) + 9:].split(";")[0] for x in phases[-6:]), "INFO", None)
+    stv = 0
+    for s in rows + ends:
+        mm = re.search(r"potkniecia: plan (\d+), stawianie (\d+), wyglad (\d+), stan (\d+), zdejmowanie (\d+), tick (\d+)", s)
+        if mm:
+            stv = max(stv, sum(int(x) for x in mm.groups()))
+    rep.add("PP-6: potkniecia (najwiecej w linii stanu) i linie ERROR in MapFields*", f"potkniecia {stv}, linii ERROR {len(errs)}", "0", stv == 0 and not errs)
+    rep.show()
+    return 0
+
+
 # ============================================================ nsrednim (18.10, paczka f15-skarbiec - decyzja Jeffa "takze srednim": skarbiec krolestwa w wojnie doplaca
 # do zoldu takze srednim rodom - W5c ponad gwarancje W5, f jak zwrot f6 i renty f7); Armoury/src/KingdomTreasury.MidAid.cs, klucz Crown War Aid Middle
 NSK_LINE = "Skarbiec dla srednich (W5c): dzien "
@@ -51199,6 +51298,8 @@ def main(argv):
         return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
     if group == "nbandy" and logp:
         return nbandy_main(logp, bdp)   # nbandy (noc 18.10, f8-bandy): limit band ROT x2 z ludzi puli wyrzutkow, puste narodziny, koszt AI band, doba realna wobec bazy (BanditLimit)
+    if group == "p6pola" and logp:
+        return p6pola_main(logp)   # p6pola (20.10, galaz p6-pola - R3-07b): pola wokol wiosek wedlug pory roku - start, plan, scena, pora, potkniecia (MapFields.cs)
     if group == "nboczne" and logp:
         return nboczne_main(logp)   # nboczne (18.10, paczka f11-drogi): boczne drogi do dalszych wiosek - plan, decale, czas, klatki, potkniecia (MapSideRoads.cs)
     if group == "ndothraki" and logp:

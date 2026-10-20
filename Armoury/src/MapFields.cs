@@ -26,7 +26,7 @@
 //  - STAN WSI (co godzine gry, tylko wsie w scenie): wies gry rabowana albo zlupiona (VillageState BeingRaided / Looted) - wszystkie pola spalone (ciemne);
 //    wioska ukladu - ksiega wiosek (VillageBook.LookOf): spalona - pola spalone, puste osady (rabunek + glod) - tyle pol odlogiem (szarobure), ile osad pustych;
 //    bez ksiegi - stan wsi gry okregu. Odczyt ksiegi tylko przy zmianie jej numeru wygladu (LookVersion) albo przy wejsciu wioski do sceny;
-//  - WYDAJNOSC: plan pol wioski dopiero, gdy jej komorka (32 x 32 jedn.) pierwszy raz wchodzi w kolo widoku kamery (ok. 30-40 sond terenu na pole), potem w
+//  - WYDAJNOSC: plan pol wioski dopiero, gdy jej komorka (32 x 32 jedn.) pierwszy raz wchodzi w kolo widoku kamery (do 6 prob miejsca x 16 sond terenu i drogi na pole), potem w
 //    pamieci; w scenie tylko pola komorek w kole widoku (to samo kolo co drogi boczne - MapSideRoads.ViewCircle, histereza 16 jedn.), kamera wyzej niz
 //    min(MapVillagesHideAboveCameraHeight, 110) - zadnego pola (jak wioski i drogi); praca 4 razy na sekunde, budzet 4 ms na cwierc sekundy; co klatke nic
 //    (CLAUDE.md 7). Zmiana siatki drog (start premii, drogi boczne opublikowane / zdjete) - pola od nowa (raz na zmiane);
