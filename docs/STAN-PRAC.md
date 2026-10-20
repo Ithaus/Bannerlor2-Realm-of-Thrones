@@ -3430,5 +3430,9 @@ przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok
   wszystko kuzni pod jedna zakladka kuzni (wyjasnione po kolei), reszta pogrupowana; (2) ZAJAZD: po wejsciu gracz znika z mapy jak we wsi + odglosy karczmy.
   Galezie w-toku/m95-menu, w-toku/m95-zajazd od e35e6f99 (= WGRANIE 94), workflow -> test po zamknieciu gry -> WGRANIE 95.- 11:10 PDT Jeff: "4 denary za nocleg to nie za duzo? sprawdz czy stawki sa realne" -> ceny ludzi/koni realne (lozko ok. 1/3 dniowki rzemieslnika 3 d, jak w sredniowieczu);
   zawyzony pokoj gracza we wspolnej izbie (3 d) -> w-toku/m95-nocleg 943cc411 (InnCommonRoomSharedBed: gracz jak czlowiek 1 d; sam z koniem 2 d zamiast 4), build 0 -> do 95.- 11:55 PDT Jeff: "blad w turniejach ... zaplacilem ponad 1k ... dostalem ponad 8k" -> nie blad kodu: R3-04a pelna wartosc konia i zbroi pokonanego (gracz pokonal lorda w 1. rundzie);
-  swiat AI 330-410 tys./d. -> w-toku/m95-turniej (TourneyRansomShare 0.25, w obie strony), build 0 -> do 95. Zloto Jeffa z tej walki zostaje.
+  swiat AI 330-410 tys./d. -> w-toku/m95-turniej (TourneyRansomShare 0.25, w obie strony), build 0 -> do 95. Zloto Jeffa z tej walki zostaje.- 12:05 PDT TURNIEJ - prawdziwy blad: TourneyRansom.VictorOf w walce grupowej dawal okup przegranego powalonego przez kogos spoza zwyciezcow zwyciezcy z najlepszym wynikiem
+  (gracz zbieral okupy lordow powalonych przez innych -> 8k w 1. rundzie). m95-turniej 4e61eae0: TourneyRansomKnockerOnly (okup tylko dla powalajacego, takze gdy potem
+  odpadl; bez powalajacego - bez okupu) + pokretlo TourneyRansomShare domyslnie 1 (Jeff: "nie musisz sztucznie zmniejszac ... jak nie maja kasy, to ich zbroje" -
+  placi tylko z tego, co ma, reszta sztuk do zwyciezcy - bez zmian). Sesja Jeffa 10:24-11:50: zamknieta normalnie, 0 bledow naszych modow (CrashScribe 0 ERROR IN A MOD,
+  Armoury 0 ERROR); logi na D:/Backup-Bannerlord/logi-jeffa/2026-10-20. Galezie do 95: m95-menu, m95-zajazd (workflow w toku), m95-nocleg, m95-turniej.
 
