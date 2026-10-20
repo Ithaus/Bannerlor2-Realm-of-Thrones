@@ -42,10 +42,15 @@ namespace Armoury
             // f9-predkosc: przyciski biegu na pasku mapy (UIExtenderEx: wstawka prefabu MapBar + mixin MapTimeControlVM) - rejestracja przed pierwszym ruchem paska,
             // wlasny try i metoda NoInlining (brak zestawu UIExtenderEx = linia w logu, reszta modulu bez zmian)
             try { SpeedUiRegister(); } catch (Exception e) { Log.Error("MapSpeedUi.Register (UIExtenderEx)", e); }
+            // r4-wioska: wioska poboczna gracza w zakladce Fiefs ekranu rodu (UIExtenderEx: wstawka prefabu ClanFiefs + mixin ClanFiefsVM) - osobny UIExtender, wlasny try
+            try { SideTabRegister(); } catch (Exception e) { Log.Error("SideVillageFiefUi.Register (UIExtenderEx)", e); }
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void SpeedUiRegister() { MapSpeedUi.Register(); }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void SideTabRegister() { SideVillageFiefUi.Register(); }
 
         /// <summary>Modele lataamy dopiero gdy wszystkie mody sa zaladowane.</summary>
         protected override void OnBeforeInitialModuleScreenSetAsRoot()

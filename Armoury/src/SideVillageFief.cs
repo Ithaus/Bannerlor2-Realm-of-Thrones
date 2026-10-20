@@ -24,11 +24,11 @@ namespace Armoury
     ///     dostaje WIOSKE POBOCZNA (wiersz ukladu wiosek arm_map_villages, nie przysiolek) w okregu wsi gry z TEGO krolestwa, najblizej partii gracza; wies gry zostaje
     ///     przy panu. Wioska stoi w ksiedze wiosek (stan stoi / uszkodzona). Brak kandydata (ksiega nieczynna) - proba co godzine, po 3 dobach tytul BK jak dotad.
     ///  W2 ZAPIS: arm_side_fief (SaveText): "sf1|uid|okreg|nazwa|doba|wyplacone|srednia". Brak klucza (stary zapis Jeffa) = brak wioski gracza.
-    ///  W3 DOCHOD (klucz SideVillageFiefIncome): przy powrocie wozu do wsi MACIERZYSTEJ okregu (VillageTakings.EnterPostfix, po 112, F4b i pracach okregu, przed danina DS)
-    ///     udzial wioski w produkcji okregu (VillageCrafts.PartsOf: ValDay czesci / suma) x przyrost licznika podatku pana w tym oknie - z licznika pana (TradeTaxAccumulated)
-    ///     do kiesy gracza, w ksiedze pieniadza jak wyplata prac okregu (MoneyLedger.CartWorksInWindow). Pan dostaje mniej dokladnie o tyle. Wojna gracza z krolestwem
-    ///     okregu albo gracz panem okregu - bez przelewu. Podpowiedz zlota (CalculateClanGoldChange z opisami, bez pobrania) - linia ze srednia 7 dob (tylko widok:
-    ///     pieniadze ida przy wozie, nie z modelu finansow - bez podwojnej wyplaty).
+    ///  W3 DOCHOD (klucz SideVillageFiefIncome) - r4-wioska (20.10, dotad przy wozie: u Jeffa i w autotescie 5 dob "do gracza 0"): CO DOBE (OnDailyTick, Pay) naleznosc
+    ///     wioski = wartosc dnia jej produkcji (VillageCrafts.PartsOf) x stawka pana z utargu (czynny model podatku wsi), z licznika podatku pana wsi gry okregu
+    ///     (TradeTaxAccumulated), reszta z kiesy pana - pan ma mniej dokladnie o tyle. Wojna z krolestwem okregu, gracz panem okregu, okreg rabowany, wioska spalona -
+    ///     bez przelewu (powod w menu i w zakladce Fiefs). Podpowiedz zlota (CalculateClanGoldChange z opisami, bez pobrania) - linia z naleznoscia dnia (tylko widok).
+    ///     Zakladka Fiefs ekranu rodu - SideVillageFiefUi (lista) i NoFiefsPostfix (tekst bez miast i zamkow).
     ///  W4 MAPA: VillageHolders.Of - gospodarzem tej wioski jest gracz (herb rodu gracza na proporczyku i w dymku, linia "This village is yours").
     ///  W5 MENU (klucz SideVillageFiefMenu): klik na wioske na mapie = jazda do niej (MapState.ProcessTravel, wzor zajazdow) i menu po dojechaniu; postoj przy niej - pytanie
     ///     raz na postoj; w menu wsi gry okregu "Visit X (your village)". Menu arm_side_fief (zwykle, nie oczekiwania): nocleg za darmo - pod dachem (recenzja: klucz
@@ -93,10 +93,11 @@ namespace Armoury
             _shareDay = -1; _share = 0; _shareNote = "-";
             _posSet = false; _pendingClick = _askedUid = null;
             _invHour = -1; _invUid = null; _invOk = false; _invWhy = null;
+            _dueDay = -1; _due = 0; _dueCode = 0; _dueWhy = ""; _dueWhyPl = "-"; _mineVal = _allVal = _rate = 0;   // r4-wioska
             DayZero();
         }
 
-        private static void DayZero() { _dCarts = _dWar = _dSelf = _dNoShare = _dIntercept = _dOpen = _dClick = _dAsk = _dRest = _dRoof = _dInvest = _dTip = 0; _dPaid = _dTax = 0; _stDay = 0; }
+        private static void DayZero() { _dCarts = _dWar = _dSelf = _dNoShare = _dIntercept = _dOpen = _dClick = _dAsk = _dRest = _dRoof = _dInvest = _dTip = 0; _dPaid = _dTax = 0; _dFromTax = _dFromLord = _dShort = 0; _stDay = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -177,6 +178,14 @@ namespace Armoury
                     if (g != null && _vmOption != null) { h.Patch(g, postfix: new HarmonyMethod(typeof(SideVillageFief), nameof(StartTextPostfix))); _startTxtWired = true; }
                 }
                 catch (Exception e) { _startTxtWired = false; Stumble("EnsureHooks(opis startu BK)", e); }
+                // r4-wioska: prawa czesc zakladki Fiefs ("Clan Does Not Own Any Fiefs") - NoFiefsText po RefreshValues ClanFiefsVM (metoda klasy bazowej - takze NavalClanFiefsVM,
+                // ktory jej nie nadpisuje); bez UIExtenderEx, wiec dziala takze bez wstawki listy (SideVillageFiefUi)
+                try
+                {
+                    var rv = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories.ClanFiefsVM), "RefreshValues");
+                    if (rv != null) { h.Patch(rv, postfix: new HarmonyMethod(typeof(SideVillageFief), nameof(NoFiefsPostfix))); _noFiefsWired = true; }
+                }
+                catch (Exception e) { _noFiefsWired = false; Stumble("EnsureHooks(Fiefs)", e); }
             }
             var fin = Campaign.Current.Models != null ? Campaign.Current.Models.ClanFinanceModel : null;
             if (fin != null && !ReferenceEquals(fin, _finTriedFor))
@@ -196,11 +205,63 @@ namespace Armoury
                     else if (m != null && decl == _finDecl) _finWired = true;
                 }
                 catch (Exception e) { _finWired = false; Stumble("EnsureHooks(model finansow)", e); }
+                // r4-wioska (prowadzacy): panel Finance ekranu rodu liczy "Total Income" z CalculateClanIncome (ClanManagementVM.RefreshDailyValues) - ta sama
+                // naleznosc dnia tylko do widoku, zeby przychod i "Daily Change" zgadzaly sie z podpowiedzia zlota
+                try
+                {
+                    var args = new[] { typeof(Clan), typeof(bool), typeof(bool), typeof(bool) };
+                    var any = fin.GetType().GetMethod("CalculateClanIncome", BindingFlags.Public | BindingFlags.Instance, null, args, null);
+                    var decl = any != null ? any.DeclaringType : null;
+                    var m = decl != null ? AccessTools.DeclaredMethod(decl, "CalculateClanIncome", args) : null;
+                    if (m != null && !m.IsAbstract && decl != _incDecl)
+                    {
+                        h.Patch(m, postfix: new HarmonyMethod(typeof(SideVillageFief), nameof(IncomeViewPostfix)) { priority = Priority.Last });
+                        _incDecl = decl; _incWired = true;
+                    }
+                    else if (m != null && decl == _incDecl) _incWired = true;
+                }
+                catch (Exception e) { _incWired = false; Stumble("EnsureHooks(przychod rodu)", e); }
             }
         }
 
+        private static Type _incDecl;
+        private static bool _incWired;
+
+        /// <summary>r4-wioska (prowadzacy): postfiks CalculateClanIncome czynnego modelu - rod gracza, BEZ pobrania (applyWithdrawals = false): naleznosc dnia wioski
+        /// (ta sama co w podpowiedzi zlota). Tylko widok: pieniadze ida z Pay w OnDailyTick; dzienny przelew gry idzie przez CalculateClanGoldChange z pobraniem,
+        /// nie przez ta metode, wiec nie ma podwojnej wyplaty.</summary>
+        public static void IncomeViewPostfix(object __instance, Clan __0, bool __1, bool __2, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (__2 || __0 == null || !HasFief || !ReferenceEquals(__0, Clan.PlayerClan)) return;
+                var s = Settings.Current;
+                if (s == null || !s.SideVillageFiefIncome || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
+                string why; long due;
+                float x = Expect(out why, out due);
+                if (x < 1f) return;
+                if (_tipTxt == null || !ReferenceEquals(_tipName, _name)) { _tipName = _name; _tipTxt = new TextObject("{=!}" + (_name ?? "?") + " (your side village: its share of the lord's tax)"); }
+                __result.Add(x, _tipTxt);
+            }
+            catch (Exception e) { Stumble("IncomeViewPostfix", e); }
+        }
+
         private static MethodInfo _vmOption;
-        private static bool _startTxtWired;
+        private static bool _startTxtWired, _noFiefsWired;
+
+        /// <summary>r4-wioska: postfiks ClanFiefsVM.RefreshValues - przy wioskce gracza tekst prawej czesci zakladki Fiefs (widoczny tylko bez miast i zamkow) mowi o niej
+        /// zamiast "Clan Does Not Own Any Fiefs". Klucz SideVillageFiefClanTab. Tylko napis - przy bledzie zostaje tekst gry.</summary>
+        public static void NoFiefsPostfix(TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories.ClanFiefsVM __instance)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (__instance == null || s == null || !s.SideVillageFiefClanTab || !HasFief) return;
+                string t = NoFiefsText();
+                if (t != null) __instance.NoFiefsText = t;
+            }
+            catch (Exception e) { Stumble("NoFiefsPostfix", e); }
+        }
         private const string StartText = "Start as a lord in a kingdom, holding one of its side villages - it flies your banner and pays you a share of the lord's tax. Reduced influence for 5 years. Gain Scholarship skill.";
 
         /// <summary>Postfiks StartOptionVM.ShortDescription (BK): opcja "start_lord" przy kluczu SideVillageFiefStart - opis wioski pobocznej zamiast tytulu Lordship.</summary>
@@ -336,7 +397,7 @@ namespace Armoury
             _uid = best.Uid; _dist = best.VillageId; _name = string.IsNullOrEmpty(best.Name) ? best.Uid : best.Name;
             _day0 = Today(); _paidAll = 0; _avg = 0;
             _px = best.X; _py = best.Y; _posSet = true;
-            _holder = null; _shareDay = -1;
+            _holder = null; _shareDay = -1; _dueDay = -1;
             var lordC = bestSt.Village.Bound != null ? bestSt.Village.Bound.OwnerClan : null;
             Log.Info(P + "NADANIE (" + how + ") - " + _name + " (" + _uid + "), okreg " + Txt(bestSt.Name) + " (" + _dist + "), pan " + (lordC != null ? Txt(lordC.Name) : "?")
                      + ", krolestwo " + k.StringId + ", " + Math.Sqrt(bestD).ToString("0.0", Inv) + " jedn. od partii gracza, kandydatow " + seen + "; wies gry zostaje przy panu.");
@@ -344,7 +405,7 @@ namespace Armoury
             {
                 string house = lordC != null ? MapVillagesView.HouseName(lordC) : "your liege";
                 string body = "You hold " + _name + ", a side village in the lands of " + Txt(bestSt.Name) + ", sworn to " + house + ". " + Txt(bestSt.Name)
-                              + " itself stays with its lord. Your village flies your banner, and its share of the lord's tax comes to you whenever the district's carts come back from market. "
+                              + " itself stays with its lord. Your village flies your banner, and every day its share of the lord's tax comes to you. "
                               + "Click it on the map to ride in: rest there, invest in its works or look it over.";
                 Log.Player(_name + " is yours now - a side village of " + Txt(bestSt.Name) + ".");
                 // okno jak zawiadomienie BK o nadaniu (BK pokazuje je w tym samym miejscu bez sprawdzania innych okien)
@@ -370,44 +431,29 @@ namespace Armoury
 
         private static string Txt(TextObject t) { try { return t != null ? t.ToString() : "?"; } catch { return "?"; } }
 
-        // ============================================================ W3: dochod przy wozie
-        /// <summary>VillageTakings.EnterPostfix (woz wrocil do wsi macierzystej; po 112, F4b i pracach okregu): udzial wioski gracza w podatku pana z tego okna.</summary>
+        // ============================================================ W3: wozy okregu (po r4-wioska tylko licznik - dochod idzie co dobe, Pay)
+        /// <summary>VillageTakings.EnterPostfix (woz wrocil do wsi macierzystej; po 112, F4b i pracach okregu): r4-wioska - BEZ przelewu (dochod plynie co dobe z Pay,
+        /// inaczej podwojnie), tylko licznik wozow okregu i podatku pana z ich okien do linii doby. Zwraca 0 (DsDues: udzial gracza przy wozie = 0).</summary>
         internal static long AtCart(MobileParty cart, Village home, long taxInWindow)
         {
-            if (!HasFief || home == null || home.Settlement == null || taxInWindow <= 0) return 0;
+            if (!HasFief || home == null || home.Settlement == null) return 0;
             try
             {
-                var s = Settings.Current;
-                if (s == null || !s.SideVillageFiefIncome) return 0;
                 if (!string.Equals(home.Settlement.StringId, _dist, StringComparison.Ordinal)) return 0;
                 _dCarts++;
-                var lord = home.Bound != null ? home.Bound.OwnerClan : null;
-                if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) { _dSelf++; return 0; }   // gracz panem okregu - podatek i tak jest jego
-                var me = Hero.MainHero;
-                if (me == null || !me.IsAlive) return 0;
-                IFaction mf = Clan.PlayerClan.MapFaction, df = home.Settlement.MapFaction;
-                if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { _dWar++; return 0; }
-                double share = ShareOf(home);
-                if (!(share > 0)) { _dNoShare++; return 0; }
-                long want = (long)Math.Floor(share * taxInWindow);
-                want = Math.Min(want, Math.Max(0, home.TradeTaxAccumulated));
-                _dTax += taxInWindow;
-                if (want < 1) return 0;
-                home.TradeTaxAccumulated -= (int)want;                       // licznik pana -> kiesa gracza (jak wyplata prac okregu)
-                me.ChangeHeroGold((int)want);
-                MoneyLedger.CartWorksInWindow(cart, 0, (int)want);            // okno powrotu wozu w ksiedze pieniadza: to nie "zniklo"
-                _dPaid += want; _paidAll += want;
-                return want;
+                if (taxInWindow > 0) _dTax += taxInWindow;
             }
-            catch (Exception e) { Stumble("AtCart", e); return 0; }
+            catch (Exception e) { Stumble("AtCart", e); }
+            return 0;
         }
 
-        /// <summary>Udzial wioski gracza w wartosci dnia produkcji okregu (VillageCrafts.PartsOf - te same wartosci co okno prac); raz na dobe. Zapas - udzial ludzi w domu.</summary>
+        /// <summary>Udzial wioski gracza w wartosci dnia produkcji okregu (VillageCrafts.PartsOf - te same wartosci co okno prac); raz na dobe. Zapas - udzial ludzi w domu.
+        /// r4-wioska: zapamietuje tez wartosc dnia wioski i okregu (_mineVal, _allVal) - podstawa naleznosci dnia (Due).</summary>
         private static double ShareOf(Village v)
         {
             int today = Today();
             if (_shareDay == today) return _share;
-            _shareDay = today; _share = 0;
+            _shareDay = today; _share = 0; _mineVal = 0; _allVal = 0;
             try
             {
                 var parts = new List<VillageCrafts.PartCraft>();
@@ -418,21 +464,215 @@ namespace Armoury
                     foreach (var p in parts)
                     {
                         double val = Math.Max(0, p.ValDay), home = p.Book != null ? Math.Max(0, p.Book.Home) : 0;
+                        if (double.IsNaN(val) || double.IsInfinity(val)) val = 0;
                         all += val; hAll += home;
                         if (!p.Main && IsMine(p.Uid)) { mine += val; hMine += home; }
                     }
+                    _allVal = all; _mineVal = mine;
                     if (all > 0 && mine > 0) { _share = Math.Min(1.0, mine / all); _shareNote = "wartosc dnia " + mine.ToString("0", Inv) + " z " + all.ToString("0", Inv) + (ks ? " (KS)" : ""); }
                     else if (hAll > 0 && hMine > 0) { _share = Math.Min(1.0, hMine / hAll); _shareNote = "ludzie w domu " + hMine.ToString("0", Inv) + " z " + hAll.ToString("0", Inv); }
                     else _shareNote = "wioska bez produkcji i ludzi w ksiedze";
                 }
                 else _shareNote = "okreg nieznany ksiedze";
             }
-            catch (Exception e) { _share = 0; _shareNote = "blad"; Stumble("ShareOf", e); }
+            catch (Exception e) { _share = 0; _mineVal = _allVal = 0; _shareNote = "blad"; Stumble("ShareOf", e); }
             return _share;
         }
 
+        // ============================================================ r4-wioska: dochod co dobe
+        private static double _mineVal, _allVal, _rate, _hand;
+        private static int _dueDay = -1, _dueCode, _dueSig; private static long _due; private static string _dueWhy = "", _dueWhyPl = "-";
+        private static long _dFromTax, _dFromLord, _dShort;
+
+        /// <summary>r4-wioska (recenzja): podpis bramek naleznosci (klucz, pan okregu, wojna, rabunek wsi gry) - zmiana w ciagu doby (np. wojna wypowiedziana) liczy Due
+        /// od nowa, zamiast pokazywac rano policzone +N. Tanie (bez ksiegi). Nie rzuca.</summary>
+        private static int DueSig()
+        {
+            if (!HasFief) return 0;
+            try
+            {
+                var s = Settings.Current;
+                int k = s != null && s.SideVillageFiefIncome ? 1 : 0;
+                var st = Settlement.Find(_dist);
+                var v = st != null ? st.Village : null;
+                if (v == null) return k | 2;
+                var lord = v.Bound != null ? v.Bound.OwnerClan : null;
+                if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) k |= 4;
+                IFaction mf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null, df = st.MapFaction;
+                if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) k |= 8;
+                if (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted) k |= 16;
+                if (lord != null) k ^= System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(lord) << 5;
+                return k;
+            }
+            catch { return -1; }
+        }
+
+        /// <summary>r4-wioska (recenzja): stawka pana z utargu wsi okregu - czynny model podatku wsi (CalculateVillageTaxFromIncome, ta sama regula co BK, 112 i DS:
+        /// 1 - DsVillage.VillageShareOfTakings), liczona tu we wlasnym try: wyjatek modelu = stawka NIEZNANA (false, dochod 0), a nie 100% (DsVillage przy wyjatku daje udzial wsi 0).</summary>
+        private static bool LordRate(Village v, out double rate)
+        {
+            rate = 0;
+            try
+            {
+                const int probe = 10000;
+                var m = Campaign.Current != null ? Campaign.Current.Models.SettlementTaxModel : null;
+                if (m == null) return false;
+                double r = m.CalculateVillageTaxFromIncome(v, probe) / (double)probe;
+                if (double.IsNaN(r) || double.IsInfinity(r)) return false;
+                rate = r < 0 ? 0 : (r > 1 ? 1 : r);
+                return true;
+            }
+            catch (Exception e) { rate = 0; Stumble("LordRate", e); return false; }
+        }
+
+        /// <summary>r4-wioska: naleznosc dnia wioski gracza - to, co z niej nalezy sie panu okregu wedlug naszej ekonomii: wartosc dnia jej produkcji (VillageCrafts.PartsOf,
+        /// ta sama co okno prac; zapas - udzial ludzi w domu x wartosc okregu) x H okregu (utarg oddany przy wozach / wartosc produkcji - DistrictWorks.HandedRatio, ta sama
+        /// co okno prac: zmierzona albo srednia swiata 0.868; recenzja - podatek pana nalicza sie od utargu, nie od wartosci) x stawka pana z utargu (LordRate: czynny model
+        /// podatku wsi - ta sama regula co BK, 112 i "udzial pana" DS przy wozie). Raz na dobe (fresh - od nowa, przy wyplacie; zmiana podpisu bramek DueSig - od nowa).
+        /// 0 tylko w uczciwych przypadkach: klucz wylaczony, gracz panem okregu, wojna z krolestwem okregu, wies gry okregu rabowana / spladrowana (gra tez nie daje wtedy
+        /// panu podatku), wioska gracza spalona, pan nie bierze podatku, wioska wytwarza dzis za malo, stawka nieznana - powod po angielsku w whyEn (Fiefs, menu), po polsku
+        /// w _dueWhyPl (log). Watek glowny.</summary>
+        internal static long Due(out string whyEn, bool fresh = false)
+        {
+            int today = Today(), sig = DueSig();
+            if (!fresh && _dueDay == today && _dueSig == sig) { whyEn = _dueWhy; return _due; }
+            _dueDay = today; _dueSig = sig; _due = 0; _rate = 0; _hand = 0; _dueCode = 0; _dueWhy = ""; _dueWhyPl = "-";
+            try
+            {
+                var s = Settings.Current;
+                if (!HasFief) { _dueWhy = "This village is not yours."; _dueWhyPl = "brak wioski"; }
+                else if (s == null || !s.SideVillageFiefIncome) { _dueWhy = "Its income is switched off in mod settings."; _dueWhyPl = "klucz dochodu WYL"; }
+                else
+                {
+                    var st = Settlement.Find(_dist);
+                    var v = st != null ? st.Village : null;
+                    var lord = v != null && v.Bound != null ? v.Bound.OwnerClan : null;
+                    IFaction mf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null, df = st != null ? st.MapFaction : null;
+                    VillageBook.VState vs;
+                    if (v == null) { _dueWhy = "Its district is not known."; _dueWhyPl = "okreg nieznany"; }
+                    else if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) { _dueCode = 1; _dueWhy = "You hold the district yourself - its whole tax is yours already."; _dueWhyPl = "gracz panem okregu"; }
+                    else if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { _dueCode = 2; _dueWhy = "Nothing while you are at war with its lord's realm."; _dueWhyPl = "wojna z krolestwem okregu"; }
+                    else if (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted) { _dueWhy = "Nothing while " + Txt(st.Name) + " lies raided - the lord takes no tax from it either."; _dueWhyPl = "wies gry okregu rabowana / spladrowana"; }
+                    else if (VillageBook.StateOf(_uid, out vs) && (vs.State == VillageBook.SBurned || vs.State == VillageBook.SBurning || vs.State == VillageBook.SAbandoned)) { _dueWhy = "Nothing while your village lies burned."; _dueWhyPl = "wioska gracza spalona"; }
+                    else
+                    {
+                        double share = ShareOf(v);
+                        double val = _mineVal > 0 ? _mineVal : share * _allVal;
+                        if (double.IsNaN(val) || double.IsInfinity(val) || val < 0) val = 0;
+                        _hand = DistrictWorks.HandedRatio(v, _allVal);
+                        if (double.IsNaN(_hand) || double.IsInfinity(_hand) || _hand <= 0) _hand = 0.868;
+                        bool rateOk = LordRate(v, out _rate);
+                        double d = val * _hand * _rate;
+                        string calc = "wartosc wioski " + val.ToString("0", Inv) + " x H " + _hand.ToString("0.00", Inv) + " x stawka pana " + (100 * _rate).ToString("0", Inv) + "%";
+                        if (!rateOk) { _dueCode = 3; _dueWhy = "Its lord's tax is not known today."; _dueWhyPl = "stawka pana nieznana (model podatku wsi)"; }
+                        else if (!(val > 0)) { _dueCode = 3; _dueWhy = "What your village makes is not known yet."; _dueWhyPl = "brak wartosci produkcji (" + _shareNote + ")"; }
+                        else if (!(_rate > 0)) { _dueCode = 3; _dueWhy = "The lord takes no tax from this district."; _dueWhyPl = "stawka pana 0"; }
+                        else if (!(d >= 0.5) || double.IsInfinity(d)) { _dueCode = 3; _dueWhy = "Your village makes too little today to owe the lord anything."; _dueWhyPl = "za mala wartosc dnia (" + calc + ")"; }
+                        else { _due = (long)Math.Round(Math.Min(d, 1e6)); _dueWhyPl = calc; }
+                    }
+                }
+            }
+            catch (Exception e) { _due = 0; _dueWhy = "Not known today."; _dueWhyPl = "blad"; Stumble("Due", e); }
+            whyEn = _dueWhy;
+            return _due;
+        }
+
+        /// <summary>r4-wioska (OnDailyTick, SideVillageFief.Daily): wyplata naleznosci dnia graczowi - z licznika podatku pana tej wsi gry okregu (TradeTaxAccumulated: podatek
+        /// z utargow wozow okregu, ktorego pan jeszcze nie zebral), a reszta z kiesy glowy rodu pana (tam ida zebrane podatki). Recenzja: z BK pan zbiera licznik wsi
+        /// codziennie w 80-100% (EconomyPatches, AddSettlementIncome -> BKTaxModel.CalculateVillageTaxFromIncome i pobranie), wiec zwykle placi glownie KIESA pana.
+        /// Zamknieta ekonomia: pan ma mniej dokladnie o tyle, ile dostaje gracz; brak u pana - "brak" (nic z niczego; widok - Expect).
+        /// Bez podwojnego liczenia: przy wozie nie ma juz przelewu (AtCart), czynsz i daniny DS zostaja przy panie.</summary>
+        private static void Pay()
+        {
+            if (!HasFief) return;
+            try
+            {
+                string why;
+                long due = Due(out why, true);
+                if (_dueCode == 1) _dSelf++; else if (_dueCode == 2) _dWar++; else if (_dueCode == 3) _dNoShare++;   // liczniki linii doby - raz na wyplate
+                if (due <= 0) return;
+                var me = Hero.MainHero;
+                var st = Settlement.Find(_dist);
+                var v = st != null ? st.Village : null;
+                var lord = v != null && v.Bound != null ? v.Bound.OwnerClan : null;
+                if (me == null || !me.IsAlive || v == null || lord == null) return;
+                long fromTax = Math.Min(due, Math.Max(0, (long)v.TradeTaxAccumulated));
+                long fromLord = 0;
+                var lh = lord.Leader;
+                if (due - fromTax > 0 && lh != null && lh.IsAlive && !ReferenceEquals(lh, me)) fromLord = Math.Min(due - fromTax, Math.Max(0, (long)lh.Gold));
+                if (fromTax > 0) v.TradeTaxAccumulated -= (int)fromTax;          // licznik pana -> gracz (jak wyplata prac okregu)
+                if (fromLord > 0) lh.ChangeHeroGold(-(int)fromLord);             // kiesa pana -> gracz
+                long paid = fromTax + fromLord;
+                if (paid > 0) me.ChangeHeroGold((int)paid);
+                _dPaid += paid; _paidAll += paid; _dFromTax += fromTax; _dFromLord += fromLord; _dShort += due - paid;
+            }
+            catch (Exception e) { Stumble("Pay", e); }
+        }
+
+        /// <summary>r4-wioska (recenzja): to, co pan moze dac teraz - licznik podatku wsi gry okregu + kiesa glowy rodu pana (te same zrodla co Pay). long.MaxValue - nieznane
+        /// (widok bez obciecia). Watek glowny, nie rzuca.</summary>
+        private static long LordCanPay()
+        {
+            try
+            {
+                var st = Settlement.Find(_dist);
+                var v = st != null ? st.Village : null;
+                var lord = v != null && v.Bound != null ? v.Bound.OwnerClan : null;
+                if (v == null || lord == null) return 0;
+                long have = Math.Max(0, (long)v.TradeTaxAccumulated);
+                var lh = lord.Leader; var me = Hero.MainHero;
+                if (lh != null && lh.IsAlive && !ReferenceEquals(lh, me)) have += Math.Max(0, (long)lh.Gold);
+                return have;
+            }
+            catch (Exception e) { Stumble("LordCanPay", e); return long.MaxValue; }
+        }
+
+        /// <summary>r4-wioska (recenzja): widok dochodu dnia (podpowiedz zlota, Fiefs, menu) - naleznosc Due obcieta do tego, co pan ma teraz (LordCanPay), z powodem
+        /// po angielsku, gdy obcieta - zeby ekran nie obiecywal +N, gdy pan nie ma z czego zaplacic. Pieniadze plyna tylko z Pay.</summary>
+        internal static long Expect(out string whyEn, out long due)
+        {
+            due = Due(out whyEn);
+            if (due <= 0) return 0;
+            long have = LordCanPay();
+            if (have >= due) return due;
+            whyEn = have > 0 ? "Its lord has only " + have.ToString("N0", Inv) + " to give today." : "Its lord has no money to pay it today.";
+            return Math.Max(0, have);
+        }
+
+        /// <summary>r4-wioska: zakladka Fiefs ekranu rodu (SideVillageFiefUi) - naglowek, linia wioski i dochod dnia. false - brak wioski gracza. Watek glowny, nie rzuca.</summary>
+        internal static bool ClanTab(out string header, out string line, out string income)
+        {
+            header = line = income = "";
+            try
+            {
+                if (!HasFief) return false;
+                var st = Settlement.Find(_dist);
+                var lord = st != null && st.Village != null && st.Village.Bound != null ? st.Village.Bound.OwnerClan : null;
+                header = "Side villages (1)";
+                line = _name + " - lands of " + (st != null ? Txt(st.Name) : _dist) + (lord != null && !ReferenceEquals(lord, Clan.PlayerClan) ? ", sworn to " + MapVillagesView.HouseName(lord) : "");
+                string why; long due;
+                long d = Expect(out why, out due);
+                income = d <= 0 ? "Income: none today. " + why
+                       : d < due ? "Income: about " + d.ToString("N0", Inv) + " today (its share of the lord's tax is " + due.ToString("N0", Inv) + ", but the lord has no more to give)"
+                       : "Income: about " + d.ToString("N0", Inv) + " a day (its share of the lord's tax)";
+                return true;
+            }
+            catch (Exception e) { Stumble("ClanTab", e); return false; }
+        }
+
+        /// <summary>r4-wioska: tekst prawej czesci zakladki Fiefs, gdy rod nie ma miast ani zamkow (zamiast "Clan Does Not Own Any Fiefs"). null - bez zmian.</summary>
+        internal static string NoFiefsText()
+        {
+            string h, l, i;
+            if (!ClanTab(out h, out l, out i)) return null;
+            return "Your clan holds no towns or castles.\n\nYour side village: " + l + ".\n" + i.TrimEnd('.', ' ') + ".";   // recenzja: powody koncza sie kropka - bez dwoch kropek
+        }
+
+        internal static void UiStumble(string where, Exception e) { Stumble("Ui." + where, e); }
+
         // ============================================================ W3: linia w podpowiedzi zlota
-        /// <summary>Postfiks CalculateClanGoldChange czynnego modelu: rod gracza, z opisami i BEZ pobrania (podpowiedz zlota) - srednia 7 dob udzialu wioski. Tylko widok.</summary>
+        /// <summary>Postfiks CalculateClanGoldChange czynnego modelu: rod gracza, z opisami i BEZ pobrania (podpowiedz zlota) - r4-wioska: naleznosc dnia (Due - wyplata
+        /// w najblizszym OnDailyTick), nie srednia 7 dob (na starcie 0). Tylko widok: pieniadze ida z Pay, nie z modelu finansow (bez podwojnej wyplaty).</summary>
         public static void GoldTipPostfix(object __instance, Clan __0, bool __1, bool __2, ref ExplainedNumber __result)
         {
             try
@@ -440,9 +680,10 @@ namespace Armoury
                 if (!__1 || __2 || __0 == null || !HasFief || !ReferenceEquals(__0, Clan.PlayerClan)) return;
                 var s = Settings.Current;
                 if (s == null || !s.SideVillageFiefIncome || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
-                float x = (float)Math.Round(_avg);
+                string why; long due;
+                float x = Expect(out why, out due);   // recenzja: obciete do tego, co pan ma teraz (bez obietnicy +N, gdy pan nie ma z czego)
                 if (x < 1f) return;
-                if (_tipTxt == null || !ReferenceEquals(_tipName, _name)) { _tipName = _name; _tipTxt = new TextObject("{=!}" + (_name ?? "?") + " (your village's share of the lord's tax)"); }
+                if (_tipTxt == null || !ReferenceEquals(_tipName, _name)) { _tipName = _name; _tipTxt = new TextObject("{=!}" + (_name ?? "?") + " (your side village: its share of the lord's tax)"); }
                 __result.Add(x, _tipTxt);
                 _dTip++;
             }
@@ -754,8 +995,11 @@ namespace Armoury
                 sb.Append(Math.Round(vs.Home + vs.Away).ToString("N0", Inv)).Append(" people in ").Append(Math.Max(1.0, Math.Round(vs.Settlements)).ToString("0", Inv)).Append(" homesteads")
                   .Append(vs.State == VillageBook.SStanding ? "." : vs.State == VillageBook.SBurned ? " - burned, people are slowly coming back." : " - raiders have emptied part of it.").Append('\n');
             if (st != null) foreach (string l in DistrictWorks.PartLines(st, _uid, false)) sb.Append(l).Append('\n');
-            sb.Append("Your share of the lord's tax: about ").Append(Math.Round(_avg).ToString("N0", Inv)).Append(" a day, ").Append(_paidAll.ToString("N0", Inv)).Append(" in all since day ").Append(_day0).Append('.');
-            if (!Settings.Current.SideVillageFiefIncome) sb.Append(" (switched off in mod settings)");
+            string why; long due;
+            long got = Expect(out why, out due);   // r4-wioska: dochod dnia (ten sam co w podpowiedzi zlota i w zakladce Fiefs; recenzja - obciety do tego, co pan ma)
+            if (got > 0) sb.Append("Your share of the lord's tax: about ").Append(got.ToString("N0", Inv)).Append(got < due ? " today (the lord has no more to give)" : " a day");
+            else sb.Append("Your share of the lord's tax: none today (").Append(why.TrimEnd('.')).Append(")");
+            sb.Append(", ").Append(_paidAll.ToString("N0", Inv)).Append(" in all since day ").Append(_day0).Append('.');
             return sb.ToString();
         }
 
@@ -770,8 +1014,8 @@ namespace Armoury
                 var more = new StringBuilder();
                 foreach (string l in DistrictWorks.PartLines(st, _uid, true)) if (!shown.Contains(l)) more.Append('\n').Append(l);
                 if (st.Village != null) ShareOf(st.Village);
-                more.Append("\nHow it pays: when the carts of ").Append(Txt(st.Name)).Append(" come back from market, the lord takes his tax. Your village's part of it - its share of what the district makes, now about ")
-                    .Append((100 * _share).ToString("0", Inv)).Append("% - is yours. At war with the lord's realm you get nothing.");
+                more.Append("\nHow it pays: the lord of ").Append(Txt(st.Name)).Append(" takes his tax from what the district sells at market. The part that comes from your village - its share of what the district makes, now about ")
+                    .Append((100 * _share).ToString("0", Inv)).Append("% - is paid to you every day, out of the lord's tax (or his purse). At war with the lord's realm, or while the district lies raided or your village burned, you get nothing.");
                 body += "\n" + more.ToString();
             }
             // przeglad calosci 20.10: ramka okna (SingleQueryPopup ROT) nie przewija - ok. 19 linii (Rumours.PageLines z zapasem). Przy wojnie, spaleniu i odbudowie
@@ -877,6 +1121,14 @@ namespace Armoury
                     add("T8 model finansow (linia podpowiedzi)", _finWired, _finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK");
                     double sh = st != null && st.Village != null ? ShareOf(st.Village) : 0;
                     add("T9 udzial wioski w okregu", sh > 0 && sh < 1, (100 * sh).ToString("0.0", Inv) + "% (" + _shareNote + ")");
+                    // T11 (r4-wioska): naleznosc dnia znana od razu (bez wozu i bez wczorajszej wartosci) i tekst zakladki Fiefs
+                    string tw; long td = Due(out tw, true);
+                    string th, tl, ti; bool tab = ClanTab(out th, out tl, out ti);
+                    // recenzja: takze rejestracja wstawki i mixinu UIExtenderEx (przy kluczu WL) - sam napis nie dowodzi bloku w Fiefs; wyglad bloku tylko recznie w ekranie rodu
+                    var ts = Settings.Current;
+                    bool ui = (ts != null && !ts.SideVillageFiefClanTab) || (SideVillageFiefUi.State ?? "").StartsWith("wstawka", StringComparison.Ordinal);
+                    add("T11 dochod dnia i zakladka Fiefs", td > 0 && tab && ui, "nalezne " + td + " (" + _dueWhyPl + (tw.Length > 0 ? ", " + tw : "") + "), Fiefs: " + (tab ? th + " | " + tl + " | " + ti : "BRAK")
+                        + ", lista - " + SideVillageFiefUi.State);
                     // T10 (recenzja, WAZNE): nocleg pod dachem - stan noclegu karczmy z uid wioski i zapis arm_inns tam i z powrotem; stan noclegu gracza przywrocony
                     string i0 = TownInns.Export();
                     bool made = TownInns.HostSleep(_dist, _uid, _name);
@@ -901,6 +1153,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null) return;
                 int day = Today() - 1;
+                Pay();   // r4-wioska: dochod dnia (naleznosc wioski z licznika podatku pana okregu, reszta z kiesy pana) - przed srednia i linia doby
                 // srednia: przez pierwsze 7 dob od nadania srednia z dob, potem wykladnicza 7 dob (bez nowego stanu w zapisie - doba nadania jest w zapisie)
                 if (HasFief) { int n = Math.Max(1, Math.Min(7, Today() - _day0)); _avg += (_dPaid - _avg) / n; if (_avg < 0) _avg = 0; }
                 bool start = !_startLogged;
@@ -911,11 +1164,15 @@ namespace Armoury
                   .Append(" | klucze: start ").Append(s.SideVillageFiefStart ? "WL" : "WYL").Append(", dochod ").Append(s.SideVillageFiefIncome ? "WL" : "WYL").Append(", menu ").Append(s.SideVillageFiefMenu ? "WL" : "WYL")
                   .Append(", nocleg pod dachem ").Append(s.SideVillageFiefLodging ? (TownInns.On ? "WL" : "WL (karczmy WYL)") : "WYL")
                   .Append(" | latki: BK GiveLordshipOnKingdomJoin ").Append(_bkWired ? "wpieta" : "BRAK").Append(", podpowiedz zlota ").Append(_finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK")
-                  .Append(", opis startu BK (StartOptionVM.ShortDescription) ").Append(_startTxtWired ? "wpiety" : "BRAK");
+                  .Append(", opis startu BK (StartOptionVM.ShortDescription) ").Append(_startTxtWired ? "wpiety" : "BRAK")
+                  .Append(", zakladka Fiefs: tekst ").Append(_noFiefsWired ? "wpiety" : "BRAK").Append(", lista - ").Append(SideVillageFiefUi.State)
+                  .Append(", klucz ").Append(s.SideVillageFiefClanTab ? "WL" : "WYL");
                 if (HasFief)
                 {
                     sb.Append(" | wioska ").Append(_name).Append(" (").Append(_uid).Append(", okreg ").Append(_dist).Append(", od doby ").Append(_day0).Append(')')
                       .Append(" | wozy okregu ").Append(_dCarts).Append(", podatek pana w oknach ").Append(_dTax).Append(", udzial ").Append((100 * _share).ToString("0.0", Inv)).Append("% (").Append(_shareNote).Append(")")
+                      .Append(" | dochod dnia (r4): nalezne ").Append(_due).Append(" (").Append(_dueWhyPl).Append("), z licznika podatku pana ").Append(_dFromTax).Append(", z kiesy pana ").Append(_dFromLord)
+                      .Append(", brak u pana ").Append(_dShort)
                       .Append(", do gracza ").Append(_dPaid).Append(" (razem ").Append(_paidAll).Append("), srednia 7 dob ").Append(_avg.ToString("0.0", Inv))
                       .Append(", bez przelewu: wojna ").Append(_dWar).Append(", gracz panem ").Append(_dSelf).Append(", bez udzialu ").Append(_dNoShare);
                 }

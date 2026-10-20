@@ -351,7 +351,7 @@ namespace Armoury
                 // recenzja calosci (noc 17/18.10): wyplata prac okregu (DistrictWorks - licznik pana + kiesa wsi, przed ta danina) osobno, nie jako udzial pana. Dziesiecina zostaje
                 // od calego utargu `handed` (jak dla udzialu pana: placi wies, najwyzej `part`), udzial korony W4 - od czesci wsi netto - te same reguly dla pana i inwestora
                 long wk = Math.Max(0, Math.Min(works, (long)handed));
-                // przeglad calosci 20.10: udzial wioski pobocznej gracza (SideVillageFief.AtCart - z licznika pana w tym oknie) tez osobno, nie jako udzial pana
+                // przeglad calosci 20.10: udzial wioski pobocznej gracza (SideVillageFief.AtCart) osobno, nie jako udzial pana; r4-wioska: przy wozie zawsze 0 (dochod co dobe z licznika pana - SideVillageFief.Pay)
                 long sd = Math.Max(0, Math.Min(side, Math.Max(0, (long)handed - part - wk)));
                 _cPart += part; _cWorks += wk; _cSide += sd; _cLord += Math.Max(0, handed - part - wk - sd);
                 // W2 dziesiecina: polowa jalmuzna zostaje w kiesie, budowa septow - z kiesy do ludu i kasy miasta targowego
