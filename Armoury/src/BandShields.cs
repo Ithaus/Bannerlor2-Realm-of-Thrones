@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -23,8 +27,14 @@ namespace Armoury
     /// (BannerColorPersistence z ROT-Core zmienia przy spawnie tylko kolory ubran partii z bohaterem-wodzem; ROT patch24 i NavalDLC buduja gotowa bron
     /// - AgentOverridenSpawnMissionEquipment - tylko zaciagowi gracza i w misjach fabularnych; parametr herbu w OnAgentBuild nikt w bitwie nie czyta).
     ///
-    /// TERAZ: prefiks Mission.SpawnAgent (Priority.High - przed prefiksami, ktore buduja bron z AgentBanner): czlowiek partii frakcji bandyckiej (bez Innych)
-    /// dostaje herb prawdziwego rodu:
+    /// Ten sam herb gra czyta tez z POCHODZENIA agenta (agent.Origin.Banner): zbroje i tuniki z herbem (MissionScreen.OnEquipItemsFromSpawnEquipment,
+    /// IsUsingTableau - w ROT m.in. chain_armor_short_tabbard, velaryon_soldier_armor, northern_knight_armor), Agent.UpdateSpawnEquipmentAndRefreshVisuals,
+    /// znacznik oddzialu z kapitanem (FormationIndicatorMissionView), pociski machin i strzaly plonace NavalDLC (recenzja 19.10).
+    ///
+    /// TERAZ: (a) postfiks gettera Banner w PartyGroupAgentOrigin i PartyAgentOrigin - dla czlowieka bandy zwraca herb wybrany dla niego (raz na pochodzenie
+    /// w misji, pamiec _chosen), wiec Mission.SpawnTroop sam poda go do AgentBuildData, a tunika, znacznik i pociski maja ten sam herb co tarcza;
+    /// (b) prefiks Mission.SpawnAgent (Priority.High - przed prefiksami, ktore buduja bron z AgentBanner) ustawia ten sam herb w AgentBuildData
+    /// (agenci budowani bez SpawnTroop). Czlowiek partii frakcji bandyckiej (bez Innych) dostaje herb prawdziwego rodu:
     ///  (1) DEZERTER albo rozbitek (jednostka kultury krolestwa, nie bandycka - OutlawLaw zostawia dezerterow i rozbitkow w ich typie zolnierza) - herb
     ///      pana ziemi, z ktorej wzial go pobor: regiony pochodzenia skladu bandy z ksiegi ludzi (PeopleBook E4/7, udzialy region -> ludzie), tylko regiony
     ///      jego kultury (kultura osady, rodu pana albo krolestwa pana); losowanie wagi ludzi;
@@ -33,8 +43,9 @@ namespace Armoury
     ///  (4) BANDYTA z urodzenia (kultura bandycka albo kultura klanu bandy) i kazdy bez (1)-(3) - NAKRADZIONE: gospodarze 3 najblizszych wsi gry
     ///      (VillageHolders - ten sam herb co proporczyki wiosek na mapie; bez klucza Village Banner Per Holder - pan wsi) i panowie 3 najblizszych warowni,
     ///      rowno; pusto (same rody gracza) - kolejne warownie od najblizszej.
-    /// Nigdy herb Twojego rodu (zebys w bitwie nie bral bandyty za swojego), herb bandycki ani Innych. Wybor deterministyczny na czlowieka (UniqueSeed
-    /// rosteru + id bandy); listy herbow liczone raz na bande w misji (bez kosztu co klatke, tylko watek misji). Kolory ubran (kolory druzyny) bez zmian.
+    /// Nigdy herb strony gracza w tej bitwie (Twoj rod, rody partii po Twojej stronie i ich krolestwa - zebys w bitwie nie bral bandyty za swojego
+    /// ani za sojusznika), herb bandycki ani Innych. Wybor deterministyczny na czlowieka (UniqueSeed rosteru + id bandy); listy herbow liczone raz na
+    /// bande w misji (bez kosztu co klatke; liczy tylko watek glowny, inne watki czytaja gotowy wybor pod zamkiem). Kolory ubran (kolory druzyny) bez zmian.
     /// Klucz BandShieldsStolenArms (off - herb bandy, jak dotad); linia "Tarcze band (herby):" po rozstawieniu i na koniec misji, gdy doszli ludzie.
     /// </summary>
     internal static class BandShields
@@ -105,8 +116,20 @@ namespace Armoury
         private static readonly HashSet<string> _codes = new HashSet<string>(StringComparer.Ordinal);
         private static readonly Dictionary<string, int> _byHouse = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly int[] _kind = new int[KKinds];
-        private static int _men, _heroes, _none, _skipReady, _skipUndead, _stMission, _loggedMen = -1;
-        private static string _playerCode;
+        private static int _men, _heroes, _none, _ready, _skipUndead, _stMission, _loggedMen = -1, _seedless, _friendParties, _originHits;
+        // herby strony gracza w tej bitwie (Twoj rod, rody partii po Twojej stronie i ich krolestwa) - nigdy na tarczy bandyty
+        private static readonly HashSet<string> _friendCodes = new HashSet<string>(StringComparer.Ordinal);
+
+        // wybor na czlowieka: pochodzenie agenta -> herb (null = bez zmiany). Pisze tylko watek glowny; czyta kazdy watek - zawsze pod zamkiem.
+        private static readonly object _gate = new object();
+        private static readonly Dictionary<IAgentOriginBase, Banner> _chosen = new Dictionary<IAgentOriginBase, Banner>(new RefEq());
+        private static int _main = -1;                                  // watek glowny (ApplyAll w OnBeforeInitialModuleScreenSetAsRoot)
+
+        private sealed class RefEq : IEqualityComparer<IAgentOriginBase>
+        {
+            public bool Equals(IAgentOriginBase x, IAgentOriginBase y) { return ReferenceEquals(x, y); }
+            public int GetHashCode(IAgentOriginBase o) { return RuntimeHelpers.GetHashCode(o); }
+        }
 
         // ---------------------------------------------------------------- sesja
         private static int _stSession;
@@ -122,14 +145,50 @@ namespace Armoury
 
         internal static void ApplyAll(Harmony h)
         {
+            _main = Environment.CurrentManagedThreadId;
             try
             {
                 var m = AccessTools.DeclaredMethod(typeof(Mission), "SpawnAgent");
-                if (m == null) { Log.Info("Tarcze band (herby): brak Mission.SpawnAgent - latka nie weszla."); return; }
-                h.Patch(m, prefix: new HarmonyMethod(typeof(BandShields), nameof(Prefix)) { priority = Priority.High });
-                Log.Info("Tarcze band (herby): latka Mission.SpawnAgent wpieta (prefiks High) - ludzie band dostaja na tarcze herby prawdziwych rodow (dezerter - pan ziemi pochodzenia albo rod/krolestwo jego kultury, reszta - nakradzione z najblizszych wsi i warowni); klucz Band Shields Stolen Arms " + (On ? "TAK" : "NIE") + ".");
+                if (m == null) Log.Info("Tarcze band (herby): brak Mission.SpawnAgent - latka nie weszla.");
+                else
+                {
+                    h.Patch(m, prefix: new HarmonyMethod(typeof(BandShields), nameof(Prefix)) { priority = Priority.High });
+                    Log.Info("Tarcze band (herby): latka Mission.SpawnAgent wpieta (prefiks High) - ludzie band dostaja na tarcze herby prawdziwych rodow (dezerter - pan ziemi pochodzenia albo rod/krolestwo jego kultury, reszta - nakradzione z najblizszych wsi i warowni); klucz Band Shields Stolen Arms " + (On ? "TAK" : "NIE") + ".");
+                }
             }
             catch (Exception e) { Log.Error("BandShields.ApplyAll", e); }
+            // herb pochodzenia agenta (zbroje i tuniki z herbem, znaczniki oddzialow, pociski): postfiks gettera Banner na klasach deklarujacych.
+            // Oba gettery to metody z wywolaniami (nie 1-bajtowy ret - bez ryzyka UNWIND_INFO z 16:09); wolane tylko przez interfejs IAgentOriginBase
+            // (sprawdzone w metadanych wszystkich DLL gry i modow - zadnego wywolania wprost, wiec JIT ich nie wkleja).
+            int ok = PatchGetter(h, typeof(PartyGroupAgentOrigin)) + PatchGetter(h, typeof(PartyAgentOrigin));
+            Log.Info("Tarcze band (herby): herb pochodzenia ludzi band (zbroje i tuniki z herbem, znaczniki oddzialow, pociski) - postfiks Banner wpiety " + ok + "/2 (PartyGroupAgentOrigin, PartyAgentOrigin).");
+        }
+
+        private static int PatchGetter(Harmony h, Type t)
+        {
+            try
+            {
+                var g = AccessTools.DeclaredPropertyGetter(t, "Banner");
+                if (g == null) { Log.Info("Tarcze band (herby): brak " + t.Name + ".Banner - herb pochodzenia bez zmian."); return 0; }
+                h.Patch(g, postfix: new HarmonyMethod(typeof(BandShields), nameof(OriginBannerPostfix)));
+                return 1;
+            }
+            catch (Exception e) { Log.Error("BandShields.PatchGetter(" + t.Name + ")", e); return 0; }
+        }
+
+        // ---------------------------------------------------------------- postfiks herbu pochodzenia (kazdy watek; liczy tylko watek glowny)
+        private static void OriginBannerPostfix(object __instance, ref Banner __result)
+        {
+            if (__result == null) return;
+            try
+            {
+                if (!On) return;
+                var o = __instance as IAgentOriginBase;
+                if (o == null) return;
+                var b = Decide(o, null, 0);
+                if (b != null && !ReferenceEquals(b, __result)) { __result = b; Interlocked.Increment(ref _originHits); }
+            }
+            catch (Exception e) { Stumble("OriginBanner", e); }
         }
 
         // ---------------------------------------------------------------- prefiks spawnu
@@ -141,55 +200,107 @@ namespace Armoury
                 if (!On || Campaign.Current == null) return;
                 var o = agentBuildData.AgentOrigin;
                 if (o == null) return;
-                var pb = o.BattleCombatant as PartyBase;
-                if (pb == null) return;
-                var f = pb.MapFaction;
-                if (f == null || !f.IsBanditFaction) return;
-                var ch = agentBuildData.AgentCharacter as CharacterObject;
-                if (ch == null || ch.IsPlayerCharacter) return;
-                Begin(__instance);
-                if (Undead.Character(ch) || (pb.MobileParty != null && Undead.Party(pb.MobileParty))) { _skipUndead++; return; }
-                // gotowa bron od innego moda (zaciag ROT, misje fabularne NavalDLC) - herb juz w niej siedzi; nie ruszamy (licznik)
-                if (agentBuildData.AgentOverridenSpawnMissionEquipment != null) { _skipReady++; return; }
-                var pa = ArmsOf(pb, f);
-                if (pa == null) return;
-                _men++;
-                if (ch.IsHero) _heroes++;
-                int seed = o.UniqueSeed;
-                if (seed == 0) seed = agentBuildData.AgentEquipmentSeed;
-                if (seed == 0) seed = _men * 7919 + 1;
-                uint hsh = Mix(unchecked((uint)seed) ^ pa.Salt);
-                int kind;
-                Pick p = ChooseList(pa, ch, f, out kind);
-                int i = p != null ? p.Draw(hsh) : -1;
-                if (i < 0) { _none++; return; }
-                var b = p.B[i];
+                // SpawnTroop podal juz herb z gettera pochodzenia (ten sam wybor z pamieci); tu dla agentow budowanych bez SpawnTroop
+                var b = Decide(o, __instance, agentBuildData.AgentEquipmentSeed);
+                if (b == null) return;
                 agentBuildData.Banner(b);
-                _kind[kind]++;
-                _codes.Add(b.BannerCode);
-                int n; _byHouse.TryGetValue(p.L[i], out n); _byHouse[p.L[i]] = n + 1;
+                // gotowa bron innego moda: tarcze w niej maja herb, z jakim ja zbudowano (NavalDLC/ROT biora go z pochodzenia - czyli nasz); licznik
+                if (agentBuildData.AgentOverridenSpawnMissionEquipment != null) _ready++;
             }
             catch (Exception e) { Stumble("Prefix", e); }
         }
 
-        /// <summary>Nowa misja - pamiec od nowa (obiekty innej misji nie zostaja).</summary>
+        /// <summary>Herb dla czlowieka bandy - raz na pochodzenie agenta w misji, potem z pamieci (kazdy watek); null - bez zmiany.
+        /// Nowy wybor liczy tylko watek glowny (spawn, widoki misji); inny watek dostaje wylacznie to, co juz wybrane.</summary>
+        private static Banner Decide(IAgentOriginBase o, Mission m, int seedHint)
+        {
+            var pb = o.BattleCombatant as PartyBase;
+            if (pb == null) return null;
+            var f = pb.MapFaction;
+            if (f == null || !f.IsBanditFaction) return null;
+            Banner b;
+            lock (_gate) { if (_chosen.TryGetValue(o, out b)) return b; }
+            if (Environment.CurrentManagedThreadId != _main || Campaign.Current == null) return null;
+            if (m == null) m = Mission.Current;
+            if (m == null || m.MissionEnded) return null;     // koniec misji (pamiec juz wyczyszczona) - nic nowego, nic nie trzymamy do nastepnej
+            var ch = o.Troop as CharacterObject;
+            if (ch == null || ch.IsPlayerCharacter) return null;
+            Begin(m);
+            b = Choose(o, pb, f, ch, seedHint);
+            lock (_gate) _chosen[o] = b;
+            return b;
+        }
+
+        private static Banner Choose(IAgentOriginBase o, PartyBase pb, IFaction f, CharacterObject ch, int seedHint)
+        {
+            if (Undead.Character(ch) || (pb.MobileParty != null && Undead.Party(pb.MobileParty))) { _skipUndead++; return null; }
+            var pa = ArmsOf(pb, f);
+            if (pa == null) return null;
+            _men++;
+            if (ch.IsHero) _heroes++;
+            int seed = o.UniqueSeed;
+            if (seed == 0) seed = seedHint;
+            if (seed == 0) { _seedless++; seed = unchecked(_seedless * 7919 + (int)Fnv(ch.StringId ?? "")); }   // posilki DR, kryjowka: bez ziarna rosteru
+            uint hsh = Mix(unchecked((uint)seed) ^ pa.Salt);
+            int kind;
+            Pick p = ChooseList(pa, ch, f, out kind);
+            int i = p != null ? p.Draw(hsh) : -1;
+            if (i < 0) { _none++; return null; }
+            var b = p.B[i];
+            _kind[kind]++;
+            _codes.Add(b.BannerCode);
+            int n; _byHouse.TryGetValue(p.L[i], out n); _byHouse[p.L[i]] = n + 1;
+            return b;
+        }
+
+        /// <summary>Nowa misja - pamiec od nowa (obiekty innej misji nie zostaja) i herby strony gracza w tej bitwie.</summary>
         private static void Begin(Mission m)
         {
             var cur = _mission != null ? _mission.Target as Mission : null;
             if (ReferenceEquals(cur, m)) return;
             Clear();
             _mission = new WeakReference(m);
-            try { var pc = Clan.PlayerClan; _playerCode = pc != null && pc.Banner != null ? pc.Banner.BannerCode : null; } catch { _playerCode = null; }
+            try { var pc = Clan.PlayerClan; if (pc != null) AddFriend(pc.Banner); } catch { }
+            try
+            {
+                var me = MapEvent.PlayerMapEvent;
+                if (me != null && me.PlayerSide != BattleSideEnum.None)
+                {
+                    var side = me.PlayerSide == BattleSideEnum.Attacker ? me.AttackerSide : me.DefenderSide;
+                    if (side != null && side.Parties != null)
+                        foreach (var mep in side.Parties)
+                        {
+                            var p = mep != null ? mep.Party : null;
+                            if (p == null) continue;
+                            _friendParties++;
+                            var lh = p.LeaderHero;
+                            if (lh != null) { AddFriend(lh.ClanBanner); if (lh.Clan != null) AddFriend(lh.Clan.Banner); }
+                            var ow = p.Owner;
+                            if (ow != null && ow.Clan != null) AddFriend(ow.Clan.Banner);
+                            var mf = p.MapFaction;
+                            if (mf != null && !mf.IsBanditFaction) AddFriend(mf.Banner);
+                        }
+                }
+            }
+            catch (Exception e) { Stumble("Begin(strona gracza)", e); }
+        }
+
+        private static void AddFriend(Banner b)
+        {
+            if (b == null) return;
+            string code = b.BannerCode;
+            if (!string.IsNullOrEmpty(code)) _friendCodes.Add(code);
         }
 
         private static void Clear()
         {
             _mission = null;
-            _arms.Clear(); _realm.Clear(); _codes.Clear(); _byHouse.Clear();
+            _arms.Clear(); _realm.Clear(); _codes.Clear(); _byHouse.Clear(); _friendCodes.Clear();
+            lock (_gate) _chosen.Clear();
             Array.Clear(_kind, 0, _kind.Length);
-            _men = _heroes = _none = _skipReady = _skipUndead = _stMission = 0;
+            _men = _heroes = _none = _ready = _skipUndead = _stMission = _seedless = _friendParties = 0;
+            Interlocked.Exchange(ref _originHits, 0);
             _loggedMen = -1;
-            _playerCode = null;
         }
 
         private static PartyArms ArmsOf(PartyBase pb, IFaction f)
@@ -233,7 +344,7 @@ namespace Armoury
             return StolenList(pa);
         }
 
-        /// <summary>Rod gotowy na tarcze bandyty: zyje, nie bandycki, nie Inni, nie Twoj, ma herb inny niz herb bandy i Twoj.</summary>
+        /// <summary>Rod gotowy na tarcze bandyty: zyje, nie bandycki, nie Inni, nie Twoj, ma herb inny niz herb bandy i herby strony gracza w tej bitwie.</summary>
         private static bool ClanOk(Clan c, PartyArms pa)
         {
             if (c == null || c.IsEliminated || c.IsBanditFaction || ReferenceEquals(c, Clan.PlayerClan)) return false;
@@ -246,7 +357,7 @@ namespace Armoury
             if (b == null) return false;
             string code = b.BannerCode;
             if (string.IsNullOrEmpty(code)) return false;
-            if (_playerCode != null && string.Equals(code, _playerCode, StringComparison.Ordinal)) return false;
+            if (_friendCodes.Contains(code)) return false;     // Twoj rod, sojusznicy w tej bitwie i ich krolestwa
             if (pa != null && pa.OwnBanner != null && string.Equals(code, pa.OwnBanner, StringComparison.Ordinal)) return false;
             return true;
         }
@@ -467,7 +578,7 @@ namespace Armoury
                     if (end && cur == null) Clear();
                     return;
                 }
-                bool any = _men > 0 || _skipUndead > 0 || _skipReady > 0 || _stMission > 0;
+                bool any = _men > 0 || _skipUndead > 0 || _ready > 0 || _stMission > 0;
                 if (any && (!end || _loggedMen != _men))
                 {
                     var sb = new StringBuilder(400);
@@ -481,7 +592,9 @@ namespace Armoury
                       .Append(", najblizszy rod ich kultury ").Append(_kind[KNear]).Append(", krolestwo ich kultury ").Append(_kind[KRealm]);
                     sb.Append(" | nakradzione (gospodarze 3 najblizszych wsi i panowie 3 najblizszych warowni) ").Append(_kind[KStolen]);
                     sb.Append(" | bez herbu do wyboru ").Append(_none).Append(" (herb bandy zostal)");
-                    sb.Append(" | pominieci: gotowa bron innego moda ").Append(_skipReady).Append(", Inni ").Append(_skipUndead);
+                    sb.Append(" | herb pochodzenia (tuniki z herbem, znaczniki, pociski) podmieniony ").Append(Volatile.Read(ref _originHits)).Append(" razy");
+                    sb.Append(" | wykluczone herby strony gracza ").Append(_friendCodes.Count).Append(" (partii ").Append(_friendParties).Append(')');
+                    sb.Append(" | z gotowa bronia innego moda ").Append(_ready).Append(" | pominieci Inni ").Append(_skipUndead);
                     if (_byHouse.Count > 0)
                     {
                         var top = new List<KeyValuePair<string, int>>(_byHouse);
