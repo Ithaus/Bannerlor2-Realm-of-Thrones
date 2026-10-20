@@ -3391,4 +3391,7 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   Poprawki fali 1: wf_11c6ab8f-17b, drzewa zb/n22f-{plany (NKS-30n), najemnicy (P3W3-3), ruda (ZC1-16, D2K-7), scalenie (naprawy/jednostki/kruki z reszta)}
   od 4885ae75 - diagnoza z poprawka -> 2 recenzje -> poprawki. Logi testow 19/20.10: D:/Backup-Bannerlord/logi-testow/2026-10-20.
   Rownolegle test n22b (18 galezi, 4885ae75): testy-n22b.ps1, DLL test/n22b, CrashScribe-at-n22b.dll (zb/n22-at + 4885ae75).
+- 07:35 PDT Jeff: "wychowankowie - wywal, napad na spiacy oboz - wywal, zacznij fale 2" -> FALA 2b wf_3d53bfb8-a50 (skrypt workflows/scripts/pomysly-fala-2b.js):
+  7 galezi p6-{okup, sztormy, spichlerz, szubienice, pola, drogi, a7}, dokonczenie od stanu drzew (baza 91bf9c63), recenzje: 2 soczewki (okup, spichlerz, drogi, a7),
+  1 laczona (szubienice, pola, sztormy). p6-zakladnicy (2 commity) i p6-napad (pusta) - ODRZUCONE przez Jeffa, nie scalac. Fala 2 -> WGRANIE 94 po 93.
 
