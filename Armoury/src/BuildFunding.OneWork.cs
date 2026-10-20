@@ -180,11 +180,11 @@ namespace Armoury
         }
 
         /// <summary>Pensy potrzebne do konca biezacego poziomu przy pelnym budzecie (material BuildMaterialShare, place wedle miasta targowego - PointsFor) z zapasem
-        /// 5% + 10 pensow; koszt poziomu 0 albo blad - bez sufitu (float.MaxValue).</summary>
+        /// 5% + 10 pensow. Koszt poziomu 0 (poziom 3 - BuildingType.GetProductionCost zwraca 0; budowla czeka na zdjecie z kolejki w ticku osady) - 0, nic do zaplaty.</summary>
         private static float OneNeed(Settlement st, Building b, float ppp, Settlement market)
         {
             int cost = b.GetConstructionCost();
-            if (cost <= 0) return float.MaxValue;
+            if (cost <= 0) return 0f;
             double rem = cost - b.BuildingProgress - Boost(st.Town);
             if (rem <= 0) return 0f;
             var s = Settings.Current;
