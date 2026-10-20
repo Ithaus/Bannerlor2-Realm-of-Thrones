@@ -1261,6 +1261,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_side_fief", e); }
             try { string sh = dataStore.IsSaving ? SideVillageHome.ExportSave() : null; SaveText.Sync(dataStore, "arm_side_home", ref sh); if (dataStore.IsLoading) SideVillageHome.Import(sh); }   // r4-dom: skrzynia domu w wiosce gracza (sklad do logu przy zapisie - starsza DLL klucza nie zapisze)
             catch (Exception e) { Log.Error("SyncData.arm_side_home", e); }
+            // R3-09f (regale gornicze): konta wozow wsi z kruszcem sprzedanym, a jeszcze nie w domu ("1|idWozu~kruszec~ladunek~doba"); brak klucza (stary zapis) = pusto; wlasny try
+            try { string rg = dataStore.IsSaving ? MineRegale.Export() : null; if (!dataStore.IsSaving || rg != null) SaveText.Sync(dataStore, "arm_regale", ref rg); if (dataStore.IsLoading) MineRegale.Import(rg); }
+            catch (Exception e) { Log.Error("SyncData.arm_regale", e); }
             // f5-a7 (noc 17/18.10): sygnal KS reguly zmiany zajec A7 - srednie ceny sygnalu miast, rodzaj Held, liczniki sezonu ("a7s1|...", straznik 64 KB); pisany tylko
             // z danymi (bez sygnalu - bez klucza, zapis jak dotad); wlasny try; brak klucza (stary zapis, Ironman Jeffa) = srednia od pierwszego kroku, Held od zera;
             // starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> StartCalibration.Reset -> RuleReset -> A7sReset)
@@ -2749,6 +2752,7 @@ namespace Armoury
             try { Seal31B.Daily(); } catch (Exception e) { Log.Error("Seal31B.Daily", e); } DayProfile.Lap("Seal31B.Daily");   // 3.1/3.3 (31b): linia "Szczelnosc (164a/31b)" i zerowanie licznikow - PO ksiedze pieniadza
             try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); } DayProfile.Lap("VillageTakings.Daily");   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
             try { DsVillage.Daily(); } catch (Exception e) { Log.Error("DsVillage.Daily", e); } DayProfile.Lap("DsVillage.Daily");
+            try { MineRegale.Daily(); } catch (Exception e) { Log.Error("MineRegale.Daily", e); } DayProfile.Lap("MineRegale.Daily");   // R3-09f: linia "Regale gornicze (R3-09f)" i zerowanie licznikow doby
             try { DsTowns.Daily(); } catch (Exception e) { Log.Error("DsTowns.Daily", e); } DayProfile.Lap("DsTowns.Daily");   // DS (F3): linie "Firmy miast i zamkow (DS)" i "Pozyczki zaliczkowe (DS)" za okno od poprzedniej doby   // DS (F1): linia "Daniny wsi (DS)" za okno od poprzedniej doby (wozy, markietani, czynsz, skrzynia, stare pobory w rampie) i zerowanie licznikow
             try { TownFolk.DaDaily(); } catch (Exception e) { Log.Error("TownFolk.DaDaily", e); } DayProfile.Lap("TownFolk.DaDaily");   // ds-akumulator: linia "Akumulator kies (ds-akumulator)" (danina od skarbca ludu, roboty z prawdziwym materialem, lepszy stol, jednorazowe wplywy korony, kiesy)
             try { Measure40.Daily(); } catch (Exception e) { Log.Error("Measure40.Daily", e); } DayProfile.Lap("Measure40.Daily");   // E4/0 (188): linie "Hearth", "Dobrobyt", "Jency", "Zima (E4/0)" - po 169c (milicja), przed ksiega ludzi (tylko log)

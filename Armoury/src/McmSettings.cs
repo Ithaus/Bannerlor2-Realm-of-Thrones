@@ -6372,6 +6372,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryCoalBeforeLordShare { get; set; } = true;
 
+        [SettingPropertyBool("Mine Regale", HintText = "the lord of a mining village takes, on top of his usual tax, a further share of what its carts get for iron, silver and gold at market (Mine Regale Share, after the bloomery's wood bill) - the old right of a lord to the ore under his land. It comes out of the village's own part of those takings, never from coin it had before; a mine that owes the town merchants for wood, or would fall below a week of wood money for its bloomery, pays it only from what it has above that (needs Village Takings Whole). Off = the lord takes the same share from ore as from grain", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool MineRegale { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Mine Regale Share", 0.000f, 0.500f, "0.000", HintText = "with Mine Regale: the lord's extra share of what a mining village's carts got for its ore (0.125 = one eighth, the king's urbura at the silver mines of Kutna Hora; medieval lords and kings took a tenth to a quarter; at most 0.5)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float MineRegaleShare { get; set; } = 0.125f;
+
         [SettingPropertyBool("Tools By Use", HintText = "a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ToolsByUse { get; set; } = true;
@@ -9860,6 +9868,8 @@ namespace Armoury
             s.BloomeryCartRange = BloomeryCartRange;
             s.BloomeryWoodDemand = BloomeryWoodDemand;
             s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
+            s.MineRegale = MineRegale;
+            s.MineRegaleShare = MineRegaleShare;
             s.ToolsByUse = ToolsByUse;
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;

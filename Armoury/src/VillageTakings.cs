@@ -102,7 +102,17 @@ namespace Armoury
         // odczyt dla ksiegi pieniadza (MoneyLedger.Daily biegnie tuz przed naszym Daily - te same granice doby)
         /// <summary>KS krok 8 (pieniadze Planu): utarg oddany przez powracajace tabory od ostatniego Daily i czesc, ktora zostala we wsi (kiesa od BK + dopisane + zwrot za drewno).
         /// Wolane przed VillageTakings.Daily tej samej doby (StartCalibration.Daily) - okno pelnej doby.</summary>
-        internal static void SplitToday(out long handed, out long village) { handed = _tHanded; village = _tKept + _tAddPurse + _tCoalBack; }
+        internal static void SplitToday(out long handed, out long village) { handed = _tHanded; village = _tKept + _tAddPurse + _tCoalBack - _tRegale; }
+
+        // R3-09f: regale gornicze zdjete z kies wsi w oknach powrotu wozow tej doby (MineRegale.AtCart) - czesc wsi utargu mniejsza o tyle (SplitToday, alfa KS)
+        private static long _tRegale;
+        internal static void RegaleTaken(Village v, long amount)
+        {
+            if (v == null || amount <= 0) return;
+            _tRegale += amount;
+            long[] a;
+            if (_tByV.TryGetValue(v, out a)) a[1] = Math.Max(0L, a[1] - amount);
+        }
 
         // KS krok 8 (recenzja 17.10, wazne): utarg doby wedlug wsi macierzystej - oddane przez tabory i sprzedaz z magazynu wsi (zaplacone) oraz to, co z tego weszlo do kiesy
         // wsi (kiesa od BK, dopisek 112, zwrot za drewno, sakwa rozbitego taboru do kiesy, cena towaru kupionego we wsi) - alfa okregu Planu (StartCalibration.Money.cs)
@@ -151,7 +161,7 @@ namespace Armoury
             _cFoughtN = _cDisbandN = _cToHeroN = _cToBandN = _cSpareN = 0;
             _cFought = _cDisband = _cToHero = _cToBand = _cToPlayer = _cHomeTax = _cHomePurse = _cSpare = _cLost = 0;
             _stumbles = 0;
-            _tByV.Clear(); _fByVPaid = 0;
+            _tByV.Clear(); _fByVPaid = 0; _tRegale = 0;
         }
 
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
@@ -233,7 +243,9 @@ namespace Armoury
             if (__state == null) return;
             long estates;
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
+            MineRegale.Open(__state);                        // R3-09f: rachunek za drewno kopalni przed F4b (podstawa regale po drewnie)
             CoalFirst(__state, estates);
+            MineRegale.AtCart(__state);                      // R3-09f: regale gornicze - kiesa wsi -> licznik pana od utargu za kruszec (przed pracami okregu i daninami DS)
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             long side = SideFief(__state);                   // n20-wioska: wozy okregu wioski pobocznej gracza - r4-wioska: tylko licznik (dochod co dobe w SideVillageFief.Pay), zwraca 0
             DsDues(__state, works, side);
