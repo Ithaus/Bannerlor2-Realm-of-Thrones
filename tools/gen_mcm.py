@@ -37,6 +37,8 @@ RANGES = {
     'MapRoadWideMargin': (0.0, 2.0, "0.00"),
     # n20-drogi (noc 19/20.10): premia drogi bocznej - kod przycina do 0..50 (MapRoads.SidePctOf)
     'MapSideRoadSpeedPercent': (0.0, 50.0, "0.0"),
+    # m96-valyria: premia drogi Valyrii - kod przycina do 0..50 (MapRoadKinds.ValPct; nie mniej niz premia traktu)
+    'MapValyrianRoadSpeedPercent': (0, 50, "0"),
     # p5-bloto (R3-07c): kara blota poza droga w deszczu - kod przycina do 0..50 (MapMud.PctOf)
     'MapMudSpeedPercent': (0, 50, "0"),
     # p6-okup (R3-03a): stawki okupu wsi (kod przycina do 0..1, gorna >= dolnej) i dni ochrony (kod przycina do 1..364)

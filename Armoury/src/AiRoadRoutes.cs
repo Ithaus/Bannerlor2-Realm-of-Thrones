@@ -104,6 +104,10 @@ namespace Armoury
             public int[] AdjStart, Adj;
             public float[] AdjLen;     // dlugosc przejscia (prosta albo sciezka silnika); < 0 = krawedz bez sciezki (pomijana)
             public bool[] AdjDirect;   // prosta cieciwa przechodzi po siatce gry (sprawdzone raz przy budowie) - bez wywolania silnika w planowaniu
+            public byte[] AdjCls;      // m96-valyria: klasa krawedzi (MapRoadKinds: trakt, Valyria, szlak karawan, most Valyrii) - waga w Dijkstrze z Eff
+            public int Bridges;        // m96-valyria: mosty Valyrii w sieci
+            public bool Classes;       // m96-valyria: rodzaje drog wczytane (PointClasses != null) - bez nich wszystkie krawedzie to Trakt (tylko log)
+            public double ValLength, CarLength;   // m96-valyria: dlugosc krawedzi Valyrii (z mostami) i szlakow karawan (tylko log)
             public float GX0, GY0, GInv;
             public int GNx, GNy;
             public int[] GStart, GNode;
@@ -466,11 +470,12 @@ namespace Armoury
 
         /// <summary>Koszt przejazdu lamanej start -> pts[0..n) w jednostkach "poza droga": probki co SampleStep, ta sama miara co premia (MapRoads.KindAt:
         /// 2 trakt / (1 + premia), 1 droga boczna / (1 + premia boczna), reszta 1). trakt = dlugosc probek na trakcie. Bez alokacji, watek roboczy.</summary>
-        private static float RideCost(Vec2 start, Vec2[] pts, int n, float len, float pct, float spct, out float trakt)
+        private static float RideCost(Vec2 start, Vec2[] pts, int n, float len, float pct, float spct, float vpct, float cpct, out float trakt)
         {
             float step = len / MaxSamples;
             if (step < SampleStep) step = SampleStep;
             float wr = 1f / (1f + pct), ws = 1f / (1f + spct);
+            float wv = 1f / (1f + vpct), wc = 1f / (1f + cpct);   // m96-valyria: droga Valyrii / szlak karawan (MapRoads.KindClassAt 4 / 5)
             float cost = 0f, tr = 0f;
             Vec2 a = start;
             for (int i = 0; i < n; i++)
@@ -485,8 +490,10 @@ namespace Armoury
                     for (int j = 0; j < m; j++)
                     {
                         float t = (j + 0.5f) / m;
-                        int k = MapRoads.KindAt(a.x + dx * t, a.y + dy * t);
+                        int k = MapRoads.KindClassAt(a.x + dx * t, a.y + dy * t);
                         if (k == 2) { cost += sl * wr; tr += sl; }
+                        else if (k == 4) { cost += sl * wv; tr += sl; }
+                        else if (k == 5) { cost += sl * wc; tr += sl; }
                         else if (k == 1) cost += sl * ws;
                         else cost += sl;
                     }
@@ -510,6 +517,9 @@ namespace Armoury
             float detour = Detour(s);   // sufit dlugosci objazdu
             float pct = RoadPct(s);     // waga drogi w koszcie = czynna premia traktu (recenzja p6-drogi: nie klucz nadkladu)
             float w = 1f / (1f + pct);
+            // m96-valyria: waga krawedzi wedlug rodzaju czynnego (MapRoadKinds.Eff) - droga Valyrii, szlak karawan, most bez klucza = poza droga (1)
+            float vpct = MapRoads.ValPctNow(s), cpct = MapRoads.CarPctNow(s);
+            float wv = 1f / (1f + vpct), wc = 1f / (1f + cpct);
             float R = L * RadiusShare;
             if (R < RadiusMin) R = RadiusMin; else if (R > RadiusMax) R = RadiusMax;
             float R2 = R * R;
@@ -558,7 +568,8 @@ namespace Armoury
                     int m = g.Adj[a];
                     float el = g.AdjLen[a];
                     if (el < 0f || !g.Ok[m] || g.Island[m] != island) continue;
-                    float nk = pk + el * w;
+                    int ef = g.AdjCls != null ? MapRoadKinds.Eff(s, g.AdjCls[a]) : MapRoadKinds.Trakt;
+                    float nk = pk + el * (ef == MapRoadKinds.Trakt ? w : ef == MapRoadKinds.Valyrian ? wv : ef == MapRoadKinds.Caravan ? wc : 1f);
                     if (nk > L) continue;
                     if (scr.Stamp[m] == scr.Now && nk >= scr.Cost[m]) continue;
                     if (scr.Nc > 0 && ZoneHit(scr, g.X[pn], g.Y[pn], g.X[m], g.Y[m])) continue;
@@ -607,8 +618,8 @@ namespace Armoury
             if (total > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return RouteCtl; }
             // czas: koszt przejazdu objazdu i trasy gry z probek ta sama miara co premia (trasa gry tez bywa czesciowo na drodze); droga = trakt z probek
             float spct = SidePct(s), detTrakt, gameTrakt;
-            float costDet = RideCost(S, scr.Out, scr.Size, total, pct, spct, out detTrakt);
-            float costGame = RideCost(S, path.PathPoints, path.Size, L, pct, spct, out gameTrakt);
+            float costDet = RideCost(S, scr.Out, scr.Size, total, pct, spct, vpct, cpct, out detTrakt);
+            float costGame = RideCost(S, path.PathPoints, path.Size, L, pct, spct, vpct, cpct, out gameTrakt);
             if (detTrakt < MinRoadShare * total) { Interlocked.Increment(ref _fewRoad); return RouteCtl; }
             if (!(costDet <= costGame)) { Interlocked.Increment(ref _notWorth); return RouteCtl; }
 
@@ -803,6 +814,8 @@ namespace Armoury
                 if (g == null) { _note = "siec niezbudowana: " + err; if (err != null && err.StartsWith("zaden wezel", StringComparison.Ordinal)) _tried = false; return 0; }
                 _g = g;
                 _note = "siec z pliku " + MapRoads.FileName;
+                MapRoadKinds.AiNote = "siec AI drog: mosty Valyrii " + g.Bridges + ", krawedzie Valyrii " + g.ValLength.ToString("0", Inv) + " jedn., szlakow karawan "
+                                      + g.CarLength.ToString("0", Inv) + " jedn. (klasy " + (g.Classes ? "tak" : "nie") + ")";   // m96-valyria: do linii VR
             }
             catch (Exception e) { _g = null; _note = "blad budowy sieci (" + e.GetType().Name + ")"; Log.Error("AiRoadRoutes.Build", e); }
             return (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
@@ -864,6 +877,11 @@ namespace Armoury
             var plist = new int[np];
             for (int i = 0; i < np; i++) { int c = (int)((ys[i] - minY) / pc) * pnx + (int)((xs[i] - minX) / pc); plist[pstart[c] + pfill[c]++] = i; }
             var joinA = new List<int>(); var joinB = new List<int>();
+            // m96-valyria: klasa odcinka konczacego sie w punkcie (MapRoadKinds: trakt / Valyria / szlak) - granice klas wymuszone jako wezly; mosty Valyrii
+            // (przerwy farby) jako krawedzie sieci przy kluczu MapValyrianRoads na starcie budowy. null = siec jak przed zmiana.
+            List<int> brA, brB;
+            byte[] pcls = MapRoadKinds.PointClasses(file, ids, out brA, out brB);
+            int joins0;
             int lines = 0;
             for (int l = 0; l + 1 < ls.Count; l++)
             {
@@ -871,6 +889,7 @@ namespace Armoury
                 if (b <= a) continue;   // lamana z jednego punktu - bez odcinkow (jak MapRoads)
                 lines++;
                 keep[a] = true; keep[b] = true;
+                if (pcls != null) for (int i = a + 1; i < b; i++) if (pcls[i] != pcls[i + 1]) keep[i] = true;
                 for (int e = 0; e < 2; e++)
                 {
                     int p = e == 0 ? a : b;
@@ -894,6 +913,14 @@ namespace Armoury
                     if (bestJ >= 0) { keep[bestJ] = true; joinA.Add(p); joinB.Add(bestJ); }
                 }
             }
+            joins0 = joinA.Count;   // m96-valyria: dalej mosty Valyrii (klasa Bridge)
+            if (pcls != null && brA != null && MapRoadKinds.ValOn(Settings.Current))
+                for (int k = 0; k < brA.Count; k++)
+                {
+                    int a = brA[k], b = brB[k];
+                    if (a < 0 || b < 0 || a >= np || b >= np) continue;
+                    keep[a] = true; keep[b] = true; joinA.Add(a); joinB.Add(b);
+                }
             // Douglas-Peucker miedzy punktami wymuszonymi (konce, rozstaje)
             var stack = new List<int>(64);
             for (int l = 0; l + 1 < ls.Count; l++)
@@ -935,10 +962,12 @@ namespace Armoury
             for (int i = 0; i < np; i++) nodeOf[i] = keep[i] ? nn++ : -1;
             var g = new Graph();
             g.Nodes = nn; g.Points = np; g.Lines = lines; g.Joins = joinA.Count;
+            g.Classes = pcls != null;   // m96-valyria (recenzja: AdjCls jest zawsze - "klasy" z pliku rodzajow)
             g.X = new float[nn]; g.Y = new float[nn]; g.Face = new PathFaceRecord[nn]; g.Ok = new bool[nn]; g.Island = new int[nn];
             for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { g.X[nodeOf[i]] = xs[i]; g.Y[nodeOf[i]] = ys[i]; }
             // krawedzie: kolejne wezly lamanej + rozstaje
             var ea = new List<int>(nn * 2); var eb = new List<int>(nn * 2);
+            var ec = new List<byte>(nn * 2);   // m96-valyria: klasa krawedzi (MapRoadKinds)
             double length = 0;
             for (int l = 0; l + 1 < ls.Count; l++)
             {
@@ -948,11 +977,12 @@ namespace Armoury
                 for (int i = a; i <= b; i++)
                 {
                     if (nodeOf[i] < 0) continue;
-                    if (prev >= 0) { ea.Add(nodeOf[prev]); eb.Add(nodeOf[i]); length += Len(xs[i] - xs[prev], ys[i] - ys[prev]); }
+                    if (prev >= 0) { ea.Add(nodeOf[prev]); eb.Add(nodeOf[i]); ec.Add(pcls != null ? pcls[i] : MapRoadKinds.Trakt); length += Len(xs[i] - xs[prev], ys[i] - ys[prev]); }
                     prev = i;
                 }
             }
-            for (int k = 0; k < joinA.Count; k++) { ea.Add(nodeOf[joinA[k]]); eb.Add(nodeOf[joinB[k]]); }
+            for (int k = 0; k < joinA.Count; k++) { ea.Add(nodeOf[joinA[k]]); eb.Add(nodeOf[joinB[k]]); ec.Add(k < joins0 ? MapRoadKinds.Trakt : MapRoadKinds.Bridge); }
+            g.Bridges = joinA.Count - joins0;
             g.Length = length;
             // sciany siatki gry (raz): wezel bez sciany albo na scianie zakazanej dla marszu ladem = poza siecia
             int bad = 0;
@@ -1018,12 +1048,15 @@ namespace Armoury
             for (int i = 0; i < nn; i++) g.AdjStart[i + 1] = g.AdjStart[i] + deg[i];
             g.AdjCount = g.AdjStart[nn];
             g.Adj = new int[g.AdjCount]; g.AdjLen = new float[g.AdjCount]; g.AdjDirect = new bool[g.AdjCount];
+            g.AdjCls = new byte[g.AdjCount];
             var fill = new int[nn];
             for (int k = 0; k < ea.Count; k++)
             {
                 int u = ea[k], v = eb[k];
-                int iu = g.AdjStart[u] + fill[u]++; g.Adj[iu] = v; g.AdjLen[iu] = elen[k]; g.AdjDirect[iu] = edir[k];
-                int iv = g.AdjStart[v] + fill[v]++; g.Adj[iv] = u; g.AdjLen[iv] = elen[k]; g.AdjDirect[iv] = edir[k];
+                int iu = g.AdjStart[u] + fill[u]++; g.Adj[iu] = v; g.AdjLen[iu] = elen[k]; g.AdjDirect[iu] = edir[k]; g.AdjCls[iu] = ec[k];
+                int iv = g.AdjStart[v] + fill[v]++; g.Adj[iv] = u; g.AdjLen[iv] = elen[k]; g.AdjDirect[iv] = edir[k]; g.AdjCls[iv] = ec[k];
+                if (ec[k] == MapRoadKinds.Valyrian || ec[k] == MapRoadKinds.Bridge) { if (elen[k] >= 0f) g.ValLength += elen[k]; }
+                else if (ec[k] == MapRoadKinds.Caravan && elen[k] >= 0f) g.CarLength += elen[k];
             }
             // skladowe (tylko do logu)
             var par = new int[nn];

@@ -1876,6 +1876,18 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MapSideRoadSpeedPercent { get; set; } = 7.5f;
 
+        [SettingPropertyBool("Map Valyrian Roads", HintText = "the old Valyrian roads of Essos - the demon road from Volantis through Mantarys to Meereen with its branch to Tolos, and the road from Pentos through Ghoyan Drohe and Norvos to Qohor - are fused stone that never turns to mud: every land party travels on them faster than on an ordinary road, by Map Valyrian Road Speed Percent (never less than the ordinary road bonus); the speed tooltip shows a 'Valyrian road' line. Off: they count as ordinary roads", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapValyrianRoads { get; set; } = true;
+
+        [SettingPropertyInteger("Map Valyrian Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a Valyrian road, in percent of its speed (25 = +25%; at most 50; never less than Map Road Speed Percent)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int MapValyrianRoadSpeedPercent { get; set; } = 25;
+
+        [SettingPropertyBool("Map Essos Caravan Trails", HintText = "in deep Essos (the Dothraki sea, Sarnor, Ibben, Yi Ti, Qarth) the lore knows no real roads: the painted tracks there are caravan trails and speed a land party up only like a village lane (Map Side Road Speed Percent, 'Caravan trail' line). Off: they count as ordinary roads", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapEssosCaravanTrails { get; set; } = true;
+
         [SettingPropertyBool("Map Mud Speed Penalty", HintText = "mud off the roads: while it rains on the campaign map, and for about a day after the rain stops, every land party (yours, the lords', caravans, villagers, bandits) travels slower when it is off the road - by Map Mud Speed Percent in a downpour ('Mud' line in the speed tooltip) and by Map Mud Wet Speed Percent on wet ground after rain ('Wet ground' line). On a painted main road, and on a village lane with Map Side Road Speed Bonus, there is no mud. Snow keeps its own penalty and ships at sea are not affected. Needs Map Road Speed Bonus. Off = no mud penalty, as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool MapMudSpeedPenalty { get; set; } = true;
@@ -9000,6 +9012,9 @@ namespace Armoury
             s.MapRoadWideMargin = MapRoadWideMargin;
             s.MapSideRoadSpeedBonus = MapSideRoadSpeedBonus;
             s.MapSideRoadSpeedPercent = MapSideRoadSpeedPercent;
+            s.MapValyrianRoads = MapValyrianRoads;
+            s.MapValyrianRoadSpeedPercent = MapValyrianRoadSpeedPercent;
+            s.MapEssosCaravanTrails = MapEssosCaravanTrails;
             s.MapMudSpeedPenalty = MapMudSpeedPenalty;
             s.MapMudSpeedPercent = MapMudSpeedPercent;
             s.MapMudWetSpeedPercent = MapMudWetSpeedPercent;
