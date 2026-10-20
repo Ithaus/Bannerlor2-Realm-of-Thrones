@@ -274,6 +274,7 @@ namespace Armoury
                 FletchForge.ApplyAll(_harmony);
                 ForgeClock.ApplyAll(_harmony);   // wpis 83: jeden zegar kuzni
                 ArmourQuality.ApplyAll(_harmony); // zbroja z zakladki CRAFT jak bron: prog, pekniecie i jakosc z kowalstwa (PO FletchForge i ForgeClock)
+                try { QualityScarcity.ApplyAll(_harmony); } catch (Exception e) { Log.Error("QualityScarcity.ApplyAll", e); }   // m96-jakosc: rzadkosc legendarnych i mistrzowskich (droga gry, lup gracza)
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 // n20-herby (Jeff 19.10): ludzie band w bitwie z herbami prawdziwych rodow na tarczach (prefiks High na Mission.SpawnAgent; klucz Band Shields Stolen Arms)
@@ -567,6 +568,7 @@ namespace Armoury
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
                 starter.AddBehavior(new HeroGearBehavior());        // Z16: samotest ekranu przy wczytaniu (tylko log, bez zapisu)
+                starter.AddBehavior(new QualityScarcityBehavior()); // m96-jakosc: spis jakosci raz na dobe, wyrownanie nadmiaru na polkach, linia logu (bez zapisu)
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
                 starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)

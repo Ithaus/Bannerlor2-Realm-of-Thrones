@@ -294,6 +294,7 @@ namespace Armoury
 
         public static void GankPostfix(object __instance, CharacterObject __0, ItemObject.ItemTypeEnum __1, ref EquipmentElement __result)
         {
+            QualityScarcity.Filter(ref __result, QualityScarcity.SrcGank);   // m96-jakosc: rzut jakosci ROT przez regule (nie rzuca)
             try
             {
                 var s = Settings.Current;
@@ -313,6 +314,7 @@ namespace Armoury
                 {
                     var grp = pick.ItemComponent != null ? pick.ItemComponent.ItemModifierGroup : null;
                     if (grp != null) mod = grp.GetRandomItemModifierProductionScoreBased();   // jak ROT GetRandomItem
+                    mod = QualityScarcity.Roll(pick, mod, QualityScarcity.SrcGank);           // m96-jakosc: ta sama regula jakosci co warsztaty
                 }
                 catch { mod = null; }
                 Log.Info("Z16: ROT - jeniec " + __0.StringId + " nie udzwignie " + got.StringId + " - dostaje " + pick.StringId
