@@ -3321,4 +3321,6 @@ Kopie *.bak-2026-10-20-wgranie91-przed + D:/Backup-Bannerlord/wgrane/2026-10-20-
 TESTY: n20r3-bitwa / n20r3-nowa / n20r3-160 kod 0, 0 ERROR; R3J-1 TAK, R3J-3 (160) TAK 78.2%, SZ-A8-2 TAK; R3J-2 NIE (-7%); A17-11e 737 ludzi w jednej dobie bitew (109200).
 engine_config.txt: safely_exited = 1 (kopia engine_config.txt.bak-2026-10-20-przed-safely) - Jeff nie dostanie okna Safe Mode.
 OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 2 (hodowla dla kolejki); obserwowac NO-4, A17-11e, ruda w miastach.
+- 20.10 ok. 01:40: BLAD (moj): logi Jeffa z sesji 19.10 10:43, 10:58, 11:40, 13:00 (Armoury, CrashScribe session, RC) usuniete rotacja w czasie 12 autotestow nocy -
+  zabezpieczone tylko 09:52 (logi-testow/jeff-*) i 14:41 (zawieszenie-2026-10-19-1609/logi, logi-jeffa/2026-10-19). Usuniety plik testowy armoury-ks-przerwij.flag (z biegu n20r3-160).
 

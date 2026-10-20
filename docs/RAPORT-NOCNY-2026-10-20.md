@@ -124,7 +124,13 @@ sprawdzen (PLAN 8.16) jest w `docs/PLAN-DO-KONCA-MODA-2026-10-09.md`.
 ludu 88,5% (prog 95%), len i plotno spadaja w dlugim biegu, test inwazji Innych (4-letni), optymalizacja na koniec (GC ok. 4000 sprzatan na
 minute przy x8).
 
-## 6. Gdzie co jest (dla nastepnej sesji)
+## 6. Moj blad tej nocy
+
+Przed testami zabezpieczylem tylko logi Twojej ostatniej sesji (14:41-16:09). Logi z wczesniejszych sesji 19.10 (ok. 10:43, 10:58, 11:40 i 13:00)
+skasowala rotacja logow w czasie nocnych autotestow (Armoury, CrashScribe i Realistic Captivity trzymaja tylko ostatnie). Wnioski z nich byly juz
+zapisane w przekazaniu, a zapisy gry sa nietkniete. Na przyszlosc kopiuje WSZYSTKIE logi dnia przed pierwszym testem.
+
+## 7. Gdzie co jest (dla nastepnej sesji)
 
 - Stan: `docs/STAN-PRAC.md` ### 94-97, plan nocy `docs/PLAN-NOC-2026-10-20.md`, wspolny `CHANGELOG.md` w galezi `w-toku/noc-wgranie-91`.
 - Kopie: poprzednie DLL obok plikow gry (`*.bak-2026-10-19-wgranie89-przed`, `...wgranie90-przed`, `*.bak-2026-10-20-wgranie91-przed`) i w
