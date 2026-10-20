@@ -129,10 +129,106 @@ public static class Program
         return bad == 0 ? 0 : 4;
     }
 
+    // wariant G <dll> <katalog gry> [IL]: regula sieci CrashScribe (Net.Patchable + UnwindCore.NativeTiny) na prawdziwej DLL moda, poza gra -
+    // ile metod z IL <= progu ma kod JIT 1-4 B (traci siec), ile wiekszy (siec zostaje), ile nierozpoznanych (siec znika wg IL)
+    static int GameDllTest(string dll, string gameRoot, int ilMax)
+    {
+        var dirs = new System.Collections.Generic.List<string> { System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(dll)), System.IO.Path.Combine(gameRoot, "bin", "Win64_Shipping_Client") };
+        foreach (var d in System.IO.Directory.GetDirectories(System.IO.Path.Combine(gameRoot, "Modules")))
+        { var b = System.IO.Path.Combine(d, "bin", "Win64_Shipping_Client"); if (System.IO.Directory.Exists(b)) dirs.Add(b); }
+        AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
+        {
+            string n = new System.Reflection.AssemblyName(e.Name).Name + ".dll";
+            foreach (var d in dirs) { var f = System.IO.Path.Combine(d, n); if (System.IO.File.Exists(f)) return System.Reflection.Assembly.LoadFrom(f); }
+            return null;
+        };
+        var asm = System.Reflection.Assembly.LoadFrom(dll);
+        Type[] types; try { types = asm.GetTypes(); } catch (System.Reflection.ReflectionTypeLoadException r) { types = r.Types; }
+        int cand = 0, small = 0, tiny = 0, big = 0, unk = 0;
+        var tinyNames = new System.Collections.Generic.List<string>(); var unkNames = new System.Collections.Generic.List<string>();
+        var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly;
+        foreach (var t in types)
+        {
+            if (t == null) continue;
+            try
+            {
+                if (t.IsInterface || t.ContainsGenericParameters) continue;
+                if (t.Name == "Log" || t.Name == "Settings" || t.Name == "McmSettings") continue;
+                foreach (var m in t.GetMethods(flags))
+                {
+                    // ten sam filtr co CrashScribe Net.Patchable
+                    if (m.IsAbstract || m.ContainsGenericParameters || m.DeclaringType == null) continue;
+                    System.Reflection.MethodBody body; try { body = m.GetMethodBody(); } catch { continue; }
+                    if (body == null) continue;
+                    if (m.IsSpecialName && (m.Name.StartsWith("get_") || m.Name.StartsWith("set_") || m.Name.StartsWith("add_") || m.Name.StartsWith("remove_"))) continue;
+                    if (m.Name == "Finalize" || m.Name == "GetHashCode" || m.Name == "Equals" || m.Name == "ToString") continue;
+                    cand++;
+                    var il = body.GetILAsByteArray();
+                    if (il == null || il.Length > ilMax) continue;
+                    small++;
+                    int r = CrashScribe.UnwindCore.NativeTiny(m);
+                    string nm = t.FullName + "." + m.Name;
+                    if (r == 1) { tiny++; tinyNames.Add(nm); } else if (r == 0) big++; else { unk++; if (unkNames.Count < 15) unkNames.Add(nm + " | wejscie " + Bytes(m, 16) + " | il " + il.Length); }
+                }
+            }
+            catch { }
+        }
+        Console.WriteLine("G " + System.IO.Path.GetFileName(dll) + ": kandydatow sieci " + cand + ", IL <= " + ilMax + " B: " + small + " -> kod JIT 1-4 B (bez sieci) " + tiny + ", wiekszy (siec zostaje) " + big + ", nierozpoznanych (bez sieci wg IL) " + unk);
+        foreach (var n in tinyNames) Console.WriteLine("  TINY " + n);
+        foreach (var n in unkNames) Console.WriteLine("  NIEROZPOZNANA " + n);
+        return 0;
+    }
+
+    // wariant P <katalog gry> <dll> <typ> <metoda> [<dll> <typ> <metoda> ...]: latka Harmony (pusty postfix) na prawdziwej metodzie gry/moda
+    // poza gra, potem rdzen naprawy jak w CrashScribe (Locate -> Check) - czy naglowek, przesuniecie opisu stosu i naprawa dzialaja na tym kodzie
+    public static void PostAny() { }
+    static int GamePatchTest(string[] a)
+    {
+        string gameRoot = a[1];
+        var dirs = new System.Collections.Generic.List<string> { System.IO.Path.Combine(gameRoot, "bin", "Win64_Shipping_Client") };
+        foreach (var d in System.IO.Directory.GetDirectories(System.IO.Path.Combine(gameRoot, "Modules")))
+        { var b = System.IO.Path.Combine(d, "bin", "Win64_Shipping_Client"); if (System.IO.Directory.Exists(b)) dirs.Add(b); }
+        AppDomain.CurrentDomain.AssemblyResolve += (s, e) =>
+        {
+            string n = new System.Reflection.AssemblyName(e.Name).Name + ".dll";
+            foreach (var d in dirs) { var f = System.IO.Path.Combine(d, n); if (System.IO.File.Exists(f)) return System.Reflection.Assembly.LoadFrom(f); }
+            return null;
+        };
+        var h = new Harmony("uw.P");
+        int bad = 0;
+        for (int i = 2; i + 2 < a.Length; i += 3)
+        {
+            string label = a[i + 1] + "." + a[i + 2];
+            try
+            {
+                string path = null;
+                foreach (var d in dirs) { var f = System.IO.Path.Combine(d, a[i]); if (System.IO.File.Exists(f)) { path = f; break; } }
+                var asm = System.Reflection.Assembly.LoadFrom(path);
+                var t = asm.GetType(a[i + 1], true);
+                var m = AccessTools.DeclaredMethod(t, a[i + 2]);
+                h.Patch(m, postfix: new HarmonyMethod(typeof(Program), nameof(PostAny)));
+                IntPtr st; int off, n; string why = null;
+                bool ok = CrashScribe.UnwindCore.Locate(m.MethodHandle.GetFunctionPointer(), m.MethodHandle.Value, out st, out off, out n);
+                string before = ok ? Bytes(st, 12) : "-";
+                var s = new CrashScribe.UnwindCore.Small { Name = label, Start = st, Off = off, NUnw = n };
+                var r = ok ? CrashScribe.UnwindCore.Check(s, out why) : CrashScribe.UnwindCore.R.SkipError;
+                var r2 = ok ? CrashScribe.UnwindCore.Check(s, out why) : CrashScribe.UnwindCore.R.SkipError;
+                Console.WriteLine("P " + label + ": naglowek " + ok + ", opis stosu +" + off + ", RUNTIME_FUNCTION " + n + " | z latka " + before + " -> " + r + " (" + (why ?? "ok") + "), drugi raz " + r2 + " | po " + (ok ? Bytes(st, 12) : "-"));
+                if (!ok || (off <= 4 && (r != CrashScribe.UnwindCore.R.Repaired || r2 != CrashScribe.UnwindCore.R.AlreadyOk))) bad++;
+            }
+            catch (Exception e) { Console.WriteLine("P " + label + ": BLAD " + e.GetType().Name + " " + e.Message); bad++; }
+        }
+        Console.WriteLine(bad == 0 ? "P: WSZYSTKO ZGODNE" : "P: NIEZGODNOSCI " + bad);
+        return bad == 0 ? 0 : 4;
+    }
+    static string Bytes(IntPtr p, int n) { var sb = new System.Text.StringBuilder(); for (int i = 0; i < n; i++) sb.Append(System.Runtime.InteropServices.Marshal.ReadByte(p, i).ToString("X2")).Append(' '); return sb.ToString(); }
+
     public static int Main(string[] args)
     {
         string v = args.Length > 0 ? args[0] : "A";
+        if (v == "P") return GamePatchTest(args);
         if (v == "L") return LocateTest();
+        if (v == "G") return GameDllTest(args[1], args[2], args.Length > 3 ? int.Parse(args[3]) : 12);
         int seconds = args.Length > 1 ? int.Parse(args[1]) : 300;
         int allocThreads = args.Length > 2 ? int.Parse(args[2]) : 3;
         Target t = Make(args.Length > 3 ? args[3] : "");

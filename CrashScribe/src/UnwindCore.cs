@@ -86,6 +86,11 @@ namespace CrashScribe
                 byte* p = (byte*)start;
                 if (p[0] == 0xE9) start = (IntPtr)((long)start + 5 + *(int*)(p + 1));
                 else if (p[0] == 0x48 && p[1] == 0xB8 && p[10] == 0xFF && p[11] == 0xE0) start = *(IntPtr*)(p + 2);
+                // thunk metod typow MarshalByRefObject (np. pochodne Stream): test rcx,rcx; je; mov rax,[rcx]; mov r10,MT; cmp rax,r10; je; mov rax,adres
+                // (pierwszy wzorzec MonoMod x86_64Arch.KnownMethodThunks; adres na +25)
+                else if (Readable(start, 33) && p[0] == 0x48 && p[1] == 0x85 && p[2] == 0xC9 && p[3] == 0x74 && p[5] == 0x48 && p[6] == 0x8B && p[7] == 0x01
+                         && p[8] == 0x49 && p[18] == 0x49 && p[19] == 0x3B && p[20] == 0xC2 && p[21] == 0x74 && p[23] == 0x48 && p[24] == 0xB8)
+                    start = *(IntPtr*)(p + 25);
                 else return false;
             }
             return false;

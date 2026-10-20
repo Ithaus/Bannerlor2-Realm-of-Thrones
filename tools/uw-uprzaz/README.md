@@ -17,8 +17,18 @@ L (bez straznika: harness.exe L) = rdzen na swiezych metodach: NativeTiny/naglow
 stosu dla metody wirtualnej, statycznej, lambdy i duzej; naprawa, cel skoku przed/po (przez trampoline),
 wywolanie postfixa, zdjecie latki (Unpatch), ponowne zalozenie i ponowna naprawa, wspolny blok trampolin.
 Kod wyjscia 0 = "L: WSZYSTKO ZGODNE".
+G (harness.exe G <dll> <katalog gry> [IL]) = regula sieci CrashScribe (filtr Net.Patchable + UnwindCore.NativeTiny) na prawdziwej
+DLL moda poza gra: ile metod traci siec (kod JIT 1-4 B), ile ja zachowuje, ile nierozpoznanych.
+P (harness.exe P <katalog gry> <dll> <typ> <metoda> ...) = pusty postfix Harmony na prawdziwej metodzie gry/moda poza gra i rdzen
+naprawy jak w CrashScribe (Locate -> Check dwa razy).
 
 Wyniki 19.10 (etap 2/3): A 3/3 zawieszenie < 15 s, B/C/D czysto (B 300 s, C 600 s, D 11 min przy 1,6 mln GC gen0).
 Wyniki 19.10 po recenzji (rdzen UnwindCore.cs): L zgodne (Tiny/StaticTiny/Lambda: NativeTiny 1, opis stosu +4;
 NonTiny: 0, +32; cel skoku ten sam; postfix +1 po naprawie i po ponownej latce; 1 blok trampolin na 2 metody);
 A zawieszenie < 15 s; D 150 s czysto, 462 tys. GC gen0, wywolan postfixa = liczba petli.
+G (19.10, Armoury.dll z tej galezi): kandydatow 13528 (= "Net cast over Armoury" w logu gry), IL <= 12 B: 720 -> kod 1-4 B: 93
+(nazwy IDENTYCZNE z 93 TINY Armoury w skan.txt z zywej gry), wiekszy 627, nierozpoznanych 0; RealisticCaptivity 184/24 -> 1;
+GrandTourney 57/1 -> 1; ForgeView 51/15 -> 1 (ForgeView nie jest pod siecia).
+P (19.10): MBSubModuleBase.OnApplicationTick / AfterAsyncTickTick / OnNetworkTick, DefaultSkillLevelingManager.OnShipDamaged,
+DefaultWorkshopModel.GetConvertProductionCost, ViewModel.OnFinalize, BK PopulationClass.get_count, CampaignEventReceiver.DailyTickClan:
+naglowek zgodny, opis stosu +4, 1 RUNTIME_FUNCTION, skok z latka psuje bajt +4 (0x00), naprawa Repaired, drugi raz AlreadyOk (bajt +4 = 0x19).
