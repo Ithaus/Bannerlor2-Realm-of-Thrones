@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-20 (WGRANIE 94 - fala 1 (18 pomyslow) + fala 2 (7 pomyslow) z listy 35 Jeffa, poprawki po testach; WGRANIE 93 pominiete)
+
+**Zakres (Jeff 20.10, doslownie):** "28 - nie 29 - nie POzostale tak, zacznij te zmiany i daj znac jak wgrasz."; "Rob od razu fale 2"; "wychownakowie - wywal,
+napad na spiacy - obo wywal, zacznij fale 2"; "nie pozostlay limit idzie na poprawki fla 1"; "ja itak zaczynam nową grę" -> opcja 2 (nowa kampania od razu na 94);
+"ale scalamy fale 2 i wgrywamy 94 i dopiero wtedy zrob test bo che juz agrac nowa kampanie".
+**Zmiana:** `w-toku/n23-calosc` = WGRANIE 92 (3957fa13) + fala 1: p5-rody (posag AI, pomoc wasali na okup), p5-turniej (wykup konia i zbroi), p5-handel (jarmarki
+po zniwach, barki rzeczne, arm_rivers.tsv), p5-kruki (wiesci z opoznieniem), p5-urodzaj (rok urodzaju, jesienny uboj), p5-stada (stada jako lup, zmeczona ziemia),
+p5-bloto (bloto poza droga w deszczu), p5-armia (dzien odpoczynku armii AI, marsz forsowny gracza), p5-zalogi (zalogi graniczne 75% w pokoju), p5-tarcze (ciesle
+pomagaja tarczownikom w wojnie), p5-regale (udzial pana w rudzie), p5-zwiad (zwiad noca i w lesie), p5-inzynieria (Inzynieria przy budowach), p5-medycyna
+(chirurg i Taktyka a smierc pokonanych), p5-budowy (jedna budowa na rod), p5-warsztaty (cena warsztatu po rozruchu), p5-naprawy (naprawy wedlug godzin cechow,
+platnerz i kwatermistrz w taborze), p5-jednostki (jazda Doliny i Reach +20, konni lucznicy Freyow - CrashScribe Army175);
+poprawki: recenzja scalenia (OneNeed z EngPaidNeed; wykup turniejowy min(G - wydane, kiesy) - R), n22f-plany (miara zbieznosci Planu wobec poziomu polek kroku 8),
+n22f-najemnicy / n22f-ruda (tylko narzedzie - zmiennosc), n22f-scalenie (Rumours: wiesci 13 dob / 300 - kruki gubily dalekie wiesci), n22f-naprawy2
+(MendIdleHandsFirst: naprawy najpierw z bezczynnych rak, AI najwyzej 15% rak linii - n22b: lukarze -42%, siodlarze -14%); fala 2: p6-okup (okup wsi
+zamiast rabunku, "Demand tribute"), p6-sztormy (zima 2x burz NavalDLC, statki -15% w burzy, wozy morskie +1 doba zima), p6-spichlerz (miasto kupuje nadwyzke
+spichlerzy wsi okregu), p6-szubienice (szubienice przy rozstajach po rozbiciu band), p6-pola (pola wokol wiosek wedlug pory roku), p6-drogi (AI wybiera trakty),
+p6-a7 (KsSwitchSignalRule domyslnie TAK + TownWorksHireDistrict - odplyw kas miast); recenzja scalenia fali 2 (spichlerz nad progiem bramki krainy KS, zboze
+sprzedane miastu nie jest spadkiem bramki, Pompy z robotami miast, zakres RaidTributeSpareDays). Wpisy: docs/noc-1920/p5-*-, p6-*-, n22f-*-, n23-scalenie-CHANGELOG.md.
+Odrzucone przez Jeffa: R3-09d konopie, R3-09e strzyza, R3-03c wychowankowie, R3-08b napad na spiacy oboz (galezie p6-zakladnicy, p6-napad - nie scalac).
+Armoury 2125 ustawien; CrashScribe i GrandTourney jak w testach n22b/n22c; RealisticCaptivity, ForgeView bez zmian. Armoury.json Jeffa: KsSwitchSignalRule false -> true.
+**Testy przed wgraniem:** n22a (15 galezi fali 1): bitwa 4/4, nowa 120/120, 160 - kod 0, 0 ERROR; n22b (18 galezi): bitwa 4/4, nowa 120/120, 160 - kod 0, 0 ERROR,
+zawieszenia tylko przy wyjsciu z gry; n22c (+ n22f): bitwa, nowa (NKS-30n TAK mediana 2, P3W3-3 TAK 2130), 160. Fala 2 i n22f-naprawy2 BEZ autotestu w grze przed
+wgraniem (decyzja Jeffa) - krotki test na wgranej wersji, dlugi test, gdy Jeff zamknie gre albo w nocy.
+**Ryzyko / co sprawdzic:** fala 2 nie byla w grze (spichlerz - miasta w niedoborze Vaes Diaf, New Ghys, Vaes Dothrak, Yronwood; okup - ile wsi dalej plonie;
+AI drogi - goscie uczt BK; pola i szubienice - wyglad na mapie); naprawy AI ok. 1100 szt./d i zaleglosc obitych; lukarze/krawcy w n22b nizej z innej przyczyny - zbadac.
+**Status:** WGRANE 94 - DO SPRAWDZENIA (dlugi autotest po grze Jeffa).
+
 ## 2026-10-20 (WGRANIE 92 - decyzje Jeffa 20.10 rano: wioska poboczna placi i dziala jak wies, przetop czesc, zloto startu, Wolni Ludzie, zlecenia z kiesy rodu)
 
 **Zakres (Jeff 20.10, doslownie):** "NIe ma poakzanego moje thiefts i mam na minusie, wioska nic nie zarabia?"; "okay olej to w senise zrob wersje fnalna"; "i do wioski ktora
