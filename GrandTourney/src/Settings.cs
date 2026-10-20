@@ -57,6 +57,10 @@ namespace GrandTourney
         public int MaxNoblesInBracket = 15;                // at most this many of the sixteen places go to lords
         public bool TourneyRansom = true;                  // whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions (only when you ride in the lists yourself) and the AI knights alike - a common soldier fights in borrowed kit, ladies and townsfolk wager nothing, kin never ransom kin, a tourney called off costs nobody; an AI lord pays only from what his house can spare beyond its war chest, the victor wears what is better than his own, and the vanquished buys plain kit at the market
 
+        // m95-turniej (Jeff 20.10: wygrana walka dala 8k przy 1.7k za przegrana - pelna wartosc zbroi lorda to lata dochodu biednego rycerza, a swiat AI przesuwal
+        // 330-410 tys. zlota dziennie): okup szranek = czesc wartosci konia i zbroi, w obie strony; sztuki przechodza dopiero, gdy nie stac nawet na okup
+        public float TourneyRansomShare = 0.25f;           // with Tourney Ransom: the ransom of the lists is this share of the worth of the horse and armour in their present state (0.25 = a quarter - blunted arms are for honour, not for war); the pieces go to the victor only when the vanquished cannot pay even that. 1 = the full worth, as before
+
         public bool LogEnabled = true;                     // write a log file in the module folder
 
         public static void Load(string moduleDataDir)

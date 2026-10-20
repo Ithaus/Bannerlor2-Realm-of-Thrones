@@ -438,6 +438,23 @@ namespace GrandTourney
 
         private static int Bit(EquipmentIndex i) { return 1 << (int)i; }
 
+        /// <summary>m95-turniej: okup sztuki = wartosc w obecnym stanie x Tourney Ransom Share (0.05-1, domyslnie 0.25), najmniej 1 zloto.</summary>
+        private static int ShareOf(int w)
+        {
+            float s = Settings.Current != null ? Settings.Current.TourneyRansomShare : 1f;
+            if (!(s > 0f) || s >= 1f) return w;
+            if (s < 0.05f) s = 0.05f;
+            return Math.Max(1, (int)Math.Round(w * (double)s));
+        }
+
+        /// <summary>m95-turniej: dopisek do okna gracza - okup to czesc wartosci.</summary>
+        private static string ShareNote()
+        {
+            float s = Settings.Current != null ? Settings.Current.TourneyRansomShare : 1f;
+            if (!(s > 0f) || s >= 1f) return "";
+            return " (the ransom of the lists: " + (s == 0.25f ? "a quarter" : Math.Round(s * 100f) + "%") + " of their worth)";
+        }
+
         /// <summary>Kon i zbroja przegranego z wartoscia w obecnym stanie, od najdrozszej. Smok i jego ladry - nie.</summary>
         private static List<Piece> Stake(Hero h, bool count)
         {
@@ -454,6 +471,9 @@ namespace GrandTourney
                 if (el.IsEmpty || el.Item == null) continue;
                 int w = el.ItemValue;
                 if (w <= 0) continue;
+                // m95-turniej (Jeff 20.10: "zaplacilem ponad 1k za przegrana ... ale dostalem w tym samym czasie ponad 8k zlota"): okup szranek to czesc wartosci
+                // (Tourney Ransom Share, domyslnie 1/4) - turniej na tepa bron, nie wojna; ta sama stawka w obie strony, gracz i AI
+                w = ShareOf(w);
                 list.Add(new Piece { Slot = idx, El = el, Worth = w });
             }
             list.Sort((a, b) => b.Worth.CompareTo(a.Worth));
@@ -835,7 +855,7 @@ namespace GrandTourney
                             string nm; try { nm = pc.El.GetModifiedItemName().ToString(); } catch { nm = pc.El.Item.Name.ToString(); }
                             sb.Append("  ").Append(nm).Append(" - ").Append(pc.Worth).Append(" gold\n");
                         }
-                        sb.Append("\nAll together ").Append(total).Append(" gold in their present state. ");
+                        sb.Append("\nAll together ").Append(total).Append(" gold in their present state").Append(ShareNote()).Append(". ");
                         if (can >= total) sb.Append("Pay to keep them, or yield them.");
                         else if (can > 0) sb.Append("You can pay only ").Append(can).Append(" gold: that keeps ").Append(keep.Count).Append(" of ").Append(stake.Count)
                                             .Append(" pieces, the rest goes to the victor.");
