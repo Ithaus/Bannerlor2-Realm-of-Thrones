@@ -1075,6 +1075,7 @@ namespace Armoury
                 foreach (var kv in _b) if (!kv.Value.Today && (kv.Key == null || kv.Key.IsEliminated)) drop.Add(kv.Key);
                 foreach (var c in drop) _b.Remove(c);
                 Report(s, today);
+                BorderGarrisons.Report(s, today);   // R3-08g: linia "Zalogi graniczne" (wlasny try)
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally
@@ -1112,7 +1113,7 @@ namespace Armoury
                 if (!_warGar.TryGetValue(st.StringId, out wr)) { wr = cur; _warGar[st.StringId] = wr; }   // przed pierwsza wojna - stan z pierwszej doby
                 else if (b.War) { wr += (cur - wr) / Days28; _warGar[st.StringId] = wr; }                 // srednia z dob wojny (28 dob)
                 if (full) continue;
-                double t = Math.Max(0f, s.GarrisonPeaceShare) * wr;
+                double t = BorderGarrisons.PeaceShare(st, s, wr) * wr;   // R3-08g: twierdza graniczna GarrisonPeaceShareBorder (0.75), reszta GarrisonPeaceShare (BorderGarrisons.cs)
                 tgt.Add(new KeyValuePair<Settlement, double>(st, t)); curs.Add(cur); sum += t;
             }
             if (full || tgt.Count == 0) return;
