@@ -1086,6 +1086,10 @@ Uzycie (Python 3, tylko odczyt):
                     (bez konta NIEWOLNI) poza kulturami z niewola nie rosnie od pierwszej do ostatniej doby pliku (tylko TDebtSl dodaje niewolnych), NNW-11/12 INFO (kultury,
                     wolni, powody bez ruchu: bez KS, wladca bez niewoli, D >= 0.8, zapas >= 7 dni). Log sprzed paczki (np. Armoury-2026-10-17_23-22-37.log): linie INFO,
                     NNW-10 z CSV liczony, bez wyjatku.
+--grupa m96valyria: (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; galaz w-toku/m96-valyria, Armoury/src/MapRoadKinds.cs, plik Armoury/ModuleData/arm_map_roads_valyria.tsv)
+                    python -I tools/sprawdz_logi.py --grupa m96valyria <Armoury-*.log> (strumieniowo). VR-0 start sesji CZYNNE, plik zgodny (V 800..850 jedn., mosty 7 /
+                    20..35 jedn., szlaki 150..170 jedn.); VR-1 linie doby; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia > 0; VR-3 audyt Valyrii premia =
+                    oczekiwana +-1.5 pp z wpisem; VR-4 audyt szlaku (INFO); VR-5 siec AI: mosty >= 1, klasy tak; VR-6 potkniecia i ERROR 0.
 --grupa ndrogi    : (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, plik
                     Armoury/ModuleData/arm_map_roads_geo.tsv) python -I tools/sprawdz_logi.py --grupa ndrogi <Armoury-*.log> (strumieniowo). NDR-0 start sesji: plik drog
                     wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa ROT zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid
@@ -52154,6 +52158,114 @@ def p6spichlerz_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; Armoury/src/MapRoadKinds.cs, dane arm_map_roads_valyria.tsv)
+M96VALYRIA_HEAD = "Drogi Valyrii (VR): "
+M96VALYRIA_START = re.compile(r"Drogi Valyrii \(VR\): start sesji - klucz MapValyrianRoads (?P<kv>tak|nie) \(premia (?P<vp>\d+)%.*?klucz MapEssosCaravanTrails (?P<kc>tak|nie)"
+                              r".*? \| (?P<note>.*) \| siatka drog (?P<grid>wczytana|NIE) \| stan (?P<st>CZYNNE|NIECZYNNE[^.]*)\.$")
+M96VALYRIA_FILE = re.compile(r"wierszy V (?P<rv>\d+), C (?P<rc>\d+), mosty (?P<rb>\d+), zle (?P<bad>\d+), poza plikiem drog (?P<miss>\d+) \| drogi Valyrii (?P<sv>\d+) odcinkow "
+                             r"\((?P<lv>\d+\.\d) jedn\.\) \+ mosty (?P<sb>\d+) \((?P<lb>\d+\.\d) jedn\.\), szlaki karawan (?P<sc>\d+) odcinkow \((?P<lc>\d+\.\d) jedn\.\); plik drog zgodny")
+M96VALYRIA_DAY = re.compile(r"Drogi Valyrii \(VR\): dzien (?P<day>-?\d+) \| klucze: Valyria (?P<kv>tak|nie), szlaki (?P<kc>tak|nie) \| partio-godzin w marszu (?P<n>\d+): "
+                            r"na drodze Valyrii (?P<hv>\d+) \([^)]*\), na szlaku karawan (?P<hc>\d+) \([^)]*\), na zwyklym trakcie (?P<ht>\d+) \([^)]*\) \| liczenia predkosci "
+                            r"z premia: Valyria ok\. (?P<sv>\d+), szlak ok\. (?P<sc>\d+) \| odcinkow V (?P<segv>\d+) \+ mosty (?P<segb>\d+), C (?P<segc>\d+)(?P<audit>.*?) \| "
+                            r"(?P<ai>siec AI drog[^|]*) \| potkniecia (?P<stum>\d+)\.$")
+M96VALYRIA_AUD = re.compile(r" \| audyt (?P<k>Valyria|szlak): (?P<n>\d+) partii(?:, premia rzeczywista sr\. (?P<avg>-?\d+\.\d+)% \(min (?P<mn>-?\d+\.\d+), maks (?P<mx>-?\d+\.\d+)\), "
+                            r"z wpisem '[^']*' (?P<lines>\d+))?, oczekiwane (?P<exp>\d+\.\d)%")
+M96VALYRIA_AI = re.compile(r"siec AI drog: mosty Valyrii (?P<b>\d+), krawedzie Valyrii (?P<lv>\d+) jedn\., szlakow karawan (?P<lc>\d+) jedn\. \(klasy (?P<cls>tak|nie)\)")
+
+
+def m96valyria_main(logp):
+    """m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; Armoury/src/MapRoadKinds.cs, klucze MapValyrianRoads / MapValyrianRoadSpeedPercent /
+    MapEssosCaravanTrails): drogi Valyrii (demon road Volantis - Mantarys - Meereen z odnoga do Tolos; Pentos - Ghoyan Drohe - Norvos - Qohor) +25% (co najmniej
+    trakt), mosty przez przerwy farby; farba w glebi Essos (Sarnor) = szlak karawan jak droga boczna. Progi: VR-0 start sesji CZYNNE, plik zgodny (V 800..850 jedn.,
+    mosty 7 / 20..35 jedn., szlaki 150..170 jedn., zle 0, poza plikiem 0); VR-1 linie doby rozpoznane; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia
+    > 0 (udzial INFO; oczekiwane ok. 0.3-2% partio-godzin w marszu); VR-3 audyt Valyrii: premia rzeczywista sr. = oczekiwana +-1.5 pp, wpis 'Valyrian road' w
+    kazdej probce; VR-4 audyt szlaku (INFO przy 0 probek); VR-5 siec AI: mosty >= 1, klasy tak; VR-6 potkniecia 0 i "ERROR in MapRoadKinds." 0."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("VR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, bad = [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96VALYRIA_HEAD):
+                if s.startswith(M96VALYRIA_HEAD + "start sesji"):
+                    mm = M96VALYRIA_START.match(s)
+                    (starts.append((mm.groupdict(), s)) if mm else bad.append(s))
+                elif s.startswith(M96VALYRIA_HEAD + "dzien "):
+                    mm = M96VALYRIA_DAY.match(s)
+                    (days.append(mm.groupdict()) if mm else bad.append(s))
+            elif "ERROR in MapRoadKinds." in s:
+                n_err += 1
+    if not starts and not days:
+        rep.add("VR-0: linie 'Drogi Valyrii (VR)'", "brak w logu" + (f" (nierozpoznane {len(bad)}: {bad[0][:160]})" if bad else ""), "INFO (log sprzed paczki m96-valyria)",
+                False if bad else None)
+        rep.show()
+        return 0
+    # VR-0
+    if starts:
+        st, line = starts[-1]
+        fm = M96VALYRIA_FILE.search(st["note"])
+        if fm:
+            lv, lb, lc = float(fm["lv"]), float(fm["lb"]), float(fm["lc"])
+            ok0 = (st["st"] == "CZYNNE" and st["grid"] == "wczytana" and 800 <= lv <= 850 and int(fm["sb"]) == 7 and 20 <= lb <= 35 and 150 <= lc <= 170
+                   and int(fm["bad"]) == 0 and int(fm["miss"]) == 0)
+            rep.add("VR-0: start sesji - rodzaje drog wczytane, stan CZYNNE", f"Valyria {st['kv']} ({st['vp']}%), szlaki {st['kc']}; V {fm['sv']} odcinkow {lv:.1f} jedn., mosty "
+                    f"{fm['sb']} ({lb:.1f}), C {fm['sc']} ({lc:.1f}), zle {fm['bad']}, poza plikiem {fm['miss']}; stan {st['st']}",
+                    "CZYNNE, V 800..850 jedn., mosty 7 / 20..35 jedn., C 150..170 jedn., zle 0, poza plikiem 0", ok0)
+        else:
+            rep.add("VR-0: start sesji - plik rodzajow", st["note"][:220] + f"; stan {st['st']}", "plik wczytany i zgodny z plikiem drog", False)
+    else:
+        rep.add("VR-0: start sesji", "brak linii startu sesji", "linia przy kazdym starcie sesji (przy MapRoadSpeedBonus)", False)
+    # VR-1
+    rep.add("VR-1: linie doby rozpoznane", f"doby {len(days)}, nierozpoznane {len(bad)}" + (f" (np. {bad[0][:200]})" if bad else ""), "doby > 0, nierozpoznane 0",
+            len(days) > 0 and not bad)
+    if not days:
+        rep.add("VR-2..5: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba)", None)
+    else:
+        n = sum(int(d["n"]) for d in days)
+        hv = sum(int(d["hv"]) for d in days)
+        hc = sum(int(d["hc"]) for d in days)
+        sv = sum(int(d["sv"]) for d in days)
+        on = days[-1]["kv"] == "tak"
+        share = 100.0 * hv / n if n else 0.0
+        rep.add("VR-2: partio-godziny na drodze Valyrii i liczenia z premia (suma dob)", f"{hv}/{n} = {share:.2f}% (szlak karawan {hc}); liczenia z premia Valyrii ok. {sv}",
+                "> 0 i > 0 przy kluczu tak (udzial INFO, oczekiwane ok. 0.3-2%)", (hv > 0 and sv > 0) if on else None)
+        # VR-3 / VR-4: audyty
+        for kind, name in (("Valyria", "VR-3: audyt AI na drodze Valyrii"), ("szlak", "VR-4: audyt AI na szlaku karawan")):
+            tn, ts, tl, mn, mx, exp = 0, 0.0, 0, None, None, None
+            for d in days:
+                for am in M96VALYRIA_AUD.finditer(d["audit"]):
+                    if am["k"] != kind:
+                        continue
+                    exp = float(am["exp"])
+                    k = int(am["n"])
+                    if k and am["avg"] is not None:
+                        tn += k; ts += float(am["avg"]) * k; tl += int(am["lines"])
+                        mn = float(am["mn"]) if mn is None else min(mn, float(am["mn"]))
+                        mx = float(am["mx"]) if mx is None else max(mx, float(am["mx"]))
+            if tn == 0:
+                rep.add(name, "probek 0", "INFO (zadna partia AI w marszu na tym rodzaju drogi w takcie linii)", None)
+                continue
+            avg = ts / tn
+            ok = abs(avg - exp) <= 1.5 and tl == tn
+            rep.add(name, f"probek {tn}, premia sr. {avg:.2f}% (min {mn:.2f}, maks {mx:.2f}), z wpisem {tl}; oczekiwane {exp:.1f}%",
+                    f"sr. = oczekiwana +-1.5 pp, wpis w kazdej probce" + (" (INFO dla szlaku)" if kind == "szlak" else ""), ok if kind == "Valyria" else (None if ok else False))
+        am = M96VALYRIA_AI.search(days[-1]["ai"])
+        if am:
+            rep.add("VR-5: siec AI drog - mosty Valyrii i klasy krawedzi", f"mosty {am['b']}, krawedzie Valyrii {am['lv']} jedn., szlakow {am['lc']} jedn., klasy {am['cls']}",
+                    "mosty >= 1, klasy tak (przy kluczu Valyrii tak)", (int(am["b"]) >= 1 and am["cls"] == "tak") if on else None)
+        else:
+            rep.add("VR-5: siec AI drog", days[-1]["ai"][:160], "INFO (siec AI drog niezbudowana - patrz AI drogi (AD))", None)
+    stum = max([int(d["stum"]) for d in days] or [0])
+    rep.add("VR-6: potkniecia MapRoadKinds i ERROR", f"potkniecia (maks. w linii) {stum}, 'ERROR in MapRoadKinds.' {n_err}", "0 i 0", stum == 0 and n_err == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -52343,6 +52455,8 @@ def main(argv):
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
     if group == "nturniej" and logp:
         return nturniej_main(logp)   # nturniej (16.10, Jeff "miasto nie moglo zaplacic mi 1300"): lancuch platnikow nagrody turnieju i dlugi osad wobec gracza (TourneyPay)
+    if group == "m96valyria" and logp:
+        return m96valyria_main(logp)   # m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"): drogi Valyrii +25%, mosty, szlaki karawan glebi Essos, audyt premii (MapRoadKinds)
     if group == "ndrogi" and logp:
         return ndrogi_main(logp)   # ndrogi (noc 17/18.10, Jeff "szybsze poruszanie po drogach"): +15% na drogach ROT, plik drog, latka pamieci predkosci, audyt premii i sufitu (MapRoads)
     if group == "p6sztormy" and logp:
