@@ -1734,6 +1734,37 @@ namespace Armoury
             b.GearLeft = Math.Max(0, b.GearLeft - amount); _dGearSpent += amount;
         }
 
+        /// <summary>r4-zlecenia (recenzja, Craft Order Clan Purse): GearCap takze przed pierwszym budzetem sesji (Pending - po wczytaniu albo starcie kampanii,
+        /// do pierwszego ClanBudget.Daily): rod, ktory dostanie budzet (Eligible) - niewydany przydzial sprzetu z zapisu (GearLeft, ten sam, ktory Daily przywroci),
+        /// bez wpisu w zapisie 0 (nowa kampania - przydzialu jeszcze nie ma). false - rod bez budzetu (bez ograniczenia). Tylko odczyt.</summary>
+        internal static bool GearCapAny(Clan c, out int cap)
+        {
+            if (GearCap(c, out cap)) return true;
+            cap = 0;
+            try
+            {
+                if (c == null || !Pending || !Eligible(c)) return false;
+                double[] sv;
+                if (c.StringId != null && _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 2) cap = (int)Math.Max(0, Math.Min(int.MaxValue, sv[2]));
+                return true;
+            }
+            catch (Exception e) { Stumble("GearCapAny", e); cap = 0; return false; }
+        }
+
+        /// <summary>r4-zlecenia (recenzja): GearSpent takze przed pierwszym budzetem sesji - schodzi z przydzialu z zapisu (Daily przywroci juz pomniejszony).</summary>
+        internal static void GearSpentAny(Clan c, int amount)
+        {
+            if (c == null || amount <= 0) return;
+            if (Of(c) != null) { GearSpent(c, amount); return; }
+            try
+            {
+                if (!Pending || !Eligible(c)) return;
+                double[] sv;
+                if (c.StringId != null && _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 2) { sv[2] = Math.Max(0, sv[2] - amount); _dGearSpent += amount; }
+            }
+            catch (Exception e) { Stumble("GearSpentAny", e); }
+        }
+
         /// <summary>168: D rodu z ostatniego budzetu (Bank biegnie przed budzetem - to D wczoraj); -1 - rod bez budzetu.</summary>
         internal static double DLast(Clan c)
         {

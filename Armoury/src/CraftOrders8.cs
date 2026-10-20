@@ -38,6 +38,7 @@ namespace Armoury
     ///        nagroda przeliczona, gdy jest wieksza niz 3 x nowa (bez podwojnego przeliczenia);
     ///      - doswiadczenie za zlecenie (CraftingOrder.GetOrderExperience liczy z wartosci PROJEKTU) dalej od wartosci sprzed przeliczenia - postfiks;
     ///      - CompleteOrder: wyplata przez GiverPay.PayFromGiver - placi zleceniodawca ze swojej kiesy, przy pustej kiesie mniej i komunikat;
+    ///        r4-zlecenia (klucz CraftOrderClanPurse, CraftOrderClanPurse.cs): brak lorda, ktory nie jest glowa rodu, doplaca glowa rodu (kiesa rodu);
     ///        wykuta bron: lord - jak gra, a gdy nie wzial do reki - do taboru jego druzyny; zleceniodawca bez druzyny (notabl, lord w miescie, zadanie) -
     ///        na polke miasta zlecenia; zolnierz z niczego wyciety (licznik).
     ///    Klucz CraftOrdersGiverCanPay (NZ, 16.10, CraftOrdersPurse.cs): zlecenie miejskie tylko od zleceniodawcy z kiesa na sume swoich zlecen (po przeliczeniu, +20% na premie); zlecenia
@@ -176,6 +177,7 @@ namespace Armoury
 
         private static int _cDone, _cCustom, _cShortN, _cTroopCut, _cTroopGiven, _cLordTook, _cTabor, _cShelf, _cLost;
         private static long _cDue, _cPaid, _cNothing;
+        private static long _cHead; private static int _cHeadN, _cHeadFull;   // r4-zlecenia (Craft Order Clan Purse): doplata glowy rodu - kwota, zlecenia, w tym do pelna
 
         /// <summary>Prefiks CompleteOrder(Town, CraftingOrder, ItemObject, Hero): kontekst wyplaty (zamykany w finalizerze - takze po wyjatku).</summary>
         public static void CompletePrefix(CraftingCampaignBehavior __instance, Town __0, CraftingOrder __1, out Done __state)
@@ -192,6 +194,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("CompletePrefix(zadanie)", e); }
                 d.Ctx = GiverPay.Open("zlecenia kowalskie", __1 != null ? __1.OrderOwner : null, PayOn);
+                d.Ctx.ClanPurse = CraftOrderClanPurse.KeyOn;   // r4-zlecenia: brak lorda, ktory nie jest glowa rodu, doplaca glowa (tylko przy PayOn - kontekst z On)
                 __state = d;
             }
             catch (Exception e) { Stumble("CompletePrefix", e); }
@@ -230,6 +233,7 @@ namespace Armoury
                 if (c == null) return;
                 GiverPay.Close(c);
                 _cDue += c.Due; _cPaid += c.Paid; _cShortN += c.Short; _cNothing += c.FromNothing;
+                _cHead += c.FromHead; _cHeadN += c.HeadN; _cHeadFull += c.HeadFull;
             }
             catch (Exception e) { Stumble("CompleteFinalizer", e); }
         }
@@ -601,6 +605,7 @@ namespace Armoury
             _sOrders = _sCustom = _sPriced = _sNoPrice = _sConv = _sKept = _sHigh = 0; _sBefore = _sAfter = 0;
             GiverPay.Reset();
             CraftOrdersPurse.Reset();   // NZ (16.10): zlecenia od zleceniodawcy z pieniedzmi - liczniki (ta sama chwila)
+            CraftOrderClanPurse.Reset();   // r4-zlecenia: potkniecia doplaty glowy rodu
             ClearDay();
         }
 
@@ -611,6 +616,7 @@ namespace Armoury
             _xpCalls = _xpScaled = 0;
             _cDone = _cCustom = _cShortN = _cTroopCut = _cTroopGiven = _cLordTook = _cTabor = _cShelf = _cLost = 0;
             _cDue = _cPaid = _cNothing = 0;
+            _cHead = 0; _cHeadN = _cHeadFull = 0;
             _pickCalls = _pickFallback = _pickShadow = _pickShadowClosed = _tierCut = 0;
             _bOpen = _bEmpty = _bSold = _bPoor = _bGone = _bOld = _bFree = 0; _bGold = _bVoid = 0;
         }
@@ -660,7 +666,9 @@ namespace Armoury
                 if (_nkReplaced >= 0) _nkReplaced = -1;   // raz w linii
                 sb.Append(" | okno \"zlecenia kowalskie\": oddanych ").Append(_cDone).Append(" (w tym zlecen zadan ").Append(_cCustom).Append(')')
                   .Append(", obiecane ").Append(_cDue).Append(", zaplacone przez zleceniodawce ").Append(_cPaid)
-                  .Append(", niedoplata przy pustej kiesie ").Append(_cDue - _cPaid).Append(" w ").Append(_cShortN).Append(" zleceniach")
+                  .Append(", doplata glowy rodu (Craft Order Clan Purse ").Append(s.CraftOrderClanPurse ? "CZYNNE" : "WYLACZONE").Append(") ").Append(_cHead)
+                  .Append(" w ").Append(_cHeadN).Append(" zleceniach (do pelna ").Append(_cHeadFull).Append(", potkniecia ").Append(CraftOrderClanPurse.Stumbles).Append(')')
+                  .Append(", niedoplata przy pustej kiesie ").Append(_cDue - _cPaid - _cHead).Append(" w ").Append(_cShortN).Append(" zleceniach")
                   .Append(", zloto z niczego ").Append(_cNothing)
                   .Append(", zolnierz z niczego: wyciety ").Append(_cTroopCut).Append(", dany ").Append(_cTroopGiven)
                   .Append(", bron: lord wzial do reki ").Append(_cLordTook).Append(", do taboru lorda ").Append(_cTabor).Append(", na polke miasta ").Append(_cShelf)
