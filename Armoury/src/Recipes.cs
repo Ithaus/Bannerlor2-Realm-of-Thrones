@@ -65,6 +65,7 @@ namespace Armoury
         // dostep dla FletchForge (zdjecie skory/lnu kategoria przy kuciu pancerzy BK)
         internal static ItemObject SoftLeather { get { ResolveGoods(); return _leather; } }
         internal static ItemObject SoftLinen { get { ResolveGoods(); return _linen; } }
+        internal static ItemObject SoftVelvet { get { ResolveGoods(); return _velvet; } }   // n20-kuznia: aksamit tarcz t5+ w CRAFT BK (FletchForge)
 
         /// <summary>
         /// Ile jednostek materialu wart jest ten pancerz - regula Jeffa:
