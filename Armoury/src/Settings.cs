@@ -2042,6 +2042,9 @@ namespace Armoury
         public bool MapVillageNamesOnHover = true;         // Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update
         // T7 (noc 08/09.10): mlyn wodny na brzegu, linia pana w dymku
         public bool MillOnBank = true;                     // water mills on rivers stand on the bank, not in the stream: the whole mill village, mill and wheel included, is set half a step back from the river's edge. Mills on the sea coast are unchanged. Off = as before, the wheel a little out in the water
+        // p6-szubienice (R3-07a, Jeff 20.10 "pozostale tak"): szubienica przy rozstajach po rozbitej bandzie / oczyszczonej kryjowce (Gallows.cs, GallowsView.cs) - czysty
+        // wyglad, 7-14 dob, jedna na okreg, najwyzej 200 naraz (pelna lista: zwalnia AI najdalej od gracza), zapis arm_gallows. Klucz NOWY; off = nowych nie przybywa, stojace schowane
+        public bool MapGallows = true;                     // gallows at the crossroads: when your party, a lord, a patrol or a garrison beats a band of outlaws - or clears a hideout - a gallows with the hanged stands for 7 to 14 days at the nearest crossroads (or by the nearest road), at most one in a district and 200 in the world (when full, the one farthest from you makes way; yours stand their time). Only a sight on the map - nothing else changes. Off = no new gallows, the standing ones are hidden
         public bool VillageTipHeldBy = true;               // the map village tooltip names who holds the land, live from the game: 'A village of the Tumbledown lands, held by House Stark of Winterfell' ('your fief' for your own). Off = 'A village of the X district', as before
 
         // --- Arming the garrisons ---

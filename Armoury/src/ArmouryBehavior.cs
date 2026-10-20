@@ -749,6 +749,9 @@ namespace Armoury
         // p5-kruki (R3-05c): kruki w drodze od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p5RavensReset = P5RavensReset();
         private static bool P5RavensReset() { try { Ravens.Reset(); } catch (Exception e) { Log.Error("P5RavensReset", e); } return true; }
+        // p6-szubienice (R3-07a): szubienice przy rozstajach od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-handel)
+        private readonly bool _p6SzubieniceReset = P6SzubieniceReset();
+        private static bool P6SzubieniceReset() { try { Gallows.Reset(); } catch (Exception e) { Log.Error("P6SzubieniceReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1311,6 +1314,10 @@ namespace Armoury
             // Ironman Jeffa) = brak jarmarkow w toku (kalendarz otworzy nastepne); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P5HandelReset)
             try { string hf = dataStore.IsSaving ? HarvestFairs.Export() : null; if (!dataStore.IsSaving || hf != null) SaveText.Sync(dataStore, "arm_fairs", ref hf); if (dataStore.IsLoading) HarvestFairs.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_fairs", e); }
+            // p6-szubienice (R3-07a): szubienice stojace ("g1|x;y;yaw;koniec;okreg;wisielcy;rodzaj;kryjowka~..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis,
+            // save040 Jeffa) = brak szubienic; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6SzubieniceReset)
+            try { string gw = dataStore.IsSaving ? Gallows.Export() : null; if (!dataStore.IsSaving || gw != null) SaveText.Sync(dataStore, "arm_gallows", ref gw); if (dataStore.IsLoading) Gallows.Import(gw); }
+            catch (Exception e) { Log.Error("SyncData.arm_gallows", e); }
         }
 
         public override void RegisterEvents()
@@ -1523,6 +1530,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("FreeFolkRaids.OnPartyDestroyed", FreeFolkRaids.OnPartyDestroyed));   // fix-mur: kto rozbil bande najazdu (tylko linia "cel:"; bez band - nic)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("FreeFolkRaids.OnMapEventEnded", FreeFolkRaids.OnMapEventEnded));   // recenzja fix-mur: kto pobil bande w marszu (tylko linia "cel:"; bez band w marszu - nic)
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("Gallows.OnMapEventEnded", Gallows.OnMapEventEnded));   // p6-szubienice (R3-07a): rozbita banda / oczyszczona kryjowka -> szubienica przy rozstajach (tylko wyglad; sam odczyt bitwy)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
@@ -2125,6 +2133,7 @@ namespace Armoury
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { MapRoads.SessionStart(); } catch (Exception e) { Log.Error("MapRoads.SessionStart", e); }   // SW-DROGI (noc 17/18.10): plik drog ROT do siatki, pamiec partii od zera, linia "Drogi (DR): start sesji" - PO McmSettings.Apply
             try { MapMud.SessionStart(); } catch (Exception e) { Log.Error("MapMud.SessionStart", e); }   // p5-bloto (R3-07c): linia "Bloto (BL): start sesji" - PO MapRoads.SessionStart (siatka drog)
+            try { Gallows.SessionStart(); } catch (Exception e) { Log.Error("Gallows.SessionStart", e); }   // p6-szubienice (R3-07a): trakty z pliku drog, przeterminowane z zapisu, linia "Szubienice (p6): start sesji"
             try { MapSideRoads.SessionStart(); } catch (Exception e) { Log.Error("MapSideRoads.SessionStart", e); }   // f11-drogi: linia "Drogi boczne (f11): wylaczone / wlaczone" i plik-przelacznik autotestu od nowa - PO McmSettings.Apply
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
@@ -2786,6 +2795,7 @@ namespace Armoury
             try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); } DayProfile.Lap("TerrainEase.Stage7Daily");   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
             try { MapRoads.Daily(); } catch (Exception e) { Log.Error("MapRoads.Daily", e); } DayProfile.Lap("MapRoads.Daily");   // SW-DROGI (noc 17/18.10): linia "Drogi (DR): dzien N" (spis, audyt premii, koszt) w dobie linii (tylko log)
             try { MapMud.Daily(); } catch (Exception e) { Log.Error("MapMud.Daily", e); } DayProfile.Lap("MapMud.Daily");   // p5-bloto (R3-07c): linia "Bloto (BL): dzien N" (spis deszczu i blota, audyt kary, koszt) w dobie linii (tylko log)
+            try { Gallows.Daily(); } catch (Exception e) { Log.Error("Gallows.Daily", e); } DayProfile.Lap("Gallows.Daily");   // p6-szubienice (R3-07a): koniec czasu szubienic, linia "Szubienice (p6): dzien N" w dobie linii
             try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); } DayProfile.Lap("TwinsCrossing.Daily");   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
             try { CrossingLaw.Daily(); } catch (Exception e) { Log.Error("CrossingLaw.Daily", e); } DayProfile.Lap("CrossingLaw.Daily");   // E8/Q (262): linia "Straz przeprawy (E8/Q)" i zerowanie licznikow doby - PO linii E7/B (jej dopisek czyta te same liczniki)
             try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow

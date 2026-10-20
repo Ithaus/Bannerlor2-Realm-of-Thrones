@@ -405,6 +405,17 @@ namespace Armoury
                     Log.Error("RoadsideInns: komponent widoku nie laduje sie (proba " + _innsLoadFails + "/3)", e);
                 }
             }
+            // p6-szubienice (R3-07a): szubienice przy rozstajach - osobna rejestracja widoku przed wylacznikiem wiosek, ta sama ochrona przed bledem ladowania typu
+            // (po 3 probach szubienice na mapie nie startuja do konca sesji; lista i zapis dzialaja dalej); przy kluczu MapGallows = off typ widoku sie nie laduje
+            if (_gallowsLoadFails < 3 && Settings.Current.MapGallows)
+            {
+                try { GallowsTick(); }
+                catch (Exception e)
+                {
+                    _gallowsLoadFails++;
+                    Log.Error("Gallows: komponent widoku nie laduje sie (proba " + _gallowsLoadFails + "/3)", e);
+                }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -430,6 +441,14 @@ namespace Armoury
         private static void RoadsideInnsTick()
         {
             RoadsideInnsView.EnsureRegistered();
+        }
+
+        private static int _gallowsLoadFails;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void GallowsTick()
+        {
+            GallowsView.EnsureRegistered();
         }
 
         private static int _sideRoadsLoadFails;

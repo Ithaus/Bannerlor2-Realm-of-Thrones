@@ -321,6 +321,9 @@ namespace Armoury
             return !_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp));
         }
 
+        /// <summary>p6-szubienice (Gallows): plan drog bocznych podany przez widok mapy (null - brak planu, drogi boczne wylaczone albo nowa sesja). Tylko odczyt.</summary>
+        internal static SideRoadPlan.Result SidePlan() { lock (_pubLock) return _sideRes; }
+
         /// <summary>Pamiec partii: Party.Index | komorka + 1 (tylko do logu zmian, porownanie idzie po stanie) | stan (1 poza droga, 2 trakt, 3 boczna).</summary>
         private static void Record(MobileParty mp, int cell, int st)
         {
