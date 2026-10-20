@@ -3394,4 +3394,9 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
 - 07:35 PDT Jeff: "wychowankowie - wywal, napad na spiacy oboz - wywal, zacznij fale 2" -> FALA 2b wf_3d53bfb8-a50 (skrypt workflows/scripts/pomysly-fala-2b.js):
   7 galezi p6-{okup, sztormy, spichlerz, szubienice, pola, drogi, a7}, dokonczenie od stanu drzew (baza 91bf9c63), recenzje: 2 soczewki (okup, spichlerz, drogi, a7),
   1 laczona (szubienice, pola, sztormy). p6-zakladnicy (2 commity) i p6-napad (pusta) - ODRZUCONE przez Jeffa, nie scalac. Fala 2 -> WGRANIE 94 po 93.
+- 08:25 PDT Jeff (o optymalizacji): "to zapisz na prace nocna" -> docs/PLAN-OPTYMALIZACJA-NOC.md (po WGRANIU 94; pomiary 20.10: takt doby 570-600 ms,
+  fala 1 nie spowolnila: 593 -> 570 ms, 15.6 -> 15.0 s/dobe). Poprawki fali 1 scalone: n22f-plany 6180e54b (miara zbieznosci wobec poziomu polek kroku 8 - tylko raport),
+  n22f-najemnicy 4c1db61f (narzedzie, fala 1 nie jest przyczyna; n22b-nowa d80-107 2092), n22f-ruda cec39eef (narzedzie: ZC1-16 odbicie po spadku, D2K-7 regula
+  HorseClose - zmiennosc), n22f-scalenie ef4139f3 (Rumours: wiesci 13 dob / 300 zamiast 60 FIFO - kruki gubily dalekie wiesci) -> n22-calosc 3c3a7ad9
+  (2108 ustawien, build 0). n22b: bitwa i nowa kod 0, 160 w toku; potem testy-n22c.ps1 (DLL test/n22c = n22b + Armoury 97efca1d) -> WGRANIE 93.
 
