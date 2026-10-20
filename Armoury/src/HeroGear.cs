@@ -382,8 +382,8 @@ namespace Armoury
                     bool want = rule && other;
                     if (OursOnly(it)) ours++;
                     if (!got) refused++;
-                    if (got == want) agree++;
                     if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { bard++; if (got == want) bardOk++; }
+                    if (got == want) agree++;
                     else if (bad.Count < 5)
                         bad.Add(h.StringId + "/" + it.StringId + " (" + ItemReq.SkillFor(it).StringId + " " + co.GetSkillValue(ItemReq.SkillFor(it))
                                 + " vs " + it.Difficulty + "): ekran " + (got ? "TAK" : "NIE") + ", regula " + (want ? "TAK" : "NIE"));
