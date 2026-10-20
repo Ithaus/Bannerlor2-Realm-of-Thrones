@@ -3326,4 +3326,9 @@ OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 
 - 20.10 ok. 02:05: ODPOWIEDZI JEFFA na pytania raportu (doslownie): "1. tylko czesc 2. nie 3. co to? 4. jakie?"
   1 -> przetop broni z 1 sztaby oddaje tylko czesc (koniec "minimum 1 sztaba" - galaz w-toku/r4-przetop od 1ffbd891, workflow); 2 -> NIE robimy paczki aksamitu (ZC1-4o zostaje
   pomiarem); 3 i 4 -> wyjasnienie A7 i lista starych decyzji w czacie.
+- 20.10 ok. 02:15: DECYZJE JEFFA do starych pytan planu (doslownie): "1. obciamy kazde zloto w staarcie 2. nie rozumiem 3. walcza wszyscy dorosli 4. nie rozumiem?
+  5. Nie tylko ze swojej kiesy, kiesa rodu zarzadza szef rodu." oraz "A7 i 35 pomyslow, zostawimy na nocna prace, ale daj mi liste 35 pomyslow z dokladnym wyjasnieniem".
+  -> workflow wf_bc7a8672-3eb: w-toku/r4-zloto (PLAN 3.10 - kazde zloto startu przeliczone na ceny historyczne), w-toku/r4-wolni (PLAN 4.17 - walcza wszyscy dorosli),
+  w-toku/r4-zlecenia (PLAN 8.3 - brak zlota lorda doplaca glowa rodu); 2 (zyznosc krain) i 4 (drogi Valyrii) - wyjasnic jeszcze raz; A7 i 35 pomyslow - praca nocna.
+  Opis 35 pomyslow: workflow wf_c92f06fe-cab -> docs/POMYSLY-35-2026-10-20.md.
 
