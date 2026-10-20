@@ -303,7 +303,7 @@ namespace Armoury
             bool live = Live;
             var next = new Dictionary<Town, float>();
             int towns = 0, besieged = 0, walkers = 0, fedTowns = 0, fedVills = 0, shortTowns = 0, shortVills = 0, fullTown = 0, noGold = 0, surplusVills = 0;
-            double units = 0.0, rations = 0.0, rationsCheck = 0.0, priceSum = 0.0; long gold = 0; int priceN = 0;
+            double units = 0.0, rations = 0.0, rationsCheck = 0.0, priceSum = 0.0, stockIn = 0.0; long gold = 0, townOut = 0, vilIn = 0; int priceN = 0;
             foreach (var town in Town.AllTowns)
             {
                 try
@@ -333,6 +333,7 @@ namespace Armoury
                     double q = QOf(town);
                     int spend = -1, price = 0;   // kasa i cena - dopiero przy pierwszej wsi z nadwyzka (BuyFloor liczy zapytania do linii 169c)
                     double got = 0.0; long paid = 0; bool any = false;
+                    float fs0 = town.FoodStocks; int tg0 = town.Gold;   // kontrola: zapas i kasa miasta przed zakupem (roznica po petli = to, co weszlo / wyszlo)
                     for (int i = 0; i < bv.Count; i++)
                     {
                         var v = bv[i];
@@ -352,19 +353,20 @@ namespace Armoury
                         double took = Famine.TributeTake(v, want * q);   // racje ze spichlerza wsi (nie wiecej niz lezy)
                         if (!(took > 0.0)) continue;
                         double gu = took / q;
+                        town.FoodStocks += (float)gu;                     // od razu - zboze zdjete ze spichlerza wsi jest juz w miescie, nawet gdyby dalej cos rzucilo
                         long pay = (long)Math.Round(gu * price);
                         if (pay > afford) pay = afford;
                         if (pay < 0) pay = 0;
+                        int vg0 = v.Gold;
                         if (pay > 0) { town.ChangeGold(-(int)pay); v.ChangeGold((int)pay); }
-                        got += gu; paid += pay; rations += took; rationsCheck += gu * q; fedVills++; any = true;
+                        vilIn += v.Gold - vg0;
+                        // liczniki po kazdej sprzedazy (wyjatek dalej w tym miescie nie gubi tego, co juz przeszlo)
+                        if (!any) { fedTowns++; priceSum += price; priceN++; }
+                        got += gu; paid += pay; units += gu; gold += pay; rations += took; rationsCheck += gu * q; fedVills++; any = true;
+                        next[town] = (float)got;
                         if (shortT && food - took < KeepShare * vcap) shortVills++;   // sprzedala z zapasu ponizej 98% sufitu (miasto w niedoborze)
                     }
-                    if (any && got > 0.0)
-                    {
-                        town.FoodStocks += (float)got;
-                        next[town] = (float)got;
-                        fedTowns++; units += got; gold += paid; priceSum += price; priceN++;
-                    }
+                    if (any) { stockIn += town.FoodStocks - fs0; townOut += tg0 - town.Gold; }
                 }
                 catch (Exception e) { Stumble("Daily(miasto)", e); }
             }
@@ -372,7 +374,7 @@ namespace Armoury
             _sessUnits += units; _sessRations += rations; _sessGold += gold;
             if (!s.LogEnabled) { NewDay(); return; }
             // pomiar po zakupie: pelny bilans (z naszymi skladnikami), Food 0, skladnik wsi zdjety
-            int neg = 0, negPeace = 0, hungry = 0, termTowns = 0; double termSum = 0.0, low = double.MaxValue; string lowName = "-";
+            int neg = 0, negPeace = 0, hungry = 0, hungryPeace = 0, termTowns = 0; double termSum = 0.0, low = double.MaxValue; string lowName = "-";
             foreach (var town in Town.AllTowns)
             {
                 try
@@ -382,7 +384,7 @@ namespace Armoury
                     float b = town.FoodChange;
                     if (b < _beThr) { neg++; if (!st.IsUnderSiege) negPeace++; }
                     if (b < low) { low = b; lowName = st.Name != null ? st.Name.ToString() : st.StringId; }
-                    if (town.FoodStocks <= 0f) hungry++;
+                    if (town.FoodStocks <= 0f) { hungry++; if (!st.IsUnderSiege) hungryPeace++; }
                     if (live && !st.IsUnderSiege) { double v = VillageTerm(st); if (v > 0.001) { termTowns++; termSum += v; } }
                 }
                 catch (Exception e) { Stumble("Daily(pomiar)", e); }
@@ -392,16 +394,18 @@ namespace Armoury
             sb.Append("Spichlerz miejski (p6): dzien ").Append(today).Append(live ? " | CZYNNE" : " | SPICHLERZE WSI NIECZYNNE (Famine) - skladnik wsi miast jak w grze, bezpiecznik BE czynny")
               .Append(" | miast ").Append(towns).Append(" (oblezone ").Append(besieged).Append(", Innych ").Append(walkers).Append(')')
               .Append(" | zboze ze wsi do miast dzis ").Append(F(units, "0.##")).Append(" szt./d Food (").Append(F(rations, "0")).Append(" racji) z ").Append(fedVills)
-              .Append(" wsi do ").Append(fedTowns).Append(" miast; wsi z nadwyzka ").Append(surplusVills).Append(", miasto pelne ").Append(fullTown)
-              .Append(", kasa miasta za mala ").Append(noGold)
+              .Append(" wsi do ").Append(fedTowns).Append(" miast; wsi z nadwyzka ").Append(surplusVills).Append(", bez miejsca w miescie ").Append(fullTown)
+              .Append(", bez zaplaty (kasa miasta) ").Append(noGold)
               .Append(" | zloto miasto->wies ").Append(gold).Append(" zl (cena zboza srednio ").Append(priceN > 0 ? F(priceSum / priceN, "0.#") : "-").Append(" zl/szt.)")
               .Append(" | miasta w niedoborze (zapas < ").Append(F(ShortDays, "0")).Append(" dni): ").Append(shortTowns).Append(", wsie sprzedaly z zapasu ponizej 98% sufitu ").Append(shortVills)
               .Append(" | skladnik wsi gry zdjety -").Append(F(termSum, "0.#")).Append("/d w ").Append(termTowns).Append(" miastach")
               .Append(" | miasta z bilansem < ").Append(F(_beThr, "0.##")).Append(": ").Append(neg).Append(" (bez oblezenia ").Append(negPeace).Append("; najnizszy ").Append(lowName).Append(' ')
               .Append(low == double.MaxValue ? "-" : F(low, "0.#")).Append(')')
-              .Append(" | miasta glodujace (Food 0): ").Append(hungry)
+              .Append(" | miasta glodujace (Food 0): ").Append(hungry).Append(" (bez oblezenia ").Append(hungryPeace).Append(')')
               .Append(_bePatched ? " | BE od wczoraj: testy miast " : " | BE (" + _beWhy + "): testy miast ").Append(_beSeen).Append(", oslonieto ").Append(_beGuard).Append(" (").Append(guardTowns).Append(" miast), glod BE bez jedzenia ").Append(_beHungry)
               .Append(" | kontrola: racje zdjete ").Append(F(rations, "0.##")).Append(" = Food x Q ").Append(F(rationsCheck, "0.##"))
+              .Append("; zapas miast +").Append(F(stockIn, "0.##")).Append(" = zakup ").Append(F(units, "0.##"))
+              .Append("; zloto: kasy miast -").Append(townOut).Append(", kiesy wsi +").Append(vilIn).Append(", zaplata ").Append(gold)
               .Append("; od wczytania ").Append(F(_sessUnits, "0.#")).Append(" szt. Food, ").Append(F(_sessRations, "0")).Append(" racji, ").Append(_sessGold).Append(" zl")
               .Append(" | potkniecia ").Append(_stumbles).Append(" (razem ").Append(_stumblesAll).Append(')')
               .Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms.");
