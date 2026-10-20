@@ -172,6 +172,10 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public bool TourneyRansom { get; set; } = true;
 
+        [SettingPropertyBool("Tourney Ransom Knocker Only", HintText = "with Tourney Ransom: in a group fight the ransom goes only to the knight who really struck the vanquished down (even if he was beaten later himself); a knight nobody struck down owes nothing. Off = as before, the best of the winners took the ransom of everyone his side outlasted (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("The lists themselves")]
+        public bool TourneyRansomKnockerOnly { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Tourney Ransom Share", 0.05f, 1.00f, "0.00", HintText = "with Tourney Ransom: the ransom of the lists is this share of the worth of the horse and armour in their present state (0.25 = a quarter - blunted arms are for honour, not for war); the pieces go to the victor only when the vanquished cannot pay even that. 1 = the full worth, as before (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
         public float TourneyRansomShare { get; set; } = 0.25f;
@@ -222,6 +226,7 @@ namespace GrandTourney
             s.NoblesIgnoreSkillGate = NoblesIgnoreSkillGate;
             s.MaxNoblesInBracket = MaxNoblesInBracket;
             s.TourneyRansom = TourneyRansom;
+            s.TourneyRansomKnockerOnly = TourneyRansomKnockerOnly;
             s.TourneyRansomShare = TourneyRansomShare;
             s.LogEnabled = LogEnabled;
         }

@@ -14,3 +14,11 @@ dopisuje "(the ransom of the lists: a quarter of their worth)". Sprzedaz sztuki 
 **Status:** DO SPRAWDZENIA (build 0). **Test w grze:** turniej z wygrana i przegrana walka - okno okupu ok. 1/4 wartosci; linia "Wykup (R3-04a): dzien" - kwoty ok. 4x nizsze.
 **Dla Jeffa:** Wygrana walka w szrankach daje teraz okup rowny 1/4 wartosci konia i zbroi pokonanego (u Ciebie ok. 2 tys. zamiast 8 tys.), a przegrana kosztuje 1/4 Twojego
 sprzetu (ok. 440 zamiast 1763). Turniej na tepa bron jest dla honoru - wciaz sie oplaca, ale nie daje fortuny.
+
+## Druga zmiana (Jeff: "ale jak to mozliwe, ze doszedlem do drugiej rundy i tyle kasy?") - prawdziwy blad
+**Przyczyna:** TourneyRansom.VictorOf - w walce grupowej przegrany, ktorego powalil ktos spoza zwyciezcow (sam potem odpadl) albo nikt, trafial do zwyciezcy z najlepszym
+wynikiem. Gracz z najlepszym wynikiem w swojej grupie 1. rundy zbieral okupy lordow powalonych przez innych.
+**Zmiana:** klucz Tourney Ransom Knocker Only (domyslnie TAK): okup tylko dla tego, kto naprawde powalil przegranego (_ko z KoPostfix), takze gdy sam potem odpadl;
+bez powalajacego z innej druzyny - bez okupu (licznik "bez powalajacego" w linii doby). NIE = jak dotad.
+**Test w grze:** walka grupowa z lordami - okna/komunikaty "bested by you" tylko za rycerzy powalonych przez gracza.
+
