@@ -761,6 +761,22 @@ namespace Armoury
                 if (dataStore.IsLoading) BulkUnit.Import(bulkUnit);
             }
             catch (Exception e) { Log.Error("SyncData.arm_bulk_unit", e); }
+            // R3-05e: rok urodzaju (doba losowania, siatka i wezly pola pogody) - brak klucza = stary zapis (x1 do nastepnego okna zniw); osobny try
+            try
+            {
+                string harvestYear = dataStore.IsSaving ? HarvestYear.Export() : null;
+                SaveText.Sync(dataStore, "arm_harvest_year", ref harvestYear);
+                if (dataStore.IsLoading) HarvestYear.Import(harvestYear);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_harvest_year", e); }
+            // R3-05f: dlug stad wsi po uboju jesiennym - brak klucza = stary zapis (bez dlugu); starsza DLL ignoruje klucz (dlug przepada - zwierzeta zostaja na targu)
+            try
+            {
+                string herdCull = dataStore.IsSaving ? HerdCull.Export() : null;
+                SaveText.Sync(dataStore, "arm_herd_cull", ref herdCull);
+                if (dataStore.IsLoading) HerdCull.Import(herdCull);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_herd_cull", e); }
             // 110 (zawor kasy zamku): dar startowy w kasach zamkow rozliczony raz na kampanie; brak klucza = stary zapis (o przycieciu
             // decyduje wiek kampanii). Osobny try PRZED reszta, jak przy zapasie startowym: wyjatek innego klucza nie moze zgubic tej flagi -
             // zgubiona flaga to drugie przyciecie, ktore zdjeloby z kas zamkow prawdziwy doplyw
@@ -1296,6 +1312,7 @@ namespace Armoury
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, GoodsPaths.OnItemProduced);   // ZC1 (BkSideGoodsOrigin): miod pitny zrobiony w miastach - o tyle drwale robia go mniej
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, TownFolk.OnItemProduced);   // E5/0 (195): wartosc wyrobow miast i zamkow - place rzemiosla 35% (kiesa ludu na sucho, tylko log)
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, Stage6Measure.OnItemProduced);   // E6/0 (206): wyroby miast wedlug krainy i konie ze stadnin wsi (tylko log)
+            CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, HerdCull.OnItemProduced);   // R3-05f: uboj jesienny (mieso, skory, sol) i splata dlugu stada z przyrostu wsi
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, VillageByPeople.OnItemProduced);   // GL-1 (P1): towar glowny wsi dopisany wsi - plon faktyczny do plon-wsi.csv (tylko licznik, przy kluczu VillageOutputByPeople)
             CampaignEvents.OnItemConsumedEvent.AddNonSerializedListener(this, OreLedger.OnConsumed);   // wpis 98: wsad linii towarowych (narzedzia, deski)
             // pelny system rynku uzbrojenia (Jeff 04.10, docs/MODEL-MATERIALOW.md)
@@ -2400,6 +2417,7 @@ namespace Armoury
             try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); } DayProfile.Lap("FoodChain.Daily");   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
             try { BkrotChains.Daily(); } catch (Exception e) { Log.Error("BkrotChains.Daily", e); } DayProfile.Lap("BkrotChains.Daily");   // P4 audytu: linia "Lancuchy modeli BKROT (P4): dzien N" (predkosc na morzu, zold Innych / Nieskalanych / na morzu, wzrok)
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); } DayProfile.Lap("WinterBite.OnDaily");
+            try { HarvestYear.Daily(); } catch (Exception e) { Log.Error("HarvestYear.Daily", e); } try { HerdCull.Daily(); } catch (Exception e) { Log.Error("HerdCull.Daily", e); } DayProfile.Lap("HarvestYear/HerdCull");   // R3-05e/f: rok urodzaju (losowanie w oknie zniw), okno uboju jesiennego i splata stad
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
             finally { GoodsLedger.End(gfForage); } DayProfile.Lap("ScorchedEarth.OnDaily");

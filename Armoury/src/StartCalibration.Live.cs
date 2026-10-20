@@ -354,6 +354,7 @@ namespace Armoury
                 catch { f = 1.0; }
                 if (!(f >= 0) || double.IsInfinity(f)) f = 1.0;
                 for (int i = 0; i < ItemCount; i++) prod[i] *= f;
+                HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (poza zima)
             }
             // co okreg zje sam (wies; pola mieszczan - nic, ich ludzie sa w potrzebach miasta)
             if (!ld.TF)
