@@ -22,3 +22,9 @@ wynikiem. Gracz z najlepszym wynikiem w swojej grupie 1. rundy zbieral okupy lor
 bez powalajacego z innej druzyny - bez okupu (licznik "bez powalajacego" w linii doby). NIE = jak dotad.
 **Test w grze:** walka grupowa z lordami - okna/komunikaty "bested by you" tylko za rycerzy powalonych przez gracza.
 
+## Decyzja Jeffa (20.10 ok. 12:00): bez zmniejszania
+"ale nie musisz sztucznie zmniejszac, jak powalilem 3 rycerzy, to po pierwsze biore ich okup ... za ich zbroje, ale jak nie maja kasy, to ich zbroje, bo nie moga placic
+z czego czego nie maja, aby nie bylo kasy z niczego" -> TourneyRansomShare domyslnie 1 (pelna wartosc, jak przed m95); pokretlo zostaje. Zostaje Knocker Only (okup tylko od
+rycerzy powalonych przez gracza/AI, takze w walce grupowej). Placi tylko z tego, co ma (kiesa, glowa rodu w granicy nadwyzki rodu ponad rezerwe), reszta sztuk do zwyciezcy -
+tak dzialalo i dziala (Settle: pc.Worth <= room i <= kiesa + glowa).
+
