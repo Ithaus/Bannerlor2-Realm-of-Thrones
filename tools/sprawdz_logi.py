@@ -50580,7 +50580,7 @@ NSP_DAYN = re.compile(r"^Spichlerze \(E4/6\): dzien (?P<d>-?\d+) \| CZYNNE")
 NSP_SPOIL = re.compile(r"\| psucie w spichlerzach \(f23\): zepsute dzis (?P<s>\d+) racji z (?P<b>\d+) w spichlerzu po dobie \((?P<p>\d+(?:\.\d+)?)%/rok = ulamek doby "
                        r"(?P<dd>\d+(?:\.\d+)?) na (?P<y>\d+) dni roku gry\); od wczytania (?P<t>\d+) racji")
 NSP_SPOFF = re.compile(r"\| psucie w spichlerzach \(f23\): (?P<why>WYLACZONE w MCM|0%/rok)")
-NSP_CTL = re.compile(r"\| kontrola spichlerzy ([+-]?\d+(?:\.\d+)?)")
+NSPI_CTL = re.compile(r"\| kontrola spichlerzy ([+-]?\d+(?:\.\d+)?)")
 NSP_TOT = re.compile(r"\| spichlerze swiata (\d+(?:\.\d+)?) mln racji = (\d+) dni potrzeby \(gospodarze (\d+(?:\.\d+)?) mln")
 NSP_HUNG = re.compile(r"\| glod: wsi (\d+)")
 NSP_DEAD = re.compile(r"\| zmarli z glodu: gospodarze (\d+(?:\.\d+)?), uchodzcy (\d+(?:\.\d+)?), mieszczanie (\d+(?:\.\d+)?)")
@@ -50625,7 +50625,7 @@ def nspichlerze_main(logp):
                 if not md:
                     continue
                 d = int(md.group("d"))
-                mc, mt = NSP_CTL.search(s), NSP_TOT.search(s)
+                mc, mt = NSPI_CTL.search(s), NSP_TOT.search(s)
                 mh, mz = NSP_HUNG.search(s), NSP_DEAD.search(s)
                 rec = {"c": float(mc.group(1)) if mc else None, "tot": float(mt.group(1)) * 1e6 if mt else None, "dn": int(mt.group(2)) if mt else None,
                        "hosts": float(mt.group(3)) * 1e6 if mt else None, "hung": int(mh.group(1)) if mh else 0,
