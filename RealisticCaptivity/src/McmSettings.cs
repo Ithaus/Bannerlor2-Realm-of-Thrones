@@ -36,9 +36,17 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Gear and plunder")]
         public bool CaptorTakesAllFromPlayer { get; set; } = true;
 
-        [SettingPropertyBool("Player Loses Like Ai Lord", HintText = "when you are taken captive you lose what a beaten AI lord loses, no more and no less: your captors keep you in your own arms and clothes (a lord's renowned arms still go by the custom of war), your purse pays only the battle's toll as any lord's does (a twentieth, at most 10000), and your whole baggage train is theirs as a broken lord's company is; your companions keep their gear too (overrides Captor Takes All From Player, Strip Equipment, Strip Companions and Loot Gold Percent; off = as before) (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyBool("Player Loses Like Ai Lord", HintText = "when you are taken captive you lose what a beaten AI lord loses, no more and no less: your captors keep you in your own arms and clothes (a lord's renowned arms still go by the custom of war), your purse pays only the battle's toll as any lord's does (a twentieth, at most 10000), and your whole baggage train is theirs as a broken lord's company is; your companions keep their gear too; with Captor Takes Arms And Purse on, your war gear and your purse go to your captor as well (overrides Captor Takes All From Player, Strip Equipment, Strip Companions and Loot Gold Percent; off = as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool PlayerLosesLikeAiLord { get; set; } = true;
+
+        [SettingPropertyBool("Captor Takes Arms And Purse", HintText = "with Player Loses Like Ai Lord on: whoever takes you captive also takes your war gear - weapons, banner, armour, horse and harness - into his own packs (the stores of the settlement, if its militia, garrison or dungeon took you) and every coin in your purse into his own purse (or the settlement's coffers). Your town clothes stay yours, but on the road and in battle you have only your smallclothes and no horse until you get new gear. What you do not carry stays yours: the strongbox and chest of your houses, your workshops and fiefs. Renowned unique arms still go only by the custom of war. Your gear is then his plunder like any other: he may sell it or wear it. If his company is beaten and you are set free by force, you take your gear back (see Gear Back From Victors); ransom, escape or peace leave it with him (off = you keep your arms and your purse, as before) (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Gear and plunder")]
+        public bool CaptorTakesArmsAndPurse { get; set; } = true;
+
+        [SettingPropertyBool("Gear Back From Victors", HintText = "when your captors' company is beaten in battle and you are set free, you also take back the pieces of your war gear that the victors have just taken from your captors' packs, so all of your gear that your captors still had comes back to you, whoever freed you (off = only what the victors left in your captors' packs comes back, about half) (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Gear and plunder")]
+        public bool GearBackFromVictors { get; set; } = true;
 
         [SettingPropertyBool("Captor Takes All Baggage", HintText = "with Captor Takes All From Player on, your captor also takes your whole baggage train - goods, food and pack animals - not just Loot Party Inventory Percent; a lord or a band puts it in their own packs, a settlement whose men took you (militia, garrison or dungeon) in its own stores, like your gold (off = Loot Party Inventory Percent, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
@@ -469,6 +477,8 @@ namespace RealisticCaptivity
             s.LootGoldPercent = LootGoldPercent;
             s.CaptorTakesAllFromPlayer = CaptorTakesAllFromPlayer;
             s.PlayerLosesLikeAiLord = PlayerLosesLikeAiLord;
+            s.CaptorTakesArmsAndPurse = CaptorTakesArmsAndPurse;
+            s.GearBackFromVictors = GearBackFromVictors;
             s.CaptorTakesAllBaggage = CaptorTakesAllBaggage;
             s.BuybackEnabled = BuybackEnabled;
             s.BuybackPriceMultiplier = BuybackPriceMultiplier;

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -35,6 +37,22 @@ namespace RealisticCaptivity
         private string _captorHomeId = "";        // StringId osady
         private string _captorBandId = "";        // StringId partii bez bohatera i bez osady (banda)
         private int _e8DebtHomeN, _e8DebtHomeGold, _e8DebtNoTaker;   // liczniki sesji (nie w save; nowa instancja = nowa kampania, R8)
+        // n20-niewola (CaptorTakesArmsAndPurse): rynsztunek bojowy gracza oddany zdobywcy - TYLKO KSIEGA (sztuki leza w jukach zdobywcy / zapasie osady,
+        // nie tu): co zabrano ("slot|item|mod") i dokad ("p:<StringId partii>" / "s:<StringId osady>"). Sluzy do odebrania przy odbiciu sila i do linii
+        // logu przy wyjsciu; czyszczona przy kazdym wyjsciu z niewoli. Zapis: jeden napis rc_n20_warGear "1#dokad#wpis;wpis" (najwyzej 12 wpisow) przez
+        // SaveText.Sync; stary zapis bez klucza - pusta ksiega (nic do odebrania).
+        private List<string> _warGear = new List<string>();
+        private string _warGearAt = "";
+        private int _n20Taken, _n20Items, _n20Back, _n20Left;   // liczniki sesji (nie w save) do linii logu
+        private long _n20Gold;
+        // n20-niewola poprawka po recenzji (GearBackFromVictors): SLAD LUPU - ktore sztuki z ksiegi gra dala zwyciezcom z jukow zdobywcy w bitwie, ktora zaraz
+        // uwolni gracza. MapEvent.CalculateAndCommitMapEventResults: LootDefeatedPartyItems (juki pokonanych losowo do zwyciezcow, szansa ok. 0.5 na sztuke,
+        // zdarzenie OnLootDistributedToParty) idzie PRZED LootDefeatedPartyPrisoners (tam ApplyByReleasedAfterBattle gracza) - obie w jednym wywolaniu, partie
+        // sa jeszcze w bitwie. Slad tylko na czas tego rozliczenia (nie w save): wazny, gdy przy wyjsciu partia zdobywcy jest w TEJ SAMEJ bitwie (_lootTrailEvent).
+        private sealed class LootTrail { public PartyBase To; public EquipmentElement El; public int N; }
+        private readonly List<LootTrail> _lootTrail = new List<LootTrail>();
+        private MapEvent _lootTrailEvent;
+        private int _n20FromVictors, _trailFail;   // liczniki sesji (nie w save)
 
         // ODBICIE SILA, ALE NIE PRZEZ SILNIK (13.09): wlasna odsiecz rodu konczy
         // niewole przez ApplyByEscape (Rescue.cs:76), a nie ReleasedAfterBattle -
@@ -82,6 +100,7 @@ namespace RealisticCaptivity
                     var e8p = (e8 ?? "").Split('|');
                     if (e8p.Length >= 3 && e8p[0] == "1") { _captorHomeId = e8p[1]; _captorBandId = e8p[2]; }
                 }
+                SyncWarGear(dataStore);   // n20-niewola
                 _familyHomeSold = _familyHomeSold || Homes.FamilyHomeSold;
                 dataStore.SyncData("rc_familyHomeSold", ref _familyHomeSold);
                 Homes.FamilyHomeSold = _familyHomeSold;
@@ -106,6 +125,7 @@ namespace RealisticCaptivity
             CampaignEvents.HeroPrisonerReleased.AddNonSerializedListener(this, OnHeroPrisonerReleased);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, CleanBreak.OnMapEventEnded);
+            CampaignEvents.OnLootDistributedToPartyEvent.AddNonSerializedListener(this, OnLootDistributed);   // n20-niewola: slad lupu (GearBackFromVictors)
         }
 
         private Dictionary<string, ItemRoster> _homeStash = new Dictionary<string, ItemRoster>();
@@ -131,6 +151,11 @@ namespace RealisticCaptivity
                 Homes.AnnounceOwned();
                 Dialogs.Add(starter);
                 Log.Info("Sesja wystartowala, dialogi, domy i praca dodane.");
+                // n20-niewola: stan reguly na start sesji (widac w kazdym biegu, takze bez pojmania)
+                Log.Info("Niewola gracza (n20): CaptorTakesArmsAndPurse=" + Settings.Current.CaptorTakesArmsAndPurse + " (C4 PlayerLosesLikeAiLord=" + Settings.Current.PlayerLosesLikeAiLord
+                         + "; czynne: " + (Settings.Current.CaptorTakesArmsAndPurse && Settings.Current.PlayerLosesLikeAiLord) + "), GearBackFromVictors=" + Settings.Current.GearBackFromVictors
+                         + ", unikaty przez Armoury UniqueSpoils: " + ArmouryBridge.UniqueKnown
+                         + ", ksiega rynsztunku u zdobywcy z zapisu: " + (_warGear != null ? _warGear.Count : 0) + " szt." + (_warGear != null && _warGear.Count > 0 ? " (" + _warGearAt + ")" : ""));
             }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
         }
@@ -155,7 +180,9 @@ namespace RealisticCaptivity
 
                 _lowborn = !HasNobleStanding();
                 // C4 (Jeff 14.10): jak pokonany lord AI - rynsztunek zostaje na graczu (unikaty bierze zdobywca w Armoury UniqueSpoils, jak u AI)
-                if (Settings.Current.PlayerLosesLikeAiLord) Log.Info("Pojmanie gracza (C4, jak lord AI): rynsztunek zostaje na graczu (unikaty - zwyczaj wojny Armoury), zloto - tylko lup bitwy (5%, najwyzej 10 000), tabor caly do zdobywcy, zbrojownia DTE - Armoury.");
+                // n20-niewola (Jeff 19.10, CaptorTakesArmsAndPurse): przy C4 zdobywca bierze tez rynsztunek bojowy do swoich jukow i cale zloto przy sobie (LootBaggage)
+                if (Settings.Current.PlayerLosesLikeAiLord && Settings.Current.CaptorTakesArmsAndPurse) TakeWarGear(capturer);
+                else if (Settings.Current.PlayerLosesLikeAiLord) Log.Info("Pojmanie gracza (C4, jak lord AI): rynsztunek zostaje na graczu (unikaty - zwyczaj wojny Armoury), zloto - tylko lup bitwy (5%, najwyzej 10 000), tabor caly do zdobywcy, zbrojownia DTE - Armoury.");
                 else if (Settings.Current.StripEquipment || Settings.Current.CaptorTakesAllFromPlayer) StripGear();   // E5 decyzja 9: caly rynsztunek
                 LootBaggage(capturer);
                 StartRescueMission();
@@ -213,6 +240,282 @@ namespace RealisticCaptivity
                     Log.Player("Your captors stripped you of your war gear. " + taken + " items taken.", true);
             }
             catch (Exception e) { Log.Error("StripGear", e); }
+        }
+
+        // ---------------------------------------------------------------- n20-niewola: rynsztunek bojowy do zdobywcy
+        /// <summary>n20-niewola (Jeff 19.10, CaptorTakesArmsAndPurse, przy C4): zdobywca zabiera rynsztunek bojowy gracza - 12 slotow zestawu bojowego (bron,
+        /// choragiew, zbroja, kon, uprzaz) - DO SWOICH JUKOW, nie w limbo jak stary StripGear: lord i banda - juki partii (ItemRoster), osada (milicja, zaloga,
+        /// loch) - jej zapas (Settlement.ItemRoster); ten sam odbiorca co tabor w LootBaggage (CaptorHome). Dalej to jego lup jak kazdy inny: AI sprzedaje lup
+        /// w miescie (zaplata miasta), prawo band Armoury (OutlawLaw), a gdy jego druzyna przegra bitwe - gra rozdaje juki zwyciezcom losowo, sztuka po sztuce
+        /// z szansa ok. 0.5 (MapEvent.LootDefeatedPartyItems, PRZED uwolnieniem jencow - LootDefeatedPartyPrisoners; milicja i zaloga nie lupia) - zwrot
+        /// graczowi w WarGearOnRelease (z GearBackFromVictors takze od zwyciezcow). Stroj cywilny i zestaw ukrycia zostaja - ale widac je TYLKO w scenach osad:
+        /// ikona na mapie, ekran postaci i bitwa uzywaja zestawu bojowego (CharacterObject.Equipment = HeroObject.BattleEquipment), wiec tam bohater jest
+        /// w bieliznie i pieszo (bez lachmanow z niczego - zamknieta ekonomia; w zestawie cywilnym zostaje tez bron cywilna, jesli ja nosil, ale do bitwy
+        /// gra jej nie bierze). Unikaty (spis ROT, stal valyrianska) - tylko zwyczaj wojny Armoury (UniqueSpoils.Take: bierze je
+        /// zdobywca-bohater, sluchacz Armoury biegnie PRZED RC - zarejestrowany pozniej); RC ich nie rusza. Sztuka, ktora nie weszla do jukow, zostaje
+        /// na graczu (nic nie znika). Bez pojmujacego z jukami - nic nie zabrane. Ksiega _warGear - tylko do odebrania przy odbiciu sila.</summary>
+        private void TakeWarGear(PartyBase capturer)
+        {
+            try
+            {
+                _warGear.Clear(); _warGearAt = ""; _lootTrail.Clear(); _lootTrailEvent = null;
+                var eq = Hero.MainHero != null ? Hero.MainHero.BattleEquipment : null;
+                if (eq == null || (Campaign.Current != null && ReferenceEquals(eq, Campaign.Current.DeadBattleEquipment))) return;
+                string at, where;
+                var dest = PlunderDest(capturer, out at, out where);
+                if (dest == null)
+                {
+                    Log.Info("Rynsztunek gracza (n20, CaptorTakesArmsAndPurse): pojmujacy bez jukow i zapasu (" + (capturer != null ? capturer.Name.ToString() : "brak partii") + ") - rynsztunek zostaje na graczu.");
+                    return;
+                }
+                int taken = 0, horse = 0, weapons = 0, armour = 0, uniq = 0, fail = 0;
+                long worth = 0;
+                for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
+                {
+                    var el = eq[i];
+                    if (el.IsEmpty || el.Item == null) continue;
+                    if (ArmouryBridge.IsUnique(el.Item)) { uniq++; continue; }   // unikat - zwyczaj wojny Armoury, nie juki zdobywcy
+                    try { dest.AddToCounts(el, 1); }
+                    catch (Exception e) { if (fail++ == 0) Log.Error("TakeWarGear.put", e); continue; }   // nie weszla do jukow - zostaje na graczu
+                    eq[i] = EquipmentElement.Invalid;
+                    _warGear.Add(i + "|" + el.Item.StringId + "|" + (el.ItemModifier != null ? el.ItemModifier.StringId : ""));
+                    taken++; worth += el.ItemValue;
+                    if (i == (int)EquipmentIndex.Horse || i == (int)EquipmentIndex.HorseHarness) horse++;
+                    else if (i <= (int)EquipmentIndex.ExtraWeaponSlot) weapons++;
+                    else armour++;
+                }
+                if (taken > 0) _warGearAt = at;
+                _n20Taken++; _n20Items += taken;
+                int leftOn = 0;   // co zostalo w zestawie bojowym (unikat, ktorego nikt nie wzial; sztuka, ktora nie weszla do jukow)
+                for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++) if (!eq[i].IsEmpty) leftOn++;
+                Log.Info("Rynsztunek gracza (n20, CaptorTakesArmsAndPurse): " + taken + " szt. (wartosc " + worth + "; bron i choragiew " + weapons + ", zbroja " + armour
+                         + ", kon i uprzaz " + horse + ") -> " + where + " | unikaty zostawione zwyczajowi wojny Armoury " + uniq + (ArmouryBridge.UniqueKnown ? "" : " (brak Armoury UniqueSpoils)")
+                         + (fail > 0 ? " | nie weszly do jukow, zostaja na graczu " + fail : "") + " | stroj cywilny i zestaw ukrycia zostaja (widac je tylko w osadach; na mapie, w ekranie postaci i w bitwie zestaw bojowy - zostaje w nim " + leftOn
+                         + " szt., pusty korpus to bielizna)"
+                         + " | w tej sesji pojman " + _n20Taken + ", sztuk " + _n20Items + ".");
+                if (taken > 0)
+                    Log.Player("Your captors strip you of your war gear - " + taken + " pieces" + (horse > 0 ? ", your horse among them" : "") + " - and put it in their "
+                               + (at.StartsWith("s:") ? "stores" : "packs") + (leftOn == 0
+                                   ? ". You keep your town clothes, but on the road and in battle you have only your smallclothes" + (horse > 0 ? " and go on foot" : "") + " until you get new gear."
+                                   : ". You keep your town clothes and the " + leftOn + " pieces they left you" + (horse > 0 ? ", but you go on foot" : "") + "."), true);
+            }
+            catch (Exception e) { Log.Error("TakeWarGear", e); }
+        }
+
+        /// <summary>n20-niewola: dokad idzie lup z gracza - ten sam odbiorca co tabor (LootBaggage): osada pojmujacego bez bohatera (loch, milicja, zaloga) -
+        /// jej zapas; inna partia w polu (lord, banda, karawana) - jej juki. at: "s:&lt;osada&gt;" / "p:&lt;partia&gt;"; null - nikt.</summary>
+        private static ItemRoster PlunderDest(PartyBase capturer, out string at, out string where)
+        {
+            at = ""; where = "nikt";
+            if (capturer == null) return null;
+            Settlement home = CaptorHome(capturer);
+            if (home != null && home.ItemRoster != null) { at = "s:" + home.StringId; where = "zapas osady " + home.Name; return home.ItemRoster; }
+            var mp = capturer.IsMobile ? capturer.MobileParty : null;
+            if (mp != null && mp != MobileParty.MainParty && capturer.ItemRoster != null) { at = "p:" + mp.StringId; where = "juki partii " + capturer.Name; return capturer.ItemRoster; }
+            return null;
+        }
+
+        /// <summary>n20-niewola, wyjscie z niewoli: rynsztunek zostaje u zdobywcy (okup, ucieczka, pokoj, wyrzucenie przez bandytow, dlug). ODBICIE SILA
+        /// (ReleasedAfterBattle albo odsiecz rodu Rescue.TryFightRescue) - gracz odbiera swoje sztuka po sztuce (ten sam przedmiot i stan): najpierw z jukow /
+        /// zapasu tych, ktorzy go trzymali; przy ReleasedAfterBattle i GearBackFromVictors - brakujace sztuki takze z jukow zwyciezcow, ktorym gra dala je z jukow
+        /// zdobywcy w TEJ bitwie (slad _lootTrail, OnLootDistributed). Tak obie drogi odsieczy (wirtualna TryFightRescue i prawdziwa bitwa AI z AI) i kazdy
+        /// zwyciezca (lord, druzyna rodu, milicja) daja ten sam wynik: wraca wszystko, co zdobywca jeszcze mial. Czego juz nie ma (sprzedane, zalozone przed
+        /// bitwa; przy wylaczonym kluczu - lup zwyciezcow), tego nie ma - nic nie powstaje. Juki innej partii niz ta, ktora trzymala gracza w chwili wyjscia
+        /// (np. lord odjechal, gracz w lochu) - bez odbioru. Odebrana sztuka wraca do swojego slotu, a gdy slot zajety - do taboru gracza. Ksiega i slad
+        /// czyszczone zawsze.</summary>
+        private void WarGearOnRelease(PartyBase heldBy, EndCaptivityDetail detail, bool byForce)
+        {
+            int n = _warGear.Count, back = 0, gone = 0, toBag = 0, fromVictors = 0;
+            string at = _warGearAt ?? "";
+            bool keyVictors = Settings.Current.GearBackFromVictors;
+            try
+            {
+                string where = "";
+                ItemRoster from = byForce ? HolderIfSame(heldBy, out where) : null;
+                // slad lupu tylko z tej samej bitwy, w ktorej padla partia zdobywcy (partie sa jeszcze w bitwie przy LootDefeatedPartyPrisoners)
+                bool useTrail = from != null && keyVictors && detail == EndCaptivityDetail.ReleasedAfterBattle && _lootTrail.Count > 0
+                                && _lootTrailEvent != null && heldBy != null && ReferenceEquals(heldBy.MapEvent, _lootTrailEvent);
+                var slots = new StringBuilder();
+                var victors = new List<string>();
+                if (from != null)
+                {
+                    var eq = Hero.MainHero.BattleEquipment;
+                    foreach (var entry in _warGear)
+                    {
+                        int slot; EquipmentElement el;
+                        if (!ParseGear(entry, out slot, out el)) { gone++; continue; }
+                        ItemRoster src = null;
+                        int idx = from.FindIndexOfElement(el);
+                        if (idx >= 0 && from.GetElementNumber(idx) > 0) src = from;
+                        else if (useTrail)
+                        {
+                            foreach (var t in _lootTrail)
+                            {
+                                if (t.N <= 0 || t.To == null || t.To.ItemRoster == null || !t.El.IsEqualTo(el)) continue;
+                                int j = t.To.ItemRoster.FindIndexOfElement(el);
+                                if (j < 0 || t.To.ItemRoster.GetElementNumber(j) <= 0) continue;
+                                src = t.To.ItemRoster;
+                                t.N--;
+                                fromVictors++;
+                                string nm = t.To.Name != null ? t.To.Name.ToString() : "?";
+                                if (!victors.Contains(nm)) victors.Add(nm);
+                                break;
+                            }
+                        }
+                        if (src == null) { gone++; continue; }
+                        src.AddToCounts(el, -1);
+                        if (slot >= 0 && slot < (int)EquipmentIndex.NumEquipmentSetSlots && eq[slot].IsEmpty) eq[slot] = el;
+                        else { MobileParty.MainParty.ItemRoster.AddToCounts(el, 1); toBag++; }
+                        back++;
+                        if (slots.Length > 0) slots.Append(',');
+                        slots.Append(slot >= 0 && slot < (int)EquipmentIndex.NumEquipmentSetSlots ? ((EquipmentIndex)slot).ToString() : slot.ToString());
+                    }
+                }
+                int left = n - back - gone;
+                _n20Back += back; _n20Left += left + gone; _n20FromVictors += fromVictors;
+                Log.Info("Rynsztunek gracza (n20) przy wyjsciu z niewoli (" + detail + (byForce ? ", odbicie sila" : "") + "): zabrane " + n + " szt. -> " + (at != "" ? at : "?")
+                         + (byForce ? (from != null ? "; odebrane " + back + " (z " + where + " " + (back - fromVictors) + ", od zwyciezcow z tej bitwy " + fromVictors
+                                                      + (victors.Count > 0 ? " [" + string.Join("; ", victors) + "]" : "") + (toBag > 0 ? "; do taboru, slot zajety " + toBag : "") + ")"
+                                                      + (back > 0 ? ", sloty " + slots : "") + ", juz nie ma " + gone
+                                                      + " | GearBackFromVictors=" + keyVictors + (detail == EndCaptivityDetail.ReleasedAfterBattle ? ", slad lupu " + (useTrail ? "uzyty" : "brak") : "")
+                                                    : "; juki innej partii niz ta, ktora trzymala gracza (" + (heldBy != null ? heldBy.Name.ToString() : "brak") + ") - bez odbioru")
+                                   : "; zostaje u zdobywcy " + n)
+                         + " | w tej sesji pojman " + _n20Taken + ", sztuk " + _n20Items + ", zlota " + _n20Gold + ", odebranych przy odbiciu " + _n20Back
+                         + " (od zwyciezcow " + _n20FromVictors + "), zostalo u zdobywcow " + _n20Left + ".");
+                if (detail == EndCaptivityDetail.Death) return;
+                // przy wylaczonym kluczu brakujace sztuki po bitwie to zwykle lup zwyciezcow; przy wlaczonym - sprzedane / zalozone przed bitwa
+                string goneWhy = (!keyVictors && detail == EndCaptivityDetail.ReleasedAfterBattle) ? "plunder of the victors, sold or worn" : "sold or worn before you were freed";
+                if (back > 0 && gone == 0)
+                    Log.Player("Your captors are broken, and your war gear comes back to you - all " + back + " pieces"
+                               + (fromVictors > 0 ? ", some of them handed back by the men who freed you." : "."), false);
+                else if (back > 0)
+                    Log.Player("Your captors are broken, and you take back " + back + " pieces of your war gear"
+                               + (fromVictors > 0 ? ", some of them handed back by the men who freed you" : "") + ". The other " + gone + " are gone - " + goneWhy + ".", false);
+                else if (from != null)
+                    Log.Player("Your war gear is no longer with those who held you - " + goneWhy + ".", true);
+                else
+                    Log.Player("Your war gear stays with your captors. Win it back, or buy new.", true);
+            }
+            catch (Exception e) { Log.Error("WarGearOnRelease", e); }
+            finally { _warGear.Clear(); _warGearAt = ""; _lootTrail.Clear(); _lootTrailEvent = null; }
+        }
+
+        /// <summary>n20-niewola: wpis ksiegi "slot|item|mod" -> slot i sztuka (ten sam przedmiot i stan). false - zly wpis albo przedmiotu nie ma w grze.</summary>
+        private static bool ParseGear(string entry, out int slot, out EquipmentElement el)
+        {
+            slot = -1; el = EquipmentElement.Invalid;
+            var p = (entry ?? "").Split('|');
+            if (p.Length < 2 || !int.TryParse(p[0], out slot)) return false;
+            ItemObject item = null; ItemModifier mod = null;
+            try
+            {
+                item = MBObjectManager.Instance.GetObject<ItemObject>(p[1]);
+                if (item != null && p.Length > 2 && !string.IsNullOrEmpty(p[2])) mod = MBObjectManager.Instance.GetObject<ItemModifier>(p[2]);
+            }
+            catch { item = null; }
+            if (item == null) return false;
+            el = new EquipmentElement(item, mod);
+            return true;
+        }
+
+        /// <summary>n20-niewola (GearBackFromVictors), CampaignEvents.OnLootDistributedToPartyEvent: gra dala zwyciezcy lup z jukow pokonanej partii
+        /// (MapEvent.LootDefeatedPartyItems; zdarzenie z innym zwyciezca niz gracz pada tylko tam). Gdy pokonana partia to ta, ktora trzyma gracza i do ktorej
+        /// jukow poszedl jego rynsztunek - zapamietaj, ile sztuk z ksiegi dostal ten zwyciezca (najwyzej tyle, ile jest w ksiedze). Zdarzenie pada przy kazdej
+        /// bitwie swiata - pierwszy warunek (pusta ksiega) bez alokacji; idzie na watku glownym (rozliczenie bitew), nie z PartiesThink.</summary>
+        private void OnLootDistributed(PartyBase winner, PartyBase defeated, ItemRoster loot)
+        {
+            if (_warGear == null || _warGear.Count == 0 || winner == null || defeated == null || loot == null || loot.Count == 0) return;
+            try
+            {
+                if (!Settings.Current.GearBackFromVictors || Hero.MainHero == null || !Hero.MainHero.IsPrisoner) return;
+                var at = _warGearAt ?? "";
+                if (at.Length < 3 || at[0] != 'p' || !defeated.IsMobile || defeated.MobileParty == null || defeated.MobileParty.StringId != at.Substring(2)) return;
+                if (Hero.MainHero.PartyBelongedToAsPrisoner != defeated && PlayerCaptivity.CaptorParty != defeated) return;   // ksiega wskazuje te partie, ale gracza trzyma juz kto inny
+                var me = defeated.MapEvent;
+                if (me == null) return;
+                if (!ReferenceEquals(_lootTrailEvent, me)) { _lootTrail.Clear(); _lootTrailEvent = me; }
+                int noted = 0;
+                var seen = new List<EquipmentElement>();
+                foreach (var entry in _warGear)
+                {
+                    int slot; EquipmentElement el;
+                    if (!ParseGear(entry, out slot, out el)) continue;
+                    bool dup = false;
+                    foreach (var x in seen) if (x.IsEqualTo(el)) { dup = true; break; }
+                    if (dup) continue;
+                    seen.Add(el);
+                    int inLedger = 0;
+                    foreach (var e2 in _warGear) { int s2; EquipmentElement el2; if (ParseGear(e2, out s2, out el2) && el2.IsEqualTo(el)) inLedger++; }
+                    int idx = loot.FindIndexOfElement(el);
+                    int got = idx >= 0 ? loot.GetElementNumber(idx) : 0;
+                    int k = Math.Min(got, inLedger);
+                    if (k <= 0) continue;
+                    _lootTrail.Add(new LootTrail { To = winner, El = el, N = k });
+                    noted += k;
+                }
+                if (noted > 0)
+                    Log.Info("Slad lupu (n20 GearBackFromVictors): " + winner.Name + " wzial z jukow " + defeated.Name + " " + noted + " szt. rynsztunku gracza - wroca przy uwolnieniu w tej bitwie.");
+            }
+            catch (Exception e) { if (_trailFail++ < 3) Log.Error("OnLootDistributed", e); }
+        }
+
+        /// <summary>Juki / zapas z ksiegi, ale tylko gdy to ta sama partia albo osada, ktora trzymala gracza w chwili wyjscia. Inaczej null.</summary>
+        private ItemRoster HolderIfSame(PartyBase heldBy, out string where)
+        {
+            where = "";
+            var at = _warGearAt ?? "";
+            if (heldBy == null || at.Length < 3) return null;
+            string id = at.Substring(2);
+            if (at[0] == 'p')
+            {
+                var mp = heldBy.IsMobile ? heldBy.MobileParty : null;
+                if (mp != null && mp.StringId == id && mp.ItemRoster != null) { where = "juki partii " + heldBy.Name; return mp.ItemRoster; }
+                return null;
+            }
+            if (at[0] == 's')
+            {
+                Settlement st = CaptorHome(heldBy) ?? (heldBy.IsSettlement ? heldBy.Settlement : null);
+                if (st != null && st.StringId == id && st.ItemRoster != null) { where = "zapas osady " + st.Name; return st.ItemRoster; }
+            }
+            return null;
+        }
+
+        /// <summary>n20-niewola: ksiega rynsztunku w zapisie - jeden napis "1#dokad#wpis;wpis" (najwyzej 12 wpisow, ponizej 2 KB) przez SaveText.Sync.
+        /// Stary zapis bez klucza - pusta ksiega. Wlasny try - wyjatek tu nie przerywa reszty SyncData.</summary>
+        private void SyncWarGear(IDataStore ds)
+        {
+            try
+            {
+                string s = null;
+                if (ds.IsSaving)
+                {
+                    var sb = new StringBuilder("1#");
+                    sb.Append(_warGearAt ?? "").Append('#');
+                    int k = 0;
+                    if (_warGear != null)
+                        foreach (var e in _warGear)
+                        {
+                            if (k >= 16) break;
+                            if (k > 0) sb.Append(';');
+                            sb.Append(e);
+                            k++;
+                        }
+                    s = sb.ToString();
+                }
+                SaveText.Sync(ds, "rc_n20_warGear", ref s);
+                if (ds.IsLoading)
+                {
+                    _warGear = new List<string>();
+                    _warGearAt = "";
+                    var p = (s ?? "").Split('#');
+                    if (p.Length >= 3 && p[0] == "1")
+                    {
+                        _warGearAt = p[1];
+                        foreach (var e in p[2].Split(';')) if (!string.IsNullOrEmpty(e)) _warGear.Add(e);
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("SyncWarGear", e); }
         }
 
         // ---------------------------------------------------------------- towarzysze
@@ -578,7 +881,23 @@ namespace RealisticCaptivity
 
                 int goldTaken = 0;
                 string to = "";
-                if (likeAi) to = "nikt - jak lord AI: zloto tylko przez lup bitwy (5%, najwyzej 10 000; A6)";
+                // n20-niewola (CaptorTakesArmsAndPurse): przy C4 cale zloto przy sobie (Hero.Gold) do pojmujacego - ta sama droga co E5 (GoldToCaptor: kiesa lorda,
+                // kasa osady milicji / zalogi / lochu, kiesa bandy). Pojmanie idzie w CaptureDefeatedPartyMembers PRZED rozliczeniem lupu A6 - Armoury liczy to,
+                // co zeszlo z kiesy od migawki, jako zaliczke (LeaderCap), wiec gracz nie placi drugi raz, a udzialy zwyciezcow z puli maleja o to samo.
+                bool armsPurse = likeAi && s.CaptorTakesArmsAndPurse;
+                if (armsPurse)
+                {
+                    int g = Hero.MainHero.Gold;
+                    if (g > 0)
+                    {
+                        to = GoldToCaptor(capturer, g);
+                        goldTaken = to != null ? g - Math.Max(0, Hero.MainHero.Gold) : 0;
+                        to = to == null ? "brak pojmujacego - nic nie zabrano" : to + " (n20 CaptorTakesArmsAndPurse: cale zloto przy sobie; A6 - zaliczka lupu bitwy)";
+                    }
+                    else to = "kiesa pusta (n20 CaptorTakesArmsAndPurse)";
+                    _n20Gold += goldTaken;
+                }
+                else if (likeAi) to = "nikt - jak lord AI: zloto tylko przez lup bitwy (5%, najwyzej 10 000; A6)";
                 else if (all)
                 {
                     int g = Hero.MainHero.Gold;
@@ -602,7 +921,10 @@ namespace RealisticCaptivity
                 Log.Info("Przetrzasnieto juki: " + itemsTaken + " przedmiotow, " + goldTaken + " zlota."
                          + (all ? (likeAi ? " C4 (PlayerLosesLikeAiLord): zloto -> " : " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> ") + to + "; ladunek " + pct + "%" + (allBag ? (likeAi ? " (caly tabor, jak lord AI)" : " (cale juki, CaptorTakesAllBaggage)") : "") + " -> "
                                 + (dest != null ? (bagHome != null && dest == bagHome.ItemRoster ? "zapas osady " + bagHome.Name : (capturer.IsSettlement ? "zapas osady " : "juki partii ") + capturer.Name) : "nikt (nic nie zabrano)") : ""));
-                if (likeAi)
+                if (armsPurse)
+                    Log.Player((goldTaken > 0 ? "They emptied your purse - every one of your " + goldTaken + " gold is theirs now" : "They found your purse empty")
+                               + (itemsTaken > 0 ? ", and your whole baggage train with it (" + itemsTaken + " items)." : "."), true);
+                else if (likeAi)
                     Log.Player((itemsTaken > 0 ? "Your captors take your whole baggage train (" + itemsTaken + " items), as from any beaten lord. " : "")
                                + "You keep your arms and your purse - your purse pays only the battle's toll, as any lord's does.", true);
                 else if (all && goldTaken > 0)
@@ -820,6 +1142,7 @@ namespace RealisticCaptivity
                 // mimo ze to byla regularna bitwa o twoja skore - stad flaga.
                 bool freedByForce = detail == EndCaptivityDetail.ReleasedAfterBattle || _rescuedByForce;
                 _rescuedByForce = false;
+                if (_warGear != null && _warGear.Count > 0) WarGearOnRelease(party, detail, freedByForce);   // n20-niewola
                 if (HasStoredGear && freedByForce)
                 {
                     RestoreGear();
@@ -907,7 +1230,7 @@ namespace RealisticCaptivity
 
         internal void OnCaptivityEnded()
         {
-            try { _onParole = false; Log.Info("Niewola zakonczona. Rynsztunek w rekach zdobywcy: " + HasStoredGear); }
+            try { _onParole = false; Log.Info("Niewola zakonczona. Rynsztunek w rekach zdobywcy: " + HasStoredGear + (_warGear != null && _warGear.Count > 0 ? " (ksiega odkupu StripGear); n20 - w jukach zdobywcy " + _warGear.Count + " szt." : "")); }
             catch (Exception e) { Log.Error("OnCaptivityEnded", e); }
         }
 
