@@ -1496,8 +1496,9 @@ Uzycie (Python 3, tylko odczyt):
                     f5-a7: NF4-2 z kluczem Ks Switch Signal porownuje licznik reguly z wariantem "sygnal KS (f5-a7)" diagnozy (dopisek "regula liczy ten sygnal"),
                     NF4-12 (INFO) nacisk przy sygnale KS obok cen gry i wzoru Planu.
 --grupa p6a7      : (20.10, fala 2 pomyslow, galaz p6-a7 - A7 domyslnie TAK + odplyw kas miast; Armoury/src/TownHire.cs, klucz Town Works Hire District) linia
-                    "Roboty miast z rak okregu (p6-a7)": P6A7-0 linie, P6A7-1 zdjete z kas = do kies wsi, P6A7-2 zwrot i wydatki wsi na przebudowy (INFO), P6A7-3 suma kas
-                    miast <= +30 tys./d w ostatnich 28 dobach, P6A7-4 zwrot <= wydatki wsi na przebudowy, P6A7-5 czas, potkniecia, ERROR. Porownanie - grupy nakum, nkasy.
+                    "Roboty miast z rak okregu (p6-a7)": P6A7-0 linie, P6A7-1 zdjete z kas = do kies wsi, P6A7-2 zwrot, wplaty przebudow do kas i wydatki wsi (INFO), P6A7-3 suma kas
+                    miast <= +30 tys./d w ostatnich 28 dobach, P6A7-4 zwrot <= wplaty przebudow do kas, P6A7-5 czas, potkniecia, ERROR, P6A7-6 wplaty i zwrot poza
+                    doplywem netto kupcow (firmy DS). Porownanie - grupy nakum, nkasy.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -45994,22 +45995,30 @@ def nf4_parse_a7(s):
 
 
 # p6-a7 (fala 2 pomyslow, 20.10): roboty miast z rak okregu - odplyw kas miast do kies wsi (Armoury/src/TownHire.cs, klucz Town Works Hire District)
+# recenzja p6-a7: zwrot od wplat przebudow DO KAS (nie od calego wydatku wsi), zwrot zbiorczy (najpierw miasto za swoj okreg, reszta za miasta pod progiem),
+# wplaty i zwrot poza doplywem netto kupcow (TownPurse.NoteRebuildLoop - firmy DS), bez NoteTake
 P6A7_LINE = "Roboty miast z rak okregu (p6-a7): dzien "
 P6A7_RX = re.compile(r"Roboty miast z rak okregu \(p6-a7\): dzien (\d+) \| klucz Town Works Hire District TAK, (od doby (\d+)|czeka na [^|]*)[^|]*"
                      r"\| doba: miast (\d+), kasy razem (-?\d+), srednia 7 dob (-?\d+), pulap startu (\d+), progi razem (-?\d+), pulap (-?\d+), "
                      r"nadwyzka sredniej (-?\d+), wyplata dzis (\d+), miast ponad wlasnym progiem (\d+), przebudowy A7 (TAK|NIE) "
-                     r"\| zwrot przebudow: wsie zaplacily miastom dzis (\d+), srednia 7 dob (\d+), do zwrotu \(najwyzej kasa ponad progiem\) (\d+), od linii wsie zaplacily (\d+) "
-                     r"\| od linii \(dob (\d+), z wyplata (\d+)\): zdjete z kas miast (\d+) = do kies wsi (\d+) \(kontrola zdjete - do wsi = (-?\d+);.*?"
+                     r"\| zwrot przebudow: wsie zaplacily miastom dzis (\d+), do kas (\d+), srednia 7 dob do kas (\d+), miasta za swoj okreg \(najwyzej kasa ponad progiem\) (\d+), "
+                     r"kasa ponad progiem razem (\d+), od linii wsie zaplacily (\d+), do kas (\d+), poza doplywem netto kupcow wplaty (\d+) i zwrot (\d+) "
+                     r"\| od linii \(dob (\d+), z wyplata (\d+)\): zdjete z kas miast (\d+) = do kies wsi (\d+) \(kontrola zdjete - do wsi = (-?\d+);[^)]*\), "
+                     r"za swoj okreg (\d+), za okregi miast pod progiem (\d+), na dobe (-?\d+) .*?"
                      r"\| czas ([\d.]+) ms \(najwiecej ([\d.]+)\) \| potkniecia (\d+)")
+P6A7_KEYS = ("day", "_on", "start", "n", "gold", "s", "g0", "keep", "cap", "over", "plan", "nover", "a7", "vild", "rebd", "reba", "own", "exs", "vill", "rebl",
+             "loopin", "loopout", "days", "pdays", "took", "gave", "ctl", "townown", "townoth", "perday", "ms", "msmax", "stum")
 P6A7_ERR = "ERROR in TownHire."
 
 
 def p6a7_main(logp):
     """p6a7 (fala 2, A7 + odplyw kas miast; Armoury/src/TownHire.cs). Linia "Roboty miast z rak okregu (p6-a7): dzien N" w dobach linii (LogGate). Progi:
-    P6A7-0 linie rozpoznane; P6A7-1 kontrola zdjete z kas = do kies wsi (0 w kazdej linii); P6A7-2 wyplata i wydatki wsi na przebudowy w miastach - ostatnie 28 dob (INFO);
-    P6A7-3 suma kas miast (linia p6-a7) - przyrost ostatnich 28 dob <= +30 000/d (jak NAKUM-26; fin103 z A7 bez odplywu +69 tys./d) - tylko z regula czynna;
-    P6A7-4 zwrot nie wiekszy niz wydatki wsi na przebudowy od startu reguly (kiesy wsi nie sa nowym akumulatorem - NAKUM-5); P6A7-5 czas <= 1 ms/d, potkniecia 0,
-    ERROR TownHire 0. Porownanie z biegiem bez A7: NAKUM-5/7/12/26 i NKA-1 (grupy nakum, nkasy) - osobno."""
+    P6A7-0 linie rozpoznane; P6A7-1 kontrola zdjete z kas = do kies wsi = za swoj okreg + za miasta pod progiem (kazda linia); P6A7-2 wyplata, wplaty przebudow
+    do kas i wydatki wsi - ostatnie 28 dob (INFO); P6A7-3 suma kas miast (linia p6-a7) - przyrost ostatnich 28 dob <= +30 000/d (jak NAKUM-26; fin103 z A7 bez
+    odplywu +69 tys./d) - tylko z regula czynna; P6A7-4 zwrot nie wiekszy niz wplaty przebudow do kas od startu reguly (+ 7 x srednia z pierwszej linii + 1000;
+    kiesy wsi nie sa nowym akumulatorem - NAKUM-5); P6A7-5 czas <= 1 ms/d, potkniecia 0, ERROR TownHire 0; P6A7-6 od drugiej linii z regula: wplaty do kas i zwrot
+    poza doplywem netto kupcow (TownPurse - firmy DS) = wplaty do kas i zdjete z kas (recenzja p6-a7: bez liczenia dwa razy). Porownanie z biegiem bez A7:
+    NAKUM-5/7/12/26 i NKA-1 (grupy nakum, nkasy) - osobno."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("P6A7-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -46025,11 +46034,20 @@ def p6a7_main(logp):
                 if not r:
                     bad += 1
                     continue
-                g = r.groups()
-                rows.append({"day": int(g[0]), "on": g[2] is not None, "start": int(g[2]) if g[2] else None, "n": int(g[3]), "gold": int(g[4]), "s": int(g[5]),
-                             "g0": int(g[6]), "keep": int(g[7]), "cap": int(g[8]), "over": int(g[9]), "plan": int(g[10]), "nover": int(g[11]), "a7": g[12] == "TAK",
-                             "rebd": int(g[13]), "reba": int(g[14]), "ret": int(g[15]), "rebl": int(g[16]), "days": int(g[17]), "pdays": int(g[18]),
-                             "took": int(g[19]), "gave": int(g[20]), "ctl": int(g[21]), "ms": float(g[22]), "msmax": float(g[23]), "stum": int(g[24])})
+                d = {}
+                for k, v in zip(P6A7_KEYS, r.groups()):
+                    if k == "_on":
+                        continue
+                    if k == "a7":
+                        d[k] = v == "TAK"
+                    elif k == "start":
+                        d[k] = int(v) if v else None
+                    elif k in ("ms", "msmax"):
+                        d[k] = float(v)
+                    else:
+                        d[k] = int(v)
+                d["on"] = d["start"] is not None
+                rows.append(d)
             elif P6A7_ERR in s:
                 errs += 1
     on = [r for r in rows if r["on"]]
@@ -46042,17 +46060,19 @@ def p6a7_main(logp):
         return 0
     rep.add("P6A7-0: linia 'Roboty miast z rak okregu (p6-a7)'", f"linii {len(rows)} (dzien {rows[0]['day']}..{rows[-1]['day']}), nierozpoznanych {bad}; regula czynna od doby "
             + (str(on[0]["start"]) if on else "- (czeka na firmy DS albo na przebudowy A7)"), "nierozpoznanych 0", bad == 0)
-    badc = [r["day"] for r in rows if r["ctl"] != 0 or r["took"] != r["gave"]]
-    rep.add("P6A7-1: zdjete z kas miast = do kies wsi (kontrola linii, kazda linia)", f"linii z rozjazdem {len(badc)}" + (f" (dzien {badc[0]})" if badc else ""),
-            "0 (przelew kasa miasta -> kiesy wsi, nic z niczego)", not badc)
+    badc = [r["day"] for r in rows if r["ctl"] != 0 or r["took"] != r["gave"] or r["townown"] + r["townoth"] != r["took"]]
+    rep.add("P6A7-1: zdjete z kas miast = do kies wsi = za swoj okreg + za miasta pod progiem (kontrola linii, kazda linia)",
+            f"linii z rozjazdem {len(badc)}" + (f" (dzien {badc[0]})" if badc else ""), "0 (przelew kasa miasta -> kiesy wsi, nic z niczego)", not badc)
     if on:
         last = on[-1]["day"]
         w = [r for r in on if r["day"] > last - 28]
-        dsum = sum(r["days"] for r in w); tsum = sum(r["took"] for r in w); bsum = sum(r["rebl"] for r in w)
-        rep.add("P6A7-2: zwrot z kas miast do kies wsi okregu i wydatki wsi na przebudowy w miastach - ostatnie 28 dob (INFO)",
-                f"zwrot {tsum / max(1, dsum):.0f}/d, wsie zaplacily miastom {bsum / max(1, dsum):.0f}/d (dob {dsum}, z wyplata {sum(r['pdays'] for r in w)}); ostatnia doba: "
-                f"kasy {on[-1]['gold']}, srednia 7 dob {on[-1]['s']}, pulap {on[-1]['cap']} (startu {on[-1]['g0']}, progi {on[-1]['keep']}), nadwyzka sredniej {on[-1]['over']}, "
-                f"do zwrotu {on[-1]['ret']}, wyplata {on[-1]['plan']}, miast ponad progiem {on[-1]['nover']}", "INFO", None)
+        dsum = sum(r["days"] for r in w); tsum = sum(r["took"] for r in w); bsum = sum(r["rebl"] for r in w); vsum = sum(r["vill"] for r in w)
+        osum = sum(r["townown"] for r in w); xsum = sum(r["townoth"] for r in w); dd = max(1, dsum)
+        rep.add("P6A7-2: zwrot z kas miast do kies wsi okregu, wplaty przebudow do kas i wydatki wsi na przebudowy - ostatnie 28 dob (INFO)",
+                f"zwrot {tsum / dd:.0f}/d (za swoj okreg {osum / dd:.0f}, za miasta pod progiem {xsum / dd:.0f}), przebudowy wplacily do kas {bsum / dd:.0f}/d "
+                f"(wsie zaplacily miastom {vsum / dd:.0f}/d; dob {dsum}, z wyplata {sum(r['pdays'] for r in w)}); ostatnia doba: kasy {on[-1]['gold']}, srednia 7 dob {on[-1]['s']}, "
+                f"pulap {on[-1]['cap']} (startu {on[-1]['g0']}, progi {on[-1]['keep']}), nadwyzka sredniej {on[-1]['over']}, srednia wplat do kas {on[-1]['reba']}, "
+                f"za swoj okreg {on[-1]['own']}, kasa ponad progiem {on[-1]['exs']}, wyplata {on[-1]['plan']}, miast ponad progiem {on[-1]['nover']}", "INFO", None)
         if len(w) >= 2 and w[-1]["day"] > w[0]["day"]:
             gk = (w[-1]["gold"] - w[0]["gold"]) / (w[-1]["day"] - w[0]["day"])
             rep.add(f"P6A7-3: suma kas miast (linia p6-a7) - przyrost na dobe (doby {w[0]['day']}-{w[-1]['day']})", f"{gk:+.0f}/d; kasy {w[-1]['gold'] / 1e6:.2f} mln",
@@ -46061,12 +46081,22 @@ def p6a7_main(logp):
             rep.add("P6A7-3: suma kas miast (linia p6-a7)", f"linii z regula w oknie {len(w)}", "INFO (za malo linii)", None)
         i0 = rows.index(on[0])
         ta = sum(r["took"] for r in rows[i0:]); ba = sum(r["rebl"] for r in rows[i0:])
-        lim4 = ba + 1000
-        rep.add("P6A7-4: zwrot do kies wsi od startu reguly wobec wydatkow wsi na przebudowy w miastach (kiesy wsi nie sa nowym akumulatorem)",
-                f"zwrot {ta}, wsie zaplacily {ba} ({(100.0 * ta / ba) if ba > 0 else 0:.0f}%)", "zwrot <= wydatki wsi + 1000 (kazde miasto najwyzej srednia 7 dob swojego okregu)",
-                ta <= lim4)
+        lim4 = ba + 7 * rows[i0]["reba"] + 1000
+        rep.add("P6A7-4: zwrot do kies wsi od startu reguly wobec wplat przebudow do kas (kiesy wsi nie sa nowym akumulatorem)",
+                f"zwrot {ta}, przebudowy wplacily do kas {ba} ({(100.0 * ta / ba) if ba > 0 else 0:.0f}%)",
+                "zwrot <= wplaty do kas + 7 x srednia z pierwszej linii + 1000 (razem najwyzej srednia 7 dob wplat swiata)", ta <= lim4)
+        later = on[1:]
+        if later:
+            bin_ = sum(r["rebl"] for r in later); lin = sum(r["loopin"] for r in later); tk = sum(r["took"] for r in later); lout = sum(r["loopout"] for r in later)
+            ok6 = abs(bin_ - lin) <= 1 and abs(tk - lout) <= 1
+            rep.add("P6A7-6: wplaty przebudow do kas i zwrot poza doplywem netto kupcow (firmy DS) - od drugiej linii z regula",
+                    f"wplaty do kas {bin_}, poza doplywem {lin}; zdjete z kas {tk}, zwrot poza doplywem {lout}",
+                    "rowne (recenzja p6-a7: firma pana i korony nie rosnie od pieniedzy oddanych wsiom; TownPurse wylaczony - INFO)",
+                    ok6 if (lin > 0 or lout > 0 or (bin_ == 0 and tk == 0)) else None)
+        else:
+            rep.add("P6A7-6: wplaty i zwrot poza doplywem netto kupcow", "jedna linia z regula", "INFO (za malo linii)", None)
     else:
-        rep.add("P6A7-2..4: regula", "czeka w calym logu (firmy DS albo przebudowy A7)", "INFO (bez A7 regula tylko mierzy - kasy jak bez galezi)", None)
+        rep.add("P6A7-2..4, 6: regula", "czeka w calym logu (firmy DS albo przebudowy A7)", "INFO (bez A7 regula tylko mierzy - kasy jak bez galezi)", None)
     msd = sum(r["ms"] * r["days"] for r in rows) / max(1, sum(r["days"] for r in rows)); msx = max(r["msmax"] for r in rows); st = sum(r["stum"] for r in rows)
     rep.add("P6A7-5: czas reguly (ms na dobe), potkniecia i ERROR TownHire", f"srednio {msd:.2f} ms (najwiecej {msx:.2f}), potkniecia {st}, ERROR {errs}",
             "<= 1 ms/d, 0, 0", msd <= 1.0 and st == 0 and errs == 0)
