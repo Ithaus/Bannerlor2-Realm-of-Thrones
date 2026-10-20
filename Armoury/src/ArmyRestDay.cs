@@ -141,6 +141,7 @@ namespace Armoury
                 if (!s.ArmyRestDay)
                 {
                     if (_recs.Count > 0) { ReleaseAll("klucz Army Rest Day wylaczony"); _recs.Clear(); }
+                    _pending = null;   // zapis wczytany przy wylaczonym kluczu - po wlaczeniu serie od nowa
                     return;
                 }
                 ResolvePending();
