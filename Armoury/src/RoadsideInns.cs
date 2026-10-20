@@ -570,7 +570,7 @@ namespace Armoury
                 string mesh = null;
                 try { if (inn != null && inn.Village != null && inn.Village.SettlementComponent != null) mesh = inn.Village.SettlementComponent.WaitMeshName; } catch { }
                 try { args.MenuContext.SetBackgroundMeshName(string.IsNullOrEmpty(mesh) ? "wait_fallback" : mesh); } catch { }
-                RoadsideInnStay.OnMenuInit(args, inn);   // m95-zajazd: dzwiek karczmy i partia schowana na czas pobytu (wlasny try)
+                RoadsideInnStay.OnMenuInit(args, inn);   // m95-zajazd: partia schowana na czas pobytu (wlasny try); dzwiek - RoadsideInnStay.InnMenuSound
                 var sb = new StringBuilder();
                 if (inn == null) sb.Append("You stand by the road. There is no inn here.");
                 else

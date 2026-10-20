@@ -31,12 +31,20 @@ namespace Armoury
     ///     Wyjscie: "Ride on" od razu (Leave), reszta - straznik 4 razy na sekunde z OnApplicationTick (dziala takze przy zatrzymanym czasie): stan "w zajezdzie" =
     ///     menu arm_roadinn przy zajezdzie albo sen oplacony w tym zajezdzie (arm_sleep_wait, TownInns.RoadSleepUid), partia aktywna, poza osada, bitwa, spotkaniem,
     ///     oblezeniem, morzem, niewola i sluzba ROT. Inaczej (pobudka, bitwa, napad, klucz wylaczony, menu zamkniete) - partia z powrotem: widocznosc liczy gra
-    ///     (UpdateVisibilityAndInspected) dla partii gracza i jej armii. Wczytanie zapisu w zajezdzie: stan tylko w pamieci, straznik chowa partie od nowa (IsVisible
-    ///     jest w zapisie gry, ale gra liczy je od nowa przy wczytaniu; stary DLL - partia wraca przy pierwszym ticku czasu).
+    ///     (UpdateVisibilityAndInspected) dla partii gracza i jej armii. Wczytanie zapisu w zajezdzie: stan tylko w pamieci, straznik chowa partie od nowa.
+    ///     IsVisible jest w zapisie gry (MobileParty._isVisible, SaveableField 1024), a gra NIE liczy go przy wczytaniu - dopiero przy pierwszym ticku z biegnacym
+    ///     czasem (UpdateVisibilitiesAroundMainParty wraca przy Stop). Dlatego "Ride on" liczy widocznosc takze bez naszego ukrycia, gdy partia jest niewidoczna
+    ///     (zapis z zajazdu przy wylaczonym kluczu, stary DLL) - jedno wywolanie metody gry przy wyjsciu (Unstick).
+    ///     Gdy cos innego uparcie pokazuje partie (ReassertMax ponownych ukryc), oddajemy pobyt i nie chowamy w tym zajezdzie do konca pobytu (_gaveUpUid).
     ///  U2 Dzwiek (klucz RoadsideInnTavernSound): to, co gra daje w dzielnicy karczmy miasta (PlayerTownVisitCampaignBehavior, menu "town_backstreet"): tlo
     ///     "event:/map/ambient/node/settlements/2d/tavern" i dzwiek wejscia "event:/ui/panels/panel_settlement_enter_tavern" (oba w Native sound_event_data.gen.xml).
-    ///     MenuViewContext gra tlo, dopoki menu jest otwarte (takze przez sen - to samo menu), i wylacza je przy zamknieciu menu. Tlo obrazka: gra nie ma obrazka
-    ///     karczmy (dzielnica karczmy pokazuje wait_mesh miasta) - zajazd zostaje przy wait_mesh wsi okregu, jak dotad.
+    ///     Ustawiane jak w grze: [GameMenuInitializationHandler] na "arm_roadinn" i "arm_sleep_wait" (tylko sen oplacony w zajezdzie). Init menu (RunOnInit) sie
+    ///     nie nadaje: MenuContext.HandleStates wola po nim Handler.OnMenuCreate, a MenuViewContext.OnMenuCreate konczy StopAllSounds - tlo ustawione w init gaslo
+    ///     przy kazdym SwitchToMenu (sen) i Refresh (powrot z ekwipunku, koniec rozmowy). InitializeState idzie po OnMenuCreate. Zamkniecie menu - gra wylacza tlo
+    ///     (OnDeactivate -> StopAllSounds). Gdy gra przelaczy menu w tym samym kontekscie (napad na spiacych -> menu spotkania), StopAllSounds gasi tlo, ale
+    ///     CurrentAmbientSoundID zostaje i MenuViewContext.OnActivate gralby karczme znow po misji bitwy - straznik zdejmuje wtedy nasze id z kontekstu (refleksja na
+    ///     prywatnym setterze, bez wolania silnika dzwieku). Tlo obrazka: gra nie ma obrazka karczmy (dzielnica karczmy pokazuje wait_mesh miasta) - zajazd zostaje
+    ///     przy wait_mesh wsi okregu, jak dotad.
     ///  Linie "Zajazdy (ZJ): pobyt - ..." - start sesji (klucze, latki), kazde ukrycie i powrot (z powodem), dzwiek, doba. Potkniecia liczone (pierwsze do Log.Error),
     ///  nic nie gasimy globalnie; latka napisu po 3 potknieciach z rzedu - napis zostaje jak dotad, ukrycie dziala dalej. Nic do zapisu gry.
     /// </summary>
@@ -54,8 +62,14 @@ namespace Armoury
         // stan pobytu (tylko pamiec)
         private static bool _hidden;
         private static string _hiddenUid, _hiddenName;
+        private static string _gaveUpUid;   // pobyt oddany po ReassertMax (cos innego pokazuje partie) - bez ukrycia w tym zajezdzie, az pobyt sie skonczy
         private static int _stayReassert;
         private static long _lastCheck;
+        // dzwiek: kontekst menu, w ktorym ustawilismy tlo karczmy (tylko pamiec), i ostatnie zalogowane menu
+        private static MenuContext _soundMc;
+        private static string _soundMenu;
+        private static PropertyInfo _ambProp, _panelProp;
+        private static bool _sndPropsTried;
         // latki (raz na proces)
         private static Harmony _h;
         private static bool _visTried, _visPatched, _plateTried, _platePatched;
@@ -77,7 +91,8 @@ namespace Armoury
         /// <summary>Nowa kampania albo wczytanie (RoadsideInns.Reset): stan pobytu i liczniki od zera (latki zostaja - raz na proces).</summary>
         internal static void Reset()
         {
-            _hidden = false; _hiddenUid = _hiddenName = null; _stayReassert = 0; _lastCheck = 0;
+            _hidden = false; _hiddenUid = _hiddenName = _gaveUpUid = null; _stayReassert = 0; _lastCheck = 0;
+            _soundMc = null; _soundMenu = null;
             _dHide = _dShow = _dHold = _dReassert = _dPlate = _dSound = _dStumbles = 0;
             _stumbles = 0; _errLogged = false; _plateStrikes = 0;
         }
@@ -272,48 +287,126 @@ namespace Armoury
             Log.Info(P + "partia gracza znow na mapie (" + name + ") - powod: " + why + "; widoczna " + (mp != null && mp.IsVisible ? "tak" : "nie") + ".");
         }
 
-        /// <summary>"Ride on" w menu zajazdu - partia z powrotem przed zamknieciem menu.</summary>
+        /// <summary>Partia gracza niewidoczna, choc nie schowalismy jej my (zapis z zajazdu wczytany przy wylaczonym kluczu albo ze starego DLL: _isVisible jest w zapisie,
+        /// a gra liczy widocznosc dopiero przy ticku z biegnacym czasem) - widocznosc liczy gra od razu, raz, przy wyjsciu. Bitwa, osada, partia nieaktywna, sluzba ROT
+        /// (ROT sam chowa partie w sluzbie) - nic.</summary>
+        private static void Unstick(string why)
+        {
+            var mp = MobileParty.MainParty;
+            if (_hidden || mp == null || mp.Party == null || mp.IsVisible || !mp.IsActive || mp.MapEvent != null || mp.CurrentSettlement != null || NightRest.EnlistedNow) return;
+            mp.Party.UpdateVisibilityAndInspected(mp.Position);   // metoda gry (prefiks przepuszcza - _hidden false)
+            int army = Followers(mp);
+            _dShow++;
+            Log.Info(P + "partia gracza byla niewidoczna bez ukrycia zajazdu (zapis z zajazdu przy wylaczonym kluczu albo ze starego DLL) - " + why
+                     + ": widocznosc policzona przez gre, widoczna " + (mp.IsVisible ? "tak" : "nie") + ", partie armii " + army + ".");
+        }
+
+        /// <summary>"Ride on" w menu zajazdu - partia z powrotem przed zamknieciem menu (takze niewidoczna z zapisu, bez naszego ukrycia - Unstick).</summary>
         internal static void Leave(string why)
         {
-            try { if (_hidden) Show(why); }
+            _gaveUpUid = null;   // pobyt skonczony
+            try { if (_hidden) Show(why); else Unstick(why); }
             catch (Exception e) { _hidden = false; Stumble("Leave", e); }
         }
 
-        /// <summary>RoadsideInns.MenuInit: dzwiek karczmy (raz na menu - tlo juz grane nie startuje od nowa) i ukrycie partii przy wejsciu (takze po wczytaniu w menu).</summary>
+        private static bool GaveUp(RoadsideInns.Inn inn) { return inn != null && _gaveUpUid != null && _gaveUpUid == inn.Uid; }
+
+        /// <summary>RoadsideInns.MenuInit: ukrycie partii przy wejsciu (takze po wczytaniu w menu). Dzwiek - InnMenuSound (po OnMenuCreate gry).</summary>
         internal static void OnMenuInit(MenuCallbackArgs args, RoadsideInns.Inn inn)
         {
             try
             {
                 if (inn == null) return;
-                if (SoundOn) SetTavernSound(args, inn, true);
                 string why;
-                if (HideOn && !_hidden && CanHide(inn, true, out why)) Hide(inn, "wejscie (menu zajazdu)");
+                if (HideOn && !_hidden && !GaveUp(inn) && CanHide(inn, true, out why)) Hide(inn, "wejscie (menu zajazdu)");
             }
             catch (Exception e) { Stumble("OnMenuInit", e); }
         }
 
-        /// <summary>TownInns.RoadSleepInit: sen w zajezdzie - tlo karczmy (gdy menu go nie gra, np. po wczytaniu w trakcie snu) i partia schowana.</summary>
+        /// <summary>TownInns.RoadSleepInit: sen w zajezdzie - partia schowana. Dzwiek - InnSleepSound (po OnMenuCreate gry).</summary>
         internal static void OnSleepInit(MenuCallbackArgs args, string uid)
         {
             try
             {
                 var inn = RoadsideInns.Find(uid);
                 if (inn == null) return;
-                if (SoundOn) SetTavernSound(args, inn, false);
                 string why;
-                if (HideOn && !_hidden && CanHide(inn, false, out why)) Hide(inn, "sen w zajezdzie");
+                if (HideOn && !_hidden && !GaveUp(inn) && CanHide(inn, false, out why)) Hide(inn, "sen w zajezdzie");
             }
             catch (Exception e) { Stumble("OnSleepInit", e); }
         }
 
-        private static void SetTavernSound(MenuCallbackArgs args, RoadsideInns.Inn inn, bool door)
+        // ------------------------------------------------------------ dzwiek (jak gra: inicjalizacja menu po OnMenuCreate)
+        /// <summary>Menu zajazdu: tlo karczmy i drzwi przy kazdej inicjalizacji menu (wejscie, SwitchToMenu, Refresh po ekwipunku/rozmowie, wczytanie) - jak gra w
+        /// "town_backstreet". GameMenuCallbackManager zbiera te metody z zestawow modow (Armoury odwoluje sie do CampaignSystem); jedna metoda na id menu - dla
+        /// "arm_roadinn" i "arm_sleep_wait" innej nie ma (gra, SandBox, BK, ROT i galezie m95 - grep). Wyjatek nie wychodzi do gry (HandleStates).</summary>
+        [GameMenuInitializationHandler(RoadsideInns.Menu)]
+        public static void InnMenuSound(MenuCallbackArgs args)
+        {
+            try
+            {
+                if (!SoundOn) return;   // wylaczony klucz - menu bez dzwieku, jak dotad
+                var inn = RoadsideInns.CurrentOrNear();
+                if (inn == null) return;
+                SetTavernSound(args, RoadsideInns.Menu, inn.Uid, inn.Name, true);
+            }
+            catch (Exception e) { Stumble("InnMenuSound", e); }
+        }
+
+        /// <summary>Sen: tlo karczmy tylko przy snie oplaconym w zajezdzie (TownInns.RoadSleepUid); sen obozowy i sen w miescie - nic (jak dotad).</summary>
+        [GameMenuInitializationHandler(SleepMenu)]
+        public static void InnSleepSound(MenuCallbackArgs args)
+        {
+            try
+            {
+                if (!SoundOn) return;
+                string uid = TownInns.RoadSleepUid();
+                var inn = uid != null ? RoadsideInns.Find(uid) : null;
+                if (inn == null) return;
+                SetTavernSound(args, SleepMenu, inn.Uid, inn.Name, false);
+            }
+            catch (Exception e) { Stumble("InnSleepSound", e); }
+        }
+
+        /// <summary>SetAmbientSound gry: MenuViewContext.PlayAmbientSound zwalnia poprzednie tlo i gra nowe (nic sie nie dubluje); przy Handler == null (wejscie z mapy,
+        /// wczytanie) gra je MenuViewContext.OnActivate. Linia logu raz na kontekst i menu.</summary>
+        private static void SetTavernSound(MenuCallbackArgs args, string menu, string uid, string name, bool door)
         {
             var mc = args != null ? args.MenuContext : null;
-            if (mc == null || mc.CurrentAmbientSoundID == AmbientTavern) return;
+            if (mc == null) return;
             mc.SetAmbientSound(AmbientTavern);
             if (door) mc.SetPanelSound(PanelTavern);
             _dSound++;
-            Log.Info(P + "dzwiek karczmy w " + inn.Name + " (" + inn.Uid + "): tlo " + AmbientTavern + (door ? ", wejscie " + PanelTavern : " (sen)") + ".");
+            bool fresh = !ReferenceEquals(mc, _soundMc) || _soundMenu != menu;
+            _soundMc = mc; _soundMenu = menu;
+            if (fresh)
+                Log.Info(P + "dzwiek karczmy w " + name + " (" + uid + "), menu " + menu + ": tlo " + AmbientTavern + (door ? ", wejscie " + PanelTavern : " (sen)") + ".");
+        }
+
+        /// <summary>Straznik dzwieku: menu zamkniete albo nowy kontekst - nic (gra wylaczyla tlo, stary kontekst nie wroci). Ten sam kontekst, ale juz nie zajazd ani sen w
+        /// nim (napad na spiacych - menu spotkania): gra zgasila tlo przy zmianie menu (OnMenuCreate -> StopAllSounds), ale nasze id zostaje w kontekscie i
+        /// MenuViewContext.OnActivate zagralby karczme znow po misji bitwy - zdejmujemy id (prywatny setter, refleksja; silnik dzwieku nie jest wolany). Raz.</summary>
+        private static void SoundGuard()
+        {
+            var mc = _soundMc;
+            if (!ReferenceEquals(Campaign.Current.CurrentMenuContext, mc)) { _soundMc = null; _soundMenu = null; return; }
+            string id = MenuId();
+            if (id == RoadsideInns.Menu || (id == SleepMenu && TownInns.RoadSleepUid() != null)) return;   // dalej w zajezdzie
+            _soundMc = null; _soundMenu = null;
+            bool amb = mc.CurrentAmbientSoundID == AmbientTavern, door = mc.CurrentPanelSoundID == PanelTavern;
+            if (!amb && !door) return;   // nowe menu ustawilo wlasne
+            if (!_sndPropsTried)
+            {
+                _sndPropsTried = true;
+                _ambProp = AccessTools.DeclaredProperty(typeof(MenuContext), "CurrentAmbientSoundID");
+                _panelProp = AccessTools.DeclaredProperty(typeof(MenuContext), "CurrentPanelSoundID");
+            }
+            var sa = _ambProp != null ? _ambProp.GetSetMethod(true) : null;
+            var sp = _panelProp != null ? _panelProp.GetSetMethod(true) : null;
+            if (amb && sa != null) sa.Invoke(mc, new object[] { null });
+            if (door && sp != null) sp.Invoke(mc, new object[] { null });
+            Log.Info(P + "dzwiek karczmy zdjety z kontekstu menu " + (id ?? "?") + " (gra zgasila tlo przy zmianie menu; po bitwie nie wroci): tlo "
+                     + (amb ? (sa != null ? "zdjete" : "BRAK settera - zostaje") : "-") + ", wejscie " + (door ? (sp != null ? "zdjete" : "BRAK settera - zostaje") : "-") + ".");
         }
 
         // ------------------------------------------------------------ straznik (SubModuleMain.OnApplicationTick)
@@ -322,24 +415,38 @@ namespace Armoury
         /// Tylko na mapie (misja, ekwipunek - stan bez zmian do powrotu).</summary>
         internal static void AppTick()
         {
-            if (!_hidden && !HideOn) return;
+            if (!_hidden && !HideOn && _soundMc == null) return;
             long t = Stopwatch.GetTimestamp();
             if (t - _lastCheck < Stopwatch.Frequency / 4) return;
             _lastCheck = t;
             try
             {
-                if (Campaign.Current == null || MobileParty.MainParty == null) { _hidden = false; _hiddenUid = _hiddenName = null; return; }   // poza kampania - stan tylko w pamieci
+                if (Campaign.Current == null || MobileParty.MainParty == null) { _hidden = false; _hiddenUid = _hiddenName = _gaveUpUid = null; _soundMc = null; _soundMenu = null; return; }   // poza kampania - stan tylko w pamieci
                 var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
                 if (gsm == null || !(gsm.ActiveState is MapState)) return;
+                if (_soundMc != null)
+                {
+                    try { SoundGuard(); }
+                    catch (Exception e) { _soundMc = null; _soundMenu = null; Stumble("SoundGuard", e); }
+                }
+                if (!_hidden && !HideOn) return;
                 RoadsideInns.Inn inn; string why;
                 bool want = InnNow(out inn, out why);
                 if (!HideOn) { want = false; why = "klucz wylaczony"; }
-                if (want && !_hidden) Hide(inn, "straznik (menu " + MenuId() + ")");
+                if (!want) _gaveUpUid = null;   // pobyt skonczony - nastepny pobyt (takze w tym zajezdzie) znow z ukryciem
+                if (want && !_hidden && !GaveUp(inn)) Hide(inn, "straznik (menu " + MenuId() + ")");
                 else if (!want && _hidden) Show(why);
                 else if (want && _hidden && MobileParty.MainParty.IsVisible)
                 {
-                    // cos poza metoda widocznosci gry pokazalo partie (np. kod innego moda) - schowac jeszcze raz, najwyzej ReassertMax razy na pobyt
-                    if (++_stayReassert > ReassertMax) { Show("inny kod pokazuje partie (" + ReassertMax + " razy w tym pobycie)"); return; }
+                    // cos poza metoda widocznosci gry pokazalo partie (np. kod innego moda) - schowac jeszcze raz, najwyzej ReassertMax razy na pobyt;
+                    // potem oddajemy i nie chowamy w tym zajezdzie, az pobyt sie skonczy (bez cyklu: ukrycie - 20 ponowien - powrot - ukrycie)
+                    if (++_stayReassert > ReassertMax)
+                    {
+                        string uid = _hiddenUid;
+                        Show("inny kod pokazuje partie (" + ReassertMax + " razy w tym pobycie) - bez ukrycia w tym zajezdzie do konca pobytu");
+                        _gaveUpUid = uid;
+                        return;
+                    }
                     _dReassert++;
                     MobileParty.MainParty.IsVisible = false;
                 }

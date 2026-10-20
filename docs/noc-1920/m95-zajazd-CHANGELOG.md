@@ -36,19 +36,24 @@ dzielnica karczmy (`town_backstreet`) `event:/map/ambient/node/settlements/2d/ta
   wraca: widocznosc liczy gra (`UpdateVisibilityAndInspected` dla druzyny i jej armii). Wczytanie zapisu w zajezdzie: stan tylko w pamieci, straznik albo
   init menu chowa druzyne od nowa. Nic nie wola `SwitchToMenu` (pulapka menu oczekiwania), nic nie dotyka wizerunkow co klatke - tylko pole `IsVisible`
   przy zmianie stanu, reszte robi gra.
-- DZWIEK (klucz `RoadsideInnTavernSound`): w `MenuInit` zajazdu `SetAmbientSound("event:/map/ambient/node/settlements/2d/tavern")` i
+- DZWIEK (klucz `RoadsideInnTavernSound`): `SetAmbientSound("event:/map/ambient/node/settlements/2d/tavern")` i
   `SetPanelSound("event:/ui/panels/panel_settlement_enter_tavern")` - dokladnie to, co gra daje w dzielnicy karczmy miasta (oba zdarzenia sa w
-  `Modules/Native/ModuleData/sound_event_data.gen.xml`, linie 786 i 12676). Sen przechodzi do `arm_sleep_wait` w tym samym menu - gwar gra dalej; po
-  wczytaniu w trakcie snu tlo ustawia `RoadSleepInit` (bez drzwi). Nie ustawiamy drugi raz, gdy juz gra (petla nie startuje od nowa).
+  `Modules/Native/ModuleData/sound_event_data.gen.xml`, linie 786 i 12676). Ustawiane tak jak w grze (poprawka po recenzji, patrz nizej): metody z
+  `[GameMenuInitializationHandler("arm_roadinn")]` (tlo + drzwi) i `[GameMenuInitializationHandler("arm_sleep_wait")]` (tylko tlo, tylko sen oplacony
+  w zajezdzie - `TownInns.RoadSleepUid()`; sen obozowy i w miescie bez zmian). Gra wola je przy kazdej inicjalizacji menu PO `OnMenuCreate` (ktore gasi
+  dzwieki), wiec gwar gra przy wejsciu, przez sen, po powrocie z ekwipunku i po wczytaniu.
 - TLO OBRAZKA: gra nie ma obrazka karczmy (`SetBackgroundMeshName` w grze i SandBox: tylko `encounter_*`, `wait_*`, `town_blockade`; dzielnica karczmy
   w miescie zostaje przy `wait_mesh` miasta). Zajazd zostaje przy `wait_mesh` wsi okregu, jak dotad - bez zmiany.
 - LOG (prefiks `Zajazdy (ZJ): pobyt - `, nie myli sie z liniami grupy nzajazdy w `tools/sprawdz_logi.py`): `start sesji | klucze ... | latka widocznosci:
   wpieta TaleWorlds.CampaignSystem.Party.PartyBase.UpdateVisibilityAndInspected (prefiks) | latka napisu gracza: wpieta ... (prefiks) | ...`;
   `ukrycie partii gracza w <zajazd> (<uid>) - wejscie (menu zajazdu) / sen w zajezdzie / straznik (...)`; `partia gracza znow na mapie (<zajazd>) -
-  powod: Ride on / menu zamkniete / bitwa / spotkanie / klucz wylaczony ...`; `dzwiek karczmy w <zajazd>: tlo ..., wejscie ...`; `dzien N | ukrycia,
+  powod: Ride on / menu zamkniete / bitwa / spotkanie / klucz wylaczony ...`; `dzwiek karczmy w <zajazd> (<uid>), menu arm_roadinn|arm_sleep_wait: tlo
+  ..., wejscie ...` (raz na kontekst i menu); `dzwiek karczmy zdjety z kontekstu menu <id> ...` (napad w trakcie snu); `partia gracza byla niewidoczna
+  bez ukrycia zajazdu ... - Ride on: widocznosc policzona przez gre` (zapis z zajazdu przy wylaczonym kluczu / stary DLL); `dzien N | ukrycia,
   powroty, przytrzymania (tick gry), ponowne ukrycia, napis gracza zdjety, dzwiek karczmy | teraz schowana | latki | potkniecia`. Bledy jako
   `ERROR in RoadsideInns.Stay.*` - licza sie w progu ZJ-8 grupy nzajazdy.
-- Wpiecia: `RoadsideInns.cs` (Reset, MenuInit, "Ride on", SessionStart, Daily), `TownInns.Road.cs` (`RoadSleepUid`, wywolanie w `RoadSleepInit`),
+- Wpiecia: `RoadsideInns.cs` (Reset, MenuInit, "Ride on", SessionStart, Daily), `TownInns.Road.cs` (`RoadSleepUid`, wywolanie w `RoadSleepInit` -
+  tylko ukrycie; dzwiek idzie przez `[GameMenuInitializationHandler]` w `RoadsideInnStay`),
   `SubModuleMain.cs` (straznik w `OnApplicationTick`, licznik bledu ladowania typu po 3 - gra bez zmian), `Settings.cs` + `McmSettings.cs` (gen_mcm).
 
 **Ryzyko / co sprawdzic (kontrola calosci).**
@@ -58,28 +63,61 @@ dzielnica karczmy (`town_backstreet`) `event:/map/ambient/node/settlements/2d/ta
   od widocznosci) - przy bitwie prefiks puszcza metode gry, straznik zdejmuje stan.
 - Wizerunek: zmiana `IsVisible` = jedno `SetVisualAsDirty` przy wejsciu i wyjsciu (jak wyjscie partii z mgly). Namiot snu (`NightRest.Tent`) stoi pod
   ukrytym wizerunkiem - schowany z nim (tak gra chowa namioty oblegajacych we mgle); ZOBACZYC w grze, czy namiot przy snie w zajezdzie nie jest widoczny.
-  Pobudka: `Tent(false)` pokazuje figurki (alfa 0 z gasniecia), straznik po <= 0.25 s przywraca widocznosc - mozliwe krotkie mrugniecie, do oceny na oko.
-- Zapis: `MobileParty._isVisible` jest w zapisie gry. Zapis w zajezdzie = `false` w pliku; gra liczy widocznosc od nowa przy wczytaniu i przy kazdym ticku
-  czasu (takze stary DLL i klucz wylaczony - druzyna wraca). Nowych danych w zapisie brak.
+  Pobudka: `Tent(false)` pokazuje figurki, straznik po <= 0.25 s przywraca widocznosc. Obie recenzje: `Tent(false)` zaraz wola `ClearVisualMemory` ->
+  `ResetPartyIcon` (figurki od nowa), wiec mrugniecia raczej nie bedzie - do oceny na oko.
+- Zapis: `MobileParty._isVisible` jest w zapisie gry. Zapis w zajezdzie = `false` w pliku. Gra NIE liczy widocznosci przy wczytaniu (sprostowanie po
+  recenzji): `GameInitTick` tylko przy nowej grze, `PartyBase.OnFinishLoadState` tylko `SetVisualAsDirty`; liczy dopiero przy pierwszym ticku z biegnacym
+  czasem (`UpdateVisibilitiesAroundMainParty` wraca przy `Stop`). Dlatego "Ride on" liczy widocznosc takze bez naszego ukrycia, gdy druzyna jest
+  niewidoczna (klucz wylaczony po zapisie w zajezdzie, stary DLL) - jedno wywolanie metody gry. W samym menu zajazdu przy wylaczonym kluczu druzyna z
+  takiego zapisu zostaje niewidoczna do "Ride on" albo do pierwszego ticku czasu (stary DLL: tylko do ticku czasu). Nowych danych w zapisie brak.
+- Dzwiek przy napadzie: straznik zdejmuje id tla z kontekstu do 0.25 s po zmianie menu; gdyby misja bitwy ruszyla szybciej (gracz musi wybrac w menu
+  spotkania, wiec raczej nie), po bitwie w menu spotkania zagra gwar karczmy - tylko dzwiek, do konca spotkania.
 - Koszt: prefiks widocznosci - jedno pole bool dla kazdej partii w zasiegu (gdy nic nie schowane), w zajezdzie test jednej partii; straznik - przy
-  wylaczonym kluczu i niczym schowanym nic, inaczej 4 razy na sekunde odczyt id menu (w zajezdzie plus sprawdzenie sluzby ROT przez odbicie).
+  wylaczonym kluczu ukrycia, niczym schowanym i bez naszego tla w otwartym menu nic, inaczej 4 razy na sekunde odczyt id menu (w zajezdzie plus sprawdzenie sluzby ROT przez odbicie).
   Male metody pod Harmony (zawieszenie GC 19.10): latamy dwie duze metody gry, nie male.
 - Kolizje: `w-toku/m95-nocleg` (943cc411) zmienia `Settings.cs`, `McmSettings.cs`, `RoadsideInns.cs`, `TownInns.Road.cs` - sprawdzone `git merge-tree`
   c4ddeba9 x 943cc411: bez konfliktow (drzewo 3eb0f53c; McmSettings.cs po scaleniu i tak od nowa z gen_mcm). `w-toku/m95-menu` bez commitow
   (= baza e35e6f99). Uruchomione tylko budowanie (kod 0), bez gry i autotestu (zakaz w tej pracy).
+
+**Poprawki po recenzjach (gracz, technika) - c656d5b1 -> ten commit.**
+- WAZNE (gracz) - PRAWDA, poprawione: gwar cichl przy zasnieciu w zajezdzie (i po powrocie z ekwipunku / koncu rozmowy). Dowod (dekompilacja 1.4.8):
+  `MenuContext.HandleStates` wola `GameMenu.RunOnInit` (nasz `MenuInit` / `RoadSleepInit`), potem `Handler.OnMenuCreate()` - a
+  `MenuViewContext.OnMenuCreate` konczy sie `StopAllSounds()`; dopiero potem `GameMenuCallbackManager.InitializeState`. Gra ustawia gwar karczmy wlasnie
+  tam (`[GameMenuInitializationHandler("town_backstreet")]`, `PlayerTownVisitCampaignBehavior:1406`). Do tego nasz warunek "juz gra" (`CurrentAmbientSoundID
+  == tavern`) blokowal ponowne ustawienie po `SwitchToMenu("arm_sleep_wait")`. Zmiana: dzwiek przeniesiony z init menu do dwoch metod
+  `[GameMenuInitializationHandler]` w `RoadsideInnStay` (`InnMenuSound` dla `arm_roadinn`, `InnSleepSound` dla `arm_sleep_wait`), warunek "juz gra" zdjety
+  (`PlayAmbientSound` gry zwalnia poprzednie tlo - nic sie nie dubluje). `GameMenuCallbackManager` zbiera takie metody z zestawow aktywnych modulow
+  (`GetActiveReferencingGameAssembliesSafe`; Armoury.dll jest w `SubModule.xml`, `GetTypes` obejmuje typy internal), jedna metoda na id menu - dla tych
+  dwoch id nikt inny jej nie ma (grep: gra, SandBox, BK, ROT, galezie m95-menu/nocleg/turniej). Wyjatek w srodku lapany (nie wychodzi do `HandleStates`).
+- DROBNE (technika) - CZESCIOWO PRAWDA, poprawione: przy napadzie na spiacych gra przelacza menu w tym samym kontekscie na spotkanie. Gwar NIE gra dalej w
+  menu spotkania (sprostowanie: `SwitchToMenu` -> `HandleStates` -> `OnMenuCreate` -> `StopAllSounds` gasi go przy zmianie menu), ale id tla zostaje w
+  `MenuContext.CurrentAmbientSoundID` (`SwitchToMenu` go nie czysci, menu spotkania ustawia tylko `SetPanelSound`), a `MenuViewContext.OnActivate` po
+  misji bitwy gra je od nowa - to prawda. Zmiana: straznik (ten sam, 4 razy na sekunde, takze przy samym kluczu dzwieku) widzi, ze kontekst menu z naszym
+  tlem pokazuje juz inne menu, i zdejmuje nasze id tla i drzwi z kontekstu (prywatny setter przez odbicie, bez wolania silnika dzwieku - pusty id do
+  `SoundEvent.CreateEventFromString` nie jest sprawdzony, wiec go nie uzywamy). Raz, przy zmianie stanu.
+- DROBNE (gracz) - PRAWDA, poprawione: po oddaniu pobytu (`ReassertMax` = 20 ponownych ukryc, gdy cudzy kod uparcie pokazuje druzyne) straznik chowal
+  druzyne znowu przy nastepnym ticku - cykl co ok. 5 s. Zmiana: `_gaveUpUid` - po oddaniu bez ukrycia w tym zajezdzie, az pobyt sie skonczy ("Ride on",
+  menu zamkniete, inne menu, klucz wylaczony); zerowane tez w `Reset`.
+- DROBNE (obie) - PRAWDA, poprawione: zdanie "gra liczy widocznosc od nowa przy wczytaniu" bylo nieprawdziwe (patrz Ryzyko / Zapis). Zmiana: "Ride on"
+  przy niewidocznej druzynie bez naszego ukrycia wola raz metode gry `UpdateVisibilityAndInspected` (i armie) - bez bitwy, osady, sluzby ROT, druzyna aktywna.
+  Komentarz w `RoadsideInnStay.cs` i wpis poprawione.
 
 **Status.** DO SPRAWDZENIA (zbudowane, kod 0; bez autotestu - Jeff gra).
 
 **Test w grze (krok po kroku dla Jeffa).**
 1. Podjedz do zajazdu przy drodze i kliknij go (albo stan obok i wybierz "Go in"). Gdy otworzy sie menu zajazdu: slychac skrzypniecie drzwi i gwar karczmy;
    na mapie wokol menu Twojej druzyny (jezdziec, kon, napis z imieniem) przy zajezdzie juz nie ma.
-2. Kliknij "Ride on" - druzyna od razu wraca na mape obok zajazdu, gwar cichnie.
-3. Wejdz jeszcze raz i wybierz nocleg (np. "Common room"). Podczas snu: gwar dalej gra, druzyny (ani namiotu) na mapie nie widac.
-4. Po pobudce (albo "Rouse the men early") druzyna wraca na mape.
-5. Zapisz gre w menu zajazdu i wczytaj - druzyna dalej schowana, menu zajazdu dziala; "Ride on" przywraca druzyne.
-6. Wylacz w MCM "Roadside Inn Hide Party" i "Roadside Inn Tavern Sound" - zajazd jak dotad (druzyna widoczna obok, cisza).
-7. W logu Armoury szukaj `Zajazdy (ZJ): pobyt - ` : linia startu ma "latka widocznosci: wpieta" i "latka napisu gracza: wpieta"; przy kazdym wejsciu
-   "ukrycie partii gracza", przy wyjsciu "partia gracza znow na mapie - powod: ...", "dzwiek karczmy w ..."; brak `ERROR in RoadsideInns.Stay`.
+2. W menu zajazdu otworz ekwipunek (I) i zamknij - gwar dalej gra.
+3. Kliknij "Ride on" - druzyna od razu wraca na mape obok zajazdu, gwar cichnie.
+4. Wejdz jeszcze raz i wybierz nocleg (np. "Common room"). Podczas snu: gwar dalej gra, druzyny (ani namiotu) na mapie nie widac.
+5. Po pobudce (albo "Rouse the men early") druzyna wraca na mape.
+6. Zapisz gre w menu zajazdu i wczytaj - druzyna dalej schowana, gwar gra, menu zajazdu dziala; "Ride on" przywraca druzyne.
+7. Wylacz w MCM "Roadside Inn Hide Party" i "Roadside Inn Tavern Sound" - zajazd jak dotad (druzyna widoczna obok, cisza). Jesli wczytasz zapis z kroku 6
+   przy wylaczonym "Roadside Inn Hide Party": po "Ride on" druzyna od razu na mapie (bez puszczania czasu).
+8. W logu Armoury szukaj `Zajazdy (ZJ): pobyt - ` : linia startu ma "latka widocznosci: wpieta" i "latka napisu gracza: wpieta"; przy kazdym wejsciu
+   "ukrycie partii gracza", przy wyjsciu "partia gracza znow na mapie - powod: ...", "dzwiek karczmy w ... menu arm_roadinn", przy snie "dzwiek karczmy
+   w ... menu arm_sleep_wait"; brak `ERROR in RoadsideInns.Stay`. Gdyby ktos napadl na spiaca druzyne: "dzwiek karczmy zdjety z kontekstu menu ...", a po
+   bitwie w menu spotkania nie ma gwaru karczmy.
 
 **Decyzje (projektowal Claude; wylaczniki: `RoadsideInnHideParty`, `RoadsideInnTavernSound`).**
 - Dwa osobne klucze: ukrycie dotyka widocznosci druzyny (latka Harmony), dzwiek tylko menu - Jeff moze wylaczyc jedno bez drugiego.

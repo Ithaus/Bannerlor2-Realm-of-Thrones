@@ -98,7 +98,7 @@ namespace Armoury
                 if (!string.IsNullOrEmpty(mesh)) args.MenuContext.SetBackgroundMeshName(mesh);
             }
             catch { }
-            RoadsideInnStay.OnSleepInit(args, r.RoadUid);   // m95-zajazd: sen w zajezdzie - partia schowana, dzwiek karczmy (po wczytaniu w trakcie snu tez; wlasny try)
+            RoadsideInnStay.OnSleepInit(args, r.RoadUid);   // m95-zajazd: sen w zajezdzie - partia schowana (po wczytaniu w trakcie snu tez; wlasny try); dzwiek - RoadsideInnStay.InnSleepSound
             string bed = r.Q == 2 ? "The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds"
                        : r.Q == 1 ? "The men drink their ale by the hearth of " + r.Town + " and sleep in beds"
                        : "The men bed down on the straw of the common room of " + r.Town + ", the horses in the yard";
