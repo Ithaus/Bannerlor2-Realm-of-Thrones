@@ -6316,6 +6316,54 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownLoanTakesFolkLoans { get; set; } = false;
 
+        [SettingPropertyBool("Town Debt", HintText = "town councils borrow and tax: when a town's coffer cannot pay its lord's and the crown's dues, its council borrows what is owed - first from its merchant families and craftsmen (half of what they hold above their savings), then from its notables, last from the Iron Bank - and pays the dues at once. It pays interest and pays the debt back from what the coffer holds above the merchants' stock; the repayments come out of the merchants' profit, so the lord's dues from the town do not rise (and fall at the next review) while the town is in debt. A town in debt slowly loses prosperity. A council that is out of credit raises an extraordinary tax on its own burghers and notables (once every Town Debt Levy Gap Days): it pays its creditors and the dues, but costs loyalty, prosperity and the notables' goodwill towards the lord. Your towns follow the same rules; see Town affairs - The council's debts. Off = no new town debts, as before (debts already owed stand still in the save)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownDebt { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Debt Rate", 0.00f, 0.50f, "0.00", HintText = "with Town Debt: the interest a year a town council pays its merchant families, craftsmen and notables on what it borrowed (0.10 = ten parts in a hundred)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtRate { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Town Debt Bank Rate", 0.00f, 1.00f, "0.00", HintText = "with Town Debt: the interest a year a town council pays the Iron Bank (as much as the Bank asks of a king)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtBankRate { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Town Debt Limit Reserve", 0.00f, 20.00f, "0.0", HintText = "with Town Debt: the most a town council may owe, in times its merchants' stock (the part of the coffer no tax touches); at nine tenths of it the council counts as out of credit", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLimitReserve { get; set; } = 3.0f;
+
+        [SettingPropertyFloatingInteger("Town Debt Repay Share", 0.00f, 1.00f, "0.00", HintText = "with Town Debt: the part of what the coffer holds above the merchants' stock that the council pays its creditors each day (the Iron Bank first)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtRepayShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Town Debt Prosperity Per Day", 0.00f, 10.00f, "0.00", HintText = "with Town Debt: the prosperity a town loses each day while its council is in debt, at the full limit of its credit (less for a smaller debt)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtProsperityPerDay { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Town Debt Levy Share", 0.00f, 0.50f, "0.00", HintText = "with Town Debt: the extraordinary tax of a council out of credit - the part of what each class of burghers holds above its savings and each notable above Town Debt Notable Keep (never more than the debt and the dues)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLevyShare { get; set; } = 0.10f;
+
+        [SettingPropertyInteger("Town Debt Levy Gap Days", 7, 364, "0", HintText = "with Town Debt: the fewest days between two extraordinary taxes of the same town", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownDebtLevyGapDays { get; set; } = 28;
+
+        [SettingPropertyFloatingInteger("Town Debt Levy Loyalty", 0.00f, 50.00f, "0.0", HintText = "with Town Debt: the loyalty a town loses with each extraordinary tax (never below 20 by this tax alone)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLevyLoyalty { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Town Debt Levy Prosperity", 0.000f, 0.500f, "0.000", HintText = "with Town Debt: the part of its prosperity a town loses with each extraordinary tax (0.01 = one part in a hundred)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLevyProsperity { get; set; } = 0.01f;
+
+        [SettingPropertyInteger("Town Debt Levy Relation", 0, 20, "0", HintText = "with Town Debt: how much each notable who paid an extraordinary tax thinks less of the town's lord", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownDebtLevyRelation { get; set; } = 2;
+
+        [SettingPropertyInteger("Town Debt Notable Keep", 0, 50000, "0", HintText = "with Town Debt: the coin a notable always keeps - he lends to the council and pays its extraordinary tax only from what he holds above it", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownDebtNotableKeep { get; set; } = 5000;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -10106,6 +10154,18 @@ namespace Armoury
             s.TownLoanFolkReserveTimes = TownLoanFolkReserveTimes;
             s.TownLoanCofferReserveTimes = TownLoanCofferReserveTimes;
             s.TownLoanTakesFolkLoans = TownLoanTakesFolkLoans;
+            s.TownDebt = TownDebt;
+            s.TownDebtRate = TownDebtRate;
+            s.TownDebtBankRate = TownDebtBankRate;
+            s.TownDebtLimitReserve = TownDebtLimitReserve;
+            s.TownDebtRepayShare = TownDebtRepayShare;
+            s.TownDebtProsperityPerDay = TownDebtProsperityPerDay;
+            s.TownDebtLevyShare = TownDebtLevyShare;
+            s.TownDebtLevyGapDays = TownDebtLevyGapDays;
+            s.TownDebtLevyLoyalty = TownDebtLevyLoyalty;
+            s.TownDebtLevyProsperity = TownDebtLevyProsperity;
+            s.TownDebtLevyRelation = TownDebtLevyRelation;
+            s.TownDebtNotableKeep = TownDebtNotableKeep;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
