@@ -6320,6 +6320,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool GarrisonHorsesToLords { get; set; } = true;
 
+        [SettingPropertyBool("Garrison Harness To Lords", HintText = "with Rider Needs Harness on, the same lord also takes the garrison's spare saddles and harness that fit a horse - beyond what its own mounted men use and a few kept for losses - up to what he lacks, before he buys any; same terms as the horses: free from his own house, at the market price from another house of his realm. The market is not touched (off = only the horses)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool GarrisonHarnessToLords { get; set; } = true;
+
         [SettingPropertyBool("Pack Animals From Market", HintText = "a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool PackAnimalsFromMarket { get; set; } = true;
@@ -9811,6 +9815,7 @@ namespace Armoury
             s.AiSellsSpareHorses = AiSellsSpareHorses;
             s.AiSpareHorseShare = AiSpareHorseShare;
             s.GarrisonHorsesToLords = GarrisonHorsesToLords;
+            s.GarrisonHarnessToLords = GarrisonHarnessToLords;
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.VillagerPacksFromHerd = VillagerPacksFromHerd;
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;

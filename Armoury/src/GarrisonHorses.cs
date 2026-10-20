@@ -31,7 +31,7 @@ namespace Armoury
     /// </summary>
     internal static class GarrisonHorses
     {
-        private static int _dStamp = -1, _dStops, _dStopsFree, _dFree, _dLackBefore, _dLackAfter, _dToRiders, _dToQueue, _dOwn, _dPaidN, _dGold, _dNoBudget, _dRefused;
+        private static int _dStamp = -1, _dStops, _dStopsFree, _dFree, _dLackBefore, _dLackAfter, _dToRiders, _dToQueue, _dOwn, _dPaidN, _dGold, _dNoBudget, _dRefused, _dHStops, _dHNeed, _dHarness, _dHOwn, _dHGold;
         private static readonly int[] _dCat = new int[3];
         private static int _stumbles, _stumblesAll;
         private static readonly int[] HighOrder = { 1, 2, 0 }, LowOrder = { 0, 1, 2 }, QueueOrder = { 1, 0, 2 };
@@ -46,7 +46,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dStops = _dStopsFree = _dFree = _dLackBefore = _dLackAfter = _dToRiders = _dToQueue = _dOwn = _dPaidN = _dGold = _dNoBudget = _dRefused = 0;
+            _dStops = _dStopsFree = _dFree = _dLackBefore = _dLackAfter = _dToRiders = _dToQueue = _dOwn = _dPaidN = _dGold = _dNoBudget = _dRefused = _dHStops = _dHNeed = _dHarness = _dHOwn = _dHGold = 0;
             _dCat[0] = _dCat[1] = _dCat[2] = 0; _stumbles = 0;
         }
 
@@ -54,7 +54,7 @@ namespace Armoury
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (d == _dStamp) return;
-            if (_dStamp >= 0 && _dStops + _stumbles > 0)
+            if (_dStamp >= 0 && _dStops + _dHStops + _stumbles > 0)
             {
                 try
                 {
@@ -64,7 +64,10 @@ namespace Armoury
                              + " (dostali konia z zalogi " + _dToRiders + ") | do kolejki awansow na jezdnego (tabor) " + _dToQueue
                              + " | razem wedlug kategorii (zwykly/bojowy/szlachetny) " + _dCat[0] + "/" + _dCat[1] + "/" + _dCat[2]
                              + " | z zalog wlasnego rodu " + _dOwn + ", od innych rodow krolestwa " + _dPaidN + " za " + _dGold + " zl (glowom rodow panow twierdz; bez budzetu "
-                             + _dNoBudget + " postojow) | z targu 0 (polki nietkniete) | DTE nie przyjal " + _dRefused + " | potkniecia dzis " + _stumbles + " (razem " + _stumblesAll + ").");
+                             + _dNoBudget + " postojow)"
+                             + " | uprzaz zalog (GarrisonHarnessToLords " + (Settings.Current != null && Settings.Current.GarrisonHarnessToLords ? "tak" : "nie") + "): postoje z brakiem siodel "
+                             + _dHStops + " (brak przed " + _dHNeed + "), wzieli " + _dHarness + " szt. (z zalog wlasnego rodu " + _dHOwn + ", od innych rodow za " + _dHGold + " zl)"
+                             + " | z targu 0 (polki nietkniete) | DTE nie przyjal " + _dRefused + " | potkniecia dzis " + _stumbles + " (razem " + _stumblesAll + ").");
                 }
                 catch { }
             }
@@ -138,7 +141,7 @@ namespace Armoury
                         if (k < 0) break;
                         int want = Math.Min(avail[k], high ? needHigh : lack - needHigh);
                         if (want <= 0) break;
-                        int got = Move(party, st, garArm, k, want, true, own, ref budget, ref gold);
+                        int got = Move(party, gar, st, garArm, k, want, true, own, ref budget, ref gold);
                         if (got <= 0) { avail[k] = 0; continue; }
                         avail[k] -= got; lack -= got; movedArm += got;
                         if (high) needHigh -= got;
@@ -157,7 +160,7 @@ namespace Armoury
                         if (cap <= 0) break;
                         int want = Math.Min(Math.Min(avail[k], cap), Math.Max(0, rsv.Short[k] - rsv.Have[k]));
                         if (want <= 0) continue;
-                        int got = Move(party, st, garArm, k, want, false, own, ref budget, ref gold);
+                        int got = Move(party, gar, st, garArm, k, want, false, own, ref budget, ref gold);
                         if (got <= 0) continue;
                         avail[k] -= got; cap -= got; movedBag += got;
                     }
@@ -191,6 +194,95 @@ namespace Armoury
             }
         }
 
+        /// <summary>
+        /// r3-jazda (3), klucz GarrisonHarnessToLords - UPRZAZ ZALOGI POD JEZDZCOW LORDA (brama E8/H "jezdziec = kon + uprzaz"). Z SaddleLaw.OnSettlementEntered,
+        /// po uprzezy z taboru, przed zakupami siodel (AiGear): lord rodu AI w twierdzy swojego krolestwa bierze uprzaz rodziny konia ze zbrojowni zalogi ponad
+        /// jej jezdzcow z koniem (SaddleLaw.Pairs z jezdzcami patroli BK) i jej luz, najwyzej brak do zapasu siodel (SaddleLaw.BuyNeed - ta sama miara co zakup).
+        /// Te same warunki, kolejnosc (najtansze najpierw) i rozliczenie co konie (wlasny rod - bez zlota; inny rod - cena targu glowie rodu pana twierdzy z budzetu F5).
+        /// </summary>
+        internal static void GiveHarness(MobileParty party, Settlement st)
+        {
+            var c = Settings.Current;
+            if (c == null || !c.GarrisonHarnessToLords || !On || !SaddleLaw.On || party == null || st == null) return;
+            try
+            {
+                if (!CavalryTemplate.Steered(party) || party.MapEvent != null || Undead.Party(party)) return;
+                if (!(st.IsTown || st.IsCastle) || st.Town == null || st.IsUnderSiege) return;
+                var gar = st.Town.GarrisonParty;
+                var owner = st.OwnerClan;
+                var clan = CavalryTemplate.ClanOf(party);
+                if (gar == null || gar == party || owner == null || clan == null || owner == Clan.PlayerClan) return;
+                bool own = owner == clan;
+                if (!own && (clan.Kingdom == null || owner.Kingdom != clan.Kingdom)) return;
+                var all = AiGear.Armories();
+                Dictionary<ItemObject, int> garArm;
+                if (all == null || !all.TryGetValue(gar.Id, out garArm) || garArm == null || garArm.Count == 0) return;
+                int need = SaddleLaw.BuyNeed(party);
+                if (need <= 0) return;
+                Flush();
+                _dHStops++; _dHNeed += need;
+                var gp = SaddleLaw.Pairs(gar, GarrisonArmory.PatrolRiders(st));
+                int keep = Math.Max(Math.Max(0, c.AiMountSpareBuffer), (int)Math.Ceiling(MBMath.ClampFloat(c.AiSpareHorseShare, 0f, 1f) * gp.Riders - 1e-4));
+                int n = Math.Min(need, gp.FreeHarness - keep);
+                if (n <= 0) return;
+                var lord = party.LeaderHero;
+                Hero payee = null;
+                int budget = int.MaxValue;
+                bool gearRule = false;
+                if (!own)
+                {
+                    payee = owner.Leader;
+                    if (payee == null || !payee.IsAlive || payee == lord) return;
+                    int gearLeft = 0;
+                    gearRule = c.AiMountGearPurseShare > 0f && !clan.IsUnderMercenaryService && ClanBudget.GearCap(clan, out gearLeft);
+                    int purse = Math.Max(0, lord.Gold);
+                    budget = gearRule ? Math.Min(gearLeft, (int)(Math.Max(0, purse - Math.Max(0, c.AiGearGoldReserve)) * MBMath.ClampFloat(c.AiMountGearPurseShare, 0f, 1f)))
+                                      : (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+                    if (budget < 50) { _dNoBudget++; return; }
+                }
+                int done = 0, gold = 0;
+                while (done < n)
+                {
+                    ItemObject best = null; int bestCnt = 0;
+                    foreach (var kv in garArm)
+                    {
+                        var it = kv.Key;
+                        if (it == null || kv.Value <= 0 || !SaddleLaw.Fits(it)) continue;
+                        if (best == null || it.Value < best.Value) { best = it; bestCnt = kv.Value; }
+                    }
+                    if (best == null) break;
+                    int take = Math.Min(n - done, bestCnt);
+                    int price = 0;
+                    if (!own)
+                    {
+                        price = Stables.MarketPrice(st, new EquipmentElement(best));
+                        if (price <= 0) price = Math.Max(1, best.Value);
+                        take = Math.Min(take, budget / price);
+                    }
+                    if (take <= 0) break;
+                    if (!AiGear.AddToArmory(party, best, take)) { _dRefused += take; break; }   // DTE nie przyjal - uprzaz zostaje w zalodze
+                    try { AiWear.MoveWorn(gar, party, best, take, bestCnt); } catch { _stumbles++; _stumblesAll++; }   // stan sztuk idzie z uprzeza (jak A7)
+                    if (bestCnt - take > 0) garArm[best] = bestCnt - take; else garArm.Remove(best);
+                    if (!own) { budget -= price * take; gold += price * take; }
+                    done += take;
+                }
+                if (done <= 0) return;
+                _dHarness += done;
+                if (own) _dHOwn += done;
+                else if (gold > 0)
+                {
+                    TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(lord, payee, gold, true);
+                    _dHGold += gold; _dGold += gold;
+                    if (gearRule) ClanBudget.GearSpent(clan, gold);
+                }
+            }
+            catch (Exception e)
+            {
+                _stumbles++; _stumblesAll++;
+                if (_stumbles == 1) Log.Error("GarrisonHorses.GiveHarness", e);
+            }
+        }
+
         private static int Pick(int[] avail, int[] order)
         {
             foreach (int k in order) if (avail[k] > 0) return k;
@@ -199,7 +291,7 @@ namespace Armoury
 
         /// <summary>Przenosi do n wierzchowcow kategorii k (najtansze najpierw) ze zbrojowni zalogi: toArmory - do zbrojowni DTE partii (odmowa DTE - kon
         /// wraca do zalogi), inaczej do taboru. Inny rod - kazda sztuka po cenie targu z budzetu (budget, gold). Zwraca, ile przeszlo.</summary>
-        private static int Move(MobileParty party, Settlement st, Dictionary<ItemObject, int> garArm, int k, int n, bool toArmory, bool own, ref int budget, ref int gold)
+        private static int Move(MobileParty party, MobileParty gar, Settlement st, Dictionary<ItemObject, int> garArm, int k, int n, bool toArmory, bool own, ref int budget, ref int gold)
         {
             int done = 0;
             while (done < n)
@@ -223,17 +315,14 @@ namespace Armoury
                     take = Math.Min(take, afford);
                 }
                 if (take <= 0) break;
-                if (bestCnt - take > 0) garArm[best] = bestCnt - take; else garArm.Remove(best);
                 if (toArmory)
                 {
-                    if (!AiGear.AddToArmory(party, best, take))
-                    {
-                        int back; garArm.TryGetValue(best, out back); garArm[best] = back + take;   // DTE nie przyjal - kon zostaje w zalodze
-                        _dRefused += take;
-                        break;
-                    }
+                    // jak A7 (GarrisonArmory.MoveKits): najpierw do zbrojowni odbiorcy, potem zapis stanu sztuk (AiWear - u koni tylko spis "nie lup"), potem zdjecie u dawcy
+                    if (!AiGear.AddToArmory(party, best, take)) { _dRefused += take; break; }   // DTE nie przyjal - kon zostaje w zalodze
+                    try { AiWear.MoveWorn(gar, party, best, take, bestCnt); } catch { _stumbles++; _stumblesAll++; }
                 }
                 else party.ItemRoster.AddToCounts(new EquipmentElement(best), take);
+                if (bestCnt - take > 0) garArm[best] = bestCnt - take; else garArm.Remove(best);
                 if (!own) { budget -= price * take; gold += price * take; }
                 done += take; _dCat[k] += take;
             }
