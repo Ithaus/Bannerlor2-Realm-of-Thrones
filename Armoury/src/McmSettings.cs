@@ -1812,9 +1812,25 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int MapRoadSpeedPercent { get; set; } = 15;
 
-        [SettingPropertyFloatingInteger("Map Road Margin", 0.00f, 2.00f, "0.00", HintText = "how far beyond the painted edge of a road (in map units) a party still counts as on it - the road paint is coarse and party paths never follow it exactly (0.4 = about two kilometres; at most 2)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Map Road Margin", 0.00f, 2.00f, "0.00", HintText = "how far beyond the painted edge of a road (in map units) a party still counts as on it when Map Road Wide Field is off - the road paint is coarse and party paths never follow it exactly (0.4 = about two kilometres; at most 2)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public float MapRoadMargin { get; set; } = 0.40f;
+
+        [SettingPropertyBool("Map Road Wide Field", HintText = "a wider road: a party that strays a little from a road - a painted main road or a village lane - keeps its road bonus up to Map Road Wide Margin beyond the edge of the road. Off = the narrow field of Map Road Margin, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadWideField { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Map Road Wide Margin", 0.00f, 2.00f, "0.00", HintText = "with Map Road Wide Field on: how far beyond the edge of a road (in map units) a party still counts as on it - on the painted roads and on the village lanes alike (1.0 = about five kilometres; at most 2)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float MapRoadWideMargin { get; set; } = 1.00f;
+
+        [SettingPropertyBool("Map Side Road Speed Bonus", HintText = "the lanes to the villages drawn on the campaign map (Map Side Roads) speed up every land party too - yours, the lords', caravans, villagers, bandits - by Map Side Road Speed Percent: the speed tooltip shows a 'Side road' line and the marching-column cap is raised by the same share. On a painted main road the main road bonus counts instead - the two never add up. Needs Map Road Speed Bonus and Map Side Roads. Off = the lanes are only a picture, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapSideRoadSpeedBonus { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Map Side Road Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much faster a land party travels on a village lane, in percent of its speed (7.5 = +7.5%; at most 50)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float MapSideRoadSpeedPercent { get; set; } = 7.5f;
 
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
@@ -6416,7 +6432,7 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
-        [SettingPropertyBool("Map Side Roads", HintText = "dirt lanes on the campaign map lead from the main painted roads to the villages that lie farther away - a village close to a main road gets no lane of its own, villages behind it join its lane, and the lanes wind along the land around water, mountains and towns. With Map Side Roads All Villages on, every village gets a lane - see that option. Visual only - lanes do not change speed or routes. Turned on, the lanes appear on the map within a few seconds; turned off, they are taken away. Off = no lanes are drawn", RequireRestart = false)]
+        [SettingPropertyBool("Map Side Roads", HintText = "dirt lanes on the campaign map lead from the main painted roads to the villages that lie farther away - a village close to a main road gets no lane of its own, villages behind it join its lane, and the lanes wind along the land around water, mountains and towns. With Map Side Roads All Villages on, every village gets a lane - see that option. Lanes do not change routes; with Map Side Road Speed Bonus on, a party travelling on a lane goes a little faster - yours and the AI's alike. Turned on, the lanes appear on the map within a few seconds; turned off, they are taken away. Off = no lanes are drawn and nobody gets the lane speed bonus", RequireRestart = false)]
         [SettingPropertyGroup("Side roads to far villages")]
         public bool MapSideRoads { get; set; } = false;
 
@@ -8553,6 +8569,10 @@ namespace Armoury
             s.MapRoadSpeedBonus = MapRoadSpeedBonus;
             s.MapRoadSpeedPercent = MapRoadSpeedPercent;
             s.MapRoadMargin = MapRoadMargin;
+            s.MapRoadWideField = MapRoadWideField;
+            s.MapRoadWideMargin = MapRoadWideMargin;
+            s.MapSideRoadSpeedBonus = MapSideRoadSpeedBonus;
+            s.MapSideRoadSpeedPercent = MapSideRoadSpeedPercent;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;

@@ -35101,6 +35101,130 @@ NDR_PLAYER = re.compile(r"gracz: na drodze (?P<on>tak|nie) \(od krawedzi farby (
                         r"LimitMax (?P<lim>\d+\.\d+|brak), wpis Road (?P<line>tak|nie), pamiec gry (?P<cache>\d+\.\d+)(?:, na podlodze LimitMin (?P<floor>tak|nie))?")
 NDR_SPEED_AUDIT = re.compile(r"Audyt predkosci \(dzien (?P<day>-?\d+), teren [^)]*\): (?P<body>.*) => (?P<res>-?\d+\.\d+)$")
 NDR_ERR = ("ERROR in MapRoads.",)
+# n20-drogi (noc 19/20.10, Jeff "daj +7.5% na drogach pobocznych"; recenzja, uwaga 3): linie drog bocznych (MapRoads.SessionStart / SideWork / Line)
+NDR_SIDE_HEAD = NDR_HEAD + "drogi boczne"
+NDR_SIDE_START = re.compile(r"Drogi \(DR\): drogi boczne - start sesji: klucz MapSideRoadSpeedBonus (?P<key>tak|nie), premia (?P<pct>\d+\.\d)%, margines (?P<m>\d+\.\d+) jedn\. "
+                            r"\(wspolny z traktami(?:; (?P<field>.*?))?\) - czekaja na plan drog bocznych z widoku mapy \(klucz MapSideRoads (?P<vis>tak|nie)\)\.$")
+NDR_SIDE_PUB = re.compile(r"Drogi \(DR\): drogi boczne w premii predkosci (?P<ok>TAK|NIE)(?P<rest>.*)$")
+NDR_SIDE_PUB_NUM = re.compile(r" - drog (?P<roads>\d+), odcinkow (?P<segs>\d+) \(co ok\. [\d.]+ jedn\.\), dlugosc (?P<len>\d+) jedn\., pol-szerokosc (?P<half>[\d.]+) "
+                              r"\+ margines (?P<m>[\d.]+|-) jedn\. \| siatka wspolna: (?P<nx>\d+) x (?P<ny>\d+) komorek po \d+ jedn\., z drogami (?P<cells>\d+), wpisow (?P<ent>\d+), "
+                              r"maks\. odcinkow na komorke (?P<maxc>\d+) \| budowa (?P<ms>\d+\.\d) ms")
+NDR_SIDE_DAY = re.compile(r"Drogi \(DR\): drogi boczne, dzien (?P<day>-?\d+) \| klucz MapSideRoadSpeedBonus (?P<key>tak|nie), premia (?P<pct>\d+\.\d)%, margines (?P<m>\d+\.\d+) "
+                          r"\| (?P<side>w premii \(drog (?P<roads>\d+), odcinkow (?P<segs>\d+)\)|NIE w premii - [^|]*?) "
+                          r"\| partio-godziny AI w ruchu na ladzie (?P<tot>\d+), na drodze bocznej (?P<on>\d+) \([^)]*\) - rody (?P<l1>\d+)/(?P<l0>\d+) \([^)]*\), "
+                          r"karawany (?P<c1>\d+)/(?P<c0>\d+) \([^)]*\), wozy wsi (?P<v1>\d+)/(?P<v0>\d+) \([^)]*\), bandy (?P<b1>\d+)/(?P<b0>\d+) \([^)]*\), "
+                          r"inne (?P<o1>\d+)/(?P<o0>\d+) \([^)]*\) \| gracz godzin w ruchu (?P<ph>\d+), na drodze bocznej (?P<pon>\d+) "
+                          r"\| liczenia predkosci \(ok\.\) (?P<sc>\d+), z premia drogi bocznej (?P<ss>\d+) \([^)]*\) "
+                          r"\| (?P<audit>audyt[^|]*?)(?: \| (?P<player>gracz:[^|]*?))?\.$")
+NDR_SIDE_AUDIT = re.compile(r"audyt AI na drodze bocznej: kandydatow (?P<cand>\d+); probek (?P<n>\d+), premia rzeczywista sr\. (?P<avg>-?\d+\.\d+|-)% "
+                            r"\(min (?P<mn>-?\d+\.\d+|-), maks (?P<mx>-?\d+\.\d+|-)\), bez wpisu Side road (?P<noline>\d+), zjedzona przez sufit (?P<eaten>\d+), "
+                            r"na suficie LimitMax (?P<cap>\d+), pamiec gry zgodna (?P<cok>\d+)/(?P<cn>\d+), na podlodze LimitMin \(poza srednia\) (?P<floor>\d+)")
+NDR_SIDE_PLAYER = re.compile(r"gracz: na drodze bocznej (?P<on>tak|nie \(na trakcie\)|nie) \(od krawedzi drogi bocznej (?P<ed>[^ ]+) jedn\.\), bez premii (?P<r0>\d+\.\d+), "
+                             r"z premia (?P<r1>\d+\.\d+), LimitMax (?P<lim>\d+\.\d+|brak), wpis Side road (?P<line>tak|nie), pamiec gry (?P<cache>\d+\.\d+), "
+                             r"na podlodze LimitMin (?P<floor>tak|nie)")
+
+
+def ndrogi_side_rows(rep, sstarts, spubs, sdays, sbad):
+    """n20-drogi (recenzja, uwaga 3): progi drog bocznych - NDR-10 plan drog bocznych w premii (ostatnia linia "w premii predkosci TAK", drog >= 1000,
+    odcinkow >= 10 000, maks. na komorke <= 80); NDR-11 udzial partio-godzin AI na drodze bocznej 2-30% w dobach z drogami bocznymi w premii (symulacja tras AI
+    sondy, uklad Jeffa: 14.3% przy marginesie 1.0, 8.4% przy 0.4) i liczenia z premia boczna > 0; NDR-12 audyt AI na drodze bocznej: premia rzeczywista sr. =
+    premia boczna +-1 pp, bez wpisu Side road 0, zjedzona <= 5%, pamiec gry zgodna >= 80%; NDR-13 gracz na drodze bocznej: z premia / bez = 1 + premia boczna
+    +-1 pp, wpis Side road, wynik <= LimitMax. Klucz MapSideRoadSpeedBonus albo MapSideRoads wylaczony = INFO."""
+    if not sstarts and not spubs and not sdays and not sbad:
+        rep.add("NDR-10..13: drogi boczne w premii", "brak linii 'Drogi (DR): drogi boczne'", "INFO (log sprzed n20-drogi)", None)
+        return
+    st = sstarts[-1] if sstarts else None
+    off = st is not None and (st["key"] != "tak" or st["vis"] != "tak" or float(st["pct"]) <= 0.0)
+    if sbad:
+        rep.add("NDR-10: linie drog bocznych rozpoznane", f"nierozpoznane {len(sbad)} (np. {sbad[0][:200]})", "nierozpoznane 0", False)
+    if off:
+        rep.add("NDR-10..13: drogi boczne w premii", f"klucz MapSideRoadSpeedBonus {st['key']}, premia {st['pct']}%, MapSideRoads {st['vis']}",
+                "INFO (premia drog bocznych wylaczona kluczem)", None)
+        return
+    # NDR-10
+    field = (st["field"] or "-") if st else "-"
+    if spubs:
+        ok_l = [p for p in spubs if p[0] == "TAK"]
+        last = spubs[-1]
+        nm = NDR_SIDE_PUB_NUM.match(last[1]) if last[0] == "TAK" else None
+        if nm:
+            ok10 = int(nm["roads"]) >= 1000 and int(nm["segs"]) >= 10000 and int(nm["maxc"]) <= 80
+            rep.add("NDR-10: drogi boczne w premii predkosci (plan z widoku mapy w siatce wspolnej)",
+                    f"linii TAK {len(ok_l)}, NIE {len(spubs) - len(ok_l)}; ostatnia: drog {nm['roads']}, odcinkow {nm['segs']}, dlugosc {nm['len']} jedn., pol-szerokosc {nm['half']} "
+                    f"+ margines {nm['m']}; komorek z drogami {nm['cells']}, wpisow {nm['ent']}, maks. na komorke {nm['maxc']}; budowa {nm['ms']} ms; pole: {field}",
+                    "ostatnia TAK, drog >= 1000, odcinkow >= 10000, maks. na komorke <= 80", ok10)
+        else:
+            rep.add("NDR-10: drogi boczne w premii predkosci", f"ostatnia linia: {last[0]}{last[1][:200]}", "ostatnia linia TAK", False)
+    else:
+        rep.add("NDR-10: drogi boczne w premii predkosci", "brak linii 'drogi boczne w premii predkosci' (plan widoku mapy nie podany do premii)",
+                "linia TAK kilka sekund po planie drog bocznych", False if sdays else None)
+    days_on = [g for g in sdays if g["side"].startswith("w premii")]
+    if not days_on:
+        rep.add("NDR-11..13: doby z drogami bocznymi w premii", f"dob linii {len(sdays)}, z drogami bocznymi w premii 0", "INFO (sesja krotsza niz doba)",
+                None if not sdays else False)
+        return
+    spct = float(days_on[-1]["pct"])
+
+    def tot(k):
+        return sum(int(g[k]) for g in days_on)
+    # NDR-11
+    t_all, t_on, sc, ss = tot("tot"), tot("on"), tot("sc"), tot("ss")
+    share = 100.0 * t_on / t_all if t_all else None
+    ok11 = None
+    if share is not None:
+        ok11 = 2.0 <= share <= 30.0 and (t_on == 0 or ss > 0)
+    rep.add("NDR-11: udzial partio-godzin AI w ruchu na drodze bocznej (doby z drogami bocznymi w premii) i liczenia z premia boczna",
+            f"{t_on}/{t_all} = " + (f"{share:.2f}%" if share is not None else "-") + f" (dob {len(days_on)}); rody {tot('l1')}/{tot('l0')}, karawany {tot('c1')}/{tot('c0')}, "
+            f"wozy wsi {tot('v1')}/{tot('v0')}, bandy {tot('b1')}/{tot('b0')}, inne {tot('o1')}/{tot('o0')}; liczenia (ok.) {sc}, z premia boczna {ss}",
+            "2-30% (symulacja tras AI sondy, uklad Jeffa: 14.3% przy marginesie 1.0), z premia boczna > 0", ok11)
+    # NDR-12
+    an = anb = anl = aeat = acok = acn = afl = bad_a = 0
+    asum = 0.0
+    for g in days_on:
+        if not g["audit"].startswith("audyt AI na drodze bocznej"):
+            continue
+        am = NDR_SIDE_AUDIT.search(g["audit"])
+        if not am:
+            bad_a += 1
+            continue
+        n, fl = int(am["n"]), int(am["floor"])
+        nb = n - fl
+        an += n
+        afl += fl
+        anb += nb
+        if nb > 0 and am["avg"] != "-":
+            asum += float(am["avg"]) * nb
+        anl += int(am["noline"])
+        aeat += int(am["eaten"])
+        acok += int(am["cok"])
+        acn += int(am["cn"])
+    if anb > 0:
+        avg = asum / anb
+        ok12 = abs(avg - spct) <= 1.0 and anl == 0 and aeat <= 0.05 * anb and (acn == 0 or acok >= 0.8 * acn) and bad_a == 0
+        rep.add("NDR-12: audyt AI na drodze bocznej (premia rzeczywista, wpis Side road, sufit, pamiec gry)",
+                f"probek {an} (na podlodze LimitMin {afl}), premia sr. {avg:.2f}% z {anb}, bez wpisu Side road {anl}, zjedzona przez sufit {aeat}, pamiec gry zgodna {acok}/{acn}"
+                + (f"; segment nierozpoznany w {bad_a} dobach" if bad_a else ""),
+                f"premia {spct} +-1 pp, bez wpisu Side road 0, zjedzona <= 5%, pamiec gry zgodna >= 80%", ok12)
+    else:
+        rep.add("NDR-12: audyt AI na drodze bocznej", f"probek {an} (na podlodze {afl})" + (f"; segment nierozpoznany w {bad_a} dobach" if bad_a else ""),
+                "INFO (brak partii AI na drodze bocznej w chwili audytu)", None if not bad_a else False)
+    # NDR-13
+    pl_on, pl_bad = 0, []
+    for g in days_on:
+        pm = NDR_SIDE_PLAYER.search(g["player"] or "")
+        if not pm or pm["on"] != "tak" or pm["floor"] == "tak":
+            continue
+        pl_on += 1
+        r0, r1 = float(pm["r0"]), float(pm["r1"])
+        ratio = (r1 / r0 - 1.0) * 100.0 if r0 > 0 else 0.0
+        over = pm["lim"] != "brak" and r1 > float(pm["lim"]) + 0.002
+        if abs(ratio - spct) > 1.0 or over or pm["line"] != "tak":
+            pl_bad.append(f"dzien {g['day']}: {r0} -> {r1} ({ratio:.1f}%), LimitMax {pm['lim']}, Side road {pm['line']}")
+    if pl_on:
+        rep.add("NDR-13: gracz na drodze bocznej - premia w calosci, wpis Side road", f"dob gracza na drodze bocznej {pl_on}, poza progiem {len(pl_bad)}"
+                + (f" (np. {pl_bad[0]})" if pl_bad else ""), f"z premia / bez = 1 + {spct}% +-1 pp, wpis Side road, wynik <= LimitMax", not pl_bad)
+    else:
+        rep.add("NDR-13: gracz na drodze bocznej", "gracz nie byl na drodze bocznej w chwili audytu", "INFO", None)
 
 
 def ndrogi_main(logp):
@@ -35117,20 +35241,33 @@ def ndrogi_main(logp):
     Recenzja 17/18.10: NDR-1 takze linia "straznik zapisu stanu drogi ... 2/2 wpiety" i "straznik zapisu stanu 2/2" w linii sesji (stan drogi zapisywany tylko
     w liczeniu, ktore gra zapisuje do pamieci predkosci); NDR-0 "premia NIECZYNNA (latka predkosci niewpieta przy starcie gry ...)" = NIE; NDR-5 probki
     "na podlodze LimitMin" poza srednia i poza "zjedzona" (premia ginie na podlodze gry); NDR-6 gracz na podlodze poza ocena; NDR-8 takze maks. "od wczytania"
-    (w cichych logach potkniecia z dob bez linii sa tylko tam)."""
+    (w cichych logach potkniecia z dob bez linii sa tylko tam).
+    n20-drogi (noc 19/20.10): szersze pole (MapRoadWideField / MapRoadWideMargin 1.0) i drogi boczne +7.5% (MapSideRoadSpeedBonus) - NDR-10..13 w ndrogi_side_rows."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NDR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     hooks, starts, starts_off, days, bad, audits, writers = [], [], [], [], [], [], []
+    sstarts, spubs, sdays, sbad = [], [], [], []   # n20-drogi: drogi boczne
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
             if s.startswith(NDR_HEAD):
-                if s.startswith(NDR_HEAD + "straznik zapisu stanu drogi"):
+                if s.startswith(NDR_SIDE_HEAD):
+                    # n20-drogi: linie drog bocznych (osobne - linia startu sesji i linia doby traktow bez zmian)
+                    if s.startswith(NDR_SIDE_HEAD + " - start sesji"):
+                        mm = NDR_SIDE_START.match(s)
+                        (sstarts.append(mm.groupdict()) if mm else sbad.append(s))
+                    elif s.startswith(NDR_SIDE_HEAD + " w premii predkosci"):
+                        mm = NDR_SIDE_PUB.match(s)
+                        (spubs.append((mm["ok"], mm["rest"])) if mm else sbad.append(s))
+                    elif s.startswith(NDR_SIDE_HEAD + ", dzien "):
+                        mm = NDR_SIDE_DAY.match(s)
+                        (sdays.append(mm.groupdict()) if mm else sbad.append(s))
+                elif s.startswith(NDR_HEAD + "straznik zapisu stanu drogi"):
                     writers.append(s)   # recenzja 17/18.10 (uwaga 1): straznik zapisu stanu drogi (CalculateSpeedForPartyUnified, getter SpeedExplained)
                 elif s.startswith(NDR_HEAD + "latka pamieci predkosci") or s.startswith(NDR_HEAD + "premia drog wylaczona przy starcie gry") or s.startswith(NDR_HEAD + "BRAK metody"):
                     hooks.append(s)
@@ -35208,6 +35345,7 @@ def ndrogi_main(logp):
             "nierozpoznane 0", (not bad) if (days or bad) else None)
     if not days:
         rep.add("NDR-3..8: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba albo klucz wylaczony)", None)
+        ndrogi_side_rows(rep, sstarts, spubs, sdays, sbad)   # n20-drogi
         rep.show()
         return 0
 
@@ -35218,7 +35356,7 @@ def ndrogi_main(logp):
     t_all, t_on = tot("tot"), tot("on")
     share = 100.0 * t_on / t_all if t_all else None
     rep.add("NDR-3: udzial partio-godzin AI w ruchu na drodze (suma dob)", f"{t_on}/{t_all} = " + (f"{share:.2f}%" if share is not None else "-")
-            + f" (godzin spisu {tot('h')}, dob {len(days)})", "1-25% (symulacja tras AI sondy przy marginesie 0.4: 4.9%)",
+            + f" (godzin spisu {tot('h')}, dob {len(days)})", "1-25% (symulacja tras AI sondy: 4.9% przy marginesie 0.4, 9.2% przy 1.0)",
             (1.0 <= share <= 25.0) if share is not None else None)
     # NDR-4
     sc, so, flips = tot("sc"), tot("so"), tot("flips")
@@ -35323,6 +35461,7 @@ def ndrogi_main(logp):
             f"rody {tot('l1')}/{tot('l0')} ({sh(tot('l1'), tot('l0'))}), karawany {tot('c1')}/{tot('c0')} ({sh(tot('c1'), tot('c0'))}), "
             f"wozy wsi {tot('v1')}/{tot('v0')} ({sh(tot('v1'), tot('v0'))}), bandy {tot('b1')}/{tot('b0')} ({sh(tot('b1'), tot('b0'))}), "
             f"inne {tot('o1')}/{tot('o0')} ({sh(tot('o1'), tot('o0'))}); gracz godzin w ruchu {tot('ph')}, na drodze {tot('pon')}", "INFO", None)
+    ndrogi_side_rows(rep, sstarts, spubs, sdays, sbad)   # n20-drogi: NDR-10..13 drogi boczne
     rep.show()
     return 0
 
