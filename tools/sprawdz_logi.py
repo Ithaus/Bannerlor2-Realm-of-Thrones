@@ -469,7 +469,7 @@ Uzycie (Python 3, tylko odczyt):
                     pokrycie lukow, GB-5 dorobek nowej kampanii z lukami), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
 --grupa drobne2   : (14.10) ksiegi i drobne bledy biegu dwuletniego: D2K-1 K39 bankruci tylko bez lenna i <= 28 dob, D2K-2 K20 do lasu <= 5%,
                     D2K-3 G5 jedno okno ksiegi wiosek, D2K-4 ludzie przy zniknieciu partii (INFO), D2K-5 GL2-9 bez zaworu przy kasie ponad zapasem <= 14 dob,
-                    D2K-6 H-4b uprzaz wedlug miejsca (INFO), D2K-7 KR-8 ciecie stoi mimo nadmiaru (wzrost stosu w oknie regulatora 56 dob) = 0, D2K-8 Q-3 <= 4 zawrocen na dobe.
+                    D2K-6 H-4b uprzaz wedlug miejsca (INFO), D2K-7 KR-8 ciecie stoi mimo nadmiaru (C/P < 0.98 'bez zmian' - regula regulatora) = 0, D2K-8 Q-3 <= 4 zawrocen na dobe.
                     python -I tools/sprawdz_logi.py --grupa drobne2 <Armoury-*.log> (log czytany strumieniowo)
                     (noc 17/18.10, stare-a12) grupa drobne2 wola takze --grupa na12 (raport A12 po raportach drobne2).
 --grupa na12      : (noc 17/18.10, paczka stare-a12; docs/noc-1718/stare-a12-CHANGELOG.md) naprawy spraw A12 z diagnoz drobne2: NA12-1 H-4b reszta uprzezy w ksiedze
@@ -999,7 +999,7 @@ Uzycie (Python 3, tylko odczyt):
                     ZC1-7 RemoveParty w jedzeniu <= 2/d, ZC1-8 kontrola z ksiega rudy i drewna ZGODNA, ZC1-9a/b przejscie BK (marmur i miod), ZC1-9c produkcja miodu
                     pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego <= 1.10 x poczatek, ZC1-10 konwoje DTE i karawany BK bez jedzenia z niczego, ZC1-10c cele karawan
                     zywnosci bez zapasu <= 10%, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zapas zboza >= 0.95 x baza, ZC1-16 przyrost zapasu
-                    jedwabiu i rudy srebra <= 10% produkcji w 28 albo 56 dobach i <= 25% w 28, ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza x czesc produkcji wsi bez pol mieszczan KS (f25-sprawdz,
+                    jedwabiu i rudy srebra <= 10% produkcji w 28 dobach (wyjatek: odbicie po spadku, przybylo w drodze, nie na polkach; zawsze <= 25%), ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza x czesc produkcji wsi bez pol mieszczan KS (f25-sprawdz,
                     decyzja Jeffa 2a; sam stosunek do bazy - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza, ZC1-18 reszta
                     bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu; reszta INFO. Bez --baza-doby progi "wobec bazy" - wobec poczatku biegu
                     albo INFO. Log bez paczki: INFO.
@@ -19391,7 +19391,8 @@ def drobne2k_main(logp):
     D2K-4 rownanie krain: przy zniknieciu partii (suma, najgorsza doba) i linie diagnozy (INFO);
     D2K-5 GL2-9: najdluzsza seria dob bez zaworu przy kasie miasta ponad zapasem kupcow (kasy-miast.csv) <= 14 (seria przy kasie ponizej zapasu - cecha, INFO);
     D2K-6 H-4b: uprzaz wedlug miejsca (INFO - diagnoza);
-    D2K-7 KR-8: stos rosnie > 5% przy > 60 dniach zuzycia, mnozniku w mocy ponad podloga x0.10 i decyzji "bez zmian" = 0 (ciecie stoi mimo nadmiaru);
+    D2K-7 KR-8: decyzja "bez zmian" przy stosie ponad gornym progiem dni zuzycia, C/P < 0.98, mnozniku ponad podloga x0.10 i celu regulatora ponizej mnoznika = 0
+    (ciecie stoi mimo nadmiaru; regula HorseClose wprost z liczb linii decyzji, n22f-ruda);
     D2K-8 Q-3: najwiecej zawrocen jednej partii na dobe <= 4 (przerwa 3 h dziala - bez wibracji), najdluzsza seria dob z >= 3 (INFO) i cel AI (INFO)."""
     rep = Report()
     pre = {"dlugi": "Dlugi (168): dzien", "kw": "Ksiega wiosek (E4/11): dzien", "dev": "Ludzie (spustoszenie): dzien",
@@ -19573,43 +19574,78 @@ def drobne2k_main(logp):
             "INFO (diagnoza: w ktorym miejscu znika uprzaz; spadek w zbrojowniach DTE bez zakupow E8/H = rozliczenie bitew DTE)", None)
 
     # ---------------- D2K-7 KR-8
-    dec = {}
+    # n22f-ruda (20.10, po recenzjach): wiersz sprawdza wprost regule regulatora z liczb linii decyzji (HarvestValve.HorseClose), a nie wzrost stosu.
+    # Regulator: C = P - (stos - stos poczatku okna); przy nadmiarze (stos > gorny prog dni zuzycia, linia "stos 30-60 dni") tnie, gdy C < 0.98 x P (klucz
+    # Horse Breeding Cut Over Stock; bez niego 0.90), do cel = max(x0.10, 0.95 x C / baseP, polowa m0), baseP = P0 / MA + P1 / m0 (P0, P1 - produkcja starszego
+    # i mlodszego kubelka 28 dob; MA, m0 - ich mnozniki); zmiana, gdy cel < m0. Wiersz liczy cel z linii: P0 / P1 - z sum "produkcja doby" (doby d-55..d-28
+    # i d-27..d - suma = P z linii decyzji, sprawdzone na n22a160 i r2nowa), MA - m0 decyzji sprzed 28 dob albo mnoznik z linii doby starszego kubelka.
+    # NIE: "bez zmian" (bez "ciecie na sucho") ponad podloga x0.10, C/P < 0.98 i cel < 0.97 x m0 (zapas 3% na zaokraglenia mnoznikow). Gdy MA <= m0, cel
+    # < m0 przy kazdym C/P < 0.98 (baseP >= P / m0). Cel >= m0 - regulator czeka z projektu (pierwsze okno po cieciu: r2nowa d108920 bojowy C/P 0.71 po x1.00
+    # -> x0.50, cel ok. 0.51) - INFO. Wzrost stosu > 5% wobec poprzedniej decyzji - INFO (n22a160 bojowy d109172 2071 -> 2193 po spadku 2187 -> 2071,
+    # C/P 1168/1174 = 0.995 - regula slusznie nie tnie). Log dwuletni sprzed KR-8 (13.10): zwykly d109032/d109060/d109088 C/P 0.92-0.94 - NIE (martwy pas
+    # 0.90-0.98, dla ktorego wiersz powstal).
+    dec, dmul, dprod = {}, {"zwykly": {}, "bojowy": {}}, {"zwykly": {}, "bojowy": {}}
     for s in got["hod"]:
+        d = day_of(s)
+        if d is None:
+            continue
         if " - decyzja " in s:
-            d = day_of(s)
-            if d is not None:
-                dec[d] = s
-    # n22f-ruda (20.10): wzrost stosu liczony w oknie regulatora (linia "okno 56 dob": stos teraz wobec stosu decyzji sprzed 56 dob = poczatek okna,
-    # z ktorego HorseClose liczy C = P - (stos - stos poczatku okna)), a nie wobec poprzedniej decyzji (28 dob = pol okna). Regulator tnie przy nadmiarze, gdy
-    # C < 0.98 x P, czyli gdy stos w oknie urosl o > 2% produkcji okna; "bez zmian" przy wzroscie > 5% stosu w oknie = regula nie zadzialala (to lapie wiersz).
-    # Dowod: n22a160 bojowy d109172 2071 -> 2193 (+5.9% w 28 dobach) po spadku 2187 -> 2071 - w oknie 56 dob 2187 -> 2193 (+0.3%), C/P 1168/1174 = 0.995;
-    # r2160, r3160, n21160 - ten sam rodzaj na koniec x0.29-0.31, 93-111 dni zuzycia. Wzrost wobec poprzedniej decyzji - INFO w napisie.
-    flagged, half, seen = [], [], 0
+            dec[d] = s
+            continue
+        mm = re.search(r"\| mnozniki x([\d.]+)/x([\d.]+)/", s)
+        if mm:
+            dmul["zwykly"][d], dmul["bojowy"][d] = float(mm.group(1)), float(mm.group(2))
+        mm = re.search(r"produkcja doby zwykly/bojowy/szlachetny/juczny (\d+)/(\d+)/", s)
+        if mm:
+            dprod["zwykly"][d], dprod["bojowy"][d] = int(mm.group(1)), int(mm.group(2))
+    flagged, waited, nostart, half, seen, judged = [], [], [], [], 0, 0
     for name in ("zwykly", "bojowy"):
-        prev_st, prev_m = None, None
-        hist = {}
+        prev_st, m0_at = None, {}
         for d in sorted(dec):
-            m = re.search(name + r": x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja [\d.]+ \(\d+/\d+\), stos (\d+) = (\d+) dni zuzycia, ([a-z ]+?)(?: \(|;|\])", dec[d])
+            sg = re.search(name + r": (x[^;\]]*)", dec[d])
+            m = re.match(r"x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja [\d.]+ \((\d+)/(\d+)\), stos (\d+) = (\d+) dni zuzycia, (.*)$", sg.group(1)) if sg else None
             if not m:
-                prev_st = prev_m = None
+                prev_st = None
                 continue
             seen += 1
             mw = re.search(r"okno (\d+) dob", dec[d])
             win = int(mw.group(1)) if mw else 56
-            m_after = float(m.group(2) or m.group(1)); st_ = int(m.group(3)); days = int(m.group(4)); what = m.group(5).strip()
-            hist[d] = st_
-            if days > 60 and prev_m is not None and prev_m > 0.1001 and what == "bez zmian":
-                w0 = hist.get(d - win)
-                if w0 is not None and st_ > 1.05 * w0:
-                    flagged.append(f"{name} d{d}: {w0} -> {st_} w oknie {win} dob ({days} dni, x{prev_m:.2f} bez zmian)")
-                elif prev_st is not None and st_ > 1.05 * prev_st:
-                    half.append(f"{name} d{d}: {prev_st} -> {st_}" + (f", w oknie {win} dob {w0} -> {st_}" if w0 is not None else ", bez poczatku okna"))
-            prev_st, prev_m = st_, m_after
-    rep.add("D2K-7: KR-8 stos rosnie ponad 60 dni zuzycia, a ciecie stoi (mnoznik ponad podloga x0.10, 'bez zmian')",
-            f"{len(flagged)}" + (f" [{'; '.join(flagged[:4])}]" if flagged else "") + f" (decyzji x rodzajow {seen})"
-            + (f"; INFO: wzrost tylko wobec poprzedniej decyzji (pol okna) {len(half)} [{'; '.join(half[:4])}]" if half else ""),
-            "0 w oknie regulatora (wzrost stosu > 5% wobec decyzji sprzed okna; wzrost przy cieciu w toku albo na podlodze x0.10 - cecha: w pokoju konie bojowe"
-            " sie nie zuzywaja; bieg dwuletni 3 397 dni przy 48 zuzytych na 56 dob; n22f-ruda)",
+            mh = re.search(r"stos (\d+)-(\d+) dni zuzycia", dec[d])
+            high = int(mh.group(2)) if mh else 60
+            bk = win // 2
+            m0 = float(m.group(1)); C, P, st_, days = int(m.group(3)), int(m.group(4)), int(m.group(5)), int(m.group(6)); what = m.group(7)
+            m0_at[d] = m0
+            if what.startswith("bez zmian") and "na sucho" not in what and days > high and m0 > 0.1001 and P > 0:
+                judged += 1
+                if prev_st is not None and st_ > 1.05 * prev_st:
+                    half.append(f"{name} d{d}: {prev_st} -> {st_}, C/P {C}/{P}")
+                if C < 0.98 * P - 1:
+                    MA = m0_at.get(d - bk)
+                    if MA is None:
+                        mid = [x for x in range(d - win + 2, d - bk - 1) if x in dmul[name]]
+                        MA = dmul[name][mid[len(mid) // 2]] if mid else None
+                    p0 = [dprod[name].get(x) for x in range(d - win + 1, d - bk + 1)]
+                    p1 = [dprod[name].get(x) for x in range(d - bk + 1, d + 1)]
+                    tgt = None
+                    if MA is not None and MA > 0 and None not in p0 and None not in p1 and sum(p0) + sum(p1) > 0:
+                        f0 = sum(p0) / (sum(p0) + sum(p1))
+                        baseP = P * (f0 / MA + (1.0 - f0) / m0)
+                        tgt = max(0.1, 0.95 * C / baseP, 0.5 * m0)
+                    if MA is None:
+                        nostart.append(f"{name} d{d}: C/P {C}/{P}")
+                    elif (tgt is not None and tgt < 0.97 * m0) or (tgt is None and MA <= m0 + 1e-4):
+                        flagged.append(f"{name} d{d}: C/P {C}/{P} = {C / P:.2f} < 0.98, stos {st_} = {days} dni, x{m0:.2f} bez zmian"
+                                       + (f", cel x{tgt:.2f}" if tgt is not None else f" (starszy kubelek x{MA:.2f})"))
+                    else:
+                        waited.append(f"{name} d{d}: C/P {C}/{P} po x{MA:.2f} -> x{m0:.2f}" + (f", cel x{tgt:.2f}" if tgt is not None else ""))
+            prev_st = st_
+    rep.add("D2K-7: KR-8 stos ponad gornym progiem dni zuzycia, a ciecie stoi (C/P < 0.98, mnoznik ponad podloga x0.10, 'bez zmian')",
+            f"{len(flagged)}" + (f" [{'; '.join(flagged[:4])}]" if flagged else "") + f" (decyzji x rodzajow {seen}, w tym 'bez zmian' w nadmiarze {judged})"
+            + (f"; INFO: regulator czeka z projektu (cel >= mnoznik, okno po cieciu) {len(waited)} [{'; '.join(waited[:3])}]" if waited else "")
+            + (f"; INFO: bez mnoznika starszego kubelka {len(nostart)} [{'; '.join(nostart[:3])}]" if nostart else "")
+            + (f"; INFO: wzrost stosu > 5% wobec poprzedniej decyzji {len(half)} [{'; '.join(half[:3])}]" if half else ""),
+            "0 (regula HorseClose: przy nadmiarze ciecie, gdy C < 0.98 P - klucz Horse Breeding Cut Over Stock - i cel max(0.95 C / baseP, polowa) ponizej mnoznika;"
+            " na podlodze x0.10 - cecha; w pokoju konie bojowe sie nie zuzywaja; n22f-ruda)",
             (len(flagged) == 0) if seen else None)
 
     # ---------------- D2K-8 Q-3
@@ -37727,7 +37763,7 @@ def nzc1_main(logp, bdp=None):
     pierwszych), ZC1-6/7 jedzenie "bez nazwy" i RemoveParty <= 2 szt./d na towar, ZC1-8 kontrola z ksiega rudy i drewna, ZC1-9a marmur 0.7-1.3, ZC1-9b miod lesny
     0.7-1.3, ZC1-9c produkcja miodu pitnego >= 80% bazy, ZC1-9d indeks miodu pitnego nie wyzszy niz baza (x1.10), ZC1-10 konwoje DTE i karawany BK (je 0),
     ZC1-10c cele karawan zywnosci bez zapasu <= 10% celodob, ZC1-11 czas <= 5 ms, ZC1-14 slady K4 jedzenia ponad limit 0, ZC1-15 zboze (zapas wobec bazy),
-    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji w 28 ostatnich albo w 56 dobach - pelny cykl KS, n22f-ruda; zawsze <= 25% w 28), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza x czesc produkcji wsi bez pol mieszczan KS (f25-sprawdz, decyzja Jeffa 2a; bez bazy: doby 2-29 biegu, f16-ks; sam stosunek - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza,
+    ZC1-16 zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji w 28 dobach; wyjatek - odbicie po spadku: poprzednie 28 dob bez przyrostu, 56 dob <= 10%, polki miast i wsie <= 10%; zawsze <= 25%; n22f-ruda), ZC1-16b utarg wozow jedwabiu i rudy srebra >= 0.8 x baza x czesc produkcji wsi bez pol mieszczan KS (f25-sprawdz, decyzja Jeffa 2a; bez bazy: doby 2-29 biegu, f16-ks; sam stosunek - INFO), ZC1-17 'nie do wydania' <= 1.05 x baza,
     ZC1-18 reszta bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu, reszta INFO. Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -38028,23 +38064,40 @@ def nzc1_main(logp, bdp=None):
         if len(ks) >= 14:
             slope = (sk[ks[-1]] - sk[ks[0]]) / max(1, ks[-1] - ks[0])
             pm = _nz1_mean([pr.get(d) for d in ks]) or 0.0
-            # n22f-ruda (20.10): zalew = przyrost trwaly (pelny cykl KS, 56 dob) i dalej trwajacy (28 ostatnich dob); sam przyrost 28 dob to pol cyklu.
-            # Zapas rudy srebra w ksiedze to w 2/3 towar w drodze (karawany 2 800-5 700 szt., wozy 30-1 400), a KS zmienia rece przy kopalniach co 7 dob
-            # wedlug ceny z 28 dob - zapas waha sie z okresem ok. 56 dob. Dowod (ruda srebra, okna 28 dob od doby 29 biegu 160 dob): r2160 NIE w 13 ze 106 okien
-            # (najgorsze +31.3/d przy 164.5 = 19%), r3160 1/106 (12%), n21160 0/106, n22a160 2/106 (ostatnie +27.0/206.7 = 13%: P-C dwoch polowek 56 dob
-            # -6.3/d i +25.5/d, polki miast i wsie 1527 -> 994, przybylo w karawanach +678 i wozach +532); okna 56 dob w tych biegach: NIE 0 z 78 (najwyzej 7%).
-            # Zalew trwaly (blad ZC1 16.10: +120/d, ok. 70% produkcji) przekracza 10% w obu oknach; nagly zalew ostatnich 28 dob - prog 25% (ponad 19%
-            # najwiekszego wahniecia polowki cyklu w biegach 160 dob). Bieg krotszy niz 56 dob - sam prog 28 dob jak dotad.
+            # n22f-ruda (20.10, po recenzjach): wyjatek "odbicie po spadku" - przyrost 28 dob ponad 10% produkcji nie jest zalewem, gdy (1) poprzednie 28 dob
+            # zapas nie rosl (<= +0.5/d), (2) w 56 dobach przyrost <= 10% produkcji, (3) polki miast i wsie (posiadacze "miasta" + "wsie") w 28 dobach
+            # urosly <= 10% produkcji - przybylo w drodze (wozy, karawany), nie na polkach - i (4) przyrost 28 dob <= 25% produkcji. Poza tym prog 28 dob jak dotad.
+            # Skad wahania (nie cykl - log): zapas rudy w ksiedze to w 2/3 towar w drodze (karawany 2 800-5 700 szt.), zuzycie tygodniowe skacze (r2160 108-321/d,
+            # n22a160 145-246/d), a regale KS co 28 dob podnosza rece przy kopalniach srebra o 10% (indeks srebra ok. 3-3.9 > 1.2 przez caly bieg - tylko w gore,
+            # do sufitu bloku): w ostatnich 56 dobach P rosnie w drugiej polowce we wszystkich 4 biegach 160 dob. n22a160: P 192.2 -> 206.7, C 198.5 -> 181.2,
+            # zapas 5061 -> 4834 -> 5564 (spadek, potem +27.0/206.7 = 13%), polki miast i wsie 1527 -> 994, karawany +678, wozy +532 - wyjatek: TAK.
+            # Okna 28 dob od doby 56 (biegi 160 dob, ruda srebra): stary prog NIE 13/106 (r2160), 1, 0, 2 (n22a160); z wyjatkiem 1, 1, 0, 0. Jedwab i nowa
+            # kampania (r2/r3/n21/n22a nowa) - ostatnie okno bez zmiany werdyktu (r3nowa ruda NIE zostaje: zapas rosl w obu polowkach, +13.8 i +20.1/d).
+            # Przepuszcza: zalew w samej drodze (karawany, wozy) 10-25% produkcji krotszy niz ok. 5-6 tygodni po spadku zapasu; zalew polek ponad 10% - NIE.
             k56 = sorted(sk)[-56:]
-            s56 = pm56 = None
+            s56 = pm56 = sA = None
             if len(k56) >= 56:
                 s56 = (sk[k56[-1]] - sk[k56[0]]) / max(1, k56[-1] - k56[0])
                 pm56 = _nz1_mean([pr.get(d) for d in k56]) or 0.0
+                sA = (sk[k56[28]] - sk[k56[0]]) / max(1, k56[28] - k56[0])
+
+            def _z16_shelf(d):
+                g = goods.get(d, {}).get(gid)
+                mm = re.search(r"posiadacze \[([^\]]*)\]", g[3]) if g else None
+                if not mm:
+                    return None
+                h = dict((a.strip(), int(v)) for a, v in re.findall(r"([a-z ]+?) (\d+)(?:,|$)", mm.group(1)))
+                return h.get("miasta", 0) + h.get("wsie", 0) if ("miasta" in h or "wsie" in h) else None
+            h0, h1 = _z16_shelf(ks[0]), _z16_shelf(ks[-1])
+            sh28 = (h1 - h0) / max(1, ks[-1] - ks[0]) if h0 is not None and h1 is not None else None
             hi28 = slope > 0.10 * pm + 0.5
-            bad = slope > 0.25 * pm + 0.5 or (hi28 and (s56 is None or s56 > 0.10 * pm56 + 0.5))
+            rebound = (s56 is not None and sA <= 0.5 and s56 <= 0.10 * pm56 + 0.5 and sh28 is not None and sh28 <= 0.10 * pm + 0.5)
+            bad = slope > 0.25 * pm + 0.5 or (hi28 and not rebound)
             rep.add(f"ZC1-16: zapas - {nm} (przyrost na dobe, ostatnie {len(ks)} dob) wobec produkcji", f"{slope:+.1f}/d przy produkcji {pm:.1f}/d (zapas {sk[ks[0]]} -> {sk[ks[-1]]})"
-                    + (f"; 56 dob {s56:+.1f}/d przy {pm56:.1f}/d (zapas {sk[k56[0]]} -> {sk[k56[-1]]})" if s56 is not None else "; 56 dob - za krotki bieg"),
-                    "<= 10% produkcji w 28 ostatnich dobach albo w 56 (pelny cykl KS - przyrost pol cyklu przy plaskim 56 dob to wahniecie towaru w drodze), i zawsze"
+                    + (f"; polki miast i wsie {h0} -> {h1} ({sh28:+.1f}/d)" if sh28 is not None else "; polki - brak posiadaczy w linii")
+                    + (f"; 56 dob {s56:+.1f}/d przy {pm56:.1f}/d (zapas {sk[k56[0]]} -> {sk[k56[28]]} -> {sk[k56[-1]]})" if s56 is not None else "; 56 dob - za krotki bieg")
+                    + ("; wyjatek: odbicie po spadku, przybylo w drodze" if hi28 and rebound and not bad else ""),
+                    "<= 10% produkcji w 28 dobach; wyjatek - odbicie po spadku: poprzednie 28 dob bez przyrostu, 56 dob <= 10%, polki miast i wsie <= 10%, i zawsze"
                     " <= 25% w 28 dobach (rzemioslo pierwsze bez zalewu polek; n22f-ruda)", not bad)
         else:
             rep.add(f"ZC1-16: zapas - {nm}", f"dob {len(ks)} (za malo)", "INFO", None)
