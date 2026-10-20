@@ -761,6 +761,9 @@ namespace Armoury
         // p6-drogi (R3-07d): AI wybiera drogi - pamiec planow partii i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-urodzaj)
         private readonly bool _p6DrogiReset = P6DrogiReset();
         private static bool P6DrogiReset() { try { AiRoadRoutes.Reset(); } catch (Exception e) { Log.Error("P6DrogiReset", e); } return true; }
+        // p6-spichlerz (R3-06f): zakup dnia i liczniki spichlerza miejskiego od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _p6SpichlerzReset = P6SpichlerzReset();
+        private static bool P6SpichlerzReset() { try { TownGranary.Reset(); } catch (Exception e) { Log.Error("P6SpichlerzReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -2171,6 +2174,7 @@ namespace Armoury
             try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)
             try { FolkAidLoyalty.EnsureHooks(); } catch (Exception e) { Log.Error("FolkAidLoyalty.EnsureHooks", e); }   // P1b: kara lojalnosci za danine - postfiks na czynny model lojalnosci (BK ma pola statyczne z GameTexts - tylko w kampanii)
             try { KsHunger.EnsureHooks(); } catch (Exception e) { Log.Error("KsHunger.EnsureHooks", e); }   // r4-glodbunt: glod miast KS -> "Hunger" w czynnych modelach lojalnosci i bezpieczenstwa (w kampanii), pomiar posilku; stan sesji glodu i KsLordFood od nowa
+            try { TownGranary.EnsureHooks(); } catch (Exception e) { Log.Error("TownGranary.EnsureHooks", e); }   // p6-spichlerz (R3-06f): bezpiecznik BetterEconomy (typ BE w kampanii) i linia startu sesji
             try { GentryService.EnsureHooks(); } catch (Exception e) { Log.Error("GentryService.EnsureHooks", e); }   // 179: wezwanie rycerza i rozwiazanie jego partii (BK), zakupy majatkow BK w przydziale sprzetu 166
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
             try { RotLeaks37.EnsureHooks(); } catch (Exception e) { Log.Error("RotLeaks37.EnsureHooks", e); }   // 3.7: podmiana rekruta ROT i rebelia bez zlota z niczego (transpilery raz na proces)
@@ -2559,6 +2563,8 @@ namespace Armoury
             // N2-E4 (noc 16.10, noc-ekonomia2): opal mieszczan z polki miasta za zloto kiesy ludu ponad jutrzejszy koszyk - PO koniach roboczych (ta sama regula zaplaty)
             // i PO dymarkach (drewno dymarek pierwsze), w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa miasta); wlasna ramka ksiegi towarow FCons ("mieszczanie")
             try { TownFolk.FirewoodDaily(); } catch (Exception e) { Log.Error("TownFolk.FirewoodDaily", e); } DayProfile.Lap("TownFolk.FirewoodDaily");
+            // p6-spichlerz (R3-06f): wsie miast sprzedaja miastu zboze ponad 98% sufitu spichlerza (migawka Famine.Daily tej doby) - kasa miasta -> kiesa wsi w pozycji MFolk
+            try { TownGranary.Daily(); } catch (Exception e) { Log.Error("TownGranary.Daily", e); } DayProfile.Lap("TownGranary.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow

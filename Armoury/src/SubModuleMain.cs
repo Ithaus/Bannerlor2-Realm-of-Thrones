@@ -219,6 +219,7 @@ namespace Armoury
                 try { ArmsFromPeople.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ArmsFromPeople.ApplyAll", e); }
                 try { VillageBook.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageBook.ApplyAll", e); }   // E4/11 (193): zywnosc warowni od ludzi (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu (U26)
                 try { PeopleMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleMarket.ApplyAll", e); }   // GL-2 (P2 e): neutralizacja licznika Food warowni (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu MarketByPeople
+                try { TownGranary.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownGranary.ApplyAll", e); }   // p6-spichlerz (R3-06f): bilans jedzenia miasta (postfiks Last DefaultSettlementFoodModel) i Town.DailyTick - wpiete zawsze, licza przy kluczu TownGranaryFromVillages
                 // P4 (zbytki, targ widzi sakiewke): oferta ludu w szacunku popytu targu - prefiks / postfiks / finalizer na modelach gry i BetterEconomy (jak RawPrice, bez pol
                 // statycznych z tekstow); wpiete zawsze, licza przy kluczach FolkLuxuryList i MarketSeesPurse
                 try { TownFolk.LadderApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFolk.LadderApplyAll", e); }

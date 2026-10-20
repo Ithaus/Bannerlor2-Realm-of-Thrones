@@ -1833,6 +1833,15 @@ Uzycie (Python 3, tylko odczyt):
                     i ERROR in BookHoldings.Free 0, NWL-4 wypuszczeni i pozostali (INFO), NWL-5 twierdza, ktorej stary pan byl juz w krolestwie nowego pana (naglowek
                     linii "X: rod (krolestwo) -> rod (to samo krolestwo)"), ma odcinek "loch bez zmian" i zadnego wypuszczenia; inne twierdze - nigdy "loch bez zmian".
                     Log sprzed paczki albo bez przywrocenia: INFO, bez wyjatku.
+--grupa p6spichlerz: (20.10, galaz p6-spichlerz - R3-06f, POMYSLY-35 pkt 16; Armoury/src/TownGranary.cs, klucz Town Granary From Villages) miasto je ze swoich
+                    wsi: nadwyzka spichlerzy wsi (Famine) ponad 98% sufitu za cene targu zamiast stalego skladnika wsi gry, niedobor miasta (zapas < 30 dni albo 30%
+                    sufitu) - sprzedaz z zapasu wsi ponad rok, bezpiecznik BetterEconomy i werbunku zalogi. python -I tools/sprawdz_logi.py --grupa p6spichlerz
+                    <Armoury-*.log> (strumieniowo). SP-0 linie galezi (brak - INFO), linie doby czytelne; SP-1 latki przy starcie gry; SP-2 start sesji (klucz, Famine,
+                    latki, BE, zaloga); SP-3 doby CZYNNE i miast >= 90; SP-4 skladnik wsi zdjety (> 0 w kazdej dobie, mediana >= 50 miast); SP-5 kontrola: racje = ubytek stodol,
+                    zapas miast = zakup, kasy miast = kiesy wsi = zaplata; SP-6 zboze ze wsi do miast > 0 (gdy sa wsie z nadwyzka); SP-7 zloto i cena 1-500 zl/szt.;
+                    SP-8 miasta przy Food 0 bez oblezenia <= 2 naraz; SP-9 miasta z bilansem < progu BE (INFO); SP-9b miasta ponizej 80% sufitu (BK Well fed, INFO);
+                    SP-10 bezpiecznik BE (testy 80-200/d, glod BE bez jedzenia <= Food 0 + 2); SP-10b BE gospodarka miasta (odczyty >= 80/d); SP-11 werbunek zalogi
+                    (dzienne ticki 80-200/d, odczyty >= polowa); SP-11b niedobor (INFO); SP-12 czas doby (mediana <= 10 ms, max <= 40 ms); SP-13 potkniecia i ERROR 0.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -51850,6 +51859,187 @@ def p6okup_main(logp):
     return 0
 
 
+# ============================================================ p6spichlerz (20.10, galaz p6-spichlerz - R3-06f): miasto je ze swoich wsi - spichlerz miejski (TownGranary.cs)
+P6SPICHLERZ_HEAD = "Spichlerz miejski (p6): "
+P6SPICHLERZ_DAY = re.compile(
+    r"Spichlerz miejski \(p6\): dzien (?P<day>-?\d+) \| (?P<live>CZYNNE|SPICHLERZE WSI NIECZYNNE)[^|]*\| miast (?P<towns>\d+) \(oblezone (?P<bes>\d+), Innych (?P<ww>\d+)\)"
+    r" \| zboze ze wsi do miast dzis (?P<units>[-\d.]+) szt\./d Food \((?P<rat>[-\d.]+) racji\) z (?P<fv>\d+) wsi do (?P<ft>\d+) miast; wsi z nadwyzka (?P<sv>\d+),"
+    r" bez miejsca w miescie (?P<full>\d+), nadwyzka ponizej [\d.]+ Food (?P<tiny>\d+), bez zaplaty \(kasa miasta\) (?P<nog>\d+) \| zloto miasto->wies (?P<gold>-?\d+) zl \(cena zboza srednio (?P<price>[-\d.]+) zl/szt\.\)"
+    r" \| miasta w niedoborze \([^)]*\): (?P<short>\d+), wsie sprzedaly z zapasu ponizej 98% sufitu (?P<shv>\d+)"
+    r" \| skladnik wsi gry zdjety -(?P<term>[-\d.]+)/d w (?P<termt>\d+) miastach"
+    r" \| miasta z bilansem < (?P<thr>[-\d.]+): (?P<neg>\d+) \(bez oblezenia (?P<negp>\d+); najnizszy (?P<lown>.*?) (?P<low>-?[\d.]+|-)\)"
+    r" \| miasta glodujace \(Food 0\): (?P<hun>\d+) \(bez oblezenia (?P<hunp>\d+)\)"
+    r" \| miasta ponizej 80% sufitu zapasu bez oblezenia \(BK Well fed \+0\.5 lojalnosci\): (?P<b80>\d+)"
+    r" \| BE[^:]*: testy miast (?P<bes_t>\d+), oslonieto (?P<beg>\d+) \((?P<begt>\d+) miast\), glod BE bez jedzenia (?P<beh>\d+)"
+    r" \| BE gospodarka miasta[^:]*: odczyty bilansu (?P<eco>\d+), oslonieto (?P<ecog>\d+), bez jedzenia (?P<ecoh>\d+)"
+    r" \| werbunek zalogi[^:]*: dzienne ticki miast (?P<gt>\d+) \(odczyty bilansu (?P<gr>\d+)\), testy miast z bilansem <= 0 (?P<gs>\d+), oslonieto (?P<gg>\d+),"
+    r" deficyt takze ze skladnikiem wsi \(regula gry\) (?P<go>\d+), w niedoborze bez werbunku (?P<gh>\d+)"
+    r" \| kontrola: racje zdjete (?P<r1>[-\d.]+) = ubytek stodol wsi (?P<r2>[-\d.]+); zapas miast \+(?P<si>[-\d.]+) = zakup (?P<su>[-\d.]+);"
+    r" zloto: kasy miast -(?P<to>-?\d+), kiesy wsi \+(?P<vi>-?\d+), zaplata (?P<pg>-?\d+)"
+    r".*? \| potkniecia (?P<st>\d+) \(razem (?P<sta>\d+)\) \| czas (?P<ms>[\d.]+) ms\.")
+
+
+def p6spichlerz_main(logp):
+    """p6spichlerz (20.10, galaz p6-spichlerz - R3-06f, POMYSLY-35 pkt 16): miasto je ze swoich wsi - nadwyzka spichlerzy wsi (Famine) za cene targu zamiast
+    stalego skladnika wsi gry, niedobor miasta, bezpiecznik BetterEconomy i werbunku zalogi; klucz Town Granary From Villages domyslnie TAK.
+    Progi SP-0..SP-13 - opis w naglowku pliku (--grupa p6spichlerz). Log bez galezi: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("SP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    boots, starts, offs, days, bad, errs = [], [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(P6SPICHLERZ_HEAD):
+                r = s[len(P6SPICHLERZ_HEAD):]
+                if r.startswith("latki przy starcie gry"):
+                    boots.append(s)
+                elif r.startswith("start sesji"):
+                    starts.append(s)
+                elif r.startswith("WYLACZONY"):
+                    offs.append(s)
+                elif r.startswith("dzien "):
+                    mm = P6SPICHLERZ_DAY.match(s)
+                    if mm:
+                        days.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+            elif s.startswith(("ERROR in TownGranary", "ERROR in P6SpichlerzReset")):
+                errs.append(s)
+    print(f"plik: {logp} | startow gry {len(boots)}, startow sesji {len(starts)}, dob {len(days)} (nieczytelnych {len(bad)}), WYLACZONY {len(offs)}, ERROR {len(errs)}")
+    if not boots and not starts and not days and not errs:
+        rep.add("SP-0: linie 'Spichlerz miejski (p6)'", "brak w logu", "INFO (log sprzed galezi p6-spichlerz)", None)
+        rep.show()
+        return 0
+    rep.add("SP-0: linie galezi", f"startow gry {len(boots)}, startow sesji {len(starts)}, dob {len(days)}, WYLACZONY {len(offs)}; linii doby nieczytelnych {len(bad)}"
+            + (f" (np. {bad[0][:160]})" if bad else ""), "linie doby czytelne (0 nieczytelnych)", not bad)
+    if boots:
+        b = boots[-1]
+        ok = ("bilans jedzenia miasta wpiety" in b and "Town.DailyTick wpiety" in b and "werbunek zalogi wpiety (OnDailySettlementTick i CanSettlementAutoRecruit)" in b
+              and "BRAK: -." in b)
+        rep.add("SP-1: latki przy starcie gry (ostatni start)", b[len(P6SPICHLERZ_HEAD):][:240],
+                "bilans miasta, Town.DailyTick i werbunek zalogi (OnDailySettlementTick i CanSettlementAutoRecruit) wpiete, BRAK: -", ok)
+    else:
+        rep.add("SP-1: latki przy starcie gry", "brak linii", "jest w kazdym starcie gry z galezia", False)
+    if starts:
+        st = starts[-1]
+        key = "klucz Town Granary From Villages TAK" in st
+        fam = "spichlerze wsi (Famine) czynne" in st
+        hooks = "bilans miasta wpiety, Town.DailyTick wpiety" in st
+        be = re.search(r"\| bezpiecznik BE (.*?), prog BE ", st)
+        bew = be.group(1).strip() if be else "-"
+        eco = re.search(r"\| gospodarka miasta BE \(polityka, projekty, cechy\) ([^|]*)", st)
+        ecow = eco.group(1).strip() if eco else "-"
+        gar = re.search(r"\| werbunek zalogi ([^|]*)", st)
+        garw = gar.group(1).strip() if gar else "-"
+        ok = (key and fam and hooks and (bew.startswith("wpiety") or bew.startswith("bez BetterEconomy"))
+              and (ecow.startswith("wpiety") or ecow.startswith("bez BetterEconomy")) and garw.startswith("wpiety (OnDailySettlementTick"))
+        rep.add("SP-2: start sesji (ostatni)", f"klucz {'TAK' if key else 'NIE'}, Famine {'czynne' if fam else 'NIECZYNNE'}, latki bilansu {'tak' if hooks else 'NIE'}, BE: {bew}, "
+                f"gospodarka miasta BE: {ecow}, zaloga: {garw}",
+                "klucz TAK, Famine czynne, bilans i Town.DailyTick wpiete, BE i gospodarka miasta BE wpiete (albo bez BetterEconomy), werbunek zalogi wpiety na OnDailySettlementTick", ok)
+    else:
+        rep.add("SP-2: start sesji", "brak linii", "jest po wczytaniu kampanii", False)
+    if not days:
+        rep.add("SP-3: linie doby", "brak", "co dobe przy kluczu TAK", None if offs else False)
+        rep.add("SP-13: potkniecia i ERROR in TownGranary*", f"linii ERROR {len(errs)}", "0", not errs)
+        rep.show()
+        return 0
+    live = [d for d in days if d["live"] == "CZYNNE"]
+    towns = [int(d["towns"]) for d in days]
+    rep.add("SP-3: doby CZYNNE i miasta w linii", f"dob {len(days)}, CZYNNE {len(live)}; miast min {min(towns)}, max {max(towns)}",
+            "wszystkie doby CZYNNE (spichlerze wsi Famine), miast >= 90", len(live) == len(days) and min(towns) >= 90)
+    if live:
+        tt = sorted(int(d["termt"]) for d in live)
+        tsum = [float(d["term"]) for d in live]
+        med = tt[len(tt) // 2]
+        rep.add("SP-4: skladnik wsi gry zdjety (miasta w dobie)", f"miast min {tt[0]}, mediana {med}, max {tt[-1]}; zdjete srednio {sum(tsum) / len(tsum):.1f} Food/d",
+                "> 0 w kazdej dobie, mediana >= 50 miast", tt[0] > 0 and med >= 50)
+    badr, bads, badg = [], [], []
+    for d in days:
+        r1, r2 = float(d["r1"]), float(d["r2"])
+        if abs(r1 - r2) > max(0.5, 1e-6 * abs(r1)):
+            badr.append(f"{d['day']}: {r1} / {r2}")
+        si, su = float(d["si"]), float(d["su"])
+        if abs(si - su) > max(1.0, 0.002 * abs(su)):
+            bads.append(f"{d['day']}: +{si} / {su}")
+        to, vi, pg = int(d["to"]), int(d["vi"]), int(d["pg"])
+        if not (to == vi == pg):
+            badg.append(f"{d['day']}: -{to} / +{vi} / {pg}")
+    rep.add("SP-5: kontrola (racje zdjete = ubytek stodol wsi; zapas miast = zakup; kasy miast = kiesy wsi = zaplata)",
+            f"dob {len(days)}; racje poza tolerancja {len(badr)}, zapas {len(bads)}, zloto {len(badg)}" + (f" ({'; '.join((badr + bads + badg)[:4])})" if badr or bads or badg else ""),
+            "0 dob poza kontrola (racje +-0.5, zapas +-max(1, 0.2%), zloto co do denara)", not badr and not bads and not badg)
+    units = [float(d["units"]) for d in days]
+    golds = [int(d["gold"]) for d in days]
+    sv = sum(int(d["sv"]) for d in days)
+    fed = [int(d["ft"]) for d in days]
+    tot_u, tot_g = sum(units), sum(golds)
+    if tot_u > 0:
+        ok6 = True
+    elif sv > 0:
+        ok6 = False
+    else:
+        ok6 = None
+    rep.add("SP-6: zboze ze wsi do miast",
+            f"razem {tot_u:.1f} szt. Food w {sum(1 for u in units if u > 0)} z {len(units)} dob (srednio {tot_u / len(units):.1f}/d, miast karmionych max {max(fed)}); "
+            f"wsi z nadwyzka (wsio-doby) {sv}, bez miejsca w miescie {sum(int(d['full']) for d in days)}, nadwyzka ponizej 0.05 Food {sum(int(d['tiny']) for d in days)}, "
+            f"bez zaplaty {sum(int(d['nog']) for d in days)}",
+            "> 0 w oknie, gdy sa wsie z nadwyzka (bez nadwyzki - INFO)", ok6)
+    pr = tot_g / tot_u if tot_u > 0 else 0.0
+    rep.add("SP-7: zloto miasto -> wies", f"razem {tot_g} zl ({tot_g / len(golds):.0f} zl/d), srednio {pr:.1f} zl za szt. Food",
+            "cena 1-500 zl/szt. przy zakupach (bez zakupow - INFO)", (1.0 <= pr <= 500.0) if tot_u > 0 else None)
+    hp = [int(d["hunp"]) for d in days]
+    hall = [int(d["hun"]) for d in days]
+    worst = max(range(len(days)), key=lambda i: hp[i])
+    rep.add("SP-8: miasta glodujace (Food 0) bez oblezenia", f"najwiecej {hp[worst]} (doba {days[worst]['day']}), doby z > 0: {sum(1 for x in hp if x > 0)}; razem z oblezonymi najwiecej {max(hall)}",
+            "<= 2 naraz (glod w pokoju tylko po spalonych wsiach i przy pustym targu)", hp[worst] <= 2)
+    negs = sorted(int(d["negp"]) for d in days)
+    rep.add("SP-9: miasta z bilansem < progu BE bez oblezenia (INFO)", f"mediana {negs[len(negs) // 2]}, max {negs[-1]}; najnizszy (ostatnia doba) {days[-1]['lown']} {days[-1]['low']}",
+            "INFO (przed galezia 0-4 miast; po zdjeciu skladnika wsi wiecej - bezpiecznik BE SP-10)", None)
+    b80 = [int(d["b80"]) for d in days]
+    b80s = sorted(b80)
+    rep.add("SP-9b: miasta ponizej 80% sufitu zapasu bez oblezenia (BK Well fed +0.5 lojalnosci; INFO)",
+            f"pierwsza doba {b80[0]}, mediana {b80s[len(b80s) // 2]}, max {b80s[-1]}, ostatnia doba {b80[-1]}",
+            "INFO (porownac z WGRANIEM 92: miasta bez +0.5/d lojalnosci BK - decyzja Jeffa)", None)
+    bts = sorted(int(d["bes_t"]) for d in (days[1:] or days))
+    begs = sum(int(d["beg"]) for d in days)
+    behs = [int(d["beh"]) for d in days]
+    bes_on = bool(starts) and "bezpiecznik BE wpiety" in starts[-1]
+    btm = bts[len(bts) // 2]
+    rep.add("SP-10: bezpiecznik BE (testy miast na dobe, oslony, glod BE bez jedzenia)",
+            f"testy mediana {btm}, oslonieto razem {begs}, glod BE bez jedzenia najwiecej {max(behs)} (Food 0 najwiecej {max(hall)})",
+            "BE wpiety: testy na dobe 80-200 (kazde miasto raz), glod BE bez jedzenia <= miasta przy Food 0 + 2; bez BE - INFO",
+            (80 <= btm <= 200 and max(behs) <= max(hall) + 2) if bes_on else None)
+    ecos = sorted(int(d["eco"]) for d in (days[1:] or days))
+    eco_on = bool(starts) and "gospodarka miasta BE (polityka, projekty, cechy) wpiety" in starts[-1]
+    ecom = ecos[len(ecos) // 2]
+    rep.add("SP-10b: bezpiecznik BE w gospodarce miasta (FoodRelief, Granaries, cechy)",
+            f"odczyty bilansu na dobe mediana {ecom}, oslonieto razem {sum(int(d['ecog']) for d in days)}, bez jedzenia najwiecej {max(int(d['ecoh']) for d in days)}",
+            "BE wpiety: odczyty na dobe >= 80 (TickGuilds - kazde miasto co dobe); bez BE - INFO", (ecom >= 80) if eco_on else None)
+    gar_on = bool(starts) and "werbunek zalogi wpiety (OnDailySettlementTick" in starts[-1]
+    gl = [d for d in (days[1:] or days) if d["live"] == "CZYNNE"]
+    gts = sorted(int(d["gt"]) for d in gl) if gl else [0]
+    grs = sorted(int(d["gr"]) for d in gl) if gl else [0]
+    gtm, grm = gts[len(gts) // 2], grs[len(grs) // 2]
+    gss, ggs, gos, ghs = (sum(int(d["gs"]) for d in days), sum(int(d["gg"]) for d in days), sum(int(d["go"]) for d in days), sum(int(d["gh"]) for d in days))
+    rep.add("SP-11: werbunek zalogi gry (okno na dziennym ticku)",
+            f"dzienne ticki miast na dobe mediana {gtm}, odczyty bilansu w nich mediana {grm}; testy z bilansem <= 0 razem {gss}, oslonieto {ggs}, "
+            f"deficyt takze ze skladnikiem wsi (regula gry) {gos}, w niedoborze bez werbunku {ghs}",
+            "latka wpieta i doby CZYNNE: dzienne ticki 80-200 na dobe i odczyty bilansu >= polowa tickow (okno dziala w ticku gry); inaczej INFO",
+            (80 <= gtm <= 200 and grm * 2 >= gtm) if (gar_on and gl) else None)
+    sh = [int(d["short"]) for d in days]
+    rep.add("SP-11b: miasta w niedoborze i sprzedaz z zapasu wsi (INFO)",
+            f"miast w niedoborze najwiecej {max(sh)} (srednio {sum(sh) / len(sh):.1f}), wsio-doby sprzedazy ponizej 98% sufitu {sum(int(d['shv']) for d in days)}", "INFO", None)
+    ms = sorted(float(d["ms"]) for d in days)
+    rep.add("SP-12: czas doby", f"mediana {ms[len(ms) // 2]:.1f} ms, max {ms[-1]:.1f} ms", "mediana <= 10 ms, max <= 40 ms", ms[len(ms) // 2] <= 10 and ms[-1] <= 40)
+    stv = sum(int(d["st"]) for d in days)
+    rep.add("SP-13: potkniecia i ERROR in TownGranary*", f"potkniecia (suma dob) {stv}, linii ERROR {len(errs)}" + (f" ({errs[0][:140]})" if errs else ""), "0", stv == 0 and not errs)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -52139,6 +52329,8 @@ def main(argv):
         return nspichlerze_main(logp)   # nspichlerze (19.10, paczka f23-spichlerze): psucie zapasu spichlerzy (Famine, Granary Spoilage) i jency krolestwa nowego pana do zalogi przy przywroceniu wlosci (BookHoldings)
     if group == "p6okup" and logp:
         return p6okup_main(logp)   # p6-okup (R3-03a, noc 20.10): okup okolicy zamiast palenia wsi (RaidTribute) - progi PO-0..PO-10
+    if group == "p6spichlerz" and logp:
+        return p6spichlerz_main(logp)   # p6spichlerz (20.10, galaz p6-spichlerz - R3-06f): miasto je ze swoich wsi - zboze ze spichlerzy wsi do miast, zloto, niedobor, bezpiecznik BE i zalogi (TownGranary.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

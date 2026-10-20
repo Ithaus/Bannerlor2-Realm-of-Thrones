@@ -3516,6 +3516,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool TownFoodByVillagePeople { get; set; } = true;
 
+        [SettingPropertyBool("Town Granary From Villages", HintText = "towns get from their villages only the grain the villages can spare (above two years of their own food, one year when the town runs short), paid from the town's money at its grain price; a town with food in store or at its market does not starve. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TownGranaryFromVillages { get; set; } = true;
+
         [SettingPropertyBool("Watch Law Enabled", HintText = "every man who joins the Night's Watch comes from the Seven Kingdoms: first the convicts sent to the Wall, then outlaws who take the black, then common folk of every land by its numbers. A brother never goes home: routed or disbanded he walks back to the Wall, and a deserter hides among the outlaws of the North", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WatchLawEnabled { get; set; } = true;
@@ -9366,6 +9370,7 @@ namespace Armoury
             s.VillageBookEnabled = VillageBookEnabled;
             s.DistrictSettlementPeople = DistrictSettlementPeople;
             s.TownFoodByVillagePeople = TownFoodByVillagePeople;
+            s.TownGranaryFromVillages = TownGranaryFromVillages;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;
             s.WatchDoesNotRaid = WatchDoesNotRaid;
