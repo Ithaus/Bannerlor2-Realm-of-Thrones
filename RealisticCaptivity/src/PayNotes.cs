@@ -11,7 +11,8 @@ namespace RealisticCaptivity
     /// Przelew gry (GiveGoldAction z disableNotification = false) z graczem po jednej stronie pokazuje gola informacje "You paid N" / "You received N"
     /// (SandBox DefaultNotificationsCampaignBehavior). Przy kluczu PlayerPaymentReasons nasze miejsca przelewaja z disableNotification = true (On) i zostaje
     /// JEDEN komunikat z powodem: nasz dotychczasowy (Silent - tylko licznik) albo nowy (Paid / Got - wyglad i dzwiek jak komunikat gry). Kwoty, platnicy
-    /// i odbiorcy bez zmian. Wylaczony klucz = komunikat gry jak dotad (od razu). Bez stanu w zapisie, bez latek Harmony. Linia logu przy kazdej podmianie.
+    /// i odbiorcy bez zmian. Wylaczony klucz = komunikat gry jak dotad (MCM tego moda wchodzi po wczytaniu zapisu). Bez stanu w zapisie, bez latek Harmony.
+    /// Linia logu przy kazdej podmianie.
     /// </summary>
     internal static class PayNotes
     {

@@ -79,7 +79,8 @@ grupa "The village menu", domyslnie wlaczony; MCM Jeffa tego klucza nie ma). Wpi
 **Zmiana (A) - komunikaty platnosci:** nowy plik `Armoury/src/PayNotes.cs` (+ kopie `RealisticCaptivity/src/PayNotes.cs`, `GrandTourney/src/PayNotes.cs`), nowy klucz
 **Player Payment Reasons** w kazdym z trzech modow (grupa "Payment messages", domyslnie wlaczony; nowy - MCM Jeffa go nie ma). Przy wlaczonym kluczu przelew gracza idzie
 z `disableNotification = true` i jest JEDEN komunikat (bialy, ikona monety, ten sam dzwiek co gra): nowy z powodem (`Paid` / `Got`) albo dotychczasowy nasz, ktory juz
-mowil powod (`Silent` - tylko licznik). Wylaczony = komunikat gry jak dotad (od razu, bez wczytania). Kwoty, platnicy i odbiorcy bez zmian (ta sama metoda GiveGoldAction,
+mowil powod (`Silent` - tylko licznik). Wylaczony = komunikat gry jak dotad (Armoury - od nastepnej godziny gry, McmSettings.Apply co godzine; RC i GT - po
+wczytaniu zapisu, jak wszystkie ich klucze MCM). Kwoty, platnicy i odbiorcy bez zmian (ta sama metoda GiveGoldAction,
 ten sam MoneyLedger/RealPayer - zdarzenie gry idzie dalej, zmienia sie tylko flaga komunikatu).
 
 | Miejsce | Plik | Komunikat (klucz wlaczony) |
@@ -161,8 +162,12 @@ ten sam MoneyLedger/RealPayer - zdarzenie gry idzie dalej, zmienia sie tylko fla
 7. Jesli gdzies dalej widzisz gole "You paid N" / "You received N" - napisz gdzie; w Armoury.log bedzie linia `komunikat gry bez powodu (...) | wolajacy: ...`, ktora
    pokaze, skad przyszlo (np. `grep -a "komunikat gry bez powodu" Armoury-*.log`).
 8. MCM Armoury -> "The village menu" -> wylacz **Village Menu Tidy**, zapisz, wczytaj: menu wsi jak dawniej (linia WYLACZONY). "Payment messages" -> wylacz **Player
-   Payment Reasons**: od razu znowu "You paid N" gry i stare komunikaty. Wlacz z powrotem.
+   Payment Reasons**: po godzinie gry (Armoury) / po wczytaniu (RC, GT) znowu "You paid N" gry i stare komunikaty. Wlacz z powrotem.
 9. Napisz, co by bylo lepiej gdzie indziej (np. Banner Kings albo dniowka z powrotem na wierzch) - przestawienie to jedna linijka w planie (oprocz "Recruit troops"
    i "Buy products" - musza zostac w menu wsi).
 
 Potkniecia: VillageMenus i PayNotes licza per miejsce (`VillageMenus.<miejsce> (potkniecie N)`, `PayNotes.Show/OnTraded (potkniecie N)`) - nic sie nie gasi.
+
+Poprawka po wlasnym przegladzie (20.10, drugi commit): w GrandTourney klucz stal przed `LogEnabled`, wiec `gen_mcm.py` przenosil "Log Enabled" do grupy
+"Payment messages" - blok przeniesiony za `LogEnabled` (Log Enabled zostaje w "The lists themselves"); opisy, kiedy dziala wylacznik (Armoury - co godzine gry,
+RC/GT - po wczytaniu), poprawione w Settings.cs, PayNotes.cs i tutaj. Build trzech modow ponownie kod 0.

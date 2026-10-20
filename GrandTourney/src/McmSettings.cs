@@ -180,13 +180,13 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public float TourneyRansomShare { get; set; } = 1f;
 
+        [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("The lists themselves")]
+        public bool LogEnabled { get; set; } = true;
+
         [SettingPropertyBool("Player Payment Reasons", HintText = "when you pay or receive gold for a tourney (hosting fee, takings, the champion's purse, refunds), the game's bare 'You paid N' / 'You received N' is replaced by one message that says what for. Only the message changes - sums and payers stay the same. Off = the game's message as before (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Payment messages")]
         public bool PlayerPaymentReasons { get; set; } = true;
-
-        [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
-        [SettingPropertyGroup("Payment messages")]
-        public bool LogEnabled { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -232,8 +232,8 @@ namespace GrandTourney
             s.TourneyRansom = TourneyRansom;
             s.TourneyRansomKnockerOnly = TourneyRansomKnockerOnly;
             s.TourneyRansomShare = TourneyRansomShare;
-            s.PlayerPaymentReasons = PlayerPaymentReasons;
             s.LogEnabled = LogEnabled;
+            s.PlayerPaymentReasons = PlayerPaymentReasons;
         }
 
         internal static void Apply()

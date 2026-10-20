@@ -16,7 +16,7 @@ namespace Armoury
     /// Przy kluczu PlayerPaymentReasons nasze miejsca, w ktorych placi albo dostaje gracz, wolaja przelew z disableNotification = true (Quiet) i pokazuja JEDEN
     /// wlasny komunikat z powodem i rozbiciem (Paid / Got) - ten sam wyglad co komunikat gry (bialy, ikona monety, ten sam dzwiek). Kwoty, platnicy i odbiorcy
     /// bez zmian - zmienia sie tylko napis. AI bez komunikatow (Quiet zmienia cos tylko tam, gdzie gra i tak pokazalaby komunikat graczowi).
-    /// Wylaczony klucz = komunikat gry jak dotad (od razu, bez wczytania). Bez stanu w zapisie, bez latek Harmony. Liczniki tylko do logu: linia startu sesji
+    /// Wylaczony klucz = komunikat gry jak dotad (od nastepnej godziny gry - McmSettings.Apply co godzine, bez wczytania). Bez stanu w zapisie, bez latek Harmony. Liczniki tylko do logu: linia startu sesji
     /// i linia przy kazdej podmianie ("Komunikaty platnosci (m96-wies): ...").
     /// Zwiad (tylko odczyt): nasluch zdarzenia gry HeroOrPartyTradedGold - gdy gra MIMO TO pokazuje graczowi gola informacje (showNotification, gracz po jednej
     /// stronie), linia logu z miejscem wywolania (stos bez ramek gry), zeby znalezc reszte zrodel "You paid N" (Jeff 20.10: w logach dnia nie bylo noclegu ani
@@ -34,7 +34,7 @@ namespace Armoury
         private static readonly object Owner = new object();
         private static WeakReference<Campaign> _hookFor;
 
-        /// <summary>Klucz PlayerPaymentReasons (czytany przy kazdym przelewie - zmiana w MCM dziala od razu).</summary>
+        /// <summary>Klucz PlayerPaymentReasons (czytany przy kazdym przelewie; zmiana w MCM wchodzi z McmSettings.Apply co godzine gry).</summary>
         internal static bool On
         {
             get { try { var s = Settings.Current; return s != null && s.PlayerPaymentReasons; } catch { return false; } }

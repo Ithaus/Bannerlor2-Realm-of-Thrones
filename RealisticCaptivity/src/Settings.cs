@@ -184,7 +184,7 @@ namespace RealisticCaptivity
         // --- Payment messages ---
         // m96-wies (Jeff 20.10: "You paid w miescie 2 - powinno byc, za co"): PayNotes.cs - przy przelewach gracza z tego moda komunikat gry "You paid N" /
         // "You received N" wylaczony; zostaje jeden komunikat z powodem (dotychczasowy albo nowy: rata dlugu okupu, kupno i sprzedaz domu). Kwoty bez zmian.
-        // Wylaczony = komunikaty gry jak dotad (od razu). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony). Ten sam klucz w Armoury i GrandTourney.
+        // Wylaczony = komunikaty gry jak dotad (od nastepnego wczytania - MCM RC). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony). Ten sam klucz w Armoury i GT.
         public bool PlayerPaymentReasons = true;           // when you pay or receive gold in captivity, for your ransom or your house, the game's bare "You paid N" / "You received N" is replaced by one message that says what for. Only the message changes - sums and payers stay the same. Off = the game's message as before
 
         // --- Other ---

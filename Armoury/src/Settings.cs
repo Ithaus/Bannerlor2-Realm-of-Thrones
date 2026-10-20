@@ -3772,7 +3772,7 @@ namespace Armoury
         // m96-wies (Jeff 20.10: "You paid w miescie 2 - powinno byc, za co: za nocleg w karczmie"): PayNotes.cs - przy przelewach gracza z naszych modow komunikat gry
         // "You paid N" / "You received N" wylaczony, zamiast niego jeden nasz z powodem i rozbiciem (nocleg w karczmie i zajezdzie, kuznia na dobe, ksiazki, okup
         // gracza, zlecenia, sprzedaz warsztatu, okup wsi, wplaty karawan, sakiewki wiesniakow). Tylko komunikat - kwoty i przelewy bez zmian. AI bez komunikatow.
-        // Wylaczony = komunikaty jak dotad (od razu). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
+        // Wylaczony = komunikaty jak dotad (od nastepnej godziny gry - McmSettings.Apply co godzine). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
         public bool PlayerPaymentReasons = true;           // when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare "You paid N" / "You received N" is replaced by one message that says what for, with the split (e.g. "You paid 2 for your night at a common room in Seagard (bed 1, horse 1)."). Only the message changes - sums and payers stay the same. Off = the game's message as before
 
         public static void Load(string moduleDataDir)
