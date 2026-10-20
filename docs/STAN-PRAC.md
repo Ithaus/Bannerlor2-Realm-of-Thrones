@@ -3399,4 +3399,9 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   n22f-najemnicy 4c1db61f (narzedzie, fala 1 nie jest przyczyna; n22b-nowa d80-107 2092), n22f-ruda cec39eef (narzedzie: ZC1-16 odbicie po spadku, D2K-7 regula
   HorseClose - zmiennosc), n22f-scalenie ef4139f3 (Rumours: wiesci 13 dob / 300 zamiast 60 FIFO - kruki gubily dalekie wiesci) -> n22-calosc 3c3a7ad9
   (2108 ustawien, build 0). n22b: bitwa i nowa kod 0, 160 w toku; potem testy-n22c.ps1 (DLL test/n22c = n22b + Armoury 97efca1d) -> WGRANIE 93.
+- 08:40 PDT n22b (18 galezi, 4885ae75): bitwa 4/4, nowa 120/120, 160/160 - kod 0 (zawieszenia tylko przy wyjsciu, poza kampania). Nowe linie dzialaja:
+  R3-02 (AI 1289 szt./d), R3-08e (vale_rider/lancer, reach_rider +20), R3-08f (frey_rider w 9 szablonach), R3-05c (kruki 26, sr. 56 h).
+  PROBLEM R3-02: naprawy wedlug godzin cechow zabieraja produkcji ok. 400 roboczodni/d (naprawy 76 -> 473): zrobione 28 dob vs n22a - lukarze -42%, miecznicy -13%,
+  siodlarze -14%, krawcy -11%; NC-10 luki 182 -> 154/d, dob bez kusz 3. -> wf_ea663318-f9e (zb/n22f-naprawy2 od 3c3a7ad9): najpierw bezczynne rece, maly udzial AI
+  w rekach linii. Test koncowy n22c (3c3a7ad9 bez tej poprawki) w toku od 08:37; po poprawce: test 160 + nowa -> WGRANIE 93 ok. 11:30-12:00.
 
