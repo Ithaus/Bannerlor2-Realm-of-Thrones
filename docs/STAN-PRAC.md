@@ -3371,4 +3371,8 @@ TESTY n22a (15 galezi): testy-n22a.ps1 (bitwa 5 dob x4, nowa 120 start-zloto, 16
 DALEJ: 3 galezie + poprawki scalenia -> n22 -> testy -> WGRANIE 93. Fala 2 (p6-*, od n22) po odnowieniu limitu 5 h (07:10 PDT): okup okolicy 03a, zakladnicy 03c,
 sztormy 05d, spichlerz miasta 06f, szubienice 07a, pola 07b, AI drogi 07d, napad na oboz 08b, A7 (KsSwitchSignalRule) + odplyw kas miast (fin103: NAKUM-7 +69 tys./d).
 Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
+- 05:40 PDT Jeff: "Rob od razu fale 2" -> FALA 2 wf_37c5a03f-75f od n22 91bf9c63: galezie w-toku/p6-{okup, zakladnicy, sztormy, spichlerz, szubienice, pola, drogi,
+  napad, a7}, drzewa zb/p6-*; kazda: kod -> 2 recenzje (gra, technika) -> poprawki. A7: domyslna KsSwitchSignalRule = true w galezi, Armoury.json Jeffa ma false -
+  zmienic przy wgraniu (kopia .bak); test A7 = 160 dob + armoury-a7-wlacz.flag + ks-auto, porownanie NAKUM-7/12, NKA-1 z n22a-160 (bez A7).
+  Log wzorcowy WGRANIA 91 (160 dob) skopiowany do zb/logi-wzorcowe (rotacja logow).
 
