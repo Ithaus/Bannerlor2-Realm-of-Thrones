@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -205,14 +207,28 @@ namespace Armoury
         }
 
         /// <summary>GEOGRAFIA WIERZCHOWCOW na targach (Jeff 14.09): mamut nigdzie,
-        /// wielblad w Dorne i Qarth, rydwan w Essos, slon w Volantis - reszta
-        /// schodzi z polek, bo stamtad kupowala je nasza stajnia AI.</summary>
+        /// wielblad w Qarthu (r2-konie: CamelsOnlyQarth), rydwan w Essos, slon w Volantis - reszta
+        /// schodzi z polek, bo stamtad kupowala je nasza stajnia AI.
+        /// r2-konie (PLAN 6.9, klucz ExoticMountsNeverVanish): NIC W NICOSC. Dotad sztuka nie u swoich byla kasowana (AddToCounts(-n) bez odbiorcy;
+        /// bieg 160 dob na WGRANIU 89: 128 linii, 398 szt.). Zrodla: wywoz kupcow (SupplyDemand.DailyTrade - koszyk "kon tieru t" wiozl wielblady
+        /// Qarthu z konmi; teraz cel musi trzymac ten wierzchowiec - zatrzymanie u zrodla), karawany gry (handel zwierzetami, Jeff 30.08 "karawany okej")
+        /// i lup lordow sprzedany w miescie (PartiesSellLoot: juczne i z modyfikatorem). Teraz w dobie: sztuke z polki MIASTA kupuje najblizsze
+        /// miasto, ktore ja trzyma (AllowedForSettlement, nie oblezone) - placi z kasy ponad zapas kupcow (CastlePurse.Spendable) po cenie straganu
+        /// zrodla, sztuka sztuka (ShelfBuy.Take), jedzie wozem kupcow (TradeCarts.Ship; bez wozow - od razu), dokladnie jak wywoz kupcow; bez kupca
+        /// (mamut - nikt go nie trzyma, wies, zamek bez targu, biedny odbiorca, wczytanie) zostaje na polce. Stajnia AI i tak bierze tylko IsPlainMount,
+        /// notabl - MountLaw przez GearFit. Linia: "Egzotyczne wierzchowce (r2-konie)".</summary>
+        private static int _exStumbles;
         private static void SweepMarkets(string why)
         {
-            int off = 0;
+            var s = Settings.Current;
+            bool keep = s != null && s.ExoticMountsNeverVanish;
+            bool move = keep && why == "dzien";   // przy wczytaniu woz kupcow nie jest jeszcze odtworzony (TradeCarts w OnSessionLaunched) - tylko licznik
+            int off = 0, moved = 0, kept = 0, deals = 0; long gold = 0;
             try
             {
-                foreach (var st in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
+                List<Settlement> towns = null;
+                bool carts = move && TradeCarts.On;
+                foreach (var st in Settlement.All)
                 {
                     var roster = st != null ? st.ItemRoster : null;
                     if (roster == null) continue;
@@ -222,13 +238,68 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !MountLaw.IsExotic(it)) continue;
                         if (MountLaw.AllowedForSettlement(st, it)) continue;
-                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
-                        off += el.Amount;
+                        if (!keep)
+                        {
+                            roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                            off += el.Amount;
+                            continue;
+                        }
+                        int got = 0;
+                        if (move && st.IsTown && st.Town != null && !st.IsUnderSiege)
+                        {
+                            try
+                            {
+                                if (towns == null) { towns = new List<Settlement>(); foreach (var t in Settlement.All) if (t != null && t.IsTown && t.Town != null && t.ItemRoster != null) towns.Add(t); }
+                                got = SendHome(st, el, towns, carts, ref gold);
+                                if (got > 0) deals++;
+                            }
+                            catch (Exception e) { if (++_exStumbles <= 3) Log.Error("LegendaryLaw.SendHome", e); }
+                        }
+                        moved += got;
+                        kept += el.Amount - got;
                     }
                 }
             }
             catch (Exception e) { Log.Error("LegendaryLaw.SweepMarkets", e); }
             if (off > 0) Log.Info("LegendaryLaw: targi (" + why + ") - " + off + " egzotycznych wierzchowcow zdjetych z polek nie u swoich.");
+            if (keep && (moved > 0 || kept > 0 || why != "dzien" || (int)CampaignTime.Now.ToDays % 7 == 0))
+                Log.Info("Egzotyczne wierzchowce (r2-konie): " + why + " | nie u swoich na polkach: kupione przez targ, ktory je trzyma, " + moved + " szt. w " + deals
+                         + " transakcjach (zaplacone " + gold + " zl" + (move && TradeCarts.On ? ", wozem kupcow" : move ? ", od razu" : "") + "), zostaja na polce " + kept
+                         + " szt. (brak targu, ktory je trzyma, albo kupca), skasowane 0" + (_exStumbles > 0 ? " | potkniecia " + _exStumbles : "") + ".");
+        }
+
+        /// <summary>r2-konie: najblizsze miasto, ktore trzyma ten wierzchowiec, kupuje stos z polki src - jak wywoz kupcow (SupplyDemand.DailyTradeCore):
+        /// sztuka po cenie straganu zrodla, z kasy celu ponad zapas kupcow, zloto do kasy zrodla, sztuka wozem. Zwraca, ile sztuk poszlo.</summary>
+        private static int SendHome(Settlement src, ItemRosterElement el, List<Settlement> towns, bool carts, ref long gold)
+        {
+            var it = el.EquipmentElement.Item;
+            var srcPos = src.GetPosition2D;
+            Settlement best = null; float bestD = float.MaxValue;
+            foreach (var t in towns)
+            {
+                if (t == src || t.IsUnderSiege || !MountLaw.AllowedForSettlement(t, it)) continue;
+                if (CastlePurse.Spendable(t.Town) <= 0) continue;
+                float d = srcPos.Distance(t.GetPosition2D);
+                if (d < bestD) { bestD = d; best = t; }
+            }
+            if (best == null) return 0;
+            var eel = el.EquipmentElement;
+            var market = src;
+            int cost, first, last;
+            int n = ShelfBuy.Take(src.ItemRoster, eel, el.Amount, CastlePurse.Spendable(best.Town),
+                                  () => market.Town.MarketData.GetPrice(eel, null, false, market.Party), out cost, out first, out last, 0, false);
+            if (n <= 0) return 0;
+            if (carts) TradeCarts.Ship(src, best, eel, n, cost, bestD);
+            else
+            {
+                best.ItemRoster.AddToCounts(eel, n);
+                Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);
+            }
+            best.Town.ChangeGold(-cost);
+            src.Town.ChangeGold(cost);
+            try { TownFolk.OnTownCoin(best, -cost, TownFolk.BOurs); } catch { }
+            gold += cost;
+            return n;
         }
 
         /// <summary>Wirtualne magazyny DTE partii AI (EveryoneCampaignBehavior.

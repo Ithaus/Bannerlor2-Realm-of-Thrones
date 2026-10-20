@@ -815,6 +815,7 @@ namespace Armoury
                 // ilu dalej brakuje konia - Stajnia dokupi razem z konmi na awanse
                 int lack = Remount(party);
                 if (!c.CavalryNeedsMounts || !c.AiBuysMounts) return;
+                if (c.QarthStablesBuyCamels && settlement.IsTown) CamelBuy(party, settlement, c);   // r2-konie (PLAN 6.9): wielblady jezdzcow wielbladow - osobno od koni, wlasna przerwa nie potrzebna (kupno tylko do braku w zbrojowni)
                 // E6/K3 (219): na zamku rodu partii tylko kon rycerza od rodu (stado wsi przypietej do zamku); zwykle zakupy jak dotad tylko w miescie i we wsi
                 // recenzja 219: K3 (kon rycerza, zamek, zdjeta przerwa) tylko dla partii rodow AI (CavalryTemplate.Steered) - rod gracza bez zmian, jak sterowanie awansem
                 bool k3 = CavalryTemplate.Steered(party);
@@ -1057,6 +1058,90 @@ namespace Armoury
                          + ", mial " + have + (quota != null ? " wolnych - kupno do zapasu wedlug kategorii E6/K2" : "") + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }
+        }
+
+        /// <summary>
+        /// r2-konie (PLAN 6.9, klucz QarthStablesBuyCamels) - STAJNIE QARTHU KUPUJA WIELBLADY. Dotad Stajnia brala tylko IsPlainMount (Monster "horse"),
+        /// wiec wielblad (Monster "camel") nigdy nie byl kupowany, a test "camel ... it.Culture != settlement.Culture" w petli targu byl martwy (wielblady
+        /// maja w XML kulture aserai, Qarth - qartheen). Jezdzcy na wielbladach (wzorzec ma wielblada w slocie konia: w ROT qartheen_camel_rider,
+        /// qartheen_cameleer) nie sa jezdzcami Stajni (Riders, Remount, zapas K2 - tylko IsPlainMount) i nikt im wielbladow nie kupowal.
+        /// Teraz, tylko przy TroopsFightWithOwnKitOnly (jak Remount - bez niego DTE sadza jezdzca na zwierzeciu wzorca): lord AI w miescie, ktorego targ
+        /// trzyma wielblady (MountLaw.AllowedForSettlement - Qarth), kupuje wierzchowce-wielblady (nie juczne) do ZBROJOWNI DTE partii, najwyzej tyle,
+        /// ilu jezdzcom wielbladow brakuje wielblada w zbrojowni, i najwyzej AiMountMaxPerVisit na postoj; najtansze najpierw, sztuka po cenie straganu
+        /// (ShelfBuy), z AiMountPurseShare kiesy pana (jak zwykly zakup bez przydzialu rodu), zloto do miasta. Partia musi miec prawo do wielblada
+        /// (MountLaw.AllowedForParty). Bez pompy: kupno tylko do braku, nadwyzek wielbladow nikt nie sprzedaje (MenPurse pomija konie zbrojowni,
+        /// SellSpareHorses - tylko IsPlainMount). Odmowa DTE - sztuka wraca na polke, zloto nie idzie. Linia "Stajnia AI (r2-konie): ... wielblady".
+        /// </summary>
+        private static int _camelStumbles;
+        private static void CamelBuy(MobileParty party, TaleWorlds.CampaignSystem.Settlements.Settlement settlement, Settings c)
+        {
+            try
+            {
+                if (!GarrisonKit.OwnKitOn || party.MapEvent != null || Undead.Party(party)) return;
+                var shelf = settlement.ItemRoster;
+                if (shelf == null || settlement.Town == null) return;
+                // jezdzcy na wielbladach (wzorzec) - tani przeglad rosteru, bez alokacji
+                int riders = 0;
+                ItemObject probe = null;
+                var r = party.MemberRoster;
+                if (r == null) return;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var ch = el.Character;
+                    if (ch == null || ch.IsHero || el.Number <= 0) continue;
+                    ItemObject m = null;
+                    try { var eq = ch.Equipment; m = eq != null ? eq[EquipmentIndex.Horse].Item : null; } catch { }
+                    if (m == null || !CamelMount(m)) continue;
+                    riders += el.Number;
+                    if (probe == null) probe = m;
+                }
+                if (riders <= 0) return;
+                if (!MountLaw.AllowedForSettlement(settlement, probe) || !MountLaw.AllowedForParty(party, probe)) return;
+                var all = AiGear.Armories();
+                if (all == null) return;
+                System.Collections.Generic.Dictionary<ItemObject, int> arm; all.TryGetValue(party.Id, out arm);
+                int have = 0;
+                if (arm != null) foreach (var kv in arm) if (kv.Value > 0 && CamelMount(kv.Key)) have += kv.Value;
+                int need = Math.Min(riders - have, Math.Max(1, c.AiMountMaxPerVisit));
+                if (need <= 0) return;
+                var lord = party.LeaderHero;
+                int budget = (int)(lord.Gold * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+                int bought = 0, paid = 0;
+                while (need > 0 && budget - paid >= 50)
+                {
+                    int best = -1, bestPrice = int.MaxValue;
+                    for (int i = 0; i < shelf.Count; i++)
+                    {
+                        var el = shelf[i];
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !CamelMount(it)) continue;
+                        int price = PriceOf(settlement, el.EquipmentElement);
+                        if (price < bestPrice) { bestPrice = price; best = i; }
+                    }
+                    if (best < 0 || bestPrice > budget - paid) break;
+                    var cel = shelf[best].EquipmentElement;
+                    int cost, first, lastP;
+                    int take = ShelfBuy.Take(shelf, cel, Math.Min(need, shelf[best].Amount), budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
+                    if (take <= 0) break;
+                    if (!AiGear.AddToArmory(party, cel.Item, take)) { shelf.AddToCounts(cel, take); break; }   // DTE nie przyjal - sztuki wracaja na polke, nikt nie placi
+                    paid += cost; bought += take; need -= take;
+                }
+                if (bought <= 0) return;
+                TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
+                Log.Info("Stajnia AI (r2-konie): " + lord.Name + " kupil " + bought + " wielbladow do zbrojowni w " + settlement.Name + " za " + paid
+                         + " (jezdzcow wielbladow " + riders + ", wielbladow w zbrojowni przed zakupem " + have + ")" + (_camelStumbles > 0 ? " | potkniecia " + _camelStumbles : "") + ".");
+            }
+            catch (Exception e) { if (++_camelStumbles <= 3) Log.Error("Stables.CamelBuy", e); }
+        }
+
+        /// <summary>r2-konie: wierzchowiec-wielblad (rodzina Camel, IsMount, nie juczny).</summary>
+        private static bool CamelMount(ItemObject it)
+        {
+            if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse) return false;
+            var hc = it.HorseComponent;
+            if (hc == null || !hc.IsMount || hc.IsPackAnimal) return false;
+            return MountLaw.FamilyOf(it) == MountLaw.Fam.Camel;
         }
 
         /// <summary>

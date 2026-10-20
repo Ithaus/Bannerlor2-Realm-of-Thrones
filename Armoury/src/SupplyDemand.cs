@@ -593,6 +593,8 @@ namespace Armoury
                 if (share <= 0f) return;
                 float range = Math.Max(1f, c.SupplyDemandTradeRange);
                 bool carts = TradeCarts.On;   // E6/R3 (215): wywoz wozem - sztuki w drodze licza sie do polki celu, oblezone osady bez handlu
+                bool exoticHome = c.ExoticMountsNeverVanish;   // r2-konie: wielblad, rydwan, slon, mamut tylko do celu, ktory je trzyma (MountLaw) - zostaja u zrodla
+                int exoticHeld = 0;
                 int harness = 0;
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();   // sklad8-p: czas wywozu (wyceny sztuka po sztuce) - tylko log
 
@@ -695,6 +697,9 @@ namespace Armoury
                                 var el = shelf.GetElementCopyAtIndex(i);
                                 var it = el.EquipmentElement.Item;
                                 if (el.Amount <= 0 || it == null || (int)it.ItemType * 10 + TierOf(it) != key) continue;
+                                // r2-konie (PLAN 6.9): koszyk "kon tieru t" niosl wielblady Qarthu do miast, ktore ich nie trzymaja - tam LegendaryLaw kasowal je z polki;
+                                // teraz sztuka egzotyczna jedzie tylko do celu, ktory ja trzyma, inaczej zostaje na polce zrodla (ten sam warunek co SweepMarkets)
+                                if (exoticHome && it.ItemType == ItemObject.ItemTypeEnum.Horse && MountLaw.IsExotic(it) && !MountLaw.AllowedForSettlement(best, it)) { exoticHeld += el.Amount; continue; }
                                 // sklad8-p (uwaga 3, ceny hurtu Jeffa 09.10 08:00): kazda sztuka po cenie straganu zrodla, liczonej od nowa po zdjeciu poprzedniej
                                 // (ShelfBuy.Take - jak gra w SellItemsAction); sztuka tylko, gdy odbiorce stac na nia z reszty kasy. Stan sztuki w cenie (wartosc
                                 // ze stanem - ItemValue - jak B4). Dotad: wartosc x 50% x mnoznik zawalonej polki, jedna cena za n sztuk stosu.
@@ -733,7 +738,8 @@ namespace Armoury
                     Log.Info("PodazPopyt: kupcy wywiezli " + moved + " szt. nadwyzki uzbrojenia w " + deals + " transakcjach miedzy osadami (zaplacone "
                              + paid + " zlota, kazda sztuka po cenie straganu zrodla - wycen " + tradeEvals + ", czas wywozu "
                              + ((System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
-                             + " ms); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach" + TradeCarts.Brief() + ".");
+                             + " ms); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach" + TradeCarts.Brief()
+                             + (exoticHome && exoticHeld > 0 ? "; egzotyczne wierzchowce zatrzymane u zrodla (cel ich nie trzyma, r2-konie) " + exoticHeld + " szt.-prob" : "") + ".");
             }
             catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
         }
