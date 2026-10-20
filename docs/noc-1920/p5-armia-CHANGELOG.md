@@ -2,10 +2,11 @@
 
 ## Dla Jeffa (prostymi slowami)
 Armie lordow po 6 dniach marszu z rzedu staja na caly dzien odpoczynku; potem maja wieksza spojnosc (+2) i lepsze morale (+5 dla kazdej druzyny w obozie).
-Nie staja, gdy oblegaja, walcza, ida na odsiecz albo gdy blisko jest silniejszy wrog - i zrywaja postoj, gdy przyjdzie niebezpieczenstwo. Twoja armia dostaje
+Nie staja, gdy oblegaja, walcza, ida na odsiecz, gdy blisko jest silniejszy wrog albo gdy w polu koncza sie zapasy jedzenia - i zrywaja postoj, gdy przyjdzie niebezpieczenstwo. Twoja armia dostaje
 to samo, jesli po takim marszu sama postoi dzien (o swicie dostaniesz komunikat, ze postoj sie nalezy). Nowy rozkaz "Forced march" (klawisz O albo pytanie
 "Night Falls"): druzyna idzie o 25% szybciej, ale nikt nie spi, a kazde 24 godziny takiego marszu kosztuja jeszcze jedna zarwana noc - przy marszu bez
 przerwy dlug snu rosnie co 12 godzin, wiec to zryw na dzien-dwa, nie sposob na cala wyprawe.
+Rozkaz sam sie konczy, gdy rozbijesz oboz, wejdziesz do miasta, zaczniesz oblezenie albo gdy kolumna postoi 3 godziny - nie zgubisz snu przez zapomnienie.
 
 ## Problem / zrodlo pomyslu
 - Jeff 20.10 o liscie `docs/POMYSLY-35-2026-10-20.md`: "28 - nie, 29 - nie. Pozostale tak". Pozycje 21 (R3-08a) i 23 (R3-08c), zrodlo: audyt 09.10
@@ -29,12 +30,15 @@ przerwy dlug snu rosnie co 12 godzin, wiec to zryw na dzien-dwa, nie sposob na c
   i wstrzymaniu w osadzie rzadzi NightRest (my nic nie ruszamy - jego alarmy od wroga dzialaja jak zawsze). Po postoju AI decyduje od nowa (rozkaz sprzed
   postoju nie wraca - jak swit obozu przy Hold).
 - Nie zaczyna (odklada do nastepnego switu): bitwa, oblezenie (oboz obleznikow, oblezona osada), morze, odsiecz/obrona (DefendSettlement), szturm, cel
-  oblezenia/najazdu w promieniu zagrozenia, ucieczka, alarm nocy, cudza blokada AI (uczta / gentry BK), licznik bezczynnosci gry >= 44 z 48, silniejszy
-  wrog (>= 0.8 sily armii, lord albo armia w polu) w promieniu max(6, AiCampDangerRadius) jedn., oblezona albo lupiona osada wlasnego krolestwa w 3 x tym
-  promieniu. W trakcie postoju co godzine przerywaja go: bitwa, oblezenie, morze, doczepienie, silniejszy wrog i osada krolestwa w potrzebie (AI wodza
-  od reki z powrotem - samo ocenia walke albo ucieczke).
-- Bezczynnosc gry [K `Army.CheckInactivity`]: kazda godzina wodza na Hold = +1, 48 = rozwiazanie armii (Inactivity). W godzinach, w ktorych to my trzymamy
-  armie, licznik wraca do wartosci z poczatku postoju (odpoczynek nie jest bezczynnoscia); noc obozu liczy sie jak zawsze.
+  oblezenia/najazdu w promieniu zagrozenia, ucieczka, alarm nocy, cudza blokada AI (uczta / gentry BK - termin > 1.5 h), licznik bezczynnosci gry
+  >= 46 - godziny nocy obozu (oboz 0-6: 40; sufit 44), silniejszy wrog (>= 0.8 sily armii, lord albo armia w polu) w promieniu max(6, AiCampDangerRadius)
+  jedn., oblezona albo lupiona osada wlasnego krolestwa w 3 x tym promieniu, w polu jedzenie na < 3 dni u wodza albo ktorejs doczepionej druzyny.
+  W trakcie postoju co godzine przerywaja go: bitwa, oblezenie, morze, doczepienie, silniejszy wrog, osada krolestwa w potrzebie i w polu jedzenie
+  na < 2 dni (AI wodza od reki z powrotem - samo ocenia walke, ucieczke albo droge po zywnosc). Armia rozwiazana w srodku godziny - straznik od razu
+  puszcza bylego wodza.
+- Bezczynnosc gry [K `Army.CheckInactivity`]: kazda godzina wodza na Hold (a takze GoToSettlement do przyjaznej osady i patrol) = +1, cel wrogi = -2,
+  48 = rozwiazanie armii (Inactivity). W godzinach, w ktorych to my trzymamy armie, licznik wraca do wartosci z poczatku postoju (odpoczynek nie jest
+  bezczynnoscia); noc obozu w srodku postoju liczy sie jak zawsze - dlatego prog startu jest nizszy o dlugosc nocy.
 - Premia (czysta doba odpoczynku po serii >= progu - po postoju AI, postoj sam z siebie albo armia gracza): spojnosc + `ArmyRestDayCohesion` (2, do 100),
   `RecentEventsMorale` + `ArmyRestDayMorale` (5) wodza i kazdej doczepionej druzyny (gra zdejmuje 10% tego dodatku na dobe).
 - Gracz: nikt go nie zatrzymuje; o swicie po serii komunikat ("Your army has marched N days in a row..."), czysta doba postoju daje te sama premie
@@ -52,13 +56,17 @@ przerwy dlug snu rosnie co 12 godzin, wiec to zryw na dzien-dwa, nie sposob na c
   "always make camp".
 - Dlug: swit liczy dobe jak zawsze (bez snu = +1), a do tego kazde 24 h rozkazu = jeszcze jedna noc dlugu (komunikat; dlug o swicie dla musztry tez, jak
   `SettleDeferred`). Przy marszu bez przerwy = 2 noce na dobe, czyli co 12 h. Krotszy zryw zostawia "zmeczenie" (godziny), ktore liczy sie do nastepnego
-  marszu forsownego i schodzi o 2 h za kazda dobe zwyklego wypoczynku (baza snu, zero godzin rozkazu) - nie ma darmowych zrywow przez wylaczanie przed 24 h.
-- Koniec sam: oboz (O, Night Falls, oboz BK), sen w menu, wejscie do osady (takze karczma), niewola, sluzba ROT, doczepienie do cudzej armii, morze, dlug 3
-  (zapasc - kolumna staje), wylaczenie klucza. Nie zaczyna: niewola, sluzba ROT, osada, morze, cudza armia, sen, Nieumarli, dlug 3.
+  marszu forsownego i schodzi o 2 h za kazda dobe zwyklego wypoczynku (baza snu albo sen w menu przez swit, zero godzin rozkazu) - nie ma darmowych zrywow
+  przez wylaczanie przed 24 h. Zanik liczony w galezi switu ksiegi gracza (`ForcedMarch.Dawn`, przed `SettleNight`), z odpoczynkiem doby po doliczeniu
+  godziny 5-6 - zwykla noc 0-6 daje pelne 6 h.
+- Koniec sam: oboz (O, Night Falls, oboz BK), sen w menu, wejscie do osady (takze karczma), oboz obleznikow, 3 h z rzedu bez ruchu (komunikat "The column
+  has stood still..."), niewola, sluzba ROT, doczepienie do cudzej armii, morze, dlug 3 (zapasc - kolumna staje), Nieumarli, smierc bohatera, wylaczenie
+  klucza albo ksiegi snu. Nie zaczyna: niewola, sluzba ROT, osada, oboz obleznikow, morze, cudza armia, sen, Nieumarli, dlug 3.
 - Zapis `arm_forcedmarch` (SaveText.Sync): wlaczony, zmeczenie, godziny w biezacej dobie.
 ### Wpiecia w pliki wspolne (minimalne)
-- `NightRest.cs`: OnHourly (godzina marszu forsownego przed dodaniem odpoczynku, warunek obozu automatycznego, brak pytania o nocleg), SpeedPostfix (1 linia),
-  panel O (pozycja 4 + case), Night Falls (pozycja 4 + case). Odczyty prywatnego stanu NightRest - w `partial class NightRest` w nowych plikach.
+- `NightRest.cs`: OnHourly (godzina marszu forsownego przed dodaniem odpoczynku, warunek obozu automatycznego, brak pytania o nocleg, `ForcedMarch.Dawn`
+  w galezi switu, `ForcedMarch.Cancel` w 3 wyjsciach przed ksiega gracza), SpeedPostfix (1 linia), panel O (pozycja 4 + case), Night Falls (pozycja 4 + case).
+  Odczyty prywatnego stanu NightRest (takze `ForeignHold` przez `ForeignAiHold`) - w `partial class NightRest` w nowych plikach.
 - `ArmouryBehavior.cs`: Reset w konstruktorze, dwa klucze SyncData, `ArmyRestDay.Hourly()` zaraz po `NightRest.OnHourly()`, `ArmyRestDay.OnTick()` w TickEvent.
 - `Settings.cs`: 2 bloki pol (przy NightMarchNotice i przy ArmyCohesionYearScale), `McmSettings.cs` z `tools/gen_mcm.py`, w `gen_mcm.py` zakresy 4 suwakow.
 
@@ -67,9 +75,10 @@ przerwy dlug snu rosnie co 12 godzin, wiec to zryw na dzien-dwa, nie sposob na c
   `OnTick` wychodzi na `_resting == 0`). Ksiega snu gracza zmieniona tylko w godzinach z rozkazem.
 - Kolizje: (1) NightRest oboz nocy / sen dlugu / alarm - postoj nie dotyka wodza, ktorego trzyma NightRest (`NightRest.NightHolds`), a swit postoju jest
   PO swicie obozu w tym samym ticku. (2) SleepGate (bramka SetMove*) - dotyczy tylko spiacych w obozie i snie dlugu, nasze Hold w dzien przechodzi.
-  (3) Cudza blokada AI (BK) - postoj nie zaczyna sie (`IsDisabled` bez NightRest), nasze `DisableForHours(1)` nie wyglada dla NightRest na cudza blokade
-  (termin <= 1 h). (4) StrategicCampaignAI145 - co 4 h `TryRetreatFromBadSiege` / `TryReinforceFragileGarrison`; oblezenie postoju nie zaczyna, rozkaz
-  wzmocnienia zalogi straznik cofa (licznik "wstrzymania straznika"). (5) Premia karczmy i marsz forsowny moga sie sumowac (oba od wyniku).
+  (3) Cudza blokada AI (BK) - postoj nie zaczyna sie (termin > 1.5 h, jak `NightRest.ForeignHold`; bez odczytu terminu kazde wylaczone AI), nasze
+  `DisableForHours(1)` nie wyglada dla NightRest na cudza blokade (termin <= 1 h). (4) StrategicCampaignAI145 - co 4 h `TryRetreatFromBadSiege`
+  (oblezenie postoju nie zaczyna) i `TryReinforceFragileGarrison` (przenosi ludzi do zalogi, bez rozkazu ruchu - postoju nie dotyka). (5) Premia karczmy
+  i marsz forsowny moga sie sumowac (oba od wyniku).
 - Spojnosc logiki: ekonomia nie dotknieta (bez zlota i rzeczy). Spojnosc +2: dzis spadek srednio -0.52 na dobe (AC), armia 5 druzyn ok. -0.8 u siebie,
   -1.6 na ziemi wroga - +2 to 1-2.5 doby spadku; audyt dawal +2 przy -3.6 na dobe. Przeliczone x 0.23 wyszloby +0.46, mniej niz jedna doba spadku przy
   koszcie doby drogi - zostawiam +2 (do zmiany suwakiem). Spojnosc dzis i tak nie rozwiazuje armii - wiekszy skutek da morale +5 (mniej dezercji).
@@ -85,6 +94,23 @@ przerwy dlug snu rosnie co 12 godzin, wiec to zryw na dzien-dwa, nie sposob na c
 - Scalanie: wpiecia w NightRest.OnHourly (3 miejsca), SpeedPostfix, panel O i Night Falls; ArmouryBehavior (konstruktor, SyncData po arm_nightrest_ai,
   tick godzinowy po NightRest.OnHourly, TickEvent po CrossingLaw); Settings (2 bloki); gen_mcm RANGES po MaxForcedNights.
 
+## Recenzja (20.10) - 0 krytycznych, 2 wazne, 6 drobnych; wszystkie prawdziwe, wszystkie poprawione (commit 2e013dc3)
+- WAZNE 1 (ForcedMarch, zanik zmeczenia nigdy nie zachodzil): prawda - warunek o swicie czytal odpoczynek doby przed doliczeniem godziny 5-6 (5 h < 6).
+  Poprawka: nowe `ForcedMarch.Dawn(s, restBefore, sleepingNow)` w galezi switu `NightRest.OnHourly` (raz na swit, przed `SettleNight`) - odpoczynek po
+  doliczeniu godziny i sen w menu jak `sleptBase`, zapas 0.01 h; linia switu podaje teraz "odpoczynek doby X h z bazy Y".
+- WAZNE 2 (ArmyRestDay, postoj bez sprawdzenia jedzenia): prawda - wylaczone AI nie pojdzie po zywnosc, `Army.CheckArmyDispersion` rozwiazuje armie przy
+  > 50% glodujacych druzyn. Poprawka: w polu postoj zaczyna sie tylko przy jedzeniu na >= 3 dni u wodza i kazdej doczepionej (prog BK), przerwanie przy
+  < 2 dniach (powod "jedzenie" w "odlozone"/"przerwane"); liczone `ItemRoster.TotalFood / -FoodChange` bez dzielenia przez 0 (GetNumDaysForFoodToLast
+  przy FoodChange 0 dawalby int.MinValue). W osadzie bez warunku - `PartiesBuyFoodCampaignBehavior.HourlyTickParty` kupuje co godzine bez AI.
+- drobne 3 (prog bezczynnosci bez nocy): prawda - prog startu = 46 - godziny nocy obozu (0-6: 40, sufit 44, dol 24).
+- drobne 4 (zapis zaraz po wczytaniu gubi stan): prawda - `Export` zwraca nieprzypisany `_pending` bez zmian.
+- drobne 5 (kazde wylaczone AI = cudza blokada): prawda - teraz `NightRest.ForeignAiHold` (termin > 1.5 h, jak ForeignHold); bez odczytu terminu jak dotad.
+- drobne 6 (marsz forsowny przy oblezeniu / dlugim postoju): prawda - koniec przy obozie obleznikow i po 3 h z rzedu bez ruchu (poza bitwa); nie zaczyna sie
+  w obozie obleznikow.
+- drobne 7 (Nieumarly / smierc w trakcie marszu): prawda - `ForcedMarch.Cancel` w wyjsciach OnHourly (ksiega snu wylaczona, bohater martwy, Nieumarli).
+- drobne 8 (straznik trzyma wodza rozwiazanej armii do godziny): prawda - `OnTick` konczy postoj, gdy `lead.Army != a` albo wodz jest doczepiony.
+- Nieprawdziwych uwag nie bylo. Niescislosc w opisie (TryReinforceFragileGarrison bez rozkazu ruchu) poprawiona w "Ryzyko".
+
 ## Status: DO SPRAWDZENIA (build Armoury 0 bledow; bez autotestu - zakaz w tym zadaniu)
 
 ## Decyzje (projektowal Claude - Jeff: "ekonomie projektuje Claude")
@@ -98,11 +124,14 @@ przerwy dlug snu rosnie co 12 godzin, wiec to zryw na dzien-dwa, nie sposob na c
 7. R3-08a armia nie stoi, gdy trzeba bronic wlasnych (oblezenie / najazd w poblizu) albo grozi silniejszy wrog; postoj zrywa niebezpieczenstwo.
 8. R3-08a gracz: komunikat i ta sama premia, bez zatrzymywania (propozycja z opisu pomyslu 21).
 9. R3-08a licznik bezczynnosci gry chroniony w dzien postoju - inaczej dzienny Hold (+18) rozwiazywalby armie, ktore juz maja noce obozu na liczniku.
+10. Recenzja: postoj w polu tylko z jedzeniem na >= 3 dni (trwa do < 2 dni) - prog jak uczta BK; w osadzie bez warunku (zakupy co godzine bez AI).
+11. Recenzja: marsz forsowny konczy sie po 3 h z rzedu bez ruchu (stoja i nie spia - sam koszt) i w obozie obleznikow.
 
 ## Test w grze
 - Autotest (log Armoury): linia "Dzien odpoczynku armii (R3-08a): dzien N" co dobe - po ok. 7 dobach "postoje zaczete" > 0, "z premia ... po postoju AI" > 0,
-  "przerwane" z powodami, "bezczynnosc gry cofnieta" > 0; przyklady "staje na dobe po N dobach marszu" i "postoj przerwany: ...". "Spojnosc armii (AC wiek)":
+  "przerwane" z powodami (mozliwe m.in. "jedzenie", "wrog", "armia rozwiazana"), "bezczynnosc gry cofnieta" > 0; przyklady "staje na dobe po N dobach marszu" i "postoj przerwany: ...". "Spojnosc armii (AC wiek)":
   Inactivity nie powinno rosnac szybciej niz dotad (64 na 160 dob). Potkniecia 0.
 - Jeff (marsz forsowny - autotest go nie wlacza): na mapie O -> "Forced march": komunikat, w okienku predkosci "Forced march +..."; postoj noca bez namiotu;
-  po 24 h komunikat o dodatkowej nocy; wejscie do miasta -> "The forced march ends."; w logu linie "Marsz forsowny (R3-08c):" (wlaczony, koniec, swit gracza).
+  po 24 h komunikat o dodatkowej nocy; wejscie do miasta -> "The forced march ends."; postoj 3 h -> "The column has stood still for 3 hours."; po
+  zrywie i zwyklej nocy 0-6 linia switu "zmeczenie X -> X-2"; w logu linie "Marsz forsowny (R3-08c):" (wlaczony, koniec z powodem, swit gracza).
 - Jeff (armia): po 6 dniach marszu Twojej armii komunikat o swicie; dzien postoju -> "A day of rest: your army's cohesion +2...".
