@@ -259,6 +259,8 @@ namespace Armoury
                 MarchPace.ApplyAll(_harmony);
                 // SW-DROGI (noc 17/18.10): premia drogi ROT jedzie w latce MarchPace; tu tylko postfiks pamieci predkosci gry (MobileParty.IsLastSpeedCacheInvalid) i straznik zapisu stanu (CalculateSpeedForPartyUnified, getter SpeedExplained)
                 try { MapRoads.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapRoads.ApplyAll", e); }
+                // p6-drogi (R3-07d): AI wybiera drogi - postfiks MobileParty.ComputePath (objazd droga) i straznik ucieczki RecalculateLongTermPath; wpiete zawsze, dziala przy kluczu MapRoadAiRoutes
+                try { AiRoadRoutes.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AiRoadRoutes.ApplyAll", e); }
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze

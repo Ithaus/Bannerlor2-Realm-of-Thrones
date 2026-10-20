@@ -1888,6 +1888,18 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MapMudWetSpeedPercent { get; set; } = 7.5f;
 
+        [SettingPropertyBool("Map Road Ai Routes", HintText = "lords, caravans and villagers choose the painted roads: on a march over land to a settlement or a spot at least Map Road Ai Min Distance away, the party rides to the nearest good stretch of main road, follows it and leaves it near its goal - whenever that way is at most Map Road Ai Detour Percent longer than the game's own route and the road makes up at least half of it, so with the road bonus it gets there about as fast or faster. Not for your party, bandits, a chase, a flight, a siege or a battle. Needs Map Road Speed Bonus. Off = the game's own routes, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadAiRoutes { get; set; } = true;
+
+        [SettingPropertyInteger("Map Road Ai Min Distance", 10, 200, "0", HintText = "the shortest march (in map units, along the game's own route) for which lords, caravans and villagers look for a road (30 = about 140 km; half of the villagers' trips to their town and nearly every caravan hop between towns)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int MapRoadAiMinDistance { get; set; } = 30;
+
+        [SettingPropertyInteger("Map Road Ai Detour Percent", 0, 50, "0", HintText = "how much longer than the game's own route a way along the road may be, in percent (15 = up to 15% longer, which the +15% road bonus pays back; at most 50)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int MapRoadAiDetourPercent { get; set; } = 15;
+
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool MaterialLawEnabled { get; set; } = true;
@@ -8879,6 +8891,9 @@ namespace Armoury
             s.MapMudSpeedPenalty = MapMudSpeedPenalty;
             s.MapMudSpeedPercent = MapMudSpeedPercent;
             s.MapMudWetSpeedPercent = MapMudWetSpeedPercent;
+            s.MapRoadAiRoutes = MapRoadAiRoutes;
+            s.MapRoadAiMinDistance = MapRoadAiMinDistance;
+            s.MapRoadAiDetourPercent = MapRoadAiDetourPercent;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;
