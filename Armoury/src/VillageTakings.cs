@@ -235,7 +235,7 @@ namespace Armoury
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
-            long side = SideFief(__state);                   // n20-wioska: udzial wioski pobocznej gracza w podatku pana z tego okna (licznik pana -> gracz; po pracach okregu, przed danina DS)
+            long side = SideFief(__state);                   // n20-wioska: wozy okregu wioski pobocznej gracza - r4-wioska: tylko licznik (dochod co dobe w SideVillageFief.Pay), zwraca 0
             DsDues(__state, works, side);
             F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
             CartCsv(__state);                                // f14-wsie: utarg wozu wies po wsi do wsie-kiesy.csv (tylko licznik, po wszystkich krokach okna)
