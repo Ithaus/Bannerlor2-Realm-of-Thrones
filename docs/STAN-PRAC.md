@@ -3323,4 +3323,7 @@ engine_config.txt: safely_exited = 1 (kopia engine_config.txt.bak-2026-10-20-prz
 OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 2 (hodowla dla kolejki); obserwowac NO-4, A17-11e, ruda w miastach.
 - 20.10 ok. 01:40: BLAD (moj): logi Jeffa z sesji 19.10 10:43, 10:58, 11:40, 13:00 (Armoury, CrashScribe session, RC) usuniete rotacja w czasie 12 autotestow nocy -
   zabezpieczone tylko 09:52 (logi-testow/jeff-*) i 14:41 (zawieszenie-2026-10-19-1609/logi, logi-jeffa/2026-10-19). Usuniety plik testowy armoury-ks-przerwij.flag (z biegu n20r3-160).
+- 20.10 ok. 02:05: ODPOWIEDZI JEFFA na pytania raportu (doslownie): "1. tylko czesc 2. nie 3. co to? 4. jakie?"
+  1 -> przetop broni z 1 sztaby oddaje tylko czesc (koniec "minimum 1 sztaba" - galaz w-toku/r4-przetop od 1ffbd891, workflow); 2 -> NIE robimy paczki aksamitu (ZC1-4o zostaje
+  pomiarem); 3 i 4 -> wyjasnienie A7 i lista starych decyzji w czacie.
 
