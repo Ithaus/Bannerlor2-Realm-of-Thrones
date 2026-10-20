@@ -330,7 +330,14 @@ namespace Armoury
             _fBw = AccessTools.DeclaredField(bkT, "baseWage");
             var seen = new List<object>();
             var q = new Queue<object>();
-            q.Enqueue(Campaign.Current.Models.PartyWageModel);
+            // BKROT (czynny) dziedziczy po BK, ale jego wywolanie bazowe GetTotalWage idzie lancuchem BkrotChains (ROT -> NavalDLC -> BEE -> BK) - najpierw glowa
+            // lancucha i obiekt DOKLADNIE typu BK na jego dnie; obiekt pochodny (BKROT) tylko w zapasie
+            var active = Campaign.Current.Models.PartyWageModel;
+            object head = null;
+            try { head = BkrotChains.WageHead(active); } catch { head = null; }
+            if (head != null) q.Enqueue(head);
+            q.Enqueue(active);
+            object sub = null;
             while (q.Count > 0 && seen.Count < 40)
             {
                 var x = q.Dequeue();
@@ -339,7 +346,8 @@ namespace Armoury
                 foreach (var y in seen) if (ReferenceEquals(x, y)) { was = true; break; }
                 if (was) continue;
                 seen.Add(x);
-                if (bkT.IsInstanceOfType(x)) return x;
+                if (x.GetType() == bkT) return x;
+                if (sub == null && bkT.IsInstanceOfType(x)) sub = x;
                 for (var t = x.GetType(); t != null && t != typeof(object); t = t.BaseType)
                     foreach (var f in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                     {
@@ -350,7 +358,7 @@ namespace Armoury
                         if (v is PartyWageModel) q.Enqueue(v);
                     }
             }
-            return null;
+            return sub;
         }
 
         /// <summary>BaseWage: pole baseWage zywego ogniwa BK (BK czyta ustawienia raz na proces - wazne jest to, co ma ogniwo), przy 0 albo bez ogniwa - ustawienia BK
@@ -363,14 +371,15 @@ namespace Armoury
             {
                 _bkWage = FindBkWage();
                 if (_bkWage == null) { _bwSrc += ", ogniwa BKPartyWageModel w lancuchu BRAK"; return; }
+                _bwSrc = "ogniwo " + _bkWage.GetType().Name + ": ";
                 float live = _fBw != null ? Convert.ToSingle(_fBw.GetValue(_bkWage)) : 0f;
                 if (live > 0f)
                 {
-                    if (Math.Abs(live - _bw) > 0.0001f) _bwSrc = "ogniwo BK " + live.ToString("0.00", Inv) + " - ROZNA od ustawien " + _bw.ToString("0.00", Inv) + ", liczymy od ogniwa";
-                    else _bwSrc = "ogniwo BK = ustawienia";
+                    if (Math.Abs(live - _bw) > 0.0001f) _bwSrc += live.ToString("0.00", Inv) + " - ROZNA od ustawien " + _bw.ToString("0.00", Inv) + ", liczymy od ogniwa";
+                    else _bwSrc += "= ustawienia";
                     _bw = live;
                 }
-                else _bwSrc = "ogniwo BK jeszcze nie czytalo (0) - ustawienia BK";
+                else _bwSrc += "jeszcze nie czytalo (0) - ustawienia BK";
             }
             catch (Exception e) { Stumble("ReadBaseWage", e); _bwSrc += ", odczyt ogniwa - wyjatek"; }
         }
