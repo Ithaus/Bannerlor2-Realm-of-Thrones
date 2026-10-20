@@ -3496,7 +3496,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool TownFoodByVillagePeople { get; set; } = true;
 
-        [SettingPropertyBool("Town Granary From Villages", HintText = "a town's food store gets from its villages only the grain they really have to spare: each village keeps up to two years of its own food in its granary (one year when the town runs short) and sells what lies above to the town at the town's grain price, paid from the town's spare money; when the district eats its own stores, nothing comes. Castles keep the old food from their villages. Townsfolk still buy bread at the market, and BetterEconomy no longer thins a town's people for a falling food balance while its store or market still has food; a town with food in store keeps recruiting its garrison. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Town Granary From Villages", HintText = "towns get from their villages only the grain the villages can spare (above two years of their own food, one year when the town runs short), paid from the town's money at its grain price; a town with food in store or at its market does not starve. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownGranaryFromVillages { get; set; } = true;
 
