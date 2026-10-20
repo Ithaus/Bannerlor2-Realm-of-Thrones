@@ -3472,5 +3472,7 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   Czekaja: m96-wzory, m96-dlugi (wf_c0a7b77f-584), m96-jakosc (wf_be7a1543-8a3), m96-czaskuzni (wf_cfcc67c5-e15).- 16:00 PDT m96-czaskuzni ea73b600 gotowe (ForgeOneJob: ekran kuzni = jedna robota, po Done/Esc zawsze pasek arm_project_wait na lacznym czasie; wytop najpierw i od
   niego nie mozna odejsc - metal juz w sakwach; od sztuk mozna odejsc, reszta czeka w kuzni i idzie tylko przy kowadle; noc 23-5 kuznia stoi; oblezenie/bitwa przerywa)
   -> scalone do n25 4ea8dfd3 (2142 ustawien, build 0). DO DECYZJI JEFFA: czy noc ma zatrzymywac kucie, czy od wytopu da sie odejsc.- 16:05 PDT Jeff potwierdzil czas kuzni: "wytapianie zatem jest zablokowane i leci czas wytapiania najpierw, a potem czas kucia i mozna wtedy kucie przerwac";
-  "noca spia" -> m96-czaskuzni bez zmian (zgodne z kodem).
+  "noca spia" -> m96-czaskuzni bez zmian (zgodne z kodem).- 16:10 PDT m96-jakosc 4a662ce0 gotowe (QualityScarcity: przyczyna - warsztaty AI losuja jakosc rzutem gry, RBM 4.3% L / 8.7% MW, AI ich nie kupuje -> zalegaja; limit swiata
+  L 6 / MW 60, szanse 0.1% / 0.4% w warsztatach, rzut gry odebrany na drodze gry i lupie, nadmiar obnizany na polkach (wartosc, nie zloto), wyroby gracza nietykalne)
+  -> scalone do n25. Czeka tylko wf_c0a7b77f-584 (m96-wzory, m96-dlugi).
 
