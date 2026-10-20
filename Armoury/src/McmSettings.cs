@@ -944,6 +944,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsNoFreeGold { get; set; } = true;
 
+        [SettingPropertyBool("Hist Fence Min Old Coin", HintText = "the Spoils of War fence's lowest item worth (Fence Min Item Value) is compared with a piece's worth before the historical repricing, or with today's worth when that is higher - the same in the fence menu, in his offer and in the sale - otherwise he refuses almost every ordinary weapon. The price he pays stays the same", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool HistFenceMinOldCoin { get; set; } = true;
+
+        [SettingPropertyBool("Hist Donate Renown Old Coin", HintText = "renown for gear you give to your Spoils of War company counts each piece sold at its worth before the historical repricing, or at today's worth when that is higher - otherwise it is 20-30 times smaller. The coin paid stays the same", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool HistDonateRenownOldCoin { get; set; } = true;
+
         [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers the smiths' work (with Smith Mend From Market on: its share of the days a master spent making the piece, at the town's day wage; off: a quarter of the worth it has lost), plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less - see Wrecks To Scrap) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
@@ -2659,6 +2667,26 @@ namespace Armoury
         [SettingPropertyBool("Hist Roguery Xp Old Value", HintText = "Roguery XP for raiding villages, looting villagers and caravans and forcing supplies counts the trade goods at their worth before the historical repricing, with the game's own factors (never less than the game gives) - otherwise cheaper goods slow Roguery 3-20 times, for you and for the AI lords. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistRogueryXpOldValue { get; set; } = true;
+
+        [SettingPropertyBool("Hist Warehouse Xp Old Value", HintText = "Trade XP from your own workshops' output counts each piece at its worth before the historical repricing, as the game meant (never less than the game gives) - otherwise beer, pottery or tools give 6-26 times less Trade XP. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistWarehouseXpOldValue { get; set; } = true;
+
+        [SettingPropertyBool("Hist Ai Loot Score Old Coin", HintText = "AI lords weigh the loot in their baggage at its worth before the historical repricing when they decide to ride to a town and sell it - otherwise cheap loot never seems worth a trip and arms return to the markets slowly. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistAiLootScoreOldCoin { get; set; } = true;
+
+        [SettingPropertyBool("Hist Bandit Hideout Score Old Coin", HintText = "bandits weigh their plunder at its worth before the historical repricing when they decide to carry it back to their hideout - otherwise they hardly ever go home with loot. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistBanditHideoutScoreOldCoin { get; set; } = true;
+
+        [SettingPropertyBool("Hist Hideout Loot Old Coin", HintText = "the extra goods you find after a night raid on a hideout are counted at their worth before the historical repricing, never as worth less than the game counts them (so never more goods than without it) - otherwise the game's sum buys many times more goods out of nothing. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistHideoutLootOldCoin { get; set; } = true;
+
+        [SettingPropertyBool("Hist Old Coin From Definition", HintText = "for every rule that counts in the old coin (quest quantities, Roguery and Trade XP, the AI's and bandits' loot weights, hideout goods, the fence, company renown) the worth before the historical repricing of the Banner Kings goods that a Realm of Thrones patch divides by 100 (fur 125 becomes 1, gold ingot 1000 becomes 10, ink 200 becomes 2) is taken from the worth they were defined with - otherwise these goods count as worth 1-10 and, for one, the gang's stolen-goods quest can ask for thousands of furs. Off = the worth at load, as before. Switching it mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistOldCoinFromDefinition { get; set; } = true;
 
         [SettingPropertyBool("Hist Research From Old Value", HintText = "smithing part research (new parts for a weapon class) counts from a piece's worth before the historical repricing, as smithing XP already does - otherwise a forged sword worth 21 pence instead of 1105 gives almost no research and no new parts unlock", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -4991,6 +5019,10 @@ namespace Armoury
         [SettingPropertyBool("Book Price Fix", HintText = "Banner Kings books are worth what a manuscript was worth (700 or 1,000 instead of 7 or 10 - a Realm of Thrones patch had divided their worth by 100), and buying one from a Banner Kings bookseller is a real trade: you pay the price shown in the list (Banner Kings took a thousand times that), the coin goes to the bookseller's purse instead of vanishing, and the book leaves his collection instead of appearing out of thin air - a bookseller who has sold all his books has none left. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("The forge gate")]
         public bool BookPriceFix { get; set; } = true;
+
+        [SettingPropertyBool("Book Goal Trade", HintText = "the Banner Kings goal 'Acquire Book' is the same trade as buying from the bookseller: you pay the price of the book (not 30 times as much), the coin goes to the bookseller and the book leaves his collection. Needs Book Price Fix. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyGroup("The forge gate")]
+        public bool BookGoalTrade { get; set; } = true;
 
         [SettingPropertyBool("Craft Orders Historical", HintText = "the smithing orders of lords and notables are a real trade in the world's coin: the reward is reckoned from the historical worth of the ordered weapon (tens or hundreds, not thousands), the client pays it from his own purse instead of out of thin air (a client short of coin pays what he has and you are told), the weapon you forged goes to the lord's baggage or onto the town's stalls instead of vanishing, and a lord no longer gets a free soldier with it. The smithing experience for an order is unchanged. Orders already waiting in a save are repriced once on load. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("The forge gate")]
@@ -8375,6 +8407,8 @@ namespace Armoury
             s.SpoilsClanRealSoldiers = SpoilsClanRealSoldiers;
             s.SpoilsNoAutoSale = SpoilsNoAutoSale;
             s.SpoilsNoFreeGold = SpoilsNoFreeGold;
+            s.HistFenceMinOldCoin = HistFenceMinOldCoin;
+            s.HistDonateRenownOldCoin = HistDonateRenownOldCoin;
             s.SpoilsQuartermasterRepair = SpoilsQuartermasterRepair;
             s.DonationXpOff = DonationXpOff;
             s.SpoilsCancelKeeps = SpoilsCancelKeeps;
@@ -8804,6 +8838,11 @@ namespace Armoury
             s.HistTournamentScale = HistTournamentScale;
             s.HistQuestQtyOldCoin = HistQuestQtyOldCoin;
             s.HistRogueryXpOldValue = HistRogueryXpOldValue;
+            s.HistWarehouseXpOldValue = HistWarehouseXpOldValue;
+            s.HistAiLootScoreOldCoin = HistAiLootScoreOldCoin;
+            s.HistBanditHideoutScoreOldCoin = HistBanditHideoutScoreOldCoin;
+            s.HistHideoutLootOldCoin = HistHideoutLootOldCoin;
+            s.HistOldCoinFromDefinition = HistOldCoinFromDefinition;
             s.HistResearchFromOldValue = HistResearchFromOldValue;
             s.HistUniquePrestige = HistUniquePrestige;
             s.HistBulkUnitFactor = HistBulkUnitFactor;
@@ -9387,6 +9426,7 @@ namespace Armoury
             s.HelperSkillForFullRelief = HelperSkillForFullRelief;
             s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
             s.BookPriceFix = BookPriceFix;
+            s.BookGoalTrade = BookGoalTrade;
             s.CraftOrdersHistorical = CraftOrdersHistorical;
             s.CraftOrdersGiverCanPay = CraftOrdersGiverCanPay;
             s.CraftOrdersOpenedOnly = CraftOrdersOpenedOnly;

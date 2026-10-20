@@ -178,12 +178,12 @@ namespace Armoury
         /// <summary>Rozliczenie sprzedazy miastu: transakcje, sztuki sprzedane / zostawione, zaplata miasta, oferta Spoils (z niczego).</summary>
         private sealed class Tally
         {
-            public int Deals, Sold, Kept, Paid, Offer, Worth, Capped, Poor;
-            public void Clear() { Deals = Sold = Kept = Paid = Offer = Worth = Capped = Poor = 0; }
+            public int Deals, Sold, Kept, Paid, Offer, Worth, Capped, Poor, Old;   // Old (n20-wyceny): wartosc sprzedanych sztuk sprzed przeliczenia cen (slawa daru)
+            public void Clear() { Deals = Sold = Kept = Paid = Offer = Worth = Capped = Poor = Old = 0; }
         }
 
         /// <summary>Stos do sprzedazy: element, liczba sztuk, oferta Spoils za sztuke, wartosc sztuki wedle Spoils (statystyki klanu).</summary>
-        private struct Lot { public EquipmentElement El; public int Amount, Offer, Worth; }
+        private struct Lot { public EquipmentElement El; public int Amount, Offer, Worth, Old; }   // Old (n20-wyceny): wartosc sztuki sprzed przeliczenia (tylko dar dla kompanii)
 
         /// <summary>Nowa gra albo wczytanie (konstruktor ArmouryBehavior): liczniki od zera.</summary>
         internal static void Reset()
@@ -444,7 +444,7 @@ namespace Armoury
                         try { st.ItemRoster.AddToCounts(lot.El, 1); placed = true; }
                         finally { if (!placed) source.AddToCounts(lot.El, 1); }
                         if (market < lot.Offer) t.Capped++;
-                        due += price; t.Sold++; t.Worth += lot.Worth;
+                        due += price; t.Sold++; t.Worth += lot.Worth; t.Old += lot.Old;
                     }
                 }
             }
@@ -525,8 +525,9 @@ namespace Armoury
             {
                 var el = bag.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
-                if (it == null || el.Amount <= 0 || !IsLooted(el.EquipmentElement.ItemModifier) || it.Value < min) continue;
+                if (it == null || el.Amount <= 0 || !IsLooted(el.EquipmentElement.ItemModifier) || Wyceny20.FenceWorth(it) < min) continue;   // n20-wyceny (klucz Hist Fence Min Old Coin): prog Spoils w starej monecie wobec wartosci sprzed przeliczenia (albo dzisiejszej, gdy wyzsza) - ta sama funkcja co w menu Spoils (transpiler Wyceny20.HookF); bez klucza - Value
                 if (cat != FenceAll && Convert.ToInt32(_mFenceCat.Invoke(null, new object[] { it })) != cat) continue;
+                Wyceny20.FenceNote(it, el.Amount, min);                    // recenzja 20.10: licznik linii "Paser (n20)" PO filtrze kategorii
                 float r = rate * (float)_mTypeCoef.Invoke(null, new object[] { it }) * bulk;
                 if (bargain) r += bonus;
                 r = MathF.Clamp(r * 0.22f, 0.05f, 0.95f);
@@ -534,6 +535,7 @@ namespace Armoury
                 lots.Add(new Lot { El = el.EquipmentElement, Amount = el.Amount, Offer = unit, Worth = it.Value });
                 offer += (long)unit * el.Amount;
             }
+            Wyceny20.FenceDone(min);                                       // n20-wyceny: linia "Paser (n20)", gdy prog sprzed przeliczenia wpuscil sztuki
             var st = Settlement.CurrentSettlement;
             int s0 = _fence.Sold, k0 = _fence.Kept;
             int paid = SellToTown(st, bag, lots, Hero.MainHero, limit, _fence);
@@ -698,7 +700,7 @@ namespace Armoury
                 int v = el.EquipmentElement.Item != null ? el.EquipmentElement.Item.Value : 0;
                 if (el.EquipmentElement.ItemModifier != null) v = (int)((float)v * el.EquipmentElement.ItemModifier.PriceMultiplier);
                 count += el.Amount; value += v * el.Amount;
-                units.Add(new Lot { El = el.EquipmentElement, Amount = el.Amount, Worth = v });
+                units.Add(new Lot { El = el.EquipmentElement, Amount = el.Amount, Worth = v, Old = Wyceny20.OldWorth(el.EquipmentElement) });
             }
             if (count == 0) return;                                        // Spoils: nic nie oddano
             if (leader == null)                                            // Spoils: przedmioty przepadaly bez zaplaty - tu wracaja do sakw
@@ -710,9 +712,9 @@ namespace Armoury
             float rate = value > 0 ? (float)offer / value : 0f;
             for (int i = 0; i < units.Count; i++) { var u = units[i]; u.Offer = (int)((float)u.Worth * rate); units[i] = u; }
             var st = Settlement.CurrentSettlement;
-            int s0 = _don.Sold, k0 = _don.Kept, w0 = _don.Worth;
+            int s0 = _don.Sold, k0 = _don.Kept, w0 = _don.Worth, o0 = _don.Old;
             int paid = SellToTown(st, screen, units, leader, -1, _don);
-            int sold = _don.Sold - s0, kept = _don.Kept - k0, worth = _don.Worth - w0;
+            int sold = _don.Sold - s0, kept = _don.Kept - k0, worth = _don.Worth - w0, oldWorth = _don.Old - o0;
             _don.Deals++; _don.Offer += offer;
             string name = clan != null && clan.Name != null ? clan.Name.ToString() : "the company";
             if (sold <= 0)
@@ -729,7 +731,7 @@ namespace Armoury
                 if (fValue != null) fValue.SetValue(data, (int)fValue.GetValue(data) + worth);
                 if (fDay != null) fDay.SetValue(data, CampaignTime.Now.ElapsedDaysUntilNow);   // jak Spoils (ten sam zapis)
             }
-            float renown = (float)worth / 10000f;                          // jak Spoils: slawa od wartosci - tu od wartosci SPRZEDANEJ
+            float renown = (float)Wyceny20.RenownWorth(sold, worth, oldWorth) / 10000f;   // jak Spoils: slawa od wartosci - tu od wartosci SPRZEDANEJ; n20-wyceny (klucz Hist Donate Renown Old Coin): sprzed przeliczenia cen
             if (renown >= 0.1f && clan != null) { try { clan.AddRenown(renown); } catch (Exception e) { Stumble("SpoilsSeal.Donate.Renown", e); } }
             Say("Sold " + sold + " pieces of your gear to " + Nm(st) + " for " + paid + " denars, paid into the treasury of \"" + name + "\"."
                 + (kept > 0 ? " " + kept + " pieces go back to your baggage - the town has no more coin for them." : ""),
