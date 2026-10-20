@@ -3439,3 +3439,11 @@ przyczyna poza naprawami: lucznik przydzielone 589-676 -> 335-339 w ostatnich ok
   kod 0. Testy calosci testy-95.ps1 (DLL test/n24b: Armoury edd0c0f8, GrandTourney e7caa02f, RealisticCaptivity 9e72fc80, CrashScribe e5ffb849, ForgeView 19aa052a):
   bitwa, nowa 8, 160 z zapisu - w toku od 12:15 -> WGRANIE 95 (wgraj-v5 -Tree zb/n24-calosc -Tag 2026-10-20-wgranie95).
 
+### 101. WGRANIE 95 (20.10 ok. 13:10 PDT) - START TUTAJ
+W grze: `w-toku/noc-wgranie-95` = n24-calosc 848b2e80 | Armoury **edd0c0f8** (2129 ustawien), GrandTourney e7caa02f (43), RealisticCaptivity 9e72fc80 (Homes.Outside),
+CrashScribe e5ffb849, ForgeView 19aa052a. Kopie *.bak-2026-10-20-wgranie95-przed + D:/Backup-Bannerlord/wgrane/2026-10-20-wgranie95-przed. safely_exited = 1.
+= 94 + m95-turniej (okup tylko dla powalajacego, pelna wartosc), m95-nocleg (wspolna izba 1 d dla gracza), m95-menu (19/19 opcji w 4 podmenu: karczma, kuznia, praca,
+sprawy miasta), m95-zajazd (druzyna znika z mapy, gwar karczmy). TESTY 95: bitwa 4/4, nowa 8/8, 160/160 z zapisu - kod 0, Armoury 0 ERROR, zawieszenia tylko przy wyjsciu.
+Jeff gra kampanie z 94 (Seagard) - zapis 94 wczytuje 95 (test 160 z zapisu). NOC 20/21.10: docs/ZADANIA-OBOZ-NOC.md, potem docs/PLAN-OPTYMALIZACJA-NOC.md; dlugi bieg
+nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS przy spichlerzu, naprawy AI, lukarze) - gdy Jeff nie gra.
+
