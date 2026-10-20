@@ -737,6 +737,9 @@ namespace Armoury
         // f9-predkosc: liczniki linii "Predkosc mapy (f9)" od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _f9Reset = F9Reset();
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
+        // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _r4ScrapsReset = R4ScrapsReset();
+        private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -875,6 +878,9 @@ namespace Armoury
             // C3 (Jeff 14.10): pula kompletow weteranow w karczmach (Import odklada napis - przedmioty przy pierwszym uzyciu); stary zapis bez klucza = pusta pula
             try { string vk = dataStore.IsSaving ? VetKit.Export() : null; SaveText.Sync(dataStore, "arm_vetkit", ref vk); if (dataStore.IsLoading) VetKit.Import(vk); }
             catch (Exception e) { Log.Error("SyncData.arm_vetkit", e); }
+            // r4-przetop: skrzynka resztek przetopu kuzni gracza (tysiaczne sztaby 6 gatunkow, format "1|"); wlasny try; brak klucza (stary zapis) = pusta skrzynka
+            try { string sc = dataStore.IsSaving ? SmeltScraps.Export() : null; SaveText.Sync(dataStore, "arm_smeltscraps", ref sc); if (dataStore.IsLoading) SmeltScraps.Import(sc); }
+            catch (Exception e) { Log.Error("SyncData.arm_smeltscraps", e); }
             // GL-0: odniesienia skal "ludzie okregu" (srednia wies, sredni rynek, srednie podzamcze) i zamrozone przypisanie wsi do targu (format "1|"); wlasny try;
             // brak klucza (stary zapis), inny format albo blad = kalibracja przy pierwszym spisie po wczytaniu (PeopleScale.Import)
             try { string ps = dataStore.IsSaving ? PeopleScale.Export() : null; SaveText.Sync(dataStore, "arm_peoplescale", ref ps); if (dataStore.IsLoading) PeopleScale.Import(ps); }

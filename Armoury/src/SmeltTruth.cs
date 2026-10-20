@@ -231,6 +231,8 @@ namespace Armoury
             {
                 if (!WeaponOn || item == null || item.WeaponDesign == null || result == null || result.Length < 7) return;
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SmithingModel : null;
+                // r4-przetop (klucz SmeltKeepsScraps, Jeff 20.10 "tylko czesc"): dokladny udzial bez minimum 1 sztaby, ulamki do skrzynki resztek (SmeltScraps)
+                if (SmeltScraps.On) { SmeltScraps.Apply(item, SmeltScraps.WeaponMilli(PartsMetal(item), ClassCap(model, item), Share()), result); return; }
                 var m = WeaponMetal(PartsMetal(item), ClassCap(model, item), Share());
                 for (int g = 1; g <= 6; g++) result[g] = m[g];
             }
@@ -262,7 +264,8 @@ namespace Armoury
                 if (!_logged.Add(item.StringId ?? "")) return;
                 var model = Campaign.Current.Models.SmithingModel;
                 var raw = PartsMetal(item, false);
-                var o = model.GetSmeltingOutputForItem(item);
+                // r4-przetop: wynik prawdziwego przetopu (skrzynka resztek juz zapisana - ponowne liczenie pokazaloby podglad nastepnej sztuki)
+                var o = SmeltScraps.LastOutFor(item) ?? model.GetSmeltingOutputForItem(item);
                 Log.Info("Przetop broni (n20-kuznia): " + item.StringId + " | czesci: " + Fmt(raw, 1, 6)
                          + (raw[1] > 0 ? (NoCrudeOn ? " (surowka czesci liczona jako zelazo kute)" : " (surowka czesci jak w grze)") : "")
                          + " -> wynik: " + Fmt(o, 1, 6)
@@ -281,6 +284,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             WeaponsDone = 0; _logged.Clear(); _modelType = null; _metalMaxFor = null;
+            SmeltScraps.SessionReset();
             var sb = new StringBuilder();
             try
             {
@@ -294,14 +298,18 @@ namespace Armoury
                   .Append(", Bk Shield Bill By Recipe ").Append(s != null && s.BkShieldBillByRecipe ? "TAK" : "NIE")
                   .Append(", Smith No Crude Input ").Append(NoCrudeOn ? "TAK" : "NIE")
                   .Append(", Shield No Velvet ").Append(s != null && s.ShieldNoVelvet ? "TAK" : "NIE")
+                  .Append(", Smelt Keeps Scraps ").Append(SmeltScraps.On ? "TAK" : "NIE")
                   .Append(" | model ").Append(model != null ? model.GetType().Name : "brak")
                   .Append(", wyjscie wpiete w ").Append(SmeltTab.PatchedTypes.Count.ToString(Inv)).Append(" modelach");
                 if (model == null) { Log.Info(sb.ToString()); return; }
-                int weapons = 0, higher = 0, crudeFromNothing = 0, overHalf = 0, noMetal = 0, oneBar = 0, crudeWeapons = 0, crudeOut = 0; long partsSum = 0, outSum = 0;
+                int weapons = 0, higher = 0, crudeFromNothing = 0, overHalf = 0, noMetal = 0, oneBar = 0, crudeWeapons = 0, crudeOut = 0, zeroBars = 0; long partsSum = 0, outSum = 0;
+                ItemObject scrapProbe = null;   // r4-przetop: bron z 1 sztaba (najlepiej simple_pike_t2) - dwa przetopy od pustej skrzynki
                 string exHigher = null, exCrude = null;
                 ItemObject crudeProbe = null;
                 var samples = new List<string>();
                 ItemObject armourProbe = null, shieldProbe = null, shieldTopProbe = null;
+                SmeltScraps.Ignore = true;      // samosprawdzenie bez skrzynki resztek (inaczej wynik zalezy od tego, co gracz juz przetopil)
+                try {
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null) continue;
@@ -330,20 +338,34 @@ namespace Armoury
                     if (o[1] > 0 && raw[1] == 0) { crudeFromNothing++; if (exCrude == null) exCrude = it.StringId + " [" + Fmt(raw, 1, 6) + " -> " + Fmt(o, 1, 6) + "]"; }
                     if (pTot >= 2 && oTot * 2 > pTot) overHalf++;
                     if (pTot == 1 && oTot == 1) oneBar++;
+                    if (pTot > 0 && oTot == 0) zeroBars++;
+                    if (pTot == 1 && (scrapProbe == null || it.StringId == "simple_pike_t2")) scrapProbe = it;
                     if (o[1] > 0) crudeOut++;
                     if (samples.Count < 4 && pTot >= 4) samples.Add(it.StringId + " [" + Fmt(raw, 1, 6) + " -> " + Fmt(o, 1, 6) + "]");
                 }
+                } finally { SmeltScraps.Ignore = false; }
                 sb.Append(" | bronie z projektem ").Append(weapons.ToString(Inv))
                   .Append(": gatunek wyzszy niz w czesciach ").Append(higher.ToString(Inv)).Append(exHigher != null ? " (np. " + exHigher + ")" : "")
                   .Append(", surowka bez surowki w czesciach ").Append(crudeFromNothing.ToString(Inv)).Append(exCrude != null ? " (np. " + exCrude + ")" : "")
                   .Append(", ponad polowe metalu czesci ").Append(overHalf.ToString(Inv))
                   .Append(", bez metalu w czesciach ").Append(noMetal.ToString(Inv))
-                  .Append(", z 1 sztaby oddaja ja cala (minimum 1 jak pancerz) ").Append(oneBar.ToString(Inv))
+                  .Append(", z 1 sztaby oddaja ja cala ").Append(oneBar.ToString(Inv)).Append(SmeltScraps.On && WeaponOn ? " (Smelt Keeps Scraps TAK - ma byc 0)" : (SmeltScraps.On ? " (Smelt Keeps Scraps nieczynny dla broni: Smelt Weapon By Parts NIE)" : " (minimum 1 jak pancerz)"))
+                  .Append(", z wynikiem 0 sztab (calosc do resztek) ").Append(zeroBars.ToString(Inv))
                   .Append(", surowka w wyniku ").Append(crudeOut.ToString(Inv))
                   .Append(", metal wyniku / czesci ").Append(outSum.ToString(Inv)).Append('/').Append(partsSum.ToString(Inv))
                   .Append(" (przy kluczach TAK: 0, 0, 0; surowka w wyniku 0)")
                   .Append(" | przyklady: ").Append(samples.Count > 0 ? string.Join("; ", samples.ToArray()) : "-");
-                sb.Append(" | pancerz: ").Append(Once(model, armourProbe)).Append(" | tarcza: ").Append(Once(model, shieldProbe));
+                SmeltScraps.Ignore = true;
+                try { sb.Append(" | pancerz: ").Append(Once(model, armourProbe)).Append(" | tarcza: ").Append(Once(model, shieldProbe)); }
+                finally { SmeltScraps.Ignore = false; }
+                sb.Append(" | resztki przetopu (r4-przetop): klucz Smelt Keeps Scraps ").Append(SmeltScraps.On ? "TAK" : "NIE (skrzynka nieuzywana)")
+                  .Append(", skrzynka: ").Append(SmeltScraps.BoxLog())
+                  // po recenzji r4: proba tylko tam, gdzie klucz naprawde dziala (bron - Smelt Weapon By Parts, pancerz - Smelt Armour Once), bez falszywego alarmu
+                  .Append(", proba broni ").Append(!WeaponOn ? "klucz nieczynny dla broni (Smelt Weapon By Parts NIE)"
+                        : scrapProbe != null ? scrapProbe.StringId + ": " + SmeltScraps.TwoSmelts(SmeltScraps.WeaponMilli(PartsMetal(scrapProbe), ClassCap(model, scrapProbe), Share())) : "brak")
+                  .Append(", proba pancerza ").Append(!ArmourOnceOn ? "klucz nieczynny dla pancerza (Smelt Armour Once NIE)"
+                        : armourProbe != null ? armourProbe.StringId + ": " + SmeltScraps.TwoSmelts(SmeltScraps.ArmourMilli(armourProbe)) : "brak")
+                  .Append(" (przy kluczu TAK bron z 1 sztaba: 1. przetop 0 szt., 2. przetop 1 szt.)");
                 sb.Append(" | kwit tarczy w CRAFT BK: ").Append(FletchForge.ShieldBillCheck(shieldProbe));
                 sb.Append(" | tarcza t5+: ").Append(ShieldFacing(shieldTopProbe));
                 sb.Append(" | kucie bez surowki: latki ").Append(_costHook).Append(", czesci z surowka ").Append(CrudePieces().ToString(Inv))
@@ -416,7 +438,10 @@ namespace Armoury
             {
                 var model = modelObj as TaleWorlds.CampaignSystem.ComponentInterfaces.SmithingModel;
                 if (model == null || it == null) return "brak proby";
-                int ours = 0; foreach (var p in SmeltTab.YieldFor(it)) ours += p.Count;
+                int ours = 0;
+                // r4-przetop: przy Smelt Keeps Scraps (i liczeniu raz) model daje cale sztaby z dokladnego udzialu - porownanie z ta sama regula (bez skrzynki)
+                if (SmeltScraps.On && ArmourOnceOn) { var mi = SmeltScraps.ArmourMilli(it); for (int g = 1; g <= 6; g++) ours += Math.Max(0, mi[g]) / SmeltScraps.Unit; }
+                else foreach (var p in SmeltTab.YieldFor(it)) ours += p.Count;
                 var o = model.GetSmeltingOutputForItem(it);
                 int got = 0; for (int g = 1; g <= 6 && g < o.Length; g++) got += Math.Max(0, o[g]);
                 return it.StringId + " model " + got.ToString(Inv) + " / receptura " + ours.ToString(Inv) + " (" + Fmt(o, 1, 6) + ")" + (got == ours ? " = raz" : (got == 2 * ours ? " = DWA RAZY" : " = INNE"));

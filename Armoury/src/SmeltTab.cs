@@ -87,7 +87,9 @@ namespace Armoury
                                 capped.Add(new Recipes.Part(p.Item, n));
                                 left -= n;
                             }
-                            if (_capLogged.Add(it.StringId ?? "")) Log.Info("SmeltTab: przetop " + it.StringId + " przyciety do kosztu wykucia: " + total + " -> " + (cap - left) + " szt. metalu (wykucie " + u + ").");
+                            if (_capLogged.Add(it.StringId ?? "")) Log.Info("SmeltTab: przetop " + it.StringId + " przyciety do kosztu wykucia: " + total + " -> " + (cap - left) + " szt. metalu (wykucie " + u + ")."
+                                    // po recenzji r4: przy Smelt Keeps Scraps (i liczeniu raz) to tylko regula listy Smelt - prawdziwy wynik liczy SmeltScraps.ArmourMilli
+                                    + (SmeltScraps.On && SmeltTruth.ArmourOnceOn ? " (regula listy Smelt; wynik przetopu przy Smelt Keeps Scraps: dokladny udzial, linia 'Przetop resztki')" : ""));
                             y = capped;
                         }
                     }
@@ -134,6 +136,9 @@ namespace Armoury
                 bool once = SmeltTruth.ArmourOnceOn;
                 if (once && !outer) return;
                 if (once) for (int g = 1; g <= 6 && g < __result.Length; g++) __result[g] = 0;
+                // r4-przetop (klucz SmeltKeepsScraps, Jeff 20.10 "tylko czesc"): dokladny udzial receptury bez "kazda czesc najmniej 1" (Recipes.SmeltYield),
+                // ulamki do skrzynki resztek (SmeltScraps); tylko przy liczeniu raz - bez SmeltArmourOnce zostaje stara droga (wewnetrzne i zewnetrzne dodaja)
+                if (once && SmeltScraps.On) { SmeltScraps.Apply(item, SmeltScraps.ArmourMilli(item), __result); return; }
                 foreach (var p in YieldFor(item))
                 {
                     int idx = MaterialIndex(p.Item);
@@ -180,10 +185,19 @@ namespace Armoury
                     return false;
                 }
 
-                var outp = model.GetSmeltingOutputForItem(item);
-                for (int i = 8; i >= 0; i--)
-                    if (outp[i] != 0) roster.AddToCounts(model.GetCraftingMaterialItem((CraftingMaterials)i), outp[i]);
+                // r4-przetop: okno prawdziwego przetopu - wynik liczony raz ze skrzynki resztek, nowa skrzynka zapisana zaraz po wydaniu metalu
+                SmeltScraps.Begin(item);
+                int[] outp;
+                try
+                {
+                    outp = model.GetSmeltingOutputForItem(item);
+                    for (int i = 8; i >= 0; i--)
+                        if (outp[i] != 0) roster.AddToCounts(model.GetCraftingMaterialItem((CraftingMaterials)i), outp[i]);
+                    SmeltScraps.End(true);
+                }
+                catch { SmeltScraps.End(false); throw; }
                 roster.AddToCounts(equipmentElement, -1);
+                SmeltScraps.Announce(item);
                 currentCraftingHero.AddSkillXp(DefaultSkills.Crafting, model.GetSkillXpForSmelting(item));
                 int cost = model.GetEnergyCostForSmelting(item, currentCraftingHero);
                 __instance.SetHeroCraftingStamina(currentCraftingHero, __instance.GetHeroCraftingStamina(currentCraftingHero) - cost);
@@ -309,6 +323,14 @@ namespace Armoury
                 if (mDo != null)
                     h.Patch(mDo, prefix: new HarmonyMethod(typeof(SmeltTab), "DoSmeltingPrefix"),
                                  postfix: new HarmonyMethod(typeof(SmeltTab), "DoSmeltingPostfix"));
+                // r4-przetop: okno zapisu skrzynki resztek przy przetopie broni (oryginal gry) - prefiks ostatni, postfiks pierwszy; klucz czytany w srodku
+                if (mDo != null)
+                    try
+                    {
+                        h.Patch(mDo, prefix: new HarmonyMethod(typeof(SmeltScraps), "SmeltPrefix") { priority = Priority.Last },
+                                     postfix: new HarmonyMethod(typeof(SmeltScraps), "SmeltPostfix") { priority = Priority.First });
+                    }
+                    catch (Exception e) { Log.Error("SmeltTab.ApplyAll(resztki)", e); }
 
                 // wyjscie przetopu: kazdy model dziedziczacy po SmithingModel (RBM/BK moga podmieniac)
                 int outs = 0;
