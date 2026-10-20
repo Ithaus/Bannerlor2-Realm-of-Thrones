@@ -27,7 +27,8 @@ namespace Armoury
     ///    to, co dalby szacunek x (1 + b), bez pytania modelu drugi raz i bez skladania sie dopisku z dnia na dzien. Indeks ceny rosnie przez 2 tygodnie (ok. +36%
     ///    popytu na koniec, cena ok. +20% przy tej samej polce) i po jarmarku wraca sam. Placi kasa miasta (Town.Gold) - kupcy miasta skupuja drozej, a kupujacy w
     ///    miescie tez placa drozej; budzet konsumpcji mieszczan (GetDailyDemandForCategory) bez zmian. Wozy wsi (MarketCarts.Choose) i karawany (BK GetTradeScoreForTown,
-    ///    CaravanGoods) widza wyzsza cene przez dane rynku - nic wiecej nie trzeba wpinac. Uzbrojenie poza regula (osobny rynek broni modu).
+    ///    CaravanGoods) widza wyzsza cene przez dane rynku - nic wiecej nie trzeba wpinac. Uzbrojenie poza regula (osobny rynek broni modu). Narzedzia ("tools") poza
+    ///    regula: ToolsByUse czyta ich Demand jako dzienne zuzycie miasta (dopis kazalby warsztatom robic narzedzia na zapas i zuzywac rude).
     ///  - OPLATA TARGOWA: od kazdej sprzedazy miastu jarmarku przez woz wsi i karawane FeeRate (1%) utargu z sakwy sprzedajacego do kasy miasta (Town.ChangeGold).
     ///    Wpieta w TownToll (CartEnd / TakeCaravan) - te same zwolnienia co myto (kontrakty 174, wyprzedaz przed rozwiazaniem, dostawy) i ta sama kontrola ksiegi:
     ///    woz - migawka okna przesunieta (MoneyLedger.CartTollInWindow), karawana - czesc myta wracajaca do kasy (TownToll.LastToTown); wplata nazwana jak myto do kasy
@@ -187,8 +188,10 @@ namespace Armoury
                     {
                         if (doy < l.StartDoy || doy >= l.StartDoy + Days) continue;
                         int start = year * y + l.StartDoy;
+                        // recenzja p5-handel: "juz byl" = ta kraina w TYM ROKU (nie ten sam dzien startu) - kalendarz liczy sie od nowa w kazdej sesji z kultur miast
+                        // (BK zmienia kulture osady) i z dlugosci roku, wiec po wczytaniu dzien startu krainy moze sie przesunac; jeden jarmark krainy na rok zostaje
                         bool had = false;
-                        foreach (var f in _fairs) if (f.Realm == l.Realm && f.Start == start) { had = true; break; }
+                        foreach (var f in _fairs) if (f.Realm == l.Realm && f.Start / y == year) { had = true; break; }
                         if (had) continue;
                         Open(l.Realm, start, day);
                     }
@@ -252,6 +255,13 @@ namespace Armoury
         /// <summary>Czy w miescie trwa jarmark (tylko odczyt; watek glowny).</summary>
         internal static bool IsFairTown(Town t) { return t != null && On && _active.ContainsKey(t); }
 
+        /// <summary>Stawka oplaty targowej przy sprzedazy tej osadzie teraz (FeeRate w miescie jarmarku, inaczej 0) - prog zysku karawan T1 (TownToll.CaravanRateFor).
+        /// Nie rzuca.</summary>
+        internal static double FeeRateFor(Settlement st)
+        {
+            try { return st != null && st.IsTown && IsFairTown(st.Town) ? FeeRate : 0.0; } catch { return 0.0; }
+        }
+
         // ------------------------------------------------------------ popyt (ItemConsumptionBehavior.UpdateSupplyAndDemand, watek glowny)
         public static void SupplyPrefix(Town __0)
         {
@@ -282,6 +292,7 @@ namespace Armoury
                 {
                     var c = all[i];
                     if (c == null || !(c.IsTradeGood || c.IsAnimal)) continue;
+                    if (c.StringId == "tools") continue;                           // recenzja: ToolsByUse czyta Demand narzedzi jako zuzycie miasta (bramka 30 dni) - bez dopisu
                     float now = md.GetCategoryData(c).Demand;
                     float add = DemandBoost * (now - (1f - a) * _old[i]);      // b x (a x szacunek dnia)
                     if (!(add > 0f) || float.IsInfinity(add)) continue;
@@ -350,8 +361,9 @@ namespace Armoury
             try
             {
                 var sb = new StringBuilder(1200);
-                sb.Append("Jarmarki po zniwach (R3-05a): dzien ").Append(day).Append(" | ").Append(s.HarvestFairs ? "CZYNNE" : "WYLACZONE (MCM)")
-                  .Append(" | rok ").Append(year).Append(", dzien roku ").Append(doy).Append(", pora Westeros ").Append(SafeSeason())
+                // recenzja p5-handel: "dzien N-1" jak Myto targowe i Barki rzeczne (liczniki oplaty i popytu - z minionej doby); otwarcia, zamkniecia i "trwa" - stan od doby N
+                sb.Append("Jarmarki po zniwach (R3-05a): dzien ").Append(day - 1).Append(" | ").Append(s.HarvestFairs ? "CZYNNE" : "WYLACZONE (MCM)")
+                  .Append(" | stan od doby ").Append(day).Append(": rok ").Append(year).Append(", dzien roku ").Append(doy).Append(", pora Westeros ").Append(SafeSeason())
                   .Append(" | trwa ").Append(_active.Count).Append(": ");
                 int k = 0;
                 foreach (var kv in _active)
@@ -362,7 +374,7 @@ namespace Armoury
                 sb.Append(" | otwarte ").Append(_opened).Append(_openTxt.Length > 0 ? " [" + _openTxt + "]" : "")
                   .Append(", zamkniete ").Append(_closed).Append(_closeTxt.Length > 0 ? " [" + _closeTxt + "]" : "")
                   .Append(", pominiete ").Append(_skipped)
-                  .Append(" | oplata targowa: wozy sprzedazy ").Append(_cartN).Append(" (utarg ").Append(_cartGross).Append(", oplata ").Append(_cartFee)
+                  .Append(" | doba ").Append(day - 1).Append(" - oplata targowa: wozy sprzedazy ").Append(_cartN).Append(" (utarg ").Append(_cartGross).Append(", oplata ").Append(_cartFee)
                   .Append("), karawany ").Append(_carN).Append(" (utarg ").Append(_carGross).Append(", oplata ").Append(_carFee)
                   .Append("), do kas miast ").Append(_cartFee + _carFee)
                   .Append(" | popyt: dopis w miastach ").Append(_boostTowns).Append(", kategorii ").Append(_boostCats).Append(", suma dopisu ").Append(_boostSum.ToString("0.0", Inv))

@@ -2436,7 +2436,7 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartsBestMarket { get; set; } = true;
 
-        [SettingPropertyBool("River Barges", HintText = "carriage down a river costs about half the overland price: when villagers choose their market and caravans weigh a trade run, a town on the same river as their village or as the town they leave (the Trident, the Mander, the Honeywine, the Blackwater, the Greenblood, the Rhoyne) counts as half as far. Carts and caravans still travel by road; only the reckoning changes (off = distance by road only)", RequireRestart = false)]
+        [SettingPropertyBool("River Barges", HintText = "carriage down a river costs about half the overland price. Villagers reach twice as far for a market town on the same river as their village (the Trident, the Mander, the Honeywine, the Blackwater, the Greenblood, the Rhoyne); the cart still makes the whole trip by road, so a far river town wins only when it truly pays more per day. Caravans weigh a run to a town on the same river as the town they leave as half as far. Nothing changes on the map (off = distance by road only)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool RiverBarges { get; set; } = true;
 
@@ -7152,7 +7152,7 @@ namespace Armoury
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public float TownMarketTollCaravanRate { get; set; } = 0.02f;
 
-        [SettingPropertyBool("Harvest Fairs", HintText = "a harvest fair: after the harvest every land holds a two-week fair in its richest town, one land after another from the south to the north (none in a year without a harvest). More buyers come, so that town pays better for trade goods and livestock - the money is the town's own, nothing is made from nothing - and every village cart and caravan selling there pays a 1% fair fee to the town's purse (off = no fairs)", RequireRestart = false)]
+        [SettingPropertyBool("Harvest Fairs", HintText = "a harvest fair: after the harvest every land holds a two-week fair in its richest town, one land after another from the south to the north (none in a year without a harvest). More buyers come, so that town pays better for trade goods and livestock (not tools or arms) - the money is the town's own, nothing is made from nothing - and every village cart and caravan selling there pays a 1% fair fee to the town's purse (off = no fairs)", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool HarvestFairs { get; set; } = true;
 

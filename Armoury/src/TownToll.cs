@@ -150,6 +150,18 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>R3-05a (recenzja p5-handel): stawka, ktora zejdzie z utargu karawany przy sprzedazy osadzie st teraz - myto (jak wyzej) + oplata targowa jarmarku
+        /// (HarvestFairs.FeeRateFor; dziala takze bez myta), z tymi samymi zwolnieniami co TakeCaravan. Prog zysku T1 (CaravanGoods.Sell). Nie rzuca.</summary>
+        internal static double CaravanRateFor(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (mp == null || _exempt > 0 || MaterialOrders.HasContract(mp)) return 0;
+                return (On ? RateCaravan : 0) + HarvestFairs.FeeRateFor(st);
+            }
+            catch { return 0; }
+        }
+
         private static bool Players(MobileParty mp)
         {
             try { return mp != null && mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan; } catch { return false; }

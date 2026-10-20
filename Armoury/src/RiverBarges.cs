@@ -16,8 +16,11 @@ namespace Armoury
     /// Regula: droga miedzy dwiema osadami nad TA SAMA rzeka liczy sie jak Factor (polowa) drogi ladowej - tylko w rachunku, barek na mapie nie ma (wozy i karawany jada
     /// trasa gry). Osada nad rzeka = wpis w ModuleData\arm_rivers.tsv (recznie z mapy ROT 8.1.8: rzeka, id osady, nazwa). Wies nalezy do rzeki swojej osady (Village.Bound -
     /// miasto albo zamek), chyba ze sama jest w pliku. Uklad rzeki (dorzecze z doplywami: Trident z Widlami, Rhoyne z Noyne i Qhoyne) to jedna rzeka.
-    ///  - WOZ WSI (MarketCarts.Choose, miernik utargu na dobe): czas kursu tam i z powrotem z odleglosci x Factor, gdy wies i miasto sa nad ta sama rzeka; zasieg
-    ///    (MarketMaxDistance) dalej liczony droga ladowa - barka nie wydluza zasiegu, tylko tanieje kurs.
+    ///  - WOZ WSI (MarketCarts.Choose, miernik utargu na dobe): gdy wies i miasto sa nad ta sama rzeka, droga do ZASIEGU (MarketMaxDistance) liczy sie x Factor -
+    ///    barka poszerza rynek wsi wzdluz rzeki (do 2 x dalej). Czas kursu i przestoj magazynu wsi (doby magazynu / doby kursu) dalej z prawdziwej drogi, bo woz jedzie
+    ///    caly kurs ladem (recenzja p5-handel: polowa czasu w mierniku tylko ukrywala przestoj, ktory naprawde nastepuje) - dalekie miasto rzeczne wygrywa tylko wtedy,
+    ///    gdy mimo dluzszej jazdy daje wiecej na dobe (np. bliskie miasta zawalone tym towarem). W mierniku wozu nie ma innego kosztu drogi niz czas, wiec nic wiecej
+    ///    barka uczciwie nie obniza.
     ///  - KARAWANA (BK BKCaravansBehavior.GetTradeScoreForTown, postfiks): ocena miasta BK = zysk x 1 / (droga + kara dalekiej drogi + 8). Gdy osada, w ktorej karawana stoi
     ///    (albo z ktorej wyjechala), i miasto celu sa nad ta sama rzeka, wynik x (d + kara(d) + dom + 8) / (d/2 + kara(d/2) + dom + 8) - ta sama formula BK z polowa drogi
     ///    (progi kary z sredniej odleglosci miast, jak BK i BKROT; czlon powrotu do domu bez zmian). Wynik -1 (odciety) zostaje.
@@ -38,7 +41,7 @@ namespace Armoury
         private static volatile bool _limits; private static float _lVeryFar, _lFar, _lMedium, _lClose;
 
         // liczniki od ostatniej linii
-        private static int _cartEval, _cartPick, _cartPickAll, _carScore, _stumbles, _stumbleSess;
+        private static int _cartEval, _cartExtra, _cartPick, _cartPickFar, _cartPickAll, _carScore, _stumbles, _stumbleSess;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly object Gate = new object();
 
@@ -52,7 +55,7 @@ namespace Armoury
             ZeroDay();
         }
 
-        private static void ZeroDay() { _cartEval = _cartPick = _cartPickAll = _carScore = _stumbles = 0; }
+        private static void ZeroDay() { _cartEval = _cartExtra = _cartPick = _cartPickFar = _cartPickAll = _carScore = _stumbles = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -117,7 +120,7 @@ namespace Armoury
                 var map = _river;
                 var sb = new StringBuilder(900);
                 sb.Append("Barki rzeczne (R3-05b): start sesji | klucz River Barges ").Append(On ? "tak" : "nie").Append(" | ").Append(_loadNote)
-                  .Append(" | droga nad ta sama rzeka x").Append(Factor.ToString("0.##", Inv)).Append(" w wyborze miasta wozu wsi i w ocenie miast karawan BK | latka ocena miast BK ")
+                  .Append(" | droga nad ta sama rzeka x").Append(Factor.ToString("0.##", Inv)).Append(" w zasiegu wozu wsi (czas kursu i przestoj magazynu z prawdziwej drogi) i w ocenie miast karawan BK | latka ocena miast BK ")
                   .Append(_hooked ? "wpieta" : "NIE").Append(" | rzeki: ");
                 if (map != null)
                 {
@@ -157,7 +160,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ woz wsi (MarketCarts.Choose)
-        /// <summary>Mnoznik drogi kursu wozu: Factor, gdy wies (home) i miasto (to) sa nad ta sama rzeka; inaczej 1. Nie rzuca.</summary>
+        /// <summary>Mnoznik drogi do testu zasiegu wozu: Factor, gdy wies (home) i miasto (to) sa nad ta sama rzeka; inaczej 1. Nie rzuca.</summary>
         internal static double CartFactor(Settlement home, Settlement to)
         {
             try
@@ -172,8 +175,11 @@ namespace Armoury
             catch (Exception e) { Stumble("CartFactor", e); return 1.0; }
         }
 
-        /// <summary>Woz wybral miasto (licznik linii: ile wyborow, ile z nich nad ta sama rzeka). Nie rzuca.</summary>
-        internal static void NoteCartPick(Settlement home, Settlement to)
+        /// <summary>Miasto weszlo do wyboru wozu tylko dzieki barce (droga ladowa ponad zasieg, polowa w zasiegu). Nie rzuca.</summary>
+        internal static void NoteCartExtra() { Interlocked.Increment(ref _cartExtra); }
+
+        /// <summary>Woz wybral miasto (licznik linii: ile wyborow, ile z nich nad ta sama rzeka, ile z nich poza zasiegiem ladowym - far). Nie rzuca.</summary>
+        internal static void NoteCartPick(Settlement home, Settlement to, bool far)
         {
             try
             {
@@ -181,7 +187,7 @@ namespace Armoury
                 if (map == null || map.Count == 0 || !On) return;
                 Interlocked.Increment(ref _cartPickAll);
                 int a = RiverOf(map, home);
-                if (a > 0 && a == RiverOf(map, to)) Interlocked.Increment(ref _cartPick);
+                if (a > 0 && a == RiverOf(map, to)) { Interlocked.Increment(ref _cartPick); if (far) Interlocked.Increment(ref _cartPickFar); }
             }
             catch (Exception e) { Stumble("NoteCartPick", e); }
         }
@@ -252,7 +258,8 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var map = _river;
                 Log.Info("Barki rzeczne (R3-05b): dzien " + day + " | " + (s.RiverBarges ? "CZYNNE" : "WYLACZONE (MCM)") + " | osad nad rzekami " + (map != null ? map.Count : 0)
-                         + " | wozy wsi: miast nad rzeka wsi w wycenie " + _cartEval + ", wyborow " + _cartPickAll + ", w tym miasto nad rzeka wsi " + _cartPick
+                         + " | wozy wsi: par wies-miasto nad ta sama rzeka " + _cartEval + ", miast w wyborze tylko dzieki barce " + _cartExtra + ", wyborow " + _cartPickAll
+                         + ", w tym miasto nad rzeka wsi " + _cartPick + " (z tego poza zasiegiem ladowym " + _cartPickFar + ")"
                          + " | karawany BK: ocen miast z barka " + _carScore + " | potkniecia " + _stumbles + " (sesja " + _stumbleSess + ").");
             }
             catch (Exception e) { Stumble("Daily", e); }

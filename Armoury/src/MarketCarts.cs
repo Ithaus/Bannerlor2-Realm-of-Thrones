@@ -457,10 +457,14 @@ namespace Armoury
                     if (st == null || st.IsUnderSiege || Hostile(cart, home, st)) continue;
                     bool isOwn = !castle && st == v.Bound;                             // wies miejska: swoje miasto zawsze kandydatem
                     float d = Dist(cart, at, st);
-                    if (!isOwn && (d <= 0f || (max > 0f && d > max))) continue;
-                    float d0 = d; bool byp = isOwn && (d <= 0f || (max > 0f && d > max));   // f19-e2 (pomiar): wlasne miasto bez testu zasiegu
+                    // R3-05b (recenzja p5-handel): barka poszerza zasieg - droga nad ta sama rzeka liczy sie do zasiegu w polowie; czas kursu i przestoj magazynu
+                    // dalej z prawdziwej drogi (woz jedzie caly kurs ladem), wiec dalekie miasto rzeczne wygrywa tylko, gdy naprawde da wiecej na dobe
+                    float dr = d * (float)RiverBarges.CartFactor(home, st);
+                    if (!isOwn && (d <= 0f || (max > 0f && dr > max))) continue;
+                    if (!isOwn && max > 0f && d > max) RiverBarges.NoteCartExtra();      // kandydat tylko dzieki barce (licznik linii)
+                    float d0 = d; bool byp = isOwn && (d <= 0f || (max > 0f && dr > max));   // f19-e2 (pomiar): wlasne miasto bez testu zasiegu
                     if (d < 0f) d = 0f;
-                    double T = 2.0 * d * RiverBarges.CartFactor(home, st) / perDay + wait;   // R3-05b: kurs nad ta sama rzeka liczy sie jak polowa drogi (barka); zasieg - droga ladowa
+                    double T = 2.0 * d / perDay + wait;
                     bool useFull = full != null && (whole || T > tfree);
                     var news = s.VillageCartRoadNews ? NewsFor(t) : null;
                     var ld = useFull ? full : load;
@@ -521,7 +525,7 @@ namespace Armoury
                     _sumOwn += ReferenceEquals(ownC, best) ? bestVal : Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk);
                 }
                 OreNote(best.T, best.Load);
-                RiverBarges.NoteCartPick(home, best.T.Settlement);                    // R3-05b: licznik linii "Barki rzeczne"
+                RiverBarges.NoteCartPick(home, best.T.Settlement, max > 0f && best.D0 > max && !best.Byp);   // R3-05b: licznik linii "Barki rzeczne" (wybor poza zasiegiem ladowym)
                 NotePick(cart, best.T.Settlement, best.D0, best.Byp, movedN, null);   // f19-e2 (pomiar)
                 return best.T.Settlement;
             }

@@ -17,6 +17,8 @@ Mander	town_ES7	Tumbleton
 Mander	ROT_town27	Lord Hewett's Town
 Honeywine	town_V6	Oldtown
 Honeywine	castle_ES8	Honeyholt
+# The Blackwater Rush: on the Realm of Thrones map only King's Landing and the Red Keep stand on it, side by side - no other stronghold upstream is sure,
+# so a barge on the Blackwater changes almost nothing (both rows kept so a sure upstream place can be added here later).
 Blackwater	town_EW4	King's Landing
 Blackwater	ROT_castle61	Red Keep
 Greenblood	town_A7	Planky Town
