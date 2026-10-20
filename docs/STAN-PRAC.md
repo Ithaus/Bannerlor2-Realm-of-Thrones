@@ -3404,4 +3404,6 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   PROBLEM R3-02: naprawy wedlug godzin cechow zabieraja produkcji ok. 400 roboczodni/d (naprawy 76 -> 473): zrobione 28 dob vs n22a - lukarze -42%, miecznicy -13%,
   siodlarze -14%, krawcy -11%; NC-10 luki 182 -> 154/d, dob bez kusz 3. -> wf_ea663318-f9e (zb/n22f-naprawy2 od 3c3a7ad9): najpierw bezczynne rece, maly udzial AI
   w rekach linii. Test koncowy n22c (3c3a7ad9 bez tej poprawki) w toku od 08:37; po poprawce: test 160 + nowa -> WGRANIE 93 ok. 11:30-12:00.
+- 08:50 PDT Jeff z gry: start "Indebted Lord" DZIALA, premia na drodze bocznej DZIALA. Nowe zadanie na noc: OBOZ ARMII (oboz od 22:00, wejscie i chodzenie po obozie,
+  trening, wyglad wedlug druzyny, udzwig konia/juk, przedmioty obozowe i wozy, miasteczko obozowe) + rozpoznanie modow -> docs/ZADANIA-OBOZ-NOC.md. Noc: oboz, potem optymalizacja.
 
