@@ -146,7 +146,7 @@ namespace Armoury
                 MBTextManager.SetTextVariable("ARM_ROADINN_Q" + q, ShortLabels.Pick(QName[q] + " - " + b.Total + " d", QName[q] + " (" + QWhat[q] + ") - " + split));
                 var t = new StringBuilder();
                 if (ShortLabels.On) t.Append(QName[q]).Append(" (").Append(QWhat[q]).Append(") - ").Append(split).Append(".\n");
-                t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(PRoom[q]).Append(" d your room.");
+                t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(RoomOf(q)).Append(" d ").Append(RoomWord(q)).Append(".");
                 if (men > 0)
                 {
                     t.Append("\nThe men (").Append(men).Append(", ").Append(b.Mounted).Append(" mounted): ");
@@ -163,7 +163,7 @@ namespace Armoury
                         parts.Add(b.Comp[i].Name + " " + (b.CompQ[i] < 0 ? "the stable" : QualityOf(b.CompQ[i]) + " " + b.CompCost[i] + " d"));
                     t.Append(string.Join(", ", parts.ToArray())).Append(".");
                 }
-                t.Append("\nYou: room ").Append(PRoom[q]);
+                t.Append("\nYou: ").Append(RoomWord(q) == "your bed" ? "bed " : "room ").Append(RoomOf(q));
                 if (b.OwnHorse) t.Append(" + your horse ").Append(PHorse[q]);
                 if (b.Spare + b.ArmorySpare > 0) t.Append(" + ").Append(b.Spare + b.ArmorySpare).Append(" horses that carry nobody x ").Append(PHorse[q]);
                 t.Append(" = ").Append(b.PlayerCost).Append(" d (you have ").Append(Hero.MainHero.Gold).Append(").");
@@ -271,7 +271,7 @@ namespace Armoury
                          + ", porzadna karczma " + (b.FootAt[1] + b.MountAt[1]) + ", dobry dom " + (b.FootAt[2] + b.MountAt[2]) + ", stajnia " + b.MenStable
                          + "; sakiewka ludzi " + b.MenPurse + ", wolne " + b.MenFree + ", zaplacili " + menPaid + " z " + b.MenCost + (b.MenNoPurse ? " (sakiewki wylaczone)" : "")
                          + " | towarzysze " + b.Comp.Count + (compLog.Length > 0 ? ": " + compLog : "") + ", z kiesy " + compGoldPaid + ", z sakiewki ludzi " + compPursePaid
-                         + " | gracz: pokoj " + PRoom[q] + ", swoj kon " + (b.OwnHorse ? 1 : 0) + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " x " + PHorse[q]
+                         + " | gracz: pokoj " + RoomOf(q) + ", swoj kon " + (b.OwnHorse ? 1 : 0) + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " x " + PHorse[q]
                          + " = " + b.PlayerCost + ", zaplacil " + playerPaid
                          + " | razem " + paidAll + " (ludzie " + menPaid + ", towarzysze " + compPaid + ", gracz " + playerPaid + ") -> kiesa wsi " + purseAll + ", podatek pana wsi " + taxAll
                          + ", korona (DS) " + crownAll

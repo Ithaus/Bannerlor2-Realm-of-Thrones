@@ -582,7 +582,7 @@ namespace Armoury
                     catch { }
                     sb.Append(" About ").Append(Rumours.Round(inn.People).ToString("N0", Inv)).Append(" souls live in the villages around.");
                     sb.Append("\n\n").Append(BedsText(inn));
-                    sb.Append(" The prices are those of the town inns (a man / a horse / your own room): common room 1 / 1 / 3");
+                    sb.Append(" The prices are those of the town inns (a man / a horse / your own room): common room 1 / 1 / " + TownInns.RoomOf(0));
                     if (inn.Tiers >= 2) sb.Append(", decent inn 2 / 2 / 8");
                     if (inn.Tiers >= 3) sb.Append(", good house 4 / 3 / 20");
                     sb.Append(". Every soldier pays for himself and his horse from his own purse; you pay for yourself, your horse and every horse that carries nobody. The coin stays with the village whose lands the inn stands on.");
