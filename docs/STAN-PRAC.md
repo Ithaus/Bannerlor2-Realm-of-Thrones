@@ -3480,5 +3480,8 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   splata z nadwyzki, dobrobyt -0.5/d, podatek nadzwyczajny; brak podpowiedzi kasy - menu Town affairs -> The council's debts; przeglady wymuszone dopiero po 240+ dobach).
   Scalone do n25 45f3efa7 + licznik "bez powalajacego" tylko rycerze; 2167 ustawien, 5 modow build 0. W toku: m96-wies (menu wsi + komunikaty platnosci, wf_72028594-b56).
   Jeff: "You paid 2 - powinno byc, za co (nocleg)"; "menu wsi tez jak miasto i zamek".- 16:35 PDT Jeff: "przejrzyj kucie strzal i lukow i pancerzy, bo niektore strzaly wymagaja 14 najlepszej stali albo luki 8 lnu, to bez sensu" -> wf_48e51b44-1b9,
-  w-toku/m96-receptury od n25 4fa764dc (audyt wszystkich przepisow + regula z masy przedmiotu i budowy, przetop nie wiecej niz przepis).
+  w-toku/m96-receptury od n25 4fa764dc (audyt wszystkich przepisow + regula z masy przedmiotu i budowy, przetop nie wiecej niz przepis).- 16:50 PDT Jeff (luk [V] 160 War Longbow znany przy t1): "Wiedza: odkryto losowo lowland_yew_bow (BOWS, t5, zakres 1-6)" - zakres zawyzony zle rozdanymi t6 -> wf_39026e72-fa6,
+  w-toku/m96-wzory2 (druga naprawa zapisu #m96seedfix2: wzory z losowania ponad zakres PatternDrawBySkill znikaja, punkty wracaja). Przepisy kuzni: Jeff "zasada wagi surowca jak
+  drewno/wegiel - ile wazy jednostka i na ile starcza" + "przetop mniej, straty, madrze" -> wf_48e51b44-1b9 PRZERWANY, nowy wf_3eb8bfa3-879 (receptury-kuzni-2.js: surowce w kg z
+  otwartymi ladunkami jak drewno, przetop = masa metalu minus zgar/zuzel, czesci niemetalowe przepadaja, bez zysku). Stara proba: m96-receptury-tmp/przerwana-proba-Recipes.diff.
 
