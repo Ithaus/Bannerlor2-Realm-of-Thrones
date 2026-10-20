@@ -52,19 +52,20 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Zloto z kies rodziny AI: glowa, potem dorosli lordowie rodu - kazdy najwyzej do podlogi floor. Zwraca zebrane (zdjete z kies). Wspolne z posagiem (AiDowry).
+        /// Zloto z kies rodziny AI: glowa, potem dorosli lordowie rodu - kazdy najwyzej do podlogi floor; skip - nie placi (panna przy posagu). Zwraca zebrane
+        /// (zdjete z kies). Wspolne z posagiem (AiDowry).
         /// </summary>
-        internal static long TakeFromFamily(Clan c, long want, long floor)
+        internal static long TakeFromFamily(Clan c, long want, long floor, Hero skip = null)
         {
             long got = 0;
             if (c == null || want <= 0) return 0;
             var lead = c.Leader;
-            if (lead != null && lead.IsAlive && lead != Hero.MainHero) got += TakeFrom(lead, want - got, floor);
+            if (lead != null && lead != skip && lead.IsAlive && lead != Hero.MainHero) got += TakeFrom(lead, want - got, floor);
             if (got >= want) return got;
             foreach (var h in c.Heroes)
             {
                 if (got >= want) break;
-                if (h == null || h == lead || h == Hero.MainHero || !h.IsAlive || h.IsChild || h.Clan != c || !h.IsLord) continue;
+                if (h == null || h == lead || h == skip || h == Hero.MainHero || !h.IsAlive || h.IsChild || h.Clan != c || !h.IsLord) continue;
                 got += TakeFrom(h, want - got, floor);
             }
             return got;

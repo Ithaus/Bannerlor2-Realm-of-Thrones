@@ -157,7 +157,8 @@ namespace Armoury
                 _dBrideN++;
                 var bride = b; var payer = cb; var recv = ca;
                 var to = recv.Leader;
-                if (payer.IsBanditFaction || recv.IsBanditFaction || to == null || !to.IsAlive || to == Hero.MainHero) { _dOtherN++; return; }
+                // panna - glowa wlasnego rodu (odchodzi, bo pan mlody tez jest glowa i stoi pierwszy): bez posagu - jej kiesa idzie z nia, rod zostaje bez glowy
+                if (payer.IsBanditFaction || recv.IsBanditFaction || payer.Leader == bride || to == null || !to.IsAlive || to == Hero.MainHero) { _dOtherN++; return; }
                 double G, R; bool war;
                 if (!ClanBudget.ChestOf(payer, out G, out R, out war)) { _dNoBudgetN++; return; }
                 double g = Math.Min(G, ClanIncomeBook.FamilyGoldOf(payer));
@@ -172,7 +173,7 @@ namespace Armoury
                 if (bk >= 0) { dowry = Math.Min(dowry, bk); _dBkSum += (long)bk; }
                 long want = (long)Math.Min(dowry, above);
                 if (want <= 0) { _dPoorN++; return; }
-                long got = VassalRansomAid.TakeFromFamily(payer, want, Math.Max(0, s.FamilyPurseFloor));
+                long got = VassalRansomAid.TakeFromFamily(payer, want, Math.Max(0, s.FamilyPurseFloor), bride);   // panna nie placi sama za siebie - jej kiesa idzie z nia
                 if (got <= 0) { _dPoorN++; return; }
                 int ig = (int)Math.Min(int.MaxValue, got);
                 to.ChangeHeroGold(ig);
@@ -218,7 +219,7 @@ namespace Armoury
                 if (s == null || !s.LogEnabled || Campaign.Current == null) return;
                 if (!On && _dWedN == 0 && _dTiltUp == 0 && _dTiltDown == 0) return;
                 Log.Info("Posagi AI (R3-01c): dzien " + (int)CampaignTime.Now.ToDays + " | slubow AI-AI " + _dWedN + ": panna przechodzi do rodu meza " + _dBrideN + ", pan mlody do rodu zony "
-                         + _dGroomN + ", ten sam rod " + _dSameN + ", inne (rod po slubie poza para, brak glowy rodu meza) " + _dOtherN
+                         + _dGroomN + ", ten sam rod " + _dSameN + ", inne (rod po slubie poza para, panna glowa rodu, brak glowy rodu meza) " + _dOtherN
                          + " | posagow " + _dPaidN + " razem " + _dPaid + " zl (najwiekszy: " + (_dMax ?? "-") + "; wycena BK tych panien razem " + _dBkSum + ")"
                          + " | bez posagu: rod panny bez nadwyzki ponad rezerwe " + _dPoorN + ", rod panny bez budzetu (dluznik, zajecie, Straz, najemnik, bez krolestwa) " + _dNoBudgetN
                          + " | pominiete: rod gracza albo kontrakt BK " + _dSkipN
