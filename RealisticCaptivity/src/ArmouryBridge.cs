@@ -51,5 +51,35 @@ namespace RealisticCaptivity
             try { return _playerRansom != null ? (int)_playerRansom.Invoke(null, null) : -1; }
             catch { return -1; }
         }
+
+        // n20-niewola: unikaty (spis ROT i stal valyrianska) ida przy pojmaniu TYLKO zwyczajem wojny Armoury (UniqueSpoils.Take - zdobywca-bohater je
+        // zaklada, pojmany dostaje zamiennik); RC ich nie bierze do jukow zdobywcy (stal valyrianska w taborze AI znika - UniqueSpoils 177-fix).
+        // Armoury.UniqueSpoils.Is(ItemObject) - internal static, przez refleksje (bez twardej zaleznosci); bez Armoury = nic nie jest unikatem.
+        private static bool _uTried;
+        private static MethodInfo _isUnique;
+        private static int _uStumbles;
+
+        private static void ResolveUnique()
+        {
+            if (_uTried) return;
+            _uTried = true;
+            try
+            {
+                var t = AccessTools.TypeByName("Armoury.UniqueSpoils");
+                if (t != null) _isUnique = AccessTools.DeclaredMethod(t, "Is", new[] { typeof(TaleWorlds.Core.ItemObject) });
+            }
+            catch (Exception e) { Log.Error("ArmouryBridge.ResolveUnique", e); }
+        }
+
+        internal static bool IsUnique(TaleWorlds.Core.ItemObject it)
+        {
+            ResolveUnique();
+            if (it == null || _isUnique == null) return false;
+            try { return (bool)_isUnique.Invoke(null, new object[] { it }); }
+            catch (Exception e) { if (_uStumbles++ == 0) Log.Error("ArmouryBridge.IsUnique", e); return false; }
+        }
+
+        /// <summary>Czy Armoury z UniqueSpoils jest wczytane (linia logu n20).</summary>
+        internal static bool UniqueKnown { get { ResolveUnique(); return _isUnique != null; } }
     }
 }
