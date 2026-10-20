@@ -116,3 +116,12 @@ DO SPRAWDZENIA (build Release kod 0, 0 bledow; autotestu nie uruchamialem - zaka
 ## Status po recenzji
 DO SPRAWDZENIA. Build Release: Armoury kod 0 (0 bledow, 4 stare ostrzezenia), CrashScribe kod 0 (0 bledow, 0 ostrzezen); gen_mcm uruchomiony
 po zmianie Settings.cs. Autotestu nie uruchamialem (zakaz w tym zadaniu). Do wgrania razem: Armoury.dll i CrashScribe.dll (CamelCulling).
+
+## Recenzja - znaleziska 5 i 6 (dopisane przez prowadzacego, 19.10 ok. 21:40)
+- DROBNE, prawdziwe (5) - `Stables.CamelBuy` omijal granice targu koni (AiMountMarketSharePercent, AiMountShelfFloor - Jeff 15.09 "praktycznie nigdzie
+  nie ma koni do kupienia") i przydzial sprzetu rodu (F5). POPRAWKA: ta sama czesc polki i to samo minimum co zwykle konie; budzet jak F5 (GearRule:
+  min(przydzial rodu, AiMountGearPurseShare x kiesa ponad AiGearGoldReserve), po zakupie ClanBudget.GearSpent), inaczej AiMountPurseShare kiesy.
+  Linia "Stajnia AI (r2-konie)" dopisuje "na polce N, wolno z polki M, z przydzialu rodu / z kiesy pana".
+- DROBNE, prawdziwe (6) - odmowa DTE oddawala sztuki surowym AddToCounts; teraz ShelfBuy.PutBack (pamiec polki i licznik hurtu poprawione).
+- (7) SendHome jedno miasto - bez zmian (zloto sie zgadza, sztuka czeka dobe na kupca).
+

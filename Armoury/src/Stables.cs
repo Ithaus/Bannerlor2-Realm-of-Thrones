@@ -1105,8 +1105,29 @@ namespace Armoury
                 if (arm != null) foreach (var kv in arm) if (kv.Value > 0 && CamelMount(kv.Key)) have += kv.Value;
                 int need = Math.Min(riders - have, Math.Max(1, c.AiMountMaxPerVisit));
                 if (need <= 0) return;
+                // recenzja r2-konie (5): te same granice targu co zwykle konie - z polki schodzi najwyzej czesc (AiMountMarketSharePercent)
+                // i nigdy ostatnie sztuki (AiMountShelfFloor); Jeff 15.09 "praktycznie nigdzie nie ma koni do kupienia"
+                int shelfCamels = 0;
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var e0 = shelf[i];
+                    if (e0.EquipmentElement.Item != null && e0.Amount > 0 && CamelMount(e0.EquipmentElement.Item)) shelfCamels += e0.Amount;
+                }
+                int marketAllow = (int)(shelfCamels * MBMath.ClampFloat(c.AiMountMarketSharePercent / 100f, 0f, 1f));
+                marketAllow = Math.Min(marketAllow, Math.Max(0, shelfCamels - Math.Max(0, c.AiMountShelfFloor)));
+                need = Math.Min(need, marketAllow);
+                if (need <= 0) return;
                 var lord = party.LeaderHero;
-                int budget = (int)(lord.Gold * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+                // recenzja r2-konie (5): budzet jak zwykle konie (F5) - rod z budzetem 166 z przydzialu sprzetu (GearSpent po zakupie), inaczej udzial kiesy pana
+                int gearLeft, budget;
+                var camelClan = CavalryTemplate.ClanOf(party);
+                bool gearRule = GearRule(camelClan, out gearLeft);
+                if (gearRule)
+                {
+                    int fromPurse = (int)(Math.Max(0, lord.Gold - Math.Max(0, c.AiGearGoldReserve)) * MBMath.ClampFloat(c.AiMountGearPurseShare, 0f, 1f));
+                    budget = Math.Min(gearLeft, fromPurse);
+                }
+                else budget = (int)(lord.Gold * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
                 int bought = 0, paid = 0;
                 while (need > 0 && budget - paid >= 50)
                 {
@@ -1124,13 +1145,15 @@ namespace Armoury
                     int cost, first, lastP;
                     int take = ShelfBuy.Take(shelf, cel, Math.Min(need, shelf[best].Amount), budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
                     if (take <= 0) break;
-                    if (!AiGear.AddToArmory(party, cel.Item, take)) { shelf.AddToCounts(cel, take); break; }   // DTE nie przyjal - sztuki wracaja na polke, nikt nie placi
+                    if (!AiGear.AddToArmory(party, cel.Item, take)) { ShelfBuy.PutBack(shelf, cel, take, cost, first); break; }   // DTE nie przyjal - sztuki wracaja na polke (z poprawka pamieci polki i licznika hurtu), nikt nie placi
                     paid += cost; bought += take; need -= take;
                 }
                 if (bought <= 0) return;
                 TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
+                if (gearRule && paid > 0) ClanBudget.GearSpent(camelClan, paid);   // 166: schodzi z przydzialu sprzetu rodu (zloto poszlo pan -> miasto)
                 Log.Info("Stajnia AI (r2-konie): " + lord.Name + " kupil " + bought + " wielbladow do zbrojowni w " + settlement.Name + " za " + paid
-                         + " (jezdzcow wielbladow " + riders + ", wielbladow w zbrojowni przed zakupem " + have + ")" + (_camelStumbles > 0 ? " | potkniecia " + _camelStumbles : "") + ".");
+                         + " (jezdzcow wielbladow " + riders + ", wielbladow w zbrojowni przed zakupem " + have + ", na polce " + shelfCamels + ", wolno z polki " + marketAllow
+                         + (gearRule ? ", z przydzialu rodu" : ", z kiesy pana") + ")" + (_camelStumbles > 0 ? " | potkniecia " + _camelStumbles : "") + ".");
             }
             catch (Exception e) { if (++_camelStumbles <= 3) Log.Error("Stables.CamelBuy", e); }
         }
