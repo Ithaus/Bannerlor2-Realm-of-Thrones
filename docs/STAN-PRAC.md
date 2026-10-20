@@ -3454,5 +3454,8 @@ nowej kampanii ok. 180 dob na 94/95 (fala 2 w dlugiej grze: p6 grupy, bramka KS 
   od 848b2e80 = 95: valyria, sakiewki, koszyk, len, bandy, zamek) -> scalenie, wielki test w nocy (gdy Jeff skonczy), WGRANIE 96. ZYZNOSC KRAIN - ODRZUCONA przez Jeffa.
   Jeff gra od 13:28 na 95 (obserwator straz-jeffa.sh od znacznika 13:12).- 14:45 PDT Jeff (zrzut kuzni): "jest blad, ze moge stworzyc luki tier 6 od poczatku gry, zobacz, czy nie ma wiecej takich bledow" + "dlugi miast tak, robimy" ->
   wf_c0a7b77f-584: w-toku/m96-wzory (przyczyna lukow [VI] PATTERN KNOWN - RangedLore/ForgeView + audyt calego katalogu wzorow) i w-toku/m96-dlugi (dlugi miast u mieszczan
-  i Banku Zelaznego, splata z nadwyzek kosztem renty pana, podatek nadzwyczajny miasta przy niewyplacalnosci) od 848b2e80 -> do 96 (wielki test w nocy).
+  i Banku Zelaznego, splata z nadwyzek kosztem renty pana, podatek nadzwyczajny miasta przy niewyplacalnosci) od 848b2e80 -> do 96 (wielki test w nocy).- 14:30 PDT CRASH JEFFA 14:27 (Eyrie, kuznia z podmenu Go to the smithy, projektowanie broni): WeaponDesignVM.DoesCurrentItemHaveSecondaryUsage NullReference -
+  przedmiot bez czesci broni (ItemObject.Weapons => WeaponComponent?.Weapons null); NASZ straznik CrashScribe Mends.VmNeedsItem sprawdzal tylko item != null.
+  -> w-toku/m96-kuznia 7cc2b323 (prefiks sprawdza WeaponComponent/Weapons + finalizer NRE). Jeff: "wgraj jako wersje, ja bede dalej gral i testowal" -> WGRANIE 95a
+  (= 95 + CrashScribe 76ec2034), test 95a-bitwa (CrashScribe-at-n95a.dll = n22-at + 848b2e80 + m96-kuznia).
 
