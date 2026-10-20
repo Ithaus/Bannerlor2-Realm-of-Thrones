@@ -233,6 +233,7 @@ namespace Armoury
                 }
                 // R3-05e: rok urodzaju - plony pol i sadow x czynnik regionu (0.6..1.2), tym samym wzorem (czynnik x suma), po rekach E4/5 i E4/7; poza zima i rokiem - nic
                 HarvestYear.ProdStep(village, item, ref __result);
+                VillageHerds.ProdStep(village, item, ref __result);   // R3-06c (p5-stada): stado wsi po rabunku - towary stada x H (czynnik x suma), wlasny try
                 // E6/W3 (221): regulator wsi - mnoznik towaru (bez zywnosci; zwierzeta rzezne tylko z AnimalsUnderValve - T3-K2) wedlug zuzycia swiata, decyzja co 28 dob (HarvestValve); ten sam wzor
                 // (czynnik x suma po E4), przemienny z R1/K4, PRZED W2 (ostatni krok) i sufitem dymarki R1; 1 = nic nie dopisujemy
                 float valve = HarvestValve.Factor(item);
@@ -290,6 +291,7 @@ namespace Armoury
                 m *= Devastation.YieldFactor(village);
                 m *= FreeHands.YieldFactor(village);
                 m *= HarvestYear.Factor(village, item);   // R3-05e: ten sam czynnik co HarvestYear.ProdStep
+                m *= VillageHerds.Factor(village, item);   // R3-06c (p5-stada): ten sam czynnik stada co ProdPostfix
                 m *= HarvestValve.Factor(item);
                 if (vt != null && GoodsPaths.SideOn)
                 {

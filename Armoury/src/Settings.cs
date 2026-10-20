@@ -2521,6 +2521,14 @@ namespace Armoury
         // gdy wodzem jest gracz, po kazdym pelnym kroku pasek staje na 99% i okienko pyta: nastepna osada (ok. N dni) albo koniec; "End Raiding" po >= 1 osadzie konczy
         // rabunek jako spalony. NK. Off = gracz jak AI (jeden krok i koniec)
         public bool RaidPlayerStepPopup = true;            // your raid stops after each settlement and asks: raid the next one (about N days) or end the raid (off = your raid burns one settlement and ends, as the lords' raids do)
+        // R3-06c (noc 20.10, p5-stada; VillageHerds.cs): stado wsi (drobne: owce i swinie; bydlo) jako majatek okregu - rabunek zabiera 1.5 x udzial trafionych obecnego stada
+        // (najwyzej 90%, nie mniej niz 10% stada), napastnik pedzi 0.5 sztuki na czlowieka, reszta zabita; zwierzeta, welna i nabial x stado; odrost 25% / 12% rocznie. Zapis arm_herds.
+        // Off = stado zawsze pelne (jak dotad), stan zostaje w zapisie
+        public bool VillageHerdsAsLoot = true;             // raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth. Raiders keep at most one animal for every two men
+        // R3-06d (noc 20.10, p5-stada; TiredLand.cs): ziemia zajeta okregu ponad ziemie (ponad baze z pierwszego rachunku) - towary ziemi x (baza / rho)^0.6, najmniej x0.5;
+        // tylko wsie i pola mieszczan pod KS. Recenzja: hamulec przyrostu ponad ziemie startu (bez osobnego modelu ugoru); okreg przeludniony juz na starcie - zwolniony.
+        // Zapis arm_tiredland. Off = plon liniowo od rak (jak dotad)
+        public bool TiredLandYield = true;                 // when a district grows beyond the land it farmed at the start, the newcomers sow the fallow and the soil tires: each extra farmer adds less than the last (fields, orchards and pastures; not mines, fishing or forest). Only with the start calibration applied; a district already crowded at the start keeps its yield
 
         // --- The map and its crossings (stage 7) ---
         // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi

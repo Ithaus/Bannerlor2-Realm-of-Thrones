@@ -342,6 +342,7 @@ namespace Armoury
             var res = new DistResult();
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
+            if (factors && !ld.TF) HerdKs(ld, prod, kgT);   // R3-06c (p5-stada, recenzja): stado wsi PRZED pracami okregu (stado prac pedzi DistrictWorks) - tylko gra; StartCalibration.Stada.cs
             if (factors) WorksKs(ld, prod);              // inwest: dodatek prac okregu (b x kg zajecia czesci) przed zima i czynnikami rak - tylko gra (Plan nie)
             double f = 1.0;
             if (factors)
@@ -355,6 +356,8 @@ namespace Armoury
                 if (!(f >= 0) || double.IsInfinity(f)) f = 1.0;
                 for (int i = 0; i < ItemCount; i++) prod[i] *= f;
                 HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (poza zima)
+                // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
+                LandKs(ld, prod, f);
             }
             // co okreg zje sam (wies; pola mieszczan - nic, ich ludzie sa w potrzebach miasta)
             if (!ld.TF)
@@ -362,6 +365,7 @@ namespace Armoury
                 // KS-R3 G6 (klucz Ks Granary Release): piwo 400 kcal/l po obu stronach (ziarno na piwo domowe nie liczy sie jak chleb) i lepszy stol (NeedMult) po obu stronach
                 bool fix = factors && SwGranaryRelease;
                 res.OwnKcal = KsDeliver.Own(prod, ld.OwnNeed, res.Own, fix);
+                if (factors) HerdLandOwn(ld, res.OwnKcal, fix);   // R3-06c/d (recenzja): kcal wlasnego stolu zabrane przez stado i ziemie - bramka krainy (StartCalibration.Stada.cs)
                 // pelna potrzeba kcal ludzi w domu (caly koszyk - takze to, co z targu): racja = jedzenie jednego czlowieka na dobe
                 double fn = 0; if (fix) foreach (var x in ld.FullNeed) fn += x;
                 res.KcalNeed = fix && fn > 0 ? KsDeliver.KcalNeed(ld.FullNeed) : (d.People > 0 ? KsDeliver.KcalNeed(d.Need0) * Math.Min(1.0, ld.PeopleHome / d.People) : 0.0);
