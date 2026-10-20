@@ -87,8 +87,12 @@ namespace Armoury
             _screen = MapScreen.Instance;
             _active = true;
             _seenVersion = int.MinValue;
-            Log.Info("Szubienice (p6): widok mapy - szubienic na liscie " + Gallows.Active.Count + "; obrazki powstaja raz przy kamerze (z <= "
-                     + Settings.Current.MapVillagesHideAboveCameraHeight.ToString("0", Inv) + "), potem tylko pokaz / schowaj; zdjecie przy zmianie listy.");
+            try
+            {
+                Log.Info("Szubienice (p6): widok mapy - szubienic na liscie " + Gallows.Active.Count + "; obrazki powstaja raz przy kamerze (z <= "
+                         + Settings.Current.MapVillagesHideAboveCameraHeight.ToString("0", Inv) + "), potem tylko pokaz / schowaj; zdjecie przy zmianie listy.");
+            }
+            catch (Exception e) { Log.Error("GallowsView.OnInitialize", e); }
         }
 
         protected override void OnFinalize()

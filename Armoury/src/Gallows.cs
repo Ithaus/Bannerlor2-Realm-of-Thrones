@@ -87,6 +87,7 @@ namespace Armoury
         private static readonly Dictionary<long, List<int>> _blkCells = new Dictionary<long, List<int>>();
         private static readonly List<Settlement> _villages = new List<Settlement>(600);
         private static bool _blkBuilt;
+        private static int _blkMv;                      // wioski na mapie w przeszkodach (0 - uklad nie byl jeszcze wczytany: nastepne uzycie buduje od nowa)
         private static string _blkNote = "-";
 
         // liczniki od ostatniej linii doby
@@ -95,6 +96,8 @@ namespace Armoury
         private static int _stumbles, _stumblesAll;
         private static double _pickMs;
         private static int _pickN;
+        private static double _netMs, _loadMs;         // ostatnia przebudowa sieci (drogi boczne) i wczytanie traktow - poza srednia wyboru miejsca
+        private static int _netBuilds, _blkBuilds;
         private static int _loadedFromSave, _expiredOnLoad;
         // widok (bez typow SandBox.View - linia doby czyta je, gdy typ widoku sie nie zaladowal)
         internal static int VCreated, VShowDay, VHideDay, VRemoved, VShownMax, VMeshMiss, VFailed, VStCreate, VStVis, VPiecesDay;
@@ -110,7 +113,8 @@ namespace Armoury
             _mainSeg.Clear(); _mainCross.Clear(); _segCells.Clear(); _crossCells.Clear();
             _seg = new float[0]; _segN = 0; _segMain = 0; _cross = new Cross[0];
             _lanes = _laneCross = _laneFork = 0;
-            _blk.Clear(); _blkCells.Clear(); _villages.Clear(); _blkBuilt = false; _blkNote = "-";
+            _blk.Clear(); _blkCells.Clear(); _villages.Clear(); _blkBuilt = false; _blkNote = "-"; _blkMv = 0;
+            _netMs = _loadMs = 0; _netBuilds = _blkBuilds = 0;
             ZeroDay();
             _aPlaced = _aRemoved = _aRefresh = _aReplaced = _aiLines = 0;
             _stumbles = _stumblesAll = 0;
@@ -201,6 +205,7 @@ namespace Armoury
             if (_mainLoaded) return;
             _mainLoaded = true;
             _mainSeg.Clear(); _mainCross.Clear();
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
                 string path = MapVillageData.DataPathFor(MapRoads.FileName);
@@ -255,6 +260,8 @@ namespace Armoury
                             + _mainCross.Count + " (>= 3 odnogi), zle wiersze " + bad;
             }
             catch (Exception e) { _mainSeg.Clear(); _mainCross.Clear(); _fileNote = "blad wczytania " + MapRoads.FileName + " (" + e.GetType().Name + ")"; Stumble("LoadMain", e); }
+            _loadMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            _fileNote += ", wczytanie " + _loadMs.ToString("0.0", Inv) + " ms";
             _netBuilt = false;
         }
 
@@ -287,6 +294,7 @@ namespace Armoury
             if (_netBuilt && ReferenceEquals(plan, _planRef)) return;
             _planRef = plan;
             _netBuilt = true;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             var seg = new List<float>(_mainSeg.Count + 4 * 32000);
             seg.AddRange(_mainSeg);
             var cross = new List<Cross>(_mainCross.Count + 2200);
@@ -320,13 +328,21 @@ namespace Armoury
                 for (int cx = x0; cx <= x1; cx++) for (int cy = y0; cy <= y1; cy++) AddCell(_segCells, Key(cx, cy), k);
             }
             for (int k = 0; k < _cross.Length; k++) AddCell(_crossCells, Key(CellOf(_cross[k].X), CellOf(_cross[k].Y)), k);
+            _netMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            _netBuilds++;
         }
 
         /// <summary>Przeszkody (osady gry, wioski na mapie, zajazdy) i wsie gry - raz na sesje, przy pierwszym uzyciu.</summary>
         private static void EnsureBlockers()
         {
-            if (_blkBuilt) return;
+            if (_blkBuilt)
+            {
+                // uklad wiosek doszedl po pierwszym uzyciu (wczesniej pusty) - przeszkody jeszcze raz, tylko wtedy
+                var lr = _blkMv > 0 ? null : VillageBook.LayoutRecords();
+                if (lr == null || lr.Count == 0) return;
+            }
             _blkBuilt = true;
+            _blkBuilds++;
             _blk.Clear(); _blkCells.Clear(); _villages.Clear();
             int st = 0, mv = 0, inns = 0;
             try
@@ -353,7 +369,8 @@ namespace Armoury
                 if (all != null) foreach (var inn in all) { if (inn == null) continue; AddBlk(inn.Bx, inn.By, 1.2f); inns++; }
             }
             catch (Exception e) { Stumble("Blockers.Inns", e); }
-            _blkNote = "osady " + st + ", wioski na mapie " + mv + ", zajazdy " + inns + ", wsie gry (okregi) " + _villages.Count;
+            _blkMv = mv;
+            _blkNote = "osady " + st + ", wioski na mapie " + mv + ", zajazdy " + inns + ", wsie gry (okregi) " + _villages.Count + (_blkBuilds > 1 ? " (budowane " + _blkBuilds + " razy)" : "");
         }
 
         private static void AddBlk(float x, float y, float r)
@@ -549,9 +566,9 @@ namespace Armoury
 
         private static void Raise(float bx, float by, bool hideout, double days, int bodies, int men, bool player, MapEvent me)
         {
-            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             EnsureNet();
             EnsureBlockers();
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             float px, py, yaw;
             int kind;
             bool ok = Pick(bx, by, hideout, out px, out py, out yaw, out kind);
@@ -617,7 +634,7 @@ namespace Armoury
                 for (int i = _active.Count - 1; i >= 0; i--)
                     if (_active[i].End <= now) { _active.RemoveAt(i); _dRemoved++; _aRemoved++; Version++; }
                 if (!LogGate.Lines) return;
-                int day = (int)now;
+                int day = (int)now - 1;   // doba zakonczona (jak linie drog i blota)
                 int k0 = 0, k1 = 0, k2 = 0, k3 = 0, hid = 0, b = 0;
                 var districts = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var e in _active)
@@ -634,6 +651,7 @@ namespace Armoury
                          + " (koniec czasu), pominiete: bez drogi " + _dNoRoad + ", bez pana (karawana / wozy) " + _dNoLaw + ", Nieumarli " + _dUndead
                          + " | wybor miejsca srednio " + (_pickN > 0 ? (_pickMs / _pickN).ToString("0.00", Inv) : "-") + " ms (" + _pickN + ")"
                          + " | siec: rozstaje traktu " + _mainCross.Count + ", drogi boczne " + _lanes + " (wloty do traktu " + _laneCross + ", rozwidlenia " + _laneFork + ")"
+                         + ", przebudowy " + _netBuilds + (_netBuilds > 0 ? " (ostatnia " + _netMs.ToString("0.0", Inv) + " ms)" : "")
                          + (_planRef == null ? " - plan drog bocznych niedostepny" : "") + "; przeszkody: " + _blkNote
                          + " | od wczytania: postawione " + _aPlaced + ", odnowione " + _aRefresh + ", zastapione " + _aReplaced + ", zdjete " + _aRemoved
                          + " | widok: obrazki postawione " + VCreated + ", zdjete " + VRemoved + ", pokazane najwiecej naraz " + VShownMax + ", pokaz/schowaj " + VShowDay + "/" + VHideDay
