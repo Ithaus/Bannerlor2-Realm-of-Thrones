@@ -1308,8 +1308,8 @@ namespace Armoury
             // Ironman Jeffa) = brak jarmarkow w toku (kalendarz otworzy nastepne); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P5HandelReset)
             try { string hf = dataStore.IsSaving ? HarvestFairs.Export() : null; if (!dataStore.IsSaving || hf != null) SaveText.Sync(dataStore, "arm_fairs", ref hf); if (dataStore.IsLoading) HarvestFairs.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_fairs", e); }
-            // p6-a7: pulapy kas miast robot z rak okregu ("th1|doba startu|id:H;..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis, kampania Jeffa) = start
-            // reguly od pierwszej doby z firmami DS po wczytaniu (H = kasa tej doby); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
+            // p6-a7: roboty miast z rak okregu ("th2|doba startu|pulap startu|S|doba S|id:zwrot,..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis,
+            // kampania Jeffa) = pomiar od pierwszej doby z firmami DS, start przy pierwszych przebudowach A7; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
             try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
             catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
         }
