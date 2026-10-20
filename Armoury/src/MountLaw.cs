@@ -104,8 +104,10 @@ namespace Armoury
             return mask;
         }
 
-        /// <summary>r2-konie: klucz CamelsOnlyQarth - wielblad tylko qartheen (wylaczony - takze aserai, jak dotad).</summary>
-        private static bool CamelsQarthOnly { get { var s = Settings.Current; return s != null && s.CamelsOnlyQarth; } }
+        /// <summary>r2-konie: klucz CamelsOnlyQarth - wielblad tylko qartheen (wylaczony - takze aserai, jak dotad). Recenzja: tylko gdy dziala
+        /// CamelLaw (nowa kampania, stadniny Dorne nie rodza wielbladow) - inaczej Dorne rodzi wielblady i dalej ich uzywa, jak dotad
+        /// (bez tego kazdy wielblad z Dorne jechalby przez pol mapy do Qarthu).</summary>
+        private static bool CamelsQarthOnly { get { var s = Settings.Current; return s != null && s.CamelsOnlyQarth && CamelLaw.On; } }
 
         /// <summary>Kultura, ktorej wielblad przysluguje (wolne od alokacji - porownania napisow).</summary>
         private static bool CamelCulture(string culture)

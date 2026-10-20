@@ -6240,7 +6240,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SandSteedsInDorne { get; set; } = true;
 
-        [SettingPropertyBool("Camels Only Qarth", HintText = "camels belong to Qarth alone: only the men of Qarth (and troops whose own kit has a camel) ride them and only the markets of Qarth keep them - Dorne rides its sand steeds (off = Dorne may ride and sell camels too, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Camels Only Qarth", HintText = "camels belong to Qarth alone: only the men of Qarth (and troops whose own kit has a camel) ride them and only the markets of Qarth keep them - Dorne rides its sand steeds; works together with Sand Steeds In Dorne in a new campaign (off, or an older campaign = Dorne may ride and sell camels too, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool CamelsOnlyQarth { get; set; } = true;
 
