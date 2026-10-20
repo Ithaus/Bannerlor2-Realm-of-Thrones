@@ -205,7 +205,45 @@ namespace Armoury
                     else if (m != null && decl == _finDecl) _finWired = true;
                 }
                 catch (Exception e) { _finWired = false; Stumble("EnsureHooks(model finansow)", e); }
+                // r4-wioska (prowadzacy): panel Finance ekranu rodu liczy "Total Income" z CalculateClanIncome (ClanManagementVM.RefreshDailyValues) - ta sama
+                // naleznosc dnia tylko do widoku, zeby przychod i "Daily Change" zgadzaly sie z podpowiedzia zlota
+                try
+                {
+                    var args = new[] { typeof(Clan), typeof(bool), typeof(bool), typeof(bool) };
+                    var any = fin.GetType().GetMethod("CalculateClanIncome", BindingFlags.Public | BindingFlags.Instance, null, args, null);
+                    var decl = any != null ? any.DeclaringType : null;
+                    var m = decl != null ? AccessTools.DeclaredMethod(decl, "CalculateClanIncome", args) : null;
+                    if (m != null && !m.IsAbstract && decl != _incDecl)
+                    {
+                        h.Patch(m, postfix: new HarmonyMethod(typeof(SideVillageFief), nameof(IncomeViewPostfix)) { priority = Priority.Last });
+                        _incDecl = decl; _incWired = true;
+                    }
+                    else if (m != null && decl == _incDecl) _incWired = true;
+                }
+                catch (Exception e) { _incWired = false; Stumble("EnsureHooks(przychod rodu)", e); }
             }
+        }
+
+        private static Type _incDecl;
+        private static bool _incWired;
+
+        /// <summary>r4-wioska (prowadzacy): postfiks CalculateClanIncome czynnego modelu - rod gracza, BEZ pobrania (applyWithdrawals = false): naleznosc dnia wioski
+        /// (ta sama co w podpowiedzi zlota). Tylko widok: pieniadze ida z Pay w OnDailyTick; dzienny przelew gry idzie przez CalculateClanGoldChange z pobraniem,
+        /// nie przez ta metode, wiec nie ma podwojnej wyplaty.</summary>
+        public static void IncomeViewPostfix(object __instance, Clan __0, bool __1, bool __2, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (__2 || __0 == null || !HasFief || !ReferenceEquals(__0, Clan.PlayerClan)) return;
+                var s = Settings.Current;
+                if (s == null || !s.SideVillageFiefIncome || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
+                string why; long due;
+                float x = Expect(out why, out due);
+                if (x < 1f) return;
+                if (_tipTxt == null || !ReferenceEquals(_tipName, _name)) { _tipName = _name; _tipTxt = new TextObject("{=!}" + (_name ?? "?") + " (your side village: its share of the lord's tax)"); }
+                __result.Add(x, _tipTxt);
+            }
+            catch (Exception e) { Stumble("IncomeViewPostfix", e); }
         }
 
         private static MethodInfo _vmOption;

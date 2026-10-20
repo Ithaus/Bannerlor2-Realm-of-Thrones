@@ -117,3 +117,12 @@ gracza 0".
    lord's tax is not known today.", w logu "stawka pana nieznana").
 5. Podstawa od wartosci, nie od utargu: x H okregu (`DistrictWorks.HandedRatio` = HOf, ta sama liczba co okno prac), w linii doby "x H h".
 6. T11 obiecywal za duzo: warunek takze `SideVillageFiefUi.State` = "wstawka ..." (przy kluczu WL), stan w szczegolach testu; wyglad - tylko recznie.
+
+## Dopisek prowadzacego (20.10 ok. 03:20): przychod w panelu Finance ekranu rodu
+- Panel Finance ekranu rodu (ClanManagementVM.RefreshDailyValues) liczy "Total Income" z ClanFinanceModel.CalculateClanIncome (bez opisow, bez pobrania) - z sama
+  podpowiedzia zlota Jeff dalej widzialby tam przychod 0. Dodany IncomeViewPostfix na CalculateClanIncome czynnego modelu (ROTClanFinanceModel; cel przez
+  DeclaringType jak przy podpowiedzi), te same warunki: rod gracza, applyWithdrawals = false, instancja = czynny model, klucz SideVillageFiefIncome - ta sama
+  naleznosc dnia (Expect). Tylko widok. Bez podwojnej wyplaty: dzienny przelew gry idzie przez CalculateClanGoldChange(applyWithdrawals = true) i
+  CalculateClanIncomeInternal (DefaultClanFinanceModel), ROTClanFinanceModel.CalculateClanGoldChange wola _previousModel.CalculateClanGoldChange, nie swoje
+  CalculateClanIncome - podpowiedz zlota nie liczy wioski drugi raz (sprawdzone w dekompilacji 1.4.8 i ROT.dll).
+
