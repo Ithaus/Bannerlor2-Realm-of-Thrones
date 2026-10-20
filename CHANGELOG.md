@@ -23,7 +23,8 @@ oraz "napraw ten crash i poraw te 142 funkcje w grze". Plan: docs/PLAN-NOC-2026-
 Dodatkowo: A7 (Ks Switch Signal Rule) przetestowane osobno (fin103) - regula OK, ale kasy miast rosna 2x -> zostaje WYLACZONE; NKA-1 / NAKUM-7 z biegow x20 = artefakt tempa (fin102 x8).
 **Ryzyko / co sprawdzic:** UnwindRepair pisze do kodu w pamieci (tylko przy dokladnym wzorcu, inaczej pomija) - linia "Opis stosu (UW, menu)"; niewola sprawdzona tylko w kodzie
 (autotest nie doprowadzil do niewoli); start "Indebted Lord" sprawdzony furtka autotestu (nie przez kreator postaci); zold rodu gracza zmienia sie od razu po wczytaniu.
-**Status:** DO SPRAWDZENIA - testy i wgranie w STAN-PRAC ### 94.
+**Testy:** n20b 5 dob + 4 bitwy x20 (Armoury-2026-10-19_19-16-27.log) kod 0, 4/4 bitwy, 0 ERROR naszych; UW: 44 metody nachodzace - 44 naprawione, 0 pominietych, OnApplicationTick/AfterAsyncTickTick/OnNetworkTick naprawione; wioska gracza test 10/10; n20b-160 (160 dob x8, Armoury-2026-10-19_19-25-02.log) kod 0, 22 x ERROR CAUGHT FURTHER UP (jak baza), 0 ERROR w logu Armoury, 0 zawieszen, czyste wyjscie gry; porownanie 119 grup z fin102 (88, x8): 16 nowych NIE/ETAP - zmiennosc biegu (ruda/wegiel, NKA-1, LN-8 ...) albo nowy pomiar (ZC1-4o aksamit 32% < 50%), NZC6-5 do drugiego biegu (n20c).
+**Status:** WGRANE 89 (19.10 ok. 20:15 PDT; Armoury 870557da, CrashScribe 2e6a801e, RealisticCaptivity e55869a2; GT/ForgeView bez zmian) - DO SPRAWDZENIA w grze Jeffa.
 
 ## 2026-10-19 (WGRANIE 88 - Jeff: "TAK NAPRAW TERAZ" (zadania, Lotrostwo) i arakhy u wojsk Westeros)
 
