@@ -42,3 +42,6 @@ Test: CrashScribe-at = zb/n22-at + git merge n25 HEAD, build CrashScribe; katalo
 - Kazda zmiana pod kluczem MCM; Armoury.json Jeffa nadpisuje domyslne (sprawdzic klucze przy wgraniu).
 - Bash heredoc gubi backslashe w pythonie - sciezki przez chr(92). Workflow - skrypty bez CR.
 - Limity: pauza przy 90% 5 h; tydzien do ok. 97-99%, potem zaktualizowac TEN plik i STAN-PRAC i zakonczyc.
+
+## Dopisek 17:45
+- Obroncy wiosek pobocznych (Jeff): krok 2 po m97-wioski - obroncy z milicji wsi glownej, napad = bitwa z tymczasowym oddzialem, polegli z milicji, bez stalych partii.
