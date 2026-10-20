@@ -52,6 +52,7 @@ namespace Armoury
                         state = "STOI " + (sd + 1) + " dni";
                     }
                     else { _stuckDays.Remove(key); going++; state = "idzie +" + (had ? (prog - prev).ToString("0.#") : "?"); }
+                    if (BuildFunding.OneWaiting(st)) state += " (w kolejce rodu - R3-11a)";   // przydzial pana poszedl dzis na inna budowe rodu
                     _sig[key] = sig; _last[key] = prog;
                     power += pw;
                     int daysLeft = pw > 0.01f && cost > 0 ? (int)Math.Ceiling((cost - prog) / pw) : -1;
@@ -60,7 +61,7 @@ namespace Armoury
                 }
                 foreach (var l in lines) Log.Info("Budowa: dzien " + day + " - " + l);
                 Log.Info("Budowy: dzien " + day + " - osad " + towns + ": w budowie " + (going + stuck + done) + " (idzie " + going + ", stoi " + stuck + ", ukonczonych poziomow " + done
-                         + "), bez budowy " + idle + "; srednia moc " + (going + stuck + done > 0 ? (power / (going + stuck + done)).ToString("0.#") : "-") + " pkt/dzien.");
+                         + "), bez budowy " + idle + ", w kolejce rodu (R3-11a) " + BuildFunding.OneWaitingCount + "; srednia moc " + (going + stuck + done > 0 ? (power / (going + stuck + done)).ToString("0.#") : "-") + " pkt/dzien.");
             }
             catch (Exception e) { Log.Error("BuildDiary", e); }
         }
