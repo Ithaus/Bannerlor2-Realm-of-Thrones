@@ -596,7 +596,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool CraftResultPopup { get; set; } = true;
 
-        [SettingPropertyBool("Short Button Labels", HintText = "short text on this mod's menu buttons and in its pick-one windows (investing in the district's works, inn beds, the forge, Qohor, the order ledger, raids): one line that fits the button; prices, sums and explanations move into the tooltip you see when you point at it. Menu buttons change after loading a save, window rows at once. Off = the old long text on the buttons", RequireRestart = false)]
+        [SettingPropertyBool("Short Button Labels", HintText = "short text on this mod's menu buttons and in its pick-one windows (investing in the district's works, inn beds, the forge, Qohor, the order ledger, the muster book, raids): one line that fits the button; prices, sums and explanations move into the tooltip you see when you point at it. Most menu buttons change after loading a save; inn beds and window rows change at once. Off = the old long text on the buttons", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool ShortButtonLabels { get; set; } = true;
 

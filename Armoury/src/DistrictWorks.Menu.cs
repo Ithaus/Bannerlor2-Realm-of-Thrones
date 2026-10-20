@@ -155,8 +155,9 @@ namespace Armoury
                                    + Math.Round(100 * q.ShareDist).ToString("0", Inv) + "%";
                     if (q.Allowed) title += " - full kit " + Math.Round(q.KitPer * q.S).ToString("N0", Inv) + " - first coins about " + Math.Round(100 * ret).ToString("0", Inv) + "% a year" + (q.Main ? ", burns last" : "");
                     else title += " - " + q.Why;
-                    // n20-napisy: na przycisku wioska, zajecie i zysk pierwszych monet (albo "closed"); reszta dawnego napisu na gorze podpowiedzi
-                    string shortTitle = (q.Name ?? "?") + " - " + (m != null ? m.Name : "?") + (q.Allowed ? " - " + Math.Round(100 * ret).ToString("0", Inv) + "% a year" : " - closed");
+                    // n20-napisy: na przycisku wioska, zajecie i zysk pierwszych monet (albo "closed"); reszta dawnego napisu na gorze podpowiedzi;
+                    // recenzja: "up to" - to zysk krancowy pierwszych monet (najwyzszy), nie calej wplaty
+                    string shortTitle = (q.Name ?? "?") + " - " + (m != null ? m.Name : "?") + (q.Allowed ? " - up to " + Math.Round(100 * ret).ToString("0", Inv) + "% a year" : " - closed");
                     string moved = (q.Main ? "Main village" : place.Length > 0 ? "Side village, " + place : "Side village") + ": " + Math.Round(q.N) + " homesteads, "
                                    + Math.Round(100 * q.ShareDist).ToString("0", Inv) + "% of the district."
                                    + (q.Allowed ? " Full kit " + Math.Round(q.KitPer * q.S).ToString("N0", Inv) + "; the first coins earn about " + Math.Round(100 * ret).ToString("0", Inv) + "% a year"
@@ -280,7 +281,8 @@ namespace Armoury
                     else if (k > q.Room + 0.5) why = "There is room for " + Math.Floor(q.Room).ToString("N0", Inv) + " more";
                     else if (k < min) why = "At least " + min.ToString("N0", Inv);
                     // n20-napisy: na przycisku kwota i dochod; przyrost towaru, rok i udzial w podpowiedzi (przy kwocie niedostepnej powod na gorze)
-                    string tag = a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? " (all)" : a.Value == " (full kit)" ? " (full kit)" : " (best buy)";
+                    // recenzja: kwota "still 12% on the last coin" to najwiecej przy 12% na ostatniej monecie, nie "najlepszy zakup" (mniejsze kwoty maja wyzszy procent)
+                    string tag = a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? " (all)" : a.Value == " (full kit)" ? " (full kit)" : " (last coin 12%)";
                     string shortText = k.ToString("N0", Inv) + tag + " - " + inc.ToString("0.0", Inv) + " a day (" + Math.Round(100 * inc * 364 / Math.Max(1, k)) + "% a year)";
                     string details = (a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? "All the gold you have. " : a.Value == " (full kit)" ? "Enough for the full kit. "
                                       : "The most that still earns 12% a year on the last coin. ")

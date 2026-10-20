@@ -1582,7 +1582,9 @@ namespace Armoury
                 if (elements.Count == 0) { Log.Player("The men need nothing - there is no one to outfit.", true); return; }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
-                    "The Order Ledger", "What shall the smith procure for the men? Racks / need counts what the armoury holds against what they carry.",
+                    // n20-napisy (recenzja): opis zgodny z nowym zapisem wierszy "X: 12 of 100"
+                    "The Order Ledger", ShortLabels.Pick("What shall the smith procure for the men? \"12 of 100\" is what the armoury holds of what the men need.",
+                                                         "What shall the smith procure for the men? Racks / need counts what the armoury holds against what they carry."),
                     elements, true, 1, 1, "Choose", "Leave",
                     delegate (List<InquiryElement> sel)
                     {

@@ -50,18 +50,21 @@ Opcje menu gry (403 px):
 Okna wyboru (wiersz 419 px, z obrazkiem 333 px; najwyzej 2 linie):
 | okno | przed | po | do podpowiedzi |
 |---|---|---|---|
-| Works in the X district (inwestowanie, okno 1) | `Ironrath (main village) - fish - 30 homesteads, 45% - full kit 12,345 - first coins about 25% a year, burns last` (ok. 1090) | `Ironrath - fish - 25% a year` (zamknieta: `Ironrath - fish - closed`) | `Main village: 30 homesteads, 45% of the district. Full kit 12,345; the first coins earn about 25% a year; burns last.` + dawna podpowiedz (z powodem zamkniecia) |
+| Works in the X district (inwestowanie, okno 1) | `Ironrath (main village) - fish - 30 homesteads, 45% - full kit 12,345 - first coins about 25% a year, burns last` (ok. 1090) | `Ironrath - fish - up to 25% a year` (zamknieta: `Ironrath - fish - closed`; "up to" - to zysk pierwszych monet, recenzja) | `Main village: 30 homesteads, 45% of the district. Full kit 12,345; the first coins earn about 25% a year; burns last.` + dawna podpowiedz (z powodem zamkniecia) |
 | j.w. odbudowa | `Rebuild your ploughs in X: 1,500 (by day 812)` | `Rebuild ploughs in X: 1,500` | `Rebuild by day 812.` |
 | j.w. przelacznik | `Automatic rebuilding: ON - click to switch off` | `Automatic rebuilding: ON` | `Choose it to switch it off.` |
-| X - rodzaj prac (inwestowanie, okno 2, kwoty) | `1,000 (still 12% on the last coin) - +12.3% fish - about 3.4 a day (1,234 a year, 12%) - 5.6% of its fish yours` (ok. 700) | `1,000 (best buy) - 3.4 a day (12% a year)`; dopiski `(all)`, `(full kit)` | wyjasnienie dopisku, `+12.3% fish in X. About 3.4 a day, 1,234 a year (12% of what you pay). 5.6% of its fish yours.`; przy kwocie niedostepnej powod na gorze |
+| X - rodzaj prac (inwestowanie, okno 2, kwoty) | `1,000 (still 12% on the last coin) - +12.3% fish - about 3.4 a day (1,234 a year, 12%) - 5.6% of its fish yours` (ok. 700) | `1,000 (last coin 12%) - 3.4 a day (12% a year)` (dawniej w tej galezi `(best buy)` - poprawione po recenzji); dopiski `(all)`, `(full kit)` | wyjasnienie dopisku, `+12.3% fish in X. About 3.4 a day, 1,234 a year (12% of what you pay). 5.6% of its fish yours.`; przy kwocie niedostepnej powod na gorze |
 | The Order Ledger - tiery ze straganu | `Tier 3 - X, 1234 gold off the stall (5 on the stalls)` | `Tier 3 - X, 1234 gold` | `1234 gold off the stall, 5 on the stalls.` |
 | j.w. brak | `Tier 3 - none on the stalls of King's Landing` | `Tier 3 - none on the stalls` | (miasto bylo juz w podpowiedzi) |
 | X (tier N) off the stalls - ilosc | `10 x BodyArmor (tier 3) - 1234 gold  (only 5 on the stalls)  (fills the shortage)` | `10 pieces - 1234 gold (only 5)` | `Fills the shortage.` (reszta byla w podpowiedzi) |
 | The Order Ledger - tiery (bez straganu) | `Tier 3 - X, 1234 gold apiece` | `Tier 3 - X, 1234 gold` | `1234 gold apiece.` |
 | X - ilosc (bez straganu) | `10 x X - 1234 gold  (fills the shortage)` | `10 pieces - 1234 gold` | `Fills the shortage.` |
 | The Order Ledger - rodzaje | `HorseHarness   (racks 12 / need 100)  - SHORT 88` | `HorseHarness: 12 of 100 - short 88` | `On the racks 12, the men need 100.` |
+| The Order Ledger - tekst okna (nie przycisk) | `... Racks / need counts what the armoury holds against what they carry.` | `... "12 of 100" is what the armoury holds of what the men need.` | - (opis zgodny z nowym zapisem wierszy, recenzja) |
 | At the Anvil (luki/kusze/amunicja) | `LEGEND - X   (tier 6)  - needs Smithing 250` / `- pattern unknown` | `LEGEND - X (t6) - Smithing 250` / `- unknown` | (pelne zdania byly juz w podpowiedzi) |
 | Town/Castle purse (BEE) | `Pay 5000 gold - <powod>` | `Pay 5000 gold` | (powod byl juz w podpowiedzi) |
+| The Masters of Qohor - "Take back your blade" (obrazek, 333 px; recenzja) | `Ice into Valyrian Steel Sword type 3 and Valyrian Steel Sword type 7 - 12 day(s) left` (734 px, 3 linie) | `Ice - 12 days left` (najdluzszy `Valyrian Steel Sword Blue - 120 days left`, 2 linie) | `Ice into Valyrian Steel Sword type 3 and Valyrian Steel Sword type 7.` nad `The fee of N gold is not returned.` |
+| Muster book - wybor sztuki z obrazkiem (333 px; sprawdzone po recenzji) | `Northern Saddle with Steel Faceguard  x12/100  (t6)  [YOUR BAGGAGE]` / `...  [WORN BY YOU]` (3 linie) | `Northern Saddle with Steel Faceguard x12/100 (t6) [BAGGAGE]` / `... [WORN]` (2 linie) | ("In YOUR baggage..." / "You wear this now..." byly juz w podpowiedzi) |
 
 Przyciski zwyklych okien (164 px):
 | okno | przed | po | dawny napis idzie do |
@@ -71,7 +74,11 @@ Przyciski zwyklych okien (164 px):
 
 Bez zmian (zmierzone, mieszcza sie): pozostale opcje menu Armoury, RealisticCaptivity, GrandTourney (najdluzsza `Have a blade reforged in a new form` 327 px),
 przyciski okien (najdluzsze RC `I accept the debt` / `I would rather rot` 160 px z 164 - na granicy, zostaja), wiersze z nazwami przedmiotow/oddzialow
-(MusterBook, Orders, kuznia - najwyzej 2 linie). Ramka plotek w gospodach nieruszana (zadanie "plotki"). CrashScribe i ForgeView bez zmian.
+- po recenzji sprawdzone na WSZYSTKICH nazwach ROT (1503 przedmioty z ROT-Content/ROT-Core, z modyfikatorami z ich grupy `modifier_group`, 1380 oddzialow),
+lamanie po slowach przy 333 px (z obrazkiem): kuznia - naprawa `[EQUIPPED]`/`[STORES] ... x120` 0 wierszy ponad 2 linie, kuznia luki/kusze `LEGEND - ... (t6) - Smithing 250` 0,
+muster book - oddzialy `[Horse archers t5] ... x120` 0 (najszerszy `Golden Company Aurum Spearbearers` 2 linie), sloty `Horse harness: ... [ASSIGNED]` 0,
+Qohor - wybor klingi `... (Masterwork)  x2` 0. Jedyne wyjatki byly w Qohor "Take back" (wszystkie zlecenia) i muster book `[YOUR BAGGAGE]`/`[WORN BY YOU]`
+(1 nazwa: `Northern Saddle with Steel Faceguard`) - oba skrocone wyzej. Ramka plotek w gospodach nieruszana (zadanie "plotki"). CrashScribe i ForgeView bez zmian.
 
 **Ryzyko / co sprawdzic:**
 - Regresje: zmieniaja sie tylko napisy i podpowiedzi; identyfikatory opcji, indeksy, warunki (owiniete 1:1, wynik i IsEnabled z dawnego warunku),
@@ -91,7 +98,10 @@ przyciski okien (najdluzsze RC `I accept the debt` / `I would rather rot` 160 px
 - Regula napisu: stala opcja menu do ok. 85% z 403 px (jedna linia z zapasem); wiersz okna - jedna linia, gdy nazwy sa typowe, najwyzej 2 przy dlugich
   nazwach wiosek/przedmiotow (tych nie skracam - to nazwy wlasne).
 - Na przycisku zostaje to, co rozni opcje miedzy soba (kwota, dochod dzienny, procent na rok, suma noclegu); wszystko inne do podpowiedzi.
-- Kwota "still 12% on the last coin" nazwana na przycisku `(best buy)`, z wyjasnieniem w podpowiedzi ("The most that still earns 12% a year on the last coin.").
+- Kwota "still 12% on the last coin" nazwana na przycisku `(last coin 12%)` (po recenzji; wczesniej `(best buy)` - mylace, bo mniejsze kwoty maja wyzszy procent),
+  z wyjasnieniem w podpowiedzi ("The most that still earns 12% a year on the last coin."). Okno okregu: `up to N% a year` - zysk pierwszych monet, nie calej wplaty.
+- Klucz Short Button Labels zostaje w grupie MCM "The finished piece" (Armoury) - przeniesienie do innej grupy = przesuniecie pola w Settings.cs i wiekszy konflikt
+  przy scalaniu 12 galezi; w raporcie dla Jeffa podane, gdzie go szukac.
 - RealisticCaptivity i GrandTourney bez zmian (nic nie przekracza szerokosci) - wiec bez nowych kluczy w tych modach.
 
 ### Test w grze
@@ -101,4 +111,27 @@ przyciski okien (najdluzsze RC `I accept the debt` / `I would rather rot` 160 px
   Brak `ERROR ShortLabels.Audit`.
 - Na oko (Jeff albo reczny test): wies -> "Invest in the district's works" (wiersze w jednej linii, podpowiedz z danymi), wybor czesci -> kwoty;
   miasto -> "Take lodgings at an inn" (3 opcje w jednej linii, podpowiedz z rozbiciem kosztow); kuznia -> "Work the forge" i "The mending bench".
+  Qohor (ze zleceniem w toku) -> "Take back your blade": wiersz `<klinga> - N days left`, w podpowiedzi `X into Y.` i oplata;
+  muster book -> oddzial -> slot: wiersze sztuk z taboru `[BAGGAGE]`, zalozonych `[WORN]` (najwyzej 2 linie).
 - Specjalny plik/flaga: nie.
+
+### Recenzja (HEAD b8933d91) - co sprawdzone i co zrobione
+- **Wazne - Qohor "Take back your blade" 3 linie przy ramce na 2: PRAWDA.** Sprawdzone w kodzie (`QohorMasters.TakeBack`: `Describe(o)` = "X and ... into Y and Z")
+  i na nazwach ROT (`Valyrian Steel Sword type 2..8`, `Blue`, `Red`; pomiar FiraSansExtraCondensed 25, lamanie po slowach przy 333 px: 658-734 px = 3 linie).
+  Poprawione: przy kluczu wiersz `<pierwsza klinga> - N days left` (`1 day left` dla 1), pelne "X into Y and Z." na gorze podpowiedzi nad zdaniem o oplacie;
+  bez klucza dawny napis 1:1. Identyfikator wiersza (Order), obrazek i skutek wyboru bez zmian. Przy okazji sprawdzone WSZYSTKIE wiersze z obrazkiem
+  na pelnych spisach nazw ROT (wyzej, "Bez zmian") - znaleziony drugi przypadek: muster book `[YOUR BAGGAGE]`/`[WORN BY YOU]` z 1 nazwa (siodlo
+  `Northern Saddle with Steel Faceguard`) - skrocone dopiski `[BAGGAGE]`/`[WORN]` przy kluczu (podpowiedzi juz to tlumaczyly). Zdanie o "najwyzej 2 liniach" poprawione.
+- **Drobne - "25% a year" bez "first coins" i mylace "(best buy)": PRAWDA** (`ret` to zysk krancowy pierwszych monet; kwota z dopiskiem to najwiecej przy 12%
+  na ostatniej monecie). Poprawione: `up to 25% a year` i `(last coin 12%)`; podpowiedzi bez zmian (juz mowily prawde). Szerokosc: `1,000 (last coin 12%) - 3.4 a day (12% a year)`
+  390 px z 419 (1 linia), najdluzsza nazwa wioski ROT z najdluzszym zajeciem - 2 linie.
+- **Drobne - opis "The Order Ledger" tlumaczyl dawny zapis "Racks / need": PRAWDA.** Przy kluczu opis `"12 of 100" is what the armoury holds of what the men need.`
+  (ShortLabels.Pick), bez klucza dawny.
+- **Drobne - opis klucza MCM: PRAWDA** (nocleg w karczmie/zajezdzie liczony na zywo w `QCondition` - zmienia sie od razu). HintText: `Most menu buttons change after
+  loading a save; inn beds and window rows change at once.` + `the muster book` na liscie. gen_mcm uruchomiony (Armoury 2013 ustawien, RC/GT bez zmian).
+  Grupa MCM bez zmian (decyzja wyzej).
+- **Drobne - linia kontrolna nie mierzy wierszy okien: prawda, NIE zmieniane.** Autotest (5 dob + bitwa / 160 dob) nie otwiera okien wyboru (nikt nie klika),
+  wiec licznik w `Pick` pokazalby 0 - nic by nie dowiodl. Szerokosc wierszy sprawdzona zamiast tego na pelnych spisach nazw ROT (metryki .fnt gry, skrypty
+  pomiaru w `scratchpad/zb/n20-napisy-tmp`: `miara.py`, `linie.py`, `wiersze_mb.py`, `mody.py`). Okna zostaja do sprawdzenia na oko (Test w grze).
+- md5 DLL inne niz u autora: przyczyna nieustalona (recenzent budowal sam, mozliwie z innego katalogu albo stanu plikow); md5 i tak zmienia sie z kazda poprawka -
+  dla wgrania liczy sie build z tego HEAD: kod wyjscia 0 i 0 Error(s) (md5 ponizej, w raporcie).

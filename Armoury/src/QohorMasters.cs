@@ -445,8 +445,14 @@ namespace Armoury
             {
                 var run = PlayerOrders().Where(o => !o.Ready).ToList();
                 if (run.Count == 0) return;
-                var els = run.Select(o => new InquiryElement(o, Describe(o) + " - " + o.DaysLeft + " day(s) left", SmithMenu.ItemPic(ValyrianBlades.Item(o.InIds[0])), true,
-                                                             "The fee of " + o.Fee + " gold is not returned.")).ToList();
+                // n20-napisy (recenzja): wiersz z obrazkiem ma 333 px i najwyzej 2 linie - "X into Y and Z" z nazwami ROT mialo 3 linie;
+                // na przycisku klinga oddana mistrzom i dni, pelny opis zlecenia na gorze podpowiedzi
+                var els = run.Select(o => new InquiryElement(o,
+                                                             ShortLabels.Pick(NameOf(o.InIds[0]) + (o.InIds.Count > 1 ? " +" + (o.InIds.Count - 1) : "") + " - "
+                                                                              + (o.DaysLeft == 1 ? "1 day left" : o.DaysLeft + " days left"),
+                                                                              Describe(o) + " - " + o.DaysLeft + " day(s) left"),
+                                                             SmithMenu.ItemPic(ValyrianBlades.Item(o.InIds[0])), true,
+                                                             ShortLabels.Hint(Describe(o) + ".", "The fee of " + o.Fee + " gold is not returned."))).ToList();
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "The Masters of Qohor", "Which blade do you take back as it was?", els, true, 1, 1, "Take it back", "Leave it with them",
                     delegate (List<InquiryElement> sel)
