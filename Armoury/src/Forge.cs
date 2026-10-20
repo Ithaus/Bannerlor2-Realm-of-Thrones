@@ -550,6 +550,7 @@ namespace Armoury
             why = null;
             try
             {
+                if (PatternGate.RareStuff(item)) { why = PatternGate.RareWhy; return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - obie drogi kucia i menu kowala
                 if (!Recipes.IsLegendary(item)) return true;
                 // OPANOWANY WZOR UNIKATU (Jeff 30.08: "moge kuc wiecej niz
                 // jeden, jak juz opanuje") - legendarny KOSZT zostaje

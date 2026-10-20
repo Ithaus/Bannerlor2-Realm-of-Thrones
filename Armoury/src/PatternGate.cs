@@ -19,7 +19,13 @@ namespace Armoury
     ///     (lyanna_armor, loras_*...) zamkniete na zawsze, bo Teachable (NotMerchandise) i UniqueGear.Is - obie drogi - je odrzucaly.
     ///  4. KAFELEK CRAFT (PatternTileShowsSkill): BlockText dla ForgeView - "znany, ale za trudny" (prog i jedyna legenda),
     ///     ta sama regula co Forge.Smith / ArmourQuality.Begin / brama tarcz.
-    /// Wszystko na watku glownym (UI i kampania), bez alokacji w petlach listy (prog z pamieci podrecznej na kampanie).
+    ///  5. (po recenzjach) KUSZA WEDLUG SILY W KSIEDZE (XbowPatternTierByPower): tier wzoru kuszy = tier, o ktory kuznia pyta Smithing
+    ///     (XbowPrice.ForgeTier - luk tej samej sily, XbowForgeEquivTier). Log Jeffa 13-28-19 "Kusze wedlug luku": crossbow_g/d/e t1->t6,
+    ///     c t1->t5, b t1->t3, a t1->t2, f t2->t6 - szesc z nich rozdawane jako tier 1 i znane od dnia 1, jak Ravens' Teeth.
+    ///  6. (po recenzjach) LUKI Z RZADKIEGO MATERIALU (RareBowsNotForged): czardrzewo, smocza kosc, zlotoserce, luk olbrzyma, strzaly
+    ///     Ravens' Teeth - wycenione jak skonczony zasob (HistExoticBows, np. ravens_teeth_longbow 5000 d), a kwit kuzni to drewno i kilka
+    ///     sztabek; nie ma wzoru, kowadlo odmawia (Forge.LegendAllowed - wspolna brama obu drog kucia), kafelek mowi dlaczego.
+    /// Wszystko na watku glownym (UI i kampania), bez alokacji w petlach listy (prog z pamieci podrecznej na sesje i ustawienia).
     /// </summary>
     internal static class PatternGate
     {
@@ -28,6 +34,48 @@ namespace Armoury
         internal static bool ShieldOn { get { var s = S; return s != null && s.ShieldCraftSkillGate; } }
         internal static bool UniquesOn { get { var s = S; return s != null && s.ForgeUniquesByStudy; } }
         internal static bool TileOn { get { var s = S; return s != null && s.PatternTileShowsSkill; } }
+        internal static bool XbowTierOn { get { var s = S; return s != null && s.XbowPatternTierByPower; } }
+
+        // ------------------------------------------------------------ 5. tier wzoru kuszy wedlug sily
+        /// <summary>Tier wzoru (ksiega, rozdanie, losowanie, etykieta): kusza - tier, o ktory kuznia pyta Smithing (XbowPrice.ForgeTier, 0 = brak
+        /// przeliczenia albo XbowForgeEquivTier NIE), reszta - tier gry (Recipes.Grade). Klucz wylaczony: tier gry jak dotad.</summary>
+        internal static int LoreTier(ItemObject it)
+        {
+            int g = Recipes.Grade(it);
+            if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Crossbow || !XbowTierOn) return g;
+            int f = XbowPrice.ForgeTier(it);
+            if (f > g) return f > 6 ? 6 : f;
+            return g;
+        }
+
+        // ------------------------------------------------------------ 6. luki z rzadkiego materialu
+        internal const string RareWhy = "No smith can make this any more - the stuff it is made of cannot be had. Only the ones already in the world remain.";
+        private static readonly HashSet<string> _rare = new HashSet<string>(StringComparer.Ordinal);
+        private static string _rareFrom;
+
+        /// <summary>Przedmiot z listy RareBowsIds przy kluczu RareBowsNotForged (lista z ustawien, przeliczana tylko przy zmianie napisu).</summary>
+        internal static bool RareStuff(ItemObject it)
+        {
+            try
+            {
+                if (it == null || it.StringId == null) return false;
+                var s = S;
+                string src = s != null && s.RareBowsNotForged ? s.RareBowsIds : null;
+                if (string.IsNullOrEmpty(src)) return false;
+                if (!ReferenceEquals(src, _rareFrom))
+                {
+                    _rare.Clear();
+                    foreach (var id in src.Split(','))
+                    {
+                        var t = id.Trim();
+                        if (t.Length > 0) _rare.Add(t);
+                    }
+                    _rareFrom = src;
+                }
+                return _rare.Contains(it.StringId);
+            }
+            catch { return false; }
+        }
 
         // liczniki od startu sesji (linia LoreSeedFix + linia doby nie jest potrzebna - zdarzenia rzadkie, kazde z wlasna linia do 20 sztuk)
         internal static int Draws, DrawsCapped, ShieldRefused, ShieldPassed, Stumbles;
@@ -161,13 +209,17 @@ namespace Armoury
         // ------------------------------------------------------------ 4. kafelek CRAFT (ForgeView przez refleksje)
         private static readonly Dictionary<ItemObject, int> _need = new Dictionary<ItemObject, int>();
         private static Campaign _needFor;
+        private static long _needStamp = -1;
         private static readonly Dictionary<int, string> _needText = new Dictionary<int, string>();
 
-        /// <summary>Prog umiejetnosci wzoru (Recipes.For().SkillNeeded, z legenda i kusza wedlug luku) - raz na kampanie na sztuke.</summary>
+        /// <summary>Prog umiejetnosci wzoru (Recipes.For().SkillNeeded, z legenda i kusza wedlug luku) - raz na sztuke w sesji; pamiec od nowa przy
+        /// innej kampanii albo zmianie w MCM ustawien, z ktorych liczy sie prog (SmithingSkillPerTier, LegendarySkillNeeded, XbowForgeEquivTier).</summary>
         private static int NeedOf(ItemObject item)
         {
             var c = Campaign.Current;
-            if (!ReferenceEquals(c, _needFor)) { _need.Clear(); _needFor = c; }
+            var s = S;
+            long stamp = s == null ? 0 : ((long)s.SmithingSkillPerTier * 100000L + (long)s.LegendarySkillNeeded * 10L + (s.XbowForgeEquivTier ? 1L : 0L));
+            if (!ReferenceEquals(c, _needFor) || stamp != _needStamp) { _need.Clear(); _needFor = c; _needStamp = stamp; }
             int n;
             if (_need.TryGetValue(item, out n)) return n;
             n = Recipes.For(item).SkillNeeded;
@@ -185,6 +237,7 @@ namespace Armoury
             try
             {
                 if (!TileOn || item == null) return null;
+                if (RareStuff(item)) return "RARE STUFF - CANNOT BE FORGED";   // po recenzjach: takze bez wzoru - kafelek nie obiecuje nauki
                 if (!RangedLore.KnownOf(item)) return null;   // nieznany - zostaje "PATTERN NOT LEARNED"
                 bool ranged = FletchForge.RangedType(item);
                 bool gated = ranged
@@ -208,7 +261,30 @@ namespace Armoury
         internal static string Keys()
         {
             return "losowanie wg reki " + (DrawOn ? "TAK" : "NIE") + ", prog tarcz w CRAFT " + (ShieldOn ? (ArmourQuality.CraftOn ? "TAK" : "TAK (uspiony - CraftOn NIE)") : "NIE")
-                   + ", unikaty ROT tylko z oryginalu " + (UniquesOn ? "TAK" : "NIE") + ", kafelek z progiem " + (TileOn ? "TAK" : "NIE");
+                   + ", unikaty ROT tylko z oryginalu " + (UniquesOn ? "TAK" : "NIE") + ", kafelek z progiem " + (TileOn ? "TAK" : "NIE")
+                   + ", kusza wedlug sily w ksiedze " + (XbowTierOn ? (XbowPrice.Active ? "TAK" : "TAK (uspiony - kusze nie przeliczone w tej sesji)") : "NIE")
+                   + ", rzadki material bez kucia " + RareCount();
+        }
+
+        /// <summary>Do linii startu: ile przedmiotow z listy RareBowsIds istnieje w grze (0 = lista pusta albo nieznane id).</summary>
+        private static string RareCount()
+        {
+            try
+            {
+                var s = S;
+                if (s == null || !s.RareBowsNotForged) return "NIE";
+                if (string.IsNullOrEmpty(s.RareBowsIds)) return "TAK (lista pusta)";
+                int n = 0, all = 0;
+                foreach (var id in s.RareBowsIds.Split(','))
+                {
+                    var t = id.Trim();
+                    if (t.Length == 0) continue;
+                    all++;
+                    if (TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(t) != null) n++;
+                }
+                return "TAK (" + n + " z " + all + " id w grze)";
+            }
+            catch { return "?"; }
         }
     }
 }

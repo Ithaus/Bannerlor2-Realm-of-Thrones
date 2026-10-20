@@ -412,13 +412,25 @@ namespace Armoury
         [SettingPropertyGroup("Learning patterns")]
         public bool ShieldCraftSkillGate { get; set; } = true;
 
-        [SettingPropertyBool("Forge Uniques By Study", HintText = "the famed pieces of Westeros (the great bows and arrows of the legends, the named armours) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned", RequireRestart = false)]
+        [SettingPropertyBool("Forge Uniques By Study", HintText = "the famed pieces of Westeros (the named armours, the giants' arrows, and the great bows when Rare Bows Not Forged is off) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool ForgeUniquesByStudy { get; set; } = true;
 
-        [SettingPropertyBool("Pattern Tile Shows Skill", HintText = "the CRAFT tab tells a known pattern you cannot forge yet apart from one you can: 'PATTERN KNOWN - NEEDS 165 SMITHING' (or 'LEGEND ALREADY FORGED') in amber and a lighter shade on the tile, for the smith chosen at the anvil. Off: every known pattern reads PATTERN KNOWN", RequireRestart = false)]
+        [SettingPropertyBool("Pattern Tile Shows Skill", HintText = "the CRAFT tab tells a known pattern you cannot forge yet apart from one you can: 'PATTERN KNOWN - NEEDS 165 SMITHING' (or 'LEGEND ALREADY FORGED', or 'RARE STUFF - CANNOT BE FORGED') in amber and a lighter shade on the tile, for the smith chosen at the anvil (read again whenever the list or the chosen pattern changes). Off: every known pattern reads PATTERN KNOWN", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool PatternTileShowsSkill { get; set; } = true;
+
+        [SettingPropertyBool("Xbow Pattern Tier By Power", HintText = "a strong crossbow counts in your pattern book at the tier of a bow of the same strength, the same tier your forge asks Smithing for (Xbow Forge Equiv Tier): the 330 lb crossbow is a tier 6 pattern - it is not handed out at the start and is drawn at the bench only when your hand is near it; its tile reads [VI]. Off: crossbows count at their low game tier (all but one were tier 1 patterns known from day one)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool XbowPatternTierByPower { get; set; } = true;
+
+        [SettingPropertyBool("Rare Bows Not Forged", HintText = "bows and arrows of a stuff no smith can get (dragonbone, weirwood, Summer Isles goldenheart, a giant's bow, the Ravens' Teeth arrows - priced as a scarce treasure in Hist Exotic Bows) cannot be forged: no pattern, no bench, the tile reads RARE STUFF - CANNOT BE FORGED; the ones in the world stay and can be melted down for study points. Off: forged like any bow from wood and iron (a 5000 denar Ravens' Teeth longbow out of a few ingots)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareBowsNotForged { get; set; } = true;
+
+        [SettingPropertyBool("Legend Twin Pieces Hidden", HintText = "the twin blades of the legends (the 'Dual' copies of Dark Sister, Oathkeeper, Needle, the Valyrian blades and the rest - the same blade under another name, used by no item) are hidden in the weapon designer like the legend's own parts. Off: these twins stayed open from day one in the dual sword class, so a Valyrian or legendary blade could be forged from common steel", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool LegendTwinPiecesHidden { get; set; } = true;
 
         [SettingPropertyBool("Troop Wear Enabled", HintText = "the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
@@ -8652,6 +8664,9 @@ namespace Armoury
             s.ShieldCraftSkillGate = ShieldCraftSkillGate;
             s.ForgeUniquesByStudy = ForgeUniquesByStudy;
             s.PatternTileShowsSkill = PatternTileShowsSkill;
+            s.XbowPatternTierByPower = XbowPatternTierByPower;
+            s.RareBowsNotForged = RareBowsNotForged;
+            s.LegendTwinPiecesHidden = LegendTwinPiecesHidden;
             s.TroopWearEnabled = TroopWearEnabled;
             s.TroopWearPercent = TroopWearPercent;
             s.TroopWearPerHit = TroopWearPerHit;

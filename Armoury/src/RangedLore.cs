@@ -93,13 +93,15 @@ namespace Armoury
             return SchoolOf(it);
         }
 
-        internal static int TierOf(ItemObject it) { return Recipes.Grade(it); }
+        // m96-wzory po recenzjach: tier WZORU - kusza wedlug sily (tier, o ktory kuznia pyta Smithing; XbowPatternTierByPower), reszta tier gry jak dotad
+        internal static int TierOf(ItemObject it) { return PatternGate.LoreTier(it); }
 
         /// <summary>Wzor nadaje sie do nauki? Machiny, sprzet cwiczebny i smiecie - nie.</summary>
         internal static bool Teachable(ItemObject it)
         {
             if (it == null || !IsProgressClass(it)) return false;
             if (PatternGate.StudyOnly(it)) return false;   // m96-wzory: unikat ROT (wielkie luki, imienne zbroje) - tylko z przetopu/rozbiorki oryginalu (UniqueLore)
+            if (PatternGate.RareStuff(it)) return false;   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - nie ma wzoru, kowadlo odmawia
             if (IsArmourBranch(SchoolOf(it))) return !it.NotMerchandise;   // pancerz spoza kramow to legenda
             return !SmithMenu.BannedRanged(it);
         }
@@ -167,7 +169,7 @@ namespace Armoury
                 foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (item == null || item.ItemType != type) continue;
-                    if (SmithMenu.BannedRanged(item)) continue;
+                    if (SmithMenu.BannedRanged(item) || PatternGate.RareStuff(item)) continue;   // m96-wzory po recenzjach: rzadki material nie jest wzorem
                     if (TierOf(item) != tier) continue;
                     total++;
                     if (KnownOf(item)) known++;
@@ -199,6 +201,7 @@ namespace Armoury
             try
             {
                 if (it == null) return false;
+                if (PatternGate.RareStuff(it)) return false;   // m96-wzory po recenzjach: nie do wykucia - przetop daje tylko punkty nauki (Study)
                 // unikat imienny: nauczalny ze zdobytego egzemplarza, poki nieopanowany
                 if (PatternGate.IsForgeUnique(it))
                     return ArmouryBehavior.UniqueLore == null || !ArmouryBehavior.UniqueLore.Contains(it.StringId);
@@ -217,6 +220,7 @@ namespace Armoury
             try
             {
                 if (it == null) return false;
+                if (PatternGate.RareStuff(it)) return false;   // m96-wzory po recenzjach: rzadki material - nic do zdjecia
                 // unikat imienny idzie do WLASNEJ ksiegi (UniqueLore) - obie
                 // drogi Jeffa: przetop (OnSmelted) i rozbiorka u kowala
                 // (TakeApart) trafiaja tutaj

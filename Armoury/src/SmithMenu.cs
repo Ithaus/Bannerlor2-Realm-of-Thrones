@@ -2806,7 +2806,8 @@ namespace Armoury
                     bool hasStamina = Forge.Stamina() >= r.Stamina;
                     bool legend = Recipes.IsLegendary(item);
                     string legendWhy = null;
-                    bool legendLocked = legend && !Forge.LegendAllowed(item, out legendWhy);
+                    bool rare = PatternGate.RareStuff(item);   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - szary, z powodem
+                    bool legendLocked = (legend || rare) && !Forge.LegendAllowed(item, out legendWhy);
                     bool unknown = !RangedLore.KnownOf(item);   // wzor jeszcze nie odkryty - widac, ale szary
                     int fail = (int)(Forge.FailureChance(r) * 100f);
 
@@ -2825,8 +2826,11 @@ namespace Armoury
                     }
                     catch { }
 
-                    string hint = (legend ? "A LEGEND. Only one may ever exist - and the bill is legendary.\n" : "") +
-                                  (unknown ? "Pattern NOT yet discovered - the craft itself will teach you (keep making bows and crossbows).\n" : "") +
+                    // m96-wzory (recenzja): unikat kuzni (UniqueGear / unikat ROT) uczy sie tylko z oryginalu; opanowana legenda nie jest juz "jedyna" (Forge.LegendAllowed)
+                    bool mastered = legend && ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(item.StringId);
+                    string hint = (legend ? (mastered ? "A LEGEND you have mastered - you may forge it again, and the bill is legendary.\n" : "A LEGEND. Only one may ever exist - and the bill is legendary.\n") : "") +
+                                  (unknown && !rare ? (PatternGate.IsForgeUnique(item) ? "A famed piece - seize the original and melt it down, or take it apart (200 Smithing).\n"
+                                                              : "Pattern NOT yet discovered - the craft itself will teach you (keep making bows and crossbows).\n") : "") +
                                   Recipes.Describe(r) + stats +
                                   "\nStamina " + r.Stamina + " (you have " + Forge.Stamina() + ")" +
                                   "\nSmithing " + r.SkillNeeded + " required (yours: " + skill + ")" +

@@ -107,6 +107,8 @@ namespace Armoury
         /// </summary>
         public static bool CraftPrefix(object __instance, bool __runOriginal)
         {
+            // m96-wzory (recenzja): gdy wczesniejszy prefiks zwrocil false, Harmony 2.4.2 tego prefiksu w ogole NIE wola (Refused zostaje z poprzedniego
+            // kliku) - ponizsze sprawdzenie to zapas; postfiks FletchForge.BkCraftPostfix rozpoznaje odmowe po __runOriginal
             Clear(); Refused = false;
             if (!__runOriginal) return true;
             try
