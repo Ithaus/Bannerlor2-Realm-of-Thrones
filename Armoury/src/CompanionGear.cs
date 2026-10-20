@@ -14,7 +14,8 @@ namespace Armoury
     /// Zloto towarzysza to Hero.Gold: cena najmu idzie gracz -> towarzysz (GiveGoldAction, CompanionPay), dzienny zold - CompanionWage.PayFromWage.
     ///
     /// Kiedy: druzyna gracza w MIESCIE (wjazd albo doba postoju; raz na dobe), nie w wojnie z miastem, nie w oblezeniu, nie w oknie lupu miasta (CitySack.StayWindow),
-    /// po zakupach ludzi (sluchacze zarejestrowane po MenPurse). Kto: towarzysze gracza w druzynie gracza (Hero.IsPlayerCompanion, zywi, nie w niewoli).
+    /// PO zakupach ludzi (recenzja: MbEvent wola dopisanego pozniej wczesniej - sluchacze zarejestrowane PRZED MenPurse). Kto: bohaterowie rodu gracza w druzynie
+    /// gracza - towarzysze i rodzina (Hero.Clan = rod gracza; ten sam zbior co zold CW, bez gracza i glowy rodu), zywi, nie w niewoli.
     /// Budzet: kiesa towarzysza minus rezerwa CompanionGearReserveDays dni jego zoldu (tabela CompanionWage.DailyOf).
     /// Co (zestaw bojowy): zbroje - korpus, helm, nogi, rece, plaszcz - puste sloty albo sztuka co najmniej 1 tier nizej (AiGear.TierOf) i slabsza (RangedRank.Key);
     /// bron 0-3 - tylko wymiana tej samej klasy broni (miecz za miecz, kolczan za kolczan) o co najmniej 1 tier wyzej i silniejsza; puste sloty broni, kon i rzad
@@ -99,6 +100,13 @@ namespace Armoury
             catch (Exception e) { Stumble("OnDailyTickParty", e); }
         }
 
+        /// <summary>Bohater rodu gracza (towarzysz - Clan = CompanionOf - albo rodzina), nie gracz i nie glowa rodu, zywy, nie w niewoli (recenzja: jak zold CW).</summary>
+        private static bool Member(Hero h)
+        {
+            var pc = Clan.PlayerClan;
+            return h != null && pc != null && h.Clan == pc && h != Hero.MainHero && h != pc.Leader && h.IsAlive && !h.IsPrisoner;
+        }
+
         private static ItemObject.ItemTypeEnum ArmorType(EquipmentIndex i)
         {
             switch (i)
@@ -127,8 +135,7 @@ namespace Armoury
                 if (ch == null || !ch.IsHero) continue;
                 var h = ch.HeroObject;
                 // BattleEquipment bez wlasnego zestawu oddaje wspolny Campaign.DeadBattleEquipment - tego nie wolno ruszac
-                if (h != null && h != Hero.MainHero && h.IsPlayerCompanion && h.IsAlive && !h.IsPrisoner && h.BattleEquipment != null
-                    && !ReferenceEquals(h.BattleEquipment, Campaign.Current.DeadBattleEquipment)) heroes.Add(h);
+                if (Member(h) && h.BattleEquipment != null && !ReferenceEquals(h.BattleEquipment, Campaign.Current.DeadBattleEquipment)) heroes.Add(h);
             }
             if (heroes.Count == 0) return;
             int day = (int)CampaignTime.Now.ToDays;
@@ -160,8 +167,10 @@ namespace Armoury
                 finally { purse1 += h.Gold; }
             }
             _sessN += n; _sessGold += gold;
+            bool kin = false;
+            foreach (var h in heroes) if (!h.IsPlayerCompanion) kin = true;
             if (n > 0)
-                Log.Player("Your companions bought better gear with their own coin in " + st.Name + " for " + gold + " denars: " + string.Join("; ", said.ToArray())
+                Log.Player((kin ? "Your companions and kin" : "Your companions") + " bought better gear with their own coin in " + st.Name + " for " + gold + " denars: " + string.Join("; ", said.ToArray())
                            + (said.Count < heroes.Count - poor - nothing ? "; ..." : "") + ". The pieces they took off are in your inventory.");
             Log.Info("Towarzysze (CG): " + st.Name + " (" + why + ") dzien " + day + " | klucz CompanionBuysOwnGear TAK, rezerwa " + Math.Max(0f, s.CompanionGearReserveDays).ToString("0", Inv)
                      + " dni zoldu | towarzysze w druzynie " + heroes.Count + ", kupili " + n + " szt. za " + gold + " d" + (lines.Count > 0 ? " (" + string.Join("; ", lines.ToArray()) + ")" : "")

@@ -300,7 +300,7 @@ namespace Armoury
                 if (MenUpgrade.On && avail > 0)
                 {
                     var s = Settings.Current;
-                    long cap = (long)Math.Max(0, s.MenGearSaveDays) * Math.Max(0, Wage(mp));
+                    long cap = (long)Math.Max(0, s.MenGearSaveDays) * MenWage(mp);   // CW (recenzja): bez zoldu bohaterow rodu - ich zold do sakiewki ludzi nie idzie
                     int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - reserve));
                     kept = Math.Min(Math.Min(SavedOf(mp), avail), room);      // dawne oszczednosci: nie wiecej, niz jest w sakiewce i niz limit
                     int want = (int)((long)(avail - kept) * Math.Max(0, Math.Min(100, s.MenGearSavePercent)) / 100);
@@ -365,6 +365,10 @@ namespace Armoury
         }
 
         internal static int WageRaw(MobileParty mp) { try { return mp.TotalWage; } catch { return 0; } }
+
+        /// <summary>CW (recenzja 19/20.10): zold partii, ktory idzie do sakiewki ludzi - bez zoldu bohaterow rodu gracza z regula CompanionWageByLevel
+        /// (ich zold idzie do ich kies, CompanionWage.PayFromWage). Limity MenGearSaveDays. Partie spoza rodu gracza - jak dotad.</summary>
+        private static int MenWage(MobileParty mp) { return Math.Max(0, Wage(mp) - CompanionWage.DueInRoster(mp)); }
 
         [ThreadStatic] private static bool _wMemoOn, _wMemoHas;
         [ThreadStatic] private static MobileParty _wMemoP;
@@ -497,7 +501,7 @@ namespace Armoury
             var s = Settings.Current;
             if (!MenUpgrade.On || s == null) return;
             int avail = (int)Math.Max(0L, purse - res);
-            long cap = (long)Math.Max(0, s.MenGearSaveDays) * Math.Max(0, Wage(mp));
+            long cap = (long)Math.Max(0, s.MenGearSaveDays) * MenWage(mp);   // CW (recenzja): bez zoldu bohaterow rodu - ich zold do sakiewki ludzi nie idzie
             if (capShare < 1f) cap = (long)(cap * (double)Math.Max(0f, capShare));
             int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - mend));
             kept = Math.Min(Math.Min(SavedOf(mp), avail), room);
