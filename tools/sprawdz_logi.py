@@ -1587,7 +1587,7 @@ Uzycie (Python 3, tylko odczyt):
 --grupa p6pola    : (20.10, galaz p6-pola - R3-07b, POMYSLY-35 pkt 18; Armoury/src/MapFields.cs, klucz Map Village Fields) pola wokol wiosek na mapie wedlug pory
                     roku. python -I tools/sprawdz_logi.py --grupa p6pola <Armoury-*.log> (strumieniowo). PP-0 linie "Pola (p6)" (brak - INFO: log sprzed galezi albo klucz
                     NIE); PP-1 start: wsi z polami > 0 i czas startu <= 100 ms; PP-2 ostatnia linia "stan": wsi z planem > 0, pol w planie > 0, przy kamerze nisko pol w
-                    scenie > 0; PP-3 udzial pol bez miejsca <= 60% (INFO z rozkladem przyczyn); PP-3b (recenzja) wsi z planem bez zadnego pola <= 5%; PP-3c
+                    scenie > 0; PP-3 udzial pol bez miejsca <= 25% (po recenzji; symulacja na rastrze terenu z drogami 8-11%; z rozkladem przyczyn); PP-3b (recenzja) wsi z planem bez zadnego pola <= 5%; PP-3c
                     (recenzja) pola odrzucone przez farbe drogi <= 10% pol planu (log sprzed recenzji z przyczyna "droga" - INFO); PP-4 najdluzszy tick stawiania
                     <= 15 ms (budzet 4 ms + jedna wioska); PP-5 pora pol (linie "pora pol A -> B" - INFO z lista) i zgodnosc pory z dniem roku w linii startu (dzien
                     przeliczony na rok 364 jak MapFields.Phase, dlugosc roku z linii - "rok N dni"; bez niej 364); PP-6 potkniecia (najwiecej w linii "stan") i
@@ -47482,8 +47482,8 @@ def p6pola_main(logp):
         rep.add("PP-2: pola w planie i w scenie (ostatnia linia stanu)", f"wsi z planem {pv}, pol w planie {pf}, w scenie {live} (kamera {'nisko' if vis else 'wysoko'})",
                 "wsi z planem > 0, pol w planie > 0, w scenie > 0 przy kamerze nisko", pv > 0 and pf > 0 and (live > 0 or not vis))
         share = nofield / (nofield + pf) if nofield + pf > 0 else 0.0
-        why = re.search(r"\(bez miejsca: \d+(?: - |; odrzucone w 6 probach - )([^)]*)\)", r)
-        rep.add("PP-3: pola bez miejsca (udzial)", f"{nofield} z {nofield + pf} ({share:.0%}); {why.group(1) if why else '-'}", "<= 60%", share <= 0.60)
+        why = re.search(r"\(bez miejsca: \d+(?: - |; odrzucone w \d+ probach - )([^)]*)\)", r)
+        rep.add("PP-3: pola bez miejsca (udzial)", f"{nofield} z {nofield + pf} ({share:.0%}); {why.group(1) if why else '-'}", "<= 25%", share <= 0.25)
         zero = num(r"\(bez zadnego pola (\d+)\)", r, int, -1)
         if zero is not None and zero >= 0:
             zs = zero / pv if pv > 0 else 0.0

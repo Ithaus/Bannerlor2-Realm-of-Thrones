@@ -15,11 +15,11 @@
 //    2/3/4 pola, mlyn / wiatrak / zagroda / spichlerz +1, rybacka -2, najmniej 1). Wies bez ladu uprawnego wokol (woda, bagno, stok, gesto sasiedzi) zostaje
 //    bez pol - linia "stan" liczy takie wsie ("bez zadnego pola");
 //  - GDZIE: pierscien wokol obrazka wioski (pol obrysu + pol pola + 0.2 jedn.), katy rowno co 360/K st. od frontu wioski (+ hash), pole wzdluz pierscienia.
-//    Pole odrzucone (probuje 6 miejsc, potem bez tego pola): za blisko miasta / zamku, nachodzi na inne pole wioski, nie po swojej stronie granicy z sasiednia
+//    Pole odrzucone (probuje 10 miejsc: kat +-0 / 0.45 / 0.9 rad na dwoch odleglosciach, potem bez tego pola): za blisko miasta / zamku, nachodzi na inne pole wioski, nie po swojej stronie granicy z sasiednia
 //    wioska (polplaszczyzna Voronoi z zapasem pol pola - pola dwoch wiosek nigdy na siebie nie wchodza) albo na jej obrazek, nie na ladzie uprawnym (sciana
 //    siatki: Plain / Desert / Forest / Steppe / RuralArea - bez sniegu wiecznego, bagna, wydm i plazy), na farbie drogi (MapRoads.PaintNear - prostokat pola
 //    wobec pasa traktu albo drogi bocznej: pol-szerokosc farby + RoadGap 0.2 jedn.; recenzja: NIE margines premii predkosci 1.0, ktory zabieral pola z pasa
-//    1.25 jedn. od osi kazdej drogi przy wioskach), na stoku (rozrzut wysokosci rogow > 0.7 jedn. albo normalna < 0.85). Wioska bez zadnego pola po 6 probach
+//    1.25 jedn. od osi kazdej drogi przy wioskach), na stoku (rozrzut wysokosci rogow > 0.7 jedn. albo normalna < 0.85). Wioska bez zadnego pola po 10 probach
 //    (recenzja) - pierscien zapasowy: 24 katy x 3 odleglosci, do K pol;
 //  - PORA POL (raz na dobe gry, ta sama dla calego swiata; dni w roku 364-dniowym, inny rok - proporcjonalnie): dni 0-69 zaorane (siew), 70-195 zielone,
 //    okno zniw FreeHands (dni 196-252, ta sama regula co rece do zniw i plon - lato albo jesien Westeros): 196-223 dojrzale zolte, 224-252 sciernisko;
@@ -30,7 +30,7 @@
 //    wioska ukladu - ksiega wiosek (VillageBook.LookOf): spalona - pola spalone, puste osady (rabunek + glod) - taki udzial POSTAWIONYCH pol odlogiem (szarobure),
 //    jaki udzial osad pusty;
 //    bez ksiegi - stan wsi gry okregu. Odczyt ksiegi tylko przy zmianie jej numeru wygladu (LookVersion) albo przy wejsciu wioski do sceny;
-//  - WYDAJNOSC: plan pol wioski dopiero, gdy jej komorka (32 x 32 jedn.) pierwszy raz wchodzi w kolo widoku kamery (do 6 prob miejsca x 5 sond terenu + test pasa drogi
+//  - WYDAJNOSC: plan pol wioski dopiero, gdy jej komorka (32 x 32 jedn.) pierwszy raz wchodzi w kolo widoku kamery (do 10 prob miejsca x 5 sond terenu + test pasa drogi
 //    na pole; pierscien zapasowy najwyzej 72 proby na wies bez pola), potem w
 //    pamieci; w scenie tylko pola komorek w kole widoku (to samo kolo co drogi boczne - MapSideRoads.ViewCircle, histereza 16 jedn.), kamera wyzej niz
 //    min(MapVillagesHideAboveCameraHeight, 110) - zadnego pola (jak wioski i drogi); praca 4 razy na sekunde, budzet 4 ms na cwierc sekundy; co klatke nic
@@ -159,8 +159,9 @@ namespace Armoury
         private const string DecalSet = "editor_set";
         private static readonly string[] MatNames = { "decal_production_farm_wheat_a", "decal_production_farm_wheat_b", "decal_production_farm_wheat_c", "decal_production_farm_wheat_d" };
         private static readonly float[,] MatArg = { { 0.490f, 0.490f, -0.010f, -0.040f }, { 0.490f, 0.490f, 0.500f, 0.040f }, { 0.490f, 0.510f, -0.020f, 0.450f }, { 0.520f, 0.510f, 0.470f, 0.560f } };
-        private static readonly float[] TryDa = { 0f, 0.45f, -0.45f, 0f, 0.45f, -0.45f };
-        private static readonly float[] TryDd = { 0f, 0f, 0f, 0.7f, 0.7f, 0.7f };
+        // recenzja: +-0.9 rad (4 proby wiecej, tylko dla pola odrzuconego w pierwszych 6) - symulacja na rastrze terenu z drogami: pol 85% -> 92% planu
+        private static readonly float[] TryDa = { 0f, 0.45f, -0.45f, 0f, 0.45f, -0.45f, 0.9f, -0.9f, 0.9f, -0.9f };
+        private static readonly float[] TryDd = { 0f, 0f, 0f, 0.7f, 0.7f, 0.7f, 0f, 0f, 0.7f, 0.7f };
         private static readonly long BudgetTicks = System.Diagnostics.Stopwatch.Frequency * 4 / 1000;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -795,7 +796,7 @@ namespace Armoury
                         switch (why) { case 1: _rTown++; break; case 2: _rOwn++; break; case 3: _rNeighbor++; break; case 4: _rLand++; break; case 5: _rRoad++; break; default: _rSlope++; break; }
                     }
                 }
-                // recenzja: zadne pole nie znalazlo miejsca w 6 probach (lad tylko w luce miedzy katami) - pierscien zapasowy: 24 katy x 3 odleglosci, najblizej
+                // recenzja: zadne pole nie znalazlo miejsca w 10 probach (lad tylko w luce miedzy katami) - pierscien zapasowy: 24 katy x 3 odleglosci, najblizej
                 // najpierw, do K pol (wymiary i material pola o numerze n jak wyzej; pola obok siebie nie nachodza - Check 2)
                 if (n == 0 && v.K > 0)
                 {
@@ -991,7 +992,7 @@ namespace Armoury
             sb.Append("w scenie pol ").Append(_live).Append(" (komorek ").Append(inCells).Append(", widoczne ").Append(_visible ? "tak" : "nie - kamera wysoko").Append(")");
             sb.Append("; wsi z planem ").Append(_plannedV).Append(" z ").Append(_vill != null ? _vill.Count : 0).Append(" (bez zadnego pola ").Append(_zeroV)
               .Append("), pol w planie ").Append(_plannedF)
-              .Append(" (bez miejsca: ").Append(_noField).Append("; odrzucone w 6 probach - miasto/zamek ").Append(_rTown).Append(", inne pole ").Append(_rOwn).Append(", sasiad ").Append(_rNeighbor)
+              .Append(" (bez miejsca: ").Append(_noField).Append("; odrzucone w " + TryDa.Length + " probach - miasto/zamek ").Append(_rTown).Append(", inne pole ").Append(_rOwn).Append(", sasiad ").Append(_rNeighbor)
               .Append(", nie lad uprawny ").Append(_rLand).Append(", farba drogi ").Append(_rRoad).Append(", stok ").Append(_rSlope)
               .Append("; pierscien zapasowy: wsi ").Append(_ringV).Append(", pol ").Append(_ringF).Append(")");
             sb.Append("; wyglad pol komorek w scenie:");
