@@ -2972,7 +2972,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int StartGoldAdventurer { get; set; } = 100;
 
-        [SettingPropertyBool("Start Gold Cut", HintText = "new campaigns only: every coin you are handed at the start - the game's own 1000 and each Banner Kings start (Mariner 10000, Mercenary 250, Outlaw 50, Adventurer 1000) - is cut by the same ratio as the Adventurer (Start Gold Adventurer / 1000), so each start keeps its place against the others but in this world's coin; the rest was nobody's and is gone. Off = only the Adventurer is cut, as before", RequireRestart = false)]
+        [SettingPropertyBool("Start Gold Cut", HintText = "every coin you are handed at the start of a new campaign - the game's own 1000 and each Banner Kings start (Mariner 10000, Mercenary 250, Outlaw 50, Adventurer 1000), also a Banner Kings start picked later in an older save - is cut by the same ratio as the Adventurer (Start Gold Adventurer / 1000), so each start keeps its place against the others but in this world's coin; the start window shows the cut amounts; the rest was nobody's and is gone. Off = only the Adventurer and a start with no Banner Kings choice are cut, as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool StartGoldCut { get; set; } = true;
 
