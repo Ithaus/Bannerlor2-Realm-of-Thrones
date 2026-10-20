@@ -33,7 +33,7 @@ namespace Armoury
     ///     "kiesy kopaln ponizej kosztu drewna doby" w linii zelaza). Kopalnie srebra i zlota bez dymarki - bez zapasu.
     /// DS (daniny wsi, DsVillage.DuesAtCart) biegnie PO regale i bierze dziesiecine od calego utargu, a udzial korony od czesci wsi netto (przyrost kiesy) -
     /// regale nie jest liczone drugi raz; czynsz staly i renta wsi liczone od kiesy, ktora juz nie ma regale. Kopalnie BK w miastach (polowa ceny rudy jako danina)
-    /// to inna droga (warsztat miasta) - tu tylko wozy wsi. Wioska poboczna gracza (SideVillageFief) - regale jest w liczniku pana, wiec idzie z nim jak podatek.
+    /// to inna droga (warsztat miasta) - tu tylko wozy wsi. Wioska poboczna gracza (SideVillageFief.AtCart po r4-wioska - tylko licznik linii; naleznosc Due osobno) - bez zmian.
     /// KS (alfa okregu) i SplitToday widza czesc wsi pomniejszona o regale (VillageTakings.RegaleTaken).
     /// Zapis arm_regale (SaveText): "1|idWozu~wartoscKruszcu~wartoscLadunku|..." - woz w drodze z kruszcem sprzedanym, a jeszcze nie w domu; brak klucza (stary zapis
     /// Jeffa) = pusto, woz bez konta oddaje utarg jak dotad. Klucz NIE - nic sie nie zapisuje na konta i nic nie pobiera (utarg bit w bit jak przed paczka).
