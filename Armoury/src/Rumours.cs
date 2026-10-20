@@ -52,6 +52,11 @@ namespace Armoury
         private sealed class News { public int Kind, Day, N; public float X, Y; public string A = "", B = "", C = ""; }
         private const int NWar = 1, NPeace = 2, NCaptured = 3, NRaided = 4, NBattle = 5, NSiege = 6;
         private const int NewsMax = 60, NewsDays = 60, BandsMax = 6000, SaveMaxChars = 400000;
+        // n22f (scalenie p5-kruki x plotki): przy RavenNews wiesc zostaje w ksiedze, dopoki moze jeszcze leciec z nia kruk (Ravens.HoldDays), najwyzej NewsMaxRavens.
+        // Dowod (8 biegow 19/20.10, linia "wiesci N (nowe dzis M)"): ok. 11 nowych wiesci na dobe, ksiega pelna (60) w 80-96% dob, wiec wiesc zyla mediana
+        // 5-6 dob - karczma dalej niz ok. 580-730 jedn. (Pentos - Winterfell 643, Qarth - KP 1062) nie uslyszalaby jej nigdy (NotYet czeka do 12 dob).
+        // Ksiega z oknem krukow (HoldDays, 14 dob) w symulacji tych biegow: mediana 155-178 wiesci, najwiecej 238 - sufit 300 z zapasem. Klucz wylaczony - 60 jak dotad.
+        private const int NewsMaxRavens = 300;
         private static readonly Dictionary<string, Band> _bands = new Dictionary<string, Band>(StringComparer.Ordinal);
         private static readonly List<News> _news = new List<News>();
 
@@ -117,7 +122,9 @@ namespace Armoury
         {
             _news.Add(new News { Kind = kind, Day = Today, X = at.x, Y = at.y, A = Clean(a), B = Clean(b), C = Clean(c), N = n });
             _dNews++;
-            while (_news.Count > NewsMax) _news.RemoveAt(0);
+            // n22f: ponad NewsMax najstarsza wiesc odpada jak dotad - przy krukach dopiero, gdy jest starsza niz najdluzszy lot kruka (albo ksiega ponad NewsMaxRavens)
+            int hold = Ravens.On ? Ravens.HoldDays : -1, today = Today;
+            while (_news.Count > NewsMax && (hold < 0 || _news.Count > NewsMaxRavens || today - _news[0].Day > hold)) _news.RemoveAt(0);
         }
 
         internal static void OnRaidCompleted(BattleSideEnum winner, RaidEventComponent raid)
@@ -272,7 +279,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis
-        /// <summary>"v1|id,doba,znana,napady;...|rodzaj,doba,x,y,n,a,b,c;..." - straznik rozmiaru (najwyzej BandsMax band, wiesci NewsMax; ponad SaveMaxChars bandy pominiete).
+        /// <summary>"v1|id,doba,znana,napady;...|rodzaj,doba,x,y,n,a,b,c;..." - straznik rozmiaru (najwyzej BandsMax band, wiesci NewsMax, przy krukach NewsMaxRavens; ponad SaveMaxChars bandy pominiete).
         /// Klucz wylaczony - "" (nic do zapisu).</summary>
         internal static string Export()
         {
@@ -333,7 +340,7 @@ namespace Armoury
                     if (a.Length < 8 || !int.TryParse(a[0], NumberStyles.Integer, Inv, out kind) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out day)
                         || !float.TryParse(a[2], NumberStyles.Float, Inv, out x) || !float.TryParse(a[3], NumberStyles.Float, Inv, out y)
                         || !int.TryParse(a[4], NumberStyles.Integer, Inv, out n) || kind < NWar || kind > NSiege) { bad++; continue; }
-                    if (_news.Count < NewsMax) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });
+                    if (_news.Count < NewsMaxRavens) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });   // n22f: ksiega z krukami (AddNews przycina przy kluczu wylaczonym)
                 }
                 int fixedOld = NamesOn ? OldBandNames() : 0;
                 _importNote = "band " + _bands.Count + " (z imieniem herszta " + named + "), wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "")
