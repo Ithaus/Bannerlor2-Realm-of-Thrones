@@ -492,7 +492,7 @@ namespace Armoury
             bool disband = mp.IsDisbanding;
             double foodUse = Math.Max(0.0, -mp.FoodChange);
             int foodKeep = (int)Math.Ceiling(foodUse * FoodKeepDays), foodHave = 0;
-            double keepK = 1.0 - TownToll.CaravanRateFor(mp);              // utarg po mycie E3-G3 (poprawki: prog zysku netto)
+            double keepK = 1.0 - TownToll.CaravanRateFor(mp, st);          // utarg po mycie E3-G3 (poprawki: prog zysku netto); R3-05a: z oplata jarmarku
             // ksiega: koszt calego ladunku towarow handlowych (podzial zoldu) i kandydaci
             double cargo = 0;
             var cands = new List<Cand>();

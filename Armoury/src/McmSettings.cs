@@ -2436,6 +2436,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartsBestMarket { get; set; } = true;
 
+        [SettingPropertyBool("River Barges", HintText = "carriage down a river costs about half the overland price. Villagers reach twice as far for a market town on the same river as their village (the Trident, the Mander, the Honeywine, the Blackwater, the Greenblood, the Rhoyne); the cart still makes the whole trip by road, so a far river town wins only when it truly pays more per day. Caravans weigh a run to a town on the same river as the town they leave as half as far. Nothing changes on the map (off = distance by road only)", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool RiverBarges { get; set; } = true;
+
         [SettingPropertyBool("Village Cart Full Load Far", HintText = "villagers setting out on a road longer than their storehouse can bear take everything their cart can carry, so the village does not stand idle and its goods do not lie waiting (needs Village Carts Best Market)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFullLoadFar { get; set; } = true;
@@ -7172,6 +7176,10 @@ namespace Armoury
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public float TownMarketTollCaravanRate { get; set; } = 0.02f;
 
+        [SettingPropertyBool("Harvest Fairs", HintText = "a harvest fair: after the harvest every land holds a two-week fair in its richest town, one land after another from the south to the north (none in a year without a harvest). More buyers come, so that town pays better for trade goods and livestock (not tools or arms) - the money is the town's own, nothing is made from nothing - and every village cart and caravan selling there pays a 1% fair fee to the town's purse (off = no fairs)", RequireRestart = false)]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool HarvestFairs { get; set; } = true;
+
         [SettingPropertyBool("Town Ground Rent", HintText = "a third of the rent the working folk and the craftsmen pay for their houses goes to the head of the house that holds the town as ground rent; the other two thirds still go to the townsmen who own the houses (off = all of it to the townsmen, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool TownGroundRent { get; set; } = true;
@@ -8900,6 +8908,7 @@ namespace Armoury
             s.MarketCartFactor = MarketCartFactor;
             s.MarketCartAllVillages = MarketCartAllVillages;
             s.VillageCartsBestMarket = VillageCartsBestMarket;
+            s.RiverBarges = RiverBarges;
             s.VillageCartFullLoadFar = VillageCartFullLoadFar;
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
@@ -10084,6 +10093,7 @@ namespace Armoury
             s.TownMarketToll = TownMarketToll;
             s.TownMarketTollRate = TownMarketTollRate;
             s.TownMarketTollCaravanRate = TownMarketTollCaravanRate;
+            s.HarvestFairs = HarvestFairs;
             s.TownGroundRent = TownGroundRent;
             s.CaravanSellWhereDear = CaravanSellWhereDear;
             s.CaravanProfitToOwner = CaravanProfitToOwner;
