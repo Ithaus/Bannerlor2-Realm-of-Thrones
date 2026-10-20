@@ -3438,7 +3438,7 @@ namespace CrashScribe
         // podniesione do wymogu ich WLASNEGO zestawu bojowego, zeby nikt nie stracil zbroi - ta sama zasada co SkillSinew u zolnierzy
         // (15.09: "nie zmieniaj sprzetu, podnies umiejetnosci"), tylko w gore, niczego nie zdejmujemy (decyzja 3). GRACZ nigdy.
         // Dzieci (sprzet i umiejetnosci dostaja przy pelnoletnosci) i notable (nie wychodza w pole) - poza. Bez broni, koni i ladr
-        // (ladry: od Z16b ReqSkill daje Jazde, a bohaterom ladr nie sprawdzamy - CanUseHero). Bez treningu Atletyki w zbroi (decyzja 03:55).
+        // (ladry: Jazda - ReqSkill od Z16b, u bohaterow CanUseHero od r2-pancerz; nie podnosimy - to, co nosi, zostaje). Bez treningu Atletyki w zbroi (decyzja 03:55).
         // SetInitialSkillLevel (gra 1.4.8, HeroDeveloper.cs:190-196) ustawia umiejetnosc i XP pod nia: bez awansu poziomu i bez
         // komunikatu (tak robi RC przy zaniku miesni). PERKI (POPRAWKA Z16-1c po recenzji - dotad stalo tu "bez perkow"): sam
         // SetInitialSkillLevel ich nie daje, ale gra dobiera je bohaterom spoza klanu gracza CODZIENNIE
@@ -3469,12 +3469,12 @@ namespace CrashScribe
         /// <summary>Z16-1c: podnoszenie - tylko przy obu wlacznikach (HeroSkillToOwnGear i HeroGearRequirements).</summary>
         internal static bool HeroRaiseOn() { return HeroSkillOn() && HeroReqOn(); }
 
-        /// <summary>Z16: lustro Armoury ItemReq.MeetsHero - ten sam wymog co CanUse (ReqSkill + Difficulty), tylko ladry
-        /// konskie przepuszczone. To DECYZJA, nie obejscie: od Z16b ReqSkill daje ladrom Jazde (zolnierze, K1, kwatermistrz),
-        /// a bohaterom ladr nie sprawdzamy (opis MCM Armoury HeroGearRequirements: "Horse barding is not checked").</summary>
+        /// <summary>Z16: lustro Armoury ItemReq.MeetsHero - ten sam wymog co CanUse (ReqSkill + Difficulty; ladry - Jazda).
+        /// r2-pancerz (PLAN 1.7): ladry bohaterom sprawdzane Jazda jak na ekranie gry (ROT ExtraGearRequirements daje ladrom
+        /// RelevantSkill Riding); przy wylaczonym Armoury HeroBardingNeedsRiding - przepuszczone jak dotad (bez Armoury - sprawdzane).</summary>
         internal static bool CanUseHero(CharacterObject co, ItemObject it)
         {
-            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return true; } catch { }
+            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness && ArmouryFloat("HeroBardingNeedsRiding", 1f) < 0.5f) return true; } catch { }
             return CanUse(co, it);
         }
 

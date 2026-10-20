@@ -21,7 +21,7 @@ namespace Armoury
     /// WeaponComponentData.GetRelevantSkillFromWeaponClass: Arrow -> Bow, Bolt -> Crossbow; POPRAWKA Z16-5 po recenzji - wczesniej
     /// opis mowil, ze amunicja przechodzila). Przechodzil tylko PANCERZ (RelevantSkill = null), wiec gracz i towarzysze zakladali
     /// kazda zbroje. Etap 2 (ekran): postfiks na CanUseItem (3-arg - 2-arg wola 3-arg) dodaje brakujacy wiersz tej samej reguly
-    /// co u zolnierzy: pancerz - Atletyka (ItemReq.MeetsHero, ladry przepuszczone - decyzja, patrz ItemReq.MeetsHero); strzaly i belty pilnuje sama gra.
+    /// co u zolnierzy: pancerz - Atletyka, ladry - Jazda (ItemReq.MeetsHero; r2-pancerz - dotad ladry przepuszczone); strzaly i belty pilnuje sama gra.
     /// Ekran (SPInventoryVM.IsItemEquipmentPossible / CanCharacterUseItem) zrobi z tego sam czerwona karte i komunikat gry
     /// "You don't have enough {SKILL_NAME} skill to equip this item". Nigdy "nie" -> "tak". Opis przedmiotu (ItemMenuVM)
     /// dostaje linie "Requires: Athletics 175" w tym samym miejscu, co gra pisze wymog broni (po wadze). To, co bohater juz
@@ -40,7 +40,8 @@ namespace Armoury
                     new[] { typeof(BasicCharacterObject), typeof(EquipmentElement), typeof(TextObject).MakeByRefType() });
                 if (m != null) h.Patch(m, postfix: new HarmonyMethod(typeof(HeroGear), nameof(CanUsePostfix)));
                 Log.Info("Z16: ekran ekwipunku " + (m != null
-                    ? "pilnuje pancerza (Athletics) u bohaterow - ta sama regula co u zolnierzy; strzaly (Bow) i belty (Crossbow) pilnuje sama gra."
+                    ? "pilnuje pancerza (Athletics) u bohaterow - ta sama regula co u zolnierzy; strzaly (Bow) i belty (Crossbow) pilnuje sama gra; ladry (Riding) - "
+                      + (ItemReq.BardingByRiding() ? "wedlug Jazdy (HeroBardingNeedsRiding)." : "bez sprawdzania (HeroBardingNeedsRiding wylaczone).")
                     : "- CharacterHelper.CanUseItem(3) NIEZNALEZIONE, sito ekranu spi."));
             }
             catch (Exception e) { Log.Error("HeroGear.ApplyAll(CanUseItem)", e); }
@@ -59,13 +60,15 @@ namespace Armoury
             ApplyGank(h);
         }
 
-        /// <summary>Sztuka, ktorej wymog pilnuje tylko nasza regula (gra nie ma dla niej RelevantSkill): pancerz bez ladr.
-        /// Bron, tarcze, konie, strzaly i belty (RelevantSkill Bow/Crossbow z klasy broni) pilnuje gra - tym samym wierszem
-        /// i komunikatem; dla nich warunek RelevantSkill != null zwraca false (Z16-5: opis poprawiony, dzialanie bez zmian).</summary>
+        /// <summary>Sztuka, ktorej wymog pilnuje tylko nasza regula (gra nie ma dla niej RelevantSkill): pancerz, a przy
+        /// HeroBardingNeedsRiding takze ladry (Jazda). Bron, tarcze, konie, strzaly i belty (RelevantSkill Bow/Crossbow z klasy broni)
+        /// pilnuje gra - tym samym wierszem i komunikatem; dla nich warunek RelevantSkill != null zwraca false (Z16-5: opis poprawiony,
+        /// dzialanie bez zmian). r2-pancerz: przy ROT ExtraGearRequirements (domyslnie TAK) pancerz i ladry MAJA RelevantSkill
+        /// (ROT XMLParserAddons.RelevantSkill: pancerz - Atletyka, ladry - Jazda) - wtedy pilnuje ich sama gra, a ten wiersz spi.</summary>
         internal static bool OursOnly(ItemObject it)
         {
             if (it == null || it.RelevantSkill != null) return false;
-            if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return false;
+            if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness && !ItemReq.BardingByRiding()) return false;
             return ItemReq.SkillFor(it) != null;
         }
 
@@ -351,12 +354,21 @@ namespace Armoury
                 foreach (var h in Hero.AllAliveHeroes)
                     if (h != null && h.CharacterObject != null && !h.IsChild && !h.IsNotable) heroes.Add(h);
                 var items = new List<ItemObject>();
+                // r2-pancerz: czy RelevantSkill pancerza i ladr daje ROT (ExtraGearRequirements) - wtedy wiersz Z16 spi (pancerz 0)
+                bool rotArmour = false, rotBarding = false;
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
-                    if (it != null && it.Difficulty > 0 && ItemReq.SkillFor(it) != null) items.Add(it);
+                {
+                    if (it == null) continue;
+                    if (it.HasArmorComponent && it.RelevantSkill != null)
+                    {
+                        if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) rotBarding = true; else rotArmour = true;
+                    }
+                    if (it.Difficulty > 0 && ItemReq.SkillFor(it) != null) items.Add(it);
+                }
                 if (heroes.Count == 0 || items.Count == 0) { Log.Info("Z16 samotest: brak bohaterow albo sztuk z wymogiem - pominiety."); return; }
                 bool on = Settings.Current != null && Settings.Current.HeroGearRequirements;
                 var rnd = new Random(1609);
-                int n = 500, agree = 0, ours = 0, refused = 0;
+                int n = 500, agree = 0, ours = 0, refused = 0, bard = 0, bardOk = 0;
                 var bad = new List<string>();
                 for (int i = 0; i < n; i++)
                 {
@@ -370,13 +382,16 @@ namespace Armoury
                     bool want = rule && other;
                     if (OursOnly(it)) ours++;
                     if (!got) refused++;
+                    if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { bard++; if (got == want) bardOk++; }
                     if (got == want) agree++;
                     else if (bad.Count < 5)
                         bad.Add(h.StringId + "/" + it.StringId + " (" + ItemReq.SkillFor(it).StringId + " " + co.GetSkillValue(ItemReq.SkillFor(it))
                                 + " vs " + it.Difficulty + "): ekran " + (got ? "TAK" : "NIE") + ", regula " + (want ? "TAK" : "NIE"));
                 }
                 Log.Info("Z16 samotest: CanUseItem zgodny z ItemReq.MeetsHero w " + agree + "/" + n + " par (w tym pancerz - wiersz Z16 - "
-                         + ours + ", odmowy " + refused + ", sito " + (on ? "wlaczone" : "WYLACZONE") + ")"
+                         + ours + ", odmowy " + refused + ", sito " + (on ? "wlaczone" : "WYLACZONE")
+                         + ", ladry " + bardOk + "/" + bard + " zgodne, wedlug Jazdy " + (ItemReq.BardingByRiding() ? "TAK" : "NIE")
+                         + ", RelevantSkill z ROT: pancerz " + (rotArmour ? "TAK" : "NIE") + ", ladry " + (rotBarding ? "TAK" : "NIE") + ")"
                          + (bad.Count > 0 ? " - NIEZGODNE: " + string.Join("; ", bad.ToArray()) : "") + ".");
             }
             catch (Exception e) { Log.Error("HeroGear.SelfTest", e); }

@@ -38,9 +38,13 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Z16 (Jeff 09.10): SITO BOHATEROW - gracz, towarzysze, lordowie AI. To samo co Meets, z jednym wyjatkiem:
-        /// ladry konskie (HorseHarness) przechodza. To DECYZJA, nie obejscie: od Z16b SkillFor daje ladrom Jazde (zolnierze,
-        /// K1, kwatermistrz), a bohaterom ladr nie sprawdzamy (opis MCM HeroGearRequirements: "Horse barding is not checked").
+        /// Z16 (Jeff 09.10): SITO BOHATEROW - gracz, towarzysze, lordowie AI. To samo co Meets (ladry konskie - Jazda, jak
+        /// u zolnierzy: SkillFor od Z16b). r2-pancerz (PLAN 1.7): dotad ladry bohaterom przepuszczalismy ("Horse barding is not
+        /// checked" - pozostalosc projektu Z16, gdy SkillFor dawal ladrom Atletyke), a ekran gry ich NIE przepuszczal: ROT 8.1.8
+        /// (XMLParserAddons.RelevantSkill, postfiks na ItemObject.RelevantSkill, przy ROTCoreBehavior.ExtraGearRequirements -
+        /// domyslnie TAK, zapis kampanii) daje ladrom Jazde, a pancerzowi Atletyke, wiec CharacterHelper.CanUseItem odmawia
+        /// ladr ponad Jazde. Samotest Z16 (test 160 dob na WGRANIU 89): 489/500, niezgodne - ladry (ekran NIE, regula TAK). Teraz ladry
+        /// wedlug Jazdy takze u bohaterow (wylacznik HeroBardingNeedsRiding - wylaczony = stare przepuszczanie).
         /// Jedna metoda dla wszystkich drog zakladania u bohaterow (sklad9-p: takze sprzet startowy gracza - StartKit): ekran
         /// (HeroGear), Spoils auto-equip, unikaty (UniqueSpoils, UniqueLaw.StandInFor), zaciag ROT (DragonUnmount),
         /// zamiennik broni zabranej jencowi (ROT gank). Lustro w CrashScribe: Mends.CanUseHero.
@@ -48,9 +52,16 @@ namespace Armoury
         internal static bool MeetsHero(CharacterObject ch, ItemObject it, out string why)
         {
             why = null;
-            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return true; }
+            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness && !BardingByRiding()) return true; }
             catch { return true; }
             return Meets(ch, it, out why);
+        }
+
+        /// <summary>r2-pancerz: ladry u bohaterow wedlug Jazdy (HeroBardingNeedsRiding; bez ustawien - TAK). Odczyt pola, bez alokacji.</summary>
+        internal static bool BardingByRiding()
+        {
+            var s = Settings.Current;
+            return s == null || s.HeroBardingNeedsRiding;
         }
 
         internal static bool MeetsHero(CharacterObject ch, ItemObject it)

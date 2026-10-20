@@ -36,8 +36,8 @@ namespace Armoury
         }
 
         /// <summary>sklad9-p: jedno zrodlo prawdy - sito bohaterow ItemReq.MeetsHero (ItemReq.SkillFor: bron i kon z danych, pancerz -
-        /// Atletyka, strzaly Luk, belty Kusza; ladry konskie bohaterom nie sprawdzane - jak na ekranie i w opisie MCM). Dotad wlasna kopia
-        /// bez galezi ladr: ladry (ArmorComponent) mierzone Atletyka wobec Difficulty z XML ROT.</summary>
+        /// Atletyka, strzaly Luk, belty Kusza; ladry konskie - Jazda, jak na ekranie gry z ROT ExtraGearRequirements - r2-pancerz,
+        /// wylacznik HeroBardingNeedsRiding). Dotad wlasna kopia bez galezi ladr: ladry (ArmorComponent) mierzone Atletyka wobec Difficulty z XML ROT.</summary>
         private static bool CanUse(Hero h, ItemObject it)
         {
             try
@@ -64,6 +64,9 @@ namespace Armoury
                 if (it.Culture != null && culture != null && it.Culture != culture && !it.Culture.StringId.StartsWith("neutral")) continue;
                 if (ArmsPricing.IsUnique(it)) continue;
                 if (orig.ItemType == ItemObject.ItemTypeEnum.Horse && it.HorseComponent != null && it.HorseComponent.IsPackAnimal) continue;
+                // r2-pancerz: ladry odtad sprawdzane Jazda - zamiennik tylko tej samej rodziny (kon/wielblad/slon), inaczej nie pasuje do konia
+                if (orig.ItemType == ItemObject.ItemTypeEnum.HorseHarness
+                    && (it.ArmorComponent == null || orig.ArmorComponent == null || it.ArmorComponent.FamilyType != orig.ArmorComponent.FamilyType)) continue;
                 if (!CanUse(h, it)) continue;
                 if (best == null || Worth(it) > Worth(best)) best = it;
             }
