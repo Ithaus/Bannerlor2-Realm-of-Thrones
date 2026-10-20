@@ -4832,6 +4832,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
 
+        [SettingPropertyBool("Raven News", HintText = "news of far-off wars, battles and sieges reaches you as fast as a raven flies: wars declared and peace, alliances or non-aggression pacts made between other realms, sieges, raids and assaults, lords slain in battle or executed, taken captive, set free or risen as White Walkers come to you later the farther away they happened - about three days from King's Landing to Winterfell, four and a half from Pentos, a week from Qarth, never more than twelve days - with a note saying where the raven came from (e.g. 'A raven from Winterfell, 3 days on the wing: ...'). Tavern gossip about such news waits for the same raven. News about you, your clan, your close kin or your fiefs (on either side of a fight), wars, peace or alliances of your own realm, your realm's hosts gathering and deaths in its ruling house still come at once, and so does anything less than a day's ride away. Only your messages wait - the lords of the world know what they knew before. Ravens in flight are kept in the save. Off = all news at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RavenNews { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -5012,6 +5016,14 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public float TroopMendMaxHours { get; set; } = 24f;
 
+        [SettingPropertyBool("Camp Armourer", HintText = "the companion with the best Smithing in your party works as the company armourer: while you camp, besiege or rest outside a town (not on the march, not at night) he mends your men's worn metal kit from the stores - weapons, mail, plate, helms - worst first, slower than a town workshop (more Smithing, quicker hands), with the materials from your baggage (iron, charcoal, leather...) as when you mend it yourself - a piece he has no materials for waits and he takes the next one; he learns Smithing only for the hours he really works (8 experience an hour, at most 100 a day); a piece he has begun stays on his anvil until it is done; wrecks, horses, leather, cloth, bows and shields are not his work", RequireRestart = false)]
+        [SettingPropertyGroup("The men's gear")]
+        public bool CampArmourer { get; set; } = true;
+
+        [SettingPropertyBool("Camp Quartermaster Steward", HintText = "with Camp Armourer on: your party's quartermaster (the leader if none is set) hands the armourer his pieces, measures out the materials and sorts the work - his Steward saves the armourer time (up to a quarter quicker at Steward 200, still slower than a town workshop), and he learns Steward only for the hours the camp forge really works (2 an hour, at most 25 a day); a quartermaster who is the armourer himself, wounded or a prisoner gives no help", RequireRestart = false)]
+        [SettingPropertyGroup("The men's gear")]
+        public bool CampQuartermasterSteward { get; set; } = true;
+
         [SettingPropertyBool("Troop Order Enabled", HintText = "order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks", RequireRestart = false)]
         [SettingPropertyGroup("The men's gear")]
         public bool TroopOrderEnabled { get; set; } = true;
@@ -5035,6 +5047,18 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Mend Loot Hours Per Piece", 0.00f, 2.40f, "0.00", HintText = "hours per battle-worn piece from the bags", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public float MendLootHoursPerPiece { get; set; } = 0.6f;
+
+        [SettingPropertyBool("Mend Hours By Guild", HintText = "a repair in town takes as many working hours as it really would, and the right trade does it: smiths for metal, saddlers for leather and saddles, tailors for cloth and padded coats, bowyers for bows and crossbows, shieldmakers for shields. A lightly worn sword is an hour or two, a battered brigandine about 140 hours, so a big haul of loot takes a day or two; hours spent mending yesterday are missing from that trade's workshop work today. Your orders (loot, a single piece, your harness, the men's racks) take as long as the trade's free hands need and keep those hands busy hour by hour while you wait - what does not fit today goes on tomorrow, so Troop Mend Max Hours no longer cuts the men's racks short; the quartermaster's repairs (Spoils) take only the hours the trades have free today, the rest waits. The price of the repair does not change (off = every piece 0.6 hours at the smiths, your harness 1.5 hours a piece, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendHoursByGuild { get; set; } = true;
+
+        [SettingPropertyBool("Auto Mend Half Guild", HintText = "with Mend Hours By Guild on: the repairs nobody orders by hand - the AI lords' men and your own men paying from their purse - together take at most half of each trade's working hours in a town each day, so the workshops never stand idle and some hands stay free for your own orders (off = they may take every free hour)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AutoMendHalfGuild { get; set; } = true;
+
+        [SettingPropertyBool("Mend Bulk Every Order", HintText = "the bulk rate of the men's racks (Troop Mend Bulk Discount: 0.5% off the work per piece, up to 30%) applies to every repair order in a town: your loot from the bags, your harness, the quartermaster's repairs (Spoils), your men's daily mending and each AI lord's day at the smiths (counting the pieces the trades really take that day) - the more pieces in one order, the bigger the rate; off the work only, not the materials or the hours (off = only on the men's racks, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendBulkEveryOrder { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Mend Material Max Share", 0.00f, 1.00f, "0.00", HintText = "mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials - and of the days of work that made the piece", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
@@ -5383,6 +5407,14 @@ namespace Armoury
         [SettingPropertyBool("Army175 Minor Lore", HintText = "the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load", RequireRestart = false)]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175MinorLore { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Vale Reach Knights", HintText = "As in the books, the knights of the Vale and the Reach ride and fight better: the Vale Rider (tier 3), the Vale Lancer (tier 4) and the Reach Rider (tier 4) get 20 more Riding and 20 more of their main weapon skill on top of what their own gear demands (the weapon skill stays one point below the next tier's requirement, so no man outgrows his tier), and the two Vale riders wear armour one step heavier: heavier Vale pieces of their own tier on head, legs, hands and shoulders (the Vale has no heavier breastplate at tiers 3-4, so the body armour stays; the armour part works only together with Army 175 Tier Gear). Only your own battles feel it: auto-resolve counts a soldier by his tier, not his skills, and pay does not change. Applied by CrashScribe, takes effect on the next load", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175ValeReachKnights { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Frey Horse Archers", HintText = "As in the books, House Frey rides out with mounted archers: the Frey Rider (tier 4, upgraded from the Frey Cutthroat) becomes a horse archer - a short bow usable from the saddle, two quivers of arrows of his tier and one melee weapon he can use on horseback, no shield; Bow becomes his best skill and he forms up with the horse archers. The Frey Horseman (tier 5) stays a lancer. Lords buy bows and arrows for him instead of lances, ROT still recruits and upgrades Frey riders as before, and in auto-resolve he counts as a horse archer (stronger on open plains, weaker in forests and sieges). Works only together with Army 175 Tier Gear. Applied by CrashScribe, takes effect on the next load", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175FreyHorseArchers { get; set; } = true;
 
         [SettingPropertyBool("Army Cohesion Year Scale", HintText = "An army's cohesion falls each day at the pace the game meant for its 84-day year, scaled to the long year (84 / 364 = 0.23): a lord's army of five parties holds together about 80 days instead of about 19, and about 45 days instead of 12 deep in enemy land; your own army likewise. Starving, low-morale and weak parties still drain it faster, and a commander can still spend influence to restore it. Off = the game's daily loss", RequireRestart = false)]
         [SettingPropertyGroup("Armies of the realms (175)")]
@@ -9615,6 +9647,7 @@ namespace Armoury
             s.InnGossipLootWords = InnGossipLootWords;
             s.InnGossipLeaderNames = InnGossipLeaderNames;
             s.InnGossipPages = InnGossipPages;
+            s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
@@ -9660,12 +9693,17 @@ namespace Armoury
             s.TroopMendBulkDiscountPP = TroopMendBulkDiscountPP;
             s.TroopMendBulkDiscountMax = TroopMendBulkDiscountMax;
             s.TroopMendMaxHours = TroopMendMaxHours;
+            s.CampArmourer = CampArmourer;
+            s.CampQuartermasterSteward = CampQuartermasterSteward;
             s.TroopOrderEnabled = TroopOrderEnabled;
             s.TroopOrderMarkup = TroopOrderMarkup;
             s.TroopOrderFromShelf = TroopOrderFromShelf;
             s.SmithRepairHoursPerPiece = SmithRepairHoursPerPiece;
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
+            s.MendHoursByGuild = MendHoursByGuild;
+            s.AutoMendHalfGuild = AutoMendHalfGuild;
+            s.MendBulkEveryOrder = MendBulkEveryOrder;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;
             s.WrecksToScrap = WrecksToScrap;
@@ -9753,6 +9791,8 @@ namespace Armoury
             s.Army175NorthFoot = Army175NorthFoot;
             s.Army175VolantisNorvos = Army175VolantisNorvos;
             s.Army175MinorLore = Army175MinorLore;
+            s.Army175ValeReachKnights = Army175ValeReachKnights;
+            s.Army175FreyHorseArchers = Army175FreyHorseArchers;
             s.ArmyCohesionYearScale = ArmyCohesionYearScale;
             s.ArmyRestDay = ArmyRestDay;
             s.ArmyRestDayAfterMarchDays = ArmyRestDayAfterMarchDays;

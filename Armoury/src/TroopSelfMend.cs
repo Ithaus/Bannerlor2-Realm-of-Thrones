@@ -28,7 +28,7 @@ namespace Armoury
         private static float _bench;
         private static string _benchTown;
 
-        internal static void LeftTown() { _bench = 0f; _benchTown = null; }
+        internal static void LeftTown() { _bench = 0f; _benchTown = null; GuildMend.MenLeftTown(); }
 
         internal static int UnitCost(EquipmentElement ee)   // internal: robocizna kowali miasta - ta sama stawka u kwatermistrza Spoils (SpoilsSeal)
         {
@@ -136,6 +136,7 @@ namespace Armoury
 
         internal static void Hourly()
         {
+            GuildMend.HourTick();   // R3-02 / R3-04c: przelom doby pul cechow + platnerz w taborze (wlasne try)
             try
             {
                 var s = Settings.Current;
@@ -150,12 +151,14 @@ namespace Armoury
                 var worn = MenWorn(armory);   // K1 (przeglad): tylko sztuki ludzi - Twoja czesc kazdego id (najgorsze egzemplarze) pomijana
                 if (worn.Count == 0) { _bench = 0f; return; }
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
+                if (GuildMend.On) { _bench = 0f; GuildMend.MenHourly(main, st, armory, worn); return; }   // R3-02: godziny wedlug cechu i stanu, polowa rak, rabat hurtowy
                 // godziny kowali na godzine: rece miasta x (platnerze + miecznicy) / wszystkie cechy
                 // wpis 91: godziny z WSPOLNEJ puli kowali miasta (dzienny zapas rozlozony na 18 godzin pracy)
                 float hourShare = Math.Min(SmithHours.Available(st.Town), SmithHours.Capacity(st.Town) / Math.Max(1f, s.WorkHoursPerManDay));   // wpis 93: dzien pracy kowala rozlozony na jego godziny
                 _bench += hourShare;
                 float per = Math.Max(0.05f, s.MendLootHoursPerPiece);
-                if (MendMaterial.MenAndLordsOn) { HourlyWithMaterial(main, st, armory, worn, hourShare, per); return; }   // poprawka po audycie TOWARY 3
+                int bulkN = GuildMend.MenBulkN(st, worn);   // R3-02 (recenzja): rabat hurtowy zlecenia dnia takze bez godzin cechow (0% przy wylaczonym MendBulkEveryOrder)
+                if (MendMaterial.MenAndLordsOn) { HourlyWithMaterial(main, st, armory, worn, hourShare, per, bulkN); return; }   // poprawka po audycie TOWARY 3
                 int mended = 0, paid = 0;
                 bool broke = false;
                 foreach (var el in worn)
@@ -163,10 +166,11 @@ namespace Armoury
                     int left = el.Amount, fixedN = 0;
                     while (left > 0 && _bench >= per)
                     {
-                        int unit = UnitCost(el.EquipmentElement, st);
+                        int unit = GuildMend.Bulk(UnitCost(el.EquipmentElement, st), bulkN);
                         if (MenPurse.Get(main) < unit) { broke = true; break; }
                         MenPurse.Take(main, unit);
                         MendMaterial.PaySmiths(st, unit, unit);   // E6/N1: sama robocizna - do kiesy ludu (B1), reszta kasa; linia kas 169 w PaySmiths
+                        GuildMend.NoteBulk(unit, bulkN);
                         _bench -= per; left--; fixedN++; paid += unit;
                     }
                     if (fixedN > 0)
@@ -201,7 +205,7 @@ namespace Armoury
         private static int _hourMat;
         private static readonly float[] _hourKg = new float[MendMaterial.Kinds];
 
-        private static void HourlyWithMaterial(MobileParty main, Settlement st, ItemRoster armory, List<ItemRosterElement> worn, float hourShare, float per)
+        private static void HourlyWithMaterial(MobileParty main, Settlement st, ItemRoster armory, List<ItemRosterElement> worn, float hourShare, float per, int bulkN = 0)
         {
             var o = new MendMaterial.Order(st);
             int purse = MenPurse.Get(main);
@@ -213,7 +217,7 @@ namespace Armoury
                 int n = Math.Min(el.Amount, (int)Math.Floor(_bench / per + 0.0001f));   // tyle sztuk tego stosu, na ile starczy godzin kowali
                 if (n <= 0) break;
                 int poor0 = o.Poor;
-                int planned = o.AddLot(ee, MendMaterial.Needs(ee), UnitCost(ee, st), n, purse, int.MaxValue);   // brak materialu: reszta stosu czeka, nastepny stos dalej
+                int planned = o.AddLot(ee, MendMaterial.Needs(ee), GuildMend.Bulk(UnitCost(ee, st), bulkN), n, purse, int.MaxValue);   // brak materialu: reszta stosu czeka, nastepny stos dalej (R3-02: po rabacie hurtowym)
                 _bench -= planned * per;
                 if (o.Poor > poor0) { broke = true; break; }
             }
@@ -229,6 +233,7 @@ namespace Armoury
                 }
                 paid = MenPurse.Take(main, o.Total);
                 MendMaterial.PaySmiths(st, paid, o.Labor);   // E6/N1: robocizna do kiesy ludu (B1), material do kasy miasta; linia kas 169 w PaySmiths
+                GuildMend.NoteBulk(o.Labor, bulkN);
                 for (int k = 0; k < MendMaterial.Kinds; k++) _hourKg[k] += o.Bench.UsedKg[k];
                 _hourMat += o.MatGold;
             }
@@ -291,22 +296,38 @@ namespace Armoury
                 foreach (var el in worn) wornTotal += el.Amount;
                 int budget = Math.Max(3, (int)Math.Round(wornTotal * s.TroopSelfMendPercentPerDay / 100.0));
                 if (budget > wornTotal) budget = wornTotal;
-                if (MendMaterial.MenAndLordsOn) { RunWithMaterial(st, armory, worn, budget); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
+                // R3-02 (recenzja, sciezka 6b): godziny cechow (naprawa automatyczna - polowa rak) i rabat hurtowy zlecenia dnia (sztuki, na ktore cech ma godziny)
+                var gb = GuildMend.On ? new GuildMend.Budget(st.Town) : null;
+                int bulkN = 0;
+                if (GuildMend.BulkOn)
+                {
+                    if (gb == null) bulkN = budget;
+                    else
+                    {
+                        var els = new List<EquipmentElement>();
+                        foreach (var el in worn) for (int k = 0; k < el.Amount && els.Count < budget; k++) els.Add(el.EquipmentElement);
+                        bulkN = gb.Preview(els);
+                    }
+                }
+                if (MendMaterial.MenAndLordsOn) { RunWithMaterial(st, armory, worn, budget, gb, bulkN); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int mended = 0, paidAll = 0;
                 foreach (var el in worn)
                 {
                     if (budget <= 0) break;
                     // audyt pelny K2: naprawa PLATNA miastu (robocizna jak u kowala: 25% utraconej wartosci) - wczesniej za darmo
-                    int unit = UnitCost(el.EquipmentElement, st);   // ta sama robota co w Hourly i na lawie
+                    int unit = GuildMend.Bulk(UnitCost(el.EquipmentElement, st), bulkN);   // ta sama robota co w Hourly i na lawie (R3-02: po rabacie hurtowym)
                     int afford = Math.Max(0, TaleWorlds.CampaignSystem.Hero.MainHero.Gold - paidAll) / unit;
                     int take = Math.Min(Math.Min(budget, el.Amount), afford);
+                    if (gb != null) { take = gb.HowMany(el.EquipmentElement, take); if (take <= 0) continue; gb.Take(el.EquipmentElement, take); }   // cech bez godzin - stos czeka, inne cechy dalej
                     if (take <= 0) break;
+                    GuildMend.NoteBulk(unit * take, bulkN);
                     paidAll += unit * take;
                     armory.AddToCounts(el.EquipmentElement, -take);
                     armory.AddToCounts(new EquipmentElement(el.EquipmentElement.Item), take);   // czysty stan
                     mended += take; budget -= take;
                 }
                 if (paidAll > 0) Pay.ToSettlement(paidAll);
+                if (gb != null) gb.CommitMen(mended);
                 if (mended > 0)
                 {
                     Log.Info("TroopSelfMend: wojsko naprawilo " + mended + " sztuk w " + st.Name + " za " + paidAll + " zl do kasy miasta.");
@@ -318,7 +339,7 @@ namespace Armoury
         }
 
         /// <summary>Run przy naprawach z materialem: ten sam plan co Hourly (MendMaterial.Order), zaplata z kiesy gracza do kasy miasta.</summary>
-        private static void RunWithMaterial(Settlement st, ItemRoster armory, List<ItemRosterElement> worn, int budget)
+        private static void RunWithMaterial(Settlement st, ItemRoster armory, List<ItemRosterElement> worn, int budget, GuildMend.Budget gb = null, int bulkN = 0)
         {
             var o = new MendMaterial.Order(st);
             long gold = Math.Max(0, TaleWorlds.CampaignSystem.Hero.MainHero.Gold);
@@ -326,9 +347,14 @@ namespace Armoury
             {
                 if (o.Pieces >= budget) break;
                 var ee = el.EquipmentElement;
-                o.AddLot(ee, MendMaterial.Needs(ee), UnitCost(ee, st), el.Amount, gold, budget);
+                int n = el.Amount;
+                if (gb != null) { n = gb.HowMany(ee, n); if (n <= 0) continue; }   // R3-02: tyle sztuk stosu, na ile cech ma dzis godzin (reszta czeka)
+                int planned = o.AddLot(ee, MendMaterial.Needs(ee), GuildMend.Bulk(UnitCost(ee, st), bulkN), n, gold, budget);
+                if (gb != null) gb.Take(ee, planned);
                 if (o.Poor > 0) break;
             }
+            if (gb != null) gb.CommitMen(o.Pieces);
+            if (o.Pieces > 0) GuildMend.NoteBulk(o.Labor, bulkN);
             if (o.Pieces <= 0)
             {
                 if (o.Wait > 0) Log.Info("TroopSelfMend: " + st.Name + " - nic nie naprawiono, czeka na material " + o.Wait + " (brak: " + MendMaterial.KindsPl(o.WaitMask) + ").");

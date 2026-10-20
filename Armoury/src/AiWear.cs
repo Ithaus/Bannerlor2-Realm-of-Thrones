@@ -927,6 +927,8 @@ namespace Armoury
                 // wpis 91: z WSPOLNEJ puli kowali miasta - lordowie i gracz dziela te same rece
                 float perPiece = Math.Max(0.05f, s.MendLootHoursPerPiece);
                 int cap = (int)(SmithHours.Available(st.Town) / perPiece);
+                var gb = GuildMend.On ? new GuildMend.Budget(st.Town) : null;   // R3-02: godziny wedlug cechu i stanu, najwyzej polowa rak cechu (AI + ludzie gracza)
+                if (gb != null) cap = int.MaxValue;
                 var jobs = new List<KeyValuePair<string, string>>();   // przedmiot, modyfikator - najgorsze najpierw
                 // E6/N1 (217, R16): przy AiMendsWornOnly tylko obite sztuki, ktore nosza ludzie (dopasowanie swieze - raz na dobe na partie, pamiec dla rezerwy)
                 bool oldMem;   // F6 pkt 2: naprawa liczy swiezo (fresh) - nigdy z pamieci
@@ -962,24 +964,41 @@ namespace Armoury
                     var cheapFirst = jobs.OrderBy(j => unitBy[j.Key + "|" + j.Value]).ToList();
                     jobs.Clear(); jobs.AddRange(cheapFirst);
                 }
-                if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece, q); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
+                // R3-02: rabat hurtowy - zlecenie to dzien lorda w miescie; recenzja: od sztuk, ktore cech (albo kowale starej reguly) naprawde wezmie dzis, nie od calej kolejki
+                int bulkN = 0;
+                if (GuildMend.BulkOn)
+                {
+                    if (gb == null) bulkN = Math.Min(jobs.Count, cap);
+                    else
+                    {
+                        var els = new List<EquipmentElement>(jobs.Count);
+                        foreach (var j in jobs) { var io = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (io != null) els.Add(new EquipmentElement(io, Mod(j.Value))); }
+                        bulkN = gb.Preview(els);
+                    }
+                }
+                if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece, q, gb, bulkN); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int done = 0, paid = 0, poorN = 0, afterPoor = 0;
+                bool brokeP = false;   // R3-02: sakiewka przerwala zlecenie (licznik powodu stania przy godzinach cechow)
                 foreach (var j in jobs)
                 {
                     if (done >= cap) break;
                     var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
-                    int unit = UnitCost(item, Mod(j.Value), st);
-                    if (MenPurse.Get(mp) < unit) { if (!q) break; poorN++; continue; }   // E8/W (R5): sztuka, na ktora nie stac, czeka - nastepna probuje (dotad koniec na dzis)
+                    if (gb != null && gb.HowMany(new EquipmentElement(item, Mod(j.Value)), 1) < 1) continue;   // R3-02: cech tej sztuki nie ma dzis godzin - czeka, inne cechy dalej
+                    int unit = GuildMend.Bulk(UnitCost(item, Mod(j.Value), st), bulkN);
+                    if (MenPurse.Get(mp) < unit) { if (!q) { brokeP = true; break; } poorN++; continue; }   // E8/W (R5): sztuka, na ktora nie stac, czeka - nastepna probuje (dotad koniec na dzis)
+                    if (gb != null) gb.Take(new EquipmentElement(item, Mod(j.Value)), 1);
+                    if (bulkN > 0) GuildMend.NoteBulk(unit, bulkN);
                     MenPurse.Take(mp, unit);
                     _dayFolk += MendMaterial.PaySmiths(st, unit, unit);   // E6/N1: sama robocizna - do kiesy ludu (B1), reszta kasa; linia kas 169 w PaySmiths
                     AddWorn(mp.StringId, j.Key, j.Value, -1);
                     done++; paid += unit;
                     if (poorN > 0) afterPoor++;
                 }
-                SmithHours.Use(st.Town, done * perPiece);
+                if (gb != null) gb.Commit(done); else SmithHours.Use(st.Town, done * perPiece);
                 _dayMended += done; _dayPaid += paid;
                 if (q) WMend(poorN, afterPoor);   // E8/W: linia doby (tylko licznik)
-                P2Mend(mp, jobs.Count, done, 0, 0, q ? poorN > 0 : done < cap, done >= cap, q ? poorN : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
+                bool capHit = gb != null ? gb.CapHit : done >= cap;
+                P2Mend(mp, jobs.Count, done, 0, 0, q ? poorN > 0 : (gb != null ? brokeP : done < cap), capHit, q ? poorN : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik); R3-02 wylaczony - jak dotad
             }
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }
         }
@@ -1019,7 +1038,7 @@ namespace Armoury
         /// przedmiotu i stanu tez), inne ida dalej; sakiewka ludzi placi robote + material w calych pensach do kasy miasta. Najpierw plan na
         /// kopii (polka i zapas bez zmian), potem Commit, zaplata i zapis stanu - tylko dla zaplanowanych sztuk. Godziny kowali - za gotowe.
         /// </summary>
-        private static void MendWithMaterial(MobileParty mp, Settlement st, List<KeyValuePair<string, string>> jobs, int cap, float perPiece, bool q)
+        private static void MendWithMaterial(MobileParty mp, Settlement st, List<KeyValuePair<string, string>> jobs, int cap, float perPiece, bool q, GuildMend.Budget gb = null, int bulkN = 0)
         {
             var o = new MendMaterial.Order(st);
             int purse = MenPurse.Get(mp);
@@ -1036,12 +1055,14 @@ namespace Armoury
                 var mod = Mod(j.Value);
                 var ee = new EquipmentElement(item, mod);
                 var need = MendMaterial.Needs(ee);
-                int unit = UnitCost(item, mod, st), n = count[j.Key + "|" + j.Value];
+                int unit = GuildMend.Bulk(UnitCost(item, mod, st), bulkN), n = count[j.Key + "|" + j.Value];   // R3-02: rabat hurtowy zlecenia (0 = bez)
+                if (gb != null) { n = gb.HowMany(ee, n); if (n <= 0) continue; }   // R3-02: tyle sztuk stosu, na ile cech ma dzis godzin (reszta czeka)
                 // E8/W: sama robocizna ponad reszte sakiewki - stos czeka bez planowania materialu (AddLot odrzucilby kazda sztuke tak samo: robocizna
                 // + material <= sakiewka); sztuka bez receptury kowala idzie do AddLot (licznik "nie robota kowala")
                 if (q && need != null && (long)o.Labor + unit + o.MatGold > purse) { poorPre += n; sawPoor = true; continue; }
                 int poor0 = o.Poor, pcs0 = o.Pieces; bool sawBefore = sawPoor;
-                o.AddLot(ee, need, unit, n, purse, cap);
+                int planned = o.AddLot(ee, need, unit, n, purse, cap);
+                if (gb != null) gb.Take(ee, planned);
                 if (sawBefore) afterPoor += o.Pieces - pcs0;
                 if (o.Poor > poor0)
                 {
@@ -1057,14 +1078,15 @@ namespace Armoury
                 paid = MenPurse.Take(mp, o.Total);
                 _dayFolk += MendMaterial.PaySmiths(st, paid, o.Labor);   // E6/N1: robocizna do kiesy ludu (B1), material do kasy miasta; linia kas 169 w PaySmiths
                 _dayMat += o.MatGold; _dayTowns++;
+                if (bulkN > 0) GuildMend.NoteBulk(o.Labor, bulkN);
                 for (int k = 0; k < MendMaterial.Kinds; k++) _dayKg[k] += o.Bench.UsedKg[k];
             }
-            SmithHours.Use(st.Town, done * perPiece);
+            if (gb != null) gb.Commit(done); else SmithHours.Use(st.Town, done * perPiece);
             _dayMended += done; _dayPaid += paid;
             _dayWait += o.Wait; _dayWaitMask |= o.WaitMask; _dayNoSmith += o.NoSmith;
             for (int k = 0; k < MendMaterial.Kinds; k++) _dayWaitBy[k] += o.WaitBy[k];
             if (q) WMend(o.Poor + poorPre, afterPoor);   // E8/W: linia doby (tylko licznik)
-            P2Mend(mp, jobs.Count, done, o.Wait, o.NoSmith, o.Poor + poorPre > 0, o.Pieces >= cap, q ? o.Poor + poorPre : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
+            P2Mend(mp, jobs.Count, done, o.Wait, o.NoSmith, o.Poor + poorPre > 0, gb != null ? gb.CapHit : o.Pieces >= cap, q ? o.Poor + poorPre : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
         }
 
         /// <summary>E8/W (249): zlecenie napraw z kolejka "czeka i idzie dalej" - ile sztuk czekalo na sakiewke i ile naprawiono PO pierwszej takiej sztuce
