@@ -108,6 +108,18 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmeltNoWood { get; set; } = true;
 
+        [SettingPropertyBool("Smelt Weapon By Parts", HintText = "smelting a weapon gives back metal of the same grades its parts are made of, in the same proportions, and at most the same share of its metal as smelting armour (about half, never more than Banner Kings allows for that kind of weapon). No crude iron from nowhere and no steel out of a wrought-iron weapon. Off = as Banner Kings does it: the cheaper metal is cut first and a bar of crude iron is added", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmeltWeaponByParts { get; set; } = true;
+
+        [SettingPropertyBool("Smelt Armour Once", HintText = "smelting armour or a shield gives back its metal once - the smelting screen used to count it twice (the game's rule and Banner Kings' rule both added it) and Banner Kings added a bar of crude iron to every shield. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmeltArmourOnce { get; set; } = true;
+
+        [SettingPropertyBool("Smith No Crude Input", HintText = "crude iron is only for refining: a weapon part that the game lists with crude iron costs the same number of wrought iron bars at the anvil, and with Smelt Weapon By Parts smelting such a weapon gives wrought iron back, never crude. Off = as in the game (those parts eat crude iron and smelting can give it back)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmithNoCrudeInput { get; set; } = true;
+
         [SettingPropertyBool("Forge One Clock", HintText = "one forge clock: Craft puts the piece on the smith's bench for the hours the Banner Kings screen shows (stamina spent / 6); pieces come off one by one when done - no lump wait afterwards", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOneClock { get; set; } = true;
@@ -1923,6 +1935,18 @@ namespace Armoury
         [SettingPropertyBool("Smelt Cap To Craft Cost", HintText = "melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool SmeltCapToCraftCost { get; set; } = true;
+
+        [SettingPropertyBool("Smelt Cap From Forge Bill", HintText = "with Smelt Cap To Craft Cost: the limit is a share of the metal that forging the same piece really takes at the anvil (its weight), not of its armour points - plate and mail gave back a tenth of their metal instead of up to half. Off = limit from armour points, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool SmeltCapFromForgeBill { get; set; } = true;
+
+        [SettingPropertyBool("Bk Shield Bill By Recipe", HintText = "a shield forged on the Banner Kings armour screen takes the same materials as at your own anvil - wood, iron for the rim and boss, leather and charcoal - instead of two pieces of wood (a wooden shield cost no iron to make, yet melted down into several bars). Off = the Banner Kings bill", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool BkShieldBillByRecipe { get; set; } = true;
+
+        [SettingPropertyBool("Shield No Velvet", HintText = "shields need no velvet: a tier 5-6 shield is faced with leather instead (the same count) - one piece of velvet costs many times the shield itself, and armour takes none either. Off = tier 5-6 shields also take velvet, at your anvil and on the Banner Kings screen", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool ShieldNoVelvet { get; set; } = true;
 
         [SettingPropertyBool("Start Stock In Loads", HintText = "new campaign only: the ore and timber the world starts with are counted by the load too - the game hands out the starting stock before the 100 kg load comes into force, so every storehouse, stall and pack train held ten times the intended weight and choked village storehouses stopped all work; done once, at the first launch of a new campaign (saves older than a day are left as they are)", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
@@ -8142,6 +8166,9 @@ namespace Armoury
             s.SmithWoodKgPerPiece = SmithWoodKgPerPiece;
             s.TourneyPrizeCommissioned = TourneyPrizeCommissioned;
             s.SmeltNoWood = SmeltNoWood;
+            s.SmeltWeaponByParts = SmeltWeaponByParts;
+            s.SmeltArmourOnce = SmeltArmourOnce;
+            s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
             s.ForgeLikeTownSmith = ForgeLikeTownSmith;
@@ -8596,6 +8623,9 @@ namespace Armoury
             s.NoFreeTimberAndTools = NoFreeTimberAndTools;
             s.VillageWoodlotLoads = VillageWoodlotLoads;
             s.SmeltCapToCraftCost = SmeltCapToCraftCost;
+            s.SmeltCapFromForgeBill = SmeltCapFromForgeBill;
+            s.BkShieldBillByRecipe = BkShieldBillByRecipe;
+            s.ShieldNoVelvet = ShieldNoVelvet;
             s.StartStockInLoads = StartStockInLoads;
             s.ArmsCostPricingEnabled = ArmsCostPricingEnabled;
             s.ArmsPriceBand = ArmsPriceBand;
