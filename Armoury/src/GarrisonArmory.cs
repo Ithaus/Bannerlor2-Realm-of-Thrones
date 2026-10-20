@@ -752,8 +752,53 @@ namespace Armoury
             return need;
         }
 
+        /// <summary>r3-jazda (GarrisonHorses): jezdzcy (IsMounted, bez bohaterow) patroli BK tej osady - ich konie leza w zbrojowni zalogi, wiec nie sa
+        /// wolne (poprawka liczby jezdzcow dla Stables.Balance). null - bez patroli. Ta sama mapa patroli raz na dobe co C10 i A7.</summary>
+        internal static Dictionary<CharacterObject, int> PatrolRiders(Settlement st)
+        {
+            try
+            {
+                if (st == null || _bkPatrolType == null) return null;
+                List<MobileParty> pl;
+                if (!PatrolsToday().TryGetValue(st, out pl) || pl == null || pl.Count == 0) return null;
+                Dictionary<CharacterObject, int> d = null;
+                foreach (var p in pl)
+                {
+                    // recenzja r3-jazda: patrol, ktory w ciagu doby wrocil albo zginal (nieczynny), nie liczy sie - jego ludzie sa juz w zalodze albo polegli
+                    var r = p != null && p.IsActive ? p.MemberRoster : null;
+                    if (r == null) continue;
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var el = r.GetElementCopyAtIndex(i);
+                        var ch = el.Character;
+                        if (ch == null || ch.IsHero || el.Number <= 0 || !ch.IsMounted) continue;
+                        if (d == null) d = new Dictionary<CharacterObject, int>();
+                        int v; d.TryGetValue(ch, out v); d[ch] = v + el.Number;
+                    }
+                }
+                return d;
+            }
+            catch (Exception e) { Stumble("PatrolRiders", e); return null; }
+        }
+
         private static Dictionary<Settlement, List<MobileParty>> _patrols;
         private static int _patrolsDay = -1;
+        private static bool _bkCreateHooked;
+
+        /// <summary>Recenzja r3-jazda: postfiks BK GarrisonPartyComponent.CreateParty(Settlement origin) - nowy patrol do mapy patroli biezacej doby
+        /// (mapa z innej doby i tak powstanie od nowa przy nastepnym uzyciu). Tylko dopisanie, bez przegladu partii.</summary>
+        private static void BkPatrolCreatedPostfix(Settlement origin, MobileParty __result)
+        {
+            try
+            {
+                if (__result == null || origin == null || _patrols == null || _patrolsDay != (int)CampaignTime.Now.ToDays) return;
+                var home = __result.HomeSettlement ?? origin;
+                List<MobileParty> l;
+                if (!_patrols.TryGetValue(home, out l)) _patrols[home] = l = new List<MobileParty>();
+                if (!l.Contains(__result)) l.Add(__result);
+            }
+            catch (Exception e) { Stumble("BkPatrolCreated", e); }
+        }
 
         /// <summary>Mapa patroli BK (osada -> patrole) liczona leniwie raz na dobe (jeden przeglad MobileParty.All) - wspolna dla C10 i A7.</summary>
         private static Dictionary<Settlement, List<MobileParty>> PatrolsToday()
@@ -1308,10 +1353,25 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll(CreateParty)", e); }
             try { _bkPatrolType = AccessTools.TypeByName("BannerKings.Components.GarrisonPartyComponent"); } catch { _bkPatrolType = null; }
+            // recenzja r3-jazda: patrol BK powstaly w ciagu doby (BK DailyTickSettlement - GarrisonPartyComponent.CreateParty zdejmuje ludzi z zalogi)
+            // dopisywany do mapy patroli tej doby - inaczej jego jezdzcy znikali z rachunku zalogi, a ich konie wygladaly na wolne (GarrisonHorses)
+            try
+            {
+                if (_bkPatrolType != null && !_bkCreateHooked)
+                {
+                    var m = AccessTools.Method(_bkPatrolType, "CreateParty", new[] { typeof(Settlement) });
+                    if (m != null && m.IsStatic && m.ReturnType == typeof(MobileParty))
+                    {
+                        h.Patch(m, postfix: new HarmonyMethod(typeof(GarrisonArmory), nameof(BkPatrolCreatedPostfix)));
+                        _bkCreateHooked = true;
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll(BkPatrol)", e); }
             Log.Info("GarrisonArmory: komplet z ludzmi - zostawienie " + (_leaveHooked ? "wpiete" : "BRAK") + ", zabranie " + (_takeHooked ? "wpiete" : "BRAK")
                      + ", rozwiazanie partii " + (_disbandHooked ? "wpiete" : "BRAK") + ", ekran druzyny gracza (poprawki sklad7; sklad7b: takze partie towarzyszy, rodu i \"Donate Troops\") "
                      + (_screenHooked ? "wpiety" : "BRAK") + ", nowa partia rodu (sklad7b) " + (_createHooked ? "wpieta" : "BRAK")
-                     + "; patrole BK: typ " + (_bkPatrolType != null ? "znaleziony" : "brak") + ".");
+                     + "; patrole BK: typ " + (_bkPatrolType != null ? "znaleziony" : "brak") + ", nowy patrol w ciagu doby (r3-jazda) " + (_bkCreateHooked ? "wpiety" : "BRAK") + ".");
         }
     }
 }

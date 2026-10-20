@@ -595,6 +595,7 @@ namespace Armoury
             try { TradeCarts.ForEachInTransit((it, n) => { int c = Cat(it); if (c >= 0) road[c] += n; }); } catch (Exception e) { Stumble("TradeCarts", e); }
             var now = new long[Cats];
             for (int i = 0; i < Cats; i++) now[i] = shelf[i] + vil[i] + stash[i] + party[i] + arm[i] + hero[i] + vet[i] + parm[i] + road[i];
+            try { GarrisonHorses.NoteShelf(shelf); } catch { }   // r3-jazda: polki koni do linii "Konie zalog dla lordow" (targi nie pustoszeja; tylko odczyt, swieza tablica tej doby)
             string state = "stan " + Row(now) + " (polki miast i zamkow " + Row(shelf) + ", magazyny wsi " + Row(vil) + ", schowki " + Row(stash) + ", tabory " + Row(party)
                            + ", zbrojownie DTE " + Row(arm) + ", zbrojownia gracza " + Row(parm) + ", bohaterowie " + Row(hero) + ", pula weteranow " + Row(vet) + ", w drodze wozem (215) " + Row(road) + ")";
             if (_prev == null)

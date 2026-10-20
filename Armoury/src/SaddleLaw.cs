@@ -619,14 +619,17 @@ namespace Armoury
             if (mp == null || st == null || mp.IsMainParty || !mp.IsLordParty || mp.MapEvent != null) return;
             try
             {
-                if (mp.ItemRoster == null || BagFit(mp.ItemRoster) <= 0) return;
-                long t0 = Tick();
-                try
+                if (mp.ItemRoster != null && BagFit(mp.ItemRoster) > 0)
                 {
-                    int want = BuyNeed(mp);
-                    if (want > 0) _dResaddle += MoveFromBag(mp, want);
+                    long t0 = Tick();
+                    try
+                    {
+                        int want = BuyNeed(mp);
+                        if (want > 0) _dResaddle += MoveFromBag(mp, want);
+                    }
+                    finally { Tock(t0); }
                 }
-                finally { Tock(t0); }
+                GarrisonHorses.GiveHarness(mp, st);   // r3-jazda (3): po uprzezy z taboru, przed zakupem siodel - uprzaz zalogi twierdzy swojego krolestwa ponad jej jezdzcow (wlasny try)
             }
             catch (Exception e) { Stumble("OnSettlementEntered", e); }
         }
@@ -786,6 +789,7 @@ namespace Armoury
                     CensusOne(MobileParty.MainParty, mine);
                 }
                 catch (Exception e) { Stumble("Census", e); }
+                try { GarrisonHorses.NoteCavalry(lords.Men, lords.TypeMounted, lords.Mounted); } catch (Exception e) { Stumble("NoteCavalry", e); }   // r3-jazda: jazda wedlug typu i z koniem do linii "Konie zalog dla lordow" (tylko odczyt spisu)
                 ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
                 long poolHar = 0;
                 try { HorseFate.VetPoolHarness((it, n) => poolHar += n); } catch (Exception e) { Stumble("VetPool", e); }
