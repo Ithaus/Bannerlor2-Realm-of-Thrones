@@ -41,9 +41,14 @@ namespace Armoury
         private const string P = "Plotki (PL): ";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal static bool On { get { var s = Settings.Current; return s != null && s.InnGossip; } }
+        // n20-plotki: stopnie slowne zamiast kwot / banda od herszta / strony w ramce - kazde pod wlasnym kluczem
+        private static bool WordsOn { get { var s = Settings.Current; return s != null && s.InnGossip && s.InnGossipLootWords; } }
+        private static bool NamesOn { get { var s = Settings.Current; return s != null && s.InnGossip && s.InnGossipLeaderNames; } }
+        private static bool PagesOn { get { var s = Settings.Current; return s != null && s.InnGossip && s.InnGossipPages; } }
 
         // ------------------------------------------------------------ ksiega (zapis arm_rumours)
-        private sealed class Band { public int First; public bool Known; public int Raids; }
+        // n20-plotki: Name/Female - nadane imie herszta (bez bohatera), zapis jako 5. i 6. pole wpisu bandy (stary DLL czyta 4 pierwsze - zgodne w obie strony)
+        private sealed class Band { public int First; public bool Known; public int Raids; public string Name; public bool Female; }
         private sealed class News { public int Kind, Day, N; public float X, Y; public string A = "", B = "", C = ""; }
         private const int NWar = 1, NPeace = 2, NCaptured = 3, NRaided = 4, NBattle = 5, NSiege = 6;
         private const int NewsMax = 60, NewsDays = 60, BandsMax = 6000, SaveMaxChars = 400000;
@@ -54,6 +59,9 @@ namespace Armoury
         private static int _dHeard, _dHeardRoad, _dHeardTown, _dItems, _dEmpty, _dBandsNew, _dBandsGone, _dNews, _dStumbles, _stumbles;
         private static readonly int[] _dCat = new int[7];   // 0 bandy, 1 kryjowki, 2 wojska, 3 karawany, 4 ceny, 5 wojny, 6 pusto
         private static long _dBuildTicks;
+        // n20-plotki: liczniki doby - herszci (bohater / z ksiegi / nadane), stopnie lupu (kiesy band, skarbce kryjowek), okna i strony
+        private static int _dNameHero, _dNameBook, _dNameNew, _dWindows, _dPages, _dPagesTurned, _dMaxLines;
+        private static readonly int[] _dPurseTier = new int[6], _dHoardTier = new int[6];
         private static bool _errLogged;
         private static string _importNote = "brak klucza (stary zapis albo nowa kampania)";
 
@@ -76,6 +84,8 @@ namespace Armoury
             _dHeard = _dHeardRoad = _dHeardTown = _dItems = _dEmpty = _dBandsNew = _dBandsGone = _dNews = _dStumbles = 0;
             Array.Clear(_dCat, 0, _dCat.Length);
             _dBuildTicks = 0;
+            _dNameHero = _dNameBook = _dNameNew = _dWindows = _dPages = _dPagesTurned = _dMaxLines = 0;
+            Array.Clear(_dPurseTier, 0, _dPurseTier.Length); Array.Clear(_dHoardTier, 0, _dHoardTier.Length);
         }
 
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
@@ -122,6 +132,8 @@ namespace Armoury
                 if (mp != null && mp.IsBandit && !string.IsNullOrEmpty(mp.StringId)) { Band b; if (_bands.TryGetValue(mp.StringId, out b)) b.Raids++; }
                 string who = lp != null && lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : lp != null ? lp.Name.ToString() : "raiders";
                 string fac = lp != null && lp.MapFaction != null ? lp.MapFaction.Name.ToString() : "";
+                // n20-plotki (InnGossipLeaderNames): banda w wiesci - "Jon Rivers and his bandits", bez "of Broken Men"
+                if (mp != null && mp.IsBandit && NamesOn) { who = BandWho(mp); fac = ""; }
                 AddNews(NRaided, st.GetPosition2D, who, fac, st.Name.ToString(), 0);
             }
             catch (Exception e) { Stumble("OnRaidCompleted", e); }
@@ -168,6 +180,12 @@ namespace Armoury
                 if ((wm == null || !wm.IsLordParty) && (lm == null || !lm.IsLordParty)) return;   // wielkie bitwy panow, nie potyczki band
                 string wn = w.LeaderParty.LeaderHero != null ? w.LeaderParty.LeaderHero.Name.ToString() : w.LeaderParty.Name.ToString();
                 string ln = l.LeaderParty.LeaderHero != null ? l.LeaderParty.LeaderHero.Name.ToString() : l.LeaderParty.Name.ToString();
+                // n20-plotki (InnGossipLeaderNames): banda po jednej ze stron - od herszta, nie "Broken Men"
+                if (NamesOn)
+                {
+                    if (wm != null && wm.IsBandit) wn = BandWho(wm);
+                    if (lm != null && lm.IsBandit) ln = BandWho(lm);
+                }
                 Vec2 pos = me.Position.ToVec2();
                 var near = NearestNamed(pos, 40f);
                 AddNews(NBattle, pos, wn, ln, near != null ? near.Name.ToString() : "", men);
@@ -238,6 +256,7 @@ namespace Armoury
                          + " dni), nowe dzis " + _dBandsNew + ", rozbite dzis " + _dBandsGone + ", dopisane bez doby " + added + ", usuniete martwe " + removed
                          + " | wiesci " + _news.Count + " (nowe dzis " + _dNews + ")"
                          + " | porzadki " + sw.ElapsedMilliseconds + " ms | wyjatki budowy dzis " + _dStumbles + " (od wczytania " + _stumbles + ").");
+                try { TalesLine(day); } catch (Exception e) { Stumble("TalesLine", e); }   // n20-plotki: osobna linia (linia doby wyzej ma stala postac dla sprawdz_logi.py)
             }
             catch (Exception e) { Stumble("DailyLog", e); }
             finally { DayReset(); }
@@ -267,6 +286,7 @@ namespace Armoury
                     if (kv.Key.IndexOfAny(new[] { ',', ';', '|' }) >= 0 || kv.Key.Length > 80) continue;
                     if (n++ > 0) sb.Append(';');
                     sb.Append(kv.Key).Append(',').Append(kv.Value.First.ToString(Inv)).Append(',').Append(kv.Value.Known ? '1' : '0').Append(',').Append(kv.Value.Raids.ToString(Inv));
+                    if (!string.IsNullOrEmpty(kv.Value.Name)) sb.Append(',').Append(Clean(kv.Value.Name)).Append(',').Append(kv.Value.Female ? '1' : '0');   // n20-plotki: imie herszta
                     if (sb.Length > SaveMaxChars) { sb.Length = 3; break; }   // straznik: bandy pominiete (wiesci zostaja)
                 }
                 sb.Append('|');
@@ -291,14 +311,19 @@ namespace Armoury
             {
                 var parts = data.Split('|');
                 if (parts.Length < 3 || parts[0] != "v1") { _importNote = "nieznany format - pominiety"; return; }
-                int bad = 0;
+                int bad = 0, named = 0;
                 foreach (var e in parts[1].Split(';'))
                 {
                     if (e.Length == 0) continue;
                     var a = e.Split(',');
                     int first, raids;
                     if (a.Length < 4 || !int.TryParse(a[1], NumberStyles.Integer, Inv, out first) || !int.TryParse(a[3], NumberStyles.Integer, Inv, out raids)) { bad++; continue; }
-                    if (_bands.Count < BandsMax) _bands[a[0]] = new Band { First = first, Known = a[2] == "1", Raids = Math.Max(0, raids) };
+                    if (_bands.Count < BandsMax)
+                    {
+                        var nb = new Band { First = first, Known = a[2] == "1", Raids = Math.Max(0, raids) };
+                        if (a.Length >= 6 && a[4].Trim().Length > 0) { nb.Name = a[4].Trim(); nb.Female = a[5] == "1"; named++; }   // n20-plotki: imie herszta z zapisu
+                        _bands[a[0]] = nb;
+                    }
                 }
                 foreach (var e in parts[2].Split(';'))
                 {
@@ -310,7 +335,7 @@ namespace Armoury
                         || !int.TryParse(a[4], NumberStyles.Integer, Inv, out n) || kind < NWar || kind > NSiege) { bad++; continue; }
                     if (_news.Count < NewsMax) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });
                 }
-                _importNote = "band " + _bands.Count + ", wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "");
+                _importNote = "band " + _bands.Count + " (z imieniem herszta " + named + "), wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "");
             }
             catch (Exception e) { _bands.Clear(); _news.Clear(); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
         }
@@ -378,18 +403,119 @@ namespace Armoury
             catch (Exception e) { Stumble("Build", e); items = new List<Item>(); }
             _dBuildTicks += Stopwatch.GetTimestamp() - t0;
             _dHeard++;
-            var sb = new StringBuilder(town ? "The innkeeper leans on his counter, and the drinkers are happy to talk:" : "By the hearth, drovers, pilgrims and pedlars trade the news of the road:");
+            string head = town ? "The innkeeper leans on his counter, and the drinkers are happy to talk:" : "By the hearth, drovers, pilgrims and pedlars trade the news of the road:";
             var cats = new int[7];
-            if (items.Count == 0)
+            if (items.Count == 0) { _dEmpty++; cats[6]++; }
+            foreach (var it in items) { cats[it.Cat]++; _dCat[it.Cat]++; _dItems++; }
+            // n20-plotki (InnGossipPages): strony mieszczace sie w ramce; klucz wylaczony - jedno okno jak dotad
+            var lines = new List<int>();
+            List<string> pages;
+            if (PagesOn) pages = Paginate(head, items, lines);
+            else
             {
-                _dEmpty++; cats[6]++;
-                sb.Append("\n\nThe talk is all of the weather and the harvest - nothing worth a copper.");
+                var sb = new StringBuilder(head);
+                if (items.Count == 0) sb.Append("\n\n").Append(Empty);
+                foreach (var it in items) sb.Append("\n\n- ").Append(it.Text);
+                pages = new List<string> { sb.ToString() };
+                lines.Add(EstLines(pages[0]));
             }
-            foreach (var it in items) { sb.Append("\n\n- ").Append(it.Text); cats[it.Cat]++; _dCat[it.Cat]++; _dItems++; }
+            _dWindows++; _dPages += pages.Count;
+            foreach (var n in lines) if (n > _dMaxLines) _dMaxLines = n;
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
             Log.Info(P + "sluchane w " + place + " (" + (town ? "karczma miasta" : "zajazd") + ", " + key + ") dzien " + Today + " - plotek " + items.Count + " (bandy " + cats[0] + ", kryjowki " + cats[1]
-                     + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5] + "), czas " + ms.ToString("0.0", Inv) + " ms.");
-            InformationManager.ShowInquiry(new InquiryData(place + " - gossip", sb.ToString(), true, false, "Enough talk", null, null, null), true);
+                     + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5] + "), czas " + ms.ToString("0.0", Inv) + " ms"
+                     + " | strony " + pages.Count + " (linie ok. " + JoinInts(lines) + ", miesci sie " + PageLines + ")" + (PagesOn ? "" : " - klucz Inn Gossip Pages WYLACZONE") + ".");
+            ShowPage(place, pages, 0);
+        }
+
+        // ------------------------------------------------------------ strony w ramce (n20-plotki, klucz InnGossipPages)
+        // Ramka okna gry (prefab SingleQueryPopup z ROT-Content) nie przewija opisu: tekst ma najwyzej 480 px wysokosci, a cala lista okna 645 px
+        // (tytul ok. 83 + marginesy opisu 40 + przyciski 70) - na opis zostaje ok. 452 px = 19 linii pisma FiraSansExtraCondensed 20 (wysokosc linii 38/32 x 20 = 23.75 px).
+        // Szerokosc opisu 512 - 2 x 30 = 452 px. Liczymy linie z szerokosci znakow czcionki gry (xadvance z .fnt, rozmiar 32) z zapasem: zawijanie przy 430 px, strona do 17 linii.
+        private const string Empty = "The talk is all of the weather and the harvest - nothing worth a copper.";
+        private const float WrapPx = 430f, FontScale = 20f / 32f;
+        internal const int PageLines = 17;
+        private static readonly byte[] Adv =
+        {
+            6,7,11,13,14,22,19,6,8,8,12,13,6,10,6,13,15,11,12,13,14,13,14,11,14,14,6,6,13,13,13,12,
+            27,15,16,14,17,13,12,16,17,7,8,15,12,21,17,18,15,18,16,14,13,17,15,22,14,14,13,8,13,8,14,13,
+            8,14,15,12,15,14,9,13,15,7,7,13,7,22,15,15,15,15,10,12,9,15,13,19,13,13,11,8,10,8,12
+        };
+
+        private static float WordPx(string w)
+        {
+            int u = 0;
+            foreach (char ch in w) u += ch >= 32 && ch <= 126 ? Adv[ch - 32] : 16;
+            return u * FontScale;
+        }
+
+        /// <summary>Linie tekstu w ramce okna (zawijanie po slowach przy WrapPx; pusty akapit = 1 linia).</summary>
+        internal static int EstLines(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            float space = Adv[0] * FontScale;
+            int lines = 0;
+            foreach (var para in text.Split('\n'))
+            {
+                lines++;
+                float cur = 0f;
+                foreach (var word in para.Split(' '))
+                {
+                    if (word.Length == 0) continue;
+                    float w = WordPx(word);
+                    if (cur <= 0f) cur = w;
+                    else if (cur + space + w <= WrapPx) cur += space + w;
+                    else { lines++; cur = w; }
+                    while (cur > WrapPx) { lines++; cur -= WrapPx; }   // slowo dluzsze niz linia (nie zdarza sie - na wszelki wypadek liczy, nie psuje)
+                }
+            }
+            return lines;
+        }
+
+        /// <summary>Plotki na strony: naglowek na pierwszej, wpisy w kolejnosci, pusta linia miedzy wpisami; nowa strona, gdy wpis by sie nie zmiescil (PageLines).</summary>
+        private static List<string> Paginate(string head, List<Item> items, List<int> lines)
+        {
+            var pages = new List<string>();
+            var sb = new StringBuilder(head);
+            int n = EstLines(head), onPage = 0;
+            var texts = new List<string>();
+            if (items.Count == 0) texts.Add(Empty);
+            foreach (var it in items) texts.Add("- " + it.Text);
+            foreach (var t in texts)
+            {
+                int need = EstLines(t) + 1;   // + pusta linia przed wpisem
+                if (onPage > 0 && n + need > PageLines)
+                {
+                    pages.Add(sb.ToString()); lines.Add(n);
+                    sb.Length = 0; n = 0; onPage = 0;
+                }
+                if (sb.Length > 0) sb.Append("\n\n"); else need--;
+                sb.Append(t); n += need; onPage++;
+            }
+            pages.Add(sb.ToString()); lines.Add(n);
+            return pages;
+        }
+
+        /// <summary>Okno strony i: "Hear more" (nastepna strona - gra kolejkuje okno i pokazuje je po zamknieciu tego, GauntletQueryManager.CloseQuery) i "Enough talk";
+        /// ostatnia strona - samo "Enough talk" jak dotad.</summary>
+        private static void ShowPage(string place, List<string> pages, int i)
+        {
+            bool more = i + 1 < pages.Count;
+            string title = place + " - gossip" + (pages.Count > 1 ? " (" + (i + 1).ToString(Inv) + "/" + pages.Count.ToString(Inv) + ")" : "");
+            Action next = null;
+            if (more)
+            {
+                int k = i + 1;
+                next = () => { try { _dPagesTurned++; ShowPage(place, pages, k); } catch (Exception e) { Stumble("NextPage", e); } };
+            }
+            InformationManager.ShowInquiry(new InquiryData(title, pages[i], true, more, more ? "Hear more" : "Enough talk", more ? "Enough talk" : null, next, null), true);
+        }
+
+        private static string JoinInts(List<int> v)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < v.Count; i++) { if (i > 0) sb.Append('+'); sb.Append(v[i].ToString(Inv)); }
+            return sb.ToString();
         }
 
         /// <summary>Plotki dla miejsca (deterministycznie: miejsce + doba). Najwyzej 2 o bandach, 1 o kryjowce, 1 o wojsku, 1 o karawanie, 1 o cenach, 2 o wojnach.</summary>
@@ -459,6 +585,21 @@ namespace Armoury
             if (e >= 20000) return "a king's ransom";
             if (e >= 5000) return "chests of silver";
             return "as much as " + Coarse(e).ToString("N0", Inv) + " denars";
+        }
+
+        // n20-plotki (InnGossipLootWords): stopnie lupu zamiast kwot. Skala z gry Jeffa 19.10 (log 14:41): ok. 930 band ma razem ok. 204 tys. (srednio ok. 220 na bande),
+        // skarbce 58 kryjowek ok. 93 tys. (srednio ok. 1 600, najwiekszy ok. 7 200). Progi: do 50 - bieda, do 250 - pare monet, do 700 - niezly lup, do 1 800 - bogaty,
+        // do 4 500 - wielki, wyzej - ogromny skarb. Jedna skala dla kies band i skarbcow (slowo znaczy wszedzie to samo). Daleko (dokladnosc < 0.45) plotka rosnie x1.4-3.0.
+        private static readonly int[] LootSteps = { 50, 250, 700, 1800, 4500 };
+        private static readonly string[] PurseWords = { "nothing", "a few stolen coins", "a fair haul", "rich spoils", "a great haul of plunder", "a huge hoard" };
+        private static readonly string[] HoardWords = { "little", "a little coin", "a fair hoard", "a rich hoard", "a great hoard", "a huge hoard" };
+
+        private static int LootTier(int g, float q, uint seed)
+        {
+            double e = q >= 0.45f ? g : g * Blow(seed);
+            int t = 0;
+            while (t < LootSteps.Length && e > LootSteps[t]) t++;
+            return t;
         }
 
         private static string Dir(Vec2 from, Vec2 to)
@@ -543,6 +684,126 @@ namespace Armoury
             return ((h >> 9) & 1u) == 0 ? Pre[(h >> 10) % (uint)Pre.Length] + " " + first : first + " " + Post[(h >> 10) % (uint)Post.Length];
         }
 
+        // n20-plotki (InnGossipLeaderNames): banda od herszta - imie i nazwisko. Westeros: nazwisko bekarta krainy (Snow, Rivers, Hill...) albo nazwisko prostego ludu;
+        // Wolni Ludzie - przydomek; Essos - "z miasta" (tam nie ma nazwisk). Kraina = kultura najblizszego miasta od DOMU bandy (kryjowka / osada bandy; bez domu - miejsce
+        // bandy przy pierwszym nadaniu), imie z list imion tej kultury w grze. Nadane imie zostaje w ksiedze band (zapis arm_rumours) - ta sama banda zawsze tak samo.
+        private static readonly string[] PlainF = { "Alys", "Jeyne", "Bella", "Wynafryd", "Mya", "Hilda", "Sarra", "Ryella" };
+        private static readonly string[] Smallfolk = { "Tanner", "Fletcher", "Cooper", "Thatcher", "Miller", "Potter", "Cobb", "Heddle", "Barleycorn", "Greenhands", "Marsh", "Brook", "Hook", "Shepherd" };
+        private static readonly string[] FreeBy = { "Bonebreaker", "Frostfinger", "Longspear", "Redbeard", "Wolfskin", "Stonecrow", "Icehand", "Crowkiller", "Ironbelly", "Thornhide" };
+        private static readonly string[] Kinds = { "bandits", "outlaws", "cutthroats" };
+
+        /// <summary>Nazwisko bekarta krainy Westeros wedlug id kultury ROT (null - brak: Wolni Ludzie / Essos / nieznana).</summary>
+        private static string Bastard(string cid)
+        {
+            switch (cid)
+            {
+                case "battania": case "skagosi": case "nightswatch": case "whitewalker": return "Snow";
+                case "river": return "Rivers";
+                case "vlandia": return "Hill";
+                case "reach": return "Flowers";
+                case "vale": return "Stone";
+                case "crownlands": case "dragonstone": return "Waters";
+                case "stormlands": return "Storm";
+                case "aserai": return "Sand";
+                case "sturgia": return "Pyke";
+                default: return null;
+            }
+        }
+
+        private static string MakeName(MobileParty p, out bool female)
+        {
+            uint h = MapVillageData.Fnv((p.StringId ?? "band") + "|herszt");
+            female = h % 10u == 0u;   // co dziesiaty herszt bez bohatera to kobieta
+            Vec2 home = p.GetPosition2D;
+            try { var hs = p.HomeSettlement; if (hs != null) home = hs.GetPosition2D; } catch { }
+            Settlement town = null;
+            try { town = NearestTown(home); } catch { town = null; }
+            var c = town != null ? town.Culture : null;
+            string first = null;
+            try
+            {
+                var list = c == null ? null : female ? c.FemaleNameList : c.MaleNameList;
+                if (list != null && list.Count > 0) first = list[(int)((h >> 4) % (uint)list.Count)].ToString();
+            }
+            catch { first = null; }
+            if (string.IsNullOrEmpty(first) || first.IndexOf('{') >= 0) first = female ? PlainF[(h >> 4) % (uint)PlainF.Length] : Plain[(h >> 4) % (uint)Plain.Length];
+            string cid = c != null && c.StringId != null ? c.StringId : "";
+            uint r = h >> 12;
+            string sur;
+            string bast = Bastard(cid);
+            if (bast != null) sur = (r & 1u) == 0 ? bast : Smallfolk[(r >> 1) % (uint)Smallfolk.Length];
+            else if (cid == "freefolk" || cid == "wildlings") sur = FreeBy[(r >> 1) % (uint)FreeBy.Length];
+            else if (town != null && cid.Length > 0) sur = "of " + town.Name;
+            else sur = Smallfolk[(r >> 1) % (uint)Smallfolk.Length];
+            return Clean(first + " " + sur).Trim();
+        }
+
+        /// <summary>Herszt bandy: bohater - pelne imie; inaczej imie z ksiegi band albo nadane teraz (i zapisane w ksiedze).</summary>
+        private static string BandLeader(MobileParty p, out bool female)
+        {
+            var hero = p.LeaderHero;
+            if (hero != null) { female = hero.IsFemale; _dNameHero++; return hero.Name.ToString(); }
+            Band b = null;
+            if (!string.IsNullOrEmpty(p.StringId)) _bands.TryGetValue(p.StringId, out b);
+            if (b != null && !string.IsNullOrEmpty(b.Name)) { female = b.Female; _dNameBook++; return b.Name; }
+            string name = MakeName(p, out female);
+            _dNameNew++;
+            if (b != null) { b.Name = name; b.Female = female; }
+            return name;
+        }
+
+        /// <summary>"Jon Rivers and his bandits" / "Alys Snow and her outlaws" - rodzaj ludzi staly dla bandy (z id).</summary>
+        private static string BandWho(MobileParty p)
+        {
+            bool female;
+            string leader = BandLeader(p, out female);
+            uint h = MapVillageData.Fnv((p.StringId ?? "band") + "|ludzie");
+            return leader + " and " + (female ? "her " : "his ") + Kinds[h % (uint)Kinds.Length];
+        }
+
+        // ------------------------------------------------------------ linia doby n20-plotki + proba przy graczu
+        /// <summary>Linia "Plotki (PL): opowiesci dzien N": klucze, herszci, stopnie lupu, okna i strony; proba = plotki przy graczu bez okna (autotest nie klika plotek).</summary>
+        private static void TalesLine(int day)
+        {
+            string probe = "-";
+            var mp = MobileParty.MainParty;
+            if (mp != null)
+            {
+                List<Item> items = null;
+                try { items = Build(mp.GetPosition2D, "proba"); } catch (Exception e) { Stumble("Probe", e); }
+                if (items != null)
+                {
+                    var lines = new List<int>();
+                    var pages = PagesOn ? Paginate("By the hearth, drovers, pilgrims and pedlars trade the news of the road:", items, lines) : null;
+                    string sample = null;
+                    foreach (var it in items) if (it.Cat == 0) { sample = it.Text; break; }
+                    if (sample == null) foreach (var it in items) if (it.Cat == 1) { sample = it.Text; break; }
+                    probe = "plotek " + items.Count + (pages != null ? ", stron " + pages.Count + " (linie ok. " + JoinInts(lines) + ")" : ", strony WYLACZONE")
+                            + (sample != null ? ", przyklad: \"" + sample + "\"" : "");
+                }
+            }
+            Log.Info(P + "opowiesci dzien " + day + " | klucze: Inn Gossip Loot Words " + (WordsOn ? "tak" : "WYLACZONE") + ", Inn Gossip Leader Names " + (NamesOn ? "tak" : "WYLACZONE")
+                     + ", Inn Gossip Pages " + (PagesOn ? "tak" : "WYLACZONE")
+                     + " | herszci: bohaterowie " + _dNameHero + ", z ksiegi " + _dNameBook + ", nadane " + _dNameNew + " (imion w ksiedze " + NamedInBook() + ")"
+                     + " | lup slowami: kiesy band " + JoinArr(_dPurseTier) + ", skarbce kryjowek " + JoinArr(_dHoardTier) + " (stopnie 0-5)"
+                     + " | okna " + _dWindows + ", strony " + _dPages + ", przewiniete " + _dPagesTurned + ", najdluzsza strona " + _dMaxLines + " linii (miesci sie " + PageLines + ")"
+                     + " | proba przy graczu (bez okna): " + probe + ".");
+        }
+
+        private static int NamedInBook()
+        {
+            int n = 0;
+            foreach (var b in _bands.Values) if (!string.IsNullOrEmpty(b.Name)) n++;
+            return n;
+        }
+
+        private static string JoinArr(int[] v)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < v.Length; i++) { if (i > 0) sb.Append('/'); sb.Append(v[i].ToString(Inv)); }
+            return sb.ToString();
+        }
+
         private static string Since(Band b, int today)
         {
             if (b == null || !b.Known) return "for a good while now";
@@ -579,11 +840,21 @@ namespace Armoury
                 Band b; _bands.TryGetValue(p.StringId ?? "", out b);
                 int men = p.MemberRoster.TotalManCount, gold = Math.Max(0, p.PartyTradeGold);
                 bool rich = gold >= Math.Max(1500, 40 * men);
-                string kind = p.ActualClan != null ? p.ActualClan.Name.ToString() : "outlaws";
+                // n20-plotki (InnGossipLeaderNames): "Jon Rivers and his bandits" zamiast przezwiska i nazwy rodzaju bandy ("Broken Men")
+                string who;
+                if (NamesOn) who = BandWho(p);
+                else who = Leader(p) + " and his " + (p.ActualClan != null ? p.ActualClan.Name.ToString() : "outlaws");
                 var t = new StringBuilder();
-                t.Append(i == 0 ? "They say " : "Others speak of how ").Append(Leader(p)).Append(" and his ").Append(kind).Append(" have been robbing the roads ").Append(Where(at, p.GetPosition2D, q))
+                t.Append(i == 0 ? "They say " : "Others speak of how ").Append(who).Append(" have been robbing the roads ").Append(Where(at, p.GetPosition2D, q))
                  .Append(' ').Append(Since(b, today)).Append(" - ").Append(Men(men, q, s)).Append(" men");
-                if (gold <= 50) t.Append(", but poor as church mice.");
+                if (WordsOn)
+                {
+                    // n20-plotki (InnGossipLootWords): nikt nie liczyl kiesy bandy - stopien slowny (daleko plotka rosnie)
+                    int tier = LootTier(gold, q, s >> 3);
+                    _dPurseTier[tier]++;
+                    t.Append(tier == 0 ? ", but poor as church mice." : ", with " + PurseWords[tier] + ".");
+                }
+                else if (gold <= 50) t.Append(", but poor as church mice.");
                 else t.Append(rich ? ", and fat with plunder: " : ", with ").Append(Coin(gold, q, s >> 3)).Append(" in their purses.");
                 if (b != null && b.Raids > 0) t.Append(" They have burned ").Append(b.Raids == 1 ? "a village" : b.Raids + " villages").Append(" already.");
                 if (rich) t.Append(" It will be hard to smoke them out now.");
@@ -616,7 +887,14 @@ namespace Armoury
             int g = best.SettlementComponent != null ? Math.Max(0, best.SettlementComponent.Gold) : 0;
             var t = new StringBuilder("There is an outlaw lair in the wilds ");
             t.Append(Where(at, best.GetPosition2D, q)).Append(" - ").Append(q >= 0.45f ? (bestBands == 1 ? "one band goes" : bestBands + " bands go") : "many bands go").Append(" in and out of it");
-            if (g < 100) t.Append(", though folk say there is little worth taking.");
+            if (WordsOn)
+            {
+                // n20-plotki (InnGossipLootWords): skarbiec kryjowki slowami, ta sama skala co kiesy band
+                int tier = LootTier(g, q, s);
+                _dHoardTier[tier]++;
+                t.Append(tier == 0 ? ", though folk say there is little worth taking." : ", and folk swear there is " + HoardWords[tier] + " hidden there for whoever clears it out.");
+            }
+            else if (g < 100) t.Append(", though folk say there is little worth taking.");
             else t.Append(", and folk swear ").Append(Coin(g, q, s)).Append(" lies hidden there for whoever clears it out.");
             all.Add(new Item { Cat = 1, Score = 2.5f + bs / 10f, Text = t.ToString() });
         }

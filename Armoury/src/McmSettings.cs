@@ -4608,6 +4608,18 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossip { get; set; } = true;
 
+        [SettingPropertyBool("Inn Gossip Loot Words", HintText = "gossip tells how much a band of outlaws has taken in words - a few stolen coins, a fair haul, rich spoils, a great haul of plunder, a huge hoard - never an exact sum, since nobody has counted a bandit's purse; the treasure in a bandit lair the same way. Far away the tale grows in the telling. Off = sums in denars, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnGossipLootWords { get; set; } = true;
+
+        [SettingPropertyBool("Inn Gossip Leader Names", HintText = "gossip names a band of outlaws after its leader - 'Jon Rivers and his bandits' - instead of its kind ('Broken Men'): a band led by a hero goes by the hero's full name, any other band gets a leader with a name from the land it comes from and keeps that name for as long as it lives (kept in the save). Also in the news of burned villages. Off = the kind of band and a nickname, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnGossipLeaderNames { get; set; } = true;
+
+        [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnGossipPages { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -9211,6 +9223,9 @@ namespace Armoury
             s.TownInnPriceBonus = TownInnPriceBonus;
             s.RoadsideInns = RoadsideInns;
             s.InnGossip = InnGossip;
+            s.InnGossipLootWords = InnGossipLootWords;
+            s.InnGossipLeaderNames = InnGossipLeaderNames;
+            s.InnGossipPages = InnGossipPages;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
