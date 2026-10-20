@@ -25,6 +25,11 @@ namespace Armoury
     ///     bez rabatu (0.5% od kilku pensow znika w zaokragleniu). Uprzaz i sztuka na grzbiecie: godziny ze stanu w ksiedze zuzycia (procenty).
     ///     Zamknieta ekonomia: placacy placi mniej i kasa miasta dostaje mniej o te sama kwote.
     /// Wylaczone klucze - jak dotad co do godziny i pensa. Stan tylko dzienny (pule jak SmithHours) - nic do zapisu.
+    /// Poprawki po recenzji: (a) zlecenie gracza na wiecej niz dzisiejsze wolne rece rezerwuje godziny cechu CO GODZINE czekania (PlayerStart + HourTick),
+    /// nie dopiero na koncu - AI i ludzie gracza widza zajete rece od razu; czego dzis nie ma (koniec roboty przed rezerwacja, AI zajelo rece w tym czasie) -
+    /// przechodzi jako dlug cechu na nastepne dni (_carry), wiec zadna roboczogodzina nie powstaje z niczego. (b) Rabat lorda AI od sztuk, na ktore cech
+    /// ma dzis godziny (Budget.Preview), nie od calej kolejki. (c) Kwatermistrz Spoils (SpoilsSeal) i stara regula ludzi (TroopSelfMend.Run, sakiewki
+    /// wylaczone) - te same godziny cechow i rabat (Order*/RunBudget).
     /// </summary>
     internal static class GuildMend
     {
@@ -138,6 +143,7 @@ namespace Armoury
         {
             _used.Clear(); _yesterday.Clear(); _auto.Clear(); _day = -1;
             Array.Clear(_menBench, 0, Trades); _menTown = null; _menLastHour = -999; _bulkDay = -1; _bulkTown = null; _bulkN = 0;
+            _carry.Clear(); ClearOrder();
             ResetStats();
             FieldArmourer.Reset();
         }
@@ -151,6 +157,31 @@ namespace Armoury
             _used = new Dictionary<Town, float[]>();
             _auto = new Dictionary<Town, float[]>();
             _day = d;
+            CarryIn();
+        }
+
+        // ------------------------------------------------------------ dlug cechu (recenzja: zlecenie gracza ponad wolne rece dnia nie powstaje z niczego)
+        private static readonly Dictionary<Town, float[]> _carry = new Dictionary<Town, float[]>();
+
+        /// <summary>Nowy dzien: zalegle godziny zlecen gracza zajmuja najpierw rece cechu (najwyzej cala dzienna zmiana; reszta - nastepny dzien).</summary>
+        private static void CarryIn()
+        {
+            if (_carry.Count == 0) return;
+            var done = new List<Town>();
+            foreach (var kv in _carry)
+            {
+                bool any = false;
+                for (int k = 0; k < Trades; k++)
+                {
+                    float c = kv.Value[k];
+                    if (c <= 0f) continue;
+                    float x = Math.Min(c, Available(kv.Key, k));
+                    if (x > 0f) { UseRaw(kv.Key, k, x, false); kv.Value[k] = c - x; _stCarryH += x; }
+                    if (kv.Value[k] > 0.01f) any = true; else kv.Value[k] = 0f;
+                }
+                if (!any) done.Add(kv.Key);
+            }
+            foreach (var t in done) _carry.Remove(t);
         }
 
         private static float[] Row(Dictionary<Town, float[]> map, Town t)
@@ -197,6 +228,19 @@ namespace Armoury
         {
             if (t == null || hours <= 0f) return;
             Roll();
+            if (!auto)
+            {
+                // zlecenie gracza: dzis najwyzej wolne godziny cechu, reszta jako dlug cechu na nastepne dni (CarryIn) - nic z niczego
+                float today = Math.Min(hours, Available(t, trade));
+                if (hours - today > 0.001f) Row(_carry, t)[trade] += hours - today;
+                hours = today;
+                if (hours <= 0f) return;
+            }
+            UseRaw(t, trade, hours, auto);
+        }
+
+        private static void UseRaw(Town t, int trade, float hours, bool auto)
+        {
             if (trade == Smith) SmithHours.Use(t, hours); else Row(_used, t)[trade] += hours;
             if (auto) Row(_auto, t)[trade] += hours;
         }
@@ -278,11 +322,16 @@ namespace Armoury
                 return Math.Max(0.5f, worst);
             }
 
-            public void Use(Town t)
+            /// <summary>Godziny z pul miasta za gotowe sztuki zlecenia; taken - godziny juz zarezerwowane w czasie czekania (null - zadne).</summary>
+            public void Use(Town t, float[] taken)
             {
-                for (int k = 0; k < Trades; k++) GuildMend.Use(t, k, H[k], false);
+                for (int k = 0; k < Trades; k++)
+                {
+                    float c = Math.Max(0f, H[k] - (taken != null ? taken[k] : 0f));
+                    GuildMend.Use(t, k, c, false);
+                    _stPlayerH[k] += c;
+                }
                 _stPlayerPieces += Pieces;
-                for (int k = 0; k < Trades; k++) _stPlayerH[k] += H[k];
             }
 
             public string LogPl()
@@ -301,11 +350,60 @@ namespace Armoury
             return t.Clock(st.Town);
         }
 
+        /// <summary>Koniec zlecenia gracza (gotowe sztuki): godziny tych sztuk minus to, co zlecenie juz zarezerwowalo w czasie czekania (godziny
+        /// zarezerwowane na sztuki nieukonczone - przepracowane, nie wracaja).</summary>
         internal static void PlayerDone(Tally t)
         {
             var st = Settlement.CurrentSettlement;
-            if (!On || t == null || st == null || st.Town == null) return;
-            t.Use(st.Town);
+            if (!On || t == null || st == null || st.Town == null) { ClearOrder(); return; }
+            t.Use(st.Town, _poTown == st.Town ? _poTaken : null);
+            ClearOrder();
+        }
+
+        /// <summary>Zlecenie gracza wykonane od reki (kwatermistrz Spoils - SpoilsSeal): godziny cechow za zrobione sztuki z pul miasta.</summary>
+        internal static void OrderDone(Town t, Tally tally)
+        {
+            if (!On || t == null || tally == null) return;
+            tally.Use(t, null);
+        }
+
+        // ------------------------------------------------------------ zlecenie gracza w toku: rezerwacja godzin co godzine czekania (recenzja)
+        private static readonly float[] _poLeft = new float[Trades], _poTaken = new float[Trades];
+        private static Town _poTown;
+        private static int _poSerial = -1;
+
+        private static void ClearOrder() { Array.Clear(_poLeft, 0, Trades); Array.Clear(_poTaken, 0, Trades); _poTown = null; _poSerial = -1; }
+
+        /// <summary>Zamiast PlayerClock jako argument StartTimedWork: ile godzin zegara potrwa zlecenie, i poczatek rezerwacji jego godzin. Wolane
+        /// zawsze wprost jako argument SmithMenu.StartTimedWork - ta praca dostanie numer WorkSerial + 1 (inna praca na czas konczy rezerwacje).</summary>
+        internal static float PlayerStart(Tally t, float fallback)
+        {
+            float clock = PlayerClock(t, fallback);
+            ClearOrder();
+            var st = Settlement.CurrentSettlement;
+            if (On && t != null && st != null && st.Town != null && t.Pieces > 0)
+            {
+                _poTown = st.Town; _poSerial = SmithMenu.WorkSerial + 1;
+                for (int k = 0; k < Trades; k++) _poLeft[k] = t.H[k];
+            }
+            return clock;
+        }
+
+        /// <summary>Co godzine czekania: kazdy cech zlecenia bierze swoje wolne rece (najwyzej rece cechu na godzine i to, co zostalo do zrobienia).
+        /// Praca skonczona, przerwana albo inna praca na czas - rezerwacja staje (zarezerwowane zostaje do rozliczenia w PlayerDone).</summary>
+        private static void PlayerReserve()
+        {
+            if (_poTown == null) return;
+            var st = Settlement.CurrentSettlement;
+            if (!SmithMenu.WorkWaiting || SmithMenu.WorkSerial != _poSerial || st == null || st.Town != _poTown) { Array.Clear(_poLeft, 0, Trades); return; }
+            for (int k = 0; k < Trades; k++)
+            {
+                if (_poLeft[k] <= 0f) continue;
+                float x = Math.Min(_poLeft[k], Math.Min(Available(_poTown, k), Math.Max(1f, Hands(_poTown, k))));
+                if (x <= 0f) continue;
+                UseRaw(_poTown, k, x, false);
+                _poLeft[k] -= x; _poTaken[k] += x; _stPlayerH[k] += x;
+            }
         }
 
         // ------------------------------------------------------------ uprzaz gracza i sztuka na grzbiecie: stan z ksiegi zuzycia (procenty), nie z modyfikatora
@@ -398,6 +496,21 @@ namespace Armoury
                 if (fit < n) { CapHit = true; CapN += n - fit; }
                 return Math.Max(0, fit);
             }
+            /// <summary>Ile sztuk kolejki (w tej kolejnosci) zmieszcza dzis godziny cechow - bez zmiany budzetu; do rabatu hurtowego zlecenia lorda
+            /// (recenzja: rabat od sztuk, ktore cech naprawde wezmie, nie od calej zaleglosci partii).</summary>
+            public int Preview(List<EquipmentElement> pieces)
+            {
+                var left = (float[])_left.Clone();
+                int n = 0;
+                foreach (var ee in pieces)
+                {
+                    if (ee.Item == null) continue;
+                    int k = TradeOf(ee.Item); float h = Hours(ee);
+                    if (left[k] + 0.0001f >= h) { left[k] -= h; n++; }
+                }
+                return n;
+            }
+
             public void Take(EquipmentElement ee, int n)
             {
                 if (ee.Item == null || n <= 0) return;
@@ -408,6 +521,13 @@ namespace Armoury
             {
                 for (int k = 0; k < Trades; k++) { Use(_t, k, _take[k], true); _stAiH[k] += _take[k]; }
                 _stAiPieces += pieces; _stAiCapN += CapN; if (CapHit) _stAiCapVisits++;
+            }
+
+            /// <summary>To samo dla dziennej naprawy Twoich ludzi starej reguly (TroopSelfMend.Run, sakiewki wylaczone) - liczniki ludzi, nie AI.</summary>
+            public void CommitMen(int pieces)
+            {
+                for (int k = 0; k < Trades; k++) { Use(_t, k, _take[k], true); _stMenH[k] += _take[k]; _take[k] = 0f; }
+                _stMenPieces += pieces;
             }
         }
 
@@ -421,6 +541,20 @@ namespace Armoury
 
         internal static void MenLeftTown() { Array.Clear(_menBench, 0, Trades); _menTown = null; }
 
+        /// <summary>Zlecenie dnia ludzi gracza do rabatu hurtowego: sztuki czekajace pierwszej godziny pracy w tym miescie (tez stara sciezka
+        /// TroopSelfMend.Hourly przy wylaczonym MendHoursByGuild - recenzja). Rabat i tak 0 przy wylaczonym MendBulkEveryOrder (BulkCut).</summary>
+        internal static int MenBulkN(Settlement st, List<ItemRosterElement> worn)
+        {
+            int day = (int)CampaignTime.Now.ToDays;
+            if (_bulkDay != day || _bulkTown != st.StringId)
+            {
+                int wornN = 0;
+                foreach (var el in worn) wornN += el.Amount;
+                _bulkDay = day; _bulkTown = st.StringId; _bulkN = wornN;
+            }
+            return _bulkN;
+        }
+
         /// <summary>Godzina pracy cechow miasta nad obitym sprzetem Twoich ludzi (zastepuje stala 0.6 h na sztuke w TroopSelfMend.Hourly). Kazdy cech ma
         /// wlasna lawe godzin (rece cechu / WorkHoursPerManDay na godzine, przy AutoMendHalfGuild polowa); sztuka konczy sie, gdy na lawie jej cechu
         /// zbierze sie tyle godzin, ile trwa jej naprawa. Zaplata (robota po rabacie hurtowym + material) z sakiewki ludzi do kasy miasta - jak dotad.</summary>
@@ -430,9 +564,7 @@ namespace Armoury
             int nowH = (int)CampaignTime.Now.ToHours;
             if (_menTown != st.StringId || nowH - _menLastHour > 8) { Array.Clear(_menBench, 0, Trades); _menTown = st.StringId; }
             _menLastHour = nowH;
-            int day = (int)CampaignTime.Now.ToDays, wornN = 0;
-            foreach (var el in worn) wornN += el.Amount;
-            if (_bulkDay != day || _bulkTown != st.StringId) { _bulkDay = day; _bulkTown = st.StringId; _bulkN = wornN; }   // zlecenie dnia: sztuki czekajace rano
+            MenBulkN(st, worn);
 
             var has = new bool[Trades]; var share = new float[Trades]; var start = new float[Trades]; var doneH = new float[Trades]; var limited = new bool[Trades];
             foreach (var el in worn) if (el.EquipmentElement.Item != null) has[TradeOf(el.EquipmentElement.Item)] = true;
@@ -543,17 +675,18 @@ namespace Armoury
         // ------------------------------------------------------------ linia doby (log_grep: "Naprawy wg cechow (R3-02)")
         private static readonly float[] _stAiH = new float[Trades], _stMenH = new float[Trades], _stPlayerH = new float[Trades];
         private static int _stAiPieces, _stAiCapN, _stAiCapVisits, _stMenPieces, _stPlayerPieces, _stBulkGold;
+        private static float _stCarryH;
 
         private static void ResetStats()
         {
             Array.Clear(_stAiH, 0, Trades); Array.Clear(_stMenH, 0, Trades); Array.Clear(_stPlayerH, 0, Trades);
-            _stAiPieces = _stAiCapN = _stAiCapVisits = _stMenPieces = _stPlayerPieces = _stBulkGold = 0;
+            _stAiPieces = _stAiCapN = _stAiCapVisits = _stMenPieces = _stPlayerPieces = _stBulkGold = 0; _stCarryH = 0f;
         }
 
         /// <summary>Wolane co godzine (TroopSelfMend.Hourly): przelom doby pul + platnerz w polu.</summary>
         internal static void HourTick()
         {
-            try { if (On) Roll(); }
+            try { if (On) { Roll(); PlayerReserve(); } else ClearOrder(); }
             catch (Exception e) { if (++_errTick <= 3) Log.Error("GuildMend.HourTick (potkniecie " + _errTick + ")", e); }
             FieldArmourer.Hourly();
         }
@@ -561,12 +694,15 @@ namespace Armoury
 
         private static void LogDay()
         {
-            if (_stAiPieces + _stMenPieces + _stPlayerPieces + _stAiCapN + _stBulkGold == 0) { ResetStats(); return; }
+            if (_stAiPieces + _stMenPieces + _stPlayerPieces + _stAiCapN + _stBulkGold == 0 && _stCarryH <= 0f && _carry.Count == 0) { ResetStats(); return; }
             Log.Info("Naprawy wg cechow (R3-02): doba " + _day + " | AI: " + _stAiPieces + " szt., godz. " + Row5(_stAiH) + ", stop na polowie rak cechu " + _stAiCapN
                      + " szt. w " + _stAiCapVisits + " wizytach | ludzie gracza: " + _stMenPieces + " szt., godz. " + Row5(_stMenH) + " | gracz (zlecenia): "
-                     + _stPlayerPieces + " szt., godz. " + Row5(_stPlayerH) + " | rabat hurtowy razem " + _stBulkGold + " zl (kowale/siodlarze/krawcy/lukarze/tarczownicy)");
+                     + _stPlayerPieces + " szt., godz. " + Row5(_stPlayerH) + " | rabat hurtowy razem " + _stBulkGold + " zl | dlug cechow: splacono " + (int)Math.Round(_stCarryH)
+                     + " h, zostaje " + (int)Math.Round(CarryLeft()) + " h w " + _carry.Count + " miastach (kowale/siodlarze/krawcy/lukarze/tarczownicy)");
             ResetStats();
         }
+
+        private static float CarryLeft() { float x = 0f; foreach (var kv in _carry) for (int k = 0; k < Trades; k++) x += kv.Value[k]; return x; }
 
         private static string Row5(float[] h)
         {

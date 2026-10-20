@@ -964,7 +964,18 @@ namespace Armoury
                     var cheapFirst = jobs.OrderBy(j => unitBy[j.Key + "|" + j.Value]).ToList();
                     jobs.Clear(); jobs.AddRange(cheapFirst);
                 }
-                int bulkN = GuildMend.BulkOn ? jobs.Count : 0;   // R3-02: rabat hurtowy - zlecenie to dzien lorda w miescie
+                // R3-02: rabat hurtowy - zlecenie to dzien lorda w miescie; recenzja: od sztuk, ktore cech (albo kowale starej reguly) naprawde wezmie dzis, nie od calej kolejki
+                int bulkN = 0;
+                if (GuildMend.BulkOn)
+                {
+                    if (gb == null) bulkN = Math.Min(jobs.Count, cap);
+                    else
+                    {
+                        var els = new List<EquipmentElement>(jobs.Count);
+                        foreach (var j in jobs) { var io = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (io != null) els.Add(new EquipmentElement(io, Mod(j.Value))); }
+                        bulkN = gb.Preview(els);
+                    }
+                }
                 if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece, q, gb, bulkN); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int done = 0, paid = 0, poorN = 0, afterPoor = 0;
                 bool brokeP = false;   // R3-02: sakiewka przerwala zlecenie (licznik powodu stania przy godzinach cechow)

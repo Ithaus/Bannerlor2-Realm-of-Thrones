@@ -16,22 +16,49 @@ namespace Armoury
     /// ta sama pamiec ulamkow sakw) - brak materialu: sztuka czeka, platnerz nie pracuje i nie dostaje doswiadczenia. Robocizna nic nie kosztuje
     /// (towarzysz bierze juz zold). Doswiadczenie Kowalstwa tylko za przepracowane godziny (XpPerHour), najwyzej XpPerDay na dobe - jak dni przy kowadle.
     /// Wraki (stan <= 10%) i konie - nie (jak kowale miasta). Klucz CampArmourer; stan tylko w pamieci (lawa ginie przy wczytaniu - kilka godzin pracy).
+    /// Poprawki po recenzji: brak materialu na najgorsza NIEZACZETA sztuke - platnerz bierze nastepna, na ktora material jest (jak "stos czeka, nastepny
+    /// dalej" u kowali miasta, MendMaterial.Order); zaczeta sztuka (postep > 0) zostaje na kowadle, takze gdy platnerz jest chwilowo ranny.
+    /// R3-04c, drugi czlon (klucz CampQuartermasterSteward): KWATERMISTRZ ZBROJOWNI WEDLUG ZARZADZANIA. Kwatermistrz druzyny (rola gry, MobileParty.
+    /// EffectiveQuartermaster - bez przydzialu sam dowodca) wydaje platnerzowi sztuki z magazynu, odmierza material z taboru i sortuje robote: przy jego
+    /// Zarzadzaniu (Steward) platnerz traci mniej czasu - robota x (1 + Steward/800, najwyzej +25%; razem najwyzej 0.94 roboczogodziny na godzine, wciaz
+    /// wolniej niz pelny warsztat). Kwatermistrz uczy sie Zarzadzania tylko za godziny, w ktorych kuznia naprawde pracowala (2 XP na godzine, sufit 25
+    /// na dobe). Ten sam czlowiek nie robi dwoch rzeczy naraz: kwatermistrz bedacy platnerzem, ranny albo w niewoli - bez premii i bez XP. Material bez zmian.
     /// </summary>
     internal static class FieldArmourer
     {
         private const float XpPerHour = 8f, XpPerDay = 100f;
+        private const float QmXpPerHour = 2f, QmXpPerDay = 25f, QmMaxBonus = 0.25f, QmPerPoint = 1f / 800f;   // R3-04c: kwatermistrz wedlug Steward
+        private const int MaxScan = 60;   // ile sztuk z kolejki sprawdzic co godzine, szukajac materialu (najgorsze najpierw)
         private const int MinSkill = 20;
         private static float _bench;
         private static string _benchKey;
         private static int _xpDay = -1;
         private static float _xpToday;
         private static int _dayPieces, _dayWaitMat, _errN, _logDay = -1;
-        private static float _dayHours, _dayXp;
-        private static string _dayWho;
+        private static float _dayHours, _dayXp, _qmXpToday, _dayQmXp, _dayQmBonus;
+        private static string _dayWho, _dayQm;
+        private static int _qmXpDay = -1, _dayQmHours;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.CampArmourer; } }
 
-        internal static void Reset() { _bench = 0f; _benchKey = null; _xpDay = -1; _xpToday = 0f; _dayPieces = 0; _dayWaitMat = 0; _dayHours = 0f; _dayXp = 0f; _dayWho = null; _logDay = -1; }
+        internal static bool QmOn { get { var s = Settings.Current; return s != null && s.CampArmourer && s.CampQuartermasterSteward; } }
+
+        internal static void Reset()
+        {
+            _bench = 0f; _benchKey = null; _xpDay = -1; _xpToday = 0f; _dayPieces = 0; _dayWaitMat = 0; _dayHours = 0f; _dayXp = 0f; _dayWho = null; _logDay = -1;
+            _qmXpDay = -1; _qmXpToday = 0f; _dayQmXp = 0f; _dayQmBonus = 0f; _dayQm = null; _dayQmHours = 0;
+        }
+
+        /// <summary>R3-04c: kwatermistrz druzyny, ktory pomaga platnerzowi (null - wylaczone, ten sam czlowiek co platnerz, ranny albo w niewoli).</summary>
+        private static Hero Quartermaster(MobileParty main, Hero armourer, out int steward)
+        {
+            steward = 0;
+            if (!QmOn) return null;
+            var q = main.EffectiveQuartermaster;
+            if (q == null || q == armourer || !q.IsAlive || q.IsWounded || q.IsPrisoner) return null;
+            steward = q.GetSkillValue(DefaultSkills.Steward);
+            return q;
+        }
 
         /// <summary>Towarzysz z najlepszym Kowalstwem w druzynie gracza (bez gracza, rannych i jencow); null - nikt nie umie (ponizej MinSkill).</summary>
         private static Hero Pick(MobileParty main, out int skill)
@@ -54,6 +81,15 @@ namespace Armoury
 
         private static string KeyOf(EquipmentElement ee) { return ee.Item.StringId + "|" + (ee.ItemModifier != null ? ee.ItemModifier.StringId : ""); }
 
+        /// <summary>Czy tabor ma caly material tej naprawy (to samo sprawdzenie co dotad dla jednej sztuki).</summary>
+        private static bool HasAll(List<Recipes.Part> mats)
+        {
+            if (mats == null) return true;
+            foreach (var p in mats)
+                if (p.Item != null && Recipes.CountInInventory(p.Item) < p.Count) return false;
+            return true;
+        }
+
         internal static void Hourly()
         {
             try
@@ -69,7 +105,7 @@ namespace Armoury
                 if (s.WorkshopNightRest) { int hh = CampaignTime.Now.GetHourOfDay; if (hh >= 23 || hh < 5) return; }
                 int skill;
                 var who = Pick(main, out skill);
-                if (who == null) { _bench = 0f; return; }
+                if (who == null) return;   // nikt nie umie albo platnerz ranny - zaczeta sztuka czeka na kowadle (postep zostaje; recenzja)
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
                 // tylko robota kowala z tabeli godzin (bron, kolczuga, plyta, helm, metalowy kropierz) z receptura kowala - jak kowale miasta (MendMaterial.Needs:
@@ -79,25 +115,51 @@ namespace Armoury
                     if (el.EquipmentElement.Item != null && GuildMend.IsSmithWork(el.EquipmentElement.Item)) worn.Add(el);
                 if (worn.Count == 0) { _bench = 0f; _benchKey = null; return; }
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));   // najgorsze najpierw
-                // sztuka zaczeta zostaje na kowadle do konca (nowy, gorszy lup po bitwie nie kasuje godzin juz przepracowanych); inaczej najgorsza z receptura
+                // sztuka zaczeta (postep > 0) zostaje na kowadle do konca (nowy, gorszy lup po bitwie nie kasuje godzin juz przepracowanych) - brak materialu: czeka;
+                // inaczej najgorsza z receptura, NA KTORA JEST MATERIAL W TABORZE (recenzja: jedna brakujaca sztaba nie blokuje calej kolejki)
                 int pick = -1;
-                if (_benchKey != null)
+                List<Recipes.Part> mats = null;
+                if (_benchKey != null && _bench > 0f)
                     for (int i = 0; i < worn.Count; i++) if (KeyOf(worn[i].EquipmentElement) == _benchKey) { pick = i; break; }
-                if (pick < 0)
-                    for (int i = 0; i < worn.Count; i++) if (MendMaterial.Needs(worn[i].EquipmentElement) != null) { pick = i; break; }
-                if (pick < 0) { _bench = 0f; _benchKey = null; return; }
+                if (pick >= 0)
+                {
+                    mats = MendMaterial.SelfPartsOf(worn[pick].EquipmentElement);
+                    if (!HasAll(mats)) { _dayWaitMat++; return; }   // zaczeta sztuka czeka na material (postep zostaje)
+                }
+                else
+                {
+                    bool missing = false;
+                    int scanned = 0;
+                    for (int i = 0; i < worn.Count && scanned < MaxScan; i++)
+                    {
+                        if (MendMaterial.Needs(worn[i].EquipmentElement) == null) continue;
+                        scanned++;
+                        var m = MendMaterial.SelfPartsOf(worn[i].EquipmentElement);
+                        if (HasAll(m)) { pick = i; mats = m; break; }
+                        missing = true;   // ta sztuka czeka na material - nastepna dalej
+                    }
+                    if (pick < 0) { _bench = 0f; _benchKey = null; if (missing) _dayWaitMat++; return; }   // zadna sztuka nie ma materialu w taborze
+                }
                 var head = worn[pick].EquipmentElement;
                 string key = KeyOf(head);
                 if (key != _benchKey) { _bench = 0f; _benchKey = key; }   // inna sztuka na kowadle - zaczyna od nowa
-                var mats = MendMaterial.SelfPartsOf(head);
-                foreach (var p in mats)
-                    if (p.Item != null && Recipes.CountInInventory(p.Item) < p.Count) { _dayWaitMat++; return; }   // brak materialu w taborze - nie pracuje
                 float eff = Math.Min(0.75f, 0.25f + skill / 400f);
+                int stw;
+                var qm = Quartermaster(main, who, out stw);   // R3-04c: kwatermistrz wedlug Steward - mniej straconego czasu przy kowadle
+                float bonus = qm != null ? Math.Min(QmMaxBonus, stw * QmPerPoint) : 0f;
+                eff *= 1f + bonus;
                 float need = GuildMend.Hours(head);
                 _bench += eff;
                 _dayHours += eff; _dayWho = who.Name != null ? who.Name.ToString() : who.StringId;
-                // doswiadczenie za przepracowana godzine, z sufitem dobowym
                 int d = (int)CampaignTime.Now.ToDays;
+                if (qm != null)
+                {
+                    _dayQm = qm.Name != null ? qm.Name.ToString() : qm.StringId; _dayQmBonus = Math.Max(_dayQmBonus, bonus); _dayQmHours++;
+                    if (d != _qmXpDay) { _qmXpDay = d; _qmXpToday = 0f; }
+                    float qx = Math.Min(QmXpPerHour, Math.Max(0f, QmXpPerDay - _qmXpToday));   // tylko za godzine, w ktorej kuznia pracowala; sufit dobowy
+                    if (qx > 0f && qm.HeroDeveloper != null) { qm.HeroDeveloper.AddSkillXp(DefaultSkills.Steward, qx); _qmXpToday += qx; _dayQmXp += qx; }
+                }
+                // doswiadczenie za przepracowana godzine, z sufitem dobowym
                 if (d != _xpDay) { _xpDay = d; _xpToday = 0f; }
                 float xp = Math.Min(XpPerHour, Math.Max(0f, XpPerDay - _xpToday));
                 if (xp > 0f) { who.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, xp); _xpToday += xp; _dayXp += xp; }
@@ -127,13 +189,15 @@ namespace Armoury
             if (_dayPieces > 0 || _dayHours > 0f || _dayWaitMat > 0)
             {
                 Log.Info("Platnerz w taborze (R3-04c): doba " + _logDay + " | " + (_dayWho ?? "-") + " - naprawil " + _dayPieces + " szt. metalu ludzi, przepracowal "
-                         + GuildMend.F1(_dayHours) + " roboczogodz., XP Kowalstwa " + (int)Math.Round(_dayXp) + " (sufit " + (int)XpPerDay + "/dobe), godzin bez materialu " + _dayWaitMat + ".");
+                         + GuildMend.F1(_dayHours) + " roboczogodz., XP Kowalstwa " + (int)Math.Round(_dayXp) + " (sufit " + (int)XpPerDay + "/dobe), godzin bez materialu " + _dayWaitMat
+                         + " | kwatermistrz (Steward): " + (_dayQm != null ? _dayQm + " - " + _dayQmHours + " godz. pomocy, premia do +" + (int)Math.Round(_dayQmBonus * 100f) + "%, XP Zarzadzania "
+                         + (int)Math.Round(_dayQmXp) + " (sufit " + (int)QmXpPerDay + "/dobe)" : (QmOn ? "brak (ten sam co platnerz, ranny albo nikt)" : "wylaczone")) + ".");
                 if (_dayPieces > 0)
                     Log.Player(_dayWho + " mended " + _dayPieces + (_dayPieces == 1 ? " piece" : " pieces") + " of your men's kit at the camp forge yesterday.");
                 else if (_dayWaitMat > 0 && _dayHours <= 0f)
                     Log.Player("Your armourer had nothing to mend with - the baggage lacks the iron or other materials.", true);
             }
-            _logDay = d; _dayPieces = 0; _dayWaitMat = 0; _dayHours = 0f; _dayXp = 0f; _dayWho = null;
+            _logDay = d; _dayPieces = 0; _dayWaitMat = 0; _dayHours = 0f; _dayXp = 0f; _dayWho = null; _dayQm = null; _dayQmXp = 0f; _dayQmBonus = 0f; _dayQmHours = 0;
         }
     }
 }
