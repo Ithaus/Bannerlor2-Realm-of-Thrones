@@ -165,9 +165,81 @@ namespace Armoury
                 }
                 return best;
             }
+
+            /// <summary>p6-pola (widok pol, recenzja): czy pas FARBY drogi (trakt albo droga boczna; pol-szerokosc odcinka + gap, BEZ marginesu premii
+            /// predkosci) dotyka prostokata pola: srodek (x, y), os dluga (c, s) z pol-dlugoscia hb, os krotka (-s, c) z pol-szerokoscia ha. Dokladnie: odcinek
+            /// przecina prostokat albo jest od niego blizej niz Half + gap. Komorka srodka wystarcza, gdy przekatna/2 + gap <= MaxMargin (wpis siega Half +
+            /// MaxMargin), inaczej tez komorki rogow.</summary>
+            internal bool RectHit(float x, float y, float c, float s, float ha, float hb, float gap)
+            {
+                int probes = (float)Math.Sqrt(ha * ha + hb * hb) + gap > MaxMargin ? 5 : 1;
+                for (int q = 0; q < probes; q++)
+                {
+                    float qx = x, qy = y;
+                    if (q > 0)
+                    {
+                        float sa = (q == 1 || q == 2) ? ha : -ha, sb = (q == 1 || q == 3) ? hb : -hb;
+                        qx = x + c * sb - s * sa; qy = y + s * sb + c * sa;
+                    }
+                    int cell = CellOf(qx, qy);
+                    if (Empty(cell)) continue;
+                    int k1 = Start[cell + 1];
+                    for (int k = Start[cell]; k < k1; k++)
+                    {
+                        int g = Seg[k];
+                        float px = Ax[g] - x, py = Ay[g] - y;   // odcinek w ukladzie pola: u wzdluz osi dlugiej, v wzdluz krotkiej
+                        float u0 = px * c + py * s, v0 = py * c - px * s;
+                        float du = Dx[g] * c + Dy[g] * s, dv = Dy[g] * c - Dx[g] * s;
+                        if (SegBoxHit(u0, v0, du, dv, hb, ha, Half[g] + gap)) return true;
+                    }
+                }
+                return false;
+            }
+
+            /// <summary>Odcinek (u0, v0) + t (du, dv), t 0..1, wobec prostokata |u| <= bu, |v| <= bv: przecina (Liang-Barsky) albo odleglosc <= r. Rozlaczne figury
+            /// wypukle: najblizej jest koniec odcinka do prostokata albo rog prostokata do odcinka.</summary>
+            private static bool SegBoxHit(float u0, float v0, float du, float dv, float bu, float bv, float r)
+            {
+                float t0 = 0f, t1 = 1f;
+                if (Clip(-du, u0 + bu, ref t0, ref t1) && Clip(du, bu - u0, ref t0, ref t1) && Clip(-dv, v0 + bv, ref t0, ref t1) && Clip(dv, bv - v0, ref t0, ref t1)) return true;
+                float r2 = r * r;
+                if (PtBox2(u0, v0, bu, bv) <= r2 || PtBox2(u0 + du, v0 + dv, bu, bv) <= r2) return true;
+                float l2 = du * du + dv * dv;
+                for (int q = 0; q < 4; q++)
+                {
+                    float wu = ((q & 1) == 0 ? bu : -bu) - u0, wv = ((q & 2) == 0 ? bv : -bv) - v0;
+                    float t = l2 > 1e-12f ? (wu * du + wv * dv) / l2 : 0f;
+                    if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
+                    float eu = wu - t * du, ev = wv - t * dv;
+                    if (eu * eu + ev * ev <= r2) return true;
+                }
+                return false;
+            }
+
+            /// <summary>Liang-Barsky: warunek p * t <= q zaweza przedzial [t0, t1]; false = przedzial pusty.</summary>
+            private static bool Clip(float p, float q, ref float t0, ref float t1)
+            {
+                if (p == 0f) return q >= 0f;
+                float t = q / p;
+                if (p < 0f) { if (t > t1) return false; if (t > t0) t0 = t; }
+                else { if (t < t0) return false; if (t < t1) t1 = t; }
+                return true;
+            }
+
+            private static float PtBox2(float u, float v, float bu, float bv)
+            {
+                float eu = Math.Abs(u) - bu, ev = Math.Abs(v) - bv;
+                if (eu < 0f) eu = 0f;
+                if (ev < 0f) ev = 0f;
+                return eu * eu + ev * ev;
+            }
         }
 
         private static volatile Grid _grid;            // siatka sciezki predkosci: same trakty (_main) albo trakty + drogi boczne
+        internal static object GridNow { get { return _grid; } }   // p6-pola: widok pol poznaje zmiane siatki (pola nie na drodze - plan od nowa)
+        /// <summary>p6-pola (recenzja): pas farby drogi na prostokacie pola - Grid.RectHit na siatce z chwili planu (GridNow); bez siatki false. Niezalezne od
+        /// kluczy premii (MapRoadWideField / MapRoadWideMargin / MapSideRoadSpeedBonus) - drogi boczne sa w siatce zawsze, gdy plan widoku jest opublikowany.</summary>
+        internal static bool PaintNear(object grid, float x, float y, float c, float s, float ha, float hb, float gap) { var g = grid as Grid; return g != null && g.RectHit(x, y, c, s, ha, hb, gap); }
         private static volatile Grid _main;            // n20-drogi: siatka samych traktow (Load)
         private static readonly object _pubLock = new object();   // n20-drogi: publikacja _grid / _main / stanu drog bocznych (watek glowny i watek budowy)
         private static SideRoadPlan.Result _sideRes;   // plan drog bocznych podany przez widok (pod _pubLock)
