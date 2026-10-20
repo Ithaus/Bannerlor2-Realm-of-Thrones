@@ -888,6 +888,10 @@ namespace Armoury
             double[] eta = null; sbyte[] esg = null;                   // feed-swiat (Ks Plan Markets Clear): krok ceny towaru (maleje, gdy cena skacze w kolko)
             if (x.In.MarketsClear && ClearEta) { eta = new double[n]; esg = new sbyte[n]; for (int i = 0; i < n; i++) eta[i] = Eta; }
             bool conv = false;
+            // n22f-plany (klucz Ks Plan Converge Shelf Level): zapas polek kroku 8 (margines popytu targu) poza testem zbieznosci - wspolny poziom S/D rynku w [1, margines];
+            // margines 1 albo klucz wylaczony - poziom 1 (test jak dotad, bit w bit)
+            double lcap = x.In.ConvShelfLevel && x.In.MarketMargin > 1.0 && x.In.MarketMargin <= 1.10 ? x.In.MarketMargin : 1.0;
+            var lev = new double[NM]; for (int m = 0; m < NM; m++) lev[m] = 1.0;
             int it = 0;
             for (it = 0; it < rounds; it++)
             {
@@ -923,11 +927,12 @@ namespace Armoury
                 if (EqDebug != null) EqDebug(it, p, S, x.Dm, xs);              // feed-swiat: harness (przebieg rownowagi); w grze null
                 if (it % 50 == 49)
                 {
+                    if (lcap > 1.0) ShelfLevel(x, p, S, act, lcap, lev);
                     bool bad = false; double mt = 0;
                     for (int i = 0; i < n; i++)
                     {
                         if (!act[i]) continue;
-                        double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0);
+                        double dev = Math.Abs(S[i] / (Math.Max(1.0, x.Dm[i]) * lev[i / KsTab.NG]) - 1.0);
                         bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
                         if (dev > Tol && !atb) bad = true;
                         if (!atb) mt += dev;
@@ -965,10 +970,12 @@ namespace Armoury
             x.Rent = rr;
             // stan zbieznosci do wyniku
             x.R.Open.Clear(); x.R.Bounds.Clear();
+            if (lcap > 1.0) ShelfLevel(x, p, S, act, lcap, lev);           // n22f-plany: poziom stanu oddanego (najlepszy punkt kontrolny albo ostatni)
+            for (int m = 0; m < NM && m < x.R.ConvLev.Length; m++) x.R.ConvLev[m] = lev[m];
             for (int i = 0; i < n; i++)
             {
                 if (!act[i]) continue;
-                double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0);
+                double dev = Math.Abs(S[i] / (Math.Max(1.0, x.Dm[i]) * lev[i / KsTab.NG]) - 1.0);
                 bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
                 string nm = x.R.Markets[i / KsTab.NG] + " " + KsTab.Goods[i % KsTab.NG];
                 if (atb) x.R.Bounds.Add(nm + " " + p[i].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
@@ -983,6 +990,28 @@ namespace Armoury
         }
 
         private static double[] Ones(int n) { var a = new double[n]; for (int i = 0; i < n; i++) a[i] = 1.0; return a; }
+
+        /// <summary>n22f-plany (klucz Ks Plan Converge Shelf Level): wspolny poziom podazy / popytu rynku m = srednia geometryczna S/D wazona wartoscia popytu (te same wagi co
+        /// normalizacja cen) towarow czynnych poza granica ceny, ucieta do [1, cap]. Normalizacja cen na rynek zdejmuje wspolny poziom cen, wiec nadwyzki wspolnej wszystkim
+        /// towarom (zapas polek kroku 8: podaz targu = margines x popyt targu) ceny wzgledne nie zbijaja - test zbieznosci mierzy odchylenie towaru od tego poziomu.
+        /// Brak (poziom ponizej 1) zostaje w tescie jak dotad; poziom ponad margines - tylko do marginesu.</summary>
+        private static void ShelfLevel(Ctx x, double[] p, double[] S, bool[] act, double cap, double[] lev)
+        {
+            for (int m = 0; m < NM; m++)
+            {
+                double ws = 0, wl = 0;
+                for (int g = 0; g < KsTab.NG; g++)
+                {
+                    int i = m * KsTab.NG + g;
+                    if (!act[i] || !(S[i] > 0) || p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999) continue;
+                    double w = x.Dm[i] * x.Val[g];
+                    if (!(w > 0)) continue;
+                    ws += w; wl += w * Math.Log(S[i] / Math.Max(1.0, x.Dm[i]));
+                }
+                double c = ws > 0 ? Math.Exp(wl / ws) : 1.0;
+                lev[m] = !(c > 1.0) ? 1.0 : (c > cap ? cap : c);
+            }
+        }
 
         private static Dictionary<string, double[]> DistrictProd(Ctx x, double[] xs)
         {

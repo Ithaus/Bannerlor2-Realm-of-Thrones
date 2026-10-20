@@ -7620,6 +7620,10 @@ namespace Armoury
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsPlanMarketsClearVillages { get; set; } = false;
 
+        [SettingPropertyBool("Ks Plan Converge Shelf Level", HintText = "with Start Calibration: the weekly plan judges whether each market has settled against the market's common level of supply over demand, up to the small stock it plans for the town stalls (3 in 100 before the calibration is switched on and for 28 days after) - a surplus that every good shares is that stall stock, which relative prices cannot and should not remove. A shortage is judged as before. Only the plan's own check of its reckoning - no coin or goods change hands; a market that has settled is closed a little sooner. Off = every good must be within 2 in 100 of its demand, as before", RequireRestart = false)]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsPlanConvergeShelfLevel { get; set; } = true;
+
         [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter in the cold lands needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt; hunters of the warm lands as before). Off = the old table", RequireRestart = false)]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsColdLand { get; set; } = true;
@@ -10344,6 +10348,7 @@ namespace Armoury
             s.KsSelfFeedSlow = KsSelfFeedSlow;
             s.KsPlanMarketsClear = KsPlanMarketsClear;
             s.KsPlanMarketsClearVillages = KsPlanMarketsClearVillages;
+            s.KsPlanConvergeShelfLevel = KsPlanConvergeShelfLevel;
             s.KsColdLand = KsColdLand;
             s.KsHungerUnrest = KsHungerUnrest;
             s.KsHungerLoyaltyMax = KsHungerLoyaltyMax;
