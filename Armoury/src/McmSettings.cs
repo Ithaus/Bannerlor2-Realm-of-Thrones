@@ -5052,9 +5052,13 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool MendHoursByGuild { get; set; } = true;
 
-        [SettingPropertyBool("Auto Mend Half Guild", HintText = "with Mend Hours By Guild on: the repairs nobody orders by hand - the AI lords' men and your own men paying from their purse - together take at most half of each trade's working hours in a town each day, so the workshops never stand idle and some hands stay free for your own orders (off = they may take every free hour)", RequireRestart = false)]
+        [SettingPropertyBool("Auto Mend Half Guild", HintText = "with Mend Hours By Guild on: the repairs nobody orders by hand - the AI lords' men and your own men paying from their purse - together take at most half of each trade's working hours in a town each day, so the workshops never stand idle and some hands stay free for your own orders (off = they may take every free hour). Only used when Mend Idle Hands First is off", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool AutoMendHalfGuild { get; set; } = true;
+
+        [SettingPropertyBool("Mend Idle Hands First", HintText = "with Mend Hours By Guild on: repairs take first the hands of a trade that have no work today - a town workshop with nothing to make, a trade with no line of its own, a line whose work is going to waste - and only then hands busy making new arms; the repairs nobody orders by hand (the AI lords' men and your own men paying from their purse) take at most a tenth of those busy hands a day and the rest waits, while your own orders may still take every free hour. Hours from idle hands are not taken off tomorrow's workshop work (off = the half-of-each-trade rule of Auto Mend Half Guild, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendIdleHandsFirst { get; set; } = true;
 
         [SettingPropertyBool("Mend Bulk Every Order", HintText = "the bulk rate of the men's racks (Troop Mend Bulk Discount: 0.5% off the work per piece, up to 30%) applies to every repair order in a town: your loot from the bags, your harness, the quartermaster's repairs (Spoils), your men's daily mending and each AI lord's day at the smiths (counting the pieces the trades really take that day) - the more pieces in one order, the bigger the rate; off the work only, not the materials or the hours (off = only on the men's racks, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
@@ -9707,6 +9711,7 @@ namespace Armoury
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
             s.MendHoursByGuild = MendHoursByGuild;
             s.AutoMendHalfGuild = AutoMendHalfGuild;
+            s.MendIdleHandsFirst = MendIdleHandsFirst;
             s.MendBulkEveryOrder = MendBulkEveryOrder;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;

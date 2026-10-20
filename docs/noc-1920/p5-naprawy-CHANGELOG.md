@@ -118,3 +118,65 @@ szacunkiem (nie pomiarem) - poprawiony rabat AI; spadek produkcji siodlarzy do s
 8. Kwatermistrz Spoils: dymek i komunikat z `Bulk rate for N pieces` i ewentualnie `pieces wait for free hands`; w logu `godziny cechow (R3-02)`.
 9. Oboz z platnerzem i kwatermistrzem (inny towarzysz, Steward 50+): w linii platnerza `kwatermistrz (Steward): <imie> - ... premia do +6%` i XP Zarzadzania
    <= 25/dobe; sztuka bez materialu (np. t5 bez zelaza t5) nie blokuje lzejszych.
+
+**Poprawka n22f-naprawy2 (20.10, do WGRANIA 93) - naprawy najpierw z rak bez roboty (`MendIdleHandsFirst`).**
+
+*Dla Jeffa (prosto).* Naprawy u cechow zostaja realistyczne (godziny rzemieslnika jak dotad, cena bez zmian), ale teraz najpierw robia je ludzie, ktorzy
+i tak nie maja roboty: warsztat miasta, ktory dzis nic nie robi, cech bez wlasnej linii i linie, ktorych praca przepada. Z rzemieslnikow, ktorzy robia nowa
+bron i zbroje, lordowie AI i sakiewka Twoich ludzi biora najwyzej jedna dziesiata dziennie (dotad polowe), a Twoje wlasne zlecenia dalej moga zajac kazde wolne rece.
+
+*Problem z liczbami.* Biegi 160 dob z zapisu autotest-F-d240 (x8), srednie ostatnich 28 dob, segment "rece (174.1)" i "cechy [przydzielone/zrobione]":
+n22a-160 (bez p5-naprawy, `Armoury-2026-10-20_06-03-49.log`) - rece 10601, liniom 9998, naprawy i konserwacja 76, bezczynne 526; siodlarz 1217/1050,
+krawiec 2552/451, platnerz 3795/3136, miecznik 1396/591, lucznik 616/303, tarczownik 421/211. n22b-160 (z p5-naprawy R3-02, `Armoury-2026-10-20_07-52-35.log`) -
+liniom 9413, naprawy i konserwacja 473 (+400 roboczodni), bezczynne 655; siodlarz 1103/908 (-14% zrobionych), krawiec 2276/400 (-11%), miecznik 1309/514 (-13%),
+lucznik 384/177 (-42%), tarczownik 414/210, platnerz 3925/3296 (+5%). Linia R3-02 (srednia 28 dob, parse.py w n22f-naprawy2-tmp): AI 1513 szt./d, godziny
+kowale/siodlarze/krawcy/lukarze/tarczownicy 3436/3268/518/255/122 (razem 7599 h = 475 roboczodni przy 16 h), stop na polowie rak 6598 szt. w 97 wizytach (ze 150 zlecen).
+Rece cechow swiata (TownHands 9823 x wagi 0.4/0.15/0.3/0.1/0.05): siodlarze 1473 roboczodni = 23 575 h/d - naprawy AI zjadly 13.9% ich rak, a zrobionych
+siodlarzy ubylo 13.5% (zgodne). Kowale: +2350 h wobec dawnych 0.6 h/szt. = 3.7% rak; krawcy 1.1%, lukarze 1.6%, tarczownicy 1.6% - spadki krawcow (-11%)
+i lukarzy (-42%) NIE wynikaja z godzin napraw (patrz Ryzyko). Bezczynne rece swiata ok. 530-650 roboczodni, a "przydzielone - zrobione" (rece przy liniach,
+ktorych praca przepada przy pelnym banku) ok. 4300 roboczodni (krawcy 82%, miecznicy 58%, lukarze 51%, siodlarze 14%) - tych rak naprawy dotad nie widzialy.
+Zuzycie AI: zuzyte w bitwach 378-715/d, naprawione w miastach 1513-1897/d (28 dob); obitych razem 150-175 tys. szt. w kazdym biegu (n21, n22a i n22b - ten sam
+zakres, zaleglosc nie rosla bez konca mimo spadku napraw w n22b).
+
+*Zmiana.* Nowy klucz `MendIdleHandsFirst` (TAK, dziala przy `MendHoursByGuild`; NIE = polowa rak `AutoMendHalfGuild` co do godziny jak dotad).
+- Plan doby ukrytego warsztatu rzemieslnikow (`WorkshopLaw.BuildPlan`, raz na miasto na dobe, `NotePlanForMend`) podaje GuildMend rece kazdego cechu napraw:
+  bezczynne (caly warsztat bez czynnej linii), cech bez linii (jego rece idace do innych cechow - "przeniesione z cechow bez roboty"), rece przy liniach cechu.
+  Cykl linii (`CyclePrefix`) zglasza linie z pelnym bankiem roboty (dzisiejsza robota przepada) - jej rece sa dzis bez roboty (`GuildMend.NoteStuck`).
+- Kazda godzina napraw (AI, ludzie gracza, zlecenia gracza, dlug cechu) bierze kolejno: bezczynne -> cech bez linii -> linie z pelnym bankiem -> rece linii (`Split`).
+- Naprawy automatyczne (AI + sakiewka ludzi): trzy pierwsze zrodla bez limitu, z rak linii najwyzej 10% na dobe (`AutoLineShare`, `AutoRoom`); lawa ludzi gracza
+  co godzine w tym samym tempie (dzienny przydzial / godziny zmiany). Zlecenia gracza - jak dotad wszystkie wolne godziny cechu (`Available`, od reki).
+- Jutrzejsze ciecie linii (`ManDaysYesterday`, kowale `SmithHours.ManDaysYesterday - SmithFreeManDaysYesterday`): bez godzin z rak bezczynnych i z linii
+  z pelnym bankiem (te rece i tak nic nie robily, wiec nic nie powstaje z niczego); godziny cechu bez linii odchodza od rak przeniesionych (jak dotad), z rak linii - od linii.
+- Dlaczego 10%: model (sim.py w n22f-naprawy2-tmp, na liczbach z linii) - limit s rak linii w wizytach, w ktorych dzis wiaze polowa; siodlarze s=0.10 -> ciecie linii
+  ok. 5-6.6% (wobec 13.9%), s=0.20 -> 8.9%; kowale 2-3%; reszta ponizej 1.5%. Sztuk AI bez nowych zrodel: s=0.10 ok. 870/d, s=0.20 ok. 1190/d; nowe zrodla
+  (linie z pelnym bankiem: kowale ok. 28% rak linii, krawcy 82%) dokladaja godziny bez ciecia produkcji - szacunek 1100-1300 szt./d przy s=0.10.
+  Wyzsze s nie miesci siodlarzy w 5%, wiec 10% (jak propozycja prowadzacego).
+- Linia logu (dopisek na koncu `Naprawy wg cechow (R3-02): doba`): `| zrodlo godzin (MendIdleHandsFirst TAK, k/s/k/l/t): bezczynne a/b/c/d/e, cech bez linii
+  (rece przeniesione) ..., linie z pelnym bankiem ..., rece linii ... (w tym automatyczne ..., limit 10% rak linii) | rece cechow wg planow N miast (roboczodni,
+  k/s/k/l/t): bezczynne ... (M miast), cech bez linii ..., linie z pelnym bankiem ..., pozostale rece linii ...`. Licznik "stop na polowie rak cechu" - nazwa bez
+  zmian (porownywalnosc), przy TAK liczy sztuki zatrzymane na nowym limicie.
+- Pliki: GuildMend.cs (zrodla rak, AutoRoom/AutoDaily/Split, linia doby), WorkshopLaw.cs (NotePlanForMend, pelny bank w CyclePrefix, kowale bez godzin bezczynnych),
+  Settings.cs + McmSettings.cs (gen_mcm; opis `AutoMendHalfGuild` - "dziala przy MendIdleHandsFirst NIE").
+
+*Ryzyko / co sprawdzic (kontrola calosci).*
+- Spadki lukarzy (-42%) i krawcow (-11%) w n22b nie wynikaja z godzin napraw (16 i 32 roboczodni/d = 4% i 1.4% ich rak); u lukarzy spadly rece przeniesione
+  wedlug braku (165 -> 29). n22b mialo tez p5-jednostki i p5-kruki - jesli spadek zostanie po tej poprawce, przyczyna jest gdzie indziej (osobna sprawa, nie naprawy).
+- Model jest szacunkiem swiata (logi nie maja rozkladu na miasta): udzial wizyt z wiazacym limitem i zrodla wedlug miast - do sprawdzenia nowym dopiskiem linii.
+  Jesli AI < 1000 szt./d przy siodlarzach w 5% - nastepny krok: limit linii osobno dla siodlarzy (nie wieksze s dla wszystkich).
+- Linia z pelnym bankiem: w dobie, w ktorej znow zacznie sztuke, jej robota moze byc policzona raz w naprawach i raz w banku (najwyzej jedna dniowka linii;
+  bank to 60 dni roboty). Linie z cyklem rzadszym niz co 2 doby zglaszaja sie rzadziej (ostroznie - mniej rak bez roboty).
+- Odwrocenie stanu miasta z dnia na dzien (wczoraj warsztat bezczynny, dzis pracuje): godziny z rak bezczynnych zostaja bez ciecia; godziny cechu bez linii, ktory
+  dzis ma linie, odchodza od jego linii (moze przekroczyc 10% jednego dnia). Cech nieobecny w planie warsztatu - jego czesc rak liczona jak rece linii (ostroznie).
+- Kowale: godziny cechu bez linii (np. miecznicy bez rudy) ciete dalej wedlug wag platnerz/miecznik (jak od wpisu 91) - czesc moze pojsc od linii platnerzy.
+- Wspolny stan: `_plan`, `_stuck`, `_src` tylko w pamieci (doba; plan starszy niz 2 doby = brak planu), czyszczone w `GuildMend.Reset` (z `SmithHours.Reset`);
+  nic do zapisu. Wszystko na watku glownym (cykle warsztatow - dzienny tik osady; naprawy - DailyTickParty, HourlyTick, menu). Alokacje: wiersz na miasto na dobe.
+- Zamknieta ekonomia: cena naprawy i zaplaty bez zmian (decyzja Jeffa 07.10); suma godzin cechu dalej najwyzej `Capacity` (rece cechu x 16 h).
+- Wylacznik: `MendIdleHandsFirst` NIE - AutoAvailable, lawa ludzi i ciecia jak dotad (polowa przy `AutoMendHalfGuild`); zostaja tylko liczniki nowego dopisku.
+- Status: build Release 0 bledow (po gen_mcm); gra nieuruchamiana (zakaz w zadaniu) - DO SPRAWDZENIA w autotescie.
+
+*Oczekiwane liczby w autotescie (160 dob z autotest-F-d240, x8, srednie 28 dob).*
+- `Warsztaty: dzien` - rece (174.1): naprawy i konserwacja ok. 150-250 (n22b 473, n22a 76); liniom >= ok. 9750; siodlarz zrobione >= ok. 1000 (n22a 1050,
+  n22b 908); platnerz, miecznik, tarczownik w 5% od n22a; krawiec i lucznik - jesli dalej ponizej, przyczyna poza naprawami (Ryzyko).
+- `Naprawy wg cechow (R3-02): doba` - AI ok. 1100-1300 szt./d; dopisek: wiekszosc godzin krawcow i lukarzy oraz duza czesc kowali w "linie z pelnym bankiem",
+  "rece linii (w tym automatyczne)" na cech nie wiecej niz ok. 10% "pozostalych rak linii" z dopisku planow x 16 h (siodlarze ok. 1000-1200 h/d).
+- `Zuzycie AI: dzien` - naprawione w miastach >= ok. 1100/d i wiecej niz zuzyte w bitwach; obitych razem w zakresie 110-180 tys. (jak n21/n22a/n22b), bez stalego wzrostu.

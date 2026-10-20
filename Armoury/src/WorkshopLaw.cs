@@ -260,10 +260,14 @@ namespace Armoury
                 var key = new KeyValuePair<Workshop, string>(workshop, line);
                 Wip w;
                 if (!_wip.TryGetValue(key, out w)) { w = new Wip { Day = day, Labor = share }; _wip[key] = w; }
-                w.Labor += share * Math.Max(0, day - w.Day);
+                int addDays = Math.Max(0, day - w.Day);
+                w.Labor += share * addDays;
                 w.Day = day;
                 float planDays = PlanDays;   // 174.1: bank roboty i plan (E) z jednego klucza WorkshopPlanDays (domyslnie 60 - jak dotad)
-                w.Labor = Math.Min(w.Labor, share * planDays + (w.Item != null ? w.Days : 0f));   // reka bez roboty nie odklada wiecej niz plan (2 miesiace)
+                float bankCap = share * planDays + (w.Item != null ? w.Days : 0f);
+                // n22f-naprawy2: pelny bank roboty w ukrytym warsztacie = rece tej linii dzis bez roboty (robota przepada) - naprawy biora je najpierw (GuildMend)
+                if (addDays > 0 && share > 0f && w.Labor > bankCap + 0.001f && workshop.WorkshopType.IsHidden && GuildMend.On) GuildMend.NoteStuck(town, GuildOf(production), share);
+                w.Labor = Math.Min(w.Labor, bankCap);   // reka bez roboty nie odklada wiecej niz plan (2 miesiace)
 
                 float[] owed;
                 if (!_owed.TryGetValue(workshop, out owed)) { owed = new float[4]; _owed[workshop] = owed; }
@@ -1024,8 +1028,8 @@ namespace Armoury
                     float freed = H * Math.Max(0f, wAll - wAct) / wAll;
                     // wpis 91 + 174.0 (e): kowale, ktorzy wczoraj naprawiali, i konserwacja zapasu na polce - mniej rak platnerzy i miecznikow (ukryty warsztat)
                     float smithW = GuildWeight("platnerz") + GuildWeight("miecznik"), repairPool = 0f;
-                    if (workshop.WorkshopType.IsHidden && smithW > 0f)
-                        repairPool = (SmithHours.ManDaysYesterday(town) + ArmsLeaks.UpkeepManDays(town)) / Math.Max(1, ActiveSmithWorkshops(town));
+                    if (workshop.WorkshopType.IsHidden && smithW > 0f)   // n22f-naprawy2: bez godzin z rak bezczynnych i linii z pelnym bankiem (0 przy wylaczonym MendIdleHandsFirst)
+                        repairPool = (Math.Max(0f, SmithHours.ManDaysYesterday(town) - GuildMend.SmithFreeManDaysYesterday(town)) + ArmsLeaks.UpkeepManDays(town)) / Math.Max(1, ActiveSmithWorkshops(town));
                     // recenzja 174: cech kowali nieczynny (miasto bez rudy) - jego czesc napraw i konserwacji odchodzi od rak zwolnionych, zanim pojda do innych
                     // cechow (dotad te same rece liczyly sie dwa razy: naprawy w SmithHours i praca w innym cechu; konserwacja byla darmowa)
                     if (repairPool > 0f)
@@ -1112,9 +1116,37 @@ namespace Armoury
                 }
                 _hands += H + carp; _handsLines += toLines; _handsRepair += repairs;
                 if (carp > 0f) ShieldWarHelp.Note(town, carp, carpOwn);   // R3-09a
+                if (workshop.WorkshopType.IsHidden) NotePlanForMend(GuildMend.PlanRow(town), plan, hg, H);   // n22f-naprawy2
             }
             catch (Exception e) { _planStumbles++; if (!_planErrLogged) { _planErrLogged = true; Log.Error("WorkshopLaw.BuildPlan", e); } }   // recenzja 174: raz w logu, reszta w liczniku potkniec
             return plan;
+        }
+
+        /// <summary>n22f-naprawy2 (GuildMend, MendIdleHandsFirst): rece cechow z planu doby ukrytego warsztatu - [0..4] rece cechu bez czynnej linii
+        /// (przeniesione do innych cechow), [5..9] rece przy liniach cechu, [10] = 1 caly warsztat bez czynnej linii. Cech bez linii w tym warsztacie
+        /// (nie ma go w planie) - jego czesc rak liczona jak rece linii (ostroznie: naprawy automatyczne biora z niej najwyzej limit linii). Raz na dobe.</summary>
+        private static void NotePlanForMend(float[] row, Dictionary<string, LinePlan> plan, Dictionary<string, float> hg, float H)
+        {
+            if (row == null || row.Length < 11) return;
+            Array.Clear(row, 0, 11);   // [11] - doba planu (GuildMend.PlanRow)
+            if (hg.Count == 0) { row[10] = 1f; return; }
+            float wAll = 0f, wSum = 0f;
+            int present = 0;
+            for (int i = 0; i < GuildOrder.Length; i++)
+            {
+                wSum += GuildWeight(GuildOrder[i]);
+                foreach (var lp in plan.Values) if (lp.Guild == GuildOrder[i]) { present |= 1 << i; wAll += GuildWeight(GuildOrder[i]); break; }
+            }
+            for (int i = 0; i < GuildOrder.Length; i++)
+            {
+                string g = GuildOrder[i];
+                int k = GuildMend.TradeOfGuild(g);
+                if (k < 0) continue;
+                float h;
+                if (hg.TryGetValue(g, out h)) row[5 + k] += h;
+                else if ((present & (1 << i)) != 0) { if (wAll > 0f) row[k] += H * GuildWeight(g) / wAll; }
+                else if (wSum > 0f) row[5 + k] += H * GuildWeight(g) / wSum;
+            }
         }
 
         // ------------------------------------------------------------ 174.1: koszyki w robocie (miasto -> koszyk), liczniki doby
