@@ -8076,6 +8076,22 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float DistrictWorksAiWorldPace { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Side Village Fief Start", HintText = "Banner Kings start 'Indebted Lord': instead of the lordship title of a main village (which stays with its lord), you are given one side village of the realm you join, close to where you start - it is yours, it flies your banner on the map and pays you its share of the lord's taxes. Off = Banner Kings gives the main village title, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefStart { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Fief Income", HintText = "with a side village of your own: each time the district's carts come back from market, the side village's share of the lord's tax (its share of what the district makes) goes to you instead of the lord - shown as a line in your daily gold tooltip. Off = the lord keeps it all", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefIncome { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Fief Menu", HintText = "with a side village of your own: click it on the map (or choose 'Visit ... (your village)' in its main village) to ride in - rest the night there for free, invest in its works, look over what it makes and pays you. Off = no menu", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefMenu { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Fief Lodging", HintText = "with Side Village Fief Menu: 'Rest the night here' in your own village puts the men under your villagers' roofs for free - like the common room of an inn: nobody stirs before dawn and the men wake rested (a little faster and in better spirits until dusk). Needs Town Inns. Off = the men camp by the village, as anywhere on the map", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefLodging { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -10210,6 +10226,10 @@ namespace Armoury
             s.DistrictWorksAiReserveDays = DistrictWorksAiReserveDays;
             s.DistrictWorksAiReserveFlat = DistrictWorksAiReserveFlat;
             s.DistrictWorksAiWorldPace = DistrictWorksAiWorldPace;
+            s.SideVillageFiefStart = SideVillageFiefStart;
+            s.SideVillageFiefIncome = SideVillageFiefIncome;
+            s.SideVillageFiefMenu = SideVillageFiefMenu;
+            s.SideVillageFiefLodging = SideVillageFiefLodging;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;

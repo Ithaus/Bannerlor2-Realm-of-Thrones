@@ -327,6 +327,7 @@ namespace Armoury
                 CouncilWages35.SetHarmony(_harmony); // 3.5: tylko zapamietanie - latki BK (rada: platnik i urzad radnego) w kampanii
                 FiefGrants.SetHarmony(_harmony);     // PROJEKT-LENNA (14.10): tylko zapamietanie - latki modelu BK / BKROT i decyzji "Owner of X" w kampanii
                 BkrotChains.SetHarmony(_harmony);    // P4 audytu (AM-13, AM-09, AM-19): tylko zapamietanie - lancuchy modeli pod BKROT wpina EnsureHooks w kampanii (BKROTPatch laduje sie po Armoury)
+                SideVillageFief.SetHarmony(_harmony);   // n20-wioska: tylko zapamietanie - latki (BK start, podpowiedz zlota) w kampanii
                 EstateIncome187.SetHarmony(_harmony); // 3.1/3.3 (31b) E3/2: tylko zapamietanie - latki majatkow BK w kampanii
                 Seal31B.SetHarmony(_harmony);        // 3.1/3.3 (31b) E3/4, E3/8, E3/9: tylko zapamietanie - latki gry i BK w kampanii
                 PerfD2.SetHarmony(_harmony);         // perf-d2d3: tylko zapamietanie - prefiks podatku miast BK (PerfTownTaxSkipBk) w kampanii, po straznika

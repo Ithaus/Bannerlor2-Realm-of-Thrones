@@ -322,6 +322,8 @@ namespace Armoury
         /// okregu na dobe, wiec porownanie raz na sekunde to sam odczyt); klucz off - herb pana okregu jak dotad. "" = brak pana albo herbu.</summary>
         private static string LordCode(Slot s)
         {
+            string mine = SideVillageFief.BannerCodeOf(s.R.Uid);   // n20-wioska: wioska gracza - herb rodu gracza (takze bez VillageBannerPerHolder)
+            if (mine != null) return mine;
             if (Settings.Current.VillageBannerPerHolder && s.D != null && s.D.S != null) return VillageHolders.Code(s.D.S, s.R.Uid);
             return LordCode(s.D);
         }
@@ -341,6 +343,7 @@ namespace Armoury
         private string CapCode(Slot s, string code, int rank)
         {
             _penCapNow = false;
+            if (SideVillageFief.IsMine(s.R.Uid)) return code;   // n20-wioska: herb gracza na jego wiosce zawsze (jedna tekstura ponad limit)
             if (_penTexMode == 1)
             {
                 // sw-herby: male tekstury z ksiega; przy zwalnianiu dalekich limit tylko jako siatka bezpieczenstwa (herbow w uzyciu < PenTexKeep),

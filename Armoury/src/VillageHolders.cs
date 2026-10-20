@@ -55,8 +55,8 @@ namespace Armoury
     /// </summary>
     internal static class VillageHolders
     {
-        internal const int RuleEstate = 0, RuleLore = 1, RuleRealmEstate = 2, RuleRealmHouse = 3, RuleLord = 4, RuleTitle = 5, RuleCanon = 6;
-        private static readonly string[] RuleName = { "majatek BK", "rycerz z lore", "rycerz krolestwa z majatku obok", "rod krolestwa", "pan", "tytul BK", "rod kanonu" };
+        internal const int RuleEstate = 0, RuleLore = 1, RuleRealmEstate = 2, RuleRealmHouse = 3, RuleLord = 4, RuleTitle = 5, RuleCanon = 6, RulePlayer = 7;   // n20-wioska: RulePlayer - wioska poboczna gracza (SideVillageFief)
+        private static readonly string[] RuleName = { "majatek BK", "rycerz z lore", "rycerz krolestwa z majatku obok", "rod krolestwa", "pan", "tytul BK", "rod kanonu", "wioska gracza" };
         private const int NearDistricts = 6, NearHouses = 3;
         private const int NearSeats = 2;                            // D2: rody 2 najblizszych siedzib przed rodami zaprzysiezonymi panu
         private const float SeatRadius = 60f;                       // D2: ...ale tylko siedzib do 60 jednostek mapy od wsi gry (p90 najblizszej siedziby; symulacja startu: bez
@@ -151,6 +151,9 @@ namespace Armoury
             if (district == null || district.Village == null || district.StringId == null) return null;
             try
             {
+                // n20-wioska: wioska poboczna gracza - gospodarzem gracz (herb rodu gracza), przed pamiecia okregu (bez przebudowy okregu)
+                var mine = SideVillageFief.HolderOf(district, uid);
+                if (mine != null) return mine;
                 var c = CacheFor(district);
                 if (c == null) return null;
                 Holder h = uid == null ? c.Main : null;
@@ -613,6 +616,7 @@ namespace Armoury
         internal static string Line(Holder h)
         {
             if (h == null) return null;
+            if (h.Rule == RulePlayer) return SideVillageFief.TipLine(h.Lord);   // n20-wioska: "This village is yours, sworn to House X."
             Clan lord = h.Lord;
             bool own = lord != null && ReferenceEquals(lord, Clan.PlayerClan);
             var row = h.Lore;
