@@ -61,8 +61,8 @@ niz po spaleniu wsi.
    rabunkow - jak dotad linia "Rabunek osada po osadzie (E7/R1)".
 10. **Klucze MCM** (nowe, w Armoury.json Jeffa ich nie ma - wchodza domyslne): `RaidTributeEnabled` (TAK), `RaidTributeShareLow` 0.10,
     `RaidTributeShareHigh` 0.20 (suwaki 0..0.5), `RaidTributeSpareDays` 30 (suwak 1..84). Pola w Settings.cs zaraz za `RaidPlayerStepPopup`.
-11. **Wpiecia w plikach wspolnych** (minimalne): `ArmouryBehavior.cs` - 3 miejsca po 1-3 linie (reset, SyncData, `RaidTribute.RegisterEvents(this)`
-    za VillageHerds); `Settings.cs` - 4 pola; `DistrictRaid.cs` - nowa metoda `StepEstimate` (tylko odczyt, nic w istniejacym kodzie);
+11. **Wpiecia w plikach wspolnych** (minimalne): `ArmouryBehavior.cs` - 3 miejsca po 1-3 linie (reset za `_prisonerBaseline` - z dala od linii
+    resetu fali 1, SyncData za `arm_herds`, `RaidTribute.RegisterEvents(this)` za VillageHerds); `Settings.cs` - 4 pola; `DistrictRaid.cs` - nowa metoda `StepEstimate` (tylko odczyt, nic w istniejacym kodzie);
     `tools/gen_mcm.py` - 3 zakresy suwakow; `tools/sprawdz_logi.py` - grupa `p6okup` (def `p6okup_main`, stale `P6OKUP_*`). SubModuleMain bez zmian
     (latki zaklada RaidTribute w starcie sesji, wlasna instancja Harmony "com.jeff.armoury.raidtribute", raz na proces).
 
@@ -89,7 +89,9 @@ niz po spaleniu wsi.
 - **Menu**: opcja zwyklego menu, bez `SwitchToMenu` z menu oczekiwania; warunki opcji gry tylko blokowane (IsEnabled false + dymek), nie ukrywane.
 
 ## Status
-DO SPRAWDZENIA (zbudowane: `dotnet build Armoury` kod 0, 0 Error(s); nie wgrane, nie testowane w grze - fala 2 idzie do wspolnego scalenia).
+DO SPRAWDZENIA (zbudowane: `dotnet build Armoury` kod 0, 0 Error(s); proba scalenia z n22-calosc 4885ae75 (`git merge-tree`, bez zmian w innych
+drzewach) - bez konfliktow, scalony Armoury buduje sie (kod 0), gen_mcm na scalonym bez zmian; nie wgrane, nie testowane w grze - fala 2 idzie do
+wspolnego scalenia).
 
 ## Decyzje (moje, Jeff: "ekonomie projektuje Claude")
 - Stawka 10-20% wedlug przewagi (1:1 -> 10%, 5:1 -> 20%) - liczby z audytu N4; sila jako liczba ludzi (prosta do wyjasnienia), nie "sila" modelu gry.
