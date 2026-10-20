@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-20 (WGRANIE 91 - runda 3 nocy 19/20.10: PLAN 6.14 konie zalog dla lordow AI)
+
+**Zmiana:** `w-toku/n20-calosc` db85ef2d = WGRANIE 90 + `w-toku/r3-jazda` 9bc09019 (wpis docs/noc-1920/r3-jazda-CHANGELOG.md): klucze GarrisonHorsesToLords i
+GarrisonHarnessToLords - lord rodu AI na postoju w twierdzy swojego krolestwa bierze wolne konie (i uprzaz) zalogi ponad jej jezdzcow i luz: najpierw dla swoich konnych
+bez konia, potem do kolejki awansow na jezdnego; wlasny rod bez zlota, inny rod tego samego krolestwa placi cene targu glowie rodu pana twierdzy (budzet F5, GearSpent);
+targi koni nietkniete. Armoury 8ea6c892 (2056 ustawien); CrashScribe bez zmian.
+**Testy:** n20r3-bitwa (5 dob + 4 bitwy x20), n20r3-nowa (120 dob nowej kampanii x8), n20r3-160 (160 dob x8 z zapisu) - kod 0, 0 ERROR w logu Armoury. R3J-1 TAK
+(7-11 koni/d z zalog), R3J-3 160 dob TAK (jazda z koniem 75.2% -> 78.2%), polki koni SZ-A8-2 TAK (10662 / 11971). R3J-2 NIE (konni bez konia -7% zamiast -30%),
+punkt 2 (hodowla koni bojowych dla kolejki) OTWARTY; linia 219 / SZ-A8-1 bez zmian (miara wedlug typu jednostki). Porownanie grup: 160 dob 5 nowych NIE, w tym A17-11e
+(737 ludzi w 9 rosterach w jednej dobie wielkich bitew 109200 - sciezka ludzi, nie koni), nowa kampania 3 nowe przy progu.
+**Ryzyko / co sprawdzic:** zakupy koni lordow z targu spadly (45.6/d wobec 62.1/d) - czesc brakow pokrywa zaloga; A17-11e obserwowac w nastepnym biegu.
+**Status:** WGRANE 91 - DO SPRAWDZENIA w grze Jeffa.
+
 ## 2026-10-20 (WGRANIE 90 - runda 2 nocy 19/20.10: PLAN 6.10 klimat przed warsztatami, 6.9 wierzchowce egzotyczne, 1.7 ladry wedlug Jazdy)
 
 **Zakres:** audyt PLAN-DO-KONCA-MODA-2026-10-09 wobec WGRANIA 89 (212 pozycji: 137 wgrane, 35 czeka na Jeffa, 21 czesciowo, 12 porzucone, 5 otwarte, 2 nieznane);
