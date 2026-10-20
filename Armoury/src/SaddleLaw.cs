@@ -789,6 +789,7 @@ namespace Armoury
                     CensusOne(MobileParty.MainParty, mine);
                 }
                 catch (Exception e) { Stumble("Census", e); }
+                try { GarrisonHorses.NoteCavalry(lords.Men, lords.TypeMounted, lords.Mounted); } catch (Exception e) { Stumble("NoteCavalry", e); }   // r3-jazda: jazda wedlug typu i z koniem do linii "Konie zalog dla lordow" (tylko odczyt spisu)
                 ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
                 long poolHar = 0;
                 try { HorseFate.VetPoolHarness((it, n) => poolHar += n); } catch (Exception e) { Stumble("VetPool", e); }

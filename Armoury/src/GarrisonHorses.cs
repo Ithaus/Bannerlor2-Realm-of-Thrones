@@ -13,7 +13,12 @@ namespace Armoury
     /// Dowod (WGRANIE 90, bieg 160 dob z zapisu, linie "Konie AI (175)" i "Jezdzcy i uprzaz (E8/H)" d109236): konni bez konia 3743 z 16568, a jednoczesnie
     /// wolne konie w zbrojowniach 2975 - w ZALOGACH (zbrojownie zalog: konie 5610 przy 3501 jezdzcach wedlug typu, z koniem 2703), podczas gdy w partiach rodow AI
     /// "bez konia" 2066. Rachunek koni (Stables.Balance) jest per partia, wiec kon zalogi nigdy nie trafial pod jezdzca lorda: zalogi nie sprzedaja koni
-    /// (MenPurse.SellArmorySurplus - galaz koni tylko partii lordow), a lord zabierajacy jezdzcow z zalogi zostawia tam ich konie (Stajnia przenosi tylko ludzi).
+    /// (MenPurse.SellArmorySurplus - galaz koni tylko partii lordow) ani nie kupuja, a ani Remount, ani Stajnia nie siegaja do zbrojowni zalogi. Konie zostaja
+    /// w zalogach po poleglych jezdzcach zalog, po dorobku startowym (ColdStart) i po przeniesieniach A7 (MoveKits przenosi konie z ludzmi, ale pula koni
+    /// dawcy jest dzielona proporcjonalnie - PlanKits share - wiec nie wyrownuje kont koni miedzy partiami).
+    /// MIARA (recenzja r3-jazda): krok (1) daje konia jezdzcom, ktorzy SA konni wedlug typu - podnosi jazde rzeczywista (E8/H "z koniem"), a nie linie
+    /// "Rycerze i jazda (219)" / SZ-A8-1 (te licza konnych wedlug typu, ch.IsMounted). Na linie 219 dziala tylko krok (2) (kolejka awansow) i posrednio
+    /// zakup Stajni tego postoju (Reserve.Short zawiera jezdzcow bez konia - mniej braku, wiecej budzetu i limitu postoju na konie dla awansow).
     /// Teraz przy postoju lorda rodu AI w miescie albo zamku swojego krolestwa (nie oblezonym), po dosadzeniu z taboru (Stables.Remount):
     ///  (1) jezdzcy bez konia dostaja do zbrojowni DTE wolne konie zbrojowni zalogi - ta sama kolejnosc kategorii co Remount (z prawem do bojowego: bojowy,
     ///      szlachetny, zwykly; reszta: zwykly, bojowy, szlachetny; w kategorii najtansze);
@@ -31,10 +36,15 @@ namespace Armoury
     /// </summary>
     internal static class GarrisonHorses
     {
-        private static int _dStamp = -1, _dStops, _dStopsFree, _dFree, _dLackBefore, _dLackAfter, _dToRiders, _dToQueue, _dOwn, _dPaidN, _dGold, _dNoBudget, _dRefused, _dHStops, _dHNeed, _dHarness, _dHOwn, _dHGold;
+        private static int _dStamp = -1, _dStops, _dStopsFree, _dFree, _dLackBefore, _dLackAfter, _dToRiders, _dToQueue, _dOwn, _dPaidN, _dGold, _dNoBudget, _dRefused, _dHStops, _dHNeed, _dHarness, _dHOwn, _dHGold, _dHNoBudget, _dHRefused;
         private static readonly int[] _dCat = new int[3];
         private static int _stumbles, _stumblesAll;
         private static readonly int[] HighOrder = { 1, 2, 0 }, LowOrder = { 0, 1, 2 }, QueueOrder = { 1, 0, 2 };
+        // recenzja r3-jazda (miara): spis partii rodow AI z linii E8/H (jazda wedlug typu i z koniem) i polki koni z linii E6/0 - pierwszy w biegu i ostatni
+        // (tylko odczyt cudzych spisow doby, bez wlasnej petli po partiach); tablice polek to swieze tablice tamtej linii (bez kopii)
+        private static long _cavMen0 = -1, _cavType0, _cavHorse0, _cavMen = -1, _cavType, _cavHorse;
+        private static int _cavDay0 = -1, _cavDay = -1, _shelfDay0 = -1, _shelfDay = -1;
+        private static long[] _shelf0, _shelf;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.GarrisonHorsesToLords && GarrisonKit.OwnKitOn; } }
 
@@ -42,11 +52,48 @@ namespace Armoury
         internal static void Reset()
         {
             ClearDay(); _dStamp = -1; _stumblesAll = 0;
+            _cavMen0 = _cavMen = -1; _cavType0 = _cavHorse0 = _cavType = _cavHorse = 0; _cavDay0 = _cavDay = _shelfDay0 = _shelfDay = -1; _shelf0 = _shelf = null;
+        }
+
+        /// <summary>Z SaddleLaw.Daily (spis E8/H, partie rodow AI): ludzie, jazda wedlug typu, z koniem - do linii "Konie zalog dla lordow" (przed/po biegu).</summary>
+        internal static void NoteCavalry(long men, long typeMounted, long withHorse)
+        {
+            if (men <= 0) return;
+            int d = (int)CampaignTime.Now.ToDays;
+            if (_cavMen0 < 0) { _cavMen0 = men; _cavType0 = typeMounted; _cavHorse0 = withHorse; _cavDay0 = d; }
+            _cavMen = men; _cavType = typeMounted; _cavHorse = withHorse; _cavDay = d;
+        }
+
+        /// <summary>Z ArmsBook (linia "Konie (E6/0)"): polki miast i zamkow wedlug kategorii ksiegi (swieza tablica tej doby) - do linii (targi nie pustoszeja).</summary>
+        internal static void NoteShelf(long[] shelf)
+        {
+            if (shelf == null || shelf.Length < 3) return;
+            int d = (int)CampaignTime.Now.ToDays;
+            if (_shelf0 == null) { _shelf0 = shelf; _shelfDay0 = d; }
+            _shelf = shelf; _shelfDay = d;
+        }
+
+        private static string Pct(long a, long b) { return b > 0 ? (100.0 * a / b).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "0.00"; }
+
+        private static string CavPart()
+        {
+            if (_cavMen < 0) return " | jazda partii rodow AI: brak spisu E8/H";
+            return " | jazda partii rodow AI (spis E8/H doby " + _cavDay + "): wedlug typu " + Pct(_cavType, _cavMen) + "% (to licza linia 219 i SZ-A8-1), z koniem "
+                   + Pct(_cavHorse, _cavMen) + "% (" + Pct(_cavHorse, _cavType) + "% jazdy wedlug typu ma konia - na to dziala krok (1)); na starcie biegu (doba " + _cavDay0
+                   + "): wedlug typu " + Pct(_cavType0, _cavMen0) + "%, z koniem " + Pct(_cavHorse0, _cavMen0) + "% (" + Pct(_cavHorse0, _cavType0) + "%)";
+        }
+
+        private static string ShelfPart()
+        {
+            if (_shelf == null) return " | polki koni: brak linii E6/0";
+            return " | polki koni miast i zamkow (E6/0, zwykle/bojowe/szlachetne): doba " + _shelfDay + " " + _shelf[0] + "/" + _shelf[1] + "/" + _shelf[2]
+                   + " (razem " + (_shelf[0] + _shelf[1] + _shelf[2]) + "), na starcie biegu (doba " + _shelfDay0 + ") " + _shelf0[0] + "/" + _shelf0[1] + "/" + _shelf0[2]
+                   + " (razem " + (_shelf0[0] + _shelf0[1] + _shelf0[2]) + ")";
         }
 
         private static void ClearDay()
         {
-            _dStops = _dStopsFree = _dFree = _dLackBefore = _dLackAfter = _dToRiders = _dToQueue = _dOwn = _dPaidN = _dGold = _dNoBudget = _dRefused = _dHStops = _dHNeed = _dHarness = _dHOwn = _dHGold = 0;
+            _dStops = _dStopsFree = _dFree = _dLackBefore = _dLackAfter = _dToRiders = _dToQueue = _dOwn = _dPaidN = _dGold = _dNoBudget = _dRefused = _dHStops = _dHNeed = _dHarness = _dHOwn = _dHGold = _dHNoBudget = _dHRefused = 0;
             _dCat[0] = _dCat[1] = _dCat[2] = 0; _stumbles = 0;
         }
 
@@ -66,8 +113,10 @@ namespace Armoury
                              + " | z zalog wlasnego rodu " + _dOwn + ", od innych rodow krolestwa " + _dPaidN + " za " + _dGold + " zl (glowom rodow panow twierdz; bez budzetu "
                              + _dNoBudget + " postojow)"
                              + " | uprzaz zalog (GarrisonHarnessToLords " + (Settings.Current != null && Settings.Current.GarrisonHarnessToLords ? "tak" : "nie") + "): postoje z brakiem siodel "
-                             + _dHStops + " (brak przed " + _dHNeed + "), wzieli " + _dHarness + " szt. (z zalog wlasnego rodu " + _dHOwn + ", od innych rodow za " + _dHGold + " zl)"
-                             + " | z targu 0 (polki nietkniete) | DTE nie przyjal " + _dRefused + " | potkniecia dzis " + _stumbles + " (razem " + _stumblesAll + ").");
+                             + _dHStops + " (brak przed " + _dHNeed + "), wzieli " + _dHarness + " szt. (z zalog wlasnego rodu " + _dHOwn + ", od innych rodow za " + _dHGold + " zl; bez budzetu "
+                             + _dHNoBudget + " postojow; DTE nie przyjal " + _dHRefused + ")"
+                             + " | z targu 0 (polki nietkniete) | DTE nie przyjal koni " + _dRefused + CavPart() + ShelfPart()
+                             + " | potkniecia dzis " + _stumbles + " (razem " + _stumblesAll + ").");
                 }
                 catch { }
             }
@@ -171,7 +220,7 @@ namespace Armoury
                 finally
                 {
                     // zaplata za to, co naprawde przeszlo - takze gdy przenoszenie przerwal wyjatek (zamknieta ekonomia: kon od innego rodu zawsze oplacony)
-                    if (!own && gold > 0) Pay(lord, payee, clan, gearRule, gold);
+                    if (!own && gold > 0 && Pay(lord, payee, clan, gearRule, gold)) _dGold += gold;
                 }
                 _dToQueue += movedBag;
 
@@ -201,7 +250,8 @@ namespace Armoury
         internal static void GiveHarness(MobileParty party, Settlement st)
         {
             var c = Settings.Current;
-            if (c == null || !c.GarrisonHarnessToLords || !On || !SaddleLaw.On || party == null || st == null) return;
+            // recenzja r3-jazda: wlasny klucz (bez klucza koni GarrisonHorsesToLords) + wojsko tylko z wlasnym sprzetem, jak konie
+            if (c == null || !c.GarrisonHarnessToLords || !GarrisonKit.OwnKitOn || !SaddleLaw.On || party == null || st == null) return;
             try
             {
                 if (!CavalryTemplate.Steered(party) || party.MapEvent != null || Undead.Party(party)) return;
@@ -236,18 +286,19 @@ namespace Armoury
                     int purse = Math.Max(0, lord.Gold);
                     budget = gearRule ? Math.Min(gearLeft, (int)(Math.Max(0, purse - Math.Max(0, c.AiGearGoldReserve)) * MBMath.ClampFloat(c.AiMountGearPurseShare, 0f, 1f)))
                                       : (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
-                    if (budget < 50) { _dNoBudget++; return; }
+                    if (budget < 50) { _dHNoBudget++; return; }
                 }
-                int done = 0, gold = 0;
+                int done = 0, gold = 0, guard = 0;
                 try
                 {
-                while (done < n)
+                while (done < n && guard++ < 64)
                 {
                     ItemObject best = null; int bestCnt = 0;
                     foreach (var kv in garArm)
                     {
                         var it = kv.Key;
-                        if (it == null || kv.Value <= 0 || !SaddleLaw.Fits(it)) continue;
+                        // recenzja r3-jazda: sztuki, ktorych DTE nie przyjmie (zbior odmow sesji / czarna lista), pomijane - nie blokuja reszty uprzezy
+                        if (it == null || kv.Value <= 0 || !SaddleLaw.Fits(it) || !AiGear.DteTakes(it)) continue;
                         if (best == null || it.Value < best.Value) { best = it; bestCnt = kv.Value; }
                     }
                     if (best == null) break;
@@ -260,7 +311,14 @@ namespace Armoury
                         take = Math.Min(take, budget / price);
                     }
                     if (take <= 0) break;
-                    if (!AiGear.AddToArmory(party, best, take)) { _dRefused += take; break; }   // DTE nie przyjal - uprzaz zostaje w zalodze
+                    if (!AiGear.AddToArmory(party, best, take))
+                    {
+                        // DTE nie przyjal - uprzaz zostaje w zalodze; sztuka trafila do zbioru odmow (DteTakes = false), wiec nastepny obieg bierze kolejna
+                        // najtansza; odmowa bez wpisu do zbioru (blad wywolania) - koniec jak dotad
+                        _dHRefused += take;
+                        if (AiGear.DteTakes(best)) break;
+                        continue;
+                    }
                     try { AiWear.MoveWorn(gar, party, best, take, bestCnt); } catch { _stumbles++; _stumblesAll++; }   // stan sztuk idzie z uprzeza (jak A7)
                     if (bestCnt - take > 0) garArm[best] = bestCnt - take; else garArm.Remove(best);
                     if (!own) { budget -= price * take; gold += price * take; }
@@ -269,7 +327,7 @@ namespace Armoury
                 }
                 finally
                 {
-                    if (!own && gold > 0) { Pay(lord, payee, clan, gearRule, gold); _dHGold += gold; }
+                    if (!own && gold > 0 && Pay(lord, payee, clan, gearRule, gold)) _dHGold += gold;
                 }
                 if (done <= 0) return;
                 _dHarness += done;
@@ -282,16 +340,18 @@ namespace Armoury
             }
         }
 
-        /// <summary>Inny rod krolestwa: pan partii placi glowie rodu pana twierdzy (przelew miedzy bohaterami), kwota schodzi z przydzialu sprzetu rodu (F5).</summary>
-        private static void Pay(Hero lord, Hero payee, Clan clan, bool gearRule, int gold)
+        /// <summary>Inny rod krolestwa: pan partii placi glowie rodu pana twierdzy (przelew miedzy bohaterami), kwota schodzi z przydzialu sprzetu rodu (F5).
+        /// true - przelew przeszedl (licznik zlota w linii tylko wtedy).</summary>
+        private static bool Pay(Hero lord, Hero payee, Clan clan, bool gearRule, int gold)
         {
             try
             {
                 TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(lord, payee, gold, true);
-                _dGold += gold;
-                if (gearRule) ClanBudget.GearSpent(clan, gold);
             }
+            catch (Exception e) { _stumbles++; _stumblesAll++; if (_stumbles == 1) Log.Error("GarrisonHorses.Pay", e); return false; }
+            try { if (gearRule) ClanBudget.GearSpent(clan, gold); }
             catch (Exception e) { _stumbles++; _stumblesAll++; if (_stumbles == 1) Log.Error("GarrisonHorses.Pay", e); }
+            return true;
         }
 
         private static int Pick(int[] avail, int[] order)
@@ -304,14 +364,16 @@ namespace Armoury
         /// wraca do zalogi), inaczej do taboru. Inny rod - kazda sztuka po cenie targu z budzetu (budget, gold). Zwraca, ile przeszlo.</summary>
         private static int Move(MobileParty party, MobileParty gar, Settlement st, Dictionary<ItemObject, int> garArm, int k, int n, bool toArmory, bool own, ref int budget, ref int gold)
         {
-            int done = 0;
-            while (done < n)
+            int done = 0, guard = 0;
+            while (done < n && guard++ < 64)
             {
                 ItemObject best = null; int bestCnt = 0;
                 foreach (var kv in garArm)
                 {
                     var it = kv.Key;
                     if (it == null || kv.Value <= 0 || !Stables.IsPlainMount(it) || Stables.Level(it.ItemCategory) != k) continue;
+                    // recenzja r3-jazda: do zbrojowni DTE tylko sztuki, ktore DTE przyjmie (zbior odmow sesji) - odrzucona nie blokuje reszty kategorii
+                    if (toArmory && !AiGear.DteTakes(it)) continue;
                     if (best == null || it.Value < best.Value) { best = it; bestCnt = kv.Value; }
                 }
                 if (best == null) break;
@@ -329,7 +391,14 @@ namespace Armoury
                 if (toArmory)
                 {
                     // jak A7 (GarrisonArmory.MoveKits): najpierw do zbrojowni odbiorcy, potem zapis stanu sztuk (AiWear - u koni tylko spis "nie lup"), potem zdjecie u dawcy
-                    if (!AiGear.AddToArmory(party, best, take)) { _dRefused += take; break; }   // DTE nie przyjal - kon zostaje w zalodze
+                    if (!AiGear.AddToArmory(party, best, take))
+                    {
+                        // DTE nie przyjal - kon zostaje w zalodze; sztuka jest juz w zbiorze odmow (DteTakes = false) - nastepny obieg bierze kolejna najtansza
+                        // tej kategorii; odmowa bez wpisu do zbioru (blad wywolania) - koniec jak dotad
+                        _dRefused += take;
+                        if (AiGear.DteTakes(best)) break;
+                        continue;
+                    }
                     try { AiWear.MoveWorn(gar, party, best, take, bestCnt); } catch { _stumbles++; _stumblesAll++; }
                 }
                 else party.ItemRoster.AddToCounts(new EquipmentElement(best), take);
