@@ -147,7 +147,7 @@ namespace Armoury
             {
                 // KS runda 4 (17.10, STAN-PRAC 68/72): ALFA Z PRAW DS - budzet koszyka = czesc wsi z oddanego utargu po panu, dziesiecinie (polowa wraca jako jalmuzna)
                 // i udziale korony w wojnie (DsVillage.BudgetShare) minus czynsz staly dnia; bez poborow resztowych, wiec bez petli alfa -> 0 (runda 3: 0.47 -> 0.00 w 5 Planach)
-                double shDs = DsVillage.BudgetShare(v, v.Settlement.MapFaction as Kingdom);
+                double shDs = DsVillage.BudgetShare(v, v.Settlement.MapFaction as Kingdom, MineRegale.KsShareOfTakings(v, a[0]));   // R3-09f: regale gornicze poza modelem podatku
                 double rentDs = DsVillage.RentPerDay(v);
                 double baseDs = a[0] / Math.Max(1e-6, PhiNow());
                 _alphaDsN++;

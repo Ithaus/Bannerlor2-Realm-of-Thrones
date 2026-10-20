@@ -6372,7 +6372,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryCoalBeforeLordShare { get; set; } = true;
 
-        [SettingPropertyBool("Mine Regale", HintText = "the lord of a mining village takes, on top of his usual tax, a further share of what its carts get for iron, silver and gold at market (Mine Regale Share, after the bloomery's wood bill) - the old right of a lord to the ore under his land. It comes out of the village's own part of those takings, never from coin it had before; a mine that owes the town merchants for wood, or would fall below a week of wood money for its bloomery, pays it only from what it has above that (needs Village Takings Whole). Off = the lord takes the same share from ore as from grain", RequireRestart = false)]
+        [SettingPropertyBool("Mine Regale", HintText = "the lord of a mining village takes, on top of his usual tax, a further share of what its carts get for iron, silver and gold at market (Mine Regale Share, after the bloomery's wood bill) - the old right of a lord to the ore under his land. It comes out of the village's own part of those takings, never from coin it had before; a mine that owes the town merchants for wood pays none of it, and otherwise pays only from what it has above a reserve of wood money for its bloomery (2 days when the merchants of its town give wood on credit, a week when they do not) (needs Village Takings Whole). Off = the lord takes the same share from ore as from grain", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MineRegale { get; set; } = true;
 
