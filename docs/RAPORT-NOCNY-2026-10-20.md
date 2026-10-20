@@ -1,6 +1,7 @@
 # RAPORT NOCNY 19/20.10 - dla Jeffa
 
-Dzien dobry. W grze jest **WGRANIE 90** (wgrane 19.10 ok. 23:25 zegara komputera, po autotestach; WGRANIE 89 o 20:15 + runda 2). Twoj zapis Ironman z 15:48 jest caly
+Dzien dobry. W grze jest **WGRANIE 91** (wgrane 20.10 ok. 01:45 zegara komputera, po autotestach). Po drodze: WGRANIE 89 (19.10 20:15 - Twoje punkty
+z wieczora i naprawa zawieszenia), 90 (23:25 - runda 2 z planu do konca moda), 91 (01:45 - runda 3). Gra nie zapyta Cie o tryb awaryjny ("Safe Mode"). Twoj zapis Ironman z 15:48 jest caly
 (kopie: `D:\Backup-Bannerlord\zapisy-jeffa\2026-10-19-po-sesji-88` i `D:\Backup-Bannerlord\zawieszenie-2026-10-19-1609\zapis`).
 
 ## 1. Zawieszenie z 16:09 - naprawione
@@ -25,8 +26,8 @@ Wylacznik awaryjny: `Modules\CrashScribe\ModuleData\CrashScribe.settings.xml` ->
 
 ## 2. Twoje punkty z wieczora - co jest w grze
 
-Wszystko ponizej jest w grze (WGRANIE 89 i 90), kazda zmiana ma wlasny wylacznik w MCM (domyslnie wlaczony). Szczegoly kazdej: `docs/noc-1920/<punkt>-CHANGELOG.md`
-w galezi `w-toku/noc-wgranie-90`.
+Wszystko ponizej jest w grze (WGRANIE 89-91), kazda zmiana ma wlasny wylacznik w MCM (domyslnie wlaczony). Szczegoly kazdej: `docs/noc-1920/<punkt>-CHANGELOG.md`
+w galezi `w-toku/noc-wgranie-91`.
 
 1. **Relacje po bandytach** - zamiast kilkudziesieciu okienek jest JEDNO, np. "Villages around Oldstones are grateful you beat the bandits:
    relation +2 with 14 notables in 5 villages (...)". Zrodla byly dwa: nasze "wdzieczne wioski" i mod Dynamic Reinforcements (lordowie z odsieczy) -
@@ -67,6 +68,10 @@ w galezi `w-toku/noc-wgranie-90`.
       Exotic Mounts Never Vanish, Qarth Stables Buy Camels.
     - 1.7 - ladry (zbroja konia) bohaterow wymagaja Jazdy, tak jak ekran ekwipunku gry z ROT - nasza regula i ekran mowia to samo (500/500).
       MCM: Hero Barding Needs Riding.
+14. **Runda 3 (WGRANIE 91) - wiecej koni dla jazdy AI (PLAN 6.14):** lord AI w twierdzy swojego krolestwa bierze wolne konie i uprzaz zalogi dla swoich
+    konnych, ktorzy nie maja konia (wlasny rod za darmo, inny rod placi cene targu); targi nietkniete. Skutek na razie skromny: jazdy z koniem
+    75% -> 78%, konnych bez konia -7%. Druga czesc (hodowla koni bojowych dla kolejki awansow) zostaje do zrobienia.
+    MCM: Garrison Horses To Lords, Garrison Harness To Lords.
 
 ## 3. Co sprawdzone, a co nie
 
@@ -77,8 +82,8 @@ Sprawdzone w autotestach (wszystkie: kod 0, 0 bledow naszego kodu, 0 zawieszen g
   bylo przy WGRANIU 87-88 (53-57) - obserwuje;
 - NOWA kampania 120 dob x8 na 89 i dla porownania na 88: tyle samo niezaliczonych progow (118 / 118), 10 w jedna, 10 w druga strone
   (zmiennosc), wiec dzisiejsze zmiany nie psuja startu kampanii; na 90 nawet mniej (113);
-- WGRANIE 90: 5 dob + 4 bitwy, nowa kampania 120 dob i 160 dob z zapisu - kod 0, 0 bledow; jedyne do obserwacji: NO-4 (nowy dlug snu AI o swicie)
-  pojedyncze skoki 47 / 41 przy progu 40 (srednio 8-9).
+- WGRANIE 90 i 91: kazde 5 dob + 4 bitwy, nowa kampania 120 dob i 160 dob z zapisu - kod 0, 0 bledow; do obserwacji: NO-4 (nowy dlug snu AI
+  o swicie, pojedyncze skoki 47 / 41 przy progu 40) i A17-11e (jednego dnia wielkich bitew w biegu 91 zniknelo 737 ludzi z rozbitych partii).
 
 Nie sprawdzone w grze (sprawdzone tylko w kodzie, w dekompilacji i przez recenzje):
 - **niewola** - w przegranej bitwie autotestu bohater uciekl z pola, wiec do niewoli nie trafil;
@@ -115,6 +120,14 @@ w kreatorze, zakupy towarzyszy w miescie, wyglad przyciskow i plotek na strony, 
 sprawdzen (PLAN 8.16) jest w `docs/PLAN-DO-KONCA-MODA-2026-10-09.md`.
 
 **Otwarte prace z planu do konca moda** (audyt dzis w nocy: 212 pozycji - 137 w grze, 35 czeka na Twoje slowo, 21 czesciowo, 12 porzucone,
-5 otwarte, 2 nieznane): dwuletni bieg od nowej kampanii (wojsko lordow w 2. roku), sakiewki zolnierzy 21 dni zoldu (prog 15), koszyk jedzenia
+5 otwarte, 2 nieznane; w nocy zrobione 6.9, 6.10, 1.7 i czesc 6.14): dwuletni bieg od nowej kampanii (wojsko lordow w 2. roku), sakiewki zolnierzy 21 dni zoldu (prog 15), koszyk jedzenia
 ludu 88,5% (prog 95%), len i plotno spadaja w dlugim biegu, test inwazji Innych (4-letni), optymalizacja na koniec (GC ok. 4000 sprzatan na
 minute przy x8).
+
+## 6. Gdzie co jest (dla nastepnej sesji)
+
+- Stan: `docs/STAN-PRAC.md` ### 94-97, plan nocy `docs/PLAN-NOC-2026-10-20.md`, wspolny `CHANGELOG.md` w galezi `w-toku/noc-wgranie-91`.
+- Kopie: poprzednie DLL obok plikow gry (`*.bak-2026-10-19-wgranie89-przed`, `...wgranie90-przed`, `*.bak-2026-10-20-wgranie91-przed`) i w
+  `D:\Backup-Bannerlord\wgrane\`; Twoj zapis w `D:\Backup-Bannerlord\zapisy-jeffa6-10-19-po-sesji-88`.
+- Cofniecie calej nocy: wgrac DLL z `D:\Backup-Bannerlord\wgrane6-10-19-wgranie89-przed` (to WGRANIE 88).
+
