@@ -73,13 +73,15 @@ namespace Armoury
         private sealed class Graph
         {
             public int Nodes, Lines, Joins, BadNodes, Comps, Points, AdjCount;
+            public int EdgesDirect, EdgesBent, EdgesCut;   // krawedzie: prosta po siatce gry / z objazdem silnika / bez sciezki (wyciete)
             public double Length;
             public float[] X, Y;
             public PathFaceRecord[] Face;
             public bool[] Ok;
             public int[] Island;
             public int[] AdjStart, Adj;
-            public float[] AdjLen;
+            public float[] AdjLen;     // dlugosc przejscia (prosta albo sciezka silnika); < 0 = krawedz bez sciezki (pomijana)
+            public bool[] AdjDirect;   // prosta cieciwa przechodzi po siatce gry (sprawdzone raz przy budowie) - bez wywolania silnika w planowaniu
             public float GX0, GY0, GInv;
             public int GNx, GNy;
             public int[] GStart, GNode;
@@ -88,7 +90,10 @@ namespace Armoury
         private sealed class Scratch
         {
             public float[] Cost;
-            public int[] Prev, Stamp, Chain, HeapN;
+            public int[] Prev, PrevA, Stamp, Chain, HeapN;
+            public readonly float[] Cx = new float[4], Cy = new float[4];   // p6-drogi: strefy przepraw wrogiego pana (CrossingLaw) - bez objazdu przez nie
+            public int Nc;
+            public float Cr2;
             public float[] HeapK;
             public int Now, HeapCount, Size;
             public readonly Vec2[] Out = new Vec2[PathCap];
@@ -98,7 +103,7 @@ namespace Armoury
             {
                 int cap = g.Nodes + g.AdjCount + 8;
                 if (Cost != null && Cost.Length >= g.Nodes && HeapN.Length >= cap) return;
-                Cost = new float[g.Nodes]; Prev = new int[g.Nodes]; Stamp = new int[g.Nodes]; Chain = new int[g.Nodes + 1];
+                Cost = new float[g.Nodes]; Prev = new int[g.Nodes]; PrevA = new int[g.Nodes]; Stamp = new int[g.Nodes]; Chain = new int[g.Nodes + 1];
                 HeapN = new int[cap]; HeapK = new float[cap]; Now = 0;
             }
 
@@ -154,6 +159,13 @@ namespace Armoury
         [ThreadStatic] private static int _longTerm;   // RecalculateLongTermPath w toku (liczenie ucieczki) - bez objazdu
 
         // pamiec partii: Party.Index << 32 | skrot celu (bity 2..31) | stan (bity 0..1); godzina planu osobno (para nieatomowa - rozjazd = jedno planowanie wiecej/mniej)
+        // przeprawy-warownie CrossingLaw (te same id: Twins, Moat Cailin, Bloody Gate) - straz odbija wrogie partie lordow; objazd lorda w wojnie z panem
+        // przeprawy nie prowadzi przez strefe (CrossingRadius + 1 jedn.) - inaczej droga wiodlaby go pod most co 3 h (cel-odwrot, przerwa, znow objazd)
+        private static readonly string[] CrossingIds = { "ROT_town3", "castle_B1", "castle_EN2" };
+        private static TaleWorlds.CampaignSystem.Settlements.Settlement[] _cross = new TaleWorlds.CampaignSystem.Settlements.Settlement[0];
+        private static Vec2[] _crossPos = new Vec2[0];
+        private static long _crossAvoid;
+
         private static readonly long[] _slotKey = new long[1 << SlotBits];
         private static readonly int[] _slotHour = new int[1 << SlotBits];
 
@@ -326,6 +338,7 @@ namespace Armoury
             float R = L * RadiusShare;
             if (R < RadiusMin) R = RadiusMin; else if (R > RadiusMax) R = RadiusMax;
             float R2 = R * R;
+            Avoid(s, mp, scr, cat);
 
             // zrodla: wezly sieci w promieniu R od startu (ta sama wyspa siatki)
             int seeds = 0;
@@ -341,11 +354,12 @@ namespace Armoury
                     {
                         int n = g.GNode[k];
                         if (!g.Ok[n] || g.Island[n] != island) continue;
+                        if (scr.Nc > 0 && InZone(scr, g.X[n], g.Y[n])) continue;
                         float dx = g.X[n] - S.x, dy = g.Y[n] - S.y, d2 = dx * dx + dy * dy;
                         if (d2 > R2) continue;
                         float cost = (float)Math.Sqrt(d2);
                         if (scr.Stamp[n] == scr.Now && scr.Cost[n] <= cost) continue;
-                        scr.Stamp[n] = scr.Now; scr.Cost[n] = cost; scr.Prev[n] = -1;
+                        scr.Stamp[n] = scr.Now; scr.Cost[n] = cost; scr.Prev[n] = -1; scr.PrevA[n] = -1;
                         if (scr.Push(n, cost)) seeds++;
                     }
                 }
@@ -367,11 +381,13 @@ namespace Armoury
                 for (int a = g.AdjStart[pn]; a < g.AdjStart[pn + 1]; a++)
                 {
                     int m = g.Adj[a];
-                    if (!g.Ok[m] || g.Island[m] != island) continue;
-                    float nk = pk + g.AdjLen[a] * w;
+                    float el = g.AdjLen[a];
+                    if (el < 0f || !g.Ok[m] || g.Island[m] != island) continue;
+                    float nk = pk + el * w;
                     if (nk > L) continue;
                     if (scr.Stamp[m] == scr.Now && nk >= scr.Cost[m]) continue;
-                    scr.Stamp[m] = scr.Now; scr.Cost[m] = nk; scr.Prev[m] = pn;
+                    if (scr.Nc > 0 && ZoneHit(scr, g.X[pn], g.Y[pn], g.X[m], g.Y[m])) continue;
+                    scr.Stamp[m] = scr.Now; scr.Cost[m] = nk; scr.Prev[m] = pn; scr.PrevA[m] = a;
                     scr.Push(m, nk);
                 }
             }
@@ -388,7 +404,7 @@ namespace Armoury
             for (int i = 0, j = cn - 1; i < j; i++, j--) { int t = scr.Chain[i]; scr.Chain[i] = scr.Chain[j]; scr.Chain[j] = t; }
             int c0 = scr.Chain[0], cl = scr.Chain[cn - 1];
             float road = 0f;
-            for (int i = 1; i < cn; i++) road += Dist(g, scr.Chain[i - 1], scr.Chain[i]);
+            for (int i = 1; i < cn; i++) road += g.AdjLen[scr.PrevA[scr.Chain[i]]];
             float off1 = Len(g.X[c0] - S.x, g.Y[c0] - S.y), off2 = Len(T.x - g.X[cl], T.y - g.Y[cl]);
             float est = off1 + road + off2;
             if (road < MinRoadShare * est) { Interlocked.Increment(ref _fewRoad); return false; }
@@ -407,11 +423,13 @@ namespace Armoury
             {
                 int a = scr.Chain[i - 1], b = scr.Chain[i];
                 float before = total;
-                r = Leg(scene, scr, g.Face[a], new Vec2(g.X[a], g.Y[a]), g.Face[b], new Vec2(g.X[b], g.Y[b]), inv, s2l, l2s, ref last, ref total);
+                // krawedz prosta po siatce gry (sprawdzona przy budowie) - sam punkt; inaczej silnik jak w ComputePath
+                if (g.AdjDirect[scr.PrevA[b]]) r = AddPoint(scr, new Vec2(g.X[b], g.Y[b]), ref last, ref total) ? 0 : -2;
+                else r = Leg(scene, scr, g.Face[a], new Vec2(g.X[a], g.Y[a]), g.Face[b], new Vec2(g.X[b], g.Y[b]), inv, s2l, l2s, ref last, ref total);
                 roadReal += total - before;
             }
             if (r == 0) r = Leg(scene, scr, g.Face[cl], new Vec2(g.X[cl], g.Y[cl]), endFace, T, inv, s2l, l2s, ref last, ref total);
-            if (r == 0 && (scr.Size == 0 || (scr.Out[scr.Size - 1] - T).LengthSquared > 1e-4f)) r = AddPoint(scr, T, ref last, ref total) ? 0 : -2;
+            if (r == 0 && scr.Size == 0) r = -1;
             if (r == -1) { Interlocked.Increment(ref _navFail); return false; }
             if (r == -2) { Interlocked.Increment(ref _tooMany); return false; }
             if (total > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return false; }
@@ -434,6 +452,52 @@ namespace Armoury
         private static float Len(float dx, float dy) { return (float)Math.Sqrt(dx * dx + dy * dy); }
 
         private static float Dist(Graph g, int a, int b) { return Len(g.X[b] - g.X[a], g.Y[b] - g.Y[a]); }
+
+        /// <summary>Strefy przepraw CrossingLaw dla tego planu: tylko lord (straz odbija partie lordow) w wojnie z panem przeprawy.</summary>
+        private static void Avoid(Settings s, MobileParty mp, Scratch scr, int cat)
+        {
+            scr.Nc = 0;
+            var cs = _cross;
+            if (cat != 0 || cs.Length == 0) return;
+            var mf = mp.MapFaction;
+            if (mf == null) return;
+            float r = s.CrossingRadius + 1f;
+            scr.Cr2 = r * r;
+            var cp = _crossPos;
+            for (int i = 0; i < cs.Length && scr.Nc < scr.Cx.Length; i++)
+            {
+                var st = cs[i];
+                if (st == null) continue;
+                var of = st.MapFaction;
+                if (of == null || of == mf || !mf.IsAtWarWith(of)) continue;
+                scr.Cx[scr.Nc] = cp[i].x; scr.Cy[scr.Nc] = cp[i].y; scr.Nc++;
+            }
+        }
+
+        private static bool InZone(Scratch scr, float x, float y)
+        {
+            for (int i = 0; i < scr.Nc; i++)
+            {
+                float dx = x - scr.Cx[i], dy = y - scr.Cy[i];
+                if (dx * dx + dy * dy <= scr.Cr2) { Interlocked.Increment(ref _crossAvoid); return true; }
+            }
+            return false;
+        }
+
+        /// <summary>Cieciwa a-b wchodzi w strefe przeprawy (odleglosc odcinka od bramy <= promien).</summary>
+        private static bool ZoneHit(Scratch scr, float ax, float ay, float bx, float by)
+        {
+            float dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+            for (int i = 0; i < scr.Nc; i++)
+            {
+                float px = scr.Cx[i] - ax, py = scr.Cy[i] - ay;
+                float t = l2 > 1e-9f ? (px * dx + py * dy) / l2 : 0f;
+                if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
+                float ex = px - t * dx, ey = py - t * dy;
+                if (ex * ex + ey * ey <= scr.Cr2) { Interlocked.Increment(ref _crossAvoid); return true; }
+            }
+            return false;
+        }
 
         /// <summary>Odcinek trasy: ta sama sciana = prosta (sciana wypukla), inaczej silnik (GetPathBetweenAIFaces jak w ComputePath). 0 dobrze, -1 bez sciezki,
         /// -2 ponad 128 punktow.</summary>
@@ -468,6 +532,8 @@ namespace Armoury
             _g = null;
             _note = "nie zbudowana";
             _tried = false;
+            _cross = new TaleWorlds.CampaignSystem.Settlements.Settlement[0];
+            _crossPos = new Vec2[0];
             Array.Clear(_slotKey, 0, _slotKey.Length);
             Array.Clear(_slotHour, 0, _slotHour.Length);
             ZeroDay();
@@ -479,6 +545,7 @@ namespace Armoury
             _seen = _short = _repeat = _planned = _noRoad = _notWorth = _fewRoad = _tooLong = _navFail = _tooMany = _legCalls = _ticks = 0;
             for (int i = 0; i < _acc.Length; i++) _acc[i] = 0;
             _overPm = _roadPm = _timePm = 0;
+            _crossAvoid = 0;
             _stumbles = 0;
         }
 
@@ -511,11 +578,30 @@ namespace Armoury
             }
             double ms = TryBuild();
             var g = _g;
+            int cross = FindCrossings();
             Log.Info(P + "start sesji - klucz MapRoadAiRoutes tak, marsz od " + MinDist(s).ToString("0", Inv) + " jedn., nadklad do " + (Detour(s) * 100f).ToString("0", Inv)
                      + "%, droga >= " + (MinRoadShare * 100f).ToString("0", Inv) + "% trasy, tylko rody / karawany / wozy wsi | " + _note
                      + (g != null ? " | siec: wezlow " + g.Nodes + " (poza siatka gry " + g.BadNodes + "), polaczen " + (g.AdjCount / 2) + ", rozstajow " + g.Joins + ", skladowych " + g.Comps
-                                    + ", lamanych " + g.Lines + ", punktow pliku " + g.Points + ", dlugosc " + g.Length.ToString("0.0", Inv) + " jedn." : "")
+                                    + ", lamanych " + g.Lines + ", punktow pliku " + g.Points + ", dlugosc " + g.Length.ToString("0.0", Inv) + " jedn.; krawedzie po siatce gry: proste " + g.EdgesDirect
+                                    + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut : "")
+                     + " | przeprawy CrossingLaw " + cross + "/" + CrossingIds.Length + " (wrogi lord bez objazdu przez strefe)"
                      + " | latka ComputePath " + _hookNote + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
+        }
+
+        /// <summary>Przeprawy CrossingLaw w tej kampanii (watek glowny; obiekt osady inny w kazdej kampanii).</summary>
+        private static int FindCrossings()
+        {
+            var cs = new TaleWorlds.CampaignSystem.Settlements.Settlement[CrossingIds.Length];
+            var cp = new Vec2[CrossingIds.Length];
+            int found = 0;
+            for (int i = 0; i < cs.Length; i++)
+            {
+                try { cs[i] = TaleWorlds.CampaignSystem.Settlements.Settlement.Find(CrossingIds[i]); } catch { cs[i] = null; }
+                if (cs[i] != null) { cp[i] = cs[i].GetPosition2D; found++; }
+            }
+            _crossPos = cp;
+            _cross = cs;
+            return found;
         }
 
         private static double TryBuild()
@@ -531,7 +617,7 @@ namespace Armoury
                 if (path == null || !File.Exists(path)) { _note = "BRAK pliku ModuleData\\" + MapRoads.FileName; return 0; }
                 string err;
                 var g = Build(path, out err);
-                if (g == null) { _note = "siec niezbudowana: " + err; return 0; }
+                if (g == null) { _note = "siec niezbudowana: " + err; if (err != null && err.StartsWith("zaden wezel", StringComparison.Ordinal)) _tried = false; return 0; }
                 _g = g;
                 _note = "siec z pliku " + MapRoads.FileName;
             }
@@ -685,20 +771,6 @@ namespace Armoury
             }
             for (int k = 0; k < joinA.Count; k++) { ea.Add(nodeOf[joinA[k]]); eb.Add(nodeOf[joinB[k]]); }
             g.Length = length;
-            var deg = new int[nn + 1];
-            for (int k = 0; k < ea.Count; k++) { deg[ea[k]]++; deg[eb[k]]++; }
-            g.AdjStart = new int[nn + 1];
-            for (int i = 0; i < nn; i++) g.AdjStart[i + 1] = g.AdjStart[i] + deg[i];
-            g.AdjCount = g.AdjStart[nn];
-            g.Adj = new int[g.AdjCount]; g.AdjLen = new float[g.AdjCount];
-            var fill = new int[nn];
-            for (int k = 0; k < ea.Count; k++)
-            {
-                int u = ea[k], v = eb[k];
-                float d = Dist(g, u, v);
-                int iu = g.AdjStart[u] + fill[u]++; g.Adj[iu] = v; g.AdjLen[iu] = d;
-                int iv = g.AdjStart[v] + fill[v]++; g.Adj[iv] = u; g.AdjLen[iv] = d;
-            }
             // sciany siatki gry (raz): wezel bez sciany albo na scianie zakazanej dla marszu ladem = poza siecia
             int bad = 0;
             for (int i = 0; i < nn; i++)
@@ -714,13 +786,69 @@ namespace Armoury
                 catch { g.Face[i] = PathFaceRecord.NullFaceRecord; g.Ok[i] = false; g.Island[i] = -1; bad++; }
             }
             g.BadNodes = bad;
+            if (bad >= nn) { err = "zaden wezel nie lezy na siatce gry (siatka mapy niegotowa?) - proba w nastepnej dobie"; return null; }
+            // krawedzie po siatce gry (raz, watek glowny, tym samym wywolaniem co ComputePath): ta sama sciana albo sciezka silnika = sama cieciwa (kazdy punkt
+            // sciezki do 0.02 jedn. od cieciwy) -> PROSTA, w planowaniu bez silnika; sciezka z objazdem do 3 x cieciwa + 2 -> dlugosc sciezki, silnik w planowaniu;
+            // bez sciezki albo objazd dalszy (np. rzeka bez mostu pod farba drogi) -> krawedz WYCIETA
+            int ne = ea.Count;
+            var elen = new float[ne];
+            var edir = new bool[ne];
+            var camp = Campaign.Current;
+            IMapScene scene = camp.MapSceneWrapper;
+            int[] inv = camp.Models.PartyNavigationModel.GetInvalidTerrainTypesForNavigationType(MobileParty.NavigationType.Default);
+            int s2l = camp.Models.MapDistanceModel.RegionSwitchCostFromSeaToLand, l2s = camp.Models.MapDistanceModel.RegionSwitchCostFromLandToSea;
+            var tmp = new NavigationPath();
+            for (int k = 0; k < ne; k++)
+            {
+                int u = ea[k], v = eb[k];
+                float chord = Dist(g, u, v);
+                elen[k] = -1f;
+                if (!g.Ok[u] || !g.Ok[v] || g.Island[u] != g.Island[v]) { g.EdgesCut++; continue; }
+                if (g.Face[u].FaceIndex == g.Face[v].FaceIndex) { elen[k] = chord; edir[k] = true; g.EdgesDirect++; continue; }
+                Vec2 a = new Vec2(g.X[u], g.Y[u]), b = new Vec2(g.X[v], g.Y[v]);
+                bool ok;
+                try { ok = scene.GetPathBetweenAIFaces(g.Face[u], g.Face[v], a, b, AgentRadius, tmp, inv, 2f, s2l, l2s); }
+                catch { ok = false; }
+                int n = ok ? tmp.Size : 0;
+                if (n <= 0 || n > PathCap) { g.EdgesCut++; continue; }
+                float pl = 0f, dev = 0f;
+                Vec2 last = a;
+                float dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+                for (int i = 0; i < n; i++)
+                {
+                    Vec2 q = tmp.PathPoints[i];
+                    pl += (q - last).Length; last = q;
+                    float px = q.x - a.x, py = q.y - a.y;
+                    float t = l2 > 1e-9f ? (px * dx + py * dy) / l2 : 0f;
+                    if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
+                    float ex = px - t * dx, ey = py - t * dy, e = ex * ex + ey * ey;
+                    if (e > dev) dev = e;
+                }
+                if ((last - b).LengthSquared > 1e-4f) { g.EdgesCut++; continue; }   // silnik nie doszedl do konca krawedzi
+                if (dev <= 0.02f * 0.02f) { elen[k] = chord; edir[k] = true; g.EdgesDirect++; }
+                else if (pl <= chord * 3f + 2f) { elen[k] = pl; g.EdgesBent++; }
+                else g.EdgesCut++;
+            }
+            var deg = new int[nn + 1];
+            for (int k = 0; k < ea.Count; k++) { deg[ea[k]]++; deg[eb[k]]++; }
+            g.AdjStart = new int[nn + 1];
+            for (int i = 0; i < nn; i++) g.AdjStart[i + 1] = g.AdjStart[i] + deg[i];
+            g.AdjCount = g.AdjStart[nn];
+            g.Adj = new int[g.AdjCount]; g.AdjLen = new float[g.AdjCount]; g.AdjDirect = new bool[g.AdjCount];
+            var fill = new int[nn];
+            for (int k = 0; k < ea.Count; k++)
+            {
+                int u = ea[k], v = eb[k];
+                int iu = g.AdjStart[u] + fill[u]++; g.Adj[iu] = v; g.AdjLen[iu] = elen[k]; g.AdjDirect[iu] = edir[k];
+                int iv = g.AdjStart[v] + fill[v]++; g.Adj[iv] = u; g.AdjLen[iv] = elen[k]; g.AdjDirect[iv] = edir[k];
+            }
             // skladowe (tylko do logu)
             var par = new int[nn];
             for (int i = 0; i < nn; i++) par[i] = i;
             for (int k = 0; k < ea.Count; k++)
             {
                 int u = ea[k], v = eb[k];
-                if (!g.Ok[u] || !g.Ok[v]) continue;
+                if (elen[k] < 0f) continue;
                 int ru = Find(par, u), rv = Find(par, v);
                 if (ru != rv) par[ru] = rv;
             }
@@ -800,6 +928,7 @@ namespace Armoury
                 if (s.MapRoadAiRoutes && _g == null && !_tried)
                 {
                     double ms = TryBuild();   // klucz wlaczony w MCM w trakcie sesji - siec budowana tu (watek glowny)
+                    if (_cross.Length == 0) FindCrossings();
                     Log.Info(P + "siec zbudowana w trakcie sesji: " + _note + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
                 }
                 if (!s.MapRoadAiRoutes) { ZeroDay(); return; }
@@ -825,7 +954,8 @@ namespace Armoury
               .Append(", karawany ").Append(_acc[1].ToString(ci)).Append(", wozy wsi ").Append(_acc[2].ToString(ci)).Append(')')
               .Append(" | odrzucone ").Append(rej.ToString(ci)).Append(": bez drogi w zasiegu ").Append(_noRoad.ToString(ci)).Append(", droga sie nie oplaca ").Append(_notWorth.ToString(ci))
               .Append(", malo drogi ").Append(_fewRoad.ToString(ci)).Append(", za dlugie ").Append(_tooLong.ToString(ci)).Append(", siatka gry (odcinek bez sciezki) ").Append(_navFail.ToString(ci))
-              .Append(", ponad 128 punktow ").Append(_tooMany.ToString(ci));
+              .Append(", ponad 128 punktow ").Append(_tooMany.ToString(ci))
+              .Append("; ominiete wezly / krawedzie w strefie przepraw wrogiego pana ").Append(_crossAvoid.ToString(ci));
             if (acc > 0)
                 sb.Append(" | objazd sr.: nadklad drogi +").Append((_overPm / (double)acc / 10.0).ToString("0.0", ci)).Append("% trasy gry, droga ")
                   .Append((_roadPm / (double)acc / 10.0).ToString("0.0", ci)).Append("% trasy, czas szac. ").Append((_timePm / (double)acc / 10.0).ToString("0.0", ci)).Append("% czasu trasy gry");
