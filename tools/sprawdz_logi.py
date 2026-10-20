@@ -23484,6 +23484,18 @@ def szybkie_main(logp, start_arg, until=120):
                     f"E8/H bez konia <= {int(fac * 100)}% WGRANIA 90 ({int(fac * base_lu)})", (lu <= fac * base_lu) if lu is not None else None)
         else:
             rep.add("R3J-2: konni bez konia w partiach lordow AI", "brak linii Konie AI (175) z podzialem r3-jazda i E8/H", "INFO", None)
+        # recenzja r3-jazda: krok (1) daje konia jezdzcom, ktorzy SA konni wedlug typu - nie zmienia linii 219 / SZ-A8-1 (konni wedlug typu), tylko jazde
+        # rzeczywista: udzial jazdy wedlug typu, ktora ma konia w zbrojowni (E8/H partie rodow AI: z koniem / jazda wedlug typu)
+        mh = re.search(r"partie rodow AI: partii \d+, ludzi (\d+), jazda wedlug typu (\d+) \([0-9.]+%\), objeci regula \d+, z koniem (\d+)", hh[max(hh)]) if hh else None
+        if mh:
+            men, typ, hor = (int(x) for x in mh.groups())
+            ratio = 100.0 * hor / typ if typ > 0 else 0.0
+            base_r = 77.8 if until <= 240 else 75.2   # WGRANIE 90 (E8/H, ostatnia doba okna jak R3J-2): nowa kampania d120 7473/9606, bieg z zapisu d400 9652/12841
+            rep.add("R3J-3: jazda rzeczywista partii rodow AI (E8/H: z koniem wsrod jazdy wedlug typu), ostatnia doba okna",
+                    f"{ratio:.1f}% ({hor} z {typ}; z koniem {100.0 * hor / max(1, men):.2f}% ludzi, wedlug typu {100.0 * typ / max(1, men):.2f}%) wobec WGRANIA 90 {base_r}%",
+                    f">= baza + 2 pkt ({base_r + 2:.1f}%) - na to dziala krok (1); linia 219 / SZ-A8-1 tylko krok (2) i zakup", ratio >= base_r + 2.0)
+        else:
+            rep.add("R3J-3: jazda rzeczywista partii rodow AI", "brak linii Jezdzcy i uprzaz (E8/H) w oknie", "INFO", None)
     except Exception as e:
         rep.add("blok R3J", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
 
