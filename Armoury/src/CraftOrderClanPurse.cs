@@ -21,6 +21,9 @@ namespace Armoury
     ///     jak dotad. Komunikat gracza mowi, kto zaplacil ile;
     ///   - przy tworzeniu i w przegladzie zlecen (CraftOrdersPurse): miara "stac go" = kiesa zamawiajacego + to, co moze doplacic glowa (w przegladzie doby
     ///     doplata glowy rozdzielana na zlecenia wszystkich czlonkow rodu - jedna kiesa glowy, nie liczona dwa razy).
+    /// Recenzja (20.10): przydzial sprzetu takze przed pierwszym budzetem sesji (ClanBudget.GearCapAny/GearSpentAny - przydzial z zapisu, nowa kampania 0);
+    ///   w przegladzie NZ glowa placi najpierw za swoje zlecenia (jej zlecenia ida przed zleceniami czlonkow), czlonkom doplaca z kiesy ponad rezerwe i ponad
+    ///   swoje zlecenia (Room z ownNeed); przy tworzeniu - po brakach pozostalych czlonkow rodu (CraftOrdersPurse.ClanLeft).
     /// Kto: zamawiajacy jest lordem (Hero.IsLord - nie notabl, nie szef gangu ze zlecenia zadania), jego rod nie jest rodem gracza, glowa (Clan.Leader) zyje
     /// i nie jest nim samym. Zamknieta ekonomia: GiveGoldAction glowa -> gracz (zdarzenie gry z prawdziwym platnikiem), nic z niczego.
     /// Stan tylko w pamieci (liczniki doby); nic w zapisie. Reset z CraftOrders8.Reset. Wyjatek = licznik potkniec, bez wylacznika.
@@ -60,15 +63,20 @@ namespace Armoury
             return h;
         }
 
-        /// <summary>Ile glowa moze dzis doplacic: kiesa ponad AiGearGoldReserve; w rodzie z budzetem 166 najwyzej niewydany przydzial sprzetu rodu.</summary>
-        internal static int Room(Hero head, out bool capped, out int gearLeft)
+        /// <summary>Ile glowa moze dzis doplacic: kiesa ponad AiGearGoldReserve; w rodzie z budzetem 166 najwyzej niewydany przydzial sprzetu rodu
+        /// (takze przed pierwszym budzetem sesji - przydzial z zapisu, ClanBudget.GearCapAny).</summary>
+        internal static int Room(Hero head, out bool capped, out int gearLeft) { return Room(head, 0, out capped, out gearLeft); }
+
+        /// <summary>Room po wlasnych zleceniach glowy (ownNeed - kiesa potrzebna na sume jej zlecen z zapasem; CraftOrdersPurse): kiesa ponad rezerwe i ponad
+        /// wlasne zlecenia, w rodzie z budzetem 166 najwyzej niewydany przydzial sprzetu (wlasne zlecenia glowy nie ida z przydzialu).</summary>
+        internal static int Room(Hero head, long ownNeed, out bool capped, out int gearLeft)
         {
             capped = false; gearLeft = 0;
             if (head == null) return 0;
             var s = Settings.Current;
             int reserve = s != null ? Math.Max(0, s.AiGearGoldReserve) : 0;
-            long room = Math.Max(0L, (long)head.Gold - reserve);
-            capped = head.Clan != null && ClanBudget.GearCap(head.Clan, out gearLeft);
+            long room = Math.Max(0L, (long)head.Gold - reserve - Math.Max(0L, ownNeed));
+            capped = head.Clan != null && ClanBudget.GearCapAny(head.Clan, out gearLeft);   // recenzja: takze przed pierwszym budzetem sesji (przydzial z zapisu)
             if (capped) room = Math.Min(room, Math.Max(0, gearLeft));
             return (int)Math.Min(int.MaxValue, room);
         }
@@ -106,7 +114,7 @@ namespace Armoury
                 {
                     GiveGoldAction.ApplyBetweenCharacters(head, recipient, give, disableNotification);
                     help = give;
-                    if (capped) ClanBudget.GearSpent(head.Clan, help);   // 166: schodzi z przydzialu sprzetu rodu (zloto poszlo glowa -> gracz)
+                    if (capped) ClanBudget.GearSpentAny(head.Clan, help);   // 166: schodzi z przydzialu sprzetu rodu (zloto poszlo glowa -> gracz; przed pierwszym budzetem sesji - z przydzialu z zapisu)
                 }
                 try
                 {

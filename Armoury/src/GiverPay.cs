@@ -94,7 +94,12 @@ namespace Armoury
                     {
                         string hn = head != null && head.Name != null ? head.Name.ToString() : "the head of the clan";
                         if (got >= amount)
-                            Log.Player(who + " paid " + pay + " and " + hn + ", head of the clan, paid the remaining " + help + " of the agreed " + amount + ".");
+                        {
+                            if (pay <= 0) Log.Player(hn + ", head of the clan, paid the agreed " + amount + " on behalf of " + who + ".");   // recenzja: pusta kiesa lorda
+                            else Log.Player(who + " paid " + pay + " and " + hn + ", head of the clan, paid the remaining " + help + " of the agreed " + amount + ".");
+                        }
+                        else if (pay <= 0)
+                            Log.Player(hn + ", head of the clan, could pay only " + help + " of the agreed " + amount + " on behalf of " + who + ".", true);
                         else
                             Log.Player(who + " and " + hn + ", head of the clan, could pay only " + got + " of the agreed " + amount
                                        + " (" + who + ": " + pay + ", " + hn + ": " + help + ").", true);

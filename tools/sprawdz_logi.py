@@ -14046,6 +14046,7 @@ def etap8_k(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     # ---------------- K-3: okno "zlecenia kowalskie"
     done, quest = tot(r"oddanych (\d+) \(w tym"), tot(r"w tym zlecen zadan (\d+)\)")
     due, paid, short_n = tot(r"obiecane (\d+)"), tot(r"zaplacone przez zleceniodawce (\d+)"), tot(r"niedoplata przy pustej kiesie -?\d+ w (\d+) zleceniach")
+    head_paid = tot(r"doplata glowy rodu \(Craft Order Clan Purse \w+\) (\d+)")   # r4-zlecenia: brak lorda doplacony przez glowe rodu (0 w logach sprzed galezi)
     nothing, t_cut, t_given = tot(r"zloto z niczego (\d+)"), tot(r"zolnierz z niczego: wyciety (\d+)"), tot(r"wyciety \d+, dany (\d+)")
     hand, tabor, shelf, lost = tot(r"lord wzial do reki (\d+)"), tot(r"do taboru lorda (\d+)"), tot(r"na polke miasta (\d+)"), tot(r"bron w nicosc (\d+)")
     if done > 0:
@@ -14053,7 +14054,8 @@ def etap8_k(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 f"z niczego {nothing}, zolnierz dany {t_given} (wyciety {t_cut}), bron w nicosc {lost}; oddanych {done} (zadan {quest}): lord do reki {hand}, tabor lorda {tabor}, polka miasta {shelf}",
                 "0 / 0 / 0; oddanych = do reki + tabor + polka", nothing == 0 and t_given == 0 and lost == 0 and done == hand + tabor + shelf)
         rep.add("K-3b: zlecenia kowalskie - obiecane i zaplacone przez zleceniodawcow (suma okna)",
-                f"obiecane {due}, zaplacone {paid}, niedoplata {due - paid} w {short_n} zleceniach (pusta kiesa zleceniodawcy - bez doplat)", "INFO", None)
+                f"obiecane {due}, zaplacone przez zleceniodawcow {paid}, doplata glowy rodu {head_paid}, niedoplata {due - paid - head_paid} w {short_n} zleceniach "
+                f"(pusta kiesa zleceniodawcy po doplacie glowy rodu - Craft Order Clan Purse)", "INFO", None)
     else:
         rep.add("K-3: okno \"zlecenia kowalskie\"", "gracz nie oddal zadnego zlecenia w oknie (autotest)" + (f"; UWAGA liczniki bez oddania: z niczego {nothing}, w nicosc {lost}" if nothing or lost else ""),
                 "INFO - sprawdzenie reczne 8.16 p. 6 (nagroda w setkach, zloto od zleceniodawcy, komunikat przy pustej kiesie)", None if not (nothing or lost) else False)
@@ -32456,11 +32458,15 @@ NZE_REST = (r", wiszacych (\d+) \(bez pokrycia (\d+)\), kiesa zleceniodawcow min
             r"\| zostawione mimo braku: ekran kuzni otwarty (\d+), niezgodny slot albo brak drogi gry (\d+) "
             r"\| w cieniu \(klucz wylaczony\): bez kiesy (\d+), bez zywego zleceniodawcy (\d+) "
             r"\| zlecen zadan \(pominiete\) (\d+), bez pokrycia (\d+) "
+            # r4-zlecenia (20.10, Craft Order Clan Purse): segment kiesy rodu - opcjonalny (logi sprzed galezi bez niego; grupy None)
+            r"(?:\| kiesa rodu \(Craft Order Clan Purse (CZYNNE|WYLACZONE)\): zlecen lordow, ktorzy nie sa glowa rodu (\d+), pokryte dopiero doplata glowy (\d+) "
+            r"\(doplata glowy na nie razem (\d+), glow (\d+)\), bez pokrycia mimo glowy (\d+), w cieniu \(klucz wylaczony\) pokrylaby glowa (\d+) )?"
             r"\| klucz Craft Orders Giver Can Pay (CZYNNE|WYLACZONE), placi zleceniodawca \(Craft Orders Historical\) (CZYNNE|WYLACZONE), dziala (TAK|NIE)")
 NZE_DAY = re.compile(r"Zlecenia kowalskie \(NZ\): dzien (-?\d+) \| utworzone (\d+), odrzucone przy tworzeniu (\d+) \(brak kiesy\), "
                      r"usuniete w dobie (\d+) \(kiesa (\d+), smierc (\d+)\)" + NZE_REST
                      + r" \| przy tworzeniu bez sprawdzenia: klucz albo platnik wylaczony (\d+), przed przeliczeniem cen (\d+), ekran kuzni otwarty (\d+), "
-                     r"zostawione \(niezgodny slot albo brak drogi gry\) (\d+) \| odrzucone przy tworzeniu przez sume zlecen zleceniodawcy (\d+) \| nagrody: odrzuconych razem (\d+), usunietych w dobie razem (\d+) "
+                     r"zostawione \(niezgodny slot albo brak drogi gry\) (\d+) \| odrzucone przy tworzeniu przez sume zlecen zleceniodawcy (\d+)"
+                     r"(?:, zostawione przy tworzeniu dzieki doplacie glowy rodu (\d+))? \| nagrody: odrzuconych razem (\d+), usunietych w dobie razem (\d+) "
                      r"\| koszt ([0-9.]+) ms/dobe \| potkniecia (\d+) \(od wczytania (\d+)\)\.$")
 NZE_SES = re.compile(r"Zlecenia kowalskie \(NZ\): start sesji \| zlecen miejskich z zapisu (\d+), usuniete z zapisu (\d+) \(kiesa (\d+), smierc (\d+); "
                      r"nagrod usunietych razem (\d+)\)" + NZE_REST
@@ -32468,9 +32474,13 @@ NZE_SES = re.compile(r"Zlecenia kowalskie \(NZ\): start sesji \| zlecen miejskic
                      r"\| latka tworzenia \(CreateTownOrder\) (TAK|NIE), droga gry RemoveTownOrder (TAK|NIE) \| koszt ([0-9.]+) ms \| potkniecia (\d+)\.$")
 NZE_WIRE = NZE_HEAD + "latki przy starcie gry"
 NZE_E8K = re.compile(r"Kuznia \(E8/K\): dzien (-?\d+) \|.*?oddanych (\d+) \(w tym zlecen zadan (\d+)\), obiecane (\d+), zaplacone przez zleceniodawce (\d+), "
+                     r"(?:doplata glowy rodu \(Craft Order Clan Purse (CZYNNE|WYLACZONE)\) (\d+) w (\d+) zleceniach \(do pelna (\d+), potkniecia (\d+)\), )?"   # r4-zlecenia
                      r"niedoplata przy pustej kiesie (-?\d+) w (\d+) zleceniach")
+NZE_CERR = "ERROR in CraftOrderClanPurse."   # r4-zlecenia
 NZE_ERR = "ERROR in CraftOrdersPurse."
-NZE_REST_KEYS = ("hang", "unc", "pmin", "pmed", "resv", "psum", "multi", "maxn", "open", "mism", "shp", "shd", "quest", "qunc", "key", "pay", "on")
+NZE_REST_KEYS = ("hang", "unc", "pmin", "pmed", "resv", "psum", "multi", "maxn", "open", "mism", "shp", "shd", "quest", "qunc",
+                 "ckey", "clords", "ccov", "chelp", "cheads", "cshort", "cshadow",   # r4-zlecenia: kiesa rodu (None - log sprzed galezi)
+                 "key", "pay", "on")
 
 
 def nze_rest(g, i):
@@ -32478,7 +32488,9 @@ def nze_rest(g, i):
     v = g[i:i + len(NZE_REST_KEYS)]
     d = {}
     for k, x in zip(NZE_REST_KEYS, v):
-        if k in ("key", "pay"):
+        if x is None:
+            d[k] = None                                   # r4-zlecenia: segment kiesy rodu nieobecny (log sprzed galezi)
+        elif k in ("key", "pay", "ckey"):
             d[k] = x == "CZYNNE"
         elif k == "on":
             d[k] = x == "TAK"
@@ -32501,7 +32513,11 @@ def nzlec_main(logp):
     odrzucone; kilka zlecen u jednego - najwiecej >= 2; zadan bez pokrycia <= zadan), NZE-5 po przegladzie doby (dziala TAK) wiszace bez pokrycia tylko spod
     otwartej kuzni, niezgodny slot / brak drogi gry 0 (przegladu i tworzenia), NZE-6 odrzucone i usuniete (INFO), NZE-7 wiszace i kiesy zleceniodawcow
     (INFO), NZE-8 niedoplata przy oddaniu (linie E8/K w dobach z NZ dziala TAK): najwyzej 1 na 10 oddanych (oddanych < 5 - INFO), NZE-9 potkniecia (doby
-    i startu sesji) i ERROR in CraftOrdersPurse.* 0, NZE-10 koszt (INFO). Log bez paczki: INFO, bez wyjatku."""
+    i startu sesji) i ERROR in CraftOrdersPurse.* 0, NZE-10 koszt (INFO). Log bez paczki: INFO, bez wyjatku.
+    r4-zlecenia (20.10, klucz CraftOrderClanPurse): segment "kiesa rodu (Craft Order Clan Purse ...)" w linii NZ, pole "zostawione przy tworzeniu dzieki doplacie
+    glowy rodu" w linii doby i "doplata glowy rodu (...)" w linii E8/K - opcjonalne (logi sprzed galezi bez nich); NZE-11 spojnosc kiesy rodu (pokryte + bez pokrycia
+    + cien <= zlecen lordow-czlonkow, pokryte > 0 <=> doplata > 0, cien tylko przy kluczu wylaczonym, E8/K do pelna <= z doplata, potkniecia 0), NZE-9 liczy
+    takze ERROR in CraftOrderClanPurse.*."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NZE-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -32522,8 +32538,9 @@ def nzlec_main(logp):
                         g = mm.groups()
                         r = dict(seen=int(g[0]), rem=int(g[1]), poor=int(g[2]), dead=int(g[3]), due=int(g[4]))
                         r.update(nze_rest(g, 5))
-                        r.update(made=int(g[22]), rej=int(g[23]), rejsum=int(g[24]), early=int(g[25]), wired=g[26] == "TAK", way=g[27] == "TAK", ms=float(g[28]),
-                                 stum=int(g[29]))
+                        k = 5 + len(NZE_REST_KEYS)
+                        r.update(made=int(g[k]), rej=int(g[k + 1]), rejsum=int(g[k + 2]), early=int(g[k + 3]), wired=g[k + 4] == "TAK", way=g[k + 5] == "TAK",
+                                 ms=float(g[k + 6]), stum=int(g[k + 7]))
                         sess.append(r)
                     else:
                         bad.append(s)
@@ -32533,8 +32550,10 @@ def nzlec_main(logp):
                         g = mm.groups()
                         r = dict(day=int(g[0]), made=int(g[1]), rej=int(g[2]), rem=int(g[3]), poor=int(g[4]), dead=int(g[5]))
                         r.update(nze_rest(g, 6))
-                        r.update(c_off=int(g[23]), c_early=int(g[24]), c_open=int(g[25]), c_kept=int(g[26]), rejsum=int(g[27]), rej_due=int(g[28]),
-                                 rem_due=int(g[29]), ms=float(g[30]), stum=int(g[31]), stum_s=int(g[32]))
+                        k = 6 + len(NZE_REST_KEYS)
+                        r.update(c_off=int(g[k]), c_early=int(g[k + 1]), c_open=int(g[k + 2]), c_kept=int(g[k + 3]), rejsum=int(g[k + 4]),
+                                 mclan=int(g[k + 5]) if g[k + 5] is not None else None, rej_due=int(g[k + 6]),
+                                 rem_due=int(g[k + 7]), ms=float(g[k + 8]), stum=int(g[k + 9]), stum_s=int(g[k + 10]))
                         days[r["day"]] = r
                     else:
                         bad.append(s)
@@ -32544,10 +32563,12 @@ def nzlec_main(logp):
                 mm = NZE_E8K.match(s)
                 if mm:
                     g = mm.groups()
-                    e8k[int(g[0])] = dict(done=int(g[1]), quest=int(g[2]), due=int(g[3]), paid=int(g[4]), short=int(g[6]))
+                    e8k[int(g[0])] = dict(done=int(g[1]), quest=int(g[2]), due=int(g[3]), paid=int(g[4]), short=int(g[11]),
+                                          ckey=None if g[5] is None else g[5] == "CZYNNE", head=int(g[6] or 0), headn=int(g[7] or 0), headfull=int(g[8] or 0),
+                                          cstum=int(g[9] or 0))
                 else:
                     e8k.setdefault(num(r"dzien (-?\d+)", s, int, -10 ** 9), None)
-            elif s.startswith(NZE_ERR):
+            elif s.startswith(NZE_ERR) or s.startswith(NZE_CERR):
                 n_err += 1
     print(f"plik: {logp} | linii startu gry {len(wires)}, startu sesji {len(sess)}, doby {len(days)}, nierozpoznanych NZ {len(bad)}, linii E8/K doby {len(e8k)}")
     if not wires and not sess and not days and not bad:
@@ -32674,15 +32695,48 @@ def nzlec_main(logp):
     short = sum(x["short"] for x in ed)
     if done >= 5:
         rep.add("NZE-8: niedoplata przy oddaniu zlecenia (linie E8/K w dobach z dziala TAK)",
-                f"oddanych {done} (zadan {sum(x['quest'] for x in ed)}), z niedoplata {short}; obiecane {sum(x['due'] for x in ed)}, zaplacone {sum(x['paid'] for x in ed)}",
+                f"oddanych {done} (zadan {sum(x['quest'] for x in ed)}), z niedoplata {short}; obiecane {sum(x['due'] for x in ed)}, zaplacone {sum(x['paid'] for x in ed)}"
+                f", doplata glowy rodu {sum(x['head'] for x in ed)} w {sum(x['headn'] for x in ed)} (do pelna {sum(x['headfull'] for x in ed)})",
                 "najwyzej 1 na 10 oddanych (kiesa spadla po przegladzie albo premia za lepsza bron)", short * 10 <= done)
     else:
         rep.add("NZE-8: niedoplata przy oddaniu zlecenia", f"oddanych {done}, z niedoplata {short} (dob z linia E8/K i dziala TAK {len(ed)})",
                 "INFO (oddanych < 5 - autotest nie kuje zlecen; sprawdzenie w grze: brak komunikatu 'could pay only 0 of the agreed')", None)
+    # NZE-11 (r4-zlecenia, Craft Order Clan Purse): kiesa rodu - spojnosc segmentu w liniach NZ i pola doplaty glowy w liniach E8/K
+    crow = [r for r in rows if r.get("ckey") is not None]
+    if crow:
+        cinc = []
+        for r in crow:
+            why = []
+            if r["ccov"] + r["cshort"] + r["cshadow"] > r["clords"]:
+                why.append("pokryte + bez pokrycia + cien > zlecen lordow")
+            if (r["ccov"] > 0) != (r["chelp"] > 0) or r["cheads"] > r["ccov"] or (r["cheads"] > 0) != (r["ccov"] > 0):
+                why.append("pokryte / doplata / glow niespojne")
+            if r["ckey"] and r["pay"] and r["cshadow"]:          # cien tylko, gdy klucz kiesy rodu albo platnik (Craft Orders Historical) wylaczony
+                why.append("cien przy kluczu i platniku czynnych")
+            if not (r["ckey"] and r["pay"]) and (r["ccov"] or r["chelp"]):
+                why.append("doplata glowy przy kluczu albo platniku wylaczonym")
+            if not r["on"] and (r.get("mclan") or 0):            # tworzenie sprawdzane tylko przy dziala TAK
+                why.append("zostawione przy tworzeniu dzieki glowie przy dziala NIE")
+            if why:
+                cinc.append((r["day"], why))
+        eh = [x for x in e8k.values() if x and x.get("ckey") is not None]
+        e_bad = [x for x in eh if x["headfull"] > x["headn"] or (x["head"] > 0) != (x["headn"] > 0)]
+        cstum = max([x["cstum"] for x in eh] or [0])
+        last = crow[-1]
+        rep.add("NZE-11: kiesa rodu (Craft Order Clan Purse) - segment w liniach NZ spojny, doplata glowy w E8/K spojna, potkniecia 0",
+                f"dob z segmentem {len(crow)} (klucz {'CZYNNE' if last['ckey'] else 'WYLACZONE'}), niespojnych {len(cinc)}" + (f" (np. d{cinc[0][0]}: {', '.join(cinc[0][1])})" if cinc else "")
+                + f"; suma dob: zlecen lordow-czlonkow (wiszacych) srednio {sum(r['clords'] for r in crow) / len(crow):.0f}, pokryte dopiero doplata glowy srednio "
+                f"{sum(r['ccov'] for r in crow) / len(crow):.1f} (doplata srednio {sum(r['chelp'] for r in crow) / len(crow):.0f}), bez pokrycia mimo glowy {sum(r['cshort'] for r in crow)}, "
+                f"zostawione przy tworzeniu dzieki glowie {sum(r.get('mclan') or 0 for r in crow)}; E8/K: linii z polem {len(eh)}, niespojnych {len(e_bad)}, "
+                f"doplata glowy {sum(x['head'] for x in eh)} w {sum(x['headn'] for x in eh)} zleceniach, potkniecia {cstum}",
+                "niespojnych 0 / 0, potkniecia 0 (pokryte dopiero doplata glowy > 0 - INFO: lordowie-czlonkowie rodu skladaja zlecenia)",
+                not cinc and not e_bad and cstum == 0)
+    else:
+        rep.add("NZE-11: kiesa rodu (Craft Order Clan Purse)", "brak segmentu 'kiesa rodu' w liniach doby NZ", "INFO (log sprzed galezi r4-zlecenia)", None)
     # NZE-9 potkniecia i bledy
     stu = sum(r["stum"] for r in rows)
     stu_s = max([r["stum"] for r in sess] or [0])
-    rep.add("NZE-9: potkniecia (doby / start sesji) i linie ERROR in CraftOrdersPurse.*", f"{stu} / {stu_s} / {n_err}", "0 / 0 / 0", stu == 0 and stu_s == 0 and n_err == 0)
+    rep.add("NZE-9: potkniecia (doby / start sesji) i linie ERROR in CraftOrdersPurse.* / CraftOrderClanPurse.*", f"{stu} / {stu_s} / {n_err}", "0 / 0 / 0", stu == 0 and stu_s == 0 and n_err == 0)
     # NZE-10 koszt
     cs = [r["ms"] for r in rows]
     rep.add("NZE-10: koszt (tworzenie i przeglad)", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms" + (f"; start sesji najwiecej {max(r['ms'] for r in sess):.2f} ms" if sess else ""),
