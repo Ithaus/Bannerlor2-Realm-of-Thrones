@@ -81,6 +81,7 @@ namespace Armoury
             new Move("rc_home_buy_town", MenuAffairs, "RC", "Buy a house - a roof of your own, with a strongbox and a chest."),
             new Move("arm_townloan_borrow_town", MenuAffairs, "Armoury", "Borrow from the town council - a loan from the townsfolk's purse."),
             new Move("arm_townloan_repay_town", MenuAffairs, "Armoury", "Repay the town council - pay back what you owe."),
+            new Move("arm_towndebt_town", MenuAffairs, "Armoury", "The council's debts - what the town owes, to whom, and what it costs."),   // m96-dlugi
             new Move("gt_proclaim_tourney", MenuAffairs, "GT", "Proclaim a tourney - call the knights of the realm to your lists."),
             new Move("arm_garrison_kit_town", MenuAffairs, "Armoury", "Hand kit to the garrison - arms and armour for the men who hold the town."),
         };

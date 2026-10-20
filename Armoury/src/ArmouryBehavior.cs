@@ -770,6 +770,9 @@ namespace Armoury
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
+        // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
+        private readonly bool _m96DlugiReset = M96DlugiReset();
+        private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1346,6 +1349,10 @@ namespace Armoury
             // kampania Jeffa) = pomiar od pierwszej doby z firmami DS, start przy pierwszych przebudowach A7; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
             try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
             catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
+            // m96-dlugi: dlugi rad miast ("td1|id;P;R;B;IP;IR;dzien podatku;od kiedy;ostatni podatek;notabl~kwota~odsetki,...;dni kwartalu z dlugiem"); pisany tylko z danymi; wlasny try; brak klucza
+            // (stary zapis, kampania Jeffa z WGRANIA 94/95) = rady bez dlugow; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> M96DlugiReset)
+            try { string td = dataStore.IsSaving ? TownDebt.Export() : null; if (!dataStore.IsSaving || td != null) SaveText.Sync(dataStore, "arm_towndebt", ref td); if (dataStore.IsLoading) TownDebt.Import(td); }
+            catch (Exception e) { Log.Error("SyncData.arm_towndebt", e); }
         }
 
         public override void RegisterEvents()
@@ -2243,6 +2250,7 @@ namespace Armoury
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
+            try { TownDebt.AddMenus(starter); } catch (Exception e) { Log.Error("TownDebt.AddMenus", e); }   // m96-dlugi: "The council's debts" w menu miasta (m95-menu przenosi do Town affairs)
             try { TownFolk.TownLoanMenus(starter); } catch (Exception e) { Log.Error("TownFolk.TownLoanMenus", e); }   // f8-pozyczka: "Borrow from the town council" / "Repay ..." w menu wlasnego miasta i zamku
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
             try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }
@@ -2596,6 +2604,9 @@ namespace Armoury
             try { TownFolk.FirewoodDaily(); } catch (Exception e) { Log.Error("TownFolk.FirewoodDaily", e); } DayProfile.Lap("TownFolk.FirewoodDaily");
             // p6-spichlerz (R3-06f): wsie miast sprzedaja miastu zboze ponad 98% sufitu spichlerza (migawka Famine.Daily tej doby) - kasa miasta -> kiesa wsi w pozycji MFolk
             try { TownGranary.Daily(); } catch (Exception e) { Log.Error("TownGranary.Daily", e); } DayProfile.Lap("TownGranary.Daily");
+            // m96-dlugi: rady miast - pozyczka na zaleglosci firm DS tej doby (PopulationLaw.Daily wyzej), odsetki, splata z nadwyzki, podatek nadzwyczajny, dobrobyt; PO kiesie
+            // ludu (potrzeba klas na dzis) i PRZED pozyczkami f8 (ClanBudget - wspolny pulap dzienny kies) i CrownIncome.Begin (czesc korony w wplywie dnia); pozycja MFolk ksiegi
+            try { TownDebt.Daily(); } catch (Exception e) { Log.Error("TownDebt.Daily", e); } DayProfile.Lap("TownDebt.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow

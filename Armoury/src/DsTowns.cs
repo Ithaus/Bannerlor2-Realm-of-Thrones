@@ -40,7 +40,7 @@ namespace Armoury
     /// nie pieniadz. Zapis arm_daniny_miasta (SaveText): brak klucza (stary zapis) = start okna pomiaru przy wlaczonym kluczu. Wylaczenie klucza - stare zasady od nastepnej
     /// doby, zaleglosci zostaja w zapisie bez skutku, zaliczki mieszczan przechodza do zwyklego dlugu korona2. Kazde zdarzenie we wlasnym try, potkniecia liczone.
     /// </summary>
-    internal static class DsTowns
+    internal static partial class DsTowns
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const double OverReserve = 1.5;                 // M6 i M9 (kasa): ponad 1.5 x zapas kupcow
@@ -405,7 +405,9 @@ namespace Armoury
             foreach (var f in _farm.Values)
             {
                 double inst = (f.FL + f.FC + f.FLf) / Weeks;
-                if (f.AL + f.AC + f.ALf >= Math.Max(1.0, inst)) f.ATerms++; else f.ATerms = 0;
+                int a0 = f.ATerms; double real = f.AL + f.AC + f.ALf;
+                if (real >= Math.Max(1.0, inst)) f.ATerms++; else f.ATerms = 0;
+                TownDebt.NoteTerm(f.St, real, inst, a0);   // m96-dlugi (recenzja): osobny licznik rady (zaleglosc + dlug rady) - tylko przeglad wymuszony; ATerms (zajecie) jak dotad
             }
         }
 
@@ -471,11 +473,11 @@ namespace Armoury
                 {
                     if (f.Fixed < 0 || f.NF < NetMinDays) continue;
                     double inst = (f.FL + f.FC + f.FLf) / Weeks;
-                    bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
+                    bool arrears = f.AL + f.AC + f.ALf + TownDebt.ArrearsLike(f.St) >= Math.Max(1.0, inst);   // m96-dlugi: dlug rady jak zaleglosc (bez podwyzki; przeglad wymuszony)
                     int gap = today - f.Fixed;                          // dob od ostatniego przegladu (albo ustalenia firmy)
                     bool due = gap >= qd;
                     // zaleglosci przez at dni kwartalu z rzedu, nadal >= raty, i dzien kwartalu po ostatnim przegladzie (ATerms zmienione od tamtej doby)
-                    bool forced = at > 0 && arrears && f.ATerms >= at && f.Fixed < lastTerms;
+                    bool forced = at > 0 && arrears && TownDebt.TermsLike(f.St, f.ATerms) >= at && f.Fixed < lastTerms;   // m96-dlugi: dni kwartalu z dlugiem rady (klucz wylaczony - ATerms)
                     // przed wlasna doba (tylko przy Ds Farm Review Days > kwartal): najwyzej jedna zmiana na kwartal
                     bool early = !due && forced && gap >= Quarter;
                     if (!due && !early) continue;
@@ -584,7 +586,7 @@ namespace Armoury
                     if (!StartCalibration.KsTownApplied(t)) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
                     long g = t.Gold;
                     double inst = (f.FL + f.FC + f.FLf) / Weeks;
-                    bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
+                    bool arrears = f.AL + f.AC + f.ALf + TownDebt.ArrearsLike(f.St) >= Math.Max(1.0, inst);   // m96-dlugi: dlug rady jak zaleglosc (bez podwyzki; przeglad wymuszony)
                     if (g <= OverReserve * TownPurse.Reserve(t) || RemitOf(st) != 0 || arrears)
                     {
                         if (cu) CatchUpWhy(st, t, g, arrears);                   // f7-kasy: tylko licznik powodu (linia)
