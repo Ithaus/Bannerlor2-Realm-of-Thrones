@@ -144,6 +144,8 @@ namespace CrashScribe
         /// ktorych kultura (aserai=Dorne, volantine=Essos) nie zgadza sie
         /// z kultura partii. Zwierze NIE znika - zostaje w taborze jako towar
         /// na sprzedaz (karawany moga handlowac); po prostu nikt nie wsiada.
+        /// r2-konie (PLAN 6.9, recenzja): WIELBLAD - przy kluczu Armoury CamelsOnlyQarth wedlug Armoury.MountLaw.AllowedForParty (jedna
+        /// regula w obu modach: Qarth albo wlasny szablon); wielblady maja w XML kulture aserai, wiec stara regula wycinala je Qarthowi.
         /// </summary>
         /// <summary>
         /// TOWAR TO NIE LUP BITEWNY (Jeff 02.09: "co to znaczy damaged grapes,

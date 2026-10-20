@@ -351,6 +351,8 @@ namespace Armoury
             return kill;
         }
 
+        private static int _bagStumbles;   // r2-konie: potkniecia przy oddaniu egzotyka do taboru (pierwsze 3 do logu)
+
         private static void SweepAiArmories(string why)
         {
             _swOwners = 0; _swArmories = 0; _swSamples = 0; _swDiff = 0;   // NW: liczniki tej czystki
@@ -361,7 +363,11 @@ namespace Armoury
                 var f = t != null ? AccessTools.Field(t, "PartyArmories") : null;
                 var map = f != null ? f.GetValue(null) as System.Collections.IDictionary : null;
                 if (map == null) return;
-                int cut = 0, parties = 0, clubs = 0, mounts = 0;
+                int cut = 0, parties = 0, clubs = 0, mounts = 0, toBag = 0;
+                // r2-konie (recenzja, klucz ExoticMountsNeverVanish): egzotyk nie u swoich schodzi ze zbrojowni DTE do TABORU partii jako towar
+                // (nic w nicosc) - DTE bierze z taboru tylko bron i pancerz, Stajnia tylko IsPlainMount, wiec nie wraca do zbrojowni; w miescie
+                // sprzedany na polke - SweepMarkets oddaje go targowi, ktory go trzyma. Wylaczony - kasowanie jak dotad.
+                bool exoticKeep = Settings.Current != null && Settings.Current.ExoticMountsNeverVanish;
                 foreach (System.Collections.DictionaryEntry e in map)
                 {
                     var inner = e.Value as System.Collections.IDictionary;
@@ -388,6 +394,7 @@ namespace Armoury
                     }
                     if (!lazy) resolve();
                     List<object> kill = null;
+                    List<KeyValuePair<ItemObject, int>> bag = null;   // r2-konie: egzotyki do taboru (po zdjeciu ze zbrojowni)
                     foreach (System.Collections.DictionaryEntry kv in inner)
                     {
                         var it = kv.Key as ItemObject;
@@ -412,7 +419,14 @@ namespace Armoury
                             {
                                 if (kill == null) kill = new List<object>();
                                 kill.Add(kv.Key);
-                                try { mounts += Convert.ToInt32(kv.Value); } catch { mounts++; }
+                                int nm;
+                                try { nm = Convert.ToInt32(kv.Value); } catch { nm = 1; }
+                                mounts += nm;
+                                if (exoticKeep && nm > 0 && owner.ItemRoster != null)
+                                {
+                                    if (bag == null) bag = new List<KeyValuePair<ItemObject, int>>();
+                                    bag.Add(new KeyValuePair<ItemObject, int>(it, nm));
+                                }
                                 continue;
                             }
                         }
@@ -438,11 +452,18 @@ namespace Armoury
                         parties++;
                         foreach (var k in kill) inner.Remove(k);
                     }
+                    if (bag != null)
+                        foreach (var b in bag)
+                        {
+                            try { owner.ItemRoster.AddToCounts(new EquipmentElement(b.Key), b.Value); toBag += b.Value; }
+                            catch (Exception ex) { if (++_bagStumbles <= 3) Log.Error("LegendaryLaw.SweepAiArmories(tabor) " + b.Key.StringId, ex); }
+                        }
                 }
                 if (cut > 0 || clubs > 0 || mounts > 0)
                     Log.Info("LegendaryLaw: magazyny AI (" + why + ") - " + cut + " legend przepadlo z " + parties + " partii"
                              + (clubs > 0 ? ", " + clubs + " szt. sprzetu olbrzymow z partii bez olbrzymow" : "")
-                             + (mounts > 0 ? ", " + mounts + " egzotycznych wierzchowcow nie u swoich" : "") + ".");
+                             + (mounts > 0 ? ", " + mounts + " egzotycznych wierzchowcow nie u swoich" + (exoticKeep ? " (r2-konie: do taboru partii jako towar "
+                                              + toBag + ", w nicosc " + (mounts - toBag) + ")" : "") : "") + ".");
             }
             catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
         }

@@ -6244,7 +6244,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool CamelsOnlyQarth { get; set; } = true;
 
-        [SettingPropertyBool("Exotic Mounts Never Vanish", HintText = "camels, chariots, elephants and mammoths are never struck off a market shelf: merchants do not haul them to a market that does not keep them, and one that a caravan or a lord sold there is bought by the nearest market that keeps it - that market pays the price and the beast goes there by the merchants' cart - or stays on the shelf (off = struck off the shelf, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Exotic Mounts Never Vanish", HintText = "camels, chariots, elephants and mammoths are never struck off a market shelf: merchants do not haul them to a market that does not keep them, and one that a caravan or a lord sold there is bought by the nearest market that keeps it - that market pays the price and the beast goes there by the merchants' cart - or stays on the shelf; one in a troops' armoury of men who may not ride it goes to the party's baggage as goods, and the player keeps such beasts in the bags as goods (off = struck off, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ExoticMountsNeverVanish { get; set; } = true;
 

@@ -1722,9 +1722,13 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || s.LootMinConditionPercent <= 0) return;
-                int cut = 0;
-                foreach (var roster in new[] { MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null,
-                                               QuartermasterLaw.DteArmory() })
+                int cut = 0, exoToBag = 0;
+                // r2-konie (recenzja, klucz ExoticMountsNeverVanish): wielblad/rydwan/slon/mamut nie u swoich nie znika z sakw gracza - kupiony
+                // na targu albo zdobyty zostaje towarem w sakwach; ze zbrojowni DTE gracza schodzi do sakw (DTE i tak go nie przydzieli).
+                // Slonie-towar wedlug id - jak dotad (Jeff 29.08). Wylaczony - kasowanie jak dotad.
+                bool exoticKeep = s.ExoticMountsNeverVanish;
+                var bagRoster = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                foreach (var roster in new[] { bagRoster, QuartermasterLaw.DteArmory() })
                 {
                     if (roster == null) continue;
                     for (int i = roster.Count - 1; i >= 0; i--)
@@ -1732,6 +1736,17 @@ namespace Armoury
                         var el = roster.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || it == null) continue;
+                        if (exoticKeep && !(it.StringId != null && (it.StringId == "elephant" || it.StringId.StartsWith("rot_elephant")))
+                            && MountLaw.IsExotic(it) && !MountLaw.AllowedForParty(MobileParty.MainParty, it))
+                        {
+                            if (roster != bagRoster && bagRoster != null)
+                            {
+                                roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                                bagRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                                exoToBag += el.Amount;
+                            }
+                            continue;
+                        }
                         // slonie-towar precz (Jeff: "slonie ma Zlota Kompania")
                         if (it.StringId != null && (it.StringId == "elephant" || it.StringId.StartsWith("rot_elephant")))
                         {
@@ -1767,6 +1782,8 @@ namespace Armoury
                         // ("biore") nikt nie nadpisuje.
                     }
                 }
+                if (exoToBag > 0)
+                    Log.Info("CleanseTrashInBags (r2-konie): " + exoToBag + " egzotycznych wierzchowcow nie u swoich ze zbrojowni gracza do sakw jako towar, skasowane 0.");
                 if (cut > 0)
                 {
                     Log.Info("CleanseTrashInBags: " + cut + " szt. (slonie-towar, zalegle legendy) wyrzucono z sakw/magazynu.");
