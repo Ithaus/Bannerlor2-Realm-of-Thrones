@@ -8140,6 +8140,18 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefClanTab { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Fief Trade", HintText = "with Side Village Fief Menu: 'Trade' in your village - buy and sell at the market of its main village: its goods, its prices, and the coin goes to that village's purse (as 'Buy products' in a village). Off = no trade option", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefTrade { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Fief House", HintText = "with Side Village Fief Menu: 'Your house' in your village - sleep in your own bed for free (the best rest there is: like the good house of an inn, wounded heal faster while you sleep) and keep things in the house chest. Needs Town Inns and Night Rest for the bed. Empty the chest before switching Armoury off or going back to an older version - only this version keeps it in the save. Off = no house (the chest stays in the save)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefHouse { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Fief Walk", HintText = "with Side Village Fief Menu: 'Take a walk' in your village - walk the lands of its main village on foot (your village has no scene of its own). Works when you come in through the main village ('Visit ... (your village)'). Off = no walk option", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageFiefWalk { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -10290,6 +10302,9 @@ namespace Armoury
             s.SideVillageFiefMenu = SideVillageFiefMenu;
             s.SideVillageFiefLodging = SideVillageFiefLodging;
             s.SideVillageFiefClanTab = SideVillageFiefClanTab;
+            s.SideVillageFiefTrade = SideVillageFiefTrade;
+            s.SideVillageFiefHouse = SideVillageFiefHouse;
+            s.SideVillageFiefWalk = SideVillageFiefWalk;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;

@@ -1259,6 +1259,8 @@ namespace Armoury
             // n20-wioska (noc 19/20.10): wioska poboczna gracza ("sf1|uid|okreg|nazwa|doba|wyplacone|srednia"); wlasny try, brak klucza (stary zapis, Ironman Jeffa) = brak wioski gracza
             try { string sf = dataStore.IsSaving ? SideVillageFief.Export() : null; SaveText.Sync(dataStore, "arm_side_fief", ref sf); if (dataStore.IsLoading) SideVillageFief.Import(sf); }
             catch (Exception e) { Log.Error("SyncData.arm_side_fief", e); }
+            try { string sh = dataStore.IsSaving ? SideVillageHome.ExportSave() : null; SaveText.Sync(dataStore, "arm_side_home", ref sh); if (dataStore.IsLoading) SideVillageHome.Import(sh); }   // r4-dom: skrzynia domu w wiosce gracza (sklad do logu przy zapisie - starsza DLL klucza nie zapisze)
+            catch (Exception e) { Log.Error("SyncData.arm_side_home", e); }
             // f5-a7 (noc 17/18.10): sygnal KS reguly zmiany zajec A7 - srednie ceny sygnalu miast, rodzaj Held, liczniki sezonu ("a7s1|...", straznik 64 KB); pisany tylko
             // z danymi (bez sygnalu - bez klucza, zapis jak dotad); wlasny try; brak klucza (stary zapis, Ironman Jeffa) = srednia od pierwszego kroku, Held od zera;
             // starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> StartCalibration.Reset -> RuleReset -> A7sReset)

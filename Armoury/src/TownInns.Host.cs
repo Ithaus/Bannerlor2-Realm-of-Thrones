@@ -74,9 +74,9 @@ namespace Armoury
                 r.StartMin = now;
                 long dawn = NextAt(now, NightRest.PlayerDawn);
                 r.WakeMin = dawn - now <= HoldMaxMin ? dawn : 0;
-                Log.Info(PH + "nocleg pod dachem w " + r.Town + " (" + r.HostUid + ", okreg " + r.TownId + ") od " + When(now) + ", "
+                Log.Info(PH + (IsHouse(r) ? "nocleg we wlasnym domu w " : "nocleg pod dachem w ") + r.Town + " (" + r.HostUid + ", okreg " + r.TownId + ") od " + When(now) + ", "
                          + (r.WakeMin > 0 ? "pobudka nie przed " + When(r.WakeMin) + " (swit)" : "bez czekania do switu (swit dalej niz 12 h) - sen do wyspania")
-                         + ", bez oplaty, jakosc " + QLog[HostQ] + ": predkosc +" + F1(r.Speed) + "%, morale +" + F1(r.Morale) + ", sen x" + r.Sleep.ToString("0.00", Inv) + ".");
+                         + ", bez oplaty, jakosc " + QLog[Math.Max(0, Math.Min(2, r.Q))] + ": predkosc +" + F1(r.Speed) + "%, morale +" + F1(r.Morale) + ", sen x" + r.Sleep.ToString("0.00", Inv) + ".");
             }
             try
             {
@@ -85,6 +85,9 @@ namespace Armoury
                 if (!string.IsNullOrEmpty(mesh)) args.MenuContext.SetBackgroundMeshName(mesh);
             }
             catch { }
+            if (IsHouse(r))   // r4-dom: wlasny dom w wiosce gracza (dobry dom)
+                return "You sleep in your own bed in your house at " + r.Town + "; the men bed down in its hall and the horses in its barns"
+                       + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
             return "Your people of " + r.Town + " take the men in for the night: they sleep on straw under roofs, the horses in the barns"
                    + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
         }
