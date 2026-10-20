@@ -4840,9 +4840,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int ForcedMarchSpeedPercent { get; set; } = 25;
 
-        [SettingPropertyBool("Town Inns", HintText = "in a town you can take lodgings at an inn: a common room (straw - 1 a man, 1 a horse, 3 for your own room), a decent inn (beds, a warm hearth, ale - 2/2/8) or a good house (rooms, wine, a bath - 4/3/20); the men still eat from their own wagons. Every soldier pays for himself and his horse from his own purse; companions pay from their own purses (with Companion Wage By Level off, the rest from the men's purse, where their pay then goes) (who cannot afford it takes a cheaper bed or the stable, free); you pay for yourself, your horse and the horses that carry nobody (in the baggage or the armoury). Taken in the evening or at night (from 18:00 with the usual camp hours) you sleep until dawn, by day until the men have slept; you wake rested until dusk, at most 12 hours: +5/+10/+12% speed on the map and +2/+5/+8 morale, weighted by how many slept in each kind of bed (only with no sleep debt); a decent inn or a good house also pays off sleep debt a quarter faster, and a good house heals the wounded half again as fast that night. The coin goes to the townsfolk who keep the inns. Needs Night Rest. Off = no inns, as before", RequireRestart = false)]
+        [SettingPropertyBool("Town Inns", HintText = "in a town you can take lodgings at an inn: a common room (straw - 1 a man, 1 a horse, 1 for your own bed among the men with Inn Common Room Shared Bed, else 3 for a room), a decent inn (beds, a warm hearth, ale - 2/2/8) or a good house (rooms, wine, a bath - 4/3/20); the men still eat from their own wagons. Every soldier pays for himself and his horse from his own purse; companions pay from their own purses (with Companion Wage By Level off, the rest from the men's purse, where their pay then goes) (who cannot afford it takes a cheaper bed or the stable, free); you pay for yourself, your horse and the horses that carry nobody (in the baggage or the armoury). Taken in the evening or at night (from 18:00 with the usual camp hours) you sleep until dawn, by day until the men have slept; you wake rested until dusk, at most 12 hours: +5/+10/+12% speed on the map and +2/+5/+8 morale, weighted by how many slept in each kind of bed (only with no sleep debt); a decent inn or a good house also pays off sleep debt a quarter faster, and a good house heals the wounded half again as fast that night. The coin goes to the townsfolk who keep the inns. Needs Night Rest. Off = no inns, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool TownInns { get; set; } = true;
+
+        [SettingPropertyBool("Inn Common Room Shared Bed", HintText = "in the common room of an inn you sleep on the straw among your men and pay what a man pays for his place (1 d) instead of 3 d for a room of your own - a room is for the decent inn and the good house. Off = 3 d for your own room in the common room, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnCommonRoomSharedBed { get; set; } = true;
 
         [SettingPropertyBool("Town Inn Price Bonus", HintText = "after a night in a good house (asleep until dawn) you trade a little better in that same town until dusk, at most 12 hours: you buy up to 3% cheaper and sell up to 3% dearer in the trade screen - never more than half the town's own gap between buying and selling, so buying and selling back never pays - and only until you have gained about 100 denars by it. Off = the good house gives no price bonus", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -9722,6 +9726,7 @@ namespace Armoury
             s.ForcedMarch = ForcedMarch;
             s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;
+            s.InnCommonRoomSharedBed = InnCommonRoomSharedBed;
             s.TownInnPriceBonus = TownInnPriceBonus;
             s.RoadsideInns = RoadsideInns;
             s.InnGossip = InnGossip;

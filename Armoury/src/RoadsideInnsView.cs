@@ -435,7 +435,7 @@ namespace Armoury
                     list.Add(new TooltipProperty("", inn.Name, 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                     list.Add(new TooltipProperty("", Cap(RoadsideInns.KindText(inn)) + " on the lands of " + inn.Village.Name + ".", 0));
                     list.Add(new TooltipProperty("", RoadsideInns.BedsText(inn), 0));
-                    var beds = new StringBuilder("A man / a horse / your room: common room 1 / 1 / 3");
+                    var beds = new StringBuilder("A man / a horse / your room: common room 1 / 1 / " + TownInns.RoomOf(0));
                     if (inn.Tiers >= 2) beds.Append(", decent inn 2 / 2 / 8");
                     if (inn.Tiers >= 3) beds.Append(", good house 4 / 3 / 20");
                     list.Add(new TooltipProperty("", beds.ToString() + ".", 0));

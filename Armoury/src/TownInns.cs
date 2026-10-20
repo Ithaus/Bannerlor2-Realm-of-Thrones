@@ -82,7 +82,12 @@ namespace Armoury
         private const long HoldMaxMin = 12 * 60;     // czekanie na swit tylko, gdy swit najwyzej 12 h przed nami
         private const long RestedMaxMin = 12 * 60;   // recenzja 16.10: wypoczeci do zmierzchu, ale najwyzej 12 h od pobudki
         private const long DropAwakeMin = 120;       // oplacony nocleg bez snu w menu dluzej niz 2 h - stan zdjety (log)
-        private static int PriceGainCap { get { return 5 * PRoom[2]; } }   // recenzja 16.10: zysk z premii cen na jeden nocleg najwyzej 5 x pokoj dobrego domu
+        private static int PriceGainCap { get { return 5 * PRoom[2]; } }
+        /// <summary>m95-nocleg (Jeff 20.10 "4 denary za nocleg to nie za duzo? sprawdz, czy stawki sa realne"): we wspolnej izbie gracz spi na slomie wsrod swoich ludzi
+        /// i placi za lozko jak czlowiek (PMan[0]); wlasny pokoj tylko w porzadnej karczmie i dobrym domu. Klucz Inn Common Room Shared Bed (NIE = 3 d jak dotad).</summary>
+        internal static int RoomOf(int q) { var s = Settings.Current; return (q == 0 && s != null && s.InnCommonRoomSharedBed) ? PMan[0] : PRoom[q]; }
+        /// <summary>m95-nocleg: napis "your room" albo "your bed" (wspolna izba z kluczem).</summary>
+        internal static string RoomWord(int q) { var s = Settings.Current; return (q == 0 && s != null && s.InnCommonRoomSharedBed) ? "your bed" : "your room"; }   // recenzja 16.10: zysk z premii cen na jeden nocleg najwyzej 5 x pokoj dobrego domu
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TownInns && s.NightRestEnabled; } }
         private static bool PriceKey { get { var s = Settings.Current; return s != null && s.TownInnPriceBonus; } }
@@ -328,7 +333,7 @@ namespace Armoury
             }
             b.OwnHorse = HasMount(me);
             b.Spare = SpareHorses(mp);
-            b.PlayerCost = PRoom[q] + ((b.OwnHorse ? 1 : 0) + b.Spare + b.ArmorySpare) * PHorse[q];
+            b.PlayerCost = RoomOf(q) + ((b.OwnHorse ? 1 : 0) + b.Spare + b.ArmorySpare) * PHorse[q];
             b.PlayerCan = me.Gold >= b.PlayerCost;
             b.People[q + 1]++;
             b.Persons = b.Foot + b.Mounted + b.Comp.Count + 1;
@@ -438,7 +443,7 @@ namespace Armoury
                 try { if (st != null && st.SettlementComponent != null && !string.IsNullOrEmpty(st.SettlementComponent.WaitMeshName)) args.MenuContext.SetBackgroundMeshName(st.SettlementComponent.WaitMeshName); } catch { }
                 var sb = new StringBuilder();
                 sb.Append("The inns of ").Append(st != null ? st.Name.ToString() : "the town").Append(" offer three kinds of night (a man / a horse / your own room):\n");
-                sb.Append("\nCommon room - straw and a roof: 1 / 1 / 3. Rested until dusk: +5% speed on the map, +2 morale.");
+                sb.Append("\nCommon room - straw and a roof: 1 / 1 / ").Append(RoomOf(0)).Append(RoomOf(0) == PMan[0] ? " (you sleep on the straw among your men)" : "").Append(". Rested until dusk: +5% speed on the map, +2 morale.");
                 sb.Append("\nDecent inn - beds, a warm hearth and ale: 2 / 2 / 8. +10% speed, +5 morale, and sleep comes a quarter faster (sleep debt is paid off sooner).");
                 sb.Append("\nGood house - rooms, wine and a bath: 4 / 3 / 20. +12% speed, +8 morale, sleep a quarter faster, the wounded heal half again as fast that night");
                 sb.Append(PriceKey ? ", and after a night there you trade up to 3% better in this town until dusk." : ".");
@@ -488,7 +493,7 @@ namespace Armoury
                 MBTextManager.SetTextVariable("ARM_INN_Q" + q, ShortLabels.Pick(QName[q] + " - " + b.Total + " d", QName[q] + " (" + QWhat[q] + ") - " + split));
                 var t = new StringBuilder();
                 if (ShortLabels.On) t.Append(QName[q]).Append(" (").Append(QWhat[q]).Append(") - ").Append(split).Append(".\n");
-                t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(PRoom[q]).Append(" d your room.");
+                t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(RoomOf(q)).Append(" d ").Append(RoomWord(q)).Append(".");
                 if (men > 0)
                 {
                     t.Append("\nThe men (").Append(men).Append(", ").Append(b.Mounted).Append(" mounted");
@@ -510,7 +515,7 @@ namespace Armoury
                     t.Append(string.Join(", ", parts.ToArray())).Append(".");
                     if (b.CompWaivedSum > 0) t.Append(" The sack spares them ").Append(b.CompWaivedSum).Append(" d they would take from the men's purse.");
                 }
-                t.Append("\nYou: room ").Append(PRoom[q]);
+                t.Append("\nYou: ").Append(RoomWord(q) == "your bed" ? "bed " : "room ").Append(RoomOf(q));
                 if (b.OwnHorse) t.Append(" + your horse ").Append(PHorse[q]);
                 if (b.Spare > 0) t.Append(" + ").Append(b.Spare).Append(b.Spare == 1 ? " horse" : " horses").Append(" in the baggage that carry nobody x ").Append(PHorse[q]);
                 if (b.ArmorySpare > 0) t.Append(" + ").Append(b.ArmorySpare).Append(b.ArmorySpare == 1 ? " horse" : " horses").Append(" in the armoury that carry nobody x ").Append(PHorse[q]);
@@ -603,7 +608,7 @@ namespace Armoury
                          + (b.MenNoPurse ? " (sakiewki wylaczone)" : "") + (b.Sacked ? " (okno lupu - bez zaplaty z sakiewki)" : "")
                          + " | towarzysze " + b.Comp.Count + (compLog.Length > 0 ? ": " + compLog : "") + ", z kiesy " + compGoldPaid + ", z sakiewki ludzi " + compPursePaid
                          + " z " + b.CompPurseSum + (b.CompWaivedSum > 0 ? ", darowane w oknie lupu " + b.CompWaivedSum : "")
-                         + " | gracz: pokoj " + PRoom[q] + ", swoj kon " + (b.OwnHorse ? 1 : 0)
+                         + " | gracz: pokoj " + RoomOf(q) + ", swoj kon " + (b.OwnHorse ? 1 : 0)
                          + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " (tabor " + b.Spare + ", zbrojownia " + (b.Armory ? b.ArmorySpare.ToString(Inv) : "brak") + ") x " + PHorse[q]
                          + " = " + b.PlayerCost + ", zaplacil " + playerPaid
                          + " | razem " + paidAll + " (ludzie " + menPaid + ", towarzysze " + compPaid + ", gracz " + playerPaid + ") -> kiesa ludu " + folkAll + ", kasa miasta " + (paidAll - folkAll)
