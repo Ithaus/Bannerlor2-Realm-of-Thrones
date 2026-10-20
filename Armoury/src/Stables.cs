@@ -800,6 +800,7 @@ namespace Armoury
         {
             int n = _lastBuy.Count;
             _lastBuy.Clear();
+            GarrisonHorses.Reset();   // r3-jazda: liczniki doby kroku "konie zalog dla lordow"
             SaddleLaw.Reset();   // E8/H (271): pamiec sesji reguly "jezdziec = kon + uprzaz" (spisy wzorcow i przedmiotow, doby sprzedazy uprzezy) - ten sam Reset, nie drugi
             return n;
         }
@@ -814,6 +815,9 @@ namespace Armoury
                 // sklad7b-p: kon jest sztuka zbrojowni - przy kazdym postoju lord dosadza jezdzcow bez konia koniami z taboru (nadmiar do taboru);
                 // ilu dalej brakuje konia - Stajnia dokupi razem z konmi na awanse
                 int lack = Remount(party);
+                // r3-jazda (PLAN 6.14, GarrisonHorsesToLords): wolne konie zalogi twierdzy swojego krolestwa - pod jezdzcow bez konia i do kolejki awansow,
+                // przed zakupem (zakup liczy brak po tym kroku); targ nietkniety
+                lack = GarrisonHorses.Give(party, settlement, lack);
                 if (!c.CavalryNeedsMounts || !c.AiBuysMounts) return;
                 if (c.QarthStablesBuyCamels && settlement.IsTown) CamelBuy(party, settlement, c);   // r2-konie (PLAN 6.9): wielblady jezdzcow wielbladow - osobno od koni, wlasna przerwa nie potrzebna (kupno tylko do braku w zbrojowni)
                 // E6/K3 (219): na zamku rodu partii tylko kon rycerza od rodu (stado wsi przypietej do zamku); zwykle zakupy jak dotad tylko w miescie i we wsi

@@ -6316,6 +6316,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float AiSpareHorseShare { get; set; } = 0.10f;
 
+        [SettingPropertyBool("Garrison Horses To Lords", HintText = "an AI lord stopping at a town or castle of his own realm takes the garrison's spare horses - those beyond its own riders, the riders of its patrols and a few kept for losses - for his riders who have no horse and for his men ready to be raised to horse; from his own house's stronghold for nothing, from another house's for the market price paid to that house's head, out of the same budget as his other horses. The market is not touched (off = garrison horses stay in the garrison, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool GarrisonHorsesToLords { get; set; } = true;
+
         [SettingPropertyBool("Pack Animals From Market", HintText = "a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool PackAnimalsFromMarket { get; set; } = true;
@@ -9806,6 +9810,7 @@ namespace Armoury
             s.TroopSwapNeedsHorse = TroopSwapNeedsHorse;
             s.AiSellsSpareHorses = AiSellsSpareHorses;
             s.AiSpareHorseShare = AiSpareHorseShare;
+            s.GarrisonHorsesToLords = GarrisonHorsesToLords;
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.VillagerPacksFromHerd = VillagerPacksFromHerd;
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;

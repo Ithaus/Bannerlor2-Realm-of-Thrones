@@ -752,6 +752,34 @@ namespace Armoury
             return need;
         }
 
+        /// <summary>r3-jazda (GarrisonHorses): jezdzcy (IsMounted, bez bohaterow) patroli BK tej osady - ich konie leza w zbrojowni zalogi, wiec nie sa
+        /// wolne (poprawka liczby jezdzcow dla Stables.Balance). null - bez patroli. Ta sama mapa patroli raz na dobe co C10 i A7.</summary>
+        internal static Dictionary<CharacterObject, int> PatrolRiders(Settlement st)
+        {
+            try
+            {
+                if (st == null || _bkPatrolType == null) return null;
+                List<MobileParty> pl;
+                if (!PatrolsToday().TryGetValue(st, out pl) || pl == null || pl.Count == 0) return null;
+                Dictionary<CharacterObject, int> d = null;
+                foreach (var p in pl)
+                {
+                    var r = p != null ? p.MemberRoster : null;
+                    if (r == null) continue;
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var el = r.GetElementCopyAtIndex(i);
+                        var ch = el.Character;
+                        if (ch == null || ch.IsHero || el.Number <= 0 || !ch.IsMounted) continue;
+                        if (d == null) d = new Dictionary<CharacterObject, int>();
+                        int v; d.TryGetValue(ch, out v); d[ch] = v + el.Number;
+                    }
+                }
+                return d;
+            }
+            catch (Exception e) { Stumble("PatrolRiders", e); return null; }
+        }
+
         private static Dictionary<Settlement, List<MobileParty>> _patrols;
         private static int _patrolsDay = -1;
 

@@ -295,6 +295,7 @@ namespace Armoury
                 var bal = Stables.Balance(mp);
                 r[CBezKonia] += bal.Unhorsed;
                 r[CWolne] += bal.FreeAll;
+                if (mp.IsGarrison) { _dGarUnhorsed += bal.Unhorsed; _dGarFree += bal.FreeAll; } else { _dLordUnhorsed += bal.Unhorsed; _dLordFree += bal.FreeAll; }   // r3-jazda: podzial lordowie / zalogi (tylko linia)
                 r[CWolneZwykle] += bal.Free[0]; r[CWolneBojowe] += bal.Free[1]; r[CWolneSzlachetne] += bal.Free[2];
                 var s = Settings.Current;
                 if (s != null && s.CavalryNeedsMounts)
@@ -547,9 +548,12 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ linia dnia i CSV
+        // r3-jazda (GarrisonHorses): podzial "bez konia" / "wolne" na partie lordow i zalogi (spis doby z CountParty; zerowane w Daily)
+        private static long _dLordUnhorsed, _dLordFree, _dGarUnhorsed, _dGarFree;
+
         internal static void Daily()
         {
-            if (!On) { _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0; SpareHorses.DayReset(); return; }   // E6/K2: liczniki segmentu tez zerowane
+            if (!On) { _dLordUnhorsed = _dLordFree = _dGarUnhorsed = _dGarFree = 0; _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0; SpareHorses.DayReset(); return; }   // E6/K2: liczniki segmentu tez zerowane
             var inv = CultureInfo.InvariantCulture;
             int day = (int)CampaignTime.Now.ToDays;
             // kazde krolestwo ma wiersz (takze bez zdarzen)
@@ -567,6 +571,7 @@ namespace Armoury
               .Append(t[CCzekaInnaKat]).Append("), konni bez konia w zbrojowni ")
               .Append(t[CBezKonia]).Append(" z ").Append(t[CKonni]).Append(" konnych (").Append(t[CWszyscy]).Append(" ludzi w partiach lordow i zalogach AI), wolne konie w zbrojowniach ").Append(t[CWolne])
               .Append(" (zwykle ").Append(t[CWolneZwykle]).Append(", bojowe ").Append(t[CWolneBojowe]).Append(", szlachetne ").Append(t[CWolneSzlachetne]).Append(")")
+              .Append(" [r3-jazda: partie lordow - bez konia ").Append(_dLordUnhorsed).Append(", wolne ").Append(_dLordFree).Append("; zalogi - bez konia ").Append(_dGarUnhorsed).Append(", wolne ").Append(_dGarFree).Append("]")
               .Append(" | przecieki wolnych koni: jezdzcy zostawieni w zalodze ").Append(t[CWolneZaloga]).Append(", dezerterzy ").Append(t[CWolneDezercja])
               .Append(", konie z echa werbunku ROT ").Append(t[CKonieEcho])
               .Append(" | zakupy lordow: ").Append(t[CKupione]).Append(" koni za ").Append(t[CZloto]).Append(" (targ ").Append(t[CKupioneTarg]).Append(", wsie ").Append(t[CKupioneWsie])
@@ -590,6 +595,7 @@ namespace Armoury
               .Append(" | wiersze: krolestwa (AI lordowie i zalogi), ").Append(PlayerClanKey).Append(", ").Append(OtherPartiesKey)
               .Append(" | potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
+            _dLordUnhorsed = _dLordFree = _dGarUnhorsed = _dGarFree = 0;   // r3-jazda
             try
             {
                 var rows = new StringBuilder();
