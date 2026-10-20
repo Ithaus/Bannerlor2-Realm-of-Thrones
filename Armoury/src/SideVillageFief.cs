@@ -42,7 +42,7 @@ namespace Armoury
         private const string P = "Wioska gracza (n20): ";
         internal const string Menu = "arm_side_fief";
         internal const string OptVillage = "arm_side_fief_visit";
-        private const string SaveVer = "sf1";
+        private const string SaveVer = "sf1", PendVer = "sfp";   // sfp|krolestwo|doba - nadanie startu BK jeszcze czeka
         internal const string AutoFlagName = "armoury-wioska-gracza.flag";
         private const float EnterR = 1.6f, LeaveR = 3.5f, ArriveEps = 0.25f;
         private const int FallbackDays = 3;
@@ -112,7 +112,7 @@ namespace Armoury
         // ============================================================ zapis
         internal static string Export()
         {
-            if (!HasFief) return "";
+            if (!HasFief) return _pendKingdom != null ? PendVer + "|" + Clean(_pendKingdom) + "|" + _pendDay.ToString(Inv) : "";   // nadanie czeka (ksiega nieczynna) - przezyje zapis
             return SaveVer + "|" + Clean(_uid) + "|" + Clean(_dist) + "|" + Clean(_name) + "|" + _day0.ToString(Inv) + "|" + _paidAll.ToString(Inv) + "|" + _avg.ToString("0.###", Inv);
         }
 
@@ -125,6 +125,12 @@ namespace Armoury
             try
             {
                 var f = data.Split('|');
+                if (f.Length >= 3 && f[0] == PendVer && f[1].Length > 0)
+                {
+                    _pendKingdom = f[1]; _pendHow = "start BK (Indebted Lord), po wczytaniu";
+                    if (!int.TryParse(f[2], NumberStyles.Integer, Inv, out _pendDay)) _pendDay = Today();
+                    return;
+                }
                 if (f.Length < 7 || f[0] != SaveVer || f[1].Length == 0 || f[2].Length == 0) { Log.Info(P + "zapis arm_side_fief nieznany (" + data.Length + " znakow) - pominiety, brak wioski gracza."); return; }
                 _uid = f[1]; _dist = f[2]; _name = f[3].Length > 0 ? f[3] : f[1];
                 int.TryParse(f[4], NumberStyles.Integer, Inv, out _day0);
@@ -298,7 +304,8 @@ namespace Armoury
                               + " itself stays with its lord. Your village flies your banner, and its share of the lord's tax comes to you whenever the district's carts come back from market. "
                               + "Click it on the map to ride in: rest there, invest in its works or look it over.";
                 Log.Player(_name + " is yours now - a side village of " + Txt(bestSt.Name) + ".");
-                try { if (!InformationManager.IsAnyInquiryActive()) InformationManager.ShowInquiry(new InquiryData("Your village", body, true, false, "Done", null, null, null), false); } catch { }
+                // okno jak zawiadomienie BK o nadaniu (BK pokazuje je w tym samym miejscu bez sprawdzania innych okien)
+                try { InformationManager.ShowInquiry(new InquiryData("Your village", body, true, false, "Done", null, null, null), true); } catch (Exception e) { Stumble("Grant.Okno", e); }
             }
             return true;
         }
@@ -607,9 +614,14 @@ namespace Armoury
             var st = Settlement.Find(_dist);
             if (st != null)
             {
+                // tylko linie dymku, ktorych nie ma juz w tekscie menu ("Kit in place")
+                var shown = new HashSet<string>(DistrictWorks.PartLines(st, _uid, false), StringComparer.Ordinal);
                 var more = new StringBuilder();
-                foreach (string l in DistrictWorks.PartLines(st, _uid, true)) more.Append('\n').Append(l);
-                if (more.Length > 0) body += "\n" + more.ToString();
+                foreach (string l in DistrictWorks.PartLines(st, _uid, true)) if (!shown.Contains(l)) more.Append('\n').Append(l);
+                if (st.Village != null) ShareOf(st.Village);
+                more.Append("\nHow it pays: when the carts of ").Append(Txt(st.Name)).Append(" come back from market, the lord takes his tax. Your village's part of it - its share of what the district makes, now about ")
+                    .Append((100 * _share).ToString("0", Inv)).Append("% - is yours. At war with the lord's realm you get nothing.");
+                body += "\n" + more.ToString();
             }
             InformationManager.ShowInquiry(new InquiryData(_name ?? "Your village", body, true, false, "Done", null, null, null), false);
         }
@@ -705,7 +717,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null) return;
                 int day = Today() - 1;
-                if (HasFief) _avg += (_dPaid - _avg) / 7.0;
+                // srednia: przez pierwsze 7 dob od nadania srednia z dob, potem wykladnicza 7 dob (bez nowego stanu w zapisie - doba nadania jest w zapisie)
+                if (HasFief) { int n = Math.Max(1, Math.Min(7, Today() - _day0)); _avg += (_dPaid - _avg) / n; if (_avg < 0) _avg = 0; }
                 bool start = !_startLogged;
                 _startLogged = true;
                 if (!start && !HasFief && _dIntercept == 0 && _st == 0) return;
