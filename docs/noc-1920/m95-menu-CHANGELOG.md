@@ -88,13 +88,14 @@ Nowy uklad (opcja -> nowe miejsce):
   niebezpieczna; tu jej nie ma (sprawdzone: `SandBoxGameManager.OnLoadFinished` -> `SetNextMenu`/`MapState.OnLoadingFinished` po `DoLoadingForGameType`).
 - Opcje, ktore cudze mody dodaja PO starcie sesji (zadania gry przez `QuestBase.AddGameMenuOption`, `OnGameLoadFinished`, AIInfluence - zaciemniony,
   nie dalo sie zdekompilowac), zostaja w menu miasta tam, gdzie je mod wstawil - nie gina. Linia startu wypisuje cale menu miasta po zmianie.
-- Zapis zrobiony WEWNATRZ nowego podmenu i wczytany z WYLACZONYM kluczem: menu z zapisu nie istnieje - gra sama konczy spotkanie (`PlayerEncounter.Finish`,
-  druzyna na mapie przy miescie; ta sama droga co przy usunietym modzie). Z wlaczonym kluczem podmenu istnieje (tworzone przed `OnLoadFinished`).
+- Zapis zrobiony WEWNATRZ nowego podmenu i wczytany z WYLACZONYM kluczem: po poprawkach recenzji trzy podmenu sa rejestrowane zawsze, wiec zapis otwiera
+  puste podmenu (opis + "Back to town center" -> menu miasta). Bez Armoury (mod usuniety) - gra sama konczy spotkanie (`PlayerEncounter.Finish`, druzyna
+  na mapie przy miescie), jak przy kazdym usunietym modzie z wlasnym menu.
 - Cudze powroty (naprawa RB po zaplacie, Back z DTE / BEE / BK, koniec pracy RC) laduja w glownym menu miasta, nie w podmenu - jak dotad.
 - Koszt: warunki opcji w podmenu sa liczone przez wejscie tak jak dotad przez menu miasta (te same wywolania, raz na odswiezenie menu) + raz przy
   otwarciu podmenu dla opisu. Bez stanu w zapisie, bez latek Harmony (tylko odczyt prywatnego pola `GameMenu._menuItems` przez AccessTools).
 - Zmiana klucza w trakcie gry dziala od nastepnego wczytania; warunki wejsc nie patrza na klucz, wiec wylaczenie w trakcie gry niczego nie chowa.
-- Build: Armoury `dotnet build -c Release` kod 0 (0 bledow). Gry nie uruchamiano (Jeff gra) - zachowanie w grze NIESPRAWDZONE.
+- Build: Armoury i RealisticCaptivity `dotnet build -c Release` kod 0 (0 bledow). Gry nie uruchamiano (Jeff gra) - zachowanie w grze NIESPRAWDZONE.
 
 **Status:** DO SPRAWDZENIA (galaz w-toku/m95-menu; do WGRANIA 95 po autotescie).
 
@@ -104,7 +105,7 @@ Nowy uklad (opcja -> nowe miejsce):
 2. Wejdz do miasta. Menu glowne: port, keep, arena, tavern district, Recruit troops, Trade, **Go to the smithy**, **Look for paid work**, **Town affairs**,
    Wait here, Leave (plus opcje zadan / dom / Iron Bank, gdzie sa). Nie powinno byc juz "Work the forge", "Take lodgings at an inn", "Realm ledger" itd.
 3. **Go to the tavern district**: sa "Visit the tavern", okup jencow, najemnicy i nowe: "Take lodgings at an inn" i (w cudzym miescie)
-   "Contact local informants", nad "Back to town center". Wejdz do karczmy i daj "Back to the town" - wracasz do dzielnicy karczm. Przespij noc - jak dotad.
+   "Contact local informants", nad "Back to town center". Wejdz do karczmy: wyjscie nazywa sie teraz "Back to the tavern district" i tam wraca. Przespij noc - jak dotad (pobudka w menu miasta).
 4. **Go to the smithy**: na gorze opis kazdej opcji; "Enter smithy" otwiera kuznie gry (crafting); "Work the forge" - nasza kuznia, a "Wipe your hands and
    step out" wraca do "Go to the smithy"; "Visit the local blacksmith..." (RB) i "Manage Armory" (DTE) dzialaja jak dotad (ich powrot - menu miasta).
    Jesli kowal ma zamowienie (!) w kuzni gry, "!" widac na "Go to the smithy".
@@ -112,4 +113,29 @@ Nowy uklad (opcja -> nowe miejsce):
 6. **Town affairs**: People of this land, Estates and livelihood, Realm ledger, Living Economy, Banner Kings, Buy a house (gdy nie masz tu domu) - kazda
    otwiera to samo okno / menu co dotad. "Back to town center" wraca do menu miasta.
 7. MCM Armoury -> "The town menu" -> wylacz **Town Menu Tidy**, zapisz, wczytaj: menu miasta jak dawniej (linia logu: WYLACZONY). Wlacz z powrotem.
-8. Napisz, czego brakuje albo co by bylo lepiej gdzie indziej (np. Banner Kings z powrotem na wierzch) - przestawienie to jedna linijka w planie.
+8. Na pasku u gory podmenu sa tytuly: "Smithy", "Paid Work", "Town Affairs". W Qohorze (u mistrzow) wyjscie nazywa sie "Back to the smithy" i tam wraca.
+9. Dom (poprawka RC): we WSI, w ktorej nie masz domu, jako pierwsza rzecz po wczytaniu zapisu kup dom ("Buy a house in this place"), potem "Step back outside" -
+   ma byc zwykle menu wsi (dotad menu miasta we wsi i blad). To samo w miescie: kup dom w "Town affairs", wyjdz - menu miasta.
+10. Zapis w srodku "Go to the smithy", wylacz Town Menu Tidy, wczytaj: puste podmenu z "Back to town center" (dotad druzyna ladowala na mapie). Wlacz z powrotem.
+11. Napisz, czego brakuje albo co by bylo lepiej gdzie indziej (np. Banner Kings z powrotem na wierzch) - przestawienie to jedna linijka w planie
+    (oprocz "Manage town" i "Recruit troops" - te musza zostac w menu miasta, patrz nizej).
+
+### Poprawki po recenzjach (gracz, technika) - 20.10
+
+**Dla Jeffa (prosto):** wyjscie z karczmy nazywa sie teraz "Back to the tavern district", a u mistrzow Qohoru "Back to the smithy" - napis mowi,
+dokad prowadzi. Nowe podmenu maja tytul na gorze. Przy okazji naprawiony stary blad domow: kupno domu we wsi i wyjscie z niego moglo otworzyc menu miasta
+we wsi i wywrocic menu - teraz wyjscie zawsze prowadzi do menu tej osady, w ktorej stoisz.
+
+| Uwaga recenzji | Ocena | Co zrobione |
+|---|---|---|
+| (technika, WAZNE, blad sprzed m95) RC `Homes.cs`: po kupnie domu "Step back outside" i sprzedaz wracaja do statycznego `_cameFrom`, ktore ustawia tylko wejscie "Go to your house" | **PRAWDZIWE** - sprawdzone: `BuyConsequence` -> `SwitchToMenu("rc_home")` bez `_cameFrom` (domyslnie "town"); gra `PlayerTownVisitCampaignBehavior.game_menu_town_on_init` czyta `Settlement.CurrentSettlement.Town.GarrisonParty` (we wsi `Town == null` -> NullReference w init menu); odwrotnie (wejscie we wsi, kupno w miescie) - menu wsi w miescie | nowe `Homes.Outside()` (wies -> "village", miasto -> "town", zapas `_cameFrom`) - ten sam wzor co `Work.BackMenu` (audyt 13.10); "Step back outside" i powrot po sprzedazy przez `Outside()`, kupno ustawia `_cameFrom = Outside()`. Bez klucza MCM: to naprawa bledu (wylacznik przywracalby wywrotke), w zwyklej drodze (wejscie z miasta/wsi) wynik identyczny jak dotad. Kupno z "Town affairs" -> wyjscie do glownego menu miasta (RC nie zna podmenu Armoury) |
+| (gracz) napisy naszych wyjsc nie mowia, dokad prowadza ("Back to the town" -> dzielnica karczm, "Leave" u Qohoru -> "Go to the smithy") | prawdziwe | `TownMenus.SetBackLabel` z warunku opcji (gra liczy warunek przed odczytem napisu - `GameMenuVM.Refresh`; ten sam wzor co `CrimeCampaignBehavior`: `args.Text.SetTextVariable`): "Back to the tavern district" / "Back to the smithy", gdy wejscie przeniesione; inaczej napis jak dotad ("Back to the town", "Leave"). Pobudka po nocy w karczmie dalej w menu miasta (`NightRest.SettlementMenu`) - zmiana w NightRest, osobny wpis, jesli Jeff zechce |
+| (gracz) przy wylaczonym kluczu podmenu nie powstaja - zapis z podmenu wyprowadza druzyne na mape | prawdziwe | trzy podmenu `arm_tm_*` (opis, tytul, "Back to town center") rejestrowane zawsze, takze przy wylaczonym kluczu i pustym podmenu; klucz decyduje tylko o przenoszeniu opcji i wpieciu wejsc. Przy bledzie przenoszenia listy podmenu tez wracaja z kopii (tylko "Back" - opcja nie stoi w dwoch miejscach) |
+| (technika) zewnetrzny catch po zatwierdzeniu moze zgasic `_on` i schowac wejscia | prawdziwe (dzis praktycznie nieosiagalne) | flaga `committed`; linia logu startu we wlasnym try (`Stumble("linia startu")`); zewnetrzny catch nie rusza stanu po zatwierdzeniu |
+| (technika) statyczne `_doneFor` i `_hubs` trzymaja menu i zachowania poprzedniej kampanii | prawdziwe | `_hubs` juz nie statyczne (lokalne w `Apply`; obiekty Hub zyja w delegatach swoich menu i gina z `GameMenuManager` kampanii), `_doneFor` jako `WeakReference<GameMenuManager>`; `_where` to same napisy. `BackTo` dodatkowo sprawdza, ze podmenu istnieje w biezacej kampanii (inaczej "town") |
+| (technika) brak tytulu podmenu (`args.MenuTitle`) | prawdziwe | `Hub.Title`: "Smithy", "Paid Work", "Town Affairs" - `Init` ustawia `args.MenuTitle` (`GameMenu.RunOnInit` przepisuje go do menu) |
+| (technika) pulapka: opcje gry z `GameMenuEventHandler("town", ...)` po przeniesieniu bylyby martwe | prawdziwe (dzis nie w planie) | straznik `TownOnly` = `manage_production`, `manage_production_cheat`, `recruit_volunteers` (sprawdzone w dekompilacji: tylko te trzy maja `GameMenuEventHandler("town", ...)` w CampaignSystem; SandBox, SandBox.View, StoryMode, ViewModelCollection - brak); `Apply` je pomija i dopisuje do linii logu "nieprzenaszalne", gdyby ktos dodal je do planu |
+
+**Ryzyko / co sprawdzic:** napisy wyjsc liczone w warunku opcji (raz na odswiezenie menu, napis z `_where` - bez pracy co klatke); zmienna tekstu na
+wlasnym `TextObject` opcji (nie globalna). Puste podmenu przy wylaczonym kluczu sa nieosiagalne z menu miasta (wejsc nie ma), tylko z zapisu.
+RC: `Outside()` wolane tylko przy kliknieciu. Build Armoury i RC kod 0. **Status:** DO SPRAWDZENIA (jak caly wpis).

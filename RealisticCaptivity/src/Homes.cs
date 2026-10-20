@@ -27,6 +27,23 @@ namespace RealisticCaptivity
         private static string _cameFrom = "town";
 
         private static Settlement Here { get { return Settlement.CurrentSettlement; } }
+
+        /// <summary>m95-menu, recenzja (wazne, blad sprzed m95): menu "na zewnatrz" domu brane z osady, w ktorej gracz stoi (jak Work.BackMenu, audyt 13.10).
+        /// Dotad "Step back outside" i sprzedaz wracaly do statycznego _cameFrom, ktore ustawia tylko wejscie "Go to your house" - kupno domu (BuyConsequence)
+        /// go nie ustawia. Kupno we WSI jako pierwsze w sesji (_cameFrom = "town") i wyjscie = menu miasta we wsi, a init menu miasta czyta
+        /// Settlement.CurrentSettlement.Town.GarrisonParty (we wsi Town == null) - NullReference w init menu. Odwrotnie (wejscie we wsi, kupno w miescie) -
+        /// menu wsi w miescie. Pole zostaje tylko jako zapas, gdy osady nie da sie odczytac.</summary>
+        private static string Outside()
+        {
+            try
+            {
+                var h = Here;
+                if (h != null && h.IsVillage) return "village";
+                if (h != null && h.IsTown) return "town";
+            }
+            catch { }
+            return _cameFrom;
+        }
         private static bool Owned(Settlement s) { return s != null && Vault != null && Vault.ContainsKey(s.StringId); }
 
         internal static int BuyPrice(Settlement s)
@@ -145,7 +162,7 @@ namespace RealisticCaptivity
 
             starter.AddGameMenuOption("rc_home", "rc_home_leave",
                 "{=!}Step back outside", c => Leave(c, GameMenuOption.LeaveType.Leave),
-                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(_cameFrom); }, true, 9);
+                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(Outside()); }, true, 9);
         }
 
         private static bool Leave(MenuCallbackArgs args, GameMenuOption.LeaveType t)
@@ -193,6 +210,7 @@ namespace RealisticCaptivity
                             Stash[id] = new ItemRoster();
                             Log.Player("The house in " + Here.Name + " is yours.", false);
                             Log.Info("Kupiono dom: " + id + " za " + price);
+                            _cameFrom = Outside();   // m95-menu (recenzja): kupno nie przechodzi przez wejscie "Go to your house" - powrot z osady
                             GameMenu.SwitchToMenu("rc_home");
                         }
                         catch (Exception e) { Log.Error("BuyHome", e); }
@@ -260,7 +278,7 @@ namespace RealisticCaptivity
                             if (Vault.Count == 0) FamilyHomeSold = true;
                             Log.Player("The house in " + Here.Name + " has a new owner. " + (pay + banked) + " gold changes hands.", false);
                             Log.Info("Sprzedano dom: " + id + " za " + pay + " + skarbiec " + banked);
-                            GameMenu.SwitchToMenu(_cameFrom);
+                            GameMenu.SwitchToMenu(Outside());
                         }
                         catch (Exception e) { Log.Error("SellHome", e); }
                     }, null), true);

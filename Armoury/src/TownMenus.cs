@@ -29,6 +29,9 @@ namespace Armoury
     /// Klucz TownMenuTidy (wylaczony = nic sie nie rusza, menu jak dotad). Zmiana klucza w trakcie gry dziala od nastepnego wczytania (menu budowane raz na sesje;
     /// warunki wejsc NIE patrza na klucz, wiec wylaczenie w trakcie gry niczego nie chowa). Bez stanu w zapisie. Potkniecia liczone per opcja, nic sie nie gasi.
     /// Tylko miasto: zamek ("castle") i wies bez zmian.
+    /// Poprawki po recenzjach: trzy podmenu rejestrowane zawsze (takze przy wylaczonym kluczu - zapis zrobiony w podmenu wczyta sie normalnie), podmenu maja
+    /// tytul, napisy naszych wyjsc mowia, dokad prowadza (BackLabel), stan statyczny bez mocnych odwolan do menu i zachowan poprzedniej kampanii,
+    /// blad przy linii logu po przeniesieniu nie gasi wejsc, opcje gry z GameMenuEventHandler("town", ...) nieprzenaszalne (straznik TownOnly).
     /// </summary>
     internal static class TownMenus
     {
@@ -47,6 +50,12 @@ namespace Armoury
                 Ours = who == "Armoury" || who == "RC" || who == "GT";
             }
         }
+
+        // Opcje gry, ktorych prawdziwy skutek siedzi w GameMenuEventHandler("town", id) (TaleWorlds.CampaignSystem PlayerTownVisit i
+        // PlayerTownVisitCampaignBehavior; GameMenuCallbackManager szuka handlera po id BIEZACEGO menu) - poza menu "town" bylyby widoczne, ale martwe.
+        // NIE przenosic: "Manage town" (skutek w AddGameMenuOption = null), "Manage town (Cheat)", "Recruit troops". Straznik w Apply pomija je i loguje,
+        // gdyby ktos dopisal je do planu.
+        private static readonly HashSet<string> TownOnly = new HashSet<string> { "manage_production", "manage_production_cheat", "recruit_volunteers" };
 
         // kolejnosc w tablicy = kolejnosc w podmenu
         private static readonly Move[] Plan =
@@ -79,13 +88,13 @@ namespace Armoury
         /// <summary>Nowe podmenu z wejsciem w menu miasta: przeniesione opcje (te same obiekty) i ich zdania opisu.</summary>
         private sealed class Hub
         {
-            public readonly string Opt, Menu, Label, Head, TextVar;
+            public readonly string Opt, Menu, Label, Title, Head, TextVar;
             public readonly GameMenuOption.LeaveType Icon;
             public readonly List<GameMenuOption> Kids = new List<GameMenuOption>();
             public readonly List<string> Lines = new List<string>();     // zdanie na opcje (ta sama kolejnosc co Kids; null - bez zdania)
 
-            public Hub(string opt, string menu, string label, string head, string textVar, GameMenuOption.LeaveType icon)
-            { Opt = opt; Menu = menu; Label = label; Head = head; TextVar = textVar; Icon = icon; }
+            public Hub(string opt, string menu, string label, string title, string head, string textVar, GameMenuOption.LeaveType icon)
+            { Opt = opt; Menu = menu; Label = label; Title = title; Head = head; TextVar = textVar; Icon = icon; }
 
             /// <summary>Wejscie widoczne, gdy choc jedna opcja w srodku jest widoczna; znaczniki zadan opcji przechodza na wejscie, podpowiedz wymienia widoczne.</summary>
             public bool Condition(MenuCallbackArgs args)
@@ -108,9 +117,11 @@ namespace Armoury
 
             public void Consequence(MenuCallbackArgs args) { GameMenu.SwitchToMenu(Menu); }   // zwykle menu (nie menu oczekiwania) - SwitchToMenu wolno
 
-            /// <summary>Opis podmenu: naglowek i zdanie dla kazdej opcji widocznej w tej chwili; tlo jak w karczmie (WaitMeshName osady).</summary>
+            /// <summary>Opis podmenu: naglowek i zdanie dla kazdej opcji widocznej w tej chwili; tlo jak w karczmie (WaitMeshName osady); tytul paska
+            /// (GameMenu.RunOnInit przepisuje args.MenuTitle do menu - bez niego pasek pusty; gra: "Town Center", "Backstreet").</summary>
             public void Init(MenuCallbackArgs args)
             {
+                try { args.MenuTitle = new TextObject("{=!}" + Title); } catch { }
                 try
                 {
                     var st = Settlement.CurrentSettlement;
@@ -135,17 +146,18 @@ namespace Armoury
             }
         }
 
+        // Stan statyczny bez mocnych odwolan do menu i opcji kampanii (recenzja: dotad _hubs z opcjami - delegaty do zachowan - i menedzer menu trzymaly
+        // poprzednia kampanie az do nastepnego Apply). Obiekty Hub zyja tylko w delegatach swoich menu (gina z GameMenuManager kampanii).
         private static bool _on;                                                   // ta sesja: opcje przeniesione, wejscia wpiete
-        private static Hub[] _hubs;
         private static readonly Dictionary<string, string> _where = new Dictionary<string, string>();   // id przeniesionej opcji -> menu, w ktorym teraz stoi
         private static readonly Dictionary<string, int> _st = new Dictionary<string, int>();             // potkniecia per opcja / miejsce
         private static int _stAll;
         private static System.Reflection.FieldInfo _itemsField;
-        private static GameMenuManager _doneFor;                                   // menedzer menu, w ktorym juz przeniesiono (drugie wolanie w tej samej sesji - nic)
+        private static WeakReference<GameMenuManager> _doneFor;                    // menedzer menu, w ktorym juz zrobiono (drugie wolanie w tej samej sesji - nic)
 
         private static void Reset()
         {
-            _on = false; _hubs = null; _where.Clear(); _st.Clear(); _stAll = 0;
+            _on = false; _where.Clear(); _st.Clear(); _stAll = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -192,65 +204,70 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>Menu, do ktorego wraca nasza opcja "wyjdz" (karczma, kuznia, Qohor): podmenu, w ktorym stoi jej wejscie, albo "town" (klucz wylaczony / nie przeniesiona).</summary>
+        /// <summary>Menu, do ktorego wraca nasza opcja "wyjdz" (karczma, kuznia, Qohor): podmenu, w ktorym stoi jej wejscie, albo "town" (klucz wylaczony /
+        /// nie przeniesiona / podmenu nie ma w biezacej kampanii - np. stan z poprzedniej sesji, gdyby Apply nie przeszlo).</summary>
         internal static string BackTo(string enterOptionId)
         {
             string m;
-            return _on && enterOptionId != null && _where.TryGetValue(enterOptionId, out m) && !string.IsNullOrEmpty(m) ? m : Town;
+            if (!_on || enterOptionId == null || !_where.TryGetValue(enterOptionId, out m) || string.IsNullOrEmpty(m)) return Town;
+            try
+            {
+                var mgr = Campaign.Current != null ? Campaign.Current.GameMenuManager : null;
+                if (mgr == null || mgr.GetGameMenu(m) == null) return Town;
+            }
+            catch { return Town; }
+            return m;
+        }
+
+        /// <summary>Recenzja (gracz): napis naszego wyjscia mowi, dokad prowadzi - przy przeniesionym wejsciu nazwa podmenu, inaczej napis jak dotad.
+        /// Wolane z warunku opcji (gra liczy warunek przed odczytem napisu - GameMenuVM.Refresh; ten sam wzor co CrimeCampaignBehavior).</summary>
+        internal static void SetBackLabel(MenuCallbackArgs args, string textVar, string enterOptionId, string asBefore)
+        {
+            string label = asBefore;
+            try
+            {
+                switch (BackTo(enterOptionId))
+                {
+                    case Tavern: label = "Back to the tavern district"; break;
+                    case MenuSmithy: label = "Back to the smithy"; break;
+                    case MenuWork: label = "Back to paid work"; break;
+                    case MenuAffairs: label = "Back to town affairs"; break;
+                }
+            }
+            catch { label = asBefore; }
+            try { if (args != null && args.Text != null) args.Text.SetTextVariable(textVar, label); } catch { }
         }
 
         /// <summary>
         /// SubModuleMain.OnAfterGameInitializationFinished (kampania): przeniesienie opcji menu miasta i wpiecie wejsc podmenu. Raz na sesje (nowe GameMenuManager
-        /// przy kazdym wczytaniu - stan od zera). Jedna linia logu "Menu miasta (m95-menu): start". Nie rzuca.
+        /// przy kazdym wczytaniu - stan od zera). Trzy podmenu rejestrowane zawsze, takze przy wylaczonym kluczu. Jedna linia logu "Menu miasta (m95-menu): start".
+        /// Nie rzuca.
         /// </summary>
         internal static void Apply(CampaignGameStarter starter)
         {
             const string head = "Menu miasta (m95-menu): start | ";
+            bool committed = false;
             try
             {
-                var mgr0 = Campaign.Current != null ? Campaign.Current.GameMenuManager : null;
-                if (mgr0 != null && ReferenceEquals(mgr0, _doneFor)) { Log.Info(head + "drugie wolanie w tej samej sesji - juz zrobione, bez zmian."); return; }
-                Reset();
-                var s = Settings.Current;
-                if (s == null || !s.TownMenuTidy) { Log.Info(head + "WYLACZONY w MCM (Town Menu Tidy) - menu miasta jak dotad, nic nie przeniesione."); return; }
                 var mgr = Campaign.Current != null ? Campaign.Current.GameMenuManager : null;
+                GameMenuManager done;
+                if (mgr != null && _doneFor != null && _doneFor.TryGetTarget(out done) && ReferenceEquals(mgr, done)) { Log.Info(head + "drugie wolanie w tej samej sesji - juz zrobione, bez zmian."); return; }
+                Reset();
                 if (starter == null || mgr == null) { Log.Info(head + "BRAK startera albo GameMenuManager - nic nie przeniesione, menu jak dotad."); return; }
-                var townItems = Items(mgr.GetGameMenu(Town));
-                if (townItems == null) { Log.Info(head + "BRAK menu 'town' albo listy opcji (GameMenu._menuItems) - nic nie przeniesione, menu jak dotad."); return; }
-                var tavernItems = Items(mgr.GetGameMenu(Tavern));
 
-                _hubs = new[]
+                var hubs = new[]
                 {
-                    new Hub(HubSmithy, MenuSmithy, "{=!}Go to the smithy", "The smiths' street - hammers ring from every door.", "ARM_TM_SMITHY_TEXT", GameMenuOption.LeaveType.Craft),
-                    new Hub(HubWork, MenuWork, "{=!}Look for paid work", "There is always work in a town for willing hands.", "ARM_TM_WORK_TEXT", GameMenuOption.LeaveType.Wait),
-                    new Hub(HubAffairs, MenuAffairs, "{=!}Town affairs", "The town's people, its books and its dealings.", "ARM_TM_AFFAIRS_TEXT", GameMenuOption.LeaveType.Manage),
+                    new Hub(HubSmithy, MenuSmithy, "{=!}Go to the smithy", "Smithy", "The smiths' street - hammers ring from every door.", "ARM_TM_SMITHY_TEXT", GameMenuOption.LeaveType.Craft),
+                    new Hub(HubWork, MenuWork, "{=!}Look for paid work", "Paid Work", "There is always work in a town for willing hands.", "ARM_TM_WORK_TEXT", GameMenuOption.LeaveType.Wait),
+                    new Hub(HubAffairs, MenuAffairs, "{=!}Town affairs", "Town Affairs", "The town's people, its books and its dealings.", "ARM_TM_AFFAIRS_TEXT", GameMenuOption.LeaveType.Manage),
                 };
 
-                // 1) co przenosimy (kolejnosc planu); kotwica wejsc - miejsce "Enter smithy" przed zmianami
-                int anchor = IndexOf(townItems, Anchor);
-                int before = 0;
-                var picked = new List<KeyValuePair<Move, GameMenuOption>>();
-                var missOurs = new List<string>();
-                var missForeign = new List<string>();
-                int kept = 0;
-                foreach (var m in Plan)
-                {
-                    int at = IndexOf(townItems, m.Id);
-                    if (at < 0) { (m.Ours ? missOurs : missForeign).Add(m.Id + " (" + m.Who + ")"); continue; }
-                    if (m.To == Tavern && tavernItems == null) { kept++; continue; }   // brak podmenu gry - opcja zostaje w miescie
-                    if (anchor >= 0 && at < anchor) before++;
-                    picked.Add(new KeyValuePair<Move, GameMenuOption>(m, townItems[at]));
-                }
-
-                if (picked.Count == 0) { Log.Info(head + "WLACZONY, ale zadnej opcji z planu nie ma w menu 'town' - nic nie przeniesione | nie znaleziono: " + string.Join(", ", missForeign.ToArray()) + "; " + string.Join(", ", missOurs.ToArray())); return; }
-
-                // 2) przygotowanie bez ruszania menu miasta: podmenu z "Back to town center" (jak w podmenu gry), listy opcji, miejsce w karczmie
-                foreach (var kv in picked)
-                    if (kv.Key.To != Tavern) { var h = HubOf(kv.Key.To); h.Kids.Add(kv.Value); h.Lines.Add(kv.Key.Line); }
+                // 0) trzy podmenu z "Back to town center" (jak w podmenu gry) - ZAWSZE, takze przy wylaczonym kluczu i pustym podmenu (recenzja): zapis zrobiony
+                //    w podmenu i wczytany po wylaczeniu klucza otwiera to podmenu (SandBoxGameManager.OnLoadFinished: GetGameMenu != null -> SetNextMenu), a "Back"
+                //    wraca do miasta; bez rejestracji gra konczyla spotkanie (PlayerEncounter.Finish) i druzyna stala na mapie. Menu miasta jeszcze nieruszone.
                 var subLists = new Dictionary<string, List<GameMenuOption>>();
-                foreach (var h in _hubs)
+                foreach (var h in hubs)
                 {
-                    if (h.Kids.Count == 0) continue;
                     starter.AddGameMenu(h.Menu, "{=!}{" + h.TextVar + "}", h.Init, GameMenu.MenuOverlayType.SettlementWithBoth);
                     starter.AddGameMenuOption(h.Menu, h.Menu + "_back", "{=qWAmxyYz}Back to town center",
                         delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
@@ -259,6 +276,38 @@ namespace Armoury
                     if (list == null) throw new InvalidOperationException("brak listy opcji nowego podmenu " + h.Menu + " - nic nie przeniesione");
                     subLists[h.Menu] = list;
                 }
+                _doneFor = new WeakReference<GameMenuManager>(mgr);   // podmenu zarejestrowane - drugie wolanie w tej sesji nic nie robi (bez podwojnego "Back")
+
+                var s = Settings.Current;
+                if (s == null || !s.TownMenuTidy) { Log.Info(head + "WYLACZONY w MCM (Town Menu Tidy) - menu miasta jak dotad, nic nie przeniesione (puste podmenu zarejestrowane tylko dla zapisow zrobionych w podmenu)."); return; }
+                var townItems = Items(mgr.GetGameMenu(Town));
+                if (townItems == null) { Log.Info(head + "BRAK menu 'town' albo listy opcji (GameMenu._menuItems) - nic nie przeniesione, menu jak dotad."); return; }
+                var tavernItems = Items(mgr.GetGameMenu(Tavern));
+
+                // 1) co przenosimy (kolejnosc planu); kotwica wejsc - miejsce "Enter smithy" przed zmianami
+                int anchor = IndexOf(townItems, Anchor);
+                int before = 0;
+                var picked = new List<KeyValuePair<Move, GameMenuOption>>();
+                var missOurs = new List<string>();
+                var missForeign = new List<string>();
+                var pinned = new List<string>();
+                int kept = 0;
+                foreach (var m in Plan)
+                {
+                    if (TownOnly.Contains(m.Id)) { pinned.Add(m.Id + " (" + m.Who + ")"); continue; }   // skutek w GameMenuEventHandler("town") - zostaje
+                    int at = IndexOf(townItems, m.Id);
+                    if (at < 0) { (m.Ours ? missOurs : missForeign).Add(m.Id + " (" + m.Who + ")"); continue; }
+                    if (m.To == Tavern && tavernItems == null) { kept++; continue; }   // brak podmenu gry - opcja zostaje w miescie
+                    if (anchor >= 0 && at < anchor) before++;
+                    picked.Add(new KeyValuePair<Move, GameMenuOption>(m, townItems[at]));
+                }
+                string pinnedNote = pinned.Count > 0 ? " | nieprzenaszalne (GameMenuEventHandler 'town'), zostaja w miescie " + pinned.Count + " [" + string.Join(", ", pinned.ToArray()) + "]" : "";
+
+                if (picked.Count == 0) { Log.Info(head + "WLACZONY, ale zadnej opcji z planu nie ma w menu 'town' - nic nie przeniesione | nie znaleziono: " + string.Join(", ", missForeign.ToArray()) + "; " + string.Join(", ", missOurs.ToArray()) + pinnedNote); return; }
+
+                // 2) przygotowanie bez ruszania menu miasta: listy opcji podmenu, miejsce w karczmie
+                foreach (var kv in picked)
+                    if (kv.Key.To != Tavern) { var h = HubOf(hubs, kv.Key.To); h.Kids.Add(kv.Value); h.Lines.Add(kv.Key.Line); }
                 int tavernAt = -1;
                 if (tavernItems != null)
                 {
@@ -271,6 +320,8 @@ namespace Armoury
                 // 3) zmiana (te same obiekty GameMenuOption); kopie list - przy bledzie w polowie wszystko wraca na miejsce (nic nie znika)
                 var townCopy = new List<GameMenuOption>(townItems);
                 var tavernCopy = tavernItems != null ? new List<GameMenuOption>(tavernItems) : null;
+                var subCopies = new Dictionary<string, List<GameMenuOption>>();
+                foreach (var kv in subLists) subCopies[kv.Key] = new List<GameMenuOption>(kv.Value);
                 int toTavern = 0, hubsIn = 0;
                 try
                 {
@@ -280,7 +331,7 @@ namespace Armoury
                         if (kv.Key.To == Tavern) { tavernItems.Insert(Math.Min(tavernAt, tavernItems.Count), kv.Value); tavernAt++; toTavern++; }
                         _where[kv.Key.Id] = kv.Key.To;
                     }
-                    foreach (var h in _hubs)
+                    foreach (var h in hubs)
                     {
                         if (h.Kids.Count == 0) continue;
                         subLists[h.Menu].InsertRange(0, h.Kids);    // opcje przed "Back to town center"
@@ -289,51 +340,60 @@ namespace Armoury
                     if (pos < 0) pos = IndexOf(townItems, "town_wait");
                     if (pos < 0) pos = FirstLeave(townItems);
                     if (pos < 0 || pos > townItems.Count) pos = townItems.Count;
-                    foreach (var h in _hubs)
+                    foreach (var h in hubs)
                     {
                         if (h.Kids.Count == 0) continue;
                         starter.AddGameMenuOption(Town, h.Opt, h.Label, h.Condition, h.Consequence, false, pos);
                         pos++; hubsIn++;
                     }
                     _on = true;
-                    _doneFor = mgr;
+                    committed = true;
                 }
                 catch (Exception e)
                 {
                     townItems.Clear(); townItems.AddRange(townCopy);
                     if (tavernCopy != null) { tavernItems.Clear(); tavernItems.AddRange(tavernCopy); }
+                    foreach (var kv in subCopies) { subLists[kv.Key].Clear(); subLists[kv.Key].AddRange(kv.Value); }   // podmenu: tylko "Back" (opcje nie w dwoch miejscach)
                     _where.Clear(); _on = false;
                     Stumble("Apply (cofniete)", e);
                     Log.Info(head + "BLAD przy przenoszeniu (" + e.Message + ") - menu miasta i karczmy przywrocone jak dotad, nic nie przeniesione.");
                     return;
                 }
 
-                // linia startu: co dokad, czego nie znaleziono, menu miasta po zmianie
-                var moved = new StringBuilder();
-                moved.Append("do karczmy (town_backstreet) ").Append(toTavern).Append(" [").Append(Ids(picked, Tavern)).Append("]");
-                foreach (var h in _hubs)
-                    moved.Append("; ").Append(h.Menu).Append(' ').Append(h.Kids.Count).Append(" [").Append(Ids(picked, h.Menu)).Append("]");
-                var now = new List<string>(townItems.Count);
-                foreach (var o in townItems) now.Add(o != null ? o.IdString : "?");
-                Log.Info(head + "WLACZONY (Town Menu Tidy) | przeniesione " + picked.Count + " z " + Plan.Length + " w planie: " + moved
-                         + " | wejscia podmenu wpiete " + hubsIn + " (miejsce dawnego 'Enter smithy' " + (anchor >= 0 ? "index " + anchor : "BRAK - przed Wait/Leave") + ")"
-                         + " | nie znaleziono cudzych " + missForeign.Count + (missForeign.Count > 0 ? " [" + string.Join(", ", missForeign.ToArray()) + "]" : "")
-                         + ", naszych " + missOurs.Count + (missOurs.Count > 0 ? " [" + string.Join(", ", missOurs.ToArray()) + "]" : "")
-                         + (kept > 0 ? " | zostalo w miescie (brak podmenu town_backstreet) " + kept : "")
-                         + " | menu miasta teraz " + now.Count + " opcji: " + string.Join(", ", now.ToArray()));
+                // linia startu: co dokad, czego nie znaleziono, menu miasta po zmianie. Wlasny try (recenzja): blad tutaj nie moze cofnac stanu po
+                // zatwierdzeniu - opcje juz stoja w podmenu, zgaszenie _on schowaloby wejscia do konca sesji.
+                try
+                {
+                    var moved = new StringBuilder();
+                    moved.Append("do karczmy (town_backstreet) ").Append(toTavern).Append(" [").Append(Ids(picked, Tavern)).Append("]");
+                    foreach (var h in hubs)
+                        moved.Append("; ").Append(h.Menu).Append(' ').Append(h.Kids.Count).Append(" [").Append(Ids(picked, h.Menu)).Append("]");
+                    var now = new List<string>(townItems.Count);
+                    foreach (var o in townItems) now.Add(o != null ? o.IdString : "?");
+                    Log.Info(head + "WLACZONY (Town Menu Tidy) | przeniesione " + picked.Count + " z " + Plan.Length + " w planie: " + moved
+                             + " | wejscia podmenu wpiete " + hubsIn + " (miejsce dawnego 'Enter smithy' " + (anchor >= 0 ? "index " + anchor : "BRAK - przed Wait/Leave") + ")"
+                             + " | nie znaleziono cudzych " + missForeign.Count + (missForeign.Count > 0 ? " [" + string.Join(", ", missForeign.ToArray()) + "]" : "")
+                             + ", naszych " + missOurs.Count + (missOurs.Count > 0 ? " [" + string.Join(", ", missOurs.ToArray()) + "]" : "")
+                             + (kept > 0 ? " | zostalo w miescie (brak podmenu town_backstreet) " + kept : "")
+                             + pinnedNote
+                             + " | menu miasta teraz " + now.Count + " opcji: " + string.Join(", ", now.ToArray()));
+                }
+                catch (Exception e) { Stumble("linia startu", e); }
             }
             catch (Exception e)
             {
-                // blad przed zmiana menu miasta (przygotowanie) - menu jak dotad
-                _on = false; _where.Clear();
+                // blad przed zmiana menu miasta (przygotowanie) - menu jak dotad. Po zatwierdzeniu stanu nie ruszamy (wejscia musza zostac).
+                if (!committed) { _on = false; _where.Clear(); }
                 Stumble("Apply", e);
-                Log.Info(head + "BLAD przed przenoszeniem (" + e.Message + ") - menu miasta jak dotad, nic nie przeniesione.");
+                Log.Info(head + (committed
+                    ? "BLAD po przeniesieniu (" + e.Message + ") - przeniesienie zostaje, wejscia podmenu dzialaja."
+                    : "BLAD przed przenoszeniem (" + e.Message + ") - menu miasta jak dotad, nic nie przeniesione."));
             }
         }
 
-        private static Hub HubOf(string menu)
+        private static Hub HubOf(Hub[] hubs, string menu)
         {
-            foreach (var h in _hubs) if (h.Menu == menu) return h;
+            foreach (var h in hubs) if (h.Menu == menu) return h;
             throw new InvalidOperationException("nieznane podmenu " + menu);
         }
 
