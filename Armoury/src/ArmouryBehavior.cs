@@ -752,6 +752,9 @@ namespace Armoury
         // p6-szubienice (R3-07a): szubienice przy rozstajach od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-handel)
         private readonly bool _p6SzubieniceReset = P6SzubieniceReset();
         private static bool P6SzubieniceReset() { try { Gallows.Reset(); } catch (Exception e) { Log.Error("P6SzubieniceReset", e); } return true; }
+        // p6-sztormy (R3-05d): liczniki zimowych sztormow i lista burz od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-urodzaj)
+        private readonly bool _p6SztormyReset = P6SztormyReset();
+        private static bool P6SztormyReset() { try { SeaStorms.Reset(); } catch (Exception e) { Log.Error("P6SztormyReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1615,6 +1618,8 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MapRoads.Hourly", delegate { try { MapRoads.Hourly(); } catch (Exception e) { Log.Error("MapRoads.Hourly", e); } }));
             // p5-bloto (R3-07c): spis partio-godzin w deszczu i w blocie w dobach pomiaru (LogGate.Today; tylko log)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MapMud.Hourly", delegate { try { MapMud.Hourly(); } catch (Exception e) { Log.Error("MapMud.Hourly", e); } }));
+            // p6-sztormy (R3-05d): pora roku i lista burz NavalDLC do pamieci (mnoznik zimy), burze godziny; spis statkow w burzy w dobach pomiaru (LogGate.Today)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SeaStorms.Hourly", delegate { try { SeaStorms.Hourly(); } catch (Exception e) { Log.Error("SeaStorms.Hourly", e); } }));
             // E8/Q (262): straz przeprawy zawraca wrogie partie lordow AI raz na godzine gry, niezaleznie od gracza (wylacznik CrossingLawAiClock). Rejestracja PRZED
             // probka E7/B = wolanie PO niej (gra dopisuje sluchacza na poczatek listy - MbEvent): licznik przejsc widzi przerwy sprzed rozkazu tej godziny
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CrossingLaw.AiHourly", delegate { try { CrossingLaw.AiHourly(); } catch (Exception e) { Log.Error("CrossingLaw.AiHourly", e); } }));
@@ -2134,6 +2139,7 @@ namespace Armoury
             try { MapRoads.SessionStart(); } catch (Exception e) { Log.Error("MapRoads.SessionStart", e); }   // SW-DROGI (noc 17/18.10): plik drog ROT do siatki, pamiec partii od zera, linia "Drogi (DR): start sesji" - PO McmSettings.Apply
             try { MapMud.SessionStart(); } catch (Exception e) { Log.Error("MapMud.SessionStart", e); }   // p5-bloto (R3-07c): linia "Bloto (BL): start sesji" - PO MapRoads.SessionStart (siatka drog)
             try { Gallows.SessionStart(); } catch (Exception e) { Log.Error("Gallows.SessionStart", e); }   // p6-szubienice (R3-07a): trakty z pliku drog, przeterminowane z zapisu, linia "Szubienice (p6): start sesji"
+            try { SeaStorms.SessionStart(); } catch (Exception e) { Log.Error("SeaStorms.SessionStart", e); }   // p6-sztormy (R3-05d): linia "Sztormy (MS): start sesji" - pora, lista burz, mnoznik zimy
             try { MapSideRoads.SessionStart(); } catch (Exception e) { Log.Error("MapSideRoads.SessionStart", e); }   // f11-drogi: linia "Drogi boczne (f11): wylaczone / wlaczone" i plik-przelacznik autotestu od nowa - PO McmSettings.Apply
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
@@ -2796,6 +2802,7 @@ namespace Armoury
             try { MapRoads.Daily(); } catch (Exception e) { Log.Error("MapRoads.Daily", e); } DayProfile.Lap("MapRoads.Daily");   // SW-DROGI (noc 17/18.10): linia "Drogi (DR): dzien N" (spis, audyt premii, koszt) w dobie linii (tylko log)
             try { MapMud.Daily(); } catch (Exception e) { Log.Error("MapMud.Daily", e); } DayProfile.Lap("MapMud.Daily");   // p5-bloto (R3-07c): linia "Bloto (BL): dzien N" (spis deszczu i blota, audyt kary, koszt) w dobie linii (tylko log)
             try { Gallows.Daily(); } catch (Exception e) { Log.Error("Gallows.Daily", e); } DayProfile.Lap("Gallows.Daily");   // p6-szubienice (R3-07a): koniec czasu szubienic, linia "Szubienice (p6): dzien N" w dobie linii
+            try { SeaStorms.Daily(); } catch (Exception e) { Log.Error("SeaStorms.Daily", e); } DayProfile.Lap("SeaStorms.Daily");   // p6-sztormy (R3-05d): linia "Sztormy (MS): dzien N" (burze, statki w burzy, zima / poza zima, audyt kary) w dobie linii (tylko log)
             try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); } DayProfile.Lap("TwinsCrossing.Daily");   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
             try { CrossingLaw.Daily(); } catch (Exception e) { Log.Error("CrossingLaw.Daily", e); } DayProfile.Lap("CrossingLaw.Daily");   // E8/Q (262): linia "Straz przeprawy (E8/Q)" i zerowanie licznikow doby - PO linii E7/B (jej dopisek czyta te same liczniki)
             try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow

@@ -163,7 +163,7 @@ namespace Armoury
                 if (castle == null || market == null || lines == null || lines.Count == 0) return;
                 var s = Settings.Current;
                 double perDay = Math.Max(1.0, MarketCarts.PerDay(s));
-                int days = Math.Max(1, (int)Math.Ceiling(Math.Max(0f, dist) / perDay));
+                int days = Math.Max(1, (int)Math.Ceiling(Math.Max(0f, dist) / perDay)) + SeaStorms.CartDays(SeaStorms.CCastle, false, market, castle);   // p6-sztormy (recenzja): zima przez morze - czekanie w porcie
                 int today = Today();
                 var o = new Order { Castle = castle, Market = market, PayerClan = payer, FactionAtOrder = castle.MapFaction, DayOrdered = today, DayDue = today + days, Paid = paid,
                                     PursePaid = Math.Max(0, Math.Min(paid, pursePaid)) };

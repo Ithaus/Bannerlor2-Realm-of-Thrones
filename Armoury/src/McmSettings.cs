@@ -1888,6 +1888,26 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MapMudWetSpeedPercent { get; set; } = 7.5f;
 
+        [SettingPropertyBool("Sea Storm Winter", HintText = "winter storms at sea: while it is winter in Westeros, storms are born on the open sea (War Sails) Sea Storm Winter Factor times as often and that many times more of them can rage at once (12 instead of 6). Each storm is as strong and lasts as long as before: ships caught in it still take damage and see less, and the AI still steers clear of it. When winter ends, no new storms are added until fewer than 6 remain. Off = as many storms in winter as in summer, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormWinter { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sea Storm Winter Factor", 1.00f, 2.30f, "0.00", HintText = "in winter: how many times more often storms are born at sea, and how many times more of them can rage at once (2 = twice, 12 storms instead of 6; 1 = as in summer; at most 2.3 - 14 storms)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SeaStormWinterFactor { get; set; } = 2f;
+
+        [SettingPropertyBool("Sea Storm Slows Ships", HintText = "ships caught in a storm at sea sail slower by Sea Storm Ship Speed Percent - yours, the lords', caravans, pirates alike ('Storm' line in the speed tooltip), in every season. The storm's strong wind still drives on a ship that runs before it. A storm only slows ships down, it never stops them. Off = storms do not slow ships, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormSlowsShips { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sea Storm Ship Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much slower a ship sails inside a storm at sea, in percent of its speed (15 = -15%; at most 50)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SeaStormShipSpeedPercent { get; set; } = 15f;
+
+        [SettingPropertyBool("Sea Storm Winter Carts", HintText = "winter sea crossings for goods: while there are more storms at sea in winter (Sea Storm Winter), every load of goods that crosses the sea - food for the islands, smithing materials, merchants' wares, castle supplies, wood for bloomeries - waits in port for a weather window and arrives later (1 extra day at Winter Factor 2). Goods are never lost and no route is closed. Off = sea loads take as long in winter as in summer, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormWinterCarts { get; set; } = true;
+
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool MaterialLawEnabled { get; set; } = true;
@@ -8923,6 +8943,11 @@ namespace Armoury
             s.MapMudSpeedPenalty = MapMudSpeedPenalty;
             s.MapMudSpeedPercent = MapMudSpeedPercent;
             s.MapMudWetSpeedPercent = MapMudWetSpeedPercent;
+            s.SeaStormWinter = SeaStormWinter;
+            s.SeaStormWinterFactor = SeaStormWinterFactor;
+            s.SeaStormSlowsShips = SeaStormSlowsShips;
+            s.SeaStormShipSpeedPercent = SeaStormShipSpeedPercent;
+            s.SeaStormWinterCarts = SeaStormWinterCarts;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;
