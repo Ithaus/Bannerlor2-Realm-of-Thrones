@@ -45,6 +45,7 @@ rynsztunek w "limbo" (`_storedGear`, poza swiatem) z odkupem / paserem / zwrotem
   flaga `_rescuedByForce`) i tylko gdy ksiega wskazuje te sama partie / osade, ktora trzymala gracza w chwili wyjscia (`HolderIfSame`) - sztuka po sztuce
   (ten sam przedmiot i stan, `FindIndexOfElement`) z jukow / zapasu do swojego slotu, a przy zajetym slocie do taboru gracza. Czego juz nie ma - nie ma.
   Ksiega czyszczona zawsze (`finally`). Komunikat po angielsku (odebrane / lup zwyciezcow / zostaje u zdobywcy).
+- Linia startu sesji `Niewola gracza (n20): ...` (stan klucza, czy Armoury UniqueSpoils widac, ksiega z zapisu).
 - `SyncWarGear` (wlasny try) + nowy `SaveText.cs` w RC (kopia drogi zapisu Armoury 161: napis > 8000 znakow w kawalkach; RC nie zalezy od Armoury).
 - `ArmouryBridge.IsUnique` / `UniqueKnown`.
 
@@ -91,6 +92,7 @@ rynsztunek w "limbo" (`_storedGear`, poza swiatem) z odkupem / paserem / zwrotem
 **Test w grze:** autotest 5 dob + bitwy: `bieg-bitwa.ps1 ... -Days 5 -Battles 3 -BattleSec 90 -LoadSave autotest-F-d240 -SwitchWaitSec 720 -Speed 20` - bitwa 3
 autotestu to plan "slaba druzyna -> przegrana / niewola -> ucieczka" (CrashScribe AutotestBattle, Plan Strong/Retreat/Weak), wiec 3 bitwy pokaza pojmanie
 przez bande i wyjscie ucieczka. Bez specjalnego pliku / flagi. W `Modules/RealisticCaptivity/RealisticCaptivity-*.log` biegu:
+- na starcie sesji (kazdy bieg): `Niewola gracza (n20): CaptorTakesArmsAndPurse=True (C4 PlayerLosesLikeAiLord=True; czynne: True), unikaty przez Armoury UniqueSpoils: True, ksiega rynsztunku u zdobywcy z zapisu: 0 szt.`,
 - `Gracz pojmany przez:` -> `Rynsztunek gracza (n20, CaptorTakesArmsAndPurse): N szt. (wartosc ...) -> juki partii <banda>` (N > 0, gdy gracz testu mial sprzet),
 - `Przetrzasnieto juki: ... C4 (PlayerLosesLikeAiLord): zloto -> kiesa partii <banda> (n20 CaptorTakesArmsAndPurse: cale zloto przy sobie; ...)` albo `kiesa pusta (n20`,
 - `Rynsztunek gracza (n20) przy wyjsciu z niewoli (ReleasedAfterEscape): zabrane N szt. -> p:<id>; zostaje u zdobywcy N | w tej sesji pojman 1 ...`,

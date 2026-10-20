@@ -141,6 +141,10 @@ namespace RealisticCaptivity
                 Homes.AnnounceOwned();
                 Dialogs.Add(starter);
                 Log.Info("Sesja wystartowala, dialogi, domy i praca dodane.");
+                // n20-niewola: stan reguly na start sesji (widac w kazdym biegu, takze bez pojmania)
+                Log.Info("Niewola gracza (n20): CaptorTakesArmsAndPurse=" + Settings.Current.CaptorTakesArmsAndPurse + " (C4 PlayerLosesLikeAiLord=" + Settings.Current.PlayerLosesLikeAiLord
+                         + "; czynne: " + (Settings.Current.CaptorTakesArmsAndPurse && Settings.Current.PlayerLosesLikeAiLord) + "), unikaty przez Armoury UniqueSpoils: " + ArmouryBridge.UniqueKnown
+                         + ", ksiega rynsztunku u zdobywcy z zapisu: " + (_warGear != null ? _warGear.Count : 0) + " szt." + (_warGear != null && _warGear.Count > 0 ? " (" + _warGearAt + ")" : ""));
             }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
         }
@@ -340,7 +344,7 @@ namespace RealisticCaptivity
                 if (back > 0)
                     Log.Player("Your captors are broken, and you take back " + back + " pieces of your war gear from their " + (at.StartsWith("s:") ? "stores" : "packs") + "."
                                + (gone > 0 ? " The rest is gone - plunder of the victors, sold or worn." : ""), false);
-                else if (byForce)
+                else if (from != null)
                     Log.Player("Your war gear is no longer with those who held you - the victors took it as plunder, or it was sold.", true);
                 else
                     Log.Player("Your war gear stays with your captors. Win it back, or buy new.", true);
