@@ -7320,6 +7320,10 @@ namespace Armoury
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool FolkCraftWageOnSale { get; set; } = true;
 
+        [SettingPropertyBool("Savings By Need", HintText = "the men put coin by only for kit they have seen on the stalls and could not afford: their savings for better kit (Men Gear Save Days at most) shrink to the mending they owe plus the price of those pieces, and the rest is spent as before - with the sutlers in the field, on food and drink in town. Garrisons spend what they hold beyond that in their own town or castle, at the sutlers' pace. Starts gently over Sutler Ramp Days in a running campaign (off = savings up to Men Gear Save Days, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Coin flow (night 16.10)")]
+        public bool SavingsByNeed { get; set; } = true;
+
         [SettingPropertyBool("Sutlers By Purse", HintText = "the men in the field spend with the sutlers by how full their purse is: the daily share (Sutler Daily Share) times their free coin in days of pay divided by ten, at most three times the share - men with a month of pay to spare spend three times as fast, men with five days half as fast. A company that has bought no kit for two weeks (nothing better on the stalls) keeps at most half of its usual savings for better kit (Men Gear Save Days) - the rest goes to the sutlers in the field or on food and drink in town. Starts gently over Sutler Ramp Days in a running campaign. The coin goes where it went before: the nearest friendly town and village (off = the same share of the free purse every day, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool SutlersByPurse { get; set; } = true;
@@ -10357,6 +10361,7 @@ namespace Armoury
             s.SmithWoodOnScreen = SmithWoodOnScreen;
             s.SelfMendWoodKg = SelfMendWoodKg;
             s.FolkCraftWageOnSale = FolkCraftWageOnSale;
+            s.SavingsByNeed = SavingsByNeed;
             s.SutlersByPurse = SutlersByPurse;
             s.FolkGuardNoMemory = FolkGuardNoMemory;
             s.FolkLoanBeforeGuard = FolkLoanBeforeGuard;

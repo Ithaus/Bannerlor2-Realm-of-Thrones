@@ -45,7 +45,7 @@ namespace Armoury
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
         private static long _dayCamp;          // E5/A3 (163): markietani - wydane w polu (CampTake; odbiorcy w Sutlers)
 
-        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; }
+        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; SavingsByNeed.Reset(); }
 
         internal static string Export()
         {
@@ -107,7 +107,7 @@ namespace Armoury
             try
             {
                 if (mp == null) return;
-                AiWear.Forget(mp); AiGear.Forget(mp); MenUpgrade.Forget(mp); SetSaved(mp, 0);
+                AiWear.Forget(mp); AiGear.Forget(mp); MenUpgrade.Forget(mp); SetSaved(mp, 0); SavingsByNeed.Forget(mp);   // m96: bez celu oszczedzania
                 int purse = Get(mp);
                 if (purse <= 0) return;
                 Take(mp, purse);
@@ -301,6 +301,7 @@ namespace Armoury
                 {
                     var s = Settings.Current;
                     long cap = (long)Math.Max(0, s.MenGearSaveDays) * MenWage(mp);   // CW (recenzja): bez zoldu bohaterow rodu - ich zold do sakiewki ludzi nie idzie
+                    cap = SavingsByNeed.Cap(mp, cap, reserve);   // m96 (SavingsByNeed): najwyzej naprawy + cel oszczedzania (sprzet widziany, na ktory nie bylo ich stac)
                     int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - reserve));
                     kept = Math.Min(Math.Min(SavedOf(mp), avail), room);      // dawne oszczednosci: nie wiecej, niz jest w sakiewce i niz limit
                     int want = (int)((long)(avail - kept) * Math.Max(0, Math.Min(100, s.MenGearSavePercent)) / 100);
@@ -503,6 +504,7 @@ namespace Armoury
             int avail = (int)Math.Max(0L, purse - res);
             long cap = (long)Math.Max(0, s.MenGearSaveDays) * MenWage(mp);   // CW (recenzja): bez zoldu bohaterow rodu - ich zold do sakiewki ludzi nie idzie
             if (capShare < 1f) cap = (long)(cap * (double)Math.Max(0f, capShare));
+            cap = SavingsByNeed.Cap(mp, cap, mend);   // m96 (SavingsByNeed): ta sama regula co OnLeft - w polu chronione najwyzej naprawy + cel
             int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - mend));
             kept = Math.Min(Math.Min(SavedOf(mp), avail), room);
         }
