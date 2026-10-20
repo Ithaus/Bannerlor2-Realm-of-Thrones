@@ -39,7 +39,8 @@ EnsureHooks w OnSessionLaunched, Daily w bloku pieniadza po `TownFolk.FirewoodDa
    gdy nie ma nic ani w spichlerzu, ani na targu.
 7. **Werbunek zalogi (regresja zdjetego skladnika).** Gra dobiera zalodze ludzi tylko przy `FoodChange > 0` (`GarrisonRecruitmentCampaignBehavior
    .CanSettlementAutoRecruit`). Dotad skladnik wsi trzymal bilans prawie kazdego miasta na plusie; teraz miasto z pelnym spichlerzem i ujemnym bilansem
-   przestaloby werbowac. Tylko w tym tescie bilans miasta bez niedoboru nie spada ponizej +0.01; miasto w niedoborze nie werbuje (jak w grze przy braku jedzenia).
+   przestaloby werbowac. Tylko w tym tescie (prefiks/finalizer wpiety przy starcie gry, zanim JIT moglby wkleic te mala metode do wolajacego) bilans miasta bez niedoboru
+   nie spada ponizej +0.01; miasto w niedoborze nie werbuje (jak w grze przy braku jedzenia).
 8. **Linia logu co dobe** `Spichlerz miejski (p6): dzien N | ...`: zboze ze wsi do miast (szt./d Food i racje), zloto miasto->wies i cena, miasta w niedoborze,
    skladnik zdjety, miasta z bilansem < -3 (i bez oblezenia), miasta glodujace (Food 0, i bez oblezenia), BE (testy, oslony, glod BE bez jedzenia), werbunek
    zalogi, kontrola, potkniecia, czas. Start sesji: klucz, Famine, latki, BE, zaloga.

@@ -50992,8 +50992,8 @@ def p6spichlerz_main(logp):
             + (f" (np. {bad[0][:160]})" if bad else ""), "linie doby czytelne (0 nieczytelnych)", not bad)
     if boots:
         b = boots[-1]
-        ok = "bilans jedzenia miasta wpiety" in b and "Town.DailyTick wpiety" in b and "BRAK: -." in b
-        rep.add("SP-1: latki przy starcie gry (ostatni start)", b[len(P6SPICHLERZ_HEAD):][:200], "bilans miasta i Town.DailyTick wpiete, BRAK: -", ok)
+        ok = "bilans jedzenia miasta wpiety" in b and "Town.DailyTick wpiety" in b and "werbunek zalogi wpiety" in b and "BRAK: -." in b
+        rep.add("SP-1: latki przy starcie gry (ostatni start)", b[len(P6SPICHLERZ_HEAD):][:200], "bilans miasta, Town.DailyTick i werbunek zalogi wpiete, BRAK: -", ok)
     else:
         rep.add("SP-1: latki przy starcie gry", "brak linii", "jest w kazdym starcie gry z galezia", False)
     if starts:

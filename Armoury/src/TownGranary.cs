@@ -118,7 +118,7 @@ namespace Armoury
         private static string F(double v, string f) { return double.IsNaN(v) || double.IsInfinity(v) ? "-" : v.ToString(f, Inv); }
 
         // ------------------------------------------------------------ wpiecie
-        /// <summary>SubModuleMain (start gry): postfiks bazowego modelu jedzenia warowni i prefiks/finalizer Town.DailyTick - typy gry. Raz na proces.</summary>
+        /// <summary>SubModuleMain (start gry): postfiks bazowego modelu jedzenia warowni, prefiks/finalizer Town.DailyTick i CanSettlementAutoRecruit - typy gry. Raz na proces.</summary>
         internal static void ApplyAll(Harmony h)
         {
             _h = h;
@@ -146,8 +146,23 @@ namespace Armoury
                 else missing = (missing == "-" ? "" : missing + ", ") + "Town.DailyTick";
             }
             catch (Exception e) { missing = (missing == "-" ? "" : missing + ", ") + "Town.DailyTick (" + e.GetType().Name + ")"; Log.Error("TownGranary.ApplyAll(tick)", e); }
+            try
+            {
+                // werbunek zalogi gry (pkt 6) - przy starcie gry, zanim kod kampanii sie skompiluje (mala metoda prywatna - wpieta przed pierwszym wywolaniem,
+                // zeby JIT nie wkleil oryginalu do wolajacego; precedens: ArmsFromPeople.ApplyAll latki tej samej klasy przy starcie)
+                var g = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.GarrisonRecruitmentCampaignBehavior), "CanSettlementAutoRecruit", new[] { typeof(Settlement) });
+                if (g == null) { _garWhy = "BRAK (GarrisonRecruitmentCampaignBehavior.CanSettlementAutoRecruit)"; missing = (missing == "-" ? "" : missing + ", ") + "CanSettlementAutoRecruit"; }
+                else
+                {
+                    h.Patch(g, prefix: new HarmonyMethod(typeof(TownGranary), nameof(GarPre)) { priority = Priority.First },
+                               finalizer: new HarmonyMethod(typeof(TownGranary), nameof(GarFin)));
+                    _garPatched = true;
+                    _garWhy = "wpiety (CanSettlementAutoRecruit)";
+                }
+            }
+            catch (Exception e) { _garWhy = "wyjatek " + e.GetType().Name; missing = (missing == "-" ? "" : missing + ", ") + "CanSettlementAutoRecruit (" + e.GetType().Name + ")"; Log.Error("TownGranary.ApplyAll(zaloga)", e); }
             Log.Info("Spichlerz miejski (p6): latki przy starcie gry - bilans jedzenia miasta " + (_foodPatched ? "wpiety (DefaultSettlementFoodModel, Last)" : "BRAK")
-                     + ", Town.DailyTick " + (_tickPatched ? "wpiety" : "BRAK") + "; BRAK: " + missing + ".");
+                     + ", Town.DailyTick " + (_tickPatched ? "wpiety" : "BRAK") + ", werbunek zalogi " + (_garPatched ? "wpiety" : "BRAK") + "; BRAK: " + missing + ".");
         }
 
         /// <summary>ArmouryBehavior.OnSessionLaunched: bezpiecznik BetterEconomy (typ BE moze ladowac sie po Armoury - dopiero w kampanii), raz na proces; linia startu.</summary>
@@ -173,20 +188,6 @@ namespace Armoury
                     _beThrField = ts != null ? AccessTools.Field(ts, "StarvationFoodChangeThreshold") : null;
                 }
                 catch (Exception e) { _beWhy = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks(BE)", e); }
-                try
-                {
-                    // werbunek zalogi gry (pkt 6) - typ gry, ale w kampanii (jak BE): bez kompilacji klasy przy starcie gry
-                    var g = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.GarrisonRecruitmentCampaignBehavior), "CanSettlementAutoRecruit", new[] { typeof(Settlement) });
-                    if (g == null) _garWhy = "BRAK (GarrisonRecruitmentCampaignBehavior.CanSettlementAutoRecruit)";
-                    else
-                    {
-                        _h.Patch(g, prefix: new HarmonyMethod(typeof(TownGranary), nameof(GarPre)) { priority = Priority.First },
-                                    finalizer: new HarmonyMethod(typeof(TownGranary), nameof(GarFin)));
-                        _garPatched = true;
-                        _garWhy = "wpiety (CanSettlementAutoRecruit)";
-                    }
-                }
-                catch (Exception e) { _garWhy = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks(zaloga)", e); }
             }
             ReadBeThr();
             var s = Settings.Current;
