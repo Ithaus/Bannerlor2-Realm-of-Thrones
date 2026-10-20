@@ -59,7 +59,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki od ostatniej linii (Daily)
         private static int _cN, _cNoPart, _cPeaceN, _cRemitRaid, _cRemitSiege, _cRemitFam, _cTiNoList, _cTiNoPriest, _cTiNoMarket;
-        private static long _cHanded, _cPart, _cLord, _cTithe, _cAlms, _cWage, _cMat, _cTiStay, _cCrown, _cWorks;
+        private static long _cHanded, _cPart, _cLord, _cTithe, _cAlms, _cWage, _cMat, _cTiStay, _cCrown, _cWorks, _cSide;
         private static int _sN, _sRemit; private static long _sBase, _sCrown;
         private static int _iN; private static long _iBase, _iCrown;                            // sw-zajazdy (recenzja): czesc z tego - noclegi w zajazdach przy szlakach (WarShareSutlers inn)
         private static int _rN, _rRemitN, _rRemitRaid, _rRemitSiege, _rRemitFam, _rForgivenN;
@@ -75,7 +75,7 @@ namespace Armoury
         private static void ClearCounters()
         {
             _cN = _cNoPart = _cPeaceN = _cRemitRaid = _cRemitSiege = _cRemitFam = _cTiNoList = _cTiNoPriest = _cTiNoMarket = 0;
-            _cHanded = _cPart = _cLord = _cTithe = _cAlms = _cWage = _cMat = _cTiStay = _cCrown = _cWorks = 0;
+            _cHanded = _cPart = _cLord = _cTithe = _cAlms = _cWage = _cMat = _cTiStay = _cCrown = _cWorks = _cSide = 0;
             _sN = _sRemit = 0; _sBase = _sCrown = 0;
             _iN = 0; _iBase = _iCrown = 0;
             _rN = _rRemitN = _rRemitRaid = _rRemitSiege = _rRemitFam = _rForgivenN = 0;
@@ -339,7 +339,7 @@ namespace Armoury
         /// gotowka oddana przez woz. Dziesiecina 5% handed (najwyzej part), potem udzial korony g/10 x Ramp od (part - dziesiecina). Przesuniecie okna ksiegi pieniadza
         /// (MoneyLedger.CartDuesInWindow - "kiesa wsi z utargu" brutto) i pozycja "daniny wsi przy wozie (DS)" w "Przeplywy osad (przyczyny)". Nie rzuca.
         /// </summary>
-        internal static void DuesAtCart(MobileParty cart, Village home, long part, int handed, long works = 0)
+        internal static void DuesAtCart(MobileParty cart, Village home, long part, int handed, long works = 0, long side = 0)
         {
             try
             {
@@ -351,7 +351,9 @@ namespace Armoury
                 // recenzja calosci (noc 17/18.10): wyplata prac okregu (DistrictWorks - licznik pana + kiesa wsi, przed ta danina) osobno, nie jako udzial pana. Dziesiecina zostaje
                 // od calego utargu `handed` (jak dla udzialu pana: placi wies, najwyzej `part`), udzial korony W4 - od czesci wsi netto - te same reguly dla pana i inwestora
                 long wk = Math.Max(0, Math.Min(works, (long)handed));
-                _cPart += part; _cWorks += wk; _cLord += Math.Max(0, handed - part - wk);
+                // przeglad calosci 20.10: udzial wioski pobocznej gracza (SideVillageFief.AtCart - z licznika pana w tym oknie) tez osobno, nie jako udzial pana
+                long sd = Math.Max(0, Math.Min(side, Math.Max(0, (long)handed - part - wk)));
+                _cPart += part; _cWorks += wk; _cSide += sd; _cLord += Math.Max(0, handed - part - wk - sd);
                 // W2 dziesiecina: polowa jalmuzna zostaje w kiesie, budowa septow - z kiesy do ludu i kasy miasta targowego
                 long alms, wage, mat, tOut, tIn; int state;
                 long tithe = TownFolk.TitheVillageAtCart(home, handed, part, out alms, out wage, out mat, out tOut, out tIn, out state);
@@ -773,6 +775,7 @@ namespace Armoury
                   .Append(" | wozy: powrotow ").Append(_cN).Append(", oddane ").Append(_cHanded).Append(", pan i majatki (bez zmian) ").Append(_cLord).Append(", czesc wsi ").Append(_cPart)
                   .Append(" (bez przyrostu kiesy ").Append(_cNoPart).Append(")")
                   .Append(_cWorks > 0 ? ", prace okregu (inwestorom) " + _cWorks : "")
+                  .Append(_cSide > 0 ? ", wioska gracza (z udzialu pana) " + _cSide : "")
                   .Append(", dziesiecina ").Append(_cTithe).Append(" (przez kaplanow ").Append(tithePriest).Append(": jalmuzna ").Append(_cAlms).Append(", septy ").Append(_cWage + _cMat)
                   .Append(" = place ludu ").Append(_cWage).Append(" + material ").Append(_cMat).Append("; zostalo w kiesach ").Append(_cTiStay)
                   .Append(" - bez kaplana ").Append(_cTiNoPriest).Append(" wozow, bez miasta targowego ").Append(_cTiNoMarket).Append("; pominieta bez listy kaplanow doby ").Append(_cTiNoList).Append(" wozow)")

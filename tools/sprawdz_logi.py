@@ -29312,11 +29312,15 @@ def nceny_main(logp):
                 dst += int(m4.group(1))
         med = lambda l: sorted(l)[len(l) // 2] if l else None
         H, B, R = med(hs), med(ours), med(rs)
-        rep.add("NC-21: towarzysze - linia doby (wedrowcy, nasza cena, nasza/BK)", f"dob {len(cd)}: wedrowcy mediana {H}, nasza cena mediana {B}, nasza/BK mediana {R}; potkniecia {dst}, ERROR {errs.get('CompanionPay', 0)}",
-                "wedrowcy >= 10, nasza > 0, nasza/BK 0.1-0.6, 0 / 0",
-                (H is not None and H >= 10 and B is not None and B > 0 and R is not None and 0.1 <= R <= 0.6 and dst == 0 and errs.get("CompanionPay", 0) == 0) if cd else None)
+        # przeglad calosci 20.10: przy CompanionWageByLevel (dopisek CW w linii doby) cena = 20 dni zoldu z tabeli wedlug poziomu (poz. 19 = 23 d), nie zoldu BK
+        # (ok. 99 d) - nasza/BK spada do ok. 0.05; prog dolny wtedy 0.02
+        cw = any("zold wedlug poziomu tak" in s for s in cd.values())
+        rlo = 0.02 if cw else 0.1
+        rep.add("NC-21: towarzysze - linia doby (wedrowcy, nasza cena, nasza/BK)", f"dob {len(cd)}: wedrowcy mediana {H}, nasza cena mediana {B}, nasza/BK mediana {R}{' (zold wedlug poziomu CW)' if cw else ''}; potkniecia {dst}, ERROR {errs.get('CompanionPay', 0)}",
+                f"wedrowcy >= 10, nasza > 0, nasza/BK {rlo}-0.6, 0 / 0",
+                (H is not None and H >= 10 and B is not None and B > 0 and R is not None and rlo <= R <= 0.6 and dst == 0 and errs.get("CompanionPay", 0) == 0) if cd else None)
         rep.add("NC-22: towarzysze - zold i poziom (INFO), czas linii doby", f"zold/d mediana {med(ws)}, poziom mediana {med(lv)}, czas linii doby najwiecej {max(mss) if mss else '-'} ms",
-                "INFO (postac ROT ok. 90 d/d; czas < 100 ms)", None)
+                "INFO (" + ("zold z tabeli CW wedlug poziomu, poz. 19 = 23 d" if cw else "postac ROT ok. 90 d/d") + "; czas < 100 ms)", None)
     rep.show()
     return 0
 

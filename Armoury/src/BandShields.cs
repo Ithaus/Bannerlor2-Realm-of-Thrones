@@ -280,9 +280,62 @@ namespace Armoury
                             var mf = p.MapFaction;
                             if (mf != null && !mf.IsBanditFaction) AddFriend(mf.Banner);
                         }
+                    try { DrFriends(m, me.PlayerSide); } catch (Exception e) { Stumble("Begin(odsiecz DR)", e); }
                 }
             }
             catch (Exception e) { Stumble("Begin(strona gracza)", e); }
+        }
+
+        // przeglad calosci 20.10: odsiecz DynamicReinforcements wchodzi do MapEvent dopiero przy spawnie (SpawnManager.TryJoinMapEvent), czyli po
+        // pierwszym wyborze herbu - a jej kandydaci (gospodarze wsi, panowie warowni w poblizu) to ci sami, ktorych herby bandy "kradna". Kandydatow DR
+        // liczy BattleStateBehavior.AfterStart (PartyScanner.Scan + Evaluate -> Candidates), czyli przed spawnem ludzi (DefaultBattleMissionAgentSpawnLogic
+        // spawnuje dopiero w OnMissionTick). Przyjeci kandydaci po stronie gracza - tez "strona gracza w tej bitwie". Bez DR - nic.
+        private static Type _drType;
+        private static System.Reflection.PropertyInfo _drCand;
+        private static System.Reflection.FieldInfo _drAcc, _drSide, _drParty, _drSett, _drFac, _drLead;
+        private static bool _drLooked;
+        private static int _friendDr;
+
+        private static void DrFriends(Mission m, BattleSideEnum side)
+        {
+            if (m == null || side == BattleSideEnum.None) return;
+            if (!_drLooked)
+            {
+                _drLooked = true;
+                _drType = AccessTools.TypeByName("DynamicReinforcements.Battle.BattleStateBehavior");
+                _drCand = _drType != null ? AccessTools.Property(_drType, "Candidates") : null;
+                var ct = AccessTools.TypeByName("DynamicReinforcements.Scanning.ReinforcementCandidate");
+                if (ct != null)
+                {
+                    _drAcc = AccessTools.Field(ct, "Accepted"); _drSide = AccessTools.Field(ct, "Side"); _drParty = AccessTools.Field(ct, "Party");
+                    _drSett = AccessTools.Field(ct, "Settlement"); _drFac = AccessTools.Field(ct, "Faction"); _drLead = AccessTools.Field(ct, "Leader");
+                }
+            }
+            if (_drType == null || _drCand == null || _drAcc == null || _drSide == null) return;
+            var mbs = m.MissionBehaviors;
+            if (mbs == null) return;
+            foreach (var mb in mbs)
+            {
+                if (mb == null || !_drType.IsInstanceOfType(mb)) continue;
+                var list = _drCand.GetValue(mb, null) as System.Collections.IEnumerable;
+                if (list == null) return;
+                foreach (var c in list)
+                {
+                    if (c == null || !(_drAcc.GetValue(c) is bool acc) || !acc) continue;
+                    var sv = _drSide.GetValue(c);
+                    if (!(sv is BattleSideEnum) || (BattleSideEnum)sv != side) continue;
+                    _friendDr++;
+                    var lead = _drLead != null ? _drLead.GetValue(c) as Hero : null;
+                    if (lead != null) { AddFriend(lead.ClanBanner); if (lead.Clan != null) AddFriend(lead.Clan.Banner); }
+                    var mp = _drParty != null ? _drParty.GetValue(c) as MobileParty : null;
+                    if (mp != null && mp.ActualClan != null) AddFriend(mp.ActualClan.Banner);
+                    var st = _drSett != null ? _drSett.GetValue(c) as Settlement : null;
+                    if (st != null && st.OwnerClan != null) AddFriend(st.OwnerClan.Banner);
+                    var fac = _drFac != null ? _drFac.GetValue(c) as IFaction : null;
+                    if (fac != null && !fac.IsBanditFaction) AddFriend(fac.Banner);
+                }
+                return;
+            }
         }
 
         private static void AddFriend(Banner b)
@@ -298,7 +351,7 @@ namespace Armoury
             _arms.Clear(); _realm.Clear(); _codes.Clear(); _byHouse.Clear(); _friendCodes.Clear();
             lock (_gate) _chosen.Clear();
             Array.Clear(_kind, 0, _kind.Length);
-            _men = _heroes = _none = _ready = _skipUndead = _stMission = _seedless = _friendParties = 0;
+            _men = _heroes = _none = _ready = _skipUndead = _stMission = _seedless = _friendParties = _friendDr = 0;
             Interlocked.Exchange(ref _originHits, 0);
             _loggedMen = -1;
         }
@@ -593,7 +646,7 @@ namespace Armoury
                     sb.Append(" | nakradzione (gospodarze 3 najblizszych wsi i panowie 3 najblizszych warowni) ").Append(_kind[KStolen]);
                     sb.Append(" | bez herbu do wyboru ").Append(_none).Append(" (herb bandy zostal)");
                     sb.Append(" | herb pochodzenia (tuniki z herbem, znaczniki, pociski) podmieniony ").Append(Volatile.Read(ref _originHits)).Append(" razy");
-                    sb.Append(" | wykluczone herby strony gracza ").Append(_friendCodes.Count).Append(" (partii ").Append(_friendParties).Append(')');
+                    sb.Append(" | wykluczone herby strony gracza ").Append(_friendCodes.Count).Append(" (partii ").Append(_friendParties).Append(", odsiecz DR po stronie gracza ").Append(_friendDr).Append(')');
                     sb.Append(" | z gotowa bronia innego moda ").Append(_ready).Append(" | pominieci Inni ").Append(_skipUndead);
                     if (_byHouse.Count > 0)
                     {

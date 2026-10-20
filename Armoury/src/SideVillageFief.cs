@@ -343,33 +343,34 @@ namespace Armoury
 
         // ============================================================ W3: dochod przy wozie
         /// <summary>VillageTakings.EnterPostfix (woz wrocil do wsi macierzystej; po 112, F4b i pracach okregu): udzial wioski gracza w podatku pana z tego okna.</summary>
-        internal static void AtCart(MobileParty cart, Village home, long taxInWindow)
+        internal static long AtCart(MobileParty cart, Village home, long taxInWindow)
         {
-            if (!HasFief || home == null || home.Settlement == null || taxInWindow <= 0) return;
+            if (!HasFief || home == null || home.Settlement == null || taxInWindow <= 0) return 0;
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.SideVillageFiefIncome) return;
-                if (!string.Equals(home.Settlement.StringId, _dist, StringComparison.Ordinal)) return;
+                if (s == null || !s.SideVillageFiefIncome) return 0;
+                if (!string.Equals(home.Settlement.StringId, _dist, StringComparison.Ordinal)) return 0;
                 _dCarts++;
                 var lord = home.Bound != null ? home.Bound.OwnerClan : null;
-                if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) { _dSelf++; return; }   // gracz panem okregu - podatek i tak jest jego
+                if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) { _dSelf++; return 0; }   // gracz panem okregu - podatek i tak jest jego
                 var me = Hero.MainHero;
-                if (me == null || !me.IsAlive) return;
+                if (me == null || !me.IsAlive) return 0;
                 IFaction mf = Clan.PlayerClan.MapFaction, df = home.Settlement.MapFaction;
-                if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { _dWar++; return; }
+                if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { _dWar++; return 0; }
                 double share = ShareOf(home);
-                if (!(share > 0)) { _dNoShare++; return; }
+                if (!(share > 0)) { _dNoShare++; return 0; }
                 long want = (long)Math.Floor(share * taxInWindow);
                 want = Math.Min(want, Math.Max(0, home.TradeTaxAccumulated));
                 _dTax += taxInWindow;
-                if (want < 1) return;
+                if (want < 1) return 0;
                 home.TradeTaxAccumulated -= (int)want;                       // licznik pana -> kiesa gracza (jak wyplata prac okregu)
                 me.ChangeHeroGold((int)want);
                 MoneyLedger.CartWorksInWindow(cart, 0, (int)want);            // okno powrotu wozu w ksiedze pieniadza: to nie "zniklo"
                 _dPaid += want; _paidAll += want;
+                return want;
             }
-            catch (Exception e) { Stumble("AtCart", e); }
+            catch (Exception e) { Stumble("AtCart", e); return 0; }
         }
 
         /// <summary>Udzial wioski gracza w wartosci dnia produkcji okregu (VillageCrafts.PartsOf - te same wartosci co okno prac); raz na dobe. Zapas - udzial ludzi w domu.</summary>

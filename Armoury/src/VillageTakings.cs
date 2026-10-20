@@ -235,8 +235,8 @@ namespace Armoury
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
-            SideFief(__state);                               // n20-wioska: udzial wioski pobocznej gracza w podatku pana z tego okna (licznik pana -> gracz; po pracach okregu, przed danina DS)
-            DsDues(__state, works);
+            long side = SideFief(__state);                   // n20-wioska: udzial wioski pobocznej gracza w podatku pana z tego okna (licznik pana -> gracz; po pracach okregu, przed danina DS)
+            DsDues(__state, works, side);
             F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
             CartCsv(__state);                                // f14-wsie: utarg wozu wies po wsi do wsie-kiesy.csv (tylko licznik, po wszystkich krokach okna)
         }
@@ -276,7 +276,7 @@ namespace Armoury
         /// zwrot F4b). Udzial pana i majatki (W1) bez zmian. Woz oddajacy utarg w obcej wsi - bez danin (kiesa macierzystej nie urosla). DsVillage.DuesAtCart: dziesiecina
         /// i udzial korony (wlasny try - nie rzuca).
         /// </summary>
-        private static void DsDues(Entry st, long works)
+        private static void DsDues(Entry st, long works, long side)
         {
             try
             {
@@ -284,7 +284,7 @@ namespace Armoury
                 int handed = st.Gold - st.Party.PartyTradeGold;
                 if (handed <= 0) return;
                 long part = (long)st.Home.Gold - st.HomeGold;
-                DsVillage.DuesAtCart(st.Party, st.Home, part, handed, works);
+                DsVillage.DuesAtCart(st.Party, st.Home, part, handed, works, side);
             }
             catch (Exception e) { Stumble("VillageTakings.DsDues", e); }
         }
@@ -306,16 +306,17 @@ namespace Armoury
         }
 
         /// <summary>n20-wioska: woz wrocil do wsi MACIERZYSTEJ - przyrost licznika pana w oknie (BK + 112 - F4b - prace okregu) to podstawa udzialu wioski gracza
-        /// (SideVillageFief.AtCart, wlasny try - nie rzuca). Woz w obcej wsi - nic. Kiesa wsi bez zmian (podstawa daniny DS ta sama).</summary>
-        private static void SideFief(Entry st)
+        /// (SideVillageFief.AtCart, wlasny try - nie rzuca). Woz w obcej wsi - nic. Kiesa wsi bez zmian (podstawa daniny DS ta sama). Zwraca wyplacone graczowi
+        /// (przeglad calosci 20.10: do linii DS osobno, nie jako "pan i majatki").</summary>
+        private static long SideFief(Entry st)
         {
             try
             {
-                if (st == null || st.Here != null || st.Home == null || st.Party == null || !SideVillageFief.HasFief) return;
-                if (st.Gold - st.Party.PartyTradeGold <= 0) return;
-                SideVillageFief.AtCart(st.Party, st.Home, (long)st.Home.TradeTaxAccumulated - st.HomeTax);
+                if (st == null || st.Here != null || st.Home == null || st.Party == null || !SideVillageFief.HasFief) return 0;
+                if (st.Gold - st.Party.PartyTradeGold <= 0) return 0;
+                return Math.Max(0, SideVillageFief.AtCart(st.Party, st.Home, (long)st.Home.TradeTaxAccumulated - st.HomeTax));
             }
-            catch (Exception e) { Stumble("VillageTakings.SideFief", e); }
+            catch (Exception e) { Stumble("VillageTakings.SideFief", e); return 0; }
         }
 
         /// <summary>112 pkt 1 (bez zmian): reszta utargu do kiesy wsi. Zwraca true, gdy okno bylo nasze i krok przeszedl bez wyjatku; estates = wyplaty

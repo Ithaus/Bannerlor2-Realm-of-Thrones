@@ -306,16 +306,20 @@ namespace Armoury
             b.People[0] += b.MenStable;
             // towarzysze (recenzja 16.10): najpierw wlasna kiesa, brak do wybranej jakosci z wolnej sakiewki ludzi, ktora zostala po szeregowych (tam idzie ich zold -
             // SoldierPay wplaca TotalWage druzyny gracza, z zoldem bohaterow, do sakiewki ludzi); nie starcza - najlepsza tansza albo stajnia
+            // przeglad calosci 20.10: przy CompanionWageByLevel zold takiego bohatera idzie do JEGO kiesy (SoldierPay -> CompanionWage.PayFromWage), nie do
+            // sakiewki ludzi - placi wiec tylko z kiesy; kogo nie stac, spi w tanszym lozku albo w stajni, jak zolnierz
             long left = b.MenNoPurse || sacked ? 0 : Math.Max(0, (long)b.MenFree - b.MenCost);
             foreach (var h in b.Comp)
             {
                 bool horse = HasMount(h);
                 int gold = Math.Max(0, h.Gold);
+                bool ownPay = CompanionWage.Applies(h);
+                long reach = ownPay ? 0 : left;
                 int hq = q;
-                if (!sacked) while (hq >= 0 && ManCost(hq, horse) > gold + left) hq--;
+                if (!sacked) while (hq >= 0 && ManCost(hq, horse) > gold + reach) hq--;
                 int cost = ManCost(hq, horse);
                 int fromGold = Math.Min(gold, cost);
-                int fromPurse = sacked ? 0 : cost - fromGold;
+                int fromPurse = sacked || ownPay ? 0 : cost - fromGold;
                 if (sacked) b.CompWaivedSum += cost - fromGold;
                 left -= fromPurse;
                 b.CompQ.Add(hq); b.CompGold.Add(fromGold); b.CompPurse.Add(fromPurse); b.CompCost.Add(fromGold + fromPurse);
@@ -438,7 +442,7 @@ namespace Armoury
                 sb.Append("\nDecent inn - beds, a warm hearth and ale: 2 / 2 / 8. +10% speed, +5 morale, and sleep comes a quarter faster (sleep debt is paid off sooner).");
                 sb.Append("\nGood house - rooms, wine and a bath: 4 / 3 / 20. +12% speed, +8 morale, sleep a quarter faster, the wounded heal half again as fast that night");
                 sb.Append(PriceKey ? ", and after a night there you trade up to 3% better in this town until dusk." : ".");
-                sb.Append("\n\nEvery soldier pays for himself and his horse out of his own purse - they draw their pay for it. A man who cannot afford your choice takes the best cheaper bed he can, or sleeps in the stable for free, as in camp. Companions pay from their own purses first and the rest from the men's purse, where their pay goes. You pay for yourself, your horse and every horse that carries nobody - in the baggage or in the armoury. The men eat from their own wagons, as on the road. The party's rest follows how many slept in each kind of bed.");
+                sb.Append("\n\nEvery soldier pays for himself and his horse out of his own purse - they draw their pay for it. A man who cannot afford your choice takes the best cheaper bed he can, or sleeps in the stable for free, as in camp. " + (CompanionWage.On ? "Companions pay from their own purses, where their pay goes." : "Companions pay from their own purses first and the rest from the men's purse, where their pay goes.") + " You pay for yourself, your horse and every horse that carries nobody - in the baggage or in the armoury. The men eat from their own wagons, as on the road. The party's rest follows how many slept in each kind of bed.");
                 sb.Append("\nTaken from ").Append(HoldFrom()).Append(" on, you sleep until dawn; by day, until the men have slept. You wake rested until dusk, at most 12 hours - unless the men still owe sleep.");
                 var mp = MobileParty.MainParty;
                 if (mp != null && st != null)
