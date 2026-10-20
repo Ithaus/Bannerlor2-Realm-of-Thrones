@@ -4908,6 +4908,10 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public float TroopMendMaxHours { get; set; } = 24f;
 
+        [SettingPropertyBool("Camp Armourer", HintText = "the companion with the best Smithing in your party works as the company armourer: while you camp, besiege or rest outside a town (not on the march, not at night) he mends your men's worn metal kit from the stores - weapons, mail, plate, helms - worst first, slower than a town workshop (more Smithing, quicker hands), with the materials from your baggage (iron, charcoal, leather...) as when you mend it yourself; he learns Smithing only for the hours he really works, at most 100 a day; wrecks and horses are not his work", RequireRestart = false)]
+        [SettingPropertyGroup("The men's gear")]
+        public bool CampArmourer { get; set; } = true;
+
         [SettingPropertyBool("Troop Order Enabled", HintText = "order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks", RequireRestart = false)]
         [SettingPropertyGroup("The men's gear")]
         public bool TroopOrderEnabled { get; set; } = true;
@@ -4931,6 +4935,18 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Mend Loot Hours Per Piece", 0.00f, 2.40f, "0.00", HintText = "hours per battle-worn piece from the bags", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public float MendLootHoursPerPiece { get; set; } = 0.6f;
+
+        [SettingPropertyBool("Mend Hours By Guild", HintText = "a repair in town takes as many working hours as it really would, and the right trade does it: smiths for metal, saddlers for leather and saddles, tailors for cloth and padded coats, bowyers for bows and crossbows, shieldmakers for shields. A lightly worn sword is an hour or two, a battered brigandine about 140 hours, so a big haul of loot takes a day or two; hours spent mending yesterday are missing from that trade's workshop work today. The price of the repair does not change (off = every piece 0.6 hours at the smiths, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendHoursByGuild { get; set; } = true;
+
+        [SettingPropertyBool("Auto Mend Half Guild", HintText = "with Mend Hours By Guild on: the repairs nobody orders by hand - the AI lords' men and your own men paying from their purse - together take at most half of each trade's working hours in a town each day, so the workshops never stand idle and some hands stay free for your own orders (off = they may take every free hour)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AutoMendHalfGuild { get; set; } = true;
+
+        [SettingPropertyBool("Mend Bulk Every Order", HintText = "the bulk rate of the men's racks (Troop Mend Bulk Discount: 0.5% off the work per piece, up to 30%) applies to every repair order in a town: your loot from the bags, a single piece, your men's daily mending and each AI lord's day at the smiths - off the work only, not the materials (off = only on the men's racks, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendBulkEveryOrder { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Mend Material Max Share", 0.00f, 1.00f, "0.00", HintText = "mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials - and of the days of work that made the piece", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
@@ -9494,12 +9510,16 @@ namespace Armoury
             s.TroopMendBulkDiscountPP = TroopMendBulkDiscountPP;
             s.TroopMendBulkDiscountMax = TroopMendBulkDiscountMax;
             s.TroopMendMaxHours = TroopMendMaxHours;
+            s.CampArmourer = CampArmourer;
             s.TroopOrderEnabled = TroopOrderEnabled;
             s.TroopOrderMarkup = TroopOrderMarkup;
             s.TroopOrderFromShelf = TroopOrderFromShelf;
             s.SmithRepairHoursPerPiece = SmithRepairHoursPerPiece;
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
+            s.MendHoursByGuild = MendHoursByGuild;
+            s.AutoMendHalfGuild = AutoMendHalfGuild;
+            s.MendBulkEveryOrder = MendBulkEveryOrder;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;
             s.WrecksToScrap = WrecksToScrap;

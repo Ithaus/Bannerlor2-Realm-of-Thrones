@@ -28,7 +28,7 @@ namespace Armoury
         private static float _bench;
         private static string _benchTown;
 
-        internal static void LeftTown() { _bench = 0f; _benchTown = null; }
+        internal static void LeftTown() { _bench = 0f; _benchTown = null; GuildMend.MenLeftTown(); }
 
         internal static int UnitCost(EquipmentElement ee)   // internal: robocizna kowali miasta - ta sama stawka u kwatermistrza Spoils (SpoilsSeal)
         {
@@ -136,6 +136,7 @@ namespace Armoury
 
         internal static void Hourly()
         {
+            GuildMend.HourTick();   // R3-02 / R3-04c: przelom doby pul cechow + platnerz w taborze (wlasne try)
             try
             {
                 var s = Settings.Current;
@@ -150,6 +151,7 @@ namespace Armoury
                 var worn = MenWorn(armory);   // K1 (przeglad): tylko sztuki ludzi - Twoja czesc kazdego id (najgorsze egzemplarze) pomijana
                 if (worn.Count == 0) { _bench = 0f; return; }
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
+                if (GuildMend.On) { _bench = 0f; GuildMend.MenHourly(main, st, armory, worn); return; }   // R3-02: godziny wedlug cechu i stanu, polowa rak, rabat hurtowy
                 // godziny kowali na godzine: rece miasta x (platnerze + miecznicy) / wszystkie cechy
                 // wpis 91: godziny z WSPOLNEJ puli kowali miasta (dzienny zapas rozlozony na 18 godzin pracy)
                 float hourShare = Math.Min(SmithHours.Available(st.Town), SmithHours.Capacity(st.Town) / Math.Max(1f, s.WorkHoursPerManDay));   // wpis 93: dzien pracy kowala rozlozony na jego godziny

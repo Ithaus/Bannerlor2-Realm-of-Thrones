@@ -533,6 +533,26 @@ namespace Armoury
             return o;
         }
 
+        // R3-02 (GuildMend): godziny zlecenia gracza wedlug cechow (MendHoursByGuild) i rabat hurtowy przy kazdym zleceniu (MendBulkEveryOrder)
+        private static GuildMend.Tally OneTally(EquipmentElement ee) { var t = new GuildMend.Tally(); t.Add(ee, 1); return t; }
+        private static GuildMend.Tally TallyOf(MendMaterial.Order o) { var t = new GuildMend.Tally(); if (o != null) foreach (var j in o.Jobs) t.Add(j.El, j.N); return t; }
+
+        /// <summary>Robocizna lupu z sakw: przy MendBulkEveryOrder po rabacie hurtowym za liczbe sztuk zlecenia (plan bez rabatu), inaczej PieceCost jak dotad.</summary>
+        private static Func<EquipmentElement, int> LootLabor(TaleWorlds.CampaignSystem.Roster.ItemRoster roster)
+        {
+            if (!GuildMend.BulkOn) return PieceCost;
+            int n = PlanRoster(roster, PieceCost, Hero.MainHero.Gold, int.MaxValue).Pieces;
+            return ee => GuildMend.Bulk(PieceCost(ee), n);
+        }
+
+        /// <summary>Dopisek podpowiedzi: ile godzin potrwa zlecenie u cechow miasta ("" przy wylaczonym MendHoursByGuild).</summary>
+        private static string GuildNote(MendMaterial.Order o)
+        {
+            if (!GuildMend.On || o == null || o.Pieces <= 0) return "";
+            var t = TallyOf(o);
+            return " About " + GuildMend.F1(GuildMend.PlayerClock(t, 0f)) + " hours (" + (int)Math.Round(t.Total) + " work-hours of the town's trades)." + GuildMend.BulkEn(o.Pieces);
+        }
+
         /// <summary>Wykonanie planu na rosterze: material z polki (Commit), sztuki z zuzytych na czyste, zaplata w finally - za to, co naprawde
         /// zrobione (robocizna + material w calych pensach), z kiesy gracza do kasy miasta (Pay.ToSettlement - jak dotad).</summary>
         private static void ApplyRoster(MendMaterial.Order o, TaleWorlds.CampaignSystem.Roster.ItemRoster roster, out int done, out int paid)
@@ -577,7 +597,7 @@ namespace Armoury
 
         private static string SmithLine(MendMaterial.Order q, EquipmentElement ee, int slot = -1)
         {
-            string hrs = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
+            string hrs = GuildMend.On ? GuildMend.F1(GuildMend.Hours(ee)) + "h of the " + GuildMend.TradeEn[GuildMend.TradeOf(ee.Item)] : Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";   // R3-02
             const string scrap = "Smith: not for coin - a wreck (worn to a tenth of its worth or less) is scrap: melt it down, or mend it at your own anvil";   // paczka 158
             if (SmithRefusesHere(ee, slot)) return scrap;   // recenzja 158: na grzbiecie takze stan w ksiedze
             int labor = PieceCostAt(ee, slot);   // E8/B: zalozona sztuka - wycena ksiegi (jedna cena z "Mend everything you wear")
@@ -602,14 +622,14 @@ namespace Armoury
                     int bags, bagsCost; ScanBattleWorn(out bags, out bagsCost);
                     if (bags == 0)
                     { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No battle-worn loot in your bags."); return true; }
-                    var o = PlanRoster(MobileParty.MainParty.ItemRoster, PieceCost, Hero.MainHero.Gold, int.MaxValue);
+                    var o = PlanRoster(MobileParty.MainParty.ItemRoster, LootLabor(MobileParty.MainParty.ItemRoster), Hero.MainHero.Gold, int.MaxValue);
                     string town = TownName();
                     if (!o.Ok)
                     { args.IsEnabled = false; args.Tooltip = new TextObject("There are no town smiths here."); return true; }
                     if (o.Pieces == 0)
                     { args.IsEnabled = false; args.Tooltip = new TextObject("The smiths of " + town + " can restore none of it for coin now." + o.LeftEn(town)); return true; }
                     args.Tooltip = new TextObject("The smiths of " + town + " will make " + o.Pieces + " battle-worn pieces whole for " + o.Total + " gold - "
-                        + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + MendMaterial.WageNote(Settlement.CurrentSettlement) + o.LeftEn(town));
+                        + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + MendMaterial.WageNote(Settlement.CurrentSettlement) + GuildNote(o) + o.LeftEn(town));
                     return true;
                 }
                 int can, canCost, all, allCost;
@@ -638,9 +658,9 @@ namespace Armoury
             {
                 if (MarketRule)
                 {
-                    var o = PlanRoster(MobileParty.MainParty.ItemRoster, PieceCost, Hero.MainHero.Gold, int.MaxValue);
+                    var o = PlanRoster(MobileParty.MainParty.ItemRoster, LootLabor(MobileParty.MainParty.ItemRoster), Hero.MainHero.Gold, int.MaxValue);
                     if (o.Pieces == 0) { Log.Player("The smiths of " + TownName() + " can restore none of it for coin now." + o.LeftEn(TownName()), true); return; }
-                    StartTimedWork(o.Pieces * Settings.Current.MendLootHoursPerPiece,
+                    StartTimedWork(GuildMend.PlayerClock(TallyOf(o), o.Pieces * Settings.Current.MendLootHoursPerPiece),   // R3-02: godziny cechow miasta
                         "The smiths sort the battle spoils and take hammer to the worst of it.",
                         delegate { DoMendLoot(); });
                     return;
@@ -673,7 +693,7 @@ namespace Armoury
                 {
                     // plan od nowa przy koncu roboty (jak dotad: zloto, polka i ceny moga sie zmienic przez te godziny)
                     var bag = MobileParty.MainParty.ItemRoster;
-                    var o = PlanRoster(bag, PieceCost, Hero.MainHero.Gold, int.MaxValue);
+                    var o = PlanRoster(bag, LootLabor(bag), Hero.MainHero.Gold, int.MaxValue);
                     string town = TownName();
                     if (o.Pieces == 0)
                     {
@@ -683,6 +703,7 @@ namespace Armoury
                     }
                     int doneM, paidM;
                     ApplyRoster(o, bag, out doneM, out paidM);
+                    if (doneM == o.Pieces) GuildMend.PlayerDone(TallyOf(o));   // R3-02: godziny cechow z pul miasta (warsztaty jutro maja mniej rak)
                     Log.Player("The smiths of " + town + " restored " + doneM + " battle-worn pieces for " + paidM + " gold, paid into the town's coffers: "
                                + o.Labor + " for their work and " + o.MatGold + " for materials from its market." + o.LeftEn(town));
                     Log.Info("Lawa naprawcza (lup z sakw) - kowale " + town + ": " + o.LogPl());
@@ -1057,9 +1078,9 @@ namespace Armoury
                             if (sel == null || sel.Count == 0) return;
                             int mode = (int)sel[0].Identifier;
                             if (mode == 0)
-                                StartTimedWork(Settings.Current.MendLootHoursPerPiece,
+                                StartTimedWork(GuildMend.PlayerClock(OneTally(ee), Settings.Current.MendLootHoursPerPiece),   // R3-02: godziny cechu tej sztuki
                                     "The smith takes the " + ee.Item.Name + " to his bench.",
-                                    delegate { DoMendOne(ee, slot, true, smith, null, 0); });
+                                    delegate { DoMendOne(ee, slot, true, smith, null, 0); GuildMend.PlayerDone(OneTally(ee)); });
                             else
                                 StartTimedWork(Settings.Current.SelfRepairHoursPerPiece,
                                     "You lay the " + ee.Item.Name + " on the anvil and set to work.",
@@ -1343,7 +1364,7 @@ namespace Armoury
                     var o = QuartermasterEscrow.Active ? null : PlanTroops(Hero.MainHero.Gold, int.MaxValue, out disc, out racks);
                     if (o == null || o.Pieces == 0) return;
                     int canM = o.Pieces;
-                    StartTimedWork(Math.Min(MathF.Max(1f, s.TroopMendMaxHours), canM * s.MendLootHoursPerPiece),
+                    StartTimedWork(GuildMend.PlayerClock(TallyOf(o), Math.Min(MathF.Max(1f, s.TroopMendMaxHours), canM * s.MendLootHoursPerPiece)),   // R3-02: godziny cechow miasta
                         "The smiths clear their benches and set every apprentice on the men's gear.",
                         delegate { DoMendTroops(int.MaxValue); },
                         delegate (float frac) { DoMendTroops((int)Math.Floor(canM * frac)); });
@@ -1381,6 +1402,7 @@ namespace Armoury
                     }
                     int doneM, paidM;
                     ApplyRoster(o, armory, out doneM, out paidM);
+                    if (doneM == o.Pieces) GuildMend.PlayerDone(TallyOf(o));   // R3-02: godziny cechow z pul miasta
                     Log.Player("The smiths of " + town + " made " + doneM + " pieces of the men's gear whole for " + paidM + " gold, paid into the town's coffers: "
                                + o.Labor + " for the work (bulk discount " + dp + "%) and " + o.MatGold + " for materials from its market." + o.LeftEn(town));
                     Log.Info("Lawa naprawcza (zbrojownia wojska) - kowale " + town + ": rabat " + dp + "%, " + o.LogPl());

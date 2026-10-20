@@ -1034,6 +1034,16 @@ namespace Armoury
                             float cutI = Math.Min(Math.Min(freed, H * GuildWeight(g) / wAll), repairPool * GuildWeight(g) / smithW);
                             freed -= cutI; repairs += cutI;
                         }
+                    // R3-02 (GuildMend): naprawy siodlarzy, krawcow, lukarzy i tarczownikow wczoraj - mniej rak tego cechu dzis (jak kowale wyzej); cech nieczynny - od rak zwolnionych
+                    if (workshop.WorkshopType.IsHidden && GuildMend.On)
+                        foreach (var g in GuildOrder)
+                        {
+                            if (g == "platnerz" || g == "miecznik" || !guilds.Contains(g) || nG.ContainsKey(g)) continue;
+                            float gr = GuildMend.ManDaysYesterday(town, g) / Math.Max(1, ActiveSmithWorkshops(town));
+                            if (gr <= 0f) continue;
+                            float cutI = Math.Min(Math.Min(freed, H * GuildWeight(g) / wAll), gr);
+                            freed -= cutI; repairs += cutI;
+                        }
                     foreach (var g in nG.Keys)
                     {
                         float own = H * GuildWeight(g) / wAll;
@@ -1043,6 +1053,11 @@ namespace Armoury
                         {
                             float cut = Math.Min(h, repairPool * GuildWeight(g) / smithW);
                             h -= cut; repairs += cut;
+                        }
+                        if (workshop.WorkshopType.IsHidden && g != "platnerz" && g != "miecznik")
+                        {
+                            float gr = GuildMend.ManDaysYesterday(town, g) / Math.Max(1, ActiveSmithWorkshops(town));   // R3-02: 0 przy wylaczonym MendHoursByGuild
+                            if (gr > 0f) { float cut = Math.Min(h, gr); h -= cut; repairs += cut; }
                         }
                         hg[g] = h; extraG[g] = extra;
                     }
