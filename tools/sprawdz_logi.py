@@ -1003,6 +1003,11 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m96jakosc <Armoury-*.log> (strumieniowo). JQ-0 latki bez BRAK, JQ-1 linie doby rozpoznane,
                     JQ-2/JQ-3 legendarne i mistrzowskie po wyrownaniu w limicie swiata (ponad limit tylko poza polkami albo w wyrobach gracza na polkach), JQ-4 obnizki tylko przesuwaja jakosc,
                     JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO).
+--grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
+                    python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
+                    W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
+                    zapisu (INFO), W96-5 odkrycia w zakresie wedlug reki, W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia i ERROR 0, W96-8 blizniacze
+                    czesci legend ukryte (> 0 przy kluczu). Log bez paczki: INFO, bez wyjatku.
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
                     python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
                     (klucz, plik drog, rozstaje traktu >= 100), SZB-1 linie doby rozpoznane, SZB-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy
@@ -36843,6 +36848,162 @@ def m96zamek_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96wzory (20.10, w-toku/m96-wzory: wzory kuzni po ostatecznych statystykach, naprawa zapisu, bramy wiedzy;
+# Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs; klucze LoreSeedAfterFinalStats, PatternDrawBySkill, ShieldCraftSkillGate, ForgeUniquesByStudy,
+# PatternTileShowsSkill, XbowPatternTierByPower, RareBowsNotForged, LegendTwinPiecesHidden)
+M96WZORY_HEAD = "Wiedza (m96-wzory): "
+M96WZORY_ROT = "HistoricalPrices: ROT-RBM (ROTRBMCompatibility) nadpisal ceny"
+M96WZORY_SEED = "Wiedza rzemieslnicza: rozdano wzory tieru 1 ("
+M96WZORY_TWIN = "Czesci-blizniaki legend (m96-wzory): "
+M96WZORY_TIER = re.compile(r"\| t(\d) (\d+)/(\d+)")
+M96WZORY_DRAW = re.compile(r"^Wiedza: odkryto losowo (?P<id>\S+) \((?P<sc>[A-Z ]+), t(?P<t>\d), zakres (?P<a>\d)-(?P<b>\d)\)")
+M96WZORY_REACH = re.compile(r"Smithing (?P<sk>\d+), prog na tier (?P<per>\d+) -> zakres tierow (?P<a>\d)-(?P<b>\d)")
+M96WZORY_STUMB = re.compile(r"potkniecia (\d+)")
+M96WZORY_REMOVED = re.compile(r"naprawa zapisu: zdjete (\d+) \[([^\]]*)\]")
+M96WZORY_XREM = re.compile(r"kusze wedlug sily: zdjete (\d+) \[([^\]]*)\]")
+M96WZORY_ADDED = re.compile(r"dopisane tieru 1 (\d+)")
+M96WZORY_TWIN_N = re.compile(r"ukryte w projektowaniu broni (\d+) \(domyslnie otwartych (\d+)\)")
+
+
+def m96wzory_main(logp):
+    """m96wzory (20.10, w-toku/m96-wzory; Jeff: "moge stworzyc luki tier 6 od poczatku gry"): wzory tieru 1 rozdane po ROT-RBM (OnAfterSessionLaunched),
+    naprawa ksiegi z zapisu (znaczniki #m96seedfix1, #m96xbowfix1), losowanie wedlug reki kowala, prog tarcz w CRAFT, unikaty ROT tylko z oryginalu, klik bez nauki,
+    kusze wedlug sily w ksiedze, luki z rzadkiego materialu bez kucia, blizniacze czesci legend ukryte.
+    W96-0 linia startu sesji, W96-1 linia ROT-RBM przed linia m96 (ta sama sesja), W96-2 rozdanie tieru 1 nie przed ROT-RBM (w oknie sesji: rozdanie, potem ROT = NIE;
+    bez RBM linii ROT nie ma - nic do porownania), W96-3 ksiega lukow i kusz po rozdaniu/naprawie bez znanych t2+ z rozdania (BOWS t6 0, CROSSBOWS t1 k/k == znane),
+    W96-4 naprawa zapisu (INFO: zapis Jeffa - zdjete 4 + kusze 6), W96-5 odkrycia w zakresie wedlug reki, W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia
+    i ERROR paczki 0, W96-8 blizniacze czesci legend (ukryte > 0, gdy klucz TAK). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("W96-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess = []          # sesje: linia m96, czy ROT przed, czy rozdanie przed ROT, pierwsze linie BOWS/CROSSBOWS po
+    cur_rot = cur_seed = cur_seed_then_rot = False
+    draws, reach, shields, clicks, n_err, twins = [], [], 0, 0, 0, []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96WZORY_ROT):
+                # ROT-RBM po linii m96 w tej samej sesji (przed linia BOWS) = linia m96 przed zmiana statystyk
+                if sess and sess[-1]["open"] and sess[-1]["bows"] is None:
+                    sess[-1]["rot_after"] = True
+                # rozdanie w oknie tej sesji, a dopiero potem ROT-RBM = rozdanie przed ostatecznymi statystykami
+                if cur_seed:
+                    cur_seed_then_rot = True
+                cur_rot = True
+            elif s.startswith(M96WZORY_SEED):
+                cur_seed = True
+            elif s.startswith(M96WZORY_HEAD + "start sesji") or s.startswith(M96WZORY_HEAD + "wylaczone"):
+                if sess:
+                    sess[-1]["open"] = False
+                sess.append({"line": s, "rot": cur_rot, "seed": cur_seed, "seed_then_rot": cur_seed_then_rot, "bows": None, "xbows": None,
+                             "open": True, "rot_after": False, "on": "statystyki ostateczne TAK" in s})
+                cur_rot = cur_seed = cur_seed_then_rot = False
+            elif s.startswith("BOWS: ") and sess and sess[-1]["bows"] is None and sess[-1]["open"]:
+                sess[-1]["bows"] = s
+            elif s.startswith("CROSSBOWS: ") and sess and sess[-1]["xbows"] is None and sess[-1]["open"]:
+                sess[-1]["xbows"] = s
+            elif s.startswith(M96WZORY_HEAD + "tarcza w CRAFT"):
+                shields += 1
+            elif s.startswith(M96WZORY_HEAD + "klik Craft bez kucia"):
+                clicks += 1
+            elif s.startswith(M96WZORY_HEAD + "losowanie wedlug reki"):
+                mm = M96WZORY_REACH.search(s)
+                if mm:
+                    reach.append(mm.groupdict())
+            elif s.startswith("Wiedza: odkryto losowo "):
+                mm = M96WZORY_DRAW.match(s)
+                if mm:
+                    draws.append(mm.groupdict())
+            elif s.startswith(M96WZORY_TWIN):
+                twins.append(s)
+            elif s.startswith("ERROR in LoreSeedFix") or s.startswith("ERROR in PatternGate") or s.startswith("ERROR in LegendTwins"):
+                n_err += 1
+    print(f"plik: {logp} | sesji z linia m96 {len(sess)}, odkryc losowych {len(draws)}, linii zakresu {len(reach)}, odmow tarcz {shields}, klikow bez nauki {clicks}, "
+          f"linii blizniakow {len(twins)}, ERROR {n_err}")
+    if not sess and n_err == 0 and not twins:
+        rep.add("W96-0: linia 'Wiedza (m96-wzory): start sesji'", "brak w logu", "INFO (log sprzed paczki m96-wzory albo menu glowne)", None)
+        rep.show()
+        return 0
+    on = [x for x in sess if x["on"]]
+    rep.add("W96-0: linia startu sesji", f"sesji {len(sess)}, z kluczem {len(on)}" + (f"; ostatnia: {sess[-1]['line'][len(M96WZORY_HEAD):][:300]}" if sess else ""),
+            "linia w kazdej sesji kampanii; klucz TAK", None if not on else True)
+    bad_rot = [x for x in on if x["rot_after"]]
+    rep.add("W96-1: ROT-RBM przed linia m96", f"sesji z linia ROT-RBM przed linia m96 {sum(1 for x in on if x['rot'])} z {len(on)}, ROT-RBM po linii m96 {len(bad_rot)}",
+            "ROT-RBM po linii m96 0 (bez RBM linii ROT nie ma)", None if not on else len(bad_rot) == 0)
+    early = [x for x in on if x["seed_then_rot"]]
+    rep.add("W96-2: rozdanie tieru 1 po statystykach ROT-RBM",
+            f"sesji z rozdaniem {sum(1 for x in on if x['seed'])} (po ROT-RBM {sum(1 for x in on if x['seed'] and x['rot'] and not x['seed_then_rot'])}), "
+            f"rozdanie przed ROT-RBM w tej samej sesji {len(early)}",
+            "rozdanie przed ROT-RBM 0 (nowa kampania: ROT-RBM -> rozdano -> start sesji)", None if not on else len(early) == 0)
+    rows, bad6, badx = [], 0, 0
+    for x in on:
+        fresh = "nowa ksiega" in x["line"] or "naprawa zapisu" in x["line"] or "kusze wedlug sily: zdjete" in x["line"]
+        t6 = None
+        if x["bows"]:
+            for t, k, tot in M96WZORY_TIER.findall(x["bows"]):
+                if t == "6":
+                    t6 = int(k)
+        if fresh and t6:
+            bad6 += 1
+        # kusze wedlug sily: po rozdaniu/naprawie znane sa tylko wzory tieru wzoru 1 (t2..t6 0 znanych, o ile nic nie odkryto w tej sesji)
+        xk = 0
+        if x["xbows"] and "kusze wedlug sily NIE" not in x["line"] and "nieczynne" not in x["line"]:
+            for t, k, tot in M96WZORY_TIER.findall(x["xbows"]):
+                if t != "1":
+                    xk += int(k)
+        if fresh and xk:
+            badx += 1
+        rows.append(("rozdanie/naprawa" if fresh else "zwykla") + ": " + (x["bows"][:100] if x["bows"] else "brak linii BOWS")
+                    + " / " + (x["xbows"][:100] if x["xbows"] else "brak linii CROSSBOWS"))
+    rep.add("W96-3: ksiega lukow i kusz po rozdaniu/naprawie", " || ".join(rows[-2:]) if rows else "-",
+            "przy rozdaniu albo naprawie znanych lukow t6 0 i kusz t2+ 0 (zapis Jeffa: 'BOWS: 15/58 | t1 15/15 | ... | t6 0/12' - 16/58 i t4 1/9 z GRE_vlandic_arrows; "
+            "'CROSSBOWS: 12/38 | t1 12/12 | t2 0/3 | t3 0/3 | t4 0/4 | t5 0/3 | t6 0/13')", None if not on else (bad6 == 0 and badx == 0))
+    rem = []
+    for x in on:
+        parts = []
+        mm = M96WZORY_REMOVED.search(x["line"])
+        if mm:
+            parts.append(f"zdjete {mm.group(1)} [{mm.group(2)[:200]}]")
+        mx = M96WZORY_XREM.search(x["line"])
+        if mx:
+            parts.append(f"kusze zdjete {mx.group(1)} [{mx.group(2)[:200]}]")
+        ma = M96WZORY_ADDED.search(x["line"])
+        if parts and ma:
+            parts.append(f"dopisane t1 {ma.group(1)}")
+        if parts:
+            rem.append(", ".join(parts))
+    rep.add("W96-4: naprawa zapisu", " || ".join(rem) if rem else "brak (nowa kampania albo zapis juz naprawiony)",
+            "INFO (zapis Jeffa z 20.10: zdjete 4 - goldenheart_longbow, giant_bow, ravens_teeth_longbow, ravens_teeth_arrows; kusze zdjete 6 - crossbow_g/d/e/c/b/a; "
+            "dopisane t1 0; drugie wczytanie: znaczniki)", None)
+    over = [d for d in draws if int(d["t"]) > int(d["b"])]
+    wide = [r for r in reach if int(r["b"]) > max(int(r["a"]), min(6, int(r["sk"]) // max(1, int(r["per"])) + 2))]
+    rep.add("W96-5: odkrycia w zakresie wedlug reki", f"odkryc {len(draws)} (zakres do 6: {sum(1 for d in draws if d['b'] == '6')}), poza zakresem {len(over)}, "
+            f"zakres szerszy niz skill/prog+2 {len(wide)}" + (f"; np. {over[0]}" if over else ""),
+            "poza zakresem 0, zakres wedlug reki 0 odchylek", len(over) == 0 and len(wide) == 0)
+    rep.add("W96-6: tarcze w CRAFT i kliki bez nauki", f"odmow tarcz (linie) {shields}, klikow Craft bez kucia (linie) {clicks}", "INFO", None)
+    st = 0
+    for x in sess:
+        mm = M96WZORY_STUMB.search(x["line"])
+        if mm:
+            st = max(st, int(mm.group(1)))
+    for t in twins:
+        mm = M96WZORY_STUMB.search(t)
+        if mm:
+            st = max(st, int(mm.group(1)))
+    rep.add("W96-7: potkniecia i ERROR", f"potkniecia w liniach startu najwyzej {st}, ERROR LoreSeedFix/PatternGate/LegendTwins {n_err}", "0 i 0", st == 0 and n_err == 0)
+    tw_on = [t for t in twins if "wylaczone" not in t]
+    hid = [M96WZORY_TWIN_N.search(t) for t in tw_on]
+    hid = [(int(h.group(1)), int(h.group(2))) for h in hid if h]
+    rep.add("W96-8: blizniacze czesci legend", (f"linii {len(twins)}, ostatnia: {twins[-1][len(M96WZORY_TWIN):][:300]}" if twins else "brak linii"),
+            "przy kluczu TAK ukryte > 0 w kazdej sesji (przeglad danych ROT: ok. 21, w tym valyrian_short_blade_duel i darksister_blade_duel)",
+            None if not tw_on else (len(hid) == len(tw_on) and all(h[0] > 0 for h in hid)))
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ nzajazdy (17.10, sw-zajazdy: zajazdy przy szlakach + noclegi + plotki; Armoury/src/RoadsideInns.cs, RoadsideInnsView.cs,
 # TownInns.Road.cs, Rumours.cs; klucze RoadsideInns / InnGossip)
 NZJ_HEAD = "Zajazdy (ZJ): "
@@ -53268,6 +53429,8 @@ def main(argv):
         return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group == "nkarczmy" and logp:
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
+    if group == "m96wzory" and logp:
+        return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:
         return p6szubienice_main(logp)   # p6szubienice (20.10, p6-szubienice R3-07a): szubienice przy rozstajach po rozbitej bandzie / kryjowce (Gallows, GallowsView)
     if group == "m96zamek" and logp:

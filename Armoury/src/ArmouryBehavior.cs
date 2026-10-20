@@ -1060,7 +1060,7 @@ namespace Armoury
                 // wiedza luczarska: odkryte wzory lukow/kusz i punkty nauki
                 string lore = RangedLore.Export();
                 SaveText.Sync(dataStore, "arm_rangedlore", ref lore);
-                if (dataStore.IsLoading) RangedLore.Import(lore);
+                if (dataStore.IsLoading) { RangedLore.Import(lore); LoreSeedFix.Snapshot("wczytanie"); }   // m96-wzory: tiery sprzed OnSessionLaunched (ROT-RBM zmienia luki po nas)
                 // ksiega legend: raz wykuta legenda nigdy nie powstaje po raz drugi
                 var legends = Legends;
                 dataStore.SyncData("arm_legends", ref legends);
@@ -1459,6 +1459,9 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
+            // m96-wzory: rozdanie wzorow tieru 1, sanacja, naprawa zapisu i ksiega PO OnSessionLaunched wszystkich modow (ROT-RBM przepisuje luki po nas); nowa kampania - ksiegi od zera
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => LoreSeedFix.AfterSessionLaunched(LorePurgeOnce));
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
             // pomiary do linii OB0 (armie rozwiazane przy oblezeniu, machiny AI, trafienia w mury, nowe oblezenia) - tylko pamiec i log poza OB2/OB3
@@ -2231,7 +2234,7 @@ namespace Armoury
             try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
-            try { LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }
+            try { if (!LoreSeedFix.On) LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }   // m96-wzory: przy kluczu - w OnAfterSessionLaunched (LoreSeedFix)
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
@@ -2252,7 +2255,7 @@ namespace Armoury
             try { NightRest.AddMenus(starter); } catch (Exception e) { Log.Error("NightRest.AddMenus", e); }
             try { TownInns.AddMenus(starter); } catch (Exception e) { Log.Error("TownInns.AddMenus", e); }   // KA (16.10): "Take lodgings at an inn" w menu miasta (sen - arm_sleep_wait z NightRest)
             try { RoadsideInns.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInns.AddMenus", e); }   // sw-zajazdy: menu zajazdu przy szlaku (nocleg, plotki, dalej w droge)
-            try { RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }
+            try { if (!LoreSeedFix.On) RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }   // m96-wzory: przy kluczu - po zmianach statystyk (LoreSeedFix)
             try { ArmyClothing.StartLine(); } catch (Exception e) { Log.Error("ArmyClothing.StartLine", e); }   // 150: stawki odziezy wojska i zaleznosci
             try { HorseState.OnSessionLaunched(); } catch (Exception e) { Log.Error("HorseState.OnSessionLaunched", e); }   // E6/K0 (209): licznik koni gry wedlug klucza (pelne przeliczenie przy zmianie), stan koni partii od nowa - PO porzadkach taborow wyzej
         }

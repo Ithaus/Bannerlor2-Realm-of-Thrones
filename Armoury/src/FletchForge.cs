@@ -50,11 +50,12 @@ namespace Armoury
                 // (Jeff: "pancerze tak samo, dopiero uczysz sie pancerzy").
                 // Blokada stoi PRZED podzialem na strzeleckie i BK-owe, wiec
                 // zamknietego wzoru nie wykujesz zadna droga.
+                if (PatternGate.RareStuff(item)) { Log.Player(PatternGate.RareWhy, true); return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged)
                 if (!RangedLore.KnownOf(item))
                 {
                     // unikat imienny NIE wpada z nauki przy kowadle - trzeba
                     // zdobyc oryginal i go rozlozyc albo przetopic
-                    if (UniqueGear.Is(item))
+                    if (PatternGate.IsForgeUnique(item))   // m96-wzory: takze unikaty ROT (ForgeUniquesByStudy)
                     {
                         Log.Player("This famed piece cannot be worked out at the anvil. Seize the original and study it - melt it down, or take it apart at the smith.", true);
                         return false;
@@ -140,7 +141,7 @@ namespace Armoury
         /// wlasne kucie. Postfix biegnie po KAZDEJ robocie (takze gdy prefix
         /// przejal strzeleckie) - tu tez odswiezamy liczniki ekranu.
         /// </summary>
-        public static void BkCraftPostfix(object __instance)
+        public static void BkCraftPostfix(object __instance, bool __runOriginal)
         {
             RefreshCraftScreen(__instance);
             try
@@ -157,7 +158,12 @@ namespace Armoury
                 if (item == null || RangedType(item)) return;      // strzeleckie licza sie w Forge.Smith
                 // zbroja z kuzni jak bron: brama progu odmowila - nic sie nie kulo, wiec ani nauki wzorow, ani okna wyniku
                 if (ArmourQuality.Refused) return;
-                RangedLore.OnCrafted(item);
+                // m96-wzory: prefiks odmowil (wzor nieznany - BkCraftPrefix, brama progu tarcz itp.) - BK nic nie kul, wiec ani nauki, ani okna wyniku.
+                // Bylo: Harmony 2.4.2 POMIJA prefiks bool, gdy wczesniejszy prefiks zwrocil false (MethodCreator: Ldloc runOriginal, Brfalse przed wywolaniem),
+                // wiec ArmourQuality.CraftPrefix (Priority.Low) po odmowie BkCraftPrefix w ogole nie biegl i Refused zostawal z POPRZEDNIEGO kliku (zwykle false) -
+                // ten postfiks dawal punkty za klik w zamkniety wzor. Jedyna pewna miara tutaj to __runOriginal (postfiksy go dostaja).
+                if (!__runOriginal && LoreSeedFix.On) { LoreSeedFix.NoteRefusedClick(item); return; }
+                RangedLore.OnCrafted(item, PatternGate.SmithOf(__instance));   // m96-wzory: losowanie wedlug reki kowala z ekranu
                 // okno wyniku takze dla pancerza kutego w BK CRAFT: jakosc
                 // czytamy z OSTATNIEGO stacka tego itemu w sakwach (rostery
                 // dokladaja swieze na koniec)

@@ -550,6 +550,7 @@ namespace Armoury
             why = null;
             try
             {
+                if (PatternGate.RareStuff(item)) { why = PatternGate.RareWhy; return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - obie drogi kucia i menu kowala
                 if (!Recipes.IsLegendary(item)) return true;
                 // OPANOWANY WZOR UNIKATU (Jeff 30.08: "moge kuc wiecej niz
                 // jeden, jak juz opanuje") - legendarny KOSZT zostaje
@@ -624,7 +625,7 @@ namespace Armoury
                     ForgeClock.Queue(item, quality, made, fh);
                     ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(r.Stamina));
                     if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
-                    RangedLore.OnCrafted(item);
+                    RangedLore.OnCrafted(item, hero);   // m96-wzory: losowanie wedlug reki kowala przy kowadle
                     hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
                     Log.Info("Wykuto (na lawe): " + item.StringId + " x" + made + " jakosc=" + (quality != null ? quality.StringId : "zwykla")
                              + " skill=" + skill + "/" + r.SkillNeeded + " trudnosc=" + r.Difficulty);   // ForgeOneClock (domyslnie wlaczony): ta linia, nie "Wykuto:"
@@ -638,7 +639,7 @@ namespace Armoury
                     CraftPopup.Show(item, quality, made);
                 if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId))
                     ArmouryBehavior.Legends.Add(item.StringId);
-                RangedLore.OnCrafted(item);
+                RangedLore.OnCrafted(item, hero);   // m96-wzory: losowanie wedlug reki kowala przy kowadle
                 hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                     ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
 

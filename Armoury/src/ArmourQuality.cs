@@ -107,6 +107,8 @@ namespace Armoury
         /// </summary>
         public static bool CraftPrefix(object __instance, bool __runOriginal)
         {
+            // m96-wzory (recenzja): gdy wczesniejszy prefiks zwrocil false, Harmony 2.4.2 tego prefiksu w ogole NIE wola (Refused zostaje z poprzedniego
+            // kliku) - ponizsze sprawdzenie to zapas; postfiks FletchForge.BkCraftPostfix rozpoznaje odmowe po __runOriginal
             Clear(); Refused = false;
             if (!__runOriginal) return true;
             try
@@ -119,6 +121,7 @@ namespace Armoury
                 var ac = tr.Field("armorCrafting").GetValue();
                 var cur = ac != null ? Traverse.Create(ac).Property("CurrentItem").GetValue() : null;
                 var item = cur != null ? Traverse.Create(cur).Property("Item").GetValue<ItemObject>() : null;
+                if (item != null && item.ItemType == ItemObject.ItemTypeEnum.Shield) return PatternGate.ShieldCraftPrefix(__instance, item);   // m96-wzory: prog tarcz (ShieldCraftSkillGate), kosci BK bez zmian
                 if (item == null || !item.HasArmorComponent) return true;      // tarcze, luki, amunicja - nie ta regula
                 Hero smith = null;
                 try

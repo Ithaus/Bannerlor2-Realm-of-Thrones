@@ -56,7 +56,14 @@ namespace ForgeView
               "AlphaFactor=\"0.62\" IsVisible=\"@FvLocked\"/>";
             var doc = new XmlDocument();
             doc.LoadXml(xml);
-            _nodes = new List<XmlNode> { doc.DocumentElement };
+            // m96-wzory: znany, ale za trudny dla kowala przy kowadle - lzejsza plachta (ten sam wzor wezla, rodzenstwo za pierwsza)
+            var xml2 =
+              "<Widget DoNotAcceptEvents=\"true\" IsDisabled=\"true\" WidthSizePolicy=\"StretchToParent\" " +
+              "HeightSizePolicy=\"StretchToParent\" Sprite=\"BlankWhiteSquare_9\" Color=\"#141414FF\" " +
+              "AlphaFactor=\"0.32\" IsVisible=\"@FvBlocked\"/>";
+            var doc2 = new XmlDocument();
+            doc2.LoadXml(xml2);
+            _nodes = new List<XmlNode> { doc.DocumentElement, doc2.DocumentElement };
         }
     }
 }
