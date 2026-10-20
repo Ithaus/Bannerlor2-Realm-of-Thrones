@@ -1524,8 +1524,10 @@ Uzycie (Python 3, tylko odczyt):
                     doplywem netto kupcow (firmy DS). Porownanie - grupy nakum, nkasy.
 --grupa m96dlugi_dlugi : (20.10, galaz w-toku/m96-dlugi - dlugi rad miast i podatek nadzwyczajny; Armoury/src/TownDebt.cs, klucz Town Debt) linia "Dlugi miast
                     (m96-dlugi): dzien N" i "Firmy miast i zamkow (DS)": M96D-0 linie, M96D-1 kontrola dlugu i podatku (0), M96D-2 dlug razem <= limit razem,
-                    M96D-3 zaleglosci firm DS miast na koniec <= 50% bazy WGRANIA 95 (381 134 zl u 8 miast, doba 160), M96D-4 miasta z dlugiem,
-                    wierzyciele, odsetki i splaty (INFO), M96D-5 podatki nadzwyczajne i skutki (lojalnosc na podatek <= 5), M96D-6 czas, potkniecia, ERROR TownDebt.
+                    M96D-3 zaleglosci firm DS miast Z KASY (panu + koronie, bez czesci z oszczednosci ludu - poza paczka) na koniec <= 50% bazy WGRANIA 95
+                    (209 771 zl: Duskendale 163 500 + Rhyos 46 271 - pewna czesc z kasy; cale 381 134 zl u 8 miast z ALf), M96D-4 miasta z dlugiem,
+                    wierzyciele, odsetki i splaty (INFO), M96D-5 podatki nadzwyczajne i skutki (lojalnosc na podatek <= 5), M96D-6 czas, potkniecia, ERROR TownDebt,
+                    M96D-7 zwolnienie DS po zdobyciu i czekanie na pule Banku (INFO).
                     python -I tools/sprawdz_logi.py --grupa m96dlugi_dlugi <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
@@ -53509,7 +53511,7 @@ def m96dlugi_num(pat, s, cast=int, default=None):
         return default
 
 
-def m96dlugi_main(logp, base_arr=381134):
+def m96dlugi_main(logp, base_arr=209771):
     """m96dlugi_dlugi (20.10, galaz m96-dlugi; Armoury/src/TownDebt.cs). Linia "Dlugi miast (m96-dlugi): dzien N" co dobe i zaleglosci miast z linii DS (f14-miary)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -53530,16 +53532,20 @@ def m96dlugi_main(logp, base_arr=381134):
                     "bank": m96dlugi_num(r", Bank (-?\d+) \(\d+ miast\)", s),
                     "lent": m96dlugi_num(r"pozyczki dzis (-?\d+)", s),
                     "int": m96dlugi_num(r"\| odsetki (-?\d+)", s),
-                    "rep": m96dlugi_num(r"splaty z nadwyzki kas \(ponad zapas kupcow\) (-?\d+)", s),
+                    "rep": m96dlugi_num(r"splaty z nadwyzki kas \(ponad zapas kupcow i najblizsza rate\) (-?\d+)", s),
                     "levies": m96dlugi_num(r"podatki nadzwyczajne (\d+)", s),
                     "levy": m96dlugi_num(r"podatki nadzwyczajne \d+ na (-?\d+)", s),
                     "loy": m96dlugi_num(r"lojalnosc -(\d+(?:\.\d+)?)", s, float),
                     "pros": m96dlugi_num(r"dobrobyt -(\d+(?:\.\d+)?) \(dlug\)", s, float),
-                    "ctl": m96dlugi_num(r"splacone\) (-?\d+) \(oczekiwane 0\)", s),
+                    "ctl": m96dlugi_num(r"zaokraglenia -?\d+(?:\.\d+)?\) (-?\d+) \(oczekiwane 0\)", s),
                     "ctl2": m96dlugi_num(r"w kasie\) (-?\d+) \(oczekiwane 0\)", s),
                     "ms": m96dlugi_num(r"czas (\d+(?:\.\d+)?) ms", s, float),
                     "stum": m96dlugi_num(r"potkniecia (\d+) \(sesja", s),
                     "insolv": m96dlugi_num(r"niewyplacalne (\d+)", s),
+                    "arrend": m96dlugi_num(r"bez czesci z oszczednosci ludu\) (-?\d+) zl u \d+ miast", s),
+                    "arrendn": m96dlugi_num(r"bez czesci z oszczednosci ludu\) -?\d+ zl u (\d+) miast", s),
+                    "capt": m96dlugi_num(r"po zdobyciu \(28 dob bez rat DS\) (\d+)", s),
+                    "poolw": m96dlugi_num(r"czeka na pule Banku, wyczerpana dzis (\d+)", s),
                 }
                 if any(v is None for v in d.values()):
                     bad += 1
@@ -53570,12 +53576,12 @@ def m96dlugi_main(logp, base_arr=381134):
     last = rows[-1]
     rep.add("M96D-2: dlug rad razem wobec limitu razem (ostatnia linia)", f"dlug {last['debt']}, limit {last['lim']}, Bank {last['bank']}",
             "dlug <= limit (ponad limit tylko odsetki do najblizszego podatku)", last["debt"] <= max(1, last["lim"]) * 1.05)
-    if ds_arr:
-        da = ds_arr[-1]
-        rep.add("M96D-3: zaleglosci firm DS miast na koniec (linia DS f14-miary)", f"{da[1]} zl u {da[2]} miast (doba {da[0]}); baza {base_arr}",
-                f"<= 50% bazy ({base_arr // 2}; WGRANIE 95 160 dob: 381 134 zl u 8 miast)", da[1] <= base_arr // 2)
-    else:
-        rep.add("M96D-3: zaleglosci firm DS miast", "brak linii DS (f14-miary)", "INFO (firmy DS nieczynne)", None)
+    # recenzja: miara z kasy (panu + koronie) z linii m96-dlugi - czesc z oszczednosci ludu (ALf) placi lud, paczka jej nie rusza; linia DS f14 (z ALf) tylko INFO
+    da = ds_arr[-1] if ds_arr else None
+    rep.add("M96D-3: zaleglosci firm DS miast z kasy (panu + koronie) na koniec (linia m96-dlugi)",
+            f"{last['arrend']} zl u {last['arrendn']} miast (doba {last['day']}); baza {base_arr}" + (f"; linia DS f14 z czescia ludu: {da[1]} zl u {da[2]} miast" if da else ""),
+            f"<= 50% bazy ({base_arr // 2}; WGRANIE 95 160 dob: z kasy co najmniej 209 771 zl - Duskendale 163 500, Rhyos 46 271; razem z ALf 381 134 zl u 8 miast)",
+            last["arrend"] <= base_arr // 2)
     w = [r for r in rows if r["day"] > last["day"] - 28]
     rep.add("M96D-4: miasta z dlugiem, pozyczki, odsetki, splaty - ostatnie 28 dob (INFO)",
             f"miast z dlugiem {last['towns']} (najwiecej {max(r['towns'] for r in rows)}), pozyczone {sum(r['lent'] for r in w)}, odsetki {sum(r['int'] for r in w)}, "
@@ -53585,6 +53591,9 @@ def m96dlugi_main(logp, base_arr=381134):
     rep.add("M96D-5: podatki nadzwyczajne i skutki (caly log)",
             f"podatkow {lv} na {sum(r['levy'] for r in rows)} zl, lojalnosc -{loy:.1f} (na podatek {loy / lv if lv else 0:.1f}), dobrobyt od dlugu -{sum(r['pros'] for r in rows):.0f}",
             "lojalnosc na podatek <= 5 (Town Debt Levy Loyalty)", (loy / lv <= 5.01) if lv else None)
+    rep.add("M96D-7: zwolnienie DS po zdobyciu (rada czeka) i czekanie na pule Banku (caly log, INFO)",
+            f"miastodob po zdobyciu {sum(r['capt'] for r in rows)}, czekajacych na pule Banku {sum(r['poolw'] for r in rows)} (najwiecej w dobie {max(r['poolw'] for r in rows)})",
+            "INFO (czekanie na pule - zadnego podatku z tego powodu)", None)
     msd = sum(r["ms"] for r in rows) / len(rows); st = sum(r["stum"] for r in rows)
     rep.add("M96D-6: czas (ms na dobe), potkniecia i ERROR TownDebt", f"srednio {msd:.2f} ms (najwiecej {max(r['ms'] for r in rows):.2f}), potkniecia {st}, ERROR {errs}",
             "<= 2 ms/d, 0, 0", msd <= 2.0 and st == 0 and errs == 0)

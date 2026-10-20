@@ -1343,7 +1343,7 @@ namespace Armoury
             // kampania Jeffa) = pomiar od pierwszej doby z firmami DS, start przy pierwszych przebudowach A7; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
             try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
             catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
-            // m96-dlugi: dlugi rad miast ("td1|id;P;R;B;IP;IR;dzien podatku;od kiedy;ostatni podatek;notabl~kwota~odsetki,..."); pisany tylko z danymi; wlasny try; brak klucza
+            // m96-dlugi: dlugi rad miast ("td1|id;P;R;B;IP;IR;dzien podatku;od kiedy;ostatni podatek;notabl~kwota~odsetki,...;dni kwartalu z dlugiem"); pisany tylko z danymi; wlasny try; brak klucza
             // (stary zapis, kampania Jeffa z WGRANIA 94/95) = rady bez dlugow; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> M96DlugiReset)
             try { string td = dataStore.IsSaving ? TownDebt.Export() : null; if (!dataStore.IsSaving || td != null) SaveText.Sync(dataStore, "arm_towndebt", ref td); if (dataStore.IsLoading) TownDebt.Import(td); }
             catch (Exception e) { Log.Error("SyncData.arm_towndebt", e); }

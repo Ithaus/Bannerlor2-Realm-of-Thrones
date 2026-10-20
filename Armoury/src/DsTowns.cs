@@ -405,7 +405,9 @@ namespace Armoury
             foreach (var f in _farm.Values)
             {
                 double inst = (f.FL + f.FC + f.FLf) / Weeks;
-                if (f.AL + f.AC + f.ALf + TownDebt.ArrearsLike(f.St) >= Math.Max(1.0, inst)) f.ATerms++; else f.ATerms = 0;   // m96-dlugi: dlug rady na zaleglosci firmy liczy sie jak zaleglosc (klucz Town Debt)
+                int a0 = f.ATerms; double real = f.AL + f.AC + f.ALf;
+                if (real >= Math.Max(1.0, inst)) f.ATerms++; else f.ATerms = 0;
+                TownDebt.NoteTerm(f.St, real, inst, a0);   // m96-dlugi (recenzja): osobny licznik rady (zaleglosc + dlug rady) - tylko przeglad wymuszony; ATerms (zajecie) jak dotad
             }
         }
 
@@ -475,7 +477,7 @@ namespace Armoury
                     int gap = today - f.Fixed;                          // dob od ostatniego przegladu (albo ustalenia firmy)
                     bool due = gap >= qd;
                     // zaleglosci przez at dni kwartalu z rzedu, nadal >= raty, i dzien kwartalu po ostatnim przegladzie (ATerms zmienione od tamtej doby)
-                    bool forced = at > 0 && arrears && f.ATerms >= at && f.Fixed < lastTerms;
+                    bool forced = at > 0 && arrears && TownDebt.TermsLike(f.St, f.ATerms) >= at && f.Fixed < lastTerms;   // m96-dlugi: dni kwartalu z dlugiem rady (klucz wylaczony - ATerms)
                     // przed wlasna doba (tylko przy Ds Farm Review Days > kwartal): najwyzej jedna zmiana na kwartal
                     bool early = !due && forced && gap >= Quarter;
                     if (!due && !early) continue;

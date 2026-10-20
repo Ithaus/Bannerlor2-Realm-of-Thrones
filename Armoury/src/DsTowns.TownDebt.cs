@@ -5,7 +5,8 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Armoury
 {
     /// <summary>
-    /// m96-dlugi (Jeff 20.10 "dlugi miast tak, robimy") - dostep rady miasta (TownDebt.cs) do zaleglosci firmy DS z kasy. Dwie funkcje, bez zmiany regul DS:
+    /// m96-dlugi (Jeff 20.10 "dlugi miast tak, robimy") - dostep rady miasta (TownDebt.cs) do zaleglosci firmy DS z kasy. Trzy funkcje, bez zmiany regul DS:
+    ///  - TdKeep (recenzja): ile kasy splata dlugu rady zostawia na najblizsza rate firmy;
     ///  - TdArrears: odczyt zaleglosci pana (AL) i korony (AC) z kasy oraz raty tygodniowej z kasy ((FL + FC) / 52); czesc z oszczednosci ludu (ALf) placi lud, nie kasa - poza;
     ///  - TdPayArrears: splata zaleglosci z kasy pieniedzmi, ktore rada przed chwila do tej kasy wplacila (pozyczka, podatek nadzwyczajny) - ta sama droga przelewu co rata
     ///    (ToLord: GiveGoldAction kasa -> pan; ToCrown: kasa -> skarbiec), w stosunku AL : AC, bez podlogi kasy (pieniadz przyszedl na ten cel). Pan: RentToday (D "ziemia",
@@ -32,6 +33,32 @@ namespace Armoury
             catch (Exception e) { Stumble("TdArrears", e); return false; }
         }
 
+        /// <summary>Recenzja m96-dlugi: kasa, ktorej splata dlugu rady nie rusza - podloga firm (FloorOf) + CALA najblizsza rata firmy z kasy (pan i korona; czesc z oszczednosci
+        /// ludu tylko przy wylaczonym DsFarmFolkFromSavings) x rampa + to, co kasa juz winna (zaleglosci, pomoc M7, rata M9, reszta gersumy) - te same skladniki co CofferOwes,
+        /// ale z cala rata: splata idzie co dobe, a rata w dzien raty z kasy ponad podloge, wiec splata z kasy ponad sam zapas kupcow robila brak w dzien raty i nowa pozyczke.
+        /// Firmy nieczynne / osada bez firmy - podloga (albo 0). Nie rzuca.</summary>
+        internal static double TdKeep(Settlement st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (st == null || st.Town == null || s == null || !FarmsLive) return 0;
+                double floor = FloorOf(s, TownPurse.Reserve(st.Town));
+                var f = FarmOf(st, false);
+                if (f == null || f.Fixed < 0) return floor;
+                bool folkPays = s.DsFarmFolkFromSavings;
+                double rn = NewShare;
+                double owe = (Math.Max(0, f.FL) + Math.Max(0, f.FC) + (folkPays ? 0 : Math.Max(0, f.FLf))) / Weeks * rn;
+                owe += Math.Max(0, f.AL) + Math.Max(0, f.AC) + (folkPays ? 0 : Math.Max(0, f.ALf));
+                owe += Math.Max(0, f.AidArr);
+                if (f.MovLeft >= 1) owe += Math.Min(Math.Max(0, f.MovPer), f.MovLeft) * rn;
+                owe += Math.Max(0, f.CLeft);
+                double k = floor + owe;
+                return double.IsNaN(k) || double.IsInfinity(k) ? floor : k;
+            }
+            catch (Exception e) { Stumble("TdKeep", e); return 0; }
+        }
+
         internal static long TdPayArrears(Settlement st, long budget, out long toLord, out long toCrown)
         {
             toLord = toCrown = 0;
@@ -44,6 +71,7 @@ namespace Armoury
                 var clan = st.OwnerClan;
                 var lord = clan != null ? clan.Leader : null;
                 if (lord == null || !lord.IsAlive) return 0;                      // bez zywego pana zaleglosc czeka (jak rata)
+                if (RemitOf(st) != 0) return 0;                                   // recenzja: oblezenie i 28 dob po zdobyciu - DS nie sciaga zaleglosci (jak Pay)
                 var k = clan.Kingdom;
                 if (k != null && k.IsEliminated) k = null;
                 if (k == null && f.AC > 0) { f.AL += f.AC; f.AC = 0; }            // rod bez krolestwa - calosc panu (jak Pay)

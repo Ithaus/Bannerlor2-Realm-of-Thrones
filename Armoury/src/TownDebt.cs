@@ -25,15 +25,18 @@ namespace Armoury
     ///      kupcow (TownPurse.Reserve): najpierw kupcy i patrycjat (kiesa P), potem rzemieslnicy (kiesa R) - polowa tego, co maja ponad Town Loan Folk Reserve Times x zapas
     ///      dni, wspolny pulap dzienny z pozyczka miejska f8 (TownFolk.TdLendOffer); potem notable miasta (polowa zlota ponad Town Debt Notable Keep); na koncu Bank Zelazny
     ///      (z kapitalu ponad Crown Loan Bank Floor, dziennie najwyzej 1/60 tej nadwyzki dla wszystkich miast razem). Pozyczone zloto wchodzi do kasy i od razu splaca
-    ///      zaleglosc panu i koronie (DsTowns.TdPayArrears - ta sama droga przelewu co rata). Bez zywego pana i w oblezeniu - nic (zaleglosc czeka jak dotad).
+    ///      zaleglosc panu i koronie (DsTowns.TdPayArrears - ta sama droga przelewu co rata). Bez zywego pana i w zwolnieniu DS (oblezenie, 28 dob po zdobyciu - RemitOf) - nic
+    ///      (zaleglosc czeka jak dotad).
     ///  (2) ODSETKI: Town Debt Rate rocznie u mieszczan i notabli, Town Debt Bank Rate w Banku (rok kalendarza gry - IronBank.DaysPerYearNow), doliczane co dobe do dlugu.
     ///      Odsetki wplacone kiesie klasy sa jej zarobkiem okna (podstawa podatkow pana - jak f8).
-    ///  (3) SPLATA: co dobe Town Debt Repay Share nadwyzki kasy ponad zapas kupcow - najpierw Bank (najdrozszy), potem notable i mieszczanie w stosunku dlugu. KOSZTEM
+    ///  (3) SPLATA: co dobe Town Debt Repay Share nadwyzki kasy ponad zapas kupcow i ponad podloge firm + cala najblizsza rate z kasy (DsTowns.TdKeep - recenzja: splata
+    ///      nie robi braku w dzien raty) - najpierw Bank (najdrozszy), potem notable i mieszczanie w stosunku dlugu. KOSZTEM
     ///      RENTY PANA: splata nie jest poborem (TownPurse bez NoteTake) - doplyw netto kupcow maleje o splate, a przeglad firmy DS idzie za doplywem; do tego dlug rady
-    ///      liczy sie w DS jak zaleglosc (DsTowns Terms / Review / SurplusReview - ArrearsLike): bez podwyzki firmy i z przegladem wymuszonym w dol, gdy dlug >= raty
-    ///      przez 2 dni kwartalu - firma pana i korony schodzi do sil miasta. Zajecie z kiesy gminy (DS) zostaje bez zmian - tylko przy prawdziwej zaleglosci.
+    ///      liczy sie w DS jak zaleglosc (DsTowns Review / SurplusReview - ArrearsLike): bez podwyzki firmy i z przegladem wymuszonym w dol, gdy dlug >= raty
+    ///      przez 2 dni kwartalu (osobny licznik rady Book.DTerms - NoteTerm / TermsLike) - firma pana i korony schodzi do sil miasta. Zajecie z kiesy gminy (DS) bez zmian:
+    ///      licznik ATerms tylko z prawdziwej zaleglosci (recenzja: dlug rady w ATerms uruchamial zajecie przed pozyczka).
     ///  (4) DOBROBYT: miasto z dlugiem traci co dobe Town Debt Prosperity Per Day x (dlug / limit, najwyzej 1).
-    ///  (5) NIEWYPLACALNOSC: dlug >= 90% limitu albo zaleglosc, ktorej nikt juz nie pokryl (brak kredytu) - RADA SAMA naklada PODATEK NADZWYCZAJNY (nie pan): jednorazowo
+    ///  (5) NIEWYPLACALNOSC: dlug >= 90% limitu albo zaleglosc, ktorej nikt juz nie pokryl (brak kredytu; pula Banku wyczerpana dzis przez inne miasta to nie brak) - RADA SAMA naklada PODATEK NADZWYCZAJNY (nie pan): jednorazowo
     ///      Town Debt Levy Share tego, co klasy W / R / P maja ponad 1 x zapas dni, i tego, co notable maja ponad Town Debt Notable Keep, najwyzej tyle, ile trzeba (dlug +
     ///      zaleglosc). Zebrane - do kasy, z kasy od razu wierzycielom (Bank pierwszy) i na zaleglosc firmy. Koszt: lojalnosc miasta -Town Debt Levy Loyalty (nie ponizej
     ///      20 z tego powodu), dobrobyt -Town Debt Levy Prosperity x dobrobyt, relacja kazdego placacego notabla z panem miasta -Town Debt Levy Relation. Przerwa miedzy
@@ -43,7 +46,7 @@ namespace Armoury
     /// w rozliczeniu zysku (IronBank.Dividends DvDay -> BankInto). Wierzyciel-notabl zmarly albo juz nie notabl - jego czesc przechodzi na kiese P (spadkobiercy, cech kupcow).
     /// Kiesa ludu nieczynna przy splacie - zloto zostaje w kasie, dlug bez zmiany.
     /// GRACZ: w swoim miescie powiadomienie (pierwsza pozyczka, podatek nadzwyczajny, splata do zera); w kazdym miescie z dlugiem opcja "The council's debts" (Town affairs).
-    /// ZAPIS arm_towndebt ("td1|id;P;R;B;IP;IR;dzien podatku;od kiedy;ostatni podatek;notabl~kwota~odsetki,..."), SaveText.Sync; brak klucza (stary zapis, kampania Jeffa
+    /// ZAPIS arm_towndebt ("td1|id;P;R;B;IP;IR;dzien podatku;od kiedy;ostatni podatek;notabl~kwota~odsetki,...;dni kwartalu z dlugiem"), SaveText.Sync; brak klucza (stary zapis, kampania Jeffa
     /// z WGRANIA 94/95) = brak dlugow, start od pierwszej zaleglosci. Reset przy nowej kampanii / przed wczytaniem (ArmouryBehavior, osobna linia _m96DlugiReset).
     /// Linia "Dlugi miast (m96-dlugi): dzien N" co dobe. Watek glowny (tick dobowy); wyjatek per miasto - licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7).
     /// </summary>
@@ -64,6 +67,7 @@ namespace Armoury
             public double IP, IR;                                        // niezaplacone odsetki w P i R (zarobek okna przy splacie)
             public readonly Dictionary<string, double[]> N = new Dictionary<string, double[]>();   // notabl -> [dlug, niezaplacone odsetki]
             public int LevyDay = int.MinValue, Since = -1;
+            public int DTerms;                                           // recenzja: dni kwartalu DS z rzedu z (zaleglosc + dlug rady) >= raty - tylko przeglad wymuszony DS
             public long LastLevy;
             public double Total { get { double n = 0; foreach (var v in N.Values) n += v[0]; return P + R + B + n; } }
         }
@@ -81,8 +85,10 @@ namespace Armoury
         private static long _dLentP, _dLentR, _dLentN, _dLentB, _dToLord, _dToCrown, _dRepB, _dRepN, _dRepF, _dRepInt, _dLevyW, _dLevyR, _dLevyP, _dLevyN, _dLevyToCred, _dLevyToArr, _dLevyKept, _dLoanKept;
         private static double _dInt, _dIntB, _dPros, _dLevyPros, _dLevyLoy, _dMovedN;
         private static int _dBorrowN, _dNewN, _dClearedN, _dLevies, _dLevyNotables, _dInsolvent, _dNoCredit, _dArrTowns, _dSiege, _dNoLord, _dRepN2;
-        private static double _dArrLeft, _dArrSeen;
-        private static double _bankPool;
+        private static int _dCapt, _dPoolWait, _dArrEndN;                // recenzja: zwolnienie DS po zdobyciu, czekajace na pule Banku (wyczerpana dzis), miasta z zaleglosciami na koniec
+        private static double _dArrLeft, _dArrSeen, _dArrEnd, _dAdj;     // _dAdj: spadek dlugu poza "splacone" (zaokraglenia ostatniej monety, reszta < 1 przy zerowaniu) - kontrola dlugu
+        private static double _bankPool, _bankPool0;
+        private static bool _poolShort;                                  // Borrow: zabraklo tylko dziennej puli Banku (pula na starcie doby byla) - to nie brak kredytu
         /// <summary>"Obieg" (MoneyLedger): pozyczki rad tej doby (wierzyciele -> kasy -> panowie i skarbce), splaty (kasy -> wierzyciele), podatek nadzwyczajny (lud i notable -> kasy).</summary>
         internal static long LastLent, LastRepaid, LastLevy;
 
@@ -99,7 +105,8 @@ namespace Armoury
             _dLentP = _dLentR = _dLentN = _dLentB = _dToLord = _dToCrown = _dRepB = _dRepN = _dRepF = _dRepInt = _dLevyW = _dLevyR = _dLevyP = _dLevyN = _dLevyToCred = _dLevyToArr = _dLevyKept = _dLoanKept = 0;
             _dInt = _dIntB = _dPros = _dLevyPros = _dLevyLoy = _dMovedN = 0;
             _dBorrowN = _dNewN = _dClearedN = _dLevies = _dLevyNotables = _dInsolvent = _dNoCredit = _dArrTowns = _dSiege = _dNoLord = _dRepN2 = 0;
-            _dArrLeft = _dArrSeen = 0;
+            _dCapt = _dPoolWait = _dArrEndN = 0;
+            _dArrLeft = _dArrSeen = _dArrEnd = _dAdj = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -116,7 +123,7 @@ namespace Armoury
         private static string NameOf(Settlement st) { return st != null && st.Name != null ? st.Name.ToString() : "?"; }
 
         // ------------------------------------------------------------ odczyty dla innych modulow
-        /// <summary>DsTowns (Terms, Review, SurplusReview): dlug rady miasta liczony jak zaleglosc firmy. Klucz wylaczony / brak dlugu - 0.</summary>
+        /// <summary>DsTowns (Review, SurplusReview): dlug rady miasta liczony jak zaleglosc firmy (bez podwyzki; Terms - osobny licznik NoteTerm). Klucz wylaczony / brak dlugu - 0.</summary>
         internal static double ArrearsLike(Settlement st)
         {
             try
@@ -126,6 +133,35 @@ namespace Armoury
                 return _b.TryGetValue(st.StringId, out b) ? Math.Max(0, b.Total) : 0;
             }
             catch { return 0; }
+        }
+
+        /// <summary>Recenzja m96-dlugi: DsTowns.Terms (dzien kwartalu) - osobny licznik dni kwartalu z rzedu, w ktorych prawdziwa zaleglosc firmy (real = AL + AC + ALf) plus dlug
+        /// rady >= raty. Wczesniej dlug rady wchodzil do ATerms, a ten sam licznik uruchamia ZAJECIE z kiesy gminy (Pay krok 4, przed TownDebt.Daily) - gmina placila brak
+        /// w dzien raty, zanim rada zdazyla pozyczyc. Teraz ATerms (zajecie) liczy jak przed paczka, a ten licznik sluzy tylko przegladowi wymuszonemu (TermsLike).
+        /// aTermsPrev - ATerms sprzed tej doby kwartalu (pierwszy dzien z dlugiem ciagnie dni samej zaleglosci). Tylko miasta z ksiega; klucz wylaczony - nic.</summary>
+        internal static void NoteTerm(Settlement st, double real, double inst, int aTermsPrev)
+        {
+            try
+            {
+                if (st == null || st.StringId == null || _b.Count == 0 || !On) return;
+                Book b;
+                if (!_b.TryGetValue(st.StringId, out b) || b == null) return;
+                if (Math.Max(0, real) + Math.Max(0, b.Total) >= Math.Max(1.0, inst)) b.DTerms = Math.Max(b.DTerms, Math.Max(0, aTermsPrev)) + 1;
+                else b.DTerms = 0;
+            }
+            catch { }
+        }
+
+        /// <summary>DsTowns.Review: dni kwartalu do przegladu wymuszonego - wieksze z ATerms (prawdziwa zaleglosc) i licznika rady (zaleglosc + dlug). Klucz wylaczony - ATerms.</summary>
+        internal static int TermsLike(Settlement st, int aTerms)
+        {
+            try
+            {
+                if (st == null || st.StringId == null || _b.Count == 0 || !On) return aTerms;
+                Book b;
+                return _b.TryGetValue(st.StringId, out b) && b != null ? Math.Max(aTerms, b.DTerms) : aTerms;
+            }
+            catch { return aTerms; }
         }
 
         /// <summary>IronBank.Dividends DvDay: dlugi rad wobec Banku (z odsetkami) pod id "td:&lt;miasto&gt;" - koszt pozyczek (NoteCrownLent) rozliczany jak kredyt korony.
@@ -158,6 +194,7 @@ namespace Armoury
             if (!s.TownDebt)
             {
                 if (!_offLogged) { _offLogged = true; Log.Info("Dlugi miast (m96-dlugi): WYLACZONE (MCM Town Debt) - rady nie pozyczaja ani nie nakladaja podatku; dlugi z zapisu stoja bez odsetek i skutkow (" + _b.Count + " miast)."); }
+                _debtPrev = double.NaN;                                         // po ponownym wlaczeniu kontrola dlugu od nowa (bez dob przerwy)
                 return;
             }
             _offLogged = false;
@@ -169,6 +206,7 @@ namespace Armoury
             _bankPool = 0;
             try { if (IronBank.On) _bankPool = Math.Max(0, (IronBank.FreeCapital - Math.Max(0, s.CrownLoanBankFloor)) / BankPoolDays); } catch (Exception e) { Stumble("BankPool", e); }
             double bankPool0 = _bankPool;
+            _bankPool0 = bankPool0;
             foreach (var t in Town.AllTowns)
             {
                 var st = t != null ? t.Settlement : null;
@@ -176,11 +214,19 @@ namespace Armoury
                 try { TownDay(st, t, s, today, rF, rB); }
                 catch (Exception e) { Stumble("TownDay(" + st.StringId + ")", e); }
             }
+            // recenzja: zaleglosci firm DS miast z kasy (panu + koronie, bez czesci z oszczednosci ludu - poza paczka) po dzisiejszych pozyczkach i podatkach - miara M96D-3
+            foreach (var t in Town.AllTowns)
+            {
+                var st = t != null ? t.Settlement : null;
+                if (st == null) continue;
+                double al, ac, wk, cov;
+                if (DsTowns.TdArrears(st, out al, out ac, out wk, out cov) && al + ac >= 1) { _dArrEnd += al + ac; _dArrEndN++; }
+            }
             // ksiegi bez dlugu i bez swiezego podatku - won
             _drop.Clear();
             int gap = GapDays(s);
             foreach (var kv in _b) if (kv.Value.Total < 1 && (kv.Value.LevyDay == int.MinValue || today - kv.Value.LevyDay >= gap)) _drop.Add(kv.Key);
-            for (int i = 0; i < _drop.Count; i++) _b.Remove(_drop[i]);
+            for (int i = 0; i < _drop.Count; i++) { Book db; if (_b.TryGetValue(_drop[i], out db) && db != null) _dAdj += Math.Max(0, db.Total); _b.Remove(_drop[i]); }
             LastLent = _dLentP + _dLentR + _dLentN + _dLentB;
             LastRepaid = _dRepB + _dRepN + _dRepF + _dLevyToCred;
             LastLevy = _dLevyW + _dLevyR + _dLevyP + _dLevyN;
@@ -210,12 +256,16 @@ namespace Armoury
             if (b == null && arr < MinNeed) return;                         // wiekszosc miast: bez dlugu i bez zaleglosci - nic
             // 1. odsetki i wierzyciele-notable, ktorzy odeszli
             if (b != null) Accrue(b, rF, rB);
-            if (st.IsUnderSiege) { _dSiege++; if (b != null) Prosperity(b, t, s); return; }   // oblezenie: tylko odsetki i dobrobyt (rata DS i tak darowana)
+            // oblezenie i 28 dob po zdobyciu / zmianie krolestwa (recenzja: zwolnienie DS, RemitOf) - tylko odsetki i dobrobyt: DS nie sciaga wtedy ani raty, ani zaleglosci,
+            // wiec rada nie pozycza na zaleglosci poprzedniego pana i nie naklada podatku w swiezo zdobytym miescie
+            int why = DsTowns.RemitOf(st);
+            if (why != 0) { if (why == 1) _dSiege++; else _dCapt++; if (b != null) Prosperity(b, t, s); return; }
             double limit = Limit(t, s);
-            // 2. splata z nadwyzki kasy ponad zapas kupcow - tylko bez zaleglosci firmy (nadwyzka idzie najpierw na rate i zaleglosc panu i koronie w dzien raty)
+            // 2. splata z nadwyzki kasy - tylko bez zaleglosci firmy (nadwyzka idzie najpierw na rate i zaleglosc panu i koronie w dzien raty); recenzja: ponad zapas kupcow
+            //    I ponad podloge firm + cala najblizsza rate z kasy (DsTowns.TdKeep) - splata nie robi braku w dzien raty (a z nim nowej pozyczki na te sama rate)
             if (b != null && b.Total >= 1 && al + ac < 1)
             {
-                double spare = (double)t.Gold - TownPurse.Reserve(t);
+                double spare = (double)t.Gold - Math.Max(TownPurse.Reserve(t), DsTowns.TdKeep(st));
                 double share = Clamp(s.TownDebtRepayShare, 0, 1);
                 if (spare >= 1 && share > 0)
                 {
@@ -228,6 +278,7 @@ namespace Armoury
             var lord = clan != null ? clan.Leader : null;
             bool lordOk = lord != null && lord.IsAlive;
             bool lentAny = false;
+            _poolShort = false;
             if (arr >= MinNeed && !lordOk) _dNoLord++;
             if (arr >= MinNeed && lordOk)
             {
@@ -258,7 +309,11 @@ namespace Armoury
             }
             // 4. niewyplacalnosc - podatek nadzwyczajny rady
             double tot = b != null ? b.Total : 0;
-            bool noCredit = arr >= MinNeed && lordOk && !lentAny;               // dzis nikt nic nie pozyczyl (brak miejsca w limicie albo pozyczajacych) - pulap dzienny to nie brak kredytu
+            // dzis nikt nic nie pozyczyl (brak miejsca w limicie albo pozyczajacych); recenzja: pula Banku wyczerpana dzis przez miasta wczesniej na liscie to nie brak
+            // kredytu - miasto czeka do jutra (licznik "czeka na pule Banku"), podatek tylko przy limicie albo pustym Banku
+            bool waitPool = arr >= MinNeed && lordOk && !lentAny && _poolShort;
+            if (waitPool) _dPoolWait++;
+            bool noCredit = arr >= MinNeed && lordOk && !lentAny && !waitPool;
             if (noCredit) { _dNoCredit++; _dArrLeft += arr; }
             bool insolvent = noCredit || (tot >= 1 && limit > 0 && tot >= InsolventShare * limit);
             if (insolvent)
@@ -272,7 +327,8 @@ namespace Armoury
             // 6. splacone do zera
             if (b != null && b.Since >= 0 && b.Total < 1)
             {
-                b.P = b.R = b.B = b.IP = b.IR = 0; b.N.Clear(); b.Since = -1; _dClearedN++;
+                _dAdj += Math.Max(0, b.Total);                                  // reszta < 1 skreslona bez splaty (kontrola dlugu)
+                b.P = b.R = b.B = b.IP = b.IR = 0; b.N.Clear(); b.Since = -1; b.DTerms = 0; _dClearedN++;
                 if (clan == Clan.PlayerClan) Say("The council of " + NameOf(st) + " has paid off its debts.", true);
             }
         }
@@ -371,6 +427,7 @@ namespace Armoury
                     }
                 }
             }
+            if (got < need && IronBank.On && _bankPool0 >= 1 && _bankPool < 1) _poolShort = true;   // recenzja: Bank by pozyczyl, ale dzienna pula poszla na miasta wczesniej
             return got;
         }
 
@@ -389,7 +446,9 @@ namespace Armoury
                 if (o > 0)
                 {
                     IronBank.CapitalAdd(o);
+                    double b0 = b.B;
                     b.B = Math.Max(0, b.B - o); pay -= o; done += o; if (levy) _dLevyToCred += o; else _dRepB += o;
+                    _dAdj += (b0 - b.B) - o;                                     // ostatnia moneta ponad dlug (ceil) - kontrola dlugu
                 }
             }
             if (pay <= 0) return done;
@@ -397,32 +456,38 @@ namespace Armoury
             double rest = b.P + b.R + nSum;
             if (rest < 1) return done;
             double f = Math.Min(1.0, pay / rest);
+            // recenzja: kazda czesc najwyzej do reszty `pay` (zaokraglenia do monety przy kilku wierzycielach nie wychodza ponad `pay` - kasa nie doplaca z wlasnego,
+            // kontrola podatku dokladna); ostatni wierzyciel dostaje tylko to, co zostalo
             // notable
             if (nSum >= 1)
             {
                 _ids.Clear(); foreach (var k in b.N.Keys) _ids.Add(k);
-                for (int i = 0; i < _ids.Count; i++)
+                for (int i = 0; i < _ids.Count && pay > 0; i++)
                 {
                     double[] v; if (!b.N.TryGetValue(_ids[i], out v)) continue;
                     var h = HeroOf(_ids[i]);
                     if (h == null || !h.IsAlive) continue;                      // przejdzie na kiese P przy odsetkach jutro
-                    long x = (long)Math.Min(Math.Floor(v[0] * f + 0.5), Math.Ceiling(v[0]));
+                    long x = (long)Math.Min(Math.Min(Math.Floor(v[0] * f + 0.5), Math.Ceiling(v[0])), (double)pay);
                     if (x <= 0) continue;
                     long o = Out(t, x);
                     if (o <= 0) continue;
                     try { h.ChangeHeroGold((int)o); CirculationWindows.NoteHeroGold(h, o); }
                     catch (Exception e) { t.ChangeGold((int)o); Stumble("Repay(notabl)", e); continue; }
                     double ip = Math.Min(v[1], o); v[1] -= ip; _dRepInt += (long)ip;
-                    v[0] = Math.Max(0, v[0] - o); if (v[0] < 1) b.N.Remove(_ids[i]);
-                    done += o; if (levy) _dLevyToCred += o; else _dRepN += o;
+                    double v0 = v[0];
+                    v[0] = Math.Max(0, v[0] - o);
+                    double dec = v0 - v[0];
+                    if (v[0] < 1) { dec = v0; b.N.Remove(_ids[i]); }
+                    _dAdj += dec - o;
+                    pay -= o; done += o; if (levy) _dLevyToCred += o; else _dRepN += o;
                 }
             }
             // kiesy P i R
-            for (int cls = 2; cls >= 1; cls--)
+            for (int cls = 2; cls >= 1 && pay > 0; cls--)
             {
                 double bal = cls == 2 ? b.P : b.R;
                 if (bal < 1) continue;
-                long x = (long)Math.Min(Math.Floor(bal * f + 0.5), Math.Ceiling(bal));
+                long x = (long)Math.Min(Math.Min(Math.Floor(bal * f + 0.5), Math.Ceiling(bal)), (double)pay);
                 if (x <= 0) continue;
                 double accr = cls == 2 ? b.IP : b.IR;
                 long ip = (long)Math.Min(accr, x);
@@ -432,8 +497,9 @@ namespace Armoury
                 if (gv <= 0) { t.ChangeGold((int)o); continue; }               // kiesa nieczynna - zloto zostaje w kasie, dlug bez zmiany
                 long ipp = Math.Min(ip, gv);
                 if (cls == 2) { b.P = Math.Max(0, b.P - gv); b.IP = Math.Max(0, b.IP - ipp); } else { b.R = Math.Max(0, b.R - gv); b.IR = Math.Max(0, b.IR - ipp); }
+                _dAdj += (bal - (cls == 2 ? b.P : b.R)) - gv;
                 _dRepInt += ipp;
-                done += gv; if (levy) _dLevyToCred += gv; else _dRepF += gv;
+                pay -= gv; done += gv; if (levy) _dLevyToCred += gv; else _dRepF += gv;
             }
             return done;
         }
@@ -576,10 +642,11 @@ namespace Armoury
                     var b = kv.Value;
                     double tot = b.Total;
                     if (b.LevyDay != int.MinValue && today - b.LevyDay < gap) levyRecent++;
-                    if (tot < 1) continue;
-                    towns++; sP += b.P; sR += b.R; sB += b.B;
                     double n = 0; foreach (var v in b.N.Values) n += v[0];
-                    sN += n; if (n >= 1) withN++; if (b.B >= 1) withB++;
+                    sP += b.P; sR += b.R; sB += b.B; sN += n;                     // recenzja: suma ze wszystkich ksiag (takze reszty < 1) - kontrola dlugu dokladna
+                    if (tot < 1) continue;
+                    towns++;
+                    if (n >= 1) withN++; if (b.B >= 1) withB++;
                     double lim = b.St != null && b.St.Town != null ? Limit(b.St.Town, s) : 0;
                     sLim += lim;
                     if (tot > maxD) { maxD = tot; maxName = NameOf(b.St); maxLim = lim; }
@@ -587,7 +654,7 @@ namespace Armoury
                 double debt = sP + sR + sB + sN;
                 long lent = _dLentP + _dLentR + _dLentN + _dLentB;
                 long repaid = _dRepB + _dRepN + _dRepF + _dLevyToCred;
-                double ctl = double.IsNaN(_debtPrev) ? 0 : debt - (_debtPrev + lent + _dInt - repaid);
+                double ctl = double.IsNaN(_debtPrev) ? 0 : debt - (_debtPrev + lent + _dInt - repaid - _dAdj);
                 long levy = _dLevyW + _dLevyR + _dLevyP + _dLevyN;
                 long levyUse = _dLevyToCred + _dLevyToArr + _dLevyKept;
                 var sb = new StringBuilder(1400);
@@ -600,16 +667,20 @@ namespace Armoury
                   .Append(" | pozyczki dzis ").Append(lent).Append(" w ").Append(_dBorrowN).Append(" miastach (P ").Append(_dLentP).Append(", R ").Append(_dLentR).Append(", notable ").Append(_dLentN)
                   .Append(", Bank ").Append(_dLentB).Append(" z puli ").Append(N0(bankPool0)).Append(") -> zaleglosci panom ").Append(_dToLord).Append(", koronie ").Append(_dToCrown).Append(" (lacznie z podatku), zostalo w kasie ").Append(_dLoanKept)
                   .Append(" | odsetki ").Append(N0(_dInt)).Append(" (Bank ").Append(N0(_dIntB)).Append(")")
-                  .Append(" | splaty z nadwyzki kas (ponad zapas kupcow) ").Append(_dRepB + _dRepN + _dRepF).Append(" w ").Append(_dRepN2).Append(" miastach (Bank ").Append(_dRepB).Append(", notable ").Append(_dRepN)
+                  .Append(" | splaty z nadwyzki kas (ponad zapas kupcow i najblizsza rate) ").Append(_dRepB + _dRepN + _dRepF).Append(" w ").Append(_dRepN2).Append(" miastach (Bank ").Append(_dRepB).Append(", notable ").Append(_dRepN)
                   .Append(", kiesy P/R ").Append(_dRepF).Append("; w tym odsetki do kies i notabli ").Append(_dRepInt).Append(")")
-                  .Append(" | niewyplacalne ").Append(_dInsolvent).Append(" (zaleglosc bez kredytu ").Append(_dNoCredit).Append(" - zostalo ").Append(N0(_dArrLeft)).Append(")")
+                  .Append(" | niewyplacalne ").Append(_dInsolvent).Append(" (zaleglosc bez kredytu ").Append(_dNoCredit).Append(" - zostalo ").Append(N0(_dArrLeft))
+                  .Append("; czeka na pule Banku, wyczerpana dzis ").Append(_dPoolWait).Append(")")
                   .Append(", podatki nadzwyczajne ").Append(_dLevies).Append(" na ").Append(levy).Append(" (W ").Append(_dLevyW).Append(", R ").Append(_dLevyR).Append(", P ").Append(_dLevyP).Append(", notable ").Append(_dLevyN)
                   .Append(") -> wierzycielom ").Append(_dLevyToCred).Append(", na zaleglosci ").Append(_dLevyToArr).Append(", w kasie ").Append(_dLevyKept)
                   .Append("; miast z podatkiem w ostatnich ").Append(gap).Append(" dobach ").Append(levyRecent)
                   .Append(" | skutki: dobrobyt -").Append(_dPros.ToString("0.0", Inv)).Append(" (dlug) -").Append(_dLevyPros.ToString("0.0", Inv)).Append(" (podatek), lojalnosc -").Append(_dLevyLoy.ToString("0.0", Inv))
                   .Append(", relacje notabli z panem -").Append(Math.Max(0, Math.Min(20, s.TownDebtLevyRelation))).Append(" x ").Append(_dLevyNotables)
-                  .Append(" | bez zywego pana ").Append(_dNoLord).Append(", oblezone ").Append(_dSiege).Append(", dlug zmarlych notabli na kiese P ").Append(N0(_dMovedN))
-                  .Append(" | kontrola: dlug - (wczoraj + pozyczone + odsetki - splacone) ").Append(N0(ctl)).Append(" (oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) ")
+                  .Append(" | bez zywego pana ").Append(_dNoLord).Append(", oblezone ").Append(_dSiege).Append(", po zdobyciu (28 dob bez rat DS) ").Append(_dCapt)
+                  .Append(", dlug zmarlych notabli na kiese P ").Append(N0(_dMovedN))
+                  .Append(" | zaleglosci firm DS miast z kasy na koniec (panu + koronie, bez czesci z oszczednosci ludu) ").Append(N0(_dArrEnd)).Append(" zl u ").Append(_dArrEndN).Append(" miast")
+                  .Append(" | kontrola: dlug - (wczoraj + pozyczone + odsetki - splacone - zaokraglenia ").Append(_dAdj.ToString("0.00", Inv)).Append(") ").Append(N0(ctl))
+                  .Append(" (oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) ")
                   .Append(levy - levyUse).Append(" (oczekiwane 0)")
                   .Append(" | czas ").Append(ms.ToString("0.000", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumblesSess).Append(").");
                 Log.Info(sb.ToString());
@@ -641,6 +712,7 @@ namespace Armoury
                     first = false;
                     sb.Append(n.Key).Append('~').Append(R(n.Value[0])).Append('~').Append(R(n.Value[1]));
                 }
+                sb.Append(';').Append(b.DTerms.ToString(Inv));                  // recenzja: 11. pole - dni kwartalu z dlugiem rady (zapis z 10 polami - 0)
             }
             return sb.ToString();
         }
@@ -673,6 +745,7 @@ namespace Armoury
                                 double v0 = D(q[1]); if (v0 < 1) continue;
                                 b.N[q[0]] = new double[] { v0, Math.Min(v0, D(q[2])) };
                             }
+                        if (a.Length >= 11) b.DTerms = Math.Max(0, Math.Min(64, I(a[10], 0)));
                         b.IP = Math.Min(b.IP, b.P); b.IR = Math.Min(b.IR, b.R);
                         _b[a[0]] = b; n++;
                     }
@@ -729,7 +802,8 @@ namespace Armoury
                 {
                     sb.Append("Merchant families: ").Append(N0(b.P)).Append("\nCraftsmen: ").Append(N0(b.R)).Append("\nNotables: ").Append(N0(n)).Append("\nIron Bank of Braavos: ").Append(N0(b.B)).Append("\n\n");
                     sb.Append("Interest: about ").Append(N0(intYear)).Append(" denars a year (").Append(N0(intYear / year * 7)).Append(" a week).\n");
-                    sb.Append("The council pays back from what its coffers hold above the merchants' stock (").Append(N0(TownPurse.Reserve(t))).Append(" denars), before the lord's dues can rise again.\n");
+                    sb.Append("The council pays back from what its coffers hold above the merchants' stock and the next dues (").Append(N0(Math.Max(TownPurse.Reserve(t), DsTowns.TdKeep(st))))
+                      .Append(" denars), before the lord's dues can rise again.\n");
                     sb.Append("While in debt the town loses about ").Append((Clamp(s.TownDebtProsperityPerDay, 0, 10) * q).ToString("0.0", Inv)).Append(" prosperity a day.\n");
                     if (tot >= InsolventShare * lim) sb.Append("\nThe council is near the end of its credit: it will tax its burghers and notables to pay.\n");
                 }
