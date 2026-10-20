@@ -13,7 +13,8 @@ bez liczb; technika jak D-1 (decale na mapie). Dotad wokol wiosek nie bylo zadny
 **Zmiana.** Nowy plik `Armoury/src/MapFields.cs` + minimalne wpiecia:
 - `MapFields` (statyczna, bez typow SandBox.View): klucz, pora pol swiata (`Phase`), rejestracja widoku z ochrona przed bledem ladowania typu (3 proby, jak drogi boczne);
 - `MapFieldsView` (komponent mapy, Priority 107 - po drogach bocznych): lista wiosek, plan pol, komorki, decale, pora i stan wsi, linie logu;
-- `SubModuleMain.OnApplicationTick`: jedna linia `MapFields.AppTick()` (przed wylacznikiem wiosek - pola wsi gry sa tez bez wiosek ukladu);
+- `SubModuleMain.OnApplicationTick`: jedna linia `MapFields.AppTick()` zaraz po rejestracji drog bocznych (przed wylacznikiem wiosek - pola wsi gry sa tez
+  bez wiosek ukladu; po wznowieniu przeniesiona sprzed `if (_mapVillagesLoadFails ...)`, bo w to samo miejsce dopisuje swoj blok galaz p6-szubienice);
 - `MapRoads.cs`: jedna linia `GridNow` (odczyt referencji siatki drog - zmiana siatki = pola od nowa, zeby nie lezaly na drodze);
 - `Settings.cs`: nowa sekcja "Fields around villages" z kluczem `MapVillageFields` (NOWY, domyslnie TAK) + `tools/gen_mcm.py` (McmSettings.cs);
 - `tools/sprawdz_logi.py`: grupa `--grupa p6pola` (progi PP-0..PP-6, funkcje `p6pola_phase`, `p6pola_main`).
@@ -47,17 +48,36 @@ Jak dziala:
 - Regresje / kolizje: nowy widok obok drog bocznych (106) i wiosek (100); nie dotyka ich stanu ani decali. `MapRoads.GridNow` tylko czyta referencje (volatile).
   `WinterRealm.OfVillage`, `VillageBook.LookOf`, `FreeHands.HarvestWindow`, `WesterosClimate.SkySeason` - same odczyty z watku glownego (pod ich wlasnymi zamkami).
   Ekonomia, AI, zapis: bez zmian (zero przeplywow zlota i towaru - ksiega Obieg bez nowych pozycji).
-- Wyglad NIESPRAWDZONY w grze: kolor przez `SetFactor1` mnozy barwe tekstury (shader modulate - tak jak ziemia drog bocznych). Jesli tekstura pola gry jest bardzo
-  ciemna albo kolor nie dziala na tym materiale, pory beda slabo widoczne - wtedy poprawic barwy `MapFields.LookColor` (jedna tablica). Pola pod drzewami lasu
-  (Forest dozwolony) - maluja ziemie pod drzewami (jak polana).
+- Wyglad NIESPRAWDZONY w grze: kolor przez `SetFactor1` mnozy barwe tekstury. Dowod, ze barwienie dziala na tym rodzaju naklejki: material pola
+  (`decal_production_farm_wheat_a`) ma w `materials.tpac` ten sam shader `modulate:b` + use_albedo + render_on_terrain co strzalka tropow gry `map_track_arrow`,
+  ktora gra barwi wlasnie `SetFactor1` (SandBox.View `MapTracksVisualManager`, kolor z `DefaultMapTrackModel.GetTrackColor` - `Vec3.ToARGB`, ten sam format co
+  `LookColor`). Jesli tekstura pola jest bardzo ciemna albo barwy wyjda za slabe, pory beda slabo widoczne - wtedy poprawic `MapFields.LookColor` (jedna tablica).
+  Pola pod drzewami lasu (Forest dozwolony) - maluja ziemie pod drzewami (jak polana).
+- Wielkosc i odstep sprawdzone wobec ROT: ROT-Map (`SceneObj/Main_map/scene.xscene`) ma ok. 28 takich naklejek jako dzieci encji wsi - srodki 2.1-3.5 jedn. od
+  srodka wsi, skala 1.0-1.7 (prefab: naklejka o skali 1 = 2 x 2 jedn.). U nas wies gry: srodek pola 3.65 jedn. od srodka, pole ok. 1.8-2.0 x 2.1-2.7 jedn. - ta sama
+  wielkosc co pola ROT. Przy tych kilkunastu wsiach ROT nasze pola leza obok pol ROT (moga sie czesciowo nakladac - obie to ta sama tekstura pszenicy; nie zdejmuje
+  pol ROT - to dane sceny ROT).
 - Drogi: sprawdzian drogi idzie przez siatke premii predkosci - przy `MapRoadSpeedBonus` = NIE (KindAt -1) albo `MapSideRoadSpeedBonus` = NIE pola moga lezec na
   narysowanej drodze bocznej. U Jeffa oba TAK. Siatka zmieniona (publikacja drog bocznych chwile po wczytaniu) - pola zdjete i plan od nowa raz na zmiane (linia logu).
 - Gesto ustawione wioski ukladu (odstep 4.5 jedn.) maja pola tylko po stronie z dala od sasiadow; w bardzo gestych skupiskach wioska moze zostac bez pol (log: "sasiad").
 - Obrazek wioski przesuniety przez widok wiosek (na lad, ze stoku) nie przesuwa pierscienia pol (plan liczy od polozenia z pliku ukladu - tak samo jak drogi boczne).
 - Liczba decali: kilkaset w scenie obok ok. 2 tys. decali drog bocznych; przy klopocie z plynnoscia - klucz NIE (pola zdjete od razu).
 - Watki: caly kod na watku glownym (tick widoku mapy) - nic nie wolaja watki AI.
+- Scalenie: `git merge-tree` galezi z n22-calosc (4885ae75 - 18 galezi fali 1) i z galeziami fali 2 (p6-szubienice, p6-drogi, p6-sztormy, p6-a7, p6-spichlerz,
+  p6-zakladnicy) oraz drzewami n22f-* - 0 konfliktow; drzewo scalone z n22-calosc zbudowane osobno (Armoury Release: kod 0, 0 Error(s)). n22-calosc i n22f-* nie
+  ruszaja `MapRoads.cs` ani `SubModuleMain.cs`; uzyte odczyty (FreeHands.HarvestWindow / HarvestFrom / HarvestTo, WesterosClimate.SkySeason, WinterRealm.OfVillage,
+  VillageBook.LayoutCrcNow / LayoutRecords / LookOf / LookVersion, MapSideRoads.ViewCircle, MapRoads.KindAt) sa w n22-calosc bez zmian. Priorytet widoku 107 - wolny
+  (wioski 100, zajazdy 101, szubienice p6 102, proba drog 105, drogi boczne 106).
 
-**Status.** DO SPRAWDZENIA (build Armoury Release: kod 0, 0 Error(s), ostrzezenia tylko stare; autotestu nie uruchamialem - zakaz w zadaniu).
+**Wznowienie (20.10, po "wstrzymaj fala 2" i "zacznij fale 2").** Poprzedni agent zostawil 2 commity (3cbe284d kod, 032e6cb5 grupa progow + ten wpis), drzewo czyste.
+Przejrzany caly kod `MapFields.cs` wobec wzoru drog bocznych (ta sama kolejnosc CreateDecal -> SetMaterial -> AddDecalInstance -> Frame, zdjecie, rejestracja,
+OnFinalize), materialy i argumenty atlasu z prefabow gry (zgodne z `map_icon_parts.xml`), numery scian siatki (`TerrainType` 1.4.8: Plain 1, Desert 2, Snow 3,
+Forest 4, Steppe 5, RuralArea 14, Swamp 15, Dune 16, Beach 20 - zgodne), kolejnosc `CampaignTime.Seasons` (Spring 0 .. Winter 3 - zgodna z `SeasonName`).
+Snieg wieczny bez pol - spojne z ekonomia (VillageCrafts: "snieg bez upraw"). `gen_mcm` bez zmian w McmSettings, `--grupa p6pola` sprawdzona na logu probnym
+i na logu wzorcowym 160 dob (INFO - log sprzed galezi). Jedyna zmiana kodu: przeniesienie linii wpiecia w SubModuleMain (wyzej).
+
+**Status.** DO SPRAWDZENIA (build Armoury Release: kod 0, 0 Error(s), ostrzezenia tylko stare - na galezi i na drzewie scalonym z n22-calosc; autotestu nie
+uruchamialem - zakaz w zadaniu).
 
 **Decyzje (moje, Jeff: "ekonomie projektuje Claude").**
 - Pory roku Westeros trwaja latami, wiec rytm pol idzie wedlug dnia roku (jak zniwa FreeHands), a pora Westeros decyduje tylko: zima = snieg / ugor / zielone wedlug
