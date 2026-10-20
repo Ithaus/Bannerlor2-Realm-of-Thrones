@@ -158,7 +158,7 @@ namespace Armoury
         private static FieldInfo _fRepAllN, _fRepAllC, _fRepWN, _fRepWC, _fRepAN, _fRepAC, _fBudN, _fBudC;
         private static MethodInfo _mRecordRepair;
         private const int CatWeapons = 0, CatArmor = 1, CatAll = 2;   // QuartermasterBehavior.RepairCategory
-        private static int _lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith;
+        private static int _lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastBusy, _lastBulkN;   // _lastBusy/_lastBulkN: R3-02 (recenzja)
         private static string _lastTown = "";
         private static int _rpDeals, _rpPieces, _rpLabor, _rpMat, _rpWait, _rpWrecks, _rpNoSmith, _rpPoor, _rpScrap, _rpNone;
         private static float _rpMatValue;
@@ -192,7 +192,7 @@ namespace Armoury
             Drobne39.Reset();        // 3.9: liczniki drobnych (trzecia od sumy, bandyci do bandy) - ten sam moment
             ClearDay();
             _stumbles = 0;
-            _lastWait = _lastWaitMask = _lastWrecks = _lastNoSmith = 0; _lastTown = "";
+            _lastWait = _lastWaitMask = _lastWrecks = _lastNoSmith = _lastBusy = _lastBulkN = 0; _lastTown = "";
             LClear(); _lStumbles = 0;   // E8/L (252): liczniki daru dla miasta i trofeow zostawionych na polu
             MendMaterial.Reset();   // zapas kowali miast (reszty calych sztuk) - wczytanie oddaje go w ArmouryBehavior.SyncData (arm_mendstock)
         }
@@ -781,6 +781,9 @@ namespace Armoury
             public readonly int[] WaitBy = new int[MendMaterial.Kinds];
             public int Pieces, Labor, Wait, WaitMask, Wrecks, NoSmith, Poor;
             public float Mat;
+            // R3-02 (recenzja): godziny cechow zlecenia (MendHoursByGuild), sztuki bez wolnych rak dzis i liczba sztuk do rabatu hurtowego (MendBulkEveryOrder)
+            public readonly GuildMend.Tally Hours = new GuildMend.Tally();
+            public int Busy, BulkN;
             public int Total { get { return Labor + MatGold(Mat); } }
         }
 
@@ -824,6 +827,21 @@ namespace Armoury
                 if (need == null) { p.NoSmith += el.Amount; continue; }                       // nie robota kowala (brak receptury)
                 lots.Add(new Lot2 { El = ee, Amount = el.Amount, Labor = TroopSelfMend.UnitCost(ee), Value = it.Value, Need = need });
             }
+            // R3-02 (recenzja): rabat hurtowy zlecenia u kwatermistrza - od liczby sztuk, ktore kowale moga wziac (przy budzecie najwyzej jego limit sztuk);
+            // 0 przy wylaczonym MendBulkEveryOrder (Bulk zwraca robocizne bez zmian)
+            if (GuildMend.BulkOn)
+            {
+                int all = 0; foreach (var l in lots) all += l.Amount;
+                p.BulkN = budget ? Math.Min(all, Math.Max(0, maxItems)) : all;
+                for (int i = 0; i < lots.Count; i++) { var l = lots[i]; l.Labor = GuildMend.Bulk(l.Labor, p.BulkN); lots[i] = l; }
+            }
+            // R3-02 (recenzja): godziny cechow - zlecenie gracza bierze wolne godziny cechu dzis (bez limitu polowy); czego nie zmieszcza - czeka na wolne rece
+            float[] left = null;
+            if (GuildMend.On && st != null && st.Town != null)
+            {
+                left = new float[GuildMend.Trades];
+                for (int k = 0; k < GuildMend.Trades; k++) left[k] = GuildMend.Available(st.Town, k);
+            }
             if (budget)
             {
                 for (int i = 0; i < lots.Count; i++) { var l = lots[i]; l.Est = l.Labor + p.Bench.Estimate(l.Need); lots[i] = l; }
@@ -838,6 +856,9 @@ namespace Armoury
                 for (int k = 0; k < lot.Amount; k++)
                 {
                     if (budget && p.Pieces >= maxItems) { p.Poor += lot.Amount - k; break; }
+                    int trade = left != null ? GuildMend.TradeOf(lot.El.Item) : 0;
+                    float hrs = left != null ? GuildMend.Hours(lot.El) : 0f;
+                    if (left != null && left[trade] + 0.0001f < hrs) { p.Busy += lot.Amount - k; break; }   // cech nie ma dzis wolnych rak na te sztuke - stos czeka, nastepne dalej
                     float cost; int miss;
                     var pp = p;
                     int r = p.Bench.TryMend(lot.Need, c => (long)pp.Labor + labor + MatGold(pp.Mat + c) <= limit, out cost, out miss);
@@ -852,6 +873,7 @@ namespace Armoury
                     if (job == null) { job = new Job { El = lot.El }; p.Jobs.Add(job); }
                     job.N++; job.Labor += labor; job.Mat += cost;
                     p.Pieces++; p.Labor += labor; p.Mat += cost;
+                    if (left != null) { left[trade] -= hrs; p.Hours.AddHours(lot.El.Item, hrs); }
                 }
             }
             return p;
@@ -889,7 +911,18 @@ namespace Armoury
                 int coffer = MendMaterial.CofferNow(st);
                 if (due > 0) GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, st, due, true);
                 if (due > 0) MendMaterial.PlayerLaborToFolk(st, coffer, labor);   // E8/B (258, R5): robocizna z kasy do kiesy ludu (jak N1), material zostaje w kasie
+                if (done > 0)   // R3-02 (recenzja): godziny cechow za zrobione sztuki (warsztaty jutro maja mniej rak) i rabat do linii doby
+                {
+                    GuildMend.OrderDone(st != null ? st.Town : null, p.Hours.Scaled(done, p.Pieces));
+                    GuildMend.NoteBulk(labor, p.BulkN);
+                }
             }
+        }
+
+        /// <summary>R3-02 (recenzja): sztuki, na ktore cechy miasta nie maja dzis wolnych rak ("" - zadne).</summary>
+        private static string BusyEn(int busy, string town)
+        {
+            return busy > 0 ? " " + busy + (busy == 1 ? " piece waits" : " pieces wait") + " for free hands - the trades of " + town + " have no more working hours today." : "";
         }
 
         private static string Kinds(int mask, bool en)
@@ -936,11 +969,11 @@ namespace Armoury
             if (p.Pieces == 0)
             {
                 _rpNone++;
-                Say("The smiths of " + town + " could not restore anything." + LeftEn(p.Wait, p.WaitMask, p.Wrecks, p.NoSmith, town)
+                Say("The smiths of " + town + " could not restore anything." + LeftEn(p.Wait, p.WaitMask, p.Wrecks, p.NoSmith, town) + BusyEn(p.Busy, town)
                     + (p.Poor > 0 ? " Not enough coin for the rest." : ""),
                     "[QM] Armoury: repair (" + what + ") in " + town + " - nothing restored: wait " + p.Wait + ", wrecks " + p.Wrecks + ", no smith's work " + p.NoSmith + ", over budget/gold " + p.Poor);
                 Log.Info("Kwatermistrz (Spoils) - naprawa (" + what + ") w " + town + ": nic nie naprawiono - czeka na material " + p.Wait + " szt. (brak: " + Kinds(p.WaitMask, false)
-                         + "), wrakow " + p.Wrecks + ", nie robota kowala " + p.NoSmith + ", za drogo / poza budzetem " + p.Poor + ".");
+                         + "), wrakow " + p.Wrecks + ", nie robota kowala " + p.NoSmith + ", za drogo / poza budzetem " + p.Poor + ", bez wolnych rak cechow " + p.Busy + ".");
                 if (budget) { try { GameMenu.ActivateGameMenu("realistic_loot_qm_repair"); } catch { } }
                 return;
             }
@@ -955,7 +988,7 @@ namespace Armoury
             try { var j = _pJournal != null ? _pJournal.GetValue(null, null) : null; if (j != null && _mRecordRepair != null) _mRecordRepair.Invoke(j, new object[] { done, paid }); }
             catch (Exception e) { Stumble("SpoilsSeal.Repair.Journal", e); }
             Say("The smiths of " + town + " restored " + done + (done == 1 ? " piece" : " pieces") + " for " + paid + " denars, paid into the town's coffers: "
-                + labor + " for their work and " + matGold + " for materials from its market." + LeftEn(p.Wait, p.WaitMask, p.Wrecks, p.NoSmith, town)
+                + labor + " for their work and " + matGold + " for materials from its market." + GuildMend.BulkEn(p.BulkN) + LeftEn(p.Wait, p.WaitMask, p.Wrecks, p.NoSmith, town) + BusyEn(p.Busy, town)
                 + (p.Poor > 0 ? " " + p.Poor + (budget ? " more do not fit the budget." : " more you cannot pay for.") : ""),
                 "[QM] Armoury: repair (" + what + ") in " + town + " - " + done + " items for " + paid + " den. to the town treasury (work " + labor + ", materials " + matGold
                 + "), wait " + p.Wait + ", wrecks " + p.Wrecks + ", no smith's work " + p.NoSmith + ", over budget/gold " + p.Poor);
@@ -965,7 +998,8 @@ namespace Armoury
                      + p.Bench.UsedKg[0].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + ", drewno " + p.Bench.UsedKg[1].ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
                      + ", skora " + p.Bench.UsedKg[2].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + ", plotno " + p.Bench.UsedKg[3].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
                      + "; czeka na material " + p.Wait + " szt. (brak: " + (p.Wait > 0 ? Kinds(p.WaitMask, false) : "-") + "), wrakow nieodnowionych " + p.Wrecks + ", nie robota kowala "
-                     + p.NoSmith + ", za drogo / poza budzetem " + p.Poor + ".");
+                     + p.NoSmith + ", za drogo / poza budzetem " + p.Poor + "; godziny cechow (R3-02): " + p.Hours.LogPl() + ", bez wolnych rak " + p.Busy + ", rabat hurtowy "
+                     + (int)Math.Round(GuildMend.BulkCut(p.BulkN) * 100f) + "% przy " + p.BulkN + " szt.");
             try { GameMenu.ActivateGameMenu(budget ? "realistic_loot_qm_repair" : "realistic_loot_quartermaster"); } catch { }
         }
 
@@ -1047,6 +1081,7 @@ namespace Armoury
                 _fRepAN.SetValue(__instance, a.Pieces); _fRepAC.SetValue(__instance, a.Total);
                 _fBudN.SetValue(__instance, b.Pieces); _fBudC.SetValue(__instance, b.Total);
                 _lastWait = all.Wait; _lastWaitMask = all.WaitMask; _lastWrecks = all.Wrecks; _lastNoSmith = all.NoSmith; _lastTown = Nm(st);
+                _lastBusy = all.Busy; _lastBulkN = all.BulkN;   // R3-02 (recenzja)
             }
             catch (Exception e) { Stumble("SpoilsSeal.RepairCosts", e); }
         }
@@ -1063,7 +1098,7 @@ namespace Armoury
                 var t = new TextObject("{=RL_QM_RepairText}The quartermaster's smiths can remove the 'Plundered' mark from your equipment \u2014 for a price.\n\nTotal repairable: {COUNT} items\nTotal cost: {COST} denars\nYour gold: {GOLD} denars\n\n{AFFORD}");
                 t.SetTextVariable("COUNT", count); t.SetTextVariable("COST", cost); t.SetTextVariable("GOLD", gold); t.SetTextVariable("AFFORD", afford.ToString());
                 string note = "\n\nThe smiths of " + _lastTown + " do the work and the coin goes into the town's coffers: " + (MendMaterial.RuleOn ? "their share of the days a master spent making each piece, at the day wage of " + _lastTown : "a quarter of the worth a piece has lost") + " for their labour, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool; the worse the piece, the more material."
-                              + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown);
+                              + GuildMend.BulkEn(_lastBulkN) + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown) + BusyEn(_lastBusy, _lastTown);
                 MBTextManager.SetTextVariable("REALISTIC_LOOT_QM_REPAIR_TEXT", new TextObject("{=!}" + t.ToString() + note));
             }
             catch (Exception e) { Stumble("SpoilsSeal.RepairMenu", e); }
@@ -1076,9 +1111,9 @@ namespace Armoury
             if (!QmOn || args == null) return;
             try
             {
-                if ((int)_fRepAllN.GetValue(__instance) > 0 || _lastWait + _lastWrecks + _lastNoSmith <= 0) return;
+                if ((int)_fRepAllN.GetValue(__instance) > 0 || _lastWait + _lastWrecks + _lastNoSmith + _lastBusy <= 0) return;
                 args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}Nothing the smiths of " + _lastTown + " can restore now." + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown));
+                args.Tooltip = new TextObject("{=!}Nothing the smiths of " + _lastTown + " can restore now." + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown) + BusyEn(_lastBusy, _lastTown));
             }
             catch (Exception e) { Stumble("SpoilsSeal.RepairOption", e); }
         }

@@ -18,7 +18,7 @@ namespace Armoury
         private static Dictionary<Town, float> _yesterday = new Dictionary<Town, float>();
         private static int _day = -1;
 
-        internal static void Reset() { _used.Clear(); _yesterday.Clear(); _day = -1; }
+        internal static void Reset() { _used.Clear(); _yesterday.Clear(); _day = -1; GuildMend.Reset(); }   // R3-02: pule pozostalych cechow i platnerz w taborze razem z kowalami
 
         private static float PerManDay { get { return Math.Max(1f, Settings.Current.WorkHoursPerManDay); } }
 
