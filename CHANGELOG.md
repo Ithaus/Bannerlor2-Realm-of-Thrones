@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-20 (WGRANIE 89 - noc 19/20.10: lista Jeffa, zawieszenie GC 16:09 i 142 male metody, dokonczenie PRZEKAZANIA)
+
+**Zakres (Jeff 19.10 wieczor, doslownie):** "Zaplanuj prace nocna popraw tez rzeczy ktore miales dokonczyc i rano chce miewc juz finalna rozgrywke, masz zgode na wszytko byle to skonczyc."
+oraz "napraw ten crash i poraw te 142 funkcje w grze". Plan: docs/PLAN-NOC-2026-10-20.md (w repo glownym).
+**Zmiana:** `w-toku/n20-calosc` = 934cc039 (WGRANIE 88) + 12 galezi `w-toku/n20-*` (kazda: kod -> niezalezna recenzja -> poprawki) + przeglad calosci w 5 wymiarach
+(kolizje, napisy, watki, zapis, ekonomia; 17 z 18 znalezisk poprawione). Pelne wpisy kazdej galezi: `docs/noc-1920/<klucz>-CHANGELOG.md`:
+- **zawieszenie** (CrashScribe + Armoury): naprawa opisu stosu (UNWIND_INFO) metod 1-4 B z detourem Harmony - przyczyna zamrozenia 16:09 (GC + RtlVirtualUnwind na
+  MBSubModuleBase.OnNetworkTick); siec CrashScribe bez malych metod (95 naszych z 142 znika), NeedCapPostfix bez alokacji, linia "GC (UW)". Klucze w CrashScribe.settings.xml:
+  UnwindRepair, NetSkipTinyMethods, NetTinyIlBytes, GcPulseLog. Uprzaz testowa tools/uw-uprzaz (bez naprawy: zawieszenie < 15 s; z naprawa: 11 min, 1,6 mln GC bez zaciecia).
+- **relacje**: jedno zbiorcze okienko relacji po bandach (wioski) i po odsieczy Dynamic Reinforcements (lordowie) - Bandit Relief Relation Summary, Reinforcement Relation Summary.
+- **kuznia**: przetop wedlug metalu czesci (bez stali z surowki), surowka tylko do rafinacji (Smith No Crude Input), tarcze t5-t6 bez aksamitu (Shield No Velvet) i inne (6 kluczy).
+- **plotki**: lup slowami zamiast kwot, herszt z imieniem i nazwiskiem zamiast "Broken Men", plotki na strony mieszczace sie w ramce ROT (3 klucze Inn Gossip ...).
+- **herby**: herby nakradzione / dezercji na tarczach i tunikach band, nigdy herb strony gracza ani odsieczy DR (Band Shields Stolen Arms).
+- **napisy**: krotkie napisy przyciskow (szczegoly w dymku) w naszych menu i oknach (Short Button Labels).
+- **drogi**: trakt +15% z szerszym polem (Map Road Wide Field / Margin 1.0), drogi boczne +7.5% (Map Side Road Speed Bonus / Percent).
+- **wioska**: start BK "Indebted Lord" -> wioska poboczna gracza (dochod z udzialu pana, herb, dymek, menu: nocleg pod dachem, inwestycje, przeglad) - 4 klucze Side Village Fief ...
+- **towarzysze**: zold rodu gracza wedlug tabeli Jeffa (poz. 1=1, 5=3, 10=8, 15=15, 20=25, 25=40, 30=60 d/dobe) do kies bohaterow; bohaterowie kupuja sprzet za swoje zloto (Companion ...).
+- **niewola** (RealisticCaptivity): zdobywca zabiera bron, zbroje, konia i zloto przy sobie; zwrot rynsztunku przy uwolnieniu sila (Captor Takes Arms And Purse, Gear Back From Victors).
+- **drobne**: bron Dothrakow tylko u Dothrakow, bandy sprzedaja ja paserowi; linia aksamitu wedlug miasta (Gear Fit Dothraki Only i inne).
+- **wyceny**: reszta audytu wycen (XP Handlu z magazynu, lup AI i kryjowek, kryjowka nocna, paser Spoils, ksiazka z celu BK, stara wartosc towarow BK z definicji - 8 kluczy Hist ...).
+Dodatkowo: A7 (Ks Switch Signal Rule) przetestowane osobno (fin103) - regula OK, ale kasy miast rosna 2x -> zostaje WYLACZONE; NKA-1 / NAKUM-7 z biegow x20 = artefakt tempa (fin102 x8).
+**Ryzyko / co sprawdzic:** UnwindRepair pisze do kodu w pamieci (tylko przy dokladnym wzorcu, inaczej pomija) - linia "Opis stosu (UW, menu)"; niewola sprawdzona tylko w kodzie
+(autotest nie doprowadzil do niewoli); start "Indebted Lord" sprawdzony furtka autotestu (nie przez kreator postaci); zold rodu gracza zmienia sie od razu po wczytaniu.
+**Status:** DO SPRAWDZENIA - testy i wgranie w STAN-PRAC ### 94.
+
 ## 2026-10-19 (WGRANIE 88 - Jeff: "TAK NAPRAW TERAZ" (zadania, Lotrostwo) i arakhy u wojsk Westeros)
 
 **Zmiana:** wgrane `w-toku/noc-ks4` 855a9b61 = WGRANIE 87 + f28-wyceny (raport audytu docs/AUDYT-WYCENY-2026-10-19.md; ilosci zadan i XP Lotrostwa od wartosci sprzed przeliczenia - klucze Hist Quest Qty Old Coin, Hist Roguery Xp Old Value) + f29-arakh (Gear Fit Kin Item Level). Armoury.dll 6d0fd3e4 (2012 ustawien), reszta jak 87.
