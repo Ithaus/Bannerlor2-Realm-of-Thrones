@@ -94,6 +94,7 @@ namespace Armoury
             _posSet = false; _pendingClick = _askedUid = null;
             _invHour = -1; _invUid = null; _invOk = false; _invWhy = null;
             DayZero();
+            SideVillageHome.Reset();   // r4-dom: dom, skrzynia, handel, spacer
         }
 
         private static void DayZero() { _dCarts = _dWar = _dSelf = _dNoShare = _dIntercept = _dOpen = _dClick = _dAsk = _dRest = _dRoof = _dInvest = _dTip = 0; _dPaid = _dTax = 0; _stDay = 0; }
@@ -108,6 +109,11 @@ namespace Armoury
         private static int Today() { return (int)CampaignTime.Now.ToDays; }
 
         internal static bool HasFief { get { return _uid != null && _dist != null; } }
+
+        // r4-dom (SideVillageHome): odczyt wioski gracza - uid, wies gry okregu, nazwa
+        internal static string Uid { get { return _uid; } }
+        internal static string DistId { get { return _dist; } }
+        internal static string Name { get { return _name; } }
 
         /// <summary>Wioska gracza o tym uid (widok mapy, gospodarz, dymek). Sam odczyt.</summary>
         internal static bool IsMine(string uid) { return uid != null && _uid != null && string.Equals(uid, _uid, StringComparison.Ordinal); }
@@ -671,6 +677,7 @@ namespace Armoury
                         }
                         catch (Exception e) { Stumble("Leave", e); }
                     }, true, 9);
+                SideVillageHome.AddMenus(starter);   // r4-dom: "Trade", "Your house" (lozko, skrzynia), "Take a walk"
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }
@@ -808,6 +815,7 @@ namespace Armoury
             {
                 if (_pendKingdom != null) TryPending();
                 if (!_testDone && TestWanted()) Test();
+                SideVillageHome.Hourly();   // r4-dom: samotest domu, handlu i spaceru (ta sama flaga)
             }
             catch (Exception e) { Stumble("Hourly", e); }
         }
@@ -927,6 +935,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { DayZero(); }
+            SideVillageHome.Daily();   // r4-dom: linia doby domu, handlu i spaceru
         }
     }
 }
