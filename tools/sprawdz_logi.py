@@ -1001,8 +1001,10 @@ Uzycie (Python 3, tylko odczyt):
                     lepsze) >= 80% bazy, SN-11 pokrycie korpusu lordow >= baza - 2 pp. Progi SN-3..7, 10, 11 po 14 dobach pelnej reguly. Log bez paczki: INFO.
 --grupa m96jakosc : (20.10, Jeff "za duzo jest legendary ... w sklepach za latwo mozna znalezc legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity)
                     python -I tools/sprawdz_logi.py --grupa m96jakosc <Armoury-*.log> (strumieniowo). JQ-0 latki bez BRAK, JQ-1 linie doby rozpoznane,
-                    JQ-2/JQ-3 legendarne i mistrzowskie po wyrownaniu w limicie swiata (ponad limit tylko poza polkami albo w wyrobach gracza na polkach), JQ-4 obnizki tylko przesuwaja jakosc,
-                    JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO).
+                    JQ-1b suma rodzajow = swiat (m96-jakosc2: limit NA RODZAJ przedmiotu, losowany raz na kampanie - legendarne 1-6, mistrzowskie 6-60),
+                    JQ-2/JQ-3 legendarne i mistrzowskie kazdego rodzaju po wyrownaniu w limicie rodzaju (ponad limit tylko poza polkami albo w sztukach nietykalnych), JQ-4 obnizki tylko przesuwaja jakosc,
+                    JQ-5 nowe w rodzaju w granicy miejsca rodzaju z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO),
+                    JQ-10 limity rodzajow w zakresie i stale doba do doby (rozrzut INFO). Linia sprzed m96-jakosc2 (limit swiata) - jeden rodzaj "swiat".
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -36526,21 +36528,41 @@ def nkarczmy_main(logp):
 
 # ------------------------------------------------------------ m96jakosc (20.10, Jeff "za duzo jest legendary przedmiotow ... w sklepach za latwo mozna znalezc
 # legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity). Progi JQ-x.
+# m96-jakosc2 (Jeff 20.10 17:20 "6 legendarnych danego typu ... daj wariacje, np. od 1 do 6 ... I to samo masterwork"): limit NA RODZAJ przedmiotu, losowany
+# raz na kampanie (legendarne 1-6, mistrzowskie 6-60) - linia doby ma czesc "rodzaje (stan/limit po wyrownaniu): <rodzaj> L x/limit (...) M y/limit (...)";
+# progi JQ-2/3/5 licza rodzaj po rodzaju, JQ-1b suma rodzajow = swiat, JQ-10 limity w zakresie i stale. Linia sprzed m96-jakosc2 (limit swiata) - jeden
+# rodzaj "swiat" (stare progi).
 M96JAKOSC_HEAD = "Jakosc przedmiotow (m96jakosc): "
 M96JAKOSC_ERR = "ERROR in QualityScarcity"
 M96JAKOSC_RX = {
     "day": re.compile(r"dzien (\d+)"),
     "rule": re.compile(r"\| regula (TAK|NIE)"),
-    "caps": re.compile(r"limit swiata: legendarne (\d+), mistrzowskie (\d+)"),
+    # stara: "limit swiata: legendarne 6, mistrzowskie 60"; m96-jakosc2: "limit na rodzaj: legendarne 1-6 (suma 52), mistrzowskie 6-60 (suma 495)"
+    "caps": re.compile(r"limit (swiata|na rodzaj): legendarne (\d+)(?:-(\d+) \(suma (\d+)\))?, mistrzowskie (\d+)(?:-(\d+) \(suma (\d+)\))?"),
     "before": re.compile(r"spis przed wyrownaniem: legendarne (\d+) \(polki (\d+)\), mistrzowskie (\d+) \(polki (\d+)\)"),
     "after": re.compile(r"swiat po: legendarne (\d+) \(polki (\d+), juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), mistrzowskie (\d+) \(polki (\d+), "
                         r"juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), dobre (\d+)"),
     "new": re.compile(r"nowe od wczoraj: legendarne (\d+) \[([^\]]*)\], mistrzowskie (\d+) \[([^\]]*)\] z sztuk z jakoscia (\d+)"),
     "game": re.compile(r"rzut gry odebrany: legendarne (\d+) \[[^\]]*\], mistrzowskie (\d+)"),
-    "capped": re.compile(r"zatrzymane limitem swiata: legendarne (\d+), mistrzowskie (\d+); przed pierwszym spisem (\d+)"),
+    "capped": re.compile(r"zatrzymane limitem (?:swiata|rodzaju): legendarne (\d+), mistrzowskie (\d+); przed pierwszym spisem (\d+)"),
     "dem": re.compile(r"obnizki na polkach: legendarne->mistrzowskie (\d+), legendarne->dobre (\d+), mistrzowskie->dobre (\d+), do zwyklej \([^)]*\) (\d+)"),
     "cost": re.compile(r"koszt ([\d.,]+) ms \| potkniecia (\d+)"),
 }
+M96JAKOSC_KINDS = re.compile(r"\| rodzaje \(stan/limit po wyrownaniu\): (.*?) \| koszt ")
+M96JAKOSC_KIND = re.compile(r"(\w+) L (\d+)/(\d+) \(polki (\d+), nietykalne (\d+)(?:, nowe (\d+))?\) M (\d+)/(\d+) \(polki (\d+), nietykalne (\d+)(?:, nowe (\d+))?\)")
+
+
+def m96jakosc_kinds(txt):
+    """Czesc 'rodzaje' linii -> lista slownikow rodzaju (stan, limit, polki, nietykalne, nowe) albo None (czesc nierozpoznana)."""
+    out = []
+    for part in txt.split("; "):
+        m = M96JAKOSC_KIND.fullmatch(part.strip())
+        if not m:
+            return None
+        g = m.groups()
+        out.append({"name": g[0], "L": int(g[1]), "capL": int(g[2]), "Ls": int(g[3]), "Lu": int(g[4]), "nL": int(g[5] or 0),
+                    "M": int(g[6]), "capM": int(g[7]), "Ms": int(g[8]), "Mu": int(g[9]), "nM": int(g[10] or 0)})
+    return out
 
 
 def m96jakosc_parse(s):
@@ -36558,9 +36580,13 @@ def m96jakosc_parse(s):
     sk = re.search(r"pominiete \(pociski bez celu\) (\d+), nieudane zdjecie z polki (\d+)", s)
     crL = int(cr.group(2)) if cr and cr.group(2) else (int(cr.group(1)) if cr else 0)   # stara linia: suma wyrobow jako tolerancja dla L i MW
     crM = int(cr.group(3)) if cr and cr.group(3) else (int(cr.group(1)) if cr else 0)
-    return {
+    per_type = d["caps"][0] == "na rodzaj"
+    c = d["caps"]
+    r = {
         "crL": crL, "crM": crM, "skip": int(sk.group(1)) if sk else 0, "fail": int(sk.group(2)) if sk else 0,
-        "day": I("day", 0), "on": d["rule"][0] == "TAK", "capL": I("caps", 0), "capM": I("caps", 1),
+        "day": I("day", 0), "on": d["rule"][0] == "TAK", "per_type": per_type,
+        # stara linia: limit swiata; m96-jakosc2: zakres losowania lo-hi i suma limitow rodzajow
+        "loL": int(c[1]), "hiL": int(c[2] or c[1]), "capL": int(c[3] or c[1]), "loM": int(c[4]), "hiM": int(c[5] or c[4]), "capM": int(c[6] or c[4]),
         "L0": I("before", 0), "L0s": I("before", 1), "M0": I("before", 2), "M0s": I("before", 3),
         "L": I("after", 0), "Ls": I("after", 1), "Lfix": I("after", 2) + I("after", 3) + I("after", 4) + I("after", 5),
         "M": I("after", 6), "Ms": I("after", 7), "Mfix": I("after", 8) + I("after", 9) + I("after", 10) + I("after", 11), "F": I("after", 12),
@@ -36569,14 +36595,35 @@ def m96jakosc_parse(s):
         "LM": I("dem", 0), "LF": I("dem", 1), "MF": I("dem", 2), "plain": I("dem", 3),
         "ms": float(d["cost"][0].replace(",", ".")), "stum": int(d["cost"][1]),
     }
+    if per_type:
+        mk = M96JAKOSC_KINDS.search(s)
+        kinds = m96jakosc_kinds(mk.group(1)) if mk else None
+        if not kinds:
+            return None
+        r["kinds"] = kinds
+    else:
+        # linia sprzed m96-jakosc2: jeden rodzaj "swiat" (nietykalne = wyroby gracza + pociski bez celu)
+        r["kinds"] = [{"name": "swiat", "L": r["L"], "capL": r["capL"], "Ls": r["Ls"], "Lu": crL + r["skip"], "nL": r["nL"],
+                       "M": r["M"], "capM": r["capM"], "Ms": r["Ms"], "Mu": crM + r["skip"], "nM": r["nM"]}]
+    return r
+
+
+def m96jakosc_over(k, q):
+    """Rodzaj ponad regula: sztuki do ruszenia na polkach (polki - nietykalne) wieksze niz miejsce limitu po tym, co lezy poza polkami.
+    Regula zostawia na polkach najwyzej max(0, limit - (wyroby gracza + sztuki poza polkami)) - nigdy wiecej niz max(0, limit - poza polkami)."""
+    touch = k[q + "s"] - k[q + "u"]
+    outside = k[q] - k[q + "s"]
+    return touch > max(0, k["cap" + q] - outside)
 
 
 def m96jakosc_main(logp):
     """m96jakosc (20.10; Armoury/src/QualityScarcity.cs, klucz QualityScarcity): rzut gry Legendary/Masterwork przy powstaniu sztuki przepada, wlasny rzut
-    (legendarna z tieru 5-6, mistrzowska z tieru 4-6) w limicie swiata ze spisu raz na dobe; nadmiar na polkach osad schodzi o stopien (nic nie znika).
-    JQ-0 linie startu i latek, JQ-1 linie doby rozpoznane, JQ-2/JQ-3 swiat po wyrownaniu w limicie (albo polki puste, gdy limit zajmuja juki, bohaterowie
-    i gracz), JQ-4 obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol), JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO, udzialy),
-    JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 pierwsze wyrownanie i zrodla nowych (INFO). Wejscie: log Armoury (strumieniowo)."""
+    (legendarna z tieru 5-6, mistrzowska z tieru 4-6) w limicie RODZAJU przedmiotu (m96-jakosc2: helmy, zbroje, luki ... - kazdy rodzaj swoj limit, losowany raz
+    na kampanie: legendarne 1-6, mistrzowskie 6-60) ze spisu raz na dobe; nadmiar na polkach osad schodzi o stopien (nic nie znika).
+    JQ-0 linie startu i latek, JQ-1 linie doby rozpoznane, JQ-1b suma rodzajow = swiat, JQ-2/JQ-3 kazdy rodzaj po wyrownaniu w limicie (albo polki bez sztuk do
+    ruszenia, gdy limit zajmuja juki, bohaterowie, wozy i gracz), JQ-4 obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol), JQ-5 nowe w rodzaju w granicy
+    miejsca rodzaju z wczoraj, JQ-6 rzut gry odebrany (INFO, udzialy), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 pierwsze wyrownanie i zrodla
+    nowych (INFO), JQ-10 limity rodzajow w zakresie losowania i stale doba do doby (rozrzut - INFO). Wejscie: log Armoury (strumieniowo)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("JQ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -36609,19 +36656,35 @@ def m96jakosc_main(logp):
     else:
         rep.add("JQ-0: latki", "brak linii 'wpiete'", "linia z menu glownego", None)
     if starts:
-        rep.add("JQ-0b: start sesji (klucz, limity, spis przy wczytaniu)", starts[-1][:300], "INFO", None)
+        rep.add("JQ-0b: start sesji (klucz, limity rodzajow, spis przy wczytaniu)", starts[-1][:420], "INFO", None)
     rep.add("JQ-1: linie doby rozpoznane", f"rozpoznane {len(days)}, nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""),
             "nierozpoznane 0, rozpoznane > 0", len(bad) == 0 and len(days) > 0)
+    pt = [d for d in days if d["per_type"]]
+    if pt:
+        # suma rodzajow = swiat (spis rodzaju liczy te same sztuki co spis miejsc; obnizki przesuwaja oba tak samo)
+        sumbad = [d["day"] for d in pt if sum(k["L"] for k in d["kinds"]) != d["L"] or sum(k["M"] for k in d["kinds"]) != d["M"]
+                  or sum(k["Ls"] for k in d["kinds"]) != d["Ls"] or sum(k["Ms"] for k in d["kinds"]) != d["Ms"]
+                  or sum(k["nL"] for k in d["kinds"]) != d["nL"] or sum(k["nM"] for k in d["kinds"]) != d["nM"]
+                  or sum(k["capL"] for k in d["kinds"]) != d["capL"] or sum(k["capM"] for k in d["kinds"]) != d["capM"]]
+        rep.add("JQ-1b: suma rodzajow = swiat (stan, polki, nowe, limity)", f"dob z rozjazdem {len(sumbad)} z {len(pt)}" + (f" (np. {sumbad[0]})" if sumbad else ""),
+                "0", not sumbad)
     on_days = [d for d in days if d["on"]]
     if on_days:
-        # ponad limit dopuszczalne tylko poza polkami - albo na polkach w sztukach, ktorych regula nie rusza (wyroby gracza, pociski bez celu)
-        badL = [d["day"] for d in on_days if d["L"] > d["capL"] and d["Ls"] - d["crL"] - d["skip"] > 0]
-        badM = [d["day"] for d in on_days if d["M"] > d["capM"] and d["Ms"] - d["crM"] - d["skip"] > 0]
+        # rodzaj po rodzaju: ponad limit dopuszczalne tylko poza polkami - albo na polkach w sztukach, ktorych regula nie rusza (wyroby gracza, pociski bez celu)
+        badL = [(d["day"], k["name"]) for d in on_days for k in d["kinds"] if m96jakosc_over(k, "L")]
+        badM = [(d["day"], k["name"]) for d in on_days for k in d["kinds"] if m96jakosc_over(k, "M")]
         last = on_days[-1]
-        rep.add("JQ-2: legendarne na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['L']} (polki {last['Ls']}, w tym wyroby gracza {last['crL']}, poza polkami {last['Lfix']}) przy limicie {last['capL']}; "
-                f"dob ponad limitem z polkami niepustymi {len(badL)}" + (f" (np. {badL[0]})" if badL else ""), "0 dob (ponad limit tylko poza polkami)", not badL)
-        rep.add("JQ-3: mistrzowskie na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['M']} (polki {last['Ms']}, w tym wyroby gracza {last['crM']}, poza polkami {last['Mfix']}) przy limicie {last['capM']}; "
-                f"dob ponad limitem z polkami niepustymi {len(badM)}" + (f" (np. {badM[0]})" if badM else ""), "0 dob", not badM)
+        overL = [k for k in last["kinds"] if k["L"] > k["capL"]]
+        overM = [k for k in last["kinds"] if k["M"] > k["capM"]]
+        fmt_over = lambda ks, q: ", ".join(f"{k['name']} {k[q]}/{k['cap' + q]} (poza polkami {k[q] - k[q + 's']}, nietykalne {k[q + 'u']})" for k in ks[:4])
+        rep.add("JQ-2: legendarne kazdego rodzaju po wyrownaniu w limicie rodzaju",
+                f"ostatnia doba {last['day']}: swiat {last['L']} przy sumie limitow {last['capL']} ({len(last['kinds'])} rodzajow); rodzaje ponad limit {len(overL)}"
+                + (f" [{fmt_over(overL, 'L')}]" if overL else "") + f"; (doba, rodzaj) z polkami ponad regula {len(badL)}" + (f" (np. {badL[0]})" if badL else ""),
+                "0 (ponad limit rodzaju tylko poza polkami albo w sztukach nietykalnych)", not badL)
+        rep.add("JQ-3: mistrzowskie kazdego rodzaju po wyrownaniu w limicie rodzaju",
+                f"ostatnia doba {last['day']}: swiat {last['M']} przy sumie limitow {last['capM']}; rodzaje ponad limit {len(overM)}"
+                + (f" [{fmt_over(overM, 'M')}]" if overM else "") + f"; (doba, rodzaj) z polkami ponad regula {len(badM)}" + (f" (np. {badM[0]})" if badM else ""),
+                "0", not badM)
         cons = [d["day"] for d in on_days if (d["L0"] + d["M0"]) - (d["L"] + d["M"]) != d["LF"] + d["MF"] + d["plain"]]
         rep.add("JQ-4: obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol, sztuk tyle samo)", f"dob z rozjazdem {len(cons)}" + (f" (np. {cons[0]})" if cons else ""),
                 "0", not cons)
@@ -36629,11 +36692,16 @@ def m96jakosc_main(logp):
         prev = None
         for d in days:
             if prev is not None and d["on"] and d["day"] == prev["day"] + 1:
-                if d["nL"] > max(0, d["capL"] - prev["L"]) or d["nM"] > max(0, d["capM"] - prev["M"]):
-                    over.append(d["day"])
+                pk = {k["name"]: k for k in prev["kinds"]}
+                for k in d["kinds"]:
+                    p = pk.get(k["name"])
+                    if p is None:
+                        continue
+                    if k["nL"] > max(0, k["capL"] - p["L"]) or k["nM"] > max(0, k["capM"] - p["M"]):
+                        over.append((d["day"], k["name"]))
             prev = d
-        rep.add("JQ-5: nowe legendarne i mistrzowskie w granicy miejsca z wczoraj", f"dob ponad miejsce {len(over)}" + (f" (np. {over[0]})" if over else ""),
-                "0 (nowe <= limit - swiat po wyrownaniu doby wczesniej)", not over)
+        rep.add("JQ-5: nowe legendarne i mistrzowskie w rodzaju w granicy miejsca rodzaju z wczoraj", f"(doba, rodzaj) ponad miejsce {len(over)}" + (f" (np. {over[0]})" if over else ""),
+                "0 (nowe w rodzaju <= limit rodzaju - stan rodzaju po wyrownaniu doby wczesniej)", not over)
         pcs = sum(d["pieces"] for d in on_days)
         gL = sum(d["gL"] for d in on_days)
         gM = sum(d["gM"] for d in on_days)
@@ -36646,6 +36714,9 @@ def m96jakosc_main(logp):
         rep.add("JQ-9: pierwsze wyrownanie (stary swiat)", f"doba {f0['day']}: legendarne {f0['L0']} (polki {f0['L0s']}) -> {f0['L']}, mistrzowskie {f0['M0']} (polki {f0['M0s']}) -> {f0['M']}; "
                 f"obnizki L->MW {f0['LM']}, L->dobre {f0['LF']}, MW->dobre {f0['MF']}, do zwyklej {f0['plain']}", "INFO", None)
         rep.add("JQ-9b: zrodla nowych (ostatnia doba)", f"legendarne [{last['nLsrc']}], mistrzowskie [{last['nMsrc']}]", "INFO", None)
+        if last["per_type"]:
+            rep.add("JQ-9c: rodzaje na ostatniej dobie (legendarne stan/limit, mistrzowskie stan/limit)",
+                    "; ".join(f"{k['name']} {k['L']}/{k['capL']}, {k['M']}/{k['capM']}" for k in last["kinds"]), "INFO", None)
     else:
         rep.add("JQ-2..6: regula", "brak dob z regula TAK", "INFO (klucz Quality Scarcity wylaczony - sam spis)", None)
     stum = days[-1]["stum"] if days else 0
@@ -36653,6 +36724,26 @@ def m96jakosc_main(logp):
     if days:
         mx = max(d["ms"] for d in days)
         rep.add("JQ-8: koszt doby (spis + wyrownanie)", f"najwiecej {mx:.1f} ms, srednio {sum(d['ms'] for d in days) / len(days):.1f} ms", "<= 250 ms", mx <= 250.0)
+    if pt:
+        # limity rodzajow: w zakresie losowania z linii (zmiana zakresu w MCM przycina - dalej w zakresie) i te same doba do doby przy tym samym zakresie
+        rng = [(d["day"], k["name"]) for d in pt for k in d["kinds"] if not (d["loL"] <= k["capL"] <= d["hiL"] and d["loM"] <= k["capM"] <= d["hiM"])]
+        moved = []
+        prev = None
+        for d in pt:
+            if prev is not None and d["day"] == prev["day"] + 1 and (d["loL"], d["hiL"], d["loM"], d["hiM"]) == (prev["loL"], prev["hiL"], prev["loM"], prev["hiM"]):
+                pk = {k["name"]: (k["capL"], k["capM"]) for k in prev["kinds"]}
+                moved += [(d["day"], k["name"]) for k in d["kinds"] if k["name"] in pk and pk[k["name"]] != (k["capL"], k["capM"])]
+            prev = d
+        last = pt[-1]
+        main = [k for k in last["kinds"] if k["name"] != "Other"]
+        vl = sorted(set(k["capL"] for k in main))
+        vm = sorted(set(k["capM"] for k in main))
+        rep.add("JQ-10: limity rodzajow w zakresie i stale (los raz na kampanie)",
+                f"zakres legendarne {last['loL']}-{last['hiL']}, mistrzowskie {last['loM']}-{last['hiM']}; poza zakresem {len(rng)}" + (f" (np. {rng[0]})" if rng else "")
+                + f", zmienione doba do doby {len(moved)}" + (f" (np. {moved[0]})" if moved else ""),
+                "0 i 0", not rng and not moved)
+        rep.add("JQ-10b: rozrzut limitow (ostatnia doba, bez Other)", f"legendarne: {len(vl)} roznych wartosci {vl}; mistrzowskie: {len(vm)} roznych, od {vm[0] if vm else '-'} do {vm[-1] if vm else '-'}",
+                "INFO (Jeff: wariacje, np. od 1 do 6)", None)
     rep.show()
     return 0
 

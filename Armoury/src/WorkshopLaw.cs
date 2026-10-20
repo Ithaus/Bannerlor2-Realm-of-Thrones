@@ -332,7 +332,7 @@ namespace Armoury
                     if (town.Gold - TownPurse.BuyFloor(town, 0) < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
-                    mod = QualityScarcity.Roll(w.Item, mod, QualityScarcity.SrcWorkshop);   // m96-jakosc: legendarna i mistrzowska rzadko i w limicie swiata (klucz Quality Scarcity)
+                    mod = QualityScarcity.Roll(w.Item, mod, QualityScarcity.SrcWorkshop);   // m96-jakosc: legendarna i mistrzowska rzadko i w limicie rodzaju przedmiotu (klucz Quality Scarcity)
                     workshop.ChangeGold(-wagesI);
                     int folk = TownFolk.Earn(workshop.Settlement, wagesI, TownFolk.KCraftPaid);   // E5/B1 (R11, KL L7): place cyklu do kiesy ludu W70/R30 (arytmetyka - nie rzuca)
                     town.ChangeGold(wagesI - folk);             // place wydane w miescie (E5/B1: wprost do ludu)

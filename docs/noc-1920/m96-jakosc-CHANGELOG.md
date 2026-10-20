@@ -1,5 +1,8 @@
 # m96-jakosc - legendarne i mistrzowskie rzadkie, limit swiata (20.10)
 
+> **20.10 ok. 17:20 (m96-jakosc2):** limit swiata (6 legendarnych i 60 mistrzowskich lacznie) ZASTAPIONY limitem NA RODZAJ przedmiotu, losowanym raz na kampanie
+> (legendarne 1-6, mistrzowskie 6-60 dla kazdego rodzaju) - sekcja "Limit na rodzaj" na koncu. Liczby 6 / 60 w tekscie ponizej to stan sprzed tej zmiany.
+
 **Problem (Jeff 20.10, gra na WGRANIU 95):** "za duzo jest legendary przedmiotow, legendarne przedmioty to kilka sztuk na swiecie, masterwork juz wiecej itp.,
 a w sklepach za latwo mozna znalezc legendary i masterwork". Chodzi o jakosc (modyfikatory gry: Legendary, Masterwork / Lordly, Fine / Balanced ...),
 nie o legendy z imienia (te pilnuje LegendaryLaw).
@@ -120,3 +123,76 @@ w sklepach tysiacami. Teraz legendarna moze wyjsc tylko z najlepszych wyrobow (t
 mistrzowskich najwyzej 60. Nadmiar, ktory juz lezy w sklepach, po polnocy spada o stopien (legendarna na dobra albo mistrzowska) - nic nie znika, przedmioty
 zostaja na polkach; to, co jeszcze jedzie wozami kupcow, wyrowna sie po dowiezieniu. Twoje rzeczy, Twoich towarzyszy i to, co wykujesz sam, nie sa ruszane;
 nagroda turniejowa, ktora miasto zamawia u rzemieslnikow, bedzie zwykle zwykla.
+
+## Limit na rodzaj (m96-jakosc2, 20.10)
+
+**Problem (Jeff 20.10 ok. 17:20, o regule wyzej):** "6 legendarnych danego typu, np. 6 legendarnych helmow, ale nie 6 - daj wariacje, np. od 1 do 6 legendarnych
+danego typu. I to samo masterwork." Regula m96-jakosc liczyla JEDEN limit na caly swiat (6 legendarnych i 60 mistrzowskich lacznie, wszystkie rodzaje razem).
+
+**Przyczyna (kod):** `QualityScarcity.CapL/CapM` = jedna liczba z `QualityLegendaryWorldCap` / `QualityMasterworkWorldCap`; spis, wyrownanie polek i limit przy
+powstaniu sumowaly wszystkie rodzaje przedmiotow.
+
+**Zmiana (`Armoury/src/QualityScarcity.cs`, Settings.cs + gen_mcm, `tools/sprawdz_logi.py` grupa m96jakosc; wpiecia z m96-jakosc bez zmian - `Roll` ma ten sam podpis):**
+1. **Rodzaj = `ItemObject.ItemTypeEnum`** - 16 rodzajow: HeadArmor (helmy), BodyArmor (zbroje; razem z ChestArmor - ta sama zbroja tulowia, w danych gry nieuzywana),
+   HandArmor, LegArmor, Cape, HorseHarness, OneHandedWeapon, TwoHandedWeapon, Polearm, Bow, Crossbow, Arrows, Bolts, Thrown (oszczepy, toporki, noze - jeden typ gry),
+   Shield i "Other" (reszta typow razem). **Konie:** grupa `horse` w Native i RBM (item_modifiers.xml, RBMCombat_item_modifiers.xml) nie ma etykiet Legendary
+   ani Masterwork (8-9 stanow bez `quality`, tylko "lame" jako poor) - jakosc koni tej reguly nie dotyczy (sa w "Other", ktory w danych ROT nie ma takich sztuk);
+   proce, bron palna, ksiegi, sztandary - bez jakosci. Strzal i beltow nie laczylem (osobne typy gry, Jeff: "danego typu"). Obnizka zmienia tylko modyfikator,
+   wiec sztuka nigdy nie zmienia rodzaju.
+2. **Limit losowany RAZ na kampanie dla kazdego rodzaju osobno:** legendarne z `QualityLegendaryPerTypeMin..Max` (1..6), mistrzowskie z
+   `QualityMasterworkPerTypeMin..Max` (6..60). **Rozklad rownomierny** - kazda liczba tak samo mozliwa, jak rzut kostka (Jeff chcial wariacji "od 1 do 6"; rozklad
+   z przewaga srodka dawalby prawie same 3-4 i rzadko 1 albo 6). Los deterministyczny z ziarna kampanii: `Campaign.UniqueGameId + "|jakosc|L|" + rodzaj`
+   (osobno "M"), skrot FNV-1a + domieszanie murmur3 fmix32, `lo + h % (hi - lo + 1)` - ponowne wczytanie daje te same liczby. Przyklad (to samo liczenie
+   w pythonie, m96-jakosc2-tmp/synth_jq3.py): ziarno "AbCdEfGh1234" -> legendarne [4, 5, 6, 1, 3, 5, 1, 4, 1, 1, 4, 4, 4, 4, 3] (suma 50), mistrzowskie od 6 do 59
+   (suma 439).
+3. **Zapis:** wylosowane liczby ida do zapisu - `SaveText.Sync(ds, "arm_qualitycaps")` w `QualityScarcityBehavior.SyncData` (napis "q1|HeadArmor:4,37;BodyArmor:2,51;...",
+   nazwa rodzaju, legendarne, mistrzowskie). Brak klucza (zapis sprzed paczki, nowa kampania) albo brak rodzaju w napisie = los przy starcie sesji (`EnsureLimits`,
+   przed pierwszym spisem) - z tego samego ziarna, wiec wynik ten sam. Napis to typ prosty - zapis wczytuje sie takze po cofnieciu DLL. Zmiana zakresu w MCM
+   w trakcie kampanii **przycina** wylosowana liczbe do nowego zakresu (`CapL(k)/CapM(k)`), nie losuje od nowa; min > max - min = max.
+4. **Bez sufitu globalnego:** stare `QualityLegendaryWorldCap` / `QualityMasterworkWorldCap` USUNIETE (zastapione 4 kluczami wyzej). Sufit 6 lacznie zjadalby
+   limity rodzajow (pierwsze rodzaje zabralyby wszystko), a Jeff mowi o limicie "danego typu". Swiat ma teraz lacznie 15-90 legendarnych (srednio ok. 52)
+   i 90-900 mistrzowskich (srednio ok. 495) - nadal dwa rzedy wielkosci mniej niz tysiace w sklepach przed m96-jakosc.
+5. **Wszystko per rodzaj:** spis (`Add` liczy rodzaj: swiat, polki, nietykalne - wyroby gracza i pociski bez celu), limit przy powstaniu
+   (`_wL[k] + _newL[k] >= CapL(k)` - swiat rodzaju po wyrownaniu + nowe od spisu), wyrownanie polek (`Level`: wpisy polek sortowane rodzaj, potem cena malejaco;
+   w rodzaju: limit rodzaju minus to, co poza polkami i nietykalne; najpierw mistrzowskie, miejsce, ktore zostaje, przyjmuje legendarne TEGO SAMEGO rodzaju
+   zepchniete o stopien, reszta -> dobra / zwykla jak dotad). Wyroby gracza (IsCraftedByPlayer), sakwy, schowek i bohaterowie gracza - dalej nietykalne.
+6. **Linie logu:** start sesji - "limit na rodzaj: legendarne 1-6 (suma S), mistrzowskie 6-60 (suma S); z zapisu N rodzajow, wylosowane z ziarna kampanii M | limity
+   (legendarne/mistrzowskie): HeadArmor 4/37, ... | stan rodzajow przy wczytaniu: ..."; doba - "limit na rodzaj: ..." zamiast "limit swiata", "zatrzymane limitem
+   rodzaju", nowa czesc przed kosztem: "rodzaje (stan/limit po wyrownaniu): HeadArmor L 3/4 (polki 1, nietykalne 0, nowe 0) M 40/52 (polki 30, nietykalne 2, nowe 1); ...".
+7. **sprawdz_logi m96jakosc:** JQ-2/JQ-3 rodzaj po rodzaju - blad, gdy sztuk do ruszenia na polkach (polki - nietykalne) jest wiecej niz max(0, limit rodzaju -
+   sztuki poza polkami) (regula zostawia najwyzej limit - poza polkami - wyroby gracza, wiec prog nie daje falszywych NIE przy wyrobach gracza i pociskach bez celu);
+   JQ-5 nowe w rodzaju <= limit rodzaju - stan rodzaju z doby wczesniej; nowe JQ-1b (suma rodzajow = swiat: stan, polki, nowe, limity), JQ-9c (rodzaje ostatniej
+   doby, INFO), JQ-10 (limity w zakresie losowania i stale doba do doby przy tym samym zakresie), JQ-10b (rozrzut limitow, INFO). Linia sprzed m96-jakosc2 (limit
+   swiata) czytana jako jeden rodzaj "swiat".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: wpiecia (WorkshopLaw, HeroGear x2, PlayerFees8, SubModuleMain) wolaja `Roll`/`Filter`/`Commissioned` jak dotad - podpisy bez zmian; odbior rzutu gry
+  (droga gry, lup, zaciag) nie zalezy od limitu. Spis i wyrownanie czytaja te same miejsca co m96-jakosc; suma rodzajow = liczby miejsc (sprawdza JQ-1b).
+- Wiecej jakosci na swiecie niz w m96-jakosc (ok. 52 / 495 zamiast 6 / 60) - tak chcial Jeff ("6 legendarnych danego typu"); pierwsza doba po wczytaniu starego
+  swiata obnizy mniej sztuk niz przy limicie swiata, nowe mistrzowskie (1 na 250 sztuk tieru 4+) beda powstawac dluzej, az rodzaje sie zapelnia.
+- Zapis: nowy klucz-napis arm_qualitycaps w zachowaniu QualityScarcityBehavior (wczesniej SyncData puste) - zapis zgodny wstecz i w przod. Bez klucza los z ziarna
+  (UniqueGameId - zapisy sprzed 1.2.2 maja "oldSave"; tez deterministyczne).
+- MCM: klucze `QualityLegendaryWorldCap` / `QualityMasterworkWorldCap` znikaja; m96-jakosc nie byl jeszcze wgrany, wiec w Armoury.json Jeffa ich nie powinno byc
+  (gdyby byly - nowa DLL ich nie czyta; ze MCM pomija nieznane pola pliku, nie sprawdzalem w dekompilacji MCM). Nowe klucze maja domyslne 1/6/6/60 - przed wgraniem `grep '"QualityLegendaryPerType\|QualityMasterworkPerType'`
+  w Armoury.json (pulapka 7).
+- Watki: `Roll` czyta tablice rodzaju (`_wL`, `_newL` przez Volatile/Interlocked) - jak dotad jedna liczba; limity rodzajow zapisywane tylko przy wczytaniu i starcie
+  sesji (przed pierwszym spisem, `_censusDay < 0` blokuje powstanie do tej chwili).
+- Koszt: sortowanie po rodzaju i cenie zamiast samej ceny, tablice 16 elementow - bez alokacji poza linia logu (linia ok. 3 tys. znakow, raz na dobe). Prog JQ-8
+  bez zmian (250 ms).
+- Zamknieta ekonomia: bez zmian (obnizka - ta sama liczba sztuk, zloto nie rusza; powstanie - miasto i tak placi cene zwyklej).
+
+**Status:** DO SPRAWDZENIA (build Armoury kod wyjscia 0; gry ani autotestu nie uruchamialem). sprawdz_logi sprawdzone na syntetycznych logach
+(m96-jakosc2-tmp/synth3*.log z synth_jq3.py): dobre doby - 16 progow, NIE 0; doba celowo zla - NIE dokladnie w JQ-2 (Bow ponad limit na polkach), JQ-3 i JQ-5
+(Shield: 2 nowe mistrzowskie przy pelnym limicie), JQ-10 (Arrows: limit zmieniony doba do doby); stary log m96-jakosc-tmp/synth2.log - te same werdykty co przed
+zmiana (JQ-3 NIE na celowo zlej dobie).
+
+**Test w grze / autotest:** wczytanie save040 -> "start sesji | limit na rodzaj ... z zapisu 0 rodzajow, wylosowane z ziarna kampanii 16 | limity: ..." (rozne liczby
+1-6 i 6-60). Zapis, ponowne wczytanie -> "z zapisu 16 rodzajow, wylosowane 0" i TE SAME limity. Po polnocy "rodzaje (stan/limit po wyrownaniu)": kazdy rodzaj
+<= limit (ponad tylko poza polkami albo w nietykalnych). `--grupa m96jakosc`: JQ-1b, JQ-2, JQ-3, JQ-5, JQ-10 TAK. W grze: kilka miast - legendarnych helmow,
+lukow, tarcz pojedyncze sztuki, mistrzowskich wiecej.
+
+**Dla Jeffa:** Kazdy rodzaj przedmiotu ma teraz wlasny limit na calym swiecie: helmy osobno, zbroje osobno, luki, tarcze, strzaly itd. Na poczatku kampanii gra
+losuje dla kazdego rodzaju, ile legendarnych moze byc (od 1 do 6, kazda liczba tak samo mozliwa - w jednej kampanii np. 2 legendarne helmy, 5 legendarnych lukow,
+1 legendarna tarcza) i ile mistrzowskich (od 6 do 60). Liczby zostaja na cala kampanie (sa w zapisie gry). Razem to okolo 50 legendarnych i okolo 500
+mistrzowskich na swiecie. Nadmiar w sklepach po polnocy spada o stopien - legendarny helm na mistrzowski helm, gdy jest miejsce w mistrzowskich helmach,
+inaczej na dobry. Twoje rzeczy i to, co wykujesz sam, dalej nie sa ruszane.
