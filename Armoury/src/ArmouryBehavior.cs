@@ -719,6 +719,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("ReconcileStock", e); }
         }
         private Dictionary<string,int> _prisonerBaseline;
+        // p6-okup (R3-03a): ochrony wsi po okupie od zera przy nowej kampanii / przed wczytaniem (osobna linia z dala od linii fali 1 - scalenie fali 2 bez konfliktu)
+        private readonly bool _p6OkupReset = P6OkupReset();
+        private static bool P6OkupReset() { try { RaidTribute.Reset(); } catch (Exception e) { Log.Error("P6OkupReset", e); } return true; }
 
         // r4-mur (danina zbozowa Muru, glod Wolnych Ludzi -> najazdy): reset stanu kampanii w inicjalizatorze pola (biegnie przy kazdym konstruktorze ArmouryBehavior,
         // przed jego cialem) - osobna linia zamiast dopisku do jednolinijkowego konstruktora (scalenia paczek nocy)
@@ -749,6 +752,21 @@ namespace Armoury
         // p5-kruki (R3-05c): kruki w drodze od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p5RavensReset = P5RavensReset();
         private static bool P5RavensReset() { try { Ravens.Reset(); } catch (Exception e) { Log.Error("P5RavensReset", e); } return true; }
+        // p6-szubienice (R3-07a): szubienice przy rozstajach od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-handel)
+        private readonly bool _p6SzubieniceReset = P6SzubieniceReset();
+        private static bool P6SzubieniceReset() { try { Gallows.Reset(); } catch (Exception e) { Log.Error("P6SzubieniceReset", e); } return true; }
+        // p6-sztormy (R3-05d): liczniki zimowych sztormow i lista burz od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-urodzaj)
+        private readonly bool _p6SztormyReset = P6SztormyReset();
+        private static bool P6SztormyReset() { try { SeaStorms.Reset(); } catch (Exception e) { Log.Error("P6SztormyReset", e); } return true; }
+        // p6-drogi (R3-07d): AI wybiera drogi - pamiec planow partii i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-urodzaj)
+        private readonly bool _p6DrogiReset = P6DrogiReset();
+        private static bool P6DrogiReset() { try { AiRoadRoutes.Reset(); } catch (Exception e) { Log.Error("P6DrogiReset", e); } return true; }
+        // p6-spichlerz (R3-06f): zakup dnia i liczniki spichlerza miejskiego od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _p6SpichlerzReset = P6SpichlerzReset();
+        private static bool P6SpichlerzReset() { try { TownGranary.Reset(); } catch (Exception e) { Log.Error("P6SpichlerzReset", e); } return true; }
+        // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
+        private readonly bool _p6a7Reset = P6a7Reset();
+        private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -900,6 +918,9 @@ namespace Armoury
             // R3-06c / R3-06d (p5-stada): stada wsi po rabunkach i baza ziemi okregow; brak klucza (stary zapis) = pelne stada, baza od pierwszego rachunku
             try { string hd = dataStore.IsSaving ? VillageHerds.Export() : null; SaveText.Sync(dataStore, "arm_herds", ref hd); if (dataStore.IsLoading) VillageHerds.Import(hd); }
             catch (Exception e) { Log.Error("SyncData.arm_herds", e); }
+            // p6-okup (R3-03a): wsie po okupie chronione przed krolestwem napastnika; brak klucza = brak ochron (stary zapis, nowa kampania)
+            try { string rt = dataStore.IsSaving ? RaidTribute.Export() : null; SaveText.Sync(dataStore, "arm_raidtribute", ref rt); if (dataStore.IsLoading) RaidTribute.Import(rt); }
+            catch (Exception e) { Log.Error("SyncData.arm_raidtribute", e); }
             try { string tl = dataStore.IsSaving ? TiredLand.Export() : null; SaveText.Sync(dataStore, "arm_tiredland", ref tl); if (dataStore.IsLoading) TiredLand.Import(tl); }
             catch (Exception e) { Log.Error("SyncData.arm_tiredland", e); }
             // E6/K1 (211): obserwacje W (zgony koni / zgony jezdzcow w misjach) i pula koni weteranow w karczmach (Import odklada napis - przedmioty przy pierwszym uzyciu)
@@ -1311,6 +1332,14 @@ namespace Armoury
             // Ironman Jeffa) = brak jarmarkow w toku (kalendarz otworzy nastepne); starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P5HandelReset)
             try { string hf = dataStore.IsSaving ? HarvestFairs.Export() : null; if (!dataStore.IsSaving || hf != null) SaveText.Sync(dataStore, "arm_fairs", ref hf); if (dataStore.IsLoading) HarvestFairs.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_fairs", e); }
+            // p6-szubienice (R3-07a): szubienice stojace ("g1|x;y;yaw;koniec;okreg;wisielcy;rodzaj;kryjowka~..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis,
+            // save040 Jeffa) = brak szubienic; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6SzubieniceReset)
+            try { string gw = dataStore.IsSaving ? Gallows.Export() : null; if (!dataStore.IsSaving || gw != null) SaveText.Sync(dataStore, "arm_gallows", ref gw); if (dataStore.IsLoading) Gallows.Import(gw); }
+            catch (Exception e) { Log.Error("SyncData.arm_gallows", e); }
+            // p6-a7: roboty miast z rak okregu ("th2|doba startu|pulap startu|S|doba S|id:zwrot,..."); pisany tylko z danymi; wlasny try; brak klucza (stary zapis,
+            // kampania Jeffa) = pomiar od pierwszej doby z firmami DS, start przy pierwszych przebudowach A7; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
+            try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
+            catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
         }
 
         public override void RegisterEvents()
@@ -1459,6 +1488,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
             VillageHerds.RegisterEvents(this);   // R3-06c (p5-stada): reset nowej kampanii, Resolve zapisu, rabunek gry (VillageLooted)
+            RaidTribute.RegisterEvents(this);    // R3-03a (p6-okup): latki i opcja "Demand tribute" w starcie sesji, linia doby "Okup okolicy (R3-03a)"
             TiredLand.RegisterEvents(this);      // R3-06d (p5-stada): reset nowej kampanii
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PackSources.OnDestroyed", PackSources.OnDestroyed));   // m6b: znacznik "RemoveParty po zdarzeniu zniszczenia" (konie przy RemoveParty, towar partii usunietych bez zniszczenia)
@@ -1523,6 +1553,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("FreeFolkRaids.OnPartyDestroyed", FreeFolkRaids.OnPartyDestroyed));   // fix-mur: kto rozbil bande najazdu (tylko linia "cel:"; bez band - nic)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("FreeFolkRaids.OnMapEventEnded", FreeFolkRaids.OnMapEventEnded));   // recenzja fix-mur: kto pobil bande w marszu (tylko linia "cel:"; bez band w marszu - nic)
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("Gallows.OnMapEventEnded", Gallows.OnMapEventEnded));   // p6-szubienice (R3-07a): rozbita banda / oczyszczona kryjowka -> szubienica przy rozstajach (tylko wyglad; sam odczyt bitwy)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
@@ -1607,6 +1638,9 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MapRoads.Hourly", delegate { try { MapRoads.Hourly(); } catch (Exception e) { Log.Error("MapRoads.Hourly", e); } }));
             // p5-bloto (R3-07c): spis partio-godzin w deszczu i w blocie w dobach pomiaru (LogGate.Today; tylko log)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MapMud.Hourly", delegate { try { MapMud.Hourly(); } catch (Exception e) { Log.Error("MapMud.Hourly", e); } }));
+            // p6-sztormy (R3-05d): pora roku i lista burz NavalDLC do pamieci (mnoznik zimy), burze godziny; spis statkow w burzy w dobach pomiaru (LogGate.Today)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SeaStorms.Hourly", delegate { try { SeaStorms.Hourly(); } catch (Exception e) { Log.Error("SeaStorms.Hourly", e); } }));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AiRoadRoutes.Hourly", delegate { try { AiRoadRoutes.Hourly(); } catch (Exception e) { Log.Error("AiRoadRoutes.Hourly", e); } }));   // p6-drogi (R3-07d): spis partio-godzin rodow / karawan / wozow na drodze i na objezdzie (tylko log)
             // E8/Q (262): straz przeprawy zawraca wrogie partie lordow AI raz na godzine gry, niezaleznie od gracza (wylacznik CrossingLawAiClock). Rejestracja PRZED
             // probka E7/B = wolanie PO niej (gra dopisuje sluchacza na poczatek listy - MbEvent): licznik przejsc widzi przerwy sprzed rozkazu tej godziny
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CrossingLaw.AiHourly", delegate { try { CrossingLaw.AiHourly(); } catch (Exception e) { Log.Error("CrossingLaw.AiHourly", e); } }));
@@ -2125,6 +2159,9 @@ namespace Armoury
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { MapRoads.SessionStart(); } catch (Exception e) { Log.Error("MapRoads.SessionStart", e); }   // SW-DROGI (noc 17/18.10): plik drog ROT do siatki, pamiec partii od zera, linia "Drogi (DR): start sesji" - PO McmSettings.Apply
             try { MapMud.SessionStart(); } catch (Exception e) { Log.Error("MapMud.SessionStart", e); }   // p5-bloto (R3-07c): linia "Bloto (BL): start sesji" - PO MapRoads.SessionStart (siatka drog)
+            try { Gallows.SessionStart(); } catch (Exception e) { Log.Error("Gallows.SessionStart", e); }   // p6-szubienice (R3-07a): trakty z pliku drog, przeterminowane z zapisu, linia "Szubienice (p6): start sesji"
+            try { SeaStorms.SessionStart(); } catch (Exception e) { Log.Error("SeaStorms.SessionStart", e); }   // p6-sztormy (R3-05d): linia "Sztormy (MS): start sesji" - pora, lista burz, mnoznik zimy
+            try { AiRoadRoutes.SessionStart(); } catch (Exception e) { Log.Error("AiRoadRoutes.SessionStart", e); }   // p6-drogi (R3-07d): siec drog dla tras AI, linia "AI drogi (AD): start sesji" - PO MapRoads.SessionStart (siatka drog)
             try { MapSideRoads.SessionStart(); } catch (Exception e) { Log.Error("MapSideRoads.SessionStart", e); }   // f11-drogi: linia "Drogi boczne (f11): wylaczone / wlaczone" i plik-przelacznik autotestu od nowa - PO McmSettings.Apply
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
@@ -2144,6 +2181,7 @@ namespace Armoury
             try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)
             try { FolkAidLoyalty.EnsureHooks(); } catch (Exception e) { Log.Error("FolkAidLoyalty.EnsureHooks", e); }   // P1b: kara lojalnosci za danine - postfiks na czynny model lojalnosci (BK ma pola statyczne z GameTexts - tylko w kampanii)
             try { KsHunger.EnsureHooks(); } catch (Exception e) { Log.Error("KsHunger.EnsureHooks", e); }   // r4-glodbunt: glod miast KS -> "Hunger" w czynnych modelach lojalnosci i bezpieczenstwa (w kampanii), pomiar posilku; stan sesji glodu i KsLordFood od nowa
+            try { TownGranary.EnsureHooks(); } catch (Exception e) { Log.Error("TownGranary.EnsureHooks", e); }   // p6-spichlerz (R3-06f): bezpiecznik BetterEconomy (typ BE w kampanii) i linia startu sesji
             try { GentryService.EnsureHooks(); } catch (Exception e) { Log.Error("GentryService.EnsureHooks", e); }   // 179: wezwanie rycerza i rozwiazanie jego partii (BK), zakupy majatkow BK w przydziale sprzetu 166
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
             try { RotLeaks37.EnsureHooks(); } catch (Exception e) { Log.Error("RotLeaks37.EnsureHooks", e); }   // 3.7: podmiana rekruta ROT i rebelia bez zlota z niczego (transpilery raz na proces)
@@ -2532,6 +2570,8 @@ namespace Armoury
             // N2-E4 (noc 16.10, noc-ekonomia2): opal mieszczan z polki miasta za zloto kiesy ludu ponad jutrzejszy koszyk - PO koniach roboczych (ta sama regula zaplaty)
             // i PO dymarkach (drewno dymarek pierwsze), w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa miasta); wlasna ramka ksiegi towarow FCons ("mieszczanie")
             try { TownFolk.FirewoodDaily(); } catch (Exception e) { Log.Error("TownFolk.FirewoodDaily", e); } DayProfile.Lap("TownFolk.FirewoodDaily");
+            // p6-spichlerz (R3-06f): wsie miast sprzedaja miastu zboze ponad 98% sufitu spichlerza (migawka Famine.Daily tej doby) - kasa miasta -> kiesa wsi w pozycji MFolk
+            try { TownGranary.Daily(); } catch (Exception e) { Log.Error("TownGranary.Daily", e); } DayProfile.Lap("TownGranary.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow
@@ -2717,6 +2757,9 @@ namespace Armoury
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
             try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
+            // p6-a7: roboty miast z rak okregu - PO KS i VillageCrafts (przebudowy A7 tej doby juz w kasach): miasto ponad pulapem 1/28 nadwyzki do kies wsi okregu; wlasna pozycja (MTownHire)
+            try { TownHire.Daily(); TownHire.Line(); } catch (Exception e) { Log.Error("TownHire.Daily", e); } DayProfile.Lap("TownHire.Daily");
+            try { MoneyLedger.Mark(MoneyLedger.MTownHire); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)
             try { VassalRansomAid.Report(); AiDowry.Report(); } catch (Exception e) { Log.Error("R3-01cd.Report", e); }   // R3-01d/R3-01c: linie "Pomoc wasali (R3-01d)" i "Posagi AI (R3-01c)"
@@ -2786,6 +2829,9 @@ namespace Armoury
             try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); } DayProfile.Lap("TerrainEase.Stage7Daily");   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
             try { MapRoads.Daily(); } catch (Exception e) { Log.Error("MapRoads.Daily", e); } DayProfile.Lap("MapRoads.Daily");   // SW-DROGI (noc 17/18.10): linia "Drogi (DR): dzien N" (spis, audyt premii, koszt) w dobie linii (tylko log)
             try { MapMud.Daily(); } catch (Exception e) { Log.Error("MapMud.Daily", e); } DayProfile.Lap("MapMud.Daily");   // p5-bloto (R3-07c): linia "Bloto (BL): dzien N" (spis deszczu i blota, audyt kary, koszt) w dobie linii (tylko log)
+            try { Gallows.Daily(); } catch (Exception e) { Log.Error("Gallows.Daily", e); } DayProfile.Lap("Gallows.Daily");   // p6-szubienice (R3-07a): koniec czasu szubienic, linia "Szubienice (p6): dzien N" w dobie linii
+            try { SeaStorms.Daily(); } catch (Exception e) { Log.Error("SeaStorms.Daily", e); } DayProfile.Lap("SeaStorms.Daily");   // p6-sztormy (R3-05d): linia "Sztormy (MS): dzien N" (burze, statki w burzy, zima / poza zima, audyt kary) w dobie linii (tylko log)
+            try { AiRoadRoutes.Daily(); } catch (Exception e) { Log.Error("AiRoadRoutes.Daily", e); } DayProfile.Lap("AiRoadRoutes.Daily");   // p6-drogi (R3-07d): linia "AI drogi (AD): dzien N" (objazdy, odrzucone, spis, koszt) w dobie linii (tylko log)
             try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); } DayProfile.Lap("TwinsCrossing.Daily");   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
             try { CrossingLaw.Daily(); } catch (Exception e) { Log.Error("CrossingLaw.Daily", e); } DayProfile.Lap("CrossingLaw.Daily");   // E8/Q (262): linia "Straz przeprawy (E8/Q)" i zerowanie licznikow doby - PO linii E7/B (jej dopisek czyta te same liczniki)
             try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow

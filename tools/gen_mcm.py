@@ -4,6 +4,8 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # m95-turniej: okup szranek jako czesc wartosci - kod przycina do 0.05..1 (TourneyRansom.ShareOf)
+    'TourneyRansomShare': (0.05, 1.0, "0.00"),
     'CampStartHour': (0, 23, "0"),
     'CampEndHour': (0, 23, "0"),
     'OldStockScrapYield': (0.0, 1.0, "0.00"),
@@ -37,8 +39,18 @@ RANGES = {
     'MapSideRoadSpeedPercent': (0.0, 50.0, "0.0"),
     # p5-bloto (R3-07c): kara blota poza droga w deszczu - kod przycina do 0..50 (MapMud.PctOf)
     'MapMudSpeedPercent': (0, 50, "0"),
+    # p6-okup (R3-03a): stawki okupu wsi (kod przycina do 0..1, gorna >= dolnej) i dni ochrony (kod przycina do 1..364)
+    'RaidTributeShareLow': (0.0, 0.5, "0.00"),
+    'RaidTributeShareHigh': (0.0, 0.5, "0.00"),
+    'RaidTributeSpareDays': (1, 364, "0"),   # recenzja n23: suwak jak przyciecie w kodzie (rok Armoury 364 dni; 84 to rok gry bez Armoury)
     # p5-bloto (recenzja 20.10): kara na mokrym po deszczu (LightRain) - kod przycina do 0..50 (MapMud.Clip)
     'MapMudWetSpeedPercent': (0.0, 50.0, "0.0"),
+    # p6-sztormy (R3-05d): mnoznik zimowych burz - kod przycina do 1..2.3 (SeaStorms.FactorOf); kara statku w burzy - kod przycina do 0..50 (SeaStorms.PctOf)
+    'SeaStormWinterFactor': (1.0, 2.3, "0.00"),
+    'SeaStormShipSpeedPercent': (0.0, 50.0, "0.0"),
+    # p6-drogi (R3-07d): AI wybiera drogi - kod przycina marsz do 10..200 jedn. i nadklad do 0..50% (AiRoadRoutes.MinDist / Detour)
+    'MapRoadAiMinDistance': (10, 200, "0"),
+    'MapRoadAiDetourPercent': (0, 50, "0"),
     # f22-drogi-perf (noc 17/18.10): najdalsza odleglosc komorek bocznych drog od kamery - kod przycina do 40..400 (MapSideRoads.ChunkCap)
     'MapSideRoadsChunkRadiusCap': (40, 400, "0"),
     # A17 F5 (noc 17/18.10): stocznia z drewna i za place - pnie na 1000 wartosci kadluba (0..10), udzial plac w wartosci kadluba (kod przycina do 0..1)

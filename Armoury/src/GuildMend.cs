@@ -19,6 +19,11 @@ namespace Armoury
     ///     Dotad kazda sztuka 0.6 h (MendLootHoursPerPiece) i wszystko u kowali.
     ///  2) AutoMendHalfGuild: naprawy automatyczne (lordowie AI + sakiewka Twoich ludzi) biora razem najwyzej polowe dziennych godzin kazdego cechu
     ///     w miescie - warsztaty zawsze maja co najmniej pol rak. Zlecenia gracza (lawa, sztuka, polki) moga brac wszystko, co wolne.
+    ///  2a) MendIdleHandsFirst (n22f-naprawy2, zastepuje 2): kazda godzina napraw bierze najpierw rece cechu bez roboty w tym miescie - caly warsztat
+    ///     rzemieslnikow bez czynnej linii, linie z pelnym bankiem roboty (robota i tak przepada) - a dopiero potem wlasne rece cechu, ktore pracuja:
+    ///     przeniesione do linii innych cechow (cech bez wlasnej linii) i przy jego liniach. Naprawy automatyczne biora z tych pracujacych rak razem
+    ///     najwyzej AutoLineShare (15%) wlasnych rak cechu na dobe, reszta czeka. Godziny z rak bezczynnych i z linii z pelnym bankiem nie odchodza jutro
+    ///     od linii (ManDaysYesterday, SmithFreeManDaysYesterday); rece przeniesione - jutro od rak przeniesionych, rece linii - od linii (jak dotad).
     ///  3) MendBulkEveryOrder: rabat hurtowy z polek wojska (TroopMendBulkDiscountPP/Max: 0.5% za sztuke, do 30%) przy kazdym zleceniu - od robocizny,
     ///     nie od materialu i nie od godzin. Zlecenie: jedno klikniecie gracza (lup z sakw, polki wojska, uprzaz "Mend everything you wear" -
     ///     ArmouryBehavior.RepairCost/PlanRepair); jeden dzien lorda w miescie; u Twoich ludzi - sztuki czekajace rano. Pojedyncza sztuka ("Pick a piece")
@@ -41,7 +46,15 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.MendHoursByGuild; } }
         internal static bool HalfOn { get { var s = Settings.Current; return s != null && s.MendHoursByGuild && s.AutoMendHalfGuild; } }
         internal static bool BulkOn { get { var s = Settings.Current; return s != null && s.MendBulkEveryOrder; } }
+        /// <summary>n22f-naprawy2 (MendIdleHandsFirst): naprawy biora najpierw rece cechu bez roboty (caly warsztat bez linii, cech bez linii, linia
+        /// z pelnym bankiem roboty), z rak przy liniach naprawy automatyczne najwyzej AutoLineShare na dobe. Zastepuje polowe rak (AutoMendHalfGuild).</summary>
+        internal static bool IdleOn { get { var s = Settings.Current; return s != null && s.MendHoursByGuild && s.MendIdleHandsFirst; } }
         private const float AutoShare = 0.5f;   // projekt pkt 9 [K]: AI + ludzie razem najwyzej polowa rak cechu
+        // n22f-naprawy2: z pracujacych wlasnych rak cechu (przy jego liniach i przeniesionych do linii innych cechow) naprawy automatyczne (AI + sakiewka
+        // ludzi) razem najwyzej 15% na dobe. Szacunek z biegow 160 dob (n22f-naprawy2-tmp/sim2.py, CHANGELOG galezi "Poprawka n22f-naprawy2"): n22b siodlarze
+        // 13.9% rak na naprawy = -13.5% zrobionych. Model (linie z pelnym bankiem jak w n22a / polowa tego; stop 2/3 wizyt / wszedzie): 10% - AI 670-1100 szt./d,
+        // siodlarze ok. 2.5-3% rak; 15% - AI 800-1185, siodlarze ok. 3.7-4.4%; 20% - AI 930-1260, siodlarze ok. 5-5.8% (ponad 5%). 15% = oba cele naraz.
+        private const float AutoLineShare = 0.15f;
 
         // ------------------------------------------------------------ tabela udzialow dni wykonania (projekt, "Tabela godzin")
         // kotwice ubytku 0.45 (Plundered) / 0.60 (Damaged) / 0.75 (Battered) / 0.90 (Mangled, RBM 0.1); liniowo od 0, powyzej 0.9 - wrak
@@ -144,6 +157,7 @@ namespace Armoury
             _used.Clear(); _yesterday.Clear(); _auto.Clear(); _day = -1;
             Array.Clear(_menBench, 0, Trades); _menTown = null; _menLastHour = -999; _bulkDay = -1; _bulkTown = null; _bulkN = 0;
             _carry.Clear(); ClearOrder();
+            _plan.Clear(); _stuck.Clear(); _stuckPrev.Clear(); _stuckDay = -1; _src.Clear(); _srcYesterday.Clear();
             ResetStats();
             FieldArmourer.Reset();
         }
@@ -156,8 +170,137 @@ namespace Armoury
             _yesterday = d == _day + 1 ? _used : new Dictionary<Town, float[]>();
             _used = new Dictionary<Town, float[]>();
             _auto = new Dictionary<Town, float[]>();
+            _srcYesterday = d == _day + 1 ? _src : new Dictionary<Town, float[]>();   // n22f-naprawy2: zrodlo rak wczoraj (bez ciecia linii dzis)
+            _src = new Dictionary<Town, float[]>();
             _day = d;
             CarryIn();
+        }
+
+        // ------------------------------------------------------------ n22f-naprawy2: skad sa rece napraw (MendIdleHandsFirst)
+        // plan doby ukrytego warsztatu rzemieslnikow miasta (WorkshopLaw.BuildPlan, ostatni zbudowany): [0..4] rece cechu bez czynnej linii (przeniesione
+        // do innych cechow), [5..9] rece przy liniach cechu, [10] = 1: caly warsztat bez czynnej linii (rece bezczynne), [11] doba planu; roboczodni
+        private static readonly Dictionary<Town, float[]> _plan = new Dictionary<Town, float[]>();
+        // rece przy liniach z pelnym bankiem roboty (linia nic nie robi, robota przepada; WorkshopLaw.CyclePrefix) - dzis i wczoraj; roboczodni
+        private static Dictionary<Town, float[]> _stuck = new Dictionary<Town, float[]>(), _stuckPrev = new Dictionary<Town, float[]>();
+        private static int _stuckDay = -1;
+        // godziny dzis wedlug zrodla: [0..4] bezczynne, [5..9] cech bez linii (rece przeniesione), [10..14] linia z pelnym bankiem, [15..19] rece linii,
+        // [20..24] naprawy automatyczne z rak pracujacych (przeniesione + linie) - pod limitem AutoLineShare
+        private static Dictionary<Town, float[]> _src = new Dictionary<Town, float[]>(), _srcYesterday = new Dictionary<Town, float[]>();
+        private const int SrcN = 25;
+
+        /// <summary>Cech warsztatu (WorkshopLaw.GuildOrder) -> cech napraw; -1 = inny.</summary>
+        internal static int TradeOfGuild(string g)
+        {
+            switch (g)
+            {
+                case "platnerz": case "miecznik": return Smith;
+                case "siodlarz": return Saddler;
+                case "krawiec": return Tailor;
+                case "lucznik": return Bowyer;
+                case "tarczownik": return Shieldmaker;
+                default: return -1;
+            }
+        }
+
+        /// <summary>Wiersz planu miasta do wypelnienia przez WorkshopLaw.BuildPlan (ukryty warsztat rzemieslnikow, raz na dobe); null przy wylaczonym MendHoursByGuild.</summary>
+        internal static float[] PlanRow(Town t)
+        {
+            if (!On || t == null) return null;
+            float[] r;
+            if (!_plan.TryGetValue(t, out r)) _plan[t] = r = new float[12];
+            r[11] = (float)Math.Floor(CampaignTime.Now.ToDays);   // doba planu (WorkshopLaw czysci tylko [0..10])
+            return r;
+        }
+
+        private static void RollStuck()
+        {
+            int d = (int)CampaignTime.Now.ToDays;
+            if (d == _stuckDay) return;
+            _stuckPrev = d == _stuckDay + 1 ? _stuck : new Dictionary<Town, float[]>();
+            _stuck = new Dictionary<Town, float[]>();
+            _stuckDay = d;
+        }
+
+        /// <summary>WorkshopLaw.CyclePrefix: linia cechu w ukrytym warsztacie ma pelny bank roboty (dzisiejsza robota przepada) - jej rece (share
+        /// roboczodni) sa dzis bez roboty. Raz na linie na dobe (tylko gdy cykl doliczyl robote).</summary>
+        internal static void NoteStuck(Town t, string guild, float share)
+        {
+            if (!On || t == null || share <= 0f) return;
+            int k = TradeOfGuild(guild);
+            if (k < 0) return;
+            RollStuck();
+            Row(_stuck, t)[k] += share;
+        }
+
+        /// <summary>Rece cechu (roboczodni) wedlug zrodla z ostatniego planu miasta: bezczynne (caly warsztat bez linii), cech bez linii (wlasne rece
+        /// przeniesione do linii innych cechow - pracuja), linie z pelnym bankiem (najwyzej wlasne rece linii), reszta wlasnych rak linii.
+        /// Bez planu (miasto bez ukrytego warsztatu, pierwsza doba sesji) - wszystkie rece cechu jak rece linii (ostroznie).</summary>
+        private static void Tiers(Town t, int k, out float idle, out float free, out float stuck, out float line)
+        {
+            float[] p;
+            idle = free = stuck = 0f;
+            if (!_plan.TryGetValue(t, out p) || (int)CampaignTime.Now.ToDays - (int)p[11] > 2) { line = Hands(t, k); return; }   // brak planu albo stary (warsztat bez linii zbrojnych)
+            if (p[10] > 0.5f) { idle = Hands(t, k); line = 0f; return; }
+            free = p[k]; line = p[5 + k];
+            RollStuck();
+            float[] s1, s0; _stuck.TryGetValue(t, out s1); _stuckPrev.TryGetValue(t, out s0);
+            stuck = Math.Min(line, Math.Max(s1 != null ? s1[k] : 0f, s0 != null ? s0[k] : 0f));   // dzis albo wczoraj (cykle linii ida w ciagu doby)
+            line -= stuck;
+        }
+
+        /// <summary>Godziny dla napraw automatycznych wedlug zrodla (dzis jeszcze wolne): bezczynne + linie z pelnym bankiem bez limitu; z rak pracujacych
+        /// (cech bez linii - rece przeniesione, i rece linii) razem najwyzej AutoLineShare (liczone tylko naprawy automatyczne). Poprawka po recenzji:
+        /// rece przeniesione nie sa bezczynne - jutro schodza z linii cechow, ktore je dostaly (glownie platnerzy), wiec ida pod ten sam limit.</summary>
+        private static float AutoRoom(Town t, int k)
+        {
+            float idle, free, stuck, line; Tiers(t, k, out idle, out free, out stuck, out line);
+            float[] u; _src.TryGetValue(t, out u);
+            float pmd = PerManDay, lim = AutoLineShare * (free + line) * pmd;
+            if (u == null) return (idle + stuck) * pmd + lim;
+            return Math.Max(0f, idle * pmd - u[k]) + Math.Max(0f, stuck * pmd - u[10 + k]) + Math.Max(0f, lim - u[20 + k]);
+        }
+
+        /// <summary>Pelny dzienny przydzial napraw automatycznych cechu w miescie (bez dzisiejszego zuzycia) - tempo lawy ludzi gracza na godzine.</summary>
+        private static float AutoDaily(Town t, int k)
+        {
+            float idle, free, stuck, line; Tiers(t, k, out idle, out free, out stuck, out line);
+            return (idle + stuck + AutoLineShare * (free + line)) * PerManDay;
+        }
+
+        /// <summary>Kazda godzina napraw (AI, ludzie, gracz): najpierw rece bezczynne, potem linie z pelnym bankiem, cech bez linii (rece przeniesione),
+        /// na koncu rece linii. Naprawy automatyczne z rak przeniesionych i linii - do licznika limitu ([20..24]). Przy wylaczonym MendIdleHandsFirst -
+        /// tylko liczniki doby (zachowanie jak dotad).</summary>
+        private static void Split(Town t, int k, float hours, bool auto)
+        {
+            if (hours <= 0f) return;
+            float idle, free, stuck, line; Tiers(t, k, out idle, out free, out stuck, out line);
+            var u = Row(_src, t, SrcN);
+            float pmd = PerManDay, left = hours, x;
+            x = Math.Min(left, Math.Max(0f, idle * pmd - u[k])); u[k] += x; left -= x; _stIdleH[k] += x;
+            x = Math.Min(left, Math.Max(0f, stuck * pmd - u[10 + k])); u[10 + k] += x; left -= x; _stStuckH[k] += x;
+            if (left <= 0f) return;
+            if (auto) { u[20 + k] += left; _stAutoLineH[k] += left; }   // rece pracujace (przeniesione + linie) - limit AutoLineShare
+            x = Math.Min(left, Math.Max(0f, free * pmd - u[5 + k])); u[5 + k] += x; left -= x; _stFreeH[k] += x;
+            if (left <= 0f) return;
+            u[15 + k] += left; _stLineH[k] += left;
+        }
+
+        /// <summary>Godziny cechu wczoraj z rak bezczynnych i linii z pelnym bankiem - te nie odchodza dzis od linii (robota i tak by przepadla);
+        /// 0 przy wylaczonym MendIdleHandsFirst. Rece cechu bez linii odchodza jak dotad od rak przeniesionych (WorkshopLaw).</summary>
+        private static float FreeHoursYesterday(Town t, int k)
+        {
+            if (!IdleOn || t == null) return 0f;
+            float[] u;
+            if (!_srcYesterday.TryGetValue(t, out u)) return 0f;
+            return u[k] + u[10 + k];
+        }
+
+        /// <summary>To samo dla kowali w roboczodniach (WorkshopLaw: od SmithHours.ManDaysYesterday przed cieciem platnerzy i miecznikow).</summary>
+        internal static float SmithFreeManDaysYesterday(Town t)
+        {
+            if (!IdleOn || t == null) return 0f;
+            Roll();
+            return FreeHoursYesterday(t, Smith) / PerManDay;
         }
 
         // ------------------------------------------------------------ dlug cechu (recenzja: zlecenie gracza ponad wolne rece dnia nie powstaje z niczego)
@@ -184,10 +327,10 @@ namespace Armoury
             foreach (var t in done) _carry.Remove(t);
         }
 
-        private static float[] Row(Dictionary<Town, float[]> map, Town t)
+        private static float[] Row(Dictionary<Town, float[]> map, Town t, int n = Trades)
         {
             float[] r;
-            if (!map.TryGetValue(t, out r)) map[t] = r = new float[Trades];
+            if (!map.TryGetValue(t, out r)) map[t] = r = new float[n];
             return r;
         }
 
@@ -214,10 +357,12 @@ namespace Armoury
             return Math.Max(0f, Capacity(t, trade) - (u != null ? u[trade] : 0f));
         }
 
-        /// <summary>Godziny dla napraw automatycznych (AI + sakiewka ludzi): wolne, ale razem najwyzej polowa dziennych godzin cechu (AutoMendHalfGuild).</summary>
+        /// <summary>Godziny dla napraw automatycznych (AI + sakiewka ludzi): wolne, ale razem najwyzej polowa dziennych godzin cechu (AutoMendHalfGuild);
+        /// przy MendIdleHandsFirst - rece bez roboty bez limitu i najwyzej AutoLineShare rak linii (AutoRoom), polowa nie dziala.</summary>
         internal static float AutoAvailable(Town t, int trade)
         {
             float a = Available(t, trade);
+            if (t != null && IdleOn) { Roll(); return Math.Min(a, AutoRoom(t, trade)); }
             if (!HalfOn || t == null) return a;
             Roll();
             float[] u; _auto.TryGetValue(t, out u);
@@ -243,6 +388,7 @@ namespace Armoury
         {
             if (trade == Smith) SmithHours.Use(t, hours); else Row(_used, t)[trade] += hours;
             if (auto) Row(_auto, t)[trade] += hours;
+            Split(t, trade, hours, auto);   // n22f-naprawy2: zrodlo rak (przy wylaczonym MendIdleHandsFirst - tylko liczniki)
         }
 
         /// <summary>Roboczodni cechu warsztatu (krawiec / siodlarz / lucznik / tarczownik) zjedzone wczoraj przez naprawy - tyle mniej rak w warsztacie
@@ -254,7 +400,8 @@ namespace Armoury
             if (k <= 0) return 0f;
             Roll();
             float[] u; _yesterday.TryGetValue(t, out u);
-            return u != null ? u[k] / PerManDay : 0f;
+            if (u == null) return 0f;
+            return Math.Max(0f, u[k] - FreeHoursYesterday(t, k)) / PerManDay;   // n22f-naprawy2: rece bezczynne i linie z pelnym bankiem nie odchodza od linii
         }
 
         // ------------------------------------------------------------ rabat hurtowy przy kazdym zleceniu
@@ -569,11 +716,13 @@ namespace Armoury
             var has = new bool[Trades]; var share = new float[Trades]; var start = new float[Trades]; var doneH = new float[Trades]; var limited = new bool[Trades];
             foreach (var el in worn) if (el.EquipmentElement.Item != null) has[TradeOf(el.EquipmentElement.Item)] = true;
             float frac = HalfOn ? AutoShare : 1f;
+            bool idleOn = IdleOn;
             for (int k = 0; k < Trades; k++)
             {
                 start[k] = _menBench[k];
                 if (!has[k]) { _menBench[k] = 0f; continue; }
-                share[k] = Math.Min(AutoAvailable(t, k), frac * Capacity(t, k) / PerManDay);
+                // n22f-naprawy2: przy MendIdleHandsFirst tempo na godzine = dzienny przydzial napraw automatycznych / godziny zmiany (rece bez roboty + 15% rak pracujacych)
+                share[k] = Math.Min(AutoAvailable(t, k), (idleOn ? AutoDaily(t, k) : frac * Capacity(t, k)) / PerManDay);
                 _menBench[k] += share[k];
             }
             bool broke = false;
@@ -676,9 +825,14 @@ namespace Armoury
         private static readonly float[] _stAiH = new float[Trades], _stMenH = new float[Trades], _stPlayerH = new float[Trades];
         private static int _stAiPieces, _stAiCapN, _stAiCapVisits, _stMenPieces, _stPlayerPieces, _stBulkGold;
         private static float _stCarryH;
+        // n22f-naprawy2: godziny doby wedlug zrodla rak (wszystkie naprawy: AI, ludzie, gracz) i z rak pracujacych (przeniesione + linie) tylko naprawy automatyczne
+        private static readonly float[] _stIdleH = new float[Trades], _stFreeH = new float[Trades], _stStuckH = new float[Trades], _stLineH = new float[Trades],
+                                        _stAutoLineH = new float[Trades];
 
         private static void ResetStats()
         {
+            Array.Clear(_stIdleH, 0, Trades); Array.Clear(_stFreeH, 0, Trades); Array.Clear(_stStuckH, 0, Trades); Array.Clear(_stLineH, 0, Trades);
+            Array.Clear(_stAutoLineH, 0, Trades);
             Array.Clear(_stAiH, 0, Trades); Array.Clear(_stMenH, 0, Trades); Array.Clear(_stPlayerH, 0, Trades);
             _stAiPieces = _stAiCapN = _stAiCapVisits = _stMenPieces = _stPlayerPieces = _stBulkGold = 0; _stCarryH = 0f;
         }
@@ -698,8 +852,35 @@ namespace Armoury
             Log.Info("Naprawy wg cechow (R3-02): doba " + _day + " | AI: " + _stAiPieces + " szt., godz. " + Row5(_stAiH) + ", stop na polowie rak cechu " + _stAiCapN
                      + " szt. w " + _stAiCapVisits + " wizytach | ludzie gracza: " + _stMenPieces + " szt., godz. " + Row5(_stMenH) + " | gracz (zlecenia): "
                      + _stPlayerPieces + " szt., godz. " + Row5(_stPlayerH) + " | rabat hurtowy razem " + _stBulkGold + " zl | dlug cechow: splacono " + (int)Math.Round(_stCarryH)
-                     + " h, zostaje " + (int)Math.Round(CarryLeft()) + " h w " + _carry.Count + " miastach (kowale/siodlarze/krawcy/lukarze/tarczownicy)");
+                     + " h, zostaje " + (int)Math.Round(CarryLeft()) + " h w " + _carry.Count + " miastach (kowale/siodlarze/krawcy/lukarze/tarczownicy)"
+                     + SourceText());
             ResetStats();
+        }
+
+        /// <summary>n22f-naprawy2: dopisek linii doby - skad szly godziny napraw (na cech) i rece cechow wedlug planow miast (raz na dobe, ok. 100 miast).</summary>
+        private static string SourceText()
+        {
+            var pi = new float[Trades]; var pf = new float[Trades]; var ps = new float[Trades]; var pl = new float[Trades];
+            int towns = 0, idleTowns = 0;
+            try
+            {
+                foreach (var kv in _plan)
+                {
+                    if (kv.Key == null) continue;
+                    towns++; if (kv.Value[10] > 0.5f) idleTowns++;
+                    for (int k = 0; k < Trades; k++)
+                    {
+                        float idle, free, stuck, line; Tiers(kv.Key, k, out idle, out free, out stuck, out line);
+                        pi[k] += idle; pf[k] += free; ps[k] += stuck; pl[k] += line;
+                    }
+                }
+            }
+            catch (Exception e) { if (++_errTick <= 3) Log.Error("GuildMend.SourceText (potkniecie " + _errTick + ")", e); }
+            return " | zrodlo godzin (MendIdleHandsFirst " + (IdleOn ? "TAK" : "NIE") + ", k/s/k/l/t): bezczynne " + Row5(_stIdleH) + ", linie z pelnym bankiem "
+                   + Row5(_stStuckH) + ", cech bez linii (rece przeniesione) " + Row5(_stFreeH) + ", rece linii " + Row5(_stLineH) + "; naprawy automatyczne z rak pracujacych "
+                   + "(przeniesione + linie) " + Row5(_stAutoLineH) + ", limit " + (int)Math.Round(AutoLineShare * 100f) + "% tych rak"
+                   + " | rece cechow wg planow " + towns + " miast (wlasne rece cechu, roboczodni, k/s/k/l/t): bezczynne "
+                   + Row5(pi) + " (" + idleTowns + " miast), linie z pelnym bankiem " + Row5(ps) + ", cech bez linii " + Row5(pf) + ", pozostale rece linii " + Row5(pl);
         }
 
         private static float CarryLeft() { float x = 0f; foreach (var kv in _carry) for (int k = 0; k < Trades; k++) x += kv.Value[k]; return x; }

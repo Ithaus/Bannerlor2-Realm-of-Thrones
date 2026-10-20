@@ -48,6 +48,7 @@ namespace Armoury
             inp.FeedStep = s.KsSelfFeedSlow ? KsCore.ClearStep : 0.0;          // ten sam krok 7% co sterownik rynku
             inp.MarketsClear = s.KsPlanMarketsClear;
             inp.MarketsClearVil = s.KsPlanMarketsClear && s.KsPlanMarketsClearVillages;   // recenzja: jedna cena rynku w Planie (domyslnie WYLACZONE)
+            inp.ConvShelfLevel = s.KsPlanConvergeShelfLevel;                    // n22f-plany: zapas polek kroku 8 poza testem zbieznosci (StartCalibration.Core.cs, ShelfLevel)
             var pr = _plan;
             if (pr == null || pr.Error != null) return;
             if (inp.FeedStep > 0 && pr.FloorLam != null) inp.WarmFloor = new Dictionary<string, double>(pr.FloorLam, StringComparer.Ordinal);

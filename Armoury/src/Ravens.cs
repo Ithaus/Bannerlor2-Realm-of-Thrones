@@ -263,6 +263,10 @@ namespace Armoury
         /// <summary>Godziny lotu kruka na odleglosc d jedn. mapy (list 3 h + lot 150 jedn./dobe, najwyzej 12 dob) - jedna miara dla czatu i plotek.</summary>
         internal static double EtaHours(float d) { return Math.Min(MaxHours, HandHours + Math.Max(0f, d) / SpeedPerHour); }
 
+        /// <summary>n22f (scalenie z plotkami): ile dob wiesc z ksiegi plotek moze jeszcze czekac na kruka - najdluzszy lot (MaxHours) plus doba zdarzenia
+        /// (NotYet liczy zdarzenie na koniec jego dnia). Rumours.AddNews nie wyrzuca mlodszych wiesci, zeby daleka karczma uslyszala je, gdy kruk doleci.</summary>
+        internal static int HoldDays { get { return (int)Math.Ceiling(MaxHours / 24.0) + 1; } }
+
         /// <summary>Plotki w karczmie (Rumours.Wars): wiesc z dnia 'day' z odleglosci d od karczmy jeszcze tu nie doszla - kruk z nia jeszcze leci. Zdarzenie liczone
         /// na koniec swojego dnia (plotka zna tylko dzien), wiec plotka nigdy nie wyprzedzi kruka, najwyzej spozni sie o mniej niz dobe. Klucz wylaczony albo blisko
         /// (do NearRange) = jak dotad.</summary>

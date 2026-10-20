@@ -108,7 +108,7 @@ namespace Armoury
             Cart c = null;
             try
             {
-                days = Math.Max(1, days);
+                days = Math.Max(1, days) + SeaStorms.CartDays(SeaStorms.CMat, naval, src, dst);   // p6-sztormy (recenzja): zima przez morze - czekanie w porcie
                 c = new Cart { Src = src, Dst = dst, Item = item, Mat = m, N = n, Paid = Math.Max(0, paid), DayBought = today, DayDue = today + days, Naval = naval };
                 _carts.Add(c);
                 AddIncoming(c, +1);

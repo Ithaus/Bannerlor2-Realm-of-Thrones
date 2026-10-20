@@ -107,6 +107,8 @@ namespace Armoury
         // recenzja calosci 18.10: jedzenie miasta zaplacone w oknie przez pana (KsLordFood: rachunki zywnosci KS-H, wczesna splata, doplata do zakupow KS-H) - w doplywie
         // netto liczone jak wydatek kasy (inaczej przeglad firm DS czytal pomoc pana jako zysk kupcow i podnosil firme - stale przelewanie pan -> korona przez miasto)
         private static readonly Dictionary<Town, long> _lordFoodWin = new Dictionary<Town, long>();
+        // p6-a7 (recenzja): pieniadz przebudow zajec wsi wplacony do kasy (A7/ZW) minus zwrot robotami miast (TownHire) - poza doplywem netto kupcow (przeglad firm DS)
+        private static readonly Dictionary<Town, long> _rebLoopWin = new Dictionary<Town, long>();
         private static readonly Dictionary<Town, long> _takeLast = new Dictionary<Town, long>(), _netLast = new Dictionary<Town, long>();
         private static readonly long[] _ringTake = new long[RingDays], _ringNet = new long[RingDays];
         private static int _ringHead, _ringFilled;
@@ -125,7 +127,7 @@ namespace Armoury
             _consTown = null; _regDue = null; _consGold = 0;
             _bkResolved = false; _bkLimit = null; _bkInstance = null; _bkModel = null;   // BK tworzy konfiguracje od nowa przy kazdej grze
             ClearTicks(); ClearValve(); CrownToday.Clear();
-            _streak.Clear(); _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _takeLast.Clear(); _netLast.Clear();
+            _streak.Clear(); _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _rebLoopWin.Clear(); _takeLast.Clear(); _netLast.Clear();
             ClearRing();
             ZeroLast();
         }
@@ -570,6 +572,21 @@ namespace Armoury
             catch (Exception e) { Stumble("TownPurse.NoteTake", e); }
         }
 
+        /// <summary>p6-a7 (recenzja): pieniadz przebudowy zajec wsi, ktory wszedl do kasy miasta (x dodatnie - material z polki i placa nieprzyjeta przez lud) i zwrot tej kasy
+        /// do kies wsi robotami miast (x ujemne) - TownHire, tylko od startu jej reguly. W doplywie netto kupcow (okno blok-blok, NetOf -> ustalenie i przeglad firm DS)
+        /// poza zarobkiem: przebudowa to jednorazowy wydatek wsi, ktory miasta oddaja wsiom, wiec firma pana i korony nie rosnie od pieniedzy juz oddanych (ani od tych,
+        /// ktore za miasto pod progiem oddaje inne miasto). Nie liczy sie do poboru pana i korony (_takeWin). Tylko licznik - zloto sie nie rusza; true = policzone.</summary>
+        internal static bool NoteRebuildLoop(Settlement st, long x)
+        {
+            try
+            {
+                if (x == 0 || st == null || !st.IsTown || st.Town == null || !On) return false;
+                Add(_rebLoopWin, st.Town, x);
+                return true;
+            }
+            catch (Exception e) { Stumble("TownPurse.NoteRebuildLoop", e); return false; }
+        }
+
         // ------------------------------------------------------------ raz na dobe, PRZED rentami (po MoneyLedger.BlockOpen)
         /// <summary>
         /// Poczatek naszego rozliczenia doby: zamyka liczniki tickow gry (okno = doba ksiegi pieniadza), okno udzialu zysku kupcow (migawka kas
@@ -589,7 +606,7 @@ namespace Armoury
             if (s == null || Campaign.Current == null) return;
             if (!On)
             {
-                _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _takeLast.Clear(); _netLast.Clear(); _streak.Clear();
+                _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _rebLoopWin.Clear(); _takeLast.Clear(); _netLast.Clear(); _streak.Clear();
                 ClearRing();
                 return;
             }
@@ -629,7 +646,7 @@ namespace Armoury
                     long g = t.Gold, g0;
                     if (_goldAtBlock.TryGetValue(t, out g0))
                     {
-                        long tk = Get(_takeWin, t), n = (g - g0) + tk + Get(_trimWin, t) - Get(_mintWin, t) - Get(_lordFoodWin, t);   // recenzja calosci: minus jedzenie od pana
+                        long tk = Get(_takeWin, t), n = (g - g0) + tk + Get(_trimWin, t) - Get(_mintWin, t) - Get(_lordFoodWin, t) - Get(_rebLoopWin, t);   // recenzja calosci: minus jedzenie od pana; p6-a7: minus przebudowy wsi po zwrocie
                         take += tk; net += n; towns++;
                         _takeLast[t] = tk; _netLast[t] = n;
                     }
@@ -637,7 +654,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("TownPurse.CloseWindow(" + st.StringId + ")", e); }
             }
-            _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear();
+            _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _rebLoopWin.Clear();
             LastShareOk = towns > 0;
             if (LastShareOk)
             {

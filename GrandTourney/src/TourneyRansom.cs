@@ -105,6 +105,7 @@ namespace GrandTourney
         private static int _paidN, _yieldN, _toRoster, _toMarket, _worn, _offersShown, _plPaidN, _plYieldN, _plWonN, _plWonPieces;
         private static int _refitBag, _refitBest, _refitCheap, _refitNone, _refitLater;
         private static long _paid, _yieldWorth, _marketPaid, _plPaid, _plWon, _refitGold;
+        private static int _noKnocker;   // m95-turniej: przegrani bez powalajacego z innej druzyny - bez okupu
         private static int _stumbles, _stumblesDay;
         private static bool _patched;
 
@@ -133,7 +134,7 @@ namespace GrandTourney
             _notKnight = _unasked = _forfeit = _calledOff = _fallbackRoom = 0;
             _paidN = _yieldN = _toRoster = _toMarket = _worn = _offersShown = _plPaidN = _plYieldN = _plWonN = _plWonPieces = 0;
             _refitBag = _refitBest = _refitCheap = _refitNone = _refitLater = 0;
-            _paid = _yieldWorth = _marketPaid = _plPaid = _plWon = _refitGold = 0;
+            _paid = _yieldWorth = _marketPaid = _plPaid = _plWon = _refitGold = 0; _noKnocker = 0;
             _clanSpent.Clear();
             _stumblesDay = 0;
         }
@@ -217,7 +218,7 @@ namespace GrandTourney
                 {
                     if (p == null || p.Character == null || winners.Contains(p)) continue;
                     if (forfeit && p.Team == plTeam && !_ko.ContainsKey(p.Character)) { if (p.Character.IsHero) _forfeit++; continue; }
-                    var v = VictorOf(p, winners);
+                    var v = VictorOf(p, winners, __instance.Participants);
                     if (v == null || v.Character == null) continue;
                     _missionBouts.Add(new Bout { Loser = p.Character, Victor = v.Character, Town = town, Mission = true });
                 }
@@ -226,9 +227,21 @@ namespace GrandTourney
             catch (Exception e) { Stumble("End", e); }
         }
 
-        private static TournamentParticipant VictorOf(TournamentParticipant loser, List<TournamentParticipant> winners)
+        private static TournamentParticipant VictorOf(TournamentParticipant loser, List<TournamentParticipant> winners, IEnumerable<TournamentParticipant> all)
         {
             CharacterObject ko;
+            // m95-turniej (Jeff 20.10: "jak to mozliwe, ze doszedlem do drugiej rundy i tyle kasy?"): w walce grupowej przegranego, ktorego powalil ktos, kto potem
+            // sam odpadl, kod dawal zwyciezcy z najlepszym wynikiem (czesto graczowi). Tourney Ransom Knocker Only: okup tylko dla tego, kto naprawde powalil
+            // (takze gdy potem odpadl); bez powalajacego - bez okupu. NIE = jak dotad.
+            if (Settings.Current == null || Settings.Current.TourneyRansomKnockerOnly)
+            {
+                if (!_ko.TryGetValue(loser.Character, out ko) || ko == null) { _noKnocker++; return null; }
+                if (all != null)
+                    foreach (var w in all)
+                        if (w != null && w.Character == ko && w.Team != loser.Team) return w;
+                _noKnocker++;
+                return null;
+            }
             if (_ko.TryGetValue(loser.Character, out ko))
                 foreach (var w in winners)
                     if (w != null && w.Character == ko && w.Team != loser.Team) return w;
@@ -438,6 +451,23 @@ namespace GrandTourney
 
         private static int Bit(EquipmentIndex i) { return 1 << (int)i; }
 
+        /// <summary>m95-turniej: okup sztuki = wartosc w obecnym stanie x Tourney Ransom Share (0.05-1, domyslnie 0.25), najmniej 1 zloto.</summary>
+        private static int ShareOf(int w)
+        {
+            float s = Settings.Current != null ? Settings.Current.TourneyRansomShare : 1f;
+            if (!(s > 0f) || s >= 1f) return w;
+            if (s < 0.05f) s = 0.05f;
+            return Math.Max(1, (int)Math.Round(w * (double)s));
+        }
+
+        /// <summary>m95-turniej: dopisek do okna gracza - okup to czesc wartosci.</summary>
+        private static string ShareNote()
+        {
+            float s = Settings.Current != null ? Settings.Current.TourneyRansomShare : 1f;
+            if (!(s > 0f) || s >= 1f) return "";
+            return " (the ransom of the lists: " + (s == 0.25f ? "a quarter" : Math.Round(s * 100f) + "%") + " of their worth)";
+        }
+
         /// <summary>Kon i zbroja przegranego z wartoscia w obecnym stanie, od najdrozszej. Smok i jego ladry - nie.</summary>
         private static List<Piece> Stake(Hero h, bool count)
         {
@@ -454,6 +484,9 @@ namespace GrandTourney
                 if (el.IsEmpty || el.Item == null) continue;
                 int w = el.ItemValue;
                 if (w <= 0) continue;
+                // m95-turniej (Jeff 20.10: "zaplacilem ponad 1k za przegrana ... ale dostalem w tym samym czasie ponad 8k zlota"): okup szranek to czesc wartosci
+                // (Tourney Ransom Share, domyslnie 1/4) - turniej na tepa bron, nie wojna; ta sama stawka w obie strony, gracz i AI
+                w = ShareOf(w);
                 list.Add(new Piece { Slot = idx, El = el, Worth = w });
             }
             list.Sort((a, b) => b.Worth.CompareTo(a.Worth));
@@ -835,7 +868,7 @@ namespace GrandTourney
                             string nm; try { nm = pc.El.GetModifiedItemName().ToString(); } catch { nm = pc.El.Item.Name.ToString(); }
                             sb.Append("  ").Append(nm).Append(" - ").Append(pc.Worth).Append(" gold\n");
                         }
-                        sb.Append("\nAll together ").Append(total).Append(" gold in their present state. ");
+                        sb.Append("\nAll together ").Append(total).Append(" gold in their present state").Append(ShareNote()).Append(". ");
                         if (can >= total) sb.Append("Pay to keep them, or yield them.");
                         else if (can > 0) sb.Append("You can pay only ").Append(can).Append(" gold: that keeps ").Append(keep.Count).Append(" of ").Append(stake.Count)
                                             .Append(" pieces, the rest goes to the victor.");
@@ -969,6 +1002,7 @@ namespace GrandTourney
                 Log.Info(P + "dzien " + ((int)CampaignTime.Now.ToDays).ToString(Inv) + " | klucz Tourney Ransom " + (On ? "tak" : "nie")
                          + ", nadwyzka rodu: budzet Armoury " + (Chest() != null ? "tak" : "nie") + " (zapasowa rezerwa " + _fallbackRoom + " razy)"
                          + " | turnieje " + _tourneys + ", walki " + _bouts + " (turnieje gry " + _boutsSim + ", szranki w misji " + _boutsMis + "), odwolane bez wykupu " + _calledOff
+                         + " | bez powalajacego (bez okupu, Knocker Only) " + _noKnocker
                          + " | rozliczone " + _settled + ": wykupione sztuki " + _paidN + " za " + _paid + " zlota, oddane " + _yieldN + " (wartosc " + _yieldWorth
                          + "): zalozone przez zwyciezce " + _worn + ", do taboru " + _toRoster + ", na targ " + _toMarket + " (miasto zaplacilo " + _marketPaid + ")"
                          + " | najwiecej jeden rod " + clanMax + " (" + clanMaxName + ")"

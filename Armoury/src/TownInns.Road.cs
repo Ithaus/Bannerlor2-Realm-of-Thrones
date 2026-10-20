@@ -69,6 +69,13 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>m95-zajazd (RoadsideInnStay): uid zajazdu, w ktorym gracz spi teraz po oplaconym noclegu (faza 1, partia przy zajezdzie - RoadNear); inaczej null.</summary>
+        internal static string RoadSleepUid()
+        {
+            var r = _rest;
+            return r != null && r.Phase == 1 && r.RoadUid != null && RoadNear(r) ? r.RoadUid : null;
+        }
+
         /// <summary>NightRest.SleepInit poza osada po oplaconym noclegu w zajezdzie: poczatek snu, pobudka nie przed switem (gdy swit w 12 h), tlo wsi, tekst.
         /// null = to nie sen w zajezdzie (tekst NightRest jak dotad).</summary>
         private static string RoadSleepInit(MenuCallbackArgs args, Rest r)
@@ -91,6 +98,7 @@ namespace Armoury
                 if (!string.IsNullOrEmpty(mesh)) args.MenuContext.SetBackgroundMeshName(mesh);
             }
             catch { }
+            RoadsideInnStay.OnSleepInit(args, r.RoadUid);   // m95-zajazd: sen w zajezdzie - partia schowana (po wczytaniu w trakcie snu tez; wlasny try); dzwiek - RoadsideInnStay.InnSleepSound
             string bed = r.Q == 2 ? "The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds"
                        : r.Q == 1 ? "The men drink their ale by the hearth of " + r.Town + " and sleep in beds"
                        : "The men bed down on the straw of the common room of " + r.Town + ", the horses in the yard";
@@ -146,7 +154,7 @@ namespace Armoury
                 MBTextManager.SetTextVariable("ARM_ROADINN_Q" + q, ShortLabels.Pick(QName[q] + " - " + b.Total + " d", QName[q] + " (" + QWhat[q] + ") - " + split));
                 var t = new StringBuilder();
                 if (ShortLabels.On) t.Append(QName[q]).Append(" (").Append(QWhat[q]).Append(") - ").Append(split).Append(".\n");
-                t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(PRoom[q]).Append(" d your room.");
+                t.Append(PMan[q]).Append(" d a man, ").Append(PHorse[q]).Append(" d a horse, ").Append(RoomOf(q)).Append(" d ").Append(RoomWord(q)).Append(".");
                 if (men > 0)
                 {
                     t.Append("\nThe men (").Append(men).Append(", ").Append(b.Mounted).Append(" mounted): ");
@@ -163,7 +171,7 @@ namespace Armoury
                         parts.Add(b.Comp[i].Name + " " + (b.CompQ[i] < 0 ? "the stable" : QualityOf(b.CompQ[i]) + " " + b.CompCost[i] + " d"));
                     t.Append(string.Join(", ", parts.ToArray())).Append(".");
                 }
-                t.Append("\nYou: room ").Append(PRoom[q]);
+                t.Append("\nYou: ").Append(RoomWord(q) == "your bed" ? "bed " : "room ").Append(RoomOf(q));
                 if (b.OwnHorse) t.Append(" + your horse ").Append(PHorse[q]);
                 if (b.Spare + b.ArmorySpare > 0) t.Append(" + ").Append(b.Spare + b.ArmorySpare).Append(" horses that carry nobody x ").Append(PHorse[q]);
                 t.Append(" = ").Append(b.PlayerCost).Append(" d (you have ").Append(Hero.MainHero.Gold).Append(").");
@@ -271,7 +279,7 @@ namespace Armoury
                          + ", porzadna karczma " + (b.FootAt[1] + b.MountAt[1]) + ", dobry dom " + (b.FootAt[2] + b.MountAt[2]) + ", stajnia " + b.MenStable
                          + "; sakiewka ludzi " + b.MenPurse + ", wolne " + b.MenFree + ", zaplacili " + menPaid + " z " + b.MenCost + (b.MenNoPurse ? " (sakiewki wylaczone)" : "")
                          + " | towarzysze " + b.Comp.Count + (compLog.Length > 0 ? ": " + compLog : "") + ", z kiesy " + compGoldPaid + ", z sakiewki ludzi " + compPursePaid
-                         + " | gracz: pokoj " + PRoom[q] + ", swoj kon " + (b.OwnHorse ? 1 : 0) + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " x " + PHorse[q]
+                         + " | gracz: pokoj " + RoomOf(q) + ", swoj kon " + (b.OwnHorse ? 1 : 0) + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " x " + PHorse[q]
                          + " = " + b.PlayerCost + ", zaplacil " + playerPaid
                          + " | razem " + paidAll + " (ludzie " + menPaid + ", towarzysze " + compPaid + ", gracz " + playerPaid + ") -> kiesa wsi " + purseAll + ", podatek pana wsi " + taxAll
                          + ", korona (DS) " + crownAll

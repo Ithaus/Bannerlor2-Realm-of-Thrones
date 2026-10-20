@@ -219,6 +219,7 @@ namespace Armoury
                 try { ArmsFromPeople.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ArmsFromPeople.ApplyAll", e); }
                 try { VillageBook.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageBook.ApplyAll", e); }   // E4/11 (193): zywnosc warowni od ludzi (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu (U26)
                 try { PeopleMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleMarket.ApplyAll", e); }   // GL-2 (P2 e): neutralizacja licznika Food warowni (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu MarketByPeople
+                try { TownGranary.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownGranary.ApplyAll", e); }   // p6-spichlerz (R3-06f): bilans jedzenia miasta (postfiks Last DefaultSettlementFoodModel) i Town.DailyTick - wpiete zawsze, licza przy kluczu TownGranaryFromVillages
                 // P4 (zbytki, targ widzi sakiewke): oferta ludu w szacunku popytu targu - prefiks / postfiks / finalizer na modelach gry i BetterEconomy (jak RawPrice, bez pol
                 // statycznych z tekstow); wpiete zawsze, licza przy kluczach FolkLuxuryList i MarketSeesPurse
                 try { TownFolk.LadderApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFolk.LadderApplyAll", e); }
@@ -259,6 +260,10 @@ namespace Armoury
                 MarchPace.ApplyAll(_harmony);
                 // SW-DROGI (noc 17/18.10): premia drogi ROT jedzie w latce MarchPace; tu tylko postfiks pamieci predkosci gry (MobileParty.IsLastSpeedCacheInvalid) i straznik zapisu stanu (CalculateSpeedForPartyUnified, getter SpeedExplained)
                 try { MapRoads.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapRoads.ApplyAll", e); }
+                // p6-sztormy (R3-05d): zima wiecej burz NavalDLC - postfiksy szansy narodzin i sufitu burz na NavalDLCStormModel, gettery listy burz (kara predkosci w latce MarchPace)
+                try { SeaStorms.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SeaStorms.ApplyAll", e); }
+                // p6-drogi (R3-07d): AI wybiera drogi - postfiks MobileParty.ComputePath (objazd droga) i straznik ucieczki RecalculateLongTermPath; wpiete zawsze, dziala przy kluczu MapRoadAiRoutes
+                try { AiRoadRoutes.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AiRoadRoutes.ApplyAll", e); }
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze
@@ -394,6 +399,7 @@ namespace Armoury
                     Log.Error("MapSideRoads: komponent widoku nie laduje sie (proba " + _sideRoadsLoadFails + "/3)", e);
                 }
             }
+            MapFields.AppTick();   // p6-pola (R3-07b): pola wokol wiosek wedlug pory roku - wlasna ochrona przed bledem ladowania typu (MapFields.cs); osobno od dopisow innych widokow (scalenie fali 2)
             // sw-zajazdy: zajazdy przy szlakach - osobna rejestracja widoku przed wylacznikiem wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach
             // zajazdy na mapie nie startuja do konca sesji; menu i plotki dzialaja dalej); przy kluczu RoadsideInns = off typ widoku sie nie laduje
             if (_innsLoadFails < 3 && Settings.Current.RoadsideInns)
@@ -404,6 +410,24 @@ namespace Armoury
                     _innsLoadFails++;
                     Log.Error("RoadsideInns: komponent widoku nie laduje sie (proba " + _innsLoadFails + "/3)", e);
                 }
+            }
+            // p6-szubienice (R3-07a): szubienice przy rozstajach - osobna rejestracja widoku przed wylacznikiem wiosek, ta sama ochrona przed bledem ladowania typu
+            // (po 3 probach szubienice na mapie nie startuja do konca sesji; lista i zapis dzialaja dalej); przy kluczu MapGallows = off typ widoku sie nie laduje
+            if (_gallowsLoadFails < 3 && Settings.Current.MapGallows)
+            {
+                try { GallowsTick(); }
+                catch (Exception e)
+                {
+                    _gallowsLoadFails++;
+                    Log.Error("Gallows: komponent widoku nie laduje sie (proba " + _gallowsLoadFails + "/3)", e);
+                }
+            }
+            // m95-zajazd: straznik pobytu w zajezdzie (4 razy na sekunde; poza pobytem i przy wylaczonym kluczu - nic; bez typow SandBox.View, wlasny try w srodku) -
+            // tu tylko blad ladowania typu, liczony (po 3 straznik nie startuje do konca sesji, gra bez zmian)
+            if (_innStayFails < 3)
+            {
+                try { RoadsideInnStay.AppTick(); }
+                catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
             }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
@@ -425,11 +449,20 @@ namespace Armoury
 
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
+        private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RoadsideInnsTick()
         {
             RoadsideInnsView.EnsureRegistered();
+        }
+
+        private static int _gallowsLoadFails;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void GallowsTick()
+        {
+            GallowsView.EnsureRegistered();
         }
 
         private static int _sideRoadsLoadFails;
@@ -493,6 +526,19 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("OnMissionBehaviorInitialize", e); }
+        }
+
+        /// <summary>m95-menu: po OnSessionLaunched i OnAfterSessionLaunched wszystkich zachowan (Campaign.DoLoadingForGameType -> GameManager), przed pierwszym
+        /// pokazaniem menu - porzadek menu miasta (TownMenus.Apply, klucz TownMenuTidy). Nowa kampania i wczytanie zapisu - ta sama droga.</summary>
+        public override void OnAfterGameInitializationFinished(Game game, object starterObject)
+        {
+            base.OnAfterGameInitializationFinished(game, starterObject);
+            try
+            {
+                if (game != null && game.GameType is Campaign && Campaign.Current != null)
+                    TownMenus.Apply(starterObject as CampaignGameStarter);
+            }
+            catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (TownMenus)", e); }
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)

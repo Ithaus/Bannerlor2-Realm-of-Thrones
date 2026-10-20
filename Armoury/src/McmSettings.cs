@@ -1888,6 +1888,38 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MapMudWetSpeedPercent { get; set; } = 7.5f;
 
+        [SettingPropertyBool("Sea Storm Winter", HintText = "winter storms at sea: while it is winter in Westeros, storms are born on the open sea (War Sails) Sea Storm Winter Factor times as often and that many times more of them can rage at once (12 instead of 6). Each storm is as strong and lasts as long as before: ships caught in it still take damage and see less, and the AI still steers clear of it. When winter ends, no new storms are added until fewer than 6 remain. Off = as many storms in winter as in summer, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormWinter { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sea Storm Winter Factor", 1.00f, 2.30f, "0.00", HintText = "in winter: how many times more often storms are born at sea, and how many times more of them can rage at once (2 = twice, 12 storms instead of 6; 1 = as in summer; at most 2.3 - 14 storms)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SeaStormWinterFactor { get; set; } = 2f;
+
+        [SettingPropertyBool("Sea Storm Slows Ships", HintText = "ships caught in a storm at sea sail slower by Sea Storm Ship Speed Percent - yours, the lords', caravans, pirates alike ('Storm' line in the speed tooltip), in every season. The storm's strong wind still drives on a ship that runs before it. A storm only slows ships down, it never stops them. Off = storms do not slow ships, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormSlowsShips { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sea Storm Ship Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much slower a ship sails inside a storm at sea, in percent of its speed (15 = -15%; at most 50)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SeaStormShipSpeedPercent { get; set; } = 15f;
+
+        [SettingPropertyBool("Sea Storm Winter Carts", HintText = "winter sea crossings for goods: while there are more storms at sea in winter (Sea Storm Winter), every load of goods that crosses the sea - food for the islands, smithing materials, merchants' wares, castle supplies, wood for bloomeries - waits in port for a weather window and arrives later (1 extra day at Winter Factor 2). Goods are never lost and no route is closed. Off = sea loads take as long in winter as in summer, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SeaStormWinterCarts { get; set; } = true;
+
+        [SettingPropertyBool("Map Road Ai Routes", HintText = "lords, caravans and villagers choose the painted roads: on a march over land to a settlement or a spot at least Map Road Ai Min Distance away, the party rides to the nearest good stretch of main road, follows it and leaves it near its goal - whenever that way is at most Map Road Ai Detour Percent longer than the game's own route, the road makes up at least half of it and, with the road bonus (Map Road Speed Percent), the ride takes no longer than the game's own route. Lords riding to a feast or to their estate count too. Not for your party, bandits, a chase, a flight, a siege or a battle. Needs Map Road Speed Bonus. Off = the game's own routes, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadAiRoutes { get; set; } = true;
+
+        [SettingPropertyInteger("Map Road Ai Min Distance", 10, 200, "0", HintText = "the shortest march (in map units, along the game's own route) for which lords, caravans and villagers look for a road (30 = about 140 km; half of the villagers' trips to their town and nearly every caravan hop between towns)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int MapRoadAiMinDistance { get; set; } = 30;
+
+        [SettingPropertyInteger("Map Road Ai Detour Percent", 0, 50, "0", HintText = "how much longer than the game's own route a way along the road may be, in percent (15 = up to 15% longer; a longer way is taken only when the road bonus still makes it no slower; at most 50)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int MapRoadAiDetourPercent { get; set; } = 15;
+
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool MaterialLawEnabled { get; set; } = true;
@@ -3496,6 +3528,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool TownFoodByVillagePeople { get; set; } = true;
 
+        [SettingPropertyBool("Town Granary From Villages", HintText = "towns get from their villages only the grain the villages can spare (above two years of their own food, a year and a quarter when the town runs short - the famine gate's reserve and its loss allowance), paid from the town's money at its grain price; a town with food in store or at its market does not starve. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TownGranaryFromVillages { get; set; } = true;
+
         [SettingPropertyBool("Watch Law Enabled", HintText = "every man who joins the Night's Watch comes from the Seven Kingdoms: first the convicts sent to the Wall, then outlaws who take the black, then common folk of every land by its numbers. A brother never goes home: routed or disbanded he walks back to the Wall, and a deserter hides among the outlaws of the North", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WatchLawEnabled { get; set; } = true;
@@ -4804,9 +4840,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int ForcedMarchSpeedPercent { get; set; } = 25;
 
-        [SettingPropertyBool("Town Inns", HintText = "in a town you can take lodgings at an inn: a common room (straw - 1 a man, 1 a horse, 3 for your own room), a decent inn (beds, a warm hearth, ale - 2/2/8) or a good house (rooms, wine, a bath - 4/3/20); the men still eat from their own wagons. Every soldier pays for himself and his horse from his own purse; companions pay from their own purses (with Companion Wage By Level off, the rest from the men's purse, where their pay then goes) (who cannot afford it takes a cheaper bed or the stable, free); you pay for yourself, your horse and the horses that carry nobody (in the baggage or the armoury). Taken in the evening or at night (from 18:00 with the usual camp hours) you sleep until dawn, by day until the men have slept; you wake rested until dusk, at most 12 hours: +5/+10/+12% speed on the map and +2/+5/+8 morale, weighted by how many slept in each kind of bed (only with no sleep debt); a decent inn or a good house also pays off sleep debt a quarter faster, and a good house heals the wounded half again as fast that night. The coin goes to the townsfolk who keep the inns. Needs Night Rest. Off = no inns, as before", RequireRestart = false)]
+        [SettingPropertyBool("Town Inns", HintText = "in a town you can take lodgings at an inn: a common room (straw - 1 a man, 1 a horse, 1 for your own bed among the men with Inn Common Room Shared Bed, else 3 for a room), a decent inn (beds, a warm hearth, ale - 2/2/8) or a good house (rooms, wine, a bath - 4/3/20); the men still eat from their own wagons. Every soldier pays for himself and his horse from his own purse; companions pay from their own purses (with Companion Wage By Level off, the rest from the men's purse, where their pay then goes) (who cannot afford it takes a cheaper bed or the stable, free); you pay for yourself, your horse and the horses that carry nobody (in the baggage or the armoury). Taken in the evening or at night (from 18:00 with the usual camp hours) you sleep until dawn, by day until the men have slept; you wake rested until dusk, at most 12 hours: +5/+10/+12% speed on the map and +2/+5/+8 morale, weighted by how many slept in each kind of bed (only with no sleep debt); a decent inn or a good house also pays off sleep debt a quarter faster, and a good house heals the wounded half again as fast that night. The coin goes to the townsfolk who keep the inns. Needs Night Rest. Off = no inns, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool TownInns { get; set; } = true;
+
+        [SettingPropertyBool("Inn Common Room Shared Bed", HintText = "in the common room of an inn you sleep on the straw among your men and pay what a man pays for his place (1 d) instead of 3 d for a room of your own - a room is for the decent inn and the good house. Off = 3 d for your own room in the common room, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnCommonRoomSharedBed { get; set; } = true;
 
         [SettingPropertyBool("Town Inn Price Bonus", HintText = "after a night in a good house (asleep until dawn) you trade a little better in that same town until dusk, at most 12 hours: you buy up to 3% cheaper and sell up to 3% dearer in the trade screen - never more than half the town's own gap between buying and selling, so buying and selling back never pays - and only until you have gained about 100 denars by it. Off = the good house gives no price bonus", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -4827,6 +4867,14 @@ namespace Armoury
         [SettingPropertyBool("Inn Gossip Leader Names", HintText = "gossip names a band of outlaws after its leader - 'Jon Rivers and his bandits' - instead of its kind ('Broken Men'): a band led by a hero goes by the hero's full name, any other band gets a leader with a name from the land it comes from and keeps that name for as long as it lives (kept in the save). Also in the news of burned villages. Off = the kind of band and a nickname, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipLeaderNames { get; set; } = true;
+
+        [SettingPropertyBool("Roadside Inn Hide Party", HintText = "while you are inside a roadside inn - in its menu or asleep in its beds - your party disappears from the map, as it does when you enter a village: no rider, no horse and no name over the inn, nor the parties of an army you lead. It comes back when you ride on, wake, or a fight or anything else draws you out. Off = your party stays on the map next to the inn, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnHideParty { get; set; } = true;
+
+        [SettingPropertyBool("Roadside Inn Tavern Sound", HintText = "a roadside inn sounds like one: inside you hear the hubbub of a tavern (the game's own sound of the town taverns) and the door as you go in, and it goes on while you sleep there. Off = a silent inn menu, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnTavernSound { get; set; } = true;
 
         [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -5052,9 +5100,13 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool MendHoursByGuild { get; set; } = true;
 
-        [SettingPropertyBool("Auto Mend Half Guild", HintText = "with Mend Hours By Guild on: the repairs nobody orders by hand - the AI lords' men and your own men paying from their purse - together take at most half of each trade's working hours in a town each day, so the workshops never stand idle and some hands stay free for your own orders (off = they may take every free hour)", RequireRestart = false)]
+        [SettingPropertyBool("Auto Mend Half Guild", HintText = "with Mend Hours By Guild on: the repairs nobody orders by hand - the AI lords' men and your own men paying from their purse - together take at most half of each trade's working hours in a town each day, so the workshops never stand idle and some hands stay free for your own orders (off = they may take every free hour). Only used when Mend Idle Hands First is off", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool AutoMendHalfGuild { get; set; } = true;
+
+        [SettingPropertyBool("Mend Idle Hands First", HintText = "with Mend Hours By Guild on: repairs take first the hands of a trade that have no work today - a town workshop with nothing to make, a line whose work is going to waste (its store of work is full) - and only then the trade's own hands that are busy making new arms, at its own lines or lent to another trade's lines; the repairs nobody orders by hand (the AI lords' men and your own men paying from their purse) take at most 15% of those busy hands a day and the rest waits, while your own orders may still take every free hour. Hours from idle hands are not taken off tomorrow's workshop work (off = the half-of-each-trade rule of Auto Mend Half Guild, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendIdleHandsFirst { get; set; } = true;
 
         [SettingPropertyBool("Mend Bulk Every Order", HintText = "the bulk rate of the men's racks (Troop Mend Bulk Discount: 0.5% off the work per piece, up to 30%) applies to every repair order in a town: your loot from the bags, your harness, the quartermaster's repairs (Spoils), your men's daily mending and each AI lord's day at the smiths (counting the pieces the trades really take that day) - the more pieces in one order, the bigger the rate; off the work only, not the materials or the hours (off = only on the men's racks, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
@@ -5499,6 +5551,10 @@ namespace Armoury
         [SettingPropertyBool("Mill On Bank", HintText = "water mills on rivers stand on the bank, not in the stream: the whole mill village, mill and wheel included, is set half a step back from the river's edge. Mills on the sea coast are unchanged. Off = as before, the wheel a little out in the water", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool MillOnBank { get; set; } = true;
+
+        [SettingPropertyBool("Map Gallows", HintText = "gallows at the crossroads: when your party, a lord, a patrol or a garrison beats a band of outlaws - or clears a hideout - a gallows with the hanged stands for 7 to 14 days at the nearest crossroads (or by the nearest road), at most one in a district and 200 in the world (when full, the one farthest from you makes way; yours stand their time). Only a sight on the map - nothing else changes. Off = no new gallows, the standing ones are hidden", RequireRestart = false)]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapGallows { get; set; } = true;
 
         [SettingPropertyBool("Village Tip Held By", HintText = "the map village tooltip names who holds the land, live from the game: 'A village of the Tumbledown lands, held by House Stark of Winterfell' ('your fief' for your own). Off = 'A village of the X district', as before", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
@@ -6636,6 +6692,22 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidPlayerStepPopup { get; set; } = true;
 
+        [SettingPropertyBool("Raid Tribute Enabled", HintText = "instead of burning an enemy village, a lord or army may demand tribute from it: the elders pay a share of the village purse (Raid Tribute Share Low when the raiders barely outnumber the militia, up to Raid Tribute Share High at five to one) and the village is not burned - its people and crops stay. The lords weigh it against the loot of a raid: they take tribute when it pays as well as the raid less the wages of the days it would take, and raid anyway when their men are hungry, their house cannot pay its men, the tribute is less than a day's wages, the villagers would fight, or they are Ironborn or Free Folk. You get Demand tribute in the hostile action menu of an enemy village. After paying, the village is spared by that realm (its lords and you) for Raid Tribute Spare Days and does not pay it again; its lord and elders think a little less of the raider, less than after a raid. Off = villages are raided as before", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidTributeEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Raid Tribute Share Low", 0.00f, 0.50f, "0.00", HintText = "with Raid Tribute Enabled: the share of the village purse paid as tribute when the raiders barely outnumber its defenders (0.10 = a tenth)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidTributeShareLow { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Raid Tribute Share High", 0.00f, 0.50f, "0.00", HintText = "with Raid Tribute Enabled: the share of the village purse paid as tribute when the raiders outnumber its defenders five to one or more (0.20 = a fifth)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidTributeShareHigh { get; set; } = 0.20f;
+
+        [SettingPropertyInteger("Raid Tribute Spare Days", 1, 364, "0", HintText = "with Raid Tribute Enabled: for how many days a village that paid tribute is spared by the realm it paid - its lords do not raid it and do not ask again, and neither can you", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidTributeSpareDays { get; set; } = 30;
+
         [SettingPropertyBool("Village Herds As Loot", HintText = "raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth. Raiders keep at most one animal for every two men", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool VillageHerdsAsLoot { get; set; } = true;
@@ -6731,6 +6803,10 @@ namespace Armoury
         [SettingPropertyInteger("Map Side Roads Chunk Radius Cap", 40, 400, "0", HintText = "with Map Side Roads Chunks on, the farthest distance from the camera, in map units, at which lanes are laid down when the camera is tilted lower than usual. At the game's usual camera angles the whole screen is always covered whatever the value - the limit never comes closer than the farthest corner of the screen; it only cuts the lanes far towards the horizon when the camera is tilted low. Higher = lanes reach farther towards the horizon, more to draw (40 to 400)", RequireRestart = false)]
         [SettingPropertyGroup("Side roads to far villages")]
         public int MapSideRoadsChunkRadiusCap { get; set; } = 160;
+
+        [SettingPropertyBool("Map Village Fields", HintText = "fields around the villages of the campaign map that change with the time of the year: ploughed at the start of every year, green while the crop grows, golden in the harvest weeks and stubble after the reaping (only in a summer or autumn of Westeros - the same harvest the villages live on). Through a Westeros winter the fields of the cold lands lie under snow and those of the warm south lie ploughed and bare. A raided village shows burnt fields, a half-deserted one leaves part of its fields untilled. Only a picture - nothing in the economy, the routes or the save changes. Off = no fields are drawn", RequireRestart = false)]
+        [SettingPropertyGroup("Fields around villages")]
+        public bool MapVillageFields { get; set; } = true;
 
         [SettingPropertyBool("Perf Valyrian Census", HintText = "the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
@@ -7620,6 +7696,10 @@ namespace Armoury
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsPlanMarketsClearVillages { get; set; } = false;
 
+        [SettingPropertyBool("Ks Plan Converge Shelf Level", HintText = "with Start Calibration: how the weekly plan reports, in the log, which goods its markets have not settled. The plan's villages make a little more than the towns buy - the stock it orders for the town stalls (before the calibration is switched on and in the first weeks after) - and that surplus spreads evenly over every good of the market, which relative prices cannot and should not remove. With this on, a good counts as settled when its supply lies between its demand and that common stall level of its market (never above what the plan ordered for the stalls); a shortage counts as before. Only the report changes - the plan, its hands, prices, coin and goods are exactly as before. Off = every good must be within 2 in 100 of its demand", RequireRestart = false)]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsPlanConvergeShelfLevel { get; set; } = true;
+
         [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter in the cold lands needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt; hunters of the warm lands as before). Off = the old table", RequireRestart = false)]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsColdLand { get; set; } = true;
@@ -8382,11 +8462,15 @@ namespace Armoury
 
         [SettingPropertyBool("Ks Switch Signal Rule", HintText = "with Ks Switch Signal: village parts really change their work by that reckoning, with the same brake as Start Calibration Switch Rule - another work must pay at least 25% better for about 60 days, one part of a district at a time, within what its land allows, at most 5% of the region's hands a season; the village pays for timber, tools and stone really bought at its market town's stall and for the town craftsmen, and the hands move over 60 days (vineyards, groves, orchards and date palms a year). AI villages and the player's villages alike. Off = works stay as the calibration set them (only the pressure to change is written to the log), unless Start Calibration Switch Rule is on", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
-        public bool KsSwitchSignalRule { get; set; } = false;
+        public bool KsSwitchSignalRule { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Ks Switch Market Band", 0.00f, 0.50f, "0.00", HintText = "with Ks Switch Signal: how far a good's shortage or glut at the market town may move its price in the reckoning, compared with the town's other goods (0.15 = at most 15% up or down; 0 = the calibration's own prices only)", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public float KsSwitchMarketBand { get; set; } = 0.15f;
+
+        [SettingPropertyBool("Town Works Hire District", HintText = "with Ks Switch Signal Rule: towns with more coin than they need pay back what village rebuilding put into town purses (a week's average), as wages for carts and hands from their district villages - by households, raided villages get nothing. A town pays first for its own district, then for poorer towns. Only coin moves; nothing is built. Never below a town's own needs, not while besieged or just taken. Every town, the player's too. Off = the coin stays in the town purses, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool TownWorksHireDistrict { get; set; } = true;
 
         [SettingPropertyBool("Side Village Craft Ks Signal", HintText = "with Side Village Crafts and Ks Switch Signal: a side village outside the calibration weighs its crafts by the same reckoning as the calibrated village parts (land suitability x output x the calibration's prices at its market town, minus costs and land rent) instead of land suitability x the square root of the game price index, while the calibration has a plan to price from - but only while the calibrated village parts really change their work by that reckoning (Ks Switch Signal Rule or Start Calibration Switch Rule on), so side villages never move by a reckoning the calibration itself only measures. Off = land suitability x price index, as before", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
@@ -8439,6 +8523,10 @@ namespace Armoury
         [SettingPropertyBool("Book Holdings Free Own Prisoners", HintText = "with Book Holdings Restore: right after each returned keep changes hands, the common prisoners in its dungeon who are soldiers of the new lord's realm (troops of the culture of the realm or of one of its houses, never bandits) are set free and join its garrison - the same men, none made or lost; every other prisoner stays in the dungeon (lords of the new lord's side are freed by the game itself). The freed men come without their arms, which their captors took; the garrison buys what is missing as for any new man. Only on the one-time restore - a save already restored is not touched; off = all common prisoners stay in the dungeon as before", RequireRestart = false)]
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
+
+        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory and the masters of Qohor into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("The town menu")]
+        public bool TownMenuTidy { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -8911,6 +8999,14 @@ namespace Armoury
             s.MapMudSpeedPenalty = MapMudSpeedPenalty;
             s.MapMudSpeedPercent = MapMudSpeedPercent;
             s.MapMudWetSpeedPercent = MapMudWetSpeedPercent;
+            s.SeaStormWinter = SeaStormWinter;
+            s.SeaStormWinterFactor = SeaStormWinterFactor;
+            s.SeaStormSlowsShips = SeaStormSlowsShips;
+            s.SeaStormShipSpeedPercent = SeaStormShipSpeedPercent;
+            s.SeaStormWinterCarts = SeaStormWinterCarts;
+            s.MapRoadAiRoutes = MapRoadAiRoutes;
+            s.MapRoadAiMinDistance = MapRoadAiMinDistance;
+            s.MapRoadAiDetourPercent = MapRoadAiDetourPercent;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;
@@ -9313,6 +9409,7 @@ namespace Armoury
             s.VillageBookEnabled = VillageBookEnabled;
             s.DistrictSettlementPeople = DistrictSettlementPeople;
             s.TownFoodByVillagePeople = TownFoodByVillagePeople;
+            s.TownGranaryFromVillages = TownGranaryFromVillages;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;
             s.WatchDoesNotRaid = WatchDoesNotRaid;
@@ -9641,11 +9738,14 @@ namespace Armoury
             s.ForcedMarch = ForcedMarch;
             s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;
+            s.InnCommonRoomSharedBed = InnCommonRoomSharedBed;
             s.TownInnPriceBonus = TownInnPriceBonus;
             s.RoadsideInns = RoadsideInns;
             s.InnGossip = InnGossip;
             s.InnGossipLootWords = InnGossipLootWords;
             s.InnGossipLeaderNames = InnGossipLeaderNames;
+            s.RoadsideInnHideParty = RoadsideInnHideParty;
+            s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.InnGossipPages = InnGossipPages;
             s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
@@ -9703,6 +9803,7 @@ namespace Armoury
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
             s.MendHoursByGuild = MendHoursByGuild;
             s.AutoMendHalfGuild = AutoMendHalfGuild;
+            s.MendIdleHandsFirst = MendIdleHandsFirst;
             s.MendBulkEveryOrder = MendBulkEveryOrder;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;
@@ -9814,6 +9915,7 @@ namespace Armoury
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
             s.MillOnBank = MillOnBank;
+            s.MapGallows = MapGallows;
             s.VillageTipHeldBy = VillageTipHeldBy;
             s.RotSwapSameMan = RotSwapSameMan;
             s.RecruitBringsWhatHeHas = RecruitBringsWhatHeHas;
@@ -10098,6 +10200,10 @@ namespace Armoury
             s.RaidDetachmentMen = RaidDetachmentMen;
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
+            s.RaidTributeEnabled = RaidTributeEnabled;
+            s.RaidTributeShareLow = RaidTributeShareLow;
+            s.RaidTributeShareHigh = RaidTributeShareHigh;
+            s.RaidTributeSpareDays = RaidTributeSpareDays;
             s.VillageHerdsAsLoot = VillageHerdsAsLoot;
             s.TiredLandYield = TiredLandYield;
             s.TwinsCrossingCount = TwinsCrossingCount;
@@ -10122,6 +10228,7 @@ namespace Armoury
             s.MapSideRoadsAllVillages = MapSideRoadsAllVillages;
             s.MapSideRoadsChunks = MapSideRoadsChunks;
             s.MapSideRoadsChunkRadiusCap = MapSideRoadsChunkRadiusCap;
+            s.MapVillageFields = MapVillageFields;
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
@@ -10344,6 +10451,7 @@ namespace Armoury
             s.KsSelfFeedSlow = KsSelfFeedSlow;
             s.KsPlanMarketsClear = KsPlanMarketsClear;
             s.KsPlanMarketsClearVillages = KsPlanMarketsClearVillages;
+            s.KsPlanConvergeShelfLevel = KsPlanConvergeShelfLevel;
             s.KsColdLand = KsColdLand;
             s.KsHungerUnrest = KsHungerUnrest;
             s.KsHungerLoyaltyMax = KsHungerLoyaltyMax;
@@ -10536,6 +10644,7 @@ namespace Armoury
             s.KsSwitchSignal = KsSwitchSignal;
             s.KsSwitchSignalRule = KsSwitchSignalRule;
             s.KsSwitchMarketBand = KsSwitchMarketBand;
+            s.TownWorksHireDistrict = TownWorksHireDistrict;
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
             s.BloomeryWoodCredit = BloomeryWoodCredit;
@@ -10549,6 +10658,7 @@ namespace Armoury
             s.BookHoldingsRestore = BookHoldingsRestore;
             s.BookHoldingsGarrison = BookHoldingsGarrison;
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
+            s.TownMenuTidy = TownMenuTidy;
         }
 
         internal static void Apply()

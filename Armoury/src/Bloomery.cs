@@ -786,7 +786,7 @@ namespace Armoury
                             GoodsLedger.End(gf);
                             if (got > 0)   // drewno zeszlo z polki - woz musi istniec, cokolwiek stalo sie potem
                             {
-                                var cart = new Cart { Src = c.St, Mine = v, DayBought = today, DayDue = due, N = got, Paid = paid };
+                                var cart = new Cart { Src = c.St, Mine = v, DayBought = today, DayDue = due + SeaStorms.CartDays(SeaStorms.CBloom, false, c.St, v.Settlement), N = got, Paid = paid };   // p6-sztormy (recenzja): zima przez morze - czekanie w porcie
                                 _carts.Add(cart); mine.Add(cart);
                                 _cCarts++; _cBought += got; _cGold += paid; _cDaysSum += c.Days;
                                 m.Got += got; m.BuyDay += paid;

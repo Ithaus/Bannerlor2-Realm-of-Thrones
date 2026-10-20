@@ -109,6 +109,7 @@ namespace Armoury
         internal const int MKsH = 23;                                                                           // KS-R3 G1: kupcy zywnosci KS-H - kasa celu -> kasa zrodla (towar), fracht do kies wsi zrodla i kies wyrobnikow portow, zwroty (wolne M23 z rezerwy E5/B)
         internal const int MKs = 22;                                                                            // KS (kalibracja startu): przebudowa zajec wsi (kiesy wsi -> kasy miast targowych) i plon pol mieszczan (kasy miast -> kiesy ludu)
         internal const int MZc6 = 21;                                                                           // ZC6 (DailyLife.Mobility): kupno ziemi przy awansie do szlachty (kiesy wsi -> panowie) i odkup przy spadku (panowie -> kiesy wsi; wolne M21 z rezerwy E5/B)
+        internal const int MTownHire = 31;                                                                      // p6-a7 (TownHire): roboty miast z rak okregu - kasy miast -> kiesy wsi okregu (wolne M31 z rezerwy E5/B)
         internal const int MVetPurse = 33;                                                                      // E5/B6 (201): pula sakiewek weteranow w karczmach -> kasy miast karczm ("zycie")
         private const int Marks = 34;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3; E5/B1 M18-M20; E5/B6 M33
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
@@ -124,7 +125,7 @@ namespace Armoury
                                                    "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)",
                                                    "awans stanow (ZC6): kupno i odkup ziemi - kiesy wsi i panowie ziemi", "kalibracja startu (KS): przebudowa zajec wsi (kiesy wsi -> kasy miast) i pola mieszczan (kasy miast -> kiesy ludu)", "kupcy zywnosci (KS-H): towar kasa celu -> kasa zrodla, fracht -> kiesy wsi i portow, zwroty", "(zarezerwowane E5/B)",   // 21: ZC6; 22: KS; 23: KS-H; 24-32: wolne (nieuzywane, drukowane tylko != 0)
                                                    "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
-                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "roboty miast z rak okregu (p6-a7): kasy miast -> kiesy wsi okregu", "(zarezerwowane E5/B)",   // 31: p6-a7 (TownHire)
                                                    "weterani (E5/B6): pula sakiewek weteranow w karczmach -> kasy miast karczm (zycie)" };
 
         /// <summary>m6b (6, recenzja - AlleyProbe): liczba pozycji naszego ticku i krotka nazwa pozycji (do pierwszego " (" albo ":").</summary>

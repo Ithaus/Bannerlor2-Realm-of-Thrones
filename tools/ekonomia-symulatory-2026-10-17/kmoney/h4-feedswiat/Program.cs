@@ -92,6 +92,7 @@ static class Program
         if (Environment.GetEnvironmentVariable("KS_TREACH") == "1") KsCore.TownReach = true;
         if (Environment.GetEnvironmentVariable("KS_TGRAD") == "1") KsCore.TownGrad = true;
         { var ta = Environment.GetEnvironmentVariable("KS_TALPHA"); double tv; if (!string.IsNullOrEmpty(ta) && double.TryParse(ta, NumberStyles.Float, Inv, out tv)) KsCore.TableAlpha = tv; }
+        if (Environment.GetEnvironmentVariable("KS_CONVLEV") == "1") inp.ConvShelfLevel = true;   // n22f-plany: klucz Ks Plan Converge Shelf Level
         { var mg = Environment.GetEnvironmentVariable("KS_MARGIN"); double mv; if (!string.IsNullOrEmpty(mg) && double.TryParse(mg, NumberStyles.Float, Inv, out mv)) inp.MarketMargin = mv; }
         foreach (var kv in root.GetProperty("gd").EnumerateObject())
         {

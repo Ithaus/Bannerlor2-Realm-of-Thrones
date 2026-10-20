@@ -91,6 +91,7 @@ namespace Armoury
             ColumnPostfix(__0, ref __result);
             MapRoads.SpeedRoad(__0, ref __result);
             MapMud.Speed(__0, ref __result);   // p5-bloto (R3-07c): poza droga w deszczu -MapMudSpeedPercent% (wpis "Mud"); klucz wylaczony = wychodzi od razu
+            SeaStorms.Speed(__0, ref __result);   // p6-sztormy (R3-05d): statek na morzu w burzy -SeaStormShipSpeedPercent% (wpis "Storm"); klucz wylaczony = wychodzi od razu
         }
 
         /// <summary>Kolumna marszowa (tresc dawnego SpeedPostfix bez zmian).</summary>
@@ -166,7 +167,7 @@ namespace Armoury
                 var c = Settings.Current;
                 // SW-DROGI: ta sama latka niesie premie drogi (MapRoads.SpeedRoad) - wpinana takze przy wylaczonej kolumnie, gdy MapRoadSpeedBonus wlaczony
                 // (kolumna sprawdza wtedy swoj klucz w ColumnPostfix i wychodzi); oba klucze wylaczone = jak przed zmiana
-                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus)) { Log.Info("MarchPace: wylaczony."); return; }
+                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus && !c.SeaStormSlowsShips)) { Log.Info("MarchPace: wylaczony."); return; }   // p6-sztormy: latka niesie tez kare burzy na morzu
 
                 var post = new HarmonyMethod(typeof(MarchPace).GetMethod("SpeedPostfix",
                     BindingFlags.Public | BindingFlags.Static)) { priority = Priority.Last };
@@ -193,7 +194,9 @@ namespace Armoury
                 }
                 MapRoads.SpeedModels = done;   // SW-DROGI (recenzja, uwaga 4): linie "Drogi (DR)" mowia NIECZYNNA, gdy ta latka nie weszla przy starcie gry
                 if (c.MarchPaceEnabled) Log.Info("MarchPace: kolumna marszowa wpieta w " + done + " modeli predkosci.");
-                else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla premii drog (MapRoadSpeedBonus).");
+                else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla "   // p6-sztormy (recenzja): ktore klucze niosa latke
+                              + (c.MapRoadSpeedBonus && c.SeaStormSlowsShips ? "premii drog (MapRoadSpeedBonus) i kary burzy na morzu (SeaStormSlowsShips)"
+                                 : c.SeaStormSlowsShips ? "kary burzy na morzu (SeaStormSlowsShips)" : "premii drog (MapRoadSpeedBonus)") + ".");
             }
             catch (Exception e) { Log.Error("MarchPace.ApplyAll", e); }
         }

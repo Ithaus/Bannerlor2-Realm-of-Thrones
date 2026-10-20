@@ -107,6 +107,7 @@ namespace Armoury
             _pendingUid = _askedUid = null; _current = null; _lastCheck = 0;
             _stumbles = 0; _errLogged = false;
             DayReset();
+            RoadsideInnStay.Reset();   // m95-zajazd: stan pobytu (ukrycie partii) od zera
             InnViewStats.DayZero();   // recenzja: liczniki doby widoku poprzedniej kampanii nie wchodza do pierwszej linii doby nowej (nowa gra / wczytanie bez konca doby)
         }
 
@@ -542,7 +543,7 @@ namespace Armoury
                 starter.AddGameMenuOption(Menu, "arm_roadinn_gossip", "{=!}Listen to the gossip", Rumours.RoadGossipCondition, Rumours.RoadGossipConsequence, false, 5);
                 starter.AddGameMenuOption(Menu, "arm_roadinn_leave", "{=!}Ride on",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate (MenuCallbackArgs a) { _current = null; GameMenu.ExitToLast(); }, true, 9);
+                    delegate (MenuCallbackArgs a) { _current = null; RoadsideInnStay.Leave("Ride on"); GameMenu.ExitToLast(); }, true, 9);   // m95-zajazd: partia z powrotem na mapie przed zamknieciem menu
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }
@@ -569,6 +570,7 @@ namespace Armoury
                 string mesh = null;
                 try { if (inn != null && inn.Village != null && inn.Village.SettlementComponent != null) mesh = inn.Village.SettlementComponent.WaitMeshName; } catch { }
                 try { args.MenuContext.SetBackgroundMeshName(string.IsNullOrEmpty(mesh) ? "wait_fallback" : mesh); } catch { }
+                RoadsideInnStay.OnMenuInit(args, inn);   // m95-zajazd: partia schowana na czas pobytu (wlasny try); dzwiek - RoadsideInnStay.InnMenuSound
                 var sb = new StringBuilder();
                 if (inn == null) sb.Append("You stand by the road. There is no inn here.");
                 else
@@ -582,7 +584,7 @@ namespace Armoury
                     catch { }
                     sb.Append(" About ").Append(Rumours.Round(inn.People).ToString("N0", Inv)).Append(" souls live in the villages around.");
                     sb.Append("\n\n").Append(BedsText(inn));
-                    sb.Append(" The prices are those of the town inns (a man / a horse / your own room): common room 1 / 1 / 3");
+                    sb.Append(" The prices are those of the town inns (a man / a horse / your own room): common room 1 / 1 / " + TownInns.RoomOf(0));
                     if (inn.Tiers >= 2) sb.Append(", decent inn 2 / 2 / 8");
                     if (inn.Tiers >= 3) sb.Append(", good house 4 / 3 / 20");
                     sb.Append(". Every soldier pays for himself and his horse from his own purse; you pay for yourself, your horse and every horse that carries nobody. The coin stays with the village whose lands the inn stands on.");
@@ -610,11 +612,13 @@ namespace Armoury
                 Log.Info(P + "start sesji | " + Keys() + " | " + (On ? _loadText : "zajazdy wylaczone - plik nie czytany") + " | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
+            RoadsideInnStay.SessionStart();   // m95-zajazd: latki pobytu i linia "Zajazdy (ZJ): pobyt - start sesji" (wlasny try)
         }
 
         /// <summary>Linia doby (z OnDailyTick) - przy wlaczonym kluczu RoadsideInns.</summary>
         internal static void Daily(int day)
         {
+            RoadsideInnStay.Daily(day);   // m95-zajazd: linia "Zajazdy (ZJ): pobyt - dzien N" (wlasny try, takze przy wylaczonych zajazdach - zeby bylo widac zdjecie stanu)
             try
             {
                 if (!On) { DayReset(); TownInns.RoadDayReset(); return; }

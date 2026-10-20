@@ -57,6 +57,12 @@ namespace GrandTourney
         public int MaxNoblesInBracket = 15;                // at most this many of the sixteen places go to lords
         public bool TourneyRansom = true;                  // whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions (only when you ride in the lists yourself) and the AI knights alike - a common soldier fights in borrowed kit, ladies and townsfolk wager nothing, kin never ransom kin, a tourney called off costs nobody; an AI lord pays only from what his house can spare beyond its war chest, the victor wears what is better than his own, and the vanquished buys plain kit at the market
 
+        // m95-turniej (Jeff 20.10: wygrana walka dala 8k przy 1.7k za przegrana - pelna wartosc zbroi lorda to lata dochodu biednego rycerza, a swiat AI przesuwal
+        // 330-410 tys. zlota dziennie): okup szranek = czesc wartosci konia i zbroi, w obie strony; sztuki przechodza dopiero, gdy nie stac nawet na okup
+        public bool TourneyRansomKnockerOnly = true;       // with Tourney Ransom: in a group fight the ransom goes only to the knight who really struck the vanquished down (even if he was beaten later himself); a knight nobody struck down owes nothing. Off = as before, the best of the winners took the ransom of everyone his side outlasted
+        // Jeff 20.10 ok. 12:00: "nie musisz sztucznie zmniejszac ... jak nie maja kasy, to ich zbroje, bo nie moga placic z czego czego nie maja" -> domyslnie 1 (pelna wartosc)
+        public float TourneyRansomShare = 1f;              // with Tourney Ransom: the ransom of the lists as a share of the worth of the horse and armour in their present state (1 = the full worth); the vanquished pays only from what he and his house really have, and yields the pieces he cannot pay for
+
         public bool LogEnabled = true;                     // write a log file in the module folder
 
         public static void Load(string moduleDataDir)
