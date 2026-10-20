@@ -1807,6 +1807,9 @@ namespace Armoury
         // n20-relacje (Jeff 19.10: "nie wyskakiwalo mi 30 powiadomien ... zbiorczo"): showQuickNotification = false przy BanditCheer i jedno okienko
         // zbiorcze (BanditCheer.BuildText); relacja i XP Charm bez zmian; linia logu "BanditCheer (zbiorczo):" przy kazdej wygranej z banda
         public bool BanditReliefRelationSummary = true;    // after you beat bandits, the thanks of nearby villages comes as ONE message - how much relation, with how many notables and which villages - instead of a popup for every notable; the relation you gain is the same. Off: one popup per notable, as before
+        // n20-relacje (poprawka po recenzji): drugie zrodlo okienek po tych samych bitwach - DynamicReinforcements Consequences.RewardHelpers (+2 / +1
+        // z okienkiem dla kazdego lorda z odsieczy); ReinforcementThanks: ta sama relacja bez okienek gry + jedno okienko, linia "ReinforcementThanks (zbiorczo):"
+        public bool ReinforcementRelationSummary = true;   // lords who came to your aid in battle (Dynamic Reinforcements) thank you in ONE message - how much relation and with whom - instead of a popup for every lord; the relation you gain is the same. Off: one popup per lord, as before
 
         public bool LogEnabled = true;                     // write a log file in the module folder
         // E8/O6 (270, PLAN 8.17; RD8 O5 bez utraty linii; krytyka K2-5): pliki logu otwarte na czas sesji - jeden slownik pisarzy dla Info (glowny i tematyczne),

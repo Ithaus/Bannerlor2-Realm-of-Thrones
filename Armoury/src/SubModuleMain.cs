@@ -165,6 +165,7 @@ namespace Armoury
                 try { TownFolk.ApplyCraftSale(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplyCraftSale", e); }   // N4 (poprawka po recenzji 16.10): do puli doplaty 35% tylko sztuki, ktore trafily na polke (po WorkshopTrade - wyrob do miasta wpiety wczesniej)
                 try { TownFolk.ApplySkup(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplySkup", e); }   // GL-B / 11c: robocizna od skupu plonu wsi (zaplata kasy taborom wsi; klucz FolkEarnFromVillageBuys czytany na zywo)
                 AmmoRecovery.ApplyAll(_harmony);
+                try { ReinforcementThanks.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ReinforcementThanks.ApplyAll", e); }   // n20-relacje: odsiecz DR - jedno okienko relacji zamiast okienka na lorda (transpiler RewardHelpers)
                 RecruitCost.ApplyAll(_harmony);
                 try { RecruitSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RecruitSources.ApplyAll", e); }   // 171: echo werbunku ROT, jency, autowerbunek zalog
                 try { GarrisonArmory.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll", e); }   // 171: sprzet idzie z ludzmi miedzy partia a zaloga i przy rozwiazaniu partii

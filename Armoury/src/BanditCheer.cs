@@ -28,11 +28,14 @@ namespace Armoury
     /// BKVolunteerModel.CalculateMaximumRecruitmentIndex: GetRelationImpact). Zysk liczony jak w grze: roznica relacji bazowej miedzy "efektywnymi"
     /// bohaterami (DiplomacyModel.GetHeroesForEffectiveRelation - te same, ktorym ApplyInternal zapisuje relacje) przed i po wywolaniu.
     /// Inne zrodla relacji (zadania, kryjowki, rozmowy, obrona wiesniakow w grze) bez zmian. Wylaczony klucz = okienko gry przy kazdym notablu, jak dotad.
+    /// Okienka lordow z odsieczy w tej samej bitwie (DynamicReinforcements, w chwili wyniku misji) zbiera osobno ReinforcementThanks (klucz ReinforcementRelationSummary).
     /// Wolane z watku glownego (MapEventEnded), poza goraca sciezka - zwykle listy na zdarzenie.
     /// </summary>
     internal static class BanditCheer
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        // dodatkowy czas okienka zbiorczego (recenzja: ok. 30 slow = ok. 6 s w GameNotificationVM - za malo, zeby przeczytac); tez ReinforcementThanks
+        internal const int SummaryExtraMs = 4000;
 
         // wioska z zyskiem do zbiorczego komunikatu
         private struct VillageGain { public string Name; public float Dist; public int Notables; }
@@ -128,7 +131,7 @@ namespace Armoury
                 string text = BuildText(list, raised, lo, hi);
                 try
                 {
-                    MBInformationManager.AddQuickInformation(new TextObject("{=!}" + text), 0, null, null, "event:/ui/notification/relation");
+                    MBInformationManager.AddQuickInformation(new TextObject("{=!}" + text), SummaryExtraMs, null, null, "event:/ui/notification/relation");
                 }
                 catch (Exception e) { Log.Error("BanditCheer.AfterVictory(komunikat)", e); }
                 Log.Info("BanditCheer (zbiorczo): 1 komunikat zamiast " + gained + " | wiosek z zyskiem " + list.Count + "/" + villages
@@ -139,8 +142,10 @@ namespace Armoury
             catch (Exception e) { Log.Error("BanditCheer.AfterVictory", e); }
         }
 
-        // relacja bazowa miedzy tymi samymi bohaterami, ktorym ChangeRelationAction.ApplyInternal ja zapisuje (notabl z rodem -> glowa rodu)
-        private static int BaseRelation(Hero me, Hero notable)
+        // relacja bazowa miedzy tymi samymi bohaterami, ktorym ChangeRelationAction.ApplyInternal ja zapisuje. Czynny model to BKDiplomacyModel:
+        // zwraca samych bohaterow (relacja osobista z notablem / lordem); glowa rodu tylko, gdy ktorys jest null albo to ten sam bohater.
+        // (Przekierowanie do glowy rodu dotyczy DefaultDiplomacyModel gry bez BK.) Tez ReinforcementThanks.
+        internal static int BaseRelation(Hero me, Hero notable)
         {
             Hero e1, e2;
             Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(me, notable, out e1, out e2);
