@@ -65,7 +65,7 @@ namespace Armoury
     }
 
     /// <summary>Towar gry: kg sztuki, wartosc, zuzycie dnia w sztukach (wojsko, zamki, dwory, budowy, warsztaty, razem, mieszczanie).</summary>
-    internal sealed class KsItem { public double Kg, Val, Army, Cast, Court, Bud, Ws, Cons, Town, Cloth; }   // Cloth: KS r4 P8 - odziez wojska + warsztaty zbrojne + naprawy kowali (szt./d)
+    internal sealed class KsItem { public double Kg, Val, Army, Cast, Court, Bud, Ws, Cons, Town, Cloth, VilBuy; }   // VilBuy: m96-len - plotno kupowane przez wsie w miastach ponad koszyk zaplacony Planu (szt./d)   // Cloth: KS r4 P8 - odziez wojska + warsztaty zbrojne + naprawy kowali (szt./d)
 
     /// <summary>Osada do popytu: kraina (kultura z kalibracji), rynek 0 Westeros / 1 Essos, ludzie, potrzeby [NN] w kg (napoje l) na dobe.</summary>
     internal class KsSettlement
@@ -664,6 +664,7 @@ namespace Armoury
             // KS r4 P8 (klucz Ks Cloth Demand): plotno, sukno i skora - takze odziez wojska (150), warsztaty zbrojne i naprawy kowali (135); rzemioslo miasta (148) bierze len,
             // welne i skory na plotno/sukno/skore - jest juz we wsadzie tych wyrobow (x LinenFlax / FeltWool / LeatherHide), wiec nie dopisane drugi raz
             if (x.In.ClothDemand && (id == "linen" || id == "felt" || id == "leather")) pcs += Math.Max(0.0, it.Cloth);
+            if (id == "linen") pcs += Math.Max(0.0, it.VilBuy);          // m96-len (klucz Ks Linen Village Buys In Plan; NIE - 0): zakupy wsi w miastach ponad koszyk zaplacony
             return pcs * x.In.Sigma * it.Kg;
         }
 
