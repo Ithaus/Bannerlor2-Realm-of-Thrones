@@ -64,6 +64,8 @@ namespace Armoury
             public float Avg;                   // srednia kroczaca wyniku dnia (po placach i utrzymaniu, przed wyplata wlascicielowi i podatkiem)
             public float Slow;                  // to samo z pamiecia roku (recenzja: sprzedajacy pamieta dobre lata, kupujacy zle - miesiac przestoju nie robi z warsztatu okazji)
             public int Days;                    // ile dob weszlo do sredniej
+            public int Mem;                     // R3-11b: ile dob w pamieciach od ich punktu wyjscia (dzielnik srednich, okno ceny); = Days, dopoki pamieci nie zaczely od nowa po rozruchu rynku
+            public bool Warm;                   // R3-11b: pamieci maja doby rozruchu rynku (WorkshopStartup) - pierwsza doba po rozruchu zaczyna je od nowa
             public int Op;                      // dzis: zmiana kapitalu w RunTownWorkshop (utarg - wsad - place z kapitalu)
             public int Purse;                   // dzis: place cykli zaplacone z kiesy gracza
             public int Wages, Cycles;           // dzis: place za cykle (razem) i liczba cykli towarowych
@@ -112,6 +114,7 @@ namespace Armoury
             WorkshopPace.Reset();    // E3-D2 (noc-ekonomia3 czesc 2): tempo linii - stan sesji
             WorkshopRetool.Reset();  // E3-D3: zmiany typu za cena - pamiec sesji (limit miasta 30 dob)
             WorkshopFairScore.Reset();   // F4 (noc 17/18.10): pomiar wsadu regionu i pamiec ocen - stan sesji (pomiar wraca z zapisu arm_wsinput)
+            WorkshopStartup.Reset();     // R3-11b: rozruch rynku - liczniki i porownanie w logu (stan sesji)
         }
 
         private static void ClearDay()
@@ -174,7 +177,7 @@ namespace Armoury
                 {
                     // zmiana produkcji albo bankructwo: srednia od nowa. Typ potrafi tez zmienic cudzy kod wprost
                     // (Workshop.ChangeWorkshopProduction - np. CrashScribe "strawa Polnocy") - wtedy znacznik kapitalu poprawiamy tutaj
-                    r.Type = type; r.Avg = 0f; r.Slow = 0f; r.Days = 0; r.WageCarry = 0f;
+                    r.Type = type; r.Avg = 0f; r.Slow = 0f; r.Days = 0; r.WageCarry = 0f; r.Mem = 0; r.Warm = false;
                     try { if (On) SyncInitialCapital(w); } catch (Exception e) { Stumble("WorkshopTrade.Get(kapital)", e); }
                 }
                 return r;
@@ -189,6 +192,10 @@ namespace Armoury
                     r.Avg = a; r.Days = d;
                     // pamiec roku (pole dopisane w recenzji); brak pola = srednia miesieczna
                     r.Slow = sv.Length >= 4 && float.TryParse(sv[3], NumberStyles.Float, CultureInfo.InvariantCulture, out sl) ? sl : a;
+                    // R3-11b: doby pamieci i znacznik rozruchu (pola dopisane 20.10); brak pola = pamiec od pierwszej doby, bez rozruchu (stary zapis bez zmian)
+                    int m;
+                    r.Mem = sv.Length >= 5 && int.TryParse(sv[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out m) ? Math.Max(1, Math.Min(d, m)) : d;
+                    r.Warm = sv.Length >= 6 && sv[5] == "1";
                 }
             }
             _rec[w] = r;
@@ -305,7 +312,7 @@ namespace Armoury
             avg = 0f; slow = 0f; days = 0;
             Rec r;
             if (w == null || !_rec.TryGetValue(w, out r) || r == null || r.Type != TypeId(w)) return false;
-            avg = r.Avg; slow = r.Slow; days = r.Days;
+            avg = r.Avg; slow = r.Slow; days = r.Mem;   // R3-11b: doby W PAMIECI (po rozruchu rynku licza sie od jego konca)
             return true;
         }
 
@@ -647,13 +654,15 @@ namespace Armoury
         private static void CloseDay(Workshop shop, Rec rec, int keepPaid)
         {
             int x = rec.Op - rec.Purse - keepPaid;
-            if (rec.Days <= 0) rec.Avg = Expected(shop);   // pierwsza doba: punkt wyjscia sredniej biezacej = oczekiwany wynik z cen targu
             int span = Span;
-            rec.Avg += (x - rec.Avg) / Math.Min(rec.Days + 2, span);
+            // R3-11b: rozruch rynku (pierwsze 30 dob kampanii) - pierwsza doba po nim zaczyna pamieci od nowa (Mem = 0), jak doba 1 nowej kampanii
+            WorkshopStartup.BeforeDay(shop, rec.Type, ref rec.Warm, ref rec.Mem, ref rec.Avg, ref rec.Slow, x, span, YearSpan);
+            if (rec.Mem <= 0) rec.Avg = Expected(shop);   // pierwsza doba pamieci: punkt wyjscia sredniej biezacej = oczekiwany wynik z cen targu
+            rec.Avg += (x - rec.Avg) / Math.Min(rec.Mem + 2, span);
             // audyt 120: pamiec roku to srednia samych PRAWDZIWYCH wynikow doby (pierwsza doba: Slow = x) - oczekiwany wynik z cen
             // pustej polki wyrobu (garbarnia +1456 d przy 86 d prawdziwych) nie trzyma ceny kupna przez caly pierwszy rok
-            rec.Slow += (x - rec.Slow) / Math.Min(rec.Days + 1, YearSpan);
-            rec.Days++;
+            rec.Slow += (x - rec.Slow) / Math.Min(rec.Mem + 1, YearSpan);
+            rec.Days++; rec.Mem++;
             TypeStat t;
             if (!_dType.TryGetValue(rec.Type, out t)) { t = new TypeStat(); _dType[rec.Type] = t; }
             t.Shops++; t.Cycles += rec.Cycles; t.Wages += rec.Wages; t.Keep += keepPaid;
@@ -998,7 +1007,7 @@ namespace Armoury
             {
                 bool year = sellerAsks ? rec.Slow > rec.Avg : rec.Slow < rec.Avg;
                 q.Profit = year ? rec.Slow : rec.Avg;
-                q.Window = Math.Min(rec.Days, year ? YearSpan : Span);
+                q.Window = Math.Min(rec.Mem, year ? YearSpan : Span);   // R3-11b: okno = doby w pamieci (po rozruchu rynku od jego konca)
             }
             else q.Profit = Expected(w);
             q.Tax = tax;
@@ -1380,7 +1389,8 @@ namespace Armoury
                 if (w == null || r == null || r.Days <= 0 || w.Settlement == null) continue;
                 if (sb.Length > 0) sb.Append(';');
                 sb.Append(Key(w)).Append('|').Append(r.Type).Append('|').Append(r.Avg.ToString("0.###", CultureInfo.InvariantCulture)).Append('|').Append(r.Days)
-                  .Append('|').Append(r.Slow.ToString("0.###", CultureInfo.InvariantCulture));
+                  .Append('|').Append(r.Slow.ToString("0.###", CultureInfo.InvariantCulture))
+                  .Append('|').Append(r.Mem.ToString(CultureInfo.InvariantCulture)).Append('|').Append(r.Warm ? '1' : '0');   // R3-11b (starsza DLL czyta 4 pierwsze pola)
             }
             // warsztaty, ktorych w tej sesji jeszcze nikt nie rozliczyl, zachowuja zapis z poprzedniej
             var live = new HashSet<string>();
@@ -1390,7 +1400,7 @@ namespace Armoury
                 if (live.Contains(kv.Key) || kv.Value == null || kv.Value.Length < 3) continue;
                 if (sb.Length > 0) sb.Append(';');
                 sb.Append(kv.Key).Append('|').Append(kv.Value[0]).Append('|').Append(kv.Value[1]).Append('|').Append(kv.Value[2]);
-                if (kv.Value.Length >= 4) sb.Append('|').Append(kv.Value[3]);
+                for (int i = 3; i < kv.Value.Length; i++) sb.Append('|').Append(kv.Value[i]);   // R3-11b: wszystkie pola z zapisu (rok, doby pamieci, rozruch)
             }
             return sb.ToString();
         }
@@ -1401,9 +1411,11 @@ namespace Armoury
             if (string.IsNullOrEmpty(data)) return;
             foreach (var row in data.Split(';'))
             {
-                var f = row.Split('|');                     // osada | znacznik warsztatu | typ | srednia | doby [| srednia roku]
+                var f = row.Split('|');                     // osada | znacznik warsztatu | typ | srednia | doby [| srednia roku [| doby pamieci | rozruch (R3-11b)]]
                 if (f.Length < 5) continue;
-                _saved[f[0] + "|" + f[1]] = f.Length >= 6 ? new[] { f[2], f[3], f[4], f[5] } : new[] { f[2], f[3], f[4] };
+                var v = new string[Math.Min(f.Length, 8) - 2];
+                Array.Copy(f, 2, v, 0, v.Length);
+                _saved[f[0] + "|" + f[1]] = v;
             }
         }
 
@@ -1481,6 +1493,7 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("SmallFixes8.Daily", SmallFixes8.Daily));               // E8/B (258): linia dnia "Kowadlo i drobne (E8/B)" (sam log)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopPace.Daily", WorkshopPace.Daily));             // E3-D2 (noc-ekonomia3 czesc 2): linia "Tempo warsztatow (E3-D2)"
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopRetool.Daily", WorkshopRetool.Daily));         // E3-D3: krok "warsztat zmienia branze za cena" i jego linia
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopStartup.Daily", WorkshopStartup.Daily));       // R3-11b: linia "Warsztaty - rozruch rynku (R3-11b)"
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, WorkshopFairScore.OnItemProduced);   // F4 (noc 17/18.10): wsad regionu - produkcja wsi i miast na dobe (tylko licznik, przy kluczu Workshop Retool Fair Score)
         }
 

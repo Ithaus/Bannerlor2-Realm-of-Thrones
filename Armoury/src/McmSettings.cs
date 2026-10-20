@@ -2396,6 +2396,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int WorkshopTradeProfitDays { get; set; } = 30;
 
+        [SettingPropertyBool("Workshop Price Forgets Startup", HintText = "the first month of a new campaign is the markets' start-up: stalls are still empty or overfull, so for some days or weeks a workshop can earn many times its usual profit. On: when that month is over, each workshop starts its price memories afresh from the settled market (as on the first day of a campaign), so a start-up windfall does not keep its price high for half a year; during the start-up month the price follows its takings as before. A campaign already past its start-up is not changed (off = the start-up days stay in the month and year memories)", RequireRestart = false)]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopPriceForgetsStartup { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Workshop Trade Resale Share", 0.00f, 3.20f, "0.00", HintText = "a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has (0 to 1 - anything above 1 counts as 1)", RequireRestart = false)]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradeResaleShare { get; set; } = 0.8f;
@@ -8866,6 +8870,7 @@ namespace Armoury
             s.WorkshopTradeEquipmentScale = WorkshopTradeEquipmentScale;
             s.WorkshopTradePriceYears = WorkshopTradePriceYears;
             s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
+            s.WorkshopPriceForgetsStartup = WorkshopPriceForgetsStartup;
             s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
             s.ArtisanOwnInputs = ArtisanOwnInputs;
             s.ArtisanByproductsFull = ArtisanByproductsFull;
