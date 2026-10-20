@@ -991,7 +991,7 @@ Uzycie (Python 3, tylko odczyt):
                     noclegi, plotki (INFO). Autotest nie klika zajazdow - bez noclegu i sluchania te progi INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa m96jakosc : (20.10, Jeff "za duzo jest legendary ... w sklepach za latwo mozna znalezc legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity)
                     python -I tools/sprawdz_logi.py --grupa m96jakosc <Armoury-*.log> (strumieniowo). JQ-0 latki bez BRAK, JQ-1 linie doby rozpoznane,
-                    JQ-2/JQ-3 legendarne i mistrzowskie po wyrownaniu w limicie swiata (ponad limit tylko poza polkami), JQ-4 obnizki tylko przesuwaja jakosc,
+                    JQ-2/JQ-3 legendarne i mistrzowskie po wyrownaniu w limicie swiata (ponad limit tylko poza polkami albo w wyrobach gracza na polkach), JQ-4 obnizki tylko przesuwaja jakosc,
                     JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO).
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
                     python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
@@ -36493,12 +36493,12 @@ M96JAKOSC_RX = {
     "rule": re.compile(r"\| regula (TAK|NIE)"),
     "caps": re.compile(r"limit swiata: legendarne (\d+), mistrzowskie (\d+)"),
     "before": re.compile(r"spis przed wyrownaniem: legendarne (\d+) \(polki (\d+)\), mistrzowskie (\d+) \(polki (\d+)\)"),
-    "after": re.compile(r"swiat po: legendarne (\d+) \(polki (\d+), juki (\d+), bohaterowie (\d+), gracz (\d+)\), mistrzowskie (\d+) \(polki (\d+), juki (\d+), "
-                        r"bohaterowie (\d+), gracz (\d+)\), dobre (\d+)"),
+    "after": re.compile(r"swiat po: legendarne (\d+) \(polki (\d+), juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), mistrzowskie (\d+) \(polki (\d+), "
+                        r"juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), dobre (\d+)"),
     "new": re.compile(r"nowe od wczoraj: legendarne (\d+) \[([^\]]*)\], mistrzowskie (\d+) \[([^\]]*)\] z sztuk z jakoscia (\d+)"),
     "game": re.compile(r"rzut gry odebrany: legendarne (\d+) \[[^\]]*\], mistrzowskie (\d+)"),
     "capped": re.compile(r"zatrzymane limitem swiata: legendarne (\d+), mistrzowskie (\d+); przed pierwszym spisem (\d+)"),
-    "dem": re.compile(r"obnizki na polkach: legendarne->mistrzowskie (\d+), legendarne->dobre (\d+), mistrzowskie->dobre (\d+), do zwyklej \(grupa bez Fine\) (\d+)"),
+    "dem": re.compile(r"obnizki na polkach: legendarne->mistrzowskie (\d+), legendarne->dobre (\d+), mistrzowskie->dobre (\d+), do zwyklej \([^)]*\) (\d+)"),
     "cost": re.compile(r"koszt ([\d.,]+) ms \| potkniecia (\d+)"),
 }
 
@@ -36511,12 +36511,19 @@ def m96jakosc_parse(s):
         if not m:
             return None
         d[k] = m.groups()
-    I = lambda k, i: int(d[k][i])
+    I = lambda k, i: int(d[k][i] or 0)
+    # poprawki po recenzjach (20.10): wyroby gracza L/MW osobno (nietykalne - zostaja na polkach ponad limit), pociski bez celu, nieudane zdjecie;
+    # pola opcjonalne - linia sprzed poprawek ma tylko sume wyrobow
+    cr = re.search(r"wyroby gracza na polkach nietykalne (\d+)(?: \(legendarne (\d+), mistrzowskie (\d+)\))?", s)
+    sk = re.search(r"pominiete \(pociski bez celu\) (\d+), nieudane zdjecie z polki (\d+)", s)
+    crL = int(cr.group(2)) if cr and cr.group(2) else (int(cr.group(1)) if cr else 0)   # stara linia: suma wyrobow jako tolerancja dla L i MW
+    crM = int(cr.group(3)) if cr and cr.group(3) else (int(cr.group(1)) if cr else 0)
     return {
+        "crL": crL, "crM": crM, "skip": int(sk.group(1)) if sk else 0, "fail": int(sk.group(2)) if sk else 0,
         "day": I("day", 0), "on": d["rule"][0] == "TAK", "capL": I("caps", 0), "capM": I("caps", 1),
         "L0": I("before", 0), "L0s": I("before", 1), "M0": I("before", 2), "M0s": I("before", 3),
-        "L": I("after", 0), "Ls": I("after", 1), "Lfix": I("after", 2) + I("after", 3) + I("after", 4),
-        "M": I("after", 5), "Ms": I("after", 6), "Mfix": I("after", 7) + I("after", 8) + I("after", 9), "F": I("after", 10),
+        "L": I("after", 0), "Ls": I("after", 1), "Lfix": I("after", 2) + I("after", 3) + I("after", 4) + I("after", 5),
+        "M": I("after", 6), "Ms": I("after", 7), "Mfix": I("after", 8) + I("after", 9) + I("after", 10) + I("after", 11), "F": I("after", 12),
         "nL": I("new", 0), "nLsrc": d["new"][1], "nM": I("new", 2), "nMsrc": d["new"][3], "pieces": I("new", 4),
         "gL": I("game", 0), "gM": I("game", 1), "cL": I("capped", 0), "cM": I("capped", 1), "pre": I("capped", 2),
         "LM": I("dem", 0), "LF": I("dem", 1), "MF": I("dem", 2), "plain": I("dem", 3),
@@ -36567,12 +36574,13 @@ def m96jakosc_main(logp):
             "nierozpoznane 0, rozpoznane > 0", len(bad) == 0 and len(days) > 0)
     on_days = [d for d in days if d["on"]]
     if on_days:
-        badL = [d["day"] for d in on_days if d["L"] > d["capL"] and d["Ls"] > 0]
-        badM = [d["day"] for d in on_days if d["M"] > d["capM"] and d["Ms"] > 0]
+        # ponad limit dopuszczalne tylko poza polkami - albo na polkach w sztukach, ktorych regula nie rusza (wyroby gracza, pociski bez celu)
+        badL = [d["day"] for d in on_days if d["L"] > d["capL"] and d["Ls"] - d["crL"] - d["skip"] > 0]
+        badM = [d["day"] for d in on_days if d["M"] > d["capM"] and d["Ms"] - d["crM"] - d["skip"] > 0]
         last = on_days[-1]
-        rep.add("JQ-2: legendarne na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['L']} (polki {last['Ls']}, poza polkami {last['Lfix']}) przy limicie {last['capL']}; "
+        rep.add("JQ-2: legendarne na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['L']} (polki {last['Ls']}, w tym wyroby gracza {last['crL']}, poza polkami {last['Lfix']}) przy limicie {last['capL']}; "
                 f"dob ponad limitem z polkami niepustymi {len(badL)}" + (f" (np. {badL[0]})" if badL else ""), "0 dob (ponad limit tylko poza polkami)", not badL)
-        rep.add("JQ-3: mistrzowskie na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['M']} (polki {last['Ms']}, poza polkami {last['Mfix']}) przy limicie {last['capM']}; "
+        rep.add("JQ-3: mistrzowskie na swiecie po wyrownaniu w limicie", f"ostatnia doba {last['day']}: {last['M']} (polki {last['Ms']}, w tym wyroby gracza {last['crM']}, poza polkami {last['Mfix']}) przy limicie {last['capM']}; "
                 f"dob ponad limitem z polkami niepustymi {len(badM)}" + (f" (np. {badM[0]})" if badM else ""), "0 dob", not badM)
         cons = [d["day"] for d in on_days if (d["L0"] + d["M0"]) - (d["L"] + d["M"]) != d["LF"] + d["MF"] + d["plain"]]
         rep.add("JQ-4: obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol, sztuk tyle samo)", f"dob z rozjazdem {len(cons)}" + (f" (np. {cons[0]})" if cons else ""),

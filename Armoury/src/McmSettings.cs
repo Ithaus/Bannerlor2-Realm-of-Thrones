@@ -5176,7 +5176,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiHarnessSurplusSell { get; set; } = true;
 
-        [SettingPropertyBool("Quality Scarcity", HintText = "legendary and masterwork pieces are rare: the town workshops, the loot you strip from the fallen and the other ways the world makes kit no longer turn out a legendary piece every twenty-odd and a masterwork every dozen - a legendary piece comes only from a top-tier (5-6) piece, a masterwork from tier 4 and up, and only while the world holds fewer than its limit (Quality Legendary World Cap / Quality Masterwork World Cap, counted once a day: shop stalls, packs, every hero's gear and yours). Pieces beyond the limit lying on the stalls of towns, castles and villages drop one step at the end of the day - legendary to masterwork while there is room, else to fine; masterwork to fine; the finest are kept. Nothing vanishes and no coin moves. Your bags, your stash, your clan's heroes and weapons you forged yourself are never touched; your own forge works as before (off = as before)", RequireRestart = false)]
+        [SettingPropertyBool("Quality Scarcity", HintText = "legendary and masterwork pieces are rare: the town workshops, the loot you strip from the fallen and the other ways the world makes kit no longer turn out a legendary piece every twenty-odd and a masterwork every dozen - such a roll now gives a plain piece. Only a piece someone truly makes - in a town workshop, or a tournament prize the town's craftsmen make for you - can still come out legendary (from a top-tier 5-6 piece) or masterwork (tier 4 and up), and only while the world holds fewer than its limit (Quality Legendary World Cap / Quality Masterwork World Cap, counted once a day: shop stalls, packs, merchants' carts on the road, every hero's gear and yours). Pieces beyond the limit lying on the stalls of towns, castles and villages drop one step at the end of the day - legendary to masterwork while there is room, else to fine; masterwork to fine; the finest are kept. Nothing vanishes and no coin moves. Your bags, your stash, your clan's heroes and weapons you forged yourself are never touched; your own forge works as before (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool QualityScarcity { get; set; } = true;
 
@@ -5188,11 +5188,11 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public int QualityMasterworkWorldCap { get; set; } = 60;
 
-        [SettingPropertyFloatingInteger("Quality Legendary Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one top-tier piece (tier 5-6) from a workshop, from loot or from the other ways the world makes kit comes out legendary, while the world limit has room (0.001 = one in a thousand)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Quality Legendary Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one top-tier piece (tier 5-6) made in a town workshop (or a tournament prize the town's craftsmen make) comes out legendary, while the world limit has room (0.001 = one in a thousand)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public float QualityLegendaryChance { get; set; } = 0.001f;
 
-        [SettingPropertyFloatingInteger("Quality Masterwork Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one piece of tier 4 or higher comes out masterwork, while the world limit has room (0.004 = one in two hundred and fifty)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Quality Masterwork Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one piece of tier 4 or higher made in a town workshop (or a tournament prize the town's craftsmen make) comes out masterwork, while the world limit has room (0.004 = one in two hundred and fifty)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public float QualityMasterworkChance { get; set; } = 0.004f;
 
