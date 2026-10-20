@@ -3310,4 +3310,8 @@ ForgeView 19aa052a. Kopie *.bak-2026-10-19-wgranie90-przed + D:/Backup-Bannerlor
 = 89 + r2-klimat (ClimateBeforeWorkshops), r2-konie (CamelsOnlyQarth, ExoticMountsNeverVanish, QarthStablesBuyCamels + recenzja 5/6 prowadzacego), r2-pancerz (HeroBardingNeedsRiding).
 TESTY: n20r2-bitwa / n20r2-nowa / n20r2-160 kod 0, 0 ERROR Armoury; Z16 500/500; egzotyczne skasowane 0; C1 45 wsi. Porownanie grup: 160 dob 3 nowe NIE (D14-1, NKR-4b, NO-4 47>40),
 nowa kampania 113 NIE (88/89: 118). Obserwowac NO-4. Raport dla Jeffa: docs/RAPORT-NOCNY-2026-10-20.md.
+- 20.10 ok. 00:15 PDT: runda 3 (wf_4caf29bf-bcc) PLAN 6.14 - galaz w-toku/r3-jazda 9bc09019 (czesciowo): GarrisonHorsesToLords + GarrisonHarnessToLords - wolne konie i uprzaz
+  zalog twierdz swojego krolestwa pod konnych bez konia lordow AI i ich kolejke awansow (wlasny rod bez zlota, inny rod cena targu glowie rodu, targi nietkniete);
+  checker R3J-1..3 (--grupa szybkie). Hodowla dla kolejki (punkt 2) OTWARTE; miara 219 liczy jazde wedlug typu - krok konni-bez-konia jej nie rusza (wiecej koni w bitwie).
+  Scalone n20-calosc db85ef2d (Armoury 8ea6c892, 2056 ustawien; CrashScribe bez zmian). Testy n20r3-bitwa / n20r3-160 / n20r3-nowa w toku -> WGRANIE 91 jesli czyste.
 
