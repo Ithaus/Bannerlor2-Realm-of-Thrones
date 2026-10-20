@@ -2677,6 +2677,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("Drill.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { SkillLedger.Daily(); } catch (Exception e) { Log.Error("SkillLedger.Daily", e); } DayProfile.Lap("SkillLedger.Daily");         // E8/P1 (243): linie "Umiejetnosci (E8/P1)", "XP wojska (E8/P1)", co 7 dob "Poziomy lordow (E8/P1)" (tylko log)
             try { XpFair.Daily(); } catch (Exception e) { Log.Error("XpFair.Daily", e); } DayProfile.Lap("XpFair.Daily");                 // E8/X (248): linia "Doswiadczenie (E8/X)" - gra / po zmianie (strzal, jedzenie, zwiad, drobne, RBL)
+            try { NightScout.Daily(); } catch (Exception e) { Log.Error("NightScout.Daily", e); } DayProfile.Lap("NightScout.Daily");   // R3-10a: linia "Zwiad noca (R3-10a)"
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2 / B-2: kasy osad przed wywozem kupcow - pozostale moduly osobno
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); } DayProfile.Lap("SupplyDemand.DailyTrade");   // E6/R3 (215): w srodku wozy kupcow (TradeCarts - dostawy, wywoz, linia "Przewoz kupcow wozem")
             try { MoneyLedger.Probe169("SupplyDemand.DailyTrade"); } catch { }   // f19-e1: bisekcja RB (tylko log)

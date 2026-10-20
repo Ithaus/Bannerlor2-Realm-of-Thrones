@@ -68,8 +68,9 @@ namespace Armoury
                 // z chwili klikniecia (noca + kara nocna), wiec dni nie zaleza od pory
                 bool nightNow = false;
                 try { nightNow = Campaign.Current.IsNight && !main.IsCurrentlyAtSea; } catch { }
-                float daySpeed = DaySpeed(speed, nightNow, s);
-                float days = dist * 1.2f / daySpeed / MarchHoursPerDay(daySpeed, main.IsCurrentlyAtSea, s);
+                float nightPen = NightScout.NightPenalty(main, s);   // R3-10a: kara nocy po uldze zwiadowcy (ta sama co w TerrainEase)
+                float daySpeed = DaySpeed(speed, nightNow, s, nightPen);
+                float days = dist * 1.2f / daySpeed / MarchHoursPerDay(daySpeed, main.IsCurrentlyAtSea, s, nightPen);
                 int km = (int)Math.Round(dist * KmPerUnit);
                 string name = dest != null ? dest.Name.ToString() : "the marked ground";
                 Log.Player("Course set for " + name + ": ~" + km + " km - about "
@@ -81,22 +82,22 @@ namespace Armoury
 
         // T1: predkosc dzienna - noca oddajemy kare nocna (TerrainEase: plaska
         // NightSpeedPenalty; bez TerrainEase vanilla -25%)
-        private static float DaySpeed(float speed, bool nightNow, Settings s)
+        private static float DaySpeed(float speed, bool nightNow, Settings s, float nightPen)
         {
             if (!nightNow) return speed;
-            if (s.TerrainEaseEnabled) return speed + MathF.Max(0f, s.NightSpeedPenalty);
+            if (s.TerrainEaseEnabled) return speed + nightPen;
             return speed / 0.75f;
         }
 
         // T1: godziny marszu na dobe przy obozie CampStartHour-CampEndHour
         // (0-6: 24 - 6 - utrata w 22-24); ciemnosc gry 22-02 (ROT SunSet 22 /
         // SunRise 2), kazda godzina ciemnosci poza obozem traci ulamek kary nocnej
-        private static float MarchHoursPerDay(float daySpeed, bool atSea, Settings s)
+        private static float MarchHoursPerDay(float daySpeed, bool atSea, Settings s, float nightPen)
         {
             float frac = 0f;
             if (!atSea)
                 frac = s.TerrainEaseEnabled
-                    ? MBMath.ClampFloat(MathF.Max(0f, s.NightSpeedPenalty) / MathF.Max(0.5f, daySpeed), 0f, 1f)
+                    ? MBMath.ClampFloat(nightPen / MathF.Max(0.5f, daySpeed), 0f, 1f)
                     : 0.25f;
             float h = 0f;
             for (int i = 0; i < 24; i++)

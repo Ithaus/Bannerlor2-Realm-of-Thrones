@@ -35,6 +35,12 @@ namespace Armoury
                 bool night = h >= 21 || h <= 4;
                 float f = night ? s.NightSightFactor : s.DaySightFactor;
                 if (Math.Abs(f - 1f) > 0.001f) __result.AddFactor(f - 1f, night ? _txtNight : _txtDay);
+                if (night)
+                {
+                    // R3-10a (NightScout): zwiadowca oddaje czesc nocnego ciecia - czynnik nocy + (1 - czynnik) x min(0.5, Zwiad/400)
+                    float sc = NightScout.SightFactor(party, f);
+                    if (sc > 0.0005f) __result.AddFactor(sc, NightScout.SightLabel);
+                }
             }
             catch { }
         }

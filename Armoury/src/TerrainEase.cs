@@ -92,6 +92,7 @@ namespace Armoury
                 bool probe = _probeOn && !_pGot && mp == _probeParty && (forest || desert);
                 float sf0 = 0f, bn0 = 0f;
                 if (probe) { sf0 = __result.SumOfFactors; bn0 = __result.BaseNumber; _pGame = GameLinesFactor(ref __result, forest); }
+                float scoutEase = 0f;   // R3-10a (NightScout): czesc kary lasu i nocy zdjeta przez zwiadowce - jedna pozycja "Scout" na koncu
 
                 if (forest)
                 {
@@ -100,9 +101,11 @@ namespace Armoury
                         // E7/T: zwrot = netto gry (przy cesze i ForestKin razem 0), nasza kara w ulamku, ktory gra zostawila
                         bool kin, feat;
                         float net = GameForestNet(mp, out kin, out feat);
-                        Swap(ref __result, net, _uForest, c.ForestSpeedPenalty * Math.Max(0f, net) / GameForestFull, _aForest);
+                        float fp = c.ForestSpeedPenalty * Math.Max(0f, net) / GameForestFull;
+                        Swap(ref __result, net, _uForest, fp, _aForest);
+                        scoutEase += NightScout.Ease(mp, fp);
                     }
-                    else Swap(ref __result, GameForestFull, _uForest, c.ForestSpeedPenalty, _aForest);
+                    else { Swap(ref __result, GameForestFull, _uForest, c.ForestSpeedPenalty, _aForest); scoutEase += NightScout.Ease(mp, c.ForestSpeedPenalty); }
                 }
                 else if (!atSea && (tt == TerrainType.Water || tt == TerrainType.River || tt == TerrainType.UnderBridge
                                     || tt == TerrainType.Bridge || tt == TerrainType.Fording))
@@ -142,7 +145,11 @@ namespace Armoury
                 catch { }
 
                 if (!atSea && Campaign.Current.IsNight)
+                {
                     Swap(ref __result, 0.25f, _uNight, c.NightSpeedPenalty, _aNight);
+                    scoutEase += NightScout.Ease(mp, c.NightSpeedPenalty);
+                }
+                if (scoutEase > 0.0005f) __result.Add(scoutEase, NightScout.SpeedLabel);   // R3-10a: przed sufitem kolumny (MarchPace Last)
 
             }
             catch { }

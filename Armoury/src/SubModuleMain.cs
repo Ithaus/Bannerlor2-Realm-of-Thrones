@@ -277,6 +277,7 @@ namespace Armoury
                 MountMeshGuard.ApplyAll(_harmony);   // uprzaz z cudzej rodziny = natywny crash w AddMountMesh
                 CaptiveRags.ApplyAll(_harmony);
                 SightRange.ApplyAll(_harmony);
+                try { NightScout.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NightScout.ApplyAll", e); }   // R3-10a: +5 XP Zwiadu za godzine nocnego marszu (postfiks OnTraverseTerrain), linia startu
                 BkArmourList.ApplyAll(_harmony);
                 BowStats.ApplyAll(_harmony);
                 BattlefieldLaw.ApplyAll(_harmony);
