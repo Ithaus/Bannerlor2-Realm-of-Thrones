@@ -872,6 +872,11 @@ namespace Armoury
             // E4/11 (193): ksiega wiosek pobocznych - n okregow, puste osady, stany wiosek (osobny klucz; Import tylko odklada napis do Resolve w OnSessionLaunched)
             try { string ds = dataStore.IsSaving ? VillageBook.Export() : null; SaveText.Sync(dataStore, "arm_district", ref ds); if (dataStore.IsLoading) VillageBook.Import(ds); }
             catch (Exception e) { Log.Error("SyncData.arm_district", e); }
+            // R3-06c / R3-06d (p5-stada): stada wsi po rabunkach i baza ziemi okregow; brak klucza (stary zapis) = pelne stada, baza od pierwszego rachunku
+            try { string hd = dataStore.IsSaving ? VillageHerds.Export() : null; SaveText.Sync(dataStore, "arm_herds", ref hd); if (dataStore.IsLoading) VillageHerds.Import(hd); }
+            catch (Exception e) { Log.Error("SyncData.arm_herds", e); }
+            try { string tl = dataStore.IsSaving ? TiredLand.Export() : null; SaveText.Sync(dataStore, "arm_tiredland", ref tl); if (dataStore.IsLoading) TiredLand.Import(tl); }
+            catch (Exception e) { Log.Error("SyncData.arm_tiredland", e); }
             // E6/K1 (211): obserwacje W (zgony koni / zgony jezdzcow w misjach) i pula koni weteranow w karczmach (Import odklada napis - przedmioty przy pierwszym uzyciu)
             try { string hf = dataStore.IsSaving ? HorseFate.Export() : null; SaveText.Sync(dataStore, "arm_horsefate", ref hf); if (dataStore.IsLoading) HorseFate.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_horsefate", e); }
@@ -1411,6 +1416,8 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("BattleChronicle.OnMapEventEnded", BattleChronicle.OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
+            VillageHerds.RegisterEvents(this);   // R3-06c (p5-stada): reset nowej kampanii, Resolve zapisu, rabunek gry (VillageLooted)
+            TiredLand.RegisterEvents(this);      // R3-06d (p5-stada): reset nowej kampanii
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PackSources.OnDestroyed", PackSources.OnDestroyed));   // m6b: znacznik "RemoveParty po zdarzeniu zniszczenia" (konie przy RemoveParty, towar partii usunietych bez zniszczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("GoodsLedger.OnPartyDestroyed", GoodsLedger.OnPartyDestroyed));  // paczka 146: towar, ktory przepada z partia (tylko log)
@@ -2726,6 +2733,8 @@ namespace Armoury
             try { CrossingLaw.Daily(); } catch (Exception e) { Log.Error("CrossingLaw.Daily", e); } DayProfile.Lap("CrossingLaw.Daily");   // E8/Q (262): linia "Straz przeprawy (E8/Q)" i zerowanie licznikow doby - PO linii E7/B (jej dopisek czyta te same liczniki)
             try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow
             try { DistrictRaid.Daily(); } catch (Exception e) { Log.Error("DistrictRaid.Daily", e); } DayProfile.Lap("DistrictRaid.Daily");   // E7/R1 (235): linia "Rabunek osada po osadzie (E7/R1)", koniec czujnosci, sprzatanie - PO W1 (te same doby ksiegi), PRZED Devastation.DayLine
+            try { VillageHerds.Daily(); } catch (Exception e) { Log.Error("VillageHerds.Daily", e); }   // R3-06c (p5-stada): odrost stad i linia "Stada (R3-06c)"
+            try { TiredLand.Daily(); } catch (Exception e) { Log.Error("TiredLand.Daily", e); }         // R3-06d (p5-stada): linia "Zmeczona ziemia (R3-06d)"
             try { ReaverLaw.Daily(); } catch (Exception e) { Log.Error("ReaverLaw.Daily", e); } DayProfile.Lap("ReaverLaw.Daily");   // wyspy-wolni: linie "Najezdzcy - decyzje AI (WW0)", "Zelazna cena (WW1)" - PO linii E7/R1 (te same sesje rabunku)
             try { MapVillageLore.Daily(); } catch (Exception e) { Log.Error("MapVillageLore.Daily", e); } DayProfile.Lap("MapVillageLore.Daily");   // E7/W2 (233): linia "Dymek wioski (E7/W2)" (dymki i potkniecia doby), w pierwszej dobie sesji probka wiary BK 20 wiosek (T4)
             try { DistrictMenu.Daily(); } catch (Exception e) { Log.Error("DistrictMenu.Daily", e); } DayProfile.Lap("DistrictMenu.Daily");   // E7/W3 (234): w pierwszej dobie sesji linia startowa "Menu okregu (E7/W3): start" (index pozycji po wszystkich modach), potem linia doby tylko przy uzyciu

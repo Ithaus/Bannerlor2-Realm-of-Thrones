@@ -523,6 +523,8 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Loot(zloto)", e); }
+            // R3-06c (p5-stada): stado okregu najpierw - ubytek stada za ten sam udzial s, zwierzeta do taboru wodza (VillageHerds; wlasny try w srodku)
+            try { VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null, att != null ? att.TroopCount : 0); } catch (Exception e) { Stumble("Loot(stado)", e); }
             // towar z magazynu wsi
             try
             {

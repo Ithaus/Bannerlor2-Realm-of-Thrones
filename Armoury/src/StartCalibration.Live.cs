@@ -354,6 +354,9 @@ namespace Armoury
                 catch { f = 1.0; }
                 if (!(f >= 0) || double.IsInfinity(f)) f = 1.0;
                 for (int i = 0; i < ItemCount; i++) prod[i] *= f;
+                // R3-06d (TiredLand) i R3-06c (VillageHerds): ziemia zajeta ponad baze okregu i stado wsi - tylko gra (Plan bez zmian); wlasne try w obu
+                TiredLand.KsStep(ld.Id, ld.B, prod);
+                if (!ld.TF) VillageHerds.KsStep(ld.V, prod, kgT);
             }
             // co okreg zje sam (wies; pola mieszczan - nic, ich ludzie sa w potrzebach miasta)
             if (!ld.TF)

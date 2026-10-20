@@ -6476,6 +6476,14 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidPlayerStepPopup { get; set; } = true;
 
+        [SettingPropertyBool("Village Herds As Loot", HintText = "raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool VillageHerdsAsLoot { get; set; } = true;
+
+        [SettingPropertyBool("Tired Land Yield", HintText = "when a district has more people than its land can hold, they sow the fallow and the soil tires: each extra farmer adds less than the last (fields, orchards and pastures; not mines, fishing or forest)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool TiredLandYield { get; set; } = true;
+
         [SettingPropertyBool("Twins Crossing Count", HintText = "counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything", RequireRestart = false)]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
@@ -9886,6 +9894,8 @@ namespace Armoury
             s.RaidDetachmentMen = RaidDetachmentMen;
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
+            s.VillageHerdsAsLoot = VillageHerdsAsLoot;
+            s.TiredLandYield = TiredLandYield;
             s.TwinsCrossingCount = TwinsCrossingCount;
             s.TwinsToll = TwinsToll;
             s.VillageRaidMessages = VillageRaidMessages;
