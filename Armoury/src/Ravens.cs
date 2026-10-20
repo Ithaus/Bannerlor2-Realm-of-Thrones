@@ -6,6 +6,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -39,6 +40,15 @@ namespace Armoury
     /// (klucz arm_ravens przez SaveText.Sync; brak klucza = pusta), klucz wylaczony = wszystko z kolejki od razu w nastepnej godzinie, ponad 400 w kolejce =
     /// najstarsza od razu. Zloto i towar: brak (tylko czat). Linie "Kruki (R3-05c)": start sesji, doba, do 30 wyslanych i 30 doreczonych na dobe.
     /// Potkniecia per wiesc (licznik; wiesc idzie wtedy na czat od razu, jak w grze) - nigdy globalny wylacznik.
+    /// Po recenzji 20.10: (1) Diplomacy - pakt o nieagresji (zawarcie FormNonAggressionPactAction.ApplyInternal, wygasniecie NonAggressionPactAgreement.NotifyExpired:
+    /// DisplayMessage wprost, z calej mapy, bez wpisu historii) i ROT - lord "has risen again as a White Walker" (prefiks ROT OthersPatches.patch7 na
+    /// TakePrisonerAction.ApplyInternal, wpisu niewoli wtedy nie ma) tym samym wzorem co BK: prefiks zapamietuje strony, transpiler podmienia jedno DisplayMessage
+    /// na nasze, finalizer czysci; brak moda = nic. BK "has invaded the continent" (InvasionBehavior) - martwy kod BK: zachowanie nigdzie nie dodawane, lista
+    /// DefaultInvasions pusta. (2) Plotki w karczmach (Rumours.Wars) nie podaja dalekiej wiesci, zanim nie doleci z nia kruk (NotYet - ta sama godzina lotu).
+    /// (3) "Twoje" takze: bitwa z druzyna gracza albo jego rodu po ktorejkolwiek stronie (MapEvent.InvolvedParties), uwolnienie jenca z lochu twierdzy rodu gracza,
+    /// zbiorka armii wlasnego krolestwa (gra i tak daje od razu ikone ArmyCreationMapNotification), smierc bliskich gracza (rodzice, malzonek, dzieci, rodzenstwo -
+    /// jak IsRelatedToPlayer gry, ikona DeathMapNotification) i rodu panujacego wlasnego krolestwa (glosowanie o tron od razu). (4) Wiesc o tej samej sprawie,
+    /// ktora idzie od razu (Twoja, blisko, bez miejsca), najpierw dorecza czekajace kruki o tej sprawie (Flush) - kolejnosc zachowana.
     /// </summary>
     internal static class Ravens
     {
@@ -54,16 +64,17 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.RavenNews; } }
 
-        private const int KSiege = 1, KAssault = 2, KWar = 3, KPeace = 4, KAlly = 5, KCall = 6, KFall = 7, KDeath = 8, KCapture = 9, KFreed = 10, KArmy = 11, KAftermath = 12, KN = 13;
+        private const int KSiege = 1, KAssault = 2, KWar = 3, KPeace = 4, KAlly = 5, KCall = 6, KFall = 7, KDeath = 8, KCapture = 9, KFreed = 10, KArmy = 11, KAftermath = 12, KPact = 13, KWalker = 14, KN = 15;
         private static readonly string[] KName = { "-", "oblezenie", "napad/szturm", "wojna", "pokoj", "sojusz", "wezwanie do wojny", "upadek krolestwa",
-                                                   "smierc w wojnie", "niewola", "koniec niewoli", "zbiorka armii", "po zdobyciu miasta (BK)" };
+                                                   "smierc w wojnie", "niewola", "koniec niewoli", "zbiorka armii", "po zdobyciu miasta (BK)",
+                                                   "pakt o nieagresji (Diplomacy)", "Bialy Wedrowiec (ROT)" };
 
         private sealed class Raven { public double Due, Sent; public uint Color; public int Kind, Dist; public long Seq; public string Key = "", From = "", Text = ""; }
         private static readonly List<Raven> _q = new List<Raven>();
         private static long _seq;
 
         // liczniki doby i sesji
-        private static int _dSeen, _dWar, _dDelayed, _dNear, _dMine, _dNoPos, _dOff, _dDelivered, _dForced, _dBumped, _dLogSent, _dLogGot, _dStumbles;
+        private static int _dSeen, _dWar, _dDelayed, _dNear, _dMine, _dNoPos, _dOff, _dDelivered, _dForced, _dBumped, _dLogSent, _dLogGot, _dStumbles, _dFlushed, _dRumHeld;
         private static double _dDelaySum, _dDelayMax, _dLateSum;
         private static readonly int[] _dKind = new int[KN];
         private static readonly Dictionary<string, int> _dOther = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -98,7 +109,7 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            _dBkSeen = 0;
+            _dBkSeen = 0; _dDipSeen = 0; _dRotSeen = 0; _dFlushed = 0; _dRumHeld = 0;
             _dSeen = _dWar = _dDelayed = _dNear = _dMine = _dNoPos = _dOff = _dDelivered = _dForced = _dBumped = _dLogSent = _dLogGot = _dStumbles = 0;
             _dDelaySum = _dDelayMax = _dLateSum = 0;
             Array.Clear(_dKind, 0, _dKind.Length);
@@ -172,6 +183,8 @@ namespace Armoury
                         }
                     }
                     catch (Exception e) { _wired += ", BK BLAD (" + e.GetType().Name + ")"; Log.Error("Ravens.EnsureHooks(BK)", e); }
+                    HookDiplomacy(h);
+                    HookRot(h);
                 }
             }
             catch (Exception e) { _wired = "BLAD (" + e.GetType().Name + ")"; Log.Error("Ravens.EnsureHooks", e); }
@@ -212,8 +225,8 @@ namespace Armoury
                         return true;
                     }
                     _dWar++;
-                    if (mine) { _dMine++; return true; }
-                    if (!havePos) { _dNoPos++; return true; }
+                    if (mine) { _dMine++; Flush(key); return true; }
+                    if (!havePos) { _dNoPos++; Flush(key); return true; }
                     return !Send(kind, at, key, from, cn.GetNotificationText().ToString(), Campaign.Current.Models.DiplomacyModel.GetNotificationColor(cn.NotificationType));
                 }
             }
@@ -224,10 +237,10 @@ namespace Armoury
         private static bool Send(int kind, Vec2 at, string key, string from, string text, uint color)
         {
             Vec2 me;
-            if (!PlayerPos(out me)) { _dNoPos++; return false; }
+            if (!PlayerPos(out me)) { _dNoPos++; Flush(key); return false; }
             float d = at.Distance(me);
-            if (d <= NearRange) { _dNear++; return false; }
-            double hours = Math.Min(MaxHours, HandHours + d / SpeedPerHour);
+            if (d <= NearRange) { _dNear++; Flush(key); return false; }
+            double hours = EtaHours(d);
             double now = NowH, due = now + hours;
             bool bumped = false;
             for (int i = 0; i < _q.Count; i++) if (_q[i].Key == key && _q[i].Due > due) { due = _q[i].Due; bumped = true; }   // ta sama sprawa - nie przed wczesniejsza wiescia
@@ -245,6 +258,39 @@ namespace Armoury
                          + " jedn. | dotrze za " + (due - now).ToString("0", Inv) + " h" + (bumped ? " (po wczesniejszej wiesci o tym samym)" : "") + " | " + Short(r.Text));
             }
             return true;
+        }
+
+        /// <summary>Godziny lotu kruka na odleglosc d jedn. mapy (list 3 h + lot 150 jedn./dobe, najwyzej 12 dob) - jedna miara dla czatu i plotek.</summary>
+        internal static double EtaHours(float d) { return Math.Min(MaxHours, HandHours + Math.Max(0f, d) / SpeedPerHour); }
+
+        /// <summary>Plotki w karczmie (Rumours.Wars): wiesc z dnia 'day' z odleglosci d od karczmy jeszcze tu nie doszla - kruk z nia jeszcze leci. Zdarzenie liczone
+        /// na koniec swojego dnia (plotka zna tylko dzien), wiec plotka nigdy nie wyprzedzi kruka, najwyzej spozni sie o mniej niz dobe. Klucz wylaczony albo blisko
+        /// (do NearRange) = jak dotad.</summary>
+        internal static bool NotYet(float d, int day)
+        {
+            if (d <= NearRange || !On || Campaign.Current == null) return false;
+            if (NowH - (day + 1) * 24.0 >= EtaHours(d)) return false;
+            lock (Gate) _dRumHeld++;
+            return true;
+        }
+
+        private static readonly Comparison<Raven> ByDue = delegate (Raven x, Raven y) { int c = x.Due.CompareTo(y.Due); return c != 0 ? c : x.Seq.CompareTo(y.Seq); };
+
+        /// <summary>(pod Gate) Wiesc o sprawie 'key' idzie na czat od razu (dotyczy gracza, blisko, bez miejsca) - kruki z wczesniejszymi wiesciami o tej samej
+        /// sprawie doreczyc najpierw, w kolejnosci, zeby pozniejsza wiesc nie wyprzedzila wczesniejszej.</summary>
+        private static void Flush(string key)
+        {
+            if (string.IsNullOrEmpty(key) || _q.Count == 0) return;
+            List<Raven> l = null;
+            for (int i = _q.Count - 1; i >= 0; i--)
+            {
+                if (_q[i].Key != key) continue;
+                if (l == null) l = new List<Raven>();
+                l.Add(_q[i]); _q.RemoveAt(i);
+            }
+            if (l == null) return;
+            l.Sort(ByDue);
+            foreach (var r in l) { _dFlushed++; DeliverNow(r, "przed nowsza wiescia o tym samym"); }
         }
 
         // ------------------------------------------------------------ BK: "N people have been killed in the siege aftermath of X" (BKSettlementBehavior.SiegeConsequences
@@ -285,7 +331,7 @@ namespace Armoury
                         {
                             _dWar++;
                             var by = _bkBy;
-                            if (MineS(st) || (by != null && Mine(by.LeaderHero)) || (_bkPrev != null && _bkPrev == Clan.PlayerClan)) _dMine++;
+                            if (MineS(st) || (by != null && Mine(by.LeaderHero)) || (_bkPrev != null && _bkPrev == Clan.PlayerClan)) { _dMine++; Flush("s:" + st.StringId); }
                             else if (Send(KAftermath, st.GetPosition2D, "s:" + st.StringId, Name(st), msg.Information, msg.Color.ToUnsignedInteger())) return;
                         }
                     }
@@ -295,10 +341,188 @@ namespace Armoury
             InformationManager.DisplayMessage(msg);
         }
 
+        // ------------------------------------------------------------ Diplomacy: pakty o nieagresji (Bannerlord.Diplomacy, wlaczony u Jeffa) - DisplayMessage wprost,
+        // bez wpisu historii, z calej mapy: zawarcie (FormNonAggressionPactAction.ApplyInternal(Kingdom, Kingdom, float?) - bez warunku na gracza) i wygasniecie
+        // (NonAggressionPactAgreement.NotifyExpired - krolestwo gracza dostaje okno ShowInquiry, inne DisplayMessage). Sprawa "f:" jak sojusz i pokoj tych krolestw,
+        // wiec wygasniecie paktu przy zawarciu sojuszu nie wyprzedzi kruka z wiescia o sojuszu. Krolestwo gracza po ktorejkolwiek stronie = od razu.
+        [ThreadStatic] private static IFaction _napA, _napB, _expA, _expB;
+        private static int _napSites, _expSites, _dDipSeen;
+        private static System.Reflection.PropertyInfo _pFactions, _pF1, _pF2;
+
+        private static HarmonyMethod HM(string name) { return new HarmonyMethod(typeof(Ravens), name); }
+
+        private static void HookDiplomacy(Harmony h)
+        {
+            try
+            {
+                var fa = AccessTools.TypeByName("Diplomacy.DiplomaticAction.NonAggressionPact.FormNonAggressionPactAction");
+                var na = AccessTools.TypeByName("Diplomacy.DiplomaticAction.NonAggressionPactAgreement");
+                if (fa == null && na == null) { _wired += ", Diplomacy brak"; return; }
+                var ap = fa != null ? AccessTools.DeclaredMethod(fa, "ApplyInternal") : null;
+                var ne = na != null ? AccessTools.DeclaredMethod(na, "NotifyExpired") : null;
+                if (ap != null) h.Patch(ap, prefix: HM(nameof(NapPrefix)), transpiler: HM(nameof(NapTranspiler)), finalizer: HM(nameof(NapFinalizer)));
+                if (ne != null) h.Patch(ne, prefix: HM(nameof(ExpPrefix)), transpiler: HM(nameof(ExpTranspiler)), finalizer: HM(nameof(ExpFinalizer)));
+                _wired += ", Diplomacy pakty " + (ap != null ? "zawarcie wpiete (" + _napSites + ")" : "zawarcie BRAK") + ", " + (ne != null ? "wygasniecie wpiete (" + _expSites + ")" : "wygasniecie BRAK");
+            }
+            catch (Exception e) { _wired += ", Diplomacy BLAD (" + e.GetType().Name + ")"; Log.Error("Ravens.HookDiplomacy", e); }
+        }
+
+        private static List<HarmonyLib.CodeInstruction> SwapDisplay(IEnumerable<HarmonyLib.CodeInstruction> ins, string ours, ref int sites)
+        {
+            var disp = AccessTools.Method(typeof(InformationManager), "DisplayMessage", new[] { typeof(InformationMessage) });
+            var m = AccessTools.Method(typeof(Ravens), ours);
+            var l = new List<HarmonyLib.CodeInstruction>(ins);
+            if (disp == null || m == null) return l;
+            foreach (var c in l) if (c.Calls(disp)) { c.operand = m; sites++; }
+            return l;
+        }
+
+        public static void NapPrefix(Kingdom __0, Kingdom __1) { _napA = __0; _napB = __1; }
+        public static Exception NapFinalizer(Exception __exception) { _napA = null; _napB = null; return __exception; }
+        public static IEnumerable<HarmonyLib.CodeInstruction> NapTranspiler(IEnumerable<HarmonyLib.CodeInstruction> ins) { return SwapDisplay(ins, nameof(NapDisplay), ref _napSites); }
+        public static void NapDisplay(InformationMessage msg) { DipShow(_napA, _napB, msg, "NapDisplay"); }
+
+        public static void ExpPrefix(object __instance)
+        {
+            _expA = null; _expB = null;
+            try
+            {
+                if (__instance == null) return;
+                if (_pFactions == null) _pFactions = AccessTools.Property(__instance.GetType(), "Factions");
+                object fp = _pFactions != null ? _pFactions.GetValue(__instance, null) : null;
+                if (fp == null) return;
+                if (_pF1 == null || _pF2 == null) { _pF1 = AccessTools.Property(fp.GetType(), "Faction1"); _pF2 = AccessTools.Property(fp.GetType(), "Faction2"); }
+                var f1 = _pF1 != null ? _pF1.GetValue(fp, null) as IFaction : null;
+                var f2 = _pF2 != null ? _pF2.GetValue(fp, null) as IFaction : null;
+                _expA = f1 != null ? f1.MapFaction : null; _expB = f2 != null ? f2.MapFaction : null;
+            }
+            catch (Exception e) { lock (Gate) Stumble("ExpPrefix", e); }
+        }
+        public static Exception ExpFinalizer(Exception __exception) { _expA = null; _expB = null; return __exception; }
+        public static IEnumerable<HarmonyLib.CodeInstruction> ExpTranspiler(IEnumerable<HarmonyLib.CodeInstruction> ins) { return SwapDisplay(ins, nameof(ExpDisplay), ref _expSites); }
+        public static void ExpDisplay(InformationMessage msg) { DipShow(_expA, _expB, msg, "ExpDisplay"); }
+
+        private static void DipShow(IFaction a, IFaction b, InformationMessage msg, string where)
+        {
+            try
+            {
+                if (a != null && b != null && msg != null && Campaign.Current != null && Hero.MainHero != null)
+                {
+                    lock (Gate)
+                    {
+                        _dDipSeen++;
+                        if (!On) _dOff++;
+                        else
+                        {
+                            _dWar++;
+                            Vec2 at = Vec2.Zero; string key = "", from = null; bool mine = false, havePos = false;
+                            Factions(a, b, null, ref at, ref key, ref from, ref mine, ref havePos);
+                            if (mine) { _dMine++; Flush(key); }
+                            else if (!havePos) { _dNoPos++; Flush(key); }
+                            else if (Send(KPact, at, key, from, msg.Information, msg.Color.ToUnsignedInteger())) return;
+                        }
+                    }
+                }
+            }
+            catch (Exception e) { lock (Gate) Stumble(where, e); }
+            InformationManager.DisplayMessage(msg);
+        }
+
+        // ------------------------------------------------------------ ROT: "X has risen again as a White Walker..." (ROT.HarmonyPatches.Core.OthersPatches.patch7 -
+        // prefiks ROT na TakePrisonerAction.ApplyInternal(PartyBase capturerParty, Hero prisonerCharacter): pojmany przez Wedrowcow lord zmienia rod na Bialych
+        // Wedrowcow, DisplayMessage wprost i return false - wpisu niewoli nie ma). Nasz prefiks na patch7 zapamietuje pojmujacego, jenca i jego rod sprzed zmiany
+        // (rod gracza / towarzysz gracza = od razu), transpiler podmienia to jedno DisplayMessage, finalizer czysci. Brak ROT albo inna nazwa metody = nic.
+        [ThreadStatic] private static PartyBase _rwBy;
+        [ThreadStatic] private static Hero _rwHero;
+        [ThreadStatic] private static Clan _rwClan, _rwComp;
+        private static int _rotSites, _dRotSeen;
+
+        private static void HookRot(Harmony h)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.HarmonyPatches.Core.OthersPatches");
+                var m = t != null ? AccessTools.DeclaredMethod(t, "patch7", new[] { typeof(PartyBase), typeof(Hero) }) : null;
+                if (m == null) { _wired += ", ROT Biali Wedrowcy BRAK"; return; }
+                h.Patch(m, prefix: HM(nameof(RotPrefix)), transpiler: HM(nameof(RotTranspiler)), finalizer: HM(nameof(RotFinalizer)));
+                _wired += ", ROT Biali Wedrowcy wpieci (" + _rotSites + ")";
+            }
+            catch (Exception e) { _wired += ", ROT BLAD (" + e.GetType().Name + ")"; Log.Error("Ravens.HookRot", e); }
+        }
+
+        public static void RotPrefix(PartyBase __0, Hero __1) { _rwBy = __0; _rwHero = __1; _rwClan = __1 != null ? __1.Clan : null; _rwComp = __1 != null ? __1.CompanionOf : null; }
+        public static Exception RotFinalizer(Exception __exception) { _rwBy = null; _rwHero = null; _rwClan = null; _rwComp = null; return __exception; }
+        public static IEnumerable<HarmonyLib.CodeInstruction> RotTranspiler(IEnumerable<HarmonyLib.CodeInstruction> ins) { return SwapDisplay(ins, nameof(RotDisplay), ref _rotSites); }
+
+        public static void RotDisplay(InformationMessage msg)
+        {
+            try
+            {
+                var hero = _rwHero;
+                if (hero != null && msg != null && Campaign.Current != null && Hero.MainHero != null)
+                {
+                    lock (Gate)
+                    {
+                        _dRotSeen++;
+                        if (!On) _dOff++;
+                        else
+                        {
+                            _dWar++;
+                            string key = "h:" + Id(hero);
+                            bool mine = hero == Hero.MainHero || (_rwClan != null && _rwClan == Clan.PlayerClan) || (_rwComp != null && _rwComp == Clan.PlayerClan) || Kin(hero);
+                            Vec2 at; bool have = PartyPos(_rwBy, out at) || HeroPos(hero, out at);
+                            if (mine) { _dMine++; Flush(key); }
+                            else if (!have) { _dNoPos++; Flush(key); }
+                            else if (Send(KWalker, at, key, null, msg.Information, msg.Color.ToUnsignedInteger())) return;
+                        }
+                    }
+                }
+            }
+            catch (Exception e) { lock (Gate) Stumble("RotDisplay", e); }
+            InformationManager.DisplayMessage(msg);
+        }
+
+        private static bool PartyPos(PartyBase p, out Vec2 at)
+        {
+            at = Vec2.Zero;
+            if (p == null) return false;
+            if (p.IsSettlement && p.Settlement != null) { at = p.Settlement.GetPosition2D; return true; }
+            if (p.MobileParty != null) { at = p.MobileParty.GetPosition2D; return true; }
+            return false;
+        }
+
         // ------------------------------------------------------------ rodzaj wiesci, miejsce, sprawa
         private static bool Mine(Hero h) { return h != null && (h == Hero.MainHero || (h.Clan != null && h.Clan == Clan.PlayerClan)); }
         private static bool MineF(IFaction f) { return f != null && (f == Clan.PlayerClan || f == Hero.MainHero.MapFaction); }
         private static bool MineS(Settlement s) { return s != null && s.OwnerClan != null && s.OwnerClan == Clan.PlayerClan; }
+        private static bool MineP(PartyBase p) { return p != null && (p == PartyBase.MainParty || Mine(p.LeaderHero) || (p.IsSettlement && MineS(p.Settlement))); }
+
+        /// <summary>Bliscy gracza jak w grze (CommentOnCharacterKilledBehavior.IsRelatedToPlayer: rodzice, malzonek, dzieci, rodzenstwo) - gra daje im ikone smierci.</summary>
+        private static bool Kin(Hero v)
+        {
+            var me = Hero.MainHero;
+            if (v == null || me == null) return false;
+            if (v == me || v == me.Mother || v == me.Father || v == me.Spouse) return true;
+            foreach (var c in me.Children) if (c == v) return true;
+            foreach (var b in me.Siblings) if (b == v) return true;
+            return false;
+        }
+
+        /// <summary>Bitwa przy osadzie (BattleStarted): druzyna gracza, bohater jego rodu albo twierdza rodu po KTOREJKOLWIEK stronie - takze broniacej (odsiecz
+        /// atakuje oblegajacych, lord przepedza rabujacych wies). W chwili wpisu bitwa juz trwa: strony z MapEvent napastnika albo osady, do tego oboz oblegajacych.</summary>
+        private static bool MineBattle(Settlement st, Hero lord)
+        {
+            try
+            {
+                MapEvent me = lord != null && lord.PartyBelongedTo != null ? lord.PartyBelongedTo.MapEvent : null;
+                if (me == null && st != null && st.Party != null) me = st.Party.MapEvent;
+                if (me != null) foreach (var p in me.InvolvedParties) if (MineP(p)) return true;
+                var camp = st != null && st.SiegeEvent != null ? st.SiegeEvent.BesiegerCamp : null;
+                if (camp != null && camp.LeaderParty != null && MineP(camp.LeaderParty.Party)) return true;
+            }
+            catch (Exception e) { Stumble("MineBattle", e); }
+            return false;
+        }
 
         private static bool Classify(LogEntry log, out int kind, out Vec2 at, out string key, out string from, out bool mine, out bool havePos)
         {
@@ -315,7 +539,8 @@ namespace Armoury
             {
                 kind = KAssault;
                 var st = _fBattleSt != null ? _fBattleSt(bt) : null;
-                mine = MineS(st) || (_fBattleLord != null && Mine(_fBattleLord(bt)));
+                var lord = _fBattleLord != null ? _fBattleLord(bt) : null;
+                mine = MineS(st) || Mine(lord) || MineBattle(st, lord);
                 return Place(st, ref at, ref key, ref from, ref havePos);
             }
             var dw = log as DeclareWarLogEntry;
@@ -340,7 +565,11 @@ namespace Armoury
                 if (det != KillCharacterAction.KillCharacterActionDetail.DiedInBattle && det != KillCharacterAction.KillCharacterActionDetail.WoundedInBattle
                     && det != KillCharacterAction.KillCharacterActionDetail.Executed && det != KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent) return false;
                 kind = KDeath;
-                mine = Mine(ck.Victim) || Mine(ck.Killer) || (ck.VictimClan != null && ck.VictimClan == Clan.PlayerClan);
+                // od razu takze: bliscy gracza (gra daje ikone smierci) i rod panujacy wlasnego krolestwa (smierc krola = od razu glosowanie o tron z ikona decyzji;
+                // w chwili wpisu nowy pan rodu juz wybrany, wiec sprawdzamy rod, nie Leader)
+                var myK = Hero.MainHero.MapFaction as Kingdom;
+                mine = Mine(ck.Victim) || Mine(ck.Killer) || (ck.VictimClan != null && ck.VictimClan == Clan.PlayerClan) || Kin(ck.Victim)
+                       || (myK != null && ck.VictimClan != null && ck.VictimClan == myK.RulingClan);
                 havePos = HeroPos(ck.Killer, out at) || HeroPos(ck.Victim, out at);
                 key = "h:" + Id(ck.Victim);
                 return true;
@@ -359,7 +588,10 @@ namespace Armoury
             if (fr != null)
             {
                 kind = KFreed;
-                mine = Mine(fr.Prisoner);
+                // od razu takze jeniec z lochu twierdzy rodu gracza (w chwili wpisu jeniec stoi jeszcze w osadzie lochu - EndCaptivityAction: AddHeroWithoutParty
+                // przed OnHeroPrisonerReleased) i jeniec niezaleznego rodu gracza
+                mine = Mine(fr.Prisoner) || (fr.Prisoner != null && MineS(fr.Prisoner.CurrentSettlement))
+                       || (fr.CapturerMapFaction != null && fr.CapturerMapFaction == Clan.PlayerClan);
                 havePos = HeroPos(fr.Prisoner, out at);
                 key = "h:" + Id(fr.Prisoner);
                 return true;
@@ -368,7 +600,9 @@ namespace Armoury
             if (ga != null)
             {
                 kind = KArmy;
-                mine = Mine(ga.ArmyLeader);
+                // gra pokazuje na czacie tylko zbiorke armii wlasnego krolestwa (IsVisibleNotification: ArmyMapFaction == MapFaction gracza) i od razu daje ikone
+                // ArmyCreationMapNotification - kruk bylby spoznionym duplikatem, wiec zawsze od razu
+                mine = true;
                 if (ga.GatheringPoint != null) { at = ga.GatheringPoint.Position.ToVec2(); havePos = true; }
                 else havePos = HeroPos(ga.ArmyLeader, out at);
                 key = "a:" + Id(ga.ArmyLeader);
@@ -494,7 +728,7 @@ namespace Armoury
                     due.Add(_q[i]); _q.RemoveAt(i);
                 }
                 if (due == null) return;
-                due.Sort(delegate (Raven x, Raven y) { int c = x.Due.CompareTo(y.Due); return c != 0 ? c : x.Seq.CompareTo(y.Seq); });
+                due.Sort(ByDue);
                 foreach (var r in due) DeliverNow(r, all ? "klucz wylaczony" : null);
             }
         }
@@ -568,10 +802,11 @@ namespace Armoury
                         }
                         _checkFromH = now;
                         Log.Info(P + "dzien " + (int)CampaignTime.Now.ToDays + " | klucz Raven News " + (On ? "tak" : "nie") + " | latka " + _wired
-                                 + " | wiesci gry na czacie " + _dSeen + " (+ BK po zdobyciu miasta " + _dBkSeen + "), wojenne " + _dWar + ": kruki wyslane " + _dDelayed
+                                 + " | wiesci gry na czacie " + _dSeen + " (+ BK po zdobyciu miasta " + _dBkSeen + ", Diplomacy pakty " + _dDipSeen + ", ROT Biali Wedrowcy " + _dRotSeen + "), wojenne " + _dWar + ": kruki wyslane " + _dDelayed
                                  + (_dDelayed > 0 ? " (sr. " + (_dDelaySum / _dDelayed).ToString("0", Inv) + " h, najdluzej " + _dDelayMax.ToString("0", Inv) + " h; po wczesniejszej wiesci o tym samym " + _dBumped + ")" : "")
                                  + ", od razu: dotyczy gracza " + _dMine + ", blisko (do " + NearRange.ToString("0", Inv) + " jedn.) " + _dNear + ", bez miejsca " + _dNoPos
                                  + (_dOff > 0 ? ", klucz wylaczony " + _dOff : "")
+                                 + " | wczesniejsze kruki o tym samym doreczone przed wiescia od razu " + _dFlushed + " | plotki w karczmie wstrzymane do kruka " + _dRumHeld
                                  + " | rodzaje wyslanych: " + (kinds.Length > 0 ? kinds.ToString() : "-")
                                  + " | doreczone " + _dDelivered + (_dDelivered > 0 ? " (sr. spoznienie godziny " + (_dLateSum / _dDelivered).ToString("0.0", Inv) + " h)" : "")
                                  + (_dForced > 0 ? ", od razu z pelnej kolejki " + _dForced : "")

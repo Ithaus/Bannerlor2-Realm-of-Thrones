@@ -1042,6 +1042,14 @@ namespace Armoury
             all.Add(new Item { Cat = 4, Score = 1.5f + (float)Math.Min(2.0, br - 1.0), Text = bi.Name + " fetches " + a + " in " + hiT.Name + ", but only " + b + " in " + loT.Name + " - a carter could do well." });
         }
 
+        // p5-kruki (R3-05c): dzien poczatku oblezenia z wiesci NSiege tej osady (najnowszej); brak wiesci (np. sprzed wczytania) = jak dotad
+        private static bool SiegeNotYet(Settlement st, float d)
+        {
+            string nm = Clean(st.Name != null ? st.Name.ToString() : ""); int day = -1;
+            foreach (var n in _news) if (n.Kind == NSiege && n.C == nm && n.Day > day) day = n.Day;
+            return day >= 0 && Ravens.NotYet(d, day);
+        }
+
         // ------------------------------------------------------------ wojny
         private static void Wars(List<Item> all, Vec2 at, uint seed, int today)
         {
@@ -1052,6 +1060,7 @@ namespace Armoury
                 if (age > NewsDays) continue;
                 var p = new Vec2(n.X, n.Y);
                 float d = p.Distance(at);
+                if (Ravens.NotYet(d, n.Day)) continue;   // p5-kruki (R3-05c): dalekiej wiesci nie ma w karczmie, zanim nie doleci z nia kruk
                 float q = Exact(d, age, 600f);
                 string when = age <= 1 ? "Just yesterday" : age < 7 ? "A few days ago" : age < 21 ? "Some weeks ago" : "A month or more ago";
                 string place = q >= 0.35f && n.C.Length > 0 ? n.C : null;
@@ -1085,6 +1094,7 @@ namespace Armoury
                 if (st == null || !st.IsFortification || st.SiegeEvent == null) continue;
                 float d = st.GetPosition2D.Distance(at);
                 if (d > 300f) continue;
+                if (SiegeNotYet(st, d)) continue;   // p5-kruki (R3-05c): trwajace oblezenie z daleka - dopiero, gdy doleci kruk z wiescia o nim
                 var lp = st.SiegeEvent.BesiegerCamp != null ? st.SiegeEvent.BesiegerCamp.LeaderParty : null;
                 string who = lp != null && lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : "a great host";
                 cands.Add(new KeyValuePair<float, string>(2.2f + (1f - d / 300f), st.Name + " is under siege - " + who + (lp != null && lp.MapFaction != null ? " of " + lp.MapFaction.Name : "") + " sits before its walls."));
