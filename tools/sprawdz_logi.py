@@ -36533,7 +36533,7 @@ def nkarczmy_main(logp):
 # progi JQ-2/3/5 licza rodzaj po rodzaju, JQ-1b suma rodzajow = swiat, JQ-10 limity w zakresie i stale. Linia sprzed m96-jakosc2 (limit swiata) - jeden
 # rodzaj "swiat" (stare progi).
 M96JAKOSC_HEAD = "Jakosc przedmiotow (m96jakosc): "
-M96JAKOSC_ERR = "ERROR in QualityScarcity"
+M96JAKOSC_ERR = ("ERROR in QualityScarcity", "ERROR in SyncData.arm_qualitycaps")   # m96-jakosc2: zapis limitow rodzajow
 M96JAKOSC_RX = {
     "day": re.compile(r"dzien (\d+)"),
     "rule": re.compile(r"\| regula (TAK|NIE)"),
