@@ -3345,4 +3345,10 @@ OTWARTE na rano: pytania 1-5 w docs/RAPORT-NOCNY-2026-10-20.md; PLAN 6.14 punkt 
   i limity druzyn), r4-wioska 5ff1ffe2 (dochod wioski co dobe ok. 5-15 d z podatku pana, linia w podpowiedzi zlota i w Total Income, blok w Fiefs), r4-dom b4723c7d
   (Trade, Your house: lozko + skrzynia, Take a walk tylko przez "Visit X"). Armoury 97c94eaf (2064 ustawien); CrashScribe/RC bez zmian. Kopie logow Jeffa sesji 02:17
   (Armoury, CrashScribe, RC) i save040.sav na D:. TESTY n21-bitwa / n21-nowa (armoury-start-zloto.flag) / n21-160 w toku -> WGRANIE 92.
+- 20.10 ok. 03:40: DECYZJA JEFFA o 35 pomyslach (docs/POMYSLY-35-2026-10-20.md), doslownie: "28 - nie, 29 - nie. POzostale tak, zacznij te zmiany i daj znac jak wgrasz."
+  (28 konopie i liny, 29 strzyza raz w roku - NIE; 33 pozostale - TAK; A7 z odplywem kas miast - TAK, Jeff wczesniej: "A7 i 35 pomyslow, zostawimy na nocna prace").
+  FALA 1 (wf_072a888e-e95, 18 galezi w-toku/p5-* od 5189c0fe): rody (01c+01d), naprawy (02+04c), turniej (04a), handel (05a+05b), kruki (05c), urodzaj (05e+05f),
+  stada (06c+06d), bloto (07c), armia (08a+08c), jednostki (08e+08f), zalogi (08g), tarcze (09a), regale (09f), zwiad (10a), inzynieria (10b), medycyna (10c),
+  budowy (11a), warsztaty (11b). FALA 2 (po fali 1): okup okolicy (03a), zakladnicy (03c), sztormy (05d), spichlerz miasta (06f), szubienice (07a), pola (07b),
+  AI wybiera drogi (07d), napad na spiacy oboz (08b), A7 + odplyw kas miast. Pytania 2 (zyznosc krain) i 4 (drogi Valyrii) - bez odpowiedzi po drugim wyjasnieniu.
 
