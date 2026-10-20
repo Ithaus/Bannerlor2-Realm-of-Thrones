@@ -3280,4 +3280,8 @@ W grze bez zmian: WGRANIE 88 (Armoury 6d0fd3e4). Jeff gral 14:41-16:09 (Ironman 
   NKA-1 TAK (po przegladzie 7148 zl/d, prog 10000) - w x20 NIE = artefakt tempa. NAKUM-7 NIE tylko "kasy miast +32019/d" (prog 30 tys.; glow rodow brak - x20 artefakt),
   NAKUM-12 (wlasciwy prog kas miast KS) TAK +32455/d <= 43344. Wniosek: bez zmian kodu; testy ekonomii na x8 (x20 przeklamuje NAKUM-7/NKA-1).
   Bieg zatrzymal sie 9 min na oknie "Safe Mode" po zabiciu zamarznietej gry - klikniete No. Dalej: fin103 = A7 (armoury-a7-wlacz.flag + ks-auto), 160 dob x8, w toku od 17:32.
+- 18:13 PDT: fin103 = A7 (WGRANIE 88 + armoury-a7-wlacz.flag + ks-auto, 160 dob x8, Armoury-2026-10-19_17-30-40.log) kod 0. na7 15/15 TAK (nacisk 11.4%, zmiany 0.82% blokow/sezon,
+  koszt 3.2 ms/d). ALE ekonomia gorzej niz fin102 (bez A7): nakum NIE 6 (NAKUM-7 kasy miast +69 tys./d, NAKUM-12 +65 tys./d > 43 tys., NAKUM-16/18/22/26), nkasy NKA-1 NIE (10215 > 10000).
+  DECYZJA (moja, Jeff "masz zgode na wszystko"): KsSwitchSignalRule zostaje WYLACZONE (jak w Armoury.json Jeffa: false). A7 do ponownego wlaczenia dopiero z odplywem kas miast
+  (wsie na jedwab -> wiecej pieniedzy u kupcow miast KS bez ujscia) - osobna paczka po nocy.
 
