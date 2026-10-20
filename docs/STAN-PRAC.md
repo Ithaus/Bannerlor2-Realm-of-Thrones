@@ -3410,4 +3410,8 @@ Logi Jeffa: od 04:46 brak nowych (nie gral po WGRANIU 92).
   p6-pola 6beee076, p6-drogi 173d5aff, p6-a7 c2ffc1f1 (KsSwitchSignalRule domyslnie TAK + TownWorksHireDistrict). Scalone do `w-toku/n23-calosc` od 3c3a7ad9
   (zb/n23-calosc) -> 5f2c89e2, konflikty tylko dopisy (oba zachowane), 2124 ustawien, build 0. Recenzja scalenia fali 2: wf_ecb2cb57-6d5 (ekonomia + technika -> poprawki w n23).
   PRZY WGRANIU 94: Armoury.json Jeffa "KsSwitchSignalRule": false -> true (kopia .bak). Dalej: naprawy2 do n22 (93) i do n23; testy n23 (bitwa, nowa, 160) -> WGRANIE 94.
+- 09:20 PDT Jeff: "ja i tak zaczynam nowa gre" -> wybral OPCJE 2: bez osobnego WGRANIA 93; NOWA KAMPANIA od razu na WGRANIU 94 (n23 = fala 1 + n22f + naprawy2 +
+  fala 2 + poprawki scalenia). Testy 94: bitwa (5 dob x4, wioska-gracza) + JEDNA nowa kampania ok. 180 dob (start-zloto + armoury-a7-wlacz.flag, bo Armoury.json
+  Jeffa ma A7 false do czasu wgrania) - bez biegu z zapisu (Jeff zaczyna nowa gre; test zapisu wraca przy nocnych wersjach). n22c: bitwa 0, nowa 0 (NKS-30n TAK
+  mediana 2, P3W3-3 TAK 2130, 0 ERROR), 160 w toku do ok. 10:00 (baza porownania).
 
