@@ -23,13 +23,16 @@ namespace Armoury
     ///  2. PRAWDZIWA NADWYZKA: co dobe (po Famine.Daily - migawka spichlerzy tej doby, w pozycji MFolk ksiegi pieniadza) kazda wies miasta w stanie Normal,
     ///     bez najazdu, bez glodu gospodarzy (u = 0), sprzedaje miastu to, co lezy w jej spichlerzu ponad KeepShare (98%) sufitu (sufit = 2 lata potrzeby, f23) -
     ///     to, czego i tak by nie zmiescila (nadwyzka ponad sufit przepadala w Famine jako "towar na wozy"). Gdy okreg zjada wlasny zapas (spichlerz ponizej 98%) - nic.
-    ///     Miasto w niedoborze (zapas ponizej ShortDays dni wlasnego spozycia: mieszczanie + zaloga) placi drozej, wiec wies sprzedaje takze z zapasu ponad
-    ///     KeepShareShort (rok wlasnej potrzeby) - glod przychodzi do miasta dopiero wtedy, gdy wsie maja juz tylko swoj rok.
+    ///     Miasto w niedoborze (zapas ponizej ShortDays dni wlasnego spozycia: mieszczanie + zaloga, albo ponizej ShortCapShare sufitu zapasu - nad alarmem BK
+    ///     ClusterFoodTracker: bilans &lt; 0 i zapas &lt; 25% sufitu przez 14 dob = okreg "w zastoju", BK tnie plon wsi i sle wozy jedzenia z innych miast) placi
+    ///     drozej (cena kupna targu, nie sprzedazy), wiec wies sprzedaje takze z zapasu ponad KeepShareShort (rok wlasnej potrzeby) - do podwojnego progu niedoboru.
+    ///     Glod przychodzi do miasta dopiero wtedy, gdy wsie maja juz tylko swoj rok, a targ jest pusty (BK przy zapasie &lt;= 10% sufitu dokupuje jedzenie z polki
+    ///     na brak - EconomyPatches.ItemConsumptionPatch).
     ///     Jednostki: racje spichlerza (1 racja = jedzenie 1 czlowieka na dobe) / Q miasta (mieszczan na jednostke Food = ludzie ksiegi / (dobrobyt / 40) -
     ///     ta sama skala co Famine QOf), wiec racje wsi karmia tylu mieszczan, ilu ludzi wykarmilyby na wsi.
     ///  3. ZAMKNIETA EKONOMIA: racje schodza ze spichlerza wsi (Famine.TributeTake) i od razu wchodza do Town.FoodStocks (najwyzej do miejsca: sufit - zapas -
     ///     dzisiejszy dodatni bilans bez zakupu, zeby nic nie przepadlo na sufice gry); miasto placi wsi cena zboza na swoim targu (Town.GetItemPrice(grain,
-    ///     sprzedajacy) za jednostke Food - gra liczy jedna sztuke jedzenia z targu jako +1 Food) z nadwyzki kasy ponad zapas kupcow (TownPurse.SpendableTown;
+    ///     sprzedajacy); w niedoborze cena kupna) za jednostke Food - gra liczy jedna sztuke jedzenia z targu jako +1 Food) z nadwyzki kasy ponad zapas kupcow (TownPurse.SpendableTown;
     ///     brak kasy - wies nie sprzedaje, nadwyzka zostaje w spichlerzu). Zloto: kasa miasta -> kiesa wsi (ChangeGold para) w naszym ticku dobowym (MoneyLedger
     ///     BlockOpen .. Mark(MFolk): migawki ksiegi lapia przelew, bez nowej pozycji Note169). Decyzja: sprzedaz za cene targu, nie danina pana - danina od "nadwyzki
     ///     ponad zapas" to pobor resztowy (Jeff 17.10), a sprzedaz tego, czego wies nie zmiesci, to zwykly targ.
@@ -40,6 +43,10 @@ namespace Armoury
     ///     to nie glod. Dlatego tylko w czasie testu BE (prefiks/finalizer PopulationCampaignBehavior.OnSettlementDailyTick) bilans miasta, ktore ma jedzenie
     ///     (zapas Food co najmniej na 1 dobe spozycia albo na polce targu tyle sztuk jedzenia), nie spada ponizej progu BE. Glod BE zostaje, gdy naprawde nic
     ///     nie ma: pusty spichlerz miasta i pusty targ (oblezenie, spalone wsie, odciete drogi). Gra, BK, Famine i reszta widza prawdziwy bilans.
+    ///  6. WERBUNEK ZALOGI (regresja zdjetego skladnika wsi): gra dobiera zalodze ludzi tylko przy Town.FoodChange &gt; 0 (GarrisonRecruitmentCampaignBehavior
+    ///     .CanSettlementAutoRecruit). Dotad skladnik wsi trzymal bilans prawie kazdego miasta na plusie; teraz miasto, ktore zyje z zapasu i targu, mialoby
+    ///     ujemny bilans przy pelnym spichlerzu i przestaloby werbowac. Dlatego tylko w czasie tego testu (prefiks/finalizer) bilans miasta, ktore nie jest
+    ///     w niedoborze (zapas co najmniej prog niedoboru z pkt 2), nie spada ponizej +0.01. Miasto w niedoborze nie werbuje - jak w grze przy braku jedzenia.
     /// Klucz wylaczony = wszystko jak w grze, bit w bit (postfiksy wracaja na wejsciu). Famine wylaczone - skladnik wsi zostaje (nie ma czego sprzedac), bezpiecznik
     /// BE dziala. Stan bez zapisu: zakup dnia zyje do nastepnej doby (po wczytaniu dymek bez zakupu do pierwszego Daily). Moze isc z watkow AI (postfiks): tylko
     /// odczyty, slownik dnia podmieniany w calosci (bez blokad), liczniki Interlocked. Potkniecia liczone per miejsce (bez globalnych wylacznikow, CLAUDE.md 7).
@@ -50,6 +57,7 @@ namespace Armoury
         private const double KeepShare = 0.98;        // wies trzyma do 98% sufitu spichlerza (2 lata potrzeby) - ponad to sprzedaje miastu (WallTribute CapFill)
         private const double KeepShareShort = 0.5;    // miasto w niedoborze: wies sprzedaje takze z zapasu ponad rok wlasnej potrzeby (polowa sufitu 2 lat)
         private const double ShortDays = 30.0;        // miasto w niedoborze: zapas Food ponizej tylu dni spozycia (mieszczanie + zaloga)
+        private const double ShortCapShare = 0.30;    // ... albo ponizej 30% sufitu zapasu (nad alarmem zastoju BK - 25% sufitu przy ujemnym bilansie)
         private const double MinUnits = 0.05;         // mniej jednostek Food sie nie kupuje
         private const double QDefault = 906.0;        // GL 2.3 (Famine.QWorldDefault): mieszczan na jednostke Food, gdy miasta nie da sie policzyc
         private const float BeDefault = -3f;          // BetterEconomySettings.StarvationFoodChangeThreshold (domyslnie)
@@ -63,15 +71,17 @@ namespace Armoury
         [ThreadStatic] private static bool _inTownTick;                   // wnetrze Town.DailyTick - zakup juz w zapasie
         [ThreadStatic] private static bool _noTerm;                       // nasz pomiar bilansu bez zakupu dnia
         [ThreadStatic] private static Town _beTown;                       // wnetrze BE OnSettlementDailyTick - ta osada
+        [ThreadStatic] private static Town _garTown;                      // wnetrze CanSettlementAutoRecruit (werbunek zalogi gry) - ta osada
 
-        private static bool _foodPatched, _tickPatched, _bePatched, _beTried;
-        private static string _beWhy = "nie sprawdzone";
+        private static bool _foodPatched, _tickPatched, _bePatched, _beTried, _garPatched;
+        private static string _beWhy = "nie sprawdzone", _garWhy = "nie sprawdzone";
         private static FieldInfo _beThrField;
         private static float _beThr = BeDefault;
         private static Harmony _h;
 
         // liczniki (bez zapisu)
         private static int _beGuard, _beHungry, _beSeen;                 // od ostatniego Daily: bilans podniesiony do progu BE / glod BE bez jedzenia / testy BE miast
+        private static int _garSeen, _garGuard, _garShort;               // od ostatniego Daily: testy werbunku zalogi miast z bilansem <= 0 / podniesione do +0.01 / w niedoborze (bez werbunku)
         private static readonly HashSet<string> _beGuardTowns = new HashSet<string>();
         private static readonly object Gate = new object();
         private static double _sessUnits, _sessRations; private static long _sessGold;
@@ -89,6 +99,7 @@ namespace Armoury
             _today = Empty;
             lock (Gate) { _beGuardTowns.Clear(); }
             _beGuard = _beHungry = _beSeen = 0;
+            _garSeen = _garGuard = _garShort = 0;
             _sessUnits = _sessRations = 0.0; _sessGold = 0;
             _stumbles = _stumblesAll = 0;
             lock (_errSites) _errSites.Clear();
@@ -162,14 +173,30 @@ namespace Armoury
                     _beThrField = ts != null ? AccessTools.Field(ts, "StarvationFoodChangeThreshold") : null;
                 }
                 catch (Exception e) { _beWhy = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks(BE)", e); }
+                try
+                {
+                    // werbunek zalogi gry (pkt 6) - typ gry, ale w kampanii (jak BE): bez kompilacji klasy przy starcie gry
+                    var g = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.GarrisonRecruitmentCampaignBehavior), "CanSettlementAutoRecruit", new[] { typeof(Settlement) });
+                    if (g == null) _garWhy = "BRAK (GarrisonRecruitmentCampaignBehavior.CanSettlementAutoRecruit)";
+                    else
+                    {
+                        _h.Patch(g, prefix: new HarmonyMethod(typeof(TownGranary), nameof(GarPre)) { priority = Priority.First },
+                                    finalizer: new HarmonyMethod(typeof(TownGranary), nameof(GarFin)));
+                        _garPatched = true;
+                        _garWhy = "wpiety (CanSettlementAutoRecruit)";
+                    }
+                }
+                catch (Exception e) { _garWhy = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks(zaloga)", e); }
             }
             ReadBeThr();
             var s = Settings.Current;
             Log.Info("Spichlerz miejski (p6): start sesji | klucz Town Granary From Villages " + (s != null && s.TownGranaryFromVillages ? "TAK" : "NIE")
                      + " | spichlerze wsi (Famine) " + (Famine.On ? "czynne" : "NIECZYNNE - skladnik wsi miast bez zmian") + " | bilans miasta " + (_foodPatched ? "wpiety" : "BRAK")
                      + ", Town.DailyTick " + (_tickPatched ? "wpiety" : "BRAK") + " | bezpiecznik BE " + _beWhy + ", prog BE " + F(_beThr, "0.##")
-                     + " | wies trzyma " + F(KeepShare * 100.0, "0") + "% sufitu spichlerza (miasto w niedoborze ponizej " + F(ShortDays, "0") + " dni spozycia: "
-                     + F(KeepShareShort * 100.0, "0") + "%), zaplata cena zboza targu miasta z nadwyzki kasy ponad zapas kupcow.");
+                     + " | werbunek zalogi " + _garWhy
+                     + " | wies trzyma " + F(KeepShare * 100.0, "0") + "% sufitu spichlerza (miasto w niedoborze ponizej " + F(ShortDays, "0") + " dni spozycia albo "
+                     + F(ShortCapShare * 100.0, "0") + "% sufitu zapasu: " + F(KeepShareShort * 100.0, "0")
+                     + "%), zaplata cena zboza targu miasta (sprzedazy; w niedoborze kupna) z nadwyzki kasy ponad zapas kupcow.");
         }
 
         private static void ReadBeThr()
@@ -187,11 +214,14 @@ namespace Armoury
         public static void TickFin() { _inTownTick = false; }
         public static void BePre(Settlement __0) { try { _beTown = __0 != null && __0.IsTown ? __0.Town : null; } catch { _beTown = null; } }
         public static void BeFin() { _beTown = null; }
+        public static void GarPre(Settlement __0) { try { _garTown = __0 != null && __0.IsTown ? __0.Town : null; } catch { _garTown = null; } }
+        public static void GarFin() { _garTown = null; }
 
         // ------------------------------------------------------------ bilans jedzenia miasta (postfiks, moze isc z watkow AI)
         /// <summary>
         /// Postfiks (Last) na DefaultSettlementFoodModel.CalculateTownFoodStocksChange - tylko miasta i tylko przy kluczu: (1) skladnik wsi zdjety (Live, bez oblezenia),
-        /// (2) zakup dnia (poza Town.DailyTick i naszym pomiarem), (3) w tescie BE - bilans miasta z jedzeniem nie nizszy niz prog BE. Nie rzuca.
+        /// (2) zakup dnia (poza Town.DailyTick i naszym pomiarem), (3) w tescie BE - bilans miasta z jedzeniem nie nizszy niz prog BE,
+        /// (4) w tescie werbunku zalogi gry - bilans miasta bez niedoboru nie nizszy niz +0.01 (tylko przy zdjetym skladniku wsi). Nie rzuca.
         /// </summary>
         public static void FoodPostfix(Town town, ref ExplainedNumber __result)
         {
@@ -235,6 +265,20 @@ namespace Armoury
                         else System.Threading.Interlocked.Increment(ref _beHungry);
                     }
                 }
+                if (ReferenceEquals(_garTown, town) && Famine.On)   // tylko gdy skladnik wsi zdjety (Famine wylaczone - gra bez zmian)
+                {
+                    float r = __result.ResultNumber;
+                    if (!(r > 0f))
+                    {
+                        System.Threading.Interlocked.Increment(ref _garSeen);
+                        if (!IsShort(town))
+                        {
+                            __result.Add(0.01f - r, _txtStore);
+                            System.Threading.Interlocked.Increment(ref _garGuard);
+                        }
+                        else System.Threading.Interlocked.Increment(ref _garShort);
+                    }
+                }
             }
             catch (Exception e) { Stumble("FoodPostfix", e); }
         }
@@ -255,6 +299,16 @@ namespace Armoury
             double c = Math.Max(0f, t.Prosperity) / 40.0;
             try { var g = t.GarrisonParty; if (g != null && g.Party != null) c += g.Party.NumberOfAllMembers / 20.0; } catch { }
             return c;
+        }
+
+        /// <summary>Prog niedoboru miasta (jednostki Food): ShortDays dni spozycia albo ShortCapShare sufitu zapasu - wiekszy. Wyjatek leci do wolajacego.</summary>
+        private static double ShortAt(Town t, double cons) { return Math.Max(ShortDays * cons, ShortCapShare * t.FoodStocksUpperLimit()); }
+
+        /// <summary>Miasto w niedoborze (zapas ponizej progu niedoboru). Bez alokacji. Wyjatek leci do wolajacego.</summary>
+        private static bool IsShort(Town t)
+        {
+            double cons = Cons(t);
+            return cons > 0.0 && Math.Max(0f, t.FoodStocks) < ShortAt(t, cons);
         }
 
         /// <summary>Miasto ma jedzenie: zapas Food co najmniej na 1 dobe spozycia albo na polce targu tyle sztuk jedzenia. Bez alokacji. Wyjatek leci do wolajacego.</summary>
@@ -323,12 +377,13 @@ namespace Armoury
                     _noTerm = true;
                     try { bal = town.FoodChange; } finally { _noTerm = false; }
                     double room = cap - stocks - Math.Max(0.0, (double)bal);
-                    bool shortT = cons > 0.0 && stocks < ShortDays * cons;
+                    double shortAt = ShortAt(town, cons);
+                    bool shortT = cons > 0.0 && stocks < shortAt;
                     if (shortT)
                     {
-                        // niedobor: miasto kupuje z zapasu wsi tylko do 2 x ShortDays dni spozycia (plus dzisiejszy brak) - bez zrzutu pol spichlerzy okregu w jedna dobe
+                        // niedobor: miasto kupuje z zapasu wsi tylko do podwojnego progu niedoboru (plus dzisiejszy brak) - bez zrzutu pol spichlerzy okregu w jedna dobe
                         shortTowns++;
-                        room = Math.Min(room, Math.Max(0.0, 2.0 * ShortDays * cons - stocks - (double)bal));
+                        room = Math.Min(room, Math.Max(0.0, 2.0 * shortAt - stocks - (double)bal));
                     }
                     double q = QOf(town);
                     int spend = -1, price = 0;   // kasa i cena - dopiero przy pierwszej wsi z nadwyzka (BuyFloor liczy zapytania do linii 169c)
@@ -345,7 +400,7 @@ namespace Armoury
                         surplusVills++;
                         double want = Math.Min(sur / q, room - got);
                         if (want < MinUnits) { fullTown++; continue; }
-                        if (spend < 0) { spend = Math.Max(0, TownPurse.SpendableTown(town)); price = Math.Max(1, town.GetItemPrice(DefaultItems.Grain, null, true)); }
+                        if (spend < 0) { spend = Math.Max(0, TownPurse.SpendableTown(town)); price = Math.Max(1, town.GetItemPrice(DefaultItems.Grain, null, !shortT)); }   // niedobor - cena kupna targu (drozej)
                         long afford = spend - paid;
                         double canU = afford / (double)price;
                         if (canU < want) { want = canU; noGold++; }
@@ -397,12 +452,14 @@ namespace Armoury
               .Append(" wsi do ").Append(fedTowns).Append(" miast; wsi z nadwyzka ").Append(surplusVills).Append(", bez miejsca w miescie ").Append(fullTown)
               .Append(", bez zaplaty (kasa miasta) ").Append(noGold)
               .Append(" | zloto miasto->wies ").Append(gold).Append(" zl (cena zboza srednio ").Append(priceN > 0 ? F(priceSum / priceN, "0.#") : "-").Append(" zl/szt.)")
-              .Append(" | miasta w niedoborze (zapas < ").Append(F(ShortDays, "0")).Append(" dni): ").Append(shortTowns).Append(", wsie sprzedaly z zapasu ponizej 98% sufitu ").Append(shortVills)
+              .Append(" | miasta w niedoborze (zapas < ").Append(F(ShortDays, "0")).Append(" dni albo ").Append(F(ShortCapShare * 100.0, "0")).Append("% sufitu): ").Append(shortTowns).Append(", wsie sprzedaly z zapasu ponizej 98% sufitu ").Append(shortVills)
               .Append(" | skladnik wsi gry zdjety -").Append(F(termSum, "0.#")).Append("/d w ").Append(termTowns).Append(" miastach")
               .Append(" | miasta z bilansem < ").Append(F(_beThr, "0.##")).Append(": ").Append(neg).Append(" (bez oblezenia ").Append(negPeace).Append("; najnizszy ").Append(lowName).Append(' ')
               .Append(low == double.MaxValue ? "-" : F(low, "0.#")).Append(')')
               .Append(" | miasta glodujace (Food 0): ").Append(hungry).Append(" (bez oblezenia ").Append(hungryPeace).Append(')')
               .Append(_bePatched ? " | BE od wczoraj: testy miast " : " | BE (" + _beWhy + "): testy miast ").Append(_beSeen).Append(", oslonieto ").Append(_beGuard).Append(" (").Append(guardTowns).Append(" miast), glod BE bez jedzenia ").Append(_beHungry)
+              .Append(_garPatched ? " | werbunek zalogi od wczoraj: testy miast z bilansem <= 0 " : " | werbunek zalogi (" + _garWhy + "): testy miast z bilansem <= 0 ")
+              .Append(_garSeen).Append(", oslonieto ").Append(_garGuard).Append(", w niedoborze bez werbunku ").Append(_garShort)
               .Append(" | kontrola: racje zdjete ").Append(F(rations, "0.##")).Append(" = Food x Q ").Append(F(rationsCheck, "0.##"))
               .Append("; zapas miast +").Append(F(stockIn, "0.##")).Append(" = zakup ").Append(F(units, "0.##"))
               .Append("; zloto: kasy miast -").Append(townOut).Append(", kiesy wsi +").Append(vilIn).Append(", zaplata ").Append(gold)
@@ -415,7 +472,7 @@ namespace Armoury
 
         private static void NewDay()
         {
-            _beGuard = _beHungry = _beSeen = 0; _stumbles = 0;
+            _beGuard = _beHungry = _beSeen = 0; _garSeen = _garGuard = _garShort = 0; _stumbles = 0;
             lock (Gate) _beGuardTowns.Clear();
         }
     }
