@@ -7,9 +7,9 @@ build kod 0, gen_mcm po kazdej zmianie Settings.cs) | **Status calosci:** DO SPR
 |---|---|---|---|---|
 | 1 | Rabunek druzyny gracza liczy sie w ksiedze snu jak praca (nie odpoczynek) | `RaidCountsAsWork` (TAK) | `3360ba69` | zbudowane |
 | 2 | Rzad markietanow: odziez dla druzyny gracza z polki miasta (z kiesy gracza) i praczki (zuzycie odziezy -25% przez 7 dob) | `SutlerRowClothing`, `SutlerLaundry` (TAK), `SutlerLaundryCutPercent` 25, `SutlerLaundryDays` 7, `SutlerLaundryMenPerWasher` 20 | `e31227d0` | zbudowane |
-| 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | `ea848ab0` | zbudowane, test w obie strony OK |
+| 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | `ea848ab0`, `19f6fcff` | zbudowane, test w obie strony OK |
 | 4 | KP-1 (m98plotki) liczy bledy zapisu kufli `ERROR in SyncData.arm_drink` (i arm_rumours), KP-1b z logu CrashScribe | - (narzedzie) | `4c9bb421` | sprawdzone na logach 101 |
-| 5 | `DrillCampOnlyAi` domyslnie TAK (u Jeffa juz true) | `DrillCampOnlyAi` (TAK) | (krok 5) | zbudowane |
+| 5 | `DrillCampOnlyAi` domyslnie TAK (u Jeffa juz true) | `DrillCampOnlyAi` (TAK) | `0fa1695d` | zbudowane |
 
 ---
 
@@ -241,3 +241,29 @@ SZ-4 TAK (XP z marszu 0), SZ-5 INFO: XP AI x0.67 (spadek 33%) - to stan, ktory J
 **Ryzyko:** u Jeffa zero (wartosc z MCM nadpisuje domyslna); nowa instalacja / reset MCM - AI cwiczy wolniej (jak u Jeffa: ok. -33% XP AI w biegu 101).
 
 **Status:** GOTOWE (zbudowane; zachowanie u Jeffa bez zmian).
+
+---
+
+### Podsumowanie paczki m103-drobne (stan HEAD)
+
+- **Build:** Armoury, CrashScribe, GrandTourney, RealisticCaptivity, ForgeView - kod wyjscia 0, 0 bledow (Armoury pelne przebudowanie `--no-incremental`,
+  `Armoury.dll` md5 `e07b8266fcf765d7b9e867e8b5c1c049`). `python tools/gen_mcm.py` - bez zmian po ostatnim kroku. Pozostale mody nie czytaja zmienionych typow (grep).
+- **Ustawienia Armoury:** 2249 (bylo 2243; +6). **Nowe klucze (domyslnie):** `RaidCountsAsWork` TAK ("A night's rest"); `SutlerRowClothing` TAK, `SutlerLaundry` TAK,
+  `SutlerLaundryCutPercent` 25 (0-75), `SutlerLaundryDays` 7 (1-28), `SutlerLaundryMenPerWasher` 20 (5-100) ("Camp and baggage (night 20/21.10)"). **Zmieniona domyslna:**
+  `DrillCampOnlyAi` NIE -> TAK. W `Armoury.json` Jeffa nowych kluczy nie ma (wejda domyslne), `DrillCampOnlyAi` juz true.
+- **Zapis:** `arm_board` - format nb2 (odczyt nb1 bez zmian; DLL 101 nie czyta nb2); `arm_sutlerrow` - pole 8 (koniec praczek; stare zapisy bez zmian).
+- **Nowe linie / pola logu:** "Nocleg: gracz - godzina H:00 rabunku (...) liczona jak praca ..." (raz na dobe), pole "godziny rabunku bez odpoczynku (Raid Counts As Work) N"
+  w "NocnyMarsz: gracz o swicie"; "Markietani obozu (m99): odziez | ..." i "... praczki | ...", pola "odziez" i "praczki" w linii doby rzedu i w linii startu rzedu, pola
+  "rzad markietanow (gracz, z kiesy)" i "praczki: druzyna gracza zdarla mniej o ..." w "Odziez wojska (150): dzien"; "Listy goncze (m102): ... zapis arm_board N B; sklad zapisu nb2: ...",
+  "Tablica ogloszen (m102): wczytano zapis arm_board nb2 / w starym formacie nb1 ...", "wpiete ... zapis arm_board nb2 (odczyt takze nb1)".
+- **sprawdz_logi:** WP-7 (m97wioski), MK-2/MK-3 rozszerzone + MK-8, MK-9 (m99markietani), L-8 <= 12 KB + L-8b (m102tablica), KP-1 + KP-1b (m98plotki), tekst SZ-5 (m97szkolenie).
+
+**Co sprawdzic w autotescie (nikt jeszcze nie uruchomil gry z ta DLL):**
+1. Rabunek wioski pobocznej i wsi gry przez gracza (najlepiej noca): linia "godzina ... rabunku ... liczona jak praca", w linii switu pole > 0, odpoczynek doby nie rosnie
+   w godzinach rabunku; WP-7 TAK; armia gracza z rabunkiem wioski pobocznej - doba bez premii odpoczynku (linia "Dzien odpoczynku armii (R3-08a)").
+2. Rzad markietanow (oboz >= 150): opcja odziezy (po kilku dobach z chuda sakiewka ludzi albo `SutlerClothing` NIE) - linia "odziez" z kontrola 0, MK-3 i MK-8 TAK;
+   praczki - linia "praczki", MK-9 TAK, przez 7 dob pole "praczki" w "Odziez wojska (150)", potem znika; zapis/wczytanie w trakcie praczek - opcja dalej szara z dniami.
+3. Tablica: linia doby listow - `zapis arm_board` < 12 288 B i "sklad zapisu nb2 ... (Y% nb1)", L-8 TAK; zapis i wczytanie - linia "wczytano zapis arm_board nb2" z ta sama
+   liczba listow i band; wczytanie zapisu z 101 - linia "wczytano ... w starym formacie nb1"; wyplaty listow (L-3, L-10) bez zmian.
+4. KP-1/KP-1b: `--grupa m98plotki <Armoury-*.log> --crashscribe <session-*.log>` - 0 i 0.
+5. m97szkolenie: "zasada AI TAK" jak w 101 (u Jeffa bez zmian).
