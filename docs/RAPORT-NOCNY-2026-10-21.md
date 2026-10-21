@@ -5,7 +5,7 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 ## W skrócie
 
 - **WGRANIE 96** jest w grze od 20.10 19:30. Przeszło trzy testy: bitwy, nową kampanię na 180 dób i 160 dób na starym zapisie. Wszystkie bez wywrotki i z 0 błędów w logu Armoury.
-- **WGRANIE 97**: _(stan uzupełniam po teście 97b - patrz niżej)_.
+- **WGRANIE 97** jest w grze od 20.10 23:20 (wioski boczne i ich obrońcy, obóz, szkolenie, posiłki, surowce do łuków). Przeszło dwa pełne zestawy testów (97 i 97b z poprawkami po recenzji scalenia), wszystkie bez błędów. W Twoich ustawieniach MCM zmieniłem obóz na 21:00-3:00 (była 0:00-6:00); kopia starego pliku jest obok.
 - **Twoje zapisy są nietknięte.** Testy sprawdzają to za każdym razem (104 pliki, sumy kontrolne bez zmian).
 - **Limit tygodniowy:** około 92% przy pisaniu. Rzeczy, których nie zdążyłem, są rozpisane do przekazania na końcu raportu.
 
@@ -28,7 +28,7 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **Bandyci noszą jedzenie i złoto**, jedzą codziennie, a gdy głodują, część z nich odchodzi.
 - **Sakiewki ludzi według potrzeby, koszyk ludu, płótno i sukno** w planie wsi.
 
-## Co wchodzi w 97 (po teście)
+## Co weszło w 97 (już w grze)
 
 1. **Wioski boczne jak wioski główne** (bez bohaterów).
    - Co można: wjechać, handlować ich towarem, inwestować w prace, przespać się u wieśniaków, rozbić obóz obok, rabować każdą osobno albo wziąć okup.
