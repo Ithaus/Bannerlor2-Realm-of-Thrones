@@ -54,11 +54,13 @@ namespace Armoury
             return w;
         }
 
-        /// <summary>Koniec KingdomTreasury.Daily: linia kontrolna tylko przy OptimVerify (bez niej log jak dotad).</summary>
+        /// <summary>Koniec KingdomTreasury.Daily: pamiec doby puszczona (recenzja m99: bez przytrzymania krolestw do nastepnej doby / innej kampanii),
+        /// linia kontrolna tylko przy OptimVerify (bez niej log jak dotad).</summary>
         private static void OptEnd(Settings s)
         {
             try
             {
+                _optWar.Clear();   // WarOf wolany tylko w petli rodow (po OptBegin) - po petli pamiec niepotrzebna
                 if (!_optVerify || s == null || !s.LogEnabled) return;
                 Log.Info("Optym (m99): dzien " + (int)CampaignTime.Now.ToDays + " | kontrola (Optim Verify) KingdomTreasury.Daily wojna krolestwa: zapytan " + _optWarAsk
                          + ", z pamieci " + _optWarHit + ", porownan " + _optWarCmp + ", roznic " + _optWarDiff
@@ -72,7 +74,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null) return;
-            _optWarDiffSess = 0; _optWarCmpSess = 0;
+            _optWar.Clear(); _optWarDiffSess = 0; _optWarCmpSess = 0;   // recenzja m99: nowa kampania / wczytanie - bez krolestw poprzedniej sesji
             Log.Info("Optym (m99): start | Optim Daily Cache " + (s.OptimDailyCache ? "TAK" : "NIE") + ", Optim Verify " + (s.OptimDailyCache && s.OptimVerify ? "TAK" : "NIE")
                      + " | wlaczone: " + (s.OptimDailyCache ? "KingdomTreasury.Daily - wojna krolestwa raz na krolestwo na dobe (zamiast przegladu Kingdom.All na kazdy rod)" : "brak (kod jak dotad)")
                      + " | bez zmian (wynik zalezalby od kolejnosci albo skutkow ubocznych modelu finansow - docs/noc-1920/m99-optym-CHANGELOG.md): ClanIncomeBook.Daily, SupplyDemand.DailyTrade, Sutlers.Daily, model dochodu w KingdomTreasury.Daily.");

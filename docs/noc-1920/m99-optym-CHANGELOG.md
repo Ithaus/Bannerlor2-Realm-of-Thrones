@@ -6,7 +6,7 @@ Jeff 20.10: "Na koncu zrob optymalizacje gry, czy da sie przyspieszyc jeszcze." 
 Zmierzylem, co najdluzej liczy sie o polnocy w grze (ok. 0.55-0.6 s na dobe). Cztery najwieksze kawalki to dalej te same: ksiega dochodow rodow, handel bronia
 kupcow, skarbce krolestw i markietani - razem prawie polowa. Najwieksza czesc z nich to liczenie dochodu rodu przez sama gre i Banner Kings, a to liczenie po
 drodze zapisuje pensje rady i podatki warsztatow - pominiecie go mogloby zmienic pieniadze w grze, wiec tego nie ruszalem. Bezpiecznie przyspieszylem jedna
-rzecz (skarbiec pyta o wojne raz na krolestwo zamiast raz na kazdy rod) - zysk maly (ok. 1-2 ms na dobe), liczby gry te same. Wylacznik: Optim Daily Cache.
+rzecz (skarbiec pyta o wojne raz na krolestwo zamiast raz na kazdy rod) - zysk maly (ok. 0.5-2 ms na dobe), liczby gry te same. Wylacznik: Optim Daily Cache.
 
 ## Pomiar przed (WGRANIE 98, logi Armoury, linia "Profil doby (E8/0)", ostatnie 60 dob kazdego biegu)
 Takt doby: nowa kampania 180 dob (Armoury-2026-10-20_23-25-07.log) mediana 530.5 / srednia 537.2 / max 587.2 ms;
@@ -65,7 +65,8 @@ Rozbicie (linia "Szybkosc doby (perf-d2d3)", doba 109235): w ClanIncomeBook.Dail
 
 ## Oczekiwany zysk
 KingdomTreasury.Daily: ok. 537 przegladow Kingdom.All -> jeden na krolestwo; szacunek 0.5-2 ms/dobe (ok. 0.1-0.3% taktu doby). Uczciwie: maly. Duzy zysk
-(55-65 ms, ok. 10% taktu doby) bylby z pkt 2 - zablokowany przez skutki uboczne modelu finansow (wyzej), do decyzji.
+(55-65 ms, ok. 10% taktu doby) bylby z pkt 2 listy "Zmiana dla kazdej sekcji" (model dochodu) - zablokowany przez skutki uboczne modelu finansow (wyzej),
+do decyzji.
 
 ## Ryzyko / co sprawdzic
 - Regresje: zmieniony jeden warunek w KingdomTreasury.Daily (wojna -> stawka powinnosci); inne miejsca liczace wojne (ArrearLine, AtWar(k), petla
@@ -76,6 +77,16 @@ KingdomTreasury.Daily: ok. 537 przegladow Kingdom.All -> jeden na krolestwo; sza
 - Klucze MCM: OptimDailyCache (TAK), OptimVerify (NIE) - nowe, nie ma ich w Armoury.json Jeffa (dzialaja domyslne). gen_mcm uruchomiony.
 - Autotest: bieg z OptimVerify = TAK (MO-2 roznic 0) i bieg zwykly (MO-1 takt wobec bazy WGRANIA 98:
   `python -I tools/sprawdz_logi.py --grupa m99optym <log> --baza-doby Armoury-2026-10-21_00-07-42.log`), reszta grup sprawdz_logi wobec bazy - tylko zmiennosc.
+
+## Poprawki po recenzji (21.10)
+Recenzja pelna: nic nie zmienia liczb gry, brak ryzyka CTD/NRE; trzy drobne uwagi - wszystkie poprawione (zadna nie dotyka wyniku gry):
+1. **sprawdz_logi MO-2**: bieg z linia startu "Optim Verify TAK" bez linii kontrolnych dawal INFO - teraz NIE ("tryb kontrolny wlaczony, brak porownan").
+   INFO tylko przy "Optim Verify NIE" albo w logu bez linii startu. Linie kontrolne z porownan 0 - NIE jak dotad.
+2. **_optWar** trzymal krolestwa po petli rodow do nastepnej doby (takze po wczytaniu innego zapisu - tylko pamiec, nigdy czytane, bo OptBegin czysci przed
+   uzyciem). Teraz czyszczony takze w OptEnd (po petli) i w OptimStartLine (start kampanii / wczytanie). Wynik bez zmian: WarOf wolany tylko w petli rodow,
+   po OptBegin; pamiec pusta po OptEnd = najwyzej nowe liczenie, ktore daje to samo.
+3. **sprawdz_logi MO-1**: mediana liczona jako gorny srodek (530.9 / 597.6) - teraz zwykla mediana (srednia dwoch srodkowych przy parzystym n), jak w tabeli
+   wyzej (530.5 / 597.5).
 
 ## Status
 DO SPRAWDZENIA - autotest porowna takt doby (MO-1) i progi (MO-2 kontrola roznic 0, MO-3 ERROR 0, pozostale grupy jak w bazie). Build Release: kod 0.

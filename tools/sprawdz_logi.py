@@ -54303,13 +54303,17 @@ def m99optym_stat(rows, n=60):
         return None
     tak = sorted(r[0] for r in w)
     kt = [r[1].get("KingdomTreasury.Daily", 0.0) for r in w]
-    return {"n": len(w), "med": tak[len(tak) // 2], "avg": sum(tak) / len(tak), "kt": sum(kt) / len(kt)}
+    k = len(tak)
+    med = tak[k // 2] if k % 2 else (tak[k // 2 - 1] + tak[k // 2]) / 2.0   # recenzja m99: zwykla mediana (przy parzystym n srednia dwoch srodkowych) - jak w CHANGELOG
+    return {"n": len(w), "med": med, "avg": sum(tak) / len(tak), "kt": sum(kt) / len(kt)}
 
 
 def m99optym_main(logp, basep=None):
     """m99optym (21.10, galaz w-toku/m99-optym): optymalizacja przelomu doby (KingdomTreasury.Optim.cs). MO-0 linia startu "Optym (m99): start" (klucze),
     MO-1 takt doby i KingdomTreasury.Daily (mediana / srednia ostatnich 60 dob; z --baza-doby <log bazy> - roznica wobec bazy) - INFO z liczba,
-    MO-2 tryb kontrolny (Optim Verify): roznice starej i nowej drogi = 0 (bez linii kontrolnych - INFO), MO-3 linie ERROR KingdomTreasury / OptimStartLine = 0.
+    MO-2 tryb kontrolny (Optim Verify): roznice starej i nowej drogi = 0 przy porownan > 0; linia startu z "Optim Verify TAK" bez linii kontrolnych - NIE
+    (bieg kontrolny bez porownan nic nie dowodzi); bez linii kontrolnych przy "Optim Verify NIE" albo bez linii startu - INFO. MO-3 linie ERROR KingdomTreasury /
+    OptimStartLine = 0.
     Log bez galezi: INFO, bez wyjatku."""
     rep = Report()
     start, chk, errs = [], [], 0
@@ -54351,8 +54355,12 @@ def m99optym_main(logp, basep=None):
                 cmp_sum += int(m.group(1)); diff_sum += int(m.group(2))
         rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", f"porownan {cmp_sum}, roznic {diff_sum} w {len(chk)} dobach", "roznic 0 (porownan > 0)",
                 diff_sum == 0 and cmp_sum > 0)
+    elif any("Optim Verify TAK" in t for t in start):
+        # recenzja m99: bieg kontrolny bez ani jednego porownania (klucz nie wszedl, CrownDuesEnabled / LogEnabled NIE, Daily wyszedl przez blad) - nie dowodzi niczego
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "linia startu: Optim Verify TAK, brak linii kontrolnych",
+                "linie kontrolne z porownan > 0 (tryb kontrolny wlaczony, brak porownan)", False)
     else:
-        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony)", None)
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony albo log bez linii startu)", None)
     rep.add("MO-3: linie ERROR KingdomTreasury / OptimStartLine", f"{errs}", "0", errs == 0)
     rep.show()
     return 0
