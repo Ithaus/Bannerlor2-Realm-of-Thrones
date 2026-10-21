@@ -5244,23 +5244,31 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiHarnessSurplusSell { get; set; } = true;
 
-        [SettingPropertyBool("Quality Scarcity", HintText = "legendary and masterwork pieces are rare: the town workshops, the loot you strip from the fallen and the other ways the world makes kit no longer turn out a legendary piece every twenty-odd and a masterwork every dozen - such a roll now gives a plain piece. Only a piece someone truly makes - in a town workshop, or a tournament prize the town's craftsmen make for you - can still come out legendary (from a top-tier 5-6 piece) or masterwork (tier 4 and up), and only while the world holds fewer than its limit (Quality Legendary World Cap / Quality Masterwork World Cap, counted once a day: shop stalls, packs, merchants' carts on the road, every hero's gear and yours). Pieces beyond the limit lying on the stalls of towns, castles and villages drop one step at the end of the day - legendary to masterwork while there is room, else to fine; masterwork to fine; the finest are kept. Nothing vanishes and no coin moves. Your bags, your stash, your clan's heroes and weapons you forged yourself are never touched; your own forge works as before (off = as before)", RequireRestart = false)]
+        [SettingPropertyBool("Quality Scarcity", HintText = "legendary and masterwork pieces are rare: the town workshops, the loot you strip from the fallen and the other ways the world makes kit no longer turn out a legendary piece every twenty-odd and a masterwork every dozen - such a roll now gives a plain piece. Only a piece someone truly makes - in a town workshop, or a tournament prize the town's craftsmen make for you - can still come out legendary (from a top-tier 5-6 piece) or masterwork (tier 4 and up), and only while the world holds fewer of that kind of item than its limit (each kind - helmets, body armour, bows, shields and so on - draws its own limit once per campaign, see Quality Legendary / Masterwork Per Type Min and Max; counted once a day: shop stalls, packs, merchants' carts on the road, every hero's gear and yours). Pieces beyond the limit lying on the stalls of towns, castles and villages drop to plain quality at the end of the day; the finest are kept. Nothing vanishes and no coin moves. Your bags, your stash, your clan's heroes and weapons you forged yourself are never touched; your own forge works as before (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool QualityScarcity { get; set; } = true;
 
-        [SettingPropertyInteger("Quality Legendary World Cap", 0, 200, "0", HintText = "how many legendary pieces the whole world may hold (with Quality Scarcity): stalls, packs, heroes' gear and yours together; beyond it no new one is made and the extra ones on the stalls drop to masterwork or fine", RequireRestart = false)]
+        [SettingPropertyInteger("Quality Legendary Per Type Min", 0, 50, "0", HintText = "with Quality Scarcity, each kind of item (helmets, body armour, gloves, boots, capes, horse harness, one-handed, two-handed and polearm weapons, bows, crossbows, arrows, bolts, throwing weapons, shields) gets its own limit of legendary pieces in the whole world - stalls, packs, heroes' gear and yours together - drawn once per campaign between this number and Quality Legendary Per Type Max, every number as likely as the next; beyond it no new one is made and the extra ones on the stalls drop to plain quality", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
-        public int QualityLegendaryWorldCap { get; set; } = 6;
+        public int QualityLegendaryPerTypeMin { get; set; } = 1;
 
-        [SettingPropertyInteger("Quality Masterwork World Cap", 0, 2000, "0", HintText = "how many masterwork pieces the whole world may hold (with Quality Scarcity); beyond it no new one is made and the extra ones on the stalls drop to fine", RequireRestart = false)]
+        [SettingPropertyInteger("Quality Legendary Per Type Max", 0, 50, "0", HintText = "the highest limit of legendary pieces one kind of item can draw for the campaign (with Quality Scarcity); see Quality Legendary Per Type Min", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
-        public int QualityMasterworkWorldCap { get; set; } = 60;
+        public int QualityLegendaryPerTypeMax { get; set; } = 6;
 
-        [SettingPropertyFloatingInteger("Quality Legendary Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one top-tier piece (tier 5-6) made in a town workshop (or a tournament prize the town's craftsmen make) comes out legendary, while the world limit has room (0.001 = one in a thousand)", RequireRestart = false)]
+        [SettingPropertyInteger("Quality Masterwork Per Type Min", 0, 500, "0", HintText = "with Quality Scarcity, each kind of item gets its own limit of masterwork pieces in the whole world, drawn once per campaign between this number and Quality Masterwork Per Type Max, every number as likely as the next; beyond it no new one is made and the extra ones on the stalls drop to plain quality", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityMasterworkPerTypeMin { get; set; } = 1;
+
+        [SettingPropertyInteger("Quality Masterwork Per Type Max", 0, 500, "0", HintText = "the highest limit of masterwork pieces one kind of item can draw for the campaign (with Quality Scarcity); see Quality Masterwork Per Type Min", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityMasterworkPerTypeMax { get; set; } = 60;
+
+        [SettingPropertyFloatingInteger("Quality Legendary Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one top-tier piece (tier 5-6) made in a town workshop (or a tournament prize the town's craftsmen make) comes out legendary, while the limit for its kind has room (0.001 = one in a thousand)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public float QualityLegendaryChance { get; set; } = 0.001f;
 
-        [SettingPropertyFloatingInteger("Quality Masterwork Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one piece of tier 4 or higher made in a town workshop (or a tournament prize the town's craftsmen make) comes out masterwork, while the world limit has room (0.004 = one in two hundred and fifty)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Quality Masterwork Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one piece of tier 4 or higher made in a town workshop (or a tournament prize the town's craftsmen make) comes out masterwork, while the limit for its kind has room (0.004 = one in two hundred and fifty)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public float QualityMasterworkChance { get; set; } = 0.004f;
 
@@ -10003,8 +10011,10 @@ namespace Armoury
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
             s.AiHarnessSurplusSell = AiHarnessSurplusSell;
             s.QualityScarcity = QualityScarcity;
-            s.QualityLegendaryWorldCap = QualityLegendaryWorldCap;
-            s.QualityMasterworkWorldCap = QualityMasterworkWorldCap;
+            s.QualityLegendaryPerTypeMin = QualityLegendaryPerTypeMin;
+            s.QualityLegendaryPerTypeMax = QualityLegendaryPerTypeMax;
+            s.QualityMasterworkPerTypeMin = QualityMasterworkPerTypeMin;
+            s.QualityMasterworkPerTypeMax = QualityMasterworkPerTypeMax;
             s.QualityLegendaryChance = QualityLegendaryChance;
             s.QualityMasterworkChance = QualityMasterworkChance;
             s.MendFractionMemory = MendFractionMemory;

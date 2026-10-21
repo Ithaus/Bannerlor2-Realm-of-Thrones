@@ -4,9 +4,12 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
-    # m96-jakosc: limity swiata i szanse jakosci - kod przycina do 0..200 / 0..2000 i 0..0.05 (QualityScarcity.CapL/CapM/ChanceL/ChanceM)
-    'QualityLegendaryWorldCap': (0, 200, "0"),
-    'QualityMasterworkWorldCap': (0, 2000, "0"),
+    # m96-jakosc2: limity na rodzaj (min..max losowania raz na kampanie) i szanse jakosci - kod przycina do 0..50 / 0..500 i 0..0.05
+    # (QualityScarcity.Range/ChanceL/ChanceM); min > max - kod bierze max jako min
+    'QualityLegendaryPerTypeMin': (0, 50, "0"),
+    'QualityLegendaryPerTypeMax': (0, 50, "0"),
+    'QualityMasterworkPerTypeMin': (0, 500, "0"),
+    'QualityMasterworkPerTypeMax': (0, 500, "0"),
     'QualityLegendaryChance': (0.0, 0.05, "0.0000"),
     'QualityMasterworkChance': (0.0, 0.05, "0.0000"),
     # m95-turniej: okup szranek jako czesc wartosci - kod przycina do 0.05..1 (TourneyRansom.ShareOf)
