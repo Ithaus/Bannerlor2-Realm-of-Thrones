@@ -25,6 +25,11 @@ namespace Armoury
     ///   dobie (gdyby nasz nasluch szedl przed ROT); po pierwszej dobie start zamkniety (brak bohatera / rodu - linia logu).
     ///   Dworzanin ("no" / "later"): nasluch CampaignEvents.CanHeroLeadPartyEvent (false) i postfiks HeroSpawnCampaignBehavior.GetBestAvailableCommander (wynik =
     ///   dworzanin -> null, jak postfiks BK tej metody) - nie dostaje druzyny, zostaje w osadzie rodu. Dziecko postaci (ten sam Template, z rodzicem) nie jest dworzaninem.
+    /// B (krok 3): wzor nie powstaje wcale - prefiks ROT ROTSpawnUniqueWanderers.SpawnHero(CharacterObject) (DeclaredMethod): w fazie tworzenia nowej gry
+    ///   (Campaign.CampaignGameLoadingType == NewCampaign i !GameStarted, klucz w tej chwili - ROT tworzy wedrowcow w OnNewGameCreated, mozliwe ze przed naszym
+    ///   nasluchem) i potem przy fladze kampanii - wzor B nigdy, wzor A po zamknieciu startu (bohater A, ktory zginal albo zostal usuniety, nie wraca jako wedrowiec).
+    ///   Zapas: bohater B, ktory jednak powstal (latka ROT nie wpieta), usuniety przy starcie po cichu (KillCharacterAction.ApplyByRemove - Lost, bez komunikatu).
+    ///   CrashScribe UC pyta IsCanonBlocked(wzor) (refleksja) - wzor zablokowany liczy jako "usuniete z kanonu", nie "brak" (UN-5) i nie "ROT go odtworzy".
     /// Wyjatek per obiekt - licznik potkniec (CLAUDE.md 7), nic nie gasnie.
     /// </summary>
     internal static class CanonCompanions
@@ -57,8 +62,10 @@ namespace Armoury
 
         // --- sesja ---
         private static int _st, _stDay, _commanderNulled, _commanderNulledDay;
+        private static int _spawnBlocked, _spawnBlockedDay, _removedAfter;
+        private static readonly HashSet<string> _spawnSaid = new HashSet<string>(StringComparer.Ordinal);
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
-        private static bool _installed, _pCommander;
+        private static bool _installed, _pCommander, _pSpawn;
         private static string _patchLine = "";
         private static bool _startLineSaid;
 
@@ -70,6 +77,8 @@ namespace Armoury
             _nk = _on = _startDone = false;
             _conv.Clear(); _startFail.Clear(); _court.Clear();
             _st = _stDay = _commanderNulled = _commanderNulledDay = 0;
+            _spawnBlocked = _spawnBlockedDay = _removedAfter = 0;
+            _spawnSaid.Clear();
             lock (_errSites) _errSites.Clear();
             _startLineSaid = false;
         }
@@ -158,6 +167,14 @@ namespace Armoury
                     catch (Exception e) { Stumble("ApplyAll(GetBestAvailableCommander)", e); }
                 }
                 parts.Add("dowodca partii (dworzanie bez druzyny) " + (_pCommander ? "PODPIETY" : "BRAK (HeroSpawnCampaignBehavior.GetBestAvailableCommander)"));
+                var tRot = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTSpawnUniqueWanderers");
+                var mSpawn = tRot != null ? AccessTools.DeclaredMethod(tRot, "SpawnHero", new[] { typeof(CharacterObject) }) : null;
+                if (mSpawn != null)
+                {
+                    try { h.Patch(mSpawn, prefix: new HarmonyMethod(typeof(CanonCompanions), nameof(SpawnPrefix))); _pSpawn = true; }
+                    catch (Exception e) { Stumble("ApplyAll(ROT SpawnHero)", e); }
+                }
+                parts.Add("tworzenie wedrowcow ROT (B nie powstaja) " + (_pSpawn ? "PODPIETE" : "BRAK (" + (tRot == null ? "ROT nieobecny" : "ROTSpawnUniqueWanderers.SpawnHero") + ")"));
             }
             catch (Exception e) { Stumble("ApplyAll", e); parts.Add("wyjatek " + e.GetType().Name); }
             _patchLine = string.Join(", ", parts.ToArray());
@@ -245,6 +262,53 @@ namespace Armoury
             catch (Exception e) { Stumble("CommanderPostfix", e); }
         }
 
+        // ------------------------------------------------------------ B: wzor nie powstaje
+        /// <summary>Faza blokady: flaga kampanii albo trwa tworzenie nowej gry z kluczem (ROT moze tworzyc wedrowcow przed naszym OnNewGameCreated).</summary>
+        private static bool BlockPhase()
+        {
+            if (_on) return true;
+            var c = Campaign.Current;
+            if (c == null || c.GameStarted || c.CampaignGameLoadingType != Campaign.GameLoadingType.NewCampaign) return false;
+            var s = Settings.Current;
+            return s != null && s.CanonCompanionsToClans;
+        }
+
+        private static bool Blocked(StartRow r)
+        {
+            return r != null && (r.Group == "B" || (r.Group == "A" && _startDone));
+        }
+
+        /// <summary>Dla CrashScribe UC (refleksja, Armoury.CanonCompanions.IsCanonBlocked): wzor, ktorego ROT nie odtworzy w tej kampanii (B zawsze, A po starcie).</summary>
+        internal static bool IsCanonBlocked(string templateId)
+        {
+            try
+            {
+                if (!_on || templateId == null) return false;
+                EnsureLoaded();
+                StartRow r;
+                return _byTpl.TryGetValue(templateId, out r) && Blocked(r);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Prefiks ROT ROTSpawnUniqueWanderers.SpawnHero: wzor B (zawsze) i A (po starcie) nie powstaje.</summary>
+        public static bool SpawnPrefix(CharacterObject __0)
+        {
+            try
+            {
+                if (__0 == null || __0.StringId == null || !BlockPhase()) return true;
+                EnsureLoaded();
+                StartRow r;
+                if (!_byTpl.TryGetValue(__0.StringId, out r) || !Blocked(r)) return true;
+                _spawnBlocked++; _spawnBlockedDay++;
+                if (_spawnSaid.Add(__0.StringId))
+                    Log.Info(Tag + ": ROT chcial stworzyc " + r.Name + " [" + __0.StringId + "] (grupa " + r.Group + (r.Group == "B" ? " - usuniety z kanonu" : " - postac kanonu juz byla w swiecie")
+                             + ") - nie powstaje (linia raz na sesje na wzor; ROT pyta co dobe).");
+                return false;
+            }
+            catch (Exception e) { Stumble("SpawnPrefix", e); return true; }
+        }
+
         // ------------------------------------------------------------ start kampanii
         /// <summary>OnNewGameCreatedEvent: flaga nowej kampanii i klucz w tej chwili (McmSettings.Apply byl w OnGameStart); start A.</summary>
         internal static void OnNewGame()
@@ -296,7 +360,8 @@ namespace Armoury
                      + (_nk ? YN(_on) : "stary zapis - nic") + "), zmiany stron CanonCompanionsFollowStory " + YN(s != null && s.CanonCompanionsFollowStory)
                      + " | plik " + (_note.Length == 0 ? "wczytany" : _note) + " | A " + _nA + ", B " + _nB + ", C " + _nC + ", D " + _nD
                      + " | mapa rodow znaleziona " + clansFound + "/" + clansWant + " | przeniesieni " + _conv.Count + ", bez rodu/bohatera " + _startFail.Count
-                     + ", dworzan " + _court.Count + ", start " + (_startDone ? "zamkniety" : "otwarty") + " | latki: " + _patchLine + ".");
+                     + ", dworzan " + _court.Count + ", start " + (_startDone ? "zamkniety" : "otwarty") + " | B zablokowane przy tworzeniu " + _spawnBlocked
+                     + ", usuniete po utworzeniu " + _removedAfter + " | latki: " + _patchLine + ".");
         }
 
         private static string YN(bool b) { return b ? "tak" : "nie"; }
@@ -342,6 +407,21 @@ namespace Armoury
                              + ", teraz " + Where(h) + " | wyzwalacz start (" + where + ").");
                 }
                 catch (Exception e) { Stumble("StartPass(" + r.Template + ")", e); }
+            }
+            foreach (var r in _start)
+            {
+                if (r.Group != "B") continue;
+                try
+                {
+                    var h = FindOriginal(r.Template);
+                    if (h == null || !h.IsAlive || h.CompanionOf != null || h.Clan != null) continue;
+                    string from = Where(h);
+                    KillCharacterAction.ApplyByRemove(h);   // Lost, bez komunikatu (showNotification false)
+                    _removedAfter++;
+                    Log.Info(Tag + ": B usuniety po utworzeniu - " + Nm(h) + " [" + r.Template + "] w " + from + " (latka ROT " + (_pSpawn ? "wpieta - powstal przed nasza latka" : "NIE wpieta")
+                             + "; Lost, bez komunikatu) | wyzwalacz start (" + where + ").");
+                }
+                catch (Exception e) { Stumble("StartPass.B(" + r.Template + ")", e); }
             }
             if (wait == 0 || final) _startDone = true;
         }
@@ -404,7 +484,7 @@ namespace Armoury
                 DayLine();
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _stDay = 0; _commanderNulledDay = 0;
+            _stDay = 0; _commanderNulledDay = 0; _spawnBlockedDay = 0;
         }
 
         private static void DayLine()
@@ -429,8 +509,25 @@ namespace Armoury
                     wand.Append(Nm(h)).Append(" (").Append(Where(h)).Append(h.CompanionOf != null ? ", towarzysz" : "").Append(')');
                 }
             }
+            int bAlive = 0, bDead = 0, bNone = 0;
+            var bLive = new StringBuilder();
+            foreach (var r in _start)
+            {
+                if (r.Group != "B") continue;
+                var h = FindOriginal(r.Template);
+                if (h == null) bNone++;
+                else if (!h.IsAlive) bDead++;
+                else
+                {
+                    bAlive++;
+                    if (bLive.Length > 0) bLive.Append(", ");
+                    bLive.Append(Nm(h)).Append(" (").Append(Where(h)).Append(h.CompanionOf != null ? ", towarzysz" : "").Append(')');
+                }
+            }
             Log.Info(Tag + ": dzien " + Day() + " | A " + _nA + ": w rodach " + aClan + " (lordow " + aLord + ", dworzan " + aCourt + ", z wlasna druzyna " + aParty
                      + ", jencow " + aPris + "), martwi " + aDead + ", bez bohatera " + aGone + ", wedrowcy " + aWand + (wand.Length > 0 ? " [" + wand + "]" : "")
+                     + " | B " + _nB + ": zywych " + bAlive + (bLive.Length > 0 ? " [" + bLive + "]" : "") + ", nie powstali " + bNone + ", usunieci " + bDead
+                     + ", prob ROT zablokowanych dzis " + _spawnBlockedDay + " (od wczytania " + _spawnBlocked + ")"
                      + " | dworzanin wybrany na dowodce i odrzucony dzis " + _commanderNulledDay + " (razem " + _commanderNulled + ")"
                      + (_stDay > 0 ? " | POTKNIECIA " + _stDay + " (razem " + _st + ")" : "") + ".");
         }

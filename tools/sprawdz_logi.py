@@ -17968,7 +17968,7 @@ def lup5b_main(logp, start_arg, until=364, bdp=None):
 
 UC_DAY = re.compile(
     r"Unikaty ROT \(UC\): dzien (?P<d>\d+) \| wzorow (?P<w>\d+), zywych (?P<alive>\d+) \(wolnych w miastach (?P<town>\d+), bez miejsca (?P<nowhere>\d+),"
-    r" towarzyszy (?P<comp>\d+), w rodach (?P<clan>\d+), jencow (?P<pris>\d+)\), martwych (?P<dead>\d+), znikniete (?P<lost>\d+), brak (?P<none>\d+)"
+    r" towarzyszy (?P<comp>\d+), w rodach (?P<clan>\d+), jencow (?P<pris>\d+)\), martwych (?P<dead>\d+), znikniete (?P<lost>\d+), brak (?P<none>\d+)(?:, usuniete z kanonu (?P<canon>\d+))?"
     r" \| duplikaty (?P<dup>\d+) \(usuniete dzis (?P<duprem>\d+), nie do usuniecia (?P<dupleft>\d+)\)"
     r" \| odrodzenia dzis (?P<resp>\d+) \(od wczytania \d+\)"
     r" \| przeprowadzki dzis (?P<moved>\d+) \(od wczytania \d+\), usuniete przez gre dzis (?P<lostgame>\d+), inne usuniecia dzis (?P<lostother>\d+)"
@@ -18340,14 +18340,17 @@ def unikaty_main(logp):
             f"{resp} (linii ODRODZENIE {len(resp_lines)})" + (f"; pierwsza: {resp_lines[0][len('Unikaty ROT (UC): '):][:160]}" if resp_lines else ""),
             "0 przy kluczach StayDead i Move (inaczej INFO)", (resp == 0) if keys_on else None)
     first, last = days[0], days[-1]
-    rep.add("UN-5: wzory bez bohatera (brak)", f"ostatnia doba {last['none']}, max {max(d['none'] for d in days)}, znikniete (Lost) ostatniej doby {last['lost']}",
+    rep.add("UN-5: wzory bez bohatera (brak)", f"ostatnia doba {last['none']}, max {max(d['none'] for d in days)}, znikniete (Lost) ostatniej doby {last['lost']}"
+            f", usuniete z kanonu (Armoury m101, nie brak) {last.get('canon') or 0}",
             "0 ostatniej doby (kazdy wzor ma bohatera zywego albo zmarlego)", last["none"] == 0)
     drop = first["town"] - last["town"]
     why = max(0, last["dead"] - first["dead"]) + max(0, last["comp"] - first["comp"]) + max(0, last["clan"] - first["clan"]) + max(0, last["pris"] - first["pris"])
+    canon_up = max(0, (last.get("canon") or 0) - (first.get("canon") or 0))   # m101-postacie: postacie kanonu usuniete przez Armoury (zmiany stron)
+    why += canon_up
     rep.add("UN-6: wolni unikaty w miastach (karczmy)",
             f"doba {first['d']}: {first['town']} -> doba {last['d']}: {last['town']} (spadek {drop}); zgony +{last['dead'] - first['dead']}, towarzysze +{last['comp'] - first['comp']}, "
-            f"w rodach +{last['clan'] - first['clan']}, jency +{last['pris'] - first['pris']}",
-            "spadek <= przyrost zmarlych + towarzyszy + rodow + jencow (nikt nie znika z karczm)", drop <= why)
+            f"w rodach +{last['clan'] - first['clan']}, jency +{last['pris'] - first['pris']}, usuniete z kanonu +{canon_up}",
+            "spadek <= przyrost zmarlych + towarzyszy + rodow + jencow + usunietych z kanonu (nikt nie znika z karczm)", drop <= why)
     rep.add("UN-7: unikaty bez miejsca (zbiegowie, bez miasta)", f"doba {first['d']}: {first['nowhere']} -> doba {last['d']}: {last['nowhere']}, max {max(d['nowhere'] for d in days)}",
             "ostatnia doba <= pierwsza", last["nowhere"] <= first["nowhere"])
     moved = sum(d["moved"] for d in days)

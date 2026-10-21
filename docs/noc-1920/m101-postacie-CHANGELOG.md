@@ -105,6 +105,21 @@ Braki w ROT: rodu **Stokeworth** nie ma - Bronn po odmowie walki za Tyriona idzi
 - Linie: `Postacie kanonu (m101): wpiecie | ...`, `... : start | klucz ..., A 22, B 9, C 2, D 30 | mapa rodow znaleziona N/M | ...`, `... : przeniesienie - X [wzor]
   wedrowiec w <miasto> -> rod <nazwa> (id, krolestwo), lord, druzyna: ... | wyzwalacz start (...)`, linia doby `... : dzien N | A 22: w rodach ... wedrowcy ...`.
 
+**Krok 3 - B nie powstaja + UC (Armoury CanonCompanions.cs, CrashScribe UniqueCompanions.cs, tools/sprawdz_logi.py --grupa unikaty):**
+- Prefiks `ROTSpawnUniqueWanderers.SpawnHero(CharacterObject)` (AccessTools.DeclaredMethod): w fazie tworzenia nowej gry (`NewCampaign`, `!GameStarted`, klucz)
+  i potem przy fladze kampanii - wzor B nie powstaje nigdy, wzor A nie powstaje po zamknieciu startu (postac kanonu, ktora zginela albo zostala usunieta, nie
+  wraca jako nowy wedrowiec). Linia `ROT chcial stworzyc X [wzor] (grupa B ...) - nie powstaje` raz na sesje na wzor; licznik w linii doby.
+  Zapas: bohater B, ktory jednak powstal (latka nie wpieta) - `KillCharacterAction.ApplyByRemove` (Lost, bez komunikatu) przy starcie, linia `B usuniety po utworzeniu`.
+- CrashScribe UC: `CanonBlocked(wzor)` (refleksja na `Armoury.CanonCompanions.IsCanonBlocked(string)`, raz na proces; brak Armoury = jak dotad). Linia doby UC:
+  nowe pole `usuniete z kanonu N` (wzor bez bohatera albo Lost, ktorego ROT nie odtworzy) - nie wlicza sie do `brak` (UN-5); usuniecie Lost postaci kanonu ma
+  wlasna linie ("przez Armoury (postacie kanonu m101) ... ROT go nie odtworzy"). Grupa `unikaty`: regex z polem opcjonalnym (stare logi czytaja sie jak dotad),
+  UN-6 liczy usunietych z kanonu do wyjasnienia spadku wolnych w karczmach.
+- UC sam nie przenosi postaci miedzy rodami: przeprowadzka tylko wolnego wedrowca (bez rodu), straznik duplikatow tylko wolnego - postacie A w rodach i zmiany
+  stron (krok 4) sa poza zasiegiem UC. Wedrowiec z ruchu `wander` (np. Ogar w Dorzeczu) moze zostac przeniesiony przez UC do miasta kultury wzoru, gdy gra
+  wylosuje go w TryKillCompanion - to zmiana miasta, nie strony.
+
 ### Status
 - Krok 1 (rozpoznanie + mapa rodow): GOTOWE.
-- Krok 2 (A do rodow + dworzanie bez druzyny): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA w grze. Zostalo: kroki 3-5, grupa `sprawdz_logi.py --grupa m101postacie`.
+- Krok 2 (A do rodow + dworzanie bez druzyny): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA w grze.
+- Krok 3 (B nie powstaja, A nie odradzaja sie, UC liczy 'usuniete z kanonu'): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA. Zostalo: kroki 4-5,
+  grupa `sprawdz_logi.py --grupa m101postacie`.
