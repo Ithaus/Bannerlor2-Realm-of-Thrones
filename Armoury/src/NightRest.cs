@@ -192,7 +192,9 @@ namespace Armoury
                 bool forced = ForcedMarch.Hour(s, mp, movedH);
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
-                if (resting && !forced) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                // m97-szkolenie (recenzja 4): godzina cwiczen z menu obozu ("Train the men") to praca, nie odpoczynek - jak w staminie (menu cwiczen poza InCampMenu)
+                bool drilled = CampDrill.DrilledLastHour;
+                if (resting && !forced && !drilled) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);

@@ -5796,13 +5796,17 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillCampOnly { get; set; } = true;
 
-        [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Measured on the 180-day test of 20.10: AI lords march most of their days, so their men would learn about a third to a half less - slower promotions and less demand for better gear; the daily log line measures it either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
+        [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Estimated from the 180-day test of 20.10: AI lords march most of their days, so their men would learn roughly 15 to 50 percent less (about a third in the middle) - slower promotions and less demand for better gear; the daily log line measures it exactly either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillCampOnlyAi { get; set; } = false;
 
         [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillMaster { get; set; } = true;
+
+        [SettingPropertyBool("Drill Siege Army", HintText = "with Drill Camp Only: in a siege camp or in another lord's army, where you cannot pitch your own camp, your men drill by themselves in the hours the host stands still by day, like the lords beside you - the same pace, up to 8 hours a day, no drill when starving or after a dawn short of sleep (off = no drill there at all)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillSiegeArmy { get; set; } = true;
 
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
@@ -10194,6 +10198,7 @@ namespace Armoury
             s.DrillCampOnly = DrillCampOnly;
             s.DrillCampOnlyAi = DrillCampOnlyAi;
             s.DrillMaster = DrillMaster;
+            s.DrillSiegeArmy = DrillSiegeArmy;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;

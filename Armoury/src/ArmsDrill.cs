@@ -270,8 +270,9 @@ namespace Armoury
                     share = ShareFor(__0, __1.Character);
                     if (share < 1f && !__0.IsGarrison && __1.Character != null && !__1.Character.IsHero) _pLost += __result.ResultNumber * (1f - share) * __1.Number;
                 }
-                else if (how == 1 && Drill.ElemOffWithGameXp && Gated(__0))
-                    share = ShareFor(__0, __1.Character);   // MUSZTRA-j: dzien kary AI (wynik 0 zostaje 0) - udzial tylko do pomiaru "XP gry po broni" (gra kary nie zna)
+                else if (how == 1 && (Drill.ElemOffWithGameXp || Drill.ElemCampZeroWithOldXp) && Gated(__0))
+                    share = ShareFor(__0, __1.Character);   // MUSZTRA-j: dzien kary AI (wynik 0 zostaje 0) - udzial tylko do pomiaru "XP gry po broni" (gra kary nie zna);
+                                                            // m97-szkolenie (recenzja 6): AI pod zasada obozu bez godziny postoju za dnia - udzial do pomiaru dawnej reguly
                 if (share < 1f) __result = new ExplainedNumber(__result.ResultNumber * share);   // opisy gubimy swiadomie - treningu nikt nie oglada
                 if (how != 0) Drill.Done(__0, __result.ResultNumber, share);
             }

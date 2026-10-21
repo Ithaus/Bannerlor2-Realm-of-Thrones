@@ -120,6 +120,9 @@ namespace Armoury
         internal static bool ElemArmsGate { get { return _e && _eC != null && _eC.ArmsGate; } }
         /// <summary>MUSZTRA-j: dzien kary partii AI (wynik 0) - ArmsDrill liczy udzial uzbrojonych tylko do pomiaru "XP gry po broni" (gra kary nie zna).</summary>
         internal static bool ElemOffWithGameXp { get { return _e && _eC != null && _eC.Off && !_eC.NoBase && _eGame > 0f; } }
+        /// <summary>m97-szkolenie (recenzja 6): AI pod czynna zasada obozu z wynikiem 0 (bez godziny postoju za dnia), a dawna regula dalaby XP - ArmsDrill liczy
+        /// udzial uzbrojonych tylko do pomiaru "dawna regula -> zasada obozu" (inaczej dawna regula bez udzialu broni wychodzi zawyzona).</summary>
+        internal static bool ElemCampZeroWithOldXp { get { return _e && _eC != null && _eC.Camp && !_eC.NoBase && !_eC.Main && _eHasCamp && _eCampPre <= 0f && _eOldPre > 0f; } }
 
         // tick treningu (latka MobilePartyTrainingBehavior.OnDailyTickParty)
         private static bool _tickHooked;
@@ -358,6 +361,7 @@ namespace Armoury
                 bool rest = RestHour(mp, pos.Distance(t.Pos));
                 t.Mask = ((t.Mask << 1) | (rest ? 0 : 1)) & AllHours;
                 t.Pos = pos; t.Stamp = now;
+                if (mp == MobileParty.MainParty) CampDrill.AutoHour(mp, rest, now);   // m97-szkolenie (recenzja 2): oboz oblezenia, cudza armia - cwiczenia same za dnia
             }
             catch (Exception e) { Stumble("Observe", e); }
         }
@@ -472,12 +476,14 @@ namespace Armoury
                     {
                         c.H = c.Main ? CampDrill.PlayerOwed : Math.Min(CampDrill.FullHours, DayRestHours(mp));
                         c.Hf = c.H / CampDrill.FullHours;
-                        c.Dcamp = c.Zero ? 0f : CampDrill.DayFull * c.Hf;
+                        // recenzja 1: gracz - kare (glod, dlug o swicie) pilnuje menu w chwili cwiczen; godziny juz zrobione licza sie, choc tick wypadl po
+                        // kolejnym swicie albo w glodzie (inaczej kara dzialalaby wstecz). Strona gracza i AI - kara z chwili ticku jak dotad
+                        c.Dcamp = c.Zero && !c.Main ? 0f : CampDrill.DayFull * c.Hf;
                         c.Lcamp = CampDrill.Lead(mp, c.Lead, c.Lold, s, out c.Master, out c.MasterName);
                         c.PerkV = CampDrill.PartyPerks(mp);
                     }
                     catch (Exception e) { c.PerkV = null; c.Camp = false; Stumble("CtxOf.Camp", e); }   // blad = dawna regula dla tej partii (slad w potknieciach)
-                    if (c.Camp) { c.L = c.Lcamp; c.D = c.Dcamp; }
+                    if (c.Camp) { c.L = c.Lcamp; c.D = c.Dcamp; if (c.Main) c.Off = false; }   // gracz: kara w chwili cwiczen, nie w ticku (recenzja 1)
                 }
                 c.StockOn = c.Main ? StockOn : s.DrillStockAi;
                 // sklad8-p (przeglad sklad8, uwaga 8): bramka broni przed pomiarem zapasu - wyjatek w planie K1 (MenOf, FitBest) nie moze jej pominac
@@ -833,6 +839,9 @@ namespace Armoury
                         if (pc.Off && pc.Men > 0 && pc.Hungry)
                             Log.Player(pc.Sleepless ? "Your men were too hungry to drill today, and they met the dawn short of sleep besides - nobody learned anything, training perks included."
                                                     : "Your men were too hungry to drill today - nobody learned anything, training perks included.", true);
+                        // m97-szkolenie (recenzja 1): gracz pod zasada obozu - kara nie zabiera godzin juz zrobionych (pc.Off false); glod bez godziny cwiczen - to samo zdanie co dotad
+                        else if (pc.Camp && pc.Men > 0 && pc.H <= 0f && pc.Hungry)
+                            Log.Player("Your men were too hungry to drill - nobody learned anything, training perks included.", true);
                         else if (!pc.Off && pc.Men > 0 && s.DrillDailyMessage) DayMessage(_pr, pc);   // MUSZTRA-m: dzien cwiczen - wynik i czynniki wzoru
                     }
                     // m97-szkolenie: godziny z menu obozu zuzyte tym tickiem (takze w dniu kary) i linia doby gracza
@@ -865,15 +874,16 @@ namespace Armoury
                 double perks = men > 0 ? r.P / men : 0;
                 if (c.Camp && c.H <= 0f)
                 {
-                    // m97-szkolenie: marsz nie uczy - dzien bez godziny cwiczen w obozie
-                    Log.Player("No drill today: your men drill only in camp (camp menu - Train the men, by day); marching teaches nothing.");
+                    // m97-szkolenie: marsz nie uczy - dzien bez godziny cwiczen w obozie; noc bez snu oglosil juz swit (NightRest "No drill today ...") - bez drugiego zdania
+                    if (!c.Sleepless) Log.Player("No drill today: your men drill only in camp (camp menu - Train the men, by day); marching teaches nothing.");
                     return;
                 }
                 var sb = new StringBuilder("Drill today: ").Append(xp).Append(" XP (").Append(F1(men > 0 ? xp / men : 0)).Append(" per man) - Leadership x").Append(F2(c.L));
                 if (c.Camp)
                 {
                     if (c.MasterName != null && c.Master > 0) sb.Append(" (drill master ").Append(c.MasterName).Append(")");
-                    sb.Append(", ").Append(F1(c.H)).Append(" h of drill in camp x").Append(F2(c.D)).Append(" (full day 8 h x").Append(F2(CampDrill.DayFull)).Append(")");
+                    // recenzja 3: godziny od ostatniego liczenia (tick treningu raz na dobe o swojej porze - moga byc z dwoch dni, kazdy najwyzej 8 h)
+                    sb.Append(", ").Append(F1(c.H)).Append(" h of drill in camp since the last count x").Append(F2(c.D)).Append(" (a full day of 8 h x").Append(F2(CampDrill.DayFull)).Append(")");
                 }
                 else sb.Append(c.Rest ? ", at rest x" : ", marching x").Append(F2(c.D));
                 sb.Append(", drill kit x").Append(F2(sk))
@@ -1593,7 +1603,10 @@ namespace Armoury
                 double aMen = r.N > 0 ? r.ShN / r.N : 1;           // A niezaleznie: udzial uzbrojonych z 171 wazony liczba ludzi (nie Fin/Pre)
                 double check = c.Off ? 0 : (prod + r.P) * aMen;    // kontrola przyblizona: A rozne w oddzialach, wiec +-kilka %
                 sb.Append("ludzi ").Append(c.Men).Append("; B ").Append(F1(r.B)).Append(" x dowodca ").Append(F3(c.L)).Append(" (Przywodztwo ").Append(c.Lead).Append(") x dzien ")
-                  .Append(F2(c.D)).Append(" (").Append(c.Hungry ? "GLOD - bez cwiczen" : (c.Sleepless ? "DLUG SNU O SWICIE " + c.Debt + ", teraz " + c.DebtNow + " - bez cwiczen" : (c.Rest ? "postoj" : "marsz")))
+                  .Append(F2(c.D)).Append(" (").Append(c.Camp
+                      // m97-szkolenie (recenzja 7): pod zasada obozu D = godziny cwiczen, nie postoj/marsz; kara gracza w chwili cwiczen (godziny zrobione licza sie)
+                      ? "cwiczenia w obozie " + F2(c.H) + " h od ostatniego liczenia" + (c.Hungry ? ", glod w chwili ticku" : "") + (c.Sleepless ? ", dlug snu o swicie " + c.Debt : "")
+                      : (c.Hungry ? "GLOD - bez cwiczen" : (c.Sleepless ? "DLUG SNU O SWICIE " + c.Debt + ", teraz " + c.DebtNow + " - bez cwiczen" : (c.Rest ? "postoj" : "marsz"))))
                   .Append(", ruch ").Append(c.Moved).Append(" h z 24) x zapas ").Append(F3(sk)).Append(" = ").Append(F1(prod));
                 if (c.Off) sb.Append("; perki P ").Append(F1(r.P)).Append(" -> 0 (glod/sen - perki tez 0)");
                 else sb.Append("; + perki P ").Append(F1(r.P)).Append(" = ").Append(F1(r.Pre));

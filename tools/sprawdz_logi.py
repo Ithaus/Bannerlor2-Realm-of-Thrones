@@ -1008,7 +1008,7 @@ Uzycie (Python 3, tylko odczyt):
                     JQ-10 limity rodzajow w zakresie i stale doba do doby (rozrzut INFO). Linia sprzed m96-jakosc2 (limit swiata) - jeden rodzaj "swiat".
 --grupa m97szkolenie : (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu"; Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
                     python -I tools/sprawdz_logi.py --grupa m97szkolenie <Armoury-*.log> (strumieniowo). SZ-0 start sesji i perki przerobione, SZ-1 zero XP z marszu
-                    (gracz), SZ-2 godziny tylko z menu obozu, SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI, strona gracza), SZ-5 AI wobec dawnej reguly (INFO), SZ-6 potkniecia 0.
+                    (gracz), SZ-2 godziny tylko z menu obozu (albo samoczynnie w obozie oblezenia / cudzej armii), SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI, strona gracza), SZ-5 AI wobec dawnej reguly (INFO), SZ-6 potkniecia 0.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -36544,7 +36544,9 @@ def nkarczmy_main(logp):
 # Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
 M97SZ_HEAD = "Szkolenie w obozie (m97): "
 M97SZ_ERR = ("ERROR in CampDrill", "ERROR in SyncData.arm_campdrill", "CtxOf.Camp")
-M97SZ_PLAYER = re.compile(r"gracz dzien (\d+) \| godzin cwiczen ([\d.]+) \(z menu obozu od ostatniej linii ([\d.]+);.*?\| XP przyjete (\d+) .*?potkniecia (\d+)\.")
+# recenzja 2: godziny samoczynne (oboz oblezenia, cudza armia - klucz DrillSiegeArmy) - grupa opcjonalna (linia sprzed poprawki: 0)
+M97SZ_PLAYER = re.compile(r"gracz dzien (\d+) \| godzin cwiczen ([\d.]+) \(z menu obozu od ostatniej linii ([\d.]+)(?:, samoczynnie w obozie oblezenia albo w cudzej armii ([\d.]+))?;"
+                          r".*?\| XP przyjete (\d+) .*?potkniecia (\d+)\.")
 M97SZ_AI = re.compile(r"AI dzien (\d+) \| zasada AI (TAK|NIE)[^|]*\| partii (\d+) \(ludzio-dni (\d+)\) \| godzin postoju za dnia \(najwyzej 8\) srednio ([\d.]+): 0 h (\d+), 1-7 h (-?\d+), 8 h (\d+)"
                       r" \| XP po broni: dawna regula (\d+) -> zasada obozu (\d+) \(x([\d.]+)\), na glowe na dobe ([\d.]+) -> ([\d.]+), dane naprawde (\d+)"
                       r" \| XP z marszu \(0 h postoju za dnia, XP > 0\) przy czynnej zasadzie: oddzialow (\d+)"
@@ -36576,7 +36578,8 @@ def m97szkolenie_main(logp):
                 elif rest.startswith("gracz dzien"):
                     mp = M97SZ_PLAYER.search(rest)
                     if mp:
-                        players.append((int(mp.group(1)), float(mp.group(2)), float(mp.group(3)), int(mp.group(4)), int(mp.group(5)), after_start))
+                        players.append((int(mp.group(1)), float(mp.group(2)), float(mp.group(3)), int(mp.group(5)), int(mp.group(6)), after_start,
+                                        float(mp.group(4)) if mp.group(4) else 0.0))
                     else:
                         bad.append(s)
                     after_start = False
@@ -36609,9 +36612,11 @@ def m97szkolenie_main(logp):
         bad0 = [p[0] for p in zero if p[3] > 0]
         rep.add("SZ-1: zero XP z marszu - doby gracza bez godziny cwiczen w obozie", f"dob bez cwiczen {len(zero)} z {len(players)}, z XP > 0: {len(bad0)}" + (f" (np. dzien {bad0[0]})" if bad0 else ""),
                 "0", not bad0)
-        notcamp = [p[0] for p in players if p[1] > p[2] + 0.05 and not p[5]]
+        notcamp = [p[0] for p in players if p[1] > p[2] + p[6] + 0.05 and not p[5]]
         trained = [p for p in players if p[1] > 0.0]
-        rep.add("SZ-2: godziny cwiczen gracza tylko z menu obozu", f"dob z cwiczeniami {len(trained)}, godzin razem {sum(p[1] for p in trained):.1f}; dob z godzinami ponad menu {len(notcamp)}"
+        auto_h = sum(p[6] for p in players)
+        rep.add("SZ-2: godziny cwiczen gracza tylko z menu obozu (albo samoczynnie: oboz oblezenia, cudza armia)",
+                f"dob z cwiczeniami {len(trained)}, godzin razem {sum(p[1] for p in trained):.1f} (samoczynnie {auto_h:.1f}); dob z godzinami ponad menu i samoczynne {len(notcamp)}"
                 + (f" (np. dzien {notcamp[0]})" if notcamp else "") + f"; linii konca cwiczen {len(ends)}", "0 (pierwsza doba po wczytaniu moze niesc godziny z zapisu)", not notcamp)
         if trained:
             per = [p[3] / max(0.01, p[1]) for p in trained]

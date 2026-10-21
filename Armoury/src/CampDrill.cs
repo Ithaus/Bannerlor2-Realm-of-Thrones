@@ -29,7 +29,11 @@ namespace Armoury
     ///  - P: perki treningu gry i BK (BKPartyTrainningModel.GetEffectiveDailyExperience) liczone wlasna tabela: warunek oddzialu (tier, piechota,
     ///    strzelcy, piesi) i stanu partii (morale, przeciazenie) jak w grze, warunek marszu / postoju w osadzie zastapiony cwiczeniem; wartosc gry
     ///    x 1.5 za pelny dzien cwiczen, czesc dnia - czesc. Opisy perkow podmienione (PrimaryDescription / SecondaryDescription, id bez zmian).
-    /// Glod albo dlug snu o swicie - jak dotad: dzien bez cwiczen (Drill.CtxOf c.Zero), godziny czekajace przepadaja.
+    /// Glod albo dlug snu o swicie - jak dotad: dzien bez cwiczen. Gracz: kare pilnuje menu w chwili cwiczen (WhyNot, DrillTick: glod, dlug o swicie);
+    /// godziny juz zrobione NIE przepadaja przez kare z chwili ticku (recenzja 1: tick bywa po nastepnym swicie). Strona gracza i AI - kara z ticku jak dotad.
+    /// Recenzja 2 (klucz DrillSiegeArmy): gracz w obozie oblezenia albo w armii cudzego wodza (menu obozu niedostepne) - ludzie cwicza sami w godzinach
+    /// postoju za dnia, jak lordowie obok (AutoHour z Drill.Observe), w tym samym limicie 8 h na dobe. Godzina cwiczen z menu nie jest odpoczynkiem
+    /// w ksiedze snu (NightRest, DrilledLastHour) - jak stamina (recenzja 4).
     /// </summary>
     internal static class CampDrill
     {
@@ -44,8 +48,10 @@ namespace Armoury
         private static float _dayHours;                    // godziny cwiczen w biezacej dobie (od switu), najwyzej FullHours
         private static long _dayIdx = -1;                  // doba switu, do ktorej naleza _dayHours
         private static float _owed;                        // godziny cwiczen czekajace na tick treningu druzyny gracza
-        private static bool _leave, _inMenu;
+        private static bool _leave;
         private static float _session; private static double _sessionStart;
+        private static double _lastDrillAt = -1e9;         // chwila ostatniej godziny cwiczen z menu (ksiega snu - NightRest), bez zapisu
+        private static double _auto;                       // godziny samoczynne (oboz oblezenia, cudza armia) od ostatniej linii gracza
         private static int _stumbles, _sessions;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -56,7 +62,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _dayHours = 0f; _dayIdx = -1; _owed = 0f; _leave = false; _inMenu = false; _session = 0f; _stumbles = 0; _sessions = 0; _pSession = 0;
+            _dayHours = 0f; _dayIdx = -1; _owed = 0f; _leave = false; _session = 0f; _stumbles = 0; _sessions = 0; _pSession = 0; _auto = 0; _lastDrillAt = -1e9;
             _err.Clear(); ClearDay();
         }
 
@@ -104,7 +110,37 @@ namespace Armoury
         /// <summary>Godziny cwiczen gracza czekajace na tick treningu (Drill.CtxOf druzyny gracza).</summary>
         internal static float PlayerOwed { get { return _owed; } }
 
-        /// <summary>Po ticku treningu druzyny gracza (Drill.TickPostfix): godziny zuzyte (takze w dniu kary - przepadaja) i linia doby gracza.</summary>
+        /// <summary>Recenzja 4: w ostatniej godzinie byla godzina cwiczen z menu - ksiega snu gracza (NightRest) nie liczy jej jako odpoczynku za dnia
+        /// (cwiczenia to praca, jak w staminie: menu cwiczen nie jest w InCampMenu).</summary>
+        internal static bool DrilledLastHour { get { return CampaignTime.Now.ToHours - _lastDrillAt < 0.999; } }
+
+        /// <summary>Recenzja 2 (klucz DrillSiegeArmy): gracz w obozie oblezenia albo w armii cudzego wodza - menu obozu niedostepne (klawisz O tylko na czystej
+        /// mapie), o postoju decyduje oblezenie albo wodz. Ludzie cwicza sami w godzinie postoju za dnia, jak lordowie obok (strona gracza: Drill.DayRestHours) -
+        /// ta sama doba od switu i ten sam limit 8 h co menu, ta sama kara (glod, dlug o swicie) w chwili godziny. Wolane z Drill.Observe raz na godzine
+        /// dla druzyny gracza (rest - godzina postoju wedlug Drill.RestHour, now - pelna godzina konca obserwowanej godziny). Sluzba ROT - bez zmian (partia
+        /// nieaktywna: Observe jej nie widzi, Drill.Shape daje 0 jak przed m97).</summary>
+        internal static void AutoHour(MobileParty mp, bool rest, long now)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!rest || mp == null || !PlayerOn(s) || !s.DrillSiegeArmy) return;
+                if (mp.BesiegerCamp == null && mp.AttachedTo == null) return;
+                if (mp.MapEvent != null || mp.IsCurrentlyAtSea || NightRest.EnlistedNow) return;
+                if (!DayHour(Mod24((int)(now % 24) - 1))) return;
+                if (mp.MemberRoster == null || mp.MemberRoster.TotalRegulars <= 0) return;
+                if (mp.Party != null && mp.Party.IsStarving) return;
+                if (NightRest.DawnDebtOf(mp) >= 1) return;
+                Roll();
+                float take = Math.Max(0f, Math.Min(1f, FullHours - _dayHours));
+                if (take <= 0f) return;
+                _dayHours += take; _owed += take; _auto += take;
+            }
+            catch (Exception e) { Stumble("AutoHour", e); }
+        }
+
+        /// <summary>Po ticku treningu druzyny gracza (Drill.TickPostfix): godziny zuzyte i linia doby gracza. Recenzja 1: kara z chwili ticku (glod, dlug o swicie)
+        /// nie kasuje godzin juz zrobionych - pilnuje jej menu w chwili cwiczen (Drill.CtxOf: gracz pod zasada obozu bez c.Off).</summary>
         internal static void AfterPlayerTick(Drill.Ctx c, long accepted, double men, double perks, double armed)
         {
             try
@@ -113,16 +149,18 @@ namespace Armoury
                 if (c == null || !c.Camp) return;
                 float h = _owed;
                 _owed = 0f;
-                if (s == null || !s.DrillLog) { _pSession = 0; return; }
+                if (s == null || !s.DrillLog) { _pSession = 0; _auto = 0; return; }
                 Roll();
-                Log.Info(P + "gracz dzien " + (int)CampaignTime.Now.ToDays + " | godzin cwiczen " + F2(h) + " (z menu obozu od ostatniej linii " + F2(_pSession) + "; dzis od switu "
+                Log.Info(P + "gracz dzien " + (int)CampaignTime.Now.ToDays + " | godzin cwiczen " + F2(h) + " (z menu obozu od ostatniej linii " + F2(_pSession)
+                         + ", samoczynnie w obozie oblezenia albo w cudzej armii " + F2(_auto) + "; dzis od switu "
                          + F2(_dayHours) + " z " + (int)FullHours + ") -> dzien x" + F2(c.D) + " (pelny x" + F2(DayFull) + "), godzin ruchu w dobie " + c.Moved
                          + " (dawna regula x" + F2(c.Dold) + ") | XP przyjete " + Math.Max(0L, accepted) + " (na glowe " + F1(men > 0 ? Math.Max(0L, accepted) / men : 0) + ", ludzi " + (int)men
                          + "), perki +" + F1(men > 0 ? perks / men : 0) + " na glowe | Przywodztwo x" + F2(c.L) + " (dowodca " + c.Lead + ", mistrz musztry "
                          + (c.MasterName != null ? c.MasterName + " " + c.Master : "brak") + "; bez mistrza x" + F2(c.Lold) + ") | zapas x" + F2(c.StockOn ? c.S : 1f)
-                         + " | uzbrojeni " + (int)Math.Round(100 * armed) + "% | kara: " + (c.Hungry ? "glod" : c.Sleepless ? "dlug snu o swicie" : "brak")
-                         + (c.Off && h > 0f ? " - godziny przepadly" : "") + " | wejsc w Train the men " + _sessions + ", potkniecia " + _stumbles + ".");
-                _pSession = 0; _sessions = 0;
+                         + " | uzbrojeni " + (int)Math.Round(100 * armed) + "% | kara w chwili ticku: " + (c.Hungry ? "glod" : c.Sleepless ? "dlug snu o swicie" : "brak")
+                         + ((c.Hungry || c.Sleepless) && h > 0f ? " - godziny zrobione przed kara policzone" : "") + (c.Off ? " - KARA ZASTOSOWANA" : "")
+                         + " | wejsc w Train the men " + _sessions + ", potkniecia " + _stumbles + ".");
+                _pSession = 0; _sessions = 0; _auto = 0;
             }
             catch (Exception e) { Stumble("AfterPlayerTick", e); }
         }
@@ -309,7 +347,9 @@ namespace Armoury
                          + ", Drill Law Ai " + (s.DrillLawAi ? "TAK" : "nie") + ") | tempo: pelny dzien " + (int)FullHours + " h = x" + F2(DayFull) + " (dawny postoj x1.50 x " + F2(Boost)
                          + "), godzina x" + F2(DayFull / FullHours) + ", dawny marsz x0.90 -> 0 | godziny cwiczen " + NightRest.PlayerDawn + ":00-" + Mod24(NightRest.SleepNightStart - 1)
                          + ":59 (noc snu " + NightRest.SleepNightStart + ":00-" + Mod24(NightRest.PlayerDawn - 1) + ":59 - ludzie spia) | mistrz musztry " + (s.DrillMaster ? "TAK" : "nie")
-                         + " (polowa Przywodztwa najlepszego innego bohatera druzyny) | perki przerobione " + n + "/" + Rules.Length + ": " + perks
+                         + " (polowa Przywodztwa najlepszego innego bohatera druzyny) | gracz w obozie oblezenia albo w cudzej armii - cwiczy sam w godzinach postoju za dnia "
+                         + (s.DrillSiegeArmy ? "TAK" : "nie") + " (Drill Siege Army) | kara gracza w chwili cwiczen (godziny zrobione nie przepadaja) | godzina cwiczen z menu"
+                         + " to nie odpoczynek w ksiedze snu | perki przerobione " + n + "/" + Rules.Length + ": " + perks
                          + " | stan gracza: dzis " + F2(_dayHours) + " h, do policzenia " + F2(_owed) + " h.");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -320,7 +360,7 @@ namespace Armoury
         // ------------------------------------------------------------ menu
         internal static void RegisterEvents(CampaignBehaviorBase b)
         {
-            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter st) { try { _inMenu = false; _leave = false; if (st != null) AddMenus(st); } catch (Exception e) { Stumble("RegisterEvents", e); } });
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter st) { try { _leave = false; if (st != null) AddMenus(st); } catch (Exception e) { Stumble("RegisterEvents", e); } });
         }
 
         private static void AddMenus(CampaignGameStarter starter)
@@ -382,7 +422,7 @@ namespace Armoury
                 if (mp != null) mp.SetMoveModeHold();      // cwiczenia = postoj
                 _leave = false;
                 // kazde wejscie (takze ponowne po wczytaniu albo po spotkaniu, ktore gra przelaczyla sama) - nowa sesja cwiczen do linii "koniec cwiczen"
-                _inMenu = true; _session = 0f; _sessionStart = CampaignTime.Now.ToHours; _sessions++;
+                _session = 0f; _sessionStart = CampaignTime.Now.ToHours; _sessions++;
                 Roll();
                 SetText();
                 args.MenuContext.GameMenu.StartWait();
@@ -400,7 +440,6 @@ namespace Armoury
         {
             try
             {
-                _inMenu = false;
                 if (msg != null) Log.Player(msg);
                 var s = Settings.Current;
                 if (s != null && s.DrillLog)
@@ -422,10 +461,13 @@ namespace Armoury
                 Roll();
                 if (!DayHour(CampaignTime.Now.GetHourOfDay)) { Leave("noc", "Dusk - the drill is over for today; the men eat and bed down."); return; }
                 if (mp.Party != null && mp.Party.IsStarving) { Leave("glod", "The men are too hungry to drill."); return; }
-                if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.IsMoving) { Leave("ruch", null); return; }
+                // recenzja 1: kare pilnuje menu w chwili cwiczen (tick treningu juz jej nie stosuje do godzin zrobionych) - dlug o swicie takze tu, nie tylko przy wejsciu
+                if (NightRest.DawnDebtOf(mp) >= 1) { Leave("dlug snu", "The men met the dawn short of sleep - no drill until the next dawn."); return; }
+                if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.BesiegerCamp != null || mp.SiegeEvent != null || mp.IsMoving) { Leave("ruch", null); return; }
                 float add = (float)dt.ToHours;
                 float take = Math.Max(0f, Math.Min(add, FullHours - _dayHours));
                 _dayHours += take; _owed += take; _session += take; _pSession += take;
+                if (take > 0f) _lastDrillAt = CampaignTime.Now.ToHours;   // ksiega snu: ta godzina to praca, nie odpoczynek (recenzja 4)
                 if (_dayHours >= FullHours - 0.001f)
                 {
                     Leave("pelny dzien", "A full day of drill (8 hours) - the men can learn no more today.");
