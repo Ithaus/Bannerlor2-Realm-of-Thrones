@@ -314,7 +314,7 @@ namespace Armoury
                     Log.Info(P + "dzien " + day.ToString(Inv) + " | klucze: Valyria " + (ValOn(s) ? "tak" : "nie") + ", szlaki " + (CarOn(s) ? "tak" : "nie")
                              + " | partio-godzin w marszu " + _hN + ": na drodze Valyrii " + _hV + " (" + Pct(_hV, _hN) + "%), na szlaku karawan " + _hC + " (" + Pct(_hC, _hN)
                              + "%), na zwyklym trakcie " + _hT + " (" + Pct(_hT, _hN) + "%) | liczenia predkosci z premia: Valyria ok. " + sv + ", szlak ok. " + sc
-                             + " | odcinkow V " + _segV + " + mosty " + _segB + ", C " + _segC + Audit(s) + " | " + AiNote + " | potkniecia " + _stumbles + ".");
+                             + " | odcinkow V " + _segV + " + mosty " + _segB + ", C " + _segC + Audit(s, day) + " | " + AiNote + " | potkniecia " + _stumbles + ".");
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -324,34 +324,56 @@ namespace Armoury
         /// <summary>Audyt w takcie linii (watek glowny, raz na dobe linii): do AuditMax partii AI w marszu na drodze Valyrii i na szlaku karawan - premia
         /// rzeczywista z modelu wprost (bez premii drogi / z premia, bez zapisu do pamieci partii) i wpis w podpowiedzi. Oczekiwane: Valyria = ValPct, szlak = premia
         /// drogi bocznej (poza sufitem kolumny i podloga gry).</summary>
-        private static string Audit(Settings s)
+        private static string Audit(Settings s, int day)
         {
             var sb = new StringBuilder(200);
             try
             {
                 var all = TaleWorlds.CampaignSystem.Party.MobileParty.All;
                 var main = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty;
+                // m103 P1 (VR-3): start listy przesuwany z doba - dotad co dobe pierwsze partie MobileParty.All, czyli tygodniami ta sama partia (98-160: 62 probki 1.01%)
+                int cnt = all.Count, off = cnt > 0 ? (int)((((long)day * 7919L) % cnt + cnt) % cnt) : 0;
                 for (int want = 4; want <= 5; want++)
                 {
-                    int n = 0, lines = 0, seen = 0;
-                    double sum = 0, mn = double.MaxValue, mx = double.MinValue;
+                    int n = 0, lines = 0, seen = 0, low = 0, lowFloor = 0, lowCap = 0, lowOther = 0;
+                    double sum = 0, mn = double.MaxValue, mx = double.MinValue, sumFloor = 0;
+                    StringBuilder ex = null;
                     string txt = (want == 4 ? TxtValyrian : TxtCaravan).ToString();
-                    for (int i = 0; i < all.Count && n < AuditMax; i++)
+                    for (int k = 0; k < cnt && n < AuditMax; k++)
                     {
-                        var mp = all[i];
+                        var mp = all[(off + k) % cnt];
                         if (mp == null || mp == main || !mp.IsActive || mp.AttachedTo != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || !mp.IsMoving) continue;
                         var p = mp.Position;
                         if (MapRoads.KindClassAt(p.X, p.Y) != want) continue;
                         seen++;
-                        float r0, r1; bool hl;
-                        if (!MapRoads.ProbeFor(mp, txt, out r0, out r1, out hl) || !(r0 > 0.0001f)) continue;
+                        float r0, r1, lmin, lmax; bool hl;
+                        if (!MapRoads.ProbeFor(mp, txt, out r0, out r1, out hl, out lmin, out lmax) || !(r0 > 0.0001f)) continue;
                         double b = r1 / r0 - 1.0;
                         n++; sum += b; if (b < mn) mn = b; if (b > mx) mx = b; if (hl) lines++;
+                        if (b < 0.05)
+                        {
+                            // m103 P1 (VR-3): premia ponizej 5% - id partii i powod: podloga gry (wynik bez premii na LimitMin - premia ginie w modelu), sufit kolumny (LimitMax), inne
+                            low++;
+                            string why;
+                            if (r0 <= lmin + 0.001f) { lowFloor++; sumFloor += b; why = "podloga gry"; }
+                            else if (lmax < float.MaxValue * 0.5f && r1 >= lmax - 0.0015f) { lowCap++; why = "sufit kolumny"; }
+                            else { lowOther++; why = "inne"; }
+                            if (low <= 3)
+                            {
+                                if (ex == null) ex = new StringBuilder(120); else ex.Append("; ");
+                                ex.Append((mp.StringId ?? "?").Replace('|', '/')).Append(' ').Append((100.0 * b).ToString("0.00", Inv)).Append("% ").Append(why)
+                                  .Append(" (bez premii ").Append(r0.ToString("0.000", Inv)).Append(", z premia ").Append(r1.ToString("0.000", Inv)).Append(')');
+                            }
+                        }
                     }
                     sb.Append(want == 4 ? " | audyt Valyria: " : " | audyt szlak: ").Append(n).Append(" partii");
                     if (n > 0) sb.Append(", premia rzeczywista sr. ").Append((100.0 * sum / n).ToString("0.00", Inv)).Append("% (min ").Append((100.0 * mn).ToString("0.00", Inv))
                                   .Append(", maks ").Append((100.0 * mx).ToString("0.00", Inv)).Append("), z wpisem '").Append(txt).Append("' ").Append(lines);
                     sb.Append(", oczekiwane ").Append(want == 4 ? (100f * MapRoads.ValPctNow(s)).ToString("0.0", Inv) : (100f * MapRoads.CarPctNow(s)).ToString("0.0", Inv)).Append('%');
+                    // m103 P1 (VR-3): dopisek za "oczekiwane" (regex VR-1/VR-3 bez zmian; srednia wyzej dalej ze wszystkich probek - narzedzie odejmuje probki z podlogi)
+                    if (low > 0) sb.Append(", ponizej 5%: ").Append(low).Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")
+                                   .Append(lowFloor > 0 ? (100.0 * sumFloor / lowFloor).ToString("0.00", Inv) : "0.00").Append("%; sufit kolumny ").Append(lowCap)
+                                   .Append("; inne ").Append(lowOther).Append(") [").Append(ex != null ? ex.ToString() : "").Append(']');
                 }
             }
             catch (Exception e) { Stumble("Audit", e); sb.Append(" | audyt: blad"); }

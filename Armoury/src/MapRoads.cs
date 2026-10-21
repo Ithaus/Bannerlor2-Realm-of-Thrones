@@ -1251,6 +1251,29 @@ namespace Armoury
             finally { _noRecord = false; _suppress = false; }
         }
 
+        /// <summary>m103 P1 (audyt VR): jak ProbeFor wyzej, plus podloga modelu bez premii (LimitMinValue) i sufit z premia (LimitMaxValue) - powod premii
+        /// ponizej 5% w linii VR (sam odczyt, bez zapisu do pamieci partii).</summary>
+        internal static bool ProbeFor(MobileParty mp, string txt, out float r0, out float r1, out bool hasLine, out float lmin, out float lmax)
+        {
+            r0 = r1 = 0f; hasLine = false; lmin = float.MinValue; lmax = float.MaxValue;
+            var model = Campaign.Current != null ? Campaign.Current.Models.PartySpeedCalculatingModel : null;
+            if (model == null || mp == null) return false;
+            try
+            {
+                _noRecord = true;
+                _suppress = true;
+                try { var e0 = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, false)); r0 = e0.ResultNumber; lmin = e0.LimitMinValue; }
+                finally { _suppress = false; }
+                var en = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, true));
+                r1 = en.ResultNumber;
+                lmax = en.LimitMaxValue;
+                foreach (var l in en.GetLines()) if (l.Item1 == txt) hasLine = true;
+                return true;
+            }
+            catch (Exception e) { Stumble("Audit.ProbeFor", e); return false; }
+            finally { _noRecord = false; _suppress = false; }
+        }
+
         private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out float lmin, out bool line, out bool lineS, out float cached)
         {
             r0 = r1 = lim = cached = 0f; lmin = float.MinValue; line = false; lineS = false;
