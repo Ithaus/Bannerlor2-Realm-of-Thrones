@@ -23,7 +23,7 @@ namespace Armoury
 {
     /// <summary>
     /// m97-oboz (Jeff 20.10, decyzja 2 po raporcie obozu: "chodzenie po obozie na poczatku kolejki", etap 1) - SPACER PO OBOZIE.
-    /// W naszym menu obozu (arm_camp_wait - ZWYKLE menu, nie menu oczekiwania, wiec otwarcie misji z opcji jest bezpieczne; tak samo "camp" gry) opcja
+    /// W naszym menu obozu (arm_camp_wait - ZWYKLE menu, nie menu oczekiwania, wiec otwarcie misji z opcji jest bezpieczne; NIE "camp" gry - to menu spotkania) opcja
     /// "Walk through the camp" otwiera wlasna misje typu "Camp" (nieuzywany typ misji SandBox z kompletem widokow: kamera, Esc, pasek zdrowia - SandBox.View
     /// [ViewMethod("Camp")]) na scenie bitwy z miejsca postoju (SceneModel.GetBattleSceneForMapPatch - jak Practice Drills 1.3, public domain, i jak bitwa
     /// gry w tym miejscu); pora dnia i pogoda z mapy. Bez walki: jedna druzyna (gracz), bez logiki bitwy, bez spotkania i MapEvent; czas kampanii stoi
@@ -67,10 +67,11 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter s) { try { Active = false; if (s != null) AddMenus(s); } catch (Exception e) { Stumble("SessionStart", e); } });
         }
 
-        /// <summary>Opcja w menu obozu (nasze arm_camp_wait i "camp" gry). Wolane z NightRest.AddMenus (jedna linia).</summary>
+        /// <summary>Opcja w naszym menu obozu arm_camp_wait (wlasny oboz, klawisz O; zwykle menu, czas stoi).</summary>
         internal static void AddMenus(CampaignGameStarter starter)
         {
-            foreach (var menu in new[] { "arm_camp_wait", "camp" })
+            // tylko nasze arm_camp_wait: "camp" gry to menu SPOTKANIA (DefaultEncounterGameMenuModel - PlayerEncounter trwa), menu BK - menu oczekiwania
+            foreach (var menu in new[] { "arm_camp_wait" })
             {
                 try
                 {
@@ -87,7 +88,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("AddMenus(" + menu + ")", e); }
             }
-            Log.Info(P + "opcja \"Walk through the camp\" w menu obozu (arm_camp_wait, camp) | klucz Camp Walk Enabled " + (On ? "TAK" : "NIE")
+            Log.Info(P + "opcja \"Walk through the camp\" w menu obozu (arm_camp_wait) | klucz Camp Walk Enabled " + (On ? "TAK" : "NIE")
                      + " | ludzi w scenie najwyzej " + (Settings.Current != null ? Settings.Current.CampWalkMaxMen : 0) + ".");
         }
 
