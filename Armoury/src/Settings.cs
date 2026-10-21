@@ -3954,6 +3954,9 @@ namespace Armoury
         public int WatchBountyDays = 10;                   // days a bounty stays up before it is taken down (no penalty for you)
         public bool WatchBountyAiLords = true;             // the bounty is public: a lord who breaks a posted band is paid too (never an enemy of the town; the garrison, militia, patrols and caravans are not paid - it is their job). Off = only you are paid; a band broken by a lord just comes down
         public bool WatchBountyLordTopUp = true;           // when the town's coffers cannot cover a bounty, the town's lord pays the rest from his own purse above the coin he keeps for wages (never you, if the town is yours); with this a hard-pressed town can still post bounties its lord can pay. Off = only the town's coin
+        // m102-tablica E2b (NoticeBoard.Headman.cs): list soltysa wsi zlupionej przez bande w 30 dniach (soltys bez zadania z gry), placi kiesa wsi ponad skrzynie (najwyzej 1/4),
+        // relacja +2; rozmowa tylko we wsi. Nowy klucz (domyslny).
+        public bool HeadmanBounties = true;                // when a band has plundered one of the town's villages in the last 30 days and the village headman has no other work to offer, his notice is pinned on the town's board: the same pay as the watch's (the wages of the town's guardsmen), paid from the village purse above what the village keeps for hard times (a notice at most a quarter of that), at once to whoever breaks the band; you also gain +2 with the headman. You speak with him in the village (the notice marks it on your map). Off = no headmen's notices
 
         public static void Load(string moduleDataDir)
         {

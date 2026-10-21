@@ -641,6 +641,12 @@ namespace Armoury
                     return true;
                 }
                 string id = loc.StringId == "alley" ? "center" : loc.StringId;
+                if (!Walkable(id))
+                {
+                    args.IsEnabled = false;
+                    args.Tooltip = new TextObject("{=!}You cannot walk there from the board. Talk to " + Him(e.Hero) + " here instead.");
+                    return true;
+                }
                 bool disable; TextObject why;
                 bool can = Campaign.Current.Models.SettlementAccessModel.CanMainHeroAccessLocation(st, id, out disable, out why);
                 if (!can)
@@ -666,7 +672,7 @@ namespace Armoury
                 var loc = lc != null ? lc.GetLocationOfCharacter(h) : null;
                 if (loc == null || PlayerEncounter.LocationEncounter == null) { _dDenied++; Log.Player("You cannot find " + NameOf(h) + " there now."); return; }
                 if (loc.StringId == "alley") loc = lc.GetLocationWithId("center");
-                if (loc == null) { _dDenied++; return; }
+                if (loc == null || !Walkable(loc.StringId)) { _dDenied++; return; }
                 bool disable; TextObject why;
                 if (!Campaign.Current.Models.SettlementAccessModel.CanMainHeroAccessLocation(st, loc.StringId, out disable, out why)) { _dDenied++; if (why != null) Log.Player(why.ToString()); return; }
                 Log.Info(P + "odwiedziny - " + h.StringId + " w " + loc.StringId + " (" + st.StringId + ")");   // ostatnia linia przed scena (gdyby gra wywrocila sie do pulpitu)
@@ -677,6 +683,12 @@ namespace Armoury
                 PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(loc, null, h.CharacterObject);
             }
             catch (Exception ex) { Stumble("VisitCons", ex); }
+        }
+
+        /// <summary>Lokacje, do ktorych gra sama wchodzi z paska portretow (TownEncounter: ulice i arena osobno, reszta jako wnetrze) - port i inne cudze lokacje bez "Go and see".</summary>
+        private static bool Walkable(string id)
+        {
+            return id == "center" || id == "tavern" || id == "lordshall" || id == "arena";
         }
 
         private static bool TalkCond(MenuCallbackArgs args)

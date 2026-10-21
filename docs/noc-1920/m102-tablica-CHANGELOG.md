@@ -160,3 +160,46 @@ zaplaty, linia "wyplata" (obiecane = kasa + pan + niedoplata); zapis i wczytanie
 listy znikaja z tablicy; `python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log>` po tescie 120 dob (L-7: gdy nie przejdzie - domyslne WatchBountyAiLords = false).
 
 **Stan etapow po E2:** E1, E3, E2 zrobione. Zostal E2b (soltysi).
+
+---
+
+### E2b - list soltysa "banda neka wies" (commit E2b)
+
+**Dla Jeffa:** gdy banda zlupi wies miasta, a soltys tej wsi nie ma innego zadania, na tablicy w miescie wisi jego list ("Old Tom, headman of Oxcross - WANTED: ...").
+Tablica prowadzi do wsi (flaga); rozmawiasz z soltysem na miejscu ("About your notice - the band harrying Oxcross..."). Placi kiesa wsi - tylko z tego, co wies
+ma ponad zapas na czarna godzine. Za rozbicie bandy dostajesz zaplate od razu i +2 relacji z soltysem.
+
+**Zasada (z liczbami):**
+- Zrodlo: zlupienie wsi przez bande (`RaidCompletedEvent`, zapis szkody z ta wsia) w ostatnich 30 dniach; soltys (`IsHeadman`, zywy, nie jeniec) bez zadania z gry
+  (`Issue == null`) i bez innego naszego listu; wies nie oblezona, nie lupiona teraz i nie zlupiona (stan `Looted`). Jedna banda - jeden list (kapitan albo soltys).
+- Kwota jak u kapitana (N x D x S x 1.25 x (1 + doplata), S = zold zalogi miasta tej wsi). Wolna kiesa wsi = kiesa - skrzynia na czarna godzine (`DsVillage.Chest` -
+  DsVillageChestDays x (koszyk dnia + czynsz dnia); wies nieskalibrowana - 0). List tylko, gdy kwota <= 1/4 wolnej kiesy.
+- Dowod i odbiorca jak u kapitana. Wyplata z kiesy wsi najwyzej wolna kiesa (`GiveGoldAction.ApplyForSettlementToCharacter` z osady wsi), bez doplaty pana;
+  brak - niedoplata ("The village could pay only N of the promised M."). Gracz: relacja z soltysem +2 (`ChangeRelationAction.ApplyPlayerRelation`). Bez premii
+  bezpieczenstwa miasta (ta jest za listy kapitana).
+- Rozmowa: linia gracza w `hero_main_options` (priorytet 111) tylko z soltysem z czynnym, nieprzyjetym listem; dalej "I'll hunt them down" (flaga na bandzie),
+  "Who pays, exactly?", "Not now" - powrot do glownych opcji rozmowy (8 linii).
+- Tablica: wpis w grupie wsi, karta z "Ride to X" (flaga na wsi).
+
+**Zmiana:** nowy `Armoury/src/NoticeBoard.Headman.cs`; `NoticeBoard.Later.cs` usuniety (wszystkie etapy maja kod); `NoticeBoard.Watch.cs`: szkoda z wsia (zapis H:
+`doba,rodzaj,miasto,wies` - stare 3 pola czytane dalej), wywieszenie soltysow po kapitanach, karta soltysa, wyplata z kiesy wsi; `NoticeBoard.Talk.cs`: linie
+soltysa; `NoticeBoard.cs`: "Go and see" tylko do ulic, karczmy, zamku i areny (port i cudze lokacje - tylko "Talk now"; TownEncounter innych nie zna);
+`Settings.cs`: `HeadmanBounties` (TAK); `gen_mcm.py` (2237 ustawien); `sprawdz_logi.py`: L-11 (list soltysa <= 1/4 wolnej kiesy), L-12 (list z kasy <= 1/4 wolnej kasy),
+lista soltysa w L-10.
+
+**Linie logu:** `Listy goncze (m102): list soltysa - <wies> (<miasto>) <banda> (...) = kwota, platnik wies, wolna kiesa F, soltys <id> - nazwa`; wyplata z "wies b";
+w linii doby ", soltysi: nowe N, wyplacone M, dialog 8/8"; w linii "wpiete" "dialog soltysa 8/8".
+
+**Ryzyko / co sprawdzic:**
+- Kiesa wsi: wyplata tylko ponad skrzynie (ta sama, ktorej pilnuja zakupy BK i pozyczki DS) - wies nie zostaje bez zapasu. Wies nieskalibrowana (skrzynia 0) -
+  wolna kiesa = cala kiesa, list najwyzej 1/4 kiesy.
+- Linia soltysa stoi obok linii gry w `hero_main_options` (priorytet 111) - tylko przy czynnym liscie tego soltysa.
+- Nie sprawdzone w grze: jak czesto bandy ROT lupia wsie (`RaidCompletedEvent` z banda napastnikiem) - linia doby pokaze "soltysi: nowe".
+
+**Status:** DO SPRAWDZENIA (build kod 0).
+
+**Test w grze:** po zlupieniu wsi przez bande - wpis soltysa na tablicy miasta; "Ride to X" stawia flage; we wsi rozmowa z soltysem - linia "About your notice";
+rozbicie bandy - zaplata z kiesy wsi i +2 relacji; `sprawdz_logi --grupa m102tablica` (L-11).
+
+**Stan etapow po E2b:** E1, E3, E2, E2b zrobione (caly projekt). Zostaje: autotest 120 dob z `--grupa m102tablica` i regresja (etap2, etap5, etap8_d1, Obieg),
+test reczny z projektu pkt 6.9, decyzja L-7 po tescie, wgranie (osobny krok, nie tu).

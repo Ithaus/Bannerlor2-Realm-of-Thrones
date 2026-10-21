@@ -50,6 +50,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("AddDialogs(linia tablicy)", e); }
             n += AddWatchDialogs(starter);
+            n += AddHeadmanDialogs(starter);
             return n;
         }
 

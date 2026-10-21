@@ -8956,6 +8956,10 @@ namespace Armoury
         [SettingPropertyGroup("Notice board")]
         public bool WatchBountyLordTopUp { get; set; } = true;
 
+        [SettingPropertyBool("Headman Bounties", HintText = "when a band has plundered one of the town's villages in the last 30 days and the village headman has no other work to offer, his notice is pinned on the town's board: the same pay as the watch's (the wages of the town's guardsmen), paid from the village purse above what the village keeps for hard times (a notice at most a quarter of that), at once to whoever breaks the band; you also gain +2 with the headman. You speak with him in the village (the notice marks it on your map). Off = no headmen's notices", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool HeadmanBounties { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11194,6 +11198,7 @@ namespace Armoury
             s.WatchBountyDays = WatchBountyDays;
             s.WatchBountyAiLords = WatchBountyAiLords;
             s.WatchBountyLordTopUp = WatchBountyLordTopUp;
+            s.HeadmanBounties = HeadmanBounties;
         }
 
         internal static void Apply()

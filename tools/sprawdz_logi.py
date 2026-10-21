@@ -37575,9 +37575,10 @@ M102_TB_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), otwarcia (\d+), wpisow 
 M102_PROBE = re.compile(r"nagroda czytelna (\d+)/(\d+)")
 M102_LG_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), band poza osadami (\d+), miasta z banda (\d+)/(\d+), z listem (\d+), bez nowego listu: .*?, inne (\d+); czynne (\d+) .*?"
                          r"; wyplacone (\d+) za (\d+) zl \(gracz (\d+)/(\d+) zl, lordowie (\d+)/(\d+) zl; z kas miast (\d+), od panow (\d+)\), niedoplata (\d+), z niczego (\d+)"
-                         r".*?kasa ponizej Keep po wyplacie (\d+); zapis arm_board (\d+) B; .*?koszt ([0-9.]+) ms; potkniecia (\d+)")
+                         r".*?kasa ponizej Keep po wyplacie (\d+)[^;]*; zapis arm_board (\d+) B; .*?koszt ([0-9.]+) ms; potkniecia (\d+)")
 M102_PAY = re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:pan|wies) (\d+), niedoplata (\d+), dla (gracz|lord \S+); kasa przed (-?\d+) po (-?\d+) \(Keep (-?\d+)\)")
 M102_POST = re.compile(r"list - (\S+) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik (kasa|pan \S+), wolna kasa (-?\d+)")
+M102_POSTH = re.compile(r"list soltysa - (\S+) \((\S+)\) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik wies, wolna kiesa (-?\d+)")
 M102_KASY = re.compile(r"Kasy miast \(169c\): dzien (\d+) \| miast \d+: kasy (\d+)")
 
 
@@ -37595,6 +37596,7 @@ def m102tablica_main(logp):
         rep.show()
         return 0
     wired, wiredw, tdays, ldays, pays, posts, kasy, n_err = [], [], [], [], [], [], [], 0
+    hposts = []
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -37632,6 +37634,10 @@ def m102tablica_main(logp):
                 mo = M102_POST.match(body)
                 if mo:
                     posts.append(mo)
+                    continue
+                mh = M102_POSTH.match(body)
+                if mh:
+                    hposts.append(mh)
     print(f"plik: {logp} | wpiec {len(wired)}/{len(wiredw)}, dob tablicy {len(tdays)}, dob listow {len(ldays)}, list {len(posts)}, wyplat {len(pays)}, ERROR {n_err}")
     if not wired and not tdays:
         rep.add("T-1: linia 'Tablica ogloszen (m102): wpieta'", "brak w logu", "INFO (log sprzed paczki m102-tablica albo menu glowne)", None)
@@ -37682,7 +37688,11 @@ def m102tablica_main(logp):
     rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
     cost = max([float(d.group(21)) for d in ldays] + [0.0])
     rep.add("L-9: koszt doby listow", f"najwyzej {cost:.2f} ms", "<= 3 ms", (cost <= 3.0) if ldays else None)
-    posted = {(p.group(1), p.group(2)) for p in posts}
+    posted = {(p.group(1), p.group(2)) for p in posts} | {(p.group(2), p.group(3)) for p in hposts}
+    hbad = [p for p in hposts if int(p.group(8)) * 4 > int(p.group(9))]
+    tbad = [p for p in posts if p.group(8) == "kasa" and int(p.group(7)) * 4 > int(p.group(9))]
+    rep.add("L-12: list z kasy miasta <= 1/4 wolnej kasy", f"ponad 1/4 {len(tbad)} z {sum(1 for p in posts if p.group(8) == 'kasa')}", "0", (len(tbad) == 0) if posts else None)
+    rep.add("L-11: list soltysa <= 1/4 wolnej kiesy wsi", f"ponad 1/4 {len(hbad)} z {len(hposts)}", "0", (len(hbad) == 0) if hposts else None)
     fromstart = bool(ld) and ld[0] <= (min(days) if days else ld[0]) and len(posts) > 0
     orphan = [p for p in pays if (p.group(1), p.group(2)) not in posted]
     who_bad = [p for p in pays if not (p.group(7) == "gracz" or p.group(7).startswith("lord "))]

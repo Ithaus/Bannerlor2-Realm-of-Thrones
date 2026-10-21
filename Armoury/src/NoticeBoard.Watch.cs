@@ -61,7 +61,7 @@ namespace Armoury
             public MobileParty Mp;
         }
 
-        private struct Harm { public int Day; public byte Kind; public string Town; }   // Kind 0 - wies zlupiona, 1 - karawana / woz wiejski rozbity
+        private struct Harm { public int Day; public byte Kind; public string Town, Vil; }   // Kind 0 - wies zlupiona (Vil - ta wies, E2b), 1 - karawana / woz wiejski rozbity
 
         private static readonly List<Notice> _notices = new List<Notice>();
         private static readonly Dictionary<string, List<Harm>> _harm = new Dictionary<string, List<Harm>>(StringComparer.Ordinal);
@@ -91,6 +91,7 @@ namespace Armoury
             _wNew = _wPaidN = _wPaidPlayerN = _wPaidLordN = _wDropGuard = _wDropEnemy = _wDropGone = _wDropDue = _wDropOwner = _wBelowKeep = _wFromNothing = _wTakenToday = 0;
             _wPaid = _wPaidPlayer = _wPaidLord = _wFromTown = _wFromLordPurse = _wShort = 0;
             _wStumbles = 0;
+            ZeroHeadmanDay();
         }
 
         private static void WStumble(string where, Exception e) { _wStumbles++; Stumble("Watch." + where, e); }
@@ -109,7 +110,7 @@ namespace Armoury
         /// <summary>Linia "Listy goncze (m102): wpiete" (po rejestracji menu i rozmow).</summary>
         private static void WatchStartLine()
         {
-            Log.Info(PW + "wpiete - zdarzenia " + _wEvents + "/3 (MobilePartyDestroyed, MapEventEnded, RaidCompleted), dialog kapitana " + _wDialog + "/7, opcja karty 1/1, zapis arm_board " + Ver
+            Log.Info(PW + "wpiete - zdarzenia " + _wEvents + "/3 (MobilePartyDestroyed, MapEventEnded, RaidCompleted), dialog kapitana " + _wDialog + "/7, dialog soltysa " + _hDialog + "/8, opcja karty 1/1, zapis arm_board " + Ver
                      + "; klucz Watch Bounties " + YN(WatchOn) + ", na miasto " + PerTown + ", dni " + DaysUp + ", promien " + MaxBandDist.ToString("0", Inv) + " jedn.");
         }
 
@@ -268,6 +269,7 @@ namespace Armoury
         {
             var n = NoticeOf(e);
             if (n == null) return "This notice has been taken down.";
+            if (n.Kind == 1) return HeadmanCard(n, st);
             var sb = new StringBuilder();
             sb.Append("WANTED: ").Append(n.Name.ToUpperInvariant()).Append('\n');
             sb.Append("Posted by ").Append(CaptainTitle(st)).Append(" of ").Append(st != null ? st.Name.ToString() : "the town").Append('.');
@@ -398,13 +400,13 @@ namespace Armoury
 
         // ------------------------------------------------------------ szkody band (zdarzenia)
 
-        private static void AddHarm(MobileParty band, byte kind, Settlement town)
+        private static void AddHarm(MobileParty band, byte kind, Settlement town, Settlement village = null)
         {
             if (band == null || town == null || string.IsNullOrEmpty(band.StringId)) return;
             List<Harm> l;
             if (!_harm.TryGetValue(band.StringId, out l)) { l = new List<Harm>(); _harm[band.StringId] = l; }
             if (l.Count >= 12) l.RemoveAt(0);
-            l.Add(new Harm { Day = Today, Kind = kind, Town = town.StringId });
+            l.Add(new Harm { Day = Today, Kind = kind, Town = town.StringId, Vil = village != null ? village.StringId : "" });
         }
 
         /// <summary>CampaignEvents.RaidCompletedEvent: banda zlupila wies - szkoda dla miasta tej wsi.</summary>
@@ -417,7 +419,7 @@ namespace Armoury
                 var lp = raid.AttackerSide != null ? raid.AttackerSide.LeaderParty : null;
                 var mp = lp != null ? lp.MobileParty : null;
                 if (st == null || st.Village == null || mp == null || !mp.IsBandit) return;
-                AddHarm(mp, 0, st.Village.Bound);
+                AddHarm(mp, 0, st.Village.Bound, st);
             }
             catch (Exception e) { WStumble("OnRaidCompleted", e); }
         }
@@ -522,7 +524,7 @@ namespace Armoury
             }
             int shortfall = Math.Max(0, n.Sum - fromTown - fromLord);
             if (g1 < keep - 0.5 && fromTown > 0) _wBelowKeep++;
-            try { town.Security += 2f; } catch { }
+            if (n.Kind == 0) { try { town.Security += 2f; } catch { } }
             try { GainRenownAction.Apply(payee, 1f, payee != Hero.MainHero); } catch (Exception e) { WStumble("Pay(slawa)", e); }
             int paid = fromTown + fromLord;
             _wPaidN++; _wPaid += paid; _wFromTown += fromTown; _wFromLordPurse += fromLord; _wShort += shortfall;
@@ -680,6 +682,8 @@ namespace Armoury
                 }
                 catch (Exception e) { other++; WStumble("WatchDaily(miasto " + st.StringId + ")", e); }
             }
+            // 3b) E2b: listy soltysow wsi zlupionych w 30 dniach (kiesa wsi)
+            try { HeadmanPost(day, posted); } catch (Exception e) { WStumble("WatchDaily(soltysi)", e); }
             // 4) linia doby
             try
             {
@@ -698,7 +702,7 @@ namespace Armoury
                          + ", od panow " + _wFromLordPurse + "), niedoplata " + _wShort + ", z niczego " + _wFromNothing
                          + "; zdjete " + (_wDropGuard + _wDropEnemy + _wDropGone + _wDropDue + _wDropOwner) + " (straz/karawana " + _wDropGuard + ", wrog miasta " + _wDropEnemy + ", banda znikla " + _wDropGone
                          + ", termin " + _wDropDue + ", zmiana pana " + _wDropOwner + "); kasa ponizej Keep po wyplacie " + _wBelowKeep
-                         + "; zapis arm_board " + bytes + " B; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
+                         + HeadmanDayText() + "; zapis arm_board " + bytes + " B; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
             }
             catch (Exception e) { WStumble("WatchDaily(linia)", e); }
             ZeroWatchDay();
@@ -738,7 +742,7 @@ namespace Armoury
             catch (Exception e) { WStumble("GarrisonRate", e); return FallbackRate; }
         }
 
-        // E2b: list soltysa (kiesa wsi) - patrz NoticeBoard.Headman.cs
+        // E2b: list soltysa (kiesa wsi) - NoticeBoard.Headman.cs
         private static int PayHeadman(Notice n, Hero payee) { return HeadmanPay(n, payee); }
 
         private static string WatchProbeText(List<Settlement> towns)
@@ -782,7 +786,7 @@ namespace Armoury
                 {
                     var h = kv.Value[i];
                     if (i > 0) sb.Append('/');
-                    sb.Append(h.Day.ToString(Inv)).Append(',').Append(h.Kind.ToString(Inv)).Append(',').Append(Safe(h.Town).Replace(",", "."));
+                    sb.Append(h.Day.ToString(Inv)).Append(',').Append(h.Kind.ToString(Inv)).Append(',').Append(Safe(h.Town).Replace(",", ".")).Append(',').Append(Safe(h.Vil).Replace(",", "."));
                 }
             }
         }
@@ -822,7 +826,7 @@ namespace Armoury
                             var y = h.Split(',');
                             int d, kind;
                             if (y.Length < 3 || !int.TryParse(y[0], NumberStyles.Integer, Inv, out d) || !int.TryParse(y[1], NumberStyles.Integer, Inv, out kind)) continue;
-                            l.Add(new Harm { Day = d, Kind = (byte)kind, Town = y[2] });
+                            l.Add(new Harm { Day = d, Kind = (byte)kind, Town = y[2], Vil = y.Length > 3 ? y[3] : "" });
                         }
                         if (l.Count > 0) _harm[r.Substring(0, k)] = l;
                     }
