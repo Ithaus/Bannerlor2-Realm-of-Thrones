@@ -19,6 +19,7 @@ NIE obejmuje - to osobny etap.
 | K6 | tools/obrazki_okien.py + skrypty wgrania/testu (katalog Armoury\Images) | ZROBIONE (5f109708; skrypty poza drzewem - nizej) |
 | K7 | grupa tools/sprawdz_logi.py m103sceny (SC-0..SC-14, --rgl) + test na 13 logach syntetycznych | ZROBIONE (b5b8a709, WYNIK OK) |
 | P1 | przeglad: okno ROT na wierzchu = nasze, gdy EventPopupState.Event nieczytelne; tekstura bez wskaznika = zly plik | ZROBIONE (c7517ee5, build 5 modow 0) |
+| P2 | obecnosc ROT (AccessTools.TypeByName - przeszukuje wszystkie zestawy) sprawdzana raz na proces, nie przy kazdej scenie | ZROBIONE (0535b5c5, build 5 modow 0, Armoury md5 7a002807) |
 | AT | autotest prologu 230 dob + zapis + bitwa + nowa (wzor testy-101) | DO ZROBIENIA (gra zajeta autotestem w tle - nie uruchamialem) |
 
 ## Problem
