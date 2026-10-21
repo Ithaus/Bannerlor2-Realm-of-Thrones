@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 96 - noc 20/21: poprawki z gry Jeffa na 95/95a, plan do konca moda, drogi Valyrii, dlugi miast)
+
+**Zakres (Jeff 20.10, doslownie, wybor):** "zobacz czemu mialem crash" (kuznia); "jest blad, ze moge stworzyc luki tier 6 od poczatku gry"; "za duzo jest legendary
+przedmiotow ... daj wariacje np. od 1 do 6 legendarnych danego typu. I tak samo masterwork"; "ma liczyc calkowity czas ... jak wyjde i nie skoncze kucia, to biore tylko to,
+co wykulem, a reszta czeka"; "przejrzyj kucie strzal i lukow i pancerzy ... zasade wagi surowca, tak jak w drewnie"; "przetapianie ... mniej, straty"; "You paid 2 ... powinno
+byc za co"; "menu wioski tez ustaw ... jak w miescie i zamkach"; "menu zamku tez uporzadkuj"; "Rob drogi Valyrii i trakty Essos"; "dlugi miast tak, robimy";
+"bandyci chodza bez jedzenia czy zlota?"; "Ravens Teeth i Goldenheart to mozna, to zwykle luki".
+**Zmiana:** `w-toku/n25-calosc` (03e82bcb) = WGRANIE 95 + galezie m96: kuznia (CrashScribe: NRE w VM kuzni), zamek (CastleMenuTidy), wies (VillageMenuTidy,
+PlayerPaymentReasons; GT: pula turnieju bez drugiej wplaty), valyria (MapValyrianRoads +25%, MapEssosCaravanTrails, arm_map_roads_valyria.tsv), sakiewki (SavingsByNeed),
+koszyk (KsFolkWageToShortClasses), len (KsVillageClothBuysInPlan), bandy (BandsEatFood - jedzenie i kiesy band), czaskuzni (ForgeOneJob - jeden pasek, wytop zablokowany
+pierwszy, kucie przerywalne, noca kowale spia), jakosc + jakosc2 (QualityScarcity - limit L 1-6 i MW 1-60 na rodzaj, losowany raz, arm_qualitycaps), wzory + wzory2
+(LoreSeedAfterFinalStats, XbowPatternTierByPower, naprawa zapisu #m96seedfix1/2, PatternDrawOneTierUp), dlugi (TownDebt - dlug u mieszczan i Banku, podatek nadzwyczajny),
+receptury (RecipesByMass - przepisy z masy w kg, otwarte ladunki, przetop najwyzej 50% metalu przepisu); n25: RareBowsIds = dragonbone_bow, weirwood_bow; GT: licznik
+bez powalajacego tylko dla bohaterow. Wpisy: docs/noc-1920/m96-*-CHANGELOG.md.
+**Testy (20.10):** 96-bitwa 5 dob, bitwy 4/4, misje sprawdzone - kod 0; 96-nowa 180/180 dob (14.2 s/dobe, Armoury ERROR 0) - kod 0, progi 3089 / NIE 121 (r3: 2902 / 122),
+grupy m96 TAK poza MB-2; 96-160 z autotest-F-d240 (ks-auto) 400/400 (15.6 s/dobe, ERROR 0) - kod 0, progi 2487 / NIE 104 (r3: 2292 / 90).
+**Ryzyko / co sprawdzic:** kasy miast i kiesy ludu rosna ponad prog (NAKUM-1a/7/22/26, G1-5a), zaleglosci firm DS w biegu z zapisu (M96D-3), bandy zjadaja 56-66% potrzeby
+(MB-2), warsztaty bez drewna 271/d (R1-10b) - do poprawki w 97/98; kontrola wczesna KS D+7 na starym zapisie (ks-auto) 20/24 poza pasmem (95: 19/24).
+**Status:** WGRANE 96 (20.10 19:30, tag 2026-10-21-wgranie96; Armoury 6e17caa7, CrashScribe 5c81079b, RC 634ecbb4, GT 40689947, ForgeView f7257c22).
+
 ## 2026-10-20 (WGRANIE 95 - po pierwszej grze Jeffa na 94: turniej, nocleg, menu miasta, zajazd)
 
 **Zakres (Jeff 20.10, doslownie):** "jest blad w turniejach odpadlem w drugiej rundzie ... zaplacilem ponad 1k ... dostalem w tym samym czasie ponad 8k zlota";
