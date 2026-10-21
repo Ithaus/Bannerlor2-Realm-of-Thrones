@@ -34,7 +34,8 @@ namespace Armoury
         /// <summary>Tresc i zachowanie okna (bez typow ROT).</summary>
         internal sealed class Spec
         {
-            public string Key = "";          // do logu (np. prolog_05)
+            public string Key = "";          // do logu (np. prolog_05) i klucz nagrania lektora (Kronika: kr_NNN_w[war])
+            public string VoiceMd5;          // m105-kronika K0 (A3): md5 tekstu okna dla zasady md5 lektora (Chronicle.Voice); null - bez kontroli tekstu
             public string Title = "", Upper = "", Lower = "";
             public string DoneText = "";     // przycisk glowny ("Continue...")
             public string CancelText;        // null/"" = jeden przycisk (Esc = przycisk glowny)
@@ -254,6 +255,10 @@ namespace Armoury
         /// <summary>m105-kronika K0 (A2): klucz okna dla lektora - Spec.Key (Kronika: kr_NNN_w[war] = kolumna 1 arm_lektor; sceny prologu: prolog_NN). Publiczny - lektor
         /// moze go czytac odbiciem po nazwie przy oknie z EventScreen (P9: najpierw klucz, potem tytul).</summary>
         public string Key { get { return _spec.Key ?? ""; } }
+
+        /// <summary>m105-kronika K0 (A3): md5 UTF-8 tekstu okna zlozonego jak tools/lektor/nagraj_kronika.py (Chronicle.Voice) - lektor gra nagranie Kroniki tylko przy
+        /// zgodnym md5 z manifestu arm_lektor_kronika.tsv. Pusty - okno bez kontroli tekstu (sceny prologu) albo bez glosu (zmienne).</summary>
+        public string VoiceMd5 { get { return _spec.VoiceMd5 ?? ""; } }
 
         public override void Initialize() { }
 
