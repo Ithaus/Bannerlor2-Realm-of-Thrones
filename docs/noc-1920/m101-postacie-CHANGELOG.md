@@ -1,5 +1,7 @@
 ## m101-postacie - postacie kanonu: bohaterowie ROT do rodow, usuniecie fabularnych, zmiany stron wedlug ksiazki (Armoury + CrashScribe UC)
 
+**Mod:** Armoury + CrashScribe (UC) + narzedzie | **Galaz:** `w-toku/m101-postacie` (na 1d2318e3, `w-toku/n29-calosc`) | **Klucze:** nowe `CanonCompanionsToClans`, `CanonCompanionsFollowStory` (domyslnie tak); `python -I tools/gen_mcm.py` | **Nowy plik do wgrania RAZEM z DLL:** `Armoury/ModuleData/arm_canon_moves.tsv` -> `Modules\Armoury\ModuleData\` (skrypty wgrywania kopiuja arm_*.tsv; bez niego cala paczka po cichu nic nie robi - linia startu `plik brak pliku arm_canon_moves.tsv`, `--grupa m101postacie` MP-0 / MP-0b = NIE).
+
 **Dla Jeffa (prosto):** w NOWEJ kampanii Jaime, Tyrion, Bronn, Theon, Varys, Baelish i reszta z listy A nie siedza juz w karczmach do wynajecia -
 od pierwszego dnia sa lordami swoich rodow (Jaime i Tyrion u Lannisterow, Theon u Starkow, Varys i Baelish na dworze krola, Benjen i Sam w Nocnej Strazy itd.).
 Ci, ktorzy dowodza wojskiem w ksiazce (Jaime, Tyrion, Theon, Quentyn, Rago, Benjen, pozniej Bronn), moga dostac druzyne; dworzanie (Varys, Baelish, Qyburn,
@@ -187,6 +189,8 @@ MP-1 ERROR CanonCompanions i potkniecia 0, MP-2 latki 2/2, MP-3 mapa rodow N/N, 
 wedrowcem bez zmiany `wander` (od drugiej linii doby), MP-6 zaden B nie zyje, MP-7 zmiana strony najwyzej raz, MP-8 lista zmian (INFO), MP-9 A w rodach (INFO),
 MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym logu (wszystkie wiersze licza sie bez wyjatku).
 
+**Poprawka 2 (wazne, PRAWDZIWE) - brak pliku TSV w grze byl niewidoczny dla narzedzia:** dowod - sztuczny log recenzenta (`plik brak pliku arm_canon_moves.tsv | A 0, B 0 ... 0/0`) dawal 12 progow, NIE 0. Zmiana (tools/sprawdz_logi.py): MP-0 = NIE, gdy pole `plik` linii startu nie jest `wczytany`; nowy MP-0b - A/B/C/D z logu = liczby z `Armoury/ModuleData/arm_canon_moves.tsv` w repo (A > 0); MP-3 - N/N, N > 0 i N = liczba rodow tabeli w repo (17: rody A, `#rescue`, cele clan/court/free); MP-3b - N > 0; MP-4 - A z repo (> 0); MP-6 - ostatniej doby `nie powstali + usunieci` = B z repo (9); MP-11 (INFO) - linie ratunku i usuniec przez cudzy kod. Sprawdzone: log recenzenta -> 14 progow, NIE 6 (MP-0, MP-0b, MP-3, MP-3b, MP-4, MP-6); sztuczny log zgodny z tabela (tmp synth-ok.log z synth_log.py) -> NIE 0. W naglowku wpisu linia pliku do wgrania razem z DLL.
+
 ### Poprawki po recenzji (HEAD f5492999)
 
 **Poprawka 1 (wazne, PRAWDZIWE) - ROT niszczy rody postaci A (DestroyClanAction), postacie znikaly bez zmian m16/m17/m21:**
@@ -253,4 +257,5 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
 - Krok 4 (tabela zmian stron i wykonawca): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA (zmiany przy wydarzeniach ROT widac dopiero w dlugim biegu).
 - Krok 5 (Jeyne zamiast Talisy) i grupa `--grupa m101postacie`: ZROBIONE, build kod 0. **Status calosci: DO SPRAWDZENIA** (nic nie uruchomione w grze, nic nie wgrane).
 - Poprawka 1 po recenzji (ratunek z rodow niszczonych przez ROT, prawdziwe zrodlo usuniec w UC): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
-  Zostalo: poprawka 2 (narzedzie widzi brak pliku TSV), drobne.
+- Poprawka 2 po recenzji (narzedzie widzi brak / inna wersje pliku TSV; plik do wgrania w naglowku): ZROBIONE (narzedzie, bez zmian w DLL).
+  Zostalo: drobne.

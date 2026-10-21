@@ -1017,9 +1017,10 @@ Uzycie (Python 3, tylko odczyt):
                     pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
 --grupa m101postacie : (21.10, w-toku/m101-postacie; Armoury/src/CanonCompanions.cs, klucze CanonCompanionsToClans, CanonCompanionsFollowStory)
-                    python -I tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> [--crashscribe <session-*.log>]. MP-0 start (nowa kampania z kluczem), MP-1 ERROR
-                    i potkniecia 0, MP-2 latki 2/2, MP-3 mapa rodow N/N, MP-4 przeniesienia A raz (BRAK rodu 0), MP-5 A nie sa wedrowcami bez zmiany wander, MP-6 B nie zyja,
-                    MP-7 zmiana strony najwyzej raz, MP-8 zmiany (INFO), MP-9 A w rodach (INFO), MP-10 UC: odrodzenia A/B 0. Stary zapis albo log bez paczki: INFO.
+                    python -I tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> [--crashscribe <session-*.log>]. MP-0 start (nowa kampania z kluczem, plik
+                    arm_canon_moves.tsv wczytany), MP-0b A/B/C/D = tabela w repo, MP-1 ERROR i potkniecia 0, MP-2 latki 2/2, MP-3 mapa rodow N/N (= repo, N > 0), MP-4
+                    przeniesienia A raz (BRAK rodu 0), MP-5 A nie sa wedrowcami bez zmiany wander, MP-6 B nie zyja (nie powstali + usunieci = B), MP-7 zmiana strony najwyzej
+                    raz, MP-8 zmiany (INFO), MP-9 A w rodach (INFO), MP-10 UC: odrodzenia A/B 0, MP-11 ratunek z rodow niszczonych przez fabule (INFO). Stary zapis: INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
@@ -37429,6 +37430,7 @@ def m97surowce_main(logp):
 M101P_TAG = "Postacie kanonu (m101): "
 M101P_START = re.compile(r"start \| klucz CanonCompanionsToClans (tak|nie) \(w chwili zalozenia kampanii: (tak|nie|stary zapis - nic)\)")
 M101P_COUNTS = re.compile(r"\| A (\d+), B (\d+), C (\d+), D (\d+) \|")
+M101P_FILE = re.compile(r"\| plik (.*?) \| A \d+, B \d+")
 M101P_MAP = re.compile(r"mapa rodow znaleziona (\d+)/(\d+)")
 M101P_REFS = re.compile(r"odwolania zmian \(osady, postacie, krolestwa, wydarzenia ROT\) (\d+)/(\d+)(?: BRAK: ([^|]*))?")
 M101P_DAY = re.compile(r"dzien (\d+) \| A (\d+): w rodach (\d+) \(lordow (\d+), dworzan (\d+), z wlasna druzyna (\d+), jencow (\d+)\), martwi (\d+), bez bohatera (\d+), wedrowcy (\d+)(?: \[(.*?)\])? \| B (\d+): zywych (\d+)(?: \[(.*?)\])?, nie powstali (\d+), usunieci (\d+), prob ROT zablokowanych dzis (\d+)")
@@ -37438,10 +37440,22 @@ M101P_SKIP = re.compile(r"zmiana strony #(\S+) POMINIETA - (.+?) \[(\S+)\] \((\S
 
 def m101postacie_tables():
     """Wzory A/B z danych Armoury (Armoury/ModuleData/arm_canon_moves.tsv obok narzedzia) - None, gdy pliku nie ma."""
+    d = m101postacie_data()
+    return d["groups"] if d else None
+
+
+def m101postacie_data():
+    """Dane z Armoury/ModuleData/arm_canon_moves.tsv obok narzedzia (None, gdy pliku nie ma): grupy wzorow, liczby A/B/C/D i oczekiwana liczba rodow
+    w polu 'mapa rodow znaleziona N/M' linii startu (jak CanonCompanions.StartLine: rody A, potem #rescue, potem cele clan/court/free z #move)."""
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Armoury", "ModuleData", "arm_canon_moves.tsv")
     if not os.path.isfile(p):
         return None
     grp, sec, col = {}, None, {}
+    clans, rescue = [], 0
+
+    def cell(c, name):
+        i = col.get(name, -1)
+        return c[i].strip() if 0 <= i < len(c) else ""
     with open(p, encoding="utf-8") as fh:
         for ln in fh:
             ln = ln.rstrip("\r\n")
@@ -37450,11 +37464,29 @@ def m101postacie_tables():
             c = ln.split("\t")
             if c[0].startswith("#"):
                 sec = c[0][1:]
-                col = {n: i - 1 for i, n in enumerate(c) if i > 0}
+                col = {n.strip(): i - 1 for i, n in enumerate(c) if i > 0}
                 continue
             if sec == "start" and "template" in col and "group" in col:
-                grp[c[col["template"]]] = c[col["group"]] if col["group"] < len(c) else ""
-    return grp
+                t = cell(c, "template")
+                if t and t not in grp:
+                    grp[t] = cell(c, "group")
+                    if grp[t] == "A" and cell(c, "clan"):
+                        clans.append((0, cell(c, "clan")))
+            elif sec == "rescue":
+                if cell(c, "clan") and cell(c, "to"):
+                    rescue += 1
+                    clans.append((1, cell(c, "clan")))
+                    clans.append((1, cell(c, "to")))
+            elif sec == "move":
+                kind, _, arg = cell(c, "action").partition(":")
+                if kind in ("clan", "court", "free") and arg:
+                    clans.append((2, arg))
+    seen = []
+    for _o, cid in sorted(clans, key=lambda x: x[0]):
+        if cid not in seen:
+            seen.append(cid)
+    cnt = {g: sum(1 for v in grp.values() if v == g) for g in ("A", "B", "C", "D")}
+    return {"groups": grp, "counts": cnt, "clans": len(seen), "rescue": rescue, "path": p}
 
 
 def m101postacie_main(logp, csp=None):
@@ -37470,8 +37502,10 @@ def m101postacie_main(logp, csp=None):
         rep.add("MP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    groups = m101postacie_tables() or {}
+    data = m101postacie_data()
+    groups = data["groups"] if data else {}
     starts, wires, days, moves, skips, conv, conv_skip, berr, n_err = [], [], [], [], [], [], [], [], 0
+    rescues, lost_other = [], []
     stum = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -37500,6 +37534,10 @@ def m101postacie_main(logp, csp=None):
                 conv.append(mc.group(1) if mc else "?")
             elif body.startswith("B usuniety po utworzeniu"):
                 berr.append(body)
+            elif body.startswith("ratunek - ") or (body.startswith("rod ") and " niszczony (DestroyClanAction" in body):
+                rescues.append(body)
+            elif body.startswith("postac kanonu usunieta (Lost) NIE przez Armoury"):
+                lost_other.append(body)
             elif " POMINIETA - " in body and body.startswith("zmiana strony #"):
                 skips.append(body)
             elif body.startswith("zmiana strony #") and " CZEKA - " not in body:
@@ -37513,30 +37551,44 @@ def m101postacie_main(logp, csp=None):
     st = starts[-1] if starts else ""
     ms = M101P_START.search(st)
     active = bool(ms and ms.group(2) == "tak")
-    rep.add("MP-0: linia startu (klucz, kampania, A/B/C/D)", st[:300] if st else "brak linii startu (sa linie doby)",
-            "klucz tak i 'w chwili zalozenia kampanii: tak' (nowa kampania) - inaczej INFO (stary zapis albo klucz wylaczony)", True if active else None)
+    mf = M101P_FILE.search(st)
+    fstate = mf.group(1).strip() if mf else "brak pola"
+    rep.add("MP-0: linia startu (klucz, kampania, plik danych)", (st[:300] if st else "brak linii startu (sa linie doby)") + f" | plik: {fstate}",
+            "klucz tak, 'w chwili zalozenia kampanii: tak' (nowa kampania) i 'plik wczytany' (arm_canon_moves.tsv w Modules/Armoury/ModuleData) - bez nowej kampanii INFO",
+            (fstate == "wczytany") if active else None)
     if not active:
         rep.show()
         return 0
+    mc = M101P_COUNTS.search(st)
+    got = tuple(int(x) for x in mc.groups()) if mc else None
+    if data:
+        want = tuple(data["counts"][g] for g in ("A", "B", "C", "D"))
+        rep.add("MP-0b: A/B/C/D w grze = tabela w repo", f"log {got if got else 'brak pola'}, repo {want} ({os.path.basename(data['path'])})",
+                "rowne i A > 0 (inna wersja pliku w grze albo plik nie wczytany = NIE)", bool(got) and got == want and want[0] > 0)
+    else:
+        rep.add("MP-0b: A/B/C/D w grze", f"log {got if got else 'brak pola'} (bez arm_canon_moves.tsv obok narzedzia)", "A > 0", bool(got) and got[0] > 0)
     rep.add("MP-1: ERROR CanonCompanions i potkniecia", f"ERROR {n_err}, potkniecia w liniach doby {stum}", "0 i 0", n_err == 0 and stum == 0)
     w = wires[-1] if wires else ""
     ok2 = bool(w) and "BRAK" not in w and "wyjatek" not in w and "PODPIETY" in w and "PODPIETE" in w
     rep.add("MP-2: latki (dowodca partii, tworzenie wedrowcow ROT)", w[:240] if w else "brak linii wpiecia", "obie PODPIETE, bez BRAK", ok2)
     mm = M101P_MAP.search(st)
     if mm:
-        rep.add("MP-3: mapa rodow", f"{mm.group(1)}/{mm.group(2)}", "wszystkie rody z tabeli istnieja (N/N)", mm.group(1) == mm.group(2))
+        exp = data["clans"] if data else None
+        rep.add("MP-3: mapa rodow", f"{mm.group(1)}/{mm.group(2)}" + (f" (repo: {exp} rodow)" if exp is not None else ""),
+                "wszystkie rody z tabeli istnieja (N/N), N > 0 i N = liczba rodow tabeli w repo", mm.group(1) == mm.group(2) and int(mm.group(2)) > 0
+                and (exp is None or int(mm.group(2)) == exp))
     else:
         rep.add("MP-3: mapa rodow", "brak pola w linii startu", "N/N", False)
     mr = M101P_REFS.search(st)
     rep.add("MP-3b: odwolania tabeli zmian (osady, postacie, krolestwa, wydarzenia ROT)", (f"{mr.group(1)}/{mr.group(2)}" + (f" BRAK: {mr.group(3).strip()}" if mr.group(3) else "")) if mr else "brak pola",
-            "N/N (literowka w tabeli = zmiana nigdy nie zajdzie)", bool(mr) and mr.group(1) == mr.group(2))
-    mc = M101P_COUNTS.search(st)
-    n_a = int(mc.group(1)) if mc else sum(1 for g in groups.values() if g == "A")
+            "N/N i N > 0 (literowka w tabeli = zmiana nigdy nie zajdzie)", bool(mr) and mr.group(1) == mr.group(2) and int(mr.group(2)) > 0)
+    n_a = data["counts"]["A"] if data else (int(mc.group(1)) if mc else 0)
+    n_b = data["counts"]["B"] if data else (int(mc.group(2)) if mc else 0)
     dup = sorted(set(t for t in conv if conv.count(t) > 1))
     norod = [s for s in conv_skip if "BRAK rodu" in s]
     rep.add("MP-4: przeniesienia A przy starcie", f"{len(set(conv))} z {n_a} (powtorzone {dup or 0}); pominiete {len(conv_skip)} (BRAK rodu {len(norod)})"
             + (f"; pierwsze pominiecie: {conv_skip[0][:160]}" if conv_skip else ""),
-            "kazdy wzor A raz, BRAK rodu 0 (pominiete z innego powodu - INFO)", not dup and not norod and len(set(conv)) + len(conv_skip) >= n_a)
+            "kazdy wzor A raz, A > 0, BRAK rodu 0 (pominiete z innego powodu - INFO)", n_a > 0 and not dup and not norod and len(set(conv)) + len(conv_skip) >= n_a)
     wander_ok = set(name for (_i, name, act, _b) in moves if act == "wander")
     bad_w, bad_b, bad_days = [], [], 0
     for md, body in days[1:] if len(days) > 1 else days:
@@ -37553,10 +37605,11 @@ def m101postacie_main(logp, csp=None):
     rep.add("MP-5: wzory A jako wedrowcy w karczmie bez zmiany 'wander'", f"{len(bad_w)}" + (f"; pierwszy: {bad_w[0][:160]}" if bad_w else "") + f" (nieczytelnych linii doby {bad_days})",
             "0 (od drugiej linii doby; wedrowiec po zmianie strony 'wander' - dozwolony)", not bad_w and bad_days == 0)
     last = days[-1][0] if days and days[-1][0] else None
+    b_gone = int(last.group(15)) + int(last.group(16)) if last else -1
     rep.add("MP-6: wzory B zywe", (f"{len(bad_b)} dob z zywym B" + (f"; pierwsza: {bad_b[0][:160]}" if bad_b else "")
                                    + (f" | ostatnia doba: nie powstali {last.group(15)}, usunieci {last.group(16)}, prob ROT zablokowanych {last.group(17)}" if last else ""))
-            + (f" | usuniete po utworzeniu {len(berr)}" if berr else ""),
-            "0 (B nie powstaja albo sa usuwane przy starcie)", not bad_b)
+            + (f" | usuniete po utworzeniu {len(berr)}" if berr else "") + f" | B w tabeli {n_b}",
+            "0 dob z zywym B i ostatniej doby nie powstali + usunieci = B z tabeli (> 0)", not bad_b and n_b > 0 and b_gone == n_b)
     ids = [i for (i, _n, _a, _b) in moves]
     dupm = sorted(set(i for i in ids if ids.count(i) > 1))
     rep.add("MP-7: zmiana strony wykonana najwyzej raz", f"wykonanych {len(ids)}, powtorzonych id {dupm or 0}", "0 powtorzen (stan w zapisie)", not dupm)
@@ -37566,6 +37619,10 @@ def m101postacie_main(logp, csp=None):
     if last:
         rep.add("MP-9: postacie A w rodach ostatniej doby", f"w rodach {last.group(3)} z {last.group(2)} (lordow {last.group(4)}, dworzan {last.group(5)}, z druzyna {last.group(6)}, "
                 f"jencow {last.group(7)}), martwi {last.group(8)}, wedrowcy {last.group(10)}", "INFO", None)
+    rep.add("MP-11: zniszczenie rodu przez fabule (ratunek #rescue) i usuniecia postaci kanonu przez cudzy kod",
+            f"linii ratunku {len(rescues)}" + (": " + "; ".join(r[:110] for r in rescues[:4]) if rescues else "")
+            + f" | usuniete NIE przez Armoury {len(lost_other)}" + (": " + "; ".join(r[len('postac kanonu usunieta (Lost) NIE przez Armoury - '):][:110] for r in lost_other[:4]) if lost_other else ""),
+            "INFO (RenlyDeath: Brienne -> Tarth, JeorMutiny: Nocna Straz -> Snow; BastardsEvent bez ratunku)", None)
     if csp and os.path.isfile(csp):
         resp = []
         with open(csp, encoding="utf-8", errors="replace") as fh:
