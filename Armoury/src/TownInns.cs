@@ -371,7 +371,7 @@ namespace Armoury
         private static string HoldFrom() { return Clock(Mod(NightRest.PlayerDawn * 60L - HoldMaxMin, 1440)); }
 
         /// <summary>Przewidywana pobudka po noclegu wzietym teraz - te same zasady co sen w menu (NightRest.SleepTick): cel = NightRest.SleepTargetNow (brak do
-        /// NeededHours w tej dobie), noc 21-5 pelna stawka, dzien DayRestFactor, mnoznik lozka; czekanie do switu, gdy swit najwyzej 12 h przed nami; bezpiecznik
+        /// NeededHours w tej dobie), noc snu NightRest.MenuNight pelna stawka (swit-9 do switu; swit 6 -> 21-5), dzien DayRestFactor, mnoznik lozka; czekanie do switu, gdy swit najwyzej 12 h przed nami; bezpiecznik
         /// snu NightRest.SleepCapHours. atDawn - nocleg czeka do switu. Szacunek co 15 min (podpowiedz menu).</summary>
         private static long PredictWake(long now, float sleepFactor, out bool atDawn, out long dawn)
         {
@@ -386,7 +386,7 @@ namespace Armoury
             while (t < cap && acc < target)
             {
                 long h = Mod(t, 1440) / 60;
-                acc += 0.25f * (NightRest.MenuNight((int)h) ? 1f : day) * f;   // m97-oboz: noc do switu gracza, jak sen w menu
+                acc += 0.25f * (NightRest.MenuNight((int)h) ? 1f : day) * f;   // m97-oboz: noc snu do switu gracza (swit-9), jak sen w menu
                 t += 15;
             }
             if (atDawn && t < dawn) t = dawn;
