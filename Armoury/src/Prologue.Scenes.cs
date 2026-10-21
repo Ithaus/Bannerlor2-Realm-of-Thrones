@@ -154,8 +154,8 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>null = okno wolno pokazac; inaczej powod czekania.</summary>
-        private static string SceneGate(Campaign c)
+        /// <summary>null = okno wolno pokazac; inaczej powod czekania. m105-kronika (A2): internal - te same bramki dla okien i list Kroniki (Chronicle.Step), logika bez zmian.</summary>
+        internal static string SceneGate(Campaign c)
         {
             var gsm = GameStateManager.Current;
             var active = gsm != null ? gsm.ActiveState : null;

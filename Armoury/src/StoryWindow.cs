@@ -251,6 +251,10 @@ namespace Armoury
 
         internal void Show() { OpenPopup(); }
 
+        /// <summary>m105-kronika K0 (A2): klucz okna dla lektora - Spec.Key (Kronika: kr_NNN_w[war] = kolumna 1 arm_lektor; sceny prologu: prolog_NN). Publiczny - lektor
+        /// moze go czytac odbiciem po nazwie przy oknie z EventScreen (P9: najpierw klucz, potem tytul).</summary>
+        public string Key { get { return _spec.Key ?? ""; } }
+
         public override void Initialize() { }
 
         public override bool ConditionsMet() { return false; }
