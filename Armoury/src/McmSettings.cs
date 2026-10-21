@@ -7164,7 +7164,7 @@ namespace Armoury
         [SettingPropertyGroup("Old loose ends (A17)")]
         public float ShipyardLabourShare { get; set; } = 0.1f;
 
-        [SettingPropertyBool("Shipyard Wood Above Craft Stock", HintText = "a shipyard building a ship takes timber off the town's market only above the stock the town keeps for its own smiths, bloomeries and workshops - the same rule as other building works (Build Wood Above Craft Stock); planks as before. Off = the shipyard takes timber down to the last log, as before", RequireRestart = false)]
+        [SettingPropertyBool("Shipyard Wood Above Craft Stock", HintText = "a shipyard building a ship takes timber off the town's market only above the stock the town keeps for its own smiths, bloomeries and workshops - the same rule as other building works (Build Wood Above Craft Stock); works only while Build Wood Above Craft Stock is on; planks as before. Off = the shipyard takes timber down to the last log, as before", RequireRestart = false)]
         [SettingPropertyGroup("Old loose ends (A17)")]
         public bool ShipyardWoodAboveCraftStock { get; set; } = true;
 

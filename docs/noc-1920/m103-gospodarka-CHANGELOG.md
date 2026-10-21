@@ -175,3 +175,39 @@ VR-3 na nowym formacie sprawdzony na logu syntetycznym (linie VR z 07-17-36, w 2
 Build 5 modow (Release, GameLibs z lancuch/libs): Armoury 0 (6 ostrzezen jak dotad), RealisticCaptivity 0, GrandTourney 0, ForgeView 0, CrashScribe 0. gen_mcm: Armoury 2246 ustawien (WGRANIE 101: 2243), RealisticCaptivity 115, GrandTourney 44. Nic nie wgrane, nic nie wypchniete. Test w grze: jeden finalny autotest po scaleniu wszystkich galezi (nowa kampania 180 dob z `armoury-ks-auto.flag` + bieg z zapisu na regresje).
 
 Do powiedzenia Jeffowi: GL2-8 to zmiana progu (60 dni projektu -> zapas wazony regul ludu + stac >= 95%); P7b moze podniesc R1-7 (kopalnia bez wegla) z 7.5% do ok. 8-9% w zamian za drewno dla kowali; P7a - mniej statkow AI w pierwszych 120 dobach; P6 - najedzeni piraci sa silniejsi (bez kary morale).
+
+---
+
+### Poprawki po recenzji (21.10, osobny commit; bez nowych kluczy MCM, liczby gry bez zmian)
+
+Recenzja: 7 uwag, w tym 2 pary tych samych (W12-6 dwa razy, stocznia dwa razy) - 5 roznych. Prawdziwe w tej galezi: 4 (R1-R4) - poprawione. Prawdziwa poza galezia: 1 (R5, M103_TAG) - tu nie ruszana, opis do scalania. Odrzucone: 0.
+
+**R1. W12-6 mierzyl sume ofert W+R+P (uwagi 1 i 5).**
+- Problem (log 101-nowa): licznik "oferta nadwyzki na jutro" to suma trzech klas (`TownFolk.Live.cs:1113`, `d.OffT += f.Offer[c]` dla c < 3). Przy P3 oferta W = `DOvC[0] / 60` (`TownFolk.Luxury.cs:358`), a `DOvC[0]` to ta sama nadwyzka po daninie i kiesa2, ktora idzie do "lokaty" (`TownFolk.Live.cs:1078-1079`). Dlatego suma / lokata >= 1/60 wynika z konstrukcji, a prog byl jednostronny. Liczby: sr28 oferta 183704/d przy lokacie W 10269398 (1/60 = 171157, R+P ok. 12.5 tys./d = 7% licznika); ostatnia doba 109015: oferta 199025, lokata 10719078 (1/60 = 178651, R+P ok. 20.4 tys. = 10%). Zawyzona oferta W (np. blad 1/6) przeszlaby; oferte W zanizona o kilka procent przykrylyby R/P (rosna z kiesami P).
+- Zmiana: `TownFolk.Live.cs` - nowe pole `LDay.OffW` (suma `Offer[0]` miast, zerowane z nowym LDay co dobe), dopisek P3 w linii doby "Kiesa ludu": `(P3: oferta W 1/60 = X, R i P 0.3/60 = Y - linia Zbytki)`, Y = OffT - OffW. `tools/sprawdz_logi.py` W12-6: gdy pole jest - oferta W / lokata W (lokata z tych samych dob) = 1/N +-2% DWUSTRONNIE; oferta R+P i suma W+R+P / lokata jako INFO w wyniku. Log bez pola (101 i starsze) - stary prog jednostronny z dopiskiem "log bez oferty W osobno - licznik zawiera R/P" i "prog jednostronny, nie lapie zawyzonej oferty".
+- Sprawdzenie: 101-nowa i 101-prolog (bez pola) - TAK 0.0179 jak dotad, z dopiskiem. Logi syntetyczne z 101-nowa (pole X dopisane): X = lokata/60 - TAK 0.01667 = 1/60.0 (R+P INFO 12548/d); X x10 (blad 1/6) - NIE 0.16667; X x0.85 - NIE 0.01417 = 1/70.6.
+- Ryzyko: regex `P3: oferta W 1/(\d+)` dalej czyta N (" = X" stoi za liczba); innych czytelnikow napisu brak (grep tools, src). Nazwa wiersza W12-6 bez zmian.
+- Oczekiwane (nowy bieg): W12-6 TAK ok. 0.0167 (1/60 +-2%), R+P INFO.
+
+**R2. Stocznia: klucz drukowany jako TAK bez K1 (uwagi 2 i 7).**
+- Problem: `BuildFunding.WoodHold` zwraca 0 przy wylaczonym `BuildWoodAboveCraftStock` (`BuildFunding.cs:60`), a linia "Stocznie (A17 F5)" drukowala "klucz ShipyardWoodAboveCraftStock TAK" z samego `ShipWoodHoldOn` (`A17Fix.cs:741`); opis MCM nie mowil o zaleznosci. U Jeffa K1 = TAK, wiec w grze bez skutku.
+- Zmiana: odcinek linii: `(klucz ShipyardWoodAboveCraftStock TAK, dziala TAK)` - "dziala" = oba klucze; przy samym kluczu stoczni dopisek ` - wymaga BuildWoodAboveCraftStock`. `Settings.cs` opis: "works only while Build Wood Above Craft Stock is on" + gen_mcm (Armoury 2246 ustawien, zmienia sie tylko HintText). Zachowanie bez zmian - celowo: jedna zasada K1 dla wszystkich budow (przy wylaczonym K1 wszystkie budowy biora drewno do zera, stocznia tez).
+- Ryzyko: regexy NA17 `f5`/`f5p` nie czytaja tego odcinka (sprawdzone przy P7a).
+
+**R3. Audyt VR: podloga tylko przy premii < 5% (uwaga 4).**
+- Problem: `MapRoadKinds.Audit` sprawdzal podloge gry (r0 <= LimitMin) tylko wewnatrz `if (b < 0.05)`. Probka z podlogi, ktora z premia wyszla ponad podloge (b miedzy 5% a 25%), zostawala w sredniej VR-3. Audyt traktow DR (`MapRoads.cs:1217`) wyklucza wszystkie probki z podlogi. Blad mogl dac tylko falszywe NIE (premia z podlogi <= premii pelnej).
+- Zmiana: `atFloor = r0 <= lmin + 0.001f` dla kazdej probki; dopisek drukowany, gdy jest probka z podlogi albo premia < 5%: `, ponizej 5% lub na podlodze: K (na podlodze predkosci gry F, sr. X%; sufit kolumny C; inne O) [...]`. Narzedzie: `M103_VALYRIA_LOW` czyta oba napisy (`ponizej 5%:` i `ponizej 5% lub na podlodze:`); VR-3 odejmuje wszystkie probki z podlogi (bez zmian w rachunku); VR-3b: "probki z podlogi gry albo z premia < 5%".
+- Sprawdzenie: log syntetyczny (101-nowa, w 35 dobach 2 probki z podlogi po 12.50%, srednia doby 20.83%): nowe narzedzie VR-3 TAK "bez podlogi 25.00% (ze wszystkimi 24.19%)", VR-3b 70 na podlodze; stare narzedzie (HEAD przed poprawka) nowego napisu nie czytalo - srednia 24.19%. Logi 101 bez dopisku - TAK 25.00% jak dotad; VR-1 nierozpoznane 0.
+
+**R4. GL2-8 bez wykrywania regresji wobec biegu bazowego (uwaga 6).**
+- Problem: w nowej sciezce progu (zapas wazony) `bdm` z `--baza-doby` tylko sie wyswietlal - spadek np. z 27 do 13 dni przy zapasie 12.2 dalby TAK.
+- Zmiana: przy biegu bazowym dodatkowo srednio >= 0.9 x baza (jak w starej sciezce: ponizej = NIE); w wyniku `baza N - REGRESJA: srednio < 0.9 x baza`; bez bazy napis jak w starej sciezce ("bez biegu bazowego (--baza-doby)").
+- Sprawdzenie: 101-nowa bez bazy TAK jak dotad (min 27, sr. 32, zapas 12.2, stac 100%); z baza podstawiona 60 dni - NIE "REGRESJA"; z baza 34 - TAK. 101-prolog bez bazy NIE jak dotad (stac 88%).
+- Ryzyko: baza musi byc biegiem tego samego kodu z kluczami GL wylaczonymi (definicja `--baza-doby`); stary bieg W43 (51 dni) da NIE - to porownanie z innym kodem.
+
+**R5. POZA TA GALEZIA - M103_TAG w m103-sceny i m103-lektor (uwaga 3) - PRAWDZIWA, do scalania.**
+- Sprawdzone: `w-toku/m103-sceny` ma `M103_TAG = "Prolog (m103): "` (`tools/sprawdz_logi.py:37606`, uzycia :37666-37668), `w-toku/m103-lektor` ma `M103_TAG = "Lektor (m103): "` (:37962, uzycia :38013-38015) - obie stale na poziomie modulu. Po scaleniu obu obowiazuje ostatnie przypisanie i jedna z grup (m103sceny albo m103lektor) szuka cudzych linii; git tego nie zglosi.
+- Tu nie poprawione: stalej nie ma w tej galezi, a tamte drzewa maja wlasne prace w toku (nie ruszam cudzych galezi).
+- Do scalania: przed scaleniem zmienic nazwe w obu galeziach (np. `M103S_TAG` w m103-sceny, `M103L_TAG` w m103-lektor, wraz z uzyciami); konflikt `Armoury/src/SubModuleMain.cs` miedzy m103-sceny a m103-lektor rozwiazac recznie; `McmSettings.cs` odtworzyc gen_mcm. m103-gospodarka tych miejsc nie dotyka.
+
+**Build:** 5 modow kod 0 (Armoury 6 ostrzezen jak dotad, RealisticCaptivity 0, GrandTourney 0, ForgeView 0, CrashScribe 0); gen_mcm: Armoury 2246, RealisticCaptivity 115, GrandTourney 44. Nic nie wgrane, nic nie wypchniete.

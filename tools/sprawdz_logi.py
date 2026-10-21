@@ -8145,10 +8145,30 @@ def etap5_wsie(rep, lines, start, until):
         p36 = num(r"P3: oferta W 1/(\d+)", kie[d], int)
         if p36:
             break
+    # m103 recenzja (W12-6): "oferta nadwyzki na jutro" to suma ofert W+R+P (TownFolk.Live.cs d.OffT), a przy P3 oferta W = DOvC[0]/N - ta sama nadwyzka co lokata W,
+    # wiec suma / lokata >= 1/N z samej konstrukcji. Nowy log ma oferte W osobno ("P3: oferta W 1/N = X, R i P 0.3/N = Y"): prog dwustronny oferta W / lokata W
+    # = 1/N +-2% (doby z polem; lokata z tych samych dob), R+P jako INFO. Log bez pola - stary prog jednostronny z dopiskiem, ze licznik zawiera R/P.
+    ow6 = {}
     if p36:
+        for d in w28:
+            m6 = re.search(r"P3: oferta W 1/\d+ = (\d+), R i P [\d.]+/\d+ = (-?\d+)", kie[d])
+            if m6:
+                ow6[d] = (int(m6.group(1)), int(m6.group(2)))
+    if p36 and ow6:
         thr6 = 1.0 / p36
-        rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.4f} (oferta {off / max(1, len(w28)):.0f}/d, lokata {lok / max(1, len(w28)):.0f}; P3: oferta W 1/{p36})" if q6 is not None else "-",
-                f">= 1/{p36} = {thr6:.4f} -2% (P3: oferta W 1/FolkSurplusSpendDays, R/P na wierzch; place R/P " + (f"{tempo:.2f}" if tempo is not None else "-") + " poza miara)", (q6 >= thr6 * 0.98) if q6 is not None else None)
+        n6 = len(ow6)
+        offw6 = sum(v[0] for v in ow6.values()); offrp6 = sum(v[1] for v in ow6.values())
+        lokw6 = sum(fnum(r"lokata \(kiesa W ponad zapas dni\) ([\d.]+)", kie[d], 0.0) or 0.0 for d in ow6)
+        q6w = offw6 / lokw6 if lokw6 > 0 else None
+        rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", (f"{q6w:.5f}" + (f" = 1/{1.0 / q6w:.1f}" if q6w > 0 else "") + f" (oferta W {offw6 / n6:.0f}/d, lokata W {lokw6 / n6:.0f}; dob z polem {n6} z {len(w28)};"
+                f" INFO: oferta R+P na wierzch {offrp6 / n6:.0f}/d, suma W+R+P / lokata {q6:.4f})") if q6w is not None else "-",
+                f"1/{p36} = {thr6:.5f} +-2% dwustronnie (P3: oferta W = lokata W / FolkSurplusSpendDays; R/P i place R/P " + (f"{tempo:.2f}" if tempo is not None else "-") + " poza miara)",
+                (abs(q6w / thr6 - 1.0) <= 0.02) if q6w is not None else None)
+    if p36 and not ow6:
+        thr6 = 1.0 / p36
+        rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.4f} (oferta W+R+P {off / max(1, len(w28)):.0f}/d, lokata W {lok / max(1, len(w28)):.0f}; P3: oferta W 1/{p36};"
+                f" log bez oferty W osobno - licznik zawiera R/P)" if q6 is not None else "-",
+                f">= 1/{p36} = {thr6:.4f} -2% (P3: oferta W 1/FolkSurplusSpendDays, R/P na wierzch - prog jednostronny, nie lapie zawyzonej oferty; place R/P " + (f"{tempo:.2f}" if tempo is not None else "-") + " poza miara)", (q6 >= thr6 * 0.98) if q6 is not None else None)
     if not p36: rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.3f} (oferta {off / max(1, len(w28)):.0f}/d, lokata {lok / max(1, len(w28)):.0f})" if q6 is not None else "-",
             f">= {tempo:.2f} - 0.002 (tempo z linii stanu; dotad 0.07)" if tempo is not None else ">= tempo", (q6 >= tempo - 0.002) if (q6 is not None and tempo is not None) else None)
     # ---- W12-7 zmiana kies wsi i ludu miast (cel decyzji: wsie i lud nie gromadza; przed: wsie +57.6 tys./d, lud miast +93.0 tys./d sr28 kopia-fin3)
@@ -21338,10 +21358,15 @@ def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
     thr8 = st.mean(res8) if res8 else None
     if thr8 is not None:
         ok8n = (min(bd) >= thr8 and bool(bs) and st.mean(bs) >= 95) if bd else None
+        # m103 recenzja (GL2-8): prog z regul ludu to podloga, nie wykrywanie regresji - przy biegu bazowym (--baza-doby: ten sam kod, klucze GL wylaczone)
+        # dodatkowo srednia >= 0.9 x baza (jak w starej sciezce: ponizej 0.9 x baza = NIE)
+        reg8 = bool(bd) and bdm is not None and st.mean(bd) < 0.9 * bdm
+        if ok8n and reg8:
+            ok8n = False
         rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", (f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek")
                 + f"; zapas wazony potrzeba {thr8:.1f} dni (W {rdw8:.0f} / R 21 / P 30, dob {len(res8)})" + (f"; stac srednio {st.mean(bs):.0f}%" if bs else "; brak GL2-8b")
-                + (f"; baza {bdm:.0f}" if bdm is not None else ""),
-                ">= zapas dni wazony potrzeba (regula ludu; ZMIANA PROGU 21.10 - dotad 60 dni projektu [R], nieosiagalne) i GL2-8b srednio >= 95%", ok8n)
+                + (f"; baza {bdm:.0f}" + (" - REGRESJA: srednio < 0.9 x baza" if reg8 else "") if bdm is not None else ("; baza bez tabeli tygodnia GL2 (bieg sprzed paczki?)" if bdp else "; bez biegu bazowego (--baza-doby)")),
+                ">= zapas dni wazony potrzeba (regula ludu; ZMIANA PROGU 21.10 - dotad 60 dni projektu [R], nieosiagalne) i GL2-8b srednio >= 95%; z biegiem bazowym takze srednio >= 0.9 x baza", ok8n)
     if thr8 is None: rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", (f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek")
             + (f"; baza {bdm:.0f}" if bdm is not None else ("; baza bez tabeli tygodnia GL2 (bieg sprzed paczki?)" if bdp else "; bez biegu bazowego (--baza-doby)")),
             ">= 60 (projekt [R]); ponizej, ale srednio >= 0.9 x baza = DECYZJA (baza W43 bez reguly: 51 - prog nieosiagalny przy zapasie ludu 10/21/30 dni)",
@@ -54159,7 +54184,8 @@ M96VALYRIA_AUD = re.compile(r" \| audyt (?P<k>Valyria|szlak): (?P<n>\d+) partii(
                             r"z wpisem '[^']*' (?P<lines>\d+))?, oczekiwane (?P<exp>\d+\.\d)%")
 M96VALYRIA_AI = re.compile(r"siec AI drog: mosty Valyrii (?P<b>\d+), krawedzie Valyrii (?P<lv>\d+) jedn\., szlakow karawan (?P<lc>\d+) jedn\. \(klasy (?P<cls>tak|nie)\)")
 # m103 P1 (VR-3): dopisek audytu za "oczekiwane X%" - probki z premia < 5% i powod (na podlodze predkosci gry: wynik bez premii na LimitMin, premia ginie w modelu gry)
-M103_VALYRIA_LOW = re.compile(r" \| audyt (?P<k>Valyria|szlak): [^|]*?, oczekiwane \d+\.\d%, ponizej 5%: (?P<low>\d+) \(na podlodze predkosci gry (?P<fl>\d+), sr\. (?P<fa>-?\d+\.\d+)%; "
+# m103 recenzja: nowy napis "ponizej 5% lub na podlodze" - na podlodze = wszystkie probki z podlogi (takze z premia >= 5%), jak AuditList traktow DR
+M103_VALYRIA_LOW = re.compile(r" \| audyt (?P<k>Valyria|szlak): [^|]*?, oczekiwane \d+\.\d%, ponizej 5%(?: lub na podlodze)?: (?P<low>\d+) \(na podlodze predkosci gry (?P<fl>\d+), sr\. (?P<fa>-?\d+\.\d+)%; "
                               r"sufit kolumny (?P<cap>\d+); inne (?P<oth>\d+)\) \[(?P<ex>[^\]]*)\]")
 
 
@@ -54254,7 +54280,7 @@ def m96valyria_main(logp):
                 ok = abs(avgx - exp) <= 1.5 and tl == tn
                 rep.add(name, f"probek {tn}, poza srednia na podlodze predkosci gry {fn}; premia sr. bez podlogi {avgx:.2f}% (ze wszystkimi {avg:.2f}%, min {mn:.2f}, maks {mx:.2f}), z wpisem {tl}; oczekiwane {exp:.1f}%",
                         f"sr. bez probek z podlogi = oczekiwana +-1.5 pp, wpis w kazdej probce" + (" (INFO dla szlaku)" if kind == "szlak" else ""), ok if kind == "Valyria" else (None if ok else False))
-                rep.add(name.split(":")[0] + "b: probki z premia < 5% (podloga predkosci gry poza srednia)", f"ponizej 5% {lowN}: na podlodze {fn} (sr. {fs / fn if fn else 0:.2f}%), sufit kolumny {capN}, inne {othN}"
+                rep.add(name.split(":")[0] + "b: probki z podlogi gry albo z premia < 5% (podloga poza srednia)", f"ponizej 5% lub na podlodze {lowN}: na podlodze {fn} (sr. {fs / fn if fn else 0:.2f}%), sufit kolumny {capN}, inne {othN}"
                         + (f"; przyklad: {fex}" if fex else ""), "INFO (partia z wynikiem bez premii na podlodze gry LimitMin - premia drogi ginie w modelu gry; inne > 0 do sprawdzenia)", None)
                 continue
             rep.add(name, f"probek {tn}, premia sr. {avg:.2f}% (min {mn:.2f}, maks {mx:.2f}), z wpisem {tl}; oczekiwane {exp:.1f}%",

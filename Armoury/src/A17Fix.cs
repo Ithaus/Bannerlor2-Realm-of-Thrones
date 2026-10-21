@@ -738,7 +738,7 @@ namespace Armoury
                          + " | statki z niczego " + (ShipOn ? _sFree : _sWant)
                          + " | czesci nowych statkow (ulepszenia CreateShip, z drewna i za place - wliczone wyzej; czego brak - zdjete): zalozone " + _sPieces + " za " + _sPieceValue + " zl wartosci, pominiete - brak drewna "
                          + _sPieceNoWood + ", brak nadwyzki kasy " + _sPieceNoGold + ", z niczego (potkniecie) " + _sPieceFree + ", statek poza portem (niesprawdzone) " + _sPieceLost
-                         + " | zapas rzemiosla (klucz ShipyardWoodAboveCraftStock " + YN(ShipWoodHoldOn) + "): zostawione rzemioslu " + _sWoodLeft + " pni (suma przy probach), proby pominiete tylko przez zapas " + _sWoodHeldSkip   // m103 P7a
+                         + " | zapas rzemiosla (klucz ShipyardWoodAboveCraftStock " + YN(ShipWoodHoldOn) + ", dziala " + YN(ShipWoodHoldOn && BuildFunding.WoodHoldOn) + (ShipWoodHoldOn && !BuildFunding.WoodHoldOn ? " - wymaga BuildWoodAboveCraftStock" : "") + "): zostawione rzemioslu " + _sWoodLeft + " pni (suma przy probach), proby pominiete tylko przez zapas " + _sWoodHeldSkip   // m103 P7a; recenzja: "dziala" = oba klucze (WoodHold zwraca 0 bez K1)
                          + pot);
             }
             catch (Exception e) { Log.Error("A17Fix.Daily", e); }

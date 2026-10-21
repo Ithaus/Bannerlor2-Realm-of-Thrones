@@ -350,12 +350,15 @@ namespace Armoury
                         if (!MapRoads.ProbeFor(mp, txt, out r0, out r1, out hl, out lmin, out lmax) || !(r0 > 0.0001f)) continue;
                         double b = r1 / r0 - 1.0;
                         n++; sum += b; if (b < mn) mn = b; if (b > mx) mx = b; if (hl) lines++;
-                        if (b < 0.05)
+                        // m103 recenzja (VR-3): podloga liczona dla KAZDEJ probki (jak AuditList w MapRoads.cs) - wynik bez premii na LimitMin znieksztalca premie takze,
+                        // gdy z premia wyszedl ponad podloge (b miedzy 5% a pelna premia); narzedzie odejmuje od sredniej wszystkie probki z podlogi
+                        bool atFloor = r0 <= lmin + 0.001f;
+                        if (atFloor || b < 0.05)
                         {
-                            // m103 P1 (VR-3): premia ponizej 5% - id partii i powod: podloga gry (wynik bez premii na LimitMin - premia ginie w modelu), sufit kolumny (LimitMax), inne
+                            // m103 P1 (VR-3): probka z podlogi albo premia ponizej 5% - id partii i powod: podloga gry (wynik bez premii na LimitMin - premia ginie w modelu), sufit kolumny (LimitMax), inne
                             low++;
                             string why;
-                            if (r0 <= lmin + 0.001f) { lowFloor++; sumFloor += b; why = "podloga gry"; }
+                            if (atFloor) { lowFloor++; sumFloor += b; why = "podloga gry"; }
                             else if (lmax < float.MaxValue * 0.5f && r1 >= lmax - 0.0015f) { lowCap++; why = "sufit kolumny"; }
                             else { lowOther++; why = "inne"; }
                             if (low <= 3)
@@ -371,7 +374,7 @@ namespace Armoury
                                   .Append(", maks ").Append((100.0 * mx).ToString("0.00", Inv)).Append("), z wpisem '").Append(txt).Append("' ").Append(lines);
                     sb.Append(", oczekiwane ").Append(want == 4 ? (100f * MapRoads.ValPctNow(s)).ToString("0.0", Inv) : (100f * MapRoads.CarPctNow(s)).ToString("0.0", Inv)).Append('%');
                     // m103 P1 (VR-3): dopisek za "oczekiwane" (regex VR-1/VR-3 bez zmian; srednia wyzej dalej ze wszystkich probek - narzedzie odejmuje probki z podlogi)
-                    if (low > 0) sb.Append(", ponizej 5%: ").Append(low).Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")
+                    if (low > 0) sb.Append(", ponizej 5% lub na podlodze: ").Append(low)   // m103 recenzja: na podlodze = wszystkie probki z podlogi (takze z premia >= 5%).Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")
                                    .Append(lowFloor > 0 ? (100.0 * sumFloor / lowFloor).ToString("0.00", Inv) : "0.00").Append("%; sufit kolumny ").Append(lowCap)
                                    .Append("; inne ").Append(lowOther).Append(") [").Append(ex != null ? ex.ToString() : "").Append(']');
                 }
