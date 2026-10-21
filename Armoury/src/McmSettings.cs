@@ -7120,6 +7120,10 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool OptimVerify { get; set; } = false;
 
+        [SettingPropertyBool("Optim Kt Skip Model", HintText = "at the turn of the day the crown dues no longer work out the whole income of a vassal clan that holds no town, castle or village and whose head owns no workshop, when its dues are taken from its land anyway - that income was worked out only to be thrown away. The same dues, much less work. It stands aside on its own for the day (and says why in the log) when another mod hooks that income; off = worked out for every clan, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimKtSkipModel { get; set; } = true;
+
         [SettingPropertyBool("Perf Town Tax Fast Hooks", HintText = "the town tax with rents (the lines somebody really pays, the council wages) asks Banner Kings directly instead of through slow reflection - the same numbers, less work each time a town's tax is counted; off = through reflection, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfTownTaxFastHooks { get; set; } = true;
@@ -10899,6 +10903,7 @@ namespace Armoury
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
             s.OptimDailyCache = OptimDailyCache;
             s.OptimVerify = OptimVerify;
+            s.OptimKtSkipModel = OptimKtSkipModel;
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.PerfSutlerWageExact = PerfSutlerWageExact;
             s.PerfProbeEachPlace = PerfProbeEachPlace;

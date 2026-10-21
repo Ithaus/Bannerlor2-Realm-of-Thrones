@@ -73,6 +73,7 @@ namespace Armoury
                 bool land = CrownIncome.On && s.CrownDuesFromLand;   // 165 (2.6): podstawa powinnosci = czesc "ziemia" D stalego (korona nie bierze 3% z wlasnych wyplat)
                 var model = TaleWorlds.CampaignSystem.Campaign.Current.Models.ClanFinanceModel;
                 OptBegin(s);   // m99-optym (KingdomTreasury.Optim.cs): pamiec wojny krolestw tej doby od zera
+                KtSkipBegin(s, land);   // m105-optym (KingdomTreasury.Optim105.cs): klucz OptimKtSkipModel i straznik (lancuch modelu, latki sciezki) na te dobe
                 foreach (var c in TaleWorlds.CampaignSystem.Clan.All)
                 {
                     try
@@ -80,6 +81,11 @@ namespace Armoury
                         if (c == null || c.IsEliminated || c.Kingdom == null || c.Leader == null || !c.Leader.IsAlive) continue;
                         if (c.IsUnderMercenaryService || c == c.Kingdom.RulingClan || c.IsBanditFaction) continue;
                         float income = 0f;
+                        // m105-optym (OptimKtSkipModel): rod bez lenn, wsi BK z tytulu i warsztatu glowy, z podstawa ziemia - model nic mu nie zapisuje, a wynik i tak
+                        // nadpisze StableLand nizej; pominiety (Optim Verify: liczony jak dotad, sondy zapisow przed i po). Klucz NIE / straznik - jak dotad 1:1
+                        double ktLand; bool ktSkip = KtSkip(c, out ktLand);
+                        if (ktSkip && _ktSkipVerify) KtProbeBefore(c);
+                        if (!ktSkip || _ktSkipVerify)
                         try
                         {
                             income = model.CalculateClanIncome(c, false, false, false).ResultNumber;
@@ -90,7 +96,8 @@ namespace Armoury
                         income += rent;
                         if (land)
                         {
-                            double l = ClanIncomeBook.StableLand(c);
+                            double l = ktSkip && !_ktSkipVerify ? ktLand : ClanIncomeBook.StableLand(c);   // m105-optym: pominiety model - StableLand sprzed modelu (ten sam)
+                            if (ktSkip && _ktSkipVerify) KtProbeAfter(c, ktLand, l);                        // Verify: gra bierze stara droge, roznice do licznika
                             if (l >= 0) { income = (float)l; _duesLand++; }
                             else
                             {
@@ -124,6 +131,7 @@ namespace Armoury
                          + (land ? "; podstawa (165): czesc ziemia D stalego u " + _duesLand + " rodow, stara (dochod modelu + renty - brak pomiaru D stalego) u " + _duesOld
                             + (_duesSaved > 0 ? ", ziemia z zapisu (f19-e3, pierwsza doba po wczytaniu) u " + _duesSaved : "") : "") + ".");
                 OptEnd(s);   // m99-optym: linia kontrolna tylko przy Optim Verify
+                KtSkipEnd(s);   // m105-optym: linia "Optym (m105)" - pominiete modele, straznik, kontrola
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
