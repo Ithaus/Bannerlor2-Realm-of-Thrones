@@ -67,61 +67,70 @@ namespace Armoury
             }
         }
 
-        /// <summary>Raz na proces, przy pierwszej kampanii z prologiem: transpiler na wszystkich czytelnikach CampaignStartTime w ROT.dll.</summary>
+        /// <summary>Raz na proces, przy pierwszej kampanii z prologiem: transpiler na wszystkich czytelnikach CampaignStartTime w ROT.dll i w ROTBattleAtmosphere
+        /// (LoreGates.CampaignDay - atmosfera bitew wedlug dnia opowiesci: bramki "d25", "d120"... z ujemnym dniem zamkniete; bez latki po prologu zostalaby
+        /// przesunieta o 188 dni na cala kampanie).</summary>
         internal static void InstallStory(string why)
         {
             if (_storyTried) return;
             _storyTried = true;
             var t0 = DateTime.UtcNow;
-            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0;
             try
             {
                 var tBase = AccessTools.TypeByName("ROT.Events.EventBase");
                 if (tBase == null) { _storyState = "ROT nieobecny - nic do wpiecia"; Log.Info(Tag + "latki opowiesci ROT: " + _storyState + "."); return; }
-                var asm = tBase.Assembly;
-                var getter = AccessTools.PropertyGetter(typeof(CampaignTimeModel), "CampaignStartTime");
                 var h = new Harmony("com.jeff.armoury.prologue");
                 var tr = new HarmonyMethod(typeof(Prologue), nameof(StoryTranspiler));
-                Type[] types;
-                try { types = asm.GetTypes(); }
-                catch (ReflectionTypeLoadException e) { types = Array.FindAll(e.Types ?? new Type[0], x => x != null); }
-                // tokeny odwolan do gettera w module ROT (MemberRef albo MethodDef) - filtr wstepny po bajtach IL
-                var tokCache = new Dictionary<int, bool>();
-                const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
-                foreach (var t in types)
-                {
-                    if (t == null) continue;
-                    var members = new List<MethodBase>();
-                    try { members.AddRange(t.GetMethods(all)); } catch { }
-                    try { members.AddRange(t.GetConstructors(all)); } catch { }
-                    foreach (var m in members)
-                    {
-                        try
-                        {
-                            if (m.IsAbstract) continue;
-                            MethodBody body;
-                            try { body = m.GetMethodBody(); } catch { body = null; }
-                            if (body == null) continue;
-                            var il = body.GetILAsByteArray();
-                            if (il == null || !HasGetterCall(m.Module, il, getter, tokCache)) continue;
-                            // potwierdzenie i liczba miejsc
-                            int n = 0;
-                            foreach (var kv in PatchProcessor.ReadMethodBody(m))
-                                if ((kv.Key == OpCodes.Callvirt || kv.Key == OpCodes.Call) && kv.Value is MethodBase && IsStartGetter((MethodBase)kv.Value)) n++;
-                            if (n == 0) continue;
-                            if (IsCampaignAgeType(t)) { age += n; continue; }
-                            found++; sites += n;
-                            if (t.ContainsGenericParameters || m.ContainsGenericParameters) { skipped++; continue; }
-                            if (h.Patch(m, transpiler: tr) != null) patched++; else failed++;
-                        }
-                        catch (Exception e) { failed++; Stumble("InstallStory " + t.FullName + "." + m.Name, e); }
-                    }
-                }
-                _storyState = "wpiete " + patched + "/" + found + " metod (miejsc odczytu " + sites + ", podmienionych " + _storySwapped
-                              + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + ", wiek kampanii (zaciag) bez latki " + age + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
+                _storyState = ScanPatch(tBase.Assembly, h, tr);
+                var tLore = AccessTools.TypeByName("ROTBattleAtmosphere.LoreGates");
+                _storyState += tLore != null ? " | ROTBattleAtmosphere: " + ScanPatch(tLore.Assembly, h, tr) : " | ROTBattleAtmosphere nieobecny";
             }
             catch (Exception e) { Stumble("InstallStory", e); _storyState = "BLAD wpinania (" + e.GetType().Name + ")"; }
             Log.Info(Tag + "latki opowiesci ROT (" + why + "): " + _storyState + " w " + (int)(DateTime.UtcNow - t0).TotalMilliseconds + " ms.");
+        }
+
+        /// <summary>Jeden zestaw: szukanie czytelnikow gettera (filtr bajtow IL + ReadMethodBody) i transpiler. Opis do linii logu.</summary>
+        private static string ScanPatch(Assembly asm, Harmony h, HarmonyMethod tr)
+        {
+            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0, swapped0 = _storySwapped;
+            var getter = AccessTools.PropertyGetter(typeof(CampaignTimeModel), "CampaignStartTime");
+            Type[] types;
+            try { types = asm.GetTypes(); }
+            catch (ReflectionTypeLoadException e) { types = Array.FindAll(e.Types ?? new Type[0], x => x != null); }
+            // tokeny odwolan do gettera w module zestawu (MemberRef albo MethodDef) - filtr wstepny po bajtach IL; pamiec tokenow na jeden zestaw
+            var tokCache = new Dictionary<int, bool>();
+            const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+            foreach (var t in types)
+            {
+                if (t == null) continue;
+                var members = new List<MethodBase>();
+                try { members.AddRange(t.GetMethods(all)); } catch { }
+                try { members.AddRange(t.GetConstructors(all)); } catch { }
+                foreach (var m in members)
+                {
+                    try
+                    {
+                        if (m.IsAbstract) continue;
+                        MethodBody body;
+                        try { body = m.GetMethodBody(); } catch { body = null; }
+                        if (body == null) continue;
+                        var il = body.GetILAsByteArray();
+                        if (il == null || !HasGetterCall(m.Module, il, getter, tokCache)) continue;
+                        // potwierdzenie i liczba miejsc
+                        int n = 0;
+                        foreach (var kv in PatchProcessor.ReadMethodBody(m))
+                            if ((kv.Key == OpCodes.Callvirt || kv.Key == OpCodes.Call) && kv.Value is MethodBase && IsStartGetter((MethodBase)kv.Value)) n++;
+                        if (n == 0) continue;
+                        if (IsCampaignAgeType(t)) { age += n; continue; }
+                        found++; sites += n;
+                        if (t.ContainsGenericParameters || m.ContainsGenericParameters) { skipped++; continue; }
+                        if (h.Patch(m, transpiler: tr) != null) patched++; else failed++;
+                    }
+                    catch (Exception e) { failed++; Stumble("InstallStory " + t.FullName + "." + m.Name, e); }
+                }
+            }
+            return "wpiete " + patched + "/" + found + " metod (miejsc odczytu " + sites + ", podmienionych " + (_storySwapped - swapped0)
+                   + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + ", wiek kampanii (zaciag) bez latki " + age + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
         }
 
         /// <summary>Czy w bajtach IL jest call/callvirt (0x28/0x6F) z tokenem, ktory rozwiazuje sie na getter CampaignStartTime (lub jego nadpisanie). Wynik tokenu w pamieci.</summary>

@@ -35,7 +35,8 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
   (StartDay/EndDay), `ROTStorylineWars.EnforceWars` (nic przed doba 1), `ROTOthersCampaignBehavior` (Inni 300/400/500 dni, rytm co 4 dni), `ROTEnlistmentBehavior`,
   `AIThinkPatch` (Nocna Straz po 1.5 roku). Wszystkie to os OPOWIESCI.
 - **Inne mody**: BK (`BKInterestGroupsModel` lata radykalow od startu, `BKClanBehavior` 30 dni) - wiek kampanii (kalendarz, bez zmian); ROTBattleAtmosphere
-  `LoreGates.CampaignDay` - os opowiesci, ale osobny zestaw (poza zakresem tej latki - ryzyko); AIInfluence - zaciemniony, bez zmian; SandBox statystyki - kalendarz.
+  `LoreGates.CampaignDay` (bramki atmosfery bitew "d25", "d120"... z lore_gates.json, ujemny dzien = bramka zamknieta) - os opowiesci, ta sama latka; AIInfluence -
+  zaciemniony, bez zmian; SandBox statystyki - kalendarz. ROT `ROTEnlistmentBehavior` ("You must wait at least 5 days before enlisting") - wiek kampanii, bez latki.
   Nasze: CrashScribe Fabula.DayNow i NightKingCall.Day - os opowiesci; reszta (logi, wiek kampanii w Armoury) - kalendarz.
 - **Wojny fabularne ROT**: `ROTStorylineWars.OnNewGameCreated` - 27 wojen; StartDay 0 bez wyzwalacza: Smocza Skala - Krainy Burzy oraz Nocna Straz - Wolni Ludzie;
   `EnforceWars` (doba) wypowiada przez `DeclareWarAction.ApplyByDefault`; na starcie gry w XML tylko Nocna Straz - Wolni Ludzie `isAtWar="true"`
@@ -73,7 +74,8 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - `Calendar.cs`: `LongYearTimeModel.CampaignStartTime` = `StoryStartTime - Prologue.Span` w kampanii z prologiem (`Prologue.CalendarShifted`), inaczej
   `StoryStartTime` (jak dotad). `Prologue.Span` = 188 dni liczone z minut (`CampaignTime.Minutes`, bez bledu float). Kalendarz startuje w roku 298, dzien 177
   (rok 364 dni), o 06:00 jak ROT; start opowiesci = data ROT 299 bez zmian. Prolog wymaga klucza Long Year Enabled (bez modelu Armoury - klasyczny start + linia logu).
-- `Armoury/src/Prologue.Story.cs` (nowy): JEDNA latka - transpiler na wszystkich metodach ROT.dll czytajacych `CampaignTimeModel.CampaignStartTime`
+- `Armoury/src/Prologue.Story.cs` (nowy): JEDNA latka - transpiler na wszystkich metodach ROT.dll (i ROTBattleAtmosphere - `LoreGates.CampaignDay`) czytajacych
+  `CampaignTimeModel.CampaignStartTime`; bez latki zostaje zaciag ROT (`ROTEnlistmentBehavior`, wiek kampanii)
   (`callvirt get_CampaignStartTime` -> `call Prologue.StoryStartOf(model)`: StoryStartTime modelu Armoury; inny model - jego CampaignStartTime). Szukanie po
   wszystkich typach ROT.dll (z zagniezdzonymi), filtr po bajtach IL + potwierdzenie `PatchProcessor.ReadMethodBody`. Wpinana leniwie, raz na proces, przy pierwszej
   kampanii z prologiem (nowa: OnGameStart, przed zegarem; wczytana: SyncData, przed pierwszym tickiem). Klasyczna gra bez prologu w procesie - zero latek.
@@ -143,7 +145,7 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   zostaje BEZ latki (inaczej w prologu gracz nie moglby sie zaciagnac) - linia logu: "wiek kampanii (zaciag) bez latki 1"; mniej = ktores miejsce ROT liczy od kalendarza
   (wydarzenie albo wojna ruszy za wczesnie). Metoda ROT wklejona przez JIT w wolajacego przed latka nie zobaczy podmiany - latka wchodzi przed pierwszym tickiem
   kampanii (ROT czyta start w tickach), a czytelnicy to duze metody i wywolania wirtualne/delegaty. ROTBattleAtmosphere `LoreGates.CampaignDay` (atmosfera bitew wedlug
-  dnia) liczy dalej od kalendarza - w prologu zachowa sie jak po 188 dniach opowiesci (poza zakresem, do decyzji). AIInfluence (zaciemniony) - od kalendarza.
+  dnia) - ta sama latka (inaczej bramki atmosfery bylyby przesuniete o 188 dni na cala kampanie). AIInfluence (zaciemniony) - od kalendarza.
 - E1b: zablokowana decyzja wojny AI zuzywa wplyw rodu (decyzja przechodzi, akcja nie) - w prologu AI moze tracic wplyw na probach (licznik w linii doby).
   Wojna zablokowana w samej akcji: postfiksow na ApplyInternal nie ma (grep BK/Diplomacy/BKROTPatch/nasze), zdarzenie OnWarDeclared nie leci. Prefiks ROT na tej samej
   metodzie dalej dziala. Sojusz gry daje wspolne bitwy/armie AI jak kazdy sojusz; wezwania do wojny zablokowane tylko dla par z prologu. Krolestwo korony w wojnie z
