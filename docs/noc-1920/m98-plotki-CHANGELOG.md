@@ -36,8 +36,8 @@ Piwo: `beer` (SandBoxCore, beczka 10 kg, wartosc 50; po HistoricalPrices u Jeffa
   "szuka"), dopuszczone przez czynny model malzenstw; siedziba rodu do 200 jedn. od karczmy (wiesci z bliska); 2 najlepsze wedlug tieru rodu i bliskosci.
 - **Prog upicia:** `DrunkAfterTankards` (3) **+1 przy Wytrzymalosci 5, +1 przy Atletyce 150** = 3-5 kufli od ostatniego odespania (4 h odpoczynku po ostatnim
   kuflu zeruje licznik trzezwego). Ostrzezenie przy kuflu rownym progowi ("One more tankard and you will be drunk."). Karczmarz nie naleje ponad **prog + 3**.
-- **Pijany** (kufel ponad prog): predkosc na mapie **-15%** za pierwszy kufel ponad prog, **+5%** za kazdy nastepny, najwyzej -30% (`DrunkSpeedPenaltyPercent`
-  x 2); morale bez zmian. Do odespania trzeba **6 h (baza snu) + 1 h na kufel ponad prog** odpoczynku od ostatniego kufla - liczonego tak samo jak ksiega snu
+- **Pijany** (kufel ponad prog): predkosc na mapie **-15%** za pierwszy kufel ponad prog, **+5%** za kazdy nastepny (sufit `DrunkSpeedPenaltyPercent` x 2 = 30%;
+  przy domyslnych najwyzej **-25%**, bo karczmarz nie naleje ponad prog + 3); morale bez zmian. Do odespania trzeba **6 h (baza snu) + 1 h na kufel ponad prog** odpoczynku od ostatniego kufla - liczonego tak samo jak ksiega snu
   NightRest (noc 1/h, dzien DayRestFactor, sen w menu karczmy x SleepFactor). Dlug snu rosnie o te godziny: `NightRest.NeededHours` dolicza brakujace godziny,
   wiec sen w menu ("Bed down", nocleg) trwa dluzej - gracz dosypia. "You are drunk - your party moves 15% slower on the map until you sleep it off (7 hours of rest)."
 - **Kac** (po odespaniu): predkosc **-10%** i morale **-10%** (czynnik, jak kara snu) do **18:00** dnia odespania (odespane od poludnia - 6 h).
