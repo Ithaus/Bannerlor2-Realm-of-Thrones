@@ -144,14 +144,16 @@ namespace Armoury
             Log.Info(Tag + "Robert i Ned (XML ozywionych " + _revivedNow + "/2, klucz Prologue Kings " + (KingsKey ? "TAK" : "NIE") + "): " + r + " | " + n + ".");
         }
 
-        /// <summary>CanHeroDie: w prologu Robert (do smierci krola) i Ned (do egzekucji) nie umieraja zwykla smiercia; wymuszone smierci E2b ida obok (isForced).</summary>
+        /// <summary>CanHeroDie: w prologu Robert (do smierci krola) i Ned (do egzekucji) nie umieraja zwykla smiercia; wymuszone smierci E2b ida obok (isForced).
+        /// Recenzja R3: po smierci krola (_kingFallen) i po NedEvent (_nedDone) ochrony juz nie ma - egzekucja Neda w bitwie stawia tylko znak smierci, a smierc po
+        /// bitwie (KillCharacterAction.ApplyByDeathMark) idzie bez wymuszenia i nasze weto zostawiloby Neda przy zyciu.</summary>
         internal static void CanHeroDie(Hero hero, KillCharacterAction.KillCharacterActionDetail detail, ref bool result)
         {
             try
             {
                 if (!result || !Active || !_kingsAlive || hero == null) return;
-                if (hero.StringId == RobertId && KingProtected()) result = false;
-                else if (hero.StringId == NedId && NedProtected()) result = false;
+                if (hero.StringId == RobertId && !_kingFallen && KingProtected()) result = false;
+                else if (hero.StringId == NedId && !_nedDone && NedProtected()) result = false;
             }
             catch (Exception e) { Stumble("CanHeroDie", e); }
         }
