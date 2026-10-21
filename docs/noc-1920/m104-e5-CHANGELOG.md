@@ -9,7 +9,8 @@ Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej
 
 | Krok | Co | Stan |
 |---|---|---|
-| K1 | straz niewoli (pkt 3 i 4): CanonCompanions.HeldRow / Freeing, tabela #m01 classic + #p10 Riverrun, latki EndCaptivityAction.ApplyInternal i RansomOfferCampaignBehavior.DailyTickHero, klucze PrologueTyrionHeld / PrologueJaimeAtRiverrun + 5 kluczy scen | ZROBIONE (build 0, gen_mcm) |
+| K1 | straz niewoli (pkt 3 i 4): CanonCompanions.HeldRow / Freeing, tabela #m01 classic + #p10 Riverrun, latki EndCaptivityAction.ApplyInternal i RansomOfferCampaignBehavior.DailyTickHero, klucze PrologueTyrionHeld / PrologueJaimeAtRiverrun + 5 kluczy scen | ZROBIONE (ff9d85e7, build 0, gen_mcm) |
+| K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (build Armoury + GT 0) |
 
 ## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
 
@@ -43,3 +44,36 @@ dla gracza - postfiksy). Pokoj: ReleasePrisonersInternal zostawia jenca w lochu 
 za nic); decyzja Jeffa, czy zablokowac takze barter. #p10 wymaga wolnego Jaimego w chwili wyzwalacza (jak #m01).
 
 **Status.** DO SPRAWDZENIA (autotest z prologiem: dni 110-132 bez ucieczki Tyriona; Jaime w town_V2 po wojnie Polnocy).
+
+## K2 - orszak krola Roberta (pkt 1), Ned, Tyrion na Mur
+
+**Problem.** Projekt pkt 2: dzien 0 krol rusza Krolewskim Traktem do Winterfell z dworem (Cersei z dziecmi, Jaime, Tyrion, Ogar), dzien 35 Winterfell, 55 powrot z
+Nedem, Sansa i Arya, ok. 95 Krolewska Przystan; dzien 55 Tyrion na Mur, ok. 100 przez rozstaje. Dotad nic sie nie ruszalo - tylko okna scen.
+
+**Zmiana (Prologue.World.cs - wspolne, Prologue.World.Progress.cs - scena).**
+- Rejestr partii sceny (`Control` / `Uncontrol`, bez zapisu - sceny odbudowuja go co godzine): flaga gry `DoNotMakeNewDecisions` (mysl gry, ROT AIThinkPatch i wezwania
+  do armii ja pomijaja - rozpoznanie e5:A), rozkaz przez wejscie metody (`MethodInfo.Invoke` - bramka snu Armoury SleepGate i straznik drog BK dzialaja jak przy kazdym
+  rozkazie), ukrycie przed AI `IgnoreForHours(2)` odnawiane co godzine (AI nie wybiera partii za cel i nie zaczyna spotkania; gracz moze). Partia spiaca (NightRest) -
+  rozkaz nie ruszany do switu. Partia w armii - wychodzi (wodz - armia rozwiazana). Zapis gry: flaga zdejmowana w OnBeforeSave i wracajaca w OnSaveOver (wzor
+  FreeFolkRaids - po cofnieciu DLL nikt nie stoi zamrozony). Partia nieodswiezona w przebiegu scen (klucz wylaczony, koniec sceny) - od razu wraca do zwyklego AI.
+- Orszak: krol swoja druzyna lorda; trasa z postojami tylko w miastach i wsiach (gra kupuje tam jedzenie co godzine - PartiesBuyFoodCampaignBehavior.HourlyTickParty):
+  KP (d0) -> gospoda na rozstajach (od d1) -> Blizniaki (od d10) -> Winterfell (od d28) ... d55 -> Blizniaki -> gospoda (od d70) -> KP (od d88) = koniec. Odcinek bez
+  dojazdu 15 dni po terminie nastepnego - dalej (linia SPOZNIONY). Eskorta swoimi druzynami: Jaime, Tyrion (do d55), Ned (od wyjazdu z Winterfell), krolowa i Joffrey,
+  gdy maja druzyny. W druzynie krola (TeleportHeroAction do partii; ten sam rod): dorosli z rodu krola bez druzyny - Cersei, Joffrey, Ogar (namiestnik osady zostaje).
+  Dzieci (Myrcella, Tommen) do Winterfell przy przyjezdzie i do KP na koniec; Sansa i Arya do KP na koniec (tylko czynni, wolni, bez druzyny i bez urzedu).
+  Na koniec: dosiadajacy wysiadaja w KP, wszyscy wracaja do swojego AI. Krol jencem / bez druzyny - orszak przerwany (linia).
+- Ned (d50): druzyna do Winterfell, od wyjazdu orszaku eskorta do KP; bez druzyny - na koniec orszaku do KP (TeleportHeroAction, gdy wolny i nie namiestnik).
+- Tyrion (d55): na Mur (Czarny Zamek town_B5), postoj do d96, gospoda na rozstajach do d109 (potem wolne AI; #p01 w dniu 110 bierze go stamtad).
+- Uczta BK (prefiks `BKFeastBehavior.HourlyTickPartyImpl`): partia sceny nie jedzie na uczte (rozpoznanie e5:A: co godzine DisableAi + rozkaz do miasta uczty).
+- GrandTourney `CanonApi.SkipSummon` (Armoury podaje odbiciem `Prologue.Scripted`): herold nie wzywa partii sceny; bez Armoury / kampania klasyczna - null, jak dotad.
+- Zapis sprzed E5 wczytany w polowie prologu: orszak, Ned i Tyrion, ktorych czas minal, pominiete (bez nadrabiania).
+- Linie: `orszak RUSZA`, `orszak: odcinek k/7 -> <osada> (...)`, `orszak w WINTERFELL (dzien ...)`, `orszak w KROLEWSKIEJ PRZYSTANI - KONIEC (dzien ...)`,
+  `Ned: ...`, `Tyrion: ...`; w linii doby `orszak: odcinek ... krol <pozycja>, eskorta: ..., w druzynie krola: ...`.
+
+**Ryzyko / co sprawdzic.** (1) Czy druzyna krola istnieje w dniu 0 (gra daje ja glowie rodu przy nowej grze - wynik +1000 w GetHeroPartyCommandScore); bez druzyny do d3 -
+orszak pominiety. (2) Eskorta SetMoveEscortParty przy zamrozonej AI - czy jedzie za krolem i wchodzi z nim do osad (sprawdzic w autotescie odleglosci w linii doby).
+(3) BK gentry (BKGentryBehavior.OnPartyDailyTick: DisableForHours(72) + rozkaz do majatku) - nie latane (rody orszaku nie sa szlachta BK; rozpoznanie: GentryNoParties);
+jesli w logu eskorta "stoi" - dopisac te sama latke. (4) Postoj 22 dni w Winterfell - jedzenie kupowane co godzine przez gre (miasto); w zamkach postojow nie ma.
+(5) Gracz zaatakuje orszak - wojna z korona przez wrogosc gracza jak zawsze; trasa idzie dalej.
+
+**Status.** DO SPRAWDZENIA (autotest z prologiem 230 dob: linie orszaku, Winterfell przed d40, KP przed d100).

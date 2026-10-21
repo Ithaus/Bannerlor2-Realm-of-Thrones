@@ -49,19 +49,34 @@ namespace Armoury
         private static readonly HashSet<string> _hbSaid = new HashSet<string>(StringComparer.Ordinal);
         private static string _worldWire = "nie wpiete";
         private static bool _worldDirty;      // po wczytaniu: partie scen odbudowane w pierwszej godzinie (WorldHourly)
+        private static bool _wLegacy;         // zapis kampanii z prologiem sprzed E5 (bez "whb=") - sceny, ktorych czas juz minal, pominiete (bez nadrabiania)
+        private static int _ordersDay;        // rozkazy wydane partiom scen od ostatniej linii doby
 
         private static void ResetWorld()
         {
             _hbEsc = _hbRan = _hbPeace = _hbChoice = _hbComp = _hbPass = 0;
             _hbDay = _hbPassDay = _wStumbles = 0; _hbSaid.Clear();
-            _worldDirty = false;
+            _worldDirty = false; _wLegacy = false; _ordersDay = 0;
+            _ctl.Clear(); _thawed = 0; _heroCacheDay = -1; _heroCache.Clear();
+            ResetProgress();
         }
 
         private static void WStumble(string where, Exception e) { _wStumbles++; Stumble("World." + where, e); }
 
         private static string PackWorld()
         {
-            return "whb=" + string.Join(",", new[] { _hbEsc, _hbRan, _hbPeace, _hbChoice, _hbComp, _hbPass }.Select(x => x.ToString(Inv))) + ";";
+            return "whb=" + string.Join(",", new[] { _hbEsc, _hbRan, _hbPeace, _hbChoice, _hbComp, _hbPass }.Select(x => x.ToString(Inv))) + ";"
+                   + PackProgress();
+        }
+
+        private static string Ids(IEnumerable<string> ids) { return string.Join(".", ids.Where(x => !string.IsNullOrEmpty(x)).ToArray()); }
+
+        private static List<string> IdList(Dictionary<string, string> map, string key)
+        {
+            string v;
+            var l = new List<string>();
+            if (map.TryGetValue(key, out v)) foreach (var x in v.Split('.')) if (x.Length > 0) l.Add(x);
+            return l;
         }
 
         private static void UnpackWorld(Dictionary<string, string> map)
@@ -75,6 +90,8 @@ namespace Armoury
                 for (int i = 0; i < 6 && i < a.Length; i++) int.TryParse(a[i], System.Globalization.NumberStyles.Integer, Inv, out r[i]);
                 _hbEsc = r[0]; _hbRan = r[1]; _hbPeace = r[2]; _hbChoice = r[3]; _hbComp = r[4]; _hbPass = r[5];
             }
+            _wLegacy = Active && !map.ContainsKey("whb");
+            UnpackProgress(map);
             _worldDirty = true;
         }
 
@@ -95,7 +112,24 @@ namespace Armoury
                 if (m != null && h.Patch(m, prefix: new HarmonyMethod(typeof(Prologue), nameof(RansomDailyPrefix))) != null) r = "TAK";
             }
             catch (Exception e) { WStumble("ApplyWorld.Ransom", e); }
-            _worldWire = "straz niewoli " + g + ", okup " + r;
+            string f = "BRAK (BK)", gt = "BRAK (GrandTourney)";
+            try
+            {
+                // e5:A: uczta BK (BKFeastBehavior.HourlyTickPartyImpl) co godzine wylacza AI goscia i wysyla go na uczte - partia sceny (orszak, turniej, Beric) jej nie slucha
+                var t = AccessTools.TypeByName("BannerKings.Behaviours.Feasts.BKFeastBehavior");
+                var m = t != null ? AccessTools.DeclaredMethod(t, "HourlyTickPartyImpl", new[] { typeof(MobileParty) }) : null;
+                if (m != null && h.Patch(m, prefix: new HarmonyMethod(typeof(Prologue), nameof(SkipScriptedPrefix))) != null) f = "TAK";
+            }
+            catch (Exception e) { WStumble("ApplyWorld.BkFeast", e); }
+            try
+            {
+                // GrandTourney: herold nie wzywa partii sceny (SummonLords); null w GT = jak dotad
+                var t = AccessTools.TypeByName("GrandTourney.CanonApi");
+                var fi = t != null ? t.GetField("SkipSummon", BindingFlags.Public | BindingFlags.Static) : null;
+                if (fi != null && fi.FieldType == typeof(Func<MobileParty, bool>)) { fi.SetValue(null, new Func<MobileParty, bool>(Scripted)); gt = "TAK"; }
+            }
+            catch (Exception e) { WStumble("ApplyWorld.GrandTourney", e); }
+            _worldWire = "straz niewoli " + g + ", okup " + r + ", uczta BK " + f + ", herold GT " + gt;
             return _worldWire;
         }
 
@@ -211,6 +245,184 @@ namespace Armoury
                    : " (poza niewola #" + row + "/#" + freeRow + ")");
         }
 
+        // ---------------------------------------------------------------- partie pod scena (wspolne dla scen)
+        // Partia sceny: flaga gry "bez nowych decyzji" (MobilePartyAi.DoNotMakeNewDecisions - mysl gry, ROT AIThinkPatch, wezwania do armii ja pomijaja), rozkaz sceny
+        // (idz do osady / eskortuj / scigaj / rabuj) przez wejscie metody (bramka snu Armoury SleepGate, straznik drog BK - jak GrandTourney i MaterialOrders), opcjonalnie
+        // ukrycie przed AI (MobileParty.IgnoreForHours odnawiane co godzine: AI nie wybiera jej za cel i nie zaczyna z nia spotkania; gracz moze). Spiaca partia (NightRest
+        // oboz / osada / sen dlugu) - rozkaz nie ruszany do switu (NightRest oddaje swoj, godzine pozniej poprawiamy). Rejestr bez zapisu: sceny odbudowuja go z wlasnego
+        // stanu co godzine (po wczytaniu - pierwsza godzina). Flaga gry idzie do zapisu ([SaveableProperty]), wiec WorldBeforeSave ja zdejmuje, WorldSaveOver przywraca
+        // (wzor FreeFolkRaids - partia bez wpisu nie stoi zamrozona na zawsze po cofnieciu DLL).
+        private sealed class Ctl
+        {
+            public string Scene;
+            public MobileParty P;
+            public int Kind;
+            public Settlement To;
+            public MobileParty Follow;
+            public bool Hide;
+            public bool Seen;    // odswiezona w tym przebiegu scen (bez odswiezenia - puszczona)
+        }
+
+        private const int KGo = 1, KEscort = 2, KEngage = 3, KRaid = 4;
+        private const float HideHours = 2f;
+        private static readonly Dictionary<MobileParty, Ctl> _ctl = new Dictionary<MobileParty, Ctl>();
+        private static int _thawed;
+        private static MethodInfo _mGo, _mEsc, _mEng, _mRaid;
+
+        /// <summary>Partia pod scena E5 (uczta BK, herold GrandTourney - pomijaja ja).</summary>
+        internal static bool Scripted(MobileParty mp) { return mp != null && _ctl.Count > 0 && _ctl.ContainsKey(mp); }
+
+        /// <summary>Prefiks BKFeastBehavior.HourlyTickPartyImpl(party): partia sceny nie jedzie na uczte BK.</summary>
+        public static bool SkipScriptedPrefix(MobileParty __0) { return !Scripted(__0); }
+
+        private static int CountScene(string scene) { int n = 0; foreach (var c in _ctl.Values) if (c.Scene == scene) n++; return n; }
+
+        /// <summary>Partia pod scena (albo nowy rozkaz sceny). Wolane z kroku sceny - co godzine.</summary>
+        private static void Control(string scene, MobileParty mp, int kind, Settlement to, MobileParty follow, bool hide)
+        {
+            if (mp == null || !mp.IsActive || mp == MobileParty.MainParty) return;
+            Ctl c;
+            if (!_ctl.TryGetValue(mp, out c)) { c = new Ctl { P = mp }; _ctl[mp] = c; }
+            c.Scene = scene; c.Kind = kind; c.To = to; c.Follow = follow; c.Hide = hide; c.Seen = true;
+            try { ApplyCtl(c); } catch (Exception e) { WStumble("Control(" + scene + ")", e); }
+        }
+
+        /// <summary>Partia wraca do zwyklego AI (AI mysli od razu - jak FreeFolkRaids.Release).</summary>
+        private static void Uncontrol(MobileParty mp)
+        {
+            if (mp == null || !_ctl.Remove(mp)) return;
+            Thaw(mp);
+        }
+
+        private static void UncontrolScene(string scene)
+        {
+            foreach (var c in _ctl.Values.ToList()) if (c.Scene == scene) Uncontrol(c.P);
+        }
+
+        private static void Thaw(MobileParty mp)
+        {
+            try { if (mp.IsActive && mp.Ai != null && mp.Ai.DoNotMakeNewDecisions) { mp.Ai.SetDoNotMakeNewDecisions(false); mp.Ai.RethinkAtNextHourlyTick = true; } }
+            catch (Exception e) { WStumble("Thaw", e); }
+        }
+
+        private static void ApplyCtl(Ctl c)
+        {
+            var mp = c.P;
+            if (mp == null || !mp.IsActive || mp.Ai == null) return;
+            if (!mp.Ai.DoNotMakeNewDecisions) mp.Ai.SetDoNotMakeNewDecisions(true);
+            if (c.Hide) mp.IgnoreForHours(HideHours);
+            if (mp.MapEvent != null || mp.SiegeEvent != null || mp.IsDisbanding) return;
+            if (NightRest.SleepKind(mp) != NightRest.SkNone) return;
+            if (mp.Army != null)
+            {
+                // armia (np. Ned wezwany przez swoich przed wyjazdem) - partia sceny wychodzi; wodz armii - armia rozwiazana (jak areszt Neda)
+                if (mp.Army.LeaderParty == mp) DisbandArmyAction.ApplyByUnknownReason(mp.Army);
+                else mp.Army = null;
+            }
+            if (OrderOk(c)) return;
+            var nav = MobileParty.NavigationType.Default;
+            switch (c.Kind)
+            {
+                case KGo: Call(ref _mGo, "SetMoveGoToSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) }, mp, new object[] { c.To, nav, false }); break;
+                case KEscort: Call(ref _mEsc, "SetMoveEscortParty", new[] { typeof(MobileParty), typeof(MobileParty.NavigationType), typeof(bool) }, mp, new object[] { c.Follow, nav, false }); break;
+                case KEngage: Call(ref _mEng, "SetMoveEngageParty", new[] { typeof(MobileParty), typeof(MobileParty.NavigationType) }, mp, new object[] { c.Follow, nav }); break;
+                case KRaid: Call(ref _mRaid, "SetMoveRaidSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) }, mp, new object[] { c.To, nav, false }); break;
+                default: return;
+            }
+            try { mp.RecalculateShortTermBehavior(); } catch { }
+            _ordersDay++;
+        }
+
+        private static bool OrderOk(Ctl c)
+        {
+            var mp = c.P;
+            switch (c.Kind)
+            {
+                case KGo: return c.To == null || mp.CurrentSettlement == c.To || (mp.DefaultBehavior == AiBehavior.GoToSettlement && mp.TargetSettlement == c.To);
+                case KEscort:
+                    return c.Follow == null || !c.Follow.IsActive || (mp.DefaultBehavior == AiBehavior.EscortParty && mp.TargetParty == c.Follow)
+                           || (c.Follow.CurrentSettlement != null && mp.CurrentSettlement == c.Follow.CurrentSettlement);
+                case KEngage: return c.Follow == null || !c.Follow.IsActive || (mp.DefaultBehavior == AiBehavior.EngageParty && mp.TargetParty == c.Follow);
+                case KRaid: return c.To == null || (mp.DefaultBehavior == AiBehavior.RaidSettlement && mp.TargetSettlement == c.To);
+            }
+            return true;
+        }
+
+        private static void Call(ref MethodInfo mi, string name, Type[] sig, MobileParty mp, object[] args)
+        {
+            if (mi == null) mi = typeof(MobileParty).GetMethod(name, sig);
+            if (mi == null) throw new MissingMethodException("MobileParty." + name);
+            try { mi.Invoke(mp, args); }
+            catch (TargetInvocationException e) { throw e.InnerException ?? e; }
+        }
+
+        private static float Dist(MobileParty mp, Settlement st)
+        {
+            try { return mp != null && st != null ? mp.GetPosition2D.Distance(st.GatePosition.ToVec2()) : -1f; } catch { return -1f; }
+        }
+
+        private static float Dist(MobileParty a, MobileParty b)
+        {
+            try { return a != null && b != null ? a.GetPosition2D.Distance(b.GetPosition2D) : -1f; } catch { return -1f; }
+        }
+
+        private static bool At(MobileParty mp, Settlement st)
+        {
+            if (mp == null || st == null) return false;
+            if (mp.CurrentSettlement == st) return true;
+            float d = Dist(mp, st);
+            return d >= 0f && d <= 3f;
+        }
+
+        private static string Pos(MobileParty mp, Settlement goal)
+        {
+            if (mp == null) return "-";
+            try
+            {
+                if (mp.MapEvent != null) return "bitwa";
+                if (mp.CurrentSettlement != null) return "w " + mp.CurrentSettlement.StringId;
+                return goal != null ? Dist(mp, goal).ToString("0", Inv) + " jedn. do " + goal.StringId : "w polu";
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>Druzyna, ktora bohater prowadzi (null - nie prowadzi albo jeniec; druzyna gracza i rodu gracza - nigdy).</summary>
+        private static MobileParty Led(Hero h)
+        {
+            if (h == null || !h.IsAlive || h.IsPrisoner || h.Clan == Clan.PlayerClan) return null;
+            var p = h.PartyBelongedTo;
+            return p != null && p.IsActive && p.LeaderHero == h && p != MobileParty.MainParty ? p : null;
+        }
+
+        // postacie z wzoru (skan wszystkich bohaterow) - pamiec na dobe
+        private static readonly Dictionary<string, Hero> _heroCache = new Dictionary<string, Hero>(StringComparer.Ordinal);
+        private static int _heroCacheDay = -1;
+
+        private static Hero Tpl(string tpl)
+        {
+            int d = (int)CampaignTime.Now.ToDays;
+            if (d != _heroCacheDay) { _heroCache.Clear(); _heroCacheDay = d; }
+            Hero h;
+            if (_heroCache.TryGetValue(tpl, out h)) return h;
+            h = CanonCompanions.TemplateHero(tpl);
+            if (h == null)
+                foreach (var x in Hero.AllAliveHeroes) if (x != null && x.Template != null && x.Template.StringId == tpl) { h = x; break; }
+            _heroCache[tpl] = h;
+            return h;
+        }
+
+        // ---------------------------------------------------------------- kroki scen
+
+        /// <summary>Jeden przebieg scen (co godzine; w dobie - takze zdarzenia doby). Partie nieodswiezone w przebiegu - puszczone.</summary>
+        private static void WorldStep(bool daily)
+        {
+            foreach (var c in _ctl.Values) c.Seen = false;
+            double day = PrologueDay();
+            try { ProgressStep(day, daily); } catch (Exception e) { WStumble("ProgressStep", e); }
+            foreach (var c in _ctl.Values.ToList())
+                if (!c.Seen || c.P == null || !c.P.IsActive) Uncontrol(c.P);
+        }
+
         // ---------------------------------------------------------------- doba, godzina, zapis gry
 
         /// <summary>Prologue.Daily (kazda doba kampanii z prologiem, takze po starcie opowiesci - straz Jaimego trwa w wojnie): sceny po kolei, linia doby.</summary>
@@ -220,17 +432,24 @@ namespace Armoury
             double day = PrologueDay();
             int d = (int)day;
             bool holdOn = CanonCompanions.HeldCount > 0;
-            if (day > PrologueDays + WorldLogAfterStory && !(holdOn && d % 10 == 0)) { _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); return; }
-            var sb = new StringBuilder(600);
+            if (day > PrologueDays + WorldLogAfterStory && !(holdOn && d % 10 == 0))
+            {
+                try { if (_ctl.Count > 0) WorldStep(true); } catch (Exception e) { WStumble("WorldStep(po prologu)", e); }   // wszystko oddane najpozniej w dniu 188
+                _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; return;
+            }
+            try { WorldStep(true); } catch (Exception e) { WStumble("WorldStep(doba)", e); }
+            var sb = new StringBuilder(1200);
             sb.Append(WTag).Append("dzien ").Append(d.ToString(Inv));
+            try { sb.Append(" | ").Append(ProgressLine()); } catch (Exception e) { WStumble("ProgressLine", e); }
             sb.Append(" | Tyrion: ").Append(HoldText(TyrionTpl, TyrionHoldRow, "p02"));
             sb.Append(" | Jaime: ").Append(HoldText(JaimeTpl, JaimeHoldRow, "m02"));
             sb.Append(" | straz niewoli: zablokowane dzis ").Append(_hbDay).Append(", od poczatku ucieczki ").Append(_hbEsc).Append(", dni bez okupu i okupy ").Append(_hbRan)
               .Append(", pokoj ").Append(_hbPeace).Append(", wypuszczenie ").Append(_hbChoice).Append(", wykup ").Append(_hbComp).Append(" | przepuszczone (gracz, smierc, po bitwie) dzis ")
               .Append(_hbPassDay).Append(", od poczatku ").Append(_hbPass);
+            sb.Append(" | partie pod scena ").Append(_ctl.Count).Append(", rozkazy od wczoraj ").Append(_ordersDay);
             sb.Append(" | potkniecia E5 ").Append(_wStumbles).Append('.');
             Log.Info(sb.ToString());
-            _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear();
+            _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0;
         }
 
         /// <summary>OnSessionLaunched: linia startu E5 (tylko kampania z prologiem).</summary>
@@ -242,7 +461,8 @@ namespace Armoury
             Log.Info(WTag + "start sesji | dzien prologu " + PrologueDay().ToString("0.0", Inv)
                      + " | klucze: Tyrion " + yn(s != null && s.PrologueTyrionHeld) + ", Jaime " + yn(s != null && s.PrologueJaimeAtRiverrun)
                      + " (zmiany stron CanonCompanionsFollowStory " + yn(s != null && s.CanonCompanionsFollowStory) + ")"
-                     + " | latki: " + _worldWire
+                     + " | orszak " + yn(s != null && s.PrologueRoyalProgress)
+                     + " | latki: " + _worldWire + " | zapis sprzed E5 " + yn(_wLegacy) + " | " + ProgressStart()
                      + " | straz niewoli od poczatku: ucieczki " + _hbEsc + ", okup " + _hbRan + ", pokoj " + _hbPeace + ", wypuszczenie " + _hbChoice + ", wykup " + _hbComp
                      + ", przepuszczone " + _hbPass + " | potkniecia " + _stumbles + ".");
         }
@@ -252,10 +472,38 @@ namespace Armoury
         {
             if (!Active) return;
             if (_worldDirty) _worldDirty = false;
+            if (PrologueDay() > PrologueDays + 2 && _ctl.Count == 0) return;   // po prologu nic nie biegnie (straz niewoli to latki)
+            try { WorldStep(false); } catch (Exception e) { WStumble("WorldStep(godzina)", e); }
         }
 
-        internal static void WorldBeforeSave() { }
+        /// <summary>OnBeforeSaveEvent: flaga "bez nowych decyzji" zdjeta z partii scen (gra zapisuje ja w partii) - po cofnieciu DLL nikt nie stoi zamrozony.</summary>
+        internal static void WorldBeforeSave()
+        {
+            _thawed = 0;
+            foreach (var c in _ctl.Values)
+            {
+                try
+                {
+                    var mp = c.P;
+                    if (mp == null || !mp.IsActive || mp.Ai == null || !mp.Ai.DoNotMakeNewDecisions) continue;
+                    mp.Ai.SetDoNotMakeNewDecisions(false);
+                    _thawed++;
+                }
+                catch (Exception e) { WStumble("WorldBeforeSave", e); }
+            }
+        }
 
-        internal static void WorldSaveOver() { }
+        /// <summary>OnSaveOverEvent (takze po nieudanym zapisie): flaga wraca partiom scen.</summary>
+        internal static void WorldSaveOver()
+        {
+            if (_thawed == 0) return;
+            _thawed = 0;
+            foreach (var c in _ctl.Values)
+            {
+                try { var mp = c.P; if (mp != null && mp.IsActive && mp.Ai != null && !mp.Ai.DoNotMakeNewDecisions) mp.Ai.SetDoNotMakeNewDecisions(true); }
+                catch (Exception e) { WStumble("WorldSaveOver", e); }
+            }
+        }
+
     }
 }

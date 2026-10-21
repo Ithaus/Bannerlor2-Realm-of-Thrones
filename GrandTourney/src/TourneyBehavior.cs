@@ -303,6 +303,7 @@ namespace GrandTourney
                     foreach (var mp in MobileParty.All)
                     {
                         if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
+                        if (CanonApi.Skip(mp)) continue;                  // m104-e5: partia sceny prologu Armoury (orszak, Beric, uczestnik kanonu w drodze)
                         var lord = mp.LeaderHero;
                         if (lord == null || !lord.IsAlive || !lord.IsLord || lord.IsWounded || lord.IsPrisoner) continue;
 
