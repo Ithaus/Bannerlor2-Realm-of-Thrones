@@ -91,6 +91,9 @@ namespace Armoury
             // ks-koszt T5 (klucz Ks Cost Fast): mapa koszyka miasta T rozwiazana raz na wywolanie (null - miasto poza ZC4) - ZRow / ZRowSet / ZPrice bez szukania miasta;
             // T4: progi drabiny 2 z pamieci doby
             public bool Fast; public StartCalibration.ZTown Z; public Town P2T; public double[] P2Row;
+            // m103 wsie (klucz Ks Village Basket At Shelf): budzet drabiny 1 z biezacego wplywu (Cap, zl - zostalo), ziarno i sol poza budzetem (NoCap; ich koszt idzie z budzetu),
+            // miasta obok w drabinie 1 (InF2 - przyciete schodzi z braku towaru), przyciete budzetem (szt., zl), zaplacone za ziarno i sol (zl)
+            public bool CapOn, NoCap, InF2; public double Cap, CapPcs, CapZl, GsPaid;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -168,6 +171,22 @@ namespace Armoury
             if (b.Broke) { if (count) b.UnGold += Math.Min(n, have); if (count && have < n) { b.NoGoodsPcs += n - have; b.Miss[z] += n - have; } return 0; }
             if (count && have < n) { b.NoGoodsPcs += n - have; b.Miss[z] += n - have; }
             int k = Math.Min(n, have);
+            // m103 wsie (Ks Village Basket At Shelf): drabina 1 kupuje towary po ziarnie i soli najwyzej za to, co zostalo z budzetu z biezacego wplywu (Zc4BuyCore) - reszta
+            // czeka (to nie brak kiesy ani towaru: wies tego dzis nie kupi); w miastach obok przyciete schodzi z braku towaru (nie liczy sie drugi raz ani jako popyt bez towaru)
+            if (b.CapOn && !b.NoCap)
+            {
+                double cr = Math.Max(0.0, b.Cap);
+                int kc = cr >= price ? (int)Math.Min(k, Math.Floor(cr / price)) : 0;
+                if (kc < k)
+                {
+                    int c = k - kc;
+                    // liczone tylko przy pozycji koszyka (count) i w miastach obok; zakup zastepczy (piwo za wino, ziarno na piwo) - bez drugiego liczenia
+                    if (count || b.InF2) { b.CapPcs += c; b.CapZl += (double)c * price; }
+                    if (b.InF2) { int mc = Math.Min(c, b.Miss[z]); b.Miss[z] -= mc; b.NoGoodsPcs = Math.Max(0, b.NoGoodsPcs - mc); }
+                    k = kc;
+                    if (k <= 0) return 0;
+                }
+            }
             long room = (long)b.V.Gold - Math.Max(0, b.Lim);                    // G2: zapas kiesy (towary po ziarnie i soli - ponad 7 dob ziarna i soli z Planu)
             if (room < price) { if (count) b.UnGold += k; if (b.Lim <= 0) { b.NoGold++; b.Broke = true; } return 0; }
             int had = b.V.Gold;
@@ -178,6 +197,7 @@ namespace Armoury
             b.T.ChangeGold(paid);
             b.R.AddToCounts(e, -k);
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
+            if (b.CapOn) { b.Cap -= paid; if (b.NoCap) b.GsPaid += paid; }   // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci)
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             if (b.P1) StartCalibration.Zc4NotePass1Zl(b.Mk, paid);        // recenzja runda 3: wartosc kupiona drabiny 1 (NKS-13)
@@ -292,7 +312,16 @@ namespace Armoury
                 resGS = (long)Math.Round(7.0 * perDay * ((StartCalibration.ZGrain < qp.Length ? qp[StartCalibration.ZGrain] : 0f) * pg + (StartCalibration.ZSalt < qp.Length ? qp[StartCalibration.ZSalt] : 0f) * ps));
             }
             b.P1 = qp != null;
-            ZcLadder(b, vil, mk, n, resGS);
+            // m103 wsie (klucz Ks Village Basket At Shelf): budzet drabiny 1 z biezacego wplywu (ShelfBudget) - tylko drabina 1 koszyka zaplaconego z Planu
+            double shC = 0, shB = 0, shPlan = 0, shNet = -1;
+            if (qp != null && StartCalibration.SwBasketAtShelf && ShelfBudget(b, vil, n, lam, budgetDay, out shC, out shB, out shPlan, out shNet))
+            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = 0; }
+            try { ZcLadder(b, vil, mk, n, resGS); }
+            finally
+            {
+                if (b.CapOn) StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB));
+                b.CapOn = false; b.NoCap = false; b.InF2 = false;
+            }
             b.P1 = false;
             if (qp != null)
             {
@@ -378,6 +407,39 @@ namespace Armoury
             return b.Spent;
         }
 
+        /// <summary>
+        /// m103 wsie (klucz Ks Village Basket At Shelf; diagnoza P2 Armoury-2026-10-21_10-08-39.log): Plan wycenia koszyk zaplacony wsi przy cenach startu (przyciete 0.7-1.5,
+        /// x gradient krainy - StartCalibration.Core krok 8), a wies placi cene polki: ten sam koszyk kosztowal 1.32-1.68 x budzet Planu, po rampie wsie wydaly 22.54 mln
+        /// przy budzecie 17.25 mln, kiesy wsi 8.47 -> 3.91 mln w 193 dobach KS (bez KS 8.58 -> 8.12), roznica do kas miast. REGULA: wies nie wydaje na drabine 1 wiecej,
+        /// niz biezaco zarabia - budzet tego zakupu = lam x min(budzet Planu na dobe, wplyw netto na dobe) (wplyw netto: (1 - zapas) x (do kiesy + fracht KS-H - wydatki
+        /// spoza koszyka), srednie 28 dob - ta sama miara co alfa netto KS-R3 P2; bez pomiaru - budzet Planu). Ziarno i sol zawsze w calosci (glod; ich koszt idzie
+        /// z budzetu, ponad budzet - z oszczednosci, jak dotad do pustej kiesy); reszta po kolei drabiny (projekt ZC 8.4: napoj, bialko najtansze za kcal, reszta, miasta obok)
+        /// do konca budzetu - jak przy pustej kiesie dalsze szczeble czekaja (ZcTake). Przyciete sztuki nie przechodza na jutro (to nie zaleglosc - pieniadz zostaje w kiesie);
+        /// sa w chcianych drabiny 1 i pelnego koszyka (Want, KcalW, ZlW - bez pokrycia i racje pracy domowej licza pelny koszyk), osobno od braku kiesy i towaru. Wies je swoje
+        /// (G3) dalej wobec kcal zaplaconych z Planu - brak kcal z ceny pokrywa ta sama regula co brak towaru. cost - koszt sztuk n przy cenach polki miasta targowego (linia).
+        /// false - bez budzetu (wyjatek - licznik potkniec; drabina jak w kodzie 101). Nie rzuca.
+        /// </summary>
+        private static bool ShelfBudget(ZcBuy b, Village vil, int[] n, double lam, double budgetDay, out double cost, out double bud, out double plan, out double net)
+        {
+            cost = 0; bud = 0; plan = 0; net = -1;
+            try
+            {
+                for (int z = 0; z < n.Length && z < StartCalibration.ZN; z++)
+                {
+                    if (n[z] <= 0) continue;
+                    int p = b.Z != null ? b.Z.Px[z] : StartCalibration.ZPrice(b.T, z);   // cena polki miasta targowego z doby (ta sama co ZcPrice)
+                    if (p <= 0) { var it = StartCalibration.ZItem(z); p = it != null ? Math.Max(1, it.Value) : 0; }
+                    if (p > 0) cost += (double)n[z] * p;
+                }
+                plan = double.IsNaN(budgetDay) || double.IsInfinity(budgetDay) ? 0.0 : Math.Max(0.0, budgetDay) * lam;
+                double nd;
+                if (StartCalibration.Zc4VillageNetDay(vil, out nd)) { net = nd * lam; bud = Math.Min(plan, net); }
+                else bud = plan;
+                return true;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(budzet z wplywu)", e); return false; }
+        }
+
         private static readonly Dictionary<Village, float[]> _zcCarry2 = new Dictionary<Village, float[]>();
         private static readonly int[] OwnOrder = { StartCalibration.ZGrain, StartCalibration.ZFish, StartCalibration.ZMeat, StartCalibration.ZCheese, StartCalibration.ZButter, StartCalibration.ZEgg,
                                                    StartCalibration.ZDate, StartCalibration.ZOlives, StartCalibration.ZGrape, StartCalibration.ZApple, StartCalibration.ZCarrot, StartCalibration.ZOrange, StartCalibration.ZHoney };
@@ -420,10 +482,10 @@ namespace Armoury
         {
             var done = new bool[StartCalibration.ZN];
             // (1) przetrwanie: ziarno, sol
-            b.Lim = 0;
+            b.Lim = 0; b.NoCap = true;                                           // m103 wsie: ziarno i sol poza budzetem z wplywu (glod)
             ZcTake(b, StartCalibration.ZGrain, n[StartCalibration.ZGrain], 0); done[StartCalibration.ZGrain] = true;
             ZcTake(b, StartCalibration.ZSalt, n[StartCalibration.ZSalt], 0); done[StartCalibration.ZSalt] = true;
-            b.Lim = lim;
+            b.Lim = lim; b.NoCap = false;
             // (2) napoj - najtanszy za litr najpierw; brak wina -> piwo, brak piwa -> ziarno na piwo domowe (0.4 kg na litr)
             var dr = new List<int>(ZcDrinks);
             var unit = new double[StartCalibration.ZN];
@@ -483,10 +545,12 @@ namespace Armoury
                         long s0 = b.Spent;
                         try
                         {
+                            b.InF2 = true;
                             foreach (int z in StartCalibration.ZLadder)
                             {
                                 if (b.Miss[z] <= 0) continue;
                                 b.Lim = z == StartCalibration.ZGrain || z == StartCalibration.ZSalt ? 0 : lim;
+                                b.NoCap = z == StartCalibration.ZGrain || z == StartCalibration.ZSalt;   // m103 wsie: jak w miescie targowym
                                 int got = ZcTake(b, z, b.Miss[z], StartCalibration.ZFood(z) ? 1 : 2, false);
                                 if (got > 0) { b.Miss[z] -= got; b.Elsewhere += got; }
                                 if (b.Broke) break;
@@ -494,7 +558,7 @@ namespace Armoury
                         }
                         finally
                         {
-                            GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Z = keepZ;
+                            GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Z = keepZ; b.InF2 = false; b.NoCap = false;
                             // podstawa robocizny targu (VillWin): zakupy w tamtym miescie jemu, nie miastu targowemu (wolajacy dopisze calosc miastu targowemu)
                             long sp = b.Spent - s0;
                             if (sp > 0) { Folk ma, mm; if (_f.TryGetValue(alt, out ma)) ma.VillWin += sp; if (_f.TryGetValue(mk, out mm)) mm.VillWin -= sp; }

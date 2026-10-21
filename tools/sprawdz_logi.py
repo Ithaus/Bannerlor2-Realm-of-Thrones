@@ -1618,6 +1618,13 @@ Uzycie (Python 3, tylko odczyt):
                     najdluzsza seria bez wplaty panu przy kasie > 1.5 x zapas (droga (f), INFO; poprawki po recenzji 21.10). Reszta celow D1 w grupach
                     m96dlugi_dlugi (M96D-3), nakum (NAKUM-26/27), nkasy (NKA-3), drobne2 (D2K-5), etap5 (KR-9), etap8 (C-4c, G1-5a).
                     python -I tools/sprawdz_logi.py --grupa m103p3 <Armoury-*.log>
+--grupa m103wsie  : (21.10, galaz w-toku/m103-gospodarka czesc 3 - wsie pod KS; Armoury/src/TownFolk.Ks.cs ShelfBudget, StartCalibration.Money.cs, klucz Ks Village
+                    Basket At Shelf) linie ZC4 (segment "m103 wsie", krok 8, drabina 1), "Przeplywy osad (kiesy wsi)", "Akumulator kies", "Towary ... tools": M3W-0 segment
+                    w kazdej linii ZC4 z zakupami wsi, M3W-1 kiesy wsi MNK 5 okien 26 dob >= -0.10%/d, M3W-2 wsi < 1000 zl <= 5%, M3W-3 zakupy / wplyw netto <= 0.95,
+                    M3W-4 ponad 3 x skrzynia >= 1.5 mln, M3W-5 danina od skarbca wsi do panow > 40 tys./d, M3W-6 koszyk wsi ZC4 (drabina 1 kupione / chciane, zamiast NE3-16)
+                    >= 15%, M3W-7 bez pokrycia <= 10% (W, E), M3W-9 miasta stac na jedzenie >= 80%, M3W-10 narzedzia wsi >= 30/d (DECYZJA, gdy koszyk ZC4 chce mniej),
+                    M3W-11/12 budzet z wplywu i przyciete (INFO), M3W-13 potkniecia i ERROR 0. Reszta celow: nakum (NAKUM-26), etap8 (G1-5a, C-4c), nks (NKS-13, NKS-24).
+                    python -I tools/sprawdz_logi.py --grupa m103wsie <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -55531,6 +55538,8 @@ def main(argv):
         return m96dlugi_main(logp)   # m96dlugi_dlugi (20.10, galaz m96-dlugi): dlugi rad miast, podatek nadzwyczajny (TownDebt.cs)
     if group == "m103p3" and logp:
         return m103p3_main(logp)   # m103p3 (21.10, galaz m103-gospodarka P3): sufit firm DS miast z KS i firma przy ustaleniu najwyzej doplyw netto (DsTowns.cs, KsFolkIncome.cs)
+    if group == "m103wsie" and logp:
+        return m103wsie_main(logp)   # m103wsie (21.10, m103-gospodarka czesc 3): drabina 1 wsi przy cenach polki z budzetu z wplywu (TownFolk.Ks.cs, StartCalibration.Money.cs)
     if group == "p6a7" and logp:
         return p6a7_main(logp)   # p6a7 (20.10, fala 2 pomyslow, galaz p6-a7): A7 domyslnie TAK + roboty miast z rak okregu - odplyw kas miast do kies wsi (TownHire.cs)
     if group == "na7" and logp:
@@ -57122,6 +57131,210 @@ def m103p3_main(logp):
                 "kod 101 bez (f): P2 i P0 - patrz CHANGELOG czesc 2, poprawki po recenzji)", None)
     else:
         rep.add("M3P-11: pobor wobec doplywu netto (kasy-miast.csv)", "brak kasy-miast.csv (" + kp + ")", "INFO", None)
+    rep.show()
+    return 0
+
+
+# ---------------- m103wsie (21.10, galaz w-toku/m103-gospodarka czesc 3 - wsie pod KS): drabina 1 koszyka wsi przy cenach polki z budzetu z biezacego wplywu
+# (klucz Ks Village Basket At Shelf; TownFolk.Ks.cs ShelfBudget/ZcTake, StartCalibration.Money.cs Zc4VillageNetDay/VilBasketMoney, segment linii ZC4).
+# Cele (bieg prologu z KS wobec P2 Armoury-2026-10-21_10-08-39.log): kiesy wsi >= -0.10%/d, wsi < 1000 zl <= 5%, zakupy / wplyw netto <= 0.95, ponad 3 x skrzynia
+# >= 50% P0, danina od skarbca wsi do panow > 40 tys./d, bez pokrycia <= 10%, stac na jedzenie nie gorzej niz P2; narzedzia wsi i koszyk wsi (dawne P2-5b, NE3-16) -
+# miary dla wsi z koszykiem ZC4 (dawne liczyly stara liste, ktora przy lambdzie 1 wynosi zero).
+M3W_ZC4 = "Koszyk stanow (ZC4): dzien "
+M3W_VIL = "Przeplywy osad (kiesy wsi): dzien "
+M3W_AK = "Akumulator kies (ds-akumulator): dzien "
+M3W_RX = {
+    "seg": re.compile(r"\| m103 wsie - drabina 1 przy cenach polki z budzetu z wplywu \(Ks Village Basket At Shelf TAK\): Westeros koszt koszyka zaplaconego z Planu przy cenach polki "
+                      r"(\d+) / budzet (\d+) zl \(budzet Planu (\d+), wplyw netto x [\d.]+ (\d+)\), przyciete (\d+) szt\. \((\d+) zl\); Essos koszt koszyka zaplaconego z Planu przy "
+                      r"cenach polki (\d+) / budzet (\d+) zl \(budzet Planu (\d+), wplyw netto x [\d.]+ (\d+)\), przyciete (\d+) szt\. \((\d+) zl\); zakupow (\d+), przycietych (\d+), "
+                      r"bez pomiaru wplywu (\d+); ziarno i sol ponad budzet (\d+) zl w (\d+) zakupach"),
+    "k8": re.compile(r"(Westeros|Essos) wartosc przy cenach polki chciana (\d+) / zaplacona z Planu (\d+) / kupiona (\d+) zl, kcal koszyka kupione ([\d.]+)% / robione w domu ([\d.]+)% / "
+                     r"z magazynu ([\d.]+)% / bez pokrycia ([\d.]+)%, wplyw do kies wsi \(utarg doby\) (\d+) zl \(netto z frachtem KS-H i bez wydatkow spoza koszyka (-?\d+) zl\)"),
+    "vb": re.compile(r"\| wsie: zakupow (\d+) za (\d+) zl, sztuk (\d+) \(chciane (\d+), kupione (\d+); zboze i sol (\d+)/(\d+), reszta jedzenia (\d+)/(\d+), rzeczy (\d+)/(\d+)\)"),
+    "p1": re.compile(r"\| drabina 1 \(zaplacone z Planu\): chciane (\d+) szt\., bez towaru (\d+) \([^)]*\), bez kiesy (\d+) "),
+    "eat": re.compile(r"stac na cale jedzenie: miasta ([\d.]+)%"),
+    "else": re.compile(r"zakupy wsi w miescie obok \(brak na polce targu\) (\d+) szt\."),
+    "tools": re.compile(r"[ ,]tools (\d+)\+(\d+) \("),
+    "stum": re.compile(r"\| potkniecia (\d+)\.$"),
+    "stan": re.compile(r"\| stan (-?\d+), zmiana"),
+    "lo": re.compile(r"rozklad \[P\]: osad (\d+), min -?\d+, mediana (-?\d+), max -?\d+, ponizej 1000 zlota (\d+)"),
+    "hoard": re.compile(r"danina od skarbca wsi \(Ds Hoard Due Villages\) tak: .*?ponad poziom normalny \(([\d.]+) x skrzynia\) (\d+), pobrano (\d+) \((\d+) wsi\) = do panow (\d+)"),
+    "akw": re.compile(r"wsi (\d+) \(wsie DS (\d+): mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+), kiesy (\d+), skrzynie (\d+)\)"),
+    "tw": re.compile(r"wsie \(zakupy w miescie, E5/B1\) (\d+)"),
+    "tb": re.compile(r"budowy (\d+)"),
+    "tp": re.compile(r"\| produkcja (\d+)"),
+}
+M3W_DRIFT = -0.0010      # cel m103 wsie: kiesy wsi >= -0.10%/d w kazdym z 5 okien MNK 26 dob (NDS-3a: -0.2%/d; P2 -0.205, P0 -0.064)
+M3W_POOR = 0.05          # cel: wsi z kiesa < 1000 zl <= 5% (NDS-3d: 15%; P2 24.3%, P0 1.0%)
+M3W_BUYNET = 0.95        # cel: zakupy wsi (drabina 1 + 2) / wplyw netto do kies <= 0.95 (P2 1.10 po rampie)
+M3W_OVER3 = 1500000      # cel: ponad 3 x skrzynia >= ok. 50% P0 (P0 3.11 mln na koniec, P2 0.53 mln)
+M3W_HOARD = 40000        # cel: danina od skarbca wsi do panow > 40 tys./d (P0 61-99 tys., P2 10 tys. na koniec)
+M3W_UNCOV = 10.0         # cel: bez pokrycia kcal koszyka wsi <= 10% (W i E osobno)
+M3W_EAT = 78.0           # cel: miasta stac na cale jedzenie nie gorzej niz P2 (ta miara - 28 ostatnich linii ZC4 - P2 78.1%; okno NKS-13 81.8%; prog NKS-13 95%)
+M3W_TOOLS = 30.0         # cel zadania: narzedzia kupione przez wsie >= 30/d (P2 2.5, P0 55.4) - przy koszyku ZC4 potrzeba wsi ok. 8/d (DECYZJA)
+M3W_BASKET = 15.0        # cel zadania: koszyk wsi >= 15% (NE3-16 przy lambdzie 1 = 0% z konstrukcji) - tu drabina 1 ZC4: kupione / chciane
+
+
+def _m3w_ols(xs, ys):
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    sxx = sum((x - mx) ** 2 for x in xs)
+    sl = (sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx) if sxx > 0 else 0.0
+    return sl / max(1.0, my), sl
+
+
+def m103wsie_main(logp):
+    """m103wsie: drabina 1 wsi z budzetu z wplywu (segment linii ZC4), kiesy wsi (linia Przeplywy osad), danina od skarbca wsi (Akumulator kies), krok 8 linii ZC4
+    (zakupy, wplyw netto, kcal), narzedzia wsi (linia Towary) - progi celu m103 czesci 3."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M3W-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    z, vil, ak, tl, errs = {}, {}, {}, {}, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(M3W_ZC4):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is None:
+                    continue
+                r = {"seg": M3W_RX["seg"].search(s), "vb": M3W_RX["vb"].search(s), "p1": M3W_RX["p1"].search(s), "eat": M3W_RX["eat"].search(s),
+                     "else": M3W_RX["else"].search(s), "tools": M3W_RX["tools"].search(s), "stum": M3W_RX["stum"].search(s)}
+                r = {k: (v.groups() if v else None) for k, v in r.items()}
+                r["k8"] = {g[0]: g[1:] for g in M3W_RX["k8"].findall(s)}
+                z[d] = r
+            elif s.startswith(M3W_VIL):
+                d = num(r"dzien (-?\d+)", s[:60])
+                a, b = M3W_RX["stan"].search(s), M3W_RX["lo"].search(s)
+                if d is not None and a:
+                    vil[d] = (int(a.group(1)), b.groups() if b else None)
+            elif s.startswith(M3W_AK):
+                d = num(r"dzien (-?\d+)", s[:60])
+                a, b = M3W_RX["hoard"].search(s), M3W_RX["akw"].search(s)
+                if d is not None:
+                    ak[d] = (a.groups() if a else None, b.groups() if b else None)
+            elif s.startswith("Towary: dzien ") and " - tools (" in s:
+                d = num(r"Towary: dzien (\d+)", s, int)
+                if d is not None:
+                    a, b, c = M3W_RX["tw"].search(s), M3W_RX["tb"].search(s), M3W_RX["tp"].search(s)
+                    tl[d] = (int(a.group(1)) if a else 0, int(b.group(1)) if b else 0, int(c.group(1)) if c else 0)
+            elif "Zc4BuyVillage(budzet z wplywu)" in s or "Zc4VillageNetDay" in s:
+                errs += 1
+    zd = sorted(z)
+    buyd = [d for d in zd if z[d]["vb"] and int(z[d]["vb"][0]) > 0]
+    seg = [d for d in buyd if z[d]["seg"]]
+    print(f"plik: {logp} | linii ZC4 {len(zd)} (z zakupami wsi {len(buyd)}, z segmentem m103 wsie {len(seg)}), linii kies wsi {len(vil)}, Akumulator {len(ak)}, Towary tools {len(tl)}")
+    on = bool(seg)
+    rep.add("M3W-0: segment 'm103 wsie' w linii ZC4 z zakupami wsi (klucz Ks Village Basket At Shelf)",
+            f"{len(seg)} z {len(buyd)} linii" + (f" (doby {seg[0]}-{seg[-1]})" if seg else ""),
+            "kazda linia z zakupami wsi przy kluczu TAK (brak - INFO: klucz NIE, KS niezastosowana albo log sprzed m103 wsie)", (len(seg) == len(buyd)) if on else None)
+    w28 = buyd[-28:]
+    # ---- M3W-1 kiesy wsi: MNK 5 okien 26 dob na koncu biegu (jak NDS-3a, okno z ostatnich 30 dob linii kies wsi)
+    vd = sorted(vil)
+    if len(vd) >= 26:
+        tail = vd[-30:]
+        wins = [tail[:len(tail) - k][-26:] for k in range(5) if len(tail) - k >= 26]
+        res = [_m3w_ols(w, [vil[d][0] for d in w]) for w in wins]
+        drs = [x[0] for x in res]
+        rep.add("M3W-1: kiesy wsi - dryf MNK 5 okien 26 dob na koncu biegu (linia 'Przeplywy osad (kiesy wsi)'; ta sama miara co NDS-3a, prog celu m103)",
+                " / ".join(f"{100 * x:+.3f}" for x in reversed(drs)) + f"%/d (najgorsze {100 * min(drs):+.3f}); stan {vil[tail[0]][0] / 1e6:.2f} -> {vil[tail[-1]][0] / 1e6:.2f} mln",
+                f">= {100 * M3W_DRIFT:.2f}%/d w kazdym oknie (P2 -0.205, P0 -0.064; NDS-3a >= -0.2)", min(drs) >= M3W_DRIFT)
+        lo = [vil[d][1] for d in vd[-7:] if vil[d][1]]
+        if lo:
+            x = sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)
+            rep.add("M3W-2: wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (jak NDS-3d, prog celu m103)",
+                    f"{100 * x:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]})", f"<= {100 * M3W_POOR:.0f}% (P2 24.3%, P0 1.0%; NDS-3d <= 15%)", x <= M3W_POOR)
+    else:
+        rep.add("M3W-1: kiesy wsi", f"za malo linii 'Przeplywy osad (kiesy wsi)' ({len(vd)})", ">= 26 dob", None)
+    # ---- M3W-3 zakupy / wplyw netto (krok 8 linii ZC4, ostatnie 28 linii z zakupami)
+    if w28:
+        buy = sum(int(z[d]["k8"][m][2]) for d in w28 for m in z[d]["k8"])
+        net = sum(int(z[d]["k8"][m][8]) for d in w28 for m in z[d]["k8"])
+        inf = sum(int(z[d]["k8"][m][7]) for d in w28 for m in z[d]["k8"])
+        # "netto" linii ZC4 odejmuje wszystkie wydatki spoza koszyka - takze danine od skarbca wsi (3%/d ponad 3 x skrzynie: pobor z OSZCZEDNOSCI, nie z dochodu;
+        # przy kiesach jak w P0 60-100 tys./d) - mianownik progu: netto + ta danina tej samej doby (linia Akumulator kies); surowy stosunek - w wierszu
+        hb = sum(int(ak[d][0][2]) for d in w28 if d in ak and ak[d][0])
+        r3 = buy / (net + hb) if net + hb > 0 else None
+        rep.add(f"M3W-3: zakupy wsi (kupiona - drabina 1 i 2) / wplyw netto do kies bez daniny od skarbca (krok 8 linii ZC4 + Akumulator kies, ostatnie {len(w28)} linii)",
+                f"{buy / len(w28):.0f} / ({net / len(w28):.0f} + {hb / len(w28):.0f}) zl/d = " + (f"{r3:.2f}" if r3 is not None else "-")
+                + f" (surowo zakupy / netto {buy / net if net > 0 else float('nan'):.2f}; wplyw brutto {inf / len(w28):.0f} zl/d)",
+                f"<= {M3W_BUYNET:.2f} (P2: diagnoza 1.10 po rampie)", (r3 <= M3W_BUYNET) if r3 is not None else None)
+        # ---- M3W-7 bez pokrycia, M3W-8 z magazynu (wies je swoje)
+        for mk in ("Westeros", "Essos"):
+            xs = [float(z[d]["k8"][mk][6]) for d in w28 if mk in z[d]["k8"]]
+            ow = [float(z[d]["k8"][mk][5]) for d in w28 if mk in z[d]["k8"]]
+            kb = [float(z[d]["k8"][mk][3]) for d in w28 if mk in z[d]["k8"]]
+            hm = [float(z[d]["k8"][mk][4]) for d in w28 if mk in z[d]["k8"]]
+            if xs:
+                u = sum(xs) / len(xs)
+                rep.add(f"M3W-7: bez pokrycia kcal koszyka wsi - {mk} (srednio {len(xs)} linii)",
+                        f"{u:.1f}% (kupione {sum(kb) / len(kb):.1f}%, robione w domu {sum(hm) / len(hm):.1f}%, z magazynu {sum(ow) / len(ow):.1f}%)",
+                        f"<= {M3W_UNCOV:.0f}% (z magazynu - wies je swoje: INFO, NKS-25 <= 8% kcal koszyka)", u <= M3W_UNCOV)
+        eat = [float(z[d]["eat"][0]) for d in w28 if z[d]["eat"]]
+        if eat:
+            e = sum(eat) / len(eat)
+            rep.add("M3W-9: miasta stac na cale jedzenie (linia ZC4, srednio)", f"{e:.1f}%", f">= {M3W_EAT:.0f}% (nie gorzej niz P2 78.1% w tej mierze; NKS-13 >= 95%)", e >= M3W_EAT)
+        # ---- M3W-6 koszyk wsi ZC4 (zamiast NE3-16: koszyk dnia + W1 = 0 przy lambdzie 1)
+        vb = [z[d]["vb"] for d in z if z[d]["vb"]][-10:]
+        if vb:
+            want, got = sum(int(g[3]) for g in vb), sum(int(g[4]) for g in vb)
+            els = [int(z[d]["else"][0]) for d in w28 if z[d]["else"]]
+            rz = (sum(int(g[9]) for g in vb), sum(int(g[10]) for g in vb))
+            real = 100.0 * got / want if want > 0 else 0.0
+            rep.add("M3W-6: koszyk wsi z koszykiem ZC4 - drabina 1 kupione / chciane (sztuki, 10 ostatnich linii; zamiast NE3-16 'koszyk dnia + W1', ktory przy lambdzie 1 = 0)",
+                    f"{real:.1f}% ({got} z {want} szt.; rzeczy {rz[0]}/{rz[1]}); zakupy w miastach obok (F2 - zastepuje woz W1) srednio {sum(els) / max(1, len(els)):.0f} szt./d",
+                    f">= {M3W_BASKET:.0f}%", real >= M3W_BASKET)
+        p1 = [z[d]["p1"] for d in w28 if z[d]["p1"]]
+        if p1 and on:
+            pw = sum(int(g[0]) for g in p1)
+            cut = sum(int(z[d]["seg"][4]) + int(z[d]["seg"][10]) for d in w28 if z[d]["seg"])
+            rep.add("M3W-12: drabina 1 - bez towaru / bez kiesy / przyciete budzetem z wplywu (% chcianych sztuk)",
+                    f"{100.0 * sum(int(g[1]) for g in p1) / max(1, pw):.1f}% / {100.0 * sum(int(g[2]) for g in p1) / max(1, pw):.1f}% / {100.0 * cut / max(1, pw):.1f}%",
+                    "INFO (przyciete - wies nie wydaje ponad wplyw; NKS-13b liczy bez towaru i bez kiesy)", None)
+    # ---- M3W-4/5 akumulator: ponad 3 x skrzynia i danina od skarbca wsi do panow
+    akd = sorted(d for d in ak if ak[d][0])
+    if akd:
+        o3 = [int(ak[d][0][1]) for d in akd[-7:]]
+        hp = [int(ak[d][0][4]) for d in akd[-28:]]
+        aw = ak[akd[-1]][1]
+        rep.add("M3W-4: kiesy wsi ponad 3 x skrzynia (linia Akumulator kies, srednio 7 ostatnich dob)",
+                f"{sum(o3) / len(o3) / 1e6:.2f} mln" + (f"; kiesy {int(aw[5]) / 1e6:.2f} mln, skrzynie {int(aw[6]) / 1e6:.2f} mln, mediana kiesa / skrzynia {aw[4]}" if aw else ""),
+                f">= {M3W_OVER3 / 1e6:.1f} mln (ok. 50% P0 3.11 mln; P2 0.53 mln)", sum(o3) / len(o3) >= M3W_OVER3)
+        h = sum(hp) / len(hp)
+        rep.add(f"M3W-5: danina od skarbca wsi do panow (srednio {len(hp)} ostatnich dob)", f"{h:.0f} zl/d", f"> {M3W_HOARD} (P0 61-99 tys., P2 10 tys. na koniec)", h > M3W_HOARD)
+    else:
+        rep.add("M3W-4/5: akumulator", "brak liczb 'danina od skarbca wsi' w linii Akumulator kies", "INFO", None)
+    # ---- M3W-10 narzedzia wsi (linia Towary) wobec potrzeby wsi z koszyka ZC4
+    td = sorted(tl)[-28:]
+    if td:
+        tv = sum(tl[d][0] for d in td) / len(td)
+        tb = sum(tl[d][1] for d in td) / len(td)
+        tp = sum(tl[d][2] for d in td) / len(td)
+        need = [int(z[d]["tools"][1]) for d in w28 if z[d]["tools"]]
+        nd = sum(need) / len(need) if need else None
+        rep.add(f"M3W-10: narzedzia kupione przez wsie (linia Towary, srednio {len(td)} dob) wobec potrzeby wsi z koszyka ZC4",
+                f"{tv:.1f}/d" + (f" przy potrzebie wsi ZC4 {nd:.0f}/d" if nd is not None else " (bez koszyka ZC4)") + f"; produkcja {tp:.0f}/d, budowy {tb:.0f}/d",
+                f">= {M3W_TOOLS:.0f}/d (cel zadania; DECYZJA, gdy koszyk ZC4 wsi chce mniej niz cel - narzedzia to potrzeba z tabeli stanow, a zuzycie swiata > produkcja: "
+                "o przydziale decyduje kolejnosc budowy przed wsiami)", tv >= M3W_TOOLS, decide=(nd is not None and nd < M3W_TOOLS))
+    # ---- M3W-11 budzet z wplywu (INFO)
+    if seg:
+        s28 = [z[d]["seg"] for d in seg[-28:]]
+        c = sum(int(g[0]) + int(g[6]) for g in s28)
+        b = sum(int(g[1]) + int(g[7]) for g in s28)
+        pl = sum(int(g[2]) + int(g[8]) for g in s28)
+        nt = sum(int(g[3]) + int(g[9]) for g in s28)
+        cz = sum(int(g[5]) + int(g[11]) for g in s28)
+        v = sum(int(g[12]) for g in s28)
+        vc = sum(int(g[13]) for g in s28)
+        nm = sum(int(g[14]) for g in s28)
+        gs = sum(int(g[15]) for g in s28)
+        rep.add(f"M3W-11: drabina 1 - koszt koszyka zaplaconego przy cenach polki wobec budzetu z wplywu (srednio {len(s28)} linii)",
+                f"koszt {c / len(s28):.0f} / budzet {b / len(s28):.0f} zl/d = {c / max(1, b):.2f} (budzet Planu {pl / len(s28):.0f}, wplyw netto {nt / len(s28):.0f}); "
+                f"przyciete {cz / len(s28):.0f} zl/d; zakupow przycietych {100.0 * vc / max(1, v):.0f}%, bez pomiaru wplywu {nm}; ziarno i sol ponad budzet {gs / len(s28):.0f} zl/d",
+                "INFO (koszt / budzet > 1 - ceny polki ponad ceny startu Planu; przyciete wraca do kies wsi)", None)
+    st = sum(int(z[d]["stum"][0]) for d in zd if z[d]["stum"])
+    rep.add("M3W-13: potkniecia linii ZC4 i ERROR budzetu z wplywu", f"potkniecia {st}, ERROR {errs}", "0 / 0", st == 0 and errs == 0)
     rep.show()
     return 0
 

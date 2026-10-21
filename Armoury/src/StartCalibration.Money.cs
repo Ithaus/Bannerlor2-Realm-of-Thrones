@@ -147,23 +147,58 @@ namespace Armoury
             {
                 // KS runda 4 (17.10, STAN-PRAC 68/72): ALFA Z PRAW DS - budzet koszyka = czesc wsi z oddanego utargu po panu, dziesiecinie (polowa wraca jako jalmuzna)
                 // i udziale korony w wojnie (DsVillage.BudgetShare) minus czynsz staly dnia; bez poborow resztowych, wiec bez petli alfa -> 0 (runda 3: 0.47 -> 0.00 w 5 Planach)
-                double shDs = DsVillage.BudgetShare(v, v.Settlement.MapFaction as Kingdom, MineRegale.KsShareOfTakings(v, a[0]));   // R3-09f: regale gornicze poza modelem podatku
-                double rentDs = DsVillage.RentPerDay(v);
                 double baseDs = a[0] / Math.Max(1e-6, PhiNow());
                 _alphaDsN++;
-                return Math.Max(0.0, Math.Min(0.95, (1.0 - VilReserve) * Math.Max(0.0, shDs * a[0] - rentDs) / Math.Max(1e-6, baseDs)));
+                return Math.Max(0.0, Math.Min(0.95, VilBasketMoney(v, a) / Math.Max(1e-6, baseDs)));   // m103 wsie: licznik w VilBasketMoney (te same dzialania)
             }
             if (SwAlphaNet)
             {
                 // KS-R3 P2 (klucz Ks Alpha Net): ALFA NETTO = 0.95 x (wplyw do kiesy + fracht KS-H - wydatki spoza koszyka: danina wojenna, rynek wsi BK, oplata stala,
                 // stara lista, podatek od nadwyzki) / wartosc bazowa produkcji wsi (utarg / Phi) - Plan daje wsi tylko pieniadze, ktore naprawde zostaja na koszyk
-                double[] o; _vilOut.TryGetValue(v, out o);
-                double inflow = a[1] + (o != null ? o[1] : 0.0), outflow = o != null ? o[0] : 0.0;
                 double baseV = a[0] / Math.Max(1e-6, PhiNow());
-                return Math.Max(0.0, Math.Min(0.95, 0.95 * Math.Max(0.0, inflow - outflow) / Math.Max(1e-6, baseV)));
+                return Math.Max(0.0, Math.Min(0.95, VilBasketMoney(v, a) / Math.Max(1e-6, baseV)));   // m103 wsie: licznik w VilBasketMoney (te same dzialania)
             }
             double sh = Math.Max(0.0, Math.Min(1.0, a[1] / a[0]));
             return Math.Max(0.0, Math.Min(0.95, sh * PhiNow() * (1.0 - VilReserve)));
+        }
+
+        /// <summary>Pieniadze wsi v na koszyk na dobe (zl/d, srednie 28 dob utargu a = [oddane, do kiesy]) - LICZNIK ALFY Planu (VilAlphaFor dzieli go przez wartosc bazowa):
+        /// wies DS - (1 - zapas) x (udzial z praw DS x oddane - czynsz staly) (alfa z praw DS: bez poborow od oszczednosci - danina od skarbca i podatek od nadwyzki biora
+        /// z zapasu, nie z dochodu); klucz Ks Alpha Net - 0.95 x (do kiesy + fracht KS-H - wydatki spoza koszyka); inaczej (1 - zapas) x do kiesy (najwyzej oddane).
+        /// m103 wsie (21.10): jedna funkcja dla Planu i dla budzetu drabiny 1 w grze (TownFolk.ShelfBudget - Zc4VillageNetDay).</summary>
+        private static double VilBasketMoney(Village v, double[] a)
+        {
+            double a0 = a != null ? a[0] : 0.0, a1 = a != null ? a[1] : 0.0;
+            if (v != null && v.Settlement != null && DsVillage.On(v.Settlement))
+            {
+                double shDs = DsVillage.BudgetShare(v, v.Settlement.MapFaction as Kingdom, MineRegale.KsShareOfTakings(v, a0));   // R3-09f: regale gornicze poza modelem podatku
+                double rentDs = DsVillage.RentPerDay(v);
+                return (1.0 - VilReserve) * Math.Max(0.0, shDs * a0 - rentDs);
+            }
+            if (SwAlphaNet)
+            {
+                double[] o; if (v == null || !_vilOut.TryGetValue(v, out o)) o = null;
+                double inflow = a1 + (o != null ? o[1] : 0.0), outflow = o != null ? o[0] : 0.0;
+                return 0.95 * Math.Max(0.0, inflow - outflow);
+            }
+            return (1.0 - VilReserve) * Math.Max(0.0, Math.Min(a1, a0));
+        }
+
+        /// <summary>m103 wsie (klucz Ks Village Basket At Shelf; TownFolk.ShelfBudget): pieniadze wsi v na koszyk z biezacego utargu (zl/d) - ten sam licznik co alfa
+        /// Planu tej wsi (VilBasketMoney), liczony na srednich 28 dob dzis. false - bez pomiaru (mniej niz 7 dob utargu w sesji i w zapisie). Wies bez wpisu utargu przy
+        /// pomiarze - 0 (od 28 dob nic nie oddala; zostaje ziarno i sol). Bez progu VilTakeMin: tu kwota, nie udzial (prog chroni tylko stosunek alfy). Nie rzuca.</summary>
+        internal static bool Zc4VillageNetDay(Village v, out double net)
+        {
+            net = 0;
+            try
+            {
+                if (v == null || _vtDays < 7) return false;
+                double[] a; _vilTake.TryGetValue(v, out a);
+                net = VilBasketMoney(v, a);
+                if (double.IsNaN(net) || double.IsInfinity(net) || net < 0) { net = 0; return false; }
+                return true;
+            }
+            catch (Exception e) { Stumble("Zc4VillageNetDay", e); net = 0; return false; }
         }
 
         /// <summary>KS-R3 P2: wydatki spoza koszyka i fracht wsi swiata (srednie 28 dob, zl/d) - linia pieniedzy Planu.</summary>

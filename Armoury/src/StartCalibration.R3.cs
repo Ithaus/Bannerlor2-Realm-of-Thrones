@@ -30,6 +30,8 @@ namespace Armoury
         internal static bool SwLandGradient { get { var s = S3; return s == null || s.KsLandGradient; } }
         internal static bool SwAlphaNet { get { var s = S3; return s == null || s.KsAlphaNet; } }
         internal static bool SwPaidFirst { get { var s = S3; return s == null || s.KsVillagePaidFirst; } }
+        // m103 wsie (21.10): drabina 1 wsi przy cenach polki z budzetu z biezacego wplywu (TownFolk.ShelfScale) - tylko przy SwPaidFirst (drabina 1 istnieje)
+        internal static bool SwBasketAtShelf { get { var s = S3; return s == null || s.KsVillageBasketAtShelf; } }
         internal static bool SwOwnFirst { get { var s = S3; return s == null || s.KsOwnFoodFirst; } }
         internal static bool SwPerishReach { get { var s = S3; return s == null || s.KsPerishReach; } }
         internal static bool SwRealOfftake { get { var s = S3; return s == null || s.KsRealOfftake; } }
