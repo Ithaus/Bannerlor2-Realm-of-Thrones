@@ -372,9 +372,17 @@ namespace Armoury
             int days = Math.Max(1, _mDays);
             double sF = 0, sN = 0, tL = 0, tC = 0, cL = 0, cC = 0, tLf = 0, cLf = 0, cut = 0;
             int nT = 0, nC = 0, zT = 0, zC = 0, nCut = 0;
-            // m103 P3 (d, Ds Farm Fix Share Cap): firma z kasy najwyzej caly doplyw netto okna (udzial <= 1); liczniki linii ustalenia
+            // m103 P3 (d, Ds Farm Fix Share Cap; poprawka po recenzji 21.10): WSPOLCZYNNIK SWIATA. Firmy z kasy osad z doplywem netto okna > 0 razem najwyzej ich doplyw
+            // (udzial swiata <= 1): gdy dawne pobory braly wiecej, firmy z kasy WSZYSTKICH osad (miasta i zamki, takze bez doplywu w oknie) x k = doplyw / firmy tych osad.
+            // Dotad sufit na osade z doplywu jednego okna 28 dob: doplyw okna prawie nie mowi, ile osada zarobi pozniej (P0 bez KS: 38 z 97 miast z doplywem <= 0 w oknie,
+            // Draconys -25 tys./rok w oknie, pozniej +1.40 mln; P2: Myrth 502 tys. -> 44 tys. przy pozniejszym doplywie x 364 = 3.27 mln), a doplyw <= 0 zostawial pelna
+            // firme (skok na zerze: Harroway P2 -153 zl/d - 664 tys., P0 +5.6 zl/d - 2 tys.). Wspolczynnik zostawia kolejnosc osad; osade ponad jej wlasny doplyw
+            // sprowadza potem obnizka z dochodu (e, z KS) albo przeglad zwykly (Share <= 1). Liczniki linii ustalenia
             bool capFix = s.DsFarmFixShareCap;
-            double sF0 = 0, capT = 0, capC = 0, noNetF = 0; int capNT = 0, capNC = 0, noNetN = 0;
+            double sF0 = 0, k = 1.0, capT = 0, capC = 0, noNetD = 0; int capNT = 0, capNC = 0, noNetN = 0, nMeas = 0;
+            double sF0T = 0, sNT = 0;                                               // udzial przed sufitem osobno miast (zamki = swiat - miasta) - tylko linia
+            Func<double, double, string> Sh = (a, b) => b > 0 ? (a / b).ToString("0.000", Inv) : "-";
+            var fx = new List<Farm>(); var fn = new List<double>();                 // osady ustalone dzis i ich doplyw netto okna (NaN - mniej niz 7 dob pomiaru)
             double rate1 = Math.Min(Math.Max(0, Math.Min(0.3, (double)s.DsAidesMax)), Math.Max(0, Math.Min(0.1, (double)s.DsAidesRate)));   // pomoc od sprzedazy przy g = 1
             foreach (var st in Settlement.All)
             {
@@ -391,21 +399,31 @@ namespace Armoury
                     if (f.AidCut > 0) { cut += f.AidCut; nCut++; }
                     f.ML = f.MC = f.MLf = f.SW = f.LW = 0; f.Fixed = today; f.ATerms = 0; f.SLow = -1;   // m103 P3 (e): cykl obnizki od nowa przy nowych firmach
                     double net = NetAvg(f, NetMinDays), dayF = (f.FL + f.FC) / YearDays;
-                    if (capFix)
+                    if (net > 0 && dayF > 0) { sF0 += dayF; sN += net; if (st.IsTown) { sF0T += dayF; sNT += net; } }   // udzial swiata (ta sama miara co dotad: osady z doplywem > 0 i firma > 0)
+                    fx.Add(f); fn.Add(net);
+                }
+                catch (Exception e) { Stumble("Fix(osada)", e); }
+            }
+            // m103 P3 (d): k = doplyw / firmy osad z doplywem (najwyzej 1); bez osad z pomiarem (wczytanie mniej niz 7 dob przed ustaleniem - pamiec doplywu jest sesyjna) - 1
+            if (capFix && sN > 0 && sF0 > sN) k = sN / sF0;
+            for (int i = 0; i < fx.Count; i++)
+            {
+                try
+                {
+                    var f = fx[i]; var st = f.St; double net = fn[i];
+                    if (st == null) continue;
+                    if (!double.IsNaN(net)) nMeas++;
+                    double F0 = f.FL + f.FC;
+                    if (k < 1.0 && F0 > 0)
                     {
-                        // m103 P3 (d): firma pana i korony z kasy ponad doplyw netto kupcow okna - obie w tym samym stosunku do doplywu (udzial 1); czesc z oszczednosci
-                        // ludu (FLf) bez zmiany - placi ja lud, nie kasa. Doplyw <= 0 albo bez pomiaru (mniej niz 7 dob) - bez sufitu (jak dotad, Share NaN: przeglad
-                        // zwykly z udzialem swiata), liczone w linii
-                        if (net > 0 && dayF > 0) sF0 += dayF;
-                        if (net > 0 && dayF > net)
-                        {
-                            double k = net / dayF, cy = (f.FL + f.FC) * (1 - k);
-                            f.FL *= k; f.FC *= k; dayF = (f.FL + f.FC) / YearDays;
-                            if (st.IsTown) { capNT++; capT += cy; } else { capNC++; capC += cy; }
-                        }
-                        else if (!(net > 0) && dayF > 0) { noNetN++; noNetF += f.FL + f.FC; }
+                        // firma pana i korony z kasy x k (ten sam stosunek pan / korona); czesc z oszczednosci ludu (FLf) bez zmiany - placi ja lud, nie kasa
+                        f.FL *= k; f.FC *= k;
+                        double cy = F0 * (1 - k);
+                        if (st.IsTown) { capNT++; capT += cy; } else { capNC++; capC += cy; }
                     }
-                    if (net > 0 && dayF > 0) { f.Share = capFix ? Math.Min(1.0, dayF / net) : dayF / net; sF += dayF; sN += net; } else f.Share = double.NaN;
+                    double dayF = (f.FL + f.FC) / YearDays;
+                    if (net > 0 && dayF > 0) { f.Share = capFix ? Math.Min(1.0, dayF / net) : dayF / net; sF += dayF; }
+                    else { f.Share = double.NaN; if (dayF > 0) { noNetN++; noNetD += dayF; } }   // doplyw okna <= 0 albo bez pomiaru: przeglad zwykly z udzialem swiata
                     if (st.IsTown) { nT++; tL += f.FL; tC += f.FC; tLf += f.FLf; if (dayF <= 0) zT++; }
                     else { nC++; cL += f.FL; cC += f.FC; cLf += f.FLf; if (dayF <= 0) zC++; }
                 }
@@ -416,9 +434,10 @@ namespace Armoury
                         + "; bez firmy " + zT + "), " + nC + " zamkow (z kasy panom " + N0(cL) + ", koronie " + N0(cC) + "; z oszczednosci podzamcza panom " + N0(cLf) + "; bez firmy " + zC
                         + "), rata 1/" + Weeks + " co 7 dob; firma korony zmniejszona o pomoc od sprzedazy przy g = 1 ponad dawna danine miast " + N0(cut) + " zl/rok (" + nCut + " osad)"
                         + "; udzial firmy w doplywie netto swiata " + (double.IsNaN(_worldShare) ? "-" : _worldShare.ToString("0.000", Inv))
-                        + (capFix ? " (Ds Farm Fix Share Cap TAK: przed sufitem " + (sN > 0 ? (sF0 / sN).ToString("0.000", Inv) : "-") + "; firma ponad doplyw netto okna przycieta do doplywu: miasta "
-                                    + capNT + " o " + N0(capT) + " zl/rok, zamki " + capNC + " o " + N0(capC) + " zl/rok; bez sufitu - doplyw netto okna <= 0 albo bez pomiaru: " + noNetN
-                                    + " osad z firmami " + N0(noNetF) + " zl/rok)" : "")
+                        + (capFix ? " (Ds Farm Fix Share Cap TAK: przed sufitem " + Sh(sF0, sN) + " (miasta " + Sh(sF0T, sNT) + ", zamki " + Sh(sF0 - sF0T, sN - sNT) + "); wspolczynnik swiata " + k.ToString("0.000", Inv)
+                                    + " - firmy z kasy wszystkich osad x wspolczynnik: miasta " + capNT + " o " + N0(capT) + " zl/rok, zamki " + capNC + " o " + N0(capC)
+                                    + " zl/rok; firmy bez doplywu netto okna (doplyw <= 0 albo bez pomiaru): " + noNetN + " osad, " + N0(noNetD * YearDays)
+                                    + " zl/rok; udzial z firmami bez doplywu " + (sN > 0 ? ((sF + noNetD) / sN).ToString("0.000", Inv) : "-") + "; osad z pomiarem doplywu " + nMeas + " z " + fx.Count + ")" : "")
                         + "; przejscie " + Math.Max(0, Math.Min(364, s.DsRampDays)) + " dob: zawor, P1, podatek od skarbca ludu, danina miast i W7 z ludu x (1 - rampa), nowe x rampa; nadania wojenne - sesja dzis");
         }
 
@@ -454,6 +473,7 @@ namespace Armoury
                     f.Fixed = today; _renewN++;
                     if (F <= 0) continue;
                     double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
+                    if (share > 1.0 && CapNetTown(f, s)) share = 1.0;           // m103 P3 (poprawka po recenzji): miasto z KS - cel najwyzej caly doplyw (jak (a) i (e))
                     if (double.IsNaN(share) || share <= 0) continue;
                     double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                     double nf = Math.Max(F * (1 - m), Math.Min(F * (1 + m), target));
@@ -512,6 +532,7 @@ namespace Armoury
                     else
                     {
                         double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
+                        if (share > 1.0 && CapNetTown(f, s)) share = 1.0;       // m103 P3 (poprawka po recenzji): miasto z KS - cel najwyzej caly doplyw (jak (a) i (e))
                         if (double.IsNaN(share) || share <= 0) { _revSame++; continue; }
                         double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                         double hi = arrears ? F : F * (1 + m);             // przy zaleglosci bez podwyzki
@@ -530,6 +551,16 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Review", e); }
             }
+        }
+
+        /// <summary>m103 P3 (poprawka po recenzji 21.10): miasto na drodze sufitu firm z KS (Ks Farm Follows Surplus + Ks Farm Surplus Cap Net, KS w miescie) - przeglad zwykly
+        /// (Review / Renew) celuje najwyzej w caly doplyw netto x 364 (udzial ponad 1 liczony jak 1), ten sam sufit co podwyzka (a) i obnizka z dochodu (e). Bez tego udzial
+        /// ponad 1 - stary zapis z firmami ustalonymi kodem 101 (udzial swiata 1.27, Myrth 11.5) albo Ds Farm Fix Share Cap NIE - przeglad podnosil firme +15% na kwartal
+        /// ponad doplyw, a po 14 dobach niskiej kasy (e) zbijala ja z powrotem (pila). Zamki, miasta bez KS, klucze wylaczone - jak dotad. Wolajacy w try.</summary>
+        private static bool CapNetTown(Farm f, Settings s)
+        {
+            return s != null && s.KsFarmFollowsSurplus && s.KsFarmSurplusCapNet && f != null && f.St != null && f.St.IsTown && f.St.Town != null
+                   && StartCalibration.KsTownApplied(f.St.Town);
         }
 
         // ============================================================ f5-lud: firma miasta z KS wedlug nadwyzki kasy (Ks Farm Follows Surplus)
@@ -591,6 +622,8 @@ namespace Armoury
         /// celuje w ten sam poziom (jedna miara, bez pily kwartal w dol / 14 dob w gore); licznik obnizek w pierwszym przegladzie zwyklym po podwyzce w linii f5.
         /// m103 P3 (Ks Farm Surplus Cap Net, decyzja D1 21.10 po biegu P2): (a) podwyzka najwyzej do biezacego doplywu netto x 364, (b) kwalifikacja z kasy po naleznosciach
         /// (CofferOwes), (c) bez pomiaru i podwyzek w rampie DS, (e) obnizka z dochodu w tym samym cyklu (IncomeCut), (f) firma od zera (FromZero). Klucz wylaczony - jak dotad.
+        /// Poprawki po recenzji 21.10: krok podwyzki (a) i (f) = Ks Farm Surplus Review Max x max(F, doplyw x 364) - jedna regula dla firmy 0, malej i duzej; udzial
+        /// firmy (Share) ponad 1 liczony jak 1 takze tu i w przegladzie zwyklym (CapNetTown).
         /// </summary>
         private static void SurplusReview(int today, Settings s)
         {
@@ -645,17 +678,24 @@ namespace Armoury
                     f.SG0 = g - pendNow; f.SGDay = today; f.SMin = g;            // przyrost od tej doby (bez liczenia drugi raz)
                     double F = f.FL + f.FC;
                     if (cu) _cuRev++;
-                    if (capNet && !(F > 0)) { FromZero(f, st, t, g, smin, s, days, grow, cu); continue; }   // m103 P3 (f): firma od zera
+                    if (capNet && !(F > 0)) { FromZero(f, st, t, g, smin, s, days, grow, cu, mx); continue; }   // m103 P3 (f): firma od zera
                     if (!(grow > 0) || !(F > 0)) { if (cu) { if (!(F > 0)) _cuNoFarm++; else _cuNoGrow++; } continue; }
-                    double add = Math.Min(grow * YearDays, mx * F);
-                    if (capNet && add > 0)
+                    double add;
+                    if (capNet)
                     {
                         // m103 P3 (a): sufit podwyzki - firma po podwyzce najwyzej biezacy doplyw netto kupcow x 364 (ta sama miara co udzial <= 1); bez pomiaru doplywu
-                        // (mniej niz 7 dob pamieci) albo doplyw <= 0 - bez podwyzki. Zapas kasy ponad sufit zdejmuje dalej gersuma (CatchUpDecide nizej, takze przy podwyzce 0)
+                        // (mniej niz 7 dob pamieci) albo doplyw <= 0 - bez podwyzki. Zapas kasy ponad sufit zdejmuje dalej gersuma (CatchUpDecide nizej, takze przy podwyzce 0).
+                        // Poprawka po recenzji 21.10 - JEDEN KROK dla firmy malej i firmy 0: Ks Farm Surplus Review Max z wiekszej z liczb firma / biezacy doplyw x 364
+                        // (dotad krok mx x F: firma kilku tysiecy po obnizkach (e) przy doplywie <= 0 - F x 0.75^n nigdy nie schodzi do 0 - albo po ustaleniu potrzebowala
+                        // kilkunastu cykli do zysku kupcow, a firma 0 dostawala od razu caly zysk). Firma ponizej zysku dochodzi do niego najwyzej w 1/mx cyklach (mx 0.25 -
+                        // 4 cykle, 56 dob), firma przy zysku rosnie dalej o mx x F jak dotad
                         double netA = NetAvg(f, NetMinDays);
-                        double room = netA > 0 ? Math.Max(0.0, netA * YearDays - F) : 0.0;
-                        if (room < add) { KsFolkIncome.NoteCapped(add - room); add = room; }
+                        double year = netA > 0 ? netA * YearDays : 0.0;
+                        add = Math.Min(grow * YearDays, mx * Math.Max(F, year));
+                        double room = Math.Max(0.0, year - F);
+                        if (add > 0 && room < add) { KsFolkIncome.NoteCapped(add - room); add = room; }
                     }
+                    else add = Math.Min(grow * YearDays, mx * F);
                     if (!(add > 0)) { if (cu) CatchUpDecide(f, st, t, g, smin, s, days); continue; }   // f7-kasy: gersuma takze przy podwyzce 0 (Ks Farm Surplus Review Max 0)
                     double r = (F + add) / F;
                     f.FL *= r; f.FC *= r;
@@ -673,6 +713,7 @@ namespace Armoury
                         double sh = Math.Min(1.0, (f.FL + f.FC) / YearDays / net);
                         double old = !double.IsNaN(f.Share) ? f.Share : _worldShare;
                         if (double.IsNaN(old)) old = 0;
+                        if (capNet && old > 1.0) old = 1.0;                       // m103 P3 (poprawka po recenzji): udzial ponad 1 (stary zapis, ustalenie bez sufitu, udzial swiata) liczony jak 1 - jak w przegladzie zwyklym (CapNetTown)
                         if (sh > old + 1e-9) { f.Share = sh; KsFolkIncome.NoteShareUp(); }
                     }
                 }
@@ -715,17 +756,20 @@ namespace Armoury
         /// m103 P3 (f): FIRMA OD ZERA. Miasto ustalone z firma 0 (kasa ponizej zapasu w oknie pomiaru - zawor nic nie dawal) nie mialo zadnej drogi wyjscia: przeglad
         /// wedlug nadwyzki i gersuma stawaly przy F = 0, przeglad zwykly pomija F &lt;= 0 (Volantis w P2: kasa 28 tys. przy ustaleniu, 551 tys. = 3.1 x zapas po 160 dobach,
         /// D2K-5 109 dob bez ujscia). Te same warunki co podwyzka (KS, kasa po naleznosciach ponad 1.5 x zapas, bez oblezenia / zaleglosci, nie "domy najpierw", pelny cykl,
-        /// przyrost kasy &gt; 0): przy doplywie netto &gt; 0 firma = min(przyrost x 364, doplyw x 364) - z biezacego zysku, podzial pan / korona jak w firmach miast swiata
+        /// przyrost kasy &gt; 0): przy doplywie netto &gt; 0 firma = min(przyrost x 364, Ks Farm Surplus Review Max x doplyw x 364) - z biezacego zysku, tym samym krokiem
+        /// co podwyzka (a) (poprawka po recenzji 21.10: krok mx x max(F, doplyw x 364) - bez skoku na granicy F = 0), podzial pan / korona jak w firmach miast swiata
         /// (rod bez krolestwa - calosc panu w Pay), udzial firmy w doplywie = nowa firma / doplyw (najwyzej 1), potem gersuma z zapasu okna jak po podwyzce; przy doplywie
         /// &lt;= 0 albo bez pomiaru - firma dalej 0, tylko gersuma (podzial jak w swiecie - CatchUpPay). Kasa bez przyrostu - nic (jak przy firmie &gt; 0).
         /// </summary>
-        private static void FromZero(Farm f, Settlement st, Town t, long g, long smin, Settings s, int days, double grow, bool cu)
+        private static void FromZero(Farm f, Settlement st, Town t, long g, long smin, Settings s, int days, double grow, bool cu, double mx)
         {
             if (!(grow > 0)) { if (cu) _cuNoFarm++; return; }
             double net = NetAvg(f, NetMinDays);
             if (net > 0)
             {
-                double add = Math.Min(grow * YearDays, net * YearDays);
+                // poprawka po recenzji 21.10: ten sam krok co podwyzka (a) - mx x max(F, doplyw x 364), przy F = 0: mx x doplyw x 364 (dotad caly doplyw od razu - skok
+                // na granicy F = 0 wobec firmy kilku tysiecy); sufit doplyw x 364 przy mx <= 1 nie tnie
+                double add = Math.Min(grow * YearDays, mx * net * YearDays);
                 if (add > 0)
                 {
                     double wl = WorldLordShare();
@@ -1662,7 +1706,7 @@ namespace Armoury
 
         /// <summary>m103 P3: segment linii DS - udzial firm z kasy (pan + korona, rata 1/52) w doplywie netto kupcow dzis (ta sama miara co przy ustaleniu firm: osady z doplywem
         /// netto &gt; 0 i firma &gt; 0; pamiec doplywu 28 dob, najmniej 7), swiat oraz osobno miasta i zamki; osady z firma ponad doplyw x 364 (o ile) i osady z firma bez doplywu
-        /// (doplyw &lt;= 0 albo bez pomiaru). Tylko odczyt; petla po firmach (ok. 230) raz na dobe.</summary>
+        /// (doplyw &lt;= 0 albo bez pomiaru) oraz udzial swiata z nimi (wszystkie firmy z kasy / doplyw osad z doplywem &gt; 0). Tylko odczyt; petla po firmach (ok. 230) raz na dobe.</summary>
         private static void ShareToday(StringBuilder sb)
         {
             double fT = 0, nT = 0, fC = 0, nC = 0, overAmt = 0, noNetF = 0; int over = 0, noNet = 0;
@@ -1679,7 +1723,9 @@ namespace Armoury
             sb.Append(" | udzial firm w doplywie netto (m103 P3): swiat ").Append(nT + nC > 0 ? ((fT + fC) / (nT + nC)).ToString("0.000", Inv) : "-")
               .Append(" (miasta ").Append(nT > 0 ? (fT / nT).ToString("0.000", Inv) : "-").Append(", zamki ").Append(nC > 0 ? (fC / nC).ToString("0.000", Inv) : "-")
               .Append("); osad z firma ponad doplyw ").Append(over).Append(" (o ").Append(N0(overAmt)).Append(" zl/rok), z firma bez doplywu (doplyw <= 0 albo bez pomiaru) ")
-              .Append(noNet).Append(" (firmy ").Append(N0(noNetF)).Append(" zl/rok)");
+              .Append(noNet).Append(" (firmy ").Append(N0(noNetF)).Append(" zl/rok)")
+              // poprawka po recenzji 21.10 (M3P-6): miara z firmami bez doplywu - wszystkie firmy z kasy wobec doplywu osad z doplywem > 0 (osobno, bez zmiany miary wyzej)
+              .Append("; swiat z firmami bez doplywu ").Append(nT + nC > 0 ? ((fT + fC + noNetF / YearDays) / (nT + nC)).ToString("0.000", Inv) : "-");
         }
 
         // ============================================================ zapis arm_daniny_miasta
