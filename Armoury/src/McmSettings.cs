@@ -120,6 +120,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmeltKeepsScraps { get; set; } = true;
 
+        [SettingPropertyBool("Recipes By Mass", HintText = "bows, crossbows, arrows, bolts and armour are forged from the weight of material that really goes into them, plus a fair waste (metal x1.4, wood x1.5, leather x1.2, cloth x1.1): a bowstring takes grams of linen, a sheaf of arrows a bar or two of iron for its heads, a bow no metal at all; the tier picks the grade of metal, not the amount. A part-used bar, bolt of linen or hide stays open at your anvil and serves the next pieces - a new one is taken from your bags only when it runs out (like wood). Smelting gives back the metal in the piece less its losses, never more than half of what forging it took. Off = recipes in whole pieces, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool RecipesByMass { get; set; } = true;
+
         [SettingPropertyBool("Smith No Crude Input", HintText = "crude iron is only for refining: a weapon part that the game lists with crude iron costs the same number of wrought iron bars at the anvil, and with Smelt Weapon By Parts smelting such a weapon gives wrought iron back, never crude. Off = as in the game (those parts eat crude iron and smelting can give it back)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmithNoCrudeInput { get; set; } = true;
@@ -388,7 +392,7 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryValueFloor { get; set; } = 25000f;
 
-        [SettingPropertyFloatingInteger("Legendary Material Factor", 0.00f, 16.00f, "0.00", HintText = "a legend's bill: every material count multiplied by this, plus the noblest steel on top", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Legendary Material Factor", 0.00f, 16.00f, "0.00", HintText = "a legend's bill: every material count multiplied by this, plus the noblest steel on top. With Recipes By Mass: every kilogram of every material multiplied by this (the master keeps only the best of each) and all its metal is the noblest steel - a bow still takes no metal", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryMaterialFactor { get; set; } = 4f;
 
@@ -8729,6 +8733,7 @@ namespace Armoury
             s.SmeltWeaponByParts = SmeltWeaponByParts;
             s.SmeltArmourOnce = SmeltArmourOnce;
             s.SmeltKeepsScraps = SmeltKeepsScraps;
+            s.RecipesByMass = RecipesByMass;
             s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;

@@ -78,8 +78,8 @@ namespace Armoury
                     var r = Recipes.For(it);
                     float bill = 0f;
                     if (r.Parts != null)
-                        foreach (var p in r.Parts)
-                            if (p.Item != null && p.Count > 0) bill += p.Count * Math.Max(0, p.Item.Value);
+                        foreach (var p in Recipes.ExactUnits(r))   // m96-receptury: przy przepisie z masy dokladne sztuki (kg / waga sztuki), nie sztuki do otwarcia
+                            if (p.Key != null && p.Value > 0f) bill += p.Value * Math.Max(0, p.Key.Value);
                     bool metal = mat == ArmorComponent.ArmorMaterialTypes.Plate || mat == ArmorComponent.ArmorMaterialTypes.Chainmail;
                     if (metal)
                     {
