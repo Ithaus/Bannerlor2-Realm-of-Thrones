@@ -41,11 +41,12 @@ namespace Armoury
     ///     stanu z ksiegi zuzycia). Zbrojownie DTE lordow i zalog nie maja jakosci (Dictionary ItemObject -> ile). Limit przy powstaniu = spis + nowe od
     ///     spisu - wszystko liczone osobno dla kazdego rodzaju przedmiotu.
     ///  3. NADMIAR (stary swiat Jeffa): tylko na POLKACH OSAD, przy rozliczeniu doby, rodzaj po rodzaju - sztuki ponad limit rodzaju (limit minus to, co
-    ///     trzymaja juki, bohaterowie i gracz) schodza o stopien: legendarna -> mistrzowska (gdy jest miejsce w limicie mistrzowskich tego rodzaju),
-    ///     inaczej -> dobra (Fine); mistrzowska -> dobra. Zostaja najdrozsze. Nic nie znika (ta sama liczba sztuk), zloto nie rusza - spada tylko wartosc
-    ///     towaru na polce.
-    ///     Pociski i bron miotana (modyfikator zmienia liczbe w stosie, np. RBM large_bag_* +15 strzal): cel o liczbie w stosie nie wiekszej niz zrodlo
-    ///     (inaczej zwykla) - strzal i oszczepow nie przybywa z niczego.
+    ///     trzymaja juki, bohaterowie i gracz) schodza od razu do ZWYKLEJ (bez modyfikatora; po recenzji m96-jakosc2 - Jeff przyjal "Nadmiar w sklepach
+    ///     stanieje do zwyklej jakosci", wczesniej o stopien: legendarna -> mistrzowska albo dobra, mistrzowska -> dobra). Zostaja najdrozsze. Nic nie
+    ///     znika (ta sama liczba sztuk), zloto nie rusza - spada tylko wartosc towaru na polce.
+    ///     Pociski i bron miotana (modyfikator zmienia liczbe w stosie, np. RBM large_bag_* +15 strzal): zwykla ma stos +0 - sztuka z dodatnim stosem
+    ///     traci nadwyzke stosu (to obnizka), sztuka z ujemnym stosem zostaje (zwykla dalaby strzaly z niczego; w danych Native/RBM takiej legendarnej
+    ///     ani mistrzowskiej nie ma) - licznik "pominiete".
     ///     Sakwy, schowek i bohaterowie gracza oraz bron wykuta przez gracza (IsCraftedByPlayer) - nigdy. Kuznia gracza bez zmian.
     /// LIMIT NA RODZAJ (m96-jakosc2, Jeff 20.10 17:20: "6 legendarnych danego typu, np. 6 legendarnych helmow, ale nie 6 - daj wariacje, np. od 1 do 6
     /// legendarnych danego typu. I to samo masterwork"): zamiast jednego limitu swiata (6 / 60 lacznie) kazdy rodzaj przedmiotu ma swoj limit.
@@ -54,12 +55,12 @@ namespace Armoury
     ///    reszta typow razem jako "Other" (konie - grupa horse w Native i RBM nie ma etykiet Legendary/Masterwork, wiec jakosc koni tego nie dotyczy;
     ///    proce, bron palna, ksiegi, sztandary - w ROT bez jakosci). Sztuka nigdy nie zmienia rodzaju (obnizka zmienia tylko modyfikator).
     ///  - Limit losowany RAZ na kampanie dla kazdego rodzaju osobno: legendarne QualityLegendaryPerTypeMin..Max (1..6), mistrzowskie
-    ///    QualityMasterworkPerTypeMin..Max (6..60), kazda liczba tak samo prawdopodobna (jak rzut kostka - Jeff chcial wariacji "od 1 do 6", rozklad
+    ///    QualityMasterworkPerTypeMin..Max (1..60; po recenzji od 1, bylo 6 - Jeff: "od 1 do 6 ... I to samo masterwork"), kazda liczba tak samo prawdopodobna (jak rzut kostka - Jeff chcial wariacji "od 1 do 6", rozklad
     ///    z przewaga srodka dawalby prawie same 3-4). Los z ziarna kampanii (Campaign.UniqueGameId + rodzaj, skrot FNV), wiec ponowne wczytanie daje
     ///    te same liczby; wylosowane liczby ida do zapisu (arm_qualitycaps, SaveText.Sync) - brak w zapisie (zapis sprzed paczki) = los przy wczytaniu.
     ///    Zmiana zakresu w MCM w trakcie kampanii przycina wylosowana liczbe do nowego zakresu (nie losuje od nowa).
     ///  - Bez sufitu globalnego (stare QualityLegendaryWorldCap / QualityMasterworkWorldCap usuniete): 15 rodzajow z jakoscia (Other w danych ROT
-    ///    pusty) przy 1-6 i 6-60 daje lacznie 15-90 legendarnych (srednio ok. 52) i 90-900 mistrzowskich (srednio ok. 495); sufit 6 lacznie zjadalby
+    ///    pusty) przy 1-6 i 1-60 daje lacznie 15-90 legendarnych (srednio ok. 52) i 15-900 mistrzowskich (srednio ok. 458); sufit 6 lacznie zjadalby
     ///    limity rodzajow (pierwsze 6 rodzajow zabraloby wszystko).
     /// Wylacznik QualityScarcity = false: wszystko jak przed paczka; spis i linia doby dalej (pomiar).
     /// Linia doby "Jakosc przedmiotow (m96jakosc): dzien N" (grupa sprawdz_logi m96jakosc) - z czescia "rodzaje: <rodzaj> L stan/limit (...) M stan/limit (...)".
@@ -122,7 +123,7 @@ namespace Armoury
         private static void RangeM(out int lo, out int hi)
         {
             var s = Settings.Current;
-            lo = s == null ? 6 : Math.Max(0, Math.Min(500, s.QualityMasterworkPerTypeMin)); hi = s == null ? 60 : Math.Max(0, Math.Min(500, s.QualityMasterworkPerTypeMax));
+            lo = s == null ? 1 : Math.Max(0, Math.Min(500, s.QualityMasterworkPerTypeMin)); hi = s == null ? 60 : Math.Max(0, Math.Min(500, s.QualityMasterworkPerTypeMax));
             if (lo > hi) lo = hi;
         }
 
@@ -159,9 +160,8 @@ namespace Armoury
         private static readonly Comparison<Entry> ByKindValue = (a, b) => a.K != b.K ? a.K.CompareTo(b.K) : b.V.CompareTo(a.V);
         // spis rodzaju: wszystkie miejsca (_kL/_kM), polki (_kLs/_kMs), polki nietykalne - wyroby gracza i pociski bez celu (_kLu/_kMu); po wyrownaniu
         private static readonly int[] _kL = new int[NK], _kM = new int[NK], _kLs = new int[NK], _kMs = new int[NK], _kLu = new int[NK], _kMu = new int[NK];
-        private static readonly int[] _roomM = new int[NK];   // miejsce w limicie mistrzowskich rodzaju na legendarne zepchniete o stopien
         private static int _crafted, _craftedL, _craftedM;   // wyroby gracza (IsCraftedByPlayer) legendarne / mistrzowskie na polkach - nietykalne
-        private static int _dLM, _dLF, _dMF, _dPlain, _dFromL, _dFromM, _dStacks; private static long _dValue;   // obnizki doby (do zwyklej - grupa bez Fine albo pociski)
+        private static int _dFromL, _dFromM, _dStacks; private static long _dValue;   // obnizki doby do zwyklej (legendarne, mistrzowskie, stosy, wartosc)
         private static int _dSkip, _dFail;             // obnizki doby: pominiete (pociski bez celu o nie wiekszym stosie), nieudane zdjecie z polki
         private static int _wornOrig;                  // zuzyte sztuki gracza liczone wedlug stanu z ksiegi zuzycia (legendarne / mistrzowskie)
         private static int _tourneyFixed;              // nagrody turnieju zamowione u rzemieslnikow, ktorym regula zmienila jakosc (od wczoraj)
@@ -186,7 +186,7 @@ namespace Armoury
             _capL = _capM = _noCensus = _noMod = 0; _stumbles = 0; _errLogged = false;
             lock (_modsLock) _mods.Clear();
             Array.Clear(_cnt, 0, _cnt.Length); _plainShelf = 0; _shelfL.Clear(); _shelfM.Clear(); _seenEq.Clear(); _crafted = _craftedL = _craftedM = 0;
-            _dLM = _dLF = _dMF = _dPlain = _dFromL = _dFromM = _dStacks = 0; _dValue = 0; _dSkip = _dFail = 0; _wornOrig = 0; _tourneyFixed = 0;
+            _dFromL = _dFromM = _dStacks = 0; _dValue = 0; _dSkip = _dFail = 0; _wornOrig = 0; _tourneyFixed = 0;
             _lastLineDay = -1; _lastItem = null; _lastMod = null;
         }
 
@@ -319,8 +319,6 @@ namespace Armoury
             }
             return a[i];
         }
-
-        private static ItemModifierGroup GroupOf(ItemObject it) { return it != null && it.ItemComponent != null ? it.ItemComponent.ItemModifierGroup : null; }
 
         private static int QIdx(ItemModifier m) { if (m == null) return -1; int j = (int)m.ItemQuality; return j >= 0 && j < NQ ? j : -1; }
 
@@ -620,105 +618,61 @@ namespace Armoury
         private static int Sum(int q) { int n = 0; for (int p = 0; p < NPlace; p++) n += _cnt[p, q]; return n; }
 
         // ------------------------------------------------------------ 3. nadmiar na polkach osad
-        /// <summary>Cel obnizki w grupie: najdrozszy modyfikator jakosci q o liczbie w stosie NIE WIEKSZEJ niz zrodlo (pociski i bron miotana - RBM
-        /// large_bag_* daje +3..+15 w stosie; bez tego obnizka legendarnych strzal do "duzego kolczana" dawalaby strzaly z niczego), przy rownej cenie -
-        /// stos blizszy zrodlu. ok = false: zadnego celu (wtedy zwykla, o ile zrodlo nie ma ujemnego stosu). Raz na dobe, bez alokacji.</summary>
-        private static ItemModifier Target(ItemModifierGroup g, ItemQuality q, ItemModifier from, out bool plainOk)
-        {
-            int maxStack = from != null ? from.StackCount : 0;
-            plainOk = maxStack >= 0;   // zwykla = stos 0
-            if (g == null) return null;
-            ItemModifier best = null;
-            var all = g.ItemModifiers;
-            for (int k = 0; k < all.Count; k++)
-            {
-                var m = all[k];
-                if (m == null || m.PriceMultiplier <= 0f || m.ItemQuality != q || m.StackCount > maxStack) continue;
-                if (best == null || m.PriceMultiplier > best.PriceMultiplier || (m.PriceMultiplier == best.PriceMultiplier && m.StackCount > best.StackCount)) best = m;
-            }
-            return best;
-        }
-
-        private static void Demote(ref Entry e, int n, ItemModifier to, int fromQ)
+        /// <summary>Obnizka n sztuk wpisu polki do ZWYKLEJ (bez modyfikatora; po recenzji m96-jakosc2 - wczesniej o stopien). Ta sama liczba sztuk na tej
+        /// samej polce, zloto nie rusza; stan rodzaju i polek po obnizce.</summary>
+        private static void Demote(ref Entry e, int n, int fromQ)
         {
             if (n <= 0) return;
             var r = e.R; var it = e.El.Item; var from = e.El.ItemModifier;
             if (r.AddToCounts(e.El, -n) < 0) { _dFail += n; return; }   // sztuki juz nie ma na polce - nic nie dopisujemy (nic z niczego)
-            r.AddToCounts(new EquipmentElement(it, to), n);   // ta sama liczba sztuk na tej samej polce - nic nie znika
-            float f0 = from != null ? from.PriceMultiplier : 1f, f1 = to != null ? to.PriceMultiplier : 1f;
-            _dValue += (long)Math.Round((f0 - f1) * it.Value * n);
+            r.AddToCounts(new EquipmentElement(it, null), n);   // ta sama liczba sztuk na tej samej polce - nic nie znika
+            float f0 = from != null ? from.PriceMultiplier : 1f;
+            _dValue += (long)Math.Round((f0 - 1f) * it.Value * n);
             _dStacks++;
-            int tq = QIdx(to), k = e.K;
-            // m96-jakosc2: stan rodzaju po obnizce (rodzaj sztuki sie nie zmienia - tylko modyfikator)
+            int k = e.K;
+            // stan rodzaju po obnizce (rodzaj sztuki sie nie zmienia - tylko modyfikator)
             if (fromQ == (int)ItemQuality.Legendary) { _dFromL += n; _kL[k] -= n; _kLs[k] -= n; } else { _dFromM += n; _kM[k] -= n; _kMs[k] -= n; }
-            if (tq == (int)ItemQuality.Masterwork) { _dLM += n; _kM[k] += n; _kMs[k] += n; }
-            else if (tq == (int)ItemQuality.Fine) { if (fromQ == (int)ItemQuality.Legendary) _dLF += n; else _dMF += n; }
-            else _dPlain += n;
+            if (it.WeaponComponent != null || it.ArmorComponent != null) _plainShelf += n;   // linia: zwykle uzbrojenie na polkach po wyrownaniu
             e.N -= n;
         }
 
-        /// <summary>m96-jakosc2: wyrownanie rodzaj po rodzaju. W rodzaju: limit rodzaju minus to, czego regula nie rusza (juki, bohaterowie, gracz, wozy,
-        /// wyroby gracza na polkach); ponad to sztuki z polek schodza o stopien, zostaja najdrozsze. Najpierw mistrzowskie (miejsce, ktore zostanie,
-        /// przyjmuje legendarne tego samego rodzaju zepchniete o stopien), potem legendarne.</summary>
-        private static void Level()
+        /// <summary>Wyrownanie jednej jakosci rodzaj po rodzaju. W rodzaju: limit rodzaju minus to, czego regula nie rusza (juki, bohaterowie, gracz, wozy,
+        /// wyroby gracza na polkach); ponad to sztuki z polek schodza do zwyklej, zostaja najdrozsze. Pocisk z ujemnym stosem zostaje (zwykla ma stos +0 -
+        /// dalaby strzaly z niczego; w danych Native/RBM takiej legendarnej ani mistrzowskiej nie ma) - w spisie rodzaju jako nietykalny.</summary>
+        private static void LevelQ(List<Entry> list, bool leg)
         {
-            // rodzaj bez mistrzowskich do ruszenia na polkach - cale miejsce limitu minus swiat rodzaju
-            for (int k = 0; k < NK; k++) _roomM[k] = Math.Max(0, CapM(k) - _kM[k]);
-            if (_shelfM.Count > 1) _shelfM.Sort(ByKindValue);
-            for (int i = 0; i < _shelfM.Count; )
+            if (list.Count > 1) list.Sort(ByKindValue);
+            int fromQ = leg ? (int)ItemQuality.Legendary : (int)ItemQuality.Masterwork;
+            int[] world = leg ? _kL : _kM, untouch = leg ? _kLu : _kMu;
+            for (int i = 0; i < list.Count; )
             {
-                int k = _shelfM[i].K, j = i, shelf = 0;
-                while (j < _shelfM.Count && _shelfM[j].K == k) { shelf += _shelfM[j].N; j++; }
-                int allow = Math.Max(0, CapM(k) - (_kM[k] - shelf));   // przed obnizkami tego rodzaju
-                int kept = 0;
+                int k = list[i].K, j = i, shelf = 0;
+                while (j < list.Count && list[j].K == k) { shelf += list[j].N; j++; }
+                int allow = Math.Max(0, (leg ? CapL(k) : CapM(k)) - (world[k] - shelf));   // przed obnizkami tego rodzaju
                 if (shelf > allow)
                 {
                     int left = allow;
                     for (int x = i; x < j; x++)
                     {
-                        var e = _shelfM[x];
-                        int keep = Math.Min(e.N, left); left -= keep; kept += keep;
-                        int d = e.N - keep;
-                        if (d <= 0) continue;
-                        bool plainOk;
-                        var fine = Target(GroupOf(e.El.Item), ItemQuality.Fine, e.El.ItemModifier, out plainOk);
-                        if (fine == null && !plainOk) { _dSkip += d; kept += d; _kMu[k] += d; continue; }   // pocisk z ujemnym stosem bez celu - zostaje (w danych gry nie ma)
-                        Demote(ref e, d, fine, (int)ItemQuality.Masterwork);
-                    }
-                }
-                else kept = shelf;
-                _roomM[k] = Math.Max(0, allow - kept);
-                i = j;
-            }
-
-            if (_shelfL.Count > 1) _shelfL.Sort(ByKindValue);
-            for (int i = 0; i < _shelfL.Count; )
-            {
-                int k = _shelfL[i].K, j = i, shelf = 0;
-                while (j < _shelfL.Count && _shelfL[j].K == k) { shelf += _shelfL[j].N; j++; }
-                int allow = Math.Max(0, CapL(k) - (_kL[k] - shelf));
-                if (shelf > allow)
-                {
-                    int left = allow;
-                    for (int x = i; x < j; x++)
-                    {
-                        var e = _shelfL[x];
+                        var e = list[x];
                         int keep = Math.Min(e.N, left); left -= keep;
                         int d = e.N - keep;
                         if (d <= 0) continue;
-                        var g = GroupOf(e.El.Item);
-                        bool plainOkM, plainOkF;
-                        var mw = Target(g, ItemQuality.Masterwork, e.El.ItemModifier, out plainOkM);
-                        int toM = mw != null ? Math.Min(d, _roomM[k]) : 0;
-                        if (toM > 0) { Demote(ref e, toM, mw, (int)ItemQuality.Legendary); _roomM[k] -= toM; }
-                        if (d - toM <= 0) continue;
-                        var fine = Target(g, ItemQuality.Fine, e.El.ItemModifier, out plainOkF);
-                        if (fine == null && !plainOkF) { _dSkip += d - toM; _kLu[k] += d - toM; continue; }
-                        Demote(ref e, d - toM, fine, (int)ItemQuality.Legendary);
+                        var from = e.El.ItemModifier;
+                        if (from != null && from.StackCount < 0) { _dSkip += d; untouch[k] += d; continue; }
+                        Demote(ref e, d, fromQ);
                     }
                 }
                 i = j;
             }
+        }
+
+        /// <summary>m96-jakosc2: wyrownanie rodzaj po rodzaju, mistrzowskie i legendarne osobno - obnizka idzie do zwyklej, wiec jedna jakosc nie zajmuje
+        /// miejsca w limicie drugiej (po recenzji m96-jakosc2; wczesniej legendarne schodzily na wolne miejsce mistrzowskich tego rodzaju).</summary>
+        private static void Level()
+        {
+            LevelQ(_shelfM, false);
+            LevelQ(_shelfL, true);
         }
 
         /// <summary>Doba (DailyTickEvent zachowania): spis, wyrownanie nadmiaru na polkach (przy kluczu), linia logu.</summary>
@@ -731,7 +685,7 @@ namespace Armoury
                 if (day == _lastLineDay) return;
                 _lastLineDay = day;
                 long t0 = Stopwatch.GetTimestamp();
-                _dLM = _dLF = _dMF = _dPlain = _dFromL = _dFromM = _dStacks = 0; _dValue = 0; _dSkip = _dFail = 0;
+                _dFromL = _dFromM = _dStacks = 0; _dValue = 0; _dSkip = _dFail = 0;
                 Census();
                 int before0 = Sum((int)ItemQuality.Legendary), before1 = Sum((int)ItemQuality.Masterwork);
                 int shelfL0 = _cnt[PShelf, (int)ItemQuality.Legendary], shelfM0 = _cnt[PShelf, (int)ItemQuality.Masterwork];
@@ -740,10 +694,9 @@ namespace Armoury
                 {
                     try { Level(); } catch (Exception e) { Stumble("Level", e); }
                 }
-                // po wyrownaniu: polki przesuniete o obnizki (sztuk tyle samo)
+                // po wyrownaniu: polki przesuniete o obnizki do zwyklej (sztuk tyle samo; zwykle - w "zwykle uzbrojenie na polkach", Demote)
                 _cnt[PShelf, (int)ItemQuality.Legendary] -= _dFromL;
-                _cnt[PShelf, (int)ItemQuality.Masterwork] += _dLM - _dFromM;
-                _cnt[PShelf, (int)ItemQuality.Fine] += _dLF + _dMF;
+                _cnt[PShelf, (int)ItemQuality.Masterwork] -= _dFromM;
                 // m96-jakosc2: swiat rodzaju po wyrownaniu (limit przy powstaniu) i nowe z doby do linii
                 int newL = 0, newM = 0;
                 for (int k = 0; k < NK; k++)
@@ -816,8 +769,8 @@ namespace Armoury
               .Append(", mistrzowskie ").Append(Tot(_gameM)).Append(' ').Append(BySrc(_gameM))
               .Append(" | zatrzymane limitem rodzaju: legendarne ").Append(_capL).Append(", mistrzowskie ").Append(_capM)
               .Append("; przed pierwszym spisem ").Append(_noCensus).Append("; grupa bez tej jakosci ").Append(_noMod)
-              .Append(" | obnizki na polkach: legendarne->mistrzowskie ").Append(_dLM).Append(", legendarne->dobre ").Append(_dLF)
-              .Append(", mistrzowskie->dobre ").Append(_dMF).Append(", do zwyklej (grupa bez Fine albo pociski) ").Append(_dPlain).Append(" (stosow ").Append(_dStacks).Append("), wartosc towaru na polkach -").Append(_dValue).Append(" zl (zloto nie rusza)")
+              .Append(" | obnizki na polkach do zwyklej: legendarne ").Append(_dFromL).Append(", mistrzowskie ").Append(_dFromM)
+              .Append(" (stosow ").Append(_dStacks).Append("), wartosc towaru na polkach -").Append(_dValue).Append(" zl (zloto nie rusza)")
               .Append("; pominiete (pociski bez celu) ").Append(_dSkip).Append(", nieudane zdjecie z polki ").Append(_dFail)
               .Append(" | wyroby gracza na polkach nietykalne ").Append(_crafted).Append(" (legendarne ").Append(_craftedL).Append(", mistrzowskie ").Append(_craftedM).Append(")")
               .Append(" | zuzyte rzeczy gracza wedlug ksiegi ").Append(_wornOrig).Append(", nagrody turnieju zamowione z jakoscia po regule ").Append(_tourneyFixed)
