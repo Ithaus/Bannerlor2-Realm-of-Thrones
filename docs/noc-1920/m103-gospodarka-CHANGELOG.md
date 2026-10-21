@@ -129,3 +129,31 @@ VR-3 na nowym formacie sprawdzony na logu syntetycznym (linie VR z 07-17-36, w 2
 **Oczekiwane progi (nowa kampania 180 dob, po P7a + P7b):** R1-10b ok. 120-160/d (dzis 222; prog 177 to jeden pomiar - nowy prog ze sredniej >= 2 biegow, CHANGELOG.md:16260); T2-K1-2 (miasta bez drewna) ok. 9-11 (dzis 14.2); NA17-5b drewno stoczni w dol (dzis 241 pni/d w 180 dobach); "brak drewna" stoczni w gore; R1-7 moze wzrosnac (P7b).
 
 **Build:** Armoury kod 0; gen_mcm Armoury 2245 ustawien.
+
+---
+
+### P7b. Dymarka zostawia kuzniom miasta jedna dobe ich zuzycia drewna (R1-10b) - klucz `BloomeryShelfLeavesForges` (MCM "Bloomery Shelf Leaves Forges", grupa "Crafts, raw materials and horses (stage 6)"; TAK; NIE = kod 101)
+
+**Problem (log 101-nowa, diagnoza R1-10b):** R1-10b 222/d (prog 177). Linia "Zelazo (lupy) (214)" d91-120: "targ 105/d" (dymarki z polki miasta handlowego) i "brak na polce 139/d" - polki tych miast ida do zera; miasta handlowe kopaln ponizej potrzeby srednio 4.9/d (Yunkai 24 z 30 dob, Lordsport 23, Meereen 23, Pyke 21, Tolos 16, Oldtown 14, Vaes Diaf 10). Szacunek diagnozy: ok. 60-80 z 222 cykli/d braku drewna w warsztatach. W probce 101: d30 "targ 139 (brak na polce 625)", d60 "targ 199 (269)", d90 "166 (7)", d120 "94 (92)".
+
+**Przyczyna:** `Bloomery.cs:529` (Daily, krok b, kod 101): `n = Math.Min(want, shelf.GetItemNumber(wood))` - dymarka bierze cala polke miasta handlowego, gdy chce wiecej niz lezy; zakup idzie w `Bloomery.Daily` (ArmouryBehavior.cs:2667) przed budowami i przed warsztatami (DailyTickTown rozlozony w dobie), wiec kuznie miasta zostaja bez drewna.
+
+**Sprawdzenie `CaravanBulk.UseNow` (zadanie: "sprawdz, czy liczy to, co trzeba"):** NIE - dla drewna `HandUse` (`CaravanBulk.cs:256`) przy kluczu BloomeryWoodDemand zwraca `rece x WoodPerHandForge + Bloomery.ShelfUse(town)`, czyli UseNow ZAWIERA zakupy dymarek z tej polki (srednia z NoteShelf); bez tego klucza stara stawka `g.PerHand` ma w sobie wytop rudy w miescie. ForgeKeep z UseNow zostawialby wiec dymarkom ich wlasny zakup. Dlatego nowa funkcja `CaravanBulk.UseNowNoBloomery` (dopisana obok, UseNow bez zmian): to samo co UseNow, ale drewno kuzni zawsze sama stawka wegla kowali (`rece x WoodPerHandForge`) + domy (`g.Fixed`) + rzemioslo (`TownCrafts.UseOf` / artisans) + linie warsztatow (`ShopUse`) - bez dymarek.
+
+**Zmiana (`Bloomery.cs`, przy kluczu; wymaga Bloomery At Mine):**
+- `ForgeKeep(town, wood) = ceil(CaravanBulk.UseNowNoBloomery(town, wood))` - jedna doba wlasnego zuzycia miasta, szacunek z rak (nie z pomiaru polki - nie wpada w petle przy pustej polce).
+- Daily krok b: po policzeniu `n` (i po liczniku "brak na polce" - ten bez zmian, prawdziwy brak) `n = min(n, max(0, polka - ForgeKeep))`; roznica do licznika `_dForgeLeft`. Kredyt kupcow `F5Lend` i zakup za zloto biora najwyzej `n`, wiec zapas zostaje na polce.
+- Kopalnia BK w miescie (`TownMineBlocked`, rezerwacja cyklu) - ta sama regula (to tez dymarka na polce tego miasta): cykl tylko, gdy `polka - ForgeKeep >= potrzeba` (w 101 tych kopaln 0 - "kopalnie BK w miastach: lupy 0, drewno 0"; regula dla 100% przypadkow).
+- Linia "Zelazo (lupy) (214)": w nawiasie po "(brak na polce M" nowe pole `, zostawione kuzniom N` (+ ` i cykli kopaln BK w miastach K`, gdy > 0); bez klucza bez pola. Regexy narzedzia (`\(brak na polce (\d+)`, `brak zlota wsi (\d+)`, `, targ (\d+) za`) czytaja dalej - kazdy osobno (sprawdz_logi.py:6145-6146).
+- `Settings.cs` + `McmSettings.cs` (gen_mcm: Armoury 2246 ustawien).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Wymiana R1-10b na R1-7 w miastach pustynnych i wyspowych (Yunkai, Meereen, Tolos, Pyke, Lordsport): dymarka zostawia kuzni kilka ladunkow/d, czyli ok. 1 lupa na miasto-dobe mniej; R1-7 (kopalnia bez wegla, dzis 7.5%, prog 5%) moze wzrosnac do ok. 8-9% - do powiedzenia Jeffowi slowami gracza. Brak w dymarce zamawia wozy z miast z nadwyzka (krok c, CartOrders) - R1-7d (kontrola wozow) i linia wozow dymarek.
+- Sprzezenie miar: `NoteShelf` liczy tylko to, co dymarka naprawde kupila -> `Bloomery.ShelfUse` spadnie -> `HandUse` (cel zapasu karawan, prog nadwyzki, cena drewna RawPrice) liczy mniejsze zuzycie miasta. Przy `FirewoodMineWoodKeep` cel K1 (`TargetFor` -> `UseMines`) dopelnia brak dymarek przez `MineShelfNeed - ShelfUse`, wiec zapas budow nie spada; bez tego klucza cel moze lekko spasc. Do sprawdzenia: T2-K1-1/-2, linia "Roboty ludu (P2)" (zapas rzemiosla miast), cena drewna.
+- Zamknieta ekonomia bez zmian: ten sam towar na tej samej polce, inna kolejnosc kupujacych; zaplata wsi -> kasa miasta tylko za to, co dymarka wziela.
+- Kolizja z P7a: obie reguly zostawiaja drewno rzemioslu tej samej polki (stocznia - zapas K1 10 dob, dymarka - 1 doba); nie licza sie podwojnie (kazda tylko ogranicza swoj zakup).
+- Kolizje: P7c i P9 zmieniaja `MaterialOrders.cs` - tu nie ruszany.
+
+**Oczekiwane progi (nowa kampania 180 dob, razem z P7a):** R1-10b ok. 120-160/d (dzis 222); T2-K1-2 ok. 9-11 (dzis 14.2); w linii 214 "zostawione kuzniom" > 0; "miasta handlowe kopaln ponizej potrzeby" - te same miasta, ale bez braku w warsztatach; R1-7 moze wzrosnac do ok. 8-9%; R1-7d reszta 0; R1-11 potkniecia Bloomery 0. Nowy prog R1-10b ze sredniej >= 2 biegow.
+
+**Build:** Armoury kod 0; gen_mcm Armoury 2246 ustawien.

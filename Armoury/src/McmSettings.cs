@@ -6852,6 +6852,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryWoodDemand { get; set; } = true;
 
+        [SettingPropertyBool("Bloomery Shelf Leaves Forges", HintText = "with Bloomery At Mine: a mine's bloomery buys wood from its market town's shelf only above one day of the town's own use (its smiths, households and craftsmen), so the town's armourers and fletchers are served first - a smith earns more on a load of wood than a bloomery; a bloomery that falls short orders wood by cart from towns with a surplus. Off = the bloomery may empty the shelf, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryShelfLeavesForges { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Coal Before Lord Share", HintText = "with Bloomery At Mine: what a mining village paid for the wood of its bloomery comes out of its cart's market takings first, and the lord takes his share only of what is left - the difference moves from the lord's tax on those takings to the village's purse when the cart comes home, so no gold is made; the owners of Banner Kings estates keep their part (needs Village Takings Whole; off = the lord's share is counted on the whole takings, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryCoalBeforeLordShare { get; set; } = true;
@@ -10704,6 +10708,7 @@ namespace Armoury
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;
             s.BloomeryWoodDemand = BloomeryWoodDemand;
+            s.BloomeryShelfLeavesForges = BloomeryShelfLeavesForges;
             s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
             s.MineRegale = MineRegale;
             s.MineRegaleShare = MineRegaleShare;
