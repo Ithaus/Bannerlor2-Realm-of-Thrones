@@ -211,3 +211,71 @@ Recenzja: 7 uwag, w tym 2 pary tych samych (W12-6 dwa razy, stocznia dwa razy) -
 - Do scalania: przed scaleniem zmienic nazwe w obu galeziach (np. `M103S_TAG` w m103-sceny, `M103L_TAG` w m103-lektor, wraz z uzyciami); konflikt `Armoury/src/SubModuleMain.cs` miedzy m103-sceny a m103-lektor rozwiazac recznie; `McmSettings.cs` odtworzyc gen_mcm. m103-gospodarka tych miejsc nie dotyka.
 
 **Build:** 5 modow kod 0 (Armoury 6 ostrzezen jak dotad, RealisticCaptivity 0, GrandTourney 0, ForgeView 0, CrashScribe 0); gen_mcm: Armoury 2246, RealisticCaptivity 115, GrandTourney 44. Nic nie wgrane, nic nie wypchniete.
+
+---
+
+## Czesc 2: P3 (21.10, decyzja D1 po biegu P2 - journal wf_a568aafd-15a, ostatni wiersz)
+
+**Status:** DO SPRAWDZENIA (nic nie wgrane; test: bieg A - prolog 230 dob z `armoury-ks-auto.flag`, bieg B - 160 dob z zapisu z KS; porownanie z P2 `10-08-39`, P0 `06-23-39` i `04-57-25`).
+
+### P3. Pila firm DS pod KS: sufit z doplywu netto, obnizka z dochodu, firma od zera - klucze `KsFarmSurplusCapNet` (a, b, c, e, f) i `DsFarmFixShareCap` (d) (MCM "Ks Farm Surplus Cap Net", "Ds Farm Fix Share Cap", grupa "Town purses: the farm catches up..."; oba TAK; NIE = kod 101)
+
+**Problem (log P2 `Armoury-2026-10-21_10-08-39.log`, prolog 230 dob z KS):**
+- 270 podwyzek wedlug nadwyzki, razem +35 759 182 zl/rok, jedna obnizka (linia f5 :132081). Firmy miast 35.16 mln (108704) -> 76.63 mln zl/rok (108877, :132501); P0 bez KS 35.71 -> 36.40 mln.
+- Udzial firm w doplywie netto przy ustaleniu 1.270 (:32208), w P0 1.282 - firma ponad doplyw w obu drogach.
+- Zaleglosci: Dreadfort 91 147 zl (2.1 raty) z 119 773 zl miast; zamki 270 085 zl u 41 (P0 146 700). M96D-3 93 813 zl, rosnie ok. +3.1 tys./d na koncu.
+- Volantis: firma 0 przy ustaleniu (kasa 28 191 zl przy zapasie 152 300), potem kasa 551 tys. (3.1 x zapas) bez ujscia - D2K-5 109 dob.
+- Miasta podniesione w czasie wzrostu kas spadaja ponizej zapasu kupcow (NAKUM-27 17 -> 26, NKA-3 28): Harroway pobor 4536/d przy doplywie 1607/d, Gulltown 6385 przy 3371 (kasy-miast.csv, ostatnie 28 dob).
+
+**Przyczyna (kod 101, `Armoury/src/DsTowns.cs`):**
+- :613 `add = Math.Min(grow * YearDays, mx * F)` - bez gornej granicy "doplyw netto x 364".
+- :590 kwalifikacja z kasy brutto (`g <= OverReserve * Reserve`); naleznosci (`CofferOwes`) odejmuje tylko `SurplusHolds` (:526-527).
+- :344-345 przeglad wedlug nadwyzki biegnie od doby po ustaleniu, takze w rampie DS (kasa placi rampa x rate, reszta firmy wyglada jak przyrost kupcow; P2: pierwsza podwyzka 108718, rampa 108703-108731).
+- :381-389 Fix: `Share = dayF / net` bez gornej granicy.
+- Zapadka: w gore +25% co 14 dob, w dol tylko przeglad zwykly -15% co 91 dob (`Review`).
+- :612 `!(F > 0)` konczy przeglad przed podwyzka i gersuma, `Renew`/`Review` pomijaja `F <= 0` (:433, :487) - firma 0 nie ma wyjscia.
+
+**Zmiana (`DsTowns.cs`, `KsFolkIncome.cs`, `Settings.cs` + `McmSettings.cs` z gen_mcm):**
+- (a) `SurplusReview`: `add = Min(grow*364, mx*F, Max(0, NetAvg(f, 7)*364 - F))`; bez pomiaru doplywu (NaN) albo doplyw <= 0 - podwyzka 0. Przy podwyzce 0 gersuma (`CatchUpDecide`) dalej idzie - zapas kasy ponad sufit ma ujscie. Licznik "przyciete sufitem N (-X zl/rok)" = o ile podwyzka mniejsza.
+- (b) kwalifikacja: `gq = g - CofferOwes(f, s)` zamiast `g` (ta sama miara co `SurplusHolds`: czesc najblizszej raty zebrana od dnia raty, zaleglosci, pomoc M7, rata M9, reszta gersumy); licznik powodu f7 (`CatchUpWhy`) dostaje `gq` (ten sam warunek). Pomiar przyrostu (SG0) bez zmian.
+- (c) `inRamp = NewShare < 1`: w rampie DS kazde miasto z KS - SG0/SGDay/SLow od nowa i dalej (bez pomiaru, podwyzek, gersumy i obnizek); pomiar od pierwszej doby po rampie.
+- (d) `Fix` przy `DsFarmFixShareCap`: gdy doplyw netto okna > 0 i `dayF > net` - `FL` i `FC` x `net/dayF` (udzial 1), `Share = Min(1, dayF/net)`; czesc z oszczednosci ludu (FLf) bez zmiany (placi lud). Doplyw okna <= 0 albo bez pomiaru - bez sufitu (jak dotad; Share NaN, przeglad zwykly z udzialem swiata) - liczone w linii ustalenia. Miasta i zamki, obie drogi (z KS i bez).
+- (e) `IncomeCut` (nowe): w galezi "kasa po naleznosciach <= 1.5 x zapas albo zaleglosci (firma albo dlug rady m96)" PRZED `continue` - cykl `SLow` (pole sesji): pierwsza doba w tym stanie zaczyna cykl, po `KsFarmSurplusReviewDays` (14) dobach w tym stanie bez przerwy - jesli `F > NetAvg*364`: `F = Max(NetAvg*364, (1-mx)*F)` (FL i FC w tym samym stosunku, FLf bez zmiany - jak podwyzka), nastepny cykl od tej doby. Kasa ponad progiem, oblezenie / zdobycie, rampa, utrata KS - cykl od nowa. `Share > 1` (stary zapis albo ustalenie bez sufitu) schodzi do 1 przy obnizce - przeglad zwykly nie podniesie firmy z powrotem ponad doplyw.
+- (f) `FromZero` (nowe): przy `F == 0` po pelnym cyklu (te same warunki co podwyzka) i przyroscie > 0: doplyw > 0 - firma `Min(grow*364, NetAvg*364)` w podziale pan/korona jak suma firm miast swiata (`WorldLordShare`, raz na dobe), `Share = Min(1, F/364/net)`, potem gersuma; doplyw <= 0 albo bez pomiaru - firma dalej 0, gersuma. `CatchUpPay` przy F = 0 dzieli gersume pan/korona jak w swiecie (dotad calosc panu). Kasa bez przyrostu - nic (jak przy F > 0).
+- `Fix` zeruje `SLow` (stan czyszczony przy nowych firmach); `Reset` zeruje pamiec `WorldLordShare`.
+
+**Linie logu:**
+- f5 "Dochod ludu wedlug koszyka (f5-lud)": za "| potkniecia N" (regex NLU_RX bez zmian - `match` od poczatku) przy kluczu: `| P3 sufit firm (Ks Farm Surplus Cap Net TAK): przyciete sufitem N (-X zl/rok), obnizki z dochodu N (-Y zl/rok), firmy od zera N (+Z zl/rok); od startu sesji: przyciete N (-X), obnizki N (-Y), od zera N (+Z)`. Firma od zera liczy sie tez w "podwyzek dzis". Klucz NIE - linia jak 101.
+- DS "Firmy miast i zamkow (DS)": przed "| kontrola" przy ktoryms kluczu: `| udzial firm w doplywie netto (m103 P3): swiat X (miasta A, zamki B); osad z firma ponad doplyw N (o Y zl/rok), z firma bez doplywu (doplyw <= 0 albo bez pomiaru) M (firmy Z zl/rok)` - ta sama miara co przy ustaleniu (osady z doplywem > 0 i firma > 0, pamiec 28 dob).
+- FIRMY USTALONE: za "udzial firmy w doplywie netto swiata X" przy `DsFarmFixShareCap`: ` (Ds Farm Fix Share Cap TAK: przed sufitem Y; firma ponad doplyw netto okna przycieta do doplywu: miasta N o X zl/rok, zamki M o Y zl/rok; bez sufitu - doplyw netto okna <= 0 albo bez pomiaru: K osad z firmami Z zl/rok)`.
+
+**Narzedzie (`tools/sprawdz_logi.py`, osobny blok na koncu + 1 linia dispatch + opis grupy; nic nie przestawione):** nowa grupa `--grupa m103p3` (M3P-0..11): segment f5 w kazdej linii, zero podwyzek w rampie DS (rampa < 1 z linii DS tej samej doby), sumy przycietych / obnizek / firm od zera (INFO), udzial przy ustaleniu <= 1.00, firmy przy ustaleniu (INFO), udzial na koniec <= 1.00, zaleglosci zamkow <= 200 tys., firmy na koniec (INFO), czas f5 <= 0.2 ms, potkniecia i ERROR 0, pobor wobec doplywu Volantis/Dreadfort/Harroway/Gulltown (INFO). Sprawdzone na P2, P0 i 04-57-25 (kod 0; bez segmentow - INFO, M3P-7 NIE 270 085 / 433 778 jako punkt odniesienia) i na liniach syntetycznych w nowym formacie (wszystkie regexy czytaja; NLU_RX, `byset` nkasy, M96D-3 i kontrola "platnicy - odbiorcy" czytaja linie z nowymi segmentami tak samo). Grupy nie ma w `grupy101.txt` - dopisac do listy porownania.
+
+**Kontrola calosci (CLAUDE.md 8.0):**
+- Te same pola: SG0/SGDay (SurplusReview, Renew/Review - reset przy zmianie, `NoteCofferLoan` - tylko przy SG0 != MinValue, w rampie MinValue = bez poprawki, CatchUpDecide/CatchUpPay - bez zmian); SMin (bez zmian); Share (Fix (d), Renew/Review czytaja, SurplusReview podnosi do 1, IncomeCut tnie > 1 do 1, FromZero ustawia; zapis jak dotad); CLeft (CofferOwes - teraz takze w kwalifikacji (b), HireKeep, CofferLoanFloor, CatchUp - bez zmian); FL/FC (Pay, Terms, Review/Renew, CofferOwes, CatchUpKeep, HireKeep, TdArrears/TdKeep m96, LordFarmPerDay zamkow (Z8), linia DS, zapis).
+- Przeglad f4 (Review) i (e) nie walcza: Review celuje w `Share x NetAvg x 364` z Share <= 1 (po (d)/(e)), (e) tnie tylko ponad `NetAvg x 364`; `_renewN > 0` - w dobie przegladu zwyklego dalej bez SurplusReview (jedna zmiana firm na dobe, NKA-2). Wymuszone -15% i (e) moga zejsc w tym samym kwartale - zamierzone (firma ponad zysk schodzi szybko).
+- m96-dlugi: `ArrearsLike` (dlug rady) dalej blokuje podwyzke i teraz wlacza obnizke (e); mniejsza rata po (e)/(d) = mniejsze `TdKeep`/`TdArrears weekly` - rada splaca szybciej; `NoteTerm`/`TermsLike` bez zmian.
+- f7 gersuma: przy podwyzce przycietej do 0 dalej `CatchUpDecide` (ujscie zapasu); firma od zera - gersuma po ustaleniu firmy; F = 0 bez doplywu - sama gersuma; podzial przy F = 0 jak w swiecie. Prog gersumy `CatchUpKeep` z F po zmianie (jak dotad).
+- KsFolkIncome: `NoteRaise`/`NoteShareUp`/`NoteCutAfterRaise` bez zmian; nowe liczniki tylko linii (doba i sesja, `Zero`/`Reset`).
+- Zamki i Z8: (d) obniza FL zamku ponad doplyw -> `LordFarmPerDay` (rownowaznik dnia firmy w cieciu zwrotu zoldu zalog Z8) mniejszy -> korona zwraca panu wiecej zoldu - ta sama regula ("zwrot tnie to, co wrocilo z zamku").
+- Zamknieta ekonomia: zloto sie nie rusza poza gersuma (ta sama droga co dotad: kasa -> pan / skarbiec, kontrola "zdjete - panom - koronie"); zmienia sie tylko nalezna rata. Kontrola linii DS "platnicy - odbiorcy" bez zmian.
+- Klucz NIE: `gq = g` (long -> double, ta sama liczba), `RemitOf` liczony zawsze (bez skutkow ubocznych), SLow nieczytane, linie bez segmentow - co do monety jak 101.
+
+**Skutki (d) - sprawdzone na kasy-miast.csv (okno 28 dob przed ustaleniem; tylko miasta - zamkow w CSV nie ma):**
+- P2 (108703): przycietych 31 miast, -10.06 mln zl/rok; 44 miasta z doplywem okna <= 0 bez sufitu (7.56 mln); firmy miast przy ustaleniu ok. 25.2 mln (decyzja zakladala 28-33 mln z udzialu swiata 1.27 - per miasto tnie glebiej); udzial miast przed sufitem 1.433.
+- P0 (108703, droga bez KS): 36 przycietych, -10.46 mln; 40 bez sufitu (5.44 mln).
+- 04-57-25 (109131, z zapisu): 44 przycietych, -18.48 mln z 140.2 mln.
+- Okno ustalenia w P2/P0 przypada na wlaczenie KS i spadek kas (doplyw swiata w oknie ok. 0) - doplyw okna jest szumny. Miasta przyciete ponizej 25% dawnej firmy: P2 6 (Myrth 502 tys. -> 44 tys., pozniejszy doplyw x 364 = 3.27 mln; Meereen 1.47 mln -> 256 tys., pozniej 7.29 mln), P0 5 (Harroway 841 tys. -> 2 tys., pozniej 306 tys.; Yronwood 69 tys. -> 1 tys.; Last Hearth 350 tys. -> 31 tys., pozniej 1.51 mln).
+
+**Ryzyko / co sprawdzic:**
+- R1 (d): firmy bliskie 0 przy chwilowym doplywie bliskim 0. Z KS odrabiaja (a) po +25%/14 dob (Meereen z 256 tys. do ok. 1.5 mln - ok. 8 cykli, 112 dob; w tym czasie zapas zdejmuje gersuma); BEZ KS (P0, krainy wrocone) tylko przeglad zwykly +15%/kwartal - Harroway z 2 tys. praktycznie nigdy. (f) obejmuje tylko F = 0. Nieciaglosc: doplyw okna -1 zl/d - firma bez sufitu, +1 zl/d - firma ok. 364 zl/rok. Do decyzji po tescie (klucz osobny): np. (f) dla "F ponizej doplywu x 364 x udzial" albo sufit (d) z doplywu dluzszego okna.
+- R2 (d): dochod panow z firm miast przy ustaleniu ok. -29% (P2/P0) - C-4c (rody na minusie, P2 250, granica 250) i NAKUM-7 do sprawdzenia; zamki nieoszacowane (brak CSV). Pieniadz zostaje w kasach -> M6 do P/R albo (z KS) gersuma i podwyzki (a).
+- R3 (a)+(c): mniej podwyzek -> kasy pod KS moga rosnac (NAKUM-26 P2 +7.8 tys./d, granica +30; G1-5a <= 160%); ujsciem zostaje gersuma f7 (przy podwyzce 0 tez) i M6.
+- R4 (e): obnizka wymaga 14 dob ciaglego stanu "nisko albo zaleglosci" - miasto oscylujace wokol 1.5 x zapas (raty co 7 dob) moze jej nie dostac; (b) odejmuje zebrana czesc raty, co wygladza tydzien. Sprawdzic Dreadfort, Harroway, Gulltown w kasy-miast.csv (M3P-11) i licznik obnizek.
+- R5 (b): wiecej miast poza przegladem w gore (kasa po naleznosciach) - f7 "kasa do 1.5 x zapas" w gore (to ten sam warunek).
+- R6: FLf przy `DsFarmFolkFromSavings` NIE placi kasa, a sufit (a)/(d)/(e) liczy tylko FL + FC (jak Share dotad) - u Jeffa klucz TAK (domyslny).
+- Koszt: (e)/(f) w petli SurplusReview (ok. 97 miast, NetAvg 28 liczb tylko w dobie cyklu), ShareToday raz na dobe (ok. 230 x 28) - ponizej 0.1 ms; czas f5 (M3P-9) bez zmian.
+
+**Oczekiwane progi (cele D1; bieg A wobec P2):** M96D-3 <= 50 000 zl (P2 93 813), w ostatnich 28 dobach <= +0.5 tys./d; NAKUM-27 <= 19 (P2 26); NKA-3 <= 16 (P2 28); D2K-5 <= 14 dob (P2 109, Volantis); udzial firm w doplywie netto <= 1.00 przy ustaleniu i na koniec (M3P-4, M3P-6; P2 1.270); zaleglosci zamkow <= 200 tys. (M3P-7; P2 270 085); M96D-4 niewyplacalnych 0-1, miast z dlugiem <= 20; M3P-1 0 podwyzek w rampie; M3P-0 segment w kazdej linii f5. Bez pogorszen: NAKUM-26 kasy <= +30 tys./d, G1-5a <= 160% Z33, KR-9 >= 1.0, C-4c <= 250 (docelowo <= 217), NAKUM-7 zaden nowy posiadacz ponad +30 tys./d, czas f5 <= 0.2 ms, NAKUM-7s ARYTMETYKA OK, "platnicy - odbiorcy = 0", 0 potkniec DsTowns. Bieg B (z zapisu): M96D-3 <= 105 tys. (558-873 tys.), niewyplacalnych <= 2 (9), dlug miast <= 0.5 mln (1.06), firmy miast < 231 mln, NAKUM-27 <= 14. Bieg B wczytuje zapis z firmami juz ustalonymi - (d) nie dziala (brak Fix), (e) zetnie Share > 1 przy pierwszej obnizce.
+
+**Build:** Armoury kod 0 (6 ostrzezen jak dotad); gen_mcm Armoury 2248 ustawien (bylo 2246).

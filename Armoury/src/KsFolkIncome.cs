@@ -63,6 +63,8 @@ namespace Armoury
         private static int _revN, _revNoCut, _revNS, _revHouse; private static double _revAmt, _revAmtS;
         // recenzja f5 (uwaga 2): udzial firmy w doplywie netto podniesiony razem z podwyzka (jedna miara z przegladem zwyklym), obnizki przegladem zwyklym po podwyzce (pila)
         private static int _revShare, _revCutAfter, _revCutAfterS;
+        // m103 P3 (Ks Farm Surplus Cap Net): podwyzki przyciete sufitem doplywu netto (a), obnizki z dochodu (e), firmy od zera (f) - doba (DayLine zeruje) i sesja
+        private static int _capN, _cutN, _zeroN, _capNS, _cutNS, _zeroNS; private static double _capAmt, _cutAmt, _zeroAmt, _capAmtS, _cutAmtS, _zeroAmtS;
         // miasta, w ktorych R albo P (z potrzeba) maja mniej niz dolna granica pasma - nadwyzka kupcow najpierw do ich domow (M6), bez podwyzki firmy wedlug nadwyzki
         private static readonly HashSet<string> _poorRP = new HashSet<string>(StringComparer.Ordinal);
 
@@ -109,6 +111,7 @@ namespace Armoury
         {
             for (int c = 0; c < 3; c++) _k[c].Clear();
             _err.Clear(); _stum = 0; Zero(); _revNS = 0; _revAmtS = 0; _revCutAfterS = 0; _poorRP.Clear();
+            _capNS = _cutNS = _zeroNS = 0; _capAmtS = _cutAmtS = _zeroAmtS = 0;   // m103 P3: sesja
         }
 
         private static void Zero()
@@ -123,6 +126,7 @@ namespace Armoury
             _mFull[0] = _mFull[1] = _mRule[0] = _mRule[1] = _mPaid[0] = _mPaid[1] = 0;
             _hFull = _hPaid = 0; _hrR = _hrP = 0; _hrN = 0; _dTowns = 0; _ticks = 0;
             _revN = _revNoCut = _revHouse = 0; _revAmt = 0; _revShare = _revCutAfter = 0;
+            _capN = _cutN = _zeroN = 0; _capAmt = _cutAmt = _zeroAmt = 0;   // m103 P3: doba
         }
 
         private static void Stumble(string where, Exception e)
@@ -325,6 +329,15 @@ namespace Armoury
         /// <summary>DsTowns.SurplusReview: podwyzka wstrzymana (domy najpierw).</summary>
         internal static void NoteHousesHeld() { _revHouse++; }
 
+        /// <summary>m103 P3 (a): DsTowns.SurplusReview - podwyzka przycieta sufitem biezacego doplywu netto kupcow x 364 (o ile zl/rok mniej).</summary>
+        internal static void NoteCapped(double perYear) { if (perYear > 0 && !double.IsInfinity(perYear)) { _capN++; _capAmt += perYear; _capNS++; _capAmtS += perYear; } }
+
+        /// <summary>m103 P3 (e): DsTowns.IncomeCut - firma obnizona do biezacego doplywu netto (o ile zl/rok).</summary>
+        internal static void NoteIncomeCut(double perYear) { if (perYear > 0 && !double.IsInfinity(perYear)) { _cutN++; _cutAmt += perYear; _cutNS++; _cutAmtS += perYear; } }
+
+        /// <summary>m103 P3 (f): DsTowns.FromZero - firma ustalona od zera (zl/rok; ta sama kwota jest tez w NoteRaise).</summary>
+        internal static void NoteFromZero(double perYear) { if (perYear > 0 && !double.IsInfinity(perYear)) { _zeroN++; _zeroAmt += perYear; _zeroNS++; _zeroAmtS += perYear; } }
+
         private static float Med(List<float> v) { if (v.Count == 0) return float.NaN; v.Sort(); return v[v.Count / 2]; }
         private static float MinOf(List<float> v) { if (v.Count == 0) return float.NaN; float m = v[0]; foreach (var x in v) if (x < m) m = x; return m; }
         private static string F(double v, string fmt) { return double.IsNaN(v) || double.IsInfinity(v) ? "-" : v.ToString(fmt, Inv); }
@@ -337,7 +350,7 @@ namespace Armoury
             {
                 var s = S;
                 if (s == null) return;
-                if (_dTowns == 0 && _revN == 0 && _revNoCut == 0 && _revHouse == 0 && _revCutAfter == 0) return;
+                if (_dTowns == 0 && _revN == 0 && _revNoCut == 0 && _revHouse == 0 && _revCutAfter == 0 && _capN == 0 && _cutN == 0 && _zeroN == 0) return;
                 long t0 = Stopwatch.GetTimestamp();
                 long gold = 0, over = 0; int nT = 0, nOver = 0;
                 foreach (var t in Town.AllTowns)
@@ -399,7 +412,14 @@ namespace Armoury
                   .Append(", wstrzymane - R/P miasta ponizej pasma (nadwyzka najpierw do ich domow przez M6) dzis ").Append(_revHouse)
                   .Append(", udzial firmy w doplywie netto podniesiony z podwyzka dzis ").Append(_revShare)
                   .Append(", obnizek przegladem zwyklym po podwyzce wedlug nadwyzki dzis ").Append(_revCutAfter).Append(" (od startu sesji ").Append(_revCutAfterS).Append(')')
-                  .Append(" | czas ").Append(((_ticks + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stum).Append('.');
+                  .Append(" | czas ").Append(((_ticks + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stum);
+                // m103 P3 (Ks Farm Surplus Cap Net): segment za potknieciami (regex linii f5 w sprawdz_logi bez zmiany); klucz wylaczony - linia jak w WGRANIU 101
+                if (s.KsFarmSurplusCapNet)
+                    sb.Append(" | P3 sufit firm (Ks Farm Surplus Cap Net TAK): przyciete sufitem ").Append(_capN).Append(" (-").Append(L(_capAmt)).Append(" zl/rok), obnizki z dochodu ")
+                      .Append(_cutN).Append(" (-").Append(L(_cutAmt)).Append(" zl/rok), firmy od zera ").Append(_zeroN).Append(" (+").Append(L(_zeroAmt)).Append(" zl/rok)")
+                      .Append("; od startu sesji: przyciete ").Append(_capNS).Append(" (-").Append(L(_capAmtS)).Append("), obnizki ").Append(_cutNS).Append(" (-").Append(L(_cutAmtS))
+                      .Append("), od zera ").Append(_zeroNS).Append(" (+").Append(L(_zeroAmtS)).Append(')');
+                sb.Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("DayLine", e); }

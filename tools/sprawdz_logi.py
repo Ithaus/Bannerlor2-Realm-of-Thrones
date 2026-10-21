@@ -1609,6 +1609,13 @@ Uzycie (Python 3, tylko odczyt):
                     wierzyciele, odsetki i splaty (INFO), M96D-5 podatki nadzwyczajne i skutki (lojalnosc na podatek <= 5), M96D-6 czas, potkniecia, ERROR TownDebt,
                     M96D-7 zwolnienie DS po zdobyciu i czekanie na pule Banku (INFO).
                     python -I tools/sprawdz_logi.py --grupa m96dlugi_dlugi <Armoury-*.log>
+--grupa m103p3    : (21.10, galaz w-toku/m103-gospodarka P3 - decyzja D1 po biegu P2; Armoury/src/DsTowns.cs, KsFolkIncome.cs, klucze Ks Farm Surplus Cap Net i Ds Farm
+                    Fix Share Cap) linie f5 (segment "P3 sufit firm"), DS ("udzial firm w doplywie netto (m103 P3)", rampa, f14) i FIRMY USTALONE: M3P-0 segment w kazdej
+                    linii f5, M3P-1 zadnej podwyzki w rampie DS, M3P-2/3 podwyzki, przyciete sufitem, firmy od zera, obnizki z dochodu (INFO), M3P-4 udzial przy ustaleniu
+                    <= 1.00, M3P-5 firmy przy ustaleniu (INFO), M3P-6 udzial na koniec <= 1.00, M3P-7 zaleglosci zamkow <= 200 tys., M3P-8 firmy na koniec (INFO),
+                    M3P-9 czas f5 <= 0.2 ms, M3P-10 potkniecia i ERROR 0, M3P-11 pobor wobec doplywu 4 miast z kasy-miast.csv (INFO). Reszta celow D1 w grupach
+                    m96dlugi_dlugi (M96D-3), nakum (NAKUM-26/27), nkasy (NKA-3), drobne2 (D2K-5), etap5 (KR-9), etap8 (C-4c, G1-5a).
+                    python -I tools/sprawdz_logi.py --grupa m103p3 <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -55477,6 +55484,8 @@ def main(argv):
         return nkasy_main(logp)   # nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z): firmy DS miast przegladane co kwartal, pan splaca rachunki zywnosci wczesniej, zawrocony woz bez straty towaru (DsTowns, KsLordFood, KsFoodCarts)
     if group == "m96dlugi_dlugi" and logp:
         return m96dlugi_main(logp)   # m96dlugi_dlugi (20.10, galaz m96-dlugi): dlugi rad miast, podatek nadzwyczajny (TownDebt.cs)
+    if group == "m103p3" and logp:
+        return m103p3_main(logp)   # m103p3 (21.10, galaz m103-gospodarka P3): sufit firm DS miast z KS i firma przy ustaleniu najwyzej doplyw netto (DsTowns.cs, KsFolkIncome.cs)
     if group == "p6a7" and logp:
         return p6a7_main(logp)   # p6a7 (20.10, fala 2 pomyslow, galaz p6-a7): A7 domyslnie TAK + roboty miast z rak okregu - odplyw kas miast do kies wsi (TownHire.cs)
     if group == "na7" and logp:
@@ -56851,6 +56860,171 @@ def m96dlugi_main(logp, base_arr=209771):
     msd = sum(r["ms"] for r in rows) / len(rows); st = sum(r["stum"] for r in rows)
     rep.add("M96D-6: czas (ms na dobe), potkniecia i ERROR TownDebt", f"srednio {msd:.2f} ms (najwiecej {max(r['ms'] for r in rows):.2f}), potkniecia {st}, ERROR {errs}",
             "<= 2 ms/d, 0, 0", msd <= 2.0 and st == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
+# ---------------- m103p3 (21.10, galaz w-toku/m103-gospodarka P3 - decyzja D1 po biegu P2): sufit firm DS miast z KS (Ks Farm Surplus Cap Net) i firma przy ustaleniu
+# najwyzej doplyw netto okna (Ds Farm Fix Share Cap). DsTowns.cs (SurplusReview, IncomeCut, FromZero, Fix, ShareToday), KsFolkIncome.cs (segment linii f5).
+M3P_F5 = "Dochod ludu wedlug koszyka (f5-lud): dzien "
+M3P_DS = "Firmy miast i zamkow (DS): dzien "
+M3P_RX = {
+    "seg": re.compile(r"\| P3 sufit firm \(Ks Farm Surplus Cap Net TAK\): przyciete sufitem (\d+) \(-(\d+) zl/rok\), obnizki z dochodu (\d+) \(-(\d+) zl/rok\), "
+                      r"firmy od zera (\d+) \(\+(\d+) zl/rok\)"),
+    "raise": re.compile(r"\| przeglad firmy wedlug nadwyzki kasy: podwyzek dzis (\d+) \(\+(-?\d+) zl/rok\), od startu sesji (\d+) \(\+(-?\d+) zl/rok\)"),
+    "ms": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)"),
+    "ramp": re.compile(r"\| przejscie: rampa ([\d.]+)"),
+    "farms": re.compile(r"\| firmy od doby (-?\d+): miasta (\d+) - (\d+) zl/rok, zamki (\d+) - (\d+) zl/rok"),
+    "share": re.compile(r"\| udzial firm w doplywie netto \(m103 P3\): swiat ([\d.]+|-) \(miasta ([\d.]+|-), zamki ([\d.]+|-)\); osad z firma ponad doplyw (\d+) \(o (\d+) zl/rok\), "
+                        r"z firma bez doplywu \(doplyw <= 0 albo bez pomiaru\) (\d+) \(firmy (\d+) zl/rok\)"),
+    "arr": re.compile(r"zaleglosci wedlug osad \(f14-miary\): miasta (\d+) zl u (\d+) \(z zaleglosci >= raty \d+\), zamki (\d+) zl u (\d+) \("),
+    "stum": re.compile(r"\| potkniecia (\d+) \(w sesji (\d+)\)"),
+    "fix": re.compile(r"FIRMY USTALONE po (\d+) dobach pomiaru: (\d+) miast \(z kasy panom (\d+) zl/rok, koronie (\d+) zl/rok.*?\), (\d+) zamkow \(z kasy panom (\d+), koronie (\d+);"),
+    "fixsh": re.compile(r"udzial firmy w doplywie netto swiata ([\d.]+|-)"),
+    "fixcap": re.compile(r"\(Ds Farm Fix Share Cap TAK: przed sufitem ([\d.]+|-); firma ponad doplyw netto okna przycieta do doplywu: miasta (\d+) o (\d+) zl/rok, zamki (\d+) o (\d+) zl/rok; "
+                         r"bez sufitu - doplyw netto okna <= 0 albo bez pomiaru: (\d+) osad z firmami (\d+) zl/rok\)"),
+}
+M3P_TOWNS = ("Volantis", "Dreadfort", "Harroway", "Gulltown")   # decyzja D1, test koncowy: pobor nie wiekszy niz doplyw netto (kasy-miast.csv)
+M3P_CASTLE_ARR = 200000          # decyzja D1: zaleglosci zamkow (f14) <= 200 tys. (P2 270 085, P0 146 700)
+M3P_F5_MS = 0.2                  # decyzja D1: czas linii f5 srednio <= 0.2 ms (P2 0.09)
+
+
+def _m3p_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _m3p_n(v):
+    """Liczba z odstepami tysiecy (jak w linii DS)."""
+    try:
+        return f"{int(v):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def m103p3_main(logp):
+    """m103p3: progi P3 (sufit firm DS) - linie f5 (segment P3), DS (rampa, udzial firm w doplywie netto, zaleglosci zamkow), FIRMY USTALONE, kasy-miast.csv (INFO)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M3P-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    f5, ds, fix, errs = {}, {}, None, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(M3P_F5):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is None:
+                    continue
+                r = {k: M3P_RX[k].search(s) for k in ("seg", "raise", "ms")}
+                f5[d] = {k: (v.groups() if v else None) for k, v in r.items()}
+            elif s.startswith(M3P_DS):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is None:
+                    continue
+                if "FIRMY USTALONE" in s:
+                    a, b, c = M3P_RX["fix"].search(s), M3P_RX["fixsh"].search(s), M3P_RX["fixcap"].search(s)
+                    fix = (d, a.groups() if a else None, b.group(1) if b else None, c.groups() if c else None)
+                    continue
+                if "| firmy od doby " not in s:
+                    continue
+                ds[d] = {k: (M3P_RX[k].search(s).groups() if M3P_RX[k].search(s) else None) for k in ("ramp", "farms", "share", "arr", "stum")}
+            elif "ERROR in DsTowns" in s or "ERROR in KsFolkIncome" in s:
+                errs += 1
+    seg = sorted(d for d, r in f5.items() if r["seg"])
+    print(f"plik: {logp} | linii f5 {len(f5)} (z segmentem P3 {len(seg)}), linii DS z firmami {len(ds)}, ustalenie firm {'tak (doba %d)' % fix[0] if fix else 'brak'}, ERROR {errs}")
+    on = bool(seg)
+    rep.add("M3P-0: segment P3 w linii f5 (klucz Ks Farm Surplus Cap Net)", f"linii z segmentem {len(seg)} z {len(f5)}" + (f" (doby {seg[0]}-{seg[-1]})" if seg else ""),
+            "kazda linia f5 przy kluczu TAK (brak - INFO: klucz NIE albo log sprzed m103 P3)", (len(seg) == len(f5)) if on else None)
+    # (c) bez podwyzek w rampie DS: linia f5 z podwyzkami tej doby, linia DS tej doby z rampa < 1 (DayStart i Daily w tym samym ticku)
+    bad_c = [d for d, r in f5.items() if r["raise"] and int(r["raise"][0]) > 0 and d in ds and ds[d]["ramp"] and float(ds[d]["ramp"][0]) < 0.999]
+    rep.add("M3P-1 (c): podwyzki wedlug nadwyzki w rampie DS (rampa < 1)", f"dob z podwyzka w rampie {len(bad_c)}" + (f" (np. {sorted(bad_c)[:5]})" if bad_c else ""),
+            "0 przy kluczu TAK (P2 bez klucza: pierwsza podwyzka 108718 w rampie 108703-108731)", (not bad_c) if on else None)
+    tot = [0, 0, 0, 0, 0, 0]
+    for d in seg:
+        for i, v in enumerate(f5[d]["seg"]):
+            tot[i] += int(v)
+    last_r = None
+    for d in sorted(f5):
+        if f5[d]["raise"]:
+            last_r = (d, f5[d]["raise"])
+    rep.add("M3P-2 (a, f): podwyzki, przyciete sufitem doplywu, firmy od zera (caly log)",
+            (f"podwyzek od startu sesji {last_r[1][2]} (+{_m3p_n(last_r[1][3])} zl/rok, doba {last_r[0]})" if last_r else "brak linii f5")
+            + (f"; przyciete sufitem {tot[0]} (-{_m3p_n(tot[1])} zl/rok), firmy od zera {tot[4]} (+{_m3p_n(tot[5])} zl/rok)" if on else ""),
+            "INFO (P2 bez klucza: 270 podwyzek, +35 759 182 zl/rok; cel D1: firmy miast na koniec wyraznie ponizej 76.6 mln zl/rok)", None)
+    rep.add("M3P-3 (e): obnizki z dochodu (caly log)", (f"{tot[2]} (-{_m3p_n(tot[3])} zl/rok)" if on else "brak segmentu P3"),
+            "INFO (P2: zapadka - jedna obnizka w 230 dobach; przy zaleglosciach albo kasie <= 1.5 x zapas firma ponad doplyw schodzi co 14 dob)", None)
+    # (d) ustalenie firm
+    if fix and fix[1]:
+        g = fix[1]
+        tw = int(g[2]) + int(g[3]); cw = int(g[5]) + int(g[6])
+        sh = _m3p_f(fix[2])
+        cap = fix[3]
+        rep.add("M3P-4 (d): udzial firm w doplywie netto swiata przy ustaleniu (linia FIRMY USTALONE)",
+                f"{fix[2]} (doba {fix[0]})" + (f"; przed sufitem {cap[0]}, przyciete miasta {cap[1]} o {_m3p_n(cap[2])}, zamki {cap[3]} o {_m3p_n(cap[4])} zl/rok; bez sufitu "
+                                               f"{cap[5]} osad ({_m3p_n(cap[6])} zl/rok)" if cap else " (bez segmentu Ds Farm Fix Share Cap)"),
+                "<= 1.00 przy kluczu Ds Farm Fix Share Cap TAK (P2 1.270, P0 1.282)", (sh is not None and sh <= 1.0 + 1e-9) if cap else None)
+        rep.add("M3P-5 (d): firmy z kasy przy ustaleniu", f"miasta {_m3p_n(tw)} zl/rok, zamki {_m3p_n(cw)} zl/rok",
+                "INFO (P2 35 163 000 / 10 245 000; decyzja D1: miasta ok. 28-33 mln; model z kasy-miast.csv P2: ok. 25.2 mln)", None)
+    else:
+        rep.add("M3P-4 (d): udzial firm przy ustaleniu", "brak linii FIRMY USTALONE (bieg z zapisu po ustaleniu albo Ds Towns wylaczone)", "INFO", None)
+    dsd = sorted(ds)
+    shd = [d for d in dsd if ds[d]["share"]]
+    if shd:
+        z = ds[shd[-1]]["share"]
+        w28 = [_m3p_f(ds[d]["share"][0]) for d in shd if d > shd[-1] - 28 and _m3p_f(ds[d]["share"][0]) is not None]
+        v = _m3p_f(z[0])
+        rep.add("M3P-6: udzial firm w doplywie netto swiata na koniec (linia DS)",
+                f"{z[0]} (miasta {z[1]}, zamki {z[2]}; doba {shd[-1]}), ostatnie 28 dob najwyzej {max(w28):.3f}; osad z firma ponad doplyw {z[3]} (o {_m3p_n(z[4])} zl/rok), "
+                f"z firma bez doplywu {z[5]} ({_m3p_n(z[6])} zl/rok)" if w28 else f"{z[0]} (doba {shd[-1]})",
+                "<= 1.00 (decyzja D1; P2 przy ustaleniu 1.270)", (v is not None and v <= 1.0 + 1e-9))
+    else:
+        rep.add("M3P-6: udzial firm w doplywie netto (linia DS)", "brak segmentu 'udzial firm w doplywie netto (m103 P3)'", "INFO (klucze P3 wylaczone albo log sprzed m103 P3)", None)
+    ard = [d for d in dsd if ds[d]["arr"]]
+    if ard:
+        a = ds[ard[-1]]["arr"]
+        rep.add("M3P-7: zaleglosci zamkow (f14) na koniec", f"{_m3p_n(a[2])} zl u {a[3]} zamkow; miasta {_m3p_n(a[0])} zl u {a[1]} (doba {ard[-1]})",
+                f"<= {_m3p_n(M3P_CASTLE_ARR)} zl (decyzja D1; P2 270 085, P0 146 700)", int(a[2]) <= M3P_CASTLE_ARR)
+    fd = [d for d in dsd if ds[d]["farms"]]
+    if fd:
+        a = ds[fd[-1]]["farms"]
+        rep.add("M3P-8: firmy z kas na koniec (linia DS)", f"miasta {_m3p_n(a[2])}, zamki {_m3p_n(a[4])} zl/rok (doba {fd[-1]})",
+                "INFO (P2: miasta 76 629 894, zamki 10 256 494; bieg B z zapisu: miasta ponizej 231 mln)", None)
+    msv = [float(r["ms"][0]) for r in f5.values() if r["ms"]]
+    st5 = sum(int(r["ms"][1]) for r in f5.values() if r["ms"])
+    if msv:
+        rep.add("M3P-9: czas linii f5 (srednio / najwiecej) i potkniecia f5", f"{sum(msv) / len(msv):.3f} / {max(msv):.2f} ms, potkniecia {st5}",
+                f"srednio <= {M3P_F5_MS} ms, potkniecia 0", sum(msv) / len(msv) <= M3P_F5_MS and st5 == 0)
+    sts = [int(ds[d]["stum"][0]) for d in dsd if ds[d]["stum"]]
+    rep.add("M3P-10: potkniecia DsTowns (linia DS) i ERROR DsTowns / KsFolkIncome", f"dob z potknieciami {len(sts)} (razem {sum(sts)}), ERROR {errs}", "0, 0", not sts and errs == 0)
+    # kasy-miast.csv: pobor (raty, gersuma) wobec doplywu netto w ostatnich 28 dobach - 4 miasta z decyzji (INFO)
+    kp = csv_path_of(logp).replace("budzet-rodow.csv", "kasy-miast.csv")
+    if os.path.isfile(kp):
+        per = {}
+        with open(kp, encoding="utf-8-sig", errors="replace", newline="") as fcsv:
+            for r in csv.DictReader(fcsv, delimiter=";"):
+                if r.get("miasto") not in M3P_TOWNS:
+                    continue
+                try:
+                    per.setdefault(r["miasto"], []).append((int(r["dzien"]), float(r["pobrane"] or 0), float(r["doplyw_netto"] or 0), float(r["kasa"] or 0), float(r["zapas_kupcow"] or 0)))
+                except (ValueError, KeyError, TypeError):
+                    continue
+        parts = []
+        for town in M3P_TOWNS:
+            xs = sorted(per.get(town, []))
+            if not xs:
+                parts.append(f"{town} -")
+                continue
+            w = [x for x in xs if x[0] > xs[-1][0] - 28]
+            parts.append(f"{town} pobrane {sum(x[1] for x in w) / len(w):.0f}/d wobec doplywu {sum(x[2] for x in w) / len(w):.0f}/d, kasa {xs[-1][3]:.0f} (zapas {xs[-1][4]:.0f})")
+        rep.add("M3P-11: pobor wobec doplywu netto - ostatnie 28 dob (kasy-miast.csv)", "; ".join(parts),
+                "INFO (decyzja D1: pobor nie wiekszy niz doplyw; 'pobrane' obejmuje gersume i raty co 7 dob)", None)
+    else:
+        rep.add("M3P-11: pobor wobec doplywu netto (kasy-miast.csv)", "brak kasy-miast.csv (" + kp + ")", "INFO", None)
     rep.show()
     return 0
 
