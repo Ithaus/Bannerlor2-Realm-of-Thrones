@@ -842,7 +842,9 @@ namespace Armoury
             {
                 if (__state <= 0 || __1 == null) return;
                 int pay = Math.Min(__state, Math.Max(0, __1.Gold));
-                if (pay > 0) GiveGoldAction.ApplyBetweenCharacters(__1, Hero.MainHero, pay, false);
+                bool pn = PayNotes.On;   // m96-wies: jeden komunikat z powodem zamiast "You received N" gry
+                if (pay > 0) GiveGoldAction.ApplyBetweenCharacters(__1, Hero.MainHero, pay, pn);
+                if (pn) PayNotes.Got("workshop", pay, " from " + __1.Name + " for your workshop.");
                 _dSalePaid += pay;
                 if (pay < __state)
                 {
@@ -877,8 +879,11 @@ namespace Armoury
             {
                 if (__state <= 0 || __0 == null || __0.Owner == null || __0.Settlement == null) return;
                 int before = __0.Owner.Gold;
-                GiveGoldAction.ApplyForCharacterToSettlement(__0.Owner, __0.Settlement, __state, false);
-                _dGear += before - __0.Owner.Gold;
+                bool pn = __0.Owner == Hero.MainHero && PayNotes.On;   // m96-wies (recenzja): warsztat gracza - jeden komunikat z powodem zamiast golego "You paid N"
+                GiveGoldAction.ApplyForCharacterToSettlement(__0.Owner, __0.Settlement, __state, pn);
+                int took = before - __0.Owner.Gold;
+                _dGear += took;
+                if (pn) PayNotes.Paid("workshopgear", took, " to the craftsmen of " + __0.Settlement.Name + " for new tools to change your workshop's trade.");
             }
             catch (Exception e) { Stumble("WorkshopTrade.ConvertPostfix", e); }
         }

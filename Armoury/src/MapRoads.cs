@@ -113,25 +113,45 @@ namespace Armoury
             public int MainSegs, SideSegs, SideRoads;
             public double SideLength;
             public float SideHalf;
+            // m96-valyria: klasa odcinka traktu (MapRoadKinds: 0 trakt, 1 Valyria, 2 szlak karawan, 3 most Valyrii; null = bez rodzajow) i przedzial mostow
+            public byte[] Cls;
+            public int BridgeLo, BridgeHi, Bridges;
 
             /// <summary>n20-drogi: rodzaj drogi w punkcie - 2 trakt (wygrywa), 1 droga boczna (tylko przy side), 0 poza droga. W komorce trakty sa przed
             /// bocznymi, wiec pierwszy trafiony odcinek boczny znaczy, ze zaden trakt nie siega punktu.</summary>
             internal int Kind(int c, float x, float y, float margin, bool side)
             {
+                int seg;
+                return KindS(c, x, y, margin, side, out seg);
+            }
+
+            /// <summary>m96-valyria: Kind z trafionym odcinkiem (seg; -1 poza droga). Most Valyrii (nie farba) liczy sie tylko przy kluczu MapValyrianRoads -
+            /// bez klucza pomijany (jak przed zmiana). W komorce odcinki V, mosty, trakty, szlaki (MapRoadKinds.Order) - pierwszy trafiony wygrywa.</summary>
+            internal int KindS(int c, float x, float y, float margin, bool side, out int seg)
+            {
+                seg = -1;
                 if (c < 0) return 0;
                 int k1 = Start[c + 1], ms = MainSegs;
                 for (int k = Start[c]; k < k1; k++)
                 {
                     int s = Seg[k];
                     if (s >= ms && !side) return 0;   // dalej same drogi boczne
+                    if (s >= BridgeLo && s < BridgeHi && !MapRoadKinds.ValOn(Settings.Current)) continue;
                     float px = x - Ax[s], py = y - Ay[s];
                     float t = (px * Dx[s] + py * Dy[s]) * InvL2[s];
                     if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
                     float ex = px - t * Dx[s], ey = py - t * Dy[s];
                     float r = Half[s] + margin;
-                    if (ex * ex + ey * ey <= r * r) return s < ms ? 2 : 1;
+                    if (ex * ex + ey * ey <= r * r) { seg = s; return s < ms ? 2 : 1; }
                 }
                 return 0;
+            }
+
+            /// <summary>m96-valyria: klasa odcinka (MapRoadKinds.Trakt dla drog bocznych, bez rodzajow i seg -1).</summary>
+            internal byte ClsOf(int seg)
+            {
+                var a = Cls;
+                return a != null && seg >= 0 && seg < a.Length ? a[seg] : MapRoadKinds.Trakt;
             }
 
             internal int CellOf(float x, float y)
@@ -187,6 +207,7 @@ namespace Armoury
                     for (int k = Start[cell]; k < k1; k++)
                     {
                         int g = Seg[k];
+                        if (g >= BridgeLo && g < BridgeHi) continue;   // m96-valyria: most Valyrii to nie farba - pola jak przed zmiana
                         float px = Ax[g] - x, py = Ay[g] - y;   // odcinek w ukladzie pola: u wzdluz osi dlugiej, v wzdluz krotkiej
                         float u0 = px * c + py * s, v0 = py * c - px * s;
                         float du = Dx[g] * c + Dy[g] * s, dv = Dy[g] * c - Dx[g] * s;
@@ -322,6 +343,18 @@ namespace Armoury
         /// <summary>Stan pamieci partii z rodzaju drogi: 1 poza droga, 2 trakt, 3 droga boczna.</summary>
         private static int StOf(int kind) { return kind == 2 ? 2 : kind == 1 ? 3 : 1; }
 
+        /// <summary>m96-valyria: stan pamieci z rodzajem czynnym farby (eff z MapRoadKinds.Eff): 4 droga Valyrii, 5 szlak karawan, reszta jak StOf.</summary>
+        private static int StOf(int kind, int eff) { return kind == 2 ? (eff == MapRoadKinds.Valyrian ? 4 : eff == MapRoadKinds.Caravan ? 5 : 2) : kind == 1 ? 3 : 1; }
+
+        /// <summary>m96-valyria: rodzaj w punkcie z rodzajem farby - Kind, a dla farby (2) rodzaj czynny (MapRoadKinds.Eff). Most bez klucza - Kind go pomija.</summary>
+        private static int KindEff(Grid g, int c, float x, float y, float margin, bool side, Settings s, out int eff)
+        {
+            int seg = -1;
+            int kind = g.Empty(c) ? 0 : g.KindS(c, x, y, margin, side, out seg);
+            eff = kind == 2 ? MapRoadKinds.Eff(s, g.ClsOf(seg)) : -1;
+            return kind;
+        }
+
         private static void ParStumble(Exception e)
         {
             Interlocked.Increment(ref _parStumbles);
@@ -352,16 +385,24 @@ namespace Armoury
                 var p = mp.Position;
                 float x = p.X, y = p.Y;
                 int c = g.CellOf(x, y);
-                // n20-drogi: rodzaj drogi (2 trakt, 1 droga boczna, 0 nic) - trakt wygrywa, premie sie nie sumuja
-                int kind = g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
+                // n20-drogi: rodzaj drogi (2 trakt, 1 droga boczna, 0 nic) - trakt wygrywa, premie sie nie sumuja; m96-valyria: eff - rodzaj farby
+                int eff;
+                int kind = KindEff(g, c, x, y, MarginOf(s), SideOn(s, g), s, out eff);
                 // stan do pamieci partii tylko z liczenia, ktore gra zapisuje do _lastCalculatedSpeed (straznik zapisu); bez straznika - jak przed recenzja
-                if (!_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp))) Record(mp, c, StOf(kind));
+                if (!_noRecord && !TerrainEase.ProbeActive && (_writerHooks < 2 || ReferenceEquals(_writer, mp))) Record(mp, c, StOf(kind, eff));
                 else _recSkipped++;
                 _speedCalls++;
                 if (kind == 0) return;
                 float pct;
                 TextObject txt;
-                if (kind == 2) { _speedOn++; pct = PctOf(s); txt = _txtRoad; }
+                if (kind == 2)
+                {
+                    _speedOn++;
+                    // m96-valyria: droga Valyrii - co najmniej premia traktu; szlak karawan (glab Essos) - premia drogi bocznej
+                    if (eff == MapRoadKinds.Valyrian) { MapRoadKinds.SpeedVal++; pct = MapRoadKinds.ValPct(s, PctOf(s)); txt = MapRoadKinds.TxtValyrian; }
+                    else if (eff == MapRoadKinds.Caravan) { MapRoadKinds.SpeedCar++; pct = SidePctOf(s); txt = MapRoadKinds.TxtCaravan; }
+                    else { pct = PctOf(s); txt = _txtRoad; }
+                }
                 else { _speedSide++; pct = SidePctOf(s); txt = _txtSide; }
                 if (pct <= 0f) return;
                 float res = r.ResultNumber;
@@ -387,6 +428,23 @@ namespace Armoury
             return g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
         }
 
+        /// <summary>m96-valyria (AiRoadRoutes - koszt przejazdu): jak KindAt, ale farba z rodzajem czynnym - 2 trakt, 4 droga Valyrii, 5 szlak karawan; 1 boczna,
+        /// 0 poza droga, -1 brak siatki / klucz. Bez zapisu do pamieci partii (watek roboczy).</summary>
+        internal static int KindClassAt(float x, float y)
+        {
+            var g = _grid;
+            if (g == null) return -1;
+            var s = Settings.Current;
+            if (s == null || !s.MapRoadSpeedBonus) return -1;
+            int c = g.CellOf(x, y), eff;
+            int kind = KindEff(g, c, x, y, MarginOf(s), SideOn(s, g), s, out eff);
+            return kind == 2 ? (eff == MapRoadKinds.Valyrian ? 4 : eff == MapRoadKinds.Caravan ? 5 : 2) : kind;
+        }
+
+        /// <summary>m96-valyria (AiRoadRoutes): premie do kosztu - droga Valyrii (co najmniej trakt) i szlak karawan (jak droga boczna).</summary>
+        internal static float ValPctNow(Settings s) { return MapRoadKinds.ValPct(s, PctOf(s)); }
+        internal static float CarPctNow(Settings s) { return SidePctOf(s); }
+
         /// <summary>p5-bloto (MapMud): czy to liczenie gra zapisuje do pamieci predkosci (_lastCalculatedSpeed) - ten sam straznik zapisu co stan drogi.</summary>
         internal static bool Recording(MobileParty mp)
         {
@@ -400,7 +458,7 @@ namespace Armoury
         private static void Record(MobileParty mp, int cell, int st)
         {
             int idx = mp.Party.Index;
-            long v = ((long)idx << 32) | ((long)((cell + 1) & 0xFFFFFF) << 2) | (long)(st & 3);
+            long v = ((long)idx << 32) | ((long)((cell + 1) & 0xFFFFFF) << 3) | (long)(st & 7);   // m96-valyria: stan 3 bity (4 Valyria, 5 szlak)
             Volatile.Write(ref _slots[idx & SlotMask], v);
         }
 
@@ -421,15 +479,16 @@ namespace Armoury
                 int idx = mp.Party.Index;
                 long v = Volatile.Read(ref _slots[idx & SlotMask]);
                 if ((int)(v >> 32) != idx) return;          // inna partia w slocie albo jeszcze nie liczona - decyduje gra
-                int st = (int)(v & 3);
+                int st = (int)(v & 7);
                 if (st == 0) return;
                 var p = mp.Position;
                 float x = p.X, y = p.Y;
                 int c = g.CellOf(x, y);
                 // komorka bez drog - O(1); n20-drogi: porownanie rodzaju drogi (trakt / boczna / nic) z biezacej siatki - po podmianie siatki (drogi boczne
-                // dolozone albo zdjete) inny rodzaj = przeliczenie, tak samo jak wejscie na droge
-                int kind = g.Empty(c) ? 0 : g.Kind(c, x, y, MarginOf(s), SideOn(s, g));
-                if (StOf(kind) != st) { __result = true; _flips++; }
+                // dolozone albo zdjete) inny rodzaj = przeliczenie, tak samo jak wejscie na droge; m96-valyria: takze trakt / Valyria / szlak
+                int eff;
+                int kind = KindEff(g, c, x, y, MarginOf(s), SideOn(s, g), s, out eff);
+                if (StOf(kind, eff) != st) { __result = true; _flips++; }
             }
             catch (Exception e) { ParStumble(e); }
             finally { if (t0 != 0) { _cacheTicks += Stopwatch.GetTimestamp() - t0; _cacheSampled++; } }
@@ -598,6 +657,7 @@ namespace Armoury
             Log.Info(P + "drogi boczne - start sesji: klucz MapSideRoadSpeedBonus " + (s.MapSideRoadSpeedBonus ? "tak" : "nie") + ", premia " + (SidePctOf(s) * 100f).ToString("0.0", Inv)
                      + "%, margines " + MarginOf(s).ToString("0.00", Inv) + " jedn. (wspolny z traktami; " + FieldText(s) + ") - czekaja na plan drog bocznych z widoku mapy (klucz MapSideRoads "
                      + (s.MapSideRoads ? "tak" : "nie") + ").");
+            MapRoadKinds.SessionLine(s, g != null);   // m96-valyria: osobna linia "Drogi Valyrii (VR): start sesji" (linie DR bez zmian)
         }
 
         private static void Load()
@@ -657,7 +717,7 @@ namespace Armoury
                     tnote = "terrain.bin ROT-Map zgodny (" + now + " B)";
                 }
                 else tnote = tsize > 0 ? "terrain.bin ROT-Map nie znaleziony - bez straznika mapy" : "naglowek bez terrain_size - bez straznika mapy";
-                var g = Build(ids, xs, ys, ws);
+                var g = Build(ids, xs, ys, ws, path);
                 g.Version = version; g.Md5 = md5; g.TerrainSize = tsize;
                 lock (_pubLock) { _main = g; _grid = g; }   // n20-drogi: siatka samych traktow; drogi boczne dokladane osobno (SidePublish)
                 _note = "plik " + FileName + " v" + version + ": lamanych " + g.Lines + ", punktow " + g.Points + ", odcinkow " + g.Segments + ", dlugosc "
@@ -685,7 +745,7 @@ namespace Armoury
             catch { return null; }
         }
 
-        private static Grid Build(List<int> ids, List<float> xs, List<float> ys, List<float> ws)
+        private static Grid Build(List<int> ids, List<float> xs, List<float> ys, List<float> ws, string path)
         {
             var g = new Grid();
             int n = xs.Count;
@@ -700,21 +760,40 @@ namespace Armoury
             }
             int m = sa.Count;
             g.Lines = lines; g.Segments = m;
-            g.Ax = new float[m]; g.Ay = new float[m]; g.Dx = new float[m]; g.Dy = new float[m]; g.InvL2 = new float[m]; g.Half = new float[m];
+            // m96-valyria: kolejnosc odcinkow V, mosty Valyrii, trakty, szlaki karawan (null = bez rodzajow - kolejnosc i odcinki jak przed zmiana)
+            byte[] cls; float[] br;
+            int[] ord = MapRoadKinds.Order(path, ids, xs, ys, ws, sa, HalfMin, HalfMax, out cls, out br);
+            int mt = ord != null ? ord.Length : m;
+            g.Ax = new float[mt]; g.Ay = new float[mt]; g.Dx = new float[mt]; g.Dy = new float[mt]; g.InvL2 = new float[mt]; g.Half = new float[mt];
+            g.BridgeLo = g.BridgeHi = -1;
             double len = 0;
-            for (int k = 0; k < m; k++)
+            for (int k = 0; k < mt; k++)
             {
-                int i = sa[k];
-                float ax = xs[i - 1], ay = ys[i - 1], dx = xs[i] - ax, dy = ys[i] - ay;
+                int o = ord != null ? ord[k] : k;
+                float ax, ay, dx, dy, half;
+                if (o >= 0)
+                {
+                    int i = sa[o];
+                    ax = xs[i - 1]; ay = ys[i - 1]; dx = xs[i] - ax; dy = ys[i] - ay;
+                    half = ws[i] * 0.5f;
+                    if (half < HalfMin) half = HalfMin; else if (half > HalfMax) half = HalfMax;
+                }
+                else
+                {
+                    int b = (-o - 1) * 5;   // most Valyrii przez przerwe farby (MapRoadKinds.Order)
+                    ax = br[b]; ay = br[b + 1]; dx = br[b + 2] - ax; dy = br[b + 3] - ay; half = br[b + 4];
+                    if (g.BridgeLo < 0) g.BridgeLo = k;
+                    g.BridgeHi = k + 1;
+                    g.Bridges++;
+                }
                 float l2 = dx * dx + dy * dy;
-                float half = ws[i] * 0.5f;
-                if (half < HalfMin) half = HalfMin; else if (half > HalfMax) half = HalfMax;
                 g.Ax[k] = ax; g.Ay[k] = ay; g.Dx[k] = dx; g.Dy[k] = dy; g.InvL2[k] = l2 > 1e-8f ? 1f / l2 : 0f; g.Half[k] = half;
-                len += Math.Sqrt(l2);
+                if (o >= 0) len += Math.Sqrt(l2);
             }
+            g.Cls = cls;
             g.Length = len;
-            g.MainSegs = m;
-            Index(g, m);
+            g.MainSegs = mt;
+            Index(g, mt);
             return g;
         }
 
@@ -896,7 +975,8 @@ namespace Armoury
             var g = new Grid
             {
                 Lines = main.Lines, Points = main.Points, Segments = main.Segments, Length = main.Length, Version = main.Version, Md5 = main.Md5,
-                TerrainSize = main.TerrainSize, MainSegs = m, SideSegs = sn, SideRoads = roads, SideLength = len, SideHalf = half
+                TerrainSize = main.TerrainSize, MainSegs = m, SideSegs = sn, SideRoads = roads, SideLength = len, SideHalf = half,
+                Cls = main.Cls, BridgeLo = main.BridgeLo, BridgeHi = main.BridgeHi, Bridges = main.Bridges   // m96-valyria: rodzaje traktow (indeksy 0..M-1 bez zmian)
             };
             g.Ax = new float[all]; g.Ay = new float[all]; g.Dx = new float[all]; g.Dy = new float[all]; g.InvL2 = new float[all]; g.Half = new float[all];
             Array.Copy(main.Ax, g.Ax, m); Array.Copy(main.Ay, g.Ay, m); Array.Copy(main.Dx, g.Dx, m); Array.Copy(main.Dy, g.Dy, m);
@@ -942,10 +1022,12 @@ namespace Armoury
                         int k = mp == main ? 5 : mp.IsLordParty ? 0 : mp.IsCaravan ? 1 : mp.IsVillager ? 2 : mp.IsBandit ? 3 : 4;
                         var p = mp.Position;
                         int c = g.CellOf(p.X, p.Y);
-                        int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
+                        int eff;
+                        int kind = KindEff(g, c, p.X, p.Y, margin, side, s, out eff);
                         _hN[k]++;
                         if (kind == 2) _hOn[k]++;
                         else if (kind == 1) _hSide[k]++;   // n20-drogi: na drodze bocznej (nie na trakcie)
+                        MapRoadKinds.Census(eff);          // m96-valyria: spis drog Valyrii / szlakow karawan (linia "Drogi Valyrii (VR)")
                     }
                     catch (Exception e) { Stumble("Hourly", e); }
                 }
@@ -1062,8 +1144,9 @@ namespace Armoury
                     if (mp == null || mp == main || !mp.IsActive || mp.AttachedTo != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || !mp.IsMoving) continue;
                     var p = mp.Position;
                     int c = g.CellOf(p.X, p.Y);
-                    int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
-                    if (kind == 2) _cand.Add(mp);
+                    int eff;
+                    int kind = KindEff(g, c, p.X, p.Y, margin, side, s, out eff);
+                    if (kind == 2) { if (eff == MapRoadKinds.Trakt) _cand.Add(mp); }   // m96-valyria: droga Valyrii / szlak - audyt w linii VR (inna premia)
                     else if (kind == 1) _candSide.Add(mp);
                 }
                 catch (Exception e) { Stumble("Audit.Scan", e); }
@@ -1081,7 +1164,9 @@ namespace Armoury
                 {
                     var p = main.Position;
                     int c = g.CellOf(p.X, p.Y);
-                    int kind = g.Empty(c) ? 0 : g.Kind(c, p.X, p.Y, margin, side);
+                    int eff;   // m96-valyria (recenzja): "na drodze tak" tylko na zwyklym trakcie - droga Valyrii / szlak maja inna premie (NDR-6 porownuje z traktem)
+                    int kind = KindEff(g, c, p.X, p.Y, margin, side, s, out eff);
+                    bool other = kind == 2 && eff != MapRoadKinds.Trakt;
                     float ed = g.EdgeDist(c, p.X, p.Y, false), es = g.EdgeDist(c, p.X, p.Y, true);
                     float r0, r1, lim, lmin, cached;
                     bool line, lineS;
@@ -1089,11 +1174,12 @@ namespace Armoury
                     {
                         string limT = lim < float.MaxValue * 0.5f ? lim.ToString("0.000", ci) : "brak";
                         string floorT = r0 <= lmin + 0.001f ? "tak" : "nie";
-                        sb.Append(" | gracz: na drodze ").Append(kind == 2 ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
+                        sb.Append(" | gracz: na drodze ").Append(kind == 2 && !other ? "tak" : "nie").Append(" (od krawedzi farby ").Append(ed < 1e30f ? ed.ToString("0.00", ci) : ">2").Append(" jedn.)")
                           .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
                           .Append(", LimitMax ").Append(limT)
                           .Append(", wpis Road ").Append(line ? "tak" : "nie").Append(", pamiec gry ").Append(cached.ToString("0.000", ci))
-                          .Append(", na podlodze LimitMin ").Append(floorT);
+                          .Append(", na podlodze LimitMin ").Append(floorT)
+                          .Append(other ? (eff == MapRoadKinds.Valyrian ? ", rodzaj: droga Valyrii (premia w linii VR)" : ", rodzaj: szlak karawan (premia w linii VR)") : "");
                         sd.Append(" | gracz: na drodze bocznej ").Append(kind == 1 ? "tak" : kind == 2 ? "nie (na trakcie)" : "nie").Append(" (od krawedzi drogi bocznej ")
                           .Append(es < 1e30f ? es.ToString("0.00", ci) : ">2").Append(" jedn.)")
                           .Append(", bez premii ").Append(r0.ToString("0.000", ci)).Append(", z premia ").Append(r1.ToString("0.000", ci))
@@ -1143,6 +1229,28 @@ namespace Armoury
               .Append(", na podlodze LimitMin (poza srednia) ").Append(atFloor);
         }
 
+        /// <summary>m96-valyria (audyt linii VR, watek glowny): predkosc partii bez premii drogi i z premia (model wprost, bez zapisu do pamieci partii) oraz czy
+        /// jest wpis o tekscie txt. false = brak modelu / blad.</summary>
+        internal static bool ProbeFor(MobileParty mp, string txt, out float r0, out float r1, out bool hasLine)
+        {
+            r0 = r1 = 0f; hasLine = false;
+            var model = Campaign.Current != null ? Campaign.Current.Models.PartySpeedCalculatingModel : null;
+            if (model == null || mp == null) return false;
+            try
+            {
+                _noRecord = true;
+                _suppress = true;
+                try { r0 = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, false)).ResultNumber; }
+                finally { _suppress = false; }
+                var en = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, true));
+                r1 = en.ResultNumber;
+                foreach (var l in en.GetLines()) if (l.Item1 == txt) hasLine = true;
+                return true;
+            }
+            catch (Exception e) { Stumble("Audit.ProbeFor", e); return false; }
+            finally { _noRecord = false; _suppress = false; }
+        }
+
         private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out float lmin, out bool line, out bool lineS, out float cached)
         {
             r0 = r1 = lim = cached = 0f; lmin = float.MinValue; line = false; lineS = false;
@@ -1156,9 +1264,10 @@ namespace Armoury
                 r1 = en.ResultNumber;
                 lim = en.LimitMaxValue;
                 string road = _txtRoad.ToString(), sideRoad = _txtSide.ToString();
+                string val = MapRoadKinds.TxtValyrian.ToString(), car = MapRoadKinds.TxtCaravan.ToString();   // m96-valyria: wpis farby innego rodzaju
                 foreach (var l in en.GetLines())
                 {
-                    if (l.Item1 == road) line = true;
+                    if (l.Item1 == road || l.Item1 == val || l.Item1 == car) line = true;
                     else if (l.Item1 == sideRoad) lineS = true;
                 }
                 if (_lastSpeedRef != null) cached = _lastSpeedRef(mp);

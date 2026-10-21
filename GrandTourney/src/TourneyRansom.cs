@@ -235,11 +235,12 @@ namespace GrandTourney
             // (takze gdy potem odpadl); bez powalajacego - bez okupu. NIE = jak dotad.
             if (Settings.Current == null || Settings.Current.TourneyRansomKnockerOnly)
             {
-                if (!_ko.TryGetValue(loser.Character, out ko) || ko == null) { _noKnocker++; return null; }
+                // n25: licznik tylko dla rycerzy (bohaterow) - zwykli zolnierze i tak nie placa (Settle: _commoner)
+                if (!_ko.TryGetValue(loser.Character, out ko) || ko == null) { if (loser.Character.IsHero) _noKnocker++; return null; }
                 if (all != null)
                     foreach (var w in all)
                         if (w != null && w.Character == ko && w.Team != loser.Team) return w;
-                _noKnocker++;
+                if (loser.Character.IsHero) _noKnocker++;
                 return null;
             }
             if (_ko.TryGetValue(loser.Character, out ko))

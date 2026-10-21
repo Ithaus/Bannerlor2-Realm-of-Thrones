@@ -139,6 +139,7 @@ namespace RealisticCaptivity
         {
             try
             {
+                PayNotes.Reset();   // m96-wies: liczniki komunikatow platnosci od zera w kazdej sesji
                 Homes.Stash = _homeStash;
                 Homes.Vault = _homeVault;
                 Homes.FamilyHomeSold = _familyHomeSold;
@@ -787,13 +788,14 @@ namespace RealisticCaptivity
                                  + " | w tej sesji rat " + _e8DebtHomeN + ", razem " + _e8DebtHomeGold + ", dob bez odbiorcy " + _e8DebtNoTaker);
                         pay = paid;
                     }
-                    else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, pay);
+                    else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, pay, PayNotes.On);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons
                     _ransomDebt -= pay;
                     _debtDaysUnpaid = 0;
+                    if (PayNotes.On) PayNotes.Paid("ransomdebt", pay, " as an instalment on your ransom debt" + (_ransomDebt > 0 ? " - " + _ransomDebt + " still owed." : " - the debt is paid in full."));   // m96-wies
                     if (_ransomDebt <= 0)
                     {
                         _ransomDebt = 0;
-                        Log.Player("Your ransom debt is paid in full.");
+                        if (!PayNotes.On || pay <= 0) Log.Player("Your ransom debt is paid in full.");   // m96-wies: przy kluczu powiedziane w komunikacie raty
                         Log.Info("Dlug splacony.");
                     }
                 }
@@ -917,7 +919,10 @@ namespace RealisticCaptivity
                     if (goldTaken > 0)
                     {
                         var captorHero = (capturer != null) ? capturer.LeaderHero : null;
-                        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captorHero, goldTaken);
+                        bool pn = PayNotes.On;   // m96-wies: powod mowi komunikat "They went through your baggage" nizej
+                        int had = Hero.MainHero.Gold;
+                        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captorHero, goldTaken, pn);
+                        if (pn) PayNotes.Silent("captorloot", Math.Max(0, had - Hero.MainHero.Gold));
                     }
                 }
 
@@ -945,20 +950,25 @@ namespace RealisticCaptivity
             if (capturer == null || gold <= 0) return null;
             var mp = capturer.IsMobile ? capturer.MobileParty : null;
             var lord = capturer.LeaderHero;
+            bool pn = PayNotes.On;   // m96-wies: komunikat gry wylaczony - powod mowi komunikat "They emptied your purse" u wolajacego
+            int had = Hero.MainHero.Gold;
             if (lord != null)
             {
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, lord, gold);
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, lord, gold, pn);
+                if (pn) PayNotes.Silent("captorpurse", Math.Max(0, had - Hero.MainHero.Gold));
                 return "kiesa " + lord.Name;
             }
             Settlement home = CaptorHome(capturer);
             if (home != null && home.SettlementComponent != null)
             {
-                GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold);
+                GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold, pn);
+                if (pn) PayNotes.Silent("captorpurse", Math.Max(0, had - Hero.MainHero.Gold));
                 return "kasa osady " + home.Name + (mp != null ? " (" + (mp.IsMilitia ? "milicja" : "zaloga") + ")" : "");
             }
             if (mp != null)
             {
-                GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, capturer, gold);
+                GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, capturer, gold, pn);
+                if (pn) PayNotes.Silent("captorpurse", Math.Max(0, had - Hero.MainHero.Gold));
                 return "kiesa partii " + capturer.Name;
             }
             return null;
@@ -1007,14 +1017,15 @@ namespace RealisticCaptivity
             string to = null;
             Hero heir = gone != null && gone.Clan != null ? gone.Clan.Leader : null;
             Settlement home = !string.IsNullOrEmpty(_captorHomeId) ? Settlement.Find(_captorHomeId) : null;
+            bool pn = PayNotes.On;   // m96-wies: komunikat gry wylaczony - komunikat z powodem u wolajacego (rata dlugu, wykup rynsztunku)
             if (heir != null && heir.IsAlive && heir != Hero.MainHero)
             {
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, heir, gold);
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, heir, gold, pn);
                 to = "kiesa " + heir.Name + " (glowa rodu po " + gone.Name + ")";
             }
             else if (home != null && home.SettlementComponent != null)
             {
-                GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold);
+                GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold, pn);
                 to = "kasa osady " + home.Name;
             }
             else if (!string.IsNullOrEmpty(_captorBandId))
@@ -1024,12 +1035,12 @@ namespace RealisticCaptivity
                     if (mp != null && mp.IsActive && mp.StringId == _captorBandId) { band = mp; break; }
                 if (band != null && band.LeaderHero != null && band.LeaderHero != Hero.MainHero)   // banda dostala wodza - jego kiesa (jak lord w GoldToCaptor)
                 {
-                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, band.LeaderHero, gold);
+                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, band.LeaderHero, gold, pn);
                     to = "kiesa " + band.LeaderHero.Name + " (wodz partii " + band.Name + ")";
                 }
                 else if (band != null && band.LeaderHero == null)
                 {
-                    GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, band.Party, gold);
+                    GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, band.Party, gold, pn);
                     to = "kiesa partii " + band.Name;
                 }
             }
@@ -1270,9 +1281,10 @@ namespace RealisticCaptivity
                     if (to == null) { Log.Info("Wykup rynsztunku (E8/RC): brak odbiorcy zaplaty (pojmujacy bez bohatera, osady i partii) - nic nie pobrane, rynsztunek zostaje w ksiedze."); return false; }
                     Log.Info("Wykup rynsztunku (E8/RC): " + paid + " -> " + to + " (pojmujacy bez zywego bohatera)");
                 }
-                else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, BuybackPrice);
+                else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, BuybackPrice, PayNotes.On);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons
                 RestoreGear();
-                Log.Player("You bought back your war gear for " + BuybackPrice + " gold.");
+                if (PayNotes.On) PayNotes.Paid("buyback", BuybackPrice, " to buy back your war gear.");
+                else Log.Player("You bought back your war gear for " + BuybackPrice + " gold.");
                 return true;
             }
             catch (Exception e) { Log.Error("BuyBackGear", e); return false; }

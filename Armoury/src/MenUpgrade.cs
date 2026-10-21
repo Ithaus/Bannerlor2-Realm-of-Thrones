@@ -200,6 +200,7 @@ namespace Armoury
                     return;
                 }
                 int nb0 = _dNoBetter, nm0 = _dNoMoney, nl0 = _dNoLift, nh0 = _dHeld;   // liczniki doby przed wizyta - roznica = powody tej wizyty (tylko log)
+                SavingsByNeed.Saw(false);   // m96: przeglad w wizycie na targu (okno MenPurse) - cel z koszykow "za malo w sakiewce"
                 var v = Run(main, new PlayerKit(armory), st, null, st, budget, true);
                 if (v.N <= 0)
                 {
@@ -254,6 +255,7 @@ namespace Armoury
                     if (market != null) { shop2 = market; cartFrom = market; }
                 }
                 var cart = cartFrom != null ? new List<GarrisonCarts.Line>() : null;
+                SavingsByNeed.Saw(garrison && st.IsCastle && shop2 == null);   // m96: przeglad w wizycie (okno AiGear.TryBuy); zamek bez targu miasta - wezszy
                 var v = Run(mp, new AiKit(mp, arm, garrison), shop1, shop2, sellTo, budget, false, cartFrom, cart);
                 if (cart != null && cart.Count > 0)
                 {
@@ -555,6 +557,7 @@ namespace Armoury
         {
             why = 0; heldAt = null;
             bool better = false, lift = false, priced = false, lowTier = false, shortage = false;
+            int poorMin = int.MaxValue;   // m96: najtansza lepsza sztuka, na ktora nie starczylo sakiewki
             bool ammoRule = AmmoRule(c.Type);   // sklad8-s S4
             var oldIt = oldEl.Item;
             bool hasCls = oldIt.PrimaryWeapon != null;
@@ -585,13 +588,14 @@ namespace Armoury
                     if (ammoRule && SupplyDemand.Active && FacOf(w) > 1f) { shortage = true; continue; }
                     priced = true;
                     if (w.Price < 0) { try { w.Price = shop.Town.MarketData.GetPrice(w.El, mp, false, shop.Party); } catch { w.Price = 0; } }   // cena dopiero dla kandydata
-                    if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) continue;
+                    if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) { if (w.Price > budget && w.Price < poorMin) poorMin = w.Price; continue; }
                     double score = SwapMath.UpgradeScore(oldP.Power, w.Power, w.Price, oldSell);
                     if (score > bestScore) { bestScore = score; best = w; }
                 }
                 if (best != null) return best;
             }
             why = !better ? (lowTier ? 5 : 0) : (!lift ? 1 : (!priced && heldAt != null ? 3 : (!priced && shortage ? 4 : 2)));
+            if (why == 2) SavingsByNeed.NoteWant(poorMin, false);   // m96: koszyk "za malo w sakiewce" - cel oszczedzania (tylko suma wizyty, nie rzuca)
             return null;
         }
 

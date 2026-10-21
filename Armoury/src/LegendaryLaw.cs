@@ -93,6 +93,7 @@ namespace Armoury
             try { SweepAiArmories("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
             try { SweepWorld(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepWorld", e); }
             try { LockLegendPieces(); } catch (Exception e) { Log.Error("LegendaryLaw.LockLegendPieces", e); }
+            try { LegendTwins.Hide(); } catch (Exception e) { Log.Error("LegendTwins.Hide", e); }   // m96-wzory: blizniacze klingi legend ("Dual", ta sama siatka, zaden przedmiot) - jak czesci legendy (LegendTwinPiecesHidden)
             // 177-2: rejestr i spis stali valyrianskiej - na koncu, po wszystkich czystkach (krytyka 177 pkt 6: kolejnosc nie zalezy od sluchaczy)
             try { ValyrianBlades.OnSession(); } catch (Exception e) { Log.Error("ValyrianBlades.OnSession", e); }
             // wyrownanie skilli jednostek MUSI isc PO sweepie legend - inaczej

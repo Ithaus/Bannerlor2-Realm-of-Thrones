@@ -81,7 +81,7 @@ namespace Armoury
             // odpoczywania: mlot to nie drzemka)
             starter.AddGameMenuOption(Menu, "arm_proj_wait_opt",
                 ShortLabels.Menu("{=!}Stay until the work is done", "{=!}Stay at the forge until the work is done"), ShortLabels.Tip(ProjWaitCondition, "Stay at the forge until the work is done."),
-                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_project_wait"); }, false, 1);
+                delegate (MenuCallbackArgs a) { ForgeJob.ReturnMenu = null; GameMenu.SwitchToMenu("arm_project_wait"); }, false, 1);   // m96-czaskuzni: powrot tu, do "Work the forge"
 
             // JEDNO wejscie dla wszystkich napraw (Jeff: "sprawdz czy opcje maja
             // sens i czy czegos nie wywalic" - piec pozycji naprawczych na glownym
@@ -174,7 +174,8 @@ namespace Armoury
                 // sami - ratunek z deadlocka po load w srodku menu (White Harbor)
                 delegate (MenuCallbackArgs a)
                 {
-                    _projLeave = true;
+                    string hold = ForgeJob.HoldAtAnvil();   // m96-czaskuzni: od wytopu i rafinacji (metal juz w sakwach) odejsc nie mozna - tylko od sztuk
+                    if (hold == null) _projLeave = true; else Log.Player(hold, true);
                     try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
                 }, true, 9);
         }
@@ -303,11 +304,12 @@ namespace Armoury
                 // JEDNA PRAWDA GODZIN (Jeff 29.08: "inne godziny w smith, inne jak
                 // czekam - balagan"): to jest SUMA wszystkich zlecen u tego kowala
                 // (pracuje po kolei), a robota idzie takze bez ciebie
-                MBTextManager.SetTextVariable("ARM_PROJ_TEXT",
+                MBTextManager.SetTextVariable("ARM_PROJ_TEXT", ForgeJob.On ? ForgeJob.WaitText(_projInitialHours) :   // m96-czaskuzni: jedna robota, jeden pasek
                     "The smith works the jobs one by one - about " +
                     ((int)Math.Ceiling(_projInitialHours)) + " hours until ALL your work here is done. " +
                     (ForgeClock.On ? "Each piece comes off the anvil when it is done. Leave, and the work waits for you."
                                    : "He needs no watching: leave, and the clock still runs."));
+                ForgeJob.WaitOpened(_projInitialHours);
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("ProjWaitInit", e); }
@@ -318,12 +320,18 @@ namespace Armoury
             try
             {
                 AnvilShift((float)dt.ToHours);
-                if (_projLeave) { _projLeave = false; GameMenu.SwitchToMenu(Menu); return; }
                 var b = ArmouryBehavior.Instance;
                 float left = b != null ? b.ProjectHoursLeftHere(Settlement.CurrentSettlement) : 0f;
+                // m96-czaskuzni: oblezenie / bitwa przerywa pasek (menu ze stanu gry, SwitchToMenu z ticku jak NightRest); reszta roboty czeka w kuzni
+                string trouble = ForgeJob.Interrupt();
+                if (trouble != null) { _projLeave = false; ForgeJob.WaitEnded(false, left, trouble); ForgeJob.ReturnMenu = null; GameMenu.SwitchToMenu(trouble); return; }
+                ForgeJob.WaitTick(left, (float)dt.ToHours);
+                // m96-czaskuzni: powrot tam, skad gracz wszedl do ekranu kuzni (podmenu kuzni), i linia logu o koncu albo przerwaniu roboty
+                if (_projLeave) { _projLeave = false; ForgeJob.WaitEnded(false, left); GameMenu.SwitchToMenu(ForgeJob.BackMenu(Menu)); return; }
                 if (left <= 0.01f)
                 {
-                    GameMenu.SwitchToMenu(Menu);   // wyroby juz wydane przez Forge.Finish
+                    ForgeJob.WaitEnded(true, 0f);
+                    GameMenu.SwitchToMenu(ForgeJob.BackMenu(Menu));   // wyroby juz wydane przez Forge.Finish
                     return;
                 }
                 args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(1f - left / Math.Max(1f, _projInitialHours));
@@ -779,11 +787,11 @@ namespace Armoury
             {
                 var r = Recipes.For(el.Item);
                 float share = Math.Max(0f, Settings.Current.MendMaterialMaxShare) * MendShare(el);
-                foreach (var p in r.Parts)
+                foreach (var p in Recipes.ExactUnits(r))   // m96-receptury: przy przepisie z masy dokladne sztuki (kg / waga sztuki), nie sztuki do otwarcia
                 {
-                    int need = (int)Math.Round(p.Count * share);
+                    int need = (int)Math.Round(p.Value * share);
                     if (need <= 0) continue;
-                    list.Add(new Recipes.Part(p.Item, need));
+                    list.Add(new Recipes.Part(p.Key, need));
                 }
             }
             catch (Exception e) { Log.Error("SelfMendParts", e); }
@@ -2218,7 +2226,7 @@ namespace Armoury
                     "How will you work?",
                     item.Name + (Settings.Current.ForgeHireHistorical ? ". Forge hire " + Forge.ForgeFee(r) + " gold for every day of work. " : ". Forge fee " + Forge.ForgeFee(r) + " gold. ") +
                     (ForgeClock.LikeTown ? "It takes you as long as it takes a town smith: " + Project.TimeLabel(baseDays) + " of work at a steady pace. " : "") + "Materials and stamina are spent now; " +
-                    "the piece is finished only when the work is done - and only while you remain in this settlement.",
+                    "the piece is finished only when the work is done - and only while you " + (ForgeJob.AnvilOnly ? "wait at the anvil." : "remain in this settlement."),   // m96-czaskuzni
                     opts, true, 1, 1, "Set to work", "Step back",
                     delegate (List<InquiryElement> sel)
                     {
@@ -2230,7 +2238,7 @@ namespace Armoury
                             if (!Forge.Begin(item, tempo, out days)) return;
                             ArmouryBehavior.Instance.StartProject(item, tempo, days, Settlement.CurrentSettlement);
                             Log.Player("You set to work on " + item.Name + ". " + Project.TimeLabel(days) +
-                                       " at the anvil, and you must stay here to see it through.");
+                                       (ForgeJob.AnvilOnly ? " at the anvil - stay at the forge until the work is done." : " at the anvil, and you must stay here to see it through."));   // m96-czaskuzni
                         }
                         catch (Exception ex) { Log.Error("AskTempo.Selected", ex); }
                     },
@@ -2263,6 +2271,7 @@ namespace Armoury
                     int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                     float share = MathF.Min(0.9f, Settings.Current.SmeltingReturnShare + skill * Settings.Current.SmeltingSkillBonus);
                     var y = Recipes.SmeltYield(r, share);
+                    if (r.Kg != null) { var mm = Recipes.MassSmeltMilli(item, share); bool any = false; if (mm != null) for (int g = 1; g <= 6; g++) if (mm[g] > 0) any = true; if (!any) continue; }   // m96-receptury: bez metalu do odzysku - nie niszczyc za nic (kod martwy od 27.08)
                     var sb = new System.Text.StringBuilder();
                     foreach (var p in y) { if (sb.Length > 0) sb.Append(", "); sb.Append(p.Count + "x " + p.Item.Name); }
                     elements.Add(new InquiryElement(item, item.Name + "  (x" + el.Amount + ")", ItemPic(item), true,
@@ -2386,7 +2395,7 @@ namespace Armoury
                 // w partactwie. Rozbiorka wymaga Smithing 200 - ponizej progu
                 // NIC sie nie dzieje (sztuka zostaje w sakwach); mistrz uczy sie
                 // ZAWSZE (zadnego rzutu), sztuka przepada jak przy kazdej rozbiorce.
-                if (UniqueGear.Is(item))
+                if (PatternGate.IsForgeUnique(item))   // m96-wzory: takze unikaty ROT z klasy nauki (ForgeUniquesByStudy) - wzor tylko z oryginalu
                 {
                     int smithing = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                     if (smithing < 200)
@@ -2449,7 +2458,7 @@ namespace Armoury
             {
                 var b = ArmouryBehavior.Instance;
                 InformationManager.ShowInquiry(new InquiryData("At the Forge",
-                    b.ProjectSummary() + "\n\nWork advances only on days you spend in this settlement.",
+                    b.ProjectSummary() + (ForgeJob.AnvilOnly ? "\n\nWork goes on only while you wait at the anvil." : "\n\nWork advances only on days you spend in this settlement."),   // m96-czaskuzni
                     true, false, "Good", "", null, null), true);
             }
             catch (Exception e) { Log.Error("ProgressConsequence", e); }
@@ -2806,7 +2815,8 @@ namespace Armoury
                     bool hasStamina = Forge.Stamina() >= r.Stamina;
                     bool legend = Recipes.IsLegendary(item);
                     string legendWhy = null;
-                    bool legendLocked = legend && !Forge.LegendAllowed(item, out legendWhy);
+                    bool rare = PatternGate.RareStuff(item);   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - szary, z powodem
+                    bool legendLocked = (legend || rare) && !Forge.LegendAllowed(item, out legendWhy);
                     bool unknown = !RangedLore.KnownOf(item);   // wzor jeszcze nie odkryty - widac, ale szary
                     int fail = (int)(Forge.FailureChance(r) * 100f);
 
@@ -2825,8 +2835,11 @@ namespace Armoury
                     }
                     catch { }
 
-                    string hint = (legend ? "A LEGEND. Only one may ever exist - and the bill is legendary.\n" : "") +
-                                  (unknown ? "Pattern NOT yet discovered - the craft itself will teach you (keep making bows and crossbows).\n" : "") +
+                    // m96-wzory (recenzja): unikat kuzni (UniqueGear / unikat ROT) uczy sie tylko z oryginalu; opanowana legenda nie jest juz "jedyna" (Forge.LegendAllowed)
+                    bool mastered = legend && ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(item.StringId);
+                    string hint = (legend ? (mastered ? "A LEGEND you have mastered - you may forge it again, and the bill is legendary.\n" : "A LEGEND. Only one may ever exist - and the bill is legendary.\n") : "") +
+                                  (unknown && !rare ? (PatternGate.IsForgeUnique(item) ? "A famed piece - seize the original and melt it down, or take it apart (200 Smithing).\n"
+                                                              : "Pattern NOT yet discovered - the craft itself will teach you (keep making bows and crossbows).\n") : "") +
                                   Recipes.Describe(r) + stats +
                                   "\nStamina " + r.Stamina + " (you have " + Forge.Stamina() + ")" +
                                   "\nSmithing " + r.SkillNeeded + " required (yours: " + skill + ")" +

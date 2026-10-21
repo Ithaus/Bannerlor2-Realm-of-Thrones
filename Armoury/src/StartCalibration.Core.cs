@@ -65,7 +65,7 @@ namespace Armoury
     }
 
     /// <summary>Towar gry: kg sztuki, wartosc, zuzycie dnia w sztukach (wojsko, zamki, dwory, budowy, warsztaty, razem, mieszczanie).</summary>
-    internal sealed class KsItem { public double Kg, Val, Army, Cast, Court, Bud, Ws, Cons, Town, Cloth; }   // Cloth: KS r4 P8 - odziez wojska + warsztaty zbrojne + naprawy kowali (szt./d)
+    internal sealed class KsItem { public double Kg, Val, Army, Cast, Court, Bud, Ws, Cons, Town, Cloth, VilBuy; }   // VilBuy: m96-len - plotno i sukno kupowane przez wsie w miastach ponad koszyk zaplacony Planu (szt./d)   // Cloth: KS r4 P8 - odziez wojska + warsztaty zbrojne + naprawy kowali (szt./d)
 
     /// <summary>Osada do popytu: kraina (kultura z kalibracji), rynek 0 Westeros / 1 Essos, ludzie, potrzeby [NN] w kg (napoje l) na dobe.</summary>
     internal class KsSettlement
@@ -163,6 +163,7 @@ namespace Armoury
         public double[] TBudget = new double[6], TBasket = new double[6], TPaid = new double[6];   // [m * 3 + klasa]
         public double[] Excess = new double[2], Global = new double[2], TUnRaw = new double[2];
         public double[] UnpaidV = new double[2 * KsBasket.N], UnpaidT = new double[2 * KsBasket.N];   // kg/d niezaplacone (wsie: robione w domu; miasta: odpada)
+        public double[] PaidV = new double[2 * KsBasket.N];             // m96-len: kg/d zaplacone koszyka wsi (paid x q, ostatnia runda) - StartCalibration.M96Len.cs
         public List<string> Trace = new List<string>();
         // recenzja 17.10: sprzedaz w wartosci bazowej (podstawa budzetu), z tego konie stadnin, sprzedaz bez pracy domowej (te same zajecia), alfa okregow (najmniejsza,
         // mediana, najwieksza; z pomiaru), kcal koszyka wsi (pelny, niezaplacony, robiony w domu), surowiec niezaplacony bez pokrycia (poza HomeMask), zbieznosc punktu stalego
@@ -664,6 +665,7 @@ namespace Armoury
             // KS r4 P8 (klucz Ks Cloth Demand): plotno, sukno i skora - takze odziez wojska (150), warsztaty zbrojne i naprawy kowali (135); rzemioslo miasta (148) bierze len,
             // welne i skory na plotno/sukno/skore - jest juz we wsadzie tych wyrobow (x LinenFlax / FeltWool / LeatherHide), wiec nie dopisane drugi raz
             if (x.In.ClothDemand && (id == "linen" || id == "felt" || id == "leather")) pcs += Math.Max(0.0, it.Cloth);
+            pcs += Math.Max(0.0, it.VilBuy);                              // m96-len (klucz Ks Village Cloth Buys In Plan; NIE - 0): plotno i sukno kupione przez wsie w miastach ponad koszyk zaplacony
             return pcs * x.In.Sigma * it.Kg;
         }
 
@@ -1396,6 +1398,7 @@ namespace Armoury
                 Array.Clear(M.TBudget, 0, M.TBudget.Length); Array.Clear(M.TBasket, 0, M.TBasket.Length); Array.Clear(M.TPaid, 0, M.TPaid.Length); Array.Clear(M.TUnRaw, 0, NM);
                 Array.Clear(M.UnpaidV, 0, M.UnpaidV.Length); Array.Clear(M.UnpaidT, 0, M.UnpaidT.Length); Array.Clear(M.VUnmetRaw, 0, NM);
                 Array.Clear(M.P9, 0, M.P9.Length); Array.Clear(M.ExtraT, 0, M.ExtraT.Length); M.Cheap = inp.CheapBasket;   // r4-koszyk (P9): ostatnia runda
+                Array.Clear(M.PaidV, 0, M.PaidV.Length);                     // m96-len: zaplacone koszyka wsi (kg/d) - ostatnia runda
                 Array.Clear(eat, 0, NGm);
                 view.BlockStart = x.BStart; view.X = xs; view.PairCraft = x.Pc; view.BlockW = x.W; view.RegHands = x.RegHands; view.Rent = x.Rent;
                 // ---- wsie
@@ -1546,6 +1549,7 @@ namespace Armoury
                     if (bask > budget * 1.001 + 1e-6) M.VShort[m]++;
                     M.VHands[m] += d.Wf; M.VHomeHands[m] += d.Wf * hwc; M.VUnmetRaw[m] += rawNo;
                     for (int z = 0; z < NZ; z++) M.UnpaidV[m * NZ + z] += u[z];
+                    for (int z = 0; z < NZ; z++) M.PaidV[m * NZ + z] += Math.Max(0.0, q[z] - u[z]);   // m96-len: paid x q (kg/d)
                     if (last)
                     {
                         var fp = new float[NZ]; for (int z = 0; z < NZ; z++) fp[z] = (float)paid[z];

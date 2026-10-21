@@ -39,7 +39,8 @@ namespace Armoury
                 if (menu != null)
                 {
                     int i = 0, at = -1; foreach (var o in menu.MenuOptions) { if (o != null && o.IdString == OptVillage) at = i; i++; }
-                    where += ", village index " + at + " z " + i;
+                    var mv = at < 0 ? VillageMenus.MovedTo(OptVillage) : null;   // m96-wies: pozycja przeniesiona do "Village affairs"
+                    where += mv != null ? ", village -> " + mv : ", village index " + at + " z " + i;
                 }
             }
             catch { }

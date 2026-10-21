@@ -743,6 +743,12 @@ namespace Armoury
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
+        // m96-receptury: otwarte ladunki lnu i skory od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
+        private readonly bool _m96RecepturyReset = M96RecepturyReset();
+        private static bool M96RecepturyReset() { try { SmithStock.Reset(); } catch (Exception e) { Log.Error("M96RecepturyReset", e); } return true; }
+        // m96-czaskuzni: sesja ekranu kuzni, powrot z paska i liczniki robot gracza od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
+        private readonly bool _m96CzasKuzniReset = M96CzasKuzniReset();
+        private static bool M96CzasKuzniReset() { try { ForgeJob.Reset(); } catch (Exception e) { Log.Error("M96CzasKuzniReset", e); } return true; }
         // p5-handel (R3-05a/b): jarmarki i barki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak r4-przetop)
         private readonly bool _p5HandelReset = P5HandelReset();
         private static bool P5HandelReset() { try { HarvestFairs.Reset(); RiverBarges.Reset(); } catch (Exception e) { Log.Error("P5HandelReset", e); } return true; }
@@ -767,6 +773,9 @@ namespace Armoury
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
+        // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
+        private readonly bool _m96DlugiReset = M96DlugiReset();
+        private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -932,6 +941,9 @@ namespace Armoury
             // r4-przetop: skrzynka resztek przetopu kuzni gracza (tysiaczne sztaby 6 gatunkow, format "1|"); wlasny try; brak klucza (stary zapis) = pusta skrzynka
             try { string sc = dataStore.IsSaving ? SmeltScraps.Export() : null; SaveText.Sync(dataStore, "arm_smeltscraps", ref sc); if (dataStore.IsLoading) SmeltScraps.Import(sc); }
             catch (Exception e) { Log.Error("SyncData.arm_smeltscraps", e); }
+            // m96-receptury: otwarte ladunki lnu i skory kuzni gracza w kg (SmithStock, format "1|id:kg"); wlasny try; brak klucza (stary zapis) = nic otwartego
+            try { string st = dataStore.IsSaving ? SmithStock.Export() : null; SaveText.Sync(dataStore, "arm_smith_stock", ref st); if (dataStore.IsLoading) SmithStock.Import(st); }
+            catch (Exception e) { Log.Error("SyncData.arm_smith_stock", e); }
             // GL-0: odniesienia skal "ludzie okregu" (srednia wies, sredni rynek, srednie podzamcze) i zamrozone przypisanie wsi do targu (format "1|"); wlasny try;
             // brak klucza (stary zapis), inny format albo blad = kalibracja przy pierwszym spisie po wczytaniu (PeopleScale.Import)
             try { string ps = dataStore.IsSaving ? PeopleScale.Export() : null; SaveText.Sync(dataStore, "arm_peoplescale", ref ps); if (dataStore.IsLoading) PeopleScale.Import(ps); }
@@ -1057,7 +1069,7 @@ namespace Armoury
                 // wiedza luczarska: odkryte wzory lukow/kusz i punkty nauki
                 string lore = RangedLore.Export();
                 SaveText.Sync(dataStore, "arm_rangedlore", ref lore);
-                if (dataStore.IsLoading) RangedLore.Import(lore);
+                if (dataStore.IsLoading) { RangedLore.Import(lore); LoreSeedFix.Snapshot("wczytanie"); }   // m96-wzory: tiery sprzed OnSessionLaunched (ROT-RBM zmienia luki po nas)
                 // ksiega legend: raz wykuta legenda nigdy nie powstaje po raz drugi
                 var legends = Legends;
                 dataStore.SyncData("arm_legends", ref legends);
@@ -1202,6 +1214,9 @@ namespace Armoury
             // E5/A3 (163): markietani - stan rozruchu (doba startu albo "bez rozruchu") - wlasny try; brak klucza (stary zapis) = rozruch rozstrzyga pierwsza doba
             try { string su = dataStore.IsSaving ? Sutlers.Export() : null; SaveText.Sync(dataStore, "arm_sutlers", ref su); if (dataStore.IsLoading) Sutlers.Import(su); }
             catch (Exception e) { Log.Error("SyncData.arm_sutlers", e); }
+            // m96 (SavingsByNeed): cele oszczedzania partii i rozruch - wlasny try; brak klucza (stary zapis) = cele 0, rozruch rozstrzyga pierwsza doba
+            try { string sbn = dataStore.IsSaving ? SavingsByNeed.Export() : null; SaveText.Sync(dataStore, "arm_m96sak", ref sbn); if (dataStore.IsLoading) SavingsByNeed.Import(sbn); }
+            catch (Exception e) { Log.Error("SyncData.arm_m96sak", e); }
             // E6/M2 (208): flaga nowej kampanii dla wielbladow tylko w Qarthu - wlasny try; brak klucza (stary zapis) = stadniny jak w grze
             try { string cm = dataStore.IsSaving ? CamelLaw.Export() : null; SaveText.Sync(dataStore, "arm_e6_camels", ref cm); if (dataStore.IsLoading) CamelLaw.Import(cm); }
             catch (Exception e) { Log.Error("SyncData.arm_e6_camels", e); }
@@ -1340,6 +1355,10 @@ namespace Armoury
             // kampania Jeffa) = pomiar od pierwszej doby z firmami DS, start przy pierwszych przebudowach A7; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> P6a7Reset)
             try { string th = dataStore.IsSaving ? TownHire.Export() : null; if (!dataStore.IsSaving || th != null) SaveText.Sync(dataStore, "arm_townhire", ref th); if (dataStore.IsLoading) TownHire.Import(th); }
             catch (Exception e) { Log.Error("SyncData.arm_townhire", e); }
+            // m96-dlugi: dlugi rad miast ("td1|id;P;R;B;IP;IR;dzien podatku;od kiedy;ostatni podatek;notabl~kwota~odsetki,...;dni kwartalu z dlugiem"); pisany tylko z danymi; wlasny try; brak klucza
+            // (stary zapis, kampania Jeffa z WGRANIA 94/95) = rady bez dlugow; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> M96DlugiReset)
+            try { string td = dataStore.IsSaving ? TownDebt.Export() : null; if (!dataStore.IsSaving || td != null) SaveText.Sync(dataStore, "arm_towndebt", ref td); if (dataStore.IsLoading) TownDebt.Import(td); }
+            catch (Exception e) { Log.Error("SyncData.arm_towndebt", e); }
         }
 
         public override void RegisterEvents()
@@ -1453,6 +1472,10 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
+            // m96-wzory: rozdanie wzorow tieru 1, sanacja, naprawa zapisu i ksiega PO OnSessionLaunched wszystkich modow (ROT-RBM przepisuje luki po nas); nowa kampania - ksiegi od zera
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => LoreSeedFix.AfterSessionLaunched(LorePurgeOnce));
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => Recipes.MassStartLine());   // m96-receptury: przepisy z masy po ostatecznych statystykach (ROT-RBM)
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
             // pomiary do linii OB0 (armie rozwiazane przy oblezeniu, machiny AI, trafienia w mury, nowe oblezenia) - tylko pamiec i log poza OB2/OB3
@@ -1483,6 +1506,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CalendarText.Hourly", delegate { try { CalendarText.Hourly(); } catch (Exception e) { Log.Error("CalendarText.Hourly", e); } }));
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
+            CampaignEvents.OnLootDistributedToPartyEvent.AddNonSerializedListener(this, BandFood.OnLoot);   // m96-bandy: lup jedzenia z band i druzyn lordow (pomiar)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("OutlawLaw.OnMapEventEnded", OutlawLaw.OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("BattleChronicle.OnMapEventEnded", BattleChronicle.OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85
@@ -2224,7 +2248,7 @@ namespace Armoury
             try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
-            try { LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }
+            try { if (!LoreSeedFix.On) LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }   // m96-wzory: przy kluczu - w OnAfterSessionLaunched (LoreSeedFix)
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
@@ -2233,6 +2257,7 @@ namespace Armoury
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
+            try { TownDebt.AddMenus(starter); } catch (Exception e) { Log.Error("TownDebt.AddMenus", e); }   // m96-dlugi: "The council's debts" w menu miasta (m95-menu przenosi do Town affairs)
             try { TownFolk.TownLoanMenus(starter); } catch (Exception e) { Log.Error("TownFolk.TownLoanMenus", e); }   // f8-pozyczka: "Borrow from the town council" / "Repay ..." w menu wlasnego miasta i zamku
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
             try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }
@@ -2245,7 +2270,7 @@ namespace Armoury
             try { NightRest.AddMenus(starter); } catch (Exception e) { Log.Error("NightRest.AddMenus", e); }
             try { TownInns.AddMenus(starter); } catch (Exception e) { Log.Error("TownInns.AddMenus", e); }   // KA (16.10): "Take lodgings at an inn" w menu miasta (sen - arm_sleep_wait z NightRest)
             try { RoadsideInns.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInns.AddMenus", e); }   // sw-zajazdy: menu zajazdu przy szlaku (nocleg, plotki, dalej w droge)
-            try { RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }
+            try { if (!LoreSeedFix.On) RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }   // m96-wzory: przy kluczu - po zmianach statystyk (LoreSeedFix)
             try { ArmyClothing.StartLine(); } catch (Exception e) { Log.Error("ArmyClothing.StartLine", e); }   // 150: stawki odziezy wojska i zaleznosci
             try { HorseState.OnSessionLaunched(); } catch (Exception e) { Log.Error("HorseState.OnSessionLaunched", e); }   // E6/K0 (209): licznik koni gry wedlug klucza (pelne przeliczenie przy zmianie), stan koni partii od nowa - PO porzadkach taborow wyzej
         }
@@ -2285,14 +2310,14 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) continue;
+                    if (!p.Valid) continue;   // m96-czaskuzni: praca bez sztuki (IsPrep) tez w spisie
                     if (sb.Length > 0) sb.Append("\n");
                     if (p.DaysLeft <= 0f)
-                        sb.Append(p.Item.Name + " - READY, waiting for collection at the forge");
+                        sb.Append(p.Name + " - READY, waiting for collection at the forge");
                     else
-                        sb.Append(p.Item.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
-                                  + (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)")
-                                  + ", worked " + p.TempoName);
+                        sb.Append(p.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
+                                  + (ForgeJob.ClockNote(p) ?? (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)"))   // m96-czaskuzni: robota gracza tylko na pasku
+                                  + (p.IsPrep ? "" : ", worked " + p.TempoName));
                 }
                 return sb.ToString();
             }
@@ -2301,8 +2326,12 @@ namespace Armoury
 
         internal bool HasProjects { get { return _projects.Count > 0; } }
 
+        /// <summary>m96-czaskuzni: kolejka robot gracza dla ForgeJob (wstawienie pracy bez sztuki przed sztuki z ekranu, spis do logu).</summary>
+        internal List<string> ProjectLines { get { return _projects; } }
+
         private static void HandOver(Project p)
         {
+            if (p.IsPrep) return;   // m96-czaskuzni: praca bez sztuki - nic do wydania (material dal ekran kuzni od razu)
             if (p.Kind == "van" || p.Kind == "bk") Forge.Deliver(p.Item, p.ModifierId, Math.Max(1, p.Count));   // sukces zapadl przy kowadle
             else Forge.Finish(p.Item, p.Tempo);
         }
@@ -2342,10 +2371,11 @@ namespace Armoury
                 // tyka TYLKO najstarszy niegotowy projekt - reszta czeka na
                 // swoja kolej. Rozne miasta = rozni kowale, pracuja niezaleznie.
                 var busyForge = new HashSet<string>();
+                var spare = new Dictionary<string, float>();   // m96-czaskuzni: reszta godziny taktu po skonczonym wpisie - na nastepny wpis tej kuzni
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (!p.Valid) { _projects.Remove(line); continue; }   // m96-czaskuzni: praca bez sztuki (IsPrep) zostaje
 
                     bool atForge = here != null && here.StringId == p.SettlementId;
 
@@ -2356,10 +2386,13 @@ namespace Armoury
                         continue;
                     }
 
+                    // m96-czaskuzni: praca bez sztuki czeka na rece gracza i nie blokuje kowala, ktory kuje bez ciebie (remote)
+                    if (p.IsPrep && remote && !ForgeJob.HandsAt(p.SettlementId)) continue;
+
                     // kowal tej osady juz kuje wczesniejszy projekt - ten czeka
                     if (!busyForge.Add(p.SettlementId)) continue;
 
-                    if (!atForge && !remote)
+                    if (!atForge && (!remote || p.IsPrep))   // m96-czaskuzni: wytop i rafinacja to twoje rece - tylko na miejscu
                     {
                         if (!idleWarned && Today - _lastIdleLogDay > 0.99f)
                         {
@@ -2369,6 +2402,8 @@ namespace Armoury
                         }
                         continue;
                     }
+                    // m96-czaskuzni: przy Forge One Job robota gracza idzie tylko na pasku przy kowadle - po "Step away" czeka, takze w miescie
+                    if (atForge && !(remote && !p.IsPrep) && !ForgeJob.HandsAt(p.SettlementId)) continue;
 
                     // CZELADZ TEZ SPI (Jeff 31.08): warsztat stoi noca 23-5 -
                     // zadnego postepu przez szesc ciemnych godzin. "Dni pracy"
@@ -2393,8 +2428,12 @@ namespace Armoury
 
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
-                    p.DaysLeft -= 1f / 24f;
-                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van")) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    float stepH = 1f, sp;   // m96-czaskuzni: reszta godziny po wczesniejszym wpisie tej kuzni (bez klucza zawsze pelna godzina)
+                    if (spare.TryGetValue(p.SettlementId, out sp)) { stepH = sp; spare.Remove(p.SettlementId); }
+                    p.DaysLeft -= stepH / 24f;
+                    if (ForgeJob.On && p.DaysLeft < -0.0001f) { busyForge.Remove(p.SettlementId); spare[p.SettlementId] = -p.DaysLeft * 24f; }   // m96-czaskuzni: wpis skonczony w trakcie godziny - reszta dla nastepnego
+                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van" || p.IsPrep)) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    if (p.IsPrep) { ForgeJob.TickedPrep(_projects, line, p); continue; }   // m96-czaskuzni: praca bez sztuki - same godziny, bez XP i bez wydania
                     var rr = Recipes.For(p.Item);
                     // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
                     // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
@@ -2409,7 +2448,7 @@ namespace Armoury
                         totalDays = MathF.Max(1f / 24f, ForgeClock.WorkHours(p.Item, 1, totalDays * 24f) / 24f * (p.Kind == "van" ? 1f : Project.TimeFactor(p.Tempo)));
                     if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
-                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy
+                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * stepH * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy; m96: XP za przepracowana czesc godziny
 
                     // wpis 89 (audyt): zapis W MIEJSCU - dotad Remove + Add przesuwal tykajaca sztuke na koniec listy,
                     // wiec "najstarsza" zmieniala sie co godzine i cala kolejka szla na zmiane, konczac sie razem
@@ -2442,7 +2481,7 @@ namespace Armoury
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (!p.Valid) { _projects.Remove(line); continue; }   // m96-czaskuzni: praca bez sztuki (IsPrep) zostaje
                     if (p.DaysLeft <= 0f && p.SettlementId == here.StringId)
                     { _projects.Remove(line); HandOver(p); }
                 }
@@ -2572,6 +2611,9 @@ namespace Armoury
             try { TownFolk.FirewoodDaily(); } catch (Exception e) { Log.Error("TownFolk.FirewoodDaily", e); } DayProfile.Lap("TownFolk.FirewoodDaily");
             // p6-spichlerz (R3-06f): wsie miast sprzedaja miastu zboze ponad 98% sufitu spichlerza (migawka Famine.Daily tej doby) - kasa miasta -> kiesa wsi w pozycji MFolk
             try { TownGranary.Daily(); } catch (Exception e) { Log.Error("TownGranary.Daily", e); } DayProfile.Lap("TownGranary.Daily");
+            // m96-dlugi: rady miast - pozyczka na zaleglosci firm DS tej doby (PopulationLaw.Daily wyzej), odsetki, splata z nadwyzki, podatek nadzwyczajny, dobrobyt; PO kiesie
+            // ludu (potrzeba klas na dzis) i PRZED pozyczkami f8 (ClanBudget - wspolny pulap dzienny kies) i CrownIncome.Begin (czesc korony w wplywie dnia); pozycja MFolk ksiegi
+            try { TownDebt.Daily(); } catch (Exception e) { Log.Error("TownDebt.Daily", e); } DayProfile.Lap("TownDebt.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow
@@ -2688,6 +2730,7 @@ namespace Armoury
             // E5/A3 (163): markietani - ludzie partii rodow w polu wydaja czesc wolnej sakiewki: kasa najblizszego niewrogiego miasta i kiesa wsi; osobna pozycja ksiegi
             // (MSutlers); po zwrocie korony i Banku (K3 licznik na jutro, jak OnLeft), przed budzetem rodow (projekt etapu 5, rozdz. 5.2 pkt 6)
             try { Sutlers.Daily(); } catch (Exception e) { Log.Error("Sutlers.Daily", e); } DayProfile.Lap("Sutlers.Daily");   // linia "Markietani (E5/A3)"
+            try { SavingsByNeed.Daily(); } catch (Exception e) { Log.Error("SavingsByNeed.Daily", e); } DayProfile.Lap("SavingsByNeed.Daily");   // m96: zalogi wydaja wolna sakiewke w osadzie - ta sama pozycja ksiegi (MSutlers); linia "Sakiewki wedlug potrzeby (m96)"
             try { MoneyLedger.Mark(MoneyLedger.MSutlers); } catch { }
             // E5/B6 (201): pula sakiewek weteranow wydana w miastach karczm (zycie, SutlerDailyShare; pule bez weteranow - cale); osobna pozycja ksiegi (MVetPurse);
             // przed budzetem rodow - sakiewki zwolnionych 166 tej doby wchodza do puli jutro wydawane
@@ -2828,6 +2871,7 @@ namespace Armoury
             try { WorldClock7.Daily(); } catch (Exception e) { Log.Error("WorldClock7.Daily", e); } DayProfile.Lap("WorldClock7.Daily");   // E7/0 (224): linie "Wojna i pokoj (E7/0)" i "Turnieje (E7/0)" (tylko log) - po ksiedze pieniadza
             try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); } DayProfile.Lap("TerrainEase.Stage7Daily");   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
             try { MapRoads.Daily(); } catch (Exception e) { Log.Error("MapRoads.Daily", e); } DayProfile.Lap("MapRoads.Daily");   // SW-DROGI (noc 17/18.10): linia "Drogi (DR): dzien N" (spis, audyt premii, koszt) w dobie linii (tylko log)
+            try { MapRoadKinds.Daily(); } catch (Exception e) { Log.Error("MapRoadKinds.Daily", e); } DayProfile.Lap("MapRoadKinds.Daily");   // m96-valyria: linia "Drogi Valyrii (VR): dzien N" (spis, liczenia) w dobie linii (tylko log)
             try { MapMud.Daily(); } catch (Exception e) { Log.Error("MapMud.Daily", e); } DayProfile.Lap("MapMud.Daily");   // p5-bloto (R3-07c): linia "Bloto (BL): dzien N" (spis deszczu i blota, audyt kary, koszt) w dobie linii (tylko log)
             try { Gallows.Daily(); } catch (Exception e) { Log.Error("Gallows.Daily", e); } DayProfile.Lap("Gallows.Daily");   // p6-szubienice (R3-07a): koniec czasu szubienic, linia "Szubienice (p6): dzien N" w dobie linii
             try { SeaStorms.Daily(); } catch (Exception e) { Log.Error("SeaStorms.Daily", e); } DayProfile.Lap("SeaStorms.Daily");   // p6-sztormy (R3-05d): linia "Sztormy (MS): dzien N" (burze, statki w burzy, zima / poza zima, audyt kary) w dobie linii (tylko log)
@@ -2886,7 +2930,7 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item != null && p.SettlementId == here.StringId) return true;
+                    if (p.Valid && p.SettlementId == here.StringId) return true;   // m96-czaskuzni: z praca bez sztuki
                 }
             }
             catch { }
@@ -2902,7 +2946,7 @@ namespace Armoury
                 foreach (var line in _projects)
                 {
                     var p = Project.Parse(line);
-                    if (p.Item != null && p.SettlementId == here.StringId) h += p.DaysLeft * 24f;
+                    if (p.Valid && p.SettlementId == here.StringId) h += p.DaysLeft * 24f;   // m96-czaskuzni: z praca bez sztuki
                 }
             }
             catch { }
@@ -2956,7 +3000,7 @@ namespace Armoury
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
                 ForgeClock.NoteQueued(item, 1, days * 24f, oldDays * 24f);
                 Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at "
-                           + here.Name + (ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));
+                           + here.Name + (ForgeJob.QueueNote() != null ? " - " + ForgeJob.QueueNote() : ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));   // m96-czaskuzni: tylko na pasku
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
                 // baneru wyglada to na zniknieciecie miecza
                 try

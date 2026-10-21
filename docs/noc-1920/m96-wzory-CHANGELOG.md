@@ -1,0 +1,351 @@
+## m96-wzory (20.10) - luki tieru 6 znane od poczatku gry i pokrewne bledy wiedzy kuzni (Armoury + ForgeView)
+
+**Dla Jeffa (prosto).** Goldenheart, Giant Bow i luk oraz strzaly Ravens' Teeth byly "znane" od pierwszego dnia, bo kuznia rozdawala wzory
+tieru 1 chwile przed tym, jak Realm of Thrones (przy RBM) podbija tym lukom naciag do tieru 6 - tak samo szesc mocnych kusz (do 300 funtow) bylo
+"tierem I", choc kowadlo zada za nie Kowalstwa jak za luk tieru 2-6. Teraz wzory rozdaje sie po wszystkich zmianach, kusze licza sie wedlug sily
+(kafelek [VI] przy 300-funtowej kuszy), a Twoj zapis naprawi sie sam przy wczytaniu: znikna te 4 luki i 6 kusz, a to, czego naprawde sie nauczyles,
+zostaje. Luki z rzadkiego materialu (czardrzewo, smocza kosc, zlotoserce, luk olbrzyma, Ravens' Teeth) nie daja sie juz wykuc z drewna i kilku
+sztabek - kafelek mowi "RARE STUFF - CANNOT BE FORGED" - a blizniacze klingi legend ("Dual" - Dark Sister, Oathkeeper, stal valyrianska) zniknely
+z projektowania broni. Nowy wzor z nauki wypada najwyzej o tier ponad to, co Twoj kowal uniesie, tarcze w CRAFT wymagaja Kowalstwa, a kafelek mowi
+bursztynem "PATTERN KNOWN - NEEDS 165 SMITHING", gdy wzor znasz, ale reka jeszcze nie siega.
+
+**Problem.** Jeff 20.10 (zrzut kuzni, zakladka CRAFT, Bows): "[VI] 200 Pound Goldenheart Longbow - PATTERN KNOWN, 250 Crafting Difficulty", jasne
+tez [VI] 500 Pound Giant Bow i [VI] 200 Pound Ravens' Teeth Longbow, Kowalstwo 30, nowa kampania (Seagard, dzien kilka): "jest blad, ze moge
+stworzyc luki tier 6 od poczatku gry, zobacz, czy nie ma wiecej takich bledow".
+
+**Dowod.**
+- Log Jeffa `Armoury-2026-10-20_13-28-19.log`, ta sama sesja, bez wczytania: linia 495 `BOWS: 19/65 | t1 19/19 | t2 0/12 | t5 0/7 | t6 0/12`,
+  linia 6231 `BOWS: 19/65 | t1 15/15 | t2 0/9 | t5 0/8 | t6 4/18` - znanych dalej 19, ale 4 z nich przeszly z t1 do t6. Ksiega (495) stoi przed
+  `HistoricalPrices: ROT-RBM (ROTRBMCompatibility) nadpisal ceny lukow ROT` (507). Sesja 14-33-54: to samo (linie 489 i 501).
+- Start kampanii `Armoury-2026-10-20_10-24-16.log`: `rozdano wzory tieru 1 (582 sztuk)` linia 525, ROT-RBM linia 539 - ta sama sekunda 10:25:29.
+- Kod: `ItemObject.Tierf` = `ItemValueModel.CalculateTier` na zywo; RBM: luk (MissileSpeed-60) x 0.049, strzaly z obrazen i wagi.
+  `ROT.CampaignBehaviors.ROTRBMCompatibility` (dekompilacja ROT.dll): tylko `OnSessionLaunched -> ModifyBowsAndArrows` (goldenheart 87->200,
+  ravens_teeth_longbow 87->210, giant_bow 90->500, dragonbone 95->180, weirwood 93->170, giant_arrows i ravens_teeth_arrows - obrazenia).
+  `RangedLore.Seed` (warunek TierOf == 1) biegl z `ReportLedger` w `ArmouryBehavior.OnSessionLaunched`, czyli przed ROT. Rachunek z ROTassets.xml
+  daje dokladnie t1 -4, t2 -3, t5 +1, t6 +6 jak w logu. W logach Jeffa nie ma zadnej nauki tych 4 wzorow (brak "zdjety z gotowej" i "odkryto losowo").
+- Kusze (po recenzjach): ten sam log, linia 338 `Kusze wedlug luku (XbowLikeBow): start sesji`: `crossbow_f ... t2->t6`, `crossbow_g/d/e ... t1->t6`,
+  `crossbow_c ... t1->t5`, `crossbow_b ... t1->t3`, `crossbow_a ... t1->t2` (tier rownowazny luku tej samej sily; o ten tier kuznia pyta Smithing -
+  `Recipes`: `ft = Math.Max(tier, XbowPrice.ForgeTier(item)); Need(ref r, ft, 10)`), a ksiega linia 496 `CROSSBOWS: 18/38 | t1 18/18` - szesc kusz
+  mocy tieru 2-6 rozdanych jako tier 1.
+
+**Przyczyna.** Kolejnosc: wzory tieru 1 rozdawane przed ostatecznymi statystykami lukow ROT-RBM; `LorePurgeOnce` (siatka bezpieczenstwa) tez
+biegla przed ROT i jest jednorazowa. Dotyczy KAZDEJ kampanii zaczetej z RBM i integracja ROT-RBM. Autotesty tego nie widzialy, bo ksiega startowa
+drukowala sie przed zmiana ROT. Kusze: ksiega liczyla tier gry (0-2), a kuznia tier wedlug sily - dwie miary jednego wzoru.
+
+**Zmiana** (nowe pliki `Armoury/src/LoreSeedFix.cs`, `Armoury/src/PatternGate.cs`, `Armoury/src/LegendTwins.cs`; grupa MCM "Learning patterns",
+8 kluczy, wszystkie domyslnie TAK; lista `RareBowsIds` tylko w ustawieniach):
+1. `LoreSeedAfterFinalStats` - (a) `RangedLore.Seed` nic nie robi, dopoki statystyki tej kampanii nie sa ostateczne; rozdanie, `LorePurgeOnce`
+   i linie ksiegi ida w `CampaignEvents.OnAfterSessionLaunchedEvent` (po OnSessionLaunched wszystkich modow, takze ROT). Po recenzjach: najpierw
+   naprawa/rozdanie, POTEM sanacja (blednie rozdany wzor to nie przeciek - sanacja nie wyzeruje przez niego uczciwej wiedzy; po resecie znaczniki
+   naprawy wracaja). (b) JEDNORAZOWA naprawa zapisu, znacznik `#m96seedfix1` w liscie Known (format `arm_rangedlore` "id|id;pkt" bez zmian; build 95
+   znacznik pomija, bo `GetObject` = null). Zdejmowane jest tylko to, co dal blad: wzory z bloku rozdania (miedzy `#seeded2` a `__seed_ammo_v1` - tam
+   stoi wylacznie to, co dal Seed; wszystko zdobyte potem stoi ZA `__seed_ammo_v1`), ktore sa dzis tierem 2+, a przy wczytaniu byly tierem 1 (migawka
+   tierow GRY w SyncData, przed ROT) albo sa na liscie ROT-RBM (7 id, zapas). Po recenzjach (luka zapisow sprzed 02.09): takze ciagly ciag amunicji
+   tuz ZA `__seed_ammo_v1` - tam migracja amunicji dopisala kolczany tieru 1 (w tym ravens_teeth_arrows); w zapisach od 02.09 ten ciag to amunicja
+   zdobyta pozniej, a ta nie byla tierem 1 w migawce (tier 1 rozdawano w calosci), wiec warunek jej nie zdejmie. Opanowane unikaty (UniqueLore)
+   nie sa ruszane. (c) Co sesje dopisanie brakujacych wzorow tieru 1 po ostatecznych statystykach (wzor, ktory stal sie wzorem do nauki po rozdaniu).
+   (d) Nowa kampania w tym samym procesie gry: Known, punkty nauki, `UniqueLore` i `Legends` od zera (`OnNewGameCreatedEvent`; statyczne listy
+   przeciekaly - SyncData przy nowej grze nie biegnie). (e) Klik Craft bez kucia nie uczy: `FletchForge.BkCraftPostfix` czyta `__runOriginal`.
+   Mechanizm starego bledu (poprawiony po recenzji): Harmony 2.4.2 (`MethodCreator.AddPrefixes`: `Ldloc runOriginal, Brfalse` przed wywolaniem)
+   POMIJA prefiks zwracajacy bool, gdy wczesniejszy prefiks zwrocil false - po odmowie `FletchForge.BkCraftPrefix` (Normal) prefiks
+   `ArmourQuality.CraftPrefix` (Priority.Low) w ogole nie biegl (jego `if (!__runOriginal) return true;` to zapas), `Refused` zostawal z
+   POPRZEDNIEGO kliku (zwykle false) i postfiks dawal punkty nauki i okno wyniku za klik w zamkniety wzor. Postfiksy `__runOriginal` dostaja.
+2. `PatternDrawBySkill` - gorna granica losowania nowego wzoru = Smithing kowala / `SmithingSkillPerTier` + 2 (Smithing 30 przy progu 35: tier 2;
+   35: 3; 140: 6), nigdy ponizej tieru wykutej sztuki; legenda do puli dopiero, gdy kowalowi brakuje najwyzej jednego progu do
+   `LegendarySkillNeeded`. Kowal = ten przy kowadle (`Forge.Smith` - `hero`; CRAFT BK - `CurrentCraftingHero`). Bylo: od tieru sztuki do 6 z rowna
+   szansa (`RangedLore.cs` 386) - log 13-28-19 linia 6239: `odkryto losowo GRE_vlandic_arrows (BOWS, t4, zakres 1-6)` po 3 lukach t1. Tier
+   porownywany z granica to tier WZORU (pkt 6 - kusza wedlug sily), wiec przy Smithing 30 nauka na kuszy nie da juz crossbow_f (sila t6, prog 165).
+3. `ShieldCraftSkillGate` - tarcza w CRAFT BK: `ArmourQuality.CraftPrefix` (przy `CraftOn`) pyta `PatternGate.ShieldCraftPrefix`: Smithing kowala
+   < `Recipes.For(tarcza).SkillNeeded` (Need(tier, 0): t2 35 ... t6 175 - ten sam prog co nasze menu kowala `Forge.Begin`) = odmowa, nic nie
+   schodzi, `ArmourQuality.Refused` (bez nauki i okna). Kosci BK (pekniecie) bez zmian. Po recenzji: pamiec progu (`PatternGate.NeedOf`) liczona od
+   nowa takze po zmianie w MCM `SmithingSkillPerTier`, `LegendarySkillNeeded` albo `XbowForgeEquivTier` (dotad tylko przy nowej sesji).
+4. `ForgeUniquesByStudy` - przedmiot z `RotUniques` w klasie nauki (luki, strzaly, zbroje, tarcze, kropierze) jest unikatem kuzni jak `UniqueGear`:
+   `Teachable` = false (nie rozdaje sie, nie losuje, nie liczy w ksiedze), `KnownOf` / `CanLearnFrom` / `Learn` ida przez `UniqueLore`
+   (przetop albo rozbiorka zdobytego oryginalu; rozbiorka unikatu wymaga Smithing 200 i nie pali sztuki - regula Jeffa 31.08, `SmithMenu`),
+   `FletchForge.BkCraftPrefix` mowi "seize the original", po recenzji tak samo podpowiedz naszego menu kowala (`SmithMenu.ShowItems`: unikat nieznany -
+   "A famed piece - seize the original...", legenda opanowana w UniqueLore - "A LEGEND you have mastered - you may forge it again", bez "Only one may
+   ever exist"). Imienne zbroje spoza listy `UniqueGear` (lyanna_armor, loras_*, mace_*, gold_cloak_*, blackfish_*...) przestaja byc zamkniete na zawsze.
+5. `PatternTileShowsSkill` (Armoury `PatternGate.BlockText` + ForgeView) - trzeci stan kafelka w CRAFT: znany wzor, ktorego kowal z ekranu jeszcze nie
+   moze zaczac - bursztynowy napis "PATTERN KNOWN - NEEDS 165 SMITHING" albo "PATTERN KNOWN - LEGEND ALREADY FORGED" i lzejsza plachta (0.32) na
+   wierszu listy; po recenzjach takze "RARE STUFF - CANNOT BE FORGED" (pkt 7) - ten napis rowniez przy nieznanym wzorze, zamiast czerwonego
+   "PATTERN NOT LEARNED" (nauka go nie otworzy). Po recenzji: wynik w pamieci na pare kowal + jego Smithing - inny kowal w ekranie albo przekroczony
+   prog w tej samej wizycie = liczone od nowa przy nastepnym odczycie (lista BK nie powstaje od nowa przy zmianie kowala: `CraftingVM.UpdateCraftingHero`
+   odswieza tylko projektowanie, uszlachetnianie i przetop). Gauntlet czyta wlasciwosc przy wiazaniu: po przebudowie listy (filtr, odswiezenie BK)
+   albo wyborze kafelka - kafelek juz narysowany zmienia sie dopiero wtedy (bez nowej latki na `UpdateCraftingHero`). Bramy kucia zawsze czytaja
+   aktualnego kowala. Po recenzji (technika): opanowany unikat strzelecki nie ma juz drugiego wiersza (InjectMasterworks pomija wyroby z InjectRanged).
+6. (po recenzjach) `XbowPatternTierByPower` - tier WZORU kuszy = tier, o ktory kuznia pyta Smithing (`PatternGate.LoreTier` = max(tier gry,
+   `XbowPrice.ForgeTier`); reszta przedmiotow - tier gry jak dotad). Jedna miara dla: rozdania (Seed, TopUp), naprawy zapisu, losowania (granica z
+   pkt 2), punktow nauki i ksiegi (`RangedLore.TierOf`), etykiety [I]..[VI] na liscie CRAFT (`BkArmourList`), filtra tierow ForgeView (delegat do
+   `RangedLore.TierOf`, bez alokacji) i naszego menu kowala (`SmithMenu` - etykieta "(tier N)", filtr, liczniki). Metal i materialy kuszy - tier gry
+   jak dotad (XbowForgeEquivTier). Naprawa zapisu kusz - osobny jednorazowy znacznik `#m96xbowfix1`, tylko gdy przeliczenie kusz (XbowPrice) obowiazuje
+   w tej sesji: zdejmuje kusze tieru GRY 1 z tierem wzoru 2+ (kazda kusza tieru gry 1 byla rozdana przez stary Seed, ktory dawal WSZYSTKIE wzory
+   tieru 1 - uczciwie wylosowanej nie ma, bo byla juz znana). Migawka i licznik "tiery zmienione od migawki" licza teraz tier GRY (Recipes.Grade) -
+   tier wzoru kuszy zalezy od XbowPrice, liczonego dopiero w OnSessionLaunched.
+7. (po recenzjach) `RareBowsNotForged` + lista `RareBowsIds` (dragonbone_bow, weirwood_bow, ravens_teeth_longbow, goldenheart_longbow, giant_bow,
+   ravens_teeth_arrows) - luki z rzadkiego materialu sa wycenione jak skonczony zasob (HistExoticBows: log 13-28-19 linia 342
+   `ravens_teeth_longbow 6 -> 5000, goldenheart_longbow 24 -> 3000 ...`), a kwit kuzni to drewno, kilka sztabek i len (`Recipes`, luk: 75% wagi
+   w drewnie, 25% w metalu, x2 przy t5-6) - kuznia robila 5000 d "z niczego". Teraz: `Teachable` = false (nie ma wzoru, nie rozdaje sie, nie losuje,
+   nie liczy w ksiedze ani w licznikach menu), `CanLearnFrom` / `Learn` = false (przetop daje tylko punkty nauki - `Study`; rozbiorki nie ma w liscie),
+   `Forge.LegendAllowed` (wspolna brama `Forge.Begin` i `Forge.Smith`) odmawia napisem "No smith can make this any more - the stuff it is made of
+   cannot be had...", `FletchForge.BkCraftPrefix` tak samo przed pytaniem o wzor, menu kowala - szary wiersz z tym powodem. Qarth longbow zostaje
+   (w HistExoticBows tylko z powodu ceny wedlug sily). Sztuki w swiecie zostaja.
+8. (po recenzjach) `LegendTwinPiecesHidden` (`LegendTwins.Hide`, wpiecie 1 linia w `LegendaryLaw.OnSession` zaraz po `LockLegendPieces`) - czesc,
+   ktorej nie uzywa zaden przedmiot, a ma TE SAMA SIATKE co dedykowana (ukryta) czesc legendy, jest ukrywana w projektowaniu broni jak sama czesc
+   legendy. Czesci uzywane przez zwykla bron zostaja.
+- Wpiecia: `ArmouryBehavior.cs` (SyncData: migawka po `RangedLore.Import`; RegisterEvents: 2 nasluchy; OnSessionLaunched: `LorePurgeOnce`
+  i `ReportLedger` tylko przy kluczu wylaczonym), `RangedLore.cs` (brama Seed, Teachable, unikaty, rzadki material, `TierOf` -> `PatternGate.LoreTier`,
+  `OnCrafted(item, smith)`, granica losowania), `FletchForge.cs`, `Forge.cs` (kowal do `OnCrafted`, rzadki material w `LegendAllowed`),
+  `ArmourQuality.cs` (1 linia - tarcza, komentarz o Harmony), `SmithMenu.cs` (rozbiorka unikatu, podpowiedzi), `BkArmourList.cs` (etykieta - tier wzoru),
+  `LegendaryLaw.cs` (1 linia), `Settings.cs` + `McmSettings.cs` (gen_mcm), ForgeView `ArmourItemMixin.cs`, `TableauExtension.cs`, `ArmourListColour.cs`,
+  `ArmourFilterMixin.cs`, `tools/sprawdz_logi.py` (grupa `m96wzory`).
+- Linie logu: `Wiedza (m96-wzory): start sesji | statystyki ostateczne TAK | migawka tierow wczytanie|nowa kampania | tiery zmienione od migawki N
+  (t1->wyzej M: ...) | kusze wedlug sily: tier wzoru ponad tier gry N (z tieru 1 M: ...) | <nowa ksiega - rozdanie ... (N wzorow tieru 1), kusze wedlug
+  sily: w rozdaniu | naprawa zapisu: zdjete N [...], kusze wedlug sily: zdjete N [...] | zapis juz naprawiony (...), kusze wedlug sily: juz naprawione
+  (...)>, dopisane tieru 1 K [...] | klucze ... (w tym "kusza wedlug sily w ksiedze TAK", "rzadki material bez kucia TAK (6 z 6 id w grze)") |
+  potkniecia 0.`, potem linie ksiegi (BOWS...). `Czesci-blizniaki legend (m96-wzory): ukryte w projektowaniu broni N (domyslnie otwartych M) - ...: [...]
+  | siatek czesci legend S, czesci zwyklej broni C | potkniecia 0.` (OnSessionLaunched). Dalej: `losowanie wedlug reki - kowal X Smithing S, prog na
+  tier 35 -> zakres tierow a-b` (pierwsze 20), `tarcza w CRAFT - odmowa ...` (20), `klik Craft bez kucia ... - bez nauki` (10), `nowa kampania - ksiega
+  ... od zera (...)`. ForgeView: `Armoury RangedLore (filtr tierow - m96-wzory): PODPIETY`, `Armoury PatternGate (kafelek ...): PODPIETY`.
+
+**Oczekiwane liczby.**
+- Zapis Jeffa (Seagard), pierwsze wczytanie: `tiery zmienione od migawki 7 (t1->wyzej 4: ...)`, `kusze wedlug sily: tier wzoru ponad tier gry 7
+  (z tieru 1 6: ...)`, `naprawa zapisu: zdjete 4 [ravens_teeth_arrows t6, ravens_teeth_longbow t6, giant_bow t6, goldenheart_longbow t6], kusze wedlug
+  sily: zdjete 6 [crossbow_a t2, crossbow_b t3, crossbow_c t5, crossbow_e t6, crossbow_d t6, crossbow_g t6], dopisane tieru 1 0 []` (nazwy w kolejnosci
+  odwrotnej do zapisu - kolejnosc w nawiasach dowolna). Potem `BOWS: 15/58 patterns | t1 15/15 | t2 0/9 | t3 0/6 | t4 0/9 | t5 0/7 | t6 0/12` (16/58 i `t4 1/9`, jesli zapis ma juz
+  GRE_vlandic_arrows z 14:25:48). Mianownik 58 zamiast 65: 5 unikatow ROT (goldenheart, giant_bow, weirwood, dragonbone, giant_arrows - pkt 4)
+  i 2 rzadkie nie-unikaty (ravens_teeth_longbow, ravens_teeth_arrows - pkt 7). `CROSSBOWS: 12/38 patterns | t1 12/12 | t2 0/3 | t3 0/3 | t4 0/4 |
+  t5 0/3 | t6 0/13`. `BARDING: 27/103 | t1 27/27` (POPRAWKA po recenzji: rozjazd 27/28 z sesji 13-28-19 to nie zmiana statystyk, tylko
+  `UniqueSpoils._common` - unikaty ROT noszone przez wiecej niz 3 postaci (rot_horse_armor19, white_walker_saddle; unikaty.log 13:31:32) nie dostaja
+  NotMerchandise i w pozniejszych sesjach staja sie Teachable; przy ForgeUniquesByStudy TAK sa StudyOnly (surowa lista RotUniques.Ids), wiec
+  wychodza z ksiegi i nic sie nie dopisuje. Przy ForgeUniquesByStudy NIE TopUpT1 rozda taki wspolny unikat tieru 1 jako zwykly wzor.)
+- Drugie wczytanie: `zapis juz naprawiony (znacznik #m96seedfix1), kusze wedlug sily: juz naprawione (znacznik #m96xbowfix1), dopisane tieru 1 0 []`.
+- Nowa kampania: `nowa kampania - ... od zera`, potem PO linii ROT-RBM `rozdano wzory tieru 1 (572 sztuk)` (582 - 4 luki/strzaly ROT-RBM - 6 kusz;
+  plus/minus wspolne unikaty ROT tieru 1, jesli UniqueSpoils uzna jakis za wspolny juz przy starcie), `nowa ksiega - rozdanie ... (572 wzorow tieru 1),
+  kusze wedlug sily: w rozdaniu`, `BOWS: 15/58 | t1 15/15 | ... | t6 0/12`, `CROSSBOWS: 12/38 | t1 12/12 | ... | t6 0/13`.
+- `Czesci-blizniaki legend`: ok. 21 ukrytych, ok. 19 domyslnie otwartych (przeglad XML: bolton_blade_duel, darksister_blade_duel, forlorn_blade_duel,
+  forlorn_blade2_duel, lamentation_blade_duel, lightbringer_blade_duel, needle_blade_duel, oathkeeper_blade_duel, red_rain_blade_duel, renly_blade_duel,
+  skull_blade_duel, truth_blade_duel, tyrell_blade_duel, val_blue_blade_duel, val_red_blade_duel, valsteelblade_1_duel, valsteelblade_2_duel,
+  valyrian_short_blade_duel, vigilance_blade_duel, widowswail_blade_duel, ww2_blade_duel); w grze decyduje zbior legend LegendaryLaw (41 broni), wiec
+  liczba moze byc mniejsza - valyrian_short_blade_duel i darksister_blade_duel musza byc na liscie. "129 dedykowanych czesci legend" bez zmian.
+- Smithing 30, luk t1: `zakres tierow 1-2`. Tarcza t2 w CRAFT przy Smithing 30: odmowa (prog 35), nic nie schodzi.
+
+**Znaleziska audytu i recenzji - co zrobione, co nie i dlaczego.**
+| Znalezisko | Stan |
+|---|---|
+| Wzory t1 rozdane przed ROT-RBM (krytyczne) | NAPRAWIONE - pkt 1a/1b (+ naprawa zapisu Jeffa) |
+| Losowanie do tieru 6 po 3 robotach t1 (wazne) | NAPRAWIONE - pkt 2 (po recenzji takze kusze wedlug sily - pkt 6) |
+| Kafelek mowi "PATTERN KNOWN", a kowadlo odmawia (wazne) | NAPRAWIONE - pkt 5 (po recenzji: przelicza sie przy innym kowalu / Smithing) |
+| Tarcze w CRAFT bez progu (wazne) | NAPRAWIONE - pkt 3 |
+| Unikaty strzeleckie ROT w puli, imienne zbroje nie do nauczenia (wazne) | NAPRAWIONE - pkt 4 (wielkie luki dodatkowo pkt 7) |
+| 6 kusz o mocy tieru 2-6 widac jako [I] i sa znane od startu (wazne; recenzja "gra" i "technika") | NAPRAWIONE po recenzjach - pkt 6. Wczesniejszy powod odlozenia (etykieta [I], filtr ForgeView i ksiega licza tier gry) usuniety: wszystkie trzy licza teraz ten sam tier wzoru |
+| Ravens' Teeth (5000 d) z kilku sztabek, bez limitu (wazne; recenzja "technika") | NAPRAWIONE po recenzjach - pkt 7. Wczesniejszy powod ("temat ceny, nie wiedzy") nie trzymal sie zasady "nic z niczego": cena skonczonego zasobu przy kwicie z drewna i zelaza |
+| Czesci klingi valyrianskiej do miecza w parze nie sa ukryte (wazne; recenzje) | NAPRAWIONE po recenzjach - pkt 8. Wczesniejszy powod ("niesprawdzone, bez dowodu") byl nieprawdziwy: dowod w ROT_crafting_pieces.xml:958 (`valyrian_short_blade_duel`, is_default=true), grep ROTassets.xml (zaden przedmiot), crafting_templates.xml:399 (OneHandedSwordDual), WeaponDesignVM (wszystkie szablony z CraftingTemplate.All, czesc widoczna przy !IsHiddenOnDesigner), CraftingCampaignBehavior.IsOpened (is_default = otwarta). Ten sam blad mialo 20 innych blizniakow legend |
+| W96-2 w sprawdz_logi: falszywe NIE w kazdej nowej kampanii (recenzje, wazne) | NAPRAWIONE - W96-2 sprawdza, czy w oknie sesji linia rozdania nie stoi PRZED linia ROT-RBM (bez RBM - nic do porownania); sprawdzone na logach syntetycznych: nowa kampania w dobrej kolejnosci TAK, stara kolejnosc NIE, zapis Jeffa TAK, logi recenzentow TAK |
+| Rozjazd w kropierzach - zla przyczyna i liczby (drobne) | POPRAWIONE w tym wpisie (Oczekiwane liczby) |
+| Kafelek liczony raz na zawsze, nie po zmianie kowala (drobne) | NAPRAWIONE - pkt 5 |
+| Menu kowala: "the craft itself will teach you" dla unikatow, "Only one may ever exist" po opanowaniu (drobne) | NAPRAWIONE - pkt 4 |
+| Zly opis mechanizmu kliku Craft (drobne) | POPRAWIONE - pkt 1e, komentarze w FletchForge.cs i ArmourQuality.cs |
+| Zdublowane wiersze unikatow strzeleckich po nauce (drobne, technika) | NAPRAWIONE - pkt 5 (InjectMasterworks) |
+| Pamiec progu tarcz na cala kampanie (drobne, technika) | NAPRAWIONE - pkt 3 (stempel ustawien) |
+| Luka naprawy w zapisach sprzed 02.09 (drobne, technika) | NAPRAWIONE - pkt 1b (ciag amunicji za `__seed_ammo_v1`) |
+| Unikat z UniqueGear po przetopie kuty bez limitu | NIE ZMIENIAM - regula Jeffa 30.08 ("moge kuc wiecej niz jeden, jak juz opanuje", `Forge.LegendAllowed`); materialy zwykle (stal, sukno), koszt legendarny zostaje |
+| Przeciek wiedzy i legend przy nowej kampanii bez restartu gry | NAPRAWIONE - pkt 1d |
+| Klik w zamkniety wzor daje punkty nauki (znalezione przy pracy, dowod z kodu) | NAPRAWIONE - pkt 1e |
+| Drobne znaleziska audytu nr 9 i 12 (recenzja "technika": "brak w CHANGELOG") | NIE ZNAM TRESCI - tekst audytu, ktory dostalem (dwa razy), byl uciety po 5. znalezisku; tresci punktow 9-12 nie ma tez w plikach roboczych. Zaden z nich nie zostal wiec ani naprawiony, ani odrzucony - do sprawdzenia przy scaleniu, jesli audyt jest gdzies zapisany |
+
+**Ryzyko / co sprawdzic (kontrola calosci).**
+- Kto wola `Seed`/`KnownOf` miedzy wczytaniem a `OnAfterSessionLaunched`: tylko UI kuzni, menu kowala i nauka (grep: BkArmourList, FletchForge,
+  Forge, SmithMenu, SmeltTab, ForgeView) - w tym czasie ekranow nie ma; w nowej kampanii do konca startu sesji ksiega jest pusta. AI nie czyta RangedLore.
+- Zapis: format bez zmian, znaczniki `#m96seedfix1` i `#m96xbowfix1` build 95 czyta jako nieznane id (pomija). Wylaczniki nie cofaja juz naprawionego
+  zapisu (zdjete wzory nie wracaja) - swiadomie: byly bledne. Wyjatek przez TopUpT1: po wylaczeniu `XbowPatternTierByPower` kusze tieru gry 1 wracaja
+  do ksiegi przy nastepnej sesji; po ponownym wlaczeniu (znacznik juz jest) zostaja znane - przelaczanie klucza w trakcie kampanii jest jednokierunkowe.
+- Naprawa zdejmuje tylko z bloku rozdania (i ciagu amunicji za znacznikiem w starych zapisach); w kampaniach sprzed 02.09 wzor zdobyty wtedy, ktory
+  przy wczytaniu jest tierem 2+, zostaje (warunek "byl tierem 1"); wyjatek - 7 id ROT-RBM zdobytych przed 02.09 (zbyt rzadkie, by liczyc).
+- Sanacja po naprawie: w mlodej kampanii z niezapisanym jeszcze `arm_lore_purge_v1` blednie rozdane wzory nie wywolaja juz resetu calej ksiegi.
+- `XbowPatternTierByPower`: zalezy od `XbowPrice` (RBM + ceny historyczne + `XbowForgeEquivTier`); bez przeliczenia - tier gry jak dotad (linia startu:
+  "nieczynne"), a naprawa kusz czeka na sesje z przeliczeniem. Kusza wedlug sily daje teraz tyle punktow nauki co luk tej sily (crossbow_g: 6 zamiast 1)
+  i przetop takiej kuszy odkrywa do jej tieru wzoru - spojne z progiem i stamina, ktorych kuznia za nia zada. Etykieta [VI] przy kuszy, ktorej
+  metal to sztabki niskiego tieru (metal - tier gry, jak dotad) - etykieta mowi o wzorze i progu, kwit o materiale.
+- `RareBowsNotForged`: Goldenheart, Giant Bow, Weirwood i Dragonbone (unikaty) nie daja sie wykuc nawet po opanowaniu oryginalu (dotad - po nauce
+  z oryginalu bez limitu, za legendarny kwit ze zwyklej stali); zdobyte sztuki zostaja i mozna je nosic, przetopic na punkty. Nie ruszam produkcji
+  miast (TownFletchers bierze kandydatow spoza NotMerchandise - strzaly Ravens' Teeth jako towar miasta nie sprawdzone w tym przebiegu: w logu Jeffa
+  linia startu strzelarzy ich nie wymienia).
+- `LegendTwinPiecesHidden`: tylko czesci bez zadnego przedmiotu i z siatka czesci legendy; zwykla bron i czesci wspolne bez zmian. Zlecenia kowalskie
+  i projekty BK, gdyby siegaly po ukryte czesci - ten sam stan co dla 129 czesci ukrywanych od dawna przez LockLegendPieces.
+- `PatternDrawBySkill`: wolniejsze odkrywanie wysokich tierow przy niskim Kowalstwie (zamierzone). Liczy sie kowal przy kowadle - towarzysz z 200
+  odkrywa do tieru 6.
+- `ShieldCraftSkillGate`: Jeff (Smithing 30) nie wykuje w CRAFT tarczy t2 (prog 35), choc zna worn_kite_shield - tak samo jak w naszym menu kowala.
+  Brama dziala tylko przy `CraftOn` (ArmourCraftLikeWeapons i CraftingEnabled), jak brama zbroi.
+- `ForgeUniquesByStudy`: rozbiorka unikatu ROT wymaga teraz Smithing 200 (bez spalenia), jak UniqueGear; przetop uczy jak dotad.
+- ForgeView: nowe wlasciwosci `FvBlockShown`, `FvNotLearned` (tylko widocznosc napisow w podgladzie 3D), plachty listy jak dotad; filtr tierow przez
+  delegat (brak Armoury = tier gry). Kafelek juz narysowany po zmianie kowala odswieza sie dopiero przy przebudowie listy albo wyborze kafelka.
+- Watki: wszystko na watku glownym; `KnownOf` (goraca sciezka listy) bez nowych alokacji; `TierOf` dla kusz - odczyt slownika XbowPrice pod blokada,
+  dla reszty bez zmian; petle po wszystkich przedmiotach i czesciach raz na sesje.
+- Scalenie 8 galezi m96: wpiecia jednolinijkowe w ArmouryBehavior (SyncData, RegisterEvents, OnSessionLaunched), FletchForge, Forge, ArmourQuality,
+  SmithMenu, BkArmourList, LegendaryLaw; m96-czaskuzni tez zmienia SmithMenu.cs i ArmouryBehavior.cs (inne miejsca - do sprawdzenia przy scaleniu);
+  grupa logu `m96wzory`.
+- Konfiguracja Jeffa: nowe klucze nie sa w jego Armoury.json - obowiazuja domyslne (TAK), nic do zmiany.
+
+**Status.** DO SPRAWDZENIA (build Armoury i ForgeView kod 0; w grze nie testowane).
+
+**Test w grze.** (1) Wczytac zapis Jeffa: linia `Wiedza (m96-wzory): start sesji ... naprawa zapisu: zdjete 4 [...], kusze wedlug sily: zdjete 6 [...]`,
+`BOWS: 15/58 ... t6 0/12`, `CROSSBOWS: 12/38 | t1 12/12 ...`; w kuzni CRAFT -> Bows: Goldenheart, Giant Bow, Ravens' Teeth bursztynowe "RARE STUFF -
+CANNOT BE FORGED"; Crossbows: 300-funtowa kusza "[VI]", szara "PATTERN NOT LEARNED"; znane, za trudne wzory bursztynowe "PATTERN KNOWN - NEEDS N
+SMITHING"; filtr VI pokazuje mocne kusze. W projektowaniu broni (szablon miecza w parze) nie ma klingi "Valyrian Short Sword Blade Dual" ani "Dark Sister
+Blade Dual". (2) Zapisac, wczytac jeszcze raz: `zapis juz naprawiony ..., kusze wedlug sily: juz naprawione`. (3) Nowa kampania (najlepiej po poprzedniej
+bez restartu): linia `nowa kampania - ... od zera`, `rozdano wzory tieru 1 (ok. 572 sztuk)` po linii ROT-RBM. (4) Wykuc luk t1 przy Smithing 30: `zakres
+tierow 1-2`. (5) Tarcza t2 w CRAFT: odmowa. (6) Klik Craft na zamknietym pancerzu: `klik Craft bez kucia ... bez nauki`, bez linii ksiegi. (7) `python -I
+tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log>`: W96-0..8 bez NIE.
+
+## m96-wzory2 (20.10) - Naprawa zapisu 2: wzory lukow i kusz wylosowane ponad reke kowala (Armoury)
+
+**Dla Jeffa (prosto).** Luk "[V] 160 Pound War Longbow" nie byl uczciwie nauczony: stara kuznia przy kazdym kuciu losowala nowy wzor od tieru
+wykuwanej sztuki az do tieru 6, wiec przy luku tieru I wypadl Ci luk tieru V. Teraz nowy wzor przy kowadle wypada najwyzej o JEDEN tier ponad
+najlepszy wzor, jaki juz znasz w tym rzemiosle (znasz tylko luki tieru I - nastepny bedzie tieru II, potem III...), i nigdy ponad to, co Twoj
+kowal uniesie (Kowalstwo 87: najwyzej tier IV). Zapis naprawi sie sam przy pierwszym wczytaniu: zniknie ten luk (i wszystkie inne luki, strzaly,
+kusze i belty wylosowane wczesniej takim przeskokiem), a punkty nauki, ktore na nie poszly, wroca do ksiegi lukow - nastepne kucie da wzor
+tieru II. Luki tieru VI z rozdania (Goldenheart, Giant Bow, Ravens' Teeth) zdejmuje juz pierwsza naprawa (wyzej). Pancerzy, ktore rozebrales albo
+przetopiles, naprawa nie rusza.
+
+**Problem.** Jeff 20.10 16:24 (zrzut kuzni, CRAFT, Bows, filtr V, Kowalstwo 87): "[V] 160 Pound War Longbow - PATTERN KNOWN"; "jak tworze luki,
+to nie pokazuje mi sie tier IV czy V, jak mam znajomosc tylko I, a znajomosc VI wywal mi z save".
+
+**Dowod.** Log Jeffa `Armoury-2026-10-20_14-53-56.log`: linia 18308 `BOWS: 19/65 patterns | t1 15/15 | ... | t5 0/8 | t6 4/18 -- 2 pts`,
+18309-18311 kucie `steppe_bow` (t1, skill 87), linia 18312 `Wiedza: odkryto losowo lowland_yew_bow (BOWS, t5, zakres 1-6)`, linia 18313
+`BOWS: 20/65 | ... | t5 1/8 | t6 4/18 -- 0 pts` (2 pkt + 1 za luk t1 = 3 = cena losowania 3 x tier 1), zapis 16:27:28. Wszystkie odkrycia
+i wzory zdjete z gotowych sztuk w calej kampanii (logi 10-24-16, 13-28-19, 14-33-54, 14-53-56): w szkolach lukow i kusz WYLACZNIE losowania przy
+kuciu (lowland_yew_bow t5; GRE_vlandic_arrows t4 z 14:25:48 nie wszedl do zapisu - ksiega 14:55:42 `t4 0/9`, crash 14:27), zadnego przetopu
+ani rozbiorki; w pancerzach 2 losowania t2 (zakres 1-2, rozbiorka nieudana - Study) i kilkanascie wzorow z rozbiorki, w tym `riverlands_helmet`
+tieru 5 (linie 8077-8078: `HELMETS ... t5 1/123`) przy Kowalstwie ok. 87.
+
+**Przyczyna.** Stare `RangedLore.OnCrafted` losowalo z zakresu [tier sztuki .. 6] z rowna szansa (m96-wzory pkt 2 naprawia to na przyszlosc -
+`PatternDrawBySkill`), ale wzory juz wylosowane ponad reke zostaly w zapisie. Zakres byl zawyzony niezaleznie od 4 zle rozdanych lukow t6.
+
+**Zmiana** (`Armoury/src/LoreSeedFix.cs`: `RepairReach`, `BestSmithSkill`, `LedgerShort`, wpiecie w `AfterSessionLaunched`; `PatternGate.cs`:
+`SkillCap` wydzielony z `DrawCap` - ta sama regula, `PerTierNow`; `tools/sprawdz_logi.py`: W96-9). Bez nowych kluczy - dziala przy
+`LoreSeedAfterFinalStats` i `PatternDrawBySkill` (oba domyslnie TAK).
+1. JEDNORAZOWO, znacznik `#m96seedfix2` w liscie Known (format `arm_rangedlore` "id|id;pkt" bez zmian; build 95 i m96-wzory znacznik pomijaja,
+   bo `GetObject` = null). Biegnie przy wczytaniu, zaraz po naprawie 1 (`#m96seedfix1`) i naprawie kusz (`#m96xbowfix1`), przed migracja amunicji,
+   sanacja i `TopUpT1`. Nowa kampania i ksiega wyzerowana przez sanacje dostaja znacznik od razu (nic do naprawy).
+2. Co zdejmuje: wpis PRZED znacznikiem `#m96seedfix1` (czyli zdobyty przed m96 - po nim losowanie jest juz wedlug reki), szkoly LUKOW i KUSZ
+   (luki, strzaly, kusze, belty), wzor do nauki (`Teachable`; unikat ROT i rzadki material to martwe wpisy - zostaja), nie opanowany unikat
+   (`UniqueLore`), tier wzoru (`RangedLore.TierOf` - kusza wedlug sily) ponad `SkillCap` najlepszego kowala gracza albo legenda poza zasiegiem
+   (`LegendOutOfReach`) - ta sama regula co losowanie dzis; PO RECENZJI takze tier ponad drabine tierow (nizej, "Poprawki po recenzji").
+   Najlepszy kowal = najwyzszy Smithing wsrod zywych postaci, ktore moga stanac przy kowadle w CRAFT: gracz i bohaterowie w jego druzynie (po
+   recenzji bez rodu i towarzyszy spoza druzyny - losowanie tez liczy kowala przy kowadle). Tier 1 nigdy (zakres zawsze >= 2).
+3. ZRODLA WPISU ZAPIS NIE ROZROZNIA (sprawdzone: `Learn` - przetop i rozbiorka, `TryUnlockRandom` - kucie i Study, `TopUpT1` dopisuja to samo id na
+   koniec listy; `arm_smeltscraps`, `arm_uniq_lore` i reszta zapisu nie trzymaja historii nauki). Dlatego regula bezpieczna: tylko luki i kusze
+   (w kampanii Jeffa - same losowania przy kuciu), pancerze bez zmian (slepa regula zabralaby `riverlands_helmet` t5 z rozbiorki).
+4. Zwrot punktow: 3 punkty nauki na zdjety wzor do jego szkoly (`Research`) - cena losowania to 3 x tier sztuki, przy ktorej sie pracowalo, a zapis
+   jej nie pamieta; 3 to najnizsza mozliwa (praca przy tierze 1) - u Jeffa dokladnie tyle (steppe_bow t1). Za wzor z losowania nigdy wiecej, niz
+   zaplacono; za wzor luku/kuszy sprzed m96 zdobyty przetopem albo rozbiorka (zapis go nie odroznia) tez +3 pkt, choc byl za darmo - w kampanii
+   Jeffa takich nie ma (poprawione po recenzji: bylo "nigdy wiecej, niz zaplacono" bez zastrzezenia).
+5. Czeka (bez znacznika, probuje w nastepnej sesji): `PatternDrawBySkill` NIE i `PatternDrawOneTierUp` NIE naraz (jeden wlaczony = naprawa wedlug
+   tego jednego), kusze wedlug sily nie przeliczone w tej sesji (`XbowPrice`), nie udalo sie odczytac kowali (tylko przy `PatternDrawBySkill`).
+6. Komunikat dla gracza (jeden, tylko gdy cos zdjete): "Bowyer's ledger corrected: 160 Pound War Longbow - found too far above what you knew and
+   could work - struck out; 3 study points returned." (powyzej 3 wzorow - liczba zamiast nazw).
+- Linie logu: w linii startu `Wiedza (m96-wzory): start sesji ... | naprawa zapisu: zdjete 4 [...], kusze wedlug sily: zdjete 6 [...], wzory ponad
+  reke: zdjete N [id tT SZKOLA, ...], zakres 1-C (Smithing S), punkty zwrocone P, dopisane tieru 1 ...` (potem `juz zdjete (znacznik #m96seedfix2)`
+  albo `czeka (...)`), zaraz za nia osobna linia `Wiedza (m96-wzory): naprawa zapisu 2 (#m96seedfix2) - ... | najlepszy kowal X Smithing S (postaci
+  gracza N), prog na tier 35 -> zakres tierow 1-C | wpisy lukow/kusz przed znacznikiem #m96seedfix1 W (tier 2+ H) | zdjete N [...] - skad: losowanie
+  albo punkty nauki sprzed m96 (...) | punkty zwrocone [BOWS +3] (...) | ksiega po naprawie: BOWS: ... || CROSSBOWS: ...`.
+
+**Oczekiwane liczby (zapis Jeffa z 16:27, Kowalstwo 87, jesli zaden towarzysz nie ma 105+).** Linia startu: `... naprawa zapisu: zdjete 4 [...],
+kusze wedlug sily: zdjete 6 [...], wzory ponad reke: zdjete 1 [lowland_yew_bow t5 BOWS], zakres 1-4 (Smithing 87), punkty zwrocone 3, dopisane
+tieru 1 0 []`; linia naprawy 2: `zakres tierow 1-4 ... zdjete 1 [lowland_yew_bow t5 BOWS] ... punkty zwrocone [BOWS +3] ... ksiega po naprawie:
+BOWS: 15/58 patterns | t1 15/15 | t2 0/9 | t3 0/6 | t4 0/9 | t5 0/7 | t6 0/12  --  3 pts || CROSSBOWS: 12/38 patterns | t1 12/12 | ... | t6 0/13`.
+W liczeniu builda 95a (bez wylaczen unikatow i rzadkiego materialu z m96-wzory) to byloby `t5 0/8 | t6 0/18`; mianowniki 7 i 12 to te same ksiegi
+po m96-wzory pkt 4 i 7. Jesli Jeff do wgrania wylosuje jeszcze cos ponad reke w lukach/kuszach - zejdzie tak samo (+3 pkt za kazdy); losowania
+w pancerzach zostaja. Drugie wczytanie: `wzory ponad reke: juz zdjete (znacznik #m96seedfix2)`, bez linii naprawy 2.
+**PO RECENZJI (drabina tierow) liczby wyzej zmieniaja sie tak:** wpis zdjetego ma powod - `zdjete 1 [lowland_yew_bow t5 BOWS (reka, przeskok
+tieru)]`; linia startu konczy fragment naprawy 2 na `, drabina tierow TAK, punkty zwrocone 3`; linia naprawy 2 ma `najlepszy kowal w druzynie
+<id> Smithing 87 (bohaterowie w druzynie N) ... -> zakres tierow 1-4 | drabina tierow TAK (najlepszy wzor po naprawie: BOWS t1, CROSSBOWS t1)`.
+Ksiega po naprawie bez zmian (`t5 0/7 | t6 0/12`). Kowalstwo 105+ u kogos w druzynie nie zostawia juz luku (zakres reki 1-5, ale drabina: znane
+tylko t1 -> do t2). Pierwsze kucie luku t1 po naprawie (3 + 1 pkt): linia `losowanie wedlug reki - kowal ... Smithing 87, prog na tier 35 ->
+zakres tierow 1-2 (bylo 1-6) | reka do t4, drabina tierow BOWS najwyzszy znany t1 -> do t2 | ...` i `odkryto losowo ... (BOWS, t2, zakres 1-2)`
+(bylo: t2-t4 z zakresu 1-4, tier IV z szansa 9/24).
+
+**Ryzyko / co sprawdzic (kontrola calosci).**
+- Wzor luku/kuszy sprzed m96 ponad reke zdobyty PRZETOPEM albo ROZBIORKA (Learn) albo przez Study (przetop znanej sztuki - losowanie do jej tieru,
+  dzis nadal bez progu reki) tez zejdzie - zapis tego nie odroznia. W kampanii Jeffa takich nie ma (logi wyzej); w innych zapisach mozliwe -
+  swiadomie (jedna regula zamiast zgadywania), punkty +3 za kazdy.
+- Pancerze: losowania przy kuciu sprzed m96 ponad reke zostaja (nie do odroznienia od rozbiorki). U Jeffa w zapisie tylko 2 losowania pancerzy, oba
+  t2 (w zakresie). Jesli Jeff do wgrania wykuje pancerz i wylosuje t5/t6 - zostanie.
+- Study (przetop znanego wzoru, nieudana rozbiorka) losuje dalej do tieru tej sztuki bez progu reki - regula Jeffa "z gotowej rzeczy najwyzej jej
+  poziom", nie zmieniam.
+- Kolejnosc w `AfterSessionLaunched`: naprawa 1 -> kusze -> naprawa 2 -> migracja amunicji -> sanacja -> `TopUpT1`; naprawa 2 zmniejsza wiedze t4+,
+  wiec sanacji (reset mlodej kampanii) nie wywola; po resecie punkty i tak sa zerowane, znacznik wraca. `_lorePurged` Jeffa juz TAK (wiek 59 dob).
+- Okno "przed `#m96seedfix1`": zapis z m96-wzory bez tej galezi (tylko autotesty/recenzje) - naprawa 2 przy pierwszym wczytaniu bierze wpisy
+  sprzed znacznika 1; to, co wylosowano po nim, bylo juz wedlug reki. W96-9 moze wtedy dac NIE, jesli po m96 przetopiono wzor ponad reke.
+- Zapis: format bez zmian; punkty nauki to te same pola `Research`. Watek glowny, raz na sesje, petla po liscie Known (ok. 600 wpisow) + 2 linie ksiegi.
+- `DrawCap` liczy teraz przez `SkillCap` - wynik identyczny (skill / prog + 2, min tier sztuki, max 6).
+- Scalenie: zmiany tylko w `LoreSeedFix.cs`, `PatternGate.cs` (galaz m96-wzory) i dopis W96-9 w `sprawdz_logi.py` (grupa m96wzory).
+
+**Status.** DO SPRAWDZENIA (build Armoury kod 0; w grze nie testowane; `sprawdz_logi --grupa m96wzory` na logu syntetycznym: W96-9 TAK,
+z podstawionym `t5 1/7` - NIE; na logu Jeffa 14-53-56 - INFO, bez wyjatku).
+
+**Test w grze.** Wczytac zapis Jeffa (kopie): linia startu z `wzory ponad reke: zdjete 1 [lowland_yew_bow t5 BOWS]`, linia naprawy 2 z ksiega
+`BOWS ... t5 0/7 | t6 0/12 -- 3 pts`, na ekranie jeden komunikat "Bowyer's ledger corrected ..."; w CRAFT -> Bows, filtr V: 160 Pound War Longbow
+szary "PATTERN NOT LEARNED"; wykuc luk t1: odkrycie z zakresu 1-2 (po recenzji - drabina; bylo 1-4). Zapisac, wczytac: `juz zdjete (znacznik #m96seedfix2)`. `python -I
+tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log>`: W96-0..9 bez NIE.
+
+### m96-wzory2 - Poprawki po recenzji: drabina tierow (Armoury)
+
+**Dla Jeffa (prosto).** Napisales: "nie pokazuje mi sie tier IV czy V, jak mam znajomosc tylko I". Pierwsza wersja tej naprawy zdejmowala luk
+tieru V, ale przy Kowalstwie 87 nastepne kucie luku tieru I moglo od razu dac wzor tieru IV (szansa ok. 1 na 3). Teraz nowy wzor przy kowadle
+wypada najwyzej o jeden tier ponad najlepszy wzor, jaki juz znasz w tej szkole: znasz tylko luki I - nastepny bedzie II; gdy poznasz jakis II,
+moze wypasc III; i tak dalej, az do granicy Twojej reki. Przetop albo rozebranie konkretnej rzeczy dalej uczy jej wzoru wprost (to nie losowanie).
+
+**Problem (recenzja, wazne).** Po naprawie 2 ksiega Jeffa: `BOWS t1 15/15 | t2 0/9 | t3 0/6 | t4 0/9 | ... -- 3 pts`. `SkillCap(87)` = 87/35+2 = 4,
+wiec kucie luku t1 (+1 pkt = 4 >= 3) losuje z [1..4] = 24 wzory: tier IV 9/24 = 37.5%, tier III 25%. To dokladnie to, czego Jeff nie chce
+("tier IV czy V przy znajomosci tylko I").
+
+**Przyczyna.** `PatternGate.DrawCap` mial jedna granice - reke kowala (`PatternDrawBySkill`); nie patrzyl, co ksiega juz zna.
+
+**Zmiana.**
+1. Nowy klucz `PatternDrawOneTierUp` (MCM "Learning patterns", domyslnie TAK; `Settings.cs` + `tools/gen_mcm.py`). `PatternGate.DrawCap(minTier,
+   smith, school)`: granica = nizsza z (reka: `SkillCap`, gdy `PatternDrawBySkill`) i (drabina: `LadderNext(KnownTop(school), TiersWithPatterns(...))`
+   - najnizszy tier ponad najlepszy znany wzor do nauki tej szkoly, w ktorym szkola ma jakikolwiek wzor; puste tiery pomijane, legendy poza
+   zasiegiem reki nie licza sie jako tier). Nigdy ponizej tieru wykutej sztuki (jak dotad). Oba klucze NIE = 6 (stare losowanie).
+   Jedyny wolajacy: `RangedLore.OnCrafted` (dopisany argument szkoly). `KnownTop` - ta sama miara co ksiega (`Teachable`, `TierOf`, lista Known).
+   Granica liczona raz na wywolanie `TryUnlockRandom`, wiec kilka losowan w jednej robocie nie wspina sie o dwa tiery naraz.
+2. Linia `Wiedza (m96-wzory): losowanie wedlug reki - ... -> zakres tierow a-b (bylo a-6) | reka do tN (albo NIE), drabina tierow SZKOLA
+   najwyzszy znany tT -> do tL (albo NIE) | ...` (poczatek bez zmian - W96-5 czyta jak dotad). Linia klucze: `drabina tierow TAK/NIE`.
+3. Naprawa zapisu 2 wedlug tej samej reguly (`LoreSeedFix.RepairReach`): poza reka zdejmuje wpis luku/kuszy sprzed `#m96seedfix1`, ktorego tier
+   jest ponad drabine. Liczone od dolu (t1, t2, ...), szkola po szkole: tier zostaje, gdy jest <= kolejnego niepustego tieru nad najlepszym wzorem,
+   ktory juz zostal - najhojniejsza kolejnosc, czyli zostaje wszystko, do czego dzisiejsze losowanie doszloby krok po kroku. Wpisy po znaczniku
+   i opanowane unikaty sie nie zmieniaja i licza do "najlepszego wzoru". Wpis zdjetego ma powod: `(reka)`, `(legenda)`, `(przeskok tieru)`
+   albo `(reka, przeskok tieru)`. U Jeffa wynik ten sam co przed poprawka (lowland_yew_bow), ale juz niezaleznie od tego, kto ma najwyzsze Kowalstwo.
+4. (recenzja, drobne - tanie) `BestSmithSkill`: tylko gracz i bohaterowie w jego druzynie (bylo: takze rod i towarzysze spoza druzyny -
+   namiestnik ze Smithing 105+ dawal zakres 1-5 i zostawial luk t5, ktorego zaden kowal przy kowadle nie wylosuje).
+5. (recenzja, drobne) pkt 4 opisu naprawy 2 poprawiony: zwrot +3 pkt takze za wzor sprzed m96 z przetopu/rozbiorki (zapis go nie odroznia).
+6. `tools/sprawdz_logi.py`: W96-5 - zakres nie szerszy niz drabina (`b <= max(a, L)`), wiersze `reka NIE` bez porownania z reka; W96-9 - przy
+   `drabina tierow TAK` w ksiedze po naprawie zaden znany tier nad tierem z 0 znanych.
+
+**Czego nie zmieniam (recenzja).**
+- Study (przetop znanego wzoru, nieudana rozbiorka: losowanie do tieru tej sztuki) i Learn (wzor konkretnej rzeczy) - bez drabiny: Jeff pisal
+  o tworzeniu lukow; nauka z gotowej rzeczy ma swoja regule "najwyzej jej poziom" i nie jest losowaniem przy kowadle.
+- Wlasny wylacznik naprawy 2 - nie dopisuje (CLAUDE.md par. 8 pkt 3). Naprawe blokuje dopiero `PatternDrawBySkill` NIE i `PatternDrawOneTierUp`
+  NIE naraz albo `LoreSeedAfterFinalStats` NIE. Przy wgraniu: KOPIA pliku zapisu Ironman przed pierwszym wczytaniem; id zdjetych stoja w linii
+  naprawy 2 (do recznego przywrocenia, gdyby trzeba).
+- Uwaga recenzenta: sanacja `LorePurgeOnce` (`ArmouryBehavior.cs`) wyglada na martwa - `CampaignTime.Now.ToDays` to dni od zera kalendarza
+  (w logu "dzien 108894"), wiec warunek `>= 30` zawsze przerywa. Poza zakresem tej galezi; nie ozywiam (CLAUDE.md par. 8 pkt 4) - do decyzji.
+
+**Ryzyko / co sprawdzic (kontrola calosci).**
+- Postep nauki: z samym t1 kazde losowanie daje t2, potem t2-t3 itd. - wolniej niz z sama reka, ale bez przeskokow (tego chcial Jeff). Kucie
+  sztuk tieru 1 nadal prowadzi w gore (zakres zawsze od tieru sztuki do drabiny), wiec nauka nie staje.
+- Szkola bez wzorow w jakims tierze (np. gdy klucze unikatow/rzadkiego materialu albo inny mod oproznia tier) - puste tiery pomijane,
+  wiec drabina nie staje na pustym tierze.
+- Pancerze: drabina dziala takze w pancerzach (ta sama funkcja `DrawCap`, jedna regula na jedno zjawisko). Wzory z rozbiorki licza sie do
+  najlepszego wzoru (np. helm t5 Jeffa -> drabina do t6, wiaze reka 4).
+- Wydajnosc: przy kazdej robocie z nauka raz petla po liscie Known (ok. 600 wpisow, `GetObject`) i raz po przedmiotach (jak `Ledger`, ktory
+  i tak biegnie po kazdej robocie). Bufor tierow statyczny, watek glowny. Wyjatek w drabinie -> sama reka (potkniecie liczone, bez gaszenia).
+- Naprawa 2: wyjatek przy mapie tierow szkoly -> ta szkola tylko wedlug reki (zdejmuje mniej); wyjatek przy wpisie -> wpis zostaje.
+- Zapis: format bez zmian, nowy klucz tylko w MCM (Armoury.json Jeffa go nie ma -> domyslne TAK).
+
+**Status.** DO SPRAWDZENIA (build Armoury kod 0, bez nowych ostrzezen; w grze nie testowane; `sprawdz_logi --grupa m96wzory`: log syntetyczny
+w nowym formacie - W96-5 i W96-9 TAK; z dziura `t3 1/6` w ksiedze po naprawie - W96-9 NIE; z zakresem 1-4 przy drabinie do t2 - W96-5 NIE;
+stary log syntetyczny i log Jeffa 14-53-56 - jak dotad, bez wyjatku).
+
+**Test w grze.** Jak wyzej, plus: pierwsze kucie luku t1 po naprawie - linia `losowanie wedlug reki ... -> zakres tierow 1-2 ... drabina tierow
+BOWS najwyzszy znany t1 -> do t2` i odkrycie tieru 2; w CRAFT -> Bows, filtr IV i V - zaden luk nie ma "PATTERN KNOWN".

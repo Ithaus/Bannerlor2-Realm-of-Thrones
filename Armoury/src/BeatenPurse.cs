@@ -297,6 +297,7 @@ namespace Armoury
                 _toLords += (long)Math.Round(okLords * q); _toPlayer += (long)Math.Round(okPlayer * q); _toBands += (long)Math.Round(okBands * q);
                 _toParties += (long)Math.Round((ok - okLords - okBands) * q);
                 // nskarbiec: kiesy band, ktore gra wyplaci graczowi (udzial gracza x czesc z kies x czesc band w kiesach) - tylko komunikat, bez zmiany kwot
+                try { BandFood.NoteBandGold(paidBand, (long)Math.Round((double)okPlayer * q * paidBand / paidAll)); } catch { }   // m96-bandy: zloto z kies band u zwyciezcow (pomiar, gracz osobno)
                 HideoutCarry(__instance, (long)Math.Round((double)okPlayer * q * paidBand / paidAll));
                 foreach (var w in __0)
                 {

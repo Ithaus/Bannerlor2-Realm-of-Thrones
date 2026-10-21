@@ -273,7 +273,9 @@ namespace Armoury
                 try { NightRest.ApplySleepGate(_harmony); } catch (Exception e) { Log.Error("NightRest.ApplySleepGate", e); }
                 FletchForge.ApplyAll(_harmony);
                 ForgeClock.ApplyAll(_harmony);   // wpis 83: jeden zegar kuzni
+                try { ForgeJob.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ForgeJob.ApplyAll", e); }   // m96-czaskuzni: jedna robota na ekran kuzni, jeden pasek po wyjsciu
                 ArmourQuality.ApplyAll(_harmony); // zbroja z zakladki CRAFT jak bron: prog, pekniecie i jakosc z kowalstwa (PO FletchForge i ForgeClock)
+                try { QualityScarcity.ApplyAll(_harmony); } catch (Exception e) { Log.Error("QualityScarcity.ApplyAll", e); }   // m96-jakosc: rzadkosc legendarnych i mistrzowskich (droga gry, lup gracza)
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 // n20-herby (Jeff 19.10): ludzie band w bitwie z herbami prawdziwych rodow na tarczach (prefiks High na Mission.SpawnAgent; klucz Band Shields Stolen Arms)
@@ -539,6 +541,24 @@ namespace Armoury
                     TownMenus.Apply(starterObject as CampaignGameStarter);
             }
             catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (TownMenus)", e); }
+            try
+            {
+                if (game != null && game.GameType is Campaign && Campaign.Current != null)
+                    CastleMenus.Apply(starterObject as CampaignGameStarter);   // m96-zamek: porzadek menu zamku (klucz CastleMenuTidy), ta sama chwila co miasto
+            }
+            catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (CastleMenus)", e); }
+            try
+            {
+                if (game != null && game.GameType is Campaign && Campaign.Current != null)
+                    VillageMenus.Apply(starterObject as CampaignGameStarter);   // m96-wies: porzadek menu wsi (klucz VillageMenuTidy), ta sama chwila co miasto i zamek
+            }
+            catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (VillageMenus)", e); }
+            try
+            {
+                if (game != null && game.GameType is Campaign && Campaign.Current != null)
+                    PayNotes.StartLine();   // m96-wies: komunikaty platnosci z powodem (klucz PlayerPaymentReasons) - liczniki od zera, linia startu
+            }
+            catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (PayNotes)", e); }
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
@@ -567,6 +587,7 @@ namespace Armoury
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
                 starter.AddBehavior(new HeroGearBehavior());        // Z16: samotest ekranu przy wczytaniu (tylko log, bez zapisu)
+                starter.AddBehavior(new QualityScarcityBehavior()); // m96-jakosc: spis jakosci raz na dobe, wyrownanie nadmiaru na polkach, linia logu; zapis: limity rodzajow arm_qualitycaps (m96-jakosc2)
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
                 starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)

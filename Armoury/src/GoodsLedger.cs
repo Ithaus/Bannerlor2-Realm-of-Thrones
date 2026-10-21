@@ -1326,6 +1326,7 @@ namespace Armoury
             v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
             v[KsCloth] = Group(a.Sink, GArmyCloth) + Group(a.Sink, GArms) + Group(a.Sink, GMend);
             _ksDay[it.StringId] = v;
+            StartCalibration.M96LenLedger(it.StringId, _ksDayN, Group(a.Sink, GFolkVill));   // m96-len: zakupy plotna i sukna przez wsie w miastach (nie rzuca)
             long gt = Group(a.Src, GTick) + a.GateOpen, gr = Group(a.Sink, GRemoved);   // ks-arm: twarde bramki KS (projekt rozdz. 10 pkt 2-3); f14-ksiega: + zrodla otwarte z ramek
             if (gt > 0 || gr > 0) _ksGate[it.StringId] = new[] { gt, gr };
             // KS r4 P10 (r4-ceny): [8..10] - wies je swoje W/E (czesc "bez rynku" z magazynu wsi) i stracone w drodze KS-H (czesc "bez rynku"); [0..7] bez zmian

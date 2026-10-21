@@ -120,6 +120,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmeltKeepsScraps { get; set; } = true;
 
+        [SettingPropertyBool("Recipes By Mass", HintText = "bows, crossbows, arrows, bolts and armour are forged from the weight of material that really goes into them, plus a fair waste (metal x1.4, wood x1.5, leather x1.2, cloth x1.1): a bowstring takes grams of linen, a sheaf of arrows a bar or two of iron for its heads, a bow no metal at all; the tier picks the grade of metal, not the amount. A part-used bar, bolt of linen or hide stays open at your anvil and serves the next pieces - a new one is taken from your bags only when it runs out (like wood). Smelting gives back the metal in the piece less its losses, never more than half of what forging it took. Off = recipes in whole pieces, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool RecipesByMass { get; set; } = true;
+
         [SettingPropertyBool("Smith No Crude Input", HintText = "crude iron is only for refining: a weapon part that the game lists with crude iron costs the same number of wrought iron bars at the anvil, and with Smelt Weapon By Parts smelting such a weapon gives wrought iron back, never crude. Off = as in the game (those parts eat crude iron and smelting can give it back)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmithNoCrudeInput { get; set; } = true;
@@ -131,6 +135,10 @@ namespace Armoury
         [SettingPropertyBool("Forge Only While There", HintText = "your own work at the anvil goes on only while you stay in that settlement - ride away and the bench waits for you", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOnlyWhileThere { get; set; } = true;
+
+        [SettingPropertyBool("Forge One Job", HintText = "the forge screen is one job: smelting, refining, weapons, armour, bows and orders all add their hours to one job at that forge, and leaving the screen (Done or Esc) always opens one wait with one bar for all of it - the hours the screen shows. Pieces come off the anvil in turn as the bar passes them; step away and you keep what is finished, the rest waits at that forge until you come back. Off = as before (a Banner Kings wait for smelting and refining, the bench queue for pieces)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeOneJob { get; set; } = true;
 
         [SettingPropertyBool("Forge Like Town Smith", HintText = "your work at the anvil takes as long as a town smith's: the same days of work his workshop gives the piece, each a smith's day of hours (Work Hours Per Man Day) - a mail shirt is weeks, not an afternoon; the pay stays as it was, and a lord's order gives you the days of work on top of its deadline (off = the hours of the Banner Kings screen, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
@@ -384,7 +392,7 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryValueFloor { get; set; } = 25000f;
 
-        [SettingPropertyFloatingInteger("Legendary Material Factor", 0.00f, 16.00f, "0.00", HintText = "a legend's bill: every material count multiplied by this, plus the noblest steel on top", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Legendary Material Factor", 0.00f, 16.00f, "0.00", HintText = "a legend's bill: every material count multiplied by this, plus the noblest steel on top. With Recipes By Mass: every kilogram of every material multiplied by this (the master keeps only the best of each) and all its metal is the noblest steel - a bow still takes no metal", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryMaterialFactor { get; set; } = 4f;
 
@@ -399,6 +407,42 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Smelting Skill Bonus", 0.00f, 1.00f, "0.00", HintText = "extra recovery per point of Smithing", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float SmeltingSkillBonus { get; set; } = 0.002f;
+
+        [SettingPropertyBool("Lore Seed After Final Stats", HintText = "your starting patterns (every tier 1 piece) are handed out only after all mods have set the final stats of their items. Before, Realm of Thrones raised the draw of its great bows a moment after the patterns were dealt, so the Goldenheart, Giant Bow and Ravens' Teeth bow and arrows came known from day one as tier 6. A saved game is mended once: those wrongly dealt patterns are struck out, missing tier 1 patterns are added, and patterns you really learned stay. A new campaign no longer inherits patterns or forged legends from the previous one, and clicking Craft on a pattern you do not know no longer teaches you anything", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool LoreSeedAfterFinalStats { get; set; } = true;
+
+        [SettingPropertyBool("Pattern Draw By Skill", HintText = "a new pattern found at the bench is drawn only up to one tier above what your smith's hand can already forge (Smithing Skill Per Tier), and legends only near Legendary Skill Needed. Off: any tier from the piece you made up to tier 6 (three tier 1 jobs could reveal a tier 6 pattern)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool PatternDrawBySkill { get; set; } = true;
+
+        [SettingPropertyBool("Pattern Draw One Tier Up", HintText = "a new pattern found at the bench is at most one tier above the best pattern you already know in that craft: knowing only tier 1 bows, the next bow pattern is tier 2, then tier 3, and so on, never a tier 4 or 5 out of nowhere (Pattern Draw By Skill still caps it by your smith's hand). A saved game is mended once: bow, arrow, crossbow and bolt patterns found before by such a leap are struck out and 3 study points per pattern go back to the book. Off: any tier up to what your smith's hand allows", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool PatternDrawOneTierUp { get; set; } = true;
+
+        [SettingPropertyBool("Shield Craft Skill Gate", HintText = "shields in the CRAFT tab ask the same Smithing as at your own forge (Smithing Skill Per Tier) - below it the anvil refuses and nothing is spent. Off: any known shield could be tried at any skill, only Banner Kings' botching chance stood in the way", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool ShieldCraftSkillGate { get; set; } = true;
+
+        [SettingPropertyBool("Forge Uniques By Study", HintText = "the famed pieces of Westeros (the named armours, the giants' arrows, and the great bows when Rare Bows Not Forged is off) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool ForgeUniquesByStudy { get; set; } = true;
+
+        [SettingPropertyBool("Pattern Tile Shows Skill", HintText = "the CRAFT tab tells a known pattern you cannot forge yet apart from one you can: 'PATTERN KNOWN - NEEDS 165 SMITHING' (or 'LEGEND ALREADY FORGED', or 'RARE STUFF - CANNOT BE FORGED') in amber and a lighter shade on the tile, for the smith chosen at the anvil (read again whenever the list or the chosen pattern changes). Off: every known pattern reads PATTERN KNOWN", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool PatternTileShowsSkill { get; set; } = true;
+
+        [SettingPropertyBool("Xbow Pattern Tier By Power", HintText = "a strong crossbow counts in your pattern book at the tier of a bow of the same strength, the same tier your forge asks Smithing for (Xbow Forge Equiv Tier): the 330 lb crossbow is a tier 6 pattern - it is not handed out at the start and is drawn at the bench only when your hand is near it; its tile reads [VI]. Off: crossbows count at their low game tier (all but one were tier 1 patterns known from day one)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool XbowPatternTierByPower { get; set; } = true;
+
+        [SettingPropertyBool("Rare Bows Not Forged", HintText = "bows of a stuff no smith can get (dragonbone, weirwood - the game has no such raw material to buy) cannot be forged: no pattern, no bench, the tile reads RARE STUFF - CANNOT BE FORGED; the ones in the world stay and can be melted down for study points. Off: forged like any bow from wood and iron (a 5000 denar Ravens' Teeth longbow out of a few ingots)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareBowsNotForged { get; set; } = true;
+
+        [SettingPropertyBool("Legend Twin Pieces Hidden", HintText = "the twin blades of the legends (the 'Dual' copies of Dark Sister, Oathkeeper, Needle, the Valyrian blades and the rest - the same blade under another name, used by no item) are hidden in the weapon designer like the legend's own parts. Off: these twins stayed open from day one in the dual sword class, so a Valyrian or legendary blade could be forged from common steel", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool LegendTwinPiecesHidden { get; set; } = true;
 
         [SettingPropertyBool("Troop Wear Enabled", HintText = "the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
@@ -1875,6 +1919,18 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Map Side Road Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much faster a land party travels on a village lane, in percent of its speed (7.5 = +7.5%; at most 50)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public float MapSideRoadSpeedPercent { get; set; } = 7.5f;
+
+        [SettingPropertyBool("Map Valyrian Roads", HintText = "the old Valyrian roads of Essos - the demon road from Volantis through Mantarys to Meereen with its branch to Tolos, and the road from Pentos through Ghoyan Drohe and Norvos to Qohor - are fused stone that never turns to mud: every land party travels on them faster than on an ordinary road, by Map Valyrian Road Speed Percent (never less than the ordinary road bonus); the speed tooltip shows a 'Valyrian road' line. Off: they count as ordinary roads", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapValyrianRoads { get; set; } = true;
+
+        [SettingPropertyInteger("Map Valyrian Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a Valyrian road, in percent of its speed (25 = +25%; at most 50; never less than Map Road Speed Percent)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int MapValyrianRoadSpeedPercent { get; set; } = 25;
+
+        [SettingPropertyBool("Map Essos Caravan Trails", HintText = "in deep Essos (the Dothraki sea, Sarnor, Ibben, Yi Ti, Qarth) the lore knows no real roads: the painted tracks there are caravan trails and speed a land party up only like a village lane (Map Side Road Speed Percent, 'Caravan trail' line). Off: they count as ordinary roads", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapEssosCaravanTrails { get; set; } = true;
 
         [SettingPropertyBool("Map Mud Speed Penalty", HintText = "mud off the roads: while it rains on the campaign map, and for about a day after the rain stops, every land party (yours, the lords', caravans, villagers, bandits) travels slower when it is off the road - by Map Mud Speed Percent in a downpour ('Mud' line in the speed tooltip) and by Map Mud Wet Speed Percent on wet ground after rain ('Wet ground' line). On a painted main road, and on a village lane with Map Side Road Speed Bonus, there is no mud. Snow keeps its own penalty and ships at sea are not affected. Needs Map Road Speed Bonus. Off = no mud penalty, as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -3656,6 +3712,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawLifeSpendShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Bands Eat Food", HintText = "bands eat: each day one load of food for every twenty men, as an army does - from their packs, bought through a fence with their own purse, or taken from a village within a day's ride; a starving band loses heart and after two days its men begin to slip away to the outlaws of the region; a band keeps a few days of food (the fence buys only the rest) and a few days' coin (only the rest is spent in town or goes home to the hideout). Off = bands do not eat (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BandsEatFood { get; set; } = true;
+
+        [SettingPropertyInteger("Band Food Keep Days", 0, 20, "0", HintText = "with Bands Eat Food: days of food a band keeps in its packs - the fence buys only what lies above that, and a band below it buys more through a fence (at sea too) or takes it from villages within a day's ride", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public int BandFoodKeepDays { get; set; } = 5;
+
+        [SettingPropertyInteger("Band Purse Keep Days", 0, 12, "0", HintText = "with Bands Eat Food: days of living a band keeps in its purse - a recruit's pay for each man and the day's food at the fence's price; it spends in town and carries coin home to the hideout only from what lies above that, and a band below it is topped up from what its hideout holds above the kept hoard (0 = from the whole purse, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public int BandPurseKeepDays { get; set; } = 3;
+
+        [SettingPropertyFloatingInteger("Band Hunger Leave Share", 0.00f, 1.00f, "0.00", HintText = "with Bands Eat Food: share of a starving band's men who walk off each day after two days without food (fewer when half fed) - to the outlaws of the region, not into thin air", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float BandHungerLeaveShare { get; set; } = 0.1f;
+
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ('Year 299, Day 256, Autumn')", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
@@ -5176,6 +5248,34 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiHarnessSurplusSell { get; set; } = true;
 
+        [SettingPropertyBool("Quality Scarcity", HintText = "legendary and masterwork pieces are rare: the town workshops, the loot you strip from the fallen and the other ways the world makes kit no longer turn out a legendary piece every twenty-odd and a masterwork every dozen - such a roll now gives a plain piece. Only a piece someone truly makes - in a town workshop, or a tournament prize the town's craftsmen make for you - can still come out legendary (from a top-tier 5-6 piece) or masterwork (tier 4 and up), and only while the world holds fewer of that kind of item than its limit (each kind - helmets, body armour, bows, shields and so on - draws its own limit once per campaign, see Quality Legendary / Masterwork Per Type Min and Max; counted once a day: shop stalls, packs, merchants' carts on the road, every hero's gear and yours). Pieces beyond the limit lying on the stalls of towns, castles and villages drop to plain quality at the end of the day; the finest are kept. Nothing vanishes and no coin moves. Your bags, your stash, your clan's heroes and weapons you forged yourself are never touched; your own forge works as before (off = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool QualityScarcity { get; set; } = true;
+
+        [SettingPropertyInteger("Quality Legendary Per Type Min", 0, 50, "0", HintText = "with Quality Scarcity, each kind of item (helmets, body armour, gloves, boots, capes, horse harness, one-handed, two-handed and polearm weapons, bows, crossbows, arrows, bolts, throwing weapons, shields) gets its own limit of legendary pieces in the whole world - stalls, packs, heroes' gear and yours together - drawn once per campaign between this number and Quality Legendary Per Type Max, every number as likely as the next; beyond it no new one is made and the extra ones on the stalls drop to plain quality", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityLegendaryPerTypeMin { get; set; } = 1;
+
+        [SettingPropertyInteger("Quality Legendary Per Type Max", 0, 50, "0", HintText = "the highest limit of legendary pieces one kind of item can draw for the campaign (with Quality Scarcity); see Quality Legendary Per Type Min", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityLegendaryPerTypeMax { get; set; } = 6;
+
+        [SettingPropertyInteger("Quality Masterwork Per Type Min", 0, 500, "0", HintText = "with Quality Scarcity, each kind of item gets its own limit of masterwork pieces in the whole world, drawn once per campaign between this number and Quality Masterwork Per Type Max, every number as likely as the next; beyond it no new one is made and the extra ones on the stalls drop to plain quality", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityMasterworkPerTypeMin { get; set; } = 1;
+
+        [SettingPropertyInteger("Quality Masterwork Per Type Max", 0, 500, "0", HintText = "the highest limit of masterwork pieces one kind of item can draw for the campaign (with Quality Scarcity); see Quality Masterwork Per Type Min", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public int QualityMasterworkPerTypeMax { get; set; } = 60;
+
+        [SettingPropertyFloatingInteger("Quality Legendary Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one top-tier piece (tier 5-6) made in a town workshop (or a tournament prize the town's craftsmen make) comes out legendary, while the limit for its kind has room (0.001 = one in a thousand)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public float QualityLegendaryChance { get; set; } = 0.001f;
+
+        [SettingPropertyFloatingInteger("Quality Masterwork Chance", 0.0000f, 0.0500f, "0.0000", HintText = "the chance that one piece of tier 4 or higher made in a town workshop (or a tournament prize the town's craftsmen make) comes out masterwork, while the limit for its kind has room (0.004 = one in two hundred and fifty)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public float QualityMasterworkChance { get; set; } = 0.004f;
+
         [SettingPropertyBool("Mend Fraction Memory", HintText = "with Self Repair Same Rule on: the bit of each material that a repair at your own anvil uses but that does not make a whole piece is not lost - it is tallied (one tally per material in your bags, kept in the save) and a whole piece comes off your bags once the tally reaches one (several at once if more); when the pieces due are not in your bags the repair waits, as for any missing material (off = as before: each material rounded to whole pieces per repair, a light repair may take none at all)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendFractionMemory { get; set; } = true;
@@ -6316,6 +6416,54 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownLoanTakesFolkLoans { get; set; } = false;
 
+        [SettingPropertyBool("Town Debt", HintText = "town councils borrow and tax: when a town's coffer cannot pay its lord's and the crown's dues, its council borrows what is owed - first from its merchant families and craftsmen (half of what they hold above their savings), then from its notables, last from the Iron Bank - and pays the dues at once. It pays interest and pays the debt back from what the coffer holds above the merchants' stock; the repayments come out of the merchants' profit, so the lord's dues from the town do not rise (and fall at the next review) while the town is in debt. A town in debt slowly loses prosperity. A council that is out of credit raises an extraordinary tax on its own burghers and notables (once every Town Debt Levy Gap Days): it pays its creditors and the dues, but costs loyalty, prosperity and the notables' goodwill towards the lord. Your towns follow the same rules; see Town affairs - The council's debts. Off = no new town debts, as before (debts already owed stand still in the save)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownDebt { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Debt Rate", 0.00f, 0.50f, "0.00", HintText = "with Town Debt: the interest a year a town council pays its merchant families, craftsmen and notables on what it borrowed (0.10 = ten parts in a hundred)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtRate { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Town Debt Bank Rate", 0.00f, 1.00f, "0.00", HintText = "with Town Debt: the interest a year a town council pays the Iron Bank (as much as the Bank asks of a king)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtBankRate { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Town Debt Limit Reserve", 0.00f, 20.00f, "0.0", HintText = "with Town Debt: the most a town council may owe, in times its merchants' stock (the part of the coffer no tax touches); at nine tenths of it the council counts as out of credit", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLimitReserve { get; set; } = 3.0f;
+
+        [SettingPropertyFloatingInteger("Town Debt Repay Share", 0.00f, 1.00f, "0.00", HintText = "with Town Debt: the part of what the coffer holds above the merchants' stock that the council pays its creditors each day (the Iron Bank first)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtRepayShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Town Debt Prosperity Per Day", 0.00f, 10.00f, "0.00", HintText = "with Town Debt: the prosperity a town loses each day while its council is in debt, at the full limit of its credit (less for a smaller debt)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtProsperityPerDay { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Town Debt Levy Share", 0.00f, 0.50f, "0.00", HintText = "with Town Debt: the extraordinary tax of a council out of credit - the part of what each class of burghers holds above its savings and each notable above Town Debt Notable Keep (never more than the debt and the dues)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLevyShare { get; set; } = 0.10f;
+
+        [SettingPropertyInteger("Town Debt Levy Gap Days", 7, 364, "0", HintText = "with Town Debt: the fewest days between two extraordinary taxes of the same town", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownDebtLevyGapDays { get; set; } = 28;
+
+        [SettingPropertyFloatingInteger("Town Debt Levy Loyalty", 0.00f, 50.00f, "0.0", HintText = "with Town Debt: the loyalty a town loses with each extraordinary tax (never below 20 by this tax alone)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLevyLoyalty { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Town Debt Levy Prosperity", 0.000f, 0.500f, "0.000", HintText = "with Town Debt: the part of its prosperity a town loses with each extraordinary tax (0.01 = one part in a hundred)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtLevyProsperity { get; set; } = 0.01f;
+
+        [SettingPropertyInteger("Town Debt Levy Relation", 0, 20, "0", HintText = "with Town Debt: how much each notable who paid an extraordinary tax thinks less of the town's lord", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownDebtLevyRelation { get; set; } = 2;
+
+        [SettingPropertyInteger("Town Debt Notable Keep", 0, 50000, "0", HintText = "with Town Debt: the coin a notable always keeps - he lends to the council and pays its extraordinary tax only from what he holds above it", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownDebtNotableKeep { get; set; } = 5000;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -7320,6 +7468,10 @@ namespace Armoury
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool FolkCraftWageOnSale { get; set; } = true;
 
+        [SettingPropertyBool("Savings By Need", HintText = "the men put coin by only for kit they have seen on the stalls and could not afford - a better piece, or a missing one they could not pay for: their savings for kit (Men Gear Save Days at most) shrink to the mending they owe plus the price of those pieces, and the rest is spent as before - with the sutlers in the field, on food and drink in town. Garrisons spend what they hold beyond that in their own town or castle, at the sutlers' pace. Where this would free more than a day of the men's pay at once (a running campaign), it starts gently over Sutler Ramp Days (off = savings up to Men Gear Save Days, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Coin flow (night 16.10)")]
+        public bool SavingsByNeed { get; set; } = true;
+
         [SettingPropertyBool("Sutlers By Purse", HintText = "the men in the field spend with the sutlers by how full their purse is: the daily share (Sutler Daily Share) times their free coin in days of pay divided by ten, at most three times the share - men with a month of pay to spare spend three times as fast, men with five days half as fast. A company that has bought no kit for two weeks (nothing better on the stalls) keeps at most half of its usual savings for better kit (Men Gear Save Days) - the rest goes to the sutlers in the field or on food and drink in town. Starts gently over Sutler Ramp Days in a running campaign. The coin goes where it went before: the nearest friendly town and village (off = the same share of the free purse every day, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool SutlersByPurse { get; set; } = true;
@@ -8128,6 +8280,14 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public float KsFarmSurplusReviewMax { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Ks Folk Wage To Short Classes", HintText = "with the start calibration applied in a town: the pay its townsfolk did not take because their purses are already full (mostly the labourers') goes to the craftsmen and patricians of that town who are short - first food for two days, then their full basket for Ks Folk Short Basket Days days; never more than that pay and never more than the town's purse. Off = that pay stays with the merchants", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public bool KsFolkWageToShortClasses { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Folk Short Basket Days", 2.00f, 20.00f, "0", HintText = "with Ks Folk Wage To Short Classes: up to how many days of their full basket the craftsmen and patricians of a town are topped up from that unclaimed pay (2-20, below their 21 / 30 days of reserve)", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
+        public float KsFolkShortBasketDays { get; set; } = 7f;
+
         [SettingPropertyBool("Ks Farm Surplus Net Of Dues", HintText = "with Ks Farm Follows Surplus: the regular review counts a town's purse as holding a surplus only above the coin it already holds for its dues: the part of the next farm instalment gathered since the last payday (the whole instalment on payday, a seventh of it the day after), unpaid farm and sales aid, the next war tithe instalment and the rest of a catch-up. So the coin gathered for the next instalment does not keep a farm the town cannot carry from being lowered. Off = the whole purse counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public bool KsFarmSurplusNetOfDues { get; set; } = true;
@@ -8175,6 +8335,10 @@ namespace Armoury
         [SettingPropertyBool("Ks Ctl Own Same Food", HintText = "with Ks Ctl Own Food: the market steering counts as eaten from the market only the food a village ate from its own store in place of the same food missing at the stall (its own fish for the fish it could not buy). Food it ate in place of another missing food (its fish because there was no grain) no longer counts as fish eaten - the missing grain already counts as missing, so the same hunger was counted twice and the steering grew more fish while fish piled up on the stalls; off = all the food a village ate from its store counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsCtlOwnSameFood { get; set; } = true;
+
+        [SettingPropertyBool("Ks Village Cloth Buys In Plan", HintText = "with Start Calibration: the Plan also counts the linen and felt that villages really buy in their market towns beyond the basket the Plan already pays for (the Plan took that part as woven at home, but villages buy it), so villages grow enough flax and shear enough wool for the weavers; off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
+        public bool KsVillageClothBuysInPlan { get; set; } = true;
 
         [SettingPropertyBool("Ks Cloth Demand", HintText = "with Start Calibration applied: the Plan counts the linen, felt and leather that army clothing, arms workshops and smiths' repairs use up, so villages grow enough flax and wool and keep enough hides for them (the town weavers' own flax and wool are already counted in the cloth); off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
@@ -8528,6 +8692,18 @@ namespace Armoury
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
 
+        [SettingPropertyBool("Castle Menu Tidy", HintText = "the castle menu is put in order like the town menu: managing and donating to the garrison, kit for the garrison and the castle smith's repairs move into a new 'Go to the barracks'; the castle's books and dealings (People of this land, Estates and livelihood, Realm ledger, Living Economy and the castle folk's loan) into 'Castle affairs'. The dungeon, the lord's hall, the walk, Banner Kings (where the castle's recruits are), Manage castle, the stash, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the castle menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("The castle menu")]
+        public bool CastleMenuTidy { get; set; } = true;
+
+        [SettingPropertyBool("Village Menu Tidy", HintText = "the village menu is put in order like the town and castle menus: the village's books and dealings (People of this land, Estates and livelihood, Look over the district, Invest in the district's works, Living Economy, Banner Kings, buying a house) move into a new 'Village affairs'; day labour into 'Look for paid work'. Recruiting, buying products, the walk, hostile actions, your house, your own village, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the village menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("The village menu")]
+        public bool VillageMenuTidy { get; set; } = true;
+
+        [SettingPropertyBool("Player Payment Reasons", HintText = "when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare 'You paid N' / 'You received N' is replaced by one message that says what for, with the split (e.g. 'You paid 2 for your night at a common room in Seagard (bed 1, horse 1).'). Only the message changes - sums and payers stay the same. Off = the game's message as before", RequireRestart = false)]
+        [SettingPropertyGroup("Payment messages")]
+        public bool PlayerPaymentReasons { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8557,9 +8733,11 @@ namespace Armoury
             s.SmeltWeaponByParts = SmeltWeaponByParts;
             s.SmeltArmourOnce = SmeltArmourOnce;
             s.SmeltKeepsScraps = SmeltKeepsScraps;
+            s.RecipesByMass = RecipesByMass;
             s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
+            s.ForgeOneJob = ForgeOneJob;
             s.ForgeLikeTownSmith = ForgeLikeTownSmith;
             s.ForgeTakesTime = ForgeTakesTime;
             s.DaysPerTier = DaysPerTier;
@@ -8627,6 +8805,15 @@ namespace Armoury
             s.LegendarySkillNeeded = LegendarySkillNeeded;
             s.SmeltingReturnShare = SmeltingReturnShare;
             s.SmeltingSkillBonus = SmeltingSkillBonus;
+            s.LoreSeedAfterFinalStats = LoreSeedAfterFinalStats;
+            s.PatternDrawBySkill = PatternDrawBySkill;
+            s.PatternDrawOneTierUp = PatternDrawOneTierUp;
+            s.ShieldCraftSkillGate = ShieldCraftSkillGate;
+            s.ForgeUniquesByStudy = ForgeUniquesByStudy;
+            s.PatternTileShowsSkill = PatternTileShowsSkill;
+            s.XbowPatternTierByPower = XbowPatternTierByPower;
+            s.RareBowsNotForged = RareBowsNotForged;
+            s.LegendTwinPiecesHidden = LegendTwinPiecesHidden;
             s.TroopWearEnabled = TroopWearEnabled;
             s.TroopWearPercent = TroopWearPercent;
             s.TroopWearPerHit = TroopWearPerHit;
@@ -8996,6 +9183,9 @@ namespace Armoury
             s.MapRoadWideMargin = MapRoadWideMargin;
             s.MapSideRoadSpeedBonus = MapSideRoadSpeedBonus;
             s.MapSideRoadSpeedPercent = MapSideRoadSpeedPercent;
+            s.MapValyrianRoads = MapValyrianRoads;
+            s.MapValyrianRoadSpeedPercent = MapValyrianRoadSpeedPercent;
+            s.MapEssosCaravanTrails = MapEssosCaravanTrails;
             s.MapMudSpeedPenalty = MapMudSpeedPenalty;
             s.MapMudSpeedPercent = MapMudSpeedPercent;
             s.MapMudWetSpeedPercent = MapMudWetSpeedPercent;
@@ -9441,6 +9631,10 @@ namespace Armoury
             s.OutlawHideoutStashShare = OutlawHideoutStashShare;
             s.OutlawHoardCirculates = OutlawHoardCirculates;
             s.OutlawLifeSpendShare = OutlawLifeSpendShare;
+            s.BandsEatFood = BandsEatFood;
+            s.BandFoodKeepDays = BandFoodKeepDays;
+            s.BandPurseKeepDays = BandPurseKeepDays;
+            s.BandHungerLeaveShare = BandHungerLeaveShare;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;
@@ -9821,6 +10015,13 @@ namespace Armoury
             s.AiSkipTownsfolkDress = AiSkipTownsfolkDress;
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
             s.AiHarnessSurplusSell = AiHarnessSurplusSell;
+            s.QualityScarcity = QualityScarcity;
+            s.QualityLegendaryPerTypeMin = QualityLegendaryPerTypeMin;
+            s.QualityLegendaryPerTypeMax = QualityLegendaryPerTypeMax;
+            s.QualityMasterworkPerTypeMin = QualityMasterworkPerTypeMin;
+            s.QualityMasterworkPerTypeMax = QualityMasterworkPerTypeMax;
+            s.QualityLegendaryChance = QualityLegendaryChance;
+            s.QualityMasterworkChance = QualityMasterworkChance;
             s.MendFractionMemory = MendFractionMemory;
             s.MendTakeByKind = MendTakeByKind;
             s.SmallFixes8 = SmallFixes8;
@@ -10106,6 +10307,18 @@ namespace Armoury
             s.TownLoanFolkReserveTimes = TownLoanFolkReserveTimes;
             s.TownLoanCofferReserveTimes = TownLoanCofferReserveTimes;
             s.TownLoanTakesFolkLoans = TownLoanTakesFolkLoans;
+            s.TownDebt = TownDebt;
+            s.TownDebtRate = TownDebtRate;
+            s.TownDebtBankRate = TownDebtBankRate;
+            s.TownDebtLimitReserve = TownDebtLimitReserve;
+            s.TownDebtRepayShare = TownDebtRepayShare;
+            s.TownDebtProsperityPerDay = TownDebtProsperityPerDay;
+            s.TownDebtLevyShare = TownDebtLevyShare;
+            s.TownDebtLevyGapDays = TownDebtLevyGapDays;
+            s.TownDebtLevyLoyalty = TownDebtLevyLoyalty;
+            s.TownDebtLevyProsperity = TownDebtLevyProsperity;
+            s.TownDebtLevyRelation = TownDebtLevyRelation;
+            s.TownDebtNotableKeep = TownDebtNotableKeep;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
@@ -10357,6 +10570,7 @@ namespace Armoury
             s.SmithWoodOnScreen = SmithWoodOnScreen;
             s.SelfMendWoodKg = SelfMendWoodKg;
             s.FolkCraftWageOnSale = FolkCraftWageOnSale;
+            s.SavingsByNeed = SavingsByNeed;
             s.SutlersByPurse = SutlersByPurse;
             s.FolkGuardNoMemory = FolkGuardNoMemory;
             s.FolkLoanBeforeGuard = FolkLoanBeforeGuard;
@@ -10559,6 +10773,8 @@ namespace Armoury
             s.KsFarmFollowsSurplus = KsFarmFollowsSurplus;
             s.KsFarmSurplusReviewDays = KsFarmSurplusReviewDays;
             s.KsFarmSurplusReviewMax = KsFarmSurplusReviewMax;
+            s.KsFolkWageToShortClasses = KsFolkWageToShortClasses;
+            s.KsFolkShortBasketDays = KsFolkShortBasketDays;
             s.KsFarmSurplusNetOfDues = KsFarmSurplusNetOfDues;
             s.KsFarmCatchUp = KsFarmCatchUp;
             s.KsFarmCatchUpShare = KsFarmCatchUpShare;
@@ -10571,6 +10787,7 @@ namespace Armoury
             s.KsMade7Derived = KsMade7Derived;
             s.KsCtlOwnFood = KsCtlOwnFood;
             s.KsCtlOwnSameFood = KsCtlOwnSameFood;
+            s.KsVillageClothBuysInPlan = KsVillageClothBuysInPlan;
             s.KsClothDemand = KsClothDemand;
             s.WallGrainTribute = WallGrainTribute;
             s.WallTributeTargetDays = WallTributeTargetDays;
@@ -10659,6 +10876,9 @@ namespace Armoury
             s.BookHoldingsGarrison = BookHoldingsGarrison;
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
             s.TownMenuTidy = TownMenuTidy;
+            s.CastleMenuTidy = CastleMenuTidy;
+            s.VillageMenuTidy = VillageMenuTidy;
+            s.PlayerPaymentReasons = PlayerPaymentReasons;
         }
 
         internal static void Apply()

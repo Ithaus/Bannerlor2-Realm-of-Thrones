@@ -3,6 +3,7 @@
 Uzycie (Python 3, tylko odczyt):
     python -I tools/sprawdz_logi.py --grupa etap2 <Armoury-*.log> [--baza baza.json] [--zapisz-baze baza.json] [--csv budzet-rodow.csv] [--start-kampanii N]
 --grupa etap2     : progi etapu 2.
+--grupa m96len    : (m96-len, 20.10) Plan KS liczy plotno i sukno kupowane przez wsie w miastach (KsVillageClothBuysInPlan); zapas lnu, plotna i sukna od D+28.
 --grupa etap3     : (3.1, E3/0) progi fali 1 etapu 3 (reszta ksiegi, RB3, linia "Szczelnosc (164a)") i kontrolki "prog 0" fali 2 tego drzewa.
 --grupa etap4     : (E4/0, paczka 188) progi T1-T10 pomiaru ludzi, jencow i zimy (projekt etapu 4, rozdz. 3 "E4/0" Test) w oknie dob kampanii 1-120
                     (--do-doby N zmienia okno); T9 (bieg zimowy) i baza konca etapu (d300-364) - INFO. Gdy w logu jest linia startowa
@@ -777,6 +778,10 @@ Uzycie (Python 3, tylko odczyt):
                     NK-4 kontrola k = 0 (twardy), NK-5 kontrola r = 0 (twardy; przelewy gry - okup, RC - to kategoria), NK-6 od doby 28 kryjowki z bandami z kasa >= skarbiec srednio >= 0.5 (P),
                     NK-7 stan kas (INFO), NK-8 kiesy startowe z kas kryjowek (INFO, wobec bazy), NK-9 zdarzenia: przeszukanie, bitwa gracza, zwyciezca AI (INFO),
                     NK-10 Pieniadz swiata - bandy i kryjowki (INFO), NK-11 linia Paser: stan = doplyw - odplyw (twardy). Log bez paczki: INFO, bez wyjatku.
+--grupa m96bandy  : (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"; galaz w-toku/m96-bandy, BandFood.cs) python -I tools/sprawdz_logi.py --grupa m96bandy
+                    [--baza-doby <log Armoury bazy>] <Armoury-*.log>. MB-0 linia doby, MB-1 potkniecia 0, MB-2 zjedzone/potrzeba >= 0.85 (P), MB-3 glodne <= 25% (P),
+                    MB-4 rozpady z glodu <= 20% nowych band (P), MB-5 zapas >= 2 dob (P), MB-6 lup jedzenia i zlota band > 0, MB-7 zrodla (INFO), MB-8 bandy wobec bazy >= 0.80 (P),
+                    MB-9 paser zywnosc (INFO), MB-10 kiesy band (INFO), MB-11 bandy z kryjowka z pusta kiesa - mniej niz w bazie (P), MB-12 morze (INFO).
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -989,12 +994,50 @@ Uzycie (Python 3, tylko odczyt):
                     "Daniny wsi (DS)" (recenzja), ZJ-5 plotki bez wyjatkow (+ ZJ-5b czas budowy <= 50 ms), ZJ-6 obrazek
                     raz na mape (przebudowy 0, postawione <= zajazdy), ZJ-7 koszt sprawdzania dojazdu <= 0.05 ms, ZJ-8 potkniecia i ERROR paczki 0, ZJ-9 wejscia,
                     noclegi, plotki (INFO). Autotest nie klika zajazdow - bez noclegu i sluchania te progi INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa m96sakiewki : (20.10, m96-sakiewki - PLAN 5 "sakiewki zolnierzy najwyzej 15 dni zoldu"; Armoury/src/SavingsByNeed.cs, klucz Savings By Need)
+                    python -I tools/sprawdz_logi.py --grupa m96sakiewki <Armoury-*.log> (strumieniowo). SN-0 linia doby, SN-1 rozruch (INFO), SN-2 kontrola
+                    obiegu z odczytow przed/po 0 i potkniecia 0, SN-3 sakiewki <= 15 dni zoldu (Obieg), SN-4 oszczednosci K1 <= 3 dni, SN-5 zalogi <= 10 dni,
+                    SN-6 bez wzrostu w 28 dob, SN-7 "za malo w sakiewce" <= 2% "brak lepszej", SN-8 koszt, SN-9 przeplywy (INFO), SN-10 zakupy AI (braki +
+                    lepsze) >= 80% bazy, SN-11 pokrycie korpusu lordow >= baza - 2 pp. Progi SN-3..7, 10, 11 po 14 dobach pelnej reguly. Log bez paczki: INFO.
+--grupa m96jakosc : (20.10, Jeff "za duzo jest legendary ... w sklepach za latwo mozna znalezc legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity)
+                    python -I tools/sprawdz_logi.py --grupa m96jakosc <Armoury-*.log> (strumieniowo). JQ-0 latki bez BRAK, JQ-1 linie doby rozpoznane,
+                    JQ-1b suma rodzajow = swiat (m96-jakosc2: limit NA RODZAJ przedmiotu, losowany raz na kampanie - legendarne 1-6, mistrzowskie 1-60),
+                    JQ-2/JQ-3 legendarne i mistrzowskie kazdego rodzaju po wyrownaniu w limicie rodzaju (ponad limit tylko poza polkami albo w sztukach nietykalnych), JQ-4 obnizki tylko przesuwaja jakosc
+                    (nadmiar do zwyklej: przed - po = obnizki, osobno legendarne i mistrzowskie),
+                    JQ-5 nowe w rodzaju w granicy miejsca rodzaju z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO),
+                    JQ-10 limity rodzajow w zakresie i stale doba do doby (rozrzut INFO). Linia sprzed m96-jakosc2 (limit swiata) - jeden rodzaj "swiat".
+--grupa m96receptury : (20.10, w-toku/m96-receptury - Jeff "strzaly 14 najlepszej stali, luki 8 lnu"; Armoury/src/Recipes.Mass.cs, SmithStock.cs; klucz RecipesByMass)
+                    python -I tools/sprawdz_logi.py --grupa m96receptury <Armoury-*.log> (strumieniowo). R96-0 linia startu, R96-1 metal w lukach 0, R96-2 mediana masy
+                    surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0, R96-6 latka SpendMaterials CRAFT BK
+                    wpieta, R96-7 pekniecia CRAFT BK z kg (INFO). Log bez paczki: INFO.
+--grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
+                    python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
+                    W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
+                    zapisu (INFO), W96-5 odkrycia w zakresie wedlug reki (i drabiny tierow - m96-wzory2), W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia i ERROR 0, W96-8 blizniacze
+                    czesci legend ukryte (> 0 przy kluczu), W96-9 naprawa zapisu 2 (m96-wzory2: luki i kusze ponad zakres reki zdjete, ksiega po naprawie
+                    bez znanych tierow ponad zakres). Log bez paczki: INFO, bez wyjatku.
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
                     python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
                     (klucz, plik drog, rozstaje traktu >= 100), SZB-1 linie doby rozpoznane, SZB-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy
                     bitwach z panem), SZB-3 najwyzej 'maks.' naraz (200) i jedna na okreg (okregow = aktywnych), SZB-3b limit nie skraca czasu (zastapione + odrzucone
                     przez limit <= 25% nowych, szubienice gracza nie zastapione), SZB-4 bez drogi <= 50% bitw z panem, SZB-5 wybor miejsca <= 2 ms, SZB-6 potkniecia,
                     pominiete obrazki i ERROR 0, SZB-7 obrazki i probki linii 'postawiona' (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa m96wies   : (20.10, m96-wies - Jeff 20.10 "Wioski menu tez ustaw jak w miescie i zamkach" i "You paid 2 - powinno byc, za co"; Armoury/src/VillageMenus.cs,
+                    PayNotes.cs; klucze VillageMenuTidy i PlayerPaymentReasons) python -I tools/sprawdz_logi.py --grupa m96wies <Armoury-*.log> (strumieniowo).
+                    WS-0 linie 'Menu wsi (m96-wies): start' (kazde wczytanie; blad/brak 0; ERROR paczki bez linii startu - NIE), WS-1 przeniesione = znalezione
+                    z planu, naszych nie znalezionych 0 (pelny zestaw modow 8 z 8; WS-1b cudze bez wpisu - INFO), WS-2 wejscia 'Village affairs' i 'Look for paid
+                    work' wpiete i w menu wsi, WS-3 nic nie zginelo (przed - przeniesione + wejscia = teraz; opcji planu we wsi 0; leave, trade, recruit_volunteers,
+                    hostile_action, village_center zostaja), WS-3b menu wsi po zmianie (INFO), WS-4 'ERROR in VillageMenus', 'ERROR in OnAfterGameInitializationFinished
+                    (VillageMenus)' i linie BLAD/BRAK 0; PN-0 linie 'Komunikaty platnosci (m96-wies): start' (nasluch zwiadu wpiety), PN-1 podmienione komunikaty
+                    (INFO, wg powodu), PN-2 komunikaty gry graczowi bez powodu (INFO - miejsca do dopisania), PN-3 'ERROR in PayNotes' 0.
+                    Autotest nie klika menu i nie placi - komunikaty sprawdza Jeff. Log bez paczki: INFO, bez wyjatku.
+--grupa m96zamek  : (20.10, m96-zamek - Jeff 20.10 "menu zamku tez uporzadkuj"; Armoury/src/CastleMenus.cs; klucz CastleMenuTidy)
+                    python -I tools/sprawdz_logi.py --grupa m96zamek <Armoury-*.log> (strumieniowo). ZM-0 linie 'Menu zamku (m96-zamek): start' (kazde wczytanie
+                    i nowa kampania; blad/brak 0; ERROR paczki bez linii startu - NIE), ZM-1 przeniesione = znalezione z planu, naszych nie znalezionych 0 (pelny
+                    zestaw modow 10 z 10; ZM-1b cudze bez wpisu - INFO), ZM-2 wejscia 'Go to the barracks' i 'Castle affairs' wpiete i w menu zamku, ZM-3 nic nie
+                    zginelo (przed - przeniesione + wejscia = teraz; opcji planu w zamku 0; leave, Manage castle i Banner Kings zostaja), ZM-3b menu zamku po zmianie
+                    (INFO), ZM-4 'ERROR in CastleMenus', 'ERROR in OnAfterGameInitializationFinished (CastleMenus)' i linie BLAD/BRAK 0. Klucz wylaczony: ZM-1 INFO.
+                    Autotest nie klika menu. Log bez paczki: INFO, bez wyjatku.
 --grupa nzc1      : (16.10, projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md paczka ZC1 "drogi towarow"; galaz w-toku/noc-zc1, Armoury/src/GoodsPaths.cs)
                     python -I tools/sprawdz_logi.py --grupa nzc1 [--baza-doby <log biegu bazowego bez ZC1>] <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie
                     doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast z tkalnia aksamitu (f25-sprawdz,
@@ -1086,6 +1129,10 @@ Uzycie (Python 3, tylko odczyt):
                     (bez konta NIEWOLNI) poza kulturami z niewola nie rosnie od pierwszej do ostatniej doby pliku (tylko TDebtSl dodaje niewolnych), NNW-11/12 INFO (kultury,
                     wolni, powody bez ruchu: bez KS, wladca bez niewoli, D >= 0.8, zapas >= 7 dni). Log sprzed paczki (np. Armoury-2026-10-17_23-22-37.log): linie INFO,
                     NNW-10 z CSV liczony, bez wyjatku.
+--grupa m96valyria: (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; galaz w-toku/m96-valyria, Armoury/src/MapRoadKinds.cs, plik Armoury/ModuleData/arm_map_roads_valyria.tsv)
+                    python -I tools/sprawdz_logi.py --grupa m96valyria <Armoury-*.log> (strumieniowo). VR-0 start sesji CZYNNE, plik zgodny (V 800..850 jedn., mosty 7 /
+                    20..35 jedn., szlaki 185..205 jedn.); VR-1 linie doby; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia > 0; VR-3 audyt Valyrii premia =
+                    oczekiwana +-1.5 pp z wpisem; VR-4 audyt szlaku (INFO); VR-5 siec AI: mosty >= 1, klasy tak; VR-6 potkniecia i ERROR 0.
 --grupa ndrogi    : (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, plik
                     Armoury/ModuleData/arm_map_roads_geo.tsv) python -I tools/sprawdz_logi.py --grupa ndrogi <Armoury-*.log> (strumieniowo). NDR-0 start sesji: plik drog
                     wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa ROT zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid
@@ -1522,6 +1569,13 @@ Uzycie (Python 3, tylko odczyt):
                     "Roboty miast z rak okregu (p6-a7)": P6A7-0 linie, P6A7-1 zdjete z kas = do kies wsi, P6A7-2 zwrot, wplaty przebudow do kas i wydatki wsi (INFO), P6A7-3 suma kas
                     miast <= +30 tys./d w ostatnich 28 dobach, P6A7-4 zwrot <= wplaty przebudow do kas, P6A7-5 czas, potkniecia, ERROR, P6A7-6 wplaty i zwrot poza
                     doplywem netto kupcow (firmy DS). Porownanie - grupy nakum, nkasy.
+--grupa m96dlugi_dlugi : (20.10, galaz w-toku/m96-dlugi - dlugi rad miast i podatek nadzwyczajny; Armoury/src/TownDebt.cs, klucz Town Debt) linia "Dlugi miast
+                    (m96-dlugi): dzien N" i "Firmy miast i zamkow (DS)": M96D-0 linie, M96D-1 kontrola dlugu i podatku (0), M96D-2 dlug razem <= limit razem,
+                    M96D-3 zaleglosci firm DS miast Z KASY (panu + koronie, bez czesci z oszczednosci ludu - poza paczka) na koniec <= 50% bazy WGRANIA 95
+                    (209 771 zl: Duskendale 163 500 + Rhyos 46 271 - pewna czesc z kasy; cale 381 134 zl u 8 miast z ALf), M96D-4 miasta z dlugiem,
+                    wierzyciele, odsetki i splaty (INFO), M96D-5 podatki nadzwyczajne i skutki (lojalnosc na podatek <= 5), M96D-6 czas, potkniecia, ERROR TownDebt,
+                    M96D-7 zwolnienie DS po zdobyciu i czekanie na pule Banku (INFO).
+                    python -I tools/sprawdz_logi.py --grupa m96dlugi_dlugi <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -1846,6 +1900,13 @@ Uzycie (Python 3, tylko odczyt):
                     SP-8 miasta przy Food 0 bez oblezenia <= 2 naraz; SP-9 miasta z bilansem < progu BE (INFO); SP-9b miasta ponizej 80% sufitu (BK Well fed, INFO);
                     SP-10 bezpiecznik BE (testy 80-200/d, glod BE bez jedzenia <= Food 0 + 2); SP-10b BE gospodarka miasta (odczyty >= 80/d); SP-11 werbunek zalogi
                     (dzienne ticki 80-200/d, odczyty >= polowa); SP-11b niedobor (INFO); SP-12 czas doby (mediana <= 10 ms, max <= 40 ms); SP-13 potkniecia i ERROR 0.
+--grupa m96koszyk  : (20.10, galaz m96-koszyk - PLAN 5.5; Armoury/src/TownFolk.M96Koszyk.cs, klucze Ks Folk Wage To Short Classes, Ks Folk Short Basket Days) placa,
+                    ktorej klasy z pelna kiesa nie przyjely (f5/f4, glownie W - zostaje w kasie), do R i P tego miasta w biedzie (jedzenie na 2 dni, potem koszyk na 7 dni). python -I tools/sprawdz_logi.py
+                    --grupa m96koszyk <Armoury-*.log> (strumieniowo). Okno - ostatnie 28 pelnych dob z kotwica KS (ZC4 lambda >= 0.99). MK-0 start sesji, MK-1 linie doby,
+                    MK-2 kontrola (zeszlo <= zlecone, R + P, ponad placa zatrzymana 0), MK-3 potkniecia 0, MK-4 stac jedzenie W/R/P >= 95% kazdej doby, MK-5 miast ze stac
+                    jedzenie < 95% - TAK przy 0, srednio <= 1 i max <= 3 DECYZJA (z nazwami), inaczej NIE; MK-6 pelny koszyk swiata >= 98%, MK-7 zjedzone bez zaplaty < 1%,
+                    MK-8 przelane (INFO), MK-9 chleb M3 (INFO), MK-10 czas <= 2 ms, MK-11 Plan KS - czesc zaplacona R/P (INFO), MK-12 f5 - odmowa W, kappa W2, dni
+                    koszyka (INFO). Bez kotwicy KS albo log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -11480,7 +11541,7 @@ def etap7_w3(rep, lines, start, win, until=120, **kw):
         if "WYLACZONY" in s or "NIEWPIETA" in s:
             rep.add("E7/W3 T1: pozycja w menu (ostatnia sesja)", body[:200], "klucz DistrictMenuEnabled wlaczony, pozycja wpieta", False)
         else:
-            v = re.search(r"village index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
+            v = re.search(r"village(?: -> \S+)? index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)   # m96-wies: 'village -> arm_vm_affairs_menu index K z M'
             lo = re.search(r"village_looted index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
             book = "ksiega wiosek czynna" in s
             rep.add("E7/W3 T1: \"Look over the district\" w menu village i village_looted (ostatnia sesja)", body[:260],
@@ -30241,7 +30302,7 @@ def nmisje_main(logp):
 NS_HEAD = "Skarbce kryjowek (nskarbiec): "
 NS_SHARE = re.compile(r"\| dola tak \(udzial ([\d.]+) kiesy")
 NS_BANDS = re.compile(r"\| band z kryjowka (\d+) z (\d+), dola dalo (\d+) \(pominiete: bitwa (\d+), zadanie (\d+), nieumarli (\d+), czeka na przeszukanie (\d+), "
-                      r"pusta kiesa (\d+), kiesa ponizej zlotowki doli (\d+), w ticku gry (\d+)\)")
+                      r"pusta kiesa (\d+), kiesa ponizej zlotowki doli (\d+), w ticku gry (\d+)(?:, kiesa w calosci zapasem (\d+))?\)")
 NS_PURSE = re.compile(r"\| kiesy band z kryjowka przed dola (\d+) zl, dola (\d+) zl")
 NS_IN = re.compile(r"\| wplaty (\d+) zl \(dola (\d+), wejscia do kryjowek (\d+)(?:, przelewy gry do kryjowek (\d+) w (\d+))?\)")
 NS_OUT = re.compile(r"\| wyplaty (\d+) zl \(kiesy startowe (\d+), sprzet (\d+), herszt BK (\d+), zycie w miastach (\d+), przeszukanie gracza (\d+) w (\d+), "
@@ -36480,6 +36541,236 @@ def nkarczmy_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96jakosc (20.10, Jeff "za duzo jest legendary przedmiotow ... w sklepach za latwo mozna znalezc
+# legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity). Progi JQ-x.
+# m96-jakosc2 (Jeff 20.10 17:20 "6 legendarnych danego typu ... daj wariacje, np. od 1 do 6 ... I to samo masterwork"): limit NA RODZAJ przedmiotu, losowany
+# raz na kampanie (legendarne 1-6, mistrzowskie 1-60; po recenzji od 1, bylo 6) - linia doby ma czesc "rodzaje (stan/limit po wyrownaniu): <rodzaj> L x/limit (...) M y/limit (...)";
+# progi JQ-2/3/5 licza rodzaj po rodzaju, JQ-1b suma rodzajow = swiat, JQ-10 limity w zakresie i stale. Linia sprzed m96-jakosc2 (limit swiata) - jeden
+# rodzaj "swiat" (stare progi). Po recenzji m96-jakosc2: nadmiar na polkach schodzi od razu do ZWYKLEJ ("obnizki na polkach do zwyklej: legendarne N,
+# mistrzowskie M") - JQ-4 sprawdza wtedy przed - po osobno dla legendarnych i mistrzowskich; stara linia "o stopien" (L->MW, L->dobre, MW->dobre) czytana dalej.
+M96JAKOSC_HEAD = "Jakosc przedmiotow (m96jakosc): "
+M96JAKOSC_ERR = ("ERROR in QualityScarcity", "ERROR in SyncData.arm_qualitycaps")   # m96-jakosc2: zapis limitow rodzajow
+M96JAKOSC_RX = {
+    "day": re.compile(r"dzien (\d+)"),
+    "rule": re.compile(r"\| regula (TAK|NIE)"),
+    # stara: "limit swiata: legendarne 6, mistrzowskie 60"; m96-jakosc2: "limit na rodzaj: legendarne 1-6 (suma 52), mistrzowskie 1-60 (suma 458)"
+    "caps": re.compile(r"limit (swiata|na rodzaj): legendarne (\d+)(?:-(\d+) \(suma (\d+)\))?, mistrzowskie (\d+)(?:-(\d+) \(suma (\d+)\))?"),
+    "before": re.compile(r"spis przed wyrownaniem: legendarne (\d+) \(polki (\d+)\), mistrzowskie (\d+) \(polki (\d+)\)"),
+    "after": re.compile(r"swiat po: legendarne (\d+) \(polki (\d+), juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), mistrzowskie (\d+) \(polki (\d+), "
+                        r"juki (\d+), bohaterowie (\d+), gracz (\d+)(?:, wozy (\d+))?\), dobre (\d+)"),
+    "new": re.compile(r"nowe od wczoraj: legendarne (\d+) \[([^\]]*)\], mistrzowskie (\d+) \[([^\]]*)\] z sztuk z jakoscia (\d+)"),
+    "game": re.compile(r"rzut gry odebrany: legendarne (\d+) \[[^\]]*\], mistrzowskie (\d+)"),
+    "capped": re.compile(r"zatrzymane limitem (?:swiata|rodzaju): legendarne (\d+), mistrzowskie (\d+); przed pierwszym spisem (\d+)"),
+    # stara: o stopien (L->MW, L->dobre, MW->dobre, do zwyklej); po recenzji m96-jakosc2: "obnizki na polkach do zwyklej: legendarne N, mistrzowskie M (stosow"
+    "dem": re.compile(r"obnizki na polkach(?:: legendarne->mistrzowskie (\d+), legendarne->dobre (\d+), mistrzowskie->dobre (\d+), do zwyklej \([^)]*\) (\d+)"
+                      r"| do zwyklej: legendarne (\d+), mistrzowskie (\d+) \(stosow)"),
+    "cost": re.compile(r"koszt ([\d.,]+) ms \| potkniecia (\d+)"),
+}
+M96JAKOSC_KINDS = re.compile(r"\| rodzaje \(stan/limit po wyrownaniu\): (.*?) \| koszt ")
+M96JAKOSC_KIND = re.compile(r"(\w+) L (\d+)/(\d+) \(polki (\d+), nietykalne (\d+)(?:, nowe (\d+))?\) M (\d+)/(\d+) \(polki (\d+), nietykalne (\d+)(?:, nowe (\d+))?\)")
+
+
+def m96jakosc_kinds(txt):
+    """Czesc 'rodzaje' linii -> lista slownikow rodzaju (stan, limit, polki, nietykalne, nowe) albo None (czesc nierozpoznana)."""
+    out = []
+    for part in txt.split("; "):
+        m = M96JAKOSC_KIND.fullmatch(part.strip())
+        if not m:
+            return None
+        g = m.groups()
+        out.append({"name": g[0], "L": int(g[1]), "capL": int(g[2]), "Ls": int(g[3]), "Lu": int(g[4]), "nL": int(g[5] or 0),
+                    "M": int(g[6]), "capM": int(g[7]), "Ms": int(g[8]), "Mu": int(g[9]), "nM": int(g[10] or 0)})
+    return out
+
+
+def m96jakosc_parse(s):
+    """Linia doby 'Jakosc przedmiotow (m96jakosc): dzien N' -> slownik liczb albo None (nierozpoznana)."""
+    d = {}
+    for k, rx in M96JAKOSC_RX.items():
+        m = rx.search(s)
+        if not m:
+            return None
+        d[k] = m.groups()
+    I = lambda k, i: int(d[k][i] or 0)
+    # poprawki po recenzjach (20.10): wyroby gracza L/MW osobno (nietykalne - zostaja na polkach ponad limit), pociski bez celu, nieudane zdjecie;
+    # pola opcjonalne - linia sprzed poprawek ma tylko sume wyrobow
+    cr = re.search(r"wyroby gracza na polkach nietykalne (\d+)(?: \(legendarne (\d+), mistrzowskie (\d+)\))?", s)
+    sk = re.search(r"pominiete \(pociski bez celu\) (\d+), nieudane zdjecie z polki (\d+)", s)
+    crL = int(cr.group(2)) if cr and cr.group(2) else (int(cr.group(1)) if cr else 0)   # stara linia: suma wyrobow jako tolerancja dla L i MW
+    crM = int(cr.group(3)) if cr and cr.group(3) else (int(cr.group(1)) if cr else 0)
+    per_type = d["caps"][0] == "na rodzaj"
+    c = d["caps"]
+    r = {
+        "crL": crL, "crM": crM, "skip": int(sk.group(1)) if sk else 0, "fail": int(sk.group(2)) if sk else 0,
+        "day": I("day", 0), "on": d["rule"][0] == "TAK", "per_type": per_type,
+        # stara linia: limit swiata; m96-jakosc2: zakres losowania lo-hi i suma limitow rodzajow
+        "loL": int(c[1]), "hiL": int(c[2] or c[1]), "capL": int(c[3] or c[1]), "loM": int(c[4]), "hiM": int(c[5] or c[4]), "capM": int(c[6] or c[4]),
+        "L0": I("before", 0), "L0s": I("before", 1), "M0": I("before", 2), "M0s": I("before", 3),
+        "L": I("after", 0), "Ls": I("after", 1), "Lfix": I("after", 2) + I("after", 3) + I("after", 4) + I("after", 5),
+        "M": I("after", 6), "Ms": I("after", 7), "Mfix": I("after", 8) + I("after", 9) + I("after", 10) + I("after", 11), "F": I("after", 12),
+        "nL": I("new", 0), "nLsrc": d["new"][1], "nM": I("new", 2), "nMsrc": d["new"][3], "pieces": I("new", 4),
+        "gL": I("game", 0), "gM": I("game", 1), "cL": I("capped", 0), "cM": I("capped", 1), "pre": I("capped", 2),
+        "LM": I("dem", 0), "LF": I("dem", 1), "MF": I("dem", 2), "plain": I("dem", 3) + I("dem", 4) + I("dem", 5),
+        "toplain": d["dem"][4] is not None, "pL": I("dem", 4), "pM": I("dem", 5),
+        "ms": float(d["cost"][0].replace(",", ".")), "stum": int(d["cost"][1]),
+    }
+    if per_type:
+        mk = M96JAKOSC_KINDS.search(s)
+        kinds = m96jakosc_kinds(mk.group(1)) if mk else None
+        if not kinds:
+            return None
+        r["kinds"] = kinds
+    else:
+        # linia sprzed m96-jakosc2: jeden rodzaj "swiat" (nietykalne = wyroby gracza + pociski bez celu)
+        r["kinds"] = [{"name": "swiat", "L": r["L"], "capL": r["capL"], "Ls": r["Ls"], "Lu": crL + r["skip"], "nL": r["nL"],
+                       "M": r["M"], "capM": r["capM"], "Ms": r["Ms"], "Mu": crM + r["skip"], "nM": r["nM"]}]
+    return r
+
+
+def m96jakosc_over(k, q):
+    """Rodzaj ponad regula: sztuki do ruszenia na polkach (polki - nietykalne) wieksze niz miejsce limitu po tym, co lezy poza polkami.
+    Regula zostawia na polkach najwyzej max(0, limit - (wyroby gracza + sztuki poza polkami)) - nigdy wiecej niz max(0, limit - poza polkami)."""
+    touch = k[q + "s"] - k[q + "u"]
+    outside = k[q] - k[q + "s"]
+    return touch > max(0, k["cap" + q] - outside)
+
+
+def m96jakosc_main(logp):
+    """m96jakosc (20.10; Armoury/src/QualityScarcity.cs, klucz QualityScarcity): rzut gry Legendary/Masterwork przy powstaniu sztuki przepada, wlasny rzut
+    (legendarna z tieru 5-6, mistrzowska z tieru 4-6) w limicie RODZAJU przedmiotu (m96-jakosc2: helmy, zbroje, luki ... - kazdy rodzaj swoj limit, losowany raz
+    na kampanie: legendarne 1-6, mistrzowskie 1-60) ze spisu raz na dobe; nadmiar na polkach osad schodzi do zwyklej (po recenzji m96-jakosc2; wczesniej
+    o stopien; nic nie znika).
+    JQ-0 linie startu i latek, JQ-1 linie doby rozpoznane, JQ-1b suma rodzajow = swiat, JQ-2/JQ-3 kazdy rodzaj po wyrownaniu w limicie (albo polki bez sztuk do
+    ruszenia, gdy limit zajmuja juki, bohaterowie, wozy i gracz), JQ-4 obnizki tylko przesuwaja jakosc (przed - po = obnizki w dol), JQ-5 nowe w rodzaju w granicy
+    miejsca rodzaju z wczoraj, JQ-6 rzut gry odebrany (INFO, udzialy), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 pierwsze wyrownanie i zrodla
+    nowych (INFO), JQ-10 limity rodzajow w zakresie losowania i stale doba do doby (rozrzut - INFO). Wejscie: log Armoury (strumieniowo)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("JQ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, wired, days, bad = [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96JAKOSC_HEAD):
+                rest = s[len(M96JAKOSC_HEAD):]
+                if rest.startswith("start sesji"):
+                    starts.append(rest)
+                elif rest.startswith("wpiete"):
+                    wired.append(rest)
+                elif rest.startswith("dzien "):
+                    p = m96jakosc_parse(s)
+                    (days.append(p) if p else bad.append(s))
+            elif s.startswith(M96JAKOSC_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, latek {len(wired)}, doby {len(days)} (nierozpoznanych {len(bad)}), ERROR {n_err}")
+    if not starts and not days and not bad and not wired and n_err == 0:
+        rep.add("JQ-0: linie 'Jakosc przedmiotow (m96jakosc)'", "brak w logu", "INFO (log sprzed paczki m96-jakosc)", None)
+        rep.show()
+        return 0
+    if wired:
+        rep.add("JQ-0: latki (droga gry, lup gracza, nagroda zaciagu ROT)", wired[-1][:220], "bez slowa BRAK", "BRAK" not in wired[-1])
+    else:
+        rep.add("JQ-0: latki", "brak linii 'wpiete'", "linia z menu glownego", None)
+    if starts:
+        rep.add("JQ-0b: start sesji (klucz, limity rodzajow, spis przy wczytaniu)", starts[-1][:420], "INFO", None)
+    rep.add("JQ-1: linie doby rozpoznane", f"rozpoznane {len(days)}, nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""),
+            "nierozpoznane 0, rozpoznane > 0", len(bad) == 0 and len(days) > 0)
+    pt = [d for d in days if d["per_type"]]
+    if pt:
+        # suma rodzajow = swiat (spis rodzaju liczy te same sztuki co spis miejsc; obnizki przesuwaja oba tak samo)
+        sumbad = [d["day"] for d in pt if sum(k["L"] for k in d["kinds"]) != d["L"] or sum(k["M"] for k in d["kinds"]) != d["M"]
+                  or sum(k["Ls"] for k in d["kinds"]) != d["Ls"] or sum(k["Ms"] for k in d["kinds"]) != d["Ms"]
+                  or sum(k["nL"] for k in d["kinds"]) != d["nL"] or sum(k["nM"] for k in d["kinds"]) != d["nM"]
+                  or sum(k["capL"] for k in d["kinds"]) != d["capL"] or sum(k["capM"] for k in d["kinds"]) != d["capM"]]
+        rep.add("JQ-1b: suma rodzajow = swiat (stan, polki, nowe, limity)", f"dob z rozjazdem {len(sumbad)} z {len(pt)}" + (f" (np. {sumbad[0]})" if sumbad else ""),
+                "0", not sumbad)
+    on_days = [d for d in days if d["on"]]
+    if on_days:
+        # rodzaj po rodzaju: ponad limit dopuszczalne tylko poza polkami - albo na polkach w sztukach, ktorych regula nie rusza (wyroby gracza, pociski bez celu)
+        badL = [(d["day"], k["name"]) for d in on_days for k in d["kinds"] if m96jakosc_over(k, "L")]
+        badM = [(d["day"], k["name"]) for d in on_days for k in d["kinds"] if m96jakosc_over(k, "M")]
+        last = on_days[-1]
+        overL = [k for k in last["kinds"] if k["L"] > k["capL"]]
+        overM = [k for k in last["kinds"] if k["M"] > k["capM"]]
+        fmt_over = lambda ks, q: ", ".join(f"{k['name']} {k[q]}/{k['cap' + q]} (poza polkami {k[q] - k[q + 's']}, nietykalne {k[q + 'u']})" for k in ks[:4])
+        rep.add("JQ-2: legendarne kazdego rodzaju po wyrownaniu w limicie rodzaju",
+                f"ostatnia doba {last['day']}: swiat {last['L']} przy sumie limitow {last['capL']} ({len(last['kinds'])} rodzajow); rodzaje ponad limit {len(overL)}"
+                + (f" [{fmt_over(overL, 'L')}]" if overL else "") + f"; (doba, rodzaj) z polkami ponad regula {len(badL)}" + (f" (np. {badL[0]})" if badL else ""),
+                "0 (ponad limit rodzaju tylko poza polkami albo w sztukach nietykalnych)", not badL)
+        rep.add("JQ-3: mistrzowskie kazdego rodzaju po wyrownaniu w limicie rodzaju",
+                f"ostatnia doba {last['day']}: swiat {last['M']} przy sumie limitow {last['capM']}; rodzaje ponad limit {len(overM)}"
+                + (f" [{fmt_over(overM, 'M')}]" if overM else "") + f"; (doba, rodzaj) z polkami ponad regula {len(badM)}" + (f" (np. {badM[0]})" if badM else ""),
+                "0", not badM)
+        # nadmiar do zwyklej (po recenzji m96-jakosc2): przed - po osobno dla legendarnych i mistrzowskich; stara linia (o stopien) - suma L+MW
+        cons = [d["day"] for d in on_days if (d["L0"] + d["M0"]) - (d["L"] + d["M"]) != d["LF"] + d["MF"] + d["plain"]
+                or (d["toplain"] and (d["L0"] - d["L"] != d["pL"] or d["M0"] - d["M"] != d["pM"]))]
+        rep.add("JQ-4: obnizki tylko przesuwaja jakosc (przed - po = obnizki do zwyklej, sztuk tyle samo)", f"dob z rozjazdem {len(cons)}" + (f" (np. {cons[0]})" if cons else ""),
+                "0", not cons)
+        over = []
+        prev = None
+        for d in days:
+            if prev is not None and d["on"] and d["day"] == prev["day"] + 1:
+                pk = {k["name"]: k for k in prev["kinds"]}
+                for k in d["kinds"]:
+                    p = pk.get(k["name"])
+                    if p is None:
+                        continue
+                    if k["nL"] > max(0, k["capL"] - p["L"]) or k["nM"] > max(0, k["capM"] - p["M"]):
+                        over.append((d["day"], k["name"]))
+            prev = d
+        rep.add("JQ-5: nowe legendarne i mistrzowskie w rodzaju w granicy miejsca rodzaju z wczoraj", f"(doba, rodzaj) ponad miejsce {len(over)}" + (f" (np. {over[0]})" if over else ""),
+                "0 (nowe w rodzaju <= limit rodzaju - stan rodzaju po wyrownaniu doby wczesniej)", not over)
+        pcs = sum(d["pieces"] for d in on_days)
+        gL = sum(d["gL"] for d in on_days)
+        gM = sum(d["gM"] for d in on_days)
+        nL = sum(d["nL"] for d in on_days)
+        nM = sum(d["nM"] for d in on_days)
+        rep.add("JQ-6: rzut gry odebrany / nowe z reguly (cala sesja)", f"sztuk z jakoscia {pcs}: rzut gry legendarne {gL} ({(100.0 * gL / pcs) if pcs else 0:.2f}%), mistrzowskie {gM} "
+                f"({(100.0 * gM / pcs) if pcs else 0:.2f}%); z reguly legendarne {nL}, mistrzowskie {nM}; zatrzymane limitem {sum(d['cL'] for d in on_days)}/{sum(d['cM'] for d in on_days)}",
+                "INFO (gra RBM: ok. 4.3% i 8.7% sztuk warsztatu - teraz zwykle)", None)
+        f0 = on_days[0]
+        rep.add("JQ-9: pierwsze wyrownanie (stary swiat)", f"doba {f0['day']}: legendarne {f0['L0']} (polki {f0['L0s']}) -> {f0['L']}, mistrzowskie {f0['M0']} (polki {f0['M0s']}) -> {f0['M']}; "
+                + (f"obnizki do zwyklej: legendarne {f0['pL']}, mistrzowskie {f0['pM']}" if f0["toplain"]
+                 else f"obnizki L->MW {f0['LM']}, L->dobre {f0['LF']}, MW->dobre {f0['MF']}, do zwyklej {f0['plain']}"), "INFO", None)
+        rep.add("JQ-9b: zrodla nowych (ostatnia doba)", f"legendarne [{last['nLsrc']}], mistrzowskie [{last['nMsrc']}]", "INFO", None)
+        if last["per_type"]:
+            rep.add("JQ-9c: rodzaje na ostatniej dobie (legendarne stan/limit, mistrzowskie stan/limit)",
+                    "; ".join(f"{k['name']} {k['L']}/{k['capL']}, {k['M']}/{k['capM']}" for k in last["kinds"]), "INFO", None)
+    else:
+        rep.add("JQ-2..6: regula", "brak dob z regula TAK", "INFO (klucz Quality Scarcity wylaczony - sam spis)", None)
+    stum = days[-1]["stum"] if days else 0
+    rep.add("JQ-7: potkniecia i ERROR paczki", f"potkniecia {stum}, ERROR {n_err}", "0 i 0", stum == 0 and n_err == 0)
+    if days:
+        mx = max(d["ms"] for d in days)
+        rep.add("JQ-8: koszt doby (spis + wyrownanie)", f"najwiecej {mx:.1f} ms, srednio {sum(d['ms'] for d in days) / len(days):.1f} ms", "<= 250 ms", mx <= 250.0)
+    if pt:
+        # limity rodzajow: w zakresie losowania z linii (zmiana zakresu w MCM przycina - dalej w zakresie) i te same doba do doby przy tym samym zakresie
+        rng = [(d["day"], k["name"]) for d in pt for k in d["kinds"] if not (d["loL"] <= k["capL"] <= d["hiL"] and d["loM"] <= k["capM"] <= d["hiM"])]
+        moved = []
+        prev = None
+        for d in pt:
+            if prev is not None and d["day"] == prev["day"] + 1 and (d["loL"], d["hiL"], d["loM"], d["hiM"]) == (prev["loL"], prev["hiL"], prev["loM"], prev["hiM"]):
+                pk = {k["name"]: (k["capL"], k["capM"]) for k in prev["kinds"]}
+                moved += [(d["day"], k["name"]) for k in d["kinds"] if k["name"] in pk and pk[k["name"]] != (k["capL"], k["capM"])]
+            prev = d
+        last = pt[-1]
+        main = [k for k in last["kinds"] if k["name"] != "Other"]
+        vl = sorted(set(k["capL"] for k in main))
+        vm = sorted(set(k["capM"] for k in main))
+        rep.add("JQ-10: limity rodzajow w zakresie i stale (los raz na kampanie)",
+                f"zakres legendarne {last['loL']}-{last['hiL']}, mistrzowskie {last['loM']}-{last['hiM']}; poza zakresem {len(rng)}" + (f" (np. {rng[0]})" if rng else "")
+                + f", zmienione doba do doby {len(moved)}" + (f" (np. {moved[0]})" if moved else ""),
+                "0 i 0", not rng and not moved)
+        rep.add("JQ-10b: rozrzut limitow (ostatnia doba, bez Other)", f"legendarne: {len(vl)} roznych wartosci {vl}; mistrzowskie: {len(vm)} roznych, od {vm[0] if vm else '-'} do {vm[-1] if vm else '-'}",
+                "INFO (Jeff: wariacje, np. od 1 do 6)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ p6szubienice (20.10, p6-szubienice R3-07a: szubienice przy rozstajach po rozbitej bandzie / kryjowce;
 # Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows). Progi SZB-x (SZ-x to grupa szturm).
 P6SZUBIENICE_HEAD = "Szubienice (p6): "
@@ -36584,6 +36875,487 @@ def p6szubienice_main(logp):
         rep.add("SZB-7: obrazki na mapie i probki", f"obrazki postawione {vmade}, pokazane najwiecej naraz {max(int(d['vmax']) for d in days)}, brak siatek {miss} (zapas z listy); "
                 f"probek 'postawiona/odnowiona' {len(samples)}" + (f" - {samples[0][len(P6SZUBIENICE_HEAD):][:200]}" if samples else ""),
                 "INFO (obrazki tylko przy kamerze; brak siatki wisielca = worek)", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96wies (20.10, m96-wies: porzadek menu wsi jak miasta i zamku + komunikaty platnosci z powodem;
+# Armoury/src/VillageMenus.cs, PayNotes.cs; klucze VillageMenuTidy, PlayerPaymentReasons)
+M96WIES_HEAD = "Menu wsi (m96-wies): start | "
+M96WIES_PLAN = ("arm_people_village", "arm_estates_village", "arm_district_village", "arm_works_village", "bee_village_root", "bannerkings_village_submenu",
+                "rc_home_buy_village", "rc_work_labour_village")
+M96WIES_PLAN_AFFAIRS = 7   # pierwsze 7 planu - "Village affairs", reszta - "Look for paid work"
+# opcje, ktore MUSZA zostac w menu wsi (jesli byly): wyjazd, kupno towarow i werbunek (GameMenuEventHandler "village"), wrogie czyny (podmenu gry), spacer
+M96WIES_KEEP = ("leave", "trade", "recruit_volunteers", "hostile_action", "village_center")
+M96WIES_ERR = ("ERROR in VillageMenus", "ERROR in OnAfterGameInitializationFinished (VillageMenus)")
+M96WIES_HUBS = ("arm_vm_affairs", "arm_vm_work")
+M96WIES_BEFORE = re.compile(r"\| menu wsi przed (?P<n>\d+) opcji: (?P<ids>[^|]*) \|")
+M96WIES_MOVED = re.compile(r"\| przeniesione (?P<n>\d+) z (?P<plan>\d+) w planie: ")
+M96WIES_HUBSIN = re.compile(r"\| wejscia podmenu wpiete (?P<n>\d+) \(")
+M96WIES_MISS = re.compile(r"\| nie znaleziono cudzych (?P<f>\d+)(?: \[(?P<fl>[^\]]*)\])?, naszych (?P<o>\d+)(?: \[(?P<ol>[^\]]*)\])?")
+M96WIES_AFTER = re.compile(r"\| menu wsi teraz (?P<n>\d+) opcji: (?P<ids>.*)$")
+M96WIES_PN = "Komunikaty platnosci (m96-wies): "
+M96WIES_PN_SWAP = re.compile(r"Komunikaty platnosci \(m96-wies\): (?:zaplata|wplyw|komunikat gry wylaczony \(nasz mowi powod\)) (?P<kind>\S+) (?P<amt>\d+) \| podmienione w sesji (?P<n>\d+)")
+M96WIES_PN_GAME = re.compile(r"Komunikaty platnosci \(m96-wies\): komunikat gry bez powodu \((?P<what>You paid|You received) (?P<amt>\d+)\) \| .*?\| wolajacy: (?P<where>.*?) \| takich w sesji (?P<n>\d+)")
+
+
+def m96wies_main(logp):
+    """m96wies (20.10, m96-wies; klucze VillageMenuTidy, PlayerPaymentReasons): porzadek menu wsi - ksiegi Armoury, okreg, BEE, BK i kupno domu RC do "Village affairs",
+    dniowka RC do "Look for paid work" (te same obiekty opcji); werbunek, kupno towarow, spacer, wrogie czyny, dom i wioska poboczna zostaja. Komunikaty platnosci gracza
+    z powodem zamiast golego "You paid N" gry + zwiad komunikatow gry bez powodu. Wejscie: log Armoury (strumieniowo). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("WS-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, n_err, pn_starts, pn_swap, pn_game, pn_err = [], 0, [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96WIES_HEAD):
+                starts.append(s)
+            elif s.startswith(M96WIES_ERR):
+                n_err += 1
+            elif s.startswith(M96WIES_PN):
+                if s.startswith(M96WIES_PN + "start"):
+                    pn_starts.append(s)
+                else:
+                    mm = M96WIES_PN_SWAP.match(s)
+                    if mm:
+                        pn_swap.append(mm.groupdict())
+                    else:
+                        mg = M96WIES_PN_GAME.match(s)
+                        if mg:
+                            pn_game.append(mg.groupdict())
+            elif s.startswith("ERROR in PayNotes") or s.startswith("ERROR in OnAfterGameInitializationFinished (PayNotes)"):
+                pn_err += 1
+    print(f"plik: {logp} | linii startu menu wsi {len(starts)}, ERROR in VillageMenus (z wywolaniem) {n_err} | komunikaty platnosci: startow {len(pn_starts)}, "
+          f"podmienionych {len(pn_swap)}, komunikatow gry bez powodu {len(pn_game)}, ERROR {pn_err}")
+    if not starts and n_err == 0 and not pn_starts and pn_err == 0:
+        rep.add("WS-0: linia 'Menu wsi (m96-wies): start'", "brak w logu", "INFO (log sprzed paczki m96-wies)", None)
+        rep.show()
+        return 0
+    # ---- menu wsi
+    on = [s for s in starts if s.startswith(M96WIES_HEAD + "WLACZONY (Village Menu Tidy)")]
+    off = [s for s in starts if s.startswith(M96WIES_HEAD + "WYLACZONY w MCM")]
+    bad = [s for s in starts if s.startswith((M96WIES_HEAD + "BLAD", M96WIES_HEAD + "BRAK", M96WIES_HEAD + "WLACZONY, ale"))]
+    rep.add("WS-0: linie startu sesji (kazde wczytanie / nowa kampania)", f"{len(starts)} (wlaczony {len(on)}, wylaczony {len(off)}, blad/brak {len(bad)})",
+            ">= 1, blad/brak 0 (wylaczony - INFO)", None if off and not bad else (len(starts) >= 1 and not bad))
+    if not on:
+        rep.add("WS-1: przeniesienie", "brak linii WLACZONY", "INFO (klucz Village Menu Tidy wylaczony)" if off else "INFO (bez linii startu - blad paczki, patrz WS-4)",
+                None if not bad else False)
+    else:
+        s0 = on[-1]
+        mb, mm, mh, mi, ma = (r.search(s0) for r in (M96WIES_BEFORE, M96WIES_MOVED, M96WIES_HUBSIN, M96WIES_MISS, M96WIES_AFTER))
+        if not (mb and mm and mh and mi and ma):
+            rep.add("WS-1: linia startu rozpoznana", s0[len(M96WIES_HEAD):][:240], "format paczki m96-wies", False)
+        else:
+            before, after = m96zamek_ids(mb.group("ids")), m96zamek_ids(ma.group("ids"))
+            moved, plan, hubs = int(mm.group("n")), int(mm.group("plan")), int(mh.group("n"))
+            miss_f, miss_o = int(mi.group("f")), int(mi.group("o"))
+            in_plan_before = [x for x in M96WIES_PLAN if x in before]
+            rep.add("WS-1: przeniesione opcje planu (wszystkie znalezione)", f"{moved} z {plan} w planie; w menu przed: {len(in_plan_before)}; nie znaleziono cudzych {miss_f}"
+                    + (f" [{mi.group('fl')}]" if mi.group("fl") else "") + f", naszych {miss_o}" + (f" [{mi.group('ol')}]" if mi.group("ol") else ""),
+                    "przeniesione = znalezione w menu przed, naszych nie znalezionych 0 (pelny zestaw modow: 8 z 8)", moved == len(in_plan_before) and miss_o == 0)
+            if miss_f:
+                rep.add("WS-1b: cudze opcje bez wpisu w menu wsi", mi.group("fl") or str(miss_f), "INFO (mod wylaczony albo zmienil id opcji - nie ma jej w grze)", None)
+            want_hubs = int(any(x in before for x in M96WIES_PLAN[:M96WIES_PLAN_AFFAIRS])) + int(any(x in before for x in M96WIES_PLAN[M96WIES_PLAN_AFFAIRS:]))
+            hubs_now = [x for x in M96WIES_HUBS if x in after]
+            rep.add("WS-2: wejscia podmenu wpiete (Village affairs, Look for paid work)", f"{hubs} (w menu teraz: {', '.join(hubs_now) or 'brak'})",
+                    f"= {want_hubs} i wszystkie w menu wsi", hubs == want_hubs and len(hubs_now) == hubs)
+            left = [x for x in M96WIES_PLAN if x in after]
+            lost = [x for x in before if x not in after and x not in M96WIES_PLAN]
+            keep = [x for x in M96WIES_KEEP if x in before and x not in after]
+            sums_ok = len(before) - moved + hubs == len(after) and int(mb.group("n")) == len(before) and int(ma.group("n")) == len(after)
+            rep.add("WS-3: nic nie zginelo (przed - przeniesione + wejscia = teraz)", f"przed {len(before)}, przeniesione {moved}, wejscia {hubs}, teraz {len(after)}"
+                    + (f"; opcje planu dalej we wsi: {', '.join(left)}" if left else "") + (f"; ZNIKNELY: {', '.join(lost)}" if lost else "")
+                    + (f"; brak we wsi (musza zostac): {', '.join(keep)}" if keep else ""),
+                    "rowne, opcji planu we wsi 0, zniknietych 0, leave, trade, recruit_volunteers, hostile_action, village_center zostaja", sums_ok and not left and not lost and not keep)
+            rep.add("WS-3b: menu wsi po zmianie (kolejnosc)", ", ".join(after)[:400], "INFO - werbunek, towary, spacer, wrogie czyny, dom, wejscia przed 'village_wait', wyjazd", None)
+    rep.add("WS-4: bledy paczki (menu wsi)", f"ERROR in VillageMenus (z wywolaniem) {n_err}, linii BLAD/BRAK {len(bad)}", "0", n_err == 0 and not bad)
+    # ---- komunikaty platnosci
+    if not pn_starts:
+        rep.add("PN-0: linia 'Komunikaty platnosci (m96-wies): start'", "brak", "jest przy kazdym wczytaniu (paczka m96-wies)", False if starts else None)
+    else:
+        p0 = pn_starts[-1]
+        rep.add("PN-0: start komunikatow platnosci (klucz, nasluch zwiadu)", ("WLACZONY" if "WLACZONY (Player Payment Reasons)" in p0 else "WYLACZONY") + "; "
+                + ("nasluch wpiety" if "nasluch zwiadu: wpiety" in p0 or "juz wpiety" in p0 else "nasluch NIE wpiety"),
+                "nasluch wpiety (klucz wylaczony - INFO)", ("nasluch zwiadu: wpiety" in p0 or "juz wpiety" in p0) if "WLACZONY (Player" in p0 else None)
+    kinds = {}
+    for d in pn_swap:
+        kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
+    rep.add("PN-1: podmienione komunikaty (wg powodu)", f"{len(pn_swap)}" + (": " + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) if kinds else ""),
+            "INFO (nocleg - inn / roadinn, oplaty E8/D2, ksiazki ...; autotest nie placi)", None)
+    places = {}
+    for d in pn_game:
+        places[d["where"][:160]] = places.get(d["where"][:160], 0) + 1
+    rep.add("PN-2: komunikaty gry graczowi bez powodu (zwiad - miejsca do dopisania)", f"{len(pn_game)} linii" + ("; " + " || ".join(f"{k} ({v})" for k, v in list(places.items())[:6]) if places else ""),
+            "INFO (kazde miejsce stad - kandydat do nastepnej paczki)", None)
+    rep.add("PN-3: bledy komunikatow platnosci", f"ERROR in PayNotes {pn_err}", "0", pn_err == 0)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96zamek (20.10, m96-zamek: porzadek menu zamku jak menu miasta; Armoury/src/CastleMenus.cs, klucz CastleMenuTidy)
+M96ZAMEK_HEAD = "Menu zamku (m96-zamek): start | "
+M96ZAMEK_PLAN = ("manage_garrison", "leave_troops_to_garrison", "arm_garrison_kit_castle", "repair_equipment_castle", "arm_people_castle", "arm_estates_castle",
+                 "arm_realm_ledger_castle", "bee_castle_root", "arm_townloan_borrow_castle", "arm_townloan_repay_castle")
+# opcje, ktore MUSZA zostac w menu zamku (jesli byly): wyjazd, Manage castle (GameMenuEventHandler "castle"), Banner Kings (werbunek zamku - poprawka po recenzji)
+M96ZAMEK_KEEP = ("leave", "manage_production", "bannerkings_castle_submenu")
+# blad z zewnetrznego catch w SubModuleMain (Apply wywrocone przy wywolaniu - JIT/TypeLoad, linii startu wtedy nie ma; recenzja technika)
+M96ZAMEK_ERR = ("ERROR in CastleMenus", "ERROR in OnAfterGameInitializationFinished (CastleMenus)")
+M96ZAMEK_HUBS = ("arm_cm_barracks", "arm_cm_affairs")
+M96ZAMEK_BEFORE = re.compile(r"\| menu zamku przed (?P<n>\d+) opcji: (?P<ids>[^|]*) \|")
+M96ZAMEK_MOVED = re.compile(r"\| przeniesione (?P<n>\d+) z (?P<plan>\d+) w planie: ")
+M96ZAMEK_HUBSIN = re.compile(r"\| wejscia podmenu wpiete (?P<n>\d+) \(")
+M96ZAMEK_MISS = re.compile(r"\| nie znaleziono cudzych (?P<f>\d+)(?: \[(?P<fl>[^\]]*)\])?, naszych (?P<o>\d+)(?: \[(?P<ol>[^\]]*)\])?")
+M96ZAMEK_AFTER = re.compile(r"\| menu zamku teraz (?P<n>\d+) opcji: (?P<ids>.*)$")
+
+
+def m96zamek_ids(s):
+    return [x.strip() for x in s.split(",") if x.strip()]
+
+
+def m96zamek_main(logp):
+    """m96zamek (20.10, m96-zamek; klucz CastleMenuTidy): porzadek menu zamku - zaloga gry, sprzet zalogi i kowal RB do "Go to the barracks", ksiegi Armoury, BEE
+    i pozyczka do "Castle affairs" (te same obiekty opcji); Banner Kings (werbunek zamku) zostaje na wierzchu. Wejscie: log Armoury (strumieniowo). ZM-0 linie
+    startu sesji (kazde wczytanie; brak linii przy bledzie paczki - NIE), ZM-1 przeniesione wszystkie znalezione z planu (naszych nie znalezionych 0; cudzych -
+    INFO, mod bez opcji), ZM-2 wejscia wpiete (2 przy pelnym zestawie), ZM-3 nic nie zginelo (przed - przeniesione + wejscia = teraz), zadna opcja planu nie
+    zostala w menu zamku, "leave", "manage_production" i "bannerkings_castle_submenu" (jesli byly) zostaly, ZM-4 bledy (BLAD w linii startu, ERROR in CastleMenus,
+    ERROR in OnAfterGameInitializationFinished (CastleMenus)) 0. Autotest nie klika menu - samo menu w grze sprawdza Jeff. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ZM-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, n_err = [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96ZAMEK_HEAD):
+                starts.append(s)
+            elif s.startswith(M96ZAMEK_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu menu zamku {len(starts)}, ERROR in CastleMenus (z wywolaniem w SubModuleMain) {n_err}")
+    if not starts and n_err == 0:
+        rep.add("ZM-0: linia 'Menu zamku (m96-zamek): start'", "brak w logu", "INFO (log sprzed paczki m96-zamek)", None)
+        rep.show()
+        return 0
+    on = [s for s in starts if s.startswith(M96ZAMEK_HEAD + "WLACZONY (Castle Menu Tidy)")]
+    off = [s for s in starts if s.startswith(M96ZAMEK_HEAD + "WYLACZONY w MCM")]
+    bad = [s for s in starts if s.startswith((M96ZAMEK_HEAD + "BLAD", M96ZAMEK_HEAD + "BRAK", M96ZAMEK_HEAD + "WLACZONY, ale"))]
+    rep.add("ZM-0: linie startu sesji (kazde wczytanie / nowa kampania)", f"{len(starts)} (wlaczony {len(on)}, wylaczony {len(off)}, blad/brak {len(bad)})",
+            ">= 1, blad/brak 0 (wylaczony - INFO)", None if off and not bad else (len(starts) >= 1 and not bad))
+    if not on:
+        rep.add("ZM-1: przeniesienie", "brak linii WLACZONY", "INFO (klucz Castle Menu Tidy wylaczony)" if off else "INFO (bez linii startu - blad paczki, patrz ZM-4)",
+                None if not bad else False)
+        rep.add("ZM-4: bledy paczki", f"ERROR in CastleMenus (z wywolaniem) {n_err}, linii BLAD/BRAK {len(bad)}", "0", n_err == 0 and not bad)
+        rep.show()
+        return 0
+    s0 = on[-1]
+    mb, mm, mh, mi, ma = (r.search(s0) for r in (M96ZAMEK_BEFORE, M96ZAMEK_MOVED, M96ZAMEK_HUBSIN, M96ZAMEK_MISS, M96ZAMEK_AFTER))
+    if not (mb and mm and mh and mi and ma):
+        rep.add("ZM-1: linia startu rozpoznana", s0[len(M96ZAMEK_HEAD):][:240], "format paczki m96-zamek", False)
+        rep.show()
+        return 0
+    before, after = m96zamek_ids(mb.group("ids")), m96zamek_ids(ma.group("ids"))
+    moved, plan, hubs = int(mm.group("n")), int(mm.group("plan")), int(mh.group("n"))
+    miss_f, miss_o = int(mi.group("f")), int(mi.group("o"))
+    in_plan_before = [x for x in M96ZAMEK_PLAN if x in before]
+    rep.add("ZM-1: przeniesione opcje planu (wszystkie znalezione)", f"{moved} z {plan} w planie; w menu przed: {len(in_plan_before)}; nie znaleziono cudzych {miss_f}"
+            + (f" [{mi.group('fl')}]" if mi.group("fl") else "") + f", naszych {miss_o}" + (f" [{mi.group('ol')}]" if mi.group("ol") else ""),
+            "przeniesione = znalezione w menu przed, naszych nie znalezionych 0 (pelny zestaw modow: 10 z 10)", moved == len(in_plan_before) and miss_o == 0)
+    if miss_f:
+        rep.add("ZM-1b: cudze opcje bez wpisu w menu zamku", mi.group("fl") or str(miss_f), "INFO (mod wylaczony albo zmienil id opcji - nie ma jej w grze)", None)
+    want_hubs = int(any(x in before for x in M96ZAMEK_PLAN[:4])) + int(any(x in before for x in M96ZAMEK_PLAN[4:]))
+    hubs_now = [x for x in M96ZAMEK_HUBS if x in after]
+    rep.add("ZM-2: wejscia podmenu wpiete (Go to the barracks, Castle affairs)", f"{hubs} (w menu teraz: {', '.join(hubs_now) or 'brak'})",
+            f"= {want_hubs} i wszystkie w menu zamku", hubs == want_hubs and len(hubs_now) == hubs)
+    left = [x for x in M96ZAMEK_PLAN if x in after]
+    lost = [x for x in before if x not in after and x not in M96ZAMEK_PLAN]
+    keep = [x for x in M96ZAMEK_KEEP if x in before and x not in after]
+    sums_ok = len(before) - moved + hubs == len(after) and int(mb.group("n")) == len(before) and int(ma.group("n")) == len(after)
+    rep.add("ZM-3: nic nie zginelo (przed - przeniesione + wejscia = teraz)", f"przed {len(before)}, przeniesione {moved}, wejscia {hubs}, teraz {len(after)}"
+            + (f"; opcje planu dalej w zamku: {', '.join(left)}" if left else "") + (f"; ZNIKNELY: {', '.join(lost)}" if lost else "")
+            + (f"; brak w zamku (musza zostac): {', '.join(keep)}" if keep else ""),
+            "rowne, opcji planu w zamku 0, zniknietych 0, leave, Manage castle i Banner Kings zostaja", sums_ok and not left and not lost and not keep)
+    rep.add("ZM-3b: menu zamku po zmianie (kolejnosc)", ", ".join(after)[:400], "INFO - miejsca, Banner Kings, Manage castle, schowek, wejscia przed 'town_wait', wyjazd", None)
+    rep.add("ZM-4: bledy paczki", f"ERROR in CastleMenus (z wywolaniem) {n_err}, linii BLAD/BRAK {len(bad)}", "0", n_err == 0 and not bad)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96receptury (20.10, w-toku/m96-receptury: przepisy kuzni z masy przedmiotu, otwarte ladunki lnu,
+# skory i metalu, przetop z masy minus straty; Armoury/src/Recipes.Mass.cs, SmithStock.cs; klucz RecipesByMass)
+M96REC_HEAD = "Przepisy z masy (m96-receptury): start sesji"
+M96REC_USE = "Surowce w kuzni (kg) (m96-receptury): "
+M96REC_N = re.compile(r"policzone (\d+) \(pancerze (\d+), luki (\d+), kusze (\d+), strzaly i belty (\d+); legendy (\d+)[^)]*\)(?:, latka SpendMaterials CRAFT BK [^,]+)?, stary przepis bez receptury wartosci (\d+), metal w lukach (\d+)")
+M96REC_MED = re.compile(r"mediana x([0-9.]+)")
+M96REC_STUMB = re.compile(r"potkniecia (\d+)")
+M96REC_HOOK = re.compile(r"latka SpendMaterials CRAFT BK ([^,|]+)")
+
+
+def m96receptury_main(logp):
+    """m96receptury (20.10, w-toku/m96-receptury; Jeff: "strzaly wymagaja 14 najlepszej stali albo luki 8 lnu - bez sensu", "len jest drogi - zasada wagi surowca
+    jak w drewnie", "przetapianie odda najwyzej tyle, ile przepis bierze"): przepisy w kg z masy przedmiotu, otwarte ladunki, przetop z masy minus straty.
+    R96-0 linia startu sesji (klucz TAK, policzone > 0), R96-1 metal w lukach 0, R96-2 mediana masy surowca / masy wyrobu 1.0-2.5, R96-3 kucia z kg (INFO: ile,
+    ile sztuk z sakw), R96-4 kwit CRAFT BK zgodny z przepisem (linii 'kwit BK inny' 0), R96-5 potkniecia i ERROR paczki 0. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("R96-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    heads, uses, mism, n_err, stumb, botch = [], 0, 0, 0, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96REC_HEAD):
+                heads.append(s)
+                mm = M96REC_STUMB.findall(s)
+                if mm:
+                    stumb = max(stumb, int(mm[-1]))
+            elif s.startswith(M96REC_USE):
+                if "kwit BK inny niz przepis z masy" in s:
+                    mism += 1
+                elif "pekniecie CRAFT BK" in s:
+                    botch += 1
+                    mm = M96REC_STUMB.findall(s)
+                    if mm:
+                        stumb = max(stumb, int(mm[-1]))
+                else:
+                    uses += 1
+                    mm = M96REC_STUMB.findall(s)
+                    if mm:
+                        stumb = max(stumb, int(mm[-1]))
+            elif (s.startswith("ERROR in Recipes.Mass") or s.startswith("ERROR in SmithStock") or s.startswith("ERROR in BkMassSpend")
+                  or s.startswith("ERROR in FletchForge.ApplyAll(masa)")):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(heads)}, kuc z kg {uses}, kwitow BK niezgodnych {mism}, ERROR {n_err}")
+    if not heads and uses == 0 and n_err == 0:
+        rep.add("R96-0: linia 'Przepisy z masy (m96-receptury): start sesji'", "brak w logu", "INFO (log sprzed paczki m96-receptury albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = heads[-1] if heads else ""
+    on = "klucz RecipesByMass TAK" in last
+    mm = M96REC_N.search(last)
+    rep.add("R96-0: linia startu sesji (klucz, policzone)", (last[:160] + "...") if last else "brak", "klucz TAK, policzone > 0",
+            bool(on and mm and int(mm.group(1)) > 0) if on else None)
+    if on and mm:
+        rep.add("R96-1: metal w lukach", mm.group(8), "0", int(mm.group(8)) == 0)
+        rep.add("R96-1b: stary przepis bez receptury wartosci", mm.group(7), "INFO (0 oczekiwane)", None)
+        md = M96REC_MED.search(last)
+        med = float(md.group(1)) if md else -1.0
+        rep.add("R96-2: mediana masy surowca / masy wyrobu", f"x{med:.2f}" if md else "brak", "1.0-2.5", 1.0 <= med <= 2.5 if md else False)
+    rep.add("R96-3: kucia z kg (otwarte ladunki)", str(uses), "INFO", None)
+    rep.add("R96-4: kwit CRAFT BK inny niz przepis z masy", str(mism), "0", mism == 0)
+    rep.add("R96-5: potkniecia i ERROR paczki", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    if on:
+        mh = M96REC_HOOK.search(last)
+        rep.add("R96-6: latka SpendMaterials CRAFT BK (kg za pancerz z CRAFT)", mh.group(1).strip() if mh else "brak w linii startu", "wpiete",
+                bool(mh and mh.group(1).strip() == "wpiete"))
+    rep.add("R96-7: pekniecia CRAFT BK z kg (zwrot do otwartych ladunkow)", str(botch), "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96wzory (20.10, w-toku/m96-wzory: wzory kuzni po ostatecznych statystykach, naprawa zapisu, bramy wiedzy;
+# Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs; klucze LoreSeedAfterFinalStats, PatternDrawBySkill, ShieldCraftSkillGate, ForgeUniquesByStudy,
+# PatternTileShowsSkill, XbowPatternTierByPower, RareBowsNotForged, LegendTwinPiecesHidden)
+M96WZORY_HEAD = "Wiedza (m96-wzory): "
+M96WZORY_ROT = "HistoricalPrices: ROT-RBM (ROTRBMCompatibility) nadpisal ceny"
+M96WZORY_SEED = "Wiedza rzemieslnicza: rozdano wzory tieru 1 ("
+M96WZORY_TWIN = "Czesci-blizniaki legend (m96-wzory): "
+M96WZORY_TIER = re.compile(r"\| t(\d) (\d+)/(\d+)")
+M96WZORY_DRAW = re.compile(r"^Wiedza: odkryto losowo (?P<id>\S+) \((?P<sc>[A-Z ]+), t(?P<t>\d), zakres (?P<a>\d)-(?P<b>\d)\)")
+M96WZORY_REACH = re.compile(r"Smithing (?P<sk>\d+), prog na tier (?P<per>\d+) -> zakres tierow (?P<a>\d)-(?P<b>\d)")
+M96WZORY_STUMB = re.compile(r"potkniecia (\d+)")
+M96WZORY_REMOVED = re.compile(r"naprawa zapisu: zdjete (\d+) \[([^\]]*)\]")
+M96WZORY_XREM = re.compile(r"kusze wedlug sily: zdjete (\d+) \[([^\]]*)\]")
+M96WZORY_ADDED = re.compile(r"dopisane tieru 1 (\d+)")
+M96WZORY_TWIN_N = re.compile(r"ukryte w projektowaniu broni (\d+) \(domyslnie otwartych (\d+)\)")
+# m96-wzory2: linia naprawy zapisu 2 (LoreSeedFix.RepairReach) - zakres reki, zdjete, punkty, ksiega lukow i kusz po naprawie
+M96WZORY_REACH2 = M96WZORY_HEAD + "naprawa zapisu 2"
+# m96-wzory2 po recenzji: drabina tierow w linii zakresu (PatternGate.DrawCap) - "reka do tN|NIE, drabina tierow SZKOLA najwyzszy znany tT -> do tL"
+M96WZORY_STEP = re.compile(r"drabina tierow (?P<sc>[A-Z ]+) najwyzszy znany t(?P<top>\d) -> do t(?P<lad>\d)")
+M96WZORY_R2 = re.compile(r"-> zakres tierow 1-(?P<cap>\d).*\| zdjete (?P<n>\d+) \[(?P<ids>[^\]]*)\].*\| punkty zwrocone \[(?P<pts>[^\]]*)\].*\| ksiega po naprawie: (?P<book>.*)$")
+
+
+def m96wzory_main(logp):
+    """m96wzory (20.10, w-toku/m96-wzory; Jeff: "moge stworzyc luki tier 6 od poczatku gry"): wzory tieru 1 rozdane po ROT-RBM (OnAfterSessionLaunched),
+    naprawa ksiegi z zapisu (znaczniki #m96seedfix1, #m96xbowfix1), losowanie wedlug reki kowala, prog tarcz w CRAFT, unikaty ROT tylko z oryginalu, klik bez nauki,
+    kusze wedlug sily w ksiedze, luki z rzadkiego materialu bez kucia, blizniacze czesci legend ukryte.
+    W96-0 linia startu sesji, W96-1 linia ROT-RBM przed linia m96 (ta sama sesja), W96-2 rozdanie tieru 1 nie przed ROT-RBM (w oknie sesji: rozdanie, potem ROT = NIE;
+    bez RBM linii ROT nie ma - nic do porownania), W96-3 ksiega lukow i kusz po rozdaniu/naprawie bez znanych t2+ z rozdania (BOWS t6 0, CROSSBOWS t1 k/k == znane),
+    W96-4 naprawa zapisu (INFO: zapis Jeffa - zdjete 4 + kusze 6), W96-5 odkrycia w zakresie wedlug reki (i drabiny tierow - m96-wzory2), W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia
+    i ERROR paczki 0, W96-8 blizniacze czesci legend (ukryte > 0, gdy klucz TAK). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("W96-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess = []          # sesje: linia m96, czy ROT przed, czy rozdanie przed ROT, pierwsze linie BOWS/CROSSBOWS po
+    cur_rot = cur_seed = cur_seed_then_rot = False
+    draws, reach, shields, clicks, n_err, twins = [], [], 0, 0, 0, []
+    reach2 = []        # m96-wzory2: linie naprawy zapisu 2
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96WZORY_ROT):
+                # ROT-RBM po linii m96 w tej samej sesji (przed linia BOWS) = linia m96 przed zmiana statystyk
+                if sess and sess[-1]["open"] and sess[-1]["bows"] is None:
+                    sess[-1]["rot_after"] = True
+                # rozdanie w oknie tej sesji, a dopiero potem ROT-RBM = rozdanie przed ostatecznymi statystykami
+                if cur_seed:
+                    cur_seed_then_rot = True
+                cur_rot = True
+            elif s.startswith(M96WZORY_SEED):
+                cur_seed = True
+            elif s.startswith(M96WZORY_HEAD + "start sesji") or s.startswith(M96WZORY_HEAD + "wylaczone"):
+                if sess:
+                    sess[-1]["open"] = False
+                sess.append({"line": s, "rot": cur_rot, "seed": cur_seed, "seed_then_rot": cur_seed_then_rot, "bows": None, "xbows": None,
+                             "open": True, "rot_after": False, "on": "statystyki ostateczne TAK" in s})
+                cur_rot = cur_seed = cur_seed_then_rot = False
+            elif s.startswith("BOWS: ") and sess and sess[-1]["bows"] is None and sess[-1]["open"]:
+                sess[-1]["bows"] = s
+            elif s.startswith("CROSSBOWS: ") and sess and sess[-1]["xbows"] is None and sess[-1]["open"]:
+                sess[-1]["xbows"] = s
+            elif s.startswith(M96WZORY_HEAD + "tarcza w CRAFT"):
+                shields += 1
+            elif s.startswith(M96WZORY_HEAD + "klik Craft bez kucia"):
+                clicks += 1
+            elif s.startswith(M96WZORY_HEAD + "losowanie wedlug reki"):
+                mm = M96WZORY_REACH.search(s)
+                if mm:
+                    r = mm.groupdict()
+                    r["hand_off"] = "| reka NIE" in s   # m96-wzory2: sama drabina - zakres nie wedlug reki
+                    ms = M96WZORY_STEP.search(s)
+                    r["lad"] = ms.group("lad") if ms else None
+                    reach.append(r)
+            elif s.startswith("Wiedza: odkryto losowo "):
+                mm = M96WZORY_DRAW.match(s)
+                if mm:
+                    draws.append(mm.groupdict())
+            elif s.startswith(M96WZORY_TWIN):
+                twins.append(s)
+            elif s.startswith(M96WZORY_REACH2):
+                reach2.append(s)
+            elif s.startswith("ERROR in LoreSeedFix") or s.startswith("ERROR in PatternGate") or s.startswith("ERROR in LegendTwins"):
+                n_err += 1
+    print(f"plik: {logp} | sesji z linia m96 {len(sess)}, odkryc losowych {len(draws)}, linii zakresu {len(reach)}, odmow tarcz {shields}, klikow bez nauki {clicks}, "
+          f"linii blizniakow {len(twins)}, ERROR {n_err}")
+    if not sess and n_err == 0 and not twins:
+        rep.add("W96-0: linia 'Wiedza (m96-wzory): start sesji'", "brak w logu", "INFO (log sprzed paczki m96-wzory albo menu glowne)", None)
+        rep.show()
+        return 0
+    on = [x for x in sess if x["on"]]
+    rep.add("W96-0: linia startu sesji", f"sesji {len(sess)}, z kluczem {len(on)}" + (f"; ostatnia: {sess[-1]['line'][len(M96WZORY_HEAD):][:300]}" if sess else ""),
+            "linia w kazdej sesji kampanii; klucz TAK", None if not on else True)
+    bad_rot = [x for x in on if x["rot_after"]]
+    rep.add("W96-1: ROT-RBM przed linia m96", f"sesji z linia ROT-RBM przed linia m96 {sum(1 for x in on if x['rot'])} z {len(on)}, ROT-RBM po linii m96 {len(bad_rot)}",
+            "ROT-RBM po linii m96 0 (bez RBM linii ROT nie ma)", None if not on else len(bad_rot) == 0)
+    early = [x for x in on if x["seed_then_rot"]]
+    rep.add("W96-2: rozdanie tieru 1 po statystykach ROT-RBM",
+            f"sesji z rozdaniem {sum(1 for x in on if x['seed'])} (po ROT-RBM {sum(1 for x in on if x['seed'] and x['rot'] and not x['seed_then_rot'])}), "
+            f"rozdanie przed ROT-RBM w tej samej sesji {len(early)}",
+            "rozdanie przed ROT-RBM 0 (nowa kampania: ROT-RBM -> rozdano -> start sesji)", None if not on else len(early) == 0)
+    rows, bad6, badx = [], 0, 0
+    for x in on:
+        fresh = "nowa ksiega" in x["line"] or "naprawa zapisu" in x["line"] or "kusze wedlug sily: zdjete" in x["line"]
+        t6 = None
+        if x["bows"]:
+            for t, k, tot in M96WZORY_TIER.findall(x["bows"]):
+                if t == "6":
+                    t6 = int(k)
+        if fresh and t6:
+            bad6 += 1
+        # kusze wedlug sily: po rozdaniu/naprawie znane sa tylko wzory tieru wzoru 1 (t2..t6 0 znanych, o ile nic nie odkryto w tej sesji)
+        xk = 0
+        if x["xbows"] and "kusze wedlug sily NIE" not in x["line"] and "nieczynne" not in x["line"]:
+            for t, k, tot in M96WZORY_TIER.findall(x["xbows"]):
+                if t != "1":
+                    xk += int(k)
+        if fresh and xk:
+            badx += 1
+        rows.append(("rozdanie/naprawa" if fresh else "zwykla") + ": " + (x["bows"][:100] if x["bows"] else "brak linii BOWS")
+                    + " / " + (x["xbows"][:100] if x["xbows"] else "brak linii CROSSBOWS"))
+    rep.add("W96-3: ksiega lukow i kusz po rozdaniu/naprawie", " || ".join(rows[-2:]) if rows else "-",
+            "przy rozdaniu albo naprawie znanych lukow t6 0 i kusz t2+ 0 (zapis Jeffa: 'BOWS: 15/58 | t1 15/15 | ... | t6 0/12' - 16/58 i t4 1/9 z GRE_vlandic_arrows; "
+            "'CROSSBOWS: 12/38 | t1 12/12 | t2 0/3 | t3 0/3 | t4 0/4 | t5 0/3 | t6 0/13')", None if not on else (bad6 == 0 and badx == 0))
+    rem = []
+    for x in on:
+        parts = []
+        mm = M96WZORY_REMOVED.search(x["line"])
+        if mm:
+            parts.append(f"zdjete {mm.group(1)} [{mm.group(2)[:200]}]")
+        mx = M96WZORY_XREM.search(x["line"])
+        if mx:
+            parts.append(f"kusze zdjete {mx.group(1)} [{mx.group(2)[:200]}]")
+        ma = M96WZORY_ADDED.search(x["line"])
+        if parts and ma:
+            parts.append(f"dopisane t1 {ma.group(1)}")
+        if parts:
+            rem.append(", ".join(parts))
+    rep.add("W96-4: naprawa zapisu", " || ".join(rem) if rem else "brak (nowa kampania albo zapis juz naprawiony)",
+            "INFO (zapis Jeffa z 20.10: zdjete 4 - goldenheart_longbow, giant_bow, ravens_teeth_longbow, ravens_teeth_arrows; kusze zdjete 6 - crossbow_g/d/e/c/b/a; "
+            "dopisane t1 0; drugie wczytanie: znaczniki)", None)
+    over = [d for d in draws if int(d["t"]) > int(d["b"])]
+    wide = [r for r in reach if not r.get("hand_off") and int(r["b"]) > max(int(r["a"]), min(6, int(r["sk"]) // max(1, int(r["per"])) + 2))]
+    # m96-wzory2 po recenzji: drabina tierow - zakres nie wyzej niz kolejny niepusty tier nad najlepszym znanym wzorem szkoly (albo tier sztuki)
+    stepw = [r for r in reach if r.get("lad") and int(r["b"]) > max(int(r["a"]), int(r["lad"]))]
+    rep.add("W96-5: odkrycia w zakresie wedlug reki", f"odkryc {len(draws)} (zakres do 6: {sum(1 for d in draws if d['b'] == '6')}), poza zakresem {len(over)}, "
+            f"zakres szerszy niz skill/prog+2 {len(wide)}, szerszy niz drabina tierow {len(stepw)} (linii z drabina {sum(1 for r in reach if r.get('lad'))})"
+            + (f"; np. {over[0]}" if over else ""),
+            "poza zakresem 0, zakres wedlug reki 0 odchylek, drabina 0 odchylek", len(over) == 0 and len(wide) == 0 and len(stepw) == 0)
+    rep.add("W96-6: tarcze w CRAFT i kliki bez nauki", f"odmow tarcz (linie) {shields}, klikow Craft bez kucia (linie) {clicks}", "INFO", None)
+    st = 0
+    for x in sess:
+        mm = M96WZORY_STUMB.search(x["line"])
+        if mm:
+            st = max(st, int(mm.group(1)))
+    for t in twins:
+        mm = M96WZORY_STUMB.search(t)
+        if mm:
+            st = max(st, int(mm.group(1)))
+    rep.add("W96-7: potkniecia i ERROR", f"potkniecia w liniach startu najwyzej {st}, ERROR LoreSeedFix/PatternGate/LegendTwins {n_err}", "0 i 0", st == 0 and n_err == 0)
+    tw_on = [t for t in twins if "wylaczone" not in t]
+    hid = [M96WZORY_TWIN_N.search(t) for t in tw_on]
+    hid = [(int(h.group(1)), int(h.group(2))) for h in hid if h]
+    rep.add("W96-8: blizniacze czesci legend", (f"linii {len(twins)}, ostatnia: {twins[-1][len(M96WZORY_TWIN):][:300]}" if twins else "brak linii"),
+            "przy kluczu TAK ukryte > 0 w kazdej sesji (przeglad danych ROT: ok. 21, w tym valyrian_short_blade_duel i darksister_blade_duel)",
+            None if not tw_on else (len(hid) == len(tw_on) and all(h[0] > 0 for h in hid)))
+    # W96-9 (m96-wzory2): naprawa zapisu 2 - w ksiedze lukow i kusz zaraz po naprawie nie ma znanych wzorow ponad zakres reki (wszystko sprzed m96 ponad zakres zdjete;
+    # po m96 nic nie jest jeszcze dopisane, bo naprawa biegnie w starcie sesji)
+    r2rows, r2bad = [], 0
+    for x in reach2:
+        mm = M96WZORY_R2.search(x)
+        if not mm:
+            r2rows.append("nierozpoznana: " + x[len(M96WZORY_HEAD):][:160])
+            r2bad += 1
+            continue
+        cap = int(mm.group("cap"))
+        above = sum(int(k) for t, k, tot in M96WZORY_TIER.findall(mm.group("book")) if int(t) > cap)
+        # m96-wzory2 po recenzji (drabina tierow TAK): w kazdej ksiedze po naprawie znane tiery bez dziury - po tierze z 0 znanych zaden wyzszy nie jest znany
+        skips = 0
+        if "drabina tierow TAK" in x:
+            for part in mm.group("book").split(" || "):
+                gap = False
+                for t, k, tot in M96WZORY_TIER.findall(part):
+                    if int(k) == 0:
+                        gap = True
+                    elif gap:
+                        skips += 1
+        if above or skips:
+            r2bad += 1
+        r2rows.append(f"zakres 1-{cap}, zdjete {mm.group('n')} [{mm.group('ids')[:160]}], punkty [{mm.group('pts')}], znanych ponad zakres po naprawie {above}, "
+                      f"tierow znanych ponad dziura (drabina) {skips}")
+    rep.add("W96-9: naprawa zapisu 2 (luki i kusze ponad zakres reki)", " || ".join(r2rows[-2:]) if r2rows else "brak linii (nowa kampania, zapis juz naprawiony albo naprawa czeka)",
+            "zapis Jeffa z 20.10 (Smithing 87, zakres 1-4): zdjete 1 [lowland_yew_bow t5 BOWS (reka, przeskok tieru)], punkty [BOWS +3]; po naprawie znanych "
+            "ponad zakres 0 i ponad dziura 0 (BOWS t5 0/7, t6 0/12)", None if not reach2 else r2bad == 0)
     rep.show()
     return 0
 
@@ -46256,7 +47028,7 @@ def npo_main(logp):
     if starts:
         s0 = starts[-1]
         bee_ok = "ukryte" in s0["bee"] or "BEE nieobecny" in s0["bee"]
-        menu_ok = "village index" in s0["menu"] and "index -1" not in s0["menu"]
+        menu_ok = bool(re.search(r"village(?: -> \S+)? index \d+", s0["menu"])) and "index -1" not in s0["menu"]   # m96-wies: takze po przeniesieniu do 'Village affairs'
         rep.add("NPO-0: linia startu (klucz, AI, menu, BEE, krok 112)", f"klucz {s0['key']}, AI {s0['ai']}, menu: {s0['menu'].strip()[:80]}, BEE: {s0['bee'].strip()[:80]}, krok 112 {s0['cart']}",
                 "klucz TAK, AI WYLACZONE (Jeff 16.10), menu wpiete, BEE 5/15/30 ukryte, krok 112 wpiety", s0["key"] == "TAK" and s0["ai"] == "WYLACZONE" and menu_ok and bee_ok and s0["cart"] == "wpiety")
         rep.add("NPO-0b: prace z zapisu", s0["load"].strip()[:160], "INFO", None)
@@ -52154,6 +52926,658 @@ def p6spichlerz_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; Armoury/src/MapRoadKinds.cs, dane arm_map_roads_valyria.tsv)
+M96VALYRIA_HEAD = "Drogi Valyrii (VR): "
+M96VALYRIA_START = re.compile(r"Drogi Valyrii \(VR\): start sesji - klucz MapValyrianRoads (?P<kv>tak|nie) \(premia (?P<vp>\d+)%.*?klucz MapEssosCaravanTrails (?P<kc>tak|nie)"
+                              r".*? \| (?P<note>.*) \| siatka drog (?P<grid>wczytana|NIE) \| stan (?P<st>CZYNNE|NIECZYNNE[^.]*)\.$")
+M96VALYRIA_FILE = re.compile(r"wierszy V (?P<rv>\d+), C (?P<rc>\d+), mosty (?P<rb>\d+), zle (?P<bad>\d+), poza plikiem drog (?P<miss>\d+) \| drogi Valyrii (?P<sv>\d+) odcinkow "
+                             r"\((?P<lv>\d+\.\d) jedn\.\) \+ mosty (?P<sb>\d+) \((?P<lb>\d+\.\d) jedn\.\), szlaki karawan (?P<sc>\d+) odcinkow \((?P<lc>\d+\.\d) jedn\.\); plik drog zgodny")
+M96VALYRIA_DAY = re.compile(r"Drogi Valyrii \(VR\): dzien (?P<day>-?\d+) \| klucze: Valyria (?P<kv>tak|nie), szlaki (?P<kc>tak|nie) \| partio-godzin w marszu (?P<n>\d+): "
+                            r"na drodze Valyrii (?P<hv>\d+) \([^)]*\), na szlaku karawan (?P<hc>\d+) \([^)]*\), na zwyklym trakcie (?P<ht>\d+) \([^)]*\) \| liczenia predkosci "
+                            r"z premia: Valyria ok\. (?P<sv>\d+), szlak ok\. (?P<sc>\d+) \| odcinkow V (?P<segv>\d+) \+ mosty (?P<segb>\d+), C (?P<segc>\d+)(?P<audit>.*?) \| "
+                            r"(?P<ai>siec AI drog[^|]*) \| potkniecia (?P<stum>\d+)\.$")
+M96VALYRIA_AUD = re.compile(r" \| audyt (?P<k>Valyria|szlak): (?P<n>\d+) partii(?:, premia rzeczywista sr\. (?P<avg>-?\d+\.\d+)% \(min (?P<mn>-?\d+\.\d+), maks (?P<mx>-?\d+\.\d+)\), "
+                            r"z wpisem '[^']*' (?P<lines>\d+))?, oczekiwane (?P<exp>\d+\.\d)%")
+M96VALYRIA_AI = re.compile(r"siec AI drog: mosty Valyrii (?P<b>\d+), krawedzie Valyrii (?P<lv>\d+) jedn\., szlakow karawan (?P<lc>\d+) jedn\. \(klasy (?P<cls>tak|nie)\)")
+
+
+def m96valyria_main(logp):
+    """m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"; Armoury/src/MapRoadKinds.cs, klucze MapValyrianRoads / MapValyrianRoadSpeedPercent /
+    MapEssosCaravanTrails): drogi Valyrii (demon road Volantis - Mantarys - Meereen z odnoga do Tolos; Pentos - Ghoyan Drohe - Norvos - Qohor) +25% (co najmniej
+    trakt), mosty przez przerwy farby; farba w glebi Essos (Sarnor) = szlak karawan jak droga boczna. Progi: VR-0 start sesji CZYNNE, plik zgodny (V 800..850 jedn.,
+    mosty 7 / 20..35 jedn., szlaki 185..205 jedn., zle 0, poza plikiem 0); VR-1 linie doby rozpoznane; VR-2 partio-godziny na drodze Valyrii > 0 i liczenia z premia
+    > 0 (udzial INFO; oczekiwane ok. 0.3-2% partio-godzin w marszu); VR-3 audyt Valyrii: premia rzeczywista sr. = oczekiwana +-1.5 pp, wpis 'Valyrian road' w
+    kazdej probce; VR-4 audyt szlaku (INFO przy 0 probek); VR-5 siec AI: mosty >= 1, klasy tak; VR-6 potkniecia 0 i "ERROR in MapRoadKinds." 0."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("VR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, bad = [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96VALYRIA_HEAD):
+                if s.startswith(M96VALYRIA_HEAD + "start sesji"):
+                    mm = M96VALYRIA_START.match(s)
+                    (starts.append((mm.groupdict(), s)) if mm else bad.append(s))
+                elif s.startswith(M96VALYRIA_HEAD + "dzien "):
+                    mm = M96VALYRIA_DAY.match(s)
+                    (days.append(mm.groupdict()) if mm else bad.append(s))
+            elif "ERROR in MapRoadKinds." in s:
+                n_err += 1
+    if not starts and not days:
+        rep.add("VR-0: linie 'Drogi Valyrii (VR)'", "brak w logu" + (f" (nierozpoznane {len(bad)}: {bad[0][:160]})" if bad else ""), "INFO (log sprzed paczki m96-valyria)",
+                False if bad else None)
+        rep.show()
+        return 0
+    # VR-0
+    if starts:
+        st, line = starts[-1]
+        fm = M96VALYRIA_FILE.search(st["note"])
+        if fm:
+            lv, lb, lc = float(fm["lv"]), float(fm["lb"]), float(fm["lc"])
+            ok0 = (st["st"] == "CZYNNE" and st["grid"] == "wczytana" and 800 <= lv <= 850 and int(fm["sb"]) == 7 and 20 <= lb <= 35 and 185 <= lc <= 205
+                   and int(fm["bad"]) == 0 and int(fm["miss"]) == 0)
+            rep.add("VR-0: start sesji - rodzaje drog wczytane, stan CZYNNE", f"Valyria {st['kv']} ({st['vp']}%), szlaki {st['kc']}; V {fm['sv']} odcinkow {lv:.1f} jedn., mosty "
+                    f"{fm['sb']} ({lb:.1f}), C {fm['sc']} ({lc:.1f}), zle {fm['bad']}, poza plikiem {fm['miss']}; stan {st['st']}",
+                    "CZYNNE, V 800..850 jedn., mosty 7 / 20..35 jedn., C 185..205 jedn., zle 0, poza plikiem 0", ok0)
+        else:
+            rep.add("VR-0: start sesji - plik rodzajow", st["note"][:220] + f"; stan {st['st']}", "plik wczytany i zgodny z plikiem drog", False)
+    else:
+        rep.add("VR-0: start sesji", "brak linii startu sesji", "linia przy kazdym starcie sesji (przy MapRoadSpeedBonus)", False)
+    # VR-1
+    rep.add("VR-1: linie doby rozpoznane", f"doby {len(days)}, nierozpoznane {len(bad)}" + (f" (np. {bad[0][:200]})" if bad else ""), "doby > 0, nierozpoznane 0",
+            len(days) > 0 and not bad)
+    if not days:
+        rep.add("VR-2..5: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba)", None)
+    else:
+        n = sum(int(d["n"]) for d in days)
+        hv = sum(int(d["hv"]) for d in days)
+        hc = sum(int(d["hc"]) for d in days)
+        sv = sum(int(d["sv"]) for d in days)
+        on = days[-1]["kv"] == "tak"
+        share = 100.0 * hv / n if n else 0.0
+        rep.add("VR-2: partio-godziny na drodze Valyrii i liczenia z premia (suma dob)", f"{hv}/{n} = {share:.2f}% (szlak karawan {hc}); liczenia z premia Valyrii ok. {sv}",
+                "> 0 i > 0 przy kluczu tak (udzial INFO, oczekiwane ok. 0.3-2%)", (hv > 0 and sv > 0) if on else None)
+        # VR-3 / VR-4: audyty
+        for kind, name in (("Valyria", "VR-3: audyt AI na drodze Valyrii"), ("szlak", "VR-4: audyt AI na szlaku karawan")):
+            tn, ts, tl, mn, mx, exp = 0, 0.0, 0, None, None, None
+            for d in days:
+                for am in M96VALYRIA_AUD.finditer(d["audit"]):
+                    if am["k"] != kind:
+                        continue
+                    exp = float(am["exp"])
+                    k = int(am["n"])
+                    if k and am["avg"] is not None:
+                        tn += k; ts += float(am["avg"]) * k; tl += int(am["lines"])
+                        mn = float(am["mn"]) if mn is None else min(mn, float(am["mn"]))
+                        mx = float(am["mx"]) if mx is None else max(mx, float(am["mx"]))
+            if tn == 0:
+                rep.add(name, "probek 0", "INFO (zadna partia AI w marszu na tym rodzaju drogi w takcie linii)", None)
+                continue
+            avg = ts / tn
+            ok = abs(avg - exp) <= 1.5 and tl == tn
+            rep.add(name, f"probek {tn}, premia sr. {avg:.2f}% (min {mn:.2f}, maks {mx:.2f}), z wpisem {tl}; oczekiwane {exp:.1f}%",
+                    f"sr. = oczekiwana +-1.5 pp, wpis w kazdej probce" + (" (INFO dla szlaku)" if kind == "szlak" else ""), ok if kind == "Valyria" else (None if ok else False))
+        am = M96VALYRIA_AI.search(days[-1]["ai"])
+        if am:
+            rep.add("VR-5: siec AI drog - mosty Valyrii i klasy krawedzi", f"mosty {am['b']}, krawedzie Valyrii {am['lv']} jedn., szlakow {am['lc']} jedn., klasy {am['cls']}",
+                    "mosty >= 1, klasy tak (przy kluczu Valyrii tak)", (int(am["b"]) >= 1 and am["cls"] == "tak") if on else None)
+        else:
+            rep.add("VR-5: siec AI drog", days[-1]["ai"][:160], "INFO (siec AI drog niezbudowana - patrz AI drogi (AD))", None)
+    stum = max([int(d["stum"]) for d in days] or [0])
+    rep.add("VR-6: potkniecia MapRoadKinds i ERROR", f"potkniecia (maks. w linii) {stum}, 'ERROR in MapRoadKinds.' {n_err}", "0 i 0", stum == 0 and n_err == 0)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96sakiewki (20.10, WGRANIE 96: oszczednosci wedlug potrzeby - sakiewki zolnierzy <= 15 dni zoldu;
+# Armoury/src/SavingsByNeed.cs, klucz Savings By Need; PLAN 5 "Skonczone, gdy": sakiewki zolnierzy najwyzej 15 dni zoldu)
+m96sakiewki_HEAD = "Sakiewki wedlug potrzeby (m96): "
+m96sakiewki_DAY = re.compile(r"Sakiewki wedlug potrzeby \(m96\): dzien (?P<day>-?\d+) \| udzial nowej reguly (?P<sh>[\d.]+) \((?P<ramp>[^)]*)\)"
+                             r" \| cele: przegladow (?P<vis>\d+) \(wezszych - zamek bez targu (?P<visn>\d+), cel z targu zostal (?P<keptn>\d+)\), z celem (?P<visw>\d+)"
+                             r" \(koszykow: lepsze za malo w sakiewce (?P<bask>\d+), braki za malo pieniedzy (?P<gapb>\d+); suma celow (?P<wsum>\d+)\),"
+                             r" partii z celem razem (?P<wn>\d+) \| limit oszczednosci partii: wywolan (?P<capn>\d+), dotad (?P<cap0>\d+), teraz (?P<cap1>\d+)"
+                             r" \| zalogi: (?P<gn>\d+) z sakiewka (?P<gp>\d+) \(zold dnia zalog (?P<gw>\d+) = (?P<gd>[\d.]+|-) dni\), chronione \(naprawy i cel\) (?P<gprot>\d+),"
+                             r" wolne (?P<gfree>\d+), wydaly na zycie w osadzie (?P<gtak>\d+) \((?P<gpaid>\d+) zalog; stawka [\d.]+% x min\(3, dni wolnej / 10\)\)"
+                             r" -> kasy miast (?P<gtown>\d+), kasy zamkow (?P<gcas>\d+), w tym do kies ludu (?P<gfolk>\d+); kontrola: zeszlo z sakiewek (?P<gout>\d+)"
+                             r" = przybylo w kasach osad (?P<gcof>-?\d+) \+ do kies ludu \d+ \(roznica (?P<ctl>-?\d+)\)"
+                             r", pominiete: oblezone (?P<gsg>\d+), lupione \(L3; w linii lupu jako zycie\) (?P<gsk>\d+) \| koszt (?P<ms>[\d.]+) ms(?: \| potkniecia (?P<stum>\d+))?")
+m96sakiewki_OBIEG = re.compile(r"\| rody wydaly \[P\]: zold partii (?P<zp>\d+) .*?\), zold zalog (?P<zz>\d+) .*?\| sakiewki ludzi \[P\]: stan (?P<st>\d+)")
+m96sakiewki_MAR = re.compile(r"sakiewki partii rodow (?P<lp>\d+) = (?P<ld>[\d.]+) dni zoldu \(zold dnia (?P<lw>\d+); w tym oszczednosci K1 (?P<k>\d+) = (?P<kd>[\d.]+) dni")
+m96sakiewki_DOZ = re.compile(r"Dozbrajanie: dzien (?P<day>\d+) - gracz \d+/\d+, lordowie (?P<ln>\d+)/(?P<lg>\d+), zalogi (?P<gn>\d+)/(?P<gg>\d+).*?brak lepszej na polce (?P<nb>\d+)"
+                             r".*?za malo w sakiewce (?P<nm>\d+).*?odlozone przy wyjazdach (?P<sv>\d+), ponad limit na zycie (?P<ov>\d+).*?braki zalog z ich sakiewek (?P<gap>\d+)")
+m96sakiewki_ZAK = re.compile(r"ZakupyAI: dzien (?P<day>\d+) - \d+ wizyt, \d+ szt\. kupionych za (?P<g>\d+) zlota")
+m96sakiewki_POK = re.compile(r"Pokrycie zbrojowni AI \(171\): dzien (?P<day>\d+) - partie rodow AI \(\d+ ludzi\): korpus (?P<k>\d+)%")
+# baza bez paczki (6 biegow 20.10, srednia ostatnich 28 dob; najnizsza z biegow): zakupy AI = braki (ZakupyAI) + lepsze lordow i zalog (Dozbrajanie), pokrycie korpusu
+# partii rodow (171) w ostatniej dobie. 160 dob z zapisu d240 (12-25-19, 09-14-49, 04-01-39, 00-44-29): 116-130 tys. zl/d, korpus 55-58%;
+# nowa kampania 120 dob (08-45-54, 03-32-17): 72-75 tys. zl/d, korpus 57-61%
+m96sakiewki_BASE = {"d240": (116238, 55), "nowa": (71953, 57)}
+
+
+def m96sakiewki_main(logp):
+    """m96sakiewki (20.10, WGRANIE 96; klucz Savings By Need): ludzie odkladaja na sprzet tylko to, na co na targu ich nie bylo stac (cel = w jednej wizycie
+    najtansza sztuka w kazdym koszyku dozbrajania "za malo w sakiewce" i w kazdym koszyku brakow, w ktorym pasujaca sztuka byla za droga); reszta sakiewki jak
+    dotad do markietanow / na zycie; zalogi wydaja wolna sakiewke w swojej osadzie ta sama miara co markietani N6. Wejscie: log Armoury (strumieniowo).
+    SN-0 linia doby codziennie, SN-1 rozruch (INFO), SN-2 kontrola obiegu z odczytow przed/po (zeszlo z sakiewek = przybylo w kasach + do kies ludu), potkniecia
+    i ERROR paczki 0, SN-3 sakiewki <= 15 dni zoldu (Obieg, ostatnia doba po rozruchu; oczekiwane 8-13), SN-4 oszczednosci K1 partii rodow <= 3 dni (oczekiwane
+    0.3-2), SN-5 sakiewki zalog <= 10 dni ich zoldu (oczekiwane 4-8), SN-6 sakiewki nie rosna (ostatnie 28 dob <= +1 dzien), SN-7 koszyki "za malo w sakiewce"
+    <= 2% koszykow "brak lepszej na polce", SN-8 koszt <= 30 ms srednio i <= 60 ms najwiecej, SN-9 przeplywy i cele (INFO), SN-10 zakupy AI (braki + lepsze)
+    >= 80% bazy bez paczki, SN-11 pokrycie korpusu partii rodow (171) >= baza - 2 pp (SN-10/11 tylko w biegach testu: 160 dob z zapisu d240 albo nowa kampania
+    120 dob; inaczej INFO). Progi SN-3..SN-7 i SN-10/11 dopiero 14 dob po pelnej regule (inaczej INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("SN-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    days, bad, ramp, off = {}, [], [], 0
+    obg, mar, doz, zak, pok = {}, {}, {}, {}, {}
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(m96sakiewki_HEAD):
+                if s.startswith(m96sakiewki_HEAD + "rozruch"):
+                    ramp.append(s)
+                elif "| wylaczone (Savings By Need" in s:
+                    off += 1
+                elif s.startswith(m96sakiewki_HEAD + "dzien "):
+                    mm = m96sakiewki_DAY.match(s)
+                    if mm:
+                        days[int(mm.group("day"))] = mm.groupdict()
+                    else:
+                        bad.append(s)
+            elif s.startswith("Obieg: dzien "):
+                mm = m96sakiewki_OBIEG.search(s)
+                d = re.match(r"Obieg: dzien (\d+)", s)
+                if mm and d:
+                    obg[int(d.group(1))] = (int(mm.group("st")), int(mm.group("zp")) + int(mm.group("zz")))
+            elif s.startswith("Markietani (E5/A3): dzien "):
+                mm = m96sakiewki_MAR.search(s)
+                d = re.match(r"Markietani \(E5/A3\): dzien (\d+)", s)
+                if mm and d:
+                    mar[int(d.group(1))] = (float(mm.group("ld")), float(mm.group("kd")))
+            elif s.startswith("Dozbrajanie: dzien "):
+                mm = m96sakiewki_DOZ.match(s)
+                if mm:
+                    doz[int(mm.group("day"))] = {k: int(v) for k, v in mm.groupdict().items()}
+            elif s.startswith("ZakupyAI: dzien "):
+                mm = m96sakiewki_ZAK.match(s)
+                if mm:
+                    zak[int(mm.group("day"))] = int(mm.group("g"))
+            elif s.startswith("Pokrycie zbrojowni AI (171): dzien "):
+                mm = m96sakiewki_POK.match(s)
+                if mm:
+                    pok[int(mm.group("day"))] = int(mm.group("k"))
+            elif s.startswith("ERROR in SavingsByNeed"):
+                n_err += 1
+    if not days:
+        rep.add("SN-0: linia 'Sakiewki wedlug potrzeby (m96): dzien N'", "brak" + (f" (wylaczone w {off} dobach)" if off else ""),
+                "INFO - log sprzed paczki albo klucz wylaczony", None)
+        if obg:
+            dl = sorted(obg)[-1]
+            st_, w = obg[dl]
+            rep.add("SN-3: sakiewki w dniach zoldu (Obieg, ostatnia doba)", f"{st_ / w:.1f} (doba {dl})" if w else "-", "INFO (bez paczki: 21.6-24.5 w biegach 20.10)", None)
+        if mar:
+            dl = sorted(mar)[-1]
+            rep.add("SN-4: oszczednosci K1 partii rodow (ostatnia doba)", f"{mar[dl][1]:.1f} dni; partie rodow razem {mar[dl][0]:.1f} dni", "INFO (bez paczki 10.6-14.2)", None)
+        zl = sorted(zak)[-28:]
+        dl2 = sorted(doz)[-28:]
+        if zl and dl2:
+            tot = sum(zak[d] for d in zl) / len(zl) + sum(doz[d]["lg"] + doz[d]["gg"] for d in dl2) / len(dl2)
+            rep.add("SN-10: zakupy AI - braki + lepsze lordow i zalog (srednia ostatnich 28 dob)", f"{tot:.0f} zl/d" + (f"; pokrycie korpusu partii rodow {pok[sorted(pok)[-1]]}%" if pok else ""),
+                    "INFO (baza bez paczki: d240 116-130 tys., korpus 55-58%; nowa kampania 72-75 tys., korpus 57-61%)", None)
+        rep.show()
+        return 0
+    ds = sorted(days)
+    span = ds[-1] - ds[0] + 1
+    rep.add("SN-0: linia doby codziennie", f"{len(ds)} linii na {span} dob, nieczytelnych {len(bad)}", ">= 95% dob, nieczytelnych 0",
+            len(ds) >= 0.95 * span and not bad)
+    rep.add("SN-1: rozruch (pierwsza doba z kluczem)", (ramp[0][len(m96sakiewki_HEAD):][:300] if ramp else "brak linii (rozruch rozstrzygniety w zapisie)") + (f"; linii rozruchu {len(ramp)}" if len(ramp) > 1 else ""),
+            "INFO (nowa regula uwolni > 1 dzien zoldu - trwajaca kampania: rozruch Sutler Ramp Days; nowa kampania: od razu)", None)
+    ctl = [d for d in ds if int(days[d]["ctl"]) != 0]
+    stum = max((int(days[d]["stum"]) for d in ds if days[d]["stum"]), default=0)
+    rep.add("SN-2: kontrola obiegu (zeszlo z sakiewek = przybylo w kasach osad + do kies ludu), potkniecia, ERROR in SavingsByNeed",
+            f"roznica != 0 w {len(ctl)} dobach" + (f" (np. d{ctl[0]}: {days[ctl[0]]['ctl']})" if ctl else "") + f", potkniecia {stum}, ERROR {n_err}", "0 / 0 / 0",
+            not ctl and stum == 0 and n_err == 0)
+    full = [d for d in ds if float(days[d]["sh"]) >= 0.999]
+    last = ds[-1]
+    ready = bool(full) and full[-1] == last and last - full[0] >= 14   # dwa tygodnie po pelnej regule - sakiewki zdazyly zejsc
+    od = [d for d in sorted(obg) if ds[0] <= d <= last]
+    sd = obg[od[-1]][0] / obg[od[-1]][1] if od and obg[od[-1]][1] else None
+    rep.add("SN-3: sakiewki <= 15 dni zoldu (Obieg: stan / zold partii i zalog, ostatnia doba)", (f"{sd:.1f} dni (doba {od[-1]})" if sd is not None else "brak linii Obieg")
+            + f"; pelna regula od doby {full[0] if full else '-'} ({len(full)} dob)", "<= 15 (oczekiwane 8-13; bez paczki 21.6-24.5)",
+            (sd <= 15.0) if (sd is not None and ready) else None)
+    md = [d for d in sorted(mar) if ds[0] <= d <= last]
+    kd = mar[md[-1]][1] if md else None
+    rep.add("SN-4: oszczednosci K1 partii rodow (linia markietanow, ostatnia doba)", (f"{kd:.1f} dni; partie rodow razem {mar[md[-1]][0]:.1f} dni" if kd is not None else "brak linii"),
+            "<= 3 (oczekiwane 0.3-2; bez paczki 10.6-14.2)", (kd <= 3.0) if (kd is not None and ready) else None)
+    gd = days[last]["gd"]
+    gdv = float(gd) if gd not in (None, "-") else None
+    rep.add("SN-5: sakiewki zalog w dniach ich zoldu (ostatnia doba)", f"{gdv:.1f} dni" if gdv is not None else "-", "<= 10 (oczekiwane 4-8; bez paczki 25.4-25.6)",
+            (gdv <= 10.0) if (gdv is not None and ready) else None)
+    if len(od) > 28 and ready and od[-29] >= full[0]:
+        a = obg[od[-29]]
+        da = a[0] / a[1] if a[1] else None
+        rep.add("SN-6: sakiewki nie rosna (Obieg, ostatnie 28 dob)", f"{da:.1f} -> {sd:.1f} dni" if da is not None and sd is not None else "-", "<= +1 dzien",
+                (sd - da <= 1.0) if (da is not None and sd is not None) else None)
+    else:
+        rep.add("SN-6: sakiewki nie rosna (Obieg, ostatnie 28 dob)", "za krotko po pelnej regule", "INFO (<= +1 dzien w biegu >= 42 dob po rozruchu)", None)
+    zd = [d for d in sorted(doz) if (full[0] if full else ds[0]) <= d <= last][-28:]
+    if zd:
+        av = lambda k: sum(doz[d][k] for d in zd) / len(zd)
+        nm, nb = av("nm"), av("nb")
+        rep.add("SN-7: koszyki 'za malo w sakiewce' wobec 'brak lepszej na polce' (srednia ostatnich 28 dob pelnej reguly)",
+                f"{nm:.0f}/d wobec {nb:.0f}/d ({100.0 * nm / nb if nb else 0:.2f}%); lepsze: lordowie {av('lg'):.0f} zl/d, zalogi {av('gg'):.0f} zl/d; braki zalog z sakiewek {av('gap'):.0f} zl/d;"
+                f" odlozone przy wyjazdach {av('sv'):.0f} zl/d", "<= 2% (bez paczki 0.2-0.6%: 39-124 wobec 19.3-22.5 tys.; lepsze lordow 13-17 tys. zl/d, zalog 19-37 tys.)",
+                ((nm <= 0.02 * nb) if nb else None) if ready else None)
+    ms = [float(days[d]["ms"]) for d in ds]
+    rep.add("SN-8: koszt doby (srednia / najwiecej)", f"{sum(ms) / len(ms):.1f} / {max(ms):.1f} ms", "<= 30 / <= 60 ms", sum(ms) / len(ms) <= 30.0 and max(ms) <= 60.0)
+    t28 = ds[-28:]
+    av2 = lambda k: sum(int(days[d][k]) for d in t28) / len(t28)
+    rep.add("SN-9: zalogi na zycie w osadzie i cele oszczedzania (srednia ostatnich 28 dob)",
+            f"zalogi {av2('gtak'):.0f} zl/d (miasta {av2('gtown'):.0f}, zamki {av2('gcas'):.0f}, do ludu {av2('gfolk'):.0f}); partii z celem {av2('wn'):.0f}, przegladow z celem {av2('visw'):.0f}/d"
+            f" z {av2('vis'):.0f} (wezszych {av2('visn'):.0f}, cel z targu zostal {av2('keptn'):.0f}); koszykow lepsze {av2('bask'):.0f}/d, braki {av2('gapb'):.0f}/d; suma celow {av2('wsum'):.0f} zl/d",
+            "INFO (zapis d240: w rozruchu zalogi do ok. 340 tys./d, potem ok. 120 tys./d; nowa kampania ok. 80-120 tys./d)", None)
+    # SN-10/11: braki i lepsze nie staja przez mniejsze sakiewki (recenzja: oszczednosci K1 finansowaly tez braki) - tylko w biegach testu z baza
+    kind = None
+    rl = ramp[0] if ramp else ""
+    if "nowa regula wchodzi" in rl and ds[0] >= 109000 and span >= 150:
+        kind = "d240"
+    elif "bez rozruchu" in rl and ds[0] <= 108850 and span >= 110:
+        kind = "nowa"
+    zl = [d for d in sorted(zak) if (full[0] if full else ds[0]) <= d <= last][-28:]
+    if zl and zd:
+        tot = sum(zak[d] for d in zl) / len(zl) + sum(doz[d]["lg"] + doz[d]["gg"] for d in zd) / len(zd)
+        base = m96sakiewki_BASE.get(kind)
+        rep.add("SN-10: zakupy AI - braki (ZakupyAI) + lepsze lordow i zalog (Dozbrajanie), srednia ostatnich 28 dob pelnej reguly",
+                f"{tot:.0f} zl/d" + (f" wobec bazy {base[0]} ({100.0 * tot / base[0]:.0f}%; bieg {kind})" if base else " (bieg bez bazy)"),
+                ">= 80% bazy (d240 116-130 tys., nowa kampania 72-75 tys.)", (tot >= 0.8 * base[0]) if (base and ready) else None)
+    pl = [d for d in sorted(pok) if ds[0] <= d <= last]
+    if pl:
+        base = m96sakiewki_BASE.get(kind)
+        kv = pok[pl[-1]]
+        rep.add("SN-11: pokrycie korpusu partii rodow AI (171, ostatnia doba)", f"{kv}%" + (f" wobec bazy {base[1]}% (bieg {kind})" if base else " (bieg bez bazy)"),
+                ">= baza - 2 pp (d240 55-58%, nowa kampania 57-61%)", (kv >= base[1] - 2) if (base and ready) else None)
+    rep.show()
+    return 0
+
+
+# ============================================================ m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie (TownFolk.M96Koszyk.cs)
+M96KOSZYK_PRE = "Placa dla klas w biedzie (m96-koszyk): "
+M96KOSZYK_RX = {
+    "kiesa": re.compile(r"stac jedzenie W/R/P ([\d.]+|-)%? / ([\d.]+|-)%? / ([\d.]+|-)%?, pelny W/R/P ([\d.]+|-)%? / ([\d.]+|-)%? / ([\d.]+|-)%? \(swiat ([\d.]+|-)%?\), "
+                        r"miast ze stac jedzenie < 95%: (\d+), pelny < 95%: (\d+)"),
+    "unpaid": re.compile(r"zjedzone bez zaplaty (\d+) \(([\d.]+)% wydatku gry"),
+    "lam": re.compile(r"\| lambda Westeros ([\d.]+) \(\d+ miast\), Essos ([\d.]+)"),
+    "bread": re.compile(r"zaplacono (\d+): korona (\d+) .*?nie stac nikogo (\d+) zl w (\d+) osadach"),
+    "start": re.compile(r"start sesji \| klucz Ks Folk Wage To Short Classes (TAK|NIE), cel: jedzenie na (\d+) dni, potem pelny koszyk R/P na ([\d.]+) dni"),
+    "towns": re.compile(r"miasta z kotwica (\d+) \(z placa zatrzymana w kasie (\d+): (\d+) zl\)"),
+    "uncut": re.compile(r"zdjete z okna - placa przebudowy wsi A7 \(zwrot TownHire\) (\d+) zl"),
+    "gap": re.compile(r"z luka R/P (\d+) \(jedzenie na 2 dni (\d+) zl, razem z koszykiem (\d+) zl\)"),
+    "paid": re.compile(r"przelane z kas do kies (\d+) zl \(R (\d+) / P (\d+); jedzenie (\d+), reszta koszyka (\d+)\) w (\d+) miastach"),
+    "left": re.compile(r"bez pokrycia: bez placy zatrzymanej (\d+) miast \((\d+) zl\), kasa pusta (\d+) miast, luka po przelewie (\d+) zl"),
+    "hungry": re.compile(r"R/P bez jedzenia na jutro po przelewie (\d+) miast(?:: ([^|]*?))? \| kontrola"),
+    "ctl": re.compile(r"kontrola: zlecone (\d+), zeszlo z kas (\d+), przelane = R \+ P: (tak|NIE), ponad placa zatrzymana (\d+)"),
+    "tail": re.compile(r"czas ([\d.]+) ms \| potkniecia (\d+) \(sesja (\d+)\)"),
+    # recenzja m96 (wazne): sprzezenie przez Plan KS - czesc zaplacona koszyka R/P w Planie (krok 8) i zrodlo przelewu (f5: placa W nieprzyjeta, kappa W2, dni koszyka)
+    "plan": re.compile(r"\| (Westeros|Essos): .*?miasta: W ([\d.]+)% \(budzet (\d+) / koszyk (\d+)\) R ([\d.]+)% \(budzet (\d+) / koszyk (\d+)\) "
+                       r"P ([\d.]+)% \(budzet (\d+) / koszyk (\d+)\)"),
+    "f5k": re.compile(r"kappa W2/R/P mediana ([\d.]+)/([\d.]+)/([\d.]+)"),
+    "f5d": re.compile(r"dni koszyka W/R/P \(kiesy / potrzeba miast z regula\) ([\d.]+)/([\d.]+)/([\d.]+)"),
+    "f5x": re.compile(r"oddane kasom miast -?\d+ \(W (\d+)/(\d+),"),
+    "f5c": re.compile(r"zaplacone -?\d+ \(kontrola zlecone - zaplacone = -?\d+; W (\d+)/(\d+),"),
+}
+
+
+def m96koszyk_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def m96koszyk_main(logp):
+    """m96koszyk (20.10, galaz m96-koszyk, PLAN 5.5 "kazdego dnia w kazdym miescie co najmniej 95% ludzi stac na jedzenie, 98% na pelny koszyk, zjedzone bez
+    zaplaty ponizej 1%"). Log Armoury strumieniowo. Okno = ostatnie 28 pelnych dob linii "Kiesa ludu" z kotwica KS (linia ZC4 lambda >= 0.99 w obu rynkach;
+    bez linii ZC4 albo lambda 0 - wiersze skutku INFO: bez kotwicy KS stac jest 100% i regula nie ma czego przelac). Progi:
+    MK-0 linia startu sesji (klucz TAK), MK-1 linie doby w oknie (kazda doba Kiesa ludu z KS; klucz NIE - INFO), MK-2 kontrola co dobe (zlecone >= zeszlo,
+    R + P = przelane, ponad placa zatrzymana 0), MK-3 potkniecia 0, MK-4 stac jedzenie W/R/P swiata - kazda doba okna >= 95%, MK-5 miast ze stac jedzenie
+    < 95% - TAK tylko przy 0 w kazdej dobie (prog projektu); srednio <= 1 i najwiecej <= 3 - DECYZJA z nazwami miast, ktorym regula nie pomogla (linia m96:
+    "R/P bez jedzenia na jutro po przelewie", [oblezone]); inaczej NIE; MK-6 pelny koszyk swiata sr28 >= 98% (PLAN 5.5), MK-7 zjedzone bez zaplaty sr28 i
+    max < 1%, MK-8 przelane i bez pokrycia (INFO), MK-9 chleb M3 - korona i "nie stac nikogo" sr28 (INFO; po paczce w dol), MK-10 czas linii max <= 2 ms,
+    MK-11 Plan KS: czesc zaplacona koszyka R/P (Westeros, Essos) - pierwsza i ostatnia linia okna (INFO; sprzezenie przelewu przez budzet Planu - w gore),
+    MK-12 f5: placa W nieprzyjeta (zrodlo przelewu), kappa W2 i dni koszyka W/R/P sr okna (INFO). Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, mk, kie, lam, bread, plan, f5 = [], {}, {}, {}, {}, {}, {}
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96KOSZYK_PRE):
+                if s.startswith(M96KOSZYK_PRE + "start sesji"):
+                    start.append(s)
+                else:
+                    d = num(r"dzien (\d+)", s)
+                    if d is not None:
+                        mk[d] = s
+            elif s.startswith("Kiesa ludu: dzien"):
+                if "doba niepelna" in s:
+                    continue
+                d = num(r"dzien (\d+)", s)
+                if d is not None and M96KOSZYK_RX["kiesa"].search(s):
+                    kie[d] = s
+            elif s.startswith("Koszyk stanow (ZC4): dzien"):
+                d = num(r"dzien (\d+)", s)
+                g = M96KOSZYK_RX["lam"].search(s)
+                if d is not None and g:
+                    lam[d] = min(float(g.group(1)), float(g.group(2)))
+            elif s.startswith("Chleb biedoty (M3): dzien"):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    bread[d] = s
+            elif s.startswith("KS: pieniadze planu (krok 8) doba"):
+                d = num(r"doba (\d+)", s)
+                if d is not None:
+                    rg = {}
+                    for g in M96KOSZYK_RX["plan"].finditer(s):
+                        rg[g.group(1)] = (float(g.group(5)), float(g.group(8)), int(g.group(6)), int(g.group(7)), int(g.group(9)), int(g.group(10)))
+                    if rg:
+                        plan[d] = rg
+            elif s.startswith("Dochod ludu wedlug koszyka (f5-lud): dzien"):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    f5[d] = s
+    print(f"plik: {logp} | start {len(start)}, doby m96 {len(mk)}, doby Kiesa ludu {len(kie)}, doby ZC4 {len(lam)}, doby chleba M3 {len(bread)}, "
+          f"linie Planu {len(plan)}, doby f5 {len(f5)}")
+    key_on = None
+    if start:
+        g = M96KOSZYK_RX["start"].search(start[-1])
+        key_on = (g.group(1) == "TAK") if g else None
+        rep.add("MK-0: linia startu sesji - klucz i cel", start[-1][:260], "klucz TAK, cel 2 dni jedzenia + 2-20 dni koszyka", bool(g) and g.group(1) == "TAK")
+    else:
+        rep.add("MK-0: linia startu sesji", "brak linii", "INFO (log sprzed galezi m96-koszyk)", None)
+    ks = sorted(d for d in kie if lam.get(d, 0.0) >= 0.99)
+    win = ks[-28:]
+    if not win:
+        rep.add("MK-1..MK-12: okno z kotwica KS", f"dob z ZC4 lambda >= 0.99: 0 (dob Kiesa ludu {len(kie)}, linii doby m96 {len(mk)})",
+                "INFO - bez kotwicy KS (nowa kampania do ok. 120 dob) stac jest 100% i regula nie ma czego przelac; linii doby m96 0 (sama linia startu)", None)
+    else:
+        miss = [d for d in win if d not in mk]
+        rep.add("MK-1: linie doby m96 w oknie (doby Kiesa ludu z KS)", f"okno {win[0]}-{win[-1]} ({len(win)} dob), bez linii m96 {len(miss)}"
+                + (f" (np. {miss[:5]})" if miss else "") + ("" if key_on is not False else " - klucz NIE (linii doby nie ma)"),
+                "0 brakow (przy kluczu NIE albo bez linii startu - INFO)", (len(miss) == 0) if key_on else None)
+        bad, over, st_sum, ms_max = [], 0, 0, 0.0
+        for d in sorted(mk):
+            s = mk[d]
+            c = M96KOSZYK_RX["ctl"].search(s)
+            p = M96KOSZYK_RX["paid"].search(s)
+            t = M96KOSZYK_RX["tail"].search(s)
+            if not c or not p:
+                bad.append(d)
+                continue
+            ask, got, eq, ov = int(c.group(1)), int(c.group(2)), c.group(3), int(c.group(4))
+            if got > ask or eq != "tak" or int(p.group(1)) != int(p.group(2)) + int(p.group(3)) or int(p.group(1)) != got:
+                bad.append(d)
+            over += ov
+            if t:
+                st_sum += int(t.group(2))
+                ms_max = max(ms_max, float(t.group(1)))
+        rep.add("MK-2: kontrola co dobe (zeszlo <= zlecone, R + P = przelane, ponad placa zatrzymana)",
+                f"dob z linia {len(mk)}, zlych {len(bad)}" + (f" (np. {bad[:5]})" if bad else "") + f", ponad placa zatrzymana razem {over} zl",
+                "0 zlych dob i 0 zl", (len(bad) == 0 and over == 0) if mk else None)
+        rep.add("MK-3: potkniecia m96 (suma dob)", f"{st_sum}", "0", (st_sum == 0) if mk else None)
+        rows = []
+        for d in win:
+            g = M96KOSZYK_RX["kiesa"].search(kie[d])
+            u = M96KOSZYK_RX["unpaid"].search(kie[d])
+            rows.append(([m96koszyk_f(g.group(i)) for i in range(1, 8)], int(g.group(8)), int(g.group(9)), float(u.group(2)) if u else None))
+        lowc = []
+        for (v, n8, n9, up), d in zip(rows, win):
+            cls = [x for x in v[0:3] if x is not None]
+            if cls and min(cls) < 95.0:
+                lowc.append((d, min(cls)))
+        worst = min(lowc, key=lambda x: x[1]) if lowc else None
+        rep.add("MK-4: stac jedzenie W/R/P swiata - kazda doba okna", f"dob ponizej 95%: {len(lowc)} z {len(win)}"
+                + (f", najnizej {worst[1]:.1f}% (doba {worst[0]})" if worst else "")
+                + f"; ostatnia doba W/R/P {rows[-1][0][0]} / {rows[-1][0][1]} / {rows[-1][0][2]}", ">= 95% kazdej doby (PLAN 5.5)", len(lowc) == 0)
+        nf = [r[1] for r in rows]
+        avg_nf, max_nf = sum(nf) / len(nf), max(nf)
+        names = {}
+        for d in win:
+            if d not in mk:
+                continue
+            h = M96KOSZYK_RX["hungry"].search(mk[d])
+            if h and h.group(2):
+                for nm in h.group(2).split("; "):
+                    nm = nm.strip()
+                    if nm and nm != "...":
+                        names[nm] = names.get(nm, 0) + 1
+        top = sorted(names.items(), key=lambda x: -x[1])[:8]
+        ntxt = (", miasta R/P bez jedzenia po przelewie (dob w oknie): " + ", ".join(f"{k} {v}" for k, v in top)) if top else ""
+        rep.add("MK-5: miast ze stac jedzenie < 95% (najbiedniejsza klasa miasta)", f"srednio {avg_nf:.1f}, najwiecej {max_nf}{ntxt}",
+                "0 w kazdej dobie (PLAN 5.5: w kazdym miescie); srednio <= 1 i najwiecej <= 3 - DECYZJA (nazwy i [oblezone] w wierszu: chleb M3 albo przyczyna poza krokiem)",
+                max_nf == 0, decide=(avg_nf <= 1.0 and max_nf <= 3))
+        fw = [r[0][6] for r in rows if r[0][6] is not None]
+        nfl = [r[2] for r in rows]
+        rep.add("MK-6: pelny koszyk swiata (sr okna) i miast z pelnym < 95%", (f"{sum(fw) / len(fw):.1f}%" if fw else "-") + f"; miast srednio {sum(nfl) / len(nfl):.1f}",
+                ">= 98% (PLAN 5.5)", (sum(fw) / len(fw) >= 98.0) if fw else None)
+        up = [r[3] for r in rows if r[3] is not None]
+        rep.add("MK-7: zjedzone bez zaplaty (sr okna, max)", (f"{sum(up) / len(up):.2f}% / {max(up):.2f}% wydatku gry" if up else "-"), "< 1% obie",
+                (sum(up) / len(up) < 1.0 and max(up) < 1.0) if up else None)
+        mw = [mk[d] for d in win if d in mk]
+        if mw:
+            pd = [M96KOSZYK_RX["paid"].search(s) for s in mw]
+            lf = [M96KOSZYK_RX["left"].search(s) for s in mw]
+            tw = [M96KOSZYK_RX["towns"].search(s) for s in mw]
+            gp = [M96KOSZYK_RX["gap"].search(s) for s in mw]
+            uc = [M96KOSZYK_RX["uncut"].search(s) for s in mw]
+            hg = [M96KOSZYK_RX["hungry"].search(s) for s in mw]
+            pv = [int(x.group(1)) for x in pd if x]
+            pr = [int(x.group(2)) for x in pd if x]
+            pp = [int(x.group(3)) for x in pd if x]
+            pn = [int(x.group(6)) for x in pd if x]
+            cv = [int(x.group(3)) for x in tw if x]
+            gn = [int(x.group(1)) for x in gp if x]
+            nc = [int(x.group(1)) for x in lf if x]
+            ncz = [int(x.group(2)) for x in lf if x]
+            la = [int(x.group(4)) for x in lf if x]
+            ucv = [int(x.group(1)) for x in uc if x]
+            hgv = [int(x.group(1)) for x in hg if x]
+            n = max(1, len(pv))
+            rep.add("MK-8: przelane z placy zatrzymanej (sr okna) i bez pokrycia (INFO)",
+                    f"przelane {sum(pv) / n:.0f} zl/d (R {sum(pr) / n:.0f} / P {sum(pp) / n:.0f}) w {sum(pn) / n:.1f} miastach z {sum(gn) / max(1, len(gn)):.1f} z luka; "
+                    f"placa zatrzymana {sum(cv) / max(1, len(cv)):.0f} zl/d (zdjete A7 {sum(ucv) / max(1, len(ucv)):.0f}); bez placy zatrzymanej "
+                    f"{sum(nc) / max(1, len(nc)):.1f} miast ({sum(ncz) / max(1, len(ncz)):.0f} zl/d), luka po przelewie {sum(la) / max(1, len(la)):.0f} zl/d; "
+                    f"R/P bez jedzenia na jutro po przelewie srednio {sum(hgv) / max(1, len(hgv)):.1f} miast (max {max(hgv) if hgv else '-'})",
+                    "INFO (spodziewane: przelane 30-80 tys./d, w ok. 4 tygodnie do ok. 50-110 tys./d przez sprzezenie Planu - MK-11; placa zatrzymana razem z M6 "
+                    "bogatych miast 380-560 tys./d, z tego odmowa W 120-190 tys./d - MK-12; bez pokrycia ok. 0-2 miast)", None)
+        else:
+            rep.add("MK-8: przelane (INFO)", "brak linii m96 w oknie", "INFO", None)
+        bw = [M96KOSZYK_RX["bread"].search(bread[d]) for d in win if d in bread]
+        bw = [x for x in bw if x]
+        if bw:
+            rep.add("MK-9: chleb M3 - zaplacono, korona, nie stac nikogo (sr okna, INFO)",
+                    f"zaplacono {sum(int(x.group(1)) for x in bw) / len(bw):.0f} zl/d (korona {sum(int(x.group(2)) for x in bw) / len(bw):.0f}), nie stac nikogo "
+                    f"{sum(int(x.group(3)) for x in bw) / len(bw):.0f} zl/d w {sum(int(x.group(4)) for x in bw) / len(bw):.1f} osadach",
+                    "INFO (WGRANIE 91-95, sr28: zaplacono 17.9-23.4 tys./d, nie stac nikogo 14.7-22.0 tys./d w 4.9-6.3 osadach; po paczce w dol)", None)
+        else:
+            rep.add("MK-9: chleb M3 (INFO)", "brak linii w oknie", "INFO", None)
+        rep.add("MK-10: czas linii m96 (max doby)", f"{ms_max:.2f} ms", "<= 2 ms", (ms_max <= 2.0) if mk else None)
+        pw = sorted(d for d in plan if win[0] - 7 <= d <= win[-1])
+        if pw:
+            def ptxt(d):
+                rg = plan[d]
+                return ", ".join(f"{k} R {rg[k][0]:.1f}% / P {rg[k][1]:.1f}%" for k in ("Westeros", "Essos") if k in rg)
+            rep.add("MK-11: Plan KS - czesc zaplacona koszyka R/P (pierwsza -> ostatnia linia okna)",
+                    f"doba {pw[0]}: {ptxt(pw[0])} -> doba {pw[-1]}: {ptxt(pw[-1])} ({len(pw)} linii)",
+                    "INFO (recenzja m96 - sprzezenie: przelew jest zarobkiem okna R/P, wiec budzet Planu i czesc zaplacona rosna, a z nia potrzeba W/R/P biednych "
+                    "miast; baza WGRANIE 91-95, ostatnia linia: Westeros R 92.1-96.5% / P 90.2-96.8%, Essos R 74.8-82.8% / P 78.6-87.9%; po paczce w gore)", None)
+        else:
+            rep.add("MK-11: Plan KS - czesc zaplacona R/P (INFO)", "brak linii 'KS: pieniadze planu' w oknie", "INFO", None)
+        fwn = [f5[d] for d in win if d in f5]
+        if fwn:
+            ref, kw, dd = [], [], []
+            for s in fwn:
+                x = M96KOSZYK_RX["f5x"].search(s)
+                c = M96KOSZYK_RX["f5c"].search(s)
+                k = M96KOSZYK_RX["f5k"].search(s)
+                g = M96KOSZYK_RX["f5d"].search(s)
+                if x:
+                    ref.append(int(x.group(1)) - int(x.group(2)) + ((int(c.group(1)) - int(c.group(2))) if c else 0))
+                if k:
+                    kw.append(float(k.group(1)))
+                if g:
+                    dd.append((float(g.group(1)), float(g.group(2)), float(g.group(3))))
+            dtx = ("/".join(f"{sum(v[i] for v in dd) / len(dd):.1f}" for i in range(3))) if dd else "-"
+            rep.add("MK-12: f5 - placa W nieprzyjeta (zrodlo przelewu), kappa W2 mediana, dni koszyka W/R/P (sr okna, INFO)",
+                    (f"odmowa W {sum(ref) / len(ref):.0f} zl/d (pierwsza {ref[0]}, ostatnia {ref[-1]})" if ref else "odmowa W -")
+                    + (f", kappa W2 {sum(kw) / len(kw):.3f}" if kw else "") + f", dni W/R/P {dtx}",
+                    "INFO (baza WGRANIE 91-95 - wiersz w CHANGELOG galezi; po paczce: dni R/P w gore, dni W i odmowa W moga spasc - Plan podnosi potrzebe W)", None)
+        else:
+            rep.add("MK-12: f5 (INFO)", "brak linii f5 w oknie", "INFO", None)
+    rep.show()
+    return 0
+
+
+def m96len_main(logp):
+    """m96len (20.10, galaz w-toku/m96-len; Armoury/src/StartCalibration.M96Len.cs, klucz KsVillageClothBuysInPlan): Plan KS liczy plotno i sukno kupowane
+    przez wsie w miastach (ramka E5/B1) ponad koszyk zaplacony Planu (KsMoney.PaidV). Wejscie: log Armoury (strumieniowo).
+    M96LEN-0 linie "Len KS (m96-len): plan doba" sa (log bez paczki - NIE), w kazdej plotno i sukno, potkniecia 0;
+    M96LEN-1 przy kluczu TAK co najmniej jeden Plan z dopiskiem plotna > 0 (INFO, gdy wszystkie Plany mowia "bez dopisku" z podanym powodem); w tekscie zakupy wsi,
+    zaplacone (szt./d) i dopisek plotna i sukna przy Planie wlaczenia KS (ostatni Plan przed pierwsza doba "KS: produkcja (zastosowane)");
+    M96LEN-2 / M96LEN-3 / M96LEN-6 zapas lnu / plotna / sukna swiata (ksiega towarow "Towary: ... flax / linen / felt") od D+28 do konca biegu (D = pierwsza doba
+    "KS: produkcja (zastosowane)" + 14) - nachylenie >= -10 szt./d (PLAN etap 6: "plotna w swiecie nie ubywa szybciej niz 10 dziennie"); bez KS zastosowanego - INFO
+    (cale okno biegu); baza WGRANIE 95 (12-25-19): len -79/d, plotno -21/d, sukno -23/d;
+    M96LEN-4 len w oknie: produkcja / zuzycie >= 0.90 (baza 0.78);
+    M96LEN-5 (INFO) zakupy plotna przez wsie (E5/B1), plon lnu wsi, plotno produkcja / zuzycie w oknie;
+    M96LEN-7 (INFO) welna i sukno w oknie: produkcja / zuzycie, zakupy sukna przez wsie."""
+    import re as _re
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M96LEN-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ph = _re.compile(r"Len KS \(m96-len\): plan doba (\d+) \| klucz Ks Village Cloth Buys In Plan (TAK|NIE)")
+    pg = _re.compile(r"\| (plotno|sukno) \((linen|felt)\): zakupy wsi w miastach \(E5/B1\) srednia ([0-9.]+) szt\./d.*?zaplacony w poprzednim Planie ([0-9.-]+) szt\./d"
+                     r", dopisek do popytu 1:1 ([0-9.]+) szt\./d.*? - ([^|]*)")
+    ps = _re.compile(r"potkniecia (\d+) \(sesja")
+    pt = _re.compile(r"Towary: dzien (\d+) - (flax|linen|felt|wool) \(\d+ d\): zapas (\d+)[^|]*\| produkcja (\d+) \[([^\]]*)\] \| zuzycie (\d+) \[([^\]]*)\]")
+    pa = _re.compile(r"KS: produkcja \(zastosowane\) dzien (\d+) \| od doby (\d+)")
+    plans, stum = [], 0
+    rows = {"flax": {}, "linen": {}, "felt": {}, "wool": {}}
+    apply_day = None
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "Len KS (m96-len)" in ln:
+                m = ph.search(ln)
+                if m:
+                    seg = {}
+                    for mg in pg.finditer(ln):
+                        seg[mg.group(2)] = (float(mg.group(3)), float(mg.group(4)) if mg.group(4) != "-" else -1.0, float(mg.group(5)), mg.group(6).strip())
+                    plans.append((int(m.group(1)), m.group(2), seg))
+                    ms = ps.search(ln)
+                    stum += int(ms.group(1)) if ms else 1
+                continue
+            if apply_day is None and "KS: produkcja (zastosowane)" in ln:
+                m = pa.search(ln)
+                if m:
+                    apply_day = int(m.group(2))
+                continue
+            if "Towary: dzien" in ln and (" - flax (" in ln or " - linen (" in ln or " - felt (" in ln or " - wool (" in ln):
+                m = pt.search(ln)
+                if not m:
+                    continue
+                vb = 0
+                mv = _re.search(r"wsie \(zakupy w miescie, E5/B1\) (\d+)", m.group(7))
+                if mv:
+                    vb = int(mv.group(1))
+                vil = 0
+                mw = _re.match(r"wsie (\d+)", m.group(5).strip())
+                if mw:
+                    vil = int(mw.group(1))
+                rows[m.group(2)][int(m.group(1))] = (int(m.group(3)), int(m.group(4)), int(m.group(6)), vb, vil)
+    bad = sum(1 for p in plans if "linen" not in p[2] or "felt" not in p[2])
+    rep.add("M96LEN-0: linie Planu m96-len, potkniecia", f"Planow {len(plans)} (bez obu towarow w linii {bad}), potkniecia {stum}", "Planow >= 1, oba towary i potkniecia 0",
+            len(plans) >= 1 and stum == 0 and bad == 0)
+    on = [p for p in plans if p[1] == "TAK" and "linen" in p[2]]
+    if on:
+        added = [p for p in on if p[2]["linen"][2] > 0]
+        pick = on[-1]
+        if apply_day is not None:
+            pre = [p for p in on if p[0] < apply_day]
+            if pre:
+                pick = pre[-1]
+
+        def seg_txt(p, g, nm):
+            s = p[2].get(g)
+            if not s:
+                return f"{nm} -"
+            pd = "-" if s[1] < 0 else f"{s[1]:.1f}"
+            return f"{nm}: zakupy wsi {s[0]:.1f}, zaplacone {pd}, dopisek {s[2]:.1f} szt./d ({s[3]})"
+        txt = (f"plotno z dopiskiem w {len(added)} z {len(on)} Planow; "
+               + ("Plan wlaczenia" if apply_day is not None and pick[0] < apply_day else "ostatni Plan") + f" doba {pick[0]}: "
+               + seg_txt(pick, "linen", "plotno") + "; " + seg_txt(pick, "felt", "sukno")
+               + (f"; najwiekszy dopisek plotna {max(p[2]['linen'][2] for p in added):.1f}" if added else ""))
+        rep.add("M96LEN-1: dopisek plotna i sukna wsi w Planie", txt, ">= 1 Plan z dopiskiem plotna > 0 (INFO, gdy zakupy w koszyku zaplaconym); zaplacone wsi ok. 3-6 szt./d",
+                True if added else None)
+    else:
+        rep.add("M96LEN-1: dopisek plotna i sukna wsi w Planie", "brak Planow z kluczem TAK", ">= 1 Plan z dopiskiem > 0", None if plans else False)
+    days = sorted(set(rows["flax"]) & set(rows["linen"]))
+    if not days:
+        rep.add("M96LEN-2: zapas lnu swiata", "brak linii ksiegi towarow", "nachylenie >= -10 szt./d", None)
+        rep.show()
+        return 0
+    if apply_day is not None:
+        d0 = apply_day + 14 + 28
+        win = [d for d in days if d >= d0]
+        ks = True
+    else:
+        win = days
+        ks = False
+    if len(win) < 14:
+        rep.add("M96LEN-2: zapas lnu swiata", f"okno za krotkie ({len(win)} dob od D+28)", "nachylenie >= -10 szt./d", None)
+        rep.show()
+        return 0
+
+    def slope(g):
+        xs = [d for d in win if d in rows[g]]
+        if len(xs) < 2:
+            return 0.0, 0, 0, False
+        ys = [rows[g][d][0] for d in xs]
+        n = len(xs); mx = sum(xs) / n; my = sum(ys) / n
+        den = sum((x - mx) ** 2 for x in xs)
+        return (sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den) if den > 0 else 0.0, ys[0], ys[-1], True
+
+    def avg(g, k):
+        xs = [d for d in win if d in rows[g]]
+        return (sum(rows[g][d][k] for d in xs) / len(xs)) if xs else 0.0
+
+    lab = (f"doby {win[0]}-{win[-1]} (D+28 = {apply_day + 42} - KS od {apply_day})" if ks else f"doby {win[0]}-{win[-1]} (KS niezastosowany - INFO)")
+    for k, g, nm, base in ((2, "flax", "lnu", "len -79"), (3, "linen", "plotna", "plotno -21"), (6, "felt", "sukna", "sukno -23")):
+        s, a, b, okd = slope(g)
+        if not okd:
+            rep.add(f"M96LEN-{k}: zapas {nm} swiata (ksiega towarow)", "brak linii ksiegi", "nachylenie >= -10 szt./d", None)
+            continue
+        rep.add(f"M96LEN-{k}: zapas {nm} swiata (ksiega towarow)", f"{a} -> {b}, nachylenie {s:+.1f} szt./d; {lab}", f"nachylenie >= -10 szt./d (baza W95 12-25-19: {base})",
+                (s >= -10.0) if ks else None)
+    pr = avg("flax", 1); us = avg("flax", 2)
+    rep.add("M96LEN-4: len produkcja / zuzycie w oknie", f"{pr:.0f} / {us:.0f} szt./d = {pr / us if us > 0 else 0:.2f}", ">= 0.90 (baza W95 0.78: 281 / 362)",
+            (us > 0 and pr / us >= 0.90) if ks else None)
+    vb = avg("linen", 3); vil = avg("flax", 4); lp = avg("linen", 1); lu = avg("linen", 2)
+    rep.add("M96LEN-5: plotno wsi E5/B1, plon lnu wsi, plotno produkcja / zuzycie", f"wsie kupuja {vb:.0f} szt./d, len wsi {vil:.0f} szt./d, plotno {lp:.0f} / {lu:.0f} szt./d",
+            "INFO (baza W95 12-25-19: wsie 53, len wsi 154, plotno 279 / 296)", None)
+    wp = avg("wool", 1); wu = avg("wool", 2); fp = avg("felt", 1); fu = avg("felt", 2); fv = avg("felt", 3)
+    rep.add("M96LEN-7: welna i sukno w oknie", f"welna {wp:.0f} / {wu:.0f} szt./d, sukno {fp:.0f} / {fu:.0f} szt./d, wsie kupuja sukna {fv:.0f} szt./d",
+            "INFO (baza W95 12-25-19: welna 267 / 263, sukno 175 / 201, wsie kupuja sukna 43)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -52195,6 +53619,8 @@ def main(argv):
         if a == "--wymagaj-ht":
             need_ht = True; i += 1; continue
         logp = a; i += 1
+    if group == "m96len":
+        return m96len_main(logp)   # m96-len (20.10): Plan KS liczy plotno kupowane przez wsie w miastach; zapas lnu i plotna pod KS
     if group == "noboz" and logp:
         return noboz_main(logp)   # noc-oboz (noc 15/16.10): zegar ksiegi snu z terminu ticku, straznik snu w menu, nocny marsz powiedziany wprost
     if group == "audytb" and logp:
@@ -52317,6 +53743,8 @@ def main(argv):
         return korona2_main(logp)   # korona2 (15.10, Jeff "korony pozyczaja od miast"): pozyczki koron od miast i mieszczan, czesc korony podatku do zapasu korony
     if group == "nskarbiec" and logp:
         return nskarbiec_main(logp, bdp)   # nskarbiec (noc 15/16.10, Jeff "skarbiec kryjowki - TAK"): dola dzienna band do kryjowek, wyplata zwyciezcy AI, komunikaty o zlocie
+    if group == "m96bandy" and logp:
+        return m96bandy_main(logp, bdp)   # m96bandy (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"): bandy jedza, zapas jedzenia i kiesy, glod, lup u zwyciezcow
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "nharmony" and logp:
@@ -52343,6 +53771,8 @@ def main(argv):
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
     if group == "nturniej" and logp:
         return nturniej_main(logp)   # nturniej (16.10, Jeff "miasto nie moglo zaplacic mi 1300"): lancuch platnikow nagrody turnieju i dlugi osad wobec gracza (TourneyPay)
+    if group == "m96valyria" and logp:
+        return m96valyria_main(logp)   # m96valyria (Jeff 20.10 "Rob drogi Valyrii i trakty Essos"): drogi Valyrii +25%, mosty, szlaki karawan glebi Essos, audyt premii (MapRoadKinds)
     if group == "ndrogi" and logp:
         return ndrogi_main(logp)   # ndrogi (noc 17/18.10, Jeff "szybsze poruszanie po drogach"): +15% na drogach ROT, plik drog, latka pamieci predkosci, audyt premii i sufitu (MapRoads)
     if group == "p6sztormy" and logp:
@@ -52355,10 +53785,22 @@ def main(argv):
         return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group == "nkarczmy" and logp:
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
+    if group == "m96receptury" and logp:
+        return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
+    if group == "m96wzory" and logp:
+        return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:
         return p6szubienice_main(logp)   # p6szubienice (20.10, p6-szubienice R3-07a): szubienice przy rozstajach po rozbitej bandzie / kryjowce (Gallows, GallowsView)
+    if group == "m96wies" and logp:
+        return m96wies_main(logp)   # m96wies (20.10, m96-wies): porzadek menu wsi (VillageMenus) i komunikaty platnosci z powodem (PayNotes)
+    if group == "m96zamek" and logp:
+        return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
+    if group == "m96jakosc" and logp:
+        return m96jakosc_main(logp)   # m96jakosc (20.10, Jeff "za duzo legendary"): rzadkosc legendarnych i mistrzowskich - limit na rodzaj, wyrownanie polek do zwyklej (QualityScarcity)
     if group == "nzajazdy" and logp:
         return nzajazdy_main(logp)   # nzajazdy (17.10, sw-zajazdy): zajazdy przy szlakach wedlug ludzi, nocleg -> kiesa wsi, plotki bez wyjatkow, obrazek raz na mape (RoadsideInns, Rumours)
+    if group == "m96sakiewki" and logp:
+        return m96sakiewki_main(logp)   # m96-sakiewki (20.10): oszczednosci wedlug potrzeby - sakiewki zolnierzy <= 15 dni zoldu (SavingsByNeed)
     if group == "nzc1" and logp:
         return nzc1_main(logp, bdp)   # nzc1 (16.10, projekt ZYCIE CODZIENNE paczka ZC1): drogi towarow - wieloryb, jedwab, deski, wegiel, sztaby, BK, woz za cena celu, jedzenie z niczego
     if group == "nzc0" and logp:
@@ -52413,6 +53855,8 @@ def main(argv):
         return nskory_main(logp)   # nskory (noc 17/18.10, f4-ksiega-i-skory): ksiega z aktualnych receptur KS (mnoznik BK 0), skory z uboju w miescie wedlug tabeli swiata (KsRecipes.cs, KsHides.cs)
     if group == "nkasy" and logp:
         return nkasy_main(logp)   # nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z): firmy DS miast przegladane co kwartal, pan splaca rachunki zywnosci wczesniej, zawrocony woz bez straty towaru (DsTowns, KsLordFood, KsFoodCarts)
+    if group == "m96dlugi_dlugi" and logp:
+        return m96dlugi_main(logp)   # m96dlugi_dlugi (20.10, galaz m96-dlugi): dlugi rad miast, podatek nadzwyczajny (TownDebt.cs)
     if group == "p6a7" and logp:
         return p6a7_main(logp)   # p6a7 (20.10, fala 2 pomyslow, galaz p6-a7): A7 domyslnie TAK + roboty miast z rak okregu - odplyw kas miast do kies wsi (TownHire.cs)
     if group == "na7" and logp:
@@ -52447,6 +53891,8 @@ def main(argv):
         return p6okup_main(logp)   # p6-okup (R3-03a, noc 20.10): okup okolicy zamiast palenia wsi (RaidTribute) - progi PO-0..PO-10
     if group == "p6spichlerz" and logp:
         return p6spichlerz_main(logp)   # p6spichlerz (20.10, galaz p6-spichlerz - R3-06f): miasto je ze swoich wsi - zboze ze spichlerzy wsi do miast, zloto, niedobor, bezpiecznik BE i zalogi (TownGranary.cs)
+    if group == "m96koszyk" and logp:
+        return m96koszyk_main(logp)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
@@ -53484,6 +54930,281 @@ def npolnoc_main(logp, bdp=None):
     rep.add("NKS-30g: A7 przy progu - zmiany z jedzenia na zajecie tylko na targ wstrzymane", f"{sum(a7)} (linii {len(a7)})" if a7 else "brak linii (KS nie zastosowany albo log sprzed r4-polnoc)",
             "INFO (regula A7 domyslnie wylaczona - sam pomiar)", None)
     rep.add("NKS-30h: Plan bez pokrycia wedlug krainy (krok 8, ostatni Plan)", unc if unc else "brak linii", "INFO - koszyk wsi niezaplacony i nie robiony w domu", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m96bandy (Jeff 20.10 "bandyci chodza bez jedzenia czy zlota?"; Armoury/src/BandFood.cs, OutlawLaw.FenceSell/StashDay)
+M96BANDY_HEAD = "Bandy - jedzenie i kiesy (m96-bandy): dzien "
+M96BANDY_RX = re.compile(
+    r"bandy jedzace (\d+) .*?\| potrzeba doby ([\d.]+) szt\., zjedzone (\d+), kupione u pasera (\d+) szt\. za (\d+) zl \(band (\d+), z morza (\d+), miast (\d+)\), "
+    r"zabrane wsiom (\d+) szt\. warte (\d+) zl \(band (\d+), wsi (\d+), wsi gracza (\d+): (\d+) szt\.\) \| najedzone (\d+), glodne (\d+) \(bez jedzenia (\d+), "
+    r"ponad \d+ doby (\d+), na morzu (\d+) z (\d+), z jencem-bohaterem bez odejsc (\d+)\), morale z glodu -(\d+) \| odeszli z glodu (\d+) ludzi z (\d+) band "
+    r"\(do puli wyrzutkow\), rozpady z glodu (\d+) \| zapas w jukach (\d+) szt\. \(([\d.]+|-) dob potrzeby; band z pelnym zapasem (\d+)\) \| kiesy band w polu (\d+) zl "
+    r"\(band (\d+), z kiesa (\d+), mediana (\d+) zl; z kryjowka (\d+), z kiesa (\d+), razem (\d+) zl\); dola: zapas zostal w (\d+) kiesach \((\d+) zl; w calosci "
+    r"zapasem (\d+)\); zycie w miastach: zapas nietkniety w (\d+) kiesach \((\d+) zl; w calosci zapasem (\d+)\); kieszonkowe z nadwyzki kryjowek (\d+) zl dla (\d+) "
+    r"band \(brakowalo (\d+) zl, nie starczylo (\d+) bandom;.*?\) \| lup u zwyciezcow \(od wczoraj\): jedzenie z band AI (\d+) szt\. \((\d+) przydzialow\), "
+    r"gracz (\d+) szt\. \((\d+)\); zloto z kies band (\d+) zl, gracz (\d+) zl; jedzenie z druzyn lordow AI (\d+) szt\., gracz (\d+) szt\..*?"
+    r"\| potkniecia (\d+) \(sesja (\d+)\)")
+M96BANDY_KEYS = ("bands", "need", "eaten", "bought", "boughtGold", "buyBands", "seaBuy", "buyTowns", "robbed", "robbedWorth", "robBands", "robVill",
+                 "plVill", "plRob", "fed", "hungry", "starving", "long", "seaHungry", "sea", "hero", "morale", "left", "leftBands", "broken", "stock",
+                 "stockDays", "stockOk", "purse", "field", "withPurse", "median", "home", "homeWith", "homePurse", "kept", "keptGold", "keptWhole",
+                 "lifeKept", "lifeKeptGold", "lifeWhole", "pocket", "pocketBands", "pocketWant", "pocketShort", "lootAi", "lootAiN", "lootPl", "lootPlN",
+                 "gold", "goldPl", "lordAi", "lordPl", "stum", "stumS")
+
+
+def m96bandy_rows(path, extra=None):
+    """Linie doby m96-bandy, "Paser:" (zywnosc sprzedana) i "Wyrzutki:" (band, ludzi) -> slowniki wedlug doby (strumieniowo). extra (slownik) dostaje
+    "nowe" {doba: bandy nowe} z linii Wyrzutki i "ns" {doba: (band z kryjowka, pusta kiesa)} z linii nskarbiec."""
+    rows, pas, wyr, errs = {}, {}, {}, 0
+    if extra is not None:
+        extra.setdefault("nowe", {})
+        extra.setdefault("ns", {})
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and "BandFood" in s:
+                errs += 1
+            if s.startswith(M96BANDY_HEAD):
+                d = num(r"dzien (\d+)", s)
+                if d is None:
+                    continue
+                mm = M96BANDY_RX.search(s)
+                if mm is None:
+                    rows[d] = {"on": "| CZYNNE" in s, "bad": True}
+                    continue
+                r = {"on": "| CZYNNE" in s, "bad": False}
+                for k, v in zip(M96BANDY_KEYS, mm.groups()):
+                    r[k] = (float(v) if v != "-" else 0.0) if k in ("need", "stockDays") else int(v)
+                rows[d] = r
+            elif s.startswith("Paser: dzien "):
+                d = num(r"Paser: dzien (\d+)", s)
+                if d is not None:
+                    pas[d] = num(r"zywnosc (\d+), zwierzeta", s)
+            elif s.startswith("Wyrzutki: dzien "):
+                d = num(r"Wyrzutki: dzien (\d+)", s)
+                b = re.search(r"\| band (\d+), ludzi (\d+)", s)
+                if d is not None and b:
+                    wyr[d] = (int(b.group(1)), int(b.group(2)))
+                nw = re.search(r"bandy nowe (\d+)", s)
+                if extra is not None and d is not None and nw:
+                    extra["nowe"][d] = int(nw.group(1))
+            elif extra is not None and s.startswith(NS_HEAD):
+                d = num(r"dzien (\d+)", s)
+                a = NS_BANDS.search(s)
+                if d is not None and a:
+                    extra["ns"][d] = (int(a.group(1)), int(a.group(8)))
+    return rows, pas, wyr, errs
+
+
+def m96bandy_main(logp, bdp=None):
+    """m96bandy (Jeff 20.10 "jak pokonuje bande czy ogolnie armie, to oni powinni miec tez zloto i jedzenie"): bandy jedza (BandFood.cs). Wejscie: log Armoury
+    (strumieniowo), opcjonalnie --baza-doby <log Armoury bazy bez paczki> (MB-8). MB-0 linia doby w kazdej dobie z linia Paser (format), MB-1 potkniecia i ERROR 0,
+    MB-2 zjedzone / potrzeba >= 0.85 (P), MB-3 glodne <= 25% band jedzacych srednio (P), MB-4 rozpady z glodu <= 2% band na dobe srednio (P), MB-5 zapas w jukach
+    >= 2 dob potrzeby od doby 10 (P), MB-6 lup jedzenia z band u zwyciezcow > 0 i zloto z kies band > 0 (bieg >= 20 dob), MB-7 zakupy i rabunek (INFO), MB-8 bandy
+    i ludzie w bandach - koniec biegu wobec bazy >= 0.80 (P, z --baza-doby; bez - INFO), MB-9 paser - zywnosc sprzedana (INFO), MB-10 kiesy band (INFO).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("MB-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ex = {}
+    rows, pas, wyr, errs = m96bandy_rows(logp, ex)
+    if not rows:
+        rep.add("MB-0: linia doby m96-bandy", "brak linii", "INFO (log sprzed m96-bandy albo prawo wyrzutkow wylaczone)", None)
+        rep.show()
+        return 0
+    bad = [d for d in rows if rows[d].get("bad")]
+    miss = [d for d in pas if d not in rows]
+    rep.add("MB-0: linia doby w kazdej dobie z linia Paser (format)", f"dob {len(rows)}, nierozpoznanych {len(bad)} {bad[:5]}, dob Paser bez linii {len(miss)} {miss[:5]}",
+            "0 nierozpoznanych, 0 brakow", not bad and not miss)
+    ok = [rows[d] for d in sorted(rows) if not rows[d].get("bad") and rows[d]["on"]]
+    st = max((r["stumS"] for r in ok), default=0)
+    rep.add("MB-1: potkniecia BandFood i ERROR", f"potkniecia sesji (max) {st}, linii ERROR z BandFood {errs}", "0 i 0", st == 0 and errs == 0)
+    if not ok:
+        rep.add("MB-2..MB-10", "klucz Bands Eat Food wylaczony w calym biegu", "INFO", None)
+        rep.show()
+        return 0
+    n = len(ok)
+    need = sum(r["need"] for r in ok)
+    eaten = sum(r["eaten"] for r in ok)
+    q = eaten / need if need > 0 else None
+    rep.add("MB-2: zjedzone / potrzeba (caly bieg)", f"{eaten} / {need:.0f} = {q:.3f}" if q is not None else "potrzeba 0", ">= 0.85 (P - pierwszy prog)",
+            (q >= 0.85) if q is not None else None)
+    bands = sum(r["bands"] for r in ok)
+    hq = sum(r["hungry"] for r in ok) / bands if bands else 0.0
+    rep.add("MB-3: glodne bandy (srednio na dobe)", f"{hq:.3f} band jedzacych; bez jedzenia {sum(r['starving'] for r in ok) / n:.1f}/d, ponad 2 doby {sum(r['long'] for r in ok) / n:.1f}/d",
+            "<= 0.25 (P)", hq <= 0.25)
+    bq = sum(r["broken"] for r in ok) / bands if bands else 0.0
+    brk = sum(r["broken"] for r in ok)
+    okd = [d for d in sorted(rows) if not rows[d].get("bad") and rows[d]["on"]]
+    born = sum(ex["nowe"].get(d, 0) for d in okd)
+    if born > 0:
+        rep.add("MB-4: rozpady z glodu wobec nowych band i odejscia", f"rozpady {brk} / bandy nowe {born} = {brk / born:.3f} ({bq:.4f} band jedzacych na dobe), "
+                f"odeszli {sum(r['left'] for r in ok)} ludzi z {sum(r['leftBands'] for r in ok)} band", "rozpady <= 0.20 nowych band (P)", brk <= 0.2 * born)
+    else:
+        rep.add("MB-4: rozpady z glodu i odejscia", f"rozpady {brk} ({bq:.4f} band jedzacych na dobe), odeszli {sum(r['left'] for r in ok)} ludzi "
+                f"z {sum(r['leftBands'] for r in ok)} band (bez 'bandy nowe' w linii Wyrzutki)", "rozpady <= 0.002 band jedzacych na dobe (P)", bq <= 0.002)
+    d0 = min(rows)
+    late = [rows[d] for d in sorted(rows) if d - d0 >= 10 and not rows[d].get("bad") and rows[d]["on"]]
+    if late:
+        sd = sum(r["stock"] for r in late) / max(1e-9, sum(r["need"] for r in late))
+        rep.add("MB-5: zapas jedzenia w jukach band (od doby 10)", f"{sd:.2f} dob potrzeby; band z pelnym zapasem srednio {sum(r['stockOk'] for r in late) / len(late):.0f} "
+                f"z {sum(r['bands'] for r in late) / len(late):.0f}", ">= 2 dob (P)", sd >= 2.0)
+    else:
+        rep.add("MB-5: zapas jedzenia w jukach band", "bieg krotszy niz 10 dob", "INFO", None)
+    la = sum(r["lootAi"] + r["lootPl"] for r in ok)
+    gd = sum(r["gold"] for r in ok)
+    span = max(rows) - d0 + 1
+    rep.add("MB-6: lup u zwyciezcow band - jedzenie i zloto", f"jedzenie {la} szt. (gracz {sum(r['lootPl'] for r in ok)}), zloto z kies band {gd} zl (gracz {sum(r['goldPl'] for r in ok)}); "
+            f"jedzenie z druzyn lordow {sum(r['lordAi'] + r['lordPl'] for r in ok)} szt.", "> 0 i > 0 (bieg >= 20 dob)", (la > 0 and gd > 0) if span >= 20 else None)
+    rep.add("MB-7: skad jedzenie (srednio na dobe)", f"kupione {sum(r['bought'] for r in ok) / n:.1f} szt. za {sum(r['boughtGold'] for r in ok) / n:.0f} zl, zabrane wsiom "
+            f"{sum(r['robbed'] for r in ok) / n:.1f} szt. ({sum(r['robVill'] for r in ok) / n:.1f} wsi), zjedzone {eaten / n:.1f}", "INFO", None)
+    if wyr:
+        b1, m1 = wyr[max(wyr)]
+        bw = m96bandy_rows(bdp)[2] if (bdp and os.path.isfile(bdp)) else None
+        if bw:
+            b0, m0 = bw[max(bw)]
+            okb = b0 > 0 and m0 > 0 and b1 / b0 >= 0.8 and m1 / m0 >= 0.8
+            rep.add("MB-8: bandy i ludzie w bandach - koniec biegu wobec bazy", f"band {b1} / {b0}, ludzi {m1} / {m0}", ">= 0.80 obu (P)", okb)
+        else:
+            f0 = wyr[min(wyr)]
+            rep.add("MB-8: bandy i ludzie w bandach (poczatek -> koniec biegu)", f"band {f0[0]} -> {b1}, ludzi {f0[1]} -> {m1}", "INFO (prog z --baza-doby)", None)
+    fs = [v for v in pas.values() if v is not None]
+    rep.add("MB-9: paser - zywnosc sprzedana miastom (srednio na dobe)", f"{sum(fs) / len(fs):.1f} szt." if fs else "brak",
+            "INFO (przed paczka: bieg 160 dob ok. 900/d, nowa kampania 120 dob ok. 200/d)", None)
+    L = ok[-1]
+    rep.add("MB-10: kiesy band w polu (ostatnia doba)", f"{L['purse']} zl w {L['field']} bandach, z kiesa {L['withPurse']}, mediana {L['median']} zl; z kryjowka {L['home']}, "
+            f"z kiesa {L['homeWith']} ({L['homePurse']} zl); dola zostawila zapas w {L['kept']} kiesach ({L['keptGold']} zl, w calosci {L['keptWhole']}), zycie w "
+            f"{L['lifeKept']} ({L['lifeKeptGold']} zl); kieszonkowe z kryjowek srednio {sum(r['pocket'] for r in ok) / n:.0f} zl/d dla "
+            f"{sum(r['pocketBands'] for r in ok) / n:.0f} band/d (brakowalo {sum(r['pocketWant'] for r in ok) / n:.0f} zl/d)", "INFO", None)
+
+    # MB-11 bandy z kryjowka z pusta kiesa (linia nskarbiec - ta sama miara w bazie i w biegu)
+    def empty_share(ns):
+        if not ns:
+            return None
+        h, e = ns[max(ns)]
+        return (e / h, e, h) if h > 0 else None
+    e1 = empty_share(ex["ns"])
+    exb = {}
+    if bdp and os.path.isfile(bdp):
+        m96bandy_rows(bdp, exb)
+    e0 = empty_share(exb.get("ns"))
+    if e1 and e0:
+        rep.add("MB-11: bandy z kryjowka z pusta kiesa (ostatnia doba, linia nskarbiec) wobec bazy", f"{e1[1]} z {e1[2]} = {e1[0]:.3f}; baza {e0[1]} z {e0[2]} = {e0[0]:.3f}",
+                "mniej niz w bazie (P)", e1[0] < e0[0])
+    else:
+        rep.add("MB-11: bandy z kryjowka z pusta kiesa (ostatnia doba)", (f"{e1[1]} z {e1[2]} = {e1[0]:.3f}" if e1 else "brak linii nskarbiec"), "INFO (prog z --baza-doby)", None)
+    # MB-12 bandy na morzu (piraci NavalDLC nie schodza na lad - jedzenie tylko z pasera i lupu)
+    sb_ = sum(r["sea"] for r in ok)
+    rep.add("MB-12: bandy na morzu (srednio na dobe)", f"{sb_ / n:.1f} band, glodne {sum(r['seaHungry'] for r in ok) / n:.1f}"
+            + (f" ({sum(r['seaHungry'] for r in ok) / sb_:.3f})" if sb_ else "") + f", kupily z morza {sum(r['seaBuy'] for r in ok) / n:.1f}", "INFO", None)
+    rep.show()
+    return 0
+
+
+M96DLUGI_LINE = "Dlugi miast (m96-dlugi): dzien "
+M96DLUGI_DS = "Firmy miast i zamkow (DS): dzien "
+
+
+def m96dlugi_num(pat, s, cast=int, default=None):
+    m = re.search(pat, s)
+    if not m:
+        return default
+    try:
+        return cast(m.group(1))
+    except Exception:
+        return default
+
+
+def m96dlugi_main(logp, base_arr=209771):
+    """m96dlugi_dlugi (20.10, galaz m96-dlugi; Armoury/src/TownDebt.cs). Linia "Dlugi miast (m96-dlugi): dzien N" co dobe i zaleglosci miast z linii DS (f14-miary)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M96D-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    rows, bad, errs, ds_arr = [], 0, 0, []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(M96DLUGI_LINE):
+                d = {
+                    "day": m96dlugi_num(r"dzien (\d+)", s),
+                    "towns": m96dlugi_num(r"miasta z dlugiem (\d+)", s),
+                    "debt": m96dlugi_num(r"dlug razem (-?\d+)", s),
+                    "lim": m96dlugi_num(r"limit razem (-?\d+)", s),
+                    "bank": m96dlugi_num(r", Bank (-?\d+) \(\d+ miast\)", s),
+                    "lent": m96dlugi_num(r"pozyczki dzis (-?\d+)", s),
+                    "int": m96dlugi_num(r"\| odsetki (-?\d+)", s),
+                    "rep": m96dlugi_num(r"splaty z nadwyzki kas \(ponad zapas kupcow i najblizsza rate\) (-?\d+)", s),
+                    "levies": m96dlugi_num(r"podatki nadzwyczajne (\d+)", s),
+                    "levy": m96dlugi_num(r"podatki nadzwyczajne \d+ na (-?\d+)", s),
+                    "loy": m96dlugi_num(r"lojalnosc -(\d+(?:\.\d+)?)", s, float),
+                    "pros": m96dlugi_num(r"dobrobyt -(\d+(?:\.\d+)?) \(dlug\)", s, float),
+                    "ctl": m96dlugi_num(r"zaokraglenia -?\d+(?:\.\d+)?\) (-?\d+) \(oczekiwane 0\)", s),
+                    "ctl2": m96dlugi_num(r"w kasie\) (-?\d+) \(oczekiwane 0\)", s),
+                    "ms": m96dlugi_num(r"czas (\d+(?:\.\d+)?) ms", s, float),
+                    "stum": m96dlugi_num(r"potkniecia (\d+) \(sesja", s),
+                    "insolv": m96dlugi_num(r"niewyplacalne (\d+)", s),
+                    "arrend": m96dlugi_num(r"bez czesci z oszczednosci ludu\) (-?\d+) zl u \d+ miast", s),
+                    "arrendn": m96dlugi_num(r"bez czesci z oszczednosci ludu\) -?\d+ zl u (\d+) miast", s),
+                    "capt": m96dlugi_num(r"po zdobyciu \(28 dob bez rat DS\) (\d+)", s),
+                    "poolw": m96dlugi_num(r"czeka na pule Banku, wyczerpana dzis (\d+)", s),
+                }
+                if any(v is None for v in d.values()):
+                    bad += 1
+                    continue
+                rows.append(d)
+            elif s.startswith(M96DLUGI_DS):
+                a = m96dlugi_num(r"zaleglosci wedlug osad \(f14-miary\): miasta (\d+) zl", s)
+                n = m96dlugi_num(r"zaleglosci wedlug osad \(f14-miary\): miasta \d+ zl u (\d+)", s)
+                dday = m96dlugi_num(r"dzien (\d+)", s)
+                if a is not None:
+                    ds_arr.append((dday, a, n))
+            elif "TownDebt." in s and "ERROR" in s.upper():
+                errs += 1
+    print(f"plik: {logp} | linii m96-dlugi {len(rows)} (nierozpoznanych {bad}), linii DS z zaleglosciami miast {len(ds_arr)}, ERROR {errs}")
+    if not rows:
+        rep.add("M96D-0: linia 'Dlugi miast (m96-dlugi)'", "brak w logu" + (f" (nierozpoznanych {bad})" if bad else ""),
+                "INFO (log sprzed galezi m96-dlugi albo klucz Town Debt wylaczony)", None)
+        if ds_arr:
+            da = ds_arr[-1]
+            rep.add("M96D-3: zaleglosci firm DS miast na koniec (linia DS f14-miary)", f"{da[1]} zl u {da[2]} miast (doba {da[0]})", "INFO (baza bez galezi)", None)
+        rep.add("M96D-6: ERROR TownDebt", str(errs), "0", errs == 0)
+        rep.show()
+        return 0
+    rep.add("M96D-0: linia 'Dlugi miast (m96-dlugi)'", f"linii {len(rows)} (dzien {rows[0]['day']}..{rows[-1]['day']}), nierozpoznanych {bad}", "nierozpoznanych 0", bad == 0)
+    badc = [r["day"] for r in rows if abs(r["ctl"]) > 5 or r["ctl2"] != 0]
+    rep.add("M96D-1: kontrola dlugu (wczoraj + pozyczone + odsetki - splacone) i podatku (wierzycielom + na zaleglosci + w kasie) - kazda linia",
+            f"linii z rozjazdem {len(badc)}" + (f" (dzien {badc[0]})" if badc else ""), "0 (dlug |r| <= 5 zl zaokraglen, podatek 0) - nic z niczego", not badc)
+    last = rows[-1]
+    rep.add("M96D-2: dlug rad razem wobec limitu razem (ostatnia linia)", f"dlug {last['debt']}, limit {last['lim']}, Bank {last['bank']}",
+            "dlug <= limit (ponad limit tylko odsetki do najblizszego podatku)", last["debt"] <= max(1, last["lim"]) * 1.05)
+    # recenzja: miara z kasy (panu + koronie) z linii m96-dlugi - czesc z oszczednosci ludu (ALf) placi lud, paczka jej nie rusza; linia DS f14 (z ALf) tylko INFO
+    da = ds_arr[-1] if ds_arr else None
+    rep.add("M96D-3: zaleglosci firm DS miast z kasy (panu + koronie) na koniec (linia m96-dlugi)",
+            f"{last['arrend']} zl u {last['arrendn']} miast (doba {last['day']}); baza {base_arr}" + (f"; linia DS f14 z czescia ludu: {da[1]} zl u {da[2]} miast" if da else ""),
+            f"<= 50% bazy ({base_arr // 2}; WGRANIE 95 160 dob: z kasy co najmniej 209 771 zl - Duskendale 163 500, Rhyos 46 271; razem z ALf 381 134 zl u 8 miast)",
+            last["arrend"] <= base_arr // 2)
+    w = [r for r in rows if r["day"] > last["day"] - 28]
+    rep.add("M96D-4: miasta z dlugiem, pozyczki, odsetki, splaty - ostatnie 28 dob (INFO)",
+            f"miast z dlugiem {last['towns']} (najwiecej {max(r['towns'] for r in rows)}), pozyczone {sum(r['lent'] for r in w)}, odsetki {sum(r['int'] for r in w)}, "
+            f"splacone z nadwyzki {sum(r['rep'] for r in w)}, niewyplacalnych dzis {last['insolv']}", "INFO (oczekiwane: 3-15 miast z dlugiem, dlug < 2 mln)", None)
+    lv = sum(r["levies"] for r in rows)
+    loy = sum(r["loy"] for r in rows)
+    rep.add("M96D-5: podatki nadzwyczajne i skutki (caly log)",
+            f"podatkow {lv} na {sum(r['levy'] for r in rows)} zl, lojalnosc -{loy:.1f} (na podatek {loy / lv if lv else 0:.1f}), dobrobyt od dlugu -{sum(r['pros'] for r in rows):.0f}",
+            "lojalnosc na podatek <= 5 (Town Debt Levy Loyalty)", (loy / lv <= 5.01) if lv else None)
+    rep.add("M96D-7: zwolnienie DS po zdobyciu (rada czeka) i czekanie na pule Banku (caly log, INFO)",
+            f"miastodob po zdobyciu {sum(r['capt'] for r in rows)}, czekajacych na pule Banku {sum(r['poolw'] for r in rows)} (najwiecej w dobie {max(r['poolw'] for r in rows)})",
+            "INFO (czekanie na pule - zadnego podatku z tego powodu)", None)
+    msd = sum(r["ms"] for r in rows) / len(rows); st = sum(r["stum"] for r in rows)
+    rep.add("M96D-6: czas (ms na dobe), potkniecia i ERROR TownDebt", f"srednio {msd:.2f} ms (najwiecej {max(r['ms'] for r in rows):.2f}), potkniecia {st}, ERROR {errs}",
+            "<= 2 ms/d, 0, 0", msd <= 2.0 and st == 0 and errs == 0)
     rep.show()
     return 0
 

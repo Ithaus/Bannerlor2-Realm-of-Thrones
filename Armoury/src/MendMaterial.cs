@@ -262,11 +262,11 @@ namespace Armoury
             if (ms < 0f) ms = share; else ms = Math.Min(ms, share);   // tylko obnizki - jak NeedsShare
             var r = Recipes.For(it);
             if (r.Parts == null) return list;
-            foreach (var p in r.Parts)
+            foreach (var p in Recipes.ExactUnits(r))   // m96-receptury: przy przepisie z masy dokladne sztuki (kg / waga sztuki), nie sztuki do otwarcia
             {
-                if (p.Item == null) continue;
-                if (WoodPart(p.Item) && r.WoodKg > 0f) continue;   // N12: drewno liczy SelfParts w kg (ladunki do otwarcia), nie ulamek ladunku
-                list.Add(new KeyValuePair<ItemObject, float>(p.Item, p.Count * (ForgeMetalPart(p.Item) ? ms : share)));
+                if (p.Key == null) continue;
+                if (WoodPart(p.Key) && r.WoodKg > 0f) continue;   // N12: drewno liczy SelfParts w kg (ladunki do otwarcia), nie ulamek ladunku
+                list.Add(new KeyValuePair<ItemObject, float>(p.Key, p.Value * (ForgeMetalPart(p.Key) ? ms : share)));
             }
             return list;
         }

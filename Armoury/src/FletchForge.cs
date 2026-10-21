@@ -50,11 +50,12 @@ namespace Armoury
                 // (Jeff: "pancerze tak samo, dopiero uczysz sie pancerzy").
                 // Blokada stoi PRZED podzialem na strzeleckie i BK-owe, wiec
                 // zamknietego wzoru nie wykujesz zadna droga.
+                if (PatternGate.RareStuff(item)) { Log.Player(PatternGate.RareWhy, true); return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged)
                 if (!RangedLore.KnownOf(item))
                 {
                     // unikat imienny NIE wpada z nauki przy kowadle - trzeba
                     // zdobyc oryginal i go rozlozyc albo przetopic
-                    if (UniqueGear.Is(item))
+                    if (PatternGate.IsForgeUnique(item))   // m96-wzory: takze unikaty ROT (ForgeUniquesByStudy)
                     {
                         Log.Player("This famed piece cannot be worked out at the anvil. Seize the original and study it - melt it down, or take it apart at the smith.", true);
                         return false;
@@ -140,7 +141,7 @@ namespace Armoury
         /// wlasne kucie. Postfix biegnie po KAZDEJ robocie (takze gdy prefix
         /// przejal strzeleckie) - tu tez odswiezamy liczniki ekranu.
         /// </summary>
-        public static void BkCraftPostfix(object __instance)
+        public static void BkCraftPostfix(object __instance, bool __runOriginal)
         {
             RefreshCraftScreen(__instance);
             try
@@ -157,7 +158,12 @@ namespace Armoury
                 if (item == null || RangedType(item)) return;      // strzeleckie licza sie w Forge.Smith
                 // zbroja z kuzni jak bron: brama progu odmowila - nic sie nie kulo, wiec ani nauki wzorow, ani okna wyniku
                 if (ArmourQuality.Refused) return;
-                RangedLore.OnCrafted(item);
+                // m96-wzory: prefiks odmowil (wzor nieznany - BkCraftPrefix, brama progu tarcz itp.) - BK nic nie kul, wiec ani nauki, ani okna wyniku.
+                // Bylo: Harmony 2.4.2 POMIJA prefiks bool, gdy wczesniejszy prefiks zwrocil false (MethodCreator: Ldloc runOriginal, Brfalse przed wywolaniem),
+                // wiec ArmourQuality.CraftPrefix (Priority.Low) po odmowie BkCraftPrefix w ogole nie biegl i Refused zostawal z POPRZEDNIEGO kliku (zwykle false) -
+                // ten postfiks dawal punkty za klik w zamkniety wzor. Jedyna pewna miara tutaj to __runOriginal (postfiksy go dostaja).
+                if (!__runOriginal && LoreSeedFix.On) { LoreSeedFix.NoteRefusedClick(item); return; }
+                RangedLore.OnCrafted(item, PatternGate.SmithOf(__instance));   // m96-wzory: losowanie wedlug reki kowala z ekranu
                 // okno wyniku takze dla pancerza kutego w BK CRAFT: jakosc
                 // czytamy z OSTATNIEGO stacka tego itemu w sakwach (rostery
                 // dokladaja swieze na koniec)
@@ -315,6 +321,35 @@ namespace Armoury
             catch (Exception e) { Log.Error("BkShieldSpend", e); }
         }
 
+        /// <summary>m96-receptury (RecipesByMass): pancerz wykuty w CRAFT BK - sztuki do otwarcia zdjal kwit (BkSpendMaterialsPrefix albo oryginal BK, kwit =
+        /// Recipes.For), tu kg schodza z otwartych ladunkow (skrzynka metalu, len, skora). Bez tego reszta otwartej sztuki nie zmalalaby - surowiec za darmo.</summary>
+        private static string _massHook = "nie wpiete";
+        private static int _massMismatch;
+        internal static string MassHookState { get { return _massHook; } }   // linia startu Przepisy z masy (po recenzji: stan latki widoczny co sesje)
+
+        public static void BkMassSpendPostfix(object __instance)
+        {
+            try
+            {
+                if (!Recipes.MassOn) return;
+                var item = BkCurrentItem(__instance);
+                if (item == null || !item.HasArmorComponent || !Recipes.MassCovers(item)) return;
+                // kwit, ktory BK wlasnie zdjal (ta sama metoda, otwarte ladunki jeszcze nie ruszone), musi byc kwitem przepisu z masy - inaczej (latki kwitu
+                // wylaczone) zapis kg dalby otwartym ladunkom metal, ktorego nikt nie zdjal z sakw
+                var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
+                var model = cfg != null ? Traverse.Create(cfg).Property("SmithingModel").GetValue() : null;
+                var bill = model != null ? Traverse.Create(model).Method("GetCraftingInputForArmor", item).GetValue<int[]>() : null;
+                if (!Recipes.BillMatches(Recipes.For(item), bill))
+                {
+                    _massMismatch++;
+                    if (_massMismatch <= 5) Log.Info("Surowce w kuzni (kg) (m96-receptury): CRAFT BK " + item.StringId + " - kwit BK inny niz przepis z masy, kg nie zapisane (razy " + _massMismatch + ", latki kwitu " + _massHook + ").");
+                    return;
+                }
+                Recipes.MassCommitBk(item, item.StringId + " (CRAFT BK)");
+            }
+            catch (Exception e) { Log.Error("BkMassSpend", e); }
+        }
+
         public static void BkHasMaterialsPostfix(object __instance, ref bool __result)
         {
             try
@@ -322,6 +357,26 @@ namespace Armoury
                 _velvetShort = null;
                 if (!__result) return;
                 var item = BkCurrentItem(__instance);
+                // m96-receptury (po recenzji): BK HasMaterials sprawdza skore, a potem NADPISUJE wynik sprawdzeniem lnu (flag2 = ... dwa razy, dekompilacja
+                // CraftingMixin.HasMaterials). Przepis z masy ma czasem skore i len naraz (luk refleksyjny: rog i sciegno + cieciwa; plaszcz t5+: futro + len) -
+                // bez skory przycisk Craft zostawal czynny. Sprawdzamy skore jeszcze raz, z tej samej tablicy kwitu (CurrentMaterials) i po calej kategorii skory
+                // (CountInInventory liczy co najmniej tyle co BK - blokujemy tylko, gdy BK tez nie mialby z czego zdjac).
+                if (Recipes.MassOn && item != null && Recipes.MassCovers(item))
+                {
+                    var bill = Traverse.Create(__instance).Property("CurrentMaterials").GetValue<int[]>();
+                    if (bill != null && bill.Length >= 11 && bill[9] > 0 && bill[10] > 0)
+                    {
+                        var lea = Recipes.SoftLeather;
+                        int haveL = Recipes.CountInInventory(lea);
+                        if (haveL < bill[9])
+                        {
+                            __result = false;
+                            _velvetShort = "You don't have all required materials! This also needs " + bill[9] + " " + (lea != null && lea.Name != null ? lea.Name.ToString() : "leather")
+                                           + " - you have " + haveL + ".";
+                            return;
+                        }
+                    }
+                }
                 int need = ShieldVelvetNeed(item);
                 if (need <= 0) return;
                 int have = Recipes.CountInInventory(Recipes.SoftVelvet);
@@ -394,6 +449,15 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                // m96-receptury: kg z otwartych ladunkow za pancerz z CRAFT BK - wpiete zawsze (klucz i zgodnosc kwitu sprawdza postfiks)
+                try
+                {
+                    var tMm = QuartermasterLaw.FindType("BannerKings.UI.Extensions.CraftingMixin");
+                    var mMm = tMm != null ? AccessTools.DeclaredMethod(tMm, "SpendMaterials") : null;
+                    if (mMm != null) h.Patch(mMm, postfix: new HarmonyMethod(typeof(FletchForge), "BkMassSpendPostfix"));
+                    _massHook = mMm != null ? "wpiete" : "BRAK SpendMaterials";
+                }
+                catch (Exception e3) { _massHook = "wyjatek " + e3.GetType().Name; Log.Error("FletchForge.ApplyAll(masa)", e3); }
                 // kwit pancerzy BK ma byc spojny z Prawem Wagi NIEZALEZNIE od
                 // tego, czy luczarnia jest wlaczona - patch przed gatingiem
                 if (c != null && c.CraftingEnabled)

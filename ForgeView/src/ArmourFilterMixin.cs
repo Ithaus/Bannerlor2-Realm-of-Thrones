@@ -203,6 +203,37 @@ namespace ForgeView
             catch { return true; }
         }
 
+        // ---- m96-wzory po recenzjach: tier WZORU z Armoury (RangedLore.TierOf: kusza wedlug sily, reszta tier gry) - ten sam co etykieta [I]..[VI]
+        // (BkArmourList) i ksiega; delegat zamiast Invoke - bez alokacji przy kazdym kafelku filtra ----
+        private static Func<ItemObject, int> _tierOf;
+        private static bool _tierLooked;
+
+        private static int TierOf(ItemObject it)
+        {
+            try
+            {
+                if (!_tierLooked)
+                {
+                    _tierLooked = true;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        var t = asm.GetType("Armoury.RangedLore");
+                        if (t == null) continue;
+                        var mi = t.GetMethod("TierOf", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+                                                       | System.Reflection.BindingFlags.Static, null, new[] { typeof(ItemObject) }, null);
+                        if (mi != null && mi.ReturnType == typeof(int))
+                            _tierOf = (Func<ItemObject, int>)Delegate.CreateDelegate(typeof(Func<ItemObject, int>), mi, false);
+                        break;
+                    }
+                    Log.Info("Armoury RangedLore (filtr tierow - m96-wzory): " + (_tierOf != null ? "PODPIETY (Armoury.RangedLore.TierOf - kusza wedlug sily)"
+                             : "BRAK (Armoury.RangedLore.TierOf) - zostaje: tier gry"));
+                }
+                if (_tierOf != null) return _tierOf(it);
+            }
+            catch { }
+            return (int)it.Tier + 1;
+        }
+
         private static bool RangedType(ItemObject it)
         {
             if (it == null) return false;
@@ -293,6 +324,8 @@ namespace ForgeView
                     if (id == null || _mwInjected.Contains(id)) continue;
                     var item = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
                     if (item == null) continue;
+                    // m96-wzory (recenzja): wyrob strzelecki (np. unikat ROT opanowany z oryginalu) jest juz na polce z InjectRanged - bez drugiego wiersza
+                    if (_rangedInjected && RangedType(item) && !BannedRanged(item)) continue;
                     try
                     {
                         _all.Add(new ArmorItemVM(ViewModel, item, ViewModel.GetItemType(item)));
@@ -351,7 +384,7 @@ namespace ForgeView
                 foreach (var vm in _all)
                 {
                     if (vm == null || vm.Item == null) continue;
-                    if (tier != 0 && (int)vm.Item.Tier + 1 != tier) continue;
+                    if (tier != 0 && TierOf(vm.Item) != tier) continue;   // m96-wzory (recenzja): tier wzoru jak etykieta [I]..[VI] (kusza wedlug sily)
                     if (_cat != 0 && CatOf(vm.Item) != _cat) continue;
                     pick.Add(vm);
                 }

@@ -37,7 +37,7 @@ namespace Armoury
     ///   PlayerFeesHistorical: lapowka strazy (DefaultBribeCalculationModel.GetBribeInternal - takze poslaniec Diplomacy) po kursie 5 000 starej monety
     ///     = 30 dni placy straznika (60 / 36 / 6, nie mniej niz 3 dni), lapowka przy odbijaniu wieznia = straznicy lochu x 30 dni placy x czynnik
     ///     lotrostwa gry (setki zamiast tysiecy) - obie do sakiewki zalogi (MenPurse; przez kiese partii zalogi - zdarzenie gry bohater -> partia),
-    ///     bez zalogi do kasy osady; golibroda 3, wiesci karczmarza 12, kolejka 0.3 na czlowieka, napitek 2 (bez zmian) - do kasy miasta i z niej do
+    ///     bez zalogi do kasy osady; golibroda 3, wiesci karczmarza 12, kolejka 0.3 na czlowieka, wiesci o ludziach do najecia 2 (bez zmian) - do kasy miasta i z niej do
     ///     kiesy ludu (TownFolk.EarnFromTown, uslugi).
     ///   PlayerSmallSourcesClosed: nagroda areny treningowej z kasy miasta (nadwyzka); zloto za wymuszone zapasy wsi (hearth x 4) z kiesy wsi do jej
     ///     wysokosci; NavalDLC "Coastal Guard Edict" - drugie rozliczenie zalogi portowej (zold drugi raz w nicosc, dopelnienie kiesy z niczego,
@@ -99,7 +99,14 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby
 
         private const int FBribe = 0, FBreak = 1, FBarber = 2, FClanInfo = 3, FTun = 4, FDrink = 5, Fees = 6;
-        private static readonly string[] FName = { "lapowka strazy", "odbicie wieznia", "golibroda", "wiesci karczmarza", "kolejka dla druzyny", "napitek" };
+        // m96-wies (recenzja): FDrink to oplata 2 karczmarzowi za wiesc o ludziach do najecia (dialog "I am looking for some people to hire...",
+        // TavernEmployeesCampaignBehavior.FindCompanionWithType), nie napitek - nazwa w logu i powod poprawione, stala FDrink i FolkDrink bez zmian
+        private static readonly string[] FName = { "lapowka strazy", "odbicie wieznia", "golibroda", "wiesci karczmarza", "kolejka dla druzyny", "wiesci o ludziach do najecia" };
+        // m96-wies (PayNotes): klucz do logu i powod w komunikacie gracza, ta sama kolejnosc co FName
+        private static readonly string[] FKey = { "bribe", "prisonbreak", "barber", "claninfo", "round", "hireinfo" };
+        private static readonly string[] FWhy = { " to bribe the guards.", " to the dungeon guards for the prison break.", " to the barber.",
+                                                  " to the innkeeper for news of the clans.", " for a round of drinks for your men.",
+                                                  " to the innkeeper for word of people looking for work." };
         private static readonly int[] _fN = new int[Fees];
         private static readonly long[] _fSum = new long[Fees], _fGame = new long[Fees];
         private static long _toGuards, _toChest, _toTown, _toFolk, _feeVoid;
@@ -273,15 +280,18 @@ namespace Armoury
             if (!mine) { GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn); return; }
             var me = Hero.MainHero;
             int had = me.Gold;
+            bool pn = !dn && PayNotes.On; dn = dn || pn;   // m96-wies: gdy gra pokazalaby "You paid N" - nasz komunikat z powodem (FWhy)
             if (!on || st == null)
             {
                 GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn);   // jak gra (w nicosc), licznik
                 int lost = Math.Max(0, had - me.Gold);
                 _fN[kind]++; _fSum[kind] += lost; _fGame[kind] += lost; _feeVoid += lost;
+                if (pn) PayNotes.Paid(FKey[kind], lost, FWhy[kind]);
                 return;
             }
             GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount, dn);
             int paid = Math.Max(0, had - me.Gold), folk = 0;
+            if (pn) PayNotes.Paid(FKey[kind], paid, FWhy[kind]);
             try
             {
                 if (paid > 0 && st.IsTown && st.Town != null)
@@ -350,16 +360,19 @@ namespace Armoury
             if (!mine) { GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn); return; }
             var me = Hero.MainHero;
             int had = me.Gold;
+            bool pn = !dn && PayNotes.On; dn = dn || pn;   // m96-wies: gdy gra pokazalaby "You paid N" - nasz komunikat z powodem (FWhy)
             if (!on || st == null)
             {
                 GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn);   // jak gra (w nicosc), licznik
                 int lost = Math.Max(0, had - me.Gold);
                 _fN[kind]++; _fSum[kind] += lost; _fGame[kind] += lost; _feeVoid += lost;
+                if (pn) PayNotes.Paid(FKey[kind], lost, FWhy[kind]);
                 return;
             }
             if (gar != null) GiveGoldAction.ApplyForCharacterToParty(me, gar.Party, amount, dn);
             else GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount, dn);
             int paid = Math.Max(0, had - me.Gold), purse = 0;
+            if (pn) PayNotes.Paid(FKey[kind], paid, FWhy[kind]);
             try
             {
                 if (gar != null && paid > 0 && MenPurse.On)
@@ -595,6 +608,7 @@ namespace Armoury
             // Pieniadz bez zrodla z niczego (kasa -> kiesa ludu); gdy kasy brak - rzemieslnicy dostaja, ile jest, przedmiot i tak (obiecany w szrankach).
             if (Settings.Current != null && Settings.Current.TourneyPrizeCommissioned)
             {
+                QualityScarcity.Commissioned(mine, ref el, st);   // m96-jakosc: miasto placi cene zwyklej - jakosc z rzutu RBMTournament przez regule warsztatow
                 int paidC = 0;
                 try
                 {
@@ -815,7 +829,7 @@ namespace Armoury
                 s2.From2 = tun; s2.To2 = W(nameof(TunPrice)); s2.WantCalls = 1;
                 var s3 = Add("kolejka - tekst (calculate_tun_cost_on_condition)", TAV, "calculate_tun_cost_on_condition");
                 s3.From2 = tun; s3.To2 = W(nameof(TunPrice)); s3.WantCalls = 1;
-                Call("napitek (FindCompanionWithType)", TAV, "FindCompanionWithType", abc, nameof(FolkDrink), 1);
+                Call("wiesci o ludziach do najecia (FindCompanionWithType)", TAV, "FindCompanionWithType", abc, nameof(FolkDrink), 1);
                 // drobne zrodla
                 Call("arena treningowa (conversation_arena_master_post_fight_on_condition)", SB + "ArenaMasterCampaignBehavior", "conversation_arena_master_post_fight_on_condition", abc, nameof(ArenaPrize), 1);
                 Call("wymuszone zapasy wsi (village_force_supplies_ended_successfully_on_consequence)", "TaleWorlds.CampaignSystem.CampaignBehaviors.VillageHostileActionCampaignBehavior",

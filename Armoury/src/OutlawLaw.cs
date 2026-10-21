@@ -131,6 +131,7 @@ namespace Armoury
         // i z kryjowka, ktore dola objela, pominiete wedlug przyczyny; kiesy przed dola i sama dola. Wyplaty kas kryjowek: herszt BK (TakeHoardSurplus),
         // przeszukanie gracza i zwyciezca AI (HoardTakeAll). _hoardNet = suma NASZYCH zmian kas kryjowek (HoardChange + wplata przy wejsciu) - kontrola k
         private static int _stashBands, _stashAll, _stashHome, _stashSkipBattle, _stashSkipQuest, _stashSkipUndead, _stashSkipHeld, _stashSkipEmpty, _stashSkipSmall, _stashInTick;
+        private static int _stashSkipKept;                         // m96-bandy: dola pominieta - cala kiesa to zapas (BandFood.PurseKeep)
         private static int _paySearchN, _payAiN, _aiHideBattles, _aiHideCleared, _carryN, _searchMsgN, _hoardStumbles;
         private static long _stashPurse, _stashDaily, _hoardBk, _paySearch, _payAi, _payAiLord, _payAiParty, _payAiTown, _hoardNet, _carryGold;
         // nskarbiec (poprawka po recenzji): przelewy gry (GiveGoldAction) z kasa kryjowki po jednej stronie - okup gracza do kryjowki bandy (RansomFlows 2.14),
@@ -160,6 +161,7 @@ namespace Armoury
             _warHome.Clear();
             _watchKey.Clear();                                         // E4/9: pamiec kluczy puli Strazy
             _hoardLastSum = -1; _hoardSessStumbles = 0; _hoardErrSites.Clear();   // nskarbiec: stan kas kryjowek i potkniecia tylko z tej kampanii (liczniki dnia - FenceNewDay wyzej)
+            BandFood.Reset();                                          // m96-bandy: stan jedzenia band (sesja) tylko z tej kampanii
         }
 
         private static void PoolNewDay()
@@ -183,6 +185,7 @@ namespace Armoury
             _foodBands = _foodTaken = 0;
             // nskarbiec: licznik dnia linii "Skarbce kryjowek (nskarbiec)" (linia biegnie tuz przed FenceLog, ktory zeruje w finally)
             _stashBands = _stashAll = _stashHome = _stashSkipBattle = _stashSkipQuest = _stashSkipUndead = _stashSkipHeld = _stashSkipEmpty = _stashSkipSmall = _stashInTick = 0;
+            _stashSkipKept = 0;                                        // m96-bandy
             _paySearchN = _payAiN = _aiHideBattles = _aiHideCleared = _carryN = _searchMsgN = _hoardStumbles = 0;
             _stashPurse = _stashDaily = _hoardBk = _paySearch = _payAi = _payAiLord = _payAiParty = _payAiTown = _hoardNet = _carryGold = 0;
             _giveIn = _giveOut = 0; _giveInN = _giveOutN = 0;
@@ -1348,7 +1351,7 @@ namespace Armoury
                                 try { if (!PeopleBook.IsWight(e.Character)) PeopleBook.Give(p.MemberRoster, PeopleBook.Take(p.PrisonRoster, n, PeopleBook.FPrisRecruit), PeopleBook.FPrisRecruit); } catch { }
                             }
                         }
-                        if (daily > 0)
+                        if (daily > 0 && !BandFood.Starving(p))      // m96-bandy: do glodnej bandy nikt nie przystaje (klucz off - jak dotad)
                         {
                             int room = p.Party.PartySizeLimit - p.MemberRoster.TotalManCount;
                             int want = Math.Min(room, daily);
@@ -1389,7 +1392,7 @@ namespace Armoury
                             if (why != 0)
                             {
                                 // banda poza handlem: liczymy, ile ladunku przez to lezy (pomiar do linii "Paser:")
-                                int left = CargoUnits(p.ItemRoster, food);
+                                int left = CargoUnits(p.ItemRoster, food) - (food ? Math.Min(BandFood.FoodKeep(p), BandFood.FoodUnits(p.ItemRoster)) : 0);   // m96-bandy: zapas jedzenia to nie ladunek
                                 if (left > 0)
                                 {
                                     _leftUnits += left;
@@ -1409,6 +1412,8 @@ namespace Armoury
                     }
                 }
                 MoneyLedger.Mark(MoneyLedger.MFence);         // ... a zmiana kas od poprzedniej migawki to zaplata miast za lup
+                try { BandFood.Daily(s); } catch (Exception e) { Log.Error("BandFood.Daily", e); }   // m96-bandy: bandy jedza (zakup u pasera, rabunek wsi, glod) - po zaplacie za lup
+                MoneyLedger.Mark(MoneyLedger.MLife);          // m96-bandy: ... zakupy jedzenia band u paserow - odcinek "bandy - zycie"
 
                 int bands = 0, men = 0;
                 foreach (var p in MobileParty.AllBanditParties) { bands++; men += p.MemberRoster.TotalManCount; }
@@ -2073,12 +2078,30 @@ namespace Armoury
                     if (p.IsCurrentlyUsedByAQuest) { _stashSkipQuest++; continue; }
                     if (Undead.Party(p)) { _stashSkipUndead++; continue; }
                     if (HideoutPurge.Holds(home)) { _stashSkipHeld++; continue; }
+                    // m96-bandy: drobne na BandPurseKeepDays dni zycia zostaja w kiesie, dola tylko z reszty (klucz off - 0, cala kiesa jak dotad);
+                    // "kiesy przed dola" w linii nskarbiec = kiesy ponad zapas (podstawa doli - NK-3 dola / kiesy bez zmian)
+                    int keep = BandFood.PurseKeep(p);
+                    if (keep > Math.Max(0, p.PartyTradeGold) && s.OutlawHoardCirculates)
+                    {
+                        // m96-bandy: kieszonkowe - brak do zapasu z nadwyzki kasy kryjowki ponad skarbiec (ta sama regula i kategoria co kiesy startowe)
+                        int lack = keep - Math.Max(0, p.PartyTradeGold);
+                        int got = Math.Min(lack, HoardSurplus(home));
+                        if (got > 0) { HoardChange(home, -got); p.PartyTradeGold += got; _hoardStart += got; _hoardStartWant += got; }
+                        BandFood.NotePocket(lack, got);
+                    }
                     int purse = p.PartyTradeGold;
                     if (purse <= 0) { _stashSkipEmpty++; continue; }
+                    if (keep > 0)
+                    {
+                        BandFood.NoteStashKept(purse, keep);
+                        if (keep >= purse) { _stashSkipKept++; continue; }   // cala kiesa to zapas - bez doli
+                        purse -= keep;
+                        if ((int)(purse * share) <= 0) { _stashSkipSmall++; continue; }   // nadwyzka ponizej zlotowki doli - poza "kiesami przed dola" (NK-3)
+                    }
                     _stashPurse += purse;
                     int put = (int)(purse * share);
                     if (put <= 0) { _stashSkipSmall++; continue; }   // kiesa ponizej zlotowki doli - zostaje w kiesie
-                    p.PartyTradeGold = purse - put;
+                    p.PartyTradeGold -= put;                         // m96-bandy: purse to juz kiesa ponad zapas - zdejmujemy sama dole
                     HoardChange(home, put);
                     _stashDaily += put; _stashBands++;
                 }
@@ -2130,7 +2153,7 @@ namespace Armoury
                 sb.Append(" | band z kryjowka ").Append(_stashHome).Append(" z ").Append(_stashAll).Append(", dola dalo ").Append(_stashBands)
                   .Append(" (pominiete: bitwa ").Append(_stashSkipBattle).Append(", zadanie ").Append(_stashSkipQuest).Append(", nieumarli ").Append(_stashSkipUndead)
                   .Append(", czeka na przeszukanie ").Append(_stashSkipHeld).Append(", pusta kiesa ").Append(_stashSkipEmpty).Append(", kiesa ponizej zlotowki doli ").Append(_stashSkipSmall)
-                  .Append(", w ticku gry ").Append(_stashInTick).Append(")")
+                  .Append(", w ticku gry ").Append(_stashInTick).Append(BandFood.On ? ", kiesa w calosci zapasem " + _stashSkipKept : "").Append(")")   // m96-bandy
                   .Append(" | kiesy band z kryjowka przed dola ").Append(_stashPurse).Append(" zl, dola ").Append(_stashDaily).Append(" zl")
                   .Append(" | wplaty ").Append(inn).Append(" zl (dola ").Append(_stashDaily).Append(", wejscia do kryjowek ").Append(_hideStash).Append(", przelewy gry do kryjowek ").Append(_giveIn).Append(" w ").Append(_giveInN).Append(")")
                   .Append(" | wyplaty ").Append(outw).Append(" zl (kiesy startowe ").Append(_hoardStart).Append(", sprzet ").Append(_hoardGear).Append(", herszt BK ").Append(_hoardBk)
@@ -2321,6 +2344,8 @@ namespace Armoury
                     if (p.IsCurrentlyUsedByAQuest || Undead.Party(p)) continue;
                     int purse = p.PartyTradeGold;
                     if (purse <= 0) continue;
+                    purse -= BandFood.LifeKeep(p);                // m96-bandy: zapas kiesy (dni zycia) zycie zostawia - wydatek tylko z reszty (klucz off - 0, jak dotad)
+                    if (purse <= 0) continue;
                     int spend = Math.Min(purse, Math.Max(1, (int)(purse * share)));      // co najmniej moneta - drobna kiesa tez sie rozchodzi
                     var town = ReferenceEquals(p.CurrentSettlement, null) || !p.CurrentSettlement.IsTown ? NearestOpenTown(p.Position.ToVec2()) : p.CurrentSettlement;
                     // WW4 (wyspy-wolni): banda Sea Raiders poza miastem wydaje w najblizszym porcie Wysp do 600 (dom korsarza) zamiast w najblizszym miescie
@@ -2332,7 +2357,7 @@ namespace Armoury
                     }
                     if (town == null || town.Town == null || spend <= 0) continue;
                     if (harb || (ReaverLaw.IsSeaRaider(p) && town.MapFaction != null && town.MapFaction.StringId == ReaverLaw.IronId)) _ww4Life += spend;
-                    p.PartyTradeGold = purse - spend;
+                    p.PartyTradeGold -= spend;                    // m96-bandy: purse to kiesa ponad zapas - zdejmujemy sam wydatek
                     int folk = TownFolk.EarnService(town, spend, TownFolk.KLifeBand);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca)
                     town.Town.ChangeGold(spend - folk);
                     MoneyLedger.Note169(MoneyLedger.N169Other, town, spend - folk);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
@@ -2423,6 +2448,11 @@ namespace Armoury
             var pack = p.ItemRoster;
             if (pack == null || pack.Count == 0) return;
             bool food = s.OutlawNoFreeFood, spare = s.OutlawFenceBuysSpareAnimals;
+            // m96-bandy: zapas jedzenia bandy (dzis + BandFoodKeepDays dni) zostaje w jukach - paser bierze tylko nadwyzke; cala zywnosc w zapasie =
+            // dla tej bandy zywnosc nie jest ladunkiem (klucz off - keep 0, jak dotad)
+            int keep0 = food ? BandFood.FoodKeep(p) : 0;
+            if (keep0 > 0 && BandFood.FoodUnits(pack) <= keep0) { food = false; keep0 = 0; }
+            int foodKeep = keep0;
             bool cargo = false, beasts = false;
             for (int i = 0; i < pack.Count; i++)
             {
@@ -2442,7 +2472,7 @@ namespace Armoury
             var bids = Reach(p, radius, out beyond, true);
             if (bids.Count == 0)
             {
-                if (cargo) { _leftBands++; _leftNoTown++; _leftUnits += CargoUnits(pack, food); }
+                if (cargo) { _leftBands++; _leftNoTown++; _leftUnits += Math.Max(0, CargoUnits(pack, food) - Math.Min(keep0, BandFood.FoodUnits(pack))); }   // m96-bandy: bez zapasu jedzenia
                 return;
             }
             float far = MBMath.ClampFloat(s.OutlawFenceLootShareFar, 0f, share);      // daleko nigdy lepiej niz przy miescie
@@ -2468,6 +2498,14 @@ namespace Armoury
                         continue;
                     }
                     if (lk != LootCargo) continue;
+                    if (foodKeep > 0 && el.EquipmentElement.Item.IsFood)
+                    {
+                        // m96-bandy: zapas jedzenia - ten stos (albo jego czesc) zostaje w jukach
+                        int k = Math.Min(foodKeep, el.Amount);
+                        foodKeep -= k;
+                        if (k >= el.Amount) continue;
+                        el = new ItemRosterElement(el.EquipmentElement, el.Amount - k);
+                    }
                     units += SellStack(p, pack, el, bids, reserve, false, 0f, ref poor);
                 }
                 if (spare && beasts) units += SellSpare(p, pack, bids, reserve, ref poor);
@@ -2479,7 +2517,7 @@ namespace Armoury
                 if (units > 0) { if (cargo) _sellSellers++; else _sellSpareBands++; }
                 if (cargo)
                 {
-                    int left = CargoUnits(pack, food);
+                    int left = CargoUnits(pack, food) - (keep0 > 0 ? Math.Min(keep0, BandFood.FoodUnits(pack)) : 0);   // m96-bandy: zapas jedzenia to nie ladunek
                     if (left > 0) { _leftBands++; _leftUnits += left; if (poor) _leftPoor++; }
                 }
             }

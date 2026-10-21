@@ -464,6 +464,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
         public bool RotEnlistLootGamePrice { get; set; } = true;
 
+        [SettingPropertyBool("Player Payment Reasons", HintText = "when you pay or receive gold in captivity, for your ransom or your house, the game's bare 'You paid N' / 'You received N' is replaced by one message that says what for. Only the message changes - sums and payers stay the same. Off = the game's message as before (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Payment messages")]
+        public bool PlayerPaymentReasons { get; set; } = true;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Other")]
         public bool LogEnabled { get; set; } = true;
@@ -583,6 +587,7 @@ namespace RealisticCaptivity
             s.EnlistedPostBattleHealHp = EnlistedPostBattleHealHp;
             s.EnlistedDailyCareHp = EnlistedDailyCareHp;
             s.RotEnlistLootGamePrice = RotEnlistLootGamePrice;
+            s.PlayerPaymentReasons = PlayerPaymentReasons;
             s.LogEnabled = LogEnabled;
         }
 

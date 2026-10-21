@@ -10,7 +10,7 @@ using TaleWorlds.ObjectSystem;
 namespace Armoury
 {
     /// <summary>Receptury. Gra nie ma ich dla zbroi - skladamy je z kilku gatunkow metalu i surowcow miekkich.</summary>
-    internal static class Recipes
+    internal static partial class Recipes
     {
         internal struct Part
         {
@@ -28,6 +28,8 @@ namespace Armoury
             public int Difficulty;   // TRUDNOSC dla kosci (SmithingDifficultyPerTier): jakosc, pekniecie, XP, odczyt wzoru (pokretla Jeffa 07.10)
             public int Tier;
             public bool Ranged;      // luk/kusza/amunicja - lzejsze ryzyko i stamina niz platnerka
+            public List<KgPart> Kg;  // m96-receptury (RecipesByMass): surowce w kg (Recipes.Mass.cs); null = stary przepis w sztukach
+            public ItemObject MassItem;   // m96-receptury: przedmiot przepisu z masy (linia logu)
         }
 
         // --- surowce miekkie: szukamy po ID, bo ROT moze miec swoje ---
@@ -114,6 +116,8 @@ namespace Armoury
 
         internal static Recipe For(ItemObject item)
         {
+            Recipe mr;
+            if (MassFor(item, out mr)) return mr;   // m96-receptury (RecipesByMass): surowce w kg z masy przedmiotu i otwarte ladunki - Recipes.Mass.cs
             var r = BuildRecipe(item);
             float wkg = _woodKgBuild;
             _woodKgBuild = 0f;
@@ -642,11 +646,13 @@ namespace Armoury
                 sb.Append(p.Count + "x " + p.Item.Name + " (" + have + ")");
                 sb.Append("\n");
             }
+            if (r.Kg != null) sb.Append(MassDescribe(r));   // m96-receptury: kg z otwartych ladunkow
             return sb.ToString().TrimEnd();
         }
 
         internal static bool TakeMaterials(Recipe r)
         {
+            if (r.Kg != null) return MassTake(r, r.MassItem != null ? r.MassItem.StringId : null);   // m96-receptury: sztuki z sakw i kg z otwartych ladunkow
             try
             {
                 var roster = MobileParty.MainParty.ItemRoster;
@@ -668,6 +674,7 @@ namespace Armoury
         internal static List<string> MissingParts(Recipe r, float share)
         {
             var missing = new List<string>();
+            if (r.Kg != null) return MassMissing(r, share);   // m96-receptury: udzial w kg z otwartych ladunkow
             try
             {
                 var roster = MobileParty.MainParty.ItemRoster;
@@ -686,6 +693,7 @@ namespace Armoury
 
         internal static void TakePartial(Recipe r, float share)
         {
+            if (r.Kg != null) { MassTakePartial(r, share); return; }   // m96-receptury: udzial w kg z otwartych ladunkow
             try
             {
                 var roster = MobileParty.MainParty.ItemRoster;
@@ -745,6 +753,7 @@ namespace Armoury
         /// inna stal (dawne dodatkowe "/2" dla "stali valyrianskiej" zdjete).</summary>
         internal static List<Part> SmeltYield(Recipe r, float share)
         {
+            if (r.Kg != null) return MassSmeltYield(r, share);   // m96-receptury: masa metalu sztuki minus straty, najwyzej polowa przepisu
             var list = new List<Part>();
             try
             {

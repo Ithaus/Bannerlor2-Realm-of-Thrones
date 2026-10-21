@@ -91,6 +91,48 @@ namespace Armoury
             if (_errors <= 5 || _errors % 100 == 0) Log.Error("SmeltScraps." + where + " (potkniecie " + _errors + ")", e);
         }
 
+        // ------------------------------------------------------------ m96-receptury (RecipesByMass): skrzynka = otwarta sztaba kuzni
+        // Kucie z masy (Recipes.Mass.cs) zuzywa tysiaczne sztaby: najpierw z tej skrzynki, nowa sztaba z sakw dopiero, gdy skrzynka nie starcza; reszta napoczetej
+        // sztaby wraca tu (0..Unit-1). Napoczeta sztaba i resztki przetopu to ten sam metal - jedna skrzynka, jeden zapis (arm_smeltscraps). Okno przetopu (Begin/End)
+        // biegnie wewnatrz DoSmelting - kucie go nie przecina.
+        internal static int BoxMilli(int g) { return g >= 1 && g <= 6 ? _box[g] : 0; }
+
+        /// <summary>Ile pelnych sztab gatunku g wziac z sakw na milli tysiacznych (0, gdy skrzynka starcza).</summary>
+        internal static int BarsFor(int g, int milli)
+        {
+            if (g < 1 || g > 6 || milli <= 0) return 0;
+            int lack = milli - _box[g];
+            return lack <= 0 ? 0 : (lack + Unit - 1) / Unit;
+        }
+
+        /// <summary>Kucie zuzylo milli tysiacznych gatunku g, z sakw zdjeto bars sztab - reszta do skrzynki (brak = 0, nadwyzka ponad sztabe - cale sztaby zostaja w skrzynce do Unit-1, reszta liczona jako potkniecie).</summary>
+        internal static void ForgeUse(int g, int milli, int bars)
+        {
+            try
+            {
+                if (g < 1 || g > 6) return;
+                long t = (long)_box[g] + (long)Math.Max(0, bars) * Unit - Math.Max(0, milli);
+                if (t < 0) t = 0;
+                if (t >= Unit) { _errors++; t = Unit - 1; }
+                _box[g] = (int)t;
+            }
+            catch (Exception e) { Stumble("ForgeUse", e); }
+        }
+
+        /// <summary>m96-receptury (po recenzji): pekniecie pancerza w CRAFT BK oddaje milli tysiacznych gatunku g do skrzynki (otwarta sztaba); pelne sztaby
+        /// ponad skrzynke wychodza do sakw - zwraca ile (skrzynka zostaje 0..Unit-1).</summary>
+        internal static int ForgeReturn(int g, int milli)
+        {
+            try
+            {
+                if (g < 1 || g > 6 || milli <= 0) return 0;
+                long t = (long)_box[g] + milli;
+                _box[g] = (int)(t % Unit);
+                return (int)(t / Unit);
+            }
+            catch (Exception e) { Stumble("ForgeReturn", e); return 0; }
+        }
+
         // ------------------------------------------------------------ dokladny udzial (tysiaczne czesci sztaby)
         /// <summary>Rozdziela n tysiacznych na gatunki wedlug wag (najwieksze reszty, remis - nizszy gatunek, jak SmeltTruth.WeaponMetal).</summary>
         private static int[] Spread(int[] w, long n)
@@ -141,6 +183,8 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (it == null || s == null) return new int[7];
+                var mm = Recipes.MassSmeltMilli(it, SmeltTruth.Share());   // m96-receptury: masa metalu sztuki minus straty, najwyzej polowa kg przepisu (sufit w regule)
+                if (mm != null) return mm;
                 var r = Recipes.For(it);
                 var w = new int[7];
                 long total = 0;

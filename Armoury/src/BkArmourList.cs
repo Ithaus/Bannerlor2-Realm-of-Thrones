@@ -79,7 +79,7 @@ namespace Armoury
                 var item = ItemOf(__instance);
                 if (item == null || string.IsNullOrEmpty(__result)) return;
                 if (__result.Length > 2 && __result[0] == '[') return;      // juz podpisane
-                __result = "[" + Roman(Recipes.Grade(item)) + "] " + __result;
+                __result = "[" + Roman(RangedLore.TierOf(item)) + "] " + __result;   // m96-wzory (recenzja): tier wzoru - kusza wedlug sily (XbowPatternTierByPower), reszta tier gry jak dotad
                 // wzor jeszcze nieodkryty - widac go na polce, ale kowadlo go nie przyjmie
                 // (Jeff: "te ktore mozna sa normalnie, a te ktorych nie mozna na szaro");
                 // gdy ForgeView wstrzyknal kolorowe warianty wiersza (ArmourListColour),

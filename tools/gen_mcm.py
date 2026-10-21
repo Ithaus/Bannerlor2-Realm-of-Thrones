@@ -4,6 +4,14 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # m96-jakosc2: limity na rodzaj (min..max losowania raz na kampanie) i szanse jakosci - kod przycina do 0..50 / 0..500 i 0..0.05
+    # (QualityScarcity.Range/ChanceL/ChanceM); min > max - kod bierze max jako min
+    'QualityLegendaryPerTypeMin': (0, 50, "0"),
+    'QualityLegendaryPerTypeMax': (0, 50, "0"),
+    'QualityMasterworkPerTypeMin': (0, 500, "0"),
+    'QualityMasterworkPerTypeMax': (0, 500, "0"),
+    'QualityLegendaryChance': (0.0, 0.05, "0.0000"),
+    'QualityMasterworkChance': (0.0, 0.05, "0.0000"),
     # m95-turniej: okup szranek jako czesc wartosci - kod przycina do 0.05..1 (TourneyRansom.ShareOf)
     'TourneyRansomShare': (0.05, 1.0, "0.00"),
     'CampStartHour': (0, 23, "0"),
@@ -37,6 +45,8 @@ RANGES = {
     'MapRoadWideMargin': (0.0, 2.0, "0.00"),
     # n20-drogi (noc 19/20.10): premia drogi bocznej - kod przycina do 0..50 (MapRoads.SidePctOf)
     'MapSideRoadSpeedPercent': (0.0, 50.0, "0.0"),
+    # m96-valyria: premia drogi Valyrii - kod przycina do 0..50 (MapRoadKinds.ValPct; nie mniej niz premia traktu)
+    'MapValyrianRoadSpeedPercent': (0, 50, "0"),
     # p5-bloto (R3-07c): kara blota poza droga w deszczu - kod przycina do 0..50 (MapMud.PctOf)
     'MapMudSpeedPercent': (0, 50, "0"),
     # p6-okup (R3-03a): stawki okupu wsi (kod przycina do 0..1, gorna >= dolnej) i dni ochrony (kod przycina do 1..364)
@@ -239,6 +249,19 @@ RANGES = {
     'TownLoanRentDays': (0.0, 364.0, "0"),
     'TownLoanFolkReserveTimes': (1.0, 5.0, "0.0"),
     'TownLoanCofferReserveTimes': (1.0, 5.0, "0.0"),
+    # m96-dlugi (20.10): dlugi rad miast - zakresy zgodne z przycieciem w kodzie (TownDebt.cs: Clamp stopy 0..0.5 / 0..1, limit 0..20, splata 0..1, dobrobyt 0..10,
+    # podatek 0..0.5, przerwa 7..364, lojalnosc 0..50, dobrobyt podatku 0..0.5, relacja 0..20)
+    'TownDebtRate': (0.0, 0.5, "0.00"),
+    'TownDebtBankRate': (0.0, 1.0, "0.00"),
+    'TownDebtLimitReserve': (0.0, 20.0, "0.0"),
+    'TownDebtRepayShare': (0.0, 1.0, "0.00"),
+    'TownDebtProsperityPerDay': (0.0, 10.0, "0.00"),
+    'TownDebtLevyShare': (0.0, 0.5, "0.00"),
+    'TownDebtLevyGapDays': (7, 364, "0"),
+    'TownDebtLevyLoyalty': (0.0, 50.0, "0.0"),
+    'TownDebtLevyProsperity': (0.0, 0.5, "0.000"),
+    'TownDebtLevyRelation': (0, 20, "0"),
+    'TownDebtNotableKeep': (0, 50000, "0"),
     'FolkLadderCeilingMax': (1.0, 10.0, "0.0"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
@@ -422,6 +445,8 @@ RANGES = {
     'KsFolkIncomeStepPercent': (0.5, 20.0, "0.0"),
     'KsFarmSurplusReviewDays': (7, 91, "0"),
     'KsFarmSurplusReviewMax': (0.0, 1.0, "0.00"),
+    # m96-koszyk (20.10): dni pelnego koszyka R/P z placy W zatrzymanej - kod przycina do 2..20 (TownFolk.M96Days)
+    'KsFolkShortBasketDays': (2.0, 20.0, "0"),
     # f7-kasy (noc 17/18.10): gersuma z zapasu kas miast - zgodnie z przycieciem w kodzie (DsTowns: udzial 0.05..1, dni firmy 0..182)
     'KsFarmCatchUpShare': (0.05, 1.0, "0.00"),
     'KsFarmCatchUpKeepDays': (0, 182, "0"),

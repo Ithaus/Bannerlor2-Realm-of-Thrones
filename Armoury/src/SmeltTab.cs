@@ -42,6 +42,7 @@ namespace Armoury
                 bool armour = (it.HasArmorComponent || it.ItemType == ItemObject.ItemTypeEnum.Shield)
                               && Recipes.IsMetalwork(it);
                 if (!armour) return false;
+                if (SmeltScraps.On && SmeltTruth.ArmourOnceOn) { var mm = Recipes.MassSmeltMilli(it, SmeltTruth.Share()); if (mm != null) { for (int g = 1; g <= 6; g++) if (mm[g] > 0) return true; return false; } }   // m96-receptury: dokladny odzysk (rekawica 0.4 sztaby tez sie topi)
                 return YieldFor(it).Count > 0;
             }
             catch { return false; }
@@ -63,7 +64,7 @@ namespace Armoury
             // Przetop nie odda wiecej metalu niz ulamek KOSZTU WYKUCIA tej samej sztuki.
             try
             {
-                if (s.SmeltCapToCraftCost)
+                if (s.SmeltCapToCraftCost && r.Kg == null)   // m96-receptury: przepis z masy ma sufit w samej regule (najwyzej polowa kg przepisu), a r.Parts to sztuki do otwarcia
                 {
                     // n20-kuznia (klucz SmeltCapFromForgeBill): od 04.10 (audyt K1, FletchForge) kwit CRAFT BK pancerza = Recipes.For (z WAGI), wiec sufit od
                     // punktow ochrony (ArmourUnits) cial przetop do ok. 1/10 metalu kucia (lannister_light_armor: 30 -> 5 przy kwicie ok. 60). Sufit od prawdziwego

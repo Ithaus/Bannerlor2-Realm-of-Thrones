@@ -174,6 +174,7 @@ namespace Armoury
                 EnsureCapital();
                 var crown = new Dictionary<string, double>();
                 if (!CrownBorrow.PrincipalsInto(crown)) { _dvStumbles++; return; }   // bez dlugow koron rozliczenie wzieloby je za straty - jutro dwie doby naraz
+                TownDebt.BankInto(crown);   // m96-dlugi: dlugi rad miast w Banku (id "td:<miasto>") - koszt pozyczek jak kredyt korony (NoteCrownLent)
                 if (!_dvInit)
                 {
                     DvClear();

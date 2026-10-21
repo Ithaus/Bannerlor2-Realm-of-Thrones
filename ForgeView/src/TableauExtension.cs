@@ -33,13 +33,19 @@ namespace ForgeView
                       // stan wzoru jak przy broniach: czerwony = zamkniety, zielony = znany
                       // (kolor przez Brush.FontColor - ten sam mechanizm co Brush.FontSize w TierBar)
                       "<TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
-                      "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvLocked\" " +
+                      "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvNotLearned\" " +
                       "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#D65252FF\" " +
                       "Text=\"PATTERN NOT LEARNED\"/>" +
                       "<TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
                       "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvKnown\" " +
                       "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#8FBF71FF\" " +
                       "Text=\"PATTERN KNOWN\"/>" +
+                      // m96-wzory: znany, ale za trudny dla kowala przy kowadle (prog, jedyna legenda) albo rzadki material (takze bez wzoru) - bursztyn, napis z Armoury.PatternGate;
+                      // czerwony "PATTERN NOT LEARNED" tylko, gdy nic innego nie zamyka wzoru (FvNotLearned)
+                      "<TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                      "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvBlockShown\" " +
+                      "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#E0A040FF\" " +
+                      "Text=\"@FvBlockText\"/>" +
                     "</Children></ListPanel>" +
                   "</Children></Widget>" +
                 "</Children></Widget>" +

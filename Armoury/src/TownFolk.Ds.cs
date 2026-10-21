@@ -33,6 +33,7 @@ namespace Armoury
                     xP = Math.Min(x, (long)Math.Round(x * ps)); xR = x - xP;
                     aP = (long)(xP * Math.Max(0.0, Math.Min(1.0, f5P))); aR = (long)(xR * Math.Max(0.0, Math.Min(1.0, f5R)));
                     want = aP + aR;
+                    M96NoteCut(f, x, want);                             // m96-koszyk: wyplata kupcom, ktorej R/P z pelna kiesa nie przyjeli (zostaje w kasie) - okno doby
                     if (want <= 0) { try { KsFolkIncome.NoteM6(xP, xR, 0, 0, 0, 0); } catch (Exception e) { Stumble("KsFolkIncome.NoteM6", e); } return 0; }
                 }
                 int ask = (int)Math.Min(int.MaxValue, Math.Min(want, Math.Max(0, town.Gold)));

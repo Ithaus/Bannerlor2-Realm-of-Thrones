@@ -82,6 +82,7 @@ namespace Armoury
             _active = false; _rolled = false; _postRan = false; _success = false;
             _item = null; _smith = null; _r = default(Recipes.Recipe); _skill = 0; _before = 0; _crack = -1f; _mod = null;
             _bag0 = null; _botchNote = null;
+            Recipes.MassBkClear();   // m96-receptury: zapis kg z CRAFT BK dotyczy tylko jednego klikniecia (zwrot po peknieciu)
         }
 
         /// <summary>Potkniecie na jednej sztuce: licznik, do logu tylko pierwsze 5 (dymek i lista kowadla wolaja co klatke).</summary>
@@ -107,6 +108,8 @@ namespace Armoury
         /// </summary>
         public static bool CraftPrefix(object __instance, bool __runOriginal)
         {
+            // m96-wzory (recenzja): gdy wczesniejszy prefiks zwrocil false, Harmony 2.4.2 tego prefiksu w ogole NIE wola (Refused zostaje z poprzedniego
+            // kliku) - ponizsze sprawdzenie to zapas; postfiks FletchForge.BkCraftPostfix rozpoznaje odmowe po __runOriginal
             Clear(); Refused = false;
             if (!__runOriginal) return true;
             try
@@ -119,6 +122,7 @@ namespace Armoury
                 var ac = tr.Field("armorCrafting").GetValue();
                 var cur = ac != null ? Traverse.Create(ac).Property("CurrentItem").GetValue() : null;
                 var item = cur != null ? Traverse.Create(cur).Property("Item").GetValue<ItemObject>() : null;
+                if (item != null && item.ItemType == ItemObject.ItemTypeEnum.Shield) return PatternGate.ShieldCraftPrefix(__instance, item);   // m96-wzory: prog tarcz (ShieldCraftSkillGate), kosci BK bez zmian
                 if (item == null || !item.HasArmorComponent) return true;      // tarcze, luki, amunicja - nie ta regula
                 Hero smith = null;
                 try
@@ -263,8 +267,12 @@ namespace Armoury
                 float share = Math.Max(0f, Math.Min(1f, s != null ? s.MaterialLossOnFailure : 0.5f));
                 int backAll = 0, lostAll = 0;
                 var names = new List<string>(); var ids = new List<string>();
+                // m96-receptury (po recenzji): przepis z masy zapisal w tym kliknieciu kg w otwartych ladunkach - pekniecie zabiera share x kg kazdego surowca,
+                // reszta kg wraca do otwartych ladunkow (pelne sztuki do sakw); grupy kwitu z kg nie ida zwrotem z roznicy sakw (sztuki zdjete != kg zuzyte)
+                var kgBack = Recipes.MassBotchBack(_item, share, names, ids);
                 for (int g = 0; g < 11; g++)
                 {
+                    if (kgBack != null && kgBack[g] >= 0) { backAll += kgBack[g]; lostAll += Math.Max(0, total[g] - kgBack[g]); continue; }
                     if (total[g] <= 0) continue;
                     int lost = Math.Min(total[g], Math.Max(1, (int)(total[g] * share)));   // jak Recipes.TakePartial: co najmniej 1 sztuka kazdego surowca
                     int back = total[g] - lost;
@@ -280,7 +288,8 @@ namespace Armoury
                 }
                 SmallFixes8.NoteBotch(backAll, lostAll);
                 if (backAll > 0) Log.Player("Not all is lost - back in your bags: " + string.Join(", ", names) + ".");
-                return "zwrot do sakw " + backAll + " szt." + (ids.Count > 0 ? " [" + string.Join(", ", ids) + "]" : "") + ", przepadlo " + lostAll + " szt. (ArmourBotchHalfBack)";
+                return "zwrot do sakw " + backAll + " szt." + (ids.Count > 0 ? " [" + string.Join(", ", ids) + "]" : "") + ", przepadlo " + lostAll + " szt. (ArmourBotchHalfBack"
+                       + (kgBack != null ? "; przepis z masy: przepada " + (int)Math.Round(share * 100f) + "% kg, reszta w otwartych ladunkach" : "") + ")";
             }
             catch (Exception e) { Stumble("ArmourQuality.BotchBack", e); return "material przepadl (blad zwrotu - potkniecie)"; }
         }
