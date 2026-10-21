@@ -1951,7 +1951,8 @@ Uzycie (Python 3, tylko odczyt):
                     sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
 --grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
-                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
+                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours" 0 (m103-drobne: z zapisem stanu),
+                    KP-1b (z --crashscribe <session-*.log>) bloki bledow CrashScribe ze stosem InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
                     (obieg 0), KP-4 turnieje i swaty prawdziwe w chwili sluchania, KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy upiciu / kacu,
                     KP-7 ruch doby (INFO), KP-8 pobudka z pelnym paskiem snu przy pijanym = odespane (recenzja technika). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -54898,20 +54899,54 @@ def m98_per_drink(charm, pool, by_charm):
     return min(pool, 1 + max(0, (charm + 10) // 60))
 
 
-def m98plotki_main(logp):
+# m103-drobne (KP-1): bledy kufli w logu Armoury - takze zapis/odczyt stanu (SyncData.arm_drink - InnDrink.Export/Import; SyncData.arm_rumours - ksiega plotek Rumours,
+# ta sama klasa co Rumours.Drink), nie tylko potkniecia InnDrink./Rumours.
+M98P_ERR = ("ERROR in InnDrink.", "ERROR in Rumours.", "ERROR in SyncData.arm_drink", "ERROR in SyncData.arm_rumours")
+# KP-1b (z --crashscribe): bloki bledow CrashScribe ("# ERROR ...") ze stosem w kodzie kufli i plotek
+M98P_CS = ("Armoury.InnDrink.", "Armoury.Rumours.")
+
+
+def m98plotki_cs_errors(csp):
+    """KP-1b: bloki "# ERROR ..." logu sesji CrashScribe, w ktorych stos (STACK / CALLER) przechodzi przez Armoury.InnDrink. albo Armoury.Rumours. - (bloki, przyklad)."""
+    n, ex, block = 0, None, []
+
+    def close(b):
+        nonlocal n, ex
+        if b and any(k in x for x in b for k in M98P_CS):
+            n += 1
+            if ex is None:
+                ex = next((x.strip() for x in b if x.startswith("MESSAGE")), b[0].strip())[:140]
+
+    with open(csp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if ln.startswith("# ERROR"):
+                close(block)
+                block = [ln]
+            elif block:
+                block.append(ln)
+    close(block)
+    return n, ex
+
+
+def m98plotki_main(logp, csp=None):
     """m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel (cena z beczki piwa, zloto do karczmarzy), plotek na kufel wedlug Uroku, turnieje i swaty
     tylko prawdziwe, pijanstwo i kac gracza. Log Armoury strumieniowo. KP-0 start sesji (klucze, krzywa Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 linie
     ERROR InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony (zaplacil = cena, kiesa gracza -cena, odbiorcy razem = cena, kontrola obiegu 0),
     KP-4 turnieje i swaty prawdziwe w chwili sluchania (kufle i doby: nieprawdziwe 0), KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy
-    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku.
+    m103-drobne: KP-1 liczy tez "ERROR in SyncData.arm_drink" i "ERROR in SyncData.arm_rumours" (zapis/odczyt stanu kufli i plotek); KP-1b (z --crashscribe) - bloki
+    bledow CrashScribe ze stosem Armoury.InnDrink./Armoury.Rumours. 0."""
     rep = Report()
     start, cups, drunks, days, wakes, errs = [], [], [], [], [], 0
+    errs_sync = 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
-            if "ERROR in InnDrink." in s or "ERROR in Rumours." in s:
+            if any(k in s for k in M98P_ERR):
                 errs += 1
+                if "ERROR in SyncData." in s:
+                    errs_sync += 1
             if not s.startswith(M98P_PRE):
                 continue
             t = s[len(M98P_PRE):]
@@ -54936,7 +54971,12 @@ def m98plotki_main(logp):
     curve_ok = bool(mc) and (not by_charm or (mc.group(1), mc.group(2), mc.group(3), mc.group(5)) == ("1", "2", "3", "wszystkie"))
     rep.add("KP-0: linia startu sesji (klucze, krzywa Uroku 20/80/150/250)", (start[-1][:220] if start else "brak"), "jest; przy kluczu Urok: 1/2/3/wszystkie",
             bool(start) and bool(ms) and curve_ok)
-    rep.add("KP-1: linie ERROR in InnDrink./Rumours.", f"{errs}", "0", errs == 0)
+    rep.add("KP-1: linie ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours", f"{errs} (w tym zapis/odczyt SyncData {errs_sync})", "0", errs == 0)
+    if csp and os.path.isfile(csp):
+        ncs, excs = m98plotki_cs_errors(csp)
+        rep.add("KP-1b: CrashScribe - bloki bledow ze stosem InnDrink./Rumours.", f"{ncs}" + (f" (np. {excs})" if excs else ""), "0", ncs == 0)
+    else:
+        rep.add("KP-1b: CrashScribe - bloki bledow ze stosem InnDrink./Rumours.", "bez logu CrashScribe (--crashscribe <session-*.log>)", "INFO", None)
     st_sum = sum(int(m.group(18)) for m in (M98P_RX["day"].search(x) for x in days) if m)
     rep.add("KP-2: potkniecia doby (suma)", f"{st_sum} w {len(days)} dobach", "0", st_sum == 0)
     bad, badt, badn, unread, nopay = [], [], [], 0, 0
@@ -55462,7 +55502,7 @@ def main(argv):
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
     if group == "m98plotki" and logp:
-        return m98plotki_main(logp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
+        return m98plotki_main(logp, csp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

@@ -7,7 +7,8 @@ build kod 0, gen_mcm po kazdej zmianie Settings.cs) | **Status calosci:** DO SPR
 |---|---|---|---|---|
 | 1 | Rabunek druzyny gracza liczy sie w ksiedze snu jak praca (nie odpoczynek) | `RaidCountsAsWork` (TAK) | `3360ba69` | zbudowane |
 | 2 | Rzad markietanow: odziez dla druzyny gracza z polki miasta (z kiesy gracza) i praczki (zuzycie odziezy -25% przez 7 dob) | `SutlerRowClothing`, `SutlerLaundry` (TAK), `SutlerLaundryCutPercent` 25, `SutlerLaundryDays` 7, `SutlerLaundryMenPerWasher` 20 | `e31227d0` | zbudowane |
-| 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | (krok 3) | zbudowane, test w obie strony OK |
+| 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | `ea848ab0` | zbudowane, test w obie strony OK |
+| 4 | KP-1 (m98plotki) liczy bledy zapisu kufli `ERROR in SyncData.arm_drink` (i arm_rumours), KP-1b z logu CrashScribe | - (narzedzie) | (krok 4) | sprawdzone na logach 101 |
 
 ---
 
@@ -188,3 +189,30 @@ i w szkodach; pelne doby (6 cyfr: 109016) w kazdym wpisie; miasto powtarzane w k
   liczba czynnych listow (`czynne N`) i szkod band; wczytanie zapisu z 101 - linia "wczytano zapis arm_board w starym formacie nb1".
 
 **Status:** DO SPRAWDZENIA.
+
+---
+
+### Krok 4. Progi KP-1 (grupa m98plotki) - bledy zapisu kufli
+
+**Po ludzku (dla Jeffa):** tylko narzedzie do sprawdzania logow (gra bez zmian). Sprawdzian "kufli i plotek" nie zauwazal bledu przy zapisie/wczytaniu stanu kufli;
+teraz go liczy, a z logiem CrashScribe liczy tez bledy, ktore Armoury polknal po cichu.
+
+**Problem:** KP-1 (`tools/sprawdz_logi.py`, `m98plotki_main`) liczyl tylko linie z `ERROR in InnDrink.` i `ERROR in Rumours.`. Zapis stanu kufli idzie przez
+`ArmouryBehavior.SyncData` (`InnDrink.Export/Import` pod kluczem `arm_drink`), a wyjatek lapie `catch (Exception e) { Log.Error("SyncData.arm_drink", e); }` -
+w logu `ERROR in SyncData.arm_drink: ...` (Log.Error: "ERROR in " + where), czego KP-1 nie widzial. To samo dla ksiegi plotek (`SyncData.arm_rumours` - klasa Rumours,
+w ktorej siedzi tez Rumours.Drink z m98).
+
+**Zmiana (tylko sprawdz_logi):**
+- `M98P_ERR` = `ERROR in InnDrink.`, `ERROR in Rumours.`, `ERROR in SyncData.arm_drink`, `ERROR in SyncData.arm_rumours`; KP-1 podaje tez, ile z nich to zapis/odczyt.
+- Nowy **KP-1b** (z `--crashscribe <session-*.log>`): bloki `# ERROR ...` logu CrashScribe, w ktorych stos przechodzi przez `Armoury.InnDrink.` albo `Armoury.Rumours.`
+  (wyjatek polkniety w naszym try wychodzi w CrashScribe jako "ERROR CAUGHT FURTHER UP" ze stosem) - prog 0; bez logu CrashScribe - INFO.
+  `m98plotki_main(logp, csp=None)`, dispatch przekazuje `csp`.
+- Opis grupy w pomocy i docstring zaktualizowane.
+
+**Sprawdzone na logach biegu 101:** `python -I tools/sprawdz_logi.py --grupa m98plotki Armoury-2026-10-21_07-17-36.log --crashscribe session-2026-10-21_07-17-34.log`:
+KP-1 TAK (0, w tym SyncData 0), KP-1b TAK (0 blokow), reszta bez zmian (NIE 0). Sztuczny log (linia `ERROR in SyncData.arm_drink`, linia `ERROR in InnDrink.Hourly`
+i blok CrashScribe ze stosem `Armoury.InnDrink.Import`): KP-1 NIE (2, w tym SyncData 1), KP-1b NIE (1) - wzorce dzialaja.
+
+**Ryzyko:** brak (narzedzie). Wzorzec `SyncData.arm_rumours` to szersze niz samo m98 (ksiega plotek z sw-zajazdy) - to ta sama klasa Rumours, ktorej bledy KP-1 juz liczyl.
+
+**Status:** GOTOWE (narzedzie, sprawdzone na logach 101 i na sztucznym logu).
