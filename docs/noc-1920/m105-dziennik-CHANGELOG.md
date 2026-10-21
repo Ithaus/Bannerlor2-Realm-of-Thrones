@@ -132,7 +132,7 @@ Realm of Thrones; panel ma wysokosc linii, ktore akurat widac, i znika z ostatni
 - **Aktualizacja gry:** inna nazwa metody / pola / Id widzetu = BRAK w linii start/kampania albo "widget ... nie znaleziony" (brak linii), dziennik jak w grze, bez wywrotki.
 - **Gdyby Jeff dalej widzial "Sold/Purchased" w samym dzienniku** - to inne zrodlo niz tabliczki; nastepny krok: postfiks `MPChatVM.IsMessageIncluded` (bez latania
   `DisplayMessage`).
-- **Wgranie:** sam `Armoury.dll` (md5 z buildu na e591dc3f: d799b335; DLL zawiera hash commitu w wersji). Nowych plikow GUI/ModuleData BRAK - w `wgraj-v5.ps1`
+- **Wgranie:** sam `Armoury.dll` (build na 8db0583b: md5 1c637229; DLL zawiera hash commitu w wersji - md5 liczyc z buildu przy wgraniu). Nowych plikow GUI/ModuleData BRAK - w `wgraj-v5.ps1`
   i `bieg-bitwa.ps1` nic do dopisania.
 
 ## Plan autotestu (gry nie uruchamialem)
