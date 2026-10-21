@@ -1026,6 +1026,12 @@ Uzycie (Python 3, tylko odczyt):
                     PR-2 latka startu opowiesci N/N (ROT 8.1.8: >= 30 metod, miejsca + zaciag >= 35) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
                     wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 + 6/6, PR-7 koniec prologu (Robert martwy, Joffrey krolem, Ned jencem), PR-8 NedEvent (Ned
                     martwy, Robb wladca Polnocy). Log bez prologu: INFO.
+--grupa m103sceny : (21.10, w-toku/m103-sceny; Armoury/src/Prologue.Scenes.cs, PrologueScenes.Data.cs, StoryWindow.cs, StoryPictures.cs, RotWindowPictures.cs; klucze
+                    PrologueScenes, StoryImagesForRotWindows) python -I tools/sprawdz_logi.py --grupa m103sceny <Armoury-*.log> [--crashscribe <session-*.log>]
+                    [--rgl <rgl_log_*.txt>]. SC-0 start (klucz, 23 sceny), SC-1 ERROR 0, SC-2 wszystkie nalezne pokazane, SC-3 kazda w swoim dniu, SC-4 kolejnosc bez
+                    powtorzen, SC-5 scena 23 po KONCU PROLOGU, SC-6 po jednej, SC-7 pominiete 0, SC-8 okna ROT (zapas 0), SC-9 obrazki z plikow (INFO), SC-10 bez
+                    zamkniec bez przycisku, SC-11 para z 'AUTOTEST: OKNO wydarzenie ROT', SC-12 po wczytaniu bez powtorek, SC-13 brak 'Trying to render a released
+                    texture', SC-14 obrazki okien ROT (INFO). Log bez prologu: INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
@@ -37594,6 +37600,234 @@ def m101prolog_main(logp, csp=None):
     return 0
 
 
+# ------------------------------------------------------------ m103sceny (21.10, w-toku/m103-sceny: 23 sceny prologu 298 jako okna w wygladzie wydarzen ROT, kazda w swoim
+# dniu prologu - projekt PROJEKT-PROLOG-298 pkt 2; obrazki z plikow Images\Prolog / Images\ROT; Armoury/src/Prologue.Scenes.cs, PrologueScenes.Data.cs, StoryWindow.cs,
+# StoryPictures.cs, RotWindowPictures.cs; klucze PrologueScenes, StoryImagesForRotWindows). Korzysta z M101_TAG, M101_END, M101_DAY, TS, Report.
+M103_TAG = "Prolog (m103): "
+M103_PIC_TAG = "Obrazki (m103): "
+M103_DAYS = [0, 5, 12, 35, 40, 48, 55, 62, 75, 80, 95, 100, 110, 118, 125, 132, 138, 145, 155, 160, 172, 182, 186]
+M103_ARREST = 23   # numer sceny dnia 186 (po KONIEC PROLOGU)
+M103_START = re.compile(r"start sesji \| klucz Prologue Scenes (TAK|NIE) \| sceny pokazane (\d+)/(\d+), pominiete (\d+)(.*?)\| nastepna (\S+).*?\| katalog obrazkow (.*?) \| plikow: Prolog (\d+), ROT (\d+), Kronika (\d+) \| potkniecia (\d+)")
+M103_SHOW = re.compile(r"scena (\d\d) '(.*?)' pokazana \| dzien ([0-9.]+) \(nalezna od (\d+)\) \| obrazek (.*?) \| okno (.*?) \| gracz: (.*?) \| pokazane (\d+)/(\d+), pominiete (\d+) \| (\d+) ms\.")
+M103_CLOSE = re.compile(r"scena (\d\d) zamknieta po ([0-9.]+) s \((.*?)\)\.$")
+M103_SKIP = re.compile(r"POMINIETA scena (\d\d) '(.*?)' - (.*) \(dzien prologu ([0-9.]+)\)\.$")
+M103_WAIT = re.compile(r"scena (\d\d) '(.*?)' czeka: (.*) \(dzien prologu ([0-9.]+), nalezna od (\d+)\)\.$")
+M103_FAIL = re.compile(r"scena (\d\d) '(.*?)' - okno nie otworzylo sie \(proba (\d)/3\)")
+M103_END = re.compile(r"sceny prologu zakonczone \| pokazane (\d+)/(\d+), pominiete (\d+)")
+M103_ERR = re.compile(r"^ERROR in (Prologue\.Scenes|Prologue\.ScenesStartLine|Prologue\.RotWindowPictures|StoryWindow\.|StoryPictures\.|RotWindowPictures\.)")
+M103_CS_OKNO = re.compile(r"AUTOTEST: OKNO wydarzenie ROT \"(.*?)\"")
+M103_RELEASED = "Trying to render a released texture"
+
+
+def m103sceny_main(logp, csp=None, rglp=None):
+    """m103sceny (21.10, w-toku/m103-sceny; Jeff 21.10 "I zrob wydarzenia wedlug ksiazki"): SC-0 linia startu scen (klucz TAK, 23 sceny), SC-1 ERROR scen / okna /
+    obrazkow 0, SC-2 pokazane wszystkie sceny nalezne do ostatniego dnia logu (23 przy logu >= 187 dni i KONCU PROLOGU), SC-3 kazda w swoim dniu (0 <= dzien - nalezny
+    < 1; scena 23 - w dobie KONCA PROLOGU), SC-4 kolejnosc rosnaca, bez powtorzen w calym logu, SC-5 scena 23 po linii KONIEC PROLOGU, SC-6 po jednej (zamknieta przed
+    nastepna), SC-7 pominiete 0 (poza zapisem sprzed scen - INFO), SC-8 okna ROT (zapas ShowInquiry = NIE), SC-9 obrazki z plikow i zle pliki (INFO), SC-10 zamkniecia
+    przyciskiem (bez przycisku = NIE), SC-11 para z CrashScribe (--crashscribe): kazda pokazana scena ma linie 'AUTOTEST: OKNO wydarzenie ROT "<tytul>"' w tej samej
+    kolejnosci, SC-12 po wczytaniu zapisu bez powtorek (pierwsza scena sesji = pokazane + pominiete + 1), SC-13 brak 'Trying to render a released texture' (--rgl
+    rgl_log i log CrashScribe), SC-14 obrazki okien ROT (INFO). Log bez kampanii z prologiem: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("SC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sessions = []
+    cur = {"start": None, "ev": []}
+    n_err, err_ex, end_line, end_day, last_day = 0, [], None, None, -1.0
+    bad_files, rot_swaps, rot_nofile, ends = [], [], 0, []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for no, ln in enumerate(fh):
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if M103_ERR.match(s):
+                n_err += 1
+                if len(err_ex) < 3:
+                    err_ex.append(s[:140])
+                continue
+            if s.startswith(M101_TAG):
+                body = s[len(M101_TAG):]
+                me = M101_END.search(body)
+                if me and end_line is None:
+                    end_line, end_day = no, float(me.group(2))
+                md = M101_DAY.match(body)
+                if md:
+                    last_day = max(last_day, float(md.group(1)))
+                continue
+            if s.startswith(M103_PIC_TAG):
+                body = s[len(M103_PIC_TAG):]
+                if body.startswith("ZLY PLIK"):
+                    bad_files.append(body[:160])
+                elif body.startswith("okno ROT ") and " - obrazek arm_" in body:
+                    rot_swaps.append(body.split(" '")[0][9:])
+                elif body.startswith("okno ROT ") and "brak pliku" in body:
+                    rot_nofile += 1
+                continue
+            if not s.startswith(M103_TAG):
+                continue
+            body = s[len(M103_TAG):]
+            mm = M103_START.search(body)
+            if mm:
+                if cur["start"] is not None or cur["ev"]:
+                    sessions.append(cur)
+                cur = {"start": mm.groups(), "ev": []}
+                continue
+            mm = M103_SHOW.search(body)
+            if mm:
+                d = float(mm.group(3))
+                last_day = max(last_day, d)
+                cur["ev"].append(("show", int(mm.group(1)), (d, int(mm.group(4)), mm.group(2), mm.group(5), mm.group(6)), no))
+                continue
+            mm = M103_CLOSE.search(body)
+            if mm:
+                cur["ev"].append(("close", int(mm.group(1)), (float(mm.group(2)), mm.group(3)), no))
+                continue
+            mm = M103_SKIP.search(body)
+            if mm:
+                cur["ev"].append(("skip", int(mm.group(1)), (mm.group(3), float(mm.group(4)), mm.group(2)), no))
+                continue
+            mm = M103_FAIL.search(body)
+            if mm:
+                cur["ev"].append(("fail", int(mm.group(1)), (int(mm.group(3)),), no))
+                continue
+            mm = M103_WAIT.search(body)
+            if mm:
+                cur["ev"].append(("wait", int(mm.group(1)), (mm.group(3), float(mm.group(4))), no))
+                continue
+            mm = M103_END.search(body)
+            if mm:
+                ends.append(mm.groups())
+                continue
+    if cur["start"] is not None or cur["ev"]:
+        sessions.append(cur)
+    cs_titles, cs_released = [], 0
+    if csp and os.path.isfile(csp):
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mc = M103_CS_OKNO.search(ln)
+                if mc:
+                    cs_titles.append(mc.group(1))
+                if M103_RELEASED in ln:
+                    cs_released += 1
+    rgl_released = None
+    if rglp and os.path.isfile(rglp):
+        rgl_released = 0
+        with open(rglp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if M103_RELEASED in ln:
+                    rgl_released += 1
+    starts = [x["start"] for x in sessions if x["start"]]
+    ev = [e for x in sessions for e in x["ev"]]
+    shows = [e for e in ev if e[0] == "show"]
+    closes = [e for e in ev if e[0] == "close"]
+    skips = [e for e in ev if e[0] == "skip"]
+    waits = [e for e in ev if e[0] == "wait"]
+    fails = [e for e in ev if e[0] == "fail"]
+    print(f"plik: {logp} | sesji {len(sessions)}, startow {len(starts)}, pokazanych {len(shows)}, zamknietych {len(closes)}, pominietych {len(skips)}, czeka {len(waits)}"
+          f", nieudanych otwarc {len(fails)}, ERROR {n_err}, ostatni dzien prologu {last_day:.1f}, KONIEC PROLOGU "
+          f"{'dzien ' + format(end_day, '.1f') if end_day is not None else 'brak'}")
+    if not starts and not ev:
+        rep.add("SC-0: linie 'Prolog (m103): ...'", "brak w logu", "INFO (klasyczna kampania albo log sprzed m103-sceny)", None)
+        if rot_swaps or rot_nofile or bad_files:
+            rep.add("SC-14: obrazki okien ROT", f"podmienionych {len(rot_swaps)} ({', '.join(rot_swaps[:4])}), okien bez pliku {rot_nofile}, zlych plikow {len(bad_files)}", "INFO", None)
+        rep.show()
+        return 0
+    st = starts[0] if starts else None
+    rep.add("SC-0: linia startu scen", (f"klucz {st[0]}, scen {st[2]}, pokazane {st[1]}, pominiete {st[3]}, nastepna {st[5]}" if st else "brak linii startu"),
+            "klucz TAK, scen 23", (st[0] == "TAK" and st[2] == "23") if st else False)
+    rep.add("SC-1: ERROR scen, okna i obrazkow (Prologue.Scenes, StoryWindow, StoryPictures, RotWindowPictures)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+    shown_nr = [e[1] for e in shows]
+    skipped_nr = set(e[1] for e in skips)
+    due = [k + 1 for k, d in enumerate(M103_DAYS) if d <= last_day and (k + 1 != M103_ARREST or end_line is not None)]
+    missing = [k for k in due if k not in shown_nr and k not in skipped_nr]
+    rep.add("SC-2: pokazane sceny nalezne do ostatniego dnia logu", f"pokazanych {len(set(shown_nr))} z {len(due)} naleznych" + (f" (brak: {missing[:8]})" if missing else ""),
+            "wszystkie nalezne (23 przy logu >= 187 dni i koncu prologu)", len(missing) == 0)
+    late = []
+    for e in shows:
+        nr, (d, due_day, title, img, mode) = e[1], e[2]
+        if nr == M103_ARREST and end_day is not None:
+            if not (end_day <= d < end_day + 1.0):
+                late.append(f"{nr} dzien {d:.2f} (koniec prologu {end_day:.1f})")
+        elif not (0.0 <= d - due_day < 1.0):
+            late.append(f"{nr} dzien {d:.2f} (nalezna {due_day})")
+    rep.add("SC-3: kazda scena w swoim dniu", f"poza dniem {len(late)} z {len(shows)}" + (f" ({'; '.join(late[:4])})" if late else ""),
+            "0 <= dzien pokazania - dzien nalezny < 1 (scena 23: w dobie KONCA PROLOGU)", len(late) == 0 if shows else None)
+    bad_order = []
+    for a, b in zip(shown_nr, shown_nr[1:]):
+        if b <= a:
+            bad_order.append(f"{a}->{b}")
+    dup = sorted(set(n for n in shown_nr if shown_nr.count(n) > 1))
+    rep.add("SC-4: kolejnosc rosnaca, kazda scena raz w calym logu", f"naruszen kolejnosci {len(bad_order)}, powtorzonych {len(dup)}"
+            + (f" ({', '.join(bad_order[:4])}{'; powt. ' + str(dup[:6]) if dup else ''})" if bad_order or dup else ""), "0 i 0", (not bad_order and not dup) if shows else None)
+    arr = [e for e in shows if e[1] == M103_ARREST]
+    if arr:
+        rep.add("SC-5: scena 23 (areszt Neda) po KONCU PROLOGU", f"linia sceny {arr[0][3]}, linia KONCA PROLOGU {end_line if end_line is not None else 'brak'}",
+                "scena po linii KONIEC PROLOGU", end_line is not None and arr[0][3] > end_line)
+    else:
+        rep.add("SC-5: scena 23 (areszt Neda) po KONCU PROLOGU", "scena 23 nie pokazana" + (" (pominieta)" if M103_ARREST in skipped_nr else ""),
+                "INFO gdy log krotszy niz koniec prologu", None if end_line is None or M103_ARREST in skipped_nr else False)
+    overlap = []
+    for x in sessions:
+        open_nr = None
+        for e in x["ev"]:
+            if e[0] == "show":
+                if open_nr is not None:
+                    overlap.append(f"{e[1]} przy otwartej {open_nr}")
+                open_nr = e[1]
+            elif e[0] == "close" and e[1] == open_nr:
+                open_nr = None
+    rep.add("SC-6: po jednej scenie (zamknieta przed nastepna)", f"pokazanych {len(shows)}, zamknietych {len(closes)}, nalozen {len(overlap)}" + (f" ({overlap[0]})" if overlap else ""),
+            "nalozen 0, zamkniete = pokazane (ostatnia moze byc otwarta na koncu logu)", (len(overlap) == 0 and len(shows) - len(closes) in (0, 1)) if shows else None)
+    legacy = [e for e in skips if "zapis prologu sprzed scen" in e[2][0]]
+    other = [e for e in skips if e not in legacy]
+    rep.add("SC-7: pominiete sceny (poza zapisem sprzed scen)", f"{len(other)}" + (f" ({'; '.join(str(e[1]) + ': ' + e[2][0] for e in other[:3])})" if other else "")
+            + (f" | zapis sprzed scen: {len(legacy)} (INFO)" if legacy else ""), "0 w autotescie (bitwy i niewola - powod w linii)", len(other) == 0)
+    modes = {}
+    for e in shows:
+        k = "ROT" if e[2][4] == "ROT" else "zapas"
+        modes[k] = modes.get(k, 0) + 1
+    rep.add("SC-8: okno sceny w wygladzie ROT", f"ROT {modes.get('ROT', 0)}, zapas ShowInquiry {modes.get('zapas', 0)}, nieudanych otwarc {len(fails)}"
+            + (f" (zapas: {next(e[2][4] for e in shows if e[2][4] != 'ROT')[:90]})" if modes.get('zapas') else ""),
+            "zapas 0 i nieudanych 0 (zapas = okno ROT nie weszlo - powod w linii)", (modes.get("zapas", 0) == 0 and not fails) if shows else None)
+    from_file = [e for e in shows if "(plik " in e[2][3]]
+    rep.add("SC-9: obrazki scen z plikow (Images\\Prolog)", f"z pliku {len(from_file)} z {len(shows)}" + (f" | 1.: {shows[0][2][3][:80]}" if shows else "")
+            + (f" | katalog: {st[6][:70]}, plikow Prolog {st[7]}" if st else "") + (f" | ZLE PLIKI {len(bad_files)}: {bad_files[0][:90]}" if bad_files else ""),
+            "INFO (23/23 po dostarczeniu prolog_01..23.png; do tego czasu obrazki ROT); zle pliki - popraw tools/obrazki_okien.py", None)
+    nobtn = [e for e in closes if e[2][1].startswith("bez przycisku")]
+    rep.add("SC-10: zamkniecia okien scen", f"przyciskiem {len(closes) - len(nobtn)}, bez przycisku {len(nobtn)}" + (f" ({nobtn[0][2][1][:80]})" if nobtn else ""),
+            "bez przycisku 0 (ktos zdjal okno z ekranu)", len(nobtn) == 0 if closes else None)
+    if csp:
+        titles = [e[2][2] for e in shows if e[2][4] == "ROT"]   # zapas ShowInquiry nie jest oknem ROT - AutotestUi zamyka go jako zapytanie
+        ours = [t for t in cs_titles if t in set(titles)]
+        rep.add("SC-11: para z CrashScribe 'OKNO wydarzenie ROT'", f"linii z tytulami scen {len(ours)}, scen w oknie ROT {len(titles)}, kolejnosc " + ("zgodna" if ours == titles else "INNA"),
+                "= sceny w oknie ROT i ta sama kolejnosc", ours == titles if titles else None)
+    else:
+        rep.add("SC-11: para z CrashScribe 'OKNO wydarzenie ROT'", "bez --crashscribe", "INFO (podaj --crashscribe <session-*.log>)", None)
+    # sesje z wczytanym stanem scen: maska z zapisu (pokazane + pominiete > 0) albo zapis prologu sprzed scen (WGRANIE 101 - dopisek w linii startu)
+    loads = [x for x in sessions if x["start"] and ((int(x["start"][1]) + int(x["start"][3])) > 0 or "zapis sprzed scen" in x["start"][4])]
+    if loads:
+        bad = []
+        for x in loads:
+            first = next((e[1] for e in x["ev"] if e[0] in ("show", "skip")), None)
+            exp = int(x["start"][1]) + int(x["start"][3]) + 1
+            if first is not None and first != exp:
+                bad.append(f"pierwsza {first}, oczekiwana {exp}")
+        rep.add("SC-12: po wczytaniu zapisu bez powtorek", f"sesji z wczytanym stanem scen {len(loads)}, niezgodnych {len(bad)}" + (f" ({bad[0]})" if bad else ""),
+                "pierwsza scena sesji = pokazane + pominiete z zapisu + 1", len(bad) == 0)
+    else:
+        rep.add("SC-12: po wczytaniu zapisu bez powtorek", "brak sesji z wczytanym stanem scen", "INFO (bieg z -LoadSave zapisu z polowy prologu)", None)
+    if rgl_released is not None or csp:
+        n = (rgl_released or 0) + cs_released
+        rep.add("SC-13: 'Trying to render a released texture'", f"rgl_log {rgl_released if rgl_released is not None else '-'}, CrashScribe {cs_released if csp else '-'}",
+                "0 (tekstura zwolniona przy otwartym oknie)", n == 0 if rgl_released is not None else (None if cs_released == 0 else False))
+    else:
+        rep.add("SC-13: 'Trying to render a released texture'", "bez --rgl i --crashscribe", "INFO (podaj --rgl <rgl_log_*.txt>)", None)
+    rep.add("SC-14: obrazki okien ROT (Images\\ROT)", f"podmienionych {len(rot_swaps)}" + (f" ({', '.join(rot_swaps[:4])})" if rot_swaps else "") + f", okien bez pliku {rot_nofile}"
+            + (f" | koniec scen: pokazane {ends[-1][0]}/{ends[-1][1]}, pominiete {ends[-1][2]}" if ends else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m100kryjowki (21.10, w-toku/m100-kryjowki: wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania,
 # nowe kryjowki z dala od osad i wiosek pobocznych, po rozbiciu w innym miejscu; Armoury/src/HideoutSight.cs; klucze HideoutScoutingChance, HideoutRumourReveals,
 # HideoutAwayFromSettlements, HideoutRelocateAfterClear)
@@ -55089,6 +55323,7 @@ def main(argv):
     horses = False   # P1 (kiesa1): progi dla biegu z regula koni roboczych
     tabp = None      # PROJEKT-LENNA (grupa lenna): katalog tabel biegu (ludzie-regiony.csv)
     need_ht = False  # nharmony (recenzja, uwaga 5): autotest galezi noc-harmony - brak linii HT albo stary format = NIE
+    rglp = None      # m103sceny (SC-13): rgl_log gry - assert "Trying to render a released texture"
     i = 0
     while i < len(args):
         a = args[i]
@@ -55118,6 +55353,8 @@ def main(argv):
             tabp = args[i + 1]; i += 2; continue
         if a == "--wymagaj-ht":
             need_ht = True; i += 1; continue
+        if a == "--rgl":
+            rglp = args[i + 1]; i += 2; continue
         logp = a; i += 1
     if group == "m96len":
         return m96len_main(logp)   # m96-len (20.10): Plan KS liczy plotno kupowane przez wsie w miastach; zapas lnu i plotna pod KS
@@ -55293,6 +55530,8 @@ def main(argv):
         return m101postacie_main(logp, csp)   # m101postacie (21.10, w-toku/m101-postacie): postacie kanonu do rodow, B nie powstaja, zmiany stron wedlug ksiazki (CanonCompanions)
     if group == "m101prolog" and logp:
         return m101prolog_main(logp, csp)   # m101prolog (21.10, w-toku/m101-prolog): prolog 298 - kalendarz, start opowiesci ROT, pokoj i pakty, Robert i Ned, koniec prologu
+    if group == "m103sceny" and logp:
+        return m103sceny_main(logp, csp, rglp)   # m103sceny (21.10, w-toku/m103-sceny): 23 sceny prologu jako okna ROT, obrazki z plikow, okna ROT z obrazkami Jeffa
     if group == "m100kryjowki" and logp:
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m102tablica" and logp:
