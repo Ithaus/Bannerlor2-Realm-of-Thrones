@@ -118,6 +118,7 @@ def main():
         return k, len(pcm) / 48000.0
 
     errs = 0
+    failed = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as ex:
         futs = {ex.submit(job, w): w for w in todo}
         for i, fu in enumerate(concurrent.futures.as_completed(futs), 1):
@@ -127,10 +128,16 @@ def main():
                 print('%d/%d %s %.1f s' % (i, len(todo), k, sec), flush=True)
             except Exception as e:
                 errs += 1
+                failed.add(w[0])
                 print('%d/%d %s BLAD %s' % (i, len(todo), w[0], str(e)[:200]), flush=True)
     rows = []
     for k, title, text, src in ws:
         p = os.path.join(outdir, k + '.ogg')
+        if k in failed:
+            # nagranie nieudane: zostaje stary wiersz (stary md5 tekstu = plik ma stary glos; nastepne uruchomienie nagra je znowu, gra go nie zagra)
+            if k in old and os.path.exists(p):
+                rows.append('\t'.join(old[k][:6]))
+            continue
         if os.path.exists(p):
             rows.append('%s\t%s\t%s.ogg\t%s\t%s\t%s' % (k, title, k, md5s(text.encode('utf-8')), md5s(open(p, 'rb').read()), src))
     with open(man, 'w', encoding='utf-8', newline='\n') as f:
