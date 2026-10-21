@@ -203,3 +203,7 @@ rozbicie bandy - zaplata z kiesy wsi i +2 relacji; `sprawdz_logi --grupa m102tab
 
 **Stan etapow po E2b:** E1, E3, E2, E2b zrobione (caly projekt). Zostaje: autotest 120 dob z `--grupa m102tablica` i regresja (etap2, etap5, etap8_d1, Obieg),
 test reczny z projektu pkt 6.9, decyzja L-7 po tescie, wgranie (osobny krok, nie tu).
+
+**Poprawki po wlasnym przegladzie (commit po E2b):** po wczytaniu bandy listow rozwiazywane po id jednym przebiegiem po partiach (dotad - szukanie w calej liscie partii
+dla kazdego listu, do ok. 200 x kilka tysiecy porownan w pierwszej dobie); L-7 liczy teraz wplywy kas miast z linii "Przeplywy osad (kasy miast)" (lud za towar
++ dodatnie przelewy gry do kas), a nie stan kas.
