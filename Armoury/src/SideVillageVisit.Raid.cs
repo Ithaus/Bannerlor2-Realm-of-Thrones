@@ -320,8 +320,10 @@ namespace Armoury
                 if (DefOn && !Surrenders(def, men))
                 {
                     // krok 2: obroncy wioski wychodza do walki - spotkanie gry; rabunek po wygranej (FinishFight -> BeginRaid)
-                    if (!StartFight(st, r, me, def, men, KRaid)) Log.Player("You cannot raid " + NameOf(r) + " now.", true);
-                    return;
+                    bool nobody;
+                    if (StartFight(st, r, me, def, men, KRaid, out nobody)) return;
+                    if (!nobody) { Log.Player("You cannot raid " + NameOf(r) + " now.", true); return; }
+                    def = 0;   // DOM wsi okregu na podlodze - nikt nie wychodzi (jak poddanie)
                 }
                 if (DefOn) LogSurrender(r, st, me, def, men, KRaid);
                 if (BeginRaid(st, r, me, nAll, "z menu wioski")) GameMenu.SwitchToMenu(RaidMenu);   // zwykle menu wioski -> menu oczekiwania (jak sen)
@@ -641,8 +643,10 @@ namespace Armoury
                     if (!Surrenders(def0, men0))
                     {
                         // krok 2: obroncy nie placa, tylko wychodza do walki - okup po wygranej (FinishFight -> PayTribute, stawka gorna)
-                        if (!StartFight(st, r, me, def0, men0, KTribute)) Log.Player(NameOf(r) + " will not pay you now.", true);
-                        return;
+                        bool nobody;
+                        if (StartFight(st, r, me, def0, men0, KTribute, out nobody)) return;
+                        if (!nobody) { Log.Player(NameOf(r) + " will not pay you now.", true); return; }
+                        def0 = 0;   // DOM wsi okregu na podlodze - nikt nie wychodzi (jak poddanie)
                     }
                     LogSurrender(r, st, me, def0, men0, KTribute);
                 }

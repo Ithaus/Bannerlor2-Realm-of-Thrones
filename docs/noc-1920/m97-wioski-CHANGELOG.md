@@ -171,7 +171,8 @@ gry + `DistrictRaid`, ksiega pali wioski lancuchem od strony wroga), okup (`Raid
 **Dla Jeffa (prosto).** Wioske poboczna bronia teraz jej wlasni ludzie, a nie milicja wsi glownej: mniej wiecej co dziesiaty mieszkaniec w domu bierze cep, wlocznie
 albo luk (najwyzej 60 ludzi). Gdy chcesz ja spladrowac albo zadac okupu i masz mniej niz 4 razy wiecej zdrowych ludzi, chlopi wychodza przed wioske i jest zwykla
 bitwa: wygrasz - rabunek albo okup idzie dalej, przegrasz albo odjedziesz - wioska nietknieta. Z przewaga 4:1 i wieksza poddaja sie bez walki. Polegli i pojmani
-obroncy ubywaja z ludzi okregu, a wioska przez dwa miesiace ma mniej ludzi do obrony; lordowie innych krolestw z mniejsza druzyna niz obroncy wioske omijaja.
+obroncy ubywaja z ludzi TEJ wioski (mniej rak do pracy i mniej obroncow; ubytek wypelnia sie przez dwa miesiace), reszta okregu ich nie traci; lordowie innych krolestw
+z mniejsza druzyna niz obroncy wioske omijaja.
 Wylacznik w MCM: "Side Village Defenders" (domyslnie TAK; NIE = jak dotad, wioske pilnuje cala milicja wsi glownej).
 
 **Problem.** Jeff 20.10: "czy wioski poboczne moga miec tez obroncow? czy to za duzo tak jak wioski glowne?", potem "dopisz do kolejki po obozie" (osobna bitwa
@@ -181,10 +182,11 @@ recenzji): `SideVillageVisit.Defenders` = `RaidTribute.DefOf` - cala milicja wsi
 **Zasada (z liczbami).**
 - Obroncy = wlasni ludzie wioski w domu (`VillageBook.PartView.Home` - ta sama liczba co opis wioski): 1 na 10 mieszkancow (dorosli mezczyzni to ok. 1/4 ludzi,
   do walki staje ok. 2 z 5 z nich), najwyzej 60, minus pamiec poleglych tej wioski (wraca liniowo przez 60 dob - ranni do sil, chlopcy dorastaja, ludzie z okregu).
-  Przyklady: wioska 60 mieszkancow - 6 obroncow, 150 - 15, 400 - 40 (600 i wiecej - 60). Po bitwie, w ktorej 400-osobowa wioska stracila 30 ludzi: od razu 10
-  obroncow, po 30 dobach 25, po 60 dobach znow 40 (o ile ludzi nie ubylo).
+  Przyklady: wioska 60 mieszkancow - 6 obroncow, 150 - 15, 400 - 40 (600 i wiecej - 60). Po bitwie, w ktorej 400-osobowa wioska (10% osad okregu) stracila 30 ludzi
+  (po recenzji): w domu 370, obroncow od razu 10 (37 - pamiec 27), po 30 dobach ok. 24 (w domu ok. 384, pamiec 13.5), po 60 dobach 39 (w domu 397 - okreg stracil
+  30 ludzi na stale, wraca z przyrostem ludnosci).
 - Sklad: 70% chlopi kultury wsi okregu (`Culture.Villager`, ROT `villager_*`, poziom 1), 30% milicja kultury (2/3 wlocznicy `MeleeMilitiaTroop`, 1/3 lucznicy
-  `RangedMilitiaTroop`, ROT `*_militia_spearman` / `*_militia_archer`, poziom 11 = t2), bez bohaterow. Np. 15 obroncow = 10 chlopow, 3 wlocznikow, 2 lucznikow.
+  `RangedMilitiaTroop`, ROT `*_militia_spearman` / `*_militia_archer`, poziom 11 = t2), bez bohaterow. Np. 15 obroncow = 10 chlopow, 3 wlocznikow, 2 lucznikow (po recenzji polowki w gore).
 - Poddanie: zdrowi ludzie gracza (z partiami armii, ktora prowadzi - `MenNow`) >= 4 x obroncy. 40 ludzi na wioske 60 mieszkancow (6 obroncow) - poddanie; 40 ludzi
   na wioske 150 (15) - bitwa; 160 ludzi na wioske 400 (40) - poddanie, 100 ludzi - bitwa.
 - Milicja wsi glownej nie broni juz wiosek pobocznych (broni tylko wsi glownej - bitwa rabunku gry bez zmian).
@@ -201,7 +203,7 @@ recenzji): `SideVillageVisit.Defenders` = `RaidTribute.DefOf` - cala milicja wsi
    `SetDoNotMakeNewDecisions`, stoi. Spotkanie: `PlayerEncounter.RestartPlayerEncounter(druzyna, gracz)` + `GameMenu.SwitchToMenu("encounter")` - to samo, co gra robi
    przy wrogiej akcji we wsi (`VillageHostileActionCampaignBehavior.StartHostileAction`, dekompilacja 1.4.8); init menu "encounter" sam zaczyna bitwe polowa
    (`PlayerEncounter.StartBattle` -> `FieldBattleEventComponent`). Gracz ma zwykle "Attack" / "Send troops" / "Leave". Zadnego SwitchToMenu z menu oczekiwania.
-3. **Ludzie druzyny = ludzie okregu** (zamknieta ksiega ludzi): przy wyjsciu `PeopleBook.TakeLevy(wies okregu, d, MLevyMilitia)` + `GiveNew` (pochodzenie) - ta sama
+3. **Ludzie druzyny = ludzie tej wioski** (zamknieta ksiega ludzi; po recenzji - pkt R3 nizej): przy wyjsciu `PeopleBook.TakeLevyHere(wies okregu, d, MLevyMilitia)` + `GiveNew` (pochodzenie) - ta sama
    droga co przyrost milicji (`ArmsFromPeople.MilitiaDelta`); czego DOM nie dal - mniej obroncow (`Strip`), ulamek - `GiveNone(FArmsFloor)` jak milicja. Po bitwie
    ocaleni (zdrowi i ranni w druzynie) wracaja do domow: `PeopleBook.Take(FMilitiaHome)` + `ArriveAt(..., MBackMilitia, MBackMilitiaNone)` - jak milicja; sklad
    wyczyszczony i `DestroyPartyAction.Apply(null, druzyna)` (nikt nie wraca drugi raz). Polegli i pojmani nie wracaja (ubytek z ludzi okregu) i ida do pamieci poleglych.
@@ -238,12 +240,11 @@ recenzji): `SideVillageVisit.Defenders` = `RaidTribute.DefOf` - cala milicja wsi
   (gra: `CheckNearbyPartiesToJoinPlayerMapEvent`) - jak przy kazdej bitwie.
 - Druzyna tymczasowa nalezy do rodu pana okregu na czas bitwy: nasluchy tworzenia partii (DTE, LevyGold, PeopleLedger - tylko pomiar) ja widza. DTE moze dac jej
   komplet przy utworzeniu - to tylko kilkanascie-kilkadziesiat ludzi na chwile; zbrojownia znika z druzyna.
-- Gra sama kasuje pokonana druzyne (A17: `HandleMapEventEndForPartyInternal`) i rozdziela jej szeregowych (jency do zwyciezcy, reszta "rozbici" do domow / lasu) - wtedy
-  nasz koniec liczy straty = wszyscy obroncy (pamiec poleglych i linia moga zawyzyc o rozbitych, ludzie sie zgadzaja - rozbitych prowadzi A17 / OutlawLaw).
+- Gra sama kasuje pokonana druzyne (A17: `HandleMapEventEndForPartyInternal`) i rozdziela jej szeregowych (jency do zwyciezcy, reszta "rozbici" do domow / lasu) - po
+  recenzji (R5) rozbici z `RoutedInBattle` nie sa strata (straty = obroncy - ocaleni - rozbici).
 - Przegrana gracza: gracz w lochu druzyny chlopow (do ucieczki / wykupu gry; RealisticCaptivity widzi zwykla partie). ZOBACZYC, czy niewola u "Villagers of X" nie
   zawiesza menu niewoli.
-- Pamiec poleglych to liczba obroncow, nie ludzi: ksiega wiosek nie trzyma ludzi osobno dla kazdej wioski (ludzie wioski = jej czesc ludzi okregu wedlug osad), wiec
-  polegli schodza z ludzi okregu, a "z tej wioski" pilnuje pamiec poleglych (mniej obroncow tej wioski przez 60 dob).
+- (Przed recenzja) pamiec poleglych pilnowala tylko obroncow, a ludzie schodzili z calego okregu - po recenzji (R3) brak rak wioski zdejmuje ich z TEJ wioski.
 - AI: plan kroku `DistrictRaid` (Room okregu) nie wie o wioskach pominietych z powodu obroncow - gdy miejsce maja juz tylko pominiete wioski, uderzenie trafia ludzi
   okregu, a osady nie plona (nadmiar w liczniku ksiegi `_dOver`, ta sama droga co okreg na pulapie). Rabunek wsi glownej przez gracza (`ForceMain`) i rabunek jednej
   wioski (`ForceUid`) - bez sprawdzania obroncow (gracz juz walczyl albo sie poddali).
@@ -277,3 +278,65 @@ recenzji): `SideVillageVisit.Defenders` = `RaidTribute.DefOf` - cala milicja wsi
 - Ranni obroncy, ktorych nikt nie pojmal, wracaja do domow (zyja); z ludzi schodza tylko polegli i pojmani. "Mniej rak" po bitwie liczy pamiec poleglych (60 dob).
 - Okup po wygranej bitwie - stawka gorna (q = 5): obroncy rozbici, wioska nie ma czym sie targowac.
 - AI bez symulacji bitwy: slabszy pomija wioske, silniejszy pali z ubytkiem obroncow wedlug przewagi.
+
+### Obroncy wioski (krok 2) - poprawki po recenzji (20/21.10 w nocy, commit nad 90b601e0)
+
+**Dla Jeffa (prosto).** Teraz naprawde bronia ludzie tej wioski: chlopi wychodza tylko z domow tego okregu (nie z innych wsi krainy), a polegli i pojmani
+znikaja z ludzi TEJ wioski - w jej opisie widac mniej mieszkancow, a wies glowna i sasiednie wioski maja tylu ludzi co przed bitwa. Pustke w wiosce wypelniaja
+przez dwa miesiace sasiedzi z okregu. Chlopi, ktorzy uciekli z pola bitwy, wracaja do domow i nie licza sie jako straty. Liczby i reguly bitwy bez zmian.
+
+Recenzja: bez sciezki do CTD, 3 wazne, 4 drobne. Wszystkie wazne PRAWDZIWE i poprawione, drobne - 4 poprawione.
+
+- **R1 WAZNE: `else` w `VillageBook.BurnCore` przypial sie do nowego bloku krok 2** - PRAWDA (blok `if (_chainMen > 0 ...)` wszedl miedzy `if (raid) {...}` a jego
+  `else`; rabunek wsi glownej, `ForceUid`, `ForceMain` i sesja bez sily liczyly sie tez jako "zerowanie" w linii `Ksiega wiosek (E4/11)`). Poprawka: blok obroncow
+  PRZED paleniem porcji (ludzie w domu liczone przed `Br += put` - dokladniej), para `if (raid) {...} else {...}` jak w c578f4e7.
+- **R2 WAZNE: KONTROLA linii `Wojsko z ludzi (E4/8)` rozjezdzala sie o obroncow** - PRAWDA (pobor obroncow idzie przyczyna `MLevyMilitia`, a `ours` liczyl
+  tylko `d.m1` przyrostu milicji; prog E4/8 N6 <= 1 dalby NIE w kazdej dobie z bitwa). Poprawka: `ArmsFromPeople.NoteVillageDefenders(got)` - skladnik `ob`;
+  linia: `KONTROLA: zdjete z DOM przyczynami E4/8 X - (m1 + a1 + c1 + c3 + n1w + n1e + ob) = R (ob - obroncy wiosek pobocznych N)`; `sprawdz_logi` E4/8 N6
+  czyta stara i nowa postac (sprawdzone na obu). Powrot ocalalych (`MBackMilitia`) w KONTROLI nie jest (sa tam tylko wyjscia - bez zmian); `Measure40` i
+  `TownGrowth` licza ruch hearth przyczynami - pobor i powrot obroncow to prawdziwy ruch hearth wsi okregu, wiec sie zgadzaja.
+- **R3 WAZNE: ludzie do druzyny i straty schodzily z puli calego okregu (i innych okregow regionu), nie z tej wioski** - PRAWDA (`TakeLevy` dla wsi: `FromVillage`
+  wsi okregu, potem `FromVillages` regionu od najwiekszej; ksiega wiosek dzieli DOM okregu wedlug stojacych osad, wiec wioska z 10% osad tracila ok. 1/10 strat).
+  Poprawka (3 czesci):
+  1. pobor `PeopleBook.TakeLevyHere` - tylko DOM wsi okregu (ludzie wioski sa jego czescia), bez innych wsi regionu i bez miasta; ta sama droga i podloga 50 hearth
+     co `TakeLevy`. Czego DOM nie dal - mniej obroncow; nikt (wies glowna na podlodze) - wioska jak poddana (linia `DOM wsi okregu ... na podlodze - nikt nie
+     wychodzi`). Ocaleni wracaja tam, skad ich zdjeto (`ArriveAt` wsi okregu) - przy "Leave" nic nie przeplywa miedzy okregami;
+  2. **brak rak wioski** (`SideVillageVisit._lack`, czyta `VillageBook.LackOf` w `SnapOf`): po bitwie brak = straty x (1 - udzial wioski w stojacych osadach okregu);
+     `VillageBook.People`: w domu wioski w = udzial w - brak w + udzial w x suma (j rozne od w) brak j / (DOM - udzial j) - suma po okregu = DOM (nikt z niczego).
+     Przyklad: okreg 4000 ludzi, wioska 10% osad (400), 30 poleglych i pojmanych: DOM 3970; bez braku rak wioska 397 (-3), reszta 3573 (-27); z brakiem rak 27 -
+     wioska 370 (-30), reszta 3600 (bez zmian). Brak rak wraca liniowo przez 60 dob (sasiedzi z okregu wprowadzaja sie do pustych domow) - potem wioska 397, reszta
+     3573. Bez bitew zero kosztu (`LackAny` - `SnapOf` bez petli). Zapis: sekcja `|k=uid,ilu,doba;...` w `arm_sidevil` (stary czytnik pomija);
+  3. pamiec poleglych po bitwie = 9/10 strat (1/10 zdejmuje juz mniejsza ludnosc wioski - bez podwojnego liczenia): 400-osobowa wioska po 30 stratach - w domu 370,
+     obroncow 37 - 27 = 10 (jak w przykladzie przed recenzja), po 30 dobach ok. 24, po 60 dobach 39.
+  Linia konca bitwy: `... rozbici do domow (H3) R, straty z ludnosci S (polegli i pojmani; zabici w bitwie K) | wynik: ... | pamiec poleglych F, brak rak wioski +B
+  (udzial w osadach okregu U%, razem Z).`; doba: `straty z ludnosci S (brak rak wiosek +B), rozbici do domow R ... | pamiec poleglych N wiosek, brak rak M wiosek
+  (razem Z)`.
+- **R4 drobne: OB-2 dawal NIE po wczytaniu w bitwie** - PRAWDA. Poprawka: OB-2 liczy otwarte bitwy w obrebie sesji; otwarte przy `start sesji` przechodza do
+  "przeniesionych" (straznik zamyka je po wczytaniu - koniec w nowej sesji), reszta to INFO "przerwanych wczytaniem". Sprawdzone na sztucznych logach:
+  `m97-wioski-tmp/rec2/a.log` (bitwa zamknieta po wczytaniu, druga przerwana) - TAK; `rec/reload.log` recenzenta - TAK; zli rozbici (`rec2/bad.log`) - OB-3 NIE.
+- **R5 drobne: "Send troops" - straty = wszyscy obroncy** - PRAWDA. Poprawka: `OnMapEventEnded` czyta `DiedInBattle` i `RoutedInBattle` naszej `MapEventParty`
+  (nasluch zapisany w `ArmouryBehavior` przed `OutlawLaw.OnMapEventEnded` - rozbici jeszcze w liscie); straty = obroncy - ocaleni - rozbici (rozbitych odsyla do
+  domow H3 / OutlawLaw). Rozbici w 11. polu wpisu `f=` (stary wpis bez niego - 0). OB-3: wrocilo + rozbici + straty <= obroncow.
+- **R6 drobne: przyklad skladu 15 = 10/3/2 nie zgadzal sie z kodem** (Math.Round do parzystej: 11/3/1) - PRAWDA. Poprawka: `MidpointRounding.AwayFromZero` i
+  lucznicy = zaokraglona 1/3 milicji: 15 obroncow = 10 chlopow, 3 wlocznikow, 2 lucznikow; 6 = 4/1/1; 40 = 28/8/4; 60 = 42/12/6.
+- **R7 drobne: opis MCM `Side Villages Enterable` mowil o milicji wsi glownej** - PRAWDA. Poprawka: "(spared 30 days; its own people defend it - see Side Village
+  Defenders)"; opis `Side Village Defenders`: "The fallen and the captured are lost to that village itself - fewer hands at work and fewer men to fight, filling
+  back over the next two months". `McmSettings.cs` z `tools/gen_mcm.py`.
+
+**Ryzyko / co sprawdzic (po poprawkach).**
+- `VillageBook.People` to centralny odczyt ksiegi (opis wioski, "People of this land", udzial w plonie w menu, lup rabunku wioski, `Guarded`, liczba obroncow): bez
+  braku rak nic sie nie zmienia; z brakiem - suma ludzi okregu ta sama (rachunek wyzej), zmienia sie tylko podzial. Plon okregu liczy gra - ksiega tylko go przypisuje.
+- `LackNow` wolane pod `Gate` ksiegi; `_lack` pisza tylko `FinishFight`, wczytanie i doba - watek glowny, jak cala ksiega.
+- Pobor tylko z wsi okregu: wies glowna blisko podlogi 50 hearth wystawi mniej obroncow niz pulap (`Strip`); 0 - jak poddanie.
+- Rozbici z pola wracaja droga H3 do DOM regionu pochodzenia - moga trafic do innej wsi regionu (jak kazda rozbita milicja); nie sa strata wioski.
+- Wylaczona ksiega pochodzenia (`LevyLive` NIE): nikt nie schodzi z DOM, wiec brak rak sie nie liczy (pamiec poleglych tak).
+- Zbudowane (kod 0), `gen_mcm.py`. Bez gry i autotestu (zakaz w tej pracy).
+
+**Status.** DO SPRAWDZENIA (zbudowane, kod 0; bez autotestu i bez gry).
+
+**Test w grze - dopiski do krokow 1-9 wyzej.**
+2a. Po wygranej bitwie zapamietaj "straty z ludnosci S" z logu, wjedz do tej wioski: mieszkancow mniej o ok. S; wies glowna i inne wioski - tyle co przed bitwa
+    ("People of this land" w menu wsi glownej). W logu `brak rak wioski +B`.
+2b. Linia `Wojsko z ludzi (E4/8): dzien` doby bitwy: `KONTROLA ... + ob) = 0.00 (ob - obroncy wiosek pobocznych N)`.
+2c. "Send troops" zamiast "Attack!": w logu `rozbici do domow (H3) R`, straty mniejsze niz obroncy.
+9a. Automat: `python -I tools/sprawdz_logi.py --grupa m97obroncy <Armoury.log>` (OB-2 po wczytaniu w bitwie - TAK z INFO "przerwanych wczytaniem").

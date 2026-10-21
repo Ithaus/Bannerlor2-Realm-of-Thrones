@@ -114,7 +114,8 @@ namespace Armoury
         /// <summary>E7/W1: pamiec wojny wioski dla dymka (W2) - same identyfikatory, nazwa na zywo u wolajacego.</summary>
         internal struct WarMemory { public bool Burned; public int Day, Burns; public string Hero, Clan; public double Fled, Dead; }
 
-        private struct Snap { public double Dom, A, Ar, Af, B, Sbr, Sbf, Y; }
+        // m97-wioski krok 2: Lk - brak rak wiosek tego okregu po bitwie z obroncami (SideVillageVisit.LackNow, null - brak), LkT - suma Lk[j] / (Dom - udzial j)
+        private struct Snap { public double Dom, A, Ar, Af, B, Sbr, Sbf, Y; public double[] Lk; public double LkT; }
 
         /// <summary>Stan wioski dla widoku i etapu 7 (napisy nad spalonymi, komunikaty).</summary>
         internal struct VState
@@ -1417,11 +1418,10 @@ namespace Armoury
                 double put = Math.Min(Room(d, cur), left);
                 if (put > 0.0)
                 {
-                    d.Br[cur] += put; left -= put;
-                    if (raid) { if (s != null) s.Cur = cur; if (cur == d.W) _dRaidMain += put; else _dRaidW += put; }
                     if (_chainMen > 0 && cur < d.W && d.Uid != null && d.Uid[cur] != null && s != null)
                     {
-                        // m97-wioski krok 2: obroncy tej wioski pobici przez wiekszego napastnika - raz na sesje do pamieci poleglych (bez drugiego ubytku ludzi)
+                        // m97-wioski krok 2: obroncy tej wioski pobici przez wiekszego napastnika - raz na sesje do pamieci poleglych (bez drugiego ubytku ludzi); ludzie w domu
+                        // PRZED paleniem tej porcji (recenzja: blok stal miedzy if (raid) a jego else - else przypial sie do niego i rabunek liczyl sie tez jako zerowanie)
                         if (s.DefHit == null) s.DefHit = new HashSet<string>(StringComparer.Ordinal);
                         if (s.DefHit.Add(d.Uid[cur]))
                         {
@@ -1430,6 +1430,8 @@ namespace Armoury
                             SideVillageVisit.NoteChainBurn(d.Uid[cur], h0, _chainMen);
                         }
                     }
+                    d.Br[cur] += put; left -= put;
+                    if (raid) { if (s != null) s.Cur = cur; if (cur == d.W) _dRaidMain += put; else _dRaidW += put; }
                     else { if (cur == d.W) _dForMain += put; else _dForW += put; }
                     Remember(d, cur, cx, put, today);                   // E7/W1 (232): pamiec wojny PRZED CheckUp (przejscie na spalona oznacza to samo zdarzenie 'B')
                     CheckUp(d, cur, today, raid && s != null ? s.Raider : who, true, cx);
@@ -1695,7 +1697,34 @@ namespace Armoury
             sn.Sbr = Sum(d.Br); sn.Sbf = Sum(d.Bf); sn.B = sn.Sbr + sn.Sbf;
             sn.Y = (double)Devastation.YieldFactor(d.V) * FreeHands.YieldFactor(d.V);
             if (double.IsNaN(sn.Y) || sn.Y < 0.0) sn.Y = 1.0;
+            if (SideVillageVisit.LackAny) LackOf(d, ref sn);
             return sn;
+        }
+
+        /// <summary>m97-wioski krok 2 (recenzja: polegli obroncy maja zejsc z ludzi TEJ wioski): brak rak wiosek okregu po bitwie z obroncami. Ksiega nie trzyma ludzi
+        /// wioski osobno (DOM okregu x stojace osady), wiec polegli zdjeci z DOM rozkladaliby sie na caly okreg; brak rak przesuwa ich udzial z powrotem na te wioske:
+        /// w domu wioski w = udzial w - Lk[w] + udzial w x suma (j != w) Lk[j] / (Dom - udzial j) - suma po okregu = Dom (nikt z niczego). Lk[w] najwyzej udzial w.
+        /// Zero kosztu bez bitew (LackAny). Sam odczyt, nie rzuca.</summary>
+        private static void LackOf(Dist d, ref Snap sn)
+        {
+            try
+            {
+                if (d.Uid == null || d.W <= 0 || d.Nw == null) return;
+                double denom = d.N - sn.B;
+                if (!(denom > Eps) || !(sn.Dom > Eps)) return;
+                for (int w = 0; w < d.W; w++)
+                {
+                    if (d.Uid[w] == null) continue;
+                    double lk = SideVillageVisit.LackNow(d.Uid[w]);
+                    if (!(lk > Eps)) continue;
+                    double bw = Math.Max(0.0, sn.Dom * (d.Nw[w] - d.Br[w] - d.Bf[w]) / denom), rest = sn.Dom - bw;
+                    lk = Math.Min(lk, bw);
+                    if (!(lk > Eps) || !(rest > Eps)) continue;
+                    if (sn.Lk == null) sn.Lk = new double[d.W + 1];
+                    sn.Lk[w] = lk; sn.LkT += lk / rest;
+                }
+            }
+            catch { sn.Lk = null; sn.LkT = 0.0; }
         }
 
         private static void Reconcile(Dist d, Settings s, int today)
@@ -1772,6 +1801,13 @@ namespace Armoury
         {
             double denom = d.N - sn.B;
             home = denom > Eps ? sn.Dom * (d.Nw[w] - d.Br[w] - d.Bf[w]) / denom : (w == d.W ? sn.Dom : 0.0);
+            if (sn.Lk != null && denom > Eps)
+            {
+                // m97-wioski krok 2: brak rak wiosek po bitwie z obroncami (LackOf) - ta wioska mniej, reszta okregu wiecej o tyle samo
+                double own = sn.Lk[w], rest = sn.Dom - home;
+                double t = sn.LkT - (own > 0.0 && rest > Eps ? own / rest : 0.0);
+                home = Math.Max(0.0, home - own + home * t);
+            }
             away = (sn.Sbr > Eps ? sn.Ar * d.Br[w] / sn.Sbr : (w == d.W ? sn.Ar : 0.0)) + (sn.Sbf > Eps ? sn.Af * d.Bf[w] / sn.Sbf : (w == d.W ? sn.Af : 0.0));
         }
 

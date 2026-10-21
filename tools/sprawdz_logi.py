@@ -3778,7 +3778,7 @@ def etap4_e48(rep, lines, start, win, hea, until):
     # N5 - wojsko lordow (jak E4/7 T9)
     rep.add("E4/8 N5: wojsko lordow d90-d120", "patrz E4/7 T9 (ta sama linia \"Ludzie:\")", "95-115 tys. (podloga 85)", None)
     # N6 - kontrole
-    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e\) = " + SF, arm[d]) for d in adays]
+    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?\) = " + SF, arm[d]) for d in adays]   # m97-wioski krok 2: + ob (obroncy wiosek pobocznych) - stare logi bez ob
     kc = [x for x in kc if x is not None]
     rep.add("E4/8 N6: KONTROLA linii E4/8 (najwieksza |roznica|)", f"{max(abs(x) for x in kc):.2f} ({len(kc)} dob)" if kc else "-", "<= 1 czlowiek kazdej doby", (max(abs(x) for x in kc) <= 1.0) if kc else None)
     mdays = [d for d in sorted(mia) if 1 <= run_day(d, start) <= until]
@@ -53328,7 +53328,7 @@ def m97wioski_main(logp):
 M97O_RX = {
     "start": re.compile(r"obroncy wiosek: klucz Side Village Defenders (\S+) \(1 na (\d+) mieszkancow w domu, pulap (\d+), poddanie przy (\d+):1"),
     "enc": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): ludnosc (\d+), obroncow (\d+) \(pulap ludnosci (\d+), pamiec poleglych ([\d.]+).*?\), sila gracza (\d+) -> (poddanie|bitwa)"),
-    "end": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): koniec bitwy - (.+?) \| obroncow (\d+), wrocilo do domow (\d+), straty z ludnosci (\d+) .*\| wynik: (.+?) \|"),
+    "end": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): koniec bitwy - (.+?) \| obroncow (\d+), wrocilo do domow (\d+), (?:rozbici do domow \(H3\) (\d+), )?straty z ludnosci (\d+) .*\| wynik: (.+?) \|"),
     "orph": re.compile(r"obroncy: druzyna (\S+) .* bez wpisu bitwy po wczytaniu"),
     "day": re.compile(r"obroncy wiosek: starcia (\d+) \(poddania (\d+), bitwy (\d+): wygrane gracza (\d+), przegrane / odwrot (\d+)\), straty z ludnosci (\d+)"),
     "ai": re.compile(r"AI: wiosek pominietych \(obroncow wiecej niz napastnikow\) (\d+), spalonych z ubytkiem obroncow (\d+)"),
@@ -53340,6 +53340,7 @@ def m97obroncy_main(logp):
     OB-0 start, OB-1 ERROR SideVillageVisit 0, OB-2 bitwy zamkniete, OB-3 straty <= obroncow, OB-4 obroncow <= pulapu ludnosci, OB-5 sieroty (INFO), OB-6 doba (INFO)."""
     rep = Report()
     start, encs, ends, orph, days, errs = [], [], [], [], [], 0
+    seq = []   # recenzja: kolejnosc zdarzen (start sesji / starcie / koniec) - OB-2 liczy otwarte bitwy w obrebie sesji
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
@@ -53350,15 +53351,15 @@ def m97obroncy_main(logp):
                 continue
             t = s[len(M97W_PRE):]
             if t.startswith("start sesji"):
-                start.append(t)
+                start.append(t); seq.append(("s", t))
             elif t.startswith("dzien"):
                 days.append(t)
             elif t.startswith("obroncy: druzyna"):
                 orph.append(t)
             elif t.startswith("obroncy ") and ": koniec bitwy - " in t:
-                ends.append(t)
+                ends.append(t); seq.append(("e", t))
             elif t.startswith("obroncy ") and " -> " in t:
-                encs.append(t)
+                encs.append(t); seq.append(("b", t))
     print(f"plik: {logp} | start {len(start)}, starcia {len(encs)}, konce bitew {len(ends)}, sieroty {len(orph)}, doby {len(days)}, ERROR {errs}")
     st = [M97O_RX["start"].search(x) for x in start]
     st = [m for m in st if m]
@@ -53380,28 +53381,46 @@ def m97obroncy_main(logp):
             bad4.append(f"{g.group(1)}: ludnosc {pop}, obroncow {d}, pulap {k}")
         if g.group(9) == "bitwa":
             fights.append((g.group(2), d))
-    opened = {}
-    for u, d in fights:
-        opened[u] = opened.get(u, 0) + 1
+    # OB-2 po sesjach (recenzja): bitwa otwarta przy "start sesji" (wczytanie w bitwie / w niewoli) przechodzi do "przeniesionych" - po wczytaniu straznik ja zamyka
+    # (koniec bitwy w nowej sesji) albo druzyny juz nie ma (zapis sprzed bitwy) - INFO, nie NIE
+    opened, carried, interrupted = {}, {}, 0
+    for kind, t in seq:
+        if kind == "s":
+            for u, v in opened.items():
+                if v > 0:
+                    carried[u] = carried.get(u, 0) + v
+            opened = {}
+        elif kind == "b":
+            g = M97O_RX["enc"].search(t)
+            if g and g.group(9) == "bitwa":
+                opened[g.group(2)] = opened.get(g.group(2), 0) + 1
+        else:
+            g = M97O_RX["end"].search(t)
+            if not g:
+                continue
+            u = g.group(2)
+            if opened.get(u, 0) > 0:
+                opened[u] -= 1
+            elif carried.get(u, 0) > 0:
+                carried[u] -= 1
+    interrupted = sum(v for v in carried.values() if v > 0)
     bad3 = []
     for t in ends:
         g = M97O_RX["end"].search(t)
         if not g:
             bad3.append("nieczytelna: " + t[:60]); continue
-        u = g.group(2)
-        if opened.get(u, 0) > 0:
-            opened[u] -= 1
-        d, back, lost = int(g.group(5)), int(g.group(6)), int(g.group(7))
-        if lost > d or back > d:
-            bad3.append(f"{g.group(1)}: obroncow {d}, wrocilo {back}, straty {lost}")
+        d, back, routed, lost = int(g.group(5)), int(g.group(6)), int(g.group(7) or 0), int(g.group(8))
+        if lost > d or back > d or back + routed + lost > d:
+            bad3.append(f"{g.group(1)}: obroncow {d}, wrocilo {back}, rozbici {routed}, straty {lost}")
     left = sum(v for v in opened.values() if v > 0)
     if fights:
+        tail = f", przerwanych wczytaniem {interrupted} (INFO)" if interrupted else ""
         if left == 0:
-            rep.add("OB-2: bitwy z obroncami zamkniete (druzyna nie przezywa bitwy)", f"bitew {len(fights)}, zamknietych {len(ends)}", "wszystkie", True)
-        elif left == 1 and encs and " -> bitwa" in encs[-1]:
-            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwarta 1 (ostatnia - koniec logu w bitwie?)", "INFO", None)
+            rep.add("OB-2: bitwy z obroncami zamkniete (druzyna nie przezywa bitwy)", f"bitew {len(fights)}, zamknietych {len(ends)}" + tail, "wszystkie", True)
+        elif left == 1 and seq and seq[-1][0] == "b" and " -> bitwa" in seq[-1][1]:
+            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwarta 1 (ostatnia - koniec logu w bitwie?)" + tail, "INFO", None)
         else:
-            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwartych {left}", "0 otwartych", False)
+            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwartych w sesji {left}" + tail, "0 otwartych", False)
         rep.add("OB-3: straty z ludnosci <= obroncow", f"koncow {len(ends)}, zlych {len(bad3)}" + (f" ({bad3[:3]})" if bad3 else ""), "0 zlych", not bad3)
     else:
         rep.add("OB-2/OB-3: bitwy z obroncami", "brak bitew w logu", "INFO", None)
