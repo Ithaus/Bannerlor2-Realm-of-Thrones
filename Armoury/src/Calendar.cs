@@ -34,6 +34,16 @@ namespace Armoury
         {
             get
             {
+                return StoryStartTime;
+            }
+        }
+
+        /// <summary>m101-prolog: START OPOWIESCI - data startu modelu sprzed nas (ROT: 299 AC), czyli start kampanii klasycznej. CrashScribe czyta ja odbiciem
+        /// (StoryClock - Fabula, Inni), latka opowiesci ROT (Prologue.Story) podstawia ja odczytom CampaignStartTime w ROT.dll.</summary>
+        public CampaignTime StoryStartTime
+        {
+            get
+            {
                 try { if (_prev != null) return _prev.CampaignStartTime; } catch { }
                 return base.CampaignStartTime;
             }

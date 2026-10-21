@@ -8924,6 +8924,10 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerArmourerPerStall { get; set; } = 6;
 
+        [SettingPropertyBool("Prologue Enabled", HintText = "when you start a new campaign, choose between 'Prologue 298 - the King rides north' (the campaign begins 188 days before the story of Realm of Thrones, as King Robert leaves King's Landing for Winterfell; Robert and Eddard Stark live and the realms keep the King's peace) and 'Classic start 299' (as Realm of Thrones begins). Off = always the classic start, without asking. Only new campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueEnabled { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11154,6 +11158,7 @@ namespace Armoury
             s.SutlerRevelMorale = SutlerRevelMorale;
             s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
+            s.PrologueEnabled = PrologueEnabled;
         }
 
         internal static void Apply()

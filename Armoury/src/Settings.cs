@@ -3939,6 +3939,12 @@ namespace Armoury
         public int SutlerRevelMoraleCap = 10;              // revels lift your party's morale from recent events to at most this much - another revel while the men are still merry adds only what is missing (and costs only that share)
         public int SutlerArmourerPerStall = 6;             // worn pieces of your men's kit the field armourers of one stall mend in a day (town smiths' rate plus the sutlers' cut; with Smith Mend From Market also the materials, taken from that town's market)
 
+        // --- Prologue 298 (new campaign) ---
+        // m101-prolog (Jeff 21.10 "Robimy wczesniejszy start", "Ok wersje lekka robimy", pakty i sojusze z krolestwem Roberta, "I zrob wydarzenia wedlug ksiazki"):
+        // Prologue.cs - okno wyboru startu przy "New Campaign" w menu glownym (klucz czytany przy kliknieciu); NIE = zawsze klasyczny start ROT 299 bez okna.
+        // Zapis kampanii pamieta wybor (arm_prologue). Nowe klucze (MCM Jeffa ich nie ma - domyslne).
+        public bool PrologueEnabled = true;                // when you start a new campaign, choose between "Prologue 298 - the King rides north" (the campaign begins 188 days before the story of Realm of Thrones, as King Robert leaves King's Landing for Winterfell; Robert and Eddard Stark live and the realms keep the King's peace) and "Classic start 299" (as Realm of Thrones begins). Off = always the classic start, without asking. Only new campaigns
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

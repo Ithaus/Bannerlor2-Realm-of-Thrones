@@ -64,6 +64,8 @@ namespace Armoury
                 if (_modelsPatched) return;
                 _modelsPatched = true;
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
+                // m101-prolog: okno wyboru startu nowej kampanii (Prologue 298 / Classic 299) - prefiks MBGameManager.StartNewGame, raz na proces; wlasny try
+                try { Prologue.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Prologue.ApplyAll", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
@@ -580,6 +582,8 @@ namespace Armoury
                 var starter = gameStarterObject as CampaignGameStarter;
                 if (starter == null || !(game.GameType is Campaign)) return;
                 McmSettings.Apply();
+                // m101-prolog: wybor startu z menu glownego przypiety do tej kampanii PRZED zegarem kampanii (model czasu czyta Prologue.CalendarShifted)
+                Prologue.OnGameStart(game);
                 // dlugosc roku MUSI wejsc, zanim gra przeliczy swoj zegar
                 LongYearTimeModel.Install(gameStarterObject);
                 TierDesertionModel.Install(starter);   // prawo dezercji (Jeff 17.09) - patrz DesertionLaw.cs
@@ -603,6 +607,7 @@ namespace Armoury
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
                 starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)
+                starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }
