@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 100 - kryjowki bandytow: Zwiad, plotki, miejsca)
+
+**Zakres (Jeff 21.10 ok. 03:00):** "im wiecej masz scouting, tym lepiej widzisz kryjowki bandytow, ale ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ...
+jesli plotki powiedza, ze tu i tu jest obozowisko bandytow, to wtedy jak na nie trafisz, wyswietli sie normalnie"; "Kryjowki powinny nie pokazywac sie na wioskach pobocznych,
+tylko tam, gdzie jest wolne miejsce, z dala od miast i wsi, oraz jak jedna kryjowka zostanie rozbita, to kolejna powinna pojawic sie w innym miejscu".
+**Zmiana:** `w-toku/n29-calosc` (1d2318e3) = WGRANIE 99 + m100-kryjowki (9d4c239c): HideoutScoutingChance (Zwiad <= 10 -> 0%, liniowo do 200 = 100%; rzut raz na pobyt w zasiegu),
+HideoutRumourReveals (plotka o kryjowce -> wypatrzenie normalne do rozbicia), HideoutAwayFromSettlements (aktywna kryjowka >= 10 jedn. od osady, >= 6 od wioski pobocznej; z puli ROT 266
+zostaje 183), HideoutRelocateAfterClear (nowa >= 25 jedn. od rozbitej przez 60 dni, twardo >= 12.5), HideoutGuideBanditAi (bandy AI te same zasady - postfiks
+CalculateVisitHideoutScoresForBanditParty gry i BK). Kryjowek nie przesuwamy - wybor z puli ROT. 11 kluczy. Wpis: docs/noc-1920/m100-kryjowki-CHANGELOG.md. Armoury 2228 ustawien.
+**Testy (21.10, pierwszy raz bez VoiceActingPatch):** 100-bitwa - przy pierwszym starcie po zmianie listy modow gra stala 12 min przed wczytaniem modulow (przelacznik niezuzyty, kod 1);
+powtorka 100b-bitwa 4/4 kod 0; 100-nowa 180/180 i 100-160 400/400 kod 0, ERROR 0; progi nowa 3163/NIE 135 (99: 126 - do obserwacji), m100kryjowki 9/9.
+**Status:** WGRANE 100 (21.10 05:50, tag 2026-10-21-wgranie100; Armoury 577de3f2, CrashScribe 03d2cc92, RC 564b1702, GT 6db627f3, ForgeView 36aac63c).
+Armoury.json Jeffa: DrillCampOnlyAi -> true (Jeff 21.10 "14 - tylko w obozie"; kopia Armoury.json.bak-2026-10-21-drillcampai).
+
 ## 2026-10-21 (WGRANIE 99 - oboz etap 2: markietani w duzych obozach)
 
 **Zakres (Jeff 20.10):** "miasteczko obozowe z markietankami"; decyzja 14:20 "markietani: uslugi, rozrywka i sklep - tylko w duzych obozach (armia)".
