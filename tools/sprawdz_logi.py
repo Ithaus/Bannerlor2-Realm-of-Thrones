@@ -37956,20 +37956,7 @@ def m104wojny_main(logp):
                 "latka TAK, 6 wojen (bravos-nord, tyrosh-lys, pentos-myr, norvos-qohor, volantis-valyrian, sarnor-ibb), bez empire_s (Daenerys - zegar opowiesci)", ok)
     else:
         rep.add("WK-2: latka Enforced i wojny essoskie", "kampania klasyczna", "INFO - Essos na kalendarzu tylko w kampanii z prologiem", None)
-    # WK-3 wypowiedzenia Armoury
-    cal_max = max([int(c.group(1)) for c in (M104_CAL.search(x) for x in dailies) if c] or [0])
-    bad = [d for d in decls if d[0] not in M104_ESSOS_IDS or d[1] not in M104_ESSOS_IDS]
-    early = [d for d in decls if int(d[3]) < 21]
-    late = [d for d in decls if float(d[4]) >= 1.0]
-    failed = [d for d in decls if d[2] != "WYPOWIEDZIANA"]
-    need = prolog and cal_max >= 23
-    rep.add("WK-3: wojny wypowiedziane przez Armoury (prolog)",
-            f"{len(decls)} (spoza Essos {len(bad)}, przed dniem kalendarza 21 {len(early)}, po dniu opowiesci 1 {len(late)}, bez skutku {len(failed)})"
-            + (f" [pierwsza {decls[0][0]}-{decls[0][1]} dzien kalendarza {decls[0][3]}]" if decls else "") + f" | ostatni dzien kalendarza w logu {cal_max}",
-            "tylko pary essoskie, dzien kalendarza >= 21 (StartDay 5 x 4.33 = 22), przed dniem opowiesci 1, wszystkie WYPOWIEDZIANA; co najmniej 1, gdy prolog i log siega dnia 23"
-            " (0 dopuszczalne tylko, gdy wszystkie pary juz byly w wojnie - WK-4)",
-            (not bad and not early and not late and not failed and (bool(decls) or not need)) if (decls or need) else None)
-    # WK-4 pary essoskie w wojnie w prologu
+    # WK-4 (liczone przed WK-3): pary essoskie w wojnie w prologu
     rows = []
     for x in dailies:
         c = M104_CAL.search(x)
@@ -37978,6 +37965,19 @@ def m104wojny_main(logp):
         if c and me and msd and float(msd.group(1)) < 1.0 and int(c.group(1)) >= 23:
             rows.append((int(c.group(1)), int(me.group(3)), int(me.group(4))))
     full = [r for r in rows if r[1] == r[2]]
+    # WK-3 wypowiedzenia Armoury
+    cal_max = max([int(c.group(1)) for c in (M104_CAL.search(x) for x in dailies) if c] or [0])
+    bad = [d for d in decls if d[0] not in M104_ESSOS_IDS or d[1] not in M104_ESSOS_IDS]
+    early = [d for d in decls if int(d[3]) < 21]
+    late = [d for d in decls if float(d[4]) >= 1.0]
+    failed = [d for d in decls if d[2] != "WYPOWIEDZIANA"]
+    need = prolog and cal_max >= 23 and not (rows and len(full) == len(rows))   # pary juz w wojnie (np. AI) - nic do wypowiedzenia
+    rep.add("WK-3: wojny wypowiedziane przez Armoury (prolog)",
+            f"{len(decls)} (spoza Essos {len(bad)}, przed dniem kalendarza 21 {len(early)}, po dniu opowiesci 1 {len(late)}, bez skutku {len(failed)})"
+            + (f" [pierwsza {decls[0][0]}-{decls[0][1]} dzien kalendarza {decls[0][3]}]" if decls else "") + f" | ostatni dzien kalendarza w logu {cal_max}",
+            "tylko pary essoskie, dzien kalendarza >= 21 (StartDay 5 x 4.33 = 22), przed dniem opowiesci 1, wszystkie WYPOWIEDZIANA; co najmniej 1, gdy prolog i log siega dnia 23"
+            " (0 dopuszczalne tylko, gdy wszystkie pary juz byly w wojnie - WK-4)",
+            (not bad and not early and not late and not failed and (bool(decls) or not need)) if (decls or need) else None)
     first_gap = next((r[0] for r in rows if r[1] != r[2]), None)
     rep.add("WK-4: w prologu (kalendarz >= 23) pary essoskie w wojnie", f"dob {len(rows)}, z W = N {len(full)}" + (f" (pierwsza bez pelnej: dzien {first_gap})" if first_gap is not None else ""),
             ">= 90% dob (pokoj Diplomacy ze zmeczenia wojna moze przerwac na dobe)", (len(full) >= 0.9 * len(rows)) if rows else None)

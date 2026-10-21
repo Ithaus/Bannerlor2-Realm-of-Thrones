@@ -26,7 +26,7 @@ namespace Armoury
     ///      Reach-Dorne przed decyzjami AI o wojnie (Diplomacy blokuje nim tylko DeclareWarConditions, nie DeclareWarAction - wezwania i ROT go omijaja; dlatego tez
     ///      krok 1 co dobe).
     ///   Pilnowane co dobe (brak sojuszu - od nowa, linia ODNOWIONY; wojna Reach-Dorne - pokoj od nowa) az do najazdu Daenerys.
-    /// DORNE (po zareczynach Myrcelli z Trystanem): w ksiazce Tyrion zaręcza Myrcelle na poczatku "Starcia kroli", ona odplywa przed smiercia Renly'ego. Na osi Fabuli
+    /// DORNE (po zareczynach Myrcelli z Trystanem): w ksiazce Tyrion zareczyl Myrcelle na poczatku "Starcia kroli", ona odplywa przed smiercia Renly'ego. Na osi Fabuli
     ///   (CrashScribe Fabula.Timeline, dzien ROT przed rozciagnieciem) Dorzecze wchodzi do wojny w dniu 25, Renly ginie w 120 - wybrany dzien 70 x skala osi
     ///   (CrashScribe Config.FabulaTimeScale odbiciem, zapas rok/84), przy 4.33 ok. dzien opowiesci 303 (Kronika nr 19: dni 215-390). Warunek: Myrcella (lord_4_10)
     ///   zywa, Dorne rzadzone przez Martellow (clan_aserai_1), bez wladzy gracza. Wedlug kanonu Dorne formalnie stoi przy koronie, ale nie walczy: pokoj (gdy ROT nie
@@ -348,6 +348,7 @@ namespace Armoury
                 Log.Info(WTag + "Reach z korona: pilnowanie (dzien opowiesci " + sd.ToString("0.0", Inv) + ")" + Did(did) + " | pakt Reach-Dorne " + nap + ".");
             }
             _rcHeld = true;
+            if (_rcDay == NoDay) _rcDay = day;   // sojusz zastany (np. AI po smierci Renly'ego) - pilnowany od dzis
             return "SOJUSZ TAK od dnia " + (_rcDay != NoDay ? _rcDay.ToString(Inv) : "?") + " (" + end + "), pakt Reach-Dorne " + nap + ", Reach-Dorne " + (Alive(dorne) && reach.IsAtWarWith(dorne) ? "WOJNA" : "pokoj");
         }
 
