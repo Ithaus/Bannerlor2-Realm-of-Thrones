@@ -159,3 +159,19 @@ VR-3 na nowym formacie sprawdzony na logu syntetycznym (linie VR z 07-17-36, w 2
 **Oczekiwane progi (nowa kampania 180 dob, razem z P7a):** R1-10b ok. 120-160/d (dzis 222); T2-K1-2 ok. 9-11 (dzis 14.2); w linii 214 "zostawione kuzniom" > 0; "miasta handlowe kopaln ponizej potrzeby" - te same miasta, ale bez braku w warsztatach; R1-7 moze wzrosnac do ok. 8-9%; R1-7d reszta 0; R1-11 potkniecia Bloomery 0. Nowy prog R1-10b ze sredniej >= 2 biegow.
 
 **Build:** Armoury kod 0; gen_mcm Armoury 2246 ustawien.
+
+---
+
+### Podsumowanie galezi (21.10, przed scaleniem)
+
+| Krok | Commit | Klucz MCM (domyslnie) | Linia logu |
+|---|---|---|---|
+| P0 SideVillage NRE | `087590e2` | brak (poprawka bledu) | - |
+| P1 narzedzie progow | `3881552b` | brak (narzedzie + napisy logu) | Kiesa ludu / linia stanu: "tempo W 1/60 (P3), place R/P 0.15"; Drogi Valyrii (VR): ", ponizej 5%: ..." |
+| P6 piraci na morzu | `3e6fc2f2` + `392afcf8` | `BandFoodAtSea` (TAK) | m96-bandy: "\| z morza: paser portu ..., polow zalogi ..." |
+| P7a stocznia | `7df2452d` | `ShipyardWoodAboveCraftStock` (TAK) | Stocznie (A17 F5): "\| zapas rzemiosla (...): zostawione rzemioslu N pni ..." |
+| P7b dymarka | `01fef812` | `BloomeryShelfLeavesForges` (TAK) | Zelazo (lupy) (214): "(brak na polce M, zostawione kuzniom N" |
+
+Build 5 modow (Release, GameLibs z lancuch/libs): Armoury 0 (6 ostrzezen jak dotad), RealisticCaptivity 0, GrandTourney 0, ForgeView 0, CrashScribe 0. gen_mcm: Armoury 2246 ustawien (WGRANIE 101: 2243), RealisticCaptivity 115, GrandTourney 44. Nic nie wgrane, nic nie wypchniete. Test w grze: jeden finalny autotest po scaleniu wszystkich galezi (nowa kampania 180 dob z `armoury-ks-auto.flag` + bieg z zapisu na regresje).
+
+Do powiedzenia Jeffowi: GL2-8 to zmiana progu (60 dni projektu -> zapas wazony regul ludu + stac >= 95%); P7b moze podniesc R1-7 (kopalnia bez wegla) z 7.5% do ok. 8-9% w zamian za drewno dla kowali; P7a - mniej statkow AI w pierwszych 120 dobach; P6 - najedzeni piraci sa silniejsi (bez kary morale).
