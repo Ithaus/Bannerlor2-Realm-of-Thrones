@@ -660,7 +660,7 @@ namespace Armoury
             string t = "obrazki postawione " + Created + " (dzis " + CreatedDay + "), pokazane najwiecej naraz " + ShownMax + ", pokaz/schowaj dzis " + ShowDay + "/" + HideDay
                        + ", przebudowy 0 (obrazek raz na mape), pominiete " + Failed + ", brak siatek " + MeshMiss + ", elementy zdjete z wody " + PiecesWater
                        + ", sredni czas obrazka " + ms.ToString("0.000", inv) + " ms, kliki " + ClicksDay + " | potkniecia widoku: tworzenie " + StCreate + ", widocznosc " + StVis
-                       + ", dymek " + StHover + ", klik " + StClick;
+                       + ", dymek " + StHover + ", klik " + StClick + " | " + HoverRingStats.Text();
             CreatedDay = ShowDay = HideDay = ClicksDay = 0;
             return t;
         }

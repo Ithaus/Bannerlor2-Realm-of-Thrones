@@ -1041,6 +1041,9 @@ Uzycie (Python 3, tylko odczyt):
                     E5-6 Jaime #p10 do town_V2, E5-7 klany gorskie d118-119 i >= 80% dob 119-186, E5-8 ludzie Gory d155-156 i >= 80% dob 156-186 (E5-8b spalona >= 1 wies),
                     E5-9 Beric rusza d160-165, E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
                     kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
+--grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
+                    python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
+                    KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -38205,6 +38208,65 @@ def m103sceny_main(logp, csp=None, rglp=None):
     return 0
 
 
+# ------------------------------------------------------------ m105kolko (21.10, w-toku/m105-kolko: kolko najechania przy zajazdach i wioskach pobocznych -
+# Armoury/src/MapHoverRing.cs, RoadsideInnsView.cs, MapVillagesView.cs; klucz MapHoverRingOurObjects; autotest: plik CrashScribe/armoury-kolko.flag)
+M105K_TAG = "Kolko najechania (m105): "
+M105K_TEST = re.compile(r"test - (zajazd|wioska poboczna) '.*' .* - (TAK|NIE)\.$")
+M105K_DAY = re.compile(r"kolko najechania: pokazane (\d+) razy od uruchomienia gry, encji (\d+), potkniecia (\d+)")
+
+
+def m105kolko_main(logp):
+    """m105kolko (21.10; Jeff 21.10 "dodaj [kolko] do kazdego obiektu gdzie mozna wjechac, zajazdy, wioski poboczne", "zlotawe przy neutralnych"): KO-1 ERROR
+    MapHoverRing / RingTest 0, KO-2 proby testu (plik armoury-kolko.flag) - NIE 0 i co najmniej 1 TAK (brak prob - INFO: kamera bez zajazdu i wioski), KO-3 encja
+    kola postawiona (gdy TAK), KO-4 potkniecia w linii doby zajazdow 0. Log bez linii m105: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("KO-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, tests, made, none, days = 0, [], 0, 0, []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in MapHoverRing") or s.startswith("ERROR in RoadsideInnsView.RingTest") or s.startswith("ERROR in MapVillagesView.RingTest"):
+                n_err += 1
+                continue
+            md = M105K_DAY.search(s)
+            if md:
+                days.append(tuple(int(x) for x in md.groups()))
+            if not s.startswith(M105K_TAG):
+                continue
+            body = s[len(M105K_TAG):]
+            mt = M105K_TEST.search(body)
+            if mt:
+                tests.append(mt.groups())
+            elif "encja kola na scenie mapy postawiona" in body:
+                made += 1
+            elif "bez proby" in body:
+                none += 1
+    print(f"plik: {logp} | prob testu {len(tests)} (bez proby {none}), encji {made}, linii doby z kolkiem {len(days)}, ERROR {n_err}")
+    if not tests and not made and not days and not none:
+        rep.add("KO-0: linie 'Kolko najechania (m105): ...'", "brak w logu", "INFO (log sprzed paczki m105-kolko albo bez pliku testu)", None)
+        rep.add("KO-1: ERROR MapHoverRing / RingTest", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+    rep.add("KO-1: ERROR MapHoverRing / RingTest", f"ERROR {n_err}", "0", n_err == 0)
+    ok = [t for t in tests if t[1] == "TAK"]
+    bad = [t for t in tests if t[1] == "NIE"]
+    kinds = sorted(set(t[0] for t in ok))
+    if tests:
+        rep.add("KO-2: proby kola (autotest)", f"TAK {len(ok)} ({', '.join(kinds) or '-'}), NIE {len(bad)}", "NIE 0, TAK >= 1", not bad and bool(ok))
+    else:
+        rep.add("KO-2: proby kola (autotest)", f"brak prob (bez proby {none})", "INFO - przy kamerze nie stal zajazd ani wioska z wjazdem", None)
+    if ok:
+        rep.add("KO-3: encja kola postawiona", f"{made}", ">= 1 (gdy sa proby TAK)", made >= 1)
+    st = max((d[2] for d in days), default=0)
+    rep.add("KO-4: potkniecia kola (linia doby zajazdow)", f"{st} (linii doby {len(days)})", "0", st == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m104wojny (21.10, w-toku/m104-wojny: wojny wedlug ksiazki - (1) wojny fabularne ROT czysto essoskie na
 # kalendarzu w kampanii z prologiem, (2) Reach z korona po smierci Renly'ego (pokoj z Dorne, sojusz, pakt Reach-Dorne) i Dorne z korona po zareczynach Myrcelli (pakt),
 # (3) mlode smoki Daenerys - wierzchowiec wedlug etapu; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
@@ -56492,6 +56554,8 @@ def main(argv):
         return m103sceny_main(logp, csp, rglp)   # m103sceny (21.10, w-toku/m103-sceny): 23 sceny prologu jako okna ROT, obrazki z plikow, okna ROT z obrazkami Jeffa
     if group == "m104e5" and logp:
         return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
+    if group == "m105kolko" and logp:
+        return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
     if group == "m104wojny" and logp:
         return m104wojny_main(logp)   # m104wojny (21.10, w-toku/m104-wojny): Essos na kalendarzu w prologu, Reach i Dorne z korona, mlode smoki Daenerys (Prologue.Wars/Crown/Dragons)
     if group == "m100kryjowki" and logp:

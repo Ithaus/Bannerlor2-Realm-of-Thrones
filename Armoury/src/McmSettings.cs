@@ -5764,6 +5764,10 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public float MapVillagesHideAboveCameraHeight { get; set; } = 160f;
 
+        [SettingPropertyBool("Map Hover Ring Our Objects", HintText = "Hover Ring On Inns And Side Villages: pointing at a roadside inn or a side village you can ride into shows the same ring on the ground as the game shows under its own villages - gold for neutral, red for enemies, green for your own realm, blue for allies. Off = no ring there, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapHoverRingOurObjects { get; set; } = true;
+
         [SettingPropertyBool("Map Village Names On Hover", HintText = "Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillageNamesOnHover { get; set; } = true;
@@ -10548,6 +10552,7 @@ namespace Armoury
             s.FertilityYearScale = FertilityYearScale;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
+            s.MapHoverRingOurObjects = MapHoverRingOurObjects;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
             s.MillOnBank = MillOnBank;
             s.MapGallows = MapGallows;
