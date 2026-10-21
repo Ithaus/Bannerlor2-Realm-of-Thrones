@@ -3949,6 +3949,15 @@ namespace Armoury
         public int SutlerRevelMorale = 6;                  // morale your party gains from the revel; it fades by itself over the following days
         public int SutlerRevelMoraleCap = 10;              // revels lift your party's morale from recent events to at most this much - another revel while the men are still merry adds only what is missing (and costs only that share)
         public int SutlerArmourerPerStall = 6;             // worn pieces of your men's kit the field armourers of one stall mend in a day (town smiths' rate plus the sutlers' cut; with Smith Mend From Market also the materials, taken from that town's market)
+        // m103-drobne (kolejka Jeffa pkt 7, CampSutlers.cs + ArmyClothing.cs): (a) odziez z rzedu markietanow - gracz z kiesy kupuje cale sztuki potrzeby odziezy
+        // swojej druzyny (ArmyClothing: skora, sukno, plotno) z polki miasta-zrodla po cenie miasta + narzut; towar do kasy miasta, narzut obiegiem uslug; limit sztuk
+        // rodzaju na dobe jak sklep. (b) praczki - zuzycie odziezy druzyny gracza (narastanie potrzeby ArmyClothing) mniejsze o SutlerLaundryCutPercent przez
+        // SutlerLaundryDays dob; oplata = praczki (1 na SutlerLaundryMenPerWasher ludzi) x doby x dniowka (2/3 Workshop Wage Per Day) obiegiem uslug
+        public bool SutlerRowClothing = true;              // in the sutlers' row you can clothe your own men: leather, felt and linen from the market of the town the sutlers trade with, at its prices plus the sutlers' cut, for the whole pieces your men have worn out - paid from your purse, the men's purse is spared and they need not buy them in the next town. Up to Sutler Row Stock Per Stall pieces of each a day per stall. Needs Army Clothing Enabled
+        public bool SutlerLaundry = true;                  // in the sutlers' row you can hire the washerwomen: for Sutler Laundry Days days your party wears out its clothes, shoes and linen more slowly (by Sutler Laundry Cut Percent) - washing and darning make them last. They cost a washerwoman's day wage (two thirds of Workshop Wage Per Day) per washerwoman per day, one per Sutler Laundry Men Per Washer men; the money goes to the town and the village like every service of the row. Needs Army Clothing Enabled
+        public int SutlerLaundryCutPercent = 25;           // how much less clothing your party wears out while the washerwomen work (0 to 75%)
+        public int SutlerLaundryDays = 7;                  // how many days the hired washerwomen work for your party (1 to 28)
+        public int SutlerLaundryMenPerWasher = 20;         // men of your party one washerwoman keeps in clean, darned clothes (5 to 100)
 
         // --- Notice board ---
         // m102-tablica (Jeff 20.10: "tablice ogloszen jak w grach RPG z misjami ... w miescie byla tablica i jak wchodze, mam liste lordow, kapitana strazy etc., ktorzy daja misje,

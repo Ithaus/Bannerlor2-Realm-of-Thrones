@@ -49,6 +49,10 @@ RANGES = {
     'SutlerRevelMorale': (0, 50, "0"),
     'SutlerRevelMoraleCap': (0, 100, "0"),
     'SutlerArmourerPerStall': (0, 100, "0"),
+    # m103-drobne: praczki - kod przycina do 0..75 %, 1..28 dob, 5..100 ludzi na praczke (CampSutlers.LaundryCut / LaundryDays / MenPerWasher)
+    'SutlerLaundryCutPercent': (0, 75, "0"),
+    'SutlerLaundryDays': (1, 28, "0"),
+    'SutlerLaundryMenPerWasher': (5, 100, "0"),
     'CartLoadKg': (100, 2000, "0"),
     'CartSpeedPenaltyPercent': (0, 50, "0"),
     'PackSaddleExtraKg': (0, 300, "0"),

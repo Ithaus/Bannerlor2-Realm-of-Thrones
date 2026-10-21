@@ -84,6 +84,13 @@ namespace Armoury
         private static long _dSutGold;
         private static int _dSutNeedN, _dSutTry, _dSutBuyN, _dSutPlayer, _dSutPoor, _dSutNoTown, _dSutSiege, _dSutSack;
         private static readonly HashSet<string> _dSutTowns = new HashSet<string>();
+        // m103-drobne (rzad markietanow gracza, CampSutlers): odziez z kiesy gracza (SutlerRowClothing) - sztuki, towar po cenie miasta, narzut; praczki
+        // (SutlerLaundry) - o ile mniej narosla dzis potrzeba druzyny gracza (tylko liczniki linii doby)
+        private static readonly int[] _dRow = new int[Goods];
+        private static long _dRowTown, _dRowMarkup;
+        private static int _dRowN;
+        private static readonly float[] _dWashSaved = new float[Goods];
+        private static int _dWashDays;
 
         internal static void Reset()
         {
@@ -102,6 +109,7 @@ namespace Armoury
             BkClothZeroed = 0;
             Array.Clear(_dAccField, 0, Goods); Array.Clear(_dLackG, 0, Goods); Array.Clear(_dSut, 0, Goods); Array.Clear(_dSutLack, 0, Goods);   // T3-K1
             _dSutGold = 0; _dSutNeedN = _dSutTry = _dSutBuyN = _dSutPlayer = _dSutPoor = _dSutNoTown = _dSutSiege = _dSutSack = 0; _dSutTowns.Clear();
+            Array.Clear(_dRow, 0, Goods); _dRowTown = _dRowMarkup = 0; _dRowN = 0; Array.Clear(_dWashSaved, 0, Goods); _dWashDays = 0;   // m103-drobne
         }
 
         /// <summary>Wyjatek przy jednej partii albo osadzie: pierwszy z danego miejsca do pliku, kazdy liczony w linii dnia (regula dziala dalej).</summary>
@@ -169,7 +177,15 @@ namespace Armoury
                 if (Undead.Party(mp)) return;                                   // trup nie zdziera butow (i nie ma sakiewki)
                 int men = mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;   // bez bohaterow - lord ubiera sie z wlasnej kiesy
                 if (men <= 0 || !Items()) return;
-                Accrue(mp.StringId, men, true, 1f);
+                // m103-drobne (SutlerLaundry): praczki oplacone w rzedzie markietanow - druzyna gracza zdziera dzis mniej (czesc doby zuzycia, jak share garnizonu)
+                float share = mp.IsMainParty ? CampSutlers.LaundryShare() : 1f;
+                Accrue(mp.StringId, men, true, share);
+                if (share < 1f)
+                {
+                    var s = Settings.Current;
+                    _dWashDays++;
+                    for (int g = 0; g < Goods; g++) if (_items[g] != null) _dWashSaved[g] += PerDay(Rate(s, g, true), men, Weight(g)) * (1f - share);
+                }
                 _dFieldMen += men; _dFieldN++;
             }
             catch (Exception e) { Stumble("ArmyClothing.OnDailyTickParty", e); }
@@ -283,6 +299,176 @@ namespace Armoury
             }
             catch (Exception e) { Stumble(sutler ? "ArmyClothing.BuyFromSutlers" : "ArmyClothing.BuyForParty", e); return 0; }
         }
+
+        // ------------------------------------------------------------ m103-drobne: rzad markietanow gracza (CampSutlers) - odziez z kiesy gracza i praczki
+        /// <summary>m103-drobne: potrzeba odziezy druzyny gracza (sztuki czekajace na zakup, z ulamkami) - kopia do podgladu w menu rzedu. Pusta (zera), gdy brak wpisu.</summary>
+        internal static float[] PlayerNeed()
+        {
+            var r = new float[Goods];
+            try
+            {
+                var mp = MobileParty.MainParty;
+                float[] need;
+                if (mp != null && mp.StringId != null && _need.TryGetValue(mp.StringId, out need) && need != null) Array.Copy(need, r, Goods);
+            }
+            catch (Exception e) { Stumble("ArmyClothing.PlayerNeed", e); }
+            return r;
+        }
+
+        /// <summary>m103-drobne: dzienne zuzycie druzyny gracza w sztukach (bez praczek) - do opisu praczek w menu rzedu.</summary>
+        internal static float[] PlayerWearPerDay()
+        {
+            var r = new float[Goods];
+            try
+            {
+                var mp = MobileParty.MainParty; var s = Settings.Current;
+                if (!On || s == null || mp == null || mp.MemberRoster == null || !Items()) return r;
+                int men = mp.MemberRoster.TotalRegulars;
+                for (int g = 0; g < Goods; g++) if (_items[g] != null) r[g] = PerDay(Rate(s, g, true), men, Weight(g));
+            }
+            catch (Exception e) { Stumble("ArmyClothing.PlayerWearPerDay", e); }
+            return r;
+        }
+
+        /// <summary>
+        /// m103-drobne (SutlerRowClothing): podglad uslugi odziezy rzedu - ile calych sztuk potrzeby druzyny gracza da sie wziac z polki miasta `town` (najwyzej cap[g]
+        /// towaru g) i za ile: cena markietanow = cena targu x (1 + up) liczona sztuka po sztuce jak RowBuy, ale BEZ zmiany polki (cena pierwszej sztuki dla kazdej
+        /// nastepnej - podglad; dokladna kwote liczy RowBuy). Zwraca liczbe sztuk; `lacked` - towaru potrzebnego brak na polce.
+        /// </summary>
+        internal static int RowPreview(Settlement town, float up, int[] cap, long gold, int[] got, out long price, out bool lacked)
+        {
+            price = 0; lacked = false;
+            try
+            {
+                var mp = MobileParty.MainParty;
+                if (!On || mp == null || town == null || town.Town == null || !Items()) return 0;
+                var need = PlayerNeed();
+                int n = 0;
+                var unit = new int[Goods]; var have = new int[Goods];
+                for (int g = 0; g < Goods; g++)
+                {
+                    if (need[g] < 1f || _items[g] == null) continue;
+                    EquipmentElement el; int p;
+                    if (!Cheapest(town.ItemRoster, _items[g], town.Town, town, mp, out el, out p)) { lacked = true; continue; }
+                    unit[g] = RowPrice(p, up);
+                    have[g] = Math.Min(Math.Min((int)Math.Floor(need[g]), cap[g]), Count(town.ItemRoster, _items[g]));
+                }
+                bool any = true;
+                while (any)
+                {
+                    any = false;
+                    for (int g = 0; g < Goods; g++)
+                    {
+                        if (got[g] >= have[g] || unit[g] <= 0 || price + unit[g] > gold) continue;
+                        got[g]++; price += unit[g]; n++; any = true;
+                    }
+                }
+                return n;
+            }
+            catch (Exception e) { Stumble("ArmyClothing.RowPreview", e); return 0; }
+        }
+
+        private static int RowPrice(int townPrice, float up) { return Math.Max(1, (int)Math.Ceiling(townPrice * (1.0 + up) - 1e-6)); }
+
+        private static int Count(ItemRoster shelf, ItemObject item)
+        {
+            int n = 0;
+            for (int i = 0; i < shelf.Count; i++) { var e = shelf.GetElementCopyAtIndex(i); if (e.Amount > 0 && e.EquipmentElement.Item == item) n += e.Amount; }
+            return n;
+        }
+
+        /// <summary>
+        /// m103-drobne (SutlerRowClothing): usluga odziezy rzedu markietanow - cale sztuki potrzeby druzyny gracza z polki miasta-zrodla `town`, najwyzej cap[g]
+        /// sztuk towaru g i najwyzej `gold` razem po cenie markietanow (cena targu x (1 + up)). Ta sama kolejnosc i ta sama najtansza sztuka co Buy (skora, sukno,
+        /// plotno po jednej, cena targu liczona od nowa przed kazda sztuka). Zmienia polke (sztuki znikaja - zdarte ubranie zastapione, ramka FArmyCloth ksiegi
+        /// towarow) i potrzebe. Pieniadz rozlicza wolajacy: `paidTown` (towar po cenie miasta) - RowSettle, `paidRow - paidTown` (narzut) - obieg uslug rzedu.
+        /// `undo` - zdjete sztuki do RowUndo, gdyby zaplata gracza sie nie udala.
+        /// </summary>
+        internal static int RowBuy(Settlement town, float up, int[] cap, long gold, int[] got, out int paidTown, out int paidRow, List<EquipmentElement> undo)
+        {
+            paidTown = 0; paidRow = 0;
+            var mp = MobileParty.MainParty;
+            float[] need;
+            if (!On || mp == null || mp.StringId == null || town == null || town.Town == null || !Items()) return 0;
+            if (!_need.TryGetValue(mp.StringId, out need) || need == null || !Wants(need)) return 0;
+            var shelf = town.ItemRoster;
+            var stop = new bool[Goods];
+            int n = 0;
+            bool any = true;
+            var gf = GoodsLedger.Begin(GoodsLedger.FArmyCloth, town);
+            try
+            {
+                while (any)
+                {
+                    any = false;
+                    for (int g = 0; g < Goods; g++)
+                    {
+                        if (stop[g]) continue;
+                        if (need[g] < 1f || _items[g] == null || got[g] >= cap[g]) { stop[g] = true; continue; }
+                        EquipmentElement el; int price;
+                        if (!Cheapest(shelf, _items[g], town.Town, town, mp, out el, out price)) { stop[g] = true; continue; }
+                        int pr = RowPrice(price, up);
+                        if ((long)paidRow + pr > gold) { stop[g] = true; continue; }
+                        shelf.AddToCounts(el, -1);
+                        if (undo != null) undo.Add(el);
+                        need[g] -= 1f; got[g]++; n++;
+                        paidTown += price; paidRow += pr;
+                        any = true;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("ArmyClothing.RowBuy", e); }   // jak Buy: sztuki juz zdjete zostaja policzone (wolajacy placi albo cofa RowUndo)
+            finally { GoodsLedger.End(gf); }
+            return n;
+        }
+
+        /// <summary>m103-drobne: zaplata gracza za odziez z rzedu sie nie udala - sztuki wracaja na polke miasta, potrzeba druzyny wraca (nic z niczego).</summary>
+        internal static void RowUndo(Settlement town, List<EquipmentElement> undo)
+        {
+            try
+            {
+                var mp = MobileParty.MainParty;
+                float[] need;
+                if (town == null || undo == null || undo.Count == 0 || mp == null || mp.StringId == null) return;
+                bool hasNeed = _need.TryGetValue(mp.StringId, out need) && need != null;
+                var gf = GoodsLedger.Begin(GoodsLedger.FArmyCloth, town);
+                try
+                {
+                    foreach (var el in undo)
+                    {
+                        town.ItemRoster.AddToCounts(el, 1);
+                        if (hasNeed) for (int g = 0; g < Goods; g++) if (_items[g] != null && el.Item == _items[g]) { need[g] += 1f; break; }
+                    }
+                }
+                finally { GoodsLedger.End(gf); }
+            }
+            catch (Exception e) { Stumble("ArmyClothing.RowUndo", e); }
+        }
+
+        /// <summary>m103-drobne: towar odziezy z rzedu po cenie miasta do kasy miasta-zrodla - te same liczniki co zakup partii (ksiega przeplywow NCloth,
+        /// sprzedaz kupcow MixCloth); bez tarczy zoldu (placi kiesa gracza, nie sakiewka ludzi). Sztuki i narzut do linii doby.</summary>
+        internal static void RowSettle(Settlement town, int paidTown, int markup, int[] got)
+        {
+            if (town == null || town.Town == null) return;
+            if (paidTown > 0)
+            {
+                town.Town.ChangeGold(paidTown);
+                MoneyLedger.Note(MoneyLedger.NCloth, town, paidTown);
+                try { TownFolk.Sale(town, paidTown, TownFolk.MixCloth); } catch { }
+            }
+            for (int g = 0; g < Goods; g++) _dRow[g] += got[g];
+            _dRowTown += paidTown; _dRowMarkup += Math.Max(0, markup); _dRowN++;
+        }
+
+        /// <summary>m103-drobne: napis listy sztuk po angielsku (do menu rzedu i komunikatu).</summary>
+        internal static string ListEn(int[] got) { return List(got); }
+
+        /// <summary>m103-drobne: id przedmiotu towaru g (0 skora, 1 sukno, 2 plotno) - klucz licznika dnia rzedu markietanow.</summary>
+        internal static string IdOf(int g) { return g >= 0 && g < Goods ? Ids[g] : null; }
+
+        /// <summary>m103-drobne: napis sztuk po polsku (do logu rzedu).</summary>
+        internal static string ListPl(int[] got) { return Pl(got); }
+        internal static string ListPl(float[] n) { return Pl(n); }
 
         // ------------------------------------------------------------ garnizony (SoldierPay.Route - zold zaloga juz w kasie osady)
         /// <summary>
@@ -552,6 +738,9 @@ namespace Armoury
                 else sb.Append(" - odziez partii tylko przy wyjezdzie z miasta");
                 sb.Append(" | potrzeba narosla wedlug odbiorcy: partie ").Append(Pl(_dAccField)).Append("; zalogi ").Append(Pl(gar))
                   .Append(" | wyjazd z miasta, bez towaru na polce wedlug towaru: ").Append(Pl(_dLackG));
+                // m103-drobne: rzad markietanow gracza - odziez z kiesy gracza (towar po cenie miasta do kasy miasta, narzut obiegiem uslug rzedu) i praczki
+                if (_dRowN > 0) sb.Append(" | rzad markietanow (gracz, z kiesy): ").Append(Pl(_dRow)).Append(" - towar do kasy miasta ").Append(_dRowTown).Append(" + narzut ").Append(_dRowMarkup).Append(" (zakupow ").Append(_dRowN).Append(")");
+                if (_dWashDays > 0) sb.Append(" | praczki: druzyna gracza zdarla mniej o ").Append(Pl(_dWashSaved)).Append(" (dob z praczkami ").Append(_dWashDays).Append(")");
                 if (_dGarUndead > 0) sb.Append(" | zalogi nieumarlych pominiete (trup nie zdziera butow): ").Append(_dGarUndead);
                 if (gone > 0) sb.Append(" | potrzeby po zniklych partiach i osadach usuniete: ").Append(gone);
                 sb.Append(" | potkniecia ").Append(_dStumbles).Append('.');
