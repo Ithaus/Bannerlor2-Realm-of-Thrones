@@ -2604,6 +2604,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartWholeStore { get; set; } = true;
 
+        [SettingPropertyBool("Village Cart Gold Aware", HintText = "with Village Cart Road News: village carts also count the gold that carts already on their way to a town will take from its merchants, so they do not all head for the same town and come back with goods its merchants could not pay for. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartGoldAware { get; set; } = true;
+
         [SettingPropertyBool("Village Cart Road News", HintText = "villagers know what other carts are already hauling to a town and count it as if it were on the stalls, so they do not all drive their loads to the same empty market (needs Village Carts Best Market)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartRoadNews { get; set; } = true;
@@ -9774,6 +9778,7 @@ namespace Armoury
             s.RiverBarges = RiverBarges;
             s.VillageCartFullLoadFar = VillageCartFullLoadFar;
             s.VillageCartWholeStore = VillageCartWholeStore;
+            s.VillageCartGoldAware = VillageCartGoldAware;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
             s.CastleMarketFirst = CastleMarketFirst;
