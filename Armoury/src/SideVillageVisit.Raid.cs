@@ -666,7 +666,8 @@ namespace Armoury
             if (qForce > 0) { q = qForce; rate = Rate(q); t = (long)Math.Floor(rate * Math.Max(0, st.Village.Gold) * share); }
             if (q < 1.0 || t <= 0 || st.Party == null) { if (qForce > 0) Log.Player(NameOf(r) + " has nothing left to pay you."); return false; }
             long g0 = Hero.MainHero.Gold, v0 = st.Village.Gold;
-            GiveGoldAction.ApplyForPartyToCharacter(st.Party, Hero.MainHero, (int)Math.Min(int.MaxValue, t), false);
+            bool pn = PayNotes.On;   // n26 styk (m96-wies): jeden komunikat z powodem zamiast "You received N" gry - jak okup wsi glownej (RaidTribute)
+            GiveGoldAction.ApplyForPartyToCharacter(st.Party, Hero.MainHero, (int)Math.Min(int.MaxValue, t), pn);
             long paid = Hero.MainHero.Gold - g0;
             var f = Hero.MainHero.MapFaction;
             if (f != null)
@@ -683,7 +684,8 @@ namespace Armoury
                      + "%, kiesa wsi " + v0 + " -> " + st.Village.Gold + ", kontrola: gracz +" + paid + " / wies -" + (v0 - st.Village.Gold) + "), ludzie " + men + " : obroncy " + def + (DefOn ? " wlasni" : " milicji")
                      + ", " + how + ", ochrona do doby " + (Today() + SpareDays) + " dla " + (f != null ? f.StringId : "-") + ".");
             Example("okup " + NameOf(r) + " " + paid + " zl");
-            Log.Player(NameOf(r) + " paid you " + paid.ToString("N0", Inv) + " denars of tribute. Your realm will spare it for " + SpareDays + " days.");
+            if (pn) PayNotes.Got("tribute", (int)Math.Max(0, Math.Min(int.MaxValue, paid)), ": tribute from the people of " + NameOf(r) + ". Your realm will spare it for " + SpareDays + " days.");
+            else Log.Player(NameOf(r) + " paid you " + paid.ToString("N0", Inv) + " denars of tribute. Your realm will spare it for " + SpareDays + " days.");
             return true;
         }
 

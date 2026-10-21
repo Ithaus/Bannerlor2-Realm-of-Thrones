@@ -67,7 +67,7 @@ namespace Armoury
         private static bool _lastRestPlayer, _lastMovedPlayer;
         // noc 15/16.10 (NightMarchNotice): numer nocy obozu (NightClock.NightId) ostatniego pytania, ostrzezenia i komunikatu obozu automatycznego;
         // liczniki doby gracza do linii switu (godziny marszu w godzinach obozu, obozy automatyczne, sny przerwane poza menu) i tresc komunikatow switu
-        private static long _promptNight = -1, _warnNight = -1, _campMsgNight = -1;
+        private static long _promptNight = -1, _warnNight = -1, _campMsgNight = -1, _raidNight = -1;   // _raidNight: n26 styk - linia logu godziny obozu w rabunku wioski raz na noc
         private static int _marchHoursDay, _autoCampDay, _sleepCutDay;
         private static string _lastDawnMsg;
         // noc 15/16.10 (PlayerSleepGuard, poprawka recenzji 1): splata dlugu CALYM snem w menu - cel snu (NeededHours) i dlug w chwili polozenia sie
@@ -200,12 +200,16 @@ namespace Armoury
                 long nightId = NightClock.NightId(CampStart);
                 bool captive = TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive;
                 bool enl = RotEnlisted();   // sluzba ROT raz na tick (odbicie) - dla nowych warunkow nocy gracza
+                // n26 styk (recenzja 97): rabunek wioski pobocznej (m97-wioski, menu oczekiwania bez MapEvent) to zajecie jak rabunek gry - bez namiotu, pytania,
+                // obozu z rozkazu i ostrzezenia marszu; noc NIE odhaczona (pytanie padnie w pierwszej godzinie obozu z ruchem po rabunku)
+                bool raidNow = SideVillageVisit.RaidActive;
+                if (raidNow && InCamp(h) && _raidNight != nightId) { _raidNight = nightId; Log.Info("Nocleg: gracz - godzina obozu " + h + ":00 w trakcie rabunku wioski pobocznej - bez namiotu, pytania o nocleg i ostrzezenia (noc " + nightId + " nie odhaczona)."); }
 
                 // NAMIOT SAM SIE STAWIA (Jeff 31.08: "jak spie, to czasami sie
                 // nie uruchamia") - nocny postoj w polu to oboz, takze bez menu
                 if (InCamp(h) && resting && !PlayerCamped && s.CampTentIcon && !forced
                     && mp.CurrentSettlement == null && mp.MapEvent == null
-                    && mp.AttachedTo == null && !mp.IsCurrentlyAtSea)
+                    && mp.AttachedTo == null && !mp.IsCurrentlyAtSea && !raidNow)
                 {
                     Tent(mp, true);
                     PlayerCamped = true;
@@ -248,7 +252,7 @@ namespace Armoury
                 if (promptHour && CampStart != CampEnd && movedH && s.NightPromptSkipWhenRested && _restTonight - Math.Max(0f, _dawnOwed) >= NeededHours()
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
-                    && PlayerEncounter.Current == null && !enl)
+                    && PlayerEncounter.Current == null && !enl && !raidNow)
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
                     _promptNight = nightId;
@@ -262,7 +266,7 @@ namespace Armoury
                     && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null
                     && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
-                    && PlayerEncounter.Current == null && !RotEnlisted())
+                    && PlayerEncounter.Current == null && !RotEnlisted() && !raidNow)
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
                     _promptNight = nightId;
@@ -291,7 +295,7 @@ namespace Armoury
                 // jeszcze bazy - z baza dlugu o swicie nie bedzie); poza osada, morzem, armia cudzego wodza (doczepiony), niewola, spotkaniem i sluzba ROT
                 bool marchField = CampStart != CampEnd && movedH && !resting && !PlayerCamped && !_sleeping
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
-                    && PlayerEncounter.Current == null && !captive && !enl;
+                    && PlayerEncounter.Current == null && !captive && !enl && !raidNow;
                 if (marchField && InCamp(h - 1)) _marchHoursDay++;
                 if (marchField && InCamp(h))
                 {
@@ -441,7 +445,7 @@ namespace Armoury
                 _lastRestPlayer = false; _lastMovedPlayer = false;
                 _menuDawnCut = 0f; _dawnOwed = 0f; _dawnDeferredUp = 0;
                 _menuNeeded = -1f; _menuDebt0 = 0; _menuDawns = 0;
-                _promptNight = -1; _warnNight = -1; _campMsgNight = -1;
+                _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;
                 _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
                 // PlayerSleepGuard: flaga snu z poprzedniej kampanii / sprzed wczytania nie przechodzi (dotad zawieszony sen przezywal wczytanie zapisu
                 // z mapy); wczytanie zapisu z menu snu ustawia ja od nowa w SleepInit (menu wstaje po konstruktorze)
@@ -464,7 +468,7 @@ namespace Armoury
         {
             int had = (PlayerCamped ? 1 : 0) + (_tentStrikes > 0 ? 1 : 0) + (_tentChildren >= 0 ? 1 : 0) + (_promptDay >= 0 || _promptNight >= 0 ? 1 : 0);
             _tentStrikes = 0; _tentChildren = -1; _promptDay = -1; PlayerCamped = false;
-            _promptNight = -1; _warnNight = -1; _campMsgNight = -1;   // noc 15/16.10 (NightMarchNotice): numery nocy pytania, ostrzezenia i obozu - jak dzien pytania
+            _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;   // noc 15/16.10 (NightMarchNotice): numery nocy pytania, ostrzezenia i obozu - jak dzien pytania
             return had;
         }
 

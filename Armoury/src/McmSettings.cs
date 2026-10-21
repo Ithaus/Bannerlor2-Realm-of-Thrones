@@ -8620,6 +8620,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageDefenders { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Defenders No Reinforcements", HintText = "with Side Village Defenders: a battle with the people of a side village is fought by the villagers alone, as the menu tells you - Dynamic Reinforcements treats it like a raid on a village: with its Allow Raids option off (its default) no garrison, militia or lords march in to help either side; with Allow Raids on, help comes as in any village raid. Off = Dynamic Reinforcements as in any field battle", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageDefendersNoReinforcements { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -10942,6 +10946,7 @@ namespace Armoury
             s.SideVillageFiefWalk = SideVillageFiefWalk;
             s.SideVillagesEnterable = SideVillagesEnterable;
             s.SideVillageDefenders = SideVillageDefenders;
+            s.SideVillageDefendersNoReinforcements = SideVillageDefendersNoReinforcements;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;

@@ -60,6 +60,7 @@ namespace Armoury
             public bool Levy;                            // ludzie zdjeci z DOM (PeopleBook.TakeLevyHere) - ocaleni wracaja ArriveAt
             public double Got;
             public MobileParty Party;
+            public CharacterObject[] Types;              // n26 styk: szablony obroncow (chlop, wlocznik, lucznik) ze StartFight; po wczytaniu - z kultury wsi okregu
         }
         private static Fight _fight;
         private static readonly Dictionary<string, double[]> _fallen = new Dictionary<string, double[]>(StringComparer.Ordinal);   // uid -> { ilu, doba }
@@ -68,6 +69,7 @@ namespace Armoury
         private const double FallenFighters = 1.0 - 1.0 / DefPeoplePer;   // pamiec poleglych po bitwie: 9/10 strat (1/10 zdejmuje juz mniejsza ludnosc wioski)
         private static int _dFights, _dSurr, _dWon, _dLostFights, _dOrphans, _dAiBurnNoted;
         private static double _dFallen, _dAiFallen, _dRouted, _dLack;
+        private static int _dExFreed, _dGoods;   // n26 styk: ex-jency gracza uwolnieni z druzyny obroncow, sztuki taboru druzyny do magazynu wsi okregu
         private static readonly HashSet<string> _dAiSkip = new HashSet<string>(StringComparer.Ordinal);
         private static readonly List<string> _dDefEx = new List<string>();
 
@@ -75,13 +77,13 @@ namespace Armoury
         internal static bool FightActive { get { return _fight != null; } }
 
         private static void DefReset() { _fight = null; _fallen.Clear(); _lack.Clear(); DefDayZero(); }
-        private static void DefDayZero() { _dFights = _dSurr = _dWon = _dLostFights = _dOrphans = _dAiBurnNoted = 0; _dFallen = _dAiFallen = _dRouted = _dLack = 0; _dAiSkip.Clear(); _dDefEx.Clear(); DefPrune(); }
+        private static void DefDayZero() { _dFights = _dSurr = _dWon = _dLostFights = _dOrphans = _dAiBurnNoted = 0; _dFallen = _dAiFallen = _dRouted = _dLack = 0; _dExFreed = _dGoods = 0; _dAiSkip.Clear(); _dDefEx.Clear(); DefPrune(); }
         private static bool DefDayAny() { return _dFights + _dSurr + _dOrphans + _dAiBurnNoted + _dAiSkip.Count > 0 || _fight != null; }
 
         private static string DefDayText()
         {
             return "obroncy wiosek: starcia " + (_dFights + _dSurr) + " (poddania " + _dSurr + ", bitwy " + _dFights + ": wygrane gracza " + _dWon + ", przegrane / odwrot " + _dLostFights
-                   + "), straty z ludnosci " + _dFallen.ToString("0", Inv) + " (brak rak wiosek +" + _dLack.ToString("0.0", Inv) + "), rozbici do domow " + _dRouted.ToString("0", Inv) + ", druzyny sprzatniete po wczytaniu " + _dOrphans + (_fight != null ? ", bitwa w toku " + _fight.Name : "")
+                   + "), straty z ludnosci " + _dFallen.ToString("0", Inv) + " (brak rak wiosek +" + _dLack.ToString("0.0", Inv) + "), rozbici do domow " + _dRouted.ToString("0", Inv) + ", druzyny sprzatniete po wczytaniu " + _dOrphans + (_dExFreed + _dGoods > 0 ? ", jency gracza z lupu obroncow uwolnieni " + _dExFreed + ", lup obroncow do magazynu wsi " + _dGoods + " szt." : "") + (_fight != null ? ", bitwa w toku " + _fight.Name : "")
                    + " | AI: wiosek pominietych (obroncow wiecej niz napastnikow) " + _dAiSkip.Count + ", spalonych z ubytkiem obroncow " + _dAiBurnNoted + " (ubytek " + _dAiFallen.ToString("0.0", Inv) + ")"
                    + " | pamiec poleglych " + _fallen.Count + " wiosek, brak rak " + _lack.Count + " wiosek (razem " + LackSum().ToString("0.0", Inv) + ")" + (_dDefEx.Count > 0 ? " | przyklady: " + string.Join("; ", _dDefEx.ToArray()) : "");
         }
@@ -266,7 +268,7 @@ namespace Armoury
             if (ns > 0) roster.AddToCounts(mel, ns);
             if (nr > 0) roster.AddToCounts(rng, nr);
             MobileParty party = null;
-            var f = new Fight { Uid = _uid, Dist = st.StringId, Name = NameOf(r), Kind = kind, Def = def, Men = men, Day = Today() };
+            var f = new Fight { Uid = _uid, Dist = st.StringId, Name = NameOf(r), Kind = kind, Def = def, Men = men, Day = Today(), Types = new[] { vil, mel, rng } };
             try
             {
                 party = CustomPartyComponent.CreateCustomPartyWithTroopRoster(new CampaignVec2(mp.GetPosition2D, true), 0.3f, st, new TextObject("{=!}" + DefNamePre + NameOf(r)), clan,
@@ -327,28 +329,165 @@ namespace Armoury
             }
         }
 
-        /// <summary>Ocaleni do domow (pochodzenie: ArriveAt MBackMilitia - jak milicja) i druzyna rozwiazana bez sprawcy z pustym skladem. Zwraca ilu wrocilo.</summary>
-        private static int Disband(Fight f, string why)
+        /// <summary>Ocaleni do domow (pochodzenie: ArriveAt MBackMilitia - jak milicja) i druzyna rozwiazana bez sprawcy z pustym skladem. Zwraca ilu obroncow wrocilo.</summary>
+        private static int Disband(Fight f, string why) { int fr; string note; return Disband(f, why, out fr, out note); }
+
+        /// <summary>
+        /// n26 styk (recenzja 97): po przegranej gracza (albo odwrocie z bitwy) gra oddaje druzynie obroncow jego lup - zwyklych jencow do skladu
+        /// (MapEvent.LootDefeatedPartyPrisoners -> RosterToReceiveLootMembers, dekompilacja 1.4.8) i towary do taboru (LootDefeatedPartyItems; CampCart.OnTaken
+        /// doklada drewno wozow). Obroncy = szablony wioski (chlop, wlocznik, lucznik) najwyzej do: obroncy - polegli - rozbici (bitwa bez wygranej gracza, z wynikiem)
+        /// albo obroncy (wygrana gracza, bez bitwy; sierota po wczytaniu - bez pulapu); wracaja do domow jak dotad (ArriveAt MBackMilitia, udzial regionu wsi okregu
+        /// najpierw - to ich udzial z poboru). Reszta skladu to ex-jency gracza: uwolnieni droga "uwolnieni bez odbiorcy" (LosersFlee.FreedHome - karczma, dom
+        /// pochodzenia, bez domu - pula wyrzutkow regionu przy prawie wyrzutkow), nie jako milicja wioski. Tabor druzyny (lup gracza) - do magazynu wsi okregu w ramce
+        /// GoodsLedger (przewoz, nie ujscie: wioska zabrala lup); bez rzeczy nie-handlowych, choragwi, przedmiotow zadan i unikatow (jak HorseFate.Spoils). Nie rzuca.
+        /// </summary>
+        private static int Disband(Fight f, string why, out int freed, out string note)
         {
             int left = 0;
+            freed = 0; note = "";
             var p = f != null ? f.Party : null;
             try
             {
                 if (p == null || !p.IsActive) return 0;
                 var r = p.MemberRoster;
-                left = r != null ? r.TotalManCount : 0;
                 var st = Settlement.Find(f.Dist);
-                if (left > 0 && f.Levy && PeopleBook.OriginLive && st != null)
+                if (r != null && r.TotalManCount > 0)
                 {
-                    var sh = PeopleBook.Take(r, left, PeopleBook.FMilitiaHome);
-                    PeopleBook.ArriveAt(st, sh, PeopleBook.AService, PeopleBook.MBackMilitia, PeopleBook.MBackMilitiaNone, false);
+                    var types = DefTypes(f, st);
+                    int cap = f.Def > 0 ? f.Def : int.MaxValue;
+                    if (f.Def > 0 && f.Won == 2 && f.Dead >= 0) cap = Math.Max(0, f.Def - f.Dead - Math.Max(0, f.Routed));
+                    var home = new Dictionary<CharacterObject, int>();
+                    var ex = new List<KeyValuePair<CharacterObject, int>>();
+                    int defN = 0;
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var e = r.GetElementCopyAtIndex(i);
+                        var c = e.Character;
+                        if (c == null || c.IsHero || e.Number <= 0 || Undead.Character(c)) continue;   // umarli - jak dotad znikaja z druzyna (DoomedPartyMen tez ich pomija)
+                        if (Array.IndexOf(types, c) >= 0) { int h0; home.TryGetValue(c, out h0); home[c] = h0 + e.Number; defN += e.Number; }
+                        else ex.Add(new KeyValuePair<CharacterObject, int>(c, e.Number));
+                    }
+                    left = Math.Min(defN, cap);
+                    // szablony wioski ponad pulap (jency gracza tego samego szablonu, np. chlopi z rozbitych taborow) - tez ex-jency, najpierw chlopi
+                    int over = defN - left;
+                    foreach (var c in types)
+                    {
+                        int have;
+                        if (over <= 0 || c == null || !home.TryGetValue(c, out have) || have <= 0) continue;
+                        int t = Math.Min(over, have);
+                        home[c] = have - t; ex.Add(new KeyValuePair<CharacterObject, int>(c, t)); over -= t;
+                    }
+                    int exN = 0;
+                    foreach (var kv in ex) exN += kv.Value;
+                    PeopleBook.Shares shHome = null, shEx = null;
+                    if (PeopleBook.OriginLive)
+                    {
+                        if (left > 0 && f.Levy && st != null) shHome = PeopleBook.Take(r, left, PeopleBook.FMilitiaHome);
+                        if (exN > 0) shEx = PeopleBook.Take(r, exN, PeopleBook.FFreed);
+                        if (shHome != null && shEx != null) HomeFirst(shHome, shEx, st);
+                    }
+                    if (shHome != null) PeopleBook.ArriveAt(st, shHome, PeopleBook.AService, PeopleBook.MBackMilitia, PeopleBook.MBackMilitiaNone, false);
+                    if (exN > 0)
+                    {
+                        var pos = p.GetPosition2D;
+                        var region = OutlawLaw.PoolRegionAt(pos);
+                        bool law = OutlawLaw.On && region != null;
+                        int vt = 0, got = 0, lf = 0;
+                        foreach (var kv in ex)
+                        {
+                            if (kv.Value <= 0) continue;
+                            var org = shEx != null ? shEx.Cut(kv.Value) : null;
+                            int a, b, c2;
+                            LosersFlee.FreedHome(kv.Key, kv.Value, pos, region, law, org, out a, out b, out c2);
+                            vt += a; got += b; lf += c2; freed += kv.Value;
+                        }
+                        _dExFreed += freed;
+                        note += ", jency gracza z lupu obroncow uwolnieni " + freed + " (karczma " + vt + ", do domow " + got + ", bez domu " + lf + (law ? " - pula wyrzutkow" : "") + ")";
+                    }
                 }
                 if (r != null) r.Clear();
                 try { FreePrisoners(p); } catch (Exception e) { Stumble("Disband(jency)", e); }
+                try { note += GoodsToVillage(p, st); } catch (Exception e) { Stumble("Disband(tabor)", e); }
                 DestroyPartyAction.Apply(null, p);
             }
             catch (Exception e) { Stumble("Disband(" + why + ")", e); }
             return left;
+        }
+
+        /// <summary>Szablony obroncow: ze StartFight, po wczytaniu - z kultury wsi okregu (ta sama droga co StartFight).</summary>
+        private static CharacterObject[] DefTypes(Fight f, Settlement st)
+        {
+            if (f != null && f.Types != null) return f.Types;
+            CultureObject cul = null;
+            try { cul = st != null ? (st.Culture ?? (st.OwnerClan != null ? st.OwnerClan.Culture : null)) : null; } catch { cul = null; }
+            if (cul == null) return new CharacterObject[0];
+            return new[] { cul.Villager, cul.MeleeMilitiaTroop, cul.RangedMilitiaTroop };
+        }
+
+        /// <summary>Wspolny slownik skladu (proporcjonalne Take): obroncom oddaje udzial regionu wsi okregu i "" (pobor na podlodze), ex-jencom w zamian obce udzialy
+        /// obroncow (proporcjonalnie); sumy obu grup bez zmian.</summary>
+        private static void HomeFirst(PeopleBook.Shares home, PeopleBook.Shares ex, Settlement st)
+        {
+            var reg = st != null ? OutlawLaw.RegionFor(st) : null;
+            string kS = reg != null && reg.StringId != null ? reg.StringId : "";
+            foreach (var key in new[] { kS, "" })
+            {
+                double bv;
+                if (!ex.M.TryGetValue(key, out bv) || !(bv > 1e-9)) continue;
+                double mine = 0.0, v;
+                if (home.M.TryGetValue(kS, out v)) mine += v;
+                if (kS.Length > 0 && home.M.TryGetValue("", out v)) mine += v;
+                double foreign = home.Total - mine;
+                double m = Math.Min(bv, foreign);
+                if (!(m > 1e-9)) continue;
+                var keys = new List<string>();
+                foreach (var k in home.M.Keys) if (k != kS && k.Length > 0) keys.Add(k);
+                double fr = m / foreign;
+                foreach (var k in keys)
+                {
+                    double x = home.M[k] * fr;
+                    double rest = home.M[k] - x;
+                    if (rest > 1e-9) home.M[k] = rest; else home.M.Remove(k);
+                    home.Total -= x;
+                    ex.Add(k, x);
+                }
+                double eb = ex.M[key] - m;
+                if (eb > 1e-9) ex.M[key] = eb; else ex.M.Remove(key);
+                ex.Total -= m;
+                home.Add(key, m);
+            }
+            home.Total = 0.0; foreach (var x in home.M.Values) home.Total += x;
+            ex.Total = 0.0; foreach (var x in ex.M.Values) ex.Total += x;
+            if (home.W > home.Total) home.W = home.Total;
+            if (ex.W > ex.Total) ex.W = ex.Total;
+        }
+
+        /// <summary>Tabor druzyny obroncow (lup gracza po jego przegranej) do magazynu wsi okregu - ramka GoodsLedger (przewoz). Zwraca kawalek linii logu.</summary>
+        private static string GoodsToVillage(MobileParty p, Settlement st)
+        {
+            var ir = p != null ? p.ItemRoster : null;
+            if (ir == null || ir.Count == 0) return "";
+            if (st == null || !st.IsVillage || st.ItemRoster == null) return ", tabor druzyny bez wsi okregu - przepada z druzyna";
+            var mv = new List<KeyValuePair<EquipmentElement, int>>();
+            int skip = 0;
+            for (int i = 0; i < ir.Count; i++)
+            {
+                var el = ir.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (el.Amount <= 0 || it == null) continue;
+                if (it.NotMerchandise || it.IsBannerItem || el.EquipmentElement.IsQuestItem || UniqueSpoils.Is(it)) { skip += el.Amount; continue; }
+                mv.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount));
+            }
+            if (mv.Count == 0) return skip > 0 ? ", tabor druzyny: tylko rzeczy nie-handlowe " + skip + " szt." : "";
+            int n = 0;
+            var gf = GoodsLedger.Begin(GoodsLedger.FRaid, st);
+            try
+            {
+                foreach (var m in mv) { ir.AddToCounts(m.Key, -m.Value); st.ItemRoster.AddToCounts(m.Key, m.Value); n += m.Value; }
+            }
+            finally { GoodsLedger.End(gf); }
+            _dGoods += n;
+            return ", lup obroncow do magazynu wsi " + st.StringId + " " + n + " szt. (" + mv.Count + " rodzajow" + (skip > 0 ? ", nie-handlowe zostaja " + skip : "") + ")";
         }
 
         /// <summary>Jency druzyny obroncow (ludzie gracza wzieci po jego przegranej): bohaterowie uciekaja (jak FreeFolkRaids.Home), szeregowych wioska wypuszcza - wracaja do
@@ -383,6 +522,26 @@ namespace Armoury
             Log.Info(P + "obroncy: jency druzyny obroncow wypuszczeni - " + n + " ludzi gracza wraca do jego druzyny jako ranni.");
             Log.Player("The villagers let your " + n + " captured men go - they limp back to your camp.");
         }
+
+        /// <summary>n26 styk (DrMarchArrival, posilki DR): bitwa me to bitwa z druzyna obroncow wioski (jak OnMapEventEnded). Sam odczyt, nie rzuca.</summary>
+        internal static bool IsDefendersEvent(MapEvent me)
+        {
+            try
+            {
+                var f = _fight;
+                if (f == null || me == null) return false;
+                foreach (var p in me.InvolvedParties)
+                {
+                    if (p == null) continue;
+                    if (f.Party != null ? ReferenceEquals(p, f.Party.Party) : (f.PartyId != null && p.MobileParty != null && string.Equals(p.MobileParty.StringId, f.PartyId, StringComparison.Ordinal))) return true;
+                }
+                return false;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Nazwa wioski bitwy z obroncami w toku (do linii logu posilkow DR).</summary>
+        internal static string FightName { get { var f = _fight; return f != null ? f.Name : null; } }
 
         /// <summary>MapEventEnded: bitwa z druzyna obroncow - zwyciezca (1 gracz, 2 nie gracz albo bez zwyciezcy). Sam zapis wyniku; reszta w straznku po spotkaniu.</summary>
         internal static void OnMapEventEnded(MapEvent me)
@@ -446,7 +605,9 @@ namespace Armoury
             try
             {
                 if (f.Name == null || f.Name == "?") f.Name = NameOf(Rec(f.Uid));   // po wczytaniu (ksiega czytana pozniej niz zapis)
-                int left = Disband(f, how);
+                // n26 styk: Disband zwraca tylko obroncow (najwyzej obroncy - polegli - rozbici przy przegranej, obroncy przy wygranej) - ex-jency gracza osobno
+                int exFreed; string exNote;
+                int left = Disband(f, how, out exFreed, out exNote);
                 int routed = Math.Max(0, Math.Min(f.Routed, f.Def - left));
                 int lost = Math.Max(0, f.Def - left - routed);   // polegli i pojmani; rozbici wracaja do domow droga H3 (OutlawLaw / LosersFlee.SendHome)
                 // ludzie TEJ wioski: z DOM wsi okregu ubylo lost, ksiega rozlozylaby to na caly okreg - brak rak przesuwa udzial reszty okregu na te wioske
@@ -461,7 +622,7 @@ namespace Armoury
                 string res = won ? "gracz wygral" : (f.Won == 2 ? "gracz nie wygral (przegrana, odwrot albo Leave)" : "bez wyniku bitwy (" + how + ")");
                 Log.Info(P + "obroncy " + f.Name + " (" + f.Uid + ", okreg " + f.Dist + "): koniec bitwy - " + how + " | obroncow " + f.Def + ", wrocilo do domow " + left + ", rozbici do domow (H3) "
                          + routed + ", straty z ludnosci " + lost + " (polegli i pojmani; zabici w bitwie " + Math.Max(0, f.Dead) + ") | wynik: " + res + " | pamiec poleglych " + Fallen(f.Uid).ToString("0.0", Inv)
-                         + ", brak rak wioski +" + lack.ToString("0.0", Inv) + " (udzial w osadach okregu " + (sh >= 0.0 ? (100 * sh).ToString("0", Inv) + "%" : "-") + ", razem " + LackNow(f.Uid).ToString("0.0", Inv) + ").");
+                         + ", brak rak wioski +" + lack.ToString("0.0", Inv) + " (udzial w osadach okregu " + (sh >= 0.0 ? (100 * sh).ToString("0", Inv) + "%" : "-") + ", razem " + LackNow(f.Uid).ToString("0.0", Inv) + ")" + exNote + ".");
                 if (_dDefEx.Count < 3) _dDefEx.Add(f.Name + " bitwa " + f.Def + ":" + f.Men + " " + (won ? "W" : "P") + " -" + lost);
                 var mp = MobileParty.MainParty;
                 bool alive = mp != null && mp.IsActive && Hero.MainHero != null && Hero.MainHero.IsAlive && !PlayerCaptivity.IsCaptive;
@@ -523,9 +684,10 @@ namespace Armoury
                 foreach (var mp in dead)
                 {
                     var f = new Fight { Party = mp, PartyId = mp.StringId, Dist = mp.HomeSettlement.StringId, Name = Txt(mp.Name), Levy = true };
-                    int left = Disband(f, "sierota po wczytaniu");
+                    int fr; string note;
+                    int left = Disband(f, "sierota po wczytaniu", out fr, out note);
                     _dOrphans++;
-                    Log.Info(P + "obroncy: druzyna " + f.PartyId + " (" + f.Name + ") bez wpisu bitwy po wczytaniu - rozwiazana, do domow " + left + ".");
+                    Log.Info(P + "obroncy: druzyna " + f.PartyId + " (" + f.Name + ") bez wpisu bitwy po wczytaniu - rozwiazana, do domow " + left + note + ".");
                 }
                 if (_fight != null && _fight.Party == null)
                 {

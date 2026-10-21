@@ -37,6 +37,11 @@ namespace Armoury
     /// PendingCasualties tylko za spawnowanych). Liczba wojska i reszta regul DR bez zmian.
     /// Blad latki: kandydat bez pomiaru = czas DR po staremu (licznik potkniec), wyjatek nie wychodzi z latki. Klucz DrArrivalByMarch NIE = DR jak dotad.
     /// Latki w kampanii (OnSessionLaunched, raz na proces), watek glowny (BattleStateBehavior.AfterStart misji).
+    /// n26 styk (recenzja 97, klucz SideVillageDefendersNoReinforcements): bitwa z obroncami wioski pobocznej (m97-wioski) to w grze bitwa w polu (FieldBattle), wiec
+    /// DR dawal do niej posilki (zaloga i milicja twierdzy, lordowie), choc bronia tylko mieszkancy (regula 4:1 i menu licza tylko ich). Postfiks na
+    /// DynamicReinforcements.Battle.MissionUtils.IsRealBattleMission(Mission) (dekompilacja DR: OnMissionBehaviorInitialize dokleja BattleStateBehavior tylko przy true;
+    /// rabunek wsi gry - true tylko przy DRConfig.Current.AllowRaids): przy bitwie z obroncami ta sama regula co rabunek wsi gry - AllowRaids NIE = bez posilkow
+    /// (__result = false), TAK = DR jak przy rabunku. Niezalezne od klucza DrArrivalByMarch.
     /// </summary>
     internal static class DrMarchArrival
     {
@@ -53,6 +58,9 @@ namespace Armoury
         private static bool _tried, _noDr;
         private static int _wired;                  // 0..2: Evaluate (prefiks + finalizer), ComputeArrivalTime (prefiks)
         private static string _miss;
+        private static int _defWired, _defBlocked, _defAllowed;   // n26 styk: latka IsRealBattleMission, bitwy z obroncami wioski bez posilkow / z posilkami (AllowRaids)
+        private static string _defMiss;
+        private static FieldInfo _fAllowRaids;
 
         private static FieldInfo _fParty, _fSrc, _fDist, _fAcc, _fScore, _fArr, _fRejId, _fRejDef, _fTroops, _fSide, _fSettl;
         private static PropertyInfo _pName, _pCfg;
@@ -86,12 +94,14 @@ namespace Armoury
                 _tried = true;
                 try { Hook(); }
                 catch (Exception e) { Log.Error("DrMarchArrival.Hook", e); _miss = "wyjatek przy latce"; }
+                try { HookDefenders(); }
+                catch (Exception e) { Log.Error("DrMarchArrival.HookDefenders", e); _defMiss = "wyjatek przy latce"; }
             }
             var s = Settings.Current;
             bool on = s != null && s.DrArrivalByMarch;
             if (_noDr)
             {
-                Log.Info(Tag + ": start - " + _miss + " - wylaczone (bitwy jak bez Armoury).");
+                Log.Info(Tag + ": start - " + _miss + " - wylaczone (bitwy jak bez Armoury)." + DefText(s));
                 return;
             }
             float bs = BaseSpeed();
@@ -101,7 +111,62 @@ namespace Armoury
                      + F2(bs) + " x (200/(200+ludzi))^0.4 x tempo swiata " + Pace(s) + "% / " + F2(HoursPerDt) + " (100 ludzi = " + F2(FootUph(100, bs, s, false, false))
                      + " jedn./h w dzien, noca " + F2(FootUph(100, bs, s, true, false)) + ", noca w sniegu " + F2(FootUph(100, bs, s, true, true)) + "; "
                      + (s != null && s.TerrainEaseEnabled ? "noc -" + F2(NightPen(s)) + " i snieg -" + F2(SnowPen(s)) + " plasko (TerrainEase)" : "noc -25% i snieg -10% (gra)")
-                     + "; partia stojaca od wczytania - ten wzor z ludzi calej kolumny) | potkniecia " + _stumbles + (_miss != null ? " | " + _miss : "") + ".");
+                     + "; partia stojaca od wczytania - ten wzor z ludzi calej kolumny) | potkniecia " + _stumbles + (_miss != null ? " | " + _miss : "") + "." + DefText(s));
+        }
+
+        private static string DefText(Settings s)
+        {
+            return " | obroncy wioski pobocznej: klucz Side Village Defenders No Reinforcements " + (s != null && s.SideVillageDefendersNoReinforcements ? "TAK" : "NIE") + ", latka DR IsRealBattleMission "
+                   + _defWired + "/1" + (_defMiss != null ? " (" + _defMiss + ")" : "") + ", DR Allow Raids " + (AllowRaids() ? "TAK (posilki jak przy rabunku)" : "NIE (bez posilkow)")
+                   + ", bitew bez posilkow " + _defBlocked + ", z posilkami (Allow Raids) " + _defAllowed;
+        }
+
+        /// <summary>n26 styk: postfiks na DR MissionUtils.IsRealBattleMission - niezalezny od reszty latek (DR bez ReinforcementCalculator tez moze go miec).</summary>
+        private static void HookDefenders()
+        {
+            var mu = AccessTools.TypeByName("DynamicReinforcements.Battle.MissionUtils");
+            var m = mu != null ? AccessTools.DeclaredMethod(mu, "IsRealBattleMission") : null;
+            if (m == null) { _defMiss = "brak DR MissionUtils.IsRealBattleMission (brak DR albo inna wersja)"; return; }
+            var cfg = AccessTools.TypeByName(CfgName);
+            _fAllowRaids = cfg != null ? AccessTools.Field(cfg, "AllowRaids") : null;
+            if (_pCfg == null && cfg != null) _pCfg = AccessTools.Property(cfg, "Current");
+            var r = _h.Patch(m, postfix: new HarmonyMethod(typeof(DrMarchArrival), nameof(RealBattlePostfix)));
+            if (r == null) { _defMiss = "Harmony.Patch(IsRealBattleMission) zwrocil null (BKROTLog)"; return; }
+            _defWired = 1;
+        }
+
+        /// <summary>DR AllowRaids (pole DRConfig.Current); bez odczytu - false (ustawienie domyslne DR).</summary>
+        private static bool AllowRaids()
+        {
+            try
+            {
+                var cfg = _pCfg != null ? _pCfg.GetValue(null, null) : null;
+                return cfg != null && _fAllowRaids != null && _fAllowRaids.GetValue(cfg) is bool && (bool)_fAllowRaids.GetValue(cfg);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Postfiks DR IsRealBattleMission(Mission): bitwa z obroncami wioski pobocznej jak rabunek wsi gry (AllowRaids NIE - bez posilkow DR).</summary>
+        public static void RealBattlePostfix(ref bool __result)
+        {
+            try
+            {
+                if (!__result) return;
+                var s = Settings.Current;
+                if (s == null || !s.SideVillageDefendersNoReinforcements) return;
+                var me = MapEvent.PlayerMapEvent;
+                if (me == null || !SideVillageVisit.IsDefendersEvent(me)) return;
+                if (AllowRaids())
+                {
+                    _defAllowed++;
+                    Log.Info(Tag + ": bitwa z obroncami wioski " + (SideVillageVisit.FightName ?? "?") + " - DR Allow Raids TAK, posilki DR jak przy rabunku wsi gry (w sesji " + _defAllowed + ").");
+                    return;
+                }
+                __result = false;
+                _defBlocked++;
+                Log.Info(Tag + ": posilki DR wylaczone: bitwa z obroncami wioski " + (SideVillageVisit.FightName ?? "?") + " (bronia tylko mieszkancy; jak rabunek wsi gry przy DR Allow Raids NIE) | w sesji " + _defBlocked + ".");
+            }
+            catch (Exception e) { Stumble("RealBattlePostfix", e); }
         }
 
         private static void Hook()
