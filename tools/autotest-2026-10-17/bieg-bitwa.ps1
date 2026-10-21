@@ -37,6 +37,8 @@ if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_houses_canon
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv')) { $rel += 'Armoury\ModuleData\arm_ks_land.tsv' }   # 16.10 KS kalibracja startu
 # 17.10 noc: kazdy plik danych Armoury\ModuleData\arm_*.tsv z drzewa (zajazdy, drogi geo, uklad v6 ...), ktorego jeszcze nie ma na liscie
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.tsv' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\ModuleData\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
+# 20.10 m97-surowce: takze pliki arm_*.xml w Armoury\ModuleData (arm_items_rare.xml, arm_strings.xml - nowe, w grze ich nie ma; po tescie znikaja, wgranie bez kopii .bak)
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.xml' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\ModuleData\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
 $ef = @()
 foreach ($r in $rel) {
     $src = Join-Path $Tree $r

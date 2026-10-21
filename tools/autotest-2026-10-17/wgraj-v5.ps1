@@ -42,6 +42,11 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData
     $r0 = 'Armoury\ModuleData\' + $f.Name
     if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
 }
+# 20.10 m97-surowce: takze pliki arm_*.xml w Armoury\ModuleData (arm_items_rare.xml, arm_strings.xml - nowe, w grze ich nie ma; po tescie znikaja, wgranie bez kopii .bak)
+foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.xml' -File -ErrorAction SilentlyContinue)) {
+    $r0 = 'Armoury\ModuleData\' + $f.Name
+    if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
+}
 foreach ($i in $items) {
     if (-not (Test-Path -LiteralPath $i.src -PathType Leaf)) { Write-Host ("STOP: brak zrodla " + $i.src); exit 2 }
     if ((Get-Item -LiteralPath $i.src).Length -eq 0) { Write-Host ("STOP: zrodlo puste " + $i.src); exit 2 }
