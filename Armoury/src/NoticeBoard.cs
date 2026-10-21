@@ -136,6 +136,7 @@ namespace Armoury
                 Log.Info(P + "wpieta - menu town " + _wiredTown + "/1 (za town_backstreet: " + (idx >= 0 ? "index " + idx : "BRAK - na koncu") + "), podmenu " + _wiredMenus + "/2, linie rozmowy " + lines
                          + "; klucze: Notice Board " + YN(s != null && s.NoticeBoard) + ", Villages " + YN(s != null && s.NoticeBoardVillages) + TalkKeysText()
                          + WatchKeysText());
+                WatchStartLine();
             }
             catch (Exception e) { Stumble("AddMenus", e); Log.Info(P + "BLAD rejestracji (" + e.Message + ") - menu town " + _wiredTown + "/1, podmenu " + _wiredMenus + "/2."); }
         }
@@ -481,7 +482,8 @@ namespace Armoury
                 args.optionLeaveType = e.K == Kind.Task ? GameMenuOption.LeaveType.WaitQuest : e.K == Kind.Watch || e.K == Kind.Headman ? GameMenuOption.LeaveType.HostileAction
                                      : e.Group == 1 ? GameMenuOption.LeaveType.Conversation : GameMenuOption.LeaveType.Default;
                 MBTextManager.SetTextVariable("ARM_BOARD_ITEM", e.Line);
-                if (e.Hero != null && e.K != Kind.Task) MenuHelper.SetIssueAndQuestDataForHero(args, e.Hero);
+                if (e.K == Kind.Watch || e.K == Kind.Headman) WatchQuestFlag(args, e);
+                else if (e.Hero != null && e.K != Kind.Task) MenuHelper.SetIssueAndQuestDataForHero(args, e.Hero);
                 return true;
             }
             catch (Exception ex) { Stumble("ItemCond", ex); return false; }
@@ -877,7 +879,7 @@ namespace Armoury
                          + ", odwiedziny " + _dVisit + ", rozmowy teraz " + _dTalk + ", flagi " + _dFlag + " (czynne " + _flags.Count + "), z tablicy do zadania " + _dToQuest
                          + ", odmowy dostepu " + _dDenied + ", zdjete przed kliknieciem " + _dGone + ", nagroda nieczytelna " + _dRewardBad + ", tekst z tokenami " + _dTok + " (z " + _dTexts + " tekstow)"
                          + ", koszt otwarcia sr. " + (_dOpen > 0 ? _dOpenMs / _dOpen : 0).ToString("0.00", Inv) + " ms, doba " + ms.ToString("0.00", Inv) + " ms | proba: " + probe
-                         + " | potkniecia " + _stumblesDay + " (sesja " + _stumbles + ")");
+                         + " | potkniecia " + _stumblesDay + " (sesja " + _stumbles + "), wpieta " + YN(_wired));
             }
             catch (Exception e) { Stumble("Daily(linia)", e); }
             ZeroDay();

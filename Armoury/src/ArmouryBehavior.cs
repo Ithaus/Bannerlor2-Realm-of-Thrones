@@ -1468,6 +1468,11 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, SideVillageVisit.OnMapEventEnded);   // m97-wioski krok 2: wynik bitwy z obroncami wioski pobocznej (sam zapis zwyciezcy; tylko przy bitwie w toku)
             CampaignEvents.ConversationEnded.AddNonSerializedListener(this, NoticeBoard.OnConversationEnded);   // m102-tablica E3: osoba z tablicy (licznik "z tablicy do zadania"), kapitan strazy (E2) - flaga rozmowy zdjeta
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, NoticeBoard.OnSettlementLeft);   // m102-tablica E3: wyjazd gracza z miasta - osoba z tablicy zapomniana
+            // m102-tablica E2: listy gonczne - wyplata za rozbita bande i szkody band (karawany, wozy) w MapEventEnded (przed zniszczeniem partii), zlupione wsie, banda znikla
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("NoticeBoard.OnMapEventEnded", NoticeBoard.OnMapEventEnded));
+            CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, NoticeBoard.OnRaidCompleted);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("NoticeBoard.OnPartyDestroyed", NoticeBoard.OnPartyDestroyed));
+            NoticeBoard.NoteEventsWired(3);
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
             Ravens.RegisterEvents(this);   // p5-kruki (R3-05c): latka czatu w starcie sesji, doreczenie krukow co godzine, linia doby
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));

@@ -8936,6 +8936,26 @@ namespace Armoury
         [SettingPropertyGroup("Notice board")]
         public bool NoticeBoardOpening { get; set; } = true;
 
+        [SettingPropertyBool("Watch Bounties", HintText = "the captain of the watch (in King's Landing the captain of the Gold Cloaks) posts bounties on the notice board on bands roaming near the town: the pay is the wages of as many guardsmen as the band has men (10 to 60) for three days (four for a mounted band) plus a quarter, more if the band has plundered the town's villages or robbed its caravans or is led by a named chief (at most double). The town pays only from coin it can spare above its merchants' reserve and the next instalments it owes (one bounty at most a quarter of that); a poor town or a council in debt posts none. Whoever breaks the band is paid at once, on top of its loot. Off = no bounties", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBounties { get; set; } = true;
+
+        [SettingPropertyInteger("Watch Bounties Per Town", 0, 5, "0", HintText = "most bounties one town keeps posted at once", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public int WatchBountiesPerTown { get; set; } = 2;
+
+        [SettingPropertyInteger("Watch Bounty Days", 1, 60, "0", HintText = "days a bounty stays up before it is taken down (no penalty for you)", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public int WatchBountyDays { get; set; } = 10;
+
+        [SettingPropertyBool("Watch Bounty Ai Lords", HintText = "the bounty is public: a lord who breaks a posted band is paid too (never an enemy of the town; the garrison, militia, patrols and caravans are not paid - it is their job). Off = only you are paid; a band broken by a lord just comes down", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyAiLords { get; set; } = true;
+
+        [SettingPropertyBool("Watch Bounty Lord Top Up", HintText = "when the town's coffers cannot cover a bounty, the town's lord pays the rest from his own purse above the coin he keeps for wages (never you, if the town is yours); with this a hard-pressed town can still post bounties its lord can pay. Off = only the town's coin", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyLordTopUp { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11169,6 +11189,11 @@ namespace Armoury
             s.NoticeBoard = NoticeBoard;
             s.NoticeBoardVillages = NoticeBoardVillages;
             s.NoticeBoardOpening = NoticeBoardOpening;
+            s.WatchBounties = WatchBounties;
+            s.WatchBountiesPerTown = WatchBountiesPerTown;
+            s.WatchBountyDays = WatchBountyDays;
+            s.WatchBountyAiLords = WatchBountyAiLords;
+            s.WatchBountyLordTopUp = WatchBountyLordTopUp;
         }
 
         internal static void Apply()

@@ -98,3 +98,65 @@ i do lorda w sali (brak wstepu - wyszarzone z powodem); "Talk now" z notablem; f
 a zadanie stoi na gorze tablicy z dniami i flaga na zleceniodawcy.
 
 **Stan etapow po E3:** E1 i E3 zrobione. Zostaly: E2 (listy gonczne kapitana), E2b (soltysi).
+
+---
+
+### E2 - listy gonczne kapitana strazy (commit E2)
+
+**Dla Jeffa:** kapitana strazy nie ma w grze, w ROT ani w Banner Kings - teraz jest na tablicy. W kazdym miescie wisza najwyzej 2 listy gonczne na konkretne bandy
+z okolicy ("WANTED: Jon Rivers and his bandits (20) - 375"). Kapitan (w Krolewskiej Przystani kapitan Zlotych Plaszczy) opowie o bandzie i oznaczy ja na mapie.
+Kto rozbije bande - Ty albo lord - dostaje zaplate od razu, z kasy miasta (a gdy ta za mala, doplaca pan miasta); lup bandy i tak bierzesz osobno. Biedne
+albo zadluzone miasto listow nie wywiesza - nic z niczego.
+
+**Zasada (z liczbami):**
+- Doba (`NoticeBoard.WatchDaily`, z `NoticeBoard.Daily`): jeden przebieg po `MobileParty.AllBanditParties` - bez Innych (`Undead.Party`), bez band w osadach
+  (kryjowki - zadania soltysa z gry), bez band na morzu (`IsCurrentlyAtSea`), bez band w bitwie, od 5 zdrowych ludzi; miasto = najblizsze (wszystkie miasta, takze
+  oblezone) w promieniu 45 jedn. (ok. 214 km).
+- W miescie najwyzej `WatchBountiesPerTown` (2) listow; kolejnosc: najwieksza doplata za szkody, potem najwiecej ludzi. Termin `WatchBountyDays` (10 dni).
+- Kwota = N x D x S x 1.25 x (1 + doplata): N = zdrowi ludzie bandy 10..60, D = 3 (4 przy wiekszosci konnych), S = pelny zold zalogi miasta na glowe
+  (`MountedWage.FullTotalWage`; bez zalogi 5); doplata +25% za kazda wies miasta zlupiona przez bande w 60 dniach (`RaidCompletedEvent`), +15% za kazda rozbita
+  karawane / woz wiejski okregu (`MapEventEnded`: bandyci wygrali), +50% za herszta-bohatera, razem najwyzej +100%. Przyklad: 20 ludzi, S = 5 -> 20 x 3 x 5 x 1.25 = 375.
+- Wolna kasa = kasa - max(`TownPurse.Reserve`, `DsTowns.TdKeep`). List z kasy, gdy kwota <= 1/4 (wolnej kasy - kwot czynnych listow miasta); inaczej
+  (`WatchBountyLordTopUp`) z doplata pana (AI, nie gracz), gdy ma ponad `AiGearGoldReserve` co najmniej kwote; inaczej brak listu ("brak kasy"). Rada z dlugiem
+  (`TownDebt.ArrearsLike > 0`) i oblezone miasto nie wywieszaja nowych.
+- Zdjecie: banda znikla albo nieaktywna, termin, zmiana pana miasta (rod przy wywieszeniu).
+- Dowod (`MapEventEnded`, przed zniszczeniem partii w `HandleMapEventEnd`): banda po stronie przegranej z mniej niz 25% ludzi z chwili listu (albo nieaktywna).
+  Odbiorca: gracz po stronie zwyciezcy; lord AI prowadzacy strone zwyciezcy (`WatchBountyAiLords`); nie wrog miasta (`IsAtWarWith`). Straz, milicja, patrol,
+  karawana, wiesniacy, bandyci, nieznany - list zdjety bez wyplaty. Banda zniszczona bez bitwy (`MobilePartyDestroyed`) - list zdjety.
+- Wyplata od razu: kasa miasta `min(kwota, wolna kasa)` (`GiveGoldAction.ApplyForSettlementToCharacter`), reszta od pana miasta z jego zlota ponad rezerwe
+  (`ApplyBetweenCharacters`; nie gdy pan to gracz albo sam odbiorca), brak - niedoplata z komunikatem "The council could pay only N of the promised M.".
+  Bezpieczenstwo miasta +2, slawa +1. Komunikat gracza z powodem (bez "You received N" gry).
+- Kapitan: twarz `goldcloak_captain` w `town_EW4`, inaczej piechur z najwyzszym poziomem z zalogi (na start `EliteBasicTroop` kultury pana); rozmowa
+  `CampaignMapConversation.OpenConversation` z partia zalogi (wzor gry "Talk to the garrison commander"); bez zalogi opcja wyszarzona. Dialog `start` priorytet 310
+  z flaga naszej rozmowy (zdejmowana w `ConversationEnded`): "I'll hunt them down" (przyjety, flaga na bandzie do konca listu), "Who pays, exactly?", "Not now".
+  Straz: "the watch" (Westeros), "the city guard" (Essos), "the Gold Cloaks" (`town_EW4`). Nazwa bandy z plotek (`Rumours.BandName`, nowy odczyt) - nie w zapisie.
+
+**Zmiana:** nowy `Armoury/src/NoticeBoard.Watch.cs`; `NoticeBoard.Later.cs` - zostaly tylko miejsca E2b; `Rumours.BandName` (odczyt); `ArmouryBehavior`: nasluchy
+`MapEventEnded`, `RaidCompletedEvent`, `MobilePartyDestroyed` (po CirculationWindows - tamten zostaje pierwszy); `Settings.cs`: `WatchBounties` (TAK),
+`WatchBountiesPerTown` (2), `WatchBountyDays` (10), `WatchBountyAiLords` (TAK), `WatchBountyLordTopUp` (TAK); `gen_mcm.py`: zakresy 0..5 i 1..60 (2236 ustawien);
+`tools/sprawdz_logi.py --grupa m102tablica` (T-1..T-7 i L-1..L-10, L-K; sprawdzone na sztucznym logu).
+
+**Zapis:** `arm_board` = `nb1|F=flagi|W=miasto~banda~~ludzie~dni~doplata~kwota~od~do~flagi~S*100~rodzaj~soltys~wies~rod pana;...|H=banda~doba,rodzaj,miasto/...`
+(ok. 90 B na list, 2 x 97 miast - ok. 17 KB w najgorszym razie; prog L-8 16 KB pokaze, czy trzeba skrocic).
+
+**Linie logu:** `Listy goncze (m102): wpiete - zdarzenia 3/3 ..., dialog kapitana 7/7, opcja karty 1/1, zapis arm_board nb1`; `list - <miasto> <banda> (N ludzi, D d, S s,
+szkody +p%) = kwota, platnik kasa|pan, wolna kasa F - nazwa`; `wyplata - <miasto> <banda> obiecane M, kasa a + pan b, niedoplata c, dla gracz|lord id; kasa przed g0 po g1 (Keep k)`;
+`zdjety bez wyplaty - ...`; `przyjety przez gracza - ...`; `rozmowa z kapitanem - ...`; linia doby z miastami, powodami, wyplatami, zdjeciami, zapisem, kosztem i potknieciami.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Nic z niczego: kazda wyplata to przelew kasa miasta -> odbiorca albo pan -> odbiorca (zdarzenie gry `HeroOrPartyTradedGold` - ksiega Obieg je widzi); kasa
+  nigdy ponizej Keep (wyplata najwyzej wolna kasa). Ta sama banda w zadaniu kupca i w liscie - dwie zaplaty od dwoch platnikow (projekt 4.5).
+- Lup bandy (BeatenPurse, skarbiec kryjowki) bez zmian - nagroda jest osobno. AI lordow nie zmieniamy (bez celow AI) - tylko czasem dostaja zaplate (L-7).
+- Kolejnosc nasluchow: `MapEventEnded` - nasz tylko czyta bitwe i placi z kasy miasta (bez wplywu na inne nasluchy); `MobilePartyDestroyed` - tylko zdjecie listu
+  (bez przelewu), CirculationWindows zostaje pierwszym dopisanym (biegnie ostatni).
+- Rozmowa z kapitanem: szablon zolnierza (nie bohater) - flaga naszej rozmowy i ta sama postac, priorytet 310 nad 300 z gry; flaga zdejmowana na koncu kazdej rozmowy.
+- Nie sprawdzone w grze: ile band jest poza osadami w ROT (ROT_Hideouts, ROTBanditLeaveHideouts), typowe S zalog ROT, czy promien 45 jedn. pasuje do mapy ROT
+  (linia doby pokaze "band poza osadami" i "miasta z banda").
+
+**Status:** DO SPRAWDZENIA (build kod 0; gra nie uruchamiana).
+
+**Test w grze:** tablica w Krolewskiej Przystani - wpis kapitana Zlotych Plaszczy, rozmowa, "I'll hunt them down" stawia flage na bandzie; rozbic bande - komunikat
+zaplaty, linia "wyplata" (obiecane = kasa + pan + niedoplata); zapis i wczytanie z czynnym listem (list stoi, nazwa bandy wraca); wczytanie z `WatchBounties` NIE - bez bledu,
+listy znikaja z tablicy; `python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log>` po tescie 120 dob (L-7: gdy nie przejdzie - domyslne WatchBountyAiLords = false).
+
+**Stan etapow po E2:** E1, E3, E2 zrobione. Zostal E2b (soltysi).
