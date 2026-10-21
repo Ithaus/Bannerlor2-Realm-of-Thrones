@@ -22,9 +22,10 @@ namespace Armoury
         private const int HeadmanHarmDays = 30;
         private static int _hNew, _hPaid, _hDialog;
 
-        private static bool HeadmanOn { get { var s = Settings.Current; return s != null && s.HeadmanBounties; } }
+        /// <summary>Listy soltysow: klucz HeadmanBounties, tablica (NoticeBoard) i wsie na tablicy (NoticeBoardVillages) - soltys to czlowiek wsi (poprawka po recenzji).</summary>
+        private static bool HeadmanOn { get { var s = Settings.Current; return s != null && s.NoticeBoard && s.NoticeBoardVillages && s.HeadmanBounties; } }
 
-        private static string HeadmanKeysText() { return ", Headman Bounties " + YN(HeadmanOn); }
+        private static string HeadmanKeysText() { var s = Settings.Current; return ", Headman Bounties " + YN(s != null && s.HeadmanBounties); }
 
         private static Hero HeadmanOf(Settlement vs)
         {
@@ -120,7 +121,7 @@ namespace Armoury
             sb.Append("Posted by ").Append(NameOf(head)).Append(", headman of ").Append(vs != null ? vs.Name.ToString() : "a village").Append('.');
             string near = n.Mp != null ? NearName(n.Mp.GetPosition2D) : null;
             sb.Append("\n\n\"They came and took what they pleased. ").Append(n.Men).Append(" of them - ").Append(near != null ? "still about, near " + near : "still about").Append(". Break them and the village will pay.\"");
-            sb.Append("\n\nPay: ").Append(n.Sum.ToString("N0", Inv)).Append(" denars from the village purse, paid at once to whoever breaks them - on top of whatever the band carries.");
+            sb.Append("\n\nPay: ").Append(n.Sum.ToString("N0", Inv)).Append(" denars from the village purse, paid at once to ").Append(PaidTo()).Append(" - on top of whatever the band carries.");
             sb.Append("\nTime: the notice stays up ").Append(Math.Max(0, n.Due - Today)).Append(" more days.");
             if (vs != null) sb.Append("\n\nYou must ride to ").Append(vs.Name).Append(" to speak with the headman").Append(Away(st, vs.GetPosition2D)).Append('.');
             if (n.Taken) sb.Append("\n\nYou have told the headman you will hunt them.");
@@ -163,7 +164,7 @@ namespace Armoury
                 string near = n.Mp != null ? NearName(n.Mp.GetPosition2D) : null;
                 MBTextManager.SetTextVariable("ARM_HEAD_VILLAGE", vname);
                 MBTextManager.SetTextVariable("ARM_HEAD_OPEN", n.Name + " - " + n.Men + " of them. They plundered us and they are still about" + (near != null ? ", near " + near : "") + ". The village pays "
-                                                + n.Sum.ToString("N0", Inv) + " to whoever breaks them, coin in hand. Whatever they carry is yours.");
+                                                + n.Sum.ToString("N0", Inv) + " to " + PaidTo() + ", coin in hand. Whatever they carry is yours.");
                 MBTextManager.SetTextVariable("ARM_WATCH_TAKEN", "Gods be good to you. " + (near != null ? "They were last seen near " + near + ". " : "") + "I'll mark them for you.");
                 _talkNotice = n;
                 return true;

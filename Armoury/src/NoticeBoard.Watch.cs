@@ -73,11 +73,21 @@ namespace Armoury
         private static Notice _talkNotice;
 
         // liczniki doby
-        private static int _wNew, _wPaidN, _wPaidPlayerN, _wPaidLordN, _wDropGuard, _wDropEnemy, _wDropGone, _wDropDue, _wDropOwner, _wBelowKeep, _wFromNothing, _wTakenToday;
-        private static long _wPaid, _wPaidPlayer, _wPaidLord, _wFromTown, _wFromLordPurse, _wShort;
+        private static int _wNew, _wPaidN, _wPaidPlayerN, _wPaidLordN, _wDropGuard, _wDropEnemy, _wDropGone, _wDropDue, _wDropOwner, _wDropKey, _wBelowKeep, _wTakenToday;
+        private static long _wPaid, _wPaidPlayer, _wPaidLord, _wFromTown, _wFromLordPurse, _wFromVillage, _wShort;
+        private static long _wFromNothing;   // poprawka po recenzji: zmierzone zloto odbiorcy ponad zmierzony ubytek platnikow (kasa miasta, pan, kiesa wsi) - ma byc 0
         private static int _wStumbles;
 
-        internal static bool WatchOn { get { var s = Settings.Current; return s != null && s.WatchBounties; } }
+        /// <summary>Listy kapitana: klucz WatchBounties i sama tablica (NoticeBoard) - bez tablicy listow nikt nie widzi, wiec nie wisza i nie placa (poprawka po recenzji).</summary>
+        internal static bool WatchOn { get { var s = Settings.Current; return s != null && s.NoticeBoard && s.WatchBounties; } }
+
+        /// <summary>Czy ten rodzaj listu jest wlaczony (0 - kapitan: WatchOn, 1 - soltys: HeadmanOn). Wylaczony - list zdjety bez wyplaty.</summary>
+        private static bool KindOn(Notice n) { return n != null && (n.Kind == 1 ? HeadmanOn : WatchOn); }
+
+        private static bool AiLordsPaid { get { var s = Settings.Current; return s != null && s.WatchBountyAiLords; } }
+
+        /// <summary>Kto dostaje nagrode (tekst karty) - zalezy od klucza WatchBountyAiLords.</summary>
+        private static string PaidTo() { return AiLordsPaid ? "whoever breaks them" : "you when you break them"; }
 
         private static void ResetWatch()
         {
@@ -88,8 +98,8 @@ namespace Armoury
 
         private static void ZeroWatchDay()
         {
-            _wNew = _wPaidN = _wPaidPlayerN = _wPaidLordN = _wDropGuard = _wDropEnemy = _wDropGone = _wDropDue = _wDropOwner = _wBelowKeep = _wFromNothing = _wTakenToday = 0;
-            _wPaid = _wPaidPlayer = _wPaidLord = _wFromTown = _wFromLordPurse = _wShort = 0;
+            _wNew = _wPaidN = _wPaidPlayerN = _wPaidLordN = _wDropGuard = _wDropEnemy = _wDropGone = _wDropDue = _wDropOwner = _wDropKey = _wBelowKeep = _wTakenToday = 0;
+            _wPaid = _wPaidPlayer = _wPaidLord = _wFromTown = _wFromLordPurse = _wFromVillage = _wShort = _wFromNothing = 0;
             _wStumbles = 0;
             ZeroHeadmanDay();
         }
@@ -197,7 +207,7 @@ namespace Armoury
                 try
                 {
                     if (n.Town != st.StringId || !Live(n)) continue;
-                    if (n.Kind == 0 && !WatchOn) continue;
+                    if (!KindOn(n)) continue;
                     var e = new Entry { K = n.Kind == 0 ? Kind.Watch : Kind.Headman, Tag = n, Reward = n.Sum, Group = n.Kind == 0 ? 1 : 2 };
                     if (n.Kind == 1) { e.Village = Settlement.Find(n.Village); e.Hero = Hero.Find(n.Giver); }
                     string near = n.Mp != null ? NearName(n.Mp.GetPosition2D) : null;
@@ -276,8 +286,9 @@ namespace Armoury
             string near = n.Mp != null ? NearName(n.Mp.GetPosition2D) : null;
             sb.Append("\n\n").Append(n.Men.ToString(Inv)).Append(" men")
               .Append(near != null ? ", last seen near " + near : "").Append(n.Mp != null ? Away(st, n.Mp.GetPosition2D) : "").Append('.').Append(HarmText(n));
-            sb.Append("\n\nPay: ").Append(n.Sum.ToString("N0", Inv)).Append(" denars, paid at once to whoever breaks them - on top of whatever the band carries. ").Append(PayerText(n, st));
-            sb.Append("\nTime: the notice stays up ").Append(Math.Max(0, n.Due - Today)).Append(" more days. It is public: if a lord breaks them first, he is paid.");
+            sb.Append("\n\nPay: ").Append(n.Sum.ToString("N0", Inv)).Append(" denars, paid at once to ").Append(PaidTo()).Append(" - on top of whatever the band carries. ").Append(PayerText(n, st));
+            sb.Append("\nTime: the notice stays up ").Append(Math.Max(0, n.Due - Today)).Append(" more days.")
+              .Append(AiLordsPaid ? " It is public: if a lord breaks them first, he is paid." : " If a lord breaks them first, the notice comes down unpaid.");
             if (n.Taken) sb.Append("\n\nYou have told the captain you will hunt them.");
             return sb.ToString();
         }
@@ -470,10 +481,17 @@ namespace Armoury
             var st = n.St ?? Settlement.Find(n.Town);
             _notices.Remove(n);
             if (st == null || st.Town == null) { _wDropGone++; return; }
+            if (!KindOn(n))   // poprawka po recenzji: wylaczony klucz (albo cala tablica) - list zdjety bez wyplaty, kasa nie placi za niewidoczne listy
+            {
+                _wDropKey++;
+                Log.Info(PW + "zdjety bez wyplaty - " + n.Town + " " + n.Band + " (rodzaj " + n.Kind + ") - klucz NIE");
+                return;
+            }
             Hero payee = null;
             string who;
             var s = Settings.Current;
-            if (me.IsPlayerMapEvent && me.PlayerSide == win) { payee = Hero.MainHero; who = "gracz"; }
+            // poprawka po recenzji (projekt 6.3 "Kto rozbil"): gracz tylko gdy jego partia prowadzi strone zwyciezcy (sam albo na czele armii); gracz w armii lorda AI - placi sie prowadzacemu
+            if (me.IsPlayerMapEvent && me.PlayerSide == win && winSide.LeaderParty == PartyBase.MainParty) { payee = Hero.MainHero; who = "gracz"; }
             else
             {
                 var lp = winSide.LeaderParty;
@@ -507,6 +525,10 @@ namespace Armoury
         {
             var town = st.Town;
             int g0 = town.Gold;
+            int p0 = payee.Gold;                                   // pomiar (poprawka po recenzji): odbiorca dostal tyle, ile ubylo platnikom
+            var vil = n.Kind == 1 ? Settlement.Find(n.Village) : null;
+            int v0 = vil != null && vil.Village != null ? vil.Village.Gold : 0;
+            int o0 = 0, o1 = 0;
             double keep = Keep(st);
             int free = (int)Math.Max(0, Math.Min(int.MaxValue, g0 - keep));
             int fromTown = Math.Max(0, Math.Min(n.Sum, free));
@@ -520,17 +542,25 @@ namespace Armoury
             else if (n.Sum > fromTown && s != null && s.WatchBountyLordTopUp && owner != null && owner != payee && owner != Hero.MainHero && owner.IsAlive)
             {
                 fromLord = Math.Max(0, Math.Min(n.Sum - fromTown, owner.Gold - LordReserve));
+                o0 = owner.Gold;
                 if (fromLord > 0) GiveGoldAction.ApplyBetweenCharacters(owner, payee, fromLord, true);
+                o1 = owner.Gold;
             }
+            int v1 = vil != null && vil.Village != null ? vil.Village.Gold : 0;
+            int p1 = payee.Gold;
+            long got = (long)p1 - p0, gave = ((long)g0 - g1) + ((long)o0 - o1) + ((long)v0 - v1);
+            if (got > gave) _wFromNothing += got - gave;
             int shortfall = Math.Max(0, n.Sum - fromTown - fromLord);
             if (g1 < keep - 0.5 && fromTown > 0) _wBelowKeep++;
             if (n.Kind == 0) { try { town.Security += 2f; } catch { } }
             try { GainRenownAction.Apply(payee, 1f, payee != Hero.MainHero); } catch (Exception e) { WStumble("Pay(slawa)", e); }
             int paid = fromTown + fromLord;
-            _wPaidN++; _wPaid += paid; _wFromTown += fromTown; _wFromLordPurse += fromLord; _wShort += shortfall;
+            _wPaidN++; _wPaid += paid; _wFromTown += fromTown; _wShort += shortfall;
+            if (n.Kind == 1) _wFromVillage += fromLord; else _wFromLordPurse += fromLord;   // poprawka po recenzji: kiesa wsi osobno (nie "od panow")
             if (payee == Hero.MainHero) { _wPaidPlayerN++; _wPaidPlayer += paid; } else { _wPaidLordN++; _wPaidLord += paid; }
             Log.Info(PW + "wyplata - " + n.Town + " " + n.Band + " obiecane " + n.Sum + ", kasa " + fromTown + " + " + (n.Kind == 1 ? "wies " : "pan ") + fromLord + ", niedoplata " + shortfall
-                     + ", dla " + who + "; kasa przed " + g0 + " po " + g1 + " (Keep " + ((long)Math.Round(keep)).ToString(Inv) + ")");
+                     + ", dla " + who + "; kasa przed " + g0 + " po " + g1 + " (Keep " + ((long)Math.Round(keep)).ToString(Inv) + ")"
+                     + "; odbiorca " + got.ToString(Inv) + ", platnicy " + gave.ToString(Inv) + ", z niczego " + (got - gave).ToString(Inv));
             if (payee == Hero.MainHero)
             {
                 string by = n.Kind == 1 ? "The headman of " + n.Village : Cap(GuardName(st)) + " of " + st.Name;
@@ -602,6 +632,7 @@ namespace Armoury
                     if (n.Mp == null && byId != null) { MobileParty f; if (byId.TryGetValue(n.Band ?? "", out f)) n.Mp = f; }
                     if (n.Mp != null && string.IsNullOrEmpty(n.Name)) n.Name = BandNameOf(n.Mp);
                     if (n.St == null || n.St.Town == null || n.Mp == null || !n.Mp.IsActive) { _notices.RemoveAt(i); _wDropGone++; continue; }
+                    if (!KindOn(n)) { _notices.RemoveAt(i); _wDropKey++; continue; }   // poprawka po recenzji: klucz rodzaju albo tablica wylaczone
                     if (day > n.Due) { _notices.RemoveAt(i); _wDropDue++; continue; }
                     string owner = n.St.OwnerClan != null ? n.St.OwnerClan.StringId : "";
                     if (owner != n.Owner) { _notices.RemoveAt(i); _wDropOwner++; continue; }
@@ -643,7 +674,7 @@ namespace Armoury
                 var st = kv.Key;
                 try
                 {
-                    if (s == null || !s.WatchBounties || per <= 0) { keyOff++; continue; }
+                    if (s == null || !WatchOn || per <= 0) { keyOff++; continue; }
                     int have = 0; long committed = 0;
                     foreach (var n in _notices) if (n.Kind == 0 && n.Town == st.StringId) { have++; committed += n.Sum; }
                     if (have >= per) { atLimit++; continue; }
@@ -698,14 +729,14 @@ namespace Armoury
                 string exp = Export();
                 int bytes = exp != null ? exp.Length : 0;
                 double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
-                Log.Info(PW + "dzien " + day + ", klucz " + YN(s != null && s.WatchBounties) + ", band poza osadami " + bands + ", miasta z banda " + withBand + "/" + Town.AllTowns.Count + ", z listem " + withNotice
+                Log.Info(PW + "dzien " + day + ", klucz " + YN(WatchOn) + ", band poza osadami " + bands + ", miasta z banda " + withBand + "/" + Town.AllTowns.Count + ", z listem " + withNotice
                          + ", bez nowego listu: brak kasy " + noCash + ", limit " + atLimit + ", kazda banda z listem " + allPosted + ", oblezone " + besieged + ", dlug rady " + inDebt + ", bez pana " + noLord
                          + ", klucz " + keyOff + ", inne " + other
                          + "; czynne " + _notices.Count + " (nowe " + _wNew + ", przyjete przez gracza " + takenAll + ", dzis " + _wTakenToday + ")"
                          + "; wyplacone " + _wPaidN + " za " + _wPaid + " zl (gracz " + _wPaidPlayerN + "/" + _wPaidPlayer + " zl, lordowie " + _wPaidLordN + "/" + _wPaidLord + " zl; z kas miast " + _wFromTown
-                         + ", od panow " + _wFromLordPurse + "), niedoplata " + _wShort + ", z niczego " + _wFromNothing
-                         + "; zdjete " + (_wDropGuard + _wDropEnemy + _wDropGone + _wDropDue + _wDropOwner) + " (straz/karawana " + _wDropGuard + ", wrog miasta " + _wDropEnemy + ", banda znikla " + _wDropGone
-                         + ", termin " + _wDropDue + ", zmiana pana " + _wDropOwner + "); kasa ponizej Keep po wyplacie " + _wBelowKeep
+                         + ", od panow " + _wFromLordPurse + ", z kies wsi " + _wFromVillage + "), niedoplata " + _wShort + ", z niczego " + _wFromNothing
+                         + "; zdjete " + (_wDropGuard + _wDropEnemy + _wDropGone + _wDropDue + _wDropOwner + _wDropKey) + " (straz/karawana " + _wDropGuard + ", wrog miasta " + _wDropEnemy + ", banda znikla " + _wDropGone
+                         + ", termin " + _wDropDue + ", zmiana pana " + _wDropOwner + ", klucz " + _wDropKey + "); kasa ponizej Keep po wyplacie " + _wBelowKeep
                          + HeadmanDayText() + "; zapis arm_board " + bytes + " B; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
             }
             catch (Exception e) { WStumble("WatchDaily(linia)", e); }
