@@ -290,13 +290,15 @@ namespace Armoury
 
         private const int LogAfterStoryDays = 20;   // linia doby jeszcze tyle dni opowiesci (egzekucja Neda - dzien ~9 osi x4.33)
 
-        /// <summary>Doba kampanii z prologiem: pokoj i pakty (Peace), linia doby. Po starcie opowiesci - jeszcze LogAfterStoryDays dni linii, potem cisza.</summary>
+        /// <summary>Doba kampanii z prologiem: koniec prologu (co dobe, bez limitu dnia), pokoj i pakty (Peace), linia doby. Po starcie opowiesci - jeszcze
+        /// LogAfterStoryDays dni linii, potem cisza w logu.</summary>
         internal static void Daily()
         {
             if (!Active) return;
             double day = PrologueDay();
-            if (day > PrologueDays + LogAfterStoryDays) return;
+            // recenzja R2: smierc krola (ponawiana, gdy krol w bitwie) i Ned w lochu - takze po dniu 208, inaczej krol w dlugim oblezeniu zostalby krolem na zawsze
             string end = DailyEnd();
+            if (day > PrologueDays + LogAfterStoryDays) return;
             bool before = BeforeStory();
             string peace = DailyPeace();
             Log.Info(Tag + "dzien " + ((int)day).ToString(Inv) + " prologu (" + (before ? "opowiesc za " + (PrologueDays - day).ToString("0.0", Inv) + " dni"

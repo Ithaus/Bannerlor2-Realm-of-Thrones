@@ -37566,9 +37566,9 @@ def m101prolog_main(logp, csp=None):
             + ("; bez moda Diplomacy - same sojusze" if no_dip else ""), "sojusze 3/3, pakty 6/6 kazdej doby", (len(pk_bad) == 0) if pk else None)
     if ends:
         e = ends[-1]
-        ok = e[2].startswith("TAK") and e[3] == "TAK" and "jeniec w town_EW4 TAK" in e[4]
+        ok = e[2].startswith("TAK") and e[3] == "TAK" and ("jeniec w town_EW4 TAK" in e[4] or "juz stracony (NedEvent)" in e[4])
         rep.add("PR-7: koniec prologu (dzien 186)", f"dzien {e[1]} | Robert martwy {e[2]} | Joffrey krolem {e[3]} | Ned: {e[4][:60]} | pakty: {e[5]}",
-                "Robert martwy TAK, Joffrey krolem TAK, Ned jeniec w town_EW4 TAK", ok)
+                "Robert martwy TAK, Joffrey krolem TAK, Ned jeniec w town_EW4 TAK (krol zmarl po NedEvent - Ned juz stracony)", ok)
     else:
         last = max([d[0] for d in days], default=-1)
         rep.add("PR-7: koniec prologu (dzien 186)", f"brak linii (ostatnia doba prologu w logu {last})", "INFO gdy log krotszy niz 186 dob", None if last < 187 else False)

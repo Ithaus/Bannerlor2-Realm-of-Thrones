@@ -172,6 +172,7 @@ Recenzja pelna HEAD 8e09b71e: nic krytycznego, 1 wazne, 4 drobne. Kazde sprawdzo
 | Nr | Waga | Co | Sprawdzenie | Stan |
 |---|---|---|---|---|
 | R1 | wazne | PR-2 wymagal miejsc + zaciag >= 38, a w ROT.dll jest 35 | PRAWDA: wlasny licznik IL (cel wywolania = `TaleWorlds...CampaignTimeModel`): 35 wywolan w 31 metodach (30 z latka: 34 miejsca, w tym 1 rytm `% 4f`; 1 zaciag). 38 z rozpoznania to linie dectool grep z definicjami | POPRAWIONE: PR-2 `N = M >= 30`, `miejsca + zaciag >= 35`; CHANGELOG (Odczyty ROT, log E1a, Ryzyko E1a, Test krok 4) - oczekiwane 30/30, 34, 33, 1, 1; komentarz w Prologue.Story.cs |
+| R2 | drobne | `Daily()` konczyl sie po dniu 208 przed `DailyEnd` - krol w bitwie/oblezeniu od dnia 186 do 208 (i przy NedEvent) nie umarlby nigdy; pakty gasly dopiero po sprawdzeniu bitwy | PRAWDA w kodzie (Prologue.cs: return przed DailyEnd; Prologue.End.cs: Busy przed EndPacts). Sojusze i tak maja koniec w dniu 187 (`UpdateAllianceEndTime` tylko przedluza - gdy domyslny koniec sojuszu gry jest pozniej, zostaje pozniej) | POPRAWIONE: `DailyEnd` co dobe bez limitu dnia (limit 208 tylko dla linii logu); `EndPacts` przed sprawdzeniem bitwy (pakty gasna w dniu 186 zawsze); NedEvent przy krolu w bitwie - Ned stracony jak dotad (ROT zaklada martwego Neda), krol umiera po walce w nastepnej udanej probie, linia egzekucji mowi `krol Robert jeszcze zyje ...`; krol po NedEvent - bez drugiego aresztu Neda (`Ned: juz stracony (NedEvent)`, PR-7 to przyjmuje), komunikat gracza bez zdania o uwiezieniu |
 
 ## Status
 

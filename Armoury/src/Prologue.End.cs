@@ -11,9 +11,9 @@ namespace Armoury
 {
     /// <summary>
     /// m101-prolog E2b - KONIEC PROLOGU (projekt pkt 2: dzien 186 - smierc Roberta, Joffrey krolem, Ned w lochu; dzien 188 = dzien 0 ROT, egzekucja Neda).
-    /// (1) Doba >= KingFallsDay prologu (Daily): najpierw pakty prologu gasna (EndPacts), potem krol umiera "od ran z polowania na dzika": AddDeathMark(WoundedInBattle)
+    /// (1) Doba >= KingFallsDay prologu (Daily): najpierw pakty prologu gasna (EndPacts - takze, gdy krol jest w bitwie), potem krol umiera "od ran z polowania na dzika": AddDeathMark(WoundedInBattle)
     ///     + KillCharacterAction.ApplyByDeathMarkForced (wymuszona - nasza ochrona CanHeroDie i cudze weta nie blokuja). Krol w bitwie albo oblezeniu (jego druzyna albo
-    ///     strona, ktora trzyma go w niewoli) - czekamy do nastepnej doby. Gra sama robi sukcesje: przywodca rodu clan_nord_1 z dziedzicow (ChangeClanLeaderAction),
+    ///     strona, ktora trzyma go w niewoli) - czekamy do nastepnej doby (proba co dobe bez limitu dnia, recenzja R2). Gra sama robi sukcesje: przywodca rodu clan_nord_1 z dziedzicow (ChangeClanLeaderAction),
     ///     glosowanie o tron z premia ROT x999 dla rodu panujacego; gdy przywodca nie jest Joffreyem, a Joffrey zyje w tym rodzie - ustawiamy Joffreya
     ///     (ChangeClanLeaderAction.ApplyWithSelectedNewLeader). Nazwa rodu wraca do oryginalu z XML ("Baratheon, Joffrey").
     /// (2) Ned jencem korony w Krolewskiej Przystani (town_EW4): druzyna rozwiazana (jego armia - DisbandArmyAction), TakePrisonerAction do lochu osady; Ned w bitwie -
@@ -29,8 +29,9 @@ namespace Armoury
         private const string KingsLandingId = "town_EW4";
         private static bool _kingFallen, _nedDone, _endLogged;
         private static int _kingWaits, _nedArrests;
+        private static string _pactsEndText = "";   // wynik EndPacts z dnia 186 (do linii KONCA PROLOGU, gdy krol umrze pozniej)
 
-        private static void ResetEnd() { _kingFallen = false; _nedDone = false; _endLogged = false; _kingWaits = 0; _nedArrests = 0; }
+        private static void ResetEnd() { _kingFallen = false; _nedDone = false; _endLogged = false; _kingWaits = 0; _nedArrests = 0; _pactsEndText = ""; }
 
         private static string PackEnd() { return "kf=" + (_kingFallen ? "1" : "0") + ";nd=" + (_nedDone ? "1" : "0") + ";"; }
 
@@ -75,13 +76,16 @@ namespace Armoury
         private static bool TryKingFalls(string why)
         {
             var robert = H(RobertId);
+            // recenzja R2: pakty gasna w dniu 186 takze wtedy, gdy krol jest w bitwie (sojusz z prologu nie dotrwa do wojen ROT po NedEvent)
+            if (!_pactsEnded) _pactsEndText = EndPacts();
             if (_kingsAlive && robert != null && robert.IsAlive && Busy(robert))
             {
                 _kingWaits++;
-                Log.Info(Tag + "koniec prologu (" + why + "): krol Robert w bitwie albo oblezeniu - smierc krola nastepnej doby (czeka " + _kingWaits + ").");
+                Log.Info(Tag + "koniec prologu (" + why + "): krol Robert w bitwie albo oblezeniu - smierc krola nastepnej doby (czeka " + _kingWaits
+                         + ", pakty: " + (string.IsNullOrEmpty(_pactsEndText) ? "zakonczone" : _pactsEndText) + ").");
                 return false;
             }
-            string pacts = EndPacts();
+            string pacts = string.IsNullOrEmpty(_pactsEndText) ? "juz zakonczone" : _pactsEndText;
             string died = "-";
             if (_kingsAlive && robert != null && robert.IsAlive)
             {
@@ -117,14 +121,15 @@ namespace Armoury
             var crown = K(Crown);
             bool joffKing = crown != null && joff != null && crown.Leader == joff;
             // Ned do lochu
-            string ned = _kingsAlive ? ArrestNed() : "nie ozywiony";
+            // krol umiera po NedEvent (byl w bitwie) - Ned juz stracony, bez drugiego aresztu
+            string ned = !_kingsAlive ? "nie ozywiony" : _nedDone ? "juz stracony (NedEvent)" : ArrestNed();
             _endLogged = true;
             Log.Info(Tag + "KONIEC PROLOGU (" + why + ", dzien " + PrologueDay().ToString("0.0", Inv) + ") | Robert martwy " + died
                      + " | korona: wladca " + Who(crown != null ? crown.Leader : null) + " - Joffrey krolem " + (joffKing ? "TAK" : "NIE") + " (" + heir + ")"
                      + " | Ned: " + ned + " | pakty: " + pacts + " | potkniecia " + _stumbles + ".");
             if (_kingsAlive)
-                Log.Player("King Robert Baratheon is dead of the wounds a boar gave him on the hunt. Joffrey Baratheon sits the Iron Throne, and Lord Eddard Stark, "
-                           + "Hand of the King, has been seized for treason and thrown into the black cells of King's Landing.");
+                Log.Player("King Robert Baratheon is dead of the wounds a boar gave him on the hunt. Joffrey Baratheon sits the Iron Throne"
+                           + (_nedDone ? "." : ", and Lord Eddard Stark, Hand of the King, has been seized for treason and thrown into the black cells of King's Landing."));
             return true;
         }
 
@@ -209,7 +214,8 @@ namespace Armoury
                 var north = K(NorthId);
                 Log.Info(Tag + "egzekucja Neda (NedEvent, dzien opowiesci " + (PrologueDay() - PrologueDays).ToString("0.0", Inv) + ") | Ned martwy " + killed
                          + " | rod Stark: glowa " + Who(stark != null ? stark.Leader : null) + " (" + fix + ")"
-                         + " | Polnoc: wladca " + Who(north != null ? north.Leader : null) + " - Robb " + (north != null && robb != null && north.Leader == robb ? "TAK" : "NIE") + ".");
+                         + " | Polnoc: wladca " + Who(north != null ? north.Leader : null) + " - Robb " + (north != null && robb != null && north.Leader == robb ? "TAK" : "NIE")
+                         + (_kingFallen ? "" : " | krol Robert jeszcze zyje (w bitwie albo oblezeniu) - smierc krola po walce, proba co dobe") + ".");
             }
             catch (Exception e) { Stumble("NedEventPrefix", e); }
         }
