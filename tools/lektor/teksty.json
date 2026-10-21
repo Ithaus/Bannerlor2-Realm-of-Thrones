@@ -1,0 +1,352 @@
+[
+ {
+  "cls": "BlackwaterEvent",
+  "n": 0,
+  "title_id": "ROTd0hD1DmLa",
+  "title": "Stannis Retreats to Dragonstone",
+  "upper_id": "ROTDX2yMuTHa",
+  "upper": "Stannis Baratheon has been defeated!",
+  "lower_id": "ROTxr7w26Pua",
+  "lower": "He nearly achieved victory when Tywin and the Tyrell army arrive and force a reluctant retreat. Most of Stannis' bannermen either die or are forced to switch allegiances. Stannis is forced back to Dragonstone to contemplate his next move."
+ },
+ {
+  "cls": "BlackwaterEvent",
+  "n": 1,
+  "title_id": "ROTd0hD1DmLaa",
+  "title": "Stannis Claims the Iron Throne",
+  "upper_id": "ROT_StannisWon",
+  "upper": "You arrive in the knick of time and your troops turn the tide of battle!",
+  "lower_id": "ROTPlayerCheated",
+  "lower": "The true king sits the iron throne thanks to you!"
+ },
+ {
+  "cls": "AegonInvasionEvent",
+  "n": 0,
+  "title_id": "ROTEjHgHyLa",
+  "title": "Aegon Makes His Move",
+  "upper_id": "ROTOzIkJVKW",
+  "upper": "Aegon, scion of House Targaryen, has landed in the Stormlands to reclaim the Iron Throne, a seat his ancestors forged in fire and blood centuries ago. Following the Targaryen dynasty's ousting by Robert's Rebellion, Aegon seeks to restore his family's legacy.",
+  "lower_id": "ROTVlVhc1Ae",
+  "lower": "Many houses of the Stormlands, weary of the Baratheon/Lannister reign, rally to his cause, seeing him as the rightful king to unite the realm."
+ },
+ {
+  "cls": "BlackwaterSiegeEvent",
+  "n": 0,
+  "title_id": "ROTd0hD1DmLa",
+  "title": "Battle of the Blackwater",
+  "upper_id": "ROTDX2yMuTH_BWSE",
+  "upper": "Stannis Baratheon assaults King's Landing and is bombarded with wildfire that destroyed nearly his entire fleet.",
+  "lower_id": "ROTxr7w26Pu_BWSE",
+  "lower": "Despite the casualties, Stannis presses on and assualts the walls!"
+ },
+ {
+  "cls": "BlackwaterSiegeNotificationEvent",
+  "n": 0,
+  "title_id": "ROTd0hD1DmL",
+  "title": "Stannis Sails for King's Landing",
+  "upper_id": "ROTDX2yMuTH",
+  "upper": "Stannis gathers all his bannermen and sails for King's Landing to claim what is rightfully his.",
+  "lower_id": "ROTxr7w26Pu",
+  "lower": "Will you ride to join the battle or just let fate decide the outcome?"
+ },
+ {
+  "cls": "BastardsSiegeNotificationEvent",
+  "n": 0,
+  "title_id": "bastard1",
+  "title": "To Winterfell",
+  "upper_id": "bastard2",
+  "upper": "The King in the North calls all banners still loyal to House Stark.",
+  "lower_id": "bastard3",
+  "lower": "They march towards Winterfell!"
+ },
+ {
+  "cls": "BastardsEvent",
+  "n": 0,
+  "title_id": "bastard4",
+  "title": "Ramsay Holds Winterfell",
+  "upper_id": "bastard5",
+  "upper": "The short reign of Jon Snow is over!",
+  "lower_id": "bastard6",
+  "lower": "His head is put on a spike at the gates of Winterfell and all prisoners flayed and displayed for miles in every direction."
+ },
+ {
+  "cls": "BastardsEvent",
+  "n": 1,
+  "title_id": "bastards7",
+  "title": "Stark Homecoming",
+  "upper_id": "bastards8",
+  "upper": "Jon Snow's army prevails! Ramsay Bolton is captured and fed to his hounds.",
+  "lower_id": "bastard9",
+  "lower": "The Stark Banner flies in Winterfell once again!"
+ },
+ {
+  "cls": "BastardsSiegeEvent",
+  "n": 0,
+  "title_id": "bastards10",
+  "title": "Battle of the Bastards",
+  "upper_id": "bastards11",
+  "upper": "The bastard of Winterfell and the Dreadfort meet in field outside Winterfell.",
+  "lower_id": "bastards12",
+  "lower": "After a battle for the ages, Ramsay escapes back into the gates of Winterfell. The King in the North presses forward to assualt the walls of his home. A bastard would die today no matter what."
+ },
+ {
+  "cls": "HarrenhalEvent",
+  "n": 0,
+  "title_id": "harren7",
+  "title": "Roose Bolton Denied!",
+  "upper_id": "harren8",
+  "upper": "Roose Bolton was defeated at Harrenhal!",
+  "lower_id": "harren9",
+  "lower": "The Lion prevails!"
+ },
+ {
+  "cls": "HarrenhalEvent",
+  "n": 1,
+  "title_id": "harren10",
+  "title": "A Northern Stronghold in the South",
+  "upper_id": "harren11",
+  "upper": "Roose Bolton prevails, Harrenhall is under the control of the North!",
+  "lower_id": "harren12",
+  "lower": "Tywin presses forward into the Riverlands in persuit of Robb Stark."
+ },
+ {
+  "cls": "HarrenhalSiegeEvent",
+  "n": 0,
+  "title_id": "harren4",
+  "title": "Roose Bolton Besieges Harrenhal",
+  "upper_id": "harren5",
+  "upper": "The lightly guarded Harrenhal is in the emminent grasp of Roose Bolton's army, after a shady dealing with the Brave Companions.",
+  "lower_id": "harren6",
+  "lower": "The walls still stand and those loyal to Tywin do not surrender. The battle commences."
+ },
+ {
+  "cls": "HarrenhalSiegeNotificationEvent",
+  "n": 0,
+  "title_id": "harren1",
+  "title": "Roose Bolton Strikes a Deal",
+  "upper_id": "harren2",
+  "upper": "Lord Roose Bolton makes a deal with Vargo Hoat, leaving Harrenhal ripe for the taking.",
+  "lower_id": "harren3",
+  "lower": "He takes his army south, just as Lord Tywin leaves Harrenhal to meet Robb Stark's forces."
+ },
+ {
+  "cls": "JonEvent",
+  "n": 0,
+  "title_id": "jonevent1",
+  "title": "King in the North",
+  "upper_id": "jonevent2",
+  "upper": "Jon Snow is murdered by his fellow men of the Night's Watch. Melisandre brings Jon's fire back from the unknown and he awakes!",
+  "lower_id": "jonevent3",
+  "lower": "Jon Snow departs the Night's Watch, his oath fulfilled. In a meeting with the northern lords still loyal to house Stark, Jon Snow is proclaimed King in the North!"
+ },
+ {
+  "cls": "RamsayEvent",
+  "n": 0,
+  "title_id": "ramsayevent1",
+  "title": "A Bastard to Lord",
+  "upper_id": "ramsay2",
+  "upper": "Roose Bolton is dead and Ramsay Bolton is the lord of the Dreadfort.",
+  "lower_id": "ramsay3",
+  "lower": "It's reported he was poisoned by his enemies."
+ },
+ {
+  "cls": "WallEvent",
+  "n": 0,
+  "title_id": "wall333",
+  "title": "Wildlings Routed",
+  "upper_id": "wall334",
+  "upper": "Mance Rayder has been defeated!",
+  "lower_id": "wall335",
+  "lower": "The Men of the Night's Watch valiantly defend the Seven Kingdoms and defeat repel the attack of the Freefolk!"
+ },
+ {
+  "cls": "WallEvent",
+  "n": 1,
+  "title_id": "wall338",
+  "title": "Freefolk Overwhelm",
+  "upper_id": "wall336",
+  "upper": "Mance Rayder and the Freefolk take Castle Black and the Wall!",
+  "lower_id": "wall337",
+  "lower": "The remaining forces of Night's watch retreat to the Shadow Tower."
+ },
+ {
+  "cls": "WallSiegeEvent",
+  "n": 0,
+  "title_id": "wall222",
+  "title": "Freefolk Attack The Wall",
+  "upper_id": "wall223",
+  "upper": "Mance Rayder arrives at the wall and light the largest fire the north has ever seen!",
+  "lower_id": "wall224",
+  "lower": "The battle to protect the seven kindoms from savages, or the battle for the future of the freefolk begins! You decide your own perspective of the situation."
+ },
+ {
+  "cls": "WallSiegeNotificationEvent",
+  "n": 0,
+  "title_id": "wall111",
+  "title": "Freefolk March South",
+  "upper_id": "wall112",
+  "upper": "An unprecedented unification of the tribes north of the wall marches south through the haunted forest.",
+  "lower_id": "wall113",
+  "lower": "If you want to help the Night's Watch defend the civilized world, or even come to the aid wildlings, you must head north now."
+ },
+ {
+  "cls": "KingsLandingEvent",
+  "n": 0,
+  "title_id": "ROTkuFgsFRE",
+  "title": "The Iron Throne is Yours",
+  "upper_id": "ROTZVDFcxua",
+  "upper": "Whether by brute force, politics or just treachery, you are now the lord of King's Landing.",
+  "lower_id": "ROTMbmAljNf",
+  "lower": "You've been bestowed the power to send any lord to the Wall, Kingsguard are now at your beck and call and the armor of one of history's great Targaryen heroes is yours for the taking."
+ },
+ {
+  "cls": "FistEvent",
+  "n": 0,
+  "title_id": "ROTRcQV5TQA",
+  "title": "The Undead Swarm the Fist of the First Men",
+  "upper_id": "ROTTOQI5z8g",
+  "upper": "The Night's Watch mount an honorable defense at the Fist.",
+  "lower_id": "ROTCy0tyZ7c",
+  "lower": "But the undead hordes overtake them."
+ },
+ {
+  "cls": "NightKingDeathEvent",
+  "n": 0,
+  "title_id": "ROTq9VmC243",
+  "title": "The Army Of The Dead Is No More",
+  "upper_id": "ROT2TX8j6fk",
+  "upper": "The Night King has been dispatched. The curse of undeath leaves the bodies of the reanimated as their bodies fall like sacks of bones that they are.",
+  "lower_id": "ROTDH7x1wSt",
+  "lower": "All fates lie in the choices of the living now. What path will you take?"
+ },
+ {
+  "cls": "JeorMutinyEvent",
+  "n": 0,
+  "title_id": "ROTnSOdZKwe",
+  "title": "Mutiny at the Crasters Keep",
+  "upper_id": "ROTaYw2Lo0u",
+  "upper": "Lord Commander of the Night's Watch, Jeor Mormont was killed by his own men at Craster's Keep.",
+  "lower_id": "ROT7EnzuABD",
+  "lower": "Alliser Thorne assumes the role of acting lord commander, until a leader is decided."
+ },
+ {
+  "cls": "RiverlandsDeclareWarEvent",
+  "n": 0,
+  "title_id": "ROTRhKTB9hN",
+  "title": "Riverlands Join the Fight",
+  "upper_id": "ROTKXX4JKWX",
+  "upper": "The Riverlands declare war against the crown.",
+  "lower_id": "ROTXwPmtRmP",
+  "lower": "House Tully pledges fealty to the King in the North."
+ },
+ {
+  "cls": "DanyInvasionEvent",
+  "n": 0,
+  "title_id": "ROTOJFCuxVf",
+  "title": "Danaerys Targaryen Invades",
+  "upper_id": "ROTWvrY36jQ",
+  "upper": "The Mother of Dragons and her fleet of Unsullied and Dothraki sail for Dragonstone, her ancestral home.",
+  "lower_id": "ROTdN0eURAO",
+  "lower": "Once she arrived and her power was observed by the lords of Blackwater Bay. Many Houses pay homage and swear fealty to the rightful heir to the Iron Throne."
+ },
+ {
+  "cls": "JoffreyEvent",
+  "n": 0,
+  "title_id": "ROTHe3TFq5U",
+  "title": "The Purple Wedding",
+  "upper_id": "ROTyordaNAJ",
+  "upper": "King Joffrey Baratheon was murdered in horrific fashion by a poison called 'the strangler' at his wedding feast.",
+  "lower_id": "ROTAsEr22J2",
+  "lower": "Many say that the imp is to blame, his very uncle, Tyrion Lannister, who was imprisoned, but managed to escape and flee the realm."
+ },
+ {
+  "cls": "EastwatchEvent",
+  "n": 0,
+  "title_id": "ROTVFZM1Yqz",
+  "title": "Stannis to Eastwatch",
+  "upper_id": "ROTDZGEN7X2",
+  "upper": "Stannis Baratheon agrees to leave Dragonstone and sails for Eastwatch by the Sea to aid the Night's Watch after receiving a raven from Maester Aemon pleading for help.",
+  "lower_id": "ROTHjeczBrk",
+  "lower": "Melisandre burns a prisoner at the stake for R'hllor's blessing on their voyage."
+ },
+ {
+  "cls": "NedEvent",
+  "n": 0,
+  "title_id": "ROT3I4POW6w",
+  "title": "Execution of Ned Stark",
+  "upper_id": "ROTop0O9Ise",
+  "upper": "Ned Stark has just been executed for treason. The lion and the wolf are at each other's throats. Stannis and Renly Baratheon are calling their banners to claim what they think is rightfully theirs. The War of the Five Kings has begun.",
+  "lower_id": "ROTKcevrxNg",
+  "lower": "You have been thrust into this grim world of deceit and treachery. Amidst all the turmoil, lies many opportunities to make a name for yourself. What path will you choose? Just remember, if you play the Game of Thrones, you win or you die."
+ },
+ {
+  "cls": "RickardKarstarkExecutionEvent",
+  "n": 0,
+  "title_id": "ROTRk8CXPzh",
+  "title": "Rickard Karstark Execution",
+  "upper_id": "ROTc8xTaFcJ",
+  "upper": "Lord Rickard Karstark is executed by King Robb Stark for exacting his revenge on some young Lannister prisoners for the death of his two sons by Jaime Lannister.",
+  "lower_id": "ROTqQ2PTcKy",
+  "lower": "House Karstark's troops march back home to Karhold and proclaim for King Stannis Baratheon."
+ },
+ {
+  "cls": "RooseDeathEvent",
+  "n": 0,
+  "title_id": "ROTevKPxRyQ",
+  "title": "The Demise of Roose Bolton.",
+  "upper_id": "ROTGloU9lai",
+  "upper": "A weary messenger arrives at your camp, bearing news of recent events. 'My lord,' he begins, 'as you may know, Roose Bolton has met an untimely end, and a most heinous plot was uncovered of the treachery of House Bolton as well as House Frey. They quickly change allegiance to the Westerlands and are now counted as enemies of House Stark and Tully.'",
+  "lower_id": "ROT4f9vs6LD",
+  "lower": "Robb Stark takes one on the chin and looses some bannermen and a bridge, but the war rages on. Will you use this conflict to climb the ladder or wait for the dust to settle?"
+ },
+ {
+  "cls": "RedWeddingEvent",
+  "n": 0,
+  "title_id": "ROTtVlfw5co",
+  "title": "A Joyous Occasion",
+  "upper_id": "ROTGV2SK7sm",
+  "upper": "You hear a passing merchant shout 'Clear the road! Coming through! We have precious cargo in route for The Twins. Haven't you heard? Riverlords' houses unite and I heard the Young Wolf himself will be attending. So out my way, we only have a fortnight.'",
+  "lower_id": "ROTK3QBlC0i",
+  "lower": "When you hear the news, hairs stand up on the back of your neck. You know something is awry. What could you possibly do anyway. If only you cut the head off the right snake and thwart the plan. Or are you just delusional for thinking all this?"
+ },
+ {
+  "cls": "RedWeddingEvent",
+  "n": 1,
+  "title_id": "redwedding1",
+  "title": "The Red Wedding",
+  "upper_id": "redwedding2",
+  "upper": "A messenger approaches your party, his face pale and voice trembling. 'My lord, I bear despicable tidings,' he stammers. 'Robb Stark, the King in the North, has been murdered. The Freys and Boltons conspired with the backing of Tywin, and murdered him in cold blood, as a welcomed guest. Instantly, the North and Riverlands are meer shadows of what they were, and the Westerlands are stronger than ever.'",
+  "lower_id": "redwedding3",
+  "lower": "Do you aid what's left of the North to avenge this treachery? Do you stand with House Tully at Riverrun and fight off enemies from all angles? Do you just be opportunistic and capitalize from the chaos any way you can? What will you choose?"
+ },
+ {
+  "cls": "RenlyDeathEvent",
+  "n": 0,
+  "title_id": "ROTgnVsyL6t",
+  "title": "Influence of Melisandre",
+  "upper_id": "ROT8Nn1nRpF",
+  "upper": "A messenger approaches your party with a look of concern on his face. 'My lord,' he says, 'I have news of great import. It is said that Stannis Baratheon has turned to a Red Priestess of R'hllor for aid in his bid for the Iron Throne.The rumors say that she wields great power and has convinced Stannis to resort to dark magic to defeat his own brother, Renly Baratheon.'",
+  "lower_id": "ROTbGGUyME6",
+  "lower": "The messenger's words leave you with a sense of unease. You have to make a choice: will you attempt to intervene and put a stop to Stannis' actions, or will you sit back and let the events unfold? The outcome of this conflict may have far-reaching consequences for the Realm."
+ },
+ {
+  "cls": "RenlyDeathEvent",
+  "n": 1,
+  "title_id": "renlydeath1",
+  "title": "A Shadow's Deed",
+  "upper_id": "renlydeath2",
+  "upper": "A messenger approaches your party, his face pale and voice trembling. 'My lord, I bear dark tidings,' he stammers. 'Renly Baratheon has been slain in his camp by a shadowy wraith. The whispers claim that the wraith bore the visage of Stannis himself. In the wake of this tragedy, Renly's bannermen have pledged their fealty to Stannis, who now controls Storm's End.",
+  "lower_id": "renlydeath3",
+  "lower": "The turn of events leaves you pondering your next move. Stannis' newfound power could make him a valuable ally, or it could be used against you should his ambitions go unchecked. Will you hold Stannis accountable for his actions, or join forces with him to seize the opportunities this new alliance may offer?"
+ },
+ {
+  "cls": "StannisDeathEvent",
+  "n": 0,
+  "title_id": "ROToLSmMbN3",
+  "title": "The End of King Stannis Baratheon.",
+  "upper_id": "ROTuuEyt9db",
+  "upper": "A weary messenger arrives at your camp, bearing news of recent events. 'My lord,' he begins, 'as you may know, Stannis Baratheon has perished. His bannermen now face a critical decision: to whom will they pledge their loyalty? Many eyes are turning toward Renly Baratheon, who stands poised to unite the Stormlands under his rule.'",
+  "lower_id": "ROTxJdNHxSU",
+  "lower": "The messenger's words serve as a reminder that in the game of thrones, fortunes can change in the blink of an eye. Stannis' death has created a power vacuum, and only time will tell how it will be filled. For now, you must remain vigilant, adapting to the ever-shifting landscape of Westeros, as alliances form and crumble around you."
+ }
+]
