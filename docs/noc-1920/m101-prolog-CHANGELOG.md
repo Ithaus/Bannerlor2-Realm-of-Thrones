@@ -32,7 +32,8 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 - **Odczyty CampaignStartTime gry** (TaleWorlds.CampaignSystem): `Campaign.DailyTick` (tydzien co 7 dni od startu), `Campaign.CreateCampaignEvents` (faza
   ticku dobowego), `MapTimeTracker` nowej gry, `SaveHandler` (DayLong w opisie zapisu), `FoodConsumptionBehavior` (pierwsza doba), `KingdomDecisionProposalBehavior`
   (5 dni bez decyzji). Wszystkie chca startu KALENDARZA - zostaja na modelu. Przesuniecie o pelne 188 dni nie zmienia fazy ticku dobowego.
-- **Odczyty ROT** (ROT.dll, lista pytania-tmp/rot-grep-start.txt): 38 miejsc w 28 typach - wydarzenia (`CampaignStartTime + Days(N)`), `ROTStorylineWar.Enforced`
+- **Odczyty ROT** (ROT.dll; recenzja 21.10 - licznik IL: 35 wywolan `CampaignTimeModel.get_CampaignStartTime` w 31 metodach; 38 "miejsc" z
+  rozpoznania (pytania-tmp/rot-grep-start.txt) to linie dectool grep razem z definicjami `ROTCampaignData.CampaignStartTime` i `ROTCampaignTimeModel.CampaignStartTime`) - wydarzenia (`CampaignStartTime + Days(N)`), `ROTStorylineWar.Enforced`
   (StartDay/EndDay), `ROTStorylineWars.EnforceWars` (nic przed doba 1), `ROTOthersCampaignBehavior` (Inni 300/400/500 dni, rytm co 4 dni), `ROTEnlistmentBehavior`,
   `AIThinkPatch` (Nocna Straz po 1.5 roku). Wszystkie to os OPOWIESCI.
 - **Inne mody**: BK (`BKInterestGroupsModel` lata radykalow od startu, `BKClanBehavior` 30 dni) - wiek kampanii (kalendarz, bez zmian); ROTBattleAtmosphere
@@ -87,7 +88,7 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - `CrashScribe/src/StoryClock.cs` (nowy): start opowiesci odbiciem (`StoryStartTime` czynnego modelu; brak - `CampaignStartTime`). `Fabula.DayNow` i `NightKingCall.Day`
   licza od niego (bramki Fabuli i kalendarz Innych w prologu ujemne = zamkniete; os x4.33 bez zmian - dni prologu to zwykle dni gry, os liczy od startu opowiesci).
 - Log: `Prolog (m101): latki opowiesci ROT (nowa kampania|wczytany zapis): wpiete N/M metod (miejsc odczytu X, podmienionych Y, rytm na kalendarzu R, wiek kampanii
-  (zaciag) bez latki A) | ROTBattleAtmosphere: wpiete 1/1 metod (...) w Z ms.` (oczekiwane: X = 37, Y = 36, R = 1, A = 1); w linii startu sesji:
+  (zaciag) bez latki A) | ROTBattleAtmosphere: wpiete 1/1 metod (...) w Z ms.` (oczekiwane dla ROT 8.1.8: N/M = 30/30, X = 34, Y = 33, R = 1, A = 1 - razem z zaciagiem 35 wywolan w 31 metodach); w linii startu sesji:
   `start kalendarza Year 298, Day 177 | start opowiesci Year 299, Day 1 (dzien prologu D) | latki opowiesci ROT: ...`.
 
 ### E1b - pokoj krola i pakty z krolestwem Roberta (ZROBIONE)
@@ -145,8 +146,8 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   idzie ta sama droga co przycisk "New Campaign" (GameStateManager.CleanAndPushState). Inna droga do nowej gry niz MBGameManager.StartNewGame (np. mod z wlasnym
   menedzerem gry) = brak okna i klasyczny start (bezpieczny kierunek).
 - Regresja klasycznego startu: w E0 jedyna zmiana w kampanii to nowe zachowanie z pustym kluczem zapisu i linia logu.
-- E1a: oczekiwane 38 miejsc z rozpoznania (28 typow), z tego 1 (ROTEnlistmentBehavior - "You must wait at least 5 days before enlisting") to wiek kampanii i
-  zostaje BEZ latki (inaczej w prologu gracz nie moglby sie zaciagnac) - linia logu: "wiek kampanii (zaciag) bez latki 1"; mniej = ktores miejsce ROT liczy od kalendarza
+- E1a: oczekiwane 35 wywolan gettera w 31 metodach (licznik IL na ROT.dll 8.1.8; 38 z rozpoznania liczylo tez linie definicji), z tego 1 (ROTEnlistmentBehavior - "You must wait at least 5 days before enlisting") to wiek kampanii i
+  zostaje BEZ latki (inaczej w prologu gracz nie moglby sie zaciagnac) - linia logu: "wiek kampanii (zaciag) bez latki 1"; linia: miejsc odczytu 34 w 30 metodach (1 rytm); mniej = ktores miejsce ROT liczy od kalendarza
   (wydarzenie albo wojna ruszy za wczesnie). Metoda ROT wklejona przez JIT w wolajacego przed latka nie zobaczy podmiany - latka wchodzi przed pierwszym tickiem
   kampanii (ROT czyta start w tickach), a czytelnicy to duze metody i wywolania wirtualne/delegaty. ROTBattleAtmosphere `LoreGates.CampaignDay` (atmosfera bitew wedlug
   dnia) - ta sama latka (inaczej bramki atmosfery bylyby przesuniete o 188 dni na cala kampanie). AIInfluence (zaciemniony) - od kalendarza.
@@ -163,6 +164,14 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   zostaje w lochu i zyje (do decyzji: wtedy wlasna egzekucja w dniu ~9 opowiesci).
 - E1a regresja klasycznego startu: model czasu zwraca te sama wartosc co dotad (StoryStartTime = stary getter), latka ROT nie wpina sie; StoryClock w CrashScribe
   zwraca StoryStartTime = CampaignStartTime co do tika.
+
+## Poprawki po recenzji (21.10)
+
+Recenzja pelna HEAD 8e09b71e: nic krytycznego, 1 wazne, 4 drobne. Kazde sprawdzone w kodzie i dekompilacji, prawdziwe poprawione (build Armoury 0, commit po kazdej).
+
+| Nr | Waga | Co | Sprawdzenie | Stan |
+|---|---|---|---|---|
+| R1 | wazne | PR-2 wymagal miejsc + zaciag >= 38, a w ROT.dll jest 35 | PRAWDA: wlasny licznik IL (cel wywolania = `TaleWorlds...CampaignTimeModel`): 35 wywolan w 31 metodach (30 z latka: 34 miejsca, w tym 1 rytm `% 4f`; 1 zaciag). 38 z rozpoznania to linie dectool grep z definicjami | POPRAWIONE: PR-2 `N = M >= 30`, `miejsca + zaciag >= 35`; CHANGELOG (Odczyty ROT, log E1a, Ryzyko E1a, Test krok 4) - oczekiwane 30/30, 34, 33, 1, 1; komentarz w Prologue.Story.cs |
 
 ## Status
 
@@ -184,7 +193,7 @@ Klasyczny start (regresja):
 
 Prolog:
 4. "Prologue 298" -> data na pasku "Year 298, Day 177"; w Armoury.log: `wybor ... PROLOG 298 (okno wyboru)`, `nowa kampania z PROLOGIEM 298`,
-   `latki opowiesci ROT (nowa kampania): wpiete N/N metod (miejsc odczytu 37, ... wiek kampanii (zaciag) bez latki 1)`, `latki prologu (nowa kampania): ... TAK`,
+   `latki opowiesci ROT (nowa kampania): wpiete 30/30 metod (miejsc odczytu 34, podmienionych 33, rytm na kalendarzu 1, wiek kampanii (zaciag) bez latki 1)`, `latki prologu (nowa kampania): ... TAK`,
    `Robert i Ned (XML ozywionych 2/2 ...): ... TAK | ... TAK`, `swiat rozstawiony | pakty: sojusze 3/3 ..., pakty o nieagresji 6/6 ...`.
 5. Encyklopedia: Robert Baratheon zyje, wladca krolestwa korony, glowa rodu "Baratheon, Robert", zona Cersei; Eddard Stark zyje, wladca Polnocy, zona Catelyn;
    Joffrey i Robb w rodach. Krolestwo korony: sojusze z Polnoca, Krainami Burzy i Dorzeczem; pakty o nieagresji (ekran Diplomacy) z Dolina, Smocza Skala, Reach,

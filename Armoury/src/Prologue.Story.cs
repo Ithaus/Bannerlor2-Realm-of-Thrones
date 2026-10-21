@@ -11,7 +11,7 @@ namespace Armoury
     /// <summary>
     /// m101-prolog E1a - START OPOWIESCI dla ROT. W kampanii z prologiem model czasu (LongYearTimeModel.CampaignStartTime) podaje start KALENDARZA (ROT 299 minus 188 dni),
     /// a cala os ROT ma liczyc od startu OPOWIESCI (data ROT 299, jak w klasycznym starcie). JEDNA latka: transpiler na kazdej metodzie ROT.dll, ktora czyta
-    /// CampaignTimeModel.CampaignStartTime (rozpoznanie: 38 miejsc w 28 typach - wydarzenia ROT.Events.*, wojny fabularne ROTStorylineWar/ROTStorylineWars, Inni
+    /// CampaignTimeModel.CampaignStartTime (licznik IL, ROT 8.1.8: 35 wywolan w 31 metodach - wydarzenia ROT.Events.*, wojny fabularne ROTStorylineWar/ROTStorylineWars, Inni
     /// ROTOthersCampaignBehavior, zaciag ROTEnlistmentBehavior, AIThinkPatch). Kazde "callvirt CampaignTimeModel::get_CampaignStartTime" zamieniamy na
     /// "call Prologue.StoryStartOf(CampaignTimeModel)" - ten sam stos (model -> CampaignTime), etykiety i bloki bez zmian. StoryStartOf zwraca StoryStartTime
     /// modelu Armoury (start opowiesci); dla innego modelu - CampaignStartTime jak dotad. W klasycznej kampanii oba sa rowne co do tika.

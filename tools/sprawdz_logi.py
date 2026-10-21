@@ -1018,7 +1018,7 @@ Uzycie (Python 3, tylko odczyt):
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
 --grupa m101prolog : (21.10, w-toku/m101-prolog; Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
                     python -I tools/sprawdz_logi.py --grupa m101prolog <Armoury-*.log> [--crashscribe <session-*.log>]. PR-0 linie startu, PR-1 ERROR i potkniecia 0,
-                    PR-2 latka startu opowiesci N/N (>= 27 metod, miejsca + zaciag >= 38) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
+                    PR-2 latka startu opowiesci N/N (ROT 8.1.8: >= 30 metod, miejsca + zaciag >= 35) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
                     wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 + 6/6, PR-7 koniec prologu (Robert martwy, Joffrey krolem, Ned jencem), PR-8 NedEvent (Ned
                     martwy, Robb wladca Polnocy). Log bez prologu: INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
@@ -37443,7 +37443,7 @@ M101_CS_START = re.compile(r"FABULA: wydarzenie (\S+) WYSTARTOWALO \(dzien (-?\d
 
 def m101prolog_main(logp, csp=None):
     """m101prolog (21.10, w-toku/m101-prolog; Jeff 21.10 "Robimy wczesniejszy start", "Ok wersje lekka robimy", pakty i sojusze z krolestwem Roberta na czas
-    prologu): PR-0 linie startu (latki menu, wybor, start sesji), PR-1 ERROR Prologue i potkniecia 0, PR-2 latki opowiesci ROT N/N (M >= 28 metod, >= 38 miejsc)
+    prologu): PR-0 linie startu (latki menu, wybor, start sesji), PR-1 ERROR Prologue i potkniecia 0, PR-2 latki opowiesci ROT N/N (M >= 30 metod, miejsca + zaciag >= 35)
     i reszta latek TAK, PR-3 Robert i Ned ozywieni 2/2, PR-4 w prologu zadne wydarzenie ROT nie ruszylo (Armoury: 'wydarzenia ROT ruszone 0'; z --crashscribe:
     zadne 'FABULA: wydarzenie ... WYSTARTOWALO' z dniem < 0), PR-5 w prologu zadna wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 i 6/6 do konca
     prologu, PR-7 koniec prologu: Robert martwy, Joffrey krolem, Ned jencem w town_EW4, PR-8 egzekucja Neda: Ned martwy, Robb wladca Polnocy.
@@ -37534,8 +37534,8 @@ def m101prolog_main(logp, csp=None):
     if story:
         st = story[-1]
         rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} (podmienionych {st[4]}, rytm na kalendarzu {st[7]}), wiek kampanii bez latki {st[5]} ({st[0]})",
-                "N = M >= 27, podmienionych + rytm >= miejsc, rytm <= 1 (Inni % 4), miejsca + wiek kampanii >= 38 (rozpoznanie: 38 odczytow, 1 to zaciag)",
-                st[1] == st[2] and st[2] >= 27 and st[4] + st[7] >= st[3] and st[7] <= 1 and st[3] + st[5] >= 38)
+                "N = M >= 30, podmienionych + rytm >= miejsc, rytm <= 1 (Inni % 4), miejsca + wiek kampanii >= 35 (ROT 8.1.8, licznik IL: 35 wywolan gettera w 31 metodach - 30 z latka: 34 miejsca, w tym 1 rytm; 1 zaciag; 38 z rozpoznania liczylo tez linie definicji)",
+                st[1] == st[2] and st[2] >= 30 and st[4] + st[7] >= st[3] and st[7] <= 1 and st[3] + st[5] >= 35)
         rep.add("PR-2c: latka startu opowiesci w ROTBattleAtmosphere (LoreGates.CampaignDay)", f"wpiete {st[6][0]}/{st[6][1]}" if st[6] else "brak (mod nieobecny albo stara linia)",
                 "N = M >= 1", (st[6][0] == st[6][1] and st[6][1] >= 1) if st[6] else None)
     else:
