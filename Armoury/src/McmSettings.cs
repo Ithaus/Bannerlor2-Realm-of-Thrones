@@ -412,6 +412,10 @@ namespace Armoury
         [SettingPropertyGroup("Learning patterns")]
         public bool PatternDrawBySkill { get; set; } = true;
 
+        [SettingPropertyBool("Pattern Draw One Tier Up", HintText = "a new pattern found at the bench is at most one tier above the best pattern you already know in that craft: knowing only tier 1 bows, the next bow pattern is tier 2, then tier 3, and so on, never a tier 4 or 5 out of nowhere (Pattern Draw By Skill still caps it by your smith's hand). A saved game is mended once: bow, arrow, crossbow and bolt patterns found before by such a leap are struck out and 3 study points per pattern go back to the book. Off: any tier up to what your smith's hand allows", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool PatternDrawOneTierUp { get; set; } = true;
+
         [SettingPropertyBool("Shield Craft Skill Gate", HintText = "shields in the CRAFT tab ask the same Smithing as at your own forge (Smithing Skill Per Tier) - below it the anvil refuses and nothing is spent. Off: any known shield could be tried at any skill, only Banner Kings' botching chance stood in the way", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool ShieldCraftSkillGate { get; set; } = true;
@@ -8782,6 +8786,7 @@ namespace Armoury
             s.SmeltingSkillBonus = SmeltingSkillBonus;
             s.LoreSeedAfterFinalStats = LoreSeedAfterFinalStats;
             s.PatternDrawBySkill = PatternDrawBySkill;
+            s.PatternDrawOneTierUp = PatternDrawOneTierUp;
             s.ShieldCraftSkillGate = ShieldCraftSkillGate;
             s.ForgeUniquesByStudy = ForgeUniquesByStudy;
             s.PatternTileShowsSkill = PatternTileShowsSkill;

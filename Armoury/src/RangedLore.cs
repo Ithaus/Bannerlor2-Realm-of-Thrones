@@ -392,7 +392,7 @@ namespace Armoury
                 if (sc == SchoolNone) return;
                 Research[sc] += pts;
                 int tThis = Math.Max(1, TierOf(item));
-                TryUnlockRandom(sc, tThis, PatternGate.DrawCap(tThis, smith), tThis, smith);
+                TryUnlockRandom(sc, tThis, PatternGate.DrawCap(tThis, smith, sc), tThis, smith);   // m96-wzory2: reka + drabina tierow szkoly
                 // po kazdej robocie mowimy, ile jeszcze do nastepnego wzoru
                 if (sc != SchoolNone)
                 {

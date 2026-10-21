@@ -1006,8 +1006,9 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
-                    zapisu (INFO), W96-5 odkrycia w zakresie wedlug reki, W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia i ERROR 0, W96-8 blizniacze
-                    czesci legend ukryte (> 0 przy kluczu). Log bez paczki: INFO, bez wyjatku.
+                    zapisu (INFO), W96-5 odkrycia w zakresie wedlug reki (i drabiny tierow - m96-wzory2), W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia i ERROR 0, W96-8 blizniacze
+                    czesci legend ukryte (> 0 przy kluczu), W96-9 naprawa zapisu 2 (m96-wzory2: luki i kusze ponad zakres reki zdjete, ksiega po naprawie
+                    bez znanych tierow ponad zakres). Log bez paczki: INFO, bez wyjatku.
 --grupa p6szubienice : (20.10, p6-szubienice R3-07a - POMYSLY-35 pkt 17, Jeff 20.10 "pozostale tak"; Armoury/src/Gallows.cs, GallowsView.cs; klucz MapGallows)
                     python -I tools/sprawdz_logi.py --grupa p6szubienice <Armoury-*.log> (strumieniowo). Progi SZB-x (SZ-x to grupa szturm). SZB-0 linia startu
                     (klucz, plik drog, rozstaje traktu >= 100), SZB-1 linie doby rozpoznane, SZB-2 rozbite bandy daja szubienice (postawione + odnowione > 0 przy
@@ -36870,6 +36871,11 @@ M96WZORY_REMOVED = re.compile(r"naprawa zapisu: zdjete (\d+) \[([^\]]*)\]")
 M96WZORY_XREM = re.compile(r"kusze wedlug sily: zdjete (\d+) \[([^\]]*)\]")
 M96WZORY_ADDED = re.compile(r"dopisane tieru 1 (\d+)")
 M96WZORY_TWIN_N = re.compile(r"ukryte w projektowaniu broni (\d+) \(domyslnie otwartych (\d+)\)")
+# m96-wzory2: linia naprawy zapisu 2 (LoreSeedFix.RepairReach) - zakres reki, zdjete, punkty, ksiega lukow i kusz po naprawie
+M96WZORY_REACH2 = M96WZORY_HEAD + "naprawa zapisu 2"
+# m96-wzory2 po recenzji: drabina tierow w linii zakresu (PatternGate.DrawCap) - "reka do tN|NIE, drabina tierow SZKOLA najwyzszy znany tT -> do tL"
+M96WZORY_STEP = re.compile(r"drabina tierow (?P<sc>[A-Z ]+) najwyzszy znany t(?P<top>\d) -> do t(?P<lad>\d)")
+M96WZORY_R2 = re.compile(r"-> zakres tierow 1-(?P<cap>\d).*\| zdjete (?P<n>\d+) \[(?P<ids>[^\]]*)\].*\| punkty zwrocone \[(?P<pts>[^\]]*)\].*\| ksiega po naprawie: (?P<book>.*)$")
 
 
 def m96wzory_main(logp):
@@ -36878,7 +36884,7 @@ def m96wzory_main(logp):
     kusze wedlug sily w ksiedze, luki z rzadkiego materialu bez kucia, blizniacze czesci legend ukryte.
     W96-0 linia startu sesji, W96-1 linia ROT-RBM przed linia m96 (ta sama sesja), W96-2 rozdanie tieru 1 nie przed ROT-RBM (w oknie sesji: rozdanie, potem ROT = NIE;
     bez RBM linii ROT nie ma - nic do porownania), W96-3 ksiega lukow i kusz po rozdaniu/naprawie bez znanych t2+ z rozdania (BOWS t6 0, CROSSBOWS t1 k/k == znane),
-    W96-4 naprawa zapisu (INFO: zapis Jeffa - zdjete 4 + kusze 6), W96-5 odkrycia w zakresie wedlug reki, W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia
+    W96-4 naprawa zapisu (INFO: zapis Jeffa - zdjete 4 + kusze 6), W96-5 odkrycia w zakresie wedlug reki (i drabiny tierow - m96-wzory2), W96-6 tarcze i kliki bez nauki (INFO), W96-7 potkniecia
     i ERROR paczki 0, W96-8 blizniacze czesci legend (ukryte > 0, gdy klucz TAK). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -36888,6 +36894,7 @@ def m96wzory_main(logp):
     sess = []          # sesje: linia m96, czy ROT przed, czy rozdanie przed ROT, pierwsze linie BOWS/CROSSBOWS po
     cur_rot = cur_seed = cur_seed_then_rot = False
     draws, reach, shields, clicks, n_err, twins = [], [], 0, 0, 0, []
+    reach2 = []        # m96-wzory2: linie naprawy zapisu 2
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -36919,13 +36926,19 @@ def m96wzory_main(logp):
             elif s.startswith(M96WZORY_HEAD + "losowanie wedlug reki"):
                 mm = M96WZORY_REACH.search(s)
                 if mm:
-                    reach.append(mm.groupdict())
+                    r = mm.groupdict()
+                    r["hand_off"] = "| reka NIE" in s   # m96-wzory2: sama drabina - zakres nie wedlug reki
+                    ms = M96WZORY_STEP.search(s)
+                    r["lad"] = ms.group("lad") if ms else None
+                    reach.append(r)
             elif s.startswith("Wiedza: odkryto losowo "):
                 mm = M96WZORY_DRAW.match(s)
                 if mm:
                     draws.append(mm.groupdict())
             elif s.startswith(M96WZORY_TWIN):
                 twins.append(s)
+            elif s.startswith(M96WZORY_REACH2):
+                reach2.append(s)
             elif s.startswith("ERROR in LoreSeedFix") or s.startswith("ERROR in PatternGate") or s.startswith("ERROR in LegendTwins"):
                 n_err += 1
     print(f"plik: {logp} | sesji z linia m96 {len(sess)}, odkryc losowych {len(draws)}, linii zakresu {len(reach)}, odmow tarcz {shields}, klikow bez nauki {clicks}, "
@@ -36986,10 +36999,13 @@ def m96wzory_main(logp):
             "INFO (zapis Jeffa z 20.10: zdjete 4 - goldenheart_longbow, giant_bow, ravens_teeth_longbow, ravens_teeth_arrows; kusze zdjete 6 - crossbow_g/d/e/c/b/a; "
             "dopisane t1 0; drugie wczytanie: znaczniki)", None)
     over = [d for d in draws if int(d["t"]) > int(d["b"])]
-    wide = [r for r in reach if int(r["b"]) > max(int(r["a"]), min(6, int(r["sk"]) // max(1, int(r["per"])) + 2))]
+    wide = [r for r in reach if not r.get("hand_off") and int(r["b"]) > max(int(r["a"]), min(6, int(r["sk"]) // max(1, int(r["per"])) + 2))]
+    # m96-wzory2 po recenzji: drabina tierow - zakres nie wyzej niz kolejny niepusty tier nad najlepszym znanym wzorem szkoly (albo tier sztuki)
+    stepw = [r for r in reach if r.get("lad") and int(r["b"]) > max(int(r["a"]), int(r["lad"]))]
     rep.add("W96-5: odkrycia w zakresie wedlug reki", f"odkryc {len(draws)} (zakres do 6: {sum(1 for d in draws if d['b'] == '6')}), poza zakresem {len(over)}, "
-            f"zakres szerszy niz skill/prog+2 {len(wide)}" + (f"; np. {over[0]}" if over else ""),
-            "poza zakresem 0, zakres wedlug reki 0 odchylek", len(over) == 0 and len(wide) == 0)
+            f"zakres szerszy niz skill/prog+2 {len(wide)}, szerszy niz drabina tierow {len(stepw)} (linii z drabina {sum(1 for r in reach if r.get('lad'))})"
+            + (f"; np. {over[0]}" if over else ""),
+            "poza zakresem 0, zakres wedlug reki 0 odchylek, drabina 0 odchylek", len(over) == 0 and len(wide) == 0 and len(stepw) == 0)
     rep.add("W96-6: tarcze w CRAFT i kliki bez nauki", f"odmow tarcz (linie) {shields}, klikow Craft bez kucia (linie) {clicks}", "INFO", None)
     st = 0
     for x in sess:
@@ -37007,6 +37023,34 @@ def m96wzory_main(logp):
     rep.add("W96-8: blizniacze czesci legend", (f"linii {len(twins)}, ostatnia: {twins[-1][len(M96WZORY_TWIN):][:300]}" if twins else "brak linii"),
             "przy kluczu TAK ukryte > 0 w kazdej sesji (przeglad danych ROT: ok. 21, w tym valyrian_short_blade_duel i darksister_blade_duel)",
             None if not tw_on else (len(hid) == len(tw_on) and all(h[0] > 0 for h in hid)))
+    # W96-9 (m96-wzory2): naprawa zapisu 2 - w ksiedze lukow i kusz zaraz po naprawie nie ma znanych wzorow ponad zakres reki (wszystko sprzed m96 ponad zakres zdjete;
+    # po m96 nic nie jest jeszcze dopisane, bo naprawa biegnie w starcie sesji)
+    r2rows, r2bad = [], 0
+    for x in reach2:
+        mm = M96WZORY_R2.search(x)
+        if not mm:
+            r2rows.append("nierozpoznana: " + x[len(M96WZORY_HEAD):][:160])
+            r2bad += 1
+            continue
+        cap = int(mm.group("cap"))
+        above = sum(int(k) for t, k, tot in M96WZORY_TIER.findall(mm.group("book")) if int(t) > cap)
+        # m96-wzory2 po recenzji (drabina tierow TAK): w kazdej ksiedze po naprawie znane tiery bez dziury - po tierze z 0 znanych zaden wyzszy nie jest znany
+        skips = 0
+        if "drabina tierow TAK" in x:
+            for part in mm.group("book").split(" || "):
+                gap = False
+                for t, k, tot in M96WZORY_TIER.findall(part):
+                    if int(k) == 0:
+                        gap = True
+                    elif gap:
+                        skips += 1
+        if above or skips:
+            r2bad += 1
+        r2rows.append(f"zakres 1-{cap}, zdjete {mm.group('n')} [{mm.group('ids')[:160]}], punkty [{mm.group('pts')}], znanych ponad zakres po naprawie {above}, "
+                      f"tierow znanych ponad dziura (drabina) {skips}")
+    rep.add("W96-9: naprawa zapisu 2 (luki i kusze ponad zakres reki)", " || ".join(r2rows[-2:]) if r2rows else "brak linii (nowa kampania, zapis juz naprawiony albo naprawa czeka)",
+            "zapis Jeffa z 20.10 (Smithing 87, zakres 1-4): zdjete 1 [lowland_yew_bow t5 BOWS (reka, przeskok tieru)], punkty [BOWS +3]; po naprawie znanych "
+            "ponad zakres 0 i ponad dziura 0 (BOWS t5 0/7, t6 0/12)", None if not reach2 else r2bad == 0)
     rep.show()
     return 0
 
