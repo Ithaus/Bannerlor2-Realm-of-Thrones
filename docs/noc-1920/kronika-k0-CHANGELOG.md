@@ -2,7 +2,56 @@
 
 Baza: n32-calosc 77c17f3c (kandydat WGRANIA 102) + scalone kronika-dane (6441d096) + nagrania lektora (fcf2b976, 9e02b0f2).
 Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E, F, G); kontrakt danych: docs/KRONIKA-FORMAT.md (wygrywa przy sprzecznosci).
-Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 akcje swiata i obrazki, A4 lektor/progi/autotest.
+Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
+wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
+
+## 2026-10-21 - K0 krok A3: lektor okien Kroniki (klucz, zasada md5, .ogg) i obrazki z puli tematu
+
+**Problem:** okna Kroniki (A2) pokazywaly sie bez glosu (Lektor szukal nagran tylko po tytule i tylko w .wav - 293 nagrania kr_*.ogg z manifestem
+arm_lektor_kronika.tsv lezaly bez uzytku; warianty o tym samym tytule czytalyby zly tekst) i zawsze z pierwszym sprite'em tematu (Pictures.Pick = null).
+**Przyczyna:** nowa funkcja (plan P8, P9; E: Lektor.cs _byKey + .ogg, Chronicle.Pictures.cs).
+**Zmiana:**
+- `Lektor.cs`: indeks PO KLUCZU (_byKey) przed indeksem po tytule - klucz z kolumny 1 arm_lektor.tsv (58 WAV okien ROT i prologu: po tytule dalej jak dotad)
+  oraz z NOWEGO manifestu Lektor/EN/arm_lektor_kronika.tsv (klucz, tytul, plik, md5 tekstu, md5 pliku, paczka) - wiersze Kroniki tylko po kluczu. Klucz czytany
+  z okna opowiesci Armoury (typ Armoury.ArmStoryEvent po nazwie: Key, VoiceMd5); okna ROT bez zmian (tytul). ZASADA md5: nagranie Kroniki gra tylko przy md5 tekstu
+  z manifestu = VoiceMd5 okna; md5 nie-hex ("nieaktualne", 4 wiersze) = cisza z linia; okno Kroniki bez nagrania - cisza bez szukania po tytule.
+  Pliki .ogg obok .wav (CheckAudio): CheckOgg - "OggS" + pakiet identyfikacji Vorbis (czestotliwosc) + bloki zer na koncu i w srodku przy wczytaniu, md5 pliku
+  i dlugosc z granuli ostatniej strony przy odtworzeniu. Ta sama droga SoundEvent.CreateEventFromExternalFile("event:/Extra/voiceover") - w dekompilacji SandBox 1.4.8
+  EavesdroppingMissionLogic gra tak pliki StoryMode VoicedLines/*.ogg (pelna sciezka). Linie: start/latka "| nagran Kroniki N (ogg n; ok, ze starym tekstem s,
+  odrzucone r ...)" po czesci okien ROT (format "nagran okien N" bez zmian - LK-3); okno '... - start. Po kluczu kr_NNN_w (Kronika, md5 tekstu zgodny).';
+  cisza '(klucz kr_..) - tekst okna inny niz nagrany (md5 okna x, nagrania y), cisza.'; doba: ", po kluczu n, Kronika z innym tekstem n" na koncu czesci okien.
+  API: WindowsEnabled, KronikaText(), VoiceWhy(key, textMd5), CheckAudio/CheckOgg.
+- `Chronicle.Voice.cs` (nowy): tekst nagrania DOKLADNIE jak tools/lektor/nagraj_kronika.py (tytul/gora/dol bez {=...}, tytul.rstrip('.!?') + "." + 
+
+ + gora +
+  
+
+ + dol, "R'hllor" -> "the Red God"; '{' = zmienne = bez glosu), Md5, Why (zasada md5 przez Lektor.VoiceWhy), LineText (do linii okna).
+- `StoryWindow.cs`: Spec.VoiceMd5, ArmStoryEvent.VoiceMd5 (publiczny - lektor czyta odbiciem).
+- `Chronicle.Pictures.cs`: Pick - pula tematu (pliki Images/Kronika/kronika_<temat>_<n>, istniejace Images/Prolog/prolog_NN z kolumny prolog, sprite'y ROT bez
+  poza rotacja i bez nieznanych w SpriteData), indeks = FNV-1a id okna mod n, poprzedni obrazek sesji -> nastepny, plik przez StoryPictures.Acquire (zly plik -
+  nastepny element z powodem), temat z kolumna tylko (stannis_upadek = 081) poza swoim wydarzeniem - sprite zastepczy messenger-img, stannis-slain tylko w 081
+  (twardo). Fallback (DefaultSprite), StartText (pliki w pulach), DayText, Reset (ResetCampaign), Restore (okno nie otworzylo sie - pamiec obrazka wraca).
+- `Chronicle.cs`: bez ScanRecordings/_ogg (lektor z manifestu przez Voice); linia startu: "obrazki: plikow Kroniki ..., prolog_NN z tematow a/b" i "lektor: wierszy
+  lektor=1 z nagraniem a/b (bez nagrania, tekst inny, stary tekst, plik odrzucony, zmienne; klucze lektora okien TAK/NIE) | nagran Kroniki ..."; linia
+  "okno ... pokazane": "obrazek temat->nazwa (ROT|plik; pula n (...), indeks i -> nazwa)" i "lektor kr_NNN_w TAK | NIE (powod) | - (lektor=0)" (okno zapasu: NIE);
+  doba: "| obrazki w sesji: wybrane n (z pliku n, pliki odrzucone n)".
+**Ryzyko / co sprawdzic:**
+- K0c (autotest, nie robiony - zakaz gry): czy silnik gra .ogg 24 kHz mono z naszej sciezki (glosy gry: .ogg 48 kHz mono) - linie "okno ROT ... -> kr_NNN_w.ogg
+  (x s) - start." i "grane po 0,5 s: tak", koniec bez "ZA WCZESNIE"; "silnik nie przyjal" = 0. Jesli nie gra - nagraj_kronika.py moze dac .wav (manifest przyjmuje .wav).
+- Skrypt wgrania (repo glowne tools/autotest-2026-10-17/wgraj-v5.ps1) kopiuje z Lektor tylko *.wav i *.tsv - bez zmiany (osobny commit, plan E) nagrania .ogg nie
+  trafia do gry: linia startu lektora pokaze "nagran Kroniki 0 ... odrzucone 293: kr_001_1.ogg (brak pliku)", okna Kroniki beda bez glosu (bez bledu).
+- Wczytanie manifestu przy Install (menu glowne): 293 pliki x (naglowek 64 B + 2 bloki 4 KB) - jednorazowo; md5 pliku (ok. 300 KB) dopiero przy odtworzeniu.
+- 18 wierszy lektor=1 bez nagrania: 17 wersja=pelna (skrypt ich nie nagrywa) + 051.1a (brak w manifescie - nagrac). 4 "nieaktualne" (075.3, 079.1, 090.1, 090.1a).
+- Obrazki z plikow: poza gra Acquire zwraca null (brak SpriteData) - w grze wejda prolog_01..03 (tematy dwor, polnoc, essos ...). Kronika/kronika_* dzis brak.
+- Testy (scratchpad 7aee5f12/kr-a3): md5_test.py - prawdziwa funkcja windows() z nagraj_kronika.py: 289 md5 = manifest, 4 stare, 0 roznych; C# Chronicle.Voice.Md5
+  vs python dla wszystkich 294 wierszy skryptu: 294 zgodne, 0 roznych; harness (prawdziwy Armoury.dll poza gra) 44/44 OK - manifest 293/ogg 293/stare 4/odrzucone 0,
+  indeks okien ROT bez zmian (58), zasada md5 (zgodny / inny / nieaktualne / brak / prolog bez kontroli / zmienne), skladanie tekstu i R'hllor, CheckOgg (dobry, zera
+  na koncu/naglowku/srodku, WAV jako .ogg, uciety - md5, za krotki, brak), manifest negatywny (2 wczytane, 3 odrzucone, 4 zle linie, dubel, linia z zerami), pule
+  tematow, stannis_upadek tylko 081, sprite'y poza rotacja, staly skrot (FNV = python), bez powtorki z rzedu (346 okien; jedyna powtorka - pula 1 stannis_upadek),
+  Fallback; harness A1 42/42 (zrzut modelu identyczny), A2 35/35. Gra NIE uruchamiana.
+- Build Armoury 0 bledow, 7 ostrzezen (stare).
+**Status:** DO SPRAWDZENIA (krok A3 z 4; bez wgrania).
 
 ## 2026-10-21 - K0 krok A2: zachowanie, okna, wybory, zapis
 
