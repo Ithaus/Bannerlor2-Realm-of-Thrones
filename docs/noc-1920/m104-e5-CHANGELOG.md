@@ -11,7 +11,8 @@ Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej
 |---|---|---|
 | K1 | straz niewoli (pkt 3 i 4): CanonCompanions.HeldRow / Freeing, tabela #m01 classic + #p10 Riverrun, latki EndCaptivityAction.ApplyInternal i RansomOfferCampaignBehavior.DailyTickHero, klucze PrologueTyrionHeld / PrologueJaimeAtRiverrun + 5 kluczy scen | ZROBIONE (ff9d85e7, build 0, gen_mcm) |
 | K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (9e4b8151, build Armoury + GT 0) |
-| K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (build Armoury + GT 0) |
+| K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (b0ee6e05, build Armoury + GT 0) |
+| K4 | klany gorskie Doliny (pkt 5): od d118 do 4 band klanu hilltribesmen (Stone Crows, Burned Men, Milk Snakes, Black Ears) przy wsiach Gorskiego Traktu, ludzie z puli okregu (RaidDraw), uzupelnienie co 3 dni do d186, po prologu zwykle bandy | ZROBIONE (build 0) |
 
 ## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
 
@@ -103,3 +104,22 @@ z Zachodu (ok. 310 jedn.) i Loras z Highgarden (ok. 300) jada ok. 4-5 dob z nocl
 konca) - w oknie 125-127 to w porzadku. (4) Gracz w arenie w dniu 127 - niemozliwe w ticku doby (misja wstrzymuje kampanie).
 
 **Status.** DO SPRAWDZENIA (autotest: linia ROZSTRZYGNIETY w d123-127, uczestnicy kanonu w drabince).
+
+## K4 - klany gorskie Doliny (pkt 5)
+
+**Problem.** Projekt pkt 2, dzien 118: klany gorskie napadaja na Gorskim Trakcie. W swiecie ROT nie ma klanow gorskich Doliny jako band (Burned Men, Milk Snakes,
+Black Ears - brak; Stone Crows i Moon Brothers to pomniejsze frakcje, nie bandy - rozpoznanie e5:B).
+
+**Zmiana (Prologue.World.Clans.cs).** Od dnia 118 do 186: najwyzej 4 bandy klanu bandyckiego `hilltribesmen` (Hill Tribesmen, kultura i oddzialy ROT) z nazwami
+klanow z ksiazki (Party.SetCustomName: Stone Crows, Burned Men, Milk Snakes, Black Ears), dom bandy = wies na Gorskim Trakcie z najmniejsza liczba band sceny
+(Stoneyhead, Durlston, Shady Glen, Hollow's Creek, Monton - wsie Orlego Gniazda i Krwawej Bramy). Wzor FreeFolkRaids: `OutlawLaw.RaidDraw` z okregu wsi (pula wyrzutkow,
+potem domy wsi okregu - nikt z niczego), `BanditPartyComponent.CreateLooterParty` (AI band gry - patrol wokol domu, napady na podroznych), kiesa 0, `PeopleBook.Give`
+(pochodzenie FPoolBand), `PeopleLedger.FixCreatedMen`; nieudane utworzenie - `OutlawLaw.RaidUndraw` (ludzie wracaja do puli). W dniu 118 do 4 band, potem uzupelnienie
+po jednej co 3 dni. Bandy NIE sa zamrazane - to zwykle bandy (werbunek i jedzenie jak kazda banda). Po prologu (188) zostaja zwyklymi bandami (scena ich nie sledzi).
+Prawo wyrzutkow wylaczone - bez ludzi, bez band (linia). Linie: `klany gorskie: nowa banda '<nazwa>' (<id>, klan hilltribesmen) przy <wies> (okreg ...) - N ludzi
+(z puli ..., zabrani z domow ...) | w polu k/4`, w linii doby `klany gorskie: w polu k/4 (ludzi ...), od poczatku ...`.
+
+**Ryzyko / co sprawdzic.** (1) Okreg Doliny moze miec mala pule - wtedy bandy biora z domow wsi (jak glod Wolnych Ludzi) albo nie powstaja (linia "za malo ludzi").
+(2) Liczba band swiata rosnie o najwyzej 4 (twardy sufit sceny). (3) CommonerFor = lekki bandyta klanu (hilltribesmen_grunt), jak w RaidDraw.
+
+**Status.** DO SPRAWDZENIA (autotest: linie "nowa banda" w d118-119, w polu >= 1 w oknie 118-186).

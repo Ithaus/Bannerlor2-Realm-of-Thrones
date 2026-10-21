@@ -60,6 +60,7 @@ namespace Armoury
             _ctl.Clear(); _thawed = 0; _heroCacheDay = -1; _heroCache.Clear();
             ResetProgress();
             ResetTourney();
+            ResetClans();
         }
 
         private static void WStumble(string where, Exception e) { _wStumbles++; Stumble("World." + where, e); }
@@ -67,7 +68,7 @@ namespace Armoury
         private static string PackWorld()
         {
             return "whb=" + string.Join(",", new[] { _hbEsc, _hbRan, _hbPeace, _hbChoice, _hbComp, _hbPass }.Select(x => x.ToString(Inv))) + ";"
-                   + PackProgress() + PackTourney();
+                   + PackProgress() + PackTourney() + PackClans();
         }
 
         private static string Ids(IEnumerable<string> ids) { return string.Join(".", ids.Where(x => !string.IsNullOrEmpty(x)).ToArray()); }
@@ -94,6 +95,7 @@ namespace Armoury
             _wLegacy = Active && !map.ContainsKey("whb");
             UnpackProgress(map);
             UnpackTourney(map);
+            UnpackClans(map);
             _worldDirty = true;
         }
 
@@ -422,6 +424,7 @@ namespace Armoury
             double day = PrologueDay();
             try { ProgressStep(day, daily); } catch (Exception e) { WStumble("ProgressStep", e); }
             try { TourneyStep(day, daily); } catch (Exception e) { WStumble("TourneyStep", e); }
+            try { ClansStep(day, daily); } catch (Exception e) { WStumble("ClansStep", e); }
             foreach (var c in _ctl.Values.ToList())
                 if (!c.Seen || c.P == null || !c.P.IsActive) Uncontrol(c.P);
         }
@@ -445,6 +448,7 @@ namespace Armoury
             sb.Append(WTag).Append("dzien ").Append(d.ToString(Inv));
             try { sb.Append(" | ").Append(ProgressLine()); } catch (Exception e) { WStumble("ProgressLine", e); }
             try { sb.Append(" | ").Append(TourneyLine()); } catch (Exception e) { WStumble("TourneyLine", e); }
+            try { sb.Append(" | ").Append(ClansLine()); } catch (Exception e) { WStumble("ClansLine", e); }
             sb.Append(" | Tyrion: ").Append(HoldText(TyrionTpl, TyrionHoldRow, "p02"));
             sb.Append(" | Jaime: ").Append(HoldText(JaimeTpl, JaimeHoldRow, "m02"));
             sb.Append(" | straz niewoli: zablokowane dzis ").Append(_hbDay).Append(", od poczatku ucieczki ").Append(_hbEsc).Append(", dni bez okupu i okupy ").Append(_hbRan)
@@ -465,9 +469,9 @@ namespace Armoury
             Log.Info(WTag + "start sesji | dzien prologu " + PrologueDay().ToString("0.0", Inv)
                      + " | klucze: Tyrion " + yn(s != null && s.PrologueTyrionHeld) + ", Jaime " + yn(s != null && s.PrologueJaimeAtRiverrun)
                      + " (zmiany stron CanonCompanionsFollowStory " + yn(s != null && s.CanonCompanionsFollowStory) + ")"
-                     + " | orszak " + yn(s != null && s.PrologueRoyalProgress)
+                     + " | orszak " + yn(s != null && s.PrologueRoyalProgress) + ", klany " + yn(s != null && s.PrologueHillClans)
                      + ", turniej " + yn(s != null && s.PrologueHandTourney)
-                     + " | latki: " + _worldWire + " | zapis sprzed E5 " + yn(_wLegacy) + " | " + ProgressStart() + " | " + TourneyLine()
+                     + " | latki: " + _worldWire + " | zapis sprzed E5 " + yn(_wLegacy) + " | " + ProgressStart() + " | " + TourneyLine() + " | " + ClansLine()
                      + " | straz niewoli od poczatku: ucieczki " + _hbEsc + ", okup " + _hbRan + ", pokoj " + _hbPeace + ", wypuszczenie " + _hbChoice + ", wykup " + _hbComp
                      + ", przepuszczone " + _hbPass + " | potkniecia " + _stumbles + ".");
         }
