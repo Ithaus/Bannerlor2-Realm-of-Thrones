@@ -23,7 +23,8 @@ namespace Armoury
     /// OKNA (Chronicle.AppTick z SubModuleMain.OnApplicationTick, 4 razy na sekunde, poza tickiem kampanii jak sceny prologu): bramki Prologue.SceneGate + brak okna
     /// opowiesci (StoryWindow.IsOpen) + StableSec s spokoju, najwyzej PerDay okien na dobe, GapHours od poprzedniego okna Kroniki i od zamkniecia okna wydarzenia ROT
     /// (EventPopupState znika ze stosu stanow). Przed pokazaniem ponowna kontrola warunkow i wyboru wiersza (swiat mogl sie zmienic od doby). Okno: StoryWindow
-    /// (ArmStoryEvent.Key = kr_NNN_w[war] dla lektora), obrazek Chronicle.Pictures.Pick (A3; null = sprite tematu ROT). Rozstrzygniecie przy pokazaniu: stan (State),
+    /// (ArmStoryEvent.Key = kr_NNN_w[war] i VoiceMd5 = md5 tekstu okna dla lektora - Chronicle.Voice, zasada md5; A3), obrazek Chronicle.Pictures.Pick (A3: pula tematu,
+    /// staly skrot id, bez powtorki poprzedniego; null = Pictures.Fallback). Rozstrzygniecie przy pokazaniu: stan (State),
     /// skutki okna (Actions.Run), wybor (Choice - lista po zamknieciu albo opcja bierna). Okno, ktore nie otworzylo sie 3 razy - POMINIETE.
     /// ZAPIS: jeden klucz "arm_kronika" (SaveText.Sync): State + Terms + paczki znane w zapisie (pk) + tempo + Choice + Actions + Recurring. Zapis bez klucza (sprzed
     /// Kroniki) - stan pusty, paczki nowe w zapisie: okna minione (do juz minal albo od minal o ponad MaxLate) POMINIETE "zapis sprzed paczki kNN" - bez lawiny.
@@ -90,7 +91,6 @@ namespace Armoury
         private static long _lastCheck, _okSince, _closedAt;
         private static bool _rotWasOn;
         private static double _rotClosedHour = -1e9;
-        private static readonly HashSet<string> _ogg = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static int _saveBytes;
         // liczniki doby
         private static int _dShown, _dNews, _dSkipped, _dLog, _dNothing, _dFails;
@@ -114,6 +114,7 @@ namespace Armoury
             Choice.Reset();
             Actions.Reset();
             Recurring.Reset();
+            Pictures.Reset();
         }
 
         private static void DayReset() { _dShown = _dNews = _dSkipped = _dLog = _dNothing = _dFails = 0; }
@@ -141,7 +142,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             try { Data.EnsureLoaded(); } catch (Exception e) { Stumble("SessionStart.Data", e); }
-            try { Terms.Invalidate(); ScanRecordings(); } catch (Exception e) { Stumble("SessionStart.Lektor", e); }
+            try { Terms.Invalidate(); } catch (Exception e) { Stumble("SessionStart.Terms", e); }
             try { CheckPacks(); } catch (Exception e) { Stumble("SessionStart.Packs", e); }
             try { Recurring.SessionStart(); } catch (Exception e) { Stumble("SessionStart.Recurring", e); }
             try { if (KeyOn) Plan(Day(), false); } catch (Exception e) { Stumble("SessionStart.Plan", e); }
@@ -171,29 +172,32 @@ namespace Armoury
             }
         }
 
-        /// <summary>Nagrania Kroniki obecne w ModuleData/Lektor/EN (kr_*.ogg) - do linii okna i startu ("lektor TAK/NIE"); odtwarzanie - Lektor (A4).</summary>
-        private static void ScanRecordings()
+        /// <summary>Lektor do linii startu (plan G "lektor okien z nagraniem a/b"): wiersze lektor=1 pokazywane w oknie, dla kazdego zasada md5 (Chronicle.Voice) -
+        /// z nagraniem zgodnym / bez nagrania / tekst inny niz nagrany / stary tekst w manifescie / plik odrzucony / zmienne.</summary>
+        private static string VoiceStartText()
         {
-            _ogg.Clear();
-            try
+            int narr = 0, rec = 0, none = 0, changed = 0, stale = 0, bad = 0, vars = 0;
+            foreach (var w in Data.Windows)
             {
-                string p = MapVillageTooltip.ModulePath("ModuleData", Data.TopicsFile);
-                string dir = p != null ? System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(p), "Lektor"), "EN") : null;
-                if (dir == null || !System.IO.Directory.Exists(dir)) return;
-                foreach (var f in System.IO.Directory.GetFiles(dir, "kr_*.ogg")) _ogg.Add(System.IO.Path.GetFileNameWithoutExtension(f));
+                foreach (var r in Rows(w))
+                {
+                    if (!r.Narrated || !r.Shows) continue;
+                    narr++;
+                    string md5, why = Voice.Why(r, out md5);
+                    if (why == null) rec++;
+                    else if (why.StartsWith("tekst okna inny", StringComparison.Ordinal)) changed++;
+                    else if (why.IndexOf("starym tekstem", StringComparison.Ordinal) >= 0) stale++;
+                    else if (why.StartsWith("plik ", StringComparison.Ordinal)) bad++;
+                    else if (why.StartsWith("zmienne", StringComparison.Ordinal)) vars++;
+                    else none++;
+                }
             }
-            catch (Exception e) { Stumble("ScanRecordings", e); }
+            return "lektor: wierszy lektor=1 z nagraniem " + rec + "/" + narr + " (bez nagrania " + none + ", tekst inny niz nagrany " + changed + ", stary tekst w manifescie " + stale
+                   + ", plik odrzucony " + bad + ", zmienne " + vars + "; klucze lektora okien " + YN(Lektor.WindowsEnabled) + ") | " + Lektor.KronikaText();
         }
-
-        private static bool HasRecording(Data.RowDef r) { return r != null && r.Narrated && _ogg.Contains(r.NarrationKey); }
 
         private static void StartLine()
         {
-            int narr = 0, rec = 0;
-            foreach (var w in Data.Windows)
-            {
-                foreach (var r in Rows(w)) if (r.Narrated && r.Shows) { narr++; if (HasRecording(r)) rec++; }
-            }
             int okno, wiesc, log, nic;
             State.FormCounts(out okno, out wiesc, out log, out nic);
             double sd = Terms.StoryDay();
@@ -206,7 +210,8 @@ namespace Armoury
             Log.Info(Tag + "start sesji | klucze: Chronicle Of Westeros " + YN(KeyOn) + ", World Changes " + YN(KeyWorld) + ", Full Versions " + YN(KeyFull)
                      + ", Player Choices " + YN(KeyChoices) + " | " + Data.Summary()
                      + " | os x" + Terms.DocK().ToString("0.00", Inv) + ", plan Fabuli " + YN(Terms.PlanAvailable)
-                     + " | lektor: okien z nagraniem " + rec + "/" + narr + " (kr_*.ogg w ModuleData/Lektor/EN: " + _ogg.Count + ")"
+                     + " | " + Pictures.StartText()
+                     + " | " + VoiceStartText()
                      + " | zapis: pokazane " + okno + ", wiesci " + wiesc + ", log " + log + ", nic " + nic + ", pominiete " + State.Skipped + ", wybory " + State.Choices
                      + ", flagi " + State.Flags + ", czeka na wybor " + Choice.Count + ", akcje czekaja " + Actions.WaitCount + ", ukryci " + Actions.Hidden
                      + ", instancje w kolejce " + Recurring.QueueCount + ", paczki znane " + PacksText() + (_newCampaign ? " (nowa kampania)" : "")
@@ -583,11 +588,12 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Sprite ROT tematu wiersza (pierwszy z arm_kronika_tematy.tsv) - gdy Pictures.Pick nie da obrazka (jak Prologue.Scenes przy braku pliku).</summary>
+        /// <summary>Sprite ROT tematu wiersza - gdy Pictures.Pick nie da obrazka (jak Prologue.Scenes przy braku pliku): pierwszy dozwolony sprite tematu (bez poza
+        /// rotacja, stannis-slain tylko 081, kolumna tylko), inaczej messenger-img (Pictures.Fallback).</summary>
         private static string DefaultSprite(Data.RowDef r)
         {
-            var tp = Data.Topic(r.Topic);
-            return tp != null && tp.Sprites.Length > 0 ? tp.Sprites[0] : "messenger-img";
+            try { return Pictures.Fallback(r); }
+            catch (Exception e) { Stumble("DefaultSprite", e); return Pictures.Neutral; }
         }
 
         private static void Show(Due d, RowPick p, long t)
@@ -595,13 +601,15 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             var r = p.Row;
             string how = "-";
-            string header = null;
+            string header = null, prevPic = Pictures.Last;
             try { header = Pictures.Pick(d.W, r, d.Id, out how); } catch (Exception e) { Stumble("Pictures.Pick(" + d.Id + ")", e); header = null; }
             bool file = header != null && header.StartsWith(StoryPictures.SpritePrefix, StringComparison.Ordinal);
-            if (header == null) { header = DefaultSprite(r); how = "domyslny sprite tematu (Pictures bez obrazka)"; }
+            if (header == null) { header = DefaultSprite(r); how = (how ?? "-") + " - sprite domyslny"; }
+            // lektor (A3, P9): klucz nagrania i md5 tekstu okna - Lektor gra nagranie Kroniki tylko przy zgodnym md5 (zasada md5, Chronicle.Voice)
+            string vmd5, vwhy = Voice.Why(r, out vmd5);
             var spec = new StoryWindow.Spec
             {
-                Key = r.NarrationKey,
+                Key = r.NarrationKey, VoiceMd5 = vmd5,
                 Title = TextOf(r.Title, p.Vars), Upper = TextOf(r.Upper, p.Vars), Lower = TextOf(r.Lower, p.Vars),
                 DoneText = PrologueScenes.Continue(), Header = header, Background = "event-bg", Tag = ++_openSeq, Closed = OnClosed
             };
@@ -610,6 +618,7 @@ namespace Armoury
             if (mode == null)
             {
                 if (file) StoryPictures.Drop(header);
+                Pictures.Restore(prevPic);
                 if (_openFailId != d.Id) { _openFailId = d.Id; _openFails = 0; }
                 _openFails++; _dFails++;
                 Log.Info(Tag + "okno " + d.Id + " '" + spec.Title + "' - nie otworzylo sie (proba " + _openFails + "/" + OpenFailsMax + ").");
@@ -628,7 +637,7 @@ namespace Armoury
                      + " | dzien opowiesci " + F1(Terms.StoryDay()) + " (od " + w.Od + " = " + F1(Terms.DocToStory(w.Od))
                      + (w.Do >= 0 ? ", do " + w.Do + " = " + F1(Terms.DocToStory(w.Do)) : ", do -") + PlanText(w) + ")"
                      + " | obrazek " + (r.Topic.Length > 0 ? r.Topic : "-") + "->" + header + " (" + (file ? "plik" : "ROT") + "; " + how + ")"
-                     + " | lektor " + r.NarrationKey + " " + (r.Narrated ? (HasRecording(r) ? "TAK" : "NIE (brak nagrania)") : "- (lektor=0)")
+                     + " | lektor " + (mode == "ROT" ? Voice.LineText(r, vwhy) : r.NarrationKey + " NIE (okno zapasu - lektor gra tylko w oknie ROT)")
                      + " | okno " + mode + " | gracz: " + Where() + (p.Player ? "" : " (poza kolumna gracz: " + p.PlayerWhy + ")")
                      + " | dzis " + _tempoCount + "/" + PerDay + " | " + ms.ToString("0", Inv) + " ms.");
             Resolve(d.Id, d.W, p, "okno", d.Tok, null);
@@ -694,6 +703,7 @@ namespace Armoury
             sb.Append(" | wybory: czeka ").Append(Choice.Count).Append(", ").Append(Choice.DayText());
             sb.Append(" | ").Append(Recurring.DayText());
             sb.Append(" | bandy ").Append(Actions.Bands).Append("/12 | ukryci ").Append(Actions.Hidden);
+            sb.Append(" | ").Append(Pictures.DayText());
             sb.Append(" | stan: pokazane/wiesci ").Append(State.Resolved).Append(", pominiete ").Append(State.Skipped).Append(", flagi ").Append(State.Flags);
             int bytes = _saveBytes;
             try { bytes = Encoding.UTF8.GetByteCount(Build()); } catch (Exception e) { Stumble("DayLine.Size", e); }
