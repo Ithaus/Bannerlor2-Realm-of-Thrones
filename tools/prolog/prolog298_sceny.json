@@ -21,7 +21,7 @@
    "day": 12,
    "Title": "A Khal's Bride",
    "UpperText": "Across the Narrow Sea, outside the Free City of Pentos, Viserys Targaryen gives his sister Daenerys in marriage to Khal Drogo, a Dothraki warlord who rides with tens of thousands. Magister Illyrio gifts the bride three dragon eggs turned to stone by the ages, and the exiled knight Ser Jorah Mormont joins their service.",
-   "LowerText": "Viserys believes the khal will repay him with an army to win back his father's throne. The Dothraki do not cross the sea lightly, but the realm's spies take note. In King's Landing, Robert Baratheon never forgets a Targaryen.",
+   "LowerText": "Viserys believes the khal will repay him with an army to win back his father's throne. The Dothraki do not cross the sea lightly, but the realm's spies take note. Robert Baratheon never forgets a Targaryen.",
    "fallback_sprite": "messenger-1"
   },
   {
@@ -53,7 +53,7 @@
    "day": 55,
    "Title": "Roads South and North",
    "UpperText": "The royal column leaves Winterfell for King's Landing, with Lord Eddard, Sansa and Arya in its train. On the same morning Jon Snow rides north with his uncle Benjen to serve in the Night's Watch, and Tyrion Lannister goes with them, eager to see the Wall with his own eyes.",
-   "LowerText": "Bran has still not woken. The Starks are now split between Winterfell, the Wall and the capital, and they may never be whole again. For weeks to come the Kingsroad will be crowded with the king's men.",
+   "LowerText": "Bran has still not woken. The Starks are now split between Winterfell, the Wall and the capital, and they may never be whole again. At their parting, Ned promises Jon that when next they meet, he will tell him of his mother.",
    "fallback_sprite": "messenger-img"
   },
   {
@@ -69,7 +69,7 @@
    "day": 75,
    "Title": "Blood at the Trident",
    "UpperText": "Near the Ruby Ford, Prince Joffrey attacks Mycah, a butcher's boy who was sparring with Arya Stark. Arya's wolf Nymeria bites the prince, and Arya hurls his sword into the river. The queen demands blood: Nymeria has fled, so Sansa's gentle wolf Lady must die in her place, and the Hound rides down the butcher's boy.",
-   "LowerText": "Lord Eddard kills Lady himself rather than leave it to another. The quarrel poisons the bond between Stark and Lannister before the court has even reached the capital. If you ride with the king's column, expect to be asked whose side you are on.",
+   "LowerText": "Lord Eddard kills Lady himself rather than leave it to another. The quarrel poisons the bond between Stark and Lannister before the court has even reached the capital. Sansa blames her sister for Lady's death, and Arya will never forgive the Hound for the butcher's boy.",
    "fallback_sprite": "event-bg"
   },
   {
@@ -157,7 +157,7 @@
    "day": 160,
    "Title": "The King's Justice",
    "UpperText": "With King Robert away hunting, Lord Eddard sits the Iron Throne and hears the smallfolk of the Riverlands. He strips Ser Gregor of his lands and titles and sends Lord Beric Dondarrion with six score men, Thoros of Myr among them, to bring the Mountain to justice.",
-   "LowerText": "Ned also summons Lord Tywin to court to answer for his bannerman's crimes. It is the act of an honest Hand, and it makes the Lannisters his open enemies. Beric's riders now hunt the raiders along the rivers.",
+   "LowerText": "Ned also summons Lord Tywin to court to answer for his bannerman's crimes. It is the act of an honest Hand, and it makes the Lannisters his open enemies. Lord Tywin does not come.",
    "fallback_sprite": "kingslanding"
   },
   {
