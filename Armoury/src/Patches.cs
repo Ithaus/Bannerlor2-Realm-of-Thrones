@@ -804,7 +804,7 @@ namespace Armoury
             }
             catch { }
             finally { Charging = false; }
-            if (PayNotes.On) PayNotes.Paid("forgeday", rate, " for a full day at the forge in " + s.Name + ", up front.");   // m96-wies: jeden komunikat z powodem
+            if (PayNotes.On) PayNotes.Paid("forgeday", rate, " to hire the forge in " + s.Name + " for a full day, paid up front.");   // m96-wies: jeden komunikat z powodem
             else TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(
                 "The forge is yours for a full day - " + rate + " gold, paid up front.",
                 TaleWorlds.Library.Colors.Yellow));

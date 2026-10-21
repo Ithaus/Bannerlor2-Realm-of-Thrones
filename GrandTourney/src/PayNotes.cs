@@ -26,6 +26,18 @@ namespace GrandTourney
             get { try { var s = Settings.Current; return s != null && s.PlayerPaymentReasons; } catch { return false; } }
         }
 
+        /// <summary>m96-wies (recenzja): start sesji (OnSessionLaunched) - liczniki od zera, jak StartLine w Armoury; drugi zapis w tym samym
+        /// uruchomieniu gry nie dolicza do pierwszego. Stan klucza "teraz" (MCM tego moda wchodzi po wczytaniu zapisu).</summary>
+        internal static void Reset()
+        {
+            try
+            {
+                _byKind.Clear(); _n = 0; _st = 0;
+                Log.Info(Head + "nowa sesja | liczniki od zera | klucz PlayerPaymentReasons teraz: " + (On ? "TAK" : "NIE"));   // nie "start" - linia startu PN-0 jest w Armoury
+            }
+            catch { }
+        }
+
         /// <summary>Gracz zaplacil: "You paid N{ikona}" + powod. Kwota 0 - nic.</summary>
         internal static void Paid(string kind, int amount, string why) { Show(kind, amount, why, 1); }
 

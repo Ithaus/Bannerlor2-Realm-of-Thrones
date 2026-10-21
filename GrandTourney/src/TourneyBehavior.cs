@@ -48,7 +48,7 @@ namespace GrandTourney
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
-            try { HostMenu.Add(starter); Log.Info("Menu ogloszenia turnieju dodane."); }
+            try { PayNotes.Reset(); HostMenu.Add(starter); Log.Info("Menu ogloszenia turnieju dodane."); }   // m96-wies: liczniki komunikatow platnosci od zera
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
         }
 
@@ -591,9 +591,12 @@ namespace GrandTourney
             try
             {
                 var h = winner != null ? winner.HeroObject : null;
-                if (h != null && h.IsAlive) GiveGoldAction.ApplyBetweenCharacters(null, h, purse, h != Hero.MainHero || PayNotes.On);   // m96-wies: graczowi powod mowi komunikat nizej
-                if (h != null && h.IsAlive && h == Hero.MainHero && PayNotes.On) PayNotes.Silent("championpurse", purse);
-                else if (town != null) town.ChangeGold(purse);
+                if (h != null && h.IsAlive)
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(null, h, purse, h != Hero.MainHero || PayNotes.On);   // m96-wies: graczowi powod mowi komunikat nizej
+                    if (h == Hero.MainHero && PayNotes.On) PayNotes.Silent("championpurse", purse);
+                }
+                else if (town != null) town.ChangeGold(purse);   // m96-wies: else nalezy do ifa bohatera - pula idzie albo do bohatera, albo do miasta
                 Log.Info("Pula turnieju w " + (town != null ? town.Name.ToString() : "?") + ": " + purse + " -> " + (h != null ? h.Name.ToString() : "kasa miasta"));
                 if (h == Hero.MainHero) Log.Player("The champion's purse is yours: " + purse + " gold.");
             }

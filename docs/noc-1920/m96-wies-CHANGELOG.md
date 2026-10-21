@@ -1,7 +1,9 @@
 ## m96-wies - menu wsi uporzadkowane jak miasto i zamek + komunikaty platnosci z powodem (Armoury, RealisticCaptivity, GrandTourney)
 
-**Dla Jeffa (prosto):** (1) Gdy placisz albo dostajesz zloto przez nasze mody, zamiast golego "You paid 2" gry jest jeden komunikat, za co i ile, np.
-"You paid 2 for your night at a common room in Seagard (bed 1, horse 1). Your men paid 14 from their purses." - nocleg w karczmie i zajezdzie, kuznia na dobe,
+**Dla Jeffa (prosto):** (1) Te "You paid 2" w Seagard to nie byl nocleg w karczmie, tylko **wynajem kuzni na dobe** - przy przetopie Banner Kings kaze czekac
+ok. 23 h, wiec wyglada to jak noc (log: 5 x "kuznia w Seagard oplacona na 24h za 2" miedzy 16:07 a 16:23, noclegow w karczmie 0). Teraz zamiast golego "You paid 2"
+jest jeden komunikat: "You paid 2 to hire the forge in Seagard for a full day, paid up front." Tak samo wszedzie, gdzie placisz albo dostajesz zloto przez nasze mody,
+np. w karczmie: "You paid 2 for your night at a common room in Seagard (bed 1, horse 1). Your men paid 14 from their purses." - nocleg w karczmie i zajezdzie, kuznia na dobe,
 ksiazki, okup, zlecenia, sprzedaz warsztatu, okup wsi, wplaty karawan, lapowki, golibroda, kolejka w karczmie, dom, dlug okupu, turniej. Kwoty sie nie zmieniaja.
 (2) Menu wsi jest teraz krotkie jak menu miasta i zamku: zostaja werbunek, kupno towarow, spacer, "Take a hostile action" (rabunek, zapasy, rekruci, okup - jak
 dotad w jednym podmenu gry), Twoj dom, Twoja wioska, czekanie i wyjazd, a ksiegi, okreg i prace okregu, Living Economy, Banner Kings i kupno domu sa w **Village affairs**,
@@ -15,10 +17,15 @@ miescie i zamkach."
 - (A) "You paid N" / "You received N" to `SandBox DefaultNotificationsCampaignBehavior.OnHeroOrPartyTradedGold` (teksty `str_gold_removed_with_icon` /
   `str_you_received_gold_with_icon` z Native module_strings, dzwiek monet) - pokazywany po kazdym `GiveGoldAction.*` z `disableNotification = false`, gdy gracz jest
   po jednej stronie (`GiveGoldAction.ApplyInternal` -> zdarzenie `HeroOrPartyTradedGold(..., showQuickInformation)`). `ChangeHeroGold` komunikatu nie daje.
-- (A) W logach Jeffa z 20.10 (`D:\Backup-Bannerlord\logi-jeffa\2026-10-20`, wszystkie `Armoury-*.log` i tematyczne `Logs\2026-10-20_*`) nie ma ANI JEDNEGO noclegu
-  w karczmie ("Karczmy (KA): dzien ... noclegi 0" kazdej doby, brak linii "nocleg w ... wybor") ani oplaty E8/D2 ("Wydatki gracza (E8/D2)": oplaty 0) - **zrodla
-  "You paid 2" nie potwierdzilem w logu**. Najbardziej pasuje wspolna izba karczmy (lozko 1 + kon 1 = 2 - TownInns.Commit placil z `quiet = false`, a nasz komunikat
-  "You take lodgings ..." szedl osobno) albo napitek w karczmie (PlayerFees8 FDrink = 2). Oba miejsca maja teraz powod. Zeby znalezc reszte, jest **zwiad** (nizej).
+- (A) **Zrodlo "You paid 2" potwierdzone w logu (poprawka po recenzji - pierwsza wersja wpisu go nie znalazla):** to dobowa oplata za kuznie (`DayPass.EnsureBought`,
+  Patches.cs) w Seagard. `D:\Backup-Bannerlord\logi-jeffa\2026-10-20\Armoury-2026-10-20_14-53-56.log`: 5 x `DayPass: kuznia w Seagard oplacona na 24h za 2.`
+  (16:07:47, 16:08:50, 16:11:34, 16:22:22, 16:23:38), tuz obok `Jeden zegar kuzni: ekran BK 23.3 h ... odsiadka BK za przetop / rafinacje 23.3 h` i `Przetop broni
+  (n20-kuznia)`; w `Armoury-2026-10-20_10-24-16.log` 3 x to samo w Seagard (10:51:38, 10:59:28, 11:09:07), w innych miastach po 3-4 (The Twins, Harrenhal, The Eyrie,
+  Riverrun ...). BK przy przetopie kaze odsiedziec ok. 23 h - stad skojarzenie z noclegiem. Kod przed zmiana: `ApplyForCharacterToSettlement(Hero.MainHero, s, rate)`
+  bez flagi = komunikat gry "You paid 2" i osobny zolty "The forge is yours for a full day - 2 gold, paid up front.". W tych samych logach noclegow w karczmie 0
+  ("Karczmy (KA): dzien ... noclegi 0" kazdej doby; linie "Nocleg: gracz ..." to oboz w marszu) i oplat E8/D2 0 ("Wydatki gracza (E8/D2)": oplaty 0). Biezacy
+  `Modules\Armoury\Armoury-2026-10-20_14-53-56.log` w folderze gry (ostatni zapis 16:27:36) - to samo. Karczma i zajazd i tak dostaly powod (to tez placenie gracza
+  w miescie), a **zwiad** (nizej) pokaze kazde inne miejsce.
 - (A) Przejrzane wszystkie `GiveGoldAction.*` w Armoury, RC i GT (376 wywolan): te z komunikatem gry dla gracza i bez `true` - lista w tabeli "Zmiana (A)". Reszta
   juz przelewa z `disableNotification = true` albo nie dotyczy gracza (AI).
 - (B) Wszystkie DLL w `bin` i `Modules\*\bin\Win64_Shipping_Client` przeszukane na napis "village" (sterta #US) przy `AddGameMenuOption`, potem zdekompilowane
@@ -87,15 +94,16 @@ ten sam MoneyLedger/RealPayer - zdarzenie gry idzie dalej, zmienia sie tylko fla
 |---|---|---|
 | Nocleg w karczmie miasta | Armoury TownInns.cs (+ TownInns.PayNote.cs) | "You paid 2 for your night at a common room in Seagard (bed 1, horse 1). Your men paid 14 from their purses. Your companions paid 3." (jeden na cala druzyne; towarzysze placili juz cicho) |
 | Nocleg w zajezdzie | Armoury TownInns.Road.cs | jak wyzej ("... in The Crossroads Inn ...") |
-| Kuznia na dobe (DayPass) | Armoury Patches.cs | "You paid 40 for a full day at the forge in X, up front." |
+| Kuznia na dobe (DayPass) - **to bylo "You paid 2" Jeffa** | Armoury Patches.cs | "You paid 2 to hire the forge in Seagard for a full day, paid up front." (zamiast "You paid 2" gry + zoltego "The forge is yours ...") |
 | Ksiazki u ksiegarza / z celu BK | Armoury CraftOrders8.cs, Wyceny20.cs | "You paid N for {ksiazka} ({ksiegarz})." |
 | Okup gracza (menu niewoli) | Armoury RansomFlows.cs | "You paid N as your ransom, to {odbiorca}." |
 | Zlecenie lorda (tablica) | Armoury Orders.cs | "You received N from {lord} for the {rzecz}. Word of your craft spreads." |
 | Sprzedaz warsztatu | Armoury WorkshopTrade.cs | "You received N from {kupiec} for your workshop." |
+| Zmiana produkcji warsztatu gracza (nowy sprzet) | Armoury WorkshopTrade.cs (ConvertPostfix) | "You paid N to the craftsmen of X for new tools to change your workshop's trade." (dopisane po recenzji; warsztat AI bez zmian) |
 | Okup wsi (Demand tribute) | Armoury RaidTribute.cs | "You received N: tribute from the elders of X. Your realm will spare the village for D days." |
 | Zysk karawany | Armoury Seal31B.cs | "You received N: the {karawana} deposited its profit with you in X." |
 | Sakiewka pobitych wiesniakow | Armoury VillageTakings.cs | "You received N: the purse of the beaten villagers of X." |
-| Lapowka strazy, odbicie wieznia, golibroda, wiesci karczmarza, kolejka, napitek (E8/D2) | Armoury PlayerFees8.cs | "You paid N to the barber." itd. (tylko gdy gra pokazalaby komunikat) |
+| Lapowka strazy, odbicie wieznia, golibroda, wiesci karczmarza, kolejka, wiesci o ludziach do najecia (E8/D2) | Armoury PlayerFees8.cs | "You paid N to the barber." / "You paid 2 to the innkeeper for word of people looking for work." itd. (tylko gdy gra pokazalaby komunikat) |
 | Rata dlugu okupu | RC CaptivityBehavior.cs | "You paid N as an instalment on your ransom debt - D still owed." / "... - the debt is paid in full." |
 | Zloto zabrane przy pojmaniu, lapowka za ucieczke, okup przez poslanca, skarbiec domu | RC CaptivityBehavior, Drobne39, Rescue, Homes | komunikat gry wylaczony, zostaje nasz dotychczasowy ("They emptied your purse ...", "X bribed a guard for you", "... negotiated your release ...", "N gold rests under your own roof now.") |
 | Wykup rynsztunku, kupno i sprzedaz domu | RC CaptivityBehavior, Homes | "You paid N to buy back your war gear." / "You paid N for the house in X. It is yours." / "You received N for your house in X (H for the house, S from its strongbox). It has a new owner." |
@@ -114,6 +122,8 @@ ten sam MoneyLedger/RealPayer - zdarzenie gry idzie dalej, zmienia sie tylko fla
   arm_vm_affairs_menu 7 [...]; arm_vm_work_menu 1 [rc_work_labour_village] | wejscia podmenu wpiete 2 (przed 'village_wait' (index K)) | nie znaleziono cudzych 0,
   naszych 0 | menu wsi teraz 15 opcji: <id po kolei>`. Wylaczony klucz: `... WYLACZONY w MCM (Village Menu Tidy) - menu wsi jak dotad ...`.
 - Armoury.log, kazde wczytanie: `Komunikaty platnosci (m96-wies): start | WLACZONY (Player Payment Reasons) ... | nasluch zwiadu: wpiety ...`.
+- RealisticCaptivity.log / GrandTourney.log, kazde wczytanie (OnSessionLaunched): `Komunikaty platnosci (m96-wies): nowa sesja | liczniki od zera | klucz
+  PlayerPaymentReasons teraz: TAK|NIE` (nie "start" - PN-0 czyta linie startu Armoury).
 - Armoury.log / RealisticCaptivity.log / GrandTourney.log, przy kazdej podmianie: `Komunikaty platnosci (m96-wies): zaplata inn 2 | podmienione w sesji N (zaplaty ..,
   wplywy ..) | wg powodu: inn 1, ...` (RC/GT: `zaplata|wplyw|komunikat gry wylaczony (nasz mowi powod) <powod> <kwota> | podmienione w sesji N | wg powodu: ...`).
 - **Oczekiwane w autotescie** (pelny zestaw modow Jeffa): przeniesione **8 z 8** (sprawy wsi 7, praca 1), nie znaleziono cudzych **0**, naszych **0**, wejscia **2**,
@@ -157,8 +167,14 @@ ten sam MoneyLedger/RealPayer - zdarzenie gry idzie dalej, zmienia sie tylko fla
    Buy a house (gdy sa) - kazda otwiera to samo okno / menu co dotad. Back z BK / Living Economy wraca do glownego menu wsi. "Back to the village" - menu wsi.
 4. **Look for paid work**: Hire yourself out for day labour - dziala jak dotad, po pracy wraca do menu wsi.
 5. Take a hostile action - bez zmian (raid, zapasy, rekruci, Demand tribute).
-6. Przespij sie w karczmie miasta (wspolna izba): JEDEN komunikat "You paid 2 for your night at a common room in X (bed 1, horse 1). ..." - bez osobnego "You paid 2".
-   To samo w zajezdzie. Kup kolejke albo u golibrody: "You paid N for a round of drinks for your men." / "... to the barber."
+6. **To bylo Twoje "You paid 2":** w miescie, gdzie kuznia nie jest jeszcze oplacona na dzis (np. Seagard), przetop albo kucie w kuzni Banner Kings. JEDEN komunikat
+   "You paid 2 to hire the forge in Seagard for a full day, paid up front." - bez osobnego "You paid 2" i bez zoltego "The forge is yours ...". W logu
+   `Komunikaty platnosci (m96-wies): zaplata forgeday 2` obok `DayPass: kuznia w Seagard oplacona na 24h za 2.`
+6b. Przespij sie w karczmie miasta (wspolna izba): JEDEN komunikat "You paid 2 for your night at a common room in X (bed 1, horse 1). ..." - bez osobnego "You paid 2".
+   To samo w zajezdzie. Kup kolejke albo u golibrody: "You paid N for a round of drinks for your men." / "... to the barber."; zapytaj karczmarza o ludzi do
+   najecia (zwiadowca, chirurg ...): "You paid 2 to the innkeeper for word of people looking for work."
+6c. Turniej ogloszony przez Ciebie z pula, wygrany przez lorda AI: pula idzie do zwyciezcy, kasa miasta NIE rosnie o nia drugi raz (linia `Pula turnieju w X: N -> <imie>`;
+   kasa miasta w ekranie miasta przed i po turnieju bez skoku o pule).
 7. Jesli gdzies dalej widzisz gole "You paid N" / "You received N" - napisz gdzie; w Armoury.log bedzie linia `komunikat gry bez powodu (...) | wolajacy: ...`, ktora
    pokaze, skad przyszlo (np. `grep -a "komunikat gry bez powodu" Armoury-*.log`).
 8. MCM Armoury -> "The village menu" -> wylacz **Village Menu Tidy**, zapisz, wczytaj: menu wsi jak dawniej (linia WYLACZONY). "Payment messages" -> wylacz **Player
@@ -167,6 +183,28 @@ ten sam MoneyLedger/RealPayer - zdarzenie gry idzie dalej, zmienia sie tylko fla
    i "Buy products" - musza zostac w menu wsi).
 
 Potkniecia: VillageMenus i PayNotes licza per miejsce (`VillageMenus.<miejsce> (potkniecie N)`, `PayNotes.Show/OnTraded (potkniecie N)`) - nic sie nie gasi.
+
+**Poprawki po recenzjach (20.10, trzeci commit; dwie recenzje - "gracz" i "technika"):**
+- **KRYTYCZNE, prawdziwe - poprawione: GrandTourney `PayPurse`.** Wstawiona linia `if (... PayNotes.On) PayNotes.Silent("championpurse", ...)` stala miedzy
+  `if (h != null && h.IsAlive) GiveGoldAction...` a `else if (town != null) town.ChangeGold(purse)` i przejela `else`. Skutek: pule gracza wygrana przez zywego
+  bohatera AI (albo przez gracza przy wylaczonym kluczu) dostawal zwyciezca, a kasa miasta dostawala ja drugi raz z niczego - przy kazdym turnieju gracza z pula
+  (`HistoricalTownRates` = tak u Jeffa). Teraz `if (bohater) { GiveGold...; if (gracz && klucz) Silent(...); } else if (town != null) town.ChangeGold(purse);` -
+  jak przed paczka (4358d771). Przejrzany caly diff paczki pod ten sam wzor (kazde `else` za wstawiona linia): Orders, Patches (DayPass), RaidTribute, RansomFlows,
+  Seal31B, TownInns.PayNote, GT (zwroty, oplata gospodarza), RC (dlug, wykup, dom, Drobne39) - wszystkie `else` naleza do zamierzonego `if` (para "nasz komunikat
+  albo stary komunikat" albo zmieniona tylko linia `else`). W grze dopisany krok 6c.
+- **WAZNE, prawdziwe - poprawione: zly powod dla oplaty 2 u karczmarza** (`PlayerFees8` `FDrink`). To nie napitek, tylko zaplata karczmarzowi za wiesc o ludziach
+  do najecia (SandBox `TavernEmployeesCampaignBehavior.FindCompanionWithType`: `GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, 2, false)`, dialog
+  `tavernkeeper_companion_info_start` "I am looking for some people to hire with specific skills..." - sprawdzone w dekompilacji). Powod teraz
+  " to the innkeeper for word of people looking for work.", klucz w logu `hireinfo`, nazwa w linii doby E8/D2 "wiesci o ludziach do najecia" (stala `FDrink` i
+  metoda `FolkDrink` bez zmian; `sprawdz_logi.py` nie czyta tej nazwy - grep).
+- **WAZNE, prawdziwe - poprawione: diagnoza (A).** Zrodlo "You paid 2" jest w logu: kuznia na dobe w Seagard (punkt "Dowod" wyzej, tekst "Dla Jeffa", krok testu 6).
+  Kod juz to pokrywal (`forgeday`); powod brzmi teraz wprost "to hire the forge in X for a full day, paid up front." (wczesniej "for a full day at the forge in X, up front.").
+- Drobne - poprawione: zmiana produkcji warsztatu gracza (`WorkshopTrade.ConvertPostfix`) placila z `disableNotification = false` - teraz przy graczu i kluczu
+  `true` + "You paid N to the craftsmen of X for new tools to change your workshop's trade."; warsztat AI i kwota (`_dGear`) bez zmian.
+- Drobne - poprawione: RC i GT licza "podmienione w sesji" od zera w kazdej sesji (`PayNotes.Reset()` w `OnSessionLaunched`, linia "nowa sesja"); w RC rata dlugu i
+  wykup rynsztunku u pojmujacego bez zywego bohatera liczyly sie w logu dwa razy (`Silent("captorhome")` w `GoldToCaptorHome` + `Paid` u wolajacego) - `Silent` usuniety,
+  licznik robi wolajacy. Gracz i tak widzial jeden komunikat.
+- Build po poprawkach: Armoury, RealisticCaptivity, GrandTourney `dotnet build -c Release` kod 0 (0 bledow). Gry nie uruchamiano - NIESPRAWDZONE w grze.
 
 Poprawka po wlasnym przegladzie (20.10, drugi commit): w GrandTourney klucz stal przed `LogEnabled`, wiec `gen_mcm.py` przenosil "Log Enabled" do grupy
 "Payment messages" - blok przeniesiony za `LogEnabled` (Log Enabled zostaje w "The lists themselves"); opisy, kiedy dziala wylacznik (Armoury - co godzine gry,

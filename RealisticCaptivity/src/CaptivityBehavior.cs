@@ -139,6 +139,7 @@ namespace RealisticCaptivity
         {
             try
             {
+                PayNotes.Reset();   // m96-wies: liczniki komunikatow platnosci od zera w kazdej sesji
                 Homes.Stash = _homeStash;
                 Homes.Vault = _homeVault;
                 Homes.FamilyHomeSold = _familyHomeSold;
@@ -1044,7 +1045,6 @@ namespace RealisticCaptivity
                 }
             }
             if (to != null) paid = Math.Max(0, before - Hero.MainHero.Gold);
-            if (to != null && pn) PayNotes.Silent("captorhome", paid);   // m96-wies: licznik (komunikat z powodem u wolajacego)
             return to;
         }
 
