@@ -121,6 +121,81 @@ namespace Armoury
 
         internal static bool Active { get { return _on; } }
 
+        // --- m104-e5: jency kanonu trzymani do uwolnienia z tabeli (straz niewoli prologu - Prologue.World; bez zapisu - liczone z _done) ---
+        // postac, ktorej ostatni wykonany (ok) wiersz to "prisoner", a pozniejszy wiersz "free" tej postaci jeszcze nie zapadl -> id wiersza niewoli (np. p01 Tyrion,
+        // p10 Jaime). Mapa liczona w dobie (po Moves) i przy starcie sesji; czytana w latkach Armoury (EndCaptivityAction, okup) - odczyt O(1), watek gry.
+        private static readonly Dictionary<Hero, string> _held = new Dictionary<Hero, string>();
+        private static readonly Dictionary<Hero, int> _heldDay = new Dictionary<Hero, int>();   // dzien kampanii wykonania wiersza niewoli
+        private static readonly Dictionary<Hero, string> _heldArg = new Dictionary<Hero, string>(); // recenzja m104: cel wiersza niewoli (osada albo rod, np. town_EN1)
+        private static Hero _freeing;   // na czas wlasnej akcji "free" (EndCaptivityAction.ApplyByReleasedByChoice) - straz przepuszcza
+
+        /// <summary>m104-e5: id wiersza niewoli, w ktorej postac jest trzymana do wiersza "free" (null - nie trzymana).</summary>
+        internal static string HeldRow(Hero h)
+        {
+            string r;
+            return h != null && _held.Count > 0 && _held.TryGetValue(h, out r) ? r : null;
+        }
+
+        /// <summary>m104-e5: trwa nasze uwolnienie tej postaci (akcja "free") - straz niewoli prologu nie blokuje.</summary>
+        internal static bool Freeing(Hero h) { return h != null && ReferenceEquals(h, _freeing); }
+
+        /// <summary>m104-e5: dzien kampanii, w ktorym wiersz niewoli trzymanej postaci zostal wykonany (-1 - nie trzymana).</summary>
+        internal static int HeldDay(Hero h)
+        {
+            int d;
+            return h != null && _heldDay.Count > 0 && _heldDay.TryGetValue(h, out d) ? d : -1;
+        }
+
+        /// <summary>Recenzja m104: cel wiersza niewoli trzymanej postaci (argument akcji "prisoner": osada albo rod; null - nie trzymana). Straz prologu trzyma
+        /// tylko w lochu tej osady (p01 town_EN1, p10 town_V2) - po ucieczce przez upadek osady i ponownym pojmaniu cudzy loch nie trzyma.</summary>
+        internal static string HeldArg(Hero h)
+        {
+            string a;
+            return h != null && _heldArg.Count > 0 && _heldArg.TryGetValue(h, out a) ? a : null;
+        }
+
+        internal static int HeldCount { get { return _held.Count; } }
+
+        /// <summary>m104-e5: postac kanonu z wzoru ROTwanderer* (oryginal bez rodzicow) - dla scen prologu (orszak, turniej).</summary>
+        internal static Hero TemplateHero(string tpl) { try { return FindOriginal(tpl); } catch { return null; } }
+
+        private static void RebuildHeld()
+        {
+            _held.Clear(); _heldDay.Clear(); _heldArg.Clear();
+            if (!_on || !_startDone || _moves.Count == 0) return;
+            try
+            {
+                var byWho = new Dictionary<string, List<MoveRow>>(StringComparer.Ordinal);
+                foreach (var r in _moves)
+                {
+                    List<MoveRow> l;
+                    if (!byWho.TryGetValue(r.Who, out l)) { l = new List<MoveRow>(); byWho[r.Who] = l; }
+                    l.Add(r);
+                }
+                foreach (var kv in byWho)
+                {
+                    var l = kv.Value;
+                    int last = -1;
+                    for (int j = 0; j < l.Count; j++)
+                    {
+                        string v;
+                        if (_done.TryGetValue(l[j].Id, out v) && v.EndsWith("|ok", StringComparison.Ordinal)) last = j;
+                    }
+                    if (last < 0 || l[last].Action != "prisoner") continue;
+                    bool freeLater = false;
+                    for (int j = last + 1; j < l.Count; j++) if (l[j].Action == "free" && !_done.ContainsKey(l[j].Id)) { freeLater = true; break; }
+                    if (!freeLater) continue;
+                    var h = WhoHero(l[last]);
+                    if (h == null || !h.IsAlive || !h.IsPrisoner) continue;
+                    _held[h] = l[last].Id;
+                    _heldArg[h] = l[last].Arg;
+                    string dv; int dd;
+                    _heldDay[h] = _done.TryGetValue(l[last].Id, out dv) && int.TryParse(dv.Split('|')[0], NumberStyles.Integer, Inv, out dd) ? dd : Day();
+                }
+            }
+            catch (Exception e) { Stumble("RebuildHeld", e); }
+        }
+
         /// <summary>Konstruktor zachowania (kazda kampania: nowa i wczytana) - stan od zera; dane z pliku zostaja.</summary>
         internal static void Reset()
         {
@@ -131,6 +206,7 @@ namespace Armoury
             _spawnSaid.Clear();
             _done.Clear(); _first.Clear(); _pend.Clear(); _gone.Clear(); _lostBy.Clear();
             _removingKey = _removingWhy = null;
+            _held.Clear(); _heldDay.Clear(); _heldArg.Clear(); _freeing = null;   // m104-e5: jency kanonu trzymani do wiersza "free"
             _rescDay = _rescTotal = _lostOtherDay = 0;
             _dDone = _dSkip = _tDone = _tSkip = 0;
             _waitSaid.Clear(); _waitWhy.Clear(); _evDay.Clear();
@@ -549,6 +625,7 @@ namespace Armoury
             {
                 EnsureLoaded();   // maly plik - linia startu z licznikami takze w starym zapisie
                 if (_on && !_startDone) StartPass("start sesji", false);
+                RebuildHeld();   // m104-e5: po wczytaniu - jency kanonu trzymani (straz niewoli prologu) od pierwszej godziny
                 StartLine();
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -757,6 +834,7 @@ namespace Armoury
                 if (!_startDone) StartPass("pierwsza doba", true);
                 var s = Settings.Current;
                 if (_startDone && s != null && s.CanonCompanionsFollowStory) Moves();
+                RebuildHeld();   // m104-e5: jency kanonu trzymani (po dzisiejszych zmianach stron)
                 DayLine();
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -1249,7 +1327,9 @@ namespace Armoury
                         var clan = FindClan(r.Arg);
                         if (Captive(h))
                         {
-                            EndCaptivityAction.ApplyByReleasedByChoice(h);
+                            _freeing = h;   // m104-e5: nasze uwolnienie - straz niewoli prologu (Prologue.World) przepuszcza
+                            try { EndCaptivityAction.ApplyByReleasedByChoice(h); }
+                            finally { _freeing = null; }
                             why = "uwolniony";
                         }
                         else why = "juz wolny";

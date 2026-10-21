@@ -9032,6 +9032,34 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueScenes { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Royal Progress", HintText = "in a Prologue 298 campaign King Robert rides the Kingsroad to Winterfell with his household (days 0 to about 33) and back to King's Landing with Lord Eddard (days 55 to about 93): Jaime and Tyrion Lannister and later Ned ride beside him with their own men, the queen, the Hound and other grown members of the king's house ride in his party; the bands and lords of the realm leave the column alone (you may still attack it). On day 55 Tyrion rides north to the Wall and comes back south to the crossroads inn. At the end of each road the parties go back to their own business. Off = everyone keeps to his own business", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueRoyalProgress { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Hand Tourney", HintText = "in a Prologue 298 campaign King Robert holds the Tourney of the Hand at King's Landing (Grand Tourney): proclaimed on day 121, the lists open on day 125 and the tourney is decided by day 127; Ser Gregor Clegane, Ser Loras Tyrell, Sandor Clegane and Ser Jaime Lannister ride to the city and take their places in the lists first, and you may ride too. Off = no royal tourney", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueHandTourney { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Tyrion Held", HintText = "in a Prologue 298 campaign Tyrion Lannister, seized by Lady Catelyn on day 110, stays in the dungeon of the Eyrie until his trial by combat on day 132: no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of the Eyrie can end it sooner). The guard holds only in the dungeon of the Eyrie, and never while the Eyrie is yours. Needs Canon Companions Follow Story. Off = he may escape or be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueTyrionHeld { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Jaime At Riverrun", HintText = "in a Prologue 298 campaign Jaime Lannister, taken by Robb Stark's host when the war begins, is held at Riverrun until Lady Catelyn frees him (the canon table, after the Battle of the Blackwater; if that never comes, at most 150 days past the time the Blackwater is due in the story): no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of Riverrun can end it sooner). The guard holds only in the dungeon of Riverrun, and never while Riverrun is yours. Needs Canon Companions Follow Story. Off = he is still taken to Riverrun, but may escape or be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueJaimeAtRiverrun { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Hill Clans", HintText = "in a Prologue 298 campaign from day 118 the clans of the Mountains of the Moon (Painted Dogs, Burned Men, Milk Snakes, Black Ears) come down on the roads of the Vale: up to four bands of hill tribesmen around the Eyrie and the Bloody Gate, raised from the outlaws and the poor of the Vale (no one out of nothing), who prey on travellers like any band; after the prologue they stay as ordinary bands. Off = no clan bands", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueHillClans { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Mountain Raiders", HintText = "in a Prologue 298 campaign from day 155 two bands of the Mountain's Men flying no banners, raised around Harrenhal (no one out of nothing), burn the villages of the Riverlands one after another (the game's raids - the losses go into the books like any raid), without a war between the realms; the lords and bands of the realm the Cleganes serve leave them alone (the river lords, Lord Beric and you may fight them); at the end of the prologue they go back to the woods and villages they came from. Off = no raiders", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueMountainRaiders { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Beric Hunt", HintText = "in a Prologue 298 campaign from day 160 Lord Beric Dondarrion (or, without him, the head of House Dondarrion) rides with his men after the Mountain's Men until they are broken or the prologue ends; the lords and bands of the realm leave him alone on the way. Off = no hunt", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueBericHunt { get; set; } = true;
+
         [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Story windows")]
         public bool StoryImagesForRotWindows { get; set; } = true;
@@ -11313,6 +11341,13 @@ namespace Armoury
             s.ProloguePacts = ProloguePacts;
             s.PrologueKings = PrologueKings;
             s.PrologueScenes = PrologueScenes;
+            s.PrologueRoyalProgress = PrologueRoyalProgress;
+            s.PrologueHandTourney = PrologueHandTourney;
+            s.PrologueTyrionHeld = PrologueTyrionHeld;
+            s.PrologueJaimeAtRiverrun = PrologueJaimeAtRiverrun;
+            s.PrologueHillClans = PrologueHillClans;
+            s.PrologueMountainRaiders = PrologueMountainRaiders;
+            s.PrologueBericHunt = PrologueBericHunt;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;
             s.LektorEventWindows = LektorEventWindows;

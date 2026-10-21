@@ -1034,6 +1034,13 @@ Uzycie (Python 3, tylko odczyt):
                     oknie 0 (linia Armoury 'ZWOLNIENIE PRZY OKNIE'; assert gry 'Trying to render a released texture' w grze wydaniowej nie trafia do logow - --rgl
                     tylko dodatkowo), SC-14 obrazki okien ROT (INFO). Sceny zalatwione w zapisie (pokazane + pominiete z linii startu) SC-2 liczy jako zalatwione.
                     Log bez prologu (kampania klasyczna): SC-0 INFO, SC-1 i SC-13 dalej licza (latka okien ROT i obrazki dzialaja w kazdej kampanii), SC-14 INFO.
+--grupa m104e5 : (21.10, w-toku/m104-e5; Armoury/src/Prologue.World*.cs, CanonCompanions.cs, arm_canon_moves.tsv #p10, GrandTourney/src/CanonApi.cs; klucze
+                    PrologueRoyalProgress, PrologueHandTourney, PrologueTyrionHeld, PrologueJaimeAtRiverrun, PrologueHillClans, PrologueMountainRaiders, PrologueBericHunt)
+                    python -I tools/sprawdz_logi.py --grupa m104e5 <Armoury-*.log>. E5-0 start i latki, E5-1 ERROR i potkniecia 0, E5-2 orszak (rusza <= d3, Winterfell
+                    < d40, KP < d100), E5-3 Tyrion na Mur (INFO), E5-4 Turniej Reki w KP d123-127 (E5-4b kanon w drabince INFO), E5-5 Tyrion jencem town_EN1 d111-131,
+                    E5-6 Jaime #p10 do town_V2, E5-7 klany gorskie d118-119 i >= 80% dob 119-186, E5-8 ludzie Gory d155-156 i >= 80% dob 156-186 (E5-8b spalona >= 1 wies),
+                    E5-9 Beric rusza d160-165, E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
+                    kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
@@ -37695,6 +37702,243 @@ def m101prolog_main(logp, csp=None):
     return 0
 
 
+# ------------------------------------------------------------ m104e5 (21.10, w-toku/m104-e5: sceny zmieniajace swiat prologu 298 - orszak krola, Turniej Reki, Tyrion i Jaime
+# jencami, klany gorskie Doliny, ludzie Gory, Beric; Armoury/src/Prologue.World*.cs, CanonCompanions.cs (HeldRow), arm_canon_moves.tsv (#p10), GrandTourney CanonApi;
+# klucze PrologueRoyalProgress, PrologueHandTourney, PrologueTyrionHeld, PrologueJaimeAtRiverrun, PrologueHillClans, PrologueMountainRaiders, PrologueBericHunt).
+# Korzysta z TS, Report, M101_TAG, M101_DAY, M101P_TAG.
+M104_TAG = "Prolog E5 (m104): "
+M104_DAY = re.compile(r"^dzien (\d+) \| (.*)")
+M104_EV_DAY = re.compile(r"\(dzien prologu ([0-9.]+)")
+M104_ERR = re.compile(r"^ERROR in Prologue\.(World|DailyWorld|ApplyWorld|WorldHourly|WorldBeforeSave|WorldSaveOver|WorldStartLine)|^ERROR in CanonCompanions\.RebuildHeld")
+M104_CANON = re.compile(r"zmiana strony #(p01|p02|p10|m01|m02)( POMINIETA)? - (.*)")
+# recenzja m104: klucze scen z linii startu E5 (scena wylaczona kluczem - INFO z powodem, nie NIE)
+M104_KEYS = re.compile(r"\| orszak (TAK|NIE), Beric (TAK|NIE), ludzie Gory (TAK|NIE), klany (TAK|NIE), turniej (TAK|NIE)")
+M104_HOLDKEYS = re.compile(r"klucze: Tyrion (TAK|NIE), Jaime (TAK|NIE) \(zmiany stron CanonCompanionsFollowStory (TAK|NIE)\)")
+
+
+def m104e5_main(logp):
+    """m104e5 (21.10, w-toku/m104-e5; Jeff 21.10 "Kod scen zmieniajacych swiat i wojen wedlug ksiazki - rob to teraz"): E5-0 linie startu E5 (latki straz niewoli i okup TAK),
+    E5-1 ERROR scen i potkniecia E5 0, E5-2 orszak: rusza do d3, Winterfell przed d40, Krolewska Przystan przed d100, E5-3 Tyrion na Mur (INFO), E5-4 Turniej Reki
+    rozstrzygniety w KP w d123-127 (E5-4b uczestnicy kanonu w drabince - INFO), E5-5 Tyrion jencem town_EN1 bez ucieczki w dniach 111-131 (linie doby) i bez
+    'PRZEPUSZCZONE' poza smiercia, E5-6 Jaime: #p10 do town_V2 (bez linii - INFO, gdy wojna Polnocy nie wybuchla), E5-7 klany gorskie: pierwsza banda d118-119 i w polu
+    >= 1 przez >= 80% dob 119-186, E5-8 ludzie Gory: pierwsza banda d155-156 i w polu przez >= 80% dob 156-186 (albo rozbici w bitwie), E5-8b spalona >= 1 wies,
+    E5-9 Beric rusza w d160-165 (POMINIETY - INFO z powodem), E5-10 po prologu (doba >= 189) partie pod scena 0, E5-11 straz niewoli (INFO).
+    Log bez kampanii z prologiem: INFO (kampania klasyczna - E5 nie dziala)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("E5-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, n_err, err_ex = [], {}, 0, []
+    ev = {"rusza": [], "winterfell": [], "kp": [], "pominiety": [], "cb": [], "inn": [], "ty_end": [], "t_done": [], "t_skip": [], "t_proc": [],
+          "blocked": [], "passed": [], "kg_new": [], "kg_fail": [], "mm_new": [], "mm_burn": [], "mm_lost": [], "mm_home": [], "b_go": [], "b_skip": [], "b_end": [],
+          "kg_skip": [], "mm_skip": []}
+    canon = []
+    last_prol = -1
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if M104_ERR.match(s):
+                n_err += 1
+                if len(err_ex) < 3:
+                    err_ex.append(s[:140])
+                continue
+            if s.startswith(M101_TAG):
+                md = M101_DAY.match(s[len(M101_TAG):])
+                if md:
+                    last_prol = max(last_prol, int(md.group(1)))
+                continue
+            if s.startswith(M101P_TAG):
+                mc = M104_CANON.search(s[len(M101P_TAG):])
+                if mc:
+                    canon.append((mc.group(1), bool(mc.group(2)), mc.group(3)))
+                continue
+            if not s.startswith(M104_TAG):
+                continue
+            body = s[len(M104_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            md = M104_DAY.match(body)
+            if md:
+                days[int(md.group(1))] = md.group(2)
+                last_prol = max(last_prol, int(md.group(1)))
+                continue
+            me = M104_EV_DAY.search(body)
+            d = float(me.group(1)) if me else None
+            for key, pat in (("rusza", "orszak RUSZA"), ("winterfell", "orszak w WINTERFELL"), ("kp", "orszak w KROLEWSKIEJ PRZYSTANI - KONIEC"),
+                             ("pominiety", "orszak POMINIETY albo PRZERWANY"), ("cb", "Tyrion: w CZARNYM ZAMKU"), ("inn", "Tyrion: w GOSPODZIE NA ROZSTAJACH"),
+                             ("t_done", "Turniej Reki ROZSTRZYGNIETY"), ("t_skip", "Turniej Reki POMINIETY albo ODWOLANY"), ("t_proc", "Turniej Reki OBWIESZCZONY"),
+                             ("blocked", "straz niewoli: ZABLOKOWANE"), ("passed", "straz niewoli: PRZEPUSZCZONE"), ("kg_new", "klany gorskie: nowa banda"),
+                             ("kg_fail", "klany gorskie: banda"), ("mm_new", "ludzie Gory: nowa banda"), ("mm_burn", "ludzie Gory: SPALONA wies"),
+                             ("mm_lost", "ludzie Gory: banda "), ("mm_home", "ludzie Gory: koniec prologu"), ("b_go", "Beric: rusza"), ("b_skip", "Beric: POMINIETY"),
+                             ("b_end", "Beric: KONIEC"), ("kg_skip", "klany gorskie POMINIETE"), ("mm_skip", "ludzie Gory POMINIECI")):
+                if body.startswith(pat):
+                    if key == "kg_fail" and "NIE powstala" not in body:
+                        continue
+                    if key == "mm_lost" and "ROZBITA" not in body:
+                        continue
+                    ev[key].append((d, body))
+                    break
+    print(f"plik: {logp} | linii startu E5 {len(starts)}, dob E5 {len(days)}, ostatnia doba prologu {last_prol}, ERROR {n_err}, zmian kanonu (p01/p02/p10/m01/m02) {len(canon)}")
+    if not starts and not days:
+        rep.add("E5-0: linie 'Prolog E5 (m104): ...'", "brak w logu", "INFO (kampania klasyczna albo log sprzed paczki m104-e5)", None)
+        rep.show()
+        return 0
+    st = starts[-1] if starts else ""
+    rep.add("E5-0: linia startu E5 i latki", st[:200] if st else "brak linii startu (log od srodka sesji)", "latki 'straz niewoli TAK, okup TAK'",
+            ("straz niewoli TAK, okup TAK" in st) if st else None)
+    # recenzja m104: klucze z ostatniej linii startu - scena wylaczona kluczem albo pominieta przez zapis sprzed E5 daje INFO z powodem
+    keys = {}
+    mk = M104_KEYS.search(st) if st else None
+    if mk:
+        keys.update(zip(("orszak", "beric", "gora", "klany", "turniej"), mk.groups()))
+    mh = M104_HOLDKEYS.search(st) if st else None
+    if mh:
+        keys.update(zip(("tyrion", "jaime", "follow"), mh.groups()))
+
+    def off(k):
+        return keys.get(k) == "NIE"
+
+    def legacy(key):
+        return next((e for e in ev[key] if "zapis sprzed E5" in e[1]), None)
+    stumb = 0
+    for t in days.values():
+        mt = re.search(r"potkniecia E5 (\d+)", t)
+        if mt:
+            stumb = max(stumb, int(mt.group(1)))
+    rep.add("E5-1: ERROR scen E5 i potkniecia E5", f"ERROR {n_err}" + (f" ({err_ex[0]})" if err_ex else "") + f", potkniecia E5 (najwiecej w linii doby) {stumb}", "0 i 0",
+            n_err == 0 and stumb == 0)
+
+    def first(key):
+        return ev[key][0] if ev[key] else None
+
+    # E5-2 orszak
+    pom = first("pominiety")
+    if off("orszak") and not ev["rusza"]:
+        rep.add("E5-2: orszak krola", "klucz PrologueRoyalProgress NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    elif pom and ("zapis sprzed E5" in pom[1] or "nie ozywiony" in pom[1]):
+        rep.add("E5-2: orszak krola", f"POMINIETY: {pom[1][:140]}", "INFO (zapis sprzed E5 / Robert nie ozywiony)", None)
+    else:
+        r0, w0, k0 = first("rusza"), first("winterfell"), first("kp")
+        parts = [f"rusza d{r0[0]}" if r0 else "bez linii RUSZA", f"Winterfell d{w0[0]}" if w0 else "Winterfell -", f"KP d{k0[0]}" if k0 else "KP -"]
+        if pom:
+            parts.append("PRZERWANY: " + pom[1][:100])
+        ok = None
+        if r0 and r0[0] is not None and r0[0] > 3:
+            ok = False
+        elif last_prol >= 40 and not (w0 and w0[0] is not None and w0[0] < 40):
+            ok = False
+        elif last_prol >= 100 and not (k0 and k0[0] is not None and k0[0] < 100):
+            ok = False
+        elif r0 and (last_prol >= 100 or (w0 and last_prol >= 40)):
+            ok = True
+        rep.add("E5-2: orszak krola (rusza, Winterfell, Krolewska Przystan)", ", ".join(parts) + f" (log do d{last_prol})", "rusza <= d3, Winterfell < d40, KP < d100 (krotszy log - INFO)", ok)
+    cb, inn = first("cb"), first("inn")
+    rep.add("E5-3: Tyrion na Mur i do gospody", (f"Czarny Zamek d{cb[0]}" if cb else "Czarny Zamek -") + ", " + (f"gospoda d{inn[0]}" if inn else "gospoda -"), "INFO (Tyrion bez druzyny - bez drogi)", None)
+    # E5-4 turniej
+    td, ts = first("t_done"), first("t_skip")
+    if off("turniej") and not td and not ev["t_proc"]:
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", "klucz PrologueHandTourney NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    elif td:
+        mw = re.search(r"\| zwyciezca (.*?) \| uczestnicy kanonu w drabince: (.*?) \| gracz (TAK|NIE)", td[1])
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", f"ROZSTRZYGNIETY d{td[0]}" + (f", zwyciezca {mw.group(1)}, gracz {mw.group(3)}" if mw else ""), "d123-127",
+                td[0] is not None and 123 <= td[0] < 128 and "town_EW4" in td[1])
+        if mw:
+            rep.add("E5-4b: uczestnicy kanonu w drabince", mw.group(2), "INFO (Gregor, Loras, Ogar, Jaime - ilu weszlo)", None)
+    elif ts:
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", ts[1][:160], "INFO przy zapisie sprzed E5, inaczej NIE", None if "zapis sprzed E5" in ts[1] else False)
+    else:
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", f"brak linii ROZSTRZYGNIETY (obwieszczony: {'TAK d' + str(first('t_proc')[0]) if ev['t_proc'] else 'NIE'})",
+                "d123-127 (log krotszy niz 128 dob - INFO)", None if last_prol < 128 else False)
+    # E5-5 Tyrion 110-132
+    win = [d for d in sorted(days) if 111 <= d <= 131]
+    bad = []
+    for d in win:
+        mt = re.search(r"\| Tyrion: (.*?) \| Jaime:", days[d])
+        t = mt.group(1) if mt else ""
+        if "jeniec town_EN1" not in t:
+            bad.append((d, t[:80]))
+    pas = [p for p in ev["passed"] if p[0] is not None and 110 <= p[0] <= 132 and "Tyrion" in p[1] and "Death" not in p[1]]
+    blk = [p for p in ev["blocked"] if "Tyrion" in p[1]]
+    p01 = [c for c in canon if c[0] == "p01"]
+    if off("tyrion") or off("follow"):
+        rep.add("E5-5: Tyrion jencem w Orlim Gniezdzie 110-132", "klucz " + ("PrologueTyrionHeld" if off("tyrion") else "CanonCompanionsFollowStory") + " NIE (linia startu)",
+                "INFO (straz wylaczona kluczem)", None)
+    elif not win:
+        rep.add("E5-5: Tyrion jencem w Orlim Gniezdzie 110-132", f"brak dob 111-131 w logu (#p01: {'TAK' if p01 else 'brak linii'})", "INFO (log krotszy)", None)
+    else:
+        rep.add("E5-5: Tyrion jencem w Orlim Gniezdzie 110-132", f"dob w oknie {len(win)}, poza lochem town_EN1 {len(bad)}" + (f" (d{bad[0][0]}: {bad[0][1]})" if bad else "")
+                + f", przepuszczone (nie smierc) {len(pas)}, zablokowane linie {len(blk)}, #p01 {'POMINIETA' if p01 and p01[0][1] else ('TAK' if p01 else 'brak linii')}",
+                "kazda doba 111-131 'jeniec town_EN1', 0 przepuszczonych", len(bad) == 0 and len(pas) == 0)
+    # E5-6 Jaime
+    p10 = [c for c in canon if c[0] == "p10"]
+    m01 = [c for c in canon if c[0] == "m01"]
+    if p10:
+        c = p10[-1]
+        rep.add("E5-6: Jaime jencem w Riverrun (#p10)", ("POMINIETA: " if c[1] else "") + c[2][:160], "#p10 wykonana: akcja prisoner:town_V2 (POMINIETA - NIE)",
+                (not c[1]) and "prisoner:town_V2" in c[2])
+    else:
+        rep.add("E5-6: Jaime jencem w Riverrun (#p10)", "brak linii #p10" + (f" (#m01: {'POMINIETA' if m01[-1][1] else 'wykonana!'})" if m01 else ""),
+                "INFO, gdy wojna Polnocy z korona jeszcze nie wybuchla (wyzwalacz war:battania:vlandia+5)", None if not (m01 and not m01[-1][1]) else False)
+
+    def presence(prefix, lo, hi):
+        seen, ok = 0, 0
+        for d in sorted(days):
+            if lo <= d <= hi:
+                seen += 1
+                mm = re.search(re.escape(prefix) + r" w polu (\d+)/", days[d])
+                if mm and int(mm.group(1)) >= 1:
+                    ok += 1
+        return seen, ok
+
+    kg0 = first("kg_new")
+    seen, okd = presence("klany gorskie:", 119, 186)
+    if off("klany") and not kg0:
+        rep.add("E5-7: klany gorskie Doliny", "klucz PrologueHillClans NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    elif legacy("kg_skip") and not kg0:
+        rep.add("E5-7: klany gorskie Doliny", "POMINIETE: " + legacy("kg_skip")[1][:120], "INFO (zapis sprzed E5)", None)
+    elif last_prol < 119:
+        rep.add("E5-7: klany gorskie Doliny", f"log do d{last_prol}", "INFO (log krotszy niz 119 dob)", None)
+    else:
+        rep.add("E5-7: klany gorskie Doliny", (f"pierwsza banda d{kg0[0]}" if kg0 else "bez nowej bandy" + (f" ({ev['kg_fail'][0][1][:100]})" if ev["kg_fail"] else ""))
+                + f", band od poczatku {len(ev['kg_new'])}, dob z banda w polu {okd}/{seen} (d119-186)", "pierwsza d118-119, w polu >= 80% dob okna",
+                bool(kg0) and kg0[0] is not None and 118 <= kg0[0] < 120 and (seen == 0 or okd >= 0.8 * seen))
+    mm0 = first("mm_new")
+    seen2, ok2 = presence("ludzie Gory:", 156, 186)
+    lost_all = len(ev["mm_lost"]) >= max(1, len(ev["mm_new"]))
+    if (off("gora") or legacy("mm_skip")) and not mm0:
+        why = "klucz PrologueMountainRaiders NIE (linia startu)" if off("gora") else "POMINIECI: " + legacy("mm_skip")[1][:120]
+        rep.add("E5-8: ludzie Gory w Dorzeczu", why, "INFO (scena wylaczona kluczem albo zapis sprzed E5)", None)
+        rep.add("E5-8b: spalone wsie Dorzecza", why, "INFO (scena wylaczona kluczem albo zapis sprzed E5)", None)
+    elif last_prol < 156:
+        rep.add("E5-8: ludzie Gory w Dorzeczu", f"log do d{last_prol}", "INFO (log krotszy niz 156 dob)", None)
+    else:
+        rep.add("E5-8: ludzie Gory w Dorzeczu", (f"pierwsza banda d{mm0[0]}" if mm0 else "bez nowej bandy") + f", band {len(ev['mm_new'])}, dob z banda w polu {ok2}/{seen2} (d156-186), rozbite {len(ev['mm_lost'])}",
+                "pierwsza d155-156, w polu >= 80% dob okna albo wszystkie rozbite w bitwie", bool(mm0) and mm0[0] is not None and 155 <= mm0[0] < 157 and (seen2 == 0 or ok2 >= 0.8 * seen2 or lost_all))
+        rep.add("E5-8b: spalone wsie Dorzecza", f"{len(ev['mm_burn'])}" + (f" (pierwsza: {ev['mm_burn'][0][1][:90]})" if ev["mm_burn"] else "") + f", powrot do domow linii {len(ev['mm_home'])}",
+                ">= 1 do d186 (krotszy log - INFO)", (len(ev["mm_burn"]) >= 1) if last_prol >= 186 or ev["mm_burn"] else None)
+    bg, bs = first("b_go"), first("b_skip")
+    if bg:
+        rep.add("E5-9: oddzial Berica", bg[1][:170], "rusza w d160-165", bg[0] is not None and 160 <= bg[0] < 166)
+    elif bs:
+        rep.add("E5-9: oddzial Berica", bs[1][:170], "INFO (POMINIETY - powod w linii)", None)
+    elif off("beric"):
+        rep.add("E5-9: oddzial Berica", "klucz PrologueBericHunt NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    else:
+        rep.add("E5-9: oddzial Berica", "brak linii", "rusza w d160-165 (log krotszy niz 166 dob - INFO)", None if last_prol < 166 else False)
+    after = [d for d in sorted(days) if d >= 189]
+    if after:
+        mp = re.search(r"partie pod scena (\d+)", days[after[0]])
+        rep.add("E5-10: po prologu wszystko oddane", f"doba {after[0]}: partie pod scena {mp.group(1) if mp else '?'}", "0", (mp is not None and int(mp.group(1)) == 0))
+    else:
+        rep.add("E5-10: po prologu wszystko oddane", f"log do d{last_prol}", "INFO (log krotszy niz 189 dob)", None)
+    rep.add("E5-11: straz niewoli", f"zablokowane linie {len(ev['blocked'])}, przepuszczone linie {len(ev['passed'])}" + (f" (ostatnia: {ev['passed'][-1][1][:100]})" if ev["passed"] else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m103sceny (21.10, w-toku/m103-sceny: 23 sceny prologu 298 jako okna w wygladzie wydarzen ROT, kazda w swoim
 # dniu prologu - projekt PROJEKT-PROLOG-298 pkt 2; obrazki z plikow Images\Prolog / Images\ROT; Armoury/src/Prologue.Scenes.cs, PrologueScenes.Data.cs, StoryWindow.cs,
 # StoryPictures.cs, RotWindowPictures.cs; klucze PrologueScenes, StoryImagesForRotWindows). Korzysta z M101_TAG, M101_END, M101_DAY, TS, Report.
@@ -37702,6 +37946,7 @@ M103_TAG = "Prolog (m103): "
 M103_PIC_TAG = "Obrazki (m103): "
 M103_DAYS = [0, 5, 12, 35, 40, 48, 55, 62, 75, 80, 95, 100, 110, 118, 125, 132, 138, 145, 155, 160, 172, 182, 186]
 M103_ARREST = 23   # numer sceny dnia 186 (po KONIEC PROLOGU)
+M103_TOURNEY, M103_TOURNEY_LAST = 15, 137   # recenzja m104: scena 15 (Turniej Reki) czeka na koniec turnieju sceny E5 ('czeka: Turniej Reki jeszcze trwa'), najdluzej do d137
 M103_START = re.compile(r"start sesji \| klucz Prologue Scenes (TAK|NIE) \| sceny pokazane (\d+)/(\d+), pominiete (\d+)(.*?)\| nastepna (\S+).*?\| katalog obrazkow (.*?) \| plikow: Prolog (\d+), ROT (\d+), Kronika (\d+) \| potkniecia (\d+)")
 M103_SHOW = re.compile(r"scena (\d\d) '(.*?)' pokazana \| dzien ([0-9.]+) \(nalezna od (\d+)\) \| obrazek (.*?) \| okno (.*?) \| gracz: (.*?) \| pokazane (\d+)/(\d+), pominiete (\d+) \| (\d+) ms\.")
 M103_CLOSE = re.compile(r"scena (\d\d) zamknieta po ([0-9.]+) s \((.*?)\)\.$")
@@ -37866,10 +38111,12 @@ def m103sceny_main(logp, csp=None, rglp=None):
         if nr == M103_ARREST and end_day is not None:
             if not (end_day <= d < end_day + 1.0):
                 late.append(f"{nr} dzien {d:.2f} (koniec prologu {end_day:.1f})")
+        elif nr == M103_TOURNEY and 0.0 <= d - due_day < M103_TOURNEY_LAST - due_day + 1.0:
+            pass   # recenzja m104: czekala na koniec Turnieju Reki (E5) - w oknie d125-137
         elif not (0.0 <= d - due_day < 1.0):
             late.append(f"{nr} dzien {d:.2f} (nalezna {due_day})")
     rep.add("SC-3: kazda scena w swoim dniu", f"poza dniem {len(late)} z {len(shows)}" + (f" ({'; '.join(late[:4])})" if late else ""),
-            "0 <= dzien pokazania - dzien nalezny < 1 (scena 23: w dobie KONCA PROLOGU)", len(late) == 0 if shows else None)
+            "0 <= dzien pokazania - dzien nalezny < 1 (scena 23: w dobie KONCA PROLOGU; scena 15: do d137 - czeka na koniec Turnieju Reki E5)", len(late) == 0 if shows else None)
     bad_order = []
     for a, b in zip(shown_nr, shown_nr[1:]):
         if b <= a:
@@ -55998,6 +56245,8 @@ def main(argv):
         return m101prolog_main(logp, csp)   # m101prolog (21.10, w-toku/m101-prolog): prolog 298 - kalendarz, start opowiesci ROT, pokoj i pakty, Robert i Ned, koniec prologu
     if group == "m103sceny" and logp:
         return m103sceny_main(logp, csp, rglp)   # m103sceny (21.10, w-toku/m103-sceny): 23 sceny prologu jako okna ROT, obrazki z plikow, okna ROT z obrazkami Jeffa
+    if group == "m104e5" and logp:
+        return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
     if group == "m100kryjowki" and logp:
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m102tablica" and logp:

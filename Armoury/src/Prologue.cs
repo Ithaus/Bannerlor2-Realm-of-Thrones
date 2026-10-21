@@ -188,7 +188,9 @@ namespace Armoury
             try { p = ApplyPeace(h); } catch (Exception e) { Stumble("ApplyPeace", e); p = "BLAD"; }
             try { k = ApplyKings(h); } catch (Exception e) { Stumble("ApplyKings", e); k = "BLAD"; }
             try { n = ApplyEnd(h); } catch (Exception e) { Stumble("ApplyEnd", e); n = "BLAD"; }
-            _restState = "pokoj i pakty: " + p + " | Robert i Ned z XML " + k + " | egzekucja Neda (NedEvent) " + n;
+            string w = "-";
+            try { w = ApplyWorld(h); } catch (Exception e) { Stumble("ApplyWorld", e); w = "BLAD"; }   // m104-e5: sceny zmieniajace swiat (straz niewoli, ...)
+            _restState = "pokoj i pakty: " + p + " | Robert i Ned z XML " + k + " | egzekucja Neda (NedEvent) " + n + " | sceny E5: " + w;
             Log.Info(Tag + "latki prologu (" + why + "): " + _restState + ".");
         }
 
@@ -200,6 +202,7 @@ namespace Armoury
             ResetKings();
             ResetEnd();
             ResetScenes();   // m103-sceny: maska scen prologu
+            ResetWorld();    // m104-e5: sceny zmieniajace swiat
         }
 
         // ---------------------------------------------------------------- zapis
@@ -207,7 +210,7 @@ namespace Armoury
         internal static string Pack()
         {
             if (!Active) return "";
-            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings() + PackEnd() + PackScenes();   // m103-sceny: sc= / sk=
+            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings() + PackEnd() + PackScenes() + PackWorld();   // m103-sceny: sc= / sk=; m104-e5: w*=
         }
 
         internal static void Unpack(string v)
@@ -229,6 +232,7 @@ namespace Armoury
             UnpackKings(map);
             UnpackEnd(map);
             UnpackScenes(map);   // m103-sceny: zapis bez "sc=" (WGRANIE 101) - minione sceny pominiete przy pierwszym ticku mapy
+            UnpackWorld(map);    // m104-e5: zapis bez "w*=" (sprzed E5) - sceny od biezacego dnia (minione - pominiete)
             if (Active) OnPrologueCampaign("wczytany zapis");
         }
 
@@ -300,6 +304,7 @@ namespace Armoury
             double day = PrologueDay();
             // recenzja R2: smierc krola (ponawiana, gdy krol w bitwie) i Ned w lochu - takze po dniu 208, inaczej krol w dlugim oblezeniu zostalby krolem na zawsze
             string end = DailyEnd();
+            try { DailyWorld(); } catch (Exception e) { Stumble("DailyWorld", e); }   // m104-e5: sceny zmieniajace swiat (po koncu prologu z dnia - partie oddane przed aresztem)
             if (day > PrologueDays + LogAfterStoryDays) return;
             bool before = BeforeStory();
             string peace = DailyPeace();
@@ -362,6 +367,28 @@ namespace Armoury
             CampaignEvents.CanHeroDieEvent.AddNonSerializedListener(this, Prologue.CanHeroDie);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
+            // m104-e5: sceny zmieniajace swiat - partie scen (flaga "bez nowych decyzji" poza zapisem gry, odbudowa po wczytaniu, ukrycie przed AI)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, OnHourly);
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, OnBeforeSave);
+            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, OnSaveOver);
+            CampaignEvents.TournamentFinished.AddNonSerializedListener(this, Prologue.OnTourneyFinished);   // m104-e5: Turniej Reki
+            CampaignEvents.TournamentCancelled.AddNonSerializedListener(this, Prologue.OnTourneyCancelled);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Prologue.OnWorldPartyDestroyed);   // m104-e5: kto rozbil Ludzi Gory
+        }
+
+        private void OnHourly()
+        {
+            try { Prologue.WorldHourly(); } catch (Exception e) { Prologue.Stumble("WorldHourly", e); }
+        }
+
+        private void OnBeforeSave()
+        {
+            try { Prologue.WorldBeforeSave(); } catch (Exception e) { Prologue.Stumble("WorldBeforeSave", e); }
+        }
+
+        private void OnSaveOver(bool ok, string name)
+        {
+            try { Prologue.WorldSaveOver(); } catch (Exception e) { Prologue.Stumble("WorldSaveOver", e); }
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -391,6 +418,7 @@ namespace Armoury
         {
             try { Prologue.StartLine(); } catch (Exception e) { Prologue.Stumble("StartLine", e); }
             try { Prologue.ScenesStartLine(); } catch (Exception e) { Prologue.Stumble("ScenesStartLine", e); }   // m103-sceny: linia startu scen prologu
+            try { Prologue.WorldStartLine(); } catch (Exception e) { Prologue.Stumble("WorldStartLine", e); }     // m104-e5: linia startu scen zmieniajacych swiat
             try { RotWindowPictures.StartLine(); } catch (Exception e) { Prologue.Stumble("RotWindowPictures.StartLine", e); }   // m103-sceny: obrazki okien (kazda kampania)
         }
     }

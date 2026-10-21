@@ -21,7 +21,9 @@ namespace GrandTourney
         private List<string> _hostCooldowns = new List<string>();   // "townId|day"
         private List<string> _adoptSilence = new List<string>();     // "townId|day" - po odwolaniu nie przejmuj od razu
 
-        public TourneyBehavior() { Instance = this; }
+        // m104-e5 (recenzja): turniej kanonu Armoury (CanonApi) - stan statyczny zerowany przy kazdej kampanii (nowa i wczytana), inaczej kampania klasyczna wczytana
+        // po prologu z nierozstrzygnietym Turniejem Reki dostawalaby kolejnosc kanonu w Krolewskiej Przystani; Armoury podaje uczestnikow ponownie po wczytaniu.
+        public TourneyBehavior() { Instance = this; CanonApi.SetHeroes(null, null); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -165,6 +167,29 @@ namespace GrandTourney
             catch (Exception e) { Log.Error("OnTournamentStarted", e); }
         }
 
+        /// <summary>m104-e5: turniej kanonu (Armoury, prolog 298 - CanonApi.ProclaimRoyal): wpis "|c" (bez reguly osmiu i bez spadku do lokalnego przy wojnie
+        /// krolestwa), turniej w miescie nowy albo przejety (wpis przed AddTournament - OnTournamentStarted nie oglasza drugi raz), wezwania jak zawsze.</summary>
+        internal string ProclaimCanon(Town town)
+        {
+            var mgr = Campaign.Current.TournamentManager;
+            var game = mgr.GetTournamentGame(town);
+            string had = game != null ? "przejety istniejacy turniej" : "nowy turniej";
+            int fee = PurseOf(town);
+            Remove(town);
+            _events.Add(town.Settlement.StringId + "|" + Today.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "|0|" + fee + "|c");
+            if (game == null)
+            {
+                game = Campaign.Current.Models.TournamentModel.CreateTournament(town);
+                mgr.AddTournament(game);
+            }
+            int invited = SummonLords(town, fee);
+            Log.Info("Turniej kanonu (Armoury, prolog 298) w " + town.Name + ": " + had + ", wezwano " + invited + " lordow, otwarcie za " + Settings.Current.GatherDays
+                     + " dni (bez reguly osmiu i bez spadku do lokalnego).");
+            return had + ", wezwano " + invited + " lordow, otwarcie za " + Settings.Current.GatherDays + " dni";
+        }
+
+        private static bool IsCanon(string[] p) { return p != null && p.Length > 4 && p[4] == "c"; }
+
         internal void Proclaim(Town town, int hostFeePaid)
         {
             try
@@ -303,6 +328,7 @@ namespace GrandTourney
                     foreach (var mp in MobileParty.All)
                     {
                         if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
+                        if (CanonApi.Skip(mp)) continue;                  // m104-e5: partia sceny prologu Armoury (orszak, Beric, uczestnik kanonu w drodze)
                         var lord = mp.LeaderHero;
                         if (lord == null || !lord.IsAlive || !lord.IsLord || lord.IsWounded || lord.IsPrisoner) continue;
 
@@ -464,7 +490,8 @@ namespace GrandTourney
                     if (state != 0) continue;
 
                     // wojna doszla pod mury, zanim goscie dojechali - impreza odwolana
-                    if (s.PeaceOnly && WarAtTheGates(town))
+                    // m104-e5: turniej kanonu (krolewski) odwoluje tylko oblezenie albo bunt - nie wroga druzyna w okolicy (np. brotherhood w stalej wojnie z korona)
+                    if (s.PeaceOnly && (IsCanon(p) ? (town.Settlement.IsUnderSiege || town.InRebelliousState) : WarAtTheGates(town)))
                     {
                         _events.Remove(line);
                         TourneyRansom.CallOff(game, town);   // R3-04a: odwolanie bez wykupu
@@ -486,7 +513,8 @@ namespace GrandTourney
                     // wojna wybuchla GOSPODARZOWI w trakcie zjazdu: lordowie jada na
                     // front (ReleaseWarBound juz ich puscil), a impreza nie umiera -
                     // schodzi do rangi lokalnej ze skromna nagroda
-                    if (s.LocalWhenAtWar && RealmAtWar(town.Settlement.MapFaction))
+                    // m104-e5: turniej kanonu (krolewski) nie schodzi do lokalnego
+                    if (s.LocalWhenAtWar && !IsCanon(p) && RealmAtWar(town.Settlement.MapFaction))
                     {
                         _events.Remove(line);
                         SetLocalPrize(game);
@@ -513,7 +541,7 @@ namespace GrandTourney
                     }
 
                     int lords = CountLordsPresent(town);
-                    if (lords >= s.MinLordsToHold)
+                    if (lords >= s.MinLordsToHold || IsCanon(p))   // m104-e5: turniej kanonu otwiera sie jako Grand bez reguly osmiu
                     {
                         _events.Remove(line);
                         _events.Add(p[0] + "|" + p[1] + "|1|" + fee);
@@ -558,6 +586,7 @@ namespace GrandTourney
         {
             try
             {
+                if (town != null) CanonApi.Done(town.Settlement);   // m104-e5
                 var line = Find(town);
                 if (line == null) return;
                 int purse = PurseOf(town);
@@ -625,6 +654,7 @@ namespace GrandTourney
         {
             try
             {
+                if (town != null) CanonApi.Done(town.Settlement);   // m104-e5
                 int purse = PurseOf(town);
                 Remove(town);
                 if (purse > 0 && Settings.Current.HistoricalTownRates) PayPurse(winner, town, purse);

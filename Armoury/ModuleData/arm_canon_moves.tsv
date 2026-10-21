@@ -82,9 +82,10 @@ ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
 # mode: empty = every campaign, prolog = only a campaign started with the prologue (m101-prolog), classic = only the classic start.
 # message: shown to the player only if he knows the character or his realm is one of the two sides; empty = log only.
 #move	id	who	name	trigger	action	mode	message	note
-m01	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:clan_battania_1			Whispering Wood - taken by Robb Stark's host (before Ned's execution in the book; in ROT the war of the North starts with NedEvent)
+m01	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:clan_battania_1	classic		Whispering Wood - taken by Robb Stark's host (before Ned's execution in the book; in ROT the war of the North starts with NedEvent); classic start only - in Prologue 298 row p10 holds him at Riverrun
+p10	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:town_V2	prolog		Whispering Wood - taken by Robb Stark's host and held at Riverrun until Catelyn frees him (m02); Jeff 21.10: Riverrun. MCM Prologue Jaime At Riverrun: no escape or ransom until then (m104-e5)
 m02	ROTwanderer1	Jaime Lannister	done:BlackwaterEvent	free:clan_vlandia_1		Jaime Lannister has been set free and rides home to his house.	Catelyn frees him (end of A Clash of Kings)
-p01	ROTwanderer8	Tyrion Lannister	prolday:110	prisoner:town_EN1	prolog		Catelyn seizes him at the crossroads inn and takes him to the Eyrie
+p01	ROTwanderer8	Tyrion Lannister	prolday:110	prisoner:town_EN1	prolog		Catelyn seizes him at the crossroads inn and takes him to the Eyrie; MCM Prologue Tyrion Held: no escape or ransom until the trial (p02, m104-e5)
 p02	ROTwanderer8	Tyrion Lannister	prolday:132	free:clan_vlandia_1	prolog		trial by combat at the Eyrie, Bronn is his champion
 m03	ROTwanderer8	Tyrion Lannister	ev:JoffreyEvent+40	clan:clan_khuzait_2		Tyrion Lannister has fled across the narrow sea.	accused of Joffrey's death, kills Tywin and flees; in Essos with the Second Sons (A Dance with Dragons)
 m04	ROTwanderer8	Tyrion Lannister	ev:DanyInvasionEvent	clan:clan_empire_south_1		Tyrion Lannister sails with Daenerys Targaryen as her Hand.	Hand of the Queen
