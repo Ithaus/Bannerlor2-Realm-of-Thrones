@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 98 - plotki w karczmie i zajezdzie: turnieje, swaty, kufel za plotki wedlug Uroku, pijanstwo i kac)
+
+**Zakres (Jeff 20.10, doslownie):** "W gossip tez powinny byc turnieje, gdzie jest turniej itp. ... ktos wydaje zone albo szuka meza dla swojej corki ... musze kupic piwo
+lub ale cokolwiek, aby sluchac"; "za kazde wypite piwo moge dostac tyle plotek, ile moja charyzma ... jak wypije za duzo piwa, mam minus do predkosci i musze dospac,
+i nastepny dzien kac".
+**Zmiana:** `w-toku/n27-calosc` = WGRANIE 97 + m98-plotki (c76531de): InnGossipNeedsDrink (kufel = beczka/10, min 1 d, do karczmarza - HeroPays/RoadHeroPays,
+komunikat z powodem), GossipPerDrinkByCharm (Urok 20 -> 1, 80 -> 2, 150 -> 3, 200 -> 4, 250 -> wszystkie; 5 XP Uroku za plotke; uslyszane po tozsamosci wiesci 10 dob),
+GossipTournaments (turnieje - tylko trwajace), GossipMatchmaking (swaty - wolni dorosli lordowie), DrinkDrunkHangover (prog 3-5 kufli; pijany -15% + 5%/kufel, max -25%,
+odespanie 6 h + 1 h/kufel; kac -10% predkosci i morale do 18:00, bez premii lozka). Wpis: docs/noc-1920/m98-plotki-CHANGELOG.md. Armoury 2204 ustawien.
+**Testy (20/21.10):** 98-bitwa 4/4, 98-nowa 180/180, 98-160 400/400 - kod 0, ERROR 0; progi nowa 3147/NIE 114 (97b: 127); m98plotki 9/9 TAK, nzajazdy TAK.
+**Ryzyko / co sprawdzic:** kac zabiera premie lozka po zapitej nocy w karczmie (zamierzone - do oceny Jeffa); banda w plotkach wraca, gdy zmieni miejsce (promien 25/50 jedn.).
+**Status:** WGRANE 98 (21.10 00:55, tag 2026-10-21-wgranie98; Armoury 2e8b4dac, CrashScribe b1287a14, RC b8fa2031, GT fa5cfba9, ForgeView 7d9e8091).
+
 ## 2026-10-21 (WGRANIE 97 - noc 20/21: wioski poboczne jak wsie + obroncy, oboz 21-3 i spacer, szkolenie w obozie, posilki DR z marszu, czardrzewo i smocza kosc)
 
 **Zakres (Jeff 20.10, doslownie, wybor):** "Czy mozemy zrobic tak, ze do wioski pobocznej tez mozna wjechac jak do wioski glownej ... bez bohaterow w niej?"; "ale ja chce, aby to
