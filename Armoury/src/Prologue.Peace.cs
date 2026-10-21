@@ -131,13 +131,17 @@ namespace Armoury
             catch (Exception e) { Stumble("WarPrefix", e); return true; }
         }
 
-        /// <summary>Prefiks AllianceCampaignBehavior.StartCallToWarAgreement: w prologu krol i jego sojusznicy z prologu nie wzywaja sie do wojen.</summary>
-        public static bool CallToWarPrefix(Kingdom callingKingdom, Kingdom calledKingdom)
+        /// <summary>Prefiks AllianceCampaignBehavior.StartCallToWarAgreement: w prologu krol i jego sojusznicy z prologu nie wzywaja sie do wojen; zadne wezwanie nie
+        /// wciaga krolestwa Westeros do wojny z krolestwem Westeros (recenzja R4: ta sama regula co WarPrefix, ale PRZED rejestracja porozumienia, przelewem
+        /// CallToWarWallet / zlota gracza i premia relacji - inaczej powstaje porozumienie bez wojny, a gracz placi za nic).</summary>
+        public static bool CallToWarPrefix(Kingdom callingKingdom, Kingdom calledKingdom, Kingdom kingdomToCallToWarAgainst)
         {
             try
             {
                 if (!PeaceOn || callingKingdom == null || calledKingdom == null) return true;
-                if (!IsPrologueAlliance(callingKingdom, calledKingdom)) return true;
+                bool realmWar = kingdomToCallToWarAgainst != null && calledKingdom != kingdomToCallToWarAgainst && IsRealm(calledKingdom) && IsRealm(kingdomToCallToWarAgainst)
+                                && !PlayerRules(calledKingdom) && !PlayerRules(kingdomToCallToWarAgainst);
+                if (!realmWar && !IsPrologueAlliance(callingKingdom, calledKingdom)) return true;
                 _callsBlockedDay++;
                 return false;
             }
