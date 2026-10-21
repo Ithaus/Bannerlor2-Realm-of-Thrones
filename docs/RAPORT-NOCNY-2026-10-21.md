@@ -10,6 +10,7 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **WGRANIE 99** (markietani w dużych obozach) jest w grze od 21.10 03:50. Testy przeszły bez błędów.
 - **WGRANIE 100** (kryjówki bandytów) jest w grze od 21.10 05:50. Testy przeszły bez błędów. Przy pierwszym uruchomieniu gry po wyłączeniu VoiceActingPatchRemake może pojawić się okno launchera o liście modów - wystarczy je potwierdzić.
 - **Szkolenie lordów komputera:** też tylko w obozie, tak jak zdecydowałeś (ustawione w MCM, kopia pliku jest obok).
+- **WGRANIE 101** jest w grze od 21.10 08:05: **prolog 298** (start od wyjazdu Roberta, w nowej kampanii), **postacie kanonu w rodach** (Jaime, Tyrion i inni nie są już do wynajęcia; zmieniają strony według książki) i **tablica ogłoszeń** w miastach (zlecenia, kapitan straży z listami gończymi). Test prologu przeszedł w grze: w dniu 186 ginie Robert, królem zostaje Joffrey, Ned trafia do lochu, a 9 dni później ROT go stracą i Północ przejmuje Robb. Sceny prologu (okna z tekstem i Twoimi obrazkami) dojdą w następnej wersji.
 - **VoiceActingPatchRemake jest wyłączony** (jak chciałeś). Postacie w rozmowach nie mówią już głosem z Fish Audio. Kopia listy modów jest obok (LauncherData.xml.bak-2026-10-21-bez-voiceacting).
 - **Twoje zapisy są nietknięte.** Testy sprawdzają to za każdym razem (104 pliki, sumy kontrolne bez zmian).
 - **Limit tygodniowy:** około 95% przy pisaniu. Rzeczy, których nie zdążyłem, są rozpisane do przekazania na końcu raportu.
