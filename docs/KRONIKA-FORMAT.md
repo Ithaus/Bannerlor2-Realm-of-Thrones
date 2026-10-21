@@ -4,6 +4,8 @@ Stan: 21.10.2026, galaz `w-toku/kronika-dane` (baza n31-calosc 59a054b7). Warstw
 Poprawki po paczkach K1-K10 (21.10, commit "117 wydarzen K1-K10"): 3.3 `kr:` przy wylaczonej Kronice = FALSZ (nigdy); 8 stan par i `remove->hide`
 tylko razem z K0; 10/11 jednostki dni, `hide` na ukrytym i koniec ukrycia "nigdy"; 12 uchwyty z opisem dla K0 i kolumna gdzie; 13 `@cel` w oldage
 i wizja; 17 nowe reguly walidatora. Dziennik galezi: `docs/noc-1920/kronika-dane-CHANGELOG.md`.
+Recenzja danych (21.10, commit "poprawki po recenzji"): 11 przyklad glowy rodu (Kevan juz nie ginie w 095.1) i `unhide` nieukrytego; sciezki
+ksiazka/serial Brienne rozdzielone warunkami (047.2 `przed` = `kr:083.1`, 070.2a i 083.1a bez Brienne po drugiej sciezce) - lista w dzienniku.
 Zrodla: `docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md` (repo glowne) sekcja "## PLAN kronika" (B P1-P10, D, E, F, G)
 oraz "## kronika:A" i "## kronika:B"; `docs/KRONIKA-WESTEROS-V2-2026-10-21.md` (117 wydarzen, decyzje Jeffa).
 Silnik K0 (Chronicle*.cs) powstanie pozniej i ma czytac DOKLADNIE ten format. Walidator: `tools/kronika/kronika_check.py`.
@@ -333,9 +335,13 @@ Zasady silnika K0 ustalone po paczkach K1-K10 (21.10):
 - **`dragon_*`** = smoki (dragon_black ... dragon_smoke2, dragon_thumbnail w ROTassets.xml). `dragonglass_axe` i `dragonstone_*` to zwykly sprzet
   (wolno w `item`, gdy ma posiadacza - dzis topora z obsydianu nikt nie nosi, wiec akcja bylaby POMINIETA).
 - **Towary** (`ware`, `#zadanie co`): id z XML albo z kodu gry (DefaultItems: grain, meat, hides, tools, iron, hardwood, charcoal, ironIngot1-6).
-- **`die`/`hide` na postaci, ktora W CHWILI AKCJI jest glowa rodu albo wladca** (stan gry - walidator widzi tylko glowy z XML; np. Kevan
-  lord_4_13 po 052.1, gdy 095.1 opcja b go zabija): akcja z wiersza/opcji `lekka` albo `obie` = POMINIETA `glowa rodu - tylko pelna` (wersja lekka
+- **`die`/`hide` na postaci, ktora W CHWILI AKCJI jest glowa rodu albo wladca** (stan gry - walidator widzi tylko glowy z XML; np. Donella
+  lord_7_5_2 w 020.1a, gdyby po smierci Halysa gra zrobila ja glowa Hornwoodow): akcja z wiersza/opcji `lekka` albo `obie` = POMINIETA `glowa rodu - tylko pelna` (wersja lekka
   nie zmienia glow rodow, rozdz. 16.4); z wiersza `pelna` = smierc z dziedzicem wybranym przez gre (dla `hide` - zawsze POMINIETA).
+  Dlatego okna nie zabijaja w opcjach `obie` postaci, ktora inne okno robi glowa rodu (recenzja 21.10: 095.1 nie zabija juz Kevana - po 052.1
+  jest glowa Lannisterow; ginie w 080.1, ktore ma warianty `succeed`).
+- **`unhide` na postaci, ktorej Kronika nie ukryla** (np. Bran lord_5_7 w 088.2 i 098.1 - zadne okno go nie ukrywa, bo po Krwawych Godach
+  jest glowa Starkow) = POMINIETA `nie ukryty`, bez teleportu - postac zostaje tam, gdzie jest w grze.
 - **Akcja z rodem/bohaterem, ktorego nie ma w grze** (np. `relk:brotherhood`, gdy Bractwo nie ma przywodcy; `item` z rodu, w ktorym nikt nie nosi
   przedmiotu) = POMINIETA z powodem, reszta skutkow idzie dalej.
 

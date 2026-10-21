@@ -2,6 +2,60 @@
 
 (Plik przeniesiony 21.10 z `docs/kronika-dane-CHANGELOG.md` do `docs/noc-1920/` - jak dzienniki pozostalych galezi.)
 
+## 2026-10-21 - poprawki po recenzji danych K1-K10
+
+**Problem:** recenzja calosci paczek k01-k10 (przeczytane wszystkie 210 okien / 348 wierszy, opcje, wiesci, bandy, zadania - nie tylko probka):
+kanon i v2, cytaty, warunki piaskownicy, kolejnosc osi, wersja lekka, chronione postacie, duble z oknami ROT i scenami prologu (PrologueScenes.Data.cs
+01-23 koncza sie na upadku Reki - dubli brak), angielski. Walidator byl czysty, ale znalazly sie bledy, ktorych walidator nie widzi (tresc vs stan swiata):
+- 047.2 szlo PO 070.2 (`po=kr:070.2+5`, jak w v2), a tekst opowiadal je w kolejnosci ksiazki i drugi raz pokazywal spotkanie Brienne z Jaimem ("Days later
+  she finds Jaime") - to samo spotkanie konczy 070.2. Do tego sciezka serialu (083.1 - Brienne ratuje Sanse, ok. 1410) i ksiazki (047.2 - sad Pani
+  w Kapturze i ukrycie Brienne na 30 dni, ok. 1430) mogly przyjsc obie, w dowolnej kolejnosci.
+- 095.1 (Wielki Sept, serial) zabijal Kevana w opcjach `obie` (a i b), a wiesci N1/N2 mowily o jego smierci; po 052.1 (wyjatek lekki `succeed`)
+  Kevan jest glowa Lannisterow, wiec `die` bylby POMINIETY (FORMAT 11) - tekst klamalby w kazdej kampanii kanonicznej. Kevan i tak ginie w 080.1
+  (Varys, ksiazka), ktore ma na to warianty `succeed`.
+- 115.2 (gruzy Czerwonej Twierdzy, Kleganowie) przychodzilo tez po lagodnej wersji Dzwonow 115.1a (miasto oddane bez ognia) - `kr:115.1` jest
+  prawdziwe dla obu wierszy.
+- 051.1 (koronacja Tommena) = `done:JoffreyEvent+15`, a smierc Tywina (052.1, m03) = `ev:JoffreyEvent+40`: okno przychodzi za zycia Tywina,
+  a tekst mowil o regencji Cersei i Kevanie odmawiajacym sluzby (to jest po smierci Tywina).
+- 090.1/090.1a: "On the road to Oldtown" - a 905.1 (wczesniej, od 1200) mowi, ze Sam juz dotarl do Cytadeli (Marwyn).
+- Drobne fakty i piaskownica: 075.3 z jamy uwalnia sie "jeden" smok (ksiazka: oba); 079.1 Zlota Kompania "w Myr wsiada na statki" (zrywa kontrakt
+  z Myr, nie wsiada tam); 097.1a/b "Sept splonal z polowa ich rodu" - nieprawda po opcji a w 095.1 (Tyrellowie ostrzezeni uciekli), a "{ROSE}, now at
+  the head" - nieprawda, gdy glowa Tyrellow sie nie zmienila (Mace zyje w lekkiej); 117.2c "miasto odbudowane z popiolow" - po 115.1a nie splonelo;
+  049.2 "her dead sister" - warunki nie sprawdzaja smierci Catelyn; 060.2 "Winter is coming to..." - haslo Starkow jako zdanie opisu (zasada bez cytatow).
+- 071.2 przenosi Alys (`clan:` do Thennow) bez sprawdzenia, czy nie jest glowa Karstarkow (wersja lekka nie zmienia glow rodow, FORMAT 16.4).
+- 088.2 i 098.1 robia `unhide` Brana, ktorego zadne okno nie ukrywa (po Krwawych Godach jest glowa Starkow) - FORMAT nie mowil, co wtedy robi K0.
+**Zmiana:**
+- k04 047.2: `przed=kr:083.1` (po oknie serialu przepada, nie ma `_W`); gora/dol napisane jako wyjasnienie wstecz ("Only now does the truth come out ...
+  the tale of Sansa was the price of her life") zamiast drugiego spotkania; Jaime bez akcji (zostaje przy rodzie, decyzja v2 47), `hide` Brienne bez zmian.
+- k06 070.2a (Raventree bez Brienne): warunek `dead:ROTwanderer9 | kr:083.1`; k07 083.1a (Sansa jedzie bez Brienne): `dead:ROTwanderer9 | kr:047.2`.
+  Sciezki Brienne ksiazka/serial sie wykluczaja.
+- k08 095.1: bez `die:lord_4_13` w opcjach a i b; N1 "The High Sparrow and hundreds of the faithful die", N2 bez Kevana.
+- k10 115.2: warunki `+ & flag:k115_ostra` (wariant d Kleganow dziedziczy).
+- k05 051.1a NOWY wariant (`alive:lord_4_1`, obie, lektor 1): ten sam gorny akapit, dolny - Tywin rzadzi jako Reka i chce wydac corke i odeslac
+  ja na Casterly Rock (ksiazka), skutek `rel:lord_4_2:lord_4_1:-10`. Id nowe (paczka niewgrana - bez nagrobka).
+- k06 071.2: `+ & !head:lord_2_18_1:clan_sturgia_6`.
+- Teksty: 090.1/090.1a "Samwell Tarly rides out from Oldtown to bring ..."; 075.3 "both dragons break loose"; 079.1 "breaks its contract with Myr ...
+  take ship for the west beneath a banner they have never followed"; 097.1a/b "Since the Great Sept burned, the roses want ..." i "{ROSE}, head of
+  House Tyrell"; 117.2c "sits the Iron Throne in King's Landing"; 049.2 "her sister"; 060.2 "Winter is closing in on the Mountains of the Moon".
+- `docs/KRONIKA-FORMAT.md`: naglowek (lista poprawek); rozdz. 11 - przyklad glowy rodu zmieniony (Kevan juz nie w 095.1, zasada: nie zabijac w opcjach
+  `obie` postaci, ktora inne okno robi glowa rodu) i nowa zasada K0: `unhide` postaci nieukrytej przez Kronike = POMINIETA `nie ukryty`, bez teleportu.
+- Generatory paczek (scratchpad 7aee5f12 `k34/`, `k56/`, `k78/gen.py`, `k910/gen.py`) NIE sa zaktualizowane - od tego commitu zrodlem sa pliki TSV
+  w repo (ponowne uruchomienie generatora cofneloby te poprawki).
+**Liczby po poprawkach (--stat):** k01-k10: okien 210 (wierszy 349 - +1 wariant 051.1a), wyborow 41, band 20, zadan 10, okien z lektor=1 200
+(wierszy 311), znakow lektora 147087. K4 12873, K5 18843 (41 wierszy, 39 z lektorem), K7 14914, K8 12636 znakow; reszta bez zmian.
+**Testy:** `python -I tools/kronika/kronika_check.py` (k00-k10): **0 bledow, 0 uwag, WYNIK OK** (pojemnosc linii nowych tekstow - walidator, linie.py).
+Odwolania nowe: `kr:083.1` (k04 -> k07), `kr:047.2` (k07 -> k04) - znane walidatorowi, bez UWAG.
+**Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0):**
+- Gra Jeffa bez zmian: same dane, ktore czyta dopiero silnik K0 (go nie ma); `arm_canon_moves.tsv` nietkniety; nic nie wgrywane.
+- 047.2 przepada (bez wiesci) na sciezce serialu - linia `POMINIETE ... 083.1 juz ruszylo`. 115.2 i 116.1 po lagodnych Dzwonach czekaja na flage,
+  ktora nie przyjdzie (bez `do`) - nic nie pokazuja; to samo robilo juz 116.1.
+- Swiadomie BEZ zmian (zapis dla K0/Jeffa): 112.2 Arya zabija Nocnego Krola w bozym gaju bez termu "kto zabil" (luka z FORMAT 12); 109 Twardy Dom
+  dopiero, gdy Inni zajma go na mapie (ok. 2167, v2) - dlugo po smierci Jona; kolejnosc 070.1 list -> 070.2 Raventree (v2, w ksiazce odwrotnie);
+  078.1 Synowie Harpii w jamie Daznaka (element serialu); 063.1 tylko, gdy Riverrun ma rod Blackfisha (v2: ROT daje mu zamek na Krwawych Godach);
+  116.2 w lekkiej Jon (krol Polnocy) zostaje jencem rodu Daenerys bez terminu; 059.2 wymaga Deepwood Motte u Zelaznych (ROT start: Glover) - rzadko.
+- Decyzje Jeffa z poprzedniego wpisu (smierci kanoniczne tylko w `pelna`, nowe wiersze `#move` dla Theona/Brienne/Podricka/Jaimego) - aktualne.
+**Status:** DANE (bez C#), nie wgrywane - silnik K0 pozniej (plan E).
+
 ## 2026-10-21 - 117 wydarzen K1-K10 (paczki tresci, scalenie, poprawki walidatora i formatu)
 
 **Problem:** Kronika Westeros miala format, walidator i 2 okna testowe (k00), ale zadnej tresci. Decyzje Jeffa: wszystkie 117 wydarzen, teksty EN
