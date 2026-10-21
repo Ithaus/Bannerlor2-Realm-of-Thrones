@@ -91,7 +91,7 @@ namespace Armoury
 
         private static void ResetWatch()
         {
-            _notices.Clear(); _harm.Clear();
+            _notices.Clear(); _harm.Clear(); _vilTown.Clear(); _secV1 = -1;
             _captainTalk = false; _captainChar = null; _talkNotice = null;
             ZeroWatchDay();
         }
@@ -120,7 +120,7 @@ namespace Armoury
         /// <summary>Linia "Listy goncze (m102): wpiete" (po rejestracji menu i rozmow).</summary>
         private static void WatchStartLine()
         {
-            Log.Info(PW + "wpiete - zdarzenia " + _wEvents + "/3 (MobilePartyDestroyed, MapEventEnded, RaidCompleted), dialog kapitana " + _wDialog + "/7, dialog soltysa " + _hDialog + "/8, opcja karty 1/1, zapis arm_board " + Ver
+            Log.Info(PW + "wpiete - zdarzenia " + _wEvents + "/3 (MobilePartyDestroyed, MapEventEnded, RaidCompleted), dialog kapitana " + _wDialog + "/7, dialog soltysa " + _hDialog + "/8, opcja karty 1/1, zapis arm_board " + Ver2 + " (odczyt takze " + Ver + ")"
                      + "; klucz Watch Bounties " + YN(WatchOn) + ", na miasto " + PerTown + ", dni " + DaysUp + ", promien " + MaxBandDist.ToString("0", Inv) + " jedn.");
         }
 
@@ -252,8 +252,31 @@ namespace Armoury
             List<Harm> l;
             if (band == null || !_harm.TryGetValue(band, out l)) return 0;
             int n = 0, from = Today - HarmDays;
-            foreach (var h in l) if (h.Kind == kind && h.Day >= from && h.Town == town) n++;
+            foreach (var h in l) if (h.Kind == kind && h.Day >= from && HarmTown(h) == town) n++;
             return n;
+        }
+
+        /// <summary>m103-drobne: miasto szkody - zapisane albo (zapis nb2, rabunek wsi) z wsi: Village.Bound, jak przy AddHarm z OnRaidCompleted.</summary>
+        private static string HarmTown(Harm h) { return h.Town ?? VilTown(h.Vil); }
+
+        private static readonly Dictionary<string, string> _vilTown = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        /// <summary>m103-drobne: miasto (albo zamek) wsi - Village.Bound (stale w grze); pamiec tylko udanych odczytow. Brak wsi - "".</summary>
+        private static string VilTown(string vil)
+        {
+            if (string.IsNullOrEmpty(vil)) return "";
+            string t;
+            if (_vilTown.TryGetValue(vil, out t)) return t;
+            try
+            {
+                var vs = Settlement.Find(vil);
+                var b = vs != null && vs.Village != null ? vs.Village.Bound : null;
+                t = b != null ? b.StringId : null;
+            }
+            catch { t = null; }
+            if (string.IsNullOrEmpty(t)) return "";
+            _vilTown[vil] = t;
+            return t;
         }
 
         private static string HarmText(Notice n)
@@ -729,6 +752,8 @@ namespace Armoury
                 string exp = Export();
                 int bytes = exp != null ? exp.Length : 0;
                 double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+                // m103-drobne: pomiar - stary format nb1 w tym samym stanie (poza kosztem doby; tylko do linii)
+                try { var v1 = ExportV1(); _secV1 = v1 != null ? v1.Length : 0; } catch { _secV1 = -1; }
                 Log.Info(PW + "dzien " + day + ", klucz " + YN(WatchOn) + ", band poza osadami " + bands + ", miasta z banda " + withBand + "/" + Town.AllTowns.Count + ", z listem " + withNotice
                          + ", bez nowego listu: brak kasy " + noCash + ", limit " + atLimit + ", kazda banda z listem " + allPosted + ", oblezone " + besieged + ", dlug rady " + inDebt + ", bez pana " + noLord
                          + ", klucz " + keyOff + ", inne " + other
@@ -737,7 +762,7 @@ namespace Armoury
                          + ", od panow " + _wFromLordPurse + ", z kies wsi " + _wFromVillage + "), niedoplata " + _wShort + ", z niczego " + _wFromNothing
                          + "; zdjete " + (_wDropGuard + _wDropEnemy + _wDropGone + _wDropDue + _wDropOwner + _wDropKey) + " (straz/karawana " + _wDropGuard + ", wrog miasta " + _wDropEnemy + ", banda znikla " + _wDropGone
                          + ", termin " + _wDropDue + ", zmiana pana " + _wDropOwner + ", klucz " + _wDropKey + "); kasa ponizej Keep po wyplacie " + _wBelowKeep
-                         + HeadmanDayText() + "; zapis arm_board " + bytes + " B; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
+                         + HeadmanDayText() + "; zapis arm_board " + bytes + " B; " + SaveMixText(bytes) + "; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
             }
             catch (Exception e) { WStumble("WatchDaily(linia)", e); }
             ZeroWatchDay();
@@ -821,9 +846,108 @@ namespace Armoury
                 {
                     var h = kv.Value[i];
                     if (i > 0) sb.Append('/');
-                    sb.Append(h.Day.ToString(Inv)).Append(',').Append(h.Kind.ToString(Inv)).Append(',').Append(Safe(h.Town).Replace(",", ".")).Append(',').Append(Safe(h.Vil).Replace(",", "."));
+                    sb.Append(h.Day.ToString(Inv)).Append(',').Append(h.Kind.ToString(Inv)).Append(',').Append(Safe(HarmTown(h)).Replace(",", ".")).Append(',').Append(Safe(h.Vil).Replace(",", "."));   // m103-drobne: miasto z wsi po wczytaniu nb2
                 }
             }
+        }
+
+        /// <summary>m103-drobne (zapis nb2): listy "miasto~banda~ludzie~kwota~termin-D~TL~rodzaj~rod pana[~soltys~wies]" (bez nazwy, dni, doplaty, S i doby wywieszenia -
+        /// nikt ich po wywieszeniu nie czyta) i szkody "banda~D-doba,rodzaj[,miasto[,wies]]/..." - miasto puste: przy wsi z Village.Bound tej wsi, bez wsi - jak poprzedni
+        /// wpis tej bandy bez wsi; wpisy starsze niz HarmDays pominiete (nikt ich nie liczy). Zwraca liczbe zapisanych wpisow szkod.</summary>
+        private static int WatchExport2(StringBuilder w, StringBuilder h, int d0, IdTable ids)
+        {
+            foreach (var n in _notices)
+            {
+                if (w.Length > 0) w.Append(';');
+                w.Append(ids.Enc(n.Town)).Append('~').Append(ids.Enc(n.Band)).Append('~').Append(n.Men.ToString(Inv)).Append('~').Append(n.Sum.ToString(Inv))
+                 .Append('~').Append((n.Due - d0).ToString(Inv)).Append('~').Append(n.Taken ? "T" : "").Append(n.Lord ? "L" : "").Append('~').Append(n.Kind.ToString(Inv))
+                 .Append('~').Append(ids.Enc(n.Owner));
+                bool g = !string.IsNullOrEmpty(n.Giver), v = !string.IsNullOrEmpty(n.Village);
+                if (g || v) w.Append('~').Append(g ? ids.Enc(n.Giver) : "").Append('~').Append(v ? ids.Enc(n.Village) : "");
+            }
+            int cnt = 0;
+            foreach (var kv in _harm)
+            {
+                bool live = false;
+                foreach (var e in kv.Value) if (d0 - e.Day <= HarmDays) { live = true; break; }
+                if (!live) continue;   // banda bez zywych wpisow - bez klucza (i bez przedrostka w P)
+                if (h.Length > 0) h.Append(';');
+                h.Append(ids.Enc(kv.Key)).Append('~');
+                string last = null;
+                int inBand = 0;
+                foreach (var e in kv.Value)
+                {
+                    if (d0 - e.Day > HarmDays) continue;   // nikt go juz nie liczy (HarmCount 60 dob, soltysi 30)
+                    if (inBand > 0) h.Append('/');
+                    h.Append((d0 - e.Day).ToString(Inv)).Append(',').Append(e.Kind.ToString(Inv));
+                    string town = HarmTown(e) ?? "", vil = e.Vil ?? "";
+                    if (vil.Length > 0)
+                    {
+                        string tw = VilTown(vil) == town ? "" : ids.Enc(town).Replace(",", ".");
+                        h.Append(',').Append(tw).Append(',').Append(ids.Enc(vil).Replace(",", "."));
+                    }
+                    else
+                    {
+                        if (town != last) h.Append(',').Append(ids.Enc(town).Replace(",", "."));
+                        last = town;
+                    }
+                    inBand++;
+                }
+                cnt += inBand;
+            }
+            return cnt;
+        }
+
+        /// <summary>m103-drobne: odczyt czesci W= i H= zapisu nb2 (d0 - doba zapisu, pre - tablica przedrostkow).</summary>
+        private static void WatchImport2(string p, int d0, string[] pre)
+        {
+            try
+            {
+                if (p.StartsWith("W=", StringComparison.Ordinal))
+                {
+                    _notices.Clear();
+                    if (p.Length <= 2) return;
+                    foreach (var r in p.Substring(2).Split(';'))
+                    {
+                        var x = r.Split('~');
+                        if (x.Length < 8) continue;
+                        int men, sum, due, kind;
+                        if (!int.TryParse(x[2], NumberStyles.Integer, Inv, out men) || !int.TryParse(x[3], NumberStyles.Integer, Inv, out sum)
+                            || !int.TryParse(x[4], NumberStyles.Integer, Inv, out due) || !int.TryParse(x[6], NumberStyles.Integer, Inv, out kind)) continue;
+                        _notices.Add(new Notice
+                        {
+                            Town = Dec(x[0], pre), Band = Dec(x[1], pre), Name = "", Men = men, Sum = sum, Due = d0 + due, Posted = 0, Days = 0, BonusPct = 0, S = 0f,
+                            Taken = x[5].IndexOf('T') >= 0, Lord = x[5].IndexOf('L') >= 0, Kind = kind, Owner = Dec(x[7], pre),
+                            Giver = x.Length > 8 ? Dec(x[8], pre) : "", Village = x.Length > 9 ? Dec(x[9], pre) : ""
+                        });
+                    }
+                }
+                else if (p.StartsWith("H=", StringComparison.Ordinal))
+                {
+                    _harm.Clear();
+                    if (p.Length <= 2) return;
+                    foreach (var r in p.Substring(2).Split(';'))
+                    {
+                        int k = r.IndexOf('~');
+                        if (k <= 0) continue;
+                        var l = new List<Harm>();
+                        string last = "";
+                        foreach (var e in r.Substring(k + 1).Split('/'))
+                        {
+                            var y = e.Split(',');
+                            int off, kind;
+                            if (y.Length < 2 || !int.TryParse(y[0], NumberStyles.Integer, Inv, out off) || !int.TryParse(y[1], NumberStyles.Integer, Inv, out kind)) continue;
+                            string tw = y.Length > 2 ? Dec(y[2], pre) : "", vil = y.Length > 3 ? Dec(y[3], pre) : "";
+                            string town;
+                            if (vil.Length > 0) town = tw.Length > 0 ? tw : null;   // null - miasto z wsi (HarmTown, leniwie - odczyt nie zalezy od obiektow gry)
+                            else { town = tw.Length > 0 ? tw : last; last = town; }
+                            l.Add(new Harm { Day = d0 - off, Kind = (byte)kind, Town = town, Vil = vil });
+                        }
+                        if (l.Count > 0) _harm[Dec(r.Substring(0, k), pre)] = l;
+                    }
+                }
+            }
+            catch (Exception e) { WStumble("WatchImport2", e); }
         }
 
         private static void WatchImport(string p)

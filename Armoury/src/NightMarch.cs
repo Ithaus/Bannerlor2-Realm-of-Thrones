@@ -1424,6 +1424,7 @@ namespace Armoury
                          + "; dlug o swicie (musztra) " + DawnDebt + (DawnDebt == Debt ? "" : " - NIEZGODNY z dlugiem po")
                          + "; marsz w godzinach obozu " + marchH + " h, oboz automatyczny " + (autoCamps > 0 ? "tak" : "nie") + ", tryb zmierzchu " + CampPromptMode
                          + ", sen przerwany poza menu " + cuts + ", dlug odlozony do pobudki " + (_dawnOwed > 0f ? "tak (brak " + F1(_dawnOwed) + " h)" : "nie")
+                         + ", godziny rabunku bez odpoczynku (Raid Counts As Work) " + _raidWorkHoursDay   // m103-drobne: postoj w rabunku liczony jak praca
                          + (_dawnDeferredUp > 0 ? ", dlug odlozony z poprzedniego switu +" + _dawnDeferredUp : "")
                          + "; komunikat: " + (string.IsNullOrEmpty(_lastDawnMsg) ? "-" : "'" + _lastDawnMsg + "'") + ".");
             }

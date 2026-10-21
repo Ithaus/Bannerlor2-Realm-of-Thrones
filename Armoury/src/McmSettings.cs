@@ -4916,6 +4916,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightMarchNotice { get; set; } = true;
 
+        [SettingPropertyBool("Raid Counts As Work", HintText = "raiding is work, not rest: the hours your party spends raiding (a hamlet from its own menu, or a village of the map as the raider - alone, leading an army or with another lord's army) count like drill, not like a halt - the men get no rest from them in the sleep ledger, and a day spent raiding a hamlet is no day of rest for the army you lead; off = as before (standing at the village while raiding counted as rest)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RaidCountsAsWork { get; set; } = true;
+
         [SettingPropertyBool("Forced March", HintText = "a forced march for your column: pick 'Forced march' with the O key or when night falls - your party (and the army you lead) moves this much faster, but nobody sleeps while it lasts (halts do not count as rest and no camp is pitched on its own), and on top of the nights they miss, every 24 hours of it costs one more sleepless night - so the sleep debt grows every 12 hours instead of once a day, and its penalties soon eat the gain. A shorter dash leaves weariness that counts toward the next one and fades by 2 hours a day of proper rest. It ends when you make camp, bed down, enter a settlement or put to sea. Needs Night Rest. Off = only the old 'March on'", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool ForcedMarch { get; set; } = true;
@@ -5910,7 +5914,7 @@ namespace Armoury
 
         [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Estimated from the 180-day test of 20.10: AI lords march most of their days, so their men would learn roughly 15 to 50 percent less (about a third in the middle) - slower promotions and less demand for better gear; the daily log line measures it exactly either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
-        public bool DrillCampOnlyAi { get; set; } = false;
+        public bool DrillCampOnlyAi { get; set; } = true;
 
         [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
@@ -8932,6 +8936,26 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerArmourerPerStall { get; set; } = 6;
 
+        [SettingPropertyBool("Sutler Row Clothing", HintText = "in the sutlers' row you can clothe your own men: leather, felt and linen from the market of the town the sutlers trade with, at its prices plus the sutlers' cut, for the whole pieces your men have worn out - paid from your purse, the men's purse is spared and they need not buy them in the next town. Up to Sutler Row Stock Per Stall pieces of each a day per stall. Needs Army Clothing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool SutlerRowClothing { get; set; } = true;
+
+        [SettingPropertyBool("Sutler Laundry", HintText = "in the sutlers' row you can hire the washerwomen: for Sutler Laundry Days days your party wears out its clothes, shoes and linen more slowly (by Sutler Laundry Cut Percent) - washing and darning make them last. They cost a washerwoman's day wage (two thirds of Workshop Wage Per Day) per washerwoman per day, one per Sutler Laundry Men Per Washer men; the money goes to the town and the village like every service of the row. Needs Army Clothing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool SutlerLaundry { get; set; } = true;
+
+        [SettingPropertyInteger("Sutler Laundry Cut Percent", 0, 75, "0", HintText = "how much less clothing your party wears out while the washerwomen work (0 to 75%)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerLaundryCutPercent { get; set; } = 25;
+
+        [SettingPropertyInteger("Sutler Laundry Days", 1, 28, "0", HintText = "how many days the hired washerwomen work for your party (1 to 28)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerLaundryDays { get; set; } = 7;
+
+        [SettingPropertyInteger("Sutler Laundry Men Per Washer", 5, 100, "0", HintText = "men of your party one washerwoman keeps in clean, darned clothes (5 to 100)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerLaundryMenPerWasher { get; set; } = 20;
+
         [SettingPropertyBool("Notice Board", HintText = "'Read the notice board' in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board, and no bounties from the watch or the headmen either", RequireRestart = false)]
         [SettingPropertyGroup("Notice board")]
         public bool NoticeBoard { get; set; } = true;
@@ -10212,6 +10236,7 @@ namespace Armoury
             s.NightLedgerClock = NightLedgerClock;
             s.PlayerSleepGuard = PlayerSleepGuard;
             s.NightMarchNotice = NightMarchNotice;
+            s.RaidCountsAsWork = RaidCountsAsWork;
             s.ForcedMarch = ForcedMarch;
             s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;
@@ -11216,6 +11241,11 @@ namespace Armoury
             s.SutlerRevelMorale = SutlerRevelMorale;
             s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
+            s.SutlerRowClothing = SutlerRowClothing;
+            s.SutlerLaundry = SutlerLaundry;
+            s.SutlerLaundryCutPercent = SutlerLaundryCutPercent;
+            s.SutlerLaundryDays = SutlerLaundryDays;
+            s.SutlerLaundryMenPerWasher = SutlerLaundryMenPerWasher;
             s.NoticeBoard = NoticeBoard;
             s.NoticeBoardVillages = NoticeBoardVillages;
             s.NoticeBoardOpening = NoticeBoardOpening;

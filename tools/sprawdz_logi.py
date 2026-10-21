@@ -1032,10 +1032,11 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m102tablica : (21.10, w-toku/m102-tablica; Armoury/src/NoticeBoard*.cs, klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties i nast.)
                     python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
                     T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
-                    L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+                    L-7 lordom <= 1% kas miast, L-8 zapis <= 12 KB (m103-drobne, nb2), L-8b nb2 wobec nb1 (INFO), L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
-                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
+                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
+                    MK-8 (m103) odziez z rzedu: potrzeba druzyny spada o kupione sztuki, MK-9 (m103) praczki: cena = praczki x doby x dniowka. Log bez paczki: INFO.
 --grupa m97posilki : (20.10, w-toku/m97-posilki - Jeff "wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; Armoury/src/DrMarchArrival.cs; klucz DrArrivalByMarch)
                     python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
                     P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
@@ -1950,7 +1951,8 @@ Uzycie (Python 3, tylko odczyt):
                     sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
 --grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
-                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
+                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours" 0 (m103-drobne: z zapisem stanu),
+                    KP-1b (z --crashscribe <session-*.log>) bloki bledow CrashScribe ze stosem InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
                     (obieg 0), KP-4 turnieje i swaty prawdziwe w chwili sluchania, KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy upiciu / kacu,
                     KP-7 ruch doby (INFO), KP-8 pobudka z pelnym paskiem snu przy pijanym = odespane (recenzja technika). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -36691,7 +36693,7 @@ def m97szkolenie_main(logp):
         rep.add("SZ-5: AI XP zasada obozu wobec dawnej reguly (decyzja: Drill Camp Only Ai)",
                 f"XP po broni razem dawna {old} -> obozu {camp} (x{ratio:.2f}, {'spadek' if ratio < 1 else 'wzrost'} {abs(1 - ratio) * 100:.0f}%); godzin postoju za dnia srednio {sum(hours) / len(hours):.2f};"
                 f" partio-doby 0 h {h0} ({100 * h0 / max(1, pd):.0f}%), 8 h {h8} ({100 * h8 / max(1, pd):.0f}%)",
-                "INFO (powyzej ok. 30% spadku - Jeff decyduje o kluczu)", None)
+                "INFO (klucz domyslnie TAK od m103-drobne, u Jeffa TAK; powyzej ok. 30% spadku - do oceny)", None)
         st_last = int(ais[-1][21])
         rep.add("SZ-6: potkniecia CampDrill (ostatnia linia AI)", str(st_last), "0", st_last == 0)
     else:
@@ -38107,7 +38109,18 @@ def m102tablica_main(logp):
     rep.add("L-7: wyplaty lordom w oknie <= 1% wplywow kas miast", f"lordom {lords} zl, wplywy kas miast w oknie {infl} zl ({(100.0 * lords / infl if infl else 0):.3f}%; lud za towar + przelewy gry do kas,"
             f" linii {len(inflows)}; srednia kas {avg:.0f})", "<= 1% (inaczej domyslne WatchBountyAiLords = false)", (lords <= 0.01 * infl) if infl else None)
     big = max([int(d.group(20)) for d in ldays] + [0])
-    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
+    # m103-drobne: zapis nb2 (odchudzony) - cel < 12 KB (bieg 101 w nb1: 18.5 KB > 16 KB, SaveText kawalkowal); L-8b sklad i nb1 w tym samym stanie (pomiar)
+    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 12288 B (m103-drobne nb2; nb1 do WGRANIA 101 - 18.5 KB)", (big <= 12288) if ldays else None)
+    v1 = []
+    for d in ldays:
+        mv = re.search(r"zapis arm_board (\d+) B; sklad zapisu nb2: .*?stary format nb1 w tym samym stanie (\d+) B", d.string)
+        if mv and int(mv.group(2)) > 0:
+            v1.append((int(mv.group(1)), int(mv.group(2))))
+    if v1:
+        bi = max(v1, key=lambda x: x[1])
+        rep.add("L-8b: nb2 wobec nb1 w tym samym stanie (pomiar)", f"dob {len(v1)}; najwiekszy nb1 {bi[1]} B -> nb2 {bi[0]} B ({100.0 * bi[0] / bi[1]:.0f}%)", "INFO", None)
+    else:
+        rep.add("L-8b: nb2 wobec nb1", "brak pola sklad zapisu (log sprzed m103-drobne)", "INFO", None)
     cost = max([float(d.group(21)) for d in ldays] + [0.0])
     rep.add("L-9: koszt doby listow", f"najwyzej {cost:.2f} ms", "<= 3 ms", (cost <= 3.0) if ldays else None)
     posted = {(p.group(1), p.group(2)) for p in posts} | {(p.group(2), p.group(3)) for p in hposts}
@@ -38138,6 +38151,11 @@ M99M_SHOP = re.compile(r"kupione (\d+) sztuk \(cena markietanow (-?\d+), miasta 
 M99M_DAY = re.compile(r"dzien (\d+) \|.*\(roznica (-?\d+)\) \| potkniecia (\d+)")
 M99M_SOLD = re.compile(r"\| skup dzis (\d+) z limitu (\d+)")                                   # poprawka po recenzji: limit skupu na dobe
 M99M_REV = re.compile(r"morale RecentEvents (-?[0-9.]+) -> (-?[0-9.]+) \(dodatek ([0-9.]+), pulap (\d+)\)")   # poprawka po recenzji: pulap zabawy
+# m103-drobne: odziez z rzedu (potrzeba druzyny przed -> po, kupione) i praczki (cena = praczki x doby x dniowka)
+M99M_CLO = re.compile(r"potrzeba skora ([0-9.]+), sukno ([0-9.]+), plotno ([0-9.]+) -> skora ([0-9.]+), sukno ([0-9.]+), plotno ([0-9.]+) \| kupione skora (\d+), sukno (\d+), plotno (\d+)")
+M99M_WASH = re.compile(r"-> praczek (\d+) \(1 na (\d+)\) x (\d+) dob x dniowka ([0-9.]+) = (\d+)")
+M99M_WASHMEN = re.compile(r"druzyna gracza (\d+) ludzi \(bez bohaterow\) -> praczek")              # poprawka po recenzji m103: ludzie w chwili najecia
+M99M_WASHCOV = re.compile(r"\| objeci do (\d+) ludzi \(praczki x (\d+)")                           # poprawka po recenzji m103: objeci oplaconymi praczkami
 
 
 def m99markietani_main(logp):
@@ -38152,6 +38170,7 @@ def m99markietani_main(logp):
         return 0
     starts, uses, ctl, shops, days, n_err, stumb, opened = [], [], [], [], [], 0, 0, 0
     solds, revs = [], []
+    clos, washes = [], []   # m103-drobne
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -38172,12 +38191,12 @@ def m99markietani_main(logp):
                 continue
             kind = body.split(" |", 1)[0]
             mc = M99M_CAMP.search(body)
-            if mc and kind in ("cyrulik", "platnerz", "zabawa", "sklep otwarty", "sklep zamkniety"):
+            if mc and kind in ("cyrulik", "platnerz", "zabawa", "sklep otwarty", "sklep zamkniety", "odziez", "praczki"):
                 uses.append((kind, int(mc.group(1)), int(mc.group(2)), int(mc.group(3))))
             if kind == "sklep otwarty":
                 opened += 1
             mk = M99M_CTL.search(body)
-            if mk and kind in ("cyrulik", "platnerz", "zabawa", "sklep zamkniety"):
+            if mk and kind in ("cyrulik", "platnerz", "zabawa", "sklep zamkniety", "odziez", "praczki"):
                 a, b, c, r = int(mk.group(1)), int(mk.group(2)), int(mk.group(3) or 0), int(mk.group(4))
                 ctl.append((kind, a, b + c, r))
             ms = M99M_SHOP.search(body)
@@ -38189,6 +38208,14 @@ def m99markietani_main(logp):
             mr = M99M_REV.search(body)
             if mr and kind == "zabawa":
                 revs.append((float(mr.group(1)), float(mr.group(2)), float(mr.group(3)), int(mr.group(4))))
+            mcl = M99M_CLO.search(body)
+            if mcl and kind == "odziez":
+                clos.append(tuple(float(mcl.group(i)) for i in range(1, 10)))
+            mw = M99M_WASH.search(body)
+            if mw and kind == "praczki":
+                mm, mv = M99M_WASHMEN.search(body), M99M_WASHCOV.search(body)
+                washes.append((int(mw.group(1)), int(mw.group(2)), int(mw.group(3)), float(mw.group(4)), int(mw.group(5)),
+                               int(mm.group(1)) if mm else None, int(mv.group(1)) if mv else None))
     print(f"plik: {logp} | startow {len(starts)}, uzyc {len(uses)} (sklep otwarty {opened}, zamkniety {len(shops)}), linii doby {len(days)}, ERROR {n_err}")
     if not starts and not uses:
         rep.add("MK-0: linia 'Markietani obozu (m99): start sesji'", "brak w logu", "INFO (log sprzed paczki m99-markietani albo menu glowne)", None)
@@ -38215,6 +38242,15 @@ def m99markietani_main(logp):
     rep.add("MK-7: zabawa w pulapie morale", f"ponad pulap albo dodatek < 1: {len(br)} z {len(revs)}" + (f" (np. {br[0][0]} -> {br[0][1]}, pulap {br[0][3]})" if br else ""), "0", (len(br) == 0) if revs else None)
     nc = sum(1 for u in uses if u[0] == "cyrulik"); nz = sum(1 for u in uses if u[0] == "zabawa"); npl = sum(1 for u in uses if u[0] == "platnerz")
     rep.add("MK-5: uzycie (INFO)", f"cyrulik {nc}, platnerz {npl}, zabawa {nz}, sklep {len(shops)}: kupione {tb} sztuk, sprzedane {ts}, gracz netto {net}, narzut {mk}", "INFO", None)
+    # m103-drobne: MK-8 odziez z rzedu - potrzeba druzyny spada dokladnie o kupione sztuki; MK-9 praczki - cena = praczki x doby x dniowka (w gore), praczek = ceil(ludzie / na praczke)
+    badc = [c for c in clos if any(abs((c[i] - c[i + 3]) - c[i + 6]) > 0.11 for i in range(3))]   # log: potrzeba 10-100 z jednym miejscem po przecinku (ArmyClothing.F)
+    rep.add("MK-8: odziez z rzedu - potrzeba druzyny spada o kupione sztuki", f"zakupow {len(clos)}, niezgodnych {len(badc)}" + (f" (np. {badc[0]})" if badc else ""),
+            "0 niezgodnych", (len(badc) == 0) if clos else None)
+    badw = [w for w in washes if not (0 <= w[4] - w[0] * w[2] * w[3] < 1.0 + 1e-6)]   # cena = sufit iloczynu (dniowka w logu do 0.01)
+    # poprawka po recenzji m103: objeci = praczki x ludzi na praczke i nie mniej niz ludzie w chwili najecia (linia bez pola - log sprzed poprawki, bez sprawdzenia)
+    badw += [w for w in washes if w[6] is not None and (w[6] != w[0] * w[1] or (w[5] is not None and w[6] < w[5])) and w not in badw]
+    rep.add("MK-9: praczki - cena = praczki x doby x dniowka, objeci = praczki x ludzi na praczke", f"najec {len(washes)}, niezgodnych {len(badw)}" + (f" (np. {badw[0]})" if badw else ""),
+            "0 niezgodnych", (len(badw) == 0) if washes else None)
     rep.show()
     return 0
 
@@ -54739,27 +54775,55 @@ def m96len_main(logp):
 
 # ============================================================ m97wioski (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs): wjazd do wiosek pobocznych
 M97W_PRE = "Wioski poboczne (WP): "
+# poprawka po recenzji (WP-7): granica sesji - linie wypisywane po kazdym wczytaniu / nowej kampanii przed pierwsza godzina rabunku (zegar ksiegi - NightClock.Reset
+# z NightRest.ResetWorld, ta sama chwila co zerowanie licznika godzin rabunku doby; start wiosek pobocznych - OnSessionLaunched)
+M97W_SESS = ("Nocleg (zegar ksiegi): start sesji", M97W_PRE + "start sesji")
 M97W_RX = {
     "trade": re.compile(r"handel w (.+?) zamkniety: gracz ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\), wies okregu (\S+) ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\)"),
     "trib": re.compile(r"okup (.+?) \(.*kontrola: gracz \+(-?\d+) / wies -(-?\d+)\)"),
     "raidend": re.compile(r"rabunek (.+?) \(.*\) - koniec: (.+?) \|.*lup .*: zloto (-?\d+) z kiesy wsi"),
     "day": re.compile(r"dzien (-?\d+) \| klucz (\S+) \| wjazdy (\d+) \(kliki (\d+)\) \| handel (\d+):.* \| noclegi (\d+) \(bez oplaty (\d+)\), obozy (\d+), okna prac (\d+)"),
     "st": re.compile(r"potkniecia doby (\d+), sesji (\d+)"),
+    # m103-drobne (RaidCountsAsWork): godzina rabunku gracza liczona jak praca (NightRest.OnHourly, raz na dobe) i suma doby w linii gracza o swicie
+    "work": re.compile(r"^Nocleg: gracz - godzina (\d+):00 rabunku \((wioska poboczna|wies gry, gracz po stronie napastnika)\) liczona jak praca"),
+    "workdawn": re.compile(r"godziny rabunku bez odpoczynku \(Raid Counts As Work\) (\d+)"),
 }
 
 
 def m97wioski_main(logp):
     """m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do kazdej wioski pobocznej - handel koszykiem, nocleg, oboz, prace, rabunek tej wioski, okup (SideVillageVisit).
     Log Armoury strumieniowo. Progi: WP-0 start sesji, WP-1 linie ERROR SideVillageVisit 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi o -zysk gracza
-    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO), WP-7 (m103-drobne) rabunek jako praca
+    w ksiedze snu: linie "godzina rabunku liczona jak praca" i suma godzin w linii gracza o swicie (suma >= liczba linii dobowych). Log bez galezi: INFO, bez wyjatku.
+    Poprawka po recenzji: WP-7 liczony osobno w kazdej sesji (licznik godzin rabunku doby zeruje sie przy kazdym wczytaniu - NightRest.ResetWorld z konstruktora
+    ArmouryBehavior; granica sesji = linia "Nocleg (zegar ksiegi): start sesji" albo "Wioski poboczne (WP): start sesji"), w kazdej sesji najwyzej 1 linia doby bez switu."""
     rep = Report()
     start, days, trades, tribs, raids, errs = [], [], [], [], [], 0
+    rw_lines, rw_kinds, rw_dawn, rw_dawn_lines = 0, {}, 0, 0
+    # poprawka po recenzji: WP-7 w kazdej sesji osobno - [linie doby, godziny w liniach switu] biezacej sesji; sesje z linia doby trafiaja do rw_sess przy granicy
+    rw_cur, rw_sess = [0, 0], []
+
+    def rw_close():
+        if rw_cur[0] or rw_cur[1]:
+            rw_sess.append((rw_cur[0], rw_cur[1]))
+        rw_cur[0] = rw_cur[1] = 0
+
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97W_SESS):
+                rw_close()
             if "ERROR in SideVillageVisit." in s:
                 errs += 1
+            mw = M97W_RX["work"].search(s)
+            if mw:
+                rw_lines += 1; rw_cur[0] += 1
+                rw_kinds[mw.group(2)] = rw_kinds.get(mw.group(2), 0) + 1
+            if s.startswith("NocnyMarsz: gracz o swicie"):
+                md = M97W_RX["workdawn"].search(s)
+                if md:
+                    rw_dawn += int(md.group(1)); rw_dawn_lines += 1; rw_cur[1] += int(md.group(1))
             if not s.startswith(M97W_PRE):
                 continue
             t = s[len(M97W_PRE):]
@@ -54773,6 +54837,7 @@ def m97wioski_main(logp):
                 tribs.append(t)
             elif t.startswith("rabunek ") and " - koniec: " in t:
                 raids.append(t)
+    rw_close()
     print(f"plik: {logp} | start {len(start)}, doby {len(days)}, handel {len(trades)}, okupy {len(tribs)}, rabunki {len(raids)}, ERROR {errs}")
     if not start and not days:
         rep.add("WP-0: linia startu wiosek pobocznych", "brak linii", "INFO (log sprzed galezi m97-wioski)", None)
@@ -54820,6 +54885,14 @@ def m97wioski_main(logp):
         if m:
             ent += int(m.group(3)); tr += int(m.group(5)); rest += int(m.group(6)); camp += int(m.group(8)); inv += int(m.group(9))
     rep.add("WP-6: ruch doby (suma)", f"wjazdy {ent}, handel {tr}, noclegi {rest}, obozy {camp}, okna prac {inv}", "INFO", None)
+    if rw_dawn_lines:
+        rw_bad = [x for x in rw_sess if x[1] < x[0] - 1]
+        rep.add("WP-7: rabunek jako praca (Raid Counts As Work) - linie doby / godziny w liniach switu, w kazdej sesji",
+                f"linii {rw_lines} {rw_kinds}, godzin bez odpoczynku {rw_dawn} w {rw_dawn_lines} liniach switu; sesji z rabunkiem {len(rw_sess)}, niezgodnych {len(rw_bad)}"
+                + (f" (np. linii {rw_bad[0][0]}, godzin {rw_bad[0][1]})" if rw_bad else ""),
+                "w kazdej sesji godzin >= linii - 1 (kazda linia doby to co najmniej 1 h; ostatnia doba sesji - zapis/wczytanie albo koniec logu - bez switu)", not rw_bad)
+    else:
+        rep.add("WP-7: rabunek jako praca", f"linii {rw_lines}, brak pola w liniach switu (log sprzed m103-drobne)", "INFO", None)
     rep.show()
     return 0
 
@@ -54850,20 +54923,67 @@ def m98_per_drink(charm, pool, by_charm):
     return min(pool, 1 + max(0, (charm + 10) // 60))
 
 
-def m98plotki_main(logp):
+# m103-drobne (KP-1): bledy kufli w logu Armoury - takze zapis/odczyt stanu (SyncData.arm_drink - InnDrink.Export/Import; SyncData.arm_rumours - ksiega plotek Rumours,
+# ta sama klasa co Rumours.Drink), nie tylko potkniecia InnDrink./Rumours.
+M98P_ERR = ("ERROR in InnDrink.", "ERROR in Rumours.", "ERROR in SyncData.arm_drink", "ERROR in SyncData.arm_rumours")
+# KP-1b (z --crashscribe): bloki bledow CrashScribe ("# ERROR ...") ze stosem w kodzie kufli i plotek
+M98P_CS = ("Armoury.InnDrink.", "Armoury.Rumours.")
+M98P_CS_TS = re.compile(r"\[\d\d:\d\d:\d\d\] ")   # poprawka po recenzji: zwykla linia logu CrashScribe (poza blokiem bledu)
+
+
+def m98plotki_cs_errors(csp):
+    """KP-1b: bloki "# ERROR ..." logu sesji CrashScribe, w ktorych stos (STACK / CALLER) przechodzi przez Armoury.InnDrink. albo Armoury.Rumours. - (bloki, przyklad).
+    Poprawka po recenzji: blok (Scribe.Report: "#####", "# ERROR ...", "#####", tresc, "#####") konczy sie na drugiej linii "#####" od naglowka albo na pierwszej
+    zwyklej linii "[HH:MM:SS] ..." - zwykle linie CrashScribe po bloku (breadcrumb, Net, Mends) nie trafiaja do bloku."""
+    n, ex, block, seps = 0, None, [], 0
+
+    def close(b):
+        nonlocal n, ex
+        if b and any(k in x for x in b for k in M98P_CS):
+            n += 1
+            if ex is None:
+                ex = next((x.strip() for x in b if x.startswith("MESSAGE")), b[0].strip())[:140]
+
+    with open(csp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if ln.startswith("# ERROR"):
+                close(block)
+                block, seps = [ln], 0
+            elif block:
+                if ln.startswith("#####"):
+                    seps += 1
+                    block.append(ln)
+                    if seps >= 2:            # 1. "#####" zamyka naglowek, 2. - tresc bloku
+                        close(block)
+                        block = []
+                elif M98P_CS_TS.match(ln):   # zwykla linia logu CrashScribe - blok bez zamkniecia (urwany) konczy sie tutaj
+                    close(block)
+                    block = []
+                else:
+                    block.append(ln)
+    close(block)
+    return n, ex
+
+
+def m98plotki_main(logp, csp=None):
     """m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel (cena z beczki piwa, zloto do karczmarzy), plotek na kufel wedlug Uroku, turnieje i swaty
     tylko prawdziwe, pijanstwo i kac gracza. Log Armoury strumieniowo. KP-0 start sesji (klucze, krzywa Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 linie
     ERROR InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony (zaplacil = cena, kiesa gracza -cena, odbiorcy razem = cena, kontrola obiegu 0),
     KP-4 turnieje i swaty prawdziwe w chwili sluchania (kufle i doby: nieprawdziwe 0), KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy
-    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku.
+    m103-drobne: KP-1 liczy tez "ERROR in SyncData.arm_drink" i "ERROR in SyncData.arm_rumours" (zapis/odczyt stanu kufli i plotek); KP-1b (z --crashscribe) - bloki
+    bledow CrashScribe ze stosem Armoury.InnDrink./Armoury.Rumours. 0."""
     rep = Report()
     start, cups, drunks, days, wakes, errs = [], [], [], [], [], 0
+    errs_sync = 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
-            if "ERROR in InnDrink." in s or "ERROR in Rumours." in s:
+            if any(k in s for k in M98P_ERR):
                 errs += 1
+                if "ERROR in SyncData." in s:
+                    errs_sync += 1
             if not s.startswith(M98P_PRE):
                 continue
             t = s[len(M98P_PRE):]
@@ -54888,7 +55008,12 @@ def m98plotki_main(logp):
     curve_ok = bool(mc) and (not by_charm or (mc.group(1), mc.group(2), mc.group(3), mc.group(5)) == ("1", "2", "3", "wszystkie"))
     rep.add("KP-0: linia startu sesji (klucze, krzywa Uroku 20/80/150/250)", (start[-1][:220] if start else "brak"), "jest; przy kluczu Urok: 1/2/3/wszystkie",
             bool(start) and bool(ms) and curve_ok)
-    rep.add("KP-1: linie ERROR in InnDrink./Rumours.", f"{errs}", "0", errs == 0)
+    rep.add("KP-1: linie ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours", f"{errs} (w tym zapis/odczyt SyncData {errs_sync})", "0", errs == 0)
+    if csp and os.path.isfile(csp):
+        ncs, excs = m98plotki_cs_errors(csp)
+        rep.add("KP-1b: CrashScribe - bloki bledow ze stosem InnDrink./Rumours.", f"{ncs}" + (f" (np. {excs})" if excs else ""), "0", ncs == 0)
+    else:
+        rep.add("KP-1b: CrashScribe - bloki bledow ze stosem InnDrink./Rumours.", "bez logu CrashScribe (--crashscribe <session-*.log>)", "INFO", None)
     st_sum = sum(int(m.group(18)) for m in (M98P_RX["day"].search(x) for x in days) if m)
     rep.add("KP-2: potkniecia doby (suma)", f"{st_sum} w {len(days)} dobach", "0", st_sum == 0)
     bad, badt, badn, unread, nopay = [], [], [], 0, 0
@@ -55414,7 +55539,7 @@ def main(argv):
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
     if group == "m98plotki" and logp:
-        return m98plotki_main(logp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
+        return m98plotki_main(logp, csp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
