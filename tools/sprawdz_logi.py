@@ -54745,21 +54745,34 @@ M97W_RX = {
     "raidend": re.compile(r"rabunek (.+?) \(.*\) - koniec: (.+?) \|.*lup .*: zloto (-?\d+) z kiesy wsi"),
     "day": re.compile(r"dzien (-?\d+) \| klucz (\S+) \| wjazdy (\d+) \(kliki (\d+)\) \| handel (\d+):.* \| noclegi (\d+) \(bez oplaty (\d+)\), obozy (\d+), okna prac (\d+)"),
     "st": re.compile(r"potkniecia doby (\d+), sesji (\d+)"),
+    # m103-drobne (RaidCountsAsWork): godzina rabunku gracza liczona jak praca (NightRest.OnHourly, raz na dobe) i suma doby w linii gracza o swicie
+    "work": re.compile(r"^Nocleg: gracz - godzina (\d+):00 rabunku \((wioska poboczna|wies gry, gracz po stronie napastnika)\) liczona jak praca"),
+    "workdawn": re.compile(r"godziny rabunku bez odpoczynku \(Raid Counts As Work\) (\d+)"),
 }
 
 
 def m97wioski_main(logp):
     """m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do kazdej wioski pobocznej - handel koszykiem, nocleg, oboz, prace, rabunek tej wioski, okup (SideVillageVisit).
     Log Armoury strumieniowo. Progi: WP-0 start sesji, WP-1 linie ERROR SideVillageVisit 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi o -zysk gracza
-    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO), WP-7 (m103-drobne) rabunek jako praca
+    w ksiedze snu: linie "godzina rabunku liczona jak praca" i suma godzin w linii gracza o swicie (suma >= liczba linii dobowych). Log bez galezi: INFO, bez wyjatku."""
     rep = Report()
     start, days, trades, tribs, raids, errs = [], [], [], [], [], 0
+    rw_lines, rw_kinds, rw_dawn, rw_dawn_lines = 0, {}, 0, 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
             if "ERROR in SideVillageVisit." in s:
                 errs += 1
+            mw = M97W_RX["work"].search(s)
+            if mw:
+                rw_lines += 1
+                rw_kinds[mw.group(2)] = rw_kinds.get(mw.group(2), 0) + 1
+            if s.startswith("NocnyMarsz: gracz o swicie"):
+                md = M97W_RX["workdawn"].search(s)
+                if md:
+                    rw_dawn += int(md.group(1)); rw_dawn_lines += 1
             if not s.startswith(M97W_PRE):
                 continue
             t = s[len(M97W_PRE):]
@@ -54820,6 +54833,12 @@ def m97wioski_main(logp):
         if m:
             ent += int(m.group(3)); tr += int(m.group(5)); rest += int(m.group(6)); camp += int(m.group(8)); inv += int(m.group(9))
     rep.add("WP-6: ruch doby (suma)", f"wjazdy {ent}, handel {tr}, noclegi {rest}, obozy {camp}, okna prac {inv}", "INFO", None)
+    if rw_dawn_lines:
+        rep.add("WP-7: rabunek jako praca (Raid Counts As Work) - linie doby / godziny w liniach switu",
+                f"linii {rw_lines} {rw_kinds}, godzin bez odpoczynku {rw_dawn} w {rw_dawn_lines} liniach switu",
+                "godzin >= linii - 1 (kazda linia doby to co najmniej 1 h; ostatnia doba logu bez switu)", rw_dawn >= rw_lines - 1)
+    else:
+        rep.add("WP-7: rabunek jako praca", f"linii {rw_lines}, brak pola w liniach switu (log sprzed m103-drobne)", "INFO", None)
     rep.show()
     return 0
 

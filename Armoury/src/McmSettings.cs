@@ -4916,6 +4916,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightMarchNotice { get; set; } = true;
 
+        [SettingPropertyBool("Raid Counts As Work", HintText = "raiding is work, not rest: the hours your party spends raiding (a hamlet from its own menu, or a village of the map as the raider - alone, leading an army or with another lord's army) count like drill, not like a halt - the men get no rest from them in the sleep ledger, and a day spent raiding a hamlet is no day of rest for the army you lead; off = as before (standing at the village while raiding counted as rest)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RaidCountsAsWork { get; set; } = true;
+
         [SettingPropertyBool("Forced March", HintText = "a forced march for your column: pick 'Forced march' with the O key or when night falls - your party (and the army you lead) moves this much faster, but nobody sleeps while it lasts (halts do not count as rest and no camp is pitched on its own), and on top of the nights they miss, every 24 hours of it costs one more sleepless night - so the sleep debt grows every 12 hours instead of once a day, and its penalties soon eat the gain. A shorter dash leaves weariness that counts toward the next one and fades by 2 hours a day of proper rest. It ends when you make camp, bed down, enter a settlement or put to sea. Needs Night Rest. Off = only the old 'March on'", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool ForcedMarch { get; set; } = true;
@@ -10212,6 +10216,7 @@ namespace Armoury
             s.NightLedgerClock = NightLedgerClock;
             s.PlayerSleepGuard = PlayerSleepGuard;
             s.NightMarchNotice = NightMarchNotice;
+            s.RaidCountsAsWork = RaidCountsAsWork;
             s.ForcedMarch = ForcedMarch;
             s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;

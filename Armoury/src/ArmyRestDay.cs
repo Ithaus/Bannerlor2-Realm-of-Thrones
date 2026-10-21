@@ -200,7 +200,8 @@ namespace Armoury
             r.Pos = pos; r.HasPos = true; r.LastMoved = moved;
             r.Hours++;
             if (moved) r.MovedH++;
-            if (Busy(lead)) r.BusyH++;
+            // m103-drobne (RaidCountsAsWork): rabunek wioski pobocznej przez armie gracza (bez MapEvent) to zajecie jak rabunek wsi gry - doba z nim nie jest doba odpoczynku
+            if (Busy(lead) || (player && NightRest.RaidWorkHour())) r.BusyH++;
             bool dawnNow = dawnTick && r.LastDawnDay != day;
             if (r.Resting && !dawnNow) Keep(a, lead, r, s);   // swit i tak konczy postoj (Dawn)
             if (dawnNow) { r.LastDawnDay = day; Dawn(a, lead, r, s, player); }
