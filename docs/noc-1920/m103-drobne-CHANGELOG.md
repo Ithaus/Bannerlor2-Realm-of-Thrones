@@ -187,7 +187,9 @@ i w szkodach; pelne doby (6 cyfr: 109016) w kazdym wpisie; miasto powtarzane w k
 - Koszt: eksport raz na dobe (linia) i przy zapisie; drugi eksport nb1 tylko do pomiaru (ok. tyle co dotad, poza kosztem L-9). `VilTown` - `Settlement.Find` raz na wies
   (pamiec), wolany przy eksporcie i w `HarmCount` tylko dla wpisow z miastem z wsi.
 - Autotest: linia "wpiete" z `nb2`; linia doby - `zapis arm_board` < 12 288 B i pole "sklad zapisu" (procent wobec nb1); po zapisie i wczytaniu - "Listy goncze" z ta sama
-  liczba czynnych listow (`czynne N`) i szkod band; wczytanie zapisu z 101 - linia "wczytano zapis arm_board w starym formacie nb1".
+  liczba czynnych listow (`czynne N`) i szkod band; wczytanie zapisu z 101 - linia "wczytano zapis arm_board w starym formacie nb1"; wczytanie zapisu nb2 - linia
+  "Tablica ogloszen (m102): wczytano zapis arm_board nb2 (N B, doba zapisu D, przedrostkow P) - flagi a, listy b, szkody band c (wpisow k)" (poprawka po przegladzie wlasnym,
+  ta sama liczba listow i band co w linii doby przed zapisem).
 
 **Status:** DO SPRAWDZENIA.
 

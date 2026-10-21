@@ -1075,7 +1075,7 @@ namespace Armoury
             try
             {
                 var parts = s.Split('|');
-                if (parts.Length > 0 && parts[0] == Ver2) { Import2(parts); return; }   // m103-drobne
+                if (parts.Length > 0 && parts[0] == Ver2) { Import2(parts, s.Length); return; }   // m103-drobne
                 if (parts.Length == 0 || parts[0] != Ver) { Log.Info(P + "zapis arm_board w nieznanej wersji (" + (parts.Length > 0 ? parts[0] : "?") + ") - pominiety."); return; }
                 for (int i = 1; i < parts.Length; i++)
                 {
@@ -1099,7 +1099,7 @@ namespace Armoury
         }
 
         /// <summary>m103-drobne: odczyt nb2 - najpierw D (doba zapisu) i P (przedrostki), potem flagi, listy i szkody (doby = D + przesuniecie).</summary>
-        private static void Import2(string[] parts)
+        private static void Import2(string[] parts, int bytes)
         {
             int d0 = 0; bool hasD = false;
             string[] pre = new string[0];
@@ -1126,6 +1126,10 @@ namespace Armoury
                 }
                 else if (p.StartsWith("W=", StringComparison.Ordinal) || p.StartsWith("H=", StringComparison.Ordinal)) WatchImport2(p, d0, pre);
             }
+            int hn = 0;
+            foreach (var kv in _harm) hn += kv.Value.Count;
+            Log.Info(P + "wczytano zapis arm_board nb2 (" + bytes + " B, doba zapisu " + d0 + ", przedrostkow " + pre.Length + ") - flagi " + _flags.Count + ", listy " + _notices.Count
+                     + ", szkody band " + _harm.Count + " (wpisow " + hn + ").");
         }
 
         internal static string Safe(string s)
