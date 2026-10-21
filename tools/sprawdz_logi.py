@@ -37817,6 +37817,7 @@ M103_TAG = "Prolog (m103): "
 M103_PIC_TAG = "Obrazki (m103): "
 M103_DAYS = [0, 5, 12, 35, 40, 48, 55, 62, 75, 80, 95, 100, 110, 118, 125, 132, 138, 145, 155, 160, 172, 182, 186]
 M103_ARREST = 23   # numer sceny dnia 186 (po KONIEC PROLOGU)
+M103_TOURNEY, M103_TOURNEY_LAST = 15, 137   # recenzja m104: scena 15 (Turniej Reki) czeka na koniec turnieju sceny E5 ('czeka: Turniej Reki jeszcze trwa'), najdluzej do d137
 M103_START = re.compile(r"start sesji \| klucz Prologue Scenes (TAK|NIE) \| sceny pokazane (\d+)/(\d+), pominiete (\d+)(.*?)\| nastepna (\S+).*?\| katalog obrazkow (.*?) \| plikow: Prolog (\d+), ROT (\d+), Kronika (\d+) \| potkniecia (\d+)")
 M103_SHOW = re.compile(r"scena (\d\d) '(.*?)' pokazana \| dzien ([0-9.]+) \(nalezna od (\d+)\) \| obrazek (.*?) \| okno (.*?) \| gracz: (.*?) \| pokazane (\d+)/(\d+), pominiete (\d+) \| (\d+) ms\.")
 M103_CLOSE = re.compile(r"scena (\d\d) zamknieta po ([0-9.]+) s \((.*?)\)\.$")
@@ -37981,10 +37982,12 @@ def m103sceny_main(logp, csp=None, rglp=None):
         if nr == M103_ARREST and end_day is not None:
             if not (end_day <= d < end_day + 1.0):
                 late.append(f"{nr} dzien {d:.2f} (koniec prologu {end_day:.1f})")
+        elif nr == M103_TOURNEY and 0.0 <= d - due_day < M103_TOURNEY_LAST - due_day + 1.0:
+            pass   # recenzja m104: czekala na koniec Turnieju Reki (E5) - w oknie d125-137
         elif not (0.0 <= d - due_day < 1.0):
             late.append(f"{nr} dzien {d:.2f} (nalezna {due_day})")
     rep.add("SC-3: kazda scena w swoim dniu", f"poza dniem {len(late)} z {len(shows)}" + (f" ({'; '.join(late[:4])})" if late else ""),
-            "0 <= dzien pokazania - dzien nalezny < 1 (scena 23: w dobie KONCA PROLOGU)", len(late) == 0 if shows else None)
+            "0 <= dzien pokazania - dzien nalezny < 1 (scena 23: w dobie KONCA PROLOGU; scena 15: do d137 - czeka na koniec Turnieju Reki E5)", len(late) == 0 if shows else None)
     bad_order = []
     for a, b in zip(shown_nr, shown_nr[1:]):
         if b <= a:

@@ -140,6 +140,18 @@ namespace Armoury
             try { _gtSetHeroes.Invoke(null, new object[] { null, null }); } catch (Exception e) { WStumble("GtClear", e); }
         }
 
+        /// <summary>Recenzja m104: Turniej Reki sceny E5 jeszcze sie nie skonczyl (klucz, faza przed / wezwania / obwieszczony) - scena 15 czeka (Prologue.Scenes).</summary>
+        internal static bool TourneyPending()
+        {
+            var s = S;
+            return s != null && s.PrologueHandTourney && _thPhase >= 0 && _thPhase < 3;
+        }
+
+        private static string TourneyPendingText()
+        {
+            return _thPhase == 0 ? "przed wezwaniami" : _thPhase == 1 ? "uczestnicy w drodze" : "obwieszczony, rozstrzygniecie najpozniej d" + TourneyResolveBy;
+        }
+
         private static void TourneySkip(string why, double day)
         {
             _thPhase = -1; _thWhy = why;

@@ -38,6 +38,10 @@ namespace Armoury
     {
         internal const string ScTag = "Prolog (m103): ";
         private const int SceneArrest = 22;              // indeks sceny dnia 186 (smierc krola, areszt Neda)
+        // recenzja m104: scena 15 (Turniej Reki, dzien 125) opowiada przebieg turnieju - przy scenie E5 (klucz PrologueHandTourney) czeka, az Turniej Reki sie skonczy
+        // (rozstrzygniety albo odwolany/pominiety; gra rozstrzyga go najpozniej w dniu 127), najdluzej do dnia SceneTourneyLastDay - inaczej okno mowiloby o koncu
+        // turnieju, zanim gracz wjedzie w szranki. Zwyciezce turnieju na mapie podaje komunikat sceny E5 (Prologue.World.Tourney).
+        private const int SceneTourney = 14, SceneTourneyLastDay = 137;
         private const int SceneMaxLateDays = 30;         // zalegla dluzej - pominieta
         private const double SceneStableSec = 2.0;       // bramki spelnione tyle sekund z rzedu (po kreatorze, po wczytaniu, miedzy scenami)
         private const double SceneWaitLogDays = 0.25;    // linia "czeka" dopiero przy takim spoznieniu (raz na dzien prologu)
@@ -104,11 +108,12 @@ namespace Armoury
             if (_scLegacy) SkipPassedLegacy(day);
             if (!ScenesKey) { _scOkSince = 0; return; }
             string waitWhy;
-            int next = NextScene(day, out waitWhy);
+            int waitIdx;
+            int next = NextScene(day, out waitWhy, out waitIdx);
             if (next < 0)
             {
                 _scOkSince = 0;
-                if (waitWhy != null) NoteWait(SceneArrest, day, waitWhy);
+                if (waitWhy != null) NoteWait(waitIdx, day, waitWhy);
                 if (!_scEndLogged && Bits(_scShown | _scSkipped) >= SceneCount) EndScenes(day);
                 return;
             }
@@ -120,10 +125,11 @@ namespace Armoury
             OpenScene(next, day, t);
         }
 
-        /// <summary>Najnizsza nalezna scena (pomija i loguje sceny, ktorych juz nie pokazemy); -1 - nic teraz (waitWhy - scena 23 czeka na koniec prologu).</summary>
-        private static int NextScene(double day, out string waitWhy)
+        /// <summary>Najnizsza nalezna scena (pomija i loguje sceny, ktorych juz nie pokazemy); -1 - nic teraz (waitWhy - scena waitIdx czeka: 23 na koniec prologu,
+        /// 15 na koniec Turnieju Reki).</summary>
+        private static int NextScene(double day, out string waitWhy, out int waitIdx)
         {
-            waitWhy = null;
+            waitWhy = null; waitIdx = -1;
             var all = PrologueScenes.All;
             for (int i = 0; i < all.Length; i++)
             {
@@ -131,10 +137,15 @@ namespace Armoury
                 int due = all[i].Day;
                 if (day < due) return -1;
                 if (i < SceneArrest && day >= PrologueDays) { SkipScene(i, day, "opowiesc ROT ruszyla (dzien prologu >= " + PrologueDays + ")"); continue; }
+                if (i == SceneTourney && day < SceneTourneyLastDay && TourneyPending())
+                {
+                    waitWhy = "Turniej Reki jeszcze trwa (" + TourneyPendingText() + "; najdluzej do dnia " + SceneTourneyLastDay + ")"; waitIdx = i;
+                    return -1;
+                }
                 if (i == SceneArrest)
                 {
                     if (_nedDone) { SkipScene(i, day, "Ned juz stracony (NedEvent przed scena)"); continue; }
-                    if (!_kingFallen) { waitWhy = "koniec prologu jeszcze nie wszedl (krol w bitwie albo oblezeniu - smierc krola co dobe)"; return -1; }
+                    if (!_kingFallen) { waitWhy = "koniec prologu jeszcze nie wszedl (krol w bitwie albo oblezeniu - smierc krola co dobe)"; waitIdx = i; return -1; }
                     return i;   // po smierci krola - bez limitu spoznienia (krol mogl umrzec pozniej)
                 }
                 if (day - due > SceneMaxLateDays) { SkipScene(i, day, "spozniona o " + (day - due).ToString("0.0", Inv) + " dni (ponad " + SceneMaxLateDays + ")"); continue; }
