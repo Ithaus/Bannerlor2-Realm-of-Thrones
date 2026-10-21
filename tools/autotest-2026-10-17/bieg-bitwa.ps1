@@ -27,7 +27,8 @@ $rel = @(
     'Armoury\ModuleData\arm_map_villages.tsv',
     'Armoury\ModuleData\arm_map_village_lore.tsv',
     'Armoury\Prefabs\arm_map_roads.xml',
-    'CrashScribe\ModuleData\CrashScribe.settings.xml'
+    'CrashScribe\ModuleData\CrashScribe.settings.xml',
+    'Armoury\SubModule.xml'   # 20.10 m97-surowce: wezly Xmls (arm_items_rare, arm_strings) - jak wgraj-v5
 )
 # 16.10 uklad wiosek v5 (noc-wioski): pliki _v4 obowiazkowe przy drzewie v5 (jak tools/wgranie/wgraj.ps1 d5c37b2f)
 $lay = Join-Path $Tree 'Armoury\ModuleData\arm_map_villages.tsv'
