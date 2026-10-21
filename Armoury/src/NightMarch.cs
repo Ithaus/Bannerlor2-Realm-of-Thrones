@@ -58,7 +58,10 @@ namespace Armoury
 #else
         private const bool DryBuild = false;
 #endif
-        private const int DebtCampHour = 20;          // oboz splaty dlugu 1: ticki 21..6 = 10 h pelnej stawki (1 h zapasu nad 9 h)
+        // m97-oboz: oboz splaty dlugu 1 liczony OD KONCA obozu swiata (bylo na sztywno 20:00 - przy obozie 0-6 dawalo 10 h, przy 21-3 tylko 7 h):
+        // DebtCampLen h pelnej stawki (1 h zapasu nad 9 h) konczy sie o CampEnd; dluzszy oboz swiata - splata od jego poczatku. 0-6 -> 20:00 jak dotad, 21-3 -> 17:00.
+        private const int DebtCampLen = 10;
+        private static int DebtCampHour { get { return Mod24(CampEnd - Math.Max(DebtCampLen, CampLen())); } }
         private const float RestMoveLimit = Drill.RestStep;   // jak gracz (OnHourly) i musztra (grupa11: jedna stala 0.35): ponizej - partia stoi
         private const double AlarmGraceHours = 0.5;   // AI sprawdza inicjatywe co ok. 0.15-0.18 h (AiCheckInterval 0.25 x 0.6-0.7)
         private const int AiSaveCap = 1500;           // wpisow ksiegi w zapisie (lordow ROT ok. 500-700)

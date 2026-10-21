@@ -386,7 +386,7 @@ namespace Armoury
             while (t < cap && acc < target)
             {
                 long h = Mod(t, 1440) / 60;
-                acc += 0.25f * (h >= 21 || h <= 5 ? 1f : day) * f;
+                acc += 0.25f * (NightRest.MenuNight((int)h) ? 1f : day) * f;   // m97-oboz: noc do switu gracza, jak sen w menu
                 t += 15;
             }
             if (atDawn && t < dawn) t = dawn;

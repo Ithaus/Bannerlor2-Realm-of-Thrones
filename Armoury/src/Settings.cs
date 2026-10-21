@@ -1709,8 +1709,9 @@ namespace Armoury
         public bool AiCampsAtNight = true;                 // the world sleeps too: lord parties and caravans halt for the night (camp hours) unless chased or in action
         // NW O5 (noc 16.10): zagrozenia karawan w obozie nocy z siatki mapy (komorki ok. AiCampDangerRadius, 3 x 3 sasiednie) zamiast przegladu wszystkich lordow i band - ten sam warunek i ta sama odpowiedz "czy jest ktokolwiek"; kontrola R9 w probce 1/64 zapytan
         public bool AiCampFastScan = true;                 // camping caravans look for enemies only in the map squares around them instead of checking every lord and band in the world - the same alarms, found faster; off = the old full check
-        public int CampStartHour = 0;                      // hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp
-        public int CampEndHour = 6;                        // hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp (your own sleep then still settles at 6)
+        // m97-oboz: domyslnie 21 i 3 (bylo 0 i 6) - ta sama dlugosc snu i marszu, ale cala noc gry 22-2 w obozie (bez jazdy z kara nocy)
+        public int CampStartHour = 21;                     // hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp
+        public int CampEndHour = 3;                        // hour the world breaks camp and marches on (your dawn); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp (your own sleep then still settles at 6)
         public bool AiBanditsCampToo = false;               // brigands sleep as well - hideout by day, their own fire in the field by night
         public int AiTentCap = 60;                         // at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture
         public float AiTentRadius = 100f;                   // tent icons appear only this close to your party - the world beyond still sleeps, just without the picture
@@ -1788,7 +1789,7 @@ namespace Armoury
         public bool HideoutAlarmVoice = true;              // the alarm is HEARD: one man in every ring of the relay lets out a real battle yell (the game's own voice line)
         public bool SightCycleEnabled = true;              // eyes follow the sun: every party sees further by day and shorter after dark
         public float DaySightFactor = 1.15f;               // spotting range in daylight, times this
-        public float NightSightFactor = 0.65f;             // spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud
+        public float NightSightFactor = 0.65f;             // spotting range at night (the game's night, 22:00-2:00) - the cut is mild, for you HEAR more after dark: a marching column is loud
 
         // --- Map speed buttons ---
         // f9-predkosc (Jeff 18.10: "przy x8 gra zwalnia i sie przycina ... jest mod, ktory daje trzy buttony x1, x4 i x8"): MapSpeed.cs, MapSpeedUi.cs, MapSpeedProfile.cs.

@@ -4820,13 +4820,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiCampFastScan { get; set; } = true;
 
-        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp", RequireRestart = false)]
+        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
-        public int CampStartHour { get; set; } = 0;
+        public int CampStartHour { get; set; } = 21;
 
-        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp (your own sleep then still settles at 6)", RequireRestart = false)]
+        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on (your dawn); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp (your own sleep then still settles at 6)", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
-        public int CampEndHour { get; set; } = 6;
+        public int CampEndHour { get; set; } = 3;
 
         [SettingPropertyBool("Ai Bandits Camp Too", HintText = "brigands sleep as well - hideout by day, their own fire in the field by night", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -5040,7 +5040,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float DaySightFactor { get; set; } = 1.15f;
 
-        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night (the game's night, 22:00-2:00) - the cut is mild, for you HEAR more after dark: a marching column is loud", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public float NightSightFactor { get; set; } = 0.65f;
 
