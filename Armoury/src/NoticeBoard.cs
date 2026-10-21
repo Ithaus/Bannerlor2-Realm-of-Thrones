@@ -508,6 +508,18 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>E3: sprawa wpisu przyjeta przez gracza (zadanie w toku albo wyslani ludzie) - karta mowi "taken up", nie "taken down".</summary>
+        private static bool Taken(Entry e)
+        {
+            try
+            {
+                var i = e != null ? e.Issue : null;
+                if (i == null) return false;
+                return (i.IssueQuest != null && i.IssueQuest.IsOngoing) || i.IsSolvingWithAlternative;
+            }
+            catch { return false; }
+        }
+
         private static void Gone()
         {
             _dGone++;
@@ -525,7 +537,8 @@ namespace Armoury
             try
             {
                 var e = _sel;
-                if (e == null || !Valid(e)) { if (e != null) _dGone++; _sel = null; text = "This notice has been taken down."; }
+                if (e != null && !Valid(e) && Taken(e)) { _sel = null; text = "You have taken up this work - it is now among your tasks at the top of the board."; }
+                else if (e == null || !Valid(e)) { if (e != null) _dGone++; _sel = null; text = "This notice has been taken down."; }
                 else if (e.K == Kind.Task) text = TaskCard(e, st);
                 else if (e.K == Kind.Watch || e.K == Kind.Headman) text = WatchCard(e, st);
                 else text = IssueCard(e, st);

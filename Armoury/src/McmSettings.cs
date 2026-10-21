@@ -8932,6 +8932,10 @@ namespace Armoury
         [SettingPropertyGroup("Notice board")]
         public bool NoticeBoardVillages { get; set; } = true;
 
+        [SettingPropertyBool("Notice Board Opening", HintText = "when you come to someone from the notice board ('Go and see' or 'Talk now'), you can open with 'I read your notice on the board in ...' and they tell you about the work at once in their own words; the rest of the talk is the game's own. Off = only the game's own lines", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardOpening { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11164,6 +11168,7 @@ namespace Armoury
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
             s.NoticeBoard = NoticeBoard;
             s.NoticeBoardVillages = NoticeBoardVillages;
+            s.NoticeBoardOpening = NoticeBoardOpening;
         }
 
         internal static void Apply()

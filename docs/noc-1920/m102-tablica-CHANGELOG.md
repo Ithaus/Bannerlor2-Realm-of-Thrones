@@ -65,4 +65,36 @@ w miescie byla tablica i jak wchodze, mam liste lordow, kapitana strazy etc., kt
 i do lorda w sali (brak wstepu - wyszarzone z powodem); "Talk now" z notablem; flaga na wies i drugi klik zdejmuje; zapis i wczytanie na karcie (karta mowi "taken down",
 "Back" dziala); `python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log>`.
 
-**Stan etapow:** E1 zrobiony. Zostaly: E3 (linia "I read your notice", slowa zleceniodawcy, "Your tasks"), E2 (listy gonczne kapitana), E2b (soltysi).
+**Stan etapow po E1:** E1 zrobiony. Zostaly: E3, E2, E2b.
+
+---
+
+### E3 - rozmowa z tablicy, slowa zleceniodawcy, "Your tasks" (commit E3)
+
+**Zasada (z liczbami):**
+- "Go and see" i "Talk now" zapamietuja osobe i jej sprawe. W glownych opcjach rozmowy z ta osoba gracz ma linie "I read your notice on the board in X."
+  (`hero_main_options` -> `issue_offer`, priorytet 111 - ta sama para stanow co linia gry `hero_give_issue` 110, bez skutku; dalej kwestie zadania z gry bez zmian).
+  Warunki jak w grze: rozmowca nie jeniec, gracz i rozmowca nie na tratwie, sprawa wolna. Klucz `NoticeBoardOpening` (TAK).
+- Osoba zapomniana przy koncu rozmowy z nia (`CampaignEvents.ConversationEnded`) i przy wyjezdzie gracza z miasta (`OnSettlementLeftEvent`). Gdy sprawa po
+  rozmowie nie jest juz wolna (zadanie w toku albo wyslani ludzie) - licznik i linia "z tablicy do zadania".
+- Karta: slowa zleceniodawcy (`IssueBriefByIssueGiver`, oczyszczone; z niewypelnionymi tokenami - opis gry `Description`, licznik "tekst z tokenami").
+- "Your tasks": na gorze tablicy najwyzej 8 zadan gracza w toku (`QuestManager.Quests`, `IsOngoing`): tytul, zleceniodawca, kwota obiecana
+  (`QuestPay8.PromisedReward` - zamrozona przy przyjeciu, najwyzej kwota gry), dni do `QuestDueTime` (ukryty czas - bez dni), gdzie jest zleceniodawca; karta z flaga na nim.
+- Karta sprawy przyjetej przez gracza mowi "You have taken up this work" zamiast "taken down".
+
+**Zmiana:** nowy `Armoury/src/NoticeBoard.Talk.cs`; puste miejsca E3 zdjete z `NoticeBoard.Later.cs`; `ArmouryBehavior`: nasluchy `ConversationEnded` i `OnSettlementLeftEvent`;
+`Settings.cs`: `NoticeBoardOpening` (TAK); `gen_mcm.py` (2231 ustawien).
+
+**Linie logu:** `Tablica ogloszen (m102): z tablicy do zadania - <hero> (<miasto>)`; w linii "wpieta" klucz Opening i liczba linii rozmowy (1 w E3, z kapitanem wiecej).
+
+**Ryzyko / co sprawdzic:**
+- Linia 111 stoi obok linii gry 110 ("I heard you may need some help...") - obie prowadza do tego samego `issue_offer`; nasza tylko, gdy gracz przyszedl z tablicy.
+- Inne mody rozmow (AIInfluence, Diplomacy) moga dopisywac linie w `hero_main_options` - nie sprawdzone (projekt 6.8).
+- "Your tasks" to sam odczyt zadan gry (bez zmian w zadaniach); kwota obiecana - ten sam slownik QuestPay8, co wyplata.
+
+**Status:** DO SPRAWDZENIA (build kod 0).
+
+**Test w grze:** z tablicy "Talk now" z kupcem - na liscie opcji "I read your notice on the board in ..."; po przyjeciu zadania karta tej osoby mowi "taken up",
+a zadanie stoi na gorze tablicy z dniami i flaga na zleceniodawcy.
+
+**Stan etapow po E3:** E1 i E3 zrobione. Zostaly: E2 (listy gonczne kapitana), E2b (soltysi).

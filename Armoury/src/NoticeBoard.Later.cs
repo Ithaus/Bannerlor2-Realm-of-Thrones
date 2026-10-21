@@ -7,20 +7,12 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Armoury
 {
-    /// <summary>m102-tablica: miejsca na etapy E3 (rozmowa, "Your tasks") i E2 (listy gonczne) - w E1 puste (tablica tylko z zadaniami gry).</summary>
+    /// <summary>m102-tablica: miejsca na etap E2 (listy gonczne) - przed E2 puste (tablica z zadaniami gry i rozmowa E3).</summary>
     internal static partial class NoticeBoard
     {
-        // E3
-        private static void ResetTalk() { }
-        private static string TalkKeysText() { return ""; }
-        private static int AddDialogs(CampaignGameStarter starter) { return 0; }
-        private static void TasksInto(Settlement st, List<Entry> list) { }
-        private static void TasksText(StringBuilder sb, List<Entry> list) { }
-        private static string TaskCard(Entry e, Settlement st) { return "Your task."; }
-        private static string BriefOf(IssueBase issue) { return null; }
-        private static void MarkFromBoard(Hero h, Settlement st) { }
-
         // E2
+        private static int AddWatchDialogs(CampaignGameStarter starter) { return 0; }
+        private static void WatchConversationEnded() { }
         private static bool WatchOn { get { return false; } }
         private static void ResetWatch() { }
         private static void AddWatchOptions(CampaignGameStarter starter) { }

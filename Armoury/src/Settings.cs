@@ -3946,6 +3946,7 @@ namespace Armoury
         // miejscem osoby; "Go and see" / "Talk now" jak pasek portretow gry, flaga na mapie. Nowe klucze (MCM Jeffa ich nie ma - domyslne).
         public bool NoticeBoard = true;                    // "Read the notice board" in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board
         public bool NoticeBoardVillages = true;            // the notice board also lists the headmen and landowners of the town's villages who have work for you; you must ride to the village to speak with them (the notice can mark the village on your map). Off = only people in town and the town lord's house
+        public bool NoticeBoardOpening = true;             // when you come to someone from the notice board ("Go and see" or "Talk now"), you can open with "I read your notice on the board in ..." and they tell you about the work at once in their own words; the rest of the talk is the game's own. Off = only the game's own lines
 
         public static void Load(string moduleDataDir)
         {
