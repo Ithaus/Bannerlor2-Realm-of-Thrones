@@ -35,7 +35,7 @@ namespace Armoury
         internal const string RepairMark = "#m96seedfix1";
         internal const string XbowMark = "#m96xbowfix1";   // po recenzjach: kusze wedlug sily zdjete z rozdania (XbowPatternTierByPower) - osobno, bo zalezy od XbowPrice
         // m96-wzory2 (Jeff 20.10 16:24, zrzut "[V] 160 Pound War Longbow - PATTERN KNOWN" przy Smithing 87): naprawa zapisu 2 - wzory lukow i kusz
-        // zdobyte przed m96 ponad zakres, jaki daje dzis losowanie wedlug reki (PatternDrawBySkill). Patrz RepairReach.
+        // zdobyte przed m96 ponad zakres, jaki daje dzis losowanie (reka PatternDrawBySkill i, po recenzji, drabina tierow PatternDrawOneTierUp). Patrz RepairReach.
         internal const string ReachMark = "#m96seedfix2";
         // cena losowania = 3 x tier sztuki, przy ktorej sie pracuje (RangedLore.TryUnlockRandom); zapis jej nie pamieta - zwrot najnizszej mozliwej (praca przy tierze 1)
         private const float ReachRefund = 3f;
@@ -292,36 +292,51 @@ namespace Armoury
 
         /// <summary>
         /// m96-wzory2 - NAPRAWA ZAPISU 2, jednorazowo (znacznik ReachMark w liscie Known; format "id|id;pkt" bez zmian, starsze buildy znacznik pomijaja,
-        /// bo GetObject zwraca null). Jeff 20.10 16:24: przy Smithing 87 "[V] 160 Pound War Longbow - PATTERN KNOWN"; log 14-53-56 linia 18312
-        /// "odkryto losowo lowland_yew_bow (BOWS, t5, zakres 1-6)" przy kuciu steppe_bow (t1) - stare losowanie bralo od tieru sztuki do 6.
-        /// Regula: wpisy sprzed znacznika RepairMark (czyli zdobyte przed m96 - po nim losowanie jest juz wedlug reki), szkoly LUKOW i KUSZ (luki,
-        /// strzaly, kusze, belty), wzor do nauki, nie opanowany unikat, tier wzoru ponad zakres PatternDrawBySkill dla najlepszego kowala gracza teraz
-        /// (albo legenda poza zasiegiem) - zdjety; za kazdy zwrot 3 punktow nauki do jego szkoly (najnizsza cena losowania; zapis ceny nie pamieta).
+        /// bo GetObject zwraca null). Jeff 20.10 16:24: przy Smithing 87 "[V] 160 Pound War Longbow - PATTERN KNOWN" ("nie pokazuje mi sie tier IV czy V,
+        /// jak mam znajomosc tylko I"); log 14-53-56 linia 18312 "odkryto losowo lowland_yew_bow (BOWS, t5, zakres 1-6)" przy kuciu steppe_bow (t1) -
+        /// stare losowanie bralo od tieru sztuki do 6.
+        /// Regula = dzisiejsze losowanie przy kowadle (PatternGate.DrawCap): wpis sprzed znacznika RepairMark (zdobyty przed m96), szkoly LUKOW i KUSZ
+        /// (luki, strzaly, kusze, belty), wzor do nauki, nie opanowany unikat - zdjety, gdy:
+        ///  - reka (PatternDrawBySkill): tier ponad SkillCap najlepszego kowala w druzynie gracza albo legenda poza zasiegiem;
+        ///  - drabina (PatternDrawOneTierUp, po recenzji): tier ponad kolejny niepusty tier nad najlepszym wzorem szkoly, ktory zostaje. Liczone od dolu
+        ///    (t1, t2, ...) - najhojniejsza kolejnosc: zostaje wszystko, do czego dzisiejsze losowanie mogloby dojsc krok po kroku. Wpisy po znaczniku
+        ///    i opanowane unikaty licza sie do "najlepszego wzoru" i nie sa ruszane.
+        /// Za kazdy zdjety zwrot 3 punktow nauki do jego szkoly (najnizsza cena losowania; zapis ceny nie pamieta).
         /// ZRODLA WPISU ZAPIS NIE ROZROZNIA: losowanie, punkty nauki i przetop/rozbiorka (Learn) dopisuja to samo id na koniec listy. Pancerze
         /// (helmy, kirysy, nogawice, rekawice, plaszcze, tarcze, kropierze) zostaja - tam glowna droga jest rozbiorka (log 14-53-56 linia 8077:
         /// riverlands_helmet, tier 5, zdjety z gotowej sztuki przy Smithing ok. 87 - slepa regula by go zabrala); w lukach i kuszach w calej kampanii
         /// Jeffa (logi 10-24-16 .. 14-53-56) nie ma ani jednego wzoru z przetopu, jest tylko losowanie.
-        /// Czeka (bez znacznika), gdy losowanie wedlug reki jest wylaczone albo kusze wedlug sily nie sa przeliczone w tej sesji (tier kuszy niepewny).
+        /// Czeka (bez znacznika), gdy oba klucze sa wylaczone, kusze wedlug sily nie sa przeliczone w tej sesji (tier kuszy niepewny) albo nie da sie
+        /// odczytac kowali.
         /// </summary>
         private static string RepairReach(List<string> K, bool xbowReady, out string detail)
         {
             detail = null;
             if (K.Contains(ReachMark)) return "wzory ponad reke: juz zdjete (znacznik " + ReachMark + ")";
-            if (!PatternGate.DrawOn) return "wzory ponad reke: czeka (losowanie wedlug reki NIE)";
+            bool hand = PatternGate.DrawOn, step = PatternGate.StepOn;
+            if (!hand && !step) return "wzory ponad reke: czeka (losowanie wedlug reki NIE i drabina tierow NIE)";
             if (PatternGate.XbowTierOn && !xbowReady) return "wzory ponad reke: czeka (kusze wedlug sily nie przeliczone w tej sesji)";
             int iEnd = K.IndexOf(RepairMark);
             if (iEnd < 0) return "wzory ponad reke: czeka (brak znacznika " + RepairMark + ")";
 
-            string who;
-            int smiths;
-            int skill = BestSmithSkill(out who, out smiths);
-            if (skill < 0) return "wzory ponad reke: czeka (nie udalo sie odczytac kowali gracza)";   // bez pewnego Smithing nic nie zdejmujemy
-            int cap = PatternGate.SkillCap(skill);
-            var removed = new List<string>();
-            var names = new List<string>();
-            var back = new float[RangedLore.SchoolCount];
+            string who = "-";
+            int smiths = 0, skill = -1;
+            if (hand)
+            {
+                skill = BestSmithSkill(out who, out smiths);
+                if (skill < 0) return "wzory ponad reke: czeka (nie udalo sie odczytac kowali gracza)";   // bez pewnego Smithing nic nie zdejmujemy
+            }
+            int cap = hand ? PatternGate.SkillCap(skill) : 6;
+            int reach = hand ? skill : int.MaxValue;   // jak PatternGate.LegendReach: bez reki - bez filtra legend
+
+            // 1. kandydaci (przed znacznikiem 1) i najlepszy wzor, ktory zostaje bez sprawdzania (po znaczniku albo opanowany unikat)
+            var cIdx = new List<int>();
+            var cIt = new List<ItemObject>();
+            var cSc = new List<int>();
+            var cT = new List<int>();
+            var keepTop = new int[RangedLore.SchoolCount];
             int seen = 0, high = 0;
-            for (int i = iEnd - 1; i >= 0; i--)
+            for (int i = 0; i < K.Count; i++)
             {
                 try
                 {
@@ -331,17 +346,70 @@ namespace Armoury
                     if (it == null) continue;
                     int sc = RangedLore.SchoolOf(it);
                     if (sc != RangedLore.SchoolBow && sc != RangedLore.SchoolXbow) continue;   // pancerze - bez zmian (rozbiorka, patrz opis)
-                    seen++;
                     if (!RangedLore.Teachable(it)) continue;   // unikat ROT / rzadki material - martwy wpis, nie pokazuje sie jako wzor
-                    if (ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(id)) continue;
                     int t = RangedLore.TierOf(it);
+                    if (t < 1) t = 1;
+                    if (t > 6) t = 6;
+                    bool mastered = ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(id);
+                    if (i > iEnd || mastered) { if (t > keepTop[sc]) keepTop[sc] = t; continue; }
+                    seen++;
                     if (t > 1) high++;
-                    bool legend = t <= cap && PatternGate.LegendOutOfReach(it, skill);
-                    if (t <= cap && !legend) continue;
-                    K.RemoveAt(i);
-                    back[sc] += ReachRefund;
-                    removed.Add(id + " t" + t + " " + RangedLore.SchoolName(sc) + (legend ? " legenda" : ""));
-                    names.Add(it.Name != null ? it.Name.ToString() : id);
+                    cIdx.Add(i); cIt.Add(it); cSc.Add(sc); cT.Add(t);
+                }
+                catch (Exception e) { Stumble("LoreSeedFix.RepairReach", e); }   // wpis nieodczytany - zostaje
+            }
+
+            // 2. decyzja od dolu, szkola po szkole (tier 1 zawsze zostaje: reka >= 2, drabina od 0 -> pierwszy niepusty tier)
+            var why = new string[cIdx.Count];
+            var tiers = new bool[7];
+            var finalTop = new int[RangedLore.SchoolCount];
+            int[] schools = { RangedLore.SchoolBow, RangedLore.SchoolXbow };
+            foreach (int sc in schools)
+            {
+                int top = keepTop[sc];
+                bool stepSc = step;
+                if (stepSc)
+                {
+                    try { PatternGate.TiersWithPatterns(sc, reach, tiers); }
+                    catch (Exception e) { Stumble("LoreSeedFix.RepairReach", e); stepSc = false; }   // bez mapy tierow - sama reka (zdejmuje mniej)
+                }
+                for (int t = 1; t <= 6; t++)
+                {
+                    int next = stepSc ? PatternGate.LadderNext(top, tiers) : 6;
+                    bool kept = false;
+                    for (int k = 0; k < cIdx.Count; k++)
+                    {
+                        if (cSc[k] != sc || cT[k] != t) continue;
+                        string r = null;
+                        try
+                        {
+                            if (t > cap) r = "reka";
+                            else if (hand && PatternGate.LegendOutOfReach(cIt[k], skill)) r = "legenda";
+                            if (stepSc && t > next) r = r == null ? "przeskok tieru" : r + ", przeskok tieru";
+                        }
+                        catch (Exception e) { Stumble("LoreSeedFix.RepairReach", e); r = null; }   // watpliwy - zostaje
+                        if (r == null) kept = true;
+                        else why[k] = r;
+                    }
+                    if (kept && t > top) top = t;
+                }
+                finalTop[sc] = top;
+            }
+
+            // 3. zdjecie od konca listy (cIdx rosnaco), zwrot punktow do szkoly
+            var removed = new List<string>();
+            var names = new List<string>();
+            var back = new float[RangedLore.SchoolCount];
+            for (int k = cIdx.Count - 1; k >= 0; k--)
+            {
+                if (why[k] == null) continue;
+                try
+                {
+                    var it = cIt[k];
+                    K.RemoveAt(cIdx[k]);
+                    back[cSc[k]] += ReachRefund;
+                    removed.Insert(0, it.StringId + " t" + cT[k] + " " + RangedLore.SchoolName(cSc[k]) + " (" + why[k] + ")");
+                    names.Insert(0, it.Name != null ? it.Name.ToString() : it.StringId);
                 }
                 catch (Exception e) { Stumble("LoreSeedFix.RepairReach", e); }
             }
@@ -363,21 +431,25 @@ namespace Armoury
                 try
                 {
                     string what = names.Count <= 3 ? string.Join(", ", names.ToArray()) : names.Count + " bow and crossbow patterns";
-                    Log.Player("Bowyer's ledger corrected: " + what + " - drawn beyond what your smiths can work - struck out; "
+                    Log.Player("Bowyer's ledger corrected: " + what + " - found too far above what you knew and could work - struck out; "
                                + total.ToString("0.#", ci) + " study points returned.");
                 }
                 catch { }
             }
 
             string list = string.Join(", ", (removed.Count > 12 ? removed.GetRange(0, 12) : removed).ToArray()) + (removed.Count > 12 ? ", ..." : "");
-            detail = "Wiedza (m96-wzory): naprawa zapisu 2 (" + ReachMark + ") - wzory lukow i kusz sprzed m96 ponad zakres reki | najlepszy kowal " + who
-                     + " Smithing " + skill + " (postaci gracza " + smiths + "), prog na tier " + PatternGate.PerTierNow() + " -> zakres tierow 1-" + cap
-                     + " | wpisy lukow/kusz przed znacznikiem " + RepairMark + " " + seen + " (tier 2+ " + high + ") | zdjete " + removed.Count + " [" + list
+            string handTxt = hand ? "najlepszy kowal w druzynie " + who + " Smithing " + skill + " (bohaterowie w druzynie " + smiths + "), prog na tier "
+                                    + PatternGate.PerTierNow() : "reka NIE (PatternDrawBySkill)";
+            string stepTxt = step ? "drabina tierow TAK (najlepszy wzor po naprawie: BOWS t" + finalTop[RangedLore.SchoolBow] + ", CROSSBOWS t"
+                                    + finalTop[RangedLore.SchoolXbow] + ")" : "drabina tierow NIE (PatternDrawOneTierUp)";
+            detail = "Wiedza (m96-wzory): naprawa zapisu 2 (" + ReachMark + ") - wzory lukow i kusz sprzed m96 ponad dzisiejsze losowanie | " + handTxt
+                     + " -> zakres tierow 1-" + cap + " | " + stepTxt
+                     + " | wpisy lukow/kusz do nauki przed znacznikiem " + RepairMark + " " + seen + " (tier 2+ " + high + ") | zdjete " + removed.Count + " [" + list
                      + "] - skad: losowanie albo punkty nauki sprzed m96 (zapis nie zapisuje zrodla; przetop i rozbiorka dalyby ten sam wpis - dlatego tylko luki"
                      + " i kusze, pancerze bez zmian) | punkty zwrocone [" + string.Join(", ", refunds.ToArray()) + "] (" + ReachRefund.ToString("0", ci)
                      + " na wzor - najnizsza cena losowania) | ksiega po naprawie: " + LedgerShort(RangedLore.SchoolBow) + " || " + LedgerShort(RangedLore.SchoolXbow) + ".";
-            return "wzory ponad reke: zdjete " + removed.Count + " [" + list + "], zakres 1-" + cap + " (Smithing " + skill + "), punkty zwrocone "
-                   + total.ToString("0.#", ci);
+            return "wzory ponad reke: zdjete " + removed.Count + " [" + list + "], zakres 1-" + cap + (hand ? " (Smithing " + skill + ")" : " (reka NIE)")
+                   + ", drabina tierow " + (step ? "TAK" : "NIE") + ", punkty zwrocone " + total.ToString("0.#", ci);
         }
 
         /// <summary>Linia ksiegi szkoly bez czesci "next pattern" (do linii naprawy zapisu 2).</summary>
@@ -394,8 +466,9 @@ namespace Armoury
             catch (Exception e) { Stumble("LoreSeedFix.LedgerShort", e); return "?"; }
         }
 
-        /// <summary>Najwyzszy Smithing wsrod postaci gracza, ktore moga stanac przy kowadle teraz albo pozniej: gracz, bohaterowie w druzynie,
-        /// rod gracza i jego towarzysze (zywi). Hojnie - wyzszy zakres = mniej zdjetych wzorow. -1 = blad odczytu (naprawa czeka).</summary>
+        /// <summary>Najwyzszy Smithing wsrod postaci, ktore moga stanac przy kowadle w CRAFT: gracz i bohaterowie w jego druzynie (zywi) - ta sama miara
+        /// co losowanie (PatternGate.DrawCap liczy kowala przy kowadle). Po recenzji: bez rodu i towarzyszy spoza druzyny (namiestnik ze Smithing 105+
+        /// zostawialby graczowi luk t5, ktorego zaden jego kowal przy kowadle dzis nie wylosuje). -1 = blad odczytu (naprawa czeka).</summary>
         private static int BestSmithSkill(out string who, out int count)
         {
             who = "-";
@@ -410,12 +483,6 @@ namespace Armoury
                 if (party != null && party.MemberRoster != null)
                     foreach (var m in party.MemberRoster.GetTroopRoster())
                         if (m.Character != null && m.Character.HeroObject != null) heroes.Add(m.Character.HeroObject);
-                var clan = Clan.PlayerClan;
-                if (clan != null)
-                {
-                    foreach (var h in clan.Heroes) heroes.Add(h);
-                    foreach (var h in clan.Companions) heroes.Add(h);
-                }
                 foreach (var h in heroes)
                 {
                     if (h == null || !h.IsAlive || !seen.Add(h)) continue;

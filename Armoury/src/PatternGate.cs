@@ -25,6 +25,9 @@ namespace Armoury
     ///  6. (po recenzjach) LUKI Z RZADKIEGO MATERIALU (RareBowsNotForged): czardrzewo, smocza kosc, zlotoserce, luk olbrzyma, strzaly
     ///     Ravens' Teeth - wycenione jak skonczony zasob (HistExoticBows, np. ravens_teeth_longbow 5000 d), a kwit kuzni to drewno i kilka
     ///     sztabek; nie ma wzoru, kowadlo odmawia (Forge.LegendAllowed - wspolna brama obu drog kucia), kafelek mowi dlaczego.
+    ///  7. (m96-wzory2 po recenzji) DRABINA TIEROW (PatternDrawOneTierUp): Jeff 20.10 16:24 "nie pokazuje mi sie tier IV czy V, jak mam znajomosc tylko I" -
+    ///     sama reka przy Smithing 87 dawala zakres 1-4 przy samych wzorach t1; teraz losowanie najwyzej o kolejny niepusty tier ponad najlepszy znany
+    ///     wzor szkoly (znam t1 -> t2, znam t2 -> t3...), nizsza z obu granic. Study (nauka z cudzej sztuki) i Learn (przetop/rozbiorka) - bez zmian.
     /// Wszystko na watku glownym (UI i kampania), bez alokacji w petlach listy (prog z pamieci podrecznej na sesje i ustawienia).
     /// </summary>
     internal static class PatternGate
@@ -118,13 +121,27 @@ namespace Armoury
 
         private static int PerTier() { var s = S; return s != null ? Math.Max(1, s.SmithingSkillPerTier) : 35; }
 
-        /// <summary>Najwyzszy tier, jaki moze wypasc z nauki: tier, ktory reka kowala juz unosi (skill / prog na tier + 1), i jeden wyzej.
-        /// Smithing 30 przy progu 35: tier 2; 35: tier 3; 140: tier 6. Nigdy ponizej tieru wykutej sztuki. Klucz wylaczony: 6 (jak dotad).</summary>
-        internal static int DrawCap(int minTier, Hero smith)
+        /// <summary>Najwyzszy tier, jaki moze wypasc z nauki przy kowadle (szkola school):
+        ///  - reka (PatternDrawBySkill): tier, ktory reka kowala juz unosi (skill / prog na tier + 1), i jeden wyzej - Smithing 30 przy progu 35: tier 2; 35: 3; 140: 6;
+        ///  - drabina (PatternDrawOneTierUp, m96-wzory2 po recenzji): najwyzej kolejny niepusty tier ponad najlepszy znany wzor tej szkoly (znam tylko t1 -> t2).
+        /// Wiazaca nizsza z obu. Nigdy ponizej tieru wykutej sztuki. Oba klucze wylaczone: 6 (jak dotad).</summary>
+        internal static int DrawCap(int minTier, Hero smith, int school)
         {
-            if (!DrawOn) return 6;
+            bool hand = DrawOn, step = StepOn;
+            if (!hand && !step) return 6;
             int skill = SkillOf(smith);
-            int cap = SkillCap(skill);
+            int handCap = hand ? SkillCap(skill) : 6;
+            int top = 0, stepCap = 6;
+            if (step)
+            {
+                try
+                {
+                    top = KnownTop(school);
+                    stepCap = LadderNext(top, TiersWithPatterns(school, LegendReach(smith), _tiersBuf));
+                }
+                catch (Exception e) { Stumble("PatternGate.DrawCap", e); top = 0; stepCap = 6; }   // blad odczytu ksiegi - sama reka (jak przed drabina)
+            }
+            int cap = handCap < stepCap ? handCap : stepCap;
             if (cap < minTier) cap = minTier;
             if (cap > 6) cap = 6;
             Draws++;
@@ -135,10 +152,60 @@ namespace Armoury
                 {
                     _drawLines++;
                     Log.Info("Wiedza (m96-wzory): losowanie wedlug reki - kowal " + Who(smith) + " Smithing " + skill + ", prog na tier " + PerTier()
-                             + " -> zakres tierow " + minTier + "-" + cap + " (bylo " + minTier + "-6) | robot z nauka od startu sesji " + Draws + ", z przycietym zakresem " + DrawsCapped + ".");
+                             + " -> zakres tierow " + minTier + "-" + cap + " (bylo " + minTier + "-6) | reka " + (hand ? "do t" + handCap : "NIE")
+                             + ", drabina tierow " + (step ? RangedLore.SchoolName(school) + " najwyzszy znany t" + top + " -> do t" + stepCap : "NIE")
+                             + " | robot z nauka od startu sesji " + Draws + ", z przycietym zakresem " + DrawsCapped + ".");
                 }
             }
             return cap;
+        }
+
+        // ------------------------------------------------------------ 1b. drabina tierow (m96-wzory2 po recenzji)
+        internal static bool StepOn { get { var s = S; return s != null && s.PatternDrawOneTierUp; } }
+        private static readonly bool[] _tiersBuf = new bool[7];   // watek glowny; DrawCap wola raz na robote
+
+        /// <summary>Najwyzszy tier (1-6) znanego wzoru do nauki w tej szkole (lista Known, ta sama miara co ksiega - Teachable, TierOf); 0 = zaden.</summary>
+        internal static int KnownTop(int school)
+        {
+            int top = 0;
+            var K = RangedLore.Known;
+            for (int i = 0; i < K.Count; i++)
+            {
+                var id = K[i];
+                if (string.IsNullOrEmpty(id) || id[0] == '#' || id.StartsWith("__", StringComparison.Ordinal)) continue;
+                var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
+                if (it == null || RangedLore.SchoolOf(it) != school || !RangedLore.Teachable(it)) continue;
+                int t = RangedLore.TierOf(it);
+                if (t < 1) t = 1;
+                if (t > 6) t = 6;
+                if (t > top) top = t;
+            }
+            return top;
+        }
+
+        /// <summary>Tiery (1-6), w ktorych szkola ma jakikolwiek wzor do nauki (legenda poza zasiegiem reach - nie; int.MaxValue = bez filtra).
+        /// Wypelnia i zwraca into (dlugosc 7).</summary>
+        internal static bool[] TiersWithPatterns(int school, int reach, bool[] into)
+        {
+            for (int t = 0; t < into.Length; t++) into[t] = false;
+            foreach (var item in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+            {
+                if (item == null || RangedLore.SchoolOf(item) != school) continue;
+                if (!RangedLore.Teachable(item)) continue;
+                if (reach != int.MaxValue && LegendOutOfReach(item, reach)) continue;
+                int t = RangedLore.TierOf(item);
+                if (t < 1) t = 1;
+                if (t > 6) t = 6;
+                into[t] = true;
+            }
+            return into;
+        }
+
+        /// <summary>Drabina: najnizszy tier ponad top, w ktorym szkola ma wzory (puste tiery pomijane - inaczej nauka stanelaby na zawsze); brak = 6.</summary>
+        internal static int LadderNext(int top, bool[] tiers)
+        {
+            for (int t = top + 1; t <= 6; t++) if (tiers[t]) return t;
+            return 6;
         }
 
         /// <summary>Gorna granica losowania dla reki o tym Smithing (bez dolnej granicy tieru wykutej sztuki): skill / prog na tier + 2, najwyzej 6.
@@ -270,7 +337,7 @@ namespace Armoury
 
         internal static string Keys()
         {
-            return "losowanie wg reki " + (DrawOn ? "TAK" : "NIE") + ", prog tarcz w CRAFT " + (ShieldOn ? (ArmourQuality.CraftOn ? "TAK" : "TAK (uspiony - CraftOn NIE)") : "NIE")
+            return "losowanie wg reki " + (DrawOn ? "TAK" : "NIE") + ", drabina tierow " + (StepOn ? "TAK" : "NIE") + ", prog tarcz w CRAFT " + (ShieldOn ? (ArmourQuality.CraftOn ? "TAK" : "TAK (uspiony - CraftOn NIE)") : "NIE")
                    + ", unikaty ROT tylko z oryginalu " + (UniquesOn ? "TAK" : "NIE") + ", kafelek z progiem " + (TileOn ? "TAK" : "NIE")
                    + ", kusza wedlug sily w ksiedze " + (XbowTierOn ? (XbowPrice.Active ? "TAK" : "TAK (uspiony - kusze nie przeliczone w tej sesji)") : "NIE")
                    + ", rzadki material bez kucia " + RareCount();
