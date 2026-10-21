@@ -742,11 +742,14 @@ namespace Armoury
                 var msg = new StringBuilder((n.HostUid != null ? (IsHouse(n) ? "Rested in your own house: until " : "Rested under your villagers' roofs: until ") : "Rested in a bed: until ") + Clock(n.UntilMin) + " the column marches " + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
                 if (n.Price && PriceKey) msg.Append(" The good house's name opens doors - you trade up to 3% better in ").Append(n.Town).Append(" until ").Append(Clock(n.UntilMin)).Append(".");
                 if (NightRest.Debt > 0) msg.Append(n.HostUid != null ? " Old weariness still lingers - the night's rest shows once the sleep debt is paid off." : " Old weariness still lingers - the bed's comfort shows once the sleep debt is paid off.");
+                // m98-plotki (recenzja gra, wazne): pijany albo skacowany - premia lozka wstrzymana w latkach NightRest (InnDrink.SpoilsRest), komunikat to mowi
+                bool spoilt = InnDrink.SpoilsRest;
+                if (spoilt) msg.Append(InnDrink.Drunk ? " But you are still drunk - the bed does you no good until you sleep it off." : " But the ale still pounds in your head - the bed does you no good until the hangover passes.");
                 Log.Player(msg.ToString());
                 Log.Info(P + how + " w " + n.Town + " " + When(now) + " - w menu " + F1(menuRest) + " h, pelny pasek " + (full ? "tak" : "nie") + " -> wypoczeci do "
                          + When(n.UntilMin) + " (predkosc +" + F1(n.Speed) + "%, morale +" + F1(n.Morale) + ", cena " + (n.Price && PriceKey ? "tak" : "nie")
                          + (r.Price && !n.Price ? " - bez nocy do switu" : "")
-                         + ", dlug snu " + NightRest.Debt + (NightRest.Debt > 0 ? " - premia czeka na splate dlugu" : "") + ").");
+                         + ", dlug snu " + NightRest.Debt + (NightRest.Debt > 0 ? " - premia czeka na splate dlugu" : "") + (spoilt ? ", kara kufli (m98) - premia wstrzymana do konca kary" : "") + ").");
             }
             catch (Exception e) { Stumble("Wake", e); }
         }

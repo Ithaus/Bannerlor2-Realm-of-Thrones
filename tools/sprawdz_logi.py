@@ -1932,7 +1932,7 @@ Uzycie (Python 3, tylko odczyt):
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
                     Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
                     (obieg 0), KP-4 turnieje i swaty prawdziwe w chwili sluchania, KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy upiciu / kacu,
-                    KP-7 ruch doby (INFO). Log sprzed galezi - INFO.
+                    KP-7 ruch doby (INFO), KP-8 pobudka z pelnym paskiem snu przy pijanym = odespane (recenzja technika). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -37873,7 +37873,7 @@ def nzajazdy_main(logp):
         rep.add("ZJ-5: plotki zbudowane bez wyjatkow (suma dob)", f"sluchane {sum(int(g['heard']) for g in pdays)}, plotek {sum(int(g['items']) for g in pdays)}, wyjatki budowy {pst}",
                 "wyjatki 0", pst == 0)
         bms = max(float(g["bms"]) for g in pdays)
-        rep.add("ZJ-5b: czas budowy plotek (najgorsza doba, srednio na sluchanie)", f"{bms:.2f} ms", "<= 50 ms (INFO bez sluchania)",
+        rep.add("ZJ-5b: czas budowy plotek (najgorsza doba, srednio na budowe puli - m98-plotki; bez kufla to samo co na sluchanie)", f"{bms:.2f} ms", "<= 50 ms (INFO bez sluchania)",
                 None if sum(int(g["heard"]) for g in pdays) == 0 else bms <= 50.0)
     else:
         rep.add("ZJ-5: linie doby plotek", "brak", "INFO (klucz Inn Gossip wylaczony albo sesja krotsza niz doba)", None)
@@ -54026,6 +54026,7 @@ M98P_RX = {
     "town": re.compile(r"kiesa ludu \S+ (-?\d+), kasa miasta (-?\d+)$"),
     "road": re.compile(r"kiesa wsi \S+ (-?\d+), podatek pana (\d+), korona \(DS\) (\d+)$"),
     "drunk": re.compile(r"(upicie|pijany dalej) - kufli (\d+) \(prog (\d+), .*?ponad prog (\d+), kara predkosci -(\d+)%"),
+    "wake": re.compile(r"pobudka \((.+?)\) - pasek (\S+) h, pelny pasek (tak|nie), .*? h -> (dalej pijany|odespane), dzien (-?\d+)"),
     "day": re.compile(r"dzien (-?\d+) \| .*?\| kufle (\d+), zaplacone (\d+) .*?roznica (-?\d+) \| plotek uslyszanych (\d+) \(turnieje (\d+), nieprawdziwe (\d+); swaty (\d+), nieprawdziwe (\d+)\)"
                       r".*?\| upicia (\d+), odespania (\d+), kace (\d+), godziny kary: pijany (\d+), kac (\d+), bez stanu (\d+) .*?\| pula: turniejow w toku w swiecie (\d+), kandydatow do swatow w swiecie (\S+?) "
                       r".*?\| potkniecia dzis (\d+)"),
@@ -54047,7 +54048,7 @@ def m98plotki_main(logp):
     KP-4 turnieje i swaty prawdziwe w chwili sluchania (kufle i doby: nieprawdziwe 0), KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy
     upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
     rep = Report()
-    start, cups, drunks, days, errs = [], [], [], [], 0
+    start, cups, drunks, days, wakes, errs = [], [], [], [], [], 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
@@ -54065,6 +54066,8 @@ def m98plotki_main(logp):
                 cups.append(t)
             elif t.startswith("upicie") or t.startswith("pijany dalej"):
                 drunks.append(t)
+            elif t.startswith("pobudka ("):
+                wakes.append(t)
     print(f"plik: {logp} | start {len(start)}, doby {len(days)}, kufle {len(cups)}, upicia {len(drunks)}, ERROR {errs}")
     if not start and not days and not cups:
         rep.add("KP-0: linia startu kufli", "brak linii", "INFO (log sprzed galezi m98-plotki)", None)
@@ -54079,9 +54082,12 @@ def m98plotki_main(logp):
     rep.add("KP-1: linie ERROR in InnDrink./Rumours.", f"{errs}", "0", errs == 0)
     st_sum = sum(int(m.group(18)) for m in (M98P_RX["day"].search(x) for x in days) if m)
     rep.add("KP-2: potkniecia doby (suma)", f"{st_sum} w {len(days)} dobach", "0", st_sum == 0)
-    bad, badt, badn, unread = [], [], [], 0
+    bad, badt, badn, unread, nopay = [], [], [], 0, 0
     tn = tt = mn = mt = 0
     for t in cups:
+        if "zaplata nie przeszla" in t:
+            nopay += 1   # kufel bez zaplaty = bez plotek (obieg zamkniety) - w opisie, nie w progu
+            continue
         m = M98P_RX["cup"].search(t)
         if not m:
             unread += 1
@@ -54105,7 +54111,7 @@ def m98plotki_main(logp):
             badn.append(f"{m.group(3)} d{m.group(4)}: Urok {charm}, nowych {fresh}, plotek {n} (oczekiwane {m98_per_drink(charm, fresh, by_charm)})")
     if cups:
         rep.add("KP-3: kufel zaplacony, pieniadz u odbiorcy (cena = zaplacil = -kiesa gracza = odbiorcy, obieg 0)",
-                f"kufli {len(cups)}, nieczytelnych {unread}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""), "0 niezgodnych i 0 nieczytelnych", not bad and unread == 0)
+                f"kufli {len(cups)} (zaplata nie przeszla {nopay} - bez plotek), nieczytelnych {unread}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""), "0 niezgodnych i 0 nieczytelnych", not bad and unread == 0)
     else:
         rep.add("KP-3: kufel zaplacony", "brak kufli w logu", "INFO (gracz nie sluchal plotek)", None)
     dfalse = sum(int(m.group(7)) + int(m.group(9)) for m in (M98P_RX["day"].search(x) for x in days) if m)
@@ -54129,6 +54135,16 @@ def m98plotki_main(logp):
             pool_t, pool_m = m.group(16), m.group(17)
     rep.add("KP-7: ruch doby (suma)", f"kufle {tot[0]}, zaplacone {tot[1]}, plotek {tot[2]} (turnieje {tot[3]}, swaty {tot[4]}), upicia {tot[5]}, odespania {tot[6]}, "
             f"godziny pijany {tot[7]}, kac {tot[8]} | ostatnia doba: turniejow w toku {pool_t}, kandydatow do swatow {pool_m}", "INFO", None)
+    # KP-8 (recenzja technika): pobudka z pelnym paskiem snu w stanie pijanym ma konczyc pijanstwo (pasek jest prawda o tym snie)
+    wk = [M98P_RX["wake"].search(x) for x in wakes]
+    wfull = [m for m in wk if m and m.group(3) == "tak"]
+    wbad = [f"{m.group(1)} d{m.group(5)} pasek {m.group(2)} h" for m in wfull if m.group(4) == "dalej pijany"]
+    wunread = sum(1 for m in wk if m is None)
+    if wakes:
+        rep.add("KP-8: pobudka z pelnym paskiem snu przy pijanym = odespane", f"pobudek pijanego {len(wakes)} (pelny pasek {len(wfull)}, nieczytelnych {wunread}), "
+                f"pelny pasek i dalej pijany {len(wbad)}" + (f" ({wbad[:3]})" if wbad else ""), "0 i 0 nieczytelnych", not wbad and wunread == 0)
+    else:
+        rep.add("KP-8: pobudka z pelnym paskiem snu przy pijanym", "brak pobudek pijanego w logu", "INFO", None)
     rep.show()
     return 0
 

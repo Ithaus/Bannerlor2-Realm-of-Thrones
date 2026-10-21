@@ -5,7 +5,8 @@
 od 50 - dwie, od 110 - trzy, od 170 - cztery, od 230 - wszystkie); kolejny kufel = kolejne plotki, a te juz uslyszane w tej karczmie nie wracaja. W plotkach
 sa teraz tez **turnieje** (gdzie, jak daleko, od kiedy, jaka nagroda) i **swaty** (pan albo pani rodu w okolicy szuka meza dla corki albo zony dla syna) -
 tylko prawdziwe, z biezacego stanu gry. Jak wypijesz za duzo (zwykle ponad 3 kufle, wiecej przy dobrej Wytrzymalosci i Atletyce), jestes pijany: druzyna
-wolniej idzie po mapie, az to odespisz (sen trwa dluzej), a potem budzisz sie z kacem do zmierzchu.
+wolniej idzie po mapie, az to odespisz (sen trwa dluzej), a potem budzisz sie z kacem do zmierzchu. Z kacem lozko w karczmie nie daje premii
+"wypoczety" - kto zapil noc, ten rano nie jest wypoczety. Ta sama wiesc (ten sam turniej, ta sama banda w tym samym miejscu) nie wraca za kolejny kufel.
 
 **Problem:** Jeff 20.10 ok. 15:20: "W gossip tez powinny byc turnieje, gdzie jest turniej itp. [...] ze ktos wydaje zone albo szuka dla meza dla swojej corki
 jakis lord czy ktos, i jak biore gossip, to musze kupic piwo lub ale cokolwiek, aby sluchac, nie slucham przeciez z pustym jezykiem, bo by mnie wyrzucili
@@ -27,8 +28,9 @@ Piwo: `beer` (SandBoxCore, beczka 10 kg, wartosc 50; po HistoricalPrices u Jeffa
   obiegu przy kazdym kuflu (suma posiadaczy przed i po) - roznica ma byc 0. Komunikat z powodem: "You paid 1 for a tankard of ale at X." (PayNotes).
 - **Plotek na kufel wedlug Uroku (Charm):** `1 + (Urok + 10) / 60`, od 230 - wszystkie: **Urok 20 -> 1, 80 -> 2, 150 -> 3, 200 -> 4, 250 -> wszystkie**
   (progi 50 / 110 / 170 / 230). Pula miejsca jak dotad (6 dawnych) + do 2 turniejow i do 2 swatow = najwyzej 10. Kolejnosc od najwazniejszej (jak dotad).
-  Uslyszane w tym miejscu (karczma miasta - id miasta, zajazd - uid) nie wracaja, poki tekst plotki sie nie zmieni (ksiega skrotow tekstu, wpis zyje 10 dob,
-  najwyzej 400 miejsc x 60 wpisow); wszystko uslyszane - opcja szara "You have heard all the talk here. Come back when there is fresh news." (bez placenia).
+  Uslyszane w tym miejscu (karczma miasta - id miasta, zajazd - uid) nie wracaja, poki nie ma NOWEJ WIESCI (ksiega skrotow tozsamosci wiesci - po recenzji,
+  patrz nizej; wpis zyje 10 dob, najwyzej 400 miejsc x 60 wpisow); wszystko uslyszane - opcja szara "You have heard all the talk here. Come back when there
+  is fresh news." (bez placenia).
   **5 XP Uroku** za kazda uslyszana plotke.
 - **Turnieje:** turniej gry w toku do 450 jedn. od karczmy (najblizsze 2), daleki dopiero, gdy moglby doleciec kruk (`Ravens.NotYet`, jak wiesci wojenne);
   tresc: miasto ("here in X" do 6 jedn.), odleglosc i kierunek, kiedy ogloszony (dzis / wczoraj / kilka dni / tygodnie), nagroda i jej cena na targu tego miasta.
@@ -41,7 +43,11 @@ Piwo: `beer` (SandBoxCore, beczka 10 kg, wartosc 50; po HistoricalPrices u Jeffa
   NightRest (noc 1/h, dzien DayRestFactor, sen w menu karczmy x SleepFactor). Dlug snu rosnie o te godziny: `NightRest.NeededHours` dolicza brakujace godziny,
   wiec sen w menu ("Bed down", nocleg) trwa dluzej - gracz dosypia. "You are drunk - your party moves 15% slower on the map until you sleep it off (7 hours of rest)."
 - **Kac** (po odespaniu): predkosc **-10%** i morale **-10%** (czynnik, jak kara snu) do **18:00** dnia odespania (odespane od poludnia - 6 h).
-  "You wake with a hangover - your head pounds: ..." po pobudce; "Your head clears - the hangover is gone." Kufel w czasie kaca zdejmuje kac (pijany zamiast).
+  "You wake with a hangover - your head pounds: ..." po pobudce z menu snu; odespane w postoju albo obozie na mapie (bez menu snu) - "The ale wears off, but
+  a hangover follows - ..."; "Your head clears - the hangover is gone." Kufel w czasie kaca zdejmuje kac (pijany zamiast).
+- **Pijany albo skacowany nie jest wypoczety:** premia noclegu "Slept in a bed" / "Slept under a roof" (predkosc +5..12%, morale +2..8 do zmierzchu) nie dziala,
+  dopoki trwa kara kufli; komunikat pobudki w karczmie to mowi ("But the ale still pounds in your head - the bed does you no good until the hangover passes.").
+  Kac trwa do 18:00, premia tez do zmierzchu (18:00) - w praktyce noc zapita w karczmie = bez premii lozka.
 - Tylko gracz. Kary licza latki NightRest (SpeedPostfix / MoralePostfix, raz na lancuch modeli) z pol int liczonych na watku glownym.
 
 **Zmiana (Armoury):**
@@ -67,16 +73,56 @@ Piwo: `beer` (SandBoxCore, beczka 10 kg, wartosc 50; po HistoricalPrices u Jeffa
   dotad (linia doby bez zmian formatu - parser nzajazdy). Etykieta opcji to teraz zmienna tekstu - warunek ustawia ja zawsze jako pierwsza rzecz.
 - NightRest: `NeededHours` dla trzezwego bez zmian (ExtraSleepH = 0). Pijany: dluzszy cel snu w menu, pozniejsza splata starego dlugu od reki (CreditRest),
   rzadziej pomijane pytanie o nocleg (NightPromptSkipWhenRested) - zamierzone ("musze dospac"). Swit dalej liczy dlug od bazy (SleepHoursNeeded), wiec
-  picie samo dlugu nocy nie robi. Kara pijanego jest od wyniku przed kara dlugu (skladaja sie), premia karczmy "wypoczeci" moze isc razem z kacem.
+  picie samo dlugu nocy nie robi. Kara pijanego jest od wyniku przed kara dlugu (skladaja sie); premia karczmy "wypoczeci" wstrzymana, dopoki trwa kara kufli
+  (po recenzji). Pobudka (LeaveSleep / EndSleepQuiet) wola InnDrink.OnWake przed TownInns - kac jest juz ustawiony, gdy karczma pisze komunikat. Kowadlo -
+  NeededHoursFresh (trzezwy bez zmian).
 - Zamknieta ekonomia: kufel = przelew gracz -> karczmarze tymi samymi metodami co nocleg; piwo z polek nie znika (jak wino w noclegu - usluga, nie towar).
   Cena 1 d przy beczce 3 d to x6 hurtu (najmniejsza moneta) - przy drogim piwie x2.
-- "Uslyszane" liczy sie po tekscie: plotka o tej samej bandzie z nowa liczba ludzi albo z przesada liczona z ziarna doby (daleko) wraca jako nowa - to
-  nowa wersja wiesci, ale Jeff moze ja odebrac jako powtorke. Do oceny w grze.
+- "Uslyszane" liczy sie po tozsamosci wiesci (po recenzji): banda wraca dopiero w innym miejscu (inna najblizsza osada / kratka) albo po spaleniu wsi; wojsko -
+  po zmianie celu; jesli Jeff uzna, ze banda "w drodze" zbyt rzadko wraca albo zbyt czesto - do strojenia promienia miejsca (25 / 50 jedn.).
 - Swaty: rodzic "szuka" to nasz opis faktu (dziecko wolne i dopuszczone do slubu) - gra nie ma stanu "szuka meza". Model BK moze miec inne warunki niz domyslny.
 - Turnieje GrandTourney w fazie zjazdu: plotka mowi o turnieju gry (TournamentGame) - jesli GrandTourney trzyma zjazd bez TournamentGame, plotki o nim nie ma.
 - Koszt: pula liczona najwyzej raz na godzine gry na miejsce (warunek opcji tez ja czyta); swaty - przeglad rodow z siedziba do 200 jedn.; linia doby - jeden
   przeglad wszystkich rodow (kandydaci w swiecie).
 - Nie testowane w grze (zakaz: trwa test 97b). Build Release kod 0.
+
+**Poprawki po recenzjach (gra, technika) - kazde zgloszenie sprawdzone w kodzie:**
+- **[technika, wazne] PRAWDZIWE - pobudka z pelnym paskiem zostawiala gracza pijanym.** Dowod: `InnDrink._slept` rosl tylko pelnymi tikami godzinowymi
+  (`RestHour` z `NightRest.OnHourly`), a sen w menu konczy sie na pasku `_menuRest >= _menuTarget` (ulamki godzin). Przyklad z recenzji: 4 kufle przy progu 3
+  (odespac 7 h), sen od 21:00, pobudka ok. 04:40 z pelnym paskiem, tiki 6 x 1.0 + 0.6 = 6.6 < 7 - pijany, a w marszu tik juz nie dolicza. Zmiana:
+  `InnDrink.OnSleepInit` (NightRest.SleepInit) zapamietuje odpoczynek od kufla przy polozeniu sie, `InnDrink.OnWake` (NightRest.LeaveSleep i EndSleepQuiet,
+  przed TownInns) ustawia `_slept = max(_slept, przy polozeniu + pasek)` i trzezwi od razu (kac od pobudki, komunikat od razu). Pelny pasek zawsze = odespane
+  (cel paska >= brakujace godziny). Linia logu "Kufle (m98): pobudka (pobudka|sen przerwany) - pasek X h, pelny pasek tak/nie, ... -> odespane|dalej pijany";
+  nowy prog **KP-8**: pobudka z pelnym paskiem i "dalej pijany" = 0.
+- **[gra, wazne] PRAWDZIWE - kac znosil sie z premia lozka.** Dowod: NightRest.SpeedPostfix najpierw kara kaca (-10%), potem przy dlugu 0 `TownInns.SpeedBonus`
+  (+10% porzadna karczma, +12% dobry dom): 0.90 x 1.10 = 0.99. Zmiana: `InnDrink.SpoilsRest` (pijany albo kac) - SpeedPostfix / MoralePostfix nie dodaja premii
+  lozka; `TownInns.Wake` dopisuje do komunikatu pobudki zdanie o kacu (albo "you are still drunk") i do logu "kara kufli (m98) - premia wstrzymana". Jedna zasada:
+  kto zapil noc, temu lozko nie daje wypoczynku, dopoki trwa kara kufli.
+- **[gra, wazne] PRAWDZIWE - "uslyszane" po tekscie wracalo.** Dowod: tekst turnieju zmienia sie z doba ("only today" / "yesterday" / "a few days ago") i cena
+  nagrody, bandy i wojska maja pozycje z biezacej godziny (Where), przesada z ziarna doby. Zmiana: `Item.Id` - tozsamosc wiesci, skrot ksiegi z Id (tekst tylko
+  zapasowo): turniej = miasto + doba ogloszenia; swaty = bohater; banda = partia + miejsce (najblizsza osada do 25 jedn., dalej kratka 50 jedn.) + liczba
+  spalonych wsi; kryjowka = osada; wojsko = partia przywodcy + cel (oblega X / idzie na X / zbiera sie przy X / w marszu + miejsce); duzy oddzial pana = partia +
+  miejsce; karawana = partia + cel; ceny = towar + dwa miasta; wiesc wojenna = rodzaj + doba + strony + miejsce; trwajace oblezenie = osada + oblegajacy;
+  "wojna/pokoj krolestwa" = krolestwo + lista wrogow. Ta sama banda w tym samym miejscu nie wraca; gdy przejdzie w inne miejsce albo spali wies - to nowa wiesc
+  (warta kufla). Zapis arm_drink bez zmian formatu (skroty uint) - stare wpisy z tekstu po prostu nie pasuja (galaz nie byla wgrana).
+- **[gra, technika, drobne] PRAWDZIWE - "A tourney is being held at here in X".** Zmiana: przyimek w galezi - "held here in X" / "held at X, a day's ride to the ...".
+- **[gra, drobne] PRAWDZIWE - swaty pod BK sprawdzaly za malo.** Dowod (dekompilacja): `BKMarriageModel.IsSuitableForMarriage` sprawdza tylko zywy, nie w niewoli,
+  rod nie banda, nie w bitwie/armii, wiek; `DefaultMarriageModel` dodatkowo IsActive, IsLord, !IsMinorFactionHero, !IsNotable, !IsTemplate i
+  `IMarriageOfferCampaignBehavior.IsHeroEngaged`. U Jeffa czynny ROT > BK. Zmiana: `Candidate` sprawdza te warunki domyslnego modelu sam (przed modelem czynnym).
+- **[gra, drobne] PRAWDZIWE - sen przy kowadle po kuflach za dlugi.** Dowod: `SmithMenu.AnvilShift` bral `NightRest.NeededHours()` (u pijanego = max(potrzeba,
+  reszta + odpoczynek doby) - menu snu odejmuje odpoczynek doby, kowadlo nie). Zmiana: `NightRest.NeededHoursFresh()` = potrzeba + ExtraSleepH(potrzeba, 0)
+  = max(potrzeba, brakujace do odespania); trzezwy - jak dotad.
+- **[gra, drobne] PRAWDZIWE - zajazd wroga albo rabowany nalewal kufel.** Zmiana: `TownInns.RoadDrinkBarred` - te same warunki wojny i rabunku co nocleg
+  (`RoadAllowed`), te same napisy; opcja szara z powodem, skutek tez sprawdza.
+- **[gra, drobne] PRAWDZIWE - "You wake with a hangover" o 2:00 w obozie na mapie.** Zmiana: po menu snu komunikat daje `OnWake` ("You wake with a hangover");
+  odespane w postoju lub obozie bez menu snu - "The ale wears off, but a hangover follows - ...".
+- **[gra, drobne] PRAWDZIWE - budowa puli w warunku opcji psula srednia "budowa srednio".** Zmiana: licznik budow `_dBuilds` (Show bez kufla i Pool kufla),
+  "budowa srednio" = czas / liczba budow (bez kufla to samo co dotad: jedna budowa na sluchanie); etykieta ZJ-5b w sprawdz_logi poprawiona. Zostaje (opisane, nie
+  zmieniane): budowa puli przy samym wejsciu do karczmy nadaje imiona herszcom (_dNameNew) i liczy plotki wstrzymane przez kruki (Ravens) takze bez sluchania -
+  to liczniki i ksiega imion, bez wplywu na zloto i swiat.
+- sprawdz_logi --grupa m98plotki: linia "kufel w ... - zaplata nie przeszla" (kufel bez zaplaty = bez plotek) nie jest juz liczona jako nieczytelna w KP-3
+  (dotad sztuczny log z ta linia dawal KP-3 NIE); liczba w opisie progu.
+- Tekst recenzji technika byl w zadaniu uciety po drugim zgloszeniu - poprawione sa zgloszenia, ktore byly widoczne.
 
 **Status:** DO SPRAWDZENIA (galaz w-toku/m98-plotki, nie wgrane).
 
@@ -88,7 +134,12 @@ Piwo: `beer` (SandBoxCore, beczka 10 kg, wartosc 50; po HistoricalPrices u Jeffa
 3. Kliknij jeszcze raz - nowe plotki, bez powtorek. Po wysluchaniu wszystkiego opcja szara: "You have heard all the talk here...".
 4. Sprawdz turnieje (miasto blisko trwajacego turnieju) i swaty - nazwy i miasta zgadzaja sie z encyklopedia i menu turnieju.
 5. Wypij ponad prog (np. w kilku karczmach) - "You are drunk - your party moves 15% slower...". Na mapie najedz na predkosc - pozycja "Drunk".
-6. Poloz sie spac (O -> Bed down / nocleg) - sen trwa dluzej; po pobudce "You wake with a hangover..."; predkosc "Hangover" -10%, morale -10% do 18:00,
-   potem "Your head clears - the hangover is gone.".
+6. Poloz sie spac (O -> Bed down / nocleg) - sen trwa dluzej; od razu przy pobudce (pelny pasek) "You wake with a hangover..."; predkosc "Hangover" -10%,
+   morale -10% do 18:00, potem "Your head clears - the hangover is gone.". W logu "Kufle (m98): pobudka (pobudka) - ... pelny pasek tak ... -> odespane".
+   Nocleg w karczmie po kuflach: komunikat "Rested in a bed ... But the ale still pounds in your head - the bed does you no good until the hangover passes.",
+   w rozpisce predkosci nie ma "Slept in a bed", jest "Hangover".
 7. Zapisz w stanie pijanym, wczytaj - stan zostaje. Log: `python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log>` - wszystkie progi TAK.
-8. Zajazd przy szlaku: to samo, zaplata do wsi okregu (linia kufla: "kiesa wsi ..., podatek pana ..., korona (DS) ...").
+8. Zajazd przy szlaku: to samo, zaplata do wsi okregu (linia kufla: "kiesa wsi ..., podatek pana ..., korona (DS) ..."). Zajazd pana, z ktorym jestes
+   na wojnie, albo wies rabowana - opcja szara z tym samym powodem co nocleg.
+9. Ten sam turniej nastepnego dnia w tej samej karczmie nie wraca jako nowa plotka; banda wraca dopiero, gdy jest gdzie indziej.
+10. Kuznia: praca przy kowadle po kuflach - sen przy kowadle najwyzej tyle, ile brakuje do odespania (nie kilkanascie godzin).

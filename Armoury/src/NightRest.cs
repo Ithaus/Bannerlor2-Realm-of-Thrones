@@ -129,6 +129,16 @@ namespace Armoury
             return need + InnDrink.ExtraSleepH(need, _restTonight);   // m98-plotki: pijany gracz dosypia (baza + 1 h na kufel ponad prog od ostatniego kufla); trzezwy - 0
         }
 
+        /// <summary>m98-plotki (recenzja gra, SmithMenu.AnvilShift): godziny snu liczone od teraz, bez odejmowania odpoczynku doby - trzezwy jak NeededHours,
+        /// pijany max(potrzeba, brakujace do odespania). NeededHours dolicza pijanemu odpoczynek doby, bo menu snu odejmuje go od celu (_menuTarget); kowadlo nie odejmuje.</summary>
+        internal static float NeededHoursFresh()
+        {
+            var s = Settings.Current;
+            float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
+            float need = baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            return need + InnDrink.ExtraSleepH(need, 0f);
+        }
+
         // ------------------------------------------------------------ rachunek nocy
         internal static void OnHourly()
         {
@@ -1748,6 +1758,7 @@ namespace Armoury
                 try { clockH = (float)(CampaignTime.Now - _sleepStart).ToHours; } catch { }
                 Log.Info("Nocleg: sen w menu przerwany poza menu snu (menu '" + why + "') - koniec snu: w menu " + F1(_menuRest) + " h (zegara " + F1(clockH)
                          + " h), odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + d + ".");
+                InnDrink.OnWake(_menuRest, false, "sen przerwany");   // m98-plotki (recenzja technika): odsypianie kufli z paska tego snu (wlasny try)
                 TownInns.OnInterrupted(_menuRest, why);   // KA: sen w karczmie przerwany - premia tylko po przespanej bazie (wlasny try)
                 _menuNeeded = -1f; _menuDawns = 0;
             }
@@ -1878,7 +1889,8 @@ namespace Armoury
                 if (d < 1)
                 {
                     // KA (karczmy): wyspany w lozku gracz bez dlugu snu - premia do zmierzchu (TownInns.SpeedBonus; raz na lancuch modeli, jak kara)
-                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal) TownInns.SpeedBonus(ref __result);
+                    // m98-plotki (recenzja gra, wazne): pijany albo skacowany - premii lozka nie ma (InnDrink.SpoilsRest; kac jej nie znosi do zera)
+                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal && !InnDrink.SpoilsRest) TownInns.SpeedBonus(ref __result);
                     return;
                 }
                 if (!SpeedDepth.OutermostFinal) return;          // lancuch modeli (ROT->RB->vanilla): kara tylko raz
@@ -1910,7 +1922,7 @@ namespace Armoury
                 if (d < 1)
                 {
                     // KA (karczmy): premia morale wyspanego w lozku gracza bez dlugu snu (TownInns.MoraleBonus; raz na lancuch modeli)
-                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale) TownInns.MoraleBonus(ref __result);
+                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale && !InnDrink.SpoilsRest) TownInns.MoraleBonus(ref __result);   // m98-plotki: jak predkosc
                     return;
                 }
                 if (!SpeedDepth.OutermostMorale) return;         // lancuch modeli morale: kara tylko raz
@@ -2322,6 +2334,7 @@ namespace Armoury
                     }
                 }
                 catch { }
+                InnDrink.OnWake(_menuRest, innFull, "pobudka");   // m98-plotki (recenzja technika, wazne): pasek tego snu odsypia kufle; przed karczma - komunikat lozka wie o kacu (wlasny try)
                 TownInns.OnWake(_menuRest, innFull);   // KA: sen w karczmie - stan "wypoczety" do zmierzchu albo bez premii (wlasny try; poza karczma nic)
                 // KA: sen w osadzie (karczma) - bez namiotu, powrot do menu osady z ticku snu (LeaveSleep w osadzie wola tylko SleepTick - opcja
                 // "Rouse the men early" podnosi tam flage); ExitToLast w miescie niszczy MenuContext i laduje w town_outside (SmithMenu)
@@ -2397,6 +2410,7 @@ namespace Armoury
                 if (!again) { _dawnOwed = 0f; _menuDawns = 0; }
                 // poprawka recenzji 1: cel calego snu i dlug przy polozeniu sie - do splaty calym paskiem (CreditWholeSleep)
                 _menuNeeded = needed; _menuDebt0 = Debt;
+                InnDrink.OnSleepInit();   // m98-plotki: odpoczynek od kufla przy polozeniu sie (pobudka wyrownuje z paskiem; wlasny try)
                 // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);

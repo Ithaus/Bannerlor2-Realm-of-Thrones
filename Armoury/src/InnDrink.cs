@@ -20,12 +20,17 @@ namespace Armoury
     ///  - PIJANY (kufel ponad prog): predkosc na mapie -DrunkSpeedPenaltyPercent (15%) za pierwszy kufel ponad prog, +5% za kazdy nastepny, najwyzej 2 x (30%);
     ///    do odespania: trzeba odpoczac SleepHoursNeeded (6 h) + 1 h na kufel ponad prog, liczone od ostatniego kufla tym samym odpoczynkiem co ksiega snu NightRest
     ///    (noc 1/h, dzien DayRestFactor, sen w karczmie x SleepFactor). Dlug snu rosnie o te godziny: NightRest.NeededHours dolicza ExtraSleepH, wiec sen w menu
-    ///    trwa dluzej (gracz "dosypia"), a splata starego dlugu wymaga i tych godzin.
+    ///    trwa dluzej (gracz "dosypia"), a splata starego dlugu wymaga i tych godzin. Recenzja (technika): pobudka z menu snu wyrownuje odpoczynek z paskiem snu
+    ///    (OnSleepInit / OnWake - pelny pasek = odespane od razu; tiki godzinowe gubily brzegi i gracz budzil sie pijany). Kowadlo: NightRest.NeededHoursFresh.
     ///  - KAC (po odespaniu): predkosc -HangoverSpeedPenaltyPercent (10%) i morale -HangoverMoralePenaltyPercent (10%, czynnik jak kara snu) do zmierzchu (18:00)
-    ///    dnia, w ktorym gracz odespal (odespane od poludnia - 6 h). Kufel w czasie kaca zdejmuje kac (pijany zamiast skacowanego).
+    ///    dnia, w ktorym gracz odespal (odespane od poludnia - 6 h). Kufel w czasie kaca zdejmuje kac (pijany zamiast skacowanego). Komunikat: po menu snu "You wake
+    ///    with a hangover", odespane w postoju lub obozie na mapie - "The ale wears off, but a hangover follows". Recenzja (gra): pijany albo skacowany - premia
+    ///    "wypoczety w lozku" karczmy (TownInns.SpeedBonus / MoraleBonus) wstrzymana (SpoilsRest), dotad kac i premia znosily sie do ok. 0.
     ///  - Kary liczone na watku glownym (kufel, godzina, wczytanie) do pol _spdPct / _morPct (int - odczyt w latkach z dowolnego watku jest bezpieczny).
-    ///  - Ksiega uslyszanych plotek: miejsce (karczma miasta - id miasta, zajazd - uid) -> skrot tekstu plotki -> doba; plotka uslyszana w tym miejscu nie wraca,
-    ///    dopoki jej tekst sie nie zmieni; wpisy starsze niz HeardDays (10) odpadaja; najwyzej HeardPlaces miejsc i HeardPerPlace wpisow.
+    ///  - Ksiega uslyszanych plotek: miejsce (karczma miasta - id miasta, zajazd - uid) -> skrot tozsamosci wiesci (Rumours Item.Id: turniej = miasto + doba
+    ///    ogloszenia, swaty = bohater, banda = partia + miejsce + spalone wsie, wojsko = partia + cel, karawana = partia + cel, ceny = towar + dwa miasta, wiesc
+    ///    wojenna = rodzaj + doba + strony; recenzja gra - dotad skrot tekstu) -> doba; ta sama wiesc w tym miejscu nie wraca; wpisy starsze niz HeardDays (10)
+    ///    odpadaja; najwyzej HeardPlaces miejsc i HeardPerPlace wpisow.
     ///  - Zapis "arm_drink" (SaveText.Sync, v1); brak klucza = trzezwy, nic nie uslyszane.
     ///  - Log "Kufle (m98): " - start sesji (klucze, krzywa Uroku, prog), kazdy kufel (Rumours.Drink), upicie, odespanie, kac, linia doby; tools/sprawdz_logi.py --grupa m98plotki.
     /// Wyjatek - licznik potkniec (pierwszy do Log.Error), nic nie gasimy.
@@ -47,6 +52,9 @@ namespace Armoury
         private static long _hangUntil;
         private static volatile int _spdPct, _morPct;
         private static volatile bool _isHang;
+        // recenzja (technika, wazne): odpoczynek od kufla w chwili polozenia sie w menu snu (-1 = brak snu w menu) - pobudka wyrownuje _slept z paskiem snu
+        // (pasek liczy ulamki godzin, a tiki godzinowe gubia brzegi - ta sama zasada co NightRest.LeaveSleep "pasek jest prawda o tym snie")
+        private static float _lieSlept = -1f;
         private static readonly Dictionary<string, Dictionary<uint, int>> _heard = new Dictionary<string, Dictionary<uint, int>>(StringComparer.Ordinal);
         private static string _importNote = "brak klucza (stary zapis albo nowa kampania)";
 
@@ -67,7 +75,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _cups = _over = 0; _drunk = _hangMsg = false; _slept = 0f; _hangUntil = 0; _spdPct = _morPct = 0; _isHang = false;
+            _cups = _over = 0; _drunk = _hangMsg = false; _slept = 0f; _hangUntil = 0; _spdPct = _morPct = 0; _isHang = false; _lieSlept = -1f;
             _heard.Clear(); _stumbles = 0; _errLogged = false; _importNote = "brak klucza (stary zapis albo nowa kampania)";
             DayReset();
         }
@@ -84,6 +92,10 @@ namespace Armoury
         internal static int Cups { get { return _cups; } }
         internal static bool Drunk { get { return _drunk; } }
         internal static bool Hungover { get { return _hangUntil > 0; } }
+
+        /// <summary>Recenzja (gra, wazne): kara kufli trwa (pijany albo kac) - premia "wypoczety w lozku" (TownInns.SpeedBonus / MoraleBonus) w tym czasie nie dziala:
+        /// jedna zasada - kto zapil noc, temu lozko nie daje wypoczynku, dopoki kac nie minie. Pola int - odczyt z latek z dowolnego watku bezpieczny.</summary>
+        internal static bool SpoilsRest { get { return _spdPct > 0 || _morPct > 0; } }
 
         // ------------------------------------------------------------ progi
         /// <summary>Prog upicia gracza: DrunkAfterTankards + 1 przy Wytrzymalosci 5 + 1 przy Atletyce 150 (najmniej 1).</summary>
@@ -242,7 +254,7 @@ namespace Armoury
             catch (Exception e) { Stumble("RestHour", e); }
         }
 
-        private static void Sober()
+        private static void Sober(string how = null)
         {
             var s = Settings.Current;
             int over = _over;
@@ -257,7 +269,57 @@ namespace Armoury
             Recompute();
             Log.Info(P + "odespane - odpoczynek " + slept.ToString("0.0", Inv) + " h (ponad prog bylo " + over + ") o " + h + ":00, dzien " + Today
                      + " -> KAC do " + ((until / 60) % 24) + ":00 (" + ((until - nm) / 60.0).ToString("0.0", Inv) + " h): predkosc -" + _spdPct + "%, morale -" + _morPct + "%"
-                     + (NightRest.SleepingNow ? ", komunikat po pobudce" : "") + ".");
+                     + (how != null ? ", " + how + " - komunikat od razu" : NightRest.SleepingNow ? ", komunikat po pobudce" : ", komunikat bez pobudki (postoj / oboz na mapie)") + ".");
+        }
+
+        /// <summary>Komunikat kaca: po pobudce z menu snu "You wake with a hangover"; odespane w postoju lub obozie na mapie (bez menu snu - recenzja gra:
+        /// komunikat "wake" o 2:00 w obozie) - "The ale wears off".</summary>
+        private static void HangMsg(bool wake)
+        {
+            _hangMsg = false;
+            if (_hangUntil <= 0) return;
+            string until = ((_hangUntil / 60) % 24) == 18 ? "dusk." : ((_hangUntil / 60) % 24) + ":00.";
+            Msg((wake ? "You wake with a hangover - your head pounds: your party moves " : "The ale wears off, but a hangover follows - your party moves ")
+                + _spdPct + "% slower and the men's morale is " + _morPct + "% lower until " + until, Colors.Yellow);
+        }
+
+        // ------------------------------------------------------------ sen w menu (NightRest.SleepInit / LeaveSleep / EndSleepQuiet)
+        /// <summary>NightRest.SleepInit: odpoczynek od kufla w chwili polozenia sie (ponowne wejscie w menu snu - od nowa, jak _menuRest).</summary>
+        internal static void OnSleepInit()
+        {
+            try { _lieSlept = On && (_drunk || _cups > 0) ? _slept : -1f; }
+            catch (Exception e) { Stumble("OnSleepInit", e); }
+        }
+
+        /// <summary>Recenzja (technika, wazne): pobudka z menu snu (LeaveSleep) albo sen przerwany (EndSleepQuiet). Pasek snu (menuRest, z SleepFactor karczmy) jest
+        /// prawda o tym snie: _slept = max(_slept, odpoczynek przy polozeniu sie + pasek); pijany i odespane - trzezwieje teraz (kac od pobudki), nie w nastepnym
+        /// tiku godzinowym, ktorego w marszu juz nie ma. Potem komunikat kaca po pobudce (takze odespane tikiem w czasie snu). Linia logu "pobudka".</summary>
+        internal static void OnWake(float menuRest, bool full, string how)
+        {
+            try
+            {
+                float lie = _lieSlept;
+                _lieSlept = -1f;
+                if (On && lie >= 0f && (_drunk || _cups > 0))
+                {
+                    float before = _slept;
+                    _slept = Math.Max(_slept, lie + Math.Max(0f, menuRest));
+                    bool was = _drunk;
+                    float need = NeedH();
+                    if (_drunk && DrunkOn && _slept + 0.01f >= need) Sober(how);
+                    else if (!_drunk && _cups > 0 && _slept >= ResetRestH)
+                    {
+                        Log.Info(P + "licznik kufli wyzerowany po " + _slept.ToString("0.0", Inv) + " h odpoczynku (bylo " + _cups + ", trzezwy, " + how + "), dzien " + Today + ".");
+                        _cups = 0; _slept = 0f;
+                    }
+                    if (was)
+                        Log.Info(P + "pobudka (" + how + ") - pasek " + menuRest.ToString("0.0", Inv) + " h, pelny pasek " + (full ? "tak" : "nie") + ", odpoczynek od kufla "
+                                 + lie.ToString("0.0", Inv) + " + pasek -> " + Math.Max(before, lie + Math.Max(0f, menuRest)).ToString("0.0", Inv) + " h z " + need.ToString("0.0", Inv) + " h -> "
+                                 + (_drunk ? "dalej pijany" : "odespane") + ", dzien " + Today + ".");
+                }
+                if (_hangMsg) HangMsg(true);
+            }
+            catch (Exception e) { Stumble("OnWake", e); }
         }
 
         /// <summary>Godzina gry (po NightRest.OnHourly): koniec kaca, komunikat kaca po pobudce, klucz wylaczony - stan zdjety, liczniki godzin kary.</summary>
@@ -275,13 +337,7 @@ namespace Armoury
                     Recompute();
                     return;
                 }
-                if (_hangMsg && !NightRest.SleepingNow)
-                {
-                    _hangMsg = false;
-                    if (_hangUntil > 0)
-                        Msg("You wake with a hangover - your head pounds: your party moves " + _spdPct + "% slower and the men's morale is " + _morPct + "% lower until "
-                            + (((_hangUntil / 60) % 24) == 18 ? "dusk." : ((_hangUntil / 60) % 24) + ":00."), Colors.Yellow);
-                }
+                if (_hangMsg && !NightRest.SleepingNow) HangMsg(false);   // odespane bez menu snu (postoj, oboz na mapie); po menu snu komunikat dal juz OnWake
                 if (_hangUntil > 0 && NowMin() >= _hangUntil)
                 {
                     _hangUntil = 0;

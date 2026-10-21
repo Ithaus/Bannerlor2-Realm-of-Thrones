@@ -210,7 +210,7 @@ namespace Armoury
                 _anvilAwake += hours;
                 if (_anvilAwake >= Math.Max(6f, s.AnvilShiftHours))
                 {
-                    _anvilAsleep = NightRest.NeededHours();
+                    _anvilAsleep = NightRest.NeededHoursFresh();   // m98-plotki (recenzja gra): bez odpoczynku doby w celu - trzezwy jak dotad (NeededHours), pijany do odespania
                     Log.Player(((int)s.AnvilShiftHours) + " hours at the anvil - you bed down by the forge ("
                                + _anvilAsleep.ToString("0.#") + "h of sleep" + (NightRest.Debt > 0 ? ", paying off the debt" : "") + ").", true);
                 }

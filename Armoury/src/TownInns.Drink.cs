@@ -25,6 +25,22 @@ namespace Armoury
             return RoadHeroPays(Hero.MainHero, vs, cost, PayNotes.Quiet(false), out tax, out crown);
         }
 
+        /// <summary>m98-plotki (recenzja gra): zajazd nalewa kufel na tych samych warunkach wojny i rabunku co nocleg (RoadAllowed) - jedna zasada na jedno zjawisko:
+        /// wies okregu we wojnie z frakcja gracza albo rabowana - karczmarz zamyka drzwi (zloto nie idzie do wroga). Zwraca powod (EN) albo null - nalewa.</summary>
+        internal static string RoadDrinkBarred(RoadsideInns.Inn inn)
+        {
+            if (inn == null || inn.Village == null || inn.Village.Village == null || Hero.MainHero == null) return "Nobody pours ale here now.";
+            bool vil = inn.Kind == "village";
+            try
+            {
+                var vf = inn.Village.MapFaction; var pf = Hero.MainHero.MapFaction;
+                if (vf != null && pf != null && FactionManager.IsAtWarAgainstFaction(vf, pf)) return vil ? "The villagers bar their doors to the enemies of their lord." : "The keeper bars the door to the enemies of his lord.";
+            }
+            catch { }
+            if (inn.Village.Village.VillageState == Village.VillageStates.BeingRaided) return vil ? "Raiders are on these lands - the villagers have barred their doors." : "Raiders are on these lands - the inn is barred and the keeper hides.";
+            return null;
+        }
+
         /// <summary>Kontrola obiegu kufla w miescie: te same posiadacze co nocleg (World) bez towarzyszy.</summary>
         internal static long DrinkWorldTown(Settlement st) { return World(st, NoComp); }
 

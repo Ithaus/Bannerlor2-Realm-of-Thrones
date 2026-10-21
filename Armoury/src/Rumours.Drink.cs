@@ -22,7 +22,9 @@ namespace Armoury
     ///    i ktore przejmuje GrandTourney), do 450 jedn. od karczmy, najblizsze 2; daleki turniej dopiero, gdy moglby doleciec kruk (Ravens.NotYet, jak wiesci wojenne).
     ///    Tresc: miasto, odleglosc i kierunek, kiedy ogloszony (TournamentGame.CreationTime), nagroda (TournamentGame.Prize) i jej cena na targu tego miasta.
     ///  - SWATY (GossipMatchmaking, kategoria 8): dorosle niezamezne dzieci rodow (Clan.All bez rodu gracza i band), ktore czynny model malzenstw gry/BK dopuszcza
-    ///    do slubu (MarriageModel.IsSuitableForMarriage: zywy, bez malzonka, wiek, pan rodu, nie zareczony, nie w bitwie/armii), z zywym rodzicem (ojciec, inaczej
+    ///    do slubu (MarriageModel.IsSuitableForMarriage - u Jeffa ROT > BK: zywy, nie w niewoli, wiek, nie w bitwie/armii) i ktore spelniaja warunki domyslnego
+    ///    modelu gry, ktorych BK nie sprawdza (recenzja gra: na mapie - IsActive, pan - IsLord, nie z rodu pomniejszego, nie notabl, nie wzor, nie zareczony
+    ///    przez oferte slubu gry - IMarriageOfferCampaignBehavior.IsHeroEngaged), z zywym rodzicem (ojciec, inaczej
     ///    matka - to on/ona "szuka"), najwyzej 40 lat, bez glowy rodu; siedziba rodu (Clan.HomeSettlement) do 200 jedn. od karczmy - wiesci z bliska; najwyzej 2,
     ///    wazone tierem rodu i bliskoscia.
     ///  - Dawne kategorie bez zmian (najwyzej 6 jak dotad); nowe maja wlasne miejsca (po 2), wiec przy wylaczonych kluczach pula jest ta sama co przed galezia.
@@ -30,7 +32,9 @@ namespace Armoury
     ///    ("beer", beczka 10 kg ok. 20 kufli, karczmarz x2) w miescie (zajazd - miasto handlowe wsi okregu, inaczej najblizsze); bez piwa w grze - 2 d. Zaplata ta
     ///    sama droga co nocleg gracza (TownInns.DrinkPayTown / DrinkPayRoad) z kontrola obiegu; komunikat z powodem (PayNotes). Opcja szara z podpowiedzia: brak
     ///    pieniedzy, karczmarz nie naleje (InnDrink.MaxCups), wszystko juz uslyszane tutaj. Plotek na kufel - InnDrink.PerDrink (Urok), kolejnosc jak dotad
-    ///    (od najwazniejszej); uslyszane w tym miejscu nie wracaja (InnDrink.MarkHeard - skrot tekstu); 5 XP Uroku za kazda.
+    ///    (od najwazniejszej); uslyszane w tym miejscu nie wracaja (InnDrink.MarkHeard - skrot TOZSAMOSCI wiesci Item.Id, recenzja gra: dotad skrot tekstu, a tekst
+    ///    zmienia sie z doba, przesada i pozycja - ten sam turniej wracal co dzien, banda co godzine); 5 XP Uroku za kazda. Zajazd wroga albo rabowany - nie nalewa
+    ///    (TownInns.RoadDrinkBarred, te same warunki co nocleg).
     ///  - Pula dla miejsca liczona raz na godzine gry (warunek opcji i zaplata widza te sama pule).
     /// Linia "Kufle (m98): kufel w ..." przy kazdym kuflu: cena, beczka, komu, kontrola obiegu, Urok -> plotek, rodzaje, turnieje i swaty sprawdzone w chwili
     /// sluchania (turniej dalej w grze, kandydat zyje i jest wolny).
@@ -76,9 +80,10 @@ namespace Armoury
                 float d = found[i].Key;
                 int age = Math.Max(0, (int)g.CreationTime.ElapsedDaysUntilNow);
                 string when = age < 1 ? "only today" : age < 2 ? "yesterday" : age < 7 ? "a few days ago" : "some weeks ago";
-                string where = d < 6f ? "here in " + t.Name : t.Name + ", " + Days(d) + " to the " + Dir(at, t.Settlement.GetPosition2D);
+                // recenzja (gra, technika): przyimek w galezi - "held here in X" / "held at X, a day's ride to the north" (dotad "held at here in X")
+                string where = d < 6f ? "here in " + t.Name : "at " + t.Name + ", " + Days(d) + " to the " + Dir(at, t.Settlement.GetPosition2D);
                 var sb = new StringBuilder();
-                sb.Append(i == 0 ? "A tourney is being held at " : "There is talk of another tourney at ").Append(where).Append(" - it was proclaimed ").Append(when).Append('.');
+                sb.Append(i == 0 ? "A tourney is being held " : "There is talk of another tourney ").Append(where).Append(" - it was proclaimed ").Append(when).Append('.');
                 var pr = g.Prize;
                 if (pr != null)
                 {
@@ -88,7 +93,8 @@ namespace Armoury
                     if (worth > 0) sb.Append(", worth some ").Append(Round(worth).ToString("N0", Inv)).Append(" denars");
                     sb.Append('.');
                 }
-                all.Add(new Item { Cat = CatTourn, Score = 2.6f + (1f - d / TournR), Text = sb.ToString(), Ref = t.Settlement.StringId });
+                all.Add(new Item { Cat = CatTourn, Score = 2.6f + (1f - d / TournR), Text = sb.ToString(), Ref = t.Settlement.StringId,
+                                   Id = "t|" + t.Settlement.StringId + "|" + ((int)g.CreationTime.ToDays).ToString(Inv) });   // ten sam turniej = ta sama plotka (wiek i cena nagrody bez znaczenia)
             }
         }
 
@@ -117,6 +123,15 @@ namespace Armoury
             var c = h.Clan;
             if (c == null || c == Clan.PlayerClan || c.IsBanditFaction || c.Leader == h) return false;
             if (Parent(h) == null) return false;
+            // recenzja (gra): warunki domyslnego modelu gry, ktorych BK (czynny pod ROT) nie sprawdza - bohater na mapie, pan, nie z rodu pomniejszego, nie notabl,
+            // nie wzor, nie zareczony przez oferte slubu gry
+            if (!h.IsActive || !h.IsLord || h.IsMinorFactionHero || h.IsNotable || h.IsTemplate) return false;
+            try
+            {
+                var offers = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<TaleWorlds.CampaignSystem.CampaignBehaviors.IMarriageOfferCampaignBehavior>() : null;
+                if (offers != null && offers.IsHeroEngaged(h)) return false;
+            }
+            catch { return false; }
             try { return mm.IsSuitableForMarriage(h); } catch { return false; }
         }
 
@@ -161,7 +176,7 @@ namespace Armoury
                   .Append(", ").Append(((int)h.Age).ToString(Inv)).Append(" years old");
                 sb.Append(d < 6f ? ", here in " + seat.Name : " - their seat is " + seat.Name + ", " + Days(d) + " to the " + Dir(at, seat.GetPosition2D));
                 sb.Append(c.Tier >= 4 ? ". A great house - a match worth having." : ".");
-                all.Add(new Item { Cat = CatMatch, Score = 2.0f + Math.Min(1.5f, found[i].Key / 4f), Text = sb.ToString(), Ref = h.StringId });
+                all.Add(new Item { Cat = CatMatch, Score = 2.0f + Math.Min(1.5f, found[i].Key / 4f), Text = sb.ToString(), Ref = h.StringId, Id = "m|" + h.StringId });
             }
         }
 
@@ -232,26 +247,29 @@ namespace Armoury
             List<Item> items;
             try { items = Build(at, key); }
             catch (Exception e) { Stumble("Build", e); items = new List<Item>(); }
-            _dBuildTicks += Stopwatch.GetTimestamp() - t0;
+            _dBuildTicks += Stopwatch.GetTimestamp() - t0; _dBuilds++;   // recenzja (gra): dzielnik "budowa srednio" - budowy, nie sluchania (warunek opcji tez buduje)
             _pool = items; _poolKey = key; _poolHour = hr;
             return items;
         }
 
+        /// <summary>Skrot do ksiegi uslyszanych: tozsamosc wiesci (Item.Id), bez niej - tekst.</summary>
+        private static uint HeardHash(Item it) { return MapVillageData.Fnv(it.Id ?? it.Text ?? ""); }
+
         private static List<Item> Fresh(List<Item> pool, string key)
         {
             var res = new List<Item>();
-            foreach (var it in pool) if (!InnDrink.Heard(key, MapVillageData.Fnv(it.Text ?? ""))) res.Add(it);
+            foreach (var it in pool) if (!InnDrink.Heard(key, HeardHash(it))) res.Add(it);
             return res;
         }
 
         // ------------------------------------------------------------ opcja menu (kufel)
         /// <summary>Warunek opcji przy kluczu InnGossipNeedsDrink: etykieta z cena, opcja szara z powodem (bez pieniedzy, karczmarz nie naleje, nic nowego, brak karczmarza).</summary>
-        private static bool DrinkCondition(MenuCallbackArgs args, string var, Vec2 at, string key, Settlement priceTown, bool served)
+        private static bool DrinkCondition(MenuCallbackArgs args, string var, Vec2 at, string key, Settlement priceTown, string barred)
         {
             int price = TankardPrice(priceTown);
             MBTextManager.SetTextVariable(var, ShortLabels.Pick("Buy a tankard and listen (" + price + " d)", "Buy a tankard of ale and listen to the gossip (" + price + " d)"));
             var me = Hero.MainHero;
-            if (!served || me == null) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}Nobody pours ale here now."); return true; }
+            if (barred != null || me == null) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + (barred ?? "Nobody pours ale here now.")); return true; }   // recenzja (gra): zajazd wroga / rabowany - jak nocleg
             var fresh = Fresh(Pool(at, key), key);
             int cups = InnDrink.Cups, max = InnDrink.MaxCups(), ch = InnDrink.Charm();
             if (fresh.Count == 0)
@@ -293,6 +311,11 @@ namespace Armoury
         {
             var me = Hero.MainHero;
             if (me == null) return;
+            if (!town)
+            {
+                string barred = TownInns.RoadDrinkBarred(inn);   // recenzja (gra): te same warunki wojny i rabunku co nocleg w zajezdzie
+                if (barred != null) { Log.Player(barred, true); return; }
+            }
             Settlement priceTown = town ? st : RoadTown(inn, at);
             int cask = CaskPrice(priceTown), price = TankardPrice(priceTown);
             var pool = Pool(at, key);
@@ -345,7 +368,7 @@ namespace Armoury
             var cats = new int[NewCats];
             foreach (var it in take)
             {
-                InnDrink.MarkHeard(key, MapVillageData.Fnv(it.Text ?? ""));
+                InnDrink.MarkHeard(key, HeardHash(it));
                 if (it.Cat >= 0 && it.Cat < NewCats) cats[it.Cat]++;
                 if (it.Cat == CatTourn)
                 {
