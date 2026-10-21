@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 2026-10-21 (n31 (kandydat WGRANIA 102) - scalenie m103-drobne, m103-sceny, m103-lektor)
+## 2026-10-21 (n31 (kandydat WGRANIA 102) - scalenie m103-drobne, m103-sceny, m103-lektor + m103-gospodarka (czesc 1 i 2))
 
 **Zmiana:** `w-toku/n31-calosc` = WGRANIE 101 (ed9273fa) + m103-drobne (7839c384: rabunek druzyny gracza liczy sie jak praca - RaidCountsAsWork, odziez z rzedu markietanow
 i praczki, zapis tablicy arm_board w formacie nb2, DrillCampOnlyAi domyslnie TAK; [CHANGELOG galezi](docs/noc-1920/m103-drobne-CHANGELOG.md)) + m103-sceny (756e685f: 23 sceny
@@ -29,7 +29,22 @@ jak trzeba); m97wioski (WP-7), m99markietani (MK-8, MK-9), m102tablica (L-8, L-8
 (p2-prolog-ks, 230 dob) bez wyjatku (nowe wiersze INFO - log sprzed paczek).
 **Ryzyko / co sprawdzic:** w autotescie prologu: sceny z nagraniem (m103sceny + m103lektor --crashscribe: LK-5 start > 0, LK-6/LK-7), obrazki i lektor na tym samym EventScreen;
 w grze lektor gra 23 sceny prologu (ok. 40 s kazda) - Jeff moze zamknac okno wczesniej (stop). Plotki na zywo z rezerwa 3000 zuzywaja zapas planu do 3000 znakow.
-**Status:** DO SPRAWDZENIA - kandydat WGRANIA 102; przed testem scalenie m103-gospodarka (po czesci 2).
+**+ m103-gospodarka (czesc 1 i 2)** (d1e44f8c; [CHANGELOG galezi](docs/noc-1920/m103-gospodarka-CHANGELOG.md)): P0 SideVillageVisit.Today bez NRE przy starcie nowej kampanii;
+P1 narzedzie progow W12-4/W12-6/GL2-8/VR-3 (i napisy logu TownFolk.Live); P6 piraci na morzu (BandFoodAtSea: paser miasta z portem, polow zalogi na brak porcji); P7a stocznia bierze pnie
+tylko ponad zapas rzemiosla (ShipyardWoodAboveCraftStock); P7b dymarka zostawia kuzniom miasta dobe ich zuzycia drewna (BloomeryShelfLeavesForges); P3 (a-f) sufit firm DS z doplywu
+netto (KsFarmSurplusCapNet, DsFarmFixShareCap) z poprawkami po recenzji (wspolczynnik swiata, jeden krok); D4 narzedzie NKS-7e/NKS-7. Scalenie 078276a1 BEZ konfliktow (Settings.cs,
+McmSettings.cs, sprawdz_logi.py scalone automatycznie; reszta plikow zmieniona tylko w gospodarce). McmSettings z gen_mcm = wynik automatu co do bajtu. sprawdz_logi.py: 0 dubli
+definicji na poziomie modulu (ast), sprawdz_narzedzie: dispatch poza main 0, zle wstawki 0, duble def 0, duble grup 0 (m103p3 osobno, z return). R5 z recenzji gospodarki (M103_TAG
+w scenach i lektorze) bylo juz rozwiazane przy scaleniu lektora (M103L_*). Settings.cs: 0 dubli pol.
+**Build / testy (z gospodarka):** gen_mcm: Armoury 2261 ustawien (+5: BandFoodAtSea, ShipyardWoodAboveCraftStock, BloomeryShelfLeavesForges, KsFarmSurplusCapNet, DsFarmFixShareCap;
+zadnego z nich nie ma w Armoury.json Jeffa - domyslne TAK zadzialaja), RC 115, GT 44. Build 5 modow kod 0 na 078276a1 (md5): Armoury 3a2876da, CrashScribe d8ab9bce,
+RealisticCaptivity 754d6fec, GrandTourney 2807fa1a, ForgeView 75557eeb - kopie w katalogu testow 6ba92574/test/n102. Grupy na logu P2 (Armoury-2026-10-21_10-08-39, sprzed
+zmian gospodarki, scen i lektora) kod 0: m103p3 (13 progow, NIE 1 - M3P-7 zaleglosci zamkow 270 tys., log bez kluczy P3), m96bandy (14, NIE 1 - MB-2 0.582, log sprzed P6; MB-13
+INFO "brak"), etap5 (389, NIE 18, DECYZJA 3), m103sceny i m103lektor (INFO - brak linii), m101prolog (11/11 TAK). CrashScribe bez zmian zrodel wobec 101 (git diff ed9273fa..HEAD
+-- CrashScribe pusty) - autotest moze uzyc CrashScribe-at-n101.dll.
+**Ryzyko / co sprawdzic (gospodarka):** w autotescie m103p3 (M3P-0 segment P3 w kazdej linii f5, M3P-1 0 podwyzek w rampie, M3P-7 zaleglosci zamkow <= 200 tys.), m96bandy
+(MB-13 odcinek "z morza" w kazdej dobie, MB-2 >= 0.85), linia Stocznie "dziala TAK", linia Zelazo "zostawione kuzniom"; P3 zmienia firmy miast pod KS (P2: 76.6 mln zl/rok bez P3).
+**Status:** DO SPRAWDZENIA - kandydat WGRANIA 102 (z m103-gospodarka czesc 1 i 2); DLL testu 6ba92574/test/n102, CrashScribe-at-n101.dll.
 
 ## 2026-10-21 (WGRANIE 101 - prolog 298 (rdzen), postacie kanonu do rodow, tablica ogloszen)
 
