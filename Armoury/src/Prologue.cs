@@ -173,6 +173,7 @@ namespace Armoury
         {
             try { InstallStory(why); } catch (Exception e) { Stumble("InstallStory", e); }
             try { InstallRest(why); } catch (Exception e) { Stumble("InstallRest", e); }
+            try { InstallEssos(why); } catch (Exception e) { WStumble("InstallEssos", e); }   // m104-wojny (1): wojny essoskie na kalendarzu
         }
 
         private static bool _restTried;
@@ -200,6 +201,7 @@ namespace Armoury
             ResetKings();
             ResetEnd();
             ResetScenes();   // m103-sceny: maska scen prologu
+            ResetWars();     // m104-wojny: stan wojen kanonu (zapis arm_m104 - CanonWarsBehavior)
         }
 
         // ---------------------------------------------------------------- zapis

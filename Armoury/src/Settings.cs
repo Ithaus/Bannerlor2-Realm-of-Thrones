@@ -3982,6 +3982,23 @@ namespace Armoury
         // m103-sceny E4 (Prologue.Scenes.cs): 23 sceny prologu wedlug ksiazki (projekt pkt 2) jako okna w wygladzie wydarzen ROT - kazda w swoim dniu prologu, gdy gracz
         // na mapie (takze w menu osady i w niewoli; nie w bitwie, rozmowie, misji), zalegle po kolei; scena dnia 186 po smierci krola. Czytany na zywo. Nowy klucz.
         public bool PrologueScenes = true;                 // in a Prologue 298 campaign the events of the half year before the War of the Five Kings are told in story windows like those of Realm of Thrones (23 scenes from A Game of Thrones, from the death of Jon Arryn to the arrest of Lord Eddard), each on its day while you are on the map; a scene missed in battle or captivity comes afterwards. Your own pictures: Modules/Armoury/Images/Prolog/prolog_01.png to prolog_23.png. Off = no story windows (the world changes the same)
+        // m104-wojny (1) (Prologue.Wars.cs): wojny fabularne ROT miedzy dwoma krolestwami Essos (Wolne Miasta, Dothrakowie, Qarth, Sarnor, Ibben, Aegon) w kampanii z prologiem
+        // licza StartDay/EndDay od startu KALENDARZA (prefiks/finalizer ROTStorylineWar.Enforced - flaga w Prologue.StoryStartOf); w prologu, gdy ROT EnforceWars stoi
+        // na bramce dnia opowiesci, wypowiada je doba Armoury (ta sama metoda ROT Enforced). Daenerys (empire_s) i wojny z udzialem Westeros - od startu opowiesci. Na zywo.
+        public bool PrologueEssosWarsCalendar = true;      // in a Prologue 298 campaign the storyline wars of Realm of Thrones fought between two realms of Essos (Braavos and Lorath, Tyrosh and Lys, Pentos and Myr, Norvos and Qohor, Volantis and Aegon, Sarnor and Ibben) count their days from the start of the campaign, so Essos is already at war during the prologue. Daenerys' wars and every war of Westeros still wait for the story. Off = every storyline war waits for the story
+
+        // --- Wars of the books ---
+        // m104-wojny (2) (Prologue.Wars.cs): po smierci Renly'ego (lord_1_9 martwy albo RenlyDeathEvent zakonczone) Reach Tyrellow: pokoj z Dorne (MakePeaceAction), pokoj z korona,
+        // SOJUSZ gry z korona (IAllianceCampaignBehavior.StartAlliance, przedluzany UpdateAllianceEndTime) i pakt o nieagresji Diplomacy Reach-Dorne - pilnowane co dobe
+        // do najazdu Daenerys (DanyInvasionEvent). Krolestwo gracza poza regula. Kazda kampania. Co dobe.
+        public bool CanonReachJoinsCrown = true;           // after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Off = the Reach keeps its own wars and alliances
+        // m104-wojny (2): po zareczynach Myrcelli z Trystanem (dzien osi ROT 70 x skala Fabuli, ok. dnia opowiesci 303; Myrcella zywa, Dorne Martellow) pokoj korona-Dorne i pakt
+        // o nieagresji Diplomacy - pilnowany co dobe; przy najezdzie Daenerys nasze pakty Dorne wygaszone (Dorne przechodzi do Daenerys - wojna ROT). Kazda kampania. Co dobe.
+        public bool CanonDorneJoinsCrown = true;           // after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Off = no pact
+        // m104-wojny (3) (Prologue.Dragons.cs): wierzchowiec Daenerys (lord_1_14, slot konia zestawu bojowego) wedlug dnia opowiesci: jaja (prolog) i smoczeta (do 0.40 D) - bez smoka,
+        // kon z jej taboru; mlode (0.40 D) dragon_green 75%, podrosle (0.625 D) dragon_brown 85%, dorosle (0.85 D albo najazd) dragon_black 105% (body_length ROT);
+        // D = dzien najazdu Daenerys (450 x skala Fabuli). Tylko kampania (bez latek bitwy). Wylaczony - smok ROT wraca. Co dobe.
+        public bool DaenerysDragonsGrow = true;            // Daenerys' dragons grow up with the story: in the prologue they are still eggs, and the hatchlings are too small to fight, so Daenerys rides a horse from her own train; later the smallest of her dragons carries her into battle, then a bigger one, and Drogon himself when full-grown (about the time of Daznak's Pit, before her invasion of Westeros). Off = Drogon is full-grown from the first day, as in Realm of Thrones
 
         // --- Story windows ---
         // m103-sceny (RotWindowPictures.cs): obrazki Jeffa w oknach wydarzen ROT - plik Modules\Armoury\Images\ROT\rot_<KlasaROT>_<n>.png|jpg zastepuje obrazek tego
