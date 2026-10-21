@@ -28,6 +28,19 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **Bandyci noszą jedzenie i złoto**, jedzą codziennie, a gdy głodują, część z nich odchodzi.
 - **Sakiewki ludzi według potrzeby, koszyk ludu, płótno i sukno** w planie wsi.
 
+## Co weszło w 98 (już w grze, od 21.10 00:55)
+
+- **Plotki w karczmie i zajeździe za kufel.**
+  - Słuchanie: plotek słuchasz dopiero po kupieniu kufla piwa albo ale, około 1 d. Pieniądze idą do karczmarza.
+  - Ile plotek z kufla, według Uroku: przy 20 jedna, przy 80 dwie, przy 150 trzy, przy 200 cztery, przy 250 wszystkie.
+  - Co nowego słychać: gdzie trwa turniej i który lord szuka męża dla córki albo żony dla syna. Plotki są tylko prawdziwe.
+  - Powtórki: plotka, którą już słyszałeś, nie wraca.
+- **Pijaństwo i kac.**
+  - Kiedy się upijasz: po 3-5 kuflach, zależnie od Wytrzymałości i Atletyki.
+  - Pijany: tracisz 15-25% szybkości na mapie i musisz dospać.
+  - Kac: następnego dnia do 18:00 tracisz 10% szybkości i 10% morale. Nocleg w łóżku nie daje wtedy premii.
+- **Testy:** przeszło wszystkie trzy, bez błędów, a progi wypadły lepiej niż w 97.
+
 ## Co weszło w 97 (już w grze)
 
 1. **Wioski boczne jak wioski główne** (bez bohaterów).
@@ -94,7 +107,6 @@ Testy tego nie psują, to rzeczy do strojenia:
 
 Kolejność według Twojej listy:
 1. Tablica ogłoszeń: rozpoznanie i projekt są gotowe (docs/PROJEKT-TABLICA-OGLOSZEN-2026-10-21.md). Gra ma 43 rodzaje zadań. Kapitana straży nie ma ani w grze, ani w ROT, ani w BK, więc dodamy go sami: będzie wywieszał listy gończe na bandy z okolicy, a nagrodę zapłaci kasa miasta (za bandę 20 ludzi ok. 375 d). Kod robi drugie konto.
-2. Plotki: turnieje, swaty, piwo i ale, plotki według Charyzmy, za dużo piwa daje karę do szybkości, sen i kaca.
 3. Obóz etap 2: markietani z usługami, rozrywką i sklepem w dużych obozach.
 4. Optymalizacja gry (na koniec).
 5. Strojenie gospodarki miast, opisane wyżej.
