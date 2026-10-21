@@ -1039,7 +1039,8 @@ Uzycie (Python 3, tylko odczyt):
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
                     essoskie od dnia kalendarza 21, WK-4 pary essoskie w wojnie w prologu (>= 90% dob od dnia 23), WK-5 Reach z korona (zdarzenie najwyzej raz, potem
                     SOJUSZ TAK, Reach-Dorne bez wojny), WK-6 Dorne z korona od dnia zareczyn Myrcelli (PAKT, bez wojny), WK-7 smoki: etap wedlug dnia opowiesci i siodlo
-                    zgodne z etapem, WK-8 zdarzenia (INFO). Kampania klasyczna: WK-2..4 INFO.
+                    zgodne z etapem (smok pod siodlem tylko dorosly Drogon), WK-8 zdarzenia (INFO). Kampania klasyczna: WK-2..4 INFO; klucz Essos NIE: WK-2 tylko latka,
+                    WK-3/WK-4 INFO; zapis sprzed m104 ("nie dotyczy"): WK-5..7 INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
@@ -37868,6 +37869,8 @@ M104_ESSOS_DECL = re.compile(r"ESSOS - wojna (\S+)-(\S+) (WYPOWIEDZIANA|NIE wesz
 M104_PATCH = re.compile(r"latka wojen essoskich \((.*?)\): ROTStorylineWar\.Enforced (\S+)\.")
 M104_DRAG = re.compile(r"\(3\) smoki Daenerys: klucz (TAK|NIE), (etap (\S+)(?: \(klucz NIE[^)]*\))? \| siodlo (\S+)(.*?)\(D=(\d+)\))?")
 M104_REACH = re.compile(r"\| \(2\) Reach: (.*?) \| Dorne: (.*?) \| \(3\)")
+M104_GONE = re.compile(r", zniszczone (\d+) \((.*?)\)")
+M104_SCOPE = re.compile(r"\| zakres \(2\) i \(3\): (.*?) \| \(2\)")
 M104_MYR = re.compile(r"zareczyny Myrcelli w dniu(?: opowiesci)? (\d+)")
 
 
@@ -37888,7 +37891,9 @@ def m104wojny_main(logp):
     i potkniecia 0, WK-2 latka Enforced TAK w kampanii z prologiem i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wojny wypowiedziane przez Armoury tylko
     essoskie i od dnia kalendarza >= 21, WK-4 w prologu od dnia kalendarza 23 pary essoskie w wojnie (W = N w >= 90% dob), WK-5 Reach z korona po smierci Renly'ego
     (REACH Z KORONA najwyzej raz na sesje, potem SOJUSZ TAK, Reach-Dorne bez WOJNY), WK-6 Dorne z korona od dnia zareczyn Myrcelli (PAKT, bez WOJNY korona-Dorne),
-    WK-7 smoki: etap zgodny z dniem opowiesci (D z linii, tolerancja 1 dzien), siodlo zgodne z etapem, WK-8 zdarzenia (INFO). Log bez linii m104: INFO."""
+    WK-7 smoki: etap zgodny z dniem opowiesci (D z linii, tolerancja 1 dzien), siodlo zgodne z etapem (smok tylko dorosly - recenzja R5), WK-8 zdarzenia (INFO).
+    Log bez linii m104: INFO. Recenzja: klucz Essos NIE - WK-2 tylko latka, WK-3/WK-4 INFO (R6); wojny ze strona zniszczona poza N ("zniszczone Z"), po starcie
+    opowiesci ROT usuwa je z listy - N + Z <= 6 (R7); zapis sprzed m104 bez prologu - "nie dotyczy", WK-5..7 INFO (R1)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("WK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -37939,21 +37944,40 @@ def m104wojny_main(logp):
     rep.add("WK-0: linia startu sesji", (starts[-1][:150] if starts else "brak (tylko linie doby)"), "co najmniej 1", bool(starts))
     rep.add("WK-1: ERROR CanonWars i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
     prolog = any("prolog TAK" in x for x in starts)
+    scopes = [ms.group(1) for ms in (M104_SCOPE.search(x) for x in starts) if ms]
+    rep.add("WK-0: zakres (2) i (3)", scopes[-1] if scopes else "brak w linii startu (log sprzed poprawek recenzji)",
+            "INFO - kampania z prologiem / nowa kampania (znacznik) / nie dotyczy (zapis sprzed m104 - decyzja Jeffa nr 5)", None)
+    # R6: klucz Essos NIE (linia startu albo linia doby) - WK-2 tylko latka, WK-3/WK-4 INFO
+    ess_off = prolog and (any("Essos na kalendarzu: klucz NIE" in x for x in starts) or any("(1) Essos: klucz NIE" in x for x in dailies))
     # WK-2 latka i lista wojen essoskich
-    if prolog:
+    if prolog and ess_off:
         pt = patches[-1] if patches else None
-        ess = None
+        rep.add("WK-2: latka Enforced (klucz Essos NIE)", f"latka {pt[1] if pt else 'brak linii'}",
+                "latka TAK (lista wojen nie sprawdzana - klucz PrologueEssosWarsCalendar NIE, wojny czekaja na opowiesc)", pt is not None and pt[1] == "TAK")
+    elif prolog:
+        pt = patches[-1] if patches else None
+        ess, ess_line = None, ""
         for x in starts:
             me = M104_ESSOS_N.search(x)
             if me:
-                ess = me
+                ess, ess_line = me, x
         lst = ess.group(2) if ess else ""
-        pairs = re.findall(r"([a-z_]+)-([a-z_]+)", lst)
+        mg = M104_GONE.search(ess_line) if ess else None
+        n_gone = int(mg.group(1)) if mg else 0
+        lst_all = lst + (", " + mg.group(2) if mg else "")
+        msd = M104_SD.search(ess_line) if ess else None
+        in_prolog = msd is not None and float(msd.group(1)) < 1.0
+        pairs = re.findall(r"([a-z_]+)-([a-z_]+)", lst_all)
         bad_ids = [p for p in pairs if p[0] not in M104_ESSOS_IDS or p[1] not in M104_ESSOS_IDS]
-        ok = pt is not None and pt[1] == "TAK" and ess is not None and int(ess.group(1)) == 6 and "empire_s" not in lst and not bad_ids
+        total = (int(ess.group(1)) + n_gone) if ess else -1
+        # R7: w prologu (bramka ROT zamknieta) lista pelna - N + Z = 6; po starcie opowiesci ROT EnforceWars usuwa wojny ze strona zniszczona - N + Z <= 6
+        n_ok = total == 6 if in_prolog else 0 <= total <= 6
+        ok = pt is not None and pt[1] == "TAK" and ess is not None and n_ok and "empire_s" not in lst_all and not bad_ids
         rep.add("WK-2: latka Enforced i wojny essoskie na kalendarzu",
-                f"latka {pt[1] if pt else 'brak linii'}" + (f" | na kalendarzu {ess.group(1)} ({lst[:160]})" if ess else " | brak listy w linii startu"),
-                "latka TAK, 6 wojen (bravos-nord, tyrosh-lys, pentos-myr, norvos-qohor, volantis-valyrian, sarnor-ibb), bez empire_s (Daenerys - zegar opowiesci)", ok)
+                f"latka {pt[1] if pt else 'brak linii'}" + (f" | na kalendarzu {ess.group(1)} ({lst[:160]})" + (f", zniszczone {n_gone} ({mg.group(2)[:60]})" if mg else "")
+                                                             + f" | linia startu {'w prologu' if in_prolog else 'po starcie opowiesci'}" if ess else " | brak listy w linii startu"),
+                "latka TAK, w prologu 6 wojen razem ze zniszczonymi (bravos-nord, tyrosh-lys, pentos-myr, norvos-qohor, volantis-valyrian, sarnor-ibb), po starcie opowiesci"
+                " najwyzej 6 (ROT usuwa wojny ze strona zniszczona), bez empire_s (Daenerys - zegar opowiesci)", ok)
     else:
         rep.add("WK-2: latka Enforced i wojny essoskie", "kampania klasyczna", "INFO - Essos na kalendarzu tylko w kampanii z prologiem", None)
     # WK-4 (liczone przed WK-3): pary essoskie w wojnie w prologu
@@ -37971,16 +37995,19 @@ def m104wojny_main(logp):
     early = [d for d in decls if int(d[3]) < 21]
     late = [d for d in decls if float(d[4]) >= 1.0]
     failed = [d for d in decls if d[2] != "WYPOWIEDZIANA"]
-    need = prolog and cal_max >= 23 and not (rows and len(full) == len(rows))   # pary juz w wojnie (np. AI) - nic do wypowiedzenia
+    # R6: klucz NIE - nic; pary juz w wojnie (np. AI) - nic do wypowiedzenia; log bez dob prologu od dnia kalendarza 23 (np. sesja od dnia opowiesci 10) - nic do sprawdzenia
+    need = prolog and not ess_off and bool(rows) and len(full) != len(rows)
     rep.add("WK-3: wojny wypowiedziane przez Armoury (prolog)",
             f"{len(decls)} (spoza Essos {len(bad)}, przed dniem kalendarza 21 {len(early)}, po dniu opowiesci 1 {len(late)}, bez skutku {len(failed)})"
             + (f" [pierwsza {decls[0][0]}-{decls[0][1]} dzien kalendarza {decls[0][3]}]" if decls else "") + f" | ostatni dzien kalendarza w logu {cal_max}",
             "tylko pary essoskie, dzien kalendarza >= 21 (StartDay 5 x 4.33 = 22), przed dniem opowiesci 1, wszystkie WYPOWIEDZIANA; co najmniej 1, gdy prolog i log siega dnia 23"
-            " (0 dopuszczalne tylko, gdy wszystkie pary juz byly w wojnie - WK-4)",
+            " (0 dopuszczalne, gdy wszystkie pary juz byly w wojnie - WK-4; klucz Essos NIE albo log bez dob prologu >= 23 - INFO)",
             (not bad and not early and not late and not failed and (bool(decls) or not need)) if (decls or need) else None)
     first_gap = next((r[0] for r in rows if r[1] != r[2]), None)
-    rep.add("WK-4: w prologu (kalendarz >= 23) pary essoskie w wojnie", f"dob {len(rows)}, z W = N {len(full)}" + (f" (pierwsza bez pelnej: dzien {first_gap})" if first_gap is not None else ""),
-            ">= 90% dob (pokoj Diplomacy ze zmeczenia wojna moze przerwac na dobe)", (len(full) >= 0.9 * len(rows)) if rows else None)
+    rep.add("WK-4: w prologu (kalendarz >= 23) pary essoskie w wojnie", f"dob {len(rows)}, z W = N {len(full)}" + (f" (pierwsza bez pelnej: dzien {first_gap})" if first_gap is not None else "")
+            + (" | klucz Essos NIE" if ess_off else ""),
+            ">= 90% dob (pokoj Diplomacy ze zmeczenia wojna moze przerwac na dobe; N bez wojen ze strona zniszczona); klucz Essos NIE - INFO",
+            (len(full) >= 0.9 * len(rows)) if rows and not ess_off else None)
     # WK-5 Reach
     reach_ev = [e for e in events if e.startswith("REACH Z KORONA")]
     reach_rows = []
@@ -37993,8 +38020,9 @@ def m104wojny_main(logp):
     war_rd = [r for r in reach_rows if "Reach-Dorne WOJNA" in r[1]]
     first_held = held[0][0] if held else None
     lost = [r for r in reach_rows if first_held is not None and r[0] > first_held
-            and not ("SOJUSZ TAK" in r[1] or r[1].startswith("zakonczone") or r[1].startswith("klucz NIE") or "gracza" in r[1])]
-    if reach_ev or held or any(not r[1].startswith("czeka (Renly zyje)") and not r[1].startswith("klucz NIE") for r in reach_rows):
+            and not ("SOJUSZ TAK" in r[1] or r[1].startswith("zakonczone") or r[1].startswith("klucz NIE") or "gracza" in r[1] or r[1].startswith("nie dotyczy"))]
+    m104_idle = ("czeka (Renly zyje)", "klucz NIE", "nie dotyczy", "krolestwo gracza")
+    if reach_ev or held or any(not r[1].startswith(m104_idle) for r in reach_rows):
         rep.add("WK-5: Reach z korona po smierci Renly'ego",
                 f"zdarzen REACH Z KORONA {len(reach_ev)}" + (f" ({reach_ev[0][:140]})" if reach_ev else "")
                 + f" | dob SOJUSZ TAK {len(held)}, bez sojuszu po zalozeniu {len(lost)}, z wojna Reach-Dorne {len(war_rd)}"
@@ -38002,7 +38030,8 @@ def m104wojny_main(logp):
                 "REACH Z KORONA najwyzej 1 na sesje; po pierwszym SOJUSZ TAK kazda doba SOJUSZ TAK (do najazdu Daenerys), Reach-Dorne bez WOJNY",
                 len(reach_ev) <= max(1, len(starts)) and not lost and not war_rd and bool(held))
     else:
-        rep.add("WK-5: Reach z korona", (reach_rows[-1][1][:100] if reach_rows else "brak linii doby"), "INFO - Renly zyje w calym logu", None)
+        rep.add("WK-5: Reach z korona", (reach_rows[-1][1][:100] if reach_rows else "brak linii doby"),
+                "INFO - Renly zyje w calym logu (albo klucz NIE / nie dotyczy / krolestwo gracza)", None)
     # WK-6 Dorne
     dorne_ev = [e for e in events if e.startswith("DORNE Z KORONA")]
     md = None
@@ -38020,7 +38049,7 @@ def m104wojny_main(logp):
                 "od dnia zareczyn (+1) stan PAKT (zalozony albo juz jest), bez wojny korona-Dorne", not late_wait and not war_cd and bool(pact))
     else:
         rep.add("WK-6: Dorne z korona", (reach_rows[-1][2][:100] if reach_rows else "brak linii doby") + (f" | dzien zareczyn {md}" if md is not None else ""),
-                "INFO - log nie siega dnia zareczyn Myrcelli", None)
+                "INFO - log nie siega dnia zareczyn Myrcelli (albo klucz NIE / nie dotyczy)", None)
     # WK-7 smoki
     drows, bad_stage, bad_saddle = [], [], []
     for x in starts + dailies:
@@ -38034,7 +38063,7 @@ def m104wojny_main(logp):
             bad_stage.append((sd, stage, m104_stage_of(sd, d)))
         if "czeka:" in rest:
             continue
-        want = {"jaja": None, "smoczeta": None, "mlode": "dragon_green", "podrosle": "dragon_brown", "dorosle": "dragon_black"}.get(stage)
+        want = {"jaja": None, "smoczeta": None, "mlode": None, "podrosle": None, "dorosle": "dragon_black"}.get(stage)   # R5: smok pod siodlem tylko dorosly Drogon
         if (want is None and saddle.startswith("dragon_")) or (want is not None and not saddle.startswith("dragon_")):
             bad_saddle.append((sd, stage, saddle))
     if drows:
@@ -38042,10 +38071,10 @@ def m104wojny_main(logp):
                 f"linii {len(drows)} (ostatnia: dzien {drows[-1][0]:.0f}, etap {drows[-1][1]}, siodlo {drows[-1][2]}), zly etap {len(bad_stage)}"
                 + (f" {bad_stage[0]}" if bad_stage else "") + f", zle siodlo {len(bad_saddle)}" + (f" {bad_saddle[0]}" if bad_saddle else "")
                 + f" | zmian siodla {len(drag_changes)}" + (f" ({drag_changes[0][:110]})" if drag_changes else ""),
-                "etap wedlug dnia opowiesci (jaja < 0 <= smoczeta < 0.40 D <= mlode < 0.625 D <= podrosle < 0.85 D <= dorosle; najazd = dorosle), jaja/smoczeta bez smoka,"
-                " mlode/podrosle/dorosle na smoku (inny niz w tabeli tylko po kradziezy)", not bad_stage and not bad_saddle)
+                "etap wedlug dnia opowiesci (jaja < 0 <= smoczeta < 0.40 D <= mlode < 0.625 D <= podrosle < 0.85 D <= dorosle; najazd = dorosle), jaja/smoczeta/mlode/podrosle"
+                " bez smoka pod siodlem, dorosle na smoku (Drogon; inny tylko po kradziezy)", not bad_stage and not bad_saddle)
     else:
-        rep.add("WK-7: smoki Daenerys", "brak linii z kluczem TAK", "INFO - klucz DaenerysDragonsGrow NIE albo Daenerys bez zmian", None)
+        rep.add("WK-7: smoki Daenerys", "brak linii z kluczem TAK i etapem", "INFO - klucz DaenerysDragonsGrow NIE, zapis poza zakresem (nie dotyczy) albo Daenerys bez zmian", None)
     # WK-8 zdarzenia (INFO)
     kinds = {}
     for e in events:

@@ -11,7 +11,8 @@ using TaleWorlds.ObjectSystem;
 namespace Armoury
 {
     /// <summary>
-    /// m104-wojny (3) - MLODE SMOKI DAENERYS (klucz DaenerysDragonsGrow; kazda kampania). TYLKO KAMPANIA - zadnej latki bitwy ani autobitwy.
+    /// m104-wojny (3) - MLODE SMOKI DAENERYS (klucz DaenerysDragonsGrow; zakres Prologue.CanonHere - kampania z prologiem albo nowa kampania z m104, stary zapis bez
+    /// znacznika - nic, recenzja R1 / decyzja Jeffa nr 5). TYLKO KAMPANIA - zadnej latki bitwy ani autobitwy.
     ///
     /// ROZPOZNANIE (ROT 8.1.8, dekompilacja; tor "smoki" journalu wf_d4f0c951-09f - wnioski zgodne):
     ///  - ROT-Dragon nie ma DLL - same zasoby (Monster "dragon" chodzacy i "dragonfly" latajacy). Smoki to przedmioty Type="Horse" (ROTassets.xml): dragon_black
@@ -29,10 +30,14 @@ namespace Armoury
     ///  po id dragon_* i MonsterUsage. Etapy wedlug dnia opowiesci (D = dzien najazdu Daenerys na osi Fabuli = 450 x skala, przy 4.33 ok. 1949):
     ///    jaja       - prolog (dzien opowiesci &lt; 0): bez smoka;
     ///    smoczeta   - 0 .. 0.40 D (ok. 779, Astapor - pierwszy ogien Drogona w ksiazce): bez smoka w bitwie (za male, by walczyc);
-    ///    mlode      - 0.40 D .. 0.625 D (ok. 1218): najmniejszy smok ROT dragon_green (body_length 75, speed 35);
-    ///    podrosle   - 0.625 D .. 0.85 D (ok. 1656, arena Daznaka - Drogon pierwszy raz niesie Daenerys): dragon_brown (85, speed 40);
+    ///    mlode      - 0.40 D .. 0.625 D (ok. 1218): bez smoka pod siodlem - smoki rosna, ale nie nosza jezdzca (kon z jej taboru);
+    ///    podrosle   - 0.625 D .. 0.85 D (ok. 1656, arena Daznaka - Drogon pierwszy raz niesie Daenerys): dalej bez smoka pod siodlem (kon z taboru);
     ///    dorosle    - od 0.85 D albo po DanyInvasionEvent: dragon_black - Drogon jak w ROT (105, extra_health 1000, speed 45).
-    ///  Smok skradziony (ROTGankBehavior._stolenDragons, stare zapisy) - nastepny z kolejnosci etapu; wszystkie skradzione - bez smoka (jak ROT).
+    ///  KANON (recenzja R5): w ksiazkach Daenerys dosiada tylko Drogona i pierwszy raz leci na nim na arenie Daznaka. Przedmioty ROT dragon_green i dragon_brown
+    ///  nazywaja sie w grze "Viserion" i "Rhaegal" - Daenerys na nich byloby sprzeczne z ksiazka, a mniejsze modele (75/85) pod jezdzcem nie byly sprawdzone w bitwie
+    ///  (siodlo i kamera jezdzca sie nie skaluja). Dlatego etapy mlode i podrosle sa bez smoka; wariant "mniejszy smok wczesniej" tylko na slowo Jeffa
+    ///  (StageDragons[DYoung]/[DGrown], decyzja nr 5 w CHANGELOG).
+    ///  Smok skradziony (ROTGankBehavior._stolenDragons, stare zapisy) - nastepny z kolejnosci ROT (black, brown, green); wszystkie skradzione - bez smoka (jak ROT).
     ///  Bez smoka: najlepszy zwykly wierzchowiec (Stables.IsPlainMount, tier, potem wartosc) z taboru partii, ktora Daenerys prowadzi - do slotu (nic z niczego);
     ///  brak konia albo partii - pusty slot (pieszo). Powrot smoka: kon ze slotu wraca do taboru jej partii; uprzaz innej rodziny niz smok (AccessViolation w AddMountMesh
     ///  - Mends) tez do taboru; bez partii - zamiana czeka do doby, w ktorej Daenerys prowadzi partie.
@@ -43,6 +48,9 @@ namespace Armoury
     ///  autobitwy (ROT daje plaskie DragonDamageScaling kazdemu ciosowi bohatera ze smokiem - u Jeffa 10, wiec "slabszy mlody smok" w autobitwie i tak by nie rosl rowno),
     ///  karmienia DragonFeed wedlug wieku, wlasnych modeli mlodych smokow (XML). Patrz CHANGELOG.
     /// Klucz wylaczony: smok, ktorego zdjelismy, wraca raz (dorosly wedlug ROT), potem nic. Daenerys martwa, Inna (kultura whitewalker) albo gracz - bez zmian.
+    /// COFNIECIE DLL (recenzja R4): zdjety smok nie lezy nigdzie - wraca tylko ta sciezka (klucz NIE, _dMod). Przed podmiana DLL na wersje sprzed m104: klucz
+    ///  "Daenerys Dragons Grow" na NIE, jedna doba w grze (linia "... (klucz NIE - powrot smoka ROT) | siodlo X -> dragon_black"), zapis - dopiero potem DLL. Procedura
+    ///  w CHANGELOG galezi (sekcja "Poprawki po recenzji").
     /// Stan w zapisie (arm_m104): dm = wierzchowiec zmieniony przez nas, ds = ostatni etap (komunikat dla gracza tylko przy zmianie etapu w trakcie gry).
     /// </summary>
     internal static partial class Prologue
@@ -51,13 +59,14 @@ namespace Armoury
         private const float FracYoung = 0.40f, FracGrown = 0.625f, FracAdult = 0.85f;
         private static readonly string[] DStageName = { "jaja", "smoczeta", "mlode", "podrosle", "dorosle" };
         private const int DEggs = 0, DHatch = 1, DYoung = 2, DGrown = 3, DAdult = 4;
-        // smoki Daenerys ROT (ROTGankBehavior._dragons) w kolejnosci etapu; dorosle - jak ROT (pierwszy nieskradziony: black, brown, green)
+        // smoki Daenerys ROT (ROTGankBehavior._dragons) pod siodlem wedlug etapu; null = bez smoka (kon z taboru). R5 (kanon): smok pod siodlem dopiero dorosly Drogon;
+        // dorosle - jak ROT (pierwszy nieskradziony: black, brown, green)
         private static readonly string[][] StageDragons =
         {
-            null,
-            null,
-            new[] { "dragon_green", "dragon_brown", "dragon_black" },
-            new[] { "dragon_brown", "dragon_green", "dragon_black" },
+            null,   // jaja
+            null,   // smoczeta
+            null,   // mlode - smoki nie nosza jezdzca (R5)
+            null,   // podrosle - Daenerys pierwszy raz dosiada Drogona na arenie Daznaka (R5)
             new[] { "dragon_black", "dragon_brown", "dragon_green" },
         };
 
@@ -210,8 +219,10 @@ namespace Armoury
 
         private static void DragonsApplyCore(string why)
         {
-            bool key = DragonsKey;
-            if (!key && !_dMod) { _dState = "klucz NIE - smok jak w ROT"; return; }
+            // R1: poza zakresem (stary zapis bez znacznika) - jak klucz wylaczony (_dMod i tak puste - nic nie zdjelismy)
+            bool here = CanonHere;
+            bool key = DragonsKey && here;
+            if (!key && !_dMod) { _dState = here ? "klucz NIE - smok jak w ROT" : ScopeNo + " - smok jak w ROT"; return; }
             var dany = Dany();
             if (dany == null || !dany.IsAlive) { _dState = "Daenerys " + (dany == null ? "nieobecna" : "nie zyje") + " - bez zmian"; _dMod = false; return; }
             if (dany == Hero.MainHero) { _dState = "Daenerys to gracz - bez zmian"; _dMod = false; return; }
@@ -274,7 +285,7 @@ namespace Armoury
                 }
             }
             if (wait == null) _dMod = key && stage < DAdult;
-            string stageTxt = DStageName[stage] + (key ? "" : " (klucz NIE - powrot smoka ROT)");
+            string stageTxt = DStageName[stage] + (key ? "" : here ? " (klucz NIE - powrot smoka ROT)" : " (poza zakresem - powrot smoka ROT)");
             var now = eq[EquipmentIndex.Horse].Item;
             _dState = "etap " + stageTxt + " | siodlo " + Id(now) + (wait != null ? " | " + wait : "")
                       + (next >= 0 ? " | nastepny etap od dnia opowiesci " + ((int)Math.Ceiling(next)).ToString(Inv) : "") + " (D=" + ((int)DanyInvasionDay()).ToString(Inv) + ")";
@@ -292,10 +303,11 @@ namespace Armoury
 
         private static void PlayerDragonNews(int stage)
         {
+            // R5: bez obietnic smoka pod siodlem przed etapem dorosle (Daenerys dosiada tylko Drogona)
             string t = stage == DHatch ? "Word from the east: three dragons have hatched from Daenerys Targaryen's eggs in the ashes of Khal Drogo's pyre. They are still far too small to fight."
-                     : stage == DYoung ? "Word from Slaver's Bay: Daenerys' dragons have grown big enough to fight, and the first of them now carries her into battle, though he is still young."
-                     : stage == DGrown ? "Word from Slaver's Bay: Daenerys' dragons are half-grown now, bigger than any warhorse."
-                     : stage == DAdult ? "Word from Slaver's Bay: Drogon is full-grown, and Daenerys rides him to war."
+                     : stage == DYoung ? "Word from Slaver's Bay: Daenerys' dragons have grown big enough to breathe fire, but none of them is yet big enough to carry her."
+                     : stage == DGrown ? "Word from Slaver's Bay: Daenerys' dragons are half-grown now, bigger than any warhorse, but none of them has let her ride yet."
+                     : stage == DAdult ? "Word from Slaver's Bay: Drogon is full-grown and has let Daenerys ride him. Now she rides him to war."
                      : null;
             if (t != null) Log.Player(t);
         }

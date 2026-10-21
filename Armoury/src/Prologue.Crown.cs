@@ -9,7 +9,8 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 namespace Armoury
 {
     /// <summary>
-    /// m104-wojny (2) - REACH I DORNE Z KORONA JAK W KSIAZKACH (klucze CanonReachJoinsCrown i CanonDorneJoinsCrown; kazda kampania - klasyczna i z prologiem).
+    /// m104-wojny (2) - REACH I DORNE Z KORONA JAK W KSIAZKACH (klucze CanonReachJoinsCrown i CanonDorneJoinsCrown; zakres Prologue.CanonHere - kampania z prologiem
+    /// albo nowa kampania z m104; stary zapis bez znacznika - nic, jak klucze wylaczone; recenzja R1, decyzja Jeffa nr 5).
     ///
     /// REACH (po smierci Renly'ego: bohater ROT lord_1_9 martwy albo RenlyDeathEvent zakonczone - ta sama regula co CrashScribe CanonAlliances.RenlyGone): Reach rzadzony
     /// przez Tyrellow (clan_empire_west_1), bez sojuszu ze Smocza Skala, zadna strona bez wladzy gracza. Kolejnosc ma znaczenie - StartAlliance gry (dekompilacja 1.4.8)
@@ -19,6 +20,10 @@ namespace Armoury
     ///      rozciagnieciu dni 22-433) w chwili smierci Renly'ego (~520-534) juz nie jest wymuszana; gdyby byla (inna skala osi) - jej wpis ROT dostaje IsEnabled = false
     ///      (ten sam przelacznik co okno ROT "Edit Storyline Wars"; zapisuje sie w zapisie ROT), dopiero potem pokoj.
     ///   2. Korona w wojnie z Reach (wojna ROT FIVE_KINGS_WESTERLANDS_REACH wylaczona przez ROT OnRenlysDeath, ale moze trwac): pokoj, gdy ROT jej nie wymusza.
+    ///      2a (recenzja R3): Renly zginal poza wydarzeniem ROT (RenlyDeathEvent wymaga zywych Renly'ego i Stannisa oraz Krain Burzy i Smoczej Skali - wtedy ROT
+    ///      OnRenlysDeath nie biegnie) - wyzwalacz tej wojny (StartDay 135 x skala, ok. 585, bez konca) zostaje wlaczony; zdejmujemy go tak samo jak ROT (Trigger(false)
+    ///      + FlavorText _reachAlliedRenly), PRZED pokojem i sojuszem - inaczej ROT EnforceWars wypowie wojne korona-Reach i zerwie sojusz (kara -100, EndAlliance).
+    ///      Wojny Reach-Dorzecze (Trigger(true) w OnRenlysDeath) nie ruszamy - nowej wojny nie ma w naszej regule.
     ///   3. SOJUSZ gry korona + Reach (IAllianceCampaignBehavior.StartAlliance przez interfejs - latki CrownCallToWar / CanonAlliances widza wszystko jak przy sojuszu AI).
     ///      CrashScribe CanonAlliances dopuszcza Korona + Reach po smierci Renly'ego (nie zerwie go przy wczytaniu).
     ///   4. Koniec sojuszu (gra: 84 dni) przesuwany na +364 dni, gdy zostalo mniej niz 182 (prywatne UpdateAllianceEndTime - tylko przedluza; jak Prologue.Peace).
@@ -26,6 +31,7 @@ namespace Armoury
     ///      Reach-Dorne przed decyzjami AI o wojnie (Diplomacy blokuje nim tylko DeclareWarConditions, nie DeclareWarAction - wezwania i ROT go omijaja; dlatego tez
     ///      krok 1 co dobe).
     ///   Pilnowane co dobe (brak sojuszu - od nowa, linia ODNOWIONY; wojna Reach-Dorne - pokoj od nowa) az do najazdu Daenerys.
+    ///   Dorne gracza (recenzja R2): kroki 1 i 5 pominiete - jego wojny z Reach nie konczymy i paktu w jego imieniu nie zakladamy; sojusz korona-Reach jak dotad.
     /// DORNE (po zareczynach Myrcelli z Trystanem): w ksiazce Tyrion zareczyl Myrcelle na poczatku "Starcia kroli", ona odplywa przed smiercia Renly'ego. Na osi Fabuli
     ///   (CrashScribe Fabula.Timeline, dzien ROT przed rozciagnieciem) Dorzecze wchodzi do wojny w dniu 25, Renly ginie w 120 - wybrany dzien 70 x skala osi
     ///   (CrashScribe Config.FabulaTimeScale odbiciem, zapas rok/84), przy 4.33 ok. dzien opowiesci 303 (Kronika nr 19: dni 215-390). Warunek: Myrcella (lord_4_10)
@@ -35,6 +41,8 @@ namespace Armoury
     /// KONIEC: najazd Daenerys (DanyInvasionEvent ruszyl - ROT wlacza wojne DANY_INVASION_DORNE_WESTERLANDS): nasze pakty Dorne (korona-Dorne, Reach-Dorne) wygaszone
     ///   (Expire Diplomacy), sojusz Reach-korona bez pilnowania (trwa do swojego terminu, potem wedlug gry). Raz (stan w zapisie).
     /// Klucz wylaczony: nic nie zakladamy; nasze pakty tej czesci wygaszone raz (dlugie terminy); sojusz zostaje do swojego terminu.
+    /// Gracz wladca strony naszego paktu (recenzja R8; tez pozniej, np. tytul BannerKings): nasz pakt tej pary wygaszony raz (Diplomacy blokuje paktem takze graczowi
+    ///   wypowiedzenie wojny - DeclareWarConditions/NoNonAggressionPactCondition) - opis klucza "never if you rule either realm".
     /// Bez moda Diplomacy: bez paktow (sam pokoj i sojusz).
     /// </summary>
     internal static partial class Prologue
@@ -206,6 +214,33 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>R3: wyzwalacz wojny ROT FIVE_KINGS_WESTERLANDS_REACH zdjety jak w ROT OnRenlysDeath (Trigger(false) + FlavorText _reachAlliedRenly), gdy Renly
+        /// zginal poza RenlyDeathEvent. -1 = brak odczytu ROT, 0 = nic do zrobienia (ROT zdjal sam albo brak wpisu), 1 = zdjety teraz.</summary>
+        private static int UntriggerWestReach()
+        {
+            if (!RotWarsReady() || _pWId == null || _pWTriggered == null || _mWTrigger == null) return -1;
+            foreach (var war in RotWars())
+            {
+                try
+                {
+                    var id = _pWId.GetValue(war, null);
+                    if (id == null || id.ToString() != "FIVE_KINGS_WESTERLANDS_REACH") continue;
+                    if (!(bool)_pWTriggered.GetValue(war, null)) return 0;
+                    _mWTrigger.Invoke(war, new object[] { false });
+                    try
+                    {
+                        var beh = RotWarsBehavior();
+                        var txt = _fReachAllied != null && beh != null ? _fReachAllied.GetValue(beh) : null;
+                        if (txt != null && _pWFlavor != null && _pWFlavor.CanWrite) _pWFlavor.SetValue(war, txt, null);
+                    }
+                    catch (Exception e) { WStumble("UntriggerWestReach.FlavorText", e); }
+                    return (bool)_pWTriggered.GetValue(war, null) ? 0 : 1;
+                }
+                catch (Exception e) { WStumble("UntriggerWestReach", e); return 0; }
+            }
+            return 0;
+        }
+
         private static float NapDays(double sd) { return (float)Math.Max(NapMinDays, DanyInvasionDay() + NapAfterInvasionDays - sd); }
 
         /// <summary>Pakt o nieagresji Diplomacy a-b (bez kosztow, bez pytania gracza). true = jest po wywolaniu.</summary>
@@ -234,21 +269,28 @@ namespace Armoury
         private static void CrownDaily()
         {
             double sd = StoryDays();
+            // R1: poza zakresem (stary zapis bez znacznika) - jak klucze wylaczone (nasze flagi i tak puste - nic nie zalozylismy)
+            bool here = CanonHere;
+            bool rk = ReachKey && here, dk = DorneKey && here;
+            string offWhy = here ? null : ScopeNo;
             // klucz wylaczony - nasze pakty tej czesci wygaszone (raz)
-            if (!ReachKey && _rnOurs) { int n = 0; try { n = ExpireNap(K(ReachId), K(DorneId)); } catch (Exception e) { WStumble("ExpireNap Reach", e); } _rnOurs = false; _rcHeld = false; _warsEventDay = true;
-                Log.Info(WTag + "klucz Canon Reach Joins Crown NIE - nasz pakt Reach-Dorne wygaszony " + n + ", sojusz Reach-korona bez pilnowania (trwa do swojego terminu)."); }
-            if (!DorneKey && _cdOurs) { int n = 0; try { n = ExpireNap(K(Crown), K(DorneId)); } catch (Exception e) { WStumble("ExpireNap Dorne", e); } _cdOurs = false; _warsEventDay = true;
-                Log.Info(WTag + "klucz Canon Dorne Joins Crown NIE - nasz pakt korona-Dorne wygaszony " + n + "."); }
-            if (!ReachKey && !DorneKey) { _reachState = "klucz NIE"; _dorneState = "klucz NIE"; return; }
+            if (!rk && _rnOurs) { int n = 0; try { n = ExpireNap(K(ReachId), K(DorneId)); } catch (Exception e) { WStumble("ExpireNap Reach", e); } _rnOurs = false; _rcHeld = false; _warsEventDay = true;
+                Log.Info(WTag + (offWhy ?? "klucz Canon Reach Joins Crown NIE") + " - nasz pakt Reach-Dorne wygaszony " + n + ", sojusz Reach-korona bez pilnowania (trwa do swojego terminu)."); }
+            if (!dk && _cdOurs) { int n = 0; try { n = ExpireNap(K(Crown), K(DorneId)); } catch (Exception e) { WStumble("ExpireNap Dorne", e); } _cdOurs = false; _warsEventDay = true;
+                Log.Info(WTag + (offWhy ?? "klucz Canon Dorne Joins Crown NIE") + " - nasz pakt korona-Dorne wygaszony " + n + "."); }
+            if (!here) { _reachState = _dorneState = ScopeNo; return; }
+            if (!rk && !dk) { _reachState = "klucz NIE"; _dorneState = "klucz NIE"; return; }
             if (_crownEnded) { _reachState = _dorneState = "zakonczone (najazd Daenerys, dzien opowiesci " + _crownEndDay.ToString(Inv) + ")"; return; }
             if (DanyInvaded()) { EndCrown("DanyInvasionEvent ruszyl", sd); return; }
             var crown = K(Crown); var reach = K(ReachId); var dorne = K(DorneId);
             var beh = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<IAllianceCampaignBehavior>() : null;
+            // R8: gracz wladca strony naszego paktu - pakt tej pary wygaszony (raz)
+            try { PlayerPactsOff(crown, reach, dorne); } catch (Exception e) { WStumble("PlayerPactsOff", e); }
 
             // REACH
             try
             {
-                if (!ReachKey) _reachState = "klucz NIE";
+                if (!rk) _reachState = "klucz NIE";
                 else if (!Alive(crown) || !Alive(reach)) _reachState = "brak krolestwa (korona " + (Alive(crown) ? "jest" : "BRAK") + ", Reach " + (Alive(reach) ? "jest" : "BRAK") + ")";
                 else if (!RenlyGone()) _reachState = "czeka (Renly zyje)";
                 else if (PlayerRules(crown) || PlayerRules(reach)) _reachState = "krolestwo gracza - poza regula";
@@ -263,7 +305,7 @@ namespace Armoury
             {
                 float md = MyrcellaDay();
                 var myr = HeroAny(MyrcellaHeroId);
-                if (!DorneKey) _dorneState = "klucz NIE";
+                if (!dk) _dorneState = "klucz NIE";
                 else if (!Alive(crown) || !Alive(dorne)) _dorneState = "brak krolestwa (korona " + (Alive(crown) ? "jest" : "BRAK") + ", Dorne " + (Alive(dorne) ? "jest" : "BRAK") + ")";
                 else if (sd < md && !_cdOurs) _dorneState = "czeka (zareczyny Myrcelli w dniu opowiesci " + ((int)md).ToString(Inv) + ")";
                 else if (!_cdOurs && (myr == null || !myr.IsAlive)) _dorneState = "nie bedzie (Myrcella " + (myr == null ? "nieobecna" : "nie zyje") + " - bez zareczyn)";
@@ -274,12 +316,34 @@ namespace Armoury
             catch (Exception e) { WStumble("HoldDorne", e); _dorneState = "BLAD (" + e.GetType().Name + ")"; }
         }
 
+        /// <summary>R8: nasz pakt pary, w ktorej gracz rzadzi jedna ze stron (tez pozniej - tytuly, roszczenia BannerKings), wygaszony raz: Reach-Dorne gdy gracz rzadzi
+        /// Reach albo Dorne, korona-Dorne gdy gracz rzadzi korona albo Dorne. Pakty AI i sojusz zostaja.</summary>
+        private static void PlayerPactsOff(Kingdom crown, Kingdom reach, Kingdom dorne)
+        {
+            if (_rnOurs && (PlayerRules(reach) || PlayerRules(dorne)))
+            {
+                int n = 0;
+                try { n = ExpireNap(reach, dorne); } catch (Exception e) { WStumble("ExpireNap Reach gracz", e); }
+                _rnOurs = false; _warsEventDay = true;
+                Log.Info(WTag + "krolestwo gracza (" + (PlayerRules(reach) ? ReachId : DorneId) + ") - nasz pakt Reach-Dorne wygaszony " + n + " (gracz nie jest zwiazany naszym paktem).");
+            }
+            if (_cdOurs && (PlayerRules(crown) || PlayerRules(dorne)))
+            {
+                int n = 0;
+                try { n = ExpireNap(crown, dorne); } catch (Exception e) { WStumble("ExpireNap Dorne gracz", e); }
+                _cdOurs = false; _warsEventDay = true;
+                Log.Info(WTag + "krolestwo gracza (" + (PlayerRules(crown) ? Crown : DorneId) + ") - nasz pakt korona-Dorne wygaszony " + n + " (gracz nie jest zwiazany naszym paktem).");
+            }
+        }
+
         private static string HoldReach(Kingdom crown, Kingdom reach, Kingdom dorne, IAllianceCampaignBehavior beh, double sd)
         {
             var did = new List<string>();
             int day = (int)Math.Floor(sd);
+            // R2: Dorne gracza - krokow 1 i 5 nie robimy (jego wojny z Reach nie konczymy, paktu w jego imieniu nie zakladamy)
+            bool playerDorne = PlayerRules(dorne);
             // 1. pokoj Reach-Dorne PRZED sojuszem - inaczej StartAlliance zlozy wniosek wezwania korony przeciw Dorne
-            if (Alive(dorne) && reach.IsAtWarWith(dorne))
+            if (!playerDorne && Alive(dorne) && reach.IsAtWarWith(dorne))
             {
                 if (WarForced(reach, dorne)) did.Add("wojna ROT Reach-Dorne wymuszona - wpisow ROT wylaczonych " + DisableRotWar(reach, dorne));
                 if (!WarForced(reach, dorne))
@@ -287,6 +351,14 @@ namespace Armoury
                     MakePeaceAction.Apply(reach, dorne);
                     did.Add(reach.IsAtWarWith(dorne) ? "pokoj Reach-Dorne NIE wszedl" : (_rcHeld ? "ponowny pokoj Reach-Dorne" : "pokoj Reach-Dorne"));
                 }
+            }
+            // 2a. R3: Renly zginal poza RenlyDeathEvent - wyzwalacz wojny ROT korona-Reach zdejmujemy jak ROT OnRenlysDeath (przed pokojem i sojuszem)
+            int untr = UntriggerWestReach();
+            if (untr > 0)
+            {
+                did.Add("wyzwalacz wojny ROT FIVE_KINGS_WESTERLANDS_REACH zdjety (jak ROT OnRenlysDeath)");
+                Log.Info(WTag + "Reach z korona: wojna ROT korona-Reach (FIVE_KINGS_WESTERLANDS_REACH) - wyzwalacz zdjety jak w ROT OnRenlysDeath (Renly nie zyje poza RenlyDeathEvent: "
+                         + (RotEventState("RenlyDeathEvent") == 2 ? "wydarzenie zakonczone bez smierci z reki ROT" : "wydarzenie nie ruszylo") + "; dzien opowiesci " + sd.ToString("0.0", Inv) + ").");
             }
             // 2. pokoj korona-Reach (ROT OnRenlysDeath wylacza swoja wojne korona-Reach, ale stan wojny moze trwac)
             if (crown.IsAtWarWith(reach))
@@ -322,7 +394,8 @@ namespace Armoury
             catch (Exception e) { WStumble("AllianceEnd", e); end = "koniec ?"; }
             // 5. pakt Reach-Dorne (trzyma pokoj przed decyzjami AI)
             string nap = "-";
-            if (Alive(dorne))
+            if (playerDorne) nap = "Dorne gracza - bez paktu";
+            else if (Alive(dorne))
             {
                 if (reach.IsAtWarWith(dorne)) nap = "wojna - bez paktu";
                 else if (beh.IsAllyWithKingdom(reach, dorne)) nap = "sojusz (AI) - pakt zbedny";
@@ -349,7 +422,8 @@ namespace Armoury
             }
             _rcHeld = true;
             if (_rcDay == NoDay) _rcDay = day;   // sojusz zastany (np. AI po smierci Renly'ego) - pilnowany od dzis
-            return "SOJUSZ TAK od dnia " + (_rcDay != NoDay ? _rcDay.ToString(Inv) : "?") + " (" + end + "), pakt Reach-Dorne " + nap + ", Reach-Dorne " + (Alive(dorne) && reach.IsAtWarWith(dorne) ? "WOJNA" : "pokoj");
+            return "SOJUSZ TAK od dnia " + (_rcDay != NoDay ? _rcDay.ToString(Inv) : "?") + " (" + end + "), pakt Reach-Dorne " + nap + ", Reach-Dorne "
+                   + (playerDorne ? "bez zmian (Dorne gracza)" : Alive(dorne) && reach.IsAtWarWith(dorne) ? "WOJNA" : "pokoj");
         }
 
         private static string HoldDorne(Kingdom crown, Kingdom dorne, IAllianceCampaignBehavior beh, double sd)

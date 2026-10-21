@@ -8992,15 +8992,15 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueEssosWarsCalendar { get; set; } = true;
 
-        [SettingPropertyBool("Canon Reach Joins Crown", HintText = "after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Off = the Reach keeps its own wars and alliances", RequireRestart = false)]
+        [SettingPropertyBool("Canon Reach Joins Crown", HintText = "after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = the Reach keeps its own wars and alliances", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonReachJoinsCrown { get; set; } = true;
 
-        [SettingPropertyBool("Canon Dorne Joins Crown", HintText = "after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Off = no pact", RequireRestart = false)]
+        [SettingPropertyBool("Canon Dorne Joins Crown", HintText = "after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = no pact", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonDorneJoinsCrown { get; set; } = true;
 
-        [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and the hatchlings are too small to fight, so Daenerys rides a horse from her own train; later the smallest of her dragons carries her into battle, then a bigger one, and Drogon himself when full-grown (about the time of Daznak's Pit, before her invasion of Westeros). Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool DaenerysDragonsGrow { get; set; } = true;
 

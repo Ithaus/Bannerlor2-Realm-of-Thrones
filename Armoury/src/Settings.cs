@@ -3990,15 +3990,18 @@ namespace Armoury
         // --- Wars of the books ---
         // m104-wojny (2) (Prologue.Wars.cs): po smierci Renly'ego (lord_1_9 martwy albo RenlyDeathEvent zakonczone) Reach Tyrellow: pokoj z Dorne (MakePeaceAction), pokoj z korona,
         // SOJUSZ gry z korona (IAllianceCampaignBehavior.StartAlliance, przedluzany UpdateAllianceEndTime) i pakt o nieagresji Diplomacy Reach-Dorne - pilnowane co dobe
-        // do najazdu Daenerys (DanyInvasionEvent). Krolestwo gracza poza regula. Kazda kampania. Co dobe.
-        public bool CanonReachJoinsCrown = true;           // after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Off = the Reach keeps its own wars and alliances
+        // do najazdu Daenerys (DanyInvasionEvent). Krolestwo gracza poza regula (Dorne gracza - bez pokoju i paktu Reach-Dorne; nasz pakt wygaszony, gdy gracz rzadzi strona).
+        // Zakres (recenzja R1): kampania z prologiem albo nowa kampania z m104 (znacznik w zapisie arm_m104); stary zapis - nic (decyzja Jeffa nr 5). Co dobe.
+        public bool CanonReachJoinsCrown = true;           // after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = the Reach keeps its own wars and alliances
         // m104-wojny (2): po zareczynach Myrcelli z Trystanem (dzien osi ROT 70 x skala Fabuli, ok. dnia opowiesci 303; Myrcella zywa, Dorne Martellow) pokoj korona-Dorne i pakt
-        // o nieagresji Diplomacy - pilnowany co dobe; przy najezdzie Daenerys nasze pakty Dorne wygaszone (Dorne przechodzi do Daenerys - wojna ROT). Kazda kampania. Co dobe.
-        public bool CanonDorneJoinsCrown = true;           // after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Off = no pact
-        // m104-wojny (3) (Prologue.Dragons.cs): wierzchowiec Daenerys (lord_1_14, slot konia zestawu bojowego) wedlug dnia opowiesci: jaja (prolog) i smoczeta (do 0.40 D) - bez smoka,
-        // kon z jej taboru; mlode (0.40 D) dragon_green 75%, podrosle (0.625 D) dragon_brown 85%, dorosle (0.85 D albo najazd) dragon_black 105% (body_length ROT);
-        // D = dzien najazdu Daenerys (450 x skala Fabuli). Tylko kampania (bez latek bitwy). Wylaczony - smok ROT wraca. Co dobe.
-        public bool DaenerysDragonsGrow = true;            // Daenerys' dragons grow up with the story: in the prologue they are still eggs, and the hatchlings are too small to fight, so Daenerys rides a horse from her own train; later the smallest of her dragons carries her into battle, then a bigger one, and Drogon himself when full-grown (about the time of Daznak's Pit, before her invasion of Westeros). Off = Drogon is full-grown from the first day, as in Realm of Thrones
+        // o nieagresji Diplomacy - pilnowany co dobe; przy najezdzie Daenerys nasze pakty Dorne wygaszone (Dorne przechodzi do Daenerys - wojna ROT). Gracz wladca strony -
+        // nasz pakt wygaszony (R8). Zakres jak wyzej (kampania z prologiem albo nowa kampania z m104). Co dobe.
+        public bool CanonDorneJoinsCrown = true;           // after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = no pact
+        // m104-wojny (3) (Prologue.Dragons.cs): wierzchowiec Daenerys (lord_1_14, slot konia zestawu bojowego) wedlug dnia opowiesci: jaja (prolog), smoczeta (do 0.40 D),
+        // mlode (0.40 D) i podrosle (0.625 D) - bez smoka pod siodlem, kon z jej taboru (kanon, recenzja R5: Daenerys dosiada tylko Drogona, pierwszy raz na arenie Daznaka);
+        // dorosle (0.85 D albo najazd) dragon_black - Drogon jak w ROT. D = dzien najazdu Daenerys (450 x skala Fabuli). Tylko kampania (bez latek bitwy). Zakres jak (2).
+        // Wylaczony - smok ROT wraca (raz). Przed cofnieciem DLL ponizej m104: klucz NIE i jedna doba (R4). Co dobe.
+        public bool DaenerysDragonsGrow = true;            // Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones
 
         // --- Story windows ---
         // m103-sceny (RotWindowPictures.cs): obrazki Jeffa w oknach wydarzen ROT - plik Modules\Armoury\Images\ROT\rot_<KlasaROT>_<n>.png|jpg zastepuje obrazek tego

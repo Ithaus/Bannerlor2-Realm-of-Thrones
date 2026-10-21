@@ -33,6 +33,9 @@ namespace Armoury
     ///     Klasyczna kampania: nic (Active = false; zreszta oba zegary sa rowne). Klucz wylaczony - wszystkie wojny czekaja na opowiesc, jak w 103.
     /// (2) REACH I DORNE Z KORONA (klucze CanonReachJoinsCrown, CanonDorneJoinsCrown) i (3) MLODE SMOKI DAENERYS (klucz DaenerysDragonsGrow) - Prologue.Crown /
     ///     Prologue.Dragons w tym samym pliku i w Prologue.Dragons.cs.
+    ///     ZAKRES (2) i (3) (recenzja R1, do decyzji Jeffa nr 5 w CHANGELOG): kampania z prologiem 298 (Active) albo nowa kampania utworzona z ta DLL (znacznik nw=1
+    ///     w arm_m104, CampaignEvents.OnNewGameCreatedEvent). Zapis bez znacznika (biezaca kampania klasyczna Jeffa z 20.10) - jak klucze wylaczone: nic nie zakladamy
+    ///     i nic nie zdejmujemy; linia startu i doby mowia "nie dotyczy". Wlaczenie w starych zapisach = CanonHere zwraca true (jedna linia), tylko na slowo Jeffa.
     /// Bledy: per wywolanie, liczone (WStumble, wlasny licznik - linia "potkniecia"), bez globalnego wylacznika. Stan (2) i (3) w zapisie: klucz "arm_m104" (CanonWarsBehavior).
     /// </summary>
     internal static partial class Prologue
@@ -47,6 +50,19 @@ namespace Armoury
 
         private static bool EssosKey { get { var s = S; return s != null && s.PrologueEssosWarsCalendar; } }
 
+        // ---------------------------------------------------------------- zakres (2) i (3) (recenzja R1)
+        private static bool _wNew;   // nowa kampania utworzona z m104 (zapis arm_m104 "nw")
+
+        /// <summary>CanonWarsBehavior: CampaignEvents.OnNewGameCreatedEvent (po OnGameStart - ResetWars juz wyzerowal stan) - znacznik nowej kampanii.</summary>
+        internal static void WarsOnNewGame() { _wNew = true; }
+
+        /// <summary>(2) i (3) dzialaja: kampania z prologiem albo nowa kampania z m104 (znacznik w zapisie). Stary zapis (biezaca kampania klasyczna Jeffa) - nie.</summary>
+        internal static bool CanonHere { get { return Active || _wNew; } }
+
+        private const string ScopeNo = "nie dotyczy (zapis sprzed m104 bez prologu - decyzja Jeffa nr 5)";
+
+        private static string ScopeText() { return Active ? "kampania z prologiem" : _wNew ? "nowa kampania (znacznik)" : ScopeNo; }
+
         // ---------------------------------------------------------------- bledy m104 (osobny licznik - linie m101 bez zmian)
         private static int _wStumbles, _wStumblesDay;
 
@@ -58,9 +74,9 @@ namespace Armoury
 
         // ---------------------------------------------------------------- ROT: wojny fabularne (odbiciem)
         private static bool _rotWarsTried;
-        private static FieldInfo _fSubWars, _fWarList, _fCalling;
-        private static PropertyInfo _pWF1, _pWF2, _pWEnabled, _pWCustom;
-        private static MethodInfo _mWEnforced, _mWForced;
+        private static FieldInfo _fSubWars, _fWarList, _fCalling, _fReachAllied;
+        private static PropertyInfo _pWF1, _pWF2, _pWEnabled, _pWCustom, _pWId, _pWTriggered, _pWFlavor;
+        private static MethodInfo _mWEnforced, _mWForced, _mWTrigger;
 
         private static bool RotWarsReady()
         {
@@ -83,6 +99,12 @@ namespace Armoury
                         _pWEnabled = AccessTools.Property(tWar, "IsEnabled");
                         _pWCustom = AccessTools.Property(tWar, "IsCustom");
                         _mWEnforced = AccessTools.DeclaredMethod(tWar, "Enforced", new[] { typeof(string).MakeByRefType() });
+                        // R3 (Prologue.Crown UntriggerWestReach): wyzwalacz wojny jak ROT OnRenlysDeath - opcjonalne (brak = linia doby mowi BRAK)
+                        _pWId = AccessTools.Property(tWar, "Id");
+                        _pWTriggered = AccessTools.Property(tWar, "IsTriggered");
+                        _pWFlavor = AccessTools.Property(tWar, "FlavorText");
+                        _mWTrigger = AccessTools.DeclaredMethod(tWar, "Trigger", new[] { typeof(bool) });
+                        _fReachAllied = AccessTools.Field(tWars, "_reachAlliedRenly");
                     }
                 }
                 catch (Exception e) { WStumble("RotWarsReady", e); }
@@ -225,22 +247,27 @@ namespace Armoury
             }
         }
 
-        /// <summary>Opis wojen essoskich do linii: na liscie N (pary), w wojnie W, wypowiedziane przez nas.</summary>
+        /// <summary>Opis wojen essoskich do linii: na liscie N (pary), w wojnie W; wojny ze strona zniszczona osobno ("zniszczone Z (pary)") - poza N i W, jak w EssosDaily
+        /// i w ROT (EnforceWars usuwa je z listy od dnia opowiesci 1; w prologu bramka stoi, wiec zostaja na liscie) - recenzja R7.</summary>
         private static string EssosText()
         {
             if (!RotWarsReady()) return "ROT nieobecny";
             int n = 0, w = 0;
             var l = new List<string>();
+            var gone = new List<string>();
             foreach (var war in RotWars())
             {
                 if (!IsEssosWar(war)) continue;
-                n++;
                 var f1 = WF1(war); var f2 = WF2(war);
-                bool at = f1 != null && f2 != null && FactionManager.IsAtWarAgainstFaction(f1, f2);
+                string pair = (f1 != null ? f1.StringId : "?") + "-" + (f2 != null ? f2.StringId : "?");
+                if (f1 == null || f2 == null || f1.IsEliminated || f2.IsEliminated) { gone.Add(pair); continue; }
+                n++;
+                bool at = FactionManager.IsAtWarAgainstFaction(f1, f2);
                 if (at) w++;
-                l.Add((f1 != null ? f1.StringId : "?") + "-" + (f2 != null ? f2.StringId : "?") + (at ? " (wojna)" : ""));
+                l.Add(pair + (at ? " (wojna)" : ""));
             }
-            return "na kalendarzu " + n + " (" + string.Join(", ", l.ToArray()) + "), w wojnie " + w + "/" + n;
+            return "na kalendarzu " + n + " (" + string.Join(", ", l.ToArray()) + "), w wojnie " + w + "/" + n
+                   + (gone.Count > 0 ? ", zniszczone " + gone.Count + " (" + string.Join(", ", gone.ToArray()) + ")" : "");
         }
 
         // ---------------------------------------------------------------- zapis, reset, linie (wspolne dla m104)
@@ -250,13 +277,14 @@ namespace Armoury
         {
             _wStumblesDay = 0; _essosDeclaredDay = 0; _essosDeclared = 0; _essosToday.Clear();
             _warsEventDay = false;
+            _wNew = false;
             ResetCrown();
             ResetDragons();
         }
 
         internal static string PackWars()
         {
-            return "v=1;" + PackCrown() + PackDragons();
+            return "v=1;nw=" + (_wNew ? "1" : "0") + ";" + PackCrown() + PackDragons();
         }
 
         internal static void UnpackWars(string v)
@@ -269,6 +297,8 @@ namespace Armoury
                     int i = part.IndexOf('=');
                     if (i > 0) map[part.Substring(0, i)] = part.Substring(i + 1);
                 }
+            string nw;
+            _wNew = map.TryGetValue("nw", out nw) && nw == "1";
             UnpackCrown(map);
             UnpackDragons(map);
         }
@@ -284,6 +314,7 @@ namespace Armoury
                          + (StoryDays() < 1.0 ? ", bramka ROT EnforceWars zamknieta - wypowiada doba Armoury" : ", wymusza ROT EnforceWars");
             Log.Info(WTag + "start sesji | prolog " + (Active ? "TAK" : "NIE") + " | dzien opowiesci " + StoryDays().ToString("0.0", Inv)
                      + " | (1) Essos na kalendarzu: " + essos
+                     + " | zakres (2) i (3): " + ScopeText()
                      + " | (2) Reach i Dorne z korona: " + CrownStartText()
                      + " | (3) smoki Daenerys: " + DragonsText()
                      + " | potkniecia " + _wStumbles + ".");
@@ -320,6 +351,7 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
             CampaignEvents.HeroPrisonerReleased.AddNonSerializedListener(this, OnHeroReleased);   // (3) Daenerys z niewoli - etap smokow od razu
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Prologue.WarsOnNewGame());   // R1: zakres (2) i (3) - znacznik nowej kampanii
         }
 
         public override void SyncData(IDataStore dataStore)
