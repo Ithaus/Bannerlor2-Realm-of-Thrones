@@ -13,7 +13,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 | E1a | kalendarz -188 dni, start opowiesci, latka odczytow CampaignStartTime w ROT.dll, Fabula/Inni CrashScribe | ZROBIONE (build Armoury 0, CrashScribe 0) |
 | E1b | pokoj w prologu (wojny Westeros-Westeros zablokowane), pakty i sojusze z krolestwem Roberta | ZROBIONE (build Armoury 0, CrashScribe 0) |
 | E2a | Robert i Ned zyja, glowy rodow i wladcy | ZROBIONE (build Armoury 0) |
-| E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | do zrobienia |
+| E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | ZROBIONE (build Armoury 0) |
 | LOG | grupa tools/sprawdz_logi.py --grupa m101prolog | do zrobienia |
 
 ## Rozpoznanie (dekompilacja gry 1.4.8, ROT 8.1.8, Diplomacy 1.4.7, BK)
@@ -116,6 +116,23 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   `Prolog (m101): Robert i Ned (XML ozywionych 2/2, ...): Robert ... glowa rodu clan_nord_1 (byl Joffrey ...), krolestwo vlandia wladca Robert ... TAK | Ned ... TAK.`;
   linia doby dostala `krol Robert ZYJE | korona: wladca ... | Ned ZYJE (wolny) | Polnoc: wladca ...`.
 
+### E2b - koniec prologu i egzekucja Neda (ZROBIONE)
+- `Armoury/src/Prologue.End.cs` (nowy):
+  - doba prologu >= 186 (`DailyEnd`, raz): `EndPacts` (sojusze zerwane, pakty wygaszone), potem smierc krola: `AddDeathMark(WoundedInBattle)` +
+    `KillCharacterAction.ApplyByDeathMarkForced` (wymuszona - "od ran z polowania"); krol w bitwie/oblezeniu (albo jego strażnik-zwyciezca w bitwie) - nastepna doba.
+    Sukcesje robi gra (przywodca rodu z dziedzicow, glosowanie o tron z premia ROT x999 dla rodu panujacego); gdy przywodca rodu `clan_nord_1` nie jest Joffreyem,
+    a Joffrey zyje w tym rodzie - `ChangeClanLeaderAction.ApplyWithSelectedNewLeader`. Nazwa rodu wraca do "Baratheon, Joffrey" (z zapisu, zakodowana
+    `Uri.EscapeDataString`). Komunikat dla gracza (EN) o smierci krola, Joffreyu na tronie i uwiezieniu Neda.
+  - Ned do lochu Krolewskiej Przystani (`town_EW4`): jego armia rozwiazana (`DisbandArmyAction.ApplyByUnknownReason`) albo druzyna odpieta od cudzej armii,
+    `TakePrisonerAction.Apply(KL.Party, Ned)`, pusta druzyna `DisbandPartyAction.StartDisband`; Ned w bitwie - nastepna doba; jeniec kogos innego - najpierw
+    `EndCaptivityAction.ApplyByEscape`. Pilnowane co dobe do egzekucji (gra wypuszcza jencow przy pokoju - Ned wraca do lochu).
+  - prefiks `ROT.Events.NedEvent.StartEvent` (leniwie z reszta latek prologu): zywy Ned -> `KillCharacterAction.ApplyByExecution(Ned, Joffrey, pokaz, isForced)`
+    PRZED `ROTEvents.OnNedDeath` ROT; potem Robb glowa Starkow (jesli gra wybrala innego dziedzica - ustawiamy Robba) = wladca Polnocy.
+  - zapis: `kf=` (krol upadl), `nd=` (Ned stracony).
+- Log: `Prolog (m101): KONIEC PROLOGU (doba 186, dzien 186.x) | Robert martwy TAK (WoundedInBattle) | korona: wladca Joffrey Baratheon (lord_7_1) - Joffrey krolem TAK
+  (...) | Ned: jeniec w town_EW4 TAK (...) | pakty: sojusze zerwane 3, pakty wygaszone 6 | potkniecia 0.`;
+  `Prolog (m101): egzekucja Neda (NedEvent, dzien opowiesci 8.x) | Ned martwy TAK | rod Stark: glowa Robb Stark (lord_5_1) (...) | Polnoc: wladca Robb Stark (lord_5_1) - Robb TAK.`
+
 ## Ryzyko / co sprawdzic
 
 - E0: okno pokazuje sie w menu glownym (InformationManager.ShowInquiry na ekranie poczatkowym - tak jak okna gry o wyjsciu); wywolanie StartNewGame z przycisku okna
@@ -133,6 +150,10 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - E2a: BK nadaje tytuly przy nowej grze - jesli robi to przed naszym SetLeader, tytul krola trzyma Joffrey (a nie Robert), tytul Polnocy - Robb; gra i ROT
   i tak licza wladce z przywodcy rodu panujacego. Sprawdzic w encyklopedii BK (tytuly) po starcie prologu. ROT nigdzie nie czyta Roberta ani Neda (grep ROT.dll:
   tylko definicje w ROTLords). AIInfluence moze mowic o "zmarlym krolu" (opisy) - poza zakresem.
+- E2b: glosowanie o tron po smierci krola (gra) widzi gracz w krolestwie korony; premia ROT x999 zostawia tron rodowi Joffreya. BK z tytulem dziedzicznym moze dac tytul
+  dziedzicowi i przestawic rod panujacy na rod dziedzica (ten sam rod). Ned w lochu moze uciec (4% dziennie w grze, RealisticCaptivity) albo wyjsc przy pokoju
+  korony z kims trzecim - wraca do lochu nastepnej doby; egzekucja w NedEvent zabija go wszedzie. NedEvent nie odpali (wylaczona Fabula, ROT bez wydarzenia) - Ned
+  zostaje w lochu i zyje (do decyzji: wtedy wlasna egzekucja w dniu ~9 opowiesci).
 - E1a regresja klasycznego startu: model czasu zwraca te sama wartosc co dotad (StoryStartTime = stary getter), latka ROT nie wpina sie; StoryClock w CrashScribe
   zwraca StoryStartTime = CampaignStartTime co do tika.
 
@@ -153,6 +174,9 @@ DO SPRAWDZENIA (nic nie wgrane; gra Jeffa i test 100 nietkniete).
    Polnoca, Krainami Burzy i Dorzeczem, pakty z reszta; w liniach doby `wojny Westeros-Westeros (bez Wolnych Ludzi) 0`; Nocna Straz w wojnie z Wolnymi Ludzmi.
 8. (E2a) Prolog: encyklopedia - Robert Baratheon zyje, wladca krolestwa korony, glowa rodu "Baratheon, Robert", zona Cersei; Eddard Stark zyje, wladca Polnocy,
    zona Catelyn; Joffrey i Robb jako czlonkowie rodow. W logu `XML ozywionych 2/2` i oba `TAK`.
+9. (E2b) Dzien 186 prologu: komunikat o smierci krola; encyklopedia - Robert martwy (od ran), Joffrey wladca korony, rod "Baratheon, Joffrey"; Ned jencem w
+   Krolewskiej Przystani; sojusze i pakty z korona znikaja. Log: `KONIEC PROLOGU ... Joffrey krolem TAK ... Ned: jeniec w town_EW4 TAK`.
+10. (E2b) Okolo 9 dni po starcie opowiesci okno ROT "Execution of Ned Stark"; encyklopedia - Ned martwy (stracony), Robb wladca Polnocy. Log: `egzekucja Neda ... Robb TAK`.
 6. (E1a) Klasyczny: data "Year 299, Day 1", `latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie)`, Fabula jak dotad (`FABULA: dzien 0`).
 
 ## Dla Jeffa

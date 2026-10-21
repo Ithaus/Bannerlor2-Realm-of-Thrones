@@ -184,10 +184,11 @@ namespace Armoury
             if (_restTried) return;
             _restTried = true;
             var h = new Harmony("com.jeff.armoury.prologue");
-            string p = "-", k = "-";
+            string p = "-", k = "-", n = "-";
             try { p = ApplyPeace(h); } catch (Exception e) { Stumble("ApplyPeace", e); p = "BLAD"; }
             try { k = ApplyKings(h); } catch (Exception e) { Stumble("ApplyKings", e); k = "BLAD"; }
-            _restState = "pokoj i pakty: " + p + " | Robert i Ned z XML " + k;
+            try { n = ApplyEnd(h); } catch (Exception e) { Stumble("ApplyEnd", e); n = "BLAD"; }
+            _restState = "pokoj i pakty: " + p + " | Robert i Ned z XML " + k + " | egzekucja Neda (NedEvent) " + n;
             Log.Info(Tag + "latki prologu (" + why + "): " + _restState + ".");
         }
 
@@ -197,6 +198,7 @@ namespace Armoury
             _stumblesDay = 0;
             ResetPeace();
             ResetKings();
+            ResetEnd();
         }
 
         // ---------------------------------------------------------------- zapis
@@ -204,7 +206,7 @@ namespace Armoury
         internal static string Pack()
         {
             if (!Active) return "";
-            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings();
+            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings() + PackEnd();
         }
 
         internal static void Unpack(string v)
@@ -221,13 +223,16 @@ namespace Armoury
             }
             string on;
             Active = map.TryGetValue("on", out on) && on == "1";
-            string by; ChosenBy = map.TryGetValue("by", out by) ? by : "zapis";
+            string by; ChosenBy = map.TryGetValue("by", out by) ? Unesc(by) : "zapis";
             UnpackPeace(map);
             UnpackKings(map);
+            UnpackEnd(map);
             if (Active) OnPrologueCampaign("wczytany zapis");
         }
 
-        private static string Clean(string s) { return (s ?? "").Replace(';', ',').Replace('=', ':'); }
+        /// <summary>Wartosc do zapisu "klucz=wartosc;" - znaki ';' i '=' (np. w tekscie "{=ROT01670}...") zakodowane (Uri.EscapeDataString), odczyt - Unesc.</summary>
+        private static string Clean(string s) { return Uri.EscapeDataString(s ?? ""); }
+        internal static string Unesc(string s) { try { return Uri.UnescapeDataString(s ?? ""); } catch { return s ?? ""; } }
 
         internal static int ParseInt(System.Collections.Generic.Dictionary<string, string> map, string key, int def)
         {
@@ -290,10 +295,11 @@ namespace Armoury
             if (!Active) return;
             double day = PrologueDay();
             if (day > PrologueDays + LogAfterStoryDays) return;
+            string end = DailyEnd();
             bool before = BeforeStory();
             string peace = DailyPeace();
             Log.Info(Tag + "dzien " + ((int)day).ToString(Inv) + " prologu (" + (before ? "opowiesc za " + (PrologueDays - day).ToString("0.0", Inv) + " dni"
-                     : "opowiesc trwa, dzien opowiesci " + (day - PrologueDays).ToString("0.0", Inv)) + ") | " + peace + " | " + DailyKings()
+                     : "opowiesc trwa, dzien opowiesci " + (day - PrologueDays).ToString("0.0", Inv)) + ") | " + end + " | " + peace + " | " + DailyKings()
                      + " | wydarzenia ROT ruszone " + RotEventsStarted() + " | potkniecia " + _stumblesDay + " (razem " + _stumbles + ").");
             _stumblesDay = 0;
         }

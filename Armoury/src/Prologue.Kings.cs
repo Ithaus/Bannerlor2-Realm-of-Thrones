@@ -50,7 +50,7 @@ namespace Armoury
             ResetKings();
             string v;
             _kingsAlive = map.TryGetValue("ka", out v) && v == "1";
-            _crownClanName = map.TryGetValue("cn", out v) ? v : "";
+            _crownClanName = map.TryGetValue("cn", out v) ? Unesc(v) : "";
         }
 
         internal static Hero H(string id)
