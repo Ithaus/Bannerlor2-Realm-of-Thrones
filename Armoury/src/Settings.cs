@@ -3944,6 +3944,12 @@ namespace Armoury
         // Prologue.cs - okno wyboru startu przy "New Campaign" w menu glownym (klucz czytany przy kliknieciu); NIE = zawsze klasyczny start ROT 299 bez okna.
         // Zapis kampanii pamieta wybor (arm_prologue). Nowe klucze (MCM Jeffa ich nie ma - domyslne).
         public bool PrologueEnabled = true;                // when you start a new campaign, choose between "Prologue 298 - the King rides north" (the campaign begins 188 days before the story of Realm of Thrones, as King Robert leaves King's Landing for Winterfell; Robert and Eddard Stark live and the realms keep the King's peace) and "Classic start 299" (as Realm of Thrones begins). Off = always the classic start, without asking. Only new campaigns
+        // m101-prolog E1b (Prologue.Peace.cs): do startu opowiesci prefiks DeclareWarAction.ApplyInternal nie przepuszcza wojny miedzy krolestwami Westeros (bez Wolnych
+        // Ludzi; wrogosc gracza, przestepstwo, bunt, zalozenie krolestwa i krolestwo gracza - poza regula). Czytany na zywo.
+        public bool ProloguePeace = true;                  // in a Prologue 298 campaign, until the story of Realm of Thrones begins no realm of Westeros declares war on another (the Night's Watch still fights the Free Folk, and Free Folk raids go on); wars you start yourself are not stopped. Off = the AI may declare wars in the prologue
+        // m101-prolog E1b: sojusze gry (Polnoc, Krainy Burzy, Dorzecze) i pakty o nieagresji Diplomacy (Dolina, Smocza Skala, Reach, Dorne, Zelazne Wyspy, Skagos) z krolestwem
+        // Roberta (vlandia) do jego smierci; zakladane na starcie i pilnowane co dobe, gaszone przy smierci krola. Brak moda Diplomacy - bez paktow. Czytany co dobe.
+        public bool ProloguePacts = true;                  // in a Prologue 298 campaign every realm of Westeros but the Night's Watch and the Free Folk stands with King Robert's realm: the North, the Stormlands and the Riverlands as allies, the Vale, Dragonstone, the Reach, Dorne, the Iron Islands and Skagos by non-aggression pacts (Diplomacy). They hold until the King dies. Off = no pacts
 
         public static void Load(string moduleDataDir)
         {

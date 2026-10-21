@@ -67,14 +67,15 @@ namespace Armoury
         /// od tworzenia swiata (Hero.Deserialize, DeclareWarAction - Prologue.Kings/Peace). Latki opowiesci ROT - leniwie (InstallStory).</summary>
         internal static void ApplyAll(Harmony h)
         {
-            string a = "BRAK";
+            string a = "BRAK", c = "-";
             try
             {
                 var m = AccessTools.DeclaredMethod(typeof(MBGameManager), "StartNewGame", new[] { typeof(MBGameManager) });
                 if (m != null && h.Patch(m, prefix: new HarmonyMethod(typeof(Prologue), nameof(StartNewGamePrefix))) != null) a = "TAK";
             }
             catch (Exception e) { Stumble("ApplyAll.StartNewGame", e); }
-            Log.Info(Tag + "latki menu glownego: okno wyboru " + a
+            try { c = ApplyPeace(h); } catch (Exception e) { Stumble("ApplyAll.Peace", e); }
+            Log.Info(Tag + "latki menu glownego: okno wyboru " + a + " | pokoj i pakty: " + c
                      + " | klucz Prologue Enabled " + (S != null && S.PrologueEnabled ? "TAK" : "NIE") + ".");
         }
 
@@ -177,6 +178,7 @@ namespace Armoury
         {
             Active = false; ChosenBy = "";
             _stumblesDay = 0;
+            ResetPeace();
         }
 
         // ---------------------------------------------------------------- zapis
@@ -184,7 +186,7 @@ namespace Armoury
         internal static string Pack()
         {
             if (!Active) return "";
-            return "v=1;on=1;by=" + Clean(ChosenBy) + ";";
+            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace();
         }
 
         internal static void Unpack(string v)
@@ -202,6 +204,7 @@ namespace Armoury
             string on;
             Active = map.TryGetValue("on", out on) && on == "1";
             string by; ChosenBy = map.TryGetValue("by", out by) ? by : "zapis";
+            UnpackPeace(map);
             if (Active) OnPrologueCampaign("wczytany zapis");
         }
 
@@ -251,6 +254,69 @@ namespace Armoury
                      + " | klucz Prologue Enabled " + (S != null && S.PrologueEnabled ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
         }
 
+        /// <summary>Po rozstawieniu swiata nowej kampanii (OnNewGameCreatedPartialFollowUpEnd): pakty z krolestwem Roberta.</summary>
+        internal static void OnWorldReady()
+        {
+            if (!Active) return;
+            string p = EnsurePacts("start kampanii");
+            Log.Info(Tag + "swiat rozstawiony | pakty: " + p + ".");
+        }
+
+        private const int LogAfterStoryDays = 20;   // linia doby jeszcze tyle dni opowiesci (egzekucja Neda - dzien ~9 osi x4.33)
+
+        /// <summary>Doba kampanii z prologiem: pokoj i pakty (Peace), linia doby. Po starcie opowiesci - jeszcze LogAfterStoryDays dni linii, potem cisza.</summary>
+        internal static void Daily()
+        {
+            if (!Active) return;
+            double day = PrologueDay();
+            if (day > PrologueDays + LogAfterStoryDays) return;
+            bool before = BeforeStory();
+            string peace = DailyPeace();
+            Log.Info(Tag + "dzien " + ((int)day).ToString(Inv) + " prologu (" + (before ? "opowiesc za " + (PrologueDays - day).ToString("0.0", Inv) + " dni"
+                     : "opowiesc trwa, dzien opowiesci " + (day - PrologueDays).ToString("0.0", Inv)) + ") | " + peace
+                     + " | wydarzenia ROT ruszone " + RotEventsStarted() + " | potkniecia " + _stumblesDay + " (razem " + _stumbles + ").");
+            _stumblesDay = 0;
+        }
+
+        // wydarzenia ROT (odbiciem, jak CrashScribe Fabula): ROTEventBehavior._events, EventBase.TotalEvents / IsActive
+        private static System.Reflection.FieldInfo _fEvents;
+        private static System.Reflection.PropertyInfo _pTotal, _pIsActive;
+        private static Type _tEvBeh;
+
+        /// <summary>Ile wydarzen ROT juz ruszylo (TotalEvents > 0 albo trwa) i ktore - w prologu ma byc 0.</summary>
+        private static string RotEventsStarted()
+        {
+            try
+            {
+                if (_tEvBeh == null)
+                {
+                    _tEvBeh = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTEventBehavior");
+                    var tBase = AccessTools.TypeByName("ROT.Events.EventBase");
+                    if (_tEvBeh == null || tBase == null) return "- (brak ROT)";
+                    _fEvents = AccessTools.Field(_tEvBeh, "_events");
+                    _pTotal = AccessTools.Property(tBase, "TotalEvents");
+                    _pIsActive = AccessTools.Property(tBase, "IsActive");
+                }
+                if (_fEvents == null || _pTotal == null || _pIsActive == null) return "- (brak pol ROT)";
+                var mi = typeof(Campaign).GetMethod("GetCampaignBehavior");
+                var beh = mi != null ? mi.MakeGenericMethod(_tEvBeh).Invoke(Campaign.Current, null) : null;
+                var list = beh != null ? _fEvents.GetValue(beh) as System.Collections.IEnumerable : null;
+                if (list == null) return "- (brak listy ROT)";
+                int n = 0; var names = new System.Collections.Generic.List<string>();
+                foreach (var ev in list)
+                {
+                    if (ev == null) continue;
+                    int total = Convert.ToInt32(_pTotal.GetValue(ev, null));
+                    bool act = Convert.ToBoolean(_pIsActive.GetValue(ev, null));
+                    if (total <= 0 && !act) continue;
+                    n++;
+                    if (names.Count < 6) names.Add(ev.GetType().Name);
+                }
+                return n == 0 ? "0" : n + " (" + string.Join(", ", names.ToArray()) + ")";
+            }
+            catch (Exception e) { Stumble("RotEventsStarted", e); return "- (blad)"; }
+        }
+
         internal static void ResetDay() { _stumblesDay = 0; }
         internal static int StumblesDay { get { return _stumblesDay; } }
     }
@@ -260,7 +326,9 @@ namespace Armoury
     {
         public override void RegisterEvents()
         {
+            CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent.AddNonSerializedListener(this, OnNewGameCreatedEnd);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -269,6 +337,16 @@ namespace Armoury
             try { if (dataStore.IsSaving) v = Prologue.Pack(); } catch (Exception e) { Prologue.Stumble("Pack", e); v = ""; }
             SaveText.Sync(dataStore, "arm_prologue", ref v);
             if (dataStore.IsLoading) { try { Prologue.Unpack(v); } catch (Exception e) { Prologue.Stumble("Unpack", e); } }
+        }
+
+        private void OnNewGameCreatedEnd(CampaignGameStarter starter)
+        {
+            try { Prologue.OnWorldReady(); } catch (Exception e) { Prologue.Stumble("OnWorldReady", e); }
+        }
+
+        private void OnDaily()
+        {
+            try { Prologue.Daily(); } catch (Exception e) { Prologue.Stumble("Daily", e); }
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)

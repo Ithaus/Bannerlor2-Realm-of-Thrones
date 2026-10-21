@@ -8928,6 +8928,14 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Peace", HintText = "in a Prologue 298 campaign, until the story of Realm of Thrones begins no realm of Westeros declares war on another (the Night's Watch still fights the Free Folk, and Free Folk raids go on); wars you start yourself are not stopped. Off = the AI may declare wars in the prologue", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool ProloguePeace { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Pacts", HintText = "in a Prologue 298 campaign every realm of Westeros but the Night's Watch and the Free Folk stands with King Robert's realm: the North, the Stormlands and the Riverlands as allies, the Vale, Dragonstone, the Reach, Dorne, the Iron Islands and Skagos by non-aggression pacts (Diplomacy). They hold until the King dies. Off = no pacts", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool ProloguePacts { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11159,6 +11167,8 @@ namespace Armoury
             s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
             s.PrologueEnabled = PrologueEnabled;
+            s.ProloguePeace = ProloguePeace;
+            s.ProloguePacts = ProloguePacts;
         }
 
         internal static void Apply()

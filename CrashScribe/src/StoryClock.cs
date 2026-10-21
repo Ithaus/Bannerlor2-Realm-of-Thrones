@@ -39,6 +39,28 @@ namespace CrashScribe
             return m.CampaignStartTime;
         }
 
+        private static bool _allyTried;
+        private static MethodInfo _mPrologueAlly;
+
+        /// <summary>m101-prolog E1b: sojusz z prologu 298 (krol Robert + Polnoc / Krainy Burzy / Dorzecze, do smierci krola) - Armoury.Prologue.IsPrologueAlliance
+        /// odbiciem; brak Armoury albo metody - false (zasada kanonu jak dotad).</summary>
+        internal static bool PrologueAlliance(Kingdom a, Kingdom b)
+        {
+            try
+            {
+                if (!_allyTried)
+                {
+                    _allyTried = true;
+                    var t = HarmonyLib.AccessTools.TypeByName("Armoury.Prologue");
+                    _mPrologueAlly = t != null ? HarmonyLib.AccessTools.Method(t, "IsPrologueAlliance", new[] { typeof(Kingdom), typeof(Kingdom) }) : null;
+                }
+                if (_mPrologueAlly == null) return false;
+                object r = _mPrologueAlly.Invoke(null, new object[] { a, b });
+                return r is bool && (bool)r;
+            }
+            catch { return false; }
+        }
+
         /// <summary>Doby od startu opowiesci (ujemne w prologu).</summary>
         internal static double Days()
         {

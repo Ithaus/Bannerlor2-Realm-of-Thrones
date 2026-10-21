@@ -11,7 +11,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 |---|---|---|
 | E0 | wybor startu przy nowej kampanii, zapis wyboru, klucz MCM, flaga autotestu | ZROBIONE (build 0) |
 | E1a | kalendarz -188 dni, start opowiesci, latka odczytow CampaignStartTime w ROT.dll, Fabula/Inni CrashScribe | ZROBIONE (build Armoury 0, CrashScribe 0) |
-| E1b | pokoj w prologu (wojny Westeros-Westeros zablokowane), pakty i sojusze z krolestwem Roberta | do zrobienia |
+| E1b | pokoj w prologu (wojny Westeros-Westeros zablokowane), pakty i sojusze z krolestwem Roberta | ZROBIONE (build Armoury 0, CrashScribe 0) |
 | E2a | Robert i Ned zyja, glowy rodow i wladcy | do zrobienia |
 | E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | do zrobienia |
 | LOG | grupa tools/sprawdz_logi.py --grupa m101prolog | do zrobienia |
@@ -84,6 +84,23 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - Log: `Prolog (m101): latki opowiesci ROT (nowa kampania|wczytany zapis): wpiete N/M metod (miejsc odczytu X, podmienionych Y) w Z ms.`; w linii startu sesji:
   `start kalendarza Year 298, Day 177 | start opowiesci Year 299, Day 1 (dzien prologu D) | latki opowiesci ROT: ...`.
 
+### E1b - pokoj krola i pakty z krolestwem Roberta (ZROBIONE)
+- `Armoury/src/Prologue.Peace.cs` (nowy), klucze `ProloguePeace` i `ProloguePacts` (MCM, nowe, domyslnie TAK):
+  - POKOJ (do startu opowiesci): prefiks `DeclareWarAction.ApplyInternal` - wojna miedzy dwoma krolestwami Westeros (battania, vlandia, riverlands, dragonstone,
+    stormlands, empire_w, empire, sturgia, aserai, nightswatch, skagosi) nie wchodzi. Wolni Ludzie (freefolk) poza regula (Nocna Straz - Wolni Ludzie i najazdy jak
+    dotad). Poza regula tez krolestwo gracza i wojny `CausedByPlayerHostility / CausedByCrimeRatingChange / CausedByRebellion / CausedByKingdomCreation`.
+    Lapie wszystkie drogi (AI, decyzje krolestwa, BK, Diplomacy, wojny fabularne ROT, wezwania sojusznikow) - jedna brama gry.
+  - PAKTY: sojusz gry (`IAllianceCampaignBehavior.StartAlliance`, koniec przesuniety na dzien 187 prologu prywatnym `UpdateAllianceEndTime`) korona (vlandia) +
+    Polnoc, Krainy Burzy, Dorzecze; pakt o nieagresji Diplomacy (odbiciem, bez kosztow, bez pytania gracza) korona + Dolina, Smocza Skala, Reach, Dorne, Zelazne
+    Wyspy, Skagos. Zakladane po rozstawieniu swiata (`OnNewGameCreatedPartialFollowUpEnd`), pilnowane co dobe (wygasly / zerwany - od nowa). Wezwania do wojny
+    miedzy krolem i sojusznikami z prologu zablokowane w prologu (prefiks `AllianceCampaignBehavior.StartCallToWarAgreement`). `EndPacts` (wola E2b przy smierci
+    Roberta): nasze sojusze `EndAlliance`, nasze pakty `Expire()`; zapis pamieta, ktore sa nasze (pa=/pn=).
+  - Linia doby w prologu: `Prolog (m101): dzien N prologu (opowiesc za X dni) | pokoj krola TAK | wojny Westeros-Westeros (bez Wolnych Ludzi) 0 | zablokowane
+    wypowiedzenia dzis A (razem B) [...] | pakty: sojusze 3/3, pakty o nieagresji 6/6 | wydarzenia ROT ruszone 0 | potkniecia 0 (razem 0).` (po starcie opowiesci
+    jeszcze 20 dni linii).
+- `CrashScribe/src/CanonAlliances.cs`: `Allowed` przepuszcza sojusz z prologu (`StoryClock.PrologueAlliance` -> `Armoury.Prologue.IsPrologueAlliance` odbiciem) -
+  zrywanie przy wczytaniu i blokada propozycji AI nie ruszaja sojuszy krola w prologu.
+
 ## Ryzyko / co sprawdzic
 
 - E0: okno pokazuje sie w menu glownym (InformationManager.ShowInquiry na ekranie poczatkowym - tak jak okna gry o wyjsciu); wywolanie StartNewGame z przycisku okna
@@ -94,6 +111,10 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   (wydarzenie albo wojna ruszy za wczesnie). Metoda ROT wklejona przez JIT w wolajacego przed latka nie zobaczy podmiany - latka wchodzi przed pierwszym tickiem
   kampanii (ROT czyta start w tickach), a czytelnicy to duze metody i wywolania wirtualne/delegaty. ROTBattleAtmosphere `LoreGates.CampaignDay` (atmosfera bitew wedlug
   dnia) liczy dalej od kalendarza - w prologu zachowa sie jak po 188 dniach opowiesci (poza zakresem, do decyzji). AIInfluence (zaciemniony) - od kalendarza.
+- E1b: zablokowana decyzja wojny AI zuzywa wplyw rodu (decyzja przechodzi, akcja nie) - w prologu AI moze tracic wplyw na probach (licznik w linii doby).
+  Wojna zablokowana w samej akcji: postfiksow na ApplyInternal nie ma (grep BK/Diplomacy/BKROTPatch/nasze), zdarzenie OnWarDeclared nie leci. Prefiks ROT na tej samej
+  metodzie dalej dziala. Sojusz gry daje wspolne bitwy/armie AI jak kazdy sojusz; wezwania do wojny zablokowane tylko dla par z prologu. Krolestwo korony w wojnie z
+  ktoryms krolestwem - para pominieta (linia "pominiete"). Brak Diplomacy - same sojusze (3/3), linia "brak moda Diplomacy".
 - E1a regresja klasycznego startu: model czasu zwraca te sama wartosc co dotad (StoryStartTime = stary getter), latka ROT nie wpina sie; StoryClock w CrashScribe
   zwraca StoryStartTime = CampaignStartTime co do tika.
 
@@ -110,6 +131,8 @@ DO SPRAWDZENIA (nic nie wgrane; gra Jeffa i test 100 nietkniete).
 4. Zapisz, wczytaj: `start sesji | prolog TAK (okno wyboru)` (wybor z zapisu).
 5. (E1a) Prolog: na pasku mapy data "Year 298, Day 177"; w Armoury.log `latki opowiesci ROT (nowa kampania): wpiete N/N metod (miejsc odczytu 38 ...)`;
    w logu CrashScribe `FABULA: dzien -187 | ...` (ujemny = prolog) i zadnego `FABULA: wydarzenie ... WYSTARTOWALO` przed dniem 0.
+7. (E1b) Prolog: linia `swiat rozstawiony | pakty: sojusze 3/3, pakty o nieagresji 6/6`; na mapie (encyklopedia krolestwa korony / ekran Diplomacy) sojusze z
+   Polnoca, Krainami Burzy i Dorzeczem, pakty z reszta; w liniach doby `wojny Westeros-Westeros (bez Wolnych Ludzi) 0`; Nocna Straz w wojnie z Wolnymi Ludzmi.
 6. (E1a) Klasyczny: data "Year 299, Day 1", `latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie)`, Fabula jak dotad (`FABULA: dzien 0`).
 
 ## Dla Jeffa
