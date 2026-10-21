@@ -72,7 +72,16 @@ namespace Armoury
 
         private static string BarText(CampaignTime now, int minuteOfDay)
         {
-            return now.ToString() + " - " + (minuteOfDay / 60).ToString("00") + ":" + (minuteOfDay % 60).ToString("00");
+            string hm = (minuteOfDay / 60).ToString("00") + ":" + (minuteOfDay % 60).ToString("00");
+            var s = Settings.Current;
+            if (s != null && s.MapClockSeasonSecondLine && CalendarText.On)
+            {
+                // Jeff 21.10: "Year 298, Day 192, Summer" nie miescilo sie w ramce paska - pora roku i godzina w drugiej linii
+                string season = null;
+                try { season = CalendarText.SeasonName(now); } catch { season = null; }
+                return CalendarText.Date(now, false) + "\n" + (string.IsNullOrEmpty(season) ? hm : season + ", " + hm);
+            }
+            return now.ToString() + " - " + hm;
         }
 
         /// <summary>

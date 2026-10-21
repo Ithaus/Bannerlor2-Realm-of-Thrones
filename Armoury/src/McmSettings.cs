@@ -4804,6 +4804,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int CampBackground { get; set; } = 1;
 
+        [SettingPropertyBool("Map Clock Season Second Line", HintText = "Jeff 21.10: the season and the hour on a second line under the date on the map bar ('Year 299, Day 256' / 'Autumn, 14:30'), so the text stays inside its frame", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool MapClockSeasonSecondLine { get; set; } = true;
+
         [SettingPropertyBool("Map Clock Enabled", HintText = "the hour of the day next to the date on the map bar ('Year 299, Day 256, Autumn - 14:30')", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool MapClockEnabled { get; set; } = true;
@@ -10304,6 +10308,7 @@ namespace Armoury
             s.NightRestEnabled = NightRestEnabled;
             s.NightRestEveryModel = NightRestEveryModel;
             s.CampBackground = CampBackground;
+            s.MapClockSeasonSecondLine = MapClockSeasonSecondLine;
             s.MapClockEnabled = MapClockEnabled;
             s.ReadableDateEnabled = ReadableDateEnabled;
             s.FastForwardMultiplier = FastForwardMultiplier;
