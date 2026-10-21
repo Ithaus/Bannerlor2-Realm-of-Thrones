@@ -1,0 +1,70 @@
+##### sen-noc-menu
+VERDICT: Na styku sen / noc / menu / czas scalenie jest w zasadzie spojne. Znalazlem jeden wazny blad i jedna drobna niespojnosc, oba w ponizszej liscie; dowody pochodza z czytania kodu, gry nie uruchamialem.
+
+Sprawdzone, bez zastrzezen:
+- **Build:** Armoury z HEAD 8e93796e w worktree n26-recenzja-tmp konczy sie kodem 0, 0 bledow, 6 dawnych ostrzezen.
+- **Klucze MCM:** gen_mcm.py daje McmSettings.cs bajt w bajt, zgodnie z Settings.cs. Nie ma dubli nazw kluczy. Powtorzone grupy (Army purchases, Iron Bank, The law of the battlefield) byly juz w n25. Nowe grupy "Battle reinforcements" i "Camp and baggage (night 20/21.10)" z nikim nie koliduja.
+- **Reczny konflikt TownInns.Road.cs:** rozwiazany poprawnie. `RoadHeroPays` dostaje `PayNotes.Quiet(false)` dla karczmy, zajazdu i wioski. Przy wlaczonym kluczu wioska daje jeden komunikat (`PayNotes.Paid`), przy wylaczonym komunikat gry plus `Log.Player` jak dotad. Nic z n25 ani z m97 nie zginelo.
+- **Nocleg w wiosce pobocznej:** `HostSleep`, `RoadCommit` i `BeginInnSleep` (wolane ze zwyklego menu) korzystaja z nowych `MenuNight`, `LedgerNight` i `PlayerDawn`. Obejmuje to `HoldAbed` (pobudka o 3:00), `PredictWake` i premie do zmierzchu. W kodzie m97-wioski nie ma zaszytych godzin 21-5 ani 6:00.
+- **Oboz przy wiosce:** "Make camp here" robi `RoadsideInnStay.Leave` i `ExitToLast`, a potem tick wola `MakeCampNow`, wiec otwiera sie `arm_camp_wait`. "Train the men" i "Walk through the camp" dzialaja tam bez kolizji.
+- **SwitchToMenu:** w nowych menu o
+--- [wazne] real=True Armoury/src/NightRest.cs
+PROBLEM: NightRest (ksiega snu gracza, godzina obozu) nie rozpoznaje rabunku wioski pobocznej z m97-wioski jako zajecia. Pytanie "Night Falls" i rozkaz "always make camp" przerywaja wiec rabunek: OwnCamp -> ActivateGameMenu, a przy otwartym menu to jest SwitchToMenu. Gdy partia w ostatniej godzinie stala, w trakcie rabunku stawia sie namiot i pada komunikat obozu. Rabunek gry jest od tego wolny, bo ma MapEvent. Nasz RaidMenu to samo menu oczekiwania bez MapEvent, a zaden warunek NightRest go nie wylacza. m97-oboz przesunal poczatek obozu z 0:00 na 21:00, wiec trafia to wieczorne rabunki tuz po dojezdzie.
+FIX: W NightRest.OnHourly dopisac warunek && !SideVillageVisit.RaidActive w obu blokach: namiot automatyczny (l. 206) i pytanie albo oboz z rozkazu (l. 260). Najlepiej tez przy marchField (l. 293), zeby nie bylo ostrzezenia o nocnym marszu. Ogolniej: ksiega gracza powinna pomijac godzine, w ktorej otwarte jest obce menu oczekiwania poza obozem i snem (Campaign.Current.CurrentMenuContext z GameMenu.IsWaitMenu). Ten sam warunek ochroni kolejne menu oczekiwania na mapie.
+VER: REKTA SCENARIUSZA:
+(a) "Kara relacji juz naliczona" w praktyce nie zachodzi. Pytanie wymaga ruchu od poprzedniego tiku, wiec rabunek trwa wtedy krocej niz godzine. Pend < 1, nie bylo jeszcze uderzenia, Hit = 0, a FinishRaid nalicza relacje dopiero przy Hit > 0.5. Nie ma tez lupu ani drugiej kary za ponowny rabunek. Strata to przerwany rozkaz, wymuszony oboz, dezorganizacja i blokada okupu.
+(b) W domyslnym trybie ask gracz moze odmowic ("March on" albo "Later"), wiec samo przerwanie dzieje sie tylko po "Make camp" albo przy stalym rozkazie "always". Waga: blizej drobnego i waznego niz wazne. Nie grozi wywrotka gry ani utrata zapisu.
+
+Blad nie pochodzi ze scalenia tekstu, tylko z zachowania na styku: nowe menu oczekiwania z m97-wioski nie ma MapEvent ani spotkania, a NightRest stoi bez bramki menu. Przy starym obozie od 0:00 bylby tak samo, tylko rzadziej. m97-oboz przesunal go na wieczor.
+VERFIX: W NightRest.OnHourly (Armoury/src/NightRest.cs) wyliczyc raz `bool raidNow = SideVillageVisit.RaidActive;` (wlasciwosc internal static, Raid.cs:70) i dopisac `&& !raidNow` do czterech warunkow:
+- namiot automatyczny (l.206),
+- blok pominiecia ZB-6 (l.248, zeby nie odhaczal nocy),
+- pytanie albo oboz z rozkazu (l.260),
+- marchField (l.293); bez tego po zablokowaniu pytania wyskoczyloby ostrzezenie "Your column marches on through the night" w srodku rabunku.
+
+Noc nie zostaje odhaczona (_promptNight bez zmian), wiec pytanie padnie w pierwszej godzinie obozu z ruchem po rabunku. Opcjonalnie, szerzej: pomijac pytanie i namiot, gdy Campaign.Current.CurrentMenuContext?.GameMenu?.IsWaitMenu == true, a menu nie jest naszym menu snu ani obozu. To ochroni tez przyszle menu oczekiwania na mapie.
+--- [drobne] Armoury/src/SideVillageVisit.Raid.cs: m97-wioski wyszla z bazy 25f24c17, sprzed m96-wies (PayNotes / PlayerPaymentReasons). Nowe miejsce platnosci gracza, okup wioski pobocznej, robi przelew z komunikatem gry. Dlatego przy wlaczonym kluczu sa dwa komunikaty: goly "You received N" gry i nasz "X paid you N denars of tribute". Okup wsi glownej (RaidTribute) daje juz jeden komunikat z powodem. Do tego w recznie rozwiazanym konflikcie Town
+##### ekonomia-wojsko
+VERDICT: Recenzja scalenia n26-calosc (HEAD 8e93796e), soczewka: ekonomia, ludzie i wojsko. Nie znalazłem nic krytycznego (CTD, utrata zapisu). Są dwa ważne problemy, oba dotyczą bitwy z obrońcami wioski pobocznej.
+
+**Co sprawdziłem i jest w porządku:**
+- **Scalenie bez strat.** Każda linia dodana w czterech gałęziach (pliki .cs, .xml, .py) jest w HEAD. Jedyne różnice to ręcznie rozwiązany komunikat noclegu w TownInns.Road.cs, rozwiązany poprawnie: wioska dostaje PayNotes albo Log.Player, karczma dostaje InnNote.
+- **sprawdz_logi.py.** Grupy m97surowce, m97posilki, m97szkolenie, m97wioski i m97obroncy uruchomione przez `python -I` na Armoury-2026-10-20_17-49-10.log: każda kończy się kodem 0 i daje INFO "log sprzed paczki". Grupa etap4 daje "E4/8 N6 KONTROLA = 0.00 (120 dób) TAK". Regex N6 przetestowałem na linii nowej (z "+ ob") i starej (bez "ob"): oba warianty działają. Grupy m97oboz nie ma, ale gałąź m97-oboz nigdy jej nie dodała, więc to nie strata przy scaleniu.
+- **Szkolenie a obrońcy.** Drill (Hourly, Shape i tick gracza) bierze tylko IsLordParty. Drużyna obrońców ma CustomPartyComponent, więc nie dostaje XP i nie trafia do liczników musztry ani do linii CampDrill. Bazowe XP gry dla partii, która nie jest partią lorda, też wynosi 0.
+- **KONTROLA E4/8 (ob).** TakeLevyHere idzie przez FromVillage i Move z przyczyną MLevyMilitia. Ta sama liczba trafia do D.ob, a D jest zerowane razem z dobą, więc bilans się zamyka.
+- **Wóz (MarchPace) a DrMarchArrival.** CampCart.Speed dotyczy tyl
+--- [wazne] real=True Armoury/src/DrMarchArrival.cs
+PROBLEM: Posiłki DR mogą dołączyć do bitwy z obrońcami wioski pobocznej. Przychodzą: załoga i milicja pobliskiej twierdzy (zamku lub miasta) oraz partie lordów i armie frakcji pana okręgu z odległości do DrMaxMarchHours (2 h marszu). Kłóci się to z założeniem m97-wioski, że bronią tylko mieszkańcy tej wioski (O1, poprawka Jeffa). Kłóci się też z regułą poddania 4:1 i tekstem menu, które liczą wyłącznie wieśniaków. Rabunek wioski jest tu bitwą w polu (FieldBattle), więc ustawienie Jeffa AllowRaids=false, które zdejmuje posiłki z rabunku wsi gry, tej bitwy nie obejmuje. Ani DrMarchArrival, ani SideVillageVisit nie rozpoznaje tej bitwy (FightActive i DefOn nie są czytane poza Defenders.cs).
+FIX: W DrMarchArrival.EvalPrefix (latka i tak siedzi na Evaluate(list, MapEvent)) dodać sprawdzenie, czy w __1.InvolvedParties jest drużyna obrońców (np. SideVillageVisit.IsDefendersEvent(MapEvent) porównujące StringId z _fight.PartyId). Jeśli tak, zdjąć z listy kandydatów strony obrońców, albo wszystkich, tak jak DR robi przy AllowRaids=false, i zapisać to w linii bitwy. Sprawdzenie musi działać także przy DrArrivalByMarch NIE, bo dziś EvalPrefix wtedy od razu wychodzi. Inna droga: czytać AllowRaids z DRConfig.Current i traktować tę bitwę jak rabunek.
+VER: . 30 + 1.96 x 120 = 265 s. Lordowie wroga są w promieniu ok. 5 jedn., co na wojnie zdarza się zwykle.
+Skutek: menu i dymek (Defenders.cs:216-231) zapowiadają tylko N wieśniaków, a reguła 4:1 (233) liczy tylko ich. Mimo to w bitwie dochodzą załoga, milicja i lordowie. Straty załogi i milicji schodzą z twierdzy (DR CollectCasualties i PendingCasualties). Ta sama rzecz przy rabunku wsi gry (Raid) daje zero posiłków.
+Księgowość wioski się nie psuje. Agenci milicji DR mają PartyAgentOrigin(Settlement.Party), a załoga wchodzi osobnym MapEventParty. Skład drużyny wieśniaków i FinishFight liczą więc dalej tylko swoich. Waga: ważne (zasada i balans), nie krytyczne.
+Uwaga o miejscu przyczyny: źródłem jest bitwa z m97-wioski w zderzeniu z DR. Przed m97-posiłki efekt byłby większy (każdy w promieniu 50 jedn., najpóźniej po 60 s). DrMarchArrival tylko go zawęża, ale jest naturalnym miejscem poprawki.
+VERFIX: Najprościej i zgodnie z AllowRaids: dodać w DrMarchArrival.Hook dodatkową łatkę, postfix na DynamicReinforcements.Battle.MissionUtils.IsRealBattleMission(Mission). Działa ona niezależnie od klucza DrArrivalByMarch. Gdy __result == true i SideVillageVisit.IsDefendersEvent(MapEvent.PlayerMapEvent), ustawić __result = false. Wtedy BattleStateBehavior w ogóle nie powstaje, tak samo jak przy rabunku wsi gry. Warunek można uzależnić od DRConfig.Current.AllowRaids czytanego refleksją: false oznacza bez posiłków, true oznacza DR jak w zwykłej bitwie.
+W SideVillageVisit dodać `internal static bool IsDefendersEvent(MapEvent me)`: zwraca true, gdy `_fight != null && _fight.Party != null && me != null` i w `me.InvolvedParties` jest `ReferenceEquals(p, _fight.Party.Party)`. Tak samo sprawdza to dziś OnMapEventEnded w Defenders.cs:395.
+Dopisać linię logu, np. "posiłki DR wyłączone: bitwa z obrońcami w
+--- [wazne] real=True Armoury/src/SideVillageVisit.Defenders.cs
+PROBLEM: Gdy gracz przegra z obrońcami (albo ucieknie ze spotkania), gra oddaje drużynie obrońców jego łup. Zwykli jeńcy gracza (np. bandyci) trafiają do MemberRoster drużyny jako uwolnieni. Około połowy towarów gracza trafia do jej ItemRoster, a CampCart.OnTaken dokłada tam 3 drewna za każdy wóz. Disband liczy wtedy 'left' jako cały skład, razem z ex-jeńcami, i odsyła ich do DOM okręgu jako wracającą milicję (MBackMilitia). FinishFight liczy straty jako Def - left - routed, więc przy left >= Def straty wychodzą 0: wioska nie dostaje pamięci poległych ani braku rąk, choć jej ludzie zginęli. Tabor drużyny ginie bez odbiorcy przy DestroyPartyAction: towary, konie, surowce rzadkie z sakw i drewno wozów przepadają. To łamie zasadę "nic w nicość". Błąd leży głównie w kodzie m97-wioski, ale jego skutki dotykają drewna wozów (m97-oboz) i surowców z sakw (m97-surowce).
+FIX: W Disband (albo w FinishFight przed nim) liczyć 'left' najwyżej do f.Def. Zwykłych członków ponad obrońców (ex-jeńców gracza) potraktować osobno: wypuścić ich albo oddać zgodnie z ich własnym pochodzeniem, nie przez ArriveAt MBackMilitia do DOM okręgu. Najlepiej zapamiętać skład obrońców przy StartFight i odejmować od niego. Przed DestroyPartyAction przenieść ItemRoster drużyny do magazynu wsi okręgu (st.ItemRoster) w ramce GoodsLedger, bo to wioska zabrała łup. Zwłaszcza dotyczy to drewna z CampCart.OnTaken i surowców rzadkich.
+VER: 0, lost = 0, AddFallen(0) i bez AddLack.
+   - Wioska nie traci obrońców w pamięci poległych ani w braku rąk.
+   - Log pokaże „wrocilo do domow 30” przy 15 obrońcach. sprawdz_logi.py:54099 (back > d) da wtedy NIE w OB-3.
+   - Nawet 1 jeniec zaniża straty o 1.
+6) FightGuard (:427-431) czeka do końca niewoli, a potem woła FinishFight, więc ta ścieżka na pewno przebiegnie.
+
+Scenariusz jest osiągalny: bitwa zaczyna się już przy mniej niż 4:1, np. gracz z 10 ludźmi i jeńcami przeciw 15-30 obrońcom.
+
+Changelog m97-wioski (pkt 5 i Ryzyko) mówi tylko o jeńcach w lochu drużyny, a o łupie gracza w jej składzie i taborze nie ma ani słowa.
+
+Błąd leży w kodzie m97-wioski. Na styk gałęzi wychodzi przez drewno z m97-oboz (CampCart.OnTaken) i towary rzadkie z m97-surowce, które giną razem z drużyną. Waga „ważne” jest słuszna: nie ma CTD ani utraty zapisu, ale jest wyciek towarów i zaniżone straty wioski.
+VERFIX: 1) W OnMapEventEnded zapamiętać f.Dead i f.Routed (już jest). W FinishFight przy f.Won != 1 liczyć tak:
+   - ocalali obrońcy = max(0, f.Def - f.Dead - routed),
+   - lost = f.Def - ocalali - routed (wygrana obrońców, więc gracz nikogo nie pojmał),
+   - nadwyżka = max(0, TotalManCount - ocalali): to ex-jeńcy gracza.
+   Przy f.Won == 1 zostaje obecny wzór, z left obciętym do f.Def.
+2) W Disband z Take/ArriveAt(MBackMilitia) przepuszczać tylko ocalałych obrońców (najwyżej f.Def - Dead - routed). Ex-jeńców potraktować osobno, np. jako uwolnionych:
+   - Take(r, nadwyżka, FLooted lub FTransfer),
+   - HomeOrNote(..., MBackFreed), dla bandytów pula OutlawLaw.
+   Nie przepuszczać ich przez MBackMilitia.
+3) Przed DestroyPartyAction przenieść p.ItemRoster drużyny do magazynu wsi okręgu (Settlement.Find(f.Dist).ItemRoster) w ramce GoodsLedger, jak łup wioski.
+   - Dotyczy to też drewna z CampCart.OnT
