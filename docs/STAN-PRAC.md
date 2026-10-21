@@ -3491,4 +3491,5 @@ Zapisy Jeffa (Ironman*.sav, saveauto*) skopiowane do D:/Backup-Bannerlord/zapisy
   kg + ladunki + przetop ze stratami), m96-jakosc2 wf_f0791615-a57 (limit na rodzaj L 1-6 / MW 6-60), m97-wioski wf_a63458ba-100 (wioski poboczne jak wsie). n25-calosc 25f24c17
   (Ravens Teeth/Goldenheart/luk olbrzymow do wykucia). Po skonczeniu m96-*: scalenie do n25, testy, WGRANIE 96. Potem oboz etap 1, surowce czardrzewo/smocza kosc,
   tablica ogloszen i plotki, optymalizacja. Limity 17:35: tydzien 80%, 5 h 68% (reset 17:10->18:10?).
+- 18:00 PDT m96-wzory2 44e724df SCALONE do n25 (naprawa zapisu #m96seedfix2: lowland_yew_bow t5 zdjety, +3 pkt; drabina tierow PatternDrawOneTierUp - nowy wzor najwyzej 1 tier ponad najlepszy znany). Przed pierwszym wczytaniem kampanii Jeffa na 96 - kopia Ironman (jest: D:/Backup-Bannerlord/zapisy-jeffa/2026-10-20-wieczor).
 

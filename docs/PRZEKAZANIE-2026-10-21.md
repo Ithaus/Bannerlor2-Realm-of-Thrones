@@ -45,3 +45,5 @@ Test: CrashScribe-at = zb/n22-at + git merge n25 HEAD, build CrashScribe; katalo
 
 ## Dopisek 17:45
 - Obroncy wiosek pobocznych (Jeff): krok 2 po m97-wioski - obroncy z milicji wsi glownej, napad = bitwa z tymczasowym oddzialem, polegli z milicji, bez stalych partii.
+- 18:00 PDT m96-wzory2 44e724df SCALONE do n25 (naprawa zapisu #m96seedfix2: lowland_yew_bow t5 zdjety, +3 pkt; drabina tierow PatternDrawOneTierUp - nowy wzor najwyzej 1 tier ponad najlepszy znany). Przed pierwszym wczytaniem kampanii Jeffa na 96 - kopia Ironman (jest: D:/Backup-Bannerlord/zapisy-jeffa/2026-10-20-wieczor).
+
