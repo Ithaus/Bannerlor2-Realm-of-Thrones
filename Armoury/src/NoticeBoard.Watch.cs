@@ -588,14 +588,18 @@ namespace Armoury
                 foreach (var kv in _harm) { kv.Value.RemoveAll(h => h.Day < day - HarmDays); if (kv.Value.Count == 0) drop.Add(kv.Key); }
                 foreach (var k in drop) _harm.Remove(k);
             }
-            // 1) zdjecie listow
+            // 1) zdjecie listow (po wczytaniu bandy po id jednym przebiegiem - bez szukania w calej liscie partii dla kazdego listu)
+            Dictionary<string, MobileParty> byId = null;
+            foreach (var n in _notices) if (n.Mp == null) { byId = new Dictionary<string, MobileParty>(StringComparer.Ordinal); break; }
+            if (byId != null)
+                foreach (var mp in MobileParty.All) if (mp != null && !string.IsNullOrEmpty(mp.StringId)) byId[mp.StringId] = mp;
             for (int i = _notices.Count - 1; i >= 0; i--)
             {
                 var n = _notices[i];
                 try
                 {
                     if (n.St == null) n.St = Settlement.Find(n.Town);
-                    if (n.Mp == null) n.Mp = FindParty(n.Band);
+                    if (n.Mp == null && byId != null) { MobileParty f; if (byId.TryGetValue(n.Band ?? "", out f)) n.Mp = f; }
                     if (n.Mp != null && string.IsNullOrEmpty(n.Name)) n.Name = BandNameOf(n.Mp);
                     if (n.St == null || n.St.Town == null || n.Mp == null || !n.Mp.IsActive) { _notices.RemoveAt(i); _wDropGone++; continue; }
                     if (day > n.Due) { _notices.RemoveAt(i); _wDropDue++; continue; }

@@ -37580,6 +37580,8 @@ M102_PAY = re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:p
 M102_POST = re.compile(r"list - (\S+) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik (kasa|pan \S+), wolna kasa (-?\d+)")
 M102_POSTH = re.compile(r"list soltysa - (\S+) \((\S+)\) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik wies, wolna kiesa (-?\d+)")
 M102_KASY = re.compile(r"Kasy miast \(169c\): dzien (\d+) \| miast \d+: kasy (\d+)")
+M102_FOLK = re.compile(r"lud za towar \(E5/B1\) \+(\d+)")
+M102_GIVE = re.compile(r"przelewy gry \(GiveGoldAction\) [+-]?\d+ \[P\] \(([^)]*)\)")
 
 
 def m102tablica_main(logp):
@@ -37588,7 +37590,7 @@ def m102tablica_main(logp):
     T-4 nagroda nieczytelna 0 (doba i proba), T-5 tekst z tokenami <= 2% tekstow, T-6 koszt otwarcia sr. <= 5 ms, T-7 proba (INFO);
     L-1 linia "wpiete" (zdarzenia 3/3, dialog 7/7), L-2 linia doby listow w kazdej dobie, L-3 kazda wyplata: obiecane = kasa + pan + niedoplata, z niczego 0,
     L-4 kasa po wyplacie >= Keep (i licznik doby 0), L-5 "inne" 0 od d2, L-6 od d7 co najmniej 1 list czynny przy bandach (bez band INFO), L-7 wyplaty lordom w oknie
-    <= 1% sredniej sumy kas miast (linia "Kasy miast (169c)"; bez niej INFO), L-8 zapis arm_board <= 16 KB, L-9 koszt doby listow <= 3 ms, L-10 wyplata tylko za bande
+    <= 1% wplywow kas miast (linia "Przeplywy osad (kasy miast)": lud za towar + przelewy gry do kas; bez niej INFO), L-8 zapis arm_board <= 16 KB, L-9 koszt doby listow <= 3 ms, L-10 wyplata tylko za bande
     z listem wywieszonym w logu (przy logu od startu kampanii) i tylko dla gracza albo lorda. Log bez paczki: INFO."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -37596,13 +37598,23 @@ def m102tablica_main(logp):
         rep.show()
         return 0
     wired, wiredw, tdays, ldays, pays, posts, kasy, n_err = [], [], [], [], [], [], [], 0
-    hposts = []
+    hposts, inflows = [], []
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
             if s.startswith("ERROR in NoticeBoard"):
                 n_err += 1
+                continue
+            if s.startswith("Przeplywy osad (kasy miast): dzien"):
+                inflow = 0
+                mf = M102_FOLK.search(s)
+                if mf:
+                    inflow += int(mf.group(1))
+                mg = M102_GIVE.search(s)
+                if mg:
+                    inflow += sum(int(x) for x in re.findall(r"\+(\d+)/", mg.group(1)))
+                inflows.append(inflow)
                 continue
             if s.startswith("Kasy miast (169c)"):
                 mk = M102_KASY.match(s)
@@ -37681,9 +37693,10 @@ def m102tablica_main(logp):
     empty = [d for d in late if int(d.group(8)) == 0]
     rep.add("L-6: od d7 co najmniej 1 list czynny (przy bandach)", f"dob od d7 z bandami {len(late)}, bez listu {len(empty)}", ">= 1 w kazdej", (len(empty) == 0) if late else None)
     lords = sum(int(d.group(14)) for d in ldays)
+    infl = sum(inflows)
     avg = (sum(kasy) / len(kasy)) if kasy else 0
-    rep.add("L-7: wyplaty lordom w oknie <= 1% sredniej sumy kas miast", f"lordom {lords} zl, srednia kas miast {avg:.0f} zl ({(100.0 * lords / avg if avg else 0):.3f}%)", "<= 1% (inaczej domyslne WatchBountyAiLords = false)",
-            (lords <= 0.01 * avg) if avg else None)
+    rep.add("L-7: wyplaty lordom w oknie <= 1% wplywow kas miast", f"lordom {lords} zl, wplywy kas miast w oknie {infl} zl ({(100.0 * lords / infl if infl else 0):.3f}%; lud za towar + przelewy gry do kas,"
+            f" linii {len(inflows)}; srednia kas {avg:.0f})", "<= 1% (inaczej domyslne WatchBountyAiLords = false)", (lords <= 0.01 * infl) if infl else None)
     big = max([int(d.group(20)) for d in ldays] + [0])
     rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
     cost = max([float(d.group(21)) for d in ldays] + [0.0])
