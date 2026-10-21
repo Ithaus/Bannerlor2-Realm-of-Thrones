@@ -32,6 +32,12 @@ namespace Armoury
         internal static bool SwPaidFirst { get { var s = S3; return s == null || s.KsVillagePaidFirst; } }
         // m103 wsie (21.10): drabina 1 wsi przy cenach polki z budzetu z biezacego wplywu (TownFolk.ShelfBudget) - tylko przy SwPaidFirst (drabina 1 istnieje)
         internal static bool SwBasketAtShelf { get { var s = S3; return s == null || s.KsVillageBasketAtShelf; } }
+        // m105 gosp4 (21.10, czesc 4): klucze drabiny 1 wsi przy budzecie z wplywu - dzialaja tylko z budzetem W1 (TownFolk.ZcBuy.CapOn)
+        internal static bool SwCheapKcalFirst { get { var s = S3; return s == null || s.KsVillageCheapKcalFirst; } }
+        internal static bool SwGrainSpike { get { var s = S3; return s == null || s.KsVillageGrainSpikeFromSurplus; } }
+        internal static bool SwOwnGrainFirst { get { var s = S3; return s == null || s.KsVillageOwnGrainFirst; } }
+        internal static bool SwChestRefill { get { var s = S3; return s == null || s.KsVillageChestRefill; } }
+        internal static bool M105AnyOn { get { return SwCheapKcalFirst || SwGrainSpike || SwOwnGrainFirst || SwChestRefill; } }
         internal static bool SwOwnFirst { get { var s = S3; return s == null || s.KsOwnFoodFirst; } }
         internal static bool SwPerishReach { get { var s = S3; return s == null || s.KsPerishReach; } }
         internal static bool SwRealOfftake { get { var s = S3; return s == null || s.KsRealOfftake; } }
