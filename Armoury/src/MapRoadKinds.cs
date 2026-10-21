@@ -374,7 +374,9 @@ namespace Armoury
                                   .Append(", maks ").Append((100.0 * mx).ToString("0.00", Inv)).Append("), z wpisem '").Append(txt).Append("' ").Append(lines);
                     sb.Append(", oczekiwane ").Append(want == 4 ? (100f * MapRoads.ValPctNow(s)).ToString("0.0", Inv) : (100f * MapRoads.CarPctNow(s)).ToString("0.0", Inv)).Append('%');
                     // m103 P1 (VR-3): dopisek za "oczekiwane" (regex VR-1/VR-3 bez zmian; srednia wyzej dalej ze wszystkich probek - narzedzie odejmuje probki z podlogi)
-                    if (low > 0) sb.Append(", ponizej 5% lub na podlodze: ").Append(low)   // m103 recenzja: na podlodze = wszystkie probki z podlogi (takze z premia >= 5%).Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")
+                    // m103 recenzja: na podlodze = wszystkie probki z podlogi (takze z premia >= 5%)
+                    // scalenie n31: komentarz stal w srodku wyrazenia i wylaczal ".Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")" - regex M103_VALYRIA_LOW nie trafial
+                    if (low > 0) sb.Append(", ponizej 5% lub na podlodze: ").Append(low).Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")
                                    .Append(lowFloor > 0 ? (100.0 * sumFloor / lowFloor).ToString("0.00", Inv) : "0.00").Append("%; sufit kolumny ").Append(lowCap)
                                    .Append("; inne ").Append(lowOther).Append(") [").Append(ex != null ? ex.ToString() : "").Append(']');
                 }
