@@ -5914,7 +5914,7 @@ namespace Armoury
 
         [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Estimated from the 180-day test of 20.10: AI lords march most of their days, so their men would learn roughly 15 to 50 percent less (about a third in the middle) - slower promotions and less demand for better gear; the daily log line measures it exactly either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
-        public bool DrillCampOnlyAi { get; set; } = false;
+        public bool DrillCampOnlyAi { get; set; } = true;
 
         [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]

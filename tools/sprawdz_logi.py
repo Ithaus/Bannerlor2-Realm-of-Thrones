@@ -36693,7 +36693,7 @@ def m97szkolenie_main(logp):
         rep.add("SZ-5: AI XP zasada obozu wobec dawnej reguly (decyzja: Drill Camp Only Ai)",
                 f"XP po broni razem dawna {old} -> obozu {camp} (x{ratio:.2f}, {'spadek' if ratio < 1 else 'wzrost'} {abs(1 - ratio) * 100:.0f}%); godzin postoju za dnia srednio {sum(hours) / len(hours):.2f};"
                 f" partio-doby 0 h {h0} ({100 * h0 / max(1, pd):.0f}%), 8 h {h8} ({100 * h8 / max(1, pd):.0f}%)",
-                "INFO (powyzej ok. 30% spadku - Jeff decyduje o kluczu)", None)
+                "INFO (klucz domyslnie TAK od m103-drobne, u Jeffa TAK; powyzej ok. 30% spadku - do oceny)", None)
         st_last = int(ais[-1][21])
         rep.add("SZ-6: potkniecia CampDrill (ostatnia linia AI)", str(st_last), "0", st_last == 0)
     else:

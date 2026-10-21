@@ -8,7 +8,8 @@ build kod 0, gen_mcm po kazdej zmianie Settings.cs) | **Status calosci:** DO SPR
 | 1 | Rabunek druzyny gracza liczy sie w ksiedze snu jak praca (nie odpoczynek) | `RaidCountsAsWork` (TAK) | `3360ba69` | zbudowane |
 | 2 | Rzad markietanow: odziez dla druzyny gracza z polki miasta (z kiesy gracza) i praczki (zuzycie odziezy -25% przez 7 dob) | `SutlerRowClothing`, `SutlerLaundry` (TAK), `SutlerLaundryCutPercent` 25, `SutlerLaundryDays` 7, `SutlerLaundryMenPerWasher` 20 | `e31227d0` | zbudowane |
 | 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | `ea848ab0` | zbudowane, test w obie strony OK |
-| 4 | KP-1 (m98plotki) liczy bledy zapisu kufli `ERROR in SyncData.arm_drink` (i arm_rumours), KP-1b z logu CrashScribe | - (narzedzie) | (krok 4) | sprawdzone na logach 101 |
+| 4 | KP-1 (m98plotki) liczy bledy zapisu kufli `ERROR in SyncData.arm_drink` (i arm_rumours), KP-1b z logu CrashScribe | - (narzedzie) | `4c9bb421` | sprawdzone na logach 101 |
+| 5 | `DrillCampOnlyAi` domyslnie TAK (u Jeffa juz true) | `DrillCampOnlyAi` (TAK) | (krok 5) | zbudowane |
 
 ---
 
@@ -216,3 +217,25 @@ i blok CrashScribe ze stosem `Armoury.InnDrink.Import`): KP-1 NIE (2, w tym Sync
 **Ryzyko:** brak (narzedzie). Wzorzec `SyncData.arm_rumours` to szersze niz samo m98 (ksiega plotek z sw-zajazdy) - to ta sama klasa Rumours, ktorej bledy KP-1 juz liczyl.
 
 **Status:** GOTOWE (narzedzie, sprawdzone na logach 101 i na sztucznym logu).
+
+---
+
+### Krok 5. DrillCampOnlyAi domyslnie TAK
+
+**Po ludzku (dla Jeffa):** u Ciebie nic sie nie zmienia - masz to juz wlaczone w MCM. Zmienia sie tylko wartosc domyslna w kodzie, zeby po resecie ustawien
+albo na nowej instalacji lordowie AI tez cwiczyli tylko na postoju za dnia (tak jak w Twojej grze).
+
+**Problem:** kolejka Jeffa pkt 7: `DrillCampOnlyAi` w `Settings.cs` mial domyslnie `false`, a u Jeffa w `Armoury.json` jest `"DrillCampOnlyAi": true`
+(sprawdzone w `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json`; `DrillLawAi` tez true).
+
+**Zmiana:** `Settings.cs`: `public bool DrillCampOnlyAi = true;` (z komentarzem), `python tools/gen_mcm.py` -> `McmSettings.cs` `= true` (jedyna zmiana w pliku MCM).
+sprawdz_logi `m97szkolenie` SZ-5 - tekst progu INFO (klucz domyslnie TAK od m103).
+
+**Kontrola calosci (co zaklada domyslne NIE):** grep calego repo (`*.cs`, `*.py`, `*.ps1`, `*.json`, `*.xml`): klucz czytaja tylko `CampDrill.RuleFor` (`s.DrillCampOnlyAi && s.DrillLawAi`)
+i linia startu CampDrill; `Drill.cs:671` - komentarz pomiaru (mierzy obie reguly niezaleznie od klucza). `Armoury/ModuleData/Armoury.settings.xml` klucza nie ma (start procesu - domyslne z kodu).
+Progi `m97szkolenie`: SZ-4 sprawdza tylko doby z "zasada AI TAK" (bez zalozenia o domyslnej), SZ-5 to INFO. Log biegu 101 (klucz true u Jeffa): "zasada AI TAK" 180/180 dob,
+SZ-4 TAK (XP z marszu 0), SZ-5 INFO: XP AI x0.67 (spadek 33%) - to stan, ktory Jeff juz gra. Zadnych testow ani skryptow autotestu z tym kluczem.
+
+**Ryzyko:** u Jeffa zero (wartosc z MCM nadpisuje domyslna); nowa instalacja / reset MCM - AI cwiczy wolniej (jak u Jeffa: ok. -33% XP AI w biegu 101).
+
+**Status:** GOTOWE (zbudowane; zachowanie u Jeffa bez zmian).
