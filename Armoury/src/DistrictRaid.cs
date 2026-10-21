@@ -77,6 +77,9 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.RaidBySettlementEnabled && _ready; } }
         /// <summary>E7/R2: okienko gracza po kazdej osadzie czynne (klucz i obie latki menu); nieczynne = gracz jak AI (jeden krok i koniec).</summary>
         internal static bool PopupOn { get { var s = Settings.Current; return s != null && s.RaidPlayerStepPopup && _popupReady; } }
+        /// <summary>m97-wioski (Jeff 20.10: "pladrowanie wioski trzeba robic kazda osobno, nie tak, ze robi sie to z glownej"): rabunek wsi gry, ktory prowadzi gracz, pali tylko
+        /// osady wsi gry - wioski poboczne gracz rabuje osobno z ich menu (SideVillageVisit). Klucze RaidBySettlementEnabled i SideVillagesEnterable; AI bez zmian.</summary>
+        internal static bool PlayerMainOnly { get { return On && SideVillageVisit.On; } }
 
         internal sealed class Sess
         {
@@ -96,6 +99,9 @@ namespace Armoury
             public double SHit, SDead, SFled, SRef, SCap;    // trafieni, zabici, las, uchodzcy, plan pojmanych (E4/9) kroku
             public double SFoodBurn, SFoodEat;               // racje spichlerza spalone przy uderzeniach / zjedzone przez napastnikow w kroku (tylko sesja gracza)
             public long SGold, STake, SBurn;                 // lup kroku: zloto z kiesy wsi, sztuki zabrane, sztuki spalone w rabunku
+            // m97-wioski: MainOnly - krok gracza pali tylko osady wsi gry (klucz SideVillagesEnterable; wioski poboczne rabuje sie osobno); Fid - frakcja napastnika
+            // (wioski, ktore zaplacily jej okup, poza planem i lancuchem). Bez zapisu - Decide liczy od nowa po wczytaniu.
+            public bool MainOnly; public string Fid;
         }
 
         internal sealed class EndCtx { public Sess Ss; public long Cap0; public double RaidDead; }
@@ -183,6 +189,7 @@ namespace Armoury
             if (_sess.TryGetValue(comp, out ss)) return ss;
             if (_notMine.Contains(comp)) return null;
             bool mine = false, player = false;
+            string fid = null;
             Village v = null;
             try
             {
@@ -201,11 +208,12 @@ namespace Armoury
                     var mp = lp != null ? lp.MobileParty : null;
                     mine = mp != null;
                     player = mp != null && mp == MobileParty.MainParty;
+                    try { var lf = lp.MapFaction; fid = lf != null ? lf.StringId : null; } catch { fid = null; }   // m97-wioski: ochrony wiosek po okupie
                 }
             }
             catch (Exception e) { mine = false; Stumble("Decide", e); }
             if (!mine) { _notMine.Add(comp); return null; }
-            ss = new Sess { Comp = comp, V = v, Player = player };
+            ss = new Sess { Comp = comp, V = v, Player = player, Fid = fid, MainOnly = player && PlayerMainOnly };
             ss.Rs = Devastation.StateOf(comp, v, true);           // TEN SAM stan rabunku E4/5 (v2): jency E4/9, Inni, klucz sesji ksiegi wiosek
             _sess[comp] = ss;
             _dStarted++;
@@ -301,7 +309,7 @@ namespace Armoury
         /// Plan kroku przy stanie okregu TERAZ (bez zmiany stanu): osady okregu, Z w zasiegu, m, praca w ludziach, u, ludzie w domu (udzial lupu). Arytmetyka
         /// E7/R1 bez zmian - wydzielona, bo E7/R2 liczy nia takze nastepny krok gracza (przycisk "about N days" i sam krok - jedna regula).
         /// </summary>
-        private static StepPlan Plan(Village v, int men)
+        private static StepPlan Plan(Village v, int men, bool mainOnly = false, string fid = null)
         {
             var s = Settings.Current;
             var p = new StepPlan();
@@ -311,6 +319,15 @@ namespace Armoury
             double n;
             if (!VillageBook.DistrictN(v, out n)) n = Math.Max(1.0, Math.Round(l / Math.Max(50, Math.Min(5000, s.DistrictSettlementPeople))));
             double sv = n > 0.0 ? l / n : 0.0;
+            // m97-wioski: krok gracza - tylko osady wsi gry; kazdy napastnik - bez wiosek, ktore zaplacily okup jego frakcji. Zasieg i miejsce z czesci, ktore wolno palic
+            // (ludzie na osade = l / n - ta sama miara co ksiega przy uderzeniu). Nic nie wykluczone - plan jak dotad (AI bez ochron bez zmian).
+            double room, cap, nb;
+            if ((mainOnly || fid != null) && VillageBook.RoomFor(v, mainOnly, fid, out room, out cap, out nb))
+            {
+                double svb = l / nb;
+                open = Math.Min(open, room * svb);
+                reach = cap * svb;
+            }
             int d = Math.Max(20, Math.Min(2000, s.RaidDetachmentMen));
             double z = sv > 0.0 ? Math.Floor(open / sv) : 0.0;
             if (z >= 1.0) p.M = Math.Min(z, Math.Max(1.0, Math.Floor(men / (double)d)));
@@ -334,14 +351,14 @@ namespace Armoury
         /// <summary>p6-okup (R3-03a, RaidTribute): szacunek jednego kroku rabunku AI TERAZ dla `men` napastnikow - ta sama arytmetyka co Start (Plan): udzial lupu
         /// s = praca kroku / ludzie w domu, doby kroku = praca / (DevastationPerRaiderDay x men x u), mnoznik modelu rabunku 1 (perki znane dopiero w zdarzeniu).
         /// Okreg wypalony - s = 0, doby 0. false - regula E7/R1 nieczynna, wies poza spustoszeniem albo R = 0 (rabunek gry - lup z innej reguly). Tylko odczyt.</summary>
-        internal static bool StepEstimate(Village v, int men, out double share, out double days)
+        internal static bool StepEstimate(Village v, int men, out double share, out double days, string fid = null)
         {
             share = 0.0; days = 0.0;
             var s = Settings.Current;
             if (!On || v == null || men <= 0 || s == null || !(s.DevastationPerRaiderDay > 0f) || !Devastation.CoversQuiet(v)) return false;
             try
             {
-                var p = Plan(v, men);
+                var p = Plan(v, men, false, fid);   // m97-wioski: fid - bez wiosek, ktore zaplacily okup tej frakcji (jak krok)
                 if (p.BurnedOut || !(p.Work > 0.0)) return true;
                 share = p.Home > 0.0 ? Clamp01(p.Work / p.Home) : 0.0;
                 days = p.Work / (s.DevastationPerRaiderDay * (double)men * Math.Max(UFloor, p.U));
@@ -357,7 +374,8 @@ namespace Armoury
             var v = ss.V;
             ss.Started = true;
             ss.Hp0 = Math.Max(0.01f, Math.Min(1f, v.Settlement.SettlementHitPoints));
-            var p = Plan(v, men);
+            ss.MainOnly = ss.Player && PlayerMainOnly;   // m97-wioski: klucz czytany na kazdy krok
+            var p = Plan(v, men, ss.MainOnly, ss.Fid);
             ss.M = p.M; ss.Work = p.Work; ss.U = p.U;
             ss.BurnedOut = p.BurnedOut; ss.UClamped = p.UClamped;
             if (p.BurnedOut) _dBurnedOut++;
@@ -433,7 +451,18 @@ namespace Armoury
             double c0 = 0.0, b0 = 0.0, b1;
             bool hasB = false;
             if (ss.Player) { c0 = ss.Rs != null ? ss.Rs.CapWould : 0.0; hasB = Famine.FoodOf(ss.V, out b0); }
-            double h = Devastation.StrikePeople(ss.V, people, pd, ss.Rs, null, out d, out f, out r);
+            // m97-wioski: krok gracza (tylko wies gry) albo napastnik, ktoremu wioski zaplacily okup - uderzenie nie wieksze niz miejsce czesci, ktore wolno palic, TERAZ
+            // (ludzie okregu maleja z kazdym uderzeniem, osady zapelniaja sie szybciej niz praca kroku - bez obciecia ludzie szliby z domow innych wiosek bez palenia)
+            double ask = people, room, cap, nb, hh, aw, op, rc;
+            if ((ss.MainOnly || ss.Fid != null) && VillageBook.RoomFor(ss.V, ss.MainOnly, ss.Fid, out room, out cap, out nb) && Devastation.DistrictPeople(ss.V, out hh, out aw, out op, out rc))
+                ask = Math.Min(people, room * (hh + aw) / nb);
+            double h = 0.0; d = f = r = 0.0;
+            if (ask > 1e-9)
+            {
+                VillageBook.ForceMain = ss.MainOnly;
+                try { h = Devastation.StrikePeople(ss.V, ask, pd, ss.Rs, null, out d, out f, out r); }
+                finally { VillageBook.ForceMain = false; }
+            }
             ss.Struck += people; ss.PdPend = 0.0;
             ss.Hit += h; ss.Dead += d; ss.Fled += f; ss.Ref += r;
             ss.SHit += h; ss.SDead += d; ss.SFled += f; ss.SRef += r;
@@ -763,7 +792,7 @@ namespace Armoury
             var v = ss.V; var comp = ss.Comp;
             var att = comp.AttackerSide;
             int men = att != null ? att.TroopCount : 0;
-            var p = Plan(v, men);
+            var p = Plan(v, men, ss.Player && PlayerMainOnly, ss.Fid);   // m97-wioski: nastepny krok gracza - tylko osady wsi gry
             double rate = Math.Max(0f, s.DevastationPerRaiderDay) * men * ss.F * p.U;          // ludzi przeszukanych na dobe - ta sama regula co krok (R x N x f x u)
             bool next = !p.BurnedOut && p.M >= 1.0 && p.Work > 0.0 && rate > 0.0;
             string vname, dname; int burned, n; bool sb, wb;

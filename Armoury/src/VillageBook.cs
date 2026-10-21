@@ -95,7 +95,8 @@ namespace Armoury
         private sealed class PoolItem { public float X, Y; public double R, F; public byte Flag; public int Ev = -1, Rb = -1, From = -1; public Mem M; }
 
         // E7/W1: C - napastnik sesji (identyfikatory do pamieci i komunikatu), Burned - ta sesja przeszla jakas wioske na spalona (przy Looted bez "plundered")
-        private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; public Cx C; public bool Burned; }
+        // m97-wioski: Fid - frakcja napastnika (StringId; wioski chronione okupem przed nia lancuch omija - SideVillageVisit.Spared)
+        private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; public Cx C; public bool Burned; public string Fid; public int Men; public HashSet<string> DefHit; }
 
         /// <summary>
         /// E7/W1 (232, R14): pamiec wojny wioski - ostatnie zdarzenie (rabunek albo zerowanie armii): rodzaj ('B' - przeszla na spalona w ksiedze w tym zdarzeniu,
@@ -113,7 +114,8 @@ namespace Armoury
         /// <summary>E7/W1: pamiec wojny wioski dla dymka (W2) - same identyfikatory, nazwa na zywo u wolajacego.</summary>
         internal struct WarMemory { public bool Burned; public int Day, Burns; public string Hero, Clan; public double Fled, Dead; }
 
-        private struct Snap { public double Dom, A, Ar, Af, B, Sbr, Sbf, Y; }
+        // m97-wioski krok 2: Lk - brak rak wiosek tego okregu po bitwie z obroncami (SideVillageVisit.LackNow, null - brak), LkT - suma Lk[j] / (Dom - udzial j)
+        private struct Snap { public double Dom, A, Ar, Af, B, Sbr, Sbf, Y; public double[] Lk; public double LkT; }
 
         /// <summary>Stan wioski dla widoku i etapu 7 (napisy nad spalonymi, komunikaty).</summary>
         internal struct VState
@@ -1219,7 +1221,7 @@ namespace Armoury
             int best = -1; double bs = double.MaxValue;
             for (int w = 0; w < d.W; w++)
             {
-                if (Room(d, w) <= Eps) continue;
+                if (Room(d, w) <= Eps || Shielded(d, w, s != null ? s.Fid : null) || Guarded(d, w)) continue;
                 double cos = 0.0;
                 if (s != null && s.HasFrom)
                 {
@@ -1234,13 +1236,13 @@ namespace Armoury
             return Room(d, d.W) > Eps ? d.W : -1;
         }
 
-        /// <summary>Nastepna: najblizsza (x, y) wioska z miejscem do `from` (remis - kolejnosc); wies gry na koncu.</summary>
-        private static int NextFrom(Dist d, int from)
+        /// <summary>Nastepna: najblizsza (x, y) wioska z miejscem do `from` (remis - kolejnosc); wies gry na koncu. m97-wioski: fid - bez wiosek chronionych okupem przed ta frakcja.</summary>
+        private static int NextFrom(Dist d, int from, string fid = null)
         {
             int best = -1; double bd = double.MaxValue;
             for (int w = 0; w < d.W; w++)
             {
-                if (w == from || Room(d, w) <= Eps) continue;
+                if (w == from || Room(d, w) <= Eps || Shielded(d, w, fid) || Guarded(d, w)) continue;
                 double dx = d.X[w] - d.X[from], dy = d.Y[w] - d.Y[from], dd = dx * dx + dy * dy;
                 if (dd < bd) { bd = dd; best = w; }
             }
@@ -1282,6 +1284,8 @@ namespace Armoury
                     s.C = CxOf(lp.MobileParty, s.Raider, s);             // E7/W1 (232): identyfikatory napastnika raz na sesje
                     // strona wroga = najblizsza wsi warownia frakcji napastnika (raz na sesje); bandy i Inni bez twierdz - bez kierunku
                     var fac = lp.MapFaction;
+                    if (fac != null) s.Fid = fac.StringId;   // m97-wioski: lancuch omija wioski, ktore zaplacily okup tej frakcji
+                    try { s.Men = SideVillageVisit.PartyMen(lp.MobileParty); } catch { s.Men = 0; }   // m97-wioski krok 2: sila napastnika na starcie sesji (obroncy wiosek)
                     if (fac != null)
                     {
                         float mx = d.X[d.W], my = d.Y[d.W];
@@ -1298,7 +1302,8 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("VillageBook.SessionFor", e); }
             if (s.C == null) s.C = new Cx { Who = s.Raider, Tag = s, S = s };       // E7/W1: bez wodza po stronie napastnika - pamiec bez identyfikatorow
-            s.Cur = PickFirst(d, s);
+            // m97-wioski: rabunek wsi gry prowadzony przez gracza (DistrictRaid, klucz SideVillagesEnterable) pali tylko jej osady - ogien od razu na wsi gry, nie na wiosce
+            s.Cur = s.C.Player && DistrictRaid.PlayerMainOnly ? (Room(d, d.W) > Eps ? d.W : -1) : PickFirst(d, s);
             d.S = s; d.SmokeIdx = -1;
             _dSess++;
             return s;
@@ -1378,8 +1383,33 @@ namespace Armoury
         /// </summary>
         private static double Burn(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who, Cx cx = null)
         {
+            // m97-wioski krok 2: lancuch rabunku (bez wymuszenia jednej wioski / wsi gry) zna sile napastnika - wioska z wiekszymi obroncami pominieta (Guarded)
+            _chainMen = raid && s != null && ForceUid == null && !ForceMain ? s.Men : 0;
+            try { return BurnCore(d, dB, raid, s, hasPos, px, py, today, who, cx); }
+            finally { _chainMen = 0; }
+        }
+
+        /// <summary>m97-wioski krok 2: sila napastnika biezacego lancucha rabunku (0 - bez sprawdzania obroncow; ustawiane tylko na czas Burn, watek glowny pod Gate).</summary>
+        private static int _chainMen;
+
+        /// <summary>m97-wioski krok 2: obroncy wioski pobocznej w (wlasni ludzie w domu - SideVillageVisit.DefendersFor) wiecej niz napastnik biezacego lancucha - pominieta.</summary>
+        private static bool Guarded(Dist d, int w)
+        {
+            if (_chainMen <= 0 || w < 0 || w >= d.W || d.Uid == null || d.Uid[w] == null || !SideVillageVisit.DefOn) return false;
+            double home, away;
+            People(d, SnapOf(d), w, out home, out away);
+            if (SideVillageVisit.DefendersFor(d.Uid[w], home) <= _chainMen) return false;
+            SideVillageVisit.NoteChainSkip(d.Uid[w]);
+            return true;
+        }
+
+        private static double BurnCore(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who, Cx cx)
+        {
             int cur;
-            if (raid && s != null) cur = s.Cur >= 0 && Room(d, s.Cur) > Eps ? s.Cur : (s.Cur < 0 ? PickFirst(d, s) : NextFrom(d, s.Cur));
+            int forced = Forced(d);   // m97-wioski: rabunek jednej wioski pobocznej (SideVillageVisit) albo wsi gry przez gracza (DistrictRaid) - tylko jej osady, bez lancucha (-2 = bez wymuszenia)
+            string fid = raid && s != null ? s.Fid : null;   // m97-wioski: lancuch rabunku omija wioski chronione okupem przed frakcja napastnika
+            if (forced != -2) cur = forced;
+            else if (raid && s != null) cur = s.Cur >= 0 && Room(d, s.Cur) > Eps && !Shielded(d, s.Cur, fid) ? s.Cur : (s.Cur < 0 ? PickFirst(d, s) : NextFrom(d, s.Cur, fid));
             else cur = hasPos ? NearestTo(d, px, py) : FirstByOrder(d);
             double left = dB;
             int guard = 0;
@@ -1388,16 +1418,98 @@ namespace Armoury
                 double put = Math.Min(Room(d, cur), left);
                 if (put > 0.0)
                 {
+                    if (_chainMen > 0 && cur < d.W && d.Uid != null && d.Uid[cur] != null && s != null)
+                    {
+                        // m97-wioski krok 2: obroncy tej wioski pobici przez wiekszego napastnika - raz na sesje do pamieci poleglych (bez drugiego ubytku ludzi); ludzie w domu
+                        // PRZED paleniem tej porcji (recenzja: blok stal miedzy if (raid) a jego else - else przypial sie do niego i rabunek liczyl sie tez jako zerowanie)
+                        if (s.DefHit == null) s.DefHit = new HashSet<string>(StringComparer.Ordinal);
+                        if (s.DefHit.Add(d.Uid[cur]))
+                        {
+                            double h0, a0;
+                            People(d, SnapOf(d), cur, out h0, out a0);
+                            SideVillageVisit.NoteChainBurn(d.Uid[cur], h0, _chainMen);
+                        }
+                    }
                     d.Br[cur] += put; left -= put;
                     if (raid) { if (s != null) s.Cur = cur; if (cur == d.W) _dRaidMain += put; else _dRaidW += put; }
                     else { if (cur == d.W) _dForMain += put; else _dForW += put; }
                     Remember(d, cur, cx, put, today);                   // E7/W1 (232): pamiec wojny PRZED CheckUp (przejscie na spalona oznacza to samo zdarzenie 'B')
                     CheckUp(d, cur, today, raid && s != null ? s.Raider : who, true, cx);
                 }
-                if (left <= Eps) break;
-                cur = NextFrom(d, cur);
+                if (left <= Eps || forced != -2) break;
+                cur = NextFrom(d, cur, fid);
             }
             return left > Eps ? left : 0.0;
+        }
+
+        /// <summary>m97-wioski: uid wioski pobocznej, ktorej osady pali biezace uderzenie (SideVillageVisit.StrikeChunk ustawia i zdejmuje w try/finally, watek glowny).</summary>
+        internal static string ForceUid;
+
+        /// <summary>m97-wioski: biezace uderzenie pali tylko osady wsi gry (DistrictRaid.StrikeChunk sesji gracza przy SideVillagesEnterable - try/finally, watek glowny).</summary>
+        internal static bool ForceMain;
+
+        /// <summary>m97-wioski: indeks wioski ForceUid w okregu albo wsi gry (ForceMain); -1 - brak albo pelna (nic nie spalone, nadmiar w linii), -2 - bez wymuszenia (lancuch jak dotad).</summary>
+        private static int Forced(Dist d)
+        {
+            string u = ForceUid;
+            if (u == null) return ForceMain ? (Room(d, d.W) > Eps ? d.W : -1) : -2;
+            if (d.Uid != null) for (int w = 0; w < d.W; w++) if (string.Equals(d.Uid[w], u, StringComparison.Ordinal)) return Room(d, w) > Eps ? w : -1;
+            return -1;
+        }
+
+        /// <summary>m97-wioski: wioska poboczna w chroniona okupem przed frakcja fid (SideVillageVisit - migawka, bez alokacji). Wies gry (w == W) - nigdy (jej ochrona to p6).</summary>
+        private static bool Shielded(Dist d, int w, string fid)
+        {
+            return fid != null && w >= 0 && w < d.W && d.Uid != null && d.Uid[w] != null && SideVillageVisit.Spared(d.Uid[w], fid);
+        }
+
+        /// <summary>
+        /// m97-wioski: miejsce (osady do pulapu, Room) i pulap (DevastationMaxPercent x osady) czesci okregu, ktore napastnik moze palic: mainOnly - sama wies gry (rabunek gracza
+        /// przy SideVillagesEnterable), fid - bez wiosek chronionych okupem przed ta frakcja; n - osady okregu (ta sama miara co OnStrike: dB = trafieni x n / ludzie okregu).
+        /// false - nic nie wykluczone (albo ksiega nieczynna, okreg nieznany) - wolajacy liczy jak dotad. Sam odczyt pod Gate, nie rzuca.
+        /// </summary>
+        internal static bool RoomFor(Village v, bool mainOnly, string fid, out double room, out double cap, out double n)
+        {
+            room = cap = n = 0.0;
+            if (v == null || !Active || (!mainOnly && (fid == null || !SideVillageVisit.AnyProt))) return false;   // bez ochron - od razu (AI bez zmian, bez blokady)
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || d == null || !EnsureN(d) || d.Nw == null) return false;
+                    double ms = Devastation.MaxShare(Settings.Current);
+                    bool cut = mainOnly;
+                    for (int w = 0; w <= d.W; w++)
+                    {
+                        if (w < d.W && (mainOnly || Shielded(d, w, fid))) { cut = true; continue; }
+                        room += Math.Max(0.0, Room(d, w)); cap += ms * Math.Max(0.0, d.Nw[w]);
+                    }
+                    n = d.N;
+                    return cut && n > 0.0;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.RoomFor", e); return false; }
+        }
+
+        /// <summary>m97-wioski: miejsce (osady do pulapu) jednej wioski pobocznej i osady okregu - rabunek tej wioski (SideVillageVisit) obcina uderzenie do jej miejsca.
+        /// false - ksiega nieczynna albo wioska nieznana. Sam odczyt pod Gate, nie rzuca.</summary>
+        internal static bool UidRoom(Village v, string uid, out double room, out double n)
+        {
+            room = n = 0.0;
+            if (v == null || uid == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || d == null || !EnsureN(d) || d.Uid == null) return false;
+                    for (int w = 0; w < d.W; w++)
+                        if (string.Equals(d.Uid[w], uid, StringComparison.Ordinal)) { room = Math.Max(0.0, Room(d, w)); n = d.N; return n > 0.0; }
+                    return false;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.UidRoom", e); return false; }
         }
 
         // ------------------------------------------------------------ wpiecia w nasz kod (bez Harmony)
@@ -1585,7 +1697,34 @@ namespace Armoury
             sn.Sbr = Sum(d.Br); sn.Sbf = Sum(d.Bf); sn.B = sn.Sbr + sn.Sbf;
             sn.Y = (double)Devastation.YieldFactor(d.V) * FreeHands.YieldFactor(d.V);
             if (double.IsNaN(sn.Y) || sn.Y < 0.0) sn.Y = 1.0;
+            if (SideVillageVisit.LackAny) LackOf(d, ref sn);
             return sn;
+        }
+
+        /// <summary>m97-wioski krok 2 (recenzja: polegli obroncy maja zejsc z ludzi TEJ wioski): brak rak wiosek okregu po bitwie z obroncami. Ksiega nie trzyma ludzi
+        /// wioski osobno (DOM okregu x stojace osady), wiec polegli zdjeci z DOM rozkladaliby sie na caly okreg; brak rak przesuwa ich udzial z powrotem na te wioske:
+        /// w domu wioski w = udzial w - Lk[w] + udzial w x suma (j != w) Lk[j] / (Dom - udzial j) - suma po okregu = Dom (nikt z niczego). Lk[w] najwyzej udzial w.
+        /// Zero kosztu bez bitew (LackAny). Sam odczyt, nie rzuca.</summary>
+        private static void LackOf(Dist d, ref Snap sn)
+        {
+            try
+            {
+                if (d.Uid == null || d.W <= 0 || d.Nw == null) return;
+                double denom = d.N - sn.B;
+                if (!(denom > Eps) || !(sn.Dom > Eps)) return;
+                for (int w = 0; w < d.W; w++)
+                {
+                    if (d.Uid[w] == null) continue;
+                    double lk = SideVillageVisit.LackNow(d.Uid[w]);
+                    if (!(lk > Eps)) continue;
+                    double bw = Math.Max(0.0, sn.Dom * (d.Nw[w] - d.Br[w] - d.Bf[w]) / denom), rest = sn.Dom - bw;
+                    lk = Math.Min(lk, bw);
+                    if (!(lk > Eps) || !(rest > Eps)) continue;
+                    if (sn.Lk == null) sn.Lk = new double[d.W + 1];
+                    sn.Lk[w] = lk; sn.LkT += lk / rest;
+                }
+            }
+            catch { sn.Lk = null; sn.LkT = 0.0; }
         }
 
         private static void Reconcile(Dist d, Settings s, int today)
@@ -1662,6 +1801,13 @@ namespace Armoury
         {
             double denom = d.N - sn.B;
             home = denom > Eps ? sn.Dom * (d.Nw[w] - d.Br[w] - d.Bf[w]) / denom : (w == d.W ? sn.Dom : 0.0);
+            if (sn.Lk != null && denom > Eps)
+            {
+                // m97-wioski krok 2: brak rak wiosek po bitwie z obroncami (LackOf) - ta wioska mniej, reszta okregu wiecej o tyle samo
+                double own = sn.Lk[w], rest = sn.Dom - home;
+                double t = sn.LkT - (own > 0.0 && rest > Eps ? own / rest : 0.0);
+                home = Math.Max(0.0, home - own + home * t);
+            }
             away = (sn.Sbr > Eps ? sn.Ar * d.Br[w] / sn.Sbr : (w == d.W ? sn.Ar : 0.0)) + (sn.Sbf > Eps ? sn.Af * d.Bf[w] / sn.Sbf : (w == d.W ? sn.Af : 0.0));
         }
 

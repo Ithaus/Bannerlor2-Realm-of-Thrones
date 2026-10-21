@@ -86,6 +86,7 @@ namespace Armoury
             public int b1N, b2N, b3N, b4N, b5N; public double b1, b2, b3, b4, b5, bNone, bOther; public double sEnd;
             // rozwiazane bez bitwy (R6)
             public int q, qRemoved; public double qHere, qOther, qNone, qWall, qVet; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
+            public double ob;                    // m97-wioski krok 2: obroncy wioski pobocznej zdjeci z DOM wsi okregu (PeopleBook.TakeLevyHere, MLevyMilitia) - do KONTROLI
             public long ticks;
         }
         private static Day D = new Day();
@@ -521,6 +522,8 @@ namespace Armoury
 
         /// <summary>Okno E4/7 rozwiazania partii (5.6): ludzie rozwiazanej partii, ktorych gra dopisala do milicji wsi.</summary>
         internal static void NoteMilitiaDisband(double men) { if (men > 0.0) D.j += men; }
+        /// <summary>m97-wioski krok 2: obroncy wioski pobocznej zdjeci z DOM przyczyna MLevyMilitia (SideVillageVisit.StartFight) - skladnik ob KONTROLI linii E4/8.</summary>
+        internal static void NoteVillageDefenders(double men) { if (men > 0.0 && !double.IsInfinity(men)) D.ob += men; }
 
         // ================================================================ K3: nowe druzyny lordow (6.2-6.4)
         public sealed class SpawnState { public Dictionary<CharacterObject, int> Before; public int Grain0; }
@@ -1123,8 +1126,8 @@ namespace Armoury
             // kontrola kodu: ruch DOM przyczynami E4/8 w ksiedze (PeopleBook.ArmsDayMen) = to, co linia zdjela
             var bm = PeopleBook.ArmsDayMen;
             double bookOut = bm[PeopleBook.MLevyMilitia] + bm[PeopleBook.MLevySpawn] + bm[PeopleBook.MCaravanOut] + bm[PeopleBook.MCaravanRefill] + bm[PeopleBook.MRoadOut];
-            double ours = d.m1 + d.a1 + d.c1 + d.c3 + d.n1w + d.n1e;
-            sb.Append(" | KONTROLA: zdjete z DOM przyczynami E4/8 ").Append(F1(bookOut)).Append(" - (m1 + a1 + c1 + c3 + n1w + n1e) = ").Append((bookOut - ours).ToString("0.00", Inv));
+            double ours = d.m1 + d.a1 + d.c1 + d.c3 + d.n1w + d.n1e + d.ob;   // m97-wioski krok 2: + ob (obroncy wiosek pobocznych)
+            sb.Append(" | KONTROLA: zdjete z DOM przyczynami E4/8 ").Append(F1(bookOut)).Append(" - (m1 + a1 + c1 + c3 + n1w + n1e + ob) = ").Append((bookOut - ours).ToString("0.00", Inv)).Append(" (ob - obroncy wiosek pobocznych ").Append(F1(d.ob)).Append(")");
             sb.Append(" | potkniecia ").Append(_stumblesDay);
             if (_stumbleAt.Count > 0) sb.Append(" (").Append(string.Join(", ", _stumbleAt.Select(kv => kv.Key + " " + kv.Value).ToArray())).Append(")");
             double ms = (d.ticks + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency;

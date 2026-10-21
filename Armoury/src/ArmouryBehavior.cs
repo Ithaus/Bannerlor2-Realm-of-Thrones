@@ -722,6 +722,9 @@ namespace Armoury
         // p6-okup (R3-03a): ochrony wsi po okupie od zera przy nowej kampanii / przed wczytaniem (osobna linia z dala od linii fali 1 - scalenie fali 2 bez konfliktu)
         private readonly bool _p6OkupReset = P6OkupReset();
         private static bool P6OkupReset() { try { RaidTribute.Reset(); } catch (Exception e) { Log.Error("P6OkupReset", e); } return true; }
+        // m97-wioski: wjazd do wiosek pobocznych - stan wejscia, okupy i rabunek w toku od zera (osobna linia, jak p6-okup)
+        private readonly bool _m97WioskiReset = M97WioskiReset();
+        private static bool M97WioskiReset() { try { SideVillageVisit.Reset(); } catch (Exception e) { Log.Error("M97WioskiReset", e); } return true; }
 
         // r4-mur (danina zbozowa Muru, glod Wolnych Ludzi -> najazdy): reset stanu kampanii w inicjalizatorze pola (biegnie przy kazdym konstruktorze ArmouryBehavior,
         // przed jego cialem) - osobna linia zamiast dopisku do jednolinijkowego konstruktora (scalenia paczek nocy)
@@ -1351,6 +1354,8 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_side_fief", e); }
             try { string sh = dataStore.IsSaving ? SideVillageHome.ExportSave() : null; SaveText.Sync(dataStore, "arm_side_home", ref sh); if (dataStore.IsLoading) SideVillageHome.Import(sh); }   // r4-dom: skrzynia domu w wiosce gracza (sklad do logu przy zapisie - starsza DLL klucza nie zapisze)
             catch (Exception e) { Log.Error("SyncData.arm_side_home", e); }
+            try { string sv = dataStore.IsSaving ? SideVillageVisit.Export() : null; SaveText.Sync(dataStore, "arm_sidevil", ref sv); if (dataStore.IsLoading) SideVillageVisit.Import(sv); }   // m97-wioski: okupy wiosek pobocznych, rabunki gracza (10 dob), rabunek w toku; brak klucza = nic
+            catch (Exception e) { Log.Error("SyncData.arm_sidevil", e); }
             // R3-09f (regale gornicze): konta wozow wsi z kruszcem sprzedanym, a jeszcze nie w domu ("1|idWozu~kruszec~ladunek~doba"); brak klucza (stary zapis) = pusto; wlasny try
             try { string rg = dataStore.IsSaving ? MineRegale.Export() : null; if (!dataStore.IsSaving || rg != null) SaveText.Sync(dataStore, "arm_regale", ref rg); if (dataStore.IsLoading) MineRegale.Import(rg); }
             catch (Exception e) { Log.Error("SyncData.arm_regale", e); }
@@ -1432,7 +1437,8 @@ namespace Armoury
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, TownInns.OnPlayerExchange);   // KA: handel gracza w miescie noclegu przy premii cen (tylko licznik linii doby)
             // sw-zajazdy: dojazd do zajazdu przy szlaku (4 razy na sekunde, jedna partia - klucz RoadsideInns) i ksiega plotek (zdarzenia swiata - klucz InnGossip)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { RoadsideInns.Tick(); });
-            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageFief.Tick(); });   // n20-wioska: wjazd do wioski gracza po kliku / postoju (4 razy na sekunde, jedno porownanie odleglosci)
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageFief.Tick(); });
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageVisit.Tick(); });   // m97-wioski: wjazd do wioski pobocznej po kliku, oboz po menu, straznik rabunku (4 razy na sekunde, tylko gdy cos czeka)   // n20-wioska: wjazd do wioski gracza po kliku / postoju (4 razy na sekunde, jedno porownanie odleglosci)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SideVillageFief.Hourly", delegate { try { SideVillageFief.Hourly(); } catch (Exception e) { Log.Error("SideVillageFief.Hourly", e); } }));   // n20-wioska: oczekujace nadanie, furtka autotestu
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, Rumours.OnPartyCreated);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Rumours.OnPartyDestroyed);
@@ -1441,6 +1447,7 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, Rumours.OnMakePeace);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, Rumours.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, Rumours.OnMapEventEnded);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, SideVillageVisit.OnMapEventEnded);   // m97-wioski krok 2: wynik bitwy z obroncami wioski pobocznej (sam zapis zwyciezcy; tylko przy bitwie w toku)
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
             Ravens.RegisterEvents(this);   // p5-kruki (R3-05c): latka czatu w starcie sesji, doreczenie krukow co godzine, linia doby
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
@@ -2169,7 +2176,8 @@ namespace Armoury
             try { VillageCrafts.SessionStart(); } catch (Exception e) { Log.Error("VillageCrafts.SessionStart", e); }   // inwest: linia "Zajecia wiosek (ZW): start" - PO VillageBook.Resolve i StartCalibration.SessionStart (plik ziemi KS z nakladka v6)
             try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
-            try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
+            try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }
+            try { SideVillageVisit.SessionStart(); } catch (Exception e) { Log.Error("SideVillageVisit.SessionStart", e); }   // m97-wioski: linia "Wioski poboczne (WP): start sesji"   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
             try { HarvestFairs.SessionStart(); } catch (Exception e) { Log.Error("HarvestFairs.SessionStart", e); }   // R3-05a: latka popytu (raz na proces), kalendarz krain, linia "Jarmarki po zniwach (R3-05a): start sesji"
             try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
@@ -2282,6 +2290,7 @@ namespace Armoury
             try { TownFolk.TownLoanMenus(starter); } catch (Exception e) { Log.Error("TownFolk.TownLoanMenus", e); }   // f8-pozyczka: "Borrow from the town council" / "Repay ..." w menu wlasnego miasta i zamku
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
             try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }
+            try { SideVillageVisit.AddMenus(starter); } catch (Exception e) { Log.Error("SideVillageVisit.AddMenus", e); }   // m97-wioski: menu kazdej wioski pobocznej (nocleg, oboz, handel, prace, wrogie akcje)
             try { SideVillageFief.AddMenus(starter); } catch (Exception e) { Log.Error("SideVillageFief.AddMenus", e); }   // n20-wioska: menu wioski gracza (nocleg, prace, przeglad) i "Visit X (your village)" w menu wsi gry   // inwest: "Invest in the district's works" za "Look over the district" (village, village_looted)
             try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
             try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
@@ -2820,7 +2829,8 @@ namespace Armoury
             try { DistrictIcon.Daily(); } catch (Exception e) { Log.Error("DistrictIcon.Daily", e); } DayProfile.Lap("DistrictIcon.Daily");
             try { MoneyLedger.Probe169("DistrictIcon.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
-            try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu
+            try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }
+            try { SideVillageVisit.Daily(); } catch (Exception e) { Log.Error("SideVillageVisit.Daily", e); }   // m97-wioski: linia "Wioski poboczne (WP): dzien N" (tylko z ruchem)   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
             // p6-a7: roboty miast z rak okregu - PO KS i VillageCrafts (przebudowy A7 tej doby juz w kasach): miasto ponad pulapem 1/28 nadwyzki do kies wsi okregu; wlasna pozycja (MTownHire)
             try { TownHire.Daily(); TownHire.Line(); } catch (Exception e) { Log.Error("TownHire.Daily", e); } DayProfile.Lap("TownHire.Daily");

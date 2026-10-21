@@ -8612,6 +8612,14 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefWalk { get; set; } = true;
 
+        [SettingPropertyBool("Side Villages Enterable", HintText = "every side village on the map can be entered like a main village, though nobody of note lives there: click it to ride in (your party leaves the map as in a roadside inn). Inside: what it is and makes, rest the night (paid like an inn's common room, free on your own lands), make camp, buy what it makes (its share of its main village's store) and sell to it, invest in its works, and - at war - raid that one village alone or make it pay tribute (spared 30 days; its own people defend it - see Side Village Defenders). Your own raid on a main village then burns only that village's homesteads - each side village is raided on its own. Off = side villages are only pictures on the map, and raids burn them in a chain, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillagesEnterable { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Defenders", HintText = "with Side Villages Enterable: a side village is defended by its own people instead of the militia of its main village - about 1 in 10 of the people at home (at most 60) take up flails, spears and bows. Raid it or demand tribute with fewer than 4 times as many fit men and they come out to fight you by the village in an ordinary battle: win and the raid or tribute goes on, lose or leave and the village is spared. With 4 times as many men or more they give in without a fight. The fallen and the captured are lost to that village itself - fewer hands at work and fewer men to fight, filling back over the next two months. Raiders of other realms with fewer men than a side village's defenders pass it by. Off = the whole militia of the main village guards its side villages, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageDefenders { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -10932,6 +10940,8 @@ namespace Armoury
             s.SideVillageFiefTrade = SideVillageFiefTrade;
             s.SideVillageFiefHouse = SideVillageFiefHouse;
             s.SideVillageFiefWalk = SideVillageFiefWalk;
+            s.SideVillagesEnterable = SideVillagesEnterable;
+            s.SideVillageDefenders = SideVillageDefenders;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;

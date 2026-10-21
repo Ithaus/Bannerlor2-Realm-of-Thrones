@@ -49,7 +49,8 @@ namespace Armoury
             try
             {
                 var mp = MobileParty.MainParty;
-                if (r == null || r.HostUid == null || mp == null || !SideVillageFief.IsMine(r.HostUid)) return false;
+                if (r == null || r.HostUid == null || mp == null) return false;
+                if (!SideVillageFief.IsMine(r.HostUid)) return SideVillageVisit.HostNear(r.HostUid, r.TownId, RoadSleepR);   // m97-wioski: wioska poboczna na ziemi rodu gracza
                 var st = mp.CurrentSettlement;
                 if (st != null) return st.StringId == r.TownId;
                 return SideVillageFief.PlayerDist() <= RoadSleepR;
