@@ -2816,7 +2816,7 @@ namespace Armoury
                     bool legend = Recipes.IsLegendary(item);
                     string legendWhy = null;
                     bool rare = PatternGate.RareStuff(item);   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - szary, z powodem
-                    bool legendLocked = (legend || rare) && !Forge.LegendAllowed(item, out legendWhy);
+                    bool legendLocked = (legend || rare || RareMaterials.Covers(item)) && !Forge.LegendAllowed(item, out legendWhy);   // m97-surowce: brak surowca - szary, z powodem
                     bool unknown = !RangedLore.KnownOf(item);   // wzor jeszcze nie odkryty - widac, ale szary
                     int fail = (int)(Forge.FailureChance(r) * 100f);
 

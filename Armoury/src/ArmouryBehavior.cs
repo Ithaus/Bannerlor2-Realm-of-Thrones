@@ -1474,6 +1474,7 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
             // m96-wzory: rozdanie wzorow tieru 1, sanacja, naprawa zapisu i ksiega PO OnSessionLaunched wszystkich modow (ROT-RBM przepisuje luki po nas); nowa kampania - ksiegi od zera
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => LoreSeedFix.AfterSessionLaunched(LorePurgeOnce));
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => RareMaterials.StartLine());   // m97-surowce: czardrzewo i smocza kosc - surowce, zrodla, doplyw (po cenach HistoricalPrices)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => Recipes.MassStartLine());   // m96-receptury: przepisy z masy po ostatecznych statystykach (ROT-RBM)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
@@ -2523,6 +2524,7 @@ namespace Armoury
             try { CraftOrders8.Daily(); } catch (Exception e) { Log.Error("CraftOrders8.Daily", e); } DayProfile.Lap("CraftOrders8.Daily");   // E8/K (255): linia "Kuznia (E8/K)" - zlecenia kowalskie i ksiegarz BK; w nowej kampanii raz wymiana zlecen startowych
             try { CraftOrdersPurse.Daily(); } catch (Exception e) { Log.Error("CraftOrdersPurse.Daily", e); } DayProfile.Lap("CraftOrdersPurse.Daily");   // NZ (16.10): przeglad zlecen kowalskich (kiesa zleceniodawcy nie pokrywa sumy jego zlecen albo zmarly - zdjete) i linia "Zlecenia kowalskie (NZ)"; PO CraftOrders8.Daily (wymiana startowa)
             try { QuestPay8.Daily(); } catch (Exception e) { Log.Error("QuestPay8.Daily", e); } DayProfile.Lap("QuestPay8.Daily");   // E8/D1 (256): linia "Nagrody zadan (E8/D1)" i porzadek w slowniku kwot zamrozonych
+            try { RareMaterials.Daily(); } catch (Exception e) { Log.Error("RareMaterials.Daily", e); } DayProfile.Lap("RareMaterials.Daily");   // m97-surowce: doplyw czardrzewa i smoczej kosci, linia "Surowce rzadkie (m97-surowce): dzien N"
             try { RogueryXp28.Daily(); } catch (Exception e) { Log.Error("RogueryXp28.Daily", e); }   // f28-wyceny (B): linia "Lotrostwo (f28): dzien N" - tylko log
             try { Wyceny20.Daily(); } catch (Exception e) { Log.Error("Wyceny20.Daily", e); }   // n20-wyceny: linie "Handel z warsztatu (n20)", "Lup AI (n20)", "Kryjowki band (n20)" - tylko log
             try { PlayerFees8.Daily(); } catch (Exception e) { Log.Error("PlayerFees8.Daily", e); } DayProfile.Lap("PlayerFees8.Daily");   // E8/D2 (257): linia "Wydatki gracza (E8/D2)" - tylko log

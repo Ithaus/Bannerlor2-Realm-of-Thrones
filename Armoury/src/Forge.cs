@@ -305,6 +305,7 @@ namespace Armoury
                 float relief = Helper.Relief(helper);
 
                 Recipes.TakeMaterials(r);
+                RareMaterials.Take(item, false);   // m97-surowce: surowiec luku schodzi na starcie roboty, jak reszta materialow
                 SpendStamina(MathF.Max(1, (int)(r.Stamina * (1f - relief * s.HelperStaminaRelief))));
                 days = s.ForgeTakesTime ? MathF.Max(0.5f, r.Tier * s.DaysPerTier * Project.TimeFactor(tempo)) : 0f;
                 // C5 (Jeff 14.10 "jak u kowali AI"): podstawa = dni kowala z warsztatu AI x godziny dnia kowala (tempo i pomocnik jak dotad)
@@ -475,6 +476,7 @@ namespace Armoury
                     Log.Player("After all that work, the piece cracked at the quench. Nothing to show for it.", true);
                     Banner("The " + item.Name + " cracked at the quench - nothing to show for the work.");
                     Log.Info("Kucie nieudane po czasie: " + item.StringId);
+                    RareMaterials.NoteLost(item);   // m97-surowce (recenzja): klepka czardrzewa / smoczej kosci zdjeta przy Begin przepada z lukiem - napis i licznik
                     return;
                 }
 
@@ -564,6 +566,7 @@ namespace Armoury
             try
             {
                 if (PatternGate.RareStuff(item)) { why = PatternGate.RareWhy; return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - obie drogi kucia i menu kowala
+                if (!RareMaterials.Ready(item, out why)) return false;   // m97-surowce: luk z czardrzewa / smoczej kosci - surowiec w sakwach
                 if (!Recipes.IsLegendary(item)) return true;
                 // OPANOWANY WZOR UNIKATU (Jeff 30.08: "moge kuc wiecej niz
                 // jeden, jak juz opanuje") - legendarny KOSZT zostaje
@@ -625,6 +628,7 @@ namespace Armoury
                 if (MBRandom.RandomFloat < FailureChance(r, 1, hero))
                 {
                     Recipes.TakePartial(r, s.MaterialLossOnFailure);
+                    RareMaterials.Take(item, true);   // m97-surowce: klepka peka z lukiem
                     hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r, false) * 0.3f * xpMul);
                     Log.Player("The piece cracked on the anvil. Half your metal is slag.", true);
                     Log.Info("Kucie nieudane: " + item.StringId + " (skill " + skill + "/" + r.SkillNeeded + ", trudnosc " + r.Difficulty + ")");
@@ -632,6 +636,7 @@ namespace Armoury
                 }
 
                 Recipes.TakeMaterials(r);
+                RareMaterials.Take(item, false);   // m97-surowce: surowiec luku (czardrzewo / smocza kosc) z sakw
                 var quality = RollQuality(item, r, 1, hero);
                 // amunicje robi sie SERIAMI: jedna robota = kilka wiazek strzal/beltow
                 int made = (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)

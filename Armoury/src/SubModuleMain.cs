@@ -561,6 +561,13 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (PayNotes)", e); }
         }
 
+        /// <summary>m97-surowce: kategoria arm_rare_stuff (czardrzewo, smocza kosc) przed wczytaniem XML przedmiotow (arm_items_rare.xml) - ta sama chwila co NavalDLC.</summary>
+        public override void InitializeSubModuleGameObjects(Game game)
+        {
+            base.InitializeSubModuleGameObjects(game);
+            RareMaterials.RegisterCategory(game);
+        }
+
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             base.OnGameStart(game, gameStarterObject);
