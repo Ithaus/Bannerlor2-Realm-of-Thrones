@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (n31 (kandydat WGRANIA 102) - scalenie m103-drobne, m103-sceny, m103-lektor)
+
+**Zmiana:** `w-toku/n31-calosc` = WGRANIE 101 (ed9273fa) + m103-drobne (7839c384: rabunek druzyny gracza liczy sie jak praca - RaidCountsAsWork, odziez z rzedu markietanow
+i praczki, zapis tablicy arm_board w formacie nb2, DrillCampOnlyAi domyslnie TAK; [CHANGELOG galezi](docs/noc-1920/m103-drobne-CHANGELOG.md)) + m103-sceny (756e685f: 23 sceny
+prologu 298 jako okna ROT, obrazki z plikow Armoury/Images, obrazki Jeffa w oknach ROT; klucze PrologueScenes, StoryImagesForRotWindows; [CHANGELOG galezi](docs/noc-1920/m103-sceny-CHANGELOG.md))
++ m103-lektor (1907414c: lektor David - okna ROT z nagran, plotki na zywo przez ElevenLabs z pamiecia nagran; 5 kluczy "Narrator ..."; [CHANGELOG galezi](docs/noc-1920/m103-lektor-CHANGELOG.md)).
+Scalenia: 620847f7 (drobne, bez konfliktow), 638c9381 (sceny, bez konfliktow), 4e90665e (lektor).
+**Konflikty (lektor):** SubModuleMain.cs - obie wstawki zostaja: RotWindowPictures.ApplyAll, potem Lektor.Install (rozne latki EventScreen: obrazki prefiks OnActivate / postfiks
+OnDeactivate, lektor postfiks OnActivate / prefiks OnDeactivate); StoryTick (sceny), potem Lektor.AppTick - oba PRZED returnem wiosek (Map Villages = off nie gasi scen ani lektora);
+pola _storyTickFails/_lektorFails i OnGameEnd scen. sprawdz_logi.py - pomoc: L-8 z m103-drobne + opis grupy m103lektor; dispatch m103sceny i m103lektor osobno, kazdy z return.
+McmSettings.cs - --ours + gen_mcm. Blad wykryty przy scaleniu: obie galezie zdefiniowaly stala modulu M103_TAG (sceny "Prolog (m103): ", lektor "Lektor (m103): ") - ostatnia
+wygrywala i m103sceny szukalby linii lektora; stale lektora przemianowane na M103L_* (25 miejsc), teraz zadnych dubli nazw na poziomie modulu (ast).
+**Dane lektora prologu (n31):** 23 nagrania prolog_01..prolog_23.wav (David v2, 24 kHz mono 16 bit, razem 918.6 s; naglowek 44 B, rozmiar = 44 + dane; najdluzszy ciag zer 1014 B
+< blok kontrolny 4096 B) w Armoury/ModuleData/Lektor/EN + 23 wiersze w arm_lektor.tsv (klucz prolog_NN, tytul okna, plik, md5). Tytuly zgodne co do znaku z Title scen
+w PrologueScenes.Data.cs i tools/prolog/prolog298_sceny.json (23/23); okno sceny to EventPopupState ROT z EventScreen, wiec lektor rozpoznaje je po EventTitle jak okna ROT.
+Razem 58 wierszy i 58 plikow, bez dubli tytulow (takze po obcieciu kropek, bez wielkosci liter), format jak wczytuje Lektor.LoadIndex (4 kolumny, md5 32 znaki, CRLF).
+**Rezerwa lektora:** LektorGossipReserveChars 14000 -> 3000 (14000 z recenzji galezi trzymalo znaki na nagranie prologu; prolog nagrany, plan 25724/38031). Settings.cs (wartosc
+i opis), zapas ReserveChars() w Lektor.Live.cs, McmSettings z gen_mcm. Armoury.json Jeffa nie ma kluczy Lektor* (sprawdzone), wiec domyslna zadziala.
+**Skrypty:** wgraj-v5.ps1 uzywany do wgran (repo tools/autotest-2026-10-17) mial blok obrazkow (sceny), ale nie mial bloku nagran lektora (galaz dopisala go do starej kopii
+w katalogu testow) - wgranie 102 nie skopiowaloby nagran. Jedna wersja obu skryptow (obrazki + lektor) w repo glownym (697c4885) i w katalogu testow 6ba92574/test
+(kopie *.bak-n31-przed). Proba: wgraj-v5 -DryRun na udawanym katalogu gry z drzewem n31 - kod 0, 59 wierszy Lektor (58 wav + tsv, md5 z tsv zgodne); parser PowerShell 0 bledow.
+**Build / testy:** gen_mcm: Armoury 2256 ustawien (101: 2243; +6 drobne, +2 sceny, +5 lektor), RC 115, GT 44. Build 5 modow kod 0: Armoury d5024f0f, CrashScribe 9ff48892,
+RealisticCaptivity fb1236ee, GrandTourney 9e6453b3, ForgeView badac832 (kod CrashScribe/RC/GT/ForgeView bez zmian wobec 101). sprawdz_narzedzie: dispatch poza main 0,
+zle wstawki 0, duble def 0, duble grup 0. sprawdz_logi --help kod 0; test_m103sceny 14/14 OK; m103lektor na logu syntetycznym 10/10 TAK (LK-3: 58 = wiersze tsv; z liczba 35 - NIE,
+jak trzeba); m97wioski (WP-7), m99markietani (MK-8, MK-9), m102tablica (L-8, L-8b), m98plotki (KP-1, KP-1b z --crashscribe), m103sceny, m103lektor na logu biegu 10:08
+(p2-prolog-ks, 230 dob) bez wyjatku (nowe wiersze INFO - log sprzed paczek).
+**Ryzyko / co sprawdzic:** w autotescie prologu: sceny z nagraniem (m103sceny + m103lektor --crashscribe: LK-5 start > 0, LK-6/LK-7), obrazki i lektor na tym samym EventScreen;
+w grze lektor gra 23 sceny prologu (ok. 40 s kazda) - Jeff moze zamknac okno wczesniej (stop). Plotki na zywo z rezerwa 3000 zuzywaja zapas planu do 3000 znakow.
+**Status:** DO SPRAWDZENIA - kandydat WGRANIA 102; przed testem scalenie m103-gospodarka (po czesci 2).
+
 ## 2026-10-21 (WGRANIE 101 - prolog 298 (rdzen), postacie kanonu do rodow, tablica ogloszen)
 
 **Zakres (Jeff 21.10):** "Robimy wczesniejszy start"; "Ok wersje lekka robimy" + pakty Diplomacy z krolestwem Roberta; "zrob wydarzenia wedlug ksiazki"; postacie A do rodow ("pamietaj, ze potem

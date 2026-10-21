@@ -34,3 +34,26 @@ WallEvent_0	Wildlings Routed	WallEvent_0.wav	b38d3e2249df8dbec8b058453dc47cbd
 WallEvent_1	Freefolk Overwhelm	WallEvent_1.wav	57b4f4b9103b589fb2a0af679583d012
 WallSiegeEvent_0	Freefolk Attack The Wall	WallSiegeEvent_0.wav	dc573de95b680a3cc15f4c63494a6da4
 WallSiegeNotificationEvent_0	Freefolk March South	WallSiegeNotificationEvent_0.wav	db0b015141682b1c5f05d795aca7fc06
+prolog_01	The King Rides North	prolog_01.wav	b41c2639828dab8b49daf016497ba707
+prolog_02	Wolves in the Snow	prolog_02.wav	4fd239704a27108c475cca77f93a025f
+prolog_03	A Khal's Bride	prolog_03.wav	51158cb92bebb3fa3b87efcc19800e5b
+prolog_04	The King in Winterfell	prolog_04.wav	fb629e013289b29519d08db696159da7
+prolog_05	The Fall of Bran Stark	prolog_05.wav	d501e29b12ed184f76e04d70d2c4addc
+prolog_06	The King's Hand	prolog_06.wav	369d5f1e081d4dc58ba852018ec81307
+prolog_07	Roads South and North	prolog_07.wav	92ed8ad7a65d6266e72efec5dcc7654b
+prolog_08	A Knife in the Night	prolog_08.wav	618be5c3ce3dc757b5168ff6143f3ca9
+prolog_09	Blood at the Trident	prolog_09.wav	0a82325ca50f3a91c85624d330096547
+prolog_10	A Ranger Lost	prolog_10.wav	673676ee7bef28f67e476cd4b4d2a37d
+prolog_11	The Small Council	prolog_11.wav	e2b72606881ebf3a11b4e065a53044e6
+prolog_12	The Dragonbone Dagger	prolog_12.wav	6581ed8e4d507f4c5c2953422525f06c
+prolog_13	The Inn at the Crossroads	prolog_13.wav	8c472c8d9cc43d19aab09b6b391bb4fc
+prolog_14	The Mountain Clans	prolog_14.wav	b6a536247b02102c8b274900433597b8
+prolog_15	The Tourney of the Hand	prolog_15.wav	7262be0734cbfd6cc16b38593ef87881
+prolog_16	Trial at the Eyrie	prolog_16.wav	9831c4251932d3f5fc0bed840993209c
+prolog_17	Swords in the Street	prolog_17.wav	068b4f164d3ff13d3d99ee4642ba34f9
+prolog_18	A Crown of Gold	prolog_18.wav	42b39f1b5f0d44a8777cc0422cc9aed9
+prolog_19	The Riverlands Burn	prolog_19.wav	307c1585084eee7a25455c615e795f20
+prolog_20	The King's Justice	prolog_20.wav	bde48d4dcb18c10d88eac4758d5fba20
+prolog_21	A Cup of Wine	prolog_21.wav	a86d45400b5b41efca857505e018faa1
+prolog_22	The Royal Hunt	prolog_22.wav	86e9c5b6090d0b5d79c19fbfeaf58dfe
+prolog_23	The Fall of the Hand	prolog_23.wav	6494af10d35c2484d222ddcff07aca1d

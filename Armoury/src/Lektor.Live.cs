@@ -116,7 +116,7 @@ namespace Armoury
         private static int _liveFlag = -1;
 
         private static int DailyMax() { var s = Settings.Current; int n = s != null ? s.LektorGossipDailyChars : 1000; return n < 0 ? 0 : n > 10000 ? 10000 : n; }
-        private static int ReserveChars() { var s = Settings.Current; int n = s != null ? s.LektorGossipReserveChars : 14000; return n < 0 ? 0 : n > 30000 ? 30000 : n; }
+        private static int ReserveChars() { var s = Settings.Current; int n = s != null ? s.LektorGossipReserveChars : 3000; return n < 0 ? 0 : n > 30000 ? 30000 : n; }
         private static string K8(string key) { return key != null && key.Length >= 8 ? key.Substring(0, 8) : (key ?? "-"); }
         private static string Today() { return DateTime.Now.ToString("yyyy-MM-dd", Inv); }
         private static string Clock() { return DateTime.Now.ToString("HH:mm:ss", Inv); }

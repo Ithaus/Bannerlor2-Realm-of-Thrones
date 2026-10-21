@@ -9032,9 +9032,9 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipDailyChars { get; set; } = 1000;
 
-        [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. 14000 keeps about 11000 letters for the prologue recordings still to be made plus 3000 spare; set it to 3000 once they are made. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
+        [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
-        public int LektorGossipReserveChars { get; set; } = 14000;
+        public int LektorGossipReserveChars { get; set; } = 3000;
 
         public void ApplyTo(Settings s)
         {
