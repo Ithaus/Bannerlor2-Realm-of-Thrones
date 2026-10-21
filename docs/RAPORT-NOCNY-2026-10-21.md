@@ -1,13 +1,15 @@
 # Raport nocny 20/21.10 dla Jeffa
 
-Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC ### 102-104, a przekazanie dla drugiego konta w PRZEKAZANIE-2026-10-21.md.
+Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC ### 102-106, a przekazanie dla drugiego konta w PRZEKAZANIE-2026-10-21.md.
 
 ## W skrócie
 
 - **WGRANIE 96** jest w grze od 20.10 19:30. Przeszło trzy testy: bitwy, nową kampanię na 180 dób i 160 dób na starym zapisie. Wszystkie bez wywrotki i z 0 błędów w logu Armoury.
 - **WGRANIE 97** jest w grze od 20.10 23:20 (wioski boczne i ich obrońcy, obóz, szkolenie, posiłki, surowce do łuków). Przeszło dwa pełne zestawy testów (97 i 97b z poprawkami po recenzji scalenia), wszystkie bez błędów. W Twoich ustawieniach MCM zmieniłem obóz na 21:00-3:00 (była 0:00-6:00); kopia starego pliku jest obok.
+- **WGRANIE 98** (plotki za kufel, pijaństwo i kac) jest w grze od 21.10 00:55. Testy przeszły bez błędów.
+- **WGRANIE 99** (markietani w dużych obozach): _test w toku, wynik niżej_.
 - **Twoje zapisy są nietknięte.** Testy sprawdzają to za każdym razem (104 pliki, sumy kontrolne bez zmian).
-- **Limit tygodniowy:** około 92% przy pisaniu. Rzeczy, których nie zdążyłem, są rozpisane do przekazania na końcu raportu.
+- **Limit tygodniowy:** około 95% przy pisaniu. Rzeczy, których nie zdążyłem, są rozpisane do przekazania na końcu raportu.
 
 ## Co weszło w 96 (już w grze)
 
@@ -27,6 +29,16 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **Długi miast:** rada miasta pożycza u mieszczan i w Banku, a w potrzebie ściąga podatek nadzwyczajny.
 - **Bandyci noszą jedzenie i złoto**, jedzą codziennie, a gdy głodują, część z nich odchodzi.
 - **Sakiewki ludzi według potrzeby, koszyk ludu, płótno i sukno** w planie wsi.
+
+## Co wchodzi w 99 (markietani - po teście)
+
+- **Gdzie:** w menu obozu opcja **„Visit the sutlers' row”**, gdy masz co najmniej 150 ludzi albo jesteś w armii (także w cudzej: opcja jest w menu armii).
+- **Ile kramów:** 1 na 100 ludzi, najwyżej 12.
+- **Cyrulicy:** leczą rannych. 8 rannych na kram na dobę, za człowieka 15 d razy jego poziom plus 1 (żołnierz 1. poziomu 30 d, 5. poziomu 90 d).
+- **Płatnerze polowi:** naprawiają zużyty sprzęt Twoich ludzi, 6 sztuk na kram na dobę. Płacisz jak u kowala w mieście plus 30%, a materiał schodzi z półki miasta.
+- **Zabawa (ale i kości):** morale +6, najwyżej +10, raz na 24 godziny, około 2 d na człowieka.
+- **Sklep:** towar pochodzi z półek najbliższego miasta, z narzutem 30%. Markietani skupują też łup, do 1500 d na kram na dobę.
+- **Skąd pieniądze i towar:** pieniądze idą do kasy miasta i do wsi, a towar znika z półki miasta, więc nic nie bierze się z niczego.
 
 ## Co weszło w 98 (już w grze, od 21.10 00:55)
 
@@ -103,10 +115,14 @@ Testy tego nie psują, to rzeczy do strojenia:
 - Warsztaty częściej stają bez drewna.
 - Chleb jest trochę za drogi.
 
-## Czego nie zdążyłem (do przekazania)
+## Czego nie zdążyłem (do przekazania na drugie konto)
 
-Kolejność według Twojej listy:
-1. Tablica ogłoszeń: rozpoznanie i projekt są gotowe (docs/PROJEKT-TABLICA-OGLOSZEN-2026-10-21.md). Gra ma 43 rodzaje zadań. Kapitana straży nie ma ani w grze, ani w ROT, ani w BK, więc dodamy go sami: będzie wywieszał listy gończe na bandy z okolicy, a nagrodę zapłaci kasa miasta (za bandę 20 ludzi ok. 375 d). Kod robi drugie konto.
-3. Obóz etap 2: markietani z usługami, rozrywką i sklepem w dużych obozach.
-4. Optymalizacja gry (na koniec).
-5. Strojenie gospodarki miast, opisane wyżej.
+1. **Tablica ogłoszeń:** rozpoznanie i projekt są gotowe (docs/PROJEKT-TABLICA-OGLOSZEN-2026-10-21.md).
+   - Zadania: gra ma 43 rodzaje zadań.
+   - Kapitan straży: nie ma go ani w grze, ani w ROT, ani w BK, więc dodamy go sami. Będzie wywieszał listy gończe na bandy z okolicy, a nagrodę zapłaci kasa miasta (za bandę 20 ludzi około 375 d).
+   - Kolejność prac: najpierw tablica z zadaniami gry i kartą ogłoszenia, potem kapitan straży.
+2. **Optymalizacja:** pomiar zrobiony, ale bezpiecznie dało się przyspieszyć tylko odrobinę (0,1-0,3%), więc tego nie wgrywałem.
+   - Najwięcej czasu przy przejściu doby zajmują: dochody rodów (około 90 ms), handel podaży i popytu (około 67 ms), skarbiec królestw (około 65 ms) i markietani (około 40 ms).
+   - Prawdziwy zysk, około 10% i więcej, wymaga przebudowy tych części z dowodem, że liczby gry się nie zmienią. Pomiar i plan są w gałęzi w-toku/m99-optym (docs/noc-1920/m99-optym-CHANGELOG.md).
+3. **Strojenie gospodarki miast** (opisane wyżej).
+4. **Twoje decyzje z listy wyżej** oraz praczki i odzież u markietanów.
