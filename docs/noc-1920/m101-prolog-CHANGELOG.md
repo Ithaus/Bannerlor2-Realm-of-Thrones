@@ -10,7 +10,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 | Krok | Co | Stan |
 |---|---|---|
 | E0 | wybor startu przy nowej kampanii, zapis wyboru, klucz MCM, flaga autotestu | ZROBIONE (build 0) |
-| E1a | kalendarz -188 dni, start opowiesci, latka odczytow CampaignStartTime w ROT.dll, Fabula/Inni CrashScribe | do zrobienia |
+| E1a | kalendarz -188 dni, start opowiesci, latka odczytow CampaignStartTime w ROT.dll, Fabula/Inni CrashScribe | ZROBIONE (build Armoury 0, CrashScribe 0) |
 | E1b | pokoj w prologu (wojny Westeros-Westeros zablokowane), pakty i sojusze z krolestwem Roberta | do zrobienia |
 | E2a | Robert i Ned zyja, glowy rodow i wladcy | do zrobienia |
 | E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | do zrobienia |
@@ -69,12 +69,33 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - Log: `Prolog (m101): latki menu glownego: okno wyboru TAK|BRAK ...`, `Prolog (m101): wybor startu nowej kampanii: PROLOG 298|KLASYCZNY 299 (...)`,
   `Prolog (m101): start sesji | prolog TAK|NIE | start kalendarza ... | start opowiesci ... | potkniecia N.`
 
+### E1a - kalendarz i start opowiesci (ZROBIONE)
+- `Calendar.cs`: `LongYearTimeModel.CampaignStartTime` = `StoryStartTime - Prologue.Span` w kampanii z prologiem (`Prologue.CalendarShifted`), inaczej
+  `StoryStartTime` (jak dotad). `Prologue.Span` = 188 dni liczone z minut (`CampaignTime.Minutes`, bez bledu float). Kalendarz startuje w roku 298, dzien 177
+  (rok 364 dni), o 06:00 jak ROT; start opowiesci = data ROT 299 bez zmian. Prolog wymaga klucza Long Year Enabled (bez modelu Armoury - klasyczny start + linia logu).
+- `Armoury/src/Prologue.Story.cs` (nowy): JEDNA latka - transpiler na wszystkich metodach ROT.dll czytajacych `CampaignTimeModel.CampaignStartTime`
+  (`callvirt get_CampaignStartTime` -> `call Prologue.StoryStartOf(model)`: StoryStartTime modelu Armoury; inny model - jego CampaignStartTime). Szukanie po
+  wszystkich typach ROT.dll (z zagniezdzonymi), filtr po bajtach IL + potwierdzenie `PatchProcessor.ReadMethodBody`. Wpinana leniwie, raz na proces, przy pierwszej
+  kampanii z prologiem (nowa: OnGameStart, przed zegarem; wczytana: SyncData, przed pierwszym tickiem). Klasyczna gra bez prologu w procesie - zero latek.
+  Skutek: wszystkie wydarzenia ROT (`CampaignStartTime + Days(N)`), wojny fabularne (`Enforced` StartDay/EndDay, `EnforceWars` nic przed doba 1 opowiesci -
+  takze wojny z StartDay 0), Inni (300/400/500 dni, rytm co 4 dni - 188 dzieli sie przez 4, rytm ten sam), zaciag i AI Nocnej Strazy licza od startu opowiesci.
+- `CrashScribe/src/StoryClock.cs` (nowy): start opowiesci odbiciem (`StoryStartTime` czynnego modelu; brak - `CampaignStartTime`). `Fabula.DayNow` i `NightKingCall.Day`
+  licza od niego (bramki Fabuli i kalendarz Innych w prologu ujemne = zamkniete; os x4.33 bez zmian - dni prologu to zwykle dni gry, os liczy od startu opowiesci).
+- Log: `Prolog (m101): latki opowiesci ROT (nowa kampania|wczytany zapis): wpiete N/M metod (miejsc odczytu X, podmienionych Y) w Z ms.`; w linii startu sesji:
+  `start kalendarza Year 298, Day 177 | start opowiesci Year 299, Day 1 (dzien prologu D) | latki opowiesci ROT: ...`.
+
 ## Ryzyko / co sprawdzic
 
 - E0: okno pokazuje sie w menu glownym (InformationManager.ShowInquiry na ekranie poczatkowym - tak jak okna gry o wyjsciu); wywolanie StartNewGame z przycisku okna
   idzie ta sama droga co przycisk "New Campaign" (GameStateManager.CleanAndPushState). Inna droga do nowej gry niz MBGameManager.StartNewGame (np. mod z wlasnym
   menedzerem gry) = brak okna i klasyczny start (bezpieczny kierunek).
 - Regresja klasycznego startu: w E0 jedyna zmiana w kampanii to nowe zachowanie z pustym kluczem zapisu i linia logu.
+- E1a: oczekiwane M = 28 typow / 38 miejsc z rozpoznania (liczba metod moze byc wieksza o metody zagniezdzone); mniej = ktores miejsce ROT liczy od kalendarza
+  (wydarzenie albo wojna ruszy za wczesnie). Metoda ROT wklejona przez JIT w wolajacego przed latka nie zobaczy podmiany - latka wchodzi przed pierwszym tickiem
+  kampanii (ROT czyta start w tickach), a czytelnicy to duze metody i wywolania wirtualne/delegaty. ROTBattleAtmosphere `LoreGates.CampaignDay` (atmosfera bitew wedlug
+  dnia) liczy dalej od kalendarza - w prologu zachowa sie jak po 188 dniach opowiesci (poza zakresem, do decyzji). AIInfluence (zaciemniony) - od kalendarza.
+- E1a regresja klasycznego startu: model czasu zwraca te sama wartosc co dotad (StoryStartTime = stary getter), latka ROT nie wpina sie; StoryClock w CrashScribe
+  zwraca StoryStartTime = CampaignStartTime co do tika.
 
 ## Status
 
@@ -87,6 +108,9 @@ DO SPRAWDZENIA (nic nie wgrane; gra Jeffa i test 100 nietkniete).
 2. "Classic 299" -> kampania jak dotad; w Armoury.log `Prolog (m101): wybor startu nowej kampanii: KLASYCZNY 299 (okno wyboru)` i `start sesji | prolog NIE`.
 3. "Prologue 298" -> w logu `wybor ... PROLOG 298 (okno wyboru)`, `nowa kampania z PROLOGIEM 298`, `start sesji | prolog TAK`.
 4. Zapisz, wczytaj: `start sesji | prolog TAK (okno wyboru)` (wybor z zapisu).
+5. (E1a) Prolog: na pasku mapy data "Year 298, Day 177"; w Armoury.log `latki opowiesci ROT (nowa kampania): wpiete N/N metod (miejsc odczytu 38 ...)`;
+   w logu CrashScribe `FABULA: dzien -187 | ...` (ujemny = prolog) i zadnego `FABULA: wydarzenie ... WYSTARTOWALO` przed dniem 0.
+6. (E1a) Klasyczny: data "Year 299, Day 1", `latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie)`, Fabula jak dotad (`FABULA: dzien 0`).
 
 ## Dla Jeffa
 

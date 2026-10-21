@@ -30,11 +30,16 @@ namespace Armoury
 
         internal LongYearTimeModel(CampaignTimeModel prev) { _prev = prev; }
 
+        /// <summary>Start KALENDARZA kampanii. m101-prolog: kampania z prologiem 298 (Prologue.CalendarShifted - wybor z menu glownego przypiety w OnGameStart przed
+        /// zegarem kampanii, po wczytaniu z zapisu arm_prologue) zaczyna sie Prologue.Span (188 dni co do minuty) przed startem opowiesci; klasyczna - w starcie opowiesci.
+        /// Czytaja go gra (zegar nowej kampanii, tydzien, faza ticku dobowego, opis zapisu), BK i nasze liczniki wieku kampanii - wszystkie chca kalendarza.
+        /// Os opowiesci ROT czyta StoryStartTime (latka Prologue.Story, CrashScribe StoryClock).</summary>
         public override CampaignTime CampaignStartTime
         {
             get
             {
-                return StoryStartTime;
+                var story = StoryStartTime;
+                return Prologue.CalendarShifted ? story - Prologue.Span : story;
             }
         }
 

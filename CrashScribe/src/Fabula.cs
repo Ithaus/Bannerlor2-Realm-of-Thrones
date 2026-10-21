@@ -89,7 +89,7 @@ namespace CrashScribe
         {
             try
             {
-                return (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays;
+                return StoryClock.Days();   // m101-prolog: od startu opowiesci (w prologu 298 ujemne - bramki zamkniete)
             }
             catch { return 0.0; }
         }

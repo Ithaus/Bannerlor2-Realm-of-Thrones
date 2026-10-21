@@ -152,6 +152,12 @@ namespace Armoury
                 Active = mine && _creatingPrologue;
                 ChosenBy = mine ? _creatingWhy : "";
                 _creatingFor = null; _creatingPrologue = false; _creatingWhy = "";
+                if (Active && (S == null || !S.LongYearEnabled))
+                {
+                    // bez modelu czasu Armoury (klucz Long Year Enabled) nie ma przesuniecia kalendarza ani startu opowiesci - klasyczny start
+                    Active = false;
+                    Log.Info(Tag + "wybrano prolog, ale klucz Long Year Enabled NIE (brak modelu czasu Armoury) - kampania KLASYCZNA.");
+                }
                 if (Active)
                 {
                     Log.Info(Tag + "nowa kampania z PROLOGIEM 298 (" + ChosenBy + ") - kalendarz zacznie sie " + PrologueDays + " dni przed startem opowiesci ROT.");
@@ -161,9 +167,10 @@ namespace Armoury
             catch (Exception e) { Stumble("OnGameStart", e); }
         }
 
-        /// <summary>Kampania z prologiem w tym procesie (nowa albo wczytana).</summary>
+        /// <summary>Kampania z prologiem w tym procesie (nowa albo wczytana): latki opowiesci ROT raz na proces (Prologue.Story).</summary>
         private static void OnPrologueCampaign(string why)
         {
+            try { InstallStory(why); } catch (Exception e) { Stumble("InstallStory", e); }
         }
 
         private static void ResetCampaign()
@@ -239,7 +246,8 @@ namespace Armoury
             }
             catch { }
             Log.Info(Tag + "start sesji | prolog " + (Active ? "TAK" : "NIE") + (Active ? " (" + ChosenBy + ")" : "")
-                     + " | start kalendarza " + cal + " | start opowiesci " + story
+                     + " | start kalendarza " + cal + " | start opowiesci " + story + (Active ? " (dzien prologu " + PrologueDay().ToString("0.0", Inv) + ")" : "")
+                     + " | latki opowiesci ROT: " + StoryState
                      + " | klucz Prologue Enabled " + (S != null && S.PrologueEnabled ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
         }
 
