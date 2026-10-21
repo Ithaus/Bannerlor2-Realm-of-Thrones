@@ -89,6 +89,14 @@ namespace Armoury
         {
             var s = S;
             if (s == null || !s.PrologueRoyalProgress) return;   // klucz wylaczony - partie orszaku puszczone (WorldStep), stan zostaje
+            if (day >= KingFallsDay)
+            {
+                // e5:A: blokady zdjete przed smiercia krola i aresztem Neda - orszak, Ned i Tyrion, ktore jeszcze trwaja (zatrzymane w drodze), koncza sie
+                if (_rpPhase >= 1 && _rpPhase <= LegCount) ColumnSkip("koniec prologu (dzien " + KingFallsDay + ") - orszak nie dojechal", day);
+                if (_nedPhase == 1 || _nedPhase == 2) { _nedPhase = 3; Log.Info(WTag + "Ned: koniec eskorty - koniec prologu (dzien prologu " + D(day) + ")."); }
+                if (_tyPhase >= 1 && _tyPhase <= 4) TyrionEnd(5, "koniec prologu", day);
+                return;
+            }
             ColumnStep(day);
             NedStep(day);
             TyrionStep(day);
@@ -144,8 +152,17 @@ namespace Armoury
             foreach (var h in EscortHeroes(day))
             {
                 var ep = Led(h);
-                if (ep != null && ep != rob) Control(PScene, ep, KEscort, null, rob, true);
+                if (ep != null && ep != rob) Escort(PScene, ep, rob);
             }
+        }
+
+        /// <summary>Eskorta krola: w drodze - SetMoveEscortParty; krol w osadzie (postoj) - eskorta wjezdza do tej osady (eskorta gry czeka pod brama
+        /// - MobileParty.ComputeIsWaiting - i nie kupuje jedzenia; w miescie i wsi gra kupuje je co godzine).</summary>
+        private static void Escort(string scene, MobileParty ep, MobileParty rob)
+        {
+            var at = rob.CurrentSettlement;
+            if (at != null && (at.IsTown || at.IsVillage || at.IsCastle)) Control(scene, ep, KGo, at, null, true);
+            else Control(scene, ep, KEscort, null, rob, true);
         }
 
         private static void NextLeg(MobileParty rob, double day, string why)
@@ -298,7 +315,7 @@ namespace Armoury
                 return;
             }
             var rob = Led(H(RobertId));
-            if (rob != null && rob != np) Control(NScene, np, KEscort, null, rob, true);
+            if (rob != null && rob != np) Escort(NScene, np, rob);
         }
 
         private static void TyrionEnd(int phase, string why, double day)

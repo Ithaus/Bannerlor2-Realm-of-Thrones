@@ -16,7 +16,7 @@ namespace Armoury
     /// m104-e5 pkt 2 - TURNIEJ REKI (klucz PrologueHandTourney; projekt pkt 2: dzien 125, Krolewska Przystan, Gora, Rycerz Kwiatow, Ogar, gracz moze startowac).
     /// Dzien 117: uczestnicy kanonu jada do Krolewskiej Przystani - Ser Gregor Clegane (lord_4_21), Ser Loras Tyrell (lord_1_44), Ser Jaime Lannister (ROTwanderer1)
     /// swoimi druzynami (partia sceny: rozkaz "do miasta", bez nowych decyzji; partia w armii - nie ruszamy jej, linia), Ogar (ROTwanderer3, dworzanin bez druzyny) -
-    /// przeniesiony do miasta (gra nie wyprowadza lordow z miasta z turniejem - HeroSpawnCampaignBehavior.CanHeroMoveToAnotherSettlement). Dzien 121: obwieszczenie
+    /// przeniesiony do miasta w dniu obwieszczenia (gra nie wyprowadza lordow z miasta z turniejem - HeroSpawnCampaignBehavior.CanHeroMoveToAnotherSettlement). Dzien 121: obwieszczenie
     /// przez GrandTourney (CanonApi.ProclaimRoyal odbiciem: turniej Grand bez reguly osmiu i bez spadku do lokalnego, zjazd GatherDays = 4 dni z zamknietymi listami,
     /// uczestnicy kanonu w drabince przed innymi lordami), bez GrandTourney - turniej gry (TournamentModel.CreateTournament). Dzien 125 listy otwarte (gracz moze
     /// startowac), dzien 127 - jesli nikt go nie rozegral - rozstrzygniecie gry (TournamentManager.ResolveTournament; nagroda jak w kazdym turnieju - nic z niczego).
@@ -118,7 +118,8 @@ namespace Armoury
                     Control(HScene, p, KGo, kl, null, false);
                     continue;
                 }
-                if (_thMoved.Contains(h.StringId) || h.CurrentSettlement == kl) continue;
+                // bez druzyny - dopiero po obwieszczeniu (turniej w miescie: gra nie wyprowadza wtedy lordow z miasta - HeroSpawnCampaignBehavior.CanHeroMoveToAnotherSettlement)
+                if (_thPhase < 2 || _thMoved.Contains(h.StringId) || h.CurrentSettlement == kl) continue;
                 try
                 {
                     if (!h.IsAlive || h.IsPrisoner || h.PartyBelongedTo != null || h.IsChild || !h.IsActive || h.GovernorOf != null || h.Clan == Clan.PlayerClan) continue;

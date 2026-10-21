@@ -488,7 +488,8 @@ namespace GrandTourney
                     if (state != 0) continue;
 
                     // wojna doszla pod mury, zanim goscie dojechali - impreza odwolana
-                    if (s.PeaceOnly && WarAtTheGates(town))
+                    // m104-e5: turniej kanonu (krolewski) odwoluje tylko oblezenie albo bunt - nie wroga druzyna w okolicy (np. brotherhood w stalej wojnie z korona)
+                    if (s.PeaceOnly && (IsCanon(p) ? (town.Settlement.IsUnderSiege || town.InRebelliousState) : WarAtTheGates(town)))
                     {
                         _events.Remove(line);
                         TourneyRansom.CallOff(game, town);   // R3-04a: odwolanie bez wykupu
