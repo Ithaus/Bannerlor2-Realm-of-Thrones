@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- m97-surowce (Armoury): rzadkie surowce lukow z czardrzewa i smoczej kosci. Kategoria arm_rare_stuff rejestruje kod (SubModuleMain.InitializeSubModuleGameObjects)
+     przed wczytaniem tego pliku. Wartosc: ok. 2/3 ceny luku (HistExoticBows: weirwood_bow 6000, dragonbone_bow 20000) - reszta to praca mistrza. -->
+<Items>
+	<Item
+		id="arm_weirwood"
+		name="{=arm_weirwood}Weirwood{@Plural}weirwood staves{\@}"
+		mesh="hardwood"
+		culture="Culture.freefolk"
+		item_category="arm_rare_stuff"
+		value="4000"
+		weight="2.5"
+		Type="Goods">
+		<Flags
+			Civilian="true" />
+	</Item>
+	<Item
+		id="arm_dragonbone"
+		name="{=arm_dragonbone}Dragonbone{@Plural}pieces of dragonbone{\@}"
+		mesh="walrus_ivory"
+		culture="Culture.valyrian"
+		item_category="arm_rare_stuff"
+		value="14000"
+		weight="2"
+		Type="Goods">
+		<Flags
+			Civilian="true" />
+	</Item>
+</Items>

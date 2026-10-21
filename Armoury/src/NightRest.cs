@@ -67,7 +67,7 @@ namespace Armoury
         private static bool _lastRestPlayer, _lastMovedPlayer;
         // noc 15/16.10 (NightMarchNotice): numer nocy obozu (NightClock.NightId) ostatniego pytania, ostrzezenia i komunikatu obozu automatycznego;
         // liczniki doby gracza do linii switu (godziny marszu w godzinach obozu, obozy automatyczne, sny przerwane poza menu) i tresc komunikatow switu
-        private static long _promptNight = -1, _warnNight = -1, _campMsgNight = -1;
+        private static long _promptNight = -1, _warnNight = -1, _campMsgNight = -1, _raidNight = -1;   // _raidNight: n26 styk - linia logu godziny obozu w rabunku wioski raz na noc
         private static int _marchHoursDay, _autoCampDay, _sleepCutDay;
         private static string _lastDawnMsg;
         // noc 15/16.10 (PlayerSleepGuard, poprawka recenzji 1): splata dlugu CALYM snem w menu - cel snu (NeededHours) i dlug w chwili polozenia sie
@@ -125,7 +125,18 @@ namespace Armoury
         {
             var s = Settings.Current;
             float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
-            return baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            float need = baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            return need + InnDrink.ExtraSleepH(need, _restTonight);   // m98-plotki: pijany gracz dosypia (baza + 1 h na kufel ponad prog od ostatniego kufla); trzezwy - 0
+        }
+
+        /// <summary>m98-plotki (recenzja gra, SmithMenu.AnvilShift): godziny snu liczone od teraz, bez odejmowania odpoczynku doby - trzezwy jak NeededHours,
+        /// pijany max(potrzeba, brakujace do odespania). NeededHours dolicza pijanemu odpoczynek doby, bo menu snu odejmuje go od celu (_menuTarget); kowadlo nie odejmuje.</summary>
+        internal static float NeededHoursFresh()
+        {
+            var s = Settings.Current;
+            float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
+            float need = baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            return need + InnDrink.ExtraSleepH(need, 0f);
         }
 
         // ------------------------------------------------------------ rachunek nocy
@@ -177,7 +188,7 @@ namespace Armoury
                 // dawal 5.6 h i dlug); sufit 12, zeby zle ustawienie nie robilo nocy z calej doby
                 // poprawka recenzji: rowne godziny (brak obozu swiata) nie przesuwaja swita gracza - wtedy stary swit 6:00
                 int dawn = PlayerDawn;
-                bool night = h >= 21 || h <= Math.Min(dawn, 12);
+                bool night = LedgerNight(h);   // m97-oboz (recenzja): 10 tikow konczacych sie o swicie (swit 6 -> 21..6 jak dotad)
                 // grupa11: czesc wspolna z musztra (osada, oboz obleznikow, krok <= 0.35 jedn.) - jedna funkcja Drill.RestHour;
                 // morze i sluzba ROT to zasady snu (nie postoju) - dochodza tylko tutaj
                 bool resting = Drill.RestHour(mp, step)
@@ -192,18 +203,25 @@ namespace Armoury
                 bool forced = ForcedMarch.Hour(s, mp, movedH);
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
-                if (resting && !forced) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                // m97-szkolenie (recenzja 4): godzina cwiczen z menu obozu ("Train the men") to praca, nie odpoczynek - jak w staminie (menu cwiczen poza InCampMenu)
+                bool drilled = CampDrill.DrilledLastHour;
+                if (resting && !forced && !drilled) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                InnDrink.RestHour(resting && !forced && !drilled ? (night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) : 0f, _sleeping);   // m98-plotki: odsypianie kufli tym samym odpoczynkiem (wlasny try)
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);
                 bool captive = TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive;
                 bool enl = RotEnlisted();   // sluzba ROT raz na tick (odbicie) - dla nowych warunkow nocy gracza
+                // n26 styk (recenzja 97): rabunek wioski pobocznej (m97-wioski, menu oczekiwania bez MapEvent) to zajecie jak rabunek gry - bez namiotu, pytania,
+                // obozu z rozkazu i ostrzezenia marszu; noc NIE odhaczona (pytanie padnie w pierwszej godzinie obozu z ruchem po rabunku)
+                bool raidNow = SideVillageVisit.RaidActive;
+                if (raidNow && InCamp(h) && _raidNight != nightId) { _raidNight = nightId; Log.Info("Nocleg: gracz - godzina obozu " + h + ":00 w trakcie rabunku wioski pobocznej - bez namiotu, pytania o nocleg i ostrzezenia (noc " + nightId + " nie odhaczona)."); }
 
                 // NAMIOT SAM SIE STAWIA (Jeff 31.08: "jak spie, to czasami sie
                 // nie uruchamia") - nocny postoj w polu to oboz, takze bez menu
                 if (InCamp(h) && resting && !PlayerCamped && s.CampTentIcon && !forced
                     && mp.CurrentSettlement == null && mp.MapEvent == null
-                    && mp.AttachedTo == null && !mp.IsCurrentlyAtSea)
+                    && mp.AttachedTo == null && !mp.IsCurrentlyAtSea && !raidNow)
                 {
                     Tent(mp, true);
                     PlayerCamped = true;
@@ -246,7 +264,7 @@ namespace Armoury
                 if (promptHour && CampStart != CampEnd && movedH && s.NightPromptSkipWhenRested && _restTonight - Math.Max(0f, _dawnOwed) >= NeededHours()
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
-                    && PlayerEncounter.Current == null && !enl)
+                    && PlayerEncounter.Current == null && !enl && !raidNow)
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
                     _promptNight = nightId;
@@ -260,7 +278,7 @@ namespace Armoury
                     && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null
                     && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
-                    && PlayerEncounter.Current == null && !RotEnlisted())
+                    && PlayerEncounter.Current == null && !RotEnlisted() && !raidNow)
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
                     _promptNight = nightId;
@@ -289,7 +307,7 @@ namespace Armoury
                 // jeszcze bazy - z baza dlugu o swicie nie bedzie); poza osada, morzem, armia cudzego wodza (doczepiony), niewola, spotkaniem i sluzba ROT
                 bool marchField = CampStart != CampEnd && movedH && !resting && !PlayerCamped && !_sleeping
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
-                    && PlayerEncounter.Current == null && !captive && !enl;
+                    && PlayerEncounter.Current == null && !captive && !enl && !raidNow;
                 if (marchField && InCamp(h - 1)) _marchHoursDay++;
                 if (marchField && InCamp(h))
                 {
@@ -365,10 +383,20 @@ namespace Armoury
 
         // ---- T1 (noc 08/09.10): JEDNA NOC OBOZU dla calego swiata. Jeff: "jak armia
         // idzie, to trzeba rozbic oboz - daj godziny od 24 do 6 rano". Godziny z MCM
-        // (CampStartHour / CampEndHour, domyslnie 0 i 6), rowne godziny = brak obozu
+        // (CampStartHour / CampEndHour, domyslnie 21 i 3 od m97-oboz - noc gry 22-2 cala w obozie; bylo 0 i 6), rowne godziny = brak obozu
         // (bez tego 0/0 uspiloby swiat na 24 h w trwajacej kampanii).
-        internal static int CampStart { get { var s = Settings.Current; return Mod24(s != null ? s.CampStartHour : 0); } }
-        internal static int CampEnd { get { var s = Settings.Current; return Mod24(s != null ? s.CampEndHour : 6); } }
+        internal static int CampStart { get { var s = Settings.Current; return Mod24(s != null ? s.CampStartHour : 21); } }
+        internal static int CampEnd { get { var s = Settings.Current; return Mod24(s != null ? s.CampEndHour : 3); } }
+        // m97-oboz (recenzja gry, krytyczne): okno pelnej stawki snu ZAKOTWICZONE O SWICIE, stalej dlugosci - bylo "od 21:00 do switu", co przy swicie 3:00
+        // skracalo je z 10 tikow do 7 (oboz splaty dlugu 1 od 17:00 dawal 8.8 h z 9, gracz splacal dlug 2-5 h dluzej). Teraz przesuniecie godzin obozu
+        // przesuwa cala noc snu: swit 6 -> ksiega 21..6 i menu 21:00-5:59 (dokladnie jak dotad), swit 3 -> ksiega 18..3 i menu 18:00-2:59.
+        private const int SleepNightTicks = 10;   // tikow ksiegi pelnej stawki (tick o godzinie h liczy godzine h-1..h; swit-9 .. swit)
+        /// <summary>Ksiega snu (gracz OnHourly i AI): tick o godzinie h w nocy snu = h w [swit-9, swit] (10 tikow, przez polnoc).</summary>
+        internal static bool LedgerNight(int h) { return Mod24(h - (PlayerDawn - (SleepNightTicks - 1))) < SleepNightTicks; }
+        /// <summary>Sen w menu i w karczmie (godzina zegara): noc snu = [swit-9, swit) - 9 godzin zegara, ktore ksiega liczy tikami swit-8 .. swit.</summary>
+        internal static bool MenuNight(int h) { return Mod24(h - (PlayerDawn - (SleepNightTicks - 1))) < SleepNightTicks - 1; }
+        /// <summary>Pierwsza godzina nocy snu (do logu): swit-9.</summary>
+        internal static int SleepNightStart { get { return Mod24(PlayerDawn - (SleepNightTicks - 1)); } }
         private static int Mod24(int h) { return ((h % 24) + 24) % 24; }
         /// <summary>Swit rachunku snu gracza: koniec obozu, a przy rownych godzinach (swiat nie obozuje) stary swit 6:00.</summary>
         internal static int PlayerDawn { get { int st = CampStart, e = CampEnd; return st == e ? 6 : e; } }
@@ -429,7 +457,7 @@ namespace Armoury
                 _lastRestPlayer = false; _lastMovedPlayer = false;
                 _menuDawnCut = 0f; _dawnOwed = 0f; _dawnDeferredUp = 0;
                 _menuNeeded = -1f; _menuDebt0 = 0; _menuDawns = 0;
-                _promptNight = -1; _warnNight = -1; _campMsgNight = -1;
+                _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;
                 _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
                 // PlayerSleepGuard: flaga snu z poprzedniej kampanii / sprzed wczytania nie przechodzi (dotad zawieszony sen przezywal wczytanie zapisu
                 // z mapy); wczytanie zapisu z menu snu ustawia ja od nowa w SleepInit (menu wstaje po konstruktorze)
@@ -452,7 +480,7 @@ namespace Armoury
         {
             int had = (PlayerCamped ? 1 : 0) + (_tentStrikes > 0 ? 1 : 0) + (_tentChildren >= 0 ? 1 : 0) + (_promptDay >= 0 || _promptNight >= 0 ? 1 : 0);
             _tentStrikes = 0; _tentChildren = -1; _promptDay = -1; PlayerCamped = false;
-            _promptNight = -1; _warnNight = -1; _campMsgNight = -1;   // noc 15/16.10 (NightMarchNotice): numery nocy pytania, ostrzezenia i obozu - jak dzien pytania
+            _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;   // noc 15/16.10 (NightMarchNotice): numery nocy pytania, ostrzezenia i obozu - jak dzien pytania
             return had;
         }
 
@@ -497,7 +525,7 @@ namespace Armoury
                      + ", AiNightReliefWider=" + s.AiNightReliefWider + ", AiNightsAwakeInChase="
                      + s.AiNightsAwakeInChase.ToString("0.##", CultureInfo.InvariantCulture) + ", promien alarmu "
                      + s.AiCampDangerRadius.ToString("0.#", CultureInfo.InvariantCulture) + " jedn., poscig do " + CampLen()
-                     + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00"
+                     + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00, noc snu (pelna stawka) " + SleepNightStart + ":00-" + PlayerDawn + ":00"
                      + "; T10-R: MaxForcedNights=" + s.MaxForcedNights + (s.MaxForcedNights > 0 ? " (potem obowiazkowy odpoczynek do dlugu 0, ucieczka tylko przed wrogiem >= "
                         + CrushRatio.ToString("0.#", CultureInfo.InvariantCulture) + " x silniejszym; armia wedlug najbardziej zmeczonej partii)" : " (bez limitu - stare reguly)")
                      + (DryBuild ? " - DLL NA SUCHO (T10_DRY): tylko log, zachowanie i kary jak w T1" : "")
@@ -953,7 +981,7 @@ namespace Armoury
         }
 
         /// <summary>
-        /// CALY SWIAT OBOZUJE. Godzina obozu (T1: CampStartHour-CampEndHour, domyslnie 0-6): partie lordow i karawany
+        /// CALY SWIAT OBOZUJE. Godzina obozu (T1: CampStartHour-CampEndHour, domyslnie 21-3 od m97-oboz, wczesniej 0-6): partie lordow i karawany
         /// staja na nocleg (AI upione na godzine, wznawiane co tick nocy),
         /// z namiotem na mapie. NIE staja: scigani i uciekajacy (wrog w poblizu
         /// lub rozkaz ucieczki), armie w akcji (bitwa/oblezenie), zeglujacy,
@@ -1730,6 +1758,7 @@ namespace Armoury
                 try { clockH = (float)(CampaignTime.Now - _sleepStart).ToHours; } catch { }
                 Log.Info("Nocleg: sen w menu przerwany poza menu snu (menu '" + why + "') - koniec snu: w menu " + F1(_menuRest) + " h (zegara " + F1(clockH)
                          + " h), odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + d + ".");
+                InnDrink.OnWake(_menuRest, false, "sen przerwany");   // m98-plotki (recenzja technika): odsypianie kufli z paska tego snu (wlasny try)
                 TownInns.OnInterrupted(_menuRest, why);   // KA: sen w karczmie przerwany - premia tylko po przespanej bazie (wlasny try)
                 _menuNeeded = -1f; _menuDawns = 0;
             }
@@ -1854,11 +1883,14 @@ namespace Armoury
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
                 // R3-08c (ForcedMarch.cs): marsz forsowny gracza +% od wyniku, raz na lancuch - PRZED kara dlugu (kara liczy sie od predkosci z premia)
                 if (mobileParty == MobileParty.MainParty && ForcedMarch.Active && SpeedDepth.OutermostFinal) ForcedMarch.SpeedBonus(ref __result);
+                // m98-plotki (DrinkDrunkHangover): gracz pijany albo skacowany - kara od wyniku, raz na lancuch modeli (niezaleznie od dlugu snu); bez stanu - nic
+                if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal) InnDrink.SpeedPenalty(ref __result, DryBuild);
                 int d = DebtFor(mobileParty);
                 if (d < 1)
                 {
                     // KA (karczmy): wyspany w lozku gracz bez dlugu snu - premia do zmierzchu (TownInns.SpeedBonus; raz na lancuch modeli, jak kara)
-                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal) TownInns.SpeedBonus(ref __result);
+                    // m98-plotki (recenzja gra, wazne): pijany albo skacowany - premii lozka nie ma (InnDrink.SpoilsRest; kac jej nie znosi do zera)
+                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal && !InnDrink.SpoilsRest) TownInns.SpeedBonus(ref __result);
                     return;
                 }
                 if (!SpeedDepth.OutermostFinal) return;          // lancuch modeli (ROT->RB->vanilla): kara tylko raz
@@ -1884,11 +1916,13 @@ namespace Armoury
                 var mobileParty = __0;
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
+                // m98-plotki (DrinkDrunkHangover): kac gracza - kara morale (czynnik), raz na lancuch modeli; bez kaca - nic
+                if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale) InnDrink.MoralePenalty(ref __result, DryBuild);
                 int d = DebtFor(mobileParty);
                 if (d < 1)
                 {
                     // KA (karczmy): premia morale wyspanego w lozku gracza bez dlugu snu (TownInns.MoraleBonus; raz na lancuch modeli)
-                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale) TownInns.MoraleBonus(ref __result);
+                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale && !InnDrink.SpoilsRest) TownInns.MoraleBonus(ref __result);   // m98-plotki: jak predkosc
                     return;
                 }
                 if (!SpeedDepth.OutermostMorale) return;         // lancuch modeli morale: kara tylko raz
@@ -2300,6 +2334,7 @@ namespace Armoury
                     }
                 }
                 catch { }
+                InnDrink.OnWake(_menuRest, innFull, "pobudka");   // m98-plotki (recenzja technika, wazne): pasek tego snu odsypia kufle; przed karczma - komunikat lozka wie o kacu (wlasny try)
                 TownInns.OnWake(_menuRest, innFull);   // KA: sen w karczmie - stan "wypoczety" do zmierzchu albo bez premii (wlasny try; poza karczma nic)
                 // KA: sen w osadzie (karczma) - bez namiotu, powrot do menu osady z ticku snu (LeaveSleep w osadzie wola tylko SleepTick - opcja
                 // "Rouse the men early" podnosi tam flage); ExitToLast w miescie niszczy MenuContext i laduje w town_outside (SmithMenu)
@@ -2322,7 +2357,7 @@ namespace Armoury
         }
 
         /// <summary>Tlo menu obozu: grafika kultury (jak u armii), zapasowo ogolna - koniec z czerwonym "temp".</summary>
-        private static void SetCampBackground(MenuCallbackArgs args)
+        internal static void SetCampBackground(MenuCallbackArgs args)   // m97-szkolenie: takze menu cwiczen (CampDrill)
         {
             try
             {
@@ -2375,11 +2410,12 @@ namespace Armoury
                 if (!again) { _dawnOwed = 0f; _menuDawns = 0; }
                 // poprawka recenzji 1: cel calego snu i dlug przy polozeniu sie - do splaty calym paskiem (CreditWholeSleep)
                 _menuNeeded = needed; _menuDebt0 = Debt;
+                InnDrink.OnSleepInit();   // m98-plotki: odpoczynek od kufla przy polozeniu sie (pobudka wyrownuje z paskiem; wlasny try)
                 // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);
                 int h = CampaignTime.Now.GetHourOfDay;
-                bool night = h >= 21 || h <= 5;
+                bool night = MenuNight(h);   // m97-oboz: 9 h zegara do switu gracza (swit 6 -> 21-5 jak dotad, swit 3 -> 18-2)
                 _rouseAsked = false;
                 // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
                 string inn = TownInns.OnSleepInit(args);
@@ -2441,7 +2477,7 @@ namespace Armoury
                 // wlasne godziny snu: noc pelna stawka, dzien slabiej - te same
                 // zasady co rachunek doby w OnHourly, ale bez jego zerowania
                 int h = CampaignTime.Now.GetHourOfDay;
-                bool night = h >= 21 || h <= 5;
+                bool night = MenuNight(h);   // m97-oboz: 9 h zegara do switu gracza (swit 6 -> 21-5 jak dotad, swit 3 -> 18-2)
                 float day = s != null ? MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f) : 0.5f;
                 // KA: w lozku karczmy sen idzie szybciej (wazone liczba ludzi w porzadnej karczmie i dobrym domu, x1.25); poza karczma 1 - jak dotad
                 _menuRest += (float)dt.ToHours * (night ? 1f : day) * TownInns.SleepFactor();

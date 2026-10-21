@@ -64,6 +64,8 @@ namespace Armoury
                 if (_modelsPatched) return;
                 _modelsPatched = true;
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
+                // m101-prolog: okno wyboru startu nowej kampanii (Prologue 298 / Classic 299) - prefiks MBGameManager.StartNewGame, raz na proces; wlasny try
+                try { Prologue.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Prologue.ApplyAll", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
@@ -173,6 +175,7 @@ namespace Armoury
                 try { TownFolk.ApplySkup(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplySkup", e); }   // GL-B / 11c: robocizna od skupu plonu wsi (zaplata kasy taborom wsi; klucz FolkEarnFromVillageBuys czytany na zywo)
                 AmmoRecovery.ApplyAll(_harmony);
                 try { ReinforcementThanks.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ReinforcementThanks.ApplyAll", e); }   // n20-relacje: odsiecz DR - jedno okienko relacji zamiast okienka na lorda (transpiler RewardHelpers)
+                DrMarchArrival.ApplyAll(_harmony);   // m97-posilki: tylko zapamietuje Harmony - latki na DR (Evaluate, ComputeArrivalTime) w kampanii (ArmouryBehavior.OnSessionLaunched)
                 RecruitCost.ApplyAll(_harmony);
                 try { RecruitSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RecruitSources.ApplyAll", e); }   // 171: echo werbunku ROT, jency, autowerbunek zalog
                 try { GarrisonArmory.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll", e); }   // 171: sprzet idzie z ludzmi miedzy partia a zaloga i przy rozwiazaniu partii
@@ -233,6 +236,7 @@ namespace Armoury
                 // wpiety zawsze, dziala przy kluczu BesiegedReliefFirst
                 try { BesiegedRelief.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BesiegedRelief.ApplyAll", e); }
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }
+                try { HideoutSight.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HideoutSight.ApplyAll", e); }   // m100-kryjowki: bramka wypatrzenia i miejsce nowych kryjowek
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
                 // E6/K0 (209): licznik koni gry u zrodla (postfiks ItemRoster.OnRosterUpdated - liczy dopiero przy kluczu, flaga ustawiana w kampanii),
@@ -247,6 +251,8 @@ namespace Armoury
                 // E6/K5 (213): juczne nowych karawan z targu miasta startu (postfiks InitializeCaravanOnCreation + postfiks CreateCaravanParty VeryLow - po E4/8 Low,
                 // przed finalizerami CaravanCapital/O17) i udzwig luzaka pod jukami (postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity); dziala przy kluczach
                 try { PackMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackMarket.ApplyAll", e); }
+                // m97-oboz: woz taborowy i siodla transportowe - postfiks pojemnosci (jak PackMarket) i CalculateFinalSpeed wszystkich modeli predkosci (licznik glebokosci)
+                try { CampCart.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CampCart.ApplyAll", e); }
                 // m6b (4): juczne nowego taboru wsi ze stada albo z targu (postfiks InitializeVillagerPartyProperties), juczne konwoju DTE bez kopii do zbrojowni,
                 // nazwane pozycje ksiegi koni (zapas drogi DTE i BK, konie przy RemoveParty) i towar partii usunietych bez zniszczenia (ksiega towarow, klucz FoodSourcesInLedger)
                 try { PackSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackSources.ApplyAll", e); }
@@ -349,6 +355,7 @@ namespace Armoury
                 MercTenure.SetHarmony(_harmony);    // M6a-1: tylko zapamietanie - latki najmu gry i BK w kampanii
                 PeaceHold.SetHarmony(_harmony);     // M6a-3: tylko zapamietanie - latka pokoju gry w kampanii
                 MercContract.SetHarmony(_harmony);  // 185: tylko zapamietanie - latki modelu finansow w kampanii   // 169c: tylko zapamietanie - okna pomiaru wpina EnsureHooks w kampanii
+                try { CanonCompanions.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CanonCompanions.ApplyAll", e); }   // m101-postacie: dworzanie bez druzyny (postfiks GetBestAvailableCommander, jak BK)
                 // paczka 146: ksiega towarow (tylko log) - NA KONCU: ramki (prefiks + finalizer) na metodach, ktore wolaja metody juz
                 // zalatane wyzej i przez BK, i podsluch ItemRoster.AddToCounts dopiero gdy wszystkie ramki sa wpiete
                 try { GoodsLedger.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GoodsLedger.ApplyAll", e); }
@@ -561,6 +568,13 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnAfterGameInitializationFinished (PayNotes)", e); }
         }
 
+        /// <summary>m97-surowce: kategoria arm_rare_stuff (czardrzewo, smocza kosc) przed wczytaniem XML przedmiotow (arm_items_rare.xml) - ta sama chwila co NavalDLC.</summary>
+        public override void InitializeSubModuleGameObjects(Game game)
+        {
+            base.InitializeSubModuleGameObjects(game);
+            RareMaterials.RegisterCategory(game);
+        }
+
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             base.OnGameStart(game, gameStarterObject);
@@ -569,6 +583,8 @@ namespace Armoury
                 var starter = gameStarterObject as CampaignGameStarter;
                 if (starter == null || !(game.GameType is Campaign)) return;
                 McmSettings.Apply();
+                // m101-prolog: wybor startu z menu glownego przypiety do tej kampanii PRZED zegarem kampanii (model czasu czyta Prologue.CalendarShifted)
+                Prologue.OnGameStart(game);
                 // dlugosc roku MUSI wejsc, zanim gra przeliczy swoj zegar
                 LongYearTimeModel.Install(gameStarterObject);
                 TierDesertionModel.Install(starter);   // prawo dezercji (Jeff 17.09) - patrz DesertionLaw.cs
@@ -582,6 +598,7 @@ namespace Armoury
                 starter.AddBehavior(new DesertionLaw());
                 starter.AddBehavior(new MusterBook());
                 starter.AddBehavior(new HideoutSpotter());
+                starter.AddBehavior(new HideoutSight());       // m100-kryjowki: wypatrzenie ze Zwiadu, plotka odslania, miejsce nowych kryjowek (zapis arm_hideout_sight)
                 starter.AddBehavior(new HouseLevies());
                 starter.AddBehavior(new WorkshopTradeBehavior());   // warsztaty towarowe: linia dnia, rozmowa kupna, srednie zysku w zapisie
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
@@ -591,6 +608,8 @@ namespace Armoury
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
                 starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)
+                starter.AddBehavior(new CanonCompanionsBehavior()); // m101-postacie: postacie kanonu do rodow, usuniete, zmiany stron (flaga arm_canon_companions, tylko nowa kampania)
+                starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

@@ -56,8 +56,15 @@ namespace Armoury
         private static readonly HashSet<string> _rare = new HashSet<string>(StringComparer.Ordinal);
         private static string _rareFrom;
 
-        /// <summary>Przedmiot z listy RareBowsIds przy kluczu RareBowsNotForged (lista z ustawien, przeliczana tylko przy zmianie napisu).</summary>
+        /// <summary>Przedmiot z listy RareBowsIds przy kluczu RareBowsNotForged, ktorego nie da sie wykuc: m97-surowce - luk, dla ktorego jest
+        /// surowiec (RareMaterials.Covers: czardrzewo, smocza kosc), kuje sie z tego surowca (brama Forge.LegendAllowed) i rzadkim materialem nie jest.</summary>
         internal static bool RareStuff(ItemObject it)
+        {
+            return InRareList(it) && !RareMaterials.Covers(it);
+        }
+
+        /// <summary>Przedmiot z listy RareBowsIds przy kluczu RareBowsNotForged (lista z ustawien, przeliczana tylko przy zmianie napisu).</summary>
+        internal static bool InRareList(ItemObject it)
         {
             try
             {
@@ -316,6 +323,8 @@ namespace Armoury
                 if (!TileOn || item == null) return null;
                 if (RareStuff(item)) return "RARE STUFF - CANNOT BE FORGED";   // po recenzjach: takze bez wzoru - kafelek nie obiecuje nauki
                 if (!RangedLore.KnownOf(item)) return null;   // nieznany - zostaje "PATTERN NOT LEARNED"
+                string rm = RareMaterials.TileText(item);   // m97-surowce: znany wzor luku z rzadkiego surowca, surowca brak w sakwach
+                if (rm != null) return rm;
                 bool ranged = FletchForge.RangedType(item);
                 bool gated = ranged
                     || (item.HasArmorComponent && ArmourQuality.CraftOn)

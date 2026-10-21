@@ -1,0 +1,126 @@
+# Armoury: canon characters (m101-postacie, CanonCompanions.cs, MCM Canon Companions To Clans / Canon Companions Follow Story). New campaigns only.
+# Jeff 21.10: the book characters ROT puts in the taverns (ROTwanderer* in ROT-Content/ModuleData/spspecialcharacters_ROTcustomwanderers.xml)
+# A - start as lords of their house (party: yes = may lead a party, no = courtier who never leads a party - the game moves idle lords between the towns of their realm, later = courtier until a move 'lead');
+# B - never created (the ROT spawner skips them); C, D - stay for hire (listed only to be counted). After the start no A/B template is created twice.
+# clan = Clan.StringId of Realm of Thrones (spclans.xml); a missing clan leaves the character a wanderer (logged).
+#start	template	group	name	clan	party	note
+ROTwanderer1	A	Jaime Lannister	clan_vlandia_1	yes	Kingsguard, son of Tywin; leads men
+ROTwanderer8	A	Tyrion Lannister	clan_vlandia_1	yes	son of Tywin, later Hand of the King; leads the clansmen at the Green Fork and the Blackwater
+ROTwanderer4	A	Bronn of the Blackwater	clan_vlandia_1	later	Tyrion's sellsword; may lead men once knighted after the Blackwater
+ROTwanderer6	A	Podrick Payne	clan_vlandia_1	no	Tyrion's squire
+ROTwanderer19	A	Shagga son of Dolf	clan_vlandia_1	no	Stone Crows chief at Tyrion's side
+ROTwanderer12	A	Qyburn	clan_vlandia_1	no	courtier (maester without a chain)
+ROTwanderer3	A	Sandor Clegane	clan_nord_1	no	sworn shield of King Joffrey (court)
+ROTwanderer2	A	Lord Varys	clan_nord_1	no	Master of Whisperers (court)
+ROTwanderer27	A	Lord Petyr Baelish	clan_nord_1	no	Master of Coin (court)
+ROTwanderer25	A	Jacelyn Bywater	clan_nord_1	no	Commander of the City Watch (court)
+ROTwanderer9	A	Brienne of Tarth	clan_empire_west_2	no	Rainbow Guard of Renly
+ROTwanderer20	A	Theon Greyjoy	clan_battania_1	yes	ward of the Starks at the start of the war; leads men
+ROTwanderer18	A	Osha	clan_battania_1	no	wildling captive serving the Starks at Winterfell
+ROTwanderer38	A	Benjen Stark	clan_battania_2	yes	First Ranger of the Night's Watch; leads rangings
+ROTwanderer5	A	Samwell Tarly	clan_battania_2	no	steward of the Night's Watch
+ROTwanderer28	A	Yoren	clan_battania_2	no	wandering crow, recruiter of the Night's Watch
+ROTwanderer26	A	Quentyn Martell	clan_aserai_1	yes	prince of Dorne; leads men
+ROTwanderer22	A	Hizdahr zo Loraq	clan_empire_south_1	no	noble of Meereen (Meereen belongs to House Targaryen in ROT)
+ROTwanderer15	A	Rago the Bloodrider	clan_empire_south_1	yes	bloodrider of Daenerys; leads riders
+ROTwanderer21	A	Myranda	clan_empire_south_3	no	with Ramsay (show)
+ROTwanderer23	A	Locke	clan_empire_south_3	no	Bolton man (show)
+ROTwanderer33	A	Wun Wun	clan_sturgia_2	no	giant of the free folk (Mance Rayder)
+ROTwanderer14	B	Hodor			goes with Bran and dies (Jeff)
+ROTwanderer13	B	Syrio Forel			dies when Ned is arrested (before ROT starts)
+ROTwanderer50	B	Jory Cassel			dies in King's Landing before ROT starts
+ROTwanderer24	B	Maester Cressen			dies early in 299
+ROTwanderer10	B	Jaquin Hagar			Faceless Man - his own story
+ROTwanderer17	B	Kinvara the Red Priestess			priestess (show), not a fighter
+ROTwanderer16	B	Xaro Xhoan Daxos			merchant prince of Qarth
+ROTwanderer7	B	Gendry			apprentice smith, then with Yoren and the Brotherhood
+ROTwanderer45	B	Talisa			show only - Jeyne Westerling (ROTlord_177) weds Robb instead (Jeff 21.10)
+ROTwanderer11	C	Mya Stone			minor book character, stays for hire (Jeff: C - ok)
+ROTwanderer29	C	Dick Crabb			minor book character, stays for hire (Jeff: C - ok)
+ROTwanderer30	D	Ser Harlan Blackhare			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer31	D	Ser Benfry the Lucky			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer32	D	Ser Adrian Fairwood			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer34	D	Tae Hill			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer35	D	Ser Timothy Warden			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer36	D	Barry B Beesbury			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer37	D	Liam Ochre			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer39	D	Aemon Vezos			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer40	D	Arion Sand			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer41	D	Ser Osbert Tempest			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer42	D	Guts			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer47	D	Setzuko Kawasaki			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer49	D	Kallias Aentius			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer51	D	Pienner Stonetree			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer52	D	Ser Beric Karstark			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer53	D	Corvan Hale			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer54	D	Ser Kemal			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer55	D	Vissenya Rosedragon			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer56	D	Shadow Shwani			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer57	D	Snake Yi			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer59	D	Ash Pyke			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer60	D	Bjorn			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer61	D	Mio Brixler			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer62	D	Cyrus Bennett			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer63	D	Alyssa Storm			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer64	D	Alexios of Darrowford			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer65	D	Ser Cristal Hightower			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer66	D	Isa Storm			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer67	D	Steve Breitenfeld			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
+# #move - side changes after the books (CanonCompanionsFollowStory). Rows of one character run in file order; a row waits until the earlier rows of the
+# same character are done; an earlier row whose trigger has not come yet is dropped when a later one fires (the story went past it).
+# who: ROTwanderer* = the character made from that template (no parents); any other id = Hero.StringId (ROT lords, e.g. ROTlord_177 Jeyne Westerling).
+# trigger: terms joined by | (any of them); a term may end with +N = N days after it first came true:
+#   ev:<ROT event> started (IsActive or done), done:<ROT event> finished (ROT.Events.*: NedEvent, RenlyDeathEvent, BlackwaterSiegeEvent, BlackwaterEvent,
+#   RedWeddingEvent, JoffreyEvent = Purple Wedding, RamsayEvent, JonEvent, WallEvent, HarrenhalSiegeNotificationEvent, RickardKarstarkExecutionEvent,
+#   AegonInvasionEvent, DanyInvasionEvent ...), dead:<hero id>, war:<kingdom>:<kingdom> (at war), own:<settlement>:<kingdom> (held by that realm),
+#   rotday:N (days since the story of ROT began - the execution of Ned Stark), prolday:N (days of the prologue; only in a campaign started with it).
+# action: clan:<clan> lord of that house (may lead a party) | court:<clan> courtier of that house (no party) | lead (may lead a party from now on) |
+#   prisoner:<clan or settlement> captive of that house (its head's party, else its seat) or in that keep | free:<clan> set free and back to that house |
+#   wander:<culture> leaves his house and wanders a town of that culture (for hire) | remove (gone from the world, no message) |
+#   die (dies, no message) | marry:<hero id> | wed:<hero id> (marries and joins the spouse's house).
+# mode: empty = every campaign, prolog = only a campaign started with the prologue (m101-prolog), classic = only the classic start.
+# message: shown to the player only if he knows the character or his realm is one of the two sides; empty = log only.
+#move	id	who	name	trigger	action	mode	message	note
+m01	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:clan_battania_1			Whispering Wood - taken by Robb Stark's host (before Ned's execution in the book; in ROT the war of the North starts with NedEvent)
+m02	ROTwanderer1	Jaime Lannister	done:BlackwaterEvent	free:clan_vlandia_1		Jaime Lannister has been set free and rides home to his house.	Catelyn frees him (end of A Clash of Kings)
+p01	ROTwanderer8	Tyrion Lannister	prolday:110	prisoner:town_EN1	prolog		Catelyn seizes him at the crossroads inn and takes him to the Eyrie
+p02	ROTwanderer8	Tyrion Lannister	prolday:132	free:clan_vlandia_1	prolog		trial by combat at the Eyrie, Bronn is his champion
+m03	ROTwanderer8	Tyrion Lannister	ev:JoffreyEvent+40	clan:clan_khuzait_2		Tyrion Lannister has fled across the narrow sea.	accused of Joffrey's death, kills Tywin and flees; in Essos with the Second Sons (A Dance with Dragons)
+m04	ROTwanderer8	Tyrion Lannister	ev:DanyInvasionEvent	clan:clan_empire_south_1		Tyrion Lannister sails with Daenerys Targaryen as her Hand.	Hand of the Queen
+p03	ROTwanderer4	Bronn of the Blackwater	prolday:0	wander:river	prolog		sellsword on the roads of the Riverlands until the crossroads inn
+p04	ROTwanderer4	Bronn of the Blackwater	prolday:132	court:clan_vlandia_1	prolog		Tyrion's champion at the Eyrie, then his man (no party of his own until knighted - m05)
+m05	ROTwanderer4	Bronn of the Blackwater	done:BlackwaterEvent	lead			knighted after the Blackwater - may lead men
+m06	ROTwanderer4	Bronn of the Blackwater	ev:JoffreyEvent+30	clan:clan_nord_1			will not fight for Tyrion; weds Lollys Stokeworth - no House Stokeworth in ROT, so he stays with the crown
+m07	ROTwanderer6	Podrick Payne	ev:JoffreyEvent+40	wander:river			after Tyrion's flight rides with Brienne in search of Sansa
+p05	ROTwanderer19	Shagga son of Dolf	prolday:0	clan:stone_crows	prolog		Stone Crows in the Mountains of the Moon
+p06	ROTwanderer19	Shagga son of Dolf	prolday:132	court:clan_vlandia_1	prolog		follows Tyrion after the trial
+m08	ROTwanderer19	Shagga son of Dolf	ev:JoffreyEvent+40	clan:stone_crows			after Tyrion's fall goes back to the hills (an outlaw in the kingswood in the book)
+m09	ROTwanderer12	Qyburn	ev:JoffreyEvent+40	court:clan_nord_1			after Tywin's death serves Cersei
+m10	ROTwanderer3	Sandor Clegane	done:BlackwaterEvent	wander:river		Sandor Clegane has deserted King's Landing.	deserts in the battle and roams the Riverlands
+m11	ROTwanderer3	Sandor Clegane	done:RedWeddingEvent+20	remove			left for dead after the Twins; the Quiet Isle
+m12	ROTwanderer2	Lord Varys	ev:AegonInvasionEvent	court:ROTclan_84			his plan all along: Aegon
+m13	ROTwanderer27	Lord Petyr Baelish	ev:JoffreyEvent+5	court:clan_vlandia_3		Petyr Baelish has left King's Landing for the Vale.	flees with Sansa to the Vale
+m14	ROTwanderer27	Lord Petyr Baelish	ev:JoffreyEvent+15	marry:lord_4_6			weds Lysa Arryn
+m15	ROTwanderer25	Jacelyn Bywater	done:BlackwaterSiegeEvent|done:BlackwaterEvent	die			killed at the Blackwater
+m16	ROTwanderer9	Brienne of Tarth	dead:lord_1_9	court:clan_battania_1			after Renly's death swears herself to Catelyn Stark
+m17	ROTwanderer9	Brienne of Tarth	done:RedWeddingEvent|dead:lord_5_1	wander:river			after the Red Wedding searches for Sansa
+m18	ROTwanderer20	Theon Greyjoy	war:sturgia:battania	clan:clan_sturgia_1		Theon Greyjoy has gone home to the Iron Islands.	Balon's ironborn fall on the North
+m19	ROTwanderer20	Theon Greyjoy	done:BlackwaterEvent+10	prisoner:clan_empire_south_3			Winterfell falls in the days of the Blackwater; Ramsay takes him to the Dreadfort
+p07	ROTwanderer18	Osha	prolday:0	court:clan_sturgia_2	prolog		free folk beyond the Wall
+p08	ROTwanderer18	Osha	prolday:62	court:clan_battania_1	prolog		taken in the wolfswood, serves at Winterfell
+m20	ROTwanderer18	Osha	done:BlackwaterEvent+10	remove			flees with Rickon when Winterfell falls
+p09	ROTwanderer38	Benjen Stark	prolday:80	remove	prolog		lost beyond the Wall
+m21	ROTwanderer5	Samwell Tarly	done:WallEvent+20	remove			sent to Oldtown to forge his chain
+m22	ROTwanderer28	Yoren	ev:HarrenhalSiegeNotificationEvent|rotday:120	die			killed by Amory Lorch's men in the Riverlands
+m23	ROTwanderer26	Quentyn Martell	ev:JonEvent	die			burned by the dragons in Meereen (A Dance with Dragons)
+m24	ROTwanderer22	Hizdahr zo Loraq	ev:RamsayEvent	marry:lord_1_14			weds Daenerys in Meereen (A Dance with Dragons)
+m25	ROTwanderer33	Wun Wun	ev:JonEvent	court:clan_battania_6			with Jon Snow once the free folk pass the Wall
+m26	ROTlord_177	Jeyne Westerling	own:castle_EN6:battania|ev:RickardKarstarkExecutionEvent	wed:lord_5_1		Robb Stark has wed Jeyne Westerling of the Crag.	Robb takes the Crag and weds Jeyne (A Storm of Swords tells it; before the Karstark execution) - Talisa of the show is not in the world (B)
+m27	ROTlord_177	Jeyne Westerling	dead:lord_5_1	clan:ROTclan_45			after Robb's death she goes back to House Westerling
+# #rescue - a house destroyed by the story (DestroyClanAction: ROT RenlyDeathEvent destroys Renly's house before Renly is slain, JeorMutinyEvent the Night's Watch
+# of Jeor Mormont; the game then removes every member but the head). The canon characters of that house go to house 'to' first (as a side change) and keep
+# their own later rows; a destroyed house with no row here (Bolton or Snow in BastardsEvent, Stannis) takes its canon characters with it (logged).
+#rescue	clan	to	note
+clan_empire_west_2	clan_empire_west_5	Renly's house dies with him: Brienne goes home to Tarth for a day at most, then to Catelyn Stark (m16, dead:lord_1_9)
+clan_battania_2	clan_battania_6	Jeor Mormont's Night's Watch dies with him (Craster's Keep): Benjen, Samwell and Yoren stay on the Wall with Jon Snow, Lord Commander after Jeor in the book

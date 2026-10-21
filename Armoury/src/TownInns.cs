@@ -371,7 +371,7 @@ namespace Armoury
         private static string HoldFrom() { return Clock(Mod(NightRest.PlayerDawn * 60L - HoldMaxMin, 1440)); }
 
         /// <summary>Przewidywana pobudka po noclegu wzietym teraz - te same zasady co sen w menu (NightRest.SleepTick): cel = NightRest.SleepTargetNow (brak do
-        /// NeededHours w tej dobie), noc 21-5 pelna stawka, dzien DayRestFactor, mnoznik lozka; czekanie do switu, gdy swit najwyzej 12 h przed nami; bezpiecznik
+        /// NeededHours w tej dobie), noc snu NightRest.MenuNight pelna stawka (swit-9 do switu; swit 6 -> 21-5), dzien DayRestFactor, mnoznik lozka; czekanie do switu, gdy swit najwyzej 12 h przed nami; bezpiecznik
         /// snu NightRest.SleepCapHours. atDawn - nocleg czeka do switu. Szacunek co 15 min (podpowiedz menu).</summary>
         private static long PredictWake(long now, float sleepFactor, out bool atDawn, out long dawn)
         {
@@ -386,7 +386,7 @@ namespace Armoury
             while (t < cap && acc < target)
             {
                 long h = Mod(t, 1440) / 60;
-                acc += 0.25f * (h >= 21 || h <= 5 ? 1f : day) * f;
+                acc += 0.25f * (NightRest.MenuNight((int)h) ? 1f : day) * f;   // m97-oboz: noc snu do switu gracza (swit-9), jak sen w menu
                 t += 15;
             }
             if (atDawn && t < dawn) t = dawn;
@@ -411,7 +411,7 @@ namespace Armoury
                         delegate (MenuCallbackArgs a) { Commit(q); }, false, q);
                 }
                 // sw-zajazdy (InnGossip): plotki karczmarza w miescie - okno z tekstem (bez zmiany menu); klucz wylaczony - opcji nie ma
-                starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}Listen to the gossip", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
+                starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}{ARM_GOSSIP_TOWN}", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
                 // m95-menu (recenzja): napis mowi, dokad prowadzi - "Back to the tavern district", gdy wejscie stoi w dzielnicy karczm; inaczej jak dotad
                 starter.AddGameMenuOption(Menu, "arm_inn_back", "{=!}{ARM_INN_BACK}",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; TownMenus.SetBackLabel(a, "ARM_INN_BACK", "arm_inn_enter", "Back to the town"); return true; },
@@ -742,11 +742,14 @@ namespace Armoury
                 var msg = new StringBuilder((n.HostUid != null ? (IsHouse(n) ? "Rested in your own house: until " : "Rested under your villagers' roofs: until ") : "Rested in a bed: until ") + Clock(n.UntilMin) + " the column marches " + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
                 if (n.Price && PriceKey) msg.Append(" The good house's name opens doors - you trade up to 3% better in ").Append(n.Town).Append(" until ").Append(Clock(n.UntilMin)).Append(".");
                 if (NightRest.Debt > 0) msg.Append(n.HostUid != null ? " Old weariness still lingers - the night's rest shows once the sleep debt is paid off." : " Old weariness still lingers - the bed's comfort shows once the sleep debt is paid off.");
+                // m98-plotki (recenzja gra, wazne): pijany albo skacowany - premia lozka wstrzymana w latkach NightRest (InnDrink.SpoilsRest), komunikat to mowi
+                bool spoilt = InnDrink.SpoilsRest;
+                if (spoilt) msg.Append(InnDrink.Drunk ? " But you are still drunk - the bed does you no good until you sleep it off." : " But the ale still pounds in your head - the bed does you no good until the hangover passes.");
                 Log.Player(msg.ToString());
                 Log.Info(P + how + " w " + n.Town + " " + When(now) + " - w menu " + F1(menuRest) + " h, pelny pasek " + (full ? "tak" : "nie") + " -> wypoczeci do "
                          + When(n.UntilMin) + " (predkosc +" + F1(n.Speed) + "%, morale +" + F1(n.Morale) + ", cena " + (n.Price && PriceKey ? "tak" : "nie")
                          + (r.Price && !n.Price ? " - bez nocy do switu" : "")
-                         + ", dlug snu " + NightRest.Debt + (NightRest.Debt > 0 ? " - premia czeka na splate dlugu" : "") + ").");
+                         + ", dlug snu " + NightRest.Debt + (NightRest.Debt > 0 ? " - premia czeka na splate dlugu" : "") + (spoilt ? ", kara kufli (m98) - premia wstrzymana do konca kary" : "") + ").");
             }
             catch (Exception e) { Stumble("Wake", e); }
         }

@@ -92,6 +92,7 @@ namespace Armoury
             MapRoads.SpeedRoad(__0, ref __result);
             MapMud.Speed(__0, ref __result);   // p5-bloto (R3-07c): poza droga w deszczu -MapMudSpeedPercent% (wpis "Mud"); klucz wylaczony = wychodzi od razu
             SeaStorms.Speed(__0, ref __result);   // p6-sztormy (R3-05d): statek na morzu w burzy -SeaStormShipSpeedPercent% (wpis "Storm"); klucz wylaczony = wychodzi od razu
+            CampCart.Speed(__0, ref __result);    // m97-oboz (recenzja): woz gracza w zaprzegu -CartSpeedPenaltyPercent% PO suficie kolumny (wpis "Supply cart"); bez wozu = wychodzi od razu
         }
 
         /// <summary>Kolumna marszowa (tresc dawnego SpeedPostfix bez zmian).</summary>
@@ -167,7 +168,7 @@ namespace Armoury
                 var c = Settings.Current;
                 // SW-DROGI: ta sama latka niesie premie drogi (MapRoads.SpeedRoad) - wpinana takze przy wylaczonej kolumnie, gdy MapRoadSpeedBonus wlaczony
                 // (kolumna sprawdza wtedy swoj klucz w ColumnPostfix i wychodzi); oba klucze wylaczone = jak przed zmiana
-                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus && !c.SeaStormSlowsShips)) { Log.Info("MarchPace: wylaczony."); return; }   // p6-sztormy: latka niesie tez kare burzy na morzu
+                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus && !c.SeaStormSlowsShips && !c.CampCartEnabled)) { Log.Info("MarchPace: wylaczony."); return; }   // m97-oboz: latka niesie tez kare wozu   // p6-sztormy: latka niesie tez kare burzy na morzu
 
                 var post = new HarmonyMethod(typeof(MarchPace).GetMethod("SpeedPostfix",
                     BindingFlags.Public | BindingFlags.Static)) { priority = Priority.Last };
@@ -196,7 +197,7 @@ namespace Armoury
                 if (c.MarchPaceEnabled) Log.Info("MarchPace: kolumna marszowa wpieta w " + done + " modeli predkosci.");
                 else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla "   // p6-sztormy (recenzja): ktore klucze niosa latke
                               + (c.MapRoadSpeedBonus && c.SeaStormSlowsShips ? "premii drog (MapRoadSpeedBonus) i kary burzy na morzu (SeaStormSlowsShips)"
-                                 : c.SeaStormSlowsShips ? "kary burzy na morzu (SeaStormSlowsShips)" : "premii drog (MapRoadSpeedBonus)") + ".");
+                                 : c.SeaStormSlowsShips ? "kary burzy na morzu (SeaStormSlowsShips)" : c.MapRoadSpeedBonus ? "premii drog (MapRoadSpeedBonus)" : "kary wozu gracza (CampCartEnabled)") + ".");
             }
             catch (Exception e) { Log.Error("MarchPace.ApplyAll", e); }
         }

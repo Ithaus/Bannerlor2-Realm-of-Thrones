@@ -1010,6 +1010,39 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m96receptury <Armoury-*.log> (strumieniowo). R96-0 linia startu, R96-1 metal w lukach 0, R96-2 mediana masy
                     surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0, R96-6 latka SpendMaterials CRAFT BK
                     wpieta, R96-7 pekniecia CRAFT BK z kg (INFO). Log bez paczki: INFO.
+--grupa m97surowce : (20.10, w-toku/m97-surowce - Jeff "luk z czardrzewa - trzeba miec czardrzewo, smoczej kosci - smocza kosc"; Armoury/src/RareMaterials.cs,
+                    ModuleData/arm_items_rare.xml; klucze RareBowsNeedMaterial, RareMaterialSupply, RareMaterialOnlyFromSource)
+                    python -I tools/sprawdz_logi.py --grupa m97surowce <Armoury-*.log> (strumieniowo). S97-0 linia startu, S97-1 surowce istnieja (2 z 2, nie towar
+                    handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 doplyw nie doklada ponad
+                    pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
+                    (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
+--grupa m101postacie : (21.10, w-toku/m101-postacie; Armoury/src/CanonCompanions.cs, klucze CanonCompanionsToClans, CanonCompanionsFollowStory)
+                    python -I tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> [--crashscribe <session-*.log>]. MP-0 start (nowa kampania z kluczem, plik
+                    arm_canon_moves.tsv wczytany), MP-0b A/B/C/D = tabela w repo, MP-1 ERROR i potkniecia 0, MP-2 latki 2/2, MP-3 mapa rodow N/N (= repo, N > 0), MP-4
+                    przeniesienia A raz (BRAK rodu 0), MP-5 A nie sa wedrowcami bez zmiany wander, MP-6 B nie zyja (nie powstali + usunieci = B), MP-7 zmiana strony najwyzej
+                    raz, MP-8 zmiany (INFO), MP-9 A w rodach (INFO), MP-10 UC: odrodzenia A/B 0, MP-11 ratunek z rodow niszczonych przez fabule (INFO). Stary zapis: INFO.
+--grupa m101prolog : (21.10, w-toku/m101-prolog; Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
+                    python -I tools/sprawdz_logi.py --grupa m101prolog <Armoury-*.log> [--crashscribe <session-*.log>]. PR-0 linie startu, PR-1 ERROR i potkniecia 0,
+                    PR-2 latka startu opowiesci N/N (ROT 8.1.8: >= 30 metod, miejsca + zaciag >= 35) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
+                    wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 + 6/6, PR-7 koniec prologu (Robert martwy, Joffrey krolem, Ned jencem), PR-8 NedEvent (Ned
+                    martwy, Robb wladca Polnocy). Log bez prologu: INFO.
+--grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
+                    HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
+                    KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
+--grupa m102tablica : (21.10, w-toku/m102-tablica; Armoury/src/NoticeBoard*.cs, klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties i nast.)
+                    python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
+                    T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
+                    L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+--grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
+                    python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
+                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
+--grupa m97posilki : (20.10, w-toku/m97-posilki - Jeff "wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; Armoury/src/DrMarchArrival.cs; klucz DrArrivalByMarch)
+                    python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
+                    P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
+                    Log bez paczki albo bez bitew z DR: INFO.
+--grupa m97szkolenie : (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu"; Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
+                    python -I tools/sprawdz_logi.py --grupa m97szkolenie <Armoury-*.log> (strumieniowo). SZ-0 start sesji i perki przerobione, SZ-1 zero XP z marszu
+                    (gracz), SZ-2 godziny tylko z menu obozu (albo samoczynnie w obozie oblezenia / cudzej armii), SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI, strona gracza), SZ-5 AI wobec dawnej reguly (INFO), SZ-6 potkniecia 0.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -1907,6 +1940,19 @@ Uzycie (Python 3, tylko odczyt):
                     jedzenie < 95% - TAK przy 0, srednio <= 1 i max <= 3 DECYZJA (z nazwami), inaczej NIE; MK-6 pelny koszyk swiata >= 98%, MK-7 zjedzone bez zaplaty < 1%,
                     MK-8 przelane (INFO), MK-9 chleb M3 (INFO), MK-10 czas <= 2 ms, MK-11 Plan KS - czesc zaplacona R/P (INFO), MK-12 f5 - odmowa W, kappa W2, dni
                     koszyka (INFO). Bez kotwicy KS albo log sprzed galezi - INFO.
+--grupa m97wioski  : (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs, klucz Side Villages Enterable) wjazd do kazdej wioski pobocznej (handel koszykiem,
+                    nocleg, oboz, prace, rabunek tej wioski, okup). python -I tools/sprawdz_logi.py --grupa m97wioski <Armoury-*.log> (strumieniowo). WP-0 start sesji,
+                    WP-1 linie "ERROR in SideVillageVisit." 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi zmienia sie o -zysk gracza, kiesa gracza o zysk),
+                    WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek zakonczone z lupem / bez (INFO), WP-6 ruch doby (INFO). Log sprzed galezi - INFO.
+--grupa m97obroncy : (20.10, m97-wioski krok 2; Armoury/src/SideVillageVisit.Defenders.cs, klucz Side Village Defenders) obroncy wioski pobocznej z jej wlasnych ludzi.
+                    OB-0 start (klucz, udzial), OB-1 linie "ERROR in SideVillageVisit." 0, OB-2 kazda bitwa z obroncami zamknieta (druzyna nie przezywa bitwy; ostatnia
+                    otwarta na koncu logu - INFO), OB-3 straty z ludnosci <= obroncow, OB-4 obroncow <= pulapu ludnosci (1/10 w domu, najwyzej 60), OB-5 druzyny
+                    sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
+--grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
+                    turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
+                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
+                    (obieg 0), KP-4 turnieje i swaty prawdziwe w chwili sluchania, KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy upiciu / kacu,
+                    KP-7 ruch doby (INFO), KP-8 pobudka z pelnym paskiem snu przy pijanym = odespane (recenzja technika). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -3787,7 +3833,7 @@ def etap4_e48(rep, lines, start, win, hea, until):
     # N5 - wojsko lordow (jak E4/7 T9)
     rep.add("E4/8 N5: wojsko lordow d90-d120", "patrz E4/7 T9 (ta sama linia \"Ludzie:\")", "95-115 tys. (podloga 85)", None)
     # N6 - kontrole
-    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e\) = " + SF, arm[d]) for d in adays]
+    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?\) = " + SF, arm[d]) for d in adays]   # m97-wioski krok 2: + ob (obroncy wiosek pobocznych) - stare logi bez ob
     kc = [x for x in kc if x is not None]
     rep.add("E4/8 N6: KONTROLA linii E4/8 (najwieksza |roznica|)", f"{max(abs(x) for x in kc):.2f} ({len(kc)} dob)" if kc else "-", "<= 1 czlowiek kazdej doby", (max(abs(x) for x in kc) <= 1.0) if kc else None)
     mdays = [d for d in sorted(mia) if 1 <= run_day(d, start) <= until]
@@ -17936,7 +17982,7 @@ def lup5b_main(logp, start_arg, until=364, bdp=None):
 
 UC_DAY = re.compile(
     r"Unikaty ROT \(UC\): dzien (?P<d>\d+) \| wzorow (?P<w>\d+), zywych (?P<alive>\d+) \(wolnych w miastach (?P<town>\d+), bez miejsca (?P<nowhere>\d+),"
-    r" towarzyszy (?P<comp>\d+), w rodach (?P<clan>\d+), jencow (?P<pris>\d+)\), martwych (?P<dead>\d+), znikniete (?P<lost>\d+), brak (?P<none>\d+)"
+    r" towarzyszy (?P<comp>\d+), w rodach (?P<clan>\d+), jencow (?P<pris>\d+)\), martwych (?P<dead>\d+), znikniete (?P<lost>\d+), brak (?P<none>\d+)(?:, usuniete z kanonu (?P<canon>\d+))?"
     r" \| duplikaty (?P<dup>\d+) \(usuniete dzis (?P<duprem>\d+), nie do usuniecia (?P<dupleft>\d+)\)"
     r" \| odrodzenia dzis (?P<resp>\d+) \(od wczytania \d+\)"
     r" \| przeprowadzki dzis (?P<moved>\d+) \(od wczytania \d+\), usuniete przez gre dzis (?P<lostgame>\d+), inne usuniecia dzis (?P<lostother>\d+)"
@@ -18308,14 +18354,17 @@ def unikaty_main(logp):
             f"{resp} (linii ODRODZENIE {len(resp_lines)})" + (f"; pierwsza: {resp_lines[0][len('Unikaty ROT (UC): '):][:160]}" if resp_lines else ""),
             "0 przy kluczach StayDead i Move (inaczej INFO)", (resp == 0) if keys_on else None)
     first, last = days[0], days[-1]
-    rep.add("UN-5: wzory bez bohatera (brak)", f"ostatnia doba {last['none']}, max {max(d['none'] for d in days)}, znikniete (Lost) ostatniej doby {last['lost']}",
+    rep.add("UN-5: wzory bez bohatera (brak)", f"ostatnia doba {last['none']}, max {max(d['none'] for d in days)}, znikniete (Lost) ostatniej doby {last['lost']}"
+            f", usuniete z kanonu (Armoury m101, nie brak) {last.get('canon') or 0}",
             "0 ostatniej doby (kazdy wzor ma bohatera zywego albo zmarlego)", last["none"] == 0)
     drop = first["town"] - last["town"]
     why = max(0, last["dead"] - first["dead"]) + max(0, last["comp"] - first["comp"]) + max(0, last["clan"] - first["clan"]) + max(0, last["pris"] - first["pris"])
+    canon_up = max(0, (last.get("canon") or 0) - (first.get("canon") or 0))   # m101-postacie: postacie kanonu usuniete przez Armoury (zmiany stron)
+    why += canon_up
     rep.add("UN-6: wolni unikaty w miastach (karczmy)",
             f"doba {first['d']}: {first['town']} -> doba {last['d']}: {last['town']} (spadek {drop}); zgony +{last['dead'] - first['dead']}, towarzysze +{last['comp'] - first['comp']}, "
-            f"w rodach +{last['clan'] - first['clan']}, jency +{last['pris'] - first['pris']}",
-            "spadek <= przyrost zmarlych + towarzyszy + rodow + jencow (nikt nie znika z karczm)", drop <= why)
+            f"w rodach +{last['clan'] - first['clan']}, jency +{last['pris'] - first['pris']}, usuniete z kanonu +{canon_up}",
+            "spadek <= przyrost zmarlych + towarzyszy + rodow + jencow + usunietych z kanonu (nikt nie znika z karczm)", drop <= why)
     rep.add("UN-7: unikaty bez miejsca (zbiegowie, bez miasta)", f"doba {first['d']}: {first['nowhere']} -> doba {last['d']}: {last['nowhere']}, max {max(d['nowhere'] for d in days)}",
             "ostatnia doba <= pierwsza", last["nowhere"] <= first["nowhere"])
     moved = sum(d["moved"] for d in days)
@@ -36541,6 +36590,116 @@ def nkarczmy_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m97szkolenie (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu, w marszu jest marsz";
+# Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
+M97SZ_HEAD = "Szkolenie w obozie (m97): "
+M97SZ_ERR = ("ERROR in CampDrill", "ERROR in SyncData.arm_campdrill", "CtxOf.Camp")
+# recenzja 2: godziny samoczynne (oboz oblezenia, cudza armia - klucz DrillSiegeArmy) - grupa opcjonalna (linia sprzed poprawki: 0)
+M97SZ_PLAYER = re.compile(r"gracz dzien (\d+) \| godzin cwiczen ([\d.]+) \(z menu obozu od ostatniej linii ([\d.]+)(?:, samoczynnie w obozie oblezenia albo w cudzej armii ([\d.]+))?;"
+                          r".*?\| XP przyjete (\d+) .*?potkniecia (\d+)\.")
+M97SZ_AI = re.compile(r"AI dzien (\d+) \| zasada AI (TAK|NIE)[^|]*\| partii (\d+) \(ludzio-dni (\d+)\) \| godzin postoju za dnia \(najwyzej 8\) srednio ([\d.]+): 0 h (\d+), 1-7 h (-?\d+), 8 h (\d+)"
+                      r" \| XP po broni: dawna regula (\d+) -> zasada obozu (\d+) \(x([\d.]+)\), na glowe na dobe ([\d.]+) -> ([\d.]+), dane naprawde (\d+)"
+                      r" \| XP z marszu \(0 h postoju za dnia, XP > 0\) przy czynnej zasadzie: oddzialow (\d+)"
+                      r" \| strona gracza \(rod, armia\): partii (\d+), godzin srednio ([\d.]+), XP dawna (\d+) -> obozu (\d+), dane (\d+), z marszu oddzialow (\d+) \| potkniecia (\d+)\.")
+
+
+def m97szkolenie_main(logp):
+    """m97szkolenie (20.10; Armoury/src/CampDrill.cs): marsz nie uczy, gracz cwiczy tylko z menu obozu ("Train the men"), pelny dzien (8 h) x2.25,
+    strona gracza i AI (przy DrillCampOnlyAi) - godziny postoju za dnia. SZ-0 linia startu (zasada, perki przerobione), SZ-1 zero XP bez godzin cwiczen
+    (gracz), SZ-2 godziny gracza tylko z menu obozu, SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI i strona gracza), SZ-5 AI XP wobec
+    dawnej reguly (INFO - decyzja Jeffa o DrillCampOnlyAi), SZ-6 potkniecia 0. Wejscie: log Armoury (strumieniowo)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("SZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, players, ais, ends, bad = [], [], [], [], []
+    n_err = 0
+    after_start = False
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97SZ_HEAD):
+                rest = s[len(M97SZ_HEAD):]
+                if rest.startswith("start sesji"):
+                    starts.append(rest)
+                    after_start = True
+                elif rest.startswith("gracz dzien"):
+                    mp = M97SZ_PLAYER.search(rest)
+                    if mp:
+                        players.append((int(mp.group(1)), float(mp.group(2)), float(mp.group(3)), int(mp.group(5)), int(mp.group(6)), after_start,
+                                        float(mp.group(4)) if mp.group(4) else 0.0))
+                    else:
+                        bad.append(s)
+                    after_start = False
+                elif rest.startswith("AI dzien"):
+                    ma = M97SZ_AI.search(rest)
+                    (ais.append(ma.groups()) if ma else bad.append(s))
+                elif rest.startswith("koniec cwiczen"):
+                    ends.append(rest)
+            elif "ERROR" in s and any(e in s for e in M97SZ_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, doby gracza {len(players)}, doby AI {len(ais)}, konca cwiczen {len(ends)}, nierozpoznanych {len(bad)}, ERROR {n_err}")
+    if not starts and not players and not ais:
+        rep.add("SZ-0: linie 'Szkolenie w obozie (m97)'", "brak w logu", "INFO (log sprzed paczki m97-szkolenie)", None)
+        rep.show()
+        return 0
+    if starts:
+        st = starts[-1]
+        on = "gracz tylko z menu obozu (Train the men) TAK" in st
+        mk = re.search(r"perki przerobione (\d+)/(\d+)", st)
+        n_perk = int(mk.group(1)) if mk else -1
+        rep.add("SZ-0: start sesji (zasada, tempo, perki przerobione)", st[:520], "INFO", None)
+        if on:
+            rep.add("SZ-0b: perki treningu przerobione (opisy podmienione)", f"{n_perk}/{mk.group(2) if mk else '?'}", ">= 10 (Polearm Drills daje w grze 0 - bez zmian)", n_perk >= 10)
+    else:
+        on = False
+        rep.add("SZ-0: start sesji", "brak linii startu", "linia przy kazdym wczytaniu", False)
+    rep.add("SZ-0c: linie rozpoznane", f"nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""), "0", not bad)
+    if players:
+        zero = [p for p in players if p[1] <= 0.0]
+        bad0 = [p[0] for p in zero if p[3] > 0]
+        rep.add("SZ-1: zero XP z marszu - doby gracza bez godziny cwiczen w obozie", f"dob bez cwiczen {len(zero)} z {len(players)}, z XP > 0: {len(bad0)}" + (f" (np. dzien {bad0[0]})" if bad0 else ""),
+                "0", not bad0)
+        notcamp = [p[0] for p in players if p[1] > p[2] + p[6] + 0.05 and not p[5]]
+        trained = [p for p in players if p[1] > 0.0]
+        auto_h = sum(p[6] for p in players)
+        rep.add("SZ-2: godziny cwiczen gracza tylko z menu obozu (albo samoczynnie: oboz oblezenia, cudza armia)",
+                f"dob z cwiczeniami {len(trained)}, godzin razem {sum(p[1] for p in trained):.1f} (samoczynnie {auto_h:.1f}); dob z godzinami ponad menu i samoczynne {len(notcamp)}"
+                + (f" (np. dzien {notcamp[0]})" if notcamp else "") + f"; linii konca cwiczen {len(ends)}", "0 (pierwsza doba po wczytaniu moze niesc godziny z zapisu)", not notcamp)
+        if trained:
+            per = [p[3] / max(0.01, p[1]) for p in trained]
+            rep.add("SZ-2b: XP gracza na godzine cwiczen (INFO)", f"srednio {sum(per) / len(per):.0f} XP na godzine (cala druzyna), najwiecej godzin w dobie {max(p[1] for p in trained):.1f}",
+                    "INFO (najwyzej 8 h na dobe od switu)", None)
+    else:
+        rep.add("SZ-1: doby gracza", "brak linii doby gracza", "INFO (zasada gracza nieczynna albo Drill Log wylaczony)", None)
+    rep.add("SZ-3: ERROR CampDrill / arm_campdrill / CtxOf.Camp", str(n_err), "0", n_err == 0)
+    if ais:
+        on_ai = [a for a in ais if a[1] == "TAK"]
+        bad_ai = [a[0] for a in on_ai if int(a[14]) > 0]
+        rep.add("SZ-4: XP z marszu AI przy czynnej zasadzie AI", f"dob z zasada AI {len(on_ai)} z {len(ais)}, z oddzialami z XP bez postoju za dnia {len(bad_ai)}" + (f" (np. {bad_ai[0]})" if bad_ai else ""),
+                "0", not bad_ai)
+        bad_s = [a[0] for a in ais if int(a[20]) > 0] if on else []
+        rep.add("SZ-4b: XP z marszu strony gracza (rod, armia gracza)", f"dob z oddzialami z XP bez postoju za dnia {len(bad_s)}" + (f" (np. {bad_s[0]})" if bad_s else ""),
+                "0 przy zasadzie gracza", not bad_s if on else None)
+        old = sum(int(a[8]) for a in ais)
+        camp = sum(int(a[9]) for a in ais)
+        hours = [float(a[4]) for a in ais]
+        h0 = sum(int(a[5]) for a in ais); h8 = sum(int(a[7]) for a in ais); pd = sum(int(a[2]) for a in ais)
+        ratio = camp / old if old else 0
+        rep.add("SZ-5: AI XP zasada obozu wobec dawnej reguly (decyzja: Drill Camp Only Ai)",
+                f"XP po broni razem dawna {old} -> obozu {camp} (x{ratio:.2f}, {'spadek' if ratio < 1 else 'wzrost'} {abs(1 - ratio) * 100:.0f}%); godzin postoju za dnia srednio {sum(hours) / len(hours):.2f};"
+                f" partio-doby 0 h {h0} ({100 * h0 / max(1, pd):.0f}%), 8 h {h8} ({100 * h8 / max(1, pd):.0f}%)",
+                "INFO (powyzej ok. 30% spadku - Jeff decyduje o kluczu)", None)
+        st_last = int(ais[-1][21])
+        rep.add("SZ-6: potkniecia CampDrill (ostatnia linia AI)", str(st_last), "0", st_last == 0)
+    else:
+        rep.add("SZ-4: linie AI", "brak", "INFO (Drill Log wylaczony)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96jakosc (20.10, Jeff "za duzo jest legendary przedmiotow ... w sklepach za latwo mozna znalezc
 # legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity). Progi JQ-x.
 # m96-jakosc2 (Jeff 20.10 17:20 "6 legendarnych danego typu ... daj wariacje, np. od 1 do 6 ... I to samo masterwork"): limit NA RODZAJ przedmiotu, losowany
@@ -37161,6 +37320,1006 @@ def m96receptury_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m97surowce (20.10, w-toku/m97-surowce: czardrzewo i smocza kosc - surowce lukow z listy
+# RareBowsIds, doplyw z osad za Murem i z Valyrii/Volantis/Qarth; Armoury/src/RareMaterials.cs, ModuleData/arm_items_rare.xml)
+M97S_HEAD = "Surowce rzadkie (m97-surowce): start sesji"
+M97S_DAY = "Surowce rzadkie (m97-surowce): dzien "
+M97S_USE = "Surowce rzadkie (m97-surowce): kucie "
+M97S_FOUND = re.compile(r"istnieje (\d+) z (\d+)")
+M97S_ITEM = re.compile(r"(arm_\w+) \([^)]*\) cena (\d+) d, waga ([0-9.]+) kg, kategoria (\S+) \(towar handlowy (TAK|NIE)")
+M97S_SRC = re.compile(r"(weirwood|dragonbone) (\d+) z (\d+) osad")
+M97S_DNUM = re.compile(r"dzien (\d+)")
+M97S_MAT = re.compile(r"\| (\w+): przybylo (\d+)(?: \([^)]*\))?, zapas regionu (-?\d+)/(\d+), swiata (\?|-?\d+)/(\d+)")
+M97S_STUMB = re.compile(r"potkniecia (\d+)")
+M97S_HOOKS = re.compile(r"nagrody gry bez surowca: Caravan Ambush [^|]*, Trade Proposal [^|]*")
+M97S_GUARD = re.compile(r"nagrody gry bez surowca \(od startu sesji\): [^|]*")
+
+
+def m97surowce_main(logp):
+    """m97surowce (20.10, w-toku/m97-surowce; Jeff: "luk z czardrzewa okay, trzeba miec czardrzewo, smoczej kosci - smocza kosc ... aby dalo sie wszystko wykuc"):
+    dwa rzadkie surowce (arm_weirwood, arm_dragonbone), doplyw dobowy z osad zrodla z pulapem regionu i swiata, kucie luku z surowcem.
+    S97-0 linia startu (klucz RareBowsNeedMaterial TAK), S97-1 surowce istnieja (2 z 2, kategoria nie towar handlowy, cena > 0), S97-2 osady zrodla > 0 dla obu,
+    S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (log krotszy - INFO), S97-3b kolejne bloki 30 dob (INFO), S97-4 doplyw nie doklada ponad pulap (NIE tylko
+    przy 'przybylo 1' z zapasem po dodaniu > pulap; S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR
+    paczki 0, S97-7 latki nagrod gry (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK (S97-7b podmiany - INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("S97-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    heads, days, uses, n_err, stumb = [], [], 0, 0, 0
+    over, over_info, guard = [], [], ""
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97S_HEAD):
+                heads.append(s)
+            elif s.startswith(M97S_DAY):
+                dn = M97S_DNUM.search(s)
+                gm = M97S_GUARD.search(s)
+                if gm:
+                    guard = gm.group(0)
+                added = 0
+                for mm in M97S_MAT.finditer(s):
+                    a = int(mm.group(2))
+                    added += a
+                    reg, regcap = int(mm.group(3)), int(mm.group(4))
+                    wo = mm.group(5) != "?" and int(mm.group(5)) > int(mm.group(6))
+                    # recenzja 20.10: pulap jest brama tylko losu (sztuka powstaje przy zapasie < pulap, wiec po dodaniu zapas <= pulap) - NIE tylko,
+                    # gdy NASZ doplyw dolozyl ponad pulap; zapas ponad pulap bez przyrostu (gracz sprzedal w osadzie zrodla, nagroda sprzed paczki) - INFO
+                    if reg > regcap or wo:
+                        txt = (f"{mm.group(1)} region {reg}/{regcap}" if reg > regcap else "") + (f" swiat {mm.group(5)}/{mm.group(6)}" if wo else "")
+                        (over if a > 0 else over_info).append(f"d{dn.group(1) if dn else '?'} " + txt.strip())
+                capped = any(int(x.group(3)) >= int(x.group(4)) or (x.group(5) != "?" and int(x.group(5)) >= int(x.group(6))) for x in M97S_MAT.finditer(s))
+                if dn:
+                    days.append((int(dn.group(1)), added, capped))
+            elif s.startswith(M97S_USE):
+                uses += 1
+            elif s.startswith("ERROR in RareMaterials"):
+                n_err += 1
+            else:
+                continue
+            ms = M97S_STUMB.findall(s)
+            if ms:
+                stumb = max(stumb, int(ms[-1]))
+    print(f"plik: {logp} | linii startu {len(heads)}, linii doby {len(days)}, kuc z surowcem {uses}, ERROR {n_err}")
+    if not heads and not days and uses == 0 and n_err == 0:
+        rep.add("S97-0: linia 'Surowce rzadkie (m97-surowce): start sesji'", "brak w logu", "INFO (log sprzed paczki m97-surowce albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = heads[-1] if heads else ""
+    on = "RareBowsNeedMaterial TAK" in last
+    rep.add("S97-0: linia startu sesji", (last[:160] + "...") if last else "brak", "klucz RareBowsNeedMaterial TAK", bool(last) and on)
+    fm = M97S_FOUND.search(last)
+    items = M97S_ITEM.findall(last)
+    ok1 = bool(fm and fm.group(1) == fm.group(2) == "2") and len(items) == 2 and all(int(i[1]) > 0 and i[4] == "NIE" for i in items)
+    rep.add("S97-1: surowce istnieja (id, cena, kategoria)", "; ".join(f"{i[0]} {i[1]} d {i[2]} kg {i[3]} handlowy {i[4]}" for i in items) or "brak",
+            "2 z 2, cena > 0, towar handlowy NIE", ok1)
+    src = M97S_SRC.findall(last)
+    rep.add("S97-2: osady zrodla", ", ".join(f"{a} {b}/{c}" for a, b, c in src) or "brak", "obie > 0", len(src) == 2 and all(int(b) > 0 for _, b, _ in src))
+    if days:
+        days.sort()
+        d0 = days[0][0]
+        span = days[-1][0] - d0 + 1
+        total = sum(a for _, a, _ in days)
+        # los dobowy (czardrzewo 1/15, smocza kosc 1/30): 30 dob bez zadnej sztuki obu surowcow ma szanse ok. 4.5% - prog na PIERWSZE 30 dob logu,
+        # dalsze bloki 30 dob tylko INFO; doba z pulapem (region albo swiat pelny) liczy sie jak doplyw (nie ma gdzie dolozyc)
+        blocks = {}
+        for d, a, c in days:
+            k = (d - d0) // 30
+            got, cap = blocks.get(k, (0, False))
+            blocks[k] = (got + a, cap or c)
+        b0 = blocks.get(0, (0, False))
+        if span >= 30:
+            rep.add("S97-3: doplyw w pierwszych 30 dobach", f"dob {span}, razem {total}, pierwsze 30 dob {b0[0]}" + (" (pulap)" if b0[1] else ""),
+                    "> 0 albo pulap (szansa falszywego NIE ok. 4.5% - wtedy linia doby: losowan/trafien)", b0[0] > 0 or b0[1])
+        else:
+            rep.add("S97-3: doplyw w 30 dobach", f"dob {span}, razem {total}", "INFO (log krotszy niz 30 dob)", None)
+        rep.add("S97-3b: przybylo w kolejnych blokach 30 dob", ", ".join(f"{v[0]}{'p' if v[1] else ''}" for _, v in sorted(blocks.items())), "INFO (p = pulap w bloku)", None)
+    else:
+        rep.add("S97-3: doplyw w 30 dobach", "brak linii doby", "INFO (RareMaterialSupply NIE albo log bez doby)", None)
+    rep.add("S97-4: doplyw nie doklada ponad pulap (region, swiat)", ", ".join(over[:6]) if over else "w pulapie", "przy 'przybylo 1' zapas po dodaniu <= pulap", not over)
+    rep.add("S97-4b: zapas ponad pulap bez przyrostu (sztuki z zewnatrz)", f"{len(over_info)} dob" + (": " + ", ".join(over_info[:4]) if over_info else ""), "INFO", None)
+    on_g = "RareMaterialOnlyFromSource TAK" in last
+    hooks_ok = "Caravan Ambush wpieta" in last and "Trade Proposal wpieta" in last
+    hm = M97S_HOOKS.search(last)
+    rep.add("S97-7: nagrody gry bez surowca (latki Caravan Ambush, Trade Proposal)", hm.group(0) if hm else "brak w linii startu",
+            "obie wpiete przy RareMaterialOnlyFromSource TAK" if on_g else "INFO (klucz NIE albo linia sprzed poprawki)", hooks_ok if on_g else None)
+    rep.add("S97-7b: podmiany nagrod gry (ostatnia linia doby)", guard or "brak", "INFO", None)
+    rep.add("S97-5: kucia z surowcem", str(uses), "INFO", None)
+    rep.add("S97-6: potkniecia i ERROR paczki", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m101prolog (21.10, w-toku/m101-prolog: prolog 298 - wybor startu, kalendarz 188 dni przed opowiescia,
+# latka startu opowiesci w ROT.dll, pokoj krola i pakty z krolestwem Roberta, Robert i Ned zyja, koniec prologu w dniu 186, egzekucja Neda w NedEvent;
+# Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
+M101_TAG = "Prolog (m101): "
+M101_STORY = re.compile(r"latki opowiesci ROT \((.*?)\): wpiete (\d+)/(\d+) metod \(miejsc odczytu (\d+), podmienionych (\d+)")
+M101_AGE = re.compile(r"wiek kampanii \(zaciag\) bez latki (\d+)")
+M101_RHY = re.compile(r"rytm na kalendarzu (\d+)")
+M101_LORE = re.compile(r"\| ROTBattleAtmosphere: wpiete (\d+)/(\d+) metod")
+M101_REST = re.compile(r"latki prologu \((.*?)\): pokoj i pakty: wojny ([A-Z]+), wezwania ([A-Z]+), koniec sojuszu ([A-Z]+) \| Robert i Ned z XML ([A-Z]+) \| egzekucja Neda \(NedEvent\) ([A-Z]+)")
+M101_KINGS = re.compile(r"Robert i Ned \(XML ozywionych (\d)/2.*?\): (.*)")
+M101_DAY = re.compile(r"dzien (\d+) prologu \((opowiesc za [0-9.]+ dni|opowiesc trwa, dzien opowiesci -?[0-9.]+)\) \| (.*)")
+M101_WARS = re.compile(r"wojny Westeros-Westeros \(bez Wolnych Ludzi\) (\d+)")
+M101_PACTS = re.compile(r"pakty: sojusze (\d)/(\d)(?: \(nowe \d+\))?, pakty o nieagresji (?:(\d)/(\d)|brak moda Diplomacy)")
+M101_EVENTS = re.compile(r"wydarzenia ROT ruszone (\d+|-)")
+M101_STUMB = re.compile(r"potkniecia (\d+) \(razem (\d+)\)")
+M101_END = re.compile(r"KONIEC PROLOGU \((.*?), dzien ([0-9.]+)\) \| Robert martwy (\S+).*?Joffrey krolem (TAK|NIE).*?\| Ned: (.*?) \| pakty: (.*?) \| potkniecia (\d+)")
+M101_NED = re.compile(r"egzekucja Neda \(NedEvent, dzien opowiesci (-?[0-9.]+)\) \| Ned martwy (\S+).*?- Robb (TAK|NIE)")
+M101_CS_START = re.compile(r"FABULA: wydarzenie (\S+) WYSTARTOWALO \(dzien (-?\d+)\)")
+
+
+def m101prolog_main(logp, csp=None):
+    """m101prolog (21.10, w-toku/m101-prolog; Jeff 21.10 "Robimy wczesniejszy start", "Ok wersje lekka robimy", pakty i sojusze z krolestwem Roberta na czas
+    prologu): PR-0 linie startu (latki menu, wybor, start sesji), PR-1 ERROR Prologue i potkniecia 0, PR-2 latki opowiesci ROT N/N (M >= 30 metod, miejsca + zaciag >= 35)
+    i reszta latek TAK, PR-3 Robert i Ned ozywieni 2/2, PR-4 w prologu zadne wydarzenie ROT nie ruszylo (Armoury: 'wydarzenia ROT ruszone 0'; z --crashscribe:
+    zadne 'FABULA: wydarzenie ... WYSTARTOWALO' z dniem < 0), PR-5 w prologu zadna wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 i 6/6 do konca
+    prologu, PR-7 koniec prologu: Robert martwy, Joffrey krolem, Ned jencem w town_EW4, PR-8 egzekucja Neda: Ned martwy, Robb wladca Polnocy.
+    Log bez kampanii z prologiem: INFO (klasyczny start - sprawdzamy tylko, ze latki opowiesci nie weszly)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("PR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    menu, choices, starts, story, rest, kings, days, ends, neds, n_err = [], [], [], [], [], [], [], [], [], 0
+    stumb = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in Prologue"):
+                n_err += 1
+                continue
+            if not s.startswith(M101_TAG):
+                continue
+            body = s[len(M101_TAG):]
+            if body.startswith("latki menu glownego"):
+                menu.append(body); continue
+            if body.startswith("wybor startu nowej kampanii"):
+                choices.append(body); continue
+            if body.startswith("start sesji"):
+                starts.append(body)
+                ms = re.search(r"\| potkniecia (\d+)\.", body)
+                if ms:
+                    stumb = max(stumb, int(ms.group(1)))
+                continue
+            mm = M101_STORY.search(body)
+            if mm:
+                ma = M101_AGE.search(body)
+                ml = M101_LORE.search(body)
+                mr = M101_RHY.search(body)
+                story.append((mm.group(1), int(mm.group(2)), int(mm.group(3)), int(mm.group(4)), int(mm.group(5)), int(ma.group(1)) if ma else 0,
+                              (int(ml.group(1)), int(ml.group(2))) if ml else None, int(mr.group(1)) if mr else 0)); continue
+            mm = M101_REST.search(body)
+            if mm:
+                rest.append(mm.groups()); continue
+            mm = M101_KINGS.search(body)
+            if mm:
+                kings.append((int(mm.group(1)), mm.group(2))); continue
+            mm = M101_END.search(body)
+            if mm:
+                ends.append(mm.groups())
+                stumb = max(stumb, int(mm.group(7)))
+                continue
+            mm = M101_NED.search(body)
+            if mm:
+                neds.append(mm.groups()); continue
+            mm = M101_DAY.match(body)
+            if mm:
+                rest_of = mm.group(3)
+                before = mm.group(2).startswith("opowiesc za")
+                mw = M101_WARS.search(rest_of)
+                mp = M101_PACTS.search(rest_of)
+                me = M101_EVENTS.search(rest_of)
+                mt = M101_STUMB.search(rest_of)
+                if mt:
+                    stumb = max(stumb, int(mt.group(1)))
+                days.append((int(mm.group(1)), before, int(mw.group(1)) if mw else None,
+                             (int(mp.group(1)), int(mp.group(2)), int(mp.group(3)) if mp.group(3) else None, int(mp.group(4)) if mp.group(4) else None) if mp else None,
+                             me.group(1) if me else None, "koniec prologu TAK" in rest_of))
+    cs_early = []
+    if csp and os.path.isfile(csp):
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mc = M101_CS_START.search(ln)
+                if mc and int(mc.group(2)) < 0:
+                    cs_early.append((mc.group(1), int(mc.group(2))))
+    prolog = any("prolog TAK" in x for x in starts) or bool(days)
+    print(f"plik: {logp} | linii menu {len(menu)}, wyborow {len(choices)}, startow sesji {len(starts)}, dob prologu {len(days)}, koncow {len(ends)}, egzekucji {len(neds)}, ERROR {n_err}")
+    if not menu and not starts:
+        rep.add("PR-0: linie 'Prolog (m101): ...'", "brak w logu", "INFO (log sprzed paczki m101-prolog)", None)
+        rep.show()
+        return 0
+    rep.add("PR-0: latki menu glownego i wybor startu", (menu[-1][:120] if menu else "brak linii menu") + (" | " + choices[-1][:90] if choices else " | brak wyboru (wczytanie zapisu)"),
+            "okno wyboru TAK", ("okno wyboru TAK" in menu[-1]) if menu else None)
+    rep.add("PR-1: ERROR Prologue i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    if not prolog:
+        ok = all("latki opowiesci ROT: nie wpiete" in x for x in starts) if starts else None
+        rep.add("PR-2: kampania klasyczna - latki opowiesci ROT nie wpiete", f"startow sesji {len(starts)}" + (f" ({starts[-1][:140]})" if starts else ""),
+                "INFO - w logu nie ma kampanii z prologiem; klasyczny start bez latek opowiesci", ok)
+        rep.show()
+        return 0
+    if story:
+        st = story[-1]
+        rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} (podmienionych {st[4]}, rytm na kalendarzu {st[7]}), wiek kampanii bez latki {st[5]} ({st[0]})",
+                "N = M >= 30, podmienionych + rytm >= miejsc, rytm <= 1 (Inni % 4), miejsca + wiek kampanii >= 35 (ROT 8.1.8, licznik IL: 35 wywolan gettera w 31 metodach - 30 z latka: 34 miejsca, w tym 1 rytm; 1 zaciag; 38 z rozpoznania liczylo tez linie definicji)",
+                st[1] == st[2] and st[2] >= 30 and st[4] + st[7] >= st[3] and st[7] <= 1 and st[3] + st[5] >= 35)
+        rep.add("PR-2c: latka startu opowiesci w ROTBattleAtmosphere (LoreGates.CampaignDay)", f"wpiete {st[6][0]}/{st[6][1]}" if st[6] else "brak (mod nieobecny albo stara linia)",
+                "N = M >= 1", (st[6][0] == st[6][1] and st[6][1] >= 1) if st[6] else None)
+    else:
+        rep.add("PR-2: latka startu opowiesci w ROT.dll", "brak linii 'latki opowiesci ROT (...)'", "linia z wpiete N/M", False)
+    if rest:
+        r = rest[-1]
+        rep.add("PR-2b: reszta latek prologu", f"wojny {r[1]}, wezwania {r[2]}, koniec sojuszu {r[3]}, XML {r[4]}, NedEvent {r[5]}", "wszystkie TAK",
+                all(x == "TAK" for x in r[1:6]))
+    else:
+        rep.add("PR-2b: reszta latek prologu", "brak linii 'latki prologu (...)'", "linia z TAK", False)
+    if kings:
+        k = kings[-1]
+        rep.add("PR-3: Robert i Ned ozywieni, glowy rodow i wladcy", f"XML {k[0]}/2 | {k[1][:160]}", "2/2 i oba 'TAK'", k[0] == 2 and k[1].count(" TAK") >= 2)
+    else:
+        rep.add("PR-3: Robert i Ned ozywieni", "brak linii (wczytany zapis bez startu nowej kampanii w tym logu)", "INFO", None)
+    pro = [d for d in days if d[1]]
+    ev_bad = [d for d in pro if d[4] not in (None, "0", "-")]
+    rep.add("PR-4: w prologu zadne wydarzenie ROT nie ruszylo", f"dob prologu {len(pro)}, z ruszonym wydarzeniem {len(ev_bad)}" + (f" (dzien {ev_bad[0][0]}: {ev_bad[0][4]})" if ev_bad else "")
+            + (f"; CrashScribe: starty przed dniem 0: {len(cs_early)}" + (f" ({cs_early[0][0]} dzien {cs_early[0][1]})" if cs_early else "") if csp else "; bez --crashscribe"),
+            "0 (i 0 w logu CrashScribe)", (len(ev_bad) == 0 and len(cs_early) == 0) if pro else None)
+    war_bad = [d for d in pro if d[2]]
+    rep.add("PR-5: w prologu zadna wojna Westeros-Westeros (bez Wolnych Ludzi)", f"dob z wojna {len(war_bad)} z {len(pro)}" + (f" (dzien {war_bad[0][0]}: {war_bad[0][2]})" if war_bad else ""),
+            "0", (len(war_bad) == 0) if pro else None)
+    pk = [d for d in pro if d[3] is not None and not d[5]]
+    pk_bad = [d for d in pk if d[3][0] != d[3][1] or (d[3][2] is not None and d[3][2] != d[3][3])]
+    no_dip = any(d[3][2] is None for d in pk)
+    rep.add("PR-6: pakty z krolestwem Roberta do konca prologu", f"dob z pelnymi paktami {len(pk) - len(pk_bad)} z {len(pk)}" + (f" (dzien {pk_bad[0][0]}: {pk_bad[0][3]})" if pk_bad else "")
+            + ("; bez moda Diplomacy - same sojusze" if no_dip else ""), "sojusze 3/3, pakty 6/6 kazdej doby", (len(pk_bad) == 0) if pk else None)
+    if ends:
+        e = ends[-1]
+        ok = e[2].startswith("TAK") and e[3] == "TAK" and ("jeniec w town_EW4 TAK" in e[4] or "juz stracony (NedEvent)" in e[4])
+        rep.add("PR-7: koniec prologu (dzien 186)", f"dzien {e[1]} | Robert martwy {e[2]} | Joffrey krolem {e[3]} | Ned: {e[4][:60]} | pakty: {e[5]}",
+                "Robert martwy TAK, Joffrey krolem TAK, Ned jeniec w town_EW4 TAK (krol zmarl po NedEvent - Ned juz stracony)", ok)
+    else:
+        last = max([d[0] for d in days], default=-1)
+        rep.add("PR-7: koniec prologu (dzien 186)", f"brak linii (ostatnia doba prologu w logu {last})", "INFO gdy log krotszy niz 186 dob", None if last < 187 else False)
+    if neds:
+        n = neds[-1]
+        rep.add("PR-8: egzekucja Neda (NedEvent)", f"dzien opowiesci {n[0]} | Ned martwy {n[1]} | Robb wladca Polnocy {n[2]}", "Ned martwy TAK, Robb TAK",
+                n[1] == "TAK" and n[2] == "TAK")
+    else:
+        rep.add("PR-8: egzekucja Neda (NedEvent)", "brak linii", "INFO gdy log nie siega ~9 dni opowiesci", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m100kryjowki (21.10, w-toku/m100-kryjowki: wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania,
+# nowe kryjowki z dala od osad i wiosek pobocznych, po rozbiciu w innym miejscu; Armoury/src/HideoutSight.cs; klucze HideoutScoutingChance, HideoutRumourReveals,
+# HideoutAwayFromSettlements, HideoutRelocateAfterClear)
+M101P_TAG = "Postacie kanonu (m101): "
+M101P_START = re.compile(r"start \| klucz CanonCompanionsToClans (tak|nie) \(w chwili zalozenia kampanii: (tak|nie|stary zapis - nic)\)")
+M101P_COUNTS = re.compile(r"\| A (\d+), B (\d+), C (\d+), D (\d+) \|")
+M101P_FILE = re.compile(r"\| plik (.*?) \| A \d+, B \d+")
+M101P_MAP = re.compile(r"mapa rodow znaleziona (\d+)/(\d+)")
+M101P_REFS = re.compile(r"odwolania zmian \(osady, postacie, krolestwa, wydarzenia ROT\) (\d+)/(\d+)(?: BRAK: ([^|]*))?")
+M101P_DAY = re.compile(r"dzien (\d+) \| A (\d+): w rodach (\d+) \(lordow (\d+), dworzan (\d+), z wlasna druzyna (\d+), jencow (\d+)\), martwi (\d+), bez bohatera (\d+), wedrowcy (\d+)(?: \[(.*?)\])? \| B (\d+): zywych (\d+)(?: \[(.*?)\])?, nie powstali (\d+), usunieci (\d+), prob ROT zablokowanych dzis (\d+)")
+M101P_MOVE = re.compile(r"zmiana strony #(\S+) - (.+?) \[(\S+)\] akcja (\w+)")
+M101P_SKIP = re.compile(r"zmiana strony #(\S+) POMINIETA - (.+?) \[(\S+)\] \((\S+?)\) - (.*?) \| wyzwalacz")
+
+
+def m101postacie_tables():
+    """Wzory A/B z danych Armoury (Armoury/ModuleData/arm_canon_moves.tsv obok narzedzia) - None, gdy pliku nie ma."""
+    d = m101postacie_data()
+    return d["groups"] if d else None
+
+
+def m101postacie_data():
+    """Dane z Armoury/ModuleData/arm_canon_moves.tsv obok narzedzia (None, gdy pliku nie ma): grupy wzorow, liczby A/B/C/D i oczekiwana liczba rodow
+    w polu 'mapa rodow znaleziona N/M' linii startu (jak CanonCompanions.StartLine: rody A, potem #rescue, potem cele clan/court/free z #move)."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Armoury", "ModuleData", "arm_canon_moves.tsv")
+    if not os.path.isfile(p):
+        return None
+    grp, sec, col = {}, None, {}
+    clans, rescue = [], 0
+
+    def cell(c, name):
+        i = col.get(name, -1)
+        return c[i].strip() if 0 <= i < len(c) else ""
+    with open(p, encoding="utf-8") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            if not ln or ln.startswith("# ") or ln == "#":
+                continue
+            c = ln.split("\t")
+            if c[0].startswith("#"):
+                sec = c[0][1:]
+                col = {n.strip(): i - 1 for i, n in enumerate(c) if i > 0}
+                continue
+            if sec == "start" and "template" in col and "group" in col:
+                t = cell(c, "template")
+                if t and t not in grp:
+                    grp[t] = cell(c, "group")
+                    if grp[t] == "A" and cell(c, "clan"):
+                        clans.append((0, cell(c, "clan")))
+            elif sec == "rescue":
+                if cell(c, "clan") and cell(c, "to"):
+                    rescue += 1
+                    clans.append((1, cell(c, "clan")))
+                    clans.append((1, cell(c, "to")))
+            elif sec == "move":
+                kind, _, arg = cell(c, "action").partition(":")
+                if kind in ("clan", "court", "free") and arg:
+                    clans.append((2, arg))
+    seen = []
+    for _o, cid in sorted(clans, key=lambda x: x[0]):
+        if cid not in seen:
+            seen.append(cid)
+    cnt = {g: sum(1 for v in grp.values() if v == g) for g in ("A", "B", "C", "D")}
+    return {"groups": grp, "counts": cnt, "clans": len(seen), "rescue": rescue, "path": p}
+
+
+def m101postacie_main(logp, csp=None):
+    """m101postacie (21.10, w-toku/m101-postacie; Jeff 21.10 "Jaime Lannister i Tyrion nie sa bohaterami, zrob ich lordami Lannisterow, tak samo innych ...
+    wywal bohaterow, ktorzy sa de facto po stronie i w jakiejs fabule"; Armoury/src/CanonCompanions.cs, klucze CanonCompanionsToClans i CanonCompanionsFollowStory).
+    Wejscie: log Armoury (--crashscribe <session-*.log> - opcjonalnie, odrodzenia UC). MP-0 linia startu (klucz i kampania), MP-1 ERROR CanonCompanions i
+    potkniecia 0, MP-2 latki 2/2 (dowodca partii, tworzenie wedrowcow ROT), MP-3 mapa rodow N/N, MP-4 przeniesienia A przy starcie (kazdy wzor raz, BRAK rodu 0),
+    MP-5 zaden wzor A nie jest wedrowcem bez zmiany 'wander' (od pierwszej doby), MP-6 zaden wzor B nie zyje, MP-7 kazda zmiana strony wykonana najwyzej raz,
+    MP-8 zmiany wykonane / pominiete (INFO), MP-9 dworzanie bez druzyny (INFO), MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Log bez paczki albo
+    stary zapis: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("MP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    data = m101postacie_data()
+    groups = data["groups"] if data else {}
+    starts, wires, days, moves, skips, conv, conv_skip, berr, n_err = [], [], [], [], [], [], [], [], 0
+    rescues, lost_other = [], []
+    stum = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in CanonCompanions") or s.startswith("ERROR in SyncData.arm_canon_companions"):
+                n_err += 1
+                continue
+            if not s.startswith(M101P_TAG):
+                continue
+            body = s[len(M101P_TAG):]
+            if body.startswith("wpiecie"):
+                wires.append(body)
+            elif body.startswith("start |"):
+                starts.append(body)
+            elif body.startswith("dzien "):
+                md = M101P_DAY.match(body)
+                days.append((md, body))
+                mp = re.search(r"POTKNIECIA (\d+)", body)
+                if mp:
+                    stum += int(mp.group(1))
+            elif body.startswith("przeniesienie POMINIETE"):
+                conv_skip.append(body)
+            elif body.startswith("przeniesienie - "):
+                mc = re.search(r"\[(\S+)\]", body)
+                conv.append(mc.group(1) if mc else "?")
+            elif body.startswith("B usuniety po utworzeniu"):
+                berr.append(body)
+            elif body.startswith("ratunek - ") or (body.startswith("rod ") and " niszczony (DestroyClanAction" in body):
+                rescues.append(body)
+            elif body.startswith("postac kanonu usunieta (Lost) NIE przez Armoury"):
+                lost_other.append(body)
+            elif " POMINIETA - " in body and body.startswith("zmiana strony #"):
+                skips.append(body)
+            elif body.startswith("zmiana strony #") and " CZEKA - " not in body:
+                mm = M101P_MOVE.match(body)
+                moves.append((mm.group(1) if mm else "?", mm.group(2) if mm else "?", mm.group(4) if mm else "?", body))
+    print(f"plik: {logp} | linii startu {len(starts)}, doby {len(days)}, przeniesien {len(conv)}, zmian stron {len(moves)}, pominietych {len(skips)}")
+    if not starts and not days:
+        rep.add("MP-0: linia startu (postacie kanonu)", "brak linii", "INFO (wersja sprzed paczki m101-postacie)", None)
+        rep.show()
+        return 0
+    st = starts[-1] if starts else ""
+    ms = M101P_START.search(st)
+    active = bool(ms and ms.group(2) == "tak")
+    mf = M101P_FILE.search(st)
+    fstate = mf.group(1).strip() if mf else "brak pola"
+    rep.add("MP-0: linia startu (klucz, kampania, plik danych)", (st[:300] if st else "brak linii startu (sa linie doby)") + f" | plik: {fstate}",
+            "klucz tak, 'w chwili zalozenia kampanii: tak' (nowa kampania) i 'plik wczytany' (arm_canon_moves.tsv w Modules/Armoury/ModuleData) - bez nowej kampanii INFO",
+            (fstate == "wczytany") if active else None)
+    if not active:
+        rep.show()
+        return 0
+    mc = M101P_COUNTS.search(st)
+    got = tuple(int(x) for x in mc.groups()) if mc else None
+    if data:
+        want = tuple(data["counts"][g] for g in ("A", "B", "C", "D"))
+        rep.add("MP-0b: A/B/C/D w grze = tabela w repo", f"log {got if got else 'brak pola'}, repo {want} ({os.path.basename(data['path'])})",
+                "rowne i A > 0 (inna wersja pliku w grze albo plik nie wczytany = NIE)", bool(got) and got == want and want[0] > 0)
+    else:
+        rep.add("MP-0b: A/B/C/D w grze", f"log {got if got else 'brak pola'} (bez arm_canon_moves.tsv obok narzedzia)", "A > 0", bool(got) and got[0] > 0)
+    rep.add("MP-1: ERROR CanonCompanions i potkniecia", f"ERROR {n_err}, potkniecia w liniach doby {stum}", "0 i 0", n_err == 0 and stum == 0)
+    w = wires[-1] if wires else ""
+    ok2 = bool(w) and "BRAK" not in w and "wyjatek" not in w and "PODPIETY" in w and "PODPIETE" in w
+    rep.add("MP-2: latki (dowodca partii, tworzenie wedrowcow ROT)", w[:240] if w else "brak linii wpiecia", "obie PODPIETE, bez BRAK", ok2)
+    mm = M101P_MAP.search(st)
+    if mm:
+        exp = data["clans"] if data else None
+        rep.add("MP-3: mapa rodow", f"{mm.group(1)}/{mm.group(2)}" + (f" (repo: {exp} rodow)" if exp is not None else ""),
+                "wszystkie rody z tabeli istnieja (N/N), N > 0 i N = liczba rodow tabeli w repo", mm.group(1) == mm.group(2) and int(mm.group(2)) > 0
+                and (exp is None or int(mm.group(2)) == exp))
+    else:
+        rep.add("MP-3: mapa rodow", "brak pola w linii startu", "N/N", False)
+    mr = M101P_REFS.search(st)
+    rep.add("MP-3b: odwolania tabeli zmian (osady, postacie, krolestwa, wydarzenia ROT)", (f"{mr.group(1)}/{mr.group(2)}" + (f" BRAK: {mr.group(3).strip()}" if mr.group(3) else "")) if mr else "brak pola",
+            "N/N i N > 0 (literowka w tabeli = zmiana nigdy nie zajdzie)", bool(mr) and mr.group(1) == mr.group(2) and int(mr.group(2)) > 0)
+    n_a = data["counts"]["A"] if data else (int(mc.group(1)) if mc else 0)
+    n_b = data["counts"]["B"] if data else (int(mc.group(2)) if mc else 0)
+    dup = sorted(set(t for t in conv if conv.count(t) > 1))
+    norod = [s for s in conv_skip if "BRAK rodu" in s]
+    rep.add("MP-4: przeniesienia A przy starcie", f"{len(set(conv))} z {n_a} (powtorzone {dup or 0}); pominiete {len(conv_skip)} (BRAK rodu {len(norod)})"
+            + (f"; pierwsze pominiecie: {conv_skip[0][:160]}" if conv_skip else ""),
+            "kazdy wzor A raz, A > 0, BRAK rodu 0 (pominiete z innego powodu - INFO)", n_a > 0 and not dup and not norod and len(set(conv)) + len(conv_skip) >= n_a)
+    wander_ok = set(name for (_i, name, act, _b) in moves if act == "wander")
+    bad_w, bad_b, bad_days = [], [], 0
+    for md, body in days[1:] if len(days) > 1 else days:
+        if not md:
+            bad_days += 1
+            continue
+        if int(md.group(10)) > 0 and md.group(11):
+            for item in md.group(11).split("; "):
+                nm = item.split(" (")[0]
+                if nm and nm not in wander_ok:
+                    bad_w.append(f"doba {md.group(1)}: {item}")
+        if int(md.group(13)) > 0:
+            bad_b.append(f"doba {md.group(1)}: {md.group(14) or md.group(13)}")
+    rep.add("MP-5: wzory A jako wedrowcy w karczmie bez zmiany 'wander'", f"{len(bad_w)}" + (f"; pierwszy: {bad_w[0][:160]}" if bad_w else "") + f" (nieczytelnych linii doby {bad_days})",
+            "0 (od drugiej linii doby; wedrowiec po zmianie strony 'wander' - dozwolony)", not bad_w and bad_days == 0)
+    last = days[-1][0] if days and days[-1][0] else None
+    b_gone = int(last.group(15)) + int(last.group(16)) if last else -1
+    rep.add("MP-6: wzory B zywe", (f"{len(bad_b)} dob z zywym B" + (f"; pierwsza: {bad_b[0][:160]}" if bad_b else "")
+                                   + (f" | ostatnia doba: nie powstali {last.group(15)}, usunieci {last.group(16)}, prob ROT zablokowanych {last.group(17)}" if last else ""))
+            + (f" | usuniete po utworzeniu {len(berr)}" if berr else "") + f" | B w tabeli {n_b}",
+            "0 dob z zywym B i ostatniej doby nie powstali + usunieci = B z tabeli (> 0)", not bad_b and n_b > 0 and b_gone == n_b)
+    ids = [i for (i, _n, _a, _b) in moves]
+    dupm = sorted(set(i for i in ids if ids.count(i) > 1))
+    rep.add("MP-7: zmiana strony wykonana najwyzej raz", f"wykonanych {len(ids)}, powtorzonych id {dupm or 0}", "0 powtorzen (stan w zapisie)", not dupm)
+    rep.add("MP-8: zmiany stron wykonane / pominiete", ("; ".join(f"#{i} {n} ({a})" for (i, n, a, _b) in moves[:12]) or "brak") + f" | pominiete {len(skips)}"
+            + (": " + "; ".join(s[len("zmiana strony "):][:90] for s in skips[:6]) if skips else ""),
+            "INFO (zmiany przychodza z wydarzeniami ROT - dlugi bieg)", None)
+    if last:
+        rep.add("MP-9: postacie A w rodach ostatniej doby", f"w rodach {last.group(3)} z {last.group(2)} (lordow {last.group(4)}, dworzan {last.group(5)}, z druzyna {last.group(6)}, "
+                f"jencow {last.group(7)}), martwi {last.group(8)}, wedrowcy {last.group(10)}", "INFO", None)
+    rep.add("MP-11: zniszczenie rodu przez fabule (ratunek #rescue) i usuniecia postaci kanonu przez cudzy kod",
+            f"linii ratunku {len(rescues)}" + (": " + "; ".join(r[:110] for r in rescues[:4]) if rescues else "")
+            + f" | usuniete NIE przez Armoury {len(lost_other)}" + (": " + "; ".join(r[len('postac kanonu usunieta (Lost) NIE przez Armoury - '):][:110] for r in lost_other[:4]) if lost_other else ""),
+            "INFO (RenlyDeath: Brienne -> Tarth, JeorMutiny: Nocna Straz -> Snow; BastardsEvent bez ratunku)", None)
+    if csp and os.path.isfile(csp):
+        resp = []
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if "Unikaty ROT (UC): ODRODZENIE - nowy bohater z wzoru " in ln:
+                    mt = re.search(r"z wzoru (\S+) ", ln)
+                    if mt and groups.get(mt.group(1)) in ("A", "B"):
+                        resp.append(ln.strip()[:160])
+        rep.add("MP-10: UC - odrodzenia wzorow A/B (log CrashScribe)", f"{len(resp)}" + (f"; pierwsza: {resp[0]}" if resp else ""), "0", not resp)
+    else:
+        rep.add("MP-10: UC - odrodzenia wzorow A/B", "bez logu CrashScribe (--crashscribe)", "INFO", None)
+    rep.show()
+    return 0
+
+
+M100K_TAG = "Kryjowki (m100): "
+M100K_START = re.compile(r"krzywa: Zwiad <= (\d+) -> 0%, \d+\.\.(\d+) liniowo")
+M100K_WIRE = re.compile(r"latki wpiete (\d)/4")
+M100K_AIW = re.compile(r"bandy AI (\d)/(\d)")
+M100K_OUT = re.compile(r"(aktywacja poza wyborem|aktywacja BK) (\S+) \(.*?\) \| .*? \| zgodna z zasada (TAK|NIE) \| najblizsza osada ([-0-9.]+)")
+M100K_NONE = re.compile(r"aktywacja brak \((\S+)\) \| wybor gry (\S+) przy rozbitej (\S+) ([0-9.]+)")
+M100K_ROLL = re.compile(r"rzut (\S+) \| Zwiad (\d+) \(.*?\), szansa ([-0-9.]+)%?, wynik (TAK|NIE), znana z plotki (TAK|NIE)")
+M100K_SPOT = re.compile(r"wypatrzona (\S+) \| Zwiad (\d+) \(.*?\), szansa ([0-9.]+)%, droga (.*?), znana z plotki (TAK|NIE)")
+M100K_ACT = re.compile(r"aktywacja (\S+) \(.*?\) \| (.*?) \| stopien (\d) \| najblizsza osada ([0-9.]+) \(prog ([0-9.]+)\), wioska poboczna ([0-9.]+|- brak warstwy|-) \(prog ([0-9.]+)\), "
+                       r"od rozbitej (?:(\S+) ([0-9.]+)|-) \(promien ([0-9.]+)")
+M100K_CLR = re.compile(r"rozbita (\S+) ")
+M100K_DAY = re.compile(r"dzien (\d+) \|.*\| potkniecia (\d+)")
+
+
+def m100kryjowki_main(logp):
+    """m100kryjowki (21.10, w-toku/m100-kryjowki; Jeff 21.10 "ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ... w karczmie ... plotki" oraz
+    "nie na wioskach pobocznych ... z dala od miast i wsi ... po rozbiciu kolejna w innym miejscu"): KR-0 linia startu, KR-1 ERROR HideoutSight i potkniecia 0,
+    KR-2 latki 4/4 i bandy AI k/k, KR-3 zadna nowa kryjowka blizej niz prog (stopien 3 = brak wolnego punktu - DECYZJA; '-' wioski = brak warstwy - INFO), KR-4 przy
+    Zwiadzie <= progu wypatrzenie tylko z plotki albo zadania (rzut przy Zwiadzie <= progu zawsze NIE), KR-5 po rozbiciu nowa w innym miejscu (pole 'od rozbitej':
+    nigdy blizej niz pol promienia, stopien 0/1 poza promieniem; stopien 2/3 w pasie pol..caly promien i 'aktywacja brak' - INFO), KR-6 uzycie (INFO), KR-7 (recenzja
+    21.10) kryjowki zajete przez bandy AI poza wyborem zgodne z zasada (pierwsza doba sesji i herszt BK - INFO)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("KR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, rolls, spots, acts, clears, n_err, stumb, wire = [], [], [], [], [], 0, 0, None
+    seq = []
+    aiw, outs, nones, day_seen = None, [], [], True
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in HideoutSight"):
+                n_err += 1
+                continue
+            if not s.startswith(M100K_TAG):
+                continue
+            body = s[len(M100K_TAG):]
+            mw = M100K_WIRE.search(body)
+            if mw:
+                wire = int(mw.group(1))
+            ma2 = M100K_AIW.search(body)
+            if ma2:
+                aiw = (int(ma2.group(1)), int(ma2.group(2)))
+            if body.startswith("start sesji"):
+                starts.append(body)
+                day_seen = False
+                continue
+            md = M100K_DAY.match(body)
+            if md:
+                stumb = max(stumb, int(md.group(2)))
+                day_seen = True
+                continue
+            mo = M100K_OUT.match(body)
+            if mo:
+                outs.append((mo.group(1), mo.group(2), mo.group(3), day_seen))
+                continue
+            mn = M100K_NONE.match(body)
+            if mn:
+                nones.append((mn.group(2), mn.group(3), float(mn.group(4))))
+                continue
+            mr = M100K_ROLL.match(body)
+            if mr:
+                rolls.append((mr.group(1), int(mr.group(2)), mr.group(3), mr.group(4), mr.group(5)))
+                continue
+            ms = M100K_SPOT.match(body)
+            if ms:
+                spots.append((ms.group(1), int(ms.group(2)), ms.group(4), ms.group(5)))
+                continue
+            ma = M100K_ACT.match(body)
+            if ma:
+                a = (ma.group(1), ma.group(2), int(ma.group(3)), float(ma.group(4)), float(ma.group(5)),
+                     float(ma.group(6)) if ma.group(6)[0] != "-" else 1e9, float(ma.group(7)), ma.group(8),
+                     float(ma.group(9)) if ma.group(9) else 1e9, float(ma.group(10)))
+                acts.append(a)
+                seq.append(("a", a))
+                continue
+            mc = M100K_CLR.match(body)
+            if mc:
+                clears.append(mc.group(1))
+                seq.append(("c", mc.group(1)))
+    print(f"plik: {logp} | startow {len(starts)}, rzutow {len(rolls)}, wypatrzen {len(spots)}, aktywacji {len(acts)}, rozbitych {len(clears)}, ERROR {n_err}")
+    if not starts and not rolls and not acts:
+        rep.add("KR-0: linia 'Kryjowki (m100): start sesji'", "brak w logu", "INFO (log sprzed paczki m100-kryjowki albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    lo = 10
+    mm = M100K_START.search(last)
+    if mm:
+        lo = int(mm.group(1))
+    on = "Hideout Scouting Chance TAK" in last
+    rep.add("KR-0: linia startu (klucze, krzywa, pula)", (last[:170] + "...") if last else "brak", "klucze TAK, krzywa i pula w linii", (on and mm is not None) if last else False)
+    rep.add("KR-1: ERROR HideoutSight i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    rep.add("KR-2: latki wpiete (rdzen, bandy AI gra/BK)", (f"{wire}/4" if wire is not None else "brak linii") + (f", bandy AI {aiw[0]}/{aiw[1]}" if aiw else ", bandy AI brak pola"),
+            "4/4 i bandy AI k/k (k >= 1)", wire == 4 and aiw is not None and aiw[1] >= 1 and aiw[0] == aiw[1])
+    bad = [a for a in acts if a[2] <= 1 and (a[3] < a[4] or a[5] < a[6])]
+    noside = [a for a in acts if a[5] >= 1e8]
+    nofit = [a for a in acts if a[2] == 3]
+    rep.add("KR-3: nowa kryjowka nie blizej niz prog (osada, wioska poboczna)", f"blizej niz prog {len(bad)} z {len(acts)}"
+            + (f" (np. {bad[0][0]}: osada {bad[0][3]} / {bad[0][4]}, wioska {bad[0][5]} / {bad[0][6]})" if bad else "")
+            + f"; bez wolnego punktu (stopien 3) {len(nofit)}", "0", (len(bad) == 0) if acts else None)
+    if noside:
+        rep.add("KR-3c: aktywacje bez warstwy wiosek pobocznych ('-')", f"{len(noside)} z {len(acts)} (np. {noside[0][0]})",
+                "INFO - brak danych o wioskach pobocznych (plik ukladu nie wczytany albo z innej sceny)", None)
+    if nofit:
+        rep.add("KR-3b: aktywacje bez wolnego punktu (najdalszy od osad)", f"{len(nofit)} (np. {nofit[0][0]}: osada {nofit[0][3]}, wioska {nofit[0][5]})",
+                "0 - inaczej za male progi albo za mala pula kultury", False, decide=True)
+    low_roll_ok = [r for r in rolls if r[1] <= lo and r[4] == "NIE" and r[3] == "TAK"]
+    low_spot = [x for x in spots if x[1] <= lo and not (x[2] == "plotka" or x[2].startswith("inne") or x[3] == "TAK")]
+    rep.add(f"KR-4: Zwiad <= {lo} - wypatrzenie tylko z plotki (albo zadania)", f"udanych rzutow przy Zwiadzie <= {lo}: {len(low_roll_ok)}, wypatrzen bez plotki: {len(low_spot)}"
+            + (f" (np. {low_spot[0][0]} Zwiad {low_spot[0][1]} droga {low_spot[0][2]})" if low_spot else ""), "0 i 0",
+            (len(low_roll_ok) == 0 and len(low_spot) == 0) if (rolls or spots) else None)
+    # KR-5 (recenzja 21.10): z pola 'od rozbitej X D (promien R)' linii aktywacji (kod liczy je z pamieci rozbitych - wygasla pamiec = brak pola, wiec ponowna aktywacja
+    # punktu po HideoutClearedMemoryDays jest zgodna): nigdy D < R/2 (w tym ten sam punkt, D = 0); stopien 0/1 nigdy D < R; stopien 2/3 w pasie R/2..R - INFO
+    worse, info = [], []
+    for a in acts:
+        if a[7] is None:
+            continue
+        if a[8] < a[9] * 0.5 or (a[2] <= 1 and a[8] < a[9]):
+            worse.append(a)
+        elif a[8] < a[9]:
+            info.append(a)
+    rep.add("KR-5: po rozbiciu nowa w innym miejscu", f"aktywacji blizej rozbitej niz pozwala stopien: {len(worse)}" + (f" (np. {worse[0][0]} od {worse[0][7]} {worse[0][8]})" if worse else "")
+            + f"; poluzowana pamiec (stopien 2/3, pas pol..caly promien) {len(info)}; bez nowej kryjowki (jedyny wolny punkt przy rozbitej) {len(nones)}",
+            "0", (len(worse) == 0) if (clears and acts) else None)
+    passes = sum(1 for r in rolls if r[3] == "TAK" and r[4] == "NIE")
+    known = sum(1 for r in rolls if r[4] == "TAK")
+    swapped = sum(1 for a in acts if "zamiast" in a[1])
+    ai_out = [o for o in outs if o[0] == "aktywacja poza wyborem"]
+    bk_out = [o for o in outs if o[0] == "aktywacja BK"]
+    ai_bad = [o for o in ai_out if o[2] == "NIE" and o[3]]
+    ai_bad0 = [o for o in ai_out if o[2] == "NIE" and not o[3]]
+    rep.add("KR-7: kryjowki zajete przez bandy AI poza wyborem - zgodne z zasada", f"poza wyborem {len(ai_out)}, niezgodne {len(ai_bad)}"
+            + (f" (np. {ai_bad[0][1]})" if ai_bad else "") + f"; pierwsza doba sesji niezgodne {len(ai_bad0)} (bandy juz w drodze - INFO); herszt BK {len(bk_out)} (niezgodne "
+            + f"{sum(1 for o in bk_out if o[2] == 'NIE')} - INFO, pierwszy punkt kultury)", "0 niezgodnych", (len(ai_bad) == 0) if outs or acts else None)
+    rep.add("KR-6: uzycie (INFO)", f"rzuty {len(rolls)} (udane {passes}, z plotki {known}), wypatrzone {len(spots)}, aktywacje {len(acts)} (zamienione {swapped}), rozbite {len(clears)}",
+            "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m102tablica (21.10, w-toku/m102-tablica: tablica ogloszen w miescie - zadania gry, rozmowa z tablicy,
+# "Your tasks", listy gonczne kapitana strazy z kasy miasta; Armoury/src/NoticeBoard*.cs; klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties ...)
+M102_TB = "Tablica ogloszen (m102): "
+M102_LG = "Listy goncze (m102): "
+M102_TB_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), otwarcia (\d+), wpisow sr\. ([0-9.]+) .*?nagroda nieczytelna (\d+), tekst z tokenami (\d+) \(z (\d+) tekstow\), koszt otwarcia sr\. ([0-9.]+) ms"
+                         r".*?\| proba: (.*?) \| potkniecia (\d+)")
+M102_PROBE = re.compile(r"nagroda czytelna (\d+)/(\d+)")
+M102_LG_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), band poza osadami (\d+), miasta z banda (\d+)/(\d+), z listem (\d+), bez nowego listu: .*?, inne (\d+); czynne (\d+) .*?"
+                         r"; wyplacone (\d+) za (\d+) zl \(gracz (\d+)/(\d+) zl, lordowie (\d+)/(\d+) zl; z kas miast (\d+), od panow (\d+)(?:, z kies wsi \d+)?\), niedoplata (\d+), z niczego (\d+)"
+                         r".*?kasa ponizej Keep po wyplacie (\d+)[^;]*; zapis arm_board (\d+) B; .*?koszt ([0-9.]+) ms; potkniecia (\d+)")
+M102_PAY = re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:pan|wies) (\d+), niedoplata (\d+), dla (gracz|lord \S+); kasa przed (-?\d+) po (-?\d+) \(Keep (-?\d+)\)"
+                      r"(?:; odbiorca (-?\d+), platnicy (-?\d+), z niczego (-?\d+))?")   # poprawka po recenzji: zmierzone zloto odbiorcy i platnikow
+M102_CARRY = re.compile(r"; czynne (\d+) \(nowe (\d+)")
+M102_DROPS = re.compile(r"; zdjete (\d+) \(")
+M102_POST = re.compile(r"list - (\S+) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik (kasa|pan \S+), wolna kasa (-?\d+)")
+M102_POSTH = re.compile(r"list soltysa - (\S+) \((\S+)\) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik wies, wolna kiesa (-?\d+)")
+M102_KASY = re.compile(r"Kasy miast \(169c\): dzien (\d+) \| miast \d+: kasy (\d+)")
+M102_FOLK = re.compile(r"lud za towar \(E5/B1\) \+(\d+)")
+M102_GIVE = re.compile(r"przelewy gry \(GiveGoldAction\) [+-]?\d+ \[P\] \(([^)]*)\)")
+
+
+def m102tablica_main(logp):
+    """m102tablica (21.10, w-toku/m102-tablica; Jeff 20.10 "tablice ogloszen jak w grach RPG z misjami ... kapitana strazy"; projekt PROJEKT-TABLICA-OGLOSZEN-2026-10-21 pkt 6.7):
+    T-1 linia "wpieta" (menu town 1/1, podmenu 2/2), T-2 linia doby tablicy w kazdej dobie okna (bez pierwszej i ostatniej), T-3 ERROR NoticeBoard i potkniecia 0,
+    T-4 nagroda nieczytelna 0 (doba i proba), T-5 tekst z tokenami <= 2% tekstow, T-6 koszt otwarcia sr. <= 5 ms, T-7 proba (INFO);
+    L-1 linia "wpiete" (zdarzenia 3/3, dialog 7/7), L-2 linia doby listow w kazdej dobie, L-3 kazda wyplata: obiecane = kasa + pan + niedoplata, kasa przed - po = kasa, platnicy = kasa + pan/wies, odbiorca = platnicy (pomiar), z niczego 0,
+    L-4 kasa po wyplacie >= Keep (i licznik doby 0), L-5 "inne" 0 od d2, L-6 od d7 co najmniej 1 list czynny przy bandach (bez band INFO), L-7 wyplaty lordom w oknie
+    <= 1% wplywow kas miast (linia "Przeplywy osad (kasy miast)": lud za towar + przelewy gry do kas; bez niej INFO), L-8 zapis arm_board <= 16 KB, L-9 koszt doby listow <= 3 ms, L-10 wyplata tylko za bande
+    z listem wywieszonym w logu (bez listu w logu najwyzej tyle, ile listow wczytano z zapisu na poczatku sesji) i tylko dla gracza albo lorda. Log bez paczki: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("T-1: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    wired, wiredw, tdays, ldays, pays, posts, kasy, n_err = [], [], [], [], [], [], [], 0
+    hposts, inflows = [], []
+    carried, need_carry = 0, True   # L-10: listy wczytane z zapisu (czynne - nowe + wyplacone + zdjete pierwszej doby kazdej sesji)
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in NoticeBoard"):
+                n_err += 1
+                continue
+            if s.startswith("Przeplywy osad (kasy miast): dzien"):
+                inflow = 0
+                mf = M102_FOLK.search(s)
+                if mf:
+                    inflow += int(mf.group(1))
+                mg = M102_GIVE.search(s)
+                if mg:
+                    inflow += sum(int(x) for x in re.findall(r"\+(\d+)/", mg.group(1)))
+                inflows.append(inflow)
+                continue
+            if s.startswith("Kasy miast (169c)"):
+                mk = M102_KASY.match(s)
+                if mk:
+                    kasy.append(int(mk.group(2)))
+                continue
+            if s.startswith(M102_TB):
+                body = s[len(M102_TB):]
+                if body.startswith("wpieta"):
+                    wired.append(body)
+                    continue
+                md = M102_TB_DAY.match(body)
+                if md:
+                    tdays.append(md)
+                continue
+            if s.startswith(M102_LG):
+                body = s[len(M102_LG):]
+                if body.startswith("wpiete"):
+                    wiredw.append(body)
+                    need_carry = True
+                    continue
+                md = M102_LG_DAY.match(body)
+                if md:
+                    ldays.append(md)
+                    if need_carry:
+                        need_carry = False
+                        mc = M102_CARRY.search(body); mz = M102_DROPS.search(body)
+                        if mc:
+                            carried += max(0, int(mc.group(1)) - int(mc.group(2)) + int(md.group(9)) + (int(mz.group(1)) if mz else 0))
+                    continue
+                mp = M102_PAY.match(body)
+                if mp:
+                    pays.append(mp)
+                    continue
+                mo = M102_POST.match(body)
+                if mo:
+                    posts.append(mo)
+                    continue
+                mh = M102_POSTH.match(body)
+                if mh:
+                    hposts.append(mh)
+    print(f"plik: {logp} | wpiec {len(wired)}/{len(wiredw)}, dob tablicy {len(tdays)}, dob listow {len(ldays)}, list {len(posts)}, wyplat {len(pays)}, ERROR {n_err}")
+    if not wired and not tdays:
+        rep.add("T-1: linia 'Tablica ogloszen (m102): wpieta'", "brak w logu", "INFO (log sprzed paczki m102-tablica albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = wired[-1] if wired else ""
+    ok1 = "menu town 1/1" in last and "podmenu 2/2" in last
+    rep.add("T-1: linia 'wpieta' (menu town 1/1, podmenu 2/2)", (last[:160] + "...") if last else "brak", "menu town 1/1, podmenu 2/2", ok1 if last else False)
+    days = sorted(int(d.group(1)) for d in tdays)
+    gaps = [d for a, b in zip(days, days[1:]) for d in range(a + 1, b)] if days else []
+    rep.add("T-2: linia doby tablicy w kazdej dobie", f"dob {len(days)} ({days[0] if days else '-'}..{days[-1] if days else '-'}), brakow {len(gaps)}", "0 brakow", (len(gaps) == 0) if len(days) > 2 else None)
+    stumb = max([int(d.group(10)) for d in tdays] + [0])
+    rep.add("T-3: ERROR NoticeBoard i potkniecia", f"ERROR {n_err}, potkniecia (max doby) {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    bad = sum(int(d.group(5)) for d in tdays)
+    pr = [M102_PROBE.search(d.group(9)) for d in tdays]
+    pr = [(int(x.group(1)), int(x.group(2))) for x in pr if x]
+    pbad = sum(b - a for a, b in pr)
+    rep.add("T-4: nagroda nieczytelna", f"doby {bad}, proba {pbad} (prob {len(pr)})", "0", (bad == 0 and pbad == 0) if (tdays or pr) else None)
+    tok = sum(int(d.group(6)) for d in tdays); txt = sum(int(d.group(7)) for d in tdays)
+    rep.add("T-5: tekst z tokenami", f"{tok} z {txt} tekstow ({(100.0 * tok / txt if txt else 0):.1f}%)", "<= 2%", (tok <= 0.02 * txt) if txt else None)
+    opened = [(int(d.group(3)), float(d.group(8))) for d in tdays if int(d.group(3)) > 0]
+    worst = max([c for _, c in opened] + [0.0])
+    rep.add("T-6: koszt otwarcia tablicy sr.", f"dob z otwarciem {len(opened)}, najgorsza srednia {worst:.2f} ms", "<= 5 ms", (worst <= 5.0) if opened else None)
+    rep.add("T-7: proba tablic (INFO)", (pr and f"prob {len(pr)}, ostatnia: {tdays[[i for i, d in enumerate(tdays) if M102_PROBE.search(d.group(9))][-1]].group(9)[:220]}") or "brak proby (doba % 30 == 5)", "INFO", None)
+    # listy gonczne
+    lw = wiredw[-1] if wiredw else ""
+    rep.add("L-1: linia 'Listy goncze (m102): wpiete'", (lw[:150] + "...") if lw else "brak", "zdarzenia 3/3, dialog kapitana 7/7", ("zdarzenia 3/3" in lw and "dialog kapitana 7/7" in lw) if lw else False)
+    ld = sorted(int(d.group(1)) for d in ldays)
+    lg = [d for a, b in zip(ld, ld[1:]) for d in range(a + 1, b)] if ld else []
+    rep.add("L-2: linia doby listow w kazdej dobie", f"dob {len(ld)}, brakow {len(lg)}", "0 brakow", (len(lg) == 0) if len(ld) > 2 else None)
+    def m102_pay_bad(p):
+        if int(p.group(3)) != int(p.group(4)) + int(p.group(5)) + int(p.group(6)):
+            return "obiecane != kasa + pan + niedoplata"
+        if int(p.group(8)) - int(p.group(9)) != int(p.group(4)):
+            return "kasa przed - po != kasa"
+        if p.group(11) is not None:
+            if int(p.group(12)) != int(p.group(4)) + int(p.group(5)):
+                return "platnicy != kasa + pan/wies"
+            if int(p.group(11)) != int(p.group(12)):
+                return "odbiorca != platnicy"
+        return None
+    badp = [(p, m102_pay_bad(p)) for p in pays]
+    badp = [(p, w) for p, w in badp if w]
+    meas = sum(1 for p in pays if p.group(11) is not None)
+    nothing = sum(int(d.group(18)) for d in ldays)
+    rep.add("L-3: wyplata = pobrane (kasa przed - po, platnicy, odbiorca), z niczego 0", f"zlych wyplat {len(badp)} z {len(pays)} (z pomiarem {meas}), z niczego {nothing}"
+            + (f" (np. {badp[0][1]}: {badp[0][0].group(0)[:140]})" if badp else ""),
+            "0 i 0", (len(badp) == 0 and nothing == 0) if (pays or ldays) else None)
+    below = [p for p in pays if int(p.group(4)) > 0 and int(p.group(9)) < int(p.group(10))]
+    belowd = sum(int(d.group(19)) for d in ldays)
+    rep.add("L-4: kasa po wyplacie >= Keep", f"ponizej {len(below)} z {len(pays)}, licznik dob {belowd}", "0 i 0", (len(below) == 0 and belowd == 0) if (pays or ldays) else None)
+    other = [(int(d.group(1)), int(d.group(7))) for d in ldays[1:] if int(d.group(7)) > 0]
+    rep.add("L-5: 'inne' (bez listu bez powodu) od d2", f"dob z inne > 0: {len(other)}" + (f" (np. dzien {other[0][0]}: {other[0][1]})" if other else ""), "0", (len(other) == 0) if len(ldays) > 1 else None)
+    late = [d for d in ldays[6:] if d.group(2) == "TAK" and int(d.group(3)) > 0]
+    empty = [d for d in late if int(d.group(8)) == 0]
+    rep.add("L-6: od d7 co najmniej 1 list czynny (przy bandach)", f"dob od d7 z bandami {len(late)}, bez listu {len(empty)}", ">= 1 w kazdej", (len(empty) == 0) if late else None)
+    lords = sum(int(d.group(14)) for d in ldays)
+    infl = sum(inflows)
+    avg = (sum(kasy) / len(kasy)) if kasy else 0
+    rep.add("L-7: wyplaty lordom w oknie <= 1% wplywow kas miast", f"lordom {lords} zl, wplywy kas miast w oknie {infl} zl ({(100.0 * lords / infl if infl else 0):.3f}%; lud za towar + przelewy gry do kas,"
+            f" linii {len(inflows)}; srednia kas {avg:.0f})", "<= 1% (inaczej domyslne WatchBountyAiLords = false)", (lords <= 0.01 * infl) if infl else None)
+    big = max([int(d.group(20)) for d in ldays] + [0])
+    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
+    cost = max([float(d.group(21)) for d in ldays] + [0.0])
+    rep.add("L-9: koszt doby listow", f"najwyzej {cost:.2f} ms", "<= 3 ms", (cost <= 3.0) if ldays else None)
+    posted = {(p.group(1), p.group(2)) for p in posts} | {(p.group(2), p.group(3)) for p in hposts}
+    hbad = [p for p in hposts if int(p.group(8)) * 4 > int(p.group(9))]
+    tbad = [p for p in posts if p.group(8) == "kasa" and int(p.group(7)) * 4 > int(p.group(9))]
+    rep.add("L-12: list z kasy miasta <= 1/4 wolnej kasy", f"ponad 1/4 {len(tbad)} z {sum(1 for p in posts if p.group(8) == 'kasa')}", "0", (len(tbad) == 0) if posts else None)
+    rep.add("L-11: list soltysa <= 1/4 wolnej kiesy wsi", f"ponad 1/4 {len(hbad)} z {len(hposts)}", "0", (len(hbad) == 0) if hposts else None)
+    orphan = [p for p in pays if (p.group(1), p.group(2)) not in posted]
+    who_bad = [p for p in pays if not (p.group(7) == "gracz" or p.group(7).startswith("lord "))]
+    rep.add("L-10: wyplata tylko za bande z listem, tylko gracz albo lord", f"bez listu w logu {len(orphan)} z {len(pays)} (listow z zapisu {carried}), zly odbiorca {len(who_bad)}",
+            "bez listu <= listow z zapisu, zly odbiorca 0", (len(who_bad) == 0 and len(orphan) <= carried) if pays else None)
+    lstumb = max([int(d.group(22)) for d in ldays] + [0])
+    rep.add("L-K: potkniecia listow", f"max doby {lstumb}", "0", lstumb == 0 if ldays else None)
+    tot = sum(int(d.group(10)) for d in ldays); pl = sum(int(d.group(12)) for d in ldays)
+    rep.add("L-INFO: listy i wyplaty", f"wywieszone {len(posts)}, wyplat {len(pays)} za {tot} zl (gracz {pl} zl, lordowie {lords} zl), ostatnia doba: "
+            + (ldays[-1].group(0)[:200] if ldays else "-"), "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m99markietani (21.10, w-toku/m99-markietani: rzad markietanow w menu obozu gracza - cyrulicy, zabawa,
+# sklep z polki miasta z narzutem, tylko duzy oboz; Armoury/src/CampSutlers.cs; klucz CampSutlersRow)
+M99M_TAG = "Markietani obozu (m99): "
+M99M_CAMP = re.compile(r"\| oboz (\d+) ludzi \(prog (\d+)\), kramy (\d+)")
+M99M_CTL = re.compile(r"\| kontrola: (-?\d+) = (-?\d+)(?: \+ (-?\d+))? \(roznica (-?\d+)\)")
+M99M_SHOP = re.compile(r"kupione (\d+) sztuk \(cena markietanow (-?\d+), miasta (-?\d+)\), z polki miasta zdjete (\d+) \(brak na polce (\d+)\), sprzedane (\d+) sztuk \(skup (-?\d+)\) na polke miasta (\d+)"
+                       r" \| gracz netto (-?\d+) .*?= towar do kasy miasta (-?\d+) \+ narzut (-?\d+)")
+M99M_DAY = re.compile(r"dzien (\d+) \|.*\(roznica (-?\d+)\) \| potkniecia (\d+)")
+M99M_SOLD = re.compile(r"\| skup dzis (\d+) z limitu (\d+)")                                   # poprawka po recenzji: limit skupu na dobe
+M99M_REV = re.compile(r"morale RecentEvents (-?[0-9.]+) -> (-?[0-9.]+) \(dodatek ([0-9.]+), pulap (\d+)\)")   # poprawka po recenzji: pulap zabawy
+
+
+def m99markietani_main(logp):
+    """m99markietani (21.10, w-toku/m99-markietani; Jeff 20.10 "miasteczko obozowe z markietankami", decyzja 4 "uslugi, rozrywka i sklep - tylko w duzych obozach"):
+    MK-0 linia startu (klucz), MK-1 ERROR CampSutlers i potkniecia 0, MK-2 uslugi i sklep tylko w duzym obozie (oboz >= prog), MK-3 pieniadz w obiegu (kazda zaplata =
+    suma odbiorcow, roznica 0; sklep: gracz netto = towar do miasta + narzut; linia doby roznica 0), MK-4 towar: z polki miasta zdjete = kupione (brak na polce 0),
+    sprzedane = na polke miasta, MK-5 uzycie (INFO). Log bez paczki albo bez wizyt: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("MK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, uses, ctl, shops, days, n_err, stumb, opened = [], [], [], [], [], 0, 0, 0
+    solds, revs = [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in CampSutlers"):
+                n_err += 1
+                continue
+            if not s.startswith(M99M_TAG):
+                continue
+            body = s[len(M99M_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            md = M99M_DAY.match(body)
+            if md:
+                days.append((int(md.group(1)), int(md.group(2))))
+                stumb = max(stumb, int(md.group(3)))
+                continue
+            kind = body.split(" |", 1)[0]
+            mc = M99M_CAMP.search(body)
+            if mc and kind in ("cyrulik", "platnerz", "zabawa", "sklep otwarty", "sklep zamkniety"):
+                uses.append((kind, int(mc.group(1)), int(mc.group(2)), int(mc.group(3))))
+            if kind == "sklep otwarty":
+                opened += 1
+            mk = M99M_CTL.search(body)
+            if mk and kind in ("cyrulik", "platnerz", "zabawa", "sklep zamkniety"):
+                a, b, c, r = int(mk.group(1)), int(mk.group(2)), int(mk.group(3) or 0), int(mk.group(4))
+                ctl.append((kind, a, b + c, r))
+            ms = M99M_SHOP.search(body)
+            if ms and kind == "sklep zamkniety":
+                shops.append(tuple(int(ms.group(i)) for i in range(1, 12)))
+            mo = M99M_SOLD.search(body)
+            if mo and kind == "sklep zamkniety":
+                solds.append((int(mo.group(1)), int(mo.group(2))))
+            mr = M99M_REV.search(body)
+            if mr and kind == "zabawa":
+                revs.append((float(mr.group(1)), float(mr.group(2)), float(mr.group(3)), int(mr.group(4))))
+    print(f"plik: {logp} | startow {len(starts)}, uzyc {len(uses)} (sklep otwarty {opened}, zamkniety {len(shops)}), linii doby {len(days)}, ERROR {n_err}")
+    if not starts and not uses:
+        rep.add("MK-0: linia 'Markietani obozu (m99): start sesji'", "brak w logu", "INFO (log sprzed paczki m99-markietani albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    on = "klucz Camp Sutlers Row TAK" in last
+    rep.add("MK-0: linia startu (klucz)", (last[:150] + "...") if last else "brak", "klucz Camp Sutlers Row TAK", on if last else False)
+    rep.add("MK-1: ERROR CampSutlers i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    small = [u for u in uses if u[1] < u[2] or u[3] < 1]
+    rep.add("MK-2: uslugi i sklep tylko w duzym obozie", f"ponizej progu {len(small)} z {len(uses)}" + (f" (np. {small[0][0]}: {small[0][1]} < {small[0][2]})" if small else ""),
+            "0", (len(small) == 0) if uses else None)
+    bad = [c for c in ctl if c[3] != 0 or c[1] != c[2]]
+    badd = [d for d in days if d[1] != 0]
+    rep.add("MK-3: pieniadz w obiegu (zaplata = odbiorcy)", f"zlych kontroli {len(bad)} z {len(ctl)}, dob z roznica {len(badd)} z {len(days)}"
+            + (f" (np. {bad[0][0]}: {bad[0][1]} != {bad[0][2]})" if bad else ""), "0 i 0", (len(bad) == 0 and len(badd) == 0) if (ctl or days) else None)
+    badg = [x for x in shops if x[3] + x[4] != x[0] or x[4] != 0 or x[5] != x[7] or x[8] != x[9] + x[10] or x[10] < 0]
+    rep.add("MK-4: towar z polki miasta = towar w sklepie", f"zlych zamkniec {len(badg)} z {len(shops)} (kupione = zdjete z polki, brak 0, sprzedane = na polke, netto = towar + narzut)",
+            "0", (len(badg) == 0) if shops else None)
+    tb = sum(x[0] for x in shops); ts = sum(x[5] for x in shops); net = sum(x[8] for x in shops); mk = sum(x[10] for x in shops)
+    bs = [x for x in solds if x[0] > x[1]]
+    rep.add("MK-6: skup w limicie dnia (gotowka kramow na dobe)", f"ponad limit {len(bs)} z {len(solds)}" + (f" (np. {bs[0][0]} > {bs[0][1]})" if bs else ""), "0", (len(bs) == 0) if solds else None)
+    br = [r for r in revs if r[1] > max(r[0], r[3]) + 0.05 or r[2] < 0.95]
+    rep.add("MK-7: zabawa w pulapie morale", f"ponad pulap albo dodatek < 1: {len(br)} z {len(revs)}" + (f" (np. {br[0][0]} -> {br[0][1]}, pulap {br[0][3]})" if br else ""), "0", (len(br) == 0) if revs else None)
+    nc = sum(1 for u in uses if u[0] == "cyrulik"); nz = sum(1 for u in uses if u[0] == "zabawa"); npl = sum(1 for u in uses if u[0] == "platnerz")
+    rep.add("MK-5: uzycie (INFO)", f"cyrulik {nc}, platnerz {npl}, zabawa {nz}, sklep {len(shops)}: kupione {tb} sztuk, sprzedane {ts}, gracz netto {net}, narzut {mk}", "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m97posilki (20.10, w-toku/m97-posilki: posilki Dynamic Reinforcements marszem - czas w bitwie
+# z godzin marszu, dalecy odmawiaja "za daleko"; Armoury/src/DrMarchArrival.cs; klucze DrArrivalByMarch, DrMaxMarchHours, DrSecondsPerMarchHour, DrDeploySeconds)
+M97P_TAG = "Posilki marszem (m97-posilki): "
+M97P_START = re.compile(r"start - klucz DrArrivalByMarch (TAK|NIE), latki wpiete (\d)/2 .*maks\. ([0-9.]+) h marszu, ([0-9.]+) s bitwy na godzine marszu, rozwiniecie ([0-9.]+) s")
+M97P_STUMB = re.compile(r"potkniecia (\d+)")
+M97P_BATTLE = re.compile(r"bitwa (\d+) \| kandydatow (\d+), za daleko (\d+) \(ponad ([0-9.]+) h marszu[^)]*\), przyjetych (\d+), blisko a odmowa DR (\d+), bez pomiaru (\d+) "
+                         r"\| czas = ([0-9.]+) s \+ h x ([0-9.]+) s \| najblizsi za daleko: (.*?) \| sesja:")
+M97P_FAR = re.compile(r"([0-9.]+) jedn\. / ([0-9.]+) jedn\./h = ([0-9.]+) h")
+M97P_ACC = re.compile(r"przyjety (.*) \| odleglosc ([0-9.]+) jedn\., predkosc ([0-9.]+) jedn\./h \(([^)]*)\), marsz ([0-9.]+) h -> czas z marszu ([0-9.]+) s, w bitwie t\+([0-9.]+) s")
+M97P_ACC_NOM = re.compile(r"przyjety (.*) \| bez pomiaru \(czas DR\), w bitwie t\+([0-9.]+) s")
+
+
+def m97posilki_main(logp):
+    """m97posilki (20.10, w-toku/m97-posilki; Jeff: "wojsko za szybko pojawia sie i powinno pojawiac sie tylko, jesli jest naprawde blisko, i im jest dalej,
+    tym dluzej sie na nie czeka"): Dynamic Reinforcements - czas w bitwie = rozwiniecie + godziny marszu x sekundy na godzine, ponad DrMaxMarchHours odmowa.
+    P97-0 linia startu (klucz TAK, latki 2/2; brak DR = INFO), P97-1 potkniecia i ERROR DrMarchArrival 0, P97-2 zaden przyjety oddzial ponad maks. godzin marszu,
+    P97-3 czas rosnie z godzinami marszu (czas z marszu = rozwiniecie + h x sekundy; w bitwie nie wczesniej niz czas z marszu - odstep grup i armia DR tylko
+    opozniaja; w jednej bitwie dalszy marsz nie daje krotszego czasu), P97-4 odrzuceni "za daleko" ponad maks. godzin, P97-5 bitwy, przyjeci, dalecy (INFO),
+    P97-6 przyjeci bez pomiaru (czas DR po staremu) 0. Log bez paczki albo bez bitew z DR: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("P97-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, battles, acc, nom, far_ex, n_err, stumb = [], [], [], 0, [], 0, 0
+    cur = None   # (maks h, rozwiniecie, s/h, numer bitwy) z ostatniej linii bitwy - linie "przyjety" ida zaraz po niej
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in DrMarchArrival"):
+                n_err += 1
+                continue
+            if not s.startswith(M97P_TAG):
+                continue
+            body = s[len(M97P_TAG):]
+            for mm in M97P_STUMB.findall(body):
+                stumb = max(stumb, int(mm))
+            if body.startswith("start - "):
+                starts.append(body)
+                continue
+            mb = M97P_BATTLE.match(body)
+            if mb:
+                cur = (float(mb.group(4)), float(mb.group(8)), float(mb.group(9)), len(battles))
+                battles.append(mb)
+                for fm in M97P_FAR.finditer(mb.group(10)):
+                    far_ex.append((float(fm.group(3)), cur[0]))
+                continue
+            ma = M97P_ACC.match(body)
+            if ma and cur:
+                acc.append((cur, ma.group(1), float(ma.group(2)), float(ma.group(3)), ma.group(4), float(ma.group(5)), float(ma.group(6)), float(ma.group(7))))
+                continue
+            if M97P_ACC_NOM.match(body):
+                nom += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, bitew {len(battles)}, przyjetych z pomiarem {len(acc)}, bez pomiaru {nom}, ERROR {n_err}")
+    if not starts and not battles:
+        rep.add("P97-0: linia 'Posilki marszem (m97-posilki): start'", "brak w logu", "INFO (log sprzed paczki m97-posilki albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    ms = M97P_START.search(last)
+    if "brak modu DynamicReinforcements" in last:
+        rep.add("P97-0: linia startu", last[:140], "INFO (bez modu DR - nic do zmiany)", None)
+    elif ms:
+        on = ms.group(1) == "TAK"
+        rep.add("P97-0: linia startu (klucz, latki)", f"klucz {ms.group(1)}, latki {ms.group(2)}/2, maks. {ms.group(3)} h, {ms.group(4)} s/h, rozwiniecie {ms.group(5)} s",
+                "klucz TAK, latki 2/2", (ms.group(2) == "2") if on else None)
+    else:
+        rep.add("P97-0: linia startu", (last[:160] + "...") if last else "brak", "klucz TAK, latki 2/2", False)
+    rep.add("P97-1: potkniecia i ERROR DrMarchArrival", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    over = [a for a in acc if a[5] > a[0][0] + 0.005]
+    rep.add("P97-2: przyjeci ponad maks. godzin marszu", f"{len(over)} z {len(acc)}" + (f" (np. {over[0][1][:40]} {over[0][5]:.2f} h > {over[0][0][0]:.2f})" if over else ""),
+            "0", len(over) == 0)
+    bad_f, bad_late, bad_ord = 0, 0, 0
+    by_b = {}
+    for a in acc:
+        (mx, dep, sph, bi), name, d, v, frm, h, t_m, t_b = a
+        if abs(t_m - (dep + h * sph)) > 0.6 + 0.005 * sph:   # zaokraglenia logu: h do 0.01, czas do 1 s
+            bad_f += 1
+        if t_b + 1.0 < t_m:
+            bad_late += 1
+        by_b.setdefault(bi, []).append((h, t_m))
+    for lst in by_b.values():
+        lst.sort()
+        for i in range(1, len(lst)):
+            if lst[i][1] + 1.0 < lst[i - 1][1]:
+                bad_ord += 1
+    rep.add("P97-3: czas rosnie z godzinami marszu", f"wzor zly {bad_f}, w bitwie wczesniej niz z marszu {bad_late}, dalszy wczesniej {bad_ord} (przyjetych {len(acc)})",
+            "0 / 0 / 0", (bad_f == 0 and bad_late == 0 and bad_ord == 0) if acc else None)
+    far_bad = [f for f in far_ex if f[0] < f[1] - 0.005]   # h w logu do 0.01 - 2.003 h pisze sie 2.00
+    rep.add("P97-4: odrzuceni 'za daleko' ponad maks. godzin", f"przykladow {len(far_ex)}, w granicy {len(far_bad)}", "0 w granicy", (len(far_bad) == 0) if far_ex else None)
+    n_far = sum(int(b.group(3)) for b in battles)
+    n_acc = sum(int(b.group(5)) for b in battles)
+    hs = sorted(a[5] for a in acc)
+    rng = f", godziny przyjetych {hs[0]:.2f}-{hs[-1]:.2f} h, czas w bitwie {min(a[7] for a in acc):.0f}-{max(a[7] for a in acc):.0f} s" if acc else ""
+    rep.add("P97-5: bitwy z DR, przyjeci, dalecy", f"bitew {len(battles)}, przyjetych {n_acc}, za daleko {n_far}{rng}", "INFO", None)
+    rep.add("P97-6: przyjeci bez pomiaru (czas DR po staremu)", str(nom), "0", nom == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96wzory (20.10, w-toku/m96-wzory: wzory kuzni po ostatecznych statystykach, naprawa zapisu, bramy wiedzy;
 # Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs; klucze LoreSeedAfterFinalStats, PatternDrawBySkill, ShieldCraftSkillGate, ForgeUniquesByStudy,
 # PatternTileShowsSkill, XbowPatternTierByPower, RareBowsNotForged, LegendTwinPiecesHidden)
@@ -37523,7 +38682,7 @@ def nzajazdy_main(logp):
         rep.add("ZJ-5: plotki zbudowane bez wyjatkow (suma dob)", f"sluchane {sum(int(g['heard']) for g in pdays)}, plotek {sum(int(g['items']) for g in pdays)}, wyjatki budowy {pst}",
                 "wyjatki 0", pst == 0)
         bms = max(float(g["bms"]) for g in pdays)
-        rep.add("ZJ-5b: czas budowy plotek (najgorsza doba, srednio na sluchanie)", f"{bms:.2f} ms", "<= 50 ms (INFO bez sluchania)",
+        rep.add("ZJ-5b: czas budowy plotek (najgorsza doba, srednio na budowe puli - m98-plotki; bez kufla to samo co na sluchanie)", f"{bms:.2f} ms", "<= 50 ms (INFO bez sluchania)",
                 None if sum(int(g["heard"]) for g in pdays) == 0 else bms <= 50.0)
     else:
         rep.add("ZJ-5: linie doby plotek", "brak", "INFO (klucz Inn Gossip wylaczony albo sesja krotsza niz doba)", None)
@@ -53578,6 +54737,347 @@ def m96len_main(logp):
     return 0
 
 
+# ============================================================ m97wioski (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs): wjazd do wiosek pobocznych
+M97W_PRE = "Wioski poboczne (WP): "
+M97W_RX = {
+    "trade": re.compile(r"handel w (.+?) zamkniety: gracz ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\), wies okregu (\S+) ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\)"),
+    "trib": re.compile(r"okup (.+?) \(.*kontrola: gracz \+(-?\d+) / wies -(-?\d+)\)"),
+    "raidend": re.compile(r"rabunek (.+?) \(.*\) - koniec: (.+?) \|.*lup .*: zloto (-?\d+) z kiesy wsi"),
+    "day": re.compile(r"dzien (-?\d+) \| klucz (\S+) \| wjazdy (\d+) \(kliki (\d+)\) \| handel (\d+):.* \| noclegi (\d+) \(bez oplaty (\d+)\), obozy (\d+), okna prac (\d+)"),
+    "st": re.compile(r"potkniecia doby (\d+), sesji (\d+)"),
+}
+
+
+def m97wioski_main(logp):
+    """m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do kazdej wioski pobocznej - handel koszykiem, nocleg, oboz, prace, rabunek tej wioski, okup (SideVillageVisit).
+    Log Armoury strumieniowo. Progi: WP-0 start sesji, WP-1 linie ERROR SideVillageVisit 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi o -zysk gracza
+    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, days, trades, tribs, raids, errs = [], [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR in SideVillageVisit." in s:
+                errs += 1
+            if not s.startswith(M97W_PRE):
+                continue
+            t = s[len(M97W_PRE):]
+            if t.startswith("start sesji"):
+                start.append(t)
+            elif t.startswith("dzien"):
+                days.append(t)
+            elif t.startswith("handel w ") and " zamkniety: " in t:
+                trades.append(t)
+            elif t.startswith("okup "):
+                tribs.append(t)
+            elif t.startswith("rabunek ") and " - koniec: " in t:
+                raids.append(t)
+    print(f"plik: {logp} | start {len(start)}, doby {len(days)}, handel {len(trades)}, okupy {len(tribs)}, rabunki {len(raids)}, ERROR {errs}")
+    if not start and not days:
+        rep.add("WP-0: linia startu wiosek pobocznych", "brak linii", "INFO (log sprzed galezi m97-wioski)", None)
+        rep.show()
+        return 0
+    rep.add("WP-0: linia startu sesji", (start[-1][:200] if start else "brak"), "jest", bool(start))
+    rep.add("WP-1: linie ERROR in SideVillageVisit.", f"{errs}", "0", errs == 0)
+    st = sum(int(m.group(1)) for m in (M97W_RX["st"].search(x) for x in days) if m)
+    rep.add("WP-2: potkniecia doby (suma)", f"{st} w {len(days)} dobach", "0", st == 0)
+    bad = []
+    for t in trades:
+        m = M97W_RX["trade"].search(t)
+        if not m:
+            bad.append("nieczytelna: " + t[:60]); continue
+        tp, a, b, dv, c, d = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(6)), int(m.group(7)), int(m.group(8))
+        if d - c != -tp or dv != -tp or b - a != tp:
+            bad.append(f"{m.group(1)}: gracz {tp:+d} ({a}->{b}), wies {dv:+d} ({c}->{d})")
+    if trades:
+        rep.add("WP-3: kontrola handlu w wiosce (zloto gracza = - zloto wsi)", f"zamkniec {len(trades)}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""), "0 niezgodnych", not bad)
+    else:
+        rep.add("WP-3: kontrola handlu w wiosce", "brak handlu w logu", "INFO", None)
+    badt = []
+    for t in tribs:
+        m = M97W_RX["trib"].search(t)
+        if m and int(m.group(2)) != int(m.group(3)):
+            badt.append(f"{m.group(1)}: gracz +{m.group(2)} / wies -{m.group(3)}")
+    if tribs:
+        rep.add("WP-4: kontrola okupu wioski (gracz +X = wies -X)", f"okupow {len(tribs)}, niezgodnych {len(badt)}" + (f" ({badt[:3]})" if badt else ""), "0 niezgodnych", not badt)
+    else:
+        rep.add("WP-4: kontrola okupu wioski", "brak okupow w logu", "INFO", None)
+    if raids:
+        g = [M97W_RX["raidend"].search(t) for t in raids]
+        loot = sum(int(m.group(3)) for m in g if m)
+        why = {}
+        for m in g:
+            if m:
+                k = m.group(2).split(" (")[0]
+                why[k] = why.get(k, 0) + 1
+        rep.add("WP-5: rabunki wiosek (koniec)", f"{len(raids)}: {why}, zloto lupu {loot}", "INFO", None)
+    else:
+        rep.add("WP-5: rabunki wiosek", "brak w logu", "INFO", None)
+    ent = tr = rest = camp = inv = 0
+    for t in days:
+        m = M97W_RX["day"].search(t)
+        if m:
+            ent += int(m.group(3)); tr += int(m.group(5)); rest += int(m.group(6)); camp += int(m.group(8)); inv += int(m.group(9))
+    rep.add("WP-6: ruch doby (suma)", f"wjazdy {ent}, handel {tr}, noclegi {rest}, obozy {camp}, okna prac {inv}", "INFO", None)
+    rep.show()
+    return 0
+
+
+
+# ============================================================ m98plotki (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs)
+M98P_PRE = "Kufle (m98): "
+M98P_RX = {
+    "start": re.compile(r"klucze: Inn Gossip Needs Drink (\S+), Gossip Per Drink By Charm (\S+), Gossip Tournaments (\S+), Gossip Matchmaking (\S+), Drink Drunk Hangover (\S+)"),
+    "curve": re.compile(r"krzywa Uroku \(plotek na kufel\): 20 -> (\d+), 80 -> (\d+), 150 -> (\d+), 200 -> (\d+), 250 -> (\S+?);"),
+    "cup": re.compile(r"kufel w (.+?) \((karczma miasta|zajazd), (\S+)\) dzien (-?\d+) - cena (\d+) \(beczka piwa w (\S+) (\d+)\), zaplacil (\d+) \(gracz (-?\d+) -> (-?\d+)\) -> (.+?) "
+                      r"\| kontrola obiegu: roznica (-?\d+) \| Urok (\d+) -> plotek (\d+) z (\d+) nowych \(pula (\d+), zostalo (\d+)\).*?\| turnieje (\d+) \(prawdziwe (\d+)\), swaty (\d+) \(prawdziwe (\d+)\)"),
+    "town": re.compile(r"kiesa ludu \S+ (-?\d+), kasa miasta (-?\d+)$"),
+    "road": re.compile(r"kiesa wsi \S+ (-?\d+), podatek pana (\d+), korona \(DS\) (\d+)$"),
+    "drunk": re.compile(r"(upicie|pijany dalej) - kufli (\d+) \(prog (\d+), .*?ponad prog (\d+), kara predkosci -(\d+)%"),
+    "wake": re.compile(r"pobudka \((.+?)\) - pasek (\S+) h, pelny pasek (tak|nie), .*? h -> (dalej pijany|odespane), dzien (-?\d+)"),
+    "day": re.compile(r"dzien (-?\d+) \| .*?\| kufle (\d+), zaplacone (\d+) .*?roznica (-?\d+) \| plotek uslyszanych (\d+) \(turnieje (\d+), nieprawdziwe (\d+); swaty (\d+), nieprawdziwe (\d+)\)"
+                      r".*?\| upicia (\d+), odespania (\d+), kace (\d+), godziny kary: pijany (\d+), kac (\d+), bez stanu (\d+) .*?\| pula: turniejow w toku w swiecie (\d+), kandydatow do swatow w swiecie (\S+?) "
+                      r".*?\| potkniecia dzis (\d+)"),
+}
+
+
+def m98_per_drink(charm, pool, by_charm):
+    if pool <= 0:
+        return 0
+    if not by_charm or charm >= 230:
+        return pool
+    return min(pool, 1 + max(0, (charm + 10) // 60))
+
+
+def m98plotki_main(logp):
+    """m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel (cena z beczki piwa, zloto do karczmarzy), plotek na kufel wedlug Uroku, turnieje i swaty
+    tylko prawdziwe, pijanstwo i kac gracza. Log Armoury strumieniowo. KP-0 start sesji (klucze, krzywa Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 linie
+    ERROR InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony (zaplacil = cena, kiesa gracza -cena, odbiorcy razem = cena, kontrola obiegu 0),
+    KP-4 turnieje i swaty prawdziwe w chwili sluchania (kufle i doby: nieprawdziwe 0), KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy
+    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, cups, drunks, days, wakes, errs = [], [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR in InnDrink." in s or "ERROR in Rumours." in s:
+                errs += 1
+            if not s.startswith(M98P_PRE):
+                continue
+            t = s[len(M98P_PRE):]
+            if t.startswith("start sesji"):
+                start.append(t)
+            elif t.startswith("dzien "):
+                days.append(t)
+            elif t.startswith("kufel w "):
+                cups.append(t)
+            elif t.startswith("upicie") or t.startswith("pijany dalej"):
+                drunks.append(t)
+            elif t.startswith("pobudka ("):
+                wakes.append(t)
+    print(f"plik: {logp} | start {len(start)}, doby {len(days)}, kufle {len(cups)}, upicia {len(drunks)}, ERROR {errs}")
+    if not start and not days and not cups:
+        rep.add("KP-0: linia startu kufli", "brak linii", "INFO (log sprzed galezi m98-plotki)", None)
+        rep.show()
+        return 0
+    ms = M98P_RX["start"].search(start[-1]) if start else None
+    mc = M98P_RX["curve"].search(start[-1]) if start else None
+    by_charm = not (ms and ms.group(2) != "tak")
+    curve_ok = bool(mc) and (not by_charm or (mc.group(1), mc.group(2), mc.group(3), mc.group(5)) == ("1", "2", "3", "wszystkie"))
+    rep.add("KP-0: linia startu sesji (klucze, krzywa Uroku 20/80/150/250)", (start[-1][:220] if start else "brak"), "jest; przy kluczu Urok: 1/2/3/wszystkie",
+            bool(start) and bool(ms) and curve_ok)
+    rep.add("KP-1: linie ERROR in InnDrink./Rumours.", f"{errs}", "0", errs == 0)
+    st_sum = sum(int(m.group(18)) for m in (M98P_RX["day"].search(x) for x in days) if m)
+    rep.add("KP-2: potkniecia doby (suma)", f"{st_sum} w {len(days)} dobach", "0", st_sum == 0)
+    bad, badt, badn, unread, nopay = [], [], [], 0, 0
+    tn = tt = mn = mt = 0
+    for t in cups:
+        if "zaplata nie przeszla" in t:
+            nopay += 1   # kufel bez zaplaty = bez plotek (obieg zamkniety) - w opisie, nie w progu
+            continue
+        m = M98P_RX["cup"].search(t)
+        if not m:
+            unread += 1
+            continue
+        price, paid, g0, g1, recip, diff = int(m.group(5)), int(m.group(8)), int(m.group(9)), int(m.group(10)), m.group(11), int(m.group(12))
+        charm, n, fresh = int(m.group(13)), int(m.group(14)), int(m.group(15))
+        got = None
+        mt_ = M98P_RX["town"].search(recip)
+        mr_ = M98P_RX["road"].search(recip)
+        if mt_:
+            got = int(mt_.group(1)) + int(mt_.group(2))
+        elif mr_:
+            got = int(mr_.group(1)) + int(mr_.group(2)) + int(mr_.group(3))
+        if paid != price or g0 - g1 != paid or got != paid or diff != 0:
+            bad.append(f"{m.group(3)} d{m.group(4)}: cena {price}, zaplacil {paid}, gracz {g0}->{g1}, odbiorcy {got}, roznica {diff}")
+        a, b, c, d = int(m.group(18)), int(m.group(19)), int(m.group(20)), int(m.group(21))
+        tn += a; tt += b; mn += c; mt += d
+        if a != b or c != d:
+            badt.append(f"{m.group(3)} d{m.group(4)}: turnieje {b}/{a}, swaty {d}/{c}")
+        if n != m98_per_drink(charm, fresh, by_charm):
+            badn.append(f"{m.group(3)} d{m.group(4)}: Urok {charm}, nowych {fresh}, plotek {n} (oczekiwane {m98_per_drink(charm, fresh, by_charm)})")
+    if cups:
+        rep.add("KP-3: kufel zaplacony, pieniadz u odbiorcy (cena = zaplacil = -kiesa gracza = odbiorcy, obieg 0)",
+                f"kufli {len(cups)} (zaplata nie przeszla {nopay} - bez plotek), nieczytelnych {unread}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""), "0 niezgodnych i 0 nieczytelnych", not bad and unread == 0)
+    else:
+        rep.add("KP-3: kufel zaplacony", "brak kufli w logu", "INFO (gracz nie sluchal plotek)", None)
+    dfalse = sum(int(m.group(7)) + int(m.group(9)) for m in (M98P_RX["day"].search(x) for x in days) if m)
+    rep.add("KP-4: turnieje i swaty prawdziwe w chwili sluchania", f"kufle: turnieje {tt}/{tn}, swaty {mt}/{mn}, niezgodnych {len(badt)}" + (f" ({badt[:3]})" if badt else "")
+            + f"; doby: nieprawdziwe {dfalse}", "0 nieprawdziwych", not badt and dfalse == 0 if (cups or days) else None)
+    if cups:
+        rep.add("KP-5: plotek na kufel = krzywa Uroku (<50:1, 50:2, 110:3, 170:4, 230: wszystkie)", f"niezgodnych {len(badn)}" + (f" ({badn[:3]})" if badn else ""), "0", not badn)
+    else:
+        rep.add("KP-5: plotek na kufel wedlug Uroku", "brak kufli w logu", "INFO", None)
+    badd = [x for x in drunks if (lambda mm: mm is not None and int(mm.group(2)) <= int(mm.group(3)))(M98P_RX["drunk"].search(x))]
+    nostate = sum(int(m.group(15)) for m in (M98P_RX["day"].search(x) for x in days) if m)
+    rep.add("KP-6: kara predkosci tylko przy upiciu / kacu", f"upic {len(drunks)} (w tym nie ponad prog {len(badd)}), godzin kary bez stanu {nostate}", "0 i 0",
+            len(badd) == 0 and nostate == 0 if (days or drunks) else None)
+    tot = [0] * 9
+    pool_t, pool_m = "-", "-"
+    for x in days:
+        m = M98P_RX["day"].search(x)
+        if m:
+            for i, g in enumerate((2, 3, 5, 6, 8, 10, 11, 13, 14)):
+                tot[i] += int(m.group(g))
+            pool_t, pool_m = m.group(16), m.group(17)
+    rep.add("KP-7: ruch doby (suma)", f"kufle {tot[0]}, zaplacone {tot[1]}, plotek {tot[2]} (turnieje {tot[3]}, swaty {tot[4]}), upicia {tot[5]}, odespania {tot[6]}, "
+            f"godziny pijany {tot[7]}, kac {tot[8]} | ostatnia doba: turniejow w toku {pool_t}, kandydatow do swatow {pool_m}", "INFO", None)
+    # KP-8 (recenzja technika): pobudka z pelnym paskiem snu w stanie pijanym ma konczyc pijanstwo (pasek jest prawda o tym snie)
+    wk = [M98P_RX["wake"].search(x) for x in wakes]
+    wfull = [m for m in wk if m and m.group(3) == "tak"]
+    wbad = [f"{m.group(1)} d{m.group(5)} pasek {m.group(2)} h" for m in wfull if m.group(4) == "dalej pijany"]
+    wunread = sum(1 for m in wk if m is None)
+    if wakes:
+        rep.add("KP-8: pobudka z pelnym paskiem snu przy pijanym = odespane", f"pobudek pijanego {len(wakes)} (pelny pasek {len(wfull)}, nieczytelnych {wunread}), "
+                f"pelny pasek i dalej pijany {len(wbad)}" + (f" ({wbad[:3]})" if wbad else ""), "0 i 0 nieczytelnych", not wbad and wunread == 0)
+    else:
+        rep.add("KP-8: pobudka z pelnym paskiem snu przy pijanym", "brak pobudek pijanego w logu", "INFO", None)
+    rep.show()
+    return 0
+
+
+# ============================================================ m97obroncy (20.10, m97-wioski krok 2; Armoury/src/SideVillageVisit.Defenders.cs): obroncy wioski pobocznej
+M97O_RX = {
+    "start": re.compile(r"obroncy wiosek: klucz Side Village Defenders (\S+) \(1 na (\d+) mieszkancow w domu, pulap (\d+), poddanie przy (\d+):1"),
+    "enc": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): ludnosc (\d+), obroncow (\d+) \(pulap ludnosci (\d+), pamiec poleglych ([\d.]+).*?\), sila gracza (\d+) -> (poddanie|bitwa)"),
+    "end": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): koniec bitwy - (.+?) \| obroncow (\d+), wrocilo do domow (\d+), (?:rozbici do domow \(H3\) (\d+), )?straty z ludnosci (\d+) .*\| wynik: (.+?) \|"),
+    "orph": re.compile(r"obroncy: druzyna (\S+) .* bez wpisu bitwy po wczytaniu"),
+    "day": re.compile(r"obroncy wiosek: starcia (\d+) \(poddania (\d+), bitwy (\d+): wygrane gracza (\d+), przegrane / odwrot (\d+)\), straty z ludnosci (\d+)"),
+    "ai": re.compile(r"AI: wiosek pominietych \(obroncow wiecej niz napastnikow\) (\d+), spalonych z ubytkiem obroncow (\d+)"),
+}
+
+
+def m97obroncy_main(logp):
+    """m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs). Log Armoury strumieniowo.
+    OB-0 start, OB-1 ERROR SideVillageVisit 0, OB-2 bitwy zamkniete, OB-3 straty <= obroncow, OB-4 obroncow <= pulapu ludnosci, OB-5 sieroty (INFO), OB-6 doba (INFO)."""
+    rep = Report()
+    start, encs, ends, orph, days, errs = [], [], [], [], [], 0
+    seq = []   # recenzja: kolejnosc zdarzen (start sesji / starcie / koniec) - OB-2 liczy otwarte bitwy w obrebie sesji
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR in SideVillageVisit." in s:
+                errs += 1
+            if not s.startswith(M97W_PRE):
+                continue
+            t = s[len(M97W_PRE):]
+            if t.startswith("start sesji"):
+                start.append(t); seq.append(("s", t))
+            elif t.startswith("dzien"):
+                days.append(t)
+            elif t.startswith("obroncy: druzyna"):
+                orph.append(t)
+            elif t.startswith("obroncy ") and ": koniec bitwy - " in t:
+                ends.append(t); seq.append(("e", t))
+            elif t.startswith("obroncy ") and " -> " in t:
+                encs.append(t); seq.append(("b", t))
+    print(f"plik: {logp} | start {len(start)}, starcia {len(encs)}, konce bitew {len(ends)}, sieroty {len(orph)}, doby {len(days)}, ERROR {errs}")
+    st = [M97O_RX["start"].search(x) for x in start]
+    st = [m for m in st if m]
+    if not st:
+        rep.add("OB-0: linia startu z kluczem obroncow", "brak linii", "INFO (log sprzed kroku 2 m97-wioski)", None)
+        rep.show()
+        return 0
+    m = st[-1]
+    rep.add("OB-0: start (klucz, udzial, pulap, poddanie)", f"klucz {m.group(1)}, 1 na {m.group(2)}, pulap {m.group(3)}, poddanie {m.group(4)}:1", "jest", True)
+    rep.add("OB-1: linie ERROR in SideVillageVisit.", f"{errs}", "0", errs == 0)
+    per, cap = int(m.group(2)), int(m.group(3))
+    fights, bad4 = [], []
+    for t in encs:
+        g = M97O_RX["enc"].search(t)
+        if not g:
+            bad4.append("nieczytelna: " + t[:60]); continue
+        pop, d, k = int(g.group(4)), int(g.group(5)), int(g.group(6))
+        if d > k or k > min(cap, pop // per + 1):
+            bad4.append(f"{g.group(1)}: ludnosc {pop}, obroncow {d}, pulap {k}")
+        if g.group(9) == "bitwa":
+            fights.append((g.group(2), d))
+    # OB-2 po sesjach (recenzja): bitwa otwarta przy "start sesji" (wczytanie w bitwie / w niewoli) przechodzi do "przeniesionych" - po wczytaniu straznik ja zamyka
+    # (koniec bitwy w nowej sesji) albo druzyny juz nie ma (zapis sprzed bitwy) - INFO, nie NIE
+    opened, carried, interrupted = {}, {}, 0
+    for kind, t in seq:
+        if kind == "s":
+            for u, v in opened.items():
+                if v > 0:
+                    carried[u] = carried.get(u, 0) + v
+            opened = {}
+        elif kind == "b":
+            g = M97O_RX["enc"].search(t)
+            if g and g.group(9) == "bitwa":
+                opened[g.group(2)] = opened.get(g.group(2), 0) + 1
+        else:
+            g = M97O_RX["end"].search(t)
+            if not g:
+                continue
+            u = g.group(2)
+            if opened.get(u, 0) > 0:
+                opened[u] -= 1
+            elif carried.get(u, 0) > 0:
+                carried[u] -= 1
+    interrupted = sum(v for v in carried.values() if v > 0)
+    bad3 = []
+    for t in ends:
+        g = M97O_RX["end"].search(t)
+        if not g:
+            bad3.append("nieczytelna: " + t[:60]); continue
+        d, back, routed, lost = int(g.group(5)), int(g.group(6)), int(g.group(7) or 0), int(g.group(8))
+        if lost > d or back > d or back + routed + lost > d:
+            bad3.append(f"{g.group(1)}: obroncow {d}, wrocilo {back}, rozbici {routed}, straty {lost}")
+    left = sum(v for v in opened.values() if v > 0)
+    if fights:
+        tail = f", przerwanych wczytaniem {interrupted} (INFO)" if interrupted else ""
+        if left == 0:
+            rep.add("OB-2: bitwy z obroncami zamkniete (druzyna nie przezywa bitwy)", f"bitew {len(fights)}, zamknietych {len(ends)}" + tail, "wszystkie", True)
+        elif left == 1 and seq and seq[-1][0] == "b" and " -> bitwa" in seq[-1][1]:
+            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwarta 1 (ostatnia - koniec logu w bitwie?)" + tail, "INFO", None)
+        else:
+            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwartych w sesji {left}" + tail, "0 otwartych", False)
+        rep.add("OB-3: straty z ludnosci <= obroncow", f"koncow {len(ends)}, zlych {len(bad3)}" + (f" ({bad3[:3]})" if bad3 else ""), "0 zlych", not bad3)
+    else:
+        rep.add("OB-2/OB-3: bitwy z obroncami", "brak bitew w logu", "INFO", None)
+    if encs:
+        rep.add("OB-4: obroncow <= pulapu ludnosci (1/" + str(per) + ", najwyzej " + str(cap) + ")", f"starc {len(encs)}, zlych {len(bad4)}" + (f" ({bad4[:3]})" if bad4 else ""), "0 zlych", not bad4)
+    else:
+        rep.add("OB-4: obroncow <= pulapu ludnosci", "brak starc w logu", "INFO", None)
+    rep.add("OB-5: druzyny obroncow sprzatniete po wczytaniu", f"{len(orph)}", "INFO", None)
+    a = [0] * 6
+    ai = [0, 0]
+    for t in days:
+        g = M97O_RX["day"].search(t)
+        if g:
+            for i in range(6):
+                a[i] += int(g.group(i + 1))
+        g = M97O_RX["ai"].search(t)
+        if g:
+            ai[0] += int(g.group(1)); ai[1] += int(g.group(2))
+    rep.add("OB-6: starcia doby (suma)", f"starcia {a[0]} (poddania {a[1]}, bitwy {a[2]}: wygrane {a[3]}, przegrane/odwrot {a[4]}), straty {a[5]} | AI: pominiete {ai[0]}, spalone z ubytkiem {ai[1]}", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -53787,6 +55287,20 @@ def main(argv):
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
     if group == "m96receptury" and logp:
         return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
+    if group == "m97surowce" and logp:
+        return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
+    if group == "m101postacie" and logp:
+        return m101postacie_main(logp, csp)   # m101postacie (21.10, w-toku/m101-postacie): postacie kanonu do rodow, B nie powstaja, zmiany stron wedlug ksiazki (CanonCompanions)
+    if group == "m101prolog" and logp:
+        return m101prolog_main(logp, csp)   # m101prolog (21.10, w-toku/m101-prolog): prolog 298 - kalendarz, start opowiesci ROT, pokoj i pakty, Robert i Ned, koniec prologu
+    if group == "m100kryjowki" and logp:
+        return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
+    if group == "m102tablica" and logp:
+        return m102tablica_main(logp)   # m102tablica (21.10, w-toku/m102-tablica): tablica ogloszen - zadania gry, rozmowa z tablicy, listy gonczne kapitana strazy (NoticeBoard)
+    if group == "m99markietani" and logp:
+        return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
+    if group == "m97posilki" and logp:
+        return m97posilki_main(logp)   # m97posilki (20.10, w-toku/m97-posilki): posilki DR marszem - czas z godzin marszu, dalecy odmawiaja (DrMarchArrival)
     if group == "m96wzory" and logp:
         return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:
@@ -53795,6 +55309,8 @@ def main(argv):
         return m96wies_main(logp)   # m96wies (20.10, m96-wies): porzadek menu wsi (VillageMenus) i komunikaty platnosci z powodem (PayNotes)
     if group == "m96zamek" and logp:
         return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
+    if group == "m97szkolenie" and logp:
+        return m97szkolenie_main(logp)   # m97szkolenie (20.10, Jeff "w marszu jest marsz"): cwiczenia tylko z obozu, zero XP z marszu, AI wobec dawnej reguly (CampDrill)
     if group == "m96jakosc" and logp:
         return m96jakosc_main(logp)   # m96jakosc (20.10, Jeff "za duzo legendary"): rzadkosc legendarnych i mistrzowskich - limit na rodzaj, wyrownanie polek do zwyklej (QualityScarcity)
     if group == "nzajazdy" and logp:
@@ -53892,7 +55408,13 @@ def main(argv):
     if group == "p6spichlerz" and logp:
         return p6spichlerz_main(logp)   # p6spichlerz (20.10, galaz p6-spichlerz - R3-06f): miasto je ze swoich wsi - zboze ze spichlerzy wsi do miast, zloto, niedobor, bezpiecznik BE i zalogi (TownGranary.cs)
     if group == "m96koszyk" and logp:
-        return m96koszyk_main(logp)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+        return m96koszyk_main(logp)
+    if group == "m97obroncy" and logp:
+        return m97obroncy_main(logp)   # m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs)
+    if group == "m97wioski" and logp:
+        return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+    if group == "m98plotki" and logp:
+        return m98plotki_main(logp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

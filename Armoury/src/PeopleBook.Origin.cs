@@ -1115,6 +1115,16 @@ namespace Armoury
             return got;
         }
 
+        /// <summary>m97-wioski krok 2 (recenzja: obroncy maja byc ludzmi TEJ wioski): pobor tylko z DOM jednej wsi s (wies okregu wioski pobocznej - jej ludzie sa czescia
+        /// DOM tej wsi), bez innych wsi regionu i bez miasta. Ta sama droga i podloga 50 hearth co TakeLevy (FromVillage). Zwraca, ilu zdjeto; region - warownia regionu.</summary>
+        internal static double TakeLevyHere(Settlement s, double n, int causeM, out Settlement region)
+        {
+            region = s != null ? OutlawLaw.RegionFor(s) : null;
+            if (s == null || !(n > 0.0) || !LevyLive || !s.IsVillage || s.Village == null) return 0.0;
+            try { return FromVillage(s.Village, n, causeM); }
+            catch (Exception e) { OStumble("TakeLevyHere", e); return 0.0; }
+        }
+
         private static bool LevyVillageFromTownOn { get { var s = Settings.Current; return s != null && s.LevyVillageFromTown; } }
         private static bool TownLevyByShareOn { get { var s = Settings.Current; return s != null && s.TownLevyByShare; } }
 

@@ -1,5 +1,86 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 100 - kryjowki bandytow: Zwiad, plotki, miejsca)
+
+**Zakres (Jeff 21.10 ok. 03:00):** "im wiecej masz scouting, tym lepiej widzisz kryjowki bandytow, ale ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ...
+jesli plotki powiedza, ze tu i tu jest obozowisko bandytow, to wtedy jak na nie trafisz, wyswietli sie normalnie"; "Kryjowki powinny nie pokazywac sie na wioskach pobocznych,
+tylko tam, gdzie jest wolne miejsce, z dala od miast i wsi, oraz jak jedna kryjowka zostanie rozbita, to kolejna powinna pojawic sie w innym miejscu".
+**Zmiana:** `w-toku/n29-calosc` (1d2318e3) = WGRANIE 99 + m100-kryjowki (9d4c239c): HideoutScoutingChance (Zwiad <= 10 -> 0%, liniowo do 200 = 100%; rzut raz na pobyt w zasiegu),
+HideoutRumourReveals (plotka o kryjowce -> wypatrzenie normalne do rozbicia), HideoutAwayFromSettlements (aktywna kryjowka >= 10 jedn. od osady, >= 6 od wioski pobocznej; z puli ROT 266
+zostaje 183), HideoutRelocateAfterClear (nowa >= 25 jedn. od rozbitej przez 60 dni, twardo >= 12.5), HideoutGuideBanditAi (bandy AI te same zasady - postfiks
+CalculateVisitHideoutScoresForBanditParty gry i BK). Kryjowek nie przesuwamy - wybor z puli ROT. 11 kluczy. Wpis: docs/noc-1920/m100-kryjowki-CHANGELOG.md. Armoury 2228 ustawien.
+**Testy (21.10, pierwszy raz bez VoiceActingPatch):** 100-bitwa - przy pierwszym starcie po zmianie listy modow gra stala 12 min przed wczytaniem modulow (przelacznik niezuzyty, kod 1);
+powtorka 100b-bitwa 4/4 kod 0; 100-nowa 180/180 i 100-160 400/400 kod 0, ERROR 0; progi nowa 3163/NIE 135 (99: 126 - do obserwacji), m100kryjowki 9/9.
+**Status:** WGRANE 100 (21.10 05:50, tag 2026-10-21-wgranie100; Armoury 577de3f2, CrashScribe 03d2cc92, RC 564b1702, GT 6db627f3, ForgeView 36aac63c).
+Armoury.json Jeffa: DrillCampOnlyAi -> true (Jeff 21.10 "14 - tylko w obozie"; kopia Armoury.json.bak-2026-10-21-drillcampai).
+
+## 2026-10-21 (WGRANIE 99 - oboz etap 2: markietani w duzych obozach)
+
+**Zakres (Jeff 20.10):** "miasteczko obozowe z markietankami"; decyzja 14:20 "markietani: uslugi, rozrywka i sklep - tylko w duzych obozach (armia)".
+**Zmiana:** `w-toku/n28-calosc` = WGRANIE 98 + m99-markietani (6ccd3cda): CampSutlersRow - "Visit the sutlers' row" w menu obozu i w menu armii gry (od 150 ludzi albo w armii),
+kramy 1 na 100 ludzi (max 12): cyrulicy (8 rannych/kram/dobe, 15 x (tier+1) d), platnerze polowi (6 sztuk/kram/dobe, robota jak u kowali miasta-zrodla x1.3 + material z polki),
+zabawa (morale +6, pulap +10, co 24 h, 2 d na czlowieka), sklep (towar z polek najblizszego miasta, narzut 30%, skup do 1500 d/kram/dobe); pieniadz do kasy miasta / kiesy wsi,
+towar z polki miasta. 13 kluczy. Wpis: docs/noc-1920/m99-markietani-CHANGELOG.md. Armoury 2217 ustawien.
+**Testy (21.10):** 99-bitwa 4/4, 99-nowa 180/180, 99-160 400/400 - kod 0, ERROR 0; progi nowa 3157/NIE 126 (98: 114, 97b: 127 - rozrzut), m99markietani 8/8 (autotest nie klika menu).
+**Ryzyko / co sprawdzic:** wejscie z menu cudzej armii (army_wait) - pierwszy raz w grze; platnerze z materialem poza miastem.
+**Status:** WGRANE 99 (21.10 03:50, tag 2026-10-21-wgranie99; Armoury c0c757d3, CrashScribe 15e601c3, RC b1d26e58, GT 9653495b, ForgeView 3d883521).
+LauncherData.xml Jeffa: VoiceActingPatch (VoiceActingPatchRemake) IsSelected true -> false (Jeff 21.10 "wylacz ten mod"; kopia LauncherData.xml.bak-2026-10-21-bez-voiceacting).
+
+## 2026-10-21 (WGRANIE 98 - plotki w karczmie i zajezdzie: turnieje, swaty, kufel za plotki wedlug Uroku, pijanstwo i kac)
+
+**Zakres (Jeff 20.10, doslownie):** "W gossip tez powinny byc turnieje, gdzie jest turniej itp. ... ktos wydaje zone albo szuka meza dla swojej corki ... musze kupic piwo
+lub ale cokolwiek, aby sluchac"; "za kazde wypite piwo moge dostac tyle plotek, ile moja charyzma ... jak wypije za duzo piwa, mam minus do predkosci i musze dospac,
+i nastepny dzien kac".
+**Zmiana:** `w-toku/n27-calosc` = WGRANIE 97 + m98-plotki (c76531de): InnGossipNeedsDrink (kufel = beczka/10, min 1 d, do karczmarza - HeroPays/RoadHeroPays,
+komunikat z powodem), GossipPerDrinkByCharm (Urok 20 -> 1, 80 -> 2, 150 -> 3, 200 -> 4, 250 -> wszystkie; 5 XP Uroku za plotke; uslyszane po tozsamosci wiesci 10 dob),
+GossipTournaments (turnieje - tylko trwajace), GossipMatchmaking (swaty - wolni dorosli lordowie), DrinkDrunkHangover (prog 3-5 kufli; pijany -15% + 5%/kufel, max -25%,
+odespanie 6 h + 1 h/kufel; kac -10% predkosci i morale do 18:00, bez premii lozka). Wpis: docs/noc-1920/m98-plotki-CHANGELOG.md. Armoury 2204 ustawien.
+**Testy (20/21.10):** 98-bitwa 4/4, 98-nowa 180/180, 98-160 400/400 - kod 0, ERROR 0; progi nowa 3147/NIE 114 (97b: 127); m98plotki 9/9 TAK, nzajazdy TAK.
+**Ryzyko / co sprawdzic:** kac zabiera premie lozka po zapitej nocy w karczmie (zamierzone - do oceny Jeffa); banda w plotkach wraca, gdy zmieni miejsce (promien 25/50 jedn.).
+**Status:** WGRANE 98 (21.10 00:55, tag 2026-10-21-wgranie98; Armoury 2e8b4dac, CrashScribe b1287a14, RC b8fa2031, GT fa5cfba9, ForgeView 7d9e8091).
+
+## 2026-10-21 (WGRANIE 97 - noc 20/21: wioski poboczne jak wsie + obroncy, oboz 21-3 i spacer, szkolenie w obozie, posilki DR z marszu, czardrzewo i smocza kosc)
+
+**Zakres (Jeff 20.10, doslownie, wybor):** "Czy mozemy zrobic tak, ze do wioski pobocznej tez mozna wjechac jak do wioski glownej ... bez bohaterow w niej?"; "ale ja chce, aby to
+byli ludzie z tej wioski pobocznej, a nie z wioski glownej"; oboz: "wejscie do obozu ... wyglad obozu ... wozy" (decyzje 14:20: oboz 21-3, chodzenie najpierw, woz + kon
+juczny, siodla transportowe); "szkolenie wojska nie odbywa sie w marszu ... na ekranie obozu mam opcje szkolenie wojska ... o 50% wydajniejsze ... perki leadership";
+"te Dynamic Reinforcements cos zle dziala, wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; "luk z czardrzewa okay, trzeba miec czardrzewo,
+smoczej kosci - smocza kosc ... aby dalo sie wszystko wykuc".
+**Zmiana:** `w-toku/n26-calosc` (95140596) = WGRANIE 96 + m97-wioski (SideVillagesEnterable: wjazd, handel koszykiem, prace, nocleg u wiesniakow, oboz, rabunek kazdej
+wioski osobno, okup; SideVillageDefenders: obroncy 1/10 mieszkancow DOM wioski, najwyzej 60, straty z tej wioski - brak rak 60 dob, poddanie 4:1) + m97-oboz (oboz swiata
+21-3, noc snu od switu wstecz, "Walk through the camp" - misja Camp, wyjscie Tab; woz taborowy 500 kg -10%, siodlo transportowe +50 kg; DrillCampOnly - marsz nie uczy,
+"Train the men" 8 h = x2.25 dnia, DrillMaster, DrillSiegeArmy, 12 perkow treningu przerobionych; DrillCampOnlyAi NIE) + m97-posilki (DrArrivalByMarch: 30 s + 120 s na
+godzine marszu, ponad 2 h - nie przychodzi) + m97-surowce (arm_items_rare.xml, arm_strings.xml: czardrzewo 6 osad, smocza kosc 5 osad, doplyw maly z pulapem,
+RareBowsNeedMaterial, RareMaterialOnlyFromSource) + poprawki styku po recenzji scalenia (30e698bc, 95140596: rabunek wioski a noc obozu, bez posilkow DR w bitwie
+z obroncami wioski - SideVillageDefendersNoReinforcements, lup i jency po przegranej z obroncami, jeden komunikat okupu). Wpisy: docs/noc-1920/m97-*-CHANGELOG.md,
+n26-poprawki-styku-CHANGELOG.md. Armoury 2194 ustawien; tools: wgraj-v5 i bieg-bitwa kopiuja arm_*.xml i SubModule.xml.
+**Testy (20.10):** 97 (8e93796e): bitwa 4/4, nowa 180/180, 160 z zapisu 400/400 - kod 0, ERROR 0; progi nowa 3135/NIE 122 (96: 121), 160 2525/NIE 94 (96: 104).
+97b (95140596): bitwa 4/4, nowa 180/180, 160 400/400 - kod 0, ERROR 0; progi nowa 3137/NIE 127; grupy m97 (wioski, obroncy, posilki, surowce, szkolenie) TAK.
+**Ryzyko / co sprawdzic:** spacer po obozie (pierwsza wlasna misja - autotest jej nie otwiera; wyjscie TYLKO Tab), menu wioski pobocznej i bitwa z mieszkancami,
+"Train the men", posilki DR blisko/daleko, kucie luku z czardrzewa; VR-3 premia Valyrii srednio 23.4% wobec 25% w biegu z zapisu.
+**Status:** WGRANE 97 (20.10 23:20, tag 2026-10-21-wgranie97; Armoury 25e75a27, CrashScribe 39308d49, RC bba56dd2, GT 18ec253e, ForgeView 68c8ace2;
+Armoury.json Jeffa CampStartHour 0 -> 21, CampEndHour 6 -> 3, kopia .bak-2026-10-21-wgranie97-przed).
+
+## 2026-10-21 (WGRANIE 96 - noc 20/21: poprawki z gry Jeffa na 95/95a, plan do konca moda, drogi Valyrii, dlugi miast)
+
+**Zakres (Jeff 20.10, doslownie, wybor):** "zobacz czemu mialem crash" (kuznia); "jest blad, ze moge stworzyc luki tier 6 od poczatku gry"; "za duzo jest legendary
+przedmiotow ... daj wariacje np. od 1 do 6 legendarnych danego typu. I tak samo masterwork"; "ma liczyc calkowity czas ... jak wyjde i nie skoncze kucia, to biore tylko to,
+co wykulem, a reszta czeka"; "przejrzyj kucie strzal i lukow i pancerzy ... zasade wagi surowca, tak jak w drewnie"; "przetapianie ... mniej, straty"; "You paid 2 ... powinno
+byc za co"; "menu wioski tez ustaw ... jak w miescie i zamkach"; "menu zamku tez uporzadkuj"; "Rob drogi Valyrii i trakty Essos"; "dlugi miast tak, robimy";
+"bandyci chodza bez jedzenia czy zlota?"; "Ravens Teeth i Goldenheart to mozna, to zwykle luki".
+**Zmiana:** `w-toku/n25-calosc` (03e82bcb) = WGRANIE 95 + galezie m96: kuznia (CrashScribe: NRE w VM kuzni), zamek (CastleMenuTidy), wies (VillageMenuTidy,
+PlayerPaymentReasons; GT: pula turnieju bez drugiej wplaty), valyria (MapValyrianRoads +25%, MapEssosCaravanTrails, arm_map_roads_valyria.tsv), sakiewki (SavingsByNeed),
+koszyk (KsFolkWageToShortClasses), len (KsVillageClothBuysInPlan), bandy (BandsEatFood - jedzenie i kiesy band), czaskuzni (ForgeOneJob - jeden pasek, wytop zablokowany
+pierwszy, kucie przerywalne, noca kowale spia), jakosc + jakosc2 (QualityScarcity - limit L 1-6 i MW 1-60 na rodzaj, losowany raz, arm_qualitycaps), wzory + wzory2
+(LoreSeedAfterFinalStats, XbowPatternTierByPower, naprawa zapisu #m96seedfix1/2, PatternDrawOneTierUp), dlugi (TownDebt - dlug u mieszczan i Banku, podatek nadzwyczajny),
+receptury (RecipesByMass - przepisy z masy w kg, otwarte ladunki, przetop najwyzej 50% metalu przepisu); n25: RareBowsIds = dragonbone_bow, weirwood_bow; GT: licznik
+bez powalajacego tylko dla bohaterow. Wpisy: docs/noc-1920/m96-*-CHANGELOG.md.
+**Testy (20.10):** 96-bitwa 5 dob, bitwy 4/4, misje sprawdzone - kod 0; 96-nowa 180/180 dob (14.2 s/dobe, Armoury ERROR 0) - kod 0, progi 3089 / NIE 121 (r3: 2902 / 122),
+grupy m96 TAK poza MB-2; 96-160 z autotest-F-d240 (ks-auto) 400/400 (15.6 s/dobe, ERROR 0) - kod 0, progi 2487 / NIE 104 (r3: 2292 / 90).
+**Ryzyko / co sprawdzic:** kasy miast i kiesy ludu rosna ponad prog (NAKUM-1a/7/22/26, G1-5a), zaleglosci firm DS w biegu z zapisu (M96D-3), bandy zjadaja 56-66% potrzeby
+(MB-2), warsztaty bez drewna 271/d (R1-10b) - do poprawki w 97/98; kontrola wczesna KS D+7 na starym zapisie (ks-auto) 20/24 poza pasmem (95: 19/24).
+**Status:** WGRANE 96 (20.10 19:30, tag 2026-10-21-wgranie96; Armoury 6e17caa7, CrashScribe 5c81079b, RC 634ecbb4, GT 40689947, ForgeView f7257c22).
+
 ## 2026-10-20 (WGRANIE 95 - po pierwszej grze Jeffa na 94: turniej, nocleg, menu miasta, zajazd)
 
 **Zakres (Jeff 20.10, doslownie):** "jest blad w turniejach odpadlem w drugiej rundzie ... zaplacilem ponad 1k ... dostalem w tym samym czasie ponad 8k zlota";

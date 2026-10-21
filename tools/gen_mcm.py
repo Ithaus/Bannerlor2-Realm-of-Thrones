@@ -4,6 +4,22 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # m98-plotki: kufle i pijanstwo - kod przycina prog do 1..10, kary do 0..50 % (InnDrink.Threshold / DrunkPct / Recompute)
+    'DrunkAfterTankards': (1, 10, "0"),
+    'DrunkSpeedPenaltyPercent': (0, 50, "0"),
+    'HangoverSpeedPenaltyPercent': (0, 50, "0"),
+    'HangoverMoralePenaltyPercent': (0, 50, "0"),
+    # m100-kryjowki: krzywa Zwiadu (kod: Full >= Min + 1), odleglosci w jedn. mapy, pamiec rozbitych (HideoutSight.Chance / Pick / PruneCleared)
+    'HideoutScoutingMin': (0, 100, "0"),
+    'HideoutScoutingFull': (20, 330, "0"),
+    'HideoutMinDistSettlement': (0.0, 40.0, "0.0"),
+    'HideoutMinDistSideVillage': (0.0, 30.0, "0.0"),
+    'HideoutClearedMemoryDays': (0, 364, "0"),
+    'HideoutClearedRadius': (0.0, 100.0, "0.0"),
+    # m97-posilki: posilki DR marszem - kod przycina do 0.25..6 h, 10..600 s na godzine, 0..300 s rozwiniecia (DrMarchArrival.MaxH / SecH / DepS)
+    'DrMaxMarchHours': (0.25, 6.0, "0.00"),
+    'DrSecondsPerMarchHour': (10.0, 600.0, "0"),
+    'DrDeploySeconds': (0.0, 300.0, "0"),
     # m96-jakosc2: limity na rodzaj (min..max losowania raz na kampanie) i szanse jakosci - kod przycina do 0..50 / 0..500 i 0..0.05
     # (QualityScarcity.Range/ChanceL/ChanceM); min > max - kod bierze max jako min
     'QualityLegendaryPerTypeMin': (0, 50, "0"),
@@ -14,6 +30,28 @@ RANGES = {
     'QualityMasterworkChance': (0.0, 0.05, "0.0000"),
     # m95-turniej: okup szranek jako czesc wartosci - kod przycina do 0.05..1 (TourneyRansom.ShareOf)
     'TourneyRansomShare': (0.05, 1.0, "0.00"),
+    # m97-oboz: woz i siodlo transportowe - kod przycina do 100..2000 kg, 0..50 %, 0..300 kg (CampCart.CartLoad / SlowPct / SaddleKg)
+    'CampWalkMaxMen': (0, 100, "0"),
+    'CampWalkMenPerTent': (2, 20, "0"),
+    # m99-markietani: rzad markietanow - kod przycina (CampSutlers.MinMen / PerStall / MaxStalls / Markup / StockPer / CashPer / SurgeonPer / SurgeonFee / RevelPer / RevelMorale)
+    # m102-tablica: listy gonczne - kod przycina do 0..5 na miasto i 1..60 dni (NoticeBoard.PerTown / DaysUp)
+    'WatchBountiesPerTown': (0, 5, "0"),
+    'WatchBountyDays': (1, 60, "0"),
+    'SutlerRowMinMen': (1, 5000, "0"),
+    'SutlerRowMenPerStall': (10, 1000, "0"),
+    'SutlerRowMaxStalls': (1, 50, "0"),
+    'SutlerRowMarkupPercent': (0, 100, "0"),
+    'SutlerRowStockPerStall': (1, 100, "0"),
+    'SutlerRowCashPerStall': (0, 100000, "0"),
+    'SutlerSurgeonPerStall': (0, 100, "0"),
+    'SutlerSurgeonFee': (0, 1000, "0"),
+    'SutlerRevelPerMan': (0, 50, "0"),
+    'SutlerRevelMorale': (0, 50, "0"),
+    'SutlerRevelMoraleCap': (0, 100, "0"),
+    'SutlerArmourerPerStall': (0, 100, "0"),
+    'CartLoadKg': (100, 2000, "0"),
+    'CartSpeedPenaltyPercent': (0, 50, "0"),
+    'PackSaddleExtraKg': (0, 300, "0"),
     'CampStartHour': (0, 23, "0"),
     'CampEndHour': (0, 23, "0"),
     'OldStockScrapYield': (0.0, 1.0, "0.00"),

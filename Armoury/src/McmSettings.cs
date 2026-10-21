@@ -440,6 +440,18 @@ namespace Armoury
         [SettingPropertyGroup("Learning patterns")]
         public bool RareBowsNotForged { get; set; } = true;
 
+        [SettingPropertyBool("Rare Bows Need Material", HintText = "the weirwood and dragonbone bows can be forged again - from weirwood or dragonbone carried in your bags (one whole piece per bow; a stave that splits on the anvil is lost), once you have learned the pattern from an original like any famed piece. Without it the anvil says what is missing and where it is found. Off: these bows cannot be forged at all (Rare Bows Not Forged)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareBowsNeedMaterial { get; set; } = true;
+
+        [SettingPropertyBool("Rare Material Supply", HintText = "weirwood and dragonbone come into the world slowly: now and then a piece turns up in the Free Folk villages of the haunted forest beyond the Wall (about one every 15 days, at most 3 waiting there and 10 in the whole world) and in the ruins of Valyria and the old markets of Volantis and Qarth (about one every 30 days, at most 2 there and 6 in the world). Villagers may take a piece to their market town; caravans do not trade them - buy them where they turn up. Off: no new pieces appear", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareMaterialSupply { get; set; } = true;
+
+        [SettingPropertyBool("Rare Material Only From Source", HintText = "weirwood and dragonbone come only from their lands: they are never drawn as a random reward of the Caravan Ambush quest (another good is given instead), and the Trade Proposal event never offers twice their worth in gold for one of them (it picks another good from your bags). Off: these random picks of the game may take them like any good", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareMaterialOnlyFromSource { get; set; } = true;
+
         [SettingPropertyBool("Legend Twin Pieces Hidden", HintText = "the twin blades of the legends (the 'Dual' copies of Dark Sister, Oathkeeper, Needle, the Valyrian blades and the rest - the same blade under another name, used by no item) are hidden in the weapon designer like the legend's own parts. Off: these twins stayed open from day one in the dual sword class, so a Valyrian or legendary blade could be forged from common steel", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool LegendTwinPiecesHidden { get; set; } = true;
@@ -4824,13 +4836,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiCampFastScan { get; set; } = true;
 
-        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp", RequireRestart = false)]
+        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
-        public int CampStartHour { get; set; } = 0;
+        public int CampStartHour { get; set; } = 21;
 
-        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp (your own sleep then still settles at 6)", RequireRestart = false)]
+        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on (your dawn); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp (your own sleep then still settles at 6)", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
-        public int CampEndHour { get; set; } = 6;
+        public int CampEndHour { get; set; } = 3;
 
         [SettingPropertyBool("Ai Bandits Camp Too", HintText = "brigands sleep as well - hideout by day, their own fire in the field by night", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -4952,6 +4964,42 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
 
+        [SettingPropertyBool("Inn Gossip Needs Drink", HintText = "nobody talks to a man with a dry tongue: to hear the gossip in a town inn or a roadside inn you buy a tankard of ale first - a tenth of what a cask of beer costs in the town nearby (a cask is some twenty tankards, and the innkeeper takes his share). The coin goes to the innkeepers - the townsfolk, or the village by a roadside inn - as for a night's lodging. You hear only news you have not heard in that place yet; when all of it is told, the option waits for fresh news. Off = the gossip is free and all of it at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnGossipNeedsDrink { get; set; } = true;
+
+        [SettingPropertyBool("Gossip Per Drink By Charm", HintText = "how much the drinkers tell you over one tankard depends on your Charm: below 50 - one piece of news, 50 to 109 - two, 110 to 169 - three, 170 to 229 - four, from 230 - all there is. Buy another round to hear more. Each piece you hear teaches you a little Charm (5 xp). Off = one tankard tells you everything", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipPerDrinkByCharm { get; set; } = true;
+
+        [SettingPropertyBool("Gossip Tournaments", HintText = "the gossip tells of tourneys: which town holds one, how far away it is, how long ago it was proclaimed and what the prize is - only tourneys that are really being held (far ones only once the news could have reached the inn). Off = no tourneys in the gossip, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipTournaments { get; set; } = true;
+
+        [SettingPropertyBool("Gossip Matchmaking", HintText = "the gossip tells of matchmaking: a lord or lady nearby seeking a husband for a daughter or a wife for a son - only real unwed grown children of noble houses that the game's marriage rules allow to wed, from houses whose seat is near the inn. Off = no matchmaking in the gossip, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipMatchmaking { get; set; } = true;
+
+        [SettingPropertyBool("Drink Drunk Hangover", HintText = "drink too much and you pay for it: past your limit (Drunk After Tankards, one more with Endurance 5 and one more with Athletics 150) you are drunk - your party moves slower on the map until you sleep it off, and you need an extra hour of sleep for every tankard past your limit. When you have slept it off you wake with a hangover: slower and in a worse mood until dusk. The innkeeper pours no more than three past your limit. Needs Night Rest. Off = ale has no effect on you, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool DrinkDrunkHangover { get; set; } = true;
+
+        [SettingPropertyInteger("Drunk After Tankards", 1, 10, "0", HintText = "how many tankards you can drink before you are drunk (before Endurance and Athletics add theirs), counted since you last slept", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int DrunkAfterTankards { get; set; } = 3;
+
+        [SettingPropertyInteger("Drunk Speed Penalty Percent", 0, 50, "0", HintText = "drunk: your party's map speed drops by this much for the first tankard past your limit, 5 more for each further one (at most twice this)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int DrunkSpeedPenaltyPercent { get; set; } = 15;
+
+        [SettingPropertyInteger("Hangover Speed Penalty Percent", 0, 50, "0", HintText = "hangover: your party's map speed drops by this much until dusk", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int HangoverSpeedPenaltyPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Hangover Morale Penalty Percent", 0, 50, "0", HintText = "hangover: your party's morale drops by this share until dusk", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int HangoverMoralePenaltyPercent { get; set; } = 10;
+
         [SettingPropertyBool("Raven News", HintText = "news of far-off wars, battles and sieges reaches you as fast as a raven flies: wars declared and peace, alliances or non-aggression pacts made between other realms, sieges, raids and assaults, lords slain in battle or executed, taken captive, set free or risen as White Walkers come to you later the farther away they happened - about three days from King's Landing to Winterfell, four and a half from Pentos, a week from Qarth, never more than twelve days - with a note saying where the raven came from (e.g. 'A raven from Winterfell, 3 days on the wing: ...'). Tavern gossip about such news waits for the same raven. News about you, your clan, your close kin or your fiefs (on either side of a fight), wars, peace or alliances of your own realm, your realm's hosts gathering and deaths in its ruling house still come at once, and so does anything less than a day's ride away. Only your messages wait - the lords of the world know what they knew before. Ravens in flight are kept in the save. Off = all news at once, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool RavenNews { get; set; } = true;
@@ -5044,7 +5092,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float DaySightFactor { get; set; } = 1.15f;
 
-        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night (the game's night, 22:00-2:00) - the cut is mild, for you HEAR more after dark: a marching column is loud", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public float NightSightFactor { get; set; } = 0.65f;
 
@@ -5416,6 +5464,50 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public int HideoutFlagDays { get; set; } = 3;
 
+        [SettingPropertyBool("Hideout Scouting Chance", HintText = "coming within sight of a bandit hideout no longer shows it for sure: your scout gets one try per approach, and the chance grows with Scouting - none at all up to Hideout Scouting Min, full at Hideout Scouting Full. Hideouts you heard of in a tavern or inn show as before. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutScoutingChance { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Scouting Min", 0, 100, "0", HintText = "with Hideout Scouting Chance: at or below this Scouting your scout never spots a hideout on his own (0%)", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutScoutingMin { get; set; } = 10;
+
+        [SettingPropertyInteger("Hideout Scouting Full", 20, 330, "0", HintText = "with Hideout Scouting Chance: at this Scouting a hideout in sight is always spotted (100%); in between the chance grows evenly", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutScoutingFull { get; set; } = 200;
+
+        [SettingPropertyBool("Hideout Rumour Reveals", HintText = "with Hideout Scouting Chance: talk of an outlaw lair heard in a tavern or inn (roughly where it is) lets you spot that hideout as in the game when you come near it; the talk is only of lairs you have not found yet", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutRumourReveals { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Away From Settlements", HintText = "a new bandit hideout only takes a spot out in the wilds: at least Hideout Min Dist Settlement from any town, castle or village and Hideout Min Dist Side Village from the small map villages. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutAwayFromSettlements { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Min Dist Settlement", 0.00f, 40.00f, "0.0", HintText = "with Hideout Away From Settlements: least distance (map units, about 4.75 km each) from a town, castle or village", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public float HideoutMinDistSettlement { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Hideout Min Dist Side Village", 0.00f, 30.00f, "0.0", HintText = "with Hideout Away From Settlements: least distance (map units) from a small map village", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public float HideoutMinDistSideVillage { get; set; } = 6f;
+
+        [SettingPropertyBool("Hideout Relocate After Clear", HintText = "after a hideout is cleared, the next bandit hideout does not appear in the same place or close to it - you have to search again. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutRelocateAfterClear { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Cleared Memory Days", 0, 364, "0", HintText = "with Hideout Relocate After Clear: for how many days a cleared hideout keeps new hideouts away from its area", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutClearedMemoryDays { get; set; } = 60;
+
+        [SettingPropertyFloatingInteger("Hideout Cleared Radius", 0.00f, 100.00f, "0.0", HintText = "with Hideout Relocate After Clear: how far (map units) from a recently cleared hideout no new hideout appears", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public float HideoutClearedRadius { get; set; } = 25f;
+
+        [SettingPropertyBool("Hideout Guide Bandit Ai", HintText = "with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutGuideBanditAi { get; set; } = true;
+
         [SettingPropertyBool("House Levies Enabled", HintText = "in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice", RequireRestart = false)]
         [SettingPropertyGroup("House levies")]
         public bool HouseLeviesEnabled { get; set; } = true;
@@ -5439,6 +5531,22 @@ namespace Armoury
         [SettingPropertyBool("Climate Before Workshops", HintText = "with Village Climate Fix: in a NEW campaign the villages take their final produce (the climate fix, and also the new flax villages and the southern vineyards and olive groves when Goods Rates By Pattern and Vine Olive By Climate are on) before the game sets up the town workshops, so each town starts with workshops that use what its own villages grow (no velvet looms waiting for cotton the hills around no longer give). A loaded save is not touched; off = the town workshops of a new campaign are chosen from the map's own village types as before (the villages change at session start)", RequireRestart = false)]
         [SettingPropertyGroup("Northern fare")]
         public bool ClimateBeforeWorkshops { get; set; } = true;
+
+        [SettingPropertyBool("Dr Arrival By March", HintText = "Dynamic Reinforcements: help arrives only as fast as it can march - only parties within a short march join your battle, and the farther away they are, the later they arrive (the time comes from the distance and the party's own map speed; garrisons and militia march out on foot). Parties beyond the longest march below do not come at all (DR tells you they are too far to reach you in time). Replaces the Arrival Cap of Dynamic Reinforcements; troop numbers and its other rules stay the same. Off: Dynamic Reinforcements as before (everyone within its scan radius arrives within the Arrival Cap)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public bool DrArrivalByMarch { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Dr Max March Hours", 0.25f, 6.00f, "0.00", HintText = "with Dr Arrival By March: the longest march, in map hours, that still brings help into a battle - parties farther away than this do not come", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public float DrMaxMarchHours { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Dr Seconds Per March Hour", 10.00f, 600.00f, "0", HintText = "with Dr Arrival By March: seconds of battle you wait for every hour the party has to march (2 hours away = 240 s more)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public float DrSecondsPerMarchHour { get; set; } = 120f;
+
+        [SettingPropertyFloatingInteger("Dr Deploy Seconds", 0.00f, 300.00f, "0", HintText = "with Dr Arrival By March: seconds of battle any party needs to form up and enter the field, on top of its march", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public float DrDeploySeconds { get; set; } = 30f;
 
         [SettingPropertyBool("Bandit Cheer Enabled", HintText = "villages near your victory over bandits thank you - relations with their notables improve", RequireRestart = false)]
         [SettingPropertyGroup("Grateful villages")]
@@ -5795,6 +5903,22 @@ namespace Armoury
         [SettingPropertyBool("Drill Daily Message", HintText = "once a day, on a day your men drill by Drill Law, a short line in the game tells you what they learned and why: 'Drill today: N XP (n per man) - Leadership, at rest or marching, drill kit, armed share, perks'. A day lost to hunger or lack of sleep is announced as before (off = no daily drill line)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillDailyMessage { get; set; } = true;
+
+        [SettingPropertyBool("Drill Camp Only", HintText = "marching teaches nothing: your men drill only when you order it in camp ('Train the men' in your camp menu, by day - the men sleep at night); a full day of drill (8 hours) teaches 50% more than a day of rest did before (x2.25 instead of x1.5), a shorter drill its share, still by Leadership, drill kit, armed share and perks (the training perks now add to a day of drill - their descriptions say how much); your clan's parties and the lords in your army drill only in the hours they stand still by day (settlement, siege camp, halted), by the same pace; hunger or a dawn short of sleep still means no drill (off = as before: x1.5 on a day of rest, x0.9 on the march, perks as in the game)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillCampOnly { get; set; } = true;
+
+        [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Estimated from the 180-day test of 20.10: AI lords march most of their days, so their men would learn roughly 15 to 50 percent less (about a third in the middle) - slower promotions and less demand for better gear; the daily log line measures it exactly either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillCampOnlyAi { get; set; } = false;
+
+        [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillMaster { get; set; } = true;
+
+        [SettingPropertyBool("Drill Siege Army", HintText = "with Drill Camp Only: in a siege camp or in another lord's army, where you cannot pitch your own camp, your men drill by themselves in the hours the host stands still by day, like the lords beside you - the same pace, up to 8 hours a day, no drill when starving or after a dawn short of sleep (off = no drill there at all)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillSiegeArmy { get; set; } = true;
 
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
@@ -8568,6 +8692,18 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefWalk { get; set; } = true;
 
+        [SettingPropertyBool("Side Villages Enterable", HintText = "every side village on the map can be entered like a main village, though nobody of note lives there: click it to ride in (your party leaves the map as in a roadside inn). Inside: what it is and makes, rest the night (paid like an inn's common room, free on your own lands), make camp, buy what it makes (its share of its main village's store) and sell to it, invest in its works, and - at war - raid that one village alone or make it pay tribute (spared 30 days; its own people defend it - see Side Village Defenders). Your own raid on a main village then burns only that village's homesteads - each side village is raided on its own. Off = side villages are only pictures on the map, and raids burn them in a chain, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillagesEnterable { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Defenders", HintText = "with Side Villages Enterable: a side village is defended by its own people instead of the militia of its main village - about 1 in 10 of the people at home (at most 60) take up flails, spears and bows. Raid it or demand tribute with fewer than 4 times as many fit men and they come out to fight you by the village in an ordinary battle: win and the raid or tribute goes on, lose or leave and the village is spared. With 4 times as many men or more they give in without a fight. The fallen and the captured are lost to that village itself - fewer hands at work and fewer men to fight, filling back over the next two months. Raiders of other realms with fewer men than a side village's defenders pass it by. Off = the whole militia of the main village guards its side villages, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageDefenders { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Defenders No Reinforcements", HintText = "with Side Village Defenders: a battle with the people of a side village is fought by the villagers alone, as the menu tells you - Dynamic Reinforcements treats it like a raid on a village: with its Allow Raids option off (its default) no garrison, militia or lords march in to help either side; with Allow Raids on, help comes as in any village raid. Off = Dynamic Reinforcements as in any field battle", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageDefendersNoReinforcements { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -8688,7 +8824,15 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
 
-        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory and the masters of Qohor into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
+        [SettingPropertyBool("Canon Companions To Clans", HintText = "new campaigns only: the characters of the books that Realm of Thrones puts in the taverns as companions for hire (Jaime and Tyrion Lannister, Bronn, Theon Greyjoy, Varys, Petyr Baelish, Benjen Stark, Samwell Tarly and the rest of that list) start as lords of their own houses instead - the Lannisters, the royal court, the Starks, the Night's Watch, Dorne, Daenerys and so on; those who lead men in the books may raise a party, the courtiers never lead one and stay in the towns of their realm. Those whose story takes them out of the war (Hodor, Syrio Forel, Jory Cassel, Maester Cressen, Jaqen H'ghar, Kinvara, Xaro Xhoan Daxos, Gendry and Talisa - Jeyne Westerling takes her place) do not appear at all, and none of them comes back as a wanderer. The other companions stay for hire. Off = all of them wait in the taverns as before", RequireRestart = false)]
+        [SettingPropertyGroup("Canon characters (21.10)")]
+        public bool CanonCompanionsToClans { get; set; } = true;
+
+        [SettingPropertyBool("Canon Companions Follow Story", HintText = "with Canon Companions To Clans: the canon characters change sides as in the books when the story of Realm of Thrones gets there - Tyrion flees to Essos after the Purple Wedding, the Hound deserts after the Blackwater, Theon goes home to the Iron Islands when they make war on the North, Jeyne Westerling weds Robb Stark, and so on; each change happens once, and not to anyone dead, in your captivity or in your house. Off = they stay where the campaign started them", RequireRestart = false)]
+        [SettingPropertyGroup("Canon characters (21.10)")]
+        public bool CanonCompanionsFollowStory { get; set; } = true;
+
+        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory, the masters of Qohor and the cartwright and saddler into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
 
@@ -8703,6 +8847,142 @@ namespace Armoury
         [SettingPropertyBool("Player Payment Reasons", HintText = "when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare 'You paid N' / 'You received N' is replaced by one message that says what for, with the split (e.g. 'You paid 2 for your night at a common room in Seagard (bed 1, horse 1).'). Only the message changes - sums and payers stay the same. Off = the game's message as before", RequireRestart = false)]
         [SettingPropertyGroup("Payment messages")]
         public bool PlayerPaymentReasons { get; set; } = true;
+
+        [SettingPropertyBool("Camp Cart Enabled", HintText = "supply carts: a town carpenter builds one from market wood and tools; one pack animal pulls it and hauls Cart Load Kg instead of its own 100 kg, but the column moves slower (off = carts give nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampCartEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Cart Load Kg", 100, 2000, "0", HintText = "kilograms a cart hauls behind one pack animal (the animal alone carries 100)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CartLoadKg { get; set; } = 500;
+
+        [SettingPropertyInteger("Cart Speed Penalty Percent", 0, 50, "0", HintText = "how much slower your column moves while a cart is hitched - one cart or many, the column keeps the carts' pace (many pack animals still slow a riding column as a baggage train); 0 = no slowdown", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CartSpeedPenaltyPercent { get; set; } = 10;
+
+        [SettingPropertyBool("Pack Saddle Enabled", HintText = "transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight - without such an animal it is just baggage; it is no riding saddle (off = pack saddles give nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool PackSaddleEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Pack Saddle Extra Kg", 0, 300, "0", HintText = "extra kilograms a pack animal carries with a pack saddle", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int PackSaddleExtraKg { get; set; } = 50;
+
+        [SettingPropertyBool("Camp Walk Enabled", HintText = "'Walk through the camp' in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; in an army the camp is the whole army's; no fighting, campaign time stands still; hold Tab to go back - Esc does not leave the camp (off = no option)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampWalkEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Camp Walk Max Men", 0, 100, "0", HintText = "at most this many of your soldiers are shown in the camp scene (for smooth play); the tents still follow your whole party", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CampWalkMaxMen { get; set; } = 40;
+
+        [SettingPropertyInteger("Camp Walk Men Per Tent", 2, 20, "0", HintText = "men per soldiers' tent in the camp scene; fewer men than this sleep on bedrolls round the fire", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CampWalkMenPerTent { get; set; } = 6;
+
+        [SettingPropertyBool("Camp Sutlers Row", HintText = "'Visit the sutlers' row' in your camp menu - only in a big camp (your party or the whole army with at least Sutler Row Min Men): barber-surgeons tend your wounded for a fee, an ale tent with dice and a minstrel lifts your men's morale once a day, and the sutlers sell food, ale, wine, tools, arrows and bolts brought from the nearest friendly town's market at its prices plus their cut (and buy from you for less). What they sell leaves that town's market; what you pay goes to that town and a nearby village (off = no option)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampSutlersRow { get; set; } = true;
+
+        [SettingPropertyInteger("Sutler Row Min Men", 1, 5000, "0", HintText = "men in the camp (your party, or the army's leader and all attached parties) before sutlers follow it", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMinMen { get; set; } = 150;
+
+        [SettingPropertyInteger("Sutler Row Men Per Stall", 10, 1000, "0", HintText = "one sutler's stall per this many men in the camp (150 men - 1 stall, 400 - 4, 1000 - 10)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMenPerStall { get; set; } = 100;
+
+        [SettingPropertyInteger("Sutler Row Max Stalls", 1, 50, "0", HintText = "at most this many stalls in one camp", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMaxStalls { get; set; } = 12;
+
+        [SettingPropertyInteger("Sutler Row Markup Percent", 0, 100, "0", HintText = "the sutlers' cut for cartage: they sell at the town's price plus this share and buy at the town's price less it", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMarkupPercent { get; set; } = 30;
+
+        [SettingPropertyInteger("Sutler Row Stock Per Stall", 1, 100, "0", HintText = "pieces of each kind of goods one stall brings from town each day", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowStockPerStall { get; set; } = 5;
+
+        [SettingPropertyInteger("Sutler Row Cash Per Stall", 0, 100000, "0", HintText = "denars one stall has in hand to buy goods from you (taken from the supplying town's purse)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowCashPerStall { get; set; } = 1500;
+
+        [SettingPropertyInteger("Sutler Surgeon Per Stall", 0, 100, "0", HintText = "wounded soldiers the barber-surgeons of one stall can tend in a day (they return to duty at once)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerSurgeonPerStall { get; set; } = 8;
+
+        [SettingPropertyInteger("Sutler Surgeon Fee", 0, 1000, "0", HintText = "fee per tended man, times (his tier + 1): a tier 1 recruit 30, a tier 3 soldier 60, a tier 5 veteran 90", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerSurgeonFee { get; set; } = 15;
+
+        [SettingPropertyInteger("Sutler Revel Per Man", 0, 50, "0", HintText = "denars a man for a round of ale, dice and a minstrel for your party (once a day)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRevelPerMan { get; set; } = 2;
+
+        [SettingPropertyInteger("Sutler Revel Morale", 0, 50, "0", HintText = "morale your party gains from the revel; it fades by itself over the following days", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRevelMorale { get; set; } = 6;
+
+        [SettingPropertyInteger("Sutler Revel Morale Cap", 0, 100, "0", HintText = "revels lift your party's morale from recent events to at most this much - another revel while the men are still merry adds only what is missing (and costs only that share)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRevelMoraleCap { get; set; } = 10;
+
+        [SettingPropertyInteger("Sutler Armourer Per Stall", 0, 100, "0", HintText = "worn pieces of your men's kit the field armourers of one stall mend in a day (town smiths' rate plus the sutlers' cut; with Smith Mend From Market also the materials, taken from that town's market)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerArmourerPerStall { get; set; } = 6;
+
+        [SettingPropertyBool("Notice Board", HintText = "'Read the notice board' in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board, and no bounties from the watch or the headmen either", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoard { get; set; } = true;
+
+        [SettingPropertyBool("Notice Board Villages", HintText = "the notice board also lists the headmen and landowners of the town's villages who have work for you; you must ride to the village to speak with them (the notice can mark the village on your map). Off = only people in town and the town lord's house", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardVillages { get; set; } = true;
+
+        [SettingPropertyBool("Notice Board Opening", HintText = "when you come to someone from the notice board ('Go and see' or 'Talk now'), you can open with 'I read your notice on the board in ...' and they tell you about the work at once in their own words; the rest of the talk is the game's own. Off = only the game's own lines", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardOpening { get; set; } = true;
+
+        [SettingPropertyBool("Watch Bounties", HintText = "the captain of the watch (in King's Landing the captain of the Gold Cloaks) posts bounties on the notice board on bands roaming near the town: the pay is the wages of as many guardsmen as the band has men (10 to 60) for three days (four for a mounted band) plus a quarter, more if the band has plundered the town's villages or robbed its caravans or is led by a named chief (at most double). The town pays only from coin it can spare above its merchants' reserve and the next instalments it owes (one bounty at most a quarter of that); a poor town or a council in debt posts none. Whoever breaks the band is paid at once, on top of its loot. Off = no bounties", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBounties { get; set; } = true;
+
+        [SettingPropertyInteger("Watch Bounties Per Town", 0, 5, "0", HintText = "most bounties one town keeps posted at once", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public int WatchBountiesPerTown { get; set; } = 2;
+
+        [SettingPropertyInteger("Watch Bounty Days", 1, 60, "0", HintText = "days a bounty stays up before it is taken down (no penalty for you)", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public int WatchBountyDays { get; set; } = 10;
+
+        [SettingPropertyBool("Watch Bounty Ai Lords", HintText = "the bounty is public: a lord who breaks a posted band is paid too (never an enemy of the town; the garrison, militia, patrols and caravans are not paid - it is their job). Off = only you are paid; a band broken by a lord just comes down", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyAiLords { get; set; } = true;
+
+        [SettingPropertyBool("Watch Bounty Lord Top Up", HintText = "when the town's coffers cannot cover a bounty, the town's lord pays the rest from his own purse above the coin he keeps for wages (never you, if the town is yours); with this a hard-pressed town can still post bounties its lord can pay. Off = only the town's coin", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyLordTopUp { get; set; } = true;
+
+        [SettingPropertyBool("Headman Bounties", HintText = "when a band has plundered one of the town's villages in the last 30 days and the village headman has no other work to offer, his notice is pinned on the town's board: the same pay as the watch's (the wages of the town's guardsmen), paid from the village purse above what the village keeps for hard times (a notice at most a quarter of that), at once to whoever breaks the band; you also gain +2 with the headman. You speak with him in the village (the notice marks it on your map). Needs the notice board with its villages on. Off = no headmen's notices", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool HeadmanBounties { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Enabled", HintText = "when you start a new campaign, choose between 'Prologue 298 - the King rides north' (the campaign begins 188 days before the story of Realm of Thrones, as King Robert leaves King's Landing for Winterfell; Robert and Eddard Stark live and the realms keep the King's peace) and 'Classic start 299' (as Realm of Thrones begins). Off = always the classic start, without asking. Only new campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Peace", HintText = "in a Prologue 298 campaign, until the story of Realm of Thrones begins no realm of Westeros declares war on another (the Night's Watch still fights the Free Folk, and Free Folk raids go on); wars you start yourself are not stopped. Off = the AI may declare wars in the prologue", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool ProloguePeace { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Pacts", HintText = "in a Prologue 298 campaign every realm of Westeros but the Night's Watch and the Free Folk stands with King Robert's realm: the North, the Stormlands and the Riverlands as allies, the Vale, Dragonstone, the Reach, Dorne, the Iron Islands and Skagos by non-aggression pacts (Diplomacy). They hold until the King dies. Off = no pacts", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool ProloguePacts { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Kings", HintText = "in a new Prologue 298 campaign King Robert Baratheon and Lord Eddard Stark are alive: Robert rules the crown's realm and House Baratheon of King's Landing, Ned rules the North and House Stark. On day 186 the King dies of wounds from a boar hunt, Joffrey takes the throne and Ned is thrown into the dungeons of King's Landing; his execution opens the story of Realm of Thrones. Off = both stay dead as in Realm of Thrones. Only new campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueKings { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -8813,6 +9093,9 @@ namespace Armoury
             s.PatternTileShowsSkill = PatternTileShowsSkill;
             s.XbowPatternTierByPower = XbowPatternTierByPower;
             s.RareBowsNotForged = RareBowsNotForged;
+            s.RareBowsNeedMaterial = RareBowsNeedMaterial;
+            s.RareMaterialSupply = RareMaterialSupply;
+            s.RareMaterialOnlyFromSource = RareMaterialOnlyFromSource;
             s.LegendTwinPiecesHidden = LegendTwinPiecesHidden;
             s.TroopWearEnabled = TroopWearEnabled;
             s.TroopWearPercent = TroopWearPercent;
@@ -9941,6 +10224,15 @@ namespace Armoury
             s.RoadsideInnHideParty = RoadsideInnHideParty;
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.InnGossipPages = InnGossipPages;
+            s.InnGossipNeedsDrink = InnGossipNeedsDrink;
+            s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
+            s.GossipTournaments = GossipTournaments;
+            s.GossipMatchmaking = GossipMatchmaking;
+            s.DrinkDrunkHangover = DrinkDrunkHangover;
+            s.DrunkAfterTankards = DrunkAfterTankards;
+            s.DrunkSpeedPenaltyPercent = DrunkSpeedPenaltyPercent;
+            s.HangoverSpeedPenaltyPercent = HangoverSpeedPenaltyPercent;
+            s.HangoverMoralePenaltyPercent = HangoverMoralePenaltyPercent;
             s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
@@ -10057,12 +10349,27 @@ namespace Armoury
             s.TourneyFolkPurseMin = TourneyFolkPurseMin;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
+            s.HideoutScoutingChance = HideoutScoutingChance;
+            s.HideoutScoutingMin = HideoutScoutingMin;
+            s.HideoutScoutingFull = HideoutScoutingFull;
+            s.HideoutRumourReveals = HideoutRumourReveals;
+            s.HideoutAwayFromSettlements = HideoutAwayFromSettlements;
+            s.HideoutMinDistSettlement = HideoutMinDistSettlement;
+            s.HideoutMinDistSideVillage = HideoutMinDistSideVillage;
+            s.HideoutRelocateAfterClear = HideoutRelocateAfterClear;
+            s.HideoutClearedMemoryDays = HideoutClearedMemoryDays;
+            s.HideoutClearedRadius = HideoutClearedRadius;
+            s.HideoutGuideBanditAi = HideoutGuideBanditAi;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.NorthernFareEnabled = NorthernFareEnabled;
             s.CropClimateFilter = CropClimateFilter;
             s.WoodlotByClimate = WoodlotByClimate;
             s.VillageClimateFix = VillageClimateFix;
             s.ClimateBeforeWorkshops = ClimateBeforeWorkshops;
+            s.DrArrivalByMarch = DrArrivalByMarch;
+            s.DrMaxMarchHours = DrMaxMarchHours;
+            s.DrSecondsPerMarchHour = DrSecondsPerMarchHour;
+            s.DrDeploySeconds = DrDeploySeconds;
             s.BanditCheerEnabled = BanditCheerEnabled;
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
@@ -10152,6 +10459,10 @@ namespace Armoury
             s.DrillLawAi = DrillLawAi;
             s.DrillLog = DrillLog;
             s.DrillDailyMessage = DrillDailyMessage;
+            s.DrillCampOnly = DrillCampOnly;
+            s.DrillCampOnlyAi = DrillCampOnlyAi;
+            s.DrillMaster = DrillMaster;
+            s.DrillSiegeArmy = DrillSiegeArmy;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
@@ -10845,6 +11156,9 @@ namespace Armoury
             s.SideVillageFiefTrade = SideVillageFiefTrade;
             s.SideVillageFiefHouse = SideVillageFiefHouse;
             s.SideVillageFiefWalk = SideVillageFiefWalk;
+            s.SideVillagesEnterable = SideVillagesEnterable;
+            s.SideVillageDefenders = SideVillageDefenders;
+            s.SideVillageDefendersNoReinforcements = SideVillageDefendersNoReinforcements;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
@@ -10875,10 +11189,46 @@ namespace Armoury
             s.BookHoldingsRestore = BookHoldingsRestore;
             s.BookHoldingsGarrison = BookHoldingsGarrison;
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
+            s.CanonCompanionsToClans = CanonCompanionsToClans;
+            s.CanonCompanionsFollowStory = CanonCompanionsFollowStory;
             s.TownMenuTidy = TownMenuTidy;
             s.CastleMenuTidy = CastleMenuTidy;
             s.VillageMenuTidy = VillageMenuTidy;
             s.PlayerPaymentReasons = PlayerPaymentReasons;
+            s.CampCartEnabled = CampCartEnabled;
+            s.CartLoadKg = CartLoadKg;
+            s.CartSpeedPenaltyPercent = CartSpeedPenaltyPercent;
+            s.PackSaddleEnabled = PackSaddleEnabled;
+            s.PackSaddleExtraKg = PackSaddleExtraKg;
+            s.CampWalkEnabled = CampWalkEnabled;
+            s.CampWalkMaxMen = CampWalkMaxMen;
+            s.CampWalkMenPerTent = CampWalkMenPerTent;
+            s.CampSutlersRow = CampSutlersRow;
+            s.SutlerRowMinMen = SutlerRowMinMen;
+            s.SutlerRowMenPerStall = SutlerRowMenPerStall;
+            s.SutlerRowMaxStalls = SutlerRowMaxStalls;
+            s.SutlerRowMarkupPercent = SutlerRowMarkupPercent;
+            s.SutlerRowStockPerStall = SutlerRowStockPerStall;
+            s.SutlerRowCashPerStall = SutlerRowCashPerStall;
+            s.SutlerSurgeonPerStall = SutlerSurgeonPerStall;
+            s.SutlerSurgeonFee = SutlerSurgeonFee;
+            s.SutlerRevelPerMan = SutlerRevelPerMan;
+            s.SutlerRevelMorale = SutlerRevelMorale;
+            s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
+            s.SutlerArmourerPerStall = SutlerArmourerPerStall;
+            s.NoticeBoard = NoticeBoard;
+            s.NoticeBoardVillages = NoticeBoardVillages;
+            s.NoticeBoardOpening = NoticeBoardOpening;
+            s.WatchBounties = WatchBounties;
+            s.WatchBountiesPerTown = WatchBountiesPerTown;
+            s.WatchBountyDays = WatchBountyDays;
+            s.WatchBountyAiLords = WatchBountyAiLords;
+            s.WatchBountyLordTopUp = WatchBountyLordTopUp;
+            s.HeadmanBounties = HeadmanBounties;
+            s.PrologueEnabled = PrologueEnabled;
+            s.ProloguePeace = ProloguePeace;
+            s.ProloguePacts = ProloguePacts;
+            s.PrologueKings = PrologueKings;
         }
 
         internal static void Apply()

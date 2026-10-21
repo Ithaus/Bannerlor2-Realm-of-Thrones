@@ -119,7 +119,7 @@ namespace Armoury
 
         private static long Key(float x, float y) { return ((long)(int)Math.Floor(x / Cell) << 32) ^ (uint)(int)Math.Floor(y / Cell); }
 
-        internal static Inn Find(string uid) { Inn i; return uid != null && _byUid.TryGetValue(uid, out i) ? i : null; }
+        internal static Inn Find(string uid) { Inn i; return uid != null && _byUid.TryGetValue(uid, out i) ? i : SideVillageVisit.InnFor(uid); }   // m97-wioski: zapas - "zajazd" wioski pobocznej (nocleg za oplata, ukrycie partii)
 
         /// <summary>Recenzja calosci (scalenie6): liczba zajazdow wczytanych w tej sesji (0 - plik nie czytany, brak albo pusty). TownInns.CheckTimes.</summary>
         internal static int InnCount { get { return _inns.Count; } }
@@ -540,7 +540,7 @@ namespace Armoury
                         delegate (MenuCallbackArgs a) { return TownInns.RoadQCondition(a, CurrentOrNear(), q); },
                         delegate (MenuCallbackArgs a) { TownInns.RoadCommit(CurrentOrNear(), q); }, false, q);
                 }
-                starter.AddGameMenuOption(Menu, "arm_roadinn_gossip", "{=!}Listen to the gossip", Rumours.RoadGossipCondition, Rumours.RoadGossipConsequence, false, 5);
+                starter.AddGameMenuOption(Menu, "arm_roadinn_gossip", "{=!}{ARM_GOSSIP_ROAD}", Rumours.RoadGossipCondition, Rumours.RoadGossipConsequence, false, 5);
                 starter.AddGameMenuOption(Menu, "arm_roadinn_leave", "{=!}Ride on",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                     delegate (MenuCallbackArgs a) { _current = null; RoadsideInnStay.Leave("Ride on"); GameMenu.ExitToLast(); }, true, 9);   // m95-zajazd: partia z powrotem na mapie przed zamknieciem menu

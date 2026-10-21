@@ -89,6 +89,7 @@ namespace Armoury
                 try
                 {
                     if (ty == ItemObject.ItemTypeEnum.Horse) k = (byte)(Stables.IsPlainMount(it) ? 1 : 0);
+                    else if (CampCart.IsPackSaddle(it)) k = 3;   // m97-oboz: siodlo transportowe (juczne) nie jest siodlem bojowym - nie robi jezdzca
                     else
                     {
                         // jak DTE PartyEquipmentDistributor.PopulateDictionaries: uprzaz z pancerzem - wedlug rodziny; samo siodlo (bez pancerza) - do kazdego konia
