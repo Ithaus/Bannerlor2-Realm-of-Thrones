@@ -12,7 +12,8 @@ Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej
 | K1 | straz niewoli (pkt 3 i 4): CanonCompanions.HeldRow / Freeing, tabela #m01 classic + #p10 Riverrun, latki EndCaptivityAction.ApplyInternal i RansomOfferCampaignBehavior.DailyTickHero, klucze PrologueTyrionHeld / PrologueJaimeAtRiverrun + 5 kluczy scen | ZROBIONE (ff9d85e7, build 0, gen_mcm) |
 | K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (9e4b8151, build Armoury + GT 0) |
 | K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (b0ee6e05, build Armoury + GT 0) |
-| K4 | klany gorskie Doliny (pkt 5): od d118 do 4 band klanu hilltribesmen (Stone Crows, Burned Men, Milk Snakes, Black Ears) przy wsiach Gorskiego Traktu, ludzie z puli okregu (RaidDraw), uzupelnienie co 3 dni do d186, po prologu zwykle bandy | ZROBIONE (build 0) |
+| K4 | klany gorskie Doliny (pkt 5): od d118 do 4 band klanu hilltribesmen (Stone Crows, Burned Men, Milk Snakes, Black Ears) przy wsiach Gorskiego Traktu, ludzie z puli okregu (RaidDraw), uzupelnienie co 3 dni do d186, po prologu zwykle bandy | ZROBIONE (f3025c82, build 0) |
+| K5 | ludzie Gory (pkt 6): od d155 dwie bandy robber_knights 'The Mountain's Men' pod sztandarem Lannisterow z ludzi okregu wsi Clegane najblizszej Riverrun (Harrenhal), rabunek wsi Dorzecza po kolei (mechanika gry), na koniec prologu do domow (FreeFolkRaids.Home) | ZROBIONE (build 0) |
 
 ## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
 
@@ -123,3 +124,26 @@ Prawo wyrzutkow wylaczone - bez ludzi, bez band (linia). Linie: `klany gorskie: 
 (2) Liczba band swiata rosnie o najwyzej 4 (twardy sufit sceny). (3) CommonerFor = lekki bandyta klanu (hilltribesmen_grunt), jak w RaidDraw.
 
 **Status.** DO SPRAWDZENIA (autotest: linie "nowa banda" w d118-119, w polu >= 1 w oknie 118-186).
+
+## K5 - ludzie Gory w Dorzeczu (pkt 6)
+
+**Problem.** Projekt pkt 2, dzien 155: grabiezcy Lannisterow pala wsie Dorzecza - bez wypowiadania wojny krolestw (pokoj krola w prologu).
+
+**Zmiana (Prologue.World.Raiders.cs).** Od dnia 155 dwie bandy klanu bandyckiego `robber_knights` (Robber Knights) z nazwa "The Mountain's Men" i sztandarem Lannisterow
+(Party.SetCustomName / SetCustomBanner - rod clan_vlandia_1). Klan bandycki jest w stalej wojnie z kazdym krolestwem (DefaultDiplomacyModel.GetShallowDiplomaticStance),
+wiec rabunek wsi Dorzecza idzie zwykla mechanika gry (EncounterManager: ShortTermBehavior RaidSettlement + IsAtWarAgainstFaction; precedens gry - bandy dezerterow
+w zadaniu ExtortionByDeserters) i nie potrzeba wojny krolestw. Ludzie: `OutlawLaw.RaidDraw` z okregu wsi zrodla = wies twierdzy rodu Clegane (clan_vlandia_5) najblizszej
+Riverrun (w ROT Harrenhal) - jak K4 (wzor FreeFolkRaids). Kazda banda: partia sceny (bez nowych decyzji, rozkaz `SetMoveRaidSettlement`) na najblizsza wies Dorzecza w stanie
+Normal (nie cel drugiej bandy, nie spalona przez nas w ostatnich 20 dniach); po spaleniu (wies Looted po naszym rabunku) - nastepna. W marszu do pierwszej wsi ukryta przed AI
+(wyjscie z ziem Clegane), potem widoczna - lordowie Dorzecza, Beric i gracz moga ja rozbic. Straty rabunku ksieguje gra i Armoury jak kazdy rabunek (DistrictRaid;
+zlota bandy nie ma - SmallGold.PayRaidLoot wymaga wodza-bohatera). Dzien 188: `FreeFolkRaids.Home` (teraz internal): bohaterowie-jency uciekaja, lup do wsi zrodla (zloto
+do kiesy, towar do magazynu), ludzie do puli okregu zrodla, banda rozwiazana. Klucz wylaczony w trakcie - bandy zostaja zwyklymi bandami (bez rozwiazania).
+CampaignEvents.MobilePartyDestroyed - kto rozbil bande (linia; Beric liczy swoje zwyciestwa).
+Linie: `ludzie Gory: nowa banda 'The Mountain's Men' (<id>, klan robber_knights, sztandar Lannister) przy <wies> ... | pierwszy cel <wies>`, `... nowy cel ...`, `... SPALONA wies
+<nazwa> (<id>, riverlands) przez <id> ... | spalonych od poczatku N`, `... banda <id> ROZBITA albo rozwiazana (rozbili: ...)`, `... koniec prologu - <id> wraca do domow ...`.
+
+**Ryzyko / co sprawdzic.** (1) Okreg Harrenhal - pula / domy; bez ludzi banda nie powstaje (linia), proba do d160. (2) Rabunek wymaga HP wsi > 0 i braku innej bitwy przy wsi
+(PickRaidTarget to sprawdza). (3) Bandy na zywnosci BandFood i z werbunkiem OutlawLaw jak kazda banda (nie przesuwaja band - sprawdzone). (4) Sztandar Lannisterow vs tekst
+sceny 19 "raiders flying no banners" - decyzja Jeffa (jedna stala w kodzie).
+
+**Status.** DO SPRAWDZENIA (autotest: linie "nowa banda" d155-156, co najmniej jedna SPALONA wies do d186, powrot do domow w d188).

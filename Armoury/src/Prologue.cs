@@ -373,6 +373,7 @@ namespace Armoury
             CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, OnSaveOver);
             CampaignEvents.TournamentFinished.AddNonSerializedListener(this, Prologue.OnTourneyFinished);   // m104-e5: Turniej Reki
             CampaignEvents.TournamentCancelled.AddNonSerializedListener(this, Prologue.OnTourneyCancelled);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Prologue.OnWorldPartyDestroyed);   // m104-e5: kto rozbil Ludzi Gory
         }
 
         private void OnHourly()

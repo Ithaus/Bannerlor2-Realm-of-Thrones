@@ -866,7 +866,7 @@ namespace Armoury
         /// <summary>Banda w domu: bohaterowie-jency uciekaja, zloto do kiesy wsi zrodla, towar do jej magazynu, banda rozwiazana (OutlawLaw.RaidDisband -
         /// DestroyPartyAction bez sprawcy; ludzie i jency do puli okregu zrodla ta sama droga co kazda rozwiazana banda). Zwraca ludzi skladu; -1 - prawo
         /// wyrzutkow wylaczone (banda zostaje w polu, bez zarzadu).</summary>
-        private static int Home(MobileParty mp, Settlement src, Settlement region, out long gold, out long items)
+        internal static int Home(MobileParty mp, Settlement src, Settlement region, out long gold, out long items)   // m104-e5: internal - Ludzie Gory prologu wracaja ta sama droga
         {
             gold = 0; items = 0;
             if (!OutlawLaw.On) { Release(mp); return -1; }
