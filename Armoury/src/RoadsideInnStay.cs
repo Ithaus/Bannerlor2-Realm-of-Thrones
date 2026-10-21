@@ -232,9 +232,14 @@ namespace Armoury
                 inn = RoadsideInns.CurrentOrNear();
                 return CanHide(inn, true, out why);
             }
+            if (SideVillageVisit.StayMenu(id))   // m97-wioski: menu wioski pobocznej z mapy (takze wioski gracza i jej domu) - jak menu zajazdu
+            {
+                inn = SideVillageVisit.StayInn(id);
+                return CanHide(inn, true, out why);
+            }
             if (id == SleepMenu)
             {
-                string uid = TownInns.RoadSleepUid();
+                string uid = TownInns.RoadSleepUid() ?? (SideVillageVisit.On ? TownInns.HostSleepUidNow() : null);   // m97-wioski: takze sen pod dachem w wiosce pobocznej
                 inn = uid != null ? RoadsideInns.Find(uid) : null;
                 if (inn == null) { why = "sen poza zajazdem"; return false; }
                 return CanHide(inn, false, out why);
@@ -359,6 +364,7 @@ namespace Armoury
         {
             try
             {
+                if (SideVillageVisit.SleepSound(args)) return;   // m97-wioski: sen w wiosce pobocznej - tlo wsi, nie karczmy
                 if (!SoundOn) return;
                 string uid = TownInns.RoadSleepUid();
                 var inn = uid != null ? RoadsideInns.Find(uid) : null;

@@ -4820,7 +4820,7 @@ namespace Armoury
                     if (best.V == null) best.V = new Visual(best);
                     hoveredVisual = best.V;
                     // n20-wioska: wioska gracza - klik idzie do niej (jazda i menu po dojechaniu, SideVillageFief), nie w teren; inne wioski jak dotad
-                    if (SideVillageFief.Clickable(best.R.Uid))
+                    if (SideVillageFief.Clickable(best.R.Uid) || SideVillageVisit.Clickable(best.R.Uid))   // m97-wioski: kazda wioska poboczna - wjazd jak do wsi gry (SideVillageVisit)
                     {
                         SideVillageFief.NotePos(best.R.Uid, best.Placed ? best.Cx : best.R.X, best.Placed ? best.Cy : best.R.Y);
                         if (selectedVisual == null) selectedVisual = best.V;
@@ -4843,10 +4843,16 @@ namespace Armoury
 
             public override CampaignVec2 InteractionPositionForPlayer => new CampaignVec2(_s.Placed ? new Vec2(_s.Cx, _s.Cy) : new Vec2(_s.R.X, _s.R.Y), true);
             public override MapEntityVisual AttachedTo => null;
-            public override bool IsMobileEntity => !SideVillageFief.Clickable(_s.R.Uid);   // MapScreen.cs:1608 - bez kursora "raczki"; n20-wioska: wioska gracza z raczka (klik = wjazd)
+            public override bool IsMobileEntity => !SideVillageFief.Clickable(_s.R.Uid) && !SideVillageVisit.Clickable(_s.R.Uid);   // m97-wioski: kazda wioska z raczka (klik = wjazd)
+            // MapScreen.cs:1608 - bez kursora "raczki"; n20-wioska: wioska gracza z raczka (klik = wjazd)
             public override bool OnMapClick(bool followModifierUsed)
             {
-                try { return SideVillageFief.Clickable(_s.R.Uid) && SideVillageFief.OnClick(_s.R.Uid, _s.Placed ? _s.Cx : _s.R.X, _s.Placed ? _s.Cy : _s.R.Y); }
+                try
+                {
+                    float x = _s.Placed ? _s.Cx : _s.R.X, y = _s.Placed ? _s.Cy : _s.R.Y;
+                    if (SideVillageFief.Clickable(_s.R.Uid)) return SideVillageFief.OnClick(_s.R.Uid, x, y);
+                    return SideVillageVisit.Clickable(_s.R.Uid) && SideVillageVisit.OnClick(_s.R.Uid, x, y);   // m97-wioski: obca wioska poboczna - jazda i menu po dojechaniu
+                }
                 catch (Exception e) { Log.Error("MapVillagesView.OnMapClick " + _s.R.Uid, e); return false; }
             }
             public override void OnOpenEncyclopedia() { }

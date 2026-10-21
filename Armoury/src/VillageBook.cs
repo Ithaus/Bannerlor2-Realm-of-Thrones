@@ -1379,7 +1379,9 @@ namespace Armoury
         private static double Burn(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who, Cx cx = null)
         {
             int cur;
-            if (raid && s != null) cur = s.Cur >= 0 && Room(d, s.Cur) > Eps ? s.Cur : (s.Cur < 0 ? PickFirst(d, s) : NextFrom(d, s.Cur));
+            int forced = Forced(d);   // m97-wioski: rabunek jednej wioski pobocznej (SideVillageVisit) - tylko jej osady, bez lancucha (-2 = bez wymuszenia)
+            if (forced != -2) cur = forced;
+            else if (raid && s != null) cur = s.Cur >= 0 && Room(d, s.Cur) > Eps ? s.Cur : (s.Cur < 0 ? PickFirst(d, s) : NextFrom(d, s.Cur));
             else cur = hasPos ? NearestTo(d, px, py) : FirstByOrder(d);
             double left = dB;
             int guard = 0;
@@ -1394,10 +1396,22 @@ namespace Armoury
                     Remember(d, cur, cx, put, today);                   // E7/W1 (232): pamiec wojny PRZED CheckUp (przejscie na spalona oznacza to samo zdarzenie 'B')
                     CheckUp(d, cur, today, raid && s != null ? s.Raider : who, true, cx);
                 }
-                if (left <= Eps) break;
+                if (left <= Eps || forced != -2) break;
                 cur = NextFrom(d, cur);
             }
             return left > Eps ? left : 0.0;
+        }
+
+        /// <summary>m97-wioski: uid wioski pobocznej, ktorej osady pali biezace uderzenie (SideVillageVisit.StrikeChunk ustawia i zdejmuje w try/finally, watek glowny).</summary>
+        internal static string ForceUid;
+
+        /// <summary>m97-wioski: indeks wioski ForceUid w okregu (-1 - brak albo pelna: nic nie spalone, nadmiar w linii), -2 - bez wymuszenia (lancuch jak dotad).</summary>
+        private static int Forced(Dist d)
+        {
+            string u = ForceUid;
+            if (u == null) return -2;
+            if (d.Uid != null) for (int w = 0; w < d.W; w++) if (string.Equals(d.Uid[w], u, StringComparison.Ordinal)) return Room(d, w) > Eps ? w : -1;
+            return -1;
         }
 
         // ------------------------------------------------------------ wpiecia w nasz kod (bez Harmony)

@@ -8552,6 +8552,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefWalk { get; set; } = true;
 
+        [SettingPropertyBool("Side Villages Enterable", HintText = "every side village on the map can be entered like a main village, though nobody of note lives there: click it to ride in (your party leaves the map as in a roadside inn). Inside: what it is and makes, rest the night (paid like an inn's common room, free on your own lands), make camp, buy what it makes (its share of its main village's store) and sell to it, invest in its works, and - at war - raid that one village alone or make it pay tribute (spared 30 days). Off = side villages are only pictures on the map, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillagesEnterable { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -10817,6 +10821,7 @@ namespace Armoury
             s.SideVillageFiefTrade = SideVillageFiefTrade;
             s.SideVillageFiefHouse = SideVillageFiefHouse;
             s.SideVillageFiefWalk = SideVillageFiefWalk;
+            s.SideVillagesEnterable = SideVillagesEnterable;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
