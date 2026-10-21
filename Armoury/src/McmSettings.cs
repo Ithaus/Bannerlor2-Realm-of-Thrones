@@ -5756,6 +5756,18 @@ namespace Armoury
         [SettingPropertyGroup("Blood and race")]
         public bool FertilityYearScale { get; set; } = true;
 
+        [SettingPropertyBool("Map Chat Log Clear Of Menu", HintText = "Chat Log Clear Of Menus: while a settlement or encounter menu is open on the campaign map, the message log (ravens, captures, news) moves to the right of the menu, below the middle of the screen, so it no longer covers the menu; it moves back when the menu closes. Off = the log stays over the menu, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public bool MapChatLogClearOfMenu { get; set; } = true;
+
+        [SettingPropertyBool("Map Chat Log Frame", HintText = "Chat Log Frame On The Map: messages in the log on the campaign map get a dark panel with the thin silver bars of the Realm of Thrones tooltips, sized to the lines on show; it goes away with the last line. Battles and other screens keep the game's look. Off = bare text, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public bool MapChatLogFrame { get; set; } = true;
+
+        [SettingPropertyBool("Map Hide Trade Notices", HintText = "Hide Trade Notices Over Towns: the rows with portraits above town names that list what caravans and villagers sold or bought ('Caravan of X Sold Jewelry x1 ...', 'Villagers of Y Sold ...') are no longer shown. Trade itself and every other notice (recruits, prisoners, ships) are unchanged. Off = shown, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public bool MapHideTradeNotices { get; set; } = true;
+
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillagesEnabled { get; set; } = true;
@@ -10550,6 +10562,9 @@ namespace Armoury
             s.SameRaceOnly = SameRaceOnly;
             s.PregnancyDays = PregnancyDays;
             s.FertilityYearScale = FertilityYearScale;
+            s.MapChatLogClearOfMenu = MapChatLogClearOfMenu;
+            s.MapChatLogFrame = MapChatLogFrame;
+            s.MapHideTradeNotices = MapHideTradeNotices;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapHoverRingOurObjects = MapHoverRingOurObjects;

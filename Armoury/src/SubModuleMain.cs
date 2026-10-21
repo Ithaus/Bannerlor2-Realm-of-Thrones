@@ -102,6 +102,9 @@ namespace Armoury
                 // linia dziala tylko przy kluczu VillageOutputByPeople
                 try { VillageByPeople.ApplyTip(_harmony); } catch (Exception e) { Log.Error("VillageByPeople.ApplyTip", e); }
                 try { DistrictIcon.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DistrictIcon.ApplyAll", e); }   // inwest: ikona okregu (tabliczka, dymek osady, lista produkcji miasta) - latki UI raz na proces
+                // m105-dziennik: prefiks tabliczek osad (wiersze handlu karawan i wiesniakow - klucz MapHideTradeNotices) i odbicie widoku dziennika - raz na proces, przed
+                // pierwszym VM tabliczek; wlasny try (linia "Dziennik (m105): start")
+                try { MapChatLog.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapChatLog.ApplyAll", e); }
                 // ZC2 (16.10): linie "Estates (book)" i "Livelihood" w dymku osady (miasto, zamek - region, wies) - postfiks Low dymka gry i NavalDLC, PO GL1 (wstawia
                 // pod jego linie); wlasny try, linie tylko przy kluczu DailyLifeEstates
                 try { DailyLife.ApplyTip(_harmony); } catch (Exception e) { Log.Error("DailyLife.ApplyTip", e); }
@@ -457,6 +460,13 @@ namespace Armoury
                 try { Lektor.AppTick(); }
                 catch (Exception e) { _lektorFails++; Log.Error("Lektor.AppTick: nie laduje sie (proba " + _lektorFails + "/3)", e); }
             }
+            // m105-dziennik: dziennik wiadomosci obok menu osady i ramka (4 razy na sekunde; poza taktem tylko licznik czasu; wlasny try w srodku) - tu tylko blad
+            // ladowania typu, liczony (po 3 dziennik zostaje jak w grze do konca sesji). PRZED returnem wiosek - klucz Map Villages = off nie wylacza dziennika.
+            if (_chatLogFails < 3)
+            {
+                try { ChatLogTick(dt); }
+                catch (Exception e) { _chatLogFails++; Log.Error("MapChatLog: nie laduje sie (proba " + _chatLogFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -486,12 +496,21 @@ namespace Armoury
             Prologue.ScenesAppTick();
         }
 
+        private static int _chatLogFails;   // m105-dziennik: blad ladowania typu dziennika (MapChatLog.AppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ChatLogTick(float dt)
+        {
+            MapChatLog.AppTick(dt);
+        }
+
         /// <summary>m103-sceny: wyjscie z kampanii - okno opowiesci zerowane, obrazki z plikow zwolnione od razu (StoryPictures.ReleaseAll).</summary>
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
             try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
             try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
+            try { MapChatLog.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (dziennik m105)", e); }   // m105-dziennik: linia kampanii i test od nowa
         }
         private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 

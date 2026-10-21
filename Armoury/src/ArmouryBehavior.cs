@@ -2822,6 +2822,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("TownInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RoadsideInns.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("RoadsideInns.Daily", e); } DayProfile.Lap("RoadsideInns.Daily");   // sw-zajazdy: linia "Zajazdy (ZJ): dzien N" - wejscia, noclegi, kiesy wsi, kontrola obiegu, widok
             try { MoneyLedger.Probe169("RoadsideInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
+            try { MapChatLog.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("MapChatLog.Daily", e); } DayProfile.Lap("MapChatLog.Daily");   // m105-dziennik: linia "Dziennik (m105): dzien N" - przesuniecia, ramka, handel na tabliczkach (tylko log)
             try { Rumours.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Rumours.Daily", e); } DayProfile.Lap("Rumours.Daily");   // sw-zajazdy: linia "Plotki (PL): dzien N" - sluchane, ksiega band, wiesci
             try { InnDrink.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("InnDrink.Daily", e); }   // m98-plotki: linia "Kufle (m98): dzien N"
             try { Lektor.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Lektor.Daily", e); }   // m103-lektor: linia "Lektor (m103): dzien N" - okna, plotki, znaki, bledy API
