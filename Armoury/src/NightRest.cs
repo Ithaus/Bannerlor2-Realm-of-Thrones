@@ -125,7 +125,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
-            return baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            float need = baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            return need + InnDrink.ExtraSleepH(need, _restTonight);   // m98-plotki: pijany gracz dosypia (baza + 1 h na kufel ponad prog od ostatniego kufla); trzezwy - 0
         }
 
         // ------------------------------------------------------------ rachunek nocy
@@ -195,6 +196,7 @@ namespace Armoury
                 // m97-szkolenie (recenzja 4): godzina cwiczen z menu obozu ("Train the men") to praca, nie odpoczynek - jak w staminie (menu cwiczen poza InCampMenu)
                 bool drilled = CampDrill.DrilledLastHour;
                 if (resting && !forced && !drilled) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                InnDrink.RestHour(resting && !forced && !drilled ? (night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) : 0f, _sleeping);   // m98-plotki: odsypianie kufli tym samym odpoczynkiem (wlasny try)
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);
@@ -1870,6 +1872,8 @@ namespace Armoury
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
                 // R3-08c (ForcedMarch.cs): marsz forsowny gracza +% od wyniku, raz na lancuch - PRZED kara dlugu (kara liczy sie od predkosci z premia)
                 if (mobileParty == MobileParty.MainParty && ForcedMarch.Active && SpeedDepth.OutermostFinal) ForcedMarch.SpeedBonus(ref __result);
+                // m98-plotki (DrinkDrunkHangover): gracz pijany albo skacowany - kara od wyniku, raz na lancuch modeli (niezaleznie od dlugu snu); bez stanu - nic
+                if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal) InnDrink.SpeedPenalty(ref __result, DryBuild);
                 int d = DebtFor(mobileParty);
                 if (d < 1)
                 {
@@ -1900,6 +1904,8 @@ namespace Armoury
                 var mobileParty = __0;
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
+                // m98-plotki (DrinkDrunkHangover): kac gracza - kara morale (czynnik), raz na lancuch modeli; bez kaca - nic
+                if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale) InnDrink.MoralePenalty(ref __result, DryBuild);
                 int d = DebtFor(mobileParty);
                 if (d < 1)
                 {

@@ -36,7 +36,7 @@ namespace Armoury
     /// Te same plotki w tym samym miejscu tego samego dnia (ziarno = miejsce + doba). Ksiega: zapis "arm_rumours" (v1, straznik rozmiaru); brak klucza = bandy
     /// "od dawna" (bez liczby dni), wiesci od zera. Linia "Plotki (PL): dzien N"; tools/sprawdz_logi.py --grupa nzajazdy.
     /// </summary>
-    internal static class Rumours
+    internal static partial class Rumours   // m98-plotki: turnieje, swaty i kufel w Rumours.Drink.cs
     {
         private const string P = "Plotki (PL): ";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -62,7 +62,7 @@ namespace Armoury
 
         // liczniki doby i sesji
         private static int _dHeard, _dHeardRoad, _dHeardTown, _dItems, _dEmpty, _dBandsNew, _dBandsGone, _dNews, _dStumbles, _stumbles;
-        private static readonly int[] _dCat = new int[7];   // 0 bandy, 1 kryjowki, 2 wojska, 3 karawany, 4 ceny, 5 wojny, 6 pusto
+        private static readonly int[] _dCat = new int[9];   // 0 bandy, 1 kryjowki, 2 wojska, 3 karawany, 4 ceny, 5 wojny, 6 pusto; m98-plotki: 7 turnieje, 8 swaty
         private static long _dBuildTicks;
         // n20-plotki: liczniki doby - herszci (bohater / z ksiegi / nadane), stopnie lupu (kiesy band, skarbce kryjowek), okna i strony
         private static int _dNameHero, _dNameBook, _dNameNew, _dWindows, _dPages, _dPagesTurned, _dMaxLines;
@@ -80,6 +80,7 @@ namespace Armoury
         {
             _bands.Clear(); _news.Clear();
             _priceItems = null;   // recenzja: przedmioty gry z MBObjectManager tej kampanii - nastepna kampania (nowa gra / wczytanie) buduje liste od nowa
+            DrinkReset();         // m98-plotki: pula miejsca i piwo tej kampanii
             _stumbles = 0; _errLogged = false; _importNote = "brak klucza (stary zapis albo nowa kampania)";
             DayReset();
         }
@@ -384,8 +385,10 @@ namespace Armoury
             try
             {
                 args.optionLeaveType = GameMenuOption.LeaveType.Conversation;
+                MBTextManager.SetTextVariable("ARM_GOSSIP_TOWN", "Listen to the gossip");   // m98-plotki: etykieta z cena kufla przy InnGossipNeedsDrink
                 var st = Settlement.CurrentSettlement;
                 if (!On || !TownInns.On || st == null || !st.IsTown) return false;
+                if (InnDrink.On) return DrinkCondition(args, "ARM_GOSSIP_TOWN", st.GetPosition2D, st.StringId, st, st.Town != null);
                 args.Tooltip = new TextObject("{=!}Sit by the fire with a cup and listen to what the drinkers and the innkeeper say - outlaws, lairs, hosts on the march, caravans, prices and the wars.");
                 return true;
             }
@@ -398,6 +401,7 @@ namespace Armoury
             {
                 var st = Settlement.CurrentSettlement;
                 if (st == null) return;
+                if (InnDrink.On) { DrinkConsequence(st.GetPosition2D, st.StringId, st.Name.ToString(), true, st, null); return; }   // m98-plotki: kufel przed plotkami
                 _dHeardTown++;
                 Show(st.GetPosition2D, st.StringId, st.Name.ToString(), true);
             }
@@ -409,9 +413,11 @@ namespace Armoury
             try
             {
                 args.optionLeaveType = GameMenuOption.LeaveType.Conversation;
+                MBTextManager.SetTextVariable("ARM_GOSSIP_ROAD", "Listen to the gossip");   // m98-plotki: etykieta z cena kufla przy InnGossipNeedsDrink
                 if (!On || !RoadsideInns.On) return false;
                 var inn = RoadsideInns.CurrentOrNear();
                 if (inn == null) return false;
+                if (InnDrink.On) { var at = new Vec2(inn.X, inn.Y); return DrinkCondition(args, "ARM_GOSSIP_ROAD", at, inn.Uid, RoadTown(inn, at), inn.Village != null && inn.Village.Village != null); }
                 args.Tooltip = new TextObject("{=!}Drovers, pilgrims and pedlars by the hearth trade the news of the road - the nearer and fresher, the truer.");
                 return true;
             }
@@ -424,6 +430,7 @@ namespace Armoury
             {
                 var inn = RoadsideInns.CurrentOrNear();
                 if (inn == null) return;
+                if (InnDrink.On) { DrinkConsequence(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false, null, inn); return; }   // m98-plotki: kufel przed plotkami
                 _dHeardRoad++;
                 Show(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false);
             }
@@ -431,18 +438,23 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ plotki
-        private sealed class Item { public int Cat; public float Score; public string Text; }
+        private sealed class Item { public int Cat; public float Score; public string Text; public string Ref; }   // m98-plotki: Ref - id turnieju (miasto) / kandydata (bohater) do sprawdzenia prawdy
 
-        private static void Show(Vec2 at, string key, string place, bool town)
+        // m98-plotki: given/headGiven - plotki wybrane za kufel (Rumours.Drink) i naglowek z zaplata; null - jak dotad (cala pula, zwykly naglowek)
+        private static void Show(Vec2 at, string key, string place, bool town, List<Item> given = null, string headGiven = null)
         {
             long t0 = Stopwatch.GetTimestamp();
             List<Item> items;
-            try { items = Build(at, key); }
-            catch (Exception e) { Stumble("Build", e); items = new List<Item>(); }
-            _dBuildTicks += Stopwatch.GetTimestamp() - t0;
+            if (given != null) items = given;
+            else
+            {
+                try { items = Build(at, key); }
+                catch (Exception e) { Stumble("Build", e); items = new List<Item>(); }
+                _dBuildTicks += Stopwatch.GetTimestamp() - t0;
+            }
             _dHeard++;
-            string head = town ? "The innkeeper leans on his counter, and the drinkers are happy to talk:" : "By the hearth, drovers, pilgrims and pedlars trade the news of the road:";
-            var cats = new int[7];
+            string head = headGiven ?? (town ? "The innkeeper leans on his counter, and the drinkers are happy to talk:" : "By the hearth, drovers, pilgrims and pedlars trade the news of the road:");
+            var cats = new int[NewCats];
             if (items.Count == 0) { _dEmpty++; cats[6]++; }
             foreach (var it in items) { cats[it.Cat]++; _dCat[it.Cat]++; _dItems++; }
             // n20-plotki (InnGossipPages): strony mieszczace sie w ramce; klucz wylaczony - jedno okno jak dotad
@@ -461,7 +473,8 @@ namespace Armoury
             foreach (var n in lines) if (n > _dMaxLines) _dMaxLines = n;
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
             Log.Info(P + "sluchane w " + place + " (" + (town ? "karczma miasta" : "zajazd") + ", " + key + ") dzien " + Today + " - plotek " + items.Count + " (bandy " + cats[0] + ", kryjowki " + cats[1]
-                     + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5] + "), czas " + ms.ToString("0.0", Inv) + " ms"
+                     + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5]
+                     + (TournOn || MatchOn || cats[CatTourn] + cats[CatMatch] > 0 ? ", turnieje " + cats[CatTourn] + ", swaty " + cats[CatMatch] : "") + "), czas " + ms.ToString("0.0", Inv) + " ms"
                      + " | strony " + pages.Count + " (linie ok. " + JoinInts(lines) + ", miesci sie " + PageLines + ")" + (PagesOn ? "" : " - klucz Inn Gossip Pages WYLACZONE") + ".");
             ShowPage(place, pages, 0);
         }
@@ -568,15 +581,21 @@ namespace Armoury
             try { Caravans(all, at, seed); } catch (Exception e) { Stumble("Caravans", e); }
             try { Prices(all, at, seed); } catch (Exception e) { Stumble("Prices", e); }
             try { Wars(all, at, seed, today); } catch (Exception e) { Stumble("Wars", e); }
+            try { if (TournOn) Tournaments(all, at, seed); } catch (Exception e) { Stumble("Tournaments", e); }   // m98-plotki (GossipTournaments)
+            try { if (MatchOn) Matches(all, at, seed); } catch (Exception e) { Stumble("Matches", e); }           // m98-plotki (GossipMatchmaking)
             all.Sort((x1, x2) => x2.Score.CompareTo(x1.Score));
             var res = new List<Item>();
-            var cap = new[] { 2, 1, 1, 1, 1, 2 };
-            var used = new int[6];
+            // m98-plotki: dawne kategorie najwyzej 6 jak dotad; turnieje i swaty po 2 na wlasnych miejscach (klucze wylaczone - pula jak przed galezia)
+            var cap = new[] { 2, 1, 1, 1, 1, 2, 0, 2, 2 };
+            var used = new int[NewCats];
+            int oldN = 0;
             foreach (var it in all)
             {
-                if (res.Count >= 6) break;
+                bool added = it.Cat >= CatTourn;
+                if (!added && oldN >= 6) continue;
                 if (used[it.Cat] >= cap[it.Cat]) continue;
                 used[it.Cat]++;
+                if (!added) oldN++;
                 res.Add(it);
             }
             return res;

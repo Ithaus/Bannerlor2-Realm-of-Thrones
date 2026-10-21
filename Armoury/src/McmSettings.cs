@@ -4964,6 +4964,42 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
 
+        [SettingPropertyBool("Inn Gossip Needs Drink", HintText = "nobody talks to a man with a dry tongue: to hear the gossip in a town inn or a roadside inn you buy a tankard of ale first - a tenth of what a cask of beer costs in the town nearby (a cask is some twenty tankards, and the innkeeper takes his share). The coin goes to the innkeepers - the townsfolk, or the village by a roadside inn - as for a night's lodging. You hear only news you have not heard in that place yet; when all of it is told, the option waits for fresh news. Off = the gossip is free and all of it at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnGossipNeedsDrink { get; set; } = true;
+
+        [SettingPropertyBool("Gossip Per Drink By Charm", HintText = "how much the drinkers tell you over one tankard depends on your Charm: below 50 - one piece of news, 50 to 109 - two, 110 to 169 - three, 170 to 229 - four, from 230 - all there is. Buy another round to hear more. Each piece you hear teaches you a little Charm (5 xp). Off = one tankard tells you everything", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipPerDrinkByCharm { get; set; } = true;
+
+        [SettingPropertyBool("Gossip Tournaments", HintText = "the gossip tells of tourneys: which town holds one, how far away it is, how long ago it was proclaimed and what the prize is - only tourneys that are really being held (far ones only once the news could have reached the inn). Off = no tourneys in the gossip, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipTournaments { get; set; } = true;
+
+        [SettingPropertyBool("Gossip Matchmaking", HintText = "the gossip tells of matchmaking: a lord or lady nearby seeking a husband for a daughter or a wife for a son - only real unwed grown children of noble houses that the game's marriage rules allow to wed, from houses whose seat is near the inn. Off = no matchmaking in the gossip, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipMatchmaking { get; set; } = true;
+
+        [SettingPropertyBool("Drink Drunk Hangover", HintText = "drink too much and you pay for it: past your limit (Drunk After Tankards, one more with Endurance 5 and one more with Athletics 150) you are drunk - your party moves slower on the map until you sleep it off, and you need an extra hour of sleep for every tankard past your limit. When you have slept it off you wake with a hangover: slower and in a worse mood until dusk. The innkeeper pours no more than three past your limit. Needs Night Rest. Off = ale has no effect on you, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool DrinkDrunkHangover { get; set; } = true;
+
+        [SettingPropertyInteger("Drunk After Tankards", 1, 10, "0", HintText = "how many tankards you can drink before you are drunk (before Endurance and Athletics add theirs), counted since you last slept", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int DrunkAfterTankards { get; set; } = 3;
+
+        [SettingPropertyInteger("Drunk Speed Penalty Percent", 0, 50, "0", HintText = "drunk: your party's map speed drops by this much for the first tankard past your limit, 5 more for each further one (at most twice this)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int DrunkSpeedPenaltyPercent { get; set; } = 15;
+
+        [SettingPropertyInteger("Hangover Speed Penalty Percent", 0, 50, "0", HintText = "hangover: your party's map speed drops by this much until dusk", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int HangoverSpeedPenaltyPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Hangover Morale Penalty Percent", 0, 50, "0", HintText = "hangover: your party's morale drops by this share until dusk", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public int HangoverMoralePenaltyPercent { get; set; } = 10;
+
         [SettingPropertyBool("Raven News", HintText = "news of far-off wars, battles and sieges reaches you as fast as a raven flies: wars declared and peace, alliances or non-aggression pacts made between other realms, sieges, raids and assaults, lords slain in battle or executed, taken captive, set free or risen as White Walkers come to you later the farther away they happened - about three days from King's Landing to Winterfell, four and a half from Pentos, a week from Qarth, never more than twelve days - with a note saying where the raven came from (e.g. 'A raven from Winterfell, 3 days on the wing: ...'). Tavern gossip about such news waits for the same raven. News about you, your clan, your close kin or your fiefs (on either side of a fight), wars, peace or alliances of your own realm, your realm's hosts gathering and deaths in its ruling house still come at once, and so does anything less than a day's ride away. Only your messages wait - the lords of the world know what they knew before. Ravens in flight are kept in the save. Off = all news at once, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool RavenNews { get; set; } = true;
@@ -10032,6 +10068,15 @@ namespace Armoury
             s.RoadsideInnHideParty = RoadsideInnHideParty;
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.InnGossipPages = InnGossipPages;
+            s.InnGossipNeedsDrink = InnGossipNeedsDrink;
+            s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
+            s.GossipTournaments = GossipTournaments;
+            s.GossipMatchmaking = GossipMatchmaking;
+            s.DrinkDrunkHangover = DrinkDrunkHangover;
+            s.DrunkAfterTankards = DrunkAfterTankards;
+            s.DrunkSpeedPenaltyPercent = DrunkSpeedPenaltyPercent;
+            s.HangoverSpeedPenaltyPercent = HangoverSpeedPenaltyPercent;
+            s.HangoverMoralePenaltyPercent = HangoverMoralePenaltyPercent;
             s.RavenNews = RavenNews;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;

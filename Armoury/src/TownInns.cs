@@ -411,7 +411,7 @@ namespace Armoury
                         delegate (MenuCallbackArgs a) { Commit(q); }, false, q);
                 }
                 // sw-zajazdy (InnGossip): plotki karczmarza w miescie - okno z tekstem (bez zmiany menu); klucz wylaczony - opcji nie ma
-                starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}Listen to the gossip", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
+                starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}{ARM_GOSSIP_TOWN}", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
                 // m95-menu (recenzja): napis mowi, dokad prowadzi - "Back to the tavern district", gdy wejscie stoi w dzielnicy karczm; inaczej jak dotad
                 starter.AddGameMenuOption(Menu, "arm_inn_back", "{=!}{ARM_INN_BACK}",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; TownMenus.SetBackLabel(a, "ARM_INN_BACK", "arm_inn_enter", "Back to the town"); return true; },

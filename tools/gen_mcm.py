@@ -4,6 +4,11 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # m98-plotki: kufle i pijanstwo - kod przycina prog do 1..10, kary do 0..50 % (InnDrink.Threshold / DrunkPct / Recompute)
+    'DrunkAfterTankards': (1, 10, "0"),
+    'DrunkSpeedPenaltyPercent': (0, 50, "0"),
+    'HangoverSpeedPenaltyPercent': (0, 50, "0"),
+    'HangoverMoralePenaltyPercent': (0, 50, "0"),
     # m97-posilki: posilki DR marszem - kod przycina do 0.25..6 h, 10..600 s na godzine, 0..300 s rozwiniecia (DrMarchArrival.MaxH / SecH / DepS)
     'DrMaxMarchHours': (0.25, 6.0, "0.00"),
     'DrSecondsPerMarchHour': (10.0, 600.0, "0"),

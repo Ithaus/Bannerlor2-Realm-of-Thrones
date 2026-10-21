@@ -540,7 +540,7 @@ namespace Armoury
                         delegate (MenuCallbackArgs a) { return TownInns.RoadQCondition(a, CurrentOrNear(), q); },
                         delegate (MenuCallbackArgs a) { TownInns.RoadCommit(CurrentOrNear(), q); }, false, q);
                 }
-                starter.AddGameMenuOption(Menu, "arm_roadinn_gossip", "{=!}Listen to the gossip", Rumours.RoadGossipCondition, Rumours.RoadGossipConsequence, false, 5);
+                starter.AddGameMenuOption(Menu, "arm_roadinn_gossip", "{=!}{ARM_GOSSIP_ROAD}", Rumours.RoadGossipCondition, Rumours.RoadGossipConsequence, false, 5);
                 starter.AddGameMenuOption(Menu, "arm_roadinn_leave", "{=!}Ride on",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                     delegate (MenuCallbackArgs a) { _current = null; RoadsideInnStay.Leave("Ride on"); GameMenu.ExitToLast(); }, true, 9);   // m95-zajazd: partia z powrotem na mapie przed zamknieciem menu

@@ -1928,6 +1928,11 @@ Uzycie (Python 3, tylko odczyt):
                     OB-0 start (klucz, udzial), OB-1 linie "ERROR in SideVillageVisit." 0, OB-2 kazda bitwa z obroncami zamknieta (druzyna nie przezywa bitwy; ostatnia
                     otwarta na koncu logu - INFO), OB-3 straty z ludnosci <= obroncow, OB-4 obroncow <= pulapu ludnosci (1/10 w domu, najwyzej 60), OB-5 druzyny
                     sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
+--grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
+                    turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
+                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
+                    (obieg 0), KP-4 turnieje i swaty prawdziwe w chwili sluchania, KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy upiciu / kacu,
+                    KP-7 ruch doby (INFO). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -54010,6 +54015,124 @@ def m97wioski_main(logp):
     return 0
 
 
+
+# ============================================================ m98plotki (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs)
+M98P_PRE = "Kufle (m98): "
+M98P_RX = {
+    "start": re.compile(r"klucze: Inn Gossip Needs Drink (\S+), Gossip Per Drink By Charm (\S+), Gossip Tournaments (\S+), Gossip Matchmaking (\S+), Drink Drunk Hangover (\S+)"),
+    "curve": re.compile(r"krzywa Uroku \(plotek na kufel\): 20 -> (\d+), 80 -> (\d+), 150 -> (\d+), 200 -> (\d+), 250 -> (\S+?);"),
+    "cup": re.compile(r"kufel w (.+?) \((karczma miasta|zajazd), (\S+)\) dzien (-?\d+) - cena (\d+) \(beczka piwa w (\S+) (\d+)\), zaplacil (\d+) \(gracz (-?\d+) -> (-?\d+)\) -> (.+?) "
+                      r"\| kontrola obiegu: roznica (-?\d+) \| Urok (\d+) -> plotek (\d+) z (\d+) nowych \(pula (\d+), zostalo (\d+)\).*?\| turnieje (\d+) \(prawdziwe (\d+)\), swaty (\d+) \(prawdziwe (\d+)\)"),
+    "town": re.compile(r"kiesa ludu \S+ (-?\d+), kasa miasta (-?\d+)$"),
+    "road": re.compile(r"kiesa wsi \S+ (-?\d+), podatek pana (\d+), korona \(DS\) (\d+)$"),
+    "drunk": re.compile(r"(upicie|pijany dalej) - kufli (\d+) \(prog (\d+), .*?ponad prog (\d+), kara predkosci -(\d+)%"),
+    "day": re.compile(r"dzien (-?\d+) \| .*?\| kufle (\d+), zaplacone (\d+) .*?roznica (-?\d+) \| plotek uslyszanych (\d+) \(turnieje (\d+), nieprawdziwe (\d+); swaty (\d+), nieprawdziwe (\d+)\)"
+                      r".*?\| upicia (\d+), odespania (\d+), kace (\d+), godziny kary: pijany (\d+), kac (\d+), bez stanu (\d+) .*?\| pula: turniejow w toku w swiecie (\d+), kandydatow do swatow w swiecie (\S+?) "
+                      r".*?\| potkniecia dzis (\d+)"),
+}
+
+
+def m98_per_drink(charm, pool, by_charm):
+    if pool <= 0:
+        return 0
+    if not by_charm or charm >= 230:
+        return pool
+    return min(pool, 1 + max(0, (charm + 10) // 60))
+
+
+def m98plotki_main(logp):
+    """m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel (cena z beczki piwa, zloto do karczmarzy), plotek na kufel wedlug Uroku, turnieje i swaty
+    tylko prawdziwe, pijanstwo i kac gracza. Log Armoury strumieniowo. KP-0 start sesji (klucze, krzywa Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 linie
+    ERROR InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony (zaplacil = cena, kiesa gracza -cena, odbiorcy razem = cena, kontrola obiegu 0),
+    KP-4 turnieje i swaty prawdziwe w chwili sluchania (kufle i doby: nieprawdziwe 0), KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy
+    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, cups, drunks, days, errs = [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR in InnDrink." in s or "ERROR in Rumours." in s:
+                errs += 1
+            if not s.startswith(M98P_PRE):
+                continue
+            t = s[len(M98P_PRE):]
+            if t.startswith("start sesji"):
+                start.append(t)
+            elif t.startswith("dzien "):
+                days.append(t)
+            elif t.startswith("kufel w "):
+                cups.append(t)
+            elif t.startswith("upicie") or t.startswith("pijany dalej"):
+                drunks.append(t)
+    print(f"plik: {logp} | start {len(start)}, doby {len(days)}, kufle {len(cups)}, upicia {len(drunks)}, ERROR {errs}")
+    if not start and not days and not cups:
+        rep.add("KP-0: linia startu kufli", "brak linii", "INFO (log sprzed galezi m98-plotki)", None)
+        rep.show()
+        return 0
+    ms = M98P_RX["start"].search(start[-1]) if start else None
+    mc = M98P_RX["curve"].search(start[-1]) if start else None
+    by_charm = not (ms and ms.group(2) != "tak")
+    curve_ok = bool(mc) and (not by_charm or (mc.group(1), mc.group(2), mc.group(3), mc.group(5)) == ("1", "2", "3", "wszystkie"))
+    rep.add("KP-0: linia startu sesji (klucze, krzywa Uroku 20/80/150/250)", (start[-1][:220] if start else "brak"), "jest; przy kluczu Urok: 1/2/3/wszystkie",
+            bool(start) and bool(ms) and curve_ok)
+    rep.add("KP-1: linie ERROR in InnDrink./Rumours.", f"{errs}", "0", errs == 0)
+    st_sum = sum(int(m.group(18)) for m in (M98P_RX["day"].search(x) for x in days) if m)
+    rep.add("KP-2: potkniecia doby (suma)", f"{st_sum} w {len(days)} dobach", "0", st_sum == 0)
+    bad, badt, badn, unread = [], [], [], 0
+    tn = tt = mn = mt = 0
+    for t in cups:
+        m = M98P_RX["cup"].search(t)
+        if not m:
+            unread += 1
+            continue
+        price, paid, g0, g1, recip, diff = int(m.group(5)), int(m.group(8)), int(m.group(9)), int(m.group(10)), m.group(11), int(m.group(12))
+        charm, n, fresh = int(m.group(13)), int(m.group(14)), int(m.group(15))
+        got = None
+        mt_ = M98P_RX["town"].search(recip)
+        mr_ = M98P_RX["road"].search(recip)
+        if mt_:
+            got = int(mt_.group(1)) + int(mt_.group(2))
+        elif mr_:
+            got = int(mr_.group(1)) + int(mr_.group(2)) + int(mr_.group(3))
+        if paid != price or g0 - g1 != paid or got != paid or diff != 0:
+            bad.append(f"{m.group(3)} d{m.group(4)}: cena {price}, zaplacil {paid}, gracz {g0}->{g1}, odbiorcy {got}, roznica {diff}")
+        a, b, c, d = int(m.group(18)), int(m.group(19)), int(m.group(20)), int(m.group(21))
+        tn += a; tt += b; mn += c; mt += d
+        if a != b or c != d:
+            badt.append(f"{m.group(3)} d{m.group(4)}: turnieje {b}/{a}, swaty {d}/{c}")
+        if n != m98_per_drink(charm, fresh, by_charm):
+            badn.append(f"{m.group(3)} d{m.group(4)}: Urok {charm}, nowych {fresh}, plotek {n} (oczekiwane {m98_per_drink(charm, fresh, by_charm)})")
+    if cups:
+        rep.add("KP-3: kufel zaplacony, pieniadz u odbiorcy (cena = zaplacil = -kiesa gracza = odbiorcy, obieg 0)",
+                f"kufli {len(cups)}, nieczytelnych {unread}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""), "0 niezgodnych i 0 nieczytelnych", not bad and unread == 0)
+    else:
+        rep.add("KP-3: kufel zaplacony", "brak kufli w logu", "INFO (gracz nie sluchal plotek)", None)
+    dfalse = sum(int(m.group(7)) + int(m.group(9)) for m in (M98P_RX["day"].search(x) for x in days) if m)
+    rep.add("KP-4: turnieje i swaty prawdziwe w chwili sluchania", f"kufle: turnieje {tt}/{tn}, swaty {mt}/{mn}, niezgodnych {len(badt)}" + (f" ({badt[:3]})" if badt else "")
+            + f"; doby: nieprawdziwe {dfalse}", "0 nieprawdziwych", not badt and dfalse == 0 if (cups or days) else None)
+    if cups:
+        rep.add("KP-5: plotek na kufel = krzywa Uroku (<50:1, 50:2, 110:3, 170:4, 230: wszystkie)", f"niezgodnych {len(badn)}" + (f" ({badn[:3]})" if badn else ""), "0", not badn)
+    else:
+        rep.add("KP-5: plotek na kufel wedlug Uroku", "brak kufli w logu", "INFO", None)
+    badd = [x for x in drunks if (lambda mm: mm is not None and int(mm.group(2)) <= int(mm.group(3)))(M98P_RX["drunk"].search(x))]
+    nostate = sum(int(m.group(15)) for m in (M98P_RX["day"].search(x) for x in days) if m)
+    rep.add("KP-6: kara predkosci tylko przy upiciu / kacu", f"upic {len(drunks)} (w tym nie ponad prog {len(badd)}), godzin kary bez stanu {nostate}", "0 i 0",
+            len(badd) == 0 and nostate == 0 if (days or drunks) else None)
+    tot = [0] * 9
+    pool_t, pool_m = "-", "-"
+    for x in days:
+        m = M98P_RX["day"].search(x)
+        if m:
+            for i, g in enumerate((2, 3, 5, 6, 8, 10, 11, 13, 14)):
+                tot[i] += int(m.group(g))
+            pool_t, pool_m = m.group(16), m.group(17)
+    rep.add("KP-7: ruch doby (suma)", f"kufle {tot[0]}, zaplacone {tot[1]}, plotek {tot[2]} (turnieje {tot[3]}, swaty {tot[4]}), upicia {tot[5]}, odespania {tot[6]}, "
+            f"godziny pijany {tot[7]}, kac {tot[8]} | ostatnia doba: turniejow w toku {pool_t}, kandydatow do swatow {pool_m}", "INFO", None)
+    rep.show()
+    return 0
+
+
 # ============================================================ m97obroncy (20.10, m97-wioski krok 2; Armoury/src/SideVillageVisit.Defenders.cs): obroncy wioski pobocznej
 M97O_RX = {
     "start": re.compile(r"obroncy wiosek: klucz Side Village Defenders (\S+) \(1 na (\d+) mieszkancow w domu, pulap (\d+), poddanie przy (\d+):1"),
@@ -54455,6 +54578,8 @@ def main(argv):
         return m97obroncy_main(logp)   # m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs)
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+    if group == "m98plotki" and logp:
+        return m98plotki_main(logp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
