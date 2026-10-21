@@ -8924,6 +8924,42 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerArmourerPerStall { get; set; } = 6;
 
+        [SettingPropertyBool("Notice Board", HintText = "'Read the notice board' in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board, and no bounties from the watch or the headmen either", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoard { get; set; } = true;
+
+        [SettingPropertyBool("Notice Board Villages", HintText = "the notice board also lists the headmen and landowners of the town's villages who have work for you; you must ride to the village to speak with them (the notice can mark the village on your map). Off = only people in town and the town lord's house", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardVillages { get; set; } = true;
+
+        [SettingPropertyBool("Notice Board Opening", HintText = "when you come to someone from the notice board ('Go and see' or 'Talk now'), you can open with 'I read your notice on the board in ...' and they tell you about the work at once in their own words; the rest of the talk is the game's own. Off = only the game's own lines", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardOpening { get; set; } = true;
+
+        [SettingPropertyBool("Watch Bounties", HintText = "the captain of the watch (in King's Landing the captain of the Gold Cloaks) posts bounties on the notice board on bands roaming near the town: the pay is the wages of as many guardsmen as the band has men (10 to 60) for three days (four for a mounted band) plus a quarter, more if the band has plundered the town's villages or robbed its caravans or is led by a named chief (at most double). The town pays only from coin it can spare above its merchants' reserve and the next instalments it owes (one bounty at most a quarter of that); a poor town or a council in debt posts none. Whoever breaks the band is paid at once, on top of its loot. Off = no bounties", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBounties { get; set; } = true;
+
+        [SettingPropertyInteger("Watch Bounties Per Town", 0, 5, "0", HintText = "most bounties one town keeps posted at once", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public int WatchBountiesPerTown { get; set; } = 2;
+
+        [SettingPropertyInteger("Watch Bounty Days", 1, 60, "0", HintText = "days a bounty stays up before it is taken down (no penalty for you)", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public int WatchBountyDays { get; set; } = 10;
+
+        [SettingPropertyBool("Watch Bounty Ai Lords", HintText = "the bounty is public: a lord who breaks a posted band is paid too (never an enemy of the town; the garrison, militia, patrols and caravans are not paid - it is their job). Off = only you are paid; a band broken by a lord just comes down", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyAiLords { get; set; } = true;
+
+        [SettingPropertyBool("Watch Bounty Lord Top Up", HintText = "when the town's coffers cannot cover a bounty, the town's lord pays the rest from his own purse above the coin he keeps for wages (never you, if the town is yours); with this a hard-pressed town can still post bounties its lord can pay. Off = only the town's coin", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyLordTopUp { get; set; } = true;
+
+        [SettingPropertyBool("Headman Bounties", HintText = "when a band has plundered one of the town's villages in the last 30 days and the village headman has no other work to offer, his notice is pinned on the town's board: the same pay as the watch's (the wages of the town's guardsmen), paid from the village purse above what the village keeps for hard times (a notice at most a quarter of that), at once to whoever breaks the band; you also gain +2 with the headman. You speak with him in the village (the notice marks it on your map). Needs the notice board with its villages on. Off = no headmen's notices", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool HeadmanBounties { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11154,6 +11190,15 @@ namespace Armoury
             s.SutlerRevelMorale = SutlerRevelMorale;
             s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
+            s.NoticeBoard = NoticeBoard;
+            s.NoticeBoardVillages = NoticeBoardVillages;
+            s.NoticeBoardOpening = NoticeBoardOpening;
+            s.WatchBounties = WatchBounties;
+            s.WatchBountiesPerTown = WatchBountiesPerTown;
+            s.WatchBountyDays = WatchBountyDays;
+            s.WatchBountyAiLords = WatchBountyAiLords;
+            s.WatchBountyLordTopUp = WatchBountyLordTopUp;
+            s.HeadmanBounties = HeadmanBounties;
         }
 
         internal static void Apply()

@@ -1019,6 +1019,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
+--grupa m102tablica : (21.10, w-toku/m102-tablica; Armoury/src/NoticeBoard*.cs, klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties i nast.)
+                    python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
+                    T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
+                    L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
@@ -37562,6 +37566,183 @@ def m100kryjowki_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m102tablica (21.10, w-toku/m102-tablica: tablica ogloszen w miescie - zadania gry, rozmowa z tablicy,
+# "Your tasks", listy gonczne kapitana strazy z kasy miasta; Armoury/src/NoticeBoard*.cs; klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties ...)
+M102_TB = "Tablica ogloszen (m102): "
+M102_LG = "Listy goncze (m102): "
+M102_TB_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), otwarcia (\d+), wpisow sr\. ([0-9.]+) .*?nagroda nieczytelna (\d+), tekst z tokenami (\d+) \(z (\d+) tekstow\), koszt otwarcia sr\. ([0-9.]+) ms"
+                         r".*?\| proba: (.*?) \| potkniecia (\d+)")
+M102_PROBE = re.compile(r"nagroda czytelna (\d+)/(\d+)")
+M102_LG_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), band poza osadami (\d+), miasta z banda (\d+)/(\d+), z listem (\d+), bez nowego listu: .*?, inne (\d+); czynne (\d+) .*?"
+                         r"; wyplacone (\d+) za (\d+) zl \(gracz (\d+)/(\d+) zl, lordowie (\d+)/(\d+) zl; z kas miast (\d+), od panow (\d+)(?:, z kies wsi \d+)?\), niedoplata (\d+), z niczego (\d+)"
+                         r".*?kasa ponizej Keep po wyplacie (\d+)[^;]*; zapis arm_board (\d+) B; .*?koszt ([0-9.]+) ms; potkniecia (\d+)")
+M102_PAY = re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:pan|wies) (\d+), niedoplata (\d+), dla (gracz|lord \S+); kasa przed (-?\d+) po (-?\d+) \(Keep (-?\d+)\)"
+                      r"(?:; odbiorca (-?\d+), platnicy (-?\d+), z niczego (-?\d+))?")   # poprawka po recenzji: zmierzone zloto odbiorcy i platnikow
+M102_CARRY = re.compile(r"; czynne (\d+) \(nowe (\d+)")
+M102_DROPS = re.compile(r"; zdjete (\d+) \(")
+M102_POST = re.compile(r"list - (\S+) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik (kasa|pan \S+), wolna kasa (-?\d+)")
+M102_POSTH = re.compile(r"list soltysa - (\S+) \((\S+)\) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik wies, wolna kiesa (-?\d+)")
+M102_KASY = re.compile(r"Kasy miast \(169c\): dzien (\d+) \| miast \d+: kasy (\d+)")
+M102_FOLK = re.compile(r"lud za towar \(E5/B1\) \+(\d+)")
+M102_GIVE = re.compile(r"przelewy gry \(GiveGoldAction\) [+-]?\d+ \[P\] \(([^)]*)\)")
+
+
+def m102tablica_main(logp):
+    """m102tablica (21.10, w-toku/m102-tablica; Jeff 20.10 "tablice ogloszen jak w grach RPG z misjami ... kapitana strazy"; projekt PROJEKT-TABLICA-OGLOSZEN-2026-10-21 pkt 6.7):
+    T-1 linia "wpieta" (menu town 1/1, podmenu 2/2), T-2 linia doby tablicy w kazdej dobie okna (bez pierwszej i ostatniej), T-3 ERROR NoticeBoard i potkniecia 0,
+    T-4 nagroda nieczytelna 0 (doba i proba), T-5 tekst z tokenami <= 2% tekstow, T-6 koszt otwarcia sr. <= 5 ms, T-7 proba (INFO);
+    L-1 linia "wpiete" (zdarzenia 3/3, dialog 7/7), L-2 linia doby listow w kazdej dobie, L-3 kazda wyplata: obiecane = kasa + pan + niedoplata, kasa przed - po = kasa, platnicy = kasa + pan/wies, odbiorca = platnicy (pomiar), z niczego 0,
+    L-4 kasa po wyplacie >= Keep (i licznik doby 0), L-5 "inne" 0 od d2, L-6 od d7 co najmniej 1 list czynny przy bandach (bez band INFO), L-7 wyplaty lordom w oknie
+    <= 1% wplywow kas miast (linia "Przeplywy osad (kasy miast)": lud za towar + przelewy gry do kas; bez niej INFO), L-8 zapis arm_board <= 16 KB, L-9 koszt doby listow <= 3 ms, L-10 wyplata tylko za bande
+    z listem wywieszonym w logu (bez listu w logu najwyzej tyle, ile listow wczytano z zapisu na poczatku sesji) i tylko dla gracza albo lorda. Log bez paczki: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("T-1: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    wired, wiredw, tdays, ldays, pays, posts, kasy, n_err = [], [], [], [], [], [], [], 0
+    hposts, inflows = [], []
+    carried, need_carry = 0, True   # L-10: listy wczytane z zapisu (czynne - nowe + wyplacone + zdjete pierwszej doby kazdej sesji)
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in NoticeBoard"):
+                n_err += 1
+                continue
+            if s.startswith("Przeplywy osad (kasy miast): dzien"):
+                inflow = 0
+                mf = M102_FOLK.search(s)
+                if mf:
+                    inflow += int(mf.group(1))
+                mg = M102_GIVE.search(s)
+                if mg:
+                    inflow += sum(int(x) for x in re.findall(r"\+(\d+)/", mg.group(1)))
+                inflows.append(inflow)
+                continue
+            if s.startswith("Kasy miast (169c)"):
+                mk = M102_KASY.match(s)
+                if mk:
+                    kasy.append(int(mk.group(2)))
+                continue
+            if s.startswith(M102_TB):
+                body = s[len(M102_TB):]
+                if body.startswith("wpieta"):
+                    wired.append(body)
+                    continue
+                md = M102_TB_DAY.match(body)
+                if md:
+                    tdays.append(md)
+                continue
+            if s.startswith(M102_LG):
+                body = s[len(M102_LG):]
+                if body.startswith("wpiete"):
+                    wiredw.append(body)
+                    need_carry = True
+                    continue
+                md = M102_LG_DAY.match(body)
+                if md:
+                    ldays.append(md)
+                    if need_carry:
+                        need_carry = False
+                        mc = M102_CARRY.search(body); mz = M102_DROPS.search(body)
+                        if mc:
+                            carried += max(0, int(mc.group(1)) - int(mc.group(2)) + int(md.group(9)) + (int(mz.group(1)) if mz else 0))
+                    continue
+                mp = M102_PAY.match(body)
+                if mp:
+                    pays.append(mp)
+                    continue
+                mo = M102_POST.match(body)
+                if mo:
+                    posts.append(mo)
+                    continue
+                mh = M102_POSTH.match(body)
+                if mh:
+                    hposts.append(mh)
+    print(f"plik: {logp} | wpiec {len(wired)}/{len(wiredw)}, dob tablicy {len(tdays)}, dob listow {len(ldays)}, list {len(posts)}, wyplat {len(pays)}, ERROR {n_err}")
+    if not wired and not tdays:
+        rep.add("T-1: linia 'Tablica ogloszen (m102): wpieta'", "brak w logu", "INFO (log sprzed paczki m102-tablica albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = wired[-1] if wired else ""
+    ok1 = "menu town 1/1" in last and "podmenu 2/2" in last
+    rep.add("T-1: linia 'wpieta' (menu town 1/1, podmenu 2/2)", (last[:160] + "...") if last else "brak", "menu town 1/1, podmenu 2/2", ok1 if last else False)
+    days = sorted(int(d.group(1)) for d in tdays)
+    gaps = [d for a, b in zip(days, days[1:]) for d in range(a + 1, b)] if days else []
+    rep.add("T-2: linia doby tablicy w kazdej dobie", f"dob {len(days)} ({days[0] if days else '-'}..{days[-1] if days else '-'}), brakow {len(gaps)}", "0 brakow", (len(gaps) == 0) if len(days) > 2 else None)
+    stumb = max([int(d.group(10)) for d in tdays] + [0])
+    rep.add("T-3: ERROR NoticeBoard i potkniecia", f"ERROR {n_err}, potkniecia (max doby) {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    bad = sum(int(d.group(5)) for d in tdays)
+    pr = [M102_PROBE.search(d.group(9)) for d in tdays]
+    pr = [(int(x.group(1)), int(x.group(2))) for x in pr if x]
+    pbad = sum(b - a for a, b in pr)
+    rep.add("T-4: nagroda nieczytelna", f"doby {bad}, proba {pbad} (prob {len(pr)})", "0", (bad == 0 and pbad == 0) if (tdays or pr) else None)
+    tok = sum(int(d.group(6)) for d in tdays); txt = sum(int(d.group(7)) for d in tdays)
+    rep.add("T-5: tekst z tokenami", f"{tok} z {txt} tekstow ({(100.0 * tok / txt if txt else 0):.1f}%)", "<= 2%", (tok <= 0.02 * txt) if txt else None)
+    opened = [(int(d.group(3)), float(d.group(8))) for d in tdays if int(d.group(3)) > 0]
+    worst = max([c for _, c in opened] + [0.0])
+    rep.add("T-6: koszt otwarcia tablicy sr.", f"dob z otwarciem {len(opened)}, najgorsza srednia {worst:.2f} ms", "<= 5 ms", (worst <= 5.0) if opened else None)
+    rep.add("T-7: proba tablic (INFO)", (pr and f"prob {len(pr)}, ostatnia: {tdays[[i for i, d in enumerate(tdays) if M102_PROBE.search(d.group(9))][-1]].group(9)[:220]}") or "brak proby (doba % 30 == 5)", "INFO", None)
+    # listy gonczne
+    lw = wiredw[-1] if wiredw else ""
+    rep.add("L-1: linia 'Listy goncze (m102): wpiete'", (lw[:150] + "...") if lw else "brak", "zdarzenia 3/3, dialog kapitana 7/7", ("zdarzenia 3/3" in lw and "dialog kapitana 7/7" in lw) if lw else False)
+    ld = sorted(int(d.group(1)) for d in ldays)
+    lg = [d for a, b in zip(ld, ld[1:]) for d in range(a + 1, b)] if ld else []
+    rep.add("L-2: linia doby listow w kazdej dobie", f"dob {len(ld)}, brakow {len(lg)}", "0 brakow", (len(lg) == 0) if len(ld) > 2 else None)
+    def m102_pay_bad(p):
+        if int(p.group(3)) != int(p.group(4)) + int(p.group(5)) + int(p.group(6)):
+            return "obiecane != kasa + pan + niedoplata"
+        if int(p.group(8)) - int(p.group(9)) != int(p.group(4)):
+            return "kasa przed - po != kasa"
+        if p.group(11) is not None:
+            if int(p.group(12)) != int(p.group(4)) + int(p.group(5)):
+                return "platnicy != kasa + pan/wies"
+            if int(p.group(11)) != int(p.group(12)):
+                return "odbiorca != platnicy"
+        return None
+    badp = [(p, m102_pay_bad(p)) for p in pays]
+    badp = [(p, w) for p, w in badp if w]
+    meas = sum(1 for p in pays if p.group(11) is not None)
+    nothing = sum(int(d.group(18)) for d in ldays)
+    rep.add("L-3: wyplata = pobrane (kasa przed - po, platnicy, odbiorca), z niczego 0", f"zlych wyplat {len(badp)} z {len(pays)} (z pomiarem {meas}), z niczego {nothing}"
+            + (f" (np. {badp[0][1]}: {badp[0][0].group(0)[:140]})" if badp else ""),
+            "0 i 0", (len(badp) == 0 and nothing == 0) if (pays or ldays) else None)
+    below = [p for p in pays if int(p.group(4)) > 0 and int(p.group(9)) < int(p.group(10))]
+    belowd = sum(int(d.group(19)) for d in ldays)
+    rep.add("L-4: kasa po wyplacie >= Keep", f"ponizej {len(below)} z {len(pays)}, licznik dob {belowd}", "0 i 0", (len(below) == 0 and belowd == 0) if (pays or ldays) else None)
+    other = [(int(d.group(1)), int(d.group(7))) for d in ldays[1:] if int(d.group(7)) > 0]
+    rep.add("L-5: 'inne' (bez listu bez powodu) od d2", f"dob z inne > 0: {len(other)}" + (f" (np. dzien {other[0][0]}: {other[0][1]})" if other else ""), "0", (len(other) == 0) if len(ldays) > 1 else None)
+    late = [d for d in ldays[6:] if d.group(2) == "TAK" and int(d.group(3)) > 0]
+    empty = [d for d in late if int(d.group(8)) == 0]
+    rep.add("L-6: od d7 co najmniej 1 list czynny (przy bandach)", f"dob od d7 z bandami {len(late)}, bez listu {len(empty)}", ">= 1 w kazdej", (len(empty) == 0) if late else None)
+    lords = sum(int(d.group(14)) for d in ldays)
+    infl = sum(inflows)
+    avg = (sum(kasy) / len(kasy)) if kasy else 0
+    rep.add("L-7: wyplaty lordom w oknie <= 1% wplywow kas miast", f"lordom {lords} zl, wplywy kas miast w oknie {infl} zl ({(100.0 * lords / infl if infl else 0):.3f}%; lud za towar + przelewy gry do kas,"
+            f" linii {len(inflows)}; srednia kas {avg:.0f})", "<= 1% (inaczej domyslne WatchBountyAiLords = false)", (lords <= 0.01 * infl) if infl else None)
+    big = max([int(d.group(20)) for d in ldays] + [0])
+    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
+    cost = max([float(d.group(21)) for d in ldays] + [0.0])
+    rep.add("L-9: koszt doby listow", f"najwyzej {cost:.2f} ms", "<= 3 ms", (cost <= 3.0) if ldays else None)
+    posted = {(p.group(1), p.group(2)) for p in posts} | {(p.group(2), p.group(3)) for p in hposts}
+    hbad = [p for p in hposts if int(p.group(8)) * 4 > int(p.group(9))]
+    tbad = [p for p in posts if p.group(8) == "kasa" and int(p.group(7)) * 4 > int(p.group(9))]
+    rep.add("L-12: list z kasy miasta <= 1/4 wolnej kasy", f"ponad 1/4 {len(tbad)} z {sum(1 for p in posts if p.group(8) == 'kasa')}", "0", (len(tbad) == 0) if posts else None)
+    rep.add("L-11: list soltysa <= 1/4 wolnej kiesy wsi", f"ponad 1/4 {len(hbad)} z {len(hposts)}", "0", (len(hbad) == 0) if hposts else None)
+    orphan = [p for p in pays if (p.group(1), p.group(2)) not in posted]
+    who_bad = [p for p in pays if not (p.group(7) == "gracz" or p.group(7).startswith("lord "))]
+    rep.add("L-10: wyplata tylko za bande z listem, tylko gracz albo lord", f"bez listu w logu {len(orphan)} z {len(pays)} (listow z zapisu {carried}), zly odbiorca {len(who_bad)}",
+            "bez listu <= listow z zapisu, zly odbiorca 0", (len(who_bad) == 0 and len(orphan) <= carried) if pays else None)
+    lstumb = max([int(d.group(22)) for d in ldays] + [0])
+    rep.add("L-K: potkniecia listow", f"max doby {lstumb}", "0", lstumb == 0 if ldays else None)
+    tot = sum(int(d.group(10)) for d in ldays); pl = sum(int(d.group(12)) for d in ldays)
+    rep.add("L-INFO: listy i wyplaty", f"wywieszone {len(posts)}, wyplat {len(pays)} za {tot} zl (gracz {pl} zl, lordowie {lords} zl), ostatnia doba: "
+            + (ldays[-1].group(0)[:200] if ldays else "-"), "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m99markietani (21.10, w-toku/m99-markietani: rzad markietanow w menu obozu gracza - cyrulicy, zabawa,
 # sklep z polki miasta z narzutem, tylko duzy oboz; Armoury/src/CampSutlers.cs; klucz CampSutlersRow)
 M99M_TAG = "Markietani obozu (m99): "
@@ -54725,6 +54906,8 @@ def main(argv):
         return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
     if group == "m100kryjowki" and logp:
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
+    if group == "m102tablica" and logp:
+        return m102tablica_main(logp)   # m102tablica (21.10, w-toku/m102-tablica): tablica ogloszen - zadania gry, rozmowa z tablicy, listy gonczne kapitana strazy (NoticeBoard)
     if group == "m99markietani" and logp:
         return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
     if group == "m97posilki" and logp:

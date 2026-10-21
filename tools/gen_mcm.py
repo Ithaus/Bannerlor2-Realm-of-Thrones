@@ -34,6 +34,9 @@ RANGES = {
     'CampWalkMaxMen': (0, 100, "0"),
     'CampWalkMenPerTent': (2, 20, "0"),
     # m99-markietani: rzad markietanow - kod przycina (CampSutlers.MinMen / PerStall / MaxStalls / Markup / StockPer / CashPer / SurgeonPer / SurgeonFee / RevelPer / RevelMorale)
+    # m102-tablica: listy gonczne - kod przycina do 0..5 na miasto i 1..60 dni (NoticeBoard.PerTown / DaysUp)
+    'WatchBountiesPerTown': (0, 5, "0"),
+    'WatchBountyDays': (1, 60, "0"),
     'SutlerRowMinMen': (1, 5000, "0"),
     'SutlerRowMenPerStall': (10, 1000, "0"),
     'SutlerRowMaxStalls': (1, 50, "0"),

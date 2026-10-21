@@ -833,6 +833,14 @@ namespace Armoury
             return name;
         }
 
+        /// <summary>m102-tablica (listy gonczne kapitana strazy): nazwa bandy jak w plotkach ("Jon Rivers and his bandits"); klucze plotek z imionami wylaczone albo blad - null
+        /// (tablica bierze nazwe gry). Wolane raz przy wywieszeniu listu (nazwa zostaje w liscie).</summary>
+        internal static string BandName(MobileParty p)
+        {
+            try { return p != null && NamesOn ? BandWho(p) : null; }
+            catch (Exception e) { Stumble("BandName", e); return null; }
+        }
+
         /// <summary>"Jon Rivers and his bandits" / "Alys Snow and her outlaws" - rodzaj ludzi staly dla bandy (z id).</summary>
         private static string BandWho(MobileParty p)
         {

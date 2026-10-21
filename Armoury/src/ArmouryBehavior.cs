@@ -779,6 +779,9 @@ namespace Armoury
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
+        // m102-tablica: tablica ogloszen - flagi z tablicy, listy gonczne kapitanow i soltysow od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak m96-dlugi)
+        private readonly bool _m102TablicaReset = M102TablicaReset();
+        private static bool M102TablicaReset() { try { NoticeBoard.Reset(); } catch (Exception e) { Log.Error("M102TablicaReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1391,6 +1394,10 @@ namespace Armoury
             // (stary zapis, kampania Jeffa z WGRANIA 94/95) = rady bez dlugow; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> M96DlugiReset)
             try { string td = dataStore.IsSaving ? TownDebt.Export() : null; if (!dataStore.IsSaving || td != null) SaveText.Sync(dataStore, "arm_towndebt", ref td); if (dataStore.IsLoading) TownDebt.Import(td); }
             catch (Exception e) { Log.Error("SyncData.arm_towndebt", e); }
+            // m102-tablica: tablica ogloszen ("nb1|F=flagi|W=listy gonczne|H=szkody band"); pisany tylko z danymi; wlasny try; brak klucza (stary zapis) = bez flag i listow; starsza DLL
+            // klucz pomija. Reset przed SyncData (konstruktor -> M102TablicaReset)
+            try { string nb = dataStore.IsSaving ? NoticeBoard.Export() : null; if (!dataStore.IsSaving || nb != null) SaveText.Sync(dataStore, "arm_board", ref nb); if (dataStore.IsLoading) NoticeBoard.Import(nb); }
+            catch (Exception e) { Log.Error("SyncData.arm_board", e); }
         }
 
         public override void RegisterEvents()
@@ -1459,6 +1466,13 @@ namespace Armoury
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, Rumours.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, Rumours.OnMapEventEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, SideVillageVisit.OnMapEventEnded);   // m97-wioski krok 2: wynik bitwy z obroncami wioski pobocznej (sam zapis zwyciezcy; tylko przy bitwie w toku)
+            CampaignEvents.ConversationEnded.AddNonSerializedListener(this, NoticeBoard.OnConversationEnded);   // m102-tablica E3: osoba z tablicy (licznik "z tablicy do zadania"), kapitan strazy (E2) - flaga rozmowy zdjeta
+            CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, NoticeBoard.OnSettlementLeft);   // m102-tablica E3: wyjazd gracza z miasta - osoba z tablicy zapomniana
+            // m102-tablica E2: listy gonczne - wyplata za rozbita bande i szkody band (karawany, wozy) w MapEventEnded (przed zniszczeniem partii), zlupione wsie, banda znikla
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("NoticeBoard.OnMapEventEnded", NoticeBoard.OnMapEventEnded));
+            CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, NoticeBoard.OnRaidCompleted);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("NoticeBoard.OnPartyDestroyed", NoticeBoard.OnPartyDestroyed));
+            NoticeBoard.NoteEventsWired(3);
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
             Ravens.RegisterEvents(this);   // p5-kruki (R3-05c): latka czatu w starcie sesji, doreczenie krukow co godzine, linia doby
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
@@ -1504,6 +1518,7 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, ShortLabels.Audit);
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.AddMenus(s); } catch (Exception e) { Log.Error("NoticeBoard.AddMenus", e); } });   // m102-tablica: "Read the notice board" w menu miasta - po wszystkich OnSessionLaunched (opcje gry "town" juz stoja; miejsce za karczma)
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
             // m96-wzory: rozdanie wzorow tieru 1, sanacja, naprawa zapisu i ksiega PO OnSessionLaunched wszystkich modow (ROT-RBM przepisuje luki po nas); nowa kampania - ksiegi od zera
@@ -2660,6 +2675,8 @@ namespace Armoury
             // ludu (potrzeba klas na dzis) i PRZED pozyczkami f8 (ClanBudget - wspolny pulap dzienny kies) i CrownIncome.Begin (czesc korony w wplywie dnia); pozycja MFolk ksiegi
             try { TownDebt.Daily(); } catch (Exception e) { Log.Error("TownDebt.Daily", e); } DayProfile.Lap("TownDebt.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
+            // m102-tablica: tablica ogloszen - flagi, listy gonczne kapitanow (wywieszenie z wolnej kasy miasta - sam zapis; wyplata dopiero przy rozbiciu bandy), linia doby
+            try { NoticeBoard.Daily(); } catch (Exception e) { Log.Error("NoticeBoard.Daily", e); } DayProfile.Lap("NoticeBoard.Daily");
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow
             try { MoneyLedger.Probe169("WarFront.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)

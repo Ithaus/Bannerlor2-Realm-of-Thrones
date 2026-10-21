@@ -357,6 +357,30 @@ namespace Armoury
             finally { _raw = was; }
         }
 
+        /// <summary>m102-tablica: kwota sprawy tak, jak widzi ja gracz w rozmowie (getter RewardGold z postfiksem RewardShown - po skali, gdy klucz QuestRewardInWageDays;
+        /// _raw zostaje false). Brak gettera (EnsureHooks nie przeszedl) - -1 (tablica pisze "?" i liczy "nagroda nieczytelna").</summary>
+        internal static int ShownReward(IssueBase issue)
+        {
+            if (issue == null || _rawReward == null) return -1;
+            try { return _rawReward(issue); }
+            catch (Exception e) { Stumble("ShownReward", e); return -1; }
+        }
+
+        /// <summary>m102-tablica ("Your tasks"): kwota obiecana zadania w toku - zamrozona przy przyjeciu (najwyzej kwota gry), bez wpisu - kwota gry.</summary>
+        internal static int PromisedReward(QuestBase quest)
+        {
+            if (quest == null) return 0;
+            int game = quest.RewardGold;
+            try
+            {
+                if (!On(s => s.QuestRewardInWageDays)) return game;
+                var p = Frozen(IssueOf(quest), quest);
+                if (p != null && game > 0 && p.Cap > 0 && p.Cap < game) return p.Cap;
+            }
+            catch (Exception e) { Stumble("PromisedReward", e); }
+            return game;
+        }
+
         private static int CapOf(Kind kind, int game, int labor)
         {
             if (kind != null && kind.NoScale) return int.MaxValue;
