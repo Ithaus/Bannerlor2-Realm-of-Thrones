@@ -173,6 +173,7 @@ namespace Armoury
                 try { TownFolk.ApplySkup(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplySkup", e); }   // GL-B / 11c: robocizna od skupu plonu wsi (zaplata kasy taborom wsi; klucz FolkEarnFromVillageBuys czytany na zywo)
                 AmmoRecovery.ApplyAll(_harmony);
                 try { ReinforcementThanks.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ReinforcementThanks.ApplyAll", e); }   // n20-relacje: odsiecz DR - jedno okienko relacji zamiast okienka na lorda (transpiler RewardHelpers)
+                DrMarchArrival.ApplyAll(_harmony);   // m97-posilki: tylko zapamietuje Harmony - latki na DR (Evaluate, ComputeArrivalTime) w kampanii (ArmouryBehavior.OnSessionLaunched)
                 RecruitCost.ApplyAll(_harmony);
                 try { RecruitSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RecruitSources.ApplyAll", e); }   // 171: echo werbunku ROT, jency, autowerbunek zalog
                 try { GarrisonArmory.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll", e); }   // 171: sprzet idzie z ludzmi miedzy partia a zaloga i przy rozwiazaniu partii

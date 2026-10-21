@@ -1016,6 +1016,10 @@ Uzycie (Python 3, tylko odczyt):
                     handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 doplyw nie doklada ponad
                     pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
+--grupa m97posilki : (20.10, w-toku/m97-posilki - Jeff "wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; Armoury/src/DrMarchArrival.cs; klucz DrArrivalByMarch)
+                    python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
+                    P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
+                    Log bez paczki albo bez bitew z DR: INFO.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -37280,6 +37284,107 @@ def m97surowce_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m97posilki (20.10, w-toku/m97-posilki: posilki Dynamic Reinforcements marszem - czas w bitwie
+# z godzin marszu, dalecy odmawiaja "za daleko"; Armoury/src/DrMarchArrival.cs; klucze DrArrivalByMarch, DrMaxMarchHours, DrSecondsPerMarchHour, DrDeploySeconds)
+M97P_TAG = "Posilki marszem (m97-posilki): "
+M97P_START = re.compile(r"start - klucz DrArrivalByMarch (TAK|NIE), latki wpiete (\d)/2 .*maks\. ([0-9.]+) h marszu, ([0-9.]+) s bitwy na godzine marszu, rozwiniecie ([0-9.]+) s")
+M97P_STUMB = re.compile(r"potkniecia (\d+)")
+M97P_BATTLE = re.compile(r"bitwa (\d+) \| kandydatow (\d+), za daleko (\d+) \(ponad ([0-9.]+) h marszu[^)]*\), przyjetych (\d+), blisko a odmowa DR (\d+), bez pomiaru (\d+) "
+                         r"\| czas = ([0-9.]+) s \+ h x ([0-9.]+) s \| najblizsi za daleko: (.*?) \| sesja:")
+M97P_FAR = re.compile(r"([0-9.]+) jedn\. / ([0-9.]+) jedn\./h = ([0-9.]+) h")
+M97P_ACC = re.compile(r"przyjety (.*) \| odleglosc ([0-9.]+) jedn\., predkosc ([0-9.]+) jedn\./h \(([^)]*)\), marsz ([0-9.]+) h -> czas z marszu ([0-9.]+) s, w bitwie t\+([0-9.]+) s")
+M97P_ACC_NOM = re.compile(r"przyjety (.*) \| bez pomiaru \(czas DR\), w bitwie t\+([0-9.]+) s")
+
+
+def m97posilki_main(logp):
+    """m97posilki (20.10, w-toku/m97-posilki; Jeff: "wojsko za szybko pojawia sie i powinno pojawiac sie tylko, jesli jest naprawde blisko, i im jest dalej,
+    tym dluzej sie na nie czeka"): Dynamic Reinforcements - czas w bitwie = rozwiniecie + godziny marszu x sekundy na godzine, ponad DrMaxMarchHours odmowa.
+    P97-0 linia startu (klucz TAK, latki 2/2; brak DR = INFO), P97-1 potkniecia i ERROR DrMarchArrival 0, P97-2 zaden przyjety oddzial ponad maks. godzin marszu,
+    P97-3 czas rosnie z godzinami marszu (czas z marszu = rozwiniecie + h x sekundy; w bitwie nie wczesniej niz czas z marszu - odstep grup i armia DR tylko
+    opozniaja; w jednej bitwie dalszy marsz nie daje krotszego czasu), P97-4 odrzuceni "za daleko" ponad maks. godzin, P97-5 bitwy, przyjeci, dalecy (INFO),
+    P97-6 przyjeci bez pomiaru (czas DR po staremu) 0. Log bez paczki albo bez bitew z DR: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("P97-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, battles, acc, nom, far_ex, n_err, stumb = [], [], [], 0, [], 0, 0
+    cur = None   # (maks h, rozwiniecie, s/h, numer bitwy) z ostatniej linii bitwy - linie "przyjety" ida zaraz po niej
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in DrMarchArrival"):
+                n_err += 1
+                continue
+            if not s.startswith(M97P_TAG):
+                continue
+            body = s[len(M97P_TAG):]
+            for mm in M97P_STUMB.findall(body):
+                stumb = max(stumb, int(mm))
+            if body.startswith("start - "):
+                starts.append(body)
+                continue
+            mb = M97P_BATTLE.match(body)
+            if mb:
+                cur = (float(mb.group(4)), float(mb.group(8)), float(mb.group(9)), len(battles))
+                battles.append(mb)
+                for fm in M97P_FAR.finditer(mb.group(10)):
+                    far_ex.append((float(fm.group(3)), cur[0]))
+                continue
+            ma = M97P_ACC.match(body)
+            if ma and cur:
+                acc.append((cur, ma.group(1), float(ma.group(2)), float(ma.group(3)), ma.group(4), float(ma.group(5)), float(ma.group(6)), float(ma.group(7))))
+                continue
+            if M97P_ACC_NOM.match(body):
+                nom += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, bitew {len(battles)}, przyjetych z pomiarem {len(acc)}, bez pomiaru {nom}, ERROR {n_err}")
+    if not starts and not battles:
+        rep.add("P97-0: linia 'Posilki marszem (m97-posilki): start'", "brak w logu", "INFO (log sprzed paczki m97-posilki albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    ms = M97P_START.search(last)
+    if "brak modu DynamicReinforcements" in last:
+        rep.add("P97-0: linia startu", last[:140], "INFO (bez modu DR - nic do zmiany)", None)
+    elif ms:
+        on = ms.group(1) == "TAK"
+        rep.add("P97-0: linia startu (klucz, latki)", f"klucz {ms.group(1)}, latki {ms.group(2)}/2, maks. {ms.group(3)} h, {ms.group(4)} s/h, rozwiniecie {ms.group(5)} s",
+                "klucz TAK, latki 2/2", (ms.group(2) == "2") if on else None)
+    else:
+        rep.add("P97-0: linia startu", (last[:160] + "...") if last else "brak", "klucz TAK, latki 2/2", False)
+    rep.add("P97-1: potkniecia i ERROR DrMarchArrival", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    over = [a for a in acc if a[5] > a[0][0] + 0.005]
+    rep.add("P97-2: przyjeci ponad maks. godzin marszu", f"{len(over)} z {len(acc)}" + (f" (np. {over[0][1][:40]} {over[0][5]:.2f} h > {over[0][0][0]:.2f})" if over else ""),
+            "0", len(over) == 0)
+    bad_f, bad_late, bad_ord = 0, 0, 0
+    by_b = {}
+    for a in acc:
+        (mx, dep, sph, bi), name, d, v, frm, h, t_m, t_b = a
+        if abs(t_m - (dep + h * sph)) > 0.6 + 0.005 * sph:   # zaokraglenia logu: h do 0.01, czas do 1 s
+            bad_f += 1
+        if t_b + 1.0 < t_m:
+            bad_late += 1
+        by_b.setdefault(bi, []).append((h, t_m))
+    for lst in by_b.values():
+        lst.sort()
+        for i in range(1, len(lst)):
+            if lst[i][1] + 1.0 < lst[i - 1][1]:
+                bad_ord += 1
+    rep.add("P97-3: czas rosnie z godzinami marszu", f"wzor zly {bad_f}, w bitwie wczesniej niz z marszu {bad_late}, dalszy wczesniej {bad_ord} (przyjetych {len(acc)})",
+            "0 / 0 / 0", (bad_f == 0 and bad_late == 0 and bad_ord == 0) if acc else None)
+    far_bad = [f for f in far_ex if f[0] < f[1] - 0.005]   # h w logu do 0.01 - 2.003 h pisze sie 2.00
+    rep.add("P97-4: odrzuceni 'za daleko' ponad maks. godzin", f"przykladow {len(far_ex)}, w granicy {len(far_bad)}", "0 w granicy", (len(far_bad) == 0) if far_ex else None)
+    n_far = sum(int(b.group(3)) for b in battles)
+    n_acc = sum(int(b.group(5)) for b in battles)
+    hs = sorted(a[5] for a in acc)
+    rng = f", godziny przyjetych {hs[0]:.2f}-{hs[-1]:.2f} h, czas w bitwie {min(a[7] for a in acc):.0f}-{max(a[7] for a in acc):.0f} s" if acc else ""
+    rep.add("P97-5: bitwy z DR, przyjeci, dalecy", f"bitew {len(battles)}, przyjetych {n_acc}, za daleko {n_far}{rng}", "INFO", None)
+    rep.add("P97-6: przyjeci bez pomiaru (czas DR po staremu)", str(nom), "0", nom == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96wzory (20.10, w-toku/m96-wzory: wzory kuzni po ostatecznych statystykach, naprawa zapisu, bramy wiedzy;
 # Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs; klucze LoreSeedAfterFinalStats, PatternDrawBySkill, ShieldCraftSkillGate, ForgeUniquesByStudy,
 # PatternTileShowsSkill, XbowPatternTierByPower, RareBowsNotForged, LegendTwinPiecesHidden)
@@ -53908,6 +54013,8 @@ def main(argv):
         return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
     if group == "m97surowce" and logp:
         return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
+    if group == "m97posilki" and logp:
+        return m97posilki_main(logp)   # m97posilki (20.10, w-toku/m97-posilki): posilki DR marszem - czas z godzin marszu, dalecy odmawiaja (DrMarchArrival)
     if group == "m96wzory" and logp:
         return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:
