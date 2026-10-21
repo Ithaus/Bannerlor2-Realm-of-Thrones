@@ -431,7 +431,7 @@ namespace Armoury
         }
 
         /// <summary>Najblizsze miasto; faction != null - tylko niebedace w wojnie z nia (wojna sprawdzana dopiero dla blizszego niz dotad najlepsze).</summary>
-        private static Settlement NearestTown(Vec2 p, IFaction faction)
+        internal static Settlement NearestTown(Vec2 p, IFaction faction)   // m99-markietani: takze rzad markietanow gracza (CampSutlers)
         {
             Settlement best = null; float bd = float.MaxValue;
             foreach (var t in Town.AllTowns)
@@ -447,7 +447,7 @@ namespace Armoury
         }
 
         /// <summary>Najblizsza wies w stanie Normal niebedaca w wojnie z partia.</summary>
-        private static Settlement NearestVillage(Vec2 p, IFaction faction)
+        internal static Settlement NearestVillage(Vec2 p, IFaction faction)   // m99-markietani: takze CampSutlers
         {
             Settlement best = null; float bd = float.MaxValue;
             foreach (var v in Village.All)

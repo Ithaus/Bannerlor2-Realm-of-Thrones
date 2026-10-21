@@ -3908,6 +3908,20 @@ namespace Armoury
         public bool CampWalkEnabled = true;                // "Walk through the camp" in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; in an army the camp is the whole army's; no fighting, campaign time stands still; hold Tab to go back - Esc does not leave the camp (off = no option)
         public int CampWalkMaxMen = 40;                    // at most this many of your soldiers are shown in the camp scene (for smooth play); the tents still follow your whole party
         public int CampWalkMenPerTent = 6;                 // men per soldiers' tent in the camp scene; fewer men than this sleep on bedrolls round the fire
+        // m99-markietani (CampSutlers.cs): rzad markietanow w menu obozu gracza - tylko duzy oboz (druzyna albo cala armia od SutlerRowMinMen ludzi); kramy 1 na
+        // SutlerRowMenPerStall ludzi; cyrulicy (ranni wracaja do sluzby za oplate), zabawa (morale raz na dobe), sklep z polki najblizszego niewrogiego miasta z narzutem;
+        // zaplata obiegiem markietanow (kasa miasta z hakiem 75/25, kiesa wsi). AI bez zmian (Sutlers.cs). Nowe klucze (MCM Jeffa ich nie ma - domyslne)
+        public bool CampSutlersRow = true;                 // "Visit the sutlers' row" in your camp menu - only in a big camp (your party or the whole army with at least Sutler Row Min Men): barber-surgeons tend your wounded for a fee, an ale tent with dice and a minstrel lifts your men's morale once a day, and the sutlers sell food, ale, wine, tools, arrows and bolts brought from the nearest friendly town's market at its prices plus their cut (and buy from you for less). What they sell leaves that town's market; what you pay goes to that town and a nearby village (off = no option)
+        public int SutlerRowMinMen = 150;                  // men in the camp (your party, or the army's leader and all attached parties) before sutlers follow it
+        public int SutlerRowMenPerStall = 100;             // one sutler's stall per this many men in the camp (150 men - 1 stall, 400 - 4, 1000 - 10)
+        public int SutlerRowMaxStalls = 12;                // at most this many stalls in one camp
+        public int SutlerRowMarkupPercent = 30;            // the sutlers' cut for cartage: they sell at the town's price plus this share and buy at the town's price less it
+        public int SutlerRowStockPerStall = 5;             // pieces of each kind of goods one stall brings from town each day
+        public int SutlerRowCashPerStall = 1500;           // denars one stall has in hand to buy goods from you (taken from the supplying town's purse)
+        public int SutlerSurgeonPerStall = 8;              // wounded soldiers the barber-surgeons of one stall can tend in a day (they return to duty at once)
+        public int SutlerSurgeonFee = 15;                  // fee per tended man, times (his tier + 1): a tier 1 recruit 30, a tier 3 soldier 60, a tier 5 veteran 90
+        public int SutlerRevelPerMan = 2;                  // denars a man for a round of ale, dice and a minstrel for your party (once a day)
+        public int SutlerRevelMorale = 6;                  // morale your party gains from the revel; it fades by itself over the following days
 
         public static void Load(string moduleDataDir)
         {

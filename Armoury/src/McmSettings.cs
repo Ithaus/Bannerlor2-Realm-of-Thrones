@@ -8828,6 +8828,50 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int CampWalkMenPerTent { get; set; } = 6;
 
+        [SettingPropertyBool("Camp Sutlers Row", HintText = "'Visit the sutlers' row' in your camp menu - only in a big camp (your party or the whole army with at least Sutler Row Min Men): barber-surgeons tend your wounded for a fee, an ale tent with dice and a minstrel lifts your men's morale once a day, and the sutlers sell food, ale, wine, tools, arrows and bolts brought from the nearest friendly town's market at its prices plus their cut (and buy from you for less). What they sell leaves that town's market; what you pay goes to that town and a nearby village (off = no option)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampSutlersRow { get; set; } = true;
+
+        [SettingPropertyInteger("Sutler Row Min Men", 1, 5000, "0", HintText = "men in the camp (your party, or the army's leader and all attached parties) before sutlers follow it", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMinMen { get; set; } = 150;
+
+        [SettingPropertyInteger("Sutler Row Men Per Stall", 10, 1000, "0", HintText = "one sutler's stall per this many men in the camp (150 men - 1 stall, 400 - 4, 1000 - 10)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMenPerStall { get; set; } = 100;
+
+        [SettingPropertyInteger("Sutler Row Max Stalls", 1, 50, "0", HintText = "at most this many stalls in one camp", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMaxStalls { get; set; } = 12;
+
+        [SettingPropertyInteger("Sutler Row Markup Percent", 0, 100, "0", HintText = "the sutlers' cut for cartage: they sell at the town's price plus this share and buy at the town's price less it", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowMarkupPercent { get; set; } = 30;
+
+        [SettingPropertyInteger("Sutler Row Stock Per Stall", 1, 100, "0", HintText = "pieces of each kind of goods one stall brings from town each day", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowStockPerStall { get; set; } = 5;
+
+        [SettingPropertyInteger("Sutler Row Cash Per Stall", 0, 100000, "0", HintText = "denars one stall has in hand to buy goods from you (taken from the supplying town's purse)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRowCashPerStall { get; set; } = 1500;
+
+        [SettingPropertyInteger("Sutler Surgeon Per Stall", 0, 100, "0", HintText = "wounded soldiers the barber-surgeons of one stall can tend in a day (they return to duty at once)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerSurgeonPerStall { get; set; } = 8;
+
+        [SettingPropertyInteger("Sutler Surgeon Fee", 0, 1000, "0", HintText = "fee per tended man, times (his tier + 1): a tier 1 recruit 30, a tier 3 soldier 60, a tier 5 veteran 90", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerSurgeonFee { get; set; } = 15;
+
+        [SettingPropertyInteger("Sutler Revel Per Man", 0, 50, "0", HintText = "denars a man for a round of ale, dice and a minstrel for your party (once a day)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRevelPerMan { get; set; } = 2;
+
+        [SettingPropertyInteger("Sutler Revel Morale", 0, 50, "0", HintText = "morale your party gains from the revel; it fades by itself over the following days", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRevelMorale { get; set; } = 6;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11034,6 +11078,17 @@ namespace Armoury
             s.CampWalkEnabled = CampWalkEnabled;
             s.CampWalkMaxMen = CampWalkMaxMen;
             s.CampWalkMenPerTent = CampWalkMenPerTent;
+            s.CampSutlersRow = CampSutlersRow;
+            s.SutlerRowMinMen = SutlerRowMinMen;
+            s.SutlerRowMenPerStall = SutlerRowMenPerStall;
+            s.SutlerRowMaxStalls = SutlerRowMaxStalls;
+            s.SutlerRowMarkupPercent = SutlerRowMarkupPercent;
+            s.SutlerRowStockPerStall = SutlerRowStockPerStall;
+            s.SutlerRowCashPerStall = SutlerRowCashPerStall;
+            s.SutlerSurgeonPerStall = SutlerSurgeonPerStall;
+            s.SutlerSurgeonFee = SutlerSurgeonFee;
+            s.SutlerRevelPerMan = SutlerRevelPerMan;
+            s.SutlerRevelMorale = SutlerRevelMorale;
         }
 
         internal static void Apply()

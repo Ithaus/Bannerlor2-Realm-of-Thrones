@@ -1016,6 +1016,9 @@ Uzycie (Python 3, tylko odczyt):
                     handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 doplyw nie doklada ponad
                     pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
+--grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
+                    python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
+                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO). Log bez paczki: INFO.
 --grupa m97posilki : (20.10, w-toku/m97-posilki - Jeff "wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; Armoury/src/DrMarchArrival.cs; klucz DrArrivalByMarch)
                     python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
                     P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
@@ -37410,6 +37413,84 @@ def m97surowce_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m99markietani (21.10, w-toku/m99-markietani: rzad markietanow w menu obozu gracza - cyrulicy, zabawa,
+# sklep z polki miasta z narzutem, tylko duzy oboz; Armoury/src/CampSutlers.cs; klucz CampSutlersRow)
+M99M_TAG = "Markietani obozu (m99): "
+M99M_CAMP = re.compile(r"\| oboz (\d+) ludzi \(prog (\d+)\), kramy (\d+)")
+M99M_CTL = re.compile(r"\| kontrola: (-?\d+) = (-?\d+)(?: \+ (-?\d+))? \(roznica (-?\d+)\)")
+M99M_SHOP = re.compile(r"kupione (\d+) sztuk \(cena markietanow (-?\d+), miasta (-?\d+)\), z polki miasta zdjete (\d+) \(brak na polce (\d+)\), sprzedane (\d+) sztuk \(skup (-?\d+)\) na polke miasta (\d+)"
+                       r" \| gracz netto (-?\d+) .*?= towar do kasy miasta (-?\d+) \+ narzut (-?\d+)")
+M99M_DAY = re.compile(r"dzien (\d+) \|.*\(roznica (-?\d+)\) \| potkniecia (\d+)")
+
+
+def m99markietani_main(logp):
+    """m99markietani (21.10, w-toku/m99-markietani; Jeff 20.10 "miasteczko obozowe z markietankami", decyzja 4 "uslugi, rozrywka i sklep - tylko w duzych obozach"):
+    MK-0 linia startu (klucz), MK-1 ERROR CampSutlers i potkniecia 0, MK-2 uslugi i sklep tylko w duzym obozie (oboz >= prog), MK-3 pieniadz w obiegu (kazda zaplata =
+    suma odbiorcow, roznica 0; sklep: gracz netto = towar do miasta + narzut; linia doby roznica 0), MK-4 towar: z polki miasta zdjete = kupione (brak na polce 0),
+    sprzedane = na polke miasta, MK-5 uzycie (INFO). Log bez paczki albo bez wizyt: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("MK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, uses, ctl, shops, days, n_err, stumb, opened = [], [], [], [], [], 0, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in CampSutlers"):
+                n_err += 1
+                continue
+            if not s.startswith(M99M_TAG):
+                continue
+            body = s[len(M99M_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            md = M99M_DAY.match(body)
+            if md:
+                days.append((int(md.group(1)), int(md.group(2))))
+                stumb = max(stumb, int(md.group(3)))
+                continue
+            kind = body.split(" |", 1)[0]
+            mc = M99M_CAMP.search(body)
+            if mc and kind in ("cyrulik", "zabawa", "sklep otwarty", "sklep zamkniety"):
+                uses.append((kind, int(mc.group(1)), int(mc.group(2)), int(mc.group(3))))
+            if kind == "sklep otwarty":
+                opened += 1
+            mk = M99M_CTL.search(body)
+            if mk and kind in ("cyrulik", "zabawa", "sklep zamkniety"):
+                a, b, c, r = int(mk.group(1)), int(mk.group(2)), int(mk.group(3) or 0), int(mk.group(4))
+                ctl.append((kind, a, b + c, r))
+            ms = M99M_SHOP.search(body)
+            if ms and kind == "sklep zamkniety":
+                shops.append(tuple(int(ms.group(i)) for i in range(1, 12)))
+    print(f"plik: {logp} | startow {len(starts)}, uzyc {len(uses)} (sklep otwarty {opened}, zamkniety {len(shops)}), linii doby {len(days)}, ERROR {n_err}")
+    if not starts and not uses:
+        rep.add("MK-0: linia 'Markietani obozu (m99): start sesji'", "brak w logu", "INFO (log sprzed paczki m99-markietani albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    on = "klucz Camp Sutlers Row TAK" in last
+    rep.add("MK-0: linia startu (klucz)", (last[:150] + "...") if last else "brak", "klucz Camp Sutlers Row TAK", on if last else False)
+    rep.add("MK-1: ERROR CampSutlers i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    small = [u for u in uses if u[1] < u[2] or u[3] < 1]
+    rep.add("MK-2: uslugi i sklep tylko w duzym obozie", f"ponizej progu {len(small)} z {len(uses)}" + (f" (np. {small[0][0]}: {small[0][1]} < {small[0][2]})" if small else ""),
+            "0", (len(small) == 0) if uses else None)
+    bad = [c for c in ctl if c[3] != 0 or c[1] != c[2]]
+    badd = [d for d in days if d[1] != 0]
+    rep.add("MK-3: pieniadz w obiegu (zaplata = odbiorcy)", f"zlych kontroli {len(bad)} z {len(ctl)}, dob z roznica {len(badd)} z {len(days)}"
+            + (f" (np. {bad[0][0]}: {bad[0][1]} != {bad[0][2]})" if bad else ""), "0 i 0", (len(bad) == 0 and len(badd) == 0) if (ctl or days) else None)
+    badg = [x for x in shops if x[3] + x[4] != x[0] or x[4] != 0 or x[5] != x[7] or x[8] != x[9] + x[10] or x[10] < 0]
+    rep.add("MK-4: towar z polki miasta = towar w sklepie", f"zlych zamkniec {len(badg)} z {len(shops)} (kupione = zdjete z polki, brak 0, sprzedane = na polke, netto = towar + narzut)",
+            "0", (len(badg) == 0) if shops else None)
+    tb = sum(x[0] for x in shops); ts = sum(x[5] for x in shops); net = sum(x[8] for x in shops); mk = sum(x[10] for x in shops)
+    nc = sum(1 for u in uses if u[0] == "cyrulik"); nz = sum(1 for u in uses if u[0] == "zabawa")
+    rep.add("MK-5: uzycie (INFO)", f"cyrulik {nc}, zabawa {nz}, sklep {len(shops)}: kupione {tb} sztuk, sprzedane {ts}, gracz netto {net}, narzut {mk}", "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m97posilki (20.10, w-toku/m97-posilki: posilki Dynamic Reinforcements marszem - czas w bitwie
 # z godzin marszu, dalecy odmawiaja "za daleko"; Armoury/src/DrMarchArrival.cs; klucze DrArrivalByMarch, DrMaxMarchHours, DrSecondsPerMarchHour, DrDeploySeconds)
 M97P_TAG = "Posilki marszem (m97-posilki): "
@@ -54480,6 +54561,8 @@ def main(argv):
         return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
     if group == "m97surowce" and logp:
         return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
+    if group == "m99markietani" and logp:
+        return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
     if group == "m97posilki" and logp:
         return m97posilki_main(logp)   # m97posilki (20.10, w-toku/m97-posilki): posilki DR marszem - czas z godzin marszu, dalecy odmawiaja (DrMarchArrival)
     if group == "m96wzory" and logp:

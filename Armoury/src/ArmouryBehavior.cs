@@ -816,6 +816,14 @@ namespace Armoury
                 if (dataStore.IsLoading) CampDrill.Import(campDrill);
             }
             catch (Exception e) { Log.Error("SyncData.arm_campdrill", e); }
+            // m99-markietani: stan dnia rzadu markietanow gracza "1|doba|zabawa|opatrzeni|id:n,..." - brak klucza = stary zapis (pusty dzien); osobny try
+            try
+            {
+                string sutlerRow = dataStore.IsSaving ? CampSutlers.Export() : null;
+                SaveText.Sync(dataStore, "arm_sutlerrow", ref sutlerRow);
+                if (dataStore.IsLoading) CampSutlers.Import(sutlerRow);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_sutlerrow", e); }
             // R3-05e: rok urodzaju (doba losowania, siatka i wezly pola pogody) - brak klucza = stary zapis (x1 do nastepnego okna zniw); osobny try
             try
             {
@@ -1543,6 +1551,7 @@ namespace Armoury
             TiredLand.RegisterEvents(this);      // R3-06d (p5-stada): reset nowej kampanii
             CampWalk.RegisterEvents(this);       // m97-oboz: "Walk through the camp" w menu obozu (scena obozu wedlug druzyny, tylko na zadanie gracza)
             CampDrill.RegisterEvents(this);      // m97-szkolenie: "Train the men" w menu obozu i menu cwiczen (marsz nie uczy)
+            CampSutlers.RegisterEvents(this);    // m99-markietani: "Visit the sutlers' row" w menu obozu (duzy oboz) - cyrulicy, zabawa, sklep z polki miasta; linia doby
             CampCart.RegisterEvents(this);       // m97-oboz: woz taborowy i siodla transportowe - reset nowej kampanii, menu miasta (stolarz i garbarz), linia doby, wozy w niewoli
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PackSources.OnDestroyed", PackSources.OnDestroyed));   // m6b: znacznik "RemoveParty po zdarzeniu zniszczenia" (konie przy RemoveParty, towar partii usunietych bez zniszczenia)

@@ -26,6 +26,17 @@ RANGES = {
     # m97-oboz: woz i siodlo transportowe - kod przycina do 100..2000 kg, 0..50 %, 0..300 kg (CampCart.CartLoad / SlowPct / SaddleKg)
     'CampWalkMaxMen': (0, 100, "0"),
     'CampWalkMenPerTent': (2, 20, "0"),
+    # m99-markietani: rzad markietanow - kod przycina (CampSutlers.MinMen / PerStall / MaxStalls / Markup / StockPer / CashPer / SurgeonPer / SurgeonFee / RevelPer / RevelMorale)
+    'SutlerRowMinMen': (1, 5000, "0"),
+    'SutlerRowMenPerStall': (10, 1000, "0"),
+    'SutlerRowMaxStalls': (1, 50, "0"),
+    'SutlerRowMarkupPercent': (0, 100, "0"),
+    'SutlerRowStockPerStall': (1, 100, "0"),
+    'SutlerRowCashPerStall': (0, 100000, "0"),
+    'SutlerSurgeonPerStall': (0, 100, "0"),
+    'SutlerSurgeonFee': (0, 1000, "0"),
+    'SutlerRevelPerMan': (0, 50, "0"),
+    'SutlerRevelMorale': (0, 50, "0"),
     'CartLoadKg': (100, 2000, "0"),
     'CartSpeedPenaltyPercent': (0, 50, "0"),
     'PackSaddleExtraKg': (0, 300, "0"),
