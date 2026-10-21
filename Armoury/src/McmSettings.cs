@@ -8984,6 +8984,26 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueKings { get; set; } = true;
 
+        [SettingPropertyBool("Narrator Enabled", HintText = "a narrator with the voice of David reads aloud the Realm of Thrones story windows and the gossip you hear in inns and taverns; the voice stops when you close the window. Off = no narrator at all, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool LektorEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Narrator Event Windows", HintText = "the narrator reads the Realm of Thrones story windows (the execution of Ned Stark, the Red Wedding and the rest) from recordings that come with the mod - no internet needed. A window without a recording stays silent. Off = silent story windows", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool LektorEventWindows { get; set; } = true;
+
+        [SettingPropertyBool("Narrator Gossip Live", HintText = "gossip the narrator has never read is recorded on the spot through ElevenLabs (needs the internet and your key in the file .elevenlabs/key.txt in your user folder) and kept on your disk; the same words are never sent again - next time they play from the disk at once. Off = only gossip already on your disk is read", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool LektorGossipLive { get; set; } = true;
+
+        [SettingPropertyInteger("Narrator Gossip Daily Chars", 0, 10000, "0", HintText = "most letters of new gossip sent to ElevenLabs in one day (by your computer's calendar); past it the narrator reads only gossip already on your disk until the next day, and tells you so once", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public int LektorGossipDailyChars { get; set; } = 1000;
+
+        [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public int LektorGossipReserveChars { get; set; } = 3000;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11229,6 +11249,11 @@ namespace Armoury
             s.ProloguePeace = ProloguePeace;
             s.ProloguePacts = ProloguePacts;
             s.PrologueKings = PrologueKings;
+            s.LektorEnabled = LektorEnabled;
+            s.LektorEventWindows = LektorEventWindows;
+            s.LektorGossipLive = LektorGossipLive;
+            s.LektorGossipDailyChars = LektorGossipDailyChars;
+            s.LektorGossipReserveChars = LektorGossipReserveChars;
         }
 
         internal static void Apply()
