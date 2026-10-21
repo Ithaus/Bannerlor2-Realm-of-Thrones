@@ -816,7 +816,7 @@ namespace Armoury
         /// <summary>m101-prolog: JEDNO MIEJSCE DO PODPIECIA prologu - liczba dni od startu kampanii do startu opowiesci ROT (egzekucja Neda, NedEvent); klasyczny
         /// start = 0. Galaz m101-prolog zwraca tu dlugosc prologu kampanii zaczetej z prologiem (musi byc znana w pierwszej dobie - wybor jest w tworzeniu postaci,
         /// po OnNewGameCreated). Od tego zaleza: StoryDay() (wyzwalacz rotday:N), IsProlog() (wiersze mode prolog i wyzwalacz prolday:N).</summary>
-        internal static double PrologDays() { return 0.0; }
+        internal static double PrologDays() { try { return Prologue.Active ? Prologue.PrologueDays : 0.0; } catch { return 0.0; } }   // n30: podpiete pod m101-prolog (Prologue.Active, 188 dni)
 
         internal static bool IsProlog() { return PrologDays() > 0.0; }
 

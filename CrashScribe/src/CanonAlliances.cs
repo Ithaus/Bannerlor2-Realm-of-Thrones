@@ -124,6 +124,7 @@ namespace CrashScribe
             why = null;
             if (a == null || b == null || a == b) return true;
             if (PlayerRules(a) || PlayerRules(b)) return true;
+            if (StoryClock.PrologueAlliance(a, b)) return true;   // m101-prolog: sojusz krola Roberta z prologu 298 (Armoury) - do smierci krola
             string x = a.StringId ?? "", y = b.StringId ?? "";
             if (!Westeros.Contains(x) && !Westeros.Contains(y)) return true;
             if (Is(x, y, North, River)) return true;

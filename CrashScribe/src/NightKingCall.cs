@@ -83,7 +83,7 @@ namespace CrashScribe
         /// <summary>Dzien od startu kampanii - ten sam zegar co kajdany ROT (ROT:1068-1088) i Fabula.DayNow.</summary>
         internal static double Day()
         {
-            try { return (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; }
+            try { return StoryClock.Days(); }   // m101-prolog: od startu opowiesci (jak latka Armoury na odczytach startu w ROT)
             catch { return 0.0; }   // blad = wszystko zamkniete (bezpieczniej niz otwarte)
         }
 

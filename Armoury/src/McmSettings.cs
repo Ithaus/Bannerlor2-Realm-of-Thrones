@@ -8968,6 +8968,22 @@ namespace Armoury
         [SettingPropertyGroup("Notice board")]
         public bool HeadmanBounties { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Enabled", HintText = "when you start a new campaign, choose between 'Prologue 298 - the King rides north' (the campaign begins 188 days before the story of Realm of Thrones, as King Robert leaves King's Landing for Winterfell; Robert and Eddard Stark live and the realms keep the King's peace) and 'Classic start 299' (as Realm of Thrones begins). Off = always the classic start, without asking. Only new campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Peace", HintText = "in a Prologue 298 campaign, until the story of Realm of Thrones begins no realm of Westeros declares war on another (the Night's Watch still fights the Free Folk, and Free Folk raids go on); wars you start yourself are not stopped. Off = the AI may declare wars in the prologue", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool ProloguePeace { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Pacts", HintText = "in a Prologue 298 campaign every realm of Westeros but the Night's Watch and the Free Folk stands with King Robert's realm: the North, the Stormlands and the Riverlands as allies, the Vale, Dragonstone, the Reach, Dorne, the Iron Islands and Skagos by non-aggression pacts (Diplomacy). They hold until the King dies. Off = no pacts", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool ProloguePacts { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Kings", HintText = "in a new Prologue 298 campaign King Robert Baratheon and Lord Eddard Stark are alive: Robert rules the crown's realm and House Baratheon of King's Landing, Ned rules the North and House Stark. On day 186 the King dies of wounds from a boar hunt, Joffrey takes the throne and Ned is thrown into the dungeons of King's Landing; his execution opens the story of Realm of Thrones. Off = both stay dead as in Realm of Thrones. Only new campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueKings { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11209,6 +11225,10 @@ namespace Armoury
             s.WatchBountyAiLords = WatchBountyAiLords;
             s.WatchBountyLordTopUp = WatchBountyLordTopUp;
             s.HeadmanBounties = HeadmanBounties;
+            s.PrologueEnabled = PrologueEnabled;
+            s.ProloguePeace = ProloguePeace;
+            s.ProloguePacts = ProloguePacts;
+            s.PrologueKings = PrologueKings;
         }
 
         internal static void Apply()
