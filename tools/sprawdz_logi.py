@@ -1039,7 +1039,8 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m104e5 <Armoury-*.log>. E5-0 start i latki, E5-1 ERROR i potkniecia 0, E5-2 orszak (rusza <= d3, Winterfell
                     < d40, KP < d100), E5-3 Tyrion na Mur (INFO), E5-4 Turniej Reki w KP d123-127 (E5-4b kanon w drabince INFO), E5-5 Tyrion jencem town_EN1 d111-131,
                     E5-6 Jaime #p10 do town_V2, E5-7 klany gorskie d118-119 i >= 80% dob 119-186, E5-8 ludzie Gory d155-156 i >= 80% dob 156-186 (E5-8b spalona >= 1 wies),
-                    E5-9 Beric rusza d160-165, E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
+                    E5-8c bandy i szacunki celow (INFO, m105-drobne), E5-9 Beric rusza d160-173 po pierwszej SPALONEJ wsi albo od d168 (m105-drobne; dotad d160-165),
+                    E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
                     kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
@@ -37745,7 +37746,9 @@ def m104e5_main(logp):
     rozstrzygniety w KP w d123-127 (E5-4b uczestnicy kanonu w drabince - INFO), E5-5 Tyrion jencem town_EN1 bez ucieczki w dniach 111-131 (linie doby) i bez
     'PRZEPUSZCZONE' poza smiercia, E5-6 Jaime: #p10 do town_V2 (bez linii - INFO, gdy wojna Polnocy nie wybuchla), E5-7 klany gorskie: pierwsza banda d118-119 i w polu
     >= 1 przez >= 80% dob 119-186, E5-8 ludzie Gory: pierwsza banda d155-156 i w polu przez >= 80% dob 156-186 (albo rozbici w bitwie), E5-8b spalona >= 1 wies,
-    E5-9 Beric rusza w d160-165 (POMINIETY - INFO z powodem), E5-10 po prologu (doba >= 189) partie pod scena 0, E5-11 straz niewoli (INFO).
+    E5-8c (m105-drobne, INFO) ludzie band przy narodzinach i szacunki 'szac. N dob na osade' w liniach celu, E5-9 Beric rusza w d160-173 po pierwszej SPALONEJ wsi
+    Ludzi Gory albo od d168 bez spalonej (m105-drobne: wezwanie po skargach ze spalonych wsi, na druzyne czeka 5 dni; dotad d160-165; POMINIETY - INFO z powodem),
+    E5-10 po prologu (doba >= 189) partie pod scena 0, E5-11 straz niewoli (INFO).
     Log bez kampanii z prologiem: INFO (kampania klasyczna - E5 nie dziala)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -37755,7 +37758,7 @@ def m104e5_main(logp):
     starts, days, n_err, err_ex = [], {}, 0, []
     ev = {"rusza": [], "winterfell": [], "kp": [], "pominiety": [], "cb": [], "inn": [], "ty_end": [], "t_done": [], "t_skip": [], "t_proc": [],
           "blocked": [], "passed": [], "kg_new": [], "kg_fail": [], "mm_new": [], "mm_burn": [], "mm_lost": [], "mm_home": [], "b_go": [], "b_skip": [], "b_end": [],
-          "kg_skip": [], "mm_skip": []}
+          "kg_skip": [], "mm_skip": [], "mm_tgt": []}
     canon = []
     last_prol = -1
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -37804,6 +37807,8 @@ def m104e5_main(logp):
                         continue
                     ev[key].append((d, body))
                     break
+            if body.startswith("ludzie Gory: ") and " - nowy cel " in body:
+                ev["mm_tgt"].append((d, body))   # m105-drobne: E5-8c (szacunek celu w linii 'nowy cel')
     print(f"plik: {logp} | linii startu E5 {len(starts)}, dob E5 {len(days)}, ostatnia doba prologu {last_prol}, ERROR {n_err}, zmian kanonu (p01/p02/p10/m01/m02) {len(canon)}")
     if not starts and not days:
         rep.add("E5-0: linie 'Prolog E5 (m104): ...'", "brak w logu", "INFO (kampania klasyczna albo log sprzed paczki m104-e5)", None)
@@ -37942,15 +37947,27 @@ def m104e5_main(logp):
                 "pierwsza d155-156, w polu >= 80% dob okna albo wszystkie rozbite w bitwie", bool(mm0) and mm0[0] is not None and 155 <= mm0[0] < 157 and (seen2 == 0 or ok2 >= 0.8 * seen2 or lost_all))
         rep.add("E5-8b: spalone wsie Dorzecza", f"{len(ev['mm_burn'])}" + (f" (pierwsza: {ev['mm_burn'][0][1][:90]})" if ev["mm_burn"] else "") + f", powrot do domow linii {len(ev['mm_home'])}",
                 ">= 1 do d186 (krotszy log - INFO)", (len(ev["mm_burn"]) >= 1) if last_prol >= 186 or ev["mm_burn"] else None)
+        # m105-drobne: E5-8c - ludzie band przy narodzinach (90-130, min 60) i szacunki celow ("szac. N dob na osade", "NIE ZDAZY do d186", "SILNA MILICJA")
+        men = [int(x.group(1)) for x in (re.search(r"\) - (\d+) ludzi \(z puli", e[1]) for e in ev["mm_new"]) if x]
+        est = [float(x.group(1)) for x in (re.search(r"szac\. ([0-9.]+) dob na osade", e[1]) for e in ev["mm_new"] + ev["mm_tgt"]) if x]
+        late = sum(1 for e in ev["mm_new"] + ev["mm_tgt"] if "NIE ZDAZY" in e[1])
+        strong = sum(1 for e in ev["mm_new"] + ev["mm_tgt"] if "SILNA MILICJA" in e[1])
+        rep.add("E5-8c: bandy Ludzi Gory i szacunki celow (m105-drobne)", f"ludzie band przy narodzinach {men or '-'}, szacunki dob na osade {[round(x, 1) for x in est] or '-'}"
+                f", cele 'NIE ZDAZY' {late}, 'SILNA MILICJA' {strong}, linii 'nowy cel' {len(ev['mm_tgt'])}", "INFO (bandy 90-130 ludzi, krok ok. 4-6 dob)", None)
     bg, bs = first("b_go"), first("b_skip")
     if bg:
-        rep.add("E5-9: oddzial Berica", bg[1][:170], "rusza w d160-165", bg[0] is not None and 160 <= bg[0] < 166)
+        # m105-drobne: wezwanie po pierwszej SPALONEJ wsi Ludzi Gory albo od d168 bez spalonej; na druzyne Beric czeka do 5 dni od wezwania (d160-173)
+        b0 = first("mm_burn")
+        burn_d = b0[0] if b0 else None
+        okb = bg[0] is not None and 160 <= bg[0] < 174 and ((burn_d is not None and burn_d <= bg[0] + 0.05) or bg[0] >= 168)
+        rep.add("E5-9: oddzial Berica", bg[1][:200] + (f" | pierwsza spalona wies d{burn_d}" if burn_d is not None else " | bez spalonej wsi przed ruszeniem"),
+                "rusza w d160-173 po pierwszej spalonej wsi albo od d168", okb)
     elif bs:
         rep.add("E5-9: oddzial Berica", bs[1][:170], "INFO (POMINIETY - powod w linii)", None)
     elif off("beric"):
         rep.add("E5-9: oddzial Berica", "klucz PrologueBericHunt NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
     else:
-        rep.add("E5-9: oddzial Berica", "brak linii", "rusza w d160-165 (log krotszy niz 166 dob - INFO)", None if last_prol < 166 else False)
+        rep.add("E5-9: oddzial Berica", "brak linii", "rusza w d160-173 (log krotszy niz 174 dob - INFO)", None if last_prol < 174 else False)
     after = [d for d in sorted(days) if d >= 189]
     if after:
         mp = re.search(r"partie pod scena (\d+)", days[after[0]])
