@@ -488,7 +488,18 @@ namespace Armoury
                      + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5]
                      + (TournOn || MatchOn || cats[CatTourn] + cats[CatMatch] > 0 ? ", turnieje " + cats[CatTourn] + ", swaty " + cats[CatMatch] : "") + "), czas " + ms.ToString("0.0", Inv) + " ms"
                      + " | strony " + pages.Count + " (linie ok. " + JoinInts(lines) + ", miesci sie " + PageLines + ")" + (PagesOn ? "" : " - klucz Inn Gossip Pages WYLACZONE") + ".");
-            ShowPage(place, pages, 0);
+            // m100-kryjowki: plotka o kryjowce znana dopiero, gdy gracz zobaczy strone z nia (recenzja 21.10: "Enough talk" na 1. stronie - dalsze nieprzeczytane)
+            List<List<string>> heard = null;
+            foreach (var it in items)
+            {
+                if (it == null || it.Id == null || !it.Id.StartsWith("h|")) continue;
+                if (heard == null) { heard = new List<List<string>>(); for (int k = 0; k < pages.Count; k++) heard.Add(null); }
+                int pg = 0;
+                for (int k = 0; k < pages.Count; k++) if (it.Text != null && pages[k].Contains(it.Text)) { pg = k; break; }
+                if (heard[pg] == null) heard[pg] = new List<string>();
+                heard[pg].Add(it.Id.Substring(2));
+            }
+            ShowPage(place, pages, 0, heard);
         }
 
         // ------------------------------------------------------------ strony w ramce (n20-plotki, klucz InnGossipPages)
@@ -561,15 +572,16 @@ namespace Armoury
 
         /// <summary>Okno strony i: "Hear more" (nastepna strona - gra kolejkuje okno i pokazuje je po zamknieciu tego, GauntletQueryManager.CloseQuery) i "Enough talk";
         /// ostatnia strona - samo "Enough talk" jak dotad.</summary>
-        private static void ShowPage(string place, List<string> pages, int i)
+        private static void ShowPage(string place, List<string> pages, int i, List<List<string>> heard = null)
         {
+            if (heard != null && i < heard.Count && heard[i] != null) foreach (var id in heard[i]) HideoutSight.Heard(id, place);   // m100-kryjowki
             bool more = i + 1 < pages.Count;
             string title = place + " - gossip" + (pages.Count > 1 ? " (" + (i + 1).ToString(Inv) + "/" + pages.Count.ToString(Inv) + ")" : "");
             Action next = null;
             if (more)
             {
                 int k = i + 1;
-                next = () => { try { _dPagesTurned++; ShowPage(place, pages, k); } catch (Exception e) { Stumble("NextPage", e); } };
+                next = () => { try { _dPagesTurned++; ShowPage(place, pages, k, heard); } catch (Exception e) { Stumble("NextPage", e); } };
             }
             InformationManager.ShowInquiry(new InquiryData(title, pages[i], true, more, more ? "Hear more" : "Enough talk", more ? "Enough talk" : null, next, null), true);
         }
@@ -940,6 +952,7 @@ namespace Armoury
             {
                 var st = h != null ? h.Settlement : null;
                 if (st == null) continue;
+                if (!HideoutSight.RumourFits(h)) continue;   // m100-kryjowki: przy kluczu plotka tylko o zajetej, niewypatrzonej kryjowce
                 float d = st.GetPosition2D.Distance(at);
                 if (d > R) continue;
                 int bands = 0;

@@ -62,7 +62,8 @@ namespace Armoury
 
                 foreach (var st in Settlement.All)
                 {
-                    if (st == null || !st.IsHideout || st.Hideout == null || !st.Hideout.IsSpotted) continue;
+                    if (st == null || !st.IsHideout || st.Hideout == null) continue;
+                    if (!st.Hideout.IsSpotted) { _seen.Remove(st); continue; }   // m100-kryjowki (recenzja 21.10): opustoszala (gra zeruje IsSpotted) - ponowne wypatrzenie znow z meldunkiem i flaga
                     if (_seen.Contains(st)) continue;
                     _seen.Add(st);
                     Announce(st, vt, s);

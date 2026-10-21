@@ -2010,6 +2010,20 @@ namespace Armoury
         // --- Hideout spotted ---
         public bool HideoutFlagEnabled = true;             // a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there
         public int HideoutFlagDays = 3;                    // how many days the flag stays on the map
+        // m100-kryjowki (Jeff 21.10): wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania, nowe kryjowki z dala od osad i nie tam, gdzie ostatnio rozbita
+        // (HideoutSight.cs; latki HideoutCampaignBehavior.HourlyTickSettlement, BanditSpawnCampaignBehavior.OnSettlementEntered / CheckForSpawningBanditBoss /
+        // SelectANonInfestedHideoutOfSameCultureByWeight; zapis arm_hideout_sight)
+        public bool HideoutScoutingChance = true;          // coming within sight of a bandit hideout no longer shows it for sure: your scout gets one try per approach, and the chance grows with Scouting - none at all up to Hideout Scouting Min, full at Hideout Scouting Full. Hideouts you heard of in a tavern or inn show as before. Off = as in the game
+        public int HideoutScoutingMin = 10;                // with Hideout Scouting Chance: at or below this Scouting your scout never spots a hideout on his own (0%)
+        public int HideoutScoutingFull = 200;              // with Hideout Scouting Chance: at this Scouting a hideout in sight is always spotted (100%); in between the chance grows evenly
+        public bool HideoutRumourReveals = true;           // with Hideout Scouting Chance: talk of an outlaw lair heard in a tavern or inn (roughly where it is) lets you spot that hideout as in the game when you come near it; the talk is only of lairs you have not found yet
+        public bool HideoutAwayFromSettlements = true;     // a new bandit hideout only takes a spot out in the wilds: at least Hideout Min Dist Settlement from any town, castle or village and Hideout Min Dist Side Village from the small map villages. Off = as in the game
+        public float HideoutMinDistSettlement = 10f;       // with Hideout Away From Settlements: least distance (map units, about 4.75 km each) from a town, castle or village
+        public float HideoutMinDistSideVillage = 6f;       // with Hideout Away From Settlements: least distance (map units) from a small map village
+        public bool HideoutRelocateAfterClear = true;      // after a hideout is cleared, the next bandit hideout does not appear in the same place or close to it - you have to search again. Off = as in the game
+        public int HideoutClearedMemoryDays = 60;          // with Hideout Relocate After Clear: for how many days a cleared hideout keeps new hideouts away from its area
+        public float HideoutClearedRadius = 25f;           // with Hideout Relocate After Clear: how far (map units) from a recently cleared hideout no new hideout appears
+        public bool HideoutGuideBanditAi = true;           // with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game
 
         // --- House levies ---
         public bool HouseLeviesEnabled = true;             // in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice

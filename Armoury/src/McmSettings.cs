@@ -5464,6 +5464,50 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public int HideoutFlagDays { get; set; } = 3;
 
+        [SettingPropertyBool("Hideout Scouting Chance", HintText = "coming within sight of a bandit hideout no longer shows it for sure: your scout gets one try per approach, and the chance grows with Scouting - none at all up to Hideout Scouting Min, full at Hideout Scouting Full. Hideouts you heard of in a tavern or inn show as before. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutScoutingChance { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Scouting Min", 0, 100, "0", HintText = "with Hideout Scouting Chance: at or below this Scouting your scout never spots a hideout on his own (0%)", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutScoutingMin { get; set; } = 10;
+
+        [SettingPropertyInteger("Hideout Scouting Full", 20, 330, "0", HintText = "with Hideout Scouting Chance: at this Scouting a hideout in sight is always spotted (100%); in between the chance grows evenly", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutScoutingFull { get; set; } = 200;
+
+        [SettingPropertyBool("Hideout Rumour Reveals", HintText = "with Hideout Scouting Chance: talk of an outlaw lair heard in a tavern or inn (roughly where it is) lets you spot that hideout as in the game when you come near it; the talk is only of lairs you have not found yet", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutRumourReveals { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Away From Settlements", HintText = "a new bandit hideout only takes a spot out in the wilds: at least Hideout Min Dist Settlement from any town, castle or village and Hideout Min Dist Side Village from the small map villages. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutAwayFromSettlements { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Min Dist Settlement", 0.00f, 40.00f, "0.0", HintText = "with Hideout Away From Settlements: least distance (map units, about 4.75 km each) from a town, castle or village", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public float HideoutMinDistSettlement { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Hideout Min Dist Side Village", 0.00f, 30.00f, "0.0", HintText = "with Hideout Away From Settlements: least distance (map units) from a small map village", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public float HideoutMinDistSideVillage { get; set; } = 6f;
+
+        [SettingPropertyBool("Hideout Relocate After Clear", HintText = "after a hideout is cleared, the next bandit hideout does not appear in the same place or close to it - you have to search again. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutRelocateAfterClear { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Cleared Memory Days", 0, 364, "0", HintText = "with Hideout Relocate After Clear: for how many days a cleared hideout keeps new hideouts away from its area", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutClearedMemoryDays { get; set; } = 60;
+
+        [SettingPropertyFloatingInteger("Hideout Cleared Radius", 0.00f, 100.00f, "0.0", HintText = "with Hideout Relocate After Clear: how far (map units) from a recently cleared hideout no new hideout appears", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public float HideoutClearedRadius { get; set; } = 25f;
+
+        [SettingPropertyBool("Hideout Guide Bandit Ai", HintText = "with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutGuideBanditAi { get; set; } = true;
+
         [SettingPropertyBool("House Levies Enabled", HintText = "in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice", RequireRestart = false)]
         [SettingPropertyGroup("House levies")]
         public bool HouseLeviesEnabled { get; set; } = true;
@@ -10245,6 +10289,17 @@ namespace Armoury
             s.TourneyFolkPurseMin = TourneyFolkPurseMin;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
+            s.HideoutScoutingChance = HideoutScoutingChance;
+            s.HideoutScoutingMin = HideoutScoutingMin;
+            s.HideoutScoutingFull = HideoutScoutingFull;
+            s.HideoutRumourReveals = HideoutRumourReveals;
+            s.HideoutAwayFromSettlements = HideoutAwayFromSettlements;
+            s.HideoutMinDistSettlement = HideoutMinDistSettlement;
+            s.HideoutMinDistSideVillage = HideoutMinDistSideVillage;
+            s.HideoutRelocateAfterClear = HideoutRelocateAfterClear;
+            s.HideoutClearedMemoryDays = HideoutClearedMemoryDays;
+            s.HideoutClearedRadius = HideoutClearedRadius;
+            s.HideoutGuideBanditAi = HideoutGuideBanditAi;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.NorthernFareEnabled = NorthernFareEnabled;
             s.CropClimateFilter = CropClimateFilter;

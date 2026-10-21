@@ -9,6 +9,13 @@ RANGES = {
     'DrunkSpeedPenaltyPercent': (0, 50, "0"),
     'HangoverSpeedPenaltyPercent': (0, 50, "0"),
     'HangoverMoralePenaltyPercent': (0, 50, "0"),
+    # m100-kryjowki: krzywa Zwiadu (kod: Full >= Min + 1), odleglosci w jedn. mapy, pamiec rozbitych (HideoutSight.Chance / Pick / PruneCleared)
+    'HideoutScoutingMin': (0, 100, "0"),
+    'HideoutScoutingFull': (20, 330, "0"),
+    'HideoutMinDistSettlement': (0.0, 40.0, "0.0"),
+    'HideoutMinDistSideVillage': (0.0, 30.0, "0.0"),
+    'HideoutClearedMemoryDays': (0, 364, "0"),
+    'HideoutClearedRadius': (0.0, 100.0, "0.0"),
     # m97-posilki: posilki DR marszem - kod przycina do 0.25..6 h, 10..600 s na godzine, 0..300 s rozwiniecia (DrMarchArrival.MaxH / SecH / DepS)
     'DrMaxMarchHours': (0.25, 6.0, "0.00"),
     'DrSecondsPerMarchHour': (10.0, 600.0, "0"),
