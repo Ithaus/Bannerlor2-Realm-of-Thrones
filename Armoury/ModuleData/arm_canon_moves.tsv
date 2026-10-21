@@ -1,0 +1,69 @@
+# Armoury: canon characters (m101-postacie, CanonCompanions.cs, MCM Canon Companions To Clans / Canon Companions Follow Story). New campaigns only.
+# Jeff 21.10: the book characters ROT puts in the taverns (ROTwanderer* in ROT-Content/ModuleData/spspecialcharacters_ROTcustomwanderers.xml)
+# A - start as lords of their house (party: yes = may lead a party, no = courtier who stays in the seat, later = courtier until a move 'lead');
+# B - never created (the ROT spawner skips them); C, D - stay for hire (listed only to be counted). After the start no A/B template is created twice.
+# clan = Clan.StringId of Realm of Thrones (spclans.xml); a missing clan leaves the character a wanderer (logged).
+#start	template	group	name	clan	party	note
+ROTwanderer1	A	Jaime Lannister	clan_vlandia_1	yes	Kingsguard, son of Tywin; leads men
+ROTwanderer8	A	Tyrion Lannister	clan_vlandia_1	yes	son of Tywin, later Hand of the King; leads the clansmen at the Green Fork and the Blackwater
+ROTwanderer4	A	Bronn of the Blackwater	clan_vlandia_1	later	Tyrion's sellsword; may lead men once knighted after the Blackwater
+ROTwanderer6	A	Podrick Payne	clan_vlandia_1	no	Tyrion's squire
+ROTwanderer19	A	Shagga son of Dolf	clan_vlandia_1	no	Stone Crows chief at Tyrion's side
+ROTwanderer12	A	Qyburn	clan_vlandia_1	no	courtier (maester without a chain)
+ROTwanderer3	A	Sandor Clegane	clan_nord_1	no	sworn shield of King Joffrey (court)
+ROTwanderer2	A	Lord Varys	clan_nord_1	no	Master of Whisperers (court)
+ROTwanderer27	A	Lord Petyr Baelish	clan_nord_1	no	Master of Coin (court)
+ROTwanderer25	A	Jacelyn Bywater	clan_nord_1	no	Commander of the City Watch (court)
+ROTwanderer9	A	Brienne of Tarth	clan_empire_west_2	no	Rainbow Guard of Renly
+ROTwanderer20	A	Theon Greyjoy	clan_battania_1	yes	ward of the Starks at the start of the war; leads men
+ROTwanderer18	A	Osha	clan_battania_1	no	wildling captive serving the Starks at Winterfell
+ROTwanderer38	A	Benjen Stark	clan_battania_2	yes	First Ranger of the Night's Watch; leads rangings
+ROTwanderer5	A	Samwell Tarly	clan_battania_2	no	steward of the Night's Watch
+ROTwanderer28	A	Yoren	clan_battania_2	no	wandering crow, recruiter of the Night's Watch
+ROTwanderer26	A	Quentyn Martell	clan_aserai_1	yes	prince of Dorne; leads men
+ROTwanderer22	A	Hizdahr zo Loraq	clan_empire_south_1	no	noble of Meereen (Meereen belongs to House Targaryen in ROT)
+ROTwanderer15	A	Rago the Bloodrider	clan_empire_south_1	yes	bloodrider of Daenerys; leads riders
+ROTwanderer21	A	Myranda	clan_empire_south_3	no	with Ramsay (show)
+ROTwanderer23	A	Locke	clan_empire_south_3	no	Bolton man (show)
+ROTwanderer33	A	Wun Wun	clan_sturgia_2	no	giant of the free folk (Mance Rayder)
+ROTwanderer14	B	Hodor			goes with Bran and dies (Jeff)
+ROTwanderer13	B	Syrio Forel			dies when Ned is arrested (before ROT starts)
+ROTwanderer50	B	Jory Cassel			dies in King's Landing before ROT starts
+ROTwanderer24	B	Maester Cressen			dies early in 299
+ROTwanderer10	B	Jaquin Hagar			Faceless Man - his own story
+ROTwanderer17	B	Kinvara the Red Priestess			priestess (show), not a fighter
+ROTwanderer16	B	Xaro Xhoan Daxos			merchant prince of Qarth
+ROTwanderer7	B	Gendry			apprentice smith, then with Yoren and the Brotherhood
+ROTwanderer45	B	Talisa			show only - Jeyne Westerling (ROTlord_177) weds Robb instead (Jeff 21.10)
+ROTwanderer11	C	Mya Stone			minor book character, stays for hire (Jeff: C - ok)
+ROTwanderer29	C	Dick Crabb			minor book character, stays for hire (Jeff: C - ok)
+ROTwanderer30	D	Ser Harlan Blackhare			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer31	D	Ser Benfry the Lucky			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer32	D	Ser Adrian Fairwood			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer34	D	Tae Hill			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer35	D	Ser Timothy Warden			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer36	D	Barry B Beesbury			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer37	D	Liam Ochre			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer39	D	Aemon Vezos			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer40	D	Arion Sand			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer41	D	Ser Osbert Tempest			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer42	D	Guts			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer47	D	Setzuko Kawasaki			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer49	D	Kallias Aentius			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer51	D	Pienner Stonetree			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer52	D	Ser Beric Karstark			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer53	D	Corvan Hale			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer54	D	Ser Kemal			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer55	D	Vissenya Rosedragon			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer56	D	Shadow Shwani			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer57	D	Snake Yi			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer59	D	Ash Pyke			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer60	D	Bjorn			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer61	D	Mio Brixler			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer62	D	Cyrus Bennett			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer63	D	Alyssa Storm			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer64	D	Alexios of Darrowford			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer65	D	Ser Cristal Hightower			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer66	D	Isa Storm			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer67	D	Steve Breitenfeld			made up by ROT, stays for hire (Jeff: D - ok)
+ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)

@@ -8824,6 +8824,14 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
 
+        [SettingPropertyBool("Canon Companions To Clans", HintText = "new campaigns only: the characters of the books that Realm of Thrones puts in the taverns as companions for hire (Jaime and Tyrion Lannister, Bronn, Theon Greyjoy, Varys, Petyr Baelish, Benjen Stark, Samwell Tarly and the rest of that list) start as lords of their own houses instead - the Lannisters, the royal court, the Starks, the Night's Watch, Dorne, Daenerys and so on; those who lead men in the books may raise a party, the courtiers stay in the seat of their house. Those whose story takes them out of the war (Hodor, Syrio Forel, Jory Cassel, Maester Cressen, Jaqen H'ghar, Kinvara, Xaro Xhoan Daxos, Gendry and Talisa - Jeyne Westerling takes her place) do not appear at all, and none of them comes back as a wanderer. The other companions stay for hire. Off = all of them wait in the taverns as before", RequireRestart = false)]
+        [SettingPropertyGroup("Canon characters (21.10)")]
+        public bool CanonCompanionsToClans { get; set; } = true;
+
+        [SettingPropertyBool("Canon Companions Follow Story", HintText = "with Canon Companions To Clans: the canon characters change sides as in the books when the story of Realm of Thrones gets there - Tyrion flees to Essos after the Purple Wedding, the Hound deserts after the Blackwater, Theon goes home to the Iron Islands when they make war on the North, Jeyne Westerling weds Robb Stark, and so on; each change happens once, and not to anyone dead, in your captivity or in your house. Off = they stay where the campaign started them", RequireRestart = false)]
+        [SettingPropertyGroup("Canon characters (21.10)")]
+        public bool CanonCompanionsFollowStory { get; set; } = true;
+
         [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory, the masters of Qohor and the cartwright and saddler into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
@@ -11129,6 +11137,8 @@ namespace Armoury
             s.BookHoldingsRestore = BookHoldingsRestore;
             s.BookHoldingsGarrison = BookHoldingsGarrison;
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
+            s.CanonCompanionsToClans = CanonCompanionsToClans;
+            s.CanonCompanionsFollowStory = CanonCompanionsFollowStory;
             s.TownMenuTidy = TownMenuTidy;
             s.CastleMenuTidy = CastleMenuTidy;
             s.VillageMenuTidy = VillageMenuTidy;

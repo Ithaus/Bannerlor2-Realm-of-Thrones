@@ -91,5 +91,20 @@ Braki w ROT: rodu **Stokeworth** nie ma - Bronn po odmowie walki za Tyriona idzi
 5. Jeyne/Talisa: Talisa w B, Jeyne - slub z Robbem po zdobyciu Turni przez Polnoc (albo przy egzekucji Karstarka - w ksiazce slub jest wczesniej), po smierci
    Robba wraca do Westerlingow.
 
+### Zmiana na krok
+
+**Krok 2 - A do rodow (Armoury/src/CanonCompanions.cs, ModuleData/arm_canon_moves.tsv #start, Settings.cs + McmSettings.cs, SubModuleMain.cs 2 linie):**
+- `arm_canon_moves.tsv` czesc `#start`: 63 wzory - A 22 (rod, druzyna yes/no/later), B 9 (8 z listy + Talisa), C 2, D 30.
+- Klucze MCM (grupa "Canon characters (21.10)"): `CanonCompanionsToClans` (domyslnie TAK), `CanonCompanionsFollowStory` (domyslnie TAK, krok 4).
+- `CanonCompanionsBehavior` (wlasne zachowanie, zapis `arm_canon_companions` przez SaveText.Sync): `OnNewGameCreated` - flaga nowej kampanii i klucz w tej chwili,
+  potem przejscie startu A: `SetNewOccupation(Lord)`, `Hero.Clan = rod`, `IsMinorFactionHero` wedlug rodu, z karczmy do siedziby rodu (HomeSettlement twierdza ->
+  lenno -> osada glowy rodu -> stolica krolestwa). Ponowna proba w `OnNewGameCreatedPartialFollowUpEnd`, przy starcie sesji, ostatnia w pierwszej dobie (potem
+  start zamkniety; brak bohatera / rodu - linia "przeniesienie POMINIETE").
+- Dworzanie (`party` no / later): nasluch `CanHeroLeadPartyEvent` (false) + postfiks `HeroSpawnCampaignBehavior.GetBestAvailableCommander` (wynik-dworzanin ->
+  null; licznik w linii doby). Klucz dworzanina = wzor oryginalu (bez rodzicow) - dziecko postaci nie jest dworzaninem.
+- Linie: `Postacie kanonu (m101): wpiecie | ...`, `... : start | klucz ..., A 22, B 9, C 2, D 30 | mapa rodow znaleziona N/M | ...`, `... : przeniesienie - X [wzor]
+  wedrowiec w <miasto> -> rod <nazwa> (id, krolestwo), lord, druzyna: ... | wyzwalacz start (...)`, linia doby `... : dzien N | A 22: w rodach ... wedrowcy ...`.
+
 ### Status
-- Krok 1 (rozpoznanie + mapa rodow): GOTOWE (ten wpis). Zostalo: kroki 2-5, grupa `sprawdz_logi.py --grupa m101postacie`.
+- Krok 1 (rozpoznanie + mapa rodow): GOTOWE.
+- Krok 2 (A do rodow + dworzanie bez druzyny): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA w grze. Zostalo: kroki 3-5, grupa `sprawdz_logi.py --grupa m101postacie`.
