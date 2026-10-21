@@ -14,7 +14,10 @@ Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej
 | K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (b0ee6e05, build Armoury + GT 0) |
 | K4 | klany gorskie Doliny (pkt 5): od d118 do 4 band klanu hilltribesmen (Stone Crows, Burned Men, Milk Snakes, Black Ears) przy wsiach Gorskiego Traktu, ludzie z puli okregu (RaidDraw), uzupelnienie co 3 dni do d186, po prologu zwykle bandy | ZROBIONE (f3025c82, build 0) |
 | K5 | ludzie Gory (pkt 6): od d155 dwie bandy robber_knights 'The Mountain's Men' pod sztandarem Lannisterow z ludzi okregu wsi Clegane najblizszej Riverrun (Harrenhal), rabunek wsi Dorzecza po kolei (mechanika gry), na koniec prologu do domow (FreeFolkRaids.Home) | ZROBIONE (3705aa87, build 0) |
-| K6 | oddzial Berica (pkt 7): od d160 Beric (brotherhood) albo glowa rodu Dondarrion scigaja najblizsza bande Ludzi Gory (SetMoveEngageParty, ukrycie przed AI) do ich konca / d188 | ZROBIONE (build 0) |
+| K6 | oddzial Berica (pkt 7): od d160 Beric (brotherhood) albo glowa rodu Dondarrion scigaja najblizsza bande Ludzi Gory (SetMoveEngageParty, ukrycie przed AI) do ich konca / d188 | ZROBIONE (53635f6b, build 0) |
+| P1 | przeglad wlasny: eskorta wjezdza do osady postoju krola, orszak/Ned/Tyrion koncza sie najpozniej d186, Ogar do KP po obwieszczeniu, turniej kanonu GT odwoluje tylko oblezenie/bunt, Ludzie Gory bez klucza po prologu bez sledzenia | ZROBIONE (b2815531, build Armoury + GT 0) |
+| K7 | grupa progow `--grupa m104e5` (E5-0..E5-11) + test na 3 logach syntetycznych | ZROBIONE (1ac12e1f; dobry 0 NIE, zly 4 NIE, klasyczny INFO) |
+| AT | autotest: nowa kampania z flaga prologu (armoury-prolog.flag) >= 210 dob + wczytanie zapisu w srodku (np. d60 i d150) | DO ZROBIENIA (nie uruchamialem gry - zakaz zadania) |
 
 ## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
 
@@ -169,3 +172,49 @@ na czas prologu przeniesc Berica do rodu korony (to zmiana rodu przywodcy frakcj
 ukryta (Ludzie Gory sa ukryci tylko w marszu do pierwszej wsi) - inaczej spotkanie przy rabunku wsi.
 
 **Status.** DO SPRAWDZENIA (autotest: linia "Beric: rusza" w d160-165, cel w linii doby, ewentualne ROZBITA ... (rozbili: Beric ...)).
+
+Build koncowy (5 modow kod 0, gen_mcm bez zmian): Armoury.dll md5 f54b93ed, GrandTourney.dll e7f5df53 (CrashScribe, RealisticCaptivity, ForgeView bez zmian kodu).
+Wgrywac razem: Armoury.dll + GrandTourney.dll + Armoury/ModuleData/arm_canon_moves.tsv (#m01 classic, #p10).
+
+## P1 - poprawki przegladu wlasnego (przed autotestem)
+
+- Eskorta krola: eskorta gry (SetMoveEscortParty) czeka pod brama, gdy eskortowany jest w osadzie (MobileParty.ComputeIsWaiting), i wtedy nie kupuje jedzenia (gra kupuje
+  tylko partiom w osadzie - PartiesBuyFoodCampaignBehavior.HourlyTickParty). Teraz: krol w osadzie (postoj) - eskorta wjezdza do tej osady (rozkaz "do osady"); krol
+  w drodze - eskorta. 22 dni postoju w Winterfell bez glodu eskorty.
+- Orszak, Ned i Tyrion koncza sie najpozniej w dniu 186 (e5:A: blokady zdjete przed smiercia krola i aresztem Neda) - gdyby orszak utknal.
+- Turniej Reki: Ogar (bez druzyny) przenoszony do KP dopiero po obwieszczeniu (wczesniej gra mogla go wyprowadzic - lordow z miasta z turniejem nie rusza).
+- GrandTourney: turniej kanonu odwoluje tylko oblezenie albo bunt w miescie - nie "wrog z wojskiem w promieniu" (brotherhood jest w stalej wojnie z korona - DefaultDiplomacyModel
+  .IsAtConstantWar - i jej druzyna w okolicy KP zdejmowalaby krolewski turniej).
+- Ludzie Gory przy wylaczonym kluczu: po prologu scena przestaje je sledzic (zostaja zwyklymi bandami).
+
+## K7 - progi `--grupa m104e5`
+
+`python -I tools/sprawdz_logi.py --grupa m104e5 <Armoury-*.log>`: E5-0 linia startu E5 i latki (straz niewoli TAK, okup TAK), E5-1 ERROR scen i potkniecia E5 0,
+E5-2 orszak (rusza <= d3, Winterfell < d40, KP < d100; krotszy log - INFO; pominiety przez zapis sprzed E5 / brak Roberta - INFO), E5-3 Tyrion na Mur (INFO), E5-4 Turniej
+Reki ROZSTRZYGNIETY w town_EW4 w d123-127 (E5-4b uczestnicy kanonu w drabince - INFO), E5-5 Tyrion "jeniec town_EN1" w kazdej dobie 111-131 i 0 PRZEPUSZCZONYCH (poza
+smiercia), E5-6 Jaime #p10 do town_V2 (bez linii - INFO, gdy wojna Polnocy nie wybuchla; #m01 wykonana w prologu - NIE), E5-7 klany: pierwsza banda d118-119 i w polu
+>= 80% dob 119-186, E5-8 ludzie Gory: pierwsza banda d155-156 i w polu >= 80% dob 156-186 albo wszystkie rozbite, E5-8b spalona >= 1 wies, E5-9 Beric rusza d160-165
+(POMINIETY - INFO), E5-10 doba >= 189: partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu - INFO. Test: 3 logi syntetyczne (scratchpad t5): dobry 14 progow
+0 NIE, zly (Winterfell d45, turniej d130, Tyrion poza lochem d120, ERROR) 4 NIE, klasyczny - INFO.
+
+## Co sprawdzic w autotescie (plan)
+
+1. Nowa kampania z prologiem (plik `armoury-prolog.flag`), >= 210 dob (przejscie w start opowiesci ROT i NedEvent): `--grupa m104e5`, `--grupa m101prolog`,
+   `--grupa m101postacie`, `--grupa m103sceny`.
+2. W logu: `orszak RUSZA` w d0-1 (druzyna krola istnieje), odleglosci eskorty w linii doby (czy Jaime i Tyrion dojezdzaja do krola - eskorta przy zamrozonej AI), postoj
+   w Winterfell bez spadku liczebnosci eskorty, `Tyrion: w CZARNYM ZAMKU`, `w GOSPODZIE` przed d110, `#p01` w d110, Tyrion `jeniec town_EN1` do d131, `#p02` w d132.
+3. Turniej: `OBWIESZCZONY` d121, linia GT "Turniej kanonu (Armoury, prolog 298)", "Szranki King's Landing ... turniej kanonu: uczestnikow kanonu 4, zastapionych lordow N",
+   `ROZSTRZYGNIETY` d123-127.
+4. Klany: 4 bandy w d118 (albo "za malo ludzi" - wtedy okreg Doliny bez puli); ludzie Gory: 2 bandy d155, "SPALONA wies" w kolejnych dniach, "koniec prologu - ... wraca do
+   domow" w d188; Beric "rusza" w d160 i cel w linii doby.
+5. Wczytanie zapisu w trakcie orszaku (np. d20) i po d155: linia startu E5, partie sceny odbudowane w pierwszej godzinie (rozkazy od wczoraj > 0 w nastepnej linii doby),
+   brak zamrozonych partii po wylaczeniu klucza (MCM) - nastepna godzina.
+6. Kampania klasyczna (bez pliku flagi): brak linii `Prolog E5`, w logu CanonCompanions `#p10 POMINIETA ... tylko kampania z prologiem`, #m01 jak dotad.
+
+## Decyzje do potwierdzenia przez Jeffa
+
+1. Jaime w Riverrun takze w kampanii KLASYCZNEJ? Dzis tylko prolog (#p10), klasyczna jak dotad (#m01 - Winterfell); zmiana = jedna kolumna w tabeli.
+2. Sztandar Lannisterow u Ludzi Gory (zadanie) vs tekst sceny 19 "raiders flying no banners" (ksiazka) - jedna stala (`LannisterClanId` w RaidersSpawn).
+3. Beric z brotherhood (w stalej wojnie z korona - nie wjedzie do KP, rusza tam, gdzie jest) - zostawic, czy na czas prologu przeniesc go do rodu korony.
+4. Okup gracza (barter za Tyriona / Jaimego) przechodzi - gracz zaplacil; zablokowac takze barter?
+5. Dzieci (Myrcella, Tommen, Sansa, Arya) nie jada w druzynach (gra nie pozwala dzieciom w druzynie) - przenoszone do celu przy przyjezdzie orszaku; wystarczy?
