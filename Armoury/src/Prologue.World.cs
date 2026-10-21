@@ -62,6 +62,7 @@ namespace Armoury
             ResetTourney();
             ResetClans();
             ResetRaiders();
+            ResetBeric();
         }
 
         private static void WStumble(string where, Exception e) { _wStumbles++; Stumble("World." + where, e); }
@@ -69,7 +70,7 @@ namespace Armoury
         private static string PackWorld()
         {
             return "whb=" + string.Join(",", new[] { _hbEsc, _hbRan, _hbPeace, _hbChoice, _hbComp, _hbPass }.Select(x => x.ToString(Inv))) + ";"
-                   + PackProgress() + PackTourney() + PackClans() + PackRaiders();
+                   + PackProgress() + PackTourney() + PackClans() + PackRaiders() + PackBeric();
         }
 
         private static string Ids(IEnumerable<string> ids) { return string.Join(".", ids.Where(x => !string.IsNullOrEmpty(x)).ToArray()); }
@@ -98,6 +99,7 @@ namespace Armoury
             UnpackTourney(map);
             UnpackClans(map);
             UnpackRaiders(map);
+            UnpackBeric(map);
             _worldDirty = true;
         }
 
@@ -428,6 +430,7 @@ namespace Armoury
             try { TourneyStep(day, daily); } catch (Exception e) { WStumble("TourneyStep", e); }
             try { ClansStep(day, daily); } catch (Exception e) { WStumble("ClansStep", e); }
             try { RaidersStep(day, daily); } catch (Exception e) { WStumble("RaidersStep", e); }
+            try { BericStep(day, daily); } catch (Exception e) { WStumble("BericStep", e); }
             foreach (var c in _ctl.Values.ToList())
                 if (!c.Seen || c.P == null || !c.P.IsActive) Uncontrol(c.P);
         }
@@ -453,6 +456,7 @@ namespace Armoury
             try { sb.Append(" | ").Append(TourneyLine()); } catch (Exception e) { WStumble("TourneyLine", e); }
             try { sb.Append(" | ").Append(ClansLine()); } catch (Exception e) { WStumble("ClansLine", e); }
             try { sb.Append(" | ").Append(RaidersLine()); } catch (Exception e) { WStumble("RaidersLine", e); }
+            try { sb.Append(" | ").Append(BericLine()); } catch (Exception e) { WStumble("BericLine", e); }
             sb.Append(" | Tyrion: ").Append(HoldText(TyrionTpl, TyrionHoldRow, "p02"));
             sb.Append(" | Jaime: ").Append(HoldText(JaimeTpl, JaimeHoldRow, "m02"));
             sb.Append(" | straz niewoli: zablokowane dzis ").Append(_hbDay).Append(", od poczatku ucieczki ").Append(_hbEsc).Append(", dni bez okupu i okupy ").Append(_hbRan)
@@ -473,9 +477,9 @@ namespace Armoury
             Log.Info(WTag + "start sesji | dzien prologu " + PrologueDay().ToString("0.0", Inv)
                      + " | klucze: Tyrion " + yn(s != null && s.PrologueTyrionHeld) + ", Jaime " + yn(s != null && s.PrologueJaimeAtRiverrun)
                      + " (zmiany stron CanonCompanionsFollowStory " + yn(s != null && s.CanonCompanionsFollowStory) + ")"
-                     + " | orszak " + yn(s != null && s.PrologueRoyalProgress) + ", ludzie Gory " + yn(s != null && s.PrologueMountainRaiders) + ", klany " + yn(s != null && s.PrologueHillClans)
+                     + " | orszak " + yn(s != null && s.PrologueRoyalProgress) + ", Beric " + yn(s != null && s.PrologueBericHunt) + ", ludzie Gory " + yn(s != null && s.PrologueMountainRaiders) + ", klany " + yn(s != null && s.PrologueHillClans)
                      + ", turniej " + yn(s != null && s.PrologueHandTourney)
-                     + " | latki: " + _worldWire + " | zapis sprzed E5 " + yn(_wLegacy) + " | " + ProgressStart() + " | " + TourneyLine() + " | " + ClansLine() + " | " + RaidersLine()
+                     + " | latki: " + _worldWire + " | zapis sprzed E5 " + yn(_wLegacy) + " | " + ProgressStart() + " | " + TourneyLine() + " | " + ClansLine() + " | " + RaidersLine() + " | " + BericLine()
                      + " | straz niewoli od poczatku: ucieczki " + _hbEsc + ", okup " + _hbRan + ", pokoj " + _hbPeace + ", wypuszczenie " + _hbChoice + ", wykup " + _hbComp
                      + ", przepuszczone " + _hbPass + " | potkniecia " + _stumbles + ".");
         }

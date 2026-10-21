@@ -141,7 +141,7 @@ namespace Armoury
                     Log.Info(WTag + "ludzie Gory: banda " + r.Id + " ROZBITA albo rozwiazana" + (_mmKiller.Length > 0 ? " (" + _mmKiller + ")" : "") + " (dzien prologu " + D(day) + ").");
                     continue;
                 }
-                if (!key) continue;   // klucz wylaczony - zwykla banda (WorldStep puszcza ja z rejestru), bez rozwiazania na koniec
+                if (!key) { if (day >= PrologueDays) _mm.Remove(r); continue; }   // klucz wylaczony - zwykla banda (WorldStep puszcza ja z rejestru), bez rozwiazania; po prologu - bez sledzenia
                 if (day >= PrologueDays)
                 {
                     if (mp.MapEvent != null || mp.SiegeEvent != null) { Control(MScene, mp, KGo, mp.CurrentSettlement, null, false); continue; }

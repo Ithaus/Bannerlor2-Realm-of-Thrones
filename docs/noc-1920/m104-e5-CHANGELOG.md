@@ -13,7 +13,8 @@ Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej
 | K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (9e4b8151, build Armoury + GT 0) |
 | K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (b0ee6e05, build Armoury + GT 0) |
 | K4 | klany gorskie Doliny (pkt 5): od d118 do 4 band klanu hilltribesmen (Stone Crows, Burned Men, Milk Snakes, Black Ears) przy wsiach Gorskiego Traktu, ludzie z puli okregu (RaidDraw), uzupelnienie co 3 dni do d186, po prologu zwykle bandy | ZROBIONE (f3025c82, build 0) |
-| K5 | ludzie Gory (pkt 6): od d155 dwie bandy robber_knights 'The Mountain's Men' pod sztandarem Lannisterow z ludzi okregu wsi Clegane najblizszej Riverrun (Harrenhal), rabunek wsi Dorzecza po kolei (mechanika gry), na koniec prologu do domow (FreeFolkRaids.Home) | ZROBIONE (build 0) |
+| K5 | ludzie Gory (pkt 6): od d155 dwie bandy robber_knights 'The Mountain's Men' pod sztandarem Lannisterow z ludzi okregu wsi Clegane najblizszej Riverrun (Harrenhal), rabunek wsi Dorzecza po kolei (mechanika gry), na koniec prologu do domow (FreeFolkRaids.Home) | ZROBIONE (3705aa87, build 0) |
+| K6 | oddzial Berica (pkt 7): od d160 Beric (brotherhood) albo glowa rodu Dondarrion scigaja najblizsza bande Ludzi Gory (SetMoveEngageParty, ukrycie przed AI) do ich konca / d188 | ZROBIONE (build 0) |
 
 ## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
 
@@ -147,3 +148,24 @@ Linie: `ludzie Gory: nowa banda 'The Mountain's Men' (<id>, klan robber_knights,
 sceny 19 "raiders flying no banners" - decyzja Jeffa (jedna stala w kodzie).
 
 **Status.** DO SPRAWDZENIA (autotest: linie "nowa banda" d155-156, co najmniej jedna SPALONA wies do d186, powrot do domow w d188).
+
+## K6 - oddzial Berica (pkt 7)
+
+**Problem.** Projekt pkt 2, dzien 160 (scena 20): Ned jako Reka wysyla Berica Dondarriona z ludzmi na Gore.
+
+**Rozpoznanie.** W ROT Beric to przywodca pomniejszej frakcji "brotherhood" (Brotherhood without Banners; wzor ROTuniqueleader_spc_brotherhood_0, wyjeta spod prawa,
+kultura vlandia, dom Riverrun). DefaultDiplomacyModel.IsAtConstantWar: frakcja wyjeta spod prawa i krolestwo tej samej kultury = stala wojna - Beric jest w wojnie
+z krolestwem korony (vlandia) i nie wjedzie do Krolewskiej Przystani. Z Ludzmi Gory moze walczyc: bandycki kontra nie-bandycki = wojna (GetShallowDiplomaticStance; uwaga:
+FactionManager.IsNeutralWithFaction ma wyjatek dla "outlaw", ale IsAtWarAgainstFaction pyta najpierw IsAtConstantWar -> GetShallowDiplomaticStance = War).
+
+**Zmiana (Prologue.World.Beric.cs).** Od dnia 160: Beric (gdy prowadzi druzyne), inaczej glowa rodu Dondarrion (ROTclan_58, Blackhaven), gdy prowadzi druzyne; bez nich - do d165
+proba, potem POMINIETY (linia). Partia sceny: `SetMoveEngageParty` na najblizsza zywa bande Ludzi Gory (co godzine od nowa), ukryta przed AI (lordowie korony i bandy nie
+zaczepiaja jej po drodze; gracz moze). Koniec: brak Ludzi Gory w polu, druzyna stracona albo dzien 188 - wraca do swojego AI. Zwyciestwa liczone ze zdarzenia
+MobilePartyDestroyed (wodz zwyciezcy = bohater sceny). Ludzie i zloto bez zmian (zwykla druzyna). Linie: `Beric: rusza na Ludzi Gory - <kto> [Beric (brotherhood) / zapas ...]
+druzyna ... (frakcja ...)`, `Beric: KONIEC - ... (rozbite bandy Ludzi Gory: N)`; w linii doby `Beric: poscig - <kto> N ludzi, <pozycja>, cel <banda> N jedn.`.
+
+**Ryzyko / co sprawdzic.** (1) "Z Krolewskiej Przystani" z projektu - niemozliwe dla Berica z brotherhood (wojna z korona); rusza tam, gdzie jest. Decyzja Jeffa: czy
+na czas prologu przeniesc Berica do rodu korony (to zmiana rodu przywodcy frakcji - wieksza ingerencja). (2) Ukryta partia Berica moze dogonic bande tylko, gdy banda nie jest
+ukryta (Ludzie Gory sa ukryci tylko w marszu do pierwszej wsi) - inaczej spotkanie przy rabunku wsi.
+
+**Status.** DO SPRAWDZENIA (autotest: linia "Beric: rusza" w d160-165, cel w linii doby, ewentualne ROZBITA ... (rozbili: Beric ...)).
