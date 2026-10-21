@@ -14,7 +14,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 | E1b | pokoj w prologu (wojny Westeros-Westeros zablokowane), pakty i sojusze z krolestwem Roberta | ZROBIONE (build Armoury 0, CrashScribe 0) |
 | E2a | Robert i Ned zyja, glowy rodow i wladcy | ZROBIONE (build Armoury 0) |
 | E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | ZROBIONE (build Armoury 0) |
-| LOG | grupa tools/sprawdz_logi.py --grupa m101prolog | do zrobienia |
+| LOG | grupa tools/sprawdz_logi.py --grupa m101prolog (PR-0..PR-8) | ZROBIONE (sprawdzone na logu syntetycznym) |
 
 ## Rozpoznanie (dekompilacja gry 1.4.8, ROT 8.1.8, Diplomacy 1.4.7, BK)
 
@@ -119,7 +119,7 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 ### E2b - koniec prologu i egzekucja Neda (ZROBIONE)
 - `Armoury/src/Prologue.End.cs` (nowy):
   - doba prologu >= 186 (`DailyEnd`, raz): `EndPacts` (sojusze zerwane, pakty wygaszone), potem smierc krola: `AddDeathMark(WoundedInBattle)` +
-    `KillCharacterAction.ApplyByDeathMarkForced` (wymuszona - "od ran z polowania"); krol w bitwie/oblezeniu (albo jego strażnik-zwyciezca w bitwie) - nastepna doba.
+    `KillCharacterAction.ApplyByDeathMarkForced` (wymuszona - "od ran z polowania"); krol w bitwie/oblezeniu (albo strona, ktora trzyma go w niewoli, w bitwie) - nastepna doba.
     Sukcesje robi gra (przywodca rodu z dziedzicow, glosowanie o tron z premia ROT x999 dla rodu panujacego); gdy przywodca rodu `clan_nord_1` nie jest Joffreyem,
     a Joffrey zyje w tym rodzie - `ChangeClanLeaderAction.ApplyWithSelectedNewLeader`. Nazwa rodu wraca do "Baratheon, Joffrey" (z zapisu, zakodowana
     `Uri.EscapeDataString`). Komunikat dla gracza (EN) o smierci krola, Joffreyu na tronie i uwiezieniu Neda.

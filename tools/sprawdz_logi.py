@@ -1016,6 +1016,11 @@ Uzycie (Python 3, tylko odczyt):
                     handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 doplyw nie doklada ponad
                     pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
+--grupa m101prolog : (21.10, w-toku/m101-prolog; Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
+                    python -I tools/sprawdz_logi.py --grupa m101prolog <Armoury-*.log> [--crashscribe <session-*.log>]. PR-0 linie startu, PR-1 ERROR i potkniecia 0,
+                    PR-2 latka startu opowiesci N/N (>= 28 metod, >= 38 miejsc) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
+                    wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 + 6/6, PR-7 koniec prologu (Robert martwy, Joffrey krolem, Ned jencem), PR-8 NedEvent (Ned
+                    martwy, Robb wladca Polnocy). Log bez prologu: INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
@@ -37416,6 +37421,157 @@ def m97surowce_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m101prolog (21.10, w-toku/m101-prolog: prolog 298 - wybor startu, kalendarz 188 dni przed opowiescia,
+# latka startu opowiesci w ROT.dll, pokoj krola i pakty z krolestwem Roberta, Robert i Ned zyja, koniec prologu w dniu 186, egzekucja Neda w NedEvent;
+# Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
+M101_TAG = "Prolog (m101): "
+M101_STORY = re.compile(r"latki opowiesci ROT \((.*?)\): wpiete (\d+)/(\d+) metod \(miejsc odczytu (\d+)")
+M101_REST = re.compile(r"latki prologu \((.*?)\): pokoj i pakty: wojny ([A-Z]+), wezwania ([A-Z]+), koniec sojuszu ([A-Z]+) \| Robert i Ned z XML ([A-Z]+) \| egzekucja Neda \(NedEvent\) ([A-Z]+)")
+M101_KINGS = re.compile(r"Robert i Ned \(XML ozywionych (\d)/2.*?\): (.*)")
+M101_DAY = re.compile(r"dzien (\d+) prologu \((opowiesc za [0-9.]+ dni|opowiesc trwa, dzien opowiesci -?[0-9.]+)\) \| (.*)")
+M101_WARS = re.compile(r"wojny Westeros-Westeros \(bez Wolnych Ludzi\) (\d+)")
+M101_PACTS = re.compile(r"pakty: sojusze (\d)/(\d)(?: \(nowe \d+\))?, pakty o nieagresji (?:(\d)/(\d)|brak moda Diplomacy)")
+M101_EVENTS = re.compile(r"wydarzenia ROT ruszone (\d+|-)")
+M101_STUMB = re.compile(r"potkniecia (\d+) \(razem (\d+)\)")
+M101_END = re.compile(r"KONIEC PROLOGU \((.*?), dzien ([0-9.]+)\) \| Robert martwy (\S+).*?Joffrey krolem (TAK|NIE).*?\| Ned: (.*?) \| pakty: (.*?) \| potkniecia (\d+)")
+M101_NED = re.compile(r"egzekucja Neda \(NedEvent, dzien opowiesci (-?[0-9.]+)\) \| Ned martwy (\S+).*?- Robb (TAK|NIE)")
+M101_CS_START = re.compile(r"FABULA: wydarzenie (\S+) WYSTARTOWALO \(dzien (-?\d+)\)")
+
+
+def m101prolog_main(logp, csp=None):
+    """m101prolog (21.10, w-toku/m101-prolog; Jeff 21.10 "Robimy wczesniejszy start", "Ok wersje lekka robimy", pakty i sojusze z krolestwem Roberta na czas
+    prologu): PR-0 linie startu (latki menu, wybor, start sesji), PR-1 ERROR Prologue i potkniecia 0, PR-2 latki opowiesci ROT N/N (M >= 28 metod, >= 38 miejsc)
+    i reszta latek TAK, PR-3 Robert i Ned ozywieni 2/2, PR-4 w prologu zadne wydarzenie ROT nie ruszylo (Armoury: 'wydarzenia ROT ruszone 0'; z --crashscribe:
+    zadne 'FABULA: wydarzenie ... WYSTARTOWALO' z dniem < 0), PR-5 w prologu zadna wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 i 6/6 do konca
+    prologu, PR-7 koniec prologu: Robert martwy, Joffrey krolem, Ned jencem w town_EW4, PR-8 egzekucja Neda: Ned martwy, Robb wladca Polnocy.
+    Log bez kampanii z prologiem: INFO (klasyczny start - sprawdzamy tylko, ze latki opowiesci nie weszly)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("PR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    menu, choices, starts, story, rest, kings, days, ends, neds, n_err = [], [], [], [], [], [], [], [], [], 0
+    stumb = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in Prologue"):
+                n_err += 1
+                continue
+            if not s.startswith(M101_TAG):
+                continue
+            body = s[len(M101_TAG):]
+            if body.startswith("latki menu glownego"):
+                menu.append(body); continue
+            if body.startswith("wybor startu nowej kampanii"):
+                choices.append(body); continue
+            if body.startswith("start sesji"):
+                starts.append(body)
+                ms = re.search(r"\| potkniecia (\d+)\.", body)
+                if ms:
+                    stumb = max(stumb, int(ms.group(1)))
+                continue
+            mm = M101_STORY.search(body)
+            if mm:
+                story.append((mm.group(1), int(mm.group(2)), int(mm.group(3)), int(mm.group(4)))); continue
+            mm = M101_REST.search(body)
+            if mm:
+                rest.append(mm.groups()); continue
+            mm = M101_KINGS.search(body)
+            if mm:
+                kings.append((int(mm.group(1)), mm.group(2))); continue
+            mm = M101_END.search(body)
+            if mm:
+                ends.append(mm.groups())
+                stumb = max(stumb, int(mm.group(7)))
+                continue
+            mm = M101_NED.search(body)
+            if mm:
+                neds.append(mm.groups()); continue
+            mm = M101_DAY.match(body)
+            if mm:
+                rest_of = mm.group(3)
+                before = mm.group(2).startswith("opowiesc za")
+                mw = M101_WARS.search(rest_of)
+                mp = M101_PACTS.search(rest_of)
+                me = M101_EVENTS.search(rest_of)
+                mt = M101_STUMB.search(rest_of)
+                if mt:
+                    stumb = max(stumb, int(mt.group(1)))
+                days.append((int(mm.group(1)), before, int(mw.group(1)) if mw else None,
+                             (int(mp.group(1)), int(mp.group(2)), int(mp.group(3)) if mp.group(3) else None, int(mp.group(4)) if mp.group(4) else None) if mp else None,
+                             me.group(1) if me else None, "koniec prologu TAK" in rest_of))
+    cs_early = []
+    if csp and os.path.isfile(csp):
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mc = M101_CS_START.search(ln)
+                if mc and int(mc.group(2)) < 0:
+                    cs_early.append((mc.group(1), int(mc.group(2))))
+    prolog = any("prolog TAK" in x for x in starts) or bool(days)
+    print(f"plik: {logp} | linii menu {len(menu)}, wyborow {len(choices)}, startow sesji {len(starts)}, dob prologu {len(days)}, koncow {len(ends)}, egzekucji {len(neds)}, ERROR {n_err}")
+    if not menu and not starts:
+        rep.add("PR-0: linie 'Prolog (m101): ...'", "brak w logu", "INFO (log sprzed paczki m101-prolog)", None)
+        rep.show()
+        return 0
+    rep.add("PR-0: latki menu glownego i wybor startu", (menu[-1][:120] if menu else "brak linii menu") + (" | " + choices[-1][:90] if choices else " | brak wyboru (wczytanie zapisu)"),
+            "okno wyboru TAK", ("okno wyboru TAK" in menu[-1]) if menu else None)
+    rep.add("PR-1: ERROR Prologue i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    if not prolog:
+        ok = all("latki opowiesci ROT: nie wpiete" in x for x in starts) if starts else None
+        rep.add("PR-2: kampania klasyczna - latki opowiesci ROT nie wpiete", f"startow sesji {len(starts)}" + (f" ({starts[-1][:140]})" if starts else ""),
+                "INFO - w logu nie ma kampanii z prologiem; klasyczny start bez latek opowiesci", ok)
+        rep.show()
+        return 0
+    if story:
+        st = story[-1]
+        rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} ({st[0]})", "N = M, M >= 28, miejsc >= 38",
+                st[1] == st[2] and st[2] >= 28 and st[3] >= 38)
+    else:
+        rep.add("PR-2: latka startu opowiesci w ROT.dll", "brak linii 'latki opowiesci ROT (...)'", "linia z wpiete N/M", False)
+    if rest:
+        r = rest[-1]
+        rep.add("PR-2b: reszta latek prologu", f"wojny {r[1]}, wezwania {r[2]}, koniec sojuszu {r[3]}, XML {r[4]}, NedEvent {r[5]}", "wszystkie TAK",
+                all(x == "TAK" for x in r[1:6]))
+    else:
+        rep.add("PR-2b: reszta latek prologu", "brak linii 'latki prologu (...)'", "linia z TAK", False)
+    if kings:
+        k = kings[-1]
+        rep.add("PR-3: Robert i Ned ozywieni, glowy rodow i wladcy", f"XML {k[0]}/2 | {k[1][:160]}", "2/2 i oba 'TAK'", k[0] == 2 and k[1].count(" TAK") >= 2)
+    else:
+        rep.add("PR-3: Robert i Ned ozywieni", "brak linii (wczytany zapis bez startu nowej kampanii w tym logu)", "INFO", None)
+    pro = [d for d in days if d[1]]
+    ev_bad = [d for d in pro if d[4] not in (None, "0", "-")]
+    rep.add("PR-4: w prologu zadne wydarzenie ROT nie ruszylo", f"dob prologu {len(pro)}, z ruszonym wydarzeniem {len(ev_bad)}" + (f" (dzien {ev_bad[0][0]}: {ev_bad[0][4]})" if ev_bad else "")
+            + (f"; CrashScribe: starty przed dniem 0: {len(cs_early)}" + (f" ({cs_early[0][0]} dzien {cs_early[0][1]})" if cs_early else "") if csp else "; bez --crashscribe"),
+            "0 (i 0 w logu CrashScribe)", (len(ev_bad) == 0 and len(cs_early) == 0) if pro else None)
+    war_bad = [d for d in pro if d[2]]
+    rep.add("PR-5: w prologu zadna wojna Westeros-Westeros (bez Wolnych Ludzi)", f"dob z wojna {len(war_bad)} z {len(pro)}" + (f" (dzien {war_bad[0][0]}: {war_bad[0][2]})" if war_bad else ""),
+            "0", (len(war_bad) == 0) if pro else None)
+    pk = [d for d in pro if d[3] is not None and not d[5]]
+    pk_bad = [d for d in pk if d[3][0] != d[3][1] or (d[3][2] is not None and d[3][2] != d[3][3])]
+    no_dip = any(d[3][2] is None for d in pk)
+    rep.add("PR-6: pakty z krolestwem Roberta do konca prologu", f"dob z pelnymi paktami {len(pk) - len(pk_bad)} z {len(pk)}" + (f" (dzien {pk_bad[0][0]}: {pk_bad[0][3]})" if pk_bad else "")
+            + ("; bez moda Diplomacy - same sojusze" if no_dip else ""), "sojusze 3/3, pakty 6/6 kazdej doby", (len(pk_bad) == 0) if pk else None)
+    if ends:
+        e = ends[-1]
+        ok = e[2].startswith("TAK") and e[3] == "TAK" and "jeniec w town_EW4 TAK" in e[4]
+        rep.add("PR-7: koniec prologu (dzien 186)", f"dzien {e[1]} | Robert martwy {e[2]} | Joffrey krolem {e[3]} | Ned: {e[4][:60]} | pakty: {e[5]}",
+                "Robert martwy TAK, Joffrey krolem TAK, Ned jeniec w town_EW4 TAK", ok)
+    else:
+        last = max([d[0] for d in days], default=-1)
+        rep.add("PR-7: koniec prologu (dzien 186)", f"brak linii (ostatnia doba prologu w logu {last})", "INFO gdy log krotszy niz 186 dob", None if last < 187 else False)
+    if neds:
+        n = neds[-1]
+        rep.add("PR-8: egzekucja Neda (NedEvent)", f"dzien opowiesci {n[0]} | Ned martwy {n[1]} | Robb wladca Polnocy {n[2]}", "Ned martwy TAK, Robb TAK",
+                n[1] == "TAK" and n[2] == "TAK")
+    else:
+        rep.add("PR-8: egzekucja Neda (NedEvent)", "brak linii", "INFO gdy log nie siega ~9 dni opowiesci", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m100kryjowki (21.10, w-toku/m100-kryjowki: wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania,
 # nowe kryjowki z dala od osad i wiosek pobocznych, po rozbiciu w innym miejscu; Armoury/src/HideoutSight.cs; klucze HideoutScoutingChance, HideoutRumourReveals,
 # HideoutAwayFromSettlements, HideoutRelocateAfterClear)
@@ -54723,6 +54879,8 @@ def main(argv):
         return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
     if group == "m97surowce" and logp:
         return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
+    if group == "m101prolog" and logp:
+        return m101prolog_main(logp, csp)   # m101prolog (21.10, w-toku/m101-prolog): prolog 298 - kalendarz, start opowiesci ROT, pokoj i pakty, Robert i Ned, koniec prologu
     if group == "m100kryjowki" and logp:
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m99markietani" and logp:
