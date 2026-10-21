@@ -440,6 +440,14 @@ namespace Armoury
         [SettingPropertyGroup("Learning patterns")]
         public bool RareBowsNotForged { get; set; } = true;
 
+        [SettingPropertyBool("Rare Bows Need Material", HintText = "the weirwood and dragonbone bows can be forged again - from weirwood or dragonbone carried in your bags (one whole piece per bow; a stave that splits on the anvil is lost), once you have learned the pattern from an original like any famed piece. Without it the anvil says what is missing and where it is found. Off: these bows cannot be forged at all (Rare Bows Not Forged)", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareBowsNeedMaterial { get; set; } = true;
+
+        [SettingPropertyBool("Rare Material Supply", HintText = "weirwood and dragonbone come into the world slowly: now and then a piece turns up in the Free Folk villages of the haunted forest beyond the Wall (about one every 15 days, at most 3 waiting there and 10 in the whole world) and in the ruins of Valyria and the old markets of Volantis and Qarth (about one every 30 days, at most 2 there and 6 in the world). Villagers and caravans carry them on like other goods. Off: no new pieces appear", RequireRestart = false)]
+        [SettingPropertyGroup("Learning patterns")]
+        public bool RareMaterialSupply { get; set; } = true;
+
         [SettingPropertyBool("Legend Twin Pieces Hidden", HintText = "the twin blades of the legends (the 'Dual' copies of Dark Sister, Oathkeeper, Needle, the Valyrian blades and the rest - the same blade under another name, used by no item) are hidden in the weapon designer like the legend's own parts. Off: these twins stayed open from day one in the dual sword class, so a Valyrian or legendary blade could be forged from common steel", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool LegendTwinPiecesHidden { get; set; } = true;
@@ -8813,6 +8821,8 @@ namespace Armoury
             s.PatternTileShowsSkill = PatternTileShowsSkill;
             s.XbowPatternTierByPower = XbowPatternTierByPower;
             s.RareBowsNotForged = RareBowsNotForged;
+            s.RareBowsNeedMaterial = RareBowsNeedMaterial;
+            s.RareMaterialSupply = RareMaterialSupply;
             s.LegendTwinPiecesHidden = LegendTwinPiecesHidden;
             s.TroopWearEnabled = TroopWearEnabled;
             s.TroopWearPercent = TroopWearPercent;

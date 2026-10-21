@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- m97-surowce (Armoury): nazwa kategorii arm_rare_stuff (ItemCategory.GetName -> str_item_category.<id>) -->
+<strings>
+	<string
+		id="str_item_category.arm_rare_stuff"
+		text="{=arm_rare_stuff}Rare Bowyer's Stuff" />
+</strings>

@@ -47,5 +47,17 @@
       </Tags>
     </SubModule>
   </SubModules>
-  <Xmls />
+  <Xmls>
+    <!-- m97-surowce: czardrzewo i smocza kosc (kategoria arm_rare_stuff z kodu - tylko kampania) -->
+    <XmlNode>
+      <XmlName id="Items" path="arm_items_rare" />
+      <IncludedGameTypes>
+        <GameType value="Campaign" />
+        <GameType value="CampaignStoryMode" />
+      </IncludedGameTypes>
+    </XmlNode>
+    <XmlNode>
+      <XmlName id="GameText" path="arm_strings" />
+    </XmlNode>
+  </Xmls>
 </Module>

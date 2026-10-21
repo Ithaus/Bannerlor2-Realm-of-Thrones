@@ -1010,6 +1010,11 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m96receptury <Armoury-*.log> (strumieniowo). R96-0 linia startu, R96-1 metal w lukach 0, R96-2 mediana masy
                     surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0, R96-6 latka SpendMaterials CRAFT BK
                     wpieta, R96-7 pekniecia CRAFT BK z kg (INFO). Log bez paczki: INFO.
+--grupa m97surowce : (20.10, w-toku/m97-surowce - Jeff "luk z czardrzewa - trzeba miec czardrzewo, smoczej kosci - smocza kosc"; Armoury/src/RareMaterials.cs,
+                    ModuleData/arm_items_rare.xml; klucze RareBowsNeedMaterial, RareMaterialSupply)
+                    python -I tools/sprawdz_logi.py --grupa m97surowce <Armoury-*.log> (strumieniowo). S97-0 linia startu, S97-1 surowce istnieja (2 z 2, nie towar
+                    handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 zapas regionu i swiata nie ponad
+                    pulap, S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0. Log bez paczki: INFO.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -37161,6 +37166,103 @@ def m96receptury_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m97surowce (20.10, w-toku/m97-surowce: czardrzewo i smocza kosc - surowce lukow z listy
+# RareBowsIds, doplyw z osad za Murem i z Valyrii/Volantis/Qarth; Armoury/src/RareMaterials.cs, ModuleData/arm_items_rare.xml)
+M97S_HEAD = "Surowce rzadkie (m97-surowce): start sesji"
+M97S_DAY = "Surowce rzadkie (m97-surowce): dzien "
+M97S_USE = "Surowce rzadkie (m97-surowce): kucie "
+M97S_FOUND = re.compile(r"istnieje (\d+) z (\d+)")
+M97S_ITEM = re.compile(r"(arm_\w+) \([^)]*\) cena (\d+) d, waga ([0-9.]+) kg, kategoria (\S+) \(towar handlowy (TAK|NIE)")
+M97S_SRC = re.compile(r"(weirwood|dragonbone) (\d+) z (\d+) osad")
+M97S_DNUM = re.compile(r"dzien (\d+)")
+M97S_MAT = re.compile(r"\| (\w+): przybylo (\d+)(?: \([^)]*\))?, zapas regionu (-?\d+)/(\d+), swiata (\?|-?\d+)/(\d+)")
+M97S_STUMB = re.compile(r"potkniecia (\d+)")
+
+
+def m97surowce_main(logp):
+    """m97surowce (20.10, w-toku/m97-surowce; Jeff: "luk z czardrzewa okay, trzeba miec czardrzewo, smoczej kosci - smocza kosc ... aby dalo sie wszystko wykuc"):
+    dwa rzadkie surowce (arm_weirwood, arm_dragonbone), doplyw dobowy z osad zrodla z pulapem regionu i swiata, kucie luku z surowcem.
+    S97-0 linia startu (klucz RareBowsNeedMaterial TAK), S97-1 surowce istnieja (2 z 2, kategoria nie towar handlowy, cena > 0), S97-2 osady zrodla > 0 dla obu,
+    S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (log krotszy - INFO), S97-3b kolejne bloki 30 dob (INFO), S97-4 zapas regionu i swiata nie ponad pulap w zadnej linii doby,
+    S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("S97-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    heads, days, uses, n_err, stumb = [], [], 0, 0, 0
+    over = []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97S_HEAD):
+                heads.append(s)
+            elif s.startswith(M97S_DAY):
+                dn = M97S_DNUM.search(s)
+                added = 0
+                for mm in M97S_MAT.finditer(s):
+                    added += int(mm.group(2))
+                    reg, regcap = int(mm.group(3)), int(mm.group(4))
+                    if reg > regcap:
+                        over.append(f"{mm.group(1)} region {reg}/{regcap}")
+                    if mm.group(5) != "?" and int(mm.group(5)) > int(mm.group(6)):
+                        over.append(f"{mm.group(1)} swiat {mm.group(5)}/{mm.group(6)}")
+                capped = any(int(x.group(3)) >= int(x.group(4)) or (x.group(5) != "?" and int(x.group(5)) >= int(x.group(6))) for x in M97S_MAT.finditer(s))
+                if dn:
+                    days.append((int(dn.group(1)), added, capped))
+            elif s.startswith(M97S_USE):
+                uses += 1
+            elif s.startswith("ERROR in RareMaterials"):
+                n_err += 1
+            else:
+                continue
+            ms = M97S_STUMB.findall(s)
+            if ms:
+                stumb = max(stumb, int(ms[-1]))
+    print(f"plik: {logp} | linii startu {len(heads)}, linii doby {len(days)}, kuc z surowcem {uses}, ERROR {n_err}")
+    if not heads and not days and uses == 0 and n_err == 0:
+        rep.add("S97-0: linia 'Surowce rzadkie (m97-surowce): start sesji'", "brak w logu", "INFO (log sprzed paczki m97-surowce albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = heads[-1] if heads else ""
+    on = "RareBowsNeedMaterial TAK" in last
+    rep.add("S97-0: linia startu sesji", (last[:160] + "...") if last else "brak", "klucz RareBowsNeedMaterial TAK", bool(last) and on)
+    fm = M97S_FOUND.search(last)
+    items = M97S_ITEM.findall(last)
+    ok1 = bool(fm and fm.group(1) == fm.group(2) == "2") and len(items) == 2 and all(int(i[1]) > 0 and i[4] == "NIE" for i in items)
+    rep.add("S97-1: surowce istnieja (id, cena, kategoria)", "; ".join(f"{i[0]} {i[1]} d {i[2]} kg {i[3]} handlowy {i[4]}" for i in items) or "brak",
+            "2 z 2, cena > 0, towar handlowy NIE", ok1)
+    src = M97S_SRC.findall(last)
+    rep.add("S97-2: osady zrodla", ", ".join(f"{a} {b}/{c}" for a, b, c in src) or "brak", "obie > 0", len(src) == 2 and all(int(b) > 0 for _, b, _ in src))
+    if days:
+        days.sort()
+        d0 = days[0][0]
+        span = days[-1][0] - d0 + 1
+        total = sum(a for _, a, _ in days)
+        # los dobowy (czardrzewo 1/15, smocza kosc 1/30): 30 dob bez zadnej sztuki obu surowcow ma szanse ok. 4.5% - prog na PIERWSZE 30 dob logu,
+        # dalsze bloki 30 dob tylko INFO; doba z pulapem (region albo swiat pelny) liczy sie jak doplyw (nie ma gdzie dolozyc)
+        blocks = {}
+        for d, a, c in days:
+            k = (d - d0) // 30
+            got, cap = blocks.get(k, (0, False))
+            blocks[k] = (got + a, cap or c)
+        b0 = blocks.get(0, (0, False))
+        if span >= 30:
+            rep.add("S97-3: doplyw w pierwszych 30 dobach", f"dob {span}, razem {total}, pierwsze 30 dob {b0[0]}" + (" (pulap)" if b0[1] else ""),
+                    "> 0 albo pulap (szansa falszywego NIE ok. 4.5% - wtedy linia doby: losowan/trafien)", b0[0] > 0 or b0[1])
+        else:
+            rep.add("S97-3: doplyw w 30 dobach", f"dob {span}, razem {total}", "INFO (log krotszy niz 30 dob)", None)
+        rep.add("S97-3b: przybylo w kolejnych blokach 30 dob", ", ".join(f"{v[0]}{'p' if v[1] else ''}" for _, v in sorted(blocks.items())), "INFO (p = pulap w bloku)", None)
+    else:
+        rep.add("S97-3: doplyw w 30 dobach", "brak linii doby", "INFO (RareMaterialSupply NIE albo log bez doby)", None)
+    rep.add("S97-4: zapas nie ponad pulap (region, swiat)", ", ".join(over[:6]) if over else "w pulapie", "w pulapie", not over)
+    rep.add("S97-5: kucia z surowcem", str(uses), "INFO", None)
+    rep.add("S97-6: potkniecia i ERROR paczki", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96wzory (20.10, w-toku/m96-wzory: wzory kuzni po ostatecznych statystykach, naprawa zapisu, bramy wiedzy;
 # Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs; klucze LoreSeedAfterFinalStats, PatternDrawBySkill, ShieldCraftSkillGate, ForgeUniquesByStudy,
 # PatternTileShowsSkill, XbowPatternTierByPower, RareBowsNotForged, LegendTwinPiecesHidden)
@@ -53787,6 +53889,8 @@ def main(argv):
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
     if group == "m96receptury" and logp:
         return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
+    if group == "m97surowce" and logp:
+        return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
     if group == "m96wzory" and logp:
         return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:
