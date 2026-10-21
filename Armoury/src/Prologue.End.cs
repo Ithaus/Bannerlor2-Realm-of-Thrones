@@ -147,6 +147,7 @@ namespace Armoury
             try
             {
                 if (ned.IsPrisoner) EndCaptivityAction.ApplyByEscape(ned, null, false);
+                if (ned.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(ned);   // jeniec nie rzadzi miastem (KillCharacterAction robi to samo przy smierci)
                 var party = ned.PartyBelongedTo;
                 if (party != null && party != MobileParty.MainParty)
                 {

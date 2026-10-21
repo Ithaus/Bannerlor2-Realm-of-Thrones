@@ -275,7 +275,8 @@ namespace Armoury
             Log.Info(Tag + "start sesji | prolog " + (Active ? "TAK" : "NIE") + (Active ? " (" + ChosenBy + ")" : "")
                      + " | start kalendarza " + cal + " | start opowiesci " + story + (Active ? " (dzien prologu " + PrologueDay().ToString("0.0", Inv) + ")" : "")
                      + " | latki opowiesci ROT: " + StoryState + " | " + _restState
-                     + (Active ? " | " + DailyKings() : "")
+                     + (Active ? " | " + DailyKings() + " | pakty: " + (_pactsEnded ? "zakonczone" : "nasze sojusze " + _ourAllies.Count + ", nasze pakty o nieagresji " + _ourNaps.Count)
+                        + " | koniec prologu " + (_kingFallen ? "TAK" : "NIE") : "")
                      + " | klucz Prologue Enabled " + (S != null && S.PrologueEnabled ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
         }
 

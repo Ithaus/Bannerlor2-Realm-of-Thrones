@@ -1018,7 +1018,7 @@ Uzycie (Python 3, tylko odczyt):
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
 --grupa m101prolog : (21.10, w-toku/m101-prolog; Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
                     python -I tools/sprawdz_logi.py --grupa m101prolog <Armoury-*.log> [--crashscribe <session-*.log>]. PR-0 linie startu, PR-1 ERROR i potkniecia 0,
-                    PR-2 latka startu opowiesci N/N (>= 28 metod, >= 38 miejsc) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
+                    PR-2 latka startu opowiesci N/N (>= 27 metod, miejsca + zaciag >= 38) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
                     wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 + 6/6, PR-7 koniec prologu (Robert martwy, Joffrey krolem, Ned jencem), PR-8 NedEvent (Ned
                     martwy, Robb wladca Polnocy). Log bez prologu: INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
@@ -37425,7 +37425,8 @@ def m97surowce_main(logp):
 # latka startu opowiesci w ROT.dll, pokoj krola i pakty z krolestwem Roberta, Robert i Ned zyja, koniec prologu w dniu 186, egzekucja Neda w NedEvent;
 # Armoury/src/Prologue*.cs, CrashScribe/src/StoryClock.cs; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings)
 M101_TAG = "Prolog (m101): "
-M101_STORY = re.compile(r"latki opowiesci ROT \((.*?)\): wpiete (\d+)/(\d+) metod \(miejsc odczytu (\d+)")
+M101_STORY = re.compile(r"latki opowiesci ROT \((.*?)\): wpiete (\d+)/(\d+) metod \(miejsc odczytu (\d+), podmienionych (\d+)")
+M101_AGE = re.compile(r"wiek kampanii \(zaciag\) bez latki (\d+)")
 M101_REST = re.compile(r"latki prologu \((.*?)\): pokoj i pakty: wojny ([A-Z]+), wezwania ([A-Z]+), koniec sojuszu ([A-Z]+) \| Robert i Ned z XML ([A-Z]+) \| egzekucja Neda \(NedEvent\) ([A-Z]+)")
 M101_KINGS = re.compile(r"Robert i Ned \(XML ozywionych (\d)/2.*?\): (.*)")
 M101_DAY = re.compile(r"dzien (\d+) prologu \((opowiesc za [0-9.]+ dni|opowiesc trwa, dzien opowiesci -?[0-9.]+)\) \| (.*)")
@@ -37474,7 +37475,8 @@ def m101prolog_main(logp, csp=None):
                 continue
             mm = M101_STORY.search(body)
             if mm:
-                story.append((mm.group(1), int(mm.group(2)), int(mm.group(3)), int(mm.group(4)))); continue
+                ma = M101_AGE.search(body)
+                story.append((mm.group(1), int(mm.group(2)), int(mm.group(3)), int(mm.group(4)), int(mm.group(5)), int(ma.group(1)) if ma else 0)); continue
             mm = M101_REST.search(body)
             if mm:
                 rest.append(mm.groups()); continue
@@ -37526,8 +37528,9 @@ def m101prolog_main(logp, csp=None):
         return 0
     if story:
         st = story[-1]
-        rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} ({st[0]})", "N = M, M >= 28, miejsc >= 38",
-                st[1] == st[2] and st[2] >= 28 and st[3] >= 38)
+        rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} (podmienionych {st[4]}), wiek kampanii bez latki {st[5]} ({st[0]})",
+                "N = M >= 27, podmienionych >= miejsc, miejsca + wiek kampanii >= 38 (rozpoznanie: 38 odczytow, 1 to zaciag)",
+                st[1] == st[2] and st[2] >= 27 and st[4] >= st[3] and st[3] + st[5] >= 38)
     else:
         rep.add("PR-2: latka startu opowiesci w ROT.dll", "brak linii 'latki opowiesci ROT (...)'", "linia z wpiete N/M", False)
     if rest:

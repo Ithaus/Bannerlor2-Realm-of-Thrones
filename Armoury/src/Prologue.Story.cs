@@ -23,6 +23,17 @@ namespace Armoury
     /// </summary>
     internal static partial class Prologue
     {
+        // odczyty startu, ktore mierza WIEK KAMPANII, nie os opowiesci - zostaja na kalendarzu (bez latki):
+        // ROTEnlistmentBehavior (rozmowa zaciagu: "You must wait at least 5 days before enlisting" - w prologu gracz moze sie zaciagnac jak w klasycznym starcie)
+        private static readonly string[] CampaignAgeTypes = { "ROT.CampaignBehaviors.ROTEnlistmentBehavior" };
+
+        private static bool IsCampaignAgeType(Type t)
+        {
+            for (var x = t; x != null; x = x.DeclaringType)
+                foreach (var n in CampaignAgeTypes) if (x.FullName == n) return true;
+            return false;
+        }
+
         private static bool _storyTried;
         private static string _storyState = "nie wpiete (brak kampanii z prologiem w tym procesie)";
         private static int _storySwapped;
@@ -62,7 +73,7 @@ namespace Armoury
             if (_storyTried) return;
             _storyTried = true;
             var t0 = DateTime.UtcNow;
-            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0;
+            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0;
             try
             {
                 var tBase = AccessTools.TypeByName("ROT.Events.EventBase");
@@ -98,6 +109,7 @@ namespace Armoury
                             foreach (var kv in PatchProcessor.ReadMethodBody(m))
                                 if ((kv.Key == OpCodes.Callvirt || kv.Key == OpCodes.Call) && kv.Value is MethodBase && IsStartGetter((MethodBase)kv.Value)) n++;
                             if (n == 0) continue;
+                            if (IsCampaignAgeType(t)) { age += n; continue; }
                             found++; sites += n;
                             if (t.ContainsGenericParameters || m.ContainsGenericParameters) { skipped++; continue; }
                             if (h.Patch(m, transpiler: tr) != null) patched++; else failed++;
@@ -106,7 +118,7 @@ namespace Armoury
                     }
                 }
                 _storyState = "wpiete " + patched + "/" + found + " metod (miejsc odczytu " + sites + ", podmienionych " + _storySwapped
-                              + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
+                              + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + ", wiek kampanii (zaciag) bez latki " + age + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
             }
             catch (Exception e) { Stumble("InstallStory", e); _storyState = "BLAD wpinania (" + e.GetType().Name + ")"; }
             Log.Info(Tag + "latki opowiesci ROT (" + why + "): " + _storyState + " w " + (int)(DateTime.UtcNow - t0).TotalMilliseconds + " ms.");
