@@ -94,6 +94,8 @@ namespace Armoury
             // m103 wsie (klucz Ks Village Basket At Shelf): budzet drabiny 1 z biezacego wplywu (Cap, zl - zostalo), ziarno i sol poza budzetem (NoCap; ich koszt idzie z budzetu),
             // miasta obok w drabinie 1 (InF2 - przyciete schodzi z braku towaru), przyciete budzetem (szt., zl), zaplacone za ziarno i sol (zl)
             public bool CapOn, NoCap, InF2; public double Cap, CapPcs, CapZl, GsPaid;
+            // recenzja W1: przyciete rzeczy (szczebel 2 - przedza, len, filc, skora, narzedzia, garnki, tran, futra; szt.), narzedzia drabiny 1 kupione i przyciete (szt.)
+            public double CapPcs2, ToolsGot, ToolsCut;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -160,29 +162,45 @@ namespace Armoury
             // KS-R3 H4: jedna cena z mapy doby na wywolanie (ZcPrice) - wartosc chciana przy tej cenie; G2: polka przed pusta kiesa (bez towaru to nie brak pieniedzy)
             EquipmentElement e; int have;
             int price = ZcPrice(b, z, out e, out have);
+            int pw = price; if (pw <= 0) { var iw = StartCalibration.ZItem(z); pw = iw != null ? Math.Max(1, iw.Value) : 0; }
             if (count)
             {
                 b.Want += n; b.Rw[rung] += n;
                 b.KcalW += n * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
-                int pw = price; if (pw <= 0) { var iw = StartCalibration.ZItem(z); pw = iw != null ? Math.Max(1, iw.Value) : 0; }
                 b.ZlW += (double)n * pw;
             }
-            if (price <= 0 || have <= 0) { b.NoGoods++; if (count) { b.NoGoodsPcs += n; b.Miss[z] += n; } return 0; }
-            if (b.Broke) { if (count) b.UnGold += Math.Min(n, have); if (count && have < n) { b.NoGoodsPcs += n - have; b.Miss[z] += n - have; } return 0; }
-            if (count && have < n) { b.NoGoodsPcs += n - have; b.Miss[z] += n - have; }
-            int k = Math.Min(n, have);
             // m103 wsie (Ks Village Basket At Shelf): drabina 1 kupuje towary po ziarnie i soli najwyzej za to, co zostalo z budzetu z biezacego wplywu (Zc4BuyCore) - reszta
-            // czeka (to nie brak kiesy ani towaru: wies tego dzis nie kupi); w miastach obok przyciete schodzi z braku towaru (nie liczy sie drugi raz ani jako popyt bez towaru)
-            if (b.CapOn && !b.NoCap)
+            // czeka (to nie brak kiesy ani towaru: wies tego dzis nie kupi). Recenzja W1 (niska): budzet przed brakiem towaru i kiesy - brak towaru (Miss: miasta obok F2,
+            // sterowanie rynku KsUnmet) i brak kiesy licza sie tylko do sztuk, na ktore starczyloby reszty budzetu przy cenie polki (bez ceny - wartosc towaru, jak ZlW);
+            // reszta to przyciete - ta sama potrzeba liczona tak samo bez wzgledu na polke miasta obok. Bez budzetu (klucz NIE, ziarno i sol) allow = n - jak 101.
+            bool cap = b.CapOn && !b.NoCap && pw > 0;
+            int allow = cap ? (int)Math.Min(n, Math.Floor(Math.Max(0.0, b.Cap) / pw)) : n;
+            if (price <= 0 || have <= 0)
+            {
+                b.NoGoods++;
+                if (count) { b.NoGoodsPcs += allow; b.Miss[z] += allow; }
+                ZcCut(b, z, n - allow, pw, rung, count);
+                return 0;
+            }
+            int hv = Math.Min(n, have);                                              // na polce
+            int mi = Math.Min(n - hv, Math.Max(0, allow - hv));                      // bez towaru w granicy budzetu (bez budzetu: n - hv)
+            if (b.Broke)
+            {
+                int ug = Math.Min(hv, allow);
+                if (count) { b.UnGold += ug; if (mi > 0) { b.NoGoodsPcs += mi; b.Miss[z] += mi; } }
+                ZcCut(b, z, n - ug - mi, pw, rung, count);
+                return 0;
+            }
+            if (count && mi > 0) { b.NoGoodsPcs += mi; b.Miss[z] += mi; }
+            ZcCut(b, z, n - hv - mi, pw, rung, count);                               // brak towaru ponad budzet
+            int k = hv;
+            if (cap)
             {
                 double cr = Math.Max(0.0, b.Cap);
                 int kc = cr >= price ? (int)Math.Min(k, Math.Floor(cr / price)) : 0;
                 if (kc < k)
                 {
-                    int c = k - kc;
-                    // liczone tylko przy pozycji koszyka (count) i w miastach obok; zakup zastepczy (piwo za wino, ziarno na piwo) - bez drugiego liczenia
-                    if (count || b.InF2) { b.CapPcs += c; b.CapZl += (double)c * price; }
-                    if (b.InF2) { int mc = Math.Min(c, b.Miss[z]); b.Miss[z] -= mc; b.NoGoodsPcs = Math.Max(0, b.NoGoodsPcs - mc); }
+                    ZcCut(b, z, k - kc, price, rung, count);
                     k = kc;
                     if (k <= 0) return 0;
                 }
@@ -198,11 +216,27 @@ namespace Armoury
             b.R.AddToCounts(e, -k);
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
             if (b.CapOn) { b.Cap -= paid; if (b.NoCap) b.GsPaid += paid; }   // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci)
+            if (b.CapOn && z == StartCalibration.ZTools && (count || b.InF2)) b.ToolsGot += k;   // recenzja W1: narzedzia drabiny 1 (segment linii ZC4)
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             if (b.P1) StartCalibration.Zc4NotePass1Zl(b.Mk, paid);        // recenzja runda 3: wartosc kupiona drabiny 1 (NKS-13)
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
             return k;
+        }
+
+        /// <summary>m103 wsie (Ks Village Basket At Shelf): c sztuk towaru z przycietych budzetem z biezacego wplywu (cena pw za sztuke) - liczone tylko przy pozycji koszyka
+        /// (count) i w miastach obok (zakup zastepczy - piwo za wino, ziarno na piwo - bez drugiego liczenia); w miastach obok przyciete schodzi z braku towaru (nie liczy sie
+        /// drugi raz ani jako popyt bez towaru). Recenzja W1: osobno rzeczy (szczebel 2) i narzedzia.</summary>
+        private static void ZcCut(ZcBuy b, int z, int c, int pw, int rung, bool count)
+        {
+            if (c <= 0) return;
+            if (count || b.InF2)
+            {
+                b.CapPcs += c; b.CapZl += (double)c * pw;
+                if (rung == 2) b.CapPcs2 += c;
+                if (z == StartCalibration.ZTools) b.ToolsCut += c;
+            }
+            if (b.InF2) { int mc = Math.Min(c, b.Miss[z]); b.Miss[z] -= mc; b.NoGoodsPcs = Math.Max(0, b.NoGoodsPcs - mc); }
         }
 
         /// <summary>KS-R3 G2 drabina 2 (reszta pelnego koszyka ponad zaplacone z Planu): tylko z kiesy ponad Lim (7 dob budzetu Planu) i tylko ze stanu polki ponad 1.5 x cel
@@ -315,11 +349,14 @@ namespace Armoury
             // m103 wsie (klucz Ks Village Basket At Shelf): budzet drabiny 1 z biezacego wplywu (ShelfBudget) - tylko drabina 1 koszyka zaplaconego z Planu
             double shC = 0, shB = 0, shPlan = 0, shNet = -1;
             if (qp != null && StartCalibration.SwBasketAtShelf && ShelfBudget(b, vil, n, lam, budgetDay, out shC, out shB, out shPlan, out shNet))
-            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = 0; }
+            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; }
             try { ZcLadder(b, vil, mk, n, resGS); }
             finally
             {
-                if (b.CapOn) StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB));
+                // recenzja W1: narzedzia drabiny 1 - chciane, kupione (z miastami obok), przyciete, bez towaru po miastach obok (w granicy budzetu)
+                int zt = StartCalibration.ZTools;
+                if (b.CapOn) StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
+                                                           b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
                 b.CapOn = false; b.NoCap = false; b.InF2 = false;
             }
             b.P1 = false;
