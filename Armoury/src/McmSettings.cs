@@ -8996,11 +8996,11 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueHandTourney { get; set; } = true;
 
-        [SettingPropertyBool("Prologue Tyrion Held", HintText = "in a Prologue 298 campaign Tyrion Lannister, seized by Lady Catelyn on day 110, stays in the dungeon of the Eyrie until his trial by combat on day 132: no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of the Eyrie can end it sooner). Needs Canon Companions Follow Story. Off = he may escape or be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyBool("Prologue Tyrion Held", HintText = "in a Prologue 298 campaign Tyrion Lannister, seized by Lady Catelyn on day 110, stays in the dungeon of the Eyrie until his trial by combat on day 132: no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of the Eyrie can end it sooner). The guard holds only in the dungeon of the Eyrie, and never while the Eyrie is yours. Needs Canon Companions Follow Story. Off = he may escape or be ransomed like any captive", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueTyrionHeld { get; set; } = true;
 
-        [SettingPropertyBool("Prologue Jaime At Riverrun", HintText = "in a Prologue 298 campaign Jaime Lannister, taken by Robb Stark's host when the war begins, is held at Riverrun until Lady Catelyn frees him (the canon table, after the Blackwater; at most a year): no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of Riverrun can end it sooner). Needs Canon Companions Follow Story. Off = he is still taken to Riverrun, but may escape or be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyBool("Prologue Jaime At Riverrun", HintText = "in a Prologue 298 campaign Jaime Lannister, taken by Robb Stark's host when the war begins, is held at Riverrun until Lady Catelyn frees him (the canon table, after the Battle of the Blackwater; if that never comes, at most 150 days past the time the Blackwater is due in the story): no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of Riverrun can end it sooner). The guard holds only in the dungeon of Riverrun, and never while Riverrun is yours. Needs Canon Companions Follow Story. Off = he is still taken to Riverrun, but may escape or be ransomed like any captive", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueJaimeAtRiverrun { get; set; } = true;
 

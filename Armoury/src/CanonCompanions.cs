@@ -126,6 +126,7 @@ namespace Armoury
         // p10 Jaime). Mapa liczona w dobie (po Moves) i przy starcie sesji; czytana w latkach Armoury (EndCaptivityAction, okup) - odczyt O(1), watek gry.
         private static readonly Dictionary<Hero, string> _held = new Dictionary<Hero, string>();
         private static readonly Dictionary<Hero, int> _heldDay = new Dictionary<Hero, int>();   // dzien kampanii wykonania wiersza niewoli
+        private static readonly Dictionary<Hero, string> _heldArg = new Dictionary<Hero, string>(); // recenzja m104: cel wiersza niewoli (osada albo rod, np. town_EN1)
         private static Hero _freeing;   // na czas wlasnej akcji "free" (EndCaptivityAction.ApplyByReleasedByChoice) - straz przepuszcza
 
         /// <summary>m104-e5: id wiersza niewoli, w ktorej postac jest trzymana do wiersza "free" (null - nie trzymana).</summary>
@@ -145,6 +146,14 @@ namespace Armoury
             return h != null && _heldDay.Count > 0 && _heldDay.TryGetValue(h, out d) ? d : -1;
         }
 
+        /// <summary>Recenzja m104: cel wiersza niewoli trzymanej postaci (argument akcji "prisoner": osada albo rod; null - nie trzymana). Straz prologu trzyma
+        /// tylko w lochu tej osady (p01 town_EN1, p10 town_V2) - po ucieczce przez upadek osady i ponownym pojmaniu cudzy loch nie trzyma.</summary>
+        internal static string HeldArg(Hero h)
+        {
+            string a;
+            return h != null && _heldArg.Count > 0 && _heldArg.TryGetValue(h, out a) ? a : null;
+        }
+
         internal static int HeldCount { get { return _held.Count; } }
 
         /// <summary>m104-e5: postac kanonu z wzoru ROTwanderer* (oryginal bez rodzicow) - dla scen prologu (orszak, turniej).</summary>
@@ -152,7 +161,7 @@ namespace Armoury
 
         private static void RebuildHeld()
         {
-            _held.Clear(); _heldDay.Clear();
+            _held.Clear(); _heldDay.Clear(); _heldArg.Clear();
             if (!_on || !_startDone || _moves.Count == 0) return;
             try
             {
@@ -179,6 +188,7 @@ namespace Armoury
                     var h = WhoHero(l[last]);
                     if (h == null || !h.IsAlive || !h.IsPrisoner) continue;
                     _held[h] = l[last].Id;
+                    _heldArg[h] = l[last].Arg;
                     string dv; int dd;
                     _heldDay[h] = _done.TryGetValue(l[last].Id, out dv) && int.TryParse(dv.Split('|')[0], NumberStyles.Integer, Inv, out dd) ? dd : Day();
                 }
@@ -196,7 +206,7 @@ namespace Armoury
             _spawnSaid.Clear();
             _done.Clear(); _first.Clear(); _pend.Clear(); _gone.Clear(); _lostBy.Clear();
             _removingKey = _removingWhy = null;
-            _held.Clear(); _heldDay.Clear(); _freeing = null;   // m104-e5: jency kanonu trzymani do wiersza "free"
+            _held.Clear(); _heldDay.Clear(); _heldArg.Clear(); _freeing = null;   // m104-e5: jency kanonu trzymani do wiersza "free"
             _rescDay = _rescTotal = _lostOtherDay = 0;
             _dDone = _dSkip = _tDone = _tSkip = 0;
             _waitSaid.Clear(); _waitWhy.Clear(); _evDay.Clear();

@@ -19,14 +19,15 @@ namespace Armoury
     ///
     /// STRAZ NIEWOLI (pkt 3 i 4): jency kanonu z tabeli arm_canon_moves.tsv (CanonCompanions.HeldRow - ostatni wykonany wiersz "prisoner", pozniejszy "free" jeszcze
     /// nie zapadl): #p01 Tyrion w lochu Orlego Gniazda (dzien 110 -> #p02 w dniu 132, klucz PrologueTyrionHeld) i #p10 Jaime w Riverrun (wojna Polnocy +5 dni ->
-    /// #m02 po Czarnym Nurcie, klucz PrologueJaimeAtRiverrun, najwyzej JaimeHoldMaxDays dni). Rozpoznanie m104 (dekompilacja 1.4.8): RealisticCaptivity dotyka tylko
+    /// #m02 po Czarnym Nurcie, klucz PrologueJaimeAtRiverrun, najdluzej do dnia opowiesci JaimeHoldLastStoryDay - brama oblezenia na osi Fabuli + zapas). Rozpoznanie m104 (dekompilacja 1.4.8): RealisticCaptivity dotyka tylko
     /// niewoli gracza; jeniec AI w lochu wychodzi przez (a) ucieczke 4%/dobe (PrisonerReleaseCampaignBehavior.DailyHeroTick), (b) zwolnienie przy pokoju / zmianie
     /// krolestwa rodu (ReleasePrisonersInternal - Tyrion i Dolina, Jaime i Dorzecze nie sa w wojnie z jego krolestwem), (c) okup AI-AI (RansomOfferCampaignBehavior.
     /// DailyTickHero -> ConsiderRansomPrisoner, u nas Ransom178 - zloto plynie PRZED EndCaptivityAction.ApplyByRansom), (d) wypuszczenie przez porywacza i wykup.
     /// Dwie latki: prefiks EndCaptivityAction.ApplyInternal (ucieczka, pokoj, okup, wypuszczenie, wykup - pomijane; smierc i "po bitwie" (upadek osady, zmiana pana)
     /// zawsze przechodza; gracz jako sprawca (rozbicie lochu, jego okup) przechodzi - nic nie placi za darmo) i prefiks RansomOfferCampaignBehavior.DailyTickHero
-    /// (okup nie zaczyna sie wcale - zloto nie plynie za jenca, ktory zostanie w lochu). Straz tylko w lochu OSADY (jeniec w druzynie - zwykle zasady gry: rozwiazanie
-    /// druzyny i tratwa uwalniaja go, inaczej zostalby w rozwiazanej partii) i tylko przy kluczu CanonCompanionsFollowStory (bez niego wiersz "free" nie przyjdzie).
+    /// (okup nie zaczyna sie wcale - zloto nie plynie za jenca, ktory zostanie w lochu). Straz tylko w lochu OSADY Z WIERSZA (p01 town_EN1, p10 town_V2; recenzja m104:
+    /// po wyjsciu i ponownym pojmaniu cudzy loch nie trzyma; loch rodu gracza - nigdy; jeniec w druzynie - zwykle zasady gry: rozwiazanie druzyny i tratwa uwalniaja
+    /// go, inaczej zostalby w rozwiazanej partii) i tylko przy kluczu CanonCompanionsFollowStory (bez niego wiersz "free" nie przyjdzie).
     /// Nasze uwolnienie (akcja "free") przechodzi (CanonCompanions.Freeing).
     ///
     /// Zapis: arm_prologue (klucze "w*"). Linie logu: "Prolog E5 (m104): ..." - start sesji, doba (kazda scena: stan / pozycja / postep), zdarzenia scen.
@@ -38,7 +39,12 @@ namespace Armoury
         private const string TyrionTpl = "ROTwanderer8", JaimeTpl = "ROTwanderer1";
         private const string TyrionHoldRow = "p01", JaimeHoldRow = "p10";
         private const int TyrionHoldLastDay = 140;    // dzien prologu - zapas po #p02 (132); straz Tyriona gasnie najpozniej wtedy
-        private const int JaimeHoldMaxDays = 364;     // dni od #p10 - Jaime w Riverrun najwyzej rok (dlugi rok Armoury), gdyby #m02 nie przyszedl
+        // recenzja m104: straz Jaimego liczona z osi Fabuli (CrashScribe Fabula.cs: BlackwaterSiegeEvent 177 x FabulaTimeScale; #m02 = done:BlackwaterEvent po oblezeniu),
+        // a nie stalym rokiem od #p10 (#p10 ok. 15. dnia opowiesci, oblezenie przy x4.33 ok. 766. dnia - rok gasl ok. 380 dni przed Catelyn). Zapas po bramie
+        // oblezenia, gdyby #m02 nie przyszedl (Fabula omija zatkane wydarzenie, ale nie robi go "done").
+        private const float BlackwaterSiegeRotDay = 177f;
+        private const int JaimeHoldSpareDays = 150;
+        private const float FabulaScaleDefault = 4.33f;   // CrashScribe Config.FabulaTimeScale (domyslna; brak CrashScribe albo odczytu - ta)
         private const int WorldLogAfterStory = 20;    // linia doby E5 jeszcze tyle dni po starcie opowiesci (jak linia doby prologu), potem co 10 dni przy strazy
 
         // ---------------------------------------------------------------- stan (zapis)
@@ -152,25 +158,61 @@ namespace Armoury
             return false;
         }
 
+        private static bool _fabulaTried;
+        private static FieldInfo _fabulaScale;
+
+        /// <summary>Skala osi Fabuli (CrashScribe Config.FabulaTimeScale, odbiciem - Armoury nie zna CrashScribe); brak / zla wartosc - FabulaScaleDefault.</summary>
+        private static float FabulaScale()
+        {
+            try
+            {
+                if (!_fabulaTried)
+                {
+                    _fabulaTried = true;
+                    var t = AccessTools.TypeByName("CrashScribe.Config");
+                    var f = t != null ? t.GetField("FabulaTimeScale", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+                    if (f != null && f.FieldType == typeof(float)) _fabulaScale = f;
+                }
+                if (_fabulaScale != null)
+                {
+                    float k = (float)_fabulaScale.GetValue(null);
+                    if (k >= 0.5f && k <= 20f) return k;
+                }
+            }
+            catch { }
+            return FabulaScaleDefault;
+        }
+
+        /// <summary>Ostatni dzien opowiesci strazy Jaimego: brama oblezenia Czarnego Nurtu na osi Fabuli + zapas.</summary>
+        private static int JaimeHoldLastStoryDay() { return (int)Math.Ceiling(BlackwaterSiegeRotDay * FabulaScale()) + JaimeHoldSpareDays; }
+
         private static bool HoldInTime(string row, Hero h)
         {
             if (row == TyrionHoldRow) return PrologueDay() < TyrionHoldLastDay;
-            if (row == JaimeHoldRow)
-            {
-                int since = CanonCompanions.HeldDay(h);
-                return since < 0 || (int)CampaignTime.Now.ToDays - since <= JaimeHoldMaxDays;
-            }
+            if (row == JaimeHoldRow) return PrologueDay() - PrologueDays <= JaimeHoldLastStoryDay();
             return false;
         }
 
-        /// <summary>Wiersz niewoli, ktorej pilnuje scena (null - straz nie dziala dla tego bohatera): kampania z prologiem, klucz, czas, loch osady.</summary>
+        /// <summary>Recenzja m104: powod, dla ktorego straz nie trzyma jenca z wiersza niewoli (null - trzyma). Tylko loch osady z wiersza (p01 town_EN1, p10 town_V2) -
+        /// po wyjsciu (upadek osady, "po bitwie") i ponownym pojmaniu cudzy loch nie trzyma; loch rodu gracza - nigdy (decyduje gracz).</summary>
+        private static string HoldWhyNot(string row, Hero h)
+        {
+            if (!HoldKey(row)) return "klucz";
+            if (!HoldInTime(row, h)) return "po czasie";
+            var pp = h.PartyBelongedToAsPrisoner;
+            if (pp == null || !pp.IsSettlement || pp.Settlement == null) return "nie w lochu osady";
+            string at = CanonCompanions.HeldArg(h);
+            if (string.IsNullOrEmpty(at) || pp.Settlement.StringId != at) return "nie w lochu " + (at ?? "?");
+            if (pp.Settlement.OwnerClan == Clan.PlayerClan) return "loch rodu gracza";
+            return null;
+        }
+
+        /// <summary>Wiersz niewoli, ktorej pilnuje scena (null - straz nie dziala dla tego bohatera): kampania z prologiem, klucz, czas, loch osady z wiersza (nie gracza).</summary>
         internal static string HeldByScene(Hero h)
         {
             if (!Active || h == null) return null;
             var row = CanonCompanions.HeldRow(h);
-            if (row == null || !HoldKey(row) || !HoldInTime(row, h)) return null;
-            var pp = h.PartyBelongedToAsPrisoner;
-            if (pp == null || !pp.IsSettlement) return null;
+            if (row == null || HoldWhyNot(row, h) != null) return null;
             return row;
         }
 
@@ -248,8 +290,8 @@ namespace Armoury
             if (h == null) return "brak postaci";
             string held = HeldByScene(h);
             string tab = CanonCompanions.HeldRow(h);
-            return WhoS(h) + " " + WhereS(h) + (held != null ? " (#" + held + ", straz TAK)"
-                   : tab != null ? " (#" + tab + ", straz NIE: " + (!HoldKey(tab) ? "klucz" : !HoldInTime(tab, h) ? "po czasie" : "nie w lochu osady") + ")"
+            return WhoS(h) + " " + WhereS(h) + (held != null ? " (#" + held + ", straz TAK" + (held == JaimeHoldRow ? " do dnia opowiesci " + JaimeHoldLastStoryDay() : "") + ")"
+                   : tab != null ? " (#" + tab + ", straz NIE: " + (Active ? HoldWhyNot(tab, h) ?? "?" : "bez prologu") + ")"
                    : " (poza niewola #" + row + "/#" + freeRow + ")");
         }
 
