@@ -9060,6 +9060,22 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueBericHunt { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Essos Wars Calendar", HintText = "in a Prologue 298 campaign the storyline wars of Realm of Thrones fought between two realms of Essos (Braavos and Lorath, Tyrosh and Lys, Pentos and Myr, Norvos and Qohor, Volantis and Aegon, Sarnor and Ibben) count their days from the start of the campaign, so Essos is already at war during the prologue. Daenerys' wars and every war of Westeros still wait for the story. Off = every storyline war waits for the story", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueEssosWarsCalendar { get; set; } = true;
+
+        [SettingPropertyBool("Canon Reach Joins Crown", HintText = "after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = the Reach keeps its own wars and alliances", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonReachJoinsCrown { get; set; } = true;
+
+        [SettingPropertyBool("Canon Dorne Joins Crown", HintText = "after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = no pact", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonDorneJoinsCrown { get; set; } = true;
+
+        [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool DaenerysDragonsGrow { get; set; } = true;
+
         [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Story windows")]
         public bool StoryImagesForRotWindows { get; set; } = true;
@@ -11348,6 +11364,10 @@ namespace Armoury
             s.PrologueHillClans = PrologueHillClans;
             s.PrologueMountainRaiders = PrologueMountainRaiders;
             s.PrologueBericHunt = PrologueBericHunt;
+            s.PrologueEssosWarsCalendar = PrologueEssosWarsCalendar;
+            s.CanonReachJoinsCrown = CanonReachJoinsCrown;
+            s.CanonDorneJoinsCrown = CanonDorneJoinsCrown;
+            s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;
             s.LektorEventWindows = LektorEventWindows;
