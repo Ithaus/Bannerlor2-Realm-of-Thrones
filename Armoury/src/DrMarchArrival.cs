@@ -6,9 +6,12 @@ using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace Armoury
 {
@@ -22,7 +25,10 @@ namespace Armoury
     /// ZASADA: czas z godzin marszu. Godziny = trasa / predkosc; trasa = 1.1 x linia prosta (ta sama zapasowa trasa co NightMarch), predkosc partii =
     /// ostatnia predkosc z mapy (_lastCalculatedSpeed - to, czym gra przesuwa partie; czlonek armii doczepiony - predkosc wodza) / 1.2 (4320 s gry
     /// na jednostke dt, jak NightMarch.UnitsPerHour); zaloga i milicja (oddzial wychodzi z murow pieszo) - wzor gry dla pieszych:
-    /// BaseSpeed x (200 / (200 + ludzi))^0.4 x tempo swiata (WorldPacePercent) / 1.2. Czas w bitwie = DrDeploySeconds + godziny x DrSecondsPerMarchHour.
+    /// BaseSpeed x (200 / (200 + ludzi))^0.4 x tempo swiata (WorldPacePercent), noc i snieg jak w grze (TerrainEase: plaska kara Jeffa, bez niej
+    /// procent gry), najmniej 1 (MinimumSpeed), / 1.2. Partia, ktora od wczytania zapisu stoi (_lastCalculatedSpeed = 0 - pole [CachedData], obiekt
+    /// z zapisu bez inicjalizatora pol): ten sam wzor z ludzi calej kolumny (wodz + doczepieni, jak CalculateLandBaseSpeed).
+    /// Czas w bitwie = DrDeploySeconds + godziny x DrSecondsPerMarchHour.
     /// Ponad DrMaxMarchHours godzin marszu oddzial NIE przychodzi: odrzucony z powodem DR "DR_refuse_far" (komunikat DR przy ExplainRefusals).
     /// KOD: prefiks Evaluate liczy marsz kazdego kandydata i zdejmuje dalekich z listy (DR nie liczy ich do progu, limitu ludzi ani grup); finalizer
     /// oddaje ich na koniec listy jako odrzuconych (Accepted = false, wynik DR z ComputeScore - kolejnosc komunikatow DR jak dotad); prefiks
@@ -48,7 +54,7 @@ namespace Armoury
         private static int _wired;                  // 0..2: Evaluate (prefiks + finalizer), ComputeArrivalTime (prefiks)
         private static string _miss;
 
-        private static FieldInfo _fParty, _fSrc, _fDist, _fAcc, _fScore, _fArr, _fRejId, _fRejDef, _fTroops, _fSide;
+        private static FieldInfo _fParty, _fSrc, _fDist, _fAcc, _fScore, _fArr, _fRejId, _fRejDef, _fTroops, _fSide, _fSettl;
         private static PropertyInfo _pName, _pCfg;
         private static MethodInfo _mScore;
         private static AccessTools.FieldRef<MobileParty, float> _lastSpeed;
@@ -63,9 +69,9 @@ namespace Armoury
         // stan jednego wywolania Evaluate (watek glowny misji); kandydat DR nie nadpisuje Equals - slownik po referencji
         private static readonly Dictionary<object, March> _march = new Dictionary<object, March>();
         private static readonly List<object> _far = new List<object>();
-        private static bool _active;
+        private static bool _active, _night;
         private static float _maxH, _secH, _depS;
-        private static int _stumbles, _battles, _farTotal, _accTotal, _farMine;
+        private static int _stumbles, _battles, _farTotal, _accTotal, _farMine, _stillTotal;
 
         internal static void ApplyAll(Harmony h)
         {
@@ -92,8 +98,10 @@ namespace Armoury
             Log.Info(Tag + ": start - klucz DrArrivalByMarch " + (on ? "TAK" : "NIE") + ", latki wpiete " + _wired + "/2 (DR ReinforcementCalculator.Evaluate"
                      + " + ComputeArrivalTime) | maks. " + F2(MaxH(s)) + " h marszu, " + F0(SecH(s)) + " s bitwy na godzine marszu, rozwiniecie " + F0(DepS(s))
                      + " s | trasa " + F2(RouteFactor) + " x linia prosta, predkosc partii z mapy / " + F2(HoursPerDt) + ", zaloga i milicja pieszo: "
-                     + F2(bs) + " x (200/(200+ludzi))^0.4 x tempo swiata " + Pace(s) + "% / " + F2(HoursPerDt) + " (100 ludzi = " + F2(FootUph(100, bs, s))
-                     + " jedn./h) | potkniecia " + _stumbles + (_miss != null ? " | " + _miss : "") + ".");
+                     + F2(bs) + " x (200/(200+ludzi))^0.4 x tempo swiata " + Pace(s) + "% / " + F2(HoursPerDt) + " (100 ludzi = " + F2(FootUph(100, bs, s, false, false))
+                     + " jedn./h w dzien, noca " + F2(FootUph(100, bs, s, true, false)) + ", noca w sniegu " + F2(FootUph(100, bs, s, true, true)) + "; "
+                     + (s != null && s.TerrainEaseEnabled ? "noc -" + F2(NightPen(s)) + " i snieg -" + F2(SnowPen(s)) + " plasko (TerrainEase)" : "noc -25% i snieg -10% (gra)")
+                     + "; partia stojaca od wczytania - ten wzor z ludzi calej kolumny) | potkniecia " + _stumbles + (_miss != null ? " | " + _miss : "") + ".");
         }
 
         private static void Hook()
@@ -106,6 +114,7 @@ namespace Armoury
             _fAcc = AccessTools.Field(cand, "Accepted"); _fScore = AccessTools.Field(cand, "Score"); _fArr = AccessTools.Field(cand, "ArrivalTime");
             _fRejId = AccessTools.Field(cand, "RejectReasonId"); _fRejDef = AccessTools.Field(cand, "RejectReasonDefault"); _fTroops = AccessTools.Field(cand, "TroopCount");
             _fSide = AccessTools.Field(cand, "Side");
+            _fSettl = AccessTools.Field(cand, "Settlement");   // nieobowiazkowe: tylko pozycja zalogi/milicji do sniegu
             _pName = AccessTools.Property(cand, "DisplayName");
             _pCfg = cfg != null ? AccessTools.Property(cfg, "Current") : null;
             _mScore = AccessTools.DeclaredMethod(calc, "ComputeScore");
@@ -143,6 +152,8 @@ namespace Armoury
                 var list = __0 as IList;
                 if (s == null || !s.DrArrivalByMarch || list == null || list.Count == 0 || _wired < 2) return;
                 _maxH = MaxH(s); _secH = SecH(s); _depS = DepS(s);
+                _night = false;
+                try { _night = Campaign.Current != null && Campaign.Current.IsNight; } catch { }   // czas kampanii stoi w misji - pora bitwy
                 float bs = BaseSpeed();
                 _active = true;
                 for (int i = 0; i < list.Count; i++)
@@ -227,19 +238,38 @@ namespace Armoury
             int src = Convert.ToInt32(_fSrc.GetValue(c), CultureInfo.InvariantCulture);   // DRSourceType: Army 0, Lord 1, Garrison 2, Militia 3, ...
             var mp = _fParty.GetValue(c) as MobileParty;
             float uph = 0f;
-            if (mp != null && src != 2 && src != 3 && _lastSpeed != null)
+            int men = 0;
+            try { men = (int)_fTroops.GetValue(c); } catch { }
+            if (mp != null && src != 2 && src != 3)
             {
                 // czlonek armii doczepiony do wodza idzie z predkoscia wodza (MobileParty.CalculateSpeed)
                 var basis = mp.AttachedTo ?? mp;
-                float sp = _lastSpeed(basis);
+                float sp = _lastSpeed != null ? _lastSpeed(basis) : 0f;
                 if (sp > 0.05f && sp < 50f) { uph = sp / HoursPerDt; m.From = mp.AttachedTo != null ? "armia" : "partia"; }
+                else
+                {
+                    // recenzja 20.10: po wczytaniu zapisu _lastCalculatedSpeed = 0, dopoki partia nie ruszy (stoi w zamku, obozuje, czeka na zbiorke
+                    // armii) - wzor pieszych z ludzi CALEJ kolumny (wodz + doczepieni; DR TroopCount to tylko ten czlonek), noc i snieg w pozycji wodza
+                    int col = ColumnMen(basis);
+                    bool snow = SnowAt(basis.Position.ToVec2());
+                    uph = FootUph(col > 0 ? col : men, baseSpeed, s, _night, snow);
+                    m.From = "wzor, stoi od wczytania, " + (col > 0 ? col : men) + " ludzi kolumny" + Cond(snow);
+                    _stillTotal++;
+                }
             }
             if (uph <= 0f)
             {
-                int men = 0;
-                try { men = (int)_fTroops.GetValue(c); } catch { }
-                uph = FootUph(men, baseSpeed, s);
-                m.From = src == 2 ? "zaloga pieszo" : src == 3 ? "milicja pieszo" : "pieszo";
+                // zaloga i milicja (Party == null u milicji) - pieszo, tylu ludzi, ilu DR wysyla; snieg przy bramie osady
+                bool snow = false;
+                try
+                {
+                    var st = _fSettl != null ? _fSettl.GetValue(c) as Settlement : null;
+                    if (st != null) snow = SnowAt(st.GatePosition.ToVec2());
+                    else if (mp != null) snow = SnowAt(mp.Position.ToVec2());
+                }
+                catch { }
+                uph = FootUph(men, baseSpeed, s, _night, snow);
+                m.From = (src == 2 ? "zaloga pieszo" : src == 3 ? "milicja pieszo" : "pieszo") + Cond(snow);
             }
             m.Uph = Math.Max(0.05f, uph);
             m.Hours = m.Dist * RouteFactor / m.Uph;
@@ -248,12 +278,48 @@ namespace Armoury
             return m;
         }
 
-        /// <summary>Wzor gry dla pieszych (DefaultPartySpeedCalculatingModel.CalculateBaseSpeedForParty) x tempo swiata (WorldPace) / 1.2.</summary>
-        private static float FootUph(int men, float baseSpeed, Settings s)
+        /// <summary>Wzor gry dla pieszych (DefaultPartySpeedCalculatingModel.CalculateBaseSpeedForParty) x tempo swiata (WorldPace) z noca i sniegiem
+        /// jak CalculateFinalSpeed + TerrainEase.SpeedPostfix, najmniej MinimumSpeed (1), / 1.2. ExplainedNumber: wynik = baza x (1 + suma wspolczynnikow);
+        /// WorldPace dodaje wspolczynnik (p - 1), gra noc -0.25 i snieg -0.1; TerrainEase oddaje te procenty i odejmuje plaska kare od bazy.</summary>
+        private static float FootUph(int men, float baseSpeed, Settings s, bool night, bool snow)
         {
-            float v = baseSpeed * (float)Math.Pow(200.0 / (200.0 + Math.Max(1, men)), 0.4);
-            return v * Pace(s) / 100f / HoursPerDt;
+            float b = baseSpeed * (float)Math.Pow(200.0 / (200.0 + Math.Max(1, men)), 0.4);
+            float f = Pace(s) / 100f;
+            bool ease = s != null && s.TerrainEaseEnabled;
+            if (night) { if (ease) b -= NightPen(s); else f -= 0.25f; }
+            if (snow) { if (ease) b -= SnowPen(s); else f -= 0.1f; }
+            float v = Math.Max(1f, b * f);   // finalSpeed.LimitMin(MinimumSpeed = 1) - granica trzyma tez po latkach TerrainEase
+            return v / HoursPerDt;
         }
+
+        // kary Jeffa z TerrainEase (Settings NightSpeedPenalty / SnowSpeedPenalty), przyciete do rozsadnych granic
+        private static float NightPen(Settings s) { return Clamp(s != null ? s.NightSpeedPenalty : 0.5f, 0f, 3f); }
+        private static float SnowPen(Settings s) { return Clamp(s != null ? s.SnowSpeedPenalty : 0.2f, 0f, 3f); }
+
+        /// <summary>Ludzie kolumny jak w CalculateLandBaseSpeed: partia + jej doczepione partie (u wodza armii - cala armia przy nim).</summary>
+        private static int ColumnMen(MobileParty basis)
+        {
+            int n = basis.MemberRoster != null ? basis.MemberRoster.TotalManCount : 0;
+            var att = basis.AttachedParties;
+            if (att != null)
+                for (int i = 0; i < att.Count; i++)
+                    if (att[i] != null && att[i].MemberRoster != null) n += att[i].MemberRoster.TotalManCount;
+            return n;
+        }
+
+        private static bool SnowAt(Vec2 p)
+        {
+            try
+            {
+                var wm = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MapWeatherModel : null;
+                if (wm == null) return false;
+                var w = wm.GetWeatherEventInPosition(p);
+                return w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard;
+            }
+            catch { return false; }
+        }
+
+        private static string Cond(bool snow) { return (_night ? ", noc" : "") + (snow ? ", snieg" : ""); }
 
         private static float BaseSpeed()
         {
@@ -324,7 +390,8 @@ namespace Armoury
             Log.Info(Tag + ": bitwa " + _battles + " | kandydatow " + list.Count + ", za daleko " + _far.Count + " (ponad " + F2(_maxH) + " h marszu; po stronie gracza " + _farMine + "), przyjetych "
                      + acc + ", blisko a odmowa DR " + nearRefused + ", bez pomiaru " + noMeasure + " | czas = " + F0(_depS) + " s + h x " + F0(_secH)
                      + " s | najblizsi za daleko: " + (shown > 0 ? far.ToString() : "brak") + " | sesja: bitew " + _battles + ", przyjetych " + _accTotal
-                     + ", za daleko " + _farTotal + ", potkniecia " + _stumbles + ".");
+                     + ", za daleko " + _farTotal + ", potkniecia " + _stumbles + " | noc " + (_night ? "TAK" : "NIE") + ", partii liczonych wzorem (stoja od wczytania) w sesji "
+                     + _stillTotal + ".");
             lines.Sort((x, y) => x.Key.CompareTo(y.Key));
             int n = 0;
             foreach (var kv in lines) { if (n++ >= 30) break; Log.Info(kv.Value); }
