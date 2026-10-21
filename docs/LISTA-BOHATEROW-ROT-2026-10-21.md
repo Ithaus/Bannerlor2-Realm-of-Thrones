@@ -20,7 +20,7 @@ Uwaga: zmiana wejdzie w NOWEJ kampanii (razem z prologiem 298); w biezacej kampa
 | Brienne z Tarthu | Menetragos | rod Renly'ego (Tęczowa Gwardia); po jego smierci - Starkowie (Catelyn) | Tęczowa Gwardia |
 | Theon Greyjoy | Pyke | rod Greyjoyow (Zelazne Wyspy) | syn Balona |
 | Osha | Thenn | rod Starkow (sluzba w Winterfell) | pojmana, sluzy Starkom |
-| Talisa | Bolozo | rod Starkow (zona Robba - serial) albo usunac | serial |
+| Talisa -> Jeyne Westerling (Jeff 21.10 "tak") | Bolozo | Talisa usunieta; Jeyne Westerling w rodzie Westerlingow, potem zona Robba | wedlug ksiazki |
 | Benjen Stark | Castle Black | Nocna Straz (Pierwszy Zwiadowca) | Nocna Straz |
 | Samwell Tarly | Hornvale | Nocna Straz | Nocna Straz |
 | Yoren | Castle Black | Nocna Straz (werbownik) | Nocna Straz |
