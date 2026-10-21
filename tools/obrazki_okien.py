@@ -28,6 +28,9 @@ ROT_WINDOWS = {
     'DanyInvasionEvent_0', 'JoffreyEvent_0', 'EastwatchEvent_0', 'NedEvent_0', 'RickardKarstarkExecutionEvent_0', 'RooseDeathEvent_0',
     'RedWeddingEvent_0', 'RedWeddingEvent_1', 'RenlyDeathEvent_0', 'RenlyDeathEvent_1', 'StannisDeathEvent_0',
 }
+# recenzja m103: dla tych dwoch okien ROT EventScreen laduje prefaby BlackwaterEventStannisWin / BlackwaterEventWarning z obrazkiem wpisanym na sztywno
+# (bez @HeaderImage) - gra NIGDY nie pokaze tu obrazka z pliku (RotWindowPictures pisze linie "prefab Blackwater"). 33 okna z obrazkiem, 2 bez.
+ROT_NO_IMAGE = {'BlackwaterEvent_1', 'BlackwaterSiegeNotificationEvent_0'}
 
 KINDS = [
     # (podkatalog assets, podkatalog Images, wzor nazwy, opis)
@@ -142,6 +145,8 @@ def check_only(out):
                 continue
             why = validate(open(p, 'rb').read())
             print('%-6s %-40s %s' % ('OK' if why is None else 'BLAD', sub + '/' + n, md5(p) if why is None else why))
+            if sub == 'ROT' and stem[4:] in ROT_NO_IMAGE:
+                print('UWAGA  %-40s okno %s ma w ROT prefab Blackwater z obrazkiem na sztywno - gra tego pliku nie pokaze' % (sub + '/' + n, stem[4:]))
             bad += why is not None
     return bad
 
@@ -176,6 +181,10 @@ def main():
             m = rx.match(stem)
             if not m:
                 print('UWAGA  %-40s nazwa spoza wzoru %s - pominiety' % (asub + '/' + n, desc))
+                skipped += 1
+                continue
+            if asub == 'rot' and stem[4:] in ROT_NO_IMAGE:
+                print('UWAGA  %-40s okno %s ma w ROT prefab Blackwater z obrazkiem na sztywno - gra tego okna nie podmieni, pominiety' % (asub + '/' + n, stem[4:]))
                 skipped += 1
                 continue
             if asub == 'rot' and stem[4:] not in ROT_WINDOWS:

@@ -17,6 +17,10 @@ namespace Armoury
     /// klasa z jednym oknem - po klasie, klasa z kilkoma oknami - po tytule (EN albo przetlumaczony TextObject z tym samym id). Nasze okna (ArmStoryEvent, zestaw
     /// Armoury) pomijane - obrazek wybiera StoryWindow przy pokazaniu. Lektor (galaz m103-lektor) ma osobna latke na te same metody - niezalezne.
     /// HeaderImage nie jest zapisywany (bez [SaveableProperty]), a i tak wraca przy zamknieciu. Klucz StoryImagesForRotWindows (MCM, czytany na zywo).
+    /// BEZ OBRAZKA Z PLIKU (recenzja m103): okna o tytule "Stannis Sails for King's Landing" (BlackwaterSiegeNotificationEvent_0) i "Stannis Claims the Iron Throne"
+    /// (BlackwaterEvent_1) - EventScreen.OnActivate laduje dla nich prefaby BlackwaterEventWarning / BlackwaterEventStannisWin z obrazkiem wpisanym na sztywno
+    /// (Sprite="StannisSetsSail" / "StannisIronThrone", bez @HeaderImage). To samo porownanie tytulu co w ROT (EventPanel.EventTitle == Event.Title): przy takim tytule
+    /// prefiks nic nie podmienia (raz na proces linia "prefab Blackwater"); przy tytule przetlumaczonym ROT bierze EventXml i obrazek z pliku dziala.
     /// Bledy: licznik potkniec, bez globalnego wylacznika; okno ROT otwiera sie zawsze (wyjatek prefiksu nie wychodzi).
     /// </summary>
     internal static class RotWindowPictures
@@ -27,10 +31,10 @@ namespace Armoury
         private static readonly string[][] Windows =
         {
             new[] { "BlackwaterEvent", "0", "ROTd0hD1DmLa", "Stannis Retreats to Dragonstone" },
-            new[] { "BlackwaterEvent", "1", "ROTd0hD1DmLaa", "Stannis Claims the Iron Throne" },
+            new[] { "BlackwaterEvent", "1", "ROTd0hD1DmLaa", "Stannis Claims the Iron Throne" },          // prefab BlackwaterEventStannisWin - bez obrazka z pliku
             new[] { "AegonInvasionEvent", "0", "ROTEjHgHyLa", "Aegon Makes His Move" },
             new[] { "BlackwaterSiegeEvent", "0", "ROTd0hD1DmLa", "Battle of the Blackwater" },
-            new[] { "BlackwaterSiegeNotificationEvent", "0", "ROTd0hD1DmL", "Stannis Sails for King's Landing" },
+            new[] { "BlackwaterSiegeNotificationEvent", "0", "ROTd0hD1DmL", "Stannis Sails for King's Landing" },   // prefab BlackwaterEventWarning - bez obrazka z pliku
             new[] { "BastardsSiegeNotificationEvent", "0", "bastard1", "To Winterfell" },
             new[] { "BastardsEvent", "0", "bastard4", "Ramsay Holds Winterfell" },
             new[] { "BastardsEvent", "1", "bastards7", "Stark Homecoming" },
@@ -109,7 +113,8 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("ApplyAll", e); }
             _patch = "OnActivate " + a + ", OnDeactivate " + d;
-            Log.Info(Tag + "latka okien ROT: " + _patch + " | okien w tabeli " + Windows.Length + " | klucz Story Images For Rot Windows " + (Key ? "TAK" : "NIE")
+            Log.Info(Tag + "latka okien ROT: " + _patch + " | okien w tabeli " + Windows.Length + " (z obrazkiem z pliku " + (Windows.Length - 2) + ", prefab Blackwater bez obrazka 2)"
+                     + " | klucz Story Images For Rot Windows " + (Key ? "TAK" : "NIE")
                      + " | pliki: Modules\\Armoury\\Images\\ROT\\rot_<Klasa>_<n>.png|jpg.");
         }
 
@@ -135,6 +140,13 @@ namespace Armoury
                 }
                 string stem = "rot_" + key;
                 string orig = Get(ev, "HeaderImage");
+                if (title == StoryWindow.RotTitleBlackwater1 || title == StoryWindow.RotTitleBlackwater2)
+                {
+                    // EventScreen.OnActivate przelacza na prefab Blackwater z obrazkiem na sztywno - podmiana HeaderImage nic by nie dala (dekodowanie na marne)
+                    if (_noted.Add("bw|" + key)) Log.Info(Tag + "okno ROT " + key + " '" + title + "' - prefab Blackwater ROT (obrazek wpisany w prefab, bez @HeaderImage)"
+                                                          + " - obrazek z pliku niemozliwy, zostaje obrazek ROT.");
+                    return;
+                }
                 if (StoryPictures.FindFile(StoryPictures.DirRot, stem) == null)
                 {
                     if (_noted.Add(key)) Log.Info(Tag + "okno ROT " + key + " '" + title + "' - brak pliku Images\\ROT\\" + stem + ".png|jpg, obrazek ROT " + orig + ".");
