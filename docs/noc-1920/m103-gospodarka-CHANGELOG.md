@@ -108,3 +108,24 @@ VR-3 na nowym formacie sprawdzony na logu syntetycznym (linie VR z 07-17-36, w 2
 **Oczekiwane progi (nowa kampania 180 dob):** MB-2 z 0.575 do ok. 0.97-0.99; MB-12 glodne na morzu z 61.9/d (0.989) do ok. 0 (zostaja tylko bandy ponad 480 ludzi i doba 1); MB-3 z 0.135 do ok. 0; "morale z glodu" z ok. -310..-395/d do ok. 0; MB-13 TAK, polow zalogi ok. 150-230 szt./d (potrzeba piratow, rosnie z liczba piratow); MB-0 TAK (0 nierozpoznanych); MB-1 potkniecia 0; NKS-5u bez nowego NIE; bramka KS (3) bez przyrostu.
 
 **Build:** Armoury kod 0; gen_mcm Armoury 2244 ustawien.
+
+---
+
+### P7a. Stocznia bierze drewno tylko ponad zapas rzemiosla (R1-10b) - klucz `ShipyardWoodAboveCraftStock` (MCM "Shipyard Wood Above Craft Stock", grupa "Old loose ends (A17)"; TAK; NIE = kod 101)
+
+**Problem (log 101-nowa):** R1-10b (warsztaty bez drewna, d91-180) 222/d przy progu 177 (srednia 11 biegow 203 +-33). Linia "Stocznie (A17 F5)" 101-nowa: d1-30 397 pni/d (brak drewna 202 prob/d, 33.5 statku/d), d91-120 257 pni/d (125 prob/d "brak drewna", 20.5 statku/d), d151-180 115 pni/d (49, 8.9). W d91-120 stocznie biora wiecej drewna niz wszystkie warsztaty zbrojne (201/d - diagnoza).
+
+**Przyczyna:** `A17Fix.cs:506-507` (PayBuild, kod 101): `hw = Count(shelf, _hardwood)`, `uh = Math.Min(hw, logs)` - stocznia brala pnie z polki portu do zera, bez zapasu rzemiosla, ktory od K1 (BuildWoodAboveCraftStock, 14.10) zostawiaja wszystkie inne budowy (`BuildFunding.cs:346/:370`, `BuildFunding.Folk.cs:224`, `BuildFunding.DsWorks.cs:54`); stocznia ksieguje to drewno jako budowe (ramka FBuild, `OreLedger.NoteBuild`). Jedna zasada na jedno zjawisko - stocznia jest budowa.
+
+**Zmiana (`A17Fix.cs` PayBuild, przy kluczu):** `hold = BuildFunding.WoodHold(town.Settlement, hardwood, false)`; pnie do uzycia = `max(0, polka - hold)`. `WoodHold` to ta sama regula K1: zapas rzemiosla miasta `CaravanBulk.TargetFor` (10 dob zuzycia miasta bez budow), przy tanim drewnie (indeks < 1, E3-B1b) polowa zapasu (najmniej 20); klucz K1 wylaczony - 0 (stocznia jak 101). Deski bez zmian. Kadluby i czesci statkow (SettlePieces) ida przez ten sam PayBuild. Linia "Stocznie (A17 F5)": nowy odcinek przed "| potkniecia": `| zapas rzemiosla (klucz ShipyardWoodAboveCraftStock TAK): zostawione rzemioslu N pni (suma przy probach), proby pominiete tylko przez zapas K` (N = suma min(polka, zapas) przy kazdej probie stoczni - ta sama polka moze liczyc sie w kilku probach doby; K = proby, ktore bez zapasu by sie udaly). `Settings.cs` + `McmSettings.cs` (gen_mcm: Armoury 2245 ustawien).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Mniej statkow AI w d1-120 (dzis 33.5 / 20.5 statku/d): porty ubogie w drewno (pustynia, wyspy) wolniej dojda do liczby idealnej; AI kupuje statki od portow (ShipPortsBuyToIdeal) - linia "Statki (181)", NA17-5b (pni stoczni/d w dol), NA17-5c (czesci "brak drewna" w gore), "brak drewna" w linii Stocznie w gore.
+- `WoodHold` ma liczniki pomiaru (targi, gdzie budowa pana zostawila drewno - `_woodHeldLord`, raz na targ i dobe; targi z polowa progu E3-B1b - `_woodHalf`): stocznia liczy sie teraz w nich jak budowa pana (dopisek "Roboty ludu (P2)" K1). Tylko liczby linii, nie gra.
+- Zamknieta ekonomia bez zmian: nie powstaje zaden przeplyw zlota ani towaru; zmienia sie tylko, kto pierwszy bierze z tej samej polki. Place ciesli (kasa -> kiesa ludu) tylko przy zbudowanym statku - przy mniejszej liczbie statkow mniej plac.
+- Narzedzie: regex NA17 `f5` (konczy sie na "statki z niczego N") i `f5p` (opcjonalny "statek poza portem") dzialaja z nowym odcinkiem (test na linii syntetycznej: f5 TAK, f5p te same grupy).
+- Kolizje: P7c i P9 zmieniaja `MaterialOrders.cs` - tu nie ruszany.
+
+**Oczekiwane progi (nowa kampania 180 dob, po P7a + P7b):** R1-10b ok. 120-160/d (dzis 222; prog 177 to jeden pomiar - nowy prog ze sredniej >= 2 biegow, CHANGELOG.md:16260); T2-K1-2 (miasta bez drewna) ok. 9-11 (dzis 14.2); NA17-5b drewno stoczni w dol (dzis 241 pni/d w 180 dobach); "brak drewna" stoczni w gore; R1-7 moze wzrosnac (P7b).
+
+**Build:** Armoury kod 0; gen_mcm Armoury 2245 ustawien.

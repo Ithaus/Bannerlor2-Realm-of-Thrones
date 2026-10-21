@@ -7160,6 +7160,10 @@ namespace Armoury
         [SettingPropertyGroup("Old loose ends (A17)")]
         public float ShipyardLabourShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Shipyard Wood Above Craft Stock", HintText = "a shipyard building a ship takes timber off the town's market only above the stock the town keeps for its own smiths, bloomeries and workshops - the same rule as other building works (Build Wood Above Craft Stock); planks as before. Off = the shipyard takes timber down to the last log, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool ShipyardWoodAboveCraftStock { get; set; } = true;
+
         [SettingPropertyBool("A17 Port Fish Pays Folk", HintText = "outside the start calibration, the coin a Banner Kings harbour town pays for its daily catch goes to the townsfolk as the fishermen's wages instead of vanishing (works together with the fish setting above); off = the coin vanishes, as in Banner Kings", RequireRestart = false)]
         [SettingPropertyGroup("Old loose ends (A17)")]
         public bool A17PortFishPaysFolk { get; set; } = true;
@@ -10777,6 +10781,7 @@ namespace Armoury
             s.A17ShipyardBuildsFromTimber = A17ShipyardBuildsFromTimber;
             s.ShipyardTimberPer1000 = ShipyardTimberPer1000;
             s.ShipyardLabourShare = ShipyardLabourShare;
+            s.ShipyardWoodAboveCraftStock = ShipyardWoodAboveCraftStock;
             s.A17PortFishPaysFolk = A17PortFishPaysFolk;
             s.A17AuthorLines = A17AuthorLines;
             s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;

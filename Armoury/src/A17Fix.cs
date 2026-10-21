@@ -101,6 +101,8 @@ namespace Armoury
         // F5
         private static long _sWant, _sBuilt, _sFull, _sNoWood, _sNoGold, _sWood, _sPlanks, _sWage, _sWageKept, _sNoHull, _sValue;
         private static long _sFree, _sPieces, _sPieceValue, _sPieceNoWood, _sPieceNoGold, _sPieceFree, _sPieceLost;   // recenzja stare-a17 (4), (5)
+        private static long _sWoodLeft, _sWoodHeldSkip;   // m103 P7a: pnie zostawione rzemioslu przy probach stoczni (suma min(polka, zapas)), proby pominiete tylko przez zapas rzemiosla
+        internal static bool ShipWoodHoldOn { get { var s = S; return s != null && s.ShipyardWoodAboveCraftStock; } }   // m103 P7a
 
         internal static void Reset()
         {
@@ -118,6 +120,7 @@ namespace Armoury
             _cFail = _cFailSiege = _cFailOther = _cRescued = _cCommitFail = _cPassed = _cCapIn = _cCapDone = _cInCommit = 0; _cTypes.Clear();
             _sWant = _sBuilt = _sFull = _sNoWood = _sNoGold = _sWood = _sPlanks = _sWage = _sWageKept = _sNoHull = _sValue = 0;
             _sFree = _sPieces = _sPieceValue = _sPieceNoWood = _sPieceNoGold = _sPieceFree = _sPieceLost = 0;
+            _sWoodLeft = _sWoodHeldSkip = 0;   // m103 P7a
         }
 
         // ================================================================ F1 konie partii BK
@@ -504,8 +507,16 @@ namespace Armoury
             if (_hardwood == null) { try { _hardwood = MBObjectManager.Instance.GetObject<ItemObject>("hardwood"); _planks = MBObjectManager.Instance.GetObject<ItemObject>("planks"); } catch { } }
             var shelf = town.Settlement.ItemRoster;
             int hw = Count(shelf, _hardwood), pl = Count(shelf, _planks);
+            // m103 P7a (klucz ShipyardWoodAboveCraftStock): stocznia to budowa - pnie tylko ponad zapas rzemiosla miasta (K1, BuildFunding.WoodHold; klucz K1 wylaczony - 0); deski bez zmian
+            int hold = ShipWoodHoldOn && hw > 0 && logs > 0 ? BuildFunding.WoodHold(town.Settlement, _hardwood, false) : 0;
+            int hw0 = hw;
+            if (hold > 0) { hw = Math.Max(0, hw - hold); _sWoodLeft += Math.Min(hw0, hold); }
             int uh = Math.Min(hw, logs), up = Math.Min(pl, (logs - uh) * 5);
-            if (uh + up / 5 < logs || (logs > 0 && _hardwood == null)) return 1;
+            if (uh + up / 5 < logs || (logs > 0 && _hardwood == null))
+            {
+                if (hold > 0 && _hardwood != null) { int uh0 = Math.Min(hw0, logs); if (uh0 + Math.Min(pl, (logs - uh0) * 5) / 5 >= logs) _sWoodHeldSkip++; }   // m103 P7a: bez zapasu rzemiosla stocznia by zbudowala
+                return 1;
+            }
             if (wage > 0 && TownPurse.Spare(town) < wage) return 2;
             // drewno - ramka budow ksiegi towarow na osade (ujscie "budowy"), pnie takze w ksiedze drewna (OreLedger)
             var gf = GoodsLedger.Begin(GoodsLedger.FBuild, town.Settlement);
@@ -726,7 +737,9 @@ namespace Armoury
                          + "), pominiete - port ma liczbe idealna " + _sFull + ", brak drewna " + _sNoWood + ", brak nadwyzki kasy na place " + _sNoGold + ", brak kadluba " + _sNoHull
                          + " | statki z niczego " + (ShipOn ? _sFree : _sWant)
                          + " | czesci nowych statkow (ulepszenia CreateShip, z drewna i za place - wliczone wyzej; czego brak - zdjete): zalozone " + _sPieces + " za " + _sPieceValue + " zl wartosci, pominiete - brak drewna "
-                         + _sPieceNoWood + ", brak nadwyzki kasy " + _sPieceNoGold + ", z niczego (potkniecie) " + _sPieceFree + ", statek poza portem (niesprawdzone) " + _sPieceLost + pot);
+                         + _sPieceNoWood + ", brak nadwyzki kasy " + _sPieceNoGold + ", z niczego (potkniecie) " + _sPieceFree + ", statek poza portem (niesprawdzone) " + _sPieceLost
+                         + " | zapas rzemiosla (klucz ShipyardWoodAboveCraftStock " + YN(ShipWoodHoldOn) + "): zostawione rzemioslu " + _sWoodLeft + " pni (suma przy probach), proby pominiete tylko przez zapas " + _sWoodHeldSkip   // m103 P7a
+                         + pot);
             }
             catch (Exception e) { Log.Error("A17Fix.Daily", e); }
             DayReset();
