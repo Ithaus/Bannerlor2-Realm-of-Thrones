@@ -139,7 +139,8 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   idzie ta sama droga co przycisk "New Campaign" (GameStateManager.CleanAndPushState). Inna droga do nowej gry niz MBGameManager.StartNewGame (np. mod z wlasnym
   menedzerem gry) = brak okna i klasyczny start (bezpieczny kierunek).
 - Regresja klasycznego startu: w E0 jedyna zmiana w kampanii to nowe zachowanie z pustym kluczem zapisu i linia logu.
-- E1a: oczekiwane M = 28 typow / 38 miejsc z rozpoznania (liczba metod moze byc wieksza o metody zagniezdzone); mniej = ktores miejsce ROT liczy od kalendarza
+- E1a: oczekiwane 38 miejsc z rozpoznania (28 typow), z tego 1 (ROTEnlistmentBehavior - "You must wait at least 5 days before enlisting") to wiek kampanii i
+  zostaje BEZ latki (inaczej w prologu gracz nie moglby sie zaciagnac) - linia logu: "wiek kampanii (zaciag) bez latki 1"; mniej = ktores miejsce ROT liczy od kalendarza
   (wydarzenie albo wojna ruszy za wczesnie). Metoda ROT wklejona przez JIT w wolajacego przed latka nie zobaczy podmiany - latka wchodzi przed pierwszym tickiem
   kampanii (ROT czyta start w tickach), a czytelnicy to duze metody i wywolania wirtualne/delegaty. ROTBattleAtmosphere `LoreGates.CampaignDay` (atmosfera bitew wedlug
   dnia) liczy dalej od kalendarza - w prologu zachowa sie jak po 188 dniach opowiesci (poza zakresem, do decyzji). AIInfluence (zaciemniony) - od kalendarza.
@@ -159,26 +160,43 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 
 ## Status
 
-DO SPRAWDZENIA (nic nie wgrane; gra Jeffa i test 100 nietkniete).
+DO SPRAWDZENIA - E0, E1a, E1b, E2a, E2b i grupa logow zrobione, kazdy krok z buildem kod 0 (Armoury, CrashScribe) i commitem na `w-toku/m101-prolog`.
+Nic nie wgrane do gry, gra Jeffa i test 100 nietkniete; w grze NIE sprawdzone (zakaz uruchamiania gry w tej pracy). Zostaje: autotest nowej kampanii z flaga
+prologu (co najmniej 220 dob - przejscie przez dzien 186 i NedEvent), potem sceny E4/E5 i postacie E3 (osobno).
 
 ## Test w grze krok po kroku
 
-(uzupelniane po kazdym kroku)
-1. Menu glowne -> Campaign / New Campaign: ma wyskoczyc okno "Choose your start" z dwoma przyciskami.
-2. "Classic 299" -> kampania jak dotad; w Armoury.log `Prolog (m101): wybor startu nowej kampanii: KLASYCZNY 299 (okno wyboru)` i `start sesji | prolog NIE`.
-3. "Prologue 298" -> w logu `wybor ... PROLOG 298 (okno wyboru)`, `nowa kampania z PROLOGIEM 298`, `start sesji | prolog TAK`.
-4. Zapisz, wczytaj: `start sesji | prolog TAK (okno wyboru)` (wybor z zapisu).
-5. (E1a) Prolog: na pasku mapy data "Year 298, Day 177"; w Armoury.log `latki opowiesci ROT (nowa kampania): wpiete N/N metod (miejsc odczytu 38 ...)`;
-   w logu CrashScribe `FABULA: dzien -187 | ...` (ujemny = prolog) i zadnego `FABULA: wydarzenie ... WYSTARTOWALO` przed dniem 0.
-7. (E1b) Prolog: linia `swiat rozstawiony | pakty: sojusze 3/3, pakty o nieagresji 6/6`; na mapie (encyklopedia krolestwa korony / ekran Diplomacy) sojusze z
-   Polnoca, Krainami Burzy i Dorzeczem, pakty z reszta; w liniach doby `wojny Westeros-Westeros (bez Wolnych Ludzi) 0`; Nocna Straz w wojnie z Wolnymi Ludzmi.
-8. (E2a) Prolog: encyklopedia - Robert Baratheon zyje, wladca krolestwa korony, glowa rodu "Baratheon, Robert", zona Cersei; Eddard Stark zyje, wladca Polnocy,
-   zona Catelyn; Joffrey i Robb jako czlonkowie rodow. W logu `XML ozywionych 2/2` i oba `TAK`.
-9. (E2b) Dzien 186 prologu: komunikat o smierci krola; encyklopedia - Robert martwy (od ran), Joffrey wladca korony, rod "Baratheon, Joffrey"; Ned jencem w
-   Krolewskiej Przystani; sojusze i pakty z korona znikaja. Log: `KONIEC PROLOGU ... Joffrey krolem TAK ... Ned: jeniec w town_EW4 TAK`.
-10. (E2b) Okolo 9 dni po starcie opowiesci okno ROT "Execution of Ned Stark"; encyklopedia - Ned martwy (stracony), Robb wladca Polnocy. Log: `egzekucja Neda ... Robb TAK`.
-6. (E1a) Klasyczny: data "Year 299, Day 1", `latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie)`, Fabula jak dotad (`FABULA: dzien 0`).
+Autotest (DLL autotestu CrashScribe): plik `Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-prolog.flag` (tresc dowolna) = nowa kampania od razu z
+prologiem, bez okna; bez pliku = klasyczny start bez okna. Po biegu: `python -I tools/sprawdz_logi.py --grupa m101prolog <Armoury-*.log> --crashscribe <session-*.log>`.
+
+Klasyczny start (regresja):
+1. Menu glowne -> Campaign / New Campaign: okno "Choose your start" z przyciskami "Prologue 298" i "Classic 299".
+2. "Classic 299" -> kampania jak dotad: data "Year 299, Day 1"; w Armoury.log `Prolog (m101): wybor startu nowej kampanii: KLASYCZNY 299 (okno wyboru)` i
+   `start sesji | prolog NIE | ... | latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie) | nie wpiete`; Fabula jak dotad (`FABULA: dzien 0`).
+3. Klucz Prologue Enabled NIE (MCM, Armoury, grupa "Prologue 298 (new campaign)") -> nowa kampania bez okna, klasyczny start.
+
+Prolog:
+4. "Prologue 298" -> data na pasku "Year 298, Day 177"; w Armoury.log: `wybor ... PROLOG 298 (okno wyboru)`, `nowa kampania z PROLOGIEM 298`,
+   `latki opowiesci ROT (nowa kampania): wpiete N/N metod (miejsc odczytu 37, ... wiek kampanii (zaciag) bez latki 1)`, `latki prologu (nowa kampania): ... TAK`,
+   `Robert i Ned (XML ozywionych 2/2 ...): ... TAK | ... TAK`, `swiat rozstawiony | pakty: sojusze 3/3 ..., pakty o nieagresji 6/6 ...`.
+5. Encyklopedia: Robert Baratheon zyje, wladca krolestwa korony, glowa rodu "Baratheon, Robert", zona Cersei; Eddard Stark zyje, wladca Polnocy, zona Catelyn;
+   Joffrey i Robb w rodach. Krolestwo korony: sojusze z Polnoca, Krainami Burzy i Dorzeczem; pakty o nieagresji (ekran Diplomacy) z Dolina, Smocza Skala, Reach,
+   Dorne, Zelaznymi Wyspami i Skagos. Nocna Straz dalej w wojnie z Wolnymi Ludzmi.
+6. Linie doby `Prolog (m101): dzien N prologu (opowiesc za X dni) | ... | wojny Westeros-Westeros (bez Wolnych Ludzi) 0 | ... | wydarzenia ROT ruszone 0`;
+   w logu CrashScribe `FABULA: dzien -187 ...` (ujemne w prologu) i zadnego `FABULA: wydarzenie ... WYSTARTOWALO` z dniem ujemnym.
+7. Zapisz i wczytaj: `start sesji | prolog TAK (okno wyboru) | start kalendarza Year 298, Day 177 | start opowiesci Year 299, Day 1 (dzien prologu D) | latki opowiesci
+   ROT (wczytany zapis): ...`, pakty dalej (nasze sojusze 3, pakty 6).
+8. Dzien 186 prologu: komunikat "King Robert Baratheon is dead ..."; encyklopedia - Robert martwy (od ran), Joffrey wladca korony, rod znow "Baratheon, Joffrey";
+   Ned jencem w Krolewskiej Przystani; sojusze i pakty z korona znikaja. Log: `KONIEC PROLOGU ... Robert martwy TAK ... Joffrey krolem TAK ... Ned: jeniec w town_EW4 TAK`.
+9. Dzien 188 = start opowiesci (data "Year 299, Day 1"); ok. 9 dni pozniej okno ROT "Execution of Ned Stark": Ned martwy (stracony), Robb wladca Polnocy, potem wojny
+   ROT jak w klasycznym starcie. Log: `egzekucja Neda (NedEvent ...) | Ned martwy TAK | ... - Robb TAK`.
+10. Zaciag u lorda (rozmowa ROT "enlist") dziala w prologu po 5 dniach jak w klasycznym starcie.
 
 ## Dla Jeffa
 
-(uzupelniane na koniec)
+Zrobilem pierwszy kawalek wczesniejszego startu: przy nowej kampanii gra pyta, czy zaczac od prologu 298 (krol Robert wyrusza na polnoc), czy jak dotad w 299.
+W prologu kalendarz zaczyna sie 188 dni wczesniej, Robert i Ned zyja i rzadza (Robert korona, Ned Polnoca), krolestwa Westeros nie wypowiadaja sobie wojen i trzymaja z
+Robertem: Polnoc, Krainy Burzy i Dorzecze jako sojusznicy, reszta paktami o nieagresji z moda Diplomacy. W dniu 186 Robert umiera od ran z polowania, Joffrey zostaje
+krolem, Ned trafia do lochu w Krolewskiej Przystani, a w dniu 188 rusza zwykla opowiesc ROT - egzekucja Neda (teraz naprawde go zabija) i Robb na tronie Polnocy.
+Fabula ROT (wydarzenia, wojny fabularne, Inni) liczy sie od tego dnia, wiec nic z ROT nie ruszy za wczesnie. Sceny z ksiazki (okna wydarzen, orszak krola, turniej)
+i postacie to nastepne etapy; tego nie bylo jeszcze w grze - najpierw autotest.
