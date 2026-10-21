@@ -144,12 +144,23 @@ arm, cs = run("nobtn")
 CASES.append(("nobtn", arm, cs, None, {"SC-10": "NIE"}))
 arm, cs = run("err")
 CASES.append(("err", arm, cs, None, {"SC-1": "NIE"}))
+# recenzja m103: assert gry "Trying to render a released texture" w grze wydaniowej nie trafia do zadnego logu (MBDebugManager.Assert puste) - SC-13 liczy linie
+# Armoury z kontroli przed zwolnieniem (StoryPictures.OnScreen); stary przypadek z wymyslona linia rgl_log usuniety
 arm, cs = run("ok")
-CASES.append(("rgl", arm, cs, ["[12:00:00] Assertion failed: Trying to render a released texture"], {"SC-13": "NIE"}))
+arm.append(ts(9000) + "Obrazki (m103): ZWOLNIENIE PRZY OKNIE arm_prolog_01 - okno wydarzenia ROT na wierzchu ekranu z tym obrazkiem - zwolnienie wstrzymane"
+           " (blad kolejki obrazkow: tekstura w kolejce, a okno ja rysuje) | wstrzymanych w sesji 1.")
+CASES.append(("przy-oknie", arm, cs, None, {"SC-13": "NIE", "SC-1": "TAK"}))
 CASES.append(("legacy", run_legacy(), None, None, {"SC-7": "TAK", "SC-4": "TAK", "SC-12": "TAK", "SC-3": "TAK", "SC-11": "INFO", "SC-2": "TAK"}))
-CASES.append(("reload-ok", run_reload(21), None, None, {"SC-12": "TAK", "SC-3": "TAK"}))
+CASES.append(("reload-ok", run_reload(21), None, None, {"SC-12": "TAK", "SC-3": "TAK", "SC-2": "TAK", "SC-13": "TAK"}))
 CASES.append(("reload-zle", run_reload(19), None, None, {"SC-12": "NIE"}))
-CASES.append(("klasyczna", [ts(0) + "Prolog (m101): start sesji | prolog NIE | potkniecia 0."], None, None, {"SC-0": "INFO"}))
+CASES.append(("klasyczna", [ts(0) + "Prolog (m101): start sesji | prolog NIE | potkniecia 0."], None, None, {"SC-0": "INFO", "SC-1": "TAK", "SC-13": "TAK"}))
+# recenzja m103: w kampanii klasycznej dzialaja latka okien ROT, StoryWindow.Watch i StoryPictures.AppTick - ich bledy maja dac NIE, nie samo INFO
+CASES.append(("klas-blad", [ts(0) + "Prolog (m101): start sesji | prolog NIE | potkniecia 0.",
+                            ts(1) + "Obrazki (m103): okno ROT BlackwaterEvent_1 'Stannis Claims the Iron Throne' - prefab Blackwater ROT (obrazek wpisany w prefab, bez"
+                                    " @HeaderImage) - obrazek z pliku niemozliwy, zostaje obrazek ROT.",
+                            ts(2) + "ERROR in RotWindowPictures.ActivatePrefix (potkniecie 1): System.NullReferenceException: test",
+                            ts(3) + "ERROR in StoryPictures.AppTick (potkniecie 1): System.InvalidOperationException: test"], None, None,
+              {"SC-0": "INFO", "SC-1": "NIE", "SC-13": "TAK", "SC-14": "INFO"}))
 
 bad = 0
 for name, arm, cs, rgl, exp in CASES:

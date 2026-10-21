@@ -1030,8 +1030,10 @@ Uzycie (Python 3, tylko odczyt):
                     PrologueScenes, StoryImagesForRotWindows) python -I tools/sprawdz_logi.py --grupa m103sceny <Armoury-*.log> [--crashscribe <session-*.log>]
                     [--rgl <rgl_log_*.txt>]. SC-0 start (klucz, 23 sceny), SC-1 ERROR 0, SC-2 wszystkie nalezne pokazane, SC-3 kazda w swoim dniu, SC-4 kolejnosc bez
                     powtorzen, SC-5 scena 23 po KONCU PROLOGU, SC-6 po jednej, SC-7 pominiete 0, SC-8 okna ROT (zapas 0), SC-9 obrazki z plikow (INFO), SC-10 bez
-                    zamkniec bez przycisku, SC-11 para z 'AUTOTEST: OKNO wydarzenie ROT', SC-12 po wczytaniu bez powtorek, SC-13 brak 'Trying to render a released
-                    texture', SC-14 obrazki okien ROT (INFO). Log bez prologu: INFO.
+                    zamkniec bez przycisku, SC-11 para z 'AUTOTEST: OKNO wydarzenie ROT', SC-12 po wczytaniu bez powtorek, SC-13 zwolnienie tekstury przy otwartym
+                    oknie 0 (linia Armoury 'ZWOLNIENIE PRZY OKNIE'; assert gry 'Trying to render a released texture' w grze wydaniowej nie trafia do logow - --rgl
+                    tylko dodatkowo), SC-14 obrazki okien ROT (INFO). Sceny zalatwione w zapisie (pokazane + pominiete z linii startu) SC-2 liczy jako zalatwione.
+                    Log bez prologu (kampania klasyczna): SC-0 INFO, SC-1 i SC-13 dalej licza (latka okien ROT i obrazki dzialaja w kazdej kampanii), SC-14 INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
@@ -37616,7 +37618,8 @@ M103_FAIL = re.compile(r"scena (\d\d) '(.*?)' - okno nie otworzylo sie \(proba (
 M103_END = re.compile(r"sceny prologu zakonczone \| pokazane (\d+)/(\d+), pominiete (\d+)")
 M103_ERR = re.compile(r"^ERROR in (Prologue\.Scenes|Prologue\.ScenesStartLine|Prologue\.RotWindowPictures|StoryWindow\.|StoryPictures\.|RotWindowPictures\.)")
 M103_CS_OKNO = re.compile(r"AUTOTEST: OKNO wydarzenie ROT \"(.*?)\"")
-M103_RELEASED = "Trying to render a released texture"
+M103_RELEASED = "Trying to render a released texture"   # assert gry - w grze wydaniowej nie trafia do logow (MBDebugManager.Assert puste); SC-13 liczy go tylko dodatkowo
+M103_HELD = "ZWOLNIENIE PRZY OKNIE"   # StoryPictures.AppTick: zwolnienie tekstury wstrzymane, bo okno ROT na wierzchu ja rysuje (recenzja m103)
 
 
 def m103sceny_main(logp, csp=None, rglp=None):
@@ -37625,8 +37628,10 @@ def m103sceny_main(logp, csp=None, rglp=None):
     < 1; scena 23 - w dobie KONCA PROLOGU), SC-4 kolejnosc rosnaca, bez powtorzen w calym logu, SC-5 scena 23 po linii KONIEC PROLOGU, SC-6 po jednej (zamknieta przed
     nastepna), SC-7 pominiete 0 (poza zapisem sprzed scen - INFO), SC-8 okna ROT (zapas ShowInquiry = NIE), SC-9 obrazki z plikow i zle pliki (INFO), SC-10 zamkniecia
     przyciskiem (bez przycisku = NIE), SC-11 para z CrashScribe (--crashscribe): kazda pokazana scena ma linie 'AUTOTEST: OKNO wydarzenie ROT "<tytul>"' w tej samej
-    kolejnosci, SC-12 po wczytaniu zapisu bez powtorek (pierwsza scena sesji = pokazane + pominiete + 1), SC-13 brak 'Trying to render a released texture' (--rgl
-    rgl_log i log CrashScribe), SC-14 obrazki okien ROT (INFO). Log bez kampanii z prologiem: INFO."""
+    kolejnosci, SC-12 po wczytaniu zapisu bez powtorek (pierwsza scena sesji = pokazane + pominiete + 1), SC-13 zwolnienie tekstury przy otwartym oknie 0 (linia
+    Armoury 'Obrazki (m103): ZWOLNIENIE PRZY OKNIE'; dodatkowo assert 'Trying to render a released texture' z --rgl i CrashScribe - w grze wydaniowej go tam nie ma),
+    SC-14 obrazki okien ROT (INFO). Recenzja m103: SC-2 liczy sceny zalatwione w zapisie (pokazane + pominiete z linii startu sesji) jako zalatwione (bieg z -LoadSave);
+    log bez kampanii z prologiem: SC-0 INFO, ale SC-1 (ERROR) i SC-13 dalej licza - latka okien ROT i obrazki dzialaja w kazdej kampanii."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("SC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -37636,6 +37641,7 @@ def m103sceny_main(logp, csp=None, rglp=None):
     cur = {"start": None, "ev": []}
     n_err, err_ex, end_line, end_day, last_day = 0, [], None, None, -1.0
     bad_files, rot_swaps, rot_nofile, ends = [], [], 0, []
+    held, rot_bw = [], 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for no, ln in enumerate(fh):
             m = TS.match(ln.rstrip("\n"))
@@ -37658,6 +37664,10 @@ def m103sceny_main(logp, csp=None, rglp=None):
                 body = s[len(M103_PIC_TAG):]
                 if body.startswith("ZLY PLIK"):
                     bad_files.append(body[:160])
+                elif body.startswith(M103_HELD):
+                    held.append(body[:160])
+                elif body.startswith("okno ROT ") and "prefab Blackwater" in body:
+                    rot_bw += 1
                 elif body.startswith("okno ROT ") and " - obrazek arm_" in body:
                     rot_swaps.append(body.split(" '")[0][9:])
                 elif body.startswith("okno ROT ") and "brak pliku" in body:
@@ -37726,22 +37736,37 @@ def m103sceny_main(logp, csp=None, rglp=None):
     print(f"plik: {logp} | sesji {len(sessions)}, startow {len(starts)}, pokazanych {len(shows)}, zamknietych {len(closes)}, pominietych {len(skips)}, czeka {len(waits)}"
           f", nieudanych otwarc {len(fails)}, ERROR {n_err}, ostatni dzien prologu {last_day:.1f}, KONIEC PROLOGU "
           f"{'dzien ' + format(end_day, '.1f') if end_day is not None else 'brak'}")
+    def sc1():
+        rep.add("SC-1: ERROR scen, okna i obrazkow (Prologue.Scenes, StoryWindow, StoryPictures, RotWindowPictures)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+
+    def sc13():
+        n = len(held) + (rgl_released or 0) + cs_released
+        rep.add("SC-13: zwolnienie tekstury przy otwartym oknie", f"Armoury '{M103_HELD}' {len(held)}" + (f" ({held[0][:100]})" if held else "")
+                + f" | assert gry: rgl_log {rgl_released if rgl_released is not None else '-'}, CrashScribe {cs_released if csp else '-'}",
+                "0 (assert gry w buildzie wydaniowym nie trafia do logow - liczy sie linia Armoury)", n == 0)
+
     if not starts and not ev:
         rep.add("SC-0: linie 'Prolog (m103): ...'", "brak w logu", "INFO (klasyczna kampania albo log sprzed m103-sceny)", None)
-        if rot_swaps or rot_nofile or bad_files:
-            rep.add("SC-14: obrazki okien ROT", f"podmienionych {len(rot_swaps)} ({', '.join(rot_swaps[:4])}), okien bez pliku {rot_nofile}, zlych plikow {len(bad_files)}", "INFO", None)
+        sc1()   # latka okien ROT (prefiks/postfiks EventScreen), StoryWindow.Watch i StoryPictures.AppTick dzialaja takze w kampanii klasycznej
+        sc13()
+        if rot_swaps or rot_nofile or bad_files or rot_bw:
+            rep.add("SC-14: obrazki okien ROT", f"podmienionych {len(rot_swaps)} ({', '.join(rot_swaps[:4])}), okien bez pliku {rot_nofile}, prefab Blackwater (bez obrazka) {rot_bw}"
+                    f", zlych plikow {len(bad_files)}", "INFO", None)
         rep.show()
         return 0
     st = starts[0] if starts else None
     rep.add("SC-0: linia startu scen", (f"klucz {st[0]}, scen {st[2]}, pokazane {st[1]}, pominiete {st[3]}, nastepna {st[5]}" if st else "brak linii startu"),
             "klucz TAK, scen 23", (st[0] == "TAK" and st[2] == "23") if st else False)
-    rep.add("SC-1: ERROR scen, okna i obrazkow (Prologue.Scenes, StoryWindow, StoryPictures, RotWindowPictures)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+    sc1()
     shown_nr = [e[1] for e in shows]
     skipped_nr = set(e[1] for e in skips)
+    # recenzja m103: sceny zalatwione w zapisie (maska sc=/sk= - zawsze od 01 w gore: straznik zalatwia je po kolei) - z linii startu kazdej sesji
+    saved = max([int(x[1]) + int(x[3]) for x in starts] or [0])
     due = [k + 1 for k, d in enumerate(M103_DAYS) if d <= last_day and (k + 1 != M103_ARREST or end_line is not None)]
-    missing = [k for k in due if k not in shown_nr and k not in skipped_nr]
-    rep.add("SC-2: pokazane sceny nalezne do ostatniego dnia logu", f"pokazanych {len(set(shown_nr))} z {len(due)} naleznych" + (f" (brak: {missing[:8]})" if missing else ""),
-            "wszystkie nalezne (23 przy logu >= 187 dni i koncu prologu)", len(missing) == 0)
+    missing = [k for k in due if k not in shown_nr and k not in skipped_nr and k > saved]
+    rep.add("SC-2: pokazane sceny nalezne do ostatniego dnia logu", f"pokazanych {len(set(shown_nr))} z {len(due)} naleznych" + (f", zalatwionych w zapisie {saved}" if saved else "")
+            + (f" (brak: {missing[:8]})" if missing else ""),
+            "wszystkie nalezne (23 przy logu >= 187 dni i koncu prologu; sceny z zapisu - z linii startu)", len(missing) == 0)
     late = []
     for e in shows:
         nr, (d, due_day, title, img, mode) = e[1], e[2]
@@ -37816,13 +37841,9 @@ def m103sceny_main(logp, csp=None, rglp=None):
                 "pierwsza scena sesji = pokazane + pominiete z zapisu + 1", len(bad) == 0)
     else:
         rep.add("SC-12: po wczytaniu zapisu bez powtorek", "brak sesji z wczytanym stanem scen", "INFO (bieg z -LoadSave zapisu z polowy prologu)", None)
-    if rgl_released is not None or csp:
-        n = (rgl_released or 0) + cs_released
-        rep.add("SC-13: 'Trying to render a released texture'", f"rgl_log {rgl_released if rgl_released is not None else '-'}, CrashScribe {cs_released if csp else '-'}",
-                "0 (tekstura zwolniona przy otwartym oknie)", n == 0 if rgl_released is not None else (None if cs_released == 0 else False))
-    else:
-        rep.add("SC-13: 'Trying to render a released texture'", "bez --rgl i --crashscribe", "INFO (podaj --rgl <rgl_log_*.txt>)", None)
+    sc13()
     rep.add("SC-14: obrazki okien ROT (Images\\ROT)", f"podmienionych {len(rot_swaps)}" + (f" ({', '.join(rot_swaps[:4])})" if rot_swaps else "") + f", okien bez pliku {rot_nofile}"
+            + (f", prefab Blackwater (bez obrazka) {rot_bw}" if rot_bw else "")
             + (f" | koniec scen: pokazane {ends[-1][0]}/{ends[-1][1]}, pominiete {ends[-1][2]}" if ends else ""), "INFO", None)
     rep.show()
     return 0

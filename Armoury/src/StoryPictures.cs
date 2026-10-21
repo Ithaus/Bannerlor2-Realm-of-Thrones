@@ -4,9 +4,11 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.Library;
+using TaleWorlds.ScreenSystem;
 using TaleWorlds.TwoDimension;
 using EngineTex = TaleWorlds.Engine.Texture;
 using UiTex = TaleWorlds.TwoDimension.Texture;
@@ -46,6 +48,10 @@ namespace Armoury
     /// SpriteData.GetSprite - WidgetExtensions.ConvertObject; SpriteData.Reload wymienia slownik, dlatego wpis przy kazdym pokazaniu). Unikalna nazwa tekstury silnika.
     /// ZWALNIANIE: rysowanie zwolnionej tekstury = FailedAssert "Trying to render a released texture" (TwoDimensionEnginePlatform.DrawImage) - tekstura poprzedniego
     /// obrazka czeka w kolejce i jest zwalniana dopiero, gdy na stosie stanow gry nie ma okna wydarzenia (EventPopupState) i minelo ReleaseDelaySec (AppTick).
+    /// KONTROLA PRZED ZWOLNIENIEM (recenzja m103): w grze wydaniowej ten assert nie trafia do zadnego logu (Debug.FailedAssert -> MBDebugManager.Assert ma puste
+    /// cialo, ButterLib pisze go jako Debug, a na dysk idzie tylko Info), a po naszym Release EngineTexture.Texture = null i DrawImage po cichu nic nie rysuje (pusta
+    /// ramka okna). Dlatego AppTick przed kazdym zwolnieniem sprawdza ekran (OnScreen): okno wydarzenia ROT na wierzchu z tym obrazkiem (albo z obrazkiem
+    /// nieczytelnym) = zwolnienie wstrzymane + linia "ZWOLNIENIE PRZY OKNIE" (raz na obrazek; prog SC-13 grupy m103sceny).
     /// W pamieci najwyzej jeden obrazek w uzyciu + kolejka do zwolnienia. ReleaseAll: koniec prologu (kolejka), OnGameEnd (od razu).
     /// Brak pliku albo zly plik = null (okno bierze obrazek ROT) + linia logu (zly plik - raz na zmiane pliku). Bledy: licznik potkniec, bez globalnego wylacznika.
     /// </summary>
@@ -73,12 +79,15 @@ namespace Armoury
             public UiTex Ui;
             public ArmFileSprite SpriteObj;
             public long QueuedAt;
+            public bool HeldLogged;    // linia "ZWOLNIENIE PRZY OKNIE" juz byla dla tego obrazka
         }
 
         private static readonly Dictionary<string, Entry> _loaded = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private static readonly List<Entry> _pending = new List<Entry>();
         private static readonly Dictionary<string, string> _badLogged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private static int _stumbles, _loads, _rejects, _released, _seq;
+        private static int _stumbles, _loads, _rejects, _released, _seq, _held;
+        private static FieldInfo _fScreenState;   // ROT.Screens.EventScreen._eventPopupState (do OnScreen)
+        private static Type _fScreenType;
         private static string _root;
 
         internal static int Stumbles { get { return _stumbles; } }
@@ -431,11 +440,52 @@ namespace Armoury
                 {
                     var e = _pending[i];
                     if (now - e.QueuedAt < (long)(ReleaseDelaySec * Stopwatch.Frequency)) continue;
+                    string busy = OnScreen(e);
+                    if (busy != null)
+                    {
+                        e.QueuedAt = now;   // tekstura zostaje do zamkniecia okna (ReleaseAll przy koncu gry zwalnia ja i tak)
+                        if (!e.HeldLogged)
+                        {
+                            e.HeldLogged = true;
+                            _held++;
+                            Log.Info(Tag + "ZWOLNIENIE PRZY OKNIE " + e.Sprite + " - " + busy + " - zwolnienie wstrzymane (blad kolejki obrazkow: tekstura w kolejce, a okno"
+                                     + " ja rysuje) | wstrzymanych w sesji " + _held + ".");
+                        }
+                        continue;
+                    }
                     _pending.RemoveAt(i);
                     ReleaseNow(e);
                 }
             }
             catch (Exception ex) { Stumble("AppTick", ex); }
+        }
+
+        /// <summary>Kontrola przed zwolnieniem (AppTick): null = obrazka nie ma na ekranie; inaczej powod. Rysowany jest tylko TopScreen - okno wydarzenia ROT to ekran
+        /// ROT.Screens.EventScreen (warstwa "EventScreen"); jego obrazek: _eventPopupState.Event.HeaderImage (nazwa sprite'a wpisana przy LoadMovie). Sprawdzenie
+        /// niezalezne od bramki EventWindowOnStack (inna nazwa typu - ekran, nie stan). Obrazek okna nieczytelny (zmiana ROT) = traktowany jak ten sam.</summary>
+        private static string OnScreen(Entry e)
+        {
+            try
+            {
+                var top = ScreenManager.TopScreen;
+                if (top == null) return null;
+                var tt = top.GetType();
+                if (tt.FullName != "ROT.Screens.EventScreen" && top.FindLayer<ScreenLayer>("EventScreen") == null) return null;
+                string hi = null;
+                if (_fScreenType != tt) { _fScreenType = tt; _fScreenState = AccessTools.Field(tt, "_eventPopupState"); }
+                var st = _fScreenState != null ? _fScreenState.GetValue(top) : null;
+                var pe = st != null ? AccessTools.Property(st.GetType(), "Event") : null;
+                var ev = pe != null ? pe.GetValue(st, null) : null;
+                var ph = ev != null ? AccessTools.Property(ev.GetType(), "HeaderImage") : null;
+                if (ph != null) hi = ph.GetValue(ev, null) as string;
+                if (hi == null) return "okno wydarzenia ROT na wierzchu ekranu (obrazka okna nie da sie odczytac)";
+                if (hi != e.Sprite) return null;
+                Entry cur;
+                // ta sama nazwa, ale w slowniku juz nowszy obrazek (plik podmieniony) - okno wzielo nowszy przy LoadMovie, ten mozna zwolnic
+                if (_loaded.TryGetValue(e.Sprite, out cur) && !ReferenceEquals(cur, e)) return null;
+                return "okno wydarzenia ROT na wierzchu ekranu z tym obrazkiem";
+            }
+            catch (Exception ex) { Stumble("OnScreen", ex); return "blad sprawdzenia ekranu " + ex.GetType().Name; }
         }
 
         private static void ReleaseNow(Entry e)
@@ -458,7 +508,8 @@ namespace Armoury
             e.Engine = null; e.Ui = null; e.SpriteObj = null;
         }
 
-        /// <summary>OnGameEnd: wszystko od razu (okna juz nie ma - stany gry czyszczone przy wyjsciu z kampanii).</summary>
+        /// <summary>OnGameEnd: wszystko od razu (okna juz nie ma - stany gry czyszczone przy wyjsciu z kampanii; bez kontroli OnScreen - po koncu gry nic nie rysuje
+        /// okien kampanii).</summary>
         internal static void ReleaseAll(string why)
         {
             int n = 0;
@@ -471,7 +522,7 @@ namespace Armoury
             }
             catch (Exception ex) { Stumble("ReleaseAll", ex); }
             if (n > 0) Log.Info(Tag + "zwolnione obrazki: " + n + " (" + why + ") | wczytanych w sesji " + _loads + ", odrzuconych " + _rejects + ", zwolnionych razem " + _released
-                                + " | potkniecia " + _stumbles + ".");
+                                + ", wstrzymanych przy oknie " + _held + " | potkniecia " + _stumbles + ".");
         }
 
         internal static string StartText()
