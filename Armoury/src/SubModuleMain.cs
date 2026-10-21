@@ -247,6 +247,8 @@ namespace Armoury
                 // E6/K5 (213): juczne nowych karawan z targu miasta startu (postfiks InitializeCaravanOnCreation + postfiks CreateCaravanParty VeryLow - po E4/8 Low,
                 // przed finalizerami CaravanCapital/O17) i udzwig luzaka pod jukami (postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity); dziala przy kluczach
                 try { PackMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackMarket.ApplyAll", e); }
+                // m97-oboz: woz taborowy i siodla transportowe - postfiks pojemnosci (jak PackMarket) i CalculateFinalSpeed wszystkich modeli predkosci (licznik glebokosci)
+                try { CampCart.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CampCart.ApplyAll", e); }
                 // m6b (4): juczne nowego taboru wsi ze stada albo z targu (postfiks InitializeVillagerPartyProperties), juczne konwoju DTE bez kopii do zbrojowni,
                 // nazwane pozycje ksiegi koni (zapas drogi DTE i BK, konie przy RemoveParty) i towar partii usunietych bez zniszczenia (ksiega towarow, klucz FoodSourcesInLedger)
                 try { PackSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackSources.ApplyAll", e); }

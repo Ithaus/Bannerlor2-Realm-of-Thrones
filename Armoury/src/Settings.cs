@@ -3851,6 +3851,15 @@ namespace Armoury
         // Wylaczony = komunikaty jak dotad (od nastepnej godziny gry - McmSettings.Apply co godzine). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
         public bool PlayerPaymentReasons = true;           // when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare "You paid N" / "You received N" is replaced by one message that says what for, with the split (e.g. "You paid 2 for your night at a common room in Seagard (bed 1, horse 1)."). Only the message changes - sums and payers stay the same. Off = the game's message as before
 
+        // --- Camp and baggage (night 20/21.10) ---
+        // m97-oboz (CampCart.cs): woz taborowy (stan druzyny gracza, zapis arm_campcart) - stolarz w miescie z drewna i narzedzi z polki; zwierze juczne w zaprzegu
+        // wiezie CartLoadKg zamiast 100 kg, kolumna wolniej o CartSpeedPenaltyPercent; siodlo transportowe (mule_load_a od garbarza) na wolnym jucznym +PackSaddleExtraKg
+        public bool CampCartEnabled = true;                // supply carts: a town carpenter builds one from market wood and tools; one pack animal pulls it and hauls Cart Load Kg instead of its own 100 kg, but the column moves slower (off = carts give nothing)
+        public int CartLoadKg = 500;                       // kilograms a cart hauls behind one pack animal (the animal alone carries 100)
+        public int CartSpeedPenaltyPercent = 10;           // how much slower your column moves while a cart is hitched (0 = no slowdown)
+        public bool PackSaddleEnabled = true;              // transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight; it is no riding saddle (off = pack saddles give nothing)
+        public int PackSaddleExtraKg = 50;                 // extra kilograms a pack animal carries with a pack saddle
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

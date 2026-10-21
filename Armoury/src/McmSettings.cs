@@ -8700,6 +8700,26 @@ namespace Armoury
         [SettingPropertyGroup("Payment messages")]
         public bool PlayerPaymentReasons { get; set; } = true;
 
+        [SettingPropertyBool("Camp Cart Enabled", HintText = "supply carts: a town carpenter builds one from market wood and tools; one pack animal pulls it and hauls Cart Load Kg instead of its own 100 kg, but the column moves slower (off = carts give nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampCartEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Cart Load Kg", 100, 2000, "0", HintText = "kilograms a cart hauls behind one pack animal (the animal alone carries 100)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CartLoadKg { get; set; } = 500;
+
+        [SettingPropertyInteger("Cart Speed Penalty Percent", 0, 50, "0", HintText = "how much slower your column moves while a cart is hitched (0 = no slowdown)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CartSpeedPenaltyPercent { get; set; } = 10;
+
+        [SettingPropertyBool("Pack Saddle Enabled", HintText = "transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight; it is no riding saddle (off = pack saddles give nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool PackSaddleEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Pack Saddle Extra Kg", 0, 300, "0", HintText = "extra kilograms a pack animal carries with a pack saddle", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int PackSaddleExtraKg { get; set; } = 50;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -10874,6 +10894,11 @@ namespace Armoury
             s.CastleMenuTidy = CastleMenuTidy;
             s.VillageMenuTidy = VillageMenuTidy;
             s.PlayerPaymentReasons = PlayerPaymentReasons;
+            s.CampCartEnabled = CampCartEnabled;
+            s.CartLoadKg = CartLoadKg;
+            s.CartSpeedPenaltyPercent = CartSpeedPenaltyPercent;
+            s.PackSaddleEnabled = PackSaddleEnabled;
+            s.PackSaddleExtraKg = PackSaddleExtraKg;
         }
 
         internal static void Apply()
