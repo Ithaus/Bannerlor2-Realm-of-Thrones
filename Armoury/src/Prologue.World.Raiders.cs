@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -13,11 +14,14 @@ namespace Armoury
     /// m104-e5 pkt 6 - LUDZIE GORY W DORZECZU od dnia 155 (klucz PrologueMountainRaiders; projekt pkt 2: "grabiezcy Lannisterow w Dorzeczu (spalone wsie)").
     /// Bez wojny krolestw: banda klanu bandyckiego "robber_knights" (Robber Knights - klan bandycki jest w stalej wojnie z kazdym krolestwem: DefaultDiplomacyModel.
     /// GetShallowDiplomaticStance, wiec rabunek wsi Dorzecza idzie zwykla mechanika gry - EncounterManager: ShortTermBehavior RaidSettlement + IsAtWarAgainstFaction;
-    /// precedens gry: bandy dezerterow w zadaniu ExtortionByDeserters), nazwa "The Mountain's Men", sztandar Lannisterow (Party.SetCustomBanner - rod clan_vlandia_1).
+    /// precedens gry: bandy dezerterow w zadaniu ExtortionByDeserters), nazwa "The Mountain's Men", bez sztandaru (recenzja m104: wedlug ksiazki i sceny 19 "raiders flying
+    /// no banners" - sztandar klanu bandyckiego, nie Lannisterow).
     /// Ludzie (nikt z niczego): OutlawLaw.RaidDraw z okregu wsi zrodla - wies twierdzy rodu Clegane (clan_vlandia_5) najblizszej Riverrun (w ROT Harrenhal), wzor
     /// FreeFolkRaids. Dwie bandy (RaidBands), kazda: rabuj najblizsza wies Dorzecza w stanie Normal (nie cel drugiej bandy, nie spalona przez nas w ostatnich RaidRecentDays
     /// dniach), po spaleniu - nastepna. Partia sceny (bez nowych decyzji - nie ucieka i nie zaczepia po drodze); w marszu do pierwszej wsi ukryta przed AI (ziemie
-    /// Clegane - nie bija sie z wlasnymi), potem widoczna (lordowie Dorzecza, Beric i gracz moga ja rozbic). Straty rabunku ksieguje gra i Armoury jak kazdy rabunek
+    /// Clegane - nie bija sie z wlasnymi), potem widoczna (lordowie Dorzecza, Beric i gracz moga ja rozbic). SWOI NIE BIJA SWOICH (recenzja m104, wzor FreeFolkRaids.KinPost):
+    /// do konca prologu partie krolestwa rodu Clegane (korona - vlandia) nie atakuja z wlasnej woli band Ludzi Gory, a bandy - ich (postfiks DefaultMobilePartyAIModel.
+    /// ShouldConsiderAttacking, migawka _mmKin; gracz moze atakowac). Straty rabunku ksieguje gra i Armoury jak kazdy rabunek
     /// (DistrictRaid: ludzie, spichlerz, towar; zlota nie ma - SmallGold.PayRaidLoot wymaga wodza-bohatera).
     /// KONIEC (dzien 188): kazda banda w domu jak banda najazdu Wolnych Ludzi (FreeFolkRaids.Home: bohaterowie-jency uciekaja, lup do wsi zrodla - zloto do jej kiesy,
     /// towar do magazynu - ludzie do puli okregu zrodla, banda rozwiazana). Klucz wylaczony w trakcie - bandy zostaja zwyklymi bandami (bez rozwiazania).
@@ -25,7 +29,7 @@ namespace Armoury
     internal static partial class Prologue
     {
         private const string MScene = "Gora";
-        private const string RaiderClanId = "robber_knights", CleganeClanId = "clan_vlandia_5", LannisterClanId = "clan_vlandia_1", RiverlandsId = "riverlands", RiverrunId = "town_V2";
+        private const string RaiderClanId = "robber_knights", CleganeClanId = "clan_vlandia_5", RiverlandsId = "riverlands", RiverrunId = "town_V2";
         private const string RaiderName = "The Mountain's Men";
         private const int RaidFrom = 155, RaidBands = 2, RaidMinMen = 20, RaidMaxMen = 50, RaidRecentDays = 20, RaidSpawnLate = 5;
 
@@ -44,10 +48,49 @@ namespace Armoury
         private static string _mmWhy = "", _mmNote = "", _mmKiller = "";
         private static readonly List<string> _mmKillerIds = new List<string>();   // bohaterowie-wodzowie, ktorzy rozbili bande (Beric liczy swoje)
 
+        // recenzja m104: swoi nie bija swoich - migawka czytana w watkach AI (niezmienna; podmieniana w przebiegu scen co godzine), odmowy ataku w sesji
+        private sealed class MmKin
+        {
+            public HashSet<MobileParty> Bands;
+            public IFaction Kin;
+        }
+        private static volatile MmKin _mmKin;
+        private static int _mmVeto;
+
         private static void ResetRaiders()
         {
             _mm.Clear(); _mmRecent.Clear(); _mmBurnedNames.Clear();
             _mmSpawned = _mmMen = _mmLost = _mmBurned = _mmHome = _mmBack = 0; _mmStarted = _mmDone = false; _mmWhy = _mmNote = _mmKiller = ""; _mmKillerIds.Clear();
+            _mmKin = null; _mmVeto = 0;
+        }
+
+        /// <summary>Recenzja m104: migawka "swoich" (bandy Ludzi Gory w polu do konca prologu i krolestwo rodu Clegane); null - latka nic nie zmienia.</summary>
+        private static void MmKinSet(HashSet<MobileParty> bands)
+        {
+            if (bands == null || bands.Count == 0) { _mmKin = null; return; }
+            var cl = C(CleganeClanId);
+            var f = cl != null ? cl.MapFaction : null;
+            _mmKin = f != null ? new MmKin { Bands = bands, Kin = f } : null;
+        }
+
+        /// <summary>Recenzja m104 - postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking (watki AI; wzor FreeFolkRaids.KinPost): partia krolestwa rodu Clegane nie atakuje
+        /// bandy Ludzi Gory i banda nie atakuje jej. Tylko odczyt niezmiennej migawki; poza nia - wynik gry bez zmian. Nie rzuca.</summary>
+        public static void MountainKinPost(MobileParty party, MobileParty targetParty, ref bool __result)
+        {
+            if (!__result) return;
+            var k = _mmKin;
+            if (k == null || party == null || targetParty == null) return;
+            try
+            {
+                bool tIn = k.Bands.Contains(targetParty), pIn = k.Bands.Contains(party);
+                if (tIn == pIn) return;
+                var other = tIn ? party : targetParty;
+                var f = other.MapFaction;
+                if (f == null || f != k.Kin) return;
+                __result = false;
+                Interlocked.Increment(ref _mmVeto);
+            }
+            catch { }
         }
 
         private static string PackRaiders()
@@ -122,16 +165,18 @@ namespace Armoury
 
         private static void RaidersStep(double day, bool daily)
         {
-            if (_mmDone) return;
+            if (_mmDone) { _mmKin = null; return; }
             var s = S;
             bool key = s != null && s.PrologueMountainRaiders;
             if (key && daily && !_mmStarted && day >= RaidFrom && day < PrologueDays) RaidersSpawn(day);
             if (_mm.Count == 0)
             {
+                _mmKin = null;
                 if (_mmStarted && day >= PrologueDays) _mmDone = true;
                 return;
             }
             var map = BanditsById();
+            HashSet<MobileParty> kin = null;
             foreach (var r in _mm.ToList())
             {
                 MobileParty mp;
@@ -148,8 +193,10 @@ namespace Armoury
                     RaiderHome(r, mp, day);
                     continue;
                 }
+                (kin ?? (kin = new HashSet<MobileParty>())).Add(mp);
                 try { RaiderTick(r, mp, day); } catch (Exception e) { WStumble("RaiderTick(" + r.Id + ")", e); }
             }
+            MmKinSet(kin);
             if (_mm.Count == 0 && day >= PrologueDays) _mmDone = true;
         }
 
@@ -159,7 +206,6 @@ namespace Armoury
             var clan = BanditClan(RaiderClanId);
             var src = RaiderSource();
             var region = src != null ? OutlawLaw.RegionFor(src) : null;
-            var lann = C(LannisterClanId);
             if (clan == null || src == null || region == null)
             {
                 _mmNote = clan == null ? "brak klanu " + RaiderClanId : "brak wsi rodu Clegane (" + CleganeClanId + ")";
@@ -170,14 +216,14 @@ namespace Armoury
             for (int i = _mm.Count; i < RaidBands; i++)
             {
                 string note;
-                var mp = SpawnBand("armoury_prl_mountain", clan, src, region, RaidMinMen + MBRandom.RandomInt(RaidMaxMen - RaidMinMen + 1), RaidMinMen, RaiderName, lann != null ? lann.Banner : null, out note);
+                var mp = SpawnBand("armoury_prl_mountain", clan, src, region, RaidMinMen + MBRandom.RandomInt(RaidMaxMen - RaidMinMen + 1), RaidMinMen, RaiderName, null, out note);
                 _mmNote = note;
                 if (mp == null) { Log.Info(WTag + "ludzie Gory: banda przy " + src.StringId + " NIE powstala - " + note + " (dzien prologu " + D(day) + ")."); break; }
                 var r = new Raider { Id = mp.StringId, Src = src.StringId, Region = region.StringId };
                 _mm.Add(r); _mmSpawned++; _mmMen += mp.MemberRoster.TotalRegulars; made++;
                 var tgt = PickRaidTarget(mp, r, day);
                 r.Target = tgt != null ? tgt.StringId : null;
-                Log.Info(WTag + "ludzie Gory: nowa banda '" + RaiderName + "' (" + mp.StringId + ", klan " + RaiderClanId + ", sztandar " + (lann != null ? "Lannister" : "klanu") + ") przy "
+                Log.Info(WTag + "ludzie Gory: nowa banda '" + RaiderName + "' (" + mp.StringId + ", klan " + RaiderClanId + ", bez sztandaru) przy "
                          + src.StringId + " (okreg " + region.StringId + ") - " + note + " | pierwszy cel " + (r.Target ?? "brak") + " (dzien prologu " + D(day) + ").");
             }
             if (_mm.Count >= RaidBands || day >= RaidFrom + RaidSpawnLate) _mmStarted = true;
@@ -267,7 +313,8 @@ namespace Armoury
             return "ludzie Gory: " + (_mmDone ? "koniec" + (_mmWhy.Length > 0 ? " (" + _mmWhy + ")" : "") : !_mmStarted ? "przed (od d" + RaidFrom + ")" : "w polu " + parts.Count + "/" + RaidBands)
                    + (parts.Count > 0 ? " [" + string.Join("; ", parts.ToArray()) + "]" : "") + ", od poczatku " + _mmSpawned + " band (" + _mmMen + " ludzi), spalone wsie " + _mmBurned
                    + (_mmBurnedNames.Count > 0 ? " (" + string.Join(", ", _mmBurnedNames.ToArray()) + ")" : "") + ", rozbite " + _mmLost + (_mmKiller.Length > 0 ? " (ostatnio " + _mmKiller + ")" : "")
-                   + ", wrocily do domow " + _mmHome + " (" + _mmBack + " ludzi)" + (_mmNote.Length > 0 && !_mmStarted ? ", " + _mmNote : "");
+                   + ", wrocily do domow " + _mmHome + " (" + _mmBack + " ludzi)" + ", swoi nie bija swoich: odmowy ataku w sesji " + Volatile.Read(ref _mmVeto)
+                   + (_mmNote.Length > 0 && !_mmStarted ? ", " + _mmNote : "");
         }
     }
 }

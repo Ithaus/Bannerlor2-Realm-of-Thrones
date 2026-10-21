@@ -145,7 +145,15 @@ namespace Armoury
                 if (fi != null && fi.FieldType == typeof(Func<MobileParty, bool>)) { fi.SetValue(null, new Func<MobileParty, bool>(Scripted)); gt = "TAK"; }
             }
             catch (Exception e) { WStumble("ApplyWorld.GrandTourney", e); }
-            _worldWire = "straz niewoli " + g + ", okup " + r + ", uczta BK " + f + ", herold GT " + gt;
+            string kin = "BRAK";
+            try
+            {
+                // recenzja m104: swoi nie bija swoich (Ludzie Gory i krolestwo rodu Clegane) - drugi postfiks obok FreeFolkRaids.KinPost (ten sam wzor, rozne migawki)
+                var m = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultMobilePartyAIModel), "ShouldConsiderAttacking", new[] { typeof(MobileParty), typeof(MobileParty) });
+                if (m != null && h.Patch(m, postfix: new HarmonyMethod(typeof(Prologue), nameof(MountainKinPost)) { priority = Priority.Last }) != null) kin = "TAK";
+            }
+            catch (Exception e) { WStumble("ApplyWorld.MountainKin", e); }
+            _worldWire = "straz niewoli " + g + ", okup " + r + ", uczta BK " + f + ", herold GT " + gt + ", swoi Gory " + kin;
             return _worldWire;
         }
 

@@ -9008,7 +9008,7 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueHillClans { get; set; } = true;
 
-        [SettingPropertyBool("Prologue Mountain Raiders", HintText = "in a Prologue 298 campaign from day 155 two bands of the Mountain's Men under the Lannister banner, raised around Harrenhal (no one out of nothing), burn the villages of the Riverlands one after another (the game's raids - the losses go into the books like any raid), without a war between the realms; at the end of the prologue they go back to the woods and villages they came from. Off = no raiders", RequireRestart = false)]
+        [SettingPropertyBool("Prologue Mountain Raiders", HintText = "in a Prologue 298 campaign from day 155 two bands of the Mountain's Men flying no banners, raised around Harrenhal (no one out of nothing), burn the villages of the Riverlands one after another (the game's raids - the losses go into the books like any raid), without a war between the realms; the lords and bands of the realm the Cleganes serve leave them alone (the river lords, Lord Beric and you may fight them); at the end of the prologue they go back to the woods and villages they came from. Off = no raiders", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueMountainRaiders { get; set; } = true;
 
