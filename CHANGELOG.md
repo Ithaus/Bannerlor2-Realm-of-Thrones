@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 99 - oboz etap 2: markietani w duzych obozach)
+
+**Zakres (Jeff 20.10):** "miasteczko obozowe z markietankami"; decyzja 14:20 "markietani: uslugi, rozrywka i sklep - tylko w duzych obozach (armia)".
+**Zmiana:** `w-toku/n28-calosc` = WGRANIE 98 + m99-markietani (6ccd3cda): CampSutlersRow - "Visit the sutlers' row" w menu obozu i w menu armii gry (od 150 ludzi albo w armii),
+kramy 1 na 100 ludzi (max 12): cyrulicy (8 rannych/kram/dobe, 15 x (tier+1) d), platnerze polowi (6 sztuk/kram/dobe, robota jak u kowali miasta-zrodla x1.3 + material z polki),
+zabawa (morale +6, pulap +10, co 24 h, 2 d na czlowieka), sklep (towar z polek najblizszego miasta, narzut 30%, skup do 1500 d/kram/dobe); pieniadz do kasy miasta / kiesy wsi,
+towar z polki miasta. 13 kluczy. Wpis: docs/noc-1920/m99-markietani-CHANGELOG.md. Armoury 2217 ustawien.
+**Testy (21.10):** 99-bitwa 4/4, 99-nowa 180/180, 99-160 400/400 - kod 0, ERROR 0; progi nowa 3157/NIE 126 (98: 114, 97b: 127 - rozrzut), m99markietani 8/8 (autotest nie klika menu).
+**Ryzyko / co sprawdzic:** wejscie z menu cudzej armii (army_wait) - pierwszy raz w grze; platnerze z materialem poza miastem.
+**Status:** WGRANE 99 (21.10 03:50, tag 2026-10-21-wgranie99; Armoury c0c757d3, CrashScribe 15e601c3, RC b1d26e58, GT 9653495b, ForgeView 3d883521).
+LauncherData.xml Jeffa: VoiceActingPatch (VoiceActingPatchRemake) IsSelected true -> false (Jeff 21.10 "wylacz ten mod"; kopia LauncherData.xml.bak-2026-10-21-bez-voiceacting).
+
 ## 2026-10-21 (WGRANIE 98 - plotki w karczmie i zajezdzie: turnieje, swaty, kufel za plotki wedlug Uroku, pijanstwo i kac)
 
 **Zakres (Jeff 20.10, doslownie):** "W gossip tez powinny byc turnieje, gdzie jest turniej itp. ... ktos wydaje zone albo szuka meza dla swojej corki ... musze kupic piwo
