@@ -37,11 +37,16 @@ McmSettings.cs, sprawdz_logi.py scalone automatycznie; reszta plikow zmieniona t
 definicji na poziomie modulu (ast), sprawdz_narzedzie: dispatch poza main 0, zle wstawki 0, duble def 0, duble grup 0 (m103p3 osobno, z return). R5 z recenzji gospodarki (M103_TAG
 w scenach i lektorze) bylo juz rozwiazane przy scaleniu lektora (M103L_*). Settings.cs: 0 dubli pol.
 **Build / testy (z gospodarka):** gen_mcm: Armoury 2261 ustawien (+5: BandFoodAtSea, ShipyardWoodAboveCraftStock, BloomeryShelfLeavesForges, KsFarmSurplusCapNet, DsFarmFixShareCap;
-zadnego z nich nie ma w Armoury.json Jeffa - domyslne TAK zadzialaja), RC 115, GT 44. Build 5 modow kod 0 na 078276a1 (md5): Armoury 3a2876da, CrashScribe d8ab9bce,
-RealisticCaptivity 754d6fec, GrandTourney 2807fa1a, ForgeView 75557eeb - kopie w katalogu testow 6ba92574/test/n102. Grupy na logu P2 (Armoury-2026-10-21_10-08-39, sprzed
+zadnego z nich nie ma w Armoury.json Jeffa - domyslne TAK zadzialaja), RC 115, GT 44. Build 5 modow kod 0 na f3091f49 (z poprawka VR nizej; md5): Armoury 8f767507, CrashScribe dc1c3177,
+RealisticCaptivity b67f0235, GrandTourney 5ff06a62, ForgeView 1d6056fe - kopie w katalogu testow 6ba92574/test/n102 (zastapily DLL z 078276a1). Grupy na logu P2 (Armoury-2026-10-21_10-08-39, sprzed
 zmian gospodarki, scen i lektora) kod 0: m103p3 (13 progow, NIE 1 - M3P-7 zaleglosci zamkow 270 tys., log bez kluczy P3), m96bandy (14, NIE 1 - MB-2 0.582, log sprzed P6; MB-13
 INFO "brak"), etap5 (389, NIE 18, DECYZJA 3), m103sceny i m103lektor (INFO - brak linii), m101prolog (11/11 TAK). CrashScribe bez zmian zrodel wobec 101 (git diff ed9273fa..HEAD
 -- CrashScribe pusty) - autotest moze uzyc CrashScribe-at-n101.dll.
+**Poprawka po scaleniu (f3091f49, MapRoadKinds.Audit):** komentarz `//` z recenzji gospodarki (c2117948) stal w srodku wyrazenia i wylaczal
+`.Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")` - linia VR wychodzila jako "ponizej 5% lub na podlodze: 31.00%; sufit kolumny ...", regex
+M103_VALYRIA_LOW nie trafial, wiec VR-3 liczyl srednia razem z probkami z podlogi (poprawka P1 VR-3 nie dzialala w grze). Komentarz nad instrukcja; regex sprawdzony na wzorcu
+nowej linii. Kolizji gospodarki z drobne/sceny/lektor w kodzie brak (wspolne pliki tylko Settings/McmSettings/sprawdz_logi; SideVillageVisit - drobne czyta RaidActive,
+gospodarka zmienila Today0/ProtSync; odziez z rzedu i praczki - towar odziezy i kiesa gracza, gospodarka ich nie rusza).
 **Ryzyko / co sprawdzic (gospodarka):** w autotescie m103p3 (M3P-0 segment P3 w kazdej linii f5, M3P-1 0 podwyzek w rampie, M3P-7 zaleglosci zamkow <= 200 tys.), m96bandy
 (MB-13 odcinek "z morza" w kazdej dobie, MB-2 >= 0.85), linia Stocznie "dziala TAK", linia Zelazo "zostawione kuzniom"; P3 zmienia firmy miast pod KS (P2: 76.6 mln zl/rok bez P3).
 **Status:** DO SPRAWDZENIA - kandydat WGRANIA 102 (z m103-gospodarka czesc 1 i 2); DLL testu 6ba92574/test/n102, CrashScribe-at-n101.dll.
