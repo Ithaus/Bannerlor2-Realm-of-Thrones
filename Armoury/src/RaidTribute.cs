@@ -197,7 +197,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ rachunek (jedna regula dla AI i gracza)
-        internal struct Quote { public int Men, Def; public double Q, Rate; public long Purse, T; }
+        // m97-wioski: Paid - udzial okregu (wioski poboczne), ktory juz zaplacil okup tej frakcji (SideVillageVisit) - poza kwota okupu wsi
+        internal struct Quote { public int Men, Def; public double Q, Rate, Paid; public long Purse, T; }
 
         private static int Healthy(MobileParty p) { try { return p != null && p.MemberRoster != null ? Math.Max(0, p.MemberRoster.TotalHealthyCount) : 0; } catch { return 0; } }
 
@@ -218,8 +219,9 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>Obroncy wsi: milicja + zdrowi ludzie partii stojacych we wsi, ktore sa w wojnie z napastnikiem (stanelyby w obronie).</summary>
-        private static int DefOf(Settlement st, IFaction att)
+        /// <summary>Obroncy wsi: milicja + zdrowi ludzie partii stojacych we wsi, ktore sa w wojnie z napastnikiem (stanelyby w obronie). m97-wioski: ci sami bronia
+        /// wiosek pobocznych okregu (SideVillageVisit - jedna regula sily dla wsi i jej wiosek).</summary>
+        internal static int DefOf(Settlement st, IFaction att)
         {
             double d = 0.0;
             try { d = Math.Max(0f, st.Militia); } catch { d = 0.0; }
@@ -246,7 +248,9 @@ namespace Armoury
             q.Q = (double)q.Men / Math.Max(1, q.Def);
             q.Rate = Low + (High - Low) * Clamp((q.Q - 1.0) / (FullAt - 1.0), 0.0, 1.0);
             q.Purse = st.Village != null ? Math.Max(0, st.Village.Gold) : 0;
-            q.T = q.Q >= 1.0 ? (long)Math.Floor(q.Rate * q.Purse) : 0;
+            // m97-wioski: okup okolicy bez czesci, ktora juz zaplacila okup tej frakcji jako wioski poboczne (jeden okup na kazda czesc okregu w czasie ochrony)
+            q.Paid = Clamp(SideVillageVisit.PaidShare(st, mp != null ? mp.MapFaction : null), 0.0, 1.0);
+            q.T = q.Q >= 1.0 ? (long)Math.Floor(q.Rate * q.Purse * (1.0 - q.Paid)) : 0;
             return q;
         }
 
@@ -398,7 +402,7 @@ namespace Armoury
                 long wage = Math.Max(1L, need.ArmyWage), lead = Math.Max(1L, need.LeadWage);
                 if (q.T < lead) { _rSmall++; _dRaid++; return true; }
                 double share, days, e = 0.0;
-                if (DistrictRaid.StepEstimate(st.Village, q.Men, out share, out days))
+                if (DistrictRaid.StepEstimate(st.Village, q.Men, out share, out days, mp.MapFaction != null ? mp.MapFaction.StringId : null))   // m97-wioski: bez wiosek po okupie
                 {
                     e = share * (q.Purse + StockValue(st));
                     if (q.T < e - wage * days) { _rBetter++; _dRaid++; _dRaidE += (long)e; return true; }   // C = zold calej armii: wszystkie jej druzyny stoja te doby
@@ -566,6 +570,7 @@ namespace Armoury
                     return true;
                 }
                 args.Tooltip = new TextObject("{=!}The elders will pay " + q.T + " denars (" + F(q.Rate * 100.0, "0") + "% of the village purse of " + q.Purse
+                                              + (q.Paid > 0.0005 ? " less the " + F(q.Paid * 100.0, "0") + "% of its lands whose villages already paid you" : "")   // m97-wioski
                                               + "; your " + q.Men + " men against " + q.Def + " defenders) to be spared. The village is not burned, but its lord and elders will think less of you."
                                               + " Your realm will leave it in peace for " + SpareDays + " days.");
                 return true;

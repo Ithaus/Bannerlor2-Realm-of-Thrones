@@ -38,8 +38,10 @@ namespace Armoury
     ///  V5 NOCLEG: wies okregu rodu gracza - za darmo pod dachem (TownInns.HostSleep - jak wioska gracza; TownInns.HostNear przyjmuje te wioske); obca wioska - za oplata jak
     ///     wspolna izba zajazdu (TownInns.RoadQCondition / RoadCommit z "zajazdem" tej wioski: ten sam rachunek, pieniadze do kiesy wsi okregu z podatkiem pana). W wojnie,
     ///     przy rabunku i w spalonej wiosce - nie. OBOZ: "Make camp here" - menu zamkniete, oboz rozbija tick (NightRest.MakeCampNow, droga klawisza O), bez SwitchToMenu.
-    ///  V6 WROGIE AKCJE (SideVillageVisit.Raid.cs): rabunek TEJ wioski (osobno, nie przez wies gry) i okup tej wioski z ochrona 30 dob.
-    /// Zapis arm_sidevil (SaveText): okupy, ostatnie rabunki gracza (10 dob), rabunek w toku. Brak klucza (stary zapis) = nic. AI bez zmian.
+    ///  V6 WROGIE AKCJE (SideVillageVisit.Raid.cs): rabunek TEJ wioski (osobno, nie przez wies gry) i okup tej wioski z ochrona 30 dob. Recenzja 20.10: obrona = cala
+    ///     milicja wsi okregu (jak okup wsi), rabunek wsi gry przez gracza pali tylko jej osady (DistrictRaid.PlayerMainOnly), ochrona po okupie dziala tez w lancuchu
+    ///     rabunku wsi gry (VillageBook) i pomniejsza okup wsi gry tej frakcji (RaidTribute.QuoteOf).
+    /// Zapis arm_sidevil (SaveText): okupy, ostatnie rabunki gracza (10 dob), rabunek w toku. Brak klucza (stary zapis) = nic. AI bez zmian (poza ominieciem wiosek po okupie).
     /// Linie logu "Wioski poboczne (WP): ..." - start sesji, wjazd, handel, nocleg, oboz, prace, rabunek, okup, doba. Potkniecia liczone, nic nie gasimy globalnie.
     /// </summary>
     internal static partial class SideVillageVisit
@@ -748,8 +750,8 @@ namespace Armoury
                 var s = Settings.Current;
                 var l = VillageBook.LayoutRecords();
                 Log.Info(P + "start sesji | klucz Side Villages Enterable " + (On ? "TAK" : "WYLACZONY") + " | wiosek w ukladzie " + (l != null ? l.Count.ToString(Inv) : "- (ksiega nieczynna)")
-                         + " | ukrycie partii: Roadside Inn Hide Party " + (s != null && s.RoadsideInns && s.RoadsideInnHideParty ? "tak" : "NIE") + ", nocleg za oplata: Roadside Inns i Town Inns "
-                         + (s != null && s.RoadsideInns && TownInns.On ? "tak" : "NIE") + ", okup: Raid Tribute " + (RaidTribute.On ? "tak" : "NIE")
+                         + " | ukrycie partii: Roadside Inn Hide Party " + (s != null && s.RoadsideInns && s.RoadsideInnHideParty ? "tak" : "NIE") + ", nocleg za oplata: Town Inns "
+                         + (TownInns.On ? "tak" : "NIE") + ", okup: Raid Tribute " + (RaidTribute.On ? "tak" : "NIE")
                          + ", rabunek: ksiega " + (VillageBook.Active ? "tak" : "NIE") + " | " + RaidSessionText() + " | potkniecia " + _st + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -759,6 +761,7 @@ namespace Armoury
         {
             try
             {
+                ProtSync();   // recenzja 20.10: wygasle ochrony po okupie z migawki ksiegi wiosek
                 bool any = _dEnter + _dClick + _dTrade + _dRest + _dCamp + _dInvest + _stDay > 0 || RaidDayAny();
                 if (!any) return;
                 double ms = _tickN > 0 ? _tickTicks * 1000.0 / Stopwatch.Frequency / _tickN : 0.0;

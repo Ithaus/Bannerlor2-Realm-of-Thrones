@@ -99,7 +99,8 @@ namespace Armoury
             }
             catch { }
             RoadsideInnStay.OnSleepInit(args, r.RoadUid);   // m95-zajazd: sen w zajezdzie - partia schowana (po wczytaniu w trakcie snu tez; wlasny try); dzwiek - RoadsideInnStay.InnSleepSound
-            string bed = r.Q == 2 ? "The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds"
+            string bed = IsVillageInn(r.RoadUid) ? "The villagers of " + r.Town + " take the men in for coin - straw in their barns and lofts, the horses in the yards"   // m97-wioski
+                       : r.Q == 2 ? "The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds"
                        : r.Q == 1 ? "The men drink their ale by the hearth of " + r.Town + " and sleep in beds"
                        : "The men bed down on the straw of the common room of " + r.Town + ", the horses in the yard";
             return bed + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
@@ -113,13 +114,14 @@ namespace Armoury
             why = null;
             var mp = MobileParty.MainParty;
             if (inn == null || inn.Village == null || mp == null || Hero.MainHero == null) { why = "There is no bed to be had here."; return false; }
-            if (!RoadsideInns.On) { why = "Roadside inns are switched off (game options)."; return false; }
+            bool vil = inn.Kind == "village";   // m97-wioski: nocleg w wiosce pobocznej (SideVillageVisit) - bez klucza zajazdow, napisy wsi
+            if (!RoadsideInns.On && !vil) { why = "Roadside inns are switched off (game options)."; return false; }
             if (!On) { why = "Lodgings need Town Inns and Night Rest (game options)."; return false; }
-            if (!RoadsideInns.AtInn(inn)) { why = "You are not at the inn."; return false; }
+            if (!RoadsideInns.AtInn(inn)) { why = vil ? "You are not at the village." : "You are not at the inn."; return false; }
             try
             {
                 var vf = inn.Village.MapFaction; var pf = Hero.MainHero.MapFaction;
-                if (vf != null && pf != null && FactionManager.IsAtWarAgainstFaction(vf, pf)) { why = "The keeper bars the door to the enemies of his lord."; return false; }
+                if (vf != null && pf != null && FactionManager.IsAtWarAgainstFaction(vf, pf)) { why = vil ? "The villagers bar their doors to the enemies of their lord." : "The keeper bars the door to the enemies of his lord."; return false; }
             }
             catch { }
             if (mp.MapEvent != null) { why = "Not in the middle of a fight."; return false; }
@@ -128,8 +130,15 @@ namespace Armoury
             if (mp.Army != null && mp.Army.LeaderParty != mp) { why = "You march in another lord's army - he decides where the host sleeps."; return false; }
             if (InSleepMenu()) { why = "The men are already asleep."; return false; }
             var v = inn.Village.Village;
-            if (v != null && v.VillageState == Village.VillageStates.BeingRaided) { why = "Raiders are on these lands - the inn is barred and the keeper hides."; return false; }
+            if (v != null && v.VillageState == Village.VillageStates.BeingRaided) { why = vil ? "Raiders are on these lands - the villagers have barred their doors." : "Raiders are on these lands - the inn is barred and the keeper hides."; return false; }
             return true;
+        }
+
+        /// <summary>m97-wioski: "zajazd" to wioska poboczna (SideVillageVisit.InnFor - nocleg za oplata u wiesniakow): napisy wsi zamiast karczmy.</summary>
+        private static bool IsVillageInn(string uid)
+        {
+            try { var i = uid != null ? RoadsideInns.Find(uid) : null; return i != null && i.Kind == "village"; }
+            catch { return false; }
         }
 
         /// <summary>Opcja jakosci q w menu zajazdu: tylko jakosci zajazdu (q &lt; Tiers); rachunek i podpowiedz jak w karczmie miasta.</summary>
@@ -287,7 +296,8 @@ namespace Armoury
                          + " | osoby " + b.Persons + ": stajnia " + b.People[0] + ", wspolna izba " + b.People[1] + ", porzadna karczma " + b.People[2] + ", dobry dom " + b.People[3]
                          + " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%.");
                 string men = b.Foot + b.Mounted == 0 ? "" : " Your men paid " + menPaid + " from their purses" + (b.MenStable > 0 ? ", " + b.MenStable + " of them sleep in the stable." : ".");
-                Log.Player("You take lodgings at a " + QualityOf(q) + " in " + inn.Name + " - " + paidAll + " denars in all, " + playerPaid + " of them yours." + men
+                Log.Player((inn.Kind == "village" ? "The villagers of " + inn.Name + " take you in for the night"   // m97-wioski: nocleg u wiesniakow wioski pobocznej
+                                                  : "You take lodgings at a " + QualityOf(q) + " in " + inn.Name) + " - " + paidAll + " denars in all, " + playerPaid + " of them yours." + men
                            + (compPaid > 0 ? " Your companions paid " + compPaid + "." : ""));
                 NightRest.BeginInnSleep();
             }

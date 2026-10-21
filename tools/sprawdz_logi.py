@@ -1890,6 +1890,10 @@ Uzycie (Python 3, tylko odczyt):
                     jedzenie < 95% - TAK przy 0, srednio <= 1 i max <= 3 DECYZJA (z nazwami), inaczej NIE; MK-6 pelny koszyk swiata >= 98%, MK-7 zjedzone bez zaplaty < 1%,
                     MK-8 przelane (INFO), MK-9 chleb M3 (INFO), MK-10 czas <= 2 ms, MK-11 Plan KS - czesc zaplacona R/P (INFO), MK-12 f5 - odmowa W, kappa W2, dni
                     koszyka (INFO). Bez kotwicy KS albo log sprzed galezi - INFO.
+--grupa m97wioski  : (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs, klucz Side Villages Enterable) wjazd do kazdej wioski pobocznej (handel koszykiem,
+                    nocleg, oboz, prace, rabunek tej wioski, okup). python -I tools/sprawdz_logi.py --grupa m97wioski <Armoury-*.log> (strumieniowo). WP-0 start sesji,
+                    WP-1 linie "ERROR in SideVillageVisit." 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi zmienia sie o -zysk gracza, kiesa gracza o zysk),
+                    WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek zakonczone z lupem / bez (INFO), WP-6 ruch doby (INFO). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -53229,6 +53233,93 @@ def m96len_main(logp):
     return 0
 
 
+# ============================================================ m97wioski (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs): wjazd do wiosek pobocznych
+M97W_PRE = "Wioski poboczne (WP): "
+M97W_RX = {
+    "trade": re.compile(r"handel w (.+?) zamkniety: gracz ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\), wies okregu (\S+) ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\)"),
+    "trib": re.compile(r"okup (.+?) \(.*kontrola: gracz \+(-?\d+) / wies -(-?\d+)\)"),
+    "raidend": re.compile(r"rabunek (.+?) \(.*\) - koniec: (.+?) \|.*lup .*: zloto (-?\d+) z kiesy wsi"),
+    "day": re.compile(r"dzien (-?\d+) \| klucz (\S+) \| wjazdy (\d+) \(kliki (\d+)\) \| handel (\d+):.* \| noclegi (\d+) \(bez oplaty (\d+)\), obozy (\d+), okna prac (\d+)"),
+    "st": re.compile(r"potkniecia doby (\d+), sesji (\d+)"),
+}
+
+
+def m97wioski_main(logp):
+    """m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do kazdej wioski pobocznej - handel koszykiem, nocleg, oboz, prace, rabunek tej wioski, okup (SideVillageVisit).
+    Log Armoury strumieniowo. Progi: WP-0 start sesji, WP-1 linie ERROR SideVillageVisit 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi o -zysk gracza
+    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, days, trades, tribs, raids, errs = [], [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR in SideVillageVisit." in s:
+                errs += 1
+            if not s.startswith(M97W_PRE):
+                continue
+            t = s[len(M97W_PRE):]
+            if t.startswith("start sesji"):
+                start.append(t)
+            elif t.startswith("dzien"):
+                days.append(t)
+            elif t.startswith("handel w ") and " zamkniety: " in t:
+                trades.append(t)
+            elif t.startswith("okup "):
+                tribs.append(t)
+            elif t.startswith("rabunek ") and " - koniec: " in t:
+                raids.append(t)
+    print(f"plik: {logp} | start {len(start)}, doby {len(days)}, handel {len(trades)}, okupy {len(tribs)}, rabunki {len(raids)}, ERROR {errs}")
+    if not start and not days:
+        rep.add("WP-0: linia startu wiosek pobocznych", "brak linii", "INFO (log sprzed galezi m97-wioski)", None)
+        rep.show()
+        return 0
+    rep.add("WP-0: linia startu sesji", (start[-1][:200] if start else "brak"), "jest", bool(start))
+    rep.add("WP-1: linie ERROR in SideVillageVisit.", f"{errs}", "0", errs == 0)
+    st = sum(int(m.group(1)) for m in (M97W_RX["st"].search(x) for x in days) if m)
+    rep.add("WP-2: potkniecia doby (suma)", f"{st} w {len(days)} dobach", "0", st == 0)
+    bad = []
+    for t in trades:
+        m = M97W_RX["trade"].search(t)
+        if not m:
+            bad.append("nieczytelna: " + t[:60]); continue
+        tp, a, b, dv, c, d = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(6)), int(m.group(7)), int(m.group(8))
+        if d - c != -tp or dv != -tp or b - a != tp:
+            bad.append(f"{m.group(1)}: gracz {tp:+d} ({a}->{b}), wies {dv:+d} ({c}->{d})")
+    if trades:
+        rep.add("WP-3: kontrola handlu w wiosce (zloto gracza = - zloto wsi)", f"zamkniec {len(trades)}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""), "0 niezgodnych", not bad)
+    else:
+        rep.add("WP-3: kontrola handlu w wiosce", "brak handlu w logu", "INFO", None)
+    badt = []
+    for t in tribs:
+        m = M97W_RX["trib"].search(t)
+        if m and int(m.group(2)) != int(m.group(3)):
+            badt.append(f"{m.group(1)}: gracz +{m.group(2)} / wies -{m.group(3)}")
+    if tribs:
+        rep.add("WP-4: kontrola okupu wioski (gracz +X = wies -X)", f"okupow {len(tribs)}, niezgodnych {len(badt)}" + (f" ({badt[:3]})" if badt else ""), "0 niezgodnych", not badt)
+    else:
+        rep.add("WP-4: kontrola okupu wioski", "brak okupow w logu", "INFO", None)
+    if raids:
+        g = [M97W_RX["raidend"].search(t) for t in raids]
+        loot = sum(int(m.group(3)) for m in g if m)
+        why = {}
+        for m in g:
+            if m:
+                k = m.group(2).split(" (")[0]
+                why[k] = why.get(k, 0) + 1
+        rep.add("WP-5: rabunki wiosek (koniec)", f"{len(raids)}: {why}, zloto lupu {loot}", "INFO", None)
+    else:
+        rep.add("WP-5: rabunki wiosek", "brak w logu", "INFO", None)
+    ent = tr = rest = camp = inv = 0
+    for t in days:
+        m = M97W_RX["day"].search(t)
+        if m:
+            ent += int(m.group(3)); tr += int(m.group(5)); rest += int(m.group(6)); camp += int(m.group(8)); inv += int(m.group(9))
+    rep.add("WP-6: ruch doby (suma)", f"wjazdy {ent}, handel {tr}, noclegi {rest}, obozy {camp}, okna prac {inv}", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -53539,7 +53630,9 @@ def main(argv):
     if group == "p6spichlerz" and logp:
         return p6spichlerz_main(logp)   # p6spichlerz (20.10, galaz p6-spichlerz - R3-06f): miasto je ze swoich wsi - zboze ze spichlerzy wsi do miast, zloto, niedobor, bezpiecznik BE i zalogi (TownGranary.cs)
     if group == "m96koszyk" and logp:
-        return m96koszyk_main(logp)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+        return m96koszyk_main(logp)
+    if group == "m97wioski" and logp:
+        return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

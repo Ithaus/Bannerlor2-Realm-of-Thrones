@@ -8552,7 +8552,7 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefWalk { get; set; } = true;
 
-        [SettingPropertyBool("Side Villages Enterable", HintText = "every side village on the map can be entered like a main village, though nobody of note lives there: click it to ride in (your party leaves the map as in a roadside inn). Inside: what it is and makes, rest the night (paid like an inn's common room, free on your own lands), make camp, buy what it makes (its share of its main village's store) and sell to it, invest in its works, and - at war - raid that one village alone or make it pay tribute (spared 30 days). Off = side villages are only pictures on the map, as before", RequireRestart = false)]
+        [SettingPropertyBool("Side Villages Enterable", HintText = "every side village on the map can be entered like a main village, though nobody of note lives there: click it to ride in (your party leaves the map as in a roadside inn). Inside: what it is and makes, rest the night (paid like an inn's common room, free on your own lands), make camp, buy what it makes (its share of its main village's store) and sell to it, invest in its works, and - at war - raid that one village alone or make it pay tribute (spared 30 days; the militia of its main village guards it). Your own raid on a main village then burns only that village's homesteads - each side village is raided on its own. Off = side villages are only pictures on the map, and raids burn them in a chain, as before", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillagesEnterable { get; set; } = true;
 
