@@ -1,0 +1,337 @@
+[
+ {
+  "key": "zadania-gry",
+  "summary": "PO LUDZKU (dla Jeffa):\n1) Gra ma 43 rodzaje zadań: 36 w podstawie gry i 7 w module SandBox. Daje je 6 rodzajów ludzi: kupiec, rzemieślnik i herszt gangu w mieście, sołtys i bogacz (właściciel ziemski) we wsi oraz lord. ROT nie dodaje zadań od mieszczan. Ma tylko własne zadanie \"Join {KINGDOM}\" (zaciąg) i wydarzenie Krwawe Gody. Banner Kings też nie dodaje zadań, ale gubernator miasta co tydzień może sam \"załatwić\" jedno zadanie (szansa = umiejętność Zarządzania / 1000), więc ono znika.\n2) KAPITANA STRAŻY w grze nie ma. Strażnicy to bezimienne postacie. Straż zamku wpuszcza do sali lorda, strażnik więzienia mówi o więźniach, straż miejska rzuca uwagę. Nie dają żadnych zadań. W ROT \"Gold Cloak Captain\", \"Kingsguard\" itp. to rodzaje żołnierzy w oddziałach, a nie osoby.\n3) Zadania \"wybij bandytów\" SĄ, ale dają je inni:\n- sołtys wsi: \"Kryjówka bandytów koło X\", 3000;\n- sołtys: \"Dezerterzy wymuszają we wsi\", 800 + 4200 x trudność;\n- kupiec w mieście albo bogacz wiejski: \"Pomoc z rozbójnikami\", rozbić 2-8 band koło miasta, 400 + 1500 x trudność;\n- kupiec: \"Armia kłusowników\", 500 + 3000 x trudność;\n- herszt gangu: \"Wspólnicy złapani przez łowców nagród\", odbić ich z kryjówki, 3000;\n- kupiec albo rzemieślnik z karawaną: \"Zasadzka na karawanę\", 1000 + 3000 x trudność;\n- kupiec: \"Eskorta karawany\", do 8000.\nWiększość pojawia się tylko w niespokojnych okolicach (bezpieczeństwo miasta 50-60 lub mniej). Wyjątkiem jest \"Pomoc z rozbójnikami\": wystarczy zajęta kryjówka w pobliżu.\n4) NAGRODA. Gra liczy ją jako stałą kwotę albo kwotę zależną od \"trudności\". Trudność to postęp gracza od 0,1 do 1: lenna, siła klanu, sława, poziom, wielkość drużyny. Relacja ze zleceniodawcą nie zmienia kwoty, czasem tylko blokuje przyjęcie zadania (relacja poniżej -10). W czystej grze złoto bierze się Z NICZEGO. U nas Armoury to zmienia (wgrane, log 20.10 22:31: \"wpiete 91 metod ... CZYNNE\"):\n- płaci zleceniodawca ze swojej kiesy;\n- kwota jest przycięta do wartości \"ludzie x dni x żołd x 1,25\".\nPrzykład: kryjówka bandytów to 10 ludzi x 5-10 dni. Przy żołdzie 5 denarów na głowę daje to ok. 310-625 zamiast 3000. To przykład wyliczony. W logach z Twojej gry nie ma jeszcze żadnej wypłaty za zadanie.\n5) CO GRA JUŻ POKAZUJE. W menu miasta u góry jest pasek portretów osób obecnych w mieście. Kto ma zadanie, ma wykrzyknik. Kliknięcie portretu daje dwie rzeczy:\n- \"Rozmowa\" (idziesz do tej osoby w scenie) albo \"Szybka rozmowa\";\n- listę TYTUŁÓW zadań tej osoby.\nOpcje \"Karczma\" / \"Zamek\" też dostają wykrzyknik, jeśli ktoś tam ma zadanie. W rozmowie mówisz \"Słyszałem, że potrzebujesz pomocy?\". Osoba opowiada, a Ty wybierasz: przyjmij, wyślij towarzysza z ludźmi albo odmów. Brakuje: opisu i nagrody PRZED rozmową, zadań z wsi należących do miasta i jednej wspólnej listy.\n6) ILE ZADAŃ NARAZ:\n- miasto: najwyżej 3 od mieszczan (każda osoba ma najwyżej 1);\n- wieś: najwyżej 2;\n- lordowie: 10-20% dorosłych lordów klanu.\nNa starcie kampanii zadania ma 80% miast, 70% wsi i 12% lordów. Jeśli miasto nie ma żadnego zadania, gra codziennie próbuje dodać nowe. Gdy ma 1-2, szansa na nowe wynosi 30% x (1 - n/3)². Zadanie po terminie znika z szansą 20% dziennie. Lord AI, który wchodzi do osady, może je załatwić (1%, a we własnej osadzie 5%).\n7) CZY TABLICA JEST MOŻLIWA: TAK, w obrębie tego, co gra już ma. W menu miasta (i wsi) dochodzi opcja \"Tablica ogłoszeń\". Pokazuje listę: osoba, tytuł, opis, nagroda po naszej skali, termin, gdzie ta osoba jest. Lista obejmuje miasto, wsie należące do miasta i lordów w mieście. Klik w osobę uruchamia tę samą \"Rozmowę\", co klik w portret: idziesz do niej i rozmawiasz o zadaniu jak zwykle. \"Kapitana straży\" trzeba by DOPISAĆ jako nasze nowe zadanie, na przykład \"Straż miejska: nagroda za bandy koło miasta\". Płaciłaby kasa miasta, a twarzą byłby strażnik danej kultury, w Królewskiej Przystani Złoty Płaszcz. To większa praca, bo nowy typ zadania trafia do zapisu gry.\n8) W internecie nie znalazłem gotowego moda z tablicą zadań do Bannerlorda. Najbliższy jest \"Governors Handle Issues\", w którym gubernatorzy sami załatwiają zadania. Nexus odmówił odczytu wyszukiwarki (403), więc przegląd nie jest pełny.\n\nPLIKI: zdekompilowane źródła są w C:\\Users\\GAME\\AppData\\Local\\Temp\\claude\\C--Users-GAME-Bannerlor2-Realm-of-Thrones\\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\\scratchpad\\zb\\tablica-tmp\\ (cs\\ = TaleWorlds.CampaignSystem, sb\\ = SandBox, vm\\ = ViewModelCollection). Wyciąg warunków i nagród ze wszystkich typów zadań: tablica-tmp\\extract.txt.",
+  "facts": [
+   {
+    "fact": "Gra 1.4.8 ma 43 typy zadań (IssueBase): 36 w TaleWorlds.CampaignSystem.Issues.*IssueBehavior i 7 w SandBox.Issues (FamilyFeud, NotableWantsDaughterFound, ProdigalSon, RivalGangMovingIn, RuralNotableInnAndOut, SnareTheWealthy, TheSpyParty).",
+    "evidence": "dectool list: tablica-tmp\\cs-list.txt i sandbox-list.txt; pliki tablica-tmp\\cs\\*IssueBehavior.cs, sb\\*.cs"
+   },
+   {
+    "fact": "Kupiec (IsMerchant): EscortMerchantCaravan 'Escort Merchant Caravan' (miasto bez portu, Security<=50, <2 karawany; nagroda min(dniowka x los, 8000); VeryCommon); CaravanAmbush 'Caravan Ambush' (kupiec lub rzemieslnik z karawana, miasto bez portu; 1000+3000*d; Common); MerchantArmyOfPoachers 'Army of Poachers' (Mercy+Honor<0, Security<=60, kryjowka przy wsi; 500+3000*d; Common); MerchantNeedsHelpWithOutlaws '{X} Needs Help With Brigands' (kupiec lub RuralNotable, zajeta kryjowka blisko; rozbic 2+6*d band; 400+1500*d; VeryCommon).",
+    "evidence": "ConditionsHold / RewardGold / GetFrequency w cs\\EscortMerchantCaravanIssueBehavior.cs:168,161; CaravanAmbushIssueBehavior.cs:150,136; MerchantArmyOfPoachersIssueBehavior.cs:674,667; MerchantNeedsHelpWithOutlawsIssueQuestBehavior.cs:703,697, TotalPartyCount :35"
+   },
+   {
+    "fact": "Rzemieslnik (IsArtisan): ArtisanCantSellProductsAtAFairPrice (500+1500*d, Common), ArtisanOverpricedGoods (indeks ceny surowca >2, Common).",
+    "evidence": "cs\\ArtisanCantSellProductsAtAFairPriceIssueBehavior.cs RewardGold, ConditionsHold; cs\\ArtisanOverpricedGoodsIssueBehavior.cs ConditionsHold"
+   },
+   {
+    "fact": "Herszt gangu (IsGangLeader): BettingFraud (Security<45; 250/2500/4500; Rare), CapturedByBountyHunters (kryjowka; 3000; Common), GangLeaderNeedsRecruits (2000+100/rekruta; VeryCommon), GangLeaderNeedsSpecialWeapons (wykuc 2+ceil(4*d) sztyletow, zaplata przez zamowienie u kowala; VeryCommon), GangLeaderNeedsToOffloadStolenGoods (Security<70; Common), GangLeaderNeedsWeapons (Loyalty<60; 500+cena*szt; Common), RivalGangMovingIn (Security<=60; 600+1700*d; Common), SnareTheWealthy (Security<=50, bez portu; 1000+3000*d; Rare).",
+    "evidence": "extract.txt sekcje tych plikow; cs\\GangLeaderNeedsSpecialWeaponsIssueBehavior.cs:21,421-450; sb\\RivalGangMovingInIssueBehavior.cs (RewardGold, ConditionsHold); sb\\SnareTheWealthyIssueBehavior.cs:450,1529"
+   },
+   {
+    "fact": "Soltys (IsHeadman): NearbyBanditBase 'Bandit Base Near {X}' (Security miasta-matki<=50; 3000 stale; VeryCommon; czas 30 dni); ExtortionByDeserters (Security<=50; 800+4200*d; Common); HeadmanNeedsGrain (0 zlota); HeadmanNeedsToDeliverAHerd (300+0.75*wartosc*szt; VeryCommon); HeadmanVillageNeedsDraughtAnimals (500+wartosc*szt; VeryCommon); VillageNeedsTools (500+szt*cena; VeryCommon); RuralNotableInnAndOut (1000/800; Common).",
+    "evidence": "cs\\NearbyBanditBaseIssueBehavior.cs:58,292,678-685; cs\\ExtortionByDesertersIssueBehavior.cs RewardGold, ConditionsHold; extract.txt pozostale"
+   },
+   {
+    "fact": "Bogacz wiejski / wlasciciel ziemski (IsRuralNotable): LandLordNeedsManualLaborers (50 za jenca), LandLordTheArtOfTheTrade, LandlordNeedsAccessToVillageCommons (walka z innymi wiesniakami, nie z bandytami; 250+1000*d), LandlordTrainingForRetainers (2000+4000*d), VillageNeedsCraftingMaterials (Rare), FamilyFeud (350+1500*d, Rare), NotableWantsDaughterFound (500+1200*d, Rare).",
+    "evidence": "extract.txt; cs\\LandlordNeedsAccessToVillageCommonsIssueBehavior.cs:462,471; sb\\FamilyFeudIssueBehavior.cs:87"
+   },
+   {
+    "fact": "Lordowie: ArmyNeedsSupplies, LadysKnightOut (750), LandLordCompanyOfTrouble (500 lub 1000+150*ludzie), LesserNobleRevolt (150*(30..60)), LordNeedsGarrisonTroops (1500+1.5*koszt werbunku), LordNeedsHorses, LordsNeedsTutor (slawa 5), LordWantsRivalCaptured (5000), RaidAnEnemyTerritory (15000+3000 za kazda wies ponad 3), RevenueFarming (zbior podatkow), ScoutEnemyGarrisons (0 zlota, slawa 3 + wplyw 10), Smugglers (750+3000*d), TheConquestOfSettlement (20000), ProdigalSon (1200+3000*d), TheSpyParty (500+3000*d).",
+    "evidence": "extract.txt; cs\\RaidAnEnemyTerritoryIssueBehavior.cs:321,526; cs\\LandLordCompanyOfTroubleIssueBehavior.cs:285,392,958; cs\\ScoutEnemyGarrisonsIssueBehavior.cs:510-511"
+   },
+   {
+    "fact": "Kaznodzieja (Preacher) nie ma zadnego zadania w grze.",
+    "evidence": "grep IsPreacher w cs\\*.cs i sb\\*.cs: trafienie tylko w LordConversationsCampaignBehavior.cs"
+   },
+   {
+    "fact": "W czystej grze kazda wyplata zadania to GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, kwota), czyli zloto z niczego, nie z kiesy zleceniodawcy.",
+    "evidence": "linie GOLD w tablica-tmp\\extract.txt (np. NearbyBanditBase L506, ExtortionByDeserters L672); IssueBase.cs:765-767"
+   },
+   {
+    "fact": "Trudnosc d = DefaultIssueModel.GetIssueDifficultyMultiplier() = Clamp(PlayerProgress, 0.1, 1). PlayerProgress liczy sie z lenn x0.1, sily klanu x0.0008, slawy x1.5e-5, lordow, towarzyszy, karawan, wielkosci druzyny i poziomu. Relacja nie wplywa na kwote; perki Trade.DistributedGoods / LocalConnection mnoza tylko zysk relacji, a Charm.Oratory daje slawe i wplyw.",
+    "evidence": "cs\\DefaultIssueModel.cs GetIssueDifficultyMultiplier; dectool d DefaultPlayerProgressionModel.GetPlayerProgress; cs\\IssuesCampaignBehavior.cs:396-420"
+   },
+   {
+    "fact": "[NASZ MOD] Armoury QuestPay8 jest wgrany i czynny: placi zleceniodawca ze swojej kiesy (najwyzej tyle, ile ma). Kwota = min(kwota gry, N ludzi x D dni x pelny zold na czlowieka druzyny gracza x 1.25), gdzie N i D pochodza z rozwiazania zastepczego (AlternativeSolutionBaseNeededMenCount, GetBaseAlternativeSolutionDurationInDays). Postfiks na getter RewardGold pokazuje juz przycieta kwote w rozmowie.",
+    "evidence": "n27-calosc\\Armoury\\src\\QuestPay8.cs:19-45, MakePledge ~:371; Modules\\Armoury\\Armoury-2026-10-20_22-29-26.log 22:31:34 'Nagrody zadan (E8/D1): wpiete 91 metod w 55 typach ... CZYNNE'"
+   },
+   {
+    "fact": "Wymagane ludzie i dni w zadaniach z bandytami (podstawa skali Armoury): NearbyBanditBase 10 ludzi, 4+ceil(6d) dni; NeedsHelpWithBrigands 8+ceil(11d) ludzi, 5+ceil(7d) dni; ExtortionByDeserters 21+ceil(25d), 3+ceil(5d); ArmyOfPoachers 12+ceil(28d), 3+ceil(5d); CapturedByBountyHunters 10, max(5, 4+ceil(6d)); CaravanAmbush 22+ceil(30d), 3+ceil(5d).",
+    "evidence": "grep AlternativeSolutionBaseNeededMenCount/DurationInDaysInternal w cs\\*.cs (NearbyBanditBase :54,:56; MerchantNeedsHelpWithOutlaws :37,:39; ExtortionByDeserters :105,:107)"
+   },
+   {
+    "fact": "Liczba zadan: od notabli najwyzej 3 na miasto i 2 na wies (min 1). Codziennie: przy 0 zadaniach zawsze proba nowego, przy n < max szansa 0.3*(1-n/max)^2. Lordowie: limit floor(0.2*dorosli lordowie klanu), minimum ceil(0.1*...). Na starcie: 70% wsi, 80% miast, 12% lordow. Wagi czestosci: VeryCommon 6, Common 3, Rare 1. Kazdy Hero ma najwyzej 1 zadanie (Hero.Issue).",
+    "evidence": "cs\\IssuesCampaignBehavior.cs:31-43, :59-84 OnSettlementDailyTick, :86-106, :108-143 DailyTickClan, :170-175 GetIssueGenerationChance, :356-375 GetFrequencyScore"
+   },
+   {
+    "fact": "Zadania znikaja: po IssueDueTime 20% szansy na dobe (IssueManager.DailyTick); lord AI wchodzacy do osady zalatwia losowe zadanie z szansa 1% (5% we wlasnej osadzie); w BK gubernator miasta raz w tygodniu z szansa Steward/1000.",
+    "evidence": "cs\\IssueManager.cs:235-284; cs\\IssuesCampaignBehavior.cs:377-394; tablica-tmp\\bk-BKSettlementBehavior.cs HandleIssues/FinishIssue (:340-386)"
+   },
+   {
+    "fact": "Kapitana strazy nie ma jako bohatera (Hero). Straz to szablony CharacterObject kultury (CultureObject.Guard, PrisonGuard), a dialogi SandBox.CampaignBehaviors.GuardsCampaignBehavior to tylko sala lorda, wiezienie z lapowka i komentarz straznika, bez zadan. IssueBase wymaga Hero issueOwner (konstruktor IssueBase(Hero, CampaignTime)).",
+    "evidence": "cs\\CultureObject.cs:60-62; sb\\GuardsCampaignBehavior.cs:584-623; enum Occupation (Guard, PrisonGuard); np. NearbyBanditBaseIssue ctor :base(issueOwner, ...)"
+   },
+   {
+    "fact": "W ROT 'Gold Cloak Captain' (goldcloak_captain), kingsguard_captain, riverrun_captain itd. to zolnierze (occupation=Soldier) w szablonach oddzialow, a nie osoby. Notable ROT maja te same zawody co w grze (Merchant, GangLeader, Artisan, Preacher, Headman, RuralNotable).",
+    "evidence": "Modules\\ROT-Content\\ModuleData\\ROT-Troops.xml:8969, :9263; partyTemplatesROT.xml:136,301; liczenie occupation w notablesROT.xml"
+   },
+   {
+    "fact": "ROT.dll nie usuwa zachowan zadan (RemoveBehaviors tylko FindingItemOnMapBehavior i CharacterCreationCampaignBehavior). Jedyna latka dotyczaca zadan to zabezpieczenie GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.ConditionsHold. Wlasne zadania ROT: EnlistmentVassalageQuest 'Join {KINGDOM}' (zabicia w czasie zaciagu) i RedWeddingEvent.RedWeddingQuest.",
+    "evidence": "tablica-tmp\\rot-grep-remove.txt (ROT.SubModule:301, CharacterCreationPatches:20); dectool d ROT.HarmonyPatches.NativeCrashfixes.GangLeadersIssue; tablica-tmp\\rot-EnlistmentVassalageQuest.cs:9,36"
+   },
+   {
+    "fact": "BK nie dodaje typow zadan. Ma tylko latki: HeadmanHerdQuestPatches, ScoutEnemyGarrisonsNullSafePatch, zmiany cech BKTraitBehavior, wplyw zadan na lojalnosc i dobrobyt oraz rozwiazywanie zadan przez gubernatora.",
+    "evidence": "tablica-tmp\\bk-grep-issue.txt"
+   },
+   {
+    "fact": "Gra juz pokazuje zadania. SettlementMenuOverlayVM ma pasek postaci obecnych w miescie (LocationCharacter z WillBeListedInOverlay) z QuestMarkerVM: AvailableIssue, ActiveIssue, Tracked. Menu kontekstowe po kliknieciu portretu ma opcje 'Conversation' i 'QuickConversation' oraz IssueList z tytulami zadan. Opcje menu miasta dostaja ikone przez MenuHelper.SetIssueAndQuestDataForLocations -> IssueManager.CheckIssueForMenuLocations. Dymek postaci tez pokazuje stan zadan (CampaignUIHelper.GetQuestStateOfHero).",
+    "evidence": "vm\\SettlementMenuOverlayVM.cs:944-1001, :1131-1160; cs\\MenuHelper.cs:116-121; wywolania w PlayerTownVisitCampaignBehavior:234,242,309,318; vm-grep-issue.txt TooltipRefresherCollection:257"
+   },
+   {
+    "fact": "[TECH] Rozmowa z portretu: 'Conversation' = CampaignEventDispatcher.Instance.OnPlayerStartTalkFromMenu(hero) + PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationOfCharacter(hero), null, character); dla 'alley' miejsce zmienia sie na 'center' (wejscie do sceny do tej osoby). 'QuickConversation' = CampaignMapConversation.OpenConversation(new ConversationCharacterData(CharacterObject.PlayerCharacter, ...), new ConversationCharacterData(character, ...)). Tablica moze wolac dokladnie to samo.",
+    "evidence": "vm\\GameMenuOverlay.cs:212-252 (ExecuteTroopAction)"
+   },
+   {
+    "fact": "[TECH] Dialog zadania: w 'hero_main_options' gracz mowi 'hero_give_issue' ('I heard you may need some help with a problem?', priorytet 110; warunek Hero.OneToOneConversationHero.Issue.IsOngoingWithoutQuest; podpowiedz = issue.Title), co prowadzi do 'issue_offer'. Dalej: IssueBriefByIssueGiver -> IssueAcceptByPlayer -> IssueQuestSolutionExplanationByIssueGiver -> [rozwiazanie zastepcze: towarzysz z N ludzmi na D dni] -> przyjecie / odmowa ('Sorry. I can't do that right now.'). Pozniej 'About the task you gave me...' -> quest_discuss. Tokeny: IssueManager.IssueOfferToken='issue_offer', HeroMainOptionsToken.",
+    "evidence": "cs\\LordConversationsCampaignBehavior.cs:794-796, :1897-1933; cs\\IssuesCampaignBehavior.cs:452-486; cs\\IssueManager.cs:37-43"
+   },
+   {
+    "fact": "[TECH] Dane do tablicy sa publiczne: IssueBase.Title, Description, IssueBriefByIssueGiver, IssueDueTime (pole), IssueOwner, IssueSettlement, IsOngoingWithoutQuest, IsThereAlternativeSolution, GetTotalAlternativeSolutionNeededMenCount(). RewardGold jest protected (trzeba refleksji: AccessTools.PropertyGetter(typeof(IssueBase),'RewardGold'); Armoury QuestPay8 juz ma do tego delegat _rawReward). Listy: IssueManager.Issues (MBReadOnlyDictionary<Hero,IssueBase>), static IssueManager.GetIssuesInSettlement(settlement, onlyNotables) (notable, HeroesWithoutParty, lordowie w partiach w osadzie), Settlement.BoundVillages -> Notables.Issue dla wsi miasta.",
+    "evidence": "cs\\IssueBase.cs:101,128-142,166,173,221,241,246,258,263,283,395; cs\\IssueManager.cs:23, :771-802; QuestPay8.cs:164,1112"
+   },
+   {
+    "fact": "[TECH] Gotowe klocki do wlasnego zadania 'Kapitan strazy': QuestBase + TaleWorlds.CampaignSystem.Issues.IssueQuestTasks.DefeatPartyQuestTask (PartyConditionDelegateType, OnPartyDefeatedDelegateType). Nowy typ zadania wymaga SaveableTypeDefiner z unikalnym base id (jak NearbyBanditBaseIssueTypeDefiner : base(400000)), wiec wchodzi do zapisu gry.",
+    "evidence": "cs-list.txt (IssueQuestTasks.DefeatPartyQuestTask i jego delegaty); cs\\NearbyBanditBaseIssueBehavior.cs:611-623"
+   },
+   {
+    "fact": "W sieci nie znaleziono gotowego moda z tablica ogloszen / tablica zlecen dla Bannerlorda. Najblizszy jest 'Governors Handle Issues' (gubernatorzy rozwiazuja zadania; jest fork v1.3.10).",
+    "evidence": "WebSearch: https://steamcommunity.com/sharedfiles/filedetails/changelog/2875226388 ; https://catalogue.smods.ru/archives/407537 ; wyszukiwarka Nexus https://www.nexusmods.com/games/mountandblade2bannerlord/mods?keyword=quest%20board zwrocila 403"
+   }
+  ],
+  "unverified": [
+   "Prawdziwe kwoty nagród w kampanii Jeffa: w dostępnych logach Armoury (Modules\\Armoury\\*.log i Logs\\) nie ma żadnej linii 'Nagrody zadan (E8/D1): wyplata', więc przykład 310-625 za kryjówkę jest tylko wyliczony (przyjęty żołd 5 na głowę).",
+   "Czy CampaignMapConversation.OpenConversation działa sensownie z osobą, której nie ma w mieście (np. sołtys wsi należącej do miasta) - nie sprawdzone.",
+   "Czy da się zacząć rozmowę od razu od 'issue_offer' z pominięciem 'hero_main_options' (np. własna linia z 'start' z wysokim priorytetem) - nie sprawdzone.",
+   "Czy rozmowa z postacią bez Hero (szablon straży, Gold Cloak) przez CampaignMapConversation działa na mapie - nie sprawdzone.",
+   "Typowa liczba notabli w mieście ROT - nie sprawdzone, więc nie wiadomo, ile realnie wpisów byłoby na tablicy.",
+   "Wpływ ROT_Hideouts i ROT.CampaignBehaviors.ROTBanditLeaveHideouts na zajęte kryjówki (Hideout.IsInfested), a przez to na zadania z bandytami - nie sprawdzone.",
+   "Czy inne mody (AIInfluence, BetterEconomy, StrategicCampaignAI145, Diplomacy, BKROTPatch poza listą typów) wyłączają lub zmieniają zachowania zadań - nie sprawdzone (sprawdzone tylko ROT.dll i BannerKings.dll).",
+   "Zawartość ROT.Events.RedWeddingEvent.RedWeddingQuest (typ zagnieżdżony, dekompilator nie znalazł go po pełnej nazwie) - nie sprawdzone.",
+   "Wyszukiwanie na Nexusie było niepełne (strona wyszukiwania zwróciła 403); może istnieć mod tablicy ogłoszeń, którego nie znalazłem.",
+   "Dokładny wzór nagrody ArmyNeedsSupplies, LandLordTheArtOfTheTrade (RewardGoldDeterministicRandomContribution) i EscortMerchantCaravan (DailyQuestRewardGold) - widziane tylko częściowo."
+  ]
+ },
+ {
+  "key": "mody-tablica",
+  "summary": "KRÓTKO DLA JEFFA: Tak, taką tablicę da się zrobić i duża część potrzebnych mechanizmów już jest w grze. W menu miasta u góry są portrety ludzi, którzy są w mieście (lordowie, notable, wędrowcy). Kto ma zadanie, ma przy portrecie \"!\". Po kliknięciu gra daje \"Rozmowę\" (wchodzisz do sceny i stajesz przy tej osobie, czyli Twój \"visit\") albo \"Szybką rozmowę\" (bez sceny). Zleceniodawca sam opowiada wtedy o misji. Czego brakuje: jednej listy z opisem, nagrodą i terminem. Do tego nie widać zadań z okolicznych wsi ani lordów spoza miasta. To właśnie tablica może dać: lista, klik, wybór \"Odwiedź / Porozmawiaj teraz / Zaznacz na mapie\".\n\nKAPITAN STRAŻY: takiej postaci nie ma ani w grze, ani w ROT, ani w Banner Kings. ROT ma tylko zwykłe oddziały Złotych Płaszczy i Straży Miejskiej (m.in. jednostkę \"Gold Cloak Captain\"), ale to żołnierze, a nie człowiek, który daje zlecenia. W BK są Spymaster (pilnuje porządku, może sam niszczyć kryjówki) i Constable (pilnuje prawa). Obaj siedzą w radzie lorda i dają tylko premie, nie dają zadań graczowi. Masz więc rację, że tego brakuje: w grze za tępienie bandytów płacą tylko kupcy i właściciele ziemscy, a we wsiach sołtysi. Ani władza miasta, ani straż za to nie płacą.\n\nZADANIA Z BANDYTAMI, KTÓRE GRA JUŻ MA, I ICH NAGRODY (bez naszych modów). Nagroda rośnie z \"postępem gracza\" (to liczba od 0,1 do 1: lenna, siła klanu, sława, poziom, wielkość drużyny):\n- \"Potrzebuje pomocy z rozbójnikami\". Daje kupiec w mieście albo właściciel ziemski we wsi, tylko gdy obok jest zajęta kryjówka. Trzeba rozbić od 2 do 8 band w promieniu dnia drogi, masz na to 20 dni. Płaci 400 + 1500 × postęp, czyli od 550 do 1900. Do tego +3 relacji, +5 bezpieczeństwa i +5 dobrobytu miasta.\n- \"Kryjówka bandytów koło wsi\". Daje sołtys, gdy bezpieczeństwo miasta wynosi 50 lub mniej. Stała nagroda 3000.\n- \"Wymuszenia dezerterów we wsi\". Daje sołtys, płaci 800 + 4200 × postęp, czyli od 1220 do 5000.\n- Pozostałe: zasadzka na fałszywą karawanę (od 1300 do 4000), eskorta karawany (do 8000), kłusownicy (od 800 do 3500), rywalski gang (od 770 do 2300), łowcy nagród w kryjówce od szefa gangu (3000). Od lordów: przemytnicy, schwytanie rywala (5000), podbój (20000) i inne. Razem ok. 46 rodzajów zadań.\n- W TWOJEJ grze nagrody są inne. Armoury płaci \"dniówkami\": najwyżej tyle, ile zarobiliby ludzie potrzebni do roboty przez potrzebną liczbę dni, plus 25%. Płaci zleceniodawca z własnej kiesy, a kwota zamraża się w chwili przyjęcia zadania. Według opisu w ustawieniach za kryjówkę wychodzi ok. 440 zamiast 3000. Za rozbójników przy niskim postępie: 10 ludzi × 6 dni × żołd. Ile to dokładnie w Twojej drużynie, nie sprawdziłem.\n- BK co tydzień sam załatwia jedną sprawę notabla w każdym mieście, które ma gubernatora (szansa = zarządzanie gubernatora / 1000). Przez to zleceń może być trochę mniej.\n\nWŁASNE ZADANIA ROT I BK: ROT ma tylko zadanie zaciągu (zabić 400 wrogów, 30 elitarnych i 10 lordów, żeby zostać wasalem), zadanie Krwawych Godów i drobny żart z żebrakiem i złodziejem z Valyrii. BK nie ma własnych zadań. Ma obowiązki feudalne (pomoc wojskowa, okup) i polityczne \"dylematy\" między lordami. Nie są to misje z nagrodą.\n\nGOTOWE MODY: Weekly Quests ma tablicę ogłoszeń w gildii miejskiej i łowy na herszta z dużą bandą. Sellsword ma listy gończe od notabli i karczmarzy na nazwanych bandytów, szefów gangów i bossów kryjówek: za żywego pełna zapłata, za martwego połowa. Merc Company ma tablicę kontraktów w zaułku przy karczmie. Adventurer ma ogłoszenia u karczmarza (zniknął ze Steama). Guilds of Calradia ma łowców nagród i kontrakty na banitów. Żaden z nich nie jest potwierdzony jako zgodny z ROT. Są robione pod Calradię, a autor Adventurera wprost nie gwarantuje zgodności z ROT. Większość autorów zabrania używania kodu bez zgody. Tylko Additional Quests jest na wolnej licencji MIT. Rada: robimy własną tablicę w Armoury, a z cudzych modów bierzemy tylko pomysły (pomysł nie jest chroniony, kod tak).\n\nDLA PROGRAMISTY:\n1. Opcja w menu \"town\" (AddGameMenuOption, Armoury robi to wiele razy). Lista przez MultiSelectionInquiryData, ten wzorzec jest już w 17 plikach naszego kodu. Później można zrobić ładniejszy ekran Gauntlet; UIExtenderEx jest, mamy doświadczenie z ForgeView.\n2. Skąd wziąć zadania: IssueManager.GetIssuesInSettlement(town, onlyNotables:false), do tego notable z BoundVillages i Campaign.Current.IssueManager.Issues dla lordów w okolicy. Pokazać Title i Description. Nagroda z chronionego gettera RewardGold przez AccessTools, przechodzi przez postfiks Armoury QuestPay8.RewardShown. Termin z IssueDueTime. Ludzi i dni z AlternativeSolutionBaseNeededMenCount i GetTotalAlternativeSolutionDurationInDays.\n3. Po kliknięciu, \"Odwiedź\" = ten sam kod co w grze (GameMenuOverlay.ExecuteTroopAction, przypadek Conversation): LocationComplex.Current.GetLocationOfCharacter(hero), \"alley\" zamieniony na \"center\", potem PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(location, null, hero.CharacterObject). \"Teraz\" = CampaignMapConversation.OpenConversation(ConversationCharacterData gracza i bohatera). Zleceniodawca spoza miasta = VisualTrackerManager.RegisterObject, czyli flaga na mapie (jak Wayfinder i HideoutSpotter).\n4. Kapitan straży jako NOWE zadanie: postać niebędąca bohaterem (żołnierz straży kultury miasta albo ROT goldcloak_captain w Królewskiej Przystani). Rozmowa jak u ROT z valyrian_beggar: warunek na StringId rozmówcy. QuestBase z pustym zleceniodawcą robi już ROT (EnlistmentVassalageQuest), da się też wpisać gubernatora albo właściciela miasta. Cel: DefeatPartyQuestTask z gry albo specjalnie wystawiona, nazwana banda z hersztem. Płaci kasa miasta z Armoury (TownDebt / kasy miast), stawka dniówkowa jak QuestPay8. Prawdziwy bohater w każdym z 98 miast ROT oznaczałby dużo pracy i ciężki zapis, więc lepiej postać niebędąca bohaterem.",
+  "facts": [
+   {
+    "fact": "Tablica ogłoszeń jest technicznie wykonalna, a gra ma już większość potrzebnych elementów: listę postaci w mieście z oznaczeniem '!' przy zadaniu oraz rozmowę ze sceną albo szybką rozmowę bez sceny.",
+    "evidence": "TaleWorlds.CampaignSystem.ViewModelCollection.dll: SettlementMenuOverlayVM.UpdateCharacterList (CharacterList z LocationCharacter, HeroAgentLocationModel.WillBeListedInOverlay); GameMenuPartyItemVM.RefreshQuestStatus -> CampaignUIHelper.GetQuestStateOfHero (dymek = issue.Title + issue.Description); GameMenuOverlay.ExecuteTroopAction: MenuOverlayContextList.Conversation -> PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(location, null, character), QuickConversation -> CampaignMapConversation.OpenConversation(...)"
+   },
+   {
+    "fact": "Dziś gra nie pokazuje nagrody ani terminu przed rozmową. Widać tylko tytuł i krótki opis w dymku. Lista obejmuje tylko postacie obecne w lokacjach tego miasta.",
+    "evidence": "CampaignUIHelper.GetQuestStateOfHero zwraca (flaga, Title, Description), bez RewardGold; SettlementMenuOverlayVM.UpdateCharacterList iteruje GameMenuManager.MenuLocations"
+   },
+   {
+    "fact": "W tym samym czasie jest zwykle 1-3 zadania notabli w mieście, 1-2 we wsi, a zadania ma 10-20% bohaterów klanów.",
+    "evidence": "IssuesCampaignBehavior: const MinNotableIssueCountForTowns=1, MaxNotableIssueCountForTowns=3, Min/MaxNotableIssueCountForVillages=1/2, Min/MaxIssuePercentageForClanHeroes=0.1/0.2"
+   },
+   {
+    "fact": "Mnożnik trudności i nagród zadań to PlayerProgress przycięty do przedziału 0,1-1. PlayerProgress to codzienna średnia z: lenna×0,1 + siła klanu×0,0008 + sława×0,000015 + lordowie×0,002 + towarzysze×0,01 + stronnicy×0,001 + karawany×0,01 + ludzie w drużynie×0,002 + poziom×0,002.",
+    "evidence": "DefaultIssueModel.GetIssueDifficultyMultiplier = MBMath.ClampFloat(Campaign.Current.PlayerProgress, 0.1f, 1f); Campaign.DailyTick: PlayerProgress = (PlayerProgress + PlayerProgressionModel.GetPlayerProgress())/2; DefaultPlayerProgressionModel.GetPlayerProgress"
+   },
+   {
+    "fact": "Zadanie 'Potrzebuje pomocy z rozbójnikami' daje kupiec albo właściciel ziemski, gdy pobliska kryjówka jest zajęta. Trzeba rozbić int(2+6m) band (od 2 do 8) w ciągu 20 dni. Nagroda 400+1500m (od 550 do 1900), +3 relacji, +5 bezpieczeństwa, +5 dobrobytu, +1 sławy. Częstość: VeryCommon.",
+    "evidence": "TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior: ConditionsHold (IsMerchant||IsRuralNotable, _closestHideoutsToSettlements, item.IsInfested), TotalPartyCount => (int)(2f+6f*IssueDifficultyMultiplier), RewardGold => (int)(400f+1500f*m), CampaignTime.DaysFromNow(20f), RelationshipChangeWithQuestGiver=3, Town.Security+=5, Prosperity+=5, AddRenown(1)"
+   },
+   {
+    "fact": "Zadanie 'Kryjówka bandytów koło wsi' daje sołtys, gdy bezpieczeństwo miasta wynosi 50 lub mniej. Nagroda stała 3000, +5 relacji. Rozwiązanie towarzyszem wymaga 10 ludzi na 4+ceil(6m) dni.",
+    "evidence": "NearbyBanditBaseIssueBehavior: ConditionsHold (IsHeadman && Village.Bound.Town.Security <= 50f), RewardGold => 3000, AlternativeSolutionBaseNeededMenCount => 10, AlternativeSolutionBaseDurationInDaysInternal => 4+ceil(6m), RelationshipChangeWithQuestGiver = 5"
+   },
+   {
+    "fact": "Pozostałe zadania z bandytami i przemocą w grze: Wymuszenia dezerterów (sołtys, 800+ceil(4200m)), Zasadzka na karawanę (kupiec lub rzemieślnik z karawaną, 1000+3000m), Eskorta karawany (kupiec przy bezpieczeństwie 50 lub mniej, najwyżej 8000), Armia kłusowników (kupiec, 500+3000m), Rywalski gang (szef gangu, 600+1700m), Łowcy nagród (szef gangu, kryjówka łupieżców, 3000), Przemytnicy (lord z miastem, 750+3000m), Schwytaj rywala (lord, 5000), Podbój (władca, 20000).",
+    "evidence": "Pliki *IssueBehavior w TaleWorlds.CampaignSystem.Issues i SandBox.Issues, override RewardGold oraz ConditionsHold (zdekompilowane do scratchpad zb/tablica-tmp/dec/*.cs)"
+   },
+   {
+    "fact": "W grze Jeffa nagrody przelicza Armoury QuestPay8 (domyślnie włączone): kwota = min(kwota gry, N ludzi × D dni × żołd na człowieka drużyny × 1,25). N i D biorą się z rozwiązania towarzyszem. Płaci zleceniodawca z własnej kiesy, a kwota jest zamrażana przy przyjęciu zadania.",
+    "evidence": "n27-calosc/Armoury/src/QuestPay8.cs: const Premium=1.25f, linia 378 (n = AlternativeSolutionBaseNeededMenCount, d = GetBaseAlternativeSolutionDurationInDays), linia 383 labor = n*d*rate*Premium; Settings.cs:1964-1965 QuestRewardFromGiver=true, QuestRewardInWageDays=true ('clearing a hideout pays about 440 instead of 3,000')"
+   },
+   {
+    "fact": "Ani gra, ani ROT, ani BK nie mają kapitana straży jako postaci, która daje zadania. Gra ma tylko zajęcie Guard i strażników bez imienia, z którymi rozmowa dotyczy przestępców i więźniów.",
+    "evidence": "enum TaleWorlds.CampaignSystem.Occupation (Guard, PrisonGuard to zajęcia postaci niebędących bohaterami); SandBox.CampaignBehaviors.GuardsCampaignBehavior (dialogi prison_guard_*, culture.Guard); w ROT-Content/ModuleData żaden bohater nie pełni takiej roli (Jacelyn Bywaters to wędrowiec ROTwanderer25)"
+   },
+   {
+    "fact": "ROT ma oddziały Złotych Płaszczy i Straży Miejskiej, ale to zwykli żołnierze, a nie bohaterowie.",
+    "evidence": "ROT-Content/ModuleData: goldcloak_soldier/officer/rider/captain ('Gold Cloak Captain', level 26), crownlands_militia_* ('City Watch Spearman/Crossbowman'), kingsguard"
+   },
+   {
+    "fact": "ROT ma tylko 3 własne zadania lub wątki: zaciąg i wasalstwo (400 zabitych, 30 elitarnych, 10 lordów, mnożnik w MCM), Krwawe Gody oraz żart z żebrakiem i złodziejem z Valyrii. Nie wyłącza zadań z gry, tylko poprawia jeden błąd w zadaniu szefa gangu.",
+    "evidence": "ROT.dll: ROT.CampaignBehaviors.EnlistmentVassalageQuest : QuestBase (ctor base(..., null questGiver, ..., 5000)), ROT.Events.RedWeddingEvent.RedWeddingQuest, ROT.CampaignBehaviors.ValyrianThiefCampaignBehavior (StringId == 'valyrian_beggar'/'valyrian_thief'), ROT.HarmonyPatches.NativeCrashfixes.GangLeadersIssue [HarmonyPatch(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior, 'ConditionsHold')]; RemoveBehavior dotyczy tylko FindingItemOnMapBehavior i CharacterCreationCampaignBehavior"
+   },
+   {
+    "fact": "BK (Redux v1.9.34) nie ma własnych klas zadań. Ma obowiązki feudalne (AuxiliumDuty, RansomDuty) i dylematy polityczne (petition, title_claim, succession_dispute, law_change).",
+    "evidence": "BannerKings.dll: dekompilacja całości, grep ': QuestBase' i ': IssueBase' daje 0 trafień; BannerKings.Managers.Duties.*; ModuleData/BKData/bk_dilemmas.xml (4 dylematy)"
+   },
+   {
+    "fact": "Rada BK to rada lorda, nie urząd miasta. Spymaster ma zadania 'Oversee Security' i 'Repress Criminality' (kryjówki mogą być niszczone automatycznie), Constable ma 'Enforce Law'. Dają premie, a nie misje dla gracza.",
+    "evidence": "BannerKings.Redux/ModuleData/BKData/bk_council_positions.xml (Spymaster: OverseeSecurity, RepressCriminality; Constable: EnforceLaw); BannerKings.Managers.Court.Members.Tasks.DefaultCouncilTasks.Initialize (teksty '{=ojHwJr7W}Repress Criminality', '{=9YZwe7gF}Hideouts may be automatically destroyed')"
+   },
+   {
+    "fact": "BK co tydzień, w każdym mieście z gubernatorem, ma szansę (umiejętność Steward gubernatora / 1000) sam zamknąć jedno zadanie notabla. Przez to zleceń na tablicy może być mniej.",
+    "evidence": "BannerKings.Behaviours.BKSettlementBehavior.HandleIssues (RunWeekly, MBRandom.RandomFloat < governor.GetSkillValue(Steward)/1000f) -> FinishIssue -> CompleteIssueWithAiLord / CompleteIssueWithLordSolutionWithRefuseCounterOffer; wywoływane z DailySettlementTickImpl dla każdej osady"
+   },
+   {
+    "fact": "API do tablicy jest dostępne: GetIssuesInSettlement(settlement, onlyNotables:false) zbiera też lordów w mieście. Title, Description, IssueOwner, IssueSettlement i IssueDueTime są publiczne, RewardGold jest chroniony (czyta go już Armoury przez AccessTools).",
+    "evidence": "IssueManager.GetIssuesInSettlement (linia 771), IssueManager.Issues (MBReadOnlyDictionary<Hero, IssueBase>); IssueBase: public abstract TextObject Title/Description, public CampaignTime IssueDueTime, protected virtual int RewardGold; QuestPay8.cs:1112 AccessTools.PropertyGetter(typeof(IssueBase), 'RewardGold')"
+   },
+   {
+    "fact": "Zadanie bez zleceniodawcy-bohatera i rozmowa z postacią niebędącą bohaterem to wzorce, które ROT już stosuje. Kapitan straży może więc być bez tworzenia nowych bohaterów w 98 miastach ROT.",
+    "evidence": "ROT EnlistmentVassalageQuest ctor przekazuje questGiver = null; ROT ValyrianThiefCampaignBehavior: warunki dialogu na CharacterObject.OneToOneConversationCharacter.StringId; ROT-Map/ModuleData/settlements.xml: 228 <Town>, w tym 130 is_castle (98 miast); w grze jest gotowe zadanie cząstkowe TaleWorlds.CampaignSystem.Issues.IssueQuestTasks.DefeatPartyQuestTask"
+   },
+   {
+    "fact": "Nasze mody już mają opcje w menu miasta, okna wyboru, flagi na mapie oraz kasy i długi miast. Tablica i zapłata od kapitana z kasy miasta pasują do tego, co jest.",
+    "evidence": "Armoury/src: AddGameMenuOption('town', ...) w SmithMenu, IronBank, TownInns, TownDebt.cs:765 ('The council's debts'); MultiSelectionInquiryData / CampaignMapConversation / VisualTrackerManager w 17 plikach (np. HideoutSpotter.cs, Wayfinder.cs); RealisticCaptivity/src/Work.cs:261 'Stand the night watch for pay'"
+   },
+   {
+    "fact": "Weekly Quests (Nexus 9854, Kasius9) ma tablicę ogłoszeń gildii w menu gildii miejskiej oraz zadania łowów na herszta z dużą bandą. Wymaga War Sails, Harmony i MCM. Bez zgody autora nie wolno modyfikować ani używać zasobów.",
+    "evidence": "https://www.nexusmods.com/mountandblade2bannerlord/mods/9854 (opis i zmiany z wyszukiwarki: 'Guild Bulletin Board', 'Bounty Hunting Quests', wymaga War Sails DLC, uprawnienia)"
+   },
+   {
+    "fact": "Sellsword (Nexus 12229) ma listy gończe od notabli albo karczmarzy na nazwanych banitów, szefów gangów i bossów kryjówek. Za żywego pełna zapłata, za martwego połowa. Ma przełącznik w MCM.",
+    "evidence": "https://www.nexusmods.com/mountandblade2bannerlord/mods/12229 (opis z wyszukiwarki)"
+   },
+   {
+    "fact": "Merc Company (Nexus 11384, ggstrike33, v1.0, 25.05.2026) ma tablicę kontraktów w zaułku przy karczmie (kontrakty królestwa, kupców i przestępcze), odnawianą co kilka dni. Opis: 1.2.x i nowsze, testowany na 1.3.5.",
+    "evidence": "https://www.nexusmods.com/mountandblade2bannerlord/mods/11384 (opis z wyszukiwarki)"
+   },
+   {
+    "fact": "Adventurer (Carter Drake) ma ogłoszenia o nagrodach w każdym mieście, czytane u karczmarza. Został usunięty ze Steam Workshop, został na Nexus 6594. Autor nie gwarantuje zgodności z dużymi przeróbkami w rodzaju ROT.",
+    "evidence": "https://steamcommunity.com/sharedfiles/filedetails/?id=3172213744 i https://www.nexusmods.com/mountandblade2bannerlord/mods/6594 (opisy z wyszukiwarki)"
+   },
+   {
+    "fact": "Additional Quests ma licencję MIT, więc kod wolno użyć z podaniem autora. Ma m.in. zadanie 'Bandit Army Raiding {Settlement}' z nagrodą 3000 od szlachty.",
+    "evidence": "https://github.com/hamzah-hayat/AdditionalQuests (README, plik LICENSE MIT)"
+   },
+   {
+    "fact": "Guilds of Calradia (Nexus 11628) ma łowców nagród i kontrakty na banitów i piratów. Bez zgody autora nie wolno modyfikować ani używać zasobów. Meaningful Quests (10553) i I Give Quests (12029) nie są tablicami.",
+    "evidence": "https://www.nexusmods.com/mountandblade2bannerlord/mods/11628, /10553, /12029 (opisy z wyszukiwarki)"
+   }
+  ],
+  "unverified": [
+   "Nie sprawdziłem zgodności z ROT 8.1.8 i BK Redux żadnego cudzego moda (Weekly Quests, Sellsword, Merc Company, Adventurer, Guilds of Calradia). Strony Nexusa nie dały się otworzyć (403), mam tylko fragmenty z wyszukiwarki.",
+   "Nie sprawdziłem, na jaką wersję gry jest Sellsword, Weekly Quests i Guilds of Calradia, ani jakie uprawnienia ma Sellsword.",
+   "Nie istnieje sprawdzony w sieci mod tablicy ogłoszeń zrobiony pod ROT. W wynikach są tylko mody pod Calradię oraz 'And Now My Watch Begins' (zadania Nocnej Straży od Maestera Aemona).",
+   "Nie sprawdziłem w grze, ile realnie płaci Armoury za zadanie przy żołdzie drużyny Jeffa. Wzór jest z kodu, a liczba 440 za kryjówkę z opisu ustawień.",
+   "Nie sprawdziłem w grze, czy rozmowa bez sceny z bohaterem spoza miasta (np. sołtysem z innej wsi) poprawnie pokaże jego zadanie. Część dialogów może zależeć od miejsca.",
+   "Nie sprawdziłem, czy QuestBase bez zleceniodawcy i rozmowa z postacią niebędącą bohaterem (strażnik straży) działają stabilnie w zapisie i dzienniku. ROT tak robi, ale autotestu nie było.",
+   "Nie sprawdziłem, jak często w kampanii ROT pojawia się 'pomoc z rozbójnikami'. Zależy to od zajętych kryjówek obok miasta (ROT_Hideouts i ROTBanditLeaveHideouts mogą to zmieniać).",
+   "Nie sprawdziłem, czy członkami rady BK mogą być notable z miasta (IsValidCandidate)."
+  ]
+ },
+ {
+  "key": "nasze-mody",
+  "summary": "PO LUDZKU (dla Jeffa): Tak, taka tablica jest możliwa i sama gra ma już wszystkie potrzebne klocki. Nasz mod też ma już prawie wszystko, czego tablica potrzebuje.\n\n1) Lista osób, które dają zadania. Gra ma już w zamkach opcję \"Request a meeting with someone\" (umów spotkanie): pokazuje listę lordów z \"!\" przy tych, którzy mają zadanie, a kliknięcie otwiera rozmowę. Tablicę zrobimy dokładnie tak samo, tylko w mieście. Dodamy do listy notabli (kupców, rzemieślników, hersztów gangów) i \"kapitana straży\".\n\n2) \"Visit\" działa naprawdę. Gra potrafi wczytać miejsce, w którym ta osoba stoi (karczmę, rynek, salę lorda), postawić Cię obok niej i od razu zacząć rozmowę. Sama tak robi w jednym ze swoich zadań. Jest też szybsza droga: rozmowa bez wczytywania sceny, jak przy opcji \"Talk to the garrison commander\". Kiedy rozmowa się zacznie, osoba sama opisuje swoje zadanie zwykłymi kwestiami z gry, nic nie trzeba pisać od nowa.\n\n3) Kapitan straży. W grze nie ma takiej postaci (ani w samej grze, ani w ROT, ani w BK). Ale gra ma już wzór: w jednym zadaniu rozmawiasz z \"dowódcą załogi\", czyli najlepszym piechurem z garnizonu miasta, i to wystarczy. Tak samo zrobimy kapitana, bez tworzenia nowej, stałej postaci.\n\n4) Zadanie \"wybij bandytów\" już jest w grze, ale daje je kupiec, a nie kapitan. Kupiec w mieście prosi o rozbicie 2-8 band w okolicy (zależnie od postępów gracza), daje 20 dni. Gra płaciła 550-1900 monet. Sołtys wsi prosi o oczyszczenie kryjówki za stałe 3000. Nasz mod już teraz robi z tych nagród prawdziwe pieniądze: płaci zleceniodawca ze swojej kiesy, najwyżej tyle, ile ma. Kwota to tyle, ile ludzie dostaliby żołdu za tę robotę, plus 25%. W zainstalowanych modach nie ma żadnego systemu nagród za bandytów (zapisane w naszym audycie).\n\n5) Skąd prawdziwa nagroda od kapitana. Z kasy miasta, ale tylko z nadwyżki ponad zapas kupców i ponad najbliższą ratę dla pana. Miasto zadłużone albo biedne po prostu nie wywiesi listu gończego. To się zgadza z naszą ekonomią: nic z niczego. Łup samej bandy (jej kiesa i skarbiec kryjówki) gracz i tak już dostaje od nas osobno, więc nagroda miasta to dodatkowa zapłata, a nie podwójna.\n\n6) Dowód, że banda rozbita. Mamy już cztery sprawdzone miejsca w kodzie, które rozpoznają koniec bitwy z bandą: szubienice, wdzięczne wioski, przeszukanie kryjówki i kiesa pokonanych. Tablica użyje tego samego.\n\n7) Inne nasze rzeczy też się przydadzą:\n- plotki znają bandy, ich hersztów z imienia (\"Jon Rivers and his bandits\"), ile wsi spaliły i ile mają złota;\n- kruki pozwolą, żeby wieść o rozbitej bandzie doszła do dalekiego miasta z opóźnieniem;\n- porządek menu miasta pozwala wstawić tablicę jako nowe podmenu z \"!\" przy wejściu.\n\nNie uruchamiałem gry, więc nic z tego nie zostało jeszcze sprawdzone w samej grze.\n\nDLA PROGRAMISTY: miejsca wpięcia i sygnatury są w polu facts. Zdekompilowane źródła zapisałem w C:\\Users\\GAME\\AppData\\Local\\Temp\\claude\\C--Users-GAME-Bannerlor2-Realm-of-Thrones\\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\\scratchpad\\zb\\tablica-tmp:\n- EncounterGameMenuBehavior.cs\n- Parley.cs\n- TownHelpers.cs\n- MenuHelper.cs\n- IssueManager.cs\n- IssueBase.cs\n- IssuesCampaignBehavior.cs\n- LordNeedsGarrison.cs\n- RivalGang.cs\n- MissionConversationLogic.cs\n- MerchantNeedsHelpWithOutlawsIssueQuestBehavior.cs\n- NearbyBanditBaseIssueBehavior.cs\n- Town.cs\n- BKCouncil.cs\n\nŚcieżki do kodu modów liczone od C:\\Users\\GAME\\AppData\\Local\\Temp\\claude\\C--Users-GAME-Bannerlor2-Realm-of-Thrones\\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\\scratchpad\\zb\\n27-calosc.",
+  "facts": [
+   {
+    "fact": "[MENU MIASTA - porzadek] Nowe opcje i podmenu Armoury rejestruje w ArmouryBehavior.OnSessionLaunched; TownMenus.Apply raz na sesje przenosi te same obiekty GameMenuOption z 'town' do podmenu wedlug tablicy Plan. Tablica moze byc (a) wlasnym wejsciem w 'town' (nie jest w Plan, zostaje w miescie) albo (b) wpisem Move w Plan, wtedy trafi do huba (np. MenuAffairs albo karczmy town_backstreet).",
+    "evidence": "Armoury/src/TownMenus.cs:61-88 (Plan, Move(id, To, Who, Line)), :248 Apply, :273-276 wzor wlasnego podmenu: starter.AddGameMenu(menu, \"{=!}{TEXTVAR}\", Init, GameMenu.MenuOverlayType.SettlementWithBoth) + opcja _back z GameMenu.SwitchToMenu(\"town\"); SubModuleMain.cs:538-546 OnAfterGameInitializationFinished -> TownMenus.Apply; wzor rejestracji: ArmouryBehavior.cs:2294 TownDebt.AddMenus(starter) w OnSessionLaunched (:2134); TownDebt.cs:761-768 starter.AddGameMenuOption(\"town\", \"arm_towndebt_town\", ..., DebtCond, DebtCons, false, 9)"
+   },
+   {
+    "fact": "[MENU - znaczniki '!'] Wejscie huba juz zbiera znaczniki zadan z opcji w srodku i laczy je na wejsciu; tablica moze zrobic to samo dla kazdego zleceniodawcy funkcja gry.",
+    "evidence": "TownMenus.cs:102-118 Hub.Condition: args.OptionQuestData |= f z Holds() (swiezy MenuCallbackArgs); gra: Helpers.MenuHelper.SetIssueAndQuestDataForHero(args, hero) - hero.Issue != null && hero.Issue.IssueQuest == null -> IssueQuestFlags.AvailableIssue, plus TrackedIssue/ActiveIssue z QuestManager.TrackedObjects (tablica-tmp/MenuHelper.cs:41-71)"
+   },
+   {
+    "fact": "[MENU - lista osob jak w grze] Gra ma gotowy wzor 'lista bohaterow -> klik -> rozmowa': menu z opcja powtarzalna (isRepeatable: true), lista z SetRepeatObjectList, wybor przez GetSelectedObject. Tablica moze go skopiowac 1:1 (to zwykle menu, nie menu oczekiwania - SwitchToMenu wolno, CLAUDE.md 7).",
+    "evidence": "EncounterGameMenuBehavior: AddGameMenu(\"request_meeting\", ..., game_menu_town_menu_request_meeting_on_init); AddGameMenuOption(\"request_meeting\", \"request_meeting_with\", \"{=!}{HERO_TO_MEET.LINK}\", cond, cons, isLeave: false, -1, isRepeatable: true); init: args.MenuContext.SetRepeatObjectList(TownHelpers.GetHeroesToMeetInTown(Settlement.CurrentSettlement)); cond: args.MenuContext.GetCurrentRepeatableObject() as Hero + StringHelpers.SetCharacterProperties(\"HERO_TO_MEET\", hero.CharacterObject) + MenuHelper.SetIssueAndQuestDataForHero; cons: (Hero)args.MenuContext.GetSelectedObject() (tablica-tmp/EncounterGameMenuBehavior.cs:2739-2755, 2827-2834); ta sama kopia w ParleyCampaignBehavior.AddMenus (tablica-tmp/Parley.cs:43-48)"
+   },
+   {
+    "fact": "[KTO JEST NA LISCIE] Lordowie w miescie: TownHelpers.GetHeroesToMeetInTown (partie lordow poza armia gracza i lordowie bez partii, dorosli, nie jency). Notable: Settlement.Notables. Sprawy (zadania do wziecia): IssueManager.GetIssuesInSettlement(st, onlyNotables:false) albo hero.Issue. Gubernator miasta: Town.Governor.",
+    "evidence": "tablica-tmp/TownHelpers.cs:56-74, :99-118 (RequestAMeetingPartyCondition / RequestAMeetingHeroWithoutPartyCondition); tablica-tmp/IssueManager.cs:771-802 GetIssuesInSettlement; IssueBase: Title, Description, IssueBriefByIssueGiver, IssueOwner, IssueSettlement, IssueDueTime, IsOngoingWithoutQuest, protected virtual RewardGold (tablica-tmp/IssueBase.cs:101-283); tablica-tmp/Town.cs:254 public Hero Governor"
+   },
+   {
+    "fact": "[ROZMOWA - 'Visit' ze scena, jak chce Jeff] Gra umie otworzyc scene miejsca, w ktorym stoi bohater, postawic gracza obok i od razu zaczac rozmowe (parametr talkToChar).",
+    "evidence": "SandBox RivalGangMovingInIssueBehavior:1259: PlayerEncounter.LocationEncounter.CreateAndOpenMissionController(LocationComplex.Current.GetLocationOfCharacter(hero), null, hero.CharacterObject, null); TownEncounter.CreateAndOpenMissionController(nextLocation, previousLocation, talkToChar, spawnTag) -> CampaignMission.OpenTownCenterMission / OpenIndoorMission(..., talkToChar); SandBoxMissions:302 new MissionConversationLogic(talkToChar); MissionConversationLogic(CharacterObject teleportNearChar) :74-159 - teleport do postaci i StartConversation(..., isInitialization: true) (tablica-tmp/MissionConversationLogic.cs)"
+   },
+   {
+    "fact": "[ROZMOWA - bez sceny, szybka] Z menu miasta gra otwiera rozmowe na mapie (bez wczytywania sceny) - dwa gotowe wzory z menu 'town'.",
+    "evidence": "LordNeedsGarrisonTroopsIssueQuestBehavior.talk_to_garrison_commander_on_consequence: CampaignMapConversation.OpenConversation(new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty), new ConversationCharacterData(character, settlement.Town?.GarrisonParty.Party)) - opcja AddGameMenuOption(\"town\", \"talk_to_garrison_commander_town\", ...) (tablica-tmp/LordNeedsGarrison.cs:674-709); RivalGangMovingIn 'Meet him now': CampaignMapConversation.OpenConversation(... QuestGiver.CharacterObject ...) (tablica-tmp/RivalGang.cs, rival_gang_quest_wait_duration_is_over_yes_consequence). Trzecia droga - scena spotkania: CampaignMission.OpenConversationMission(player, partner, GameSceneDataManager.Instance.MeetingScenes..., sceneLevel) (EncounterGameMenuBehavior:2827-2834). Sygnatura: struct ConversationCharacterData(CharacterObject character, PartyBase party = null, bool noHorse = false, bool noWeapon = false, bool spawnAfterFight = false, bool isCivilianEquipmentRequiredForLeader = false, ...)"
+   },
+   {
+    "fact": "[ROZMOWA - opis misji za darmo] Gdy rozmowa z bohaterem z hero.Issue sie otworzy, gra sama prowadzi dialog sprawy (opis, rozwiazanie zastepcze, przyjecie) - nie trzeba pisac tekstow misji gry od nowa.",
+    "evidence": "IssuesCampaignBehavior.AddDialogues: AddDialogLine(\"issue_explanation\", \"issue_offer\", ..., \"{=!}{IssueBriefByIssueGiverText}\", issue_offered_begin_condition, ...), przyjecie: Campaign.Current.IssueManager.StartIssueQuest(Hero.OneToOneConversationHero) (tablica-tmp/IssuesCampaignBehavior.cs:453-467)"
+   },
+   {
+    "fact": "[KAPITAN STRAZY] Nie ma takiej postaci ani w grze, ani w ROT, ani w BK. BK ma radnych Castellan i Constable, ale to rada rodu, nie miasta. Wzor gry na 'dowodce zalogi' bez tworzenia bohatera: najlepszy piechur z Town.GarrisonParty plus wlasne linie dialogu z warunkiem na te postac.",
+    "evidence": "LordNeedsGarrison.cs:699-708 (wybor: OwnerClan.Culture.EliteBasicTroop albo najwyzszy poziom IsInfantry z GarrisonParty.MemberRoster), :486-490 DialogFlow.CreateDialogFlow(\"start\", 300).NpcLine(...).Condition(() => CharacterObject.OneToOneConversationCharacter == _selectedCharacterToTalk); BK: tablica-tmp/BKCouncil.cs:19-51 (Castellan, Constable); grep dectool ROT.dll/BannerKings.dll list: brak typow captain/bounty/board (ROT ma tylko GangLeadersIssue crashfix, EnlistmentVassalageQuest, RedWeddingQuest); nasze wzory linii dialogu: RealisticCaptivity/src/Dialogs.cs:12-30 (AddPlayerLine z \"hero_main_options\", priorytet 110), Armoury/src/WorkshopTrade.cs:1525. GuardMaster.cs to parowanie w bitwie (MissionBehavior), nie kapitan; GarrisonArmory.cs to zbrojownie zalog DTE (zapis arm_garrisonarmory), bez postaci kapitana"
+   },
+   {
+    "fact": "[STRAZNIK PRZED OTWARCIEM ROZMOWY] Mamy gotowe sprawdzenia 'czy wolno otworzyc okno/rozmowe' (inne okno, rozmowa w toku, stan gry to nie mapa, autotest).",
+    "evidence": "Armoury/src/SideVillageVisit.cs:269-277 PopupBlocked (LogGate.Mode 1/2 = autotest, InformationManager.IsAnyInquiryActive(), ConversationManager.IsConversationInProgress || IsConversationFlowActive, ActiveState as MapState); RoadsideInns.cs:448-461; SiegeRansom.Player.cs:85-97 CanShow(fromMenu)"
+   },
+   {
+    "fact": "[OKNO LISTY ZAMIAST MENU] Alternatywa dla menu powtarzalnego: przewijana lista z wyborem i akcja po kliknieciu, juz uzywana w modzie.",
+    "evidence": "Armoury/src/DistrictWorks.Menu.cs:189-215 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(title, desc, list, true, 1, 1, \"Choose\", cancel, delegate(List<InquiryElement> sel){...})) z InquiryElement(identifier, ShortLabels.Pick(...), null, enabled, ShortLabels.Hint(...)); strony okna: Rumours.cs:564-575 ShowPage (InformationManager.ShowInquiry, 'Hear more')"
+   },
+   {
+    "fact": "[MISJE GRY O BANDYTACH - co realnie bylo] Gra ma zadanie 'kupiec: wybij bandytow kolo miasta' (czeste, VeryCommon). Daje je kupiec w miescie albo notabl wsi, gdy w promieniu 1.25 x sredniej odleglosci miast jest zajeta kryjowka. Zadanie: zniszczyc 2+6m band w zasiegu 0.75 tej odleglosci, 20 dni. Nagroda gry 400+1500m (m = 0.1-1), +3 relacji, +1 slawy. Drugie zadanie: soltys wsi - oczyscic kryjowke, 3000 stale, 30 dni, +5 relacji. ROT i BK ich nie wylaczaja.",
+    "evidence": "tablica-tmp/MerchantNeedsHelpWithOutlawsIssueQuestBehavior.cs:35 TotalPartyCount (int)(2+6m), :41 RewardGold 400+1500m, :229 VeryCommon, :285 DaysFromNow(20), :768 ValidBanditPartyDistance, :793-805 cache kryjowek, :818-833 ConditionsHold (IsMerchant || IsRuralNotable); NearbyBanditBaseIssueBehavior.cs:58 RewardGold 3000, :289 DaysFromNow(30), :680 IsHeadman; docs/AUDYT-WOJNA-LOGISTYKA.md:359 tabela nagrod vanilla (m = PlayerProgress 0.1-1), :366 'Glowy bandytow - BRAK systemu nagrod'; dectool grep ROT.dll/BannerKings.dll 'MerchantNeedsHelpWithOutlaws' i 'NearbyBanditBase' - 0 trafien"
+   },
+   {
+    "fact": "[NAGRODY ZADAN U NAS - juz realne] QuestPay8: kazda nagroda gry 'z niczego' (GiveGoldAction null -> gracz) placi zleceniodawca ze swojej kiesy, najwyzej tyle, ile ma. Kwota = min(kwota gry, N ludzi x D dni x zold czlowieka druzyny gracza x 1.25), zamrozona przy przyjeciu (zapis arm_e8_questpay). Getter RewardGold ma postfiks, wiec oferta w rozmowie pokazuje juz kwote po skali. Tablica powinna czytac te liczbe, nie surowa z gry.",
+    "evidence": "Armoury/src/QuestPay8.cs:19-42 (opis), :63-79 tabela Kinds, :370-384 MakePledge (N/D z AlternativeSolutionBaseNeededMenCount i GetBaseAlternativeSolutionDurationInDays, Premium 1.25), :409-436 Freeze, :455 RewardShown (postfiks getterow), :1112-1113 AccessTools.PropertyGetter(typeof(IssueBase), \"RewardGold\") -> _rawReward (RawReward z flaga _raw omija skale); GiverPay.cs:114 Transfer (ucina do kiesy platnika, komunikat 'X could pay only N'); QuestQty28.cs:17-38 ilosci towaru w zadaniach z wartosci sprzed przeliczenia"
+   },
+   {
+    "fact": "[SKAD PRAWDZIWA NAGRODA KAPITANA - kasa miasta] Kasa miasta to Town.Gold (SettlementComponent.Gold). Wolne na nagrode jest tylko to, co ponad zapas kupcow i ponad najblizsza rate firmy DS (ta sama podloga co splata dlugu rady). Miasto z dlugiem rady powinno nie wywieszac nagrod - ksiega dlugow jest prywatna, trzeba dopisac odczyt.",
+    "evidence": "TownPurse.cs:230 Reserve(Town) (nie mniej niz 10000 + 12 x dobrobyt, x skala rynku GL-2), :257 Spare(Town) = max(0, Gold - Reserve), :312 SpendableTown, :284 BuyFloor; DsTowns.TownDebt.cs:40 TdKeep(st), :19 TdArrears; TownDebt.cs:811 podloga splaty Math.Max(TownPurse.Reserve(t), DsTowns.TdKeep(st)); TownDebt.cs:94 private Dictionary<string, Book> _b (Book.Total) - brak publicznego odczytu; stawka pracy miasta: TownWage.cs:19 Index(Town) (0.5-1.5 wg dobrobytu)"
+   },
+   {
+    "fact": "[WYPLATA Z KASY MIASTA - pulapka G24] Przelew kasa miasta -> bohater robimy akcja gry, ale gra NIE ucina kwoty do stanu kasy (roznica powstaje z niczego), wiec kwote trzeba uciac samemu do Spare.",
+    "evidence": "TownPurse.cs:63-67 (opis G24: ApplyForSettlementToCharacter -> ApplyInternal bez obciecia; SettlementComponent.ChangeGold obcina kase do 0); wzory: NotableGold.cs:262 GiveGoldAction.ApplyForSettlementToCharacter(c.Town, c.H, (int)pay, true) 'kwota w nadwyzce'; DsTowns.cs:1021 'kwota nigdy ponad kase'; CastlePurse.cs:682"
+   },
+   {
+    "fact": "[NIE PLACIC DWA RAZY] Kiesa rozbitej bandy (cala) i skarbiec kryjowki juz ida do gracza z innych paczek. Nagroda miasta to osobne pieniadze z kasy miasta, nie dubel lupu.",
+    "evidence": "BeatenPurse.cs (opis 3.2: banda bez wodza traci cala kiese dla zwyciezcy; D11-2 banda przylaczona do gracza oddaje kiese; klucz BeatenPurseToVictor); HideoutPurge.cs:17-29, :84-130 (kasa kryjowki SettlementComponent.Gold po 'Search the hideout' + slawa + relacje okolicy); OutlawLaw.cs:20-60 (bandy maja tylko zrabowane zloto, skarbiec kryjowki z kies band)"
+   },
+   {
+    "fact": "[DOWOD ROZBICIA BANDY - bitwa w polu] Najlepszy wzor: MapEventEnded. Strona przegrana ma partie z MapFaction.IsBanditFaction (bez Nieumarlych), zwyciezca to strona gracza. W chwili MapEventEnded partie jeszcze istnieja (gra kasuje je pozniej w HandleMapEventEnd), wiec da sie porownac StringId bandy z listu gonczego i policzyc jej ludzi.",
+    "evidence": "Gallows.cs:535-580 OnMapEventEnded (me.WinningSide, AttackerSide/DefenderSide, mep.Party.MapFaction.IsBanditFaction, Undead.Party, mep.HealthyManCountAtStart, strona 'prawa': IsMainParty/IsLordParty/IsPatrolParty/IsGarrison/IsMilitia, me.IsHideoutBattle, me.MapEventSettlement, me.IsPlayerMapEvent); BanditCheer.cs:36-52 AfterVictory (mapEvent.PlayerSide, przegrana strona z IsBanditFaction) wolane z ArmouryBehavior.OnMapEventEnded (:3081, warunek WinningSide == PlayerSide); OutlawLaw.cs:703 komentarz 'HandleMapEventEnd biegnie po nasluchach'; rejestracja: ArmouryBehavior.cs:1610 CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd(\"Gallows.OnMapEventEnded\", Gallows.OnMapEventEnded)); kolejnosc: AutotestBattleKit.cs:39 i ArmouryBehavior.cs ok. :2251 - sluchacz dopisany pozniej biegnie wczesniej"
+   },
+   {
+    "fact": "[DOWOD - zniszczenie partii] Wzor gry to MobilePartyDestroyed z destroyerParty == PartyBase.MainParty. Uwaga: niszczyciel nie zawsze jest zwyciezca bitwy, a DestroyPartyAction bywa bez bitwy (banda przylacza sie do gracza - BanditPartyRecruited, rozwiazanie bandy). Dlatego zniszczenie liczyc tylko dla band zapamietanych jako pokonane w bitwie (jak BeatenPurse), przylaczenie i rozwiazanie traktowac osobno.",
+    "evidence": "MerchantNeedsHelpWithOutlawsIssueQuestBehavior.cs:642-648 MobilePartyDestroyed: destroyerParty == PartyBase.MainParty && _validPartiesList.Contains(mobileParty), :602-609 OnBanditPartyRecruited; BeatenPurse.cs:84 Dictionary<MobileParty, MapEvent> _beaten, :217 SplitPostfix, :357 OnBanditRecruited, :369 OnPartyDestroyed + opis 'Recenzja 3.2 (3)'; OutlawLaw.cs:1036-1066 OnPartyDestroyed (destroyer == null = rozwiazana, ludzie do puli), :1090 IsOutlawParty(MobileParty) (internal); ArmouryBehavior.cs:1565 CampaignEvents.BanditPartyRecruited"
+   },
+   {
+    "fact": "[DOWOD - kryjowka] Oczyszczenie kryjowki przez gracza: OnHideoutBattleCompletedEvent z endState Victory i PlayerSide == winnerSide. Bez gracza (oczyscil AI) jest osobna droga.",
+    "evidence": "HideoutPurge.cs:74 CampaignEvents.OnHideoutBattleCompletedEvent.AddNonSerializedListener(this, OnHideoutBattle); :84-130 (HideoutEventComponent.HideoutBattleEndState.Victory, mapEvent.IsPlayerMapEvent, mapEvent.PlayerSide != winnerSide -> return, !IsPlayerMapEvent -> AiCleared); Gallows: me.IsHideoutBattle"
+   },
+   {
+    "fact": "[CEL LISTU GONCZEGO - z plotek] Plotki maja juz wybor band i kryjowek w okolicy oraz ksiege band: od kiedy rabuja, ile wsi spalily, imie herszta. Na tablicy mozna podac te sama bande tym samym imieniem i liczyc nagrode od szkod. Ksiega i funkcje sa prywatne - trzeba dopisac internal accessor.",
+    "evidence": "Rumours.cs:888-933 Bandits (MobileParty.AllBanditParties, R=70, men>=5, wynik: ludzie + PartyTradeGold/50), :935-970 Hideouts (Hideout.All, R=160, bandy w st.Parties, SettlementComponent.Gold), :60 private _bands (Band: First, Known, Raids, Name, Female), :132-149 OnRaidCompleted (b.Raids++), :101 OnPartyCreated, :108 OnPartyDestroyed, :811 BandLeader, :825 BandWho ('Jon Rivers and his bandits'; klucz InnGossipLeaderNames), zapis arm_rumours"
+   },
+   {
+    "fact": "[KRUKI] Wiesci z opoznieniem moga zasilac tablice: daleka banda rozbita albo list gonczy z innego miasta dochodzi dopiero po locie kruka.",
+    "evidence": "Ravens.cs:264 EtaHours(float d) (3 h + d/6.25 jedn. na h, najwyzej 288 h), :273 NotYet(float d, int day), :268 HoldDays; klucz RavenNews; wzor uzycia w plotkach: Rumours.cs:123-130 AddNews + Ravens.HoldDays"
+   },
+   {
+    "fact": "[ZAPIS STANU TABLICY] Stan (listy gonczy, przyjete, terminy) jako jeden napis przez SaveText.Sync pod wlasnym kluczem - bez nowych typow zapisu (nowa klasa QuestBase wymagalaby SaveableTypeDefiner). Reset przy nowej kampanii jak TownDebt.",
+    "evidence": "ArmouryBehavior.cs:1384 SaveText.Sync(dataStore, \"arm_towndebt\", ref td) w SyncData (:783); SaveText.cs:31 Sync (napisy > 32 KB dzielone na kawalki); SaveDefiner.cs (ArmSaveDefiner definiuje tylko kontenery Dictionary<string,int/string>); TownDebt.cs:97 Reset, opis :59 '_m96DlugiReset'"
+   },
+   {
+    "fact": "[KLUCZ MCM] Nowy wylacznik dopisuje sie w trzech miejscach. Pulapka: wartosc zapisana w Armoury.json Jeffa nadpisuje domyslna z kodu.",
+    "evidence": "Settings.cs:3876 (wzor public bool TownMenuTidy = true; z opisem), McmSettings.cs:8785 (wlasciwosc) i :11025 (s.TownMenuTidy = TownMenuTidy), tools/gen_mcm.py (RANGES); CLAUDE.md sekcja 7 (MCM json)"
+   },
+   {
+    "fact": "[DOBA I GODZINA] Odswiezanie tablicy (nowe listy, wygasanie) mozna wpiac w dobe Armoury jak TownDebt.Daily, a sprawdzanie celu na mapie w godzine.",
+    "evidence": "ArmouryBehavior.cs:2652 TownDebt.Daily() z DayProfile.Lap (w OnDailyTickBodyInner :2545); godziny: wzor ArmouryBehavior.cs:1437-1648 CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr(\"X.Hourly\", ...))"
+   },
+   {
+    "fact": "[FLAGA CELU NA MAPIE] Po przyjeciu listu mozna oznaczyc bande albo kryjowke flaga na mapie - mamy gotowy wzor.",
+    "evidence": "HideoutSpotter.cs:49-74 Campaign.Current.VisualTrackerManager (flaga na HideoutFlagDays); Wayfinder.cs:116-134 (rejestracja i RemoveTrackedObject)"
+   }
+  ],
+  "unverified": [
+   "Nic nie zostało sprawdzone w uruchomionej grze (zakaz uruchamiania). Nie wiadomo, czy rozmowa otwarta z naszego menu tablicy po zakończeniu wraca do menu tablicy, czy do 'town'.",
+   "Czy LocationComplex.Current.GetLocationOfCharacter(hero) zwraca miejsce dla każdego notabla i lorda w mieście ROT, gdy gracz stoi w menu 'town' (sceny ROT mogą nie mieć wszystkich miejsc). Planowane rozwiązanie zastępcze, jeśli zwróci null: CampaignMapConversation.OpenConversation.",
+   "Czy mod AIInfluence (moduł zainstalowany, pakiet w tools/ai-influence-pack) przejmuje albo zmienia rozmowy z notablami i lordami otwierane z menu - nie dekompilowany.",
+   "Czy w 1.4.8 InquiryElement przyjmuje portret bohatera (typ identyfikatora obrazka zmienił się w wersjach 1.3+) - nie sprawdzone.",
+   "Jak często zadanie MerchantNeedsHelpWithOutlaws faktycznie pojawia się na mapie ROT (warunek: kryjówka w promieniu 1.25 x średniej odległości miast). Nie liczone z logów ani z mapy.",
+   "Czy radni BK Castellan/Constable rodu pana miasta przebywają fizycznie w mieście i mogliby grać kapitana - nie sprawdzone.",
+   "Strony Nexus Mods (quest board / notice board / bounty board) nie były przeglądane w tym rozpoznaniu - nie sprawdzone, czy istnieje gotowy mod do wzorowania lub kolizji.",
+   "Do której pozycji księgi pieniądza (MoneyLedger / Obieg) księgować wypłatę nagrody z kasy miasta, i czy TownPurse.NoteTake ją liczy - nie sprawdzone.",
+   "Zachowanie wirtualnego delegata QuestPay8._rawReward na getterze bazowym (czy zwraca kwotę klasy pochodnej z postfiksem przy _raw=false) wyprowadzone z kodu, nie przetestowane."
+  ]
+ }
+]

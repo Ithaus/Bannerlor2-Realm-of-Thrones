@@ -93,7 +93,7 @@ Testy tego nie psują, to rzeczy do strojenia:
 ## Czego nie zdążyłem (do przekazania)
 
 Kolejność według Twojej listy:
-1. Tablica ogłoszeń: zlecenia, kapitan straży, bandy do rozbicia, realne nagrody.
+1. Tablica ogłoszeń: rozpoznanie i projekt są gotowe (docs/PROJEKT-TABLICA-OGLOSZEN-2026-10-21.md). Gra ma 43 rodzaje zadań. Kapitana straży nie ma ani w grze, ani w ROT, ani w BK, więc dodamy go sami: będzie wywieszał listy gończe na bandy z okolicy, a nagrodę zapłaci kasa miasta (za bandę 20 ludzi ok. 375 d). Kod robi drugie konto.
 2. Plotki: turnieje, swaty, piwo i ale, plotki według Charyzmy, za dużo piwa daje karę do szybkości, sen i kaca.
 3. Obóz etap 2: markietani z usługami, rozrywką i sklepem w dużych obozach.
 4. Optymalizacja gry (na koniec).
