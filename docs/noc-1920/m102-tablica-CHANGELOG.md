@@ -207,3 +207,68 @@ test reczny z projektu pkt 6.9, decyzja L-7 po tescie, wgranie (osobny krok, nie
 **Poprawki po wlasnym przegladzie (commit po E2b):** po wczytaniu bandy listow rozwiazywane po id jednym przebiegiem po partiach (dotad - szukanie w calej liscie partii
 dla kazdego listu, do ok. 200 x kilka tysiecy porownan w pierwszej dobie); L-7 liczy teraz wplywy kas miast z linii "Przeplywy osad (kasy miast)" (lud za towar
 + dodatnie przelewy gry do kas), a nie stan kas.
+
+---
+
+### Poprawki po recenzji (21.10, commity 2ac8bf54, c6556a71, 2409ed96)
+
+**Dla Jeffa (prosto):** recenzja nie znalazla bledow, ktore wywracaja gre albo robia zloto z niczego. Poprawilem piec rzeczy. Wylaczenie tablicy albo listow w MCM
+naprawde je teraz zatrzymuje: listy schodza z tablicy nastepnego dnia i nikt juz za nie nie dostaje pieniedzy. Jesli jedziesz w armii lorda AI i to on prowadzi
+bitwe, nagrode dostaje on, nie Ty. Na karcie listu pisze, czy lord tez moze odebrac nagrode. Przy kazdej wyplacie gra liczy zloto przed i po, wiec test pokaze
+kazdy denar, ktory pojawilby sie z niczego.
+
+**Zasada (z liczbami):**
+- Wylaczniki: listy kapitana dzialaja tylko przy `NoticeBoard` TAK i `WatchBounties` TAK. Listy soltysow dzialaja tylko przy `NoticeBoard`, `NoticeBoardVillages`
+  i `HeadmanBounties` TAK (soltys to czlowiek wsi, a `NoticeBoardVillages` NIE znaczy "tylko ludzie miasta"). Gdy klucz jest NIE, doba zdejmuje listy tego rodzaju
+  (licznik "klucz" w "zdjete"). Rozbicie bandy przed doba zdejmuje list bez wyplaty (linia "zdjety bez wyplaty - ... klucz NIE"). Tablica nie pokazuje listow
+  wylaczonego rodzaju, a kapitan nie wywiesza nowych.
+- Kto dostaje nagrode (projekt 6.3, tabela "Kto rozbil"): gracz tylko wtedy, gdy jego partia prowadzi strone zwyciezcy (`winSide.LeaderParty == PartyBase.MainParty`,
+  czyli sam albo na czele swojej armii). Gracz w armii lorda AI: placi sie prowadzacemu lordowi (przy `WatchBountyAiLords` TAK), a przy NIE list schodzi bez wyplaty.
+- Tekst karty i rozmowy soltysa zalezy od `WatchBountyAiLords`. Przy TAK: "paid at once to whoever breaks them ... if a lord breaks them first, he is paid".
+  Przy NIE: "paid at once to you when you break them ... If a lord breaks them first, the notice comes down unpaid".
+- Pomiar wyplaty: zloto odbiorcy, kasy miasta, pana (tylko przy doplacie) i kiesy wsi (list soltysa) jest czytane przed przelewem i po nim. "Z niczego" = przyrost
+  odbiorcy ponad ubytek platnikow, ma byc 0. Licznik byl dotad martwy, teraz liczy zmierzone zloto.
+- Linia doby: kiesy wsi maja osobne pole ", z kies wsi V" (dotad wpadaly do "od panow").
+
+**Zmiana:** `tools/sprawdz_logi.py` z powrotem z koncami linii LF. Commit E2b zapisal go z CRLF, wiec diff galezi pokazywal 56 tys. zmienionych linii,
+a teraz pokazuje 183 dopisane. W pliku byla tez jedna linia z podwojnym CR, ktora git przy commicie sprowadzil do LF.
+`NoticeBoard.Watch.cs`: `WatchOn`, `KindOn`, `AiLordsPaid`, `PaidTo`; doba, `WatchInto`, `Settle` i `Pay` jak wyzej.
+`NoticeBoard.Headman.cs`: `HeadmanOn`, tekst karty i rozmowy.
+`Settings.cs`: podpowiedzi `NoticeBoard` ("Off = no board, and no bounties from the watch or the headmen either") i `HeadmanBounties` ("Needs the notice board
+with its villages on"). Po tym `gen_mcm.py` (2237 ustawien, zmienil sie tylko Armoury/src/McmSettings.cs).
+`sprawdz_logi --grupa m102tablica`:
+- L-3 sprawdza teraz przy kazdej wyplacie cztery rzeczy: obiecane = kasa + pan + niedoplata; kasa przed - po = kasa; platnicy = kasa + pan/wies; odbiorca = platnicy.
+  Do tego suma "z niczego" z dob musi byc 0.
+- L-10: wyplata bez listu w logu przechodzi tylko do liczby listow wczytanych z zapisu. Te liczbe bierze z pierwszej doby po kazdej linii "wpiete":
+  czynne - nowe + wyplacone + zdjete.
+
+**Linie logu:** `wyplata - ... kasa przed g0 po g1 (Keep k); odbiorca P, platnicy Q, z niczego Z`. Doba listow: `... z kas miast X, od panow Y, z kies wsi V), ...;
+zdjete N (..., zmiana pana a, klucz b)`. `zdjety bez wyplaty - <miasto> <banda> (rodzaj r) - klucz NIE`. Stare regexy pasuja dalej: nowe pole doby nie ma
+grupy, a dopisek wyplaty jest opcjonalny.
+
+**Sprawdzenie:**
+- Build kod 0.
+- `--grupa m102tablica` na sztucznych logach:
+  - `syn.log`, `syn-rev.log`, `syn-rev2.log`: NIE 0. Przypadek recenzji z wyplata za bande wywieszona przed logiem przechodzi teraz, bo w logu jest 1 list z zapisu.
+  - `rev-build/syn-fix-ok.log` (nowy format, doplata pana i list soltysa): NIE 0.
+  - `rev-build/syn-fix-bad.log`: NIE 2. L-3 lapie "odbiorca != platnicy" i "kasa przed - po != kasa", L-10 lapie wyplate bez listu przy 0 listow z zapisu.
+
+**Uwaga z recenzji (bez zmiany kodu):** polecenie mowi "wyplata tylko po rozbiciu przez gracza", a projekt (decyzja D4, `WatchBountyAiLords` TAK) placi takze
+lordom AI. Kod robi to, co mowi projekt. Rozstrzygnie to decyzja L-7 po tescie 120 dob: gdy L-7 nie przejdzie, domyslne `WatchBountyAiLords` = NIE.
+Wtedy placi sie tylko graczowi, a karta mowi to wprost.
+
+**Ryzyko:**
+- L-3 jest teraz scisly (tolerancja 0). Jesli jakas latka na `GiveGoldAction` (SmallGold, PlayerFees8, RotLeaks37, QuestPay8, NotableGold, RealPayer) albo nasluch
+  `HeroOrPartyTradedGold` zmieni kwote w tym przelewie, L-3 da NIE z przykladem. Recenzja przeczytala te prefiksy i zaden nie dziala przy osadzie albo panu
+  jako platniku. Jesli L-3 da NIE, trzeba szukac przyczyny w tej latce, nie w tablicy.
+- `NoticeBoardVillages` NIE wylacza teraz takze listy soltysow. To zgadza sie z podpowiedzia klucza ("only people in town and the town lord's house").
+
+**Status:** DO SPRAWDZENIA (build kod 0; gra nie uruchamiana).
+
+**Test w grze:** do testu z pkt 6.9 dochodza trzy proby:
+- wczytac zapis z czynnym listem przy `WatchBounties` NIE: list schodzi w pierwszej dobie, a rozbicie tej bandy nic nie placi;
+- jechac w armii lorda AI i rozbic bande z listem: placi sie lordowi ("dla lord ...");
+- w linii "wyplata" sprawdzic, czy "z niczego" wynosi 0.
+
+**Stan po recenzji:** wszystkie uwagi recenzji poprawione (1 wazna, 4 drobne). Zostaje to samo, co po E2b: autotest 120 dob z `--grupa m102tablica` i regresja,
+test reczny, decyzja L-7, scalenie i wgranie w osobnym kroku.
