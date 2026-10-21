@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 101 - prolog 298 (rdzen), postacie kanonu do rodow, tablica ogloszen)
+
+**Zakres (Jeff 21.10):** "Robimy wczesniejszy start"; "Ok wersje lekka robimy" + pakty Diplomacy z krolestwem Roberta; "zrob wydarzenia wedlug ksiazki"; postacie A do rodow ("pamietaj, ze potem
+Tyrion zmieni barwy"), B usunac, C/D do wynajecia, Jeyne Westerling zamiast Talisy; "rob tez 3 postacie"; "i rob 5 i 7" (7 = tablica ogloszen).
+**Zmiana:** `w-toku/n30-calosc` (26c795be) = WGRANIE 100 + m102-tablica (81ef8cc1: "Read the notice board" w menu miasta, karta ogloszenia, Go and see / Talk now / flaga, listy goncze
+kapitana strazy z kasy miasta, listy soltysow; 9 kluczy) + m101-postacie (8cb3e2a6: nowa kampania - 22 postacie kanonu do rodow, 9 nie powstaje, 36 zmian stron wedlug ksiazki w
+Armoury/ModuleData/arm_canon_moves.tsv, ratunek przy niszczeniu rodu przez ROT; klucze CanonCompanionsToClans, CanonCompanionsFollowStory) + m101-prolog (e7602988: wybor startu
+"Prologue 298", kalendarz od Year 298 Day 177, start opowiesci ROT 299 - latki 30/30 metod ROT, pokoj Westeros i pakty Diplomacy do dnia 186, Robert i Ned zyja, dzien 186 smierc
+Roberta - Joffrey, Ned w lochu, NedEvent - Ned stracony, Robb; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings) + podpiecie CanonCompanions.PrologDays pod Prologue.
+Sceny prologu (okna wedlug ksiazki, obrazki AI Jeffa) i sceny zmieniajace swiat - NASTEPNE (E4, E5). Armoury 2243 ustawien.
+**Testy (21.10):** 101-prolog 230/230 dob kod 0 (ERROR 0; KONIEC PROLOGU doba 186: Robert martwy, Joffrey krolem, Ned jeniec town_EW4; NedEvent dzien opowiesci 9: Ned martwy, Robb
+wladca Polnocy; m101prolog 11/11, m101postacie 14/14, m102tablica 21/21), 101-bitwa 4/4, 101-nowa 180/180 kod 0 (progi 3199/NIE 120; m102tablica L-8 zapis arm_board 18.5 KB > prog 16 KB -
+SaveText dzieli na kawalki, do odchudzenia). CrashScribe-at-n101 nowy (zb/n22-at + 26c795be).
+**Status:** WGRANE 101 (21.10 08:05, tag 2026-10-21-wgranie101; Armoury 059c6e6f, CrashScribe 384ac06f, RC 37adbf95, GT 14613e7b, ForgeView f9711156; nowy arm_canon_moves.tsv).
+Prolog i postacie dzialaja tylko w NOWEJ kampanii (wybor startu w tworzeniu postaci).
+
 ## 2026-10-21 (WGRANIE 100 - kryjowki bandytow: Zwiad, plotki, miejsca)
 
 **Zakres (Jeff 21.10 ok. 03:00):** "im wiecej masz scouting, tym lepiej widzisz kryjowki bandytow, ale ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ...
