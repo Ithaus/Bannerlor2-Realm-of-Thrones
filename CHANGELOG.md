@@ -1,5 +1,44 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (n32 (kandydat WGRANIA 102) = n31 + m104-e5 + m104-wojny (gospodarka cz.3 dojdzie))
+
+**Zmiana:** `w-toku/n32-calosc` = n31 (59a054b7: WGRANIE 101 + m103-drobne + m103-sceny + m103-lektor + m103-gospodarka cz.1-2) + m104-e5 (72fe7c1a; [CHANGELOG galezi](docs/noc-1920/m104-e5-CHANGELOG.md):
+sceny zmieniajace swiat prologu 298 - orszak krola Roberta do Winterfell i z powrotem, Turniej Reki w KP przez GrandTourney CanonApi, straz niewoli Tyriona (Orle Gniazdo 110-132) i Jaimego
+(Riverrun, nowy wiersz #p10 w arm_canon_moves.tsv, #m01 tylko classic), klany gorskie Doliny (Painted Dogs, Burned Men, Milk Snakes, Black Ears), ludzie Gory w Dorzeczu, oddzial Berica;
+7 kluczy Prologue*) + m104-wojny (cf47a43b; [CHANGELOG galezi](docs/noc-1920/m104-wojny-CHANGELOG.md): 6 wojen czysto essoskich na kalendarzu w prologu, Reach i Dorne z korona
+wedlug ksiazki, mlode smoki Daenerys; 4 klucze PrologueEssosWarsCalendar, CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow). Obie galezie z bazy 756e685f (m103-sceny).
+Scalenia: 50d5d94d (m104-e5, bez konfliktow), e3ef4422 (m104-wojny).
+**Konflikty (m104-wojny):** wszystkie to dopiski obu galezi przy pustej bazie (ours + theirs): Prologue.cs ResetCampaign - ResetWorld() (E5), potem ResetWars(); Settings.cs - klucze E5,
+potem PrologueEssosWarsCalendar i grupa "Wars of the books"; sprawdz_logi.py - opisy grup m104e5 i m104wojny w pomocy, dispatch kazdej grupy osobno z return; McmSettings.cs - --ours +
+gen_mcm. Prologue: Pack/Unpack, OnDaily, RegisterEvents (Hourly/BeforeSave/SaveOver/Tournament/MobilePartyDestroyed) zmienia tylko E5; wojny maja wlasne zachowanie CanonWarsBehavior
+(zapis arm_m104, SubModuleMain) i wolanie Prologue.DragonsApply w dobie ArmouryBehavior przed DragonFeed - scalone automatycznie obok lektora (SubModuleMain, ArmouryBehavior).
+**Bledy wykryte przy scaleniu (bez znacznikow konfliktu):** (1) partial class Prologue - obie galezie zdefiniowaly `WTag`, `_wStumbles`, `WStumble` (build CS0102/CS0111): w wojnach
+przemianowane na `CwTag`, `_cwStumbles`, `_cwStumblesDay`, `CwStumble` (Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs i wywolanie InstallEssos w Prologue.cs, 61 miejsc);
+tresc linii logu bez zmian ("Wojny kanonu (m104): ", bledy "CanonWars."). (2) sprawdz_logi.py - stala modulu `M104_TAG` w obu grupach (E5 "Prolog E5 (m104): ", wojny "Wojny kanonu
+(m104): "); ostatnia wygrywala i m104e5 szukalby linii wojen - stala wojen przemianowana na `M104W_TAG` (3 miejsca). Po poprawce ast: 0 dubli nazw na poziomie modulu.
+**Decyzja domyslna (Claude; Jeff moze zmienic):** ludzie Gory BEZ sztandaru, jak w ksiazce i w tekscie sceny 19 ("raiders flying no banners"). Juz zrobione w galezi E5 (R5, 89aefaa9):
+kod nie wola SetCustomBanner wcale (to nie jest jedna stala) - banda nosi sztandar klanu bandyckiego robber_knights, linia logu "nowa banda ... bez sztandaru", opis MCM PrologueMountainRaiders
+"flying no banners". Zmiana na sztandar Lannisterow = dopisanie SetCustomBanner(clan_vlandia_1) w Prologue.World.Raiders.cs. Reszta decyzji jak w galeziach (lista "Decyzje do
+potwierdzenia" w obu CHANGELOG galezi).
+**Kontrola calosci:** wspolne pliki E5/wojny z n31 tylko Settings/McmSettings/sprawdz_logi (+ ArmouryBehavior/SubModuleMain dla wojen - inne miejsca niz lektor). Latki E5
+(EndCaptivityAction.ApplyInternal, RansomOfferCampaignBehavior.DailyTickHero, BKFeastBehavior.HourlyTickPartyImpl, postfiks ShouldConsiderAttacking obok FreeFolkRaids.KinPost) i wojen
+(ROTStorylineWar.Enforced prefiks/finalizer obok CrashScribe Fabula, odczyt StoryStartOf) nie dziela celu; n31 dodal tylko latki EventScreen (obrazki, lektor). Zapis: E5 w arm_prologue
+(pola w*=), wojny w arm_m104. Scena 15 czeka na koniec Turnieju Reki (E5 R4) - lektor rozpoznaje okno po tytule, wiec gra nagranie prolog_15 wtedy, gdy okno sie pokaze. Bandy E5
+(RaidDraw, BandFood) sa na ladzie - BandFoodAtSea z gospodarki ich nie dotyczy; tablica ogloszen moze wystawic list gonczy za bande Ludzi Gory po rabunku (zwykle zachowanie bandy),
+a koniec prologu zostawia bande w zadaniu gracza (IsCurrentlyUsedByAQuest). Skrypt wgrania (repo tools/autotest-2026-10-17/wgraj-v5.ps1) kopiuje 5 DLL (z GrandTourney) i kazdy
+Armoury/ModuleData/arm_*.tsv - arm_canon_moves.tsv (#p10) pojdzie; wojny nie maja nowych plikow danych. Armoury.json Jeffa nie ma zadnego z 11 nowych kluczy (domyslne TAK zadzialaja).
+**Build / testy:** gen_mcm: Armoury 2272 ustawien (n31 2261; +7 E5, +4 wojny), RC 115, GT 44; po scaleniu E5 McmSettings z gen_mcm = wynik automatu. Build 5 modow kod 0 na e3ef4422
+(md5): Armoury d203b2b9, CrashScribe 9dbde0aa, GrandTourney 5ec21b72, RealisticCaptivity e0dec778, ForgeView e39f3163 (CrashScribe/RC/ForgeView bez zmian zrodel wobec n31 - autotest
+moze uzyc CrashScribe-at-n101.dll; inne md5 to hash commitu w wersji DLL). sprawdz_narzedzie: dispatch poza main 0, zle wstawki 0, duble def 0, duble grup 0. Logi syntetyczne:
+m104e5 - dobry 14 progow 0 NIE, zly 4 NIE, klasyczny INFO, zapis sprzed E5 (d160) 0 NIE, klucze NIE 0 NIE; m104wojny - 12 logow jak w galezi (dobre 0 NIE; zle: 2 - 5 NIE, 4 - 3 NIE,
+11 - WK-7, 12 - WK-3 i WK-4); log mieszany (linie E5 + linie wojen) - m104e5 0 NIE, m104wojny 0 NIE (sprawdza rozdzielenie M104_TAG / M104W_TAG). test_m103sceny 14/14 OK.
+Log P2 (Armoury-2026-10-21_10-08-39, sprzed galezi) kod 0: m104e5, m104wojny, m103lektor INFO (brak linii), m103sceny 3 progi 0 NIE (SC-0 INFO - brak linii scen), m101prolog 11/11 TAK, m103p3 13 progow NIE 1
+(M3P-7, jak w n31 - log bez kluczy P3).
+**Ryzyko / co sprawdzic:** autotest prologu wedlug planow obu galezi (>= 210 dob, wczytanie zapisu w srodku): --grupa m104e5, m104wojny, m101prolog, m101postacie, m103sceny,
+m103lektor (--crashscribe); w linii latek prologu "sceny E5: ..." i linia "latka wojen essoskich"; partie scen E5 i wojny Reach/Dorne nie wchodza sobie w droge (wojny dzialaja po starcie
+opowiesci, E5 konczy sie najpozniej w dniu 188). Gospodarka cz.3 dojdzie osobnym scaleniem.
+**Status:** DO SPRAWDZENIA - kandydat WGRANIA 102 (n31 + m104-e5 + m104-wojny); nic nie wgrane, gry nie uruchamialem.
+
 ## 2026-10-21 (n31 (kandydat WGRANIA 102) - scalenie m103-drobne, m103-sceny, m103-lektor + m103-gospodarka (czesc 1 i 2))
 
 **Zmiana:** `w-toku/n31-calosc` = WGRANIE 101 (ed9273fa) + m103-drobne (7839c384: rabunek druzyny gracza liczy sie jak praca - RaidCountsAsWork, odziez z rzedu markietanow
