@@ -37,6 +37,8 @@ RANGES = {
     'SutlerSurgeonFee': (0, 1000, "0"),
     'SutlerRevelPerMan': (0, 50, "0"),
     'SutlerRevelMorale': (0, 50, "0"),
+    'SutlerRevelMoraleCap': (0, 100, "0"),
+    'SutlerArmourerPerStall': (0, 100, "0"),
     'CartLoadKg': (100, 2000, "0"),
     'CartSpeedPenaltyPercent': (0, 50, "0"),
     'PackSaddleExtraKg': (0, 300, "0"),

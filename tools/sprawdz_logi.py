@@ -1018,7 +1018,7 @@ Uzycie (Python 3, tylko odczyt):
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
-                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO). Log bez paczki: INFO.
+                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
 --grupa m97posilki : (20.10, w-toku/m97-posilki - Jeff "wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; Armoury/src/DrMarchArrival.cs; klucz DrArrivalByMarch)
                     python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
                     P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
@@ -37421,6 +37421,8 @@ M99M_CTL = re.compile(r"\| kontrola: (-?\d+) = (-?\d+)(?: \+ (-?\d+))? \(roznica
 M99M_SHOP = re.compile(r"kupione (\d+) sztuk \(cena markietanow (-?\d+), miasta (-?\d+)\), z polki miasta zdjete (\d+) \(brak na polce (\d+)\), sprzedane (\d+) sztuk \(skup (-?\d+)\) na polke miasta (\d+)"
                        r" \| gracz netto (-?\d+) .*?= towar do kasy miasta (-?\d+) \+ narzut (-?\d+)")
 M99M_DAY = re.compile(r"dzien (\d+) \|.*\(roznica (-?\d+)\) \| potkniecia (\d+)")
+M99M_SOLD = re.compile(r"\| skup dzis (\d+) z limitu (\d+)")                                   # poprawka po recenzji: limit skupu na dobe
+M99M_REV = re.compile(r"morale RecentEvents (-?[0-9.]+) -> (-?[0-9.]+) \(dodatek ([0-9.]+), pulap (\d+)\)")   # poprawka po recenzji: pulap zabawy
 
 
 def m99markietani_main(logp):
@@ -37434,6 +37436,7 @@ def m99markietani_main(logp):
         rep.show()
         return 0
     starts, uses, ctl, shops, days, n_err, stumb, opened = [], [], [], [], [], 0, 0, 0
+    solds, revs = [], []
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -37454,17 +37457,23 @@ def m99markietani_main(logp):
                 continue
             kind = body.split(" |", 1)[0]
             mc = M99M_CAMP.search(body)
-            if mc and kind in ("cyrulik", "zabawa", "sklep otwarty", "sklep zamkniety"):
+            if mc and kind in ("cyrulik", "platnerz", "zabawa", "sklep otwarty", "sklep zamkniety"):
                 uses.append((kind, int(mc.group(1)), int(mc.group(2)), int(mc.group(3))))
             if kind == "sklep otwarty":
                 opened += 1
             mk = M99M_CTL.search(body)
-            if mk and kind in ("cyrulik", "zabawa", "sklep zamkniety"):
+            if mk and kind in ("cyrulik", "platnerz", "zabawa", "sklep zamkniety"):
                 a, b, c, r = int(mk.group(1)), int(mk.group(2)), int(mk.group(3) or 0), int(mk.group(4))
                 ctl.append((kind, a, b + c, r))
             ms = M99M_SHOP.search(body)
             if ms and kind == "sklep zamkniety":
                 shops.append(tuple(int(ms.group(i)) for i in range(1, 12)))
+            mo = M99M_SOLD.search(body)
+            if mo and kind == "sklep zamkniety":
+                solds.append((int(mo.group(1)), int(mo.group(2))))
+            mr = M99M_REV.search(body)
+            if mr and kind == "zabawa":
+                revs.append((float(mr.group(1)), float(mr.group(2)), float(mr.group(3)), int(mr.group(4))))
     print(f"plik: {logp} | startow {len(starts)}, uzyc {len(uses)} (sklep otwarty {opened}, zamkniety {len(shops)}), linii doby {len(days)}, ERROR {n_err}")
     if not starts and not uses:
         rep.add("MK-0: linia 'Markietani obozu (m99): start sesji'", "brak w logu", "INFO (log sprzed paczki m99-markietani albo menu glowne)", None)
@@ -37485,8 +37494,12 @@ def m99markietani_main(logp):
     rep.add("MK-4: towar z polki miasta = towar w sklepie", f"zlych zamkniec {len(badg)} z {len(shops)} (kupione = zdjete z polki, brak 0, sprzedane = na polke, netto = towar + narzut)",
             "0", (len(badg) == 0) if shops else None)
     tb = sum(x[0] for x in shops); ts = sum(x[5] for x in shops); net = sum(x[8] for x in shops); mk = sum(x[10] for x in shops)
-    nc = sum(1 for u in uses if u[0] == "cyrulik"); nz = sum(1 for u in uses if u[0] == "zabawa")
-    rep.add("MK-5: uzycie (INFO)", f"cyrulik {nc}, zabawa {nz}, sklep {len(shops)}: kupione {tb} sztuk, sprzedane {ts}, gracz netto {net}, narzut {mk}", "INFO", None)
+    bs = [x for x in solds if x[0] > x[1]]
+    rep.add("MK-6: skup w limicie dnia (gotowka kramow na dobe)", f"ponad limit {len(bs)} z {len(solds)}" + (f" (np. {bs[0][0]} > {bs[0][1]})" if bs else ""), "0", (len(bs) == 0) if solds else None)
+    br = [r for r in revs if r[1] > max(r[0], r[3]) + 0.05 or r[2] < 0.95]
+    rep.add("MK-7: zabawa w pulapie morale", f"ponad pulap albo dodatek < 1: {len(br)} z {len(revs)}" + (f" (np. {br[0][0]} -> {br[0][1]}, pulap {br[0][3]})" if br else ""), "0", (len(br) == 0) if revs else None)
+    nc = sum(1 for u in uses if u[0] == "cyrulik"); nz = sum(1 for u in uses if u[0] == "zabawa"); npl = sum(1 for u in uses if u[0] == "platnerz")
+    rep.add("MK-5: uzycie (INFO)", f"cyrulik {nc}, platnerz {npl}, zabawa {nz}, sklep {len(shops)}: kupione {tb} sztuk, sprzedane {ts}, gracz netto {net}, narzut {mk}", "INFO", None)
     rep.show()
     return 0
 

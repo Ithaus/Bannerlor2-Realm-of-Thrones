@@ -3922,6 +3922,8 @@ namespace Armoury
         public int SutlerSurgeonFee = 15;                  // fee per tended man, times (his tier + 1): a tier 1 recruit 30, a tier 3 soldier 60, a tier 5 veteran 90
         public int SutlerRevelPerMan = 2;                  // denars a man for a round of ale, dice and a minstrel for your party (once a day)
         public int SutlerRevelMorale = 6;                  // morale your party gains from the revel; it fades by itself over the following days
+        public int SutlerRevelMoraleCap = 10;              // revels lift your party's morale from recent events to at most this much - another revel while the men are still merry adds only what is missing (and costs only that share)
+        public int SutlerArmourerPerStall = 6;             // worn pieces of your men's kit the field armourers of one stall mend in a day (town smiths' rate plus the sutlers' cut; with Smith Mend From Market also the materials, taken from that town's market)
 
         public static void Load(string moduleDataDir)
         {

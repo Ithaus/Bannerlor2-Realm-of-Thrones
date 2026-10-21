@@ -8872,6 +8872,14 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerRevelMorale { get; set; } = 6;
 
+        [SettingPropertyInteger("Sutler Revel Morale Cap", 0, 100, "0", HintText = "revels lift your party's morale from recent events to at most this much - another revel while the men are still merry adds only what is missing (and costs only that share)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerRevelMoraleCap { get; set; } = 10;
+
+        [SettingPropertyInteger("Sutler Armourer Per Stall", 0, 100, "0", HintText = "worn pieces of your men's kit the field armourers of one stall mend in a day (town smiths' rate plus the sutlers' cut; with Smith Mend From Market also the materials, taken from that town's market)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerArmourerPerStall { get; set; } = 6;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11089,6 +11097,8 @@ namespace Armoury
             s.SutlerSurgeonFee = SutlerSurgeonFee;
             s.SutlerRevelPerMan = SutlerRevelPerMan;
             s.SutlerRevelMorale = SutlerRevelMorale;
+            s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
+            s.SutlerArmourerPerStall = SutlerArmourerPerStall;
         }
 
         internal static void Apply()
