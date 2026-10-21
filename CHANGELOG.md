@@ -21,8 +21,9 @@ i opis), zapas ReserveChars() w Lektor.Live.cs, McmSettings z gen_mcm. Armoury.j
 **Skrypty:** wgraj-v5.ps1 uzywany do wgran (repo tools/autotest-2026-10-17) mial blok obrazkow (sceny), ale nie mial bloku nagran lektora (galaz dopisala go do starej kopii
 w katalogu testow) - wgranie 102 nie skopiowaloby nagran. Jedna wersja obu skryptow (obrazki + lektor) w repo glownym (697c4885) i w katalogu testow 6ba92574/test
 (kopie *.bak-n31-przed). Proba: wgraj-v5 -DryRun na udawanym katalogu gry z drzewem n31 - kod 0, 59 wierszy Lektor (58 wav + tsv, md5 z tsv zgodne); parser PowerShell 0 bledow.
-**Build / testy:** gen_mcm: Armoury 2256 ustawien (101: 2243; +6 drobne, +2 sceny, +5 lektor), RC 115, GT 44. Build 5 modow kod 0: Armoury d5024f0f, CrashScribe 9ff48892,
-RealisticCaptivity fb1236ee, GrandTourney 9e6453b3, ForgeView badac832 (kod CrashScribe/RC/GT/ForgeView bez zmian wobec 101). sprawdz_narzedzie: dispatch poza main 0,
+**Build / testy:** gen_mcm: Armoury 2256 ustawien (101: 2243; +6 drobne, +2 sceny, +5 lektor), RC 115, GT 44. Build 5 modow kod 0 na e22ae0fb: Armoury 12e02669, CrashScribe 6b5e413e,
+RealisticCaptivity fef1a9db, GrandTourney d440ffaa, ForgeView 825dec01 (kod CrashScribe/RC/GT/ForgeView bez zmian wobec 101; kazda DLL ma w wersji hash commitu
+drzewa - 1.0.0+<commit> - wiec md5 zmienia sie z kazdym commitem przy tym samym kodzie: porownanie bajtow buildow 638c9381 i e22ae0fb - tylko hash, MVID i znacznik PE). sprawdz_narzedzie: dispatch poza main 0,
 zle wstawki 0, duble def 0, duble grup 0. sprawdz_logi --help kod 0; test_m103sceny 14/14 OK; m103lektor na logu syntetycznym 10/10 TAK (LK-3: 58 = wiersze tsv; z liczba 35 - NIE,
 jak trzeba); m97wioski (WP-7), m99markietani (MK-8, MK-9), m102tablica (L-8, L-8b), m98plotki (KP-1, KP-1b z --crashscribe), m103sceny, m103lektor na logu biegu 10:08
 (p2-prolog-ks, 230 dob) bez wyjatku (nowe wiersze INFO - log sprzed paczek).
