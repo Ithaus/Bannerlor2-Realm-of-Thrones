@@ -10,7 +10,8 @@ Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej
 | Krok | Co | Stan |
 |---|---|---|
 | K1 | straz niewoli (pkt 3 i 4): CanonCompanions.HeldRow / Freeing, tabela #m01 classic + #p10 Riverrun, latki EndCaptivityAction.ApplyInternal i RansomOfferCampaignBehavior.DailyTickHero, klucze PrologueTyrionHeld / PrologueJaimeAtRiverrun + 5 kluczy scen | ZROBIONE (ff9d85e7, build 0, gen_mcm) |
-| K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (build Armoury + GT 0) |
+| K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (9e4b8151, build Armoury + GT 0) |
+| K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (build Armoury + GT 0) |
 
 ## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
 
@@ -77,3 +78,28 @@ jesli w logu eskorta "stoi" - dopisac te sama latke. (4) Postoj 22 dni w Winterf
 (5) Gracz zaatakuje orszak - wojna z korona przez wrogosc gracza jak zawsze; trasa idzie dalej.
 
 **Status.** DO SPRAWDZENIA (autotest z prologiem 230 dob: linie orszaku, Winterfell przed d40, KP przed d100).
+
+## K3 - Turniej Reki (pkt 2)
+
+**Problem.** Projekt pkt 2: dzien 125 - turniej w Krolewskiej Przystani (Gora, Rycerz Kwiatow, Ogar), gracz moze startowac. GrandTourney sam turnieju nie zaklada
+w zadanym miescie i dniu; przy wojnie krolestwa (gdziekolwiek) robi z niego turniej LOKALNY bez wezwan, przy mniej niz 8 lordach - lokalny; w KP bywa 18-29 lordow,
+a drabinka ma 15 miejsc dla lordow (e5:A: "lordow w miescie 28, w drabince bylo 15, dolozono 0") - uczestnicy kanonu mogli nie wejsc.
+
+**Zmiana.**
+- GrandTourney `CanonApi.ProclaimRoyal(miasto, uczestnicy)` (publiczne, wolane odbiciem z Armoury): turniej nowy albo przejety, wpis `|c` w gt_events (5. pole - stary
+  DLL GT czyta 4 pierwsze, bez zmian), wezwania jak zawsze (SummonLords); w OnDailyTick wpis `|c` nie schodzi do lokalnego przy wojnie krolestwa i otwiera sie jako Grand
+  bez reguly osmiu; zjazd = GatherDays (4) z zamknietymi listami i bez konca turnieju (NoEarlyEnd - bez zmian). `CanonApi.SetHeroes` - uczestnicy kanonu (po wczytaniu
+  Armoury podaje ich ponownie); NoblesFightPatch: uczestnicy kanonu najpierw (OrderBy stabilny), przy braku miejsca zastepuja ostatniego lorda spoza kanonu (nie gracza);
+  linia "Szranki ... turniej kanonu: uczestnikow kanonu N, zastapionych lordow M". `CanonApi.Done` przy koncu / odwolaniu turnieju w tym miescie. Bez turnieju kanonu
+  wszystko jak dotad (petla drabinki ta sama, gdy kanonu brak).
+- Armoury `Prologue.World.Tourney.cs`: d117 Gregor (lord_4_21), Loras (lord_1_44), Jaime druzynami do KP (partia sceny, bez ukrycia; partia w armii - nie odciagamy, jak
+  herold GT), Ogar bez druzyny - przeniesiony do KP (raz; gra nie wyprowadza lordow z miasta z turniejem); d121 obwieszczenie (bez GT - turniej gry) i wiesc EN dla gracza;
+  d125 listy otwarte (GT); d127 - jesli nikt nie rozegral - `TournamentManager.ResolveTournament` (nagroda jak w kazdym turnieju gry); d128 albo koniec - uczestnicy do
+  swojego AI. TournamentFinished (KP, faza obwieszczenia) - linia `Turniej Reki ROZSTRZYGNIETY w town_EW4 (dzien ..., z graczem / AI gry / rozstrzygniecie gry w dniu 127)
+  | zwyciezca ... | uczestnicy kanonu w drabince: ... | gracz TAK/NIE` + wiesc EN (gdy gracz nie startowal). TournamentCancelled - `ODWOLANY`.
+
+**Ryzyko / co sprawdzic.** (1) GT otwiera listy, gdy minely 4 doby od obwieszczenia (dzien zapisany z 2 miejscami po przecinku - otwarcie d125 albo d126). (2) Gregor
+z Zachodu (ok. 310 jedn.) i Loras z Highgarden (ok. 300) jada ok. 4-5 dob z noclegami - od d117 zdazaja na d121-125. (3) Gra rozstrzyga turniej losowo po otwarciu (szansa
+konca) - w oknie 125-127 to w porzadku. (4) Gracz w arenie w dniu 127 - niemozliwe w ticku doby (misja wstrzymuje kampanie).
+
+**Status.** DO SPRAWDZENIA (autotest: linia ROZSTRZYGNIETY w d123-127, uczestnicy kanonu w drabince).

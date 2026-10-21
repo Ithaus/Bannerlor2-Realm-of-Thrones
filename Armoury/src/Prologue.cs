@@ -371,6 +371,8 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, OnHourly);
             CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, OnBeforeSave);
             CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, OnSaveOver);
+            CampaignEvents.TournamentFinished.AddNonSerializedListener(this, Prologue.OnTourneyFinished);   // m104-e5: Turniej Reki
+            CampaignEvents.TournamentCancelled.AddNonSerializedListener(this, Prologue.OnTourneyCancelled);
         }
 
         private void OnHourly()

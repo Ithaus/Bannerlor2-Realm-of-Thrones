@@ -179,18 +179,32 @@ namespace GrandTourney
                 foreach (var c in list) if (c != null && c.IsHero && c.HeroObject != null && c.HeroObject.IsLord) lordsIn++;
 
                 int cap = System.Math.Max(0, System.Math.Min(15, s.MaxNoblesInBracket));
-                int added = 0;
+                int added = 0, swapped = 0;
+                // m104-e5: turniej kanonu (Armoury, prolog 298 - Turniej Reki): uczestnicy kanonu najpierw (OrderBy jest stabilny - reszta w kolejnosci jak dotad), a gdy
+                // brak miejsca - zastepuja ostatniego lorda spoza kanonu (nie gracza). Bez turnieju kanonu - petla jak dotad.
+                var canon = CanonApi.HeroesFor(settlement);
+                if (canon != null) cands = System.Linq.Enumerable.ToList(System.Linq.Enumerable.OrderBy(cands, x => canon.Contains(x.StringId) ? 0 : 1));
                 foreach (var h in cands)
                 {
-                    if (lordsIn + added >= cap) break;
-                    // wstaw na miejsce wypelniacza (zolnierza) od konca
+                    bool isCanon = canon != null && canon.Contains(h.StringId);
                     int slot = -1;
-                    for (int i = list.Count - 1; i >= 0; i--)
-                        if (list[i] != null && !list[i].IsHero) { slot = i; break; }
-                    if (slot >= 0) list[slot] = h.CharacterObject;
-                    else if (list.Count < 16) list.Add(h.CharacterObject);
-                    else break;
-                    added++;
+                    bool lordOut = false;
+                    if (lordsIn + added < cap)
+                    {
+                        // wstaw na miejsce wypelniacza (zolnierza) od konca
+                        for (int i = list.Count - 1; i >= 0; i--)
+                            if (list[i] != null && !list[i].IsHero) { slot = i; break; }
+                        if (slot < 0 && list.Count < 16) { list.Add(h.CharacterObject); added++; continue; }
+                    }
+                    if (slot < 0 && isCanon)
+                        for (int i = list.Count - 1; i >= 0; i--)
+                        {
+                            var c = list[i];
+                            if (c != null && c.IsHero && !c.IsPlayerCharacter && c.HeroObject != null && c.HeroObject.IsLord && !canon.Contains(c.HeroObject.StringId)) { slot = i; lordOut = true; break; }
+                        }
+                    if (slot < 0) { if (isCanon) continue; break; }
+                    list[slot] = h.CharacterObject;
+                    if (lordOut) swapped++; else added++;
                 }
 
                 if (added > 0 || present > 0)
@@ -198,7 +212,8 @@ namespace GrandTourney
                              ", w drabince bylo " + lordsIn + ", dolozono " + added +
                              (wounded > 0 ? ", rannych/jencow " + wounded : "") +
                              (unskilled > 0 ? ", bez wyszkolenia " + unskilled : "") +
-                             (other > 0 ? ", innych odrzuconych " + other : "") + ".");
+                             (other > 0 ? ", innych odrzuconych " + other : "") +
+                             (canon != null ? ", turniej kanonu: uczestnikow kanonu " + canon.Count + ", zastapionych lordow " + swapped : "") + ".");
             }
             catch (Exception e) { Log.Error("NoblesFightPatch", e); }
         }
