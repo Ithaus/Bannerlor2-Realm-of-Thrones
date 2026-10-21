@@ -782,6 +782,9 @@ namespace Armoury
         // m102-tablica: tablica ogloszen - flagi z tablicy, listy gonczne kapitanow i soltysow od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak m96-dlugi)
         private readonly bool _m102TablicaReset = M102TablicaReset();
         private static bool M102TablicaReset() { try { NoticeBoard.Reset(); } catch (Exception e) { Log.Error("M102TablicaReset", e); } return true; }
+        // m103-lektor: lektor - klip, strona plotek i liczniki doby od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak m102-tablica)
+        private readonly bool _m103LektorReset = M103LektorReset();
+        private static bool M103LektorReset() { try { Lektor.Reset(); } catch (Exception e) { Log.Error("M103LektorReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -2210,6 +2213,7 @@ namespace Armoury
             try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
             try { InnDrink.SessionStart(); } catch (Exception e) { Log.Error("InnDrink.SessionStart", e); }   // m98-plotki: linia "Kufle (m98): start sesji" - klucze, krzywa Uroku, prog upicia
+            try { Lektor.SessionStart(); } catch (Exception e) { Log.Error("Lektor.SessionStart", e); }   // m103-lektor: linia "Lektor (m103): start sesji" - klucze, nagrania okien, latka, pamiec plotek, klucz API jest/brak, tryb
             try { BanditLimit.SessionStart(); } catch (Exception e) { Log.Error("BanditLimit.SessionStart", e); }   // f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band ROT x2 z ludzi puli wyrzutkow, stopery kosztu band - latki W KAMPANII (raz na proces), linia "Bandy i limit (f8-bandy): start sesji"
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { CompanionWage.SessionStart(); } catch (Exception e) { Log.Error("CompanionWage.SessionStart", e); }   // CW (19.10): zold towarzyszy gracza wedlug poziomu - latki TroopWage i GetHeroWage, PO CompanionPay (BaseWage BK)
@@ -2819,6 +2823,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("RoadsideInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { Rumours.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Rumours.Daily", e); } DayProfile.Lap("Rumours.Daily");   // sw-zajazdy: linia "Plotki (PL): dzien N" - sluchane, ksiega band, wiesci
             try { InnDrink.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("InnDrink.Daily", e); }   // m98-plotki: linia "Kufle (m98): dzien N"
+            try { Lektor.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Lektor.Daily", e); }   // m103-lektor: linia "Lektor (m103): dzien N" - okna, plotki, znaki, bledy API
             try { MoneyLedger.Probe169("Rumours.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); } DayProfile.Lap("ClanIncomeBook.Daily");   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
             try { MoneyLedger.Probe169("ClanIncomeBook.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
