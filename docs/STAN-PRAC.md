@@ -3500,4 +3500,4 @@ Zapisy Jeffa (Ironman*.sav, saveauto*) skopiowane do D:/Backup-Bannerlord/zapisy
   RealisticCaptivity 634ecbb4), CrashScribe-at-n96.dll (zb/n22-at + 03e82bcb). TESTY W TOKU od 19:05: testy-96.ps1 (96-bitwa, 96-nowa 180 dob, 96-160), ok. 1.5-2 h.
   Po testach: progi (sprawdz_logi wszystkie grupy + m96*), potem wgraj-v5 -DllDir test/n96 -Tree zb/n25-calosc -Tag 2026-10-21-wgranie96, safely_exited = 1, CHANGELOG
   (wpis 96 w drzewie n25), STAN-PRAC ### 103, push galezi (lancuch -> repo -> GitHub).
-
+- 17:42 PDT (uwaga: wczesniejsze godziny 18:xx/19:05 w tych wpisach byly zle - zegar komputera to 17:4x) pierwszy start testow 96 STOP kod 3: znacznik w-toku.json po przerwanym tescie 95a (14:31) - odlozony do autotest-kopie/w-toku.json.nieaktualny-95a-1739 (gra ma sprawdzone 95a z wgraj-v5); flaga armoury-ks-przerwij.flag z 95-160 (12:42, "ceny poza pasmem 19 z 24" w D+7 po ks-auto) odlozona do autotest-kopie. Testy 96 ponownie od 17:39 (PID 748, bitwa -> nowa 180 -> 160).
