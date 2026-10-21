@@ -391,6 +391,7 @@ namespace Armoury
         {
             try { Prologue.StartLine(); } catch (Exception e) { Prologue.Stumble("StartLine", e); }
             try { Prologue.ScenesStartLine(); } catch (Exception e) { Prologue.Stumble("ScenesStartLine", e); }   // m103-sceny: linia startu scen prologu
+            try { RotWindowPictures.StartLine(); } catch (Exception e) { Prologue.Stumble("RotWindowPictures.StartLine", e); }   // m103-sceny: obrazki okien (kazda kampania)
         }
     }
 }

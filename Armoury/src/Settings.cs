@@ -3983,6 +3983,11 @@ namespace Armoury
         // na mapie (takze w menu osady i w niewoli; nie w bitwie, rozmowie, misji), zalegle po kolei; scena dnia 186 po smierci krola. Czytany na zywo. Nowy klucz.
         public bool PrologueScenes = true;                 // in a Prologue 298 campaign the events of the half year before the War of the Five Kings are told in story windows like those of Realm of Thrones (23 scenes from A Game of Thrones, from the death of Jon Arryn to the arrest of Lord Eddard), each on its day while you are on the map; a scene missed in battle or captivity comes afterwards. Your own pictures: Modules/Armoury/Images/Prolog/prolog_01.png to prolog_23.png. Off = no story windows (the world changes the same)
 
+        // --- Story windows ---
+        // m103-sceny (RotWindowPictures.cs): obrazki Jeffa w oknach wydarzen ROT - plik Modules\Armoury\Images\ROT\rot_<KlasaROT>_<n>.png|jpg zastepuje obrazek tego
+        // okna (prefiks EventScreen.OnActivate, oryginal wraca przy zamknieciu); bez pliku nic sie nie zmienia. Czytany na zywo. Nowy klucz.
+        public bool StoryImagesForRotWindows = true;       // the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

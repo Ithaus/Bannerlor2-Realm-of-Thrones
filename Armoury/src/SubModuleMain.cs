@@ -66,6 +66,8 @@ namespace Armoury
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
                 // m101-prolog: okno wyboru startu nowej kampanii (Prologue 298 / Classic 299) - prefiks MBGameManager.StartNewGame, raz na proces; wlasny try
                 try { Prologue.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Prologue.ApplyAll", e); }
+                // m103-sceny: obrazki Jeffa w oknach wydarzen ROT (prefiks / postfiks EventScreen OnActivate / OnDeactivate, odbicie - bez typow ROT); wlasny try
+                try { RotWindowPictures.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RotWindowPictures.ApplyAll", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
@@ -479,6 +481,7 @@ namespace Armoury
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
+            try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
             try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
         }
 
