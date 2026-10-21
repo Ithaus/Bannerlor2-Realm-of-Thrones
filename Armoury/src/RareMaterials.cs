@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -22,12 +26,18 @@ namespace Armoury
     ///    magazynu (rynku) jednej osady zrodla, gdy zapas regionu jest ponizej pulapu i zapas swiata (osady + wszystkie partie) ponizej pulapu
     ///    swiata. Czardrzewo - wsie Wolnych Ludzi za Murem w lesie (las i traperzy: Whitetree, Milkwater, Icecave, Hauntwood, Walrus Bay, Myre);
     ///    smocza kosc - ruiny Valyrii (Usek i Esme pod Oros, miasto Elyria) i stare targi Volantis i Qarth. Lista id osad, nie kultura -
-    ///    kultura osady zmienia sie z wlascicielem (BK), drzewa i ruiny nie. Dalej handel gry (wiesniacy, karawany) rozwozi go jak inne towary;
-    ///    mieszczanie kupuja go rzadko (maly popyt) - to jedyny odplyw poza kuznia gracza.
+    ///    kultura osady zmienia sie z wlascicielem (BK), drzewa i ruiny nie. Dalej: wiesniacy moga zabrac sztuke ze wsi na targ swojego miasta
+    ///    (VillagerCampaignBehavior bierze kazdy przedmiot); karawany gry i BK jej NIE kupuja (kupuja tylko kategorie handlowe i zwierzeta) - sztuka
+    ///    czeka tam, gdzie sie pojawila. Mieszczanie kupuja ja rzadko (maly popyt) - to jedyny odplyw poza kuznia gracza.
+    ///  - Nic z niczego (recenzja 20.10): losowe nagrody gry z puli "kazdy towar handlowy" omijalyby zrodlo - nagroda zadania Caravan Ambush
+    ///    (3 losowe towary z niczego) i zdarzenie Trade Proposal (2 x wartosc zlotem z niczego za 1 sztuke z sakw). Klucz RareMaterialOnlyFromSource:
+    ///    wylosowany nasz surowiec podmieniany na inny towar z tej samej puli (zadanie) albo pomijany w wyborze (zdarzenie) - latki raz na proces.
     ///  - Kucie (Forge.LegendAllowed - wspolna brama naszego menu i CRAFT BK): luk z listy, ktorego surowiec istnieje, nie jest juz "rzadkim
     ///    materialem" (PatternGate.RareStuff = false - wzor i nauka jak kazdego unikatu ROT: z oryginalu), ale kowadlo zada sztuk surowca w
     ///    sakwach gracza: klepka = 2 x masa luku (t5-6 x2 - ta sama regula co przepis z masy), najmniej 1 cala sztuka (klepke tnie sie z jednego
-    ///    kawalka; reszta to odpad). Pekniecie przy kuciu niszczy klepke (surowiec przepada). Drewno i len z przepisu zostaja (raczka, cieciwa).
+    ///    kawalka; reszta to odpad). Pekniecie przy kuciu niszczy klepke (surowiec przepada; w robocie z czasem klepka schodzi na starcie, a pekniecie
+    ///    przy odbiorze - Forge.Finish - liczy ja jako przepadla: NoteLost). Drewno i len z przepisu zostaja (raczka, cieciwa).
+    ///  - Ksiega towarow (GoodsLedger): doplyw i zuzycie w ramce "drogi towarow (ZC1)" z opisem - nie "bez wyjasnienia".
     /// Stan w zapisie: brak (los dobowy bez pamieci; zapas lezy w magazynach osad i partii - zapis gry). Watek glowny.
     /// </summary>
     internal static class RareMaterials
@@ -67,6 +77,14 @@ namespace Armoury
         /// <summary>Droga surowca czynna: luki z listy RareBowsIds kuje sie z surowca (bez klucza - blokada jak w m96-wzory).</summary>
         internal static bool On { get { var s = S; return s != null && s.RareBowsNotForged && s.RareBowsNeedMaterial; } }
         internal static bool SupplyOn { get { var s = S; return On && S.RareMaterialSupply; } }
+        /// <summary>Recenzja 20.10: losowe nagrody gry (Caravan Ambush, Trade Proposal) nie biora naszego surowca - przedmioty sa w XML niezaleznie od kluczy kucia.</summary>
+        internal static bool GuardOn { get { var s = S; return s != null && s.RareMaterialOnlyFromSource; } }
+
+        // latki "nic z niczego" (raz na proces) i liczniki sesji
+        private static bool _hooksTried;
+        private static string _hookAmbush = "nie zakladana", _hookTrade = "nie zakladana";
+        private static FieldInfo _fReward, _fSeed;
+        private static int _ambushSwaps, _ambushDrop, _tradeSkips, _tradeNone, _guardLines;
 
         private static void Stumble(string where, Exception e)
         {
@@ -185,7 +203,12 @@ namespace Armoury
                 var m = MatFor(bow);
                 int need = PiecesFor(bow, m), have = InBags(m.Item);
                 int take = Math.Min(need, have);
-                if (take > 0) MobileParty.MainParty.ItemRoster.AddToCounts(m.Item, -take);
+                if (take > 0)
+                {
+                    var f = Fz(MobileParty.MainParty, "surowce rzadkie (m97): klepka w luku gracza");   // ksiega towarow: ujscie z opisem
+                    try { MobileParty.MainParty.ItemRoster.AddToCounts(m.Item, -take); }
+                    finally { GoodsLedger.End(f); }
+                }
                 if (cracked) m.Lost += take; else m.Used += take;
                 Log.Player(cracked ? "The " + m.Name + " stave split with the bow - it is lost." : "The " + m.Name + " went into the bow (" + take + " piece" + (take > 1 ? "s" : "") + ").", cracked);
                 _takeLines++;
@@ -195,6 +218,33 @@ namespace Armoury
                              + ", przepadlo " + m.Lost + ", potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("RareMaterials.Take", e); }
+        }
+
+        /// <summary>Forge.Finish, pekniecie po czasie (recenzja 20.10): klepka zdjeta przy Forge.Begin peka z lukiem - z "w lukach" do "przepadlo", napis i linia.</summary>
+        internal static void NoteLost(ItemObject bow)
+        {
+            try
+            {
+                if (!Covers(bow)) return;
+                var m = MatFor(bow);
+                int n = PiecesFor(bow, m);
+                int back = Math.Min(n, m.Used);   // robota mogla ruszyc w poprzedniej sesji (licznik od zera) - wtedy tylko "przepadlo"
+                m.Used -= back; m.Lost += n;
+                Log.Player("The " + m.Name + " stave split with the bow - it is lost.", true);
+                _takeLines++;
+                if (_takeLines <= 40 || _takeLines % 25 == 0)
+                    Log.Info("Surowce rzadkie (m97-surowce): kucie " + bow.StringId + " | pekniecie po czasie (Forge.Finish) - " + n + " x " + m.Id + " zdjete przy starcie roboty przepada"
+                             + " | od startu sesji: " + m.Name + " w lukach " + m.Used + ", przepadlo " + m.Lost + ", potkniecia " + _stumbles + ".");
+            }
+            catch (Exception e) { Stumble("RareMaterials.NoteLost", e); }
+        }
+
+        /// <summary>Ramka ksiegi towarow "drogi towarow (ZC1)" z opisem (null, gdy ksiega wylaczona).</summary>
+        private static GoodsLedger.Frame Fz(object at, string label)
+        {
+            var f = GoodsLedger.Begin(GoodsLedger.FZc1, at);
+            if (f != null) f.Info = label;
+            return f;
         }
 
         // ------------------------------------------------------------ doplyw dobowy
@@ -213,11 +263,18 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>Zapas swiata: magazyny wszystkich osad i wszystkich partii (liczone tylko przy trafieniu losu i co 7 dob - nie co zdarzenie).</summary>
+        /// <summary>Zapas swiata: magazyny i schowki (Stash, jak GoodsLedger) wszystkich osad i magazyny wszystkich partii (liczone tylko przy trafieniu
+        /// losu i co 7 dob - nie co zdarzenie).</summary>
         private static int WorldStock(Mat m)
         {
             int n = 0;
-            foreach (var st in Settlement.All) if (st != null && st.ItemRoster != null) n += st.ItemRoster.GetItemNumber(m.Item);
+            foreach (var st in Settlement.All)
+            {
+                if (st == null) continue;
+                if (st.ItemRoster != null) n += st.ItemRoster.GetItemNumber(m.Item);
+                var sh = st.Stash;
+                if (sh != null && !ReferenceEquals(sh, st.ItemRoster)) n += sh.GetItemNumber(m.Item);
+            }
             foreach (var p in MobileParty.All) if (p != null && p.ItemRoster != null) n += p.ItemRoster.GetItemNumber(m.Item);
             return n;
         }
@@ -259,7 +316,9 @@ namespace Armoury
                                 else
                                 {
                                     var st = cand[TaleWorlds.Core.MBRandom.RandomInt(cand.Count)];
-                                    st.ItemRoster.AddToCounts(m.Item, 1);
+                                    var f = Fz(st, "surowce rzadkie (m97): " + m.Name + " z ziemi zrodla");   // ksiega towarow: zrodlo z opisem
+                                    try { st.ItemRoster.AddToCounts(m.Item, 1); }
+                                    finally { GoodsLedger.End(f); }
                                     m.Added++; addedToday++;
                                     m.LastRegion = region + 1; m.LastWorld = world + 1;
                                     where = st.Name != null ? st.Name.ToString() : st.StringId;
@@ -276,8 +335,105 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("RareMaterials.Daily(" + m.Id + ")", e); }
             }
-            sb.Append(" | dzis przybylo ").Append(addedToday).Append(" | potkniecia ").Append(_stumbles).Append('.');
+            sb.Append(" | dzis przybylo ").Append(addedToday)
+              .Append(" | nagrody gry bez surowca (od startu sesji): Caravan Ambush podmienione ").Append(_ambushSwaps).Append(", zdjete ").Append(_ambushDrop)
+              .Append(", Trade Proposal pominiete (wywolan wyboru) ").Append(_tradeSkips).Append(" (bez innego towaru ").Append(_tradeNone).Append(")")
+              .Append(" | potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
+        }
+
+        // ------------------------------------------------------------ nic z niczego: losowe nagrody gry (recenzja 20.10)
+        private static bool IsOurs(ItemObject it)
+        {
+            var id = it != null ? it.StringId : null;
+            if (id == null) return false;
+            foreach (var m in _mats) if (id == m.Id) return true;
+            return false;
+        }
+
+        /// <summary>Raz na proces (z linii startu - w kampanii): Caravan Ambush (prefiks OnQuestSucceeded) i Trade Proposal (postfiks funkcji lokalnej
+        /// GetTradeProposalGood w IncidentsCampaignBehaviour.InitializeIncidents - nazwa kompilatora szukana po fragmencie, jedna metoda).</summary>
+        private static void EnsureHooks()
+        {
+            if (_hooksTried) return;
+            _hooksTried = true;
+            Harmony h;
+            try { h = new Harmony("com.jeff.armoury.m97surowce"); }
+            catch (Exception e) { _hookAmbush = _hookTrade = "BLAD (Harmony)"; Stumble("RareMaterials.EnsureHooks", e); return; }
+            try
+            {
+                var tq = typeof(CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest);
+                _fReward = AccessTools.DeclaredField(tq, "_rewardItems");
+                var mq = AccessTools.DeclaredMethod(tq, "OnQuestSucceeded");
+                if (mq == null || _fReward == null || _fReward.FieldType != typeof(List<ItemObject>)) _hookAmbush = "BRAK (" + (mq == null ? "OnQuestSucceeded" : "_rewardItems") + ")";
+                else { h.Patch(mq, prefix: new HarmonyMethod(typeof(RareMaterials), nameof(AmbushPre))); _hookAmbush = "wpieta"; }
+            }
+            catch (Exception e) { _hookAmbush = "BLAD"; Stumble("RareMaterials.EnsureHooks(CaravanAmbush)", e); }
+            try
+            {
+                var ti = typeof(IncidentsCampaignBehaviour);
+                _fSeed = AccessTools.DeclaredField(ti, "_activeIncidentSeed");
+                string name = null; int n = 0;
+                foreach (var mi in AccessTools.GetDeclaredMethods(ti))
+                    if (mi.Name.Contains("g__GetTradeProposalGood|") && !mi.IsStatic && mi.ReturnType == typeof(ItemRosterElement) && mi.GetParameters().Length == 0) { name = mi.Name; n++; }
+                var mt = n == 1 ? AccessTools.DeclaredMethod(ti, name) : null;
+                if (mt == null || _fSeed == null || _fSeed.FieldType != typeof(long)) _hookTrade = "BRAK (" + (n != 1 ? "GetTradeProposalGood x" + n : mt == null ? name : "_activeIncidentSeed") + ")";
+                else { h.Patch(mt, postfix: new HarmonyMethod(typeof(RareMaterials), nameof(TradePost))); _hookTrade = "wpieta"; }
+            }
+            catch (Exception e) { _hookTrade = "BLAD"; Stumble("RareMaterials.EnsureHooks(TradeProposal)", e); }
+        }
+
+        /// <summary>Caravan Ambush: przed wyplata nagrody nasz surowiec z listy (3 losowe towary handlowe z niczego) zamieniony na inny towar z tej samej puli
+        /// gry (IsTradeGood i nie NotMerchandise) - lista jest w zapisie zadania, wiec dziala tez dla zadan wylosowanych przed paczka.</summary>
+        public static void AmbushPre(object __instance)
+        {
+            try
+            {
+                if (!GuardOn || _fReward == null || __instance == null) return;
+                var list = _fReward.GetValue(__instance) as List<ItemObject>;
+                if (list == null) return;
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    var old = list[i];
+                    if (!IsOurs(old)) continue;
+                    var pool = new List<ItemObject>(64);
+                    foreach (var t in TaleWorlds.CampaignSystem.Extensions.Items.All)
+                        if (t != null && t.IsTradeGood && !t.NotMerchandise && !IsOurs(t)) pool.Add(t);
+                    string to;
+                    if (pool.Count > 0) { list[i] = pool[TaleWorlds.Core.MBRandom.RandomInt(pool.Count)]; _ambushSwaps++; to = list[i].StringId; }
+                    else { list.RemoveAt(i); _ambushDrop++; to = "nic (pula pusta)"; }
+                    _guardLines++;
+                    if (_guardLines <= 20)
+                        Log.Info("Surowce rzadkie (m97-surowce): nagroda zadania Caravan Ambush - wylosowany " + old.StringId + " zamieniony na " + to
+                                 + " (surowiec tylko z ziemi zrodla) | od startu sesji: podmienione " + _ambushSwaps + ", zdjete " + _ambushDrop + ".");
+                }
+            }
+            catch (Exception e) { Stumble("RareMaterials.AmbushPre", e); }
+        }
+
+        /// <summary>Trade Proposal: gdy wybor gry (losowy stos towaru handlowego z sakw, ziarno zdarzenia) trafil nasz surowiec - wybor z tej samej listy bez
+        /// naszych surowcow i z tym samym ziarnem (warunek, podpowiedz i skutek zdarzenia wolaja wybor kilka razy - wynik ten sam); brak innego towaru =
+        /// pusty wybor (warunek zdarzenia zwraca wtedy false - zdarzenie nie wypada).</summary>
+        public static void TradePost(object __instance, ref ItemRosterElement __result)
+        {
+            try
+            {
+                if (!GuardOn || !IsOurs(__result.EquipmentElement.Item)) return;
+                var old = __result.EquipmentElement.Item.StringId;
+                var list = new List<ItemRosterElement>();
+                var p = MobileParty.MainParty;
+                if (p != null && p.ItemRoster != null)
+                    foreach (var x in p.ItemRoster) { var it = x.EquipmentElement.Item; if (it != null && it.IsTradeGood && !IsOurs(it)) list.Add(x); }
+                long seed = _fSeed != null && __instance != null ? (long)_fSeed.GetValue(__instance) : 0L;
+                __result = list.Count > 0 ? Helpers.IncidentHelper.GetSeededRandomElement(list, seed) : default(ItemRosterElement);
+                if (list.Count > 0) _tradeSkips++; else _tradeNone++;
+                _guardLines++;
+                if (_guardLines <= 20)
+                    Log.Info("Surowce rzadkie (m97-surowce): zdarzenie Trade Proposal - wybor " + old + " pominiety, zamiast niego "
+                             + (__result.EquipmentElement.Item != null ? __result.EquipmentElement.Item.StringId : "nic (zdarzenie nie wypada)")
+                             + " (2 x wartosc zlotem bez platnika - nie za nasz surowiec) | od startu sesji: pominiete " + _tradeSkips + ", bez innego towaru " + _tradeNone + ".");
+            }
+            catch (Exception e) { Stumble("RareMaterials.TradePost", e); }
         }
 
         // ------------------------------------------------------------ linia startu
@@ -287,13 +443,18 @@ namespace Armoury
             try
             {
                 _for = null; _stumbles = 0; _badCat = 0;
+                _ambushSwaps = _ambushDrop = _tradeSkips = _tradeNone = _guardLines = 0;
                 Resolve();
+                try { EnsureHooks(); } catch (Exception e) { Stumble("RareMaterials.EnsureHooks", e); }
                 var s = S;
                 var inv = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder(512);
                 sb.Append("Surowce rzadkie (m97-surowce): start sesji | klucze RareBowsNeedMaterial ").Append(s != null && s.RareBowsNeedMaterial ? "TAK" : "NIE")
                   .Append(", RareMaterialSupply ").Append(s != null && s.RareMaterialSupply ? "TAK" : "NIE")
-                  .Append(", RareBowsNotForged ").Append(s != null && s.RareBowsNotForged ? "TAK" : "NIE").Append(" | surowce:");
+                  .Append(", RareBowsNotForged ").Append(s != null && s.RareBowsNotForged ? "TAK" : "NIE")
+                  .Append(", RareMaterialOnlyFromSource ").Append(GuardOn ? "TAK" : "NIE")
+                  .Append(" | nagrody gry bez surowca: Caravan Ambush ").Append(_hookAmbush).Append(", Trade Proposal ").Append(_hookTrade)
+                  .Append(" | surowce:");
                 int found = 0;
                 foreach (var m in _mats)
                 {

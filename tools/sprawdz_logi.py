@@ -1011,10 +1011,11 @@ Uzycie (Python 3, tylko odczyt):
                     surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0, R96-6 latka SpendMaterials CRAFT BK
                     wpieta, R96-7 pekniecia CRAFT BK z kg (INFO). Log bez paczki: INFO.
 --grupa m97surowce : (20.10, w-toku/m97-surowce - Jeff "luk z czardrzewa - trzeba miec czardrzewo, smoczej kosci - smocza kosc"; Armoury/src/RareMaterials.cs,
-                    ModuleData/arm_items_rare.xml; klucze RareBowsNeedMaterial, RareMaterialSupply)
+                    ModuleData/arm_items_rare.xml; klucze RareBowsNeedMaterial, RareMaterialSupply, RareMaterialOnlyFromSource)
                     python -I tools/sprawdz_logi.py --grupa m97surowce <Armoury-*.log> (strumieniowo). S97-0 linia startu, S97-1 surowce istnieja (2 z 2, nie towar
-                    handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 zapas regionu i swiata nie ponad
-                    pulap, S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0. Log bez paczki: INFO.
+                    handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 doplyw nie doklada ponad
+                    pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
+                    (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -37177,21 +37178,24 @@ M97S_SRC = re.compile(r"(weirwood|dragonbone) (\d+) z (\d+) osad")
 M97S_DNUM = re.compile(r"dzien (\d+)")
 M97S_MAT = re.compile(r"\| (\w+): przybylo (\d+)(?: \([^)]*\))?, zapas regionu (-?\d+)/(\d+), swiata (\?|-?\d+)/(\d+)")
 M97S_STUMB = re.compile(r"potkniecia (\d+)")
+M97S_HOOKS = re.compile(r"nagrody gry bez surowca: Caravan Ambush [^|]*, Trade Proposal [^|]*")
+M97S_GUARD = re.compile(r"nagrody gry bez surowca \(od startu sesji\): [^|]*")
 
 
 def m97surowce_main(logp):
     """m97surowce (20.10, w-toku/m97-surowce; Jeff: "luk z czardrzewa okay, trzeba miec czardrzewo, smoczej kosci - smocza kosc ... aby dalo sie wszystko wykuc"):
     dwa rzadkie surowce (arm_weirwood, arm_dragonbone), doplyw dobowy z osad zrodla z pulapem regionu i swiata, kucie luku z surowcem.
     S97-0 linia startu (klucz RareBowsNeedMaterial TAK), S97-1 surowce istnieja (2 z 2, kategoria nie towar handlowy, cena > 0), S97-2 osady zrodla > 0 dla obu,
-    S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (log krotszy - INFO), S97-3b kolejne bloki 30 dob (INFO), S97-4 zapas regionu i swiata nie ponad pulap w zadnej linii doby,
-    S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0. Log bez paczki: INFO, bez wyjatku."""
+    S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (log krotszy - INFO), S97-3b kolejne bloki 30 dob (INFO), S97-4 doplyw nie doklada ponad pulap (NIE tylko
+    przy 'przybylo 1' z zapasem po dodaniu > pulap; S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR
+    paczki 0, S97-7 latki nagrod gry (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK (S97-7b podmiany - INFO). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("S97-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     heads, days, uses, n_err, stumb = [], [], 0, 0, 0
-    over = []
+    over, over_info, guard = [], [], ""
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -37200,14 +37204,20 @@ def m97surowce_main(logp):
                 heads.append(s)
             elif s.startswith(M97S_DAY):
                 dn = M97S_DNUM.search(s)
+                gm = M97S_GUARD.search(s)
+                if gm:
+                    guard = gm.group(0)
                 added = 0
                 for mm in M97S_MAT.finditer(s):
-                    added += int(mm.group(2))
+                    a = int(mm.group(2))
+                    added += a
                     reg, regcap = int(mm.group(3)), int(mm.group(4))
-                    if reg > regcap:
-                        over.append(f"{mm.group(1)} region {reg}/{regcap}")
-                    if mm.group(5) != "?" and int(mm.group(5)) > int(mm.group(6)):
-                        over.append(f"{mm.group(1)} swiat {mm.group(5)}/{mm.group(6)}")
+                    wo = mm.group(5) != "?" and int(mm.group(5)) > int(mm.group(6))
+                    # recenzja 20.10: pulap jest brama tylko losu (sztuka powstaje przy zapasie < pulap, wiec po dodaniu zapas <= pulap) - NIE tylko,
+                    # gdy NASZ doplyw dolozyl ponad pulap; zapas ponad pulap bez przyrostu (gracz sprzedal w osadzie zrodla, nagroda sprzed paczki) - INFO
+                    if reg > regcap or wo:
+                        txt = (f"{mm.group(1)} region {reg}/{regcap}" if reg > regcap else "") + (f" swiat {mm.group(5)}/{mm.group(6)}" if wo else "")
+                        (over if a > 0 else over_info).append(f"d{dn.group(1) if dn else '?'} " + txt.strip())
                 capped = any(int(x.group(3)) >= int(x.group(4)) or (x.group(5) != "?" and int(x.group(5)) >= int(x.group(6))) for x in M97S_MAT.finditer(s))
                 if dn:
                     days.append((int(dn.group(1)), added, capped))
@@ -37256,7 +37266,14 @@ def m97surowce_main(logp):
         rep.add("S97-3b: przybylo w kolejnych blokach 30 dob", ", ".join(f"{v[0]}{'p' if v[1] else ''}" for _, v in sorted(blocks.items())), "INFO (p = pulap w bloku)", None)
     else:
         rep.add("S97-3: doplyw w 30 dobach", "brak linii doby", "INFO (RareMaterialSupply NIE albo log bez doby)", None)
-    rep.add("S97-4: zapas nie ponad pulap (region, swiat)", ", ".join(over[:6]) if over else "w pulapie", "w pulapie", not over)
+    rep.add("S97-4: doplyw nie doklada ponad pulap (region, swiat)", ", ".join(over[:6]) if over else "w pulapie", "przy 'przybylo 1' zapas po dodaniu <= pulap", not over)
+    rep.add("S97-4b: zapas ponad pulap bez przyrostu (sztuki z zewnatrz)", f"{len(over_info)} dob" + (": " + ", ".join(over_info[:4]) if over_info else ""), "INFO", None)
+    on_g = "RareMaterialOnlyFromSource TAK" in last
+    hooks_ok = "Caravan Ambush wpieta" in last and "Trade Proposal wpieta" in last
+    hm = M97S_HOOKS.search(last)
+    rep.add("S97-7: nagrody gry bez surowca (latki Caravan Ambush, Trade Proposal)", hm.group(0) if hm else "brak w linii startu",
+            "obie wpiete przy RareMaterialOnlyFromSource TAK" if on_g else "INFO (klucz NIE albo linia sprzed poprawki)", hooks_ok if on_g else None)
+    rep.add("S97-7b: podmiany nagrod gry (ostatnia linia doby)", guard or "brak", "INFO", None)
     rep.add("S97-5: kucia z surowcem", str(uses), "INFO", None)
     rep.add("S97-6: potkniecia i ERROR paczki", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
     rep.show()

@@ -476,6 +476,7 @@ namespace Armoury
                     Log.Player("After all that work, the piece cracked at the quench. Nothing to show for it.", true);
                     Banner("The " + item.Name + " cracked at the quench - nothing to show for the work.");
                     Log.Info("Kucie nieudane po czasie: " + item.StringId);
+                    RareMaterials.NoteLost(item);   // m97-surowce (recenzja): klepka czardrzewa / smoczej kosci zdjeta przy Begin przepada z lukiem - napis i licznik
                     return;
                 }
 

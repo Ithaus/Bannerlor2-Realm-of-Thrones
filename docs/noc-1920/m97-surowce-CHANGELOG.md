@@ -3,10 +3,11 @@
 **Dla Jeffa (prosto).** Luk z czardrzewa i luk ze smoczej kosci znow da sie wykuc - ale tylko z prawdziwego surowca. W swiecie pojawily sie
 dwa nowe towary: Weirwood (klepka czardrzewa, ok. 4000 d) - tylko we wsiach Wolnych Ludzi w lesie za Murem (Whitetree, Milkwater, Icecave,
 Hauntwood, Walrus Bay, Myre), mniej wiecej jedna sztuka na 15 dni; i Dragonbone (kosc smoka, ok. 14000 d) - tylko w ruinach Valyrii (Usek, Esme,
-Elyria) i na starych targach Volantis i Qarth, mniej wiecej jedna na 30 dni. Kupujesz je na targu wsi albo miasta jak inny towar (wiesniacy
-i karawany moga je przewiezc dalej). Jeden luk bierze jedna cala sztuke; gdy luk peknie na kowadle, klepka przepada. Wzor dalej trzeba zdobyc
-jak przy kazdym slawnym przedmiocie - z oryginalu. Bez surowca kowadlo mowi, czego brakuje i gdzie go szukac. Wylaczniki: "Rare Bows Need Material"
-i "Rare Material Supply" (MCM, grupa Learning patterns).
+Elyria) i na starych targach Volantis i Qarth, mniej wiecej jedna na 30 dni. Kupujesz je tam, gdzie sie pojawily (wiesniacy moga
+zabrac sztuke na targ swojego miasta; karawany ich nie woza). Gra nie da ich za darmo w nagrodzie zadania ani w zdarzeniu "Trade Proposal".
+Jeden luk bierze jedna cala sztuke; gdy luk peknie na kowadle, klepka przepada. Wzor dalej trzeba zdobyc
+jak przy kazdym slawnym przedmiocie - z oryginalu. Bez surowca kowadlo mowi, czego brakuje i gdzie go szukac. Wylaczniki: "Rare Bows Need Material",
+"Rare Material Supply" i "Rare Material Only From Source" (MCM, grupa Learning patterns).
 
 **Problem.** Jeff 20.10 o wzorach lukow: "Luk z czardrzewa okay, trzeba miec czardrzewo, smoczej kosci - smocza kosc, ale Ravens Teeth
 i Goldenheart to mozna, to zwykle luki. Pytanie, czy do lukow ze smoczej kosci i czardrzewa sa surowce ... aby dalo sie wszystko wykuc, nawet
@@ -25,6 +26,8 @@ jesli to bedzie trudne." Dzis (`RareBowsNotForged` + `RareBowsIds = "dragonbone_
 - Cena: `DefaultTradeItemPriceFactorModel.GetBasePriceFactor` - towar handlowy 0.1-10 x wartosci (przy pustym popycie 0.1), nie-towar
   0.8-1.3. Popyt: gra przy BaseDemand 0 bierze 1% dobrobytu; `BKEconomyModel.GetDailyDemandForCategory` dzieli przez `category.BaseDemand`
   (0 = NaN). Stad kategoria wlasna `arm_rare_stuff`: NIE towar handlowy (cena stabilna 0.8-1.3 x wartosci), popyt bazowy 0.02 (dodatni).
+  Karawany gry i BK tej kategorii NIE kupuja (`CaravansCampaignBehavior` - tylko kategorie `IsTradeGood || IsAnimal`; `BKCaravansBehavior:1584` tak samo);
+  wiesniacy (`VillagerCampaignBehavior.MoveItemsToVillagerParty`) biora kazdy przedmiot ze wsi na targ miasta (sprzedaz, gdy kiesa miasta starcza).
   Mieszczanie (ItemConsumptionBehavior.MakeConsumption) kupia ja rzadko - przy cenie 4000-14000 d i malym budzecie to jedna sztuka na kilkaset dni
   w miescie; wsie konsumpcji nie maja. Zaden warsztat (gra, BK, Armoury TownCrafts/WorkshopInputs - zakres kategorii) jej nie przerabia.
 - Osady (ROT-Map settlements.xml): Wolni Ludzie (`Culture.freefolk`) - wsie za Murem: Whitetree (`castle_village_S5_2`, traperzy, w ksiazkach
@@ -44,6 +47,11 @@ jesli to bedzie trudne." Dzis (`RareBowsNotForged` + `RareBowsIds = "dragonbone_
   ale tylko gdy zapas regionu (magazyny osad zrodla) jest ponizej pulapu (3 / 2), a zapas swiata (magazyny wszystkich osad i wszystkich partii,
   liczony tylko przy trafieniu i co 7 dob) ponizej pulapu swiata (10 / 6). Rok 364 dni: ok. 24 sztuki czardrzewa i 12 smoczej kosci, dopoki
   ktos je zabiera. Odplyw: kuznia gracza i rzadkie zakupy mieszczan. Los bez pamieci - wczytanie zapisu niczego nie gubi i nie podwaja.
+  Zapas swiata liczy tez schowki osad (`Settlement.Stash`, jak ksiega towarow). Sztuka nie przyjedzie karawana - lezy tam, gdzie sie pojawila
+  (wiesniacy moga ja zabrac na targ swojego miasta).
+- Nic z niczego (po recenzji): dwie losowe nagrody gry z puli "kazdy towar handlowy" omijalyby zrodlo - zadanie Caravan Ambush (3 losowe towary
+  z niczego dla gracza) i zdarzenie Trade Proposal (1 sztuka z sakw za 2 x wartosc zlotem bez platnika: 28 000 d za smocza kosc). Nasz surowiec
+  z tych losowan wypada (klucz `RareMaterialOnlyFromSource`); sama regula gry dla innych towarow zostaje bez zmian.
 - Cena: ok. 2/3 ceny luku (4000 i 14000 d); reszta to praca mistrza (prog i stamina legendy). Waga: klepka czardrzewa 2.5 kg, kosc 2 kg.
 - Przepis: luk z listy `RareBowsIds`, dla ktorego surowiec istnieje, nie jest juz "rzadkim materialem" - wzor i nauka jak kazdego unikatu ROT
   (z oryginalu: przetop albo rozbiorka przy Smithing 200), a kowadlo zada surowca w sakwach gracza. Ilosc wedlug zasady przepisu z masy:
@@ -78,6 +86,40 @@ jesli to bedzie trudne." Dzis (`RareBowsNotForged` + `RareBowsIds = "dragonbone_
   (m97-surowce): kucie weirwood_bow | zuzyte 1 x arm_weirwood z sakw gracza (potrzeba 1, bylo 1), zostalo 0 | pekniecie NIE | od startu sesji: ...`.
 - Zapis: bez nowego klucza (los bez pamieci; sztuki leza w magazynach osad i partii - zapis gry).
 
+**Poprawki po recenzjach (gra, technika - 20.10).**
+- (wazne, PRAWDA) Caravan Ambush: `CaravanAmbushIssueBehavior.cs:575-578` losuje 3 nagrody z `Items.All` (`IsTradeGood && !NotMerchandise`), a
+  `OnQuestSucceeded` (`:582-590`) dodaje je graczowi z niczego - nasze dwa przedmioty sa w tej puli. Poprawka: prefiks `AmbushPre` na
+  `CaravanAmbushIssueQuest.OnQuestSucceeded` (`AccessTools.DeclaredMethod`) - w liscie `_rewardItems` (pole zapisu zadania - dziala tez dla zadan
+  wylosowanych wczesniej) nasz surowiec zamieniony na inny losowy towar z tej samej puli gry; pula pusta (niemozliwe) - pozycja zdjeta. NIE ustawione
+  `is_merchandise="false"` (NotMerchandise wyklucza przedmiot z lupu `MapEvent.LootDefeatedPartyItems` - sztuki ginelyby z rozbitymi taborami).
+- (wazne, PRAWDA) Trade Proposal: `IncidentsCampaignBehaviour.cs:1217-1240` - `incident_trade_proposal` zdejmuje 1 sztuke i placi `ItemValue * 2` od `null`;
+  wybor `GetTradeProposalGood` (`:3416-3419`) to dowolny stos towaru handlowego z sakw (ziarno zdarzenia). Poprawka: postfiks `TradePost` na funkcji
+  lokalnej `<InitializeIncidents>g__GetTradeProposalGood|25_208` (nazwa kompilatora sprawdzona odbiciem na DLL gry 1.4.8: metoda instancji, bez
+  parametrow, zwraca `ItemRosterElement`; w kodzie szukana po fragmencie `g__GetTradeProposalGood|`, wymagana dokladnie jedna, potem
+  `AccessTools.DeclaredMethod`): gdy wybor trafil nasz surowiec - wybor z tej samej listy bez naszych surowcow i z tym samym ziarnem
+  (`Helpers.IncidentHelper.GetSeededRandomElement`, pole `_activeIncidentSeed`), wiec warunek, podpowiedz i skutek zdarzenia widza ten sam towar; brak innego
+  towaru - pusty wybor (warunek zdarzenia zwraca false, zdarzenie nie wypada).
+- (drobne, PRAWDA) Napis MCM "Villagers and caravans carry them on" - karawany tej kategorii nie kupuja. Poprawiony napis (`RareMaterialSupply`), opis w
+  `RareMaterials.cs`, akapit "Zasada" i "Dla Jeffa".
+- (drobne, PRAWDA - obie recenzje) S97-4 dawal NIE w poprawnym stanie (sztuki sprzedane w osadzie zrodla, nagrody). Teraz NIE tylko, gdy w dobie z `przybylo 1`
+  zapas po dodaniu jest ponad pulapem (kod na to nie pozwala); zapas ponad pulapem bez przyrostu - S97-4b INFO. Sprawdzone na logach syntetycznych.
+- (drobne, PRAWDA) Ksiega towarow: doplyw (`Daily`) i zuzycie klepki (`Take`) w ramce `FZc1` "drogi towarow (ZC1)" z opisem
+  ("surowce rzadkie (m97): weirwood z ziemi zrodla", "surowce rzadkie (m97): klepka w luku gracza") - nie "bez wyjasnienia".
+- (drobne, PRAWDA) Pekniecie po czasie (`Forge.Finish`) gubilo klepke po cichu: teraz `RareMaterials.NoteLost` - napis "The weirwood stave split with the bow -
+  it is lost.", licznik z "w lukach" do "przepadlo" i linia `kucie ... | pekniecie po czasie (Forge.Finish)`.
+- (drobne, PRAWDA) Zapas swiata bez schowkow osad - `WorldStock` liczy teraz `Settlement.Stash` (jak `GoodsLedger`).
+- (drobne, PRAWDA, BEZ ZMIANY KODU) Kafelek CRAFT (ForgeView `ArmourItemMixin.Block`) pamieta napis na pare kowal + Smithing i nie odswieza sie po zuzyciu
+  ostatniej klepki w tej samej wizycie (BK `OnRefresh` nie przebudowuje wierszy). Brama `Forge.Smith` dziala (kolejny klik: "Needs weirwood ... You carry none."),
+  kafelek wraca po ponownym wejsciu do CRAFT. Poprawka wymagalaby zmiany ForgeView i powiadomien VM - nie warta ryzyka; opis w tescie (krok 5).
+- (recenzja gra, pkt 3 - sprostowanie ryzyka) Brak pliku z wezla `<Xmls>` gra pomija (`GetMergedXmlForManaged` - pusta pozycja, walidacja `ValidationType.None`):
+  SubModule.xml bez dwoch XML nie wywraca gry, luki zostaja zablokowane jak dotad.
+- Reszta uwag recenzji technika (po "Zapas swiata ... Settlement.Stash") nie doszla w calosci do tej poprawki (tekst uciety) - do przejrzenia w nastepnej rundzie.
+- Klucz `RareMaterialOnlyFromSource` (nowy, domyslnie TAK; NIE = losowania gry moga wziac surowiec jak kazdy towar). Linia startu: `RareMaterialOnlyFromSource TAK |
+  nagrody gry bez surowca: Caravan Ambush wpieta, Trade Proposal wpieta`; linia doby: `nagrody gry bez surowca (od startu sesji): Caravan Ambush podmienione N,
+  zdjete N, Trade Proposal pominiete (wywolan wyboru) N (bez innego towaru N)`; pierwsze 20 zdarzen: `Surowce rzadkie (m97-surowce): nagroda zadania Caravan
+  Ambush - wylosowany ... zamieniony na ...` i `... zdarzenie Trade Proposal - wybor ... pominiety, zamiast niego ...`. Grupa `m97surowce`: S97-7 (latki wpiete
+  przy kluczu TAK), S97-7b (podmiany, INFO).
+
 **Ryzyko / co sprawdzic (kontrola calosci).**
 - Regresje: `RareStuff` czytaja `RangedLore` (Teachable, Seed, CanLearnFrom, Learn), `FletchForge.BkCraftPrefix`, `Forge.LegendAllowed`, `PatternGate.BlockText`,
   `SmithMenu` - dla dwoch lukow z surowcem zachowuja sie teraz jak unikat ROT (nauka z oryginalu przy `ForgeUniquesByStudy`; bez tego klucza -
@@ -88,7 +130,7 @@ jesli to bedzie trudne." Dzis (`RareBowsNotForged` + `RareBowsIds = "dragonbone_
   mieszczanie -> kasa miasta - regula gry). Skala: 12-24 sztuki rocznie, 10 + 6 naraz w swiecie najwyzej.
 - Kolizje z ekonomia Armoury: `HistoricalPrices` przelicza towary handlowe po kategorii (`cat.IsTradeGood`) i bron/zbroje - nasza kategoria nie jest
   towarem handlowym, nie ma jej w tabelach (cena w linii startu potwierdzi). `RawPrice` (wzor ceny surowcow) - tylko towary handlowe. Przedmiot jest
-  Type Goods (`IsTradeGood` przedmiotu TAK): `CaravanGoods` i `TravellerTrade36b` moga go wozic (zamierzone - handel), `HarvestValve` liczy tylko
+  Type Goods (`IsTradeGood` przedmiotu TAK): `CaravanGoods` i `TravellerTrade36b` moga go wozic (karawany gry i BK go jednak nie kupuja - kategoria niehandlowa; po recenzji), `HarvestValve` liczy tylko
   produkcje z ticku wsi gry (nasz przyrost jej nie dotyczy), gnicie BK i `RawNoRot` - stosy ponad 500 sztuk (nie dotyczy).
 - Niesprawdzone w grze: czy wiesniacy gry/BK zabieraja towar z niehandlowej kategorii z targu wsi do miasta (jesli nie - lezy we wsi, gracz kupuje na miejscu);
   jak szybko mieszczanie BK go kupuja (linia doby pokaze zapas; pulap swiata i tak trzyma gore); czy ekran handlu wsi pokazuje go od razu (powinien - targ wsi
@@ -99,11 +141,18 @@ jesli to bedzie trudne." Dzis (`RareBowsNotForged` + `RareBowsIds = "dragonbone_
 - `PiecesFor`: przy luku ciezszym niz klepka (nie ma takiego na liscie - oba 0.1 kg) wiecej sztuk; linia startu pokazuje liczbe na kazdy luk.
 - Konfiguracja Jeffa: klucze nowe, nie ma ich w Armoury.json - obowiazuja domyslne TAK.
 - PLIKI DO WGRANIA: `Armoury/SubModule.xml` (zmieniony), `Armoury/ModuleData/arm_items_rare.xml` i `Armoury/ModuleData/arm_strings.xml` (nowe) - skrypt
-  wgrywania kopiuje dzis tylko DLL, SubModule.xml i `arm_*.tsv`; bez tych dwoch XML luk zostaje zablokowany jak dotad, ale SubModule.xml bez nich nie
-  powinien isc sam (gra szuka plikow z wezlow `<Xmls>` - wgrywac trzy pliki razem).
+  wgrywania kopiuje dzis tylko DLL, SubModule.xml i `arm_*.tsv`; bez tych dwoch XML luk zostaje zablokowany jak dotad (gra pomija brakujacy plik z wezla
+  `<Xmls>` - recenzja; mimo to wgrywac trzy pliki razem).
+- Latki "nic z niczego" (po recenzji): cele zadeklarowane w swoich klasach (bez pulapki czynnego modelu z `PatchTarget`), raz na proces z linii startu (w kampanii);
+  w Armoury, ROT i BK nikt inny ich nie latuje (grep `CaravanAmbush`, `trade_proposal`, `IncidentsCampaignBehaviour` - u nas tylko WesterosClimate na porach roku).
+  Funkcja lokalna zdarzenia: przy innej wersji gry nazwa kompilatora moze sie zmienic - wtedy linia startu pisze `Trade Proposal BRAK (...)`, S97-7 = NIE, reszta
+  paczki dziala. Koszt: prefiks raz na udane zadanie; postfiks przy kazdym wyborze zdarzenia (porownanie id, przy trafieniu jedna petla po sakwach).
+  Inne losowania gry z towarow: `LordsNeedsTutorIssue` (tylko Jewelry), NavalDLC `SetSailAndEscortTheFortuneSeekersQuest` (Oil, WalrusTusk) - kategoria nie nasza;
+  grep `IsTradeGood` z losowaniem w BK, Spoils of War, BetterEconomy, ROT_Hideouts, turniejach - brak. AIInfluence (kod zaciemniony) - nie sprawdzone.
 
-**Status.** DO SPRAWDZENIA (build Armoury kod 0; ForgeView nieruszany; w grze nie testowane; `sprawdz_logi --grupa m97surowce` na logach syntetycznych:
-poprawny - S97-0..6 TAK; zapas ponad pulap - S97-4 NIE; log Jeffa 14-53-56 - INFO, bez wyjatku).
+**Status.** DO SPRAWDZENIA (build Armoury kod 0 - takze po poprawkach recenzji; ForgeView nieruszany; w grze nie testowane; `sprawdz_logi --grupa m97surowce`
+na logach syntetycznych: zapas ponad pulap bez przyrostu - S97-4 TAK + S97-4b INFO; przyrost ponad pulap swiata - S97-4 NIE; S97-7 TAK z latkami wpietymi;
+logi Jeffa 12-25-19 i 14-53-56 - INFO, bez wyjatku).
 
 **Test w grze krok po kroku.**
 1. Wgrac DLL + SubModule.xml + `arm_items_rare.xml` + `arm_strings.xml`; wczytac zapis. W `Armoury.log` linia `Surowce rzadkie (m97-surowce): start sesji ...
@@ -113,6 +162,10 @@ poprawny - S97-0..6 TAK; zapas ponad pulap - S97-4 NIE; log Jeffa 14-53-56 - INF
 3. Pojechac do tej wsi (np. Whitetree za Murem) - "Buy products": Weirwood ok. 3200-5200 d (0.8-1.3 x 4000). Kupic.
 4. Kuznia, CRAFT -> Bows: Weirwood Bow bez wzoru - "PATTERN NOT LEARNED" (zamiast "RARE STUFF"); klik - "This famed piece cannot be worked out at the anvil.
    Seize the original ...". Ze wzorem (oryginal przetopiony/rozebrany) i bez surowca: kafelek "PATTERN KNOWN - NEEDS WEIRWOOD", klik - "Needs weirwood - ...".
-5. Z surowcem: luk wykuty, wiadomosc "The weirwood went into the bow (1 piece).", w logu `kucie weirwood_bow | zuzyte 1 x arm_weirwood`.
+5. Z surowcem: luk wykuty, wiadomosc "The weirwood went into the bow (1 piece).", w logu `kucie weirwood_bow | zuzyte 1 x arm_weirwood`. Kafelek tego luku
+   zostaje bez napisu "NEEDS WEIRWOOD" do ponownego wejscia do CRAFT (pamiec kafelka ForgeView) - klik bez surowca i tak daje "Needs weirwood ... You carry none.".
+   W menu kowala z czasem (robota kilkudniowa) pekniecie przy odbiorze daje "The weirwood stave split with the bow - it is lost." i linie `pekniecie po czasie`.
 6. MCM "Rare Bows Need Material" NIE: kafelek znow "RARE STUFF - CANNOT BE FORGED".
-7. `python -I tools/sprawdz_logi.py --grupa m97surowce <Armoury-*.log>`: S97-0..6 bez NIE (S97-3 przy logu krotszym niz 30 dob - INFO).
+7. W linii startu: `RareMaterialOnlyFromSource TAK | nagrody gry bez surowca: Caravan Ambush wpieta, Trade Proposal wpieta`. Gdy wypadnie zadanie
+   Caravan Ambush i gra wylosuje surowiec - linia `nagroda zadania Caravan Ambush - wylosowany arm_... zamieniony na ...` (rzadkie, ok. 14% udanych zadan).
+8. `python -I tools/sprawdz_logi.py --grupa m97surowce <Armoury-*.log>`: S97-0..7 bez NIE (S97-3 przy logu krotszym niz 30 dob - INFO).
