@@ -4,7 +4,9 @@
 szansy nie ma wcale, przy 30 jest ok. 10%, przy 100 prawie polowa, przy 200 zawsze. Kryjowke, o ktorej uslyszales w karczmie albo zajezdzie ("an outlaw lair in the wilds
 near X"), widzisz normalnie, jak dotad w grze - plotka mowi tylko mniej wiecej gdzie (najblizsza osada albo kierunek i dni drogi). Nowe kryjowki powstaja tylko na
 pustkowiu: co najmniej 10 jednostek mapy (ok. 47 km) od miasta, zamku i wsi i 6 jednostek (ok. 28 km) od wioski pobocznej. Po rozbiciu kryjowki przez 60 dni zadna
-nowa nie powstanie w promieniu 25 jednostek (ok. 120 km) od niej - za kazdym razem trzeba szukac od nowa.
+nowa nie powstanie w promieniu 25 jednostek (ok. 120 km) od niej - za kazdym razem trzeba szukac od nowa. Tych samych zasad pilnuja teraz takze bandy, ktore
+same zajmuja puste kryjowki (dotad mogly wrocic do rozbitej albo stanac przy wsi). Gdy w malej krainie (np. Kingswood) jedynym wolnym miejscem jest wlasnie rozbita
+kryjowka, nowa po prostu sie nie pojawia, dopoki nie zwolni sie inne miejsce albo nie minie 60 dni.
 
 **Problem:** Jeff 21.10 ok. 03:00 (doslownie): "im wiecej masz scouting, tym lepiej widzisz kryjowki bandytow, ale ponizej 10 scoutingu masz szanse 0%, od 11 do 200
 rosna do 100% ... inaczej mozesz ja zdobyc w karczmie, pijac i zdobywajac plotki - jesli plotki powiedza, ze tu i tu jest obozowisko bandytow, to wtedy jak na nie
@@ -55,7 +57,10 @@ nowy rzut. Kryjowka znana z plotki - bez naszego rzutu. Juz wypatrzone (z zapisu
 
 Miejsce nowej kryjowki: wybor gry zostaje, gdy punkt ma >= 10 jedn. do miasta / zamku / wsi i >= 6 jedn. do wioski pobocznej oraz >= 25 jedn. do kryjowki rozbitej
 w ostatnich 60 dniach. Inaczej: (1) losowanie z punktow tej kultury spelniajacych wszystko (waga 1 + odleglosc do najblizszej zajetej kryjowki - rozrzut jak w grze);
-(2) brak - punkt z dala od osad, najdalszy od rozbitych; (3) brak - punkt najdalszy od osad. Kryjowka powstaje zawsze (jak w grze).
+(2) brak - punkt z dala od osad, najdalszy od rozbitych; (3) brak - punkt najdalszy od osad. Po recenzji: w (2) i (3) nigdy blizej niz pol promienia (12.5 jedn.)
+od rozbitej, w tym nigdy ten sam punkt; gdy nic innego nie zostaje - bez nowej kryjowki (linia `aktywacja brak`, gra probuje znowu kolejnej doby).
+Bandy AI (klucz **HideoutGuideBanditAi**): wolny punkt, ktory nie spelnia odleglosci od osad albo lezy w promieniu 25 od rozbitej w ostatnich 60 dniach, nie jest
+dla band celem "idz do kryjowki".
 
 ### Zmiana
 
@@ -92,13 +97,54 @@ w ostatnich 60 dniach. Inaczej: (1) losowanie z punktow tej kultury spelniajacyc
 - **Wczytanie gry** nie losuje od nowa (wyniki rzutow w zapisie). Odejscie i powrot = nowy rzut (to jest szukanie).
 - **Progi** wedlug analizy pliku mapy - linia startu poda pule po progach w grze; stopien 3 w KR-3b = brak wolnego punktu w kulturze (do decyzji, czy luzowac progi).
 
+### Poprawki po recenzji (21.10, ok. 03:30-04:00)
+
+Kazda uwaga sprawdzona w dekompilacji / kodzie; wszystkie prawdziwe.
+
+1. **(wazne) Bandy AI same zasiedlaja wolne punkty z pominieciem wyboru - PRAWDA, poprawione.** `AiVisitSettlementBehavior.CalculateVisitHideoutScoresForBanditParty`
+   (1.4.8, l. 494-563) daje wolnemu punktowi `0.25 + 0.75 x (20 - zajete) / 20`, a `Hideout.IsInfested` = bandy w srodku >= `NumberOfMinimumBanditPartiesInAHideoutToInfestIt`
+   (ROT 4) - punkt zajmuje sie bez `FillANewHideoutWithBandits`. BK ma te sama metode w `BKAIVisitSettlementBehavior` (obok gry). Zmiana: postfiks na obu metodach
+   (typy po nazwie; `PartyThinkParams` jako 3. parametr sprawdzany) zeruje wynik `GoToSettlement` dla punktow z migawki `_aiBlock`. Migawke liczy co godzine watek
+   glowny (`HourScan`: wolne punkty, ktore nie spelniaja odleglosci od osad / wiosek pobocznych albo leza w promieniu rozbitych), podmieniajac cala referencje
+   (`volatile`); watki AI tylko czytaja ja i zmieniaja wynik WLASNEJ partii (`SetBehaviorScore`), licznik przez `Interlocked`, bez Log i bez slownikow. Zajete kryjowki
+   (>= 4 band) nie sa blokowane - bandy dalej wracaja do istniejacych. Pomiar: co godzine zbior zajetych porownany z poprzednim; nowa zajeta, ktora nie przeszla
+   przez wybor (`_viaPick`), daje linie `aktywacja poza wyborem <id> ... zgodna z zasada TAK/NIE` + KR-7. Klucz **HideoutGuideBanditAi** (TAK) - wylaczony = bandy
+   jak w grze. Opoznienie do 1 godziny po rozbiciu (migawka co godzine) - banda potrzebuje wielu godzin drogi i 4 band, zanim punkt jest zajety.
+2. **(wazne) W pelnej kulturze po rozbiciu wraca ten sam punkt - PRAWDA, poprawione.** Kandydaci blizej niz pol promienia od rozbitej (w tym ona sama, odl. 0) sa
+   wykluczeni ze wszystkich stopni; gdy nic nie zostaje, postfiks zwraca `null` - `FillANewHideoutWithBandits` ma `if (hideout != null)` (sprawdzone, l. 302-303),
+   start kampanii idzie ta sama metoda. Linia `aktywacja brak (<kultura>) | wybor gry <id> przy rozbitej <id> D ...`. KR-5 liczy teraz z pola `od rozbitej X D
+   (promien R)`: D < R/2 zawsze NIE, stopien 0/1 z D < R NIE, stopien 2/3 w pasie R/2..R INFO.
+3. **(wazne) Nowa kampania: startowe kryjowki przed wczytaniem ukladu wiosek pobocznych - PRAWDA, poprawione.** `Campaign.DoLoadingForGameType`
+   (PostInitializeFourthState) wola `OnNewGameCreated` przed `OnSessionStart`, a `VillageBook.Resolve` (jedyne wczytanie `_file`) idzie w OnSessionLaunched.
+   Nowe `VillageBook.EnsureLayoutRecords()` wola `LoadFile()`, gdy ukladu jeszcze nie ma. Bezpieczne: scena mapy jest juz wczytana (LoadVisualsThirdState,
+   `MapSceneWrapper.GetSceneXmlCrc()` wolane tuz przed `OnNewGameCreated`), wybor pliku czyta MCM wprost (`MapVillageData.EnsureChosen` -> `McmLayoutV5/6/7`),
+   `LoadFile` jest raz na plik - `Resolve` potem nie wczytuje drugi raz i dostaje ten sam `_file`. `HideoutSight.EnsureDist` uzywa tej funkcji. Gdyby uklad mimo
+   to nie wszedl, linia aktywacji pisze `wioska poboczna - brak warstwy`, a KR-3c pokazuje to jako INFO (nie TAK).
+4. (drobne) Herszt BK zawsze w pierwszym punkcie kultury - PRAWDA, tylko pomiar: postfiks `BKBanditBehavior.InfestHieout` pisze `aktywacja BK <id> ... zgodna z
+   zasada TAK/NIE` (KR-7 INFO). Podmiany punktu NIE robimy: `CreateBanditHero` tworzy partie herszta w tym punkcie i po `InfestHieout` wprowadza ja do niego -
+   inna kryjowka rozdzielilaby herszta i bandy. Rzadkie (raz w tygodniu, 2.5%, gdy klan nie ma herszta; OutlawLaw `GateBkHero` / `GateBkInfest` dalej decyduja).
+5. (drobne) Wynik rzutu nie zapominany przy chwilowo pustej kryjowce - PRAWDA, poprawione: `HourScan` co godzine usuwa wyniki kryjowek dalej niz 1.5 x zasieg,
+   niezaleznie od zajetosci.
+6. (drobne) Plotka o kryjowce "znana" przed przeczytaniem strony - PRAWDA, poprawione: `Rumours.Show` przypisuje kazda wiesc `h|<id>` do strony, a
+   `HideoutSight.Heard` idzie w `ShowPage` dla strony, ktora gracz wlasnie widzi ("Hear more" -> nastepna strona).
+7. (drobne) Chwilowe opustoszenie kasowalo wiedze z plotki - PRAWDA, poprawione: `OnDeactivated` zapomina tylko wynik rzutu; wiedza z plotki znika dopiero przy
+   rozbiciu (`MarkCleared`) - punkt stoi w tym samym miejscu.
+8. (drobne) KR-5 nie zapominal rozbitych - PRAWDA, poprawione (pkt 2: pole linii aktywacji juz uwzglednia pamiec 60 dni).
+9. (drobne) `HideoutSpotter._seen` nie zdejmowal kryjowki - PRAWDA, poprawione: kryjowka z `IsSpotted = false` schodzi z `_seen`, ponowne wypatrzenie daje znow
+   "Hideout spotted" i flage.
+
+Latki teraz: 4 rdzenia + bandy AI (gra i BK, 2/2) + herszt BK (1/1); linia `latki wpiete 4/4 | bandy AI 2/2, BK herszt 1/1`. Linia doby: `brak miejsca`,
+`poza wyborem N (niezgodne M), BK K, bandy AI odciete C (bledy E, zakazanych punktow Z), zapomniane rzuty F`.
+
 ### Status: DO SPRAWDZENIA
 
-Build Armoury Release kod 0. Gra nie uruchamiana (trwa test 99). Nic nie wgrane.
+Build Armoury Release kod 0 (takze po poprawkach recenzji). Gra nie uruchamiana (trwa test 99). Nic nie wgrane. Grupa KR sprawdzona na sztucznym logu
+(wszystkie wiersze TAK/INFO; drugi log z bledami: KR-5 i KR-7 daja NIE).
 
 ### Test w grze krok po kroku
 
-1. Wgrac DLL, wczytac kampanie. W `Armoury.log`: `Kryjowki (m100): latki wpiete 4/4` i `start sesji` (klucze TAK, krzywa 5: 0.0%, 30: 10.5%, 100: 47.4%,
+1. Wgrac DLL, wczytac kampanie. W `Armoury.log`: `Kryjowki (m100): latki wpiete 4/4 | bandy AI 2/2, BK herszt 1/1` i `start sesji` (klucze TAK, w tym
+   Hideout Guide Bandit Ai, krzywa 5: 0.0%, 30: 10.5%, 100: 47.4%,
    200: 100.0%, pula 266, wykluczonych przez odleglosc ...).
 2. Bohater ze Zwiadem <= 10 (bez zwiadowcy w druzynie): podjechac pod znana z mapy okolice kryjowki (np. z `rozbita`/`aktywacja` w logu). Oczekiwane: linia
    `rzut <id> | Zwiad N, szansa 0.0%, wynik NIE`, brak "Hideout spotted", brak ikony. Odjechac i wrocic - nowy `rzut`, dalej NIE.
@@ -107,4 +153,7 @@ Build Armoury Release kod 0. Gra nie uruchamiana (trwa test 99). Nic nie wgrane.
 4. Wyznaczyc zwiadowce z wysokim Zwiadem (albo cheat skill) - rzut z szansa wedlug tabeli; przy 200 zawsze TAK.
 5. Rozbic kryjowke. Linia `rozbita <id> (bitwa)`. W kolejnych dniach `aktywacja <inne id> ... od rozbitej <id> D (promien 25)` z D >= 25 i osada >= 10, wioska >= 6.
 6. Zapisac, wczytac - `start sesji ... pamiec: znanych z plotki N, rozbitych M` te same liczby.
-7. `python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>` - KR-0..KR-5 TAK (albo INFO przy braku zdarzen), ERROR 0.
+7. `python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>` - KR-0..KR-5 i KR-7 TAK (albo INFO przy braku zdarzen), ERROR 0.
+8. (recenzja) Po kilku dobach: linie `dzien N` maja `bandy AI odciete C` > 0 i `zakazanych punktow Z` > 0; linie `aktywacja poza wyborem` (jesli sa) z
+   `zgodna z zasada TAK` po pierwszej dobie sesji. Nowa kampania: pierwsze `aktywacja` (start, ok. 50) z liczba przy `wioska poboczna`, nie `- brak warstwy`.
+9. (recenzja) Kraina z malo punktami (kingswood_outlaw 3): po rozbiciu, gdy pozostale zajete - `aktywacja brak (kingswood_outlaw)`, a nie ta sama kryjowka.

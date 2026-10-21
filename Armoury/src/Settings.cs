@@ -2023,6 +2023,7 @@ namespace Armoury
         public bool HideoutRelocateAfterClear = true;      // after a hideout is cleared, the next bandit hideout does not appear in the same place or close to it - you have to search again. Off = as in the game
         public int HideoutClearedMemoryDays = 60;          // with Hideout Relocate After Clear: for how many days a cleared hideout keeps new hideouts away from its area
         public float HideoutClearedRadius = 25f;           // with Hideout Relocate After Clear: how far (map units) from a recently cleared hideout no new hideout appears
+        public bool HideoutGuideBanditAi = true;           // with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game
 
         // --- House levies ---
         public bool HouseLeviesEnabled = true;             // in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice

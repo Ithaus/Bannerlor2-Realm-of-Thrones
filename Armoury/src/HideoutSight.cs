@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -38,7 +39,14 @@ namespace Armoury
     ///    (zapis) na HideoutClearedMemoryDays dni; nowa kryjowka nie powstaje w promieniu HideoutClearedRadius od ostatnio rozbitych. Punktow NIE
     ///    przesuwamy: obrazek kryjowki to obiekt sceny mapy (nie idzie za Settlement.Position), pozycja jest w zapisie, a siatka nawigacji nie daje pewnosci
     ///    ladu - wersja bezpieczna to wybor innego punktu z puli. Brak punktu spelniajacego wszystko -> najpierw luzujemy pamiec rozbitych (najdalszy od
-    ///    nich), potem odleglosc (najdalszy od osad) - kryjowka powstaje zawsze, jak w grze.
+    ///    nich), potem odleglosc (najdalszy od osad). Recenzja 21.10: nigdy blizej niz pol promienia od rozbitej (w tym ten sam punkt) - wtedy bez nowej kryjowki
+    ///    (FillANewHideoutWithBandits ma 'if (hideout != null)', gra probuje znowu nastepnej doby).
+    /// 4) BANDY AI (recenzja 21.10, klucz HideoutGuideBanditAi): bandy same zasiedlaja wolne punkty swojej kultury (AiVisitSettlementBehavior i kopia BK
+    ///    BKAIVisitSettlementBehavior.CalculateVisitHideoutScoresForBanditParty - 4 bandy w srodku = IsInfested ROT) z pominieciem wyboru 2/3. Postfiks zeruje wynik
+    ///    "idz do kryjowki" dla wolnych punktow, ktore nie spelniaja 2) albo leza w promieniu rozbitych - migawka liczona co godzine na watku glownym, watki AI
+    ///    tylko czytaja (bez Log, bez slownikow; licznik przez Interlocked). Pomiar: co godzine nowe zajete kryjowki spoza wyboru -> linia "aktywacja poza wyborem".
+    ///    Herszt BK (BKBanditBehavior.CreateBanditHero -> InfestHieout, pierwszy punkt kultury) - tylko linia "aktywacja BK" (podmiana punktu rozdzielilaby herszta
+    ///    i bandy - ryzyko w CHANGELOG).
     /// Stan (zapis arm_hideout_sight przez SaveText.Sync): znane z plotki, rozbite (id, x, y, doba), wyniki rzutow na pobyt. Watek glowny (zdarzenia kampanii).
     /// </summary>
     internal sealed class HideoutSight : CampaignBehaviorBase
@@ -64,6 +72,15 @@ namespace Armoury
         private readonly HashSet<string> _stumbleSites = new HashSet<string>();
         // liczniki doby
         private int _dRolls, _dPass, _dBlockHour, _dBlockEnter, _dRumour, _dKnownPass, _dPicks, _dKept, _dSwapped, _dLoosened, _dNoFit, _dSpotted, _dCleared;
+        private int _dNone, _dOutside, _dOutsideBad, _dBk, _dForgot;
+        // recenzja 21.10: nowe zajete kryjowki spoza wyboru (bandy AI) - zbior zajetych z poprzedniej godziny i kryjowki, ktore przeszly przez Pick / BK w tej godzinie
+        private HashSet<string> _prevInf;
+        private readonly HashSet<string> _viaPick = new HashSet<string>();
+
+        // migawka dla watkow AI: wolne punkty zakazane (watek glowny podmienia cala referencje co godzine; watki AI tylko czytaja)
+        private static volatile HashSet<Settlement> _aiBlock;
+        private static int _aiCut, _aiErr;
+        private static string _aiNote = "bandy AI 0/0";
 
         private static bool _wired;
         private static string _wireNote = "";
@@ -77,6 +94,7 @@ namespace Armoury
         private static bool RumourOn { get { var s = S; return s != null && s.HideoutScoutingChance && s.HideoutRumourReveals; } }
         private static bool AwayOn { get { var s = S; return s != null && s.HideoutAwayFromSettlements; } }
         private static bool RelocOn { get { var s = S; return s != null && s.HideoutRelocateAfterClear; } }
+        private static bool AiOn { get { var s = S; return s != null && s.HideoutGuideBanditAi && (s.HideoutAwayFromSettlements || s.HideoutRelocateAfterClear); } }
         private static double Today { get { return CampaignTime.Now.ToDays; } }
 
         public override void RegisterEvents()
@@ -286,8 +304,52 @@ namespace Armoury
         {
             var me = _inst;
             if (me == null || (!AwayOn && !RelocOn) || __result == null) return;
-            try { __result = me.Pick(__0, __result); }
+            try
+            {
+                __result = me.Pick(__0, __result);   // null = brak miejsca poza rozbitymi - gra nie zasiedla nic (FillANewHideoutWithBandits: if (hideout != null))
+                if (__result != null && __result.Settlement != null) me._viaPick.Add(__result.Settlement.StringId ?? "");
+            }
             catch (Exception e) { me.Stumble("PickPost", e); }
+        }
+
+        /// <summary>Postfiks CalculateVisitHideoutScoresForBanditParty (gra i BK; WATKI AI): wynik "idz do kryjowki" = 0 dla wolnych punktow z migawki _aiBlock.
+        /// Tylko odczyt migawki i zmiana wyniku tej partii (PartyThinkParams jest jej wlasne); bez Log, bez alokacji, licznik przez Interlocked.</summary>
+        public static void AiPost(PartyThinkParams __2)
+        {
+            var blk = _aiBlock;
+            if (blk == null || __2 == null) return;
+            try
+            {
+                var list = __2.AIBehaviorScores;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var t = list[i];
+                    if (t.Item2 <= 0f || t.Item1.AiBehavior != AiBehavior.GoToSettlement) continue;
+                    var st = t.Item1.Party as Settlement;
+                    if (st == null || !blk.Contains(st)) continue;
+                    var d = t.Item1;
+                    __2.SetBehaviorScore(in d, 0f);
+                    Interlocked.Increment(ref _aiCut);
+                }
+            }
+            catch { Interlocked.Increment(ref _aiErr); }
+        }
+
+        /// <summary>Postfiks BKBanditBehavior.InfestHieout (herszt BK, watek glowny): kryjowka zajeta poza wyborem - tylko linia (punkt bez zmian, patrz CHANGELOG).</summary>
+        public static void BkInfestPost(Hideout __0)
+        {
+            var me = _inst;
+            if (me == null || __0 == null || __0.Settlement == null) return;
+            try
+            {
+                var st = __0.Settlement;
+                if (!__0.IsInfested) return;   // OutlawLaw.GateBkInfest moglo pominac metode
+                string id = st.StringId ?? "";
+                if (!me._viaPick.Add(id)) return;
+                me._dBk++;
+                me.LogOutside(st, "aktywacja BK", "herszt BK zasiedla pierwszy punkt kultury (BKBanditBehavior.CreateBanditHero)");
+            }
+            catch (Exception e) { me.Stumble("BkInfestPost", e); }
         }
 
         internal static void ApplyAll(Harmony h)
@@ -319,8 +381,38 @@ namespace Armoury
                 if (m != null && m.ReturnType == typeof(Hideout)) { h.Patch(m, postfix: new HarmonyMethod(typeof(HideoutSight), nameof(PickPost))); ok++; } else miss.Add("SelectANonInfestedHideoutOfSameCultureByWeight");
             }
             catch (Exception e) { miss.Add("SelectANonInfested(" + e.Message + ")"); }
+            // recenzja 21.10: bandy AI (gra i BK) i herszt BK - typy szukane po nazwie (BK moze nie byc); liczone osobno od 4 latek rdzenia
+            int aiOk = 0, aiN = 0; var aiMiss = new List<string>();
+            foreach (var tn in new[] { "TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors.AiVisitSettlementBehavior", "BannerKings.Behaviours.BKAIVisitSettlementBehavior" })
+            {
+                try
+                {
+                    var t = AccessTools.TypeByName(tn);
+                    if (t == null) continue;
+                    aiN++;
+                    var m = AccessTools.DeclaredMethod(t, "CalculateVisitHideoutScoresForBanditParty");
+                    var ps = m != null ? m.GetParameters() : null;
+                    if (ps != null && ps.Length == 3 && ps[2].ParameterType == typeof(PartyThinkParams)) { h.Patch(m, postfix: new HarmonyMethod(typeof(HideoutSight), nameof(AiPost))); aiOk++; }
+                    else aiMiss.Add(t.Name);
+                }
+                catch (Exception e) { aiMiss.Add(tn + "(" + e.Message + ")"); }
+            }
+            string bk = "BK herszt -";
+            try
+            {
+                var t = AccessTools.TypeByName("BannerKings.Behaviours.BKBanditBehavior");
+                if (t != null)
+                {
+                    var m = AccessTools.DeclaredMethod(t, "InfestHieout");
+                    var ps = m != null ? m.GetParameters() : null;
+                    if (ps != null && ps.Length >= 1 && ps[0].ParameterType == typeof(Hideout)) { h.Patch(m, postfix: new HarmonyMethod(typeof(HideoutSight), nameof(BkInfestPost))); bk = "BK herszt 1/1"; }
+                    else bk = "BK herszt 0/1";
+                }
+            }
+            catch (Exception e) { bk = "BK herszt 0/1 (" + e.Message + ")"; }
+            _aiNote = "bandy AI " + aiOk + "/" + aiN + (aiMiss.Count > 0 ? " (BRAK: " + string.Join(", ", aiMiss.ToArray()) + ")" : "") + ", " + bk;
             _wired = miss.Count == 0;
-            _wireNote = "latki wpiete " + ok + "/4" + (miss.Count > 0 ? " (BRAK: " + string.Join(", ", miss.ToArray()) + ")" : "");
+            _wireNote = "latki wpiete " + ok + "/4" + (miss.Count > 0 ? " (BRAK: " + string.Join(", ", miss.ToArray()) + ")" : "") + " | " + _aiNote;
             Log.Info(P + _wireNote + ".");
         }
 
@@ -355,7 +447,7 @@ namespace Armoury
         private void EnsureDist()
         {
             object side = null;
-            try { side = VillageBook.LayoutRecords(); } catch { }
+            try { side = VillageBook.EnsureLayoutRecords(); } catch { }   // recenzja 21.10: nowa kampania wybiera startowe kryjowki przed VillageBook.Resolve
             if (_dSet.Count > 0 && ReferenceEquals(side, _sideRef)) return;
             _sideRef = side;
             _dSet.Clear(); _dSide.Clear(); _nearName.Clear();
@@ -425,6 +517,7 @@ namespace Armoury
             PruneCleared();
             _dPicks++;
             float rad = Math.Max(0f, s.HideoutClearedRadius);
+            float hard = rad * 0.5f;   // recenzja 21.10: blizej niz pol promienia od rozbitej (w tym ten sam punkt) nigdy, takze przy luzowaniu pamieci
             string cw;
             bool gAway = !AwayOn || Away(game.Settlement);
             bool gFresh = !RelocOn || NearCleared(game.Settlement, out cw) >= rad;
@@ -439,13 +532,17 @@ namespace Armoury
             var cand = new List<Hideout>();
             foreach (var h in Hideout.All)
                 if (h != null && h.Settlement != null && !h.IsInfested && h.Settlement.Culture == culture) cand.Add(h);
-            var tierA = new List<Hideout>(); var tierB = new List<Hideout>();
+            var tierA = new List<Hideout>(); var tierB = new List<Hideout>(); var rest = new List<Hideout>();
+            int hardOut = 0;
             foreach (var h in cand)
             {
+                float dcl = RelocOn ? NearCleared(h.Settlement, out cw) : float.MaxValue;
+                if (dcl < hard) { hardOut++; continue; }
                 bool away = !AwayOn || Away(h.Settlement);
-                bool fresh = !RelocOn || NearCleared(h.Settlement, out cw) >= rad;
+                bool fresh = dcl >= rad;
                 if (away && fresh) tierA.Add(h);
                 else if (away) tierB.Add(h);
+                rest.Add(h);
             }
             Hideout pick = null; string how; int tier;
             if (tierA.Count > 0) { pick = Weighted(tierA); how = "inne miejsce (wolne, z dala od osad i rozbitych)"; tier = 1; _dSwapped++; }
@@ -459,13 +556,23 @@ namespace Armoury
             else
             {
                 float bs = -1f;
-                foreach (var h in cand)
+                foreach (var h in rest)
                 {
                     float sc = AwayScore(h.Settlement);
                     if (RelocOn) { float d = NearCleared(h.Settlement, out cw); if (d < rad) sc *= 0.5f; }
                     if (sc > bs) { bs = sc; pick = h; }
                 }
-                how = "brak wolnego punktu - najdalszy od osad"; tier = 3; _dNoFit++;
+                how = "brak wolnego punktu - najdalszy od osad"; tier = 3; if (pick != null) _dNoFit++;
+            }
+            if (pick == null && hardOut > 0)
+            {
+                // jedyne wolne punkty kultury leza przy rozbitej (np. kingswood 3/3 zajete, wolna tylko rozbita) - bez nowej kryjowki, gra sprobuje nastepnej doby
+                _dNone++;
+                float dg = NearCleared(game.Settlement, out cw);
+                Log.Info(P + "aktywacja brak (" + (culture != null ? culture.StringId : "?") + ") | wybor gry " + game.Settlement.StringId + " przy rozbitej " + (cw ?? "-") + " "
+                         + dg.ToString("0.0", Inv) + ", innego wolnego punktu brak (wolnych " + cand.Count + ", przy rozbitych " + hardOut + ") - bez nowej kryjowki, gra sprobuje znowu"
+                         + " | stopien 4 | promien " + rad.ToString("0.#", Inv) + " (twardy " + hard.ToString("0.#", Inv) + "), rozbitych w pamieci " + _cleared.Count);
+                return null;
             }
             if (pick == null) { pick = game; how = "brak kandydatow - wybor gry"; tier = 3; }
             LogPick(game, pick, how, tier);
@@ -497,7 +604,7 @@ namespace Armoury
             var s = S;
             Log.Info(P + "aktywacja " + st.StringId + " (" + (st.Culture != null ? st.Culture.StringId : "?") + ") | " + how + (pick != game ? " zamiast " + game.Settlement.StringId : "")
                      + " | stopien " + tier + " | najblizsza osada " + a.ToString("0.0", Inv) + " (prog " + s.HideoutMinDistSettlement.ToString("0.#", Inv) + "), wioska poboczna "
-                     + (b >= 0f && b < 1e6f ? b.ToString("0.0", Inv) : "-") + " (prog " + s.HideoutMinDistSideVillage.ToString("0.#", Inv) + "), od rozbitej "
+                     + (b >= 0f && b < 1e6f ? b.ToString("0.0", Inv) : "- brak warstwy") + " (prog " + s.HideoutMinDistSideVillage.ToString("0.#", Inv) + "), od rozbitej "
                      + (cw != null ? cw + " " + dc.ToString("0.0", Inv) : "-") + " (promien " + s.HideoutClearedRadius.ToString("0.#", Inv) + ", rozbitych w pamieci " + _cleared.Count + ")"
                      + " | " + NearInfo(st));
         }
@@ -537,7 +644,8 @@ namespace Armoury
             {
                 if (st == null) return;
                 string id = st.StringId ?? "";
-                _known.Remove(id);   // pusta kryjowka: plotka nieaktualna, nowa trzeba znowu znalezc
+                // recenzja 21.10: chwilowo pusta kryjowka (bandy wyszly) stoi w tym samym miejscu - wiedza z plotki zostaje ("juz wiesz, gdzie szukac");
+                // znika dopiero przy rozbiciu (MarkCleared). Wynik rzutu na pobyt - od nowa.
                 _roll.Remove(id);
                 if (st.LastThreatTime.ElapsedDaysUntilNow <= 2f) MarkCleared(st, "oproznienie po walce");
             }
@@ -560,9 +668,82 @@ namespace Armoury
 
         private void OnHourly()
         {
-            if (_started) return;
-            _started = true;
-            try { StartLine(); } catch (Exception e) { Stumble("StartLine", e); }
+            if (!_started)
+            {
+                _started = true;
+                try { StartLine(); } catch (Exception e) { Stumble("StartLine", e); }
+            }
+            try { HourScan(); } catch (Exception e) { Stumble("HourScan", e); }
+        }
+
+        /// <summary>Co godzine (watek glowny): zapominanie wynikow rzutu po odejsciu, migawka zakazanych punktow dla band AI, nowe zajete kryjowki spoza wyboru.</summary>
+        private void HourScan()
+        {
+            var s = S;
+            if (s == null) return;
+            // 1) recenzja 21.10: wynik rzutu "na pobyt" zapominany po odejsciu dalej niz 1.5 x zasieg - takze gdy kryjowka chwilowo nie jest zajeta
+            if (_roll.Count > 0)
+            {
+                var mp = MobileParty.MainParty; float range = Range();
+                if (mp != null && range > 0f)
+                {
+                    List<string> drop = null;
+                    foreach (var kv in _roll)
+                    {
+                        var st = Settlement.Find(kv.Key);
+                        if (st == null || mp.Position.DistanceSquared(st.Position) > 2.25f * range * range) { if (drop == null) drop = new List<string>(); drop.Add(kv.Key); }
+                    }
+                    if (drop != null) foreach (var id in drop) { _roll.Remove(id); _dForgot++; }
+                }
+            }
+            // 2) i 3) zajete teraz; wolne zakazane dla band AI
+            EnsureDist();
+            PruneCleared();
+            float rad = Math.Max(0f, s.HideoutClearedRadius);
+            bool ai = AiOn;
+            var inf = new HashSet<string>();
+            HashSet<Settlement> block = ai ? new HashSet<Settlement>() : null;
+            string cw;
+            foreach (var h in Hideout.All)
+            {
+                var st = h != null ? h.Settlement : null;
+                if (st == null) continue;
+                if (h.IsInfested) { inf.Add(st.StringId ?? ""); continue; }
+                if (!ai) continue;
+                bool away = !AwayOn || Away(st);
+                bool fresh = !RelocOn || NearCleared(st, out cw) >= rad;
+                if (!away || !fresh) block.Add(st);
+            }
+            _aiBlock = block != null && block.Count > 0 ? block : null;
+            if (_prevInf != null)
+                foreach (var id in inf)
+                    if (!_prevInf.Contains(id) && !_viaPick.Contains(id))
+                    {
+                        var st = Settlement.Find(id);
+                        if (st != null) { _dOutside++; LogOutside(st, "aktywacja poza wyborem", "bandy AI zajely wolny punkt"); }
+                    }
+            _prevInf = inf;
+            _viaPick.Clear();
+        }
+
+        /// <summary>Linia kryjowki zajetej poza wyborem Pick (bandy AI, herszt BK): odleglosci i czy zgodna z zasada 2/3.</summary>
+        private void LogOutside(Settlement st, string head, string how)
+        {
+            var s = S;
+            EnsureDist();
+            float a, b; string cw;
+            if (!_dSet.TryGetValue(st, out a)) a = -1f;
+            if (!_dSide.TryGetValue(st, out b)) b = -1f;
+            float dc = NearCleared(st, out cw);
+            bool ok = (!AwayOn || Away(st)) && (!RelocOn || dc >= Math.Max(0f, s.HideoutClearedRadius));
+            if (!ok) _dOutsideBad++;
+            int bands = 0;
+            try { foreach (var mp in st.Parties) if (mp != null && mp.IsBandit) bands++; } catch { }
+            Log.Info(P + head + " " + st.StringId + " (" + (st.Culture != null ? st.Culture.StringId : "?") + ") | " + how + ", band w srodku " + bands
+                     + " | zgodna z zasada " + (ok ? "TAK" : "NIE") + " | najblizsza osada " + a.ToString("0.0", Inv) + " (prog " + s.HideoutMinDistSettlement.ToString("0.#", Inv)
+                     + "), wioska poboczna " + (b >= 0f && b < 1e6f ? b.ToString("0.0", Inv) : "- brak warstwy") + " (prog " + s.HideoutMinDistSideVillage.ToString("0.#", Inv)
+                     + "), od rozbitej " + (cw != null ? cw + " " + dc.ToString("0.0", Inv) : "-") + " (promien " + s.HideoutClearedRadius.ToString("0.#", Inv) + ")"
+                     + " | bandy AI: klucz " + (AiOn ? "TAK" : "NIE") + " | " + NearInfo(st));
         }
 
         private void StartLine()
@@ -589,6 +770,7 @@ namespace Armoury
             bool side = _sideRef != null;
             Log.Info(P + "start sesji | klucze: Hideout Scouting Chance " + (s.HideoutScoutingChance ? "TAK" : "NIE") + ", Hideout Rumour Reveals " + (s.HideoutRumourReveals ? "TAK" : "NIE")
                      + ", Hideout Away From Settlements " + (s.HideoutAwayFromSettlements ? "TAK" : "NIE") + ", Hideout Relocate After Clear " + (s.HideoutRelocateAfterClear ? "TAK" : "NIE")
+                     + ", Hideout Guide Bandit Ai " + (s.HideoutGuideBanditAi ? "TAK" : "NIE")
                      + " | krzywa: Zwiad <= " + s.HideoutScoutingMin + " -> 0%, " + s.HideoutScoutingMin + ".." + s.HideoutScoutingFull + " liniowo, >= " + s.HideoutScoutingFull + " -> 100% (5: "
                      + Pct(5) + ", 30: " + Pct(30) + ", 100: " + Pct(100) + ", 200: " + Pct(200) + ") | Zwiad teraz " + sc + " (" + who + ") = " + Pct(sc)
                      + " | pula " + pool + ", z dala od osad " + far + ", wykluczonych przez odleglosc " + (pool - far) + " (osada < " + s.HideoutMinDistSettlement.ToString("0.#", Inv)
@@ -608,9 +790,12 @@ namespace Armoury
                 PruneCleared();
                 Log.Info(P + "dzien " + ((int)Today).ToString(Inv) + " | rzuty " + _dRolls + " (udane " + _dPass + "), blokady wzrok " + _dBlockHour + ", banda wchodzi " + _dBlockEnter
                          + ", przepustki z plotki " + _dKnownPass + ", plotki o kryjowkach " + _dRumour + ", wypatrzone " + _dSpotted + " | aktywacje " + _dPicks + " (gry zostaje " + _dKept
-                         + ", inne miejsce " + _dSwapped + ", luzowana pamiec " + _dLoosened + ", bez wolnego " + _dNoFit + "), rozbite " + _dCleared
+                         + ", inne miejsce " + _dSwapped + ", luzowana pamiec " + _dLoosened + ", bez wolnego " + _dNoFit + ", brak miejsca " + _dNone + "), rozbite " + _dCleared
+                         + " | poza wyborem " + _dOutside + " (niezgodne " + _dOutsideBad + "), BK " + _dBk + ", bandy AI odciete " + Interlocked.Exchange(ref _aiCut, 0)
+                         + " (bledy " + Interlocked.Exchange(ref _aiErr, 0) + ", zakazanych punktow " + (_aiBlock != null ? _aiBlock.Count : 0) + "), zapomniane rzuty " + _dForgot
                          + " | pamiec: znanych " + _known.Count + ", rozbitych " + _cleared.Count + ", wynikow " + _roll.Count + " | potkniecia " + _stumbles);
                 _dRolls = _dPass = _dBlockHour = _dBlockEnter = _dRumour = _dKnownPass = _dPicks = _dKept = _dSwapped = _dLoosened = _dNoFit = _dSpotted = _dCleared = 0;
+                _dNone = _dOutside = _dOutsideBad = _dBk = _dForgot = 0;
             }
             catch (Exception e) { Stumble("OnDaily", e); }
         }

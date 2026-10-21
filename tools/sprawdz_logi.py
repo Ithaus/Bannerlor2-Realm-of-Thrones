@@ -37422,9 +37422,12 @@ def m97surowce_main(logp):
 M100K_TAG = "Kryjowki (m100): "
 M100K_START = re.compile(r"krzywa: Zwiad <= (\d+) -> 0%, \d+\.\.(\d+) liniowo")
 M100K_WIRE = re.compile(r"latki wpiete (\d)/4")
+M100K_AIW = re.compile(r"bandy AI (\d)/(\d)")
+M100K_OUT = re.compile(r"(aktywacja poza wyborem|aktywacja BK) (\S+) \(.*?\) \| .*? \| zgodna z zasada (TAK|NIE) \| najblizsza osada ([-0-9.]+)")
+M100K_NONE = re.compile(r"aktywacja brak \((\S+)\) \| wybor gry (\S+) przy rozbitej (\S+) ([0-9.]+)")
 M100K_ROLL = re.compile(r"rzut (\S+) \| Zwiad (\d+) \(.*?\), szansa ([-0-9.]+)%?, wynik (TAK|NIE), znana z plotki (TAK|NIE)")
 M100K_SPOT = re.compile(r"wypatrzona (\S+) \| Zwiad (\d+) \(.*?\), szansa ([0-9.]+)%, droga (.*?), znana z plotki (TAK|NIE)")
-M100K_ACT = re.compile(r"aktywacja (\S+) \(.*?\) \| (.*?) \| stopien (\d) \| najblizsza osada ([0-9.]+) \(prog ([0-9.]+)\), wioska poboczna ([-0-9.]+) \(prog ([0-9.]+)\), "
+M100K_ACT = re.compile(r"aktywacja (\S+) \(.*?\) \| (.*?) \| stopien (\d) \| najblizsza osada ([0-9.]+) \(prog ([0-9.]+)\), wioska poboczna ([0-9.]+|- brak warstwy|-) \(prog ([0-9.]+)\), "
                        r"od rozbitej (?:(\S+) ([0-9.]+)|-) \(promien ([0-9.]+)")
 M100K_CLR = re.compile(r"rozbita (\S+) ")
 M100K_DAY = re.compile(r"dzien (\d+) \|.*\| potkniecia (\d+)")
@@ -37433,8 +37436,10 @@ M100K_DAY = re.compile(r"dzien (\d+) \|.*\| potkniecia (\d+)")
 def m100kryjowki_main(logp):
     """m100kryjowki (21.10, w-toku/m100-kryjowki; Jeff 21.10 "ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ... w karczmie ... plotki" oraz
     "nie na wioskach pobocznych ... z dala od miast i wsi ... po rozbiciu kolejna w innym miejscu"): KR-0 linia startu, KR-1 ERROR HideoutSight i potkniecia 0,
-    KR-2 latki 4/4, KR-3 zadna nowa kryjowka blizej niz prog (stopien 3 = brak wolnego punktu - DECYZJA), KR-4 przy Zwiadzie <= progu wypatrzenie tylko z plotki
-    albo zadania (rzut przy Zwiadzie <= progu zawsze NIE), KR-5 po rozbiciu nowa w innym miejscu (nie ta sama, poza promieniem - stopien 2/3 INFO), KR-6 uzycie (INFO)."""
+    KR-2 latki 4/4 i bandy AI k/k, KR-3 zadna nowa kryjowka blizej niz prog (stopien 3 = brak wolnego punktu - DECYZJA; '-' wioski = brak warstwy - INFO), KR-4 przy
+    Zwiadzie <= progu wypatrzenie tylko z plotki albo zadania (rzut przy Zwiadzie <= progu zawsze NIE), KR-5 po rozbiciu nowa w innym miejscu (pole 'od rozbitej':
+    nigdy blizej niz pol promienia, stopien 0/1 poza promieniem; stopien 2/3 w pasie pol..caly promien i 'aktywacja brak' - INFO), KR-6 uzycie (INFO), KR-7 (recenzja
+    21.10) kryjowki zajete przez bandy AI poza wyborem zgodne z zasada (pierwsza doba sesji i herszt BK - INFO)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("KR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -37442,6 +37447,7 @@ def m100kryjowki_main(logp):
         return 0
     starts, rolls, spots, acts, clears, n_err, stumb, wire = [], [], [], [], [], 0, 0, None
     seq = []
+    aiw, outs, nones, day_seen = None, [], [], True
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -37455,12 +37461,25 @@ def m100kryjowki_main(logp):
             mw = M100K_WIRE.search(body)
             if mw:
                 wire = int(mw.group(1))
+            ma2 = M100K_AIW.search(body)
+            if ma2:
+                aiw = (int(ma2.group(1)), int(ma2.group(2)))
             if body.startswith("start sesji"):
                 starts.append(body)
+                day_seen = False
                 continue
             md = M100K_DAY.match(body)
             if md:
                 stumb = max(stumb, int(md.group(2)))
+                day_seen = True
+                continue
+            mo = M100K_OUT.match(body)
+            if mo:
+                outs.append((mo.group(1), mo.group(2), mo.group(3), day_seen))
+                continue
+            mn = M100K_NONE.match(body)
+            if mn:
+                nones.append((mn.group(2), mn.group(3), float(mn.group(4))))
                 continue
             mr = M100K_ROLL.match(body)
             if mr:
@@ -37473,7 +37492,7 @@ def m100kryjowki_main(logp):
             ma = M100K_ACT.match(body)
             if ma:
                 a = (ma.group(1), ma.group(2), int(ma.group(3)), float(ma.group(4)), float(ma.group(5)),
-                     float(ma.group(6)) if ma.group(6) != "-" else 1e9, float(ma.group(7)), ma.group(8),
+                     float(ma.group(6)) if ma.group(6)[0] != "-" else 1e9, float(ma.group(7)), ma.group(8),
                      float(ma.group(9)) if ma.group(9) else 1e9, float(ma.group(10)))
                 acts.append(a)
                 seq.append(("a", a))
@@ -37495,12 +37514,17 @@ def m100kryjowki_main(logp):
     on = "Hideout Scouting Chance TAK" in last
     rep.add("KR-0: linia startu (klucze, krzywa, pula)", (last[:170] + "...") if last else "brak", "klucze TAK, krzywa i pula w linii", (on and mm is not None) if last else False)
     rep.add("KR-1: ERROR HideoutSight i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
-    rep.add("KR-2: latki wpiete", f"{wire}/4" if wire is not None else "brak linii", "4/4", wire == 4)
+    rep.add("KR-2: latki wpiete (rdzen, bandy AI gra/BK)", (f"{wire}/4" if wire is not None else "brak linii") + (f", bandy AI {aiw[0]}/{aiw[1]}" if aiw else ", bandy AI brak pola"),
+            "4/4 i bandy AI k/k (k >= 1)", wire == 4 and aiw is not None and aiw[1] >= 1 and aiw[0] == aiw[1])
     bad = [a for a in acts if a[2] <= 1 and (a[3] < a[4] or a[5] < a[6])]
+    noside = [a for a in acts if a[5] >= 1e8]
     nofit = [a for a in acts if a[2] == 3]
     rep.add("KR-3: nowa kryjowka nie blizej niz prog (osada, wioska poboczna)", f"blizej niz prog {len(bad)} z {len(acts)}"
             + (f" (np. {bad[0][0]}: osada {bad[0][3]} / {bad[0][4]}, wioska {bad[0][5]} / {bad[0][6]})" if bad else "")
             + f"; bez wolnego punktu (stopien 3) {len(nofit)}", "0", (len(bad) == 0) if acts else None)
+    if noside:
+        rep.add("KR-3c: aktywacje bez warstwy wiosek pobocznych ('-')", f"{len(noside)} z {len(acts)} (np. {noside[0][0]})",
+                "INFO - brak danych o wioskach pobocznych (plik ukladu nie wczytany albo z innej sceny)", None)
     if nofit:
         rep.add("KR-3b: aktywacje bez wolnego punktu (najdalszy od osad)", f"{len(nofit)} (np. {nofit[0][0]}: osada {nofit[0][3]}, wioska {nofit[0][5]})",
                 "0 - inaczej za male progi albo za mala pula kultury", False, decide=True)
@@ -37509,22 +37533,29 @@ def m100kryjowki_main(logp):
     rep.add(f"KR-4: Zwiad <= {lo} - wypatrzenie tylko z plotki (albo zadania)", f"udanych rzutow przy Zwiadzie <= {lo}: {len(low_roll_ok)}, wypatrzen bez plotki: {len(low_spot)}"
             + (f" (np. {low_spot[0][0]} Zwiad {low_spot[0][1]} droga {low_spot[0][2]})" if low_spot else ""), "0 i 0",
             (len(low_roll_ok) == 0 and len(low_spot) == 0) if (rolls or spots) else None)
-    # KR-5: po rozbiciu kolejna aktywacja nie w tym samym miejscu (stopien 2/3 = pamiec poluzowana z braku punktow - INFO)
-    recent, worse, info = [], [], []
-    for kind, v in seq:
-        if kind == "c":
-            recent.append(v)
+    # KR-5 (recenzja 21.10): z pola 'od rozbitej X D (promien R)' linii aktywacji (kod liczy je z pamieci rozbitych - wygasla pamiec = brak pola, wiec ponowna aktywacja
+    # punktu po HideoutClearedMemoryDays jest zgodna): nigdy D < R/2 (w tym ten sam punkt, D = 0); stopien 0/1 nigdy D < R; stopien 2/3 w pasie R/2..R - INFO
+    worse, info = [], []
+    for a in acts:
+        if a[7] is None:
             continue
-        if not recent:
-            continue
-        a = v
-        if a[0] in recent or (a[7] is not None and a[8] < a[9]):
-            (info if a[2] >= 2 else worse).append(a)
-    rep.add("KR-5: po rozbiciu nowa w innym miejscu", f"aktywacji po rozbiciu w tym samym miejscu albo w promieniu: {len(worse)}" + (f" (np. {worse[0][0]})" if worse else "")
-            + f"; z poluzowana pamiecia (stopien 2/3) {len(info)}", "0", (len(worse) == 0) if (clears and acts) else None)
+        if a[8] < a[9] * 0.5 or (a[2] <= 1 and a[8] < a[9]):
+            worse.append(a)
+        elif a[8] < a[9]:
+            info.append(a)
+    rep.add("KR-5: po rozbiciu nowa w innym miejscu", f"aktywacji blizej rozbitej niz pozwala stopien: {len(worse)}" + (f" (np. {worse[0][0]} od {worse[0][7]} {worse[0][8]})" if worse else "")
+            + f"; poluzowana pamiec (stopien 2/3, pas pol..caly promien) {len(info)}; bez nowej kryjowki (jedyny wolny punkt przy rozbitej) {len(nones)}",
+            "0", (len(worse) == 0) if (clears and acts) else None)
     passes = sum(1 for r in rolls if r[3] == "TAK" and r[4] == "NIE")
     known = sum(1 for r in rolls if r[4] == "TAK")
     swapped = sum(1 for a in acts if "zamiast" in a[1])
+    ai_out = [o for o in outs if o[0] == "aktywacja poza wyborem"]
+    bk_out = [o for o in outs if o[0] == "aktywacja BK"]
+    ai_bad = [o for o in ai_out if o[2] == "NIE" and o[3]]
+    ai_bad0 = [o for o in ai_out if o[2] == "NIE" and not o[3]]
+    rep.add("KR-7: kryjowki zajete przez bandy AI poza wyborem - zgodne z zasada", f"poza wyborem {len(ai_out)}, niezgodne {len(ai_bad)}"
+            + (f" (np. {ai_bad[0][1]})" if ai_bad else "") + f"; pierwsza doba sesji niezgodne {len(ai_bad0)} (bandy juz w drodze - INFO); herszt BK {len(bk_out)} (niezgodne "
+            + f"{sum(1 for o in bk_out if o[2] == 'NIE')} - INFO, pierwszy punkt kultury)", "0 niezgodnych", (len(ai_bad) == 0) if outs or acts else None)
     rep.add("KR-6: uzycie (INFO)", f"rzuty {len(rolls)} (udane {passes}, z plotki {known}), wypatrzone {len(spots)}, aktywacje {len(acts)} (zamienione {swapped}), rozbite {len(clears)}",
             "INFO", None)
     rep.show()

@@ -2213,6 +2213,15 @@ namespace Armoury
         /// <summary>sw-przysiolki: wszystkie wiersze pliku ukladu tej sesji (linia sprawdzenia - wioski okregow, najblizsza sasiadka); null - plik nie wczytany.</summary>
         internal static List<MapVillageRecord> LayoutRecords() { var f = _file; return f != null ? f.Records : null; }
 
+        /// <summary>m100-kryjowki (recenzja 21.10): uklad wiosek pobocznych takze PRZED Resolve - nowa kampania wybiera startowe kryjowki w OnNewGameCreated
+        /// (Campaign.DoLoadingForGameType, PostInitializeFourthState: scena mapy wczytana wczesniej w LoadVisualsThirdState), a Resolve idzie dopiero w OnSessionLaunched.
+        /// LoadFile jest raz na plik (Resolve potem nie wczytuje drugi raz - ten sam _file), wybor pliku czyta MCM wprost (MapVillageData.EnsureChosen). Watek glowny.</summary>
+        internal static List<MapVillageRecord> EnsureLayoutRecords()
+        {
+            if (_file == null) { try { LoadFile(); } catch (Exception e) { Stumble("VillageBook.EnsureLayoutRecords", e); } }
+            var f = _file; return f != null ? f.Records : null;
+        }
+
         /// <summary>sw-przysiolki: nazwa wczytanego pliku ukladu ("" - brak).</summary>
         internal static string LayoutFile { get { return _file != null ? (_fileName ?? "") : ""; } }
 

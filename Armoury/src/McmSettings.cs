@@ -5504,6 +5504,10 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public float HideoutClearedRadius { get; set; } = 25f;
 
+        [SettingPropertyBool("Hideout Guide Bandit Ai", HintText = "with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutGuideBanditAi { get; set; } = true;
+
         [SettingPropertyBool("House Levies Enabled", HintText = "in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice", RequireRestart = false)]
         [SettingPropertyGroup("House levies")]
         public bool HouseLeviesEnabled { get; set; } = true;
@@ -10295,6 +10299,7 @@ namespace Armoury
             s.HideoutRelocateAfterClear = HideoutRelocateAfterClear;
             s.HideoutClearedMemoryDays = HideoutClearedMemoryDays;
             s.HideoutClearedRadius = HideoutClearedRadius;
+            s.HideoutGuideBanditAi = HideoutGuideBanditAi;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.NorthernFareEnabled = NorthernFareEnabled;
             s.CropClimateFilter = CropClimateFilter;
