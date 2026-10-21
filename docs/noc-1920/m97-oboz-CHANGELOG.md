@@ -49,9 +49,9 @@ transportowe". Rozpoznanie `docs/ROZPOZNANIE-OBOZ-2026-10-20.md` rozdz. 1, 2, 4,
      pomija misje cywilne), ludzie w stroju cywilnym.
    - `CampWalkLogic.Build` (raz, AfterStart): srodek = srodek granic sceny (walk area) albo srodek sceny; gracz 6 m przed srodkiem; ognisko gracza, jego poslanie
      i jego kon (BattleEquipment); 1-5 ludzi - poslania wokol ogniska; od CampWalkMenPerTent (6) ludzi: namiot wodza `Tent_Leader`, namioty zolnierskie
-     `Tent_Small` po jednym na 6 ludzi (najwyzej 40), rzedami po obu stronach, ognisko co trzy namioty (najwyzej 14), od 60 ludzi `Tent_Officer`; przy armii
-     chorazy z herbem rodu gracza (`campaign_banner_small`) przed namiotem wodza; wozy gracza (`bd_cart_a..c`, najwyzej 6) z boku; konie i juczne z taboru gracza
-     (SpawnMonster, najwyzej 12, bez bydla). Brak prefabu ROT - nastepny z listy (namioty Native), sprawdzane raz na proces `GameEntity.PrefabExists`.
+     `Tent_Small` po jednym na 6 ludzi (najwyzej 40), rzedami po 6 symetrycznie po obu stronach osi (od 18 m za srodkiem), ognisko co trzy namioty (najwyzej 14), od 60 ludzi `Tent_Officer`; przy armii
+     chorazy z herbem rodu gracza (`campaign_banner_small`) przed namiotem wodza; wozy gracza (`bd_cart_a..c`, najwyzej 6) z przodu obozu po lewej; konie i juczne z taboru gracza
+     (SpawnMonster, najwyzej 12, bez bydla) rzedem z przodu po prawej. Brak prefabu ROT - nastepny z listy (namioty Native), sprawdzane raz na proces `GameEntity.PrefabExists`.
      Miejsce kazdego elementu, gracza i siedzacych sprawdzane jak w PD (same odczyty sceny): drzewo/skala (najwyzsze cialo > 0.8 m nad terenem,
      maska cial z PD) albo woda w punkcie - przesuniecie do 8 m (9 prob), inaczej element pominiety; probki 7 x 7 co 10 m przed budowa - odczyt wody albo
      cial "zalewajacy" ponad 90% sceny jest dla tej sceny pomijany (PD robi to samo dla wody). Linia `Spacer po obozie (m97): probki terenu N | woda | drzewa/skaly`.

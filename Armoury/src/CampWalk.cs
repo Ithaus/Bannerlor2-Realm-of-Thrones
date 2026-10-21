@@ -284,7 +284,8 @@ namespace Armoury
             if (Put(m, Fire, ref mainFire, up, 1.2f)) { fires.Add(mainFire); _fires++; }
             Vec2 myBed = mainFire + right * 2.4f - up * 0.5f;
             if (Put(m, Bed, ref myBed, -right, 0.8f)) _beds++;
-            SpawnHeroHorse(m, hero, mainFire + right * 4.5f + up * 2f, up);
+            Vec2 myHorse = mainFire + right * 4.5f + up * 2f;
+            if (FreeSpot(m, ref myHorse, up, 1f)) SpawnHeroHorse(m, hero, myHorse, up);
 
             int tents = healthy >= perTent ? Math.Min(MaxTents, (healthy + perTent - 1) / perTent) : 0;
             if (healthy > 0 && tents == 0)
@@ -304,14 +305,14 @@ namespace Armoury
                 if (Put(m, TentLeader, ref lead, -up, 3.5f)) _tents++;
                 if (army && banner != null) SpawnBearer(m, team, troops, lead - up * 5f + right * 3f, -up, banner);
                 if (healthy >= 60) { Vec2 off = _c + up * 10f + right * 12f; if (Put(m, TentOfficer, ref off, -up, 3f)) _tents++; }
-                // namioty zolnierskie rzedami po 5 po obu stronach, ognisko co trzy namioty
+                // namioty zolnierskie rzedami po 6, symetrycznie po obu stronach osi obozu (x = -8, +8, -16, +16, -24, +24), ognisko co trzy namioty
                 int placed = 0;
                 for (int row = 0; placed < tents && row < 10; row++)
                 {
-                    for (int col = 0; col < 5 && placed < tents; col++)
+                    for (int col = 0; col < 6 && placed < tents; col++)
                     {
-                        float side = (placed % 2 == 0) ? -1f : 1f;
-                        Vec2 p = _c + up * (18f + row * 10f) + right * (side * (8f + col * 8f));
+                        float side = (col % 2 == 0) ? -1f : 1f;
+                        Vec2 p = _c + up * (18f + row * 10f) + right * (side * (8f + (col / 2) * 8f));
                         if (Put(m, TentSmall, ref p, -up, 2.5f)) _tents++;
                         placed++;
                         if (placed % 3 == 0 && fires.Count < MaxFires)
@@ -323,16 +324,14 @@ namespace Armoury
                 }
             }
 
-            // wozy taborowe gracza z boku obozu
+            // wozy taborowe gracza z przodu obozu po lewej (rzedy namiotow zaczynaja sie 18 m za srodkiem), konie na postoju z przodu po prawej
             int carts = Math.Min(MaxCarts, CampCart.Carts);
             for (int i = 0; i < carts; i++)
             {
-                Vec2 p = _c - right * 14f + up * (i * 5f);
+                Vec2 p = _c - up * 12f - right * (6f + i * 5f);
                 if (Put(m, Cart, ref p, up, 2f)) _carts++;
             }
-
-            // konie na postoju: wierzchowce i juczne z taboru, rzadem po drugiej stronie
-            SpawnHorses(m, party, _c + right * 16f, up);
+            SpawnHorses(m, party, _c - up * 12f + right * 6f, right);
 
             // ludzie przy ogniskach (najwyzej cap), noca czesc spi przy ogniskach
             int men = Math.Min(cap, troops.Count);
@@ -601,7 +600,7 @@ namespace Armoury
                     for (int j = 0; j < k && n < MaxHorses; j++)
                     {
                         Vec2 p = start + along * (n * 2.2f) + side * (float)(_rng.NextDouble() * 0.6);
-                        if (!m.IsPositionInsideBoundaries(p)) { n++; continue; }
+                        if (!m.IsPositionInsideBoundaries(p) || Blocked(m, p, 1f)) { n++; continue; }
                         var pos = Ground(m, p);
                         var face = side;
                         var a = m.SpawnMonster(el.EquipmentElement, default(EquipmentElement), in pos, in face, -1);
