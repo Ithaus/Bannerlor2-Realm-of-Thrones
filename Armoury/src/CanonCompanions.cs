@@ -502,7 +502,9 @@ namespace Armoury
         {
             try
             {
-                if (!_on || victim == null || detail != KillCharacterAction.KillCharacterActionDetail.Lost || !IsCanonHero(victim)) return;
+                if (!_on || victim == null || detail != KillCharacterAction.KillCharacterActionDetail.Lost) return;
+                EnsureLoaded();
+                if (!IsCanonHero(victim)) return;
                 string k = Key(victim);
                 string src;
                 if (_removingKey != null && _removingKey == k) src = _removingWhy;

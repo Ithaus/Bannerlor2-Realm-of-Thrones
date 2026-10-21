@@ -247,6 +247,8 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
   usuniec; druzyna postaci jest rozwiazywana (`StartDisband`, pusta - `DestroyPartyAction` od razu), potem gra niszczy pozostale partie rodu jak dotad. Inni sluchacze
   `OnClanDestroyed` (BK tytuly, ROT) widza rod juz bez tej postaci - jak gdyby odeszla dzien wczesniej. Do sprawdzenia w dlugim biegu: linia `ratunek` przy RenlyDeath
   (Brienne -> Tarth, potem m16) i JeorMutiny (Benjen, Samwell, Yoren -> Snow, jesli zyja), brak linii `NIE przez Armoury` dla Brienne/Nocnej Strazy.
+- **Dziedziczenie rodu (bez zmian, znane):** postac A jest doroslym lordem rodu - gdy glowa rodu zginie poza wydarzeniem ROT (bitwa), gra moze wybrac ja na
+  nowa glowe (np. Brienne po Renlym, Jaime po Tywinie). Glowa rodu nie zmienia rodu ani nie odchodzi - jej pozniejsze zmiany stron sa POMINIETE z linia (`glowa rodu ...`), ratunek tez jej nie dotyczy.
 
 - **Kolejnosc nasluchow przy nowej grze:** ROT tworzy wedrowcow w swoim `OnNewGameCreated`; jesli nasz nasluch idzie wczesniej (kolejnosc modulow), A przechodza
   przy `FollowUpEnd` (bez partii z petli nowej gry - partie przyjda z doby rodu). B blokuje faza tworzenia gry niezaleznie od kolejnosci. W logu: `wyzwalacz start
