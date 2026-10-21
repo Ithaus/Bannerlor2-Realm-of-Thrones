@@ -193,7 +193,8 @@ namespace Armoury
         private readonly Random _rng = new Random();
         private bool _built;
         private float _poseT, _t;
-        private int _tents, _fires, _beds, _carts, _men, _sleep, _horses, _props, _failed, _bearer;
+        private int _tents, _fires, _beds, _carts, _men, _sleep, _horses, _props, _failed, _bearer, _moved, _blocked;
+        private bool _waterOff, _topOff;   // jak PD: odczyt wody albo cial, ktory "zalewa" prawie cala scene (ponad 90% probek), jest dla tej sceny pomijany
         private Vec2 _c;
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
@@ -257,6 +258,7 @@ namespace Armoury
             _c = Centre(m);
             var up = new Vec2(0f, 1f);
             var right = new Vec2(1f, 0f);
+            Probe(m);
 
             // zdrowi ludzie druzyny (bez bohaterow) - lista postaci do scenki
             var troops = new List<CharacterObject>();
@@ -273,14 +275,15 @@ namespace Armoury
 
             // gracz: 6 m przed srodkiem, patrzy na oboz
             Vec2 me = _c - up * 6f;
+            FreeSpot(m, ref me, up, 0.6f);
             var player = SpawnPlayer(m, team, hero, me, up);
 
             // ognisko gracza i jego poslanie (sam gracz albo maly oddzial)
             var fires = new List<Vec2>();
             Vec2 mainFire = _c + right * 3f;
-            if (Put(m, Fire, mainFire, up)) { fires.Add(mainFire); _fires++; }
+            if (Put(m, Fire, ref mainFire, up, 1.2f)) { fires.Add(mainFire); _fires++; }
             Vec2 myBed = mainFire + right * 2.4f - up * 0.5f;
-            if (Put(m, Bed, myBed, -right)) _beds++;
+            if (Put(m, Bed, ref myBed, -right, 0.8f)) _beds++;
             SpawnHeroHorse(m, hero, mainFire + right * 4.5f + up * 2f, up);
 
             int tents = healthy >= perTent ? Math.Min(MaxTents, (healthy + perTent - 1) / perTent) : 0;
@@ -291,16 +294,16 @@ namespace Armoury
                 {
                     double ang = Math.PI * 0.4 + i * (Math.PI * 1.6 / Math.Max(1, healthy));
                     Vec2 p = mainFire + new Vec2((float)Math.Cos(ang), (float)Math.Sin(ang)) * 2.6f;
-                    if (Put(m, Bed, p, mainFire - p)) _beds++;
+                    if (Put(m, Bed, ref p, mainFire - p, 0.8f)) _beds++;
                 }
             }
             if (healthy >= perTent)
             {
                 // namiot wodza za srodkiem obozu, chorazy z herbem przy armii
                 Vec2 lead = _c + up * 10f;
-                if (Put(m, TentLeader, lead, -up)) _tents++;
+                if (Put(m, TentLeader, ref lead, -up, 3.5f)) _tents++;
                 if (army && banner != null) SpawnBearer(m, team, troops, lead - up * 5f + right * 3f, -up, banner);
-                if (healthy >= 60) { Vec2 off = _c + up * 10f + right * 12f; if (Put(m, TentOfficer, off, -up)) _tents++; }
+                if (healthy >= 60) { Vec2 off = _c + up * 10f + right * 12f; if (Put(m, TentOfficer, ref off, -up, 3f)) _tents++; }
                 // namioty zolnierskie rzedami po 5 po obu stronach, ognisko co trzy namioty
                 int placed = 0;
                 for (int row = 0; placed < tents && row < 10; row++)
@@ -309,12 +312,12 @@ namespace Armoury
                     {
                         float side = (placed % 2 == 0) ? -1f : 1f;
                         Vec2 p = _c + up * (18f + row * 10f) + right * (side * (8f + col * 8f));
-                        if (Put(m, TentSmall, p, -up)) _tents++;
+                        if (Put(m, TentSmall, ref p, -up, 2.5f)) _tents++;
                         placed++;
                         if (placed % 3 == 0 && fires.Count < MaxFires)
                         {
                             Vec2 f = p - up * 5.5f;
-                            if (Put(m, Fire, f, up)) { fires.Add(f); _fires++; }
+                            if (Put(m, Fire, ref f, up, 1.2f)) { fires.Add(f); _fires++; }
                         }
                     }
                 }
@@ -325,7 +328,7 @@ namespace Armoury
             for (int i = 0; i < carts; i++)
             {
                 Vec2 p = _c - right * 14f + up * (i * 5f);
-                if (Put(m, Cart, p, up)) _carts++;
+                if (Put(m, Cart, ref p, up, 2f)) _carts++;
             }
 
             // konie na postoju: wierzchowce i juczne z taboru, rzadem po drugiej stronie
@@ -362,7 +365,7 @@ namespace Armoury
             Log.Info(CampWalk.P + "wejscie | scena " + (SceneName ?? "?") + " | " + (night ? "noc" : "dzien") + (army ? ", armia" : "") + " | ludzi zdrowych " + healthy
                      + " (namiot na " + perTent + ") | namioty " + _tents + " (zolnierskich wedlug ludzi " + tents + "), poslania " + _beds + ", ogniska " + _fires
                      + ", wozy " + _carts + "/" + CampCart.Carts + " | agenci ludzi " + _men + " z limitu " + cap + " (spiacych " + _sleep + ")" + (_bearer > 0 ? ", chorazy z herbem" : "")
-                     + " | konie " + _horses + " | elementy " + _props + (_failed > 0 ? ", nieudane " + _failed : "") + " | gracz " + (player != null ? "tak" : "NIE")
+                     + " | konie " + _horses + " | elementy " + _props + " (przesuniete przez drzewa/skaly/wode " + _moved + ", pominiete " + _blocked + ")" + (_failed > 0 ? ", nieudane " + _failed : "") + " | gracz " + (player != null ? "tak" : "NIE")
                      + " | srodek " + _c.x.ToString("0", CultureInfo.InvariantCulture) + "," + _c.y.ToString("0", CultureInfo.InvariantCulture) + ".");
         }
 
@@ -402,11 +405,84 @@ namespace Armoury
             return new Vec3(p.x, p.y, h);
         }
 
-        private bool Put(Mission m, string[] names, Vec2 at, Vec2 facing)
+        // wzor Practice Drills (public domain): najwyzsze cialo fizyczne nad punktem (drzewo, skala, budynek sceny) i woda; maski cial jak w PD (Top / Ground)
+        private const BodyFlags TopMask = (BodyFlags)7378688;
+        private static readonly float[,] Shifts = { { 0f, 0f }, { 3f, 0f }, { -3f, 0f }, { 0f, -4f }, { 0f, 4f }, { 5f, 0f }, { -5f, 0f }, { 3f, -5f }, { -3f, 5f } };
+
+        /// <summary>Czy w promieniu r wokol punktu cos stoi (drzewo, skala - cialo wyzej niz 0.8 m nad terenem) albo jest woda. Tylko odczyt sceny.</summary>
+        private bool Blocked(Mission m, Vec2 at, float r)
+        {
+            try
+            {
+                var sc = m.Scene;
+                for (int i = 0; i < 5; i++)
+                {
+                    Vec2 p = i == 0 ? at : at + new Vec2(i == 1 ? r : i == 2 ? -r : 0f, i == 3 ? r : i == 4 ? -r : 0f) * 0.7f;
+                    float g = sc.GetTerrainHeight(p, true);
+                    float top = sc.GetGroundHeightAtPosition(new Vec3(p.x, p.y, 1000f, -1f), TopMask);
+                    if (!_topOff && top > g + 0.8f && top < g + 200f) return true;
+                    if (i == 0 && !_waterOff)
+                    {
+                        float w = sc.GetWaterLevelAtPosition(p, false, true);
+                        if (w > -5000f && w < 5000f && w > g - 0.05f) return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>Probki 7 x 7 co 10 m wokol srodka: gdy woda albo "cos stoi" na ponad 90% probek - ten odczyt jest dla tej sceny pomijany (wzor PD).</summary>
+        private void Probe(Mission m)
+        {
+            int all = 0, wet = 0, top = 0;
+            try
+            {
+                var sc = m.Scene;
+                for (int ix = -3; ix <= 3; ix++)
+                    for (int iy = -3; iy <= 3; iy++)
+                    {
+                        Vec2 p = _c + new Vec2(ix * 10f, iy * 10f);
+                        if (!m.IsPositionInsideBoundaries(p)) continue;
+                        all++;
+                        float g = sc.GetTerrainHeight(p, true);
+                        float t = sc.GetGroundHeightAtPosition(new Vec3(p.x, p.y, 1000f, -1f), TopMask);
+                        if (t > g + 0.8f && t < g + 200f) top++;
+                        float w = sc.GetWaterLevelAtPosition(p, false, true);
+                        if (w > -5000f && w < 5000f && w > g - 0.05f) wet++;
+                    }
+            }
+            catch (Exception e) { CampWalk.Stumble("Probe", e); }
+            _waterOff = all > 0 && wet > all * 0.9f;
+            _topOff = all > 0 && top > all * 0.9f;
+            Log.Info(CampWalk.P + "probki terenu " + all + " | woda " + wet + (_waterOff ? " (odczyt wody pomijany)" : "") + " | drzewa/skaly " + top
+                     + (_topOff ? " (odczyt cial pomijany)" : "") + ".");
+        }
+
+        /// <summary>Wolne miejsce najblizej at (przesuniecia jak PD); false - nic wolnego w granicach sceny.</summary>
+        private bool FreeSpot(Mission m, ref Vec2 at, Vec2 facing, float r)
+        {
+            facing.Normalize();
+            var side = new Vec2(facing.y, -facing.x);
+            for (int i = 0; i < Shifts.GetLength(0); i++)
+            {
+                Vec2 p = at + side * Shifts[i, 0] + facing * Shifts[i, 1];
+                if (!m.IsPositionInsideBoundaries(p) || Blocked(m, p, r)) continue;
+                if (i > 0) _moved++;
+                at = p;
+                return true;
+            }
+            _blocked++;
+            return false;
+        }
+
+        /// <summary>Prefab z listy (pierwszy istniejacy) w wolnym miejscu najblizej at (at = miejsce koncowe), BEZ FIZYKI (jak CampScene). Wywrotka = bez elementu.</summary>
+        private bool Put(Mission m, string[] names, ref Vec2 at, Vec2 facing, float r)
         {
             string name = CampWalkPrefabs.First(names);
             if (name == null) return false;
-            if (!m.IsPositionInsideBoundaries(at)) return false;
+            if (facing.LengthSquared < 0.0001f) facing = new Vec2(0f, 1f);
+            if (!FreeSpot(m, ref at, facing, r)) return false;
             try
             {
                 var pos = Ground(m, at);
@@ -444,7 +520,7 @@ namespace Armoury
 
         private bool SpawnSitter(Mission m, Team team, CharacterObject ch, Vec2 at, Vec2 facing, string pose)
         {
-            if (ch == null || !m.IsPositionInsideBoundaries(at)) return false;
+            if (ch == null || !m.IsPositionInsideBoundaries(at) || Blocked(m, at, 0.5f)) return false;
             try
             {
                 var pos = Ground(m, at);

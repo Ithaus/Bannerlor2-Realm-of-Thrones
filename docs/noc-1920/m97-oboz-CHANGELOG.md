@@ -52,6 +52,9 @@ transportowe". Rozpoznanie `docs/ROZPOZNANIE-OBOZ-2026-10-20.md` rozdz. 1, 2, 4,
      `Tent_Small` po jednym na 6 ludzi (najwyzej 40), rzedami po obu stronach, ognisko co trzy namioty (najwyzej 14), od 60 ludzi `Tent_Officer`; przy armii
      chorazy z herbem rodu gracza (`campaign_banner_small`) przed namiotem wodza; wozy gracza (`bd_cart_a..c`, najwyzej 6) z boku; konie i juczne z taboru gracza
      (SpawnMonster, najwyzej 12, bez bydla). Brak prefabu ROT - nastepny z listy (namioty Native), sprawdzane raz na proces `GameEntity.PrefabExists`.
+     Miejsce kazdego elementu, gracza i siedzacych sprawdzane jak w PD (same odczyty sceny): drzewo/skala (najwyzsze cialo > 0.8 m nad terenem,
+     maska cial z PD) albo woda w punkcie - przesuniecie do 8 m (9 prob), inaczej element pominiety; probki 7 x 7 co 10 m przed budowa - odczyt wody albo
+     cial "zalewajacy" ponad 90% sceny jest dla tej sceny pomijany (PD robi to samo dla wody). Linia `Spacer po obozie (m97): probki terenu N | woda | drzewa/skaly`.
    - Ludzie: zolnierze druzyny gracza (bez bohaterow), najwyzej **CampWalkMaxMen (40)**, `SimpleAgentOrigin` (bez powiazania z rosterem - zadne zdarzenie misji
      nie zabierze nikogo z druzyny), Controller None, bez broni; po 4 przy ognisku (siedza, w godzinach obozu albo noca polowa spi), reszta limitu lezy przy
      namiotach. Pozy co 1.5 s (tylko postawieni ludzie). Scenografia **bez fizyki** (jak CampScene - sprawdzony sposob).
@@ -93,8 +96,8 @@ udzwigu jucznego - 50 kg. Materialy: rama i kola z drewna, okucia z narzedzi; si
 - Warsztat, kuznia i samonaprawa (`WorkshopNightRest` 23-5) - inna regula (noc warsztatu), bez zmian. `HideoutAlarm` (noc 21-5, slyszalnosc w kryjowce) - bez zmian.
 - **Spacer = pierwsza wlasna misja w naszych modach, NIEPRZETESTOWANA w grze** (zakaz uruchamiania gry tej nocy). Nie sprawdzone: czy widoki "Camp" dzialaja
   bez spotkania (PD otwiera "CustomBattle"; my "Camp" jak SandBox OpenCampMission bez MapEvent), powrot do `arm_camp_wait` po Tab (PD wraca do swojego menu tak samo),
-  zachowanie BK/ROT na `OnMissionStarted` z `CampaignMissionComponent` (PD ma to samo w trybie odwiedzin), polozenie namiotow ROT (skala, obrot, drzewa i skaly -
-  bez sprawdzania kolizji; gracz przechodzi przez namioty - bez fizyki), czy zestaw `as_human_hideout_bandit` i pozy PD sa w ROT. Kazdy element w try z licznikiem
+  zachowanie BK/ROT na `OnMissionStarted` z `CampaignMissionComponent` (PD ma to samo w trybie odwiedzin), polozenie namiotow ROT (skala, obrot; drzewa, skaly i woda sprawdzane odczytem
+  sceny jak w PD, bez gwarancji przy gestym lesie; gracz przechodzi przez namioty - bez fizyki), czy zestaw `as_human_hideout_bandit` i pozy PD sa w ROT. Kazdy element w try z licznikiem
   potkniec - wywrotka jednego elementu = bez niego. Wydajnosc: tylko na zadanie gracza; najwyzej 40 ludzi + 12 koni + ok. 60 elementow.
 - Nasze zachowania misji dopinane do kazdej misji (FieldCraft, HitScribe, GuardMaster, BrokenMen, RoutKeeper, BattleSense, HorseFateMission, CampScene): dzialaja
   tez w misjach wsi/miast; HorseFateMission liczy tylko jezdzcow z PartyBase (nasi maja SimpleAgentOrigin, bez koni) - zero wpisow. CampScene: `IsFieldBattle` false - nic.
@@ -128,6 +131,6 @@ CartLoadKg, CartSpeedPenaltyPercent, PackSaddle*) w pliku nie istnieja - MCM wez
 Linie do grep: `NightRest: oboz swiata`, `Woz obozowy (m97)`, `Spacer po obozie (m97)`, `CampWalk.`, `CampCart.` (bledy w Log.Error).
 
 **Co zostalo (etap 1 - czesciowo):** spacer nieprzetestowany w grze (pierwsza wlasna misja - autotest z wejsciem do sceny przed wgraniem, `bieg-bitwa.ps1`
-nie obejmuje tej misji); bez kolizji z drzewami i skalami przy stawianiu namiotow; bez fizyki namiotow; ludzie tylko siedza/spia (chodzenie, jedzenie, rozmowy,
+nie obejmuje tej misji); srodek obozu staly (srodek granic sceny - bez szukania najrowniejszego miejsca jak PD); bez fizyki namiotow; ludzie tylko siedza/spia (chodzenie, jedzenie, rozmowy,
 cwiczenia - etap 2); bez dzwiekow obozu (zasoby PD - etap 2); woz nie jest przedmiotem ekwipunku (nie widac go w ekranie ekwipunku, tylko w menu i w scenie);
 markietani i miasteczko obozowe - etap 2 (decyzja zadania).
