@@ -72,6 +72,7 @@ namespace Armoury
                 _duesLand = _duesOld = 0; _duesSaved = 0;
                 bool land = CrownIncome.On && s.CrownDuesFromLand;   // 165 (2.6): podstawa powinnosci = czesc "ziemia" D stalego (korona nie bierze 3% z wlasnych wyplat)
                 var model = TaleWorlds.CampaignSystem.Campaign.Current.Models.ClanFinanceModel;
+                OptBegin(s);   // m99-optym (KingdomTreasury.Optim.cs): pamiec wojny krolestw tej doby od zera
                 foreach (var c in TaleWorlds.CampaignSystem.Clan.All)
                 {
                     try
@@ -98,8 +99,7 @@ namespace Armoury
                             }
                         }
                         if (income <= 0f) continue;
-                        bool war = false;
-                        try { foreach (var k in TaleWorlds.CampaignSystem.Kingdom.All) if (k != c.Kingdom && !k.IsEliminated && c.Kingdom.IsAtWarWith(k)) { war = true; break; } } catch { }
+                        bool war = WarOf(c.Kingdom);   // m99-optym (OptimDailyCache): raz na krolestwo na dobe; klucz NIE - stara droga 1:1 (WarOld = dotychczasowy przeglad Kingdom.All)
                         // DS F3 (K1): przy ustalonych firmach pomoc lennikow w wojnie DsVassalAidWarPercent (10% - "dziesiata" panow), w pokoju jak dotad (2%);
                         // recenzja 17.10: w przejsciu (rampa DsRampDays od ustalenia firm) stawka idzie liniowo od starej do nowej
                         float wOld = s.CrownDuesWarPercent, wNew = Math.Max(0f, Math.Min(33f, s.DsVassalAidWarPercent));
@@ -123,6 +123,7 @@ namespace Armoury
                          + "; od startu sesji " + (_duesSkippedSess + _duesModelErrSess) + ")"
                          + (land ? "; podstawa (165): czesc ziemia D stalego u " + _duesLand + " rodow, stara (dochod modelu + renty - brak pomiaru D stalego) u " + _duesOld
                             + (_duesSaved > 0 ? ", ziemia z zapisu (f19-e3, pierwsza doba po wczytaniu) u " + _duesSaved : "") : "") + ".");
+                OptEnd(s);   // m99-optym: linia kontrolna tylko przy Optim Verify
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }

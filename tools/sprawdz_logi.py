@@ -1928,6 +1928,9 @@ Uzycie (Python 3, tylko odczyt):
                     OB-0 start (klucz, udzial), OB-1 linie "ERROR in SideVillageVisit." 0, OB-2 kazda bitwa z obroncami zamknieta (druzyna nie przezywa bitwy; ostatnia
                     otwarta na koncu logu - INFO), OB-3 straty z ludnosci <= obroncow, OB-4 obroncow <= pulapu ludnosci (1/10 w domu, najwyzej 60), OB-5 druzyny
                     sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
+--grupa m99optym   : (21.10, galaz w-toku/m99-optym; Armoury/src/KingdomTreasury.Optim.cs) optymalizacja przelomu doby. python -I tools/sprawdz_logi.py --grupa m99optym
+                    <Armoury-*.log> [--baza-doby <Armoury-*.log bazy>]. MO-0 linia startu, MO-1 takt doby i KingdomTreasury.Daily wobec bazy (INFO), MO-2 Optim Verify
+                    roznice 0, MO-3 ERROR 0.
 --grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
                     Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
@@ -54269,6 +54272,92 @@ def m97obroncy_main(logp):
     return 0
 
 
+M99O_PRE = "Optym (m99): "
+M99O_PROF = re.compile(r"Profil doby \(E8/0\): dzien (\d+) \| takt doby ([\d.]+) ms \(wywolan \d+; top: (.*?)\); inne")
+M99O_CHK = re.compile(r"porownan (\d+), roznic (\d+) \(sesja")
+
+
+def m99optym_prof(logp):
+    """Linie "Profil doby (E8/0)": lista (takt doby, {sekcja: ms}) z calego logu (strumieniowo)."""
+    rows = []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "Profil doby (E8/0)" not in ln:
+                continue
+            m = M99O_PROF.search(ln)
+            if not m:
+                continue
+            secs = {}
+            for p in m.group(3).split(", "):
+                mm = re.match(r"(.+) ([\d.]+)$", p.strip())
+                if mm:
+                    secs[mm.group(1)] = float(mm.group(2))
+            rows.append((float(m.group(2)), secs))
+    return rows
+
+
+def m99optym_stat(rows, n=60):
+    """Mediana / srednia taktu doby i srednia KingdomTreasury.Daily w oknie ostatnich n dob (sekcja spoza "top" = 0)."""
+    w = rows[-n:]
+    if not w:
+        return None
+    tak = sorted(r[0] for r in w)
+    kt = [r[1].get("KingdomTreasury.Daily", 0.0) for r in w]
+    return {"n": len(w), "med": tak[len(tak) // 2], "avg": sum(tak) / len(tak), "kt": sum(kt) / len(kt)}
+
+
+def m99optym_main(logp, basep=None):
+    """m99optym (21.10, galaz w-toku/m99-optym): optymalizacja przelomu doby (KingdomTreasury.Optim.cs). MO-0 linia startu "Optym (m99): start" (klucze),
+    MO-1 takt doby i KingdomTreasury.Daily (mediana / srednia ostatnich 60 dob; z --baza-doby <log bazy> - roznica wobec bazy) - INFO z liczba,
+    MO-2 tryb kontrolny (Optim Verify): roznice starej i nowej drogi = 0 (bez linii kontrolnych - INFO), MO-3 linie ERROR KingdomTreasury / OptimStartLine = 0.
+    Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, chk, errs = [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and ("KingdomTreasury" in s or "OptimStartLine" in s):
+                errs += 1
+            if not s.startswith(M99O_PRE):
+                continue
+            t = s[len(M99O_PRE):]
+            if t.startswith("start"):
+                start.append(t)
+            elif "kontrola (Optim Verify)" in t:
+                chk.append(t)
+    rows = m99optym_prof(logp)
+    st = m99optym_stat(rows)
+    print(f"plik: {logp} | start {len(start)}, linie kontrolne {len(chk)}, doby profilu {len(rows)}, ERROR {errs}")
+    if not start:
+        rep.add("MO-0: linia startu Optym (m99)", "brak linii", "INFO (log sprzed galezi m99-optym)", None)
+    else:
+        rep.add("MO-0: linia startu Optym (m99)", start[-1][:200], "jest", True)
+    if st:
+        val = f"takt doby mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms, KingdomTreasury.Daily srednio {st['kt']:.1f} ms ({st['n']} dob)"
+        if basep:
+            bs = m99optym_stat(m99optym_prof(basep))
+            if bs:
+                val += (f" | baza: mediana {bs['med']:.1f} / srednia {bs['avg']:.1f}, KingdomTreasury.Daily {bs['kt']:.1f} ms ({bs['n']} dob)"
+                        f" | roznica mediany {st['med'] - bs['med']:+.1f} ms, KingdomTreasury.Daily {st['kt'] - bs['kt']:+.1f} ms")
+        rep.add("MO-1: takt doby (ostatnie 60 dob) wobec bazy", val, "INFO (zmiennosc biegu; oczekiwane KingdomTreasury.Daily nizej o ok. 1-3 ms)", None)
+    else:
+        rep.add("MO-1: takt doby (ostatnie 60 dob) wobec bazy", "brak linii Profil doby (E8/0)", "INFO", None)
+    if chk:
+        cmp_sum, diff_sum = 0, 0
+        for t in chk:
+            m = M99O_CHK.search(t)
+            if m:
+                cmp_sum += int(m.group(1)); diff_sum += int(m.group(2))
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", f"porownan {cmp_sum}, roznic {diff_sum} w {len(chk)} dobach", "roznic 0 (porownan > 0)",
+                diff_sum == 0 and cmp_sum > 0)
+    else:
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony)", None)
+    rep.add("MO-3: linie ERROR KingdomTreasury / OptimStartLine", f"{errs}", "0", errs == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -54594,6 +54683,8 @@ def main(argv):
         return m97obroncy_main(logp)   # m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs)
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+    if group == "m99optym" and logp:
+        return m99optym_main(logp, bdp)   # m99optym (21.10, galaz w-toku/m99-optym): takt doby wobec bazy, tryb kontrolny Optim Verify (KingdomTreasury.Optim.cs)
     if group == "m98plotki" and logp:
         return m98plotki_main(logp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:

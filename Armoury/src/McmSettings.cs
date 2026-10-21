@@ -7048,6 +7048,14 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfSutlerWageOnce { get; set; } = true;
 
+        [SettingPropertyBool("Optim Daily Cache", HintText = "at the turn of the day the crown dues ask once per kingdom whether that kingdom is at war, instead of once for every clan - the same dues, less work; off = asked for every clan, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimDailyCache { get; set; } = true;
+
+        [SettingPropertyBool("Optim Verify", HintText = "check mode for the day speed-ups: both ways are worked out, the game keeps the old one and the log counts any difference (for testing only - slower); off = only the fast way", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimVerify { get; set; } = false;
+
         [SettingPropertyBool("Perf Town Tax Fast Hooks", HintText = "the town tax with rents (the lines somebody really pays, the council wages) asks Banner Kings directly instead of through slow reflection - the same numbers, less work each time a town's tax is counted; off = through reflection, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfTownTaxFastHooks { get; set; } = true;
@@ -10589,6 +10597,8 @@ namespace Armoury
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
+            s.OptimDailyCache = OptimDailyCache;
+            s.OptimVerify = OptimVerify;
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.PerfSutlerWageExact = PerfSutlerWageExact;
             s.PerfProbeEachPlace = PerfProbeEachPlace;
