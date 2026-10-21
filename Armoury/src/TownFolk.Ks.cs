@@ -103,6 +103,8 @@ namespace Armoury
             // m105 gosp4 G3 (Ks Village Own Grain First): ziarno i sol ponad reszte budzetu najpierw z magazynu wsi - sztuki wedlug pozycji (polowa towaru liczona razem z G3 po
             // drabinie), kcal, sztuki i wartosc przy cenie polki (linia)
             public bool OwnGs; public int[] OwnEarly; public double OwnK, OwnPcs, OwnZl;
+            // m105 gosp4 G4 (Ks Village Chest Refill): wies DS ponizej skrzyni - kwota odlozona z budzetu reszty drabiny (zl), naprawde odjeta (-1: wies nie ponizej skrzyni)
+            public double Refill, RefillCut = -1;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -275,6 +277,26 @@ namespace Armoury
             catch (Exception e) { Stumble("Zc4BuyVillage(nadwyzka na skok ceny)", e); b.Spike = false; b.SpikeRoom = 0; }
         }
 
+        /// <summary>m105 gosp4 G4 (Ks Village Chest Refill; n32: 73 wsie W i 31 E ponizej skrzyni wydawaly caly budzet z wplywu): wies DS z kiesa ponizej skrzyni odklada
+        /// lam x (skrzynia - kiesa) / DsVillageChestDays z budzetu reszty drabiny (po ziarnie i soli - ZcLadder). Wies nie DS, na skrzyni albo ponad, DsVillageChestDays 0 -
+        /// bez odkladania (RefillCut -1). Nie rzuca.</summary>
+        private static void ChestRefillOf(ZcBuy b, Village vil, double lam)
+        {
+            try
+            {
+                var st = vil != null ? vil.Settlement : null;
+                if (st == null || !DsVillage.On(st) || !(lam > 0)) return;
+                int cd = DsVillage.ChestDaysNow;
+                if (cd <= 0) return;
+                double gap = DsVillage.Chest(vil) - vil.Gold;
+                if (!(gap >= 1)) return;
+                double r = lam * gap / cd;
+                if (!(r > 0) || double.IsInfinity(r)) return;
+                b.Refill = r; b.RefillCut = 0;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(skrzynia z budzetu)", e); b.Refill = 0; b.RefillCut = -1; }
+        }
+
         /// <summary>m103 wsie (Ks Village Basket At Shelf): c sztuk towaru z przycietych budzetem z biezacego wplywu (cena pw za sztuke) - liczone tylko przy pozycji koszyka
         /// (count) i w miastach obok (zakup zastepczy - piwo za wino, ziarno na piwo - bez drugiego liczenia); w miastach obok przyciete schodzi z braku towaru (nie liczy sie
         /// drugi raz ani jako popyt bez towaru). Recenzja W1: osobno rzeczy (szczebel 2) i narzedzia.</summary>
@@ -403,6 +425,8 @@ namespace Armoury
             { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; b.K1Kcal = b.K1Zl = 0; }
             if (b.CapOn && StartCalibration.SwGrainSpike) SpikeRoomOf(b, vil, lam);     // m105 gosp4 G2: kiesa przed zakupem (jak skrzynia kroku 5)
             b.OwnGs = b.CapOn && StartCalibration.SwOwnGrainFirst && StartCalibration.SwOwnFirst; b.OwnEarly = null; b.OwnK = b.OwnPcs = b.OwnZl = 0;   // m105 gosp4 G3
+            b.Refill = 0; b.RefillCut = -1;
+            if (b.CapOn && StartCalibration.SwChestRefill) ChestRefillOf(b, vil, lam);   // m105 gosp4 G4: kiesa przed zakupem
             try { ZcLadder(b, vil, mk, n, resGS); }
             finally
             {
@@ -412,7 +436,7 @@ namespace Armoury
                 {
                     StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
                                                   b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
-                    StartCalibration.Zc4NoteM105(mk, b.K1Kcal, b.K1Zl, b.SpikePaid, b.OwnPcs, b.OwnZl, -1);   // m105 gosp4: segment linii ZC4
+                    StartCalibration.Zc4NoteM105(mk, b.K1Kcal, b.K1Zl, b.SpikePaid, b.OwnPcs, b.OwnZl, b.RefillCut);   // m105 gosp4: segment linii ZC4
                     if (b.SpikePaid > 0) DsVillage.SpikeNote(vil.Settlement, b.SpikePaid);     // m105 gosp4 G2: krok 5 tej i nastepnych dob mniej o to samo
                 }
                 b.CapOn = false; b.NoCap = false; b.InF2 = false; b.Spike = false; b.SpikeRoom = 0;
@@ -656,6 +680,8 @@ namespace Armoury
             int ns = n[StartCalibration.ZSalt]; if (b.OwnGs) ns -= ZcOwnGs(b, vil, StartCalibration.ZSalt, ns);
             ZcTake(b, StartCalibration.ZSalt, ns, 0); done[StartCalibration.ZSalt] = true;
             b.Lim = lim; b.NoCap = false;
+            // m105 gosp4 G4 (Ks Village Chest Refill): wies ponizej skrzyni - budzet reszty drabiny mniejszy o czesc braku skrzyni (ziarno i sol wyzej nietkniete); pieniadz zostaje w kiesie
+            if (b.CapOn && b.Refill > 0) { double c = Math.Min(b.Refill, Math.Max(0.0, b.Cap)); b.Cap -= c; b.RefillCut = c; }
             // m105 gosp4 G1 (klucz Ks Village Cheap Kcal First, tylko z budzetem W1): napoje, bialko i reszta jedzenia jedna lista wedlug zl za 1000 kcal przy cenie polki doby
             // (bez towaru na koncu), zamiana wino -> piwo -> piwo domowe po przejsciu (ten sam budzet); rzeczy jak dotad po calym jedzeniu (4). Plan (KsBasket.Rungs) bez zmian.
             if (b.CapOn && StartCalibration.SwCheapKcalFirst) ZcCheapKcal(b, n, done);

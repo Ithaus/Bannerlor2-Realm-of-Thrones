@@ -635,18 +635,28 @@ namespace Armoury
         // ============================================================ ds-akumulator (noc 17/18.10): miary kies i skrzyn, roboty gminy po budowach
         private static readonly Dictionary<string, double> _akChest = new Dictionary<string, double>();   // id wsi -> skrzynia tej doby (SurplusDay)
         private static readonly List<double> _akGold = new List<double>(), _akCh = new List<double>(), _akRat = new List<double>();
-        private static int _akDay = -1;
+        private static int _akDay = -1, _akPoor;
+
+        /// <summary>m105 gosp4 (linia "Akumulator kies", M5G-7): wsie DS z dzisiejszego kroku 4 z kiesa ponizej min(1000 zl, skrzynia) i wszystkie wsie kroku 4; false - doby nie bylo.</summary>
+        internal static bool AkPoor(out int poor, out int n)
+        {
+            poor = 0; n = 0;
+            if (_akDay != Today || _akGold.Count == 0) return false;
+            poor = _akPoor; n = _akGold.Count;
+            return true;
+        }
 
         private static void AkNote(Settlement st, int gold, double chest)
         {
             try
             {
                 int today = Today;
-                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); }
+                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); _akPoor = 0; }
                 if (st == null || st.StringId == null) return;
                 _akChest[st.StringId] = chest;
                 _akGold.Add(Math.Max(0, gold)); _akCh.Add(Math.Max(0, chest));
                 if (chest >= 1) _akRat.Add(Math.Max(0, gold) / chest);
+                if (gold < Math.Min(1000.0, chest)) _akPoor++;                   // m105 gosp4 (M5G-7): wies biedna - kiesa ponizej 1000 zl i ponizej skrzyni (tylko licznik)
             }
             catch (Exception e) { Stumble("AkNote", e); }
         }
