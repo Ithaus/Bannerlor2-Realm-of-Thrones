@@ -74,9 +74,35 @@ if (Test-Path -LiteralPath $imgRoot -PathType Container) {
         }
     }
 }
+# 21.10 m103-lektor: nagrania lektora - Armoury\ModuleData\Lektor\**\*.wav i arm_lektor.tsv (podkatalogi - petla arm_*.tsv wyzej bierze tylko ModuleData);
+# kopia .bak, lustro i md5 jak reszta. $lekMd5: md5 nagran z kolumny 4 arm_lektor.tsv - nagranie z zerami (dysk C) nie idzie do gry (kontrola zrodel nizej)
+$lekDir = Join-Path $Tree 'Armoury\ModuleData\Lektor'
+$lekMd5 = @{}
+if (Test-Path -LiteralPath $lekDir -PathType Container) {
+    $lekFull = (Resolve-Path -LiteralPath $lekDir).Path.TrimEnd('\')
+    foreach ($f in @(Get-ChildItem -LiteralPath $lekDir -Recurse -File | Where-Object { ($_.Extension -eq '.wav' -or $_.Extension -eq '.tsv') -and $_.Name -notlike '*.bak-*' })) {
+        $r0 = 'Armoury\ModuleData\Lektor\' + $f.FullName.Substring($lekFull.Length + 1)
+        if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
+        if ($f.Name -eq 'arm_lektor.tsv') {
+            foreach ($ln in @(Get-Content -LiteralPath $f.FullName)) {
+                if (-not $ln -or $ln.StartsWith('#')) { continue }
+                $c = $ln.Split("`t")
+                if ($c.Count -ge 4 -and $c[3].Trim().Length -eq 32) { $lekMd5[(Join-Path (Split-Path -Parent $r0) $c[2].Trim())] = $c[3].Trim().ToLowerInvariant() }
+            }
+        }
+    }
+}
 foreach ($i in $items) {
     if (-not (Test-Path -LiteralPath $i.src -PathType Leaf)) { Write-Host ("STOP: brak zrodla " + $i.src); exit 2 }
     if ((Get-Item -LiteralPath $i.src).Length -eq 0) { Write-Host ("STOP: zrodlo puste " + $i.src); exit 2 }
+    if ($i.name -like '*.wav') {   # m103-lektor: naglowek RIFF/WAVE, rozmiar = 44 + dane, md5 z arm_lektor.tsv (gdy jest)
+        $fs = [IO.File]::OpenRead($i.src)
+        try { $h = New-Object byte[] 44; $null = $fs.Read($h, 0, 44); $len = $fs.Length } finally { $fs.Close() }
+        if ([Text.Encoding]::ASCII.GetString($h, 0, 4) -ne 'RIFF' -or [Text.Encoding]::ASCII.GetString($h, 8, 4) -ne 'WAVE' -or ([int64][BitConverter]::ToUInt32($h, 40) + 44) -ne $len) {
+            Write-Host ("STOP: " + $i.src + " nie jest dobrym plikiem WAV (zera albo uciety?)"); exit 2
+        }
+        if ($lekMd5.ContainsKey($i.name) -and (Md5 $i.src) -ne $lekMd5[$i.name]) { Write-Host ("STOP: " + $i.src + " ma inny md5 niz w arm_lektor.tsv (zera?)"); exit 2 }
+    }
     if ($i.dll) {
         $b = [IO.File]::ReadAllBytes($i.src)
         if ($b.Length -lt 2 -or $b[0] -ne 0x4D -or $b[1] -ne 0x5A) { Write-Host ("STOP: " + $i.src + " nie jest plikiem PE"); exit 2 }
