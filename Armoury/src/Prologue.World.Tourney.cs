@@ -132,9 +132,18 @@ namespace Armoury
             }
         }
 
+        /// <summary>Recenzja m104: koniec pierwszenstwa kanonu w GrandTourney (CanonApi.SetHeroes(null, null)) - gdy scena konczy sie bez zdarzenia konca turnieju GT
+        /// (pominiety, odwolany, turniej zniknal); GT zeruje go tez przy kazdej kampanii (konstruktor TourneyBehavior).</summary>
+        private static void GtClear()
+        {
+            if (!GtReady()) return;
+            try { _gtSetHeroes.Invoke(null, new object[] { null, null }); } catch (Exception e) { WStumble("GtClear", e); }
+        }
+
         private static void TourneySkip(string why, double day)
         {
             _thPhase = -1; _thWhy = why;
+            GtClear();
             Log.Info(WTag + "Turniej Reki POMINIETY albo ODWOLANY - " + why + " (dzien prologu " + D(day) + ").");
         }
 
@@ -177,6 +186,7 @@ namespace Armoury
             if (game == null)
             {
                 _thPhase = 3; _thDay = day; _thWinner = "?"; _thHow = "zniknal bez linii zwyciezcy";
+                GtClear();
                 Log.Info(WTag + "Turniej Reki: turnieju w " + kl.StringId + " juz nie ma (bez linii zwyciezcy) - koniec sceny (dzien prologu " + D(day) + ").");
                 return;
             }

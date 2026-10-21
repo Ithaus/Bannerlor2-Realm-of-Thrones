@@ -21,7 +21,9 @@ namespace GrandTourney
         private List<string> _hostCooldowns = new List<string>();   // "townId|day"
         private List<string> _adoptSilence = new List<string>();     // "townId|day" - po odwolaniu nie przejmuj od razu
 
-        public TourneyBehavior() { Instance = this; }
+        // m104-e5 (recenzja): turniej kanonu Armoury (CanonApi) - stan statyczny zerowany przy kazdej kampanii (nowa i wczytana), inaczej kampania klasyczna wczytana
+        // po prologu z nierozstrzygnietym Turniejem Reki dostawalaby kolejnosc kanonu w Krolewskiej Przystani; Armoury podaje uczestnikow ponownie po wczytaniu.
+        public TourneyBehavior() { Instance = this; CanonApi.SetHeroes(null, null); }
 
         public override void SyncData(IDataStore dataStore)
         {

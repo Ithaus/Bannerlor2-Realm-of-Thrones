@@ -207,13 +207,16 @@ namespace GrandTourney
                     if (lordOut) swapped++; else added++;
                 }
 
+                // m104-e5 (recenzja): ilu uczestnikow kanonu naprawde weszlo do drabinki (odpadli przez prog umiejetnosci, rane albo nieobecnosc - nie liczeni)
+                int canonIn = 0;
+                if (canon != null) foreach (var c in list) if (c != null && c.IsHero && c.HeroObject != null && canon.Contains(c.HeroObject.StringId)) canonIn++;
                 if (added > 0 || present > 0)
                     Log.Info("Szranki " + settlement.Name + ": lordow w miescie " + present +
                              ", w drabince bylo " + lordsIn + ", dolozono " + added +
                              (wounded > 0 ? ", rannych/jencow " + wounded : "") +
                              (unskilled > 0 ? ", bez wyszkolenia " + unskilled : "") +
                              (other > 0 ? ", innych odrzuconych " + other : "") +
-                             (canon != null ? ", turniej kanonu: uczestnikow kanonu " + canon.Count + ", zastapionych lordow " + swapped : "") + ".");
+                             (canon != null ? ", turniej kanonu: uczestnikow kanonu w drabince " + canonIn + "/" + canon.Count + ", zastapionych lordow " + swapped : "") + ".");
             }
             catch (Exception e) { Log.Error("NoblesFightPatch", e); }
         }
