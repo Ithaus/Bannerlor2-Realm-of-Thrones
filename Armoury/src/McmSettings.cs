@@ -9008,6 +9008,14 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueKings { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Scenes", HintText = "in a Prologue 298 campaign the events of the half year before the War of the Five Kings are told in story windows like those of Realm of Thrones (23 scenes from A Game of Thrones, from the death of Jon Arryn to the arrest of Lord Eddard), each on its day while you are on the map; a scene missed in battle or captivity comes afterwards. Your own pictures: Modules/Armoury/Images/Prolog/prolog_01.png to prolog_23.png. Off = no story windows (the world changes the same)", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueScenes { get; set; } = true;
+
+        [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyGroup("Story windows")]
+        public bool StoryImagesForRotWindows { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11259,6 +11267,8 @@ namespace Armoury
             s.ProloguePeace = ProloguePeace;
             s.ProloguePacts = ProloguePacts;
             s.PrologueKings = PrologueKings;
+            s.PrologueScenes = PrologueScenes;
+            s.StoryImagesForRotWindows = StoryImagesForRotWindows;
         }
 
         internal static void Apply()

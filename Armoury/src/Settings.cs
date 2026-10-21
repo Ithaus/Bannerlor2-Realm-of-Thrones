@@ -3993,6 +3993,14 @@ namespace Armoury
         // m101-prolog E2 (Prologue.Kings.cs): w nowej kampanii z prologiem Robert (ROTlord_506) i Ned (ROTlord_512) wczytani z XML jako zywi, glowy rodow i wladcy;
         // koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu Krolewskiej Przystani; egzekucja Neda w NedEvent ROT. Czytany przy tworzeniu kampanii.
         public bool PrologueKings = true;                  // in a new Prologue 298 campaign King Robert Baratheon and Lord Eddard Stark are alive: Robert rules the crown's realm and House Baratheon of King's Landing, Ned rules the North and House Stark. On day 186 the King dies of wounds from a boar hunt, Joffrey takes the throne and Ned is thrown into the dungeons of King's Landing; his execution opens the story of Realm of Thrones. Off = both stay dead as in Realm of Thrones. Only new campaigns
+        // m103-sceny E4 (Prologue.Scenes.cs): 23 sceny prologu wedlug ksiazki (projekt pkt 2) jako okna w wygladzie wydarzen ROT - kazda w swoim dniu prologu, gdy gracz
+        // na mapie (takze w menu osady i w niewoli; nie w bitwie, rozmowie, misji), zalegle po kolei; scena dnia 186 po smierci krola. Czytany na zywo. Nowy klucz.
+        public bool PrologueScenes = true;                 // in a Prologue 298 campaign the events of the half year before the War of the Five Kings are told in story windows like those of Realm of Thrones (23 scenes from A Game of Thrones, from the death of Jon Arryn to the arrest of Lord Eddard), each on its day while you are on the map; a scene missed in battle or captivity comes afterwards. Your own pictures: Modules/Armoury/Images/Prolog/prolog_01.png to prolog_23.png. Off = no story windows (the world changes the same)
+
+        // --- Story windows ---
+        // m103-sceny (RotWindowPictures.cs): obrazki Jeffa w oknach wydarzen ROT - plik Modules\Armoury\Images\ROT\rot_<KlasaROT>_<n>.png|jpg zastepuje obrazek tego
+        // okna (prefiks EventScreen.OnActivate, oryginal wraca przy zamknieciu); bez pliku nic sie nie zmienia. Czytany na zywo. Nowy klucz.
+        public bool StoryImagesForRotWindows = true;       // the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones
 
         public static void Load(string moduleDataDir)
         {

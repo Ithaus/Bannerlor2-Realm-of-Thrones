@@ -66,6 +66,8 @@ namespace Armoury
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
                 // m101-prolog: okno wyboru startu nowej kampanii (Prologue 298 / Classic 299) - prefiks MBGameManager.StartNewGame, raz na proces; wlasny try
                 try { Prologue.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Prologue.ApplyAll", e); }
+                // m103-sceny: obrazki Jeffa w oknach wydarzen ROT (prefiks / postfiks EventScreen OnActivate / OnDeactivate, odbicie - bez typow ROT); wlasny try
+                try { RotWindowPictures.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RotWindowPictures.ApplyAll", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
@@ -438,6 +440,14 @@ namespace Armoury
                 try { RoadsideInnStay.AppTick(); }
                 catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
             }
+            // m103-sceny: straznik scen prologu 298 i okien opowiesci (4 razy na sekunde; zamkniecie okna bez przycisku, kolejka zwolnien obrazkow z plikow - w kazdej
+            // kampanii; sceny tylko w kampanii z prologiem; wlasny try w srodku) - tu tylko blad ladowania typu (okno dziedziczy po typie ROT), liczony; po 3 straznik
+            // nie startuje do konca sesji (gra bez zmian). PRZED returnem wiosek - inaczej klucz Map Villages = off wylaczylby sceny.
+            if (_storyTickFails < 3)
+            {
+                try { StoryTick(); }
+                catch (Exception e) { _storyTickFails++; Log.Error("Prologue.Scenes: straznik nie laduje sie (proba " + _storyTickFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -459,6 +469,21 @@ namespace Armoury
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
         private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
+        private static int _storyTickFails;   // m103-sceny: blad ladowania typu straznika scen prologu (Prologue.ScenesAppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void StoryTick()
+        {
+            Prologue.ScenesAppTick();
+        }
+
+        /// <summary>m103-sceny: wyjscie z kampanii - okno opowiesci zerowane, obrazki z plikow zwolnione od razu (StoryPictures.ReleaseAll).</summary>
+        public override void OnGameEnd(Game game)
+        {
+            base.OnGameEnd(game);
+            try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
+            try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
+        }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RoadsideInnsTick()

@@ -199,6 +199,7 @@ namespace Armoury
             ResetPeace();
             ResetKings();
             ResetEnd();
+            ResetScenes();   // m103-sceny: maska scen prologu
         }
 
         // ---------------------------------------------------------------- zapis
@@ -206,7 +207,7 @@ namespace Armoury
         internal static string Pack()
         {
             if (!Active) return "";
-            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings() + PackEnd();
+            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings() + PackEnd() + PackScenes();   // m103-sceny: sc= / sk=
         }
 
         internal static void Unpack(string v)
@@ -227,6 +228,7 @@ namespace Armoury
             UnpackPeace(map);
             UnpackKings(map);
             UnpackEnd(map);
+            UnpackScenes(map);   // m103-sceny: zapis bez "sc=" (WGRANIE 101) - minione sceny pominiete przy pierwszym ticku mapy
             if (Active) OnPrologueCampaign("wczytany zapis");
         }
 
@@ -388,6 +390,8 @@ namespace Armoury
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             try { Prologue.StartLine(); } catch (Exception e) { Prologue.Stumble("StartLine", e); }
+            try { Prologue.ScenesStartLine(); } catch (Exception e) { Prologue.Stumble("ScenesStartLine", e); }   // m103-sceny: linia startu scen prologu
+            try { RotWindowPictures.StartLine(); } catch (Exception e) { Prologue.Stumble("RotWindowPictures.StartLine", e); }   // m103-sceny: obrazki okien (kazda kampania)
         }
     }
 }
