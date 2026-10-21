@@ -1,13 +1,14 @@
 # Raport nocny 20/21.10 dla Jeffa
 
-Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC ### 102-106, a przekazanie dla drugiego konta w PRZEKAZANIE-2026-10-21.md.
+Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC ### 102-106 (ostatnie wgranie: 106), a przekazanie dla drugiego konta w PRZEKAZANIE-2026-10-21.md.
 
 ## W skrócie
 
 - **WGRANIE 96** jest w grze od 20.10 19:30. Przeszło trzy testy: bitwy, nową kampanię na 180 dób i 160 dób na starym zapisie. Wszystkie bez wywrotki i z 0 błędów w logu Armoury.
 - **WGRANIE 97** jest w grze od 20.10 23:20 (wioski boczne i ich obrońcy, obóz, szkolenie, posiłki, surowce do łuków). Przeszło dwa pełne zestawy testów (97 i 97b z poprawkami po recenzji scalenia), wszystkie bez błędów. W Twoich ustawieniach MCM zmieniłem obóz na 21:00-3:00 (była 0:00-6:00); kopia starego pliku jest obok.
 - **WGRANIE 98** (plotki za kufel, pijaństwo i kac) jest w grze od 21.10 00:55. Testy przeszły bez błędów.
-- **WGRANIE 99** (markietani w dużych obozach): _test w toku, wynik niżej_.
+- **WGRANIE 99** (markietani w dużych obozach) jest w grze od 21.10 03:50. Testy przeszły bez błędów.
+- **VoiceActingPatchRemake jest wyłączony** (jak chciałeś). Postacie w rozmowach nie mówią już głosem z Fish Audio. Kopia listy modów jest obok (LauncherData.xml.bak-2026-10-21-bez-voiceacting).
 - **Twoje zapisy są nietknięte.** Testy sprawdzają to za każdym razem (104 pliki, sumy kontrolne bez zmian).
 - **Limit tygodniowy:** około 95% przy pisaniu. Rzeczy, których nie zdążyłem, są rozpisane do przekazania na końcu raportu.
 
@@ -30,7 +31,7 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **Bandyci noszą jedzenie i złoto**, jedzą codziennie, a gdy głodują, część z nich odchodzi.
 - **Sakiewki ludzi według potrzeby, koszyk ludu, płótno i sukno** w planie wsi.
 
-## Co wchodzi w 99 (markietani - po teście)
+## Co weszło w 99 (markietani, już w grze)
 
 - **Gdzie:** w menu obozu opcja **„Visit the sutlers' row”**, gdy masz co najmniej 150 ludzi albo jesteś w armii (także w cudzej: opcja jest w menu armii).
 - **Ile kramów:** 1 na 100 ludzi, najwyżej 12.
