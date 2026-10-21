@@ -800,11 +800,12 @@ namespace Armoury
             try
             {
                 Charging = true;
-                TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, s, rate);
+                TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, s, rate, PayNotes.Quiet(false));   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons
             }
             catch { }
             finally { Charging = false; }
-            TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(
+            if (PayNotes.On) PayNotes.Paid("forgeday", rate, " to hire the forge in " + s.Name + " for a full day, paid up front.");   // m96-wies: jeden komunikat z powodem
+            else TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(
                 "The forge is yours for a full day - " + rate + " gold, paid up front.",
                 TaleWorlds.Library.Colors.Yellow));
             Log.Info("DayPass: kuznia w " + s.Name + " oplacona na 24h za " + rate + ".");

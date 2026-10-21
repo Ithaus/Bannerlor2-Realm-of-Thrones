@@ -8684,6 +8684,14 @@ namespace Armoury
         [SettingPropertyGroup("The castle menu")]
         public bool CastleMenuTidy { get; set; } = true;
 
+        [SettingPropertyBool("Village Menu Tidy", HintText = "the village menu is put in order like the town and castle menus: the village's books and dealings (People of this land, Estates and livelihood, Look over the district, Invest in the district's works, Living Economy, Banner Kings, buying a house) move into a new 'Village affairs'; day labour into 'Look for paid work'. Recruiting, buying products, the walk, hostile actions, your house, your own village, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the village menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("The village menu")]
+        public bool VillageMenuTidy { get; set; } = true;
+
+        [SettingPropertyBool("Player Payment Reasons", HintText = "when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare 'You paid N' / 'You received N' is replaced by one message that says what for, with the split (e.g. 'You paid 2 for your night at a common room in Seagard (bed 1, horse 1).'). Only the message changes - sums and payers stay the same. Off = the game's message as before", RequireRestart = false)]
+        [SettingPropertyGroup("Payment messages")]
+        public bool PlayerPaymentReasons { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -10854,6 +10862,8 @@ namespace Armoury
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
             s.TownMenuTidy = TownMenuTidy;
             s.CastleMenuTidy = CastleMenuTidy;
+            s.VillageMenuTidy = VillageMenuTidy;
+            s.PlayerPaymentReasons = PlayerPaymentReasons;
         }
 
         internal static void Apply()

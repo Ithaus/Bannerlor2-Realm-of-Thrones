@@ -264,7 +264,7 @@ namespace Armoury
                     compLog.Append(b.Comp[i].StringId).Append(' ').Append(b.CompQ[i] < 0 ? "stajnia" : QLog[b.CompQ[i]]).Append(' ').Append(paid + b.CompPurse[i]);
                 }
                 int compPaid = compGoldPaid + compPursePaid;
-                int playerTax, playerCrown, playerPaid = RoadHeroPays(me, vs, b.PlayerCost, false, out playerTax, out playerCrown);
+                int playerTax, playerCrown, playerPaid = RoadHeroPays(me, vs, b.PlayerCost, PayNotes.Quiet(false), out playerTax, out playerCrown);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons (InnNote)
                 int crownAll = purseCrown + compCrown + playerCrown;
                 long diff = RoadWorld(vs, b.Comp) + crownAll - w0;   // korona DS poza suma posiadaczy noclegu - dodana z powrotem (przelew wies -> korona)
                 int paidAll = menPaid + compPaid + playerPaid, taxAll = purseTax + compTax + playerTax, purseAll = paidAll - taxAll - crownAll;
@@ -287,8 +287,9 @@ namespace Armoury
                          + " | osoby " + b.Persons + ": stajnia " + b.People[0] + ", wspolna izba " + b.People[1] + ", porzadna karczma " + b.People[2] + ", dobry dom " + b.People[3]
                          + " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%.");
                 string men = b.Foot + b.Mounted == 0 ? "" : " Your men paid " + menPaid + " from their purses" + (b.MenStable > 0 ? ", " + b.MenStable + " of them sleep in the stable." : ".");
-                Log.Player("You take lodgings at a " + QualityOf(q) + " in " + inn.Name + " - " + paidAll + " denars in all, " + playerPaid + " of them yours." + men
-                           + (compPaid > 0 ? " Your companions paid " + compPaid + "." : ""));
+                string comps = compPaid > 0 ? " Your companions paid " + compPaid + "." : "";
+                InnNote("roadinn", q, inn.Name, b, playerPaid, men + comps,   // m96-wies: jeden komunikat z powodem i rozbiciem (klucz wylaczony - jak dotad)
+                        "You take lodgings at a " + QualityOf(q) + " in " + inn.Name + " - " + paidAll + " denars in all, " + playerPaid + " of them yours." + men + comps);
                 NightRest.BeginInnSleep();
             }
             catch (Exception e) { RoadStumble("RoadCommit", e); }

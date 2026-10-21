@@ -531,8 +531,10 @@ namespace Armoury
                     var hero = win.LeaderHero;
                     if (hero != null && hero.IsAlive)
                     {
-                        GiveGoldAction.ApplyForPartyToCharacter(party.Party, hero, g);
+                        bool pn = hero == Hero.MainHero && PayNotes.On;   // m96-wies: graczowi jeden komunikat z powodem zamiast "You received N" gry
+                        GiveGoldAction.ApplyForPartyToCharacter(party.Party, hero, g, pn);
                         int moved = g - party.PartyTradeGold;
+                        if (pn) PayNotes.Got("villagers", moved, ": the purse of the beaten villagers" + (party.HomeSettlement != null ? " of " + party.HomeSettlement.Name : "") + ".");
                         _cToHero += moved; _cToHeroN++; _cLost += g - moved;
                         if (hero == Hero.MainHero) _cToPlayer += moved;
                         if (BeatenPurse.On) Ransom178.NoteBeatenGold(hero, moved);   // 3.2: korona 1/9 od wodza-wasala (prawo trzecich 178); wylaczone 3.2 = jak dotad

@@ -1015,6 +1015,15 @@ Uzycie (Python 3, tylko odczyt):
                     bitwach z panem), SZB-3 najwyzej 'maks.' naraz (200) i jedna na okreg (okregow = aktywnych), SZB-3b limit nie skraca czasu (zastapione + odrzucone
                     przez limit <= 25% nowych, szubienice gracza nie zastapione), SZB-4 bez drogi <= 50% bitw z panem, SZB-5 wybor miejsca <= 2 ms, SZB-6 potkniecia,
                     pominiete obrazki i ERROR 0, SZB-7 obrazki i probki linii 'postawiona' (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa m96wies   : (20.10, m96-wies - Jeff 20.10 "Wioski menu tez ustaw jak w miescie i zamkach" i "You paid 2 - powinno byc, za co"; Armoury/src/VillageMenus.cs,
+                    PayNotes.cs; klucze VillageMenuTidy i PlayerPaymentReasons) python -I tools/sprawdz_logi.py --grupa m96wies <Armoury-*.log> (strumieniowo).
+                    WS-0 linie 'Menu wsi (m96-wies): start' (kazde wczytanie; blad/brak 0; ERROR paczki bez linii startu - NIE), WS-1 przeniesione = znalezione
+                    z planu, naszych nie znalezionych 0 (pelny zestaw modow 8 z 8; WS-1b cudze bez wpisu - INFO), WS-2 wejscia 'Village affairs' i 'Look for paid
+                    work' wpiete i w menu wsi, WS-3 nic nie zginelo (przed - przeniesione + wejscia = teraz; opcji planu we wsi 0; leave, trade, recruit_volunteers,
+                    hostile_action, village_center zostaja), WS-3b menu wsi po zmianie (INFO), WS-4 'ERROR in VillageMenus', 'ERROR in OnAfterGameInitializationFinished
+                    (VillageMenus)' i linie BLAD/BRAK 0; PN-0 linie 'Komunikaty platnosci (m96-wies): start' (nasluch zwiadu wpiety), PN-1 podmienione komunikaty
+                    (INFO, wg powodu), PN-2 komunikaty gry graczowi bez powodu (INFO - miejsca do dopisania), PN-3 'ERROR in PayNotes' 0.
+                    Autotest nie klika menu i nie placi - komunikaty sprawdza Jeff. Log bez paczki: INFO, bez wyjatku.
 --grupa m96zamek  : (20.10, m96-zamek - Jeff 20.10 "menu zamku tez uporzadkuj"; Armoury/src/CastleMenus.cs; klucz CastleMenuTidy)
                     python -I tools/sprawdz_logi.py --grupa m96zamek <Armoury-*.log> (strumieniowo). ZM-0 linie 'Menu zamku (m96-zamek): start' (kazde wczytanie
                     i nowa kampania; blad/brak 0; ERROR paczki bez linii startu - NIE), ZM-1 przeniesione = znalezione z planu, naszych nie znalezionych 0 (pelny
@@ -11525,7 +11534,7 @@ def etap7_w3(rep, lines, start, win, until=120, **kw):
         if "WYLACZONY" in s or "NIEWPIETA" in s:
             rep.add("E7/W3 T1: pozycja w menu (ostatnia sesja)", body[:200], "klucz DistrictMenuEnabled wlaczony, pozycja wpieta", False)
         else:
-            v = re.search(r"village index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
+            v = re.search(r"village(?: -> \S+)? index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)   # m96-wies: 'village -> arm_vm_affairs_menu index K z M'
             lo = re.search(r"village_looted index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
             book = "ksiega wiosek czynna" in s
             rep.add("E7/W3 T1: \"Look over the district\" w menu village i village_looted (ostatnia sesja)", body[:260],
@@ -36766,6 +36775,124 @@ def p6szubienice_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m96wies (20.10, m96-wies: porzadek menu wsi jak miasta i zamku + komunikaty platnosci z powodem;
+# Armoury/src/VillageMenus.cs, PayNotes.cs; klucze VillageMenuTidy, PlayerPaymentReasons)
+M96WIES_HEAD = "Menu wsi (m96-wies): start | "
+M96WIES_PLAN = ("arm_people_village", "arm_estates_village", "arm_district_village", "arm_works_village", "bee_village_root", "bannerkings_village_submenu",
+                "rc_home_buy_village", "rc_work_labour_village")
+M96WIES_PLAN_AFFAIRS = 7   # pierwsze 7 planu - "Village affairs", reszta - "Look for paid work"
+# opcje, ktore MUSZA zostac w menu wsi (jesli byly): wyjazd, kupno towarow i werbunek (GameMenuEventHandler "village"), wrogie czyny (podmenu gry), spacer
+M96WIES_KEEP = ("leave", "trade", "recruit_volunteers", "hostile_action", "village_center")
+M96WIES_ERR = ("ERROR in VillageMenus", "ERROR in OnAfterGameInitializationFinished (VillageMenus)")
+M96WIES_HUBS = ("arm_vm_affairs", "arm_vm_work")
+M96WIES_BEFORE = re.compile(r"\| menu wsi przed (?P<n>\d+) opcji: (?P<ids>[^|]*) \|")
+M96WIES_MOVED = re.compile(r"\| przeniesione (?P<n>\d+) z (?P<plan>\d+) w planie: ")
+M96WIES_HUBSIN = re.compile(r"\| wejscia podmenu wpiete (?P<n>\d+) \(")
+M96WIES_MISS = re.compile(r"\| nie znaleziono cudzych (?P<f>\d+)(?: \[(?P<fl>[^\]]*)\])?, naszych (?P<o>\d+)(?: \[(?P<ol>[^\]]*)\])?")
+M96WIES_AFTER = re.compile(r"\| menu wsi teraz (?P<n>\d+) opcji: (?P<ids>.*)$")
+M96WIES_PN = "Komunikaty platnosci (m96-wies): "
+M96WIES_PN_SWAP = re.compile(r"Komunikaty platnosci \(m96-wies\): (?:zaplata|wplyw|komunikat gry wylaczony \(nasz mowi powod\)) (?P<kind>\S+) (?P<amt>\d+) \| podmienione w sesji (?P<n>\d+)")
+M96WIES_PN_GAME = re.compile(r"Komunikaty platnosci \(m96-wies\): komunikat gry bez powodu \((?P<what>You paid|You received) (?P<amt>\d+)\) \| .*?\| wolajacy: (?P<where>.*?) \| takich w sesji (?P<n>\d+)")
+
+
+def m96wies_main(logp):
+    """m96wies (20.10, m96-wies; klucze VillageMenuTidy, PlayerPaymentReasons): porzadek menu wsi - ksiegi Armoury, okreg, BEE, BK i kupno domu RC do "Village affairs",
+    dniowka RC do "Look for paid work" (te same obiekty opcji); werbunek, kupno towarow, spacer, wrogie czyny, dom i wioska poboczna zostaja. Komunikaty platnosci gracza
+    z powodem zamiast golego "You paid N" gry + zwiad komunikatow gry bez powodu. Wejscie: log Armoury (strumieniowo). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("WS-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, n_err, pn_starts, pn_swap, pn_game, pn_err = [], 0, [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M96WIES_HEAD):
+                starts.append(s)
+            elif s.startswith(M96WIES_ERR):
+                n_err += 1
+            elif s.startswith(M96WIES_PN):
+                if s.startswith(M96WIES_PN + "start"):
+                    pn_starts.append(s)
+                else:
+                    mm = M96WIES_PN_SWAP.match(s)
+                    if mm:
+                        pn_swap.append(mm.groupdict())
+                    else:
+                        mg = M96WIES_PN_GAME.match(s)
+                        if mg:
+                            pn_game.append(mg.groupdict())
+            elif s.startswith("ERROR in PayNotes") or s.startswith("ERROR in OnAfterGameInitializationFinished (PayNotes)"):
+                pn_err += 1
+    print(f"plik: {logp} | linii startu menu wsi {len(starts)}, ERROR in VillageMenus (z wywolaniem) {n_err} | komunikaty platnosci: startow {len(pn_starts)}, "
+          f"podmienionych {len(pn_swap)}, komunikatow gry bez powodu {len(pn_game)}, ERROR {pn_err}")
+    if not starts and n_err == 0 and not pn_starts and pn_err == 0:
+        rep.add("WS-0: linia 'Menu wsi (m96-wies): start'", "brak w logu", "INFO (log sprzed paczki m96-wies)", None)
+        rep.show()
+        return 0
+    # ---- menu wsi
+    on = [s for s in starts if s.startswith(M96WIES_HEAD + "WLACZONY (Village Menu Tidy)")]
+    off = [s for s in starts if s.startswith(M96WIES_HEAD + "WYLACZONY w MCM")]
+    bad = [s for s in starts if s.startswith((M96WIES_HEAD + "BLAD", M96WIES_HEAD + "BRAK", M96WIES_HEAD + "WLACZONY, ale"))]
+    rep.add("WS-0: linie startu sesji (kazde wczytanie / nowa kampania)", f"{len(starts)} (wlaczony {len(on)}, wylaczony {len(off)}, blad/brak {len(bad)})",
+            ">= 1, blad/brak 0 (wylaczony - INFO)", None if off and not bad else (len(starts) >= 1 and not bad))
+    if not on:
+        rep.add("WS-1: przeniesienie", "brak linii WLACZONY", "INFO (klucz Village Menu Tidy wylaczony)" if off else "INFO (bez linii startu - blad paczki, patrz WS-4)",
+                None if not bad else False)
+    else:
+        s0 = on[-1]
+        mb, mm, mh, mi, ma = (r.search(s0) for r in (M96WIES_BEFORE, M96WIES_MOVED, M96WIES_HUBSIN, M96WIES_MISS, M96WIES_AFTER))
+        if not (mb and mm and mh and mi and ma):
+            rep.add("WS-1: linia startu rozpoznana", s0[len(M96WIES_HEAD):][:240], "format paczki m96-wies", False)
+        else:
+            before, after = m96zamek_ids(mb.group("ids")), m96zamek_ids(ma.group("ids"))
+            moved, plan, hubs = int(mm.group("n")), int(mm.group("plan")), int(mh.group("n"))
+            miss_f, miss_o = int(mi.group("f")), int(mi.group("o"))
+            in_plan_before = [x for x in M96WIES_PLAN if x in before]
+            rep.add("WS-1: przeniesione opcje planu (wszystkie znalezione)", f"{moved} z {plan} w planie; w menu przed: {len(in_plan_before)}; nie znaleziono cudzych {miss_f}"
+                    + (f" [{mi.group('fl')}]" if mi.group("fl") else "") + f", naszych {miss_o}" + (f" [{mi.group('ol')}]" if mi.group("ol") else ""),
+                    "przeniesione = znalezione w menu przed, naszych nie znalezionych 0 (pelny zestaw modow: 8 z 8)", moved == len(in_plan_before) and miss_o == 0)
+            if miss_f:
+                rep.add("WS-1b: cudze opcje bez wpisu w menu wsi", mi.group("fl") or str(miss_f), "INFO (mod wylaczony albo zmienil id opcji - nie ma jej w grze)", None)
+            want_hubs = int(any(x in before for x in M96WIES_PLAN[:M96WIES_PLAN_AFFAIRS])) + int(any(x in before for x in M96WIES_PLAN[M96WIES_PLAN_AFFAIRS:]))
+            hubs_now = [x for x in M96WIES_HUBS if x in after]
+            rep.add("WS-2: wejscia podmenu wpiete (Village affairs, Look for paid work)", f"{hubs} (w menu teraz: {', '.join(hubs_now) or 'brak'})",
+                    f"= {want_hubs} i wszystkie w menu wsi", hubs == want_hubs and len(hubs_now) == hubs)
+            left = [x for x in M96WIES_PLAN if x in after]
+            lost = [x for x in before if x not in after and x not in M96WIES_PLAN]
+            keep = [x for x in M96WIES_KEEP if x in before and x not in after]
+            sums_ok = len(before) - moved + hubs == len(after) and int(mb.group("n")) == len(before) and int(ma.group("n")) == len(after)
+            rep.add("WS-3: nic nie zginelo (przed - przeniesione + wejscia = teraz)", f"przed {len(before)}, przeniesione {moved}, wejscia {hubs}, teraz {len(after)}"
+                    + (f"; opcje planu dalej we wsi: {', '.join(left)}" if left else "") + (f"; ZNIKNELY: {', '.join(lost)}" if lost else "")
+                    + (f"; brak we wsi (musza zostac): {', '.join(keep)}" if keep else ""),
+                    "rowne, opcji planu we wsi 0, zniknietych 0, leave, trade, recruit_volunteers, hostile_action, village_center zostaja", sums_ok and not left and not lost and not keep)
+            rep.add("WS-3b: menu wsi po zmianie (kolejnosc)", ", ".join(after)[:400], "INFO - werbunek, towary, spacer, wrogie czyny, dom, wejscia przed 'village_wait', wyjazd", None)
+    rep.add("WS-4: bledy paczki (menu wsi)", f"ERROR in VillageMenus (z wywolaniem) {n_err}, linii BLAD/BRAK {len(bad)}", "0", n_err == 0 and not bad)
+    # ---- komunikaty platnosci
+    if not pn_starts:
+        rep.add("PN-0: linia 'Komunikaty platnosci (m96-wies): start'", "brak", "jest przy kazdym wczytaniu (paczka m96-wies)", False if starts else None)
+    else:
+        p0 = pn_starts[-1]
+        rep.add("PN-0: start komunikatow platnosci (klucz, nasluch zwiadu)", ("WLACZONY" if "WLACZONY (Player Payment Reasons)" in p0 else "WYLACZONY") + "; "
+                + ("nasluch wpiety" if "nasluch zwiadu: wpiety" in p0 or "juz wpiety" in p0 else "nasluch NIE wpiety"),
+                "nasluch wpiety (klucz wylaczony - INFO)", ("nasluch zwiadu: wpiety" in p0 or "juz wpiety" in p0) if "WLACZONY (Player" in p0 else None)
+    kinds = {}
+    for d in pn_swap:
+        kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
+    rep.add("PN-1: podmienione komunikaty (wg powodu)", f"{len(pn_swap)}" + (": " + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) if kinds else ""),
+            "INFO (nocleg - inn / roadinn, oplaty E8/D2, ksiazki ...; autotest nie placi)", None)
+    places = {}
+    for d in pn_game:
+        places[d["where"][:160]] = places.get(d["where"][:160], 0) + 1
+    rep.add("PN-2: komunikaty gry graczowi bez powodu (zwiad - miejsca do dopisania)", f"{len(pn_game)} linii" + ("; " + " || ".join(f"{k} ({v})" for k, v in list(places.items())[:6]) if places else ""),
+            "INFO (kazde miejsce stad - kandydat do nastepnej paczki)", None)
+    rep.add("PN-3: bledy komunikatow platnosci", f"ERROR in PayNotes {pn_err}", "0", pn_err == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96zamek (20.10, m96-zamek: porzadek menu zamku jak menu miasta; Armoury/src/CastleMenus.cs, klucz CastleMenuTidy)
 M96ZAMEK_HEAD = "Menu zamku (m96-zamek): start | "
 M96ZAMEK_PLAN = ("manage_garrison", "leave_troops_to_garrison", "arm_garrison_kit_castle", "repair_equipment_castle", "arm_people_castle", "arm_estates_castle",
@@ -46723,7 +46850,7 @@ def npo_main(logp):
     if starts:
         s0 = starts[-1]
         bee_ok = "ukryte" in s0["bee"] or "BEE nieobecny" in s0["bee"]
-        menu_ok = "village index" in s0["menu"] and "index -1" not in s0["menu"]
+        menu_ok = bool(re.search(r"village(?: -> \S+)? index \d+", s0["menu"])) and "index -1" not in s0["menu"]   # m96-wies: takze po przeniesieniu do 'Village affairs'
         rep.add("NPO-0: linia startu (klucz, AI, menu, BEE, krok 112)", f"klucz {s0['key']}, AI {s0['ai']}, menu: {s0['menu'].strip()[:80]}, BEE: {s0['bee'].strip()[:80]}, krok 112 {s0['cart']}",
                 "klucz TAK, AI WYLACZONE (Jeff 16.10), menu wpiete, BEE 5/15/30 ukryte, krok 112 wpiety", s0["key"] == "TAK" and s0["ai"] == "WYLACZONE" and menu_ok and bee_ok and s0["cart"] == "wpiety")
         rep.add("NPO-0b: prace z zapisu", s0["load"].strip()[:160], "INFO", None)
@@ -53484,6 +53611,8 @@ def main(argv):
         return m96wzory_main(logp)   # m96wzory (20.10, w-toku/m96-wzory): wzory tieru 1 po ROT-RBM, naprawa ksiegi z zapisu, losowanie wedlug reki, prog tarcz, unikaty ROT (LoreSeedFix, PatternGate)
     if group == "p6szubienice" and logp:
         return p6szubienice_main(logp)   # p6szubienice (20.10, p6-szubienice R3-07a): szubienice przy rozstajach po rozbitej bandzie / kryjowce (Gallows, GallowsView)
+    if group == "m96wies" and logp:
+        return m96wies_main(logp)   # m96wies (20.10, m96-wies): porzadek menu wsi (VillageMenus) i komunikaty platnosci z powodem (PayNotes)
     if group == "m96zamek" and logp:
         return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
     if group == "m96jakosc" and logp:

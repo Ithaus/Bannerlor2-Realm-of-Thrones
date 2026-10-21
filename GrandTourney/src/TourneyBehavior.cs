@@ -48,7 +48,7 @@ namespace GrandTourney
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
-            try { HostMenu.Add(starter); Log.Info("Menu ogloszenia turnieju dodane."); }
+            try { PayNotes.Reset(); HostMenu.Add(starter); Log.Info("Menu ogloszenia turnieju dodane."); }   // m96-wies: liczniki komunikatow platnosci od zera
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
         }
 
@@ -468,12 +468,14 @@ namespace GrandTourney
                     {
                         _events.Remove(line);
                         TourneyRansom.CallOff(game, town);   // R3-04a: odwolanie bez wykupu
+                        bool toldA = false;   // m96-wies: zwrot z powodem w jednym komunikacie (PlayerPaymentReasons)
                         if (fee > 0)
                         {
                             int back = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);   // pula czekala na zwyciezce - wraca cala
-                            if (back > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back);
+                            if (back > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back, PayNotes.On);
+                            if (back > 0 && PayNotes.On) { PayNotes.Got("refund", back, ": your hosting fee back - war has broken out and the tourney at " + town.Name + " is called off before it began."); toldA = true; }
                         }
-                        if (PlayerHearsOf(town, fee))
+                        if (PlayerHearsOf(town, fee) && !toldA)
                             Log.Player("War has broken out. The tourney at " + town.Name +
                                        " is called off before it began.", true);
                         SilenceAdoption(town.Settlement);
@@ -488,12 +490,14 @@ namespace GrandTourney
                     {
                         _events.Remove(line);
                         SetLocalPrize(game);
+                        bool toldB = false;   // m96-wies: zwrot z powodem w jednym komunikacie (PlayerPaymentReasons)
                         if (fee > 0)
                         {
                             int back2 = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);
-                            if (back2 > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back2);
+                            if (back2 > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back2, PayNotes.On);
+                            if (back2 > 0 && PayNotes.On) { PayNotes.Got("refund", back2, ": your hosting fee back - the lords ride to war and the tourney at " + town.Name + " goes on as a local affair with a modest prize."); toldB = true; }
                         }
-                        if (PlayerHearsOf(town, fee))
+                        if (PlayerHearsOf(town, fee) && !toldB)
                             Log.Player("The lords ride to war. The tourney at " + town.Name +
                                        " goes on as a local affair with a modest prize.", true);
                         SilenceAdoption(town.Settlement);
@@ -528,7 +532,8 @@ namespace GrandTourney
                         if (fee > 0)
                         {
                             int refund = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);
-                            if (refund > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, refund);
+                            if (refund > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, refund, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+                            if (refund > 0 && PayNotes.On) PayNotes.Silent("refund", refund);
                             Log.Player("Too few knights answered at " + town.Name + ". The tourney is held as a " +
                                        "local affair with a modest prize; " + refund + " gold was recovered.", true);
                         }
@@ -572,7 +577,8 @@ namespace GrandTourney
             var s = Settings.Current;
             int back = s.HistoricalTownRates ? purse : (int)(purse * s.CancelledFeeRefund);
             if (back <= 0) return;
-            GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back);
+            GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+            if (PayNotes.On) PayNotes.Silent("purseback", back);
             Log.Player("The tourney at " + (town != null ? town.Name.ToString() : "?") + " " + what + " before a champion was crowned. "
                        + back + " gold of your purse comes back to you.", true);
             Log.Info("Zwrot puli turnieju w " + (town != null ? town.Name.ToString() : "?") + ": " + back + " z " + purse + ".");
@@ -585,8 +591,12 @@ namespace GrandTourney
             try
             {
                 var h = winner != null ? winner.HeroObject : null;
-                if (h != null && h.IsAlive) GiveGoldAction.ApplyBetweenCharacters(null, h, purse, h != Hero.MainHero);
-                else if (town != null) town.ChangeGold(purse);
+                if (h != null && h.IsAlive)
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(null, h, purse, h != Hero.MainHero || PayNotes.On);   // m96-wies: graczowi powod mowi komunikat nizej
+                    if (h == Hero.MainHero && PayNotes.On) PayNotes.Silent("championpurse", purse);
+                }
+                else if (town != null) town.ChangeGold(purse);   // m96-wies: else nalezy do ifa bohatera - pula idzie albo do bohatera, albo do miasta
                 Log.Info("Pula turnieju w " + (town != null ? town.Name.ToString() : "?") + ": " + purse + " -> " + (h != null ? h.Name.ToString() : "kasa miasta"));
                 if (h == Hero.MainHero) Log.Player("The champion's purse is yours: " + purse + " gold.");
             }
@@ -655,7 +665,8 @@ namespace GrandTourney
                 else
                 {
                     takings = lords * s.HostTakingsPerLord + (int)(town.Prosperity * s.HostTakingsProsperityFactor);
-                    if (takings > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, takings);
+                    if (takings > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, takings, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+                    if (takings > 0 && PayNotes.On) PayNotes.Silent("takings", takings);
                 }
 
                 Log.Info("Gospodarz rozliczony: lordow " + lords + ", reputacja +" + lords * s.HostRenownPerLord + ", utarg " + takings);
@@ -723,7 +734,7 @@ namespace GrandTourney
                     GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, town.Settlement, fee - prizeGold, true);
                     if (prizeGold > 0) { int had = Hero.MainHero.Gold; GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, prizeGold, true); purseTaken = had - Hero.MainHero.Gold; }
                 }
-                else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, fee);
+                else { GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, fee, PayNotes.On); if (PayNotes.On) PayNotes.Silent("hostfee", fee); }   // m96-wies: powod mowi "It cost you N gold" nizej
 
                 var game = Campaign.Current.Models.TournamentModel.CreateTournament(town);
                 Campaign.Current.TournamentManager.AddTournament(game);

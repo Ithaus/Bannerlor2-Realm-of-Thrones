@@ -205,10 +205,11 @@ namespace RealisticCaptivity
                         try
                         {
                             if (Settings.Current.HistoricalTownRates) GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, Here, price, true);   // do kasy osady (sprzedajacy - miasto), nie w nicosc
-                            else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, price);
+                            else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, price, PayNotes.On);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons
                             Vault[id] = 0;
                             Stash[id] = new ItemRoster();
-                            Log.Player("The house in " + Here.Name + " is yours.", false);
+                            if (PayNotes.On) PayNotes.Paid("house", price, " for the house in " + Here.Name + ". It is yours.");
+                            else Log.Player("The house in " + Here.Name + " is yours.", false);
                             Log.Info("Kupiono dom: " + id + " za " + price);
                             _cameFrom = Outside();   // m95-menu (recenzja): kupno nie przechodzi przez wejscie "Go to your house" - powrot z osady
                             GameMenu.SwitchToMenu("rc_home");
@@ -269,14 +270,15 @@ namespace RealisticCaptivity
                                 // kupuje osada (jej kasa, najwyzej tyle, ile ma); skarbiec domu to Twoje wlasne pieniadze
                                 pay = Math.Min(pay, TownWageLink.Spare(Here));
                                 if (pay > 0) GiveGoldAction.ApplyForSettlementToCharacter(Here, Hero.MainHero, pay, true);
-                                if (banked > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, banked);
+                                if (banked > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, banked, PayNotes.On);   // m96-wies
                             }
-                            else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay + banked);
+                            else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay + banked, PayNotes.On);   // m96-wies
                             Stash.Remove(id);
                             Vault.Remove(id);
                             // ostatni dom sprzedany - rodzinna chata nie odrasta za darmo
                             if (Vault.Count == 0) FamilyHomeSold = true;
-                            Log.Player("The house in " + Here.Name + " has a new owner. " + (pay + banked) + " gold changes hands.", false);
+                            if (PayNotes.On) PayNotes.Got("housesale", pay + banked, " for your house in " + Here.Name + (banked > 0 ? " (" + pay + " for the house, " + banked + " from its strongbox)" : "") + ". It has a new owner.");
+                            else Log.Player("The house in " + Here.Name + " has a new owner. " + (pay + banked) + " gold changes hands.", false);
                             Log.Info("Sprzedano dom: " + id + " za " + pay + " + skarbiec " + banked);
                             GameMenu.SwitchToMenu(Outside());
                         }
@@ -309,13 +311,15 @@ namespace RealisticCaptivity
                             if (!Vault.ContainsKey(id)) Vault[id] = 0;
                             if (deposit)
                             {
-                                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, amount);
+                                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, amount, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+                                if (PayNotes.On) PayNotes.Silent("strongbox", amount);
                                 Vault[id] += amount;
                             }
                             else
                             {
                                 Vault[id] -= amount;
-                                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, amount);
+                                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, amount, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+                                if (PayNotes.On) PayNotes.Silent("strongbox", amount);
                             }
                             Log.Player(deposit ? amount + " gold rests under your own roof now."
                                                : amount + " gold back in your purse.", false);

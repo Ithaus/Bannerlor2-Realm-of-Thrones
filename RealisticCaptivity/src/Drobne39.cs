@@ -49,7 +49,8 @@ namespace RealisticCaptivity
         /// partii zdobywcy).</summary>
         internal static int PayBribe(int bribe)
         {
-            if (!BribeOn) { GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, bribe); return bribe; }
+            bool pn = PayNotes.On;   // m96-wies: komunikat gry wylaczony - powod mowi "X bribed a guard for you" (Patches.Bribe)
+            if (!BribeOn) { GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, bribe, pn); if (pn) PayNotes.Silent("bribe", bribe); return bribe; }
             PartyBase captor = null;
             try { captor = PlayerCaptivity.CaptorParty; } catch { captor = null; }
             if (captor == null)
@@ -59,8 +60,9 @@ namespace RealisticCaptivity
             }
             // partia lorda: kiesa partii = zloto wodza (MobileParty.PartyTradeGold), ale tylko przelew do bohatera niesie go w zdarzeniu gry
             Hero lord = captor.IsMobile && captor.MobileParty != null && captor.MobileParty.IsLordParty ? captor.LeaderHero : null;
-            if (lord != null) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, lord, bribe);
-            else GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, captor, bribe);
+            if (lord != null) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, lord, bribe, pn);
+            else GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, captor, bribe, pn);
+            if (pn) PayNotes.Silent("bribe", bribe);
             Log.Info("Lapowka (3.9): " + bribe + " zl do kiesy partii zdobywcy " + captor.Name
                      + (lord != null ? " (kiesa " + lord.Name + ")" : (captor.IsMobile ? " (kiesa partii)" : " (kasa osady)")) + " - przelew, nie w nicosc.");
             return bribe;

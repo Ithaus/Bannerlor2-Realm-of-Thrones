@@ -3829,6 +3829,20 @@ namespace Armoury
         // schowek, czekanie, wyjazd zostaja. Wylaczony = menu jak dotad (od nastepnego wczytania). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
         public bool CastleMenuTidy = true;                 // the castle menu is put in order like the town menu: managing and donating to the garrison, kit for the garrison and the castle smith's repairs move into a new "Go to the barracks"; the castle's books and dealings (People of this land, Estates and livelihood, Realm ledger, Living Economy and the castle folk's loan) into "Castle affairs". The dungeon, the lord's hall, the walk, Banner Kings (where the castle's recruits are), Manage castle, the stash, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the castle menu as before
 
+        // --- The village menu ---
+        // m96-wies (Jeff 20.10: "Wioski menu tez ustaw, aby byly poszeregowane jak w miescie i zamkach"): VillageMenus.cs - ten sam wzor co TownMenus i CastleMenus,
+        // raz na sesje (SubModuleMain.OnAfterGameInitializationFinished, po CastleMenus): ksiegi Armoury, okreg i jego prace, Living Economy, Banner Kings, kupno domu (RC)
+        // -> "Village affairs"; dniowka (RC) -> "Look for paid work" (jak w miescie). Werbunek, kupno towarow, spacer, wrogie czyny (podmenu gry), wioska poboczna,
+        // dom, czekanie, wyjazd i zadania zostaja. Wylaczony = menu jak dotad (od nastepnego wczytania). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
+        public bool VillageMenuTidy = true;                // the village menu is put in order like the town and castle menus: the village's books and dealings (People of this land, Estates and livelihood, Look over the district, Invest in the district's works, Living Economy, Banner Kings, buying a house) move into a new "Village affairs"; day labour into "Look for paid work". Recruiting, buying products, the walk, hostile actions, your house, your own village, waiting and leaving stay where they are. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the village menu as before
+
+        // --- Payment messages ---
+        // m96-wies (Jeff 20.10: "You paid w miescie 2 - powinno byc, za co: za nocleg w karczmie"): PayNotes.cs - przy przelewach gracza z naszych modow komunikat gry
+        // "You paid N" / "You received N" wylaczony, zamiast niego jeden nasz z powodem i rozbiciem (nocleg w karczmie i zajezdzie, kuznia na dobe, ksiazki, okup
+        // gracza, zlecenia, sprzedaz warsztatu, okup wsi, wplaty karawan, sakiewki wiesniakow). Tylko komunikat - kwoty i przelewy bez zmian. AI bez komunikatow.
+        // Wylaczony = komunikaty jak dotad (od nastepnej godziny gry - McmSettings.Apply co godzine). Nowy klucz (MCM Jeffa go nie ma - domyslnie wlaczony).
+        public bool PlayerPaymentReasons = true;           // when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare "You paid N" / "You received N" is replaced by one message that says what for, with the split (e.g. "You paid 2 for your night at a common room in Seagard (bed 1, horse 1)."). Only the message changes - sums and payers stay the same. Off = the game's message as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

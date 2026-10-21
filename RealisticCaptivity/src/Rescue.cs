@@ -155,7 +155,8 @@ namespace RealisticCaptivity
 
                 if (Hero.MainHero.Gold >= agreed)
                 {
-                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captorLord, agreed);
+                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captorLord, agreed, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+                    if (PayNotes.On) PayNotes.Silent("envoyransom", agreed);
                     Log.Player(envoy.Name + " negotiated your release for " + agreed + " gold (" +
                                (int)(discount * 100) + "% off the asking price of " + asked + ").");
                     EndCaptivityAction.ApplyByRansom(Hero.MainHero, envoy);
@@ -172,7 +173,8 @@ namespace RealisticCaptivity
                 }
 
                 int paidNow = Math.Max(0, Math.Min(Hero.MainHero.Gold, agreed));
-                if (paidNow > 0) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captorLord, paidNow);
+                if (paidNow > 0) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captorLord, paidNow, PayNotes.On);   // m96-wies: powod mowi komunikat nizej
+                if (paidNow > 0 && PayNotes.On) PayNotes.Silent("envoyransom", paidNow);
                 int remainder = agreed - paidNow;
                 int pledged = (int)(remainder * s.DebtInterest);
 
