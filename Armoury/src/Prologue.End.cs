@@ -13,27 +13,29 @@ namespace Armoury
     /// m101-prolog E2b - KONIEC PROLOGU (projekt pkt 2: dzien 186 - smierc Roberta, Joffrey krolem, Ned w lochu; dzien 188 = dzien 0 ROT, egzekucja Neda).
     /// (1) Doba >= KingFallsDay prologu (Daily): najpierw pakty prologu gasna (EndPacts - takze, gdy krol jest w bitwie), potem krol umiera "od ran z polowania na dzika": AddDeathMark(WoundedInBattle)
     ///     + KillCharacterAction.ApplyByDeathMarkForced (wymuszona - nasza ochrona CanHeroDie i cudze weta nie blokuja). Krol w bitwie albo oblezeniu (jego druzyna albo
-    ///     strona, ktora trzyma go w niewoli) - czekamy do nastepnej doby (proba co dobe bez limitu dnia, recenzja R2). Gra sama robi sukcesje: przywodca rodu clan_nord_1 z dziedzicow (ChangeClanLeaderAction),
-    ///     glosowanie o tron z premia ROT x999 dla rodu panujacego; gdy przywodca nie jest Joffreyem, a Joffrey zyje w tym rodzie - ustawiamy Joffreya
-    ///     (ChangeClanLeaderAction.ApplyWithSelectedNewLeader). Nazwa rodu wraca do oryginalu z XML ("Baratheon, Joffrey").
+    ///     strona, ktora trzyma go w niewoli) - czekamy do nastepnej doby (proba co dobe bez limitu dnia, recenzja R2). Sukcesja (recenzja R5): PRZED smiercia krola
+    ///     Joffrey glowa rodu clan_nord_1 (ChangeClanLeaderAction.ApplyWithSelectedNewLeader - jak ROT JoffreyEvent), wiec krol ginie jako zwykly czlonek rodu: gra nie
+    ///     losuje dziedzica i nie dodaje glosowania o tron (KingSelectionKingdomDecision - premia ROT x999 mnozy tylko ocene wystawiana przez rod panujacy, nie daje mu
+    ///     tronu); Joffrey martwy albo poza rodem - sukcesje robi gra. Nazwa rodu wraca do oryginalu z XML ("Baratheon, Joffrey").
     /// (2) Ned jencem korony w Krolewskiej Przystani (town_EW4): druzyna rozwiazana (jego armia - DisbandArmyAction), TakePrisonerAction do lochu osady; Ned w bitwie -
     ///     nastepna doba; jeniec kogo innego - najpierw uwolniony (EndCaptivityAction.ApplyByEscape). Pilnowane co dobe do egzekucji (pokoj gry wypuszcza jencow przy
     ///     zawarciu pokoju - wtedy Ned wraca do lochu nastepnej doby).
-    /// (3) NedEvent ROT (dzien 2 osi opowiesci, x4.33) zaklada martwego Neda - prefiks NedEvent.StartEvent: Ned zyje -> KillCharacterAction.ApplyByExecution(Ned, Joffrey,
-    ///     pokaz, isForced) PRZED ROTEvents.OnNedDeath (wojny Robba ROT widza juz Robba), potem Robb glowa Starkow (gdy gra wybrala innego dziedzica - ustawiamy Robba),
-    ///     wiec Robb wladca Polnocy. Latka wpinana leniwie z reszta latek prologu.
+    /// (3) NedEvent ROT (dzien 2 osi opowiesci, x4.33) zaklada martwego Neda - prefiks NedEvent.StartEvent, PRZED ROTEvents.OnNedDeath (wojny Robba ROT widza juz
+    ///     Robba): najpierw Robb glowa Starkow (ChangeClanLeaderAction - recenzja R5, bez glosowania o tron Polnocy), wiec Robb wladca Polnocy; potem zywy Ned ->
+    ///     KillCharacterAction.ApplyByExecution(Ned, Joffrey, pokaz, isForced). Ned w walce - tylko znak smierci, gra zabija go po walce (NedMarkFollowUp pilnuje
+    ///     co dobe). Latka wpinana leniwie z reszta latek prologu.
     /// Klasyczny start: nic (latki nie ma, Active = false).
     /// </summary>
     internal static partial class Prologue
     {
         private const string KingsLandingId = "town_EW4";
-        private static bool _kingFallen, _nedDone, _endLogged;
+        private static bool _kingFallen, _nedDone, _endLogged, _nedMarked;   // _nedMarked: egzekucja Neda w walce - znak smierci, umrze po walce (recenzja R3/R5)
         private static int _kingWaits, _nedArrests;
         private static string _pactsEndText = "";   // wynik EndPacts z dnia 186 (do linii KONCA PROLOGU, gdy krol umrze pozniej)
 
-        private static void ResetEnd() { _kingFallen = false; _nedDone = false; _endLogged = false; _kingWaits = 0; _nedArrests = 0; _pactsEndText = ""; }
+        private static void ResetEnd() { _kingFallen = false; _nedDone = false; _endLogged = false; _kingWaits = 0; _nedArrests = 0; _pactsEndText = ""; _nedMarked = false; }
 
-        private static string PackEnd() { return "kf=" + (_kingFallen ? "1" : "0") + ";nd=" + (_nedDone ? "1" : "0") + ";"; }
+        private static string PackEnd() { return "kf=" + (_kingFallen ? "1" : "0") + ";nd=" + (_nedDone ? "1" : "0") + ";nm=" + (_nedMarked ? "1" : "0") + ";"; }
 
         private static void UnpackEnd(Dictionary<string, string> map)
         {
@@ -41,6 +43,7 @@ namespace Armoury
             string v;
             _kingFallen = map.TryGetValue("kf", out v) && v == "1";
             _nedDone = map.TryGetValue("nd", out v) && v == "1";
+            _nedMarked = map.TryGetValue("nm", out v) && v == "1";
             _endLogged = _kingFallen;
         }
 
@@ -69,6 +72,7 @@ namespace Armoury
             double day = PrologueDay();
             if (!_kingFallen && day >= KingFallsDay) TryKingFalls("doba " + ((int)day).ToString(Inv));
             if (_kingFallen && _kingsAlive && !_nedDone && NedProtected()) KeepNedInDungeon();
+            if (_nedMarked) NedMarkFollowUp();
             return _kingFallen ? "koniec prologu TAK" + (_nedDone ? ", Ned stracony" : "") : "koniec prologu za " + Math.Max(0.0, KingFallsDay - day).ToString("0.0", Inv) + " dni";
         }
 
@@ -87,8 +91,22 @@ namespace Armoury
             }
             string pacts = string.IsNullOrEmpty(_pactsEndText) ? "juz zakonczone" : _pactsEndText;
             string died = "-";
+            var crownClan = C(CrownClanId); var joff = H(JoffreyId);
+            string heir = "-";
             if (_kingsAlive && robert != null && robert.IsAlive)
             {
+                // recenzja R5: Joffrey glowa rodu PRZED smiercia krola (jak ROT JoffreyEvent: ChangeClanLeaderAction, potem smierc). Krol, ktory nie jest glowa rodu,
+                // umiera bez losowania dziedzica i bez glosowania o tron (KillCharacterAction: KingSelectionKingdomDecision tylko przy smierci glowy rodu panujacego) -
+                // korona od razu u Joffreya, niezaleznie od BK i StoryThrone. Joffrey martwy albo poza rodem - sukcesje robi gra (log "gra: ...").
+                try
+                {
+                    if (crownClan != null && joff != null && joff.IsAlive && joff.Clan == crownClan && crownClan.Leader != joff)
+                    {
+                        heir = "Joffrey glowa rodu przed smiercia krola (byl " + Who(crownClan.Leader) + ")";
+                        ChangeClanLeaderAction.ApplyWithSelectedNewLeader(crownClan, joff);
+                    }
+                }
+                catch (Exception e) { Stumble("TryKingFalls.Heir", e); }
                 try
                 {
                     robert.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.WoundedInBattle);
@@ -100,9 +118,7 @@ namespace Armoury
             }
             else died = robert == null ? "brak bohatera" : (robert.IsAlive ? "nie ozywiony" : "juz martwy");
             _kingFallen = true;
-            // Joffrey krolem
-            var crownClan = C(CrownClanId); var joff = H(JoffreyId);
-            string heir = "-";
+            // Joffrey krolem (zapasowo: krol juz martwy przed nami albo zmiana glowy rodu wyzej nie weszla)
             try
             {
                 if (crownClan != null && joff != null && joff.IsAlive && joff.Clan == crownClan && crownClan.Leader != joff)
@@ -110,7 +126,7 @@ namespace Armoury
                     heir = "gra wybrala " + Who(crownClan.Leader) + " - ustawiony Joffrey";
                     ChangeClanLeaderAction.ApplyWithSelectedNewLeader(crownClan, joff);
                 }
-                else heir = "gra: " + Who(crownClan != null ? crownClan.Leader : null);
+                else if (heir == "-") heir = "gra: " + Who(crownClan != null ? crownClan.Leader : null);
                 if (crownClan != null && !string.IsNullOrEmpty(_crownClanName))
                 {
                     var nm = new TextObject(_crownClanName);
@@ -180,7 +196,7 @@ namespace Armoury
             Log.Info(Tag + "Ned poza lochem przed egzekucja - z powrotem: " + r + " (aresztowan " + _nedArrests + ").");
         }
 
-        /// <summary>Prefiks NedEvent.StartEvent (ROT): w kampanii z prologiem zywy Ned zostaje stracony, Robb glowa Starkow i wladca Polnocy.</summary>
+        /// <summary>Prefiks NedEvent.StartEvent (ROT): w kampanii z prologiem Robb glowa Starkow (i przez to wladca Polnocy), potem zywy Ned zostaje stracony.</summary>
         public static void NedEventPrefix()
         {
             try
@@ -189,35 +205,58 @@ namespace Armoury
                 if (!_kingsAlive) { _nedDone = true; return; }
                 if (!_kingFallen) TryKingFalls("NedEvent przed koncem prologu");
                 var ned = H(NedId);
+                var stark = C(StarkClanId); var robb = H(RobbId);
+                string fix = "-";
+                // recenzja R5: Robb glowa rodu PRZED egzekucja (jak ROT JoffreyEvent) - Ned, ktory nie jest glowa rodu panujacego, ginie bez losowania dziedzica
+                // i bez glosowania o tron Polnocy; wladca Polnocy od razu Robb (takze gdy egzekucja w bitwie stawia tylko znak smierci)
+                try
+                {
+                    if (stark != null && robb != null && robb.IsAlive && robb.Clan == stark && stark.Leader != robb)
+                    {
+                        fix = "Robb glowa rodu przed egzekucja (byl " + Who(stark.Leader) + ")";
+                        ChangeClanLeaderAction.ApplyWithSelectedNewLeader(stark, robb);
+                    }
+                    else fix = "bez zmiany";
+                }
+                catch (Exception e) { Stumble("NedEventPrefix.Robb", e); fix = "BLAD"; }
                 string killed;
                 if (ned != null && ned.IsAlive)
                 {
                     var joff = H(JoffreyId);
                     try { KillCharacterAction.ApplyByExecution(ned, joff != null && joff.IsAlive ? joff : null, true, true); }
                     catch (Exception e) { Stumble("NedEventPrefix.Kill", e); }
-                    killed = ned.IsAlive ? (ned.DeathMark != KillCharacterAction.KillCharacterActionDetail.None ? "znak smierci (w bitwie - umrze po niej)" : "NIE") : "TAK";
+                    _nedMarked = ned.IsAlive && ned.DeathMark != KillCharacterAction.KillCharacterActionDetail.None;
+                    killed = ned.IsAlive ? (_nedMarked ? "znak smierci (w bitwie - umrze po niej)" : "NIE") : "TAK";
                 }
                 else killed = ned == null ? "brak bohatera" : "juz martwy";
                 _nedDone = true;
-                var stark = C(StarkClanId); var robb = H(RobbId);
-                string fix = "-";
-                try
-                {
-                    if (stark != null && robb != null && robb.IsAlive && robb.Clan == stark && stark.Leader != robb && (ned == null || !ned.IsAlive))
-                    {
-                        fix = "gra wybrala " + Who(stark.Leader) + " - ustawiony Robb";
-                        ChangeClanLeaderAction.ApplyWithSelectedNewLeader(stark, robb);
-                    }
-                    else fix = "gra: " + Who(stark != null ? stark.Leader : null);
-                }
-                catch (Exception e) { Stumble("NedEventPrefix.Robb", e); }
-                var north = K(NorthId);
-                Log.Info(Tag + "egzekucja Neda (NedEvent, dzien opowiesci " + (PrologueDay() - PrologueDays).ToString("0.0", Inv) + ") | Ned martwy " + killed
-                         + " | rod Stark: glowa " + Who(stark != null ? stark.Leader : null) + " (" + fix + ")"
-                         + " | Polnoc: wladca " + Who(north != null ? north.Leader : null) + " - Robb " + (north != null && robb != null && north.Leader == robb ? "TAK" : "NIE")
-                         + (_kingFallen ? "" : " | krol Robert jeszcze zyje (w bitwie albo oblezeniu) - smierc krola po walce, proba co dobe") + ".");
+                NedLine(killed, fix);
             }
             catch (Exception e) { Stumble("NedEventPrefix", e); }
+        }
+
+        /// <summary>Ned w walce przy NedEvent (znak smierci): gra zabija go po bitwie (ApplyByDeathMark); gdy po walce dalej zyje (weto innego moda) - smierc wymuszona
+        /// ze znaku. Gdy nie zyje - druga linia egzekucji (PR-8 czyta ostatnia). Co dobe (DailyEnd).</summary>
+        private static void NedMarkFollowUp()
+        {
+            var ned = H(NedId);
+            if (ned != null && ned.IsAlive && !Busy(ned))
+            {
+                try { KillCharacterAction.ApplyByDeathMarkForced(ned, true); }
+                catch (Exception e) { Stumble("NedMarkFollowUp", e); }
+            }
+            if (ned != null && ned.IsAlive) return;
+            _nedMarked = false;
+            NedLine("TAK (po walce - znak smierci z NedEvent)", "bez zmiany");
+        }
+
+        private static void NedLine(string killed, string fix)
+        {
+            var stark = C(StarkClanId); var robb = H(RobbId); var north = K(NorthId);
+            Log.Info(Tag + "egzekucja Neda (NedEvent, dzien opowiesci " + (PrologueDay() - PrologueDays).ToString("0.0", Inv) + ") | Ned martwy " + killed
+                     + " | rod Stark: glowa " + Who(stark != null ? stark.Leader : null) + " (" + fix + ")"
+                     + " | Polnoc: wladca " + Who(north != null ? north.Leader : null) + " - Robb " + (north != null && robb != null && north.Leader == robb ? "TAK" : "NIE")
+                     + (_kingFallen ? "" : " | krol Robert jeszcze zyje (w bitwie albo oblezeniu) - smierc krola po walce, proba co dobe") + ".");
         }
     }
 }

@@ -50,7 +50,10 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
   Ned `ROTlord_512` (42, zona Catelyn `ROTlord_513`, rod `clan_battania_1` Stark, `alive="false"`). Krolestwo korony `vlandia` (owner `lord_7_1` Joffrey), Polnoc
   `battania` (owner `lord_5_1` Robb). Krolewska Przystan `town_EW4`.
 - **Smierc wladcy** (`KillCharacterAction.ApplyInternal`): nowy przywodca rodu z `ChangeClanLeaderAction.ApplyWithoutSelectedNewLeader`, potem glosowanie
-  `KingSelectionKingdomDecision`; ROT mnozy zaslugi rodu panujacego x999 (KingdomDecisionPatches.patch1), BK przy tytule dziedzicznym daje tytul dziedzicowi.
+  `KingSelectionKingdomDecision` (tylko gdy ginie glowa rodu panujacego; kandydaci - 3 najsilniejsze rody). ROT `KingdomDecisionPatches.patch1` mnozy x999 ocene
+  wystawiana PRZEZ rod panujacy (`CalculateMeritOfOutcomeForClan`, clan = glosujacy) - to nie daje tronu rodowi panujacemu (recenzja R5). BK przy tytule dziedzicznym
+  uniewaznia glosowanie (`IsKingSelectionDecisionAllowed`), CrashScribe StoryThrone pilnuje tronu Joffreya. ROT `JoffreyEvent` omija glosowanie: najpierw
+  `ChangeClanLeaderAction.ApplyWithSelectedNewLeader` (Cersei), potem smierc - tak robimy przy Robercie i Nedzie.
 
 ## Zasada
 
@@ -128,15 +131,18 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - `Armoury/src/Prologue.End.cs` (nowy):
   - doba prologu >= 186 (`DailyEnd`, raz): `EndPacts` (sojusze zerwane, pakty wygaszone), potem smierc krola: `AddDeathMark(WoundedInBattle)` +
     `KillCharacterAction.ApplyByDeathMarkForced` (wymuszona - "od ran z polowania"); krol w bitwie/oblezeniu (albo strona, ktora trzyma go w niewoli, w bitwie) - nastepna doba.
-    Sukcesje robi gra (przywodca rodu z dziedzicow, glosowanie o tron z premia ROT x999 dla rodu panujacego); gdy przywodca rodu `clan_nord_1` nie jest Joffreyem,
-    a Joffrey zyje w tym rodzie - `ChangeClanLeaderAction.ApplyWithSelectedNewLeader`. Nazwa rodu wraca do "Baratheon, Joffrey" (z zapisu, zakodowana
+    Sukcesja (recenzja R5): PRZED smiercia krola Joffrey glowa rodu `clan_nord_1` (`ChangeClanLeaderAction.ApplyWithSelectedNewLeader`, jak ROT JoffreyEvent) - krol
+    ginie jako zwykly czlonek rodu, bez losowania dziedzica i bez glosowania o tron; Joffrey martwy albo poza rodem - sukcesje robi gra (log `gra: ...`).
+    Krol w walce od dnia 186 - proba co dobe bez limitu dnia (recenzja R2); pakty gasna w dniu 186 zawsze. Nazwa rodu wraca do "Baratheon, Joffrey" (z zapisu, zakodowana
     `Uri.EscapeDataString`). Komunikat dla gracza (EN) o smierci krola, Joffreyu na tronie i uwiezieniu Neda.
   - Ned do lochu Krolewskiej Przystani (`town_EW4`): jego armia rozwiazana (`DisbandArmyAction.ApplyByUnknownReason`) albo druzyna odpieta od cudzej armii,
     `TakePrisonerAction.Apply(KL.Party, Ned)`, pusta druzyna `DisbandPartyAction.StartDisband`; Ned w bitwie - nastepna doba; jeniec kogos innego - najpierw
     `EndCaptivityAction.ApplyByEscape`. Pilnowane co dobe do egzekucji (gra wypuszcza jencow przy pokoju - Ned wraca do lochu).
-  - prefiks `ROT.Events.NedEvent.StartEvent` (leniwie z reszta latek prologu): zywy Ned -> `KillCharacterAction.ApplyByExecution(Ned, Joffrey, pokaz, isForced)`
-    PRZED `ROTEvents.OnNedDeath` ROT; potem Robb glowa Starkow (jesli gra wybrala innego dziedzica - ustawiamy Robba) = wladca Polnocy.
-  - zapis: `kf=` (krol upadl), `nd=` (Ned stracony).
+  - prefiks `ROT.Events.NedEvent.StartEvent` (leniwie z reszta latek prologu), PRZED `ROTEvents.OnNedDeath` ROT: najpierw Robb glowa Starkow
+    (`ChangeClanLeaderAction.ApplyWithSelectedNewLeader` - recenzja R5, bez glosowania o tron Polnocy) = wladca Polnocy, potem zywy Ned ->
+    `KillCharacterAction.ApplyByExecution(Ned, Joffrey, pokaz, isForced)`. Ned w walce - tylko znak smierci; gra zabija go po walce, a gdy dalej zyje -
+    smierc wymuszona ze znaku w nastepnej dobie bez walki (`NedMarkFollowUp`, zapis `nm=`), wtedy druga linia egzekucji.
+  - zapis: `kf=` (krol upadl), `nd=` (Ned stracony), `nm=` (Ned ze znakiem smierci, czeka na koniec walki).
 - Log: `Prolog (m101): KONIEC PROLOGU (doba 186, dzien 186.x) | Robert martwy TAK (WoundedInBattle) | korona: wladca Joffrey Baratheon (lord_7_1) - Joffrey krolem TAK
   (...) | Ned: jeniec w town_EW4 TAK (...) | pakty: sojusze zerwane 3, pakty wygaszone 6 | potkniecia 0.`;
   `Prolog (m101): egzekucja Neda (NedEvent, dzien opowiesci 8.x) | Ned martwy TAK | rod Stark: glowa Robb Stark (lord_5_1) (...) | Polnoc: wladca Robb Stark (lord_5_1) - Robb TAK.`
@@ -159,8 +165,9 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - E2a: BK nadaje tytuly przy nowej grze - jesli robi to przed naszym SetLeader, tytul krola trzyma Joffrey (a nie Robert), tytul Polnocy - Robb; gra i ROT
   i tak licza wladce z przywodcy rodu panujacego. Sprawdzic w encyklopedii BK (tytuly) po starcie prologu. ROT nigdzie nie czyta Roberta ani Neda (grep ROT.dll:
   tylko definicje w ROTLords). AIInfluence moze mowic o "zmarlym krolu" (opisy) - poza zakresem.
-- E2b: glosowanie o tron po smierci krola (gra) widzi gracz w krolestwie korony; premia ROT x999 zostawia tron rodowi Joffreya. BK z tytulem dziedzicznym moze dac tytul
-  dziedzicowi i przestawic rod panujacy na rod dziedzica (ten sam rod). Ned w lochu moze uciec (4% dziennie w grze, RealisticCaptivity) albo wyjsc przy pokoju
+- E2b: glosowania o tron nie ma (recenzja R5: Joffrey i Robb sa glowami rodow przed smiercia ojcow; dawniej opis twierdzil, ze premia ROT x999 zostawia tron rodowi
+  Joffreya - z kodu to nie wynika). `ChangeClanLeaderAction` przed smiercia robi to samo co przy smierci (zloto ojca do syna, druzyna syna, relacje); nikt w BK,
+  ROT, Diplomacy ani u nas nie slucha `OnClanLeaderChanged` (dectool grep). BK `BKTitleBehavior.OnHeroKilled` - tytuly Roberta/Neda (jesli maja) dziedziczy BK jak dotad. Ned w lochu moze uciec (4% dziennie w grze, RealisticCaptivity) albo wyjsc przy pokoju
   korony z kims trzecim - wraca do lochu nastepnej doby; egzekucja w NedEvent zabija go wszedzie. NedEvent nie odpali (wylaczona Fabula, ROT bez wydarzenia) - Ned
   zostaje w lochu i zyje (do decyzji: wtedy wlasna egzekucja w dniu ~9 opowiesci).
 - E1a regresja klasycznego startu: model czasu zwraca te sama wartosc co dotad (StoryStartTime = stary getter), latka ROT nie wpina sie; StoryClock w CrashScribe
@@ -176,6 +183,7 @@ Recenzja pelna HEAD 8e09b71e: nic krytycznego, 1 wazne, 4 drobne. Kazde sprawdzo
 | R2 | drobne | `Daily()` konczyl sie po dniu 208 przed `DailyEnd` - krol w bitwie/oblezeniu od dnia 186 do 208 (i przy NedEvent) nie umarlby nigdy; pakty gasly dopiero po sprawdzeniu bitwy | PRAWDA w kodzie (Prologue.cs: return przed DailyEnd; Prologue.End.cs: Busy przed EndPacts). Sojusze i tak maja koniec w dniu 187 (`UpdateAllianceEndTime` tylko przedluza - gdy domyslny koniec sojuszu gry jest pozniej, zostaje pozniej) | POPRAWIONE: `DailyEnd` co dobe bez limitu dnia (limit 208 tylko dla linii logu); `EndPacts` przed sprawdzeniem bitwy (pakty gasna w dniu 186 zawsze); NedEvent przy krolu w bitwie - Ned stracony jak dotad (ROT zaklada martwego Neda), krol umiera po walce w nastepnej udanej probie, linia egzekucji mowi `krol Robert jeszcze zyje ...`; krol po NedEvent - bez drugiego aresztu Neda (`Ned: juz stracony (NedEvent)`, PR-7 to przyjmuje), komunikat gracza bez zdania o uwiezieniu |
 | R3 | drobne | `CanHeroDie` chronil Neda do dnia 218 takze po NedEvent - egzekucja Neda w bitwie stawia tylko znak smierci, smierc po bitwie bez wymuszenia, nasze weto = Ned zyje | PRAWDA: gra `KillCharacterAction.ApplyInternal` - druzyna w MapEvent/SiegeEvent i `DeathMark == None` -> tylko `AddDeathMark` i powrot; `ApplyByDeathMark` wola `ApplyInternal` bez `isForced` -> `CanDie` -> nasze CanHeroDie | POPRAWIONE: ochrona Neda tylko `!_nedDone`, Roberta tylko `!_kingFallen` |
 | R4 | drobne | blokada wojny dopiero w `DeclareWarAction` na koncu `StartCallToWarAgreement` - wczesniej gra rejestruje porozumienie, przelewa `CallToWarWallet` (gracz placi zlotem) i daje premie relacji | PRAWDA: gra `AllianceCampaignBehavior.StartCallToWarAgreement(callingKingdom, calledKingdom, kingdomToCallToWarAgainst, callToWarCost, isPlayerPaying)`: `AddCallToWarAgreement`, `ChangeHeroGold(-cost)` / portfele, `OnCallToWarAgreementStarted`, `ApplyAcceptingCallToWarOfferBonus`, na koncu `DeclareWarAction.ApplyByCallToWarAgreement` | POPRAWIONE: `CallToWarPrefix` dostal `kingdomToCallToWarAgainst` (nazwa parametru z dekompilacji) i zwraca false takze, gdy wezwany i wrog to krolestwa Westeros i zadnym nie rzadzi gracz (regula `WarPrefix`) |
+| R5 | drobne | Robert i Ned gina jako glowy rodow panujacych - gra dodaje glosowanie o tron (`KingSelectionKingdomDecision`); opis "x999 zostawia tron rodowi Joffreya" nie wynika z kodu | PRAWDA: gra `KillCharacterAction.ApplyInternal` - glowa rodu panujacego: `ChangeClanLeaderAction.ApplyWithoutSelectedNewLeader`, potem `AddDecision(new KingSelectionKingdomDecision(...))`; ROT `KingdomDecisionPatches.patch1` mnozy x999 `CalculateMeritOfOutcomeForClan` dla GLOSUJACEGO rodu panujacego. ROT `JoffreyEvent` zmienia glowe rodu przed smiercia | POPRAWIONE: Joffrey glowa `clan_nord_1` przed smiercia Roberta, Robb glowa `clan_battania_1` przed egzekucja Neda (`ChangeClanLeaderAction.ApplyWithSelectedNewLeader`); zapasowo jak dotad po smierci. Opis w Rozpoznaniu i Ryzyku poprawiony. Przy okazji R3: Ned ze znakiem smierci - dobicie wymuszone po walce (`NedMarkFollowUp`) i druga linia egzekucji |
 
 ## Status
 
