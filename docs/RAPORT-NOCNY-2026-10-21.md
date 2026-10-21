@@ -8,6 +8,7 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **WGRANIE 97** jest w grze od 20.10 23:20 (wioski boczne i ich obrońcy, obóz, szkolenie, posiłki, surowce do łuków). Przeszło dwa pełne zestawy testów (97 i 97b z poprawkami po recenzji scalenia), wszystkie bez błędów. W Twoich ustawieniach MCM zmieniłem obóz na 21:00-3:00 (była 0:00-6:00); kopia starego pliku jest obok.
 - **WGRANIE 98** (plotki za kufel, pijaństwo i kac) jest w grze od 21.10 00:55. Testy przeszły bez błędów.
 - **WGRANIE 99** (markietani w dużych obozach) jest w grze od 21.10 03:50. Testy przeszły bez błędów.
+- **WGRANIE 100** (kryjówki bandytów): _test w toku, wynik niżej_.
 - **VoiceActingPatchRemake jest wyłączony** (jak chciałeś). Postacie w rozmowach nie mówią już głosem z Fish Audio. Kopia listy modów jest obok (LauncherData.xml.bak-2026-10-21-bez-voiceacting).
 - **Twoje zapisy są nietknięte.** Testy sprawdzają to za każdym razem (104 pliki, sumy kontrolne bez zmian).
 - **Limit tygodniowy:** około 95% przy pisaniu. Rzeczy, których nie zdążyłem, są rozpisane do przekazania na końcu raportu.
@@ -30,6 +31,14 @@ Godziny podaję według zegara komputera. Szczegóły techniczne są w STAN-PRAC
 - **Długi miast:** rada miasta pożycza u mieszczan i w Banku, a w potrzebie ściąga podatek nadzwyczajny.
 - **Bandyci noszą jedzenie i złoto**, jedzą codziennie, a gdy głodują, część z nich odchodzi.
 - **Sakiewki ludzi według potrzeby, koszyk ludu, płótno i sukno** w planie wsi.
+
+## Co wchodzi w 100 (kryjówki bandytów - po teście)
+
+- **Widzenie kryjówek zależy od Zwiadu (Scouting):** do 10 szansa 0%, czyli nawet gdy najedziesz na kryjówkę, nie zobaczysz jej. Od 11 do 200 szansa rośnie do 100%: przy 30 to około 10%, przy 100 około 47%, przy 200 zawsze. Rzut jest raz, gdy kryjówka wejdzie w zasięg wzroku. Gdy odjedziesz i wrócisz, rzut jest nowy.
+- **Plotki w karczmie:** kiedy przy kuflu usłyszysz o kryjówce („obozowisko bandytów koło X”), przy niej wyświetli się normalnie, bo wiesz, gdzie szukać. Ta wiedza zostaje do rozbicia kryjówki.
+- **Miejsce:** kryjówka nie powstaje bliżej niż 10 jednostek mapy od miasta, zamku czy wsi i 6 jednostek od wioski bocznej. Z 266 miejsc kryjówek w ROT zostają 183.
+- **Po rozbiciu:** nowa kryjówka pojawia się co najmniej 25 jednostek dalej, około 120 km, przez 60 dni. Nigdy bliżej niż połowa tego. Bandy komputera trzymają się tych samych zasad.
+- **Czego nie robiłem:** nie przesuwam kryjówek w nowe punkty mapy, bo to ryzykowne dla zapisu i grafiki. Wybieram je spośród istniejących miejsc ROT, a tych jest dużo.
 
 ## Co weszło w 99 (markietani, już w grze)
 
