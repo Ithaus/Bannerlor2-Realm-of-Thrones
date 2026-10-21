@@ -438,6 +438,14 @@ namespace Armoury
                 try { RoadsideInnStay.AppTick(); }
                 catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
             }
+            // m103-sceny: straznik scen prologu 298 i okien opowiesci (4 razy na sekunde; zamkniecie okna bez przycisku, kolejka zwolnien obrazkow z plikow - w kazdej
+            // kampanii; sceny tylko w kampanii z prologiem; wlasny try w srodku) - tu tylko blad ladowania typu (okno dziedziczy po typie ROT), liczony; po 3 straznik
+            // nie startuje do konca sesji (gra bez zmian). PRZED returnem wiosek - inaczej klucz Map Villages = off wylaczylby sceny.
+            if (_storyTickFails < 3)
+            {
+                try { StoryTick(); }
+                catch (Exception e) { _storyTickFails++; Log.Error("Prologue.Scenes: straznik nie laduje sie (proba " + _storyTickFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -459,6 +467,20 @@ namespace Armoury
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
         private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
+        private static int _storyTickFails;   // m103-sceny: blad ladowania typu straznika scen prologu (Prologue.ScenesAppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void StoryTick()
+        {
+            Prologue.ScenesAppTick();
+        }
+
+        /// <summary>m103-sceny: wyjscie z kampanii - okno opowiesci zerowane, obrazki z plikow zwolnione od razu (StoryPictures.ReleaseAll).</summary>
+        public override void OnGameEnd(Game game)
+        {
+            base.OnGameEnd(game);
+            try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
+        }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RoadsideInnsTick()

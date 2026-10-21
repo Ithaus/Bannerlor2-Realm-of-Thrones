@@ -8984,6 +8984,10 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueKings { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Scenes", HintText = "in a Prologue 298 campaign the events of the half year before the War of the Five Kings are told in story windows like those of Realm of Thrones (23 scenes from A Game of Thrones, from the death of Jon Arryn to the arrest of Lord Eddard), each on its day while you are on the map; a scene missed in battle or captivity comes afterwards. Your own pictures: Modules/Armoury/Images/Prolog/prolog_01.png to prolog_23.png. Off = no story windows (the world changes the same)", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueScenes { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11229,6 +11233,7 @@ namespace Armoury
             s.ProloguePeace = ProloguePeace;
             s.ProloguePacts = ProloguePacts;
             s.PrologueKings = PrologueKings;
+            s.PrologueScenes = PrologueScenes;
         }
 
         internal static void Apply()
