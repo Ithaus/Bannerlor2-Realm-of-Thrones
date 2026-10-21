@@ -1032,7 +1032,7 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m102tablica : (21.10, w-toku/m102-tablica; Armoury/src/NoticeBoard*.cs, klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties i nast.)
                     python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
                     T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
-                    L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+                    L-7 lordom <= 1% kas miast, L-8 zapis <= 12 KB (m103-drobne, nb2), L-8b nb2 wobec nb1 (INFO), L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -38108,7 +38108,18 @@ def m102tablica_main(logp):
     rep.add("L-7: wyplaty lordom w oknie <= 1% wplywow kas miast", f"lordom {lords} zl, wplywy kas miast w oknie {infl} zl ({(100.0 * lords / infl if infl else 0):.3f}%; lud za towar + przelewy gry do kas,"
             f" linii {len(inflows)}; srednia kas {avg:.0f})", "<= 1% (inaczej domyslne WatchBountyAiLords = false)", (lords <= 0.01 * infl) if infl else None)
     big = max([int(d.group(20)) for d in ldays] + [0])
-    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
+    # m103-drobne: zapis nb2 (odchudzony) - cel < 12 KB (bieg 101 w nb1: 18.5 KB > 16 KB, SaveText kawalkowal); L-8b sklad i nb1 w tym samym stanie (pomiar)
+    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 12288 B (m103-drobne nb2; nb1 do WGRANIA 101 - 18.5 KB)", (big <= 12288) if ldays else None)
+    v1 = []
+    for d in ldays:
+        mv = re.search(r"zapis arm_board (\d+) B; sklad zapisu nb2: .*?stary format nb1 w tym samym stanie (\d+) B", d.string)
+        if mv and int(mv.group(2)) > 0:
+            v1.append((int(mv.group(1)), int(mv.group(2))))
+    if v1:
+        bi = max(v1, key=lambda x: x[1])
+        rep.add("L-8b: nb2 wobec nb1 w tym samym stanie (pomiar)", f"dob {len(v1)}; najwiekszy nb1 {bi[1]} B -> nb2 {bi[0]} B ({100.0 * bi[0] / bi[1]:.0f}%)", "INFO", None)
+    else:
+        rep.add("L-8b: nb2 wobec nb1", "brak pola sklad zapisu (log sprzed m103-drobne)", "INFO", None)
     cost = max([float(d.group(21)) for d in ldays] + [0.0])
     rep.add("L-9: koszt doby listow", f"najwyzej {cost:.2f} ms", "<= 3 ms", (cost <= 3.0) if ldays else None)
     posted = {(p.group(1), p.group(2)) for p in posts} | {(p.group(2), p.group(3)) for p in hposts}

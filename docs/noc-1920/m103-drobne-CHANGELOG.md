@@ -6,7 +6,8 @@ build kod 0, gen_mcm po kazdej zmianie Settings.cs) | **Status calosci:** DO SPR
 | Krok | Zmiana | Klucz MCM | Commit | Stan |
 |---|---|---|---|---|
 | 1 | Rabunek druzyny gracza liczy sie w ksiedze snu jak praca (nie odpoczynek) | `RaidCountsAsWork` (TAK) | `3360ba69` | zbudowane |
-| 2 | Rzad markietanow: odziez dla druzyny gracza z polki miasta (z kiesy gracza) i praczki (zuzycie odziezy -25% przez 7 dob) | `SutlerRowClothing`, `SutlerLaundry` (TAK), `SutlerLaundryCutPercent` 25, `SutlerLaundryDays` 7, `SutlerLaundryMenPerWasher` 20 | (krok 2) | zbudowane |
+| 2 | Rzad markietanow: odziez dla druzyny gracza z polki miasta (z kiesy gracza) i praczki (zuzycie odziezy -25% przez 7 dob) | `SutlerRowClothing`, `SutlerLaundry` (TAK), `SutlerLaundryCutPercent` 25, `SutlerLaundryDays` 7, `SutlerLaundryMenPerWasher` 20 | `e31227d0` | zbudowane |
+| 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | (krok 3) | zbudowane, test w obie strony OK |
 
 ---
 
@@ -131,5 +132,59 @@ moga uczciwie zmniejszyc narastanie potrzeby tylko druzyny gracza. Ceny z logu 1
 - Zapis: pole 8 `arm_sutlerrow` (kilka znakow); stary zapis Jeffa (101) czyta sie bez zmian.
 - Autotest: oboz >= 150 ludzi, kilka dob w polu z chuda sakiewka ludzi (albo `SutlerClothing` NIE), opcja odziezy - linia "odziez" z kontrola 0 i MK-8; praczki -
   linia "praczki", przez 7 dob w linii "Odziez wojska (150)" pole "praczki: druzyna gracza zdarla mniej o ...", potem znika.
+
+**Status:** DO SPRAWDZENIA.
+
+---
+
+### Krok 3. Zapis tablicy ogloszen (arm_board) - format nb2
+
+**Po ludzku (dla Jeffa):** w grze nic sie nie zmienia. Zapis listow gonczych i "kto co zlupil" zajmowal w zapisie gry 18.5 KB (wiecej niz 16 KB, przy ktorych
+zapis dzieli sie na kawalki). Teraz ten sam stan zajmuje ok. polowe (model na danych biegu 101: ok. 9.7 KB). Twoje stare zapisy wczytuja sie bez zmian;
+po pierwszym zapisie gra pisze juz nowy, krotszy format. Uwaga na cofanie: DLL sprzed tej zmiany (WGRANIE 101) nie przeczyta nowego formatu - listy
+goncze i pamiec szkod band zaczna sie wtedy od zera (listy wroca same w ciagu kilku dni, nic wiecej nie ginie).
+
+**Problem:** bieg 101 (`Armoury-2026-10-21_07-17-36.log`, nowa kampania 180 dob): linia "Listy goncze (m102): dzien ..." - `zapis arm_board` do 18462 B
+(ostatnia doba 18403 B), prog L-8 grupy m102tablica (<= 16384 B) - NIE. SaveText kawalkuje napis powyzej 16 KB.
+
+**Przyczyna (skad objetosc - policzone):** format nb1: listy `miasto~banda~nazwa~ludzie~dni~doplata~kwota~doba wywieszenia~termin~flagi~S*100~rodzaj~soltys~wies~rod`
+(84 czynne listy x ok. 81 B = ok. 6.8 KB - wyliczone z 84 ostatnich linii "list -" logu 101) i szkody band `banda~doba,rodzaj,miasto,wies/...` (159 band, reszta
+ok. 11.5 KB = ok. 72 B na bande, ok. 2.2 wpisu). Najwiecej zajmuja: id band (95% z koncowka 10-cyfrowa, np. `looters_2147131604`, srednio 19 znakow) - w listach
+i w szkodach; pelne doby (6 cyfr: 109016) w kazdym wpisie; miasto powtarzane w kazdym wpisie szkody (dla rabunku wsi wynika z wsi - `Village.Bound`, tak je zapisuje
+`OnRaidCompleted`); pola, ktorych po wywieszeniu nikt nie czyta (sprawdzone grep w NoticeBoard*.cs): `Days`, `BonusPct`, `S`, `Posted` (tylko eksport), `Name` (puste).
+
+**Zmiana:**
+- Nowy format zapisu `nb2|D=doba|P=przedrostki|F=...|W=...|H=...` (`NoticeBoard.Export`, `WatchExport2`); odczyt `nb2` (`Import2`, `WatchImport2`) i - bez zmian -
+  `nb1` (stare zapisy Jeffa z 101; po wczytaniu nb1 linia "wczytano zapis arm_board w starym formacie nb1 ... nastepny zapis w formacie nb2").
+- Id (miasto, banda, wies, rod, soltys, flaga) przez tablice przedrostkow `P`: przedrostek do ostatniego `_` raz w naglowku, w tekscie `^nr_koncowka`
+  (`sea_raiders_246` -> `^1_246`), a koncowka liczbowa od 5 cyfr bez zera na przodzie - w base36 (`looters_2147131604` -> `^0:zichck`). Tylko gdy krocej; id z
+  przecinkiem, kropka, `/`, `^`, `:` - bez zmian.
+- Doby jako przesuniecie wzgledem `D` (doba zapisu zapisana w naglowku - odczyt nie zalezy od zegara gry w SyncData): termin listu `Due - D`, wpis szkody `D - doba`,
+  flaga `Until - D`.
+- Listy bez pol nieczytanych (`nazwa`, `dni`, `doplata`, `S`, `doba wywieszenia`); po wczytaniu nb2 te pola = 0 (nikt ich nie czyta; nazwa bandy liczona po
+  wczytaniu jak dotad). Soltys i wies tylko przy liscie soltysa (puste koncowe pola obciete).
+- Szkody: miasto puste, gdy wynika z wsi (`Village.Bound`, odczyt leniwy `HarmTown` -> `VilTown` z pamiecia), albo gdy jest takie samo jak w poprzednim wpisie
+  tej bandy bez wsi; wpisy starsze niz `HarmDays` (60 dob - HarmCount liczy 60, soltysi 30) pominiete; banda bez zywych wpisow - bez klucza.
+- `HarmCount` porownuje `HarmTown(h)` (zapisane miasto albo z wsi). Stary eksport nb1 (`ExportV1`) zostal tylko do pomiaru.
+- Linia doby listow: po `zapis arm_board N B;` nowy segment `sklad zapisu nb2: naglowek z przedrostkami a B, flagi b B, listy c B (n), szkody d B (band m, wpisow k),
+  stary format nb1 w tym samym stanie X B (Y%)` - pomiar w tym samym stanie przy kazdej dobie (poza kosztem doby L-9). Linia "wpiete" - `zapis arm_board nb2 (odczyt takze nb1)`.
+- sprawdz_logi `m102tablica`: L-8 prog `<= 12288 B` (cel m103), nowy **L-8b** (INFO: nb2 wobec nb1 w tym samym stanie). Na logu 101 L-8 = NIE (18462 B, stary format) -
+  tak ma byc; po zmianie oczekiwane TAK.
+
+**Pomiar / test:**
+- Model na danych biegu 101 (`model_nb.py` w scratchpadzie: 84 listy z linii "list -" logu, szkody 159 band dopasowane do sumy nb1 = 18 256 B): nb2 = 9 670 B (53%),
+  same listy 6 847 -> 3 212 B. Wariant bez wyliczania miasta z wsi: 9 693 B. Dokladny wynik w tym samym stanie - nowe pole linii doby w nastepnym biegu.
+- Test w obie strony bez gry (konsola net472, refleksja na Armoury.dll z HEAD): 13 id (w tym koncowki z zerami, 19 cyfr, bez `_`, krotkie) - `Enc` -> `Dec` bez zmian;
+  3 listy (kapitan, soltys z wsia, termin -1, flagi TL) i szkody (wies, inne miasto, wpis 70 dob - pominiety, banda tylko ze starym wpisem - bez klucza) -
+  `WatchExport2` -> `Import2` = stan wejsciowy; potem `ExportV1` -> `Import` (stara sciezka nb1) = ten sam stan. WYNIK: OK.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: odczyt nb1 nietkniety (ta sama sciezka); nb2 czyta wszystkie pola, ktore kod czyta po wywieszeniu (miasto, banda, ludzie, kwota, termin, przyjety,
+  pan doplaca, rodzaj, rod pana, soltys, wies). `HarmCount` - miasto z wsi tylko dla wpisow bez miasta (nb2); wpisy nb1 i nowe wpisy maja miasto jak dotad.
+- Cofniecie DLL do 101 po zapisie nb2: stara wersja pisze "zapis arm_board w nieznanej wersji (nb2) - pominiety" - listy i szkody od zera (nic poza tym).
+- Koszt: eksport raz na dobe (linia) i przy zapisie; drugi eksport nb1 tylko do pomiaru (ok. tyle co dotad, poza kosztem L-9). `VilTown` - `Settlement.Find` raz na wies
+  (pamiec), wolany przy eksporcie i w `HarmCount` tylko dla wpisow z miastem z wsi.
+- Autotest: linia "wpiete" z `nb2`; linia doby - `zapis arm_board` < 12 288 B i pole "sklad zapisu" (procent wobec nb1); po zapisie i wczytaniu - "Listy goncze" z ta sama
+  liczba czynnych listow (`czynne N`) i szkod band; wczytanie zapisu z 101 - linia "wczytano zapis arm_board w starym formacie nb1".
 
 **Status:** DO SPRAWDZENIA.
