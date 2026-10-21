@@ -47,6 +47,33 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData
     $r0 = 'Armoury\ModuleData\' + $f.Name
     if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
 }
+# 21.10 m103-sceny: obrazki okien opowiesci Armoury\Images\**\*.png|jpg|jpeg (Prolog\prolog_NN, ROT\rot_<Klasa>_<n>, Kronika\kronika_<id>) - jak inne pliki:
+# zmieniony plik - kopia .bak-<Tag>-przed i lustro na D:, nowy - bez kopii; md5 po wgraniu. Plik bez sygnatury PNG/JPG (wyzerowany na dysku C) = STOP przed podmiana.
+# recenzja m103: gra bierze PIERWSZY istniejacy plik w kolejnosci .png, .jpg, .jpeg (StoryPictures.FindFile) - plik tego samego okna w innym formacie, ktory
+# lezy w grze, a nie ma go w drzewie (np. stary prolog_05.png po przejsciu na --jpg), przenosimy do .bak-<Tag>-przed (i lustro), inaczej gra dalej pokazuje stary
+$stale = @()
+$imgRoot = Join-Path $Tree 'Armoury\Images'
+if (Test-Path -LiteralPath $imgRoot -PathType Container) {
+    $imgFull = (Get-Item -LiteralPath $imgRoot).FullName.TrimEnd('\')
+    foreach ($f in @(Get-ChildItem -LiteralPath $imgFull -Recurse -File -ErrorAction SilentlyContinue | Where-Object { @('.png', '.jpg', '.jpeg') -contains $_.Extension.ToLowerInvariant() })) {
+        $r0 = 'Armoury\Images\' + $f.FullName.Substring($imgFull.Length).TrimStart('\')
+        $hb = [IO.File]::ReadAllBytes($f.FullName)
+        $png = $hb.Length -gt 8 -and $hb[0] -eq 0x89 -and $hb[1] -eq 0x50 -and $hb[2] -eq 0x4E -and $hb[3] -eq 0x47
+        $jpg = $hb.Length -gt 4 -and $hb[0] -eq 0xFF -and $hb[1] -eq 0xD8 -and $hb[$hb.Length - 2] -eq 0xFF -and $hb[$hb.Length - 1] -eq 0xD9
+        if (-not ($png -or $jpg)) { Write-Host ("STOP: obrazek " + $f.FullName + " nie jest PNG ani pelnym JPG (wyzerowany?) - popraw: python -I tools/obrazki_okien.py"); exit 2 }
+        if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
+        $stem = [IO.Path]::GetFileNameWithoutExtension($f.Name)
+        $relDir = Split-Path -Parent $r0
+        foreach ($ox in '.png', '.jpg', '.jpeg') {
+            if ($ox -eq $f.Extension.ToLowerInvariant()) { continue }
+            if (Test-Path -LiteralPath (Join-Path $f.DirectoryName ($stem + $ox)) -PathType Leaf) { continue }   # ten format tez jest w drzewie - idzie normalnie
+            $o = Join-Path $GameDir ('Modules\' + $relDir + '\' + $stem + $ox)
+            if ((Test-Path -LiteralPath $o -PathType Leaf) -and @($stale | Where-Object { $_.dst -eq $o }).Count -eq 0) {
+                $stale += [pscustomobject]@{ name = ($relDir + '\' + $stem + $ox); dst = $o; nowy = $f.Name }
+            }
+        }
+    }
+}
 foreach ($i in $items) {
     if (-not (Test-Path -LiteralPath $i.src -PathType Leaf)) { Write-Host ("STOP: brak zrodla " + $i.src); exit 2 }
     if ((Get-Item -LiteralPath $i.src).Length -eq 0) { Write-Host ("STOP: zrodlo puste " + $i.src); exit 2 }
@@ -80,6 +107,20 @@ foreach ($i in $items) {
     Copy-Item -LiteralPath $i.src -Destination $i.dst -Force
     $after = Md5 $i.dst
     $row.wynik = $(if ($after -eq $srcMd5) { 'WGRANE, md5 OK' } else { 'BLAD: md5 po wgraniu ' + $after })
+    $rows += $row
+}
+foreach ($x in $stale) {
+    $before = Md5 $x.dst
+    $row = [pscustomobject]@{ plik = $x.name; bylo = $before.Substring(0, 8); nowe = 'usuniety'; wynik = '' }
+    if ($DryRun) { $row.wynik = 'NA SUCHO: stary format bylby przeniesiony do .bak (gra wzielaby go przed ' + $x.nowy + ')'; $rows += $row; continue }
+    $bak = $x.dst + '.bak-' + $Tag + '-przed'
+    Move-Item -LiteralPath $x.dst -Destination $bak -Force
+    if ((Test-Path -LiteralPath $x.dst) -or (Md5 $bak) -ne $before) { $row.wynik = 'BLAD: stary format nie przeniesiony'; $rows += $row; continue }
+    $mi = Join-Path $mirror $x.name
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $mi)
+    Copy-Item -LiteralPath $bak -Destination $mi -Force
+    if ((Md5 $mi) -ne $before) { Write-Host ("UWAGA: lustro " + $mi + " ma inny md5") }
+    $row.wynik = 'stary format usuniety (gra wzielaby go przed ' + $x.nowy + '; kopia .bak i lustro)'
     $rows += $row
 }
 $rows | Format-Table -AutoSize | Out-String -Width 200 | Write-Host

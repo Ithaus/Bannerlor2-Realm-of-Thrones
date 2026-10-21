@@ -40,6 +40,23 @@ if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv'
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.tsv' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\ModuleData\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
 # 20.10 m97-surowce: takze pliki arm_*.xml w Armoury\ModuleData (arm_items_rare.xml, arm_strings.xml - nowe, w grze ich nie ma; po tescie znikaja, wgranie bez kopii .bak)
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Tree 'Armoury\ModuleData') -Filter 'arm_*.xml' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\ModuleData\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
+# 21.10 m103-sceny: obrazki okien opowiesci Armoury\Images\**\*.png|jpg|jpeg (Prolog\prolog_NN, ROT\rot_<Klasa>_<n>, Kronika\kronika_<id>) - gdy sa w drzewie
+# (bez nich okna biora obrazki ROT); nowe pliki po tescie znikaja jak inne pliki danych
+$imgRoot = Join-Path $Tree 'Armoury\Images'
+if (Test-Path -LiteralPath $imgRoot -PathType Container) {
+    $imgFull = (Get-Item -LiteralPath $imgRoot).FullName.TrimEnd('\')
+    foreach ($f in @(Get-ChildItem -LiteralPath $imgFull -Recurse -File -ErrorAction SilentlyContinue | Where-Object { @('.png', '.jpg', '.jpeg') -contains $_.Extension.ToLowerInvariant() })) {
+        $r0 = 'Armoury\Images\' + $f.FullName.Substring($imgFull.Length).TrimStart('\')
+        if ($rel -notcontains $r0) { $rel += $r0 }
+        # recenzja m103: gra bierze pierwszy z .png, .jpg, .jpeg - stary plik tego okna w innym formacie w grze wygra z nowym z drzewa (test go nie usuwa)
+        $stem = [IO.Path]::GetFileNameWithoutExtension($f.Name)
+        foreach ($ox in '.png', '.jpg', '.jpeg') {
+            if ($ox -eq $f.Extension.ToLowerInvariant() -or (Test-Path -LiteralPath (Join-Path $f.DirectoryName ($stem + $ox)) -PathType Leaf)) { continue }
+            $o = Join-Path 'C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules' ((Split-Path -Parent $r0) + '\' + $stem + $ox)
+            if (Test-Path -LiteralPath $o -PathType Leaf) { Write-Host ("UWAGA: w grze lezy " + $o + " - gra wezmie go przed " + $f.Name + " z drzewa (test pokaze stary obrazek); wgraj-v5.ps1 przenosi go do .bak") }
+        }
+    }
+}
 $ef = @()
 foreach ($r in $rel) {
     $src = Join-Path $Tree $r
