@@ -1912,6 +1912,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int MapRoadSpeedPercent { get; set; } = 15;
 
+        [SettingPropertyBool("Map Road Bonus Above Floor", HintText = "with Map Road Speed Bonus: the road bonus is applied to the party's speed after the game's minimum speed floor, so a very slow party on a road still moves faster than off it. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadBonusAboveFloor { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Map Road Margin", 0.00f, 2.00f, "0.00", HintText = "how far beyond the painted edge of a road (in map units) a party still counts as on it when Map Road Wide Field is off - the road paint is coarse and party paths never follow it exactly (0.4 = about two kilometres; at most 2)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public float MapRoadMargin { get; set; } = 0.40f;
@@ -9597,6 +9601,7 @@ namespace Armoury
             s.MarchPackAllowance = MarchPackAllowance;
             s.MapRoadSpeedBonus = MapRoadSpeedBonus;
             s.MapRoadSpeedPercent = MapRoadSpeedPercent;
+            s.MapRoadBonusAboveFloor = MapRoadBonusAboveFloor;
             s.MapRoadMargin = MapRoadMargin;
             s.MapRoadWideField = MapRoadWideField;
             s.MapRoadWideMargin = MapRoadWideMargin;

@@ -311,10 +311,13 @@ namespace Armoury
                 {
                     int day = (int)CampaignTime.Now.ToDays - 1;
                     long sv = Interlocked.Read(ref SpeedVal), sc = Interlocked.Read(ref SpeedCar);
+                    long fb = Interlocked.Exchange(ref MapRoads._floorBonus, 0);   // m105 G3: liczenia z premia od podlogi gry od ostatniej linii
                     Log.Info(P + "dzien " + day.ToString(Inv) + " | klucze: Valyria " + (ValOn(s) ? "tak" : "nie") + ", szlaki " + (CarOn(s) ? "tak" : "nie")
                              + " | partio-godzin w marszu " + _hN + ": na drodze Valyrii " + _hV + " (" + Pct(_hV, _hN) + "%), na szlaku karawan " + _hC + " (" + Pct(_hC, _hN)
                              + "%), na zwyklym trakcie " + _hT + " (" + Pct(_hT, _hN) + "%) | liczenia predkosci z premia: Valyria ok. " + sv + ", szlak ok. " + sc
-                             + " | odcinkow V " + _segV + " + mosty " + _segB + ", C " + _segC + Audit(s, day) + " | " + AiNote + " | potkniecia " + _stumbles + ".");
+                             + " | odcinkow V " + _segV + " + mosty " + _segB + ", C " + _segC + Audit(s, day)
+                             + (s.MapRoadBonusAboveFloor ? ", liczenia z premia od podlogi gry (m105, wszystkie drogi) ok. " + fb.ToString(Inv) : "")
+                             + " | " + AiNote + " | potkniecia " + _stumbles + ".");
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -335,7 +338,8 @@ namespace Armoury
                 int cnt = all.Count, off = cnt > 0 ? (int)((((long)day * 7919L) % cnt + cnt) % cnt) : 0;
                 for (int want = 4; want <= 5; want++)
                 {
-                    int n = 0, lines = 0, seen = 0, low = 0, lowFloor = 0, lowCap = 0, lowOther = 0;
+                    int n = 0, lines = 0, seen = 0, low = 0, lowFloor = 0, lowCap = 0, lowOther = 0, floorOk = 0;   // m105 G3: floorOk - probki z podlogi z pelna premia
+                    double expPct = want == 4 ? MapRoads.ValPctNow(s) : MapRoads.CarPctNow(s);
                     double sum = 0, mn = double.MaxValue, mx = double.MinValue, sumFloor = 0;
                     StringBuilder ex = null;
                     string txt = (want == 4 ? TxtValyrian : TxtCaravan).ToString();
@@ -353,6 +357,7 @@ namespace Armoury
                         // m103 recenzja (VR-3): podloga liczona dla KAZDEJ probki (jak AuditList w MapRoads.cs) - wynik bez premii na LimitMin znieksztalca premie takze,
                         // gdy z premia wyszedl ponad podloge (b miedzy 5% a pelna premia); narzedzie odejmuje od sredniej wszystkie probki z podlogi
                         bool atFloor = r0 <= lmin + 0.001f;
+                        if (atFloor && b >= expPct - 0.0005) floorOk++;
                         if (atFloor || b < 0.05)
                         {
                             // m103 P1 (VR-3): probka z podlogi albo premia ponizej 5% - id partii i powod: podloga gry (wynik bez premii na LimitMin - premia ginie w modelu), sufit kolumny (LimitMax), inne
@@ -379,6 +384,8 @@ namespace Armoury
                     if (low > 0) sb.Append(", ponizej 5% lub na podlodze: ").Append(low).Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")
                                    .Append(lowFloor > 0 ? (100.0 * sumFloor / lowFloor).ToString("0.00", Inv) : "0.00").Append("%; sufit kolumny ").Append(lowCap)
                                    .Append("; inne ").Append(lowOther).Append(") [").Append(ex != null ? ex.ToString() : "").Append(']');
+                    // m105 G3: dopisek za audytem (regexy VR-1 / VR-3 / M103_VALYRIA_LOW bez zmian); klucz wylaczony - linia jak w WGRANIU 102
+                    if (s != null && s.MapRoadBonusAboveFloor) sb.Append(", podloga z premia (m105) ").Append(floorOk);
                 }
             }
             catch (Exception e) { Stumble("Audit", e); sb.Append(" | audyt: blad"); }
