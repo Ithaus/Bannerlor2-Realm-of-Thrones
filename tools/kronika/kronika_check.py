@@ -100,15 +100,21 @@ PROTECTED = {
     'ROTlord_373': ('Jon Connington', [['ev:AegonInvasionEvent']]),
 }
 
-# Uchwyty kod:<nazwa> - nazwane skutki C# spoza biblioteki akcji. Najwyzej 10 (bez 'test'). Nowy = wpis tutaj + w KRONIKA-FORMAT.md.
-# nazwa -> (dozwolone numery wydarzen, opis)
+# Uchwyty kod:<nazwa> - nazwane skutki C# spoza biblioteki akcji. Najwyzej 10 (bez 'test'). Nowy = wpis tutaj + w KRONIKA-FORMAT.md rozdz. 12
+# (tam pelny opis dla programisty K0). nazwa -> (dozwolone numery wydarzen, gdzie, opis); gdzie = 'okno' (kolumna skutki okna - raz przy
+# rozstrzygnieciu, przed lista) albo 'opcja' (skutki opcji #wybor - po wyborze, uchwyt czyta kr:NNN.w=x). Gdzie indziej (po_rozbiciu, nagroda) = BLAD.
 KODY = {
-    'test': ([0], 'k00: proba silnika - tylko linia logu "kod test", bez skutkow w swiecie'),
-    'zaraza': ([76], 'blada klacz: ludzie miasta przez ksiege ludzi (PeopleBook, przyczyna choroba), ranni w oddzialach obok'),
-    'dzwony': ([115], 'Krolewska Przystan plonie: ludzie i dobrobyt przez PeopleBook/Devastation, lup z kasy miasta z platnikiem'),
-    'wielka_rada': ([117], 'Wielka Rada: lekka = tekst i relacje; pelna (ChronicleFullVersions) = wybor krola i korona'),
+    'test': ([0], 'okno', 'k00: proba silnika - tylko linia logu "kod test", bez skutkow w swiecie'),
+    'zaraza': ([76], 'okno', 'blada klacz pod Meereen: ludzie miasta przez ksiege ludzi (PeopleBook, przyczyna choroba), ranni w oddzialach obok'),
+    'dzwony': ([115], 'okno', 'Krolewska Przystan plonie: ludzie przez PeopleBook, dobrobyt przez Devastation, lup z kasy miasta dla rodu zdobywcy (z platnikiem)'),
+    'wielka_rada': ([117], 'opcja', 'Wielka Rada po glosie gracza: lekka = tekst i relacje; pelna (ChronicleFullVersions) = krol i korona wedlug glosow'),
 }
 KODY_MAX = 10
+
+# Towary rejestrowane w kodzie gry, nie w XML (TaleWorlds.CampaignSystem.DefaultItems: Grain, Meat, Hides, Tools, IronOre, HardWood,
+# Charcoal, IronIngot1-6, Trash - id sprawdzone w TaleWorlds.CampaignSystem.dll i w kodzie Armoury: GetObject<ItemObject>("iron") itd.).
+DEFAULT_ITEMS = {'grain', 'meat', 'hides', 'tools', 'iron', 'hardwood', 'charcoal', 'ironIngot1', 'ironIngot2', 'ironIngot3',
+                 'ironIngot4', 'ironIngot5', 'ironIngot6', 'trash'}
 
 # Wyjatki od "succeed tylko w wersji pelnej": smierc glowy rodu z dziedzicem w wersji lekkiej (plan J K4 + tabela B).
 SUCCEED_LIGHT_OK = {42, 49, 52, 80}
@@ -153,6 +159,8 @@ VAR_SAMPLE = 'Ser Barristan the Bold Selmy'   # najgorszy przypadek podstawienia
 TOK_ARG = {'wladca': 'kingdom', 'glowa': 'clan', 'pan': 'settlement', 'imie': 'hero', 'nazwa': 'any', 'skarbiec': 'kingdom', 'kasa': 'settlement'}
 TOK_NOARG = {'gracz', 'cel', 'kto', 'rodkto', 'region', 'liczba', 'pora'}
 TOK_RECUR = {'cel', 'kto', 'rodkto', 'region', 'liczba', 'pora'}
+# Typy zlozone miejsca argumentu -> typy proste (token pasuje, gdy pasuje do ktoregokolwiek; np. plotka:<id>:@cel:<dni> w oknie powracajacym).
+TOK_WANT = {'captor': {'clan', 'kingdom', 'settlement'}, 'source': {'hero', 'clan', 'settlement'}}
 
 PL_CHARS = set('\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c\u0104\u0106\u0118\u0141\u0143\u00d3\u015a\u0179\u017b')
 QUOTES = set('"\u201c\u201d\u201e')
@@ -279,6 +287,7 @@ class World:
             for f in item_files:
                 if os.path.isfile(f):
                     self.items.update(re.findall(r'<(?:Item|CraftedItem)\b[^>]*?\bid="([^"]*)"', read_xml(f), re.S))
+            self.items.update(DEFAULT_ITEMS)   # towary z kodu gry (DefaultItems) - grain, iron, charcoal ... nie maja XML
             t = read_xml(os.path.join(mods, 'ROT-Content', 'GUI', 'ROT-ContentSpriteData.xml'))
             for m in re.finditer(r'<SpritePart>(.*?)</SpritePart>', t, re.S):
                 b = m.group(1)
@@ -462,10 +471,11 @@ def chk_token(tok, want, world, ctx, rep):
     if name in TOK_RECUR and not ctx.recurring:
         rep.e(ctx.where, 'token %s tylko w oknie powracajacym (kolumna powtorz)' % tok)
         return False
+    wants = TOK_WANT.get(want, set(want.split('|')))   # typ zlozony (osada|krolestwo, rod|krolestwo, captor, source) = ktorykolwiek
     if name in TOK_NOARG:
         ok_for = {'gracz': {'hero', 'payer', 'clan', 'any'}, 'cel': {'settlement', 'any'}, 'kto': {'hero', 'payer', 'any'},
                   'rodkto': {'clan', 'any'}, 'region': {'kingdom', 'any'}, 'liczba': {'any'}, 'pora': {'any'}}[name]
-        if want not in ok_for:
+        if not (wants & ok_for):
             rep.e(ctx.where, 'token %s nie pasuje w miejscu typu %s' % (tok, want))
             return False
         return True
@@ -477,7 +487,7 @@ def chk_token(tok, want, world, ctx, rep):
         if not chk_ref(arg, at, world, ctx, rep):
             return False
         kind = {'wladca': 'hero', 'glowa': 'hero', 'pan': 'hero', 'imie': 'text', 'nazwa': 'text', 'skarbiec': 'payer', 'kasa': 'payer'}[name]
-        if want == 'any' or kind == want or (want == 'payer' and kind in ('hero', 'payer')):
+        if want == 'any' or kind in wants or ('payer' in wants and kind in ('hero', 'payer')):
             return True
         rep.e(ctx.where, 'token %s (%s) nie pasuje w miejscu typu %s' % (tok, kind, want))
         return False
@@ -827,6 +837,14 @@ def chk_act(raw, ctx, rep, world, refs, what):
             elif ctx.nr not in KODY[a[0]][0]:
                 rep.e(ctx.where, '%s: kod:%s dozwolony tylko w wydarzeniach %s' % (what, a[0], KODY[a[0]][0]))
                 good = False
+            else:
+                # miejsce uchwytu: 'okno' = kolumna skutki okna (przed lista), 'opcja' = skutki opcji (po wyborze - uchwyt czyta kr:NNN.w=x)
+                gdzie = {'skutki': 'okno', 'skutki opcji': 'opcja'}.get(what, what)
+                if gdzie != KODY[a[0]][1]:
+                    rep.e(ctx.where, '%s: kod:%s nalezy do %s (rejestr KODY: %s) - %s' % (
+                        what, a[0], 'skutkow okna' if KODY[a[0]][1] == 'okno' else 'skutkow KAZDEJ opcji #wybor', KODY[a[0]][1],
+                        'skutki okna ida raz przed lista, skutki opcji po wyborze (KRONIKA-FORMAT.md 3.3, 12)'))
+                    good = False
     elif name == 'rel':
         good = need(3, 3, 'rel:<bohater>:<bohater>:<d>') and R(a[0], 'hero') and R(a[1], 'hero') and I(a[2], -100, 100)
         if good and a[0] == a[1]:
@@ -901,7 +919,7 @@ def chk_act(raw, ctx, rep, world, refs, what):
     elif name == 'item':
         good = need(3, 3, 'item:<bohater>:<przedmiot>:<skad: bohater|rod|osada>') and R(a[0], 'hero') and R(a[2], 'source')
         if good:
-            if a[1].startswith('dragon'):
+            if a[1].startswith('dragon_'):   # smoki dragon_black..dragon_thumbnail; dragonglass_axe i dragonstone_* to zwykly sprzet (P4)
                 rep.e(ctx.where, '%s: %r - smoki (dragon_*) tylko Prologue.Dragons (P4), w Kronice sam tekst i flaga' % (what, raw))
                 good = False
             elif a[1] not in world.items:
@@ -1162,7 +1180,7 @@ def main():
         base = rows[0]
         nr = int(wid[:3])
         pk = win_pk[wid]
-        st = stat.setdefault(pk, {'okna': 0, 'wiersze': 0, 'wybory': 0, 'bandy': 0, 'lektor': 0})
+        st = stat.setdefault(pk, {'okna': 0, 'wiersze': 0, 'wybory': 0, 'bandy': 0, 'zadania': 0, 'lektor': 0, 'lwiersze': 0, 'lokna': set()})
         st['okna'] += 1
         st['wiersze'] += len(rows)
         if base.c['war'] != '':
@@ -1304,6 +1322,8 @@ def main():
                 if all(eff):
                     n = len(eff[0]) + len(eff[1]) + len(eff[2])
                     st['lektor'] += n
+                    st['lwiersze'] += 1
+                    st['lokna'].add(wid)
                     lk = 'kr_%s' % key.replace('.', '_')
                     if lk in world.lektor and world.lektor[lk][1]:
                         md5 = hashlib.md5(('%s\n%s\n%s' % eff).encode('utf-8')).hexdigest()
@@ -1321,6 +1341,12 @@ def main():
                     rep.e(ctx.where, 'forma/inni = wiesc, a brak tekstu %s_W (albo %s_W) w #tekst' % (key, wid))
                 else:
                     used_texts.add(key + '_W' if (key + '_W') in texts else wid + '_W')
+            # zapasowa wiesc (rozdz. 3.2 p. 4 i 5): okno z kotwica przed albo z koncem do przychodzi jako wiesc _W, gdy kotwica juz
+            # zaszla albo spoznienie > 30 dni po do - wtedy _W jest uzyty, choc forma/inni nie maja wiesc
+            if rows[0].c['przed'] or rows[0].c['do']:
+                for tk in (key + '_W', wid + '_W'):
+                    if tk in texts:
+                        used_texts.add(tk)
             # skutki
             acts = parse_acts(c['skutki'], ctx, rep, world, refs, 'skutki')
             chk_acts_rules(acts, [base_cond, cond, po if is_base else None], c['wersja'], nr, ctx, rep, world)
@@ -1458,6 +1484,9 @@ def main():
         chk_acts_rules(acts, [], 'lekka', ctx.nr, ctx, rep, world)
         chk_text(c['tytul'], tid, 'T', ctx, rep, linie, maxlen=TITLE_MAX, allow_vars=set(), label='tytul zadania')
         chk_text(c['opis'], tid, 'D', ctx, rep, linie, maxlen=NEWS_MAX, allow_vars=set(), label='opis zadania')
+        pkk = NR_PACZKA.get(int(m.group(1)))
+        if pkk in stat:
+            stat[pkk]['zadania'] += 1
 
     # --- pary P1
     pair_set = {}
@@ -1501,6 +1530,10 @@ def main():
                 rep.e(where, 'mv:%s bez pary w #para (okno, %s, po)' % (ref, ref))
     # kazdy kr: w arm_canon_moves ma pare 'kr'
     for mid, (who, trig) in world.moves.items():
+        tt = [t.strip() for t in trig.split('|') if t.strip()]
+        if tt and all(t.startswith('kr:') for t in tt):
+            # przy wylaczonej Kronice kr: = nigdy (rozdz. 3.3) - wiersz bez starego wyzwalacza nie ruszy wtedy wcale
+            rep.w('arm_canon_moves.tsv:%d' % world.moves_line.get(mid, 0), 'wiersz %s ma tylko termy kr: - przy ChronicleOfWesteros=NIE nie ruszy nigdy (stary wyzwalacz zostaje jako zapas, rozdz. 8)' % mid)
         for t in trig.split('|'):
             t = t.strip()
             mm = re.match(r'^kr:(\d{3}\.[1-9])', t)
@@ -1570,9 +1603,18 @@ def main():
             continue
         print('%s: %s: %s' % (where, lvl, msg))
     if o.stat:
+        tot = {}
         for pk in sorted(stat):
             s = stat[pk]
-            print('k%02d: okien %d (wierszy %d), wyborow %d, band %d, znakow lektora (lektor=1) %d' % (pk, s['okna'], s['wiersze'], s['wybory'], s['bandy'], s['lektor']))
+            s['lokna'] = len(s['lokna'])
+            print('k%02d: okien %d (wierszy %d), wyborow %d, band %d, zadan %d, okien z lektor=1 %d (wierszy %d), znakow lektora %d'
+                  % (pk, s['okna'], s['wiersze'], s['wybory'], s['bandy'], s['zadania'], s['lokna'], s['lwiersze'], s['lektor']))
+            if pk != 0:
+                for k, v in s.items():
+                    tot[k] = tot.get(k, 0) + v
+        if tot:
+            print('RAZEM k01-k10: okien %d (wierszy %d), wyborow %d, band %d, zadan %d, okien z lektor=1 %d (wierszy %d), znakow lektora %d'
+                  % (tot['okna'], tot['wiersze'], tot['wybory'], tot['bandy'], tot['zadania'], tot['lokna'], tot['lwiersze'], tot['lektor']))
     print('kronika_check: plikow paczek %d (%s), okien %d, wierszy okien %d, wyborow %d, tekstow %d, band %d, zadan %d, par %d, tematow %d | bledy %d, uwagi %d | WYNIK %s'
           % (len(files), ','.join('k%02d' % k for k, _ in files), len(win_rows), sum(len(v) for v in win_rows.values()), len(choices), len(texts),
              len(bands), len(tasks), len(pairs), len(themes), nerr, nwarn, 'OK' if nerr == 0 else 'BLAD'))

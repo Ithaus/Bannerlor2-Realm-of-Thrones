@@ -1,6 +1,9 @@
 # Kronika Westeros - format danych (arm_kronika_kNN.tsv) - kontrakt dla autorow tresci i silnika K0
 
 Stan: 21.10.2026, galaz `w-toku/kronika-dane` (baza n31-calosc 59a054b7). Warstwa DANYCH, bez C#.
+Poprawki po paczkach K1-K10 (21.10, commit "117 wydarzen K1-K10"): 3.3 `kr:` przy wylaczonej Kronice = FALSZ (nigdy); 8 stan par i `remove->hide`
+tylko razem z K0; 10/11 jednostki dni, `hide` na ukrytym i koniec ukrycia "nigdy"; 12 uchwyty z opisem dla K0 i kolumna gdzie; 13 `@cel` w oldage
+i wizja; 17 nowe reguly walidatora. Dziennik galezi: `docs/noc-1920/kronika-dane-CHANGELOG.md`.
 Zrodla: `docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md` (repo glowne) sekcja "## PLAN kronika" (B P1-P10, D, E, F, G)
 oraz "## kronika:A" i "## kronika:B"; `docs/KRONIKA-WESTEROS-V2-2026-10-21.md` (117 wydarzen, decyzje Jeffa).
 Silnik K0 (Chronicle*.cs) powstanie pozniej i ma czytac DOKLADNIE ten format. Walidator: `tools/kronika/kronika_check.py`.
@@ -96,7 +99,11 @@ pola z wlasnymi id (`..._1b_T`, `_1b_U`, `_1b_L`).
 - Skutki okna wykonuja sie RAZ przy rozstrzygnieciu (okno/wiesc/log), przed lista wyboru. Skutki opcji - po wyborze.
 - Klasa akcji: T (tekst), R (relacje/slawa), S (swiat). Klucz **ChronicleWorldChanges=NIE** pomija klase S (z linia logu).
 - Klucz **ChroniclePlayerChoices=NIE** (albo gracz poza `gracz`, albo 0 dostepnych opcji) = wykonuje sie opcja **bierna** bez pytania.
-- Klucz **ChronicleOfWesteros=NIE** = brak okien; termy `kr:` w arm_canon_moves sa wtedy prawdziwe (stare wyzwalacze dzialaja).
+- Klucz **ChronicleOfWesteros=NIE** = brak okien; termy `kr:` (w oknach i w arm_canon_moves) sa wtedy **FALSZYWE na zawsze** ("nigdy", jak dzis
+  nieznany term w `CanonCompanions.BaseTrue`) - wiersz `#move` z wyzwalaczem `stary|kr:NNN.w` rusza wtedy od starego wyzwalacza, bo `|` = lub.
+  (Poprawka 21.10: pierwsza wersja mowila "prawdziwe" - przy alternatywie `|` m02, m04, m18 i m22 ruszylyby w dniu startu kampanii;
+  zglosili to wszyscy autorzy K1-K10.) Wiersz z samymi termami `kr:` przy wylaczonej Kronice nie rusza wcale (walidator: UWAGA).
+- Skutki opcji, ktore musza znac wybor gracza (np. uchwyt `kod:wielka_rada`), ida w skutkach KAZDEJ opcji - skutki okna sa wykonane przed lista.
 
 ### 3.4 Teksty i id TextObject
 
@@ -207,6 +214,15 @@ Wiersz `p10` (m104-e5) jest znany walidatorowi, choc go tu jeszcze nie ma.
 **Uwaga na wyzwalacze `remove`:** m20 Osha (`done:BlackwaterEvent+10`, ok. dzien 780), m11 Sandor (`done:RedWeddingEvent+20`, ok. 990),
 m21 Sam (`done:WallEvent+20`, ok. 1200) zabijaja postac (`remove` = KillCharacterAction.ApplyByRemove). Plan zmienia je na `hide` (P3), a powroty
 sa w nr 82 (Sam), 89 (Sandor) - zmiane `remove -> hide` wpisac w PIERWSZEJ paczce wgranej po K0 (K1), inaczej kampania minie te dni wczesniej.
+**Stan 21.10 (po K1-K10): m11/m20/m21 dalej maja `remove` - CELOWO.** Dzisiejszy CanonCompanions nie zna akcji `hide` (`KnownActions`: clan, court,
+lead, prisoner, free, wander, remove, die, marry, wed) - wiersz z `hide` bylby odrzucony jako zly (`zlych wierszy` w linii startu) i nie ruszylby
+nigdy, czyli zmiana teraz zmienilaby gre Jeffa bez silnika. Kolejnosc dla K0: (1) `hide`/`unhide` w CanonCompanions.ApplyAction i KnownActions,
+(2) w TYM SAMYM commicie m11/m20/m21 `remove -> hide`. Do tego czasu okna zalezne od zywych Sama/Sandora po dniach `remove` (064.2a, 082.2,
+082.3, 089.1, 090.1, 101.1, 111.1a, 115.2d, 905.1) przepadaja na warunkach `alive:` z powodem - bez bledu.
+Pary `kr` w arm_canon_moves (stan 21.10): m02 Jaime `done:BlackwaterEvent|kr:032.1=b|kr:032.1=c`, m04 Tyrion `ev:DanyInvasionEvent|kr:099.2`,
+m18 Theon `war:sturgia:battania|kr:902.1+1`, m22 Yoren `ev:HarrenhalSiegeNotificationEvent|rotday:120|kr:008.1+1` - wszystkie ze starym wyzwalaczem.
+Zmiana strony postaci z `#move`, ktorej dzis nie ma w tabeli (Theon 072.3/087/108, Brienne i Podrick 083, Jaime 107), = NOWY wiersz `#move`
+(najlepiej `kr:` + zapasowy stary wyzwalacz) w paczce silnika - Kronika sama tego nie robi; dzis te okna maja to tylko w tekscie i flagach.
 
 ## 9. Sekcja #usuniete (nagrobki)
 
@@ -220,6 +236,9 @@ Przed pierwszym wgraniem paczki id mozna jeszcze zmieniac bez nagrobka.
   jak CanonCompanions); nie z `!` i nie przy `p:`.
 - Id w termach: bohater (ROT_heroes.xml albo ROTwanderer<N> = postac z szablonu), rod (spclans.xml), krolestwo, osada (ROT-Map settlements.xml).
   Tokeny `@...` w termach tylko w oknach powracajacych (`@cel`, `@kto`, `@rodkto`, `@region`).
+- **Jednostki dni:** `od`/`do` = dni opowiesci w skali dokumentu (przeliczane przez `k`); wszystko inne = dni KAMPANII bez przeliczenia, jak
+  w CanonCompanions: `+N` w termach, `rotday:N` (StoryDay = dni kampanii od konca prologu), `prolday:N`, oraz dlugosci w akcjach i sekcjach
+  (`wound`, `plotka`, `muster`, `#banda dni`, `#zadanie dni`).
 
 | Term | Argumenty | Prawdziwy, gdy | Zrodlo |
 |---|---|---|---|
@@ -304,16 +323,49 @@ Wzorce: "N dni przed wydarzeniem ROT X" = `warunki: plan:X-N` + `przed: ev:X` + 
 Zakazane: `move:` (P1 - para w #para), `remove` (smierc bez sladu - `die` albo `hide`), przedmioty `dragon_*` (P4), sojusze w wersji lekkiej (P5).
 Kronika nie wola StartAlliance, nie rusza smokow (tekst i flaga), nie zmienia wojen ROT.
 
+Zasady silnika K0 ustalone po paczkach K1-K10 (21.10):
+- **`hide` na postaci juz ukrytej przez Kronike**: nowy term konca ZASTEPUJE stary (linia logu `UKRYCIE: nowy koniec`). Przyklad: Arya - 008.1
+  `hide:lord_5_1_1:rotday:2000`, potem 044.2 `hide:lord_5_1_1:kr:098.2`.
+- **Koniec ukrycia, ktory juz nigdy nie zajdzie** (`kr:` okna pominietego, `alive:` martwego itd. - rozdz. 3.2 p. 4) konczy ukrycie: `unhide`
+  do siedziby rodu postaci z linia `KONIEC UKRYCIA (term nigdy)`. Dzieki temu Rickon (026.2 do `kr:084.1`), Melisandre (092.1 do `kr:112.1`)
+  i Arya (do `kr:098.2`) nie zostaja ukryci na zawsze, gdy ich okno powrotu przepadnie. `hide` BEZ terminu = do akcji `unhide` albo na zawsze
+  (tak K10 zapisuje smierc postaci z wierszami `#move`: Jaime, Theon, Varys, Sandor, Qyburn - zniknieciem, nie `die`).
+- **`dragon_*`** = smoki (dragon_black ... dragon_smoke2, dragon_thumbnail w ROTassets.xml). `dragonglass_axe` i `dragonstone_*` to zwykly sprzet
+  (wolno w `item`, gdy ma posiadacza - dzis topora z obsydianu nikt nie nosi, wiec akcja bylaby POMINIETA).
+- **Towary** (`ware`, `#zadanie co`): id z XML albo z kodu gry (DefaultItems: grain, meat, hides, tools, iron, hardwood, charcoal, ironIngot1-6).
+- **`die`/`hide` na postaci, ktora W CHWILI AKCJI jest glowa rodu albo wladca** (stan gry - walidator widzi tylko glowy z XML; np. Kevan
+  lord_4_13 po 052.1, gdy 095.1 opcja b go zabija): akcja z wiersza/opcji `lekka` albo `obie` = POMINIETA `glowa rodu - tylko pelna` (wersja lekka
+  nie zmienia glow rodow, rozdz. 16.4); z wiersza `pelna` = smierc z dziedzicem wybranym przez gre (dla `hide` - zawsze POMINIETA).
+- **Akcja z rodem/bohaterem, ktorego nie ma w grze** (np. `relk:brotherhood`, gdy Bractwo nie ma przywodcy; `item` z rodu, w ktorym nikt nie nosi
+  przedmiotu) = POMINIETA z powodem, reszta skutkow idzie dalej.
+
 ## 12. Uchwyty kod:<nazwa>
 
-Najwyzej 10 na cala Kronike (bez `test`). Nowy uchwyt = wpis w `KODY` w `kronika_check.py` (dozwolone wydarzenia + opis) i tutaj.
+Najwyzej 10 na cala Kronike (bez `test`). Nowy uchwyt = wpis w `KODY` w `kronika_check.py` (dozwolone wydarzenia, `gdzie`, opis) i tutaj.
+Stan po K1-K10 (21.10): **3 uchwyty tresci + `test`** - kazde inne miejsce bez slownika akcji autorzy zapisali tekstem, flaga albo przyblizeniem
+(lista luk nizej). Kolumna `gdzie`: `okno` = kolumna `skutki` okna (raz przy rozstrzygnieciu, przed lista), `opcja` = `skutki` KAZDEJ opcji `#wybor`
+(po wyborze; uchwyt czyta `kr:NNN.w=x`). Walidator odrzuca uchwyt w innym miejscu (tez w `po_rozbiciu` i `nagroda`).
 
-| Nazwa | Wydarzenia | Co robi (silnik w paczce) |
-|---|---|---|
-| `test` | 000 | proba silnika: tylko linia logu `kod test` |
-| `zaraza` | 076 | blada klacz: ludzie miasta przez ksiege ludzi (przyczyna choroba), ranni w oddzialach obok (PeopleBook/Devastation) - K7 |
-| `dzwony` | 115 | Krolewska Przystan plonie: ludzie i dobrobyt przez PeopleBook/Devastation, lup z kasy miasta z platnikiem - K10 |
-| `wielka_rada` | 117 | Wielka Rada: lekka = tekst i relacje; pelna = wybor krola i korona (ChronicleFullVersions) - K10 |
+Wspolne zasady dla programisty K0 (Chronicle.Codes.cs - jeden `switch` po nazwie):
+- wywolanie `RunCode(nazwa, okno, wariant, opcja)` z biezacym stanem okna; uchwyt NIE czyta tekstu okna, tylko stan gry i `kr:`/flagi;
+- klasa T (tekst) w sensie klucza ChronicleWorldChanges: uchwyt sam sprawdza klucz i przy `NIE` robi tylko czesc R (relacje) albo nic - z linia;
+- zamknieta ekonomia jak w rozdz. 11: ludzie przez PeopleBook (do/z puli regionu, nigdy z niczego), zloto zawsze z platnikiem, bez mnoznikow cen;
+- jedna linia logu `KRONIKA kod <nazwa> | okno NNN.w[war] | ...liczby... | OK/POMINIETA (powod)`; wyjatek = POMINIETA z powodem (okno i reszta
+  skutkow ida dalej), bez globalnego wylacznika (CLAUDE.md: licz potkniecia, nie gas funkcji);
+- uchwyt nieznany silnikowi danej wersji (paczka wgrana przed kodem) = POMINIETA `brak uchwytu`, okno sie pokazuje.
+
+| Nazwa | Okna | Gdzie | Od | Co robi - opis dla programisty K0 |
+|---|---|---|---|---|
+| `test` | 000.1 | okno | K0 | proba silnika: tylko linia logu `kod test`, bez zmian w swiecie (autotest K0a/K0b) |
+| `zaraza` | 076.2 | okno | K7 | **Blada klacz pod Meereen** (town_K1, wlasciciel z warunkow okna = empire_s). (1) Meereen traci 8-12% ludzi przez PeopleBook z przyczyna `choroba` (do puli regionu Zatoki - nie znikaja z ksiegi). (2) Partie stojace w promieniu ok. 30 jednostek od Meereen (oblegajace i obroncy, tez gracza) dostaja rannych: 10-20% zdrowych zolnierzy kazdej partii -> ranni (WoundedNumber), bez smierci. (3) security town_K1 -5. Ten sam rzut dla gracza i AI. Opcje 076.2 (oboz za zloto gracza / zamkniete bramy) sa osobno w `#wybor` - uchwyt ich nie czyta. Log: ludzi miasta przed/po, partii, rannych. Wersja lekka i pelna jednakowo. |
+| `dzwony` | 115.1 (wiersz glowny = wersja ostra, przy gniewie krolowej 113; wariant a lagodny NIE ma uchwytu) | okno | K10 | **Krolewska Przystan plonie** po zdobyciu przez empire_s (wyzwalacz `captured:town_EW4:empire_s`, max 1). (1) town_EW4 traci 25-35% ludzi przez PeopleBook z przyczyna `pozar` (do puli regionu korony). (2) Dobrobyt i zabudowa przez Devastation miasta (jak lupienie, poziom maksymalny) - bez kasowania budynkow. (3) Lup rodu zdobywcy: 30% kasy miasta (`@kasa:town_EW4`) -> glowa rodu-wlasciciela miasta po zdobyciu (platnik kasa miasta - zamknieta ekonomia). Udzial GRACZA nie nalezy do uchwytu: to opcja b (`gold:@kasa:town_EW4:@gracz:5000`) wykonana PO uchwycie, z tego, co zostalo w kasie (niedoplata z linia). Wersja lekka i pelna jednakowo (smierc Cersei/Jaimego to okno 115.2). |
+| `wielka_rada` | 117.1 i 117.1a - w skutkach kazdej opcji a-d | opcja | K10 | **Wielka Rada po smierci Daenerys**. Uchwyt czyta glos gracza `kr:117.1=a..d` (a Bran, b gracz, c Jon, d bez glosu - opcja bierna i autotest). LEKKA (ChronicleFullVersions=NIE): wynik rady = Bran (jak w tekscie okna), bez zmian wladcow, rodow i krolestw; uchwyt robi tylko relacje glow rodow krolestw Westeros (lista z kolumny `gracz` okna) z graczem: glos a +3, b -5, c -2, d 0 - i linie logu. PELNA (TAK): glosy glow rodow tych krolestw = slawa rodu + relacja z kandydatem; kandydaci: Bran (lord_5_7, zawsze, premia kanonu +25%), gracz (tylko przy glosie b), Jon (tylko zywy, przy glosie c); glos gracza liczy sie jak jego rod. Wynik w log i we flagach `k117_wynik_bran/gracz/jon`; zmiana korony (`ruler`/`leader` krolestwa trzymajacego town_EW4) wymaga wylacznika straznika Prologue.Crown (P5) i decyzji przy silniku K10, bo Bran jest glowa rodu Starkow (Polnoc) - korona dla niego oznacza rozdzielenie rodu albo krolestwa. Do tej decyzji pelna = jak lekka + flaga wyniku. Flagi `k117_bran/ja/jon/wstrzymal` ustawiaja same opcje. |
+
+Luki zgloszone przez autorow K1-K10 - BEZ uchwytu (zapisane tekstem/przyblizeniem; nowy uchwyt dopiero, gdy Jeff zechce, w limicie 10):
+pojedynek gracza z Gora (050.2a - dzis pewna wygrana z rana 30 dni; kandydat `pojedynek`), gorsze warunki kredytu Banku w dlugach m96 (058 - dzis
+przeplywy `gold`; kandydat `bank`), przejscie wojska do armii innego wodza (091 rycerze Doliny do Jona, 096 Dothrakowie - dzis `garrison`/tekst),
+tabor z celem AI (104 - dzis wybor gracza i banda), znacznik najezdzcy (024), "zjedzone konie" (015.1 opcja bierna bez skutku), termy stanu,
+ktorych nie ma (oblezenie Winterfell przez Innych 112.1, smierc Nocnego Krola w Winterfell 112.2, bohater w osadzie 003/033/035).
 
 ## 13. Okna powracajace (kolumna `powtorz`)
 
@@ -327,12 +379,16 @@ Najwyzej 10 na cala Kronike (bez `test`). Nowy uchwyt = wpis w `KODY` w `kronika
 | `season` | 013 | zmiana pory roku WesterosClimate; `@pora` |
 | `siegehunger:N` | 015 | oblezona twierdza N dob bez jedzenia; klucz osada + start oblezenia; `@cel` |
 | `ironraid` | 024 | wies na wybrzezu zlupiona przez Zelaznych; klucz port + 30 dni; `@cel`, `@region` |
-| `oldage` | 039 | glowa waznego rodu zmarla ze starosci; `@kto`, `@rodkto`, `@region` |
+| `oldage` | 039 | glowa waznego rodu zmarla ze starosci; `@kto`, `@rodkto`, `@region`, `@cel` = siedziba rodu zmarlego (Clan.HomeSettlement; brak - najwieksza osada rodu) - K4 rozpoznaje krolestwo przez `own:@cel:<krolestwo>` (warianty 039.1a/039.2/039.3 z innym tematem) |
 | `brokenmen` | 045 | >30% ludzi regionu poza domem i rabunek w 30 dniach; klucz region + 90 dni; `@cel`, `@region` |
 | `others:N[,N...]` | 061 | liczba osad Innych osiaga N (np. `others:1,5,15,25`); `@liczba` |
 | `captured:<osada>[:<krolestwo>]` | 109, 110, 112, 115 | osada zmienila wlasciciela (na krolestwo) |
 | `besieged:<osada>` | 110, 112 | oblezenie osady |
-| `wizja:N` | 066, 088 | okresowo co N dni, tekst z prawdziwego stanu mapy |
+| `wizja:N` | 066 (088 w K8 - okna jednorazowe, bez wizji) | okresowo co N dni, tekst z prawdziwego stanu mapy; `@cel` = najpierw oblezona twierdza Polnocy albo Muru, inaczej najblizsza (do Winterfell) osada Innych (ROTclan_126), inaczej brak instancji; `@region` = krolestwo `@cel` (propozycja K6, przyjeta) |
+
+Tokeny w miejscach typu zlozonego (`plotka:<id>:<osada|krolestwo>`, `own:<osada>:<rod|krolestwo>`, `prisoner:...:<rod|krolestwo|osada>`)
+pasuja, gdy pasuja do ktoregokolwiek typu (np. `plotka:045.1_P:@region:60`) - poprawka walidatora 21.10. Kolumna `osada` w `#banda` nie przyjmuje
+tokenow (banda ma stale miejsce; 045 tworzy bande tylko w 3 krainach).
 
 ## 14. Tematy obrazkow (arm_kronika_tematy.tsv, plan P8)
 
@@ -450,7 +506,17 @@ akcje tylko-pelne poza `wersja=pelna` (wyjatki succeed 42/49/52/80); lista chron
 `move:`/`remove`/`dragon_*`; pary `#para` w obie strony z arm_canon_moves; odwolania `kr:` (okno i opcja), `wiesc:/plotka:` (#tekst),
 `band:`, `task:`; nagrobki; tematy (sprite'y z ROT-ContentSpriteData.xml, poza rotacja, `stannis-slain` tylko 081, prolog 01-23).
 UWAGI (nie psuja wyniku): odwolanie do paczki jeszcze nie napisanej, nieuzyty tekst/banda, flaga sprawdzana a nieustawiana,
-powtorzony tytul (lektor szuka zapasowo po tytule), towar nieznaleziony w XML, klan bandy spoza bandyckich/mniejszych.
+powtorzony tytul (lektor szuka zapasowo po tytule), towar nieznaleziony w XML, klan bandy spoza bandyckich/mniejszych, wiersz `#move` z samymi termami `kr:`.
+
+Poprawki walidatora 21.10 (po paczkach K1-K10; kazda zgloszona przez autora i sprawdzona):
+- `_W` okna z kotwica `przed` albo z koncem `do` liczy sie jako uzyty (zapasowa wiesc z rozdz. 3.2 p. 4) - wczesniej 31 falszywych UWAG;
+- towary z kodu gry (DefaultItems: grain, iron, charcoal ...) sa znane - wczesniej UWAGA "nie znaleziony w XML" (id sprawdzone w TaleWorlds.CampaignSystem.dll);
+- zakaz smokow to prefiks `dragon_`, nie `dragon` - wczesniej odrzucal `dragonglass_axe` i `dragonstone_*`;
+- tokeny w miejscach typu zlozonego (`osada|krolestwo`, `rod|krolestwo`, `captor`, `source`) - wczesniej zawsze BLAD;
+- `kod:` tylko w miejscu z rejestru (`gdzie` = okno/opcja) - nowa regula (Wielka Rada byla w skutkach okna, przed glosem);
+- `--stat`: okna, wiersze, wybory, bandy, zadania, okna i wiersze z `lektor=1`, znaki lektora (tytul+gora+dol bez prefiksu `{=...}`) i RAZEM k01-k10.
+Testy nowych regul: scratchpad 7aee5f12/kr-final/neg3.py (6 BLEDOW, 4 UWAGI - kazda regula raz w obie strony); stare neg.py/neg2.py/pos.py bez zmian
+wyniku poza towarem `iron` (kr-final/old_*.txt vs new_*.txt).
 
 ## 18. Podzial na paczki K1-K10
 
@@ -461,7 +527,7 @@ Walidator pilnuje, zeby okno lezalo w pliku swojej paczki. Okien razem 204 (+ sc
 
 | Paczka | Wydarzenia | Dni (ok.) | Okna | Nowe klocki silnika (pierwsze uzycie) |
 |---|---|---|---|---|
-| K1 `k01` | 1-12 + 901 | 10-125 | 001.1 001.2 002.1 002.2 003.1 003.2 004.1 005.1 006.1 007.1 007.2 008.1 008.2 009.1 009.2 010.1 010.2 011.1 012.1 + 901.1 (19+1) | listy wyboru (2, 3, 12), `band` (8 Lorch), `tourney` (3), `security/loyalty` (9), `gold` (12), `plan:` (2), `hide` (8 Arya), m22 `+kr:008.1`, m11/m20/m21 `remove->hide` |
+| K1 `k01` | 1-12 + 901 | 10-125 | 001.1 001.2 002.1 002.2 003.1 003.2 004.1 005.1 006.1 007.1 007.2 008.1 008.2 009.1 009.2 010.1 010.2 011.1 012.1 + 901.1 (19+1) | listy wyboru (2, 3, 12), `band` (8 Lorch), `tourney` (3), `security/loyalty` (9), `gold` (12), `plan:` (2), `hide` (8 Arya), m22 `+kr:008.1`, m11/m20/m21 `remove->hide` (przeniesione do commitu silnika K0 - rozdz. 8) |
 | K2 `k02` | 13-24 + 902 | 100-520 (+powracajace) | 013.1 013.2 013.3 014.1 014.2 015.1 015.2 016.1 016.2 017.1 017.2 018.1 019.1 020.1 020.2 021.1 021.2 022.1 023.1 024.1 + 902.1 (20+1) | `task` (14, 20), `powtorz` season (13), siegehunger (15), ironraid (24), `relk`, `muster` (14, 22), `pop`, 16 za `mv:p10/m01`, 17 banda Berica (E5), 19 `cw:dorne`, 23 lekka |
 | K3 `k03` | 25-36 + 903 | 500-930 | 025.1 025.2 026.1 026.2 027.1 028.1 028.2 029.1 029.2 030.1 031.1 031.2 031.3 032.1 033.1 033.2 034.1 035.1 036.1 + 903.1 (19+1) | `wound`, `garrison` (34), 26 lekka, 27 `cw:reach`, 31 za `m26` (031.2 Hoster - tylko tekst albo nagrobek), 32 `m02`/`kr:`, 33 za `m10` |
 | K4 `k04` | 37-48 | 830-1560 | 037.1 037.2 038.1 038.2 039.1 039.2 039.3 040.1 041.1 041.2 042.1 042.2 043.1 044.1 044.2 044.3 045.1 046.1 046.2 047.1 047.2 048.1 048.2 (23) | `skill` (37), `powtorz` oldage (39), brokenmen (45), `succeed` (42 lekka), 44 `m11`, 47.2 po 64/70 (K6) |
