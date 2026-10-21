@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Armoury
 {
@@ -250,11 +251,12 @@ namespace Armoury
             _wStumblesDay = 0; _essosDeclaredDay = 0; _essosDeclared = 0; _essosToday.Clear();
             _warsEventDay = false;
             ResetCrown();
+            ResetDragons();
         }
 
         internal static string PackWars()
         {
-            return "v=1;" + PackCrown();
+            return "v=1;" + PackCrown() + PackDragons();
         }
 
         internal static void UnpackWars(string v)
@@ -268,6 +270,7 @@ namespace Armoury
                     if (i > 0) map[part.Substring(0, i)] = part.Substring(i + 1);
                 }
             UnpackCrown(map);
+            UnpackDragons(map);
         }
 
         private static bool _warsEventDay;   // cos sie dzis wydarzylo (linia doby mimo rytmu 7 dob)
@@ -282,6 +285,7 @@ namespace Armoury
             Log.Info(WTag + "start sesji | prolog " + (Active ? "TAK" : "NIE") + " | dzien opowiesci " + StoryDays().ToString("0.0", Inv)
                      + " | (1) Essos na kalendarzu: " + essos
                      + " | (2) Reach i Dorne z korona: " + CrownStartText()
+                     + " | (3) smoki Daenerys: " + DragonsText()
                      + " | potkniecia " + _wStumbles + ".");
         }
 
@@ -300,9 +304,10 @@ namespace Armoury
                                                                     + (_essosToday.Count > 0 ? " [" + string.Join(", ", _essosToday.ToArray()) + "]" : "") + " (razem " + _essosDeclared + ")"
                                                          : "klucz NIE") : "nie dotyczy")
                          + " | (2) Reach: " + _reachState + " | Dorne: " + _dorneState
+                         + " | (3) smoki Daenerys: " + DragonsText()
                          + " | potkniecia dzis " + _wStumblesDay + " (razem " + _wStumbles + ").");
             }
-            _essosDeclaredDay = 0; _essosToday.Clear(); _wStumblesDay = 0; _warsEventDay = false;
+            _essosDeclaredDay = 0; _essosToday.Clear(); _wStumblesDay = 0; _warsEventDay = false; _dChangesDay = 0;
         }
     }
 
@@ -314,6 +319,7 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
+            CampaignEvents.HeroPrisonerReleased.AddNonSerializedListener(this, OnHeroReleased);   // (3) Daenerys z niewoli - etap smokow od razu
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -326,7 +332,13 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
+            Prologue.DragonsApply("start sesji");   // (3) przed linia startu - linia mowi stan po zmianie
             try { Prologue.WarsStartLine(); } catch (Exception e) { Prologue.WStumble("WarsStartLine", e); }
+        }
+
+        private void OnHeroReleased(Hero prisoner, PartyBase party, IFaction capturer, EndCaptivityDetail detail, bool notify)
+        {
+            Prologue.DragonsOnReleased(prisoner);
         }
 
         private void OnDaily()

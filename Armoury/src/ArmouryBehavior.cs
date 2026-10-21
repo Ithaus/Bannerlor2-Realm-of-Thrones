@@ -2690,6 +2690,7 @@ namespace Armoury
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
             // 24c (14.10, klucz DragonsEatHerds): smoki jedza zwierzeta z taborow i stad wsi - PRZED ksiegami (ramka FDragon w tej samej dobie co linia "Smoki (24c)")
+            Prologue.DragonsApply("doba");   // m104-wojny (3): wierzchowiec Daenerys wedlug etapu smokow - PRZED karmieniem (DragonFeed widzi biezacy slot); bledy liczone w srodku
             try { DragonFeed.Daily(); } catch (Exception e) { Log.Error("DragonFeed.Daily", e); } DayProfile.Lap("DragonFeed.Daily");
             try { DragonFeed.Line(); } catch (Exception e) { Log.Error("DragonFeed.Line", e); }
             try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); } DayProfile.Lap("OreLedger.Daily");   // wpis 94: ksiega rudy (tylko log)
