@@ -273,6 +273,7 @@ namespace Armoury
             _unknown.Clear(); _ownByClan.Clear(); _ownCastleByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear(); _gersByClan.Clear();
             ResolveNames();
             ResolveBk();
+            CdBegin();   // m105-optym (OptimStableDelegates, ClanIncomeBook.Optim105.cs): wywolania BK nizej przez delegaty (klucz NIE - odbicie jak dotad)
             // posiadacze wsi (BK: tytul) i podatek kazdej wsi - ta sama funkcja, ktora BK liczy linie "Village Demesnes"
             object tax = null, popMgr = null, titleMgr = null;
             try
@@ -290,7 +291,7 @@ namespace Armoury
                     try
                     {
                         if (c == null || c.IsEliminated || c.IsBanditFaction || c.Leader == null) continue;
-                        var list = _mActual.Invoke(null, new object[] { c }) as System.Collections.IEnumerable;
+                        var list = CdActual(c);   // m105-optym: jak _mActual.Invoke(null, new object[] { c }) as IEnumerable
                         if (list == null) continue;
                         foreach (var o in list) { var v = o as Village; if (v != null && !holder.ContainsKey(v)) holder[v] = c; }
                     }
@@ -306,10 +307,10 @@ namespace Armoury
                     {
                         // przeglad 169c: tylko osada z danymi BK (GetPopData w podatku BK inicjuje brakujace dane - zmiana stanu gry)
                         bool pop = false;
-                        try { pop = popMgr != null && _mPopulated != null && (bool)_mPopulated.Invoke(popMgr, new object[] { v.Settlement }); } catch { pop = false; }
+                        try { pop = popMgr != null && _mPopulated != null && CdPopulated(popMgr, v.Settlement); } catch { pop = false; }   // m105-optym: jak (bool)_mPopulated.Invoke
                         if (pop)
                         {
-                            var en = (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false });
+                            var en = CdVTax(tax, v);   // m105-optym: jak (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false })
                             t = (long)en.ResultNumber;
                         }
                         else _dVNoPop++;
@@ -326,7 +327,7 @@ namespace Armoury
                     {
                         try
                         {
-                            var title = _mGetTitle.Invoke(titleMgr, new object[] { v.Settlement });
+                            var title = CdTitle(titleMgr, v.Settlement);   // m105-optym: jak _mGetTitle.Invoke(titleMgr, new object[] { v.Settlement })
                             var dj = title != null ? _pDeJure.GetValue(title, null) as Hero : null;
                             if (dj != null && dj != h.Leader)
                             {
@@ -382,6 +383,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("StableBegin(renty)", e); }
             }
+            CdEnd();   // m105-optym: linia "Optym (m105)" (delegaty, kontrola przy Optim Verify)
             _ownPaid.Clear(); _ownPaidOld.Clear();
         }
 

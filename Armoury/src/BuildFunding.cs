@@ -207,6 +207,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                BfWarBegin(s);   // m105-optym (OptimBuildWar, BuildFunding.Optim105.cs): wojna krolestwa raz na krolestwo w petli warowni
                 // ile lenn z budowa ma kazdy rod
                 var count = new Dictionary<Clan, int>();
                 var jobs = new List<KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>>();
@@ -220,7 +221,7 @@ namespace Armoury
                     if (st.OwnerClan == Clan.PlayerClan && !s.PaidConstructionPlayer) continue;
                     // wpis 86 (audyt pkt 8): wojna wstrzymuje cywilne JUZ TU - nie zabieraja dzialki murom
                     bool warNow = false;
-                    try { if (st.OwnerClan.Kingdom != null) foreach (var k in Kingdom.All) if (k != st.OwnerClan.Kingdom && !k.IsEliminated && st.OwnerClan.Kingdom.IsAtWarWith(k)) { warNow = true; break; } } catch { }
+                    warNow = BfWarOf(st.OwnerClan.Kingdom);   // m105-optym: klucz NIE - stara droga 1:1 (BfWarOld = dotychczasowy przeglad Kingdom.All)
                     if (warNow && !b.BuildingType.IsMilitaryProject)
                     {
                         // N5-E (poprawka 5 po biegu rocznym): o budowli cywilnej w wojnie decyduje prawdziwe zagrozenie warowni, nie flaga wojny krolestwa
@@ -232,6 +233,7 @@ namespace Armoury
                     jobs.Add(new KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>(st, b));
                     int n; count.TryGetValue(st.OwnerClan, out n); count[st.OwnerClan] = n + 1;
                 }
+                BfWarEnd(s);   // m105-optym: pamiec puszczona (linia kontrolna przy Optim Verify)
                 // N5-E: mury pierwsze (wpis 86: cywilne nie zabieraja dzialki murom) - rod z budowa wojskowa w toku dzieli przydzial tylko miedzy nie, jak dotad;
                 // cywilne w wojnie ida tylko u rodu bez budowy wojskowej (jego przydzial budow lezal dotad bez uzytku)
                 if (civilWar.Count > 0)
