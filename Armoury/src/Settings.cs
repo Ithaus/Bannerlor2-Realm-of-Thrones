@@ -3939,6 +3939,14 @@ namespace Armoury
         public int SutlerRevelMoraleCap = 10;              // revels lift your party's morale from recent events to at most this much - another revel while the men are still merry adds only what is missing (and costs only that share)
         public int SutlerArmourerPerStall = 6;             // worn pieces of your men's kit the field armourers of one stall mend in a day (town smiths' rate plus the sutlers' cut; with Smith Mend From Market also the materials, taken from that town's market)
 
+        // --- Notice board ---
+        // m102-tablica (Jeff 20.10: "tablice ogloszen jak w grach RPG z misjami ... w miescie byla tablica i jak wchodze, mam liste lordow, kapitana strazy etc., ktorzy daja misje,
+        // i jak klikne, mam visit i rozmawiam z nim"; projekt PROJEKT-TABLICA-OGLOSZEN-2026-10-21): NoticeBoard.cs - opcja "Read the notice board" w menu miasta (za karczma,
+        // poza porzadkiem TownMenus), lista zadan gry ludzi miasta, lordow w miescie i rodu pana, wsi miasta; karta z nagroda po skali Armoury, platnikiem, terminem,
+        // miejscem osoby; "Go and see" / "Talk now" jak pasek portretow gry, flaga na mapie. Nowe klucze (MCM Jeffa ich nie ma - domyslne).
+        public bool NoticeBoard = true;                    // "Read the notice board" in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board
+        public bool NoticeBoardVillages = true;            // the notice board also lists the headmen and landowners of the town's villages who have work for you; you must ride to the village to speak with them (the notice can mark the village on your map). Off = only people in town and the town lord's house
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

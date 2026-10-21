@@ -8924,6 +8924,14 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerArmourerPerStall { get; set; } = 6;
 
+        [SettingPropertyBool("Notice Board", HintText = "'Read the notice board' in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoard { get; set; } = true;
+
+        [SettingPropertyBool("Notice Board Villages", HintText = "the notice board also lists the headmen and landowners of the town's villages who have work for you; you must ride to the village to speak with them (the notice can mark the village on your map). Off = only people in town and the town lord's house", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardVillages { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11154,6 +11162,8 @@ namespace Armoury
             s.SutlerRevelMorale = SutlerRevelMorale;
             s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
+            s.NoticeBoard = NoticeBoard;
+            s.NoticeBoardVillages = NoticeBoardVillages;
         }
 
         internal static void Apply()
