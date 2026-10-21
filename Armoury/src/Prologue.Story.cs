@@ -52,20 +52,32 @@ namespace Armoury
                    && mi.GetParameters().Length == 0 && mi.ReturnType == typeof(CampaignTime);
         }
 
+        /// <summary>Podmiana odczytow startu na start opowiesci. WYJATEK - RYTM: odczyt, po ktorym w kilku nastepnych instrukcjach jest reszta z dzielenia (rem),
+        /// zostaje na kalendarzu. ROTOthersCampaignBehavior.OnAiHourlyTick: "ElapsedDaysUntilNow % 4f > 0f" trzyma cel patrolu Innych za Murem; w prologu dzien od
+        /// startu opowiesci jest ujemny, reszta z dzielenia ujemnej liczby nigdy nie jest > 0 i Inni zmienialiby cel co godzine. Kalendarz daje liczbe dodatnia,
+        /// a 188 dzieli sie przez 4 - rytm co do dnia jak w klasycznym starcie.</summary>
         public static IEnumerable<CodeInstruction> StoryTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var repl = AccessTools.Method(typeof(Prologue), nameof(StoryStartOf));
-            foreach (var ci in instructions)
+            var list = new List<CodeInstruction>(instructions);
+            for (int i = 0; i < list.Count; i++)
             {
+                var ci = list[i];
                 if ((ci.opcode == OpCodes.Callvirt || ci.opcode == OpCodes.Call) && ci.operand is MethodBase && IsStartGetter((MethodBase)ci.operand))
                 {
+                    bool rhythm = false;
+                    for (int k = i + 1; k < list.Count && k <= i + 6; k++)
+                        if (list[k].opcode == OpCodes.Rem || list[k].opcode == OpCodes.Rem_Un) { rhythm = true; break; }
+                    if (rhythm) { _storyRhythm++; continue; }
                     ci.opcode = OpCodes.Call;
                     ci.operand = repl;
                     _storySwapped++;
                 }
-                yield return ci;
             }
+            return list;
         }
+
+        private static int _storyRhythm;
 
         /// <summary>Raz na proces, przy pierwszej kampanii z prologiem: transpiler na wszystkich czytelnikach CampaignStartTime w ROT.dll i w ROTBattleAtmosphere
         /// (LoreGates.CampaignDay - atmosfera bitew wedlug dnia opowiesci: bramki "d25", "d120"... z ujemnym dniem zamkniete; bez latki po prologu zostalaby
@@ -92,7 +104,7 @@ namespace Armoury
         /// <summary>Jeden zestaw: szukanie czytelnikow gettera (filtr bajtow IL + ReadMethodBody) i transpiler. Opis do linii logu.</summary>
         private static string ScanPatch(Assembly asm, Harmony h, HarmonyMethod tr)
         {
-            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0, swapped0 = _storySwapped;
+            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0, swapped0 = _storySwapped, rhythm0 = _storyRhythm;
             var getter = AccessTools.PropertyGetter(typeof(CampaignTimeModel), "CampaignStartTime");
             Type[] types;
             try { types = asm.GetTypes(); }
@@ -130,6 +142,7 @@ namespace Armoury
                 }
             }
             return "wpiete " + patched + "/" + found + " metod (miejsc odczytu " + sites + ", podmienionych " + (_storySwapped - swapped0)
+                   + ", rytm na kalendarzu " + (_storyRhythm - rhythm0)
                    + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + ", wiek kampanii (zaciag) bez latki " + age + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
         }
 

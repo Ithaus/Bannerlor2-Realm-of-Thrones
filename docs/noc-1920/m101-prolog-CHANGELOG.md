@@ -76,7 +76,9 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   `StoryStartTime` (jak dotad). `Prologue.Span` = 188 dni liczone z minut (`CampaignTime.Minutes`, bez bledu float). Kalendarz startuje w roku 298, dzien 177
   (rok 364 dni), o 06:00 jak ROT; start opowiesci = data ROT 299 bez zmian. Prolog wymaga klucza Long Year Enabled (bez modelu Armoury - klasyczny start + linia logu).
 - `Armoury/src/Prologue.Story.cs` (nowy): JEDNA latka - transpiler na wszystkich metodach ROT.dll (i ROTBattleAtmosphere - `LoreGates.CampaignDay`) czytajacych
-  `CampaignTimeModel.CampaignStartTime`; bez latki zostaje zaciag ROT (`ROTEnlistmentBehavior`, wiek kampanii)
+  `CampaignTimeModel.CampaignStartTime`; bez latki zostaje zaciag ROT (`ROTEnlistmentBehavior`, wiek kampanii) i RYTM: odczyt, po ktorym w 6 instrukcjach jest
+  reszta z dzielenia (`ROTOthersCampaignBehavior.OnAiHourlyTick`: `ElapsedDaysUntilNow % 4f > 0f` trzyma cel patrolu Innych - z ujemnym dniem prologu reszta nigdy
+  nie jest > 0 i Inni zmienialiby cel co godzine; kalendarz daje liczbe dodatnia, 188 dzieli sie przez 4, rytm jak w klasycznym starcie)
   (`callvirt get_CampaignStartTime` -> `call Prologue.StoryStartOf(model)`: StoryStartTime modelu Armoury; inny model - jego CampaignStartTime). Szukanie po
   wszystkich typach ROT.dll (z zagniezdzonymi), filtr po bajtach IL + potwierdzenie `PatchProcessor.ReadMethodBody`. Wpinana leniwie, raz na proces, przy pierwszej
   kampanii z prologiem (nowa: OnGameStart, przed zegarem; wczytana: SyncData, przed pierwszym tickiem). Klasyczna gra bez prologu w procesie - zero latek.
@@ -84,7 +86,8 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   takze wojny z StartDay 0), Inni (300/400/500 dni, rytm co 4 dni - 188 dzieli sie przez 4, rytm ten sam), zaciag i AI Nocnej Strazy licza od startu opowiesci.
 - `CrashScribe/src/StoryClock.cs` (nowy): start opowiesci odbiciem (`StoryStartTime` czynnego modelu; brak - `CampaignStartTime`). `Fabula.DayNow` i `NightKingCall.Day`
   licza od niego (bramki Fabuli i kalendarz Innych w prologu ujemne = zamkniete; os x4.33 bez zmian - dni prologu to zwykle dni gry, os liczy od startu opowiesci).
-- Log: `Prolog (m101): latki opowiesci ROT (nowa kampania|wczytany zapis): wpiete N/M metod (miejsc odczytu X, podmienionych Y) w Z ms.`; w linii startu sesji:
+- Log: `Prolog (m101): latki opowiesci ROT (nowa kampania|wczytany zapis): wpiete N/M metod (miejsc odczytu X, podmienionych Y, rytm na kalendarzu R, wiek kampanii
+  (zaciag) bez latki A) | ROTBattleAtmosphere: wpiete 1/1 metod (...) w Z ms.` (oczekiwane: X = 37, Y = 36, R = 1, A = 1); w linii startu sesji:
   `start kalendarza Year 298, Day 177 | start opowiesci Year 299, Day 1 (dzien prologu D) | latki opowiesci ROT: ...`.
 
 ### E1b - pokoj krola i pakty z krolestwem Roberta (ZROBIONE)

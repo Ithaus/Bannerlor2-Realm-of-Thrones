@@ -37427,6 +37427,7 @@ def m97surowce_main(logp):
 M101_TAG = "Prolog (m101): "
 M101_STORY = re.compile(r"latki opowiesci ROT \((.*?)\): wpiete (\d+)/(\d+) metod \(miejsc odczytu (\d+), podmienionych (\d+)")
 M101_AGE = re.compile(r"wiek kampanii \(zaciag\) bez latki (\d+)")
+M101_RHY = re.compile(r"rytm na kalendarzu (\d+)")
 M101_LORE = re.compile(r"\| ROTBattleAtmosphere: wpiete (\d+)/(\d+) metod")
 M101_REST = re.compile(r"latki prologu \((.*?)\): pokoj i pakty: wojny ([A-Z]+), wezwania ([A-Z]+), koniec sojuszu ([A-Z]+) \| Robert i Ned z XML ([A-Z]+) \| egzekucja Neda \(NedEvent\) ([A-Z]+)")
 M101_KINGS = re.compile(r"Robert i Ned \(XML ozywionych (\d)/2.*?\): (.*)")
@@ -37478,8 +37479,9 @@ def m101prolog_main(logp, csp=None):
             if mm:
                 ma = M101_AGE.search(body)
                 ml = M101_LORE.search(body)
+                mr = M101_RHY.search(body)
                 story.append((mm.group(1), int(mm.group(2)), int(mm.group(3)), int(mm.group(4)), int(mm.group(5)), int(ma.group(1)) if ma else 0,
-                              (int(ml.group(1)), int(ml.group(2))) if ml else None)); continue
+                              (int(ml.group(1)), int(ml.group(2))) if ml else None, int(mr.group(1)) if mr else 0)); continue
             mm = M101_REST.search(body)
             if mm:
                 rest.append(mm.groups()); continue
@@ -37531,9 +37533,9 @@ def m101prolog_main(logp, csp=None):
         return 0
     if story:
         st = story[-1]
-        rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} (podmienionych {st[4]}), wiek kampanii bez latki {st[5]} ({st[0]})",
-                "N = M >= 27, podmienionych >= miejsc, miejsca + wiek kampanii >= 38 (rozpoznanie: 38 odczytow, 1 to zaciag)",
-                st[1] == st[2] and st[2] >= 27 and st[4] >= st[3] and st[3] + st[5] >= 38)
+        rep.add("PR-2: latka startu opowiesci w ROT.dll", f"wpiete {st[1]}/{st[2]} metod, miejsc odczytu {st[3]} (podmienionych {st[4]}, rytm na kalendarzu {st[7]}), wiek kampanii bez latki {st[5]} ({st[0]})",
+                "N = M >= 27, podmienionych + rytm >= miejsc, rytm <= 1 (Inni % 4), miejsca + wiek kampanii >= 38 (rozpoznanie: 38 odczytow, 1 to zaciag)",
+                st[1] == st[2] and st[2] >= 27 and st[4] + st[7] >= st[3] and st[7] <= 1 and st[3] + st[5] >= 38)
         rep.add("PR-2c: latka startu opowiesci w ROTBattleAtmosphere (LoreGates.CampaignDay)", f"wpiete {st[6][0]}/{st[6][1]}" if st[6] else "brak (mod nieobecny albo stara linia)",
                 "N = M >= 1", (st[6][0] == st[6][1] and st[6][1] >= 1) if st[6] else None)
     else:
