@@ -283,6 +283,14 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>Ktokolwiek (zywy albo zmarly, takze dziecko) z tym wzorem - ten sam warunek co ROT SpawnHero (AllHeroes.AnyQ(Template == wzor)).</summary>
+        private static bool AnyWithTemplate(string tpl)
+        {
+            foreach (var h in Hero.AllAliveHeroes) if (h != null && h.Template != null && h.Template.StringId == tpl) return true;
+            foreach (var h in Hero.DeadOrDisabledHeroes) if (h != null && h.Template != null && h.Template.StringId == tpl) return true;
+            return false;
+        }
+
         private static string Key(Hero h)
         {
             return IsOriginal(h) ? h.Template.StringId : (h != null ? h.StringId : "");
@@ -317,6 +325,9 @@ namespace Armoury
         internal static bool IsCourtier(Hero h)
         {
             if (!_on || _court.Count == 0 || h == null) return false;
+            // w rodzie gracza (np. po slubie) albo jako jego towarzysz - o druzynie decyduje gracz, znacznik dworzanina nie dziala (recenzja)
+            var pc = Clan.PlayerClan;
+            if (pc != null && (h.Clan == pc || h.CompanionOf == pc)) return false;
             return _court.Contains(Key(h));
         }
 
@@ -382,6 +393,8 @@ namespace Armoury
                 EnsureLoaded();
                 StartRow r;
                 if (!_byTpl.TryGetValue(__0.StringId, out r) || !Blocked(r)) return true;
+                // ROT SpawnHero tworzy tylko, gdy nikt (zywy ani zmarly) nie ma tego wzoru - wtedy nic nie blokujemy (bez falszywej linii i licznika; recenzja)
+                if (AnyWithTemplate(__0.StringId)) return true;
                 _spawnBlocked++; _spawnBlockedDay++;
                 if (_spawnSaid.Add(__0.StringId))
                     Log.Info(Tag + ": ROT chcial stworzyc " + r.Name + " [" + __0.StringId + "] (grupa " + r.Group + (r.Group == "B" ? " - usuniety z kanonu" : " - postac kanonu juz byla w swiecie")
@@ -1174,6 +1187,20 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>Koniec wszystkich zalotow obojga (jak Romance.EndAllCourtships gry - internal): RomanticState.Level = Ended. Zwraca liczbe zmienionych.</summary>
+        private static int EndCourtships(Hero a, Hero b)
+        {
+            int n = 0;
+            var list = Romance.RomanticStateList;
+            if (list == null) return 0;
+            foreach (var rs in list)
+            {
+                if (rs == null || rs.Level == Romance.RomanceLevelEnum.Ended) continue;
+                if (rs.Person1 == a || rs.Person2 == a || rs.Person1 == b || rs.Person2 == b) { rs.Level = Romance.RomanceLevelEnum.Ended; n++; }
+            }
+            return n;
+        }
+
         private static Res Execute(MoveRow r, int day)
         {
             var h = WhoHero(r);
@@ -1275,7 +1302,11 @@ namespace Armoury
                             if (r2 != Res.Done) { res = r2; why = w2; break; }
                         }
                         h.Spouse = o;   // setter ustawia obie strony (Hero.Spouse); bez zmiany rodu drugiej strony
-                        why = "slub z " + Nm(o) + " (rod " + Nm(o.Clan) + ")";
+                        // jak gra w MarriageAction.ApplyInternal: koniec zalotow obojga (Romance.EndAllCourtships jest internal - ta sama petla) i stan Marriage
+                        // (inaczej zaloty gracza do jednego z nich trwalyby dalej, a slub w grze po cichu by sie nie udal - recenzja)
+                        int ended = EndCourtships(h, o);
+                        ChangeRomanticStateAction.Apply(h, o, Romance.RomanceLevelEnum.Marriage);
+                        why = "slub z " + Nm(o) + " (rod " + Nm(o.Clan) + ")" + (ended > 0 ? ", zakonczone zaloty " + ended : "");
                         break;
                     }
             }

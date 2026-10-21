@@ -217,6 +217,16 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
   `Postacie kanonu (m101): ratunek - X [wzor] <przed> -> <po> | rod ... niszczony (DestroyClanAction ...), #rescue A -> B | dzien N`.
 - Build Armoury i CrashScribe kod 0. Status: DO SPRAWDZENIA (ratunek widac dopiero przy RenlyDeath / JeorMutiny - dlugi bieg).
 
+**Poprawki drobne (recenzja) - kod Armoury CanonCompanions.cs, build kod 0:**
+- **Falszywe blokady A w prefiksie ROT SpawnHero (PRAWDZIWE):** ROT wola SpawnHero dla 63 wzorow co dobe, a tworzy tylko, gdy nikt nie ma tego wzoru - prefiks liczyl i
+  logowal 22 wzory A, ktorych lordowie zyja (licznik 31 zamiast 9). Teraz najpierw `AnyWithTemplate` (ten sam warunek co ROT: zywy albo zmarly, takze dziecko) - wtedy
+  przepuszcza bez linii i licznika; linia `ROT chcial stworzyc ...` i licznik tylko przy prawdziwej blokadzie (B zawsze 9 na dobe, A dopiero po usunieciu i wymazaniu).
+- **Dworzanin w rodzie gracza (PRAWDZIWE):** `IsCourtier` = false, gdy postac jest w rodzie gracza albo jego towarzyszem (np. po slubie z Brienne, Osha, Myranda,
+  Hizdahrem) - o druzynie decyduje gracz (ClanPartiesVM pyta `CanLeadParty`). Znacznik zostaje w zapisie, nie dziala w rodzie gracza.
+- **Slub marry/wed bez sprzatania romansu (PRAWDZIWE):** po `Hero.Spouse` jak gra w `MarriageAction.ApplyInternal`: koniec wszystkich zalotow obojga (petla jak
+  `Romance.EndAllCourtships` - internal) i `ChangeRomanticStateAction.Apply(..., Marriage)`; linia zmiany podaje `zakonczone zaloty N`. `OnBeforeHeroesMarried`
+  (internal dyspozytora) pominiete - rod ustawia nasz `MoveToClan`.
+
 ### Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0)
 
 - **Zniszczenie rodu przez ROT (poprawka 1):** zmiana rodu w srodku `DestroyClanAction` (nasluch `OnClanDestroyed`) - postac wychodzi z rodu przed petla partii i
@@ -258,4 +268,5 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
 - Krok 5 (Jeyne zamiast Talisy) i grupa `--grupa m101postacie`: ZROBIONE, build kod 0. **Status calosci: DO SPRAWDZENIA** (nic nie uruchomione w grze, nic nie wgrane).
 - Poprawka 1 po recenzji (ratunek z rodow niszczonych przez ROT, prawdziwe zrodlo usuniec w UC): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
 - Poprawka 2 po recenzji (narzedzie widzi brak / inna wersje pliku TSV; plik do wgrania w naglowku): ZROBIONE (narzedzie, bez zmian w DLL).
-  Zostalo: drobne.
+- Drobne w kodzie (prefiks SpawnHero bez falszywych blokad, dworzanin w rodzie gracza, slub z koncem zalotow): ZROBIONE, build Armoury kod 0.
+  Zostalo: drobne w danych i opisach (Bronn p04, Varys/Baelish/Quentyn, BEL w Settings.cs, opis dworzan).
