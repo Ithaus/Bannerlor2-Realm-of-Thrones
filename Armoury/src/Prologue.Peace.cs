@@ -24,7 +24,8 @@ namespace Armoury
     ///     bez pytania gracza, czas do dnia po smierci krola) dla Doliny, Smoczej Skaly, Reach, Dorne, Zelaznych Wysp i Skagos. Brak moda Diplomacy - cicho bez paktow.
     ///     Zakladane po rozstawieniu swiata (OnNewGameCreatedPartialFollowUpEnd) i pilnowane co dobe (wygasly/zerwany - od nowa). Wezwania do wojny miedzy krolem i jego
     ///     sojusznikami z prologu sa w prologu zablokowane (prefiks AllianceCampaignBehavior.StartCallToWarAgreement - nikt nie wciaga sojusznikow np. do wojny z Wolnymi
-    ///     Ludzmi; latka 168 CrownCallToWar rozpoznaje brak porozumienia po portfelach). KONIEC: przy smierci Roberta (EndPacts) nasze sojusze zerwane (EndAlliance gry
+    ///     Ludzmi; latka 168 CrownCallToWar rozpoznaje brak porozumienia po portfelach); tym samym prefiksem kazde wezwanie krolestwa Westeros do wojny z krolestwem
+    ///     Westeros (bez krolestwa gracza) - przed rejestracja porozumienia i platnoscia (recenzja R4). KONIEC: przy smierci Roberta (EndPacts) nasze sojusze zerwane (EndAlliance gry
     ///     przez interfejs), nasze pakty wygaszone (Expire Diplomacy). CrashScribe CanonAlliances przepuszcza sojusze prologu (IsPrologueAlliance - odbiciem).
     ///     Klucz ProloguePacts (co dobe).
     /// </summary>

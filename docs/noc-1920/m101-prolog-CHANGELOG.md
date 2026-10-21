@@ -15,6 +15,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 | E2a | Robert i Ned zyja, glowy rodow i wladcy | ZROBIONE (build Armoury 0) |
 | E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | ZROBIONE (build Armoury 0) |
 | LOG | grupa tools/sprawdz_logi.py --grupa m101prolog (PR-0..PR-8) | ZROBIONE (sprawdzone na logu syntetycznym) |
+| REC | poprawki po recenzji R1-R5 (1 wazne, 4 drobne - wszystkie prawdziwe, wszystkie poprawione) | ZROBIONE (build Armoury 0, CrashScribe 0; commit po kazdej) |
 
 ## Rozpoznanie (dekompilacja gry 1.4.8, ROT 8.1.8, Diplomacy 1.4.7, BK)
 
@@ -188,6 +189,8 @@ Recenzja pelna HEAD 8e09b71e: nic krytycznego, 1 wazne, 4 drobne. Kazde sprawdzo
 ## Status
 
 DO SPRAWDZENIA - E0, E1a, E1b, E2a, E2b i grupa logow zrobione, kazdy krok z buildem kod 0 (Armoury, CrashScribe) i commitem na `w-toku/m101-prolog`.
+Recenzja pelna (21.10): R1-R5 poprawione (tabela "Poprawki po recenzji"); grupa logow sprawdzona na logach syntetycznych z prawdziwymi liczbami ROT 8.1.8
+(30/30 metod, 34 miejsca, 1 rytm, 1 zaciag) i na przypadku krola w walce przy NedEvent (krol umiera pozniej, Ned juz stracony, druga linia egzekucji).
 Nic nie wgrane do gry, gra Jeffa i test 100 nietkniete; w grze NIE sprawdzone (zakaz uruchamiania gry w tej pracy). Zostaje: autotest nowej kampanii z flaga
 prologu (co najmniej 220 dob - przejscie przez dzien 186 i NedEvent), potem sceny E4/E5 i postacie E3 (osobno).
 
