@@ -8720,6 +8720,18 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int PackSaddleExtraKg { get; set; } = 50;
 
+        [SettingPropertyBool("Camp Walk Enabled", HintText = "'Walk through the camp' in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; no fighting, campaign time stands still; hold Tab to go back (off = no option)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampWalkEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Camp Walk Max Men", 0, 100, "0", HintText = "at most this many of your soldiers are shown in the camp scene (for smooth play); the tents still follow your whole party", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CampWalkMaxMen { get; set; } = 40;
+
+        [SettingPropertyInteger("Camp Walk Men Per Tent", 2, 20, "0", HintText = "men per soldiers' tent in the camp scene; fewer men than this sleep on bedrolls round the fire", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CampWalkMenPerTent { get; set; } = 6;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -10899,6 +10911,9 @@ namespace Armoury
             s.CartSpeedPenaltyPercent = CartSpeedPenaltyPercent;
             s.PackSaddleEnabled = PackSaddleEnabled;
             s.PackSaddleExtraKg = PackSaddleExtraKg;
+            s.CampWalkEnabled = CampWalkEnabled;
+            s.CampWalkMaxMen = CampWalkMaxMen;
+            s.CampWalkMenPerTent = CampWalkMenPerTent;
         }
 
         internal static void Apply()

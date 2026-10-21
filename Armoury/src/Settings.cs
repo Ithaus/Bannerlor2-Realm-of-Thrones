@@ -3859,6 +3859,10 @@ namespace Armoury
         public int CartSpeedPenaltyPercent = 10;           // how much slower your column moves while a cart is hitched (0 = no slowdown)
         public bool PackSaddleEnabled = true;              // transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight; it is no riding saddle (off = pack saddles give nothing)
         public int PackSaddleExtraKg = 50;                 // extra kilograms a pack animal carries with a pack saddle
+        // m97-oboz (CampWalk.cs): spacer po obozie - opcja w menu obozu, scena z miejsca postoju, namioty wedlug ludzi, ogniska z siedzacymi, konie
+        public bool CampWalkEnabled = true;                // "Walk through the camp" in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; no fighting, campaign time stands still; hold Tab to go back (off = no option)
+        public int CampWalkMaxMen = 40;                    // at most this many of your soldiers are shown in the camp scene (for smooth play); the tents still follow your whole party
+        public int CampWalkMenPerTent = 6;                 // men per soldiers' tent in the camp scene; fewer men than this sleep on bedrolls round the fire
 
         public static void Load(string moduleDataDir)
         {
