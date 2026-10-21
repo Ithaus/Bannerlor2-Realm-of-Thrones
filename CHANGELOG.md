@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-21 (WGRANIE 97 - noc 20/21: wioski poboczne jak wsie + obroncy, oboz 21-3 i spacer, szkolenie w obozie, posilki DR z marszu, czardrzewo i smocza kosc)
+
+**Zakres (Jeff 20.10, doslownie, wybor):** "Czy mozemy zrobic tak, ze do wioski pobocznej tez mozna wjechac jak do wioski glownej ... bez bohaterow w niej?"; "ale ja chce, aby to
+byli ludzie z tej wioski pobocznej, a nie z wioski glownej"; oboz: "wejscie do obozu ... wyglad obozu ... wozy" (decyzje 14:20: oboz 21-3, chodzenie najpierw, woz + kon
+juczny, siodla transportowe); "szkolenie wojska nie odbywa sie w marszu ... na ekranie obozu mam opcje szkolenie wojska ... o 50% wydajniejsze ... perki leadership";
+"te Dynamic Reinforcements cos zle dziala, wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; "luk z czardrzewa okay, trzeba miec czardrzewo,
+smoczej kosci - smocza kosc ... aby dalo sie wszystko wykuc".
+**Zmiana:** `w-toku/n26-calosc` (95140596) = WGRANIE 96 + m97-wioski (SideVillagesEnterable: wjazd, handel koszykiem, prace, nocleg u wiesniakow, oboz, rabunek kazdej
+wioski osobno, okup; SideVillageDefenders: obroncy 1/10 mieszkancow DOM wioski, najwyzej 60, straty z tej wioski - brak rak 60 dob, poddanie 4:1) + m97-oboz (oboz swiata
+21-3, noc snu od switu wstecz, "Walk through the camp" - misja Camp, wyjscie Tab; woz taborowy 500 kg -10%, siodlo transportowe +50 kg; DrillCampOnly - marsz nie uczy,
+"Train the men" 8 h = x2.25 dnia, DrillMaster, DrillSiegeArmy, 12 perkow treningu przerobionych; DrillCampOnlyAi NIE) + m97-posilki (DrArrivalByMarch: 30 s + 120 s na
+godzine marszu, ponad 2 h - nie przychodzi) + m97-surowce (arm_items_rare.xml, arm_strings.xml: czardrzewo 6 osad, smocza kosc 5 osad, doplyw maly z pulapem,
+RareBowsNeedMaterial, RareMaterialOnlyFromSource) + poprawki styku po recenzji scalenia (30e698bc, 95140596: rabunek wioski a noc obozu, bez posilkow DR w bitwie
+z obroncami wioski - SideVillageDefendersNoReinforcements, lup i jency po przegranej z obroncami, jeden komunikat okupu). Wpisy: docs/noc-1920/m97-*-CHANGELOG.md,
+n26-poprawki-styku-CHANGELOG.md. Armoury 2194 ustawien; tools: wgraj-v5 i bieg-bitwa kopiuja arm_*.xml i SubModule.xml.
+**Testy (20.10):** 97 (8e93796e): bitwa 4/4, nowa 180/180, 160 z zapisu 400/400 - kod 0, ERROR 0; progi nowa 3135/NIE 122 (96: 121), 160 2525/NIE 94 (96: 104).
+97b (95140596): bitwa 4/4, nowa 180/180, 160 400/400 - kod 0, ERROR 0; progi nowa 3137/NIE 127; grupy m97 (wioski, obroncy, posilki, surowce, szkolenie) TAK.
+**Ryzyko / co sprawdzic:** spacer po obozie (pierwsza wlasna misja - autotest jej nie otwiera; wyjscie TYLKO Tab), menu wioski pobocznej i bitwa z mieszkancami,
+"Train the men", posilki DR blisko/daleko, kucie luku z czardrzewa; VR-3 premia Valyrii srednio 23.4% wobec 25% w biegu z zapisu.
+**Status:** WGRANE 97 (20.10 23:20, tag 2026-10-21-wgranie97; Armoury 25e75a27, CrashScribe 39308d49, RC bba56dd2, GT 18ec253e, ForgeView 68c8ace2;
+Armoury.json Jeffa CampStartHour 0 -> 21, CampEndHour 6 -> 3, kopia .bak-2026-10-21-wgranie97-przed).
+
 ## 2026-10-21 (WGRANIE 96 - noc 20/21: poprawki z gry Jeffa na 95/95a, plan do konca moda, drogi Valyrii, dlugi miast)
 
 **Zakres (Jeff 20.10, doslownie, wybor):** "zobacz czemu mialem crash" (kuznia); "jest blad, ze moge stworzyc luki tier 6 od poczatku gry"; "za duzo jest legendary
