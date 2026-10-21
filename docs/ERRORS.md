@@ -234,3 +234,11 @@ I shall wear no crowns and win no glory. I shall live and die at my post." - ROT
 malzenstwa czlonkom Nocnej Strazy. Po tej linii ROT nie ma dalszej sciezki dialogu, wiec nasz
 CrashScribe.DialogEscape wystawia "Let us talk" / "Farewell" (log 16.09 08:18-08:21: "rozmowa
 uratowana (1)..(3)"). Nie ma tu wyjatku w logach - to zamierzone zachowanie ROT.
+
+## Wywrotka silnika przy wyjsciu z gry (TaleWorlds.Native, rozpoznanie 21.10)
+- Objaw: po "Wyjdz" gra pada w kodzie natywnym silnika (0xC0000005, rzadziej 0xC0000094) w TaleWorlds.Native.dll +0x74DFFF..0x74E2B1, 5-25 ms po linii rgl_log "Managed Interface deleted." (Final_cleanup). Okno bledu silnika/WER; w autotescie proces wisi do ubicia (90 s), a straznik CrashScribe pisze hang-*.log "outside a campaign" (to echo, nie zawieszenie).
+- Czestosc: ok. 55-57% wyjsc (autotesty 15-21.10: 76 ze 133), od 23.08 (najstarszy slad hang 28.08, Event Log 13.09), takze w sesjach Jeffa (LauncherEx), bez zwiazku z wgraniami 9x-101 ani z lista modow (MoreBloodPoolMod, VoiceActingPatchRemake).
+- Mechanizm (prawdopodobny): zwalnianie juz zwolnionej pamieci w alokatorze silnika przy koncowym sprzataniu; winny obiekt nieznany (brak symboli), kod zarzadzany juz zakonczony.
+- Szkody: brak - przychodzi PO zapisie gry, "Saving options" (engine_config safely_exited=1) i zapisie logow; skan zer czysty. Brak zwiazku z zerowaniem plikow na dysku C.
+- Mozliwe: (1) CrashScribe Watchdog - flaga zamykania w OnSubModuleUnloaded (bez Suspend i bez "GAME HANG"), osobny limit hang-*.log w Prune; (2) autotest - po QuitGame wykrywac wpis w rgl_log_errors_<pid> i zamykac od razu (oszczednosc 60-80 s); (3) opcjonalnie (decyzja Jeffa) TerminateProcess po zapisie opcji, zeby nie bylo okna bledu.
+- Dowody: wf_096230a7-115 (journal), C:/ProgramData/Mount and Blade II Bannerlord/logs/rgl_log_errors_*.txt, C:/Users/GAME/AppData/Local/CrashDumps/Bannerlord.BLSE.*.dmp.
