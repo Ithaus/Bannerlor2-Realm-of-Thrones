@@ -53,7 +53,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 
 ## Zasada
 
-Jeden wybor przy "New Campaign" (menu glowne), przypiety do jednej kampanii i zapisany w niej. Kampania z prologiem: kalendarz zaczyna sie 188 dni przed startem
+Jeden wybor przy nowej kampanii (menu glowne, "Into the Realm"), przypiety do jednej kampanii i zapisany w niej. Kampania z prologiem: kalendarz zaczyna sie 188 dni przed startem
 opowiesci ROT; cala opowiesc ROT (wydarzenia, wojny fabularne, Inni) liczy sie od startu opowiesci, czyli tak jak w klasycznym starcie. Klasyczny start: nic sie nie
 zmienia (latki opowiesci nawet sie nie wpinaja).
 
@@ -83,7 +83,7 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   wszystkich typach ROT.dll (z zagniezdzonymi), filtr po bajtach IL + potwierdzenie `PatchProcessor.ReadMethodBody`. Wpinana leniwie, raz na proces, przy pierwszej
   kampanii z prologiem (nowa: OnGameStart, przed zegarem; wczytana: SyncData, przed pierwszym tickiem). Klasyczna gra bez prologu w procesie - zero latek.
   Skutek: wszystkie wydarzenia ROT (`CampaignStartTime + Days(N)`), wojny fabularne (`Enforced` StartDay/EndDay, `EnforceWars` nic przed doba 1 opowiesci -
-  takze wojny z StartDay 0), Inni (300/400/500 dni, rytm co 4 dni - 188 dzieli sie przez 4, rytm ten sam), zaciag i AI Nocnej Strazy licza od startu opowiesci.
+  takze wojny z StartDay 0), Inni (300/400/500 dni, wynik najazdow) i AI Nocnej Strazy licza od startu opowiesci; zaciag i rytm patrolu Innych - od kalendarza.
 - `CrashScribe/src/StoryClock.cs` (nowy): start opowiesci odbiciem (`StoryStartTime` czynnego modelu; brak - `CampaignStartTime`). `Fabula.DayNow` i `NightKingCall.Day`
   licza od niego (bramki Fabuli i kalendarz Innych w prologu ujemne = zamkniete; os x4.33 bez zmian - dni prologu to zwykle dni gry, os liczy od startu opowiesci).
 - Log: `Prolog (m101): latki opowiesci ROT (nowa kampania|wczytany zapis): wpiete N/M metod (miejsc odczytu X, podmienionych Y, rytm na kalendarzu R, wiek kampanii
