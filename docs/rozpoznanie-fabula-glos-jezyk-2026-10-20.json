@@ -1,0 +1,471 @@
+{
+ "answers": [
+  {
+   "key": "start-robert",
+   "question": "Pytanie 1 (Jeff): czy mozemy zaczac gre w momencie, gdy Krol Robert wyrusza do Winterfell, ile wczesniej zaczynalaby sie gra i ile wydarzen mozna zrobic przedtem?",
+   "short_answer": "CZESCIOWO TAK. Wczesniejszy start da sie zrobic. Kalendarz i zegar fabuly sa w naszych rekach: Armoury bierze date startu od ROT, a CrashScribe/Fabula juz trzyma wydarzenia ROT na wlasnej osi czasu. Swiat ROT jest jednak zbudowany na chwile PO aresztowaniu Neda: Robert i Ned sa w danych martwi, Joffrey jest krolem, Robb rzadzi Polnoca, Renly i Stannis maja wlasne krolestwa. Prolog trzeba wiec dobudowac. Wedlug wiki fanow (AWOIAF) Robert wyrusza w 298 AC, a egzekucja Neda jest w 299 AC. Z ich szacunkow podrozy wychodzi u mnie okolo 6-8 miesiecy. W kalendarzu Jeffa (rok 364 dni) to okolo 180-230 dni gry wczesniej, czyli start pod koniec lata lub na poczatku jesieni 298 AC. Przy tempie z Twojej sesji 20.10 to okolo 8-10 godzin grania, zanim ruszy fabula ROT. Przed egzekucja Neda miesci sie okolo 15-19 kanonicznych wydarzen. Mniej wiecej polowa to same okna z tekstem (latwe), reszta zmienia swiat (srednie). Realnie polecam \"lekki prolog\": mapa zostaje podzielona jak w ROT, ale wszyscy zyja w pokoju, Robert i Ned zyja, a na koniec prologu swiat przechodzi w start ROT. Calosc to tor L i wymaga NOWEJ kampanii.",
+   "findings": [
+    {
+     "fact": "Kampania ROT startuje na sztywno w 299 AC, 1. dnia wiosny, o godz. 6:00. ROT nie daje wyboru epoki ani zakladek startu.",
+     "evidence": "ROT.dll, typ ROT.Models.ROTCampaignTimeModel: CampaignStartTime = CampaignTime.Years(299f) + CampaignTime.Hours(6f). Kreator postaci ROT (ROT.ROTCharacterCreationCampaignBehavior.InitializeCharacterCreationStages) ma tylko standardowe etapy: kultura, twarz, historia, herb, nazwa rodu, przeglad, opcje. Wybor wieku jest, wyboru daty nie ma. Moduly ROT-Core v8.1.8 (Modules/ROT-Core/SubModule.xml)."
+    },
+    {
+     "fact": "W grze Jeffa rok ma 364 dni (13 tygodni w sezonie, sezon 91 dni), a data startu pochodzi od ROT. Nasz Armoury sam ustala dlugosc roku i date startu, wiec wczesniejszy start to dla nas mala zmiana.",
+     "evidence": "Log Armoury-2026-10-20_17-49-10.log: 'Kalendarz: rok ma 364 dni (13 tygodni w sezonie, sezon 91 dni). Data startu wedle ROT.Models.ROTCampaignTimeModel.' Kod: C:/Users/GAME/Bannerlor2-Realm-of-Thrones/Armoury/src/Calendar.cs (LongYearTimeModel.CampaignStartTime bierze _prev.CampaignStartTime), McmSettings.cs:957/961 (LongYearEnabled=true, WeeksPerSeason=13)."
+    },
+    {
+     "fact": "Gra ROT zaczyna sie od egzekucji Neda. Okno 'Execution of Ned Stark' wyskakuje 2 dni po starcie, u Jeffa przez Fabule okolo 8.-9. dnia. Tekst mowi, ze Ned 'wlasnie zostal stracony' i ze zaczela sie wojna Pieciu Kroli.",
+     "evidence": "ROT.Events.NedEvent.ConditionsMet: CampaignTime.Now < CampaignStartTime + Days(2) -> czekaj. Log CrashScribe session-2026-10-20_17-49-09.log: 'czolo kolejki: NedEvent (na dzien 8)'."
+    },
+    {
+     "fact": "Wszystkie wydarzenia ROT (21 z data i 8 lancuchowych) licza czas w DNIACH od startu kampanii. Dni ROT: Ned 2, Harrenhal 18 i 27, Dorzecze przystepuje do wojny 25, Karstark 100, Renly 120 (+14), bunt u Crastera 150, Czarny Nurt 170/177, Krwawe Gody 220 (+14), Purpurowe Gody 250, Mur 260/274, Wschodnia Strażnica 280, Ramsay 300, Jon 325, Bitwa Bekartow 350/357, Aegon 400, Dany 450, smierc Roose'a Years(4). Bez daty: Stannis, Piesc Pierwszych Ludzi, Krolewska Przystan, Nocny Krol, skutki oblezen.",
+     "evidence": "ROT.Events.*: ConditionsMet z CampaignStartTime + CampaignTime.Days(N), np. RenlyDeathEvent Days(120f), RedWeddingEvent Days(220f), DanyInvasionEvent Days(450f), RooseDeathEvent Years(4f). Lista zdarzen tworzona w ROT.CampaignBehaviors.ROTEventBehavior.OnSessionLaunched, dzialaja tylko przy ROTSettings.Events."
+    },
+    {
+     "fact": "Nasza Fabula (CrashScribe) juz rozciaga os ROT x4.33 dla roku 364 dni, poprawia kolejnosc (Karstark 190, Craster 200) i puszcza najwyzej 1 wydarzenie na 4 dni. U Jeffa wychodzi: Ned dzien ok. 9, Renly ok. 520 (1,4 roku), Krwawe Gody ok. 953 (2,6 roku), Dany ok. 1950 (5,4 roku).",
+     "evidence": "C:/Users/GAME/Bannerlor2-Realm-of-Thrones/CrashScribe/src/Fabula.cs (Timeline, GatePrefix, WarPrefix, OthersTranspiler); log session-2026-10-20_18-34-34.log: 'Fabula: rozrusznik czynny (21 bramek ... tempo 1/4 dni, os x4.33...)'; tabela w docs/AUDYT-KALENDARZ.md rozdz. 3.1."
+    },
+    {
+     "fact": "Wojny fabularne ROT tez sa liczone w dniach od startu. Niektore obowiazuja od dnia 0: Smocza Skala kontra Krainy Burzy oraz Nocna Straz kontra Wolni Ludzie (ta druga juz w XML). Wojna Polnocy z Zachodem rusza dopiero po smierci Neda.",
+     "evidence": "ROT.CampaignBehaviors.ROTStorylineWars.OnNewGameCreated: ROTStorylineWar(Dragonstone, Stormlands, 0, 0, ...), (Westerlands, Riverlands, 30, ...), (IronIslands, TheNorth, 100, 235), (TheNorth, Westerlands, trigger FIVE_KINGS_NORTH_WESTERLANDS -> OnNedDeath). ROTStorylineWar.Enforced porownuje ElapsedDaysUntilNow ze StartDay/EndDay. ROT_spkingdoms.xml: tylko 1 relacja isAtWar=\"true\" (nightswatch-freefolk)."
+    },
+    {
+     "fact": "Poza wydarzeniami ROT czyta date startu w 38 miejscach (w 28 typach). Sa wsrod nich progi Innych (300/400/500 dni oraz 1,5 roku przy Piesci i u Crastera) i blokada zaciagu 5 dni. Przesuniecie startu wymaga przesuniecia tych wszystkich zegarow, inaczej fabula ruszy w prologu.",
+     "evidence": "dectool grep 'CampaignStartTime' po ROT.dll: wynik w C:/Users/GAME/AppData/Local/Temp/claude/C--Users-GAME-Bannerlor2-Realm-of-Thrones/ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3/scratchpad/zb/pytania-tmp/rot-grep-start.txt (ROTOthersCampaignBehavior 5x, AIThinkPatch: ElapsedYearsUntilNow < 1.5, ROTEnlistmentBehavior: < 5 dni, StorylineWar 2x, wydarzenia). Gra (TaleWorlds.CampaignSystem.Campaign) ustawia zegar nowej gry na CampaignStartTime: 'MapTimeTracker = new MapTimeTracker(Models.CampaignTimeModel.CampaignStartTime)'."
+    },
+    {
+     "fact": "Swiat ROT to chwila po aresztowaniu Neda. Robert i Ned istnieja w danych, ale jako martwi. Rodziny sa podpiete dobrze: Robert jest ojcem Joffreya w tym samym rodzie, Ned ojcem Robba, Brana, Aryi, Sansy i Rickona. Robb rzadzi Polnoca, Joffrey Zachodem (z korona), Renly Krainami Burzy, Stannis Smocza Skala, Lysa Doliną, Daenerys krolestwem Targaryenow w Essos. To dobra wiadomosc: po 'ozywieniu' Roberta i Neda smierc Roberta sama przekaze rod Joffreyowi, a smierc Neda Robbowi.",
+     "evidence": "ROT-Content/ModuleData/ROT_heroes.xml l.473: Hero ROTlord_506 (Robert, wiek 50 w ROT_lords.xml l.10656) alive=\"false\" faction clan_nord_1; l.380: ROTlord_512 (Eddard, wiek 42, ROT_lords.xml l.10812) alive=\"false\" clan_battania_1; lord_7_1 Joffrey father=ROTlord_506 clan_nord_1; lord_5_1 Robb father=ROTlord_512 clan_battania_1. kingdoms.xslt: vlandia owner lord_7_1, battania owner lord_5_1, empire owner lord_4_6, empire_s owner lord_1_14; ROT_spkingdoms.xml: stormlands owner lord_1_9, dragonstone owner lord_1_11. ROT ma tez gotowe odwolania ROTLords.RobertBaratheon i ROTLords.EddardStark (ROT.Misc.ROTLords)."
+    },
+    {
+     "fact": "Wiek postaci w ROT jest podniesiony wzgledem ksiazek: Robb 25, Jon 24, Daenerys 22, Sansa 17, Bran 16, Arya 15, Rickon 5. Jaime, Tyrion, Ogar, Theon i Benjen to w ROT towarzysze do wynajecia, a nie lordowie. Sceny z nimi w prologu beda wiec tekstem albo trzeba ich przestawiac.",
+     "evidence": "ROT-Content/ModuleData/lords.xslt l.8532 (Robb 25), 8579 (Bran 16), 8626 (Arya 15), 9011 (Sansa 17), 9284 (Jon 24), 967 (Daenerys 22); ROT_lords.xml: ROTwanderer1 Jaime 38, ROTwanderer8 Tyrion 36, ROTwanderer3 Sandor 35, ROTwanderer20 Theon 26, ROTwanderer38 Benjen 31."
+    },
+    {
+     "fact": "Okno wydarzenia ROT da sie wykorzystac do wlasnych scen: klasa bazowa wydarzenia i stan okna sa publiczne, z tytulem, dwoma tekstami, tlem i obrazkiem. ROT ma 48 obrazkow wydarzen, ale zaden nie pokazuje Roberta, Winterfell, Brana ani turnieju. Nowe sceny potrzebuja nowych obrazkow, spakowanych we wlasny arkusz grafik.",
+     "evidence": "ROT.Events.EventBase (public abstract: Title, UpperText, LowerText, BackgroundImage, HeaderImage); ROT.CampaignBehaviors.EventPopupState (public, konstruktor EventPopupState(EventBase)); ROT.Screens.EventScreen laduje kategorie 'ui_event_category'; ROT-Content/GUI/ROT-ContentSpriteData.xml: 48 obrazkow w tej kategorii (aegon, blackwater, ned_stark, melisandre, robb, RobbMarching, messenger-1, traveling_merchant, ...)."
+    },
+    {
+     "fact": "Kanon: Jon Arryn umiera, a Robert jedzie do Winterfell w 298 AC. Robert ginie i Ned zostaje aresztowany w 298 AC, egzekucja Neda jest w 299 AC (serialowa mapa OmniAtlas liczy caly sezon 1 jako 298 AC). Wiki AWOIAF szacuje podroz Winterfell - Krolewska Przystan na okolo 1,75 miesiaca w kazda strone, a od przyjazdu do turnieju Reki co najmniej miesiac. Ksiazka nie podaje dat. Moje sumowanie: 1,75 + okolo 1 (pobyt) + 1,75 + 1 + 1-2 (smierc Roberta, areszt, cela) daje okolo 6-8 miesiecy od wyjazdu Roberta do egzekucji.",
+     "evidence": "Wyniki wyszukiwania ze stron AWOIAF (298 AC, Eddard Stark - data smierci 299 AC, Years after Aegon's Conquest/Calculations Events) i OmniAtlas (2980101: S1E1 / 298 AC). Strony AWOIAF zwracaly 403 przy bezposrednim odczycie, wiec liczby pochodza ze streszczen wyszukiwarki."
+    },
+    {
+     "fact": "W kalendarzu Jeffa 6-8 miesiecy to okolo 180-230 dni gry. Start wypadlby miedzy 64. dniem lata a 2. dniem jesieni 298 AC. Tempo z sesji Jeffa 20.10 14:53-16:22: 31 dni gry w 85 minut (z bitwami i menu), czyli prolog to okolo 8-10 godzin grania.",
+     "evidence": "Rok 364 dni, sezon 91 dni: 299 wiosna 1 minus 180 dni = 298 jesien 2; minus 210 dni = 298 lato 64. Log CrashScribe session-2026-10-20_14-53-55.log (bez wpisow AUTOTEST): 'FABULA: dzien 27' o 14:57:27 -> 'dzien 58' o 16:22:57."
+    },
+    {
+     "fact": "Na mapie ROT Krolewska Przystan i Winterfell dzieli w linii prostej okolo 465 jednostek mapy, a Winterfell i Czarny Zamek okolo 256. Orszak Roberta moze naprawde jechac po mapie, ale czasu przejazdu w dniach gry nie zmierzylem.",
+     "evidence": "ROT-Map/ModuleData/settlements.xml: King's Landing (523.6, 397.3), Winterfell town_B2 (396.0, 844.9), Castle Black town_B5 (467.8, 1090.8); odleglosci policzone skryptem."
+    },
+    {
+     "fact": "Turniej Reki moze skorzystac z naszego GrandTourney, ktory umie oglaszac turnieje i wpuszcza lordow do walki. Sceny prologu mozna tez podac AIInfluence przez ROT_AIInfluence_Compat, ktory juz zamienia wydarzenia ROT na 'wydarzenia swiata' do rozmow z NPC.",
+     "evidence": "C:/Users/GAME/Bannerlor2-Realm-of-Thrones/GrandTourney/src/HostMenu.cs ('Proclaim a tourney'), Patches.cs (NoblesFightPatch); Modules/ROT_AIInfluence_Compat/README.md: 'It turns major RoT events into AIInfluence world events'."
+    },
+    {
+     "fact": "Opisy w encyklopedii ROT zakladaja swiat po smierci Roberta i Neda (np. Renly: brat 'zmarlego krola Roberta', Balon: 'od smierci Neda Starka...'). W prologu trzeba je podmienic.",
+     "evidence": "grep po ROT-Content/ModuleData: ROT_heroes.xml - 10 opisow, spclans.xml - 8 opisow z frazami typu 'late king', 'Five Kings', 'executed', 'King in the North', 'since the death' (liczone grubo, wierszami)."
+    }
+   ],
+   "how": "Jak to zrobic (wariant polecany, \"lekki prolog\"):\n1) DATA STARTU: w naszym Armoury (Calendar.cs) start = data ROT minus N dni prologu (np. 210, czyli lato 298 AC). Do tego opcja w kreatorze postaci: \"Start: Wyjazd Roberta (298)\" albo \"Egzekucja Neda (299, jak ROT)\", plus przycisk \"pomin prolog\".\n2) ZEGAR FABULY ROT: Fabula (CrashScribe) dostaje przesuniecie o N dni. Bramki 21 wydarzen, wojny fabularne (StartDay/EndDay) i progi Innych licza sie od \"startu opowiesci\", a nie od startu gry. Pozostale miejsca, gdzie ROT czyta date startu (lacznie 38 w 28 typach: oblezenia, zaciag, Inni przy Piesci), obejmuje jedna wspolna latka, ktora podmienia im \"start\" na start opowiesci. Bez tego Renly zginie, zanim Robert dojedzie do Winterfell.\n3) POKOJ W PROLOGU: do konca prologu wojny fabularne ROT miedzy krolestwami Westeros sa wylaczone (takze Smocza Skala - Krainy Burzy, ktora obowiazuje od dnia 0) i AI nie wypowiada wojen. Wyjatek: Nocna Straz kontra Wolni Ludzie. Mapa zostaje podzielona jak w ROT (Bannerlord nie zna \"krolestwa w krolestwie\"). Robert jest glowa rodu Baratheonow z Krolewskiej Przystani, ktory w ROT rzadzi frakcja Zachodu i korony.\n4) ROBERT I NED ZYJA: w danych ROT sa martwi (alive=\"false\"). Zmieniamy to wlasnym plikiem przerobki XML, takim jakiego ROT sam uzywa (heroes.xslt), albo kodem przy nowej grze. Ned zostaje glowa Starkow, wiec Polnoca rzadzi Ned, nie Robb. Przy klasycznym starcie 299 nic sie nie zmienia.\n5) SCENY: wlasne wydarzenia w oknie ROT (ten sam wyglad) i zmiany swiata:\n - Smierc Jona Arryna, wiesc na start (okno, S)\n - Wilkory znalezione przez dzieci Starkow (okno, S; w ROT nie ma wilkorow jako postaci)\n - Wyjazd Roberta z Krolewskiej Przystani: orszak jedzie po mapie (M)\n - Slub Daenerys z Khalem Drogo w Pentos (okno, S; na mapie Dany juz ma krolestwo, wiec bedzie niezgodnosc)\n - Przyjazd do Winterfell i uczta (S/M)\n - Upadek Brana (okno, S)\n - Jon, Benjen i Tyrion jada na Mur (okno S; M, jesli przestawiamy Jona)\n - Ned zostaje Reka, Sansa i Arya ruszaja z orszakiem na poludnie (M)\n - Zamach na Brana, Catelyn jedzie na poludnie (S)\n - Trydent: Lady, Nymeria, Mycah (S, mozliwy wybor gracza)\n - Ned w Krolewskiej Przystani (S/M)\n - Catelyn chwyta Tyriona, proces w Orlim Gniezdzie (S jako okna, M jako zadanie)\n - Turniej Reki w Krolewskiej Przystani przez GrandTourney, gracz moze startowac (M)\n - Jaime atakuje Neda na ulicy (S)\n - Gora pustoszy Dorzecze, Beric wyslany: wojna Zachod - Dorzecze, ktora w ROT jest na dzien 25 (M)\n - Smierc Roberta na polowaniu: Joffrey krolem (M, kluczowe)\n - Aresztowanie Neda: Ned jencem w Krolewskiej Przystani (M)\n - Robb zwoluje chorągwie, Zielone Widly, Szepczacy Las (M/L; w ksiazce przed egzekucja, w ROT wojna Polnocy rusza po niej)\n - Daenerys: smierc Viserysa, smierc Drogo i smoki (okna, S)\n Koniec prologu: rusza oryginalne okno ROT \"Egzekucja Neda\". Ned ginie naprawde i rod przejmuje Robb. Od tej chwili gra idzie dokladnie jak dzis.\n6) TESTY: autotest prologu (200-230 dni), potem dalej az za smierc Renly'ego, zeby sprawdzic, ze wydarzenia ROT odpalaja w dobrej kolejnosci i nic sie nie zawiesza.\nWariant pelny (jedno krolestwo Roberta, rozpad na Pieciu Kroli, Jon w Winterfell, Dany bez krolestwa w Pentos): nie polecam. ROT trzyma na sztywno odwolania do krolestw i rodow (np. sprawdza, czy Krainy Burzy nie upadly), wiec ryzyko zepsucia fabuly i zapisow jest bardzo duze.",
+   "effort": "Calosc to tor L. Moje szacunki: (a) samo przesuniecie startu, zegara fabuly i pokoj w prologu: M, okolo 1 noc z autotestem; (b) ozywienie Roberta i Neda, smierc Roberta, areszt Neda, przejscie w start ROT: M/L, okolo 1-2 noce (najwieksze ryzyko); (c) sceny: okna z tekstem po S (1-2 godziny kazde z tekstem), sceny zmieniajace swiat po M. Wersja z 6-8 scenami to razem okolo 2-3 nocy, wersja z 15-19 scenami okolo 4-6 nocy. Do tego obrazki do scen osobno. Kazdy dlugi autotest to do okolo 80 minut (limit w CrashScribe).",
+   "risks": [
+    "Wymaga NOWEJ kampanii. Obecnej kampanii Jeffa (zaczetej 20.10) nie da sie cofnac do 298 AC.",
+    "Ozywienie Roberta i Neda nie jest sprawdzone. Bannerlord nie lubi wskrzeszania martwych postaci, wiec trzeba to sprawdzic na nowej grze (wariant z przerobka XML jak w ROT albo kodem).",
+    "Pokoj w prologu moze sie gryzc z modami, ktore same wypowiadaja wojny lub zawieraja pokoj: Diplomacy, AIInfluence (i jego latka zgodnosci z ROT), BannerKings.",
+    "BannerKings (tytuly, dziedziczenie) i BirthAndDeath (smierc ze starosci, ciaze) moga inaczej rozegrac smierc Roberta i dziedziczenie po nim. Nie sprawdzone.",
+    "Jesli przesuniecie zegara ominie ktores z 38 miejsc w ROT, wydarzenie albo wojna ruszy za wczesnie, juz w prologu (np. Inni pod Piescia). Potrzebny test calej osi.",
+    "Aktualizacja ROT (dzis v8.1.8) moze zmienic nazwy i warunki wydarzen i rozjechac nasze latki. Trzeba sprawdzac po kazdej aktualizacji ROT.",
+    "Niezgodnosci z kanonem, ktorych nie oplaca sie usuwac: Daenerys na mapie juz rzadzi krolestwem w Essos, Jon juz jest w Nocnej Strazy, Jaime, Tyrion, Ogar, Theon i Benjen to towarzysze do wynajecia, postacie sa starsze niz w ksiazce.",
+    "NPC z AIInfluence moga mowic o 'zmarlym krolu Robercie', dopoki nie podmienimy opisow (okolo 18 opisow w encyklopedii ROT, liczone grubo).",
+    "Prolog to okolo 8-10 godzin grania bez wojny Pieciu Kroli. Moze sie dluzyc, dlatego proponuje opcje 'pomin prolog' i krotszy wariant (np. 120 dni)."
+   ],
+   "costs": "Kod nic nie kosztuje (nasze mody, Harmony). Jedyny realny koszt to obrazki do nowych scen. W ROT nie ma grafik Roberta, Winterfell, Brana ani turnieju, a kadrow z serialu HBO nie wolno uzyc. Trzeba wlasnych grafik (generowanych przez AI, oplata zalezy od uslugi, nie sprawdzalem cen) albo od rysownika, albo prowizorycznie uzyc 48 istniejacych obrazkow ROT (poslaniec, kupiec, Robb). Koszt czasu: tor L, kilka nocy pracy i autotestow, plus nowa kampania dla Jeffa.",
+   "needs_from_jeff": [
+    "Decyzja, czy chcesz nowa kampanie od 298 AC (prolog nie wejdzie do obecnej gry).",
+    "Jak dlugi prolog: pelny, okolo 200-230 dni gry (kanon, start koniec lata lub poczatek jesieni 298 AC, okolo 8-10 godzin grania), czy krotszy, np. 120 dni (sceny gesciej)?",
+    "Czy 'lekki prolog' ci pasuje (mapa podzielona jak w ROT, wszyscy w pokoju, Robert i Ned zyja), czy koniecznie chcesz jedno krolestwo Roberta? Odradzam to drugie: bardzo duze ryzyko.",
+    "Ktore sceny sa dla ciebie wazne: wszystkie 15-19 czy najpierw 6-8 kluczowych (wyjazd Roberta, Winterfell, upadek Brana, Trydent, turniej Reki, smierc Roberta, areszt Neda)? Wolisz wersje z ksiazek czy z serialu?",
+    "Zgoda na obrazki do scen generowane przez AI (albo na razie obrazki z ROT).",
+    "Czy przy starcie ma byc wybor 'Prolog 298' albo 'Klasyczny start ROT 299'?"
+   ],
+   "links": [
+    "https://awoiaf.westeros.org/index.php/298_AC",
+    "https://awoiaf.westeros.org/index.php/Eddard_Stark",
+    "https://awoiaf.westeros.org/index.php/Years_after_Aegon%27s_Conquest/Calculations_Events",
+    "https://awoiaf.westeros.org/index.php/299_AC",
+    "https://omniatlas.com/maps/game-of-thrones/2980101/",
+    "https://www.pcgamer.com/uk/massive-game-of-thrones-mod-for-mount-and-blade-2-gets-early-access-release",
+    "C:/Users/GAME/Bannerlor2-Realm-of-Thrones/Armoury/src/Calendar.cs",
+    "C:/Users/GAME/Bannerlor2-Realm-of-Thrones/CrashScribe/src/Fabula.cs",
+    "C:/Users/GAME/Bannerlor2-Realm-of-Thrones/docs/AUDYT-KALENDARZ.md",
+    "C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/ROT-Content/ModuleData/ROT_heroes.xml",
+    "C:/Users/GAME/AppData/Local/Temp/claude/C--Users-GAME-Bannerlor2-Realm-of-Thrones/ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3/scratchpad/zb/pytania-tmp/dec",
+    "C:/Users/GAME/AppData/Local/Temp/claude/C--Users-GAME-Bannerlor2-Realm-of-Thrones/ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3/scratchpad/zb/pytania-tmp/rot-grep-start.txt"
+   ],
+   "unverified": [
+    "Dokladne odstepy czasu w kanonie: ksiazka nie podaje dat. 6-8 miesiecy to moje sumowanie szacunkow fanow (AWOIAF). Strony AWOIAF zwracaly blad 403, wiec daty mam ze streszczen wyszukiwarki.",
+    "Czy ozywienie Roberta i Neda (przerobka XML jak heroes.xslt w ROT albo kodem przy nowej grze) zadziala bez bledow. Nie testowane.",
+    "Czas przejazdu orszaku z Krolewskiej Przystani do Winterfell w dniach gry. Znam tylko odleglosc w linii prostej (okolo 465 jednostek mapy), predkosci nie mierzylem.",
+    "Zachowanie BannerKings (tytuly i dziedziczenie), BirthAndDeath i Diplomacy przy smierci Roberta i przy wymuszonym pokoju. Nie sprawdzone.",
+    "Czy AIInfluence wkleja opisy postaci z encyklopedii do rozmow NPC. Nie sprawdzone. Policzylem tylko grubo okolo 18 opisow, ktore zakladaja smierc Roberta lub Neda.",
+    "Tempo 8-10 godzin grania na prolog pochodzi z jednej sesji Jeffa (31 dni w 85 minut). Zalezy od stylu gry.",
+    "Czy ROT lub inny mod ma juz gotowy wczesniejszy start. W wyszukiwaniu nic takiego nie znalazlem, ale strony Nexus Mods i Discorda ROT nie przegladalem.",
+    "Wyceny grafik generowanych przez AI nie sprawdzalem."
+   ]
+  },
+  {
+   "key": "lektor",
+   "question": "Pytanie 2 (Jeff): czy mozemy udzwiekowic wydarzenia fabularne, ktore sie pokazuja, zeby czytal je lektor?",
+   "short_answer": "TAK. Tekstow jest malo, wiec to robota na jeden dzien. ROT ma 29 wydarzen fabularnych i pokazuje je w 35 roznych oknach (duzy obrazek, tytul, dwa akapity, przyciski). Razem to tylko 10 308 znakow, czyli okolo 11-12 minut nagrania na jeden jezyk. Nagrania robimy raz w ElevenLabs i wkladamy do moda jako pliki. Lektor zaczyna czytac, gdy okno sie otwiera, i milknie, gdy je zamykasz (przycisk, Enter albo Esc). Gra sama umie tak odtwarzac glos na mapie kampanii, bo robi to przy wlasnych powiadomieniach z glosem. Koszt ElevenLabs: 6 USD (Starter, sam angielski) albo 22 USD (Creator, angielski i polski z zapasem na poprawki), placone raz za jeden miesiac. Pliki zajma okolo 8-35 MB na jezyk, zaleznie od formatu. Tor M. ROT.dll zostaje nietkniety, wystarczy mala latka w naszym modzie.",
+   "findings": [
+    {
+     "fact": "Wydarzenia fabularne ROT maja wlasne okno na caly ekran, a nie zwykle okienko gry z pytaniem. U gory jest duzy obrazek, pod nim tytul i dwa akapity tekstu, na dole przyciski. Okno otwiera sie zawsze w jeden sposob (ROT przelacza gre na osobny ekran wydarzenia), wiec jeden punkt zaczepienia obejmuje 100% wydarzen.",
+     "evidence": "ROT-Core/bin/Win64_Shipping_Client/ROT.dll: ROT.Events.EventBase.OpenPopup() przelacza gre na ekran EventPopupState. ROT.Screens.EventScreen.OnActivate laduje uklad okna 'EventXml', a dla dwoch tytulow uklady 'BlackwaterEventWarning' i 'BlackwaterEventStannisWin'. ROT.ViewModels.EventPanel daje oknu tytul, oba teksty, obrazek naglowka i tlo. Uklad okna: ROT-Core/GUI/Prefabs/EventXml.xml (pola @HeaderImage, @EventTitle, @EventUpperText, @EventLowerText)."
+    },
+    {
+     "fact": "Okno zamyka sie tylko przez przycisk Gotowe/Anuluj albo klawisze Enter/Esc i za kazdym razem przechodzi przez to samo miejsce w kodzie. Mozna tam zatrzymac lektora bez wyjatkow.",
+     "evidence": "ROT.Screens.EventScreen.OnFrameTick: Esc wywoluje ExecuteCancel, Enter wywoluje ExecuteDone. EventPanel.ExecuteCancel i ExecuteDone zamykaja ekran (PopState), a wtedy wykonuje sie OnDeactivate."
+    },
+    {
+     "fact": "Teksty wydarzen sa wpisane w ROT.dll, kazdy z wlasnym numerem tekstu, i te same teksty sa w pliku jezykowym ROT. Obrazki to nazwane grafiki ROT, na przyklad 'blackwater', 'jon', 'harrenhal' i 'renly-slain' na tle 'event-bg'.",
+     "evidence": "Klasy ROT.Events.* (np. BlackwaterEvent: Title = TextObject \"{=ROTd0hD1DmLa}...\", HeaderImage = \"blackwater\"). Ten sam numer jest w ROT-Core/ModuleData/Languages/EN/str_english.xml (8845 wpisow, numer ROTd0hD1DmLa wystepuje 2 razy). Grafiki naleza do grupy ui_event_category w ROT-Content/GUI/ROT-ContentSpriteData.xml, a same obrazki sa spakowane w ROT-Content/AssetPackages/*.tpac."
+    },
+    {
+     "fact": "Rozmiar pracy: 29 wydarzen, 35 roznych okien, 10 308 znakow (tytul plus dwa akapity), 1813 slow. To okolo 11-12 minut czytania na jezyk. Najdluzsze okna: koniec Stannisa (699 znakow), smierc Renly'ego (689), Krwawe Gody (659). Najkrotsze: 'Roose Bolton Denied!' (77).",
+     "evidence": "Zliczone skryptem z dekompilacji wszystkich klas ROT.Events.*: scratchpad/zb/pytania-tmp/licz_wydarzenia.py, wynik w popups.json. 35 przypisan 'Title =', 0 tekstow skladanych w inny sposob. RedWeddingEvent i RenlyDeathEvent pokazuja po 2 okna, a Blackwater, Bastards, Harrenhal i Wall maja po 2 warianty zakonczenia."
+    },
+    {
+     "fact": "Gra umie odtworzyc plik z glosem na mapie kampanii, bez zadnej sceny, i umie go zatrzymac. Robi tak przy wlasnych powiadomieniach z glosem i przy rozmowach. Lektora zrobimy dokladnie tym samym sposobem.",
+     "evidence": "Modules/SandBox/bin/.../SandBox.GauntletUI.dll, klasa SandBoxGauntletGameNotification: SoundEvent.CreateEventFromExternalFile(\"event:/Extra/voiceover\", sciezka, null, false, false), potem Play() i Release(). SandBox.View.dll, klasa MapConversationTableau: to samo zdarzenie dzwiekowe i Stop() na koniec rozmowy. TaleWorlds.Engine.SoundEvent ma Play, Stop, Pause, Resume i IsPlaying. W ustawieniach gry jest osobny suwak VoiceOverVolume (TaleWorlds.Engine.Options.NativeOptions.NativeOptionsType)."
+    },
+    {
+     "fact": "Zwykly sposob dodawania dzwiekow przez mody (lista module_sounds.xml plus katalog ModuleSounds) nie nadaje sie do lektora. Dzwieki interfejsu maja tam limit kilku sekund, a nasze nagrania trwaja 10-60 sekund.",
+     "evidence": "ROT-Content/ModuleData/module_sounds.xml, komentarz z kategoriami dzwiekow: 'ui max 4 sec.', 'alert max 10 sec.', 'Sounds that dont have valid categories wont be played'. ROT uzywa tego tylko do krotkich efektow (slon, zombie, zagiel)."
+    },
+    {
+     "fact": "ROT ma juz 89 nagranych kwestii lordow (powitania, grozby, niewola). Gra wybiera plik po numerze tekstu. To dowod, ze pliki .ogg dolaczone do moda dzialaja, i gotowy wzor dla lektora.",
+     "evidence": "ROT-Content/ModuleData/ROTVoiceovers: 89 plikow .ogg (11,4 MB, razem 990,8 s) i do kazdego plik .xml z ruchem ust (rhubarbResult). ROT.Models.ROTVoiceOverModel.GetSoundPathForCharacter szuka pliku 'ModuleData/ROTVoiceovers/<numer tekstu>.ogg'. Kwestie podmienia ROT.HarmonyPatches.Core.CustomVoiceLines."
+    },
+    {
+     "fact": "Zainstalowany VoiceActingPatchRemake to tak naprawde 'Voice Acting Patch (FishAudio)'. Czyta na zywo rozmowy z postaciami przez serwis Fish Audio. Odtwarza dzwiek poza silnikiem gry, wiec suwak glosnosci w grze go nie dotyczy. WYLACZA tez nagrane kwestie ROT (te 89 plikow), wiec w grze Jeffa obecnie ich nie slychac. Okien wydarzen nie dotyka. Pola 'Eleven...' w jego ustawieniach to tylko podpowiedz plci glosu, polaczen z ElevenLabs nie ma. Nie sluzy do dokladania wlasnych nagran: robi pliki tymczasowe i je kasuje.",
+     "evidence": "VoiceActingPatchRemake/SubModule.xml (nazwa 'Voice Acting Patch (FishAudio)'). FishConfig.json: TtsUrl https://api.fish.audio/v1/tts, Model s1, 65 glosow meskich i 56 zenskich, osobne glosy dla 4 kultur, PurgeGeneratedAfter=true (klucz API jest, nie przepisuje go). Klasa VoicePatches.Patch_DisableVoiceOverModels wylacza 'DefaultVoiceOverModel' i 'ROT.Models.ROTVoiceOverModel'. StandaloneVoiceManager.Play uzywa NAudio WaveOutEvent. Latki tylko na ConversationManager.ProcessSentence, EndConversation i Clear. GenderHintFromPathVoiceId uzywa ElevenMaleIds tylko jako podpowiedzi plci."
+    },
+    {
+     "fact": "AIInfluence ma wlasne czytanie dialogow, ale przez program Player2 uruchomiony lokalnie, a nie przez ElevenLabs. Dotyczy tylko jego wlasnych rozmow z postaciami.",
+     "evidence": "AIInfluence/bin/.../AIInfluence.dll: napisy 'Player2', '/v1/tts/speak', 'Default is http://127.0.0.1:43153', 'Enable TTS (Text-to-Speech)', 'TTS Volume'. Uzywa CreateEventFromExternalFile i StartRhubarbRecord, obok leza OggVorbisEncoder.dll i rhubarb.exe. Slowo 'eleven' wystepuje w DLL 0 razy. Plik tts_voices.txt to lista glosow Player2."
+    },
+    {
+     "fact": "Cennik ElevenLabs (strona czytana 20.10.2026): Free 0 USD i 10 000 kredytow (tylko do uzytku niekomercyjnego, z podaniem zrodla), Starter 6 USD i 30 000, Creator 22 USD i 121 000 (pierwszy miesiac promocyjnie 11 USD), Pro 99 USD i 600 000. 1 kredyt to 1 znak dla modeli Multilingual v2 i v3 (na stronie). Polski obsluguja v3, Multilingual v2 i Flash v2.5. Pliki wychodza jako mp3, opus, pcm albo wav (wav 44,1 kHz dopiero od planu Pro). Nagrania zrobione w czasie platnego planu mozna uzywac komercyjnie na zawsze, takze po rezygnacji.",
+     "evidence": "https://elevenlabs.io/pricing, https://elevenlabs.io/docs/models, https://elevenlabs.io/docs/api-reference/text-to-speech/convert, strona pomocy o koszcie v3 i strona pomocy o tresciach po koncu subskrypcji (linki ponizej)."
+    },
+    {
+     "fact": "Nasze mody juz czytaja wydarzenia ROT, wiec latka nie wymaga zmian w ROT.dll.",
+     "evidence": "Repo C:/Users/GAME/Bannerlor2-Realm-of-Thrones: CrashScribe/src/Fabula.cs (Type.GetType(\"ROT.Events.EventBase, ROT\")) i Mends.cs (WallSiegeEvent, HarrenhalSiegeEvent). ROT ma tez komende konsoli 'rot.trigger_event <nazwa>' (ROT.Commands.TriggerEvent), ktora wywoluje dowolne wydarzenie na autotescie."
+    }
+   ],
+   "how": "Jak to bedzie dzialac, slowami gracza: wyskakuje okno wydarzenia (np. Krwawe Gody) i od razu odzywa sie lektor. Czyta tytul i oba akapity. Kiedy klikniesz przycisk albo nacisniesz Enter lub Esc, lektor milknie. Jesli do jakiegos okna nie ma nagrania (np. ROT doda nowe wydarzenie po aktualizacji), jest po prostu cicho i gra dziala dalej.\n\nKroki:\n1) Wyciagam 35 tekstow z ROT. W wersji polskiej najpierw tlumacze je na polski (laczy sie z pytaniem 3). Robie z nich scenariusz dla lektora i poprawiam w nim literowki ROT, np. 'assualt' albo 'knick of time', zeby lektor ich nie przeczytal.\n2) Jeff slucha 3-4 probek glosu z biblioteki ElevenLabs (np. stary kronikarz albo spokojny narrator) i wybiera jeden. Moge tez wybrac glos sam, jesli Jeff woli.\n3) Skrypt generuje 35 nagran na jezyk, model v3 albo Multilingual v2. Imiona w rodzaju Daenerys, Targaryen czy Harrenhal sprawdzam na sluch, a te zle wymowione poprawiam zapisem fonetycznym i generuje jeszcze raz.\n4) Pliki trafiaja do naszego moda (np. ModuleData/Lektor/EN i PL), po jednym na okno. Okno rozpoznaje po numerze tekstu ROT, a nie po tresci, wiec to samo dziala po angielsku i po polsku. Dwa warianty Harrenhal maja ten sam obrazek, wiec rozroznia je wlasnie numer tekstu.\n5) Mala latka w naszym modzie, bez ruszania ROT.dll. Przy otwarciu ekranu wydarzenia (EventScreen.OnActivate) odtwarza plik tym samym sposobem co gra przy swoich powiadomieniach z glosem (zdarzenie 'event:/Extra/voiceover', bez sceny). Przy zamknieciu (OnDeactivate) zatrzymuje dzwiek. Glosnosc idzie przez silnik gry, wiec obowiazuja suwaki z ustawien. Do tego wlacznik 'Lektor wl./wyl.' i opcjonalnie lekkie sciszenie muzyki na czas czytania.\n6) Autotest: komenda konsoli 'rot.trigger_event' po kolei na kilku wydarzeniach. Sprawdzam, czy gra, czy milknie po Esc i Enter, ktory suwak dziala, i czy nic nie gryzie sie z VoiceActingPatch. Potem wgranie wedlug zwyklej zasady.\n\nFormat pliku: gra na pewno odtwarza .ogg (tak ma ROT). ElevenLabs nie daje .ogg, a na komputerze nie ma konwertera (sprawdzone: brak ffmpeg, sox i oggenc). Dlatego najpierw testuje .wav 24 kHz albo .mp3 prosto z ElevenLabs. Jesli gra ich nie zagra, potrzebny bedzie konwerter do .ogg, a pobranie go wymaga zgody Jeffa.\n\nTen sam mechanizm obsluzy tez nowe wydarzenia z pytania 4: kazdy nowy tekst to po prostu jeden plik wiecej.",
+   "effort": "Tor M, jeden workflow z jedna recenzja. Szacuje 4-6 godzin pracy Claude'a: teksty i scenariusz okolo 1 h, generowanie i odsluch okolo 1 h na jezyk, latka i wlacznik 2-3 h, autotest okolo 1 h. Ze strony Jeffa okolo 15 minut na probki glosu i zalozenie konta. Wersja polska dochodzi do tego samego toru, plus tlumaczenie 35 tekstow (okolo 1 h). Sama latka to jedno miejsce w kodzie i obejmuje wszystkie 35 okien.",
+   "risks": [
+    "Prawa do tekstow ROT: do prywatnej gry Jeffa nagrania sa w porzadku. Udostepnienie moda z czytanymi tekstami ROT innym ludziom wymaga zgody tworcow ROT. Ich strony z zasadami na Nexusie nie udalo sie przeczytac (blokada 403), wiec przed ewentualna publikacja trzeba zapytac.",
+    "Licencja ElevenLabs: na darmowym planie wolno tylko niekomercyjnie i z podaniem zrodla. Ostateczne pliki trzeba wygenerowac w czasie platnego planu, wtedy wolno ich uzywac zawsze. Nie wolno klonowac glosow prawdziwych aktorow, np. z serialu; bierzemy glosy z biblioteki ElevenLabs.",
+    "Aktualizacja ROT moze zmienic teksty, numery tekstow albo dodac wydarzenia. Wtedy dane okno bedzie bez lektora albo z nagraniem starej wersji tekstu. Gra sie nie wywroci, a brakujace nagrania sa tanie (kilka centow za wydarzenie).",
+    "Wymowa imion z Westeros, szczegolnie u polskiego glosu. Trzeba odsluchac wszystko i poprawic zapis fonetyczny, i to wliczam w czas.",
+    "Format pliku: .ogg jest sprawdzony, .wav i .mp3 z ElevenLabs jeszcze nie w tym miejscu gry. Jesli nie zagraja, potrzebny jest konwerter, czyli pobranie narzedzia za zgoda Jeffa.",
+    "Ktory suwak steruje lektorem ('Glos/Voice Over' czy 'Dzwiek'), wyjdzie dopiero na autotescie.",
+    "VoiceActingPatch odtwarza glosy poza silnikiem gry. Lektor i glos postaci moglyby sie nalozyc tylko wtedy, gdy wydarzenie wyskoczy w trakcie rozmowy. To malo prawdopodobne, ale sprawdze na autotescie.",
+    "Teksty ROT maja bledy, np. 'Danaerys', 'assualt', 'knick of time', 'persuit'. Jesli lektor przeczyta wersje poprawiona, bedzie sie minimalnie roznic od tego, co widac na ekranie.",
+    "Uwaga przy okazji: VoiceActingPatch wylacza 89 prawdziwych nagran lordow z ROT i zastepuje je glosem z Fish Audio. To nie jest problem lektora, ale Jeff moze o tym nie wiedziec."
+   ],
+   "costs": "ElevenLabs placony raz, przez jeden miesiac, potem mozna zrezygnowac, a pliki zostaja do uzytku na zawsze. Sam angielski: okolo 10 300 znakow, z jedna poprawka okolo 20 000, czyli plan Starter za 6 USD (30 000 kredytow). Angielski i polski z 2-3 podejsciami do kazdego tekstu: okolo 23 000 znakow na jedna pelna wersje, razem z poprawkami 50-70 tysiecy, czyli plan Creator za 22 USD (121 000 kredytow; na stronie promocja 11 USD za pierwszy miesiac). Darmowy plan (10 000) prawie wystarcza na sam angielski bez poprawek, ale jest tylko do uzytku niekomercyjnego, z podaniem zrodla. Miejsce na dysku: nagrania ROT maja okolo 0,7 MB na minute w .ogg, wiec lektor zajmie okolo 8 MB na jezyk w .ogg albo okolo 35 MB w .wav 24 kHz. To nic przy 14 GB ROT. W grze nic nie dochodzi: zadnych polaczen z internetem i zadnych oplat za kazde odtworzenie. Inna mozliwosc: Jeff ma juz konto Fish Audio (klucz jest w ustawieniach VoiceActingPatch), wiec nagrania mozna zrobic tez tam, ale jakosci i ceny nie sprawdzalem.",
+   "needs_from_jeff": [
+    "Decyzja: lektor tylko po angielsku czy po angielsku i polsku (laczy sie z pytaniem 3).",
+    "Zalozenie konta ElevenLabs i oplacenie planu (Starter 6 USD albo Creator 22 USD). Jeff robi to sam, bo Claude nie zaklada kont i nie placi. Klucz API Jeff sam zapisuje w pliku na swoim komputerze poza repo (np. w zmiennej srodowiskowej), nie wkleja go do czatu.",
+    "Wybor glosu lektora z 3-4 probek, albo zgoda, zebym wybral sam.",
+    "Odpowiedz, czy mod z lektorem jest tylko dla Jeffa, czy ma byc kiedys udostepniony. Od tego zalezy, czy trzeba pytac tworcow ROT o zgode.",
+    "Gdyby gra nie zagrala .wav ani .mp3: zgoda na pobranie konwertera audio (np. ffmpeg) do zamiany na .ogg."
+   ],
+   "links": [
+    "https://elevenlabs.io/pricing",
+    "https://elevenlabs.io/docs/models",
+    "https://elevenlabs.io/docs/api-reference/text-to-speech/convert",
+    "https://elevenlabs.io/docs/help-center/product/core-capabilities/text-to-speech/how-much-does-it-cost-to-generate-using-eleven-v3-alpha.md",
+    "https://elevenlabs.io/docs/help-center/account/general/what-happens-to-my-content-after-my-subscription-ends.md",
+    "https://elevenlabs.io/docs/help-center/legal/can-i-publish-the-content-i-generate-on-the-platform/llms.txt",
+    "https://nexusmods.com/mountandblade2bannerlord/mods/3 (strona ROT, blokada 403)",
+    "https://nexusmods.com/mountandblade2bannerlord/mods/6712 (mod z glosami ElevenLabs dla postaci, znany tylko z wyszukiwarki)",
+    "C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/ROT-Core/GUI/Prefabs/EventXml.xml",
+    "C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/ROT-Content/ModuleData/ROTVoiceovers",
+    "C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/ROT-Content/ModuleData/module_sounds.xml",
+    "C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/VoiceActingPatchRemake/FishConfig.json",
+    "C:/Users/GAME/AppData/Local/Temp/claude/C--Users-GAME-Bannerlor2-Realm-of-Thrones/ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3/scratchpad/zb/pytania-tmp/popups.json",
+    "C:/Users/GAME/AppData/Local/Temp/claude/C--Users-GAME-Bannerlor2-Realm-of-Thrones/ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3/scratchpad/zb/pytania-tmp/licz_wydarzenia.py"
+   ],
+   "unverified": [
+    "Ktory suwak glosnosci w grze steruje zdarzeniem 'event:/Extra/voiceover' (najpewniej Voice Over); do sprawdzenia na autotescie.",
+    "Czy w tym miejscu gra odtwarza pliki .wav i .mp3; sprawdzone jest tylko .ogg (ROT).",
+    "Zasady ROT co do tlumaczen i nagran (strona Nexus zwraca blad 403).",
+    "Co dokladnie robi mod Nexus 6712; opis znam tylko z podsumowania wyszukiwarki, strony nie otworzylem.",
+    "Cena v3 przez API ('taniej niz na stronie'); oficjalnej stawki nie znalazlem, wiec licze 1 znak = 1 kredyt.",
+    "Czy promocja Creator za 11 USD w pierwszym miesiacu nadal obowiazuje.",
+    "Dlugosc polskich tekstow; zalozylem, ze beda o 10-20% dluzsze od angielskich (wyjdzie po tlumaczeniu).",
+    "Jakosc i cena Fish Audio jako zamiennika ElevenLabs."
+   ]
+  },
+  {
+   "key": "polski",
+   "question": "Pytanie 3: czy da sie zrobic wersje moda po polsku i po angielsku (wybor jezyka), przetlumaczyc wszystkie teksty na polski i udzwiekowic wszystko po polsku przez ElevenLabs?",
+   "short_answer": "CZESCIOWO TAK. (1) Polska wersja tekstow: TAK, i to bez wlasnego przelacznika. Gra ma oficjalny polski i w Opcjach osobno wybiera sie \"Jezyk\" (tekst) i \"Jezyk kwestii mowionych\" (glos). Wystarczy dolozyc osobny modul z polskimi plikami. ROT jest do tego dobrze przygotowany: ok. 10 800 tekstow ma swoje numery (id), a tylko ok. 110 zdan jest wpisanych na sztywno w kod. Nasze mody (Armoury, RC, GT) nie maja numerow przy tekstach i trzeba je przerobic w kodzie. Praca duza (L), kilka nocy. (2) Glosy po polsku: TAK, ale \"na zywo\", nie nagrane z gory. Jeff juz ma mod, ktory czyta kazda kwestie postaci przez Fish Audio (Voice Acting Patch). Wysyla on do czytania ten tekst, ktory widac na ekranie, wiec po przelaczeniu gry na polski prawdopodobnie od razu bedzie mowil po polsku (do sprawdzenia jednym testem). ElevenLabs da sie podpiac zamiast Fish (praca M-L). Wedlug cennikow z sieci wyjdzie ok. 5 razy drozej za znak niz Fish, ale przy tym, ile Jeff faktycznie gra, to ok. 3 USD za 7 tygodni. (3) \"Pelne udzwiekowienie wszystkiego\" (menu, encyklopedia, nagrania z gory): NIE polecam. To ok. 2,9 mln znakow, ok. 230-300 USD, ok. 41 godzin nagran i ok. 2,4 GB. Do tego 41% zdan z gry ma zmienne (imiona, liczby), wiec nagranego z gory pliku nie da sie do nich dopasowac.",
+   "findings": [
+    {
+     "fact": "Gra ma oficjalny jezyk polski (od TaleWorlds, nie fanowski) w modulach Native, SandBoxCore, SandBox, StoryMode i NavalDLC: razem ok. 24 000 tekstow i ok. 1,82 mln znakow.",
+     "evidence": "Modules\\Native\\ModuleData\\Languages\\PL\\language_data.xml: id=\"Polski\", text_processor=PolishTextProcessor, under_development=\"false\". Policzone skryptem: Native 6990 wpisow/314 tys. znakow, SandBox 10503/1,03 mln, StoryMode 831/100 tys., NavalDLC 2988/299 tys."
+    },
+    {
+     "fact": "Jezyk wybiera sie w Opcjach gry, osobno tekst ('Jezyk') i glos ('Jezyk kwestii mowionych'). Pliki jezykow ze wszystkich modulow o tym samym id (np. 'Polski') sa laczone w kolejnosci ladowania modulow, a pozniejszy modul nadpisuje wczesniejszy. Wlasny przelacznik w MCM nie jest potrzebny: wystarczy osobny modul (np. 'ROT_PL') z ModuleData\\Languages\\PL, ladowany po ROT i BK.",
+     "evidence": "TaleWorlds.Localization.dll: LocalizedTextManager.LoadLocalizationXmls szuka language_data.xml w kazdym module; LanguageData.LoadFromXml laczy wpisy po id; DeserializeStrings: _gameTextDictionary[id] = text (ostatni wygrywa). Teksty opcji w PL\\std_global_strings_xml_pol.xml: id byOZcjuE 'Jezyk kwestii mowionych', Js1lhJkk 'Jezyk'."
+    },
+    {
+     "fact": "Jesli tekst nie ma polskiego tlumaczenia, gra pokazuje tekst angielski wpisany w danych lub kodzie. Dlatego po samym przelaczeniu na polski Jeff dzis zobaczy mieszanke: gra po polsku, ROT po angielsku.",
+     "evidence": "LocalizedTextManager.GetTranslatedText zwraca null, gdy brak id w slowniku, i wtedy uzywany jest tekst oryginalny. ROT-Core ma tylko Languages\\EN, a ROT-Content, ROT-Map i ROT-Dragon nie maja folderu Languages."
+    },
+    {
+     "fact": "Pulapka przy samym przelaczeniu: 35 tekstow ROT uzywa tych samych numerow co gra, ale z inna trescia. Po polsku pokazalby sie tam oficjalny polski tekst o Calradii zamiast opisu z ROT.",
+     "evidence": "Skrypt wspolne_id.py: 554 id ROT pokrywa sie z grą, z czego 35 ma inny tekst. Przyklad: id WBl5hS0e to w grze opis polnocy Imperium, a w ROT biografia Yohna Royce'a. To samo dotyczy 8SiW73EF (Riverlands) i s2Wbx6bg (corka Stannisa)."
+    },
+    {
+     "fact": "ROT ma prawie wszystkie teksty z numerami (id), wiec da sie je przetlumaczyc samym plikiem XML. Do tlumaczenia jest ok. 10 200 tekstow, ok. 487 tys. znakow, ok. 84 tys. slow. W tym ok. 6 700 krotkich nazw i imion, ok. 1 150 zdan i ok. 390 dlugich opisow (ok. 160 tys. znakow, glownie encyklopedia).",
+     "evidence": "Skrypty unia.py i podzial.py: 10 789 unikalnych id (XML ROT-Content/ROT-Map, str_english.xml oraz literaly z ROT.dll), z czego 575 jest juz w oficjalnym PL. ROT-Core\\ModuleData\\Languages\\EN\\str_english.xml ma 8 753 wpisy i 420 tys. znakow. Najwiecej tekstu maja settlements.xml (73 tys. zn.), spclans.xml (76 tys.), ROT_heroes.xml (51 tys.) i ROT_module_strings.xml (44 tys.)."
+    },
+    {
+     "fact": "W kodzie ROT.dll jest ok. 986 tekstow z numerami, w tym wydarzenia fabularne (np. Krwawe Gody). Na sztywno, bez numeru, wpisanych jest tylko ok. 110 zdan (ok. 4,7 tys. znakow): ustawienia MCM, slonie, smoki, pojedynki. Te wymagalyby osobnej latki albo moga zostac po angielsku.",
+     "evidence": "Dekompilacja ROT.dll i skrypt literaly.py: 986 unikalnych {=id} (72 tys. znakow), 11 unikalnych TextObject bez id, 112 innych zdan. Najwiecej w ROTDragonMissionBehavior (14), ROTDuelsBehavior (13), RoTElephantSettings (5). W ROT.Events.* sa 144 TextObject z id, np. {=ROTuczBLT2R} 'Stop the Red Wedding'."
+    },
+    {
+     "fact": "Banner Kings: ok. 2 900 tekstow z numerami w DLL (188 tys. znakow) i plik std_module_strings_xml.xml z 3 166 wpisami (284 tys. znakow). Do tego ok. 450 tekstow bez numeru (31 tys. znakow) i ok. 975 innych napisow (glownie kody i ustawienia). BK ma gotowe tlumaczenie hiszpanskie, polskiego nie ma.",
+     "evidence": "Dekompilacja BannerKings.dll i literaly.py. Folder Modules\\BannerKings.Redux\\ModuleData\\Languages: DE (2 wpisy), SP (4 041 wpisow, 394 tys. znakow), bez PL. BKROTPatch ma 397 nazw bez id (np. '{FIRSTNAME}, the Book Keeper')."
+    },
+    {
+     "fact": "Nasze mody maja wszystkie napisy wpisane na sztywno po angielsku, bez numerow. Zeby mialy wersje PL/EN, trzeba je przerobic w kodzie: dac kazdemu napisowi numer i zrobic pliki EN i PL.",
+     "evidence": "Skrypt nasze_mody.py na zrodlach w C:\\Users\\GAME\\Bannerlor2-Realm-of-Thrones. Armoury: 5 tekstow z id, ok. 3 039 napisow bez id (147 tys. znakow, czesc to logi), 1 262 atrybuty ustawien MCM, 39 menu/dialogow. RealisticCaptivity: 432 napisy (17 tys.), 196 MCM. GrandTourney: 150 (5 tys.). CrashScribe: 400 (glownie diagnostyka, moze zostac po angielsku). ForgeView: 40."
+    },
+    {
+     "fact": "Polski ma odmiane i rodzaj, a gra obsluguje je specjalnymi znacznikami w tekstach. Tlumaczenie musi te znaczniki zachowac, inaczej napisy sie psuja.",
+     "evidence": "SandBox PL: z 10 503 wpisow 1 440 ma warunki plci {?...}, 2 045 znaczniki odmiany {.x}, a 4 336 zmienne {X}. W ROT str_english.xml: 179 wpisow ze zmiennymi i 111 z {?...}. Plik PL\\pl_functions.xml zawiera funkcje polskiej odmiany."
+    },
+    {
+     "fact": "Jeff juz ma mod czytajacy na glos: 'Voice Acting Patch (FishAudio)'. Na zywo czyta kazda kwestie postaci w rozmowie przez api.fish.audio. Uzywa puli glosow wedlug kultury i plci (65 meskich, 56 zenskich, osobne pule dla battania/aserai/khuzait/freefolk) i pamieta, ktora postac ma ktory glos. Wylacza przy tym oryginalne glosy gry i ROT.",
+     "evidence": "Modules\\VoiceActingPatchRemake\\SubModule.xml oraz FishConfig.json (klucz API pominalem): TtsUrl=https://api.fish.audio/v1/tts, Model=s1. Plik FishStickyVoices.json przypisuje glosy np. lord_1_1 czy villager_aserai. VoicePatches.Patch_ProcessSentence (Postfix na ConversationManager.ProcessSentence); Patch_DisableVoiceOverModels wylacza DefaultVoiceOverModel i ROT.Models.ROTVoiceOverModel."
+    },
+    {
+     "fact": "Ten mod wysyla do czytania tekst, ktory widac na ekranie, wiec po przelaczeniu gry na polski powinien czytac po polsku. Nie zapamietuje nagran: kazda kwestia jest generowana od nowa i placona za kazdym razem, a plik jest kasowany po odtworzeniu. Czyta tylko rozmowy (okno dialogu), nie okienka wydarzen, menu ani encyklopedii.",
+     "evidence": "VoicePatches.TryBuildRequest: text = manager.CurrentSentenceText, potem DialogueTextSanitizer. Ustawienie PurgeGeneratedAfter=true w GenericLipSyncService prowadzi do File.Delete. W kodzie VAP nie ma obslugi jezyka ani pamieci podrecznej (sprawdzone grepem: Language, cache)."
+    },
+    {
+     "fact": "Ile Jeff faktycznie zuzywa czytania: od 3.09 do 21.10 bylo 642-649 zapytan, ok. 40 tys. znakow, ok. 34 minuty dzwieku. Srednio jedna kwestia ma 62 znaki, trwa 4 s, generuje sie ok. 1 s i wazy ok. 64 KB.",
+     "evidence": "Modules\\VoiceActingPatchRemake\\bin\\Win64_Shipping_Client\\FishPatch.log, policzone awk: 'TTS request start' 649 razy, suma textLen=40001; 'TTS ok' 512 razy, sredni czas 1002 ms, 32,7 MB; 'lip-sync duration' w sumie 2044 s."
+    },
+    {
+     "fact": "Gra potrafi odtwarzac glosy nagrane z gory po numerze tekstu: plik xml wskazuje pliki .ogg i plik ruchu ust. Oryginalnie nagranych jest tylko ok. 378 kwestii i tylko po angielsku. Polski w grze nie ma glosow, ale mozna by je dopisac w polskim language_data (VoiceFile).",
+     "evidence": "LocalizedVoiceManager.GetLocalizedVoice(id) oraz LanguageData: element VoiceFile. Modules\\SandBox\\ModuleData\\Languages\\language_data.xml: VoiceFile sandbox_voiced_lines_en.xml (226 id, 1 147 nagran, 1 154 pliki .ogg, 105 MB w VoicedLines\\EN\\PC); StoryMode: 152 id. Pliki .xml obok .ogg zawieraja ruch ust (rhubarbResult/mouthCues). PL\\language_data.xml w SandBox nie ma VoiceFile."
+    },
+    {
+     "fact": "ElevenLabs obsluguje polski we wszystkich glownych modelach. Cena przez API: 0,08 USD za 1000 znakow (Multilingual v2 i v3) albo 0,04 USD (Flash). Plany: Starter 6 USD/mies., Creator 22 USD, Pro 99 USD, Scale 299 USD, Business 990 USD.",
+     "evidence": "https://elevenlabs.io/pricing/api: v2/v3 0,08 USD/1K, Flash/Turbo 0,04 USD/1K; Starter 75 tys. znakow v2/v3 miesiecznie, Scale 3,738 mln. https://elevenlabs.io/docs/models: Polish obslugiwany przez eleven_v3, multilingual_v2 i flash_v2_5. Strona https://elevenlabs.io/pricing podaje inne liczby kredytow (Starter 30k), wiec cenniki sie rozjezdzaja. Licencja komercyjna od planu Starter."
+    },
+    {
+     "fact": "Fish Audio S1 (to, czego Jeff uzywa teraz) tez obsluguje polski i jest ok. 5 razy tansze za znak niz ElevenLabs v3.",
+     "evidence": "docs.fish.audio (lista modeli): Polish (pl) wsrod obslugiwanych jezykow. OpenRouter: S1 kosztuje 15 USD za 1 mln bajtow UTF-8. Dla porownania ElevenLabs v3 to 80 USD za 1 mln znakow."
+    },
+    {
+     "fact": "Nie znalazlem gotowego polskiego tlumaczenia ROT ani Banner Kings. Sa fanowskie spolszczenia samej gry (stare), ale gra ma juz oficjalny polski.",
+     "evidence": "Wyszukiwania WebSearch (spolszczenie ROT/BK, ROT translation): brak wynikow. Spolszczenie daedalus.pl na IndieDB dotyczy samej gry z wersji e1.6.1. Discorda ROT nie sprawdzalem."
+    },
+    {
+     "fact": "AIInfluence (rozmowy generowane przez AI) przekazuje modelowi jezyk gry, wiec po przelaczeniu na polski postacie najpewniej beda odpowiadac po polsku. Wlasne reguly tego moda sa tylko po angielsku.",
+     "evidence": "Napisy w AIInfluence.dll: 'IMPORTANT: Game language is ', 'gameLanguage', 'Description should be in game language'. TECHNICAL_GUIDE_EN.md, wiersz 658: 'Language | English only (AI prompts are in English)'."
+    },
+    {
+     "fact": "MCM (menu ustawien modow) ma wlasny polski.",
+     "evidence": "Modules\\Bannerlord.MBOptionScreen\\ModuleData\\Languages\\PL istnieje."
+    }
+   ],
+   "how": "WERSJA PL/EN TEKSTOW (bez wlasnego przelacznika):\n1. Robimy nowy modul \"ROT_PL\" (tylko pliki XML, bez kodu) z ModuleData\\Languages\\PL\\language_data.xml (id=\"Polski\") i plikami z polskimi tekstami ROT, BK i naszych modow. W launcherze ustawiamy go za ROT i BK. Wybor jezyka: Opcje gry -> Jezyk = Polski albo English. Wersja angielska zostaje bez zmian, bo to teksty wpisane w mody.\n2. Skrypt sam zbiera wszystkie teksty z numerami: XML z ROT-Content/ROT-Map, str_english.xml oraz numery z ROT.dll, BannerKings.dll i XML BK. Prototypy liczace juz sa w scratchpad\\zb\\pytania-tmp\\skr. Te same skrypty po aktualizacji ROT pokaza, co nowe albo zmienione.\n3. Tlumacze partiami po ok. 200-300 wpisow. Zachowuje {ZMIENNE}, warunki plci {?..} i znaczniki odmiany jak w oficjalnym polskim. Imion nie tlumacze. Nazwy miejsc wedlug decyzji Jeffa (polskie z ksiazek, np. Krolewska Przystan, Koniec Burzy, Orle Gniazdo, albo angielskie). Wazne: 35 tekstow ROT, ktore dziela numer z gra, musza trafic do polskiego pliku, inaczej wyjdzie tekst o Calradii.\n4. Skrypt sprawdzajacy: poprawny XML, wszystkie zmienne na miejscu, nic nie zgubione. Potem autotest gry z jezykiem polskim (menu, encyklopedia, rozmowy, okno wydarzenia ROT).\n5. Nasze mody (Armoury, RC, GT, ForgeView): w kodzie kazdy widoczny napis dostaje numer {=ARM_xxx}, wlacznie z nazwami ustawien MCM. Do tego plik EN i PL. CrashScribe zostaje po angielsku (to diagnostyka). Ok. 110 sztywnych zdan w ROT.dll i ok. 450 w BK: latka Harmony albo zostaja po angielsku (to glownie ustawienia i komendy).\n\nGLOS PO POLSKU (zalecane: na zywo, nie nagrania z gory):\nA. Krok pierwszy, prawie za darmo: przelaczyc gre na polski i jednym testem sprawdzic, czy obecny mod Fish Audio czyta po polsku (powinien, bo czyta tekst z ekranu) i jak to brzmi.\nB. ElevenLabs: wlasny maly modul (albo przerobka obecnego) z tym samym podpieciem pod rozmowe, tylko z wywolaniem api.elevenlabs.io. Polskie glosy dobrane do kultur i plci, kazda postac ma staly glos (jak dzis). Do tego pamiec nagran na dysku: ta sama kwestia tym samym glosem nie jest placona drugi raz. Ruch ust tak jak dzis (generowany z dzwieku).\nC. Narrator dla wydarzen fabularnych ROT (okna wydarzen nie sa dzis czytane): to osobne pytanie 2. W ROT.dll teksty wydarzen maja numery, wiec mozna je nagrac z gory jednym glosem lektora (ok. 144 teksty w ROT.Events).\nD. Nagranie z gory \"wszystkiego\": nie polecam. 41% kwestii gry ma zmienne (imiona, liczby), a gra potrafi odtworzyc z gory nagrany plik tylko dla tekstu bez zmian.",
+   "effort": "Tekst PL dla ROT (ok. 10 200 wpisow, 487 tys. znakow): L, ok. 3-4 noce (tlumaczenie, sprawdzanie skryptem, autotest). Tekst PL dla Banner Kings (ok. 3 200-3 500 wpisow, ok. 300 tys. znakow): M-L, ok. 1-2 noce. Nasze mody, przerobka kodu pod jezyki: Armoury L (ok. 1 260 ustawien MCM i ok. 3 000 napisow, 2 noce), RealisticCaptivity M, GrandTourney i ForgeView S, CrashScribe zostaje. Latki na sztywne teksty ROT/BK: M albo zostawiamy po angielsku. Test, czy obecny glos Fish czyta po polsku: S (1 autotest). Podmiana na ElevenLabs z pamiecia nagran: M-L (1-2 noce i testy). Narrator wydarzen nagrany z gory: M. Razem dla pelnego polskiego tekstu i glosu w rozmowach: ok. 8-10 nocy pracy, krok po kroku i po kazdym etapie wgranie po tescie. Nagranie z gory wszystkich tekstow: L+, nie polecam.",
+   "risks": [
+    "Mieszanka jezykow: po samym przelaczeniu na polski (bez naszego pakietu) gra bedzie po polsku, a ROT po angielsku. W 35 miejscach wyskoczy zly tekst o Calradii, np. biografia Yohna Royce'a pokaze opis Imperium.",
+    "Bledy w znacznikach odmiany i plci ({?..}, {.x}, {ZMIENNE}) w tlumaczeniu wyswietla sie jako krzaczki albo zle formy. Potrzebny skrypt sprawdzajacy i test w grze.",
+    "Kazda aktualizacja ROT lub BK dodaje albo zmienia teksty. Trzeba uruchomic skrypt porownujacy i dotlumaczyc, inaczej nowe teksty beda po angielsku.",
+    "Jakosc maszynowego tlumaczenia dlugich opisow (ok. 390 opisow, 160 tys. znakow) i nazw z Westeros. Bez decyzji Jeffa o nazwach wyjdzie niespojnie.",
+    "Glos: obecny mod nie zapamietuje nagran, wiec za powtarzane kwestie placi sie za kazdym razem, a kazda kwestia czeka ok. 1 s na internet. Bez internetu albo przy limicie konta postacie milkna (w logu jest 109 przypadkow 'TTS canceled/timeout').",
+    "Akcent: glosy z puli Fish to w duzej czesci glosy angielskie. Po polsku moga brzmiec z akcentem. Trzeba odsluchac i dobrac polskie glosy.",
+    "Prawa: nie wolno klonowac glosow aktorow z serialu ani zadnych prawdziwych osob bez zgody (regulamin ElevenLabs). Do prywatnej gry wystarczy kazdy plan. Publikowanie nagran albo tlumaczenia ROT w sieci wymaga planu z licencja komercyjna (Starter i wyzej) oraz zgody tworcow ROT (to ich teksty).",
+    "Klucz API lezy zwyklym tekstem w pliku w folderze gry (tak jest dzis z kluczem Fish). Nie udostepniac tego folderu.",
+    "Przerobka naszych modow pod jezyki dotyka wielu plikow (Armoury ma 132 pliki .cs). Ryzyko pomylek przy budowaniu, wiec tylko etapami z testem.",
+    "AIInfluence: rozmowy AI po polsku zaleza od modelu AI. Jakosc polskiego niesprawdzona."
+   ],
+   "costs": "Tlumaczenie: bez dodatkowych pieniedzy, robie je ja w ramach limitow sesji Jeffa. Wyjdzie ok. 1 mln znakow angielskich (ROT, BK i nasze mody), czyli kilka milionow tokenow razem ze sprawdzaniem. To zjada tygodniowy limit, dlatego rozlozyc na kilka nocy. Glos na zywo, liczony od tego, ile Jeff realnie gra (40 tys. znakow w 7 tygodni, po polsku pewnie ok. 10-20% wiecej): ElevenLabs v3 lub Multilingual ok. 3-4 USD za 7 tygodni, Flash ok. 1,6-2 USD. Plan Starter (6 USD/mies., 75 tys. znakow przez API) z zapasem wystarcza. Dla porownania obecny Fish S1 ok. 0,7 USD za to samo (15 USD za 1 mln bajtow, wedlug OpenRouter). Narrator wydarzen ROT nagrany z gory: dziesiatki tysiecy znakow, czyli kilka USD jednorazowo. Nagranie z gory WSZYSTKIEGO (oficjalny PL 1,82 mln, ROT ok. 0,55 mln po polsku, BK ok. 0,33 mln, nasze ok. 0,2 mln, razem ok. 2,9 mln znakow): ok. 230 USD przy 0,08 USD/1K albo plan Scale 299 USD na miesiac. Kazdy dodatkowy glos dla tej samej kwestii to kolejny taki koszt. Do tego ok. 41 h dzwieku, ok. 2,4 GB w mp3 (WAV wielokrotnie wiecej) i ok. 13 h generowania jedna linia naraz.",
+   "needs_from_jeff": [
+    "Decyzja o zakresie: (a) tylko tekst PL, (b) tekst PL i glos w rozmowach, (c) do tego narrator wydarzen fabularnych. Pelnego nagrania wszystkiego z gory nie polecam.",
+    "Decyzja o glosie: zostajemy przy Fish Audio (juz dziala, ok. 5 razy taniej, wystarczy test po polsku) czy przechodzimy na ElevenLabs (mozliwie lepszy polski, ale nie sprawdzone odsluchem)?",
+    "Jesli ElevenLabs: Jeff zaklada konto, wybiera plan (na gre na zywo wystarczy Starter 6 USD/mies.) i sam wkleja klucz API do pliku konfiguracji. Ja kluczy nie wpisuje.",
+    "Budzet miesieczny na glos i zgoda na staly koszt abonamentu.",
+    "Nazwy z Westeros: polskie z ksiazek (Krolewska Przystan, Koniec Burzy, Orle Gniazdo, Nocna Straz) czy angielskie jak w ROT?",
+    "Czy tlumaczyc tez Banner Kings i nasze mody, czy na start tylko ROT.",
+    "Zgoda na jeden autotest z jezykiem polskim (przelaczenie w opcjach i powrot na angielski), poza czasem, kiedy Jeff gra.",
+    "Czy pakiet ma byc tylko dla Jeffa, czy do publikacji (wtedy zgoda tworcow ROT i licencja komercyjna na glosy)."
+   ],
+   "links": [
+    "https://elevenlabs.io/pricing/api",
+    "https://elevenlabs.io/pricing",
+    "https://elevenlabs.io/docs/models",
+    "https://docs.fish.audio/developer-platform/models-pricing/models-overview",
+    "https://openrouter.ai/fish-audio/s1",
+    "https://www.indiedb.com/members/daedaluspl/comments",
+    "https://www.gry-online.pl/newsroom/kolejna-modyfikacja-do-bannerlorda-w-swiecie-gry-o-tron/z61fb58",
+    "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\Modules\\Native\\ModuleData\\Languages\\PL\\language_data.xml",
+    "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\Modules\\ROT-Core\\ModuleData\\Languages\\EN\\str_english.xml",
+    "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\Modules\\VoiceActingPatchRemake\\FishConfig.json",
+    "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\Modules\\VoiceActingPatchRemake\\bin\\Win64_Shipping_Client\\FishPatch.log",
+    "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\Modules\\SandBox\\ModuleData\\Languages\\VoicedLines\\sandbox_voiced_lines_en.xml",
+    "C:\\Users\\GAME\\AppData\\Local\\Temp\\claude\\C--Users-GAME-Bannerlor2-Realm-of-Thrones\\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\\scratchpad\\zb\\pytania-tmp\\skr (skrypty liczace: unia.py, podzial.py, wspolne_id.py, literaly.py, nasze_mody.py)",
+    "C:\\Users\\GAME\\AppData\\Local\\Temp\\claude\\C--Users-GAME-Bannerlor2-Realm-of-Thrones\\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\\scratchpad\\zb\\pytania-tmp\\vap_VoicePatches.cs (dekompilacja moda glosowego)"
+   ],
+   "unverified": [
+    "Nie testowalem w grze, czy obecny mod Fish Audio faktycznie czyta po polsku po przelaczeniu jezyka i jak to brzmi. Kod wysyla tekst z ekranu, ale testu nie bylo.",
+    "Nie sprawdzone, czy zmiana jezyka w opcjach wymaga restartu gry i czy nie miesza nic w trwajacej kampanii (imiona w zapisie).",
+    "Nie znalazlem polskiego tlumaczenia ROT ani BK w sieci. Discorda ROT i zakladek Files na Nexusie nie przegladalem (strony Nexusa nie wyszly w wyszukiwaniu).",
+    "Cenniki ElevenLabs sie rozjezdzaja: strona /pricing/api podaje 75 tys. znakow dla Startera, a /pricing 30 tys. kredytow. Przed zakupem sprawdzic na koncie.",
+    "Cena Fish S1 (15 USD za 1 mln bajtow) pochodzi z OpenRouter, nie z oficjalnej strony Fish Audio.",
+    "Limity rownoczesnych zapytan w planach ElevenLabs i dokladny czas generowania po polsku nie sprawdzone.",
+    "Nie sprawdzilem w kodzie MCM, czy tlumaczy nazwy ustawien innych modow po numerze {=id}. MCM ma wlasny PL, a inne mody (np. Diplomacy) tak robia, ale tego nie weryfikowalem.",
+    "Liczby dla naszych modow sa przyblizone: skrypt liczy wszystkie zdania w kodzie, czesc to logi niewidoczne dla gracza.",
+    "Pozostale mody Jeffa (RBM, BetterEconomy, Spoils of War, DynamicReinforcements i inne bez folderu PL) nie zostaly policzone. Ich napisy zostana po angielsku, dopoki ich nie dodamy.",
+    "Jakosc polskich odpowiedzi AIInfluence nie sprawdzona (w DLL jest tylko przekazanie jezyka gry do AI).",
+    "Szczegoly regulaminu ElevenLabs (klonowanie glosow, publikacja nagran w modzie) nie czytane slowo w slowo. Podaje ogolna zasade: zgoda wlasciciela glosu."
+   ]
+  },
+  {
+   "key": "wydarzenia-filmy",
+   "question": "Pytanie 4 (Jeff): czy możemy dodać więcej wydarzeń pomiędzy głównymi wydarzeniami (widziałem taki mod, \"co się dzieje\", też udźwiękowiony) i czy zamiast obrazka może być filmik?",
+   "short_answer": "Wydarzenia pomiędzy głównymi: TAK. Gra i ROT mają do tego gotowe klocki, a nasze mody już pokazują takie okna. Z lektorem: TAK (nagrania przygotowane wcześniej, np. w ElevenLabs). Filmik zamiast obrazka: TAK jako film na cały ekran przed oknem wydarzenia. Gra robi to sama w kampanii War Sails (NavalDLC), w wersji 1.4.8. Filmik w ramce okna, w miejscu obrazka: CZĘŚCIOWO. Gra umie zmniejszyć film i postawić go w wybranym miejscu ekranu (tak działa tło menu głównego), ale nie ma tego nigdzie w oknie wydarzenia. Trzeba to sprawdzić próbą, około 1 dnia. Trzecia możliwość to żywa scena 3D z prawdziwymi postaciami z gry (jak ślub czy egzekucja w grze). ROT już tak robi przy egzekucji smokiem. Mod \"co się dzieje, z głosem\", który Jeff widział, to najpewniej AI Influence (okno World Events + głos przez Player2). Jeff ma go na dysku, ale wyłączył go 05.10.",
+   "findings": [
+    {
+     "fact": "ROT ma 29 głównych wydarzeń zapisanych na sztywno w ROT.dll. Gra sprawdza je raz na dobę: czy spełniony warunek, a jeśli tak, wydarzenie się zaczyna.",
+     "evidence": "ROT-Core\\bin\\Win64_Shipping_Client\\ROT.dll: typy ROT.Events.* (NedEvent ... HarrenhalEvent), lista w ROT.CampaignBehaviors.ROTEventBehavior.OnSessionLaunched, sprawdzanie w OnDailyTick (ConditionsMet -> StartEvent). ROT-Core v8.1.8, gra v1.4.8 (bin\\Win64_Shipping_Client\\Version.xml)."
+    },
+    {
+     "fact": "Główne wydarzenia ROT odpalają się najwcześniej w danym dniu kampanii. Wychodzą długie przerwy bez żadnego wydarzenia: dni 27-100 (73 doby), 177-220, 357-400, 400-450, a po dniu 450 nic już nie ma według daty. 9 wydarzeń zależy tylko od wyniku (śmierć postaci, wygrana bitwa).",
+     "evidence": "ConditionsMet w ROT.Events.*: Ned 2, Harrenhal 18/27, Dorzecze 25, Karstark 100, Renly 120, Bunt u Crastera 150, Czarny Nurt 170/177, Krwawe Gody 220, Purpurowe Gody 250, Mur 260/274, Eastwatch 280, Ramsay 300, Jon 325, Bękarty 350/357, Aegon 400, Daenerys 450. Stannis, Roose, Nocny Król, Pięść, Królewska Przystań: tylko warunki."
+    },
+    {
+     "fact": "Okno wydarzenia ROT to jeden obrazek 1024x576, tytuł, dwa akapity tekstu i najwyżej 2 przyciski (czyli najwyżej 2 wybory). ROT ma 48 obrazków wydarzeń. Część z nich jest ogólna i można ją użyć ponownie za darmo (posłaniec, wędrowny kupiec, Melisandre, Wolni Ludzie 1-3).",
+     "evidence": "ROT-Content\\GUI\\PreFabs\\EventXml.xml (BrushWidget Sprite=@HeaderImage 1024x576, DialogCloseButtons Done/Cancel); ROT.ViewModels.EventPanel (tylko ExecuteDone/ExecuteCancel); ROT-Content\\GUI\\ROT-ContentSpriteData.xml: 48 obrazków w kategorii ui_event_category (messenger-1, messenger-2, traveling_merchant, melisandre, freefolk1-3 itd.)."
+    },
+    {
+     "fact": "Wydarzenia ROT nie mają głosu ani filmów, tylko muzykę.",
+     "evidence": "NedEvent.StartEvent: PsaiCore.PlaySegment(418); w ROT.dll brak odwołań do VideoPlayback (wyszukiwanie bez wyników)."
+    },
+    {
+     "fact": "Gra ma odtwarzacz filmów na cały ekran: plik obrazu .ivf, osobny dźwięk .ogg, napisy .srt w języku gry (jest też _pl.srt). Film można pominąć klawiszem Esc, a muzyka gry sama się wycisza.",
+     "evidence": "TaleWorlds.MountAndBlade.dll: VideoPlaybackState.SetStartingParameters(videoPath, audioPath, subtitleFileBasePath, frameRate, canUserSkip), OnVideoStarted -> PauseMusicManagerSystem; Native\\...\\TaleWorlds.MountAndBlade.GauntletUI.dll: GauntletVideoPlaybackScreen wczytuje '<nazwa>_<język>.srt'; SandBox\\Videos\\CampaignIntro\\campaign_intro_pl.srt."
+    },
+    {
+     "fact": "Gra sama puszcza film w środku kampanii, gdy gracz jest na mapie. To gotowy wzór dla nas.",
+     "evidence": "NavalDLC.dll: NavalDLC.Storyline.Quests.InquireAtOstican.OnGameMenuOpened: gdy aktywna jest MapState, uruchamia VideoPlaybackState z naval_storyline_intro_cinematic.ivf/.ogg przy 24 kl./s. StoryMode.dll: DefeatTheConspiracyQuestBehavior.PlayOutroCinematic."
+    },
+    {
+     "fact": "Wszystkie filmy gry mają ten sam format: VP8 w pliku IVF, dźwięk osobno w OGG. Rozmiary: wstęp kampanii 1920x1080, 30 kl./s, 4569 klatek (ok. 152 s) = 174 MB, czyli ok. 1,1 MB na sekundę. Tło menu 2560x1440, 24 kl./s, ok. 32 s = 204 MB.",
+     "evidence": "Nagłówki DKIF/VP80 odczytane z Modules\\*\\Videos\\**\\*.ivf; obok każdego leży .ogg (np. campaign_intro.ogg 8,4 MB) i .srt w 13 językach."
+    },
+    {
+     "fact": "Odtwarzacz da się zmniejszyć i ustawić w wybranym miejscu ekranu, a film może grać w pętli pod oknami gry. Tak działa tło menu głównego. To podstawa do 'ruchomego obrazka', ale w grze nie ma przykładu filmu w ramce okna.",
+     "evidence": "TaleWorlds.Engine.VideoPlayerView.PlayVideo(video, sound, fps, looping) + View.SetOffset/SetScale/SetRenderOrder; TaleWorlds.MountAndBlade.MBInitialScreenBase.RefreshScene (looping: true) i RefreshVideoAspect (SetOffset/SetScale)."
+    },
+    {
+     "fact": "Trzecia droga: żywa scena 3D z modelami postaci (jak w grze ślub, egzekucja, koronacja, śmierć). ROT już ma własną taką scenę.",
+     "evidence": "TaleWorlds.CampaignSystem.dll: 25 typów *SceneNotificationItem/Data (scn_cutscene_wedding, scn_execution_notification, scn_become_king_notification ...); ROT.dll: ROT.Dragon.CustomHeroExecution : SceneNotificationData, SceneID 'scn_execution_notification2' = ROT-Dragon\\SceneObj\\scn_execution_notification2\\scene.xscene."
+    },
+    {
+     "fact": "AI Influence leży na dysku Jeffa (v6.0.2). Ma okno 'wydarzenia świata', samo pisze wydarzenia co 7 dni, ma głos przez program Player2 (z ruchem ust) i opcję robienia obrazków do wydarzeń. Jest wyłączony razem z łatką ROT. To najpewniej mod, który Jeff widział.",
+     "evidence": "Modules\\AIInfluence\\GUI\\Prefabs\\WorldEventsWindow.xml, tts_voices.txt, bin\\...\\rhubarb.exe, OggVorbisEncoder.dll; w AIInfluence.dll napisy '/v1/tts/speak', 'http://127.0.0.1:4315'; Documents\\...\\AIInfluenceSettings.json: EnableDynamicEvents true, DynamicEventsInterval 7, EnableTTS false, GenerateDynamicEventImages false; LauncherData.xml: AIInfluence i ROT_AIInfluence_Compat IsSelected=false; docs\\STAN-PRAC.md:185-187 (Jeff kazał wyłączyć 05.10); docs\\AUDYT-LOGI-2026-10-04.md:34 (błędy Player2 HTTP 402)."
+    },
+    {
+     "fact": "Łatka ROT dla AI Influence zamienia główne wydarzenia ROT na 'wydarzenia świata' AI Influence. Naprawia też to, że AI Influence psuło zaplanowane wojny i oblężenia ROT (np. Robb nie wypowiadał wojny).",
+     "evidence": "https://www.nexusmods.com/mountandblade2bannerlord/mods/12123 (v1, 15.07.2026, testowane z ROT-Core 8.1.x i AIInfluence 6.0.x)."
+    },
+    {
+     "fact": "Gotowe mody z wydarzeniami (żaden nie ma lektora):",
+     "evidence": "Random Events (Phill544): 59 wydarzeń, ostatnia wersja 1.3.6 'dla gry 1.3.6 i War Sails', jest polskie tłumaczenie; wolno zmieniać z podaniem autora, grafiki tylko za zgodą; kod na GitHubie bez pliku licencji. Banner Flavor Events: ponad 200 wydarzeń w klimacie Calradii, pliki tylko dla 1.3.10, zmiany tylko za zgodą autora. World Events Announcer: sezonowe okno 'co się stało na świecie' (wojny, pokoje, egzekucje, narodziny), plik dla 1.4.7, autor: 'działa też na 1.4.8', ma polski tekst. Random Event Expansion: ponad 700 wydarzeń z ponad 300 ilustracjami, dodatek do Captivity Events (1.3.13). Captivity Events (Updated 1.4.7): szkielet wydarzeń w XML, ale wpina się w podstawowe dane postaci gry; pierwotnie mod dla dorosłych."
+    },
+    {
+     "fact": "Głos w Bannerlordzie: mod Voice Acting (BlocTheWorker) czyta dialogi przez ElevenLabs w trakcie gry i zapisuje nagrania do ponownego użycia. Zainstalowany u Jeffa VoiceActingPatchRemake (włączony) gra głos przez Windows (biblioteka NAudio), a nie przez dźwięk gry. Własny dźwięk gry ma limity długości (ui do 4 s, alert do 10 s), więc lektor na 30-60 s trzeba puścić tak jak NAudio albo jako dźwięk filmu.",
+     "evidence": "https://www.nexusmods.com/mountandblade2bannerlord/mods/6712 (v1.0.3, 26.11.2025); Modules\\VoiceActingPatchRemake\\bin\\Win64_Shipping_Client\\NAudio*.dll; komentarz w ROT-Content\\ModuleData\\module_sounds.xml (lista kategorii z limitami)."
+    },
+    {
+     "fact": "Nasze mody już mają okna z wyborami, dźwięk interfejsu i bezpieczny zapis, więc szkielet wydarzeń to znana praca.",
+     "evidence": "InquiryData/MultiSelectionInquiry w Armoury\\src\\CraftPopup.cs, IronBank.cs, MusterBook.cs, GrandTourney\\src\\HostMenu.cs, RealisticCaptivity\\src\\CaptivityBehavior.cs; SoundEvent.PlaySound2D w Armoury\\src\\CraftPopup.cs:119; SyncData w Armoury\\src\\ArmouryBehavior.cs:391."
+    },
+    {
+     "fact": "Nowych obrazków do okna w stylu ROT nie da się po prostu dorzucić. ROT trzyma grafiki w spakowanych paczkach, a narzędzia do pakowania (Modding Kit) nie są zainstalowane. W kodzie gry jest wczytywanie obrazka z pliku w trakcie gry, ale tego nie testowałem.",
+     "evidence": "ROT-Content\\AssetPackages\\pack0-8.tpac (12 GB); brak bin\\Win64_Shipping_wEditor; TaleWorlds.Engine.Texture.LoadTextureFromPath / CreateFromMemory; TaleWorlds.GauntletUI.BaseTypes.TextureWidget i OnlineImageTextureWidget."
+    },
+    {
+     "fact": "Na komputerze nie ma ffmpeg (programu do przerabiania filmów na format gry).",
+     "evidence": "PowerShell Get-Command ffmpeg: brak wyniku."
+    }
+   ],
+   "how": "1) NOWE WYDARZENIA (podstawa). Robimy osobny mały mod, np. \"Kronika Westeros\", który da się włączyć i wyłączyć. W jednym pliku jest lista wydarzeń: tytuł, tekst PL i EN, obrazek, nagranie lektora, ewentualnie film, warunek i wybory ze skutkami.\n\nWarunki mogą być takie:\n- przedział dni,\n- wojna między rodami,\n- ktoś żyje albo nie żyje,\n- \"po Krwawych Godach\" (odczyt, które wydarzenia ROT już były),\n- gdzie jest gracz i czyim jest wasalem,\n- szansa losowa.\n\nDo tego przerwa między oknami, żeby nie zasypywały gracza (np. co najmniej 7-14 dni).\n\nSkutki: złoto, wpływy, relacje, ludzie, przedmioty, sława albo krótkie zadanie. Wydarzenia celowo wstawiamy w dziury ROT: dni 27-100, 177-220, 357-450 i po 450.\n\nOkno robimy własne, wyglądem jak okno ROT, ale z 2-4 wyborami. Okno ROT ma tylko 2 przyciski. Na start bierzemy gotowe obrazki ROT (posłaniec, kupiec, Wolni Ludzie itd.).\n\nW zapisie gry trzymamy tylko listę \"które wydarzenia już były\". Wyłączenie moda nie psuje zapisu.\n\n2) LEKTOR. Każde wydarzenie nagrywamy wcześniej w ElevenLabs, osobno po polsku i po angielsku. Nagranie gra, gdy otwiera się okno, i milknie, gdy okno się zamyka (puszczane tak jak VoiceActingPatch, przez Windows). Albo nagranie jest ścieżką dźwiękową filmu.\n\n3) FILMIK, trzy sposoby:\n- (a) Film na cały ekran przed oknem wydarzenia. Ten sam mechanizm, którym War Sails puszcza swój film w kampanii: tylko na mapie, Esc pomija, polskie napisy z pliku .srt. To pewne.\n- (b) \"Żywy obrazek\" w ramce okna: krótka pętla 5-10 s ustawiona w miejscu obrazka. Najpierw próba (ok. 1 dzień); jeśli nie wyjdzie, zostaje zwykły obrazek.\n- (c) Scena 3D z prawdziwymi postaciami z gry, na gotowych scenach gry (ślub, egzekucja, koronacja, śmierć), tak jak ROT robi przy egzekucji smokiem. Nowe sceny wymagają Modding Kit.\n\nSkąd filmy:\n- obrazki ROT ożywione generatorem wideo AI (obraz na film, 5-10 s),\n- nagrania z samej gry,\n- nigdy fragmenty serialu HBO.\n\nPrzeróbka na format gry (VP8 .ivf + .ogg + .srt) przez ffmpeg.\n\n4) GOTOWE MODY. World Events Announcer (sezonowe podsumowanie \"co się stało w świecie\", jest na 1.4.7/1.4.8) można szybko przetestować obok. Random Events i Banner Flavor Events są w klimacie Calradii i dla 1.3.x, więc służą tylko jako wzór pomysłów. Nie kopiujemy ich kodu ani grafik. AI Influence robi \"co się dzieje\" z głosem, ale Jeff go wyłączył 05.10 (mieszał w cenach), a Player2 zwracał błąd płatności.",
+   "effort": "Szkielet \"Kroniki\" (lista wydarzeń, warunki, własne okno z 2-4 wyborami, zapis, komenda do odpalenia wydarzenia w teście, autotest): tor M, ok. 1-2 dni pracy Claude.\n\nJedno wydarzenie tekstowe (tekst PL i EN, warunek, skutki, sprawdzenie komendą): tor S, ok. 30-60 min. Pakiet 20-30 wydarzeń w dziury ROT to w sumie tor L (kilka dni), robiony partiami po 5-10.\n\nLektor: raz tor M (odtwarzanie i zatrzymanie, głośność, PL/EN), potem ok. 10-15 min na wydarzenie (wygenerowanie i przegranie do .ogg). Jeff musi odsłuchać.\n\nFilm na cały ekran: raz tor S (wzór z War Sails, kilkadziesiąt linii), potem ok. 10-20 min na film (przeróbka, napisy PL/EN), plus czas Jeffa na wygenerowanie filmu.\n\nRuchomy obrazek w ramce: tor M-L, najpierw próba ok. 1 dnia, wynik niepewny.\n\nScena 3D na gotowej scenie gry: tor S-M na wydarzenie. Nowa scena: tor L i wymaga Modding Kit.",
+   "risks": [
+    "Nasze wydarzenia nie mogą ruszać zaplanowanych wojen i oblężeń ROT. AI Influence je psuło: Robb nie wypowiadał wojny, oblężenia stawały. Dlatego tylko dodatki, bez zmiany wojen ROT, i test kampanii ok. 120 dni.",
+    "Warunki 'po wydarzeniu X' wymagają zaglądania do środka ROT (ROTEvents i lista wydarzeń są wewnętrzne). Po każdej aktualizacji ROT trzeba to sprawdzić.",
+    "Film tylko na mapie: nie w bitwie, nie w mieście, nie w trakcie zapisu (tak robi War Sails). Inaczej grozi zawieszeniem lub złym ekranem.",
+    "Ruchomy obrazek w ramce może migać, wyjść poza ramkę albo schować się pod tłem okna. Wtedy zostaje zwykły obrazek.",
+    "Rozmiar plików: film na cały ekran 1080p trwający 30 s to ok. 34 MB przy jakości gry, więc 20 takich filmów to ok. 0,7 GB. Krótkie pętle 720p to kilka MB każda (szacunek).",
+    "Filmy z AI: twarze nie będą takie jak modele postaci w ROT ani te same w różnych klipach. Dużo prób idzie do kosza (źródła mówią o wielokrotnych powtórkach).",
+    "Prawa: żadnych fragmentów serialu HBO, głosów aktorów ani głosów udających aktorów. Teksty piszemy sami, nie przepisujemy książek ani serialu. Obrazki ROT należą do autorów ROT. Wszystko tylko do prywatnej gry, bez publikowania.",
+    "Za częste okna męczą gracza, więc potrzebny jest limit, np. najwyżej 1 na 7-14 dni (AI Influence ma domyślnie co 7 dni).",
+    "Zapis gry: tylko proste dane (lista odhaczonych wydarzeń), z pamięcią o limicie 32 KB na napis w zapisie."
+   ],
+   "costs": "Kod: 0 zł, tylko czas i limity Claude.\n\nObrazki: 48 gotowych obrazków ROT za darmo. Nowe obrazki wymagają generatora obrazów; cen nie sprawdzałem.\n\nLektor ElevenLabs:\n- Darmowy plan: 10 tys. znaków (ok. 10 min).\n- Starter: $6 miesięcznie za 30 tys. znaków (ok. 30 min).\n- Creator: $22 (pierwszy miesiąc $11) za 121 tys. znaków.\n- Jedno wydarzenie w stylu ROT to ok. 500-1000 znaków. 30 wydarzeń w dwóch językach to ok. 30-60 tys. znaków, czyli 1 miesiąc Creator albo 2 miesiące Starter.\n\nFilmy AI (ceny z serwisów zbiorczych, nie z oficjalnych cenników):\n- Veo 3.1 Lite: ok. $0,03/s (720p, bez dźwięku).\n- Kling: ok. $0,07-0,13/s.\n- Runway: ok. $0,12/s.\n- Z powtórkami (x3-5) 10-sekundowy klip kosztuje realnie ok. $1-6, a 20 klipów ok. $20-120.\n\nffmpeg i Modding Kit są darmowe.",
+   "needs_from_jeff": [
+    "Wybór kolejności. Proponuję: (1) wydarzenia tekstowe w stylu ROT w dziurach między głównymi, (2) lektor, (3) filmy na cały ekran do najważniejszych wydarzeń, (4) na końcu próba ruchomego obrazka w ramce.",
+    "Jaki klimat wydarzeń: zgodne z serialem (np. ucieczka Aryi, Tyrion namiestnikiem, wieści zza Wąskiego Morza) czy losowe 'życie Westeros' (plotki, bandyci, kupcy, zarazy, prośby lordów), czy oba. Claude przygotuje listę 20-30 pomysłów, a Jeff zaznacza, co bierzemy.",
+    "Lektor: konto ElevenLabs (darmowe na próbę albo Starter/Creator). Klucz API Jeff wpisuje do pliku ustawień sam, Claude nie wpisuje kluczy. Do tego wybór głosu polskiego i angielskiego po odsłuchu próbek.",
+    "Filmy: zgoda na pobranie i instalację ffmpeg (darmowy program do przerabiania filmów na format gry). Konto w generatorze wideo (Kling, Runway albo Veo) opłacane przez Jeffa, albo Jeff sam dostarcza klipy. Potwierdzenie, że to tylko do prywatnej gry.",
+    "Opcjonalnie: zgoda na instalację darmowego Modding Kit ze Steam. Potrzebny dopiero przy nowych obrazkach w oknie ROT albo nowych scenach 3D, na start nie.",
+    "Czy chcesz na próbę gotowy World Events Announcer (sezonowe okno 'co się stało na świecie', działa na 1.4.8 według autora)? To osobne pobranie, więc też za zgodą. AI Influence zostaje wyłączony, jak zdecydowałeś 05.10."
+   ],
+   "links": [
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/1410",
+    "https://github.com/Phill544/MnBRandomEvents",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/9137",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/12730",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/9907",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/12254",
+    "https://steamcommunity.com/app/261550/discussions/0/3482997773484590809",
+    "https://steamcommunity.com/sharedfiles/filedetails/?id=3584621421",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/12123",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/12048",
+    "https://www.nexusmods.com/mountandblade2bannerlord/mods/6712",
+    "https://elevenlabs.io/pricing",
+    "https://hackernoon.com/the-same-10-seconds-of-ai-video-can-cost-$075-or-$4-track-which-model-is-burning-your-budget",
+    "https://echai.ventures/how-founders-use-ai/video-image-audio/what-does-ai-video-and-image-actually-cost-and-what-s-a-sensible-starter-stack-on-a-founder-budget",
+    "https://forum.zdoom.org/viewtopic.php?p=1257760"
+   ],
+   "unverified": [
+    "Czy Random Events (1.3.6) i Banner Flavor Events (1.3.10) działają na 1.4.8 i z ROT: nie sprawdzone. Na stronach nie ma plików dla 1.4.x.",
+    "World Events Announcer z ROT: nie sprawdzone. Autor pisze tylko, że działa na 1.4.8.",
+    "Że mod widziany przez Jeffa to AI Influence: przypuszczenie z opisu ('co się dzieje' + głos). Nie da się tego sprawdzić bez Jeffa.",
+    "Film w ramce okna wydarzenia: odtwarzacz da się przesunąć i zmniejszyć (menu główne tak robi), ale pod oknem wydarzenia tego nie testowałem.",
+    "Wczytywanie nowych obrazków z pliku w trakcie gry (Texture.LoadTextureFromPath/CreateFromMemory) bez Modding Kit: nie testowane.",
+    "Długi lektor przez dźwięk gry (limity kategorii 4-10 s) albo przez NAudio jak VoiceActingPatch: sposób z NAudio istnieje u Jeffa, ale w oknie wydarzenia nie testowany.",
+    "Polecenie ffmpeg do formatu gry: format sprawdziłem z plików gry (VP8 w IVF, osobny OGG, SRT). Przykładowe polecenie pochodzi z forum GZDoom i nie było testowane w Bannerlordzie.",
+    "Rozmiar krótkich pętli 720p (kilka MB): szacunek, nie pomiar.",
+    "Ceny generatorów wideo pochodzą z serwisów zbiorczych, nie z oficjalnych cenników. Cen generatorów obrazów nie sprawdzałem.",
+    "Jakość polskich głosów ElevenLabs: strona cennika podaje '74 języki', ale ich nie wymienia."
+   ]
+  }
+ ],
+ "critic": "poprawka: Starter za 6 USD wystarczy na lektora po angielsku i po polsku, a nie tylko po angielsku. Angielskie teksty wydarzen to 10 308 znakow, polskie wyjda okolo 11-12 tys. (polski jest zwykle 10-20% dluzszy, to szacunek). Razem okolo 22 tys., a Starter daje 30 000 kredytow. Zostaje okolo 8 tys. na poprawki wymowy. Creator potrzebny jest tylko przy wielu powtorkach. Jesli Creator, to pierwszy miesiac kosztuje 11 USD, a nie 22: tak napisano w samej odpowiedzi, ale do kosztu wpisano 22. Abonament odnawia sie sam co miesiac, wiec po nagraniu trzeba go anulowac.\ndowod: https://elevenlabs.io/pricing (czytane dzis): Free 10k, Starter 6 USD / 30k, Creator \"$22 First month 50% off\" / \"$11 per month\" (kolejnosc napisow na stronie niejasna, najpewniej 22 USD to cena normalna, a 11 USD to pierwszy miesiac), Pro 99 USD / 600k. Plan Free nie ma licencji komercyjnej. Wymogu podania zrodla na stronie cennika nie ma, to twierdzenie nie jest tam potwierdzone. Wav/PCM 44,1 kHz jest tylko w Pro. Model v3 kosztuje 1 kredyt za znak na stronie www, a przez API mniej: https://help.elevenlabs.io/hc/en-us/articles/35869113958801-How-much-does-it-cost-to-generate-using-Eleven-v3\n\npoprawka: Konwerter do .ogg juz jest na dysku. Nie trzeba niczego pobierac ani pytac o zgode. AIInfluence ma przy sobie OggVorbisEncoder.dll (biblioteka .NET), ktorej uzywa do zamiany glosu na .ogg przed odtworzeniem w grze. To tez wskazowka, ze .ogg to sprawdzona droga, a .wav i .mp3 przez CreateEventFromExternalFile nadal nie sa sprawdzone. Naszym narzedziem mozemy zamieniac pliki ElevenLabs (pcm/wav) na .ogg. Licencji tej biblioteki nie sprawdzalem.\ndowod: Modules/AIInfluence/bin/Win64_Shipping_Client/OggVorbisEncoder.dll (895 488 B). AIInfluence.dll odwoluje sie do OggVorbisEncoder, VorbisInfo i ProcessingState (to nazwy z tej biblioteki). Kodu AIInfluence nie da sie rozlozyc dekompilatorem, bo jest zaciemniony (BadImageFormatException), wiec dowod jest posredni. ffmpeg, sox i oggenc rzeczywiscie nie ma, a w Pythonie jest tylko numpy.\n\npoprawka: \"Oficjalny polski\" w grze to tylko napisy, bez polskiego glosu. Polskie pliki (pelne, \"Polski\") maja Native, SandBox, SandBoxCore, StoryMode, CustomBattle i NavalDLC. Nagrane glosy sa tylko po angielsku. Filmy maja polskie napisy, ale angielski dzwiek. ROT ma tylko angielski.\ndowod: Modules/Native/ModuleData/Languages/PL/language_data.xml (id=\"Polski\", under_development=\"false\"). SandBox, StoryMode i NavalDLC: w ModuleData/Languages/VoicedLines jest tylko folder EN. SandBox/Videos/CampaignIntro/campaign_intro_pl.srt obok jednego campaign_intro.ogg. ROT-Core/ModuleData/Languages ma tylko EN (8845 wpisow, 424 491 znakow, 7792 rozne teksty, 397 859 znakow). Spolszczenia ROT w sieci nie znalazlem (wyszukiwarka: brak wynikow, Nexusa i Discorda ROT nie przegladalem).\n\npoprawka (nowe ryzyko do pytania 3): Po samym przelaczeniu gry na polski czesc tekstow ROT pokaze cudze polskie teksty z Calradii. ROT uzywa 259 numerow tekstow z gry podstawowej (okolo 15 400 znakow), a gra ma do nich wlasne polskie tlumaczenia. Przyklady: opis Renly'ego dostanie polski opis Apisa Warosa, opis Yohna Royce'a dostanie tekst o ziemiach Cesarstwa, a \"Hideout\" zmieni sie w \"Kryjowka\". Polska paczka ROT musi wiec nadpisac takze te 259 numerow i wczytac sie po grze podstawowej.\ndowod: skrypt porownujacy ROT-Core/.../EN/str_english.xml z plikami Modules/*/ModuleData/Languages/PL. ROT-Content/ModuleData/ROT_heroes.xml ma text=\"{=xL95EfpQ}Lord of Storm's End...\", a ten sam numer jest w SandBox/ModuleData/heroes.xml i w polskich plikach. Rozklad: std_common_strings 128, std_TaleWorlds_CampaignSystem 96, std_heroes 16.\n\npoprawka: Gra umie wideo, ale tylko na caly ekran albo jako tlo pod menu. Wideo w ramce okna wydarzenia nie jest nigdzie pokazane i jest niesprawdzone. Format to .ivf (VP8, 1080p, 30 klatek), dzwiek osobno w .ogg, napisy w .srt dla kazdego jezyka. Przyklad: campaign_intro.ivf ma 174 MB na 152 s, czyli okolo 70 MB na minute. Silnik ma funkcje skalowania, przesuwania i wyswietlania obrazu na teksturze (SetScale, SetOffset, SetRenderTarget), wiec ramka moze byc mozliwa, ale trzeba to przetestowac. Pewny wariant: filmik na caly ekran przed oknem wydarzenia. Do zrobienia .ivf potrzebny jest koder VP8 (np. ffmpeg). Na dysku go nie ma, wiec pobranie wymaga zgody Jeffa.\ndowod: TaleWorlds.Engine.VideoPlayerView.PlayVideo(video, sound, framerate, looping). TaleWorlds.MountAndBlade.View.Screens.VideoPlaybackScreen (osobny ekran, SetRenderOrder(-10000), pomijanie klawiszem). MBInitialScreenBase.RefreshScene: Videos/initial_menu/*_pc.ivf plus .ogg pod menu glownym. Naglowek campaign_intro.ivf: DKIF, VP80, 1920x1080, 30 kl./s, 4569 klatek. ROT nie ma folderu Videos.\n\npoprawka (drobna, pytanie 1): Na liscie progow dni ROT brakuje dwoch: Days(180) w BlackwaterSiegeEvent i Days(267) w WallSiegeEvent. Reszta (data startu Years(299)+Hours(6), Ned na dzien 2, Robert i Ned alive=\"false\", 1 wojna w XML, 38 odczytow daty startu) sie zgadza.\ndowod: ROT.dll, ROT.Models.ROTCampaignTimeModel (tez WeeksInSeason=3, czyli ROT sam ma rok 84 dni). Zliczenie CampaignTime.Days(...) w rot-events-all.cs. ROT_heroes.xml l.380 i 473. ROT_spkingdoms.xml: 1x isAtWar=\"true\".\n\npotwierdzone bez zmian: Patch_DisableVoiceOverModels w VoiceActingPatchRemake wylacza bez warunku DefaultVoiceOverModel i ROTVoiceOverModel (Prefix ustawia wynik na null i zwraca false), wiec 89 nagranych kwestii ROT nie gra. Glos z pliku na mapie dziala tak jak w SandBoxGauntletGameNotification (CreateEventFromExternalFile(\"event:/Extra/voiceover\"...)). Jest 29 klas wydarzen i 0 zmiennych w tekstach (SetTextVariable), wiec nagrania na stale pasuja do kazdego okna.\n\nbrakuje: Odpowiedzi 3 i 4 doszly do mnie uciete. Odpowiedz 2 urywa sie w polowie akapitu o formacie pliku, a 3 i 4 nie doszly wcale. Sprawdzilem ich tematy samodzielnie, ale ich tresci nie zweryfikowalem.\n\nbrakuje (pytanie 3): ile realnie tekstu jest do tlumaczenia i do nagrania. Mody bez gry podstawowej to okolo 840 tys. znakow: ROT 424 tys., BannerKings 290 tys. (bez PL), Diplomacy 32 tys. (ma juz PL), Spoils of War 22 tys., TournamentsXPanded 21 tys., BetterEconomy 19 tys., RBM 9 tys. Gra podstawowa po angielsku to okolo 1,6 mln znakow (SandBox 960 tys., NavalDLC 274 tys., Native 233 tys., StoryMode 95 tys.). Nagranie \"wszystkiego\" to gorna granica okolo 2,4 mln znakow. W ElevenLabs to kilka miesiecy planu Pro (600 tys. za 99 USD, razem okolo 400 USD) albo Scale (1,8 mln za 299 USD) i to wciaz za malo na jeden miesiac. Czesc tekstow to menu i encyklopedia, a nie dialogi, wiec trzeba wybrac, co czytac. Teksty ze zmiennymi (imiona, liczby) i rozmowy AIInfluence powstaja w trakcie gry, wiec nie da sie ich nagrac z gory. Potrzebny bylby glos na zywo, placony za kazde uzycie. Nasze mody (Armoury, CrashScribe, GrandTourney, RealisticCaptivity, ForgeView) nie maja folderu Languages, wiec ich teksty siedza w kodzie i trzeba je osobno przeniesc do plikow jezykowych.\n\nbrakuje (pytanie 3): tansza droga dla rozmow na zywo. Zainstalowany Voice Acting Patch (Fish Audio, model s1) juz czyta rozmowy z postaciami, a s1 obsluguje polski. Po spolszczeniu tekstow rozmow moze je czytac po polsku bez ElevenLabs. Wymaga to tylko polskiego glosu w FishConfig.json. Jakosci po polsku nie sprawdzalem.\ndowod: https://huggingface.co/fishaudio/s1-mini, https://docs.fish.audio/developer-guide/models-pricing/models-overview (13 jezykow, w tym pl). Plik Modules/VoiceActingPatchRemake/FishConfig.json.\n\nbrakuje (pytanie 4): nie wiadomo, jaki \"mod z udzwiekowionymi wydarzeniami\" widzial Jeff. W wyszukiwaniu nie znalazlem moda do Bannerlorda czy ROT z czytanymi wydarzeniami fabularnymi (byly tylko np. WarbandQuotes https://www.nexusmods.com/mountandblade2bannerlord/mods/62/ i Sound The Alarm https://www.nexusmods.com/mountandblade2bannerlord/mods/306). Trzeba poprosic Jeffa o nazwe albo link.\n\nbrakuje (pytanie 4): skad wziac filmiki. Kadrow z serialu HBO nie wolno uzyc. Cen generatorow wideo AI nie sprawdzalem. Trzeba tez policzyc rozmiar: okolo 70 MB na minute przy 1080p VP8.\n\nPlikow nie zapisywalem, wszystko sprawdzalem tylko odczytem."
+}
