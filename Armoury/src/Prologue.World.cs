@@ -57,12 +57,14 @@ namespace Armoury
         private static bool _worldDirty;      // po wczytaniu: partie scen odbudowane w pierwszej godzinie (WorldHourly)
         private static bool _wLegacy;         // zapis kampanii z prologiem sprzed E5 (bez "whb=") - sceny, ktorych czas juz minal, pominiete (bez nadrabiania)
         private static int _ordersDay;        // rozkazy wydane partiom scen od ostatniej linii doby
+        private static int _aiFreedDay;       // recenzja m104: partie scen z AI wylaczonym przez inny mod (uczta BK) - AI wlaczone od ostatniej linii doby
+        private static readonly HashSet<MobileParty> _aiFreedSaid = new HashSet<MobileParty>();   // linia raz na partie w sesji
 
         private static void ResetWorld()
         {
             _hbEsc = _hbRan = _hbPeace = _hbChoice = _hbComp = _hbPass = 0;
             _hbDay = _hbPassDay = _wStumbles = 0; _hbSaid.Clear();
-            _worldDirty = false; _wLegacy = false; _ordersDay = 0;
+            _worldDirty = false; _wLegacy = false; _ordersDay = 0; _aiFreedDay = 0; _aiFreedSaid.Clear();
             _ctl.Clear(); _thawed = 0; _heroCacheDay = -1; _heroCache.Clear();
             ResetProgress();
             ResetTourney();
@@ -369,6 +371,18 @@ namespace Armoury
                 if (mp.Army.LeaderParty == mp) DisbandArmyAction.ApplyByUnknownReason(mp.Army);
                 else mp.Army = null;
             }
+            if (mp.Ai.IsDisabled && !mp.IsInRaftState && !(mp.IsCurrentlyAtSea && !mp.HasNavalNavigationCapability))
+            {
+                // recenzja m104 (rozpoznanie e5:A): AI wylaczone przez inny mod bez terminu - uczta BK (BKFeastBehavior.HourlyTickPartyImpl: DisableAi + rozkaz do miasta
+                // uczty) zalozona przed przejeciem partii; prefiks SkipScriptedPrefix pomija juz te metode, wiec jej EnableAi nie przyjdzie (AI wraca dopiero w Feast.Finish),
+                // a gra nie wypuszcza z osady partii z wylaczonym AI (MobileParty.CheckExitingSettlementParallel). Wlasne blokady Armoury (oboz, sen dlugu, postoj w osadzie)
+                // sa wyzej (SleepKind - rozkaz nie ruszany); tratwa i morze bez statkow - AI trzyma gra (jak IslandRoads).
+                mp.Ai.EnableAi();
+                _aiFreedDay++;
+                if (_aiFreedSaid.Add(mp))
+                    Log.Info(WTag + "partia sceny " + c.Scene + " " + mp.Name + " (" + mp.StringId + (mp.CurrentSettlement != null ? ", w " + mp.CurrentSettlement.StringId : "")
+                             + ") - AI wylaczone przez inny mod (uczta BK?) - wlaczone dla rozkazu sceny (dzien prologu " + PrologueDay().ToString("0.0", Inv) + "; linia raz na partie).");
+            }
             if (OrderOk(c)) return;
             var nav = MobileParty.NavigationType.Default;
             switch (c.Kind)
@@ -489,7 +503,7 @@ namespace Armoury
             if (day > PrologueDays + WorldLogAfterStory && !(holdOn && d % 10 == 0))
             {
                 try { if (_ctl.Count > 0) WorldStep(true); } catch (Exception e) { WStumble("WorldStep(po prologu)", e); }   // wszystko oddane najpozniej w dniu 188
-                _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; return;
+                _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; _aiFreedDay = 0; return;
             }
             try { WorldStep(true); } catch (Exception e) { WStumble("WorldStep(doba)", e); }
             var sb = new StringBuilder(1200);
@@ -504,10 +518,10 @@ namespace Armoury
             sb.Append(" | straz niewoli: zablokowane dzis ").Append(_hbDay).Append(", od poczatku ucieczki ").Append(_hbEsc).Append(", dni bez okupu i okupy ").Append(_hbRan)
               .Append(", pokoj ").Append(_hbPeace).Append(", wypuszczenie ").Append(_hbChoice).Append(", wykup ").Append(_hbComp).Append(" | przepuszczone (gracz, smierc, po bitwie) dzis ")
               .Append(_hbPassDay).Append(", od poczatku ").Append(_hbPass);
-            sb.Append(" | partie pod scena ").Append(_ctl.Count).Append(", rozkazy od wczoraj ").Append(_ordersDay);
+            sb.Append(" | partie pod scena ").Append(_ctl.Count).Append(", rozkazy od wczoraj ").Append(_ordersDay).Append(", AI wlaczone (blokada innego moda) ").Append(_aiFreedDay);
             sb.Append(" | potkniecia E5 ").Append(_wStumbles).Append('.');
             Log.Info(sb.ToString());
-            _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0;
+            _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; _aiFreedDay = 0;
         }
 
         /// <summary>OnSessionLaunched: linia startu E5 (tylko kampania z prologiem).</summary>
