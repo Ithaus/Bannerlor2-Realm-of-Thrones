@@ -322,6 +322,9 @@ namespace Armoury
             try { GossipStopAll(why); } catch (Exception e) { Stumble("GossipStop", e); }
         }
 
+        /// <summary>Ten sam delegat "Enough talk" dla kazdego okna plotek (InquiryData.HasSameContentWith porownuje akcje - dubel okna rozpoznawany jak przed lektorem).</summary>
+        internal static readonly Action GossipStopAction = () => GossipStop("enough talk");
+
         private static void CountSkip(int reason, int n)
         {
             switch (reason)
