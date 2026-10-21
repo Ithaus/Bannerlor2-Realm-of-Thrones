@@ -8936,6 +8936,10 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool ProloguePacts { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Kings", HintText = "in a new Prologue 298 campaign King Robert Baratheon and Lord Eddard Stark are alive: Robert rules the crown's realm and House Baratheon of King's Landing, Ned rules the North and House Stark. On day 186 the King dies of wounds from a boar hunt, Joffrey takes the throne and Ned is thrown into the dungeons of King's Landing; his execution opens the story of Realm of Thrones. Off = both stay dead as in Realm of Thrones. Only new campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueKings { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11169,6 +11173,7 @@ namespace Armoury
             s.PrologueEnabled = PrologueEnabled;
             s.ProloguePeace = ProloguePeace;
             s.ProloguePacts = ProloguePacts;
+            s.PrologueKings = PrologueKings;
         }
 
         internal static void Apply()

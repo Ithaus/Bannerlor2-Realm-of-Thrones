@@ -63,19 +63,19 @@ namespace Armoury
 
         // ---------------------------------------------------------------- E0: okno wyboru w menu glownym
 
-        /// <summary>Raz na proces (SubModuleMain.OnBeforeInitialModuleScreenSetAsRoot): prefiks MBGameManager.StartNewGame(MBGameManager) i latki prologu dzialajace
-        /// od tworzenia swiata (Hero.Deserialize, DeclareWarAction - Prologue.Kings/Peace). Latki opowiesci ROT - leniwie (InstallStory).</summary>
+        /// <summary>Raz na proces (SubModuleMain.OnBeforeInitialModuleScreenSetAsRoot): tylko prefiks MBGameManager.StartNewGame(MBGameManager). Wszystkie inne latki
+        /// prologu (opowiesc ROT, pokoj i pakty, Robert i Ned z XML, egzekucja Neda) - leniwie przy pierwszej kampanii z prologiem (OnPrologueCampaign), dla nowej
+        /// kampanii w OnGameStart, czyli przed zegarem i przed XML bohaterow.</summary>
         internal static void ApplyAll(Harmony h)
         {
-            string a = "BRAK", c = "-";
+            string a = "BRAK";
             try
             {
                 var m = AccessTools.DeclaredMethod(typeof(MBGameManager), "StartNewGame", new[] { typeof(MBGameManager) });
                 if (m != null && h.Patch(m, prefix: new HarmonyMethod(typeof(Prologue), nameof(StartNewGamePrefix))) != null) a = "TAK";
             }
             catch (Exception e) { Stumble("ApplyAll.StartNewGame", e); }
-            try { c = ApplyPeace(h); } catch (Exception e) { Stumble("ApplyAll.Peace", e); }
-            Log.Info(Tag + "latki menu glownego: okno wyboru " + a + " | pokoj i pakty: " + c
+            Log.Info(Tag + "latki menu glownego: okno wyboru " + a + " (reszta latek prologu - przy pierwszej kampanii z prologiem)"
                      + " | klucz Prologue Enabled " + (S != null && S.PrologueEnabled ? "TAK" : "NIE") + ".");
         }
 
@@ -172,6 +172,23 @@ namespace Armoury
         private static void OnPrologueCampaign(string why)
         {
             try { InstallStory(why); } catch (Exception e) { Stumble("InstallStory", e); }
+            try { InstallRest(why); } catch (Exception e) { Stumble("InstallRest", e); }
+        }
+
+        private static bool _restTried;
+        private static string _restState = "nie wpiete";
+
+        /// <summary>Raz na proces, przy pierwszej kampanii z prologiem: pokoj i pakty (Peace), Robert i Ned z XML (Kings).</summary>
+        private static void InstallRest(string why)
+        {
+            if (_restTried) return;
+            _restTried = true;
+            var h = new Harmony("com.jeff.armoury.prologue");
+            string p = "-", k = "-";
+            try { p = ApplyPeace(h); } catch (Exception e) { Stumble("ApplyPeace", e); p = "BLAD"; }
+            try { k = ApplyKings(h); } catch (Exception e) { Stumble("ApplyKings", e); k = "BLAD"; }
+            _restState = "pokoj i pakty: " + p + " | Robert i Ned z XML " + k;
+            Log.Info(Tag + "latki prologu (" + why + "): " + _restState + ".");
         }
 
         private static void ResetCampaign()
@@ -179,6 +196,7 @@ namespace Armoury
             Active = false; ChosenBy = "";
             _stumblesDay = 0;
             ResetPeace();
+            ResetKings();
         }
 
         // ---------------------------------------------------------------- zapis
@@ -186,7 +204,7 @@ namespace Armoury
         internal static string Pack()
         {
             if (!Active) return "";
-            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace();
+            return "v=1;on=1;by=" + Clean(ChosenBy) + ";" + PackPeace() + PackKings();
         }
 
         internal static void Unpack(string v)
@@ -205,6 +223,7 @@ namespace Armoury
             Active = map.TryGetValue("on", out on) && on == "1";
             string by; ChosenBy = map.TryGetValue("by", out by) ? by : "zapis";
             UnpackPeace(map);
+            UnpackKings(map);
             if (Active) OnPrologueCampaign("wczytany zapis");
         }
 
@@ -250,7 +269,8 @@ namespace Armoury
             catch { }
             Log.Info(Tag + "start sesji | prolog " + (Active ? "TAK" : "NIE") + (Active ? " (" + ChosenBy + ")" : "")
                      + " | start kalendarza " + cal + " | start opowiesci " + story + (Active ? " (dzien prologu " + PrologueDay().ToString("0.0", Inv) + ")" : "")
-                     + " | latki opowiesci ROT: " + StoryState
+                     + " | latki opowiesci ROT: " + StoryState + " | " + _restState
+                     + (Active ? " | " + DailyKings() : "")
                      + " | klucz Prologue Enabled " + (S != null && S.PrologueEnabled ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
         }
 
@@ -273,7 +293,7 @@ namespace Armoury
             bool before = BeforeStory();
             string peace = DailyPeace();
             Log.Info(Tag + "dzien " + ((int)day).ToString(Inv) + " prologu (" + (before ? "opowiesc za " + (PrologueDays - day).ToString("0.0", Inv) + " dni"
-                     : "opowiesc trwa, dzien opowiesci " + (day - PrologueDays).ToString("0.0", Inv)) + ") | " + peace
+                     : "opowiesc trwa, dzien opowiesci " + (day - PrologueDays).ToString("0.0", Inv)) + ") | " + peace + " | " + DailyKings()
                      + " | wydarzenia ROT ruszone " + RotEventsStarted() + " | potkniecia " + _stumblesDay + " (razem " + _stumbles + ").");
             _stumblesDay = 0;
         }
@@ -326,7 +346,9 @@ namespace Armoury
     {
         public override void RegisterEvents()
         {
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, OnNewGameCreated);
             CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent.AddNonSerializedListener(this, OnNewGameCreatedEnd);
+            CampaignEvents.CanHeroDieEvent.AddNonSerializedListener(this, Prologue.CanHeroDie);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
         }
@@ -337,6 +359,11 @@ namespace Armoury
             try { if (dataStore.IsSaving) v = Prologue.Pack(); } catch (Exception e) { Prologue.Stumble("Pack", e); v = ""; }
             SaveText.Sync(dataStore, "arm_prologue", ref v);
             if (dataStore.IsLoading) { try { Prologue.Unpack(v); } catch (Exception e) { Prologue.Stumble("Unpack", e); } }
+        }
+
+        private void OnNewGameCreated(CampaignGameStarter starter)
+        {
+            try { Prologue.OnNewGameCreated(); } catch (Exception e) { Prologue.Stumble("OnNewGameCreated", e); }
         }
 
         private void OnNewGameCreatedEnd(CampaignGameStarter starter)

@@ -12,7 +12,7 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
 | E0 | wybor startu przy nowej kampanii, zapis wyboru, klucz MCM, flaga autotestu | ZROBIONE (build 0) |
 | E1a | kalendarz -188 dni, start opowiesci, latka odczytow CampaignStartTime w ROT.dll, Fabula/Inni CrashScribe | ZROBIONE (build Armoury 0, CrashScribe 0) |
 | E1b | pokoj w prologu (wojny Westeros-Westeros zablokowane), pakty i sojusze z krolestwem Roberta | ZROBIONE (build Armoury 0, CrashScribe 0) |
-| E2a | Robert i Ned zyja, glowy rodow i wladcy | do zrobienia |
+| E2a | Robert i Ned zyja, glowy rodow i wladcy | ZROBIONE (build Armoury 0) |
 | E2b | koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu; NedEvent zabija Neda, Robb wladca Polnocy | do zrobienia |
 | LOG | grupa tools/sprawdz_logi.py --grupa m101prolog | do zrobienia |
 
@@ -101,6 +101,21 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
 - `CrashScribe/src/CanonAlliances.cs`: `Allowed` przepuszcza sojusz z prologu (`StoryClock.PrologueAlliance` -> `Armoury.Prologue.IsPrologueAlliance` odbiciem) -
   zrywanie przy wczytaniu i blokada propozycji AI nie ruszaja sojuszy krola w prologu.
 
+### E2a - Robert i Ned zyja (ZROBIONE)
+- `Armoury/src/Prologue.Kings.cs` (nowy), klucz `PrologueKings` (MCM, nowy, domyslnie TAK, czytany przy tworzeniu kampanii):
+  - prefiks + finalizer `Hero.Deserialize`: w nowej kampanii z prologiem wezly XML `ROTlord_506` (Robert) i `ROTlord_512` (Ned) czytane z `alive="true"` na czas
+    tego jednego wywolania (finalizer przywraca "false"). Gra wczytuje ich jak zywych lordow z XML (NotSpawned, urodziny z wieku 50 / 42, zony z XML, listy zywych,
+    rozstawienie HeroSpawnCampaignBehavior). Bez przepisywania list rodu i menedzera obiektow (stan ustawiony ZANIM `Clan = ...` wpisuje bohatera do rodu).
+  - `OnNewGameCreated` (przed rozstawieniem lordow): `clan_nord_1.SetLeader(Robert)` + nazwa rodu "Baratheon, Robert" (oryginal "Baratheon, Joffrey" w zapisie `cn=`,
+    wraca przy smierci krola) -> Robert wladca vlandia; `clan_battania_1.SetLeader(Ned)` -> Ned wladca battania. Dziedzice: Joffrey, Robb (najstarsi synowie z XML).
+  - `CanHeroDie`: Robert (do 30 dni po dniu 186) i Ned (do 30 dni opowiesci) nie umieraja zwykla smiercia (starosc, bitwa, nie wymuszona egzekucja) - smierci E2b
+    sa wymuszone (isForced).
+- Leniwe wpinanie (zmiana w `Prologue.cs`): w menu glownym tylko okno wyboru; latki pokoju/paktow i XML - `InstallRest` przy pierwszej kampanii z prologiem
+  (nowa: OnGameStart - przed zegarem i XML bohaterow; wczytana: SyncData). Klasyczna gra: zadnej latki poza oknem.
+- Log: `Prolog (m101): latki prologu (...): pokoj i pakty: wojny TAK, wezwania TAK, koniec sojuszu TAK | Robert i Ned z XML TAK.`,
+  `Prolog (m101): Robert i Ned (XML ozywionych 2/2, ...): Robert ... glowa rodu clan_nord_1 (byl Joffrey ...), krolestwo vlandia wladca Robert ... TAK | Ned ... TAK.`;
+  linia doby dostala `krol Robert ZYJE | korona: wladca ... | Ned ZYJE (wolny) | Polnoc: wladca ...`.
+
 ## Ryzyko / co sprawdzic
 
 - E0: okno pokazuje sie w menu glownym (InformationManager.ShowInquiry na ekranie poczatkowym - tak jak okna gry o wyjsciu); wywolanie StartNewGame z przycisku okna
@@ -115,6 +130,9 @@ zmienia (latki opowiesci nawet sie nie wpinaja).
   Wojna zablokowana w samej akcji: postfiksow na ApplyInternal nie ma (grep BK/Diplomacy/BKROTPatch/nasze), zdarzenie OnWarDeclared nie leci. Prefiks ROT na tej samej
   metodzie dalej dziala. Sojusz gry daje wspolne bitwy/armie AI jak kazdy sojusz; wezwania do wojny zablokowane tylko dla par z prologu. Krolestwo korony w wojnie z
   ktoryms krolestwem - para pominieta (linia "pominiete"). Brak Diplomacy - same sojusze (3/3), linia "brak moda Diplomacy".
+- E2a: BK nadaje tytuly przy nowej grze - jesli robi to przed naszym SetLeader, tytul krola trzyma Joffrey (a nie Robert), tytul Polnocy - Robb; gra i ROT
+  i tak licza wladce z przywodcy rodu panujacego. Sprawdzic w encyklopedii BK (tytuly) po starcie prologu. ROT nigdzie nie czyta Roberta ani Neda (grep ROT.dll:
+  tylko definicje w ROTLords). AIInfluence moze mowic o "zmarlym krolu" (opisy) - poza zakresem.
 - E1a regresja klasycznego startu: model czasu zwraca te sama wartosc co dotad (StoryStartTime = stary getter), latka ROT nie wpina sie; StoryClock w CrashScribe
   zwraca StoryStartTime = CampaignStartTime co do tika.
 
@@ -133,6 +151,8 @@ DO SPRAWDZENIA (nic nie wgrane; gra Jeffa i test 100 nietkniete).
    w logu CrashScribe `FABULA: dzien -187 | ...` (ujemny = prolog) i zadnego `FABULA: wydarzenie ... WYSTARTOWALO` przed dniem 0.
 7. (E1b) Prolog: linia `swiat rozstawiony | pakty: sojusze 3/3, pakty o nieagresji 6/6`; na mapie (encyklopedia krolestwa korony / ekran Diplomacy) sojusze z
    Polnoca, Krainami Burzy i Dorzeczem, pakty z reszta; w liniach doby `wojny Westeros-Westeros (bez Wolnych Ludzi) 0`; Nocna Straz w wojnie z Wolnymi Ludzmi.
+8. (E2a) Prolog: encyklopedia - Robert Baratheon zyje, wladca krolestwa korony, glowa rodu "Baratheon, Robert", zona Cersei; Eddard Stark zyje, wladca Polnocy,
+   zona Catelyn; Joffrey i Robb jako czlonkowie rodow. W logu `XML ozywionych 2/2` i oba `TAK`.
 6. (E1a) Klasyczny: data "Year 299, Day 1", `latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie)`, Fabula jak dotad (`FABULA: dzien 0`).
 
 ## Dla Jeffa

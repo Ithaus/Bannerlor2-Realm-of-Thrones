@@ -3950,6 +3950,9 @@ namespace Armoury
         // m101-prolog E1b: sojusze gry (Polnoc, Krainy Burzy, Dorzecze) i pakty o nieagresji Diplomacy (Dolina, Smocza Skala, Reach, Dorne, Zelazne Wyspy, Skagos) z krolestwem
         // Roberta (vlandia) do jego smierci; zakladane na starcie i pilnowane co dobe, gaszone przy smierci krola. Brak moda Diplomacy - bez paktow. Czytany co dobe.
         public bool ProloguePacts = true;                  // in a Prologue 298 campaign every realm of Westeros but the Night's Watch and the Free Folk stands with King Robert's realm: the North, the Stormlands and the Riverlands as allies, the Vale, Dragonstone, the Reach, Dorne, the Iron Islands and Skagos by non-aggression pacts (Diplomacy). They hold until the King dies. Off = no pacts
+        // m101-prolog E2 (Prologue.Kings.cs): w nowej kampanii z prologiem Robert (ROTlord_506) i Ned (ROTlord_512) wczytani z XML jako zywi, glowy rodow i wladcy;
+        // koniec prologu (dzien 186): smierc Roberta, Joffrey krolem, Ned w lochu Krolewskiej Przystani; egzekucja Neda w NedEvent ROT. Czytany przy tworzeniu kampanii.
+        public bool PrologueKings = true;                  // in a new Prologue 298 campaign King Robert Baratheon and Lord Eddard Stark are alive: Robert rules the crown's realm and House Baratheon of King's Landing, Ned rules the North and House Stark. On day 186 the King dies of wounds from a boar hunt, Joffrey takes the throne and Ned is thrown into the dungeons of King's Landing; his execution opens the story of Realm of Thrones. Off = both stay dead as in Realm of Thrones. Only new campaigns
 
         public static void Load(string moduleDataDir)
         {
