@@ -98,6 +98,8 @@ namespace Armoury
             public double CapPcs2, ToolsGot, ToolsCut;
             // m105 gosp4 (czesc 4, segment linii ZC4): kcal i zl jedzenia drabiny 1 po ziarnie i soli (G1 - kcal na 1 zl)
             public double K1Kcal, K1Zl;
+            // m105 gosp4 G2 (Ks Village Grain Spike From Surplus): wies DS ponad skrzynia - skok ceny ziarna i soli ponad cene Planu z nadwyzki (zostalo w tempie kroku 5, zaplacone)
+            public bool Spike; public double SpikeRoom, SpikePaid;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -217,7 +219,13 @@ namespace Armoury
             b.T.ChangeGold(paid);
             b.R.AddToCounts(e, -k);
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
-            if (b.CapOn) { b.Cap -= paid; if (b.NoCap) b.GsPaid += paid; }   // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci)
+            if (b.CapOn)
+            {
+                // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci). m105 gosp4 G2: ziarno i sol obciazaja budzet najwyzej po cenie Planu - roznice placi
+                // nadwyzka ponad skrzynie (SpikeRoom); bez nadwyzki (albo klucz NIE) - jak dotad
+                double fromS = b.NoCap && b.Spike && b.SpikeRoom >= 0.5 ? SpikeFrom(b, z, k, paid) : 0.0;
+                b.Cap -= paid - fromS; if (b.NoCap) b.GsPaid += paid - fromS;
+            }
             if (b.CapOn && z == StartCalibration.ZTools && (count || b.InF2)) b.ToolsGot += k;   // recenzja W1: narzedzia drabiny 1 (segment linii ZC4)
             if (b.CapOn && b.P1 && !b.NoCap && KsBasket.Kcal[z] > 0) { b.K1Kcal += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.K1Zl += paid; }   // m105 gosp4: jedzenie po ziarnie i soli (G1, linia)
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
@@ -225,6 +233,43 @@ namespace Armoury
             if (b.P1) StartCalibration.Zc4NotePass1Zl(b.Mk, paid);        // recenzja runda 3: wartosc kupiona drabiny 1 (NKS-13)
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
             return k;
+        }
+
+        /// <summary>m105 gosp4 G2 (Ks Village Grain Spike From Surplus): z k sztuk ziarna albo soli zaplaconych `paid` - czesc ponad cene Planu (StartCalibration.ZPlanPrice miasta
+        /// zakupu) placi nadwyzka ponad skrzynie, najwyzej to, co z niej zostalo na ten zakup (SpikeRoom). Zwraca zl z nadwyzki (budzet z wplywu obciaza reszta). Nie rzuca.</summary>
+        private static double SpikeFrom(ZcBuy b, int z, int k, int paid)
+        {
+            try
+            {
+                double pp = StartCalibration.ZPlanPrice(b.T, z);
+                if (!(pp > 0) || k <= 0) return 0.0;
+                double over = paid - k * pp;
+                if (!(over > 0)) return 0.0;
+                double t = Math.Min(b.SpikeRoom, over);
+                b.SpikeRoom -= t; b.SpikePaid += t;
+                return t;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(skok ceny z nadwyzki)", e); return 0.0; }
+        }
+
+        /// <summary>m105 gosp4 G2: nadwyzka wsi DS na skok ceny ziarna i soli w tym zakupie - w tempie kroku 5: lam x rampa DS x (kiesa - skrzynia) / DsSurplusSpendDays (lam =
+        /// lambda x doby zakupu, jak budzet W1). Wies nie DS, na skrzyni albo ponizej, rampa 0, DsSurplusSpendDays 0 - bez nadwyzki (placi jak dotad). Nie rzuca.</summary>
+        private static void SpikeRoomOf(ZcBuy b, Village vil, double lam)
+        {
+            b.Spike = false; b.SpikeRoom = 0; b.SpikePaid = 0;
+            try
+            {
+                var st = vil != null ? vil.Settlement : null;
+                if (st == null || !DsVillage.On(st)) return;
+                int sd = DsVillage.SpendDaysNow; double ramp = DsVillage.Ramp;
+                if (sd <= 0 || !(ramp > 0) || !(lam > 0)) return;
+                double over = vil.Gold - DsVillage.Chest(vil);
+                if (!(over >= 1)) return;
+                double r = lam * ramp * over / sd;
+                if (!(r >= 0.5) || double.IsInfinity(r)) return;
+                b.Spike = true; b.SpikeRoom = r;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(nadwyzka na skok ceny)", e); b.Spike = false; b.SpikeRoom = 0; }
         }
 
         /// <summary>m103 wsie (Ks Village Basket At Shelf): c sztuk towaru z przycietych budzetem z biezacego wplywu (cena pw za sztuke) - liczone tylko przy pozycji koszyka
@@ -353,6 +398,7 @@ namespace Armoury
             double shC = 0, shB = 0, shPlan = 0, shNet = -1;
             if (qp != null && StartCalibration.SwBasketAtShelf && ShelfBudget(b, vil, n, lam, budgetDay, out shC, out shB, out shPlan, out shNet))
             { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; b.K1Kcal = b.K1Zl = 0; }
+            if (b.CapOn && StartCalibration.SwGrainSpike) SpikeRoomOf(b, vil, lam);     // m105 gosp4 G2: kiesa przed zakupem (jak skrzynia kroku 5)
             try { ZcLadder(b, vil, mk, n, resGS); }
             finally
             {
@@ -362,9 +408,10 @@ namespace Armoury
                 {
                     StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
                                                   b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
-                    StartCalibration.Zc4NoteM105(mk, b.K1Kcal, b.K1Zl, 0, 0, 0, -1);   // m105 gosp4: segment linii ZC4
+                    StartCalibration.Zc4NoteM105(mk, b.K1Kcal, b.K1Zl, b.SpikePaid, 0, 0, -1);   // m105 gosp4: segment linii ZC4
+                    if (b.SpikePaid > 0) DsVillage.SpikeNote(vil.Settlement, b.SpikePaid);     // m105 gosp4 G2: krok 5 tej i nastepnych dob mniej o to samo
                 }
-                b.CapOn = false; b.NoCap = false; b.InF2 = false;
+                b.CapOn = false; b.NoCap = false; b.InF2 = false; b.Spike = false; b.SpikeRoom = 0;
             }
             b.P1 = false;
             if (qp != null)

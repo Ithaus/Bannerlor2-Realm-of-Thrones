@@ -1070,6 +1070,15 @@ namespace Armoury
             return ShelfDays(P2Res * I) * ZDp(t, z);
         }
 
+        /// <summary>m105 gosp4 G2 (Ks Village Grain Spike From Surplus): cena Planu sztuki towaru z w miescie t (zl) - wartosc x indeks startu rynku x gradient krainy, ta sama
+        /// cena co budzet koszyka wsi w Planie (Zc4VillagePaid; ZPass2Price bez P2Res). 0 - brak towaru albo miasta. Pamiec doby T4 przy Ks Cost Fast (te same liczby).</summary>
+        internal static double ZPlanPrice(Town t, int z)
+        {
+            var it = z >= 0 && z < ZN ? ZItem(z) : null; if (t == null || it == null) return 0.0;
+            int m = TownMarket(t);
+            return Math.Max(1, it.Value) * T4StartIndex(m == 0 ? 0 : 1, z) * T4LandGrad(t.Settlement, z);
+        }
+
         /// <summary>Cena rezerwacji drabiny 2 (zl za sztuke): P2Res x cena startu krainy.</summary>
         internal static double ZPass2Price(Town t, int z)
         {
