@@ -19,7 +19,8 @@ namespace Armoury
     /// Campaign.Tick) i takze przy zatrzymanym czasie (dzien 0 nie ma doby: pierwsza doba to 1.0; DailyTick nie ponawia, gdy cos blokuje okno). Scena nalezna, gdy
     /// dzien prologu (PrologueDay) >= dzien sceny i scena nie jest w masce pokazanych/pominietych. Jedna scena naraz, zawsze najnizsza nalezna; nastepna dopiero po
     /// zamknieciu poprzedniej i SceneStableSec s spokoju.
-    /// BRAMKI (wszystkie przez SceneStableSec s z rzedu): MapState czynny i kampania ruszyla (GameStarted), bez rozmowy (MapConversationActive, ConversationManager),
+    /// BRAMKI (wszystkie przez SceneStableSec s z rzedu): MapState czynny i kampania ruszyla (GameStarted), bez ekranu wczytywania (LoadingWindow) i mapa gotowa
+    /// (MapScreen.IsReady - po wczytaniu zapisu MapState jest czynny juz w trakcie rozgrzewania sceny), bez rozmowy (MapConversationActive, ConversationManager),
     /// bez menu Esc / encyklopedii (ActiveStateDisabledByUser), bez zapytania (IsAnyInquiryActive - takze okno startowe Banner Kings) i sceny powiadomienia, bez pauzy
     /// silnika (MBCommon.IsPaused) i blokady czasu (TimeControlModeLock - zdarzenia mapy, zarzadzanie armia), bez bitwy (MainParty.MapEvent), PlayerEncounter brak
     /// ALBO w osadzie bez bitwy (menu miasta i czekanie w miescie MUSZA byc dozwolone - EncounterManager startuje PlayerEncounter przy wjezdzie, autotest stoi w
@@ -149,6 +150,12 @@ namespace Armoury
             var active = gsm != null ? gsm.ActiveState : null;
             var ms = active as MapState;
             if (ms == null) return "nie mapa (" + (active != null ? active.GetType().Name : "-") + ")";
+            // recenzja m103: po wczytaniu zapisu GameStarted = true od razu (Campaign.SetLoadingParameters), a MapState jest czynny juz w trakcie rozgrzewania sceny
+            // mapy - ekran wczytywania zdejmuje tylko MapScreen.HandleIfBlockerStatesDisabled, i to tylko gdy MapScreen jest na wierzchu (HandleIfSceneIsReady:
+            // TopScreen == this). Okno pchniete pod ekran wczytywania zostawiloby go na ekranie do zamkniecia sceny (warstwa 115003 nad wszystkim, wejscie zablokowane).
+            if (TaleWorlds.Engine.LoadingWindow.IsLoadingWindowActive) return "ekran wczytywania";
+            var msc = SandBox.View.Map.MapScreen.Instance;
+            if (msc != null && !msc.IsReady) return "mapa jeszcze nie gotowa (MapScreen.IsReady)";
             if (ms.MapConversationActive) return "rozmowa na mapie";
             var cm = c.ConversationManager;
             if (cm != null && (cm.IsConversationFlowActive || cm.IsConversationInProgress)) return "rozmowa";
