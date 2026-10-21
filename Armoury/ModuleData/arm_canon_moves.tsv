@@ -1,6 +1,6 @@
 # Armoury: canon characters (m101-postacie, CanonCompanions.cs, MCM Canon Companions To Clans / Canon Companions Follow Story). New campaigns only.
 # Jeff 21.10: the book characters ROT puts in the taverns (ROTwanderer* in ROT-Content/ModuleData/spspecialcharacters_ROTcustomwanderers.xml)
-# A - start as lords of their house (party: yes = may lead a party, no = courtier who stays in the seat, later = courtier until a move 'lead');
+# A - start as lords of their house (party: yes = may lead a party, no = courtier who never leads a party - the game moves idle lords between the towns of their realm, later = courtier until a move 'lead');
 # B - never created (the ROT spawner skips them); C, D - stay for hire (listed only to be counted). After the start no A/B template is created twice.
 # clan = Clan.StringId of Realm of Thrones (spclans.xml); a missing clan leaves the character a wanderer (logged).
 #start	template	group	name	clan	party	note
@@ -89,7 +89,7 @@ p02	ROTwanderer8	Tyrion Lannister	prolday:132	free:clan_vlandia_1	prolog		trial 
 m03	ROTwanderer8	Tyrion Lannister	ev:JoffreyEvent+40	clan:clan_khuzait_2		Tyrion Lannister has fled across the narrow sea.	accused of Joffrey's death, kills Tywin and flees; in Essos with the Second Sons (A Dance with Dragons)
 m04	ROTwanderer8	Tyrion Lannister	ev:DanyInvasionEvent	clan:clan_empire_south_1		Tyrion Lannister sails with Daenerys Targaryen as her Hand.	Hand of the Queen
 p03	ROTwanderer4	Bronn of the Blackwater	prolday:0	wander:river	prolog		sellsword on the roads of the Riverlands until the crossroads inn
-p04	ROTwanderer4	Bronn of the Blackwater	prolday:132	clan:clan_vlandia_1	prolog		Tyrion's champion at the Eyrie, then his man
+p04	ROTwanderer4	Bronn of the Blackwater	prolday:132	court:clan_vlandia_1	prolog		Tyrion's champion at the Eyrie, then his man (no party of his own until knighted - m05)
 m05	ROTwanderer4	Bronn of the Blackwater	done:BlackwaterEvent	lead			knighted after the Blackwater - may lead men
 m06	ROTwanderer4	Bronn of the Blackwater	ev:JoffreyEvent+30	clan:clan_nord_1			will not fight for Tyrion; weds Lollys Stokeworth - no House Stokeworth in ROT, so he stays with the crown
 m07	ROTwanderer6	Podrick Payne	ev:JoffreyEvent+40	wander:river			after Tyrion's flight rides with Brienne in search of Sansa

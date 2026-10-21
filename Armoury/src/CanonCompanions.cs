@@ -25,7 +25,8 @@ namespace Armoury
     ///   (OnNewGameCreatedPartialFollowUp) - lord z druzyna "yes" moze dostac partie jak kazdy lord rodu. Ponowna proba przy FollowUpEnd, starcie sesji i w pierwszej
     ///   dobie (gdyby nasz nasluch szedl przed ROT); po pierwszej dobie start zamkniety (brak bohatera / rodu - linia logu).
     ///   Dworzanin ("no" / "later"): nasluch CampaignEvents.CanHeroLeadPartyEvent (false) i postfiks HeroSpawnCampaignBehavior.GetBestAvailableCommander (wynik =
-    ///   dworzanin -> null, jak postfiks BK tej metody) - nie dostaje druzyny, zostaje w osadzie rodu. Dziecko postaci (ten sam Template, z rodzicem) nie jest dworzaninem.
+    ///   dworzanin -> null, jak postfiks BK tej metody) - nie dostaje druzyny; gra przenosi bezczynnych lordow po osadach krolestwa
+    ///   (HeroSpawnCampaignBehavior.OnHeroDailyTick - glownie miasta rodu), wiec dworzanin jest w miastach swojego krolestwa, nie stale w siedzibie. Dziecko postaci (ten sam Template, z rodzicem) nie jest dworzaninem.
     /// B (krok 3): wzor nie powstaje wcale - prefiks ROT ROTSpawnUniqueWanderers.SpawnHero(CharacterObject) (DeclaredMethod): w fazie tworzenia nowej gry
     ///   (Campaign.CampaignGameLoadingType == NewCampaign i !GameStarted, klucz w tej chwili - ROT tworzy wedrowcow w OnNewGameCreated, mozliwe ze przed naszym
     ///   nasluchem) i potem przy fladze kampanii - wzor B nigdy, wzor A po zamknieciu startu (bohater A, ktory zginal albo zostal usuniety, nie wraca jako wedrowiec).

@@ -5,7 +5,7 @@
 **Dla Jeffa (prosto):** w NOWEJ kampanii Jaime, Tyrion, Bronn, Theon, Varys, Baelish i reszta z listy A nie siedza juz w karczmach do wynajecia -
 od pierwszego dnia sa lordami swoich rodow (Jaime i Tyrion u Lannisterow, Theon u Starkow, Varys i Baelish na dworze krola, Benjen i Sam w Nocnej Strazy itd.).
 Ci, ktorzy dowodza wojskiem w ksiazce (Jaime, Tyrion, Theon, Quentyn, Rago, Benjen, pozniej Bronn), moga dostac druzyne; dworzanie (Varys, Baelish, Qyburn,
-Jacelyn, Ogar) siedza w zamku rodu. Hodor, Syrio, Jory, Cressen, Jaqen, Kinvara, Xaro, Gendry i Talisa w ogole sie nie pojawiaja (zamiast Talisy jest Jeyne
+Jacelyn, Ogar) nie dowodza wojskiem i bywaja w miastach swojego krolestwa. Hodor, Syrio, Jory, Cressen, Jaqen, Kinvara, Xaro, Gendry i Talisa w ogole sie nie pojawiaja (zamiast Talisy jest Jeyne
 Westerling, ktora w ksiazce bierze slub z Robbem). Potem postacie zmieniaja strony jak w ksiazce, przy wydarzeniach ROT (Czarny Nurt, Krwawe Gody,
 Purpurowe Gody, Aegon, Daenerys...). Twoja obecna kampania sie nie zmienia.
 
@@ -151,7 +151,7 @@ Braki w ROT: rodu **Stokeworth** nie ma - Bronn po odmowie walki za Tyriona idzi
 | p01/p02 | Tyrion (prolog) | prolog 110 / 132 | jeniec w Orlim Gniezdzie / wolny do Lannisterow | gospoda na rozstajach, proces |
 | m03 | Tyrion | JoffreyEvent +40 | Druga Synowie (z druzyna) | wiesc "Tyrion Lannister has fled across the narrow sea." |
 | m04 | Tyrion | DanyInvasionEvent | rod Targaryen (Daenerys) | Namiestnik Krolowej (wiesc) |
-| p03/p04 | Bronn (prolog) | prolog 0 / 132 | wedrowiec w Dorzeczu / Lannisterowie | najemnik do gospody, potem czempion Tyriona |
+| p03/p04 | Bronn (prolog) | prolog 0 / 132 | wedrowiec w Dorzeczu / Lannisterowie (dworzanin - druzyna dopiero po m05) | najemnik do gospody, potem czempion Tyriona |
 | m05 | Bronn | koniec BlackwaterEvent | moze prowadzic druzyne | pasowany |
 | m06 | Bronn | JoffreyEvent +30 | rod korony | Stokeworth - brak w ROT |
 | m07 | Podrick | JoffreyEvent +40 | wedrowiec w Dorzeczu | z Brienne szuka Sansy |
@@ -160,7 +160,7 @@ Braki w ROT: rodu **Stokeworth** nie ma - Bronn po odmowie walki za Tyriona idzi
 | m09 | Qyburn | JoffreyEvent +40 | dwor korony (Cersei) | po smierci Tywina |
 | m10 | Ogar | koniec BlackwaterEvent | wedrowiec w Dorzeczu | dezercja (wiesc) |
 | m11 | Ogar | koniec RedWeddingEvent +20 | usuniety | Cicha Wyspa |
-| m12 | Varys | AegonInvasionEvent | dwor Aegona | |
+| m12 | Varys | AegonInvasionEvent | dwor Aegona | do tego czasu dwor korony - w ksiazce Varys po ucieczce Tyriona zostaje w Czerwonej Twierdzy (zabija Kevana w epilogu ADWD) |
 | m13/m14 | Baelish | JoffreyEvent +5 / +15 | dwor Arrynow (wiesc) / slub z Lysa (`lord_4_6`) | ucieczka z Sansa do Doliny |
 | m15 | Jacelyn | koniec BlackwaterSiegeEvent albo BlackwaterEvent | smierc | |
 | m16 | Brienne | smierc Renly'ego (`lord_1_9`) | dworka Starkow | przy Catelyn |
@@ -227,6 +227,20 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
   `Romance.EndAllCourtships` - internal) i `ChangeRomanticStateAction.Apply(..., Marriage)`; linia zmiany podaje `zakonczone zaloty N`. `OnBeforeHeroesMarried`
   (internal dyspozytora) pominiete - rod ustawia nasz `MoveToClan`.
 
+**Poprawki drobne (recenzja) - dane i opisy:**
+- **Bronn w prologu (PRAWDZIWE, bez skutku przed scaleniem z m101-prolog):** p04 `clan:clan_vlandia_1` zdejmowal znacznik dworzanina (p03 `wander`), wiec Bronn
+  prowadzilby druzyne od dnia 132; teraz `court:clan_vlandia_1` - druzyna dopiero po m05 `lead` (pasowanie po Czarnym Nurcie), jak w klasycznym starcie.
+- **Pominiete kroki z PROJEKT pkt 3 (PRAWDZIWE - decyzje dopisane, wedlug ksiazki, Jeff: "zrob wydarzenia wedlug ksiazki"):**
+  Varys po smierci Tywina NIE ucieka z Tyrionem - w ksiazce wysyla go do Illyrio, a sam zostaje w Czerwonej Twierdzy (epilog ADWD: zabija Kevana i Pycelle'a);
+  ucieczka z Tyrionem jest z serialu. Zostaje na dworze korony do m12 (Aegon). Baelish po Czarnym Nurcie dostaje tytul lorda Harrenhal, ale tam nie siedzi
+  i nie zmienia rodu (w ROT to bylaby zmiana wlasciciela osady, nie rodu) - zostaje na dworze do m13 (ucieczka do Doliny). Quentyn jedzie do Meereen jako
+  poslaniec Dorne (najemnik Windblown) i nie zmienia strony - zostaje Martellem do smierci (m23); przeniesienie do rodu Daenerys byloby nieprawda.
+- **Dworzanie nie siedza w siedzibie (PRAWDZIWE - opis poprawiony):** gra co dobe przenosi bezczynnych lordow (`HeroSpawnCampaignBehavior.OnHeroDailyTick`,
+  `CanHeroMoveToAnotherSettlement` przepuszcza lorda bez druzyny i namiestnictwa, `GetMoveScoreForHero` - lenna krolestwa, miasta rodu +500). Opis MCM, naglowek
+  TSV, komentarz i test 3: dworzanie bez druzyny, w osadach swojego krolestwa. Osobny mechanizm "stale w siedzibie" - poza zakresem (pytanie do Jeffa, jesli zechce).
+- **Znak BEL w Settings.cs (PRAWDZIWE):** komentarz `ModuleData<BEL>rm_canon_moves.tsv` (backslash zgubiony przy zapisie) -> `ModuleData/arm_canon_moves.tsv`;
+  `grep -P` znakow sterujacych w plikach galezi - 0. Po zmianie opisu: `python -I tools/gen_mcm.py`, build kod 0.
+
 ### Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0)
 
 - **Zniszczenie rodu przez ROT (poprawka 1):** zmiana rodu w srodku `DestroyClanAction` (nasluch `OnClanDestroyed`) - postac wychodzi z rodu przed petla partii i
@@ -257,7 +271,8 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
 1. Autotest: NOWA kampania (flaga start-zloto jak dzis), kilka dob: `python -I tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> --crashscribe <session-*.log>`
    (MP-0..MP-7 TAK) i `--grupa unikaty --crashscribe <session-*.log>` (UN-4 odrodzenia 0, UN-5 brak 0, pole `usuniete z kanonu 9`).
 2. W linii startu: `A 22, B 9, C 2, D 30`, `mapa rodow znaleziona 17/17, odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) 23/23`, `ratunek przy zniszczeniu rodu (#rescue) 2 wierszy`, 22 linie `przeniesienie - ...`; w linii doby `w rodach 22`, `wedrowcy 0`, `B 9: zywych 0`.
-3. Reczny: encyklopedia - Jaime i Tyrion jako lordowie rodu Lannister, w karczmach brak Hodora i Talisy; Varys/Baelish w Krolewskiej Przystani bez druzyny.
+3. Reczny: encyklopedia - Jaime i Tyrion jako lordowie rodu Lannister, w karczmach brak Hodora i Talisy; Varys/Baelish w osadach swojego krolestwa (glownie miasta rodu
+   korony; gra co dobe przenosi bezczynnych lordow - HeroSpawnCampaignBehavior.OnHeroDailyTick), bez druzyny.
 4. Dlugi bieg (zmiany stron): linie `zmiana strony #...` przy wydarzeniach ROT (Czarny Nurt ~dzien 766, Purpurowe Gody ~1083 przy osi Fabuli x4.33).
 
 ### Status
@@ -269,4 +284,5 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
 - Poprawka 1 po recenzji (ratunek z rodow niszczonych przez ROT, prawdziwe zrodlo usuniec w UC): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
 - Poprawka 2 po recenzji (narzedzie widzi brak / inna wersje pliku TSV; plik do wgrania w naglowku): ZROBIONE (narzedzie, bez zmian w DLL).
 - Drobne w kodzie (prefiks SpawnHero bez falszywych blokad, dworzanin w rodzie gracza, slub z koncem zalotow): ZROBIONE, build Armoury kod 0.
-  Zostalo: drobne w danych i opisach (Bronn p04, Varys/Baelish/Quentyn, BEL w Settings.cs, opis dworzan).
+- Drobne w danych i opisach (Bronn p04, decyzje Varys/Baelish/Quentyn, BEL, opis dworzan): ZROBIONE, gen_mcm + build Armoury kod 0.
+  Zostalo: autotest nowej kampanii (poza tym zadaniem - zakaz gry), scalenie z m101-prolog (PrologDays).
