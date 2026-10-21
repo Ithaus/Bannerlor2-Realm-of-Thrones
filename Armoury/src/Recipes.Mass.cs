@@ -145,14 +145,22 @@ namespace Armoury
         private static void AddMetal(List<KgPart> l, CraftingMaterials g, float raw, float piece, float loss, string role, bool legend)
         {
             if (raw <= 0f) return;
-            if (legend) { g = CraftingMaterials.Iron6; raw *= LegendMetalFactor; }
+            if (legend) g = CraftingMaterials.Iron6;   // legenda: caly metal ze stali zamkowej (ilosc x LegendaryMaterialFactor - koniec MassKg, jedna regula dla kazdego surowca)
             if (g >= CraftingMaterials.Iron4) loss += SteelExtraLoss;
             AddKg(l, MaterialItem(g), (int)g, raw, piece, Math.Min(0.9f, loss), role);
         }
 
         // stale reguly (Jeff: "nie pytac o parametry" - opisane w CHANGELOG)
         private const float StringKgBow = 0.02f, StringKgXbow = 0.05f, StringWaste = 1.5f;   // cieciwa: gramy lnu (konopi), odpad x1.5
-        private const float LegendMetalFactor = 2f, SteelExtraLoss = 0.05f;
+        private const float SteelExtraLoss = 0.05f;
+
+        /// <summary>Legenda (po recenzji m96-receptury): KAZDY kg przepisu x LegendaryMaterialFactor (MCM, Jeff 4.0) - mistrz bierze tylko najlepsze kawalki
+        /// kazdego surowca (klepka, len, skora, stal); metal caly ze stali zamkowej (AddMetal). Ta sama regula dla luku, kuszy, strzal i pancerza; luk dalej bez metalu.</summary>
+        private static float LegendFactor()
+        {
+            var s = Settings.Current;
+            return s != null ? Math.Max(1f, s.LegendaryMaterialFactor) : 4f;
+        }
         private const float LossPlate = 0.25f, LossMail = 0.35f, LossFittings = 0.40f, LossRanged = 0.30f, LossHeads = 0.40f;
         private const float MetalWaste = 1.4f, WoodWaste = 1.5f, HornWaste = 1.25f;
 
@@ -226,6 +234,12 @@ namespace Armoury
                 AddKg(l, _leather, 0, hide, hide / 1.2f, 0f, "leather");
                 AddKg(l, _linen, 0, cloth, cloth / 1.1f, 0f, "cloth");
             }
+            if (legend)
+            {
+                // kg surowca x czynnik, masa w sztuce (PieceKg - podstawa przetopu) bez zmian: przetop legendy nie rosnie
+                float f = LegendFactor();
+                for (int i = 0; i < l.Count; i++) { var p = l[i]; p.Kg *= f; l[i] = p; }
+            }
             return l;
         }
 
@@ -269,7 +283,7 @@ namespace Armoury
                 var roster = MobileParty.MainParty.ItemRoster;
                 var opened = new List<string>(); var used = new List<string>();
                 foreach (var p in r.Parts) if (p.Item != null && p.Item == _wood) Take(roster, p.Item, p.Count);   // drewno: ladunki do otwarcia (SmithWood)
-                if (r.WoodKg > 0f) SmithWood.Use(r.WoodKg, WoodLoads(r), what);
+                if (r.WoodKg > 0f) SmithWood.Use(r.WoodKg, WoodLoads(r), r.MassItem != null && r.MassItem.Name != null ? r.MassItem.Name.ToString() : null);   // napis gracza: nazwa, nie id (po recenzji)
                 for (int i = 0; i < r.Kg.Count; i++)
                 {
                     var k = r.Kg[i];
@@ -301,16 +315,76 @@ namespace Armoury
                 var r = For(item);
                 if (r.Kg == null) return;
                 var used = new List<string>(); var opened = new List<string>();
+                var done = new List<KgPart>();
                 foreach (var k in r.Kg)
                 {
                     if (k.Grade < 0 || k.Item == null) continue;
                     Commit(k, k.Kg, k.Units);
+                    done.Add(k);
                     used.Add(Kg(k.Kg) + " kg " + k.Item.StringId);
                     if (k.Units > 0) opened.Add(k.Units + " " + k.Item.Name);
                 }
+                _bkKg = done; _bkItem = item;   // pekniecie w tym kliknieciu (ArmourQuality.BotchBack) oddaje czesc TYCH kg
                 Note(r, what ?? item.StringId, used, opened, 1f);
             }
             catch (Exception e) { MassStumble("MassCommitBk", e); }
+        }
+
+        // ------------------------------------------------------------ pekniecie pancerza w CRAFT BK (po recenzji: jedna regula z Forge.Smith -> MassTakePartial)
+        // DOWOD (recenzja, ArmourQuality.cs:272): MassCommitBk zapisuje pelne kg przepisu przed rzutem BK (ExecuteMainActionBK: SpendMaterials, potem
+        // CalculateBotchingChance), a BotchBack oddawal polowe SZTUK zdjetych z sakw - knight_cap przy pustej skrzynce: Iron4 tracilo 17%, Iron3 i len 100%.
+        // REGULA: pekniecie zabiera MaterialLossOnFailure x kg przepisu kazdego surowca (jak pekniety luk w naszej kuzni), reszta kg wraca do otwartych
+        // ladunkow; pelne sztuki ponad otwarty ladunek - do sakw. Nic ponad to, co zeszlo: zwrot <= (1 - strata) x kg zapisanych w tym kliknieciu.
+        private static List<KgPart> _bkKg;
+        private static ItemObject _bkItem;
+        private static int _bkBotches;
+
+        /// <summary>ArmourQuality.Clear (kazde klikniecie, przed SpendMaterials BK): zapis kg poprzedniego klikniecia nie dotyczy tego.</summary>
+        internal static void MassBkClear() { _bkKg = null; _bkItem = null; }
+
+        /// <summary>Pekniecie pancerza w CRAFT BK po zapisie kg (MassCommitBk w tym kliknieciu): (1 - loss) x kg wraca do otwartych ladunkow, pelne sztuki
+        /// do sakw. Zwraca na grupe kwitu BK (0-8 surowce kuzni, 9 skora, 10 len) liczbe sztuk oddanych do sakw albo -1 (grupa nie z kg - zwrot z sakw jak
+        /// dotad); null = w tym kliknieciu nie bylo zapisu kg.</summary>
+        internal static int[] MassBotchBack(ItemObject item, float loss, List<string> names, List<string> ids)
+        {
+            var list = _bkKg; var it = _bkItem;
+            _bkKg = null; _bkItem = null;
+            if (list == null || it == null || it != item) return null;
+            var back = new int[11];
+            for (int g = 0; g < 11; g++) back[g] = -1;
+            try
+            {
+                loss = Math.Max(0f, Math.Min(1f, loss));
+                var roster = MobileParty.MainParty.ItemRoster;
+                var kgText = new List<string>(); var kgPlayer = new List<string>();
+                foreach (var k in list)
+                {
+                    int grp = k.Grade >= 1 && k.Grade <= 6 ? k.Grade : (k.Grade == 0 && k.Item == SoftLeather ? 9 : (k.Grade == 0 && k.Item == SoftLinen ? 10 : -1));
+                    if (grp < 0 || k.Item == null) continue;
+                    if (back[grp] < 0) back[grp] = 0;
+                    float kg = k.Kg * (1f - loss);
+                    if (kg <= 0f) continue;
+                    int whole = k.Grade >= 1
+                        ? SmeltScraps.ForgeReturn(k.Grade, (int)Math.Floor(kg / Math.Max(0.01f, UnitKg(k)) * SmeltScraps.Unit + 1e-6))
+                        : SmithStock.Return(k.Item, kg);
+                    if (whole > 0)
+                    {
+                        roster.AddToCounts(k.Item, whole);
+                        back[grp] += whole;
+                        names.Add(whole + " x " + k.Item.Name); ids.Add(k.Item.StringId + " " + whole);
+                    }
+                    kgText.Add(Kg(kg) + " kg " + k.Item.StringId);
+                    kgPlayer.Add(Kg(kg) + " kg " + k.Item.Name);
+                }
+                if (kgPlayer.Count > 0) Log.Player("The botched piece is not all waste - back at the anvil: " + string.Join(", ", kgPlayer.ToArray()) + ". Left open: " + OpenText(true) + ".");
+                _bkBotches++;
+                if (_bkBotches <= 20 || _bkBotches % 25 == 0)
+                    Log.Info("Surowce w kuzni (kg) (m96-receptury): pekniecie CRAFT BK " + item.StringId + " | przepada " + ((int)Math.Round(loss * 100f)) + "% kg przepisu, wraca do otwartych ladunkow: "
+                             + (kgText.Count > 0 ? string.Join(", ", kgText.ToArray()) : "nic") + " | otwarte: " + OpenText(false) + " | pekniec w sesji " + _bkBotches
+                             + ", potkniecia " + _massStumbles + ".");
+            }
+            catch (Exception e) { MassStumble("MassBotchBack", e); }
+            return back;
         }
 
         /// <summary>Czy tablica kwitu BK (9 surowcow kuzni, skora, len) to dokladnie sztuki do otwarcia tego przepisu z masy (FletchForge.BkMassSpendPostfix).</summary>
@@ -571,7 +645,7 @@ namespace Armoury
         {
             try
             {
-                _massUses = _massOpened = _massLines = 0;
+                _massUses = _massOpened = _massLines = _bkBotches = 0;
                 var mgr = MBObjectManager.Instance;
                 if (mgr == null || Campaign.Current == null) return;
                 if (!MassOn) { Log.Info("Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass NIE - przepisy w sztukach jak dotad | potkniecia " + _massStumbles + "."); return; }
@@ -607,7 +681,8 @@ namespace Armoury
                 for (int i = 0; i < ratios.Count && i < 3; i++) lo.Add(ratios[i].Value + " x" + ratios[i].Key.ToString("0.00", Inv));
                 for (int i = ratios.Count - 1; i >= 0 && i >= ratios.Count - 5; i--) hi.Add(ratios[i].Value + " x" + ratios[i].Key.ToString("0.00", Inv));
                 Log.Info("Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass TAK | policzone " + (armour + bows + xbows + ammo) + " (pancerze " + armour + ", luki " + bows
-                         + ", kusze " + xbows + ", strzaly i belty " + ammo + "; legendy " + legends + "), stary przepis bez receptury wartosci " + old + ", metal w lukach " + metalInBows
+                         + ", kusze " + xbows + ", strzaly i belty " + ammo + "; legendy " + legends + " x" + Kg(LegendFactor()) + " kazdego kg"
+                         + "), latka SpendMaterials CRAFT BK " + FletchForge.MassHookState + ", stary przepis bez receptury wartosci " + old + ", metal w lukach " + metalInBows
                          + " (ma byc 0) | jednostki: sztaba " + Kg(MatKg(CraftingMaterials.Iron4)) + " kg, len " + Kg(SmithStock.UnitKg(_linen)) + " kg, skora " + Kg(SmithStock.UnitKg(_leather))
                          + " kg, drewno ladunek " + Kg(SmithWood.LoadKg) + " kg | masa surowca / masa wyrobu: mediana x" + med + ", najmniej: " + string.Join("; ", lo.ToArray())
                          + ", najwiecej: " + string.Join("; ", hi.ToArray()) + " | otwarte ladunki: " + OpenText(false) + " | przyklady: " + string.Join("; ", samples.ToArray())

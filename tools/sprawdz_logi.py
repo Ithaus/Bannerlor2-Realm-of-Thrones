@@ -1005,7 +1005,8 @@ Uzycie (Python 3, tylko odczyt):
                     JQ-5 nowe w granicy miejsca z wczoraj, JQ-6 rzut gry odebrany (INFO), JQ-7 potkniecia i ERROR 0, JQ-8 koszt doby <= 250 ms, JQ-9 (INFO).
 --grupa m96receptury : (20.10, w-toku/m96-receptury - Jeff "strzaly 14 najlepszej stali, luki 8 lnu"; Armoury/src/Recipes.Mass.cs, SmithStock.cs; klucz RecipesByMass)
                     python -I tools/sprawdz_logi.py --grupa m96receptury <Armoury-*.log> (strumieniowo). R96-0 linia startu, R96-1 metal w lukach 0, R96-2 mediana masy
-                    surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0. Log bez paczki: INFO.
+                    surowca / wyrobu 1.0-2.5, R96-3 kucia z kg (INFO), R96-4 kwit CRAFT BK zgodny, R96-5 potkniecia i ERROR 0, R96-6 latka SpendMaterials CRAFT BK
+                    wpieta, R96-7 pekniecia CRAFT BK z kg (INFO). Log bez paczki: INFO.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -36862,9 +36863,10 @@ def m96zamek_main(logp):
 # skory i metalu, przetop z masy minus straty; Armoury/src/Recipes.Mass.cs, SmithStock.cs; klucz RecipesByMass)
 M96REC_HEAD = "Przepisy z masy (m96-receptury): start sesji"
 M96REC_USE = "Surowce w kuzni (kg) (m96-receptury): "
-M96REC_N = re.compile(r"policzone (\d+) \(pancerze (\d+), luki (\d+), kusze (\d+), strzaly i belty (\d+); legendy (\d+)\), stary przepis bez receptury wartosci (\d+), metal w lukach (\d+)")
+M96REC_N = re.compile(r"policzone (\d+) \(pancerze (\d+), luki (\d+), kusze (\d+), strzaly i belty (\d+); legendy (\d+)[^)]*\)(?:, latka SpendMaterials CRAFT BK [^,]+)?, stary przepis bez receptury wartosci (\d+), metal w lukach (\d+)")
 M96REC_MED = re.compile(r"mediana x([0-9.]+)")
 M96REC_STUMB = re.compile(r"potkniecia (\d+)")
+M96REC_HOOK = re.compile(r"latka SpendMaterials CRAFT BK ([^,|]+)")
 
 
 def m96receptury_main(logp):
@@ -36877,7 +36879,7 @@ def m96receptury_main(logp):
         rep.add("R96-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    heads, uses, mism, n_err, stumb = [], 0, 0, 0, 0
+    heads, uses, mism, n_err, stumb, botch = [], 0, 0, 0, 0, 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -36890,12 +36892,18 @@ def m96receptury_main(logp):
             elif s.startswith(M96REC_USE):
                 if "kwit BK inny niz przepis z masy" in s:
                     mism += 1
+                elif "pekniecie CRAFT BK" in s:
+                    botch += 1
+                    mm = M96REC_STUMB.findall(s)
+                    if mm:
+                        stumb = max(stumb, int(mm[-1]))
                 else:
                     uses += 1
                     mm = M96REC_STUMB.findall(s)
                     if mm:
                         stumb = max(stumb, int(mm[-1]))
-            elif s.startswith("ERROR in Recipes.Mass") or s.startswith("ERROR in SmithStock") or s.startswith("ERROR in BkMassSpend"):
+            elif (s.startswith("ERROR in Recipes.Mass") or s.startswith("ERROR in SmithStock") or s.startswith("ERROR in BkMassSpend")
+                  or s.startswith("ERROR in FletchForge.ApplyAll(masa)")):
                 n_err += 1
     print(f"plik: {logp} | linii startu {len(heads)}, kuc z kg {uses}, kwitow BK niezgodnych {mism}, ERROR {n_err}")
     if not heads and uses == 0 and n_err == 0:
@@ -36916,6 +36924,11 @@ def m96receptury_main(logp):
     rep.add("R96-3: kucia z kg (otwarte ladunki)", str(uses), "INFO", None)
     rep.add("R96-4: kwit CRAFT BK inny niz przepis z masy", str(mism), "0", mism == 0)
     rep.add("R96-5: potkniecia i ERROR paczki", f"potkniecia {stumb}, ERROR {n_err}", "0 i 0", stumb == 0 and n_err == 0)
+    if on:
+        mh = M96REC_HOOK.search(last)
+        rep.add("R96-6: latka SpendMaterials CRAFT BK (kg za pancerz z CRAFT)", mh.group(1).strip() if mh else "brak w linii startu", "wpiete",
+                bool(mh and mh.group(1).strip() == "wpiete"))
+    rep.add("R96-7: pekniecia CRAFT BK z kg (zwrot do otwartych ladunkow)", str(botch), "INFO", None)
     rep.show()
     return 0
 

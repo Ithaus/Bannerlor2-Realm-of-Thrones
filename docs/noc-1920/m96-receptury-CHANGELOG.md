@@ -95,28 +95,31 @@ Przyklady (przed = build 95a, po = ten build; koszt po cenach z items-dump; prze
   ladunkow, tylko gdy kwit BK = przepis z masy), `Patches.cs` (TrueArmourCost: kazdy pancerz bierze kwit z przepisu z masy), `ArmouryBehavior.cs` (zapis
   `arm_smith_stock`, reset nowej kampanii, nasluch OnAfterSessionLaunched), `Settings.cs` + `McmSettings.cs` (gen_mcm), `tools/sprawdz_logi.py` (grupa `m96receptury`).
 - Gracz, CRAFT BK, nasze menu i naprawa wlasnymi rekami ida tym samym przepisem. AI: warsztaty uzbrojenia nie uzywaja `Recipes` - licza z `ArmsPricing.CostOf`
-  (te same kg i wspolczynniki, bez zmian). Zlecenia kowalskie (CraftOrders) to bron z projektu gry - koszt z `GetSmithingCostsForWeaponDesign` + SmithWood/SmithCoal,
+  (te same wspolczynniki, bez zmian; po recenzji - dwie roznice starsze niz paczka: peleryny plytowe i kolcze CostOf liczy z lnu, a luk kuszy wedlug tieru gry,
+  przepis gracza wedlug materialu i mocy - patrz "Poprawki po recenzjach"). Zlecenia kowalskie (CraftOrders) to bron z projektu gry - koszt z `GetSmithingCostsForWeaponDesign` + SmithWood/SmithCoal,
   przepisy z tej paczki ich nie dotycza.
-- Linie logu: `Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass TAK | policzone N (pancerze A, luki B, kusze C, strzaly i belty D; legendy L),
-  stary przepis bez receptury wartosci 0, metal w lukach 0 (ma byc 0) | jednostki: sztaba 0.5 kg, len 10 kg, skora 10 kg, drewno ladunek 100 kg | masa surowca /
+- Linie logu: `Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass TAK | policzone N (pancerze A, luki B, kusze C, strzaly i belty D; legendy L x4 kazdego kg),
+  latka SpendMaterials CRAFT BK wpiete, stary przepis bez receptury wartosci 0, metal w lukach 0 (ma byc 0) | jednostki: sztaba 0.5 kg, len 10 kg, skora 10 kg, drewno ladunek 100 kg | masa surowca /
   masa wyrobu: mediana xM, najmniej: ..., najwiecej: ... | otwarte ladunki: ... | przyklady: dragonbone_bow t6 0.1 kg: BYLO 14x ironIngot6 + 8x linen + 0.4 kg wood
   (87 kg) -> JEST 0.03 kg linen (string) + 0.4 kg hardwood (stave); ... | potkniecia 0.` (OnAfterSessionLaunched, po ROT-RBM). Przy kuciu (pierwsze 40, potem co 25.):
-  `Surowce w kuzni (kg) (m96-receptury): <id> | zuzyte: ... | z sakw: ... | otwarte: ... | od startu sesji: kuc N, sztuk z sakw M, potkniecia 0.`
+  `Surowce w kuzni (kg) (m96-receptury): <id> | zuzyte: ... | z sakw: ... | otwarte: ... | od startu sesji: kuc N, sztuk z sakw M, potkniecia 0.` Pekniecie pancerza
+  w CRAFT BK (pierwsze 20, potem co 25.): `Surowce w kuzni (kg) (m96-receptury): pekniecie CRAFT BK <id> | przepada 50% kg przepisu, wraca do otwartych ladunkow: ...`.
 
 **Ryzyko / co sprawdzic (kontrola calosci).**
 - Regresje / ten sam stan: kazdy czytelnik `Recipe.Parts` przejrzany (grep `.Parts`): kwit CRAFT BK (FletchForge.BkArmorBillPostfix, TrueArmourCost) i
-  HasMaterials czytaja sztuki do otwarcia - zamierzone (jak drewno); przetop (SmeltTab, SmeltScraps, Forge.Smelt, SmithMenu) i naprawa (MendMaterial, SmithMenu,
+  HasMaterials czytaja sztuki do otwarcia - zamierzone (jak drewno); przetop (SmeltTab, SmeltScraps; Forge.Smelt i SmithMenu - tygiel martwy od 27.08) i naprawa (MendMaterial, SmithMenu,
   PriceList8) czytaja kg / dokladne sztuki (inaczej otwarty ladunek zanizalby odzysk). Tarcze (FletchForge.ShieldBillCheck, aksamit, SmeltTruth) - stary przepis.
 - Nic z niczego: otwarty ladunek dostaje tylko sztuki naprawde zdjete z sakw (`MassTake` liczy roznice; CRAFT BK - tylko gdy kwit BK = przepis; brak = 0, nie
-  ujemny metal). Pekniecie w CRAFT BK (ArmourBotchHalfBack) zwraca czesc zdjetych sztuk, a otwarty ladunek ma zapisane cale kg - gracz traci najwyzej tyle co
-  dotad (zwrot B sztuk <= kg przepisu, dowod: Units <= (kg - otwarte)/jednostka + 1, B <= Units - 1). Kucie + przetop < 100% (audyt: najwyzej 0.50).
+  ujemny metal). Pekniecie w CRAFT BK (ArmourBotchHalfBack) - po recenzji w kg: przepada MaterialLossOnFailure x kg kazdego surowca, reszta kg wraca do otwartych ladunkow
+  (pelne sztuki do sakw), zwrot <= (1 - strata) x kg zapisanych w TYM kliknieciu (zapis kasowany w ArmourQuality.Clear przed kazdym kliknieciem). Kucie +
+  przetop < 100% (audyt: najwyzej 0.50).
 - Kolizje: skrzynka resztek przetopu (r4-przetop, `SmeltKeepsScraps`) jest teraz takze otwarta sztaba kuzni - resztki przetopu ida w kucie, napoczete sztaby
   w przetop (cala sztaba wychodzi do sakw, gdy skrzynka sie zapelni). Okno przetopu (Begin/End) biegnie wewnatrz DoSmelting - kucie go nie przecina. Bez
   `SmeltKeepsScraps` skrzynka dalej sluzy kuciu.
 - Ekonomia: luki i kusze kosztuja teraz grosze w materiale (praca, stamina i czas zostaja) - dotad material byl 3-5x drozszy od sztuki i nikt by ich nie kul;
   pancerze tkane i skorzane wielokrotnie tansze (tkanina 11x wartosci -> 0.6), metalowe podobnie jak dotad (helm i plyta troche drozsze - odpad x1.4,
-  kolczuga tansza). Legendy: bez x4 - luk-legenda (stealth_bow) prawie bez materialu, nadal jedna sztuka, prog legendy i stamina x3; legendy z rzadkiego
-  materialu (dragonbone, goldenheart, weirwood, giant) i tak nie do wykucia (`RareBowsNotForged`).
+  kolczuga tansza). Legendy (po recenzji): kazdy kg x4, metal ze stali zamkowej - luk-legenda (stealth_bow) 3.6 kg drewna i 0.12 kg lnu (luk to drewno; trudnosc legendy
+  to prog i stamina x3), kusza-legenda 2.8 kg Iron6; legendy z rzadkiego materialu (dragonbone, goldenheart, weirwood, giant) i tak nie do wykucia (`RareBowsNotForged`).
 - Mocne kusze: lek stalowy wedlug mocy (m96-wzory zostawilo metal kuszy przy tierze gry) - swiadomie: sila 300-funtowej kuszy to stalowy lek.
 - Peleryny: `CostOf` liczy kazda peleryne jak tkanine (193 naramienniki plytowe ROT wycenione "z lnu") - przepis kuzni idzie wedlug materialu (plyta = metal);
   wycena sztuki w HistoricalPrices tego nie zmienia (osobny temat, nie ruszalem cen).
@@ -129,6 +132,23 @@ Przyklady (przed = build 95a, po = ten build; koszt po cenach z items-dump; prze
 - Nie zmienione: tarcze, bron z ekranu kuzni gry, wegiel (pancerze i luki go w naszych przepisach nie braly - jak dotad), warsztaty AI, zlecenia kowalskie.
 - Konfiguracja Jeffa: klucz nowy, nie ma go w Armoury.json - obowiazuje domyslne TAK, nic do zmiany.
 
+**Poprawki po recenzjach (20.10 wieczorem; soczewki "sens" i "technika").**
+
+| Uwaga recenzji | Werdykt (dowod) | Co zrobione |
+|---|---|---|
+| (sens, WAZNE) Tygiel w menu kowala (`Forge.Smelt`) przy przepisie z masy obcina odzysk do calych sztab, ulamek przepada (riverlands_coif 0.94 sztaby -> 0) | NIEPRAWDZIWE dla gry: kod martwy. `SmithMenu.SmeltConsequence`/`SmeltCondition` nie sa wpiete w zadne `AddGameMenuOption` (grep po calym repo - jedyne trafienia to definicje i `Log.Error`), SmithMenu.cs:92 "tygiel WYPADL z tego menu (Jeff 27.08)"; jedyny wolajacy `Forge.Smelt` to ta opcja. Przetop gracza idzie zakladka Smelt (SmeltTab -> SmeltScraps), ktora wklada ulamek do skrzynki. To samo stwierdzila recenzja "technika". | Na zapas, gdyby tygiel wrocil: przepis z masy przy `SmeltKeepsScraps` idzie przez te sama skrzynke co zakladka Smelt (`SmeltScraps.Begin/Apply/End/Announce`), lista tygla pomija sztuki z odzyskiem 0. W grze bez zmian (kod dalej martwy). |
+| (sens + technika) Pekniecie pancerza w CRAFT BK liczy reszte otwartej sztaby dwa razy, strata przypadkowa (knight_cap: Iron4 17%, Iron3 i len 100%; przy Units = 0 - 100%) | PRAWDZIWE: `MassCommitBk` zapisywal pelne kg przed rzutem BK (CraftingMixin.ExecuteMainActionBK: SpendMaterials, potem CalculateBotchingChance), a `BotchBack` (ArmourQuality.cs:272) oddawal polowe SZTUK z roznicy sakw | `Recipes.MassBotchBack`: przy zapisie kg w tym kliknieciu pekniecie zabiera `MaterialLossOnFailure` x kg KAZDEGO surowca, reszta kg wraca do otwartych ladunkow (`SmeltScraps.ForgeReturn`, `SmithStock.Return`), pelne sztuki ponad otwarty ladunek do sakw; grupy kwitu z kg pomijaja zwrot z roznicy sakw (inne grupy - jak dotad). Jedna regula z peknietym lukiem (`MassTakePartial`). knight_cap, pusta skrzynka: zuzyte Iron4 0.605 z 1.21 kg, Iron3 0.15 z 0.30, len 0.06 z 0.12 - po 50%. |
+| (sens) Legendy: `LegendaryMaterialFactor` martwy, regula legendy tylko w metalu (luk-legenda grosze, kusza-legenda Iron6 x2) | PRAWDZIWE | Jedna regula: kazdy kg kazdego surowca x `LegendaryMaterialFactor` (Jeff 4.0), metal caly Iron6, masa w sztuce (przetop) bez zmian; luk dalej bez metalu (tabela wyzej: stealth_bow, Flamethrower_RBM). Opis klucza w MCM poprawiony (gen_mcm). Luk-legenda dalej tani w materiale - luk to drewno i cieciwa; legenda kosztuje prog i stamina x3. |
+| (sens) Groty strzal t5-6 z Iron3, t1-4 z Iron2, zadanie mowilo stal t4-6 ("Castle-forged Steel Hardened Barbed Arrows" bez stali) | PRAWDZIWE odstepstwo, SWIADOME | Gatunek grotu zostaje jak regula wyceny S2 (`ArmsPricing.AmmoGrade`: groty masowe z zelaza - Towton 1461, Holm Hill 1471; t5-6 grot stalowany = zelazo ze stalowym ostrzem w cenie Iron3). Zmiana tylko w przepisie dalaby dwie wyceny tej samej strzaly (R7: gracz i warsztaty AI). Do decyzji Jeffa: stal w grotach t4-6 = zmiana `AmmoGrade` razem z wycena i warsztatami. |
+| (sens) Ciezkie pancerze Leather (brygantyny, zbroje rodow ROT 15-23 kg) - 85% skory, 15% okuc | PRAWDZIWE, ZOSTAJE | Przepis idzie za materialem gry (`MaterialType`), tak samo jak `CostOf` (cena, warsztaty AI); zmiana tylko przepisu = dwie wyceny (R7). Zysku nie ma (skorzanych nie wolno topic - `IsMetalwork`). Otwarte: rozpoznawanie brygantyn/lusek (np. po id albo masie na punkt ochrony) razem z `CostOf`. |
+| (sens, technika) Peleryny plytowe/kolcze: `CostOf` z lnu, przepis i przetop z metalu; luk kuszy: przepis wedlug mocy (`XbowPrice.ForgeTier`), `CostOf` wedlug tieru gry | PRAWDZIWE, ZOSTAJE (starsze niz paczka; odzysk peleryn wiekszy o ok. 26%) | Dla gracza bez zysku (odzysk ok. 20% ceny peleryny; kusz nie da sie topic - zakladka Smelt bierze tylko pancerze i tarcze). W skali swiata peleryna AI "z lnu" przetopiona przez gracza daje metal - do naprawy w `CostOf` (peleryna wedlug `MaterialType`, kusza wedlug mocy) razem z warsztatami, poza ta paczka. Zdanie "AI liczy z tych samych kg" poprawione wyzej. |
+| (technika) Luk refleksyjny: BK `HasMaterials` nadpisuje sprawdzenie skory sprawdzeniem lnu; nasze menu pisze "You lack the metal" | PRAWDZIWE (dekompilacja CraftingMixin.HasMaterials: `flag2 = ...leather...;` i zaraz `flag2 = ...linen...;`) | `FletchForge.BkHasMaterialsPostfix`: przy przepisie z masy i kwicie ze skora i lnem sprawdza skore jeszcze raz (ta sama tablica `CurrentMaterials`, `CountInInventory` - cala kategoria, co najmniej tyle co BK, wiec blokuje tylko, gdy BK i tak nie mialby z czego zdjac) i gasi przycisk z podpowiedzia. `Forge.Smith`: "You lack the materials for it: <braki>" (`MissingParts`). Dotyczy tez plaszczy t5+ (futro + len). |
+| (technika) Napis drewna pokazuje id (`for default_arrows`) | PRAWDZIWE | `SmithWood.Use` dostaje nazwe przedmiotu; id zostaje w linii logu przepisu. |
+| (technika) Stan latki SpendMaterials niewidoczny w linii startu, `ERROR in FletchForge.ApplyAll(masa)` poza grupa | PRAWDZIWE | Linia startu: `latka SpendMaterials CRAFT BK wpiete` (albo `nie wpiete` / `BRAK SpendMaterials` / `wyjatek ...`; latka wpinana w OnBeforeInitialModuleScreenSetAsRoot, przed linia). sprawdz_logi: R96-6 (wpiete), ERROR ApplyAll(masa) w R96-5, R96-7 pekniecia z kg (INFO). Sprawdzone na logach syntetycznych: stary format -> R96-6 NIE, `wpiete` -> TAK, `nie wpiete` -> NIE. |
+
+Audyt po poprawkach (`audyt_kg.py` z regula legendy, wynik `przepisy-kg-przed-po.csv`, poprzedni `przepisy-kg-przed-po-v1.csv`): zmienia sie tylko 6 legend;
+flagi nowego przepisu - 6 x "masa" (legendy x4, zamierzone); przetop / metal przepisu najwyzej 0.5000; amunicja 0.9-17.3 sztaby na serie (bez balist do 5.8).
+
 **Status.** DO SPRAWDZENIA (build Armoury kod 0; ForgeView nieruszany; w grze nie testowane; liczby z modelu offline `audyt_kg.py` - w grze potwierdzi je linia startu).
 
 **Test w grze.** (1) Wczytac zapis: linia `Przepisy z masy (m96-receptury): start sesji ... metal w lukach 0 ... mediana x1.3-1.5 ... potkniecia 0` z przykladami
@@ -136,4 +156,6 @@ jak w tabeli. (2) CRAFT -> Bows: zwykly luk pokazuje 1 len (gdy nic otwartego) i
 Linen 9.97 kg", drugi luk - 0 lnu. (3) Strzaly: seria bierze 1-6 sztab zelaza (balisty do 18), drewno w kg. (4) Pancerz skorzany w CRAFT: skora w calych sztukach tylko do otwarcia,
 linia `Surowce w kuzni (kg) ... (CRAFT BK)`. (5) Przetop kolczugi w zakladce Smelt: nie wiecej niz polowa metalu jej przepisu (`Przetop resztki (r4-przetop)`).
 (6) Zapisac, wczytac - otwarte ladunki te same (linia startu: "otwarte ladunki"). (7) `python -I tools/sprawdz_logi.py --grupa m96receptury <Armoury-*.log>`:
-R96-0..5 bez NIE.
+R96-0..6 bez NIE. (8) Pekniecie pancerza w CRAFT: wiadomosc "The botched piece is not all waste - back at the anvil: ..." i linia `pekniecie CRAFT BK ... przepada 50%`;
+otwarte ladunki po peknieciu = przed kuciem minus polowa kg przepisu. (9) Luk refleksyjny (composite_bow) z lnem, bez skory: przycisk Craft szary z podpowiedzia
+"This also needs 1 Leather"; w naszym menu "You lack the materials for it: 1x Leather".

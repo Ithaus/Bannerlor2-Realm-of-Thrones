@@ -228,6 +228,18 @@ namespace Armoury
                 SpendStamina(r.Stamina / 2);
                 float share = MathF.Min(0.9f, s.SmeltingReturnShare + skill * s.SmeltingSkillBonus);
                 var yield_ = Recipes.SmeltYield(r, share);
+                // m96-receptury (po recenzji): przepis z masy - ulamek sztaby do skrzynki (otwarte ladunki), jak zakladka Smelt (SmeltScraps.Apply w oknie przetopu).
+                // Uwaga: tygiel w menu kowala jest od 27.08 MARTWY (SmithMenu.SmeltConsequence nie jest wpiety w AddGameMenuOption) - to tylko spojnosc na zapas.
+                int[] massMilli = r.Kg != null && SmeltScraps.On ? Recipes.MassSmeltMilli(item, share) : null;
+                if (massMilli != null)
+                {
+                    var res = new int[7];
+                    SmeltScraps.Begin(item);
+                    SmeltScraps.Apply(item, massMilli, res);
+                    SmeltScraps.End(true);
+                    yield_ = new List<Recipes.Part>();
+                    for (int g = 1; g <= 6; g++) if (res[g] > 0) yield_.Add(new Recipes.Part(Recipes.MaterialItem((CraftingMaterials)g), res[g]));
+                }
 
                 var roster = MobileParty.MainParty.ItemRoster;
                 roster.AddToCounts(item, -1);
@@ -244,6 +256,7 @@ namespace Armoury
                 RangedLore.OnSmelted(item);
 
                 Log.Player("You broke down " + item.Name + " for " + (sb.Length > 0 ? sb.ToString() : "scrap") + ".");
+                if (massMilli != null) SmeltScraps.Announce(item);
                 Log.Info("Przetop: " + item.StringId + " -> " + sb + " (" + (int)(share * 100) + "%)");
             }
             catch (Exception e) { Log.Error("Smelt", e); }
@@ -598,7 +611,12 @@ namespace Armoury
                 if (skill < r.SkillNeeded)
                 { Log.Player("That is beyond your hand. You need " + r.SkillNeeded + " Smithing.", true); return; }
                 if (!Recipes.HasMaterials(r))
-                { Log.Player("You lack the metal for it.", true); return; }
+                {
+                    // m96-receptury (po recenzji): luk z masy nie bierze metalu - napis mowi, czego brakuje (dotad zawsze "metal")
+                    var miss = Recipes.MissingParts(r, 1f);
+                    Log.Player("You lack the materials for it" + (miss != null && miss.Count > 0 ? ": " + string.Join(", ", miss.ToArray()) : "") + ".", true);
+                    return;
+                }
                 if (Stamina(hero) < r.Stamina)
                 { Log.Player("You are too spent to work the forge. Rest first.", true); return; }
 

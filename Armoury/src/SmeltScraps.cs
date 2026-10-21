@@ -119,6 +119,20 @@ namespace Armoury
             catch (Exception e) { Stumble("ForgeUse", e); }
         }
 
+        /// <summary>m96-receptury (po recenzji): pekniecie pancerza w CRAFT BK oddaje milli tysiacznych gatunku g do skrzynki (otwarta sztaba); pelne sztaby
+        /// ponad skrzynke wychodza do sakw - zwraca ile (skrzynka zostaje 0..Unit-1).</summary>
+        internal static int ForgeReturn(int g, int milli)
+        {
+            try
+            {
+                if (g < 1 || g > 6 || milli <= 0) return 0;
+                long t = (long)_box[g] + milli;
+                _box[g] = (int)(t % Unit);
+                return (int)(t / Unit);
+            }
+            catch (Exception e) { Stumble("ForgeReturn", e); return 0; }
+        }
+
         // ------------------------------------------------------------ dokladny udzial (tysiaczne czesci sztaby)
         /// <summary>Rozdziela n tysiacznych na gatunki wedlug wag (najwieksze reszty, remis - nizszy gatunek, jak SmeltTruth.WeaponMetal).</summary>
         private static int[] Spread(int[] w, long n)

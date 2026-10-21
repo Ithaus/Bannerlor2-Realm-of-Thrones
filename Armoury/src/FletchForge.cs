@@ -325,6 +325,7 @@ namespace Armoury
         /// Recipes.For), tu kg schodza z otwartych ladunkow (skrzynka metalu, len, skora). Bez tego reszta otwartej sztuki nie zmalalaby - surowiec za darmo.</summary>
         private static string _massHook = "nie wpiete";
         private static int _massMismatch;
+        internal static string MassHookState { get { return _massHook; } }   // linia startu Przepisy z masy (po recenzji: stan latki widoczny co sesje)
 
         public static void BkMassSpendPostfix(object __instance)
         {
@@ -356,6 +357,26 @@ namespace Armoury
                 _velvetShort = null;
                 if (!__result) return;
                 var item = BkCurrentItem(__instance);
+                // m96-receptury (po recenzji): BK HasMaterials sprawdza skore, a potem NADPISUJE wynik sprawdzeniem lnu (flag2 = ... dwa razy, dekompilacja
+                // CraftingMixin.HasMaterials). Przepis z masy ma czasem skore i len naraz (luk refleksyjny: rog i sciegno + cieciwa; plaszcz t5+: futro + len) -
+                // bez skory przycisk Craft zostawal czynny. Sprawdzamy skore jeszcze raz, z tej samej tablicy kwitu (CurrentMaterials) i po calej kategorii skory
+                // (CountInInventory liczy co najmniej tyle co BK - blokujemy tylko, gdy BK tez nie mialby z czego zdjac).
+                if (Recipes.MassOn && item != null && Recipes.MassCovers(item))
+                {
+                    var bill = Traverse.Create(__instance).Property("CurrentMaterials").GetValue<int[]>();
+                    if (bill != null && bill.Length >= 11 && bill[9] > 0 && bill[10] > 0)
+                    {
+                        var lea = Recipes.SoftLeather;
+                        int haveL = Recipes.CountInInventory(lea);
+                        if (haveL < bill[9])
+                        {
+                            __result = false;
+                            _velvetShort = "You don't have all required materials! This also needs " + bill[9] + " " + (lea != null && lea.Name != null ? lea.Name.ToString() : "leather")
+                                           + " - you have " + haveL + ".";
+                            return;
+                        }
+                    }
+                }
                 int need = ShieldVelvetNeed(item);
                 if (need <= 0) return;
                 int have = Recipes.CountInInventory(Recipes.SoftVelvet);

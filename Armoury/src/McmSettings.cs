@@ -392,7 +392,7 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryValueFloor { get; set; } = 25000f;
 
-        [SettingPropertyFloatingInteger("Legendary Material Factor", 0.00f, 16.00f, "0.00", HintText = "a legend's bill: every material count multiplied by this, plus the noblest steel on top", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Legendary Material Factor", 0.00f, 16.00f, "0.00", HintText = "a legend's bill: every material count multiplied by this, plus the noblest steel on top. With Recipes By Mass: every kilogram of every material multiplied by this (the master keeps only the best of each) and all its metal is the noblest steel - a bow still takes no metal", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryMaterialFactor { get; set; } = 4f;
 

@@ -2271,6 +2271,7 @@ namespace Armoury
                     int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                     float share = MathF.Min(0.9f, Settings.Current.SmeltingReturnShare + skill * Settings.Current.SmeltingSkillBonus);
                     var y = Recipes.SmeltYield(r, share);
+                    if (r.Kg != null) { var mm = Recipes.MassSmeltMilli(item, share); bool any = false; if (mm != null) for (int g = 1; g <= 6; g++) if (mm[g] > 0) any = true; if (!any) continue; }   // m96-receptury: bez metalu do odzysku - nie niszczyc za nic (kod martwy od 27.08)
                     var sb = new System.Text.StringBuilder();
                     foreach (var p in y) { if (sb.Length > 0) sb.Append(", "); sb.Append(p.Count + "x " + p.Item.Name); }
                     elements.Add(new InquiryElement(item, item.Name + "  (x" + el.Amount + ")", ItemPic(item), true,

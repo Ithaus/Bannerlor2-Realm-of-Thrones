@@ -123,7 +123,7 @@ namespace Armoury
         public float RangedHighTierCostFactor = 2f;        // bows and crossbows of tier 5-6 eat this many times the materials - masterworks are not massed out of a sack of sticks
         public float RangedFailureFactor = 0.5f;           // ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench
         public float LegendaryValueFloor = 25000f;         // an unbuyable piece worth at least this much is a LEGEND - legendary bills and the one-of-a-kind rule apply
-        public float LegendaryMaterialFactor = 4f;         // a legend's bill: every material count multiplied by this, plus the noblest steel on top
+        public float LegendaryMaterialFactor = 4f;         // a legend's bill: every material count multiplied by this, plus the noblest steel on top. With Recipes By Mass: every kilogram of every material multiplied by this (the master keeps only the best of each) and all its metal is the noblest steel - a bow still takes no metal
         public int LegendarySkillNeeded = 250;             // no legend leaves the forge below this Smithing
         public float SmeltingReturnShare = 0.45f;          // share of the metal that comes back when you break a piece down
         public float SmeltingSkillBonus = 0.002f;          // extra recovery per point of Smithing

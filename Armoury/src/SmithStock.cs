@@ -56,6 +56,24 @@ namespace Armoury
             catch (Exception e) { _errors++; if (_errors <= 5) Log.Error("SmithStock.Use (potkniecie " + _errors + ")", e); }
         }
 
+        /// <summary>Pekniecie pancerza w CRAFT BK (po recenzji m96-receptury): kg wracaja do otwartego ladunku, pelne sztuki ponad niego - do sakw (zwraca ile).</summary>
+        internal static int Return(ItemObject it, float kg)
+        {
+            try
+            {
+                if (it == null || it.StringId == null || kg <= 0f) return 0;
+                float u = UnitKg(it);
+                float v = OpenKg(it) + kg;
+                int whole = (int)Math.Floor(v / u);
+                v -= whole * u;
+                if (v < 0f) v = 0f;
+                if (v > MaxKg) v = MaxKg;
+                _open[it.StringId] = v;
+                return Math.Max(0, whole);
+            }
+            catch (Exception e) { _errors++; if (_errors <= 5) Log.Error("SmithStock.Return (potkniecie " + _errors + ")", e); return 0; }
+        }
+
         internal static string Text(bool player)
         {
             var sb = new StringBuilder();
