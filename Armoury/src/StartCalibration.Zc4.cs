@@ -139,6 +139,25 @@ namespace Armoury
             if (cutZl >= 0.5) _shCut++;
             if (gsOver >= 0.5) { _shGs += gsOver; _shGsN++; }
         }
+        // m105 gosp4 (czesc 4, klucze Ks Village Cheap Kcal First / Grain Spike From Surplus / Own Grain First / Chest Refill): od ostatniej linii wedlug rynku [m] - kcal i zl
+        // jedzenia drabiny 1 po ziarnie i soli (G1), skok ceny ziarna i soli zaplacony z nadwyzki ponad skrzynie (G2, zl i zakupy); swoje ziarno i sol zamiast oszczednosci
+        // (G3: szt., zl przy cenie polki, wsi); ponizej skrzyni (G4: wsi, budzet reszty drabiny mniej o zl)
+        private static readonly double[] _m5Kc = new double[2], _m5Zl = new double[2], _m5Sp = new double[2];
+        private static readonly int[] _m5SpN = new int[2];
+        private static double _m5OwnPcs, _m5OwnZl, _m5Rf; private static int _m5OwnN, _m5RfN;
+        /// <summary>m105 gosp4 (TownFolk.Zc4BuyCore, zakup drabiny 1 z budzetem W1): kcal i zl jedzenia po ziarnie i soli, skok ceny z nadwyzki (zl), swoje ziarno i sol zamiast
+        /// oszczednosci (szt., zl), budzet reszty drabiny mniej o (zl; -1 - wies nie ponizej skrzyni albo G4 wylaczony).</summary>
+        internal static void Zc4NoteM105(Settlement mk, double k1Kcal, double k1Zl, double spike, double ownPcs, double ownZl, double refillCut)
+        {
+            int m = mk != null && mk.Town != null ? TownMarket(mk.Town) : MarketOfSettlement(mk);
+            if (m < 0 || m > 1) m = 0;
+            if (k1Kcal > 0) _m5Kc[m] += k1Kcal;
+            if (k1Zl > 0) _m5Zl[m] += k1Zl;
+            if (spike >= 0.5) { _m5Sp[m] += spike; _m5SpN[m]++; }
+            if (ownPcs >= 1) { _m5OwnPcs += ownPcs; _m5OwnZl += Math.Max(0.0, ownZl); _m5OwnN++; }
+            if (refillCut >= 0) { _m5RfN++; _m5Rf += refillCut; }
+        }
+
         /// <summary>Recenzja runda 3: zl wydane przez wies w drabinie 1 (koszyk zaplacony z Planu) - linia ZC4, NKS-13.</summary>
         internal static void Zc4NotePass1Zl(Settlement mk, double zl) { if (zl <= 0) return; int m = MarketOfSettlement(mk); if (m == 0 || m == 1) _p1Zl[m] += zl; }
         private static Town _zcDictTown;                                     // miasto, ktorego slownik budzetu dnia jest juz w zlocie (BK CalculateBudget - bez zmian)
@@ -166,6 +185,8 @@ namespace Armoury
             Array.Clear(_zvRung, 0, 3); Array.Clear(_zvRungWant, 0, 3);
             for (int m = 0; m < 2; m++) { _shC[m] = _shB[m] = _shP[m] = _shN[m] = _shCutZl[m] = _shCutPcs[m] = 0; _shCut2[m] = _shTw[m] = _shTg[m] = _shTc[m] = _shTm[m] = 0; }   // m103 wsie
             _shV = _shCut = _shNoMeas = _shGsN = 0; _shGs = 0;
+            for (int m = 0; m < 2; m++) { _m5Kc[m] = _m5Zl[m] = _m5Sp[m] = 0; _m5SpN[m] = 0; }   // m105 gosp4
+            _m5OwnPcs = _m5OwnZl = _m5Rf = 0; _m5OwnN = _m5RfN = 0;
             System.Threading.Interlocked.Exchange(ref _zTkDemand, 0); _zTkDict = _zTkVill = _zTkLadder = 0; _zDemandN = 0; _zFoodBud = _zLadCut = 0; _zvUnGold = 0;
             for (int m = 0; m < 2; m++) { _zvKcalW[m] = _zvKcalG[m] = _zvZlW[m] = _zvZlP[m] = _zvZlG[m] = 0; }
             _zTkBuild = 0;
@@ -1025,6 +1046,20 @@ namespace Armoury
                   .Append(F0(_shCut2[1])).Append(" szt.; narzedzia drabiny 1 (chciane/kupione/przyciete/bez towaru szt.) Westeros ").Append(F0(_shTw[0])).Append('/').Append(F0(_shTg[0]))
                   .Append('/').Append(F0(_shTc[0])).Append('/').Append(F0(_shTm[0])).Append(", Essos ").Append(F0(_shTw[1])).Append('/').Append(F0(_shTg[1])).Append('/')
                   .Append(F0(_shTc[1])).Append('/').Append(F0(_shTm[1]));
+            }
+            // m105 gosp4 (czesc 4): drabina 1 z budzetem W1 - kcal na 1 zl jedzenia po ziarnie i soli (G1), skok ceny ziarna i soli z nadwyzki (G2), swoje ziarno zamiast
+            // oszczednosci (G3), wsie ponizej skrzyni (G4). Bez budzetu W1, bez zakupow drabiny 1 albo wszystkie cztery klucze NIE - bez segmentu (linia jak w WGRANIU 102)
+            if (SwBasketAtShelf && _shV > 0 && M105AnyOn)
+            {
+                sb.Append(" | m105 gosp4 (Cheap Kcal First ").Append(SwCheapKcalFirst ? "TAK" : "NIE").Append(", Grain Spike From Surplus ").Append(SwGrainSpike ? "TAK" : "NIE")
+                  .Append(", Own Grain First ").Append(SwOwnGrainFirst ? "TAK" : "NIE").Append(", Chest Refill ").Append(SwChestRefill ? "TAK" : "NIE")
+                  .Append("): kcal kupione drabiny 1 na 1 zl (jedzenie po ziarnie i soli)");
+                for (int m = 0; m < 2; m++)
+                    sb.Append(m == 0 ? " Westeros " : ", Essos ").Append(_m5Zl[m] > 0 ? F0(_m5Kc[m] / _m5Zl[m]) : "-").Append(" (").Append(F0(_m5Kc[m])).Append(" kcal / ")
+                      .Append(F0(_m5Zl[m])).Append(" zl)");
+                sb.Append("; skok ceny z nadwyzki Westeros ").Append(F0(_m5Sp[0])).Append(" zl w ").Append(_m5SpN[0]).Append(" zakupach, Essos ").Append(F0(_m5Sp[1]))
+                  .Append(" zl w ").Append(_m5SpN[1]).Append(" zakupach; swoje ziarno zamiast oszczednosci ").Append(F0(_m5OwnPcs)).Append(" szt. (").Append(F0(_m5OwnZl))
+                  .Append(" zl, ").Append(_m5OwnN).Append(" wsi); ponizej skrzyni ").Append(_m5RfN).Append(" wsi, budzet mniej o ").Append(F0(_m5Rf)).Append(" zl");
             }
             // wsad przetworow i 1:1 w popycie ceny (sztuki/d przy lambdzie, wszystkie miasta)
             var der = new double[ZN]; var one = new double[ZN]; var dl = new double[3];

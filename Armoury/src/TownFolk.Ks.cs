@@ -96,6 +96,8 @@ namespace Armoury
             public bool CapOn, NoCap, InF2; public double Cap, CapPcs, CapZl, GsPaid;
             // recenzja W1: przyciete rzeczy (szczebel 2 - przedza, len, filc, skora, narzedzia, garnki, tran, futra; szt.), narzedzia drabiny 1 kupione i przyciete (szt.)
             public double CapPcs2, ToolsGot, ToolsCut;
+            // m105 gosp4 (czesc 4, segment linii ZC4): kcal i zl jedzenia drabiny 1 po ziarnie i soli (G1 - kcal na 1 zl)
+            public double K1Kcal, K1Zl;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -217,6 +219,7 @@ namespace Armoury
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
             if (b.CapOn) { b.Cap -= paid; if (b.NoCap) b.GsPaid += paid; }   // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci)
             if (b.CapOn && z == StartCalibration.ZTools && (count || b.InF2)) b.ToolsGot += k;   // recenzja W1: narzedzia drabiny 1 (segment linii ZC4)
+            if (b.CapOn && b.P1 && !b.NoCap && KsBasket.Kcal[z] > 0) { b.K1Kcal += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.K1Zl += paid; }   // m105 gosp4: jedzenie po ziarnie i soli (G1, linia)
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             if (b.P1) StartCalibration.Zc4NotePass1Zl(b.Mk, paid);        // recenzja runda 3: wartosc kupiona drabiny 1 (NKS-13)
@@ -349,14 +352,18 @@ namespace Armoury
             // m103 wsie (klucz Ks Village Basket At Shelf): budzet drabiny 1 z biezacego wplywu (ShelfBudget) - tylko drabina 1 koszyka zaplaconego z Planu
             double shC = 0, shB = 0, shPlan = 0, shNet = -1;
             if (qp != null && StartCalibration.SwBasketAtShelf && ShelfBudget(b, vil, n, lam, budgetDay, out shC, out shB, out shPlan, out shNet))
-            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; }
+            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; b.K1Kcal = b.K1Zl = 0; }
             try { ZcLadder(b, vil, mk, n, resGS); }
             finally
             {
                 // recenzja W1: narzedzia drabiny 1 - chciane, kupione (z miastami obok), przyciete, bez towaru po miastach obok (w granicy budzetu)
                 int zt = StartCalibration.ZTools;
-                if (b.CapOn) StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
-                                                           b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
+                if (b.CapOn)
+                {
+                    StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
+                                                  b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
+                    StartCalibration.Zc4NoteM105(mk, b.K1Kcal, b.K1Zl, 0, 0, 0, -1);   // m105 gosp4: segment linii ZC4
+                }
                 b.CapOn = false; b.NoCap = false; b.InF2 = false;
             }
             b.P1 = false;
@@ -523,40 +530,25 @@ namespace Armoury
             ZcTake(b, StartCalibration.ZGrain, n[StartCalibration.ZGrain], 0); done[StartCalibration.ZGrain] = true;
             ZcTake(b, StartCalibration.ZSalt, n[StartCalibration.ZSalt], 0); done[StartCalibration.ZSalt] = true;
             b.Lim = lim; b.NoCap = false;
-            // (2) napoj - najtanszy za litr najpierw; brak wina -> piwo, brak piwa -> ziarno na piwo domowe (0.4 kg na litr)
-            var dr = new List<int>(ZcDrinks);
-            var unit = new double[StartCalibration.ZN];
-            foreach (int z in dr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) : double.MaxValue; }
-            dr.Sort((x, y) => unit[x].CompareTo(unit[y]));
-            var un = new int[StartCalibration.ZN];
-            foreach (int z in dr) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
-            // recenzja 17.10 (wazne): napoj zastepczy zmniejsza brak do szukania w miastach obok (dotad F2 kupowalo tam jeszcze raz to samo piwo i wino - wies placila
-            // dwa razy za jedna potrzebe napoju)
-            if (un[StartCalibration.ZWine] > 0)
+            // m105 gosp4 G1 (klucz Ks Village Cheap Kcal First, tylko z budzetem W1): napoje, bialko i reszta jedzenia jedna lista wedlug zl za 1000 kcal przy cenie polki doby
+            // (bez towaru na koncu), zamiana wino -> piwo -> piwo domowe po przejsciu (ten sam budzet); rzeczy jak dotad po calym jedzeniu (4). Plan (KsBasket.Rungs) bez zmian.
+            if (b.CapOn && StartCalibration.SwCheapKcalFirst) ZcCheapKcal(b, n, done);
+            else
             {
-                int bw = ZcTake(b, StartCalibration.ZBeer, un[StartCalibration.ZWine], 1, false);
-                un[StartCalibration.ZBeer] += un[StartCalibration.ZWine] - bw;
-                MissCovered(b, StartCalibration.ZWine, bw);
-                un[StartCalibration.ZWine] = 0;
+                // (2) napoj - najtanszy za litr najpierw; brak wina -> piwo, brak piwa -> ziarno na piwo domowe (0.4 kg na litr)
+                var dr = new List<int>(ZcDrinks);
+                var unit = new double[StartCalibration.ZN];
+                foreach (int z in dr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) : double.MaxValue; }
+                dr.Sort((x, y) => unit[x].CompareTo(unit[y]));
+                var un = new int[StartCalibration.ZN];
+                foreach (int z in dr) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
+                ZcDrinkSwap(b, un);
+                // (3) bialko - najtansze za 1000 kcal najpierw
+                var pr = new List<int>(ZcProtein);
+                foreach (int z in pr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) / (ZcKcal[z] / 1000.0) : double.MaxValue; }
+                pr.Sort((x, y) => unit[x].CompareTo(unit[y]));
+                foreach (int z in pr) { ZcTake(b, z, n[z], 1); done[z] = true; }
             }
-            if (un[StartCalibration.ZBeer] > 0)
-            {
-                double gk = StartCalibration.ZKg(StartCalibration.ZGrain), bk = StartCalibration.ZKg(StartCalibration.ZBeer);
-                int g = (int)Math.Floor(un[StartCalibration.ZBeer] * bk * KsTab.BeerGrain / gk);
-                if (g > 0)
-                {
-                    int gb = ZcTake(b, StartCalibration.ZGrain, g, 1, false); _zcBrewV += gb;
-                    // litry piwa domowego z kupionego ziarna - najpierw brak piwa, potem reszta braku wina
-                    int brew = (int)Math.Floor(gb * gk / (KsTab.BeerGrain * bk) + 1e-9);
-                    brew -= MissCovered(b, StartCalibration.ZBeer, brew);
-                    if (brew > 0) MissCovered(b, StartCalibration.ZWine, brew);
-                }
-            }
-            // (3) bialko - najtansze za 1000 kcal najpierw
-            var pr = new List<int>(ZcProtein);
-            foreach (int z in pr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) / (ZcKcal[z] / 1000.0) : double.MaxValue; }
-            pr.Sort((x, y) => unit[x].CompareTo(unit[y]));
-            foreach (int z in pr) { ZcTake(b, z, n[z], 1); done[z] = true; }
             // (4) reszta po kolei drabiny
             foreach (int z in StartCalibration.ZLadder)
             {
@@ -605,6 +597,62 @@ namespace Armoury
                 catch (Exception e) { Stumble("Zc4BuyVillage(inne miasto)", e); }
             }
             b.Lim = 0;
+        }
+
+        /// <summary>Zakup zastepczy napoju (recenzja 17.10 - wydzielone bez zmian z drabiny w m105 gosp4): un - niekupione sztuki napojow; brak wina - piwo, brak piwa - ziarno
+        /// na piwo domowe (KsTab.BeerGrain kg ziarna na litr). Napoj zastepczy zmniejsza brak do szukania w miastach obok.</summary>
+        private static void ZcDrinkSwap(ZcBuy b, int[] un)
+        {
+            // recenzja 17.10 (wazne): napoj zastepczy zmniejsza brak do szukania w miastach obok (dotad F2 kupowalo tam jeszcze raz to samo piwo i wino - wies placila
+            // dwa razy za jedna potrzebe napoju)
+            if (un[StartCalibration.ZWine] > 0)
+            {
+                int bw = ZcTake(b, StartCalibration.ZBeer, un[StartCalibration.ZWine], 1, false);
+                un[StartCalibration.ZBeer] += un[StartCalibration.ZWine] - bw;
+                MissCovered(b, StartCalibration.ZWine, bw);
+                un[StartCalibration.ZWine] = 0;
+            }
+            if (un[StartCalibration.ZBeer] > 0)
+            {
+                double gk = StartCalibration.ZKg(StartCalibration.ZGrain), bk = StartCalibration.ZKg(StartCalibration.ZBeer);
+                int g = (int)Math.Floor(un[StartCalibration.ZBeer] * bk * KsTab.BeerGrain / gk);
+                if (g > 0)
+                {
+                    int gb = ZcTake(b, StartCalibration.ZGrain, g, 1, false); _zcBrewV += gb;
+                    // litry piwa domowego z kupionego ziarna - najpierw brak piwa, potem reszta braku wina
+                    int brew = (int)Math.Floor(gb * gk / (KsTab.BeerGrain * bk) + 1e-9);
+                    brew -= MissCovered(b, StartCalibration.ZBeer, brew);
+                    if (brew > 0) MissCovered(b, StartCalibration.ZWine, brew);
+                }
+            }
+        }
+
+        /// <summary>
+        /// m105 gosp4 G1 (klucz Ks Village Cheap Kcal First; projekt czesci 4, sim_drabina na n31/n32: kcal czesci zaplaconej W +2.7..+3.9 pp przy tym samym pieniadzu): po ziarnie
+        /// i soli JEDZENIE drabiny 1 (napoje, bialko, reszta jedzenia z ZLadder) jedna lista wedlug zl za 1000 kcal przy cenie polki miasta targowego z doby - gdy budzet z wplywu
+        /// (W1) sie konczy, czekaja najdrozsze kalorie, nie zawsze bialko i owoce za napojem. Kolejnosc: towar z cena i kcal (najtanszy za 1000 kcal pierwszy), towar bez kcal
+        /// (przyprawy), towar bez polki (szukany potem w miastach obok, F2) - przy rownej cenie kolejnosc drabiny. Zakup zastepczy napoju (wino -> piwo -> piwo domowe) po
+        /// przejsciu listy, w tym samym budzecie. Rzeczy (przedza, len, skora, narzedzia, garnki) dalej po calym jedzeniu (krok (4) w ZcLadder). Wolac tylko z budzetem W1.
+        /// </summary>
+        private static void ZcCheapKcal(ZcBuy b, int[] n, bool[] done)
+        {
+            int nz = StartCalibration.ZN;
+            var fl = new List<int>(24);
+            foreach (int z in StartCalibration.ZLadder) if (!done[z] && StartCalibration.ZFood(z)) fl.Add(z);
+            var key = new double[nz]; var cls = new int[nz]; var pos = new int[nz];
+            for (int i = 0; i < fl.Count; i++)
+            {
+                int z = fl[i]; pos[z] = i;
+                EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h);
+                double kc = StartCalibration.ZKg(z) * KsBasket.Kcal[z];
+                if (p <= 0 || h <= 0) cls[z] = 2;                                    // bez towaru na polce - na koncu (miasta obok)
+                else if (!(kc > 0)) cls[z] = 1;                                      // bez kcal (przyprawy) - po jedzeniu z kcal
+                else key[z] = p / (kc / 1000.0);                                     // zl za 1000 kcal przy cenie polki doby
+            }
+            fl.Sort((x, y) => { int c = cls[x].CompareTo(cls[y]); if (c != 0) return c; c = key[x].CompareTo(key[y]); return c != 0 ? c : pos[x].CompareTo(pos[y]); });
+            var un = new int[nz];
+            foreach (int z in fl) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
+            ZcDrinkSwap(b, un);
         }
 
         /// <summary>Brak towaru z na polce pokryty zakupem zastepczym (n sztuk): mniej do szukania w miastach obok i mniej "bez towaru" w liczbach. Zwraca pokryte.</summary>
