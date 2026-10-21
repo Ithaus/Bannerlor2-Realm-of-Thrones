@@ -4002,6 +4002,20 @@ namespace Armoury
         // okna (prefiks EventScreen.OnActivate, oryginal wraca przy zamknieciu); bez pliku nic sie nie zmienia. Czytany na zywo. Nowy klucz.
         public bool StoryImagesForRotWindows = true;       // the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones
 
+        // --- Narrator ---
+        // m103-lektor (Jeff 21.10: lektor tylko po angielsku, glos David ElevenLabs, model eleven_multilingual_v2; plotki czytane na zywo - "zostaje przy Starterze,
+        // ale zapisuj kazda nagrana plotke, aby potem, jak jest cos nagrane, David nie czytal"): Lektor.cs (okna wydarzen ROT z nagran w ModuleData/Lektor/EN,
+        // latka ROT.Screens.EventScreen) i Lektor.Live.cs (plotki: pamiec nagran w Documents/.../Armoury/Lektor, zapytania ElevenLabs w watku w tle, limit dzienny,
+        // rezerwa planu z GET /v1/user/subscription). Klucz API tylko z %USERPROFILE%/.elevenlabs/key.txt w chwili zapytania. Nazwy w MCM: "Narrator ..." (gen_mcm LABELS).
+        // Wszystkie czytane na zywo. Nowe klucze (MCM Jeffa ich nie ma - domyslne).
+        // Rezerwa 14000 (poprawka po recenzji): ok. 11 tys. znakow na 23 okna prologu (nagraj_david.py, jeszcze nie nagrane) + 3 tys. zapasu - plotki nie zjadaja
+        // znakow prologu. Po nagraniu prologu 3000 w MCM albo w Armoury.json (pulapka z CLAUDE.md 7: zmiana domyslnej nie dziala, gdy MCM zapisal klucz).
+        public bool LektorEnabled = true;                 // a narrator with the voice of David reads aloud the Realm of Thrones story windows and the gossip you hear in inns and taverns; the voice stops when you close the window. Off = no narrator at all, as before
+        public bool LektorEventWindows = true;             // the narrator reads the Realm of Thrones story windows (the execution of Ned Stark, the Red Wedding and the rest) from recordings that come with the mod - no internet needed. A window without a recording stays silent. Off = silent story windows
+        public bool LektorGossipLive = true;               // gossip the narrator has never read is recorded on the spot through ElevenLabs (needs the internet and your key in the file .elevenlabs/key.txt in your user folder) and kept on your disk - next time they play from the disk at once. Words ElevenLabs has charged for are never sent again, even if the recording is later lost; only a try that brought no recording (a server error, no answer in 20 seconds) is repeated, once at most. Off = only gossip already on your disk is read
+        public int LektorGossipDailyChars = 1000;          // most letters of new gossip sent to ElevenLabs in one day (by your computer's calendar); past it the narrator reads only gossip already on your disk until the next day, and tells you so once
+        public int LektorGossipReserveChars = 14000;       // letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. 14000 keeps about 11000 letters for the prologue recordings still to be made plus 3000 spare; set it to 3000 once they are made. The plan is checked once per session; if it cannot be checked, no new gossip is recorded
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

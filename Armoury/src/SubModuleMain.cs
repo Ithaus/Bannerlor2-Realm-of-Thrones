@@ -68,6 +68,8 @@ namespace Armoury
                 try { Prologue.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Prologue.ApplyAll", e); }
                 // m103-sceny: obrazki Jeffa w oknach wydarzen ROT (prefiks / postfiks EventScreen OnActivate / OnDeactivate, odbicie - bez typow ROT); wlasny try
                 try { RotWindowPictures.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RotWindowPictures.ApplyAll", e); }
+                // m103-lektor: nagrania okien ROT (ModuleData/Lektor/EN) i latka ROT.Screens.EventScreen odbiciem (OnActivate po, OnDeactivate przed) - raz na proces; wlasny try
+                try { Lektor.Install(_harmony); } catch (Exception e) { Log.Error("Lektor.Install", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
@@ -448,6 +450,13 @@ namespace Armoury
                 try { StoryTick(); }
                 catch (Exception e) { _storyTickFails++; Log.Error("Prologue.Scenes: straznik nie laduje sie (proba " + _storyTickFails + "/3)", e); }
             }
+            // m103-lektor: lektor - koniec klipu, kontrola 0,5 s, straznik okna, wyniki watku nagran plotek (wlasny try w srodku, nic nie gra - od razu wyjscie);
+            // tu tylko blad ladowania typu, liczony (po 3 lektor nie startuje do konca sesji, gra bez zmian)
+            if (_lektorFails < 3)
+            {
+                try { Lektor.AppTick(); }
+                catch (Exception e) { _lektorFails++; Log.Error("Lektor.AppTick: nie laduje sie (proba " + _lektorFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -484,6 +493,7 @@ namespace Armoury
             try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
             try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
         }
+        private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RoadsideInnsTick()
