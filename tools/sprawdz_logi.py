@@ -1021,7 +1021,7 @@ Uzycie (Python 3, tylko odczyt):
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
 --grupa m102tablica : (21.10, w-toku/m102-tablica; Armoury/src/NoticeBoard*.cs, klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties i nast.)
                     python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
-                    T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = kasa + pan + niedoplata (z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
+                    T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
                     L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
@@ -37574,9 +37574,12 @@ M102_TB_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), otwarcia (\d+), wpisow 
                          r".*?\| proba: (.*?) \| potkniecia (\d+)")
 M102_PROBE = re.compile(r"nagroda czytelna (\d+)/(\d+)")
 M102_LG_DAY = re.compile(r"dzien (\d+), klucz (TAK|NIE), band poza osadami (\d+), miasta z banda (\d+)/(\d+), z listem (\d+), bez nowego listu: .*?, inne (\d+); czynne (\d+) .*?"
-                         r"; wyplacone (\d+) za (\d+) zl \(gracz (\d+)/(\d+) zl, lordowie (\d+)/(\d+) zl; z kas miast (\d+), od panow (\d+)\), niedoplata (\d+), z niczego (\d+)"
+                         r"; wyplacone (\d+) za (\d+) zl \(gracz (\d+)/(\d+) zl, lordowie (\d+)/(\d+) zl; z kas miast (\d+), od panow (\d+)(?:, z kies wsi \d+)?\), niedoplata (\d+), z niczego (\d+)"
                          r".*?kasa ponizej Keep po wyplacie (\d+)[^;]*; zapis arm_board (\d+) B; .*?koszt ([0-9.]+) ms; potkniecia (\d+)")
-M102_PAY = re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:pan|wies) (\d+), niedoplata (\d+), dla (gracz|lord \S+); kasa przed (-?\d+) po (-?\d+) \(Keep (-?\d+)\)")
+M102_PAY = re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:pan|wies) (\d+), niedoplata (\d+), dla (gracz|lord \S+); kasa przed (-?\d+) po (-?\d+) \(Keep (-?\d+)\)"
+                      r"(?:; odbiorca (-?\d+), platnicy (-?\d+), z niczego (-?\d+))?")   # poprawka po recenzji: zmierzone zloto odbiorcy i platnikow
+M102_CARRY = re.compile(r"; czynne (\d+) \(nowe (\d+)")
+M102_DROPS = re.compile(r"; zdjete (\d+) \(")
 M102_POST = re.compile(r"list - (\S+) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik (kasa|pan \S+), wolna kasa (-?\d+)")
 M102_POSTH = re.compile(r"list soltysa - (\S+) \((\S+)\) (\S+) \((\d+) ludzi, (\d) d, S ([0-9.]+), szkody \+(\d+)%\) = (\d+), platnik wies, wolna kiesa (-?\d+)")
 M102_KASY = re.compile(r"Kasy miast \(169c\): dzien (\d+) \| miast \d+: kasy (\d+)")
@@ -37588,10 +37591,10 @@ def m102tablica_main(logp):
     """m102tablica (21.10, w-toku/m102-tablica; Jeff 20.10 "tablice ogloszen jak w grach RPG z misjami ... kapitana strazy"; projekt PROJEKT-TABLICA-OGLOSZEN-2026-10-21 pkt 6.7):
     T-1 linia "wpieta" (menu town 1/1, podmenu 2/2), T-2 linia doby tablicy w kazdej dobie okna (bez pierwszej i ostatniej), T-3 ERROR NoticeBoard i potkniecia 0,
     T-4 nagroda nieczytelna 0 (doba i proba), T-5 tekst z tokenami <= 2% tekstow, T-6 koszt otwarcia sr. <= 5 ms, T-7 proba (INFO);
-    L-1 linia "wpiete" (zdarzenia 3/3, dialog 7/7), L-2 linia doby listow w kazdej dobie, L-3 kazda wyplata: obiecane = kasa + pan + niedoplata, z niczego 0,
+    L-1 linia "wpiete" (zdarzenia 3/3, dialog 7/7), L-2 linia doby listow w kazdej dobie, L-3 kazda wyplata: obiecane = kasa + pan + niedoplata, kasa przed - po = kasa, platnicy = kasa + pan/wies, odbiorca = platnicy (pomiar), z niczego 0,
     L-4 kasa po wyplacie >= Keep (i licznik doby 0), L-5 "inne" 0 od d2, L-6 od d7 co najmniej 1 list czynny przy bandach (bez band INFO), L-7 wyplaty lordom w oknie
     <= 1% wplywow kas miast (linia "Przeplywy osad (kasy miast)": lud za towar + przelewy gry do kas; bez niej INFO), L-8 zapis arm_board <= 16 KB, L-9 koszt doby listow <= 3 ms, L-10 wyplata tylko za bande
-    z listem wywieszonym w logu (przy logu od startu kampanii) i tylko dla gracza albo lorda. Log bez paczki: INFO."""
+    z listem wywieszonym w logu (bez listu w logu najwyzej tyle, ile listow wczytano z zapisu na poczatku sesji) i tylko dla gracza albo lorda. Log bez paczki: INFO."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("T-1: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -37599,6 +37602,7 @@ def m102tablica_main(logp):
         return 0
     wired, wiredw, tdays, ldays, pays, posts, kasy, n_err = [], [], [], [], [], [], [], 0
     hposts, inflows = [], []
+    carried, need_carry = 0, True   # L-10: listy wczytane z zapisu (czynne - nowe + wyplacone + zdjete pierwszej doby kazdej sesji)
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -37634,10 +37638,16 @@ def m102tablica_main(logp):
                 body = s[len(M102_LG):]
                 if body.startswith("wpiete"):
                     wiredw.append(body)
+                    need_carry = True
                     continue
                 md = M102_LG_DAY.match(body)
                 if md:
                     ldays.append(md)
+                    if need_carry:
+                        need_carry = False
+                        mc = M102_CARRY.search(body); mz = M102_DROPS.search(body)
+                        if mc:
+                            carried += max(0, int(mc.group(1)) - int(mc.group(2)) + int(md.group(9)) + (int(mz.group(1)) if mz else 0))
                     continue
                 mp = M102_PAY.match(body)
                 if mp:
@@ -37680,9 +37690,23 @@ def m102tablica_main(logp):
     ld = sorted(int(d.group(1)) for d in ldays)
     lg = [d for a, b in zip(ld, ld[1:]) for d in range(a + 1, b)] if ld else []
     rep.add("L-2: linia doby listow w kazdej dobie", f"dob {len(ld)}, brakow {len(lg)}", "0 brakow", (len(lg) == 0) if len(ld) > 2 else None)
-    badp = [p for p in pays if int(p.group(3)) != int(p.group(4)) + int(p.group(5)) + int(p.group(6))]
+    def m102_pay_bad(p):
+        if int(p.group(3)) != int(p.group(4)) + int(p.group(5)) + int(p.group(6)):
+            return "obiecane != kasa + pan + niedoplata"
+        if int(p.group(8)) - int(p.group(9)) != int(p.group(4)):
+            return "kasa przed - po != kasa"
+        if p.group(11) is not None:
+            if int(p.group(12)) != int(p.group(4)) + int(p.group(5)):
+                return "platnicy != kasa + pan/wies"
+            if int(p.group(11)) != int(p.group(12)):
+                return "odbiorca != platnicy"
+        return None
+    badp = [(p, m102_pay_bad(p)) for p in pays]
+    badp = [(p, w) for p, w in badp if w]
+    meas = sum(1 for p in pays if p.group(11) is not None)
     nothing = sum(int(d.group(18)) for d in ldays)
-    rep.add("L-3: wyplata = kasa + pan + niedoplata, z niczego 0", f"zlych wyplat {len(badp)} z {len(pays)}, z niczego {nothing}" + (f" (np. {badp[0].group(0)[:120]})" if badp else ""),
+    rep.add("L-3: wyplata = pobrane (kasa przed - po, platnicy, odbiorca), z niczego 0", f"zlych wyplat {len(badp)} z {len(pays)} (z pomiarem {meas}), z niczego {nothing}"
+            + (f" (np. {badp[0][1]}: {badp[0][0].group(0)[:140]})" if badp else ""),
             "0 i 0", (len(badp) == 0 and nothing == 0) if (pays or ldays) else None)
     below = [p for p in pays if int(p.group(4)) > 0 and int(p.group(9)) < int(p.group(10))]
     belowd = sum(int(d.group(19)) for d in ldays)
@@ -37706,11 +37730,10 @@ def m102tablica_main(logp):
     tbad = [p for p in posts if p.group(8) == "kasa" and int(p.group(7)) * 4 > int(p.group(9))]
     rep.add("L-12: list z kasy miasta <= 1/4 wolnej kasy", f"ponad 1/4 {len(tbad)} z {sum(1 for p in posts if p.group(8) == 'kasa')}", "0", (len(tbad) == 0) if posts else None)
     rep.add("L-11: list soltysa <= 1/4 wolnej kiesy wsi", f"ponad 1/4 {len(hbad)} z {len(hposts)}", "0", (len(hbad) == 0) if hposts else None)
-    fromstart = bool(ld) and ld[0] <= (min(days) if days else ld[0]) and len(posts) > 0
     orphan = [p for p in pays if (p.group(1), p.group(2)) not in posted]
     who_bad = [p for p in pays if not (p.group(7) == "gracz" or p.group(7).startswith("lord "))]
-    rep.add("L-10: wyplata tylko za bande z listem, tylko gracz albo lord", f"bez listu w logu {len(orphan)} z {len(pays)}, zly odbiorca {len(who_bad)}",
-            "0 i 0 (bez listu - tylko przy logu od wywieszenia)", (len(who_bad) == 0 and (len(orphan) == 0 or not fromstart)) if pays else None)
+    rep.add("L-10: wyplata tylko za bande z listem, tylko gracz albo lord", f"bez listu w logu {len(orphan)} z {len(pays)} (listow z zapisu {carried}), zly odbiorca {len(who_bad)}",
+            "bez listu <= listow z zapisu, zly odbiorca 0", (len(who_bad) == 0 and len(orphan) <= carried) if pays else None)
     lstumb = max([int(d.group(22)) for d in ldays] + [0])
     rep.add("L-K: potkniecia listow", f"max doby {lstumb}", "0", lstumb == 0 if ldays else None)
     tot = sum(int(d.group(10)) for d in ldays); pl = sum(int(d.group(12)) for d in ldays)
