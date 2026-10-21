@@ -7932,6 +7932,10 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsVillagePaidFirst { get; set; } = true;
 
+        [SettingPropertyBool("Ks Village Basket At Shelf", HintText = "with Ks Village Paid First: a village buys the part of its basket the plan pays for at today's stall prices only with the money it really earns - the plan's basket money or the same reckoning made on its takings of the last four weeks (its share of the takings less the fixed dues, a twentieth kept back), whichever is less. Grain and salt are always bought in full, from savings if need be; the rest of that part is bought along the usual ladder (drink, then the cheapest meat, fish or cheese, then the rest) until that money is spent - so the last things on the ladder (yarn, cloth, leather, tools, pots) are the first to wait - and what the village could not afford stays unbought with the money in its purse. Off = the village buys the pieces the plan counted on at whatever the stall asks, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageBasketAtShelf { get; set; } = true;
+
         [SettingPropertyBool("Ks Own Food First", HintText = "with the calibration applied: a village that could not buy the food the plan counted on eats from its own store waiting for the cart (grain first, at most half of each good a day) instead of sending it to market; off = it sells everything and goes without", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsOwnFoodFirst { get; set; } = true;
@@ -11082,6 +11086,7 @@ namespace Armoury
             s.KsLandGradient = KsLandGradient;
             s.KsAlphaNet = KsAlphaNet;
             s.KsVillagePaidFirst = KsVillagePaidFirst;
+            s.KsVillageBasketAtShelf = KsVillageBasketAtShelf;
             s.KsOwnFoodFirst = KsOwnFoodFirst;
             s.KsPerishReach = KsPerishReach;
             s.KsRealOfftake = KsRealOfftake;

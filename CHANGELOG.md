@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## n32 + m103-gospodarka3 (kandydat WGRANIA 102) - 21.10.2026
+
+- Scalone: w-toku/m103-gospodarka3 (czesc 3: koszyk wsi ZC4 przy cenach polki z budzetu z biezacego utargu - klucz KsVillageBasketAtShelf; grupa m103wsie) bez konfliktow; gen_mcm Armoury 2273; build 5 modow kod 0; ast sprawdz_logi bez dubli.
+- Obrazki prologu od Jeffa (Midjourney): Armoury/Images/Prolog/prolog_01..03.png (1024x576, tools/obrazki_okien.py, md5 2914002 / 1f47e5e / 52915a7).
+- Status: DO SPRAWDZENIA (test koncowy 102: prolog 230 z KS, prolog z zapisu, bitwa).
+
 ## 2026-10-21 (n32 (kandydat WGRANIA 102) = n31 + m104-e5 + m104-wojny (gospodarka cz.3 dojdzie))
 
 **Zmiana:** `w-toku/n32-calosc` = n31 (59a054b7: WGRANIE 101 + m103-drobne + m103-sceny + m103-lektor + m103-gospodarka cz.1-2) + m104-e5 (72fe7c1a; [CHANGELOG galezi](docs/noc-1920/m104-e5-CHANGELOG.md):
