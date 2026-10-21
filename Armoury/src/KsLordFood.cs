@@ -85,6 +85,10 @@ namespace Armoury
         private static readonly HashSet<Town> _eSeen = new HashSet<Town>();
         private static int _eAge = -1, _eSated, _eSatedPaid;
         private static long _eOpen, _ePaid;
+        // m105 G2 (Crown Hoard Feeds Hungry): rachunki splacone ze skarbca krolestwa ponad zapas wojny - zdjete ze skarbcow (zmierzone), przyjete przez wierzycieli,
+        // miasta, krolestwa, skarbiec ponizej zapasu wojny po wyplacie (oczekiwane 0), miasta z rachunkami ponad prog po panie bez kasy ponad podloge (kandydaci)
+        private static long _hfTook, _hfRecv; private static int _hfTowns, _hfBelow, _hfCand;
+        private static readonly HashSet<Kingdom> _hfK = new HashSet<Kingdom>();
 
         private static bool On(Settings s) { return s != null && s.KsLordFundsFood; }
 
@@ -143,6 +147,43 @@ namespace Armoury
             _nOff = _nMis = _nBookCut = 0; _book = _mis = 0;
             _clans.Clear(); _ksh = false; _bills = false; _creditOff = false; _ticks = 0;
             _eAge = -1; _eSated = _eSatedPaid = 0; _eOpen = _ePaid = 0;
+            _hfTook = _hfRecv = 0; _hfTowns = _hfBelow = _hfCand = 0; _hfK.Clear();   // m105 G2
+        }
+
+        /// <summary>
+        /// m105 G2 (Crown Hoard Feeds Hungry): PO panie - rachunki zywnosci miasta `st` starsze niz `age` dni, ktorych kasa miasta nie splaci (nic ponad podloge kredytu -
+        /// PayDaily splaca z tej samej granicy, wiec rachunek zostal), splaca skarbiec krolestwa wlasciciela ponad zapas wojny (limit doby wspolny z chlebem M3 -
+        /// KingdomTreasury.HoardRoom). Skarbiec -> kasy zrodel (wierzyciele, KsFoodCredit.PayByLordAge - najstarsze najpierw, z pomiarem); czego nie przyjma, wraca do skarbca.
+        /// Krolestwo gracza, rod bez krolestwa, oblezenie - nie. Doplyw netto miasta jak przy splacie pana (TownPurse.NoteLordFood). Wolajacy w try.
+        /// </summary>
+        private static void HoardBills(Town t, Settlement st, int age)
+        {
+            if (t == null || st == null || age < 0 || !KingdomTreasury.HoardFeedsOn || st.IsUnderSiege) return;
+            if (KsFoodCredit.FreeOf(t) > 0) return;                                 // kasa ma jeszcze cos ponad podloge - splaci sama (PayDaily)
+            long left = KsFoodCredit.OlderThanOf(st, age);
+            if (left <= 0) return;
+            _hfCand++;
+            var c = st.OwnerClan; var k = c != null ? c.Kingdom : null;
+            if (k == null || k.IsEliminated) return;
+            long room = KingdomTreasury.HoardRoom(k);
+            long x = Math.Min(left, Math.Min(room, (long)int.MaxValue));
+            if (x <= 0) return;
+            long w0 = k.KingdomBudgetWallet;
+            k.KingdomBudgetWallet -= (int)x;                                        // najpierw skarbiec, potem wierzyciele
+            long paid = 0;
+            try { paid = KsFoodCredit.PayByLordAge(st, x, age); } catch (Exception ex) { Stumble("HoardBills.Pay", ex); paid = 0; }
+            paid = Math.Max(0, Math.Min(x, paid));
+            long back = x - paid;
+            if (back > 0) k.KingdomBudgetWallet += (int)back;                      // nieprzyjete wraca do skarbca
+            long took = w0 - k.KingdomBudgetWallet;
+            KingdomTreasury.HoardUse(k, Math.Max(0, took));
+            _hfTook += took; _hfRecv += paid;
+            if (paid > 0)
+            {
+                _hfTowns++; _hfK.Add(k);
+                TownPurse.NoteLordFood(st, paid);                                   // jak splata pana: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
+                if (KingdomTreasury.HoardBelow(k)) _hfBelow++;
+            }
         }
 
         /// <summary>Doplata rodu `c` z biezacej doby doplat (0 - inna doba albo nic).</summary>
@@ -276,15 +317,16 @@ namespace Armoury
                         _need += (long)Math.Ceiling(want);
                         var c = st.OwnerClan;
                         var h = c != null ? c.Leader : null;
-                        if (c == null || h == null || !h.IsAlive) { _nNb++; continue; }
+                        // m105 G2: w trybie RACHUNKI wyjscia kroku pana (bez pana, gracz, bez budzetu, bez miejsca) prowadza do kroku skarbca (HoardBills), nie do nastepnego miasta
+                        if (c == null || h == null || !h.IsAlive) { _nNb++; if (_bills) HoardBills(t, st, KsFoodCredit.OverdueDays); continue; }
                         if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; continue; }   // gracz nigdy (jak chleb M3)
                         double G, R; bool war;
-                        if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; continue; }
+                        if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; if (_bills) HoardBills(t, st, KsFoodCredit.OverdueDays); continue; }
                         long outC, resC; _out.TryGetValue(c, out outC); _resv.TryGetValue(c, out resC);
                         long fam = ClanIncomeBook.FamilyGoldOf(c) + outC;          // wplaty tej doby do innych miast rodu wroca albo zaplaca najwyzej rezerwacje
                         double rate = TownFolk.BreadLordShare(s, war) * Math.Max(0, fam - R) / wcd - TownFolk.BreadLordToday(c) - TourneyPay.RepaidToday(c) - PaidToday(c) - resC;
                         long cap = (long)Math.Floor(Math.Min(Math.Min(rate, fam - R - resC), (double)h.Gold + (_bills ? 0 : outC)));
-                        if (cap <= 0) { _nRoom++; continue; }
+                        if (cap <= 0) { _nRoom++; if (_bills) HoardBills(t, st, KsFoodCredit.OverdueDays); continue; }
                         long extra = Math.Min(cap, (long)Math.Ceiling(want));
                         if (_bills)
                         {
@@ -300,6 +342,7 @@ namespace Armoury
                             _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv;
                             if (paidB > 0) { _nPay++; NotePaid(c, paidB); if (ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++; if (paidB > cap) _nOver++; }
                             if (paidB > 0) TownPurse.NoteLordFood(st, paidB);         // recenzja calosci 18.10: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
+                            HoardBills(t, st, KsFoodCredit.OverdueDays);              // m105 G2: reszta zaleglych rachunkow ze skarbca krolestwa ponad zapas wojny
                             continue;
                         }
                         // tryb DOPLATA: najmniejsza wplata, przy ktorej budzet KS-H kasy rosnie o e (reszta wraca po zakupach)
@@ -359,16 +402,17 @@ namespace Armoury
                     _need += open;
                     var c = st.OwnerClan;
                     var h = c != null ? c.Leader : null;
-                    if (c == null || h == null || !h.IsAlive) { _nNb++; continue; }
+                    // m105 G2: wyjscia kroku pana (bez pana, bez budzetu, bez miejsca) prowadza do kroku skarbca (HoardBills); gracz - nie (krolestwo gracza i tak 0)
+                    if (c == null || h == null || !h.IsAlive) { _nNb++; HoardBills(t, st, age); continue; }
                     if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; continue; }   // gracz nigdy (jak chleb M3)
                     double G, R; bool war;
-                    if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; continue; }
+                    if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; HoardBills(t, st, age); continue; }
                     // ta sama granica co tryb RACHUNKI w Before (nawias doplaty pusty w tym trybie - outC i resC 0)
                     long outC, resC; _out.TryGetValue(c, out outC); _resv.TryGetValue(c, out resC);
                     long fam = ClanIncomeBook.FamilyGoldOf(c) + outC;
                     double rate = TownFolk.BreadLordShare(s, war) * Math.Max(0, fam - R) / wcd - TownFolk.BreadLordToday(c) - TourneyPay.RepaidToday(c) - PaidToday(c) - resC;
                     long cap = (long)Math.Floor(Math.Min(Math.Min(rate, fam - R - resC), (double)h.Gold));
-                    if (cap <= 0) { _nRoom++; continue; }
+                    if (cap <= 0) { _nRoom++; HoardBills(t, st, age); continue; }
                     long extra = Math.Min(cap, open);
                     // glowa -> wierzyciele (PayByLordAge), reszta z powrotem do glowy
                     int h0 = h.Gold; h.ChangeHeroGold(-(int)Math.Min(int.MaxValue, extra)); long took = h0 - h.Gold;
@@ -388,6 +432,7 @@ namespace Armoury
                         if (ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++;
                         if (paidB > cap) _nOver++;
                     }
+                    HoardBills(t, st, age);                                           // m105 G2: reszta rachunkow ponad prog ze skarbca krolestwa ponad zapas wojny
                 }
                 catch (Exception e) { Stumble("BeforeEarly(miasto)", e); }
             }
@@ -476,6 +521,12 @@ namespace Armoury
               .Append(" = ").Append(_dLords + _dTowns + _billsRecv).Append(" (oczekiwane 0), zaplacone - (wplacone - zwrocone + rachunki) = ").Append(_lordPaid - (_dep - _ret + _billsPaid))
               .Append(" | pan ponizej rezerwy wojny po zaplacie ").Append(_nBelow).Append(", ponad tempo skrzyni ").Append(_nOver)
               .Append(", zwrot uciety (kasa za mala) ").Append(_nCut).Append(" (").Append(_cut).Append(" zl), zaleglosc nawiasu ").Append(_nStale)
+              // m105 G2 (Crown Hoard Feeds Hungry): segment przed czasem; klucz wylaczony - linia jak w WGRANIU 102
+              .Append(KingdomTreasury.HoardFeedsOn
+                  ? " | m105 skarbiec korony: rachunki splacone ze skarbca " + _hfRecv.ToString(Inv) + " zl (miast " + _hfTowns.ToString(Inv) + ", krolestw " + _hfK.Count.ToString(Inv)
+                    + ", kandydatow po panie bez kasy ponad podloge " + _hfCand.ToString(Inv) + "), kontrola skarbiec -" + _hfTook.ToString(Inv) + " + wierzyciele " + _hfRecv.ToString(Inv)
+                    + " = " + (_hfRecv - _hfTook).ToString(Inv) + ", ponizej zapasu wojny po wyplacie " + _hfBelow.ToString(Inv)
+                  : "")
               .Append(" | czas ").Append((_ticks * 1000.0 / Stopwatch.Frequency).ToString("0.000", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
             _stumbles = 0;

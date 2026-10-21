@@ -6648,6 +6648,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int CrownSurplusAidDays { get; set; } = 30;
 
+        [SettingPropertyBool("Crown Hoard Feeds Hungry", HintText = "the crown's treasury above its war reserve (kept for wars and hard times) feeds the realm's hungry towns: bread for the poor that neither the day's crown income nor the lord could pay, and the food bills of the realm's towns older than the early repayment age (Ks Lord Food Bills Early Share) that neither the town nor its lord can pay. Each day at most one part in Crown Surplus Aid Days of that surplus, shared by both. Never from loans, never below the war reserve, never the treasury of a realm you rule. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownHoardFeedsHungry { get; set; } = true;
+
         [SettingPropertyBool("Crown War Aid Middle", HintText = "in war the realm's treasury also helps the houses of modest means, not only the poor: above the crown's war aid by need (which keeps companies up to Crown War Aid Fill Target of their size), the treasury pays a share of the wages a house still lacks for its companies up to their full size - the whole lack while the house's gold is below its war reserve, a smaller share the richer the house, and nothing above twice the reserve (the same measure of need as the wage refund and the fief rents). Paid only from what the treasury holds above its war reserve and its debts, together with Crown Surplus Feeds Need Aid never more in a day than one part in Crown Surplus Aid Days of that surplus; coin only for men already in the companies, and room in the wage ceiling to recruit a step more. Never in peace, never to a house with spare room under its own ceiling or that paid scutage that day, and these wages are not repaid by the crown a second time. Your house the same way. Needs Crown Surplus Feeds Need Aid. Off = the crown helps only up to Crown War Aid Fill Target, as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidMiddle { get; set; } = true;
@@ -10777,6 +10781,7 @@ namespace Armoury
             s.NeedAidFromRents = NeedAidFromRents;
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
+            s.CrownHoardFeedsHungry = CrownHoardFeedsHungry;
             s.CrownWarAidMiddle = CrownWarAidMiddle;
             s.CrownWarAidCashByNeed = CrownWarAidCashByNeed;
             s.ScutageByNeed = ScutageByNeed;

@@ -38,11 +38,61 @@ namespace Armoury
 
         internal static bool CrownSurplusOn { get { var s = Settings.Current; return s != null && s.CrownSurplusFeedsNeedAid && NeedAidOn; } }
 
-        private static double CsDays(Settings s) { return Math.Max(1, s.CrownSurplusAidDays); }
+        internal static double CsDays(Settings s) { return Math.Max(1, s.CrownSurplusAidDays); }   // m105 G2: internal (linie chleba i rachunkow)
 
         private static void CrownSurplusReset()
         {
             CsClearDay(); _csErr.Clear(); _csStumbles = 0; LastCrownSurplusAid = 0;
+            _hfDay = int.MinValue; _hf.Clear();                                  // m105 G2: limit doby skarbca na glodne miasta
+        }
+
+        // ------------------------------------------------------------ m105 G2 (Crown Hoard Feeds Hungry): skarbiec ponad zapas wojny karmi glodne miasta
+        // Jeden limit dzienny na krolestwo dla chleba M3 (TownFolk.BreadRest) i rachunkow zywnosci KS-H (KsLordFood): 1/CrownSurplusAidDays nadwyzki skarbca (TreasurySurplusFor -
+        // ta sama miara co W5b) z pierwszego uzycia doby; kazda wyplata najwyzej biezaca nadwyzka (skarbiec nigdy ponizej zapasu wojny, nigdy z kredytu). Krolestwo gracza - 0.
+        private static int _hfDay = int.MinValue;
+        private static readonly Dictionary<Kingdom, long[]> _hf = new Dictionary<Kingdom, long[]>();   // krolestwo -> [limit doby, uzyte dzis]
+
+        internal static bool HoardFeedsOn { get { var s = Settings.Current; return s != null && s.CrownHoardFeedsHungry; } }
+
+        /// <summary>m105 G2: ile skarbiec krolestwa `k` moze dzis jeszcze dac glodnym miastom (zl; 0 - klucz wylaczony, krolestwo gracza, bez nadwyzki albo limit doby
+        /// wyczerpany). Tylko odczyt (limit doby zapisany przy pierwszym uzyciu). Nie rzuca.</summary>
+        internal static long HoardRoom(Kingdom k)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.CrownHoardFeedsHungry || k == null || k.IsEliminated || Campaign.Current == null) return 0;
+                if (k.RulingClan == null || k.RulingClan == Clan.PlayerClan) return 0;   // skarbiec krolestwa gracza nigdy
+                int d = (int)CampaignTime.Now.ToDays;
+                if (d != _hfDay) { _hf.Clear(); _hfDay = d; }
+                long res;
+                double sur = TreasurySurplusFor(k, out res);
+                long[] r;
+                if (!_hf.TryGetValue(k, out r)) { r = new long[2]; r[0] = (long)Math.Floor(sur / CsDays(s)); _hf[k] = r; }
+                long room = Math.Min(r[0] - r[1], (long)Math.Floor(sur));
+                return room > 0 ? room : 0;
+            }
+            catch (Exception e) { CsStumble("HoardRoom", e); return 0; }
+        }
+
+        /// <summary>m105 G2: skarbiec `k` wydal dzis `x` zl na glodne miasta (limit doby).</summary>
+        internal static void HoardUse(Kingdom k, long x)
+        {
+            long[] r;
+            if (k != null && x > 0 && _hf.TryGetValue(k, out r)) r[1] += x;
+        }
+
+        /// <summary>m105 G2 (kontrola linii, oczekiwane false): skarbiec `k` po wyplacie ponizej zapasu wojny + reszty wplywow dnia + dlugu w Banku i u miast.</summary>
+        internal static bool HoardBelow(Kingdom k)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || k == null) return false;
+                double free = (double)k.KingdomBudgetWallet - CrownIncome.LeftFor(k) - WarReserveOf(k, s) - CrownBorrow.DebtOf(k) - TownFolk.CrownTownDebt(k);
+                return free < -0.5;
+            }
+            catch (Exception e) { CsStumble("HoardBelow", e); return false; }
         }
 
         /// <summary>Nowa doba kroku W5 (NaRoll): stan doby znika razem z przydzialami W5.</summary>
