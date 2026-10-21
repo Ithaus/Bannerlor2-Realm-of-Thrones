@@ -43846,6 +43846,7 @@ def nks_main(logp, until=120, bdp=None):
     f4a7 = []   # f4-pomiary (NKS-19c): linie "KS: A7 diagnoza (f4-pomiary)"
     stum_sess = 0
     stum_hooks = 0
+    crewf = {}   # m103 P6: doba -> polow zalogi bandy na morzu (linia m96-bandy) - zrodlo i zjedzenie "bez rynku", NKS-5u odejmuje
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -43853,6 +43854,12 @@ def nks_main(logp, until=120, bdp=None):
             if s.startswith("ERROR in "):
                 if s.startswith(NKS_ERR):
                     errs += 1
+                continue
+            if s.startswith(M96BANDY_HEAD):   # m103 P6
+                mcf = M103_BANDSEA_RX.search(s)
+                dcf = num(r"dzien (\d+)", s)
+                if mcf and dcf is not None:
+                    crewf[dcf] = int(mcf.group(5))
                 continue
             if s.startswith("KS: koszt "):
                 # ks-koszt: pod-czasy doby KS (T0) i kontrola szybkich drog
@@ -44491,6 +44498,8 @@ def nks_main(logp, until=120, bdp=None):
                 cb = ub[g][1] if g in ub else 0
                 if g in ow_w:
                     cb = max(0, cb - sum(ow_w[g]))      # KS-R4 P10: bez rynku bez wies je swoje i bez strat w drodze KS-H
+                if g == "fish" and crewf:   # m103 P6: polow zalogi bandy na morzu - ramki bez osady (zrodlo i zjedzenie od razu), poza targiem z zalozenia
+                    cb = max(0, cb - sum(v for dcf, v in crewf.items() if w0 <= dcf <= w1))
                 if cm + cb >= 1000 and cb > 0.02 * cm:
                     ub_bad.append(f"{g} {100.0 * cb / cm:.1f}%" if cm > 0 else f"{g} {cb} szt. przy 0 na rynkach")
         else:
@@ -56543,6 +56552,10 @@ M96BANDY_KEYS = ("bands", "need", "eaten", "bought", "boughtGold", "buyBands", "
                  "lifeKept", "lifeKeptGold", "lifeWhole", "pocket", "pocketBands", "pocketWant", "pocketShort", "lootAi", "lootAiN", "lootPl", "lootPlN",
                  "gold", "goldPl", "lordAi", "lordPl", "stum", "stumS")
 
+# m103 P6 (BandFoodAtSea): odcinek linii doby m96-bandy tuz przed "| potkniecia" - zakup u pasera portu i polow zalogi bandy na morzu (albo WYLACZONE)
+M103_BANDSEA_RX = re.compile(r"\| z morza: paser portu (\d+) szt\. za (\d+) zl \(band (\d+), miast portowych (\d+)\), polow zalogi (\d+) szt\. \(band (\d+), ponad limit \d+ szt\./d (\d+)\) \| potkniecia")
+M103_BANDSEA_OFF = "| z morza: WYLACZONE (Band Food At Sea)"
+
 
 def m96bandy_rows(path, extra=None):
     """Linie doby m96-bandy, "Paser:" (zywnosc sprzedana) i "Wyrzutki:" (band, ludzi) -> slowniki wedlug doby (strumieniowo). extra (slownik) dostaje
@@ -56568,6 +56581,10 @@ def m96bandy_rows(path, extra=None):
                 r = {"on": "| CZYNNE" in s, "bad": False}
                 for k, v in zip(M96BANDY_KEYS, mm.groups()):
                     r[k] = (float(v) if v != "-" else 0.0) if k in ("need", "stockDays") else int(v)
+                ms13 = M103_BANDSEA_RX.search(s)   # m103 P6: odcinek "z morza" (brak - log sprzed m103 albo nierozpoznany; WYLACZONE - klucz zdjety)
+                r["sea13"] = tuple(int(x) for x in ms13.groups()) if ms13 else None
+                r["sea13off"] = M103_BANDSEA_OFF in s
+                r["sea13any"] = "| z morza: " in s
                 rows[d] = r
             elif s.startswith("Paser: dzien "):
                 d = num(r"Paser: dzien (\d+)", s)
@@ -56692,6 +56709,18 @@ def m96bandy_main(logp, bdp=None):
     sb_ = sum(r["sea"] for r in ok)
     rep.add("MB-12: bandy na morzu (srednio na dobe)", f"{sb_ / n:.1f} band, glodne {sum(r['seaHungry'] for r in ok) / n:.1f}"
             + (f" ({sum(r['seaHungry'] for r in ok) / sb_:.3f})" if sb_ else "") + f", kupily z morza {sum(r['seaBuy'] for r in ok) / n:.1f}", "INFO", None)
+    # MB-13 (m103 P6, BandFoodAtSea): odcinek "z morza" linii doby czytelny w kazdej dobie z kluczem; zakup u pasera portu i polow zalogi (srednio na dobe)
+    s13 = [r for r in ok if r.get("sea13any")]
+    if s13:
+        on13 = [r for r in s13 if not r.get("sea13off")]
+        bad13 = [r for r in on13 if r.get("sea13") is None]
+        g13 = [r["sea13"] for r in on13 if r.get("sea13") is not None]
+        n13 = max(1, len(g13))
+        rep.add("MB-13: odcinek 'z morza' (paser portu, polow zalogi) - linia czytelna", f"dob z odcinkiem {len(s13)} (z kluczem {len(on13)}, nieczytelnych {len(bad13)}, WYLACZONE {len(s13) - len(on13)})"
+                + (f"; srednio na dobe: paser portu {sum(x[0] for x in g13) / n13:.1f} szt. za {sum(x[1] for x in g13) / n13:.0f} zl ({sum(x[2] for x in g13) / n13:.1f} band, {sum(x[3] for x in g13) / n13:.1f} miast), polow zalogi {sum(x[4] for x in g13) / n13:.1f} szt. ({sum(x[5] for x in g13) / n13:.1f} band, ponad limit {sum(x[6] for x in g13) / n13:.2f})" if g13 else ""),
+                "0 nieczytelnych przy kluczu Band Food At Sea (polow zalogi ok. potrzeby piratow 150-230 szt./d)", len(bad13) == 0 if on13 else None)
+    else:
+        rep.add("MB-13: odcinek 'z morza' linii doby", "brak (log sprzed m103-gospodarka P6)", "INFO", None)
     rep.show()
     return 0
 

@@ -75,3 +75,36 @@ VR-3 na nowym formacie sprawdzony na logu syntetycznym (linie VR z 07-17-36, w 2
 **Oczekiwane progi (nowy bieg):** W12-4 5.00% TAK; W12-6 ok. 0.018 TAK przy progu 0.0167; GL2-8 TAK w nowej kampanii bez KS (27-32 dni wobec ok. 12 dni zapasu, stac 100%); VR-3 TAK 25.00 +-1.5 bez probek z podlogi, VR-3b INFO, "inne" ok. 0; VR-1 nierozpoznane 0.
 
 **Build:** Armoury kod 0.
+
+---
+
+### P6. Piraci bez jedzenia (MB-2) - klucz `BandFoodAtSea` (MCM "Band Food At Sea", grupa Iron Bank obok Bands Eat Food; TAK; NIE = kod 101)
+
+**Problem (log 101-nowa, `Armoury-2026-10-21_07-17-36.log`, grupa m96bandy):** MB-2 NIE "39700 / 68988 = 0.575"; MB-12 "62.6 band (na morzu), glodne 61.9 (0.989), kupily z morza 0.2". Ostatnia doba (109016): "potrzeba doby 586.8 szt., zjedzone 368 ... glodne 79 (bez jedzenia 79, ponad 2 doby 74, na morzu 79 z 82) ... morale z glodu -395". Z diagnozy: potrzeba piratow (southern/northern_pirates) 42.1% calej potrzeby band, brak u piratow = 99.3% luki; lad bez piratow 0.995. Piraci rosna bez jedzenia (2729 -> 4621 ludzi), bo na morzu nie bylo glodu dla werbunku.
+
+**Przyczyna (kod 101):** `BandFood.cs:330` rabunek tylko `!sea`; `:324` zakup tylko z kiesa > 0 (piraci startuja z pusta - OutlawLaw.StartGoldPostfix, kryjowki brak, jedzenie startowe NavalDLC zablokowane OutlawLaw.FoodPrefix); `:169` `Starving()` = false na morzu (glodni piraci werbuja); `:362` na morzu bez odejsc. Piraci nigdy nie schodza na lad (NavalDLC PiratesCampaignBehavior.AiHourlyTick - krazenie wokol strefy patrolu).
+
+**Zmiana (`BandFood.cs`, przy kluczu; bez klucza co do sztuki jak 101):**
+- (a) Zakup z morza u pasera miasta Z PORTEM: `PortTownOf` = dom bandy (`HomeSettlement`), jesli to otwarte miasto z `HasPort`, inaczej najblizsze otwarte miasto z portem (`Town.AllTowns`); bez portu w swiecie - najblizsze miasto jak dotad. Te same zasady: wlasna kiesa, `ShelfBuy.Take` z polki, zaplata do kasy miasta, `TownFolk.Sale`, marza pasera z odleglosci.
+- (b) Polow zalogi na morzu (`CrewFish`): po zjedzeniu z jukow zaloga lowi TYLKO brak dzisiejszej porcji (sztuki nalezne dzis `units - eat`; ulamek przechodzi na jutro jak dotad), najwyzej `CrewFishPerDay = 24` na dobe. Miara z dekompilacji NavalDLC `NavalFishingCampaignBehaviour.OnHourlyTickParty`: partia na morzu dostaje najwyzej 1 rybe na godzine (szansa = premia atutu Master Angler), czyli gorna granica gry 24/d - nie nowy mnoznik (pirat ok. 2.8 szt./d na bande 56 ludzi). Ryby dopisane i zdjete w tej samej dobie bandy - nic nie zostaje w jukach, nic do zapasu, nic do pasera (zadne zloto z niczego). Zaloga, ktora zjadla cala dzisiejsza porcje, jest najedzona (na morzu lowi codziennie, zapasu nie potrzebuje) - bez tego co druga doba wypadalaby "glodna" przez ulamek.
+- (c) `Starving()` na morzu jak na ladzie (przy kluczu): glodna banda na morzu nie werbuje z puli (OutlawLaw.cs:1354). Odejscia z glodu na morzu dalej NIE (`if (sea) return;` - gra tez nie zdejmuje dezerterow na morzu). Skutek: glodna na morzu zostaje tylko banda ponad limit polowu (ponad ok. 480 ludzi) - piraci 101 maja srednio 56 ludzi na bande.
+- Rabunek wybrzezy z morza - NIE (osobna decyzja, plan P6 c / `BandSeaRaidCoast`).
+- Linia doby m96-bandy: nowy odcinek tuz przed "| potkniecia": `| z morza: paser portu X szt. za G zl (band A, miast portowych M), polow zalogi Y szt. (band Z, ponad limit 24 szt./d K)`; bez klucza `| z morza: WYLACZONE (Band Food At Sea) - paser najblizszego miasta, bez polowu`.
+- `Settings.cs` (+ `McmSettings.cs` z gen_mcm: Armoury 2244 ustawien).
+- `tools/sprawdz_logi.py`: regex `M103_BANDSEA_RX`, odczyt odcinka w `m96bandy_rows` (nowe pola, regex MB-0 bez zmian - ma `.*?` przed "| potkniecia"), nowy prog **MB-13** (odcinek czytelny w kazdej dobie z kluczem; srednie paser portu i polow zalogi); NKS-5u (patrz nizej).
+
+**Ksiega towarow - ODSTEPSTWO OD PLANU (kontrola calosci, CLAUDE.md 8.0):** plan kazal zjadac ryby w ramce FFood (`Eat`). Sprawdzilem w kodzie, ze to zepsuloby KS: grupa "jedzenie partii" (GFood) to `GoodsLedger.KsArmy` -> `KsItem.Army` -> popyt krain Planu KS (`StartCalibration.Core.cs:662` OneToOne), a ramka z osada wpisuje zuzycie na rynek (`MkC[0/1]`), ktore czyta sterowanie KS (`StartCalibration.R3.cs:397`, `cu = _c28`, cel `tgt = cu x (1 + gap) / dm`). Ok. 230 szt./d ryb piratow to ok. 6% zuzycia ryb na rynkach (KS: rynki 100-160: Westeros 1737 + Essos 2051/d) - KS podnioslby podaz ryb dla popytu, ktory zaloga sama pokrywa. Dlatego: OBIE strony w ramkach polowu (FFish) z ta sama grupa "polow zalogi bandy" - zrodlo nazwane (etykieta `polow zalogi bandy|`) i ujscie ("zjedzone od razu na morzu"), BEZ osady w ramce (rynek "bez rynku": ryba zalogi nigdy nie stoi na straganie). Skutki: GFish/KsFishBoats bez przyrostu (A17Fix.cs:229), GFood/KsArmy bez przyrostu, GTick ("zrodla bez nazwy", bramka KS (3)) bez przyrostu, sterowanie KS bez zmian. Jedyny odczyt "bez rynku" z progiem to NKS-5u (zuzycie bez rynku <= 2% rynkow) - w narzedziu NKS-5u odejmuje od ryb "bez rynku" polow zalogi z linii m96-bandy z tego samego okna (tak jak juz odejmuje "wies je swoje" i straty KS-H). Na logu 100-160 (bez odcinka) wynik grupy nks identyczny jak przed zmiana.
+
+**Sprawdzenie bez gry:** build Armoury kod 0; gen_mcm. Narzedzie: log 101-nowa (bez odcinka) - MB-0 TAK (180 dob, 0 nierozpoznanych), MB-13 INFO "brak (log sprzed m103)"; log syntetyczny (linie m96-bandy z 07-17-36 z odcinkiem w nowym formacie, co 10. doba WYLACZONE) - MB-0 TAK (0 nierozpoznanych), MB-13 TAK (162 z kluczem, 0 nieczytelnych, 18 WYLACZONE). Grupa nks na 04-57-25: wynik identyczny ze stara wersja narzedzia.
+
+**Ryzyko / co sprawdzic:**
+- Ryby nie moga zostac w jukach: dopisanie i zdjecie sa w jednym wywolaniu `CrewFish` (wyjatek miedzy nimi = potkniecie BandFood, MB-1). Sprawdzic linie Paser: "zywnosc" z band nie rosnie przez polow (MB-9), ksiega towarow: ryby "polow zalogi bandy" zrodlo = ujscie co do sztuki.
+- Najedzeni piraci: brak kary morale z glodu (dzis ok. -5 na bande na dobe), werbuja jak dotad - moga czesciej bic sie na morzu: straty karawan i lordow na morzu (K1, lup, MB-6) porownac z 101-nowa. Piraci, ktorzy dotad rosli mimo glodu (2729 -> 4621), dalej rosna (werbunek bez zmian dla najedzonych) - MB-8 do obserwacji.
+- Zakup u pasera portu: piraci z kiesa (zapis z kiesami - 100-160: 13.5 band/d kupowalo z morza) kupuja w porcie domowym; miasto portowe moze stracic wiecej jedzenia z polki niz najblizsze miasto dotad (te same sztuki, inny paser). Glod miast portowych (nglod, GL2-6) porownac.
+- Rabunek wsi z morza nie wchodzi - wsie portowe i NC-16b bez zmian z tej strony.
+- `BanditPartyComponent`/`HomeSettlement` piratow NavalDLC to port (diagnoza); gdy nie - najblizsze miasto z portem.
+- Wylacznik: klucz NIE musi dac MB-2 ok. 0.575 i odcinek "WYLACZONE" (dowod, ze wylacznik dziala) - do krotkiego biegu kontrolnego.
+
+**Oczekiwane progi (nowa kampania 180 dob):** MB-2 z 0.575 do ok. 0.97-0.99; MB-12 glodne na morzu z 61.9/d (0.989) do ok. 0 (zostaja tylko bandy ponad 480 ludzi i doba 1); MB-3 z 0.135 do ok. 0; "morale z glodu" z ok. -310..-395/d do ok. 0; MB-13 TAK, polow zalogi ok. 150-230 szt./d (potrzeba piratow, rosnie z liczba piratow); MB-0 TAK (0 nierozpoznanych); MB-1 potkniecia 0; NKS-5u bez nowego NIE; bramka KS (3) bez przyrostu.
+
+**Build:** Armoury kod 0; gen_mcm Armoury 2244 ustawien.

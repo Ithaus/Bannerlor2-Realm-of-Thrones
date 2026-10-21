@@ -3740,6 +3740,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float BandHungerLeaveShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Band Food At Sea", HintText = "with Bands Eat Food: a band at sea buys its food through the fence of a port town (its home port, or the nearest port), and its crew fishes for whatever is still missing from the day's portion - eaten at once, never stored or sold, at most one catch an hour (24 a day); a band still hungry at sea takes no recruits, as on land. Off = at sea only the nearest town's fence (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BandFoodAtSea { get; set; } = true;
+
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ('Year 299, Day 256, Autumn')", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
@@ -9918,6 +9922,7 @@ namespace Armoury
             s.BandFoodKeepDays = BandFoodKeepDays;
             s.BandPurseKeepDays = BandPurseKeepDays;
             s.BandHungerLeaveShare = BandHungerLeaveShare;
+            s.BandFoodAtSea = BandFoodAtSea;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;
