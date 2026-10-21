@@ -1044,6 +1044,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
                     KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
+--grupa m105drobne : (21/22.10, w-toku/m105-drobne; Armoury/src/QuestGangAxes.cs, klucz QuestGangAxesFix; CrashScribe/src/Watchdog.cs) python -I tools/sprawdz_logi.py
+                    --grupa m105drobne <Armoury-*.log> [--crashscribe <session-*.log>]. DR-1 ERROR QuestGangAxes / QuestPay8.ShownReward 0 (T-4), DR-2 latka sprawy
+                    broni gangu WPIETA w kazdej sesji z kluczem, DR-3 sprawy broni gangu - srednia po zmianie >= 1 (brak spraw - INFO), DR-4 (z --crashscribe) po linii
+                    'Straznik zawieszen: gra sie zamyka' 0 blokow GAME HANG. Ludzie Gory (m105-drobne pkt 1): grupa m104e5 (E5-8b, E5-8c, E5-9).
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -38267,6 +38271,94 @@ def m105kolko_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m105drobne (21/22.10, w-toku/m105-drobne: punkt 7 PRZEKAZANIE "Drobne" po tescie 102 -
+# (2) T-4 sprawa broni gangu ze srednia wazona ceny siekier (Armoury/src/QuestGangAxes.cs, klucz QuestGangAxesFix), (8a) straznik zawieszen CrashScribe milknie
+# przy zamykaniu gry (CrashScribe/src/Watchdog.cs - log CrashScribe przez --crashscribe). Ludzie Gory (pkt 1) - grupa m104e5 (E5-8b, E5-8c, E5-9).
+M105D_GA = "Bron gangu (T-4"
+M105D_GA_START = re.compile(r"^Bron gangu \(T-4, klucz Quest Gang Axes Fix (TAK|NIE)\): (.*?) \| sprawy broni gangu z zapisu (\d+), naprawione (\d+)")
+M105D_GA_ONE = re.compile(r"^Bron gangu \(T-4\): (NAPRAWIONA sprawa|nowa sprawa) .*? - srednia ceny siekier gry (-?\d+).*? -> (-?\d+) d \(")
+M105D_ERR = ("ERROR in QuestGangAxes.", "ERROR in QuestPay8.ShownReward")
+M105D_CS_CLOSE = "Straznik zawieszen: gra sie zamyka"
+M105D_CS_HANG = "# GAME HANG"
+
+
+def m105drobne_main(logp, csp):
+    """m105drobne (21/22.10, w-toku/m105-drobne; PRZEKAZANIE-2026-10-21 pkt 7 "Drobne" po tescie 102): DR-1 ERROR QuestGangAxes i QuestPay8.ShownReward 0 (T-4:
+    DivideByZero w sprawie broni gangu), DR-2 linia startu 'Bron gangu (T-4, ...)' w kazdej sesji z latka WPIETA (klucz NIE - INFO), DR-3 sprawy broni gangu nowe
+    i naprawione - kazda srednia po zmianie >= 1 (brak spraw - INFO), DR-4 (z --crashscribe <session-*.log>): po linii 'Straznik zawieszen: gra sie zamyka' zaden
+    blok '# GAME HANG' (falszywe hang-*.log przy wyjsciu z gry; zawieszenia w trakcie gry nadal sie licza - INFO z liczba). Log bez linii m105: INFO."""
+    rep = Report()
+    if logp and not os.path.isfile(logp):
+        rep.add("DR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, err_ex, starts, ones = 0, [], [], []
+    if logp:
+        with open(logp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                m = TS.match(ln.rstrip("\n"))
+                s = m.group(2) if m else ln.rstrip("\n")
+                if s.startswith(M105D_ERR):
+                    n_err += 1
+                    if len(err_ex) < 2:
+                        err_ex.append(s[:120])
+                    continue
+                if not s.startswith(M105D_GA):
+                    continue
+                ms = M105D_GA_START.match(s)
+                if ms:
+                    starts.append(ms.groups())
+                    continue
+                mo = M105D_GA_ONE.match(s)
+                if mo:
+                    ones.append((mo.group(1), int(mo.group(2)), int(mo.group(3))))
+        print(f"plik: {logp} | linii startu T-4 {len(starts)}, spraw broni gangu (nowe/naprawione) {len(ones)}, ERROR {n_err}")
+        rep.add("DR-1: ERROR QuestGangAxes / QuestPay8.ShownReward (T-4)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+        if not starts:
+            rep.add("DR-2: latka sprawy broni gangu (linia startu)", "brak linii 'Bron gangu (T-4, ...)'", "INFO (log sprzed paczki m105-drobne)", None)
+        else:
+            on = [x for x in starts if x[0] == "TAK"]
+            bad = [x for x in on if "WPIETA" not in x[1]]
+            fixed_load = sum(int(x[3]) for x in starts)
+            if not on:
+                rep.add("DR-2: latka sprawy broni gangu (linia startu)", f"sesji {len(starts)}, klucz NIE", "INFO (klucz Quest Gang Axes Fix wylaczony)", None)
+            else:
+                rep.add("DR-2: latka sprawy broni gangu (linia startu)", f"sesji z kluczem TAK {len(on)}, bez WPIETA {len(bad)}" + (f" ({bad[0][1][:90]})" if bad else "")
+                        + f", spraw z zapisu naprawionych {fixed_load}", "kazda sesja z kluczem: WPIETA", not bad)
+        if not ones:
+            rep.add("DR-3: sprawy broni gangu (nowe i naprawione)", "brak", "INFO (zadna sprawa 'Gang Leader Needs Weapons' nie powstala)", None)
+        else:
+            nfix = sum(1 for x in ones if x[0].startswith("NAPRAWIONA"))
+            low = [x for x in ones if x[2] < 1]
+            zero_game = sum(1 for x in ones if x[1] <= 0)
+            med_game = sorted(x[1] for x in ones)[len(ones) // 2]
+            med_new = sorted(x[2] for x in ones)[len(ones) // 2]
+            rep.add("DR-3: sprawy broni gangu (nowe i naprawione)", f"{len(ones)} (naprawione {nfix}, srednia gry 0: {zero_game}), mediana sredniej gry {med_game} d -> nasza {med_new} d,"
+                    f" ponizej 1 d: {len(low)}", "kazda srednia po zmianie >= 1", not low)
+    if csp:
+        if not os.path.isfile(csp):
+            rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"brak pliku {csp}", "podaj <session-*.log>", None)
+        else:
+            closing, hang_after, hang_before = False, 0, 0
+            with open(csp, encoding="utf-8", errors="replace") as fh:
+                for ln in fh:
+                    if M105D_CS_CLOSE in ln:
+                        closing = True
+                    elif ln.startswith(M105D_CS_HANG):
+                        if closing:
+                            hang_after += 1
+                        else:
+                            hang_before += 1
+            if not closing:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"brak linii '{M105D_CS_CLOSE}' (zawieszenia w grze {hang_before})",
+                        "INFO (log sprzed paczki m105-drobne albo gra nie zamknieta zwyczajnie)", None)
+            else:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"po zamknieciu {hang_after}, w trakcie gry {hang_before} (INFO)", "po zamknieciu 0", hang_after == 0)
+    if not logp and not csp:
+        rep.add("DR-0: logi", "brak", "podaj <Armoury-*.log> i/albo --crashscribe <session-*.log>", None)
+    rep.show()
+    return 0
+
 # ------------------------------------------------------------ m104wojny (21.10, w-toku/m104-wojny: wojny wedlug ksiazki - (1) wojny fabularne ROT czysto essoskie na
 # kalendarzu w kampanii z prologiem, (2) Reach z korona po smierci Renly'ego (pokoj z Dorne, sojusz, pakt Reach-Dorne) i Dorne z korona po zareczynach Myrcelli (pakt),
 # (3) mlode smoki Daenerys - wierzchowiec wedlug etapu; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
@@ -56556,6 +56648,8 @@ def main(argv):
         return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
     if group == "m105kolko" and logp:
         return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
+    if group == "m105drobne" and (logp or csp):
+        return m105drobne_main(logp, csp)   # m105drobne (21/22.10, w-toku/m105-drobne): T-4 sprawa broni gangu (QuestGangAxes), straznik zawieszen CrashScribe przy zamykaniu gry (--crashscribe)
     if group == "m104wojny" and logp:
         return m104wojny_main(logp)   # m104wojny (21.10, w-toku/m104-wojny): Essos na kalendarzu w prologu, Reach i Dorne z korona, mlode smoki Daenerys (Prologue.Wars/Crown/Dragons)
     if group == "m100kryjowki" and logp:
