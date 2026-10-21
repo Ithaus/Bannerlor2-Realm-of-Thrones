@@ -38154,6 +38154,8 @@ M99M_REV = re.compile(r"morale RecentEvents (-?[0-9.]+) -> (-?[0-9.]+) \(dodatek
 # m103-drobne: odziez z rzedu (potrzeba druzyny przed -> po, kupione) i praczki (cena = praczki x doby x dniowka)
 M99M_CLO = re.compile(r"potrzeba skora ([0-9.]+), sukno ([0-9.]+), plotno ([0-9.]+) -> skora ([0-9.]+), sukno ([0-9.]+), plotno ([0-9.]+) \| kupione skora (\d+), sukno (\d+), plotno (\d+)")
 M99M_WASH = re.compile(r"-> praczek (\d+) \(1 na (\d+)\) x (\d+) dob x dniowka ([0-9.]+) = (\d+)")
+M99M_WASHMEN = re.compile(r"druzyna gracza (\d+) ludzi \(bez bohaterow\) -> praczek")              # poprawka po recenzji m103: ludzie w chwili najecia
+M99M_WASHCOV = re.compile(r"\| objeci do (\d+) ludzi \(praczki x (\d+)")                           # poprawka po recenzji m103: objeci oplaconymi praczkami
 
 
 def m99markietani_main(logp):
@@ -38211,7 +38213,9 @@ def m99markietani_main(logp):
                 clos.append(tuple(float(mcl.group(i)) for i in range(1, 10)))
             mw = M99M_WASH.search(body)
             if mw and kind == "praczki":
-                washes.append((int(mw.group(1)), int(mw.group(2)), int(mw.group(3)), float(mw.group(4)), int(mw.group(5))))
+                mm, mv = M99M_WASHMEN.search(body), M99M_WASHCOV.search(body)
+                washes.append((int(mw.group(1)), int(mw.group(2)), int(mw.group(3)), float(mw.group(4)), int(mw.group(5)),
+                               int(mm.group(1)) if mm else None, int(mv.group(1)) if mv else None))
     print(f"plik: {logp} | startow {len(starts)}, uzyc {len(uses)} (sklep otwarty {opened}, zamkniety {len(shops)}), linii doby {len(days)}, ERROR {n_err}")
     if not starts and not uses:
         rep.add("MK-0: linia 'Markietani obozu (m99): start sesji'", "brak w logu", "INFO (log sprzed paczki m99-markietani albo menu glowne)", None)
@@ -38243,7 +38247,9 @@ def m99markietani_main(logp):
     rep.add("MK-8: odziez z rzedu - potrzeba druzyny spada o kupione sztuki", f"zakupow {len(clos)}, niezgodnych {len(badc)}" + (f" (np. {badc[0]})" if badc else ""),
             "0 niezgodnych", (len(badc) == 0) if clos else None)
     badw = [w for w in washes if not (0 <= w[4] - w[0] * w[2] * w[3] < 1.0 + 1e-6)]   # cena = sufit iloczynu (dniowka w logu do 0.01)
-    rep.add("MK-9: praczki - cena = praczki x doby x dniowka", f"najec {len(washes)}, niezgodnych {len(badw)}" + (f" (np. {badw[0]})" if badw else ""),
+    # poprawka po recenzji m103: objeci = praczki x ludzi na praczke i nie mniej niz ludzie w chwili najecia (linia bez pola - log sprzed poprawki, bez sprawdzenia)
+    badw += [w for w in washes if w[6] is not None and (w[6] != w[0] * w[1] or (w[5] is not None and w[6] < w[5])) and w not in badw]
+    rep.add("MK-9: praczki - cena = praczki x doby x dniowka, objeci = praczki x ludzi na praczke", f"najec {len(washes)}, niezgodnych {len(badw)}" + (f" (np. {badw[0]})" if badw else ""),
             "0 niezgodnych", (len(badw) == 0) if washes else None)
     rep.show()
     return 0
@@ -54769,6 +54775,9 @@ def m96len_main(logp):
 
 # ============================================================ m97wioski (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs): wjazd do wiosek pobocznych
 M97W_PRE = "Wioski poboczne (WP): "
+# poprawka po recenzji (WP-7): granica sesji - linie wypisywane po kazdym wczytaniu / nowej kampanii przed pierwsza godzina rabunku (zegar ksiegi - NightClock.Reset
+# z NightRest.ResetWorld, ta sama chwila co zerowanie licznika godzin rabunku doby; start wiosek pobocznych - OnSessionLaunched)
+M97W_SESS = ("Nocleg (zegar ksiegi): start sesji", M97W_PRE + "start sesji")
 M97W_RX = {
     "trade": re.compile(r"handel w (.+?) zamkniety: gracz ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\), wies okregu (\S+) ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\)"),
     "trib": re.compile(r"okup (.+?) \(.*kontrola: gracz \+(-?\d+) / wies -(-?\d+)\)"),
@@ -54785,24 +54794,36 @@ def m97wioski_main(logp):
     """m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do kazdej wioski pobocznej - handel koszykiem, nocleg, oboz, prace, rabunek tej wioski, okup (SideVillageVisit).
     Log Armoury strumieniowo. Progi: WP-0 start sesji, WP-1 linie ERROR SideVillageVisit 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi o -zysk gracza
     i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO), WP-7 (m103-drobne) rabunek jako praca
-    w ksiedze snu: linie "godzina rabunku liczona jak praca" i suma godzin w linii gracza o swicie (suma >= liczba linii dobowych). Log bez galezi: INFO, bez wyjatku."""
+    w ksiedze snu: linie "godzina rabunku liczona jak praca" i suma godzin w linii gracza o swicie (suma >= liczba linii dobowych). Log bez galezi: INFO, bez wyjatku.
+    Poprawka po recenzji: WP-7 liczony osobno w kazdej sesji (licznik godzin rabunku doby zeruje sie przy kazdym wczytaniu - NightRest.ResetWorld z konstruktora
+    ArmouryBehavior; granica sesji = linia "Nocleg (zegar ksiegi): start sesji" albo "Wioski poboczne (WP): start sesji"), w kazdej sesji najwyzej 1 linia doby bez switu."""
     rep = Report()
     start, days, trades, tribs, raids, errs = [], [], [], [], [], 0
     rw_lines, rw_kinds, rw_dawn, rw_dawn_lines = 0, {}, 0, 0
+    # poprawka po recenzji: WP-7 w kazdej sesji osobno - [linie doby, godziny w liniach switu] biezacej sesji; sesje z linia doby trafiaja do rw_sess przy granicy
+    rw_cur, rw_sess = [0, 0], []
+
+    def rw_close():
+        if rw_cur[0] or rw_cur[1]:
+            rw_sess.append((rw_cur[0], rw_cur[1]))
+        rw_cur[0] = rw_cur[1] = 0
+
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97W_SESS):
+                rw_close()
             if "ERROR in SideVillageVisit." in s:
                 errs += 1
             mw = M97W_RX["work"].search(s)
             if mw:
-                rw_lines += 1
+                rw_lines += 1; rw_cur[0] += 1
                 rw_kinds[mw.group(2)] = rw_kinds.get(mw.group(2), 0) + 1
             if s.startswith("NocnyMarsz: gracz o swicie"):
                 md = M97W_RX["workdawn"].search(s)
                 if md:
-                    rw_dawn += int(md.group(1)); rw_dawn_lines += 1
+                    rw_dawn += int(md.group(1)); rw_dawn_lines += 1; rw_cur[1] += int(md.group(1))
             if not s.startswith(M97W_PRE):
                 continue
             t = s[len(M97W_PRE):]
@@ -54816,6 +54837,7 @@ def m97wioski_main(logp):
                 tribs.append(t)
             elif t.startswith("rabunek ") and " - koniec: " in t:
                 raids.append(t)
+    rw_close()
     print(f"plik: {logp} | start {len(start)}, doby {len(days)}, handel {len(trades)}, okupy {len(tribs)}, rabunki {len(raids)}, ERROR {errs}")
     if not start and not days:
         rep.add("WP-0: linia startu wiosek pobocznych", "brak linii", "INFO (log sprzed galezi m97-wioski)", None)
@@ -54864,9 +54886,11 @@ def m97wioski_main(logp):
             ent += int(m.group(3)); tr += int(m.group(5)); rest += int(m.group(6)); camp += int(m.group(8)); inv += int(m.group(9))
     rep.add("WP-6: ruch doby (suma)", f"wjazdy {ent}, handel {tr}, noclegi {rest}, obozy {camp}, okna prac {inv}", "INFO", None)
     if rw_dawn_lines:
-        rep.add("WP-7: rabunek jako praca (Raid Counts As Work) - linie doby / godziny w liniach switu",
-                f"linii {rw_lines} {rw_kinds}, godzin bez odpoczynku {rw_dawn} w {rw_dawn_lines} liniach switu",
-                "godzin >= linii - 1 (kazda linia doby to co najmniej 1 h; ostatnia doba logu bez switu)", rw_dawn >= rw_lines - 1)
+        rw_bad = [x for x in rw_sess if x[1] < x[0] - 1]
+        rep.add("WP-7: rabunek jako praca (Raid Counts As Work) - linie doby / godziny w liniach switu, w kazdej sesji",
+                f"linii {rw_lines} {rw_kinds}, godzin bez odpoczynku {rw_dawn} w {rw_dawn_lines} liniach switu; sesji z rabunkiem {len(rw_sess)}, niezgodnych {len(rw_bad)}"
+                + (f" (np. linii {rw_bad[0][0]}, godzin {rw_bad[0][1]})" if rw_bad else ""),
+                "w kazdej sesji godzin >= linii - 1 (kazda linia doby to co najmniej 1 h; ostatnia doba sesji - zapis/wczytanie albo koniec logu - bez switu)", not rw_bad)
     else:
         rep.add("WP-7: rabunek jako praca", f"linii {rw_lines}, brak pola w liniach switu (log sprzed m103-drobne)", "INFO", None)
     rep.show()
@@ -54904,11 +54928,14 @@ def m98_per_drink(charm, pool, by_charm):
 M98P_ERR = ("ERROR in InnDrink.", "ERROR in Rumours.", "ERROR in SyncData.arm_drink", "ERROR in SyncData.arm_rumours")
 # KP-1b (z --crashscribe): bloki bledow CrashScribe ("# ERROR ...") ze stosem w kodzie kufli i plotek
 M98P_CS = ("Armoury.InnDrink.", "Armoury.Rumours.")
+M98P_CS_TS = re.compile(r"\[\d\d:\d\d:\d\d\] ")   # poprawka po recenzji: zwykla linia logu CrashScribe (poza blokiem bledu)
 
 
 def m98plotki_cs_errors(csp):
-    """KP-1b: bloki "# ERROR ..." logu sesji CrashScribe, w ktorych stos (STACK / CALLER) przechodzi przez Armoury.InnDrink. albo Armoury.Rumours. - (bloki, przyklad)."""
-    n, ex, block = 0, None, []
+    """KP-1b: bloki "# ERROR ..." logu sesji CrashScribe, w ktorych stos (STACK / CALLER) przechodzi przez Armoury.InnDrink. albo Armoury.Rumours. - (bloki, przyklad).
+    Poprawka po recenzji: blok (Scribe.Report: "#####", "# ERROR ...", "#####", tresc, "#####") konczy sie na drugiej linii "#####" od naglowka albo na pierwszej
+    zwyklej linii "[HH:MM:SS] ..." - zwykle linie CrashScribe po bloku (breadcrumb, Net, Mends) nie trafiaja do bloku."""
+    n, ex, block, seps = 0, None, [], 0
 
     def close(b):
         nonlocal n, ex
@@ -54921,9 +54948,19 @@ def m98plotki_cs_errors(csp):
         for ln in fh:
             if ln.startswith("# ERROR"):
                 close(block)
-                block = [ln]
+                block, seps = [ln], 0
             elif block:
-                block.append(ln)
+                if ln.startswith("#####"):
+                    seps += 1
+                    block.append(ln)
+                    if seps >= 2:            # 1. "#####" zamyka naglowek, 2. - tresc bloku
+                        close(block)
+                        block = []
+                elif M98P_CS_TS.match(ln):   # zwykla linia logu CrashScribe - blok bez zamkniecia (urwany) konczy sie tutaj
+                    close(block)
+                    block = []
+                else:
+                    block.append(ln)
     close(block)
     return n, ex
 

@@ -177,8 +177,9 @@ namespace Armoury
                 if (Undead.Party(mp)) return;                                   // trup nie zdziera butow (i nie ma sakiewki)
                 int men = mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;   // bez bohaterow - lord ubiera sie z wlasnej kiesy
                 if (men <= 0 || !Items()) return;
-                // m103-drobne (SutlerLaundry): praczki oplacone w rzedzie markietanow - druzyna gracza zdziera dzis mniej (czesc doby zuzycia, jak share garnizonu)
-                float share = mp.IsMainParty ? CampSutlers.LaundryShare() : 1f;
+                // m103-drobne (SutlerLaundry): praczki oplacone w rzedzie markietanow - druzyna gracza zdziera dzis mniej (czesc doby zuzycia, jak share garnizonu);
+                // poprawka po recenzji: ulga tylko na czesc objeta oplaconymi praczkami (LaundryShare(men) - rekruci ponad oplaconych zdzieraja w pelni)
+                float share = mp.IsMainParty ? CampSutlers.LaundryShare(men) : 1f;
                 Accrue(mp.StringId, men, true, share);
                 if (share < 1f)
                 {
