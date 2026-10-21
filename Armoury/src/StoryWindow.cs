@@ -51,6 +51,7 @@ namespace Armoury
         private static object _state;   // EventPopupState okna (typ ROT - tylko jako object)
         private static long _openedAt;
         private static int _stumbles, _shownRot, _shownInquiry;
+        private static int _rotKnown;   // 0 - nie sprawdzone, 1 - ROT jest, -1 - brak ROT (stale dla procesu)
 
         internal static bool IsOpen { get { return _open != null; } }
         internal static Spec Open { get { return _open; } }
@@ -106,7 +107,9 @@ namespace Armoury
         {
             try
             {
-                if (AccessTools.TypeByName("ROT.Events.EventBase") == null) return "brak ROT (ROT.Events.EventBase)";
+                // AccessTools.TypeByName przeszukuje wszystkie zestawy (dziesiatki modow) - raz na proces
+                if (_rotKnown == 0) _rotKnown = AccessTools.TypeByName("ROT.Events.EventBase") != null ? 1 : -1;
+                if (_rotKnown < 0) return "brak ROT (ROT.Events.EventBase)";
                 var data = UIResourceManager.SpriteData;
                 if (data == null || data.SpriteCategories == null || !data.SpriteCategories.ContainsKey("ui_event_category")) return "brak kategorii sprite'ow ui_event_category (ROT-Content)";
                 return null;
