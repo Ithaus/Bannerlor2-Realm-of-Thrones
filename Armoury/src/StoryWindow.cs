@@ -124,6 +124,9 @@ namespace Armoury
             object found = null;
             foreach (var g in gsm.GameStates)
                 if (g is ROT.CampaignBehaviors.EventPopupState && ReferenceEquals(EventOf(g), ev)) found = g;
+            // EventPopupState.Event nieczytelne (zmiana ROT) - okno ROT na wierzchu jest nasze (straznik pcha tylko, gdy zadnego okna wydarzenia nie bylo na stosie);
+            // bez tego zapas pokazalby drugie okno obok naszego
+            if (found == null && _pEvent == null && gsm.ActiveState is ROT.CampaignBehaviors.EventPopupState) found = gsm.ActiveState;
             return found;
         }
 

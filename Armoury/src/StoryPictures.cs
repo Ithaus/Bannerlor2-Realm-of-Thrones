@@ -209,6 +209,7 @@ namespace Armoury
                 EngineTex tex = EngineTex.CreateFromMemory(bytes);
                 double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
                 if ((object)tex == null) { how = Bad(file, stamp, size, "silnik nie odczytal obrazka (CreateFromMemory = null)"); return null; }
+                if (!tex.IsValid) { how = Bad(file, stamp, size, "silnik nie odczytal obrazka (tekstura bez wskaznika)"); return null; }
                 _seq++;
                 try { tex.Name = name + "_" + _seq.ToString(Inv); } catch { }
                 var ui = new UiTex(new EngineTexture(tex));
