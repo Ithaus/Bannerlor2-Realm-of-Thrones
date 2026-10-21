@@ -2004,6 +2004,16 @@ namespace Armoury
         // Poprawka po recenzji: przed warsztatami typ OSTATECZNY startu sesji - T8, potem len GL5 (GoodsRates) i winnice B6 (VineOlive), stan GL5 / B6 przypiety.
         public bool ClimateBeforeWorkshops = true;         // with Village Climate Fix: in a NEW campaign the villages take their final produce (the climate fix, and also the new flax villages and the southern vineyards and olive groves when Goods Rates By Pattern and Vine Olive By Climate are on) before the game sets up the town workshops, so each town starts with workshops that use what its own villages grow (no velvet looms waiting for cotton the hills around no longer give). A loaded save is not touched; off = the town workshops of a new campaign are chosen from the map's own village types as before (the villages change at session start)
 
+        // --- Battle reinforcements ---
+        // m97-posilki (Jeff 20.10: "wojsko za szybko pojawia sie ... powinno pojawiac sie tylko, jesli jest naprawde blisko, i im jest dalej, tym dluzej sie
+        // na nie czeka"): DynamicReinforcements liczy czas dojscia z ulamka promienia skanu i tnie go do ArrivalCap (u Jeffa: kazdy w promieniu 50 jedn.
+        // - ok. 240 km - po najwyzej 60 s). DrMarchArrival: czas = rozwiniecie + godziny marszu x sekundy na godzine, ponad DrMaxMarchHours odmowa DR "za daleko".
+        // Nowe klucze - nie ma ich w Armoury.json Jeffa (wchodza domyslne). Linia logu "Posilki marszem (m97-posilki):" przy starcie sesji i przy kazdej bitwie DR
+        public bool DrArrivalByMarch = true;               // Dynamic Reinforcements: help arrives only as fast as it can march - only parties within a short march join your battle, and the farther away they are, the later they arrive (the time comes from the distance and the party's own map speed; garrisons and militia march out on foot). Parties beyond the longest march below do not come at all (DR tells you they are too far to reach you in time). Replaces the Arrival Cap of Dynamic Reinforcements; troop numbers and its other rules stay the same. Off: Dynamic Reinforcements as before (everyone within its scan radius arrives within the Arrival Cap)
+        public float DrMaxMarchHours = 2f;                 // with Dr Arrival By March: the longest march, in map hours, that still brings help into a battle - parties farther away than this do not come
+        public float DrSecondsPerMarchHour = 120f;         // with Dr Arrival By March: seconds of battle you wait for every hour the party has to march (2 hours away = 240 s more)
+        public float DrDeploySeconds = 30f;                // with Dr Arrival By March: seconds of battle any party needs to form up and enter the field, on top of its march
+
         // --- Grateful villages ---
         public bool BanditCheerEnabled = true;             // villages near your victory over bandits thank you - relations with their notables improve
         public int BanditCheerRadius = 50;                 // how far from the battlefield a village still hears the good news (map distance)

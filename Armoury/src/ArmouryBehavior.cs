@@ -2119,6 +2119,7 @@ namespace Armoury
             try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }   // sklad7: jedyne odtworzenie zbrojowni zalog (K1c GarrisonKit.RestoreArmories usuniete)
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
+            try { DrMarchArrival.EnsureHooks(); } catch (Exception e) { Log.Error("DrMarchArrival.EnsureHooks", e); }   // m97-posilki: posilki DR marszem - latki raz na proces, linia "Posilki marszem (m97-posilki): start"
             try { SkillLedger.EnsureHooks(); } catch (Exception e) { Log.Error("SkillLedger.EnsureHooks", e); }   // E8/P1 (243): ksiega umiejetnosci - latki-liczniki w kampanii (raz na proces, tylko przy SkillLedgerLog), linia startu sesji
             try { XpFair.EnsureHooks(); } catch (Exception e) { Log.Error("XpFair.EnsureHooks", e); }   // E8/X (248): doswiadczenie za skutek - latki w kampanii (raz na proces, tylko sprawy wlaczone), linia "FairXp (E8/X): start sesji"
             try { LogGate.SessionLine(); } catch (Exception e) { Log.Error("LogGate.SessionLine", e); }   // NW O4: linia "Ciche logi (NW)" - stan klucza i tryb (gra / autotest / profil)

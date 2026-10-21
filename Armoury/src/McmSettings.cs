@@ -5440,6 +5440,22 @@ namespace Armoury
         [SettingPropertyGroup("Northern fare")]
         public bool ClimateBeforeWorkshops { get; set; } = true;
 
+        [SettingPropertyBool("Dr Arrival By March", HintText = "Dynamic Reinforcements: help arrives only as fast as it can march - only parties within a short march join your battle, and the farther away they are, the later they arrive (the time comes from the distance and the party's own map speed; garrisons and militia march out on foot). Parties beyond the longest march below do not come at all (DR tells you they are too far to reach you in time). Replaces the Arrival Cap of Dynamic Reinforcements; troop numbers and its other rules stay the same. Off: Dynamic Reinforcements as before (everyone within its scan radius arrives within the Arrival Cap)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public bool DrArrivalByMarch { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Dr Max March Hours", 0.25f, 6.00f, "0.00", HintText = "with Dr Arrival By March: the longest march, in map hours, that still brings help into a battle - parties farther away than this do not come", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public float DrMaxMarchHours { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Dr Seconds Per March Hour", 10.00f, 600.00f, "0", HintText = "with Dr Arrival By March: seconds of battle you wait for every hour the party has to march (2 hours away = 240 s more)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public float DrSecondsPerMarchHour { get; set; } = 120f;
+
+        [SettingPropertyFloatingInteger("Dr Deploy Seconds", 0.00f, 300.00f, "0", HintText = "with Dr Arrival By March: seconds of battle any party needs to form up and enter the field, on top of its march", RequireRestart = false)]
+        [SettingPropertyGroup("Battle reinforcements")]
+        public float DrDeploySeconds { get; set; } = 30f;
+
         [SettingPropertyBool("Bandit Cheer Enabled", HintText = "villages near your victory over bandits thank you - relations with their notables improve", RequireRestart = false)]
         [SettingPropertyGroup("Grateful villages")]
         public bool BanditCheerEnabled { get; set; } = true;
@@ -10063,6 +10079,10 @@ namespace Armoury
             s.WoodlotByClimate = WoodlotByClimate;
             s.VillageClimateFix = VillageClimateFix;
             s.ClimateBeforeWorkshops = ClimateBeforeWorkshops;
+            s.DrArrivalByMarch = DrArrivalByMarch;
+            s.DrMaxMarchHours = DrMaxMarchHours;
+            s.DrSecondsPerMarchHour = DrSecondsPerMarchHour;
+            s.DrDeploySeconds = DrDeploySeconds;
             s.BanditCheerEnabled = BanditCheerEnabled;
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
