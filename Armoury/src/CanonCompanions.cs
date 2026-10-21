@@ -39,6 +39,10 @@ namespace Armoury
     ///   martwa, u gracza (rod, towarzysz, druzyna) albo w niewoli gracza; glowa rodu nie zmienia rodu. Zmiana rodu lorda z druzyna - wzor gry
     ///   MarriageAction.HandleClanChangeAfterMarriageForHero (armia, RemoveTroop, MakeHeroFugitiveAction, DisbandPartyAction.StartDisband - ludzie nie przepadaja).
     ///   Prolog: jedno miejsce do podpiecia - PrologDays() (galaz m101-prolog).
+    /// RATUNEK (poprawka po recenzji): ROT niszczy rody DestroyClanAction (RenlyDeath - rod Renly'ego, JeorMutiny - Nocna Straz Jeora, Bastards, StannisDeath), a gra
+    ///   usuwa wtedy (Lost) wszystkich czlonkow poza glowa - Brienne, Benjen, Samwell, Yoren znikaliby bez zmian m16/m17/m21. OnClanDestroyedEvent (przed usunieciem
+    ///   czlonkow) przenosi postacie kanonu z niszczonego rodu do rodu z #rescue (rod Renly'ego -> Tarth, Nocna Straz Jeora -> Snow); bez wiersza - znikaja z rodem
+    ///   (linia logu). Zrodlo kazdego usuniecia (Lost) postaci kanonu - zapis (lost) i CanonRemovedBy dla UC (Armoury albo cudzy kod).
     /// Wyjatek per obiekt - licznik potkniec (CLAUDE.md 7), nic nie gasnie.
     /// </summary>
     internal static class CanonCompanions
@@ -60,6 +64,13 @@ namespace Armoury
             public string[] Terms = NoTerms;
         }
 
+        /// <summary>#rescue: rod niszczony przez DestroyClanAction (wydarzenie ROT: RenlyDeath, JeorMutiny...) -> rod, do ktorego przechodza postacie kanonu z niego
+        /// (gra usuwa wszystkich czlonkow niszczonego rodu poza glowa - KillCharacterAction.ApplyByRemove, Lost).</summary>
+        internal sealed class RescueRow
+        {
+            public string Clan = "", To = "", Note = "";
+        }
+
         private static readonly string[] NoTerms = new string[0];
         private static readonly HashSet<string> KnownActions = new HashSet<string>(StringComparer.Ordinal)
             { "clan", "court", "lead", "prisoner", "free", "wander", "remove", "die", "marry", "wed" };
@@ -74,6 +85,8 @@ namespace Armoury
         private static readonly Dictionary<string, StartRow> _byTpl = new Dictionary<string, StartRow>(StringComparer.Ordinal);
         private static int _nA, _nB, _nC, _nD;
         private static readonly List<MoveRow> _moves = new List<MoveRow>();
+        private static readonly Dictionary<string, RescueRow> _rescue = new Dictionary<string, RescueRow>(StringComparer.Ordinal);
+        private static readonly HashSet<string> _whoIds = new HashSet<string>(StringComparer.Ordinal);   // id bohaterow (nie wzorow) z #move, np. ROTlord_177
         private static int _badRows;
 
         // --- stan w zapisie (arm_canon_companions) ---
@@ -86,6 +99,9 @@ namespace Armoury
         private static readonly Dictionary<string, string> _done = new Dictionary<string, string>(StringComparer.Ordinal);   // id zmiany -> "dzien|ok" / "dzien|skip"
         private static readonly Dictionary<string, int> _first = new Dictionary<string, int>(StringComparer.Ordinal);      // wyzwalacz (bez +N) -> pierwszy dzien prawdy
         private static readonly Dictionary<string, int> _pend = new Dictionary<string, int>(StringComparer.Ordinal);       // id zmiany w toku -> dzien od ktorego czeka
+        private static readonly HashSet<string> _gone = new HashSet<string>(StringComparer.Ordinal);       // rody zniszczone w tej kampanii (OnClanDestroyed; ROT wyjmuje
+                                                                                                             // rod Renly'ego i Stannisa z Clan.All - kontrola odwolan)
+        private static readonly Dictionary<string, string> _lostBy = new Dictionary<string, string>(StringComparer.Ordinal);  // klucz postaci -> kto usunal (Lost)
 
         // --- sesja ---
         private static int _st, _stDay, _commanderNulled, _commanderNulledDay;
@@ -99,6 +115,8 @@ namespace Armoury
         private static bool _installed, _pCommander, _pSpawn;
         private static string _patchLine = "";
         private static bool _startLineSaid;
+        private static string _removingKey, _removingWhy;   // na czas wlasnego KillCharacterAction.ApplyByRemove (zrodlo usuniecia dla UC i linii Lost)
+        private static int _rescDay, _rescTotal, _lostOtherDay;
 
         internal static bool Active { get { return _on; } }
 
@@ -110,7 +128,9 @@ namespace Armoury
             _st = _stDay = _commanderNulled = _commanderNulledDay = 0;
             _spawnBlocked = _spawnBlockedDay = _removedAfter = 0;
             _spawnSaid.Clear();
-            _done.Clear(); _first.Clear(); _pend.Clear();
+            _done.Clear(); _first.Clear(); _pend.Clear(); _gone.Clear(); _lostBy.Clear();
+            _removingKey = _removingWhy = null;
+            _rescDay = _rescTotal = _lostOtherDay = 0;
             _dDone = _dSkip = _tDone = _tSkip = 0;
             _waitSaid.Clear(); _waitWhy.Clear(); _evDay.Clear();
             _evBeh = null; _evCamp = null;
@@ -140,7 +160,7 @@ namespace Armoury
             }
             catch (Exception e)
             {
-                _start.Clear(); _byTpl.Clear();
+                _start.Clear(); _byTpl.Clear(); _moves.Clear(); _rescue.Clear(); _whoIds.Clear();
                 _note = "blad wczytania (" + e.GetType().Name + ")";
                 Log.Error("CanonCompanions.Load", e);
             }
@@ -148,7 +168,7 @@ namespace Armoury
 
         private static void Parse(string text)
         {
-            _start.Clear(); _byTpl.Clear(); _moves.Clear();
+            _start.Clear(); _byTpl.Clear(); _moves.Clear(); _rescue.Clear(); _whoIds.Clear();
             _nA = _nB = _nC = _nD = 0; _badRows = 0;
             var ids = new HashSet<string>(StringComparer.Ordinal);
             string section = null;
@@ -196,6 +216,13 @@ namespace Armoury
                               && (!ArgActions.Contains(m.Action) || m.Arg.Length > 0) && (m.Mode.Length == 0 || m.Mode == "prolog" || m.Mode == "classic");
                     if (!ok) { _badRows++; continue; }
                     _moves.Add(m);
+                    if (!m.Who.StartsWith(WandererPrefix, StringComparison.Ordinal)) _whoIds.Add(m.Who);
+                }
+                else if (section == "rescue")
+                {
+                    var q = new RescueRow { Clan = Cell(cells, col, "clan"), To = Cell(cells, col, "to"), Note = Cell(cells, col, "note") };
+                    if (q.Clan.Length == 0 || q.To.Length == 0 || q.Clan == q.To || _rescue.ContainsKey(q.Clan)) { _badRows++; continue; }
+                    _rescue[q.Clan] = q;
                 }
             }
         }
@@ -364,6 +391,119 @@ namespace Armoury
             catch (Exception e) { Stumble("SpawnPrefix", e); return true; }
         }
 
+        // ------------------------------------------------------------ zniszczenie rodu (ratunek) i zrodlo usuniec
+        /// <summary>Postac kanonu: oryginal wzoru A/B albo bohater z kolumny who tabeli zmian (np. Jeyne Westerling).</summary>
+        private static bool IsCanonHero(Hero h)
+        {
+            if (h == null) return false;
+            if (IsOriginal(h))
+            {
+                StartRow r;
+                return _byTpl.TryGetValue(h.Template.StringId, out r) && (r.Group == "A" || r.Group == "B");
+            }
+            return h.StringId != null && _whoIds.Contains(h.StringId);
+        }
+
+        private static string Clean(string s) { return (s ?? "").Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' '); }
+
+        /// <summary>Wlasne usuniecie (Lost, bez komunikatu) ze znacznikiem zrodla - HeroKilled i UC (CanonRemovedBy) wiedza, ze to Armoury.</summary>
+        private static void RemoveQuiet(Hero h, string why)
+        {
+            _removingKey = Key(h);
+            _removingWhy = "Armoury m101: " + why;
+            try { KillCharacterAction.ApplyByRemove(h); }   // Lost, bez komunikatu (showNotification false)
+            finally { _removingKey = null; _removingWhy = null; }
+        }
+
+        /// <summary>Dla CrashScribe UC (refleksja, Armoury.CanonCompanions.CanonRemovedBy): kto usunal postac kanonu (klucz = wzor oryginalu albo id bohatera);
+        /// null = nie wiadomo (UC sam opisuje zrodlo wedlug stanu rodu).</summary>
+        internal static string CanonRemovedBy(string key)
+        {
+            try
+            {
+                if (!_on || key == null) return null;
+                if (_removingKey != null && _removingKey == key) return _removingWhy;
+                string s;
+                return _lostBy.TryGetValue(key, out s) ? s : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>CampaignEvents.OnClanDestroyedEvent - idzie na poczatku DestroyClanAction.ApplyInternal, PRZED usunieciem czlonkow rodu (KillCharacterAction.ApplyByRemove
+        /// kazdego zywego poza glowa). ROT niszczy tak rod Renly'ego (RenlyDeathEvent - przed zabiciem Renly'ego), Jeora Mormonta (JeorMutinyEvent), Boltonow albo Snow
+        /// (BastardsEvent) i Stannisa (StannisDeathEvent). Postac kanonu z niszczonego rodu przechodzi do rodu z #rescue (jak przy zmianie strony); bez wiersza - znika z rodem.</summary>
+        internal static void OnClanDestroyed(Clan c)
+        {
+            try
+            {
+                if (!_on || c == null) return;
+                EnsureLoaded();
+                if (c.StringId != null) _gone.Add(c.StringId);
+                RescueRow q;
+                _rescue.TryGetValue(c.StringId ?? "", out q);
+                Clan to = q != null ? FindClan(q.To) : null;
+                var list = new List<Hero>();
+                foreach (var h in c.Heroes) if (h != null && h.IsAlive && IsCanonHero(h)) list.Add(h);
+                foreach (var h in list)
+                {
+                    try { RescueOne(c, h, q, to); }
+                    catch (Exception e) { Stumble("OnClanDestroyed(" + Key(h) + ")", e); }
+                }
+            }
+            catch (Exception e) { Stumble("OnClanDestroyed", e); }
+        }
+
+        private static void RescueOne(Clan c, Hero h, RescueRow q, Clan to)
+        {
+            string head = Tag + ": rod " + Nm(c) + " (" + c.StringId + ") niszczony (DestroyClanAction - wydarzenie ROT albo gra) - " + Nm(h) + " [" + Key(h) + "] " + Where(h);
+            if (c.Leader == h) { Log.Info(head + " - glowa rodu, ratunek pominiety (o glowie decyduje gra)."); return; }
+            if (q == null) { Log.Info(head + " - bez ratunku w tabeli #rescue: postac znika z rodem (Lost)."); return; }
+            if (to == null || to.IsEliminated || to == c || to == Clan.PlayerClan)
+            {
+                Log.Info(head + " - ratunek NIEMOZLIWY: rod " + q.To + (to == null ? " nie istnieje" : to == Clan.PlayerClan ? " to rod gracza" : " wyeliminowany") + " - postac znika z rodem (Lost).");
+                return;
+            }
+            if (Busy(h)) { Log.Info(head + " - ratunek NIEMOZLIWY: w bitwie albo oblezeniu - postac znika z rodem (Lost)."); return; }
+            string before = Side(h);
+            string why;
+            if (Captive(h))
+            {
+                h.Clan = to;   // jeniec zostaje w niewoli - tylko rod (bez teleportu)
+                h.IsMinorFactionHero = to.IsMinorFaction;
+                why = "jeniec - zostaje w niewoli";
+            }
+            else
+            {
+                var res = MoveToClan(h, to, IsCourtier(h), out why);
+                if (res != Res.Done) { Log.Info(head + " - ratunek NIEMOZLIWY: " + why + " - postac znika z rodem (Lost)."); return; }
+            }
+            _rescDay++; _rescTotal++;
+            Log.Info(Tag + ": ratunek - " + Nm(h) + " [" + Key(h) + "] " + before + " -> " + Side(h) + " | rod " + Nm(c) + " (" + c.StringId
+                     + ") niszczony (DestroyClanAction - wydarzenie ROT albo gra), #rescue " + q.Clan + " -> " + q.To + (why.Length > 0 ? " (" + why + ")" : "")
+                     + " | dzien " + Day() + ".");
+        }
+
+        /// <summary>CampaignEvents.HeroKilledEvent: usuniecie (Lost) postaci kanonu - zrodlo do zapisu (UC, linia doby); cudze usuniecie ma linie logu.</summary>
+        internal static void HeroKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool notify)
+        {
+            try
+            {
+                if (!_on || victim == null || detail != KillCharacterAction.KillCharacterActionDetail.Lost || !IsCanonHero(victim)) return;
+                string k = Key(victim);
+                string src;
+                if (_removingKey != null && _removingKey == k) src = _removingWhy;
+                else
+                {
+                    var c = victim.Clan;
+                    src = c != null && c.IsEliminated ? "zniszczenie rodu " + Nm(c) + " (" + c.StringId + ", DestroyClanAction - wydarzenie ROT albo gra)" : "inny kod (gra albo inny mod)";
+                    _lostOtherDay++;
+                    Log.Info(Tag + ": postac kanonu usunieta (Lost) NIE przez Armoury - " + Nm(victim) + " [" + k + "] przez " + src + ", rod " + Nm(c) + " | dzien " + Day() + ".");
+                }
+                _lostBy[k] = Clean(src);
+            }
+            catch (Exception e) { Stumble("HeroKilled", e); }
+        }
+
         // ------------------------------------------------------------ start kampanii
         /// <summary>OnNewGameCreatedEvent: flaga nowej kampanii i klucz w tej chwili (McmSettings.Apply byl w OnGameStart); start A.</summary>
         internal static void OnNewGame()
@@ -410,8 +550,15 @@ namespace Armoury
             {
                 if (r.Group != "A" || r.Clan.Length == 0 || !seen.Add(r.Clan)) continue;
                 clansWant++;
-                if (FindClan(r.Clan) != null) clansFound++; else missing.Add(r.Clan);
+                if (ClanKnown(r.Clan)) clansFound++; else missing.Add(r.Clan);
             }
+            foreach (var q in _rescue.Values)   // #rescue: niszczony rod i rod ratunku
+                foreach (var id in new[] { q.Clan, q.To })
+                {
+                    if (!seen.Add(id)) continue;
+                    clansWant++;
+                    if (ClanKnown(id)) clansFound++; else missing.Add(id);
+                }
             // rody, osady, bohaterowie i krolestwa z tabeli zmian stron (cel akcji i wyzwalacze)
             int refsWant = 0, refsFound = 0;
             var seenRef = new HashSet<string>(StringComparer.Ordinal);
@@ -420,12 +567,12 @@ namespace Armoury
                 if ((m.Action == "clan" || m.Action == "court" || m.Action == "free") && seen.Add(m.Arg))
                 {
                     clansWant++;
-                    if (FindClan(m.Arg) != null) clansFound++; else missing.Add(m.Arg);
+                    if (ClanKnown(m.Arg)) clansFound++; else missing.Add(m.Arg);
                 }
                 if (m.Action == "prisoner" && seenRef.Add("p:" + m.Arg))
                 {
                     refsWant++;
-                    if (Settlement.Find(m.Arg) != null || FindClan(m.Arg) != null) refsFound++; else missing.Add(m.Arg);
+                    if (Settlement.Find(m.Arg) != null || ClanKnown(m.Arg)) refsFound++; else missing.Add(m.Arg);
                 }
                 if ((m.Action == "marry" || m.Action == "wed") && seenRef.Add("h:" + m.Arg))
                 {
@@ -462,7 +609,17 @@ namespace Armoury
                      + " | mapa rodow znaleziona " + clansFound + "/" + clansWant + ", odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) " + refsFound + "/" + refsWant
                      + (missing.Count > 0 ? " BRAK: " + string.Join(", ", missing.ToArray()) : "") + " | przeniesieni " + _conv.Count + ", bez rodu/bohatera " + _startFail.Count
                      + ", dworzan " + _court.Count + ", start " + (_startDone ? "zamkniety" : "otwarty") + " | B zablokowane przy tworzeniu " + _spawnBlocked
-                     + ", usuniete po utworzeniu " + _removedAfter + " | latki: " + _patchLine + ".");
+                     + ", usuniete po utworzeniu " + _removedAfter + " | ratunek przy zniszczeniu rodu (#rescue) " + _rescue.Count + " wierszy, rody zniszczone w kampanii "
+                     + _gone.Count + (_gone.Count > 0 ? " [" + string.Join(", ", new List<string>(_gone).ToArray()) + "]" : "") + ", postacie kanonu usuniete (Lost) " + _lostBy.Count
+                     + " | latki: " + _patchLine + ".");
+        }
+
+        /// <summary>Rod z tabeli: jest w Clan.All albo zniszczony w tej kampanii (ROT wyjmuje rod Renly'ego i Stannisa z listy rodow) albo nadal w MBObjectManager.</summary>
+        private static bool ClanKnown(string id)
+        {
+            if (FindClan(id) != null || _gone.Contains(id)) return true;
+            try { return TaleWorlds.ObjectSystem.MBObjectManager.Instance != null && TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<Clan>(id) != null; }
+            catch { return false; }
         }
 
         private static string YN(bool b) { return b ? "tak" : "nie"; }
@@ -517,7 +674,7 @@ namespace Armoury
                     var h = FindOriginal(r.Template);
                     if (h == null || !h.IsAlive || h.CompanionOf != null || h.Clan != null) continue;
                     string from = Where(h);
-                    KillCharacterAction.ApplyByRemove(h);   // Lost, bez komunikatu (showNotification false)
+                    RemoveQuiet(h, "grupa B usunieta po utworzeniu (start)");   // Lost, bez komunikatu
                     _removedAfter++;
                     Log.Info(Tag + ": B usuniety po utworzeniu - " + Nm(h) + " [" + r.Template + "] w " + from + " (latka ROT " + (_pSpawn ? "wpieta - powstal przed nasza latka" : "NIE wpieta")
                              + "; Lost, bez komunikatu) | wyzwalacz start (" + where + ").");
@@ -587,7 +744,7 @@ namespace Armoury
                 DayLine();
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _stDay = 0; _commanderNulledDay = 0; _spawnBlockedDay = 0; _dDone = _dSkip = 0;
+            _stDay = 0; _commanderNulledDay = 0; _spawnBlockedDay = 0; _dDone = _dSkip = 0; _rescDay = 0; _lostOtherDay = 0;
         }
 
         private static void DayLine()
@@ -635,6 +792,7 @@ namespace Armoury
                      + ", pominiete " + _dSkip + "; razem wykonane " + CountDone("ok") + ", pominiete " + CountDone("skip") + ", czeka na wyzwalacz " + WaitingTrigger()
                      + ", w toku " + _pend.Count + (_pend.Count > 0 ? " [" + PendText() + "]" : "") + " | dzien opowiesci " + StoryDay().ToString("0", Inv) + (IsProlog() ? " (prolog)" : "")
                      + " | dworzanin wybrany na dowodce i odrzucony dzis " + _commanderNulledDay + " (razem " + _commanderNulled + ")"
+                     + " | ratunek przy zniszczeniu rodu dzis " + _rescDay + " (od wczytania " + _rescTotal + "), usuniete przez cudzy kod dzis " + _lostOtherDay
                      + (_stDay > 0 ? " | POTKNIECIA " + _stDay + " (razem " + _st + ")" : "") + ".");
         }
 
@@ -1093,7 +1251,7 @@ namespace Armoury
                         break;
                     }
                 case "remove":
-                    KillCharacterAction.ApplyByRemove(h);   // Lost, bez komunikatu; wzor A po starcie zablokowany - ROT go nie odtworzy
+                    RemoveQuiet(h, "zmiana strony #" + r.Id + " (remove)");   // Lost, bez komunikatu; wzor A po starcie zablokowany - ROT go nie odtworzy
                     why = "usuniety ze swiata (Lost, bez komunikatu)";
                     break;
                 case "die":
@@ -1150,6 +1308,8 @@ namespace Armoury
             foreach (var kv in _done) sb.Append("done\t").Append(kv.Key).Append('\t').Append(kv.Value).Append('\n');
             foreach (var kv in _first) sb.Append("first\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');
             foreach (var kv in _pend) sb.Append("pend\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');
+            foreach (var t in _gone) sb.Append("gone\t").Append(t).Append('\n');
+            foreach (var kv in _lostBy) sb.Append("lost\t").Append(kv.Key).Append('\t').Append(Clean(kv.Value)).Append('\n');
             return sb.ToString();
         }
 
@@ -1172,6 +1332,8 @@ namespace Armoury
                     case "done": if (p.Length >= 3) _done[p[1]] = p[2]; break;
                     case "first": { int d; if (p.Length >= 3 && int.TryParse(p[2], NumberStyles.Integer, Inv, out d)) _first[p[1]] = d; break; }
                     case "pend": { int d; if (p.Length >= 3 && int.TryParse(p[2], NumberStyles.Integer, Inv, out d)) _pend[p[1]] = d; break; }
+                    case "gone": _gone.Add(p[1]); break;
+                    case "lost": if (p.Length >= 3) _lostBy[p[1]] = p[2]; break;
                 }
             }
         }
@@ -1189,6 +1351,8 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => CanonCompanions.SessionStart());
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, CanonCompanions.Daily);
             CampaignEvents.CanHeroLeadPartyEvent.AddNonSerializedListener(this, CanonCompanions.CanLead);
+            CampaignEvents.OnClanDestroyedEvent.AddNonSerializedListener(this, CanonCompanions.OnClanDestroyed);   // ratunek postaci kanonu z rodu niszczonego przez ROT
+            CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, CanonCompanions.HeroKilled);             // zrodlo usuniecia (Lost) postaci kanonu
         }
 
         public override void SyncData(IDataStore dataStore)

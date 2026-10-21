@@ -57,6 +57,8 @@ namespace CrashScribe
     /// (Hodor, Syrio...) nie tworzy wcale; po starcie zaden wzor A/B nie powstaje drugi raz (prefiks Armoury na ROT SpawnHero). Linia doby liczy taki wzor bez
     /// bohatera jako "usuniete z kanonu" (nie "brak" - UN-5), a usuniecie Lost postaci kanonu nie mowi "ROT go odtworzy" (CanonBlocked - refleksja, Armoury
     /// Armoury.CanonCompanions.IsCanonBlocked(string); brak Armoury / metody = jak dotad).
+    /// Poprawka po recenzji: zrodlo usuniecia (Lost) postaci kanonu z Armoury.CanonCompanions.CanonRemovedBy(string) (wlasne usuniecia Armoury i zapis); bez odpowiedzi
+    /// - UC opisuje zrodlo sam wedlug rodu (rod zniszczony = DestroyClanAction, np. wydarzenie ROT; inaczej inny kod), nie przypisuje go Armoury.
     /// </summary>
     internal static class UniqueCompanions
     {
@@ -85,6 +87,7 @@ namespace CrashScribe
         private static int _dMoved, _tMoved, _dLostGame, _dLostOther, _dKept, _dSpawnBlocked, _dRespawn, _tRespawn, _dDupRemoved, _dDupLeft;
         private static int _dChildName, _dChildGear, _stumbles, _stumblesDay;
         private static System.Reflection.MethodInfo _canonFn;   // m101-postacie: Armoury.CanonCompanions.IsCanonBlocked(string) - raz na proces
+        private static System.Reflection.MethodInfo _canonByFn; // m101-postacie: Armoury.CanonCompanions.CanonRemovedBy(string) - kto usunal postac kanonu (null = nie wiadomo)
         private static bool _canonTried;
 
         private static void Stumble(string where, Exception e)
@@ -118,16 +121,39 @@ namespace CrashScribe
                         if (asm == null || asm.GetName().Name != "Armoury") continue;
                         var t = asm.GetType("Armoury.CanonCompanions");
                         if (t != null)
+                        {
                             _canonFn = t.GetMethod("IsCanonBlocked", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
                                                    null, new[] { typeof(string) }, null);
+                            _canonByFn = t.GetMethod("CanonRemovedBy", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
+                                                     null, new[] { typeof(string) }, null);
+                        }
                         break;
                     }
                 }
-                catch { _canonFn = null; }
+                catch { _canonFn = null; _canonByFn = null; }
             }
             if (_canonFn == null || templateId == null) return false;
             try { return (bool)_canonFn.Invoke(null, new object[] { templateId }); }
             catch { return false; }
+        }
+
+        /// <summary>m101-postacie: kto usunal (Lost) postac kanonu - odpowiedz Armoury (wlasne usuniecie albo zapis), inaczej opis wedlug rodu: rod zniszczony =
+        /// DestroyClanAction (np. wydarzenie ROT - RenlyDeath, JeorMutiny, Bastards), inaczej inny kod. Nigdy "Armoury", gdy Armoury tego nie potwierdzi.</summary>
+        private static string CanonBy(string templateId, Hero h)
+        {
+            string by = null;
+            if (_canonByFn != null && templateId != null)
+            {
+                try { by = _canonByFn.Invoke(null, new object[] { templateId }) as string; } catch { by = null; }
+            }
+            if (!string.IsNullOrEmpty(by)) return by;
+            try
+            {
+                var c = h != null ? h.Clan : null;
+                if (c != null && c.IsEliminated) return "zniszczenie rodu " + c.Name + " (" + c.StringId + ", DestroyClanAction - wydarzenie ROT albo gra)";
+            }
+            catch { }
+            return h != null ? "inny kod (gra albo inny mod)" : "zrodlo nieznane";
         }
 
         private static string Short(string templateId)
@@ -444,8 +470,8 @@ namespace CrashScribe
                     if (CanonBlocked(victim.Template.StringId))
                     {
                         _dLostOther++;
-                        Scribe.Line(Tag + ": unikat usuniety (Lost) - " + NameOf(victim) + " [" + victim.Template.StringId + "] przez Armoury (postacie kanonu m101), rod " + ClanName(victim)
-                                    + " - wzor zablokowany, ROT go nie odtworzy.");
+                        Scribe.Line(Tag + ": unikat usuniety (Lost) - " + NameOf(victim) + " [" + victim.Template.StringId + "] przez " + CanonBy(victim.Template.StringId, victim)
+                                    + ", rod " + ClanName(victim) + " - postac kanonu: wzor zablokowany przez Armoury m101, ROT go nie odtworzy.");
                         return;
                     }
                     if (_inTryKill > 0 || _inFire > 0 || _inLeave > 0) _dLostGame++; else _dLostOther++;
@@ -810,7 +836,8 @@ namespace CrashScribe
                 else if (last != null && CanonBlocked(id))
                 {
                     canon++;
-                    sb.Append(NameOf(last)).Append(' ').Append(Short(id)).Append(": usuniety z kanonu dnia ").Append(SafeDeathDay(last)).Append(" (Lost - Armoury m101, ROT nie odtworzy)");
+                    sb.Append(NameOf(last)).Append(' ').Append(Short(id)).Append(": usuniety z kanonu dnia ").Append(SafeDeathDay(last)).Append(" (Lost - ").Append(CanonBy(id, last))
+                      .Append("; wzor zablokowany przez Armoury m101, ROT nie odtworzy)");
                 }
                 else if (last != null)
                 {

@@ -187,7 +187,38 @@ MP-1 ERROR CanonCompanions i potkniecia 0, MP-2 latki 2/2, MP-3 mapa rodow N/N, 
 wedrowcem bez zmiany `wander` (od drugiej linii doby), MP-6 zaden B nie zyje, MP-7 zmiana strony najwyzej raz, MP-8 lista zmian (INFO), MP-9 A w rodach (INFO),
 MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym logu (wszystkie wiersze licza sie bez wyjatku).
 
+### Poprawki po recenzji (HEAD f5492999)
+
+**Poprawka 1 (wazne, PRAWDZIWE) - ROT niszczy rody postaci A (DestroyClanAction), postacie znikaly bez zmian m16/m17/m21:**
+- Dowod (dekompilacja ROT 8.1.8 i gry 1.4.8): `RenlyDeathEvent.ExecuteRenly` - `DestroyClanAction.ApplyByClanLeaderDeath(ROTClans.BaratheonRenly)` (clan_empire_west_2)
+  PRZED `KillCharacterAction.ApplyByMurder(Renly)`, potem `_clans.Remove(rod)` (rod znika z `Clan.All`); `JeorMutinyEvent.DailyTickEvent` - dzien >= 150, dobe po starcie:
+  `ChangeRulingClanAction` (Nocna Straz -> Thorne) i `DestroyClanAction.ApplyByClanLeaderDeath(ROTClans.MormontNightsWatch)` (clan_battania_2); `BastardsEvent` - Bolton
+  albo Snow; `StannisDeathEvent` - rod Stannisa. Gra `DestroyClanAction.ApplyInternal`: najpierw `OnClanDestroyed`, `DeactivateClan`, partie rodu (DestroyPartyAction), potem
+  `KillCharacterAction.ApplyByRemove` kazdego zywego czlonka poza glowa (ClanLeaderDeath). Brienne znikala przy smierci Renly'ego, Benjen/Samwell/Yoren przy buncie u
+  Crastera (dzien >= 150, WallEvent 260+) - m16, m17, m21 nigdy by nie zaszly, a UC pisal "usuniety przez Armoury".
+- Zmiana (Armoury CanonCompanions.cs): nasluch `CampaignEvents.OnClanDestroyedEvent` (idzie PRZED usunieciem czlonkow - lista `destroyedClan.Heroes` jest brana po
+  zdarzeniu): postac kanonu (oryginal wzoru A/B albo bohater z kolumny `who`) z niszczonego rodu przechodzi do rodu z nowej sekcji `#rescue` w `arm_canon_moves.tsv`
+  (ta sama droga co zmiana strony: `MoveToClan` - armia, druzyna, zbieg, teleport do siedziby; jeniec - tylko rod, zostaje w niewoli; w bitwie / glowa rodu / brak rodu -
+  bez ratunku, linia). Wiersze: rod Renly'ego `clan_empire_west_2` -> Tarth `clan_empire_west_5` (ROT przenosi Tarth do Dragonstone, rodu nie niszczy; Brienne jest
+  tam najwyzej dobe - m16 `dead:lord_1_9` wykonuje sie w najblizszej dobie, Renly ginie w tej samej chwili); Nocna Straz Jeora `clan_battania_2` -> Snow `clan_battania_6`
+  (w ksiazce Jon zostaje Lordem Dowodca po Jeorze; ROT daje wladze Thorne'owi - wybralem ksiazke). Bez wiersza (Bolton / Snow w BastardsEvent, Stannis) - postac znika
+  z rodem, z linia (Myranda i Locke gina z Boltonami jak w serialu; Wun Wun i Benjen przy wygranej Ramsaya znikaja razem z rodem Snow - decyzja: zostaja z Jonem do konca, bez kolejnego ratunku).
+- Zrodlo usuniecia: wlasne usuniecia Armoury (`remove`, zapas B) ida przez `RemoveQuiet` ze znacznikiem; nasluch `HeroKilledEvent` zapisuje zrodlo kazdego Lost postaci
+  kanonu (`lost` w zapisie arm_canon_companions), cudze ma linie `postac kanonu usunieta (Lost) NIE przez Armoury - X [wzor] przez zniszczenie rodu ...`.
+  CrashScribe UC: `CanonRemovedBy(string)` (refleksja, obok IsCanonBlocked) - linia Lost i linia doby podaja prawdziwe zrodlo (Armoury m101: #id / zniszczenie rodu
+  ... DestroyClanAction / inny kod); bez odpowiedzi Armoury UC opisuje zrodlo wedlug rodu (rod wyeliminowany = DestroyClanAction), nigdy "Armoury".
+- Kontrola odwolan: rody zniszczone w kampanii (`gone` w zapisie) i `MBObjectManager` licza sie jako znalezione - po RenlyDeath rod Renly'ego nie daje "BRAK" w linii
+  startu. `#rescue` wchodzi do mapy rodow: **17/17** (Tarth nowy). Linia startu: `ratunek przy zniszczeniu rodu (#rescue) 2 wierszy, rody zniszczone w kampanii N [...],
+  postacie kanonu usuniete (Lost) N`; linia doby: `ratunek przy zniszczeniu rodu dzis N (od wczytania N), usuniete przez cudzy kod dzis N`; linia
+  `Postacie kanonu (m101): ratunek - X [wzor] <przed> -> <po> | rod ... niszczony (DestroyClanAction ...), #rescue A -> B | dzien N`.
+- Build Armoury i CrashScribe kod 0. Status: DO SPRAWDZENIA (ratunek widac dopiero przy RenlyDeath / JeorMutiny - dlugi bieg).
+
 ### Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0)
+
+- **Zniszczenie rodu przez ROT (poprawka 1):** zmiana rodu w srodku `DestroyClanAction` (nasluch `OnClanDestroyed`) - postac wychodzi z rodu przed petla partii i
+  usuniec; druzyna postaci jest rozwiazywana (`StartDisband`, pusta - `DestroyPartyAction` od razu), potem gra niszczy pozostale partie rodu jak dotad. Inni sluchacze
+  `OnClanDestroyed` (BK tytuly, ROT) widza rod juz bez tej postaci - jak gdyby odeszla dzien wczesniej. Do sprawdzenia w dlugim biegu: linia `ratunek` przy RenlyDeath
+  (Brienne -> Tarth, potem m16) i JeorMutiny (Benjen, Samwell, Yoren -> Snow, jesli zyja), brak linii `NIE przez Armoury` dla Brienne/Nocnej Strazy.
 
 - **Kolejnosc nasluchow przy nowej grze:** ROT tworzy wedrowcow w swoim `OnNewGameCreated`; jesli nasz nasluch idzie wczesniej (kolejnosc modulow), A przechodza
   przy `FollowUpEnd` (bez partii z petli nowej gry - partie przyjda z doby rodu). B blokuje faza tworzenia gry niezaleznie od kolejnosci. W logu: `wyzwalacz start
@@ -211,7 +242,7 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
 
 1. Autotest: NOWA kampania (flaga start-zloto jak dzis), kilka dob: `python -I tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> --crashscribe <session-*.log>`
    (MP-0..MP-7 TAK) i `--grupa unikaty --crashscribe <session-*.log>` (UN-4 odrodzenia 0, UN-5 brak 0, pole `usuniete z kanonu 9`).
-2. W linii startu: `A 22, B 9, C 2, D 30`, `mapa rodow znaleziona 16/16, odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) 23/23`, 22 linie `przeniesienie - ...`; w linii doby `w rodach 22`, `wedrowcy 0`, `B 9: zywych 0`.
+2. W linii startu: `A 22, B 9, C 2, D 30`, `mapa rodow znaleziona 17/17, odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) 23/23`, `ratunek przy zniszczeniu rodu (#rescue) 2 wierszy`, 22 linie `przeniesienie - ...`; w linii doby `w rodach 22`, `wedrowcy 0`, `B 9: zywych 0`.
 3. Reczny: encyklopedia - Jaime i Tyrion jako lordowie rodu Lannister, w karczmach brak Hodora i Talisy; Varys/Baelish w Krolewskiej Przystani bez druzyny.
 4. Dlugi bieg (zmiany stron): linie `zmiana strony #...` przy wydarzeniach ROT (Czarny Nurt ~dzien 766, Purpurowe Gody ~1083 przy osi Fabuli x4.33).
 
@@ -221,3 +252,5 @@ MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym log
 - Krok 3 (B nie powstaja, A nie odradzaja sie, UC liczy 'usuniete z kanonu'): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
 - Krok 4 (tabela zmian stron i wykonawca): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA (zmiany przy wydarzeniach ROT widac dopiero w dlugim biegu).
 - Krok 5 (Jeyne zamiast Talisy) i grupa `--grupa m101postacie`: ZROBIONE, build kod 0. **Status calosci: DO SPRAWDZENIA** (nic nie uruchomione w grze, nic nie wgrane).
+- Poprawka 1 po recenzji (ratunek z rodow niszczonych przez ROT, prawdziwe zrodlo usuniec w UC): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
+  Zostalo: poprawka 2 (narzedzie widzi brak pliku TSV), drobne.
