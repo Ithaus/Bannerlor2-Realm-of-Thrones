@@ -1710,6 +1710,8 @@ namespace Armoury
         private MapScreen _screen;
         private bool _active, _finalized, _wasOff, _firstFillDone;
         private float _acc, _sinceSummary;
+        private float _ringAcc = 20f;    // m105-kolko: zegar testu kola (autotest, plik armoury-kolko.flag) - 20 s po zajazdach
+        private int _ringTestNone;
         private uint _maskCivil, _maskL1, _maskL2, _maskL3, _maskLooted, _maskSiege;
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly List<District> _districts = new List<District>();
@@ -1928,6 +1930,7 @@ namespace Armoury
                 // zdejmujemy swoje encje (jak SettlementVisualManager.OnFinalize czysci swoje). Inna sciezka (stary komponent po
                 // innej mapie) - tylko zrzucamy odwolania, cudzej sceny nie ruszamy.
                 bool sceneAlive = _screen != null && ReferenceEquals(MapScreen.Instance, _screen);
+                try { MapHoverRing.Release(sceneAlive ? _screen.MapScene : null, sceneAlive); } catch { }   // m105-kolko
                 string sum = _active ? SummaryText() : "";
                 string pen = _active && _penMesh != null ? PennantLine() : null;   // E7/W5: stan proporczykow przed zdjeciem
                 string look = _active && _lookStarted ? LookLine() : null;         // E7/W4: stan wygladu i napisow przed zdjeciem
@@ -1958,12 +1961,15 @@ namespace Armoury
         {
             if (!_active || _finalized) return;
             if (_lblCount > 0) LabelFrame(screen);   // E7/W4: pozycje napisow w kadrze (najwyzej 30) co klatke - samo przeliczenie na ekran, zadnych encji mapy
+            MapHoverRing.Tick(realDt);   // m105-kolko: co klatke - dymek na innym obiekcie = kolko znika (drugie wywolanie w klatce nic nie robi)
             _acc += realDt;
             _sinceSummary += realDt;
             if (_acc < TickEvery) return;
+            _ringAcc += _acc;
             _acc = 0f;
             try
             {
+                if (_ringAcc >= 40f) { _ringAcc = 0f; if (MapHoverRing.TestWanted()) RingTest(screen); }
                 if (!Settings.Current.MapVillagesEnabled)
                 {
                     if (!_wasOff)
@@ -4786,6 +4792,49 @@ namespace Armoury
             catch (Exception e) { Log.Error("MapVillagesView.LogHeldSamples", e); }
         }
 
+        /// <summary>m105-kolko: wielkosc kola wioski pobocznej wedlug obrysu (nigdy wieksza od kola wsi gry).</summary>
+        private static float RingScale(Slot s)
+        {
+            float r = Math.Max(s.R.HalfLen, s.R.HalfWid) * 1.1f;
+            return Math.Max(MapHoverRing.SideVillageMin, Math.Min(MapHoverRing.SideVillageMax, r));
+        }
+
+        private static bool RingWanted(Slot s)
+        {
+            return SideVillageFief.Clickable(s.R.Uid) || SideVillageVisit.Clickable(s.R.Uid);   // kolko tylko tam, gdzie mozna wjechac (jak u gry)
+        }
+
+        /// <summary>m105-kolko, autotest: kolko na 8 s przy wiosce pobocznej z wjazdem widocznej najblizej kamery (nikt nie najedzie myszka).</summary>
+        private void RingTest(MapScreen screen)
+        {
+            try
+            {
+                if (screen == null || screen.MapCameraView == null || screen.MapCameraView.Camera == null) return;
+                Vec3 cam = screen.MapCameraView.Camera.Position;
+                Slot best = null; float bd = float.MaxValue;
+                foreach (var s in _shown)
+                {
+                    if (!s.Shown || s.Root == null || !RingWanted(s)) continue;
+                    float cx = s.Placed ? s.Cx : s.R.X, cy = s.Placed ? s.Cy : s.R.Y;
+                    float dx = cx - cam.x, dy = cy - cam.y, d = dx * dx + dy * dy;
+                    if (d < bd) { bd = d; best = s; }
+                }
+                if (best == null)
+                {
+                    if (++_ringTestNone <= 3) Log.Info("Kolko najechania (m105): test - zadna wioska poboczna z wjazdem nie stoi teraz przy kamerze (wysokosc " + cam.z.ToString("0", CultureInfo.InvariantCulture) + ") - bez proby.");
+                    return;
+                }
+                if (best.V == null) best.V = new Visual(best);
+                float x = best.Placed ? best.Cx : best.R.X, y = best.Placed ? best.Cy : best.R.Y;
+                int ok0 = HoverRingStats.TestShows;
+                MapHoverRing.Show(best.V, x, y, RingScale(best), best.D.S, true);
+                Log.Info("Kolko najechania (m105): test - wioska poboczna '" + best.R.Name + "' (" + x.ToString("0.0", CultureInfo.InvariantCulture) + ", " + y.ToString("0.0", CultureInfo.InvariantCulture)
+                         + "), wielkosc " + RingScale(best).ToString("0.00", CultureInfo.InvariantCulture) + ", kolor " + MapHoverRing.ColorFor(best.D.S).ToString("X8")
+                         + " - " + (HoverRingStats.TestShows > ok0 ? "TAK" : "NIE") + ".");
+            }
+            catch (Exception e) { HoverRingStats.TestFails++; Log.Error("MapVillagesView.RingTest", e); }
+        }
+
         // ---------- dymek po najechaniu: bez fizyki, punkt terenu pod kursorem w obroconym obrysie (krytyk K4) ----------
         // MapScreen.HandleMouse (:1599-1605): komponenty po kolei wedlug Priority, petla staje na pierwszym, ktory zwroci true;
         // ustawiamy tylko hoveredVisual (selectedVisual zostaje null - klik idzie w teren, :1623-1628) i zawsze zwracamy false.
@@ -4861,6 +4910,7 @@ namespace Armoury
 
             public override void OnHover()
             {
+                if (RingWanted(_s)) MapHoverRing.Show(this, _s.Placed ? _s.Cx : _s.R.X, _s.Placed ? _s.Cy : _s.R.Y, RingScale(_s), _s.D.S);   // m105-kolko: kolko jak przy wsi gry
                 try
                 {
                     TextObject district = _s.D.S != null ? _s.D.S.Name : new TextObject(_s.D.Id);
@@ -4899,6 +4949,8 @@ namespace Armoury
                     if (_stTip <= 3 || _stTip % 200 == 0) Log.Error("MapVillagesView.OnHover " + _s.R.Uid + " (potkniecie " + _stTip + ")", e);
                 }
             }
+
+            public override void OnHoverEnd() { MapHoverRing.Hide(this); }
 
             private static int _stTip;   // licznik bledow dymka (najechanie co chwila = bez zalewu logu)
 
