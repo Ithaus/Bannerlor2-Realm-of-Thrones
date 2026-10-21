@@ -8,8 +8,8 @@ gry 1.4.8) + wyniki rownoleglego toru (journal wf_d4f0c951-09f: "wojny:A", "smok
 
 | Krok | Co | Stan |
 |---|---|---|
-| K1 | (1) Essos na kalendarzu: klucz PrologueEssosWarsCalendar, prefiks/finalizer ROTStorylineWar.Enforced (flaga w StoryStartOf), doba Armoury w prologu, linie startu/doby, CanonWarsBehavior (arm_m104), klucze (2)/(3) w Settings | ZROBIONE (build Armoury 0, gen_mcm) |
-| K2 | (2) Reach i Dorne z korona | DO ZROBIENIA |
+| K1 | (1) Essos na kalendarzu: klucz PrologueEssosWarsCalendar, prefiks/finalizer ROTStorylineWar.Enforced (flaga w StoryStartOf), doba Armoury w prologu, linie startu/doby, CanonWarsBehavior (arm_m104), klucze (2)/(3) w Settings | ZROBIONE (cda60892, build Armoury 0, gen_mcm) |
+| K2 | (2) Reach i Dorne z korona: Prologue.Crown.cs - po smierci Renly'ego pokoj Reach-Dorne, pokoj i SOJUSZ korona-Reach (przedluzany), pakt Reach-Dorne; po zareczynach Myrcelli (dzien osi 70 x skala) pokoj i pakt korona-Dorne; pilnowane co dobe do najazdu Daenerys (pakty wygaszone) | ZROBIONE (build Armoury 0) |
 | K3 | (3) mlode smoki Daenerys (tylko kampania) | DO ZROBIENIA |
 | K4 | grupa tools/sprawdz_logi.py m104wojny | DO ZROBIENIA |
 | K5 | build 5 modow, gen_mcm, raport | DO ZROBIENIA |

@@ -249,11 +249,12 @@ namespace Armoury
         {
             _wStumblesDay = 0; _essosDeclaredDay = 0; _essosDeclared = 0; _essosToday.Clear();
             _warsEventDay = false;
+            ResetCrown();
         }
 
         internal static string PackWars()
         {
-            return "v=1;";
+            return "v=1;" + PackCrown();
         }
 
         internal static void UnpackWars(string v)
@@ -266,6 +267,7 @@ namespace Armoury
                     int i = part.IndexOf('=');
                     if (i > 0) map[part.Substring(0, i)] = part.Substring(i + 1);
                 }
+            UnpackCrown(map);
         }
 
         private static bool _warsEventDay;   // cos sie dzis wydarzylo (linia doby mimo rytmu 7 dob)
@@ -279,6 +281,7 @@ namespace Armoury
                          + (StoryDays() < 1.0 ? ", bramka ROT EnforceWars zamknieta - wypowiada doba Armoury" : ", wymusza ROT EnforceWars");
             Log.Info(WTag + "start sesji | prolog " + (Active ? "TAK" : "NIE") + " | dzien opowiesci " + StoryDays().ToString("0.0", Inv)
                      + " | (1) Essos na kalendarzu: " + essos
+                     + " | (2) Reach i Dorne z korona: " + CrownStartText()
                      + " | potkniecia " + _wStumbles + ".");
         }
 
@@ -286,6 +289,7 @@ namespace Armoury
         internal static void WarsDaily()
         {
             try { EssosDaily(); } catch (Exception e) { WStumble("EssosDaily", e); }
+            try { CrownDaily(); } catch (Exception e) { WStumble("CrownDaily", e); }
             double sd = StoryDays();
             bool essosWindow = Active && EssosKey && sd < 1.0;
             int every = (int)Math.Floor(sd);
@@ -295,6 +299,7 @@ namespace Armoury
                          + " | (1) Essos: " + (Active ? (EssosKey ? EssosText() + ", wypowiedziane dzis przez Armoury " + _essosDeclaredDay
                                                                     + (_essosToday.Count > 0 ? " [" + string.Join(", ", _essosToday.ToArray()) + "]" : "") + " (razem " + _essosDeclared + ")"
                                                          : "klucz NIE") : "nie dotyczy")
+                         + " | (2) Reach: " + _reachState + " | Dorne: " + _dorneState
                          + " | potkniecia dzis " + _wStumblesDay + " (razem " + _wStumbles + ").");
             }
             _essosDeclaredDay = 0; _essosToday.Clear(); _wStumblesDay = 0; _warsEventDay = false;
