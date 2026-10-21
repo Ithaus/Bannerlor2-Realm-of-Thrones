@@ -4836,13 +4836,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiCampFastScan { get; set; } = true;
 
-        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp", RequireRestart = false)]
+        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
-        public int CampStartHour { get; set; } = 0;
+        public int CampStartHour { get; set; } = 21;
 
-        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp (your own sleep then still settles at 6)", RequireRestart = false)]
+        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on (your dawn); 21 and 3 = camp over the whole game night (22:00-2:00); equal hours = no camp (your own sleep then still settles at 6)", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
-        public int CampEndHour { get; set; } = 6;
+        public int CampEndHour { get; set; } = 3;
 
         [SettingPropertyBool("Ai Bandits Camp Too", HintText = "brigands sleep as well - hideout by day, their own fire in the field by night", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -5056,7 +5056,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float DaySightFactor { get; set; } = 1.15f;
 
-        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night (the game's night, 22:00-2:00) - the cut is mild, for you HEAR more after dark: a marching column is loud", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public float NightSightFactor { get; set; } = 0.65f;
 
@@ -5823,6 +5823,22 @@ namespace Armoury
         [SettingPropertyBool("Drill Daily Message", HintText = "once a day, on a day your men drill by Drill Law, a short line in the game tells you what they learned and why: 'Drill today: N XP (n per man) - Leadership, at rest or marching, drill kit, armed share, perks'. A day lost to hunger or lack of sleep is announced as before (off = no daily drill line)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillDailyMessage { get; set; } = true;
+
+        [SettingPropertyBool("Drill Camp Only", HintText = "marching teaches nothing: your men drill only when you order it in camp ('Train the men' in your camp menu, by day - the men sleep at night); a full day of drill (8 hours) teaches 50% more than a day of rest did before (x2.25 instead of x1.5), a shorter drill its share, still by Leadership, drill kit, armed share and perks (the training perks now add to a day of drill - their descriptions say how much); your clan's parties and the lords in your army drill only in the hours they stand still by day (settlement, siege camp, halted), by the same pace; hunger or a dawn short of sleep still means no drill (off = as before: x1.5 on a day of rest, x0.9 on the march, perks as in the game)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillCampOnly { get; set; } = true;
+
+        [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Estimated from the 180-day test of 20.10: AI lords march most of their days, so their men would learn roughly 15 to 50 percent less (about a third in the middle) - slower promotions and less demand for better gear; the daily log line measures it exactly either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillCampOnlyAi { get; set; } = false;
+
+        [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillMaster { get; set; } = true;
+
+        [SettingPropertyBool("Drill Siege Army", HintText = "with Drill Camp Only: in a siege camp or in another lord's army, where you cannot pitch your own camp, your men drill by themselves in the hours the host stands still by day, like the lords beside you - the same pace, up to 8 hours a day, no drill when starving or after a dawn short of sleep (off = no drill there at all)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillSiegeArmy { get; set; } = true;
 
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
@@ -8716,7 +8732,7 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
 
-        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory and the masters of Qohor into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
+        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory, the masters of Qohor and the cartwright and saddler into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
 
@@ -8731,6 +8747,38 @@ namespace Armoury
         [SettingPropertyBool("Player Payment Reasons", HintText = "when you pay or receive gold through this mod (a night at an inn or a roadside inn, the forge for a day, books, your ransom, orders, selling a workshop, a village's tribute, your caravans' deposits, villagers' purses after a fight), the game's bare 'You paid N' / 'You received N' is replaced by one message that says what for, with the split (e.g. 'You paid 2 for your night at a common room in Seagard (bed 1, horse 1).'). Only the message changes - sums and payers stay the same. Off = the game's message as before", RequireRestart = false)]
         [SettingPropertyGroup("Payment messages")]
         public bool PlayerPaymentReasons { get; set; } = true;
+
+        [SettingPropertyBool("Camp Cart Enabled", HintText = "supply carts: a town carpenter builds one from market wood and tools; one pack animal pulls it and hauls Cart Load Kg instead of its own 100 kg, but the column moves slower (off = carts give nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampCartEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Cart Load Kg", 100, 2000, "0", HintText = "kilograms a cart hauls behind one pack animal (the animal alone carries 100)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CartLoadKg { get; set; } = 500;
+
+        [SettingPropertyInteger("Cart Speed Penalty Percent", 0, 50, "0", HintText = "how much slower your column moves while a cart is hitched - one cart or many, the column keeps the carts' pace (many pack animals still slow a riding column as a baggage train); 0 = no slowdown", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CartSpeedPenaltyPercent { get; set; } = 10;
+
+        [SettingPropertyBool("Pack Saddle Enabled", HintText = "transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight - without such an animal it is just baggage; it is no riding saddle (off = pack saddles give nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool PackSaddleEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Pack Saddle Extra Kg", 0, 300, "0", HintText = "extra kilograms a pack animal carries with a pack saddle", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int PackSaddleExtraKg { get; set; } = 50;
+
+        [SettingPropertyBool("Camp Walk Enabled", HintText = "'Walk through the camp' in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; in an army the camp is the whole army's; no fighting, campaign time stands still; hold Tab to go back - Esc does not leave the camp (off = no option)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampWalkEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Camp Walk Max Men", 0, 100, "0", HintText = "at most this many of your soldiers are shown in the camp scene (for smooth play); the tents still follow your whole party", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CampWalkMaxMen { get; set; } = 40;
+
+        [SettingPropertyInteger("Camp Walk Men Per Tent", 2, 20, "0", HintText = "men per soldiers' tent in the camp scene; fewer men than this sleep on bedrolls round the fire", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int CampWalkMenPerTent { get; set; } = 6;
 
         public void ApplyTo(Settings s)
         {
@@ -10187,6 +10235,10 @@ namespace Armoury
             s.DrillLawAi = DrillLawAi;
             s.DrillLog = DrillLog;
             s.DrillDailyMessage = DrillDailyMessage;
+            s.DrillCampOnly = DrillCampOnly;
+            s.DrillCampOnlyAi = DrillCampOnlyAi;
+            s.DrillMaster = DrillMaster;
+            s.DrillSiegeArmy = DrillSiegeArmy;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
@@ -10914,6 +10966,14 @@ namespace Armoury
             s.CastleMenuTidy = CastleMenuTidy;
             s.VillageMenuTidy = VillageMenuTidy;
             s.PlayerPaymentReasons = PlayerPaymentReasons;
+            s.CampCartEnabled = CampCartEnabled;
+            s.CartLoadKg = CartLoadKg;
+            s.CartSpeedPenaltyPercent = CartSpeedPenaltyPercent;
+            s.PackSaddleEnabled = PackSaddleEnabled;
+            s.PackSaddleExtraKg = PackSaddleExtraKg;
+            s.CampWalkEnabled = CampWalkEnabled;
+            s.CampWalkMaxMen = CampWalkMaxMen;
+            s.CampWalkMenPerTent = CampWalkMenPerTent;
         }
 
         internal static void Apply()

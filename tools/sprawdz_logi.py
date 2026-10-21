@@ -1020,6 +1020,9 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
                     P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
                     Log bez paczki albo bez bitew z DR: INFO.
+--grupa m97szkolenie : (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu"; Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
+                    python -I tools/sprawdz_logi.py --grupa m97szkolenie <Armoury-*.log> (strumieniowo). SZ-0 start sesji i perki przerobione, SZ-1 zero XP z marszu
+                    (gracz), SZ-2 godziny tylko z menu obozu (albo samoczynnie w obozie oblezenia / cudzej armii), SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI, strona gracza), SZ-5 AI wobec dawnej reguly (INFO), SZ-6 potkniecia 0.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -36551,6 +36554,116 @@ def nkarczmy_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m97szkolenie (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu, w marszu jest marsz";
+# Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
+M97SZ_HEAD = "Szkolenie w obozie (m97): "
+M97SZ_ERR = ("ERROR in CampDrill", "ERROR in SyncData.arm_campdrill", "CtxOf.Camp")
+# recenzja 2: godziny samoczynne (oboz oblezenia, cudza armia - klucz DrillSiegeArmy) - grupa opcjonalna (linia sprzed poprawki: 0)
+M97SZ_PLAYER = re.compile(r"gracz dzien (\d+) \| godzin cwiczen ([\d.]+) \(z menu obozu od ostatniej linii ([\d.]+)(?:, samoczynnie w obozie oblezenia albo w cudzej armii ([\d.]+))?;"
+                          r".*?\| XP przyjete (\d+) .*?potkniecia (\d+)\.")
+M97SZ_AI = re.compile(r"AI dzien (\d+) \| zasada AI (TAK|NIE)[^|]*\| partii (\d+) \(ludzio-dni (\d+)\) \| godzin postoju za dnia \(najwyzej 8\) srednio ([\d.]+): 0 h (\d+), 1-7 h (-?\d+), 8 h (\d+)"
+                      r" \| XP po broni: dawna regula (\d+) -> zasada obozu (\d+) \(x([\d.]+)\), na glowe na dobe ([\d.]+) -> ([\d.]+), dane naprawde (\d+)"
+                      r" \| XP z marszu \(0 h postoju za dnia, XP > 0\) przy czynnej zasadzie: oddzialow (\d+)"
+                      r" \| strona gracza \(rod, armia\): partii (\d+), godzin srednio ([\d.]+), XP dawna (\d+) -> obozu (\d+), dane (\d+), z marszu oddzialow (\d+) \| potkniecia (\d+)\.")
+
+
+def m97szkolenie_main(logp):
+    """m97szkolenie (20.10; Armoury/src/CampDrill.cs): marsz nie uczy, gracz cwiczy tylko z menu obozu ("Train the men"), pelny dzien (8 h) x2.25,
+    strona gracza i AI (przy DrillCampOnlyAi) - godziny postoju za dnia. SZ-0 linia startu (zasada, perki przerobione), SZ-1 zero XP bez godzin cwiczen
+    (gracz), SZ-2 godziny gracza tylko z menu obozu, SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI i strona gracza), SZ-5 AI XP wobec
+    dawnej reguly (INFO - decyzja Jeffa o DrillCampOnlyAi), SZ-6 potkniecia 0. Wejscie: log Armoury (strumieniowo)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("SZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, players, ais, ends, bad = [], [], [], [], []
+    n_err = 0
+    after_start = False
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97SZ_HEAD):
+                rest = s[len(M97SZ_HEAD):]
+                if rest.startswith("start sesji"):
+                    starts.append(rest)
+                    after_start = True
+                elif rest.startswith("gracz dzien"):
+                    mp = M97SZ_PLAYER.search(rest)
+                    if mp:
+                        players.append((int(mp.group(1)), float(mp.group(2)), float(mp.group(3)), int(mp.group(5)), int(mp.group(6)), after_start,
+                                        float(mp.group(4)) if mp.group(4) else 0.0))
+                    else:
+                        bad.append(s)
+                    after_start = False
+                elif rest.startswith("AI dzien"):
+                    ma = M97SZ_AI.search(rest)
+                    (ais.append(ma.groups()) if ma else bad.append(s))
+                elif rest.startswith("koniec cwiczen"):
+                    ends.append(rest)
+            elif "ERROR" in s and any(e in s for e in M97SZ_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, doby gracza {len(players)}, doby AI {len(ais)}, konca cwiczen {len(ends)}, nierozpoznanych {len(bad)}, ERROR {n_err}")
+    if not starts and not players and not ais:
+        rep.add("SZ-0: linie 'Szkolenie w obozie (m97)'", "brak w logu", "INFO (log sprzed paczki m97-szkolenie)", None)
+        rep.show()
+        return 0
+    if starts:
+        st = starts[-1]
+        on = "gracz tylko z menu obozu (Train the men) TAK" in st
+        mk = re.search(r"perki przerobione (\d+)/(\d+)", st)
+        n_perk = int(mk.group(1)) if mk else -1
+        rep.add("SZ-0: start sesji (zasada, tempo, perki przerobione)", st[:520], "INFO", None)
+        if on:
+            rep.add("SZ-0b: perki treningu przerobione (opisy podmienione)", f"{n_perk}/{mk.group(2) if mk else '?'}", ">= 10 (Polearm Drills daje w grze 0 - bez zmian)", n_perk >= 10)
+    else:
+        on = False
+        rep.add("SZ-0: start sesji", "brak linii startu", "linia przy kazdym wczytaniu", False)
+    rep.add("SZ-0c: linie rozpoznane", f"nierozpoznane {len(bad)}" + (f" (pierwsza: {bad[0][:160]})" if bad else ""), "0", not bad)
+    if players:
+        zero = [p for p in players if p[1] <= 0.0]
+        bad0 = [p[0] for p in zero if p[3] > 0]
+        rep.add("SZ-1: zero XP z marszu - doby gracza bez godziny cwiczen w obozie", f"dob bez cwiczen {len(zero)} z {len(players)}, z XP > 0: {len(bad0)}" + (f" (np. dzien {bad0[0]})" if bad0 else ""),
+                "0", not bad0)
+        notcamp = [p[0] for p in players if p[1] > p[2] + p[6] + 0.05 and not p[5]]
+        trained = [p for p in players if p[1] > 0.0]
+        auto_h = sum(p[6] for p in players)
+        rep.add("SZ-2: godziny cwiczen gracza tylko z menu obozu (albo samoczynnie: oboz oblezenia, cudza armia)",
+                f"dob z cwiczeniami {len(trained)}, godzin razem {sum(p[1] for p in trained):.1f} (samoczynnie {auto_h:.1f}); dob z godzinami ponad menu i samoczynne {len(notcamp)}"
+                + (f" (np. dzien {notcamp[0]})" if notcamp else "") + f"; linii konca cwiczen {len(ends)}", "0 (pierwsza doba po wczytaniu moze niesc godziny z zapisu)", not notcamp)
+        if trained:
+            per = [p[3] / max(0.01, p[1]) for p in trained]
+            rep.add("SZ-2b: XP gracza na godzine cwiczen (INFO)", f"srednio {sum(per) / len(per):.0f} XP na godzine (cala druzyna), najwiecej godzin w dobie {max(p[1] for p in trained):.1f}",
+                    "INFO (najwyzej 8 h na dobe od switu)", None)
+    else:
+        rep.add("SZ-1: doby gracza", "brak linii doby gracza", "INFO (zasada gracza nieczynna albo Drill Log wylaczony)", None)
+    rep.add("SZ-3: ERROR CampDrill / arm_campdrill / CtxOf.Camp", str(n_err), "0", n_err == 0)
+    if ais:
+        on_ai = [a for a in ais if a[1] == "TAK"]
+        bad_ai = [a[0] for a in on_ai if int(a[14]) > 0]
+        rep.add("SZ-4: XP z marszu AI przy czynnej zasadzie AI", f"dob z zasada AI {len(on_ai)} z {len(ais)}, z oddzialami z XP bez postoju za dnia {len(bad_ai)}" + (f" (np. {bad_ai[0]})" if bad_ai else ""),
+                "0", not bad_ai)
+        bad_s = [a[0] for a in ais if int(a[20]) > 0] if on else []
+        rep.add("SZ-4b: XP z marszu strony gracza (rod, armia gracza)", f"dob z oddzialami z XP bez postoju za dnia {len(bad_s)}" + (f" (np. {bad_s[0]})" if bad_s else ""),
+                "0 przy zasadzie gracza", not bad_s if on else None)
+        old = sum(int(a[8]) for a in ais)
+        camp = sum(int(a[9]) for a in ais)
+        hours = [float(a[4]) for a in ais]
+        h0 = sum(int(a[5]) for a in ais); h8 = sum(int(a[7]) for a in ais); pd = sum(int(a[2]) for a in ais)
+        ratio = camp / old if old else 0
+        rep.add("SZ-5: AI XP zasada obozu wobec dawnej reguly (decyzja: Drill Camp Only Ai)",
+                f"XP po broni razem dawna {old} -> obozu {camp} (x{ratio:.2f}, {'spadek' if ratio < 1 else 'wzrost'} {abs(1 - ratio) * 100:.0f}%); godzin postoju za dnia srednio {sum(hours) / len(hours):.2f};"
+                f" partio-doby 0 h {h0} ({100 * h0 / max(1, pd):.0f}%), 8 h {h8} ({100 * h8 / max(1, pd):.0f}%)",
+                "INFO (powyzej ok. 30% spadku - Jeff decyduje o kluczu)", None)
+        st_last = int(ais[-1][21])
+        rep.add("SZ-6: potkniecia CampDrill (ostatnia linia AI)", str(st_last), "0", st_last == 0)
+    else:
+        rep.add("SZ-4: linie AI", "brak", "INFO (Drill Log wylaczony)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m96jakosc (20.10, Jeff "za duzo jest legendary przedmiotow ... w sklepach za latwo mozna znalezc
 # legendary i masterwork"; Armoury/src/QualityScarcity.cs, klucz QualityScarcity). Progi JQ-x.
 # m96-jakosc2 (Jeff 20.10 17:20 "6 legendarnych danego typu ... daj wariacje, np. od 1 do 6 ... I to samo masterwork"): limit NA RODZAJ przedmiotu, losowany
@@ -54023,6 +54136,8 @@ def main(argv):
         return m96wies_main(logp)   # m96wies (20.10, m96-wies): porzadek menu wsi (VillageMenus) i komunikaty platnosci z powodem (PayNotes)
     if group == "m96zamek" and logp:
         return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
+    if group == "m97szkolenie" and logp:
+        return m97szkolenie_main(logp)   # m97szkolenie (20.10, Jeff "w marszu jest marsz"): cwiczenia tylko z obozu, zero XP z marszu, AI wobec dawnej reguly (CampDrill)
     if group == "m96jakosc" and logp:
         return m96jakosc_main(logp)   # m96jakosc (20.10, Jeff "za duzo legendary"): rzadkosc legendarnych i mistrzowskich - limit na rodzaj, wyrownanie polek do zwyklej (QualityScarcity)
     if group == "nzajazdy" and logp:

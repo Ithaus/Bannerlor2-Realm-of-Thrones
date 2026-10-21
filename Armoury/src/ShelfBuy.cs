@@ -102,14 +102,16 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>Sztuki zdjete przez Take wracaja na polke (dostawa sie nie udala - nikt nie placi); licznik doby bez nich.</summary>
-        internal static void PutBack(ItemRoster shelf, EquipmentElement el, int n, int cost, int first)
+        /// <summary>Sztuki zdjete przez Take wracaja na polke (dostawa sie nie udala - nikt nie placi); licznik doby bez nich. tally = false (m97-oboz, recenzja:
+        /// zwrot sztuk zdjetych przez Take z tally false - woz i siodlo CampCart) - bez ruszania licznikow linii "Ceny hurtu", ktorych Take nie dodal.</summary>
+        internal static void PutBack(ItemRoster shelf, EquipmentElement el, int n, int cost, int first, bool tally = true)
         {
             if (shelf == null || n <= 0) return;
             object idx0 = ShelfIndex.OwnBefore(shelf);   // E8/O1 (265): pamiec polki aktualna tuz przed wlasnym oddaniem (albo null)
             shelf.AddToCounts(el, n);
             ShelfIndex.NoteOwn(shelf);   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
             ShelfIndex.OwnAfter(shelf, idx0, el, n);   // E8/O1: indeks +n zamiast przebudowy (nowy stos = skok wersji o 2 - zwykla przebudowa)
+            if (!tally) return;
             _dBatches--; _dPieces -= n; _dCost -= cost; _dFlat -= (long)first * n; _dBack += n;
             if (n > 1) _dMulti--;
         }

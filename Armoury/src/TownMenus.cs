@@ -69,6 +69,7 @@ namespace Armoury
             new Move("repair_equipment_town", MenuSmithy, "RB", "The local blacksmith - pay him to repair the gear of you and your companions."),
             new Move("army_armory_manage", MenuSmithy, "DTE", "Manage Armory - the store of arms and armour your troops draw their kit from."),
             new Move("arm_qohor_enter", MenuSmithy, "Armoury", "The masters of Qohor - Valyrian steel reforged to your order."),
+            new Move("arm_cartwright_enter", MenuSmithy, "Armoury", "The cartwright and saddler - a supply cart from the carpenter's yard, a pack saddle from the tannery."),   // m97-oboz (recenzja)
             // praca
             new Move("rc_work_labour_town", MenuWork, "RC", "Day labour - dig, carry and haul from dawn to dusk for a day's wage."),
             new Move("rc_work_guard", MenuWork, "RC", "Night watch - walk the walls and gates by night; the merchants pay by the watch."),

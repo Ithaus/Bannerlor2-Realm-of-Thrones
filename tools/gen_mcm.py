@@ -18,6 +18,12 @@ RANGES = {
     'QualityMasterworkChance': (0.0, 0.05, "0.0000"),
     # m95-turniej: okup szranek jako czesc wartosci - kod przycina do 0.05..1 (TourneyRansom.ShareOf)
     'TourneyRansomShare': (0.05, 1.0, "0.00"),
+    # m97-oboz: woz i siodlo transportowe - kod przycina do 100..2000 kg, 0..50 %, 0..300 kg (CampCart.CartLoad / SlowPct / SaddleKg)
+    'CampWalkMaxMen': (0, 100, "0"),
+    'CampWalkMenPerTent': (2, 20, "0"),
+    'CartLoadKg': (100, 2000, "0"),
+    'CartSpeedPenaltyPercent': (0, 50, "0"),
+    'PackSaddleExtraKg': (0, 300, "0"),
     'CampStartHour': (0, 23, "0"),
     'CampEndHour': (0, 23, "0"),
     'OldStockScrapYield': (0.0, 1.0, "0.00"),

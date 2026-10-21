@@ -23,11 +23,11 @@ namespace Armoury
     ///   ktory nie spi i idzie na lorda, w promieniu AiCampDangerRadius) nie jest powodem marszu: budzi lorda, AI ma 0.5 h na
     ///   ucieczke, inaczej lord kladzie sie z powrotem (jego rozkaz sprzed snu zostaje zapamietany). Reszta spi. Lord w osadzie
     ///   bez powodu nie wyjezdza w godzinach obozu (spi pod dachem). Poscig i odsiecz tylko przy dlugu < AiNightsAwakeInChase.
-    /// R2 - TA SAMA KSIEGA SNU CO GRACZ dla kazdej partii lorda AI (bez Nieumarlych): co godzine +1 h (21:00-swit) albo
+    /// R2 - TA SAMA KSIEGA SNU CO GRACZ dla kazdej partii lorda AI (bez Nieumarlych): co godzine +1 h (noc snu: 10 tikow do switu, LedgerNight) albo
     ///   +DayRestFactor (dzien), gdy partia stoi (< 0.35 jedn./h), jest w osadzie, na morzu (SleepAtSeaFree) albo lezy w obozie;
     ///   o swicie doba bez bazy = dlug +1 (maks. 3); splata calej sumy od reki = dlug 0. Kary te same tablice co gracz
     ///   (SpeedPostfix / MoralePostfix w NightRest.cs).
-    /// R3 - SPLATA JAK U GRACZA: dlug 1 = oboz od 20:00 do konca obozu swiata (10 h pelnej stawki, NeededHours(1) = 9), dlug 2-3
+    /// R3 - SPLATA JAK U GRACZA: dlug 1 = oboz od DebtCampHour (0-6: 20:00, 21-3: 17:00) do konca obozu swiata (10 h pelnej stawki, NeededHours(1) = 9), dlug 2-3
     ///   = sen ciagly tam, gdzie stoi (licznik jak pasek snu gracza, swit nie dolicza dlugu spiacemu). Osobny slownik _debtSleep -
     ///   galaz switu obozu swiata go nie rusza. Ucieczka i alarm przerywaja sen.
     /// Pomiar: linie "AiNightCamp: marsz" (co godzine obozu), "AiNightCamp: ruch" (niezalezny pomiar z pozycji: kto przesunal sie
@@ -58,7 +58,11 @@ namespace Armoury
 #else
         private const bool DryBuild = false;
 #endif
-        private const int DebtCampHour = 20;          // oboz splaty dlugu 1: ticki 21..6 = 10 h pelnej stawki (1 h zapasu nad 9 h)
+        // m97-oboz: oboz splaty dlugu 1 liczony OD KONCA obozu swiata (bylo na sztywno 20:00 - przy obozie 0-6 dawalo 10 h, przy 21-3 tylko 7 h):
+        // DebtCampLen h pelnej stawki (1 h zapasu nad 9 h) konczy sie o CampEnd; dluzszy oboz swiata - splata od jego poczatku. 0-6 -> 20:00 jak dotad, 21-3 -> 17:00.
+        // Pelna stawka od DebtCampHour+1 do switu, bo noc snu (LedgerNight) jest zakotwiczona o swicie: przy 21-3 ticki 18..3 = 10 h (recenzja: przy nocy "od 21" bylo 8.8 h).
+        private const int DebtCampLen = 10;
+        private static int DebtCampHour { get { return Mod24(CampEnd - Math.Max(DebtCampLen, CampLen())); } }
         private const float RestMoveLimit = Drill.RestStep;   // jak gracz (OnHourly) i musztra (grupa11: jedna stala 0.35): ponizej - partia stoi
         private const double AlarmGraceHours = 0.5;   // AI sprawdza inicjatywe co ok. 0.15-0.18 h (AiCheckInterval 0.25 x 0.6-0.7)
         private const int AiSaveCap = 1500;           // wpisow ksiegi w zapisie (lordow ROT ok. 500-700)
@@ -978,7 +982,7 @@ namespace Armoury
                 _debtWasOn = on;
             }
             int dawn = PlayerDawn;
-            bool night = h >= 21 || h <= Math.Min(dawn, 12);      // jak gracz (OnHourly)
+            bool night = LedgerNight(h);      // jak gracz (OnHourly); m97-oboz (recenzja): 10 tikow konczacych sie o swicie (swit 6 -> 21..6 jak dotad)
             float dayF = MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
             float baza = Math.Max(1f, s.SleepHoursNeeded);
             bool campPast = InCamp(h - 1);                         // godzina, ktora wlasnie minela, byla godzina obozu

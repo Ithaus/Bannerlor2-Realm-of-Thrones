@@ -31,8 +31,8 @@ namespace Armoury
                 if (_depth > 1) return;
                 var s = Settings.Current;
                 if (s == null || !s.SightCycleEnabled) return;
-                int h = CampaignTime.Now.GetHourOfDay;
-                bool night = h >= 21 || h <= 4;
+                // m97-oboz: noc wzroku = noc gry (model czasu: SunSet 22 / SunRise 2, ROT te same) - jedna noc dla kary predkosci, wzroku i obozu (bylo 21-4:59)
+                bool night = CampaignTime.Now.IsNightTime;
                 float f = night ? s.NightSightFactor : s.DaySightFactor;
                 if (Math.Abs(f - 1f) > 0.001f) __result.AddFactor(f - 1f, night ? _txtNight : _txtDay);
                 if (night)

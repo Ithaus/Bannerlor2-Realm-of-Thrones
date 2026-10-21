@@ -177,7 +177,7 @@ namespace Armoury
                 // dawal 5.6 h i dlug); sufit 12, zeby zle ustawienie nie robilo nocy z calej doby
                 // poprawka recenzji: rowne godziny (brak obozu swiata) nie przesuwaja swita gracza - wtedy stary swit 6:00
                 int dawn = PlayerDawn;
-                bool night = h >= 21 || h <= Math.Min(dawn, 12);
+                bool night = LedgerNight(h);   // m97-oboz (recenzja): 10 tikow konczacych sie o swicie (swit 6 -> 21..6 jak dotad)
                 // grupa11: czesc wspolna z musztra (osada, oboz obleznikow, krok <= 0.35 jedn.) - jedna funkcja Drill.RestHour;
                 // morze i sluzba ROT to zasady snu (nie postoju) - dochodza tylko tutaj
                 bool resting = Drill.RestHour(mp, step)
@@ -192,7 +192,9 @@ namespace Armoury
                 bool forced = ForcedMarch.Hour(s, mp, movedH);
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
-                if (resting && !forced) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                // m97-szkolenie (recenzja 4): godzina cwiczen z menu obozu ("Train the men") to praca, nie odpoczynek - jak w staminie (menu cwiczen poza InCampMenu)
+                bool drilled = CampDrill.DrilledLastHour;
+                if (resting && !forced && !drilled) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);
@@ -365,10 +367,20 @@ namespace Armoury
 
         // ---- T1 (noc 08/09.10): JEDNA NOC OBOZU dla calego swiata. Jeff: "jak armia
         // idzie, to trzeba rozbic oboz - daj godziny od 24 do 6 rano". Godziny z MCM
-        // (CampStartHour / CampEndHour, domyslnie 0 i 6), rowne godziny = brak obozu
+        // (CampStartHour / CampEndHour, domyslnie 21 i 3 od m97-oboz - noc gry 22-2 cala w obozie; bylo 0 i 6), rowne godziny = brak obozu
         // (bez tego 0/0 uspiloby swiat na 24 h w trwajacej kampanii).
-        internal static int CampStart { get { var s = Settings.Current; return Mod24(s != null ? s.CampStartHour : 0); } }
-        internal static int CampEnd { get { var s = Settings.Current; return Mod24(s != null ? s.CampEndHour : 6); } }
+        internal static int CampStart { get { var s = Settings.Current; return Mod24(s != null ? s.CampStartHour : 21); } }
+        internal static int CampEnd { get { var s = Settings.Current; return Mod24(s != null ? s.CampEndHour : 3); } }
+        // m97-oboz (recenzja gry, krytyczne): okno pelnej stawki snu ZAKOTWICZONE O SWICIE, stalej dlugosci - bylo "od 21:00 do switu", co przy swicie 3:00
+        // skracalo je z 10 tikow do 7 (oboz splaty dlugu 1 od 17:00 dawal 8.8 h z 9, gracz splacal dlug 2-5 h dluzej). Teraz przesuniecie godzin obozu
+        // przesuwa cala noc snu: swit 6 -> ksiega 21..6 i menu 21:00-5:59 (dokladnie jak dotad), swit 3 -> ksiega 18..3 i menu 18:00-2:59.
+        private const int SleepNightTicks = 10;   // tikow ksiegi pelnej stawki (tick o godzinie h liczy godzine h-1..h; swit-9 .. swit)
+        /// <summary>Ksiega snu (gracz OnHourly i AI): tick o godzinie h w nocy snu = h w [swit-9, swit] (10 tikow, przez polnoc).</summary>
+        internal static bool LedgerNight(int h) { return Mod24(h - (PlayerDawn - (SleepNightTicks - 1))) < SleepNightTicks; }
+        /// <summary>Sen w menu i w karczmie (godzina zegara): noc snu = [swit-9, swit) - 9 godzin zegara, ktore ksiega liczy tikami swit-8 .. swit.</summary>
+        internal static bool MenuNight(int h) { return Mod24(h - (PlayerDawn - (SleepNightTicks - 1))) < SleepNightTicks - 1; }
+        /// <summary>Pierwsza godzina nocy snu (do logu): swit-9.</summary>
+        internal static int SleepNightStart { get { return Mod24(PlayerDawn - (SleepNightTicks - 1)); } }
         private static int Mod24(int h) { return ((h % 24) + 24) % 24; }
         /// <summary>Swit rachunku snu gracza: koniec obozu, a przy rownych godzinach (swiat nie obozuje) stary swit 6:00.</summary>
         internal static int PlayerDawn { get { int st = CampStart, e = CampEnd; return st == e ? 6 : e; } }
@@ -497,7 +509,7 @@ namespace Armoury
                      + ", AiNightReliefWider=" + s.AiNightReliefWider + ", AiNightsAwakeInChase="
                      + s.AiNightsAwakeInChase.ToString("0.##", CultureInfo.InvariantCulture) + ", promien alarmu "
                      + s.AiCampDangerRadius.ToString("0.#", CultureInfo.InvariantCulture) + " jedn., poscig do " + CampLen()
-                     + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00"
+                     + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00, noc snu (pelna stawka) " + SleepNightStart + ":00-" + PlayerDawn + ":00"
                      + "; T10-R: MaxForcedNights=" + s.MaxForcedNights + (s.MaxForcedNights > 0 ? " (potem obowiazkowy odpoczynek do dlugu 0, ucieczka tylko przed wrogiem >= "
                         + CrushRatio.ToString("0.#", CultureInfo.InvariantCulture) + " x silniejszym; armia wedlug najbardziej zmeczonej partii)" : " (bez limitu - stare reguly)")
                      + (DryBuild ? " - DLL NA SUCHO (T10_DRY): tylko log, zachowanie i kary jak w T1" : "")
@@ -953,7 +965,7 @@ namespace Armoury
         }
 
         /// <summary>
-        /// CALY SWIAT OBOZUJE. Godzina obozu (T1: CampStartHour-CampEndHour, domyslnie 0-6): partie lordow i karawany
+        /// CALY SWIAT OBOZUJE. Godzina obozu (T1: CampStartHour-CampEndHour, domyslnie 21-3 od m97-oboz, wczesniej 0-6): partie lordow i karawany
         /// staja na nocleg (AI upione na godzine, wznawiane co tick nocy),
         /// z namiotem na mapie. NIE staja: scigani i uciekajacy (wrog w poblizu
         /// lub rozkaz ucieczki), armie w akcji (bitwa/oblezenie), zeglujacy,
@@ -2322,7 +2334,7 @@ namespace Armoury
         }
 
         /// <summary>Tlo menu obozu: grafika kultury (jak u armii), zapasowo ogolna - koniec z czerwonym "temp".</summary>
-        private static void SetCampBackground(MenuCallbackArgs args)
+        internal static void SetCampBackground(MenuCallbackArgs args)   // m97-szkolenie: takze menu cwiczen (CampDrill)
         {
             try
             {
@@ -2379,7 +2391,7 @@ namespace Armoury
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);
                 int h = CampaignTime.Now.GetHourOfDay;
-                bool night = h >= 21 || h <= 5;
+                bool night = MenuNight(h);   // m97-oboz: 9 h zegara do switu gracza (swit 6 -> 21-5 jak dotad, swit 3 -> 18-2)
                 _rouseAsked = false;
                 // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
                 string inn = TownInns.OnSleepInit(args);
@@ -2441,7 +2453,7 @@ namespace Armoury
                 // wlasne godziny snu: noc pelna stawka, dzien slabiej - te same
                 // zasady co rachunek doby w OnHourly, ale bez jego zerowania
                 int h = CampaignTime.Now.GetHourOfDay;
-                bool night = h >= 21 || h <= 5;
+                bool night = MenuNight(h);   // m97-oboz: 9 h zegara do switu gracza (swit 6 -> 21-5 jak dotad, swit 3 -> 18-2)
                 float day = s != null ? MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f) : 0.5f;
                 // KA: w lozku karczmy sen idzie szybciej (wazone liczba ludzi w porzadnej karczmie i dobrym domu, x1.25); poza karczma 1 - jak dotad
                 _menuRest += (float)dt.ToHours * (night ? 1f : day) * TownInns.SleepFactor();
