@@ -298,6 +298,25 @@ namespace Armoury
             return 0f;
         }
 
+        /// <summary>m103 P7b (klucz BloomeryShelfLeavesForges): zuzycie dobowe surowca w miescie z OBECNYCH rak BEZ dymarek - to samo co UseNow, ale dla drewna
+        /// kuznie liczone sama stawka wegla kowali (WoodPerHandForge) bez Bloomery.ShelfUse, ktore HandUse dolicza przy BloomeryWoodDemand (bez tego klucza stara
+        /// stawka g.PerHand miala w sobie wytop rudy w miescie); domy (Fixed), rzemioslo (TownCrafts / artisans) i linie warsztatow (ShopUse) jak w UseNow.
+        /// 0 = spoza tabeli albo zamek. Sam odczyt.</summary>
+        internal static float UseNowNoBloomery(Town town, ItemObject item)
+        {
+            var s = Settings.Current;
+            if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0f;
+            foreach (var g in _goods)
+            {
+                if (g.Item != item) continue;
+                float crafts = TownCrafts.Active ? TownCrafts.UseOf(town, g.Item) : g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle);
+                float hands = WorkshopLaw.TownHands(town);
+                float hand = g.Ix == WoodIx ? hands * WoodPerHandForge : hands * g.PerHand;
+                return hand + g.Fixed + crafts + ShopUse(town, g);
+            }
+            return 0f;
+        }
+
         /// <summary>174.3: suma zapasow docelowych i progow nadwyzki miast dla surowca (linia startowa "Rece (174)").</summary>
         internal static void SumsFor(string id, out int target, out int keep)
         {

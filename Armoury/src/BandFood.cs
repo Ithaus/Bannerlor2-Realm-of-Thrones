@@ -48,6 +48,18 @@ namespace Armoury
     /// (OnLoot - zdarzenie gry OnLootDistributedToParty; NoteBandGold z BeatenPurse) - gracz osobno.
     /// Stan (dlug ulamka jedzenia, doby glodu) tylko w sesji - nic nie idzie do zapisu; po wczytaniu glod liczy sie od nowa (morale zostaje w zapisie gry).
     /// Linia doby "Bandy - jedzenie i kiesy (m96-bandy)".
+    ///
+    /// m103 P6 (plan gospodarki 21.10, MB-2: piraci NavalDLC caly czas na morzu, 42% potrzeby band, bez zadnego zrodla jedzenia; klucz BandFoodAtSea):
+    ///  2a. ZAKUP Z MORZA: paser miasta Z PORTEM (dom bandy, jesli to miasto z portem, albo najblizsze otwarte miasto z portem) - te same zasady (wlasna kiesa,
+    ///      polka miasta, zaplata do kasy), bez portu w swiecie - najblizsze miasto jak dotad.
+    ///  4b. POLOW ZALOGI (tylko na morzu): czego po jukach brakuje do DZISIEJSZEJ porcji (sztuki nalezne dzis, ulamek dalej na jutro), zaloga lowi i zjada od
+    ///      razu - najwyzej CrewFishPerDay (24) na dobe: miara NavalDLC (NavalFishingCampaignBehaviour.OnHourlyTickParty - najwyzej 1 ryba na godzine na morzu).
+    ///      Ryby nigdy nie zostaja w jukach (nie ida do zapasu ani do pasera - zadne zloto z niczego). Ksiega towarow: zrodlo nazwane w ramce FFish z etykieta
+    ///      "polow zalogi bandy|" (wlasna grupa, NIE GFish/KsFishBoats - A17Fix.cs:229, Plan KS liczy te grupe jako podaz); zjedzenie w tej samej grupie (ujscie),
+    ///      bez osady w ramkach - poza popytem wojska Planu KS (GFood/KsArmy) i poza zuzyciem rynku sterowania KS (CrewFish).
+    ///      Zaloga, ktora zjadla cala dzisiejsza porcje, jest najedzona (bez zapasu - na morzu lowi codziennie).
+    ///  5b. GLOD NA MORZU jak na ladzie: Starving() - glodna banda na morzu nie werbuje (odejscia na morzu dalej nie - gra tez nie zdejmuje dezerterow na morzu).
+    ///  Rabunek wybrzezy z morza - NIE (osobna decyzja). Linia doby: odcinek "z morza: paser portu ..., polow zalogi ..." przed "| potkniecia".
     /// </summary>
     internal static class BandFood
     {
@@ -60,6 +72,12 @@ namespace Armoury
         private const float RobVillageShare = 0.5f; // z jednej wsi na dobe najwyzej polowa jej zywnosci (wszystkie bandy razem)
         private const int MaxRobVillages = 3;       // banda obchodzi na dobe najwyzej tyle wsi
         private const int LifeCoinPerMan = 1;       // dzien zycia czlowieka bandy w kiesie = zold rekruta tier 0 (DefaultPartyWageModel.GetCharacterWage)
+        private const int CrewFishPerDay = 24;      // m103 P6: polow zalogi bandy na morzu najwyzej tyle sztuk na dobe - NavalDLC daje partii na morzu najwyzej 1 rybe na godzine
+        private const string LabCrewBand = "polow zalogi bandy|";   // m103 P6: grupa ksiegi towarow (FFish) - wlasna, poza GFish/KsFishBoats (A17Fix.cs:229)
+        private const string LabCrewBandEat = "polow zalogi bandy|zjedzone od razu na morzu";   // m103 P6: ta sama grupa po stronie ujscia (poza GFood/KsArmy)
+
+        /// <summary>m103 P6: klucz BandFoodAtSea (przy Bands Eat Food) - zakup u pasera portu, polow zalogi, glod na morzu jak na ladzie.</summary>
+        internal static bool SeaOn { get { var s = Settings.Current; return s != null && s.BandFoodAtSea && On; } }
 
         private sealed class St { public float Owed; public int Hungry; }
         private static readonly Dictionary<MobileParty, St> _st = new Dictionary<MobileParty, St>(PeopleBook.RefEq.I);
@@ -71,6 +89,11 @@ namespace Armoury
         private static readonly Dictionary<Settlement, int> _villLeft = new Dictionary<Settlement, int>();   // ile zywnosci wies moze jeszcze dzis oddac bandom
         private static ItemObject _grain;
         private static bool _grainTried;
+        private static ItemObject _fish;            // m103 P6: polow zalogi
+        private static bool _fishTried;
+        private static readonly HashSet<Settlement> _portTowns = new HashSet<Settlement>();   // m103 P6: miasta portowe, u ktorych pasera kupily dzis bandy na morzu
+        private static long _seaPortUnits, _seaPortGold, _crewFish;
+        private static int _seaPortBands, _crewBands, _crewCapped;
 
         // liczniki doby
         private static int _bands, _skipBattle, _skipQuest, _skipUndead, _skipRaid, _skipEmpty;
@@ -94,6 +117,7 @@ namespace Armoury
         {
             _st.Clear(); _gone.Clear(); _purses.Clear(); _robbed.Clear(); _plRobbed.Clear(); _buyTowns.Clear(); _villLeft.Clear();
             _grain = null; _grainTried = false; _sessStumbles = 0; _err = false;
+            _fish = null; _fishTried = false;   // m103 P6
             NewDay();
             KiesaNewDay();
             _lootFoodAi = _lootFoodPlayer = _lootFoodLords = _lootFoodLordsPlayer = _bandGold = _bandGoldPlayer = 0; _lootBands = _lootBandsPlayer = 0;
@@ -106,6 +130,7 @@ namespace Armoury
             _buyBands = _seaBuyBands = _robBands = _fed = _hungry = _starving = _longHungry = _leftMen = _leftBands = _broken = _atSea = _seaHungry = _heroHeld = 0;
             _morale = 0; _stock = 0; _stockOk = 0; _stumbles = 0;
             _robbed.Clear(); _plRobbed.Clear(); _buyTowns.Clear(); _villLeft.Clear();
+            _portTowns.Clear(); _seaPortUnits = _seaPortGold = _crewFish = 0; _seaPortBands = _crewBands = _crewCapped = 0;   // m103 P6
         }
 
         private static void KiesaNewDay()
@@ -161,12 +186,64 @@ namespace Armoury
             catch (Exception e) { Stumble("FoodKeep", e); return 0; }
         }
 
-        /// <summary>OutlawLaw.Daily: banda na ladzie glodowala wczoraj - nie werbuje z puli (nikt nie przystaje do glodnych). Na morzu werbunek jak dotad
-        /// (banda nie ma jak zejsc na lad po jedzenie; recenzja: piraci NavalDLC bez werbunku tylko by wymierali).</summary>
+        /// <summary>OutlawLaw.Daily: banda na ladzie glodowala wczoraj - nie werbuje z puli (nikt nie przystaje do glodnych). Na morzu bez klucza BandFoodAtSea
+        /// werbunek jak dotad (banda nie miala jak zejsc na lad po jedzenie; recenzja: piraci NavalDLC bez werbunku tylko by wymierali); m103 P6 z kluczem -
+        /// glod na morzu jak na ladzie (zaloga lowi brak dzisiejszej porcji, wiec glodna zostaje tylko banda ponad limit polowu albo bez ryb w swiecie).</summary>
         internal static bool Starving(MobileParty p)
         {
             St st;
-            return On && p != null && !p.IsCurrentlyAtSea && _st.TryGetValue(p, out st) && st.Hungry > 0;
+            return On && p != null && (!p.IsCurrentlyAtSea || SeaOn) && _st.TryGetValue(p, out st) && st.Hungry > 0;
+        }
+
+        private static EquipmentElement FishEl()
+        {
+            if (!_fishTried)
+            {
+                _fishTried = true;
+                try { _fish = MBObjectManager.Instance.GetObject<ItemObject>("fish"); } catch { _fish = null; }
+                if (_fish != null && !_fish.IsFood) _fish = null;
+            }
+            return _fish != null ? new EquipmentElement(_fish) : EquipmentElement.Invalid;
+        }
+
+        /// <summary>m103 P6 (a): paser bandy na morzu - dom bandy, jesli to otwarte miasto z portem (NavalDLC daje piratom port jako dom), inaczej najblizsze
+        /// otwarte miasto z portem; null - zadnego (wtedy najblizsze miasto jak dotad).</summary>
+        private static Settlement PortTownOf(MobileParty p, Vec2 pos)
+        {
+            var h = p.HomeSettlement;
+            if (h != null && h.IsTown && h.Town != null && !h.IsUnderSiege && h.HasPort) return h;
+            Settlement best = null; float bd = float.MaxValue;
+            foreach (var t in Town.AllTowns)
+            {
+                var st = t != null ? t.Settlement : null;
+                if (st == null || !st.IsTown || st.IsUnderSiege || !st.HasPort) continue;
+                float d = pos.DistanceSquared(st.GetPosition2D);
+                if (d < bd) { bd = d; best = st; }
+            }
+            return best;
+        }
+
+        /// <summary>m103 P6 (b): polow zalogi bandy na morzu - n sztuk ryb (brak dzisiejszej porcji po jukach, najwyzej CrewFishPerDay) zlowionych i zjedzonych od
+        /// razu. Ksiega towarow: dwie ramki polowu (FFish) z ta sama grupa "polow zalogi bandy" - zrodlo nazwane (+n) i zjedzone od razu (-n); BEZ osady w ramce
+        /// (rynek "bez rynku": ryba zalogi nigdy nie stoi na straganie). Kontrola calosci: ramka "jedzenie partii" (FFood, grupa GFood) weszlaby do popytu wojska
+        /// Planu KS (GoodsLedger.KsArmy -> KsItem.Army), a osada w ramce - do zuzycia rynku w sterowaniu KS (MkC, StartCalibration.ControlDaily) - ok. 230 szt./d
+        /// popytu na ryby, ktory zaloga sama pokrywa; poza GFish/KsFishBoats (A17Fix.cs:229 - podaz Planu KS). Nic nie zostaje w jukach. Zwraca zjedzone.</summary>
+        private static int CrewFish(MobileParty p, int n)
+        {
+            if (n <= 0 || p.ItemRoster == null) return 0;
+            var f = FishEl();
+            if (f.Item == null) return 0;
+            var pack = p.ItemRoster;
+            var ff = GoodsLedger.Begin(GoodsLedger.FFish);
+            if (ff != null) ff.Info = LabCrewBand;
+            try { pack.AddToCounts(f, n); }
+            finally { GoodsLedger.End(ff); }
+            var gf = GoodsLedger.Begin(GoodsLedger.FFish);
+            if (gf != null) gf.Info = LabCrewBandEat;
+            try { pack.AddToCounts(f, -n); }
+            finally { GoodsLedger.End(gf); }
+            _crewFish += n; _crewBands++;
+            return n;
         }
 
         private static EquipmentElement GrainEl()
@@ -318,13 +395,20 @@ namespace Armoury
             if (sea) _atSea++;
             var pos = p.Position.ToVec2();
             var town = OutlawLaw.NearestTownOf(pos);
+            bool seaRule = sea && SeaOn;                                       // m103 P6
+            var fence = seaRule ? (PortTownOf(p, pos) ?? town) : town;         // m103 P6 (a): z morza paser miasta z portem
             int have = FoodUnits(pack);
             // 2. dokup do zapasu (dzis + keepDays) przez pasera - takze z morza (paser skupuje lup z morza, wiec i sprzedaje)
             int want = (int)Math.Ceiling(need * (1 + keepDays)) - have;
-            if (want > 0 && town != null && p.PartyTradeGold > 0)
+            if (want > 0 && fence != null && p.PartyTradeGold > 0)
             {
-                int got = Buy(p, s, want, town, pos);
-                if (got > 0) { have += got; want -= got; _buyBands++; if (sea) _seaBuyBands++; }
+                long g0 = _boughtGold;
+                int got = Buy(p, s, want, fence, pos);
+                if (got > 0)
+                {
+                    have += got; want -= got; _buyBands++; if (sea) _seaBuyBands++;
+                    if (seaRule) { _seaPortUnits += got; _seaPortGold += _boughtGold - g0; _seaPortBands++; _portTowns.Add(fence); }
+                }
             }
             // 3. czego nie kupila - rabunek wsi do pelnego zapasu (tylko na ladzie)
             if (want > 0 && !sea)
@@ -337,18 +421,27 @@ namespace Armoury
             int units = (int)owed;
             int eat = Math.Min(units, have);
             if (eat > 0) eat = Eat(p, eat, town);
+            // m103 P6 (b): na morzu zaloga lowi tylko brak dzisiejszej porcji (sztuki nalezne dzis) i zjada od razu - najwyzej CrewFishPerDay
+            int fish = 0;
+            if (seaRule && eat < units)
+            {
+                int lack0 = units - eat;
+                if (lack0 > CrewFishPerDay) _crewCapped++;
+                try { fish = CrewFish(p, Math.Min(lack0, CrewFishPerDay)); } catch (Exception e) { Stumble("CrewFish", e); }
+            }
             st.Owed = Math.Max(0f, owed - units);
             have -= eat;
-            _eaten += eat;
+            _eaten += eat + fish;
             _stock += Math.Max(0, have);
             if (have >= (int)Math.Ceiling(need * keepDays)) _stockOk++;
             // 5. glod: najedzona = zjadla dzis cala potrzebe albo ma jej zapas (dzien bez pelnej sztuki do zjedzenia nie jest glodem)
-            float fed = need <= 0f ? 1f : MBMath.ClampFloat((eat + have) / need, 0f, 1f);
+            float fed = need <= 0f ? 1f : MBMath.ClampFloat((eat + fish + have) / need, 0f, 1f);
+            if (seaRule && eat + fish >= units) fed = 1f;                      // m103 P6 (b): zaloga na morzu zjadla cala dzisiejsza porcje (ulamek na jutro) - lowi codziennie, zapas niepotrzebny
             if (fed >= 0.999f) { _fed++; st.Hungry = 0; return; }
             st.Hungry++;
             _hungry++;
             if (sea) _seaHungry++;
-            if (eat + have <= 0) _starving++;
+            if (eat + fish + have <= 0) _starving++;                           // m103 P6: banda ponad limit polowu zjadla ryby - nie "bez jedzenia"
             float lack = 1f - fed;
             try
             {
@@ -579,6 +672,10 @@ namespace Armoury
                   .Append(" szt. (").Append(_lootBandsPlayer).Append("); zloto z kies band ").Append(_bandGold).Append(" zl, gracz ").Append(_bandGoldPlayer)
                   .Append(" zl; jedzenie z druzyn lordow AI ").Append(_lootFoodLords).Append(" szt., gracz ").Append(_lootFoodLordsPlayer)
                   .Append(" szt. (reszta jukow rozbitych - linia K1 \"dobytek rozbitych\")")
+                  // m103 P6: odcinek tuz przed "| potkniecia" (regex MB-0 ma tu .*?) - zakup u pasera portu i polow zalogi bandy na morzu
+                  .Append(SeaOn ? " | z morza: paser portu " + _seaPortUnits + " szt. za " + _seaPortGold + " zl (band " + _seaPortBands + ", miast portowych " + _portTowns.Count
+                                  + "), polow zalogi " + _crewFish + " szt. (band " + _crewBands + ", ponad limit " + CrewFishPerDay + " szt./d " + _crewCapped + ")"
+                                : " | z morza: WYLACZONE (Band Food At Sea) - paser najblizszego miasta, bez polowu")
                   .Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_sessStumbles).Append(").");
                 Log.Info(sb.ToString());
                 if (_plRobUnits > 0 && _plRobbed.Count > 0)

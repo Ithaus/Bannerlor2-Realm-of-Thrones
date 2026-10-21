@@ -3740,6 +3740,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float BandHungerLeaveShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Band Food At Sea", HintText = "with Bands Eat Food: a band at sea buys its food through the fence of a port town (its home port, or the nearest port), and its crew fishes for whatever is still missing from the day's portion - eaten at once, never stored or sold, at most one catch an hour (24 a day); a band still hungry at sea takes no recruits, as on land. Off = at sea only the nearest town's fence (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BandFoodAtSea { get; set; } = true;
+
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ('Year 299, Day 256, Autumn')", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
@@ -6852,6 +6856,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryWoodDemand { get; set; } = true;
 
+        [SettingPropertyBool("Bloomery Shelf Leaves Forges", HintText = "with Bloomery At Mine: a mine's bloomery buys wood from its market town's shelf only above one day of the town's own use (its smiths, households and craftsmen), so the town's armourers and fletchers are served first - a smith earns more on a load of wood than a bloomery; a bloomery that falls short orders wood by cart from towns with a surplus. Off = the bloomery may empty the shelf, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryShelfLeavesForges { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Coal Before Lord Share", HintText = "with Bloomery At Mine: what a mining village paid for the wood of its bloomery comes out of its cart's market takings first, and the lord takes his share only of what is left - the difference moves from the lord's tax on those takings to the village's purse when the cart comes home, so no gold is made; the owners of Banner Kings estates keep their part (needs Village Takings Whole; off = the lord's share is counted on the whole takings, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryCoalBeforeLordShare { get; set; } = true;
@@ -7159,6 +7167,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Shipyard Labour Share", 0.00f, 1.00f, "0.00", HintText = "share of a hull's worth the town pays its shipwrights for building it (paid from the town's purse above the merchants' reserve to the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Old loose ends (A17)")]
         public float ShipyardLabourShare { get; set; } = 0.1f;
+
+        [SettingPropertyBool("Shipyard Wood Above Craft Stock", HintText = "a shipyard building a ship takes timber off the town's market only above the stock the town keeps for its own smiths, bloomeries and workshops - the same rule as other building works (Build Wood Above Craft Stock); works only while Build Wood Above Craft Stock is on; planks as before. Off = the shipyard takes timber down to the last log, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool ShipyardWoodAboveCraftStock { get; set; } = true;
 
         [SettingPropertyBool("A17 Port Fish Pays Folk", HintText = "outside the start calibration, the coin a Banner Kings harbour town pays for its daily catch goes to the townsfolk as the fishermen's wages instead of vanishing (works together with the fish setting above); off = the coin vanishes, as in Banner Kings", RequireRestart = false)]
         [SettingPropertyGroup("Old loose ends (A17)")]
@@ -8435,6 +8447,14 @@ namespace Armoury
         [SettingPropertyBool("Ks Farm Catch Up One Off", HintText = "with Ks Farm Catch Up: the catch-up a town pays its lord and crown is counted as a one-off payment, not as steady income from the land: it no longer raises the lord's steady income (and with it his war reserve, wage ceiling, court, dues and credit limit) for the following weeks, and the crown does not count it among its usual income when it asks its lords and towns for a war grant. The coin paid is the same. Off = the catch-up is counted like the town's yearly farm, as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool KsFarmCatchUpOneOff { get; set; } = true;
+
+        [SettingPropertyBool("Ks Farm Surplus Cap Net", HintText = "with Ks Farm Follows Surplus: a town's farm is raised for its merchants' surplus only up to what the merchants have really taken in over the last weeks (a year of their recent daily takings), by at most Ks Farm Surplus Review Max of the farm or of those takings, whichever is larger, at a time; the surplus is judged on the purse left after the coin it already owes, and nothing is measured or raised while the farms are still coming in after they were set. A town whose purse has fallen to one and a half times its working coin, or that owes part of its farm, has a farm above its merchants' takings lowered at the same pace (at most Ks Farm Surplus Review Max at a time, never below those takings). A town that pays no farm at all and keeps gathering coin gets a farm from its takings at that same pace, or pays the catch-up if it has no takings. The quarterly farm review of such a town never aims above its merchants' takings either. Off = raises up to Ks Farm Surplus Review Max of the farm whatever the takings, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool KsFarmSurplusCapNet { get; set; } = true;
+
+        [SettingPropertyBool("Ds Farm Fix Share Cap", HintText = "with Ds Towns: when the farms of towns and castles are set after the measuring weeks, all farms paid from the purse together are set no higher than what the merchants took in over those weeks - if the old dues took more, every farm is lowered by the same share (each place keeps its rank, also a place whose merchants took in nothing in those weeks), and a place still above its own takings is brought down later by the farm reviews. Off = the farm is what the old dues took, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmFixShareCap { get; set; } = true;
 
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
@@ -9970,6 +9990,7 @@ namespace Armoury
             s.BandFoodKeepDays = BandFoodKeepDays;
             s.BandPurseKeepDays = BandPurseKeepDays;
             s.BandHungerLeaveShare = BandHungerLeaveShare;
+            s.BandFoodAtSea = BandFoodAtSea;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;
@@ -10748,6 +10769,7 @@ namespace Armoury
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;
             s.BloomeryWoodDemand = BloomeryWoodDemand;
+            s.BloomeryShelfLeavesForges = BloomeryShelfLeavesForges;
             s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
             s.MineRegale = MineRegale;
             s.MineRegaleShare = MineRegaleShare;
@@ -10825,6 +10847,7 @@ namespace Armoury
             s.A17ShipyardBuildsFromTimber = A17ShipyardBuildsFromTimber;
             s.ShipyardTimberPer1000 = ShipyardTimberPer1000;
             s.ShipyardLabourShare = ShipyardLabourShare;
+            s.ShipyardWoodAboveCraftStock = ShipyardWoodAboveCraftStock;
             s.A17PortFishPaysFolk = A17PortFishPaysFolk;
             s.A17AuthorLines = A17AuthorLines;
             s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;
@@ -11144,6 +11167,8 @@ namespace Armoury
             s.KsFarmCatchUpShare = KsFarmCatchUpShare;
             s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
             s.KsFarmCatchUpOneOff = KsFarmCatchUpOneOff;
+            s.KsFarmSurplusCapNet = KsFarmSurplusCapNet;
+            s.DsFarmFixShareCap = DsFarmFixShareCap;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;
