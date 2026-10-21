@@ -1033,6 +1033,12 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
                     T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
                     L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+--grupa m103lektor : (21.10, w-toku/m103-lektor; Armoury/src/Lektor.cs, Lektor.Live.cs, klucze LektorEnabled, LektorEventWindows, LektorGossipLive, LektorGossipDailyChars,
+                    LektorGossipReserveChars) python -I tools/sprawdz_logi.py --grupa m103lektor <Armoury-*.log> [--crashscribe <session-*.log>] (strumieniowo). LK-0 linia startu,
+                    LK-1 ERROR lektora i potkniecia 0 (takze watek nagran), LK-2 latka EventScreen OnActivate i OnDeactivate tak, LK-3 nagran okien = wiersze arm_lektor.tsv w repo
+                    (odrzucone 0), LK-4 w autotescie 0 zapytan API (bez "nowe nagranie", "konto ElevenLabs"; plik armoury-lektor-live.flag - INFO), LK-5 okna ROT z nagraniem
+                    odtworzone (start > 0; z --crashscribe: okna zamkniete przez autotest z tytulem z tsv -> start > 0), LK-6 grane po 0,5 s NIE 0 i koniec za wczesnie 0,
+                    LK-7 kazdy start okna ma stop albo koniec, LK-8 znaki dzis <= limit, LK-9 plotki (INFO). Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
@@ -37951,6 +37957,164 @@ def m100kryjowki_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m103lektor (21.10, w-toku/m103-lektor: lektor - okna wydarzen ROT czytane z nagran Davida (ModuleData/Lektor/EN),
+# plotki czytane na zywo przez ElevenLabs z trwala pamiecia nagran; Armoury/src/Lektor.cs, Lektor.Live.cs; klucze LektorEnabled, LektorEventWindows, LektorGossipLive ...)
+M103_TAG = "Lektor (m103): "
+M103_DAY = re.compile(r"dzien (\d+) \| okna ROT: otwarte (\d+), z nagraniem (\d+), odtworzone (\d+) \(grane po 0,5 s tak (\d+) / nie (\d+), koniec za wczesnie (\d+)\)"
+                      r", bez nagrania (\d+), uszkodzone (\d+)")
+M103_DAY_API = re.compile(r"\| zapytania API (\d+) \(w sesji (\d+), nowych nagran w sesji (\d+)\), bledy API (\d+)")
+M103_DAY_CHARS = re.compile(r"\| znaki dzis (\d+) / (\d+) \(doba ([0-9-]+)\)")
+M103_DAY_GOS = re.compile(r"\| plotki: strony (\d+), kawalki (\d+), z pamieci (\d+), odtworzone (\d+) \(grane po 0,5 s nie (\d+), za wczesnie (\d+)\), nowe nagrania (\d+) \(znaki (\d+)\)")
+M103_DAY_STUMB = re.compile(r"\| watek nagran: potkniecia (\d+) \| potkniecia (\d+) \(w sesji (\d+)\)")
+M103_IDX = re.compile(r"nagran okien (\d+) \(([0-9]+) s; ([^,;)]*)(?:, odrzucone (\d+)[^)]*)?")
+M103_WIN = re.compile(r'okno ROT "(.*)" (?:-> (\S+) \(([0-9.]+) s\) - start\.|- (stop|koniec) po ([0-9.]+) s|- grane po 0,5 s: (tak|NIE))')
+M103_CS_WIN = re.compile(r'OKNO wydarzenie ROT "([^"]*)"')
+
+
+def m103lektor_tsv_rows():
+    """Wiersze arm_lektor.tsv w repo (obok tools/) - tytuly okien z nagraniem; brak pliku -> None."""
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Armoury", "ModuleData", "Lektor", "EN", "arm_lektor.tsv")
+    if not os.path.isfile(p):
+        return None
+    titles = []
+    with open(p, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            if not ln or ln.startswith("#"):
+                continue
+            c = ln.split("\t")
+            if len(c) >= 3:
+                titles.append(c[1].strip())
+    return titles
+
+
+def m103lektor_main(logp, csp=None):
+    """m103lektor (21.10, w-toku/m103-lektor; Jeff 21.10: lektor po angielsku, glos David ElevenLabs; plotki na zywo z pamiecia nagran - "zapisuj kazda nagrana plotke,
+    aby potem, jak jest cos nagrane, David nie czytal"): LK-0 linia startu sesji, LK-1 ERROR lektora (Lektor.*, M103LektorReset) i potkniecia 0 (doby, sesja, watek nagran),
+    LK-2 latka EventScreen "OnActivate tak, OnDeactivate tak", LK-3 nagran okien = wiersze arm_lektor.tsv w repo i odrzucone 0, LK-4 tryb autotestu: zapytania API 0, bez linii
+    "nowe nagranie plotki" i "konto ElevenLabs" (z plikiem armoury-lektor-live.flag - "API na zywo: tak" - INFO), LK-5 okna ROT z nagraniem odtworzone: linie start > 0, gdy
+    w dobach "z nagraniem" > 0 albo (z --crashscribe) autotest zamknal okno ROT o tytule z tsv; LK-6 "grane po 0,5 s: NIE" 0 i "koniec za wczesnie" 0 (okna i plotki),
+    LK-7 kazdy start okna ma stop albo koniec (ostatni moze trwac przy koncu logu), LK-8 znaki dzis <= limit dzienny, LK-9 plotki i zapytania (INFO). Log bez paczki: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("LK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, installs, days, n_err, err_first = [], [], [], 0, ""
+    win_start, win_end, win_05no, win_05yes, new_rec, konto, gos_05no = [], [], 0, 0, 0, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in Lektor") or s.startswith("ERROR in M103LektorReset") or (s.startswith("ERROR in ") and "Lektor." in s[:60]):
+                n_err += 1
+                err_first = err_first or s[:200]
+                continue
+            if not s.startswith(M103_TAG):
+                continue
+            body = s[len(M103_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            if body.startswith("latka EventScreen"):
+                installs.append(body)
+                continue
+            if body.startswith("dzien "):
+                days.append(body)
+                continue
+            if body.startswith("nowe nagranie plotki"):
+                new_rec += 1
+                continue
+            if body.startswith("konto ElevenLabs"):
+                konto += 1
+                continue
+            if body.startswith("plotka ") and "grane po 0,5 s: NIE" in body:
+                gos_05no += 1
+                continue
+            mw = M103_WIN.match(body)
+            if mw:
+                if mw.group(2):
+                    win_start.append(mw.group(1))
+                elif mw.group(4):
+                    win_end.append(mw.group(1))
+                elif mw.group(6) == "NIE":
+                    win_05no += 1
+                else:
+                    win_05yes += 1
+    print(f"plik: {logp} | startow {len(starts)}, wpiec {len(installs)}, dob {len(days)}, okien start {len(win_start)}, koniec/stop {len(win_end)}, ERROR {n_err}")
+    if not starts and not days and not installs:
+        rep.add("LK-0: linia 'Lektor (m103): start sesji'", "brak w logu", "INFO (log sprzed paczki m103-lektor albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    rep.add("LK-0: linia startu sesji", (last[:170] + "...") if last else "brak (sa inne linie lektora)", "jest", bool(last))
+    stumb = 0; wst = 0; sess = 0
+    for d in days:
+        ms = M103_DAY_STUMB.search(d)
+        if ms:
+            wst = max(wst, int(ms.group(1))); stumb = max(stumb, int(ms.group(2))); sess = max(sess, int(ms.group(3)))
+    rep.add("LK-1: ERROR lektora i potkniecia", f"ERROR {n_err}" + (f" ({err_first})" if err_first else "") + f", potkniecia doby max {stumb}, w sesji max {sess}, watek nagran {wst}",
+            "0, 0, 0, 0", n_err == 0 and stumb == 0 and sess == 0 and wst == 0)
+    src = installs[-1] if installs else last
+    okp = "OnActivate tak, OnDeactivate tak" in src
+    pk = src.find("latka EventScreen: ") if src else -1
+    pv = src[pk + len("latka EventScreen: "):].split(" |")[0][:140] if pk >= 0 else (src[:140] if src else "brak")
+    rep.add("LK-2: latka EventScreen", pv, "OnActivate tak, OnDeactivate tak", okp if src else False)
+    mi = M103_IDX.search(src) if src else None
+    titles = m103lektor_tsv_rows()
+    if mi:
+        n_idx, rej = int(mi.group(1)), int(mi.group(4) or 0)
+        want = len(titles) if titles is not None else None
+        rep.add("LK-3: nagran okien = wiersze tsv w repo, odrzucone 0", f"w logu {n_idx} (stan {mi.group(3)}), odrzucone {rej}, tsv w repo {want if want is not None else 'brak'}",
+                "rowne i 0", (n_idx == want and rej == 0) if want is not None else (n_idx > 0 and rej == 0))
+    else:
+        rep.add("LK-3: nagran okien", "brak liczby w linii", "linia 'nagran okien N'", False)
+    auto = any(("| tryb autotest" in x or "| tryb profil autotestu" in x or "| tryb nie rozpoznany" in x) for x in starts + days)   # tryb 3 - tez bez sieci (Lektor.LiveBlock)
+    live = any("API na zywo: tak" in x for x in starts)
+    req = sum(int(M103_DAY_API.search(d).group(1)) for d in days if M103_DAY_API.search(d))
+    if auto:
+        rep.add("LK-4: autotest / tryb nie rozpoznany - zapytania API 0", f"zapytania {req}, linie 'nowe nagranie plotki' {new_rec}, 'konto ElevenLabs' {konto}"
+                + (" (plik armoury-lektor-live.flag - API na zywo: tak)" if live else ""), "0, 0, 0", (req == 0 and new_rec == 0 and konto == 0) if not live else None)
+    else:
+        rep.add("LK-4: zapytania API (gra - INFO)", f"zapytania {req}, nowe nagrania {new_rec}, linie konta {konto}", "INFO (gra)", None)
+    rec_days = sum(int(M103_DAY.search(d).group(3)) for d in days if M103_DAY.search(d))
+    cs_rot, cs_known = 0, 0
+    if csp and os.path.isfile(csp):
+        tset = set(titles or [])
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mc = M103_CS_WIN.search(ln)
+                if mc:
+                    cs_rot += 1
+                    if mc.group(1) in tset:
+                        cs_known += 1
+    need = rec_days > 0 or cs_known > 0
+    rep.add("LK-5: okna ROT z nagraniem odtworzone", f"start {len(win_start)}, okna z nagraniem w dobach {rec_days}"
+            + (f", autotest zamknal okien ROT {cs_rot} (z tytulem z tsv {cs_known})" if csp else ", bez --crashscribe"), "start > 0, gdy byly okna z nagraniem",
+            (len(win_start) > 0) if need else None)
+    early = sum(int(M103_DAY.search(d).group(7)) for d in days if M103_DAY.search(d))
+    gearly = sum(int(M103_DAY_GOS.search(d).group(6)) for d in days if M103_DAY_GOS.search(d))
+    rep.add("LK-6: grane po 0,5 s NIE i koniec za wczesnie", f"okna: grane tak {win_05yes} / NIE {win_05no}, za wczesnie {early}; plotki: NIE {gos_05no}, za wczesnie {gearly}",
+            "NIE 0, za wczesnie 0", (win_05no == 0 and early == 0 and gos_05no == 0 and gearly == 0) if (win_start or gos_05no or gearly) else None)
+    open_n = len(win_start) - len(win_end)
+    rep.add("LK-7: kazdy start okna ma stop albo koniec", f"start {len(win_start)}, stop/koniec {len(win_end)}", "roznica 0 (1 - okno otwarte przy koncu logu)",
+            (0 <= open_n <= 1) if win_start else None)
+    over = []
+    for d in days:
+        mc = M103_DAY_CHARS.search(d)
+        if mc and int(mc.group(1)) > int(mc.group(2)):
+            over.append(d[:60])
+    rep.add("LK-8: znaki dzis <= limit dzienny", f"dob ponad limit {len(over)}" + (f" (np. {over[0]})" if over else ""), "0", (len(over) == 0) if days else None)
+    pages = hit = played = new = chars = 0
+    for d in days:
+        mg = M103_DAY_GOS.search(d)
+        if mg:
+            pages += int(mg.group(1)); hit += int(mg.group(3)); played += int(mg.group(4)); new += int(mg.group(7)); chars += int(mg.group(8))
+    rep.add("LK-9: plotki (INFO)", f"strony {pages}, z pamieci {hit}, odtworzone {played}, nowe nagrania {new} ({chars} znakow), zapytania API {req}"
+            + (f" | ostatnia doba: {days[-1][:200]}" if days else ""), "INFO", None)
+    rep.show()
+    return 0
+
 # ------------------------------------------------------------ m102tablica (21.10, w-toku/m102-tablica: tablica ogloszen w miescie - zadania gry, rozmowa z tablicy,
 # "Your tasks", listy gonczne kapitana strazy z kasy miasta; Armoury/src/NoticeBoard*.cs; klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties ...)
 M102_TB = "Tablica ogloszen (m102): "
@@ -55297,6 +55461,8 @@ def main(argv):
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m102tablica" and logp:
         return m102tablica_main(logp)   # m102tablica (21.10, w-toku/m102-tablica): tablica ogloszen - zadania gry, rozmowa z tablicy, listy gonczne kapitana strazy (NoticeBoard)
+    if group == "m103lektor" and logp:
+        return m103lektor_main(logp, csp)   # m103lektor (21.10, w-toku/m103-lektor): lektor - okna wydarzen ROT z nagran Davida, plotki na zywo przez ElevenLabs z pamiecia nagran (Lektor)
     if group == "m99markietani" and logp:
         return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
     if group == "m97posilki" and logp:
