@@ -59,6 +59,12 @@ namespace Armoury
         private const int NewsMaxRavens = 300;
         private static readonly Dictionary<string, Band> _bands = new Dictionary<string, Band>(StringComparer.Ordinal);
         private static readonly List<News> _news = new List<News>();
+        // m105-kronika K0 (A2): plotki Kroniki Westeros (akcja plotka:<id>:<osada|krolestwo>:<dni>) - osobna lista: wlasny czas zycia (1-120 dni zamiast NewsDays),
+        // bez wypierania przez wiesci wojenne (NewsMax), tekst z danych Kroniki (Chronicle.Data.Text) przy kazdym sluchaniu. Zapis: 4. czesc arm_rumours (stary DLL czyta 3).
+        private sealed class Story { public string Text = "", Place = ""; public int Day, Days; public bool NoLive, Kingdom; public float X, Y; }
+        private static readonly List<Story> _story = new List<Story>();
+        private const int StoryMax = 60;
+        private const float StoryRange = 450f;   // osada: slychac w karczmach do tej odleglosci (z opoznieniem krukow p5-kruki)
 
         // liczniki doby i sesji
         private static int _dHeard, _dHeardRoad, _dHeardTown, _dItems, _dEmpty, _dBandsNew, _dBandsGone, _dNews, _dStumbles, _stumbles;
@@ -79,7 +85,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _bands.Clear(); _news.Clear();
+            _bands.Clear(); _news.Clear(); _story.Clear();
             _priceItems = null;   // recenzja: przedmioty gry z MBObjectManager tej kampanii - nastepna kampania (nowa gra / wczytanie) buduje liste od nowa
             DrinkReset();         // m98-plotki: pula miejsca i piwo tej kampanii
             _stumbles = 0; _errLogged = false; _importNote = "brak klucza (stary zapis albo nowa kampania)";
@@ -127,6 +133,36 @@ namespace Armoury
             // n22f: ponad NewsMax najstarsza wiesc odpada jak dotad - przy krukach dopiero, gdy jest starsza niz najdluzszy lot kruka (albo ksiega ponad NewsMaxRavens)
             int hold = Ravens.On ? Ravens.HoldDays : -1, today = Today;
             while (_news.Count > NewsMax && (hold < 0 || _news.Count > NewsMaxRavens || today - _news[0].Day > hold)) _news.RemoveAt(0);
+        }
+
+        /// <summary>m105-kronika K0 (A2): plotka Kroniki Westeros w ksiedze wiesci - textId z #tekst Kroniki (np. 005.1_P), place = id osady albo krolestwa,
+        /// days = czas zycia 1-120 dni, noLive = bez lektora na zywo (Lektor.MarkNoLive przy sluchaniu - nagrania z pamieci graja). Ten sam tekst w tym samym miejscu
+        /// zastepuje stary wpis. false + why: klucz InnGossip NIE albo miejsca nie ma w grze.</summary>
+        internal static bool AddStoryNews(string textId, string place, int days, bool noLive, out string why)
+        {
+            why = null;
+            if (!On) { why = "plotki wylaczone (klucz Inn Gossip NIE)"; return false; }
+            if (string.IsNullOrEmpty(textId) || string.IsNullOrEmpty(place)) { why = "brak tekstu albo miejsca"; return false; }
+            try
+            {
+                var s = new Story { Text = Clean(textId), Place = Clean(place), Day = Today, Days = Math.Max(1, Math.Min(120, days)), NoLive = noLive };
+                Settlement st = null;
+                try { st = Settlement.Find(place); } catch { st = null; }
+                if (st != null) { var p = st.GetPosition2D; s.X = p.x; s.Y = p.y; }
+                else
+                {
+                    Kingdom k = null;
+                    foreach (var x in Kingdom.All) if (x != null && x.StringId == place) { k = x; break; }
+                    if (k == null) { why = "miejsce " + place + " - ani osada, ani krolestwo"; return false; }
+                    s.Kingdom = true;
+                    var p = FactionPos(k); s.X = p.x; s.Y = p.y;
+                }
+                _story.RemoveAll(o => o.Text == s.Text && o.Place == s.Place);
+                if (_story.Count >= StoryMax) _story.RemoveAt(0);
+                _story.Add(s);
+                return true;
+            }
+            catch (Exception e) { Stumble("AddStoryNews", e); why = "wyjatek " + e.GetType().Name; return false; }
         }
 
         internal static void OnRaidCompleted(BattleSideEnum winner, RaidEventComponent raid)
@@ -251,6 +287,7 @@ namespace Armoury
                 foreach (var k in dead) _bands.Remove(k);
                 removed = dead.Count;
                 _news.RemoveAll(n => Today - n.Day > NewsDays);
+                _story.RemoveAll(s => Today - s.Day > s.Days);   // m105-kronika: plotki Kroniki - wlasny czas zycia
             }
             catch (Exception e) { Stumble("Daily", e); }
             try
@@ -306,6 +343,18 @@ namespace Armoury
                     sb.Append(w.Kind.ToString(Inv)).Append(',').Append(w.Day.ToString(Inv)).Append(',').Append(w.X.ToString("0.0", Inv)).Append(',').Append(w.Y.ToString("0.0", Inv))
                       .Append(',').Append(w.N.ToString(Inv)).Append(',').Append(w.A).Append(',').Append(w.B).Append(',').Append(w.C);
                 }
+                // m105-kronika: 4. czesc - plotki Kroniki "tekst,miejsce,doba,dni,bez_lektora,krolestwo,x,y" (stary DLL czyta tylko 3 czesci)
+                if (_story.Count > 0)
+                {
+                    sb.Append('|');
+                    for (int i = 0; i < _story.Count; i++)
+                    {
+                        var s = _story[i];
+                        if (i > 0) sb.Append(';');
+                        sb.Append(s.Text).Append(',').Append(s.Place).Append(',').Append(s.Day.ToString(Inv)).Append(',').Append(s.Days.ToString(Inv)).Append(',')
+                          .Append(s.NoLive ? '1' : '0').Append(',').Append(s.Kingdom ? '1' : '0').Append(',').Append(s.X.ToString("0.0", Inv)).Append(',').Append(s.Y.ToString("0.0", Inv));
+                    }
+                }
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -313,7 +362,7 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _bands.Clear(); _news.Clear();
+            _bands.Clear(); _news.Clear(); _story.Clear();
             if (string.IsNullOrEmpty(data)) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; return; }
             if (data.Length > SaveMaxChars * 3) { _importNote = "zapis za dlugi (" + data.Length + ") - pominiety"; return; }
             try
@@ -345,8 +394,18 @@ namespace Armoury
                     if (_news.Count < NewsMaxRavens) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });   // n22f: ksiega z krukami
                 }
                 if (!Ravens.On && _news.Count > NewsMax) _news.RemoveRange(0, _news.Count - NewsMax);   // n22f: klucz wylaczony - 60 najnowszych od razu po wczytaniu, jak AddNews
+                if (parts.Length >= 4)   // m105-kronika: plotki Kroniki (4. czesc; zapis bez niej - lista pusta)
+                    foreach (var e in parts[3].Split(';'))
+                    {
+                        if (e.Length == 0) continue;
+                        var a = e.Split(',');
+                        int day, days; float x, y;
+                        if (a.Length < 8 || a[0].Length == 0 || a[1].Length == 0 || !int.TryParse(a[2], NumberStyles.Integer, Inv, out day) || !int.TryParse(a[3], NumberStyles.Integer, Inv, out days)
+                            || !float.TryParse(a[6], NumberStyles.Float, Inv, out x) || !float.TryParse(a[7], NumberStyles.Float, Inv, out y)) { bad++; continue; }
+                        if (_story.Count < StoryMax) _story.Add(new Story { Text = a[0], Place = a[1], Day = day, Days = days, NoLive = a[4] == "1", Kingdom = a[5] == "1", X = x, Y = y });
+                    }
                 int fixedOld = NamesOn ? OldBandNames() : 0;
-                _importNote = "band " + _bands.Count + " (z imieniem herszta " + named + "), wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "")
+                _importNote = "band " + _bands.Count + " (z imieniem herszta " + named + "), wiesci " + _news.Count + (_story.Count > 0 ? ", plotki Kroniki " + _story.Count : "") + (bad > 0 ? ", zlych wpisow " + bad : "")
                               + (fixedOld > 0 ? ", przerobione stare wiesci z nazwa bandy " + fixedOld : "");
             }
             catch (Exception e) { _bands.Clear(); _news.Clear(); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
@@ -1154,6 +1213,35 @@ namespace Armoury
                 if (text == null) continue;
                 float score = 1.2f + (1f - age / (float)NewsDays) * (1f / (1f + d / 250f)) * (n.Kind == NWar || n.Kind == NPeace ? 1.3f : 1f);
                 cands.Add(new Item { Cat = 5, Score = score, Text = text, Id = "w|" + n.Kind.ToString(Inv) + "|" + n.Day.ToString(Inv) + "|" + n.A + "|" + n.B + "|" + n.C });
+            }
+            // m105-kronika K0 (A2): plotki Kroniki Westeros - krolestwo: slychac w karczmach jego ziem (najblizsze miasto krolestwa); osada: do StoryRange z opoznieniem krukow.
+            // Ten sam tekst raz na strone. Bez lektora na zywo (noLive) - Lektor.MarkNoLive.
+            HashSet<string> storySeen = null;
+            Settlement storyTown = null;
+            bool storyTownDone = false;
+            foreach (var s in _story)
+            {
+                int age = Math.Max(0, today - s.Day);
+                if (age > s.Days) continue;
+                bool hear;
+                if (s.Kingdom)
+                {
+                    if (!storyTownDone) { storyTownDone = true; storyTown = NearestTown(at); }
+                    hear = storyTown != null && storyTown.MapFaction != null && storyTown.MapFaction.StringId == s.Place;
+                }
+                else
+                {
+                    float d = new Vec2(s.X, s.Y).Distance(at);
+                    hear = d <= StoryRange && !Ravens.NotYet(d, s.Day);
+                }
+                if (!hear) continue;
+                if (storySeen == null) storySeen = new HashSet<string>(StringComparer.Ordinal);
+                if (!storySeen.Add(s.Text)) continue;
+                string text = null;
+                try { var t = Chronicle.Data.Text(s.Text); text = t != null ? t.ToString() : null; } catch (Exception e) { Stumble("StoryText", e); }
+                if (string.IsNullOrEmpty(text)) continue;
+                if (s.NoLive) Lektor.MarkNoLive(text);
+                cands.Add(new Item { Cat = 5, Score = 2.6f + (1f - age / (float)s.Days), Text = text, Id = "c|" + s.Text });
             }
             // trwajace oblezenia w poblizu (stan teraz)
             foreach (var st in Settlement.All)

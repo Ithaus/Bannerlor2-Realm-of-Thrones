@@ -112,6 +112,9 @@ namespace Armoury
                            _dSkipNoKey, _dSkipStopped, _dSkipSub, _dCorrupt, _dRequests, _dApiErr, _dGossip05No, _dGossipEarly;
         private static readonly SortedDictionary<int, int> _dCodes = new SortedDictionary<int, int>();
         private static int _sRequests, _sNew;
+        // m105-kronika K0 (A2): plotki Kroniki Westeros bez lektora na zywo (KRONIKA-FORMAT 5: "bez lektora na zywo") - teksty po Norm, glowny watek; nagranie z pamieci gra
+        private static readonly HashSet<string> _noLive = new HashSet<string>(StringComparer.Ordinal);
+        private static int _dSkipStory;
         private static bool _limitMsg, _logged05;
         private static int _liveFlag = -1;
 
@@ -295,6 +298,20 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ strona plotek (Rumours.ShowPage)
+        /// <summary>m105-kronika K0 (A2): tekst plotki (Rumours, plotka Kroniki z noLive) nie idzie do API na zywo - kawalek bez glosu, gdy nie ma go w pamieci nagran.
+        /// Glowny watek (Rumours.Wars przy budowie strony). Najwyzej 400 tekstow (potem od zera). Nie rzuca.</summary>
+        internal static void MarkNoLive(string text)
+        {
+            try
+            {
+                string n = Norm(text);
+                if (n.Length == 0) return;
+                if (_noLive.Count >= 400) _noLive.Clear();
+                _noLive.Add(n);
+            }
+            catch { }
+        }
+
         /// <summary>Rumours.ShowPage tuz przed ShowInquiry (glowny watek): kawalki strony, pamiec, prosby do watku, start pierwszego gotowego. Nie rzuca.</summary>
         internal static void GossipPage(string place, string text, int page)
         {
@@ -310,13 +327,14 @@ namespace Armoury
                 var segs = new List<Seg>(parts.Count);
                 string block = null;
                 bool known = false;
-                int reason = 0, hit = 0, send = 0, skip = 0, chars = 0, sendChars = 0;
+                int reason = 0, hit = 0, send = 0, skip = 0, chars = 0, sendChars = 0, story = 0;
                 foreach (string t in parts)
                 {
                     var sg = new Seg { Text = t, Chars = t.Length, Key = KeyOf(t) };
                     chars += sg.Chars;
                     string path; double sec;
                     if (Cached(sg.Key, out path, out sec, false)) { sg.Path = path; sg.Sec = sec; sg.State = SReady; hit++; }
+                    else if (_noLive.Contains(t)) { sg.State = SSkip; story++; }   // m105-kronika: plotka Kroniki - bez lektora na zywo
                     else
                     {
                         if (!known) { block = LiveBlock(out reason); known = true; }
@@ -332,10 +350,12 @@ namespace Armoury
                 _segs = segs; _segIdx = 0; _pageActive = true; _pagePlace = place; _gapUntil = 0; _noInqSince = -1; _pageT0 = Now;
                 _dPages++; _dSegs += segs.Count; _dHit += hit;
                 if (skip > 0) CountSkip(reason, skip);
+                _dSkipStory += story;
                 if (send > 0) { EnsureWorker(); _wake.Set(); }
                 Log.Info(P + "plotki w " + place + ", strona " + (page + 1).ToString(Inv) + ": kawalkow " + segs.Count.ToString(Inv) + " (" + chars.ToString(Inv) + " znakow) - z pamieci "
                          + hit.ToString(Inv) + ", do nagrania " + send.ToString(Inv) + " (" + sendChars.ToString(Inv) + " znakow)"
-                         + (skip > 0 ? ", bez glosu " + skip.ToString(Inv) + " (" + block + ")" : "") + ".");
+                         + (skip > 0 ? ", bez glosu " + skip.ToString(Inv) + " (" + block + ")" : "")
+                         + (story > 0 ? ", plotki Kroniki bez glosu na zywo " + story.ToString(Inv) : "") + ".");
                 GossipAdvance();
             }
             catch (Exception e) { Stumble("GossipPage", e); }
@@ -485,6 +505,7 @@ namespace Armoury
             try { GossipStopAll("nowa kampania / wczytanie"); } catch (Exception e) { Stumble("GossipReset", e); }
             _dPages = _dSegs = _dHit = _dPlayed = _dNew = _dNewChars = _dSkipLimit = _dSkipReserve = _dSkipOff = _dSkipAttempts = _dSkipErr = _dDropped = 0;
             _dSkipNoKey = _dSkipStopped = _dSkipSub = _dCorrupt = _dRequests = _dApiErr = _dGossip05No = _dGossipEarly = 0;
+            _dSkipStory = 0;
             _dCodes.Clear();
             _sRequests = _sNew = 0; _limitMsg = false; _logged05 = false; _liveFlag = -1;
             lock (_wlock) { _apiStopWhy = null; _subState = 0; _subWhy = "nie pytano"; _subWhen = "-"; }   // sesja = stan konta od nowa (raz na sesje)
@@ -533,6 +554,7 @@ namespace Armoury
               .Append(", API wstrzymane ").Append(_dSkipStopped.ToString(Inv)).Append(", brak klucza ").Append(_dSkipNoKey.ToString(Inv))
               .Append(", proby ").Append(_dSkipAttempts.ToString(Inv)).Append(", blad ").Append(_dSkipErr.ToString(Inv)).Append(", porzucone ").Append(_dDropped.ToString(Inv))
               .Append(", uszkodzone w pamieci ").Append(_dCorrupt.ToString(Inv))
+              .Append(_dSkipStory > 0 ? ", plotki Kroniki bez glosu na zywo " + _dSkipStory.ToString(Inv) : "")
               .Append(" | zapytania API ").Append(_dRequests.ToString(Inv)).Append(" (w sesji ").Append(_sRequests.ToString(Inv)).Append(", nowych nagran w sesji ").Append(_sNew.ToString(Inv)).Append(")")
               .Append(", bledy API ").Append(_dApiErr.ToString(Inv)).Append(codes.Length > 0 ? " (" + codes + ")" : "")
               .Append(" | znaki dzis ").Append(today.ToString(Inv)).Append(" / ").Append(DailyMax().ToString(Inv)).Append(" (doba ").Append(day).Append(")")
@@ -540,6 +562,7 @@ namespace Armoury
               .Append(" | watek nagran: potkniecia ").Append(Volatile.Read(ref _wStumbles).ToString(Inv));
             _dPages = _dSegs = _dHit = _dPlayed = _dNew = _dNewChars = _dSkipLimit = _dSkipReserve = _dSkipOff = _dSkipAttempts = _dSkipErr = _dDropped = 0;
             _dSkipNoKey = _dSkipStopped = _dSkipSub = _dCorrupt = _dRequests = _dApiErr = _dGossip05No = _dGossipEarly = 0;
+            _dSkipStory = 0;
             _dCodes.Clear();
         }
 
