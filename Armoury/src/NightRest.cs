@@ -2332,7 +2332,7 @@ namespace Armoury
         }
 
         /// <summary>Tlo menu obozu: grafika kultury (jak u armii), zapasowo ogolna - koniec z czerwonym "temp".</summary>
-        private static void SetCampBackground(MenuCallbackArgs args)
+        internal static void SetCampBackground(MenuCallbackArgs args)   // m97-szkolenie: takze menu cwiczen (CampDrill)
         {
             try
             {

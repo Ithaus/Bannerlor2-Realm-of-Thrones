@@ -5792,6 +5792,18 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillDailyMessage { get; set; } = true;
 
+        [SettingPropertyBool("Drill Camp Only", HintText = "marching teaches nothing: your men drill only when you order it in camp ('Train the men' in your camp menu, by day - the men sleep at night); a full day of drill (8 hours) teaches 50% more than a day of rest did before (x2.25 instead of x1.5), a shorter drill its share, still by Leadership, drill kit, armed share and perks (the training perks now add to a day of drill - their descriptions say how much); your clan's parties and the lords in your army drill only in the hours they stand still by day (settlement, siege camp, halted), by the same pace; hunger or a dawn short of sleep still means no drill (off = as before: x1.5 on a day of rest, x0.9 on the march, perks as in the game)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillCampOnly { get; set; } = true;
+
+        [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Measured on the 180-day test of 20.10: AI lords march most of their days, so their men would learn about a third to a half less - slower promotions and less demand for better gear; the daily log line measures it either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillCampOnlyAi { get; set; } = false;
+
+        [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillMaster { get; set; } = true;
+
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsNotHouseholdGoods { get; set; } = true;
@@ -10179,6 +10191,9 @@ namespace Armoury
             s.DrillLawAi = DrillLawAi;
             s.DrillLog = DrillLog;
             s.DrillDailyMessage = DrillDailyMessage;
+            s.DrillCampOnly = DrillCampOnly;
+            s.DrillCampOnlyAi = DrillCampOnlyAi;
+            s.DrillMaster = DrillMaster;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
