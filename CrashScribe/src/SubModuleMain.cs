@@ -47,7 +47,7 @@ namespace CrashScribe
                         Scribe.Report("ERROR IN A BACKGROUND TASK", e.Exception, "TaskScheduler.UnobservedTaskException", null);
                         try { e.SetObserved(); } catch { }
                     };
-                    AppDomain.CurrentDomain.ProcessExit += (s, e) => { Scribe.Summary(); Trail.Close(); };
+                    AppDomain.CurrentDomain.ProcessExit += (s, e) => { Watchdog.Closing("ProcessExit"); Scribe.Summary(); Trail.Close(); };   // m105-drobne (8a): straznik milknie przy wyjsciu
                 }
 
                 if (Config.CatchFirstChance)
@@ -175,6 +175,7 @@ namespace CrashScribe
 
         protected override void OnSubModuleUnloaded()
         {
+            Watchdog.Closing("OnSubModuleUnloaded");   // m105-drobne (8a): po wyladowaniu modulow watek glowny nie bije - bez falszywego hang-*.log (nie rzuca)
             try { Scribe.Summary(); Trail.Close(); } catch { }
             base.OnSubModuleUnloaded();
         }
