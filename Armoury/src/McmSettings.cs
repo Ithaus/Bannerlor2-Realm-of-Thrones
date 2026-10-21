@@ -8464,6 +8464,10 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool KsFarmSurplusCapNet { get; set; } = true;
 
+        [SettingPropertyBool("Ds Farm Cut Below Reserve", HintText = "with Ks Farm Surplus Cap Net: when a town's merchants' purse, after what it already owes, falls below their working stock, or the town is behind on its dues, its lord's and crown's yearly due drops at once to what the town actually earns (a year of the merchants' recent daily takings), instead of waiting two weeks and cutting a quarter at a time. At most once per weekly instalment; between one and one and a half times the working stock the slower cut stays. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmCutBelowReserve { get; set; } = true;
+
         [SettingPropertyBool("Ds Farm Fix Share Cap", HintText = "with Ds Towns: when the farms of towns and castles are set after the measuring weeks, all farms paid from the purse together are set no higher than what the merchants took in over those weeks - if the old dues took more, every farm is lowered by the same share (each place keeps its rank, also a place whose merchants took in nothing in those weeks), and a place still above its own takings is brought down later by the farm reviews. Off = the farm is what the old dues took, as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsFarmFixShareCap { get; set; } = true;
@@ -11227,6 +11231,7 @@ namespace Armoury
             s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
             s.KsFarmCatchUpOneOff = KsFarmCatchUpOneOff;
             s.KsFarmSurplusCapNet = KsFarmSurplusCapNet;
+            s.DsFarmCutBelowReserve = DsFarmCutBelowReserve;
             s.DsFarmFixShareCap = DsFarmFixShareCap;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;

@@ -46,6 +46,7 @@ namespace Armoury
         internal const double OverReserve = 1.5;                 // M6 i M9 (kasa): ponad 1.5 x zapas kupcow
         internal const int Quarter = 91, Instalments = 13;       // dni kwartalu (91/182/273/364), raty nadania
         private const int Weeks = 52, NetDays = 28, CaptureDays = 28, YearDays = 364, NetMinDays = 7;
+        private const int FastGapDays = 7;                       // m105 G1: szybka obnizka najwyzej raz na 7 dob (raz na rate tygodniowa - bez szumu doplywu dzien po dniu)
 
         private sealed class Farm
         {
@@ -74,6 +75,7 @@ namespace Armoury
             public long SMin = long.MaxValue;                      // f7-kasy (Ks Farm Catch Up): najmniejsza kasa od poczatku pomiaru przyrostu (sesja) - zapas, ktory przelezal cale okno
             public long CLeft, CPer;                               // f7-kasy: reszta gersumy do zaplaty i czesc na dobe (rozlozona na okno przegladu; placi TownDay; sesja)
             public int SLow = -1;                                  // m103 P3 (e, Ks Farm Surplus Cap Net): doba startu cyklu obnizki z dochodu (kasa po naleznosciach do 1.5 x zapas albo zaleglosci; sesja)
+            public int FastDay = -1;                               // m105 G1 (Ds Farm Cut Below Reserve): doba ostatniej szybkiej obnizki (najwyzej raz na FastGapDays; sesja)
         }
 
         // ------------------------------------------------------------ stan (zapis arm_daniny_miasta)
@@ -633,6 +635,7 @@ namespace Armoury
             double mx = Math.Max(0.0, Math.Min(1.0, (double)s.KsFarmSurplusReviewMax));
             bool cu = CatchUpOn(s);                                              // f7-kasy: gersuma z zapasu (klucz wylaczony - petla co do monety jak dotad)
             bool capNet = s.KsFarmSurplusCapNet;                                 // m103 P3 (a, b, c, e, f); klucz wylaczony - kod jak w WGRANIU 101
+            bool fastOn = s.DsFarmCutBelowReserve;                               // m105 G1; klucz wylaczony - kod jak w WGRANIU 102
             // m103 P3 (c): w rampie DS kasa placi tylko rampa x rata, reszta firmy zostaje w kasie i wygladala jak przyrost kupcow (x 364 jako nadwyzka) - bez pomiaru
             // i bez podwyzek do konca rampy; pomiar przyrostu od pierwszej doby po rampie
             bool inRamp = capNet && NewShare < 1.0;
@@ -657,7 +660,10 @@ namespace Armoury
                     {
                         if (cu) CatchUpWhy(st, t, gq, arrears);                  // f7-kasy: tylko licznik powodu (linia)
                         f.SG0 = long.MinValue; f.SGDay = -1;
-                        if (capNet) IncomeCut(f, today, days, mx, remit != 0);  // m103 P3 (e): obnizka z dochodu w tym samym cyklu co podwyzka
+                        // m105 G1 (Ds Farm Cut Below Reserve): kasa po naleznosciach PONIZEJ zapasu kupcow albo zaleglosci - firma od razu do biezacego doplywu (FastCut);
+                        // gdy szybka obnizka nic nie zmienila (firma juz przy doplywie, bez pomiaru, odstep 7 dob) - obnizka z dochodu (e) jak dotad
+                        bool fast = capNet && fastOn && remit == 0 && (gq < TownPurse.Reserve(t) || arrears) && FastCut(f, today);
+                        if (capNet && !fast) IncomeCut(f, today, days, mx, remit != 0);  // m103 P3 (e): obnizka z dochodu w tym samym cyklu co podwyzka
                         continue;
                     }
                     f.SLow = -1;                                                 // m103 P3 (e): kasa ponad progiem - cykl obnizki od nowa (klucz wylaczony - pole nieczytane)
@@ -720,6 +726,61 @@ namespace Armoury
                 catch (Exception e) { Stumble("SurplusReview", e); }
                 finally { if (cu) _cuTicks += System.Diagnostics.Stopwatch.GetTimestamp() - cu0; }
             }
+        }
+
+        // ------------------------------------------------------------ m105 G1 (Ds Farm Cut Below Reserve): szybka obnizka ponizej zapasu kupcow
+        /// <summary>
+        /// m105 G1 (21.10, log 102: NAKUM-27 12 -> 18, NKA-3 16 miast z KS ponizej zapasu kupcow na koniec): obnizka z dochodu (e) schodzi o Ks Farm Surplus Review Max
+        /// co Ks Farm Surplus Review Days, a miasto, ktoremu kupcom skonczyl sie zapas obrotowy, placi przez te tygodnie firme ponad doplyw i popada w zaleglosci. Regula:
+        /// miasto z KS, ktorego kasa po naleznosciach (CofferOwes) stoi PONIZEJ zapasu kupcow albo ktore zalega (firma albo dlug rady), bez oblezenia / zdobycia - firma pana
+        /// i korony z kasy ponad biezacy doplyw netto kupcow x 364 schodzi do niego OD RAZU (doplyw &lt;= 0 - do 0), ten sam stosunek pan / korona; czesc z oszczednosci
+        /// ludu (FLf) bez zmiany - placi ja lud, nie kasa. Najwyzej raz na FastGapDays (7 - raz na rate tygodniowa: pobor miast wojennych nie idzie za szumem doplywu).
+        /// Bez pomiaru doplywu (mniej niz NetMinDays dob) - bez zmiany. Udzial firmy w doplywie ponad 1 schodzi do 1; cykl obnizki (e) od tej doby (SLow). Zloto sie nie
+        /// rusza - zmienia sie nalezna rata. Zwraca true, gdy firma zeszla. Wolajacy w try (SurplusReview).
+        /// </summary>
+        private static bool FastCut(Farm f, int today)
+        {
+            if (f.FastDay >= 0 && f.FastDay <= today && today - f.FastDay < FastGapDays) return false;
+            double F = f.FL + f.FC;
+            if (!(F > 0)) return false;
+            double net = NetAvg(f, NetMinDays);
+            if (double.IsNaN(net) || double.IsInfinity(net)) return false;
+            double cap = Math.Max(0.0, net) * YearDays;
+            if (!(F > cap + 1e-6)) return false;
+            double r = cap / F;
+            if (!(r >= 0) || r >= 1) return false;
+            f.FL *= r; f.FC *= r;
+            if (!double.IsNaN(f.Share) && f.Share > 1.0) f.Share = 1.0;
+            f.SLow = today; f.FastDay = today;
+            KsFolkIncome.NoteFastCut(F - cap);
+            return true;
+        }
+
+        /// <summary>m105 G1 (linia f5-lud, segment "m105 szybka obnizka"): miasta z KS z ustalona firma, ktorych kasa po naleznosciach stoi ponizej zapasu kupcow,
+        /// i z nich te z firma z kasy ponad biezacy doplyw netto x 364 (bez pomiaru doplywu - nie liczone do drugiej liczby). Tylko odczyt; nie rzuca.</summary>
+        internal static void FastCensus(out int below, out int over)
+        {
+            below = 0; over = 0;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null) return;
+                foreach (var f in _farm.Values)
+                {
+                    try
+                    {
+                        var st = f.St;
+                        if (st == null || !st.IsTown || st.Town == null || f.Fixed < 0 || !StartCalibration.KsTownApplied(st.Town)) continue;
+                        double gq = st.Town.Gold - (s.KsFarmSurplusCapNet ? CofferOwes(f, s) : 0.0);
+                        if (!(gq < TownPurse.Reserve(st.Town))) continue;
+                        below++;
+                        double net = NetAvg(f, NetMinDays);
+                        if (!double.IsNaN(net) && f.FL + f.FC > Math.Max(0.0, net) * YearDays + 1.0) over++;
+                    }
+                    catch (Exception e) { Stumble("FastCensus(osada)", e); }
+                }
+            }
+            catch (Exception e) { Stumble("FastCensus", e); }
         }
 
         // ------------------------------------------------------------ m103 P3 (Ks Farm Surplus Cap Net): obnizka z dochodu (e), firma od zera (f)

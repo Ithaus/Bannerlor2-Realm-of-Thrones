@@ -65,6 +65,7 @@ namespace Armoury
         private static int _revShare, _revCutAfter, _revCutAfterS;
         // m103 P3 (Ks Farm Surplus Cap Net): podwyzki przyciete sufitem doplywu netto (a), obnizki z dochodu (e), firmy od zera (f) - doba (DayLine zeruje) i sesja
         private static int _capN, _cutN, _zeroN, _capNS, _cutNS, _zeroNS; private static double _capAmt, _cutAmt, _zeroAmt, _capAmtS, _cutAmtS, _zeroAmtS;
+        private static int _fastN, _fastNS; private static double _fastAmt, _fastAmtS;   // m105 G1 (Ds Farm Cut Below Reserve): szybkie obnizki - doba i sesja
         // miasta, w ktorych R albo P (z potrzeba) maja mniej niz dolna granica pasma - nadwyzka kupcow najpierw do ich domow (M6), bez podwyzki firmy wedlug nadwyzki
         private static readonly HashSet<string> _poorRP = new HashSet<string>(StringComparer.Ordinal);
 
@@ -112,6 +113,7 @@ namespace Armoury
             for (int c = 0; c < 3; c++) _k[c].Clear();
             _err.Clear(); _stum = 0; Zero(); _revNS = 0; _revAmtS = 0; _revCutAfterS = 0; _poorRP.Clear();
             _capNS = _cutNS = _zeroNS = 0; _capAmtS = _cutAmtS = _zeroAmtS = 0;   // m103 P3: sesja
+            _fastNS = 0; _fastAmtS = 0;                                          // m105 G1: sesja
         }
 
         private static void Zero()
@@ -127,6 +129,7 @@ namespace Armoury
             _hFull = _hPaid = 0; _hrR = _hrP = 0; _hrN = 0; _dTowns = 0; _ticks = 0;
             _revN = _revNoCut = _revHouse = 0; _revAmt = 0; _revShare = _revCutAfter = 0;
             _capN = _cutN = _zeroN = 0; _capAmt = _cutAmt = _zeroAmt = 0;   // m103 P3: doba
+            _fastN = 0; _fastAmt = 0;                                       // m105 G1: doba
         }
 
         private static void Stumble(string where, Exception e)
@@ -335,6 +338,9 @@ namespace Armoury
         /// <summary>m103 P3 (e): DsTowns.IncomeCut - firma obnizona do biezacego doplywu netto (o ile zl/rok).</summary>
         internal static void NoteIncomeCut(double perYear) { if (perYear > 0 && !double.IsInfinity(perYear)) { _cutN++; _cutAmt += perYear; _cutNS++; _cutAmtS += perYear; } }
 
+        /// <summary>m105 G1: DsTowns.FastCut - firma miasta ponizej zapasu kupcow obnizona od razu do biezacego doplywu netto (o ile zl/rok).</summary>
+        internal static void NoteFastCut(double perYear) { if (perYear > 0 && !double.IsInfinity(perYear)) { _fastN++; _fastAmt += perYear; _fastNS++; _fastAmtS += perYear; } }
+
         /// <summary>m103 P3 (f): DsTowns.FromZero - firma ustalona od zera (zl/rok; ta sama kwota jest tez w NoteRaise).</summary>
         internal static void NoteFromZero(double perYear) { if (perYear > 0 && !double.IsInfinity(perYear)) { _zeroN++; _zeroAmt += perYear; _zeroNS++; _zeroAmtS += perYear; } }
 
@@ -350,7 +356,7 @@ namespace Armoury
             {
                 var s = S;
                 if (s == null) return;
-                if (_dTowns == 0 && _revN == 0 && _revNoCut == 0 && _revHouse == 0 && _revCutAfter == 0 && _capN == 0 && _cutN == 0 && _zeroN == 0) return;
+                if (_dTowns == 0 && _revN == 0 && _revNoCut == 0 && _revHouse == 0 && _revCutAfter == 0 && _capN == 0 && _cutN == 0 && _zeroN == 0 && _fastN == 0) return;
                 long t0 = Stopwatch.GetTimestamp();
                 long gold = 0, over = 0; int nT = 0, nOver = 0;
                 foreach (var t in Town.AllTowns)
@@ -419,6 +425,13 @@ namespace Armoury
                       .Append(_cutN).Append(" (-").Append(L(_cutAmt)).Append(" zl/rok), firmy od zera ").Append(_zeroN).Append(" (+").Append(L(_zeroAmt)).Append(" zl/rok)")
                       .Append("; od startu sesji: przyciete ").Append(_capNS).Append(" (-").Append(L(_capAmtS)).Append("), obnizki ").Append(_cutNS).Append(" (-").Append(L(_cutAmtS))
                       .Append("), od zera ").Append(_zeroNS).Append(" (+").Append(L(_zeroAmtS)).Append(')');
+                // m105 G1 (Ds Farm Cut Below Reserve): segment za "P3 sufit firm" (regexy linii f5 i P3 bez zmian); klucz wylaczony - linia jak w WGRANIU 102
+                if (s.KsFarmSurplusCapNet && s.DsFarmCutBelowReserve)
+                {
+                    int fb, fo; DsTowns.FastCensus(out fb, out fo);
+                    sb.Append(" | m105 szybka obnizka (Ds Farm Cut Below Reserve TAK): dzis ").Append(_fastN).Append(" (-").Append(L(_fastAmt)).Append(" zl/rok), od startu sesji ")
+                      .Append(_fastNS).Append(" (-").Append(L(_fastAmtS)).Append(" zl/rok), miast z KS ponizej zapasu ").Append(fb).Append(", z firma ponad doplyw ").Append(fo);
+                }
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }
