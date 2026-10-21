@@ -9004,7 +9004,7 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueJaimeAtRiverrun { get; set; } = true;
 
-        [SettingPropertyBool("Prologue Hill Clans", HintText = "in a Prologue 298 campaign from day 118 the clans of the Mountains of the Moon (Stone Crows, Burned Men, Milk Snakes, Black Ears) come down on the roads of the Vale: up to four bands of hill tribesmen around the Eyrie and the Bloody Gate, raised from the outlaws and the poor of the Vale (no one out of nothing), who prey on travellers like any band; after the prologue they stay as ordinary bands. Off = no clan bands", RequireRestart = false)]
+        [SettingPropertyBool("Prologue Hill Clans", HintText = "in a Prologue 298 campaign from day 118 the clans of the Mountains of the Moon (Painted Dogs, Burned Men, Milk Snakes, Black Ears) come down on the roads of the Vale: up to four bands of hill tribesmen around the Eyrie and the Bloody Gate, raised from the outlaws and the poor of the Vale (no one out of nothing), who prey on travellers like any band; after the prologue they stay as ordinary bands. Off = no clan bands", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueHillClans { get; set; } = true;
 

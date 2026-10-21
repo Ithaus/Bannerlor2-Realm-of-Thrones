@@ -16,7 +16,7 @@ namespace Armoury
     /// <summary>
     /// m104-e5 pkt 5 - KLANY GORSKIE DOLINY od dnia 118 (klucz PrologueHillClans; projekt pkt 2: "klany gorskie napadaja na Gorskim Trakcie"). W ROT nie ma Burned Men,
     /// Milk Snakes ani Black Ears; klan bandycki "hilltribesmen" (Hill Tribesmen, kultura hilltribesmen - oddzialy z ROT) - bandy tego klanu z nazwami klanow z ksiazki
-    /// (Stone Crows, Burned Men, Milk Snakes, Black Ears; Party.SetCustomName). Wzor spawnu i ksiegi ludzi - FreeFolkRaids (rozpoznanie e5:B): ludzie z OutlawLaw.RaidDraw
+    /// (Painted Dogs, Burned Men, Milk Snakes, Black Ears; Party.SetCustomName; Stone Crows to w ROT frakcja Shaggi, nie banda - recenzja m104). Wzor spawnu i ksiegi ludzi - FreeFolkRaids (rozpoznanie e5:B): ludzie z OutlawLaw.RaidDraw
     /// (najpierw pula wyrzutkow okregu, potem domy wsi okregu - "bieda i wojna"; nikt z niczego), BanditPartyComponent.CreateLooterParty z domem = wies na Gorskim Trakcie
     /// (wsie Orlego Gniazda i Krwawej Bramy) - AI band gry patroluje wokol niej i napada podroznych (tabory, karawany, slabsze partie), PeopleBook.Give (pochodzenie)
     /// i PeopleLedger.FixCreatedMen (ksiega ludzi). Bez zlota z niczego (kiesa 0), bez zamrazania AI - to zwykle bandy.
@@ -26,7 +26,8 @@ namespace Armoury
     internal static partial class Prologue
     {
         private const string HillClanId = "hilltribesmen";
-        private static readonly string[] ClanNames = { "Stone Crows", "Burned Men", "Milk Snakes", "Black Ears" };
+        // recenzja m104: bez "Stone Crows" - w ROT to pomniejsza frakcja (spclans.xml stone_crows, dom town_EN2; Shagga - wiersze kanonu p05/p06/m08, scena 16), nie banda
+        private static readonly string[] ClanNames = { "Painted Dogs", "Burned Men", "Milk Snakes", "Black Ears" };
         private static readonly string[] ClanHomes = { "village_EN1_2", "castle_village_EN2_1", "castle_village_EN2_2", "village_EN1_1", "village_EN1_3" };   // Stoneyhead, Durlston, Shady Glen, Hollow's Creek, Monton
         private const int ClanFrom = 118, ClanUntil = 186, ClanMax = 4, ClanRespawnDays = 3, ClanMinMen = 12, ClanMaxMen = 32;
 
