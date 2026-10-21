@@ -3,10 +3,12 @@
 **Dla Jeffa (prosto).** Rabunek wioski pobocznej nie jest juz przerywany przez noc: w trakcie rabunku nie pada pytanie "Night Falls", nie staje sam namiot
 i nie ma ostrzezenia o nocnym marszu - pytanie przyjdzie po rabunku. W bitwie z chlopami wioski pobocznej walcza naprawde tylko oni: Dynamic Reinforcements
 traktuje ja jak rabunek wsi (u Ciebie Allow Raids wylaczone), wiec zadna zaloga, milicja ani lord nie dochodzi. Gdy przegrasz z chlopami, Twoi jency, ktorych
-odbili, wracaja do swoich domow (a nie jako chlopi do wioski), a Twoj lup trafia do magazynu wsi okregu zamiast przepasc; straty wioski licza sie poprawnie.
+odbili, wracaja do swoich domow (a nie jako chlopi do wioski), a Twoj lup trafia do magazynu wsi okregu zamiast przepasc; straty wioski licza sie poprawnie
+(takze gdy zapiszesz i wczytasz gre w niewoli u chlopow).
 Okup wioski pobocznej daje jeden komunikat z powodem zamiast dwoch.
 
-Recenzja scalenia: 3 wazne (wszystkie potwierdzone weryfikacja i poprawione) + 1 drobne (poprawione). Zbudowane: Armoury kod 0, 0 bledow, 6 dawnych ostrzezen;
+Recenzja scalenia: 3 wazne (wszystkie potwierdzone weryfikacja i poprawione) + 1 drobne (poprawione). Recenzja poprawek (30e698bc): 0 krytycznych, 0 waznych,
+1 drobne (poprawione - punkt 5). Zbudowane: Armoury kod 0, 0 bledow, 6 dawnych ostrzezen;
 `tools/gen_mcm.py` (1 nowy klucz). Bez gry i bez autotestu (zakaz w tej pracy - trwal autotest 97).
 
 ### 1. Noc gracza a rabunek wioski pobocznej (Armoury/src/NightRest.cs)
@@ -115,5 +117,21 @@ rzecz, nie blad styku.
 
 **Test w grze.** "Demand tribute" w wiosce pobocznej z przewaga 4:1: jeden komunikat "You received N (moneta): tribute from the people of X. Your realm will spare it for
 30 days."; w logu Armoury `Komunikaty platnosci (m96-wies): ...` z rodzajem `tribute`.
+
+### 5. Po recenzji poprawek: zabici w bitwie z obroncami w zapisie (Armoury/src/SideVillageVisit.Defenders.cs)
+
+**Problem (drobne, recenzja 30e698bc).** Pulap obroncow po przegranej gracza w `Disband` (punkt 3: `Def - Dead - Routed`) opiera sie na `Fight.Dead`, a zapis sekcji
+`f=` (`DefExport` / `DefImport`) mial 11 pol bez zabitych. Gracz przegral, siedzi w niewoli druzyny obroncow (`FightGuard` czeka do konca niewoli), zapis i wczytanie:
+`Dead = -1`, pulap = `Def`. Jency gracza tego samego szablonu co obroncy (chlop / wlocznik / lucznik kultury wsi okregu) liczyli sie wtedy jako obroncy - wracali do DOM
+okregu jako milicja zamiast `FreedHome`, a straty wioski byly zanizone o tylu ludzi. Rzadkie, bez CTD i bez wycieku ludzi (sumy sie zgadzaja, OB-3 przechodzi).
+
+**Zmiana.** `Fight.Dead` jako 12. pole `f=` (za `Routed`); `DefImport`: brak pola albo blad parsowania -> `-1` (zapisy sprzed poprawki - pulap `Def`, jak dotad). Starsza DLL
+czyta tylko pierwsze 10/11 pol - dodatkowe pole jej nie przeszkadza.
+
+**Ryzyko / co sprawdzic.** Tylko zapis jednej liczby w sekcji bitwy w toku (najwyzej jedna bitwa naraz, kilka bajtow - limit napisu 32 KB bez znaczenia). Linia logu
+`koniec bitwy ... zabici w bitwie N` po wczytaniu pokazuje teraz prawdziwe N (dotad 0).
+
+**Test w grze.** Przegraj z chlopami wioski pobocznej majac w lochu chlopow kultury okregu; w niewoli zapisz i wczytaj gre; po uwolnieniu w logu `koniec bitwy` -
+`zabici w bitwie N` > 0 (jak bez wczytania), `wrocilo do domow L` najwyzej `obroncow - zabici - rozbici`, chlopi z lochu w `jency gracza z lupu obroncow uwolnieni`.
 
 **Status.** DO SPRAWDZENIA (zbudowane, kod 0; bez gry i autotestu). Do wgrania razem z kandydatem 97 po autotescie - autotest 97 biegl na DLL sprzed tych poprawek.

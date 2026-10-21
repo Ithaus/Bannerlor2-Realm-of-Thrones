@@ -718,7 +718,8 @@ namespace Armoury
             var f = _fight;
             if (f != null && f.PartyId != null)
                 sb.Append("|f=").Append(f.Uid).Append(',').Append(f.PartyId).Append(',').Append(f.Kind.ToString(Inv)).Append(',').Append(f.Def.ToString(Inv)).Append(',').Append(f.Men.ToString(Inv))
-                  .Append(',').Append(f.Day.ToString(Inv)).Append(',').Append(f.Won.ToString(Inv)).Append(',').Append(f.Levy ? "1" : "0").Append(',').Append(f.Got.ToString("R", Inv)).Append(',').Append(f.Dist ?? "").Append(',').Append(f.Routed.ToString(Inv));
+                  .Append(',').Append(f.Day.ToString(Inv)).Append(',').Append(f.Won.ToString(Inv)).Append(',').Append(f.Levy ? "1" : "0").Append(',').Append(f.Got.ToString("R", Inv)).Append(',').Append(f.Dist ?? "").Append(',').Append(f.Routed.ToString(Inv))
+                  .Append(',').Append(f.Dead.ToString(Inv));   // n26 styk (recenzja 2): zabici - pulap obroncow w Disband po wczytaniu
         }
 
         /// <summary>Sekcje d=, k= i f= z zapisu (Import). false - to nie nasza sekcja.</summary>
@@ -746,7 +747,9 @@ namespace Armoury
                 { bad++; return true; }
                 int routed;
                 if (a.Length < 11 || !int.TryParse(a[10], NumberStyles.Integer, Inv, out routed)) routed = -1;   // wpis sprzed recenzji - bez rozbitych
-                _fight = new Fight { Uid = a[0], PartyId = a[1], Kind = kind, Def = def, Men = men, Day = day, Won = won, Levy = a[7] == "1", Got = got, Dist = a[9].Length > 0 ? a[9] : null, Routed = routed };
+                int dead;
+                if (a.Length < 12 || !int.TryParse(a[11], NumberStyles.Integer, Inv, out dead)) dead = -1;      // wpis sprzed n26 styku - bez zabitych (Disband: pulap = obroncy)
+                _fight = new Fight { Uid = a[0], PartyId = a[1], Kind = kind, Def = def, Men = men, Day = day, Won = won, Levy = a[7] == "1", Got = got, Dist = a[9].Length > 0 ? a[9] : null, Routed = routed, Dead = dead };
                 _fight.Name = NameOf(Rec(_fight.Uid));
                 if (_fight.Dist == null) { var r = Rec(_fight.Uid); _fight.Dist = r != null ? r.VillageId : null; }
                 _sweepPending = true;
