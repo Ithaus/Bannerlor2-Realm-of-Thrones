@@ -979,7 +979,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wyzwalacze
-        private static bool BaseTrue(string t, out bool never)
+        /// <summary>m105-kronika (K0): internal dla Chronicle.Terms (ev, done, war, own, rotday, prolday) - logika bez zmian.</summary>
+        internal static bool BaseTrue(string t, out bool never)
         {
             never = false;
             int c = t.IndexOf(':');
@@ -1012,6 +1013,40 @@ namespace Armoury
             never = true;   // nieznany rodzaj - nie zajdzie nigdy
             return false;
         }
+
+        // --- m105-kronika (K0): odczyt dla Chronicle.Terms (tylko odczyt stanu; logika zmian stron bez zmian) ---
+
+        /// <summary>Term Kroniki mv:mNN: "done" (wiersz #move wykonany), "skip" (pominiety), "wait" (czeka na wyzwalacz albo w toku; tez przy wylaczonym
+        /// kluczu CanonCompanionsFollowStory - moze wrocic), null (brak wiersza w arm_canon_moves.tsv albo kampania bez postaci kanonu - nie zajdzie nigdy).</summary>
+        internal static string MoveState(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            string v;
+            if (_done.TryGetValue(id, out v)) return v.EndsWith("|ok", StringComparison.Ordinal) ? "done" : "skip";
+            if (!_on) return null;
+            EnsureLoaded();
+            foreach (var r in _moves) if (r.Id == id) return "wait";
+            return null;
+        }
+
+        /// <summary>Dzien kampanii rozstrzygniecia wiersza #move (wykonany albo pominiety); -1 - nierozstrzygniety.</summary>
+        internal static int MoveDay(string id)
+        {
+            string v; int d;
+            if (string.IsNullOrEmpty(id) || !_done.TryGetValue(id, out v)) return -1;
+            int bar = v.IndexOf('|');
+            return int.TryParse(bar > 0 ? v.Substring(0, bar) : v, NumberStyles.Integer, Inv, out d) ? d : -1;
+        }
+
+        /// <summary>Pierwszy dzien prawdy wyzwalacza (baza bez +N) z pamieci zmian stron; -1 - brak (Kronika bierze wczesniejszy z dwoch zapisow).</summary>
+        internal static int FirstDay(string bas)
+        {
+            int d;
+            return bas != null && _first.TryGetValue(bas, out d) ? d : -1;
+        }
+
+        /// <summary>Swiezy odczyt stanu wydarzen ROT przy nastepnym BaseTrue (pamiec _evDay czyszczona dotad tylko w dobowym przebiegu Moves).</summary>
+        internal static void ClearEventCache() { _evDay.Clear(); }
 
         /// <summary>Wyzwalacz "baza[+N]": baza spelniona kiedykolwiek (pierwszy dzien w zapisie) i minelo N dob.</summary>
         private static bool TermTrue(string term, int day, out bool never)
