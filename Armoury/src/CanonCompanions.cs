@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -30,6 +31,14 @@ namespace Armoury
     ///   nasluchem) i potem przy fladze kampanii - wzor B nigdy, wzor A po zamknieciu startu (bohater A, ktory zginal albo zostal usuniety, nie wraca jako wedrowiec).
     ///   Zapas: bohater B, ktory jednak powstal (latka ROT nie wpieta), usuniety przy starcie po cichu (KillCharacterAction.ApplyByRemove - Lost, bez komunikatu).
     ///   CrashScribe UC pyta IsCanonBlocked(wzor) (refleksja) - wzor zablokowany liczy jako "usuniete z kanonu", nie "brak" (UN-5) i nie "ROT go odtworzy".
+    /// ZMIANY STRON (krok 4, klucz CanonCompanionsFollowStory): #move w arm_canon_moves.tsv - postac (wzor albo id bohatera), wyzwalacz (ev:/done: wydarzenie ROT -
+    ///   odczyt ROTEventBehavior._events jak CrashScribe Fabula.EventState; dead:bohater; war:krolestwo:krolestwo; own:osada:krolestwo; rotday:N - dzien opowiesci
+    ///   StoryDay(); prolday:N - dzien prologu, tylko z prologiem; +N dni po pierwszym spelnieniu), akcja (clan / court / lead / prisoner / free / wander / remove / die /
+    ///   marry / wed). Raz na doba po starcie; kazda zmiana raz (stan w zapisie); wiersze tej samej postaci po kolei - wczesniejszy bez wyzwalacza odpada, gdy
+    ///   pozniejszy zaszedl ("wyprzedzony"), wczesniejszy w toku (bitwa, niewola AI) wstrzymuje pozniejsze (do 60 dob, potem pominiety). Pominiete z linia: postac
+    ///   martwa, u gracza (rod, towarzysz, druzyna) albo w niewoli gracza; glowa rodu nie zmienia rodu. Zmiana rodu lorda z druzyna - wzor gry
+    ///   MarriageAction.HandleClanChangeAfterMarriageForHero (armia, RemoveTroop, MakeHeroFugitiveAction, DisbandPartyAction.StartDisband - ludzie nie przepadaja).
+    ///   Prolog: jedno miejsce do podpiecia - PrologDays() (galaz m101-prolog).
     /// Wyjatek per obiekt - licznik potkniec (CLAUDE.md 7), nic nie gasnie.
     /// </summary>
     internal static class CanonCompanions
@@ -45,12 +54,27 @@ namespace Armoury
             public bool Court { get { return Party != "yes"; } }
         }
 
+        internal sealed class MoveRow
+        {
+            public string Id = "", Who = "", Name = "", Trigger = "", Action = "", Arg = "", Mode = "", Message = "", Note = "";
+            public string[] Terms = NoTerms;
+        }
+
+        private static readonly string[] NoTerms = new string[0];
+        private static readonly HashSet<string> KnownActions = new HashSet<string>(StringComparer.Ordinal)
+            { "clan", "court", "lead", "prisoner", "free", "wander", "remove", "die", "marry", "wed" };
+        private static readonly HashSet<string> ArgActions = new HashSet<string>(StringComparer.Ordinal)
+            { "clan", "court", "prisoner", "free", "wander", "marry", "wed" };
+        private const int WaitDays = 60;   // zmiana w toku (bitwa, niewola AI) czeka najwyzej tyle dob, potem pominieta
+
         // --- dane (raz na proces) ---
         private static bool _tried;
         private static string _note = "nie wczytane";
         private static readonly List<StartRow> _start = new List<StartRow>();
         private static readonly Dictionary<string, StartRow> _byTpl = new Dictionary<string, StartRow>(StringComparer.Ordinal);
         private static int _nA, _nB, _nC, _nD;
+        private static readonly List<MoveRow> _moves = new List<MoveRow>();
+        private static int _badRows;
 
         // --- stan w zapisie (arm_canon_companions) ---
         private static bool _nk;          // kampania zalozona z ta paczka (OnNewGameCreated)
@@ -59,11 +83,18 @@ namespace Armoury
         private static readonly HashSet<string> _conv = new HashSet<string>(StringComparer.Ordinal);       // wzory A przeniesione do rodu
         private static readonly HashSet<string> _startFail = new HashSet<string>(StringComparer.Ordinal);  // wzory A bez bohatera / rodu przy starcie
         private static readonly HashSet<string> _court = new HashSet<string>(StringComparer.Ordinal);      // klucz postaci (wzor albo id bohatera) - bez druzyny
+        private static readonly Dictionary<string, string> _done = new Dictionary<string, string>(StringComparer.Ordinal);   // id zmiany -> "dzien|ok" / "dzien|skip"
+        private static readonly Dictionary<string, int> _first = new Dictionary<string, int>(StringComparer.Ordinal);      // wyzwalacz (bez +N) -> pierwszy dzien prawdy
+        private static readonly Dictionary<string, int> _pend = new Dictionary<string, int>(StringComparer.Ordinal);       // id zmiany w toku -> dzien od ktorego czeka
 
         // --- sesja ---
         private static int _st, _stDay, _commanderNulled, _commanderNulledDay;
         private static int _spawnBlocked, _spawnBlockedDay, _removedAfter;
         private static readonly HashSet<string> _spawnSaid = new HashSet<string>(StringComparer.Ordinal);
+        private static int _dDone, _dSkip, _tDone, _tSkip;
+        private static readonly HashSet<string> _waitSaid = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> _waitWhy = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, int> _evDay = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
         private static bool _installed, _pCommander, _pSpawn;
         private static string _patchLine = "";
@@ -79,6 +110,10 @@ namespace Armoury
             _st = _stDay = _commanderNulled = _commanderNulledDay = 0;
             _spawnBlocked = _spawnBlockedDay = _removedAfter = 0;
             _spawnSaid.Clear();
+            _done.Clear(); _first.Clear(); _pend.Clear();
+            _dDone = _dSkip = _tDone = _tSkip = 0;
+            _waitSaid.Clear(); _waitWhy.Clear(); _evDay.Clear();
+            _evBeh = null; _evCamp = null;
             lock (_errSites) _errSites.Clear();
             _startLineSaid = false;
         }
@@ -113,8 +148,9 @@ namespace Armoury
 
         private static void Parse(string text)
         {
-            _start.Clear(); _byTpl.Clear();
-            _nA = _nB = _nC = _nD = 0;
+            _start.Clear(); _byTpl.Clear(); _moves.Clear();
+            _nA = _nB = _nC = _nD = 0; _badRows = 0;
+            var ids = new HashSet<string>(StringComparer.Ordinal);
             string section = null;
             var col = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (string raw in text.Split('\n'))
@@ -141,6 +177,25 @@ namespace Armoury
                     _start.Add(r);
                     _byTpl[r.Template] = r;
                     if (r.Group == "A") _nA++; else if (r.Group == "B") _nB++; else if (r.Group == "C") _nC++; else if (r.Group == "D") _nD++;
+                }
+                else if (section == "move")
+                {
+                    var m = new MoveRow
+                    {
+                        Id = Cell(cells, col, "id"), Who = Cell(cells, col, "who"), Name = Cell(cells, col, "name"), Trigger = Cell(cells, col, "trigger"),
+                        Mode = Cell(cells, col, "mode"), Message = Cell(cells, col, "message"), Note = Cell(cells, col, "note")
+                    };
+                    string act = Cell(cells, col, "action");
+                    int c = act.IndexOf(':');
+                    m.Action = c < 0 ? act : act.Substring(0, c);
+                    m.Arg = c < 0 ? "" : act.Substring(c + 1);
+                    var terms = new List<string>();
+                    foreach (var t in m.Trigger.Split('|')) { var tt = t.Trim(); if (tt.Length > 0) terms.Add(tt); }
+                    m.Terms = terms.ToArray();
+                    bool ok = m.Id.Length > 0 && ids.Add(m.Id) && m.Who.Length > 0 && KnownActions.Contains(m.Action) && m.Terms.Length > 0
+                              && (!ArgActions.Contains(m.Action) || m.Arg.Length > 0) && (m.Mode.Length == 0 || m.Mode == "prolog" || m.Mode == "classic");
+                    if (!ok) { _badRows++; continue; }
+                    _moves.Add(m);
                 }
             }
         }
@@ -359,6 +414,8 @@ namespace Armoury
             Log.Info(Tag + ": start | klucz CanonCompanionsToClans " + YN(s != null && s.CanonCompanionsToClans) + " (w chwili zalozenia kampanii: "
                      + (_nk ? YN(_on) : "stary zapis - nic") + "), zmiany stron CanonCompanionsFollowStory " + YN(s != null && s.CanonCompanionsFollowStory)
                      + " | plik " + (_note.Length == 0 ? "wczytany" : _note) + " | A " + _nA + ", B " + _nB + ", C " + _nC + ", D " + _nD
+                     + " | zmian stron w tabeli " + _moves.Count + " (zlych wierszy " + _badRows + "), wykonanych " + CountDone("ok") + ", pominietych " + CountDone("skip")
+                     + ", w toku " + _pend.Count + " | prolog " + YN(IsProlog()) + ", dzien opowiesci " + StoryDay().ToString("0", Inv)
                      + " | mapa rodow znaleziona " + clansFound + "/" + clansWant + " | przeniesieni " + _conv.Count + ", bez rodu/bohatera " + _startFail.Count
                      + ", dworzan " + _court.Count + ", start " + (_startDone ? "zamkniety" : "otwarty") + " | B zablokowane przy tworzeniu " + _spawnBlocked
                      + ", usuniete po utworzeniu " + _removedAfter + " | latki: " + _patchLine + ".");
@@ -481,10 +538,12 @@ namespace Armoury
                 if (!_on) return;
                 EnsureLoaded();
                 if (!_startDone) StartPass("pierwsza doba", true);
+                var s = Settings.Current;
+                if (_startDone && s != null && s.CanonCompanionsFollowStory) Moves();
                 DayLine();
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _stDay = 0; _commanderNulledDay = 0; _spawnBlockedDay = 0;
+            _stDay = 0; _commanderNulledDay = 0; _spawnBlockedDay = 0; _dDone = _dSkip = 0;
         }
 
         private static void DayLine()
@@ -528,9 +587,510 @@ namespace Armoury
                      + ", jencow " + aPris + "), martwi " + aDead + ", bez bohatera " + aGone + ", wedrowcy " + aWand + (wand.Length > 0 ? " [" + wand + "]" : "")
                      + " | B " + _nB + ": zywych " + bAlive + (bLive.Length > 0 ? " [" + bLive + "]" : "") + ", nie powstali " + bNone + ", usunieci " + bDead
                      + ", prob ROT zablokowanych dzis " + _spawnBlockedDay + " (od wczytania " + _spawnBlocked + ")"
+                     + " | zmiany stron (" + (Settings.Current != null && Settings.Current.CanonCompanionsFollowStory ? "wlaczone" : "WYLACZONE") + "): dzis wykonane " + _dDone
+                     + ", pominiete " + _dSkip + "; razem wykonane " + CountDone("ok") + ", pominiete " + CountDone("skip") + ", czeka na wyzwalacz " + WaitingTrigger()
+                     + ", w toku " + _pend.Count + (_pend.Count > 0 ? " [" + PendText() + "]" : "") + " | dzien opowiesci " + StoryDay().ToString("0", Inv) + (IsProlog() ? " (prolog)" : "")
                      + " | dworzanin wybrany na dowodce i odrzucony dzis " + _commanderNulledDay + " (razem " + _commanderNulled + ")"
                      + (_stDay > 0 ? " | POTKNIECIA " + _stDay + " (razem " + _st + ")" : "") + ".");
         }
+
+        // ------------------------------------------------------------ dzien opowiesci (miejsce prologu)
+        /// <summary>m101-prolog: JEDNO MIEJSCE DO PODPIECIA prologu - liczba dni od startu kampanii do startu opowiesci ROT (egzekucja Neda, NedEvent); klasyczny
+        /// start = 0. Galaz m101-prolog zwraca tu dlugosc prologu kampanii zaczetej z prologiem (musi byc znana w pierwszej dobie - wybor jest w tworzeniu postaci,
+        /// po OnNewGameCreated). Od tego zaleza: StoryDay() (wyzwalacz rotday:N), IsProlog() (wiersze mode prolog i wyzwalacz prolday:N).</summary>
+        internal static double PrologDays() { return 0.0; }
+
+        internal static bool IsProlog() { return PrologDays() > 0.0; }
+
+        private static double CampaignDays()
+        {
+            try { return (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; }
+            catch { return 0.0; }
+        }
+
+        /// <summary>Dzien opowiesci ROT: 0 = start opowiesci ROT (klasycznie start kampanii), w prologu ujemny.</summary>
+        internal static double StoryDay() { return CampaignDays() - PrologDays(); }
+
+        // ------------------------------------------------------------ wydarzenia ROT (odczyt jak CrashScribe Fabula.EventState)
+        private static object _evBeh;
+        private static Campaign _evCamp;
+        private static FieldInfo _fEvents;
+        private static PropertyInfo _pTotal, _pActive;
+        private static bool _evTypeTried;
+
+        /// <summary>-1 = nie widac listy wydarzen ROT albo tego wydarzenia, 0 = czeka, 1 = trwa (IsActive), 2 = zakonczone (TotalEvents &gt; 0).</summary>
+        private static int EventState(string typeName)
+        {
+            int cached;
+            if (_evDay.TryGetValue(typeName, out cached)) return cached;
+            int r = -1;
+            try
+            {
+                if (_evBeh == null || _evCamp != Campaign.Current)
+                {
+                    _evCamp = Campaign.Current;
+                    _evBeh = null;
+                    var tBeh = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTEventBehavior");
+                    if (tBeh != null && Campaign.Current != null)
+                    {
+                        var mi = typeof(Campaign).GetMethod("GetCampaignBehavior");
+                        if (mi != null) _evBeh = mi.MakeGenericMethod(tBeh).Invoke(Campaign.Current, null);
+                        if (_fEvents == null) _fEvents = AccessTools.Field(tBeh, "_events");
+                    }
+                    if (!_evTypeTried)
+                    {
+                        _evTypeTried = true;
+                        var tBase = AccessTools.TypeByName("ROT.Events.EventBase");
+                        if (tBase != null) { _pTotal = AccessTools.Property(tBase, "TotalEvents"); _pActive = AccessTools.Property(tBase, "IsActive"); }
+                    }
+                }
+                var list = _evBeh != null && _fEvents != null ? _fEvents.GetValue(_evBeh) as System.Collections.IEnumerable : null;
+                if (list != null && _pTotal != null && _pActive != null)
+                {
+                    foreach (var ev in list)
+                    {
+                        if (ev == null || ev.GetType().Name != typeName) continue;
+                        int total = Convert.ToInt32(_pTotal.GetValue(ev, null), Inv);
+                        bool active = Convert.ToBoolean(_pActive.GetValue(ev, null), Inv);
+                        r = active ? 1 : (total > 0 ? 2 : 0);
+                        break;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("EventState", e); r = -1; }
+            _evDay[typeName] = r;
+            return r;
+        }
+
+        // ------------------------------------------------------------ wyszukiwanie
+        private static Hero FindHeroId(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (var h in Hero.AllAliveHeroes) if (h != null && h.StringId == id) return h;
+            foreach (var h in Hero.DeadOrDisabledHeroes) if (h != null && h.StringId == id) return h;
+            return null;
+        }
+
+        private static Hero WhoHero(MoveRow r)
+        {
+            return r.Who.StartsWith(WandererPrefix, StringComparison.Ordinal) ? FindOriginal(r.Who) : FindHeroId(r.Who);
+        }
+
+        private static Kingdom FindKingdom(string id)
+        {
+            foreach (var k in Kingdom.All) if (k != null && k.StringId == id) return k;
+            return null;
+        }
+
+        // ------------------------------------------------------------ wyzwalacze
+        private static bool BaseTrue(string t, out bool never)
+        {
+            never = false;
+            int c = t.IndexOf(':');
+            string kind = c < 0 ? t : t.Substring(0, c), a = c < 0 ? "" : t.Substring(c + 1);
+            int n;
+            switch (kind)
+            {
+                case "ev": return EventState(a) >= 1;
+                case "done": return EventState(a) == 2;
+                case "dead": { var h = FindHeroId(a); return h != null && h.IsDead; }
+                case "rotday": return int.TryParse(a, NumberStyles.Integer, Inv, out n) && StoryDay() >= n;
+                case "prolday":
+                    if (!IsProlog()) { never = true; return false; }
+                    return int.TryParse(a, NumberStyles.Integer, Inv, out n) && CampaignDays() >= n;
+                case "war":
+                    {
+                        var p = a.Split(':');
+                        if (p.Length < 2) return false;
+                        var k1 = FindKingdom(p[0]); var k2 = FindKingdom(p[1]);
+                        return k1 != null && k2 != null && !k1.IsEliminated && !k2.IsEliminated && FactionManager.IsAtWarAgainstFaction(k1, k2);
+                    }
+                case "own":
+                    {
+                        var p = a.Split(':');
+                        if (p.Length < 2) return false;
+                        var st = Settlement.Find(p[0]);
+                        return st != null && st.MapFaction != null && st.MapFaction.StringId == p[1];
+                    }
+            }
+            never = true;   // nieznany rodzaj - nie zajdzie nigdy
+            return false;
+        }
+
+        /// <summary>Wyzwalacz "baza[+N]": baza spelniona kiedykolwiek (pierwszy dzien w zapisie) i minelo N dob.</summary>
+        private static bool TermTrue(string term, int day, out bool never)
+        {
+            never = false;
+            string bas = term;
+            int plus = 0, i = term.LastIndexOf('+');
+            if (i > 0 && int.TryParse(term.Substring(i + 1), NumberStyles.Integer, Inv, out plus)) bas = term.Substring(0, i);
+            else plus = 0;
+            int f;
+            if (!_first.TryGetValue(bas, out f))
+            {
+                if (!BaseTrue(bas, out never)) return false;
+                _first[bas] = day;
+                f = day;
+            }
+            return day - f >= plus;
+        }
+
+        private static bool Fires(MoveRow r, int day, out bool never)
+        {
+            bool any = false, allNever = true;
+            foreach (var t in r.Terms)
+            {
+                bool nv;
+                if (TermTrue(t, day, out nv)) any = true;
+                if (!nv) allNever = false;
+            }
+            never = !any && allNever;
+            return any;
+        }
+
+        // ------------------------------------------------------------ zmiany stron (doba)
+        private enum Res { Done, Skip, Wait }
+
+        private static int CountDone(string res)
+        {
+            int n = 0;
+            foreach (var v in _done.Values) if (v.EndsWith("|" + res, StringComparison.Ordinal)) n++;
+            return n;
+        }
+
+        private static int WaitingTrigger()
+        {
+            int n = 0;
+            foreach (var r in _moves) if (!_done.ContainsKey(r.Id) && !_pend.ContainsKey(r.Id)) n++;
+            return n;
+        }
+
+        private static string PendText()
+        {
+            var sb = new StringBuilder();
+            foreach (var r in _moves)
+            {
+                int d;
+                if (!_pend.TryGetValue(r.Id, out d)) continue;
+                string why;
+                _waitWhy.TryGetValue(r.Id, out why);
+                if (sb.Length > 0) sb.Append("; ");
+                sb.Append('#').Append(r.Id).Append(' ').Append(r.Name).Append(": ").Append(why ?? "?").Append(" od dnia ").Append(d.ToString(Inv));
+            }
+            return sb.ToString();
+        }
+
+        private static void Moves()
+        {
+            int day = Day();
+            _evDay.Clear();
+            var fires = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var r in _moves)
+            {
+                if (_done.ContainsKey(r.Id)) continue;
+                try
+                {
+                    if (r.Mode == "prolog" && !IsProlog()) { Resolve(r, day, Res.Skip, "tylko kampania z prologiem (klasyczny start)", null, null, false); continue; }
+                    if (r.Mode == "classic" && IsProlog()) { Resolve(r, day, Res.Skip, "tylko klasyczny start (kampania z prologiem)", null, null, false); continue; }
+                    bool never;
+                    bool f = Fires(r, day, out never);
+                    if (never) { Resolve(r, day, Res.Skip, "wyzwalacz nie moze zajsc w tej kampanii", null, null, false); continue; }
+                    fires[r.Id] = f || _pend.ContainsKey(r.Id);
+                }
+                catch (Exception e) { Stumble("Moves.Fires(" + r.Id + ")", e); }
+            }
+            // wiersze tej samej postaci po kolei
+            var order = new List<string>();
+            var byWho = new Dictionary<string, List<MoveRow>>(StringComparer.Ordinal);
+            foreach (var r in _moves)
+            {
+                if (_done.ContainsKey(r.Id) || !fires.ContainsKey(r.Id)) continue;
+                List<MoveRow> l;
+                if (!byWho.TryGetValue(r.Who, out l)) { l = new List<MoveRow>(); byWho[r.Who] = l; order.Add(r.Who); }
+                l.Add(r);
+            }
+            foreach (var who in order)
+            {
+                var l = byWho[who];
+                int last = -1;
+                for (int j = 0; j < l.Count; j++) if (fires[l[j].Id]) last = j;
+                if (last < 0) continue;
+                for (int j = 0; j <= last; j++)
+                {
+                    var r = l[j];
+                    try
+                    {
+                        if (!fires[r.Id])
+                        {
+                            Resolve(r, day, Res.Skip, "wyprzedzona przez #" + l[last].Id + " (jej wyzwalacz nie zaszedl, a pozniejszy tak)", null, null, false);
+                            continue;
+                        }
+                        if (Execute(r, day) == Res.Wait) break;   // w toku - pozniejsze tej postaci czekaja
+                    }
+                    catch (Exception e) { Stumble("Moves.Execute(" + r.Id + ")", e); break; }
+                }
+            }
+        }
+
+        private static string Side(Hero h)
+        {
+            if (h == null) return "-";
+            try
+            {
+                var c = h.Clan;
+                string occ = h.Occupation == Occupation.Wanderer ? "wedrowiec" : h.Occupation == Occupation.Lord ? "lord" : h.Occupation.ToString();
+                return (c != null ? "rod " + Nm(c) : "bez rodu") + ", " + occ + (IsCourtier(h) ? " (dworzanin)" : "") + ", " + Where(h);
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>Wynik zmiany: zapis (raz), linia logu, wiesc dla gracza.</summary>
+        private static void Resolve(MoveRow r, int day, Res res, string why, Hero h, string before, bool tell)
+        {
+            if (res == Res.Wait)
+            {
+                if (!_pend.ContainsKey(r.Id)) _pend[r.Id] = day;
+                _waitWhy[r.Id] = why;
+                int since = _pend[r.Id];
+                if (day - since >= WaitDays) { Resolve(r, day, Res.Skip, "czekala " + (day - since) + " dob (" + why + ")", h, before, false); return; }
+                if (_waitSaid.Add(r.Id))
+                    Log.Info(Tag + ": zmiana strony #" + r.Id + " CZEKA - " + r.Name + " [" + r.Who + "] - " + why + " (najwyzej " + WaitDays + " dob, linia raz na sesje) | wyzwalacz " + r.Trigger + ".");
+                return;
+            }
+            _pend.Remove(r.Id); _waitWhy.Remove(r.Id);
+            _done[r.Id] = day.ToString(Inv) + "|" + (res == Res.Done ? "ok" : "skip");
+            string when = " | wyzwalacz " + r.Trigger + " (dzien kampanii " + day + ", opowiesci " + StoryDay().ToString("0", Inv) + ")";
+            if (res == Res.Skip)
+            {
+                _dSkip++; _tSkip++;
+                Log.Info(Tag + ": zmiana strony #" + r.Id + " POMINIETA - " + r.Name + " [" + r.Who + "] (" + r.Action + (r.Arg.Length > 0 ? ":" + r.Arg : "") + ") - " + why + when + ".");
+                return;
+            }
+            _dDone++; _tDone++;
+            string news = "brak";
+            if (r.Message.Length > 0)
+            {
+                if (tell) { Log.Player(r.Message); news = "pokazana: \"" + r.Message + "\""; }
+                else news = "nie pokazana (gracz nie zna postaci i jego krolestwa to nie dotyczy)";
+            }
+            Log.Info(Tag + ": zmiana strony #" + r.Id + " - " + Nm(h) + " [" + r.Who + "] " + (before ?? "-") + " -> " + Side(h) + " (" + r.Action + (r.Arg.Length > 0 ? ":" + r.Arg : "")
+                     + (why != null && why.Length > 0 ? "; " + why : "") + ")" + when + " | wiesc: " + news + ".");
+        }
+
+        private static bool PlayerCaptor(Hero h)
+        {
+            var c = h.PartyBelongedToAsPrisoner;
+            if (c == null) return false;
+            if (c == PartyBase.MainParty) return true;
+            if (c.IsSettlement && c.Settlement != null && c.Settlement.OwnerClan == Clan.PlayerClan) return true;
+            if (c.IsMobile && c.MobileParty != null && c.MobileParty.ActualClan == Clan.PlayerClan) return true;
+            return false;
+        }
+
+        private static string PlayerSide(Hero h)
+        {
+            if (h == Hero.MainHero) return "to gracz";
+            if (h.Clan == Clan.PlayerClan) return "w rodzie gracza";
+            if (h.CompanionOf == Clan.PlayerClan) return "towarzysz gracza";
+            if (h.PartyBelongedTo != null && h.PartyBelongedTo == MobileParty.MainParty) return "w druzynie gracza";
+            if (PlayerCaptor(h)) return "w niewoli gracza";
+            return null;
+        }
+
+        private static bool Busy(Hero h)
+        {
+            var p = h.PartyBelongedTo;
+            return p != null && (p.MapEvent != null || p.SiegeEvent != null);
+        }
+
+        private static bool Captive(Hero h) { return h.PartyBelongedToAsPrisoner != null || h.IsPrisoner; }
+
+        /// <summary>Wyjscie z druzyny jak gra przy zmianie rodu po slubie (MarriageAction.HandleClanChangeAfterMarriageForHero): armia, RemoveTroop, zbieg,
+        /// druzyna lorda bez dowodcy rozwiazana (StartDisband - ludzie odchodza do osady, nic nie przepada).</summary>
+        private static void LeaveParty(Hero h)
+        {
+            var p = h.PartyBelongedTo;
+            if (p == null) return;
+            if (p.Army != null)
+            {
+                if (p.Army.LeaderParty == p) DisbandArmyAction.ApplyByUnknownReason(p.Army);
+                else p.Army = null;
+            }
+            bool leader = p.LeaderHero == h;
+            p.MemberRoster.RemoveTroop(h.CharacterObject);
+            MakeHeroFugitiveAction.Apply(h);
+            if (leader && p.IsLordParty) DisbandPartyAction.StartDisband(p);
+        }
+
+        private static Res MoveToClan(Hero h, Clan clan, bool court, out string why)
+        {
+            why = "";
+            if (h.Clan == clan && h.CompanionOf == null) { SetCourt(h, court); why = "juz w tym rodzie"; return Res.Done; }
+            if (h.Clan != null && h.Clan.Leader == h) { why = "glowa rodu " + Nm(h.Clan) + " - nie zmienia rodu"; return Res.Skip; }
+            if (Busy(h)) { why = "w bitwie albo oblezeniu"; return Res.Wait; }
+            LeaveParty(h);
+            if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
+            if (h.Occupation != Occupation.Lord) h.SetNewOccupation(Occupation.Lord);
+            h.Clan = clan;
+            h.IsMinorFactionHero = clan.IsMinorFaction;
+            SetCourt(h, court);
+            var seat = SeatOf(clan);
+            if (seat != null) TeleportHeroAction.ApplyImmediateTeleportToSettlement(h, seat);
+            else if (!h.IsActive) h.ChangeState(Hero.CharacterStates.Active);
+            return Res.Done;
+        }
+
+        private static Settlement PickTown(string culture, Hero h)
+        {
+            Settlement player = null;
+            try { player = Hero.MainHero != null ? Hero.MainHero.CurrentSettlement : null; } catch { }
+            var same = new List<Settlement>();
+            var any = new List<Settlement>();
+            foreach (var t in Town.AllTowns)
+            {
+                var s = t != null ? t.Settlement : null;
+                if (s == null || s == player || s.SiegeEvent != null || t.Culture == null) continue;
+                if (t.Culture.StringId == "whitewalker") continue;
+                any.Add(s);
+                if (t.Culture.StringId == culture) same.Add(s);
+            }
+            var pool = same.Count > 0 ? same : any;
+            return pool.Count > 0 ? pool[MBRandom.RandomInt(pool.Count)] : null;
+        }
+
+        private static PartyBase Captor(string arg)
+        {
+            var st = Settlement.Find(arg);
+            if (st != null) return st.OwnerClan == Clan.PlayerClan ? null : st.Party;
+            var clan = FindClan(arg);
+            if (clan == null || clan.IsEliminated || clan == Clan.PlayerClan) return null;
+            var seat = SeatOf(clan);
+            if (seat != null && seat.IsFortification && seat.Party != null && seat.OwnerClan != Clan.PlayerClan) return seat.Party;
+            var l = clan.Leader;
+            var lp = l != null && l.IsAlive ? l.PartyBelongedTo : null;
+            if (lp != null && lp.LeaderHero == l && lp.IsActive && lp.MapEvent == null && !lp.IsCurrentlyAtSea) return lp.Party;
+            return null;
+        }
+
+        private static Res Execute(MoveRow r, int day)
+        {
+            var h = WhoHero(r);
+            if (h == null) { Resolve(r, day, Res.Skip, "brak postaci (nie powstala albo wymazana)", null, null, false); return Res.Skip; }
+            if (!h.IsAlive) { Resolve(r, day, Res.Skip, "postac martwa", h, null, false); return Res.Skip; }
+            string ps = PlayerSide(h);
+            if (ps != null) { Resolve(r, day, Res.Skip, ps, h, null, false); return Res.Skip; }
+            string before = Side(h);
+            IFaction fromK = null;
+            try { fromK = h.MapFaction; } catch { }
+            Res res = Res.Done;
+            string why = "";
+            switch (r.Action)
+            {
+                case "lead":
+                    SetCourt(h, false);
+                    why = "moze prowadzic druzyne";
+                    break;
+                case "clan":
+                case "court":
+                    {
+                        if (Captive(h)) { res = Res.Wait; why = "jeniec (AI) - czeka na wolnosc"; break; }
+                        var clan = FindClan(r.Arg);
+                        if (clan == null || clan.IsEliminated) { res = Res.Skip; why = "brak rodu " + r.Arg + (clan != null ? " (wyeliminowany)" : ""); break; }
+                        res = MoveToClan(h, clan, r.Action == "court", out why);
+                        break;
+                    }
+                case "prisoner":
+                    {
+                        if (Captive(h)) { res = Res.Skip; why = "juz jeniec " + Where(h); break; }
+                        if (Busy(h)) { res = Res.Wait; why = "w bitwie albo oblezeniu"; break; }
+                        var cap = Captor(r.Arg);
+                        if (cap == null) { res = Res.Wait; why = "brak miejsca niewoli (" + r.Arg + ": siedziba / druzyna glowy rodu)"; break; }
+                        LeaveParty(h);
+                        if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
+                        if (h.CurrentSettlement != null) LeaveSettlementAction.ApplyForCharacterOnly(h);
+                        TakePrisonerAction.Apply(cap, h);
+                        why = "jeniec " + cap.Name;
+                        break;
+                    }
+                case "free":
+                    {
+                        var clan = FindClan(r.Arg);
+                        if (Captive(h))
+                        {
+                            EndCaptivityAction.ApplyByReleasedByChoice(h);
+                            why = "uwolniony";
+                        }
+                        else why = "juz wolny";
+                        if (clan != null && !clan.IsEliminated)
+                        {
+                            string w2;
+                            var r2 = MoveToClan(h, clan, IsCourtier(h), out w2);
+                            if (r2 != Res.Done) { res = r2; why += "; " + w2; break; }
+                            if (w2.Length > 0) why += "; " + w2;
+                            else why += "; do rodu " + Nm(clan);
+                        }
+                        break;
+                    }
+                case "wander":
+                    {
+                        if (Captive(h)) { res = Res.Wait; why = "jeniec (AI) - czeka na wolnosc"; break; }
+                        if (h.Clan != null && h.Clan.Leader == h) { res = Res.Skip; why = "glowa rodu " + Nm(h.Clan) + " - nie odchodzi"; break; }
+                        if (Busy(h)) { res = Res.Wait; why = "w bitwie albo oblezeniu"; break; }
+                        LeaveParty(h);
+                        if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
+                        if (h.Clan != null) h.Clan = null;
+                        SetCourt(h, false);
+                        h.IsMinorFactionHero = false;
+                        if (h.Occupation != Occupation.Wanderer) h.SetNewOccupation(Occupation.Wanderer);
+                        var town = PickTown(r.Arg, h);
+                        if (town != null) TeleportHeroAction.ApplyImmediateTeleportToSettlement(h, town);
+                        else if (!h.IsActive) h.ChangeState(Hero.CharacterStates.Active);
+                        why = "do wynajecia w " + Nm(town) + " (kultura " + r.Arg + ")";
+                        break;
+                    }
+                case "remove":
+                    KillCharacterAction.ApplyByRemove(h);   // Lost, bez komunikatu; wzor A po starcie zablokowany - ROT go nie odtworzy
+                    why = "usuniety ze swiata (Lost, bez komunikatu)";
+                    break;
+                case "die":
+                    KillCharacterAction.ApplyByMurder(h, null, false);   // smierc bez komunikatu; lord zostaje na liscie zmarlych (gra wymazuje tylko wedrowcow)
+                    why = h.IsDead ? "nie zyje (bez komunikatu)" : "znak smierci - umrze po bitwie";
+                    break;
+                case "marry":
+                case "wed":
+                    {
+                        var o = FindHeroId(r.Arg);
+                        if (o == null || !o.IsAlive) { res = Res.Skip; why = "brak albo martwy " + r.Arg; break; }
+                        if (h.Spouse != null) { res = Res.Skip; why = "juz w malzenstwie z " + Nm(h.Spouse); break; }
+                        if (o.Spouse != null) { res = Res.Skip; why = Nm(o) + " juz w malzenstwie z " + Nm(o.Spouse); break; }
+                        string ops = PlayerSide(o);
+                        if (ops != null) { res = Res.Skip; why = Nm(o) + ": " + ops; break; }
+                        if (Captive(h) || Captive(o)) { res = Res.Wait; why = "jedno z nich w niewoli"; break; }
+                        if (r.Action == "wed" && o.Clan != null && h.Clan != o.Clan)
+                        {
+                            string w2;
+                            var r2 = MoveToClan(h, o.Clan, true, out w2);
+                            if (r2 != Res.Done) { res = r2; why = w2; break; }
+                        }
+                        h.Spouse = o;   // setter ustawia obie strony (Hero.Spouse); bez zmiany rodu drugiej strony
+                        why = "slub z " + Nm(o) + " (rod " + Nm(o.Clan) + ")";
+                        break;
+                    }
+            }
+            if (res == Res.Wait) { Resolve(r, day, Res.Wait, why, h, before, false); return Res.Wait; }
+            if (res == Res.Skip) { Resolve(r, day, Res.Skip, why, h, before, false); return Res.Skip; }
+            bool tell = false;
+            try
+            {
+                var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
+                IFaction toK = h.IsAlive ? h.MapFaction : null;
+                tell = h.HasMet || (pk != null && (pk == fromK || pk == toK));
+            }
+            catch { }
+            Resolve(r, day, Res.Done, why, h, before, tell);
+            return Res.Done;
+        }
+
 
         // ------------------------------------------------------------ zapis
         internal static string Export()
@@ -543,6 +1103,9 @@ namespace Armoury
             foreach (var t in _conv) sb.Append("conv\t").Append(t).Append('\n');
             foreach (var t in _startFail) sb.Append("fail\t").Append(t).Append('\n');
             foreach (var t in _court) sb.Append("court\t").Append(t).Append('\n');
+            foreach (var kv in _done) sb.Append("done\t").Append(kv.Key).Append('\t').Append(kv.Value).Append('\n');
+            foreach (var kv in _first) sb.Append("first\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');
+            foreach (var kv in _pend) sb.Append("pend\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');
             return sb.ToString();
         }
 
@@ -562,6 +1125,9 @@ namespace Armoury
                     case "conv": _conv.Add(p[1]); break;
                     case "fail": _startFail.Add(p[1]); break;
                     case "court": _court.Add(p[1]); break;
+                    case "done": if (p.Length >= 3) _done[p[1]] = p[2]; break;
+                    case "first": { int d; if (p.Length >= 3 && int.TryParse(p[2], NumberStyles.Integer, Inv, out d)) _first[p[1]] = d; break; }
+                    case "pend": { int d; if (p.Length >= 3 && int.TryParse(p[2], NumberStyles.Integer, Inv, out d)) _pend[p[1]] = d; break; }
                 }
             }
         }

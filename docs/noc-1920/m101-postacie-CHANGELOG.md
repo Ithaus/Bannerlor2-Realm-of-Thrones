@@ -118,8 +118,65 @@ Braki w ROT: rodu **Stokeworth** nie ma - Bronn po odmowie walki za Tyriona idzi
   stron (krok 4) sa poza zasiegiem UC. Wedrowiec z ruchu `wander` (np. Ogar w Dorzeczu) moze zostac przeniesiony przez UC do miasta kultury wzoru, gdy gra
   wylosuje go w TryKillCompanion - to zmiana miasta, nie strony.
 
+**Krok 4 - zmiany stron (Armoury CanonCompanions.cs, arm_canon_moves.tsv #move):**
+- Tabela `#move` (34 wiersze: 25 dla kazdej kampanii + 9 tylko z prologiem): `id, who, name, trigger, action, mode, message, note`. Wyzwalacze: `ev:<wydarzenie ROT>`
+  (wystartowalo), `done:<wydarzenie>` (zakonczone), `dead:<id bohatera>`, `war:<krolestwo>:<krolestwo>`, `own:<osada>:<krolestwo>`, `rotday:N`, `prolday:N`, laczone `|`,
+  `+N` = N dob po pierwszym spelnieniu (dzien pierwszego spelnienia w zapisie). Akcje: `clan:` / `court:` (lord z druzyna / dworzanin), `lead`, `prisoner:<rod albo osada>`
+  (siedziba rodu, potem druzyna glowy rodu), `free:<rod>`, `wander:<kultura>` (wedrowiec do wynajecia w miescie tej kultury), `remove` (Lost, bez komunikatu),
+  `die` (smierc bez komunikatu - lord zostaje na liscie zmarlych), `marry:<id>`, `wed:<id>` (slub i rod malzonka).
+- Wykonawca: raz na dobe po zamknietym starcie i przy kluczu `CanonCompanionsFollowStory`. Wiersze jednej postaci po kolei: wczesniejszy, ktorego wyzwalacz nie
+  zaszedl, gdy pozniejszy juz tak - POMINIETY ("wyprzedzona"); wczesniejszy w toku (bitwa, oblezenie, niewola AI, brak miejsca niewoli) wstrzymuje pozniejsze, po
+  60 dobach czekania - pominiety. Kazda zmiana raz (`done` w zapisie). Pominiete z linia: postac martwa, brak postaci, u gracza (rod, towarzysz, druzyna), w niewoli
+  gracza; glowa rodu nie zmienia rodu i nie odchodzi. Wiersz `mode prolog` w klasycznym starcie - pominiety od razu ("tylko kampania z prologiem").
+- Zmiana rodu lorda: wzor gry `MarriageAction.HandleClanChangeAfterMarriageForHero` (armia rozwiazana / opuszczona, `RemoveTroop`, `MakeHeroFugitiveAction`,
+  `DisbandPartyAction.StartDisband` - ludzie odchodza, nic nie przepada), zdjecie z namiestnika, `Hero.Clan`, `TeleportHeroAction` do siedziby. Jeniec:
+  `TakePrisonerAction.Apply` (po wyjsciu z druzyny i osady); uwolnienie: `EndCaptivityAction.ApplyByReleasedByChoice`. Wedrowiec: `Hero.Clan = null`,
+  `SetNewOccupation(Wanderer)`, miasto kultury (bez oblezonych, bez miasta gracza, bez Innych). Slub: `Hero.Spouse` (obie strony), bez zmiany rodu drugiej osoby.
+- Wiesc (EN, kolumna message) tylko gdy gracz zna postac (`HasMet`) albo jego krolestwo jest jedna ze stron; inaczej tylko log.
+- **Dzien opowiesci - jedno miejsce do podpiecia prologu:** `CanonCompanions.PrologDays()` (dzis 0). Galaz m101-prolog zwraca tam dlugosc prologu (dni od startu
+  kampanii do startu opowiesci ROT); `StoryDay()` = dni od `CampaignStartTime` - `PrologDays()` (wyzwalacz `rotday`), `IsProlog()` wlacza wiersze `mode prolog` i
+  `prolday:N` (dni od startu kampanii). Wybor prologu musi byc znany w pierwszej dobie (tworzenie postaci jest po `OnNewGameCreated`, start A jest przed nim -
+  dlatego roznice prologu ida jako wiersze `prolday:0` itd.). Wyzwalacze `ev:` / `done:` ida za zegarem ROT/Fabuli - prolog ich nie dotyczy.
+- Linie: `Postacie kanonu (m101): zmiana strony #id - X [wzor] <przed> -> <po> (akcja; powod) | wyzwalacz ... (dzien kampanii, opowiesci) | wiesc: ...`,
+  `... #id POMINIETA - ... - powod`, `... #id CZEKA - ... - powod` (raz na sesje), w linii doby: dzis wykonane / pominiete, razem, czeka na wyzwalacz, w toku [lista].
+
+**Tabela zmian (wedlug ksiazki; PROJEKT pkt 3, decyzje Claude'a tam, gdzie ROT nie ma rodu albo wydarzenia):**
+
+| # | Postac | Wyzwalacz | Akcja | Uwaga |
+|---|---|---|---|---|
+| m01 | Jaime | wojna Polnoc-Zachod +5 dob | jeniec Starkow | Szepczacy Las (w ksiazce przed egzekucja Neda; wojna ROT zaczyna sie z NedEvent) |
+| m02 | Jaime | koniec BlackwaterEvent | wolny, Lannisterowie | Catelyn go uwalnia (wiesc) |
+| p01/p02 | Tyrion (prolog) | prolog 110 / 132 | jeniec w Orlim Gniezdzie / wolny do Lannisterow | gospoda na rozstajach, proces |
+| m03 | Tyrion | JoffreyEvent +40 | Druga Synowie (z druzyna) | wiesc "Tyrion Lannister has fled across the narrow sea." |
+| m04 | Tyrion | DanyInvasionEvent | rod Targaryen (Daenerys) | Namiestnik Krolowej (wiesc) |
+| p03/p04 | Bronn (prolog) | prolog 0 / 132 | wedrowiec w Dorzeczu / Lannisterowie | najemnik do gospody, potem czempion Tyriona |
+| m05 | Bronn | koniec BlackwaterEvent | moze prowadzic druzyne | pasowany |
+| m06 | Bronn | JoffreyEvent +30 | rod korony | Stokeworth - brak w ROT |
+| m07 | Podrick | JoffreyEvent +40 | wedrowiec w Dorzeczu | z Brienne szuka Sansy |
+| p05/p06 | Shagga (prolog) | prolog 0 / 132 | Kamienne Wrony / przy Tyrionie | |
+| m08 | Shagga | JoffreyEvent +40 | Kamienne Wrony | wraca w gory |
+| m09 | Qyburn | JoffreyEvent +40 | dwor korony (Cersei) | po smierci Tywina |
+| m10 | Ogar | koniec BlackwaterEvent | wedrowiec w Dorzeczu | dezercja (wiesc) |
+| m11 | Ogar | koniec RedWeddingEvent +20 | usuniety | Cicha Wyspa |
+| m12 | Varys | AegonInvasionEvent | dwor Aegona | |
+| m13/m14 | Baelish | JoffreyEvent +5 / +15 | dwor Arrynow (wiesc) / slub z Lysa (`lord_4_6`) | ucieczka z Sansa do Doliny |
+| m15 | Jacelyn | koniec BlackwaterSiegeEvent albo BlackwaterEvent | smierc | |
+| m16 | Brienne | smierc Renly'ego (`lord_1_9`) | dworka Starkow | przy Catelyn |
+| m17 | Brienne | koniec RedWeddingEvent albo smierc Robba | wedrowiec w Dorzeczu | szuka Sansy |
+| m18 | Theon | wojna Zelazne Wyspy-Polnoc | Greyjoyowie (z druzyna) | wiesc |
+| m19 | Theon | koniec BlackwaterEvent +10 | jeniec Boltonow | upadek Winterfell (ACOK) jest w czasie Czarnego Nurtu - PROJEKT mial RamsayEvent (smierc Roose'a), ksiazka: wczesniej |
+| p07/p08 | Osha (prolog) | prolog 0 / 62 | Wolni Ludzie / sluzba Starkow | |
+| m20 | Osha | koniec BlackwaterEvent +10 | usunieta | ucieka z Rickonem |
+| p09 | Benjen (prolog) | prolog 80 | usuniety | znika za Murem (klasyczny start - zostaje w Nocnej Strazy, jak lista A) |
+| m21 | Samwell | koniec WallEvent +20 | usuniety | Stare Miasto |
+| m22 | Yoren | HarrenhalSiegeNotificationEvent albo dzien opowiesci 120 | smierc | ludzie Lorcha |
+| m23 | Quentyn | JonEvent | smierc | smoki w Meereen (ADWD, ten sam czas) |
+| m24 | Hizdahr | RamsayEvent | slub z Daenerys (`lord_1_14`) | ADWD |
+| m25 | Wun Wun | JonEvent | przy Jonie (rod Snow) | ROT JonEvent przenosi rod Snow do Polnocy |
+
 ### Status
 - Krok 1 (rozpoznanie + mapa rodow): GOTOWE.
 - Krok 2 (A do rodow + dworzanie bez druzyny): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA w grze.
-- Krok 3 (B nie powstaja, A nie odradzaja sie, UC liczy 'usuniete z kanonu'): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA. Zostalo: kroki 4-5,
-  grupa `sprawdz_logi.py --grupa m101postacie`.
+- Krok 3 (B nie powstaja, A nie odradzaja sie, UC liczy 'usuniete z kanonu'): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
+- Krok 4 (tabela zmian stron i wykonawca): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA (zmiany przy wydarzeniach ROT widac dopiero w dlugim biegu).
+  Zostalo: krok 5 (Jeyne), grupa `sprawdz_logi.py --grupa m101postacie`.
