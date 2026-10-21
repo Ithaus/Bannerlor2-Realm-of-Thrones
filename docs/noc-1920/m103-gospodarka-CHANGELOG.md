@@ -109,6 +109,8 @@ VR-3 na nowym formacie sprawdzony na logu syntetycznym (linie VR z 07-17-36, w 2
 
 **Build:** Armoury kod 0; gen_mcm Armoury 2244 ustawien.
 
+**Poprawka po samoprzegladzie (osobny commit):** licznik "bez jedzenia" linii doby liczyl bande ponad limit polowu, ktora zjadla ryby, jako bez jedzenia (`eat + have <= 0`) - teraz `eat + fish + have <= 0`. Tylko liczba linii (MB-3 "bez jedzenia").
+
 ---
 
 ### P7a. Stocznia bierze drewno tylko ponad zapas rzemiosla (R1-10b) - klucz `ShipyardWoodAboveCraftStock` (MCM "Shipyard Wood Above Craft Stock", grupa "Old loose ends (A17)"; TAK; NIE = kod 101)

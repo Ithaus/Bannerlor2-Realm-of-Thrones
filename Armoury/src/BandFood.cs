@@ -441,7 +441,7 @@ namespace Armoury
             st.Hungry++;
             _hungry++;
             if (sea) _seaHungry++;
-            if (eat + have <= 0) _starving++;
+            if (eat + fish + have <= 0) _starving++;                           // m103 P6: banda ponad limit polowu zjadla ryby - nie "bez jedzenia"
             float lack = 1f - fed;
             try
             {
