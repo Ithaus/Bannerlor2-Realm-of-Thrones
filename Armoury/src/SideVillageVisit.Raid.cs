@@ -74,12 +74,14 @@ namespace Armoury
         /// <summary>Migawka ochron od nowa (po okupie, wczytaniu, resecie, na dobe) - wygasle zdjete.</summary>
         private static void ProtSync()
         {
-            int today = Today0();
-            if (today > 0) _prot.RemoveAll(p => p == null || p.Until <= today);
+            // m103 P0: zegar tylko przy niepustej liscie (RaidReset w konstruktorze nowej kampanii - zegar mapy jeszcze nie istnieje)
+            if (_prot.Count > 0) { int today = Today0(); if (today > 0) _prot.RemoveAll(p => p == null || p.Until <= today); }
             System.Threading.Volatile.Write(ref _protSnap, _prot.Count == 0 ? NoProt : _prot.ToArray());
         }
 
-        private static int Today0() { try { return Campaign.Current != null ? Today() : 0; } catch { return 0; } }
+        // m103 P0: gotowosc zegara bez rzucania wyjatku (wzor Live, A17Fix) - przy nowej grze GameStarted dopiero w pierwszym takcie, po MapTimeTracker;
+        // finalizator CrashScribe na Today() lapal NRE przed catch ponizej (blok ERROR IN A MOD na starcie kazdej nowej kampanii). 0 = dzien nieznany, jak dotad.
+        private static int Today0() { try { var c = Campaign.Current; return c != null && c.GameStarted ? Today() : 0; } catch { return 0; } }
 
         /// <summary>Jest jakas ochrona po okupie wioski (migawka) - VillageBook.RoomFor bez niej konczy od razu.</summary>
         internal static bool AnyProt { get { return System.Threading.Volatile.Read(ref _protSnap).Length > 0; } }
