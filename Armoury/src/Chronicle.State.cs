@@ -9,7 +9,7 @@ namespace Armoury
     {
         /// <summary>
         /// m105-kronika K0 (krok A1) - stan okien Kroniki czytany przez termy kr:NNN.w[=x] i flag:x (Chronicle.Terms). Pisze go silnik (krok A2: rozstrzygniecie
-        /// okna, pominiecie z powodem; A3: wybor opcji, akcja flag:). Trwaly w zapisie: Export/Import daja linie z wlasnymi prefiksami (kr/ks/kc/kf) - wolajacy
+        /// okna, pominiecie z powodem, wybor opcji, akcja flag:). Trwaly w zapisie: Export/Import daja linie z wlasnymi prefiksami (kr/ks/kc/kf) - wolajacy
         /// (ChronicleBehavior.SyncData, SaveText.Sync) moze sklejac je z innymi liniami; Import czyta tylko swoje prefiksy.
         /// Id okna: NNN.w albo instancja okna powracajacego NNN.w#klucz (kr:NNN.w = rozstrzygnieta jakakolwiek instancja). Brak logiki gry - same slowniki.
         /// </summary>
@@ -95,6 +95,39 @@ namespace Armoury
                 int n = 0;
                 string pre = id + "#";
                 foreach (var k in _res.Keys) if (k.StartsWith(pre, StringComparison.Ordinal)) n++;
+                return n;
+            }
+
+            /// <summary>A2: liczba rozstrzygniec wedlug formy (linia startu sesji).</summary>
+            internal static void FormCounts(out int okno, out int wiesc, out int log, out int nic)
+            {
+                okno = wiesc = log = nic = 0;
+                foreach (var r in _res.Values)
+                {
+                    if (r.Form == "okno") okno++;
+                    else if (r.Form == "wiesc") wiesc++;
+                    else if (r.Form == "log") log++;
+                    else if (r.Form == "nic") nic++;
+                }
+            }
+
+            /// <summary>A2: rejestr kluczy instancji okien powracajacych (NNN.w#klucz, rozstrzygniete i pominiete) najwyzej keep - najstarsze (dzien) wypadaja.
+            /// Zwraca liczbe usunietych. Limit instancji (max:N) liczy Chronicle.Recurring osobno (licznik w zapisie), wiec usuniecie klucza go nie zeruje.</summary>
+            internal static int PruneInstances(int keep)
+            {
+                var all = new List<KeyValuePair<string, int>>();
+                foreach (var kv in _res) if (kv.Key.IndexOf('#') > 0) all.Add(new KeyValuePair<string, int>(kv.Key, kv.Value.Day));
+                foreach (var kv in _skip)
+                {
+                    if (kv.Key.IndexOf('#') <= 0) continue;
+                    int d, bar = kv.Value.IndexOf('|');
+                    if (!int.TryParse(bar > 0 ? kv.Value.Substring(0, bar) : kv.Value, NumberStyles.AllowLeadingSign, Inv, out d)) d = 0;
+                    all.Add(new KeyValuePair<string, int>(kv.Key, d));
+                }
+                if (all.Count <= keep) return 0;
+                all.Sort((a, b) => a.Value.CompareTo(b.Value));
+                int n = all.Count - keep;
+                for (int i = 0; i < n; i++) { _res.Remove(all[i].Key); _skip.Remove(all[i].Key); }
                 return n;
             }
 
