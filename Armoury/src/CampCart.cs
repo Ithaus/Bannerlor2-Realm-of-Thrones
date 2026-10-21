@@ -141,7 +141,8 @@ namespace Armoury
                      + " (Pack Saddle Enabled; +" + (s != null ? SaddleKg(s) : 0) + " kg, rodzaje " + _saddles.Length + "/" + PackSaddleIds.Length + ")"
                      + " | wozy gracza " + _carts + " | materialy drewno " + (_wood != null ? "tak" : "BRAK") + ", narzedzia " + (_tools != null ? "tak" : "BRAK")
                      + ", skora " + (_leather != null ? "tak" : "BRAK") + ", siodlo do robienia " + (_madeSaddle != null ? "tak" : "BRAK")
-                     + " | menu miasta " + (menu ? "tak" : "NIE") + " | wpiecia " + _hooks + ".");
+                     + " | menu miasta " + (menu ? "tak" : "NIE") + " | wpiecia " + _hooks + ", latka kolumny w " + MapRoads.SpeedModels + " modelach predkosci"
+                     + (MapRoads.SpeedModels <= 0 ? " - KARA WOZU NIECZYNNA" : "") + ".");
         }
 
         // ------------------------------------------------------------ udzwig i predkosc
@@ -205,27 +206,38 @@ namespace Armoury
             return Math.Min(_carts, main.Party.NumberOfPackAnimals);
         }
 
-        [ThreadStatic] private static int _depth;
-        public static void DepthPrefix() { _depth++; }
-        public static Exception DepthFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
-
-        /// <summary>Postfiks CalculateFinalSpeed (kazdy model predkosci; licznik glebokosci - raz na lancuch): druzyna gracza z wozem w zaprzegu i wodz armii,
-        /// do ktorej gracz jest doczepiony, jada o CartSpeedPenaltyPercent wolniej. Na morzu bez kary.</summary>
-        public static void SpeedPostfix(MobileParty __0, ref ExplainedNumber __result)
+        /// <summary>Kara wozu: druzyna gracza z wozem w zaprzegu i wodz armii, do ktorej gracz jest doczepiony, jada o CartSpeedPenaltyPercent wolniej
+        /// (jeden woz czy wiele - kolumna idzie tempem wozow; wiele zwierzat jucznych i tak zwalnia kolumne konna jako tabor - MarchPace kind 3).
+        /// Recenzja techniki m97: dawny postfiks (AddFactor na kazdym modelu) ginal pod sufitem kolumny MarchPace (LimitMax, Priority.Last), gdy kolumna i tak
+        /// szla tempem piechoty. Teraz wolane z MarchPace.SpeedPostfix PO suficie kolumny, drogach i blocie, tak jak MapMud: procent wyniku przez Add (wynik
+        /// schodzi ponizej sufitu), a gdy inny model trzyma wynik samym LimitMax - sufit obnizony do celu. Lancuch modeli - raz (SpeedDepth). Na morzu bez kary.</summary>
+        internal static void Speed(MobileParty mp, ref ExplainedNumber r)
         {
             try
             {
-                if (_depth > 1 || _carts <= 0 || __0 == null) return;
+                if (_carts <= 0 || mp == null) return;
                 var s = Settings.Current;
                 if (s == null || !s.CampCartEnabled) return;
+                if (!SpeedDepth.OutermostFinal) return;
                 float pct = SlowPct(s);
                 if (pct <= 0f) return;
                 var main = MobileParty.MainParty;
-                if (main == null || (__0 != main && main.AttachedTo != __0)) return;
-                if (__0.IsCurrentlyAtSea || Pulled() <= 0) return;
-                __result.AddFactor(-pct / 100f, _txtSlow);
+                if (main == null || (mp != main && main.AttachedTo != mp)) return;
+                if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || Pulled() <= 0) return;
+                float res = r.ResultNumber;
+                if (res <= 0f) return;
+                float f = 1f + r.SumOfFactors;
+                float cut = res * pct / 100f;
+                float target = res - cut;
+                r.Add(f > 0.01f ? -cut / f : -cut, _txtSlow);
+                float lim = r.LimitMaxValue;
+                if (lim > 0f && lim < float.MaxValue * 0.5f && res >= lim - 0.0005f && r.ResultNumber > target + 0.001f)
+                {
+                    float lo = r.LimitMinValue;
+                    r.LimitMax(target > lo ? target : lo);
+                }
             }
-            catch (Exception e) { Stumble("SpeedPostfix", e); }
+            catch (Exception e) { Stumble("Speed", e); }
         }
 
         internal static void ApplyAll(Harmony h)
@@ -238,34 +250,8 @@ namespace Armoury
                 else { h.Patch(cap, postfix: new HarmonyMethod(typeof(CampCart), nameof(CapPostfix))); parts.Add("udzwig"); }
             }
             catch (Exception e) { parts.Add("blad udzwigu " + e.GetType().Name); Stumble("ApplyAll(udzwig)", e); }
-            int done = 0;
-            try
-            {
-                var post = new HarmonyMethod(typeof(CampCart), nameof(SpeedPostfix)) { priority = Priority.Normal };
-                var pre = new HarmonyMethod(typeof(CampCart), nameof(DepthPrefix)) { priority = Priority.First };
-                var fin = new HarmonyMethod(typeof(CampCart), nameof(DepthFinalizer));
-                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    Type[] types;
-                    try { types = asm.GetTypes(); }
-                    catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
-                    catch { continue; }
-                    foreach (var t in types)
-                    {
-                        if (t == null || t.IsAbstract || !typeof(PartySpeedModel).IsAssignableFrom(t)) continue;
-                        try
-                        {
-                            var m = AccessTools.DeclaredMethod(t, "CalculateFinalSpeed", new[] { typeof(MobileParty), typeof(ExplainedNumber) });
-                            if (m == null || m.IsAbstract) continue;
-                            h.Patch(m, prefix: pre, postfix: post, finalizer: fin);
-                            done++;
-                        }
-                        catch { }
-                    }
-                }
-                parts.Add("predkosc " + done + " modeli");
-            }
-            catch (Exception e) { parts.Add("blad predkosci " + e.GetType().Name); Stumble("ApplyAll(predkosc)", e); }
+            // predkosc: bez wlasnej latki (recenzja m97) - kara wozu biegnie w latce kolumny MarchPace (po suficie); liczba modeli w linii startu sesji
+            parts.Add("predkosc w latce kolumny MarchPace (po suficie)");
             _hooks = string.Join(", ", parts.ToArray());
             Log.Info(P + "wpiecia: " + _hooks + ".");
         }
@@ -350,9 +336,10 @@ namespace Armoury
             string t = "Carpenters and tanners work the yards by the gate. ";
             if (s != null && s.CampCartEnabled)
                 t += "A supply cart takes " + CartWood + " hardwood and " + CartTools + " tools from the market, plus the carpenter's fee. One pack animal pulls it and hauls "
-                     + CartLoad(s) + " kg instead of " + GamePackKg + " kg, but the column moves " + SlowPct(s).ToString("0", CultureInfo.InvariantCulture) + "% slower. ";
+                     + CartLoad(s) + " kg instead of " + GamePackKg + " kg, but the column moves " + SlowPct(s).ToString("0", CultureInfo.InvariantCulture) + "% slower (one cart or many - the column keeps the carts' pace). ";
             if (s != null && s.PackSaddleEnabled)
-                t += "A pack saddle takes " + SaddleLeather + " leather and " + SaddleWood + " hardwood, plus the tanner's fee. On a pack animal it adds " + SaddleKg(s) + " kg and carries its own weight. ";
+                t += "A pack saddle takes " + SaddleLeather + " leather and " + SaddleWood + " hardwood, plus the tanner's fee. On a free pack animal (one not pulling a cart) it adds " + SaddleKg(s)
+                     + " kg and carries its own weight; without such an animal it is just " + (_madeSaddle != null ? _madeSaddle.Weight : 0f).ToString("0", CultureInfo.InvariantCulture) + " kg of baggage. ";
             t += "\n\nYou have " + _carts + (_carts == 1 ? " cart" : " carts") + ", " + packs + (packs == 1 ? " pack animal" : " pack animals") + " and " + saddles
                  + (saddles == 1 ? " pack saddle" : " pack saddles") + ".";
             if (_carts > packs) t += " Some carts have no animal to pull them.";
@@ -406,9 +393,9 @@ namespace Armoury
             var eb = new EquipmentElement(b);
             int ca, fa, la, cb = 0, fb = 0, lb;
             int ta = ShelfBuy.Take(shelf, ea, na, budget, () => town.GetItemPrice(ea, mp, false), out ca, out fa, out la, 0, false);
-            if (ta < na) { ShelfBuy.PutBack(shelf, ea, ta, ca, fa); return false; }
+            if (ta < na) { ShelfBuy.PutBack(shelf, ea, ta, ca, fa, false); return false; }   // recenzja: Take z tally false - zwrot bez licznikow linii "Ceny hurtu"
             int tb = nb > 0 ? ShelfBuy.Take(shelf, eb, nb, budget - ca, () => town.GetItemPrice(eb, mp, false), out cb, out fb, out lb, 0, false) : 0;
-            if (tb < nb) { ShelfBuy.PutBack(shelf, ea, ta, ca, fa); ShelfBuy.PutBack(shelf, eb, tb, cb, fb); return false; }
+            if (tb < nb) { ShelfBuy.PutBack(shelf, ea, ta, ca, fa, false); ShelfBuy.PutBack(shelf, eb, tb, cb, fb, false); return false; }
             paid = ca + cb;
             return true;
         }

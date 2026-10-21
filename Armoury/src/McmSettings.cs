@@ -8684,7 +8684,7 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsFreeOwnPrisoners { get; set; } = true;
 
-        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory and the masters of Qohor into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
+        [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory, the masters of Qohor and the cartwright and saddler into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
 
@@ -8708,11 +8708,11 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int CartLoadKg { get; set; } = 500;
 
-        [SettingPropertyInteger("Cart Speed Penalty Percent", 0, 50, "0", HintText = "how much slower your column moves while a cart is hitched (0 = no slowdown)", RequireRestart = false)]
+        [SettingPropertyInteger("Cart Speed Penalty Percent", 0, 50, "0", HintText = "how much slower your column moves while a cart is hitched - one cart or many, the column keeps the carts' pace (many pack animals still slow a riding column as a baggage train); 0 = no slowdown", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int CartSpeedPenaltyPercent { get; set; } = 10;
 
-        [SettingPropertyBool("Pack Saddle Enabled", HintText = "transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight; it is no riding saddle (off = pack saddles give nothing)", RequireRestart = false)]
+        [SettingPropertyBool("Pack Saddle Enabled", HintText = "transport saddles: a town tanner makes a pack saddle; on a pack animal (not pulling a cart) it adds Pack Saddle Extra Kg and carries its own weight - without such an animal it is just baggage; it is no riding saddle (off = pack saddles give nothing)", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public bool PackSaddleEnabled { get; set; } = true;
 
@@ -8720,7 +8720,7 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int PackSaddleExtraKg { get; set; } = 50;
 
-        [SettingPropertyBool("Camp Walk Enabled", HintText = "'Walk through the camp' in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; no fighting, campaign time stands still; hold Tab to go back (off = no option)", RequireRestart = false)]
+        [SettingPropertyBool("Camp Walk Enabled", HintText = "'Walk through the camp' in your camp menu: walk your own camp on the spot - tents by the number of your men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires with your soldiers sitting round them, your horses and carts; in an army the camp is the whole army's; no fighting, campaign time stands still; hold Tab to go back - Esc does not leave the camp (off = no option)", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public bool CampWalkEnabled { get; set; } = true;
 
