@@ -1201,7 +1201,7 @@ Uzycie (Python 3, tylko odczyt):
                     Planu (krok 8: R i P >= 95% - od r4-koszyk wedlug P9: kcal JEDZENIA z linii "KS: tanszy koszyk miast (P9)", rzeczy INFO; log bez linii P9 - wartosc koszyka; punkt
                     staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru; feed-swiat recenzja: P9 liczy drabine przy cenach startu - to idzie do gry, narzut niedoboru
                     zostaje w Planie, wiec prog bez wyjatkow), NKS-6 zapasy miast rynku +-2%
-                    zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
+                    zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (D4 21.10: przy linii cen przed A "poza" tylko para oddalona przez KS o > 0.3 od celu wobec tej linii, takze NKS-7e; pasmo bezwzgledne - INFO "cel KS") (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
                     pieniadze (KS 0; 8b swiat wobec bazy +-0.5%; 8c koszyk niekupiony z braku pieniedzy: miasta <= 5%, wsie - kcal bez pokrycia (niekupione i nie robione
                     w domu) <= 5%; 8d reszta - INFO; 8e utarg wozow i podatek panow przed wlaczeniem i w oknie - INFO), NKS-7e kontrola wczesna D+7, NKS-9 doba KS <= 3 ms (9b z hakami ZC4/ZC5
                     <= 10 ms, 9c takt doby <= +10% bazy), NKS-10 ERROR i potkniecia 0, NKS-11 wlaczenie, NKS-12 lambda 0 w D i 1 w D+14, polki w D, NKS-13 koszyk ZC4
@@ -44157,7 +44157,7 @@ def nks_main(logp, until=120, bdp=None):
                 elif s.startswith(NKS_K + "kontrola wczesna"):
                     mm = NKS_EARLY.match(s)
                     if mm:
-                        early.append((int(mm.group("day")), int(mm.group("k")), int(mm.group("ok")), int(mm.group("n")), mm.group("res")))
+                        early.append((int(mm.group("day")), int(mm.group("k")), int(mm.group("ok")), int(mm.group("n")), mm.group("res"), s))   # m103 D4: [5] linia (pary poza pasmem)
                 elif s.startswith(NKS_K + "zapis arm_ks"):
                     mm = NKS_SAVE.match(s)
                     if mm:
@@ -44572,6 +44572,13 @@ def nks_main(logp, until=120, bdp=None):
                 (len(stk_bad) == 0) if (n and nd_win >= 7) else None, etap=len(stk_bad) < NKS_R3["nks6"])
         # NKS-7 ceny na rynek
         pr = [(d, v) for d, v in prices if w0 <= d <= w1 + 7]
+        # m103 D4 (decyzja 21.10 po P2): ceny startu z Planu sa przyciete do 0.7-1.5 (KsCore.StartIndex), a targ nie mial takich cen nigdy - takze bez KS (P0 3/24 w
+        # pasmie, P2 przed wlaczeniem 3/24). NKS-7 i NKS-7e licza pare rynek x towar jako "poza" tylko wtedy, gdy KS oddalil cene od celu o > 0.3 wobec linii
+        # "KS: ceny miast" z ostatniej doby przed A; pasmo bezwzgledne zostaje jako INFO ("cel KS"). Bez linii cen przed A (bieg z zapisu po wlaczeniu) - jak dotad.
+        nks_b0 = max((d for d, _ in prices if d < a), default=None)
+        nks_px0 = next((v for d, v in prices if d == nks_b0), None) if nks_b0 is not None else None
+        if nks_px0 is not None and not any(k >= 0 for (k, _g) in nks_px0):
+            nks_px0 = None                                                    # linia sprzed recenzji (sam swiat) - bez bazy rynkow
         if pr:
             far, cf, sl = [], [], []
             per_mk = any(k >= 0 for _, v in pr for (k, _g) in v)
@@ -44596,8 +44603,28 @@ def nks_main(logp, until=120, bdp=None):
                         slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den if den > 0 else 0.0
                         if my > 0 and abs(slope / my) > 0.005:
                             sl.append(f"{nm} {100 * slope / my:+.2f}%/d")
-            rep.add("NKS-7: ceny na rynek (mediana linii okna w pasmie ceny startu +-0.3)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
-                    + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)"), "towary rak kazdego rynku w pasmie", len(far) == 0, etap=len(far) < NKS_R3["nks7"])
+            far_rel = []                                                      # m103 D4: pary oddalone przez KS (mediana okna wobec linii cen przed A)
+            if nks_px0 is not None and per_mk:
+                for k in (0, 1):
+                    for g in NKS_MAIN:
+                        ser = [v[(k, g)][0] for _, v in pr if (k, g) in v]
+                        x0 = nks_px0.get((k, g))
+                        if not ser or x0 is None:
+                            continue
+                        med = nks_med(ser)
+                        sp = start_px.get((k, g))
+                        sp = sp if sp is not None else 1.0                    # bez linii cen startu - srodek pasma 0.7-1.3 (jak wyzej)
+                        if abs(med - sp) > 0.3 and abs(med - sp) > abs(x0[0] - sp) + 0.3:
+                            far_rel.append(f"{mk_names[k]} {g} {med:.2f} (przed A {x0[0]:.2f}, cel {sp:.2f})")
+            if nks_px0 is not None and per_mk:
+                rep.add("NKS-7: ceny na rynek (mediana linii okna; poza = KS oddalil cene od celu o > 0.3 wobec linii cen przed A)",
+                        f"linii {len(pr)}, baza doba {nks_b0}: poza {len(far_rel)}" + (f" ({', '.join(far_rel[:12])})" if far_rel else ""),
+                        "zadna para rynek x towar rak nie oddalona przez KS (D4 21.10)", len(far_rel) == 0, etap=len(far_rel) < NKS_R3["nks7"])
+                rep.add("NKS-7 (cel KS): ceny na rynek w pasmie ceny startu +-0.3 (pasmo bezwzgledne)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
+                        + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)"), "INFO (ceny startu Planu 0.7-1.5 nie sa cenami targu - luka sprzed KS; D4 21.10)", None)
+            else:
+                rep.add("NKS-7: ceny na rynek (mediana linii okna w pasmie ceny startu +-0.3)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
+                        + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)") + " (bez linii cen przed A - pasmo bezwzgledne)", "towary rak kazdego rynku w pasmie", len(far) == 0, etap=len(far) < NKS_R3["nks7"])
             rep.add("NKS-7b: sufit / podloga wzoru ceny", ", ".join(cf) if cf else "<= 20% miast", "zaden towar w > 20% miast", len(cf) == 0 if per_mk else None, etap=len(cf) < NKS_R3["nks7b"])
             rep.add("NKS-7c: nachylenie ceny w oknie", ", ".join(sl[:12]) if sl else "<= 0.5%/d", "|nachylenie| <= 0.5%/d", (len(sl) == 0) if len(pr) >= 3 else None)
         else:
@@ -44823,9 +44850,25 @@ def nks_main(logp, until=120, bdp=None):
         else:
             rep.add("NKS-29: rynek wsi BK u wsi z koszykiem ZC4", "brak liczb w linii ZC4", "<= 2%", None)
         # NKS-7e (recenzja 17.10): kontrola wczesna D+7 - wiekszosc cen poza pasmem = bieg przerwac (wynik NKS-7 znany z gory)
-        if early:
+        if early and nks_px0 is not None:
+            # m103 D4: pary poza pasmem z linii kontroli (cena od D i cena startu z tej linii) - "poza" tylko, gdy KS oddalil cene od celu o > 0.3 wobec linii cen
+            # przed A; pary w pasmie nie moga byc oddalone. Wynik jak w grze: PRZERWAC przy ponad polowie par
             e = early[0]
-            rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek)", f"doba {e[0]}: w pasmie {e[2]} z {e[3]}, wynik {e[4]}", "dalej (PRZERWAC - ponad polowa poza pasmem)", e[4] == "dalej")
+            rel7e = []
+            for mk, g, x, sp in re.findall(r"(Westeros|Essos) ([A-Za-z_]+) ([\d.]+) \(start ([\d.]+)\)", e[5]):
+                k, x, sp = (0 if mk == "Westeros" else 1), float(x), float(sp)
+                x0 = nks_px0.get((k, g))
+                if x0 is not None and abs(x - sp) > 0.3 and abs(x - sp) > abs(x0[0] - sp) + 0.3:
+                    rel7e.append(f"{mk} {g} {x:.2f} (przed A {x0[0]:.2f}, cel {sp:.2f})")
+            res7e = "PRZERWAC" if 2 * len(rel7e) > e[3] else "dalej"
+            rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek; poza = KS oddalil cene od celu o > 0.3 wobec linii cen przed A)",
+                    f"doba {e[0]}: poza {len(rel7e)} z {e[3]} (baza doba {nks_b0}), wynik {res7e}" + (f" ({', '.join(rel7e[:12])})" if rel7e else ""),
+                    "dalej (PRZERWAC - ponad polowa par oddalona przez KS; D4 21.10)", res7e == "dalej")
+            rep.add("NKS-7e (cel KS): kontrola wczesna D+7 - pasmo bezwzgledne ceny startu +-0.3 (linia gry)", f"doba {e[0]}: w pasmie {e[2]} z {e[3]}, wynik linii {e[4]}",
+                    "INFO (w grze tylko linia; ceny startu Planu 0.7-1.5 - luka sprzed KS, P0 bez KS 3/24)", None)
+        elif early:
+            e = early[0]
+            rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek)", f"doba {e[0]}: w pasmie {e[2]} z {e[3]}, wynik {e[4]} (bez linii cen przed A - pasmo bezwzgledne)", "dalej (PRZERWAC - ponad polowa poza pasmem)", e[4] == "dalej")
         elif lastp >= dd + 8:
             rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek)", "brak linii 'KS: kontrola wczesna' (log sprzed 17.10)", "linia w D+7", None)
         # NKS-14 przetwory ZC5

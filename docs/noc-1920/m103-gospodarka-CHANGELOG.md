@@ -279,3 +279,31 @@ Recenzja: 7 uwag, w tym 2 pary tych samych (W12-6 dwa razy, stocznia dwa razy) -
 **Oczekiwane progi (cele D1; bieg A wobec P2):** M96D-3 <= 50 000 zl (P2 93 813), w ostatnich 28 dobach <= +0.5 tys./d; NAKUM-27 <= 19 (P2 26); NKA-3 <= 16 (P2 28); D2K-5 <= 14 dob (P2 109, Volantis); udzial firm w doplywie netto <= 1.00 przy ustaleniu i na koniec (M3P-4, M3P-6; P2 1.270); zaleglosci zamkow <= 200 tys. (M3P-7; P2 270 085); M96D-4 niewyplacalnych 0-1, miast z dlugiem <= 20; M3P-1 0 podwyzek w rampie; M3P-0 segment w kazdej linii f5. Bez pogorszen: NAKUM-26 kasy <= +30 tys./d, G1-5a <= 160% Z33, KR-9 >= 1.0, C-4c <= 250 (docelowo <= 217), NAKUM-7 zaden nowy posiadacz ponad +30 tys./d, czas f5 <= 0.2 ms, NAKUM-7s ARYTMETYKA OK, "platnicy - odbiorcy = 0", 0 potkniec DsTowns. Bieg B (z zapisu): M96D-3 <= 105 tys. (558-873 tys.), niewyplacalnych <= 2 (9), dlug miast <= 0.5 mln (1.06), firmy miast < 231 mln, NAKUM-27 <= 14. Bieg B wczytuje zapis z firmami juz ustalonymi - (d) nie dziala (brak Fix), (e) zetnie Share > 1 przy pierwszej obnizce.
 
 **Build:** Armoury kod 0 (6 ostrzezen jak dotad); gen_mcm Armoury 2248 ustawien (bylo 2246).
+
+---
+
+### D4. Narzedzie: NKS-7e i NKS-7 licza pare "poza" tylko, gdy KS oddalil cene od celu (bez klucza MCM - tylko `tools/sprawdz_logi.py`, gra bez zmian)
+
+**Problem (log P2, flaga `armoury-ks-przerwij.flag.p2-prolog-ks-1056`):** NKS-7e NIE "w pasmie 3 z 24, wynik PRZERWAC", NKS-7 ETAP "poza pasmem 36". Ta sama miara bez KS: P0 3/24 (108682, 108703), 4/24 i 5/24; P2 przed wlaczeniem 3/24; biegi 160 z zapisu 3-4/24 - flaga PRZERWAC w kazdym biegu (95-160 ... P2: 19-21 z 24).
+
+**Przyczyna:** ceny startu z Planu (`KsCore.StartIndex`) sa przyciete do 0.7-1.5 (owoce, sol, oliwki), a targ nie mial takich cen nigdy, takze bez KS (journal wf_a568aafd-15a, diagnoza ks-flaga (a); D4). Kontrola wczesna w grze nic nie wylacza (`StartCalibration.Ramp.cs:384-400` - w grze tylko linia), wiec to blad miary narzedzia, nie gry.
+
+**Zmiana (`tools/sprawdz_logi.py`, nks_main; gra bez zmian):**
+- Baza: linia "KS: ceny miast" z ostatniej doby przed A (`a` = rampa A albo doba wlaczenia; P2 108682, 04-57-25 109109). Linia sprzed recenzji (sam swiat) albo brak linii przed A (bieg z zapisu po wlaczeniu) - progi jak dotad, z dopiskiem "(bez linii cen przed A - pasmo bezwzgledne)".
+- NKS-7e: z linii "KS: kontrola wczesna D+7" pary poza pasmem (cena od D i cena startu z tej linii); para jest "poza" tylko, gdy |cena - cel| > 0.3 i |cena - cel| > |cena przed A - cel| + 0.3; wynik jak w grze - PRZERWAC przy ponad polowie par. Nowy wiersz INFO "NKS-7e (cel KS)" - dawna miara (w pasmie X z N, wynik linii gry). Krotka `early` ma 6. pole (linia) - inne odczyty bez zmian.
+- NKS-7: ta sama regula dla mediany linii okna (cel = cena startu z linii polek startu; bez niej 1.0 - srodek pasma 0.7-1.3 jak dotad); ETAP liczony z liczby par oddalonych (prog rundy 3 `NKS_R3["nks7"]` = 45 bez zmian). Nowy wiersz INFO "NKS-7 (cel KS)" - dawne pasmo bezwzgledne. Klucze wierszy dla porownaj.py bez zmian ("NKS-7", "NKS-7e"); nowe wiersze maja klucze "NKS-7 (cel KS)" i "NKS-7e (cel KS)".
+- Opis grupy nks (pomoc) - dopisek D4.
+
+**Wyniki na istniejacych logach (gra nie uruchamiana):**
+
+| Log | NKS-7e przed -> po | NKS-7 przed -> po | nks razem NIE |
+|---|---|---|---|
+| P2 `10-08-39` | NIE (w pasmie 3 z 24, PRZERWAC) -> **TAK** (poza 7 z 24, baza 108682, dalej: Westeros grain, cheese, butter, olives, orange; Essos grain, wool) | ETAP 36 poza -> ETAP 7 (Westeros cheese, cow, hog, sheep; Essos hardwood, hog, sheep) | 15 -> 14 |
+| `04-57-25` | NIE (4 z 24, PRZERWAC) -> **TAK** (poza 4 z 24, baza 109109, dalej) | ETAP 41 -> ETAP 8 | 14 -> 13 |
+| P0 `06-23-39` (bez KS) | bez wlaczenia - bez zmian | INFO "sam Plan" - bez zmian | 3 -> 3 |
+
+Zgodne z decyzja (P2: 7/24, "dalej") i z przeliczeniem `decyzja/pasmo_wzgl.py` (KS 5-7 par, bez KS 11-13).
+
+**Ryzyko / co sprawdzic:** miara wzgledna nie lapie towaru, ktory byl daleko od celu juz przed A i KS go nie przybliza (np. sol 4.34 przy celu 1.00) - to zostaje w wierszu INFO "cel KS" i jest osobnym tematem (ceny samej KS: polki startu pomijaja 76% pozycji `StartCalibration.Ramp.cs:235`, puste polki soli, sera i oliwek - NKS-7g). Gdy linia cen przed A jest daleko od A (np. co 7 dob - do 6 dob roznicy), baza moze zawierac poczatek rampy KS - w P2 i 04-57-25 baza 3 doby przed A. Plik flagi w autotescie dalej powstaje z miary gry (kod gry bez zmian) - odklada sie recznie jak dotad.
+
+**Oczekiwane (bieg A po P3):** NKS-7e TAK (ok. 5-7 z 24, dalej), NKS-7 ETAP albo TAK (kilka par oddalonych), wiersze "cel KS" INFO jak dotad.
