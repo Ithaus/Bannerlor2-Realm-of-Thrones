@@ -466,6 +466,8 @@ namespace Armoury
             }
             _dHeard++;
             string head = headGiven ?? (town ? "The innkeeper leans on his counter, and the drinkers are happy to talk:" : "By the hearth, drovers, pilgrims and pedlars trade the news of the road:");
+            // m100-kryjowki: plotka o kryjowce pokazana graczowi = kryjowka znana (wypatrzenie jak w grze, HideoutSight)
+            foreach (var it in items) if (it != null && it.Id != null && it.Id.StartsWith("h|")) HideoutSight.Heard(it.Id.Substring(2), place);
             var cats = new int[NewCats];
             if (items.Count == 0) { _dEmpty++; cats[6]++; }
             foreach (var it in items) { cats[it.Cat]++; _dCat[it.Cat]++; _dItems++; }
@@ -940,6 +942,7 @@ namespace Armoury
             {
                 var st = h != null ? h.Settlement : null;
                 if (st == null) continue;
+                if (!HideoutSight.RumourFits(h)) continue;   // m100-kryjowki: przy kluczu plotka tylko o zajetej, niewypatrzonej kryjowce
                 float d = st.GetPosition2D.Distance(at);
                 if (d > R) continue;
                 int bands = 0;

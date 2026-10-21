@@ -1016,6 +1016,9 @@ Uzycie (Python 3, tylko odczyt):
                     handlowy, cena > 0), S97-2 osady zrodla > 0, S97-3 doplyw > 0 w pierwszych 30 dobach albo pulap (przy krotszym logu INFO; S97-3b bloki 30 dob INFO), S97-4 doplyw nie doklada ponad
                     pulap (S97-4b zapas ponad pulap bez przyrostu - INFO), S97-5 kucia z surowcem (INFO), S97-6 potkniecia i ERROR paczki 0, S97-7 latki nagrod gry
                     (Caravan Ambush, Trade Proposal) wpiete przy RareMaterialOnlyFromSource TAK. Log bez paczki: INFO.
+--grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
+                    HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
+                    KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
@@ -37413,6 +37416,121 @@ def m97surowce_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m100kryjowki (21.10, w-toku/m100-kryjowki: wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania,
+# nowe kryjowki z dala od osad i wiosek pobocznych, po rozbiciu w innym miejscu; Armoury/src/HideoutSight.cs; klucze HideoutScoutingChance, HideoutRumourReveals,
+# HideoutAwayFromSettlements, HideoutRelocateAfterClear)
+M100K_TAG = "Kryjowki (m100): "
+M100K_START = re.compile(r"krzywa: Zwiad <= (\d+) -> 0%, \d+\.\.(\d+) liniowo")
+M100K_WIRE = re.compile(r"latki wpiete (\d)/4")
+M100K_ROLL = re.compile(r"rzut (\S+) \| Zwiad (\d+) \(.*?\), szansa ([-0-9.]+)%?, wynik (TAK|NIE), znana z plotki (TAK|NIE)")
+M100K_SPOT = re.compile(r"wypatrzona (\S+) \| Zwiad (\d+) \(.*?\), szansa ([0-9.]+)%, droga (.*?), znana z plotki (TAK|NIE)")
+M100K_ACT = re.compile(r"aktywacja (\S+) \(.*?\) \| (.*?) \| stopien (\d) \| najblizsza osada ([0-9.]+) \(prog ([0-9.]+)\), wioska poboczna ([-0-9.]+) \(prog ([0-9.]+)\), "
+                       r"od rozbitej (?:(\S+) ([0-9.]+)|-) \(promien ([0-9.]+)")
+M100K_CLR = re.compile(r"rozbita (\S+) ")
+M100K_DAY = re.compile(r"dzien (\d+) \|.*\| potkniecia (\d+)")
+
+
+def m100kryjowki_main(logp):
+    """m100kryjowki (21.10, w-toku/m100-kryjowki; Jeff 21.10 "ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ... w karczmie ... plotki" oraz
+    "nie na wioskach pobocznych ... z dala od miast i wsi ... po rozbiciu kolejna w innym miejscu"): KR-0 linia startu, KR-1 ERROR HideoutSight i potkniecia 0,
+    KR-2 latki 4/4, KR-3 zadna nowa kryjowka blizej niz prog (stopien 3 = brak wolnego punktu - DECYZJA), KR-4 przy Zwiadzie <= progu wypatrzenie tylko z plotki
+    albo zadania (rzut przy Zwiadzie <= progu zawsze NIE), KR-5 po rozbiciu nowa w innym miejscu (nie ta sama, poza promieniem - stopien 2/3 INFO), KR-6 uzycie (INFO)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("KR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, rolls, spots, acts, clears, n_err, stumb, wire = [], [], [], [], [], 0, 0, None
+    seq = []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in HideoutSight"):
+                n_err += 1
+                continue
+            if not s.startswith(M100K_TAG):
+                continue
+            body = s[len(M100K_TAG):]
+            mw = M100K_WIRE.search(body)
+            if mw:
+                wire = int(mw.group(1))
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            md = M100K_DAY.match(body)
+            if md:
+                stumb = max(stumb, int(md.group(2)))
+                continue
+            mr = M100K_ROLL.match(body)
+            if mr:
+                rolls.append((mr.group(1), int(mr.group(2)), mr.group(3), mr.group(4), mr.group(5)))
+                continue
+            ms = M100K_SPOT.match(body)
+            if ms:
+                spots.append((ms.group(1), int(ms.group(2)), ms.group(4), ms.group(5)))
+                continue
+            ma = M100K_ACT.match(body)
+            if ma:
+                a = (ma.group(1), ma.group(2), int(ma.group(3)), float(ma.group(4)), float(ma.group(5)),
+                     float(ma.group(6)) if ma.group(6) != "-" else 1e9, float(ma.group(7)), ma.group(8),
+                     float(ma.group(9)) if ma.group(9) else 1e9, float(ma.group(10)))
+                acts.append(a)
+                seq.append(("a", a))
+                continue
+            mc = M100K_CLR.match(body)
+            if mc:
+                clears.append(mc.group(1))
+                seq.append(("c", mc.group(1)))
+    print(f"plik: {logp} | startow {len(starts)}, rzutow {len(rolls)}, wypatrzen {len(spots)}, aktywacji {len(acts)}, rozbitych {len(clears)}, ERROR {n_err}")
+    if not starts and not rolls and not acts:
+        rep.add("KR-0: linia 'Kryjowki (m100): start sesji'", "brak w logu", "INFO (log sprzed paczki m100-kryjowki albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    lo = 10
+    mm = M100K_START.search(last)
+    if mm:
+        lo = int(mm.group(1))
+    on = "Hideout Scouting Chance TAK" in last
+    rep.add("KR-0: linia startu (klucze, krzywa, pula)", (last[:170] + "...") if last else "brak", "klucze TAK, krzywa i pula w linii", (on and mm is not None) if last else False)
+    rep.add("KR-1: ERROR HideoutSight i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    rep.add("KR-2: latki wpiete", f"{wire}/4" if wire is not None else "brak linii", "4/4", wire == 4)
+    bad = [a for a in acts if a[2] <= 1 and (a[3] < a[4] or a[5] < a[6])]
+    nofit = [a for a in acts if a[2] == 3]
+    rep.add("KR-3: nowa kryjowka nie blizej niz prog (osada, wioska poboczna)", f"blizej niz prog {len(bad)} z {len(acts)}"
+            + (f" (np. {bad[0][0]}: osada {bad[0][3]} / {bad[0][4]}, wioska {bad[0][5]} / {bad[0][6]})" if bad else "")
+            + f"; bez wolnego punktu (stopien 3) {len(nofit)}", "0", (len(bad) == 0) if acts else None)
+    if nofit:
+        rep.add("KR-3b: aktywacje bez wolnego punktu (najdalszy od osad)", f"{len(nofit)} (np. {nofit[0][0]}: osada {nofit[0][3]}, wioska {nofit[0][5]})",
+                "0 - inaczej za male progi albo za mala pula kultury", False, decide=True)
+    low_roll_ok = [r for r in rolls if r[1] <= lo and r[4] == "NIE" and r[3] == "TAK"]
+    low_spot = [x for x in spots if x[1] <= lo and not (x[2] == "plotka" or x[2].startswith("inne") or x[3] == "TAK")]
+    rep.add(f"KR-4: Zwiad <= {lo} - wypatrzenie tylko z plotki (albo zadania)", f"udanych rzutow przy Zwiadzie <= {lo}: {len(low_roll_ok)}, wypatrzen bez plotki: {len(low_spot)}"
+            + (f" (np. {low_spot[0][0]} Zwiad {low_spot[0][1]} droga {low_spot[0][2]})" if low_spot else ""), "0 i 0",
+            (len(low_roll_ok) == 0 and len(low_spot) == 0) if (rolls or spots) else None)
+    # KR-5: po rozbiciu kolejna aktywacja nie w tym samym miejscu (stopien 2/3 = pamiec poluzowana z braku punktow - INFO)
+    recent, worse, info = [], [], []
+    for kind, v in seq:
+        if kind == "c":
+            recent.append(v)
+            continue
+        if not recent:
+            continue
+        a = v
+        if a[0] in recent or (a[7] is not None and a[8] < a[9]):
+            (info if a[2] >= 2 else worse).append(a)
+    rep.add("KR-5: po rozbiciu nowa w innym miejscu", f"aktywacji po rozbiciu w tym samym miejscu albo w promieniu: {len(worse)}" + (f" (np. {worse[0][0]})" if worse else "")
+            + f"; z poluzowana pamiecia (stopien 2/3) {len(info)}", "0", (len(worse) == 0) if (clears and acts) else None)
+    passes = sum(1 for r in rolls if r[3] == "TAK" and r[4] == "NIE")
+    known = sum(1 for r in rolls if r[4] == "TAK")
+    swapped = sum(1 for a in acts if "zamiast" in a[1])
+    rep.add("KR-6: uzycie (INFO)", f"rzuty {len(rolls)} (udane {passes}, z plotki {known}), wypatrzone {len(spots)}, aktywacje {len(acts)} (zamienione {swapped}), rozbite {len(clears)}",
+            "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m99markietani (21.10, w-toku/m99-markietani: rzad markietanow w menu obozu gracza - cyrulicy, zabawa,
 # sklep z polki miasta z narzutem, tylko duzy oboz; Armoury/src/CampSutlers.cs; klucz CampSutlersRow)
 M99M_TAG = "Markietani obozu (m99): "
@@ -54574,6 +54692,8 @@ def main(argv):
         return m96receptury_main(logp)   # m96receptury (20.10, w-toku/m96-receptury): przepisy kuzni z masy, otwarte ladunki, przetop z masy minus straty (Recipes.Mass, SmithStock)
     if group == "m97surowce" and logp:
         return m97surowce_main(logp)   # m97surowce (20.10, w-toku/m97-surowce): czardrzewo i smocza kosc - surowce, doplyw z osad zrodla, kucie lukow z surowcem (RareMaterials)
+    if group == "m100kryjowki" and logp:
+        return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m99markietani" and logp:
         return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
     if group == "m97posilki" and logp:

@@ -234,6 +234,7 @@ namespace Armoury
                 // wpiety zawsze, dziala przy kluczu BesiegedReliefFirst
                 try { BesiegedRelief.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BesiegedRelief.ApplyAll", e); }
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }
+                try { HideoutSight.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HideoutSight.ApplyAll", e); }   // m100-kryjowki: bramka wypatrzenia i miejsce nowych kryjowek
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
                 // E6/K0 (209): licznik koni gry u zrodla (postfiks ItemRoster.OnRosterUpdated - liczy dopiero przy kluczu, flaga ustawiana w kampanii),
@@ -592,6 +593,7 @@ namespace Armoury
                 starter.AddBehavior(new DesertionLaw());
                 starter.AddBehavior(new MusterBook());
                 starter.AddBehavior(new HideoutSpotter());
+                starter.AddBehavior(new HideoutSight());       // m100-kryjowki: wypatrzenie ze Zwiadu, plotka odslania, miejsce nowych kryjowek (zapis arm_hideout_sight)
                 starter.AddBehavior(new HouseLevies());
                 starter.AddBehavior(new WorkshopTradeBehavior());   // warsztaty towarowe: linia dnia, rozmowa kupna, srednie zysku w zapisie
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
