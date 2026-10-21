@@ -8992,7 +8992,7 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public bool LektorEventWindows { get; set; } = true;
 
-        [SettingPropertyBool("Narrator Gossip Live", HintText = "gossip the narrator has never read is recorded on the spot through ElevenLabs (needs the internet and your key in the file .elevenlabs/key.txt in your user folder) and kept on your disk; the same words are never sent again - next time they play from the disk at once. Off = only gossip already on your disk is read", RequireRestart = false)]
+        [SettingPropertyBool("Narrator Gossip Live", HintText = "gossip the narrator has never read is recorded on the spot through ElevenLabs (needs the internet and your key in the file .elevenlabs/key.txt in your user folder) and kept on your disk - next time they play from the disk at once. Words ElevenLabs has charged for are never sent again, even if the recording is later lost; only a try that brought no recording (a server error, no answer in 20 seconds) is repeated, once at most. Off = only gossip already on your disk is read", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public bool LektorGossipLive { get; set; } = true;
 
@@ -9000,9 +9000,9 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipDailyChars { get; set; } = 1000;
 
-        [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
+        [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. 14000 keeps about 11000 letters for the prologue recordings still to be made plus 3000 spare; set it to 3000 once they are made. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
-        public int LektorGossipReserveChars { get; set; } = 3000;
+        public int LektorGossipReserveChars { get; set; } = 14000;
 
         public void ApplyTo(Settings s)
         {

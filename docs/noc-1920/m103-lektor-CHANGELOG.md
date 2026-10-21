@@ -3,8 +3,9 @@
 **Dla Jeffa (prosto):** kiedy wyskakuje okno fabuly Realm of Thrones (egzekucja Neda, Krwawe Gody i reszta - 35 okien), lektor (glos David)
 czyta je na glos z nagran, ktore ida razem z modem - bez internetu. Zamkniesz okno - glos milknie; nastepne okno zaczyna od nowa. Plotki w karczmie
 i w zajezdzie czyta ten sam glos: plotke, ktora juz kiedys nagral, puszcza od razu z dysku; nowa plotke nagrywa w tle przez ElevenLabs (1-3 s opoznienia)
-i zapisuje na dysku - ten sam tekst nigdy drugi raz nie idzie do ElevenLabs. Jest limit dzienny (1000 liter) i rezerwa planu (3000 liter zostaje zawsze
-na koncie); po limicie raz na sesje pokaze sie "The narrator has read enough gossip for today." i lektor czyta juz tylko to, co ma na dysku.
+i zapisuje na dysku - tekst, za ktory ElevenLabs juz policzyl litery, nigdy drugi raz tam nie idzie (powtorka tylko po probie, z ktorej nic nie przyszlo).
+Jest limit dzienny (1000 liter) i rezerwa planu (14000 liter zostaje zawsze na koncie - 11 tys. na nagranie prologu i 3 tys. zapasu; po nagraniu prologu
+zmienic na 3000); po limicie raz na sesje pokaze sie "The narrator has read enough gossip for today." i lektor czyta juz tylko to, co ma na dysku.
 Cene kufla i liczby w nawiasach ("(12 d)", "(3 more)") widac na ekranie, lektor ich nie czyta - dzieki temu wstep przy kuflu nagrywa sie raz.
 
 **Problem / decyzje Jeffa (21.10):** lektor tylko po angielsku, glos David (ElevenLabs voice_id BNgbHR0DNeZixGQVzloa), model eleven_multilingual_v2,
@@ -31,7 +32,7 @@ na 23 okna prologu) - potrzebny limit dzienny i rezerwa. Klucz API tylko w %USER
 | LektorEventWindows | Narrator Event Windows | TAK | okna ROT z nagran |
 | LektorGossipLive | Narrator Gossip Live | TAK | nowe plotki przez ElevenLabs; NIE = tylko pamiec na dysku |
 | LektorGossipDailyChars | Narrator Gossip Daily Chars | 1000 (0..10000) | litery nowych plotek na dobe kalendarzowa komputera |
-| LektorGossipReserveChars | Narrator Gossip Reserve Chars | 3000 (0..30000) | litery zawsze nietkniete na koncie ElevenLabs |
+| LektorGossipReserveChars | Narrator Gossip Reserve Chars | 14000 (0..30000; bylo 3000 - poprawka po recenzji) | litery zawsze nietkniete na koncie ElevenLabs |
 
 - `tools/gen_mcm.py`: slownik LABELS - nazwa pola w MCM po angielsku dla kluczy Lektor* (CLAUDE.md: napisy w grze po angielsku), id pola zostaje nazwa
   klucza; reszta 2243 pol bez zmian (diff McmSettings.cs: tylko 5 nowych pol i 5 linii ApplyTo). Zakresy w RANGES = przyciecie w kodzie.
@@ -67,11 +68,11 @@ na 23 okna prologu) - potrzebny limit dzienny i rezerwa. Klucz API tylko w %USER
   wariantow, kazdy nagrany raz; kazda plotka (bez "- "); tekst Empty. Bez tytulu okna i przyciskow. Liczby w samych plotkach zostaja.
 - Pamiec: klucz = SHA1(voice_id|model|ustawienia|tekst po zlaczeniu bialych znakow) -> `Documents/Mount and Blade II Bannerlord/Armoury/Lektor/cache/<klucz>.wav`,
   indeks `cache/index.tsv` (klucz, czas, znaki, tekst, md5 - tylko dopisywany). Plik dobry (md5 z indeksu) -> gra od razu, zero sieci. Plik uszkodzony -
-  usuniety i traktowany jak brak (najwyzej 2 wyslania tego samego tekstu w calej historii). Kopie na D: robi juz `tools/backup-bannerlord.ps1` (caly Documents).
+  usuniety i traktowany jak brak (po recenzji: tekst oplacony nie idzie drugi raz - patrz "Poprawki po recenzji"). Kopie na D: robi juz `tools/backup-bannerlord.ps1` (caly Documents).
 - Brak w pamieci: prosba do JEDNEGO watku w tle (jedna naraz). Watek: strona nadal otwarta? -> limit dzienny (ksiega `Lektor/usage.tsv`, doba kalendarzowa
   komputera) -> klucz z pliku (w chwili zapytania; nigdy w logu) -> stan konta `GET /v1/user/subscription` raz na sesje (blad chwilowy - ponowienie po
   10 min; 401/403 albo odpowiedz bez liczb - do konca sesji) -> rezerwa -> wpis "wyslane" w ksiedze PRZED wyslaniem (Flush(true)) -> `POST
-  /v1/text-to-speech/BNgbHR0DNeZixGQVzloa?output_format=pcm_24000` (HttpWebRequest z System.dll, TLS 1.2 dodane, limit 20 s calosci) -> naglowek RIFF 44 B jak
+  /v1/text-to-speech/BNgbHR0DNeZixGQVzloa?output_format=pcm_24000` (HttpWebRequest z System.dll, TLS 1.2 dodane, stoper 20 s - po recenzji naprawde calosci) -> naglowek RIFF 44 B jak
   `nagraj_david.py` -> zapis atomowy (.tmp, Flush(true), Move, md5 po zapisie) -> indeks i "ok" w ksiedze -> wynik kolejka do glownego watku (AppTick) ->
   odtworzenie, jesli strona dalej otwarta. HTTP 401/402/403/429 -> zapytania wstrzymane do konca sesji. Glowny watek nigdy nie czeka na siec.
 - Stan konta nieznany (np. klucz bez uprawnienia "User: Read" daje 401 na /v1/user/subscription) = NIC NOWEGO, tylko pamiec (bezpieczny kierunek dla planu
@@ -85,12 +86,12 @@ na 23 okna prologu) - potrzebny limit dzienny i rezerwa. Klucz API tylko w %USER
 ### K5 - linie logu i progi (commit d9d8c64d)
 
 - `Lektor (m103): latka EventScreen: OnActivate tak, OnDeactivate tak | nagran okien 35 (827 s; ok, odrzucone 0, bez md5 0).` (menu glowne, raz na proces)
-- `Lektor (m103): start sesji | klucze: lektor TAK, okna TAK, plotki na zywo TAK, limit dzienny 1000, rezerwa 3000 | nagran okien 35 (...) | latka EventScreen: ...
+- `Lektor (m103): start sesji | klucze: lektor TAK, okna TAK, plotki na zywo TAK, limit dzienny 1000, rezerwa 14000 | nagran okien 35 (...) | latka EventScreen: ...
   | plotki: pamiec N plikow (w indeksie M), znaki dzis D / 1000 (doba RRRR-MM-DD), wyslan w ksiedze W | klucz API jest|brak | API na zywo: tak (...) / NIE - powod | tryb gra|autotest|...`
 - Okno: `okno ROT "<tytul>" -> <plik> (40.4 s) - start.`, `- grane po 0,5 s: tak|NIE`, `- stop po X s z Y s (zamkniecie okna)` albo `- koniec po X s`
   (`ZA WCZESNIE` = silnik nie gra pliku), `- brak nagrania, cisza.`, `- plik ... uszkodzony (...), cisza.`
 - Plotki: `plotki w <miejsce>, strona N: kawalkow K (Z znakow) - z pamieci A, do nagrania B (C znakow)[, bez glosu D (powod)].`, `nowe nagranie plotki <8 hex>: ...`,
-  `konto ElevenLabs: zuzyte U z L znakow, zostalo R (rezerwa 3000), odnowienie RRRR-MM-DD.`, `plotka <8 hex> - blad API HTTP 401 (status) ...`,
+  `konto ElevenLabs: zuzyte U z L znakow, zostalo R (rezerwa 14000), odnowienie RRRR-MM-DD.`, `plotka <8 hex> - blad API HTTP 401 (status) ...`,
   `limit dzienny: ...`, `rezerwa planu: ...`, `plotka <8 hex> - grane po 0,5 s: tak (pierwsza w sesji)` / `NIE (pauza silnika - okno plotek pauzuje gre)`.
 - Doba: `Lektor (m103): dzien N | okna ROT: otwarte, z nagraniem, odtworzone (grane po 0,5 s tak/nie, koniec za wczesnie), bez nagrania, uszkodzone, ...
   | plotki: strony, kawalki, z pamieci, odtworzone, nowe nagrania (znaki), bez glosu: limit dzienny, rezerwa, API wylaczone, stan konta nieznany, ...
@@ -169,7 +170,56 @@ kod 2 (plik przywrocony, md5 jak w repo). `bieg-bitwa.ps1` w kopii bez uruchomie
   Do potwierdzenia LK-5/LK-6 potrzebny bieg z wymuszonym oknem ROT (np. CrashScribe autotestu wola odbiciem `ROTEventBehavior.TriggerEvent(NedEvent)` w
   kampanii testowej) - NIE zrobione w tej paczce (CrashScribe bez zmian). W kazdym biegu: LK-0..LK-4 (start, 0 bledow, latka tak/tak, 35 nagran, 0 zapytan API).
 - Zmiana tekstu okna w aktualizacji ROT: inny tytul = cisza z linia "brak nagrania"; ten sam tytul z innym tekstem = stare nagranie.
+- (po recenzji) Rezerwa 14000: gdy MCM pierwszy raz zapisze ustawienia, 14000 trafi do `Armoury.json` Jeffa - po nagraniu prologu obnizyc do 3000 suwakiem
+  w MCM albo w pliku (gra zamknieta, kopia .bak); sama zmiana domyslnej w kodzie wtedy nie zadziala (CLAUDE.md 7). Do tego czasu plotki moga zuzyc
+  tylko to, co ponad 14000 (przy 21 tys. na koncie - ok. 7 tys.).
+- (po recenzji) W logu przy pierwszym padzie sieci: `plotka ... - siec niedostepna (...) ... znaki i proba zwrocone; nowe nagrania wstrzymane na 10 min`,
+  w linii doby `bledy API ... (siec - nie wyszlo xN)`, a `znaki dzis` NIE rosna od takich prob.
+
+### Poprawki po recenzji (21.10)
+
+Recenzja dala 6 uwag: 2 wazne (ta sama sprawa dwa razy - rezerwa) i 4 drobne. Wszystkie sprawdzone w kodzie i prawdziwe - zadnej nie odrzucono.
+
+1. **(wazne, uwagi 1 i 5) Rezerwa 3000 nie chronila prologu.** Na koncie ok. 21 tys., 11 tys. ma pojsc na 23 okna prologu; plotki stawaly dopiero przy
+   3000 (`left - j.Chars < reserve`), czyli mogly zjesc ok. 18 tys. Limit dzienny 1000 tylko to rozkladal (ok. 10-18 dni gry). **Zmiana:** domyslnie
+   **14000** (11 tys. prolog + 3 tys. zapasu) w `Settings.cs`, `McmSettings.cs` (gen_mcm) i w zapasie `ReserveChars()`; opis klucza w MCM mowi, ze po
+   nagraniu prologu ustawic 3000. Pulapka MCM - w "Ryzyko / co sprawdzic".
+2. **(drobne) Pad sieci liczony jak wyslanie.** Wpis "wyslane" szedl przed zapytaniem i zostawal takze, gdy zapytanie w ogole nie wyszlo z komputera
+   (brak DNS, odmowa polaczenia): znaki doliczane do limitu dnia (mylace "enough gossip for today"), plotka tracila jedna z 2 prob, a blad sieci nie
+   wstrzymywal zapytan. **Zmiana:** `ErrOf` oddaje `WebExceptionStatus`; `NotReached` = NameResolutionFailure, ProxyNameResolutionFailure, ConnectFailure,
+   SecureChannelFailure, TrustFailure (wszystkie przed wyslaniem HTTP) -> wpis `niewyslane` w `usage.tsv` (z data wpisu "wyslane"), znaki dnia, licznik
+   wyslan i proba zwrocone (w pamieci i przy wczytaniu ksiegi w `EnsureCache`), wynik bez `Sent` (nie liczy sie jako zapytanie), nowe nagrania wstrzymane
+   na 10 min (`_subState` 2 - potem darmowe GET stanu konta sprawdza siec). Timeout, zerwane polaczenie i Abort stopera zostaja "wyslane" (serwer mogl liczyc).
+3. **(drobne) "20 s calosci" nie bylo caloscia.** `Timeout` HttpWebRequest liczy osobno GetRequestStream, GetResponse i kazdy Read, DNS poza nim -
+   najgorzej ok. 60 s + DNS. **Zmiana:** `AbortTimer` (System.Threading.Timer -> `req.Abort()`, flaga konca, zeby spozniony stoper nic nie robil) w
+   `PostTts` (20 s) i `GetText` (10 s); `ReadAll` bez kontroli stopera po Read. Po HTTP 200 (litery juz policzone) stoper przestawiony na **60 s od startu**:
+   oplaconego nagrania nie tniemy po 20 s (to bylby dokladnie przypadek z uwagi 6), zastoj jednego Read dalej przerywa ReadWriteTimeout 20 s. Poza stoperem
+   zostaja: DNS systemu (do ok. 15 s, Abort go nie przerywa - skutek po powrocie DNS) i tunel CONNECT przez proxy (wewnetrzne zapytanie .NET z wlasnym
+   limitem 100 s - zmierzone nizej; u Jeffa proxy wylaczone, `ProxyEnable=0`).
+4. **(drobne) Zapis na dysk pod blokada, na ktora czeka glowny watek.** `AppendLine` (Flush(true)) szedl pod `_wlock`, ktory bierze tez `LiveBlock`
+   (otwarcie strony plotek), linia startu i linia doby. **Zmiana:** osobny `_fileLock` tylko w `AppendLine`; `_wlock` trzyma juz tylko liczniki. Kolejnosc
+   "wyslane przed zapytaniem" zostaje (ten sam watek). `EnsureCache` czyta ksiege raz na proces, zanim powstanie watek nagran.
+5. **(drobne) Ten sam tekst mogl pojsc drugi raz.** Decyzja: "ten sam tekst nigdy drugi raz"; kod pozwalal na 2 wyslania, a po HTTP 200 z przerwanym
+   pobieraniem litery liczyly sie podwojnie; w ksiedze i linii doby pisalo wtedy mylace "blad 200". **Zmiana:** zbior `_paid` - tekst oplacony (HTTP 200:
+   nagranie zapisane, pobieranie przerwane, zla odpowiedz, nieudany zapis, plik pozniej zniszczony przez dysk) **nigdy** nie idzie drugi raz; zbior
+   wczytywany z indeksu pamieci i z wpisow `ok` / `oplacone...` ksiegi. `MaxAttempts` 2 zostaje tylko dla prob, z ktorych nic nie przyszlo (blad serwera,
+   brak odpowiedzi w 20 s). Ksiega: `oplacone, bez nagrania`, `oplacone, zapis nieudany` zamiast `blad 200` / `blad zapisu`; linia doby: `oplacone bez
+   nagrania`, `zapis pamieci (oplacone)`, `siec - nie wyszlo`. Opis klucza Narrator Gossip Live w MCM mowi teraz dokladnie to (bez obietnicy "never" bez wyjatku).
+
+**Do akceptacji Jeffa (prosto):**
+- Plotka, ktorej nagranie zniszczy dysk C, milknie (nie placimy drugi raz). Glos wraca, gdy plik wroci z kopii na D: (backup-bannerlord trzyma graveyard).
+  Jesli wolisz zaplacic drugi raz i miec glos od razu - to jedna linia w kodzie.
+- Proba, na ktora serwer nie odpowiedzial w 20 s, moze byc powtorzona raz. Jesli serwer mimo to policzyl litery, ta jedna plotka kosztuje podwojnie (rzadkie).
+- Rezerwa 14000 do czasu nagrania prologu, potem 3000 (suwak w MCM).
+
+**Proba poza gra** (odbicie na nowym Armoury.dll w PowerShell 5.1, serwery na 127.0.0.1 ze scratchpadu, zero ruchu do ElevenLabs, katalog Lektor podmieniony
+na scratchpad): GetText - odmowa polaczenia: kod 0, ConnectFailure, 2,0 s; cichy serwer: "ponad 10 s" po 10,0 s; 200 i 1 bajt co 8 s: przerwane po 10,0 s
+(stara kontrola po Read: ok. 16 s); PostTts przez proxy, ktory nie slucha: notSent tak, paid nie, ConnectFailure; przez cichy proxy: notSent nie, "brak
+odpowiedzi po 100.0 s (limit 20 s)" (tunel CONNECT .NET - patrz pkt 3); NotReached: 5 statusow tak, 7 innych (Timeout, RequestCanceled, ReceiveFailure,
+SendFailure, ConnectionClosed, KeepAliveFailure, ProtocolError) nie; EnsureCache na ksiedze z wyslane/niewyslane/oplacone/blad/ok + indeks: znaki dzis 80
+(50 + 30, zwrot 100), wyslan 3, proby zwrocone, `_paid` = oplacone, ok, indeks (bez niewyslanego i bledu 500); AppendLine pod `_fileLock` - linia dopisana.
+Sciezki oplacone-po-200 (pobieranie, zapis) - tylko z kodu (lokalnie nie da sie udac HTTPS ElevenLabs).
 
 **Status:** DO SPRAWDZENIA - nie wgrane, nie testowane w grze. Build 5 modow kod 0 (Armoury, RealisticCaptivity, GrandTourney, ForgeView, CrashScribe),
-gen_mcm OK. Proba poza gra (odbicie na Armoury.dll): indeks 35 nagran, kontrola md5/zer/uciecia, naglowek WAV = nagraj_david.py, zapis atomowy, kawalki
+gen_mcm OK (takze po poprawkach z recenzji). Proba poza gra (odbicie na Armoury.dll): indeks 35 nagran, kontrola md5/zer/uciecia, naglowek WAV = nagraj_david.py, zapis atomowy, kawalki
 strony, SHA1, JSON, odczyt bledu 401 i liczb konta z lokalnego serwera - wszystko OK.

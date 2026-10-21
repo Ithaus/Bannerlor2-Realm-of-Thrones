@@ -21,14 +21,20 @@ namespace Armoury
     ///    indeks cache/index.tsv (klucz, czas, znaki, tekst, md5 - tylko dopisywany). Plik w pamieci i dobry (md5 z indeksu; bez wpisu - naglowek, rozmiar, bloki zer)
     ///    -> gra od razu, zero sieci. Plik uszkodzony (dysk C zeruje pliki) - usuniety i traktowany jak brak.
     ///  - Brak w pamieci: zapytanie POST https://api.elevenlabs.io/v1/text-to-speech/BNgbHR0DNeZixGQVzloa?output_format=pcm_24000 (model eleven_multilingual_v2,
-    ///    ustawienia Davida jak nagrania okien) w JEDNYM watku w tle, jedno naraz, limit czasu 20 s; odpowiedz (surowy PCM 24 kHz mono 16 bit) + naglowek RIFF 44 B
+    ///    ustawienia Davida jak nagrania okien) w JEDNYM watku w tle, jedno naraz; stoper calosci 20 s do odpowiedzi serwera (System.Threading.Timer -> Abort;
+    ///    Timeout HttpWebRequest liczy osobno GetRequestStream, GetResponse i kazdy Read, a DNS jest poza nim), po HTTP 200 (znaki juz policzone) pobieranie nie jest
+    ///    ciete po 20 s - tylko zastoj odczytu 20 s albo twardy limit 60 s od startu; odpowiedz (surowy PCM 24 kHz mono 16 bit) + naglowek RIFF 44 B
     ///    jak tools/lektor/nagraj_david.py -> zapis ATOMOWY (plik .tmp, Flush(true), Move, kontrola md5) -> wynik przez kolejke do glownego watku (AppTick) ->
-    ///    odtworzenie, jesli ta strona plotek dalej otwarta. Glowny watek nigdy nie czeka na siec.
+    ///    odtworzenie, jesli ta strona plotek dalej otwarta. Glowny watek nigdy nie czeka na siec ani na zapis plikow (ksiega i indeks pod _fileLock, ktorego glowny
+    ///    watek nie bierze; _wlock - tylko liczniki).
     ///  - Warunki zapytania: klucz LektorGossipLive, tryb gry (LogGate 0) albo plik Documents/.../CrashScribe/armoury-lektor-live.flag (autotest 1/2 i tryb nie
     ///    rozpoznany 3 - zero sieci), plik klucza %USERPROFILE%/.elevenlabs/key.txt (czytany w chwili zapytania, nigdy nie wypisywany ani kopiowany), limit dzienny
     ///    LektorGossipDailyChars (doba kalendarzowa komputera, ksiega Lektor/usage.tsv), stan konta z GET /v1/user/subscription raz na sesje (zostaje mniej niz
-    ///    LektorGossipReserveChars - nic nowego; stanu nie da sie odczytac - nic nowego, bezpieczny kierunek dla planu Starter), najwyzej 2 wyslania tego samego tekstu
-    ///    w calej historii (drugie tylko po bledzie albo zniszczonym pliku). Wpis "wyslane" w ksiedze PRZED wyslaniem - znaki liczone takze, gdy gra padnie w trakcie.
+    ///    LektorGossipReserveChars - nic nowego; stanu nie da sie odczytac - nic nowego, bezpieczny kierunek dla planu Starter). Tekst OPLACONY (ElevenLabs oddal
+    ///    nagranie - HTTP 200, takze gdy pobieranie przerwano, odpowiedz byla zla, zapis sie nie udal albo plik zniszczyl dysk) nigdy drugi raz nie idzie do API;
+    ///    tekst bez nagrania (blad serwera, brak odpowiedzi w 20 s) - najwyzej 2 wyslania w calej historii. Wpis "wyslane" w ksiedze PRZED wyslaniem - znaki
+    ///    liczone takze, gdy gra padnie w trakcie; zapytanie, ktore nie wyszlo z komputera (brak DNS, brak polaczenia, TLS przed HTTP) - wpis "niewyslane": znaki
+    ///    i proba zwrocone, nowe nagrania wstrzymane na 10 min (potem stan konta od nowa).
     ///    HTTP 401/402/403/429 (zly klucz, brak srodkow, limit) - zapytania wstrzymane do konca sesji (odpowiedz serwera, nie wyjatek obiektu).
     ///  - Koniec: "Hear more" (nowa strona zastepuje stara), "Enough talk" (akcja okna -> GossipStop), straznik w AppTick (zadne okno zapytania nie jest otwarte
     ///    przez 0,3 s). Prosby jeszcze niewyslane dla zamknietej strony sa porzucane (bez kosztu).
@@ -42,8 +48,9 @@ namespace Armoury
         private const string TtsUrl = "https://api.elevenlabs.io/v1/text-to-speech/" + VoiceId + "?output_format=pcm_24000";
         private const string SubUrl = "https://api.elevenlabs.io/v1/user/subscription";
         private const string LiveFlagName = "armoury-lektor-live.flag";
-        private const int TimeoutMs = 20000, SubTimeoutMs = 10000;
-        private const int MaxAttempts = 2;
+        private const int TimeoutMs = 20000, SubTimeoutMs = 10000, PaidCapMs = 60000;
+        private const int MaxAttempts = 2;   // wyslania BEZ nagrania (blad serwera, brak odpowiedzi); tekst oplacony (HTTP 200) - nigdy drugi raz (_paid)
+        private const int CodeSave = -1, CodeThread = -2, CodeNotSent = -3, CodePaidLost = -4;   // kody bledow bez HTTP w linii doby
         private const int PcmRate = 24000, PcmBytesPerSec = 48000;
         private const int MinPcmBytes = 9600, MaxPcmBytes = 48000 * 120;   // 0,2 s .. 120 s
         private const double GapSec = 0.35, NoInquiryGrace = 0.3, SubRetrySec = 600;
@@ -75,11 +82,13 @@ namespace Armoury
         private static bool _cacheLoaded;
         private static int _cacheFiles, _cacheZeroLines, _cacheBadLines, _cacheTmpRemoved;
 
-        // ------------------------------------------------------------ ksiega zapytan i konto (watek; glowny watek czyta pod _wlock)
+        // ------------------------------------------------------------ ksiega zapytan i konto (watek; glowny watek czyta pod _wlock - same liczniki, bez plikow)
         private static readonly object _wlock = new object();
+        private static readonly object _fileLock = new object();   // dopisywanie ksiegi i indeksu (watek nagran) - glowny watek go nie bierze (Flush(true) nie stoi na klatce)
         private static string _usageDay = "";
         private static int _usageToday, _usageSentAll, _usageZeroLines;
         private static readonly Dictionary<string, int> _attempts = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static readonly HashSet<string> _paid = new HashSet<string>(StringComparer.Ordinal);   // teksty oplacone w ElevenLabs (indeks, "ok", "oplacone") - nigdy drugi raz
         private static int _subState;          // 0 nie pytano, 1 znany, 2 blad chwilowy (ponowienie po SubRetrySec), 3 blad trwaly (do konca sesji)
         private static long _subLeft, _subLimit, _subUsed;
         private static string _subWhy = "nie pytano", _subWhen = "-";
@@ -107,9 +116,10 @@ namespace Armoury
         private static int _liveFlag = -1;
 
         private static int DailyMax() { var s = Settings.Current; int n = s != null ? s.LektorGossipDailyChars : 1000; return n < 0 ? 0 : n > 10000 ? 10000 : n; }
-        private static int ReserveChars() { var s = Settings.Current; int n = s != null ? s.LektorGossipReserveChars : 3000; return n < 0 ? 0 : n > 30000 ? 30000 : n; }
+        private static int ReserveChars() { var s = Settings.Current; int n = s != null ? s.LektorGossipReserveChars : 14000; return n < 0 ? 0 : n > 30000 ? 30000 : n; }
         private static string K8(string key) { return key != null && key.Length >= 8 ? key.Substring(0, 8) : (key ?? "-"); }
         private static string Today() { return DateTime.Now.ToString("yyyy-MM-dd", Inv); }
+        private static string Clock() { return DateTime.Now.ToString("HH:mm:ss", Inv); }
 
         // ------------------------------------------------------------ tekst strony -> kawalki
         private static readonly Regex Ws = new Regex(@"\s+", RegexOptions.CultureInvariant);
@@ -168,6 +178,7 @@ namespace Armoury
                         int chars;
                         if (c.Length < 5 || c[0].Length != 40 || c[4].Trim().Length != 32 || !int.TryParse(c[2], NumberStyles.Integer, Inv, out chars)) { _cacheBadLines++; continue; }
                         lock (_cacheLock) _cache[c[0]] = new CacheEntry { Md5 = c[4].Trim().ToLowerInvariant(), Chars = chars };
+                        lock (_wlock) _paid.Add(c[0]);   // w indeksie = nagranie przyszlo = oplacone
                     }
                 }
             }
@@ -183,6 +194,7 @@ namespace Armoury
             catch (Exception e) { Stumble("EnsureCache.Dir", e); }
             try
             {
+                // raz na proces, zanim powstanie watek nagran (GossipPage startuje go po EnsureCache) - odczyt pliku bez _fileLock
                 lock (_wlock)
                 {
                     _usageDay = Today();
@@ -195,11 +207,22 @@ namespace Armoury
                             if (line.Length == 0 || line[0] == '#') continue;
                             if (line.IndexOf('\0') >= 0) { _usageZeroLines++; continue; }
                             string[] c = line.Split('\t');   // data, czas, znaki, klucz, stan
-                            int chars;
-                            if (c.Length < 5 || c[4] != "wyslane" || !int.TryParse(c[2], NumberStyles.Integer, Inv, out chars)) continue;
-                            _usageSentAll++;
-                            int a; _attempts.TryGetValue(c[3], out a); _attempts[c[3]] = a + 1;
-                            if (c[0] == _usageDay) _usageToday += chars;
+                            int chars, a;
+                            if (c.Length < 5 || !int.TryParse(c[2], NumberStyles.Integer, Inv, out chars)) continue;
+                            string st = c[4];
+                            if (st == "wyslane")
+                            {
+                                _usageSentAll++;
+                                _attempts.TryGetValue(c[3], out a); _attempts[c[3]] = a + 1;
+                                if (c[0] == _usageDay) _usageToday += chars;
+                            }
+                            else if (st == "niewyslane")   // zapytanie nie wyszlo z komputera - zwrot wpisu "wyslane" (data = doba tamtego wpisu)
+                            {
+                                if (_usageSentAll > 0) _usageSentAll--;
+                                _attempts.TryGetValue(c[3], out a); _attempts[c[3]] = a > 0 ? a - 1 : 0;
+                                if (c[0] == _usageDay) _usageToday = Math.Max(0, _usageToday - chars);
+                            }
+                            else if (st == "ok" || st.StartsWith("oplacone", StringComparison.Ordinal)) _paid.Add(c[3]);
                         }
                     }
                 }
@@ -219,8 +242,10 @@ namespace Armoury
             if (why == null) { path = p; return true; }
             try { File.Delete(p); } catch { }
             lock (_cacheLock) _cache.Remove(key);
-            if (fromWorker) _results.Enqueue(new Res { Kind = RInfo, Reason = -1, Line = "pamiec plotek: plik " + K8(key) + " uszkodzony (" + why + ") - usuniety, nagranie od nowa (najwyzej " + MaxAttempts + " wyslan tekstu)." });
-            else { _dCorrupt++; Log.Info(P + "pamiec plotek: plik " + K8(key) + " uszkodzony (" + why + ") - usuniety, nagranie od nowa (najwyzej " + MaxAttempts + " wyslan tekstu)."); }
+            lock (_wlock) _paid.Add(key);   // plik byl = nagranie przyszlo = oplacone (takze gdy linie indeksu i ksiegi zjadl dysk)
+            string msg = "pamiec plotek: plik " + K8(key) + " uszkodzony (" + why + ") - usuniety; tekst oplacony, drugi raz nie idzie do ElevenLabs (glos wroci z plikiem z kopii na D:).";
+            if (fromWorker) _results.Enqueue(new Res { Kind = RInfo, Reason = -1, Line = msg });
+            else { _dCorrupt++; Log.Info(P + msg); }
             return false;
         }
 
@@ -497,7 +522,8 @@ namespace Armoury
             }
             var codes = new StringBuilder();
             foreach (var kv in _dCodes)
-                codes.Append(codes.Length > 0 ? ", " : "").Append(kv.Key > 0 ? "HTTP " + kv.Key.ToString(Inv) : kv.Key == 0 ? "siec" : kv.Key == -1 ? "zapis pamieci" : "watek")
+                codes.Append(codes.Length > 0 ? ", " : "").Append(kv.Key > 0 ? "HTTP " + kv.Key.ToString(Inv) : kv.Key == 0 ? "siec" : kv.Key == CodeSave ? "zapis pamieci (oplacone)"
+                                                                  : kv.Key == CodeNotSent ? "siec - nie wyszlo" : kv.Key == CodePaidLost ? "oplacone bez nagrania" : "watek")
                      .Append(" x").Append(kv.Value.ToString(Inv));
             sb.Append(" | plotki: strony ").Append(_dPages.ToString(Inv)).Append(", kawalki ").Append(_dSegs.ToString(Inv)).Append(", z pamieci ").Append(_dHit.ToString(Inv))
               .Append(", odtworzone ").Append(_dPlayed.ToString(Inv)).Append(" (grane po 0,5 s nie ").Append(_dGossip05No.ToString(Inv)).Append(", za wczesnie ").Append(_dGossipEarly.ToString(Inv)).Append(")")
@@ -543,7 +569,7 @@ namespace Armoury
                     Interlocked.Increment(ref _wStumbles);
                     try
                     {
-                        _results.Enqueue(new Res { Kind = j != null ? RSkip : RInfo, Gen = j != null ? j.Gen : 0, Idx = j != null ? j.Idx : -1, Key = j != null ? j.Key : null, Reason = 4, Code = -2,
+                        _results.Enqueue(new Res { Kind = j != null ? RSkip : RInfo, Gen = j != null ? j.Gen : 0, Idx = j != null ? j.Idx : -1, Key = j != null ? j.Key : null, Reason = 4, Code = CodeThread,
                                                    Line = "watek nagran: potkniecie " + e.GetType().Name + " - " + Short(e.Message) + (j != null ? " (plotka " + K8(j.Key) + " bez glosu)" : "") + "." });
                         Thread.Sleep(500);
                     }
@@ -575,9 +601,10 @@ namespace Armoury
             lock (_wlock)
             {
                 if (_apiStopWhy != null) return Skip(j, 7, null);
+                if (_paid.Contains(j.Key)) return Skip(j, 3, "plotka " + K8(j.Key) + " - juz oplacona w ElevenLabs (nagrania nie ma albo zniszczone) - drugi raz nie idzie, bez glosu.");
                 if (_usageDay != Today()) { _usageDay = Today(); _usageToday = 0; }
                 _attempts.TryGetValue(j.Key, out att);
-                if (att >= MaxAttempts) return Skip(j, 3, "plotka " + K8(j.Key) + " - wyslana juz " + att + " razy (najwyzej " + MaxAttempts + ") - bez glosu.");
+                if (att >= MaxAttempts) return Skip(j, 3, "plotka " + K8(j.Key) + " - wyslana juz " + att + " razy bez nagrania (najwyzej " + MaxAttempts + ") - bez glosu.");
                 if (_usageToday + j.Chars > daily) return Skip(j, 1, "limit dzienny: dzis " + _usageToday + " + " + j.Chars + " > " + daily + " znakow - plotka " + K8(j.Key) + " bez glosu.");
             }
             string key = ReadKey();
@@ -593,30 +620,57 @@ namespace Armoury
             if (left - j.Chars < reserve)
                 return Skip(j, 2, "rezerwa planu: na koncie zostalo " + left + " znakow, plotka " + j.Chars + ", rezerwa " + reserve + " - bez glosu (tylko pamiec).");
             if (j.Gen != Volatile.Read(ref _pageGen)) return Skip(j, 5, null);   // ostatnia kontrola przed kosztem
-            lock (_wlock)
+            string sentDay;
+            lock (_wlock)   // same liczniki; plik ponizej pod _fileLock (glowny watek nie czeka na Flush)
             {
-                AppendLine(UsagePath, Today() + "\t" + DateTime.Now.ToString("HH:mm:ss", Inv) + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\twyslane");
+                if (_usageDay != Today()) { _usageDay = Today(); _usageToday = 0; }
+                sentDay = _usageDay;
                 _usageToday += j.Chars; _usageSentAll++; _attempts[j.Key] = att + 1;
             }
+            AppendLine(UsagePath, sentDay + "\t" + Clock() + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\twyslane");   // PRZED wyslaniem (ten sam watek)
             var sw = Stopwatch.StartNew();
             int code;
             string err;
-            byte[] pcm = PostTts(key, j.Text, sw, out code, out err);
+            bool paid, notSent;
+            byte[] pcm = PostTts(key, j.Text, sw, out code, out err, out paid, out notSent);
             key = null;
             double ms = sw.Elapsed.TotalMilliseconds;
-            if (pcm == null || pcm.Length < MinPcmBytes || (pcm.Length & 1) != 0)
+            if (pcm != null && (pcm.Length < MinPcmBytes || (pcm.Length & 1) != 0)) { err = "odpowiedz " + pcm.Length + " B (za krotka albo nieparzysta)"; pcm = null; }
+            if (pcm == null && notSent)
             {
-                if (pcm != null) err = "odpowiedz " + pcm.Length + " B (za krotka albo nieparzysta)";
-                bool stop = code == 401 || code == 402 || code == 403 || code == 429;
+                // zapytanie nie wyszlo z komputera (brak DNS, brak polaczenia, TLS przed HTTP) - ElevenLabs nic nie policzyl: znaki i proba zwrocone,
+                // nowe nagrania wstrzymane na SubRetrySec (potem stan konta od nowa - darmowe zapytanie sprawdza siec)
                 lock (_wlock)
                 {
-                    AppendLine(UsagePath, Today() + "\t" + DateTime.Now.ToString("HH:mm:ss", Inv) + "\t0\t" + j.Key + "\tblad " + (code > 0 ? code.ToString(Inv) : "siec"));
-                    if (stop) _apiStopWhy = "HTTP " + code + (err != null ? " " + err : "");
+                    if (_usageDay == sentDay) _usageToday = Math.Max(0, _usageToday - j.Chars);
+                    if (_usageSentAll > 0) _usageSentAll--;
+                    int a; _attempts.TryGetValue(j.Key, out a); _attempts[j.Key] = a > 0 ? a - 1 : 0;
+                    _subState = 2; _subWhy = "siec niedostepna przy nagraniu (" + err + ")"; _subRetryAt = Now + SubRetrySec;
                 }
+                AppendLine(UsagePath, sentDay + "\t" + Clock() + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\tniewyslane");
+                return new Res { Kind = RSkip, Gen = j.Gen, Idx = j.Idx, Key = j.Key, Reason = 4, Code = CodeNotSent, Sent = false,
+                                 Line = "plotka " + K8(j.Key) + " - siec niedostepna (" + err + ") po " + ms.ToString("0", Inv) + " ms: zapytanie nie wyszlo z komputera, znaki i proba zwrocone;"
+                                        + " nowe nagrania wstrzymane na 10 min (potem stan konta od nowa) - bez glosu." };
+            }
+            if (pcm == null && paid)
+            {
+                // HTTP 200 - ElevenLabs policzyl znaki, ale nagranie nie doszlo (pobieranie przerwane, zla odpowiedz) - tekst oplacony, drugi raz nie idzie
+                lock (_wlock) { _paid.Add(j.Key); if (_subState == 1) _subLeft -= j.Chars; }
+                AppendLine(UsagePath, Today() + "\t" + Clock() + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\toplacone, bez nagrania");
+                return new Res { Kind = RSkip, Gen = j.Gen, Idx = j.Idx, Key = j.Key, Reason = 4, Code = CodePaidLost, Sent = true,
+                                 Line = "plotka " + K8(j.Key) + " - ElevenLabs oddal nagranie (HTTP 200, znaki policzone), ale " + (err ?? "pobieranie nieudane") + " po " + ms.ToString("0", Inv)
+                                        + " ms - bez glosu; tekst oplacony, drugi raz nie idzie." };
+            }
+            if (pcm == null)
+            {
+                bool stop = code == 401 || code == 402 || code == 403 || code == 429;
+                if (stop) lock (_wlock) _apiStopWhy = "HTTP " + code + (err != null ? " " + err : "");
+                AppendLine(UsagePath, Today() + "\t" + Clock() + "\t0\t" + j.Key + "\tblad " + (code > 0 ? code.ToString(Inv) : "siec"));
                 return new Res { Kind = RSkip, Gen = j.Gen, Idx = j.Idx, Key = j.Key, Reason = 4, Code = code > 0 ? code : 0, Sent = true,
                                  Line = "plotka " + K8(j.Key) + " - blad API " + (code > 0 ? "HTTP " + code : "sieci") + (err != null ? " (" + err + ")" : "") + " po " + ms.ToString("0", Inv)
                                         + " ms - bez glosu" + (stop ? "; zapytania wstrzymane do konca sesji" : "") + "." };
             }
+            lock (_wlock) { _paid.Add(j.Key); if (_subState == 1) _subLeft -= j.Chars; }   // nagranie przyszlo - oplacone, cokolwiek bedzie z zapisem
             byte[] wav = Wav(pcm);
             string md5;
             using (var h = MD5.Create()) md5 = Hex(h.ComputeHash(wav));
@@ -624,17 +678,14 @@ namespace Armoury
             string werr = SaveAtomic(target, wav, md5);
             if (werr != null)
             {
-                lock (_wlock) AppendLine(UsagePath, Today() + "\t" + DateTime.Now.ToString("HH:mm:ss", Inv) + "\t0\t" + j.Key + "\tblad zapisu");
-                return new Res { Kind = RSkip, Gen = j.Gen, Idx = j.Idx, Key = j.Key, Reason = 4, Code = -1, Sent = true, Line = "plotka " + K8(j.Key) + " - nagranie przyszlo, zapis pamieci nieudany (" + werr + ") - bez glosu." };
+                AppendLine(UsagePath, Today() + "\t" + Clock() + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\toplacone, zapis nieudany");
+                return new Res { Kind = RSkip, Gen = j.Gen, Idx = j.Idx, Key = j.Key, Reason = 4, Code = CodeSave, Sent = true,
+                                 Line = "plotka " + K8(j.Key) + " - nagranie przyszlo (znaki policzone), zapis pamieci nieudany (" + werr + ") - bez glosu; tekst oplacony, drugi raz nie idzie." };
             }
             int count;
             lock (_cacheLock) { _cache[j.Key] = new CacheEntry { Md5 = md5, Chars = j.Chars }; count = _cache.Count; }
-            lock (_wlock)
-            {
-                AppendLine(IndexPath, j.Key + "\t" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", Inv) + "\t" + j.Chars.ToString(Inv) + "\t" + j.Text + "\t" + md5);
-                AppendLine(UsagePath, Today() + "\t" + DateTime.Now.ToString("HH:mm:ss", Inv) + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\tok");
-                if (_subState == 1) _subLeft -= j.Chars;
-            }
+            AppendLine(IndexPath, j.Key + "\t" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", Inv) + "\t" + j.Chars.ToString(Inv) + "\t" + j.Text + "\t" + md5);
+            AppendLine(UsagePath, Today() + "\t" + Clock() + "\t" + j.Chars.ToString(Inv) + "\t" + j.Key + "\tok");
             sec = pcm.Length / (double)PcmBytesPerSec;
             return new Res { Kind = RReady, Gen = j.Gen, Idx = j.Idx, Key = j.Key, Path = target, Sec = sec, Chars = j.Chars, Sent = true, New = true,
                              Line = "nowe nagranie plotki " + K8(j.Key) + ": " + j.Chars + " znakow, " + sec.ToString("0.0", Inv) + " s, zapytanie " + ms.ToString("0", Inv) + " ms, w pamieci " + count + "." };
@@ -660,7 +711,8 @@ namespace Armoury
                 return "konto ElevenLabs: zuzyte " + used + " z " + limit + " znakow, zostalo " + (limit - used) + " (rezerwa " + ReserveChars() + "), odnowienie " + when + ".";
             }
             bool hard = code == 401 || code == 403 || (code == 200 && body != null);
-            string why = code == 200 ? "odpowiedz bez liczb znakow" : code > 0 ? "HTTP " + code + (err != null ? " " + err : "") : "blad sieci" + (err != null ? " " + err : "");
+            string why = code == 200 && body != null ? "odpowiedz bez liczb znakow" : code > 0 && code != 200 ? "HTTP " + code + (err != null ? " " + err : "")
+                       : "blad sieci" + (err != null ? " " + err : "");   // 200 bez tresci = odczyt przerwany (stoper, zastoj) - chwilowy
             lock (_wlock) { _subState = hard ? 3 : 2; _subWhy = why; _subRetryAt = Now + SubRetrySec; }
             return "konto ElevenLabs: stanu nie da sie odczytac (" + why + ") - nowe nagrania plotek wstrzymane"
                    + (hard ? " do konca sesji" + (code == 401 || code == 403 ? " (klucz bez uprawnienia User: Read?)" : "") : ", ponowienie najwczesniej za 10 min") + "; pamiec dziala.";
@@ -691,13 +743,37 @@ namespace Armoury
             return req;
         }
 
-        private static byte[] PostTts(string key, string text, Stopwatch sw, out int code, out string err)
+        /// <summary>Stoper calosci zapytania: Timeout HttpWebRequest liczy osobno GetRequestStream, GetResponse i kazdy Read (DNS poza nim), wiec po ms - Abort
+        /// (WebException RequestCanceled). cut[0] = 1 - przerwal stoper; cut[1] = 1 - zapytanie skonczone (spozniony stoper nic nie robi). Watek puli, nie rzuca.</summary>
+        private static System.Threading.Timer AbortTimer(HttpWebRequest req, int[] cut, int ms)
         {
-            code = 0; err = null;
-            HttpWebRequest req = null;
+            return new System.Threading.Timer(_ =>
+            {
+                if (Volatile.Read(ref cut[1]) != 0) return;
+                Volatile.Write(ref cut[0], 1);
+                try { req.Abort(); } catch { }
+            }, null, ms, Timeout.Infinite);
+        }
+
+        /// <summary>Zapytanie nie dotarlo do serwera (nazwa nie rozwiazana, brak polaczenia, TLS/certyfikat przed wyslaniem HTTP) - ElevenLabs nic nie policzyl.
+        /// Timeout, zerwane polaczenie, Abort stopera - NIE (serwer mogl juz liczyc).</summary>
+        private static bool NotReached(WebExceptionStatus st)
+        {
+            return st == WebExceptionStatus.NameResolutionFailure || st == WebExceptionStatus.ProxyNameResolutionFailure || st == WebExceptionStatus.ConnectFailure
+                || st == WebExceptionStatus.SecureChannelFailure || st == WebExceptionStatus.TrustFailure;
+        }
+
+        /// <summary>POST TTS. paid - przyszlo HTTP 200 (znaki policzone); notSent - zapytanie nie wyszlo z komputera. Stoper TimeoutMs do odpowiedzi serwera; po 200
+        /// pobieranie oplaconego nagrania nie jest ciete po TimeoutMs - tylko zastoj odczytu (ReadWriteTimeout) albo PaidCapMs od startu.</summary>
+        private static byte[] PostTts(string key, string text, Stopwatch sw, out int code, out string err, out bool paid, out bool notSent)
+        {
+            code = 0; err = null; paid = false; notSent = false;
+            var cut = new int[2];
+            System.Threading.Timer timer = null;
             try
             {
-                req = NewRequest(TtsUrl, "POST", key, TimeoutMs);
+                var req = NewRequest(TtsUrl, "POST", key, TimeoutMs);
+                timer = AbortTimer(req, cut, TimeoutMs);
                 req.ContentType = "application/json";
                 req.Accept = "audio/*";
                 byte[] body = Utf8.GetBytes("{\"text\":" + Json(text) + ",\"model_id\":\"" + ModelId + "\",\"voice_settings\":" + VoiceSettingsJson + "}");
@@ -707,36 +783,54 @@ namespace Armoury
                 {
                     code = (int)resp.StatusCode;
                     if (code != 200) { err = "status " + code; return null; }
-                    return ReadAll(resp, req, MaxPcmBytes, sw, TimeoutMs, out err);
+                    paid = true;
+                    timer.Change(Math.Max(1L, PaidCapMs - sw.ElapsedMilliseconds), (long)Timeout.Infinite);
+                    return ReadAll(resp, req, MaxPcmBytes, out err);
                 }
             }
-            catch (WebException we) { code = ErrOf(we, out err); return null; }
-            catch (Exception e) { err = e.GetType().Name; return null; }
+            catch (WebException we)
+            {
+                WebExceptionStatus st;
+                int c = ErrOf(we, out err, out st);
+                if (code == 0) code = c;   // 200 zostaje 200 (odczyt przerwany po odpowiedzi)
+                notSent = code == 0 && Volatile.Read(ref cut[0]) == 0 && NotReached(st);
+            }
+            catch (Exception e) { err = e.GetType().Name; }
+            finally { Volatile.Write(ref cut[1], 1); if (timer != null) timer.Dispose(); }
+            if (Volatile.Read(ref cut[0]) == 1)
+                err = (paid ? "pobieranie przerwane po " : "brak odpowiedzi po ") + (sw.ElapsedMilliseconds / 1000.0).ToString("0.0", Inv) + " s (limit " + ((paid ? PaidCapMs : TimeoutMs) / 1000) + " s)";
+            return null;
         }
 
         private static string GetText(string url, string key, out int code, out string err)
         {
             code = 0; err = null;
+            var cut = new int[2];
+            System.Threading.Timer timer = null;
             try
             {
                 var req = NewRequest(url, "GET", key, SubTimeoutMs);
+                timer = AbortTimer(req, cut, SubTimeoutMs);
                 req.Accept = "application/json";
-                var sw = Stopwatch.StartNew();
                 using (var resp = (HttpWebResponse)req.GetResponse())
                 {
                     code = (int)resp.StatusCode;
-                    byte[] b = ReadAll(resp, req, 65536, sw, SubTimeoutMs, out err);
+                    byte[] b = ReadAll(resp, req, 65536, out err);
                     return code == 200 && b != null ? Utf8.GetString(b) : null;
                 }
             }
-            catch (WebException we) { code = ErrOf(we, out err); return null; }
-            catch (Exception e) { err = e.GetType().Name; return null; }
+            catch (WebException we) { WebExceptionStatus st; int c = ErrOf(we, out err, out st); if (code == 0) code = c; }
+            catch (Exception e) { err = e.GetType().Name; }
+            finally { Volatile.Write(ref cut[1], 1); if (timer != null) timer.Dispose(); }
+            if (Volatile.Read(ref cut[0]) == 1) err = "ponad " + (SubTimeoutMs / 1000) + " s";
+            return null;
         }
 
         /// <summary>Kod HTTP z bledu (0 = siec) i krotki status z tresci bledu ElevenLabs ("quota_exceeded", "invalid_api_key" ...) - bez reszty tresci.</summary>
-        private static int ErrOf(WebException we, out string err)
+        private static int ErrOf(WebException we, out string err, out WebExceptionStatus st)
         {
-            err = we.Status.ToString();
+            st = we.Status;
+            err = st.ToString();
             var hr = we.Response as HttpWebResponse;
             if (hr == null) return 0;
             int code = (int)hr.StatusCode;
@@ -757,7 +851,8 @@ namespace Armoury
             return code;
         }
 
-        private static byte[] ReadAll(WebResponse resp, HttpWebRequest req, int max, Stopwatch sw, int limitMs, out string err)
+        /// <summary>Cala odpowiedz (najwyzej max B). Czas pilnuje stoper AbortTimer (Abort przerywa Read wyjatkiem) i ReadWriteTimeout (zastoj jednego Read).</summary>
+        private static byte[] ReadAll(WebResponse resp, HttpWebRequest req, int max, out string err)
         {
             err = null;
             using (var rs = resp.GetResponseStream())
@@ -769,7 +864,6 @@ namespace Armoury
                 {
                     ms.Write(buf, 0, k);
                     if (ms.Length > max) { err = "odpowiedz ponad " + max + " B"; try { req.Abort(); } catch { } return null; }
-                    if (sw.ElapsedMilliseconds > limitMs) { err = "ponad " + (limitMs / 1000) + " s"; try { req.Abort(); } catch { } return null; }
                 }
                 return ms.ToArray();
             }
@@ -833,17 +927,20 @@ namespace Armoury
             catch (Exception e) { return e.GetType().Name; }
         }
 
-        /// <summary>Dopisanie linii (pod _wlock) z Flush(true) - ksiega zapytan musi przetrwac wywrotke gry.</summary>
+        /// <summary>Dopisanie linii z Flush(true) - ksiega zapytan musi przetrwac wywrotke gry. Pod _fileLock (NIE pod _wlock - glowny watek nie czeka na dysk).</summary>
         private static void AppendLine(string path, string line)
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(path));
                 byte[] b = Utf8.GetBytes(line.Replace('\r', ' ').Replace('\n', ' ') + "\n");
-                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read))
+                lock (_fileLock)
                 {
-                    fs.Write(b, 0, b.Length);
-                    fs.Flush(true);
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));
+                    using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read))
+                    {
+                        fs.Write(b, 0, b.Length);
+                        fs.Flush(true);
+                    }
                 }
             }
             catch (Exception e)
