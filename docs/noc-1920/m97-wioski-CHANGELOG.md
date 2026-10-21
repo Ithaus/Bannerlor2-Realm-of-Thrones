@@ -165,3 +165,115 @@ gry + `DistrictRaid`, ksiega pali wioski lancuchem od strony wroga), okup (`Raid
 - Okup wioski: bez wpisu do licznikow wojny i do pamieci wrogich czynow gry (powod w poprawkach, pkt 5).
 - Bez pytania przy postoju przy wioskach (setki wiosek) - wejscie tylko klikiem.
 - Nocleg w obcej wiosce = cena wspolnej izby (jedna regula z zajazdem), na wlasnej ziemi za darmo (jak Twoja wioska).
+
+## Obroncy wioski (krok 2) - 20.10 w nocy (Armoury, klucz SideVillageDefenders)
+
+**Dla Jeffa (prosto).** Wioske poboczna bronia teraz jej wlasni ludzie, a nie milicja wsi glownej: mniej wiecej co dziesiaty mieszkaniec w domu bierze cep, wlocznie
+albo luk (najwyzej 60 ludzi). Gdy chcesz ja spladrowac albo zadac okupu i masz mniej niz 4 razy wiecej zdrowych ludzi, chlopi wychodza przed wioske i jest zwykla
+bitwa: wygrasz - rabunek albo okup idzie dalej, przegrasz albo odjedziesz - wioska nietknieta. Z przewaga 4:1 i wieksza poddaja sie bez walki. Polegli i pojmani
+obroncy ubywaja z ludzi okregu, a wioska przez dwa miesiace ma mniej ludzi do obrony; lordowie innych krolestw z mniejsza druzyna niz obroncy wioske omijaja.
+Wylacznik w MCM: "Side Village Defenders" (domyslnie TAK; NIE = jak dotad, wioske pilnuje cala milicja wsi glownej).
+
+**Problem.** Jeff 20.10: "czy wioski poboczne moga miec tez obroncow? czy to za duzo tak jak wioski glowne?", potem "dopisz do kolejki po obozie" (osobna bitwa
+w wiosce pobocznej) i POPRAWKA: "ale ja chce, aby to byli ludzie z tej wioski pobocznej, a nie z wioski glownej". Kod przed krokiem (c578f4e7, poprawka nr 3 po
+recenzji): `SideVillageVisit.Defenders` = `RaidTribute.DefOf` - cala milicja wsi okregu i partie we wsi; rabunek i okup wioski tylko przy przewadze, bez bitwy.
+
+**Zasada (z liczbami).**
+- Obroncy = wlasni ludzie wioski w domu (`VillageBook.PartView.Home` - ta sama liczba co opis wioski): 1 na 10 mieszkancow (dorosli mezczyzni to ok. 1/4 ludzi,
+  do walki staje ok. 2 z 5 z nich), najwyzej 60, minus pamiec poleglych tej wioski (wraca liniowo przez 60 dob - ranni do sil, chlopcy dorastaja, ludzie z okregu).
+  Przyklady: wioska 60 mieszkancow - 6 obroncow, 150 - 15, 400 - 40 (600 i wiecej - 60). Po bitwie, w ktorej 400-osobowa wioska stracila 30 ludzi: od razu 10
+  obroncow, po 30 dobach 25, po 60 dobach znow 40 (o ile ludzi nie ubylo).
+- Sklad: 70% chlopi kultury wsi okregu (`Culture.Villager`, ROT `villager_*`, poziom 1), 30% milicja kultury (2/3 wlocznicy `MeleeMilitiaTroop`, 1/3 lucznicy
+  `RangedMilitiaTroop`, ROT `*_militia_spearman` / `*_militia_archer`, poziom 11 = t2), bez bohaterow. Np. 15 obroncow = 10 chlopow, 3 wlocznikow, 2 lucznikow.
+- Poddanie: zdrowi ludzie gracza (z partiami armii, ktora prowadzi - `MenNow`) >= 4 x obroncy. 40 ludzi na wioske 60 mieszkancow (6 obroncow) - poddanie; 40 ludzi
+  na wioske 150 (15) - bitwa; 160 ludzi na wioske 400 (40) - poddanie, 100 ludzi - bitwa.
+- Milicja wsi glownej nie broni juz wiosek pobocznych (broni tylko wsi glownej - bitwa rabunku gry bez zmian).
+- AI (lancuch rabunku wsi gry w ksiedze wiosek): napastnik (zdrowi ludzie partii i jego armii na starcie sesji) mniejszy niz obroncy wioski - lancuch ja pomija;
+  wiekszy - pali jak dotad, a obroncy tracaja d x min(1, d / napastnicy) do pamieci poleglych (przy 40 obroncach i 400 napastnikach - 4, przy 50 napastnikach - 32):
+  przy duzej przewadze wiekszosc ucieka, przy rownych silach gina. Bez symulacji bitwy i bez drugiego ubytku ludzi (trafionych liczy jak dotad `Devastation`).
+
+**Zmiana.** Nowy plik `Armoury/src/SideVillageVisit.Defenders.cs` + male wpiecia.
+1. **Liczba obroncow** `DefendersFor(uid, home)` (pulap `DefCapOf` - 1/10, najwyzej 60, minus `Fallen(uid)`); `SideVillageVisit.Defenders` przy kluczu wola ja
+   zamiast `RaidTribute.DefOf`. Tekst menu wrogich akcji: "About N men of its P people would take up flails, spears and bows ... They will come out and fight you by
+   the village" albo "... they would give in without a fight"; dymki "Raid the village" / "Demand tribute" mowia, czy bedzie bitwa (bez szarej opcji z powodu sily).
+2. **Bitwa** (`StartFight`, z opcji ZWYKLEGO menu `arm_sidevil_hostile`): tymczasowa druzyna `CustomPartyComponent.CreateCustomPartyWithTroopRoster` (droga druzyn zadan
+   gry, np. `RivalGangMovingInIssue`) przy graczu, nazwa "Villagers of X", rod = pan okregu (wojna z graczem), wioska okregu jako dom, `IgnoreByOtherPartiesTill(Never)`,
+   `SetDoNotMakeNewDecisions`, stoi. Spotkanie: `PlayerEncounter.RestartPlayerEncounter(druzyna, gracz)` + `GameMenu.SwitchToMenu("encounter")` - to samo, co gra robi
+   przy wrogiej akcji we wsi (`VillageHostileActionCampaignBehavior.StartHostileAction`, dekompilacja 1.4.8); init menu "encounter" sam zaczyna bitwe polowa
+   (`PlayerEncounter.StartBattle` -> `FieldBattleEventComponent`). Gracz ma zwykle "Attack" / "Send troops" / "Leave". Zadnego SwitchToMenu z menu oczekiwania.
+3. **Ludzie druzyny = ludzie okregu** (zamknieta ksiega ludzi): przy wyjsciu `PeopleBook.TakeLevy(wies okregu, d, MLevyMilitia)` + `GiveNew` (pochodzenie) - ta sama
+   droga co przyrost milicji (`ArmsFromPeople.MilitiaDelta`); czego DOM nie dal - mniej obroncow (`Strip`), ulamek - `GiveNone(FArmsFloor)` jak milicja. Po bitwie
+   ocaleni (zdrowi i ranni w druzynie) wracaja do domow: `PeopleBook.Take(FMilitiaHome)` + `ArriveAt(..., MBackMilitia, MBackMilitiaNone)` - jak milicja; sklad
+   wyczyszczony i `DestroyPartyAction.Apply(null, druzyna)` (nikt nie wraca drugi raz). Polegli i pojmani nie wracaja (ubytek z ludzi okregu) i ida do pamieci poleglych.
+   Klucz `LevyFromVillages` / ksiega pochodzenia wylaczone - druzyna bez zdjecia z DOM (jak gra), ocaleni bez powrotu.
+4. **Wynik** - nasluch `MapEventEnded` (`SideVillageVisit.OnMapEventEnded`, 1 linia w `ArmouryBehavior`): bitwa z nasza druzyna - zwyciezca gracz (1) albo nie (2: przegrana,
+   odwrot, "Leave" bez zwyciezcy). Straznik `FightGuard` w ticku (4 razy na sekunde, tylko przy bitwie w toku): druzyna poza bitwa i brak `PlayerEncounter` (po ekranach
+   lupu) - koniec. Wygrana i gracz na mapie przy wiosce (do 4 jedn.): rabunek startuje (`BeginRaid` + `ActivateGameMenu(arm_sidevil_raid)` z ticku - bez menu) albo
+   okup (`PayTribute` ze stawka gorna, q = 5 - obroncy rozbici) i menu wioski. Przegrana - komunikat "The villagers of X held their homes - the village is spared."
+5. **Gracz w niewoli druzyny obroncow** (przegral bitwe): druzyna zostaje do konca niewoli (ucieczka / wykup gry), dopiero potem rozwiazana. Jency druzyny przy
+   rozwiazaniu: bohaterowie uciekaja (`EndCaptivityAction.ApplyByEscape`, jak `FreeFolkRaids.Home`), szeregowi wracaja do druzyny gracza jako ranni (udzialy pochodzenia
+   z lochu do skladu, `FTransfer`), komunikat "The villagers let your N captured men go".
+6. **Poddanie** (`Surrenders`): komunikat "The villagers of X see your N men and lay down their tools - they will not fight." i rabunek / okup jak dotad.
+7. **AI** (`VillageBook`): sesja rabunku ma sile napastnika (`Sess.Men` = `SideVillageVisit.PartyMen` przywodcy strony atakujacej na starcie sesji); `Burn` (teraz
+   opakowanie `BurnCore`) ustawia `_chainMen` tylko dla lancucha (bez `ForceUid` / `ForceMain`), `PickFirst` / `NextFrom` pomijaja wioske `Guarded` (obroncy z ludzi
+   w domu tej czesci > napastnik); przy pierwszym paleniu wioski w sesji `NoteChainBurn` (ubytek obroncow do pamieci poleglych).
+8. **Zapis** `arm_sidevil` (SaveText): nowe sekcje na koncu, tylko gdy sa: `|d=uid,ilu,doba;...` (pamiec poleglych) i `|f=uid,druzyna,rodzaj,obroncy,ludzie,doba,wynik,
+   levy,z DOM,okreg` (bitwa w toku). Stary czytnik je pomija; brak sekcji = brak pamieci i bitwy. Wczytanie: pierwszy tick sesji - `SweepOrphans`: druzyna z wpisu
+   odnaleziona po StringId (straznik doprowadza bitwe do konca), druzyny "Villagers of ..." (CustomPartyComponent, dom - wies) bez wpisu i poza bitwa - sklad do domow
+   i rozwiazanie; wpis bez druzyny - zamkniety bez strat.
+9. **Klucz MCM** `SideVillageDefenders` (domyslnie TAK, dziala przy `SideVillagesEnterable`), `McmSettings.cs` z `tools/gen_mcm.py`. NIE = regula poprawki nr 3.
+10. **Log** (prefiks `Wioski poboczne (WP): `): start sesji `... | obroncy wiosek: klucz Side Village Defenders TAK (1 na 10 mieszkancow w domu, pulap 60, poddanie
+   przy 4:1, sklad 70% chlopi / 30% milicja, pamiec poleglych 60 dob, wpisow N, bitwa w toku ...)`; starcie `obroncy X (uid, okreg Y): ludnosc P, obroncow D (pulap
+   ludnosci K, pamiec poleglych F; chlopi, wlocznicy, lucznicy), sila gracza M -> poddanie (...) | wynik: bez walki | straty z ludnosci 0.` albo `-> bitwa (rabunek|okup,
+   druzyna ID, z DOM n)`; koniec `obroncy X (...): koniec bitwy - jak | obroncow D, wrocilo do domow L, straty z ludnosci S (polegli i pojmani) | wynik: ... | pamiec
+   poleglych F.`; doba (w linii `dzien N`): `obroncy wiosek: starcia N (poddania, bitwy: wygrane gracza, przegrane / odwrot), straty z ludnosci, druzyny sprzatniete
+   po wczytaniu | AI: wiosek pominietych N, spalonych z ubytkiem obroncow M (ubytek x) | pamiec poleglych N wiosek`. Bledy - `ERROR in SideVillageVisit.*`.
+11. **Sprawdzanie**: `python -I tools/sprawdz_logi.py --grupa m97obroncy <Armoury.log>` - OB-0 start, OB-1 ERROR SideVillageVisit 0, OB-2 kazda bitwa zamknieta
+   (druzyna nie przezywa bitwy; ostatnia otwarta na koncu logu - INFO), OB-3 straty <= obroncow, OB-4 obroncow <= pulapu ludnosci, OB-5 sieroty (INFO), OB-6 doba
+   (INFO). Sprawdzone na sztucznym logu (TAK; zly pulap - NIE).
+
+**Ryzyko / co sprawdzic (kontrola calosci).**
+- Bitwa: droga gry (RestartPlayerEncounter + menu "encounter" ze zwyklego menu) - jak wroga akcja we wsi; NIE sprawdzone w grze (zakaz autotestu w tej pracy).
+  ZOBACZYC: menu spotkania z "Villagers of X", bitwa na mapie przy wiosce, ekrany lupu, powrot na mape i start rabunku. Inne partie w poblizu moga dolaczyc do bitwy
+  (gra: `CheckNearbyPartiesToJoinPlayerMapEvent`) - jak przy kazdej bitwie.
+- Druzyna tymczasowa nalezy do rodu pana okregu na czas bitwy: nasluchy tworzenia partii (DTE, LevyGold, PeopleLedger - tylko pomiar) ja widza. DTE moze dac jej
+  komplet przy utworzeniu - to tylko kilkanascie-kilkadziesiat ludzi na chwile; zbrojownia znika z druzyna.
+- Gra sama kasuje pokonana druzyne (A17: `HandleMapEventEndForPartyInternal`) i rozdziela jej szeregowych (jency do zwyciezcy, reszta "rozbici" do domow / lasu) - wtedy
+  nasz koniec liczy straty = wszyscy obroncy (pamiec poleglych i linia moga zawyzyc o rozbitych, ludzie sie zgadzaja - rozbitych prowadzi A17 / OutlawLaw).
+- Przegrana gracza: gracz w lochu druzyny chlopow (do ucieczki / wykupu gry; RealisticCaptivity widzi zwykla partie). ZOBACZYC, czy niewola u "Villagers of X" nie
+  zawiesza menu niewoli.
+- Pamiec poleglych to liczba obroncow, nie ludzi: ksiega wiosek nie trzyma ludzi osobno dla kazdej wioski (ludzie wioski = jej czesc ludzi okregu wedlug osad), wiec
+  polegli schodza z ludzi okregu, a "z tej wioski" pilnuje pamiec poleglych (mniej obroncow tej wioski przez 60 dob).
+- AI: plan kroku `DistrictRaid` (Room okregu) nie wie o wioskach pominietych z powodu obroncow - gdy miejsce maja juz tylko pominiete wioski, uderzenie trafia ludzi
+  okregu, a osady nie plona (nadmiar w liczniku ksiegi `_dOver`, ta sama droga co okreg na pulapie). Rabunek wsi glownej przez gracza (`ForceMain`) i rabunek jednej
+  wioski (`ForceUid`) - bez sprawdzania obroncow (gracz juz walczyl albo sie poddali).
+- `Guarded` liczy ludzi w domu wioski (`SnapOf`) przy kazdym sprawdzeniu w lancuchu - kilkanascie odczytow na uderzenie, tylko w trakcie rabunku AI.
+- Zapis w srodku bitwy / menu spotkania: druzyna jest zwykla partia gry (w zapisie gry), wpis `f=` w naszym; po wczytaniu straznik dokancza. Straznik nie patrzy
+  na klucz - bitwa z wpisu dokonczona takze po przelaczeniu na NIE; przeglad sierot tylko przy `SideVillagesEnterable` = TAK.
+- Kolizje: `VillageBook.Burn` przemianowany na `BurnCore` z opakowaniem (jedna sygnatura, te same wywolania); `Sess` ksiegi +2 pola; `SideVillageVisit.Raid.cs` -
+  `RaidStart` / `TributeConsequence` rozbite na `BeginRaid` / `PayTribute` (ta sama arytmetyka i linie logu, w linii startu rabunku doszlo "(z menu wioski)").
+  Przy scalaniu z galeziami 97: pliki wspolne jak w kroku 1 (`ArmouryBehavior.cs`, `Settings.cs`, `McmSettings.cs` od nowa z gen_mcm, `VillageBook.cs`).
+- Zbudowane (kod 0). Bez gry i autotestu (zakaz w tej pracy).
+
+**Status.** DO SPRAWDZENIA (zbudowane, kod 0; bez autotestu i bez gry).
+
+**Test w grze (krok po kroku dla Jeffa).**
+1. Wojna z krolestwem jakiejs wsi. Wjedz do jej wioski pobocznej (klik na mapie), "Take a hostile action": w tekscie "About N men of its P people would take up
+   flails, spears and bows..." - N to mniej wiecej co dziesiaty mieszkaniec (wioska 150 ludzi - ok. 15).
+2. Z druzyna mniejsza niz 4 x N: "Raid the village" - menu spotkania "Villagers of X", "Attack!" - bitwa z chlopami (cepy, wlocznie, kilka lukow). Wygraj: po ekranach
+   lupu sam startuje pasek rabunku tej wioski. W logu Armoury `Wioski poboczne (WP): obroncy X ...: koniec bitwy ... wynik: gracz wygral`.
+3. Drugi raz to samo w innej wiosce, ale w menu spotkania "Leave" - wioska nietknieta, komunikat "The villagers of X held their homes". W logu `wynik: gracz nie
+   wygral`, `wrocilo do domow N`.
+4. "Demand tribute" z mala druzyna - bitwa; po wygranej wioska placi (stawka gorna) i jest chroniona 30 dob.
+5. Z duza druzyna (4 x N i wiecej) - "Raid the village" albo "Demand tribute": komunikat "...lay down their tools - they will not fight." i od razu pasek / okup.
+6. Wroc do tej samej wioski zaraz po bitwie - obroncow mniej ("fewer than before - it has buried and nursed its men of late").
+7. Zapisz w menu spotkania (przed "Attack"), wczytaj - spotkanie dalej, po bitwie wszystko jak w pkt 2.
+8. MCM "Side Village Defenders" = NIE - znowu cala milicja wsi glownej (szara opcja przy przewadze milicji), bez bitwy w wiosce.
+9. Automat: `python -I tools/sprawdz_logi.py --grupa m97obroncy <Armoury.log>` (OB-0..OB-6) i `--grupa m97wioski`.
+
+**Decyzje (projektowal Claude; wylacznik `SideVillageDefenders`).**
+- 1 na 10 i pulap 60: dorosli mezczyzni ok. 1/4 ludzi, do walki ok. 2 z 5 z nich; wioska bez pana i bez muru nie wystawi wiecej niz kilkudziesieciu.
+- Poddanie przy 4:1 wedlug liczby ludzi (nie sily jednostek) - prosto do policzenia na oko w menu.
+- Ranni obroncy, ktorych nikt nie pojmal, wracaja do domow (zyja); z ludzi schodza tylko polegli i pojmani. "Mniej rak" po bitwie liczy pamiec poleglych (60 dob).
+- Okup po wygranej bitwie - stawka gorna (q = 5): obroncy rozbici, wioska nie ma czym sie targowac.
+- AI bez symulacji bitwy: slabszy pomija wioske, silniejszy pali z ubytkiem obroncow wedlug przewagi.

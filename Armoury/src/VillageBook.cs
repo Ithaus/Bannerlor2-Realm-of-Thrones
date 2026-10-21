@@ -96,7 +96,7 @@ namespace Armoury
 
         // E7/W1: C - napastnik sesji (identyfikatory do pamieci i komunikatu), Burned - ta sesja przeszla jakas wioske na spalona (przy Looted bez "plundered")
         // m97-wioski: Fid - frakcja napastnika (StringId; wioski chronione okupem przed nia lancuch omija - SideVillageVisit.Spared)
-        private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; public Cx C; public bool Burned; public string Fid; }
+        private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; public Cx C; public bool Burned; public string Fid; public int Men; public HashSet<string> DefHit; }
 
         /// <summary>
         /// E7/W1 (232, R14): pamiec wojny wioski - ostatnie zdarzenie (rabunek albo zerowanie armii): rodzaj ('B' - przeszla na spalona w ksiedze w tym zdarzeniu,
@@ -1220,7 +1220,7 @@ namespace Armoury
             int best = -1; double bs = double.MaxValue;
             for (int w = 0; w < d.W; w++)
             {
-                if (Room(d, w) <= Eps || Shielded(d, w, s != null ? s.Fid : null)) continue;
+                if (Room(d, w) <= Eps || Shielded(d, w, s != null ? s.Fid : null) || Guarded(d, w)) continue;
                 double cos = 0.0;
                 if (s != null && s.HasFrom)
                 {
@@ -1241,7 +1241,7 @@ namespace Armoury
             int best = -1; double bd = double.MaxValue;
             for (int w = 0; w < d.W; w++)
             {
-                if (w == from || Room(d, w) <= Eps || Shielded(d, w, fid)) continue;
+                if (w == from || Room(d, w) <= Eps || Shielded(d, w, fid) || Guarded(d, w)) continue;
                 double dx = d.X[w] - d.X[from], dy = d.Y[w] - d.Y[from], dd = dx * dx + dy * dy;
                 if (dd < bd) { bd = dd; best = w; }
             }
@@ -1284,6 +1284,7 @@ namespace Armoury
                     // strona wroga = najblizsza wsi warownia frakcji napastnika (raz na sesje); bandy i Inni bez twierdz - bez kierunku
                     var fac = lp.MapFaction;
                     if (fac != null) s.Fid = fac.StringId;   // m97-wioski: lancuch omija wioski, ktore zaplacily okup tej frakcji
+                    try { s.Men = SideVillageVisit.PartyMen(lp.MobileParty); } catch { s.Men = 0; }   // m97-wioski krok 2: sila napastnika na starcie sesji (obroncy wiosek)
                     if (fac != null)
                     {
                         float mx = d.X[d.W], my = d.Y[d.W];
@@ -1381,6 +1382,28 @@ namespace Armoury
         /// </summary>
         private static double Burn(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who, Cx cx = null)
         {
+            // m97-wioski krok 2: lancuch rabunku (bez wymuszenia jednej wioski / wsi gry) zna sile napastnika - wioska z wiekszymi obroncami pominieta (Guarded)
+            _chainMen = raid && s != null && ForceUid == null && !ForceMain ? s.Men : 0;
+            try { return BurnCore(d, dB, raid, s, hasPos, px, py, today, who, cx); }
+            finally { _chainMen = 0; }
+        }
+
+        /// <summary>m97-wioski krok 2: sila napastnika biezacego lancucha rabunku (0 - bez sprawdzania obroncow; ustawiane tylko na czas Burn, watek glowny pod Gate).</summary>
+        private static int _chainMen;
+
+        /// <summary>m97-wioski krok 2: obroncy wioski pobocznej w (wlasni ludzie w domu - SideVillageVisit.DefendersFor) wiecej niz napastnik biezacego lancucha - pominieta.</summary>
+        private static bool Guarded(Dist d, int w)
+        {
+            if (_chainMen <= 0 || w < 0 || w >= d.W || d.Uid == null || d.Uid[w] == null || !SideVillageVisit.DefOn) return false;
+            double home, away;
+            People(d, SnapOf(d), w, out home, out away);
+            if (SideVillageVisit.DefendersFor(d.Uid[w], home) <= _chainMen) return false;
+            SideVillageVisit.NoteChainSkip(d.Uid[w]);
+            return true;
+        }
+
+        private static double BurnCore(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who, Cx cx)
+        {
             int cur;
             int forced = Forced(d);   // m97-wioski: rabunek jednej wioski pobocznej (SideVillageVisit) albo wsi gry przez gracza (DistrictRaid) - tylko jej osady, bez lancucha (-2 = bez wymuszenia)
             string fid = raid && s != null ? s.Fid : null;   // m97-wioski: lancuch rabunku omija wioski chronione okupem przed frakcja napastnika
@@ -1396,6 +1419,17 @@ namespace Armoury
                 {
                     d.Br[cur] += put; left -= put;
                     if (raid) { if (s != null) s.Cur = cur; if (cur == d.W) _dRaidMain += put; else _dRaidW += put; }
+                    if (_chainMen > 0 && cur < d.W && d.Uid != null && d.Uid[cur] != null && s != null)
+                    {
+                        // m97-wioski krok 2: obroncy tej wioski pobici przez wiekszego napastnika - raz na sesje do pamieci poleglych (bez drugiego ubytku ludzi)
+                        if (s.DefHit == null) s.DefHit = new HashSet<string>(StringComparer.Ordinal);
+                        if (s.DefHit.Add(d.Uid[cur]))
+                        {
+                            double h0, a0;
+                            People(d, SnapOf(d), cur, out h0, out a0);
+                            SideVillageVisit.NoteChainBurn(d.Uid[cur], h0, _chainMen);
+                        }
+                    }
                     else { if (cur == d.W) _dForMain += put; else _dForW += put; }
                     Remember(d, cur, cx, put, today);                   // E7/W1 (232): pamiec wojny PRZED CheckUp (przejscie na spalona oznacza to samo zdarzenie 'B')
                     CheckUp(d, cur, today, raid && s != null ? s.Raider : who, true, cx);

@@ -69,7 +69,7 @@ namespace Armoury
 
         internal static bool RaidActive { get { return _raid != null; } }
 
-        private static void RaidReset() { _raid = null; _prot.Clear(); _lastRaid.Clear(); ProtSync(); }
+        private static void RaidReset() { _raid = null; _prot.Clear(); _lastRaid.Clear(); ProtSync(); DefReset(); _sweepPending = true; }
 
         /// <summary>Migawka ochron od nowa (po okupie, wczytaniu, resecie, na dobe) - wygasle zdjete.</summary>
         private static void ProtSync()
@@ -110,20 +110,21 @@ namespace Armoury
             }
             return Math.Min(1.0, sum);
         }
-        private static void RaidDayZero() { _dRaidStart = _dRaidEnd = _dRaidStop = _dRaidCut = _dTrib = _dStrikes = _dRaidCapped = 0; _dRaidHit = _dRaidDead = 0; _dRaidGold = _dRaidTake = _dRaidBurn = _dTribGold = 0; _dEx.Clear(); }
-        private static bool RaidDayAny() { return _dRaidStart + _dRaidEnd + _dTrib + _dStrikes > 0 || _raid != null; }
+        private static void RaidDayZero() { DefDayZero(); _dRaidStart = _dRaidEnd = _dRaidStop = _dRaidCut = _dTrib = _dStrikes = _dRaidCapped = 0; _dRaidHit = _dRaidDead = 0; _dRaidGold = _dRaidTake = _dRaidBurn = _dTribGold = 0; _dEx.Clear(); }
+        private static bool RaidDayAny() { return _dRaidStart + _dRaidEnd + _dTrib + _dStrikes > 0 || _raid != null || DefDayAny(); }
 
         private static string RaidDayText()
         {
             return "rabunki wiosek: zaczete " + _dRaidStart + ", skonczone " + _dRaidEnd + " (pelne " + (_dRaidEnd - _dRaidStop - _dRaidCut) + ", przerwane przez gracza " + _dRaidStop + ", inne " + _dRaidCut + ")"
                    + ", uderzen " + _dStrikes + " (obcietych do miejsca wioski " + _dRaidCapped + "), trafieni " + _dRaidHit.ToString("0.0", Inv) + " (zabici " + _dRaidDead.ToString("0.0", Inv) + "), lup: zloto " + _dRaidGold + ", sztuki " + _dRaidTake
                    + ", spalone " + _dRaidBurn + (_raid != null ? ", w toku " + _raid.Name + " " + (100.0 * Math.Min(1.0, _raid.HoursDone / Math.Max(0.01, _raid.Hours))).ToString("0", Inv) + "%" : "")
-                   + " | okupy wiosek " + _dTrib + " (" + _dTribGold + " zl), ochron " + _prot.Count + (_dEx.Count > 0 ? " | przyklady: " + string.Join("; ", _dEx.ToArray()) : "");
+                   + " | okupy wiosek " + _dTrib + " (" + _dTribGold + " zl), ochron " + _prot.Count + (_dEx.Count > 0 ? " | przyklady: " + string.Join("; ", _dEx.ToArray()) : "")
+                   + " | " + DefDayText();
         }
 
         private static string RaidSessionText()
         {
-            return "ochron po okupie " + _prot.Count + ", rabunkow gracza w pamieci " + _lastRaid.Count + ", rabunek w toku " + (_raid != null ? _raid.Name + " (" + _raid.Uid + ")" : "nie");
+            return "ochron po okupie " + _prot.Count + ", rabunkow gracza w pamieci " + _lastRaid.Count + ", rabunek w toku " + (_raid != null ? _raid.Name + " (" + _raid.Uid + ")" : "nie") + " | " + DefSessionText();
         }
 
         private static void Example(string s) { if (_dEx.Count < 3) _dEx.Add(s); }
@@ -151,6 +152,7 @@ namespace Armoury
         private static int Defenders(Settlement st, VillageBook.PartView me, double homeAll, out double share)
         {
             share = me != null && homeAll > 0 ? Math.Max(0.0, Math.Min(1.0, me.Home / homeAll)) : 0.0;
+            if (DefOn) return me != null ? DefendersFor(me.Uid, me.Home) : 0;   // krok 2 (Jeff 20.10): wlasni ludzie wioski, nie milicja wsi gry (SideVillageVisit.Defenders.cs)
             return RaidTribute.DefOf(st, Hero.MainHero != null ? Hero.MainHero.MapFaction : null);
         }
 
@@ -247,9 +249,12 @@ namespace Armoury
                     VillageBook.PartView me; double homeAll, nAll, share;
                     PartOf(st, _uid, out me, out homeAll, out nAll);
                     int def = Defenders(st, me, homeAll, out share);
+                    if (DefOn) DefHostileText(sb, r, me, def);
+                    else {
                     sb.Append("The people of ").Append(NameOf(r)).Append(" watch you from behind their doors. The militia of ").Append(Txt(st.Name)).Append(" - about ").Append(def)
                       .Append(def == 1 ? " man" : " men").Append(" - keeps watch over all its lands and would come to drive you off. You have ").Append(MenNow()).Append(" fit men.");
                     if (def > MenNow()) sb.Append(" Beat the militia at ").Append(Txt(st.Name)).Append(" first, or come with more men.");
+                    }
                 }
                 MBTextManager.SetTextVariable("ARM_SIDEVIL_HOSTILE", sb.ToString());
             }
@@ -287,11 +292,11 @@ namespace Armoury
                 string why = HostileBlock(st, me, false);
                 int men = MenNow(), def = Defenders(st, me, homeAll, out share);
                 double work = 0, hours = 0, home0 = 0;
-                if (why == null && men < Math.Max(1, def)) why = "The militia of " + Txt(st.Name) + " - about " + def + " men - would drive you off. You have " + men + ".";
+                if (why == null && !DefOn && men < Math.Max(1, def)) why = "The militia of " + Txt(st.Name) + " - about " + def + " men - would drive you off. You have " + men + ".";
                 if (why == null) RaidPlan(st, me, nAll, men, out work, out hours, out home0, out why);
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 double s0 = home0 > 0 ? Math.Min(1.0, work / home0) : 0;
-                a.Tooltip = new TextObject("{=!}Burn and plunder " + NameOf(r) + " alone - " + Math.Round(work).ToString("N0", Inv) + " people to drive off, about " + FmtHours(hours)
+                a.Tooltip = new TextObject("{=!}" + (DefOn ? DefTip(def, men) + " " : "") + "Burn and plunder " + NameOf(r) + " alone - " + Math.Round(work).ToString("N0", Inv) + " people to drive off, about " + FmtHours(hours)
                                            + ". You take its share of the purse and the store of " + Txt(st.Name) + " (about " + Math.Round(100 * s0).ToString("0", Inv) + "%: "
                                            + Math.Round(s0 * Math.Max(0, st.Village.Gold)).ToString("N0", Inv) + " denars). " + Txt(st.Name) + " itself is not raided. Its lord will hate you for it.");
                 return true;
@@ -311,18 +316,37 @@ namespace Armoury
                 PartOf(st, _uid, out me, out homeAll, out nAll);
                 int men = MenNow(), def = Defenders(st, me, homeAll, out share);
                 double work, hours, home0; string why = HostileBlock(st, me, false);
-                if (why != null || men < Math.Max(1, def) || !RaidPlan(st, me, nAll, men, out work, out hours, out home0, out why)) { Log.Player("You cannot raid " + NameOf(r) + " now.", true); return; }
-                bool slaver = false;
-                try { slaver = Hero.MainHero.MapFaction != null && LosersFlee.SlaveCulture(Hero.MainHero.MapFaction.Culture); } catch { }
-                _raid = new Raid { Uid = _uid, Dist = st.StringId, Name = NameOf(r), Work = work, Hours = hours, Home0 = home0, Men = men, Day = Today(), SlaverSet = true,
-                                   Rs = new Devastation.RaidState { Slaver = slaver, MaxMen = men } };
-                _dRaidStart++;
-                Log.Info(P + "rabunek " + _raid.Name + " (" + _uid + ", okreg " + st.StringId + ") - start: ludzi do przeszukania " + work.ToString("0.0", Inv) + " (osady " + me.Nw.ToString("0.0", Inv)
-                         + ", puste " + (me.Br + me.Bf).ToString("0.0", Inv) + "), napastnikow " + men + ", obroncow " + def + " (udzial wioski " + (100 * share).ToString("0.0", Inv) + "%), "
-                         + hours.ToString("0.0", Inv) + " h, ludzie okregu w domu " + home0.ToString("0", Inv) + ", kiesa wsi " + st.Village.Gold + ".");
-                GameMenu.SwitchToMenu(RaidMenu);   // zwykle menu wioski -> menu oczekiwania (jak sen)
+                if (why != null || (!DefOn && men < Math.Max(1, def)) || !RaidPlan(st, me, nAll, men, out work, out hours, out home0, out why)) { Log.Player("You cannot raid " + NameOf(r) + " now.", true); return; }
+                if (DefOn && !Surrenders(def, men))
+                {
+                    // krok 2: obroncy wioski wychodza do walki - spotkanie gry; rabunek po wygranej (FinishFight -> BeginRaid)
+                    if (!StartFight(st, r, me, def, men, KRaid)) Log.Player("You cannot raid " + NameOf(r) + " now.", true);
+                    return;
+                }
+                if (DefOn) LogSurrender(r, st, me, def, men, KRaid);
+                if (BeginRaid(st, r, me, nAll, "z menu wioski")) GameMenu.SwitchToMenu(RaidMenu);   // zwykle menu wioski -> menu oczekiwania (jak sen)
             }
             catch (Exception e) { _raid = null; Stumble("RaidStart", e); }
+        }
+
+        /// <summary>Start rabunku tej wioski (_uid): plan od nowa (ludzie gracza teraz), stan _raid, linia logu. Menu oczekiwania otwiera wolajacy. false - plan sie nie zgadza.</summary>
+        private static bool BeginRaid(Settlement st, MapVillageRecord r, VillageBook.PartView me, double nAll, string how)
+        {
+            int men = MenNow();
+            double work, hours, home0, share; string why;
+            double homeAll = 0; VillageBook.PartView me2; double nAll2;
+            if (PartOf(st, _uid, out me2, out homeAll, out nAll2)) { me = me2; nAll = nAll2; }
+            int def = Defenders(st, me, homeAll, out share);
+            if (!RaidPlan(st, me, nAll, men, out work, out hours, out home0, out why)) { Log.Player("You cannot raid " + NameOf(r) + " now" + (why != null ? ": " + why : "."), true); return false; }
+            bool slaver = false;
+            try { slaver = Hero.MainHero.MapFaction != null && LosersFlee.SlaveCulture(Hero.MainHero.MapFaction.Culture); } catch { }
+            _raid = new Raid { Uid = _uid, Dist = st.StringId, Name = NameOf(r), Work = work, Hours = hours, Home0 = home0, Men = men, Day = Today(), SlaverSet = true,
+                               Rs = new Devastation.RaidState { Slaver = slaver, MaxMen = men } };
+            _dRaidStart++;
+            Log.Info(P + "rabunek " + _raid.Name + " (" + _uid + ", okreg " + st.StringId + ") - start (" + how + "): ludzi do przeszukania " + work.ToString("0.0", Inv) + " (osady " + me.Nw.ToString("0.0", Inv)
+                     + ", puste " + (me.Br + me.Bf).ToString("0.0", Inv) + "), napastnikow " + men + ", obroncow " + def + (DefOn ? " wlasnych" : " milicji") + " (udzial wioski " + (100 * share).ToString("0.0", Inv) + "%), "
+                     + hours.ToString("0.0", Inv) + " h, ludzie okregu w domu " + home0.ToString("0", Inv) + ", kiesa wsi " + st.Village.Gold + ".");
+            return true;
         }
 
         [GameMenuInitializationHandler(RaidMenu)]
@@ -570,6 +594,7 @@ namespace Armoury
             men = MenNow();
             def = Defenders(st, me, homeAll, out share);
             q = (double)men / Math.Max(1, def);
+            if (DefOn && !Surrenders(def, men)) q = 5.0;   // krok 2: okup po rozbiciu obroncow - stawka gorna (dymek i wyplata po bitwie)
             rate = Rate(q);
             if (q < 1.0) return 0;
             return (long)Math.Floor(rate * Math.Max(0, st.Village.Gold) * share);
@@ -589,13 +614,13 @@ namespace Armoury
                 if (why == null)
                 {
                     t = TributeOf(st, me, homeAll, out rate, out q, out def, out men, out share);
-                    if (q < 1.0) why = "The militia of " + Txt(st.Name) + " - about " + def + " men - would rather fight. You have " + men + ".";
+                    if (q < 1.0 && !DefOn) why = "The militia of " + Txt(st.Name) + " - about " + def + " men - would rather fight. You have " + men + ".";
                     else if (t <= 0) why = "The village has nothing to pay.";
                 }
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
-                a.Tooltip = new TextObject("{=!}" + NameOf(r) + " pays " + t.ToString("N0", Inv) + " denars (" + Math.Round(100 * rate).ToString("0", Inv) + "% of its share of the purse of " + Txt(st.Name)
+                a.Tooltip = new TextObject("{=!}" + (DefOn ? DefTip(def, men) + (Surrenders(def, men) ? " " : " Then ") : "") + NameOf(r) + " pays " + t.ToString("N0", Inv) + " denars (" + Math.Round(100 * rate).ToString("0", Inv) + "% of its share of the purse of " + Txt(st.Name)
                                            + ": " + Math.Round(100 * share).ToString("0", Inv) + "% of " + st.Village.Gold.ToString("N0", Inv) + "; your " + men + " men against " + def
-                                           + " of its militia) and your realm spares it for " + SpareDays + " days: you will not raid it, and raids on " + Txt(st.Name) + " by your realm pass it by.");
+                                           + (DefOn ? " of its men" : " of its militia") + ") and your realm spares it for " + SpareDays + " days: you will not raid it, and raids on " + Txt(st.Name) + " by your realm pass it by.");
                 return true;
             }
             catch (Exception e) { Stumble("TributeCondition", e); return false; }
@@ -610,31 +635,52 @@ namespace Armoury
                 VillageBook.PartView me; double homeAll, nAll;
                 PartOf(st, _uid, out me, out homeAll, out nAll);
                 if (HostileBlock(st, me, true) != null) return;
-                double rate, q, share; int def, men;
-                long t = TributeOf(st, me, homeAll, out rate, out q, out def, out men, out share);
-                if (q < 1.0 || t <= 0 || st.Party == null) return;
-                long g0 = Hero.MainHero.Gold, v0 = st.Village.Gold;
-                GiveGoldAction.ApplyForPartyToCharacter(st.Party, Hero.MainHero, (int)Math.Min(int.MaxValue, t), false);
-                long paid = Hero.MainHero.Gold - g0;
-                var f = Hero.MainHero.MapFaction;
-                if (f != null)
+                if (DefOn)
                 {
-                    Prot p = null;
-                    foreach (var x in _prot) if (x.Uid == _uid && x.Fid == f.StringId) { p = x; break; }
-                    if (p == null) { p = new Prot { Uid = _uid, Fid = f.StringId }; _prot.Add(p); }
-                    p.Day = Today(); p.Until = Today() + SpareDays; p.Gold = paid; p.Share = share; p.Dist = st.StringId;
-                    ProtSync();
+                    double sh0; int men0 = MenNow(), def0 = Defenders(st, me, homeAll, out sh0);
+                    if (!Surrenders(def0, men0))
+                    {
+                        // krok 2: obroncy nie placa, tylko wychodza do walki - okup po wygranej (FinishFight -> PayTribute, stawka gorna)
+                        if (!StartFight(st, r, me, def0, men0, KTribute)) Log.Player(NameOf(r) + " will not pay you now.", true);
+                        return;
+                    }
+                    LogSurrender(r, st, me, def0, men0, KTribute);
                 }
-                Relations(st, RelLordTribute, 0);
-                _dTrib++; _dTribGold += paid;
-                Log.Info(P + "okup " + NameOf(r) + " (" + _uid + ", okreg " + st.StringId + "): " + paid + " zl (stawka " + (100 * rate).ToString("0.0", Inv) + "%, udzial wioski " + (100 * share).ToString("0.0", Inv)
-                         + "%, kiesa wsi " + v0 + " -> " + st.Village.Gold + ", kontrola: gracz +" + paid + " / wies -" + (v0 - st.Village.Gold) + "), ludzie " + men + " : obroncy " + def
-                         + ", ochrona do doby " + (Today() + SpareDays) + " dla " + (f != null ? f.StringId : "-") + ".");
-                Example("okup " + NameOf(r) + " " + paid + " zl");
-                Log.Player(NameOf(r) + " paid you " + paid.ToString("N0", Inv) + " denars of tribute. Your realm will spare it for " + SpareDays + " days.");
-                GameMenu.SwitchToMenu(Menu);   // zwykle menu - wolno
+                if (PayTribute(st, r, me, homeAll, -1.0, "z menu wioski")) GameMenu.SwitchToMenu(Menu);   // zwykle menu - wolno
             }
             catch (Exception e) { Stumble("Tribute", e); }
+        }
+
+        /// <summary>Okup tej wioski (_uid): przelew kiesa wsi okregu -> gracz, ochrona, relacja, linia logu. qForce &gt; 0 - stosunek sil narzucony (po bitwie: 5 = stawka gorna).
+        /// Menu otwiera wolajacy. false - nic nie zaplacono.</summary>
+        private static bool PayTribute(Settlement st, MapVillageRecord r, VillageBook.PartView me, double homeAll, double qForce, string how)
+        {
+            string why = HostileBlock(st, me, true);
+            if (why != null) { Log.Info(P + "okup " + NameOf(r) + " (" + how + ") - nie: " + why); Log.Player(why, true); return false; }
+            double rate, q, share; int def, men;
+            long t = TributeOf(st, me, homeAll, out rate, out q, out def, out men, out share);
+            if (qForce > 0) { q = qForce; rate = Rate(q); t = (long)Math.Floor(rate * Math.Max(0, st.Village.Gold) * share); }
+            if (q < 1.0 || t <= 0 || st.Party == null) { if (qForce > 0) Log.Player(NameOf(r) + " has nothing left to pay you."); return false; }
+            long g0 = Hero.MainHero.Gold, v0 = st.Village.Gold;
+            GiveGoldAction.ApplyForPartyToCharacter(st.Party, Hero.MainHero, (int)Math.Min(int.MaxValue, t), false);
+            long paid = Hero.MainHero.Gold - g0;
+            var f = Hero.MainHero.MapFaction;
+            if (f != null)
+            {
+                Prot p = null;
+                foreach (var x in _prot) if (x.Uid == _uid && x.Fid == f.StringId) { p = x; break; }
+                if (p == null) { p = new Prot { Uid = _uid, Fid = f.StringId }; _prot.Add(p); }
+                p.Day = Today(); p.Until = Today() + SpareDays; p.Gold = paid; p.Share = share; p.Dist = st.StringId;
+                ProtSync();
+            }
+            Relations(st, RelLordTribute, 0);
+            _dTrib++; _dTribGold += paid;
+            Log.Info(P + "okup " + NameOf(r) + " (" + _uid + ", okreg " + st.StringId + "): " + paid + " zl (stawka " + (100 * rate).ToString("0.0", Inv) + "%, udzial wioski " + (100 * share).ToString("0.0", Inv)
+                     + "%, kiesa wsi " + v0 + " -> " + st.Village.Gold + ", kontrola: gracz +" + paid + " / wies -" + (v0 - st.Village.Gold) + "), ludzie " + men + " : obroncy " + def + (DefOn ? " wlasni" : " milicji")
+                     + ", " + how + ", ochrona do doby " + (Today() + SpareDays) + " dla " + (f != null ? f.StringId : "-") + ".");
+            Example("okup " + NameOf(r) + " " + paid + " zl");
+            Log.Player(NameOf(r) + " paid you " + paid.ToString("N0", Inv) + " denars of tribute. Your realm will spare it for " + SpareDays + " days.");
+            return true;
         }
 
         // ------------------------------------------------------------ zapis arm_sidevil: "sv1|t=uid,fid,do,doba,zloto[,udzial,okreg];...|l=uid,doba;...|r=uid,okreg,praca,zrobione,godziny,minelo,trafieni,dom0,ludzie,doba"
@@ -666,6 +712,7 @@ namespace Armoury
                 sb.Append(rd.Uid).Append(',').Append(rd.Dist).Append(',').Append(rd.Work.ToString("R", Inv)).Append(',').Append(rd.Done.ToString("R", Inv)).Append(',').Append(rd.Hours.ToString("R", Inv))
                   .Append(',').Append(rd.HoursDone.ToString("R", Inv)).Append(',').Append(rd.Hit.ToString("R", Inv)).Append(',').Append(rd.Home0.ToString("R", Inv)).Append(',').Append(rd.Men.ToString(Inv))
                   .Append(',').Append(rd.Day.ToString(Inv));
+            DefExport(sb);   // krok 2: pamiec poleglych (d=) i bitwa w toku (f=) - tylko gdy sa (stary czytnik pomija nieznane sekcje)
             string x = sb.ToString();
             return x == SaveVer + "|t=|l=|r=" ? "" : x;
         }
@@ -704,6 +751,7 @@ namespace Armoury
                             if (a.Length < 2 || a[0].Length == 0 || !int.TryParse(a[1], NumberStyles.Integer, Inv, out day)) { bad++; continue; }
                             _lastRaid[a[0]] = day;
                         }
+                    else if (DefImport(sec, ref bad)) { }
                     else if (sec.StartsWith("r=", StringComparison.Ordinal) && sec.Length > 2)
                     {
                         var a = sec.Substring(2).Split(',');
@@ -719,7 +767,8 @@ namespace Armoury
                 }
                 if (_raid != null) _raid.Name = NameOf(Rec(_raid.Uid));
                 System.Threading.Volatile.Write(ref _protSnap, _prot.Count == 0 ? NoProt : _prot.ToArray());   // bez zdejmowania wygaslych - doba przy wczytaniu moze byc jeszcze nieznana
-                Log.Info(P + "zapis: ochron " + _prot.Count + ", rabunkow gracza w pamieci " + _lastRaid.Count + ", rabunek w toku " + (_raid != null ? _raid.Uid : "nie") + (bad > 0 ? ", zlych wpisow " + bad + " (pominiete)" : "") + ".");
+                Log.Info(P + "zapis: ochron " + _prot.Count + ", rabunkow gracza w pamieci " + _lastRaid.Count + ", rabunek w toku " + (_raid != null ? _raid.Uid : "nie")
+                         + ", pamiec poleglych " + _fallen.Count + " wiosek, bitwa z obroncami w toku " + (_fight != null ? _fight.Uid + " (druzyna " + _fight.PartyId + ")" : "nie") + (bad > 0 ? ", zlych wpisow " + bad + " (pominiete)" : "") + ".");
             }
             catch (Exception e) { RaidReset(); Stumble("Import", e); }
         }

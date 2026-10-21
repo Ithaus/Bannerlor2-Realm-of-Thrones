@@ -1425,6 +1425,7 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, Rumours.OnMakePeace);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, Rumours.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, Rumours.OnMapEventEnded);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, SideVillageVisit.OnMapEventEnded);   // m97-wioski krok 2: wynik bitwy z obroncami wioski pobocznej (sam zapis zwyciezcy; tylko przy bitwie w toku)
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
             Ravens.RegisterEvents(this);   // p5-kruki (R3-05c): latka czatu w starcie sesji, doreczenie krukow co godzine, linia doby
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));

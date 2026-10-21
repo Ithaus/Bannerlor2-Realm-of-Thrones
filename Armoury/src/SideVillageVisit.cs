@@ -40,7 +40,8 @@ namespace Armoury
     ///     przy rabunku i w spalonej wiosce - nie. OBOZ: "Make camp here" - menu zamkniete, oboz rozbija tick (NightRest.MakeCampNow, droga klawisza O), bez SwitchToMenu.
     ///  V6 WROGIE AKCJE (SideVillageVisit.Raid.cs): rabunek TEJ wioski (osobno, nie przez wies gry) i okup tej wioski z ochrona 30 dob. Recenzja 20.10: obrona = cala
     ///     milicja wsi okregu (jak okup wsi), rabunek wsi gry przez gracza pali tylko jej osady (DistrictRaid.PlayerMainOnly), ochrona po okupie dziala tez w lancuchu
-    ///     rabunku wsi gry (VillageBook) i pomniejsza okup wsi gry tej frakcji (RaidTribute.QuoteOf).
+    ///     rabunku wsi gry (VillageBook) i pomniejsza okup wsi gry tej frakcji (RaidTribute.QuoteOf). Krok 2 (SideVillageVisit.Defenders.cs, klucz SideVillageDefenders): wioske
+    ///     broni jej WLASNA ludnosc (1 na 10 w domu, pulap 60) - poddanie przy 4:1, inaczej zwykla bitwa z tymczasowa druzyna; AI slabsze niz obroncy pomija wioske w lancuchu.
     /// Zapis arm_sidevil (SaveText): okupy, ostatnie rabunki gracza (10 dob), rabunek w toku. Brak klucza (stary zapis) = nic. AI bez zmian (poza ominieciem wiosek po okupie).
     /// Linie logu "Wioski poboczne (WP): ..." - start sesji, wjazd, handel, nocleg, oboz, prace, rabunek, okup, doba. Potkniecia liczone, nic nie gasimy globalnie.
     /// </summary>
@@ -228,7 +229,7 @@ namespace Armoury
         /// <summary>CampaignEvents.TickEvent: 4 razy na sekunde (zegar rzeczywisty) - czekajacy klik (menu po dojechaniu), oboz po wyjsciu z menu, straznik rabunku.</summary>
         internal static void Tick()
         {
-            if (_pending == null && !_campAfter && !RaidActive) return;
+            if (_pending == null && !_campAfter && !RaidActive && _fight == null && !_sweepPending) return;
             long tq = Stopwatch.GetTimestamp();
             if (tq - _lastCheck < Stopwatch.Frequency / 4) return;
             _lastCheck = tq;
@@ -236,6 +237,8 @@ namespace Armoury
             try
             {
                 RaidGuard();
+                if (_sweepPending && Campaign.Current != null && MobileParty.MainParty != null) { _sweepPending = false; if (On) SweepOrphans(); }   // krok 2: druzyny obroncow po wczytaniu
+                FightGuard();   // krok 2: koniec bitwy z obroncami wioski (spotkanie skonczone) - takze przy otwartym menu
                 var c = Campaign.Current;
                 if (c == null || c.CurrentMenuContext != null) return;
                 if (PlayerEncounter.Current != null || PopupBlocked()) return;

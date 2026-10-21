@@ -1894,6 +1894,10 @@ Uzycie (Python 3, tylko odczyt):
                     nocleg, oboz, prace, rabunek tej wioski, okup). python -I tools/sprawdz_logi.py --grupa m97wioski <Armoury-*.log> (strumieniowo). WP-0 start sesji,
                     WP-1 linie "ERROR in SideVillageVisit." 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi zmienia sie o -zysk gracza, kiesa gracza o zysk),
                     WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek zakonczone z lupem / bez (INFO), WP-6 ruch doby (INFO). Log sprzed galezi - INFO.
+--grupa m97obroncy : (20.10, m97-wioski krok 2; Armoury/src/SideVillageVisit.Defenders.cs, klucz Side Village Defenders) obroncy wioski pobocznej z jej wlasnych ludzi.
+                    OB-0 start (klucz, udzial), OB-1 linie "ERROR in SideVillageVisit." 0, OB-2 kazda bitwa z obroncami zamknieta (druzyna nie przezywa bitwy; ostatnia
+                    otwarta na koncu logu - INFO), OB-3 straty z ludnosci <= obroncow, OB-4 obroncow <= pulapu ludnosci (1/10 w domu, najwyzej 60), OB-5 druzyny
+                    sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -53320,6 +53324,107 @@ def m97wioski_main(logp):
     return 0
 
 
+# ============================================================ m97obroncy (20.10, m97-wioski krok 2; Armoury/src/SideVillageVisit.Defenders.cs): obroncy wioski pobocznej
+M97O_RX = {
+    "start": re.compile(r"obroncy wiosek: klucz Side Village Defenders (\S+) \(1 na (\d+) mieszkancow w domu, pulap (\d+), poddanie przy (\d+):1"),
+    "enc": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): ludnosc (\d+), obroncow (\d+) \(pulap ludnosci (\d+), pamiec poleglych ([\d.]+).*?\), sila gracza (\d+) -> (poddanie|bitwa)"),
+    "end": re.compile(r"obroncy (.+?) \((\S+), okreg (\S+)\): koniec bitwy - (.+?) \| obroncow (\d+), wrocilo do domow (\d+), straty z ludnosci (\d+) .*\| wynik: (.+?) \|"),
+    "orph": re.compile(r"obroncy: druzyna (\S+) .* bez wpisu bitwy po wczytaniu"),
+    "day": re.compile(r"obroncy wiosek: starcia (\d+) \(poddania (\d+), bitwy (\d+): wygrane gracza (\d+), przegrane / odwrot (\d+)\), straty z ludnosci (\d+)"),
+    "ai": re.compile(r"AI: wiosek pominietych \(obroncow wiecej niz napastnikow\) (\d+), spalonych z ubytkiem obroncow (\d+)"),
+}
+
+
+def m97obroncy_main(logp):
+    """m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs). Log Armoury strumieniowo.
+    OB-0 start, OB-1 ERROR SideVillageVisit 0, OB-2 bitwy zamkniete, OB-3 straty <= obroncow, OB-4 obroncow <= pulapu ludnosci, OB-5 sieroty (INFO), OB-6 doba (INFO)."""
+    rep = Report()
+    start, encs, ends, orph, days, errs = [], [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR in SideVillageVisit." in s:
+                errs += 1
+            if not s.startswith(M97W_PRE):
+                continue
+            t = s[len(M97W_PRE):]
+            if t.startswith("start sesji"):
+                start.append(t)
+            elif t.startswith("dzien"):
+                days.append(t)
+            elif t.startswith("obroncy: druzyna"):
+                orph.append(t)
+            elif t.startswith("obroncy ") and ": koniec bitwy - " in t:
+                ends.append(t)
+            elif t.startswith("obroncy ") and " -> " in t:
+                encs.append(t)
+    print(f"plik: {logp} | start {len(start)}, starcia {len(encs)}, konce bitew {len(ends)}, sieroty {len(orph)}, doby {len(days)}, ERROR {errs}")
+    st = [M97O_RX["start"].search(x) for x in start]
+    st = [m for m in st if m]
+    if not st:
+        rep.add("OB-0: linia startu z kluczem obroncow", "brak linii", "INFO (log sprzed kroku 2 m97-wioski)", None)
+        rep.show()
+        return 0
+    m = st[-1]
+    rep.add("OB-0: start (klucz, udzial, pulap, poddanie)", f"klucz {m.group(1)}, 1 na {m.group(2)}, pulap {m.group(3)}, poddanie {m.group(4)}:1", "jest", True)
+    rep.add("OB-1: linie ERROR in SideVillageVisit.", f"{errs}", "0", errs == 0)
+    per, cap = int(m.group(2)), int(m.group(3))
+    fights, bad4 = [], []
+    for t in encs:
+        g = M97O_RX["enc"].search(t)
+        if not g:
+            bad4.append("nieczytelna: " + t[:60]); continue
+        pop, d, k = int(g.group(4)), int(g.group(5)), int(g.group(6))
+        if d > k or k > min(cap, pop // per + 1):
+            bad4.append(f"{g.group(1)}: ludnosc {pop}, obroncow {d}, pulap {k}")
+        if g.group(9) == "bitwa":
+            fights.append((g.group(2), d))
+    opened = {}
+    for u, d in fights:
+        opened[u] = opened.get(u, 0) + 1
+    bad3 = []
+    for t in ends:
+        g = M97O_RX["end"].search(t)
+        if not g:
+            bad3.append("nieczytelna: " + t[:60]); continue
+        u = g.group(2)
+        if opened.get(u, 0) > 0:
+            opened[u] -= 1
+        d, back, lost = int(g.group(5)), int(g.group(6)), int(g.group(7))
+        if lost > d or back > d:
+            bad3.append(f"{g.group(1)}: obroncow {d}, wrocilo {back}, straty {lost}")
+    left = sum(v for v in opened.values() if v > 0)
+    if fights:
+        if left == 0:
+            rep.add("OB-2: bitwy z obroncami zamkniete (druzyna nie przezywa bitwy)", f"bitew {len(fights)}, zamknietych {len(ends)}", "wszystkie", True)
+        elif left == 1 and encs and " -> bitwa" in encs[-1]:
+            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwarta 1 (ostatnia - koniec logu w bitwie?)", "INFO", None)
+        else:
+            rep.add("OB-2: bitwy z obroncami zamkniete", f"bitew {len(fights)}, otwartych {left}", "0 otwartych", False)
+        rep.add("OB-3: straty z ludnosci <= obroncow", f"koncow {len(ends)}, zlych {len(bad3)}" + (f" ({bad3[:3]})" if bad3 else ""), "0 zlych", not bad3)
+    else:
+        rep.add("OB-2/OB-3: bitwy z obroncami", "brak bitew w logu", "INFO", None)
+    if encs:
+        rep.add("OB-4: obroncow <= pulapu ludnosci (1/" + str(per) + ", najwyzej " + str(cap) + ")", f"starc {len(encs)}, zlych {len(bad4)}" + (f" ({bad4[:3]})" if bad4 else ""), "0 zlych", not bad4)
+    else:
+        rep.add("OB-4: obroncow <= pulapu ludnosci", "brak starc w logu", "INFO", None)
+    rep.add("OB-5: druzyny obroncow sprzatniete po wczytaniu", f"{len(orph)}", "INFO", None)
+    a = [0] * 6
+    ai = [0, 0]
+    for t in days:
+        g = M97O_RX["day"].search(t)
+        if g:
+            for i in range(6):
+                a[i] += int(g.group(i + 1))
+        g = M97O_RX["ai"].search(t)
+        if g:
+            ai[0] += int(g.group(1)); ai[1] += int(g.group(2))
+    rep.add("OB-6: starcia doby (suma)", f"starcia {a[0]} (poddania {a[1]}, bitwy {a[2]}: wygrane {a[3]}, przegrane/odwrot {a[4]}), straty {a[5]} | AI: pominiete {ai[0]}, spalone z ubytkiem {ai[1]}", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -53631,6 +53736,8 @@ def main(argv):
         return p6spichlerz_main(logp)   # p6spichlerz (20.10, galaz p6-spichlerz - R3-06f): miasto je ze swoich wsi - zboze ze spichlerzy wsi do miast, zloto, niedobor, bezpiecznik BE i zalogi (TownGranary.cs)
     if group == "m96koszyk" and logp:
         return m96koszyk_main(logp)
+    if group == "m97obroncy" and logp:
+        return m97obroncy_main(logp)   # m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs)
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
     if group != "etap2" or not logp:
