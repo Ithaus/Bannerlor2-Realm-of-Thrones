@@ -391,7 +391,7 @@ namespace Armoury
         {
             try
             {
-                if (_on) EnsureLoaded();
+                EnsureLoaded();   // maly plik - linia startu z licznikami takze w starym zapisie
                 if (_on && !_startDone) StartPass("start sesji", false);
                 StartLine();
             }
@@ -405,18 +405,62 @@ namespace Armoury
             var s = Settings.Current;
             int clansWant = 0, clansFound = 0;
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            var missing = new List<string>();
             foreach (var r in _start)
             {
                 if (r.Group != "A" || r.Clan.Length == 0 || !seen.Add(r.Clan)) continue;
                 clansWant++;
-                if (FindClan(r.Clan) != null) clansFound++;
+                if (FindClan(r.Clan) != null) clansFound++; else missing.Add(r.Clan);
+            }
+            // rody, osady, bohaterowie i krolestwa z tabeli zmian stron (cel akcji i wyzwalacze)
+            int refsWant = 0, refsFound = 0;
+            var seenRef = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var m in _moves)
+            {
+                if ((m.Action == "clan" || m.Action == "court" || m.Action == "free") && seen.Add(m.Arg))
+                {
+                    clansWant++;
+                    if (FindClan(m.Arg) != null) clansFound++; else missing.Add(m.Arg);
+                }
+                if (m.Action == "prisoner" && seenRef.Add("p:" + m.Arg))
+                {
+                    refsWant++;
+                    if (Settlement.Find(m.Arg) != null || FindClan(m.Arg) != null) refsFound++; else missing.Add(m.Arg);
+                }
+                if ((m.Action == "marry" || m.Action == "wed") && seenRef.Add("h:" + m.Arg))
+                {
+                    refsWant++;
+                    if (FindHeroId(m.Arg) != null) refsFound++; else missing.Add(m.Arg);
+                }
+                if (!m.Who.StartsWith(WandererPrefix, StringComparison.Ordinal) && seenRef.Add("h:" + m.Who))
+                {
+                    refsWant++;
+                    if (FindHeroId(m.Who) != null) refsFound++; else missing.Add(m.Who);
+                }
+                foreach (var t in m.Terms)
+                {
+                    string bas = t;
+                    int i = t.LastIndexOf('+');
+                    if (i > 0) bas = t.Substring(0, i);
+                    var q = bas.Split(':');
+                    if (q.Length < 2 || !seenRef.Add("t:" + bas)) continue;
+                    bool ok;
+                    if (q[0] == "dead") ok = FindHeroId(q[1]) != null;
+                    else if (q[0] == "war") ok = q.Length > 2 && FindKingdom(q[1]) != null && FindKingdom(q[2]) != null;
+                    else if (q[0] == "own") ok = q.Length > 2 && Settlement.Find(q[1]) != null && FindKingdom(q[2]) != null;
+                    else if (q[0] == "ev" || q[0] == "done") ok = AccessTools.TypeByName("ROT.Events." + q[1]) != null;
+                    else continue;
+                    refsWant++;
+                    if (ok) refsFound++; else missing.Add(bas);
+                }
             }
             Log.Info(Tag + ": start | klucz CanonCompanionsToClans " + YN(s != null && s.CanonCompanionsToClans) + " (w chwili zalozenia kampanii: "
                      + (_nk ? YN(_on) : "stary zapis - nic") + "), zmiany stron CanonCompanionsFollowStory " + YN(s != null && s.CanonCompanionsFollowStory)
                      + " | plik " + (_note.Length == 0 ? "wczytany" : _note) + " | A " + _nA + ", B " + _nB + ", C " + _nC + ", D " + _nD
                      + " | zmian stron w tabeli " + _moves.Count + " (zlych wierszy " + _badRows + "), wykonanych " + CountDone("ok") + ", pominietych " + CountDone("skip")
                      + ", w toku " + _pend.Count + " | prolog " + YN(IsProlog()) + ", dzien opowiesci " + StoryDay().ToString("0", Inv)
-                     + " | mapa rodow znaleziona " + clansFound + "/" + clansWant + " | przeniesieni " + _conv.Count + ", bez rodu/bohatera " + _startFail.Count
+                     + " | mapa rodow znaleziona " + clansFound + "/" + clansWant + ", odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) " + refsFound + "/" + refsWant
+                     + (missing.Count > 0 ? " BRAK: " + string.Join(", ", missing.ToArray()) : "") + " | przeniesieni " + _conv.Count + ", bez rodu/bohatera " + _startFail.Count
                      + ", dworzan " + _court.Count + ", start " + (_startDone ? "zamkniety" : "otwarty") + " | B zablokowane przy tworzeniu " + _spawnBlocked
                      + ", usuniete po utworzeniu " + _removedAfter + " | latki: " + _patchLine + ".");
         }
@@ -564,7 +608,7 @@ namespace Armoury
                 if (h.Occupation == Occupation.Wanderer)
                 {
                     aWand++;
-                    if (wand.Length > 0) wand.Append(", ");
+                    if (wand.Length > 0) wand.Append("; ");
                     wand.Append(Nm(h)).Append(" (").Append(Where(h)).Append(h.CompanionOf != null ? ", towarzysz" : "").Append(')');
                 }
             }
@@ -579,7 +623,7 @@ namespace Armoury
                 else
                 {
                     bAlive++;
-                    if (bLive.Length > 0) bLive.Append(", ");
+                    if (bLive.Length > 0) bLive.Append("; ");
                     bLive.Append(Nm(h)).Append(" (").Append(Where(h)).Append(h.CompanionOf != null ? ", towarzysz" : "").Append(')');
                 }
             }
@@ -873,8 +917,8 @@ namespace Armoury
                 if (tell) { Log.Player(r.Message); news = "pokazana: \"" + r.Message + "\""; }
                 else news = "nie pokazana (gracz nie zna postaci i jego krolestwa to nie dotyczy)";
             }
-            Log.Info(Tag + ": zmiana strony #" + r.Id + " - " + Nm(h) + " [" + r.Who + "] " + (before ?? "-") + " -> " + Side(h) + " (" + r.Action + (r.Arg.Length > 0 ? ":" + r.Arg : "")
-                     + (why != null && why.Length > 0 ? "; " + why : "") + ")" + when + " | wiesc: " + news + ".");
+            Log.Info(Tag + ": zmiana strony #" + r.Id + " - " + Nm(h) + " [" + r.Who + "] akcja " + r.Action + (r.Arg.Length > 0 ? ":" + r.Arg : "") + " | " + (before ?? "-") + " -> " + Side(h)
+                     + (why != null && why.Length > 0 ? " (" + why + ")" : "") + when + " | wiesc: " + news + ".");
         }
 
         private static bool PlayerCaptor(Hero h)

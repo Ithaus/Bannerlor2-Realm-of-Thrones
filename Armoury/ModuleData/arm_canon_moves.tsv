@@ -116,3 +116,5 @@ m22	ROTwanderer28	Yoren	ev:HarrenhalSiegeNotificationEvent|rotday:120	die			kill
 m23	ROTwanderer26	Quentyn Martell	ev:JonEvent	die			burned by the dragons in Meereen (A Dance with Dragons)
 m24	ROTwanderer22	Hizdahr zo Loraq	ev:RamsayEvent	marry:lord_1_14			weds Daenerys in Meereen (A Dance with Dragons)
 m25	ROTwanderer33	Wun Wun	ev:JonEvent	court:clan_battania_6			with Jon Snow once the free folk pass the Wall
+m26	ROTlord_177	Jeyne Westerling	own:castle_EN6:battania|ev:RickardKarstarkExecutionEvent	wed:lord_5_1		Robb Stark has wed Jeyne Westerling of the Crag.	Robb takes the Crag and weds Jeyne (A Storm of Swords tells it; before the Karstark execution) - Talisa of the show is not in the world (B)
+m27	ROTlord_177	Jeyne Westerling	dead:lord_5_1	clan:ROTclan_45			after Robb's death she goes back to House Westerling

@@ -174,9 +174,50 @@ Braki w ROT: rodu **Stokeworth** nie ma - Bronn po odmowie walki za Tyriona idzi
 | m24 | Hizdahr | RamsayEvent | slub z Daenerys (`lord_1_14`) | ADWD |
 | m25 | Wun Wun | JonEvent | przy Jonie (rod Snow) | ROT JonEvent przenosi rod Snow do Polnocy |
 
+**Krok 5 - Jeyne Westerling zamiast Talisy (arm_canon_moves.tsv; kod: akcja `wed` z kroku 4):**
+- Talisa (`ROTwanderer45`) jest w grupie B - nie powstaje (krok 3).
+- m26: Jeyne (`ROTlord_177`, rod Westerling `ROTclan_45`) - wyzwalacz `own:castle_EN6:battania` (Turnia w rekach Polnocy) albo `ev:RickardKarstarkExecutionEvent`
+  (w ksiazce slub jest przed egzekucja Karstarka) - `wed:lord_5_1`: slub z Robbem (oboje zywi, bez malzonka, nie u gracza, nie w niewoli) i przejscie do rodu
+  Starkow (dworka, bez druzyny); wiesc "Robb Stark has wed Jeyne Westerling of the Crag." (gracz zna Jeyne albo jego krolestwo to Polnoc / Zachod).
+- m27: smierc Robba (`dead:lord_5_1`, w ROT RedWeddingEvent) - Jeyne wraca do Westerlingow (`clan:ROTclan_45`). Robb zginal przed slubem - m26 wyprzedzona,
+  m27 zastaje Jeyne w rodzie ("juz w tym rodzie").
+
+**Narzedzie:** `tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> [--crashscribe <session-*.log>]` - MP-0 start (nowa kampania z kluczem; inaczej INFO),
+MP-1 ERROR CanonCompanions i potkniecia 0, MP-2 latki 2/2, MP-3 mapa rodow N/N, MP-3b odwolania tabeli zmian N/N (literowka = zmiana nigdy nie zajdzie), MP-4 przeniesienia A (kazdy wzor raz, BRAK rodu 0), MP-5 zaden wzor A nie jest
+wedrowcem bez zmiany `wander` (od drugiej linii doby), MP-6 zaden B nie zyje, MP-7 zmiana strony najwyzej raz, MP-8 lista zmian (INFO), MP-9 A w rodach (INFO),
+MP-10 UC: odrodzenia wzorow A/B 0 (log CrashScribe). Sprawdzone na sztucznym logu (wszystkie wiersze licza sie bez wyjatku).
+
+### Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0)
+
+- **Kolejnosc nasluchow przy nowej grze:** ROT tworzy wedrowcow w swoim `OnNewGameCreated`; jesli nasz nasluch idzie wczesniej (kolejnosc modulow), A przechodza
+  przy `FollowUpEnd` (bez partii z petli nowej gry - partie przyjda z doby rodu). B blokuje faza tworzenia gry niezaleznie od kolejnosci. W logu: `wyzwalacz start
+  (OnNewGameCreated)` albo `(FollowUpEnd)`.
+- **Partie lordow:** postac z `party yes` dostaje druzyne tylko w limicie rodu (ClanTierModel) - nie ma nowych partii ponad limit; BK w pokoju zeruje dowodce bez
+  tytulu (postfiks BK), wiec Jaime/Tyrion moga czekac na wojne. Dworzanin: nasz postfiks dziala po postfiksie BK (obie zeruja wynik - bez sprzecznosci).
+- **UC (CrashScribe):** zmiany stron poza zasiegiem przeprowadzek i straznika duplikatow (tylko wolni wedrowcy). UN-5 nie liczy usunietych z kanonu jako `brak`.
+  Wedrowiec z ruchu `wander` (Ogar, Brienne, Podrick, Bronn w prologu) moze zostac przeniesiony przez UC do miasta kultury wzoru (TryKillCompanion gry, 10%/dobe
+  na jeden wzor) - to zmiana miasta, nie strony.
+- **Usuniecia:** `remove` = Lost (lord zostaje na liscie zmarlych - gra wymazuje tylko wedrowcow; wedrowiec po 40 dobach zniknie z listy, ale wzor jest zablokowany -
+  ROT go nie odtworzy). `die` = smierc bez komunikatu (UC zapisuje zgon, `UNIKAT ZGINAL`). Encyklopedia pokaze zgon.
+- **Jency:** `prisoner` daje postac do lochu siedziby rodu (potem druzyna glowy rodu); gra / RealisticCaptivity moga ja uwolnic (ucieczka, okup) - wtedy pozniejsze
+  `free` mowi `juz wolny` i tylko dopilnuje rodu.
+- **Kampania Jeffa:** brak flagi w zapisie = nic (prefiks ROT tylko przy fladze albo przy tworzeniu nowej gry z kluczem; dworzan nie ma).
+- **Kolizje z m101-prolog:** wlasne pliki (CanonCompanions.cs, arm_canon_moves.tsv); wspolne pliki: Settings.cs (nowa grupa po Book holdings), McmSettings.cs
+  (generowany - po scaleniu `python tools/gen_mcm.py`), SubModuleMain.cs (2 linie), UniqueCompanions.cs, sprawdz_logi.py. Prolog: tylko `PrologDays()`.
+- **Nie sprawdzone w grze:** nic z tego nie bylo uruchomione (zakaz gry w tym zadaniu). Do sprawdzenia: czy `Hero.Clan` + `SetNewOccupation` na wedrowcu w
+  `OnNewGameCreated` nie psuje BK (tytuly, edukacja), czy `TeleportHeroAction` po `MakeHeroFugitiveAction` stawia lorda w siedzibie, czy wiesci pokazuja sie raz.
+
+### Test w grze
+
+1. Autotest: NOWA kampania (flaga start-zloto jak dzis), kilka dob: `python -I tools/sprawdz_logi.py --grupa m101postacie <Armoury-*.log> --crashscribe <session-*.log>`
+   (MP-0..MP-7 TAK) i `--grupa unikaty --crashscribe <session-*.log>` (UN-4 odrodzenia 0, UN-5 brak 0, pole `usuniete z kanonu 9`).
+2. W linii startu: `A 22, B 9, C 2, D 30`, `mapa rodow znaleziona 16/16, odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) 23/23`, 22 linie `przeniesienie - ...`; w linii doby `w rodach 22`, `wedrowcy 0`, `B 9: zywych 0`.
+3. Reczny: encyklopedia - Jaime i Tyrion jako lordowie rodu Lannister, w karczmach brak Hodora i Talisy; Varys/Baelish w Krolewskiej Przystani bez druzyny.
+4. Dlugi bieg (zmiany stron): linie `zmiana strony #...` przy wydarzeniach ROT (Czarny Nurt ~dzien 766, Purpurowe Gody ~1083 przy osi Fabuli x4.33).
+
 ### Status
 - Krok 1 (rozpoznanie + mapa rodow): GOTOWE.
 - Krok 2 (A do rodow + dworzanie bez druzyny): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA w grze.
 - Krok 3 (B nie powstaja, A nie odradzaja sie, UC liczy 'usuniete z kanonu'): ZROBIONE, build Armoury i CrashScribe kod 0, DO SPRAWDZENIA.
 - Krok 4 (tabela zmian stron i wykonawca): ZROBIONE, build Armoury kod 0, DO SPRAWDZENIA (zmiany przy wydarzeniach ROT widac dopiero w dlugim biegu).
-  Zostalo: krok 5 (Jeyne), grupa `sprawdz_logi.py --grupa m101postacie`.
+- Krok 5 (Jeyne zamiast Talisy) i grupa `--grupa m101postacie`: ZROBIONE, build kod 0. **Status calosci: DO SPRAWDZENIA** (nic nie uruchomione w grze, nic nie wgrane).
