@@ -26,7 +26,8 @@ limit, to zapisuj przy kazdej zmianie". Zakres tej galezi: E0 + E1 + E2 (sceny E
   (SandBoxGameManager.OnLoadFinished).
   **Wniosek**: wybor prologu musi byc znany PRZED `Campaign.OnInitialize` - w kreatorze postaci albo w OnNewGameCreated jest za pozno (zegar i stan Roberta/Neda
   juz ustalone; cofniecie zegara po stworzeniu swiata przesunelo by w przyszlosc wszystkie znaczniki czasu nadane przy tworzeniu - wszystkie mody). Dlatego okno
-  wyboru jest w MENU GLOWNYM, przy "New Campaign" (prefiks `MBGameManager.StartNewGame(MBGameManager)` - jedyna droga SandBox do nowej gry i do wczytania;
+  wyboru jest w MENU GLOWNYM, przy nowej kampanii (ROT zastepuje "Campaign" wlasnym "Into the Realm", ktory tez wola `MBGameManager.StartNewGame(new
+  SandBoxGameManager(...))`; prefiks `MBGameManager.StartNewGame(MBGameManager)` - jedyna droga SandBox do nowej gry i do wczytania;
   `SandBoxGameManager.LoadingSavedGame` odroznia wczytanie).
 - **Odczyty CampaignStartTime gry** (TaleWorlds.CampaignSystem): `Campaign.DailyTick` (tydzien co 7 dni od startu), `Campaign.CreateCampaignEvents` (faza
   ticku dobowego), `MapTimeTracker` nowej gry, `SaveHandler` (DayLong w opisie zapisu), `FoodConsumptionBehavior` (pierwsza doba), `KingdomDecisionProposalBehavior`
@@ -172,7 +173,8 @@ Autotest (DLL autotestu CrashScribe): plik `Documents\Mount and Blade II Bannerl
 prologiem, bez okna; bez pliku = klasyczny start bez okna. Po biegu: `python -I tools/sprawdz_logi.py --grupa m101prolog <Armoury-*.log> --crashscribe <session-*.log>`.
 
 Klasyczny start (regresja):
-1. Menu glowne -> Campaign / New Campaign: okno "Choose your start" z przyciskami "Prologue 298" i "Classic 299".
+1. Menu glowne -> "Into the Realm" (przycisk nowej kampanii ROT - ROT.SubModule: MBGameManager.StartNewGame(new SandBoxGameManager(...))): okno "Choose your start"
+   z przyciskami "Prologue 298" i "Classic 299".
 2. "Classic 299" -> kampania jak dotad: data "Year 299, Day 1"; w Armoury.log `Prolog (m101): wybor startu nowej kampanii: KLASYCZNY 299 (okno wyboru)` i
    `start sesji | prolog NIE | ... | latki opowiesci ROT: nie wpiete (brak kampanii z prologiem w tym procesie) | nie wpiete`; Fabula jak dotad (`FABULA: dzien 0`).
 3. Klucz Prologue Enabled NIE (MCM, Armoury, grupa "Prologue 298 (new campaign)") -> nowa kampania bez okna, klasyczny start.
