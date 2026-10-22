@@ -103,6 +103,7 @@ namespace Armoury
             SyncColdLand(); inp.SelfFeed = SelfFeedMode(); inp.SelfFeedOwn = SelfFeedOwnOnly();   // r4-polnoc: zimna ziemia (tabela swiata) i najpierw wyzywic siebie (prog Planu)
             FeedSwiatInput(inp);                                      // feed-swiat: jedzenie podstawowe, krok progu, rynek musi sie oczyscic (cieply start z poprzedniego Planu)
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
+            inp.FachOn = s != null && s.KsVillageTradeKeep;           // m106-wozy P1: fach wsi w rownowadze Planu i w RegaleStep (StartCalibration.Fach.cs)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
             foreach (var id in ids)
@@ -183,6 +184,7 @@ namespace Armoury
                     try { hands = Devastation.YieldFactor(v) * FreeHands.YieldFactor(v); } catch { hands = 1.0; }
                     kd.Wf = KsCore.VillageHands(ppl) * hands;
                     kd.Alpha = VilAlphaFor(v);                            // recenzja 17.10: alfa tej wsi z pomiaru (dekret pana); -1 - alfa rynku
+                    if (inp.FachOn) FachInput(kd, v, type, inp);          // m106-wozy P1: zajecie typu, glowny towar i baza gry na targ
                     BuildBlocks(kd, ld, v, type, info.Layout, side, info);
                     inp.Districts.Add(kd);
                     try { distMk[kd.Id] = TradeTownOf(v); } catch { }
@@ -271,6 +273,26 @@ namespace Armoury
             }
             sb.Append('.');
             return sb.ToString();
+        }
+
+        /// <summary>m106-wozy P1 (klucz Ks Village Trade Keep): fach okregu wsi - glowny towar typu (VillageType.PrimaryProduction), gdy jest towarem KS i wytwarza go zajecie typu
+        /// (P0); baza na targ = baza gry (VillageByPeople.BaseRate - baza_reguly pliku plon-wsi.csv, sztuki/d) x sigma x kg sztuki. Typ bez towaru KS (stadniny) - bez fachu.</summary>
+        private static void FachInput(KsDistrict kd, Village v, string type, KsInput inp)
+        {
+            try
+            {
+                var prim = v != null && v.VillageType != null ? v.VillageType.PrimaryProduction : null;
+                int g, c;
+                if (prim == null || prim.StringId == null || type == null || !KsTab.GoodIndex.TryGetValue(prim.StringId, out g) || !KsTab.CraftIndex.TryGetValue(type, out c)) return;
+                bool makes = false;
+                foreach (var kv in KsTab.P0[c]) if (kv.Key == g && kv.Value > 0) { makes = true; break; }
+                if (!makes) return;
+                double rate = VillageByPeople.BaseRate(v);
+                if (!(rate > 0)) return;
+                double kg = prim.Weight > 0.01f ? prim.Weight : 10.0;
+                kd.FachC = c; kd.FachG = g; kd.FachKg = rate * inp.Sigma * kg;
+            }
+            catch (Exception e) { Stumble("FachInput", e); }
         }
 
         private static void AddExo(KsInput inp, string land, int g, double kg)
@@ -385,6 +407,7 @@ namespace Armoury
             // recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu co 7 dob, nie zamrozony z dnia wlaczenia
             long tc = T0Now();                                     // ks-koszt T0: pod-czasy odbioru Planu
             if (r.Error == null && _state == StateApplied) { try { RefreshNeedMult(r, inp); } catch (Exception e) { Stumble("RefreshNeedMult", e); } }
+            if (r.Error == null && _state == StateApplied) { try { FachToLive(r); } catch (Exception e) { Stumble("FachToLive", e); } }   // m106-wozy P1: cel fachu na targ z kazdego Planu (regula A7)
             tc = T0Lap(T0CNeed, tc);
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
             tc = T0Lap(T0CLines, tc);
@@ -452,6 +475,7 @@ namespace Armoury
             Log.Info(sb.ToString());
             try { MoneyLines(r); } catch (Exception e) { Stumble("MoneyLines", e); }
             try { FeedLineLog(r); } catch (Exception e) { Stumble("FeedLine", e); }   // r4-polnoc: wyzywienie krain (NKS-30)
+            if (r.FachLine != null) Log.Info(r.FachLine.Replace("{DOBA}", _wDay.ToString(Inv)));   // m106-wozy P1: fach wsi (tekst z watku roboczego; klucz wylaczony - brak linii)
             // KS-R3: linie kroku 5 (korytarze i krainy - tekst z watku roboczego) i sterowania rynku (P4 - liczone przy zrzucie)
             if (r.CorrLine != null) Log.Info(r.CorrLine.Replace("{DOBA}", _wDay.ToString(Inv)));
             if (_ctlLine != null) Log.Info(_ctlLine);

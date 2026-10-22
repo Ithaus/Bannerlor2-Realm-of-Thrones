@@ -48,6 +48,9 @@ namespace Armoury
         // liczniki do linii (od ostatniej linii)
         private static int _rPress, _rMaxHeld, _rStarted, _rDone, _rStall, _rBudget, _rBusy, _rUp, _rDown, _rActive, _rCancel, _rWould, _rLand, _rLandStall; private static long _rPaid;
         private static int _rWinStarted;                                   // zmiany zaczete od doby D (nks: prawdziwe zmiany A7 w oknie <= 1% wiosek)
+        // m106-wozy P1 (klucz Ks Village Trade Keep): fach wsi w regule A7 - bloki trzymane, nacisk powrotu, przebudowy do fachu (od linii; razem od wczytania), wsie z niedoborem
+        // w ostatnim kroku (cel i jest w szt./d)
+        private static int _fKeep, _fPress, _fStart, _fStartAll, _fShort; private static double _fShortT, _fShortM;
 
         private static void RuleReset()
         {
@@ -56,6 +59,7 @@ namespace Armoury
             _regionMoved.Clear(); _regionSeason = -1; _rFeed = 0;
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
             _pxRestartDay = -1; _pxRestartEnd = -1;               // KS r4 P7 (r4-ceny): restart srednich cen od nowa przy wlaczeniu
+            _fKeep = _fPress = _fStart = _fStartAll = _fShort = 0; _fShortT = _fShortM = 0;   // m106-wozy P1
             _f4A7Day = -1;                                        // f4-pomiary: doba ostatniej diagnozy A7 (nowa kampania / wczytanie)
             F5Reset();                                            // f5-koszt: liczniki linii "KS: koszt f5" i kontrola raz na sesje
             F20Reset();                                           // f20-d4: pamiec polek rynku (tempo) i wagi zajec od nowa
@@ -232,6 +236,8 @@ namespace Armoury
             }
             double sigma = Math.Max(1, DailyLife.KsSigma);
             int active = 0;
+            bool fach = s != null && s.KsVillageTradeKeep;                   // m106-wozy P1: fach wsi (cel z Planu - LiveDist.FachKg; bez celu - regula jak dotad)
+            if (fach && step) { _fShort = 0; _fShortT = _fShortM = 0; }
             // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
             var vTab = step && SwCostFast ? new Dictionary<double[], double[]>() : null;
             bool f5g = step && SwCostFast2;                                  // f5-koszt: dochody G z diagnozy A7 tej doby (pamiec w bloku)
@@ -254,6 +260,25 @@ namespace Armoury
                     bool busy = false;
                     foreach (var b in ld.B) if (b != null && b.Target >= 0) { busy = true; break; }
                     string region = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
+                    // m106-wozy P1: fach okregu w dobie kroku - zajecie typu (bez regale: tych pilnuje cykl regali), produkcja na targ (ostatni rachunek okregu) wobec celu z Planu
+                    // i blok powrotu: najwieksza przydatnosc ziemi zajecia typu wsrod blokow bez typu jako glownego (jedna czesc okregu naraz - jak hamulec A7)
+                    int fct = -1; double fM = 0, fT = 0; LiveBlock fRet = null;
+                    if (fach && step && !ld.TF && ld.FachI >= 0 && ld.FachKg > 0 && ld.Res != null && type != null && KsTab.CraftIndex.TryGetValue(type, out fct) && !KsTab.IsRegale[fct])
+                    {
+                        fM = ld.Res.MarketKg[ld.FachI]; fT = ld.FachKg;
+                        double kgI = _itemKg != null && ld.FachI < _itemKg.Length ? _itemKg[ld.FachI] : 10.0;
+                        if (fM < 0.95 * fT) { _fShort++; _fShortT += fT / (sigma * kgI); _fShortM += fM / (sigma * kgI); }
+                        double bl = -1;
+                        foreach (var b in ld.B)
+                        {
+                            if (b == null || b.K == null || b.C == null || b.X == null || b.Target >= 0 || b.Cand == null || !b.Cand.Contains(fct)) continue;
+                            int mi = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[mi]) mi = i;
+                            if (b.C[mi] == fct) continue;
+                            double L = b.L(fct, type);
+                            if (L > bl) { bl = L; fRet = b; }
+                        }
+                    }
+                    else fct = -1;
                     foreach (var b in ld.B)
                     {
                         if (b == null || b.K == null || b.C == null) continue;
@@ -285,8 +310,22 @@ namespace Armoury
                             incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px);
                             foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
                         }
-                        if (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur)) { b.Held = 0; continue; }
+                        // m106-wozy P1 (fach wsi): blok z zajeciem typu jako glownym trzyma rece, dopoki praca typu daje wiecej, niz kosztuje, a okreg nie robi wiecej towaru,
+                        // niz chce Plan (na targ <= 1.05 x cel); blok powrotu (najlepsza ziemia typu) w okregu z niedoborem (< 0.95 x celu) dostaje nacisk ku zajeciu typu
+                        // bez progu x1.25 - dalej ten sam hamulec Jeffa: 60 dob nacisku, jedna czesc okregu naraz, prog wyzywienia, ziemia, 5% rak regionu, przebudowa placona
+                        bool fachRet = false;
+                        if (fct >= 0)
+                        {
+                            double fInc = sig ? A7sIncome(b, type, fct, sRow, sV, A7sRent(b)) : (vRow != null ? IncomeV(b, type, fct, px, vRow) : Income(b, type, fct, px));
+                            if (cur == fct)
+                            {
+                                if (fM <= 1.05 * fT && fInc > 0) { b.Held = 0; _fKeep++; continue; }
+                            }
+                            else if (ReferenceEquals(b, fRet) && fM < 0.95 * fT && fInc > 0) { best = fct; fachRet = true; }
+                        }
+                        if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; continue; }
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
+                        if (fachRet) _fPress++;
                         if (sig) A7sNotePress(b, ci);                    // f5-a7: rece pod naciskiem i trzymane >= 60 dob
                         if (b.Held < HoldDays) continue;
                         if (!rule) { _rWould++; continue; }                  // klucz wylaczony - sam pomiar nacisku (zmiana bylaby tu)
@@ -311,6 +350,7 @@ namespace Armoury
                             b.C = nc; b.X = nx;
                         }
                         busy = true; _rStarted++; _rWinStarted++; active++;
+                        if (fachRet) { _fStart++; _fStartAll++; }                   // m106-wozy P1: przebudowa do zajecia typu wsi
                         if (sig) A7sNoteStart(ld, b, cur, best, hands, mt, T, today);   // f5-a7: sezon wedlug rynku i przejscia, powroty, komunikat gracza (jego wies)
                         if (_rStarted <= 12) _startNotes.Add((ld.St.Name != null ? ld.St.Name.ToString() : ld.Id) + " " + KsTab.Crafts[cur] + "->" + KsTab.Crafts[best] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(b.Cost) + " zl)");
                     }
@@ -494,6 +534,13 @@ namespace Armoury
               .Append(_startNotes.Count > 0 ? " (" + string.Join("; ", _startNotes.ToArray()) + ")" : "")
               .Append(" | regale (co ").Append(RegCycle).Append(" dob od D): rece przy zlozu w gore ").Append(_rUp).Append(", w dol ").Append(_rDown)
               .Append(FeedRuleText());                                  // r4-polnoc
+            if (s != null && s.KsVillageTradeKeep)                      // m106-wozy P1: fach wsi w regule A7 (klucz wylaczony - linia jak dotad)
+            {
+                sb.Append(" | fach (m106): bloki trzymane ").Append(_fKeep).Append(", nacisk powrotu ").Append(_fPress).Append(", przebudowy do fachu zaczete ").Append(_fStart)
+                  .Append(" (od wczytania razem ").Append(_fStartAll).Append("), wsi z niedoborem ").Append(_fShort).Append(" (cel ").Append(_fShortT.ToString("0", Inv))
+                  .Append(" szt./d, jest ").Append(_fShortM.ToString("0", Inv)).Append(")");
+                _fKeep = _fPress = _fStart = 0;
+            }
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _startNotes.Clear();
             return sb.ToString();
         }

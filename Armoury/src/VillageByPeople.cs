@@ -484,6 +484,25 @@ namespace Armoury
             try { CsvRows(day, rows, made, days); } catch (Exception e) { Stumble("Raport(csv)", e); }
         }
 
+        /// <summary>m106-wozy P1 (fach wsi pod KS): baza gry glownego towaru wsi w sztukach na dobe - stawka typu x (regula: u_v x g; poza regula: (poziom + 1) x 0.5);
+        /// ta sama liczba co kolumna baza_reguly w plon-wsi.csv. 0 - brak typu, glownego towaru albo blad. Sam odczyt, nie rzuca (watek glowny - zrzut Planu).</summary>
+        internal static float BaseRate(Village v)
+        {
+            try
+            {
+                var t = v != null ? v.VillageType : null;
+                var prim = t != null ? t.PrimaryProduction : null;
+                if (prim == null || prim.StringId == null) return 0f;
+                float rate = Rate(t, prim.StringId);
+                if (!(rate > 0f)) return 0f;
+                float f, u, g;
+                double rule = TryFactor(v, out f, out u, out g) ? (double)u * g : (v.GetHearthLevel() + 1) * 0.5;
+                double r = rate * rule;
+                return r > 0 && !double.IsNaN(r) && !double.IsInfinity(r) ? (float)r : 0f;
+            }
+            catch (Exception e) { ReadStumble(e); return 0f; }
+        }
+
         private static float Rate(VillageType t, string itemId)
         {
             float r = 0f;
