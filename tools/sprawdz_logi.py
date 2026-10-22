@@ -1079,7 +1079,7 @@ Uzycie (Python 3, tylko odczyt):
                     w kolejnosci, KW-14 bandy <= 12 i sufit band fabularnych okregu z linii 'banda' (KW-14b losy band INFO), KW-15 ukrycie, die i succeed postaci
                     chronionej tylko po jej wydarzeniu ROT (KW-15b ukryci bez powrotu INFO), KW-16 zadania i zbiorki (INFO; B2). Log bez Kroniki: INFO; klucz
                     ChronicleOfWesteros NIE: progi okien INFO. m107-kronika (22.10, klucz ChronicleCanonDeaths, wiersze wersja=smierc, termy near/region i kr:NNN.w~R):
-                    KW-0b pole Canon Deaths i wierszy smierci >= 1 w linii startu (log sprzed m107 - INFO), KW-13b stan wierszy #move m17, m28-m38 (INFO), KW-17
+                    KW-0b pole Canon Deaths i wierszy smierci >= 1 w linii startu (log sprzed m107 - INFO), KW-13b stan wierszy #move m17, m28-m40 (INFO), KW-17
                     smierci kanonu: (a) succeed z wiersza smierc POMINIETA 0, (b) wiersz smierci przy Canon NIE i Full NIE 0, (c) przy World Changes NIE 0, (d) die
                     glowy rodu z wiersza smierc 0, (e) own/ruler/leader/truce OK przy Full Versions NIE 0; KW-17b odrzucone wiersze smierci z pierwszym falszywym
                     termem, die pominiete, linie 'KANON: smierc ... nie weszla' (INFO).
@@ -39880,7 +39880,7 @@ M107KR_YES = re.compile(r"^smierc kanonu (\S+) TAK - okno (\S+) wierszem smierci
 M107KR_NO = re.compile(r"^smierc kanonu (\S+) nie: (.*) \| okno (\S+) wierszem (\S+)")
 M107KR_NOTIN = re.compile(r"^KANON: smierc z (\S+) nie weszla - (\S+) \((.*)\)\.$")
 M107KR_CC_SKIPW = re.compile(r"^zmiana strony #(\S+) POMINIETA - .*? \[\S+\] \(\S+?\) - (.*?) \| wyzwalacz")
-M107KR_ROWS = ["m17", "m28", "m29", "m30", "m31", "m32", "m33", "m34", "m35", "m36", "m37", "m38"]   # KW-13b: wiersze #move z m107 (m17 - nowy wyzwalacz)
+M107KR_ROWS = ["m17", "m28", "m40", "m29", "m30", "m31", "m39", "m32", "m33", "m34", "m35", "m36", "m37", "m38"]   # KW-13b: wiersze #move z m107 (m17 - nowy wyzwalacz; m39/m40 - poprawki recenzji)
 M105KR_PROT_FALLBACK = {   # = tools/kronika/kronika_check.py PROTECTED (KRONIKA-FORMAT 15) - zapas, gdy walidatora nie ma obok
     "lord_1_29", "lord_2_3", "lord_5_17", "lord_1_14", "lord_1_11", "lord_1_17", "lord_5_1", "lord_5_7", "lord_5_13_1", "lord_7_1", "ROTlord_369", "lord_1_9",
     "lord_1_25", "lord_WE9_l", "lord_4_14", "lord_4_25", "lord_4_25_1", "lord_1_3", "lord_1_50", "lord_1_5", "ROTlord_513", "lord_5_16", "lord_2_18", "lord_5_3",
@@ -39949,7 +39949,7 @@ def m105kronika_main(logp, csp=None):
     tnie napis po 8000 znakow); KW-13 wiersz #mNN wykonany najwyzej raz, pary #para w kolejnosci (po: okno po ruchu, kr: ruch z 'zaszlo kr:' po oknie); KW-14
     bandy <= 12 (linie band - INFO); KW-15 ukrycie, die i succeed (umierajacy) postaci z listy chronionych tylko po jej wydarzeniu ROT (linia 'lista chronionych:
     ... spelnione'), ukryci bez powrotu - INFO. Klucz ChronicleOfWesteros NIE: progi okien INFO (licza KW-1, KW-10, KW-12).
-    m107-kronika (22.10): KW-0b pole Canon Deaths w linii startu, KW-13b zmiany stron m17/m28-m38 (INFO), KW-17 smierci kanonu (a-e, linie 'smierc kanonu ... TAK'
+    m107-kronika (22.10): KW-0b pole Canon Deaths w linii startu, KW-13b zmiany stron m17/m28-m40 (INFO), KW-17 smierci kanonu (a-e, linie 'smierc kanonu ... TAK'
     i akcje z dopiskiem '| smierc kanonu'), KW-17b odrzucone wiersze smierci i 'KANON: smierc ... nie weszla' (INFO)."""
     from collections import Counter
     rep = Report()
@@ -40310,6 +40310,12 @@ def m105kronika_main(logp, csp=None):
         k = (r[1], r[3])
         if k not in first_res or r[0] < first_res[k]:
             first_res[k] = r[0]
+    # recenzja m107 T6: instancja okna powracajacego ma id 'NNN.w#klucz' (Chronicle.Recurring) - para #para (115.1 -> m38) liczy pierwsza instancje pod NNN.w
+    for (c_, w_), at in list(first_res.items()):
+        if "#" in w_:
+            kb = (c_, w_.split("#")[0])
+            if kb not in first_res or at < first_res[kb]:
+                first_res[kb] = at
     move_at = {}
     for c in cc_moves:
         move_at.setdefault((c[1], c[2]), (c[0], c[5], c[4]))
@@ -40351,8 +40357,8 @@ def m105kronika_main(logp, csp=None):
             st13.append(f"{rid} OK ({okm[-1][3]}" + (f", zaszlo {okm[-1][5]}" if okm[-1][5] else f", {okm[-1][4]}") + ")")
         elif skm:
             st13.append(f"{rid} POMINIETA ({cc_skipw.get((skm[-1][1], rid), '?')[:70]})")
-    rep.add("KW-13b: zmiany stron m107 (m17, m28-m38: Theon, Brienne, Podrick, Jaime)", "; ".join(st13) or "brak linii (okna jeszcze nie przyszly)",
-            "INFO (m28 072.3, m29 087.1~a, m30 108.1, m31/m35 037.1, m32/m36 037.2|037.1+45, m33/m34 083.1~0b, m37 107.1, m38 113.1|115.1)", None)
+    rep.add("KW-13b: zmiany stron m107 (m17, m28-m40: Theon, Brienne, Podrick, Jaime)", "; ".join(st13) or "brak linii (okna jeszcze nie przyszly)",
+            "INFO (m28 072.3, m40 072.3~0+2, m29 087.1~a, m30 108.1, m31/m35 037.1, m39 JoffreyEvent+5, m32/m36 037.2|037.1+45, m33/m34 083.1~0b, m37 107.1, m38 113.1|115.1)", None)
     # KW-14 bandy
     bl = [int(M105KR_BANDS.search(d[2]).group(1)) for d in days if M105KR_BANDS.search(d[2])]
     bmax = max(bl or [0])
