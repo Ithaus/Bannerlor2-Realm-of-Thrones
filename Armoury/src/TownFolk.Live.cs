@@ -1608,6 +1608,19 @@ namespace Armoury
             catch (Exception e) { Stumble("DsVillageDay", e); nv = rent = 0; return false; }
         }
 
+        /// <summary>m105 gosp4 G5 (DsVillage.RentPay, recenzja kodu R9): za ile dob wies kupi dzis koszyk ZC4 - 2 w dobie zakupu przy Ks Village Buy Every 2 (ta sama doba
+        /// i ten sam Fnv co Villages: DailyLive liczy _liveDay = doba - 1 w tym samym ticku, po PopulationLaw.Daily), 1 - inaczej (w dobie bez zakupu takze 1). Nie rzuca.</summary>
+        internal static int VillageBuyDays(Settlement st)
+        {
+            try
+            {
+                if (!StartCalibration.SwBuyEvery2 || st == null || st.StringId == null) return 1;
+                int day = (int)CampaignTime.Now.ToDays - 1;
+                return ((KsFnv(st.StringId) + (uint)day) & 1u) == 0u ? 2 : 1;
+            }
+            catch (Exception e) { Stumble("VillageBuyDays", e); return 1; }
+        }
+
         // ============================================================ R5: zapasy startowe
         /// <summary>Nowa kampania (TownPurse.TrimStartGift / CastlePurse.TrimStartGift, mloda kampania): czy zapasy kies z daru.</summary>
         internal static bool SeedTownsDue { get { var s = Settings.Current; return Live && s.TownFolkStartReserves && _seedT == 0; } }

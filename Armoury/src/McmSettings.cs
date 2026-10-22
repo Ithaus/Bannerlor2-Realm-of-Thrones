@@ -8168,7 +8168,7 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public int DsRentArrearsPayDays { get; set; } = 28;
 
-        [SettingPropertyBool("Ds Rent After Bread", HintText = "with Ds Rent Arrears: the village pays the day's fixed rent only from what its purse holds beyond the day's basket - the rent never takes its bread, as the arrears already do; what it cannot pay goes into the lord's book of arrears (paid off later, forgiven after Ds Rent Forgive Days). Off = the day's rent is paid first from the whole purse, as before", RequireRestart = false)]
+        [SettingPropertyBool("Ds Rent After Bread", HintText = "with Ds Rent Arrears: the village pays the day's fixed rent only from what its purse holds beyond the basket it buys that day (two days' basket on its market day with Ks Village Buy Every 2) - the rent never takes its bread, as the arrears already do; what it cannot pay goes into the lord's book of arrears (paid off later, forgiven after Ds Rent Forgive Days). Off = the day's rent is paid first from the whole purse, as before", RequireRestart = false)]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public bool DsRentAfterBread { get; set; } = true;
 
