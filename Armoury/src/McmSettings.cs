@@ -2652,6 +2652,26 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float VillageCartTownMaxDays { get; set; } = 2f;
 
+        [SettingPropertyBool("Village Cart Land Road Only", HintText = "village carts only head for a town they can reach by land - a town across the sea (Harbay and Volmark on Harlaw cannot drive to Lordsport on Pyke) is never their market, not even their own town or for selling wool, flax and hides; if a village's own market lies across the sea, its cart goes to the best town it can reach by land, and a cart already standing on a shore with no road to its goal turns back once after loading. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartLandRoadOnly { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Enemy Gate", HintText = "village carts do not choose a market whose road runs past the gate of an enemy castle or town - Free Folk carts no longer try to slip past the Night's Watch at The Wall to reach Last Hearth; if every market in reach lies behind such a gate, the safest of them is taken. Off = only enemy and besieged towns themselves are avoided, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartEnemyGate { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Route Risk", HintText = "villagers remember how the carts of their region fared on the road to each town - how many arrived and how many were taken by bandits or enemies - and weigh a town's offer by the chance of getting there; with no news a road counts as safe as any other, and bad news fades (half in about two months), so a road once dangerous is tried again later. Off = every road counts as safe, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartRouteRisk { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Stuck Guard", HintText = "a village cart that has made no headway towards its goal for twice the time its own journey should take (at least three days) - on a shore with no road, at an enemy gate, shut in a strange castle - is sent home, or to the nearest friendly town it can reach by land, at most twice per journey; a cart standing at home with a load and an order to leave gets a fresh order after five days and after ten unloads its goods into the village storehouse so the village can send it out anew. Nothing is made or lost. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartStuckGuard { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Top Up On Departure", HintText = "with Village Cart Whole Store or Village Cart Full Load Far: the rest of the village storehouse is loaded onto the cart only when it actually rolls out of the village - a cart that stays at home no longer swallows the storehouse every few days. Off = loaded when the town is chosen, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartTopUpOnDeparture { get; set; } = true;
+
         [SettingPropertyBool("Island Roads Fix", HintText = "caravans and lords on islands are no longer left standing by a Banner Kings order to a place they cannot reach over land: a party with ships goes to the same place by land and sea; a caravan without ships picks the best town it can reach by land - by Banner Kings' own trade reckoning, else its home or the nearest town by road - and Banner Kings no longer picks towns across the water for such a caravan at all; if its island has no other town, it waits in town as the game's own caravans do when no trip pays; a lord whose Banner Kings feast or estate order cannot be carried out gets his own will back instead of standing frozen in a castle or town. Only orders change - nothing is made or lost (off = as Banner Kings decides)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool IslandRoadsFix { get; set; } = true;
@@ -8888,6 +8908,10 @@ namespace Armoury
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public bool KsSwitchSignalRule { get; set; } = true;
 
+        [SettingPropertyBool("Ks Village Trade Keep", HintText = "OFF by default (22.10 test w1: village food cover in Westeros fell to 13.2% with it - to be retuned). under the start calibration a village keeps its own trade - fishermen fish, woodsmen fell timber, shepherds shear: in every weekly plan the market's demand for a good is first met by the villages whose trade it is, up to what they made before the calibration (all of it if the market takes that much, otherwise the same share for each), as far as their hands and land allow and only while that work pays more than it costs; the rest goes to whoever earns most with it. Once the calibration is applied, hands leave the trade only by the slow work-switch rule, never while it pays and the village makes no more of its good than the plan asks, and a village that lost its trade gets hands back the same slow way (one part of the district at a time, paid by the village). Off = every hand follows the price, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool KsVillageTradeKeep { get; set; } = false;
+
         [SettingPropertyFloatingInteger("Ks Switch Market Band", 0.00f, 0.50f, "0.00", HintText = "with Ks Switch Signal: how far a good's shortage or glut at the market town may move its price in the reckoning, compared with the town's other goods (0.15 = at most 15% up or down; 0 = the calibration's own prices only)", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public float KsSwitchMarketBand { get; set; } = 0.15f;
@@ -9878,6 +9902,11 @@ namespace Armoury
             s.MapRoadTableFix = MapRoadTableFix;
             s.VillageCartLeaveTown = VillageCartLeaveTown;
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;
+            s.VillageCartLandRoadOnly = VillageCartLandRoadOnly;
+            s.VillageCartEnemyGate = VillageCartEnemyGate;
+            s.VillageCartRouteRisk = VillageCartRouteRisk;
+            s.VillageCartStuckGuard = VillageCartStuckGuard;
+            s.VillageCartTopUpOnDeparture = VillageCartTopUpOnDeparture;
             s.IslandRoadsFix = IslandRoadsFix;
             s.CaravanTownHourly = CaravanTownHourly;
             s.CaravanTownHourlyMaxTicks = CaravanTownHourlyMaxTicks;
@@ -11437,6 +11466,7 @@ namespace Armoury
             s.MeasureIronWoodFlow = MeasureIronWoodFlow;
             s.KsSwitchSignal = KsSwitchSignal;
             s.KsSwitchSignalRule = KsSwitchSignalRule;
+            s.KsVillageTradeKeep = KsVillageTradeKeep;
             s.KsSwitchMarketBand = KsSwitchMarketBand;
             s.TownWorksHireDistrict = TownWorksHireDistrict;
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;

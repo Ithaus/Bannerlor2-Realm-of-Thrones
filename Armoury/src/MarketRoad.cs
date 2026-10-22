@@ -47,7 +47,9 @@ namespace Armoury
             noRoad = false;
             if (s.MarketMaxDistance <= 0f) return false;        // 0 = bez wlasnego limitu (obowiazuje limit gry dla TradeBound)
             float d = Campaign.Current.Models.MapDistanceModel.GetDistance(home, tb, false, false, MobileParty.NavigationType.Default);
-            noRoad = d <= 0f;
+            // m106 W1 (Village Cart Land Road Only): brak drogi ladowej to takze pamiec drog >= prog BK (1e30 NavalDLC, 1e8 poza tablica) i NaN - dotad tylko d <= 0, wiec targ
+            // za morzem szedl droga "daleki targ" (110) i woz jechal tam, gdzie ladem nie dojedzie
+            noRoad = d <= 0f || (s.VillageCartLandRoadOnly && CartGuard.NoLandRoad(d));
             return noRoad || d > s.MarketMaxDistance;
         }
 
@@ -60,10 +62,21 @@ namespace Armoury
                 var home = villagerParty.HomeSettlement;
                 var v = home != null ? home.Village : null;
                 var go = PickTown(villagerParty, home, v, s, true);
+                bool alt = false;
+                // m106 W1 (Village Cart Land Road Only): bez wyboru miasta latka BK i gra wysylaja woz do Bound wsi - gdy z domu nie ma do niego drogi ladowej (Harbay i Volmark
+                // na Harlaw - Lordsport na Pyke), woz jedzie do najblizszego miasta osiagalnego ladem (niewrogie, nieoblezone, bez bramy wroga); brak takiego - jak dotad
+                if (go == null && s.VillageCartLandRoadOnly && home != null && v != null && v.Bound != null && villagerParty.CurrentSettlement != v.Bound
+                    && CartGuard.NoLandRoad(CartGuard.DistSS(home, v.Bound)))
+                {
+                    go = CartGuard.NearestReachableTown(villagerParty, home, true);
+                    CartGuard.NoteW1(go != null);
+                    alt = go != null;
+                }
                 if (go == null) return true;                // jak dotad: latka BK (Bound - dla wsi zamkowej zamek, ktory kupuje caly ladunek) albo gra
                 // E5/B4 (199): woz wsi zamkowej jadacy na targ miasta najpierw do swojego zamku, gdy na polce zamku brakuje jedzenia, ktore wiezie
                 // (null = prosto do miasta); drugi odcinek - CastleMarket.SellPrefix przez PickTown (count = false)
-                var stop = CastleMarket.FirstStop(villagerParty, home, v, s, go);
+                var stop = alt ? null : CastleMarket.FirstStop(villagerParty, home, v, s, go);
+                if (stop != null && s.VillageCartLandRoadOnly && home != null && CartGuard.NoLandRoad(CartGuard.DistSS(home, stop))) stop = null;   // m106 W1: zamek bez drogi ladowej - prosto do miasta
                 Move(__instance, villagerParty, stop ?? go);
                 return false;       // pomija latke BK (Bound) i oryginal - cel juz nadany
             }
@@ -152,6 +165,9 @@ namespace Armoury
                 if (party == null || !party.IsVillager) return;
                 MarketCarts.Forget(party);                                   // poprawka 119: wiesc z drogi o tym wozie wygasa
                 CastleMarket.Forget(party);                                  // E5/B4: rezerwacja jedzenia w zamku, znacznik "byl w zamku" i straz wygasaja
+                CartRisk.Lost(party, destroyer);                             // m106: strata trasy (pamiec tras) i licznik linii "Wozy (m106)" (wlasny try)
+                CartGuard.Forget(party);                                     // m106: pamiec straznika wygasa
+                MarketCarts.ForgetPending(party);                            // m106: dosypka przy wyjezdzie przepada z wozem
                 _lost++;
                 if (destroyer != null && destroyer.MobileParty != null && destroyer.MobileParty.IsBandit) _lostToBandits++;
             }

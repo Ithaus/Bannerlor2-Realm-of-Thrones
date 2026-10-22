@@ -79,7 +79,7 @@ namespace Armoury
     }
 
     /// <summary>Okreg pracy: wies gry z wioskami pobocznymi albo pola mieszczan miasta.</summary>
-    internal sealed class KsDistrict : KsSettlement
+    internal sealed partial class KsDistrict : KsSettlement                   // m106: partial - pola fachu wsi w StartCalibration.Fach.cs
     {
         public string Type;                                           // typ wsi gry ("town_fields" - pola mieszczan)
         public double Wf;                                             // rece w polu (ludzie x udzial pracy stanu)
@@ -740,6 +740,7 @@ namespace Armoury
             x.RegByDist = new Dictionary<string, double[]>(StringComparer.Ordinal);
             x.R.RegInfo.Clear();
             Array.Clear(x.R.RegLabour, 0, KsTab.NC);
+            if (x.In.FachOn) { x.FhRegT = new Dictionary<KsDistrict, double>(); x.FhRegFirst = x.FhRegTarget = 0; }   // m106: regale fachu - liczby ostatniego RegaleStep
             foreach (int g in KsTab.RegGoodsSorted)
             {
                 var rows = x.RegRows[g] ?? new List<RegRow>();
@@ -762,13 +763,16 @@ namespace Armoury
                     x.R.RegInfo.Add(KsTab.Goods[g] + "/" + x.R.Markets[z] + " popyt " + (tn / 1000).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
                                     + " t/d, sufit x" + (tc / Math.Max(1.0, tn)).ToString("0", System.Globalization.CultureInfo.InvariantCulture)
                                     + ", bez zrodla " + (Math.Max(0.0, short_ - ts) / 1000).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " t/d");
-                    foreach (var r in rows)
+                    // m106 (klucz Ks Village Trade Keep): wiersze okregow typu tego zajecia regale najpierw (StartCalibration.Fach.cs) - kwota wiersza; null - jak dotad (uzycie / sufit krainy)
+                    double[] famt = FachRegale(x, g, rows, cap, use);
+                    for (int ri = 0; ri < rows.Count; ri++)
                     {
+                        var r = rows[ri];
                         double cl; if (!cap.TryGetValue(r.Land, out cl) || cl <= 0) continue;
                         double ul = use[r.Land]; if (ul <= 0) continue;
                         double f = ul / cl;
                         double p0 = 0; foreach (var kv in KsTab.P0[r.C]) if (kv.Key == g) p0 = kv.Value;
-                        double lab = f * r.Cap / (p0 * r.L);
+                        double lab = famt != null ? famt[ri] / (p0 * r.L) : f * r.Cap / (p0 * r.L);
                         x.RegDed[r.B] += lab; x.RegHands[r.B * KsTab.NC + r.C] += lab; x.R.RegLabour[r.C] += lab;
                         var d = x.BD[r.B];
                         double[] bd; if (!x.RegByDist.TryGetValue(d.Id, out bd)) { bd = new double[KsTab.NG]; x.RegByDist[d.Id] = bd; }
@@ -810,6 +814,7 @@ namespace Armoury
             // dochod jak dotad, bit w bit (Rm bez dodatku)
             double[] dl = x.GradOn ? LandDelta(x, p) : null;
             var pha = x.PHa;                                           // r4-polnoc: ha na pracujacego pary (Pairs; mysliwy na zimnej ziemi - HuntHa tylko w strefach zimnych)
+            bool fachEq = x.FachEq; var incRaw = x.IncRaw;             // m106 (klucz Ks Village Trade Keep): fach wsi w tej rownowadze
             if (beta == 10.0)
             {
                 // koszt Planu (poprawka po autotescie 16.10 - krok 8 doklada rund): exp(beta (ln u - ln umax)) = (u / umax)^10 mnozeniem, u = dochod x premia mapy^start -
@@ -826,6 +831,7 @@ namespace Armoury
                         double rmc = Rm[x.Pm[k] * KsTab.NC + c];
                         if (dl != null) rmc += dl[x.Pl[k] * KsTab.NC + c];
                         double inc = x.Lp[k] * rmc - KsTab.KCost[c] - rent[b] * pha[k];
+                        if (fachEq) incRaw[k] = inc;                           // m106: dochod pary przed podloga (fach tylko tam, gdzie praca typu daje wiecej, niz kosztuje)
                         if (inc < 0.02) inc = 0.02;
                         double u = x.St[k] > 0 ? inc * inert : inc;
                         xs[k] = u;
@@ -836,6 +842,7 @@ namespace Armoury
                     double isum = 1.0 / sum;
                     for (int k = a; k < e; k++) xs[k] *= isum;
                 }
+                if (fachEq) ApplyFach(x, p, xs);                       // m106: fach wsi - dolna granica rak zajecia typu (przed progiem wyzywienia - prog ma pierwszenstwo)
                 if (x.FeedOn) ApplyFloors(x, p, xs);                   // r4-polnoc: najpierw wyzywic siebie (prog rak przy jedzeniu)
                 return;
             }
@@ -850,6 +857,7 @@ namespace Armoury
                     double rmc = Rm[x.Pm[k] * KsTab.NC + c];
                     if (dl != null) rmc += dl[x.Pl[k] * KsTab.NC + c];
                     double inc = x.Lp[k] * rmc - KsTab.KCost[c] - rent[b] * pha[k];
+                    if (fachEq) incRaw[k] = inc;                               // m106: dochod pary przed podloga
                     if (inc < 0.02) inc = 0.02;
                     double z = beta * (Math.Log(inc) + x.St[k] * lnI);
                     xs[k] = z;
@@ -859,6 +867,7 @@ namespace Armoury
                 for (int k = a; k < e; k++) { double v = Math.Exp(xs[k] - zmax); xs[k] = v; sum += v; }
                 for (int k = a; k < e; k++) xs[k] /= sum;
             }
+            if (fachEq) ApplyFach(x, p, xs);                           // m106: fach wsi (przed progiem wyzywienia)
             if (x.FeedOn) ApplyFloors(x, p, xs);                       // r4-polnoc: najpierw wyzywic siebie
         }
 
@@ -882,6 +891,7 @@ namespace Armoury
             for (int m = 0; m < NM; m++) for (int g = 0; g < KsTab.NG; g++) act[m * KsTab.NG + g] = !KsTab.RegGoodMask[g] && x.Dm[m * KsTab.NG + g] > 1.0;
             var rr = (double[])x.Rent.Clone();
             FloorStep(x);                                              // r4-polnoc: prog "najpierw wyzywic siebie" z par i ziemi tej rownowagi (po RegaleStep)
+            FachStep(x);                                               // m106: fach wsi - okregi, k, cele i pary tej rownowagi (klucz wylaczony - nic)
             xs = new double[x.NP]; S = new double[n];
             var dem = new double[x.NB];
             var stall = new double[StallN];
@@ -1083,6 +1093,7 @@ namespace Armoury
             R.BlockSub = sub;
             foreach (var d in x.D) if (d.TownFields) R.TownFieldHands += d.Wf;
             try { FeedStats(x, xs); } catch (Exception e) { R.Feed = null; R.CorrLine = (R.CorrLine ?? "") + " [wyzywienie krain: " + e.GetType().Name + "]"; }   // r4-polnoc
+            try { FachFinish(x, xs); } catch (Exception e) { R.DistFach = null; R.FachLine = "KS: fach wsi (m106) plan doba {DOBA} | blad linii (" + e.GetType().Name + ")."; }   // m106
         }
 
         // ============================================================ 8. pieniadze (projekt rozdz. 9 i 11.1 krok 8; poprawka po autotescie 16.10)

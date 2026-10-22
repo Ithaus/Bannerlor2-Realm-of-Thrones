@@ -66,6 +66,10 @@ namespace Armoury
             // zaplacony z Planu (popyt ceny, wsad ZC5 - gra kupuje pelny koszyk z kiesy wsi drabina)
             public float HomeKcalFrac; public float[] BasketPaid; public double WantKcal;
             public double PaidKcal;                            // KS-R3 G6: kcal koszyka zaplaconego z Planu na dobe (przy lambda 1)
+            // m106-wozy P1 (klucz Ks Village Trade Keep): fach okregu z ostatniego Planu (pamiec sesji, bez zapisu - po wczytaniu do pierwszego Planu 0: regula A7 bez fachu) -
+            // indeks towaru dostawy (KsDeliver.ItemIds) i cel na targ w kg/d po k
+            public int FachI = -1; public double FachKg;
+            public bool FachLive;                              // m106 recenzja Z5: fach zywca (bydlo, swinie, owce) - regula A7 porownuje produkcje (na targ + zjedzone)
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed; }
@@ -297,6 +301,7 @@ namespace Armoury
                 var ld = new LiveDist { Id = d.Id, TF = d.TownFields, Market = d.Market, L = land, K = d };
                 if (need != null) for (int k = 0; k < KsTab.NN; k++) ld.NeedMult[k] = d.Need0[k] > 1e-9 ? (float)Math.Max(0.25, Math.Min(4.0, need[k] / d.Need0[k])) : 1f;
                 MoneyFromPlan(R, ld);
+                FachOf(R, ld);                                         // m106-wozy P1: cel fachu na targ (klucz wylaczony - Plan bez DistFach: brak celu)
                 if (!d.TownFields && d.PplHome != null && d.Bask != null)
                 {
                     double home = 0; foreach (var v in d.PplHome) home += v;
@@ -326,6 +331,24 @@ namespace Armoury
                 list.Add(ld);
             }
             return list;
+        }
+
+        /// <summary>m106-wozy P1: fach okregu z Planu (KsResult.DistFach) - indeks towaru dostawy i cel na targ kg/d; brak wpisu albo klucz wylaczony - bez celu (FachKg 0).</summary>
+        private static void FachOf(KsResult R, LiveDist ld)
+        {
+            KsFach f;
+            if (R != null && R.DistFach != null && ld != null && ld.Id != null && R.DistFach.TryGetValue(ld.Id, out f) && f != null && f.G >= 0 && f.G < KsTab.NG && f.T > 0)
+            {
+                int it = f.G == KsTab.GMeat ? IMeat : GoodToItem[f.G];
+                if (it >= 0) { ld.FachI = it; ld.FachKg = f.T; ld.FachLive = f.G == KsTab.GCow || f.G == KsTab.GHog || f.G == KsTab.GSheep; return; }
+            }
+            if (ld != null) { ld.FachI = -1; ld.FachKg = 0; ld.FachLive = false; }
+        }
+
+        /// <summary>m106-wozy P1: odbior Planu w stanie zastosowanym - cel fachu kazdego okregu od nowa (co 7 dob z Planem; klucz wylaczony - Plan bez DistFach: cele zerowane).</summary>
+        private static void FachToLive(KsResult R)
+        {
+            foreach (var ld in _live.Values) FachOf(R, ld);
         }
 
         /// <summary>Produkcja okregu w kg/d na towar dostawy, zjedzone w okregu, na targ (kg i sztuki gry). factors - zima, E4/5 i E4/7 (w grze; Plan - nie: rece Planu juz z czynnikami rak).</summary>
