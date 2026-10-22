@@ -8932,9 +8932,9 @@ namespace Armoury
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public bool KsPlanMarketBalance { get; set; } = true;
 
-        [SettingPropertyBool("Ks Fach Market Room", HintText = "with Ks Village Trade Keep: the room a village's own trade has at the market is the market's demand less what all the villages of that market eat themselves, not only the villages with that trade - grain villages no longer grow grain for a market that is already full. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ks Fach Market Room", HintText = "OFF by default (test 103i 22.10: villages earned about 12% less from their carts, purses fell 0.14%/day, plan over 30 s). With Ks Village Trade Keep: the room a village's own trade has at the market is the market's demand less what all the villages of that market eat themselves, not only the villages with that trade - grain villages no longer grow grain for a market that is already full. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
-        public bool KsFachMarketRoom { get; set; } = true;
+        public bool KsFachMarketRoom { get; set; } = false;
 
         [SettingPropertyBool("Town Works Hire District", HintText = "with Ks Switch Signal Rule: towns with more coin than they need pay back what village rebuilding put into town purses (a week's average), as wages for carts and hands from their district villages - by households, raided villages get nothing. A town pays first for its own district, then for poorer towns. Only coin moves; nothing is built. Never below a town's own needs, not while besieged or just taken. Every town, the player's too. Off = the coin stays in the town purses, as before", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
