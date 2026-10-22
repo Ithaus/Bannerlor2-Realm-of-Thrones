@@ -16,9 +16,11 @@ namespace Armoury
     //    sam z tego towaru (NeedsOfKeep jak KsDeliver.Own, x lepszy stol);
     //  - k rynku i towaru = min(1, (popyt rynku - podaz regale i spoza tabeli - zjedzone w okregach fachu) / suma baz fachu) - wprost z podazy i popytu Planu, jedyna skala;
     //    suma celow nigdy nie przekracza popytu, wiec fach nie robi nadwyzki (zywiec - wobec rynku miesa: zywiec daje mieso x 0.5);
-    //  - w kazdej rundzie rownowagi (po logicie, przed progiem wyzywienia): okreg z produkcja towaru ponizej celu przesuwa udzial rak bloku ze wszystkich innych par na pare
-    //    zajecia typu - najpierw bloki, w ktorych typ daje najwiecej towaru na udzial (brzeg dla rybakow), tylko w blokach, w ktorych praca typu daje wiecej, niz kosztuje
-    //    (dochod pary przed podloga > 0), tylko tyle, ile brakuje, i najwyzej do ziemi bloku (ha zajete <= 0.98 x powierzchni - jak prog wyzywienia). Suma udzialow bloku = 1:
+    //  - w kazdej rundzie rownowagi (po logicie, przed progiem wyzywienia): okreg z produkcja towaru ponizej celu przesuwa udzial rak bloku na pare zajecia typu - najpierw
+    //    bloki, w ktorych typ daje najwiecej towaru na udzial (brzeg dla rybakow), tylko w blokach, w ktorych praca typu daje wiecej, niz kosztuje (dochod pary przed
+    //    podloga > 0); w bloku dawcy od pary z najnizszym dochodem (recenzja R2 - najpierw praca najgorzej platna, nie zboze i ser po rowno z reszta), bez pary mieszanki
+    //    jedzenia progu i bez pary z wiecej kcal jedzenia niz para typu (recenzja R1 - fach nie robi okregu glodniejszym); tylko tyle, ile brakuje, i najwyzej do ziemi
+    //    bloku (ha zajete <= 0.98 x powierzchni - jak prog wyzywienia). Suma udzialow bloku = 1:
     //    rak tyle samo, zmienia sie tylko ich zajecie; produkcja dalej rece x tabela swiata x ziemia - nic z niczego. Rownowaga przestawia reszte swiata (ceny), wiec bilans
     //    Planu (NKS-3) trzyma sie z konstrukcji;
     //  - regale (drwale, kopalnie, daktyle): w RegaleStep wiersze okregow typu najpierw - min(sufit wiersza, cel), razem najwyzej potrzeba krainy (jedna skala na kraine), reszta
@@ -55,6 +57,8 @@ namespace Armoury
             public double[] IncRaw;                                    // [NP] dochod pary przed podloga 0.02 (Shares, przy FachEq)
             public double[] FhOg;                                       // [NP] kg/d towaru fachu okregu pary przy udziale 1 (OVal; 0 poza okregami fachu i bez towaru)
             public int[] FhKt;                                          // [NB] para zajecia typu bloku okregu fachu (-1 - brak)
+            public bool[] FhFeed;                                       // okreg fachu objety progiem wyzywienia w tej rownowadze (PairKcal i mieszanka bloku policzone)
+            public int[] FhIdx;                                         // bufor dawcow bloku (ApplyFach - od najnizszego dochodu pary)
             public int FhN;                                             // okregi fachu (bez regale)
             public KsDistrict[] FhD; public int[] FhG, FhPs, FhPk, FhOs, FhOrd; public double[] FhT, FhOwn, FhK, FhAfter; public byte[] FhFlag;
             public double[] FhHandsBy = new double[KsTab.NC];           // rece przesuniete do fachu wedlug zajecia dawcy (ostatnia runda)
@@ -120,7 +124,7 @@ namespace Armoury
             }
             int n = dl.Count;
             x.FhN = n; x.FhD = dl.ToArray(); x.FhG = new int[n]; x.FhT = new double[n]; x.FhOwn = new double[n]; x.FhK = new double[n];
-            x.FhAfter = new double[n]; x.FhFlag = new byte[n];
+            x.FhAfter = new double[n]; x.FhFlag = new byte[n]; x.FhFeed = new bool[n];
             var ps = new List<int>(n + 1); var pk = new List<int>(n * 24); var os = new List<int>(n + 1); var ord = new List<int>(n * 20);
             var sumKg = new Dictionary<int, double>(); var sumOwn = new Dictionary<int, double>();
             var tmp = new double[KsTab.NN];
@@ -128,6 +132,7 @@ namespace Armoury
             {
                 var d = dl[i]; int g = d.FachG;
                 x.FhG[i] = g;
+                x.FhFeed[i] = x.FeedOn && x.FA != null && x.PairKcal != null && InFeedScope(d, x.In.SelfFeed, x.B[b0l[i]]);   // recenzja R1: prog wyzywienia liczyl ten okreg
                 double own = Livestock(g) ? 0.0 : FachOwn(x, d, g, tmp);
                 x.FhOwn[i] = own;
                 int key = d.Market * KsTab.NG + g;
@@ -177,12 +182,13 @@ namespace Armoury
         }
 
         /// <summary>m106 - w kazdej rundzie (Shares, po logicie, PRZED progiem wyzywienia): okreg z towarem fachu ponizej celu przesuwa rece bloku na pare zajecia typu
-        /// (opis na gorze pliku). Liczby ostatniej rundy: produkcja po fachu, flagi (1 ziemia, 2 typ bez zysku, 4 rece - wszystko juz w typie), rece wedlug zajecia dawcy.</summary>
+        /// (opis na gorze pliku; blok - FachBlock). Liczby ostatniej rundy: produkcja po fachu, flagi (1 ziemia, 2 typ bez zysku, 4 rece - wszystko juz w typie albo tylko pary
+        /// chronione progiem), rece wedlug zajecia dawcy.</summary>
         private static void ApplyFach(Ctx x, double[] p, double[] xs)
         {
             if (!x.FachEq) return;
             long t0 = Stopwatch.GetTimestamp();
-            var sc = x.BlockScale; var og = x.FhOg; var lp = x.LandP; var inc = x.IncRaw; var hb = x.FhHandsBy;
+            var sc = x.BlockScale; var og = x.FhOg; var inc = x.IncRaw; var hb = x.FhHandsBy;
             Array.Clear(hb, 0, hb.Length); x.FhHands = 0;
             for (int i = 0; i < x.FhN; i++)
             {
@@ -198,44 +204,60 @@ namespace Armoury
                         int b = x.FhOrd[q], kt = x.FhKt[b];
                         if (!(sc[b] > 0)) continue;
                         if (!(inc[kt] > 0)) { fl |= 2; continue; }                // praca typu nie daje wiecej, niz kosztuje (dochod przed podloga)
-                        int a = x.BStart[b], e = x.BStart[b + 1];
-                        double so = 0, gOth = 0, lu = 0, lOth = 0;
-                        for (int k = a; k < e; k++)
-                        {
-                            double v = xs[k];
-                            lu += v * lp[k];
-                            if (k == kt) continue;
-                            so += v; gOth += v * og[k]; lOth += v * lp[k];
-                        }
-                        if (!(so > 1e-12)) { fl |= 4; continue; }                 // cale rece bloku juz w zajeciu typu
-                        double G = sc[b] * (so * og[kt] - gOth);
-                        if (!(G > 1e-12)) continue;
-                        double f = Math.Min(1.0, gap / G);
-                        double dL = so * lp[kt] - lOth;                            // ha na przesuniety udzial (> 0 - typ bierze wiecej ziemi niz dawcy)
-                        if (dL > 1e-12)
-                        {
-                            double room = 0.98 * x.Area[b] - lu;
-                            double lim = room > 0 ? room / dL : 0.0;
-                            if (lim < f) { f = lim; fl |= 1; }
-                        }
-                        if (!(f > 1e-15)) continue;
-                        double hands = x.W[b] * sc[b];
-                        for (int k = a; k < e; k++)
-                        {
-                            if (k == kt) continue;
-                            double take = xs[k] * f;
-                            if (!(take > 0)) continue;
-                            xs[k] -= take;
-                            hb[x.Pc[k]] += take * hands; x.FhHands += take * hands;
-                        }
-                        xs[kt] += f * so;
-                        P += f * G; gap -= f * G;
+                        FachBlock(x, x.FhFeed[i], b, kt, xs, tol, ref gap, ref P, ref fl);
                     }
                     if (gap > tol && fl == 0) fl = 4;                              // bez bloku z praca typu do przesuniecia
                 }
                 x.FhAfter[i] = P; x.FhFlag[i] = fl;
             }
             x.FhTicks += Stopwatch.GetTimestamp() - t0;
+        }
+
+        /// <summary>m106 recenzja R1: para k bloku b moze oddac rece parze zajecia typu kt. Okreg objety progiem wyzywienia (feed): nie oddaje pary mieszanki jedzenia bloku
+        /// (FA, FB - te, ktore prog i tak przywroci) ani pary dajacej wiecej kcal jedzenia niz para typu (PairKcal przy pelnej pracy - ta sama miara co prog) - fach nie robi
+        /// okregu glodniejszym, a prog nie musi cofac fachu (dotad zabieralo zboze: wheat_farm 0.69 mln rak, cattle_farm:maslo 0.27 mln - Plan bez pokrycia W 8.0 -> 10.0%).</summary>
+        private static bool FachDonor(Ctx x, bool feed, int b, int k, int kt)
+        {
+            if (!feed) return true;
+            if (k == x.FA[b] || (x.FB[b] >= 0 && k == x.FB[b])) return false;
+            return !(x.PairKcal[k] > x.PairKcal[kt]);
+        }
+
+        /// <summary>m106 recenzja R2: przesuniecie rak bloku b na pare typu kt - dawcy od pary z NAJNIZSZYM dochodem (IncRaw - dochod przed podloga; remis - kolejnosc par),
+        /// kazdy tylko tyle, ile brakuje do celu, i tylko gdy typ daje z udzialu wiecej towaru niz dawca; ziemia bloku (ha zajete) najwyzej 0.98 x powierzchni - ruch, ktory bierze
+        /// wiecej ziemi niz dawca, uciety do wolnej ziemi. Dotad wszyscy dawcy oddawali po rowno - najlepiej platna praca (zboze, ser) szla na tani towar typu (ryby W 0.24) i wies
+        /// biedniala w Planie (sprzedaz wsi W -2%). Suma udzialow bloku bez zmian (nic z niczego). Flagi: 1 ziemia, 4 brak dawcy (wszystko juz w typie albo tylko pary chronione).</summary>
+        private static void FachBlock(Ctx x, bool feed, int b, int kt, double[] xs, double tol, ref double gap, ref double P, ref byte fl)
+        {
+            var sc = x.BlockScale; var og = x.FhOg; var lp = x.LandP; var inc = x.IncRaw; var hb = x.FhHandsBy;
+            int a = x.BStart[b], e = x.BStart[b + 1];
+            double lu = 0; for (int k = a; k < e; k++) lu += xs[k] * lp[k];
+            double room = 0.98 * x.Area[b] - lu;
+            if (x.FhIdx == null || x.FhIdx.Length < e - a) x.FhIdx = new int[Math.Max(64, e - a)];
+            var idx = x.FhIdx;
+            int n = 0;
+            for (int k = a; k < e; k++)
+            {
+                if (k == kt || !(xs[k] > 1e-12) || !FachDonor(x, feed, b, k, kt)) continue;
+                int t = n++;                                                   // wstawianie rosnaco wedlug dochodu (k rosnie - remis zostaje w kolejnosci par)
+                while (t > 0 && inc[idx[t - 1]].CompareTo(inc[k]) > 0) { idx[t] = idx[t - 1]; t--; }
+                idx[t] = k;
+            }
+            if (n == 0) { fl |= 4; return; }
+            double hands = x.W[b] * sc[b];
+            for (int i = 0; i < n && gap > tol; i++)
+            {
+                int k = idx[i];
+                double g = sc[b] * (og[kt] - og[k]);                           // towar fachu na przesuniety udzial
+                if (!(g > 1e-12)) continue;
+                double t = Math.Min(xs[k], gap / g);
+                double dl = lp[kt] - lp[k];                                    // ha na przesuniety udzial (> 0 - typ bierze wiecej ziemi niz dawca)
+                if (dl > 1e-12) { double lim = room > 0 ? room / dl : 0.0; if (lim < t) { t = lim; fl |= 1; } }
+                if (!(t > 1e-15)) continue;
+                xs[k] -= t; xs[kt] += t; room -= t * dl;
+                P += t * g; gap -= t * g;
+                hb[x.Pc[k]] += t * hands; x.FhHands += t * hands;
+            }
         }
 
         /// <summary>m106 - RegaleStep, rynek z i towar regale g: kwota (kg/d) kazdego wiersza. Wiersze okregow, ktorych typ jest tym zajeciem regale, najpierw: okreg dostaje

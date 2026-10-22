@@ -69,6 +69,7 @@ namespace Armoury
             // m106-wozy P1 (klucz Ks Village Trade Keep): fach okregu z ostatniego Planu (pamiec sesji, bez zapisu - po wczytaniu do pierwszego Planu 0: regula A7 bez fachu) -
             // indeks towaru dostawy (KsDeliver.ItemIds) i cel na targ w kg/d po k
             public int FachI = -1; public double FachKg;
+            public bool FachLive;                              // m106 recenzja Z5: fach zywca (bydlo, swinie, owce) - regula A7 porownuje produkcje (na targ + zjedzone)
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed; }
@@ -339,9 +340,9 @@ namespace Armoury
             if (R != null && R.DistFach != null && ld != null && ld.Id != null && R.DistFach.TryGetValue(ld.Id, out f) && f != null && f.G >= 0 && f.G < KsTab.NG && f.T > 0)
             {
                 int it = f.G == KsTab.GMeat ? IMeat : GoodToItem[f.G];
-                if (it >= 0) { ld.FachI = it; ld.FachKg = f.T; return; }
+                if (it >= 0) { ld.FachI = it; ld.FachKg = f.T; ld.FachLive = f.G == KsTab.GCow || f.G == KsTab.GHog || f.G == KsTab.GSheep; return; }
             }
-            if (ld != null) { ld.FachI = -1; ld.FachKg = 0; }
+            if (ld != null) { ld.FachI = -1; ld.FachKg = 0; ld.FachLive = false; }
         }
 
         /// <summary>m106-wozy P1: odbior Planu w stanie zastosowanym - cel fachu kazdego okregu od nowa (co 7 dob z Planem; klucz wylaczony - Plan bez DistFach: cele zerowane).</summary>

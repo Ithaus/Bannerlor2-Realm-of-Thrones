@@ -192,6 +192,12 @@ namespace Armoury
             return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);
         }
 
+        /// <summary>m106-wozy P1: dochod zajecia c bloku w regule A7 - ta sama miara co ocena bloku w tej dobie (sygnal KS albo ceny gry z wierszem miasta albo bez).</summary>
+        private static double FachInc(LiveBlock b, string type, int c, bool sig, double[] sRow, double[] sV, double[] px, double[] vRow)
+        {
+            return sig ? A7sIncome(b, type, c, sRow, sV, A7sRent(b)) : (vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px));
+        }
+
         private static bool Tree(int c) { return c == KsTab.CVine || c == KsTab.COlive || c == KsTab.CDate || c == KsTab.CCitrus; }
 
         private static int IndexOfCraft(LiveBlock b, int c) { if (b.C != null) for (int i = 0; i < b.C.Length; i++) if (b.C[i] == c) return i; return -1; }
@@ -260,22 +266,39 @@ namespace Armoury
                     bool busy = false;
                     foreach (var b in ld.B) if (b != null && b.Target >= 0) { busy = true; break; }
                     string region = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
-                    // m106-wozy P1: fach okregu w dobie kroku - zajecie typu (bez regale: tych pilnuje cykl regali), produkcja na targ (ostatni rachunek okregu) wobec celu z Planu
-                    // i blok powrotu: najwieksza przydatnosc ziemi zajecia typu wsrod blokow bez typu jako glownego (jedna czesc okregu naraz - jak hamulec A7)
+                    // m106-wozy P1: fach okregu w dobie kroku - zajecie typu (bez regale: tych pilnuje cykl regali), produkcja na targ wobec celu z Planu i blok powrotu:
+                    // najwieksza przydatnosc ziemi zajecia typu wsrod blokow, ktore naprawde moga przejsc (jedna czesc okregu naraz - jak hamulec A7)
                     int fct = -1; double fM = 0, fT = 0; LiveBlock fRet = null;
                     if (fach && step && !ld.TF && ld.FachI >= 0 && ld.FachKg > 0 && ld.Res != null && type != null && KsTab.CraftIndex.TryGetValue(type, out fct) && !KsTab.IsRegale[fct])
                     {
-                        fM = ld.Res.MarketKg[ld.FachI]; fT = ld.FachKg;
+                        // recenzja Z5: ta sama miara co cel Planu - rachunek okregu BEZ czynnikow gry (zima, spustoszenie, wolne rece, rok urodzaju, ziemia, stada i prace okregu
+                        // sa w ld.Res, a w celu Planu nie - wieloletnia zima Westeros dawala "niedobor" ponad potrzebe Planu); zywiec - produkcja (na targ + zjedzone: Own ubija zywiec
+                        // na stol, a chec zjedzenia zywca w celu = 0)
+                        var rf = ComputeDistrict(ld, false, null);
+                        fM = rf != null ? rf.MarketKg[ld.FachI] + (ld.FachLive ? rf.Own[ld.FachI] : 0.0) : ld.Res.MarketKg[ld.FachI];
+                        fT = ld.FachKg;
                         double kgI = _itemKg != null && ld.FachI < _itemKg.Length ? _itemKg[ld.FachI] : 10.0;
-                        if (fM < 0.95 * fT) { _fShort++; _fShortT += fT / (sigma * kgI); _fShortM += fM / (sigma * kgI); }
-                        double bl = -1;
-                        foreach (var b in ld.B)
+                        if (fM < 0.95 * fT)
                         {
-                            if (b == null || b.K == null || b.C == null || b.X == null || b.Target >= 0 || b.Cand == null || !b.Cand.Contains(fct)) continue;
-                            int mi = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[mi]) mi = i;
-                            if (b.C[mi] == fct) continue;
-                            double L = b.L(fct, type);
-                            if (L > bl) { bl = L; fRet = b; }
+                            _fShort++; _fShortT += fT / (sigma * kgI); _fShortM += fM / (sigma * kgI);
+                            // recenzja Z10: blok powrotu tylko sposrod blokow, ktore hamulec przepusci - bez prac okregu (KsWorksLock), praca typu daje wiecej, niz kosztuje, i nie mniej
+                            // niz biezaca (recenzja R3), prog wyzywienia (FeedKeeps) i ziemia bloku; miasto bez sygnalu KS - bez bloku (regula i tak nie ocenia)
+                            double bl = -1;
+                            if (!sig || sRow != null)
+                                foreach (var b in ld.B)
+                                {
+                                    if (b == null || b.K == null || b.C == null || b.X == null || b.Target >= 0 || b.Cand == null || b.Cand.Count < 2 || !b.Cand.Contains(fct)) continue;
+                                    int mi = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[mi]) mi = i;
+                                    int bc = b.C[mi];
+                                    if (bc == fct) continue;
+                                    double L = b.L(fct, type);
+                                    if (!(L > bl) || KsWorksLock(ld, b)) continue;
+                                    double fi = FachInc(b, type, fct, sig, sRow, sV, px, vRow);
+                                    if (!(fi > 0) || fi < FachInc(b, type, bc, sig, sRow, sV, px, vRow) || FeedKeeps(ld, bc, fct)) continue;
+                                    double area = BlockArea(ld, b), after = b.LandUse + b.X[mi] * (b.LandOf(fct, type) - b.LandOf(bc, type));
+                                    if (area > 0 && after > area * 1.02 && after > b.LandUse) continue;
+                                    bl = L; fRet = b;
+                                }
                         }
                     }
                     else fct = -1;
@@ -316,12 +339,12 @@ namespace Armoury
                         bool fachRet = false;
                         if (fct >= 0)
                         {
-                            double fInc = sig ? A7sIncome(b, type, fct, sRow, sV, A7sRent(b)) : (vRow != null ? IncomeV(b, type, fct, px, vRow) : Income(b, type, fct, px));
+                            double fInc = FachInc(b, type, fct, sig, sRow, sV, px, vRow);
                             if (cur == fct)
                             {
                                 if (fM <= 1.05 * fT && fInc > 0) { b.Held = 0; _fKeep++; continue; }
                             }
-                            else if (ReferenceEquals(b, fRet) && fM < 0.95 * fT && fInc > 0) { best = fct; fachRet = true; }
+                            else if (ReferenceEquals(b, fRet) && fM < 0.95 * fT && fInc > 0 && fInc >= incCur) { best = fct; fachRet = true; }   // recenzja R3: nie na gorzej platna prace
                         }
                         if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; continue; }
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
