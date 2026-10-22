@@ -9240,6 +9240,10 @@ namespace Armoury
         [SettingPropertyGroup("Chronicle of Westeros")]
         public bool ChroniclePlayerChoices { get; set; } = true;
 
+        [SettingPropertyBool("Chronicle Canon Deaths", HintText = "characters die in Chronicle events as they die in the books and the show, but only when the world went the same way (the character is alive, where the story puts him and in the same role). When your world went another way they live. Off = only the full versions kill them", RequireRestart = false)]
+        [SettingPropertyGroup("Chronicle of Westeros")]
+        public bool ChronicleCanonDeaths { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11549,6 +11553,7 @@ namespace Armoury
             s.ChronicleWorldChanges = ChronicleWorldChanges;
             s.ChronicleFullVersions = ChronicleFullVersions;
             s.ChroniclePlayerChoices = ChroniclePlayerChoices;
+            s.ChronicleCanonDeaths = ChronicleCanonDeaths;
         }
 
         internal static void Apply()

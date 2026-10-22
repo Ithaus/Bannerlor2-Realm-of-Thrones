@@ -147,6 +147,12 @@ SUCCEED_LIGHT_OK = {42, 49, 52, 80}
 MOVES_FROM_BRANCHES = {'p10'}
 
 FULL_ONLY = {'own', 'ruler', 'leader', 'alliance', 'truce', 'succeed'}
+# m107-kronika: wersja=smierc (smierci z kanonu w wersji lekkiej, klucz ChronicleCanonDeaths) - z akcji tylko-pelnych wolno tylko succeed
+DEATH_OK = {'succeed'}
+VERSIONS = ('lekka', 'pelna', 'obie', 'smierc')
+# Rodzaje termow wyzwalacza #move znane CanonCompanions.BaseTrue (reszta = "nigdy" - wiersz pominiety)
+MOVE_TERMS = {'ev', 'done', 'dead', 'rotday', 'prolday', 'war', 'own', 'kr'}
+RE_KR = re.compile(r'^(\d{3}\.[1-9])(?:=([a-d])|~([0a-z]+))?$')   # kr:NNN.w[=x|~R] (m107: ~R - okno rozstrzygniete wierszem z R)
 SIDE_CHANGE = {'clan', 'court', 'lead', 'prisoner', 'free', 'wander', 'die', 'marry', 'wed', 'succeed'}
 KILL_HIDE = {'die', 'hide', 'succeed'}
 CLASS = {}
@@ -747,20 +753,32 @@ def chk_term(t, ctx, rep, world, refs, what):
     elif kind == 'prolday':
         good = need(1, 'N') and chk_int(a[0], 0, 400, raw, ctx, rep) is not None
     elif kind == 'kr':
-        good = need(1, 'NNN.w[=opcja]')
+        good = need(1, 'NNN.w[=opcja|~R]')
         if good:
             ref = a[0]
             opt = None
+            krow = None
+            if '~' in ref:
+                # m107: kr:NNN.w~R - okno rozstrzygniete wierszem z R (0 = glowny, a-z = wariant), np. kr:083.1~0b
+                ref, krow = ref.split('~', 1)
             if '=' in ref:
                 ref, opt = ref.split('=', 1)
             if not RE_WIN.match(ref):
                 rep.e(ctx.where, '%s: %r - id okna ma byc NNN.w (np. 008.1)' % (what, raw))
                 good = False
+            elif opt is not None and krow is not None:
+                rep.e(ctx.where, '%s: %r - =opcja i ~R razem niedozwolone' % (what, raw))
+                good = False
             elif opt is not None and opt not in ('a', 'b', 'c', 'd'):
                 rep.e(ctx.where, '%s: %r - opcja a-d' % (what, raw))
                 good = False
+            elif krow is not None and not re.match(r'^[0a-z]+$', krow):
+                rep.e(ctx.where, '%s: %r - ~R: 0 (wiersz glowny) i/lub litery wariantow a-z' % (what, raw))
+                good = False
             else:
                 refs.append(('kr', ref, opt, ctx.where, ctx.nr))
+                if krow is not None:
+                    refs.append(('krrow', ref, krow, ctx.where, ctx.nr))
     elif kind == 'flag':
         good = need(1, '<nazwa>') and (RE_FLAG.match(a[0]) is not None or rep.e(ctx.where, '%s: nazwa flagi %r: male litery, cyfry, _ (2-41 zn.)' % (what, a[0])))
         if good:
@@ -784,6 +802,13 @@ def chk_term(t, ctx, rep, world, refs, what):
         good = need(1, 'reach|dorne') and (a[0] in ('reach', 'dorne') or rep.e(ctx.where, '%s: %r - cw:reach albo cw:dorne' % (what, raw)))
     elif kind == 'season':
         good = need(1, 'winter|spring|summer|autumn') and (a[0] in SEASONS or rep.e(ctx.where, '%s: %r - pora: %s' % (what, raw, '|'.join(sorted(SEASONS)))))
+    elif kind == 'near':
+        # m107: near:<bohater>:<osada>:<odleglosc 1-500> - bohater (osada, loch, druzyna) w promieniu od osady (Chronicle.Terms.HeroPos)
+        good = (need(3, '<bohater>:<osada>:<odleglosc>') and chk_ref(a[0], 'hero', world, ctx, rep, ctx.recurring)
+                and chk_ref(a[1], 'settlement', world, ctx, rep, ctx.recurring) and chk_int(a[2], 1, 500, raw, ctx, rep) is not None)
+    elif kind == 'region':
+        # m107: region:<bohater>:<krolestwo> - najblizsza osada bohatera nalezy do krolestwa (jak p:region dla gracza)
+        good = need(2, '<bohater>:<krolestwo>') and chk_ref(a[0], 'hero', world, ctx, rep, ctx.recurring) and chk_ref(a[1], 'kingdom', world, ctx, rep, ctx.recurring)
     elif kind == 'plan':
         mm = re.match(r'^([A-Za-z]+)-(\d+)$', ':'.join(a))
         if not mm:
@@ -1349,8 +1374,23 @@ def main():
             eff_gracz = c['gracz'] or ('' if is_base else rows[0].c['gracz'])
             if c['inni'] != c['forma'] and not eff_gracz and c['inni'] != 'nic':
                 rep.w(ctx.where, 'inni=%s bez kolumny gracz nic nie zmienia (wszyscy dostaja forme %s)' % (c['inni'], c['forma']))
-            if c['wersja'] not in ('lekka', 'pelna', 'obie'):
-                rep.e(ctx.where, 'wersja %r - lekka|pelna|obie' % c['wersja'])
+            if c['wersja'] not in VERSIONS:
+                rep.e(ctx.where, 'wersja %r - lekka|pelna|obie|smierc' % c['wersja'])
+            elif c['wersja'] == 'smierc':
+                # m107-kronika: smierc z kanonu w wersji lekkiej - zawsze wariant nad wierszem glownym obie (zapas bez smierci przy kazdym ustawieniu kluczy:
+                # Canon Deaths NIE, World Changes NIE, swiat inny niz w ksiazce; glowny lekka przy Full Versions TAK nie bierze udzialu - silnik HasFull)
+                if is_base:
+                    rep.e(ctx.where, 'wersja smierc tylko w wariancie - wiersz glowny to zapas bez smierci (silnik: ZLY WIERSZ, okno odpada)')
+                elif rows[0].c['wersja'] != 'obie':
+                    rep.e(ctx.where, 'okno z wierszem smierc: wiersz glowny ma byc wersja=obie (jest %r) - zapas bez smierci przy kazdym ustawieniu kluczy' % rows[0].c['wersja'])
+                else:
+                    names = set(x.strip().split(':', 1)[0] for x in c['skutki'].split(';') if x.strip())
+                    if c['wybor']:
+                        okey = key if key in choices else wid
+                        for cr in choices.get(okey, []):
+                            names |= set(x.strip().split(':', 1)[0] for x in cr.c['skutki'].split(';') if x.strip())
+                    if not names & {'die', 'succeed'}:
+                        rep.w(ctx.where, 'wiersz smierc bez die/succeed (w skutkach i opcjach) - nikt nie ginie; wystarczy wersja obie')
             shows = 'okno' in (c['forma'], c['inni'])
             # temat
             if c['temat']:
@@ -1509,7 +1549,13 @@ def main():
             elif c['bierna'] == '1':
                 rep.e(ctx.where, 'bierna=1 tylko na ostatniej opcji')
             acts = parse_acts(c['skutki'], ctx, rep, world, refs, 'skutki opcji')
-            wv = 'pelna' if vers == {'pelna'} else ('obie' if 'obie' in vers else 'lekka')
+            # m107: opcje tylko wierszy pelna/smierc z co najmniej jednym smierc - jak smierc (succeed wolno, own/ruler/leader/alliance/truce nie)
+            if vers == {'pelna'}:
+                wv = 'pelna'
+            elif vers and vers <= {'pelna', 'smierc'}:
+                wv = 'smierc'
+            else:
+                wv = 'obie' if 'obie' in vers else 'lekka'
             chk_acts_rules(acts, [base_cond, var_cond, dc], wv, nr, ctx, rep, world)
     for key, rows in bound_rows.items():
         wid = key[:5]
@@ -1641,6 +1687,30 @@ def main():
             rep.w('arm_canon_moves.tsv:%d' % world.moves_line.get(mid, 0), 'wiersz %s ma tylko termy kr: - przy ChronicleOfWesteros=NIE nie ruszy nigdy (stary wyzwalacz zostaje jako zapas, rozdz. 8)' % mid)
         for t in trig.split('|'):
             t = t.strip()
+            mwhere = 'arm_canon_moves.tsv:%d' % world.moves_line.get(mid, 0)
+            # m107: rodzaj termu znany CanonCompanions.BaseTrue (inny = "nigdy") i kr:NNN.w[=x|~R] - okno, opcja i warianty istnieja (paczka napisana)
+            tb = re.sub(r'\+\d+$', '', t)
+            tk = tb.split(':', 1)[0]
+            if t and tk not in MOVE_TERMS:
+                rep.e(mwhere, 'wiersz %s: term %s - CanonCompanions zna tylko %s (inny = nigdy)' % (mid, t, ', '.join(sorted(MOVE_TERMS))))
+            if tk == 'kr':
+                km = RE_KR.match(tb[3:])
+                if not km:
+                    rep.e(mwhere, 'wiersz %s: term %s - kr:NNN.w[=x|~R] (R: 0 = wiersz glowny, a-z = warianty)' % (mid, t))
+                elif km.group(1) in win_rows:
+                    kw, ko, kr_ = km.groups()
+                    rec_ = bool(win_rows[kw][0].c['powtorz'])
+                    if (ko or kr_) and rec_:
+                        rep.e(mwhere, 'wiersz %s: term %s - okno powracajace: =x i ~R nie trafiaja pod NNN.w (term nigdy nie zajdzie)' % (mid, t))
+                    if ko and not any(any(r.c['opcja'] == ko for r in choices[k]) for k in choices if k[:5] == kw):
+                        rep.e(mwhere, 'wiersz %s: term %s - okno %s nie ma opcji %s' % (mid, t, kw, ko))
+                    if kr_:
+                        wars = set(r.c['war'] for r in win_rows[kw])
+                        for ch in kr_:
+                            if ch != '0' and ch not in wars:
+                                rep.e(mwhere, 'wiersz %s: term %s - okno %s nie ma wariantu %s' % (mid, t, kw, ch))
+                elif NR_PACZKA.get(int(km.group(1)[:3])) in present_pk:
+                    rep.e(mwhere, 'wiersz %s: term %s - okna %s nie ma w paczce' % (mid, t, km.group(1)))
             mm = re.match(r'^kr:(\d{3}\.[1-9])', t)
             if mm:
                 w = mm.group(1)
@@ -1670,6 +1740,16 @@ def main():
                     rep.e(where, 'kr:%s=%s - okno nie ma wyboru' % (ref, opt))
                 elif not any(any(r.c['opcja'] == opt for r in choices[k]) for k in keys):
                     rep.e(where, 'kr:%s=%s - brak opcji %s' % (ref, opt, opt))
+        elif kind == 'krrow':
+            # m107: kr:NNN.w~R - kazda litera R to wariant okna (0 = wiersz glowny); okno powracajace - wiersz instancji nie trafia pod NNN.w (term nigdy)
+            if ref in win_rows:
+                if win_rows[ref][0].c['powtorz']:
+                    rep.e(where, 'kr:%s~%s - okno powracajace: wiersz instancji nie trafia do kr:NNN.w~R (term nigdy nie zajdzie) - uzyj flagi ze skutkow wiersza' % (ref, opt))
+                else:
+                    wars = set(r.c['war'] for r in win_rows[ref])
+                    for ch in opt:
+                        if ch != '0' and ch not in wars:
+                            rep.e(where, 'kr:%s~%s - okno %s nie ma wariantu %s' % (ref, opt, ref, ch))
         elif kind == 'hideend':
             # recenzja K0 R-2: koniec ukrycia na kr: okna powracajacego - "nigdy" dopiero po wyczerpaniu max:N; okno, ktore nie ruszy wcale (wyzwalacz
             # nie przyjdzie), zostawia postac ukryta na zawsze - skladnik potrzebuje zapasu (| ev:X | rotday:N)
@@ -1759,7 +1839,11 @@ def chk_acts_rules(acts, conds, wersja, nr, ctx, rep, world):
     terms = pos_terms([c for c in conds if c])
     for a in acts:
         if a.name in FULL_ONLY and wersja != 'pelna':
-            if not (a.name == 'succeed' and nr in SUCCEED_LIGHT_OK):
+            if wersja == 'smierc':
+                # m107: wiersz smierc (smierc kanonu w wersji lekkiej) - z akcji tylko-pelnych tylko succeed (zamki, wladcy, sojusze dalej tylko pelna)
+                if a.name not in DEATH_OK:
+                    rep.e(ctx.where, '%s - w wierszu wersja=smierc z akcji tylko-pelnych wolno tylko succeed (%s tylko w wierszu pelna)' % (a.raw, a.name))
+            elif not (a.name == 'succeed' and nr in SUCCEED_LIGHT_OK):
                 rep.e(ctx.where, '%s - akcja %s tylko w wierszu wersja=pelna (wylaczona kluczem ChronicleFullVersions)' % (a.raw, a.name))
         hero = a.args[0] if a.args else ''
         if a.name in KILL_HIDE and hero in PROTECTED and not protected_ok(hero, terms):

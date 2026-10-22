@@ -4156,6 +4156,10 @@ namespace Armoury
         public bool ChronicleWorldChanges = true;         // Chronicle events may change the world: deaths, side changes, hidden characters, bands, tasks, gold. Off = windows, relations and renown only
         public bool ChronicleFullVersions = false;        // 16 big Chronicle events come in their full versions: castle owners, rulers and alliances change. Off = the light versions, which leave these to the game
         public bool ChroniclePlayerChoices = true;        // Chronicle windows may ask you to choose what you do. Off = the book outcome without asking
+        // m107-kronika (Jeff 22.10 "tak, gina postacie, jesli historia mowi, ze gina; jesli bedzie inne zakonczenie i nie gina, to nie gina"): wiersze wersja=smierc
+        // (KRONIKA-FORMAT 3.1) - smierci z kanonu w wersji lekkiej, tylko gdy warunki wiersza (swiat jak w ksiazce) sa prawdziwe; inaczej wariant bez smierci.
+        // NIE (i Full Versions NIE) - wiersze smierc nie biora udzialu. World Changes NIE - tez nie (tekst nie twierdzi smierci, ktorej nie ma).
+        public bool ChronicleCanonDeaths = true;          // characters die in Chronicle events as they die in the books and the show, but only when the world went the same way (the character is alive, where the story puts him and in the same role). When your world went another way they live. Off = only the full versions kill them
 
         public static void Load(string moduleDataDir)
         {

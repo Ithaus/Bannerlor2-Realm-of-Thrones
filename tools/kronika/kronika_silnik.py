@@ -4,7 +4,8 @@
 Sprawdza, ze KAZDA akcja uzyta w danych (arm_kronika_k01..k10.tsv: skutki okien i opcji, po_rozbiciu band, nagroda zadan) ma w silniku
 (Armoury/src/Chronicle*.cs) procedure w slowniku Impl albo jest SWIADOMIE POMINIETA (procedura bez zadnego Res.Done - kazdy return to Res.Skip z powodem),
 ze kazdy uchwyt kod:<nazwa> z danych ma galaz w RunCode (Chronicle.Codes.cs) i ze kazdy wyzwalacz okna powracajacego (kolumna powtorz) jest w
-Recurring.Triggers i nie jest w Recurring.Unsupported.
+Recurring.Triggers i nie jest w Recurring.Unsupported. m107-kronika: kazdy rodzaj termu z kolumn warunkow (po, przed, warunki, gracz, dostepna) i z konca
+ukrycia hide:<b>:<warunek> jest w Terms.Kinds (p:<x> - w Terms.PlayerKinds) - inaczej silnik liczy go jako falsz z linia NIEZNANY TERM.
 
 Uzycie (z katalogu repo):  python -I tools/kronika/kronika_silnik.py [--repo <katalog repo>]
 Wynik: tabela akcja | wierszy | uzyc | stan, potem uchwyty i wyzwalacze, na koncu linia "kronika_silnik: ... | WYNIK OK|BLAD" (kod wyjscia 0 = OK).
@@ -28,6 +29,20 @@ COLS = {
     '#usuniete': ['id', 'powod'],
 }
 ACT_COLS = {'#okno': ['skutki'], '#wybor': ['skutki'], '#banda': ['po_rozbiciu'], '#zadanie': ['nagroda']}
+COND_COLS = {'#okno': ['po', 'przed', 'warunki', 'gracz'], '#wybor': ['dostepna']}   # m107: kolumny warunkow (rodzaje termow wobec Terms.Kinds)
+
+
+def cond_kinds(expr):
+    """Rodzaje termow warunku ('a & b | !c+5' -> ['a', 'b', 'c']); p:<x> -> 'p:<x>'."""
+    out = []
+    for conj in (expr or '').split('&'):
+        for alt in conj.split('|'):
+            s = alt.strip().lstrip('!').strip()
+            if not s:
+                continue
+            q = s.split(':')
+            out.append('p:' + q[1] if q[0] == 'p' and len(q) > 1 else q[0])
+    return out
 
 
 def read_data(md):
@@ -36,6 +51,7 @@ def read_data(md):
     uses = collections.Counter()
     codes = collections.Counter()
     trig = collections.defaultdict(list)
+    kinds = collections.Counter()   # m107: rodzaj termu -> liczba uzyc (kolumny warunkow i koniec ukrycia)
     files = sorted(glob.glob(os.path.join(md, 'arm_kronika_k*.tsv')))
     for path in files:
         base = os.path.basename(path)
@@ -57,6 +73,9 @@ def read_data(md):
                 if sec == '#okno' and d.get('powtorz') and not d.get('war'):
                     t = d['powtorz'].split(';')[0].strip().split(':')[0]
                     trig[t].append(d['id'])
+                for col in COND_COLS.get(sec, []):
+                    for k in cond_kinds(d.get(col, '')):
+                        kinds[k] += 1
                 for col in ACT_COLS.get(sec, []):
                     for raw in d.get(col, '').split(';'):
                         raw = raw.strip()
@@ -67,7 +86,10 @@ def read_data(md):
                         uses[name] += 1
                         if name == 'kod':
                             codes[raw.split(':')[1] if ':' in raw else ''] += 1
-    return files, rows, uses, codes, trig
+                        if name == 'hide' and raw.count(':') >= 2:   # hide:<bohater>:<warunek konca>
+                            for k in cond_kinds(raw.split(':', 2)[2]):
+                                kinds[k] += 1
+    return files, rows, uses, codes, trig, kinds
 
 
 def method_body(src, name):
@@ -112,7 +134,14 @@ def read_engine(srcdir):
     m = re.search(r'HashSet<string>\s+Unsupported\s*=\s*new HashSet<string>\([^)]*\)\s*(\{(.*?)\})?\s*;', src, re.S)
     if m and m.group(2):
         unsupported = re.findall(r'"(\w+)"', m.group(2))
-    return src, impl, known, codes, triggers, unsupported
+    tkinds, pkinds = [], []
+    m = re.search(r'string\[\]\s+Kinds\s*=\s*\{(.*?)\};', src, re.S)
+    if m:
+        tkinds = re.findall(r'"(\w+)"', m.group(1))
+    m = re.search(r'string\[\]\s+PlayerKinds\s*=\s*\{(.*?)\};', src, re.S)
+    if m:
+        pkinds = re.findall(r'"(\w+)"', m.group(1))
+    return src, impl, known, codes, triggers, unsupported, tkinds, pkinds
 
 
 def state_of(src, handler, seen=None):
@@ -143,8 +172,8 @@ def main():
     o = ap.parse_args()
     md = os.path.join(o.repo, 'Armoury', 'ModuleData')
     srcdir = os.path.join(o.repo, 'Armoury', 'src')
-    files, rows, uses, codes, trig = read_data(md)
-    src, impl, known, ecodes, triggers, unsupported = read_engine(srcdir)
+    files, rows, uses, codes, trig, kinds = read_data(md)
+    src, impl, known, ecodes, triggers, unsupported, tkinds, pkinds = read_engine(srcdir)
     errors = 0
     print('akcja\twierszy\tuzyc\tstan')
     nimpl = nskip = 0
@@ -183,12 +212,19 @@ def main():
         else:
             st = 'OK'
         print('%s\t%s\t%s' % (t, ','.join(trig[t]), st))
+    print()
+    print('term\tuzyc\tstan')   # m107: rodzaje termow z danych wobec Terms.Kinds / PlayerKinds
+    for k in sorted(kinds):
+        ok = (k[2:] in pkinds) if k.startswith('p:') else (k in tkinds and k != 'p')
+        if not ok:
+            errors += 1
+        print('%s\t%d\t%s' % (k, kinds[k], 'OK' if ok else 'BLAD - spoza Terms.Kinds/PlayerKinds (silnik: NIEZNANY TERM, falsz)'))
     unused = sorted(set(impl) - set(rows))
     print()
     print('kronika_silnik: plikow danych %d, akcji uzytych %d (wierszy %d, uzyc %d) - z procedura %d, swiadomie POMINIETE %d | uchwytow %d | wyzwalaczy %d '
-          '| procedur bez uzycia w danych %d (%s) | bledy %d | WYNIK %s'
+          '| rodzajow termow %d (silnik zna %d + p:%d) | procedur bez uzycia w danych %d (%s) | bledy %d | WYNIK %s'
           % (len([f for f in files if not f.endswith('k00.tsv')]), len(rows), sum(len(v) for v in rows.values()), sum(uses.values()), nimpl, nskip,
-             len(codes), len(trig), len(unused), ','.join(unused) or '-', errors, 'OK' if errors == 0 else 'BLAD'))
+             len(codes), len(trig), len(kinds), len(tkinds), len(pkinds), len(unused), ','.join(unused) or '-', errors, 'OK' if errors == 0 else 'BLAD'))
     return 0 if errors == 0 else 1
 
 
