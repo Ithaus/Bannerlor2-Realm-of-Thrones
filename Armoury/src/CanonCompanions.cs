@@ -45,6 +45,13 @@ namespace Armoury
     ///   czlonkow) przenosi postacie kanonu z niszczonego rodu do rodu z #rescue (rod Renly'ego -> Tarth, Nocna Straz Jeora -> Snow); bez wiersza - znikaja z rodem
     ///   (linia logu). Zrodlo kazdego usuniecia (Lost) postaci kanonu - zapis (lost) i CanonRemovedBy dla UC (Armoury albo cudzy kod).
     /// Wyjatek per obiekt - licznik potkniec (CLAUDE.md 7), nic nie gasnie.
+    /// m105-kronika K0 (krok A4): wykonanie akcji wydzielone do ApplyAction(Hero, akcja, arg, zrodlo) - wola je Execute (#move) i Kronika (Chronicle.Actions: hide,
+    ///   unhide). Nowe akcje hide/unhide (KRONIKA-FORMAT 8, 11, plan P3): hide = LeaveParty + DisableHeroAction (bohater w liscie martwych i wylaczonych gry),
+    ///   zakaz dla glowy rodu, wladcy, postaci gracza i listy chronionych przed ich wydarzeniem ROT (FORMAT 15); gubernator, jeniec i bitwa - czeka; rejestr ukrytych
+    ///   "hid" w zapisie (klucz postaci, zrodlo, koniec ukrycia - term Kroniki liczony w dobie Kroniki); drugie hide na ukrytym = nowy koniec; unhide tylko z rejestru
+    ///   (postac nieukryta przez Armoury - POMINIETA "nie ukryty"), teleport do osady z akcji / siedziby rodu (TeleportHeroAction - stan Active). Wiersze m11/m20/m21
+    ///   'remove' -> 'hide' w tym samym commicie. Term kr:NNN.w[=x] w wyzwalaczach #move - stan okien Kroniki (Chronicle.Resolved); klucz ChronicleOfWesteros NIE
+    ///   = falsz "nigdy" (FORMAT 3.3, stary wyzwalacz po '|' dziala dalej). Postac ukryta: kolejne wiersze #move czekaja na powrot.
     /// </summary>
     internal static class CanonCompanions
     {
@@ -74,7 +81,7 @@ namespace Armoury
 
         private static readonly string[] NoTerms = new string[0];
         private static readonly HashSet<string> KnownActions = new HashSet<string>(StringComparer.Ordinal)
-            { "clan", "court", "lead", "prisoner", "free", "wander", "remove", "die", "marry", "wed" };
+            { "clan", "court", "lead", "prisoner", "free", "wander", "remove", "die", "marry", "wed", "hide", "unhide" };   // A4: hide/unhide (arg opcjonalny)
         private static readonly HashSet<string> ArgActions = new HashSet<string>(StringComparer.Ordinal)
             { "clan", "court", "prisoner", "free", "wander", "marry", "wed" };
         private const int WaitDays = 60;   // zmiana w toku (bitwa, niewola AI) czeka najwyzej tyle dob, potem pominieta
@@ -104,6 +111,16 @@ namespace Armoury
                                                                                                              // rod Renly'ego i Stannisa z Clan.All - kontrola odwolan)
         private static readonly Dictionary<string, string> _lostBy = new Dictionary<string, string>(StringComparer.Ordinal);  // klucz postaci -> kto usunal (Lost)
 
+        /// <summary>m105-kronika A4: wpis rejestru ukrytych (akcja hide z #move albo z Kroniki) - klucz postaci (wzor oryginalu albo id bohatera), zrodlo
+        /// ("#m11", "Kronika 008.1"), koniec ukrycia (term Kroniki; pusty = do unhide albo na zawsze), dzien kampanii ukrycia.</summary>
+        internal sealed class HidRow
+        {
+            public string Key = "", Src = "", End = "";
+            public int Day;
+        }
+
+        private static readonly Dictionary<string, HidRow> _hid = new Dictionary<string, HidRow>(StringComparer.Ordinal);   // zapis "hid" (niezaleznie od _on)
+
         // --- sesja ---
         private static int _st, _stDay, _commanderNulled, _commanderNulledDay;
         private static int _spawnBlocked, _spawnBlockedDay, _removedAfter;
@@ -112,6 +129,7 @@ namespace Armoury
         private static readonly HashSet<string> _waitSaid = new HashSet<string>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> _waitWhy = new Dictionary<string, string>(StringComparer.Ordinal);
         private static readonly Dictionary<string, int> _evDay = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> _firedBy = new Dictionary<string, string>(StringComparer.Ordinal);   // A4: id zmiany -> pierwszy prawdziwy term (linia)
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
         private static bool _installed, _pCommander, _pSpawn;
         private static string _patchLine = "";
@@ -205,6 +223,7 @@ namespace Armoury
             _spawnBlocked = _spawnBlockedDay = _removedAfter = 0;
             _spawnSaid.Clear();
             _done.Clear(); _first.Clear(); _pend.Clear(); _gone.Clear(); _lostBy.Clear();
+            _hid.Clear(); _firedBy.Clear();   // m105-kronika A4: ukryci (zapis) i term, ktory zaszedl (linia logu)
             _removingKey = _removingWhy = null;
             _held.Clear(); _heldDay.Clear(); _heldArg.Clear(); _freeing = null;   // m104-e5: jency kanonu trzymani do wiersza "free"
             _rescDay = _rescTotal = _lostOtherDay = 0;
@@ -556,11 +575,12 @@ namespace Armoury
             if (Busy(h)) { Log.Info(head + " - ratunek NIEMOZLIWY: w bitwie albo oblezeniu - postac znika z rodem (Lost)."); return; }
             string before = Side(h);
             string why;
-            if (Captive(h))
+            bool hidden = IsHidden(h);
+            if (Captive(h) || hidden)
             {
-                h.Clan = to;   // jeniec zostaje w niewoli - tylko rod (bez teleportu)
+                h.Clan = to;   // jeniec zostaje w niewoli, ukryty (A4) zostaje ukryty - tylko rod (bez teleportu, ktory przywrocilby ukrytego)
                 h.IsMinorFactionHero = to.IsMinorFaction;
-                why = "jeniec - zostaje w niewoli";
+                why = hidden ? "ukryty - zostaje ukryty" : "jeniec - zostaje w niewoli";
             }
             else
             {
@@ -979,7 +999,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wyzwalacze
-        /// <summary>m105-kronika (K0): internal dla Chronicle.Terms (ev, done, war, own, rotday, prolday) - logika bez zmian.</summary>
+        /// <summary>m105-kronika (K0): internal dla Chronicle.Terms (ev, done, war, own, rotday, prolday) - logika bez zmian. A4: kr:NNN.w[=x] (wyzwalacze #move
+        /// z para 'kr', FORMAT 8) - Chronicle.Resolved; dotad kr: byl nieznanym rodzajem ("nigdy").</summary>
         internal static bool BaseTrue(string t, out bool never)
         {
             never = false;
@@ -1009,6 +1030,7 @@ namespace Armoury
                         var st = Settlement.Find(p[0]);
                         return st != null && st.MapFaction != null && st.MapFaction.StringId == p[1];
                     }
+                case "kr": return Chronicle.Resolved(a, out never);   // A4: okno Kroniki rozstrzygniete (=x - wybor); Kronika wylaczona / okno pominiete - nigdy
             }
             never = true;   // nieznany rodzaj - nie zajdzie nigdy
             return false;
@@ -1056,12 +1078,15 @@ namespace Armoury
             int plus = 0, i = term.LastIndexOf('+');
             if (i > 0 && int.TryParse(term.Substring(i + 1), NumberStyles.Integer, Inv, out plus)) bas = term.Substring(0, i);
             else plus = 0;
+            bool kr = bas.StartsWith("kr:", StringComparison.Ordinal);
+            if (kr && !Chronicle.KeyOn) { never = true; return false; }   // A4: Kronika wylaczona - kr: falsz "nigdy" takze z pamiecia +N (FORMAT 3.3)
             int f;
             if (!_first.TryGetValue(bas, out f))
             {
                 if (!BaseTrue(bas, out never)) return false;
-                _first[bas] = day;
                 f = day;
+                if (kr) { int rd = Chronicle.ResolvedDay(bas.Substring(3)); if (rd >= 0 && rd < day) f = rd; }   // A4: dokladny dzien rozstrzygniecia okna (+N)
+                _first[bas] = f;
             }
             return day - f >= plus;
         }
@@ -1072,7 +1097,7 @@ namespace Armoury
             foreach (var t in r.Terms)
             {
                 bool nv;
-                if (TermTrue(t, day, out nv)) any = true;
+                if (TermTrue(t, day, out nv)) { if (!any) _firedBy[r.Id] = t; any = true; }   // A4: pierwszy prawdziwy term do linii logu (para kr, KW-13)
                 if (!nv) allNever = false;
             }
             never = !any && allNever;
@@ -1080,7 +1105,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zmiany stron (doba)
-        private enum Res { Done, Skip, Wait }
+        internal enum Res { Done, Skip, Wait }   // A4: internal - wynik ApplyAction dla Kroniki
 
         private static int CountDone(string res)
         {
@@ -1115,6 +1140,7 @@ namespace Armoury
         {
             int day = Day();
             _evDay.Clear();
+            _firedBy.Clear();
             var fires = new Dictionary<string, bool>(StringComparer.Ordinal);
             foreach (var r in _moves)
             {
@@ -1190,7 +1216,10 @@ namespace Armoury
             }
             _pend.Remove(r.Id); _waitWhy.Remove(r.Id);
             _done[r.Id] = day.ToString(Inv) + "|" + (res == Res.Done ? "ok" : "skip");
-            string when = " | wyzwalacz " + r.Trigger + " (dzien kampanii " + day + ", opowiesci " + StoryDay().ToString("0", Inv) + ")";
+            string fired;
+            _firedBy.TryGetValue(r.Id, out fired);   // A4: ktory term alternatywy zaszedl (np. kr:008.1+1 albo stary wyzwalacz) - para kr w KW-13
+            string when = " | wyzwalacz " + r.Trigger + (fired != null && r.Terms.Length > 1 ? " (zaszlo " + fired + ")" : "")
+                          + " (dzien kampanii " + day + ", opowiesci " + StoryDay().ToString("0", Inv) + ")";
             if (res == Res.Skip)
             {
                 _dSkip++; _tSkip++;
@@ -1320,16 +1349,50 @@ namespace Armoury
         private static Res Execute(MoveRow r, int day)
         {
             var h = WhoHero(r);
-            if (h == null) { Resolve(r, day, Res.Skip, "brak postaci (nie powstala albo wymazana)", null, null, false); return Res.Skip; }
-            if (!h.IsAlive) { Resolve(r, day, Res.Skip, "postac martwa", h, null, false); return Res.Skip; }
-            string ps = PlayerSide(h);
-            if (ps != null) { Resolve(r, day, Res.Skip, ps, h, null, false); return Res.Skip; }
-            string before = Side(h);
+            string before = h != null && h.IsAlive ? Side(h) : null;
             IFaction fromK = null;
-            try { fromK = h.MapFaction; } catch { }
+            try { if (h != null) fromK = h.MapFaction; } catch { }
+            string why;
+            Res res = ApplyAction(h, r.Action, r.Arg, "#" + r.Id, out why);   // A4: ta sama droga co akcje Kroniki
+            if (res == Res.Wait) { Resolve(r, day, Res.Wait, why, h, before, false); return Res.Wait; }
+            if (res == Res.Skip) { Resolve(r, day, Res.Skip, why, h, before, false); return Res.Skip; }
+            bool tell = false;
+            try
+            {
+                var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
+                IFaction toK = h.IsAlive ? h.MapFaction : null;
+                tell = h.HasMet || (pk != null && (pk == fromK || pk == toK));
+            }
+            catch { }
+            Resolve(r, day, Res.Done, why, h, before, tell);
+            return Res.Done;
+        }
+
+        /// <summary>m105-kronika A4: jedna akcja zmiany postaci (wydzielona z Execute - logika akcji #move bez zmian). source - zrodlo do linii i zapisu ("#m11",
+        /// "Kronika 008.1"). Wspolne kontrole: brak postaci / martwa - POMINIETA; postac gracza (rod, towarzysz, druzyna, jeniec gracza) - POMINIETA (nie dla
+        /// unhide); postac ukryta przez Armoury - kazda akcja poza hide/unhide CZEKA na powrot. Wynik Done/Skip/Wait + why (linia wolajacego).</summary>
+        internal static Res ApplyAction(Hero h, string action, string arg, string source, out string why)
+        {
+            why = "";
+            arg = arg ?? "";
+            source = source ?? "";
+            if (h == null) { why = "brak postaci (nie powstala albo wymazana)"; return Res.Skip; }
+            if (!h.IsAlive) { why = "postac martwa"; return Res.Skip; }
+            if (action != "unhide")
+            {
+                string ps = PlayerSide(h);
+                if (ps != null) { why = ps; return Res.Skip; }
+                HidRow hr;
+                if (action != "hide" && _hid.TryGetValue(Key(h), out hr) && h.IsDisabled)
+                {
+                    why = "ukryty (" + hr.Src + ", od dnia " + hr.Day.ToString(Inv) + ") - czeka na powrot";
+                    return Res.Wait;
+                }
+            }
+            if (action == "hide") return Hide(h, arg, source, out why);
+            if (action == "unhide") return Unhide(h, arg, source, out why);
             Res res = Res.Done;
-            string why = "";
-            switch (r.Action)
+            switch (action)
             {
                 case "lead":
                     SetCourt(h, false);
@@ -1339,17 +1402,17 @@ namespace Armoury
                 case "court":
                     {
                         if (Captive(h)) { res = Res.Wait; why = "jeniec (AI) - czeka na wolnosc"; break; }
-                        var clan = FindClan(r.Arg);
-                        if (clan == null || clan.IsEliminated) { res = Res.Skip; why = "brak rodu " + r.Arg + (clan != null ? " (wyeliminowany)" : ""); break; }
-                        res = MoveToClan(h, clan, r.Action == "court", out why);
+                        var clan = FindClan(arg);
+                        if (clan == null || clan.IsEliminated) { res = Res.Skip; why = "brak rodu " + arg + (clan != null ? " (wyeliminowany)" : ""); break; }
+                        res = MoveToClan(h, clan, action == "court", out why);
                         break;
                     }
                 case "prisoner":
                     {
                         if (Captive(h)) { res = Res.Skip; why = "juz jeniec " + Where(h); break; }
                         if (Busy(h)) { res = Res.Wait; why = "w bitwie albo oblezeniu"; break; }
-                        var cap = Captor(r.Arg);
-                        if (cap == null) { res = Res.Wait; why = "brak miejsca niewoli (" + r.Arg + ": siedziba / druzyna glowy rodu)"; break; }
+                        var cap = Captor(arg);
+                        if (cap == null) { res = Res.Wait; why = "brak miejsca niewoli (" + arg + ": siedziba / druzyna glowy rodu)"; break; }
                         LeaveParty(h);
                         if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
                         if (h.CurrentSettlement != null) LeaveSettlementAction.ApplyForCharacterOnly(h);
@@ -1359,7 +1422,7 @@ namespace Armoury
                     }
                 case "free":
                     {
-                        var clan = FindClan(r.Arg);
+                        var clan = FindClan(arg);
                         if (Captive(h))
                         {
                             _freeing = h;   // m104-e5: nasze uwolnienie - straz niewoli prologu (Prologue.World) przepuszcza
@@ -1389,14 +1452,14 @@ namespace Armoury
                         SetCourt(h, false);
                         h.IsMinorFactionHero = false;
                         if (h.Occupation != Occupation.Wanderer) h.SetNewOccupation(Occupation.Wanderer);
-                        var town = PickTown(r.Arg, h);
+                        var town = PickTown(arg, h);
                         if (town != null) TeleportHeroAction.ApplyImmediateTeleportToSettlement(h, town);
                         else if (!h.IsActive) h.ChangeState(Hero.CharacterStates.Active);
-                        why = "do wynajecia w " + Nm(town) + " (kultura " + r.Arg + ")";
+                        why = "do wynajecia w " + Nm(town) + " (kultura " + arg + ")";
                         break;
                     }
                 case "remove":
-                    RemoveQuiet(h, "zmiana strony #" + r.Id + " (remove)");   // Lost, bez komunikatu; wzor A po starcie zablokowany - ROT go nie odtworzy
+                    RemoveQuiet(h, "zmiana strony " + source + " (remove)");   // Lost, bez komunikatu; wzor A po starcie zablokowany - ROT go nie odtworzy
                     why = "usuniety ze swiata (Lost, bez komunikatu)";
                     break;
                 case "die":
@@ -1406,14 +1469,14 @@ namespace Armoury
                 case "marry":
                 case "wed":
                     {
-                        var o = FindHeroId(r.Arg);
-                        if (o == null || !o.IsAlive) { res = Res.Skip; why = "brak albo martwy " + r.Arg; break; }
+                        var o = FindHeroId(arg);
+                        if (o == null || !o.IsAlive) { res = Res.Skip; why = "brak albo martwy " + arg; break; }
                         if (h.Spouse != null) { res = Res.Skip; why = "juz w malzenstwie z " + Nm(h.Spouse); break; }
                         if (o.Spouse != null) { res = Res.Skip; why = Nm(o) + " juz w malzenstwie z " + Nm(o.Spouse); break; }
                         string ops = PlayerSide(o);
                         if (ops != null) { res = Res.Skip; why = Nm(o) + ": " + ops; break; }
                         if (Captive(h) || Captive(o)) { res = Res.Wait; why = "jedno z nich w niewoli"; break; }
-                        if (r.Action == "wed" && o.Clan != null && h.Clan != o.Clan)
+                        if (action == "wed" && o.Clan != null && h.Clan != o.Clan)
                         {
                             string w2;
                             var r2 = MoveToClan(h, o.Clan, true, out w2);
@@ -1427,18 +1490,151 @@ namespace Armoury
                         why = "slub z " + Nm(o) + " (rod " + Nm(o.Clan) + ")" + (ended > 0 ? ", zakonczone zaloty " + ended : "");
                         break;
                     }
+                default:
+                    res = Res.Skip;
+                    why = "nieznana akcja " + action;
+                    break;
             }
-            if (res == Res.Wait) { Resolve(r, day, Res.Wait, why, h, before, false); return Res.Wait; }
-            if (res == Res.Skip) { Resolve(r, day, Res.Skip, why, h, before, false); return Res.Skip; }
-            bool tell = false;
-            try
+            return res;
+        }
+
+        // ------------------------------------------------------------ ukrycie i powrot (m105-kronika A4, plan P3, KRONIKA-FORMAT 8, 11, 15)
+
+        /// <summary>Lista chronionych (KRONIKA-FORMAT 15, jak kronika_check.py): bohater -> wydarzenia ROT, z ktorych KTOREKOLWIEK musi zajsc, zanim wolno go ukryc
+        /// (ev:X - wydarzenie ruszylo, done:X - skonczone). Postacie potrzebne pozniejszym wydarzeniom ROT nie moga zniknac wczesniej (prog KW-15).</summary>
+        private static readonly Dictionary<string, string[]> Guarded = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            { "lord_1_29", new[] { "done:BastardsEvent" } }, { "lord_2_3", new[] { "done:WallSiegeEvent" } }, { "lord_5_17", new[] { "done:BastardsEvent" } },
+            { "lord_1_14", new[] { "ev:DanyInvasionEvent" } }, { "lord_1_11", new[] { "done:StannisDeathEvent", "done:EastwatchEvent" } },
+            { "lord_1_17", new[] { "done:RooseDeathEvent" } }, { "lord_5_1", new[] { "done:RedWeddingEvent" } }, { "lord_5_7", new[] { "done:RedWeddingEvent" } },
+            { "lord_5_13_1", new[] { "done:RedWeddingEvent" } }, { "lord_7_1", new[] { "done:JoffreyEvent" } }, { "ROTlord_369", new[] { "ev:AegonInvasionEvent" } },
+            { "lord_1_9", new[] { "done:RenlyDeathEvent" } }, { "lord_1_25", new[] { "done:RenlyDeathEvent" } },
+            { "lord_WE9_l", new[] { "done:BlackwaterSiegeEvent" } }, { "lord_4_14", new[] { "done:BlackwaterSiegeEvent" } },
+            { "lord_4_25", new[] { "done:HarrenhalSiegeEvent" } }, { "lord_4_25_1", new[] { "done:HarrenhalSiegeEvent" } },
+            { "lord_1_3", new[] { "done:RedWeddingEvent" } }, { "lord_1_50", new[] { "done:RedWeddingEvent" } }, { "lord_1_5", new[] { "done:RedWeddingEvent" } },
+            { "ROTlord_513", new[] { "done:RedWeddingEvent" } }, { "lord_5_16", new[] { "done:RedWeddingEvent" } },
+            { "lord_2_18", new[] { "done:RickardKarstarkExecutionEvent" } }, { "lord_5_3", new[] { "done:JeorMutinyEvent" } }, { "lord_4_2", new[] { "done:JoffreyEvent" } },
+            { "ROTlord_568", new[] { "done:JonEvent" } }, { "lord_5_21", new[] { "done:JonEvent" } }, { "lord_2_19", new[] { "done:JonEvent" } },
+            { "lord_2_23", new[] { "done:BastardsEvent" } }, { "lord_5_20", new[] { "done:BastardsEvent" } },
+            { "ROTlord_486", new[] { "ev:DanyInvasionEvent" } }, { "ROTlord_373", new[] { "ev:AegonInvasionEvent" } },
+        };
+
+        /// <summary>0 - poza lista chronionych, 1 - na liscie i wydarzenie juz zaszlo (need = term spelniony), 2 - na liscie, wydarzenie jeszcze nie (need = czego brak).</summary>
+        internal static int GuardState(Hero h, out string need)
+        {
+            need = null;
+            string[] ev;
+            if (h == null || h.StringId == null || !Guarded.TryGetValue(h.StringId, out ev)) return 0;
+            foreach (var t in ev)
             {
-                var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
-                IFaction toK = h.IsAlive ? h.MapFaction : null;
-                tell = h.HasMet || (pk != null && (pk == fromK || pk == toK));
+                bool nv;
+                if (BaseTrue(t, out nv)) { need = t; return 1; }
             }
-            catch { }
-            Resolve(r, day, Res.Done, why, h, before, tell);
+            need = string.Join("|", ev);
+            return 2;
+        }
+
+        internal static int HiddenCount { get { return _hid.Count; } }
+
+        /// <summary>Kopia rejestru ukrytych (doba Kroniki - koniec ukrycia, linie startu i doby).</summary>
+        internal static List<HidRow> HiddenRows() { return new List<HidRow>(_hid.Values); }
+
+        /// <summary>Ukryty przez Armoury (wpis w rejestrze i stan Disabled).</summary>
+        internal static bool IsHidden(Hero h)
+        {
+            HidRow r;
+            return h != null && _hid.Count > 0 && _hid.TryGetValue(Key(h), out r) && h.IsDisabled;
+        }
+
+        /// <summary>Bohater wpisu rejestru: wzor ROTwanderer* - oryginal (zywy, wylaczony albo martwy), inaczej id bohatera (takze z listy wylaczonych).</summary>
+        internal static Hero HiddenHero(HidRow r)
+        {
+            if (r == null) return null;
+            try { return r.Key.StartsWith(WandererPrefix, StringComparison.Ordinal) ? FindOriginal(r.Key) : FindHeroId(r.Key); }
+            catch { return null; }
+        }
+
+        /// <summary>Wpis rejestru bez dzialania w grze (postac zmarla w ukryciu albo przywrocona przez gre / inny mod) - usuniecie z powodem (doba Kroniki).</summary>
+        internal static void DropHidden(HidRow r) { if (r != null) _hid.Remove(r.Key); }
+
+        private static Res Hide(Hero h, string end, string source, out string why)
+        {
+            string k = Key(h);
+            HidRow hr;
+            if (_hid.TryGetValue(k, out hr))
+            {
+                if (h.IsDisabled)
+                {
+                    // FORMAT 11: hide na postaci juz ukrytej - nowy koniec ZASTEPUJE stary (np. Arya 008.1 rotday:2000, potem 044.2 kr:098.2)
+                    string old = hr.End;
+                    hr.End = Clean(end); hr.Src = Clean(source);
+                    why = "UKRYCIE: nowy koniec " + (end.Length > 0 ? end : "do unhide (bez terminu)") + " (byl " + (old.Length > 0 ? old : "bez terminu") + ", ukryty od dnia "
+                          + hr.Day.ToString(Inv) + ")";
+                    return Res.Done;
+                }
+                _hid.Remove(k);   // wpis nieaktualny (gra przywrocila postac) - ukrycie od nowa
+            }
+            if (h.IsDisabled) { why = "wylaczony przez gre albo inny mod (nie przez Armoury) - bez zmian"; return Res.Skip; }
+            if (h.IsClanLeader) { why = "glowa rodu " + Nm(h.Clan) + " - ukrycie zakazane (FORMAT 11)"; return Res.Skip; }
+            if (h.IsKingdomLeader) { why = "wladca " + (h.MapFaction != null ? h.MapFaction.StringId : "?") + " - ukrycie zakazane"; return Res.Skip; }
+            string need;
+            int g = GuardState(h, out need);
+            if (g == 2) { why = "lista chronionych - jeszcze przed " + need + " (FORMAT 15)"; return Res.Skip; }
+            if (Captive(h)) { why = "jeniec " + Where(h) + " - czeka na wolnosc (jenca nie ukrywamy)"; return Res.Wait; }
+            if (h.GovernorOf != null) { why = "gubernator " + Nm(h.GovernorOf.Settlement) + " - czeka"; return Res.Wait; }
+            if (Busy(h)) { why = "w bitwie albo oblezeniu"; return Res.Wait; }
+            string from = Where(h);
+            LeaveParty(h);                 // plan P3: przed DisableHeroAction zawsze wyjscie z druzyny (armia, zbieg, druzyna lorda - StartDisband, ludzie nie przepadaja)
+            DisableHeroAction.Apply(h);    // gra: z osady, stan Disabled (lista martwych i wylaczonych - CampaignObjectManager.HeroStateChanged)
+            if (!h.IsDisabled) { why = "DisableHeroAction bez skutku (stan " + h.HeroState + ")"; return Res.Skip; }
+            _hid[k] = new HidRow { Key = k, Src = Clean(source), End = Clean(end), Day = Day() };
+            why = "ukryty (byl: " + from + ")" + (end.Length > 0 ? ", koniec ukrycia " + end : ", bez terminu (do unhide albo na zawsze)")
+                  + (g == 1 ? " | lista chronionych: " + need + " spelnione" : "");
+            return Res.Done;
+        }
+
+        private static Res Unhide(Hero h, string arg, string source, out string why)
+        {
+            string k = Key(h);
+            HidRow hr;
+            if (!_hid.TryGetValue(k, out hr))
+            {
+                // FORMAT 11: unhide postaci, ktorej Armoury nie ukryl - POMINIETA, bez teleportu (postac zostaje tam, gdzie jest)
+                why = "nie ukryty" + (h.IsDisabled ? " (wylaczony przez gre albo inny mod - bez zmian)" : "");
+                return Res.Skip;
+            }
+            if (!h.IsDisabled)
+            {
+                _hid.Remove(k);
+                why = "nie ukryty - przywrocony wczesniej przez gre albo inny mod (stan " + h.HeroState + "), wpis ukrycia usuniety";
+                return Res.Skip;
+            }
+            Settlement to = null;
+            string how = "";
+            if (arg.Length > 0)
+            {
+                var st = Settlement.Find(arg);
+                bool enemy = false;
+                try { enemy = st != null && st.MapFaction != null && h.MapFaction != null && FactionManager.IsAtWarAgainstFaction(st.MapFaction, h.MapFaction); } catch { }
+                if (st != null && st.SiegeEvent == null && !st.IsHideout && !enemy) { to = st; how = "osada z akcji"; }
+                else how = "osada " + arg + (st == null ? " nie istnieje" : st.SiegeEvent != null ? " oblezona" : enemy ? " wroga" : " to kryjowka") + " - ";
+            }
+            if (to == null && h.Clan != null && !h.Clan.IsEliminated)
+            {
+                var seat = SeatOf(h.Clan);
+                if (seat != null && seat.SiegeEvent == null && !seat.IsHideout) { to = seat; how += "siedziba rodu " + Nm(h.Clan); }
+            }
+            if (to == null)
+            {
+                to = PickTown(h.Culture != null ? h.Culture.StringId : "", h);
+                if (to != null) how += "miasto kultury " + (h.Culture != null ? h.Culture.StringId : "-");
+            }
+            if (to == null) { why = "brak osady powrotu"; return Res.Wait; }
+            TeleportHeroAction.ApplyImmediateTeleportToSettlement(h, to);   // gra: Disabled -> Active (lista zywych), potem wejscie do osady
+            if (!h.IsActive) h.ChangeState(Hero.CharacterStates.Active);
+            _hid.Remove(k);
+            why = "powrot do " + Nm(to) + " (" + to.StringId + ", " + how + ") po ukryciu od dnia " + hr.Day.ToString(Inv) + " (" + hr.Src + ")"
+                  + (source.Length > 0 ? " | zrodlo " + source : "");
             return Res.Done;
         }
 
@@ -1459,6 +1655,8 @@ namespace Armoury
             foreach (var kv in _pend) sb.Append("pend\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');
             foreach (var t in _gone) sb.Append("gone\t").Append(t).Append('\n');
             foreach (var kv in _lostBy) sb.Append("lost\t").Append(kv.Key).Append('\t').Append(Clean(kv.Value)).Append('\n');
+            foreach (var h in _hid.Values)   // A4: "hid klucz dzien zrodlo koniec" (koniec na koncu - moze miec ':')
+                sb.Append("hid\t").Append(h.Key).Append('\t').Append(h.Day.ToString(Inv)).Append('\t').Append(Clean(h.Src)).Append('\t').Append(Clean(h.End)).Append('\n');
             return sb.ToString();
         }
 
@@ -1483,6 +1681,13 @@ namespace Armoury
                     case "pend": { int d; if (p.Length >= 3 && int.TryParse(p[2], NumberStyles.Integer, Inv, out d)) _pend[p[1]] = d; break; }
                     case "gone": _gone.Add(p[1]); break;
                     case "lost": if (p.Length >= 3) _lostBy[p[1]] = p[2]; break;
+                    case "hid":
+                        {
+                            int d;
+                            if (p.Length >= 3 && p[1].Length > 0 && int.TryParse(p[2], NumberStyles.AllowLeadingSign, Inv, out d))
+                                _hid[p[1]] = new HidRow { Key = p[1], Day = d, Src = p.Length >= 4 ? p[3].TrimEnd('\r') : "", End = p.Length >= 5 ? p[4].TrimEnd('\r') : "" };
+                            break;
+                        }
                 }
             }
         }

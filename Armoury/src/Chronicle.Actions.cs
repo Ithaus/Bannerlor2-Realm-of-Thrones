@@ -17,6 +17,7 @@ namespace Armoury
         /// z linia. Wynik: OK / POMINIETA (powod) / CZEKA (powod) - kazdy z linia "akcja NNN.w[=x] #i <akcja> -> ...". CZEKA: ponawiana co dobe (Daily) najdluzej
         /// WaitActionDays dni, potem POMINIETA; czekajace w zapisie ("kw"). Zakres A2: wiesc, plotka (Rumours.AddStoryNews, bez lektora na zywo), flag, kod:test,
         /// rel, relp, relk, renown, influence; reszta "POMINIETA (akcja jeszcze niewspierana)" - kroki A3+ dopisuja procedury w Impl (Bands/Hidden - liczniki dla linii).
+        /// A4: hide, unhide przez CanonCompanions.ApplyAction (rejestr ukrytych tam, w zapisie arm_canon_companions); koniec ukrycia (term) - HiddenDaily w dobie Kroniki.
         /// Wyjatek w akcji - POMINIETA z powodem i potkniecie; reszta skutkow idzie dalej (bez globalnego wylacznika).
         /// </summary>
         internal static class Actions
@@ -46,6 +47,7 @@ namespace Armoury
             {
                 { "wiesc", News }, { "plotka", Rumour }, { "flag", Flag }, { "kod", Code },
                 { "rel", Rel }, { "relp", RelP }, { "relk", RelK }, { "renown", Renown }, { "influence", Influence },
+                { "hide", Hide }, { "unhide", Unhide },   // A4: przez CanonCompanions.ApplyAction (rejestr ukrytych w zapisie arm_canon_companions)
             };
 
             /// <summary>Klasa akcji: 'T' tekst, 'R' relacje i slawa, 'S' swiat (FORMAT 11, klucz ChronicleWorldChanges).</summary>
@@ -64,8 +66,21 @@ namespace Armoury
             internal static int WaitCount { get { return _wait.Count; } }
             /// <summary>Bandy Kroniki na mapie (krok A3 - akcja band). Do linii doby.</summary>
             internal static int Bands { get { return 0; } }
-            /// <summary>Postacie ukryte przez Kronike (krok A3 - akcje hide/unhide). Do linii startu i doby.</summary>
-            internal static int Hidden { get { return 0; } }
+            /// <summary>Postacie ukryte przez Armoury (A4: rejestr CanonCompanions - akcja hide z Kroniki albo z wiersza #move). Do linii startu i doby.</summary>
+            internal static int Hidden { get { try { return CanonCompanions.HiddenCount; } catch { return 0; } } }
+
+            /// <summary>A4: ukryci do linii startu/doby - "n (Kronika a, #move b)".</summary>
+            internal static string HiddenText()
+            {
+                int kr = 0, mv = 0;
+                try
+                {
+                    foreach (var r in CanonCompanions.HiddenRows())
+                        if (r.Src.StartsWith("Kronika", StringComparison.Ordinal)) kr++; else mv++;
+                }
+                catch (Exception e) { Stumble("Actions.HiddenText", e); }
+                return (kr + mv) + " (Kronika " + kr + ", #move " + mv + ")";
+            }
 
             internal static void Reset() { _wait.Clear(); DayReset(); _sOk = _sSkip = 0; }
 
@@ -371,6 +386,94 @@ namespace Armoury
                 ChangeClanInfluenceAction.Apply(cl, d);
                 detail = "rod " + cl.StringId + ": " + before.ToString("0.0", Inv) + " -> " + cl.Influence.ToString("0.0", Inv);
                 return Res.Done;
+            }
+
+            // ---------------------------------------------------------------- ukrycie i powrot (A4, plan P3, FORMAT 11: przez CanonCompanions.ApplyAction)
+
+            private static Res FromCanon(CanonCompanions.Res r) { return r == CanonCompanions.Res.Done ? Res.Done : r == CanonCompanions.Res.Wait ? Res.Wait : Res.Skip; }
+
+            /// <summary>hide:&lt;bohater&gt;[:&lt;term konca&gt;] - ukrycie (LeaveParty + DisableHeroAction w CanonCompanions); term konca moze miec ':' (SplitArgs sklejany
+            /// z powrotem). Glowa rodu, wladca, postac gracza, lista chronionych przed wydarzeniem - POMINIETA; jeniec, gubernator, bitwa - CZEKA; ukryty - nowy koniec.</summary>
+            private static Res Hide(Ctx c, List<string> a, out string detail)
+            {
+                detail = null;
+                if (a.Count < 1 || a[0].Length == 0) { detail = "hide:<bohater>[:<term konca>] - zle argumenty"; return Res.Skip; }
+                string end = a.Count > 1 ? string.Join(":", a.GetRange(1, a.Count - 1).ToArray()) : "";
+                string sw;
+                if (end.Length > 0 && !Terms.Syntax(end, out sw)) { detail = "koniec ukrycia " + end + " - " + sw; return Res.Skip; }
+                var h = Terms.FindHero(a[0], c.Tok);
+                if (h == null) { detail = "bohater " + a[0] + " nie istnieje w grze"; return Res.Skip; }
+                string why;
+                var r = FromCanon(CanonCompanions.ApplyAction(h, "hide", end, "Kronika " + c.Label, out why));
+                detail = why;
+                if (r == Res.Done)
+                    Log.Info(Tag + "ukryty " + HeroName(h) + " (" + c.Label + ") do " + (end.Length > 0 ? end : "unhide (bez terminu)") + " | " + why + ".");
+                return r;
+            }
+
+            /// <summary>unhide:&lt;bohater&gt;[:&lt;osada&gt;] - powrot ukrytego przez Armoury (teleport do osady z akcji albo siedziby rodu); nieukryty - POMINIETA "nie ukryty".</summary>
+            private static Res Unhide(Ctx c, List<string> a, out string detail)
+            {
+                detail = null;
+                if (a.Count < 1 || a.Count > 2 || a[0].Length == 0) { detail = "unhide:<bohater>[:<osada>] - zle argumenty"; return Res.Skip; }
+                var h = Terms.FindHero(a[0], c.Tok);
+                if (h == null) { detail = "bohater " + a[0] + " nie istnieje w grze"; return Res.Skip; }
+                string place = "";
+                if (a.Count > 1)
+                {
+                    var st = Terms.FindSettlement(a[1], c.Tok);
+                    place = st != null ? st.StringId : a[1];   // osada nieznana - CanonCompanions bierze siedzibe rodu (z powodem w linii)
+                }
+                string why;
+                var r = FromCanon(CanonCompanions.ApplyAction(h, "unhide", place, "Kronika " + c.Label, out why));
+                detail = why;
+                if (r == Res.Done)
+                    Log.Info(Tag + "powrot " + HeroName(h) + " -> " + (h.CurrentSettlement != null ? h.CurrentSettlement.StringId : "-") + " (" + c.Label + ") | " + why + ".");
+                return r;
+            }
+
+            /// <summary>Doba Kroniki (przed kluczem ChronicleOfWesteros): rejestr ukrytych - postac zmarla / przywrocona przez gre - wpis usuniety z linia
+            /// "UKRYCIE przerwane"; ukryty zostal glowa rodu albo wladca (gra) - powrot "KONIEC UKRYCIA (glowa rodu)"; termsOn (klucz TAK) - koniec ukrycia: term
+            /// prawdziwy albo "nigdy" (FORMAT 11 - np. kr: okna pominietego) - powrot do siedziby rodu z linia "KONIEC UKRYCIA". Klucz NIE - terminy czekaja (nic nie cofa).</summary>
+            internal static void HiddenDaily(int day, bool termsOn)
+            {
+                if (CanonCompanions.HiddenCount == 0) return;
+                foreach (var r in CanonCompanions.HiddenRows())
+                {
+                    try
+                    {
+                        var h = CanonCompanions.HiddenHero(r);
+                        string drop = h == null ? "brak postaci w grze" : h.IsDead ? "nie zyje (smierc w ukryciu - gra albo inny mod)"
+                                      : !h.IsDisabled ? "przywrocony przez gre albo inny mod (stan " + h.HeroState + ")" : null;
+                        if (drop != null)
+                        {
+                            CanonCompanions.DropHidden(r);
+                            Log.Info(Tag + "UKRYCIE przerwane " + (h != null ? HeroName(h) : r.Key) + " (" + r.Src + ", od dnia " + r.Day + ") - " + drop + " - wpis usuniety.");
+                            continue;
+                        }
+                        string reason = null;
+                        if (h.IsClanLeader || h.IsKingdomLeader) reason = (h.IsKingdomLeader ? "wladca" : "glowa rodu") + " (gra wybrala ukrytego)";
+                        else if (termsOn && r.End.Length > 0)
+                        {
+                            bool nv; string w;
+                            if (Terms.Eval(r.End, null, "koniec ukrycia " + r.Key, out nv, out w)) reason = "term prawdziwy: " + r.End;
+                            else if (nv) reason = "term nigdy: " + (w ?? r.End);
+                        }
+                        if (reason == null) continue;
+                        string why;
+                        var res = CanonCompanions.ApplyAction(h, "unhide", "", "koniec ukrycia", out why);
+                        if (res == CanonCompanions.Res.Done)
+                        {
+                            _sOk++;
+                            Log.Info(Tag + "KONIEC UKRYCIA " + HeroName(h) + " (" + r.Src + ", od dnia " + r.Day + ") - " + reason + " | powrot " + HeroName(h) + " -> "
+                                     + (h.CurrentSettlement != null ? h.CurrentSettlement.StringId : "-") + " | " + why + ".");
+                        }
+                        else if (res == CanonCompanions.Res.Skip)
+                            Log.Info(Tag + "KONIEC UKRYCIA " + HeroName(h) + " (" + r.Src + ") - " + reason + " - powrot POMINIETY (" + why + ").");
+                        // Wait (brak osady powrotu) - nastepna doba
+                    }
+                    catch (Exception e) { Stumble("Actions.HiddenDaily(" + r.Key + ")", e); }
+                }
             }
         }
     }

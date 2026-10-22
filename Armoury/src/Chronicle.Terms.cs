@@ -534,8 +534,8 @@ namespace Armoury
 
             /// <summary>kr:NNN.w[=x]: okno rozstrzygniete (okno/wiesc/log/nic); pominiete, nagrobek albo klucz ChronicleOfWesteros NIE = nigdy (FORMAT 3.3).
             /// =x: wybrana opcja x; inna opcja = nigdy; rozstrzygniete bez wyboru - nigdy, gdy wiersz, ktory wygral, nie ma listy, inaczej czeka.
-            /// Okno nieznane (paczka jeszcze nie wgrana) - falsz, nie nigdy.</summary>
-            private static bool KrTrue(string arg, out bool never)
+            /// Okno nieznane (paczka jeszcze nie wgrana) - falsz, nie nigdy. A4: internal - ta sama logika dla wyzwalaczy #move (Chronicle.Resolved).</summary>
+            internal static bool KrTrue(string arg, out bool never)
             {
                 never = false;
                 string id = arg, opt = null;

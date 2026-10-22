@@ -213,7 +213,7 @@ namespace Armoury
                      + " | " + Pictures.StartText()
                      + " | " + VoiceStartText()
                      + " | zapis: pokazane " + okno + ", wiesci " + wiesc + ", log " + log + ", nic " + nic + ", pominiete " + State.Skipped + ", wybory " + State.Choices
-                     + ", flagi " + State.Flags + ", czeka na wybor " + Choice.Count + ", akcje czekaja " + Actions.WaitCount + ", ukryci " + Actions.Hidden
+                     + ", flagi " + State.Flags + ", czeka na wybor " + Choice.Count + ", akcje czekaja " + Actions.WaitCount + ", ukryci " + Actions.HiddenText()
                      + ", instancje w kolejce " + Recurring.QueueCount + ", paczki znane " + PacksText() + (_newCampaign ? " (nowa kampania)" : "")
                      + " | " + Recurring.StartText()
                      + " | dzien kampanii " + Day() + ", dzien opowiesci " + F1(sd) + (Prologue.BeforeStory() ? " (prolog - okna osi czekaja)" : "")
@@ -246,6 +246,7 @@ namespace Armoury
         {
             int day = Day();
             try { Terms.Daily(); } catch (Exception e) { Stumble("Daily.Terms", e); }
+            try { Actions.HiddenDaily(day, KeyOn); } catch (Exception e) { Stumble("Daily.Hidden", e); }   // A4: koniec ukrycia (klucz NIE - tylko porzadek rejestru)
             if (!KeyOn)
             {
                 Log.Info(Tag + "dzien " + day + " | klucz Chronicle Of Westeros NIE - bez okien (stan zostaje) | potkniecia " + StumblesDay + " (razem " + Stumbles + ").");
@@ -702,7 +703,7 @@ namespace Armoury
             sb.Append(" | ").Append(Actions.DayText());
             sb.Append(" | wybory: czeka ").Append(Choice.Count).Append(", ").Append(Choice.DayText());
             sb.Append(" | ").Append(Recurring.DayText());
-            sb.Append(" | bandy ").Append(Actions.Bands).Append("/12 | ukryci ").Append(Actions.Hidden);
+            sb.Append(" | bandy ").Append(Actions.Bands).Append("/12 | ukryci ").Append(Actions.HiddenText());
             sb.Append(" | ").Append(Pictures.DayText());
             sb.Append(" | stan: pokazane/wiesci ").Append(State.Resolved).Append(", pominiete ").Append(State.Skipped).Append(", flagi ").Append(State.Flags);
             int bytes = _saveBytes;

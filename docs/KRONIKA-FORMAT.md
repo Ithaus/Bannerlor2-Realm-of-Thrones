@@ -221,6 +221,12 @@ lead, prisoner, free, wander, remove, die, marry, wed) - wiersz z `hide` bylby o
 nigdy, czyli zmiana teraz zmienilaby gre Jeffa bez silnika. Kolejnosc dla K0: (1) `hide`/`unhide` w CanonCompanions.ApplyAction i KnownActions,
 (2) w TYM SAMYM commicie m11/m20/m21 `remove -> hide`. Do tego czasu okna zalezne od zywych Sama/Sandora po dniach `remove` (064.2a, 082.2,
 082.3, 089.1, 090.1, 101.1, 111.1a, 115.2d, 905.1) przepadaja na warunkach `alive:` z powodem - bez bledu.
+**Stan po K0 krok A4 (galaz w-toku/kronika-00-silnik, 21/22.10): zrobione.** CanonCompanions zna `hide`/`unhide` (ApplyAction, rejestr ukrytych `hid`
+w zapisie arm_canon_companions) i w tym samym commicie m11/m20/m21 maja `hide` (p09 Benjen - prolog - dalej `remove`). Term `kr:` w wyzwalaczach
+#move liczy stan okien Kroniki (Chronicle.Resolved; klucz ChronicleOfWesteros NIE = falsz "nigdy", takze z pamiecia +N; +N od dnia rozstrzygniecia
+okna); linia zmiany strony z alternatywa w wyzwalaczu ma dopisek `(zaszlo <term>)`. `unhide` dziala na kazdego z rejestru (ukrytego akcja Kroniki
+albo wierszem #move - np. 082 Sam po m21, 089 Sandor po m11); postac spoza rejestru = POMINIETA `nie ukryty`. Postac ukryta: kolejne wiersze #move
+tej postaci CZEKAJA na powrot (do 60 dob, potem pominiete). Jeniec, gubernator i postac w bitwie przy `hide` = CZEKA (nie ukrywamy jenca).
 Pary `kr` w arm_canon_moves (stan 21.10): m02 Jaime `done:BlackwaterEvent|kr:032.1=b|kr:032.1=c`, m04 Tyrion `ev:DanyInvasionEvent|kr:099.2`,
 m18 Theon `war:sturgia:battania|kr:902.1+1`, m22 Yoren `ev:HarrenhalSiegeNotificationEvent|rotday:120|kr:008.1+1` - wszystkie ze starym wyzwalaczem.
 Zmiana strony postaci z `#move`, ktorej dzis nie ma w tabeli (Theon 072.3/087/108, Brienne i Podrick 083, Jaime 107), = NOWY wiersz `#move`

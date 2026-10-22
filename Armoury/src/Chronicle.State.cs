@@ -183,5 +183,27 @@ namespace Armoury
                 }
             }
         }
+
+        /// <summary>m105-kronika A4: term kr:NNN.w[=x] w wyzwalaczach #move (CanonCompanions.BaseTrue, para 'kr' z KRONIKA-FORMAT 8) - ta sama logika co w warunkach
+        /// okien (Terms.KrTrue): okno rozstrzygniete (=x: wybrana opcja x); klucz ChronicleOfWesteros NIE, okno pominiete albo nagrobek = falsz "nigdy" (FORMAT 3.3 -
+        /// stary wyzwalacz wiersza po '|' dziala dalej); okno nieznane (paczka jeszcze nie wgrana) = falsz. Wyjatek - potkniecie Kroniki i falsz (nie "nigdy").</summary>
+        internal static bool Resolved(string arg, out bool never)
+        {
+            never = false;
+            try
+            {
+                if (string.IsNullOrEmpty(arg)) { never = true; return false; }
+                return Terms.KrTrue(arg, out never);
+            }
+            catch (Exception e) { Stumble("Resolved(" + arg + ")", e); never = false; return false; }
+        }
+
+        /// <summary>A4: dzien kampanii rozstrzygniecia okna NNN.w dla pamieci +N wyzwalacza #move (kr:NNN.w+N liczone od dnia okna, nie od nastepnej doby);
+        /// -1 - brak (wybor =x, okno nierozstrzygniete albo Kronika wylaczona).</summary>
+        internal static int ResolvedDay(string arg)
+        {
+            if (string.IsNullOrEmpty(arg) || arg.IndexOf('=') >= 0 || !KeyOn) return -1;
+            return State.IsResolved(arg) ? State.ResolvedDay(arg) : -1;
+        }
     }
 }

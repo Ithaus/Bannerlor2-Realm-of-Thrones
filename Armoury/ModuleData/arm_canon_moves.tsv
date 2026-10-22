@@ -78,6 +78,7 @@ ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
 # action: clan:<clan> lord of that house (may lead a party) | court:<clan> courtier of that house (no party) | lead (may lead a party from now on) |
 #   prisoner:<clan or settlement> captive of that house (its head's party, else its seat) or in that keep | free:<clan> set free and back to that house |
 #   wander:<culture> leaves his house and wanders a town of that culture (for hire) | remove (gone from the world, no message) |
+#   hide[:<end term>] (m105 Chronicle K0: leaves his party and is disabled - alive, back with unhide or when the end term comes true) | unhide[:<settlement>] |
 #   die (dies, no message) | marry:<hero id> | wed:<hero id> (marries and joins the spouse's house).
 # mode: empty = every campaign, prolog = only a campaign started with the prologue (m101-prolog), classic = only the classic start.
 # message: shown to the player only if he knows the character or his realm is one of the two sides; empty = log only.
@@ -99,7 +100,7 @@ p06	ROTwanderer19	Shagga son of Dolf	prolday:132	court:clan_vlandia_1	prolog		fo
 m08	ROTwanderer19	Shagga son of Dolf	ev:JoffreyEvent+40	clan:stone_crows			after Tyrion's fall goes back to the hills (an outlaw in the kingswood in the book)
 m09	ROTwanderer12	Qyburn	ev:JoffreyEvent+40	court:clan_nord_1			after Tywin's death serves Cersei
 m10	ROTwanderer3	Sandor Clegane	done:BlackwaterEvent	wander:river		Sandor Clegane has deserted King's Landing.	deserts in the battle and roams the Riverlands
-m11	ROTwanderer3	Sandor Clegane	done:RedWeddingEvent+20	remove			left for dead after the Twins; the Quiet Isle
+m11	ROTwanderer3	Sandor Clegane	done:RedWeddingEvent+20	hide			left for dead after the Twins; the Quiet Isle
 m12	ROTwanderer2	Lord Varys	ev:AegonInvasionEvent	court:ROTclan_84			his plan all along: Aegon
 m13	ROTwanderer27	Lord Petyr Baelish	ev:JoffreyEvent+5	court:clan_vlandia_3		Petyr Baelish has left King's Landing for the Vale.	flees with Sansa to the Vale
 m14	ROTwanderer27	Lord Petyr Baelish	ev:JoffreyEvent+15	marry:lord_4_6			weds Lysa Arryn
@@ -110,9 +111,9 @@ m18	ROTwanderer20	Theon Greyjoy	war:sturgia:battania|kr:902.1+1	clan:clan_sturgi
 m19	ROTwanderer20	Theon Greyjoy	done:BlackwaterEvent+10	prisoner:clan_empire_south_3			Winterfell falls in the days of the Blackwater; Ramsay takes him to the Dreadfort
 p07	ROTwanderer18	Osha	prolday:0	court:clan_sturgia_2	prolog		free folk beyond the Wall
 p08	ROTwanderer18	Osha	prolday:62	court:clan_battania_1	prolog		taken in the wolfswood, serves at Winterfell
-m20	ROTwanderer18	Osha	done:BlackwaterEvent+10	remove			flees with Rickon when Winterfell falls
+m20	ROTwanderer18	Osha	done:BlackwaterEvent+10	hide			flees with Rickon when Winterfell falls
 p09	ROTwanderer38	Benjen Stark	prolday:80	remove	prolog		lost beyond the Wall
-m21	ROTwanderer5	Samwell Tarly	done:WallEvent+20	remove			sent to Oldtown to forge his chain
+m21	ROTwanderer5	Samwell Tarly	done:WallEvent+20	hide			sent to Oldtown to forge his chain
 m22	ROTwanderer28	Yoren	ev:HarrenhalSiegeNotificationEvent|rotday:120|kr:008.1+1	die			killed by Amory Lorch's men in the Riverlands
 m23	ROTwanderer26	Quentyn Martell	ev:JonEvent	die			burned by the dragons in Meereen (A Dance with Dragons)
 m24	ROTwanderer22	Hizdahr zo Loraq	ev:RamsayEvent	marry:lord_1_14			weds Daenerys in Meereen (A Dance with Dragons)
