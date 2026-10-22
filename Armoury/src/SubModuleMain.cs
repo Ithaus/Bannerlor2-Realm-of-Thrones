@@ -44,8 +44,6 @@ namespace Armoury
             try { SpeedUiRegister(); } catch (Exception e) { Log.Error("MapSpeedUi.Register (UIExtenderEx)", e); }
             // r4-wioska: wioska poboczna gracza w zakladce Fiefs ekranu rodu (UIExtenderEx: wstawka prefabu ClanFiefs + mixin ClanFiefsVM) - osobny UIExtender, wlasny try
             try { SideTabRegister(); } catch (Exception e) { Log.Error("SideVillageFiefUi.Register (UIExtenderEx)", e); }
-            // m105-czcionki: nazwy osad na mapie czcionka ROT (UIExtenderEx: atrybut Brush.Font w prefabach SettlementNameplateItem*) - osobny UIExtender, wlasny try
-            try { FontUiRegister(); } catch (Exception e) { Log.Error("NameplateFontUi.Register (UIExtenderEx)", e); }
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
@@ -53,9 +51,6 @@ namespace Armoury
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void SideTabRegister() { SideVillageFiefUi.Register(); }
-
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void FontUiRegister() { NameplateFontUi.Register(); }
 
         /// <summary>Modele lataamy dopiero gdy wszystkie mody sa zaladowane.</summary>
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
@@ -75,6 +70,8 @@ namespace Armoury
                 try { RotWindowPictures.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RotWindowPictures.ApplyAll", e); }
                 // m103-lektor: nagrania okien ROT (ModuleData/Lektor/EN) i latka ROT.Screens.EventScreen odbiciem (OnActivate po, OnDeactivate przed) - raz na proces; wlasny try
                 try { Lektor.Install(_harmony); } catch (Exception e) { Log.Error("Lektor.Install", e); }
+                // m105-czcionki: nazwy osad na mapie czcionka ROT - postfiks SettlementNameplateWidget (odbicie; tabliczki buduje gotowy kod gry, prefaby i UIExtenderEx nie dzialaja); wlasny try
+                try { NameplateFont.Install(_harmony); } catch (Exception e) { Log.Error("NameplateFont.Install", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
