@@ -105,6 +105,10 @@ namespace Armoury
         private static double _revUpAmt, _revDownAmt;
         // m105 gosp4 G6 (Ds Castle Income Cut): obnizki z dochodu zamkow (liczba, zl/rok) i udzial zamku > 1 liczony jak 1 w przegladzie zwyklym - doba (od linii do linii) i sesja
         private static int _ccN, _ccShare, _ccNS, _ccShareS; private static double _ccAmt, _ccAmtS;
+        // m107-gospodarka K2 (Ds Castle Folk Part No Arrears): czesc firmy zamku z oszczednosci podzamcza niezaplacona i darowana (zl, zamki) - doba i sesja, w tym zaleglosci
+        // z zapisu (ALf sprzed klucza); K3 (Ds Castle Fast Cut): szybkie obnizki zamkow (liczba, zl/rok) i zaleglosci z kas zamkow zmniejszone razem z firma (zl) - doba i sesja
+        private static double _lfFree, _lfFreeS, _lfFreeOld; private static int _lfFreeN; private static readonly HashSet<string> _lfFreeSet = new HashSet<string>();
+        private static int _cfN, _cfNS; private static double _cfAmt, _cfAmtS, _ccArrFree, _ccArrFreeS;
         // f7-kasy (Ks Farm Catch Up): gersuma z zapasu kas - doba (od linii do linii) i sesja
         private static int _cuRev, _cuDec, _cuNone, _cuNoGrow, _cuNoFarm, _cuPaidN, _cuShortN, _cuHouse, _cuArr, _cuRemit, _cuLow, _cuStum, _cuStumSess, _cuNS;
         private static double _cuDecAmt, _cuBills;
@@ -128,6 +132,7 @@ namespace Armoury
             _payOut = _payIn = 0;
             _revArrN = _revHeld = _revSame = _revEarly = 0; _revUpAmt = _revDownAmt = 0; _revMinGap = int.MaxValue;
             _ccN = _ccShare = 0; _ccAmt = 0;                                     // m105 gosp4 G6 (doba)
+            _lfFree = 0; _lfFreeN = 0; _cfN = 0; _cfAmt = 0; _ccArrFree = 0;   // m107 K2 / K3 (doba)
             _stumbles = 0;
         }
 
@@ -140,6 +145,7 @@ namespace Armoury
             _gersLord.Clear(); _gersCrown.Clear();                   // f19-e3
             _wlDay = int.MinValue; _wl = 1.0;                        // m103 P3 (f)
             _ccNS = _ccShareS = 0; _ccAmtS = 0;                      // m105 gosp4 G6 (sesja)
+            _lfFreeS = 0; _lfFreeOld = 0; _lfFreeSet.Clear(); _cfNS = 0; _cfAmtS = 0; _ccArrFreeS = 0;   // m107 K2 / K3 (sesja)
             ClearCounters();
         }
 
@@ -606,8 +612,26 @@ namespace Armoury
                     int wait = Math.Min(days, Math.Max(NetMinDays, NetMinDays + 1 - f.NF));
                     f.SLow = today - (days - wait);
                 }
-                double cut = IncomeCut(f, today, days, mx, remit != 0, true);
+                double F0 = f.FL + f.FC;
+                bool k3 = s.DsCastleFastCut;
+                // m107 K3 (Ds Castle Fast Cut): kasa po naleznosciach PONIZEJ zapasu podzamcza albo zaleglosci >= raty - firma od razu do doplywu netto 28 dob x 364 (FastCut,
+                // ta sama regula co miasta przy Ds Farm Cut Below Reserve); bez pelnych 28 probek, firma juz przy doplywie albo odstep 7 dob - obnizka z dochodu jak dotad
+                bool fast = k3 && remit == 0 && (gq < CastlePurse.Reserve(t) || arrears) && FastCut(f, today, true);
+                if (fast) { double cf = F0 - (f.FL + f.FC); _cfN++; _cfAmt += cf; _cfNS++; _cfAmtS += cf; }
+                double cut = fast ? 0 : IncomeCut(f, today, days, mx, remit != 0, true);
                 if (cut > 0) { _ccN++; _ccAmt += cut; _ccNS++; _ccAmtS += cut; }
+                // m107 K3: zaleglosci z kas zamku ida za obnizka (liczone od firmy, ktora okazala sie ponad dochod zamku) - AL i AC w tym samym stosunku; ALf bez zmian (FLf placi lud)
+                if (k3 && F0 > 0)
+                {
+                    double F1 = f.FL + f.FC;
+                    if (F1 < F0 - 1e-6 && f.AL + f.AC > 0)
+                    {
+                        double r = Math.Max(0.0, F1 / F0), a0 = f.AL + f.AC;
+                        f.AL *= r; f.AC *= r;
+                        double fr = a0 - (f.AL + f.AC);
+                        if (fr > 0) { _ccArrFree += fr; _ccArrFreeS += fr; }
+                    }
+                }
             }
             else f.SLow = -1;                                                    // kasa ponad progiem - cykl obnizki od nowa
         }
@@ -794,7 +818,7 @@ namespace Armoury
         /// dopiero od 28. doby po wczytaniu, wczesniej obnizka z dochodu (e) jak dotad). Udzial firmy w doplywie ponad 1 schodzi do 1; cykl obnizki (e) od tej doby (SLow).
         /// Zloto sie nie rusza - zmienia sie nalezna rata. Zwraca true, gdy firma zeszla. Wolajacy w try (SurplusReview).
         /// </summary>
-        private static bool FastCut(Farm f, int today)
+        private static bool FastCut(Farm f, int today, bool castle = false)
         {
             if (f.FastDay >= 0 && f.FastDay <= today && today - f.FastDay < FastGapDays) return false;
             double F = f.FL + f.FC;
@@ -808,7 +832,7 @@ namespace Armoury
             f.FL *= r; f.FC *= r;
             if (!double.IsNaN(f.Share) && f.Share > 1.0) f.Share = 1.0;
             f.SLow = today; f.FastDay = today;
-            KsFolkIncome.NoteFastCut(F - cap);
+            if (!castle) KsFolkIncome.NoteFastCut(F - cap);                      // m107 K3: szybkie obnizki zamkow licza sie osobno (linia DS) - segment m105 linii f5 jak dotad
             return true;
         }
 
@@ -1420,12 +1444,17 @@ namespace Armoury
                 return;
             }
             double before = f.AL + f.AC + f.ALf;
+            // m107 K2 (Ds Castle Folk Part No Arrears): zamek - czesc z oszczednosci podzamcza tylko z nadwyzki ponad zapas, brak darowany (bez zaleglosci); miasta jak dotad
+            bool noArrLf = !town && folkPays && s.DsCastleFolkPartNoArrears;
             if (lord == null || !lord.IsAlive)
             {
-                f.AL += iL; f.AC += iC; f.ALf += iLf; _noLord++; _noLordAmt += iL + iC + iLf;   // bez zywego pana - rata czeka (jak zawor)
-                _arrNew += iL + iC + iLf;
+                double addLf = iLf;
+                if (noArrLf && iLf > 0) { NoteLfFree(st, iLf, 0); addLf = 0; }   // m107 K2: rata ludu bez pana nie czeka - darowana
+                f.AL += iL; f.AC += iC; f.ALf += addLf; _noLord++; _noLordAmt += iL + iC + iLf;   // bez zywego pana - rata czeka (jak zawor)
+                _arrNew += iL + iC + addLf;
                 return;
             }
+            double forgOld = 0;                                     // m107 K2: zaleglosc z zapisu darowana w tej racie (nie "splacona")
             double floor = FloorOf(s, reserve);
             long avail = Math.Max(0L, (long)Math.Floor(t.Gold - floor));
             // 1. zaleglosc pomocy od sprzedazy (M7) - przed firma; recenzja 17.10: do skarbca jako wplyw dnia przez LeviesToday (AidesDay), nie jako "firmy korony"
@@ -1463,7 +1492,18 @@ namespace Armoury
             // 2b. czesc pana z oszczednosci ludu (recenzja 17.10, "scot and lot"): to, co pan bral dotad z oszczednosci ludu tej osady (podatek od skarbca ludu, W7), placi lud
             //     z kies ponad zapas dni - nie kasa kupcow; brak - zaleglosc (splacana pierwsza, zajecie z kiesy gminy jak firma)
             double wantLf = f.ALf + iLf;
-            if (wantLf >= 1)
+            if (noArrLf)
+            {
+                // m107 K2: lud placi z nadwyzki ponad zapas (zaleglosc z zapisu najpierw), reszta darowana - ALf = 0 (jak czynsz wsi ponad skrzynie, m105 gosp5)
+                double oldLf = f.ALf;
+                long gF = wantLf >= 1 ? FolkToLord(st, lord, (long)Math.Floor(wantLf)) : 0;
+                _paidLf += gF;
+                double miss = Math.Max(0, wantLf - gF);
+                forgOld = Math.Min(miss, Math.Max(0, oldLf - gF));
+                f.ALf = 0;
+                if (miss > 0) NoteLfFree(st, miss, forgOld);
+            }
+            else if (wantLf >= 1)
             {
                 long gF = FolkToLord(st, lord, (long)Math.Floor(wantLf));
                 f.ALf = Math.Max(0, wantLf - gF);
@@ -1495,6 +1535,7 @@ namespace Armoury
             // 4. zajecie (miasto): zaleglosc przez DsFarmDistraintTerms dni kwartalu - z kiesy gminy (najwyzej 2/3 jej stanu)
             if (town && f.ATerms >= Math.Max(1, Math.Min(8, s.DsFarmDistraintTerms)) && f.AL + f.AC + f.ALf >= 1) Distrain(st, f, lord, k);
             double after = f.AL + f.AC + f.ALf;
+            before -= forgOld;                                      // m107 K2: darowana zaleglosc z zapisu nie jest "splacona" (klucz wylaczony - forgOld 0, jak dotad)
             if (after > before) _arrNew += after - before; else _arrPaid += before - after;
             // 5. darowanie zaleglosci ponad DsFarmForgiveWeeks rat (licznik osobno - nie "splacone")
             int fw = ForgiveWeeks(s);
@@ -1504,6 +1545,15 @@ namespace Armoury
                 double cap = fw * instAll, arr = f.AL + f.AC + f.ALf;
                 if (arr > cap) { double r = cap / arr; _forgiven += arr - cap; _forgN++; f.AL *= r; f.AC *= r; f.ALf *= r; }
             }
+        }
+
+        /// <summary>m107 K2: licznik linii - czesc firmy zamku z oszczednosci podzamcza darowana (zl; old - w tym zaleglosc z zapisu). Zloto sie nie rusza.</summary>
+        private static void NoteLfFree(Settlement st, double zl, double old)
+        {
+            if (!(zl > 0) || double.IsInfinity(zl)) return;
+            _lfFree += zl; _lfFreeN++; _lfFreeS += zl;
+            if (old > 0 && !double.IsInfinity(old)) _lfFreeOld += old;
+            if (st != null && st.StringId != null) _lfFreeSet.Add(st.StringId);
         }
 
         /// <summary>Czesc firmy pana z oszczednosci ludu: kiesy ludu osady ponad zapas dni (TownFolk.DsFolkRate) -> glowa rodu (RentToday - D "ziemia", jak podatki panu).
@@ -1772,6 +1822,18 @@ namespace Armoury
                     sb.Append(" | m105 zamki (Ds Castle Income Cut ").Append(CastleCutOn(s) ? "TAK" : "NIE - bez Ks Farm Surplus Cap Net albo kalibracji startu").Append("): obnizki z dochodu zamkow dzis ")
                       .Append(_ccN).Append(" (-").Append(N0(_ccAmt)).Append(" zl/rok), w sesji ").Append(_ccNS).Append(" (-").Append(N0(_ccAmtS)).Append(" zl/rok); udzial zamku > 1 liczony jak 1 dzis ")
                       .Append(_ccShare).Append(", w sesji ").Append(_ccShareS);
+                // m107 K2 / K3: czesc z oszczednosci podzamcza darowana, szybkie obnizki zamkow, zaleglosci z kas zamkow zmniejszone z firma (oba klucze wylaczone - linia jak w 5da5f304)
+                if (_fixDay >= 0 && (s.DsCastleFolkPartNoArrears || s.DsCastleFastCut))
+                {
+                    double zC = 0, zLf = 0;
+                    foreach (var f in _farm.Values) if (f.St != null && f.St.IsCastle) { zC += f.AL + f.AC; zLf += f.ALf; }
+                    sb.Append(" | m107 zamki (Ds Castle Folk Part No Arrears ").Append(s.DsCastleFolkPartNoArrears ? (s.DsFarmFolkFromSavings ? "TAK" : "TAK - bez Ds Farm Folk From Savings") : "NIE")
+                      .Append(", Ds Castle Fast Cut ").Append(s.DsCastleFastCut ? (CastleCutOn(s) ? "TAK" : "TAK - bez Ds Castle Income Cut, Ks Farm Surplus Cap Net albo kalibracji startu") : "NIE")
+                      .Append("): czesc z oszczednosci podzamcza niezaplacona i darowana dzis ").Append(N0(_lfFree)).Append(" zl (").Append(_lfFreeN).Append(" zamkow), w sesji ").Append(N0(_lfFreeS))
+                      .Append(" zl (").Append(_lfFreeSet.Count).Append("), w tym zaleglosci z zapisu ").Append(N0(_lfFreeOld)).Append(" zl; szybka obnizka zamkow dzis ").Append(_cfN)
+                      .Append(" (-").Append(N0(_cfAmt)).Append(" zl/rok), w sesji ").Append(_cfNS).Append(" (-").Append(N0(_cfAmtS)).Append(" zl/rok); zaleglosci z kas zamkow zmniejszone z firma dzis ")
+                      .Append(N0(_ccArrFree)).Append(" zl, w sesji ").Append(N0(_ccArrFreeS)).Append(" zl; zaleglosci zamkow: z kas ").Append(N0(zC)).Append(" zl, z oszczednosci podzamcza ").Append(N0(zLf)).Append(" zl");
+                }
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(_payOut - _payIn);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
