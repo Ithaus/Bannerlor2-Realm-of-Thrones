@@ -8,7 +8,8 @@
 # 000.5 - (krytyk K0, plan I K0a "wiesc") forma wiesc dla kazdego gracza (tekst 000.5_W) + akcje wiesc:000.5_N1 i plotka:000.5_P; 1 doba po 000.4.
 # 000.6 - (krytyk K0, plan I K0a "wariant") zmienne {KING}=@wladca:vlandia i {ME}=@gracz w tekscie okna; wariant a (pelna) NIE moze wygrac przy kluczu
 #         Chronicle Full Versions NIE, wygrywa wariant b (obie, bez wlasnego tekstu - tekst i zmienne glownego, flaga kr_test_6b); 1 doba po 000.5.
-# 000.7 - (m107) wiersze smierc: b z falszywym near (Halys Hornwood pod Meereen), a z region: i succeed:lord_7_6:lord_7_5_1 (Hornwood -> dziedzic); forma log,
+# 000.7 - (m107) wiersze smierc: b z falszywym near (Halys Hornwood pod Meereen) i succeed:lord_7_6:lord_7_5_1, a z region: i succeed:lord_7_6:@dziedzic
+#         (poprawka A1: dziedzica Hornwoodow wybiera gra - Actions.PickHeir; bez dziedzica 000.7a nie bierze udzialu - linia "nie: ... @dziedzic"); forma log,
 #         1 doba po 000.6. Canon Deaths TAK: 000.7a (linia smierc kanonu TAK, 000.7b nie: near...); NIE (flaga armoury-kronika-kanon-nie.flag): wiersz glowny.
 # 000.8 - (m107) zrodlo kr:~R: wariant a smierc (die wedrowca ROTwanderer35) przy Canon TAK, inaczej wiersz glowny; 1 doba po 000.7.
 # 000.9 - (m107) kr:000.8~a (wariant a) i kr:000.8~0 (wiersz glowny) w warunkach okna; 1 doba po 000.8. W arm_canon_moves_test.tsv: t01 kr:000.8~a, t02 kr:000.8~0.
@@ -24,7 +25,7 @@
 000.6	b					flag:kr_test_1		okno	okno	obie		0						flag:kr_test_6b	
 000.7		0		kr:000.6+1				log	nic	obie		0						flag:kr_test_7
 000.7	b					near:lord_7_6:town_K1:5 & head:lord_7_6:clan_nord_6 & clanof:lord_7_5_1:clan_nord_6		log	nic	smierc		0						succeed:lord_7_6:lord_7_5_1 ; flag:kr_test_7b
-000.7	a					region:lord_7_6:battania & head:lord_7_6:clan_nord_6 & clanof:lord_7_5_1:clan_nord_6		log	nic	smierc		0						succeed:lord_7_6:lord_7_5_1 ; flag:kr_test_7a
+000.7	a					region:lord_7_6:battania & head:lord_7_6:clan_nord_6 & clanof:lord_7_5_1:clan_nord_6		log	nic	smierc		0						succeed:lord_7_6:@dziedzic ; flag:kr_test_7a
 000.8		0		kr:000.7+1				log	nic	obie		0						flag:kr_test_8
 000.8	a					kr:000.7		log	nic	smierc		0						die:ROTwanderer35 ; flag:kr_test_8a
 000.9		0		kr:000.8+1				log	nic	obie		0						flag:kr_test_9
