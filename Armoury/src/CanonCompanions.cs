@@ -1519,6 +1519,22 @@ namespace Armoury
             { "ROTlord_486", new[] { "ev:DanyInvasionEvent" } }, { "ROTlord_373", new[] { "ev:AegonInvasionEvent" } },
         };
 
+        /// <summary>m105-kronika B2 (KRONIKA-FORMAT 8): postac ma wiersze #move (kolumna who: wzor ROTwanderer* oryginalu albo id bohatera) - zmiany stron tylko przez
+        /// CanonCompanions (para #para); Kronika nie daje jej clan/court/lead/prisoner/free/wander/die/marry/wed/succeed. Dane wczytywane leniwie (jak start sesji).</summary>
+        internal static bool HasMoveRows(Hero h)
+        {
+            if (h == null) return false;
+            EnsureLoaded();
+            if (_moves.Count == 0) return false;
+            string k = Key(h);
+            if (k.Length > 0 && !k.StartsWith(WandererPrefix, StringComparison.Ordinal)) return _whoIds.Contains(k);
+            foreach (var m in _moves) if (m.Who == k || (h.StringId != null && m.Who == h.StringId)) return true;
+            return false;
+        }
+
+        /// <summary>m105-kronika B2: postac po stronie gracza (gracz, jego rod, towarzysz, druzyna, jeniec gracza) - opis albo null (ta sama regula co #move).</summary>
+        internal static string PlayerSideOf(Hero h) { return h != null ? PlayerSide(h) : null; }
+
         /// <summary>0 - poza lista chronionych, 1 - na liscie i wydarzenie juz zaszlo (need = term spelniony), 2 - na liscie, wydarzenie jeszcze nie (need = czego brak).</summary>
         internal static int GuardState(Hero h, out string need)
         {

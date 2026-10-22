@@ -140,6 +140,9 @@ namespace Armoury
             catch (Exception e) { CwStumble("WarForced", e); return false; }
         }
 
+        /// <summary>m105-kronika B2 (akcja truce - "Kronika nie zmienia wojen ROT", KRONIKA-FORMAT 11): tylko odczyt WarForced, logika bez zmian.</summary>
+        internal static bool RotWarForced(IFaction a, IFaction b) { return WarForced(a, b); }
+
         // wojna czysto essoska (obie strony to krolestwa z EssosIds) - strony wojny ROT sie nie zmieniaja (prywatny setter), wynik w pamieci na obiekt
         private static readonly ConditionalWeakTable<object, object> _essosOf = new ConditionalWeakTable<object, object>();
         private static readonly ConditionalWeakTable<object, object>.CreateValueCallback _essosCalc = EssosCalc;
