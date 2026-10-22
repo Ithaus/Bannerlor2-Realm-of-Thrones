@@ -5,6 +5,111 @@ Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E
 Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
 wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
 
+## 2026-10-22 - K0 STYK I ZAMKNIECIE GALEZI (styk z kodem n32, build 5 modow, plan autotestu K0a/K0b/K0c)
+
+**Problem:** zamkniecie galezi przed autotestem i scaleniem - kontrola, czy kod K0 (HEAD 80dcadc1) nie zmienia logiki galezi, na ktorych stoi (n32 77c17f3c:
+m101-postacie/prolog, m103-sceny/lektor, m104-e5, m104-wojny), czy wszystkie miejsca styku sa spiete i czy pozostale mody sie buduja.
+**Przyczyna:** krok lancucha "STYK I ZAMKNIECIE GALEZI" (plan "## PLAN kronika" C: tor L - recenzja styku; P10).
+**Wynik kontroli styku (kazdy punkt w kodzie wobec 77c17f3c, `git diff 77c17f3c HEAD`):**
+- `SubModuleMain.cs` (+18): ChronicleTick (Chronicle.AppTick) w OnApplicationTick PO StoryTick (sceny prologu) i PRZED Lektor.AppTick (lektor widzi okno Kroniki
+  w tym samym ticku) i przed returnem wiosek (klucz Map Villages NIE nie gasi Kroniki); wlasny licznik bledow ladowania typu (3, bez globalnego wylacznika).
+  OnGameEnd -> Chronicle.GameEnd (ResetCampaign w try). OnGameStart -> stan od zera w konstruktorze ChronicleBehavior (ResetCampaign; ten sam wzor co
+  CanonCompanionsBehavior -> CanonCompanions.Reset, ktory czysci tez _hid i _firedBy). AddBehavior(ChronicleBehavior) ostatni, PO CanonCompanionsBehavior, PrologueBehavior
+  i CanonWarsBehavior - doba Kroniki po dobie postaci kanonu (mv:, kr:) i po straznikach Prologue.Crown (cw:). Od 0ffd5d9f (scalonego do n33) SubModuleMain bez zmian.
+- `CanonCompanions.cs` (+379/-...; kazda zmiana uzasadniona, logika m104-e5 NIETKNIETA - HeldRow/_held/_heldDay/_heldArg/_freeing/RebuildHeld i galaz free z _freeing
+  bez zmian w diff, jedyny dotkniety wiersz m104-e5 to kontekst Reset):
+  (1) KnownActions + hide, unhide (ArgActions bez zmian - argument opcjonalny); (2) HidRow/_hid - rejestr ukrytych, Reset czysci, Export/Import linii "hid" (stary
+  Import nie ma galezi default - nieznany prefiks pomijany); (3) _firedBy - tylko tekst linii "(zaszlo X)" przy wyzwalaczu z > 1 termem, czyszczony w Moves() i Reset;
+  (4) OnClanDestroyed: ukryty jak jeniec - tylko rod, bez teleportu (dotyczy wylacznie ukrytych); (5) BeforeHeroKilled - nowy sluchacz, wyjscie od razu przy pustym
+  rejestrze; (6) BaseTrue private -> internal + `case "kr"` (dotad nieznany rodzaj = nigdy); (7) MoveState/MoveDay/FirstDay/ClearEventCache - odczyt; (8) TermTrue:
+  kr: przy kluczu NIE = nigdy, _first dla kr: = dzien rozstrzygniecia okna; dla pozostalych termow _first = day jak dotad (kolejnosc przypisan inna, wynik ten sam);
+  (9) Fires - zapis _firedBy; (10) Res internal; (11) Execute -> ApplyAction: te same kontrole w tej samej kolejnosci (brak postaci, martwa, PlayerSide) i ten sam switch
+  akcji (r.Arg/r.Action -> arg/action); roznice: `before` liczone przed kontrolami (Resolve dla Skip/Wait go nie czyta - linie bez zmian), default "nieznana akcja"
+  (parser i tak odrzuca), zrodlo w linii remove = "#" + r.Id (napis "zmiana strony #mNN (remove)" ten sam), postac ukryta przez Armoury - CZEKA (tylko ukryci);
+  (12) PickTown(noEnemy = false) - wander bez zmian, Hostile nowe; (13) Hide/Unhide/Guarded/GuardState/HasMoveRows/PlayerSideOf/HiddenRows/HiddenHero/DropHidden - nowe.
+- `Prologue.*` (bez zmiany logiki): Scenes - SceneGate private -> internal; Crown - CrownGuardHolds (odczyt _crownEnded/_rcHeld/_cdOurs); Wars - RotWarForced
+  (odczyt WarForced); World.Clans - BanditClan/BanditsById/SpawnBand, World.Tourney - GtReady: tresc przeniesiona 1:1 do StoryActions.cs (porownane wiersz po wierszu -
+  jedyna roznica: WStumble -> parametr stumble), Prologue wola przez stare nazwy z WStumble; GtClear/GtSetHeroes dalej przez GtReady (kopia MethodInfo).
+- `Lektor.cs`: arm_lektor.tsv bez zmian wobec bazy (58 wierszy, 58 WAV: 35 okien ROT + 23 sceny prologu); okna ROT (EventScreen bez ArmStoryEvent) - tylko po tytule
+  jak dotad; sceny prologu - najpierw klucz Spec.Key = Stem; skrypt kr-styk/lektor_tytuly.py: 23/23 scen - plik po kluczu = plik po tytule, kluczy kr_ w arm_lektor.tsv 0,
+  brak pliku 0. Kronika tylko z manifestu arm_lektor_kronika.tsv (po kluczu, zasada md5). arm_lektor.tsv bez pliku przy obecnym manifescie - indeks nie wraca do
+  ponownej proby (dotad wracal) - bez znaczenia (plik jest w repo i skrypcie wgrania).
+- `Rumours.cs` / `Lektor.Live.cs`: 4. czesc arm_rumours ("v1|bandy|wiesci|plotki Kroniki"; stary Import wymaga >= 3 czesci - czyta je, czwarta pomija); pola przez
+  Clean (bez ',', ';', '|'); _story czyszczone w Reset/Import; MarkNoLive - tylko plotki Kroniki (najwyzej 400 tekstow).
+- `Settings.cs` / `McmSettings.cs`: 4 klucze grupy "Chronicle of Westeros" (opisy EN); `python -I tools/gen_mcm.py` - bez roznic w drzewie (Armoury 2279,
+  RealisticCaptivity 115, GrandTourney 44).
+- `tools/sprawdz_logi.py`: dispatch m105kronika - wlasny `if group == "m105kronika" and logp: return ...` na poziomie main (miedzy m105kolko i m104wojny), nie w cudzym
+  if; sprawdz_narzedzie: "dispatch poza main [] | zle wstawki [] | zdublowane def [] | zdublowane grupy [] | kompilacja ok".
+- `arm_canon_moves.tsv`: skrypt kr-styk/canon_moves_check.py (wierna kopia CanonCompanions.Parse): 102 wiersze danych - start 63, move 37, rescue 2, ZLE WIERSZE 0;
+  akcje clan 7, court 9, die 3, free 2, hide 3 (m11/m20/m21), lead 1, marry 2, prisoner 4, remove 1 (p09), wander 4, wed 1; rodzaje termow wszystkie znane BaseTrue;
+  kr: w 4 wierszach (m02 kr:032.1=b|kr:032.1=c, m04 kr:099.2, m18 kr:902.1+1, m22 kr:008.1+1) - okna i opcje istnieja, kazdy ma stary wyzwalacz zapasowy (klucz NIE);
+  32 pary #para: kazda ma wiersz #move, pary 'kr' maja kr:<okno> w wyzwalaczu.
+- `NoticeBoard.Watch.cs` (+1): Chronicle.NoBounty - pusta lista band / StringId bez armoury_kr_ = false od razu (petla po bandach bez kosztu).
+- Pozostale mody (CrashScribe, ForgeView, GrandTourney, RealisticCaptivity) bez zmian wobec bazy; Kronika czyta CrashScribe (Fabula, plan:) i GrandTourney (CanonApi)
+  tylko odbiciem.
+**Zmiana (drobne bledy styku):** `Chronicle.Data.cs` - komentarz "k00 (2 okna testowe)" -> "okna testowe silnika 000.1-000.6" (624285f6). Innych bledow styku nie znalazlem.
+**Build i testy (HEAD po tym wpisie):**
+- Build Release, GameLibs lancuch/libs: Armoury 0 bledow (7 starych ostrzezen: BattlefieldLaw, CampWalk, SideVillageFief, StartCalibration x3, StoryWindow.CancelText),
+  CrashScribe 0/0, ForgeView 0 (4 stare), GrandTourney 0/0, RealisticCaptivity 0 (2 stare); kod wyjscia 0 kazdego.
+- kronika_check: WYNIK OK - paczek 11, okien 216, wierszy okien 358, wyborow 42, tekstow 74, band 20, zadan 10, par 32, tematow 21 | bledy 0, uwagi 5 (lektor: 051.1a brak
+  nagrania; 075.3, 079.1, 090.1, 090.1a nagranie nieaktualne). kronika_silnik: WYNIK OK (34 akcje: 32 z procedura, pop i alliance swiadomie POMINIETE; 3 uchwyty; 9 wyzwalaczy).
+- Testy syntetyczne m105kronika: kr-fix/test_kw_fix.py 46/46; stare kr-a4/test_kw.py 33/35 i kr-b2/test_kw_b2.py 36/38 - te same 2 rozbieznosci w obu (kw6 "z niczego"
+  i kw12 25 KB maja nowe oczekiwania od poprawek K0: KW-6 szuka linii zlota z ", zdjete", KW-12 prog 48 KB). Logi autotestu 0ffd5d9f: k0-k0a 22/22, k0-k0b-b 22/22 (NIE 0).
+- Gra NIE uruchamiana, nic nie wgrane, katalogi test/ nietkniete.
+**Plan autotestu (gdy Jeff nie gra; kopia logow Jeffa przed 1. biegiem; DLL z HEAD do test/; scratchpad 7aee5f12/testy-103.ps1 -Runs k0a,k0b-a; po biegu
+`python -I tools/sprawdz_logi.py --grupa m105kronika <Armoury-*.log> --crashscribe <session-*.log>` - 0 NIE; k00 wczytuje sie TYLKO z flaga testu):**
+- **K0a** - nowa kampania KLASYCZNA 40 dob, flagi armoury-kronika-test.flag (+ armoury-kolko.flag jak w testy-103), -Speed 8. Linie-dowody (Armoury.log, prefiks
+  "Kronika Westeros (KW): "):
+  - start: "dane wczytane | paczki 11: k00 6/1/0 ..." i "start sesji | klucze: Chronicle Of Westeros TAK, World Changes TAK, Full Versions NIE, Player Choices TAK |
+    paczki 11 ... | k00 testowa TAK | ... | zle wiersze 0 | nieznane termy 0 | ... plan Fabuli TAK | ... | nagran Kroniki 293 (ogg 293; ok, ze starym tekstem 4, odrzucone 0)
+    ... | potkniecia 0.";
+  - okno zwykle: "okno 000.1 'A Raven at Dusk' pokazane | wiersz glowny | ..." + "akcja 000.1 #1 flag:kr_test_1 -> OK (ustawiona)." + "akcja 000.1 #2 kod:test -> OK
+    (uchwyt test)." + "okno 000.1 zamkniete po N s (przycisk)." + para CrashScribe "AUTOTEST: OKNO" z tytulem;
+  - wariant wedlug miejsca gracza: gracz na ziemiach Polnocy (p:region:battania) -> "okno 000.1 'A Raven Over the Wolfswood' pokazane | wariant a"; gracz gdzie indziej ->
+    "wiersz glowny" (bieg 0ffd5d9f: start w town_EN1 - wariant a sie NIE pokazal; dowod wariantu daje 000.6 nizej); gracz w armii -> "wiesc 000.1 (...)";
+  - wybor 3 opcji z wyszarzona: "wybor 000.2 czeka na liste po oknie (opcji 3, dostepne ac)." -> "okno 000.2 zamkniete po N s (przycisk) - lista wyboru za 0.5 s." ->
+    "wybor 000.2 = c 'Keep your own counsel' (z 3; dostepne ac; wymuszone flaga NIE; bierna TAK)." + CrashScribe "AUTOTEST: OKNO wybor z listy \"Whispers Before the
+    Storm\" (... (000.2)) -> TAK [Confirm] wybrane: \"Keep your own counsel\" (z 3)" (b wyszarzona: brak relacji 50 z Robbem; KW-9 para listy);
+  - plan/przed: "okno 000.2 ... pokazane | wiersz glowny | dzien opowiesci d (od 0 = 0.0, do -, plan NedEvent-3 = x)" przed linia CrashScribe "FABULA: wydarzenie NedEvent
+    WYSTARTOWALO" (KW-3); gdy NedEvent ruszy wczesniej - "POMINIETE okno 000.2 - ... NedEvent juz ruszylo" albo wiesc (tez dobry wynik, z powodem);
+  - hide/unhide postaci testowej: "log 000.3 (forma log) - tylko linia logu, skutki ida | ...", "akcja 000.3 #1 hide:ROTwanderer29:kr:000.4 -> OK (ukryty (byl: ...), koniec
+    ukrycia kr:000.4)" + "ukryty Dick Crabb (000.3) do kr:000.4 | ...", "akcja 000.3 #2 hide:ROTwanderer30 -> OK (...)" + "ukryty Ser Harlan Blackhare (000.3) do unhide
+    (bez terminu) | ..."; po 3 dobach "akcja 000.4 #1 unhide:ROTwanderer30 -> OK (powrot do <miasto> (town_.., miasto kultury ..) ...)" + "powrot Ser Harlan Blackhare ->
+    town_.. (000.4) | ..."; doba pozniej "KONIEC UKRYCIA Dick Crabb (Kronika 000.3, od dnia N) - term prawdziwy: kr:000.4 | powrot Dick Crabb -> town_.. | ...". Linia doby
+    "ukryci 2 (Kronika 2, #move 0)" -> 1 -> 0. Dopuszczalne zamiast OK: "-> CZEKA (w drodze (opozniony teleport gry) - czeka, od dnia N)" (ponawiane co dobe) albo
+    "-> POMINIETA (brak postaci ...)" / "(... po stronie gracza ...)" - wtedy hide/unhide NIE sprawdzone (powtorzyc z inna postacia testowa);
+  - wiesc: "wiesc 000.5 (forma wiesc) | dzien opowiesci d." + "akcja 000.5 #1 flag:kr_test_5 -> OK (ustawiona)." + "akcja 000.5 #2 wiesc:000.5_N1 -> OK (...)." + "akcja 000.5
+    #3 plotka:000.5_P:vlandia:10 -> OK (ksiega wiesci: 000.5_P w vlandia na 10 dni).";
+  - wariant z tekstem i zmiennymi glownego: "okno 000.6 'Word from <imie wladcy vlandia>' pokazane | wariant b | ..." + "akcja 000.6 #1 flag:kr_test_6b -> OK (ustawiona)."
+    i BRAK "kr_test_6a" (wariant a wersja=pelna przy kluczu Full Versions NIE); korona bez wladcy - okno czeka z powodem "zmienna KING bez wartosci";
+  - zapis: "zapis arm_kronika N KB | rozstrzygniete ..., pominiete ..., czeka na wybor 0, ..." przy kazdym zapisie gry (< 48 KB, KW-12);
+  - zapis przy stanie 'a' i wczytanie: autotest odpowiada na liste w < 1 s, wiec zapis w stanie 'a' w biegu prawie sie nie zdarza (droga Build -> Import -> Build i powrot
+    listy sprawdzone harnessem A2/kr-fix). W grze: drugi bieg z -LoadSave zapisu konca K0a (10 dob): linia startu "zapis: pokazane N, ..., czeka na wybor 0" zgodna
+    z ostatnia linia "zapis arm_kronika" biegu 1, zadne okno k00 ani 001.1+ drugi raz (KW-7), "ukryci" jak przed zapisem; jesli zapis trafi na stan 'a' -
+    "lista wyboru 000.2 pokazana (opcji 3, dostepne ac, czekala od dnia N)." i jedna linia "wybor 000.2 = ...".
+  - oraz: K1 od dnia opowiesci 10 (001.1, 002.1, 003.1 ...) - "lektor kr_NNN_w TAK", obrazek z puli tematu, <= 2 okna na dobe z odstepem >= 6 h (KW-4), ERROR 0, potkniecia 0.
+- **K0b** - to samo z armoury-kronika-wybor.flag: **a** (testy-103 k0b-a) - "wybor 000.2 = a 'Send him a purse of silver for his host' (z 3; dostepne ac; wymuszone flaga
+  TAK; bierna NIE)" + "zloto 000.2=a: <imie gracza> (<id gracza>) -> Robb Stark (lord_5_1) 200 (zaplacone 200)." (albo z ", niedoplata n", gdy gracz ma mniej) + "akcja 000.2=a #2 relp:lord_5_1:2
+  -> OK (...)" + "akcja 000.2=a #3 flag:kr_test_2a -> OK"; KW-6 bez "z niczego". **b** (k0b-b) - b wyszarzona, wiec "wymuszone flaga NIE" i bierna c (bieg 0ffd5d9f
+  dokladnie tak) - sprawdza tylko zapas; wymuszenie dowodzi bieg z flaga a.
+- **K0c** - lektor OGG: w biegu K0a (testy-103 nie ma osobnego "k0c" - wpis w $def nie istnieje; dowod z logu K0a): "Lektor (m103): okno ROT \"A White Cloak Thrown Down\" ->
+  kr_001_1.ogg (37.4 s) - start. Po kluczu kr_001_1 (Kronika, md5 tekstu zgodny)." - linia pada dopiero PO kontroli pliku przy odtworzeniu (CheckOgg z md5 pliku
+  z manifestu; zly md5 = "plik kr_..ogg uszkodzony (md5 ... zamiast ...), cisza"); linia doby lektora "odtworzone n (grane po 0,5 s tak n / nie 0, koniec za wczesnie 0)
+  ... silnik nie przyjal 0, po kluczu n, Kronika z innym tekstem 0"; start "nagran Kroniki 293 (ogg 293; ok, ze starym tekstem 4, odrzucone 0)". Przed biegiem:
+  wgraj-v5.ps1/bieg-bitwa.ps1 kopiuja Lektor/**/*.ogg z kontrola OggS i md5 kolumny 5 manifestu (STOP przy zerach). Bieg 0ffd5d9f: 11 okien z "Po kluczu kr_",
+  "grane po 0,5 s tak 1 / nie 0" - K0c w praktyce zaliczony; powtorzyc na DLL z HEAD (zmiany poprawek nie dotykaja Lektor).
+**Ryzyko / co sprawdzic:**
+- Scalenie do n33: n33 b643aace ma K0 z 0ffd5d9f; do dolozenia commity e2f67690..HEAD (poprawki, krytyk, styk) - 18 plikow, SubModuleMain bez zmian od 0ffd5d9f (konfliktow
+  z ChatLogTick/MapChatLog.Reset nie bedzie); po scaleniu gen_mcm (n33 ma 2301 ustawien) i sprawdz_narzedzie; KW-12 w repo glownym (PLANY-E5-WOJNY-KRONIKA H) poprawic na 48 KB.
+- Cofniecie DLL po ukryciu postaci: stara DLL nie zna linii "hid" ani akcji unhide - ukryci zostaja Disabled na zawsze (w kampanii Jeffa m11/m20/m21 dopiero po
+  RedWedding/Blackwater/Wall - dlugo po wgraniu; okna k00 tylko z flaga testu). Przed cofnieciem: linia doby "ukryci 0".
+- Wiersze #move z kr: (m02, m04, m18, m22) przy kluczu Chronicle Of Westeros NIE dzialaja starym wyzwalaczem (zgodnie z FORMAT 3.3); przy Kronice wlaczonej okno moze
+  poprzedzic ruch (m22 Yoren: kr:008.1+1).
+- Lektor: scena prologu o kluczu z arm_lektor.tsv gra teraz po kluczu (ten sam plik co po tytule - 23/23); nowa scena z innym tytulem w danych i starym w tsv zagra po kluczu.
+- K0a hide/unhide zalezy od tego, czy Dick Crabb i Ser Harlan Blackhare zyja, nie sa w druzynie gracza i nie sa w drodze w dniach 000.3/000.4 (inaczej CZEKA/POMINIETA
+  z powodem - wtedy test powtorzyc).
+**Status:** DO SPRAWDZENIA (autotest K0a/K0b-a/K0c na DLL z HEAD przed scaleniem i wgraniem; nic nie wgrane).
+
 ## 2026-10-22 - K0 KRYTYK KOMPLETNOSCI (stan galezi wobec KRONIKA-FORMAT 1-20 i PLAN kronika E, F, G, H, I)
 
 **Problem:** przeglad kazdego rozdzialu kontraktu i punktow planu (termy, akcje, kolumny, sekcje, linie logu, progi, klucze MCM, flagi autotestu, zapis, okna
