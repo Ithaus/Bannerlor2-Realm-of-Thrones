@@ -39359,7 +39359,8 @@ def m105kronika_main(logp, csp=None):
             (unknown == 0 and unk_day == 0 and (last_wait is None and unres == 0 or last_wait is not None and unres <= last_wait)) if acts else None)
     nsup = Counter(a[4].split(":")[0] for a in acts if a[5] == "POMINIETA" and (a[6] or "").startswith("akcja jeszcze niewspierana"))
     rep.add("KW-5b: akcje niewspierane w tej wersji silnika", ", ".join(f"{k} {v}" for k, v in nsup.most_common()) or "0",
-            "INFO (K0: wiesc, plotka, flag, kod:test, rel, relp, relk, renown, influence, hide, unhide; reszta w paczkach K1+)", None)
+            "INFO (K0: wiesc, plotka, flag, kod:test, rel, relp, relk, renown, influence, hide, unhide; B1: gold, security, loyalty, ware, garrison, item, wound, skill; "
+            "pop - niewspierana: ksiega ludzi bez przyczyny kronika; reszta w paczkach K1+)", None)
     # KW-6 zloto
     nothing = sum(1 for g_ in golds if "z niczego" in g_) + sum(1 for a in acts if a[4].startswith("gold:") and a[5] == "OK" and "z niczego" in (a[6] or ""))
     gold_ok = [a for a in acts if a[4].startswith("gold:") and a[5] == "OK"]
