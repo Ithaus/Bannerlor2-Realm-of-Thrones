@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-22 WGRANIE 103.4 (w-toku/m108-dziennik 73075573 = 103.3 + m108-dziennik + m108-muzyka) - mniejszy dziennik, muzyka wydarzen
+**Status:** WGRANE 2026-10-22 ok. 20:55 CEST (po tescie 108b). W GRZE: Armoury b9f5ebb5 (reszta DLL jak 103.3) + 6 utworow Lektor/Muzyka/muz_*.ogg. Kopie *.bak-2026-10-22-wgranie1034-przed i na D: (wgrane/2026-10-22-wgranie1034-przed). safely_exited 1.
+- m108-dziennik (Jeff: dziennik zaslanial dol menu miasta): czcionka linii 16 zamiast 20 (MapChatLogFontSize), pole wiadomosci 75% wysokosci (MapChatLogHeightPct; dol zostaje, przy przegladaniu pelne pole).
+- m108-muzyka (Jeff: muzyka gry zagluszala lektora): przez okno wydarzenia (ROT, Kronika, sceny prologu) i strone plotek muzyka gry cichnie do zera (psai), gra cicho nasz utwor wedlug nastroju (zaloba, wojna, Polnoc, korona i smoki, intryga, plotki - ElevenLabs Music, -28 LUFS, ok. 13 dB pod lektorem), po zamknieciu okna muzyka gry wraca; klucz EventMusicEnabled.
+Test 108b (prolog 20 dob + test dziennika): kod 0, ERROR 0; m105dziennik 7/7, m103lektor 10/10 (lektor gra przy naszej muzyce), m103sceny 15/15, m101prolog 11/11; 3 okna scen: nastroj korona/polnoc/korona, muzyka gry 1.00 -> 0 i pauza, powrot po oknie.
+
 ## 2026-10-22 WGRANIE 103.3 (w-toku/n33-calosc 080b2213 = 103.2 + m107-gospodarka + m107-kronika + 9 nagran lektora) - zamki bez zaleglosci, ziarno, wozy w ucieczce, tablica, smierci z kanonu, zmiany rodow
 **Status:** WGRANE 2026-10-22 ok. 19:47 CEST (stala zgoda Jeffa, po tescie 103i). W GRZE: Armoury 4609c026, CrashScribe 84205371, RealisticCaptivity 8528f098, GrandTourney cafa41c7, ForgeView 98890d38 + 306 nagran Kroniki. Kopie *.bak-2026-10-22-wgranie1033-przed i D:\Backup-Bannerlord\wgrane\2026-10-22-wgranie1033-przed. safely_exited 1.
 - m107-gospodarka (klucze TAK): K1 Village Cart Flee Unload (woz trzymany w domu przez bandy po 3 dobach rozladowany do magazynu wsi, wies wstrzymana do odejscia band), K2 Ds Castle Folk Part No Arrears (czesc firmy zamku z oszczednosci podzamcza tylko z nadwyzki - bez zaleglosci), K3 Ds Castle Fast Cut (szybka obnizka firmy zamku, pamiec doplywu w zapisie), K4 Ks Plan Market Balance (rownowaga Planu liczona na targu - ziarno), K5 Ks Fach Market Room (miejsce fachu na targu bez tego, co wsie zjadaja same), K6 Notice Board Lean Save (zapis tablicy nb3 o 1/3 mniejszy).
