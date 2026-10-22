@@ -7960,7 +7960,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsVillageOwnGrainFirst { get; set; } = true;
 
-        [SettingPropertyBool("Ks Village Chest Refill", HintText = "with Ks Village Basket At Shelf and Dues Medieval: a village whose purse is below its rainy-day chest keeps back each day one part in Ds Village Chest Days of what is missing from the money for the food and things after grain and salt (grain and salt are never cut), so a poor village refills its chest first. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ks Village Chest Refill", HintText = "with Ks Village Basket At Shelf and Dues Medieval: a village whose purse is below its rainy-day chest keeps back each day one part in Ds Village Chest Days of what is missing from the money for the food and things after grain and salt - at most half of that money (grain and salt are never cut) - so it slowly refills its chest and still buys the rest of its food with the other half. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsVillageChestRefill { get; set; } = true;
 

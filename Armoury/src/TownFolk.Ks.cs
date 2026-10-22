@@ -278,8 +278,8 @@ namespace Armoury
         }
 
         /// <summary>m105 gosp4 G4 (Ks Village Chest Refill; n32: 73 wsie W i 31 E ponizej skrzyni wydawaly caly budzet z wplywu): wies DS z kiesa ponizej skrzyni odklada
-        /// lam x (skrzynia - kiesa) / DsVillageChestDays z budzetu reszty drabiny (po ziarnie i soli - ZcLadder). Wies nie DS, na skrzyni albo ponad, DsVillageChestDays 0 -
-        /// bez odkladania (RefillCut -1). Nie rzuca.</summary>
+        /// lam x (skrzynia - kiesa) / DsVillageChestDays z budzetu reszty drabiny (po ziarnie i soli - ZcLadder; najwyzej polowa tej reszty). Wies nie DS, na skrzyni albo ponad,
+        /// DsVillageChestDays 0 - bez odkladania (RefillCut -1). Nie rzuca.</summary>
         private static void ChestRefillOf(ZcBuy b, Village vil, double lam)
         {
             try
@@ -680,8 +680,10 @@ namespace Armoury
             int ns = n[StartCalibration.ZSalt]; if (b.OwnGs) ns -= ZcOwnGs(b, vil, StartCalibration.ZSalt, ns);
             ZcTake(b, StartCalibration.ZSalt, ns, 0); done[StartCalibration.ZSalt] = true;
             b.Lim = lim; b.NoCap = false;
-            // m105 gosp4 G4 (Ks Village Chest Refill): wies ponizej skrzyni - budzet reszty drabiny mniejszy o czesc braku skrzyni (ziarno i sol wyzej nietkniete); pieniadz zostaje w kiesie
-            if (b.CapOn && b.Refill > 0) { double c = Math.Min(b.Refill, Math.Max(0.0, b.Cap)); b.Cap -= c; b.RefillCut = c; }
+            // m105 gosp4 G4 (Ks Village Chest Refill): wies ponizej skrzyni - budzet reszty drabiny mniejszy o czesc braku skrzyni (ziarno i sol wyzej nietkniete); pieniadz zostaje w kiesie.
+            // Recenzja ekonomii R1: najwyzej polowa reszty budzetu po ziarnie i soli (dotad przy braku skrzyni ponad ok. polowe G4 zabieral cala reszte - ryby, napoje, owoce,
+            // rzeczy - do zapelnienia skrzyni); powoli, z biezacego zysku - wies dalej je reszte drabiny za druga polowe
+            if (b.CapOn && b.Refill > 0) { double c = Math.Min(b.Refill, 0.5 * Math.Max(0.0, b.Cap)); b.Cap -= c; b.RefillCut = c; }
             // m105 gosp4 G1 (klucz Ks Village Cheap Kcal First, tylko z budzetem W1): napoje, bialko i reszta jedzenia jedna lista wedlug zl za 1000 kcal przy cenie polki doby
             // (bez towaru na koncu), zamiana wino -> piwo -> piwo domowe po przejsciu (ten sam budzet); rzeczy jak dotad po calym jedzeniu (4). Plan (KsBasket.Rungs) bez zmian.
             if (b.CapOn && StartCalibration.SwCheapKcalFirst) ZcCheapKcal(b, n, done);
