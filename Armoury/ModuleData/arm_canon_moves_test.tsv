@@ -1,0 +1,7 @@
+# Armoury: Chronicle autotest rows (m107-kronika, CanonCompanions.ParseTest). Read ONLY with the test flag CrashScribe/armoury-kronika-test.flag in autotest
+# mode 1/2 (like arm_kronika_k00.tsv); only the #move section, ids must not repeat the ids of arm_canon_moves.tsv.
+# t01: window 000.8 resolved by its variant a (canon death row - Canon Deaths on, AT1) -> lead (expected done; AT2 - skipped, the term can never come true).
+# t02: window 000.8 resolved by its main row (Canon Deaths off, AT2) -> lead (expected done in AT2; AT1 - skipped).
+#move	id	who	name	trigger	action	mode	message	note
+t01	ROTwanderer31	Ser Benfry the Lucky	kr:000.8~a	lead			test kr:NNN.w~R - variant a of 000.8
+t02	ROTwanderer34	Tae Hill	kr:000.8~0	lead			test kr:NNN.w~R - main row of 000.8
