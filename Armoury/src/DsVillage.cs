@@ -501,14 +501,17 @@ namespace Armoury
                 // m105 gosp5 (klucz Ds Lord Relief Below Chest): pan nie bierze czynszu z pieniedzy skrzyni - rata dnia tylko z kiesy ponad skrzynie, reszta raty darowana
                 // bez zaleglosci (jak przy rabunku: do "wstrzymane", bez zmiany nawiasu z liczba wsi - NDS-6c bez zmian). Przed G5 (skrzynia > koszyk, wiec G5 ponizej
                 // skrzyni nic juz nie tnie). Klucz NIE - ten blok nie biegnie, chestR = -1, rata zaleglosci nizej jak dotad
+                // Recenzja gosp5 (uwaga 1): darowane liczy sie od calej raty dnia (dayR), nie od raty ograniczonej kiesa - kiesa mniejsza od raty albo 0 tez nie pisze
+                // reszty do ksiegi zaleglosci (shortDay = tylko ulamek zlotowki). pc <= kiesa, wiec payDay = pc. Klucz NIE - dayR nieuzywane
                 double chestR = -1; long chestRemit = 0;
-                if (s.DsLordReliefBelowChest && (payDay > 0 || owed >= 1))
+                long dayR = (long)Math.Max(0, Math.Floor(d));
+                if (s.DsLordReliefBelowChest && (dayR > 0 || owed >= 1))
                 {
                     chestR = ReliefChest(st);
-                    if (chestR >= 1 && payDay > 0)
+                    if (chestR >= 1 && dayR > 0)
                     {
                         long pc = (long)Math.Max(0, Math.Floor(g - chestR));
-                        if (pc < payDay) { chestRemit = payDay - pc; payDay = pc; _rChest += chestRemit; _rChestN++; _rRemit += chestRemit; }
+                        if (pc < dayR) { chestRemit = dayR - pc; payDay = Math.Min(payDay, pc); _rChest += chestRemit; _rChestN++; _rRemit += chestRemit; }
                     }
                 }
                 // m105 gosp4 G5 (klucz Ds Rent After Bread, z ksiega zaleglosci): rata dnia tylko z kiesy ponad koszyk dnia - ta sama zasada co rata zaleglosci (nizej); czego
