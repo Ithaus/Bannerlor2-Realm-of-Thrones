@@ -193,6 +193,8 @@ kr_076_1	The Butcher King of Astapor	kr_076_1.ogg	0385aa9f1e3ae0249993be3d995aeb
 kr_076_2	The Pale Mare	kr_076_2.ogg	423fb5d2a93629cec94b54bc7c1820a6	9c6de1113fc65fc951cbf9098ac3338f	arm_kronika_k07.tsv
 kr_081_1	Snow and Fire	kr_081_1.ogg	8f4a71175edc048ffd0750f6d6fb0706	995396a99346ef760b0478098171a0f5	arm_kronika_k07.tsv
 kr_081_2	The Last Charge of Stannis	kr_081_2.ogg	1d1c67cf16dce781bfaa44b653a396c0	b595f41c4720562ec11db7bc073b4136	arm_kronika_k07.tsv
+kr_081_2a	The King in the Snow	kr_081_2a.ogg	a4e5cab25f66c7d34d93825a43d0ce12	98ab200976f0bbcc702d0caf6ffb84a2	arm_kronika_k07.tsv
+kr_081_2b	The King in the Snow	kr_081_2b.ogg	b3862f15eb7c5ef8d42e54855f700efb	7ec82217b9b085725ff1d9f41c3992be	arm_kronika_k07.tsv
 kr_082_1	The Tower of Joy	kr_082_1.ogg	618763c3879884a4902ba50bef148dbe	c3cae966180668821d4fd36081c841ef	arm_kronika_k07.tsv
 kr_082_2	A Septon's Diary	kr_082_2.ogg	8b03dfe0bc922da856eae8302e2cd924	300970105c1bd41023d20774954c0da6	arm_kronika_k07.tsv
 kr_082_3	In the Crypts of Winterfell	kr_082_3.ogg	41d2470e569a26b2fcbff84db23fa9a7	ee590dd6ef36da3283f52c8f349fa394	arm_kronika_k07.tsv
@@ -233,7 +235,9 @@ kr_092_2a	The White Wolf	kr_092_2a.ogg	ea03e2f6ea132d2971746ffaf94d75f5	90594705
 kr_092_2b	The White Wolf	kr_092_2b.ogg	7015e1cdc0bbe7fcbf09c8a447d75fd1	f9c5326fcfb84cace1d739cb357e9aff	arm_kronika_k08.tsv
 kr_093_1	The Last Lesson in Braavos	kr_093_1.ogg	678ec83915bef9a0c2d67500918e04e0	ccef658aeedd80502ceaf435ade8f6c1	arm_kronika_k08.tsv
 kr_094_1	A Pie for Lord Walder	kr_094_1.ogg	d45ec4e448750cbe031aed949122abd1	379cb13f031657e2c4c4164a79dc57fa	arm_kronika_k08.tsv
+kr_094_1a	A Pie for Lord Walder	kr_094_1a.ogg	01fa536f6ff7319ab1f3519adf2f3a64	4571b8e412cb988ac120657f7a2124c4	arm_kronika_k08.tsv
 kr_094_2	The Feast at the Twins	kr_094_2.ogg	d8a50bc1e319a78e9a90decd6de8d186	f3ac5a89964960126bb6ce97f4cb7299	arm_kronika_k08.tsv
+kr_094_2a	The Feast at the Twins	kr_094_2a.ogg	e46a6aefca75313d246d3da9b2f66680	0a5370daf0f08b1b5c38f64a538f7882	arm_kronika_k08.tsv
 kr_095_1	Wildfire under the Sept	kr_095_1.ogg	8ce0f123f90e27c1388c6c09fc042357	cf69ca82b6fbce37524dd334c4fe00a7	arm_kronika_k08.tsv
 kr_095_2	Queen Cersei	kr_095_2.ogg	095bae3eaf91ab8e990f83cb208a1411	844ed7c67138c99324d46851c0ca2443	arm_kronika_k08.tsv
 kr_095_2a	The Queen Behind the Throne	kr_095_2a.ogg	ad25c01a3a5aed11f4f57a4b02122e5e	f90fd161d574a773cd14b1dff191b24a	arm_kronika_k08.tsv
@@ -257,6 +261,7 @@ kr_103_1	The Rock Without Gold	kr_103_1.ogg	cb23fe44020136957b7e8552c3ce1113	9ba
 kr_103_2	The Queen of Thorns	kr_103_2.ogg	9fb6e80fcd807bee7a7759f895eb493a	0affd4bb2c146057818ab84de8cb7271	arm_kronika_k09.tsv
 kr_104_1	Fire on the Roseroad	kr_104_1.ogg	36266c75ceacf3bd5922d3933f7f9d04	d5f353acd75a60750ce652a003f7f754	arm_kronika_k09.tsv
 kr_104_2	Fire for the Proud	kr_104_2.ogg	31c9f8ed2e857022a167e128538c1f78	518341cc5ea87bb5f7b48059016c81a6	arm_kronika_k09.tsv
+kr_104_2a	Fire for the Proud	kr_104_2a.ogg	303a9f413fb6332936d3508678887b2a	f4469783e01bb29f67a181ef8d1f5599	arm_kronika_k09.tsv
 kr_104_2b	Fire for the Proud	kr_104_2b.ogg	a8a7d1ed1903e4ae356a137b82b47829	f2650d32020e82dda90609fc620338d4	arm_kronika_k09.tsv
 kr_105_1	The Trial in the Great Hall	kr_105_1.ogg	f9407059f3a2f8ea4a2b425e03524283	66424ae7149d43ac4088336b3f3d708d	arm_kronika_k09.tsv
 kr_105_1a	The Trial in the Great Hall	kr_105_1a.ogg	c6f6d65c0d465688dc66459bef4f64e3	2c65ad8f1ed5ce46a917563be2376fe8	arm_kronika_k09.tsv
@@ -286,13 +291,17 @@ kr_114_1	The Spider's Last Letters	kr_114_1.ogg	1c1874ea7845a333a3827a4395f9ecd9
 kr_115_1	The Bells	kr_115_1.ogg	602bd5b0331a8ef3f5d9e425a6860105	562daa286444618170703554638be041	arm_kronika_k10.tsv
 kr_115_1a	The Bells	kr_115_1a.ogg	c8f4febece4cf9646ed0c8ab883fa5ef	bca58af17f14132388ee6f40f823aa4e	arm_kronika_k10.tsv
 kr_115_2	The Fall of the Red Keep	kr_115_2.ogg	28404af94f879206d990d2df51aa9dc2	0491bfd53a5f3f343d40e74b72583a90	arm_kronika_k10.tsv
-kr_115_2a	Beneath the Red Keep	kr_115_2a.ogg	848a7c206e0c197e7c0f6bbff3bac1d4	ebef10e79752061fedeb3c9256c6132c	arm_kronika_k10.tsv
 kr_115_2b	Beneath the Red Keep	kr_115_2b.ogg	848a7c206e0c197e7c0f6bbff3bac1d4	ebef10e79752061fedeb3c9256c6132c	arm_kronika_k10.tsv
 kr_115_2c	Beneath the Red Keep	kr_115_2c.ogg	848a7c206e0c197e7c0f6bbff3bac1d4	ebef10e79752061fedeb3c9256c6132c	arm_kronika_k10.tsv
 kr_115_2e	Beneath the Red Keep	kr_115_2e.ogg	848a7c206e0c197e7c0f6bbff3bac1d4	ebef10e79752061fedeb3c9256c6132c	arm_kronika_k10.tsv
+kr_115_2a	Beneath the Red Keep	kr_115_2a.ogg	848a7c206e0c197e7c0f6bbff3bac1d4	ebef10e79752061fedeb3c9256c6132c	arm_kronika_k10.tsv
 kr_115_2d	The Brothers Clegane	kr_115_2d.ogg	aa213b5d63e5f0f4c304f172ca225bb3	be17f5377670e7b7ccd710da39605b65	arm_kronika_k10.tsv
+kr_115_3a	The Kraken on the Sand	kr_115_3a.ogg	9f7437661e36cc4b4f66931424020488	f9b690e59b26ba9f04df9dceb87fa4f0	arm_kronika_k10.tsv
+kr_115_3b	The Kraken on the Sand	kr_115_3b.ogg	a5a376a7ea2607d3ad34741ef58b63cf	8698a8798905258c1998d5facdb6c556	arm_kronika_k10.tsv
+kr_115_3c	The Queen's Maester	kr_115_3c.ogg	b52c88d33f6c171e8f0f336231a692dc	dc91c8d23fd43464fcc76d4f78ad9f09	arm_kronika_k10.tsv
 kr_116_1	The Queen of Ashes	kr_116_1.ogg	6d469b449e4016f597f44afd23af3e72	3d7cca5135021e236cff12d8a8ebfc49	arm_kronika_k10.tsv
 kr_116_1a	The Queen of Ashes	kr_116_1a.ogg	50eae5a8f29ab24a276273d5ae9b2252	76ce9121843fc0ea111b6abd93d62de0	arm_kronika_k10.tsv
 kr_116_2	The Last Queen	kr_116_2.ogg	ec612f2adc124b8cd8407d3ca091ef35	9b93f2a64d7e715d24f3d9b886dd6e41	arm_kronika_k10.tsv
+kr_116_2a	The Last Queen	kr_116_2a.ogg	080d1f4e3dcc6d7b6c12fb89c9b2dc70	d9216c5e8fa2112998b55928afb5bbbb	arm_kronika_k10.tsv
 kr_117_1	The Great Council	kr_117_1.ogg	e4fb6cc88f220cd540fc5be1945c3bd5	9a0dda4da5e56808c90ce85d15026d54	arm_kronika_k10.tsv
 kr_117_1a	The Great Council	kr_117_1a.ogg	417e9a6a8fbd3a578c1c003c8f198dfc	025b34e79893c2d8fd53b9d7c5615d40	arm_kronika_k10.tsv
