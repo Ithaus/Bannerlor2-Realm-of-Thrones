@@ -493,12 +493,22 @@ namespace Armoury
                 if (s.DsRentArrears && _arr.TryGetValue(st.StringId, out a)) owed = Math.Max(0, a.Owed);
                 long g = Math.Max(0, (long)gold);
                 long payDay = (long)Math.Max(0, Math.Min(Math.Floor(d), (double)g));          // 1. rata dnia - pierwsza, najwyzej kiesa
+                double basket = -1;
+                // m105 gosp4 G5 (klucz Ds Rent After Bread, z ksiega zaleglosci): rata dnia tylko z kiesy ponad koszyk dnia - ta sama zasada co rata zaleglosci (nizej); czego
+                // kiesa nie ma ponad koszyk, idzie do ksiegi zaleglosci (krok 3: x rampa, darowane po DsRentForgiveDays rat). Klucz NIE - rata dnia z calej kiesy, jak dotad
+                if (s.DsRentAfterBread && s.DsRentArrears && payDay > 0)
+                {
+                    double nv0, r0;
+                    basket = TownFolk.DsVillageDay(st, out nv0, out r0) ? Math.Max(0, VillNeeds.ChestBasket(st, nv0)) : 0;
+                    long pb = (long)Math.Max(0, Math.Min((double)payDay, Math.Floor(g - basket)));
+                    if (pb < payDay) { _rBread += payDay - pb; _rBreadN++; payDay = pb; }
+                }
                 long payArr = 0;
                 if (owed >= 1)
                 {
                     // 2. rata zaleglosci tylko z kiesy ponad koszyk dnia (TownFolk.Villages kupuje go po czynszu)
                     double nv, r1;
-                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
+                    if (basket < 0) basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
                     int pd = ArrPayDays(s);
                     double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
                     double room = g - payDay - basket;
