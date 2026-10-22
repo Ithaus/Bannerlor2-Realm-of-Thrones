@@ -135,7 +135,7 @@ Uzycie (Python 3, tylko odczyt):
                     miejsca 0 (plik sesji unikaty.log), F1-4 / F1-5 INFO; K5 - K5-4b (F2-1) partie i sztuki poza CreateCaravanParty 0 we WSZYSTKICH dobach,
                     K5-5 (F2-2), F2-3 kupione > 0 i <= cel, F2-4 "ERROR in PackMarket." 0, F2-5 / F2-6 INFO; K1 - K1-11 / K1-12 INFO, K1-13 nawias
                     konsumpcji czynny i roznica z ksiega towarow 0, K1-14 porzucone wedlug kategorii = liczniki K0; R1 - R1-7b brak zlota i pusta kiesa wsi
-                    <= 5% potrzeby drewna (d61-until), R1-7c / R1-7d wozy dymarek CZYNNE i kontrola 0, R1-10b brak drewna w warsztatach <= 177/d, R1-14..R1-16
+                    <= 5% potrzeby drewna (d61-until), R1-7c / R1-7d wozy dymarek CZYNNE i kontrola 0, R1-10b brak drewna w warsztatach <= 60/d (m105-miasta), R1-14..R1-16
                     rachunek za drewno (CZYNNE, kontrola 0, dwa liczniki zgodne), R1-7e / R1-13 / R1-17 / R1-18 INFO; K3 - K3-8 czekajacy maleja, F5-1 pole F5
                     CZYNNE i postoje > 0, F5-2 zakupy lordow >= 80/d, F5-3 "za drogie" <= 5% wizyt, F5-4 brak przydzialu i brak zlota <= 10% wizyt, F5-6
                     korpus partii >= 62%, F5-5 / F5-7 INFO; A3 - F6-1 INFO, F6-2 oszczednosci K1 w sakiewkach >= rezerwa K1 markietanow w kazdej dobie.
@@ -6118,9 +6118,10 @@ def etap5_r1_stock(rep, lines, start, until, rows, ref=False):
             wdw[rd] = v
     if wdw:
         avg = sum(wdw.values()) / len(wdw)
+        # m105-miasta T6: trzy biegi 21.10 (102, n31, 160 z zapisu): 17, 22 i 41 na dobe - prog = najwyzszy x 1.5 (dawne 177 z biegu sprzed wozow dymarek)
         rep.add("R1-10b: cykle warsztatow \"brak surowca [.., drewno\" (srednio d91-until)" + tag, f"{avg:.0f}/d ({len(wdw)} dob)",
-                "<= 177/d (bieg sprzed wozow dymarek a589def 177, W33 199 - woz nie zabiera drewna kuzniom miast handlowych)" if not ref
-                else "INFO (prog biegu z dymarka: <= 177/d)", okv(round(avg) <= 177))
+                "<= 60/d (m105-miasta: biegi 21.10 17 / 22 / 41 na dobe x 1.5; dawniej 177 z biegu sprzed wozow dymarek)" if not ref
+                else "INFO (prog biegu z dymarka: <= 60/d)", okv(round(avg) <= 60))
 
 
 def etap5_r1(rep, lines, start, until):
@@ -9035,7 +9036,7 @@ def etap5_a3(rep, lines, start, until, mar, nob):
     cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
     mwin = [d for d in sorted(mar) if 1 <= run_day(d, start) <= until]
     mre = re.compile(r"stawka ([\d.]+)% \(pelna ([\d.]+)%; ([^)]*)\) \| w polu (\d+) partii, wydaly (\d+): z sakiewek (\d+) \(gracz (\d+)\) -> kasy miast (\d+) w (\d+) miastach"
-                     r" \(([\d.]+)%\), kiesy wsi (\d+) w (\d+) wsiach \| we wlasnych miastach rodow \(K3\) (\d+) \| bez niewrogiego miasta -> najblizsze miasto (\d+) partii \((\d+)\)"
+                     r" \(([\d.]+)%\), kiesy wsi (\d+) w (\d+) wsiach(?: \| E3-G2 danina pana[^|]*)? \| we wlasnych miastach rodow \(K3\) (\d+) \| bez niewrogiego miasta -> najblizsze miasto (\d+) partii \((\d+)\)"
                      r" \| bez niewrogiej wsi w stanie Normal -> miasto (\d+) partii \((\d+)\)")
     rows, off = {}, []
     for d in mwin:
@@ -13222,6 +13223,87 @@ def e8c_shelves(lines):
     return out
 
 
+def _m105_kasy_rows(path):
+    """m105-miasta: kasy-miast.csv -> {dzien: [wiersz, ...]} (wiersze jako slowniki; brak pliku - {})."""
+    out = {}
+    if not path or not os.path.isfile(path):
+        return out
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as fh:
+        for r in csv.DictReader(fh, delimiter=";"):
+            try:
+                out.setdefault(int(r["dzien"]), []).append(r)
+            except (KeyError, ValueError, TypeError):
+                continue
+    return out
+
+
+def _m105_f(x):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _m105_keep_ratio(km, d):
+    """m105-miasta T2 (G1-5a2): suma kas miast / suma (1.5 x zapas kupcow + 28 dob poboru) w dobie d (pobor - srednia 28 dob konczacych sie na d). None - brak doby."""
+    if d not in km:
+        return None
+    w = [x for x in sorted(km) if d - 27 <= x <= d]
+    k = sum(_m105_f(r.get("kasa")) for r in km[d])
+    z = sum(_m105_f(r.get("zapas_kupcow")) for r in km[d])
+    p = sum(_m105_f(r.get("pobrane")) for x in w for r in km[x]) / max(1, len(w))
+    den = 1.5 * z + 28.0 * p
+    return (k / den if den > 0 else None), k, z, p
+
+
+def _m105_c4c3(path):
+    """m105-miasta T5 (C-4c3 / C-4c2): budzet-rodow.csv (rody AI) -> {dzien: (rodow, zapas G < 28 dni przy tempie spadku 28 dob, G < R i G nizej niz 28 dob temu,
+    bankrutow)}. Brak pliku - {}."""
+    rows = read_csv(path) if path else []
+    by = {}
+    for r in rows:
+        try:
+            d = int(r["dzien"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        g = r.get("G"); rr = r.get("R")
+        by.setdefault(d, {})[r.get("rod_id")] = (_m105_f(g) if g not in ("", None) else None, _m105_f(rr) if rr not in ("", None) else None,
+                                                 (r.get("bankrut") or "") not in ("", "0", "nie"))
+    out = {}
+    for d in sorted(by):
+        p28 = by.get(d - 28)
+        if not p28:
+            continue
+        n = run = poor = bank = 0
+        for c, (g, rr, b) in by[d].items():
+            n += 1
+            if b:
+                bank += 1
+            g0 = p28.get(c, (None, None, False))[0]
+            if g is None or g0 is None:
+                continue
+            if g < g0:
+                rate = (g0 - g) / 28.0
+                if rate > 0 and g / rate < 28:
+                    run += 1
+                if rr is not None and rr > 0 and g < rr:
+                    poor += 1
+        out[d] = (n, run, poor, bank)
+    return out
+
+
+M105_DS_P1_ZERO = re.compile(r"przejscie: rampa [\d.]+ \(([^)]*\bP1\b[^)]*) x 0\.000\)")
+
+
+def m105_ds_p1_zero(lines):
+    """m105-miasta T11: ostatnia linia 'Firmy miast i zamkow (DS)' pokazuje P1 w grupie 'x 0.000' (P1 pod DS wylaczona z zalozenia) -> doba tej linii, inaczej None."""
+    last = None
+    for s in lines:
+        if s.startswith("Firmy miast i zamkow (DS): dzien") and M105_DS_P1_ZERO.search(s):
+            last = num(r"dzien (\d+)", s[:50])
+    return last
+
+
 def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/C (253, projekt etapu 8 v2 rozdz. 3 "E8/C" Test; odpowiedz Jeffa 12.10 nr 2 - konie wedlug kategorii TAK). Linie startu sesji (PriceList8.StartLine,
     po HistoricalPrices.Apply): "HistoricalPrices: uprzaz z wagi prawdziwej N szt., helmy t4-6 N, luki N, oszczepy N, konie N (E8/C) | ..." i
@@ -13376,8 +13458,29 @@ def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         last = max(minus)
         full = run_day(last, start) >= until and until == 120
         lim = E8_C_Z33_CLANS_MINUS * 1.1
+        # m105-miasta T5: miara jednej doby (kiesa glowy nizej niz wczoraj) liczy takze rody bogate, ktorym regula potrzeby f6/f7 (decyzje Jeffa) z zalozenia nie
+        # placi - INFO; wiazacy C-4c3 nizej (budzet-rodow.csv)
         rep.add(f"C-4c: rody na minusie (linie Skarbce, dzien {last})", f"{minus[last]} wobec Z33 {E8_C_Z33_CLANS_MINUS}",
-                f"<= Z33 + 10% ({lim:.0f})" + ("" if full else " - INFO poza doba 120"), (minus[last] <= lim) if full else None)
+                f"INFO od m105-miasta (dawniej <= Z33 + 10% ({lim:.0f}); miara jednej doby - wiazacy C-4c3)", None)
+    bp_ = csv_path_of(logp) if logp else None
+    cc_ = _m105_c4c3(bp_) if bp_ and os.path.isfile(bp_) else {}
+    if cc_:
+        ds_ = sorted(cc_)
+        d1_ = min(ds_) - 28                                                  # pierwsza doba pliku (cc_ zaczyna sie 28 dob pozniej)
+        wd_ = [d for d in ds_ if d - d1_ + 1 >= 120] or ds_
+        bind_ = any(d - d1_ + 1 >= 120 for d in ds_)
+        wst = max(wd_, key=lambda d: cc_[d][1] / max(1, cc_[d][0]))
+        bnk = max(cc_[d][3] for d in wd_)
+        pc_ = 100.0 * cc_[wst][1] / max(1, cc_[wst][0])
+        rep.add("C-4c3: rody z zapasem zlota rodziny na mniej niz 28 dni przy tempie spadku z 28 dob (budzet-rodow.csv, od doby 120 pliku do konca)",
+                f"najwiecej {cc_[wst][1]} z {cc_[wst][0]} ({pc_:.1f}%, doba {wst}); na koniec {cc_[ds_[-1]][1]} ({100.0 * cc_[ds_[-1]][1] / max(1, cc_[ds_[-1]][0]):.1f}%); bankrutow najwiecej {bnk}",
+                "<= 2% rodow kazdej doby i bankrutow 0 (m105-miasta T5; 102 0.5-1.1%, P2 0.4-1.3%)" + ("" if bind_ else " - INFO (plik krotszy niz 120 dob)"),
+                (pc_ <= 2.0 and bnk == 0) if bind_ else None)
+        dl_ = ds_[-1]
+        rep.add("C-4c2: rody z G < R i G nizej niz 28 dob temu (bieda, ktora sie poglebia)",
+                f"{cc_[dl_][2]} z {cc_[dl_][0]} ({100.0 * cc_[dl_][2] / max(1, cc_[dl_][0]):.1f}%, doba {dl_})", "INFO (oczekiwane <= 10%)", None)
+    else:
+        rep.add("C-4c3: rody z zapasem zlota rodziny na mniej niz 28 dni", f"brak {bp_ or 'budzet-rodow.csv'}", "INFO", None)
     # ---- C-5, C-6
     rep.add("C-5: obity oszczep w sakwach przez zapis i wczytanie", "autotest nie ma obitej broni miotanej w sakwach gracza", "INFO - reczne 8.16 (stan zostaje: CleanseAmmo czysci tylko strzaly i belty)", None)
     hl = re.search(r"konie wedlug kategorii \[wl\]: ([^|]*)", s0)
@@ -13878,8 +13981,24 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             dev = 100.0 * (tg - E8_G1_Z33_TOWNS) / E8_G1_Z33_TOWNS
             # narzedzie progow p2 (TRIAZ-2 h "G1-5a"): wlasne +-10% bylo ciasniejsze niz prog projektu etapu 8 (rozdz. 4 pkt 5: kasy miast >= 80% i <= 110%
             # Z33 - ten sam, ktory na tej samej liczbie stosuje C-4a). Bieg 2: 84.4% - kasy nie leca bez dna (dno d60 8.10 mln, potem +5..+18 tys./d).
+            # m105-miasta T2: Z33 jest z 13.10 - sprzed KS, f4, f5 i f7 (kasy miast maja dzis inny cel) - INFO; wiazacy G1-5a2 nizej
             rep.add("G1-5a: suma kas miast w ostatniej dobie okna wobec Z33", f"{tg} ({dev:+.1f}% wobec {E8_G1_Z33_TOWNS}; doba {run_day(max(nk), start)})",
-                    ">= 80% i <= 110% Z33 w dobie 120 (prog projektu etapu 8 rozdz. 4 pkt 5, jak C-4a; bieg krotszy - INFO)", (-20.0 <= dev <= 10.0) if full else None)
+                    "INFO od m105-miasta (dawniej >= 80% i <= 110% Z33 w dobie 120; Z33 sprzed KS, f4, f5, f7 - wiazacy G1-5a2)", None)
+    # m105-miasta T2 (G1-5a2): kasy miast wobec wlasnego progu gersumy f7 - suma kas / suma (1.5 x zapas kupcow + 28 dob poboru) w dobie 120 pliku i na koncu
+    kp_ = session_file_find(logp, "kasy-miast.csv") if logp else None
+    km_ = _m105_kasy_rows(kp_) if kp_ else {}
+    if km_:
+        kd_ = sorted(km_)
+        d120 = kd_[0] + 119
+        r1 = _m105_keep_ratio(km_, d120) if d120 in km_ else None
+        r2 = _m105_keep_ratio(km_, kd_[-1])
+        txt = (f"doba 120 pliku: {r1[0]:.2f} (kasy {r1[1] / 1e6:.2f} mln, zapas {r1[2] / 1e6:.2f} mln, pobor {r1[3]:.0f}/d)" if r1 and r1[0] is not None else "doba 120 - brak")
+        txt += f"; koniec (doba {kd_[-1] - kd_[0] + 1}): {r2[0]:.2f} (kasy {r2[1] / 1e6:.2f} mln)" if r2 and r2[0] is not None else "; koniec - brak"
+        ok_ = (r1[0] <= 1.10 and r2[0] <= 1.10) if (r1 and r2 and r1[0] is not None and r2[0] is not None) else None
+        rep.add("G1-5a2: kasy miast / (1.5 x zapas kupcow + 28 dob poboru) - prog gersumy f7 (kasy-miast.csv)", txt,
+                "<= 1.10 w dobie 120 i na koncu (102: 0.94 / 0.70, n31 0.91, P2 0.91; plik krotszy niz 120 dob - INFO)", ok_)
+    else:
+        rep.add("G1-5a2: kasy miast / prog gersumy f7", f"brak {kp_ or 'kasy-miast.csv'}", "INFO", None)
     below = tot(r"kasy ponizej zapasu przez nasza wyplate (\d+)")
     rep.add("G1-5b: kasy miast ponizej zapasu przez nasza wyplate za towar rozwiazanej karawany", f"{below}", "0", below == 0)
     pw = {d: s for d, s in by_day(lines, "Pieniadz swiata: dzien").items() if 1 <= run_day(d, start) <= until}
@@ -13899,11 +14018,11 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 rep.add("G1-5c: kiesy karawan na karawane w ostatniej dobie okna wobec Z33",
                         f"{per:.0f} zl na karawane ({devp:+.1f}% wobec {zper:.0f}); karawan {cn} (Z33 {E8_G1_Z33_CARAVAN_COUNT}), suma kies {cg} ({dev:+.1f}% wobec "
                         f"{E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)})",
-                        "+-20% na karawane w dobie 120 (bieg krotszy - INFO; NIE przy nadmiarze karawan = czeka na limit karawan kupca, TRIAZ-2)",
-                        (abs(devp) <= 20.0) if full else None)
+                        "INFO od m105-miasta (dawniej +-20% na karawane w dobie 120; srednia podbija mala liczba karawan i doplata gry do 5000 - nie miara kies)",
+                        None)
             else:
                 rep.add("G1-5c: kiesy karawan w ostatniej dobie okna wobec Z33", f"{cg} ({dev:+.1f}% wobec {E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)}; brak linii Karawany (stan))",
-                        "+-20% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 20.0) if full else None)
+                        "INFO od m105-miasta (dawniej +-20% w dobie 120)", None)
     vis = {d: s for d, s in by_day(lines, "Karawany: dzien").items() if 1 <= run_day(d, start) <= until}
     why2 = {d: s for d, s in by_day(lines, "Karawany (przyczyny): dzien").items() if 1 <= run_day(d, start) <= until}
     info = []
@@ -16821,6 +16940,10 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
         ok4 = None
         if p1 and a4 is not None and lo4 is not None:
             ok4 = a4 >= lo4
+        p1z = m105_ds_p1_zero(lines)                                         # m105-miasta T11: P1 pod DS wylaczona z zalozenia (linia DS "P1 ... x 0.000")
+        if p1z is not None and ok4 is not None:
+            ok4 = None
+            rule4 += f" - INFO: P1 pod DS wylaczona z zalozenia (linia DS doby {p1z}: 'P1 ... x 0.000', m105-miasta T11)"
         rep.add(f"P1-4: danina z oszczednosci, srednia {wname}",
                 (f"{a4 / 1e3:.1f} tys. zl/d (W {mean([x[1] for x in av]) / 1e3:.1f} / R {mean([x[2] for x in av]) / 1e3:.1f} / P {mean([x[3] for x in av]) / 1e3:.1f} / podzamcza {mean([x[4] for x in av]) / 1e3:.1f})"
                  if a4 is not None else "brak dob w oknie") + (f" - ponad gorna granice projektu {hi4 / 1e3:.0f} tys. (INFO)" if (a4 is not None and hi4 is not None and a4 > hi4) else "")
@@ -24418,8 +24541,11 @@ def rok2_main(logp, start_arg, until=120, basep=None):
             rep.add("R2-T2-1: rok 1 - miara W5-7 d93-120", "brak linii Skarbce", "INFO", None)
         mu, sd = R2_Y1["dan"]
         if m["dan91"] is not None:
+            p1z = m105_ds_p1_zero(lines0)                                    # m105-miasta T11: P1 pod DS wylaczona z zalozenia
             rep.add("R2-T2-2: danina P1 sr. d91-120", f"{fm(m['dan91'])} zl/d" + (f" (W53 {fm(b['dan91'])})" if (b and b["dan91"] is not None) else ""),
-                    f">= sr. 5 biegow - 2 odch. ({fm(mu - 2 * sd)}; sr. {fm(mu)}, odch. {fm(sd)})", m["dan91"] >= mu - 2 * sd)
+                    f">= sr. 5 biegow - 2 odch. ({fm(mu - 2 * sd)}; sr. {fm(mu)}, odch. {fm(sd)})"
+                    + (f" - INFO: P1 pod DS wylaczona z zalozenia (linia DS doby {p1z}: 'P1 ... x 0.000', m105-miasta T11)" if p1z is not None else ""),
+                    None if p1z is not None else m["dan91"] >= mu - 2 * sd)
         else:
             rep.add("R2-T2-2: danina P1 d91-120", "brak linii P1", "INFO", None)
     else:
@@ -25406,10 +25532,17 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
         full = [x for x in segs if x[1] - x[0] >= 150]
         worst = (full or segs)[-1] if segs else None
         if worst:
+            # m105-miasta T4: okno 182 dob od doby 1 lapie rozlanie zlota startowego (d0-37 -71 tys./d) - INFO; wiazacy A16-5b2 (ostatnie 56 dob)
             rep.add("A16-5b: kiesy notabli - zmiana na dobe w ostatnim oknie 182 dob", f"{worst[2] / 1e3:+.1f} tys. zl/d (d{rd(worst[0])}-d{rd(worst[1])}); okna: "
                     + ", ".join(f"d{rd(a)}-{rd(b)} {v / 1e3:+.1f}" for a, b, v in segs),
-                    ">= -15 tys. zl/d w ostatnim oknie >= 150 dob - tempo maleje (dwuletni: rok 1 -17.8, rok 2 -8.5); krotszy bieg - INFO (120 dob -23.8)",
-                    (worst[2] >= -15000) if full else None)
+                    "INFO od m105-miasta (dawniej >= -15 tys. zl/d w ostatnim oknie >= 150 dob; okno z rozlaniem zlota startowego - wiazacy A16-5b2)", None)
+        dl5 = ks[-1]
+        w56 = [d for d in ks if d >= dl5 - 56]
+        if len(w56) >= 2 and w56[-1] > w56[0]:
+            t56 = (int(nt[w56[-1]][2]) - int(nt[w56[0]][2])) / (w56[-1] - w56[0])
+            b56 = rd(w56[0]) >= 38 and (w56[-1] - w56[0]) >= 49
+            rep.add("A16-5b2: kiesy notabli - zmiana na dobe w ostatnich 56 dobach", f"{t56 / 1e3:+.1f} tys. zl/d (d{rd(w56[0])}-d{rd(w56[-1])})",
+                    ">= -15 tys. zl/d (m105-miasta T4; okno po rozlaniu zlota startowego d0-37 - bieg krotszy niz ok. 94 dob INFO)", (t56 >= -15000) if b56 else None)
     else:
         rep.add("A16-5: notable", "brak linii Warsztaty towarowe", "ponizej 4 500 <= 12%, spadek <= 15 tys. zl/d", None)
     # ---- A16-6 zalegly zold (odsylacz)
@@ -30235,7 +30368,7 @@ KR2_DAY = re.compile(r"Pozyczki koron \(korona2\): dzien (?P<d>\d+) \| pozyczki 
                      r" krolestw w wojnie (?P<war>\d+), ze skarbcem ponizej zapasu wojny (?P<cand>\d+) \(luka razem (?P<gap>-?\d+|-)\); bez pozyczki: zakaz po niesplacie"
                      r" (?P<ban>\d+), pomiar wplywow < \d+ dob (?P<warm>\d+), limit (?P<lim>\d+), miasta bez nadwyzki (?P<nosrc>\d+) \| splaty: z wplywow dnia (?P<pinc>\d+),"
                      r" z wolnego zlota ponad zapas wojny i dlugi (?P<pstock>\d+), razem (?P<paid>\d+) .*?\| niesplacone \(umorzone po \d+ dobach w pokoju\) (?P<wr>\d+) zl u"
-                     r" (?P<wrN>\d+) krolestw .*?\| dlug koron u miast (?P<debt>-?\d+) \(krolestw (?P<debtK>\d+), .*?\), limit krolestw z dlugiem (?P<limAll>-?\d+|-),"
+                     r" (?P<wrN>\d+) krolestw.*?\| dlug koron u miast (?P<debt>-?\d+) \(krolestw (?P<debtK>\d+), .*?\), limit krolestw z dlugiem (?P<limAll>-?\d+|-),"
                      r" dlug / limit najwyzej (?P<worst>[\d.]+), zakazow (?P<bans>\d+) \| kontrola: dlug - \(wczoraj \+ zawarte \+ odsetki - splacone - umorzone - przepadle\)"
                      r" (?P<ctl>-?\d+|-), skarbiec po pozyczce ponad zapas wojny (?P<above>\d+) .*?\| czesc korony podatku od nadwyzki do zapasu \(A, Folk Guard Crown To Reserve"
                      r" (?P<res>tak|nie)\): dzis (?P<resT>\d+) z (?P<crownT>\d+) zl .*?\| potkniecia (?P<st>\d+) \(sesja (?P<sts>\d+)\)")
@@ -33661,9 +33794,13 @@ def nwar_main(logp, bdp=None):
     return 0
 
 
-def _nwar_wedge(tc, first):
-    """Klin cen z linii "Rzemioslo miasta (148)": (doba, skora/skory, plotno/len) z pierwszej albo ostatniej doby z obiema parami."""
+def _nwar_wedge(tc, first, skip=0):
+    """Klin cen z linii "Rzemioslo miasta (148)": (doba, skora/skory, plotno/len) z pierwszej albo ostatniej doby z obiema parami. skip (m105-miasta T10) - poczatek
+    nie wczesniej niz pierwsza doba linii + skip (w dobie 1 polki sa puste)."""
+    lo_ = (min(tc) + skip) if (tc and first and skip) else None
     for x in (sorted(tc) if first else sorted(tc, reverse=True)):
+        if lo_ is not None and x < lo_:
+            continue
         d = tc[x]
         if d.get("skory", 0) > 0 and d.get("len", 0) > 0 and "skora" in d and "plotno" in d:
             return x, d["skora"] / d["skory"], d["plotno"] / d["len"]
@@ -33852,7 +33989,7 @@ def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
             print(f"baza-doby (f7): {bdp} nieczytelna ({e})")
             bws, btc = None, {}
     tc = f7.get("tc", {})
-    a, b = _nwar_wedge(tc, True), _nwar_wedge(tc, False)
+    a, b = _nwar_wedge(tc, True, 14), _nwar_wedge(tc, False)   # m105-miasta T10: start pomiaru = pierwsza doba + 14
     bb_end = _nwar_wedge(btc, False) if btc else None
     if a and b and a[0] != b[0]:
         txt = f"d{a[0]} -> d{b[0]}: skora/skory {a[1]:.2f} -> {b[1]:.2f}, plotno/len {a[2]:.2f} -> {b[2]:.2f} (mediany indeksow z linii 'Rzemioslo miasta (148)')"
@@ -33861,7 +33998,7 @@ def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
         ok = (b[1] >= 0.9 * a[1] and b[2] >= 0.9 * a[2]) if has_f7 else None
         et = bool(bb_end) and ok is False and b[1] >= bb_end[1] and b[2] >= bb_end[2]
         rep.add("NWAR-15: klin cen wyrobu wobec wsadu (skora/skory, plotno/len) koniec wobec poczatku", txt,
-                ">= 0.9 x poczatek obu par (fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34); gorzej, ale nie gorzej niz koniec bazy (--baza-doby) - ETAP"
+                ">= 0.9 x poczatek obu par (poczatek = pierwsza doba linii + 14 - m105-miasta T10; fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34); gorzej, ale nie gorzej niz koniec bazy (--baza-doby) - ETAP"
                 + ("" if has_f7 else " - INFO bez paczki f7"), ok, etap=et)
     else:
         rep.add("NWAR-15: klin cen wyrobu wobec wsadu", "za malo linii 'Rzemioslo miasta (148)' z polkami", "INFO", None)
@@ -43175,13 +43312,24 @@ NAK_LED_HEAD = "Pieniadz swiata (bilans - przyczyny): dzien"
 NAK_LED_REST = re.compile(r"srednia 28 dob ([-+]?\d+)(?: \(z \d+ dob\))? - prog 10000: (OK|PONAD)")
 NAK_LED_DEAD = re.compile(r"nasze moduly bez zdarzenia - korona, Bank, budowy - ([-+]?\d+) w \d+ przelewach")
 NAK_LED_REP = re.compile(r"\(do skarbcow odbiorcow \+(-?\d+),")
+# m105-miasta T1 (NAKUM-7p): sakiewki ludzi rosna razem z mobilizacja (102: zold 420 -> 577 tys./d), a w dniach zoldu spadaja (8.6 -> 7.7) - posiadacz poza bramka
+# +30 tys./d NAKUM-7 (pomiar w wierszu); warunek w NAKUM-7p z linii "Markietani (E5/A3)": sakiewki partii rodow <= 15 dni zoldu (norma A3) kazdej doby okna NAKUM-7
+# i na koncu okna nie wiecej niz na poczatku + 1 dzien (sakiewki ida za zoldem, nie ponad niego)
+NAK7_PURSE = ("sakiewki ludzi",)
+NAK7P_HEAD = "Markietani (E5/A3): dzien"
+NAK7P_RX = re.compile(r"sakiewki partii rodow (\d+) = ([\d.]+) dni zoldu \(zold dnia (\d+)")
+# m105-miasta T8 (NAKUM-2c): przed ustaleniem firm F3 danine od skarbca ludu pobiera kiesa2 (linia "Podatek od nadwyzki ludu (kiesa2)"), pole 'pobrano' linii
+# 'Akumulator kies' jest wtedy 0 - skok +82 542 w dobie przejscia (102) to zmiana pola, nie poboru. Seria sklejona: przed F3 - kiesa2, od F3 - Akumulator
+NAK2C_K2HEAD = "Podatek od nadwyzki ludu (kiesa2): dzien"
+NAK2C_K2RX = re.compile(r"\| pobrano (\d+) z \d+ osad")
 
 
 def _nak_scan(path):
     """Jeden przebieg po logu: linia 'Akumulator kies', posiadacze 'Pieniadz swiata', 'Kiesa ludu' (W/R/P, podzamcze, zapas dni W), firmy F3 (doba ustalenia),
     'Zbytki ludu' (lepszy stol), linia 'KS: rampa' (bieg z KS), ERROR paczki."""
     D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None, "f4": {}, "m6": {}, "f5": {}, "f7": {}, "f7bad": 0,
-         "led": {}}   # f19-e4: 'Pieniadz swiata (bilans - przyczyny)' - zamkniecie ksiegi (NAKUM-7s)
+         "led": {},   # f19-e4: 'Pieniadz swiata (bilans - przyczyny)' - zamkniecie ksiegi (NAKUM-7s)
+         "purse": {}, "k2": {}}   # m105-miasta: sakiewki w dniach zoldu (NAKUM-7p), seria kiesa2 (NAKUM-2c)
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -43194,7 +43342,13 @@ def _nak_scan(path):
                     D["err1"] = D["err1"] or s[:200]
                 continue
             c0 = s[:1]
-            if c0 not in "AKPFZDG":
+            if c0 not in "AKPFZDGM":
+                continue
+            if c0 == "M":
+                if s.startswith(NAK7P_HEAD):                         # m105-miasta T1 (NAKUM-7p): sakiewki partii rodow w dniach zoldu
+                    dm_ = num(r"dzien (\d+)", s[:40]); mp_ = NAK7P_RX.search(s)
+                    if dm_ is not None and mp_:
+                        D["purse"][dm_] = (int(mp_.group(1)), float(mp_.group(2)), int(mp_.group(3)))
                 continue
             if c0 == "G":
                 if s.startswith(NAK7_HEAD):                          # f7-kasy: gersuma z zapasu kas miast
@@ -43229,6 +43383,10 @@ def _nak_scan(path):
                     mr = NAK_LED_REST.search(s); md = NAK_LED_DEAD.search(s); mp = NAK_LED_REP.search(s)
                     D["led"][day] = {"arith": "ARYTMETYKA OK" in s, "rest": mr.group(2) if mr else None, "avg": int(mr.group(1)) if mr else None,
                                      "dead": int(md.group(1)) if md else None, "repin": int(mp.group(1)) if mp else None}
+            elif s.startswith(NAK2C_K2HEAD):                        # m105-miasta T8 (NAKUM-2c): seria kiesa2 do sklejenia w dobie przejscia na F3
+                day = num(r"dzien (\d+)", s[:60]); mk_ = NAK2C_K2RX.search(s)
+                if day is not None and mk_:
+                    D["k2"][day] = int(mk_.group(1))
             elif s.startswith("Pieniadz swiata: dzien"):
                 day = num(r"dzien (\d+)", s[:40])
                 if day is None:
@@ -43415,17 +43573,30 @@ def nakum_main(logp, until=None):
         else:
             rep.add("NAKUM-2b: danina od skarbca ludu w oknie", "klucz wylaczony albo bez firm F3 w oknie", "INFO", None)
         # NAKUM-2c (recenzja 18.10): miekki start - bez skoku poboru z doby na dobe (klucz wlaczony po rampie F3 od nagromadzonego skarbca: pelna stawka pierwszego dnia)
+        # m105-miasta T8: sklejenie w dobie przejscia - doba bez firm F3 (pole 'pobrano' Akumulatora 0, pobor robi kiesa2), po ktorej idzie pierwsza doba z F3: skok
+        # liczony od 'pobrano' linii kiesa2 doby przed przejsciem (ten sam pobor, inne pole); reszta serii - Akumulator jak dotad
+        K2_ = D.get("k2") or {}
         tks = [(d, G(d, "take", 0)) for d in ad if "take" in A[d]]
+        f3_ = lambda d: "due" in A[d] and A[d]["due"][1] == "tak"
+        k2n = 0
         kr = [(d, float(A[d]["keyramp"][0]), int(A[d]["keyramp"][1])) for d in ad if "keyramp" in A[d]]
         st_ = sorted(set(x[2] for x in kr if x[2] >= 0))
         if len(tks) >= 2:
-            jumps = [(b[0], b[1] - a[1]) for a, b in zip(tks, tks[1:]) if b[0] - a[0] == 1]
+            jumps = []
+            for a, b in zip(tks, tks[1:]):
+                if b[0] - a[0] != 1:
+                    continue
+                if not f3_(a[0]) and f3_(b[0]) and a[0] in K2_:            # m105-miasta T8: przejscie kiesa2 -> Ds Hoard Due
+                    jumps.append((b[0], b[1] - K2_[a[0]])); k2n += 1
+                else:
+                    jumps.append((b[0], b[1] - a[1]))
             jm = max(jumps, key=lambda x: x[1]) if jumps else (None, 0.0)
             avg = sum(x[1] for x in tks) / len(tks)
             lim = max(60000.0, 0.5 * avg)
             rmp = (f"; rampa klucza od doby {', '.join(str(x) for x in st_)} (firmy F3 od {fix})" if st_ else ("; rampa klucza: brak pola (log sprzed recenzji)" if not kr else "; rampa klucza: klucz nie czynny"))
             rep.add("NAKUM-2c: danina od skarbca ludu bez skoku (najwiekszy wzrost 'pobrano' doba do doby; miekki start klucza)",
-                    f"{jm[1]:+.0f} (dzien {jm[0]}), srednia {avg:.0f}/d" + rmp, f"<= max(60 000, 0.5 x srednia) = {lim:.0f}", jm[1] <= lim)
+                    f"{jm[1]:+.0f} (dzien {jm[0]}), srednia {avg:.0f}/d" + rmp + (f"; przejscie kiesa2 -> F3 sklejone ({k2n}; m105-miasta T8)" if k2n else ""),
+                    f"<= max(60 000, 0.5 x srednia) = {lim:.0f} (w dobie przejscia na F3 skok od 'pobrano' kiesa2 doby przed - zmiana pola, nie poboru)", jm[1] <= lim)
     else:
         rep.add("NAKUM-2: danina od skarbca ludu", "brak linii", "INFO", None)
     # NAKUM-3 roboty gminy i septy
@@ -43518,14 +43689,29 @@ def nakum_main(logp, until=None):
             rows.append((k, (v - v0) / max(1, t1 - t0), v))
         rows.sort(key=lambda x: -x[1])
         # f19-e4: skarbce krolestw (NAK7_FREE) poza bramka - decyzja Jeffa 18.10 14:20 (opis przy NAK7_FREE); ich warunek - NAKUM-7s. Reszta posiadaczy - prog bez zmian.
-        offend = [x for x in rows if x[1] > 30000 and x[0] not in NAK7_FREE]
-        free = [x for x in rows if x[0] in NAK7_FREE]
+        offend = [x for x in rows if x[1] > 30000 and x[0] not in NAK7_FREE + NAK7_PURSE]   # m105-miasta T1: sakiewki ludzi - warunek w NAKUM-7p
+        free = [x for x in rows if x[0] in NAK7_FREE]                       # skarbce krolestw - bramka NAKUM-7s (sakiewki ludzi jej nie wlaczaja)
         ftxt = "; ".join(f"{k} {g_:+.0f}/d (stan {v_ / 1e6:.2f} mln){' - ponad 30 tys./d' if g_ > 30000 else ''}" for k, g_, v_ in free)
-        rep.add(f"NAKUM-7: zaden posiadacz pieniadza (poza skarbcami krolestw - NAKUM-7s) nie rosnie > +30 tys./d (doby {t0}-{t1}, 'Pieniadz swiata')",
+        rep.add(f"NAKUM-7: zaden posiadacz pieniadza (poza skarbcami krolestw - NAKUM-7s - i sakiewkami ludzi - NAKUM-7p) nie rosnie > +30 tys./d (doby {t0}-{t1}, 'Pieniadz swiata')",
                 ", ".join(f"{k} {g_:+.0f}/d" for k, g_, _ in rows[:6]) + (f" | ponad prog: {', '.join(k for k, _, _ in offend)}" if offend else "")
-                + (f" | poza bramka (pomiar): {ftxt}" if ftxt else ""),
+                + (f" | poza bramka (pomiar): {ftxt}" if ftxt else "")
+                + "".join(f" | poza bramka (pomiar, NAKUM-7p): {k} {g_:+.0f}/d (stan {v_ / 1e6:.2f} mln)" for k, g_, v_ in rows if k in NAK7_PURSE),
                 "0 posiadaczy ponad prog (fin80: kiesy ludu miast +186 tys./d); skarbce krolestw - pomiar, nie warunek (Jeff 18.10: wzrost z ekonomii bez doplat z niczego"
-                " to nie blad) - warunek w NAKUM-7s", not offend)
+                " to nie blad) - warunek w NAKUM-7s; sakiewki ludzi - pomiar (rosna z mobilizacja), warunek w NAKUM-7p", not offend)
+        # m105-miasta T1 (NAKUM-7p): sakiewki ludzi w dniach zoldu - linia "Markietani (E5/A3)" w dobach okna NAKUM-7
+        P_ = D.get("purse") or {}
+        pw_ = [d for d in sorted(P_) if t0 <= d <= t1]
+        if len(pw_) >= 2:
+            dmx_ = max(pw_, key=lambda d: P_[d][1])
+            a7_, b7_ = P_[pw_[0]][1], P_[pw_[-1]][1]
+            sg_ = next((g_ for k, g_, _v in rows if k in NAK7_PURSE), None)
+            rep.add(f"NAKUM-7p: sakiewki ludzi w dniach zoldu (doby {pw_[0]}-{pw_[-1]}, 'Markietani (E5/A3)')",
+                    f"{a7_:.1f} -> {b7_:.1f} dni zoldu (najwiecej {P_[dmx_][1]:.1f}, doba {dmx_}); zold dnia {P_[pw_[0]][2]} -> {P_[pw_[-1]][2]}"
+                    + (f"; przyrost sakiewek {sg_:+.0f}/d (pomiar - poza bramka NAKUM-7)" if sg_ is not None else ""),
+                    "<= 15 dni zoldu kazdej doby (norma A3) i na koncu <= poczatek + 1 dzien (sakiewki ida za zoldem, nie ponad niego)",
+                    P_[dmx_][1] <= 15.0 and b7_ <= a7_ + 1.0)
+        else:
+            rep.add("NAKUM-7p: sakiewki ludzi w dniach zoldu", "brak linii 'Markietani (E5/A3)' w oknie NAKUM-7", "INFO", None)
         # NAKUM-7s (f19-e4): skarbce krolestw bez doplat z niczego - ksiega pieniadza swiata domknieta w tych samych dobach (zmiana od t0 do t1 = doby t0+1..t1)
         L = D.get("led") or {}
         lw_ = [d for d in sorted(L) if t0 < d <= t1]
