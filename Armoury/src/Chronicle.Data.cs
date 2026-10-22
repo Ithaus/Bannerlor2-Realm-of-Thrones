@@ -10,7 +10,7 @@ namespace Armoury
     /// m105-kronika K0 (krok A1) - KRONIKA WESTEROS: warstwa danych. Kontrakt: docs/KRONIKA-FORMAT.md (wygrywa przy sprzecznosci), plan: PLANY-E5-WOJNY-KRONIKA
     /// sekcja "## PLAN kronika" (E: Chronicle.Data.cs).
     /// Pliki Armoury/ModuleData/arm_kronika_kNN.tsv (paczki K1-K10, wzorzec kNN - kolejne paczki wchodza same) oraz arm_kronika_tematy.tsv (tematy obrazkow).
-    /// k00 (2 okna testowe silnika) TYLKO przy autotescie: LogGate.Mode 1/2 i plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-kronika-test.flag
+    /// k00 (okna testowe silnika 000.1-000.6) TYLKO przy autotescie: LogGate.Mode 1/2 i plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-kronika-test.flag
     /// (wzor SideVillageFief.TestWanted).
     /// Wczytanie: Chronicle.Data.EnsureLoaded() przy OnSessionLaunched (wola ChronicleBehavior, krok A2) - pierwszy raz albo po zmianie pliku (rozmiar, data,
     /// zestaw plikow, flaga testu); w tej samej sesji drugie wolanie nic nie czyta.
