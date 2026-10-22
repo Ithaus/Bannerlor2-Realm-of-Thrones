@@ -76,6 +76,9 @@ namespace Armoury
         private static double _kKept; private static int _kKeptN;                               // r4-bkwies (recenzja): czesc P5 zostawiona w kiesie (potrzeba pokryta - krok 5 do potrzeby, wies z koszykiem ZC4)
         private static double _kSpike; private static int _kSpikeN;                             // m105 gosp4 G2: P5 mniej o skok ceny chleba zaplacony z nadwyzki (zl, wsi)
         private static double _rBread; private static int _rBreadN;                             // m105 gosp4 G5: rata dnia czynszu do ksiegi zaleglosci, bo kiesa nie miala nic ponad koszyk dnia (zl, wsi)
+        // m105 gosp5 (klucz Ds Lord Relief Below Chest): ulga pana przy wozie (zl, wozy, wsi) i czynsz darowany do skrzyni (zl, wsi) - tylko liczniki linii doby
+        private static long _lrZl; private static int _lrN; private static readonly HashSet<string> _lrVil = new HashSet<string>();
+        private static double _rChest; private static int _rChestN;
 
         private static void ClearCounters()
         {
@@ -93,6 +96,7 @@ namespace Armoury
             _k5Treas = 0; _k5N = 0;
             _kKept = 0; _kKeptN = 0;
             _kSpike = 0; _kSpikeN = 0; _rBread = 0; _rBreadN = 0;   // m105 gosp4
+            _lrZl = 0; _lrN = 0; _lrVil.Clear(); _rChest = 0; _rChestN = 0;   // m105 gosp5
             _stumbles = 0;
         }
 
@@ -494,6 +498,22 @@ namespace Armoury
                 long g = Math.Max(0, (long)gold);
                 long payDay = (long)Math.Max(0, Math.Min(Math.Floor(d), (double)g));          // 1. rata dnia - pierwsza, najwyzej kiesa
                 double basket = -1;
+                // m105 gosp5 (klucz Ds Lord Relief Below Chest): pan nie bierze czynszu z pieniedzy skrzyni - rata dnia tylko z kiesy ponad skrzynie, reszta raty darowana
+                // bez zaleglosci (jak przy rabunku: do "wstrzymane", bez zmiany nawiasu z liczba wsi - NDS-6c bez zmian). Przed G5 (skrzynia > koszyk, wiec G5 ponizej
+                // skrzyni nic juz nie tnie). Klucz NIE - ten blok nie biegnie, chestR = -1, rata zaleglosci nizej jak dotad
+                // Recenzja gosp5 (uwaga 1): darowane liczy sie od calej raty dnia (dayR), nie od raty ograniczonej kiesa - kiesa mniejsza od raty albo 0 tez nie pisze
+                // reszty do ksiegi zaleglosci (shortDay = tylko ulamek zlotowki). pc <= kiesa, wiec payDay = pc. Klucz NIE - dayR nieuzywane
+                double chestR = -1; long chestRemit = 0;
+                long dayR = (long)Math.Max(0, Math.Floor(d));
+                if (s.DsLordReliefBelowChest && (dayR > 0 || owed >= 1))
+                {
+                    chestR = ReliefChest(st);
+                    if (chestR >= 1 && dayR > 0)
+                    {
+                        long pc = (long)Math.Max(0, Math.Floor(g - chestR));
+                        if (pc < dayR) { chestRemit = dayR - pc; payDay = Math.Min(payDay, pc); _rChest += chestRemit; _rChestN++; _rRemit += chestRemit; }
+                    }
+                }
                 // m105 gosp4 G5 (klucz Ds Rent After Bread, z ksiega zaleglosci): rata dnia tylko z kiesy ponad koszyk dnia - ta sama zasada co rata zaleglosci (nizej); czego
                 // kiesa nie ma ponad koszyk, idzie do ksiegi zaleglosci (krok 3: x rampa, darowane po DsRentForgiveDays rat). Klucz NIE - rata dnia z calej kiesy, jak dotad.
                 // Recenzja kodu R9: w dobie zakupu przy Ks Village Buy Every 2 wies kupuje (TownFolk.Villages po czynszu) koszyk za 2 doby - chroniony koszyk x 2
@@ -513,12 +533,13 @@ namespace Armoury
                     if (basket < 0) basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
                     int pd = ArrPayDays(s);
                     double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
-                    double room = g - payDay - basket;
+                    double keep = s.DsLordReliefBelowChest && chestR > basket ? chestR : basket;   // m105 gosp5: rata zaleglosci z kiesy ponad max(koszyk, skrzynia); klucz NIE - koszyk
+                    double room = g - payDay - keep;
                     payArr = (long)Math.Floor(Math.Max(0, Math.Min(Math.Min(owed, inst), room)));
                 }
                 long pay = payDay + payArr;
                 _rPaid += pay; _rArrPaid += payArr;
-                double shortDay = Math.Max(0, d - payDay);
+                double shortDay = Math.Max(0, d - payDay - chestRemit);                      // m105 gosp5: czesc darowana do skrzyni nie idzie do ksiegi (klucz NIE - chestRemit 0)
                 if (!s.DsRentArrears) { _rLost += shortDay; return (int)Math.Min(int.MaxValue, pay); }
                 // 3. ksiega zaleglosci w rampie (krytyczne recenzji: przy rampie 0 stare zasady - niezaplacona rata przepada)
                 double toBook = shortDay * Ramp;
@@ -678,6 +699,27 @@ namespace Armoury
         {
             double c;
             return st != null && st.StringId != null && _akDay == Today && _akChest.TryGetValue(st.StringId, out c) ? c : -1;
+        }
+
+        /// <summary>m105 gosp5 (klucz Ds Lord Relief Below Chest; VillageTakings.LordRelief i RentPay): skrzynia wsi do ulgi pana - policzona dzis w kroku 4, a gdy jeszcze
+        /// nie (woz przed blokiem doby, czynsz przed TownFolk.Villages) - z liczb dnia wsi (Chest, ta sama regula). 0 - wies nieskalibrowana. Wolajacy w try.</summary>
+        internal static double ReliefChest(Settlement st)
+        {
+            if (st == null || st.Village == null) return 0;
+            double c = ChestToday(st);
+            return c >= 0 ? c : Chest(st.Village);
+        }
+
+        /// <summary>m105 gosp5 (VillageTakings.LordRelief): ulga pana przy wozie `zl` dla wsi `st` - tylko licznik linii doby. Nie rzuca.</summary>
+        internal static void NoteRelief(Settlement st, long zl)
+        {
+            try
+            {
+                if (zl <= 0) return;
+                _lrN++; _lrZl += zl;
+                if (st != null && st.StringId != null) _lrVil.Add(st.StringId);
+            }
+            catch (Exception e) { Stumble("NoteRelief", e); }
         }
 
         private static double Med(List<double> v)
@@ -875,6 +917,11 @@ namespace Armoury
                       .Append("): krok 5 mniej o skok ceny chleba ").Append(N0(_kSpike)).Append(" zl (").Append(_kSpikeN).Append(" wsi), czeka na nastepne doby ").Append(N0(spOwed))
                       .Append(" zl (").Append(_spikeOwed.Count).Append(" wsi); czynsz po chlebie - rata dnia do zaleglosci ").Append(N0(_rBread)).Append(" zl (").Append(_rBreadN).Append(" wsi)");
                 }
+                // m105 gosp5 (klucz Ds Lord Relief Below Chest; NIE - linia jak w fd388555): ulga pana przy wozie (VillageTakings.LordRelief - licznik pana -> kiesa wsi,
+                // poza kontrola platnicy - odbiorcy; "pan i majatki (bez zmian)" wyzej jest przed ulga) i czynsz darowany do skrzyni (RentPay, w "wstrzymane")
+                if (s.DsLordReliefBelowChest)
+                    sb.Append(" | m105 gosp5 (Lord Relief Below Chest TAK): ulga pana przy wozie ").Append(_lrZl).Append(" zl w ").Append(_lrN).Append(" wozach (").Append(_lrVil.Count)
+                      .Append(" wsi), czynsz darowany do skrzyni ").Append(N0(_rChest)).Append(" zl (").Append(_rChestN).Append(" wsi)");
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(ctl);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');

@@ -1699,6 +1699,12 @@ Uzycie (Python 3, tylko odczyt):
                     zapisu <= 320 tys. i <= +1 tys./d, M5G-15 obnizki zamkow w biegu ze starego zapisu > 0 (od 28 linii firm DS), M5G-15b potkniecia i ERROR 0. Tryb
                     nowa kampania / zapis kampanii z prologiem / stary zapis - z linii wczytania zapisu i linii 'Prolog (m101): start sesji' w logu.
                     python -I tools/sprawdz_logi.py --grupa m105gosp4 <Armoury-*.log>
+--grupa m105gosp5 : (21.10, galaz w-toku/m105-gospodarka5 - biedne wsie; Armoury/src/VillageTakings.cs LordRelief, DsVillage.cs RentPay/NoteRelief, klucz Ds Lord Relief
+                    Below Chest) segment 'm105 gosp5' linii 'Daniny wsi (DS)', 'Przeplywy osad (kiesy wsi)', 'm105 wsie biedne' (Akumulator kies): M5G5-0 segment w kazdej
+                    linii DS (zly format - NIE; brak w calym logu - INFO), M5G5-1 M3W-2 wsi < 1000 zl <= 5% (bieg ze starego zapisu bez prologu - DECYZJA: wsie bez wozow
+                    i z pelna skrzynia < 1000 zl), M5G5-2 wsie biedne (kiesa < min(1000 zl, skrzynia)) <= 7% i nachylenie <= +0.1 wsi/d, M5G5-3 ulga pana przy wozie
+                    (INFO; koniec prologu 1.5-3.5 tys./d), M5G5-4 M5G-8 po uldze >= 0.514, M5G5-5 czynsz darowany do skrzyni (INFO), M5G5-6 potkniecia linii DS i ERROR 0.
+                    python -I tools/sprawdz_logi.py --grupa m105gosp5 <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -57741,6 +57747,8 @@ def main(argv):
         return m103wsie_main(logp)   # m103wsie (21.10, m103-gospodarka czesc 3): drabina 1 wsi przy cenach polki z budzetu z wplywu (TownFolk.Ks.cs, StartCalibration.Money.cs)
     if group == "m105gosp4" and logp:
         return m105gosp4_main(logp)   # m105gosp4 (21.10, m105-gospodarka4 czesc 4): drabina 1 wsi G1-G4, czynsz po chlebie G5, obnizka z dochodu zamkow G6 (TownFolk.Ks.cs, DsVillage.cs, DsTowns.cs)
+    if group == "m105gosp5" and logp:
+        return m105gosp5_main(logp)   # m105gosp5 (21.10, m105-gospodarka5): ulga pana dla wsi ponizej skrzyni przy wozie i czynsz darowany do skrzyni (VillageTakings.cs, DsVillage.cs)
     if group == "p6a7" and logp:
         return p6a7_main(logp)   # p6a7 (20.10, fala 2 pomyslow, galaz p6-a7): A7 domyslnie TAK + roboty miast z rak okregu - odplyw kas miast do kies wsi (TownHire.cs)
     if group == "na7" and logp:
@@ -59606,6 +59614,8 @@ M5G_RX = {
     "carts": re.compile(r"\| wozy: powrotow \d+, oddane (\d+), pan i majatki \(bez zmian\) (\d+), czesc wsi (\d+)"),
     "rent": re.compile(r"\| czynsz: nalezny (\d+) \(\d+ wsi\), zaplacony (\d+)"),
     "dsst": re.compile(r"\| potkniecia (\d+) \(w sesji (\d+)\)"),
+    # m105 gosp5 (klucz Ds Lord Relief Below Chest): ulga pana przy wozie i czynsz darowany do skrzyni - 'pan i majatki (bez zmian)' jest przed ulga (M5G-8 odejmuje ulge)
+    "g5": re.compile(r"\| m105 gosp5 \(Lord Relief Below Chest (TAK|NIE)\): ulga pana przy wozie (\d+) zl w (\d+) wozach \((\d+) wsi\), czynsz darowany do skrzyni (\d+) zl \((\d+) wsi\)"),
     "poor": re.compile(r"\| m105 wsie biedne \(kiesa < min\(1000 zl, skrzynia\)\) (\d+) z (\d+) wsi DS"),
     "lo": re.compile(r"ponizej 1000 zlota (\d+)"),
     "zam": re.compile(r"\| m105 zamki \(Ds Castle Income Cut (TAK|NIE[^)]*)\): obnizki z dochodu zamkow dzis (\d+) \(-(\d+) zl/rok\), w sesji (\d+) \(-(\d+) zl/rok\); "
@@ -59683,7 +59693,7 @@ def m105gosp4_main(logp):
             elif s.startswith("Daniny wsi (DS): dzien "):
                 d = num(r"dzien (-?\d+)", s[:60])
                 if d is not None:
-                    ds[d] = {k: (M5G_RX[k].search(s).groups() if M5G_RX[k].search(s) else None) for k in ("ds", "carts", "rent", "dsst")}
+                    ds[d] = {k: (M5G_RX[k].search(s).groups() if M5G_RX[k].search(s) else None) for k in ("ds", "carts", "rent", "dsst", "g5")}
                     ds[d]["g2raw"] = "| m105 gosp4 (Grain Spike From Surplus TAK" in s   # R5: G2 TAK - linie ZC4 z budzetem W1 musza miec segment
             elif s.startswith(M3W_AK):
                 d = num(r"dzien (-?\d+)", s[:60])
@@ -59849,12 +59859,16 @@ def m105gosp4_main(logp):
     if d28:
         odd = sum(int(ds[d]["carts"][0]) for d in d28) / len(d28)
         pan = sum(int(ds[d]["carts"][1]) for d in d28) / len(d28)
+        # m105 gosp5: 'pan i majatki (bez zmian)' liczy sie przed ulga pana przy wozie (VillageTakings.LordRelief po daninach DS) - od licznika odjac ulge z segmentu 'm105 gosp5'
+        rel = sum(int(ds[d]["g5"][1]) for d in d28 if ds[d]["g5"]) / len(d28)
+        pan -= rel
         rent = sum(int(ds[d]["rent"][1]) for d in d28 if ds[d]["rent"]) / len(d28)
         akd = sorted(d for d in ak if ak[d][0])[-28:]
         hp = sum(int(ak[d][0][4]) for d in akd) / len(akd) if akd else 0.0
         lr = (pan + rent + hp) / odd if odd > 0 else None
         rep.add(f"M5G-8: bezposredni dochod panow ze wsi / oddane (linie 'Daniny wsi (DS)' i Akumulator kies, srednio {len(d28)} dob; zamiast M3W-4/M3W-5)",
-                f"({pan:.0f} pan i majatki przy wozie + {rent:.0f} czynsz + {hp:.0f} danina od skarbca wsi) / {odd:.0f} oddane = " + (f"{lr:.3f}" if lr is not None else "-"),
+                f"({pan:.0f} pan i majatki przy wozie" + (f" po uldze gosp5 {rel:.0f}" if any(ds[d]["g5"] for d in d28) else "") + f" + {rent:.0f} czynsz + {hp:.0f} danina od skarbca wsi) / {odd:.0f} oddane = "
+                + (f"{lr:.3f}" if lr is not None else "-"),
                 f">= {M5G_LORDS} (n31 0.514 - 152.2 tys./d, n32 0.556 - 152.2 tys./d; czesc 4 ok. 0.53-0.55)", (lr >= M5G_LORDS) if lr is not None else None)
         dsg = [d for d in d28 if ds[d]["ds"]]
         if dsg:
@@ -59934,6 +59948,134 @@ def m105gosp4_main(logp):
     st += sum(int(ds[d]["dsst"][0]) for d in ds if ds[d]["dsst"])
     st += sum(int(fz[d]["stum"][0]) for d in fz if fz[d]["stum"])
     rep.add("M5G-15b: potkniecia linii ZC4, 'Daniny wsi (DS)' i 'Firmy miast i zamkow (DS)' oraz ERROR nowych funkcji czesci 4", f"potkniecia {st}, ERROR {errs}", "0 / 0",
+            st == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
+# ---------------- m105gosp5 (21.10, galaz w-toku/m105-gospodarka5 - biedne wsie; projekt z csv wsie-kiesy n31 12-48-45, n32 14-29-20 i 13-37-13): klucz Ds Lord Relief
+# Below Chest - dopoki kiesa wsi DS jest ponizej skrzyni, pan oddaje wsi swoja dzialke z TEGO wozu (VillageTakings.LordRelief: licznik pana -> kiesa wsi, najwyzej do skrzyni)
+# i nie bierze czynszu z pieniedzy skrzyni (DsVillage.RentPay: rata dnia z kiesy ponad skrzynie, reszta darowana bez zaleglosci - w 'wstrzymane'). Linie: 'Daniny wsi (DS)'
+# (segment 'm105 gosp5'), 'Przeplywy osad (kiesy wsi)' (M3W-2), 'Akumulator kies' ('m105 wsie biedne', danina od skarbca do panow). M5G-8 grupy m105gosp4 odejmuje ulge.
+M5G5_POOR = 0.05                   # M5G5-1: M3W-2 wsi < 1000 zl (prog celu m103; model gosp5: prolog n31 2.3%, n32 2.1%; bieg ze starego zapisu 13-37-13 7.7%)
+M5G5_POOR_AK = (0.07, 0.1)         # M5G5-2: wsie z kiesa < min(1000 zl, skrzynia) i nachylenie MNK 28 dob (wsi/d) - cel M5G-7b (model: prolog 0.5-0.9%, zapis 4.2%; nachylenie ok. 0)
+M5G5_REL = (1500.0, 3500.0)        # M5G5-3 INFO: ulga pana przy wozie na koniec prologu (zl/d; pierwsze 28 dob prologu 18-19 tys./d, zapis Jeffa 8.1 -> 4.8 tys./d)
+M5G5_ERR = ("ERROR in VillageTakings.LordRelief", "ERROR in DsVillage.RentPay", "ERROR in DsVillage.NoteRelief", "ERROR in DsVillage.Daily")
+
+
+def m105gosp5_main(logp):
+    """m105gosp5 (biedne wsie, klucz Ds Lord Relief Below Chest): segment 'm105 gosp5' linii 'Daniny wsi (DS)', M3W-2 z 'Przeplywy osad (kiesy wsi)', 'm105 wsie biedne'
+    i danina od skarbca z 'Akumulator kies' - progi M5G5-0..6."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M5G5-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ds, vil, ak = {}, {}, {}
+    errs, loaded, newc, prol = 0, False, False, False
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if "ERROR in " in s and any(e in s for e in M5G5_ERR):
+                errs += 1
+                continue
+            if s.startswith("Daniny wsi (DS): dzien "):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is not None and "| wozy: powrotow " in s:
+                    r = {k: (M5G_RX[k].search(s).groups() if M5G_RX[k].search(s) else None) for k in ("carts", "rent", "dsst", "g5")}
+                    r["raw"] = "| m105 gosp5 (" in s                                # segment w zlym formacie (regex go nie czyta) - M5G5-0 NIE
+                    ds[d] = r
+            elif s.startswith(M3W_VIL):
+                d = num(r"dzien (-?\d+)", s[:60])
+                a, b = M3W_RX["stan"].search(s), M3W_RX["lo"].search(s)
+                if d is not None and a:
+                    vil[d] = b.groups() if b else None
+            elif s.startswith(M3W_AK):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is not None:
+                    a, b = M3W_RX["hoard"].search(s), M5G_RX["poor"].search(s)
+                    ak[d] = (a.groups() if a else None, b.groups() if b else None)
+            elif s.startswith("Klimat: wczytano") or s.startswith("Wyrzutki: wczytano") or s.startswith("Stany (ZC2): wczytanie"):
+                loaded = True
+            elif s.startswith("Prolog (m101): start sesji"):
+                if "| prolog TAK" in s:
+                    prol = True
+            elif s.startswith("Prolog (m101): nowa kampania") or s.startswith("Wiedza (m96-wzory): nowa kampania"):
+                newc = True
+    save = loaded and not newc and not prol
+    mode = "bieg ze starego zapisu (bez prologu)" if save else ("zapis kampanii z prologiem" if (loaded and not newc) else "nowa kampania")
+    dd = sorted(ds)
+    gd = [d for d in dd if ds[d]["g5"]]
+    drift = [d for d in dd if ds[d]["raw"] and not ds[d]["g5"]]
+    print(f"plik: {logp} | {mode} | linii 'Daniny wsi (DS)' {len(dd)} (z segmentem m105 gosp5 {len(gd)}, zly format {len(drift)}), 'Przeplywy osad (kiesy wsi)' {len(vil)}, "
+          f"Akumulator {len(ak)}, ERROR nowych funkcji {errs}")
+    # ---- M5G5-0 segment w kazdej linii DS
+    if gd or drift:
+        miss = [d for d in dd if d >= (gd[0] if gd else drift[0]) and not ds[d]["g5"]]
+        key = ds[gd[-1]]["g5"][0] if gd else "?"
+        rep.add("M5G5-0: segment 'm105 gosp5' w kazdej linii 'Daniny wsi (DS)' od pierwszej z segmentem (klucz Ds Lord Relief Below Chest)",
+                f"z segmentem {len(gd)} z {len([d for d in dd if d >= (gd[0] if gd else drift[0])])} linii, zly format {len(drift)} (pierwsza {drift[0] if drift else '-'}), bez segmentu "
+                f"{len(miss)} (pierwsza {miss[0] if miss else '-'}); klucz {key}",
+                "zly format 0 i bez segmentu 0 (klucz wylaczony w MCM w trakcie biegu - linia bez segmentu, NIE do sprawdzenia)", not drift and not miss)
+    else:
+        rep.add("M5G5-0: segment 'm105 gosp5' w liniach 'Daniny wsi (DS)'", f"brak segmentu w {len(dd)} liniach DS",
+                "INFO (klucz Ds Lord Relief Below Chest NIE, Dues Medieval NIE albo log sprzed m105 gosp5 - progi nizej opisuja bieg bez ulgi)", None)
+    # ---- M5G5-1 M3W-2 wsi < 1000 zl (srednio 7 ostatnich dob)
+    lo = [vil[d] for d in sorted(vil)[-7:] if vil[d]]
+    if lo:
+        x = sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)
+        rep.add("M5G5-1: M3W-2 - wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (linia 'Przeplywy osad (kiesy wsi)')",
+                f"{100 * x:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]}); tryb: {mode}",
+                f"<= {100 * M5G5_POOR:.0f}% (n32 12.8%, n31 18.3%, P0 1.0%; model gosp5 prolog 2.1-2.3%); bieg ze starego zapisu bez prologu - niespelniony = DECYZJA (model 7.7%: "
+                "27 wsi bez wozow - Wolni Ludzie, Zelazne Wyspy, Ziemie Burzy - nie ma platnika, 19 wsi z pelna skrzynia < 1000 zl)", x <= M5G5_POOR, decide=save)
+    else:
+        rep.add("M5G5-1: M3W-2 - wsi z kiesa < 1000 zl", "brak linii 'Przeplywy osad (kiesy wsi)' z rozkladem", "INFO", None)
+    # ---- M5G5-2 wsie biedne (kiesa < min(1000 zl, skrzynia)) - cel M5G-7b
+    akp = sorted(d for d in ak if ak[d][1])
+    if akp:
+        l7 = akp[-7:]
+        x = sum(int(ak[d][1][0]) / max(1, int(ak[d][1][1])) for d in l7) / len(l7)
+        t28 = akp[-28:]
+        sl = _m5g_slope(t28, [int(ak[d][1][0]) for d in t28])
+        rep.add("M5G5-2: wsie biedne - kiesa < min(1000 zl, skrzynia), srednio 7 ostatnich dob, i nachylenie ich liczby MNK 28 dob (cel M5G-7b)",
+                f"{100 * x:.1f}% (ostatnia doba {ak[akp[-1]][1][0]} z {ak[akp[-1]][1][1]}); nachylenie {sl:+.2f} wsi/d ({len(t28)} dob)",
+                f"<= {100 * M5G5_POOR_AK[0]:.0f}% i nachylenie <= +{M5G5_POOR_AK[1]} wsi/d (n32 10.7-10.9%, +0.43/d; model gosp5: prolog 0.5-0.9%, zapis 4.2%, nachylenie ok. 0)",
+                x <= M5G5_POOR_AK[0] and sl <= M5G5_POOR_AK[1])
+    else:
+        rep.add("M5G5-2: wsie biedne (linia Akumulator kies)", "brak segmentu 'm105 wsie biedne'", "INFO (Dues Medieval NIE albo log sprzed m105)", None)
+    # ---- M5G5-3 ulga pana przy wozie, M5G5-5 czynsz darowany do skrzyni (INFO)
+    if gd:
+        f28, l28 = gd[:28], gd[-28:]
+        rf = sum(int(ds[d]["g5"][1]) for d in f28) / len(f28)
+        rl = sum(int(ds[d]["g5"][1]) for d in l28) / len(l28)
+        nw = sum(int(ds[d]["g5"][2]) for d in l28) / len(l28)
+        nv = sum(int(ds[d]["g5"][3]) for d in l28) / len(l28)
+        rep.add(f"M5G5-3: ulga pana przy wozie - pierwsze {len(f28)} / ostatnie {len(l28)} linii DS",
+                f"{rf:.0f} / {rl:.0f} zl/d (ostatnie: {nw:.0f} wozow/d, {nv:.0f} wsi/d)",
+                f"INFO (model gosp5: koniec prologu {M5G5_REL[0] / 1000:.1f}-{M5G5_REL[1] / 1000:.1f} tys./d, pierwsze 28 dob prologu 18-19 tys./d - ok. 12% dochodu panow ze wsi; "
+                "zapis Jeffa 8.1 -> 4.8 tys./d; rosnie pod koniec biegu - skrzynie nie napelniaja sie, patrz M5G5-2)", None)
+        cz = sum(int(ds[d]["g5"][4]) for d in l28) / len(l28)
+        czn = sum(int(ds[d]["g5"][5]) for d in l28) / len(l28)
+        rep.add(f"M5G5-5: czynsz darowany do skrzyni - ostatnie {len(l28)} linii DS", f"{cz:.0f} zl/d ({czn:.0f} wsi/d)",
+                "INFO (czynsz biednych wsi 17.4 zl/d na wies - n32 73 wsie ok. 1.3 tys./d na poczatku; liczony w 'wstrzymane' linii DS, NDS-6c bez zmian)", None)
+    # ---- M5G5-4 M5G-8 po uldze
+    d28 = [d for d in dd if ds[d]["carts"]][-28:]
+    if d28:
+        odd = sum(int(ds[d]["carts"][0]) for d in d28) / len(d28)
+        rel = sum(int(ds[d]["g5"][1]) for d in d28 if ds[d]["g5"]) / len(d28)
+        pan = sum(int(ds[d]["carts"][1]) for d in d28) / len(d28) - rel
+        rent = sum(int(ds[d]["rent"][1]) for d in d28 if ds[d]["rent"]) / len(d28)
+        akd = sorted(d for d in ak if ak[d][0])[-28:]
+        hp = sum(int(ak[d][0][4]) for d in akd) / len(akd) if akd else 0.0
+        lr = (pan + rent + hp) / odd if odd > 0 else None
+        rep.add(f"M5G5-4: M5G-8 po uldze - bezposredni dochod panow ze wsi / oddane (srednio {len(d28)} dob)",
+                f"({pan:.0f} pan i majatki przy wozie po uldze {rel:.0f} + {rent:.0f} czynsz + {hp:.0f} danina od skarbca wsi) / {odd:.0f} oddane = " + (f"{lr:.3f}" if lr is not None else "-"),
+                f">= {M5G_LORDS} (103a 0.546; model gosp5 ok. 0.535, z czescia 4 0.52-0.54 - najwezszy margines; NIE = wylaczyc klucz Ds Lord Relief Below Chest)",
+                (lr >= M5G_LORDS) if lr is not None else None)
+    # ---- M5G5-6 potkniecia linii DS i ERROR
+    st = sum(int(ds[d]["dsst"][0]) for d in dd if ds[d]["dsst"])
+    rep.add("M5G5-6: potkniecia linii 'Daniny wsi (DS)' i ERROR VillageTakings.LordRelief / DsVillage.RentPay / NoteRelief / Daily", f"potkniecia {st}, ERROR {errs}", "0 / 0",
             st == 0 and errs == 0)
     rep.show()
     return 0
