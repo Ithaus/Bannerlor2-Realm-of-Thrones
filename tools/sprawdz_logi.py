@@ -1716,6 +1716,18 @@ Uzycie (Python 3, tylko odczyt):
                     i z pelna skrzynia < 1000 zl), M5G5-2 wsie biedne (kiesa < min(1000 zl, skrzynia)) <= 7% i nachylenie <= +0.1 wsi/d, M5G5-3 ulga pana przy wozie
                     (INFO; koniec prologu 1.5-3.5 tys./d), M5G5-4 M5G-8 po uldze >= 0.514, M5G5-5 czynsz darowany do skrzyni (INFO), M5G5-6 potkniecia linii DS i ERROR 0.
                     python -I tools/sprawdz_logi.py --grupa m105gosp5 <Armoury-*.log>
+--grupa m106wozy  : (22.10, galaz w-toku/m106-wozy - W2 "woz zawsze wraca" i P1 "fach wsi" pod KS; Armoury/src/MarketCarts.cs, MarketRoad.cs, CartRisk.cs, CartGuard.cs,
+                    StartCalibration.Fach.cs/Core.cs/Plan.cs/Live.cs/Rule.cs; klucze Village Cart Land Road Only, Enemy Gate, Route Risk, Stuck Guard, Top Up On Departure, Ks Village
+                    Trade Keep) python -I tools/sprawdz_logi.py --grupa m106wozy <Armoury-*.log> [--tabele <katalog sesji z wsie-kiesy.csv, plon-wsi.csv, bitwy.log>] [--do-doby N - okno
+                    grupy nks w WZ-7]. WZ-S self-test wyrazen wobec linii kontrolnych jak w kodzie C#, WZ-S2 test syntetyczny (dobry i zly bieg przez te same funkcje). WZ-0 linia startu
+                    z 5 kluczami TAK, 'Wozy (m106): dzien' kazdej doby, 'KS: fach wsi (m106)' przy kazdym Planie; WZ-1a wozy w drodze i w obcej osadzie bez postepu > 30 dob (ostatnie 28
+                    linii) 0; WZ-1b w domu z jukami i rozkazem > 30 dob 0 (> 0 przy przyczynie gry w H1 - DECYZJA); WZ-2 Harbay i Volmark wozow >= 1 w kazdym bloku 28 dob od 28. doby
+                    (wsie-kiesy.csv) i 0 przykladow z celem Lordsport; WZ-3a wozy Wolnych Ludzi rozbite przez Straz <= 15/230 dob (nowa kampania) / 8/160 (zapis), WZ-3b wszystkie <= 50 / 30
+                    (bitwy.log H3 i linie doby, wieksza liczba), WZ-3c wybory do Last Hearth (INFO); WZ-4 wsie z glownym towarem 0 w 3 ostatnich pomiarach plon-wsi.csv <= 60 / 70 (KS z
+                    zapisu - INFO), WZ-4b Tarth ryby >= 10 szt./d; WZ-5 wsie z utargiem wozow < 30 zl/d (28 dob) <= 50 / 75; WZ-6 'bez wyjasnienia' w dobach rozladunku i dosypki <= 4 szt.
+                    i NKS-8 TAK; WZ-7 grupa nks na tym logu: NKS-2, NKS-3, NKS-19b TAK, NKS-5 poza pasmem <= baza + 3 (23 / 29), WZ-7b fach w Planie >= 50% celu, WZ-7c fach w A7 (INFO);
+                    WZ-8 wycena miast mediana <= 1.3 x baza (44.0 / 35.7 ms/d) i linia m106 <= 2 ms/d; WZ-9 ERROR nowego kodu i potkniecia 0; WZ-10 arm_cart_risk <= 80 KB; WZ-H1 i INFO.
+                    Tryb (nowa kampania / zapis) - z linii wczytania zapisu i linii nowej kampanii. Log bez linii m106 - INFO, bez wyjatku.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -58281,6 +58293,8 @@ def main(argv):
         return m103wsie_main(logp)   # m103wsie (21.10, m103-gospodarka czesc 3): drabina 1 wsi przy cenach polki z budzetu z wplywu (TownFolk.Ks.cs, StartCalibration.Money.cs)
     if group == "m105gosp4" and logp:
         return m105gosp4_main(logp)   # m105gosp4 (21.10, m105-gospodarka4 czesc 4): drabina 1 wsi G1-G4, czynsz po chlebie G5, obnizka z dochodu zamkow G6 (TownFolk.Ks.cs, DsVillage.cs, DsTowns.cs)
+    if group == "m106wozy" and logp:
+        return m106wozy_main(logp, tabp, until_arg)   # m106wozy (22.10, w-toku/m106-wozy): woz zawsze wraca (drogi ladowe, brama wroga, pamiec tras, straznik, dosypka przy wyjezdzie) i fach wsi pod KS
     if group == "m105gosp5" and logp:
         return m105gosp5_main(logp)   # m105gosp5 (21.10, m105-gospodarka5): ulga pana dla wsi ponizej skrzyni przy wozie i czynsz darowany do skrzyni (VillageTakings.cs, DsVillage.cs)
     if group == "p6a7" and logp:
@@ -60611,6 +60625,519 @@ def m105gosp5_main(logp):
     st = sum(int(ds[d]["dsst"][0]) for d in dd if ds[d]["dsst"])
     rep.add("M5G5-6: potkniecia linii 'Daniny wsi (DS)' i ERROR VillageTakings.LordRelief / DsVillage.RentPay / NoteRelief / Daily", f"potkniecia {st}, ERROR {errs}", "0 / 0",
             st == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
+# ---------------- m106wozy (22.10, galaz w-toku/m106-wozy - W2 "woz zawsze wraca" i P1 "fach wsi" pod KS; Armoury/src/MarketCarts.cs, MarketRoad.cs, CartRisk.cs, CartGuard.cs,
+# F4Pomiary.cs, StartCalibration.Fach.cs / Core.cs / Plan.cs / Live.cs / Rule.cs, VillageByPeople.cs; klucze Village Cart Land Road Only, Village Cart Enemy Gate, Village Cart
+# Route Risk, Village Cart Stuck Guard, Village Cart Top Up On Departure, Ks Village Trade Keep). Bazy: 103e (prolog 230 dob, Armoury-2026-10-22_07-14-15) i 103d (160 dob
+# z zapisu Jeffa, Armoury-2026-10-22_06-29-22) - liczby w scratchpad wozy/m106 (nks_103e.txt, nks_103d.txt, zero_103e.txt) i w projekcie m106.
+M106_HEAD = "Wozy (m106): dzien "
+M106_START = "Wozy (m106): start sesji"
+M106_EX = "Wozy (m106) przyklad: dzien "
+M106_FACH = "KS: fach wsi (m106) plan doba "
+M106_PLAN = "Kalibracja startu (KS): plan doba "
+M106_RX = {
+    "start": re.compile(r"\| Village Cart Land Road Only (TAK|NIE) \| Village Cart Enemy Gate (TAK|NIE) \| Village Cart Route Risk (TAK|NIE) \(par z zapisu (\d+)[^)]*\) "
+                        r"\| Village Cart Stuck Guard (TAK|NIE) \(.*\) \| Village Cart Top Up On Departure (TAK|NIE)\."),
+    "w1": re.compile(r"\| W1 drogi( - WYLACZONE)?: odrzucone bez drogi ladowej (\d+) \(wlasne miasto (\d+)\), wlokno bez drogi (\d+), zastepcze miasto ladem (\d+), "
+                     r"bez celu ladem (\d+), jednorazowo zawrocone (\d+)"),
+    "gate": re.compile(r"\| brama wroga( - WYLACZONA)?: odrzucone (\d+) \(wozow (\d+); najczesciej (.*?)\), wszystkie za brama (\d+)"),
+    "risk": re.compile(r"\| ryzyko trasy( - WYLACZONE)?: par (\d+) \(z danymi (\d+)\), dojechalo (\d+), rozbite (\d+) \(bandy (\d+), wrogowie (\d+), w kursie do miasta (\d+); "
+                       r"top: (.*?)\), przezywalnosc swiata ([\d.]+), wybor zmieniony przez ryzyko (\d+), najgorsze trasy (.*?) \| straznik"),
+    "guard": re.compile(r"\| straznik( - WYLACZONY)?: sledzone (\d+), bez postepu ponad prog (\d+) \(w drodze (\d+), w obcej osadzie (\d+)\), do domu (\d+), do miasta (\d+), "
+                        r"AI wlaczone (\d+), rozkaz odrzucony (\d+), bez wyjscia (\d+); w domu z jukami ponad (\d+) dob (\d+) \(nowy rozkaz (\d+), rozladowane (\d+) szt\. (\d+), "
+                        r"bez wyjscia (\d+)\); bez postepu ponad (\d+) dob (\d+) \(w drodze (\d+), w obcej osadzie (\d+), w domu (\d+)\)"),
+    "tu": re.compile(r"\| dosypka( - WYLACZONA)?: przy wyjezdzie (\d+) \(szt\. (\d+)\), czeka (\d+), przepadla (\d+)"),
+    "h1": re.compile(r"\| H1 w domu: AI wylaczone (\d+), Hold (\d+), cel chwilowy = osada (\d+), tratwa (\d+), predkosc 0 (\d+), inne (\d+)"),
+    "ms": re.compile(r"\| czas ([\d.]+) ms \(brama w wyborach ([\d.]+) ms\) \| potkniecia (\d+)\.$"),
+    "fach": re.compile(r"\| klucz TAK \| wsi z fachem (\d+) \(regale (\d+)\) \| k: (.*?) \| cel na targ (\d+) szt\./d, w Planie (\d+) \((\d+|-)%\), w pelni (\d+), "
+                       r"czesciowo (\d+) \(rece/ziemia (\d+), bez zysku (\d+), prog wyzywienia (\d+)\) \| rece do fachu ([\d.]+) tys\. .*\| czas fach (\d+) ms\.$"),
+    "rule": re.compile(r"\| fach \(m106\): bloki trzymane (\d+), nacisk powrotu (\d+), przebudowy do fachu zaczete (\d+) \(od wczytania razem (\d+)\), wsi z niedoborem (\d+) "
+                       r"\(cel (\d+) szt\./d, jest (\d+)\)"),
+    "save": re.compile(r"Wozy \(m106\): zapis pamieci tras arm_cart_risk - par (\d+), znakow (\d+), przyciete (\d+)\."),
+    "wyc": re.compile(r"; wycen (\d+) \(cen (\d+), ([\d.]+) ms\)"),
+    "lost": re.compile(r"rozbite tabory wsi \(wszystkich\) (\d+)"),
+    "unexp": re.compile(r"\| bez wyjasnienia ([+-]?\d+|-) \|"),
+    "pair": re.compile(r"^(.+?) przez (.+) (\d+)$"),
+}
+# linie kontrolne zlozone wedlug kodu C# (CartGuard.SessionStart / Daily, CartRisk.DayText / Export, StartCalibration.Fach.cs FachFinish, StartCalibration.Rule.cs RuleText) -
+# zmiana napisu w kodzie bez zmiany wyrazen wywraca self-test, a nie po cichu progi
+M106_TEST = {
+    "start": "Wozy (m106): start sesji | Village Cart Land Road Only TAK | Village Cart Enemy Gate TAK | Village Cart Route Risk TAK (par z zapisu 12, przezywalnosc swiata 0.912, "
+             "polowa po 56 dobach, start neutralny k=2) | Village Cart Stuck Guard TAK (brak postepu > max(2T,3) doby; w domu z jukami 5/10/20 dob; najwyzej 2 razy na kurs) "
+             "| Village Cart Top Up On Departure TAK.",
+    "day": "Wozy (m106): dzien 108700 | W1 drogi: odrzucone bez drogi ladowej 7 (wlasne miasto 2), wlokno bez drogi 1, zastepcze miasto ladem 1, bez celu ladem 0, jednorazowo "
+           "zawrocone 2 | brama wroga: odrzucone 9 (wozow 4; najczesciej Last Hearth przez The Wall 5), wszystkie za brama 1 | ryzyko trasy: par 140 (z danymi 61), dojechalo 30, "
+           "rozbite 3 (bandy 1, wrogowie 2, w kursie do miasta 2; top: Free Folk przez Nights Watch 2, Free Folk przez Broken Men 1), przezywalnosc swiata 0.940, wybor "
+           "zmieniony przez ryzyko 4, najgorsze trasy castle_S5->ROT_town23 s=0.31 n=4.1, castle_S7->ROT_town23 s=0.48 n=2.0 | straznik: sledzone 560, bez postepu ponad prog 3 "
+           "(w drodze 2, w obcej osadzie 1), do domu 2, do miasta 0, AI wlaczone 1, rozkaz odrzucony 0, bez wyjscia 1; w domu z jukami ponad 5 dob 2 (nowy rozkaz 1, rozladowane "
+           "1 szt. 523, bez wyjscia 0); bez postepu ponad 30 dob 1 (w drodze 0, w obcej osadzie 0, w domu 1) | dosypka: przy wyjezdzie 140 (szt. 9100), czeka 3, przepadla 1 | H1 "
+           "w domu: AI wylaczone 0, Hold 0, cel chwilowy = osada 2, tratwa 0, predkosc 0 1, inne 0 | czas 1.23 ms (brama w wyborach 0.45 ms) | potkniecia 0.",
+    "fach": "KS: fach wsi (m106) plan doba 108682 | klucz TAK | wsi z fachem 481 (regale 114) | k: W fish 1.00, W flax 0.31 | cel na targ 10366 szt./d, w Planie 7366 (71%), "
+            "w pelni 289, czesciowo 192 (rece/ziemia 92, bez zysku 44, prog wyzywienia 56) | rece do fachu 2132.1 tys. (z: wheat_farm 696.8) | regale: wsie typu najpierw "
+            "2178.4 t/d z celu 2304.9 t/d | najwiekszy niedobor (cel/w Planie szt./d): castle_village_V1_2 grain 151.9/0.0 | czas fach 1295 ms.",
+    "rule": "KS: produkcja (zastosowane) dzien 108720 | ... | najpierw wyzywic siebie (TAK): zmiany z jedzenia na zajecie tylko na targ wstrzymane 0 | fach (m106): bloki trzymane "
+            "812, nacisk powrotu 14, przebudowy do fachu zaczete 1 (od wczytania razem 3), wsi z niedoborem 40 (cel 900 szt./d, jest 310)",
+    "save": "Wozy (m106): zapis pamieci tras arm_cart_risk - par 412, znakow 15832, przyciete 3.",
+}
+M106_BASE = {   # tryb -> bazy (103e prolog / 103d zapis Jeffa)
+    "nowa kampania": {"days": 230, "ffnw": 15, "ffall": 50, "zero": 60, "poor": 50, "nks5": 23, "wyc": 44.0},
+    "zapis": {"days": 160, "ffnw": 8, "ffall": 30, "zero": 70, "poor": 75, "nks5": 29, "wyc": 35.7},
+}
+M106_ERR = ("ERROR in CartGuard.", "ERROR in CartRisk.", "ERROR in StartCalibration.Fach", "ERROR in MarketCarts.OnLeft", "ERROR in SyncData.arm_cart_risk",
+            "ERROR in MarketCarts.Choose", "ERROR in MarketRoad.RoutePrefix")
+M106_HARBAY = ("village_S2_3", "village_S2_1")   # Harbay, Volmark (Harlaw) - Lordsport (town_S2) za morzem
+M106_TARTH = "ROT_town8_village1"
+
+
+def m106w_selftest():
+    """m106wozy: wyrazenia wobec linii kontrolnych M106_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    m = M106_RX["start"].search(M106_TEST["start"])
+    if not m or m.groups() != ("TAK", "TAK", "TAK", "12", "TAK", "TAK"):
+        return f"start: {m.groups() if m else 'brak dopasowania'}"
+    s = M106_TEST["day"]
+    want = {"w1": (None, "7", "2", "1", "1", "0", "2"), "gate": (None, "9", "4", "Last Hearth przez The Wall 5", "1"),
+            "tu": (None, "140", "9100", "3", "1"), "h1": ("0", "0", "2", "0", "1", "0"), "ms": ("1.23", "0.45", "0")}
+    for k, w in want.items():
+        m = M106_RX[k].search(s)
+        if not m or m.groups() != w:
+            return f"{k}: {m.groups() if m else 'brak dopasowania'}"
+    m = M106_RX["risk"].search(s)
+    if not m or m.group(2) != "140" or m.group(5) != "3" or m.group(9) != "Free Folk przez Nights Watch 2, Free Folk przez Broken Men 1" or m.group(11) != "4":
+        return f"risk: {m.groups() if m else 'brak dopasowania'}"
+    m = M106_RX["guard"].search(s)
+    if not m or m.group(3) != "3" or m.group(12) != "2" or m.group(14) != "1" or m.group(15) != "523" or m.group(18) != "1" or m.group(21) != "1":
+        return f"guard: {m.groups() if m else 'brak dopasowania'}"
+    pm = M106_RX["pair"].match("Free Folk przez Nights Watch 2")
+    if not pm or pm.groups() != ("Free Folk", "Nights Watch", "2"):
+        return "pair: top strat"
+    m = M106_RX["fach"].search(M106_TEST["fach"])
+    if not m or m.group(1) != "481" or m.group(4) != "10366" or m.group(5) != "7366" or m.group(6) != "71" or m.group(12) != "2132.1" or m.group(13) != "1295":
+        return f"fach: {m.groups() if m else 'brak dopasowania'}"
+    m = M106_RX["rule"].search(M106_TEST["rule"])
+    if not m or m.groups() != ("812", "14", "1", "3", "40", "900", "310"):
+        return f"rule: {m.groups() if m else 'brak dopasowania'}"
+    m = M106_RX["save"].search(M106_TEST["save"])
+    if not m or m.groups() != ("412", "15832", "3"):
+        return f"save: {m.groups() if m else 'brak dopasowania'}"
+    return None
+
+
+def _m106_f(x, d=0.0):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return d
+
+
+def m106w_collect(logp):
+    """m106wozy: przebieg logu (strumieniowo) -> slownik serii linii m106, planow KS, dowozu, towarow i trybu."""
+    D = {"start": [], "day": {}, "ex": [], "fach": [], "fachbad": 0, "plans": [], "rule": {}, "save": [], "wyc": [], "lost": [], "err": 0, "err1": None,
+         "unexp": {}, "zatk": [], "loaded": False, "newc": False, "prol": False, "ks_on": None, "ks_live": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if any(s.startswith(e) for e in M106_ERR):
+                    D["err"] += 1
+                    D["err1"] = D["err1"] or s[:200]
+                continue
+            if s.startswith(M106_HEAD):
+                d = num(r"dzien (-?\d+)", s[:40])
+                if d is not None:
+                    D["day"][d] = {k: (M106_RX[k].search(s).groups() if M106_RX[k].search(s) else None) for k in ("w1", "gate", "risk", "guard", "tu", "h1", "ms")}
+                continue
+            if s.startswith(M106_START):
+                mm = M106_RX["start"].search(s)
+                D["start"].append(mm.groups() if mm else None)
+                continue
+            if s.startswith(M106_EX):
+                D["ex"].append(s)
+                continue
+            if s.startswith(M106_FACH):
+                d = num(r"plan doba (-?\d+)", s[:60])
+                mm = M106_RX["fach"].search(s)
+                if mm:
+                    D["fach"].append((d, mm.groups()))
+                else:
+                    D["fachbad"] += 1
+                continue
+            if s.startswith(M106_PLAN):
+                d = num(r"plan doba (-?\d+)", s[:60])
+                if d is not None and "| BLAD rachunku" not in s:
+                    D["plans"].append(d)
+                continue
+            if s.startswith("KS: produkcja (zastosowane) dzien "):
+                D["ks_live"] += 1
+                d = num(r"dzien (-?\d+)", s[:60])
+                mm = M106_RX["rule"].search(s)
+                if d is not None:
+                    D["rule"][d] = mm.groups() if mm else None
+                continue
+            if s.startswith("KS: WLACZONE doba "):
+                if D["ks_on"] is None:
+                    D["ks_on"] = num(r"doba (\d+)", s[:40])
+                continue
+            if s.startswith("Wozy (m106): zapis pamieci tras"):
+                mm = M106_RX["save"].search(s)
+                if mm:
+                    D["save"].append(tuple(int(x) for x in mm.groups()))
+                continue
+            if s.startswith("Dowoz (wozy): dzien "):
+                mm = M106_RX["wyc"].search(s)
+                if mm:
+                    D["wyc"].append(float(mm.group(3)))
+                continue
+            if s.startswith("Dowoz: dzien "):
+                mm = M106_RX["lost"].search(s)
+                if mm:
+                    D["lost"].append(int(mm.group(1)))
+                continue
+            if s.startswith("Towary: dzien "):
+                d = num(r"Towary: dzien (\d+)", s[:30])
+                mm = M106_RX["unexp"].search(s)
+                if d is not None and mm and mm.group(1) != "-":
+                    v = abs(int(mm.group(1)))
+                    if v > D["unexp"].get(d, 0):
+                        D["unexp"][d] = v
+                    elif d not in D["unexp"]:
+                        D["unexp"][d] = 0
+                continue
+            if s.startswith("Zatkane wsie (przyklad): dzien "):
+                if "[village_S2_3]" in s or "[village_S2_1]" in s or "Free Folk" in s or "Last Hearth" in s:
+                    D["zatk"].append(s)
+                continue
+            if s.startswith("Klimat: wczytano") or s.startswith("Wyrzutki: wczytano") or s.startswith("Stany (ZC2): wczytanie"):
+                D["loaded"] = True
+            elif s.startswith("Prolog (m101): start sesji"):
+                if "| prolog TAK" in s:
+                    D["prol"] = True
+            elif s.startswith("Prolog (m101): nowa kampania") or s.startswith("Wiedza (m96-wzory): nowa kampania"):
+                D["newc"] = True
+    D["mode"] = "zapis" if (D["loaded"] and not D["newc"]) else "nowa kampania"
+    return D
+
+
+def _m106_csv(path):
+    if not path or not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8-sig", errors="replace", newline="") as f:
+        return list(csv.DictReader(f, delimiter=";"))
+
+
+def m106w_rows(rep, D, logp, tabp, nks_rows=None):
+    """m106wozy: wiersze WZ-0..WZ-10, WZ-H1, INFO - opis w --help."""
+    import math
+    mode = D["mode"]; B = M106_BASE[mode]
+    days = sorted(D["day"])
+    nd = len(days)
+    ksmode = "KS wlaczone w biegu" if D["ks_on"] is not None else ("KS zastosowane z zapisu" if D["ks_live"] > 0 else "KS nieczynne")
+    sc = (nd / float(B["days"])) if nd else 0.0
+    # ---- WZ-0
+    st0 = [g for g in D["start"] if g]
+    keys_ok = bool(st0) and all(g[0] == "TAK" and g[1] == "TAK" and g[2] == "TAK" and g[4] == "TAK" and g[5] == "TAK" for g in st0)
+    gaps = [days[i] for i in range(1, nd) if days[i] - days[i - 1] > 1]
+    badfmt = [d for d in days if any(D["day"][d][k] is None for k in ("w1", "gate", "risk", "guard", "tu", "h1", "ms"))]
+    fp = len(D["fach"]); npl = len(D["plans"])
+    rep.add("WZ-0: linia startu z 5 kluczami TAK, linia 'Wozy (m106): dzien' kazdej doby, 'KS: fach wsi (m106)' przy kazdym Planie",
+            f"startow {len(D['start'])} (z kluczami TAK {len(st0) if keys_ok else 0}), linii doby {nd}" + (f" (luki po {gaps[:3]})" if gaps else "")
+            + (f", zly format {len(badfmt)} (np. {badfmt[:3]})" if badfmt else "") + f"; Planow KS {npl}, linii fachu {fp}" + (f", fachu w zlym formacie {D['fachbad']}" if D["fachbad"] else ""),
+            "start z kluczami TAK, doby bez luk i w formacie, linii fachu = Planow (log bez KS - linia fachu nie wymagana)",
+            (keys_ok and nd > 0 and not gaps and not badfmt and D["fachbad"] == 0 and (npl == 0 or fp >= npl)) if (D["start"] or nd) else None)
+    if nd == 0:
+        rep.add("WZ-1..10: linie m106", "brak linii 'Wozy (m106): dzien'", "INFO (log sprzed paczki m106-wozy)", None)
+        return
+    last28 = days[-28:]
+    g = lambda d, k, i: int(D["day"][d][k][i]) if D["day"][d][k] else 0
+    # ---- WZ-1a / WZ-1b (bez postepu ponad 30 dob)
+    y12 = max(g(d, "guard", 18) + g(d, "guard", 19) for d in last28)
+    y3 = max(g(d, "guard", 20) for d in last28)
+    h1 = [sum(g(d, "h1", i) for d in days) for i in range(6)]
+    rep.add("WZ-1a: wozy w drodze i w obcej osadzie bez postepu ponad 30 dob (najwiecej w ostatnich 28 liniach)", f"{y12}", "0 (baza: Harbay i Volmark 165-170 dob na brzegu)", y12 == 0)
+    outside = sum(h1[:5])
+    rep.add("WZ-1b: wozy w domu z jukami i rozkazem ponad 30 dob (najwiecej w ostatnich 28 liniach)", f"{y3}; H1 (razem od startu): AI wylaczone {h1[0]}, Hold {h1[1]}, cel chwilowy "
+            f"= osada {h1[2]}, tratwa {h1[3]}, predkosc 0 {h1[4]}, inne {h1[5]}", "0 (baza 103d: 18 wozow do 154 dob); > 0 przy przyczynie gry w H1 - DECYZJA",
+            y3 == 0, decide=(y3 > 0 and outside > 0))
+    # ---- WZ-2 Harbay i Volmark (wsie-kiesy.csv)
+    kp = os.path.join(tabp, "wsie-kiesy.csv") if tabp else session_file_find(logp, "wsie-kiesy.csv")
+    kr = _m106_csv(kp)
+    lord = [s for s in D["zatk"] if ("[village_S2_3]" in s or "[village_S2_1]" in s) and "Lordsport" in s and (num(r"dzien (\d+)", s[:60]) or 0) > days[0] + 2]
+    lord += [s for s in D["ex"] if ("[village_S2_3]" in s or "[village_S2_1]" in s) and "-> town_S2," in s and (num(r"dzien (\d+)", s[:50]) or 0) > days[0] + 2]
+    if kr:
+        kd0 = min(int(r["dzien"]) for r in kr)
+        kd1 = max(int(r["dzien"]) for r in kr)
+        blocks, bad2 = [], []
+        b0 = days[0] + 27                                             # od 28. doby biegu (pierwsza linia m106)
+        while b0 + 27 <= kd1:
+            for vid in M106_HARBAY:
+                n = sum(int(_m106_f(r.get("wozow"))) for r in kr if r.get("wies_id") == vid and b0 <= int(r["dzien"]) <= b0 + 27)
+                blocks.append((vid, b0, n))
+                if n < 1:
+                    bad2.append(f"{vid} d{b0}")
+            b0 += 28
+        rep.add("WZ-2: Harbay i Volmark - wozow >= 1 w kazdym bloku 28 dob od 28. doby (wsie-kiesy.csv); przyklady z celem Lordsport",
+                f"blokow {len(blocks)}, bez wozu {len(bad2)}" + (f" ({', '.join(bad2[:4])})" if bad2 else "") + f"; przykladow z Lordsport {len(lord)}",
+                "kazdy blok >= 1, przykladow 0 (baza: 0 kursow przez 25 okien)", (not bad2 and not lord) if blocks else None)
+    else:
+        rep.add("WZ-2: Harbay i Volmark (wsie-kiesy.csv)", f"brak {kp}; przykladow z Lordsport {len(lord)}", "INFO (podaj --tabele <katalog>)", None)
+    # ---- WZ-3 Wolni Ludzie (bitwy.log H3 i linie doby)
+    bp = os.path.join(tabp, "bitwy.log") if tabp else session_file_find(logp, "bitwy.log")
+    nw_b = all_b = None
+    if bp and os.path.isfile(bp):
+        nw_b = all_b = 0
+        with open(bp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if "Bitwa: H3 dzien" not in ln or "przegrany Villagers of " not in ln:
+                    continue
+                mm = re.search(r"przegrany Villagers of [^(]*\(([^),]*)[,)].* vs zwyciezca [^(]*\(([^),]*)[,)]", ln)
+                if not mm or mm.group(1).strip() != "Free Folk":
+                    continue
+                all_b += 1
+                w = mm.group(2).lower()
+                if "night" in w and "watch" in w:
+                    nw_b += 1
+    nw_d = all_d = 0
+    for d in days:
+        r = D["day"][d]["risk"]
+        if not r or r[8] in ("-", ""):
+            continue
+        for item in r[8].split(", "):
+            pm = M106_RX["pair"].match(item.strip())
+            if not pm or pm.group(1).strip() != "Free Folk":
+                continue
+            all_d += int(pm.group(3))
+            if "night" in pm.group(2).lower() and "watch" in pm.group(2).lower():
+                nw_d += int(pm.group(3))
+    nw = max(nw_d, nw_b or 0); alln = max(all_d, all_b or 0)
+    t3a = int(math.ceil(B["ffnw"] * sc)); t3b = int(math.ceil(B["ffall"] * sc))
+    rep.add(f"WZ-3a: wozy Wolnych Ludzi rozbite przez Straz ({mode}, {nd} dob)", f"{nw} (linie doby {nw_d}, bitwy.log H3 {nw_b if nw_b is not None else 'brak'})",
+            f"<= {t3a} ({B['ffnw']}/{B['days']} dob; baza 103e 91/230, 103d 45/160)", nw <= t3a)
+    rep.add(f"WZ-3b: wszystkie rozbite wozy Wolnych Ludzi ({mode})", f"{alln} (linie doby {all_d}, bitwy.log H3 {all_b if all_b is not None else 'brak'})",
+            f"<= {t3b} ({B['ffall']}/{B['days']} dob; baza 131/230, 62/160)", alln <= t3b)
+    ffv = set(r.get("wies_id") for r in kr if r.get("krolestwo") == "Free Folk") if kr else set()
+    lh = [s for s in D["ex"] if any("[" + v + "]" in s for v in ffv) and "-> ROT_town23," in s]
+    lh += [s for s in D["zatk"] if "Last Hearth" in s and any("[" + v + "]" in s for v in ffv)]
+    gate_lh = sum(int(re.search(r"Last Hearth przez [^,]* (\d+)$", D["day"][d]["gate"][3]).group(1)) for d in days
+                  if D["day"][d]["gate"] and re.search(r"Last Hearth przez [^,]* (\d+)$", D["day"][d]["gate"][3] or ""))
+    rep.add("WZ-3c: wybory Wolnych Ludzi do Last Hearth (przyklady m106 i zatkanych wsi)", f"przykladow {len(lh)}; brama wroga - Last Hearth najczesciej odrzucone {gate_lh} razy",
+            "INFO (oczekiwane 0 przykladow)", None)
+    # ---- WZ-4 glowny towar (plon-wsi.csv)
+    pp = os.path.join(tabp, "plon-wsi.csv") if tabp else session_file_find(logp, "plon-wsi.csv")
+    pr = _m106_csv(pp)
+    if pr:
+        rows = {}
+        for r in pr:
+            try:
+                rows.setdefault(r["wies_id"], []).append((int(r["dzien"]), _m106_f(r.get("plon_glowny_dzien"))))
+            except (KeyError, ValueError):
+                continue
+        alldays = sorted({d for v in rows.values() for d, _ in v})
+        apply_d = D["ks_on"] if D["ks_on"] is not None else (alldays[0] if alldays else 0)
+        zero, series = 0, {}
+        for vid, v in rows.items():
+            v.sort()
+            pre = [y for d, y in v if d < apply_d]
+            lastv = [y for d, y in v[-3:]]
+            if (pre and max(pre) > 0 or D["ks_on"] is None) and lastv and max(lastv) <= 1e-4:
+                zero += 1
+        for dd in alldays[-6:]:
+            series[dd] = sum(1 for vid, v in rows.items() if any(d == dd and y <= 1e-4 for d, y in v))
+        if D["ks_on"] is not None:
+            thr = B["zero"]
+            rep.add(f"WZ-4: wsie z glownym towarem = 0 w 3 ostatnich pomiarach (plon-wsi.csv, KS od doby {apply_d}, {mode})", f"{zero}",
+                    f"<= {thr} (baza 103e 186, 103d 184)", zero <= thr)
+        else:
+            rep.add(f"WZ-4: wsie z glownym towarem = 0 ({ksmode})", f"{zero}; ostatnie pomiary (wsi z zerem): " + ", ".join(f"d{k} {v}" for k, v in sorted(series.items())),
+                    "INFO (T3 - KS z zapisu: trend malejacy)", None)
+        t = rows.get(M106_TARTH, [])
+        tv = sum(y for d, y in t[-3:]) / max(1, len(t[-3:])) if t else None
+        rep.add("WZ-4b: Tarth (ROT_town8_village1) ryby na koniec (srednia 3 ostatnich pomiarow plon-wsi.csv)", f"{tv:.1f} szt./d" if tv is not None else "brak wiersza",
+                ">= 10 szt./d", (tv >= 10.0) if (tv is not None and D["ks_on"] is not None) else None)
+    else:
+        rep.add("WZ-4: glowny towar (plon-wsi.csv)", f"brak {pp}", "INFO (podaj --tabele <katalog>)", None)
+    # ---- WZ-5 utarg wozow (wsie-kiesy.csv, ostatnie 28 dob)
+    if kr:
+        kdays = sorted({int(r["dzien"]) for r in kr})
+        l28 = set(d for d in kdays if d > kdays[-1] - 28)
+        agg = {}
+        for r in kr:
+            if int(r["dzien"]) in l28:
+                a = agg.setdefault(r["wies_id"], [0, 0])
+                a[0] += int(_m106_f(r.get("dob_okna"))); a[1] += int(_m106_f(r.get("woz_netto_do_kiesy")))
+        low = sorted(v for v, a in agg.items() if a[0] > 0 and a[1] / float(a[0]) < 30.0)
+        thr = B["poor"]
+        rep.add(f"WZ-5: wsie z utargiem wozow < 30 zl/d (woz_netto_do_kiesy, ostatnie 28 dob; {mode})", f"{len(low)} z {len(agg)}", f"<= {thr} (baza 103e 70, 103d 97)", len(low) <= thr)
+    # ---- WZ-6 bez wyjasnienia w dobach dzialan straznika i dosypki
+    act = [d for d in days if g(d, "guard", 14) > 0 or g(d, "tu", 1) > 0]
+    vals = [max(D["unexp"].get(d, 0), D["unexp"].get(d + 1, 0)) for d in act]   # linia Towary tej doby i nastepnej (rozladunek w takcie doby - ksiega tej albo nastepnej)
+    vmax = max(vals) if vals else 0
+    k8 = None
+    if nks_rows:
+        for r in nks_rows:
+            if r[0].startswith("NKS-8: kontrola pieniedzy KS"):
+                k8 = r[1]
+    rep.add("WZ-6: 'bez wyjasnienia' w liniach Towary w dobach z rozladunkiem straznika albo dosypka przy wyjezdzie (najwiekszy |N| na towar)",
+            f"dob {len(act)}, najwiekszy {vmax}" + (f"; NKS-8 {k8}" if k8 else ""), "<= 4 szt. (baza: +0; rozklad +-1-4) i NKS-8 TAK", (vmax <= 4 and (k8 is None or k8 == "TAK")) if act else None)
+    # ---- WZ-7 kalibracja KS (grupa nks na tym samym logu) i fach w Planie
+    if nks_rows is not None:
+        got = {}
+        for r in nks_rows:
+            for key in ("NKS-2:", "NKS-3:", "NKS-5:", "NKS-19b:"):
+                if r[0].startswith(key) and key not in got:
+                    got[key] = r
+        n5 = None
+        if "NKS-5:" in got:
+            mm = re.search(r"poza 0\.95-1\.05 (\d+)", got["NKS-5:"][2])
+            n5 = int(mm.group(1)) if mm else None
+        ok7 = all(k in got for k in ("NKS-2:", "NKS-3:", "NKS-19b:")) and got["NKS-2:"][1] == "TAK" and got["NKS-3:"][1] == "TAK" and got["NKS-19b:"][1] == "TAK" \
+            and (n5 is None or n5 <= B["nks5"] + 3)
+        rep.add("WZ-7: kalibracja KS - NKS-2, NKS-3, NKS-19b TAK, NKS-5 poza pasmem <= baza + 3", "; ".join(f"{k} {v[1]} ({v[2][:90]})" for k, v in got.items())
+                + (f"; NKS-5 poza {n5}" if n5 is not None else ""), f"TAK/TAK/TAK, NKS-5 <= {B['nks5'] + 3} (baza {B['nks5']})",
+                ok7 if got else None)
+    if D["fach"]:
+        lastf = D["fach"][-1][1]
+        pct = int(lastf[5]) if lastf[5] != "-" else None
+        rep.add("WZ-7b: fach wsi w Planie - 'cel na targ / w Planie' ostatniego Planu", f"plan doba {D['fach'][-1][0]}: wsi z fachem {lastf[0]} (regale {lastf[1]}), cel {lastf[3]} szt./d, "
+                f"w Planie {lastf[4]} ({lastf[5]}%), w pelni {lastf[6]}, czesciowo {lastf[7]} (rece/ziemia {lastf[8]}, bez zysku {lastf[9]}, prog wyzywienia {lastf[10]}); czas fach "
+                f"{lastf[12]} ms", ">= 50%", (pct >= 50) if pct is not None else None)
+    rl = [D["rule"][d] for d in sorted(D["rule"]) if D["rule"][d]]
+    if rl:
+        rep.add("WZ-7c: fach w regule A7 (stan zastosowany)", f"linii {len(rl)}; razem: bloki trzymane {sum(int(r[0]) for r in rl)}, nacisk powrotu {sum(int(r[1]) for r in rl)}, "
+                f"przebudowy do fachu {sum(int(r[2]) for r in rl)}; na koniec wsi z niedoborem {rl[-1][4]} (cel {rl[-1][5]} szt./d, jest {rl[-1][6]})", "INFO (T3: start przebudow ok. doby 63)", None)
+    # ---- WZ-8 koszt
+    wm = sorted(D["wyc"]); w_med = wm[len(wm) // 2] if wm else None
+    ms = sorted(float(D["day"][d]["ms"][0]) for d in days if D["day"][d]["ms"]); m_med = ms[len(ms) // 2] if ms else None
+    thr8 = 1.3 * B["wyc"]
+    rep.add("WZ-8: koszt - wycena miast wozow (mediana 'wycen ... ms' linii 'Dowoz (wozy)') i linia m106 (mediana)",
+            (f"wycena {w_med:.1f} ms/d" if w_med is not None else "wycena - brak") + (f"; linia m106 {m_med:.2f} ms/d (najwiecej {ms[-1]:.2f})" if m_med is not None else ""),
+            f"wycena <= {thr8:.1f} ms/d (1.3 x baza {B['wyc']}), linia m106 <= 2 ms/d", (w_med is not None and w_med <= thr8 and m_med is not None and m_med <= 2.0))
+    # ---- WZ-9 bledy i potkniecia
+    stum = sum(int(D["day"][d]["ms"][2]) for d in days if D["day"][d]["ms"])
+    rep.add("WZ-9: ERROR nowego kodu (CartGuard, CartRisk, StartCalibration.Fach, MarketCarts.OnLeft/Choose, MarketRoad.RoutePrefix, SyncData.arm_cart_risk) i potkniecia linii m106",
+            f"ERROR {D['err']}" + (f" (pierwszy: {D['err1']})" if D["err1"] else "") + f", potkniecia {stum}", "0 / 0", D["err"] == 0 and stum == 0)
+    # ---- WZ-10 zapis
+    if D["save"]:
+        mx = max(x[1] for x in D["save"])
+        rep.add("WZ-10: rozmiar arm_cart_risk (linie zapisu)", f"zapisow {len(D['save'])}, najwiekszy {mx} znakow ({mx / 1024.0:.1f} KB), par na koniec {D['save'][-1][0]}", "<= 80 KB", mx <= 80 * 1024)
+    else:
+        rep.add("WZ-10: rozmiar arm_cart_risk", "brak linii zapisu (bieg bez zapisu gry)", "INFO", None)
+    # ---- WZ-H1 i INFO
+    rep.add("WZ-H1: przyczyny H1 (woz w domu z jukami i rozkazem; liczniki dzienne razem)", f"AI wylaczone {h1[0]}, Hold {h1[1]}, cel chwilowy = osada {h1[2]}, tratwa {h1[3]}, "
+            f"predkosc 0 {h1[4]}, inne {h1[5]}; przykladow m106 {len(D['ex'])}", "INFO (do decyzji o dalszym kroku)", None)
+    tot = lambda k, i: sum(g(d, k, i) for d in days)
+    rep.add("WZ-INFO: dzialania (razem od startu)", f"W1: odrzucone bez drogi {tot('w1', 1)} (wlasne miasto {tot('w1', 2)}), wlokno {tot('w1', 3)}, zastepcze {tot('w1', 4)}, bez celu "
+            f"{tot('w1', 5)}, jednorazowo {tot('w1', 6)}; brama: odrzucone {tot('gate', 1)}, wszystkie za brama {tot('gate', 4)}; ryzyko: wybor zmieniony {tot('risk', 10)}, "
+            f"dojechalo {tot('risk', 3)}, rozbite {tot('risk', 4)}; straznik: do domu {tot('guard', 5)}, do miasta {tot('guard', 6)}, AI {tot('guard', 7)}, odrzucony "
+            f"{tot('guard', 8)}, bez wyjscia {tot('guard', 9)}, rozladowane {tot('guard', 13)} ({tot('guard', 14)} szt.); dosypka {tot('tu', 1)} ({tot('tu', 2)} szt.), czeka "
+            f"{tot('tu', 3)}, przepadla {tot('tu', 4)}", "INFO", None)
+    lost = sum(D["lost"])
+    e8 = None
+    if nks_rows:
+        for r in nks_rows:
+            if r[0].startswith("NKS-8e"):
+                e8 = r[2]
+    rep.add("WZ-INFO: rozbite tabory wsi razem ('Dowoz:') i utarg wozow (NKS-8e)", f"rozbite {lost} w {len(D['lost'])} liniach" + (f"; NKS-8e: {e8[:160]}" if e8 else ""),
+            "INFO (baza 830/230 dob - oczekiwane mniej; NKS-8e nie mniej niz w 103e)", None)
+
+
+def m106w_synth():
+    """m106wozy - test syntetyczny: dobry i zly bieg (log + wsie-kiesy.csv + plon-wsi.csv + bitwy.log w katalogu tymczasowym) przez m106w_collect / m106w_rows.
+    None = werdykty zgodne z oczekiwanymi, inaczej opis roznicy."""
+    import tempfile
+    import shutil
+    def run(bad):
+        tmp = tempfile.mkdtemp(prefix="m106w_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = ["[00:00:00] Prolog (m101): nowa kampania z PROLOGIEM 298 (test)", "[00:00:00] " + M106_TEST["start"], "[00:00:00] KS: WLACZONE doba 100005 (test)"]
+            for d in range(100000, 100060):
+                day = M106_TEST["day"].replace("dzien 108700", "dzien %d" % d)
+                if not bad:
+                    day = day.replace("bez postepu ponad 30 dob 1 (w drodze 0, w obcej osadzie 0, w domu 1)", "bez postepu ponad 30 dob 0 (w drodze 0, w obcej osadzie 0, w domu 0)")
+                    day = day.replace("top: Free Folk przez Nights Watch 2, Free Folk przez Broken Men 1)", "top: North przez Broken Men 1)")
+                else:
+                    day = day.replace("bez postepu ponad 30 dob 1 (w drodze 0, w obcej osadzie 0, w domu 1)", "bez postepu ponad 30 dob 2 (w drodze 2, w obcej osadzie 0, w domu 0)")
+                    day = day.replace("potkniecia 0.", "potkniecia 1.")
+                L.append("[00:00:00] " + day)
+                L.append("[00:00:00] Dowoz (wozy): dzien %d - wybor miasta CZYNNY: 10 wozow; wycen 278 (cen 3000, %s ms) | cena." % (d, "30.0" if not bad else "90.0"))
+                L.append("[00:00:00] Towary: dzien %d - fish (10 d): zapas 1 | produkcja 1 | zuzycie 1 | bez wyjasnienia %s | przewoz [x]." % (d, "+0" if not bad else "+9"))
+            L.append("[00:00:00] " + M106_PLAN + "100003 | plan nr 1")
+            L.append("[00:00:00] " + M106_TEST["fach"].replace("plan doba 108682", "plan doba 100003").replace("(71%)", "(71%)" if not bad else "(31%)"))
+            L.append("[00:00:00] " + M106_TEST["save"])
+            if bad:
+                L.append("[00:00:00] ERROR in CartGuard.Daily: System.Exception: test")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            kh = "dzien;dob_okna;wies_id;wies;typ;krolestwo;miasto_targowe_id;stan;targ_oblezony;ogniska;kiesa;kiesa_poczatek_okna;zmiana_okna;skrzynia_ds;poza_tickiem;wozow;woz_oddane;woz_netto_do_kiesy"
+            kl = [kh]
+            for d in range(100006, 100060, 7):
+                for vid, kro in (("village_S2_3", "Iron Islands"), ("village_S2_1", "Iron Islands"), ("v_ff1", "Free Folk"), ("v_x", "North")):
+                    w = 0 if (bad and vid == "village_S2_3") else 1
+                    kl.append(f"{d};7;{vid};{vid};sheep_farm;{kro};town_S2;normalna;0;100;5000;5000;0;0;0;{w};700;{700 if not bad else 70}")
+            open(os.path.join(tmp, "wsie-kiesy.csv"), "w", encoding="utf-8").write("\n".join(kl) + "\n")
+            ph = "dzien;wies_id;wies;typ;krolestwo;kultura_start;ludzie;u_v;g_typu;poziom_hearth;czynnik;towar_glowny;baza_gry;baza_reguly;plon_glowny_dzien;dni_pomiaru;las_gry;las_reguly;uwagi"
+            pl = [ph]
+            for d in (100001, 100003, 100040, 100050, 100059):
+                pl.append(f"{d};{M106_TARTH};Tarth;fisherman;Stormlands;x;1;1;1;1;1;fish;30;30;{(31.0 if d < 100005 else (12.0 if not bad else 2.0))};7;;;")
+                pl.append(f"{d};v_y;Y;flax_plant;Reach;x;1;1;1;1;1;flax;5;5;{(5.0 if d < 100005 else (1.0 if not bad else 0.0))};7;;;")
+            open(os.path.join(tmp, "plon-wsi.csv"), "w", encoding="utf-8").write("\n".join(pl) + "\n")
+            bl = []
+            for i in range(40 if bad else 1):
+                bl.append("[00:00:00] Bitwa: H3 dzien 100010 - FieldBattle w regionie The Wall: przegrany Villagers of Crowrest (Free Folk) 20 ludzi (konni 0%) vs zwyciezca Ryan (Nights Watch) 112 ludzi |")
+            open(os.path.join(tmp, "bitwy.log"), "w", encoding="utf-8").write("\n".join(bl) + "\n")
+            rep = Report()
+            D = m106w_collect(logp)
+            m106w_rows(rep, D, logp, tmp, None)
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    good, badr = run(False), run(True)
+    exp_good = {"WZ-0": "TAK", "WZ-1a": "TAK", "WZ-1b": "TAK", "WZ-2": "TAK", "WZ-3a": "TAK", "WZ-3b": "TAK", "WZ-4": "TAK", "WZ-4b": "TAK", "WZ-5": "TAK", "WZ-6": "TAK",
+                "WZ-7b": "TAK", "WZ-8": "TAK", "WZ-9": "TAK", "WZ-10": "TAK"}
+    exp_bad = {"WZ-1a": "NIE", "WZ-2": "NIE", "WZ-3a": "NIE", "WZ-4b": "NIE", "WZ-6": "NIE", "WZ-7b": "NIE", "WZ-8": "NIE", "WZ-9": "NIE"}
+    diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
+    diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m106wozy_main(logp, tabp=None, until=120):
+    """m106wozy (22.10; projekt m106-wozy W2 i P1, decyzje Jeffa dla gospodarki: z podazy i popytu, start neutralny, zmiany produkcji powoli, z biezacego zysku, zamknieta
+    ekonomia, 100%): WZ-0..WZ-10, WZ-H1, INFO - opis w --help. Strumieniowo; wsie-kiesy.csv, plon-wsi.csv i bitwy.log z --tabele <katalog> albo z katalogu sesji logu;
+    WZ-7 - grupa nks na tym samym logu (wiersze NKS-2, NKS-3, NKS-5, NKS-19b, NKS-8, NKS-8e). Log bez linii m106 - wiersze INFO, bez wyjatku."""
+    import io
+    import contextlib
+    rep = Report()
+    s1 = m106w_selftest()
+    rep.add("WZ-S: self-test wyrazen (linie kontrolne jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m106w_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("WZ-S2: test syntetyczny (dobry i zly bieg przez te same funkcje progow)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("WZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m106w_collect(logp)
+    nks_rows = None
+    if D["plans"]:
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                nks_main(logp, until, None)
+            nks_rows = []
+            for ln in buf.getvalue().splitlines():
+                parts = [p.strip() for p in ln.split(" | ")]
+                if len(parts) >= 4 and parts[0].startswith("NKS-") and parts[1] in ("TAK", "NIE", "INFO", "ETAP", "DECYZJA"):
+                    nks_rows.append((parts[0], parts[1], parts[2]))
+        except Exception as e:
+            nks_rows = None
+            rep.add("WZ-7: grupa nks", f"wyjatek {type(e).__name__}: {e}", "INFO", None)
+    print(f"plik: {logp} | tryb {D['mode']} | KS: {'wlaczone doba ' + str(D['ks_on']) if D['ks_on'] is not None else ('z zapisu' if D['ks_live'] else 'nieczynne')} | linii m106 doby "
+          f"{len(D['day'])}, przykladow {len(D['ex'])}, Planow {len(D['plans'])}, linii fachu {len(D['fach'])}, ERROR {D['err']}")
+    m106w_rows(rep, D, logp, tabp, nks_rows)
     rep.show()
     return 0
 

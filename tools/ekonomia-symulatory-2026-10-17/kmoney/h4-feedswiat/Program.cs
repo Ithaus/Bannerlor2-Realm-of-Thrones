@@ -148,6 +148,40 @@ static class Program
             }
             inp.Districts.Add(kd);
         }
+        // m106-wozy P1 (KS_FACH=<plon-wsi.csv>, KS_FACH_DAY=<doba wlaczenia KS, domyslnie 108685>): fach wsi - baza gry glownego towaru (kolumna baza_reguly, ostatni pomiar
+        // przed doba) x sigma x kg sztuki; typ wsi -> zajecie KsTab, towar_glowny -> towar KsTab (P0 zajecia musi go wytwarzac). Bez zmiennej - Plan bez fachu (bit w bit)
+        {
+            var fp = Environment.GetEnvironmentVariable("KS_FACH");
+            if (!string.IsNullOrEmpty(fp) && File.Exists(fp))
+            {
+                int fday; if (!int.TryParse(Environment.GetEnvironmentVariable("KS_FACH_DAY") ?? "", out fday)) fday = 108685;
+                var bz = new Dictionary<string, KeyValuePair<int, KeyValuePair<string, double>>>();
+                string[] hdr = null;
+                foreach (var ln in File.ReadLines(fp))
+                {
+                    var c = ln.Split(';');
+                    if (hdr == null) { hdr = c; continue; }
+                    int iD = Array.IndexOf(hdr, "dzien"), iV = Array.IndexOf(hdr, "wies_id"), iG = Array.IndexOf(hdr, "towar_glowny"), iB = Array.IndexOf(hdr, "baza_reguly");
+                    if (iD < 0 || iV < 0 || iG < 0 || iB < 0 || c.Length <= Math.Max(Math.Max(iD, iV), Math.Max(iG, iB))) continue;
+                    int dd; double bb;
+                    if (!int.TryParse(c[iD], out dd) || dd >= fday || !double.TryParse(c[iB], NumberStyles.Float, Inv, out bb)) continue;
+                    KeyValuePair<int, KeyValuePair<string, double>> old;
+                    if (!bz.TryGetValue(c[iV], out old) || dd >= old.Key) bz[c[iV]] = new KeyValuePair<int, KeyValuePair<string, double>>(dd, new KeyValuePair<string, double>(c[iG], bb));
+                }
+                int nf = 0, nr = 0;
+                foreach (var d in inp.Districts)
+                {
+                    KeyValuePair<int, KeyValuePair<string, double>> e; int g, cr;
+                    if (d.TownFields || !bz.TryGetValue(d.Id, out e) || !(e.Value.Value > 0) || !KsTab.GoodIndex.TryGetValue(e.Value.Key, out g) || !KsTab.CraftIndex.TryGetValue(d.Type ?? "", out cr)) continue;
+                    bool mk = false; foreach (var kv in KsTab.P0[cr]) if (kv.Key == g && kv.Value > 0) mk = true;
+                    if (!mk) continue;
+                    KsItem it; double kg = inp.Items.TryGetValue(e.Value.Key, out it) && it != null && it.Kg > 0 ? it.Kg : 10.0;
+                    d.FachC = cr; d.FachG = g; d.FachKg = e.Value.Value * inp.Sigma * kg; nf++; if (KsTab.IsRegale[cr]) nr++;
+                }
+                inp.FachOn = true;
+                Console.WriteLine("m106 fach wsi: plik " + fp + ", wsi z baza " + bz.Count + ", okregow z fachem " + nf + " (regale " + nr + "), doba przed " + fday);
+            }
+        }
         double sigma = inp.Sigma;
         foreach (var t in root.GetProperty("towns").EnumerateArray())
         {
@@ -316,6 +350,7 @@ static class Program
             }
             if (R.CorrLine != null) Console.WriteLine("  " + R.CorrLine.Substring(0, Math.Min(R.CorrLine.Length, 2500)));
             { var fl = KsCore.FeedLine(R, pl + 1); if (fl != null) Console.WriteLine("  " + fl); }
+            if (R.FachLine != null) Console.WriteLine("  " + R.FachLine.Replace("{DOBA}", (pl + 1).ToString(Inv)));   // m106-wozy P1
             { var cl = KsCore.ClearLine(R, pl + 1); if (cl != null) Console.WriteLine("  " + cl); }
             if (R.Money != null) { var P9 = R.Money.P9; int SN = KsCheap.StatN; var o9 = new List<string>(); for (int m = 0; m < 2; m++) for (int c = 0; c < 3; c++) { double f0 = P9[(m * 3 + c) * SN], g0 = P9[(m * 3 + c) * SN + 1]; o9.Add((m == 0 ? "W" : "E") + "WRP"[c] + " " + (f0 > 0 ? (100 * g0 / f0).ToString("0.0", Inv) : "-") + "%"); } Console.WriteLine("  P9 kcal jedzenia klas miast: " + string.Join(", ", o9)); }
             var M0 = R.Money;
