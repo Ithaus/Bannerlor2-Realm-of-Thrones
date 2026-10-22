@@ -56,6 +56,7 @@ namespace Armoury
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private static readonly TextObject _txtPack = new TextObject("{=!}Spare horses under packs");
+        private static readonly TextObject _txtRider = new TextObject("{=!}Ridden horses (saddlebags)");
 
         // co gra dodala nowej karawanie (InitializeCaravanOnCreation) - zdejmowane w postfiksie CreateCaravanParty tej samej partii.
         // Klucz po REFERENCJI (poprawka F2, test zbiorczy 5-8): InitializeCaravanOnCreation biegnie wewnatrz MobileParty.CreateParty PRZED nadaniem Id
@@ -344,6 +345,47 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>m108-jezdziec (Jeff 22.10: "jade na koniu, a udzwig mam 30 tak sam z koniem, jak i bez konia"): gra liczy w udzwigu tylko luzaki taboru
+        /// (NumberOfMounts), kon pod jezdzcem nie daje nic. Postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity: RiderHorseCarryKg kg na kazdego
+        /// jezdzca partii (bohater - jego ekwipunek bojowy, zolnierz - pierwszy ekwipunek bojowy; kon w gnieździe Horse, smok nie) - juki przy siodle. Kazda partia
+        /// na ladzie (jak gra), armia z includeFollowers - takze partie doczepione. Tylko odczyt (watki tiku partii).</summary>
+        public static void RiderPostfix(MobileParty __0, bool __1, bool __6, ref ExplainedNumber __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || __0 == null || __1 || s.RiderHorseCarryKg <= 0) return;
+                int n = Riders(__0);
+                if (__6)
+                {
+                    var att = __0.AttachedParties;
+                    if (att != null) for (int i = 0; i < att.Count; i++) { var ap = att[i]; if (ap != null && ap != __0) n += Riders(ap); }
+                }
+                if (n > 0) __result.Add((float)n * s.RiderHorseCarryKg, _txtRider);
+            }
+            catch { }
+        }
+
+        /// <summary>Jezdzcy partii: ludzie (z rannymi), ktorych ekwipunek bojowy ma konia (nie smoka).</summary>
+        internal static int Riders(MobileParty mp)
+        {
+            var r = mp != null ? mp.MemberRoster : null;
+            if (r == null) return 0;
+            int n = 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var e = r.GetElementCopyAtIndex(i);
+                var ch = e.Character;
+                if (ch == null || e.Number <= 0) continue;
+                Equipment eq = ch.IsHero && ch.HeroObject != null ? ch.HeroObject.BattleEquipment : ch.FirstBattleEquipment;
+                if (eq == null) continue;
+                var horse = eq[EquipmentIndex.Horse].Item;
+                if (horse == null || DragonFeed.IsDragon(horse)) continue;
+                n += e.Number;
+            }
+            return n;
+        }
+
         // ------------------------------------------------------------ wpiecia
 
         internal static void ApplyAll(Harmony h)
@@ -368,7 +410,11 @@ namespace Armoury
             {
                 var cap = AccessTools.Method(typeof(DefaultInventoryCapacityModel), "CalculateInventoryCapacity");
                 if (cap == null) parts.Add("BRAK DefaultInventoryCapacityModel.CalculateInventoryCapacity - udzwig luzaka jak w grze");
-                else { h.Patch(cap, postfix: new HarmonyMethod(typeof(PackMarket), nameof(CapPostfix))); parts.Add("udzwig luzaka wpiety"); }
+                else
+                {
+                    h.Patch(cap, postfix: new HarmonyMethod(typeof(PackMarket), nameof(CapPostfix))); parts.Add("udzwig luzaka wpiety");
+                    h.Patch(cap, postfix: new HarmonyMethod(typeof(PackMarket), nameof(RiderPostfix))); parts.Add("udzwig konia pod jezdzcem wpiety (m108)");
+                }
             }
             catch (Exception e) { parts.Add("blad wpiecia udzwigu " + e.GetType().Name); Log.Error("PackMarket.ApplyAll(udzwig)", e); }
             _hooks = string.Join(", ", parts.ToArray());
@@ -378,6 +424,13 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ linia doby
+
+        private static int RidersSafe(MobileParty mp) { try { return Riders(mp); } catch { return -1; } }
+        private static string CapSafe(MobileParty mp)
+        {
+            try { return mp != null ? Campaign.Current.Models.InventoryCapacityModel.CalculateInventoryCapacity(mp, mp.IsCurrentlyAtSea).ResultNumber.ToString("0", CultureInfo.InvariantCulture) : "-"; }
+            catch { return "?"; }
+        }
 
         /// <summary>Linia "Juczne (213)": nowe karawany i ich juczne z doby, luzaki pod jukami i pod piechurem (spis wszystkich partii na ladzie); zeruje liczniki.</summary>
         internal static void Daily()
@@ -417,6 +470,8 @@ namespace Armoury
                      + " - konwoj nie handluje, sprzet niosa ludzie; przy kluczu NIE juczne zostaja z niczego " + _dte + " konwojow)"
                      + " | udzwig (Spare Horse Carry Kg " + s.SpareHorseCarryKg + "): luzakow pod jukami " + under + " (+" + extra + " kg = " + (under * extra).ToString(inv) + " kg, partii " + parties + ")"
                      + ", pod piechurem albo jencem " + foot + " (20 kg gry)" + (k0 ? "" : " - bez wolnych koni zbrojowni (K0 wylaczone)")
+                     + " | konie pod jezdzcem (m108, Rider Horse Carry Kg " + s.RiderHorseCarryKg + "): gracz jezdzcow " + RidersSafe(MobileParty.MainParty)
+                     + " (+" + (RidersSafe(MobileParty.MainParty) * Math.Max(0, s.RiderHorseCarryKg)).ToString(inv) + " kg), udzwig gracza teraz " + CapSafe(MobileParty.MainParty)
                      + " | poza K5: BK GiveMounts/GivePackAnimals (3.11), ladunek konwojow DTE | wpiecia: " + _hooks
                      + " | potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ").");
             DayReset();

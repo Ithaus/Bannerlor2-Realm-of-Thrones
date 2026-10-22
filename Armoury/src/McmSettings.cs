@@ -6912,6 +6912,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool DteConvoyNoFreePacks { get; set; } = true;
 
+        [SettingPropertyInteger("Rider Horse Carry Kg", 0, 60, "0", HintText = "how many kilograms of saddlebags a horse carries under its rider - you, your companions and every mounted soldier (the game counts only spare horses in the baggage; 0 = as in the game)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int RiderHorseCarryKg { get; set; } = 20;
+
         [SettingPropertyInteger("Spare Horse Carry Kg", 20, 100, "0", HintText = "how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
@@ -11007,6 +11011,7 @@ namespace Armoury
             s.VillagerPacksFromHerd = VillagerPacksFromHerd;
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;
             s.DteConvoyNoFreePacks = DteConvoyNoFreePacks;
+            s.RiderHorseCarryKg = RiderHorseCarryKg;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;
