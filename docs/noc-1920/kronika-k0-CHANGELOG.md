@@ -5,6 +5,62 @@ Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E
 Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
 wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
 
+## 2026-10-22 - K0 krok A4: ukrycie i powrot postaci (hide/unhide), term kr: w zmianach stron, progi m105kronika, skrypty wgrania
+
+**Problem:** (1) Kronika nie umiala ukryc postaci ani jej przywrocic (akcje hide/unhide "jeszcze niewspierane"; 31 hide i 15 unhide w danych K1-K10); wiersze
+#move m11 Sandor, m20 Osha, m21 Sam zabijaly postac ('remove' = KillCharacterAction.ApplyByRemove), wiec powroty z okien 082 (Sam) i 089 (Sandor) nie mialy
+kogo przywrocic. (2) Term kr:NNN.w w wyzwalaczach arm_canon_moves (pary 'kr': m02, m04, m18, m22) byl dla CanonCompanions nieznanym rodzajem ("nigdy") - okno
+Kroniki nie moglo poprzedzic ruchu. (3) Brak progow logu Kroniki (plan H). (4) wgraj-v5.ps1 i bieg-bitwa.ps1 kopiowaly z Lektor tylko *.wav i *.tsv - 293 nagrania
+kr_*.ogg nie trafilyby do gry ("nagran Kroniki 0 ... odrzucone 293 (brak pliku)", okna ciche bez bledu).
+**Przyczyna:** nowa funkcja (plan P1, P3, H, L; KRONIKA-FORMAT 8, 11, 15).
+**Zmiana:**
+- `CanonCompanions.cs`: wykonanie akcji wydzielone do `internal static Res ApplyAction(Hero, akcja, arg, zrodlo, out why)` (Execute #move wola to samo; switch
+  akcji bez zmian, zrodlo w linii remove "zmiana strony #mNN (remove)" jak dotad); `Res` internal. Wspolne kontrole: brak postaci / martwa / po stronie gracza -
+  POMINIETA (unhide bez kontroli gracza); postac ukryta przez Armoury - kazda akcja poza hide/unhide CZEKA na powrot (#move: do 60 dob). Nowe akcje:
+  `hide[:<term konca>]` - zakaz (POMINIETA): glowa rodu, wladca, wylaczony przez gre, lista chronionych przed jej wydarzeniem ROT (`Guarded` = kronika_check.PROTECTED,
+  32 postacie, harness: 0 roznic); jeniec, gubernator, bitwa/oblezenie - CZEKA; potem LeaveParty (armia, zbieg, druzyna lorda StartDisband - ludzie nie przepadaja)
+  i DisableHeroAction (dekompilacja 1.4.8: z osady, stan Disabled -> lista martwych i wylaczonych przez CampaignObjectManager.HeroStateChanged; heir: Clan.GetHeirApparents
+  pomija IsDisabled); rejestr `_hid` (klucz postaci, zrodlo "#m11" / "Kronika 008.1", koniec, dzien) w zapisie arm_canon_companions (linie "hid", niezaleznie od klucza
+  CanonCompanionsToClans); drugie hide na ukrytym = nowy koniec ("UKRYCIE: nowy koniec ..."). `unhide[:<osada>]` - tylko postac z rejestru (inaczej POMINIETA
+  "nie ukryty", bez teleportu); cel: osada z akcji (nie oblezona, nie kryjowka, nie wroga), inaczej siedziba rodu (SeatOf), inaczej miasto kultury; TeleportHeroAction
+  (Disabled -> Active - lista zywych); brak osady - CZEKA. Ratunek przy zniszczeniu rodu: ukryty dostaje tylko rod (bez teleportu, ktory by go przywrocil).
+  API: GuardState, HiddenCount, HiddenRows, IsHidden, HiddenHero, DropHidden. KnownActions + hide, unhide. FindHeroId/FindOriginal juz szukaly w liscie wylaczonych.
+  Term `kr:NNN.w[=x]` w BaseTrue -> `Chronicle.Resolved`; TermTrue: klucz ChronicleOfWesteros NIE = falsz "nigdy" takze z pamiecia +N (FORMAT 3.3), +N liczone od dnia
+  rozstrzygniecia okna (Chronicle.ResolvedDay), nie od nastepnej doby. Linia zmiany strony z alternatywa w wyzwalaczu: "| wyzwalacz ... (zaszlo <term>) (dzien ...".
+- `Armoury/ModuleData/arm_canon_moves.tsv` (TEN SAM commit c042d09d): m11, m20, m21 `remove` -> `hide` (p09 Benjen, prolog - dalej remove); komentarz akcji.
+- `Chronicle.State.cs`: `Resolved(arg, out never)` i `ResolvedDay(arg)` (most dla CanonCompanions); `Chronicle.Terms.KrTrue` internal.
+- `Chronicle.Actions.cs`: procedury `hide`/`unhide` przez ApplyAction (term konca sklejany z SplitArgs, kontrola skladni Terms.Syntax; linie "ukryty <postac> (id)
+  (NNN.w) do <term> | ..." i "powrot <postac> (id) -> <osada> (NNN.w) | ..."); `HiddenDaily(day, termsOn)` w dobie Kroniki (przed kluczem NIE): postac zmarla /
+  przywrocona przez gre - "UKRYCIE przerwane ... wpis usuniety"; ukryty wybrany przez gre na glowe rodu / wladce - powrot "KONIEC UKRYCIA (glowa rodu)"; klucz TAK:
+  term konca prawdziwy albo "nigdy" (FORMAT 11) - powrot do siedziby "KONIEC UKRYCIA (term ...)"; klucz NIE - terminy czekaja (nic nie cofa). Hidden/HiddenText
+  z rejestru CanonCompanions ("n (Kronika a, #move b)") w liniach startu i doby.
+- `Chronicle.cs`: doba wola Actions.HiddenDaily po Terms.Daily; linia "okno ... pokazane" z "| godzina kampanii H" (prog KW-4).
+- `tools/sprawdz_logi.py`: grupa m105kronika (KW-0..KW-15 z planu H + KW-3b, KW-5b, KW-15b INFO), dispatch w main (osobny if/return), opis w pomocy; pary #para
+  i okna z kotwica 'przed' czytane z danych repo, lista chronionych z tools/kronika/kronika_check.py (zapas - lista wbudowana), --crashscribe dla pary listy
+  z 'AUTOTEST: OKNO wybor z listy'. sprawdz_narzedzie: czysto.
+- Repo glowne (5b86d366): tools/autotest-2026-10-17/wgraj-v5.ps1 i bieg-bitwa.ps1 - takze Lektor/**/*.ogg (manifest arm_lektor_kronika.tsv szedl juz jako *.tsv);
+  wgraj: kontrola OggS i md5 pliku z kolumny 5 manifestu (STOP przy zerach); oba: Armoury/GUI/Prefabs/Nameplate/*.xml, gdy sa w drzewie (galaz czcionek).
+**Ryzyko / co sprawdzic:**
+- W grze nic nie sprawdzone (zakaz gry w kroku). Pierwszy autotest K0a (hide/unhide na postaci testowej): linie "ukryty", "powrot", brak potkniec; bohater po hide
+  w Hero.DeadOrDisabledHeroes, po unhide w osadzie (stan Active). Do sprawdzenia w grze: BK, ROTLords i DTE wobec bohatera Disabled (wyszukiwania po zywych go nie
+  widza; dekompilacja tylko vanilla), CrashScribe UC (spis unikatow) - ukryta postac kanonu moze liczyc sie jako "usunieta".
+- Jeniec i gubernator przy hide = CZEKA (FORMAT 11 mowi "zakaz"); po 30 dniach (Kronika) / 60 dobach (#move) - POMINIETA z powodem. Zamiana na natychmiastowe
+  POMINIETE to jedna linia w CanonCompanions.Hide.
+- m11/m20/m21 w kampanii Jeffa (prolog od 20.10) jeszcze nie wykonane - zmiana dziala od nastepnego WGRANIA; po wgraniu Sam/Sandor/Osha znikaja ukryciem, okna 082/089
+  ich przywracaja (unhide z rejestru). Okna zalezne od zywych Sama/Sandora (064.2a, 082.2, 082.3, 089.1, 090.1, 101.1, 111.1a, 115.2d, 905.1) maja teraz szanse.
+- Kolejnosc doby: CanonCompanions (ruchy #move, term kr:) przed Kronika - okno rozstrzygniete w AppTick dnia D, ruch z kr:NNN.w+1 rusza w dobie D+1 (pamiec od D).
+- Nie zrobione w K0 (dalej "akcja jeszcze niewspierana"): gold, band, task, tourney, security, loyalty, pop, ware, garrison, muster, wound, skill, item, clan, court,
+  lead, prisoner, free, wander, die, marry, wed, succeed, own, ruler, leader, alliance, truce; wyzwalacz brokenmen (045). ApplyAction gotowe dla clan/court/lead/
+  prisoner/free/wander/die/marry/wed - podpiecie w Actions.Impl wymaga kontroli z FORMAT 8 (postac z wierszami #move - tylko para) i 11 (die glowy rodu w lekka -
+  POMINIETA).
+- Testy: harness A4 (scratchpad 7aee5f12/kr-a4/harness) 43/43 - parser (m11/m20/m21 = hide, p09 remove, 0 zlych wierszy), zapis hid tam i z powrotem, ApplyAction
+  bez postaci, Resolved (okno, =x, inna opcja nigdy, pominiete nigdy, nieznane falsz), TermTrue +N od dnia okna, klucz NIE = nigdy (takze z pamiecia), Fires(m22)
+  "zaszlo kr:008.1+1", 008.1 pominiete -> m22 nie odpala, ale nie "nigdy", hide/unhide - zle argumenty i klucz swiata; Guarded = PROTECTED (0 roznic). Stare
+  harnessy: A1 42/42, A2 35/35, A3 44/44. Progi: test_kw.py 35/35 (log dobry bez NIE, kazdy KW-0..KW-15 z logiem zlym = NIE, log bez Kroniki i klucz NIE - INFO).
+  wgraj-v5.ps1 -DryRun na drzewie kronika-k0: kod 0, 293 ogg + manifest "bylaby podmiana"; drzewo probne: ogg z zerami na koncu / w naglowku = STOP (kod 2),
+  Nameplate/*.xml w tabeli; lista plikow bieg-bitwa.ps1 (fragment uruchomiony osobno): 293 ogg, manifest, 58 wav. kronika_check: WYNIK OK.
+**Status:** DO SPRAWDZENIA (autotest K0a/K0b/K0c przed wgraniem; nic nie wgrane).
+
 ## 2026-10-21 - K0 krok A3: lektor okien Kroniki (klucz, zasada md5, .ogg) i obrazki z puli tematu
 
 **Problem:** okna Kroniki (A2) pokazywaly sie bez glosu (Lektor szukal nagran tylko po tytule i tylko w .wav - 293 nagrania kr_*.ogg z manifestem
