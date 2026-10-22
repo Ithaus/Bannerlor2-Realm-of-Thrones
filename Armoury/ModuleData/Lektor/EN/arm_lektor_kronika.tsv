@@ -119,6 +119,7 @@ kr_049_2a	Alayne at the Moon Door	kr_049_2a.ogg	87b4f282a016d9a6f7c99c589b5e4631
 kr_050_1	The Red Viper Comes to Court	kr_050_1.ogg	f5da56dd5d5e9db72de6e6f485188d5c	aecdf4bdae3c2e19683c3b7968af0796	arm_kronika_k05.tsv
 kr_050_2	A Champion for the Imp	kr_050_2.ogg	82d7552be96d9dd0ef4ecaa70c47cf4f	61b481de6d717f29dbbd1386aeb77e28	arm_kronika_k05.tsv
 kr_051_1	A Boy King in the Great Sept	kr_051_1.ogg	2f997259483da22187f0343325e2a64c	303683e0d76b7bec05579e4b0acd343c	arm_kronika_k05.tsv
+kr_051_1a	A Boy King in the Great Sept	kr_051_1a.ogg	f2407d9b2766f5cabd037e9f196a87cf	b055bb67b0b1381dd0ea8b1e9ef9ddce	arm_kronika_k05.tsv
 kr_051_2	The Rose Weds the Stag	kr_051_2.ogg	9b93a8fd13b24ede48ec930af75b971b	766072c02977c9ba8521e1c90f24fdd1	arm_kronika_k05.tsv
 kr_052_1	A Crossbow in the Privy	kr_052_1.ogg	0adf937b4347688f0a4686ff90970c58	6ebed76e5f86bf0d96cda6efe8e95a3e	arm_kronika_k05.tsv
 kr_052_2	Painted Eyes in the Great Sept	kr_052_2.ogg	1cacad89cac07d3bb5bd83ad1af14fe0	f842eb01e49e1c3d0afc654d2f7f1a5a	arm_kronika_k05.tsv
@@ -187,7 +188,7 @@ kr_074_1b	The Pink Letter	kr_074_1b.ogg	5b40016fcb08d89b125975f1ee84f42c	7aef02c
 kr_075_1	Masks of the Harpy	kr_075_1.ogg	a13f21d00a89302057b9d3b5b8d4450c	ab0bea2c0de0a3ed4b97c9a691cff416	arm_kronika_k07.tsv
 kr_075_2	A Wedding for Peace	kr_075_2.ogg	780c66a4e9c828a9b9447ca6eb448661	cebb2a5453e0c84db7a81d225a19e0d5	arm_kronika_k07.tsv
 kr_075_2a	A Peace Without a Husband	kr_075_2a.ogg	368e44d6da9cfa126b93ed00f40e7b6d	2f5a0adccfde19cdc9ad56807166b4e8	arm_kronika_k07.tsv
-kr_075_3	The Prince and the Dragons	kr_075_3.ogg	nieaktualne	17a39c6bbd5076f61aa94347435b654d	arm_kronika_k07.tsv
+kr_075_3	The Prince and the Dragons	kr_075_3.ogg	70a66a8f7f65667fc80f0284d813af49	17dd3e28bc62656450225d52128c7bd2	arm_kronika_k07.tsv
 kr_076_1	The Butcher King of Astapor	kr_076_1.ogg	0385aa9f1e3ae0249993be3d995aeb6b	27443a952d52e9cf9397e2de2eadc632	arm_kronika_k07.tsv
 kr_076_2	The Pale Mare	kr_076_2.ogg	423fb5d2a93629cec94b54bc7c1820a6	9c6de1113fc65fc951cbf9098ac3338f	arm_kronika_k07.tsv
 kr_081_1	Snow and Fire	kr_081_1.ogg	8f4a71175edc048ffd0750f6d6fb0706	995396a99346ef760b0478098171a0f5	arm_kronika_k07.tsv
@@ -215,15 +216,15 @@ kr_077_2a	The Walk of Atonement	kr_077_2a.ogg	f744a42d114de71f114b538e0ac4d34e	e
 kr_078_1	Dragon over Daznak's Pit	kr_078_1.ogg	b9b936fa82353ef628aec7191d49d879	359dcdd378d63492026dbccd41f40d6e	arm_kronika_k08.tsv
 kr_078_2	The Old Knight Takes the City	kr_078_2.ogg	a84842db098f9dac2b1e5611c839127e	181aedbd1e4aaa76caa8f80b6cfc29fd	arm_kronika_k08.tsv
 kr_078_2a	The Old Knight Takes the City	kr_078_2a.ogg	11d59a3c56ddfe0c6bdc2d8b18a1a4bd	aa54e44117242e035152d853a5a0f404	arm_kronika_k08.tsv
-kr_079_1	The Golden Company Sails	kr_079_1.ogg	nieaktualne	b25a927da8155412896c0b84663bd14f	arm_kronika_k08.tsv
+kr_079_1	The Golden Company Sails	kr_079_1.ogg	e4c7e7440785166aa30b36ef624d9424	931543267dc95025330b82a00312b3ce	arm_kronika_k08.tsv
 kr_079_2	A Fleet Beyond the Sea	kr_079_2.ogg	68688cb705ae80a9d15f447a2db66314	887ed922bfb87499ea004956eab12aa7	arm_kronika_k08.tsv
 kr_088_1	Hodor's Door	kr_088_1.ogg	9e5efe161292f9b21bcbe0e73b70f00a	a8aca350cbf9201d99f202945f11323d	arm_kronika_k08.tsv
 kr_088_2	The Rider in the Woods	kr_088_2.ogg	516b3c83e88cb8874290f07f23df0e5c	922d24948a32270068d3472588c14a6f	arm_kronika_k08.tsv
 kr_088_2a	The Rider in the Woods	kr_088_2a.ogg	794062411784f9d355f03ab0e9648022	50930a478e27b004a4c31fb812f0e2a7	arm_kronika_k08.tsv
 kr_089_1	The Hound Returns	kr_089_1.ogg	8e079db350cadcef46b58178157c24d6	04ac425d00a9fe4b3b614dad212331e2	arm_kronika_k08.tsv
 kr_089_1a	The Hound Returns	kr_089_1a.ogg	36044281ce93c2e20c1da62423c5e783	84678c94813e23dbd708e500c3935d77	arm_kronika_k08.tsv
-kr_090_1	Heartsbane	kr_090_1.ogg	nieaktualne	1f7a896507d74b1ea5543471ee0a327d	arm_kronika_k08.tsv
-kr_090_1a	Heartsbane	kr_090_1a.ogg	nieaktualne	394e7dc20c99d7770b960c4c0ca74701	arm_kronika_k08.tsv
+kr_090_1	Heartsbane	kr_090_1.ogg	e1544d843a145ad71fd92ee512b49814	8b122613b268a6e7cc286a69babd1e10	arm_kronika_k08.tsv
+kr_090_1a	Heartsbane	kr_090_1a.ogg	e1a2ee2eb31cdfd5bdb8045d03208951	8b936bf9a55093124dec6113ca95ca6a	arm_kronika_k08.tsv
 kr_091_1	A Letter to the Vale	kr_091_1.ogg	30951ff1950d149fec4a84a0adb67ca0	316b79b212947e380c8f4c399aab690a	arm_kronika_k08.tsv
 kr_091_1a	The Knights of the Vale	kr_091_1a.ogg	9354b76f63fb2c3316d2720a13a29d9f	259fae72e3d6727bfc83c236d9fac0d5	arm_kronika_k08.tsv
 kr_092_1	The Stag in the Ashes	kr_092_1.ogg	ce56cb142ee189f10bd6bfb20784248c	7e84c2d3323611471f09691e97c1926e	arm_kronika_k08.tsv
