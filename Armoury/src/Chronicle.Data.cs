@@ -652,8 +652,20 @@ namespace Armoury
                     for (int j = w.Variants.Count - 1; j >= 0; j--)
                     {
                         var v = w.Variants[j];
-                        if (v.Title.Length == 0 && v.Upper.Length == 0 && v.Lower.Length == 0) { v.Title = m.Title; v.Upper = m.Upper; v.Lower = m.Lower; }
+                        if (v.Title.Length == 0 && v.Upper.Length == 0 && v.Lower.Length == 0)
+                        {
+                            v.Title = m.Title; v.Upper = m.Upper; v.Lower = m.Lower;
+                            // recenzja K0 (R-4): tekst glownego z {ZMIENNYMI} potrzebuje zmiennych glownego (045.1a/b/c: "villages around  more than once");
+                            // zmienna o tej samej nazwie we wlasnej kolumnie wariantu ma pierwszenstwo
+                            foreach (var mv in m.Vars)
+                            {
+                                bool own = false;
+                                foreach (var x in v.Vars) if (x.Name == mv.Name) { own = true; break; }
+                                if (!own) v.Vars.Add(mv);
+                            }
+                        }
                         if (v.Topic.Length == 0) v.Topic = m.Topic;
+                        if (v.Player.Length == 0) v.Player = m.Player;   // recenzja K0 (R-3): pusty gracz wariantu = gracz glownego (FORMAT 3.1; 105.1a, 073.1a/b)
                         string why = null;
                         if (v.Shows && (v.Title.Length == 0 || v.Upper.Length == 0 || v.Lower.Length == 0)) why = "forma okno bez tytulu, gory albo dolu (wlasnych albo z wiersza glownego)";
                         else if (v.NeedsNews && NewsRaw(v) == null) why = "forma wiesc bez tekstu " + v.Key + "_W ani " + w.Id + "_W w #tekst";
@@ -839,7 +851,7 @@ namespace Armoury
                 Scan(r.Po, r, "po");
                 Scan(r.Przed, r, "przed");
                 Scan(r.Cond, r, "warunki");
-                Scan(r.Player, r, "gracz");
+                if (r.IsMain || r.Window == null || !ReferenceEquals(r.Player, r.Window.Main.Player)) Scan(r.Player, r, "gracz");   // R-3: gracz dziedziczony - liczony raz
                 foreach (var o in r.Options) Scan(o.Avail, r, "dostepna " + o.Letter);
             }
 

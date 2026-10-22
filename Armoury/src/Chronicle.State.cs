@@ -25,7 +25,8 @@ namespace Armoury
             private static readonly Dictionary<string, string> _skip = new Dictionary<string, string>(StringComparer.Ordinal);  // id -> "dzien|powod"
             private static readonly Dictionary<string, char> _choice = new Dictionary<string, char>(StringComparer.Ordinal);    // id (NNN.w) -> opcja a-d
             private static readonly HashSet<string> _flags = new HashSet<string>(StringComparer.Ordinal);
-            private static readonly Dictionary<string, int> _inst = new Dictionary<string, int>(StringComparer.Ordinal);        // NNN.w -> pierwszy dzien instancji (bez zapisu)
+            private static readonly Dictionary<string, int> _inst = new Dictionary<string, int>(StringComparer.Ordinal);        // NNN.w -> pierwszy dzien instancji (zapis "ki" - recenzja R7)
+            private const int SkipWhyInst = 24, SkipWhyWin = 60;   // recenzja R8: powod w zapisie skrocony (pelny w linii POMINIETE logu; SkipWhy nikt nie czyta)
 
             internal static int Resolved { get { return _res.Count; } }
             internal static int Skipped { get { return _skip.Count; } }
@@ -44,11 +45,15 @@ namespace Armoury
                 NoteInstance(id, day);
             }
 
-            /// <summary>Okno pominiete z powodem (POMINIETE) - kr: tego okna nigdy nie zajdzie. Okno juz rozstrzygniete nie przechodzi w pominiete.</summary>
+            /// <summary>Okno pominiete z powodem (POMINIETE) - kr: tego okna nigdy nie zajdzie. Okno juz rozstrzygniete nie przechodzi w pominiete.
+            /// Powod w zapisie skrocony (instancja NNN.w#klucz najwyzej SkipWhyInst znakow, okno SkipWhyWin) - pelny jest w linii logu (recenzja R8: rozmiar zapisu).</summary>
             internal static void Skip(string id, int day, string why)
             {
                 if (string.IsNullOrEmpty(id) || _res.ContainsKey(id) || _skip.ContainsKey(id)) return;
-                _skip[id] = day.ToString(Inv) + "|" + Clean(why);
+                string w = Clean(why);
+                int max = id.IndexOf('#') > 0 ? SkipWhyInst : SkipWhyWin;
+                if (w.Length > max) w = w.Substring(0, max);
+                _skip[id] = day.ToString(Inv) + "|" + w;
             }
 
             /// <summary>Wybor opcji (takze bierna bez pytania) - zapisywany pod id okna NNN.w (KRONIKA-FORMAT 4). Raz.</summary>
@@ -112,7 +117,9 @@ namespace Armoury
             }
 
             /// <summary>A2: rejestr kluczy instancji okien powracajacych (NNN.w#klucz, rozstrzygniete i pominiete) najwyzej keep - najstarsze (dzien) wypadaja.
-            /// Zwraca liczbe usunietych. Limit instancji (max:N) liczy Chronicle.Recurring osobno (licznik w zapisie), wiec usuniecie klucza go nie zeruje.</summary>
+            /// Zwraca liczbe usunietych. Limit instancji (max:N) liczy Chronicle.Recurring osobno (licznik w zapisie), wiec usuniecie klucza go nie zeruje.
+            /// Recenzja K0: wybor instancji (kc) wypada razem z kluczem (N-1 - inaczej rosl bez konca); pierwszy dzien instancji okna (_inst, kr:NNN.w i +N)
+            /// zostaje - jest w zapisie "ki" (R7), wiec kr:112.1 po przycieciu dalej prawdziwe.</summary>
             internal static int PruneInstances(int keep)
             {
                 var all = new List<KeyValuePair<string, int>>();
@@ -127,7 +134,7 @@ namespace Armoury
                 if (all.Count <= keep) return 0;
                 all.Sort((a, b) => a.Value.CompareTo(b.Value));
                 int n = all.Count - keep;
-                for (int i = 0; i < n; i++) { _res.Remove(all[i].Key); _skip.Remove(all[i].Key); }
+                for (int i = 0; i < n; i++) { _res.Remove(all[i].Key); _skip.Remove(all[i].Key); _choice.Remove(all[i].Key); }
                 return n;
             }
 
@@ -146,18 +153,20 @@ namespace Armoury
                 return s.Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ').Replace('|', '/');
             }
 
-            /// <summary>Linie zapisu: kr id dzien forma wiersz | ks id dzien|powod | kc id opcja | kf flaga.</summary>
+            /// <summary>Linie zapisu: kr id dzien forma wiersz | ks id dzien|powod | kc id opcja | kf flaga | ki NNN.w dzien (pierwsza instancja okna powracajacego).</summary>
             internal static string Export()
             {
-                var sb = new StringBuilder(64 * (_res.Count + _skip.Count) + 16 * (_choice.Count + _flags.Count));
+                var sb = new StringBuilder(64 * (_res.Count + _skip.Count) + 16 * (_choice.Count + _flags.Count + _inst.Count));
                 foreach (var kv in _res) sb.Append("kr\t").Append(kv.Key).Append('\t').Append(kv.Value.Day.ToString(Inv)).Append('\t').Append(kv.Value.Form).Append('\t').Append(kv.Value.Row).Append('\n');
                 foreach (var kv in _skip) sb.Append("ks\t").Append(kv.Key).Append('\t').Append(kv.Value).Append('\n');
                 foreach (var kv in _choice) sb.Append("kc\t").Append(kv.Key).Append('\t').Append(kv.Value).Append('\n');
                 foreach (var f in _flags) sb.Append("kf\t").Append(f).Append('\n');
+                foreach (var kv in _inst) sb.Append("ki\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');   // R7
                 return sb.ToString();
             }
 
-            /// <summary>Wczytanie: Reset, potem linie z prefiksami kr/ks/kc/kf (inne pomijane). Pusty napis (zapis sprzed Kroniki) - stan pusty.</summary>
+            /// <summary>Wczytanie: Reset, potem linie z prefiksami kr/ks/kc/kf/ki (inne pomijane). Pusty napis (zapis sprzed Kroniki) - stan pusty.
+            /// ki (recenzja R7) - pierwszy dzien instancji okna przetrwa przyciecie rejestru; zapis bez "ki" - _inst jak dotad z ocalalych kr.</summary>
             internal static void Import(string s)
             {
                 Reset();
@@ -179,6 +188,13 @@ namespace Armoury
                         case "ks": if (p.Length >= 3) _skip[p[1]] = p[2]; break;
                         case "kc": if (p.Length >= 3 && p[2].Length == 1 && p[2][0] >= 'a' && p[2][0] <= 'd') _choice[p[1]] = p[2][0]; break;
                         case "kf": _flags.Add(p[1]); break;
+                        case "ki":
+                            {
+                                int old;
+                                if (p.Length >= 3 && p[1].IndexOf('#') < 0 && int.TryParse(p[2], NumberStyles.AllowLeadingSign, Inv, out d) && (!_inst.TryGetValue(p[1], out old) || d < old))
+                                    _inst[p[1]] = d;
+                                break;
+                            }
                     }
                 }
             }

@@ -42,7 +42,9 @@ namespace Armoury
         internal const int MaxRecurringPerDay = 1;    // instancji okien powracajacych na dobe
         internal const int RecurringKeys = 400;       // rejestr kluczy instancji w zapisie
         private const string SaveKey = "arm_kronika";
-        private const int SaveWarnBytes = 24 * 1024;
+        // recenzja K0 (R-16): 48 KB - dluga kampania (rejestr 400 kluczy instancji + ok. 210 okien + flagi + pamiec termow) to szacunkowo 30-40 KB po skroceniu
+        // powodow (R8) i przycinaniu wyborow (N-1); SaveText.Sync tnie napis na kawalki po 8000 znakow, wiec limit napisu 32 KB nie peka - prog to zapas
+        private const int SaveWarnBytes = 48 * 1024;
         private const int OpenFailsMax = 3;
         private const int WaitShown = 6;              // ile okien czekajacych z powodem w linii doby
         private static readonly long CheckTicks = Stopwatch.Frequency / 4;
@@ -92,6 +94,7 @@ namespace Armoury
         private static bool _rotWasOn;
         private static double _rotClosedHour = -1e9;
         private static int _saveBytes;
+        private static string _lastGood;   // recenzja K0 (R4): ostatni dobry napis stanu (zapis albo wczytanie) - zapas, gdy Build rzuci przy zapisie
         // liczniki doby
         private static int _dShown, _dNews, _dSkipped, _dLog, _dNothing, _dFails;
 
@@ -109,6 +112,7 @@ namespace Armoury
             _open = null; _openFails = 0; _openFailId = null;
             _okSince = 0; _closedAt = 0; _rotWasOn = false; _rotClosedHour = -1e9;
             _saveBytes = 0;
+            _lastGood = null;
             StumblesDay = 0;
             DayReset();
             Choice.Reset();
@@ -163,7 +167,9 @@ namespace Armoury
                 foreach (var w in Data.Windows)
                 {
                     if (w.Pack != p || w.Recur != null || State.IsDone(w.Id)) continue;
-                    bool gone = (w.Do >= 0 && sd > Terms.DocToStory(w.Do)) || (w.Od > 0 && sd > Terms.DocToStory(w.Od) + MaxLate);
+                    // recenzja K0 (R-5, plan C): okno z do - minione, gdy dzien opowiesci po do; bez do - gdy od minal o ponad MaxLate (dawniej od + MaxLate
+                    // pomijalo tez okna z do jeszcze przed soba)
+                    bool gone = w.Do >= 0 ? sd > Terms.DocToStory(w.Do) : (w.Od > 0 && sd > Terms.DocToStory(w.Od) + MaxLate);
                     if (!gone) continue;
                     Skip(w.Id, "zapis sprzed paczki " + p.Name);
                     n++;
@@ -247,7 +253,7 @@ namespace Armoury
         {
             int day = Day();
             try { Terms.Daily(); } catch (Exception e) { Stumble("Daily.Terms", e); }
-            try { Actions.HiddenDaily(day, KeyOn); } catch (Exception e) { Stumble("Daily.Hidden", e); }   // A4: koniec ukrycia (klucz NIE - tylko porzadek rejestru)
+            try { Actions.HiddenDaily(day); } catch (Exception e) { Stumble("Daily.Hidden", e); }   // A4: koniec ukrycia (klucz NIE: kr: = nigdy - recenzja R-1)
             try { Actions.WorldDaily(day); } catch (Exception e) { Stumble("Daily.World", e); }           // B2: bandy, zadania, zbiorki (klucz NIE nic nie cofa)
             if (!KeyOn)
             {
@@ -718,15 +724,24 @@ namespace Armoury
 
         // ---------------------------------------------------------------- zapis (ChronicleBehavior.SyncData)
 
-        /// <summary>Zapis gry (SyncData): caly stan Kroniki + linia "zapis arm_kronika n KB" (prog KW-12: ponizej 24 KB).</summary>
+        /// <summary>Zapis gry (SyncData): caly stan Kroniki + linia "zapis arm_kronika n KB" (prog KW-12: ponizej 48 KB).</summary>
         internal static string Export()
         {
             string s = Build();
+            _lastGood = s;
             _saveBytes = Encoding.UTF8.GetByteCount(s);
             Log.Info(Tag + "zapis arm_kronika " + (_saveBytes / 1024.0).ToString("0.0", Inv) + " KB" + (_saveBytes > SaveWarnBytes ? " - PONAD " + (SaveWarnBytes / 1024) + " KB (prog KW-12)" : "")
                      + " | rozstrzygniete " + State.Resolved + ", pominiete " + State.Skipped + ", czeka na wybor " + Choice.Count + ", akcje czekaja " + Actions.WaitCount
                      + ", instancje w kolejce " + Recurring.QueueCount + ", pamiec termow " + Terms.FirstCount + ".");
             return s;
+        }
+
+        /// <summary>Recenzja K0 (R4): wyjatek w Export (Build) - zapis dostaje ostatni dobry stan (z poprzedniego zapisu albo wczytania) zamiast pustego napisu
+        /// (pusty = po wczytaniu Import("") i stan od zera: okna z ostatnich 30 dni i przyszle wracaja, liczniki max:N, bandy, zadania i zbiorki od zera).</summary>
+        internal static string LastGood()
+        {
+            Log.Info(Tag + "zapis arm_kronika: blad Build - " + (_lastGood != null ? "ostatni dobry stan (" + (Encoding.UTF8.GetByteCount(_lastGood) / 1024.0).ToString("0.0", Inv) + " KB)" : "brak dobrego stanu - pusty") + ".");
+            return _lastGood ?? "";
         }
 
         /// <summary>Caly stan Kroniki jako linie z prefiksami (State kr/ks/kc/kf, Terms tf, silnik kv/kp/kn, Choice ka, Actions kw, Recurring kq/kl/kt/ko/kh).</summary>
@@ -750,6 +765,7 @@ namespace Armoury
             ResetCampaign();
             if (string.IsNullOrEmpty(s)) return;
             _saveBytes = Encoding.UTF8.GetByteCount(s);
+            _lastGood = s;
             State.Import(s);
             Terms.Import(s);
             foreach (var raw in s.Split('\n'))
@@ -803,15 +819,19 @@ namespace Armoury
 
         public override void SyncData(IDataStore dataStore)
         {
-            string v = null;
-            try { if (dataStore.IsSaving) v = Chronicle.Export(); }
-            catch (Exception e) { Chronicle.Stumble("Export", e); v = ""; }
-            SaveText.Sync(dataStore, "arm_kronika", ref v);
-            if (dataStore.IsLoading)
+            try   // recenzja K0 (R5): cale cialo w try jak CanonCompanionsBehavior/ArmouryBehavior - wyjatek SaveText.Sync nie wychodzi do zapisu gry
             {
-                try { Chronicle.Import(v); }
-                catch (Exception e) { Chronicle.Stumble("Import", e); }
+                string v = null;
+                try { if (dataStore.IsSaving) v = Chronicle.Export(); }
+                catch (Exception e) { Chronicle.Stumble("Export", e); v = Chronicle.LastGood(); }   // R4: ostatni dobry stan zamiast pustego
+                SaveText.Sync(dataStore, "arm_kronika", ref v);
+                if (dataStore.IsLoading)
+                {
+                    try { Chronicle.Import(v); }
+                    catch (Exception e) { Chronicle.Stumble("Import", e); }
+                }
             }
+            catch (Exception e) { Chronicle.Stumble("SyncData", e); }
         }
     }
 }
