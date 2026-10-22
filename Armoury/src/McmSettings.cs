@@ -1912,6 +1912,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int MapRoadSpeedPercent { get; set; } = 15;
 
+        [SettingPropertyBool("Map Road Bonus Above Floor", HintText = "with Map Road Speed Bonus: the road bonus is applied to the party's speed after the game's minimum speed floor, so a very slow party on a road still moves faster than off it. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadBonusAboveFloor { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Map Road Margin", 0.00f, 2.00f, "0.00", HintText = "how far beyond the painted edge of a road (in map units) a party still counts as on it when Map Road Wide Field is off - the road paint is coarse and party paths never follow it exactly (0.4 = about two kilometres; at most 2)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public float MapRoadMargin { get; set; } = 0.40f;
@@ -2599,6 +2603,10 @@ namespace Armoury
         [SettingPropertyBool("Village Cart Whole Store", HintText = "villagers setting out for a town market take the whole village storehouse every time - the district hires as many carts as the load needs, so a heavy load (ore, timber) neither stays behind nor slows the train; a journey counts as free only while they are back before the storehouse holds the next load (five days of the village's output, waits in town and at home included) - every day beyond that earns less, and a full storehouse stops all village work, food too. Takes the place of Village Cart Full Load Far (needs Village Carts Best Market; off = the game's three fifths of each stack, a full cart only for a long road)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartWholeStore { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Gold Aware", HintText = "with Village Cart Road News: village carts also count the gold that carts already on their way to a town will take from its merchants, so they do not all head for the same town and come back with goods its merchants could not pay for. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartGoldAware { get; set; } = true;
 
         [SettingPropertyBool("Village Cart Road News", HintText = "villagers know what other carts are already hauling to a town and count it as if it were on the stalls, so they do not all drive their loads to the same empty market (needs Village Carts Best Market)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
@@ -6668,6 +6676,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int CrownSurplusAidDays { get; set; } = 30;
 
+        [SettingPropertyBool("Crown Hoard Feeds Hungry", HintText = "the crown's treasury above its war reserve (kept for wars and hard times) feeds the realm's hungry towns: bread for the poor that neither the day's crown income nor the lord could pay, and the food bills of the realm's towns older than the early repayment age (Ks Lord Food Bills Early Share) that neither the town nor its lord can pay. Each day at most one part in Crown Surplus Aid Days of that surplus, shared by both. Never from loans, never below the war reserve, never the treasury of a realm you rule. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownHoardFeedsHungry { get; set; } = true;
+
         [SettingPropertyBool("Crown War Aid Middle", HintText = "in war the realm's treasury also helps the houses of modest means, not only the poor: above the crown's war aid by need (which keeps companies up to Crown War Aid Fill Target of their size), the treasury pays a share of the wages a house still lacks for its companies up to their full size - the whole lack while the house's gold is below its war reserve, a smaller share the richer the house, and nothing above twice the reserve (the same measure of need as the wage refund and the fief rents). Paid only from what the treasury holds above its war reserve and its debts, together with Crown Surplus Feeds Need Aid never more in a day than one part in Crown Surplus Aid Days of that surplus; coin only for men already in the companies, and room in the wage ceiling to recruit a step more. Never in peace, never to a house with spare room under its own ceiling or that paid scutage that day, and these wages are not repaid by the crown a second time. Your house the same way. Needs Crown Surplus Feeds Need Aid. Off = the crown helps only up to Crown War Aid Fill Target, as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidMiddle { get; set; } = true;
@@ -8508,6 +8520,10 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool KsFarmSurplusCapNet { get; set; } = true;
 
+        [SettingPropertyBool("Ds Farm Cut Below Reserve", HintText = "with Ks Farm Surplus Cap Net: when a town's merchants' purse, after what it already owes, falls below their working stock, or the town is behind on its dues, its lord's and crown's yearly due drops at once to what the town actually earns (a year of the merchants' recent daily takings), instead of waiting two weeks and cutting a quarter at a time. At most once per weekly instalment; between one and one and a half times the working stock the slower cut stays. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmCutBelowReserve { get; set; } = true;
+
         [SettingPropertyBool("Ds Farm Fix Share Cap", HintText = "with Ds Towns: when the farms of towns and castles are set after the measuring weeks, all farms paid from the purse together are set no higher than what the merchants took in over those weeks - if the old dues took more, every farm is lowered by the same share (each place keeps its rank, also a place whose merchants took in nothing in those weeks), and a place still above its own takings is brought down later by the farm reviews. Off = the farm is what the old dues took, as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsFarmFixShareCap { get; set; } = true;
@@ -9633,6 +9649,7 @@ namespace Armoury
             s.MarchPackAllowance = MarchPackAllowance;
             s.MapRoadSpeedBonus = MapRoadSpeedBonus;
             s.MapRoadSpeedPercent = MapRoadSpeedPercent;
+            s.MapRoadBonusAboveFloor = MapRoadBonusAboveFloor;
             s.MapRoadMargin = MapRoadMargin;
             s.MapRoadWideField = MapRoadWideField;
             s.MapRoadWideMargin = MapRoadWideMargin;
@@ -9805,6 +9822,7 @@ namespace Armoury
             s.RiverBarges = RiverBarges;
             s.VillageCartFullLoadFar = VillageCartFullLoadFar;
             s.VillageCartWholeStore = VillageCartWholeStore;
+            s.VillageCartGoldAware = VillageCartGoldAware;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
             s.CastleMarketFirst = CastleMarketFirst;
@@ -10822,6 +10840,7 @@ namespace Armoury
             s.NeedAidFromRents = NeedAidFromRents;
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
+            s.CrownHoardFeedsHungry = CrownHoardFeedsHungry;
             s.CrownWarAidMiddle = CrownWarAidMiddle;
             s.CrownWarAidCashByNeed = CrownWarAidCashByNeed;
             s.ScutageByNeed = ScutageByNeed;
@@ -11282,6 +11301,7 @@ namespace Armoury
             s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
             s.KsFarmCatchUpOneOff = KsFarmCatchUpOneOff;
             s.KsFarmSurplusCapNet = KsFarmSurplusCapNet;
+            s.DsFarmCutBelowReserve = DsFarmCutBelowReserve;
             s.DsFarmFixShareCap = DsFarmFixShareCap;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;

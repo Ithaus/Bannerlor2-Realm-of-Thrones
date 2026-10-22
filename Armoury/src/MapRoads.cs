@@ -371,6 +371,8 @@ namespace Armoury
         // ------------------------------------------------------------------ sciezka predkosci (watki robocze gry)
         /// <summary>MarchPace.SpeedPostfix (po suficie kolumny, ten sam poziom lancucha): partia ladowa na drodze +x% wyniku jako "Road" i sufit LimitMax
         /// w gore o ten sam procent (jak TownInns.SpeedBonus). Zapisuje stan drogi uzyty w tym liczeniu do pamieci partii (postfiks pamieci gry).</summary>
+        internal static long _floorBonus;   // m105 G3: liczenia predkosci z premia od podlogi gry (watki robocze - Interlocked; tylko licznik, zeruje linia VR)
+
         internal static void SpeedRoad(MobileParty mp, ref ExplainedNumber r)
         {
             if (_suppress) return;
@@ -409,6 +411,15 @@ namespace Armoury
                 if (res <= 0f) return;
                 float f = 1f + r.SumOfFactors;
                 float add = res * pct;
+                // m105 G3 (Map Road Bonus Above Floor): premia od predkosci PO podlodze gry - wynik bez podlogi (podstawa x czynniki) ponizej LimitMin dostawal res x pct
+                // dodane do wyniku bez podlogi, a podloga ja zjadala (VR-3 24.98 / 24.26%). Dodatek do wyniku bez podlogi tak, zeby wynik z premia = max(wynik, podloga) x (1 + pct);
+                // nigdy mniej niz dotad (res x pct). Partia ponad podloga - bez zmiany (u = res)
+                if (s.MapRoadBonusAboveFloor)
+                {
+                    float u = r.BaseNumber * f;
+                    float need = Math.Max(res, r.LimitMinValue) * (1f + pct) - u;
+                    if (need > add + 1e-5f) { add = need; System.Threading.Interlocked.Increment(ref _floorBonus); }
+                }
                 r.Add(f > 0.01f ? add / f : add, txt);
                 float lim = r.LimitMaxValue;
                 if (lim > 0f && lim < float.MaxValue * 0.5f) r.LimitMax(lim * (1f + pct) + 0.001f);   // zapas 0.001 - bez linii "Maximum -0.00"

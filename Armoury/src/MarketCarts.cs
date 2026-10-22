@@ -59,7 +59,7 @@ namespace Armoury
         internal sealed class Snap { public Town Town; public int Gold; public EquipmentElement[] El; public int[] N; public Dictionary<ItemCategory, ItemData> Market; }
 
         /// <summary>Wiesc z drogi: dokad jedzie woz i ile wartosci towaru (Item.Value x sztuki - jednostka polki; paczka 121: waga sztuki) wiezie w kazdej kategorii.</summary>
-        private sealed class Haul { public Town To; public Dictionary<ItemCategory, int> Value; public double Day; }
+        private sealed class Haul { public Town To; public Dictionary<ItemCategory, int> Value; public double Day; public long Gold; }   // m105 G4: Gold - wycena kursu przy wyborze (rezerwacja kasy celu)
 
         private sealed class Cand { public Town T; public float D; public double Rate; public double Ub; public List<Line> Load; public bool Full; public Dictionary<ItemCategory, int> News; public float D0; public bool Byp; }   // f19-e2: D0 - odleglosc przed obcieciem do 0, Byp - wlasne miasto mimo d <= 0 albo poza zasiegiem
 
@@ -90,6 +90,9 @@ namespace Armoury
         // ------------------------------------------------------------ stan kampanii
         private static readonly Dictionary<MobileParty, Haul> _hauls = new Dictionary<MobileParty, Haul>();
         private static readonly Dictionary<Town, Dictionary<ItemCategory, int>> _news = new Dictionary<Town, Dictionary<ItemCategory, int>>();
+        // m105 G4 (Village Cart Gold Aware): zloto kas miast zarezerwowane przez wozy w drodze (suma Haul.Gold) i liczniki doby linii "Dowoz (wozy)"
+        private static readonly Dictionary<Town, long> _gold = new Dictionary<Town, long>();
+        private static int _gNew, _gChanged, _gExpired;
 
         // ------------------------------------------------------------ liczniki doby (linia "Dowoz (wozy):")
         private static int _dec, _decCastle, _toOwn, _toOther, _noTown, _inTown, _full, _fullUnits, _ownN, _oreCarts, _oreToEmpty, _evals, _stumbles;
@@ -108,6 +111,7 @@ namespace Armoury
         internal static void Reset()
         {
             _hauls.Clear(); _news.Clear(); _errSites.Clear(); _last.Clear();   // f19-e2: _last - pomiar ostatniego wyboru
+            _gold.Clear(); _gNew = _gChanged = _gExpired = 0;                  // m105 G4
             _absUsed.Clear(); _absDay = -1; Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2); _zMis = 0;   // ZC1
             ClearDay();
         }
@@ -119,7 +123,17 @@ namespace Armoury
             _oreTowns.Clear();
             _fairN = _mismatch = _rising = _fairMax = 0; _fairFirst = _fairPaid = 0;
             _wholeKg = _wholeMaxKg = 0.0;
+            _gNew = _gChanged = _gExpired = 0;                                 // m105 G4: doba
         }
+
+        /// <summary>m105 G4: zloto kasy miasta `t` zarezerwowane przez wozy w drodze (0 - brak albo klucz wylaczony).</summary>
+        private static long Reserved(Town t)
+        {
+            long v;
+            return t != null && _gold.TryGetValue(t, out v) ? Math.Max(0, v) : 0;
+        }
+
+        private static bool GoldAware(Settings s) { return s != null && s.VillageCartGoldAware && s.VillageCartRoadNews; }
 
         /// <summary>Wyjatek przy jednym taborze: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
         private static void Stumble(string where, Exception e)
@@ -208,11 +222,20 @@ namespace Armoury
         /// </summary>
         internal static long Value(Town town, MobileParty cart, List<Line> load, bool fair, Dictionary<ItemCategory, int> news, bool bkRule)
         {
+            bool capped;
+            return Value(town, cart, load, fair, news, bkRule, 0, out capped);
+        }
+
+        /// <summary>m105 G4: wycena jak wyzej przy kasie miasta pomniejszonej o `reserved` (zloto, ktore wezma wozy juz jadace do tego miasta); capped - kasa ograniczyla
+        /// liczbe sprzedanych sztuk ktorejs pozycji (bez tego wycena bez rezerwacji bylaby taka sama).</summary>
+        internal static long Value(Town town, MobileParty cart, List<Line> load, bool fair, Dictionary<ItemCategory, int> news, bool bkRule, long reserved, out bool capped)
+        {
+            capped = false;
             var model = Campaign.Current.Models.TradeItemPriceFactorModel;
             var market = town.MarketData;
             var pack = CheapestPack(load);
             Dictionary<ItemCategory, int> added = null;
-            long gold = town.Gold, total = 0;
+            long gold = Math.Max(0L, (long)town.Gold - Math.Max(0L, reserved)), total = 0;
             for (int i = load.Count - 1; i >= 0; i--)
             {
                 var it = load[i].El.Item;
@@ -229,6 +252,7 @@ namespace Armoury
                 int p0 = Price(model, load[i].El, cart, inStore, d.Supply, d.Demand);
                 if (p0 <= 0) continue;
                 int sold = (int)Math.Min((long)n, gold / p0);
+                if (sold < n) capped = true;                                       // m105 G4: kasa (po rezerwacjach) ograniczyla sprzedaz
                 if (sold <= 0) continue;
                 gold -= (long)sold * p0;
                 if (fair)
@@ -480,13 +504,28 @@ namespace Armoury
                 if (cands.Count == 0) { _noTown++; NotePick(cart, null, -1f, false, 0, "bez miasta w zasiegu"); return null; }
                 cands.Sort((a, b) => a.Ub != b.Ub ? b.Ub.CompareTo(a.Ub) : a.D.CompareTo(b.D));
                 Cand best = null; double bestSc = 0.0; long bestVal = 0;
+                // m105 G4 (Village Cart Gold Aware): kasa kandydata minus zloto zarezerwowane przez inne wozy w drodze (wlasna rezerwacja zdjeta wyzej - Forget); best0 -
+                // wybor bez rezerwacji (tylko licznik "wybor zmieniony"; wycena bez rezerwacji tylko, gdy kasa po rezerwacjach ograniczyla sprzedaz). Gorna granica (Upper)
+                // bez limitu kasy - odciecie jak dotad (kandydaci z Ub >= wynik bez rezerwacji sa wycenieni)
+                bool ga = GoldAware(s);
+                Cand best0 = null; double bestSc0 = 0.0;
                 foreach (var c in cands)
                 {
                     if (best != null && c.Ub < bestSc) break;                          // gorna granica ponizej najlepszego - dalej juz nic
-                    long val = Value(c.T, cart, c.Load, fair, c.News, bk); _evals++;
+                    long resv = ga ? Reserved(c.T) : 0;
+                    bool capped;
+                    long val = Value(c.T, cart, c.Load, fair, c.News, bk, resv, out capped); _evals++;
                     double sc = val * c.Rate;
                     if (best == null || sc > bestSc || (sc == bestSc && c.D < best.D)) { best = c; bestSc = sc; bestVal = val; }
+                    if (ga)
+                    {
+                        long v0 = val;
+                        if (resv > 0 && capped) { bool c0; v0 = Value(c.T, cart, c.Load, fair, c.News, bk, 0, out c0); _evals++; }
+                        double sc0 = v0 * c.Rate;
+                        if (best0 == null || sc0 > bestSc0 || (sc0 == bestSc0 && c.D < best0.D)) { best0 = c; bestSc0 = sc0; }
+                    }
                 }
+                if (ga && best0 != null && !ReferenceEquals(best0, best)) _gChanged++;
                 // N2-E3 (noc-ekonomia2, klucz VillageFibreToMarket): woz z lnem, welna albo skorami surowymi, gdy zapas tego towaru wsi (juki + magazyn) przekracza
                 // FibreToMarket.FibreDays dob jej produkcji - do miasta targowego wsi (ownC), takze ponizej ceny bazowej; wycena ownC jak kazdego kandydata (Value).
                 // ownC juz najlepsze, poza kandydatami albo nic nie zaplaci - wybor jak dotad
@@ -496,7 +535,8 @@ namespace Armoury
                     int fu; double fd;
                     if (FibreToMarket.Wants(v, home, load, ownC != null, out fu, out fd))
                     {
-                        long ov = Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk); _evals++;
+                        bool ocap;
+                        long ov = Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk, ga ? Reserved(ownC.T) : 0, out ocap); _evals++;   // m105 G4: ta sama kasa po rezerwacjach
                         // licznik sztuk z ladunku miasta targowego (z doladowaniem TopUp, gdy pelny woz) - nie z samych juk (fu)
                         if (ov > 0) { FibreToMarket.NoteSent(cart, ownC.T.Settlement, castle, FibreToMarket.Units(ownC.Load), ov, bestVal); best = ownC; bestVal = ov; fibreSent = true; }
                         else FibreToMarket.NoteOwnZero();
@@ -514,7 +554,7 @@ namespace Armoury
                         if (whole) { double kg = cart.TotalWeightCarried; _wholeKg += kg; if (kg > _wholeMaxKg) _wholeMaxKg = kg; }
                     }
                 }
-                Note(cart, best.T, best.Load, bk);
+                Note(cart, best.T, best.Load, bk, bestVal);
                 // liczniki linii dobowej
                 _dec++; if (castle) _decCastle++;
                 if (own != null && best.T.Settlement == own) _toOwn++; else _toOther++;
@@ -522,7 +562,8 @@ namespace Armoury
                 if (ownC != null)
                 {
                     _ownN++; _sumOwnChosen += bestVal;
-                    _sumOwn += ReferenceEquals(ownC, best) ? bestVal : Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk);
+                    bool wcap;
+                    _sumOwn += ReferenceEquals(ownC, best) ? bestVal : Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk, ga ? Reserved(ownC.T) : 0, out wcap);   // m105 G4: jak wycena wyboru
                 }
                 OreNote(best.T, best.Load);
                 RiverBarges.NoteCartPick(home, best.T.Settlement, max > 0f && best.D0 > max && !best.Byp);   // R3-05b: licznik linii "Barki rzeczne" (wybor poza zasiegiem ladowym)
@@ -572,12 +613,12 @@ namespace Armoury
             return _news.TryGetValue(t, out d) && d.Count > 0 ? d : null;
         }
 
-        private static void Note(MobileParty cart, Town to, List<Line> load, bool bk)
+        private static void Note(MobileParty cart, Town to, List<Line> load, bool bk, long gold)
         {
             var s = Settings.Current;
             if (s == null || !s.VillageCartRoadNews) return;
             var pack = CheapestPack(load);
-            var h = new Haul { To = to, Value = new Dictionary<ItemCategory, int>(), Day = CampaignTime.Now.ToDays };
+            var h = new Haul { To = to, Value = new Dictionary<ItemCategory, int>(), Day = CampaignTime.Now.ToDays, Gold = GoldAware(s) ? Math.Max(0L, gold) : 0 };
             foreach (var l in load)
             {
                 var it = l.El.Item;
@@ -591,6 +632,7 @@ namespace Armoury
             }
             if (h.Value.Count == 0) return;
             _hauls[cart] = h;
+            if (h.Gold > 0 && to != null) { long g0; _gold.TryGetValue(to, out g0); _gold[to] = g0 + h.Gold; _gNew++; }   // m105 G4: rezerwacja kasy celu
             Dictionary<ItemCategory, int> d;
             if (!_news.TryGetValue(to, out d)) { d = new Dictionary<ItemCategory, int>(); _news[to] = d; }
             foreach (var kv in h.Value) { int v; d.TryGetValue(kv.Key, out v); d[kv.Key] = v + kv.Value; }
@@ -614,6 +656,11 @@ namespace Armoury
             Haul h;
             if (cart == null || !_hauls.TryGetValue(cart, out h)) return;
             _hauls.Remove(cart);
+            if (h.Gold > 0 && h.To != null)                                            // m105 G4: rezerwacja kasy celu wygasa razem z wiescia
+            {
+                long g0;
+                if (_gold.TryGetValue(h.To, out g0)) { g0 -= h.Gold; if (g0 > 0) _gold[h.To] = g0; else _gold.Remove(h.To); }
+            }
             Dictionary<ItemCategory, int> d;
             if (h.To == null || !_news.TryGetValue(h.To, out d)) return;
             foreach (var kv in h.Value)
@@ -818,7 +865,7 @@ namespace Armoury
             // TrySendingVillagerPartyToVillage, BK - z zamku do domu) - inaczej jego ladunek "lezalby" na polce miasta do 30 dob
             foreach (var kv in _hauls)
                 if (kv.Key == null || !kv.Key.IsActive || now - kv.Value.Day > 30.0 || Turned(kv.Key, kv.Value)) { if (stale == null) stale = new List<MobileParty>(); stale.Add(kv.Key); }
-            if (stale != null) foreach (var mp in stale) Forget(mp);
+            if (stale != null) foreach (var mp in stale) { Haul sh; if (mp != null && _hauls.TryGetValue(mp, out sh) && sh.Gold > 0) _gExpired++; Forget(mp); }   // m105 G4: rezerwacje wygasle przy porzadkach
             int dropped = stale != null ? stale.Count : 0;                         // wiesci skreslone przy porzadkach (woz zniknal, skrecil, 30 dob)
             // f19-e2: pomiar ostatniego wyboru - wozy nieczynne (rozbite, rozwiazane) wypadaja; klucz pomiaru wylaczony - pamiec pusta
             if (_last.Count > 0)
@@ -850,10 +897,14 @@ namespace Armoury
                      + " | cena ladunku sztuka po sztuce " + (!_wired ? "BRAK LATKI" : (s.VillageCartFairPrice ? "CZYNNA" : "WYLACZONA")) + ": sprzedazy " + _fairN + ", po cenie pierwszej sztuki " + _fairFirst
                      + " d, sztuka po sztuce " + _fairPaid + " d, tabory oddaly osadom nadplate " + overpay + " d (" + (_fairFirst > 0 ? (100.0 * overpay / _fairFirst).ToString("0.0", inv) : "0") + "%, najwieksza " + _fairMax + ")"
                      + ", niezgodne " + _mismatch + ", cena rosla " + _rising
+                     + (GoldAware(s) ? " | m105 zloto zarezerwowane (Village Cart Gold Aware TAK): wozow z rezerwa " + _gNew + ", zarezerwowane " + GoldReservedSum() + " zl u " + _gold.Count
+                        + " miast, wybor zmieniony " + _gChanged + ", wygasle " + _gExpired : "")
                      + " | woz x" + s.MarketCartFactor.ToString("0.0", inv) + " dla wsi " + (s.MarketCartAllVillages ? "wszystkich" : "zamkowych z targiem w miescie")
                      + (_stumbles > 0 ? " | POTKNIECIA " + _stumbles : "") + ".");
             ClearDay();
         }
+
+        private static long GoldReservedSum() { long t = 0; foreach (var v in _gold.Values) t += Math.Max(0, v); return t; }   // m105 G4 (linia)
 
         internal static void ApplyAll(Harmony h)
         {
