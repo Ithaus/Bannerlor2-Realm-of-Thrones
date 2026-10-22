@@ -58778,7 +58778,7 @@ def m105gosp4_main(logp):
             g5 = ds[dsg[-1]]["ds"][1] == "TAK"
             rep.add(f"M5G-8b (G5): czynsz po chlebie - rata dnia do ksiegi zaleglosci (srednio {len(dsg)} dob)",
                     f"{rb:.0f} zl/d ({sum(int(ds[d]['ds'][7]) for d in dsg) / len(dsg):.0f} wsi/d; klucz G5 {'TAK' if g5 else 'NIE'})",
-                    f"<= {M5G_RENT:.0f} zl/d (projekt 0.6-0.75 tys./d - 33 wsie W, 5 E przy koszyku 2 dob w dobie zakupu, recenzja kodu R9; zaleglosci czynszu i darowane po roku - "
+                    f"<= {M5G_RENT:.0f} zl/d (projekt 0.55-0.75 tys./d - 27-33 wsie W, 5 E przy koszyku 2 dob w dobie zakupu, recenzja kodu R9; zaleglosci czynszu i darowane po roku - "
                     f"linia DS, grupa nds)", (rb <= M5G_RENT) if g5 else None)
     # ---- M5G-9 M3W-3 (ta sama miara co m103wsie)
     if w28:
