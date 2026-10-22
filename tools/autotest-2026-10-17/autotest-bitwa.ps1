@@ -14,6 +14,9 @@
 #   (f) czekanie na koniec gry z limitem czasu, z kontrola postepu w autotest-*.log;
 #       po limicie / postoju / wywrotce - zamkniecie gry; po "WYJSCIE: QuitGame" proces ma ExitWaitSec
 #       (90 s) - dluzej wisi tylko silnik przy sprzataniu (okno bledu z rgl_log_errors_<PID>.txt);
+#       m105-drobne (8b): znany blad silnika przy wyjsciu (docs/ERRORS.md: 0xC0000005 po "Managed Interface deleted.")
+#       konczy bieg OD RAZU - wywrotka w rgl_log_errors_<PID>.txt albo "Managed Interface deleted." w rgl_log_<PID>.txt
+#       (po "Saving options...", czyli po zapisie engine_config / safely_exited) i proces zyje ExitQuickSec s - bez czekania 90 s;
 #   (g) ZAWSZE (finally): zamkniecie gry, przywrocenie zatwierdzonych DLL i kontrola md5,
 #       przywrocenie zmienionych plikow Configs, usuniecie niezuzytego przelacznika;
 #   (h) wynik: logi Armoury, CrashScribe, autotest-*.log, czas, doba, kody bledow, zdjecia.
@@ -64,6 +67,7 @@ param(
     [int]$SwitchWaitSec = 480,     # przelacznik niezuzyty po tylu s = w grze nie ma trybu autotestu (16.10: przy 39 modach gra zuzyla go po ok. 246 s)
     [int]$QuitWaitSec = 600,       # po "KONIEC" w logu gra ma tyle s na zapis i wyjscie
     [int]$ExitWaitSec = 90,        # po "WYJSCIE: QuitGame" w logu proces ma tyle s na zakonczenie (AT1b)
+    [int]$ExitQuickSec = 5,        # m105-drobne (8b): po "Managed Interface deleted." w rgl_log_<PID> proces zyje tyle s = znany blad przy wyjsciu, zamkniecie od razu (0 = jak dotad, tylko ExitWaitSec)
     [string]$EngineLogDir = 'C:\ProgramData\Mount and Blade II Bannerlord\logs',   # rgl_log_errors_<PID>.txt (tylko odczyt)
     [int]$PollSec = 10,
     [string[]]$Photos = @(),       # AT2: cele zdjec (opis wyzej); "wioski" = tools\autotest-zdjecia.json
@@ -110,6 +114,7 @@ $script:started = $null
 $script:proc = $null
 $script:exitCode = 0
 $script:exitNote = $null
+$script:midAt = $null   # m105-drobne (8b): chwila zobaczenia "Managed Interface deleted." w rgl_log_<PID> po QuitGame
 $script:crashNote = $null
 $script:modNote = $null
 
@@ -207,13 +212,16 @@ function Get-GameProcs {
     return , $out
 }
 
-function Stop-Game([string]$why) {
+function Stop-Game([string]$why, [switch]$Now) {
     $procs = Get-GameProcs
     if ($procs.Count -eq 0) { return }
-    Log ("ZAMYKAM GRE: " + $why + " (procesy: " + (($procs | ForEach-Object { $_.ProcessName + '#' + $_.Id }) -join ', ') + ")")
-    foreach ($p in $procs) { try { $null = $p.CloseMainWindow() } catch { } }
-    $end = (Get-Date).AddSeconds(30)
-    while ((Get-Date) -lt $end -and (Get-GameProcs).Count -gt 0) { Start-Sleep -Seconds 2 }
+    Log ("ZAMYKAM GRE: " + $why + " (procesy: " + (($procs | ForEach-Object { $_.ProcessName + '#' + $_.Id }) -join ', ') + ")" + $(if ($Now) { ' - od razu, bez CloseMainWindow' } else { '' }))
+    # m105-drobne (8b): -Now tylko po zapisie opcji silnika i usunieciu czesci zarzadzanej (znany blad przy wyjsciu) - okno bledu silnika i tak nie zamknie sie samo
+    if (-not $Now) {
+        foreach ($p in $procs) { try { $null = $p.CloseMainWindow() } catch { } }
+        $end = (Get-Date).AddSeconds(30)
+        while ((Get-Date) -lt $end -and (Get-GameProcs).Count -gt 0) { Start-Sleep -Seconds 2 }
+    }
     foreach ($p in (Get-GameProcs)) {
         try { Stop-Process -Id $p.Id -Force -ErrorAction Stop; Log ("  zabity: " + $p.ProcessName + '#' + $p.Id) } catch { Log ("  nie da sie zabic " + $p.Id + ": " + $_.Exception.Message) }
     }
@@ -383,6 +391,31 @@ function Get-ExitCrash {
     $m = [regex]::Match($el.Text, 'Unhandled Exception Code (0x[0-9A-Fa-f]+) at adress (0x[0-9A-Fa-f]+)')
     if (-not $m.Success) { return $null }
     return ('silnik wywrocil sie przy zamykaniu: ' + $m.Groups[1].Value + ' pod ' + $m.Groups[2].Value + ' (' + $el.Path + '); okno bledu silnika czeka na klikniecie - znany blad przy wyjsciu z gry, nie wynik testu')
+}
+
+function Get-ExitMarker {
+    # m105-drobne (8b): koniec rgl_log_<PID>.txt tego biegu (ostatnie 256 KB, plik zapisany po starcie gry) - "Managed Interface deleted." po "Saving options..."
+    # (silnik zapisal juz opcje, w tym safely_exited, i usunal czesc zarzadzana; potem przychodzi znany 0xC0000005 przy sprzataniu). true = znacznik jest.
+    if (-not $script:proc) { return $false }
+    $f = Join-Path $EngineLogDir ('rgl_log_' + $script:proc.Id + '.txt')
+    if (-not (Test-Path -LiteralPath $f)) { return $false }
+    try { if ((Get-Item -LiteralPath $f).LastWriteTime -lt $t0) { return $false } } catch { return $false }
+    $t = ''
+    try {
+        $fs = New-Object IO.FileStream($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try {
+            $n = [Math]::Min([long]262144, $fs.Length)
+            $null = $fs.Seek(-$n, [IO.SeekOrigin]::End)
+            $buf = New-Object byte[] ([int]$n)
+            $got = $fs.Read($buf, 0, [int]$n)
+            $t = [Text.Encoding]::UTF8.GetString($buf, 0, $got)
+        } finally { $fs.Dispose() }
+    } catch { return $false }
+    $i = $t.LastIndexOf('Managed Interface deleted.')
+    if ($i -lt 0) { return $false }
+    $s = $t.LastIndexOf('Saving options', $i)
+    $n0 = $t.LastIndexOf('Starting new log file', $i)
+    return ($s -ge 0 -and $s -gt $n0)
 }
 
 function Get-EngineCrash {
@@ -705,6 +738,18 @@ try {
                 $script:crashNote = $ec
                 Log ("WYWROTKA SILNIKA w trakcie biegu: " + $ec)
                 Stop-Game ("wywrotka silnika: " + $ec)
+                break
+            }
+        }
+        # m105-drobne (8b): po QuitGame znany blad silnika przy wyjsciu - wywrotka w rgl_log_errors_<PID> albo "Managed Interface deleted." w rgl_log_<PID>
+        # (opcje silnika juz zapisane) i proces zyje ExitQuickSec s - zamkniecie od razu (wynik jak po 90 s: 'wyjscie-wisi', nie wywrotka)
+        if ($quitAt -and $ExitQuickSec -gt 0) {
+            $crashQ = Get-ExitCrash
+            if (-not $crashQ -and -not $script:midAt -and (Get-ExitMarker)) { $script:midAt = Get-Date; Log ("rgl_log: 'Managed Interface deleted.' po QuitGame (" + [int]((Get-Date) - $quitAt).TotalSeconds + " s) - proces jeszcze zyje.") }
+            if ($crashQ -or ($script:midAt -and ((Get-Date) - $script:midAt).TotalSeconds -ge $ExitQuickSec)) {
+                $result = 'wyjscie-wisi'
+                $script:exitNote = 'znany blad silnika przy wyjsciu - zamkniety od razu, ' + [int]((Get-Date) - $quitAt).TotalSeconds + ' s po QuitGame (bez czekania ' + $ExitWaitSec + ' s)' + $(if ($crashQ) { ' - ' + $crashQ } else { ' - rgl_log: "Managed Interface deleted." po "Saving options...", proces zyl jeszcze ' + $ExitQuickSec + '+ s' })
+                Stop-Game ("po QuitGame: " + $script:exitNote) -Now
                 break
             }
         }

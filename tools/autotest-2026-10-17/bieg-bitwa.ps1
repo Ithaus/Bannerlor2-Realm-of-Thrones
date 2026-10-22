@@ -15,7 +15,8 @@ param(
     [switch]$NoArena,                                   # AT5: bez walki cwiczebnej na arenie przed bitwami
     [int]$SwitchWaitSec = 0,                            # 16.10: dluzsze czekanie na przelacznik (bank BA 600 MB laduje sie ok. 4 min); 0 = domyslne skryptu (480 s)
     [string]$ExtraAdd = '',                                # 16.10: dodatkowe pliki 'wzgledna\sciezka=zrodlo' (np. sonda geografii - test only)
-    [double]$Speed = 0                                    # 19.10 (Jeff: testy jak najszybciej): wymuszony mnoznik czasu autotestu (0 = jak w grze; max 64)
+    [double]$Speed = 0,                                   # 19.10 (Jeff: testy jak najszybciej): wymuszony mnoznik czasu autotestu (0 = jak w grze; max 64)
+    [int]$ExitQuickSec = -1                               # m105-drobne (recenzja R1): przekazane do autotest-bitwa.ps1 -ExitQuickSec (0 = stare 90 s czekania po QuitGame - bieg sprawdzajacy 8a; -1 = domyslne skryptu)
 )
 # kod wyjscia jak autotest-bitwa.ps1: 0 OK (przy -Battles misje sprawdzone), 1 nie dotarl / wywrotka, 2 stop przed testem,
 # 3 przywracanie nieudane, 4 doby OK - misje NIE sprawdzone (takiego DLL nie wgrywac jako sprawdzonego w misjach)
@@ -95,5 +96,6 @@ if ($Photos.Count -gt 0) { $a.Photos = $Photos }
 if ($Battles -gt 0) { $a.Battles = $Battles; $a.BattleSec = $BattleSec; if ($NoArena) { $a.NoArena = $true } }
 if ($SwitchWaitSec -gt 0) { $a.SwitchWaitSec = $SwitchWaitSec }
 if ($Speed -gt 0) { $a.Speed = $Speed }
+if ($ExitQuickSec -ge 0) { $a.ExitQuickSec = $ExitQuickSec }   # m105-drobne (recenzja R1)
 & $AT @a *>&1 | Tee-Object -FilePath $Out
 exit $LASTEXITCODE
