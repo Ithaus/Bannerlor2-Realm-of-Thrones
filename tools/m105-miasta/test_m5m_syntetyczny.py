@@ -1,5 +1,6 @@
 """m105-miasta: test syntetyczny grupy progow m105miasta (tools/sprawdz_logi.py --grupa m105miasta). Dwa biegi zlozone z linii jak w kodzie C# (KsFolkIncome.DayLine,
 TownFolk.BreadLine, KsLordFood.Line, MapRoadKinds.Daily, MarketCarts.Daily, linia KS-H) i kasy-miast.csv: "dobry" - kazdy wiersz M5M TAK, "zly" - kazdy wiersz NIE.
+Druga czesc (poprawki po recenzji, R2): grupa nglod, NGL-6f - splaty rachunkow ze skarbca korony (segment m105 linii pana) liczone razem z panem wobec linii KS-H.
 Uzycie (z katalogu repo albo skadkolwiek): python -I tools/m105-miasta/test_m5m_syntetyczny.py   (kod wyjscia 0 = zgodnie z oczekiwaniem)."""
 import os, re, subprocess, sys, shutil, tempfile
 
@@ -69,7 +70,7 @@ def build(dirp, good):
         L.append(cart(d, 20, 0 if good else 2))                             # zly: 10% wygaslych
         L.append(ksh(d, 0 if good else (500 if i == 200 else 0), 5000 if good else 30000))
     if not good:
-        L.append("ERROR in KsLordFood.HoardBills.Pay: System.Exception: test")
+        L.append("ERROR in MarketCarts.Daily: System.Exception: test")       # recenzja R3: cala klasa MarketCarts (dotad tylko MarketCarts.Choose)
     with open(os.path.join(dirp, f"Armoury-{tag}.log"), "w", encoding="utf-8", newline="\n") as fh:
         for s in L:
             fh.write("[12:00:00] " + s + "\n")
@@ -100,10 +101,10 @@ def verdicts(logp):
     return v, out
 
 
-EXP_GOOD = {"M5M-S": "TAK", "M5M-0": "TAK", "M5M-1": "TAK", "M5M-2": "TAK", "M5M-3": "TAK", "M5M-4": "TAK", "M5M-5": "TAK", "M5M-6": "TAK", "M5M-7": "TAK",
-            "M5M-8": "TAK", "M5M-9": "TAK", "M5M-9b": "INFO"}
-EXP_BAD = {"M5M-S": "TAK", "M5M-0": "NIE", "M5M-1": "NIE", "M5M-2": "NIE", "M5M-3": "NIE", "M5M-4": "NIE", "M5M-5": "NIE", "M5M-6": "NIE", "M5M-7": "NIE",
-           "M5M-8": "NIE", "M5M-9": "NIE", "M5M-9b": "INFO"}
+EXP_GOOD = {"M5M-S": "TAK", "M5M-0": "TAK", "M5M-1": "TAK", "M5M-2": "TAK", "M5M-3": "TAK", "M5M-3b": "INFO", "M5M-4": "TAK", "M5M-5": "TAK", "M5M-5b": "INFO",
+            "M5M-6": "TAK", "M5M-7": "TAK", "M5M-8": "TAK", "M5M-9": "TAK", "M5M-9b": "INFO"}
+EXP_BAD = {"M5M-S": "TAK", "M5M-0": "NIE", "M5M-1": "NIE", "M5M-2": "NIE", "M5M-3": "NIE", "M5M-3b": "INFO", "M5M-4": "NIE", "M5M-5": "NIE", "M5M-5b": "INFO",
+           "M5M-6": "NIE", "M5M-7": "NIE", "M5M-8": "NIE", "M5M-9": "NIE", "M5M-9b": "INFO"}
 bad = 0
 for name, good, exp in (("dobry", True, EXP_GOOD), ("zly", False, EXP_BAD)):
     lp = build(os.path.join(HERE, "syn", name), good)
@@ -111,6 +112,38 @@ for name, good, exp in (("dobry", True, EXP_GOOD), ("zly", False, EXP_BAD)):
     diff = {k: (exp[k], v.get(k)) for k in exp if v.get(k) != exp[k]}
     print(f"{name}: {'OK' if not diff and 'Traceback' not in out else 'BLAD'} {diff if diff else ''}")
     if diff or "Traceback" in out:
+        bad += 1
+        print(out[-3000:])
+
+
+# ---- czesc 2 (recenzja R2): NGL-6f - linia pana "splacone przez panow" + segment m105 "rachunki splacone ze skarbca" = linia KS-H doby o 1 mniejszej
+def nglod_log(path, hoard_seg, ksh_paid):
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        for i in range(30):
+            d = D0 + i
+            seg = (" | m105 skarbiec korony: rachunki splacone ze skarbca 1000 zl (miast 1, krolestw 1, kandydatow po panie bez kasy ponad podloge 1), kontrola skarbiec "
+                   "-1000 + wierzyciele 1000 = 0, ponizej zapasu wojny po wyplacie 0") if hoard_seg else ""
+            fh.write(f"[12:00:00] Kupcy zywnosci (KS-H) dzien {d - 1} | kredyt kupiecki TAK: otwarte 50000 zl | splacone przez panow miast (glod, zalegle rachunki) "
+                     f"{ksh_paid} zl w 2 splatach, kasy zrodel przyjely {ksh_paid} zl | kredyt w drodze: wozow 0.\n")
+            fh.write(f"[12:00:00] Pan miasta placi za dowoz (KS): dzien {d} | klucz Ks Lord Funds Food tak | tryb RACHUNKI | KS-H czynne | rachunki: otwarte 5000 zl, "
+                     f"splacone przez panow 2000 zl, kasy zrodel (wierzyciele) przyjely 2000 zl{seg} | czas 0.050 ms | potkniecia 0.\n")
+
+
+def ngl6f(path):
+    r = subprocess.run([sys.executable, "-I", os.path.join(W, "tools", "sprawdz_logi.py"), "--grupa", "nglod", path], capture_output=True)
+    out = r.stdout.decode("utf-8", "replace") + r.stderr.decode("utf-8", "replace")
+    m = re.search(r"^NGL-6f:.*?\| (TAK|NIE|INFO)\s*\|", out, re.M)
+    return (m.group(1) if m else None), out
+
+
+os.makedirs(os.path.join(HERE, "ngl"), exist_ok=True)
+for name, hs, kp, exp in (("pan + skarbiec = KS-H", True, 3000, "TAK"), ("bez skarbca (log sprzed m105)", False, 2000, "TAK"),
+                          ("KS-H ze skarbcem, linia pana bez segmentu", False, 3000, "NIE")):
+    lp = os.path.join(HERE, "ngl", "Armoury-ngl.log")
+    nglod_log(lp, hs, kp)
+    v, out = ngl6f(lp)
+    print(f"NGL-6f {name}: {'OK' if v == exp and 'Traceback' not in out else 'BLAD'} ({v}, oczekiwane {exp})")
+    if v != exp or "Traceback" in out:
         bad += 1
         print(out[-3000:])
 shutil.rmtree(HERE, ignore_errors=True)

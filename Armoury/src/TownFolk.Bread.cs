@@ -20,13 +20,17 @@ namespace Armoury
     ///    trafia do kotwicy nastepnej doby - z celem 1 dnia osada skakalaby co drugi dzien (pelna / glodna); drugi dzien to zapas na to opoznienie (w rownowadze
     ///    koszt = dzienny brak, jednorazowo +1 dzien jedzenia na osade - zostaje w kiesie ludu).
     ///  - PLATNIK: (1) korona krolestwa osady z reszty wplywow dnia PO zwrocie zoldu i po W5 / M1, PRZED rentami 180 (BreadCrown z CrownRents.Daily; krolestwa bez
-    ///    kroku rent - BreadRest zaraz po rentach) - nigdy z zapasu skarbca, nigdy z kredytu (wydatek przed zwrotem pchalby korone w wojnie do Banku); (2) zastepczo pan
+    ///    kroku rent - BreadRest zaraz po rentach) - w tym kroku nigdy z zapasu skarbca (zapas - krok 3), nigdy z kredytu (wydatek przed zwrotem pchalby korone w wojnie do Banku); (2) zastepczo pan
     ///    osady (glowa rodu wlasciciela) - tylko ponad rezerwe wojny R budzetu 166 i tylko z tej czesci tempa skrzyni (G - R) / WarChestDays, ktorej nie bierze zold
     ///    (recenzja: w sumie nie szybciej niz skrzynia) - w wojnie 1 - WarChestToWages (0.2, i o tyle mniej skrzyni sprzetu tej doby - ClanBudget), w pokoju
-    ///    1 - PeaceChestShare x WarChestToWages (0.68); NIGDY gracz; dluznik i rod w zajeciu - nie (kiese bierze wierzyciel); (3) nikt - luka zostaje (licznik).
+    ///    1 - PeaceChestShare x WarChestToWages (0.68); NIGDY gracz; dluznik i rod w zajeciu - nie (kiese bierze wierzyciel); (3) m105 G2 (klucz Crown Hoard Feeds Hungry,
+    ///    recenzja R8a - wyjatek od "nigdy z zapasu skarbca" z punktu 1): reszta luki PO panie - skarbiec krolestwa osady, tylko ponad zapas wojny + reszte wplywow dnia
+    ///    + dlugi (KingdomTreasury.HoardRoom: limit doby 1/Crown Surplus Aid Days nadwyzki, wspolny z rachunkami KS-H; krolestwo gracza-wladcy 0; nigdy z kredytu);
+    ///    lenno gracza-wasala tez (placi korona, gracz nigdy z kiesy - ta sama regula co rachunki KS-H, KsLordFood.HoardBills); (4) nikt - luka zostaje (licznik).
     ///    Kiesa klasy jest jedna (recenzja): lud wydaje ja jak zawsze - najpierw jedzenie, potem reszta koszyka (Anchor) - wiec chleb w rownowadze pokrywa caly dzienny
     ///    brak koszyka (potrzeba - zarobek), nie sam brak jedzenia. Wydzielonej "kiesy chleba" nie ma (drugi stan i druga regula na te sama kiese - zasada 0).
-    ///  - KSIEGA: skarbiec (glowa) -> kiesy ludu osady: kontrola zamknieta kies (_ctlIn, linia "Kiesa ludu" r = 0), 165 (KDay.Bread), "Obieg". Przelew miedzy
+    ///  - KSIEGA: skarbiec (glowa) -> kiesy ludu osady: kontrola zamknieta kies (_ctlIn, linia "Kiesa ludu" r = 0), 165 (KDay.Bread; chleb z zapasu skarbca z kroku 3
+    ///    bez KDay.Bread i bez CrownIncome.Spent - to nie wplywy dnia), "Obieg". Przelew miedzy
     ///    posiadaczami ksiegi pieniadza - nie zrodlo.
     /// Linia doby "Chleb biedoty (M3): dzien N". Wyjatek per osada - licznik potkniec TownFolk (CLAUDE.md 7). Watek glowny (blok doby).
     /// </summary>

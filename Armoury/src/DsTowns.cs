@@ -735,15 +735,17 @@ namespace Armoury
         /// miasto z KS, ktorego kasa po naleznosciach (CofferOwes) stoi PONIZEJ zapasu kupcow albo ktore zalega (firma albo dlug rady), bez oblezenia / zdobycia - firma pana
         /// i korony z kasy ponad biezacy doplyw netto kupcow x 364 schodzi do niego OD RAZU (doplyw &lt;= 0 - do 0), ten sam stosunek pan / korona; czesc z oszczednosci
         /// ludu (FLf) bez zmiany - placi ja lud, nie kasa. Najwyzej raz na FastGapDays (7 - raz na rate tygodniowa: pobor miast wojennych nie idzie za szumem doplywu).
-        /// Bez pomiaru doplywu (mniej niz NetMinDays dob) - bez zmiany. Udzial firmy w doplywie ponad 1 schodzi do 1; cykl obnizki (e) od tej doby (SLow). Zloto sie nie
-        /// rusza - zmienia sie nalezna rata. Zwraca true, gdy firma zeszla. Wolajacy w try (SurplusReview).
+        /// Bez PELNEGO pomiaru doplywu (mniej niz NetDays = 28 dob) - bez zmiany (recenzja R1: pamiec doplywu Net/NF i FastDay jest tylko w sesji - po wczytaniu
+        /// zapisu srednia z 7-21 dob jest rozchwiana, a obnizka idzie tylko w dol, wiec firma schodzila do najnizszej z krotkich probek; teraz szybka obnizka rusza
+        /// dopiero od 28. doby po wczytaniu, wczesniej obnizka z dochodu (e) jak dotad). Udzial firmy w doplywie ponad 1 schodzi do 1; cykl obnizki (e) od tej doby (SLow).
+        /// Zloto sie nie rusza - zmienia sie nalezna rata. Zwraca true, gdy firma zeszla. Wolajacy w try (SurplusReview).
         /// </summary>
         private static bool FastCut(Farm f, int today)
         {
             if (f.FastDay >= 0 && f.FastDay <= today && today - f.FastDay < FastGapDays) return false;
             double F = f.FL + f.FC;
             if (!(F > 0)) return false;
-            double net = NetAvg(f, NetMinDays);
+            double net = NetAvg(f, NetDays);                                    // recenzja R1: pelne 28 dob (NaN przy NF < 28 - bez zmiany)
             if (double.IsNaN(net) || double.IsInfinity(net)) return false;
             double cap = Math.Max(0.0, net) * YearDays;
             if (!(F > cap + 1e-6)) return false;
@@ -757,7 +759,7 @@ namespace Armoury
         }
 
         /// <summary>m105 G1 (linia f5-lud, segment "m105 szybka obnizka"): miasta z KS z ustalona firma, ktorych kasa po naleznosciach stoi ponizej zapasu kupcow,
-        /// i z nich te z firma z kasy ponad biezacy doplyw netto x 364 (bez pomiaru doplywu - nie liczone do drugiej liczby). Tylko odczyt; nie rzuca.</summary>
+        /// i z nich te z firma z kasy ponad biezacy doplyw netto x 364 (bez pelnego pomiaru doplywu 28 dob - nie liczone do drugiej liczby, jak w FastCut). Tylko odczyt; nie rzuca.</summary>
         internal static void FastCensus(out int below, out int over)
         {
             below = 0; over = 0;
@@ -774,7 +776,7 @@ namespace Armoury
                         double gq = st.Town.Gold - (s.KsFarmSurplusCapNet ? CofferOwes(f, s) : 0.0);
                         if (!(gq < TownPurse.Reserve(st.Town))) continue;
                         below++;
-                        double net = NetAvg(f, NetMinDays);
+                        double net = NetAvg(f, NetDays);                        // recenzja R1: ta sama miara co FastCut
                         if (!double.IsNaN(net) && f.FL + f.FC > Math.Max(0.0, net) * YearDays + 1.0) over++;
                     }
                     catch (Exception e) { Stumble("FastCensus(osada)", e); }

@@ -154,7 +154,9 @@ namespace Armoury
         /// m105 G2 (Crown Hoard Feeds Hungry): PO panie - rachunki zywnosci miasta `st` starsze niz `age` dni, ktorych kasa miasta nie splaci (nic ponad podloge kredytu -
         /// PayDaily splaca z tej samej granicy, wiec rachunek zostal), splaca skarbiec krolestwa wlasciciela ponad zapas wojny (limit doby wspolny z chlebem M3 -
         /// KingdomTreasury.HoardRoom). Skarbiec -> kasy zrodel (wierzyciele, KsFoodCredit.PayByLordAge - najstarsze najpierw, z pomiarem); czego nie przyjma, wraca do skarbca.
-        /// Krolestwo gracza, rod bez krolestwa, oblezenie - nie. Doplyw netto miasta jak przy splacie pana (TownPurse.NoteLordFood). Wolajacy w try.
+        /// Krolestwo gracza-wladcy (HoardRoom 0), rod bez krolestwa, oblezenie - nie; miasto gracza-wasala - tak (recenzja R8c: jedna regula z chlebem M3 - placi korona
+        /// krolestwa AI, gracz nigdy z kiesy). PayByLordAge liczy te splaty w linii KS-H jako "splacone przez panow miast" (DLordRepaid; kontrola zlota KS-H 0) - narzedzie
+        /// NGL-6f dolicza je do linii pana z segmentu "m105 skarbiec korony". Doplyw netto miasta jak przy splacie pana (TownPurse.NoteLordFood). Wolajacy w try.
         /// </summary>
         private static void HoardBills(Town t, Settlement st, int age)
         {
@@ -322,7 +324,9 @@ namespace Armoury
                         var h = c != null ? c.Leader : null;
                         // m105 G2: w trybie RACHUNKI wyjscia kroku pana (bez pana, gracz, bez budzetu, bez miejsca) prowadza do kroku skarbca (HoardBills), nie do nastepnego miasta
                         if (c == null || h == null || !h.IsAlive) { _nNb++; if (_bills) HoardBills(t, st, KsFoodCredit.OverdueDays); continue; }
-                        if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; continue; }   // gracz nigdy (jak chleb M3)
+                        // gracz nigdy z kiesy (jak chleb M3); recenzja R8c: jedna regula z chlebem - korona krolestwa AI placi za glodne miasto gracza-wasala ze skarbca
+                        // ponad zapas wojny (HoardRoom krolestwa gracza-wladcy = 0)
+                        if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; if (_bills) HoardBills(t, st, KsFoodCredit.OverdueDays); continue; }
                         double G, R; bool war;
                         if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; if (_bills) HoardBills(t, st, KsFoodCredit.OverdueDays); continue; }
                         long outC, resC; _out.TryGetValue(c, out outC); _resv.TryGetValue(c, out resC);
@@ -405,9 +409,10 @@ namespace Armoury
                     _need += open;
                     var c = st.OwnerClan;
                     var h = c != null ? c.Leader : null;
-                    // m105 G2: wyjscia kroku pana (bez pana, bez budzetu, bez miejsca) prowadza do kroku skarbca (HoardBills); gracz - nie (krolestwo gracza i tak 0)
+                    // m105 G2: wyjscia kroku pana (bez pana, gracz, bez budzetu, bez miejsca) prowadza do kroku skarbca (HoardBills)
                     if (c == null || h == null || !h.IsAlive) { _nNb++; HoardBills(t, st, age); continue; }
-                    if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; continue; }   // gracz nigdy (jak chleb M3)
+                    // gracz nigdy z kiesy (jak chleb M3); recenzja R8c: korona krolestwa AI placi za miasto gracza-wasala (HoardRoom krolestwa gracza-wladcy = 0)
+                    if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; HoardBills(t, st, age); continue; }
                     double G, R; bool war;
                     if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; HoardBills(t, st, age); continue; }
                     // ta sama granica co tryb RACHUNKI w Before (nawias doplaty pusty w tym trybie - outC i resC 0)

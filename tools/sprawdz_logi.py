@@ -1049,10 +1049,11 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m105miasta <Armoury-*.log> [--tabele <katalog z kasy-miast.csv>]. M5M-0 segmenty m105 w liniach
                     f5-lud, "Chleb biedoty (M3)", "Pan miasta placi za dowoz (KS)", "Drogi Valyrii (VR)", "Dowoz (wozy)" kazdej doby (klucze TAK; log bez
                     segmentow - INFO), M5M-1 miasta >= 28 dob z rzedu ponizej zapasu kupcow z poborem ponad doplyw (kasy-miast.csv, ostatnie 56 dob) <= 2, M5M-2
-                    pobor ponad doplyw w dobach ponizej zapasu (56 dob) <= 1% poboru, M5M-3 (straznik G1) firmy miast panom i koronom d202-229 >= 0.9 x 102,
-                    M5M-4 rachunki KS-H starsze niz zwloka 0 kazdej doby i starsze niz prog wczesnej splaty na koniec <= 10 tys., M5M-5 chleb "nie stac nikogo"
-                    przy wolnym limicie skarbca 0, M5M-6 skarbiec ponizej zapasu wojny po wyplacie 0 / kontrola zlota 0 / koszt skarbcow <= 40 tys./d, M5M-7 VR-3
-                    ze wszystkimi probkami >= 24.9%, M5M-8 rezerwacje wozow wygasle <= 1%, M5M-9 ERROR nowego kodu 0 (czas - INFO).
+                    pobor ponad doplyw w dobach ponizej zapasu (56 dob) <= 1% poboru, M5M-3 (straznik G1) firmy miast panom i koronom d202-229 >= 0.9 x 102
+                    (M5M-3b INFO d86-120 - pierwsze okno po rampie DS), M5M-4 rachunki KS-H starsze niz zwloka 0 kazdej doby i starsze niz prog wczesnej
+                    splaty na koniec <= 10 tys., M5M-5 SAMOKONTROLA kodu G2 - luka chleba przy wolnym limicie skarbca 0 (z konstrukcji; M5M-5b INFO pokrycie
+                    chleba ze skarbca), M5M-6 skarbiec ponizej zapasu wojny po wyplacie 0 / kontrola zlota 0 / koszt skarbcow <= 40 tys./d, M5M-7 VR-3
+                    ze wszystkimi probkami >= 24.9%, M5M-8 rezerwacje wozow wygasle <= 1%, M5M-9 ERROR nowego kodu 0 (cala klasa MarketCarts; czas - INFO).
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -1486,7 +1487,8 @@ Uzycie (Python 3, tylko odczyt):
                     zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c (recenzja) od panow <= ksiega kupcow KS-H
                     (zaplacone przez kasy celu za wozy kupione dzis) i <= wydatek kasy netto, kasa netto ponad ksiege 0 miast, NGL-6d tryb pana zgodny z kodem kupcow (kredyt
                     r4-kupcy bez podlaczonych rachunkow = NIE), NGL-6e (recenzja) doplata tylko w dobie przegladu celu KS-H (INFO: miasta poza nia), NGL-6f (scalenie z r4-kupcy: rachunki
-                    podlaczone) zalegle rachunki splacone przez panow - linia pana = linia KS-H 'splacone przez panow miast' i = przyjete przez kasy zrodel, NGL-7 INFO doplaty,
+                    podlaczone) zalegle rachunki splacone przez panow - linia pana (+ splaty ze skarbca korony z segmentu m105, G2) = linia KS-H 'splacone przez panow
+                    miast' i = przyjete przez kasy zrodel, NGL-7 INFO doplaty,
                     NGL-1b (recenzja) mianownik spichlerza = stale czynnego modelu jedzenia zgodne ze wzorem Famine.cs (40, 20),
                     NGL-8 ERROR i potkniecia 0, NGL-9 koszt <= 1 ms (mediana). Log bez paczki: "brak linii" (INFO), bez wyjatku.
 --grupa nuchodzcy : (noc 17/18.10, decyzja Jeffa "4. tak" do STAN-PRAC 57 "uchodzcy ida do najblizszego miasta (ludnosc/biedota), potem wracaja"; galaz w-toku/sw-uchodzcy,
@@ -13271,6 +13273,8 @@ def _m105_c4c3(path):
     rows = read_csv(path) if path else []
     by = {}
     for r in rows:
+        if r.get("rodzaj") == "gracz":                                       # recenzja R4: rody AI - wiersz gracza poza miara (dotad +1 w mianowniku)
+            continue
         try:
             d = int(r["dzien"])
         except (KeyError, ValueError, TypeError):
@@ -13305,12 +13309,14 @@ M105_DS_P1_ZERO = re.compile(r"przejscie: rampa [\d.]+ \(([^)]*\bP1\b[^)]*) x 0\
 
 
 def m105_ds_p1_zero(lines):
-    """m105-miasta T11: ostatnia linia 'Firmy miast i zamkow (DS)' pokazuje P1 w grupie 'x 0.000' (P1 pod DS wylaczona z zalozenia) -> doba tej linii, inaczej None."""
-    last = None
+    """m105-miasta T11: PIERWSZA linia 'Firmy miast i zamkow (DS)', ktora pokazuje P1 w grupie 'x 0.000' (P1 pod DS wylaczona z zalozenia) -> doba tej linii,
+    inaczej None. Recenzja R4: dotad ostatnia - wolajacy wyciszali prog takze wtedy, gdy P1 zeszla do 0 dopiero po oknie; teraz wolajacy porownuja te dobe z oknem."""
     for s in lines:
         if s.startswith("Firmy miast i zamkow (DS): dzien") and M105_DS_P1_ZERO.search(s):
-            last = num(r"dzien (\d+)", s[:50])
-    return last
+            d = num(r"dzien (\d+)", s[:50])
+            if d is not None:
+                return d
+    return None
 
 
 def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
@@ -13483,7 +13489,7 @@ def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         pc_ = 100.0 * cc_[wst][1] / max(1, cc_[wst][0])
         rep.add("C-4c3: rody z zapasem zlota rodziny na mniej niz 28 dni przy tempie spadku z 28 dob (budzet-rodow.csv, od doby 120 pliku do konca)",
                 f"najwiecej {cc_[wst][1]} z {cc_[wst][0]} ({pc_:.1f}%, doba {wst}); na koniec {cc_[ds_[-1]][1]} ({100.0 * cc_[ds_[-1]][1] / max(1, cc_[ds_[-1]][0]):.1f}%); bankrutow najwiecej {bnk}",
-                "<= 2% rodow kazdej doby i bankrutow 0 (m105-miasta T5; 102 0.5-1.1%, P2 0.4-1.3%)" + ("" if bind_ else " - INFO (plik krotszy niz 120 dob)"),
+                "<= 2% rodow AI kazdej doby i bankrutow 0 (m105-miasta T5; 102 1.6% (d202), n31 1.2%; zapas do 2% ok. 2 rody)" + ("" if bind_ else " - INFO (plik krotszy niz 120 dob)"),
                 (pc_ <= 2.0 and bnk == 0) if bind_ else None)
         dl_ = ds_[-1]
         rep.add("C-4c2: rody z G < R i G nizej niz 28 dob temu (bieda, ktora sie poglebia)",
@@ -14006,6 +14012,13 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         ok_ = (r1[0] <= 1.10 and r2[0] <= 1.10) if (r1 and r2 and r1[0] is not None and r2[0] is not None) else None
         rep.add("G1-5a2: kasy miast / (1.5 x zapas kupcow + 28 dob poboru) - prog gersumy f7 (kasy-miast.csv)", txt,
                 "<= 1.10 w dobie 120 i na koncu (102: 0.94 / 0.70, n31 0.91, P2 0.91; plik krotszy niz 120 dob - INFO)", ok_)
+        # recenzja R7: G1-5a2 pilnuje tylko gory (dawne G1-5a mialo tez dol >= 80%); dol i trend - INFO (miasta ponizej zapasu lapia NAKUM-27, NKA-3, M5M-1)
+        if r1 and r2 and r1[0] is not None and r2[0] is not None:
+            span_ = max(1, kd_[-1] - d120)
+            rep.add("G1-5a2b: dolna strona wskaznika G1-5a2 - trend od doby 120 pliku do konca",
+                    f"{r1[0]:.2f} -> {r2[0]:.2f} ({(r2[0] - r1[0]) * 100.0 / span_:+.3f} na 100 dob; koniec {100.0 * r2[0] / r1[0]:.0f}% doby 120)"
+                    + ("; ponizej 0.80" if r2[0] < 0.80 else ""),
+                    "INFO (dawne G1-5a: >= 80%; 102 0.94 -> 0.70, n31 0.91 -> 0.65 - kasy schodza do zapasu kupcow z zalozenia f7)", None)
     else:
         rep.add("G1-5a2: kasy miast / prog gersumy f7", f"brak {kp_ or 'kasy-miast.csv'}", "INFO", None)
     below = tot(r"kasy ponizej zapasu przez nasza wyplate (\d+)")
@@ -16950,7 +16963,8 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
         if p1 and a4 is not None and lo4 is not None:
             ok4 = a4 >= lo4
         p1z = m105_ds_p1_zero(lines)                                         # m105-miasta T11: P1 pod DS wylaczona z zalozenia (linia DS "P1 ... x 0.000")
-        if p1z is not None and ok4 is not None:
+        # recenzja R4: wyciszenie tylko, gdy P1 zeszla do 0 najpozniej w pierwszej dobie okna (cale okno bez P1)
+        if p1z is not None and ok4 is not None and wa and p1z <= min(wa):
             ok4 = None
             rule4 += f" - INFO: P1 pod DS wylaczona z zalozenia (linia DS doby {p1z}: 'P1 ... x 0.000', m105-miasta T11)"
         rep.add(f"P1-4: danina z oszczednosci, srednia {wname}",
@@ -24271,7 +24285,8 @@ def r2_measures(logp, start, lo, hi):
     out["bron"] = int(bm[t[-1]].group(2)) if t else None
     out["brbelow"] = sum(int(m.group(17)) for m in bm.values())                    # recenzja: grupa 17, dotad 18 (kiesa gracza)
     out["brplayer"] = sum(int(m.group(18)) for m in bm.values())                   # recenzja: grupa 18, dotad 19 (IndexError)
-    out["brbyk"] = (br[t[-1]].split("| na krolestwo (korona/pan/nie stac nikogo): ")[-1].rstrip(".")[:300]) if t else "-"
+    # m105-miasta (recenzja R8b): segment "| m105 skarbiec korony" stoi za lista krolestw - odciety, zeby nie wchodzil do INFO R2-4e
+    out["brbyk"] = (br[t[-1]].split("| na krolestwo (korona/pan/nie stac nikogo): ")[-1].split(" | m105")[0].rstrip(".")[:300]) if t else "-"
     ml = [R2_M3L.search(br[d]) for d in t]
     ml = [x for x in ml if x]
     out["brlord"] = (avg([int(x.group(1)) for x in ml]), avg([int(x.group(2)) for x in ml])) if ml else None
@@ -24551,6 +24566,8 @@ def rok2_main(logp, start_arg, until=120, basep=None):
         mu, sd = R2_Y1["dan"]
         if m["dan91"] is not None:
             p1z = m105_ds_p1_zero(lines0)                                    # m105-miasta T11: P1 pod DS wylaczona z zalozenia
+            if p1z is not None and run_day(p1z, start) > 91:                 # recenzja R4: tylko gdy P1 zeszla do 0 najpozniej w pierwszej dobie okna d91-120
+                p1z = None
             rep.add("R2-T2-2: danina P1 sr. d91-120", f"{fm(m['dan91'])} zl/d" + (f" (W53 {fm(b['dan91'])})" if (b and b["dan91"] is not None) else ""),
                     f">= sr. 5 biegow - 2 odch. ({fm(mu - 2 * sd)}; sr. {fm(mu)}, odch. {fm(sd)})"
                     + (f" - INFO: P1 pod DS wylaczona z zalozenia (linia DS doby {p1z}: 'P1 ... x 0.000', m105-miasta T11)" if p1z is not None else ""),
@@ -38380,9 +38397,12 @@ M5M_RX = {
     "f5ms": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)"),
 }
 M5M_ERR = ("ERROR in DsTowns.FastCensus", "ERROR in DsTowns.SurplusReview", "ERROR in KingdomTreasury.CrownSurplus.Hoard", "ERROR in KsLordFood.HoardBills",
-           "ERROR in KsLordFood.Before", "ERROR in KsFolkIncome.DayLine", "ERROR in TownFolk.BreadRest", "ERROR in MarketCarts.Choose", "ERROR in MapRoadKinds.Audit",
+           "ERROR in KsLordFood.Before", "ERROR in KsFolkIncome.DayLine", "ERROR in TownFolk.BreadRest", "ERROR in MarketCarts.", "ERROR in MapRoadKinds.Audit",
            "ERROR in MapRoadKinds.Daily")
+# recenzja R3: "ERROR in MarketCarts." - cala klasa (G4: Note / Forget / Value / Choose wolane z Daily, SellPrefix, CastleMarket - blad loguje sie nazwa wolajacego,
+# np. "ERROR in MarketCarts.Daily" z ArmouryBehavior); wyjatek w MapRoads.SpeedRoad (G3) to licznik "w predkosci dzis N" - pilnuje NDR-8 (grupa ndrogi)
 M5M_FARM_BASE = 315136.0   # M5M-3: log 102 (Armoury-2026-10-21_14-29-20, kasy-miast.csv): srednia d202-229 sumy zawor_do_pana + do_korony miast = firmy miast panom i koronom
+M5M_FARM_BASE86 = 106788.0  # M5M-3b (recenzja R3): ta sama miara w d86-120 pliku 102 (n31 113 717)
 # m105m: linie kontrolne zlozone wedlug kodu C# (KsFolkIncome.DayLine, TownFolk.BreadLine, KsLordFood.Line, MapRoadKinds.Daily, MarketCarts.Daily) - zmiana napisu w kodzie
 # bez zmiany wyrazen wyzej wywraca self-test, a nie po cichu progi
 M5M_TEST = {
@@ -38548,6 +38568,13 @@ def m105miasta_main(logp, tabp=None):
             v3 = sum(_m105_f(r.get("zawor_do_pana")) + _m105_f(r.get("do_korony")) for d in w3 for r in km[d]) / max(1, len(w3))
             rep.add("M5M-3: (straznik G1) firmy miast panom i koronom (kasy-miast.csv)", f"ostatnie 28 dob pliku {v3:.0f} zl/d (plik {len(kd)} dob)",
                     "INFO (bieg krotszy niz 229 dob; prog >= 0.9 x 102 tylko w d202-229)", None)
+        # recenzja R3: G1 dziala od konca rampy DS (d85) - pierwsze okno po rampie d86-120 (INFO; szacunek z kodu: 102 d120 ok. -9.5 tys./d)
+        w3b = [d for d in kd if 86 <= d - d0 + 1 <= 120]
+        if len(w3b) >= 28:
+            v3b = sum(_m105_f(r.get("zawor_do_pana")) + _m105_f(r.get("do_korony")) for d in w3b for r in km[d]) / len(w3b)
+            rep.add("M5M-3b: (straznik G1, pierwsze okno po rampie DS) firmy miast panom i koronom - srednia d86-120 pliku (kasy-miast.csv)",
+                    f"{v3b:.0f} zl/d wobec 102 {M5M_FARM_BASE86:.0f} ({100.0 * v3b / M5M_FARM_BASE86:.1f}%; dob {len(w3b)})",
+                    "INFO (szacunek z kodu dla 102: obnizka ok. 9.5 tys. zl/d przy d120, ok. 91% bazy d86-120; bieg z zapisu - inna faza, tylko wglad)", None)
     else:
         rep.add("M5M-1..3: kasy miast (kasy-miast.csv)", f"brak {kp}", "INFO (podaj --tabele <katalog> albo uklad sesji <katalog logu>/<znacznik>/kasy-miast.csv)", None)
     # ---- M5M-4 rachunki KS-H
@@ -38568,8 +38595,14 @@ def m105miasta_main(logp, tabp=None):
         left = sum(int(v[5]) for v in b2.values())
         leftd = [d for d in sorted(b2) if int(b2[d][5]) > 0]
         nobody = sum(int(v[4]) for v in b2.values())
-        rep.add("M5M-5: chleb 'nie stac nikogo' przy wolnym limicie skarbca korony (krolestwo z nadwyzka skarbca)", f"{left} zl w {len(leftd)} dobach"
-                + (f" (pierwsza {leftd[0]})" if leftd else "") + f"; 'nie stac nikogo po skarbcu' razem {nobody} zl (limit doby 1/Crown Surplus Aid Days - INFO)", "0 zl", left == 0)
+        # recenzja R7 / R2 (kod): po wyplacie x = min(luka, limit) albo luka = 0, albo HoardRoom = 0 - pole "przy wolnym limicie" jest z konstrukcji 0; to SAMOKONTROLA
+        # kodu (NIE tylko przy bledzie HoardRoom / HoardUse), nie miara pokrycia chleba. Pokrycie - INFO M5M-5b (luka po skarbcu zostaje z zalozenia: limit doby 1/30)
+        rep.add("M5M-5: samokontrola kodu G2 - luka chleba przy wolnym limicie skarbca korony (z konstrukcji 0)", f"{left} zl w {len(leftd)} dobach"
+                + (f" (pierwsza {leftd[0]})" if leftd else ""), "0 zl (> 0 = blad kodu HoardRoom / HoardUse; NIE jest miara pokrycia chleba)", left == 0)
+        hb_ = sum(int(v[1]) for v in b2.values())
+        rep.add("M5M-5b: chleb biedoty - ze skarbca ponad zapas wojny / 'nie stac nikogo' po skarbcu (od startu)",
+                f"ze skarbca {hb_} zl, nie stac nikogo po skarbcu {nobody} zl" + (f" (pokryte ze skarbca {100.0 * hb_ / (hb_ + nobody):.0f}% luki po panie)" if hb_ + nobody > 0 else ""),
+                "INFO (limit doby 1/Crown Surplus Aid Days nadwyzki - luka zostaje w krolestwach z mala nadwyzka, np. Pentos; szacunek projektu 67% w 102)", None)
         below = sum(int(v[9]) for v in b2.values()) + sum(int(v[7]) for v in l2.values())
         ctl = [d for d in sorted(b2) if int(b2[d][8]) != 0] + [d for d in sorted(l2) if int(l2[d][6]) != 0]
         lastd = max(list(b2) + list(l2))
@@ -46836,6 +46869,9 @@ def _nglod_scan(logp):
     # scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): zalegle rachunki splacone przez panow - czesc linii KS-H i czlon "wierzyciele" linii pana (opcjonalne, NGL-6f)
     rx_kshl = re.compile(r"Kupcy zywnosci \(KS-H\) dzien (-?\d+) .*?\| splacone przez panow miast \(glod, zalegle rachunki\) (-?\d+) zl w (\d+) splatach, kasy zrodel przyjely (-?\d+) zl")
     rx_recv = re.compile(r"kasy zrodel \(wierzyciele\) przyjely (-?\d+) zl")
+    # m105-miasta G2 (recenzja R2): splaty ze skarbca korony (KsLordFood.HoardBills -> PayByLordAge) linia KS-H liczy w "splacone przez panow miast", a linia pana
+    # tylko w segmencie m105 (nie w "splacone przez panow") - NGL-6f dolicza je do linii pana. Poza slownikiem pl: stare logi nie dostaja "nierozpoznanych" w NGL-0
+    rx_hfb = re.compile(r"\| m105 skarbiec korony: rachunki splacone ze skarbca (\d+) zl")
     ph = {
         "keys": re.compile(r"klucze: Ks Hunger Unrest (tak|nie), Ks Lord Funds Food (tak|nie), kalibracja (zastosowana|NIE zastosowana)"),
         "hooks": re.compile(r"latki: lojalnosc (wpieta|BRAK), bezpieczenstwo (wpiete|BRAK), posilek (wpiety|BRAK)"),
@@ -46904,6 +46940,9 @@ def _nglod_scan(logp):
                 mr = rx_recv.search(ln)
                 if mr:
                     rec["recv"] = (mr.group(1),)
+                mh = rx_hfb.search(ln)
+                if mh:
+                    rec["hfb"] = (mh.group(1),)
                 D["l"][d] = rec
     return D
 
@@ -47047,12 +47086,15 @@ def nglod_main(logp, until=100000):
         K = D["kshl"]
         if K and bl:
             best = max((-1, 0), key=lambda o: sum(1 for d in bl if d + o in K))
-            pairs = [(d, bl[d][0], K[d + best][0]) for d in bl if d + best in K]
+            # m105-miasta G2 (recenzja R2): pan + splaty ze skarbca korony z segmentu m105 tej samej linii pana (KS-H liczy obie w "splacone przez panow miast")
+            pairs = [(d, bl[d][0] + g(L[d], "hfb", 0, int, 0), K[d + best][0]) for d in bl if d + best in K]
             badf = [x for x in pairs if x[1] != x[2]]
             badr = [d for d in bl if bl[d][1] is not None and bl[d][1] != bl[d][0]]
-            rep.add("NGL-6f: zalegle rachunki splacone przez panow - linia pana = linia KS-H (splacone przez panow miast) i = przyjete przez kasy zrodel",
-                    f"dob sparowanych {len(pairs)} (przesuniecie {best}), roznych {len(badf)}" + (f" (dzien {badf[0][0]}: pan {badf[0][1]}, KS-H {badf[0][2]})" if badf else "")
-                    + f"; przyjete != splacone {len(badr)}; razem splacone przez panow {sum(x[1] for x in pairs)} zl w {sum(K[d][1] for d in K)} splatach (KS-H)",
+            hfb_ = sum(g(L[d], "hfb", 0, int, 0) for d in bl)
+            rep.add("NGL-6f: zalegle rachunki splacone przez panow - linia pana (+ ze skarbca korony, m105) = linia KS-H (splacone przez panow miast) i = przyjete przez kasy zrodel",
+                    f"dob sparowanych {len(pairs)} (przesuniecie {best}), roznych {len(badf)}" + (f" (dzien {badf[0][0]}: pan + skarbiec {badf[0][1]}, KS-H {badf[0][2]})" if badf else "")
+                    + f"; przyjete != splacone {len(badr)}; razem splacone przez panow {sum(x[1] for x in pairs)} zl w {sum(K[d][1] for d in K)} splatach (KS-H)"
+                    + (f", w tym ze skarbca korony (m105) {hfb_} zl" if any("hfb" in L[d] for d in bl) else ""),
                     "0 i 0", (not badf and not badr) if pairs else None)
         else:
             rep.add("NGL-6f: zalegle rachunki splacone przez panow (linia pana = linia KS-H)", "brak czesci 'splacone przez panow miast' w liniach KS-H albo linii pana",
