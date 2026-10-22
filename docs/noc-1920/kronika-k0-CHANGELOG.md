@@ -5,6 +5,53 @@ Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E
 Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
 wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
 
+## 2026-10-22 - K0 KRYTYK KOMPLETNOSCI (stan galezi wobec KRONIKA-FORMAT 1-20 i PLAN kronika E, F, G, H, I)
+
+**Problem:** przeglad kazdego rozdzialu kontraktu i punktow planu (termy, akcje, kolumny, sekcje, linie logu, progi, klucze MCM, flagi autotestu, zapis, okna
+powracajace, para P1, lista chronionych, md5 lektora) wobec kodu i narzedzi po poprawkach (c779e57d) oraz wobec logu autotestu K0a/K0b z 0ffd5d9f (scratchpad
+7aee5f12/logi-noc/k0-k0a: 13 okien, nagrania .ogg graja "po kluczu kr_NNN_w, md5 tekstu zgodny", m105kronika 22/22). Silnik ma wszystko z planu E/F/G
+i kontraktu; braki: (1) kontrola md5 lektora w kronika_check czytala arm_lektor.tsv (okna ROT i prologu, bez kluczy kr_) innym wzorem tekstu - dla 293 nagran
+Kroniki nie zadzialala nigdy (zmiana tekstu nagranego okna = cisza w grze bez slowa walidatora); (2) 016.2 `po` = `kr:016.1+7 & mv:m01 | mv:p10` - m01 (tylko
+classic) i p10 (tylko prolog) sa w kampanii drugiego trybu pomijane w pierwszej dobie (CanonCompanions Res.Skip), wiec skladnik byl prawdziwy od startu w obu
+trybach: Szepczacy Las mogl pojsc wariantem "Jaime uciekl" przed jego schwytaniem; (3) k00 nie sprawdzal w autotescie wiesci ani wariantu (plan I K0a: 000.1a
+wymaga gracza na Polnocy, wiesc 000.1 - gracza w armii; bieg k0a: 0 wiesci, 0 wariantow); (4) KRONIKA-FORMAT 1/16.5/17 opisywaly nagrania w arm_lektor.tsv
+(kolumna 5) i k00 z 2 oknami.
+**Przyczyna:** walidator A-kroku danych pisany przed manifestem nagran (fcf2b976); dane 016.2 bez znajomosci pomijania wierszy drugiego trybu; k00 z kroku danych.
+**Zmiana:**
+- `tools/kronika/kronika_check.py`: manifest `Lektor/EN/arm_lektor_kronika.tsv` (World.lektor_kr); md5 tekstu wzorem nagraj_kronika.py = Chronicle.Voice (voice_text);
+  BLAD - tekst inny niz nagrany, plik nagrania brak / md5 pliku inny (wyzerowany), dubel albo zly wiersz manifestu, klucz kr_ w arm_lektor.tsv (Lektor.LoadIndex
+  czyta go przed manifestem - zaslania wiersz i gra bez zasady md5); UWAGA - nagranie `nieaktualne`, lektor=1 bez nagrania (poza wersja=pelna, ktorych skrypt nie
+  nagrywa), nagranie bez wiersza lektor=1, lektor=1 w wariancie bez wlasnego tekstu (gra nagranie glownego; skrypt nagralby pusty tekst); UWAGA - `mv:X` wiersza
+  tylko-classic/tylko-prolog w alternatywie ` | ` (World.move_mode z kolumny mode #move).
+- Dane: 016.2 `po` = `kr:016.1+7 & mv:m01 & mv:p10` (okno za schwytaniem w obu trybach; tekst i md5 lektora bez zmian). k00: 000.5 (forma wiesc dla kazdego, akcje
+  `wiesc:000.5_N1`, `plotka:000.5_P:vlandia:10`) i 000.6 (zmienne `{KING}`=@wladca:vlandia, `{ME}`=@gracz; wariant a `pelna` - przy kluczu Full Versions NIE nie
+  moze wygrac; wariant b `obie` bez wlasnego tekstu - tekst i zmienne glownego, flaga kr_test_6b); oba w lancuchu kr:000.4+1 / kr:000.5+1 (dzien opowiesci ok. 12-14).
+- `docs/KRONIKA-FORMAT.md`: 1 (k00 6 okien, manifest nagran), 10 (`mv:` wiersza z trybem), 16.5 (wzor tekstu nagrania, zmiana tekstu nagranego okna), 17 (nowe reguly).
+- Bez zmian C# (silnik kompletny wobec planu E/F/G; build 0 bledow, 7 starych ostrzezen).
+**Braki opisane, nie robione (waga):**
+- (srednia, tresc) FORMAT 8: nowe wiersze #move dla Theona (072.3/087/108), Brienne i Podricka (083), Jaimego (107) "w paczce silnika" - nie dodane; okna maja
+  warianty na brak tych zmian (098.2a/c, 111.1 przyjmuja Brienne w battania_1 albo battania_6), wiec dzialaja, ale swiat ich nie zmienia. Nowe zmiany stron = decyzja
+  tresci przy paczkach K6-K10 (dni 1300+), nie K1.
+- (srednia, swiat) `pop` POMINIETA (10 wierszy, 22 uzycia, K2-K10), `kod:zaraza` czesc (1), `kod:dzwony` czesci (1)(2) - ksiega ludzi bez przyczyn kronika/choroba/
+  pozar; okna sie pokazuja, ludzie bez zmian (linia mowi o tym). Nowa przyczyna PeopleBook + droga do puli okregu = osobna galaz z testem ksiegi (zamknieta ekonomia).
+- (niska) `task` bez wpisu tablicy ogloszen (wiadomosc) i `alliance` zawsze POMINIETA (P5, K9/K10) - swiadome, FORMAT 7 i 11.
+- (niska, dokument) prog KW-12 w repo glownym (PLANY-E5-WOJNY-KRONIKA, H) dalej 24 KB, kod i sprawdz_logi 48 KB - poprawic przy scaleniu (inny katalog).
+- (niska, test) K0b z flaga `b`: w 000.2 opcja b jest celowo wyszarzona - bieg sprawdza tylko zapas (bierna c); wymuszenie sprawdza flaga `a` (tez gold @gracz).
+  "Zapis przy stanie 'a', wczytanie, lista wraca" (plan I K0a) - autotest odpowiada na liste w < 1 s, wiec w biegu prawie nigdy; sprawdzone harnessem (Build-Import-Build).
+- (niska, repo glowne) tools/lektor/nagraj_kronika.py czyta komorki surowo: wariant z lektor=1 bez wlasnego tekstu dostalby nagranie pustego tekstu (dzis 0 takich
+  wierszy - walidator ma UWAGE).
+- (info) 5 okien bez glosu: 051.1a (brak nagrania), 075.3, 079.1, 090.1, 090.1a (nieaktualne) - nagrac po odnowieniu ElevenLabs (kronika_check: 5 UWAG).
+**Ryzyko / co sprawdzic:**
+- 016.2 w kampanii z prologiem idzie teraz dopiero po rozstrzygnieciu p10 (schwytanie Jaimego, war:battania:vlandia+5 - zwykle dni po NedEvent, dlugo przed od 130);
+  p10 czekajace ponad 195+30 dni = okno przepada (wczesniej szlo wariantem a).
+- k00 000.6: `{KING}` bez wladcy korony (krolestwo wyeliminowane) = okno czeka z powodem "zmienna KING bez wartosci" (k00 tylko z flaga testu).
+- kronika_check liczy md5 293 plikow .ogg (ok. 90 MB) przy kazdym uruchomieniu - ok. 0,5 s.
+- Testy: kronika_check WYNIK OK (0 bledow, 5 UWAG lektora - jak linia startu silnika: z nagraniem 289/311, bez 18 = 17 pelna + 051.1a, stary tekst 4);
+  scratchpad 7aee5f12/kr-kryt/neg_lk.py 11/11 (7 regul + 4 bez falszywych, kod wyjscia 1); stare testy walidatora kr-final/t_neg, t_neg3, t_pos - 0 roznic,
+  t_neg2 - ten sam licznik bledow (kr_005_1 w arm_lektor.tsv: dawniej "tekst zmieniony", teraz "klucz Kroniki w arm_lektor.tsv"); kronika_silnik WYNIK OK;
+  harness A1 (prawdziwy Armoury.dll): k00 6/1/0, zle wiersze 0, nieznane termy 0, 000.6a/b z tekstem glownego; m105kronika na logu k0a 22/22 (bez zmian narzedzia).
+**Status:** DO SPRAWDZENIA (autotest K0a: linie "wiesc 000.5", "akcja 000.5 #2 wiesc:000.5_N1 -> OK", "okno 000.6 ... wariant b" z imieniem wladcy w tytule; nic nie wgrane).
+
 ## 2026-10-22 - K0 POPRAWKI po trzech recenzjach (bezpieczenstwo, kontrakt, styk-api)
 
 **Problem:** recenzje silnika K0 (HEAD 0ffd5d9f) i ich weryfikacja w dekompilacji 1.4.8 - stan zly: ukrycie postaci w drodze (opozniony teleport gry

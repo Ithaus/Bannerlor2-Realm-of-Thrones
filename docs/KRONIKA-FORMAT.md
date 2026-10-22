@@ -20,11 +20,11 @@ Spis: 1 pliki | 2 budowa pliku | 3 #okno | 4 #wybor | 5 #tekst | 6 #banda | 7 #z
 
 | Plik | Co | Kto czyta |
 |---|---|---|
-| `Armoury/ModuleData/arm_kronika_k00.tsv` | 2 okna testowe silnika (000.1, 000.2) - wczytywany TYLKO przy pliku `CrashScribe/armoury-kronika-test.flag` | K0, autotest K0a/K0b |
+| `Armoury/ModuleData/arm_kronika_k00.tsv` | 6 okien testowych silnika (000.1-000.6: okno, wariant miejsca, wybor z opcja wyszarzona, hide/unhide, wiesc z akcjami wiesc/plotka, zmienne i filtr wersji) - wczytywany TYLKO przy pliku `CrashScribe/armoury-kronika-test.flag` (i trybie autotestu CrashScribe 1/2) | K0, autotest K0a/K0b |
 | `Armoury/ModuleData/arm_kronika_k01.tsv` ... `k10.tsv` | paczki K1-K10 (rozdz. 18) - jeden plik na paczke | K0 + paczki |
 | `Armoury/ModuleData/arm_kronika_tematy.tsv` | tematy obrazkow -> sprite'y ROT i obrazki prologu (rozdz. 14) | Chronicle.Pictures |
 | `Armoury/ModuleData/arm_canon_moves.tsv` | zmiany stron postaci kanonu (CanonCompanions) - Kronika dopisuje tu tylko termy `kr:` (rozdz. 8) | CanonCompanions |
-| `Armoury/ModuleData/Lektor/EN/arm_lektor.tsv` | nagrania (pozniej): klucz `kr_NNN_w[war]`, kolumna 5 = md5 tekstu okna | Lektor |
+| `Armoury/ModuleData/Lektor/EN/arm_lektor_kronika.tsv` | manifest nagran Kroniki (repo glowne `tools/lektor/nagraj_kronika.py`): klucz `kr_NNN_w[war]`, tytul, plik `.ogg`, md5 tekstu (kolumna 4; tekst jak rozdz. 16.5), md5 pliku (kolumna 5), paczka; md5 tekstu nie-hex (`nieaktualne`) = nagranie ze starym tekstem (cisza). `arm_lektor.tsv` obok to nagrania okien ROT i prologu (bez kluczy `kr_`) | Lektor (zasada md5), walidator |
 
 - Kodowanie UTF-8 bez BOM, separator TAB, konce linii LF albo CRLF (git z autocrlf i tak zamienia). Bajt 0 w pliku = plik wyzerowany
   (dysk C Jeffa) - silnik wylacza cala paczke z linia `ZLY PLIK`, walidator zglasza BLAD.
@@ -292,7 +292,7 @@ Przed pierwszym wgraniem paczki id mozna jeszcze zmieniac bez nagrobka.
 | `kr:NNN.w` | okno | okno ROZSTRZYGNIETE (okno/wiesc/log/nic - poprawka K0 R-8); okno pominiete = term nigdy. Okno powracajace: rozstrzygnieta jakakolwiek instancja; `max:N` zuzyty i zadna instancja nie czeka w kolejce = nigdy (poprawka K0 R-2) | nowy |
 | `kr:NNN.w=x` | okno, opcja a-d | w oknie wybrano opcje x. NIE dla okna powracajacego - wybor instancji zapisuje sie pod `NNN.w#klucz` (walidator: BLAD, uzyj flagi z opcji; poprawka K0 R-10) | nowy |
 | `flag:<nazwa>` | male litery/cyfry/_ | flaga ustawiona akcja `flag:` (zalecana nazwa `kNNN_slowo`) | nowy |
-| `mv:<mNN>` | wiersz #move | wiersz rozstrzygniety (wykonany albo pominiety) | CanonCompanions.MoveState |
+| `mv:<mNN>` | wiersz #move | wiersz rozstrzygniety (wykonany albo pominiety). Wiersz z kolumna mode `classic`/`prolog` jest w kampanii drugiego trybu pominiety w pierwszej dobie, wiec `mv:m01 \| mv:p10` jest prawdziwe od startu - okno za ruchem w obu trybach: `mv:m01 & mv:p10` (krytyk K0, 016.2; walidator: UWAGA) | CanonCompanions.MoveState |
 | `mv:<mNN>=done` / `=skip` | | wiersz wykonany / pominiety | j.w. |
 | `cw:reach` / `cw:dorne` | | straznik Prologue.Crown trzyma sojusz korona-Reach / pakty Dorne | m104-wojny (odczyt) |
 | `season:<pora>` | winter\|spring\|summer\|autumn | pora roku WesterosClimate | nowy |
@@ -554,7 +554,10 @@ pisze `| lista chronionych: <term> spelnione` dla wszystkich trzech akcji (prog 
 4. **Wersje lekkie domyslnie**. Pelne (zamki, wladcy, sojusze, upadki rodow) tylko jako warianty `wersja=pelna` (klucz ChronicleFullVersions,
    domyslnie NIE). 16 duzych: 23, 26, 56, 59, 63, 81, 86, 94, 95, 100, 103, 107, 108, 115, 116, 117. Pelne 95/97/107 dopiero w K9/K10 (P5).
 5. **Lektor pozniej**: `lektor=1` dla okien bez `{ZMIENNYCH}` (w praktyce okno 1 kazdego wydarzenia i stale akapity). Tekst po nagraniu
-   jest zamrozony (md5 w arm_lektor.tsv - walidator).
+   jest zamrozony (md5 w arm_lektor_kronika.tsv - walidator BLAD, gra cisza). Tekst nagrania = tytul bez koncowych `.!?` + `.` + pusta linia + gora +
+   pusta linia + dol (bez `{=...}`), z zamiana wymowy `R'hllor` -> `the Red God` (nagraj_kronika.py = Chronicle.Voice = kronika_check). Zmiana tekstu
+   nagranego okna: przywrocic tekst albo nagrac ponownie (albo oznaczyc wiersz manifestu `nieaktualne` - okno bez glosu do nagrania).
+   Wariant bez wlasnego tekstu gra nagranie wiersza glownego (`lektor=1` w takim wariancie = UWAGA; skrypt nagralby pusty tekst).
 6. **Obrazki**: tylko `temat` (rozdz. 14), bez promptow.
 7. **Postacie nieobecne w ROT** (P7: Hoster Tully, Ellaria, Olenna Tyrell, Slynt, Dontos, Rodrik Cassel, Rorge, Edric Storm, Gilly, Sigorn;
    Pycelle tylko notabl) - wystepuja tylko w tekscie, bez akcji. Nowe postacie (NP) tylko w wersji pelnej.
@@ -590,7 +593,7 @@ Tylko biblioteka standardowa; miara linii = kopia `e4c/linie.py` w `tools/kronik
 Sprawdza: naglowki i liczbe kolumn; unikalne id, wariant pod wierszem glownym, czas tylko w glownym; paczke wlasciwa dla numeru;
 znane termy i akcje z liczba i typem argumentow; istnienie bohaterow/rodow/krolestw/osad/kultur/przedmiotow w XML ROT; wydarzenia ROT;
 tokeny (powracajace tylko z `powtorz`); pojemnosc tekstu, prefiksy `{=ARM_KR_...}`, zmienne, znaki fontu, polskie litery, cudzyslowy;
-`lektor=1` bez zmiennych i md5 tekstu z arm_lektor.tsv (kolumna 5); 2-4 opcje a-d, ostatnia bierna i zawsze dostepna; zloto z platnikiem;
+`lektor=1` bez zmiennych i md5 tekstu z arm_lektor_kronika.tsv (kolumna 4) oraz pliki nagran (istnieja, md5 pliku z kolumny 5); 2-4 opcje a-d, ostatnia bierna i zawsze dostepna; zloto z platnikiem;
 akcje tylko-pelne poza `wersja=pelna` (wyjatki succeed 42/49/52/80); lista chronionych; glowy rodow i wladcy; postacie z `#move`;
 `move:`/`remove`/`dragon_*`; pary `#para` w obie strony z arm_canon_moves; odwolania `kr:` (okno i opcja), `wiesc:/plotka:` (#tekst),
 `band:`, `task:`; nagrobki; tematy (sprite'y z ROT-ContentSpriteData.xml, poza rotacja, `stannis-slain` tylko 081, prolog 01-23).
@@ -609,6 +612,13 @@ Poprawki walidatora 22.10 (recenzje silnika K0): koniec ukrycia `hide` = pelny w
 liczony jak glowny przy UWADZE "inni bez kolumny gracz" (R-3).
 Testy nowych regul: scratchpad 7aee5f12/kr-final/neg3.py (6 BLEDOW, 4 UWAGI - kazda regula raz w obie strony); stare neg.py/neg2.py/pos.py bez zmian
 wyniku poza towarem `iron` (kr-final/old_*.txt vs new_*.txt).
+Poprawki walidatora 22.10 (krytyk kompletnosci K0): kontrola md5 lektora czytala `arm_lektor.tsv` (okna ROT i prologu, bez kluczy `kr_`) innym wzorem tekstu -
+dla 293 nagran Kroniki nie dzialala nigdy. Teraz manifest `arm_lektor_kronika.tsv`: BLAD - tekst okna inny niz nagrany (wzor rozdz. 16.5), plik nagrania brak albo
+md5 pliku inny (wyzerowany), dubel klucza, zly wiersz manifestu, klucz `kr_` w `arm_lektor.tsv` (Lektor czyta go przed manifestem - zaslonilby wiersz manifestu
+i gral bez zasady md5); UWAGA - nagranie `nieaktualne`, `lektor=1` bez nagrania (poza `wersja=pelna`, ktorych skrypt nie
+nagrywa), nagranie bez wiersza `lektor=1`, `lektor=1` w wariancie bez wlasnego tekstu. Stan danych 22.10: 289 nagran zgodnych, UWAGI 5 (051.1a bez nagrania; 075.3,
+079.1, 090.1, 090.1a nieaktualne - do nagrania po odnowieniu ElevenLabs). Test: scratchpad 7aee5f12/kr-kryt/neg_lk.py (7 regul w obie strony, kod wyjscia 1).
+Do tego UWAGA: `mv:X` wiersza tylko-classic/tylko-prolog w alternatywie ` | ` (rozdz. 10 - skladnik prawdziwy od startu; jedyny przypadek 016.2 poprawiony na `&`).
 
 ## 18. Podzial na paczki K1-K10
 
