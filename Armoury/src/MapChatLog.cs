@@ -23,12 +23,16 @@ namespace Armoury
     /// Bez XML i bez UIExtenderEx - wszystko z kodu (dekompilacja 1.4.8):
     ///  - dziennik to film "SPChatLog" w warstwie globalnej GauntletChatLogView (TaleWorlds.MountAndBlade.GauntletUI - bez referencji, odbicie raz przy starcie);
     ///    ChatLogWidget ma marginesy tylko jako stale atrybuty prefabu (MarginLeft 27, MarginBottom 32) i sam ich nie rusza - przestawiamy je z kodu;
-    ///  - P1 przesuniecie (klucz MapChatLogClearOfMenu): tylko w czystym stanie menu na mapie (MapScreen na wierzchu, IsInMenu, bez okien nad menu, rozmowy i pytan)
-    ///    dziennik idzie na prawo od menu: MarginLeft 560 (menu 27 + 493 + ramka 25 + odstep 15), MarginBottom 150 (dol ramki nad napisem PAUSED); poza tym
+    ///  - P1 przesuniecie (klucz MapChatLogClearOfMenu): trzy pozycje. Menu: w czystym stanie menu na mapie (MapScreen na wierzchu, IsInMenu, bez okien - NoWindows)
+    ///    dziennik idzie na prawo od menu: MarginLeft 560 (menu 27 + 493 + ramka 25 + odstep 15), MarginBottom 150 (dol ramki nad napisem PAUSED). Mapa: mapa bez menu
+    ///    i bez okien - MarginLeft 100 (obok sylwetki "Army Armory readiness" moda DynamicTroopEquipment, x 8..92 przy dole), dol z prefabu. Gra: w kazdym innym stanie
     ///    wartosci z prefabu, odczytane z widzetu przy znalezieniu. Bez animacji. Okna ROT to osobny ekran - TopScreen przestaje byc MapScreen, dziennik wraca;
     ///  - P2 ramka (klucz MapChatLogFrame): wlasny kontener "ArmChatLogFrame" jako dziecko 0 ChatLogWidget (pod tekstem) - tlo BlankWhiteSquare_9 #000000CC i dwie
     ///    belki General\TooltipHint\tooltip_frame (jak dymek ROT / ArmMapVillageTooltip.xml); wysokosc = widoczne linie (Alpha > 0.01 od konca MessageHistory,
-    ///    suma wysokosci ostatnich k dzieci InnerPanel) + 2 x 10, najwyzej pole tekstu; tylko na mapie kampanii, gdy gracz nie przeglada i nie pisze;
+    ///    suma wysokosci ostatnich k dzieci InnerPanel) + 2 x 10, najwyzej pole tekstu; tylko na mapie kampanii bez okien (NoWindows), w menu tylko przesuniety
+    ///    obok menu, gdy gracz nie przeglada i nie pisze;
+    ///  - klucze z MCM wprost 4 razy na sekunde w kampanii (zmiana w zatrzymanym menu dziala od razu - McmSettings.Apply naklada je dopiero co godzine gry);
+    ///    bez MCM - Settings.Current;
     ///  - P3 filtr handlu (klucz MapHideTradeNotices): prefiks na prywatnej SettlementNameplateNotificationsVM.OnCaravanTransactionCompleted (tabliczka osady) - wiersz
     ///    nie powstaje; zdarzenie gry dalej dochodzi do BK i naszej ekonomii (TownFolk.OnCaravanTrade). Wiersze rekrutow, jencow i okretow bez zmian.
     /// Takt 4 razy na sekunde z OnApplicationTick (SubModuleMain.ChatLogTick - NoInlining, licznik bledow ladowania typu); wlasciwosci widzetow tylko przy zmianie,
@@ -41,11 +45,13 @@ namespace Armoury
         internal const string P = "Dziennik (m105): ";
         internal const string AutoFlagName = "armoury-dziennik.flag";
         private const float MovedLeft = 560f, MovedBottom = 150f;   // jednostki UI 1920x1080
+        private const float MapLeft = 100f;                          // mapa bez menu: prawa krawedz sylwetki DTE 92 + odstep (ramka od x 108, tekst od x 115)
+        private const int PosGame = 0, PosMenu = 1, PosMap = 2;      // pozycje dziennika: prefab / obok menu / obok sylwetki
         private const float FramePad = 10f;                          // odstep ramki nad i pod liniami
         private const float FrameBottom = 55f;                       // ScrollablePanelContainer MarginBottom 65 - FramePad
         private const float TextHeightCut = 95f;                     // pole tekstu = SizeY - 45 (pasek) - 5 - 65; ramka najwyzej pole + 2 x FramePad
-        private const float PausedTop = 885f;                        // gorna granica napisu PAUSED (zrzut autotestu 18.10: y ok. 895..925, zapas 10)
-        private const float BarTop = 1015f;                          // gorna krawedz lewych przyciskow paska mapy
+        private const float PausedFromBottom = 195f;                 // gorna granica napisu PAUSED od dolu ekranu (1080 - 885; zrzut autotestu 18.10: y ok. 895..925, zapas 10)
+        private const float BarFromBottom = 65f;                     // gorna krawedz lewych przyciskow paska mapy od dolu ekranu (1080 - 1015)
         private const float MenuFrame = 27f;                         // ramka panelu menu po prawej (Frame1.Border 25 + 2)
         private const string TestTag = "Chat log test (autotest)";
 
@@ -60,11 +66,16 @@ namespace Armoury
         private static GauntletLayer _layer;
         private static Widget _root, _w, _inner, _text, _frame;
         private static float _origLeft = 27f, _origBottom = 32f;
-        private static bool _moved, _frameTried, _frameWasVis;
+        private static int _pos;           // PosGame / PosMenu / PosMap - pozycja ustawiona na widzecie
+        private static bool _frameTried, _frameWasVis;
         private static float _frameH;
         private static int _lastK;
         private static int _findWait;      // takty do nastepnego szukania po nieudanym (co 5 s)
-        private static int _finds, _movesLogged, _backsLogged;
+        private static int _finds, _movesLogged, _backsLogged, _mapLogged;
+
+        // ---- klucze (z MCM wprost w kampanii, bez MCM z Settings.Current)
+        private static bool _kClear = true, _kFrame = true, _kHide = true;
+        private static int _mcmFails;
 
         // ---- czas i kampania
         private static float _acc, _clock, _campAt, _movedAt;
@@ -72,8 +83,8 @@ namespace Armoury
 
         // ---- test autotestu
         private static bool _testOn, _mapTestDone;
-        private static int _menuTests, _testN, _probeStage;
-        private static float _lastMenuTestAt = -1e9f, _probeAt;
+        private static int _menuTests, _mapTries, _testN, _probeStage;
+        private static float _lastMenuTestAt = -1e9f, _mapNotBefore, _probeAt;
         private static string _probeKind, _probeLine, _probePath;
         private static List<string> _probeFails = new List<string>();
 
@@ -163,9 +174,8 @@ namespace Armoury
         {
             try
             {
-                var s = Settings.Current;
-                bool on = s != null && s.MapHideTradeNotices;
-                bool here = __1 != null && ____settlement != null && __1.Owner != null && ReferenceEquals(____settlement, __1.Owner.Settlement);
+                bool on = _kHide;   // klucz odswiezany w takcie (ReadKeys, 4 razy na sekunde w kampanii)
+                bool here =__1 != null && ____settlement != null && __1.Owner != null && ReferenceEquals(____settlement, __1.Owner.Settlement);
                 if (!on)
                 {
                     if (here) MapChatLogStats.DPassed++;
@@ -195,42 +205,72 @@ namespace Armoury
 
         private static void Step()
         {
-            var s = Settings.Current;
+            if (Campaign.Current != null) ReadKeys();
             MapScreen ms = Campaign.Current != null ? ScreenManager.TopScreen as MapScreen : null;
             bool onMap = ms != null;
-            if (onMap && !_campLine) CampaignLine(s);
+            if (onMap && !_campLine) CampaignLine();
             if (!Alive())
             {
-                if (_w != null && _moved) { try { _w.MarginLeft = _origLeft; _w.MarginBottom = _origBottom; } catch { } }   // odpadly widzet - marginesy prefabu
-                _w = null; _moved = false;
+                if (_w != null && _pos != PosGame) { try { _w.MarginLeft = _origLeft; _w.MarginBottom = _origBottom; } catch { } }   // odpadly widzet - marginesy prefabu
+                _w = null; _pos = PosGame;
                 if (!onMap) return;
                 if (_findWait > 0) { _findWait--; return; }
-                if (!Find(s)) { _findWait = 20; return; }
+                if (!Find()) { _findWait = 20; return; }
             }
-            bool want = s != null && s.MapChatLogClearOfMenu && onMap && MenuClean(ms);
-            if (want != _moved) Move(want);
-            Frame(s, onMap);
-            if (onMap && _testOn) TestStep(ms, s);
+            bool clean = onMap && NoWindows(ms);
+            int want = _kClear && clean ? (ms.IsInMenu ? PosMenu : PosMap) : PosGame;
+            if (want != _pos) Move(want);
+            // ramka: mapa bez okien; w menu tylko przesuniety obok menu (klucz przesuniecia NIE - menu zostaje bez ciemnego panelu, jak w grze)
+            Frame(clean && (!ms.IsInMenu || _pos == PosMenu));
+            if (onMap && _testOn) TestStep(ms);
         }
 
-        /// <summary>Czysty stan menu: menu osady albo spotkania otwarte, nic nad nim (ucieczka, zarzadzanie, werbunek, okienka gry, rozmowa, pytanie).</summary>
-        private static bool MenuClean(MapScreen ms)
+        /// <summary>Bez okien na MapScreen (z menu albo bez): ucieczka, zarzadzanie, werbunek, okienka gry, encyklopedia, okno wyniku kucia Armoury, tabela turnieju,
+        /// rozmowa, pytanie. Menu osady samo w sobie nie jest oknem - o pozycji decyduje IsInMenu.</summary>
+        private static bool NoWindows(MapScreen ms)
         {
-            if (!ms.IsInMenu || ms.IsEscapeMenuOpened || ms.IsInTownManagement || ms.IsInRecruitment || ms.IsInArmyManagement || ms.IsInHideoutTroopManage
+            if (ms.IsEscapeMenuOpened || ms.IsInTownManagement || ms.IsInRecruitment || ms.IsInArmyManagement || ms.IsInHideoutTroopManage
                 || ms.IsMarriageOfferPopupActive || ms.IsHeirSelectionPopupActive || ms.IsMapIncidentActive || ms.IsInCampaignOptions || ms.IsInBattleSimulation) return false;
+            // warstwy na MapScreen bez flagi ekranu (lezaly pod dziennikiem 15300): encyklopedia z menu albo mapy ("EncyclopediaBar" 310), okno wyniku kucia
+            // (CraftPopup, warstwa 4500 - przycisk Done pod przesunietym dziennikiem), tabela turnieju z menu miasta ("MapTournamentLeaderboard" 206, przycisk Done)
+            if (ms.EncyclopediaScreenManager != null && ms.EncyclopediaScreenManager.IsEncyclopediaOpen) return false;
+            if (CraftPopup.IsOpenOn(ms)) return false;
+            if (ms.FindLayer<ScreenLayer>("MapTournamentLeaderboard") != null) return false;
             var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
             if (cm != null && cm.IsConversationInProgress) return false;
             return !InformationManager.IsAnyInquiryActive();
         }
 
-        private static void CampaignLine(Settings s)
+        /// <summary>Klucze dziennika: z MCM wprost (zmiana w MCM dziala od razu, takze w zatrzymanym menu), bez MCM albo po 3 bledach odczytu - Settings.Current.</summary>
+        private static void ReadKeys()
+        {
+            var s = Settings.Current;
+            bool c = s == null || s.MapChatLogClearOfMenu, f = s == null || s.MapChatLogFrame, h = s == null || s.MapHideTradeNotices;
+            if (_mcmFails < 3)
+            {
+                try { McmKeys(ref c, ref f, ref h); }
+                catch (Exception e) { _mcmFails++; Stumble("ReadKeys (MCM, proba " + _mcmFails + "/3)", e); }
+            }
+            _kClear = c; _kFrame = f; _kHide = h;
+        }
+
+        /// <summary>Osobna metoda bez wstawiania: brak biblioteki MCM = blad ladowania typu przy wywolaniu (lapany w ReadKeys), nie przy JIT taktu.</summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void McmKeys(ref bool c, ref bool f, ref bool h)
+        {
+            var i = McmSettings.Instance;
+            if (i == null) return;
+            c = i.MapChatLogClearOfMenu; f = i.MapChatLogFrame; h = i.MapHideTradeNotices;
+        }
+
+        private static void CampaignLine()
         {
             _campLine = true;
             _campAt = _clock;
             try { if (!_viewOk || !_vmOk) Resolve(); } catch (Exception e) { Stumble("Resolve", e); }
             _testOn = TestWanted();
-            Log.Info(P + "kampania - klucze MapChatLogClearOfMenu=" + YN(s != null && s.MapChatLogClearOfMenu) + ", MapChatLogFrame=" + YN(s != null && s.MapChatLogFrame)
-                     + ", MapHideTradeNotices=" + YN(s != null && s.MapHideTradeNotices) + " (czytane na zywo, co 0,25 s), widok dziennika " + (_viewOk ? "TAK" : "BRAK")
+            Log.Info(P + "kampania - klucze MapChatLogClearOfMenu=" + YN(_kClear) + ", MapChatLogFrame=" + YN(_kFrame) + ", MapHideTradeNotices=" + YN(_kHide)
+                     + " (z MCM na zywo, co 0,25 s), widok dziennika " + (_viewOk ? "TAK" : "BRAK")
                      + ", pola MPChatVM " + (_vmOk ? "TAK" : "BRAK") + ", latka tabliczek " + (_patchOk ? "TAK" : "BRAK") + ", test autotestu " + YN(_testOn) + ".");
         }
 
@@ -257,7 +297,7 @@ namespace Armoury
             return gl != null ? gl.Layer as GauntletLayer : null;
         }
 
-        private static bool Find(Settings s)
+        private static bool Find()
         {
             GauntletLayer layer = ChatLayer();
             UIContext ctx = layer != null ? layer.UIContext : null;
@@ -269,11 +309,11 @@ namespace Armoury
             _inner = w.FindChild("InnerPanel", true);
             _text = w.FindChild("ScrollablePanelContainer", true);
             _origLeft = w.MarginLeft; _origBottom = w.MarginBottom;   // nowy film - wartosci prefabu
-            _moved = false;
+            _pos = PosGame;
             _frame = null; _frameTried = false; _frameWasVis = false; _frameH = 0f; _lastK = 0;
             _finds++;
             string fr;
-            if (s != null && s.MapChatLogFrame) fr = BuildFrame();
+            if (_kFrame) fr = BuildFrame();
             else fr = "NIE (klucz MapChatLogFrame wylaczony - ramka powstanie przy wlaczeniu)";
             float sc = ctx.CustomScale;
             Log.Info(P + "widget dziennika znaleziony (" + _finds + ". raz; ChatLogWidget, marginesy " + F0(_origLeft) + "/" + F0(_origBottom) + ", rozmiar "
@@ -350,33 +390,40 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ P1: przesuniecie
-        private static void Move(bool want)
+        /// <summary>Pozycja dziennika. Liczniki doby: przesuniecia = wejscia obok menu, powroty = wyjscia spod menu (do pozycji gry albo mapy); mapa <-> gra
+        /// (okno na mapie bez menu) bez licznika, w logu 3 pierwsze wejscia obok sylwetki w sesji.</summary>
+        private static void Move(int want)
         {
             float l0 = _w.MarginLeft, b0 = _w.MarginBottom;
-            float l = want ? MovedLeft : _origLeft, b = want ? MovedBottom : _origBottom;
+            float l = want == PosMenu ? MovedLeft : want == PosMap ? MapLeft : _origLeft;
+            float b = want == PosMenu ? MovedBottom : _origBottom;
             _w.MarginLeft = l;
             _w.MarginBottom = b;
-            _moved = want;
-            if (want)
+            int was = _pos;
+            _pos = want;
+            string mg = " (MarginLeft " + F0(l0) + " -> " + F0(l) + ", MarginBottom " + F0(b0) + " -> " + F0(b) + ").";
+            if (want == PosMenu)
             {
                 MapChatLogStats.DMoves++;
                 _movedAt = _clock;
-                if (++_movesLogged <= 3) Log.Info(P + "przesuniety obok menu (MarginLeft " + F0(l0) + " -> " + F0(l) + ", MarginBottom " + F0(b0) + " -> " + F0(b) + ").");
+                if (++_movesLogged <= 3) Log.Info(P + "przesuniety obok menu" + mg);
             }
-            else
+            else if (was == PosMenu)
             {
                 MapChatLogStats.DBacks++;
-                if (++_backsLogged <= 3) Log.Info(P + "wrocil na miejsce gry (MarginLeft " + F0(l0) + " -> " + F0(l) + ", MarginBottom " + F0(b0) + " -> " + F0(b) + ").");
+                if (++_backsLogged <= 3) Log.Info(P + (want == PosMap ? "wrocil spod menu na miejsce mapy (obok sylwetki armii)" : "wrocil na miejsce gry") + mg);
             }
+            else if (want == PosMap && ++_mapLogged <= 3) Log.Info(P + "przesuniety obok sylwetki armii (mapa bez menu)" + mg);
         }
 
         // ------------------------------------------------------------ P2: ramka
-        private static void Frame(Settings s, bool onMap)
+        /// <summary>where = stan, w ktorym ramka moze sie pokazac (mapa bez okien; w menu tylko przesuniety obok menu).</summary>
+        private static void Frame(bool where)
         {
-            bool key = s != null && s.MapChatLogFrame;
+            bool key = _kFrame;
             if (_frame == null)
             {
-                if (!key || !onMap || _frameTried) return;
+                if (!key || !where || _frameTried) return;
                 string fr = BuildFrame();
                 Log.Info(P + "ramka dodana pozniej (klucz MapChatLogFrame wlaczony w sesji) " + fr + ".");
                 if (_frame == null) return;
@@ -384,7 +431,7 @@ namespace Armoury
             bool vis = false;
             float h = _frameH;
             int k = 0;
-            if (key && onMap)
+            if (key && where)
             {
                 IList hist;
                 bool busy;
@@ -453,16 +500,24 @@ namespace Armoury
             return Path.Combine(Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe");
         }
 
-        /// <summary>(a) raz na mapie bez menu (najwczesniej 10 s po wejsciu na mape), (b) w czystym stanie menu najwczesniej 20 s po przesunieciu, najwyzej 2 razy,
-        /// co najmniej co 120 s. Proba: 3 linie, po 1,5 s pomiar i zdjecie silnika, po 3 s sprawdzenie pliku i linia "test - ...".</summary>
-        private static void TestStep(MapScreen ms, Settings s)
+        /// <summary>(a) raz na mapie bez menu i bez okien (najwczesniej 10 s po wejsciu na mape), (b) w czystym stanie menu najwczesniej 20 s po przesunieciu,
+        /// najwyzej 2 pomiary (licznik rosnie przy pomiarze - przerwana proba nie zjada miejsca), co najmniej co 120 s. Proba: 3 linie, po 1,5 s pomiar i zdjecie
+        /// silnika, po 3 s sprawdzenie pliku i linia "test - ...".</summary>
+        private static void TestStep(MapScreen ms)
         {
             if (_probeStage == 1)
             {
                 if (_clock < _probeAt) return;
-                if (_probeKind == "mapa" && ms.IsInMenu) { Log.Info(P + "test - bez proby (mapa: menu otworzylo sie przed pomiarem)."); _probeStage = 0; return; }
-                if (_probeKind == "menu" && !_moved) { Log.Info(P + "test - bez proby (menu: menu zamkniete albo okno nad menu przed pomiarem)."); _probeStage = 0; return; }
-                Measure(ms, s);
+                if (_probeKind == "mapa" && (ms.IsInMenu || !NoWindows(ms)))
+                {
+                    Log.Info(P + "test - bez proby (mapa: menu albo okno otworzylo sie przed pomiarem).");
+                    _probeStage = 0;
+                    if (_mapTries < 3) { _mapTestDone = false; _mapNotBefore = _clock + 30f; }   // do 3 prob, co >= 30 s
+                    return;
+                }
+                if (_probeKind == "menu" && _pos != PosMenu) { Log.Info(P + "test - bez proby (menu: menu zamkniete albo okno nad menu przed pomiarem)."); _probeStage = 0; return; }
+                if (_probeKind == "menu") _menuTests++;
+                Measure(ms);
                 _probeStage = 2;
                 _probeAt = _clock + 3f;
                 return;
@@ -477,14 +532,9 @@ namespace Armoury
                 _probeStage = 0;
                 return;
             }
-            if (!_mapTestDone && !ms.IsInMenu && _clock - _campAt >= 10f && !ms.IsEscapeMenuOpened && !InformationManager.IsAnyInquiryActive())
+            if (!_mapTestDone && !ms.IsInMenu && _clock - _campAt >= 10f && _clock >= _mapNotBefore && NoWindows(ms)) { _mapTestDone = true; _mapTries++; Post("mapa"); return; }
+            if (_menuTests < 2 && _pos == PosMenu && _clock - _movedAt >= 20f && _clock - _lastMenuTestAt >= 120f)
             {
-                var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
-                if (cm == null || !cm.IsConversationInProgress) { _mapTestDone = true; Post("mapa"); return; }
-            }
-            if (_menuTests < 2 && _moved && _clock - _movedAt >= 20f && _clock - _lastMenuTestAt >= 120f)
-            {
-                _menuTests++;
                 _lastMenuTestAt = _clock;
                 Post("menu");
             }
@@ -517,12 +567,17 @@ namespace Armoury
 
         private static string XY(RectU r) { return "x " + F0(r.L) + ".." + F0(r.R) + " y " + F0(r.T) + ".." + F0(r.B); }
 
-        private static void Measure(MapScreen ms, Settings s)
+        private static void Measure(MapScreen ms)
         {
             _probeFails.Clear();
             _probePath = null;
             float sc = _w.Context.CustomScale;
             if (sc <= 0f) sc = 1f;
+            // wysokosc ekranu w jednostkach UI z korzenia warstwy: 1080 przy 16:9 i UIScale 1; wezsze proporcje (16:10) i UIScale != 1 daja inna -
+            // granice PAUSED i paska liczone od dolu (oba przypiete do dolu ekranu)
+            float hU = _root != null ? (_root.Bottom - _root.Top) / sc : 0f;
+            if (hU < 200f) hU = 1080f;
+            float pausedTop = hU - PausedFromBottom, barTop = hU - BarFromBottom;
             RectU log = U(_w, sc);
             RectU text = _text != null ? U(_text, sc) : log;
             bool frameVis = _frame != null && _frame.IsVisible;
@@ -565,14 +620,18 @@ namespace Armoury
                 if (ov > 0f && oh > 0f) over = (int)Math.Ceiling(ov);
             }
             int bottom = frameVis ? (int)Math.Round(fr.B) : -1;
-            bool key = s != null && s.MapChatLogFrame;
+            bool key = _kFrame;
             if (_probeKind == "menu")
             {
                 if (!hasMenu) _probeFails.Add("menu nie znalezione (GameMenuParent)");
                 if (over > 0) _probeFails.Add("zachodzenie " + over + " px");
-                if (frameVis && bottom > PausedTop) _probeFails.Add("dol ramki ponizej granicy PAUSED");
+                if (frameVis && bottom > pausedTop) _probeFails.Add("dol ramki ponizej granicy PAUSED");
             }
-            else if (frameVis && bottom >= BarTop) _probeFails.Add("dol ramki na pasku mapy");
+            else
+            {
+                if (frameVis && bottom >= barTop) _probeFails.Add("dol ramki na pasku mapy");
+                if (_kClear && content.L < MapLeft - 0.5f) _probeFails.Add("lewa krawedz x=" + F0(content.L) + " < " + F0(MapLeft) + " (sylwetka armii)");
+            }
             if (key && !frameVis) _probeFails.Add("ramka niewidoczna");
             if (tests < 3) _probeFails.Add("linii testowych widac " + tests + "/3");
             string shot = "zdjecie ";
@@ -588,23 +647,31 @@ namespace Armoury
             catch (Exception e) { shot += "BLAD (" + e.GetType().Name + ")"; _probeFails.Add("zdjecie: wyjatek"); Stumble("Measure.Shot", e); }
             _probeLine = "test - " + _probeKind + ": linie testowe " + tests + "/3 (widocznych " + vis + "), dziennik " + XY(log) + ", tekst " + XY(text)
                          + ", menu " + (hasMenu ? XY(menu) + " (z ramka " + F0(MenuFrame) + ")" : "brak") + ", zachodzenie " + over + " px, ramka " + (frameVis ? "TAK (" + XY(fr) + ", linii " + _lastK + ")" : "NIE (klucz " + YN(key) + ")")
-                         + ", dol ramki y=" + bottom + " (granica PAUSED " + F0(PausedTop) + ", pasek " + F0(BarTop) + "), " + shot;
+                         + ", dol ramki y=" + bottom + " (granica PAUSED " + F0(pausedTop) + ", pasek " + F0(barTop) + ", wysokosc " + F0(hU) + "), lewa krawedz x=" + F0(content.L)
+                         + ", " + shot;
         }
 
         // ============================================================ doba i kampania
         /// <summary>ArmouryBehavior.OnDailyTickBodyInner: linia doby (liczby za dobe, potkniecia od startu gry) i zerowanie licznikow doby.</summary>
         internal static void Daily(int day)
         {
-            var s = Settings.Current;
-            Log.Info(P + MapChatLogStats.DayText(day, s != null && s.MapHideTradeNotices));
+            Log.Info(P + MapChatLogStats.DayText(day, _kHide));
             MapChatLogStats.DayReset();
         }
 
-        /// <summary>Wyjscie z kampanii (SubModuleMain.OnGameEnd): linia kampanii i test od nowa; widzet zostaje (takt poza kampania oddaje miejsce gry i chowa ramke).</summary>
+        /// <summary>Wyjscie z kampanii (SubModuleMain.OnGameEnd): linia kampanii i test od nowa, liczniki doby i linii przesuniec od zera (wczytanie zapisu w srodku
+        /// doby nie przenosi liczb do pierwszej linii nowej sesji; potkniecia St licza od startu gry - zostaja); widzet zostaje - marginesy prefabu i ramka ukryta
+        /// od razu, bez licznika powrotow.</summary>
         internal static void Reset()
         {
             _campLine = false;
-            _testOn = false; _mapTestDone = false; _menuTests = 0; _probeStage = 0; _lastMenuTestAt = -1e9f;
+            _testOn = false; _mapTestDone = false; _menuTests = 0; _mapTries = 0; _probeStage = 0; _lastMenuTestAt = -1e9f; _mapNotBefore = 0f;
+            if (_w != null && _pos != PosGame) { try { _w.MarginLeft = _origLeft; _w.MarginBottom = _origBottom; } catch { } }
+            _pos = PosGame;
+            if (_frame != null) { try { _frame.IsVisible = false; } catch { } }
+            _frameWasVis = false;
+            _movesLogged = 0; _backsLogged = 0; _mapLogged = 0;
+            MapChatLogStats.DayReset();
         }
     }
 

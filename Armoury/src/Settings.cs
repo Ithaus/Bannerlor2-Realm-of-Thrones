@@ -2172,9 +2172,9 @@ namespace Armoury
 
         // --- Map news ---
         // m105-dziennik (Jeff 21.10 "tak, rob dziennik"): dziennik wiadomosci na mapie nie zaslania menu osady, ramka w stylu ROT, bez wierszy handlu nad miastami
-        // (MapChatLog.cs; czytane na zywo - takt 4 razy na sekunde, latka tabliczek przy kazdym zdarzeniu)
-        public bool MapChatLogClearOfMenu = true;          // Chat Log Clear Of Menus: while a settlement or encounter menu is open on the campaign map, the message log (ravens, captures, news) moves to the right of the menu, below the middle of the screen, so it no longer covers the menu; it moves back when the menu closes. Off = the log stays over the menu, as before
-        public bool MapChatLogFrame = true;                // Chat Log Frame On The Map: messages in the log on the campaign map get a dark panel with the thin silver bars of the Realm of Thrones tooltips, sized to the lines on show; it goes away with the last line. Battles and other screens keep the game's look. Off = bare text, as before
+        // (MapChatLog.cs; z MCM wprost 4 razy na sekunde w kampanii - zmiana dziala od razu, takze w zatrzymanym menu; latka tabliczek z tej samej wartosci; bez MCM z tych pol)
+        public bool MapChatLogClearOfMenu = true;          // Chat Log Clear Of Menus: while a settlement or encounter menu is open on the campaign map, the message log (ravens, captures, news) moves to the right of the menu, below the middle of the screen, so it no longer covers the menu; it moves back when the menu closes. On the open map with no window up it sits a little in from the left edge, clear of the army readiness button in the corner. Off = the log stays in the corner and over the menu, as before
+        public bool MapChatLogFrame = true;                // Chat Log Frame On The Map: messages in the log on the campaign map get a dark panel with the thin silver bars of the Realm of Thrones tooltips, sized to the lines on show; it goes away with the last line. Battles, other screens and windows over the map keep the game's look, and so does a settlement menu when the log is not moved clear of it. Off = bare text, as before
         public bool MapHideTradeNotices = true;            // Hide Trade Notices Over Towns: the rows with portraits above town names that list what caravans and villagers sold or bought ("Caravan of X Sold Jewelry x1 ...", "Villagers of Y Sold ...") are no longer shown. Trade itself and every other notice (recruits, prisoners, ships) are unchanged. Off = shown, as before
 
         // --- Map villages ---
