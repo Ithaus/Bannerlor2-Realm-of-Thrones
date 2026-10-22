@@ -162,3 +162,7 @@ KANDYDAT WGRANIA 103: w-toku/n33-calosc b643aace (drzewo zb/n33-calosc) = 102 + 
 TESTY: 103a/103b/103c (bez K0) kod 0; K0 k0a/k0b 22/22. TEST KONCOWY 103d w toku (testy-103.ps1 w scratchpad 7aee5f12...: -Dll n103d -Runs prolog,wczyt,bitwa,160; logi kopiowane do scratchpad/logi-noc/<bieg>; progi: tools/sprawdz_logi.py --grupa X).
 W TOKU: wf K0 wz5lay1g6 (recenzje -> poprawki -> krytyk -> styk na galezi w-toku/kronika-00-silnik); po nim: scalic galaz do n33, build, 1 bieg prologu, potem wgranie.
 WGRANIE 103: powershell -File tools/autotest-2026-10-17/wgraj-v5.ps1 -DllDir <test>/n103d (albo nowszy) -Tree zb/n33-calosc -Tag 2026-10-22-wgranie103; safely_exited=1; CHANGELOG.md wpis 103; RAPORT-NOCNY-2026-10-22.md (szkic juz jest); STAN-PRAC ### 110.
+
+### WGRANIE 103 (22.10 08:10 CEST)
+W GRZE: WGRANIE 103 = w-toku/n33-calosc 706dd55b (CHANGELOG.md wpis 103). Raport dla Jeffa: docs/RAPORT-NOCNY-2026-10-22.md. Testy nocy: logi w scratchpad 7aee5f12.../logi-noc/<bieg>, zrzuty w .../zrzuty/<bieg>.
+DALEJ (niedomkniete): gospodarka - M3W-2 wsie < 1000 zl 8.2% (cel 5%; zostaja wsie bez wozow: Wolni Ludzie, Zelazne Wyspy), M3W-10 narzedzia wsi, M5G-13 zaleglosci zamkow 21 tys., M3W-1 dryf kies na starym zapisie -0.30%/d; lektor 5 okien Kroniki (nagraj_kronika.py po odnowieniu ElevenLabs ok. 21.11); obrazki prologu 04-23 od Jeffa; prog E5-10 (bandy Gory ida do domow pod scena - za scisly); KW-12 w planie (24 KB vs 48 KB w kodzie).

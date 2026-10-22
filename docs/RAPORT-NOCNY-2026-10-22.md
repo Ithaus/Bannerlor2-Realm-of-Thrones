@@ -2,9 +2,14 @@
 
 ## W skrócie
 
-**[UZUPEŁNIĆ PO WGRANIU: godzina wgrania, wynik ostatniego testu]**
+**Wersja 103 jest wgrana (22.10, 08:10 czasu polskiego) i sprawdzona. Możesz grać.**
 
-Wersja 103 to wersja 102 plus wszystko, o co prosiłeś wieczorem. Każda część przeszła testy automatyczne bez błędu modu i bez wywrotki gry. Twoje zapisy przez całą noc były nietknięte.
+- **Wgranie:** 312 plików, każdy z zgodną sumą kontrolną. Kopia wersji 102 leży na dysku D.
+- **Testy w nocy:** 13 przebiegów (pełne prologi po 230 dni, wczytania zapisu, bitwy, 160 dni na starym zapisie, testy Kroniki). Wszystkie przeszły bez błędu modu i bez wywrotki gry.
+- **Ostatni test finalnej wersji:** pełny prolog i wczytanie, kod 0, 0 błędów.
+- **Twoje zapisy** przez całą noc były nietknięte.
+
+Wersja 103 to wersja 102 plus wszystko, o co prosiłeś wieczorem. Niedomknięte zostały tylko trzy cele gospodarki i 5 nagrań lektora (szczegóły niżej).
 
 ## Co nowego w 103
 
