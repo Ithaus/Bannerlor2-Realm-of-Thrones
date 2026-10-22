@@ -9072,7 +9072,7 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueMountainRaiders { get; set; } = true;
 
-        [SettingPropertyBool("Prologue Beric Hunt", HintText = "in a Prologue 298 campaign from day 160 Lord Beric Dondarrion (or, without him, the head of House Dondarrion) rides with his men after the Mountain's Men until they are broken or the prologue ends; the lords and bands of the realm leave him alone on the way. Off = no hunt", RequireRestart = false)]
+        [SettingPropertyBool("Prologue Beric Hunt", HintText = "in a Prologue 298 campaign, once the Mountain's Men burn their first village (not before day 160, and on day 168 at the latest even if no village has burned), Lord Beric Dondarrion (or, without him, the head of House Dondarrion) rides with his men after the Mountain's Men until they are broken or the prologue ends; the lords and bands of the realm leave him alone on the way. Off = no hunt", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueBericHunt { get; set; } = true;
 

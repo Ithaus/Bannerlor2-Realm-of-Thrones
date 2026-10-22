@@ -27,7 +27,11 @@ namespace Armoury
     /// "cena x ilosc" to naprawde koszt siekier; ilosc liczy dalej QuestQty28 (20000 w starej monecie / srednia sprzed przeliczenia). Sprawy z zapisu: przy starcie
     /// sesji naprawiane TYLKO zepsute (srednia <= 0 albo indeks poza lista) - sprawa poprawna zostaje jak byla (gracz mogl juz slyszec ilosc w rozmowie).
     /// Klucz wylaczony - gra bez zmian (latka wpieta, postfiks nic nie robi). Latka W KAMPANII (CLAUDE.md 7), raz na proces.
-    /// Log: linia startu (wpiecie, sprawy z zapisu), linia na kazda nowa / naprawiona sprawe (najwyzej 40 na sesje).
+    /// Recenzja m105 R-1: prefiks getterow RewardGold i RequestedWeaponAmount sprawy (GetterPre) - zepsuta sprawa (srednia <= 0: sprzed latki, klucz wlaczony w trakcie
+    /// gry, potkniecie postfiksu) naprawiana PRZED cialem gettera. IL 1.4.8 get_RewardGold: ldc.i4 500, ldfld _averagePriceForItem, call get_RequestedWeaponAmount, mul, add -
+    /// pole lezy na stosie, zanim getter ilosci (QuestQty28.OldAvg -> RepairLate) je naprawi, wiec pierwszy odczyt nagrody (wiersz tablicy) liczyl 500 + 0; bez f28
+    /// (klucz HistQuestQtyOldCoin NIE) naprawy przed 20000 / 0 nie bylo wcale (DivideByZero w tekscie rozmowy).
+    /// Log: linia startu (wpiecie, sprawy z zapisu), linia na kazda nowa / naprawiona sprawe (najwyzej 40 na sesje) z iloscia siekier i nagroda gry (recenzja m105 R2).
     /// </summary>
     internal static class QuestGangAxes
     {
@@ -40,6 +44,7 @@ namespace Armoury
         private static bool _tried, _hooked;
         private static Type _t;
         private static FieldInfo _fAvg, _fIdx;
+        private static MethodInfo _gQty;      // getter RequestedWeaponAmount (linia logu - ilosc siekier, recenzja m105 R2)
         private static WeaponClass[] _classes;
         private static string _status = "";
         private static int _new, _fixedNew, _fixedLoad, _fixedLate, _stumbles, _lines;
@@ -132,9 +137,14 @@ namespace Armoury
             if (_lines < MaxLines)
             {
                 _lines++;
+                // recenzja m105 R2: ilosc siekier (getter gry z QuestQty28) i nagroda gry bez skali (500 + srednia x ilosc) po zmianie pola - do progu DR-3 (ilosc >= 1)
+                string qty = "?", rew = "?";
+                try { if (_gQty != null) qty = ((int)_gQty.Invoke(issue, null)).ToString(); } catch (Exception e) { qty = "? (" + (e.InnerException ?? e).GetType().Name + ")"; }
+                try { var ib = issue as IssueBase; if (ib != null) { int r = QuestPay8.RawReward(ib); if (r > 0) rew = r.ToString(); } } catch { }
                 Log.Info("Bron gangu (T-4): " + (broken ? "NAPRAWIONA sprawa" : "nowa sprawa") + " " + Who(issue as IssueBase) + " (" + when + ") - srednia ceny siekier gry " + avg
                          + (broken ? (avg <= 0 ? " (zero: dzielenie calkowite gry albo brak siekier 1H na polkach)" : "") + ", indeks klasy " + idx + " -> " + ci : "")
-                         + " -> " + na + " d (" + src + ") | w sesji: nowe " + _new + ", naprawione " + (_fixedNew + _fixedLoad + _fixedLate) + " (nowe " + _fixedNew
+                         + " -> " + na + " d (" + src + ") | ilosc siekier " + qty + ", nagroda gry (bez skali) " + rew
+                         + " | w sesji: nowe " + _new + ", naprawione " + (_fixedNew + _fixedLoad + _fixedLate) + " (nowe " + _fixedNew
                          + ", z zapisu " + _fixedLoad + ", przy odczycie " + _fixedLate + ").");
             }
             return true;
@@ -150,12 +160,23 @@ namespace Armoury
             catch (Exception e) { Stumble("CtorPost", e); }
         }
 
-        /// <summary>QuestQty28.OldAvg przy sredniej <= 0 (sprawa sprzed latki albo z wylaczonym kluczem): naprawa zepsutej sprawy przed dzieleniem. true - naprawiona.</summary>
+        /// <summary>QuestQty28.OldAvg i GetterPre przy sredniej <= 0 (sprawa sprzed latki albo z wylaczonym kluczem): naprawa zepsutej sprawy przed dzieleniem. true - naprawiona.</summary>
         internal static bool RepairLate(object issue)
         {
             if (!On || !_hooked) return false;
             try { return Repair(issue, false, "pozny odczyt"); }
             catch (Exception e) { Stumble("RepairLate", e); return false; }
+        }
+
+        /// <summary>
+        /// Recenzja m105 R-1: prefiks getterow RewardGold i RequestedWeaponAmount sprawy broni gangu - zepsuta sprawa naprawiona przed cialem gettera (get_RewardGold
+        /// czyta pole przed wolaniem gettera ilosci; bez f28 to jedyna naprawa przed 20000 / 0). Sprawa poprawna - jeden odczyt pola i wyjscie.
+        /// </summary>
+        public static void GetterPre(object __instance)
+        {
+            if (__instance == null || _fAvg == null || !On) return;
+            try { if ((int)_fAvg.GetValue(__instance) <= 0) RepairLate(__instance); }
+            catch (Exception e) { Stumble("GetterPre", e); }
         }
 
         /// <summary>Z ArmouryBehavior.OnSessionLaunched (W KAMPANII - CLAUDE.md 7): latka raz na proces, naprawa zepsutych spraw z zapisu, linia startu.</summary>
@@ -207,7 +228,18 @@ namespace Armoury
                 if (_h == null) _h = new Harmony("com.jeff.armoury.m105gangaxes");
                 _h.Patch(ctor, postfix: new HarmonyMethod(typeof(QuestGangAxes), nameof(CtorPost)));
                 _hooked = true;
-                _status = "latka konstruktora " + Inner + "(Hero) WPIETA (klasy broni listy: " + _classes.Length + ", pierwsza " + _classes[0] + ")";
+                // recenzja m105 R-1: prefiksy getterow nagrody i ilosci (metody zadeklarowane w klasie sprawy - DeclaredPropertyGetter, CLAUDE.md 7)
+                _gQty = AccessTools.DeclaredPropertyGetter(_t, "RequestedWeaponAmount");
+                int gOk = 0; var gMiss = new List<string>();
+                foreach (var gn in new[] { "RewardGold", "RequestedWeaponAmount" })
+                {
+                    var g = gn == "RequestedWeaponAmount" ? _gQty : AccessTools.DeclaredPropertyGetter(_t, gn);
+                    if (g == null) { gMiss.Add(gn + " BRAK"); continue; }
+                    try { _h.Patch(g, prefix: new HarmonyMethod(typeof(QuestGangAxes), nameof(GetterPre))); gOk++; }
+                    catch (Exception e) { gMiss.Add(gn + " BLAD (" + e.GetType().Name + ")"); Stumble("EnsureHooks(getter " + gn + ")", e); }
+                }
+                _status = "latka konstruktora " + Inner + "(Hero) WPIETA (klasy broni listy: " + _classes.Length + ", pierwsza " + _classes[0] + "), prefiksy getterow nagrody i ilosci "
+                          + gOk + "/2" + (gMiss.Count > 0 ? " (" + string.Join(", ", gMiss.ToArray()) + ")" : "");
             }
             catch (Exception e) { _status = "BLAD wpiecia (" + e.GetType().Name + ")"; Stumble("EnsureHooks", e); }
         }
