@@ -59,12 +59,18 @@ if (Test-Path -LiteralPath $imgRoot -PathType Container) {
 }
 # 21.10 m103-lektor: nagrania lektora - Armoury\ModuleData\Lektor\**\*.wav i arm_lektor.tsv (podkatalogi; po tescie autotest-bitwa.ps1 usuwa pliki, ktorych w grze nie bylo -
 # zostaje pusty katalog Lektor\EN, co nie szkodzi: lektor bez tsv milczy i pisze linie)
+# 21/22.10 Kronika K0: takze nagrania Kroniki *.ogg i manifest arm_lektor_kronika.tsv (jak wgraj-v5.ps1)
 $lekDir = Join-Path $Tree 'Armoury\ModuleData\Lektor'
 if (Test-Path -LiteralPath $lekDir -PathType Container) {
     $lekFull = (Resolve-Path -LiteralPath $lekDir).Path.TrimEnd('\')
-    foreach ($f in @(Get-ChildItem -LiteralPath $lekDir -Recurse -File | Where-Object { ($_.Extension -eq '.wav' -or $_.Extension -eq '.tsv') -and $_.Name -notlike '*.bak-*' })) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $lekDir -Recurse -File | Where-Object { ($_.Extension -eq '.wav' -or $_.Extension -eq '.ogg' -or $_.Extension -eq '.tsv') -and $_.Name -notlike '*.bak-*' })) {
         $r0 = 'Armoury\ModuleData\Lektor\' + $f.FullName.Substring($lekFull.Length + 1); if ($rel -notcontains $r0) { $rel += $r0 }
     }
+}
+# 21/22.10 galaz czcionek: prefaby tabliczek Armoury\GUI\Prefabs\Nameplate\*.xml - gdy sa w drzewie
+$npDir = Join-Path $Tree 'Armoury\GUI\Prefabs\Nameplate'
+if (Test-Path -LiteralPath $npDir -PathType Container) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $npDir -Filter '*.xml' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\GUI\Prefabs\Nameplate\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
 }
 $ef = @()
 foreach ($r in $rel) {

@@ -76,20 +76,31 @@ if (Test-Path -LiteralPath $imgRoot -PathType Container) {
 }
 # 21.10 m103-lektor: nagrania lektora - Armoury\ModuleData\Lektor\**\*.wav i arm_lektor.tsv (podkatalogi - petla arm_*.tsv wyzej bierze tylko ModuleData);
 # kopia .bak, lustro i md5 jak reszta. $lekMd5: md5 nagran z kolumny 4 arm_lektor.tsv - nagranie z zerami (dysk C) nie idzie do gry (kontrola zrodel nizej)
+# 21/22.10 Kronika K0 (w-toku/kronika-00-silnik): takze nagrania Kroniki *.ogg i ich manifest arm_lektor_kronika.tsv (klucz, tytul, plik, md5 tekstu, md5 PLIKU w kolumnie 5,
+# paczka) - bez tego Lektor pisze "nagran Kroniki 0 ... odrzucone 293 (brak pliku)" i okna Kroniki sa ciche. Kontrola .ogg nizej: naglowek OggS + md5 z manifestu.
 $lekDir = Join-Path $Tree 'Armoury\ModuleData\Lektor'
 $lekMd5 = @{}
 if (Test-Path -LiteralPath $lekDir -PathType Container) {
     $lekFull = (Resolve-Path -LiteralPath $lekDir).Path.TrimEnd('\')
-    foreach ($f in @(Get-ChildItem -LiteralPath $lekDir -Recurse -File | Where-Object { ($_.Extension -eq '.wav' -or $_.Extension -eq '.tsv') -and $_.Name -notlike '*.bak-*' })) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $lekDir -Recurse -File | Where-Object { ($_.Extension -eq '.wav' -or $_.Extension -eq '.ogg' -or $_.Extension -eq '.tsv') -and $_.Name -notlike '*.bak-*' })) {
         $r0 = 'Armoury\ModuleData\Lektor\' + $f.FullName.Substring($lekFull.Length + 1)
         if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
-        if ($f.Name -eq 'arm_lektor.tsv') {
+        if ($f.Name -eq 'arm_lektor.tsv' -or $f.Name -eq 'arm_lektor_kronika.tsv') {
+            $mc = $(if ($f.Name -eq 'arm_lektor.tsv') { 3 } else { 4 })   # md5 pliku: arm_lektor.tsv kolumna 4, manifest Kroniki kolumna 5
             foreach ($ln in @(Get-Content -LiteralPath $f.FullName)) {
                 if (-not $ln -or $ln.StartsWith('#')) { continue }
                 $c = $ln.Split("`t")
-                if ($c.Count -ge 4 -and $c[3].Trim().Length -eq 32) { $lekMd5[(Join-Path (Split-Path -Parent $r0) $c[2].Trim())] = $c[3].Trim().ToLowerInvariant() }
+                if ($c.Count -gt $mc -and $c[$mc].Trim().Length -eq 32) { $lekMd5[(Join-Path (Split-Path -Parent $r0) $c[2].Trim())] = $c[$mc].Trim().ToLowerInvariant() }
             }
         }
+    }
+}
+# 21/22.10 galaz czcionek: prefaby tabliczek Armoury\GUI\Prefabs\Nameplate\*.xml - gdy sa w drzewie (bez nich nic nie dochodzi)
+$npDir = Join-Path $Tree 'Armoury\GUI\Prefabs\Nameplate'
+if (Test-Path -LiteralPath $npDir -PathType Container) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $npDir -Filter '*.xml' -File -ErrorAction SilentlyContinue)) {
+        $r0 = 'Armoury\GUI\Prefabs\Nameplate\' + $f.Name
+        if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
     }
 }
 foreach ($i in $items) {
@@ -102,6 +113,12 @@ foreach ($i in $items) {
             Write-Host ("STOP: " + $i.src + " nie jest dobrym plikiem WAV (zera albo uciety?)"); exit 2
         }
         if ($lekMd5.ContainsKey($i.name) -and (Md5 $i.src) -ne $lekMd5[$i.name]) { Write-Host ("STOP: " + $i.src + " ma inny md5 niz w arm_lektor.tsv (zera?)"); exit 2 }
+    }
+    if ($i.name -like '*.ogg') {   # Kronika K0: naglowek OggS, md5 pliku z arm_lektor_kronika.tsv (kolumna 5) - nagranie z zerami (dysk C) nie idzie do gry
+        $fs = [IO.File]::OpenRead($i.src)
+        try { $h = New-Object byte[] 4; $null = $fs.Read($h, 0, 4) } finally { $fs.Close() }
+        if ([Text.Encoding]::ASCII.GetString($h, 0, 4) -ne 'OggS') { Write-Host ("STOP: " + $i.src + " nie jest plikiem OGG (zera?)"); exit 2 }
+        if ($lekMd5.ContainsKey($i.name) -and (Md5 $i.src) -ne $lekMd5[$i.name]) { Write-Host ("STOP: " + $i.src + " ma inny md5 niz w arm_lektor_kronika.tsv (zera albo stara wersja?)"); exit 2 }
     }
     if ($i.dll) {
         $b = [IO.File]::ReadAllBytes($i.src)
