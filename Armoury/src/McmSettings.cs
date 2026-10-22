@@ -7120,9 +7120,9 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool OptimVerify { get; set; } = false;
 
-        [SettingPropertyBool("Optim Kt Skip Model", HintText = "at the turn of the day the crown dues no longer work out the whole income of a vassal clan that holds no town, castle or village and whose head owns no workshop, when its dues are taken from its land anyway - that income was worked out only to be thrown away. The same dues, much less work. It stands aside on its own for the day (and says why in the log) when another mod hooks that income; off = worked out for every clan, as before", RequireRestart = false)]
+        [SettingPropertyBool("Optim Kt Skip Model", HintText = "OFF by default (night 21/22.10 check run: the income model draws random numbers for some clans, so skipping it shifts the game's dice - 2 differences in 77 263 checks). At the turn of the day the crown dues no longer work out the whole income of a vassal clan that holds no town, castle or village and whose head owns no workshop, when its dues are taken from its land anyway - that income was worked out only to be thrown away. The same dues, much less work. It stands aside on its own for the day (and says why in the log) when another mod hooks that income; off = worked out for every clan, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
-        public bool OptimKtSkipModel { get; set; } = true;
+        public bool OptimKtSkipModel { get; set; } = false;
 
         [SettingPropertyBool("Optim Sutler Nearest", HintText = "the sutlers of the bands in the field find the nearest town and village from a list of the map's settlements made once a day, instead of looking over every town and village again for each of some four hundred bands - the same town, the same village, the same coin; off = every settlement is looked over for each band, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
