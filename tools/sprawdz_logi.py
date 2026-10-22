@@ -1735,17 +1735,21 @@ Uzycie (Python 3, tylko odczyt):
                     Balance i K5 Ks Fach Market Room (StartCalibration.Core.cs, Fach.cs, Plan.cs), K6 Notice Board Lean Save (NoticeBoard.cs, Nb3.cs, Watch.cs); zad. 1 bez klucza)
                     python -I tools/sprawdz_logi.py --grupa m107gosp <Armoury-*.log> [--do-doby N - okno grupy nks w M7G-22]. M7G-S self-test wyrazen wobec linii kontrolnych jak
                     w kodzie C# (takze wyrazenia grup m105gosp5, m105gosp4, m106wozy, nks na tych samych liniach), M7G-S2 test syntetyczny (dobry i zly bieg). M7G-0 linia
-                    'Gospodarka (m107): start sesji' z 6 kluczami TAK. Wsie: M7G-11 M3W-2 w mierze 'kiesa < min(1000 zl, skrzynia)' <= 5% (7 ostatnich dob), M7G-12 straznik: wsie
+                    'Gospodarka (m107): start sesji' z 6 kluczami TAK. Wsie: M7G-11 M3W-2 surowo - wsi z kiesa < 1000 zl <= 5% (7 ostatnich dob linii Przeplywy osad; poprawka
+                    R1: miara 'kiesa < min(1000 zl, skrzynia)' chowa spadek dochodu wsi - skrzynia idzie za dochodem - tylko INFO w M7G-11n), M7G-12 straznik: wsie
                     z pelna mala skrzynia MNK 28 dob <= +0.05 wsi/d, M7G-13 udzial wsi ze skrzynia < 1000 zl (INFO), M7G-14 ulga pana pominieta - licznik bez przyrostu (INFO),
                     M7G-15 wsie bez wozu > 14 dob z przyczyna (INFO). Wozy: M7G-21 H1 'cel chwilowy = osada' w 28 ostatnich liniach srednio <= 0.5/d i najwiecej <= 2, M7G-22
-                    rozladunki > 0 przy przypadkach ucieczki, 'bez wyjasnienia' <= 4 szt. w dobach rozladunku i NKS-8 TAK, M7G-23 wsie wstrzymane > 30 dob (INFO), M7G-24 mediana
-                    czasu linii Wozy <= 2 ms. Zamki: M7G-31 segment 'm107 zamki' w kazdej linii firm DS, M7G-32 zaleglosci zamkow z oszczednosci podzamcza <= 1 zl od 14. doby sesji,
-                    M7G-33 najwieksza zaleglosc zamku <= 4 raty (7 ostatnich linii), M7G-34 szybkie obnizki i firmy zamkow (INFO), M7G-35 wplaty ludu panom wobec 103h (INFO).
-                    Ziarno: M7G-41 segment 'm107 rownowaga na targ' w kazdym Planie i ostatnia rownowaga kroku 8 zbiezna >= 80% Planow (mniej - INFO z lista), M7G-42 ziarno W i E
-                    NA TARG od wlaczenia KS: mediana <= 1.06, najwiecej <= 1.05 x max(1, f luki zapasu), M7G-43 zywnosc poza pasmem (INFO), M7G-44 dopisek K5 w linii fachu.
-                    Tablica: M7G-51 kazdy zapis gry <= 12288 B i proba odczytu nb3 zgodna, M7G-52 wczytanie nb3 = liczby z ostatniego zapisu, M7G-53 koszt doby listow mediana
-                    <= 1.0 ms i doby >= 1.5 ms <= 2%, M7G-54 wczytanie nb2 -> nastepny zapis nb3 zgodny. M7G-9 ERROR nowych funkcji, zly format segmentu Wozy, proby niezgodne 0.
-                    Log bez linii m107 - INFO, bez wyjatku.
+                    rozladunki > 0 przy przypadkach ucieczki, 'bez wyjasnienia' <= 4 szt. w dobach rozladunku i NKS-8 TAK, M7G-23 wsie wstrzymane > 30 dob 0 (> 0 - DECYZJA), M7G-24
+                    mediana czasu linii Wozy <= 2 ms. Zamki: M7G-31 segment 'm107 zamki' w kazdej linii firm DS, M7G-32 zaleglosci zamkow z oszczednosci podzamcza (ALf >= 1 zl;
+                    ulamek ponizej 1 zl przechodzi do nastepnej raty) <= 1 zl od 14. doby sesji, M7G-33 najwieksza zaleglosc zamku <= 4 raty (7 ostatnich linii), M7G-34 szybkie
+                    obnizki i firmy zamkow (INFO), M7G-35 wplaty ludu panom wobec 103h (INFO). Ziarno: M7G-41 segment 'm107 rownowaga na targ' w kazdym Planie i ostatnia
+                    rownowaga kroku 8 zbiezna >= 80% Planow (mniej - INFO z lista), M7G-42 ziarno W i E NA TARG od wlaczenia KS: mediana <= 1.06, najwiecej <= 1.05 x max(1, f luki
+                    zapasu), M7G-43 zywnosc poza pasmem (INFO), M7G-44 dopisek K5 w linii fachu, M7G-45 czas Planu wlaczenia i cieplych Planow po wlaczeniu osobno (INFO; NKS-2).
+                    Tablica: M7G-51 kazdy zapis gry <= 12288 B, proba odczytu nb3 zgodna i BLAD eksportu 0, M7G-52 wczytanie nb3 = liczby z zapisu tej samej doby (linie zapisu bez
+                    doby - ostatni zapis przed wczytaniem), M7G-53 koszt doby listow mediana <= 1.0 ms i doby >= 1.5 ms <= 2%, M7G-54 wczytanie nb2 -> nastepny zapis nb3 zgodny.
+                    M7G-9 ERROR nowych funkcji (takze CartGuard.Guard(woz), CartGuard.Unload, DsTowns.*, NoticeBoard.Export, Watch.WatchImport2), zly format segmentu Wozy, proby
+                    niezgodne i BLAD eksportu 0. Klucz liczy sie jako TAK tylko z linii startu: log bez linii m107 (sprzed m107) - progi kluczy INFO, bez wyjatku; werdykt bez
+                    klucza dalej daja M7G-11 i M7G-9 oraz progi formatu / czasu / poziomu przy obecnych liniach (M7G-12, M7G-24, M7G-31, M7G-33, M7G-41, M7G-44, M7G-53).
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -59971,33 +59975,28 @@ def _m3w_ols(xs, ys):
     return sl / max(1.0, my), sl
 
 
-def m107_m3w2(rep, tag, lo, akp, thr, base, src, decide=False):
-    """m107-gospodarka (zad. 1, 22.10): M3W-2 w mierze 'kiesa < min(1000 zl, skrzynia)' - wies bez zapasu na czarna godzine (segment 'm105 wsie biedne' linii Akumulator kies,
-    srednio 7 ostatnich dob; ta sama miara co M5G5-2 i M5G-7b). Dotad 'kiesa < 1000 zl': 25 z 41 biednych wsi 103h (4.4 pp) to wsie z PELNA wlasna skrzynia mniejsza niz 1000 zl
-    (RentPay bierze czynsz tylko ponad skrzynie - kiesa stoi na skrzyni), dla 102 wsi ze skrzynia < 1000 zl prog byl nieosiagalny z konstrukcji. Cel 5% bez zmiany; straznik
-    miary - M7G-12 grupy m107gosp. Log bez segmentu (Dues Medieval NIE, log sprzed m105) - stara miara (linia Przeplywy osad). Wiersz {tag}r (INFO): surowo '< 1000 zl' z rozkladem
-    A (pelna mala skrzynia) / B (biedne bez zapasu) z dopisku m107."""
+def m107_m3w2(rep, tag, lo, akp):
+    """m107-gospodarka (zad. 1, 22.10; poprawka recenzji ekonomii R1): wiersz {tag}n (INFO) - wsie biedne w mierze 'kiesa < min(1000 zl, skrzynia)' (segment 'm105 wsie
+    biedne' linii Akumulator kies, srednio 7 ostatnich dob; ta sama miara co M5G5-2 i M5G-7b) i rozklad A (pelna mala skrzynia: skrzynia <= kiesa < 1000 zl) / B (bez zapasu)
+    z dopisku m107. Wiersz wiazacy {tag} zostaje w mierze surowej 'kiesa < 1000 zl' (linia Przeplywy osad): skrzynia wsi zalezy od jej dochodu (DsVillage.ChestOf = 21 x
+    (koszyk z ilosci zaplaconych w Planie + czynsz)), wiec wies, ktora biednieje, ma tez mniejsza skrzynie i nizszy prog nowej miary - nowa miara chowa spadek dochodu wsi
+    (103h: wsi A 1-3 przed Planem -> 25-32 na koncu, mediana skrzyni A 2226 -> 462 zl; 69 ze 102 wsi ze skrzynia < 1000 zl ma kiese >= 1000 zl - prog surowy jest osiagalny)."""
     ad = sorted(d for d in akp if akp[d][0])
-    raw = (sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)) if lo else None
-    if ad:
-        l7 = ad[-7:]
-        x = sum(int(akp[d][0][0]) / max(1, int(akp[d][0][1])) for d in l7) / len(l7)
-        rep.add(f"{tag}: wsie biedne - kiesa < min(1000 zl, skrzynia) (bez zapasu na czarna godzine; miara m107), srednio 7 ostatnich dob ({src})",
-                f"{100 * x:.2f}% (ostatnia doba {akp[ad[-1]][0][0]} z {akp[ad[-1]][0][1]} wsi DS)",
-                f"<= {100 * thr:.0f}% (cel bez zmiany; dotad miara 'kiesa < 1000 zl' - 1000 zl bylo zastepnikiem skrzyni) {base}", x <= thr, decide=decide)
-        mx = [(akp[d][0], akp[d][1]) for d in l7 if akp[d][1]]
-        txt = (f"surowo '< 1000 zl' (Przeplywy osad, wszystkie wsie) {100 * raw:.1f}%" if raw is not None else "surowo '< 1000 zl' - brak linii Przeplywy osad")
-        if mx:
-            n = sum(int(p[1]) for p, _ in mx) / len(mx)
-            fa = sum(int(q[2]) for _, q in mx) / len(mx); fb = sum(int(p[0]) for p, _ in mx) / len(mx); fs = sum(int(q[3]) for _, q in mx) / len(mx)
-            txt += (f"; wsie DS (srednio {len(mx)} dob): A pelna mala skrzynia (skrzynia <= kiesa < 1000 zl) {fa:.1f} ({100 * fa / max(1, n):.1f}%), B bez zapasu {fb:.1f} "
-                    f"({100 * fb / max(1, n):.1f}%), skrzynia < 1000 zl {fs:.1f}")
-        else:
-            txt += "; rozklad A/B - brak dopisku m107 w linii Akumulator kies"
-        rep.add(f"{tag}r: wsi z kiesa < 1000 zl surowo i rozklad A/B (INFO)", txt, "INFO (surowo ok. 7-8% przy B <= 5%: reszta to wsie z pelna skrzynia ponizej 1000 zl)", None)
-    elif lo:
-        rep.add(f"{tag}: wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (stara miara - log bez segmentu 'm105 wsie biedne')",
-                f"{100 * raw:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]})", f"<= {100 * thr:.0f}% {base}", raw <= thr, decide=decide)
+    if not ad:
+        return
+    l7 = ad[-7:]
+    x = sum(int(akp[d][0][0]) / max(1, int(akp[d][0][1])) for d in l7) / len(l7)
+    txt = f"{100 * x:.2f}% (ostatnia doba {akp[ad[-1]][0][0]} z {akp[ad[-1]][0][1]} wsi DS)"
+    mx = [(akp[d][0], akp[d][1]) for d in l7 if akp[d][1]]
+    if mx:
+        n = sum(int(p[1]) for p, _ in mx) / len(mx)
+        fa = sum(int(q[2]) for _, q in mx) / len(mx); fb = sum(int(p[0]) for p, _ in mx) / len(mx); fs = sum(int(q[3]) for _, q in mx) / len(mx)
+        txt += (f"; wsie DS (srednio {len(mx)} dob): A pelna mala skrzynia (skrzynia <= kiesa < 1000 zl) {fa:.1f} ({100 * fa / max(1, n):.1f}%), B bez zapasu {fb:.1f} "
+                f"({100 * fb / max(1, n):.1f}%), skrzynia < 1000 zl {fs:.1f}")
+    else:
+        txt += "; rozklad A/B - brak dopisku m107 w linii Akumulator kies"
+    rep.add(f"{tag}n: wsie biedne w mierze 'kiesa < min(1000 zl, skrzynia)' i rozklad A/B, srednio 7 ostatnich dob (INFO)", txt,
+            "INFO (miara nie wiaze: skrzynia idzie za dochodem wsi - biedniejaca wies ma nizszy prog; wiaze surowe '< 1000 zl' wyzej; wzrost A - M7G-12)", None)
 
 
 def m103wsie_main(logp):
@@ -60063,7 +60062,11 @@ def m103wsie_main(logp):
                 " / ".join(f"{100 * x:+.3f}" for x in reversed(drs)) + f"%/d (najgorsze {100 * min(drs):+.3f}); stan {vil[tail[0]][0] / 1e6:.2f} -> {vil[tail[-1]][0] / 1e6:.2f} mln",
                 f">= {100 * M3W_DRIFT:.2f}%/d w kazdym oknie (P2 -0.205, P0 -0.064; NDS-3a >= -0.2)", min(drs) >= M3W_DRIFT)
         lo = [vil[d][1] for d in vd[-7:] if vil[d][1]]
-        m107_m3w2(rep, "M3W-2", lo, akp, M3W_POOR, "(P2 24.3%, P0 1.0%; NDS-3d <= 15%)", "jak NDS-3d, prog celu m103")
+        if lo:
+            x = sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)
+            rep.add("M3W-2: wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (jak NDS-3d, prog celu m103)",
+                    f"{100 * x:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]})", f"<= {100 * M3W_POOR:.0f}% (P2 24.3%, P0 1.0%; NDS-3d <= 15%)", x <= M3W_POOR)
+        m107_m3w2(rep, "M3W-2", lo, akp)   # m107 (zad. 1, poprawka R1): nowa miara tylko INFO (M3W-2n)
     else:
         rep.add("M3W-1: kiesy wsi", f"za malo linii 'Przeplywy osad (kiesy wsi)' ({len(vd)})", ">= 26 dob", None)
     # ---- M3W-3 zakupy / wplyw netto (krok 8 linii ZC4, ostatnie 28 linii z zakupami)
@@ -60595,7 +60598,7 @@ def m105gosp5_main(logp):
                 if d is not None:
                     a, b = M3W_RX["hoard"].search(s), M5G_RX["poor"].search(s)
                     ak[d] = (a.groups() if a else None, b.groups() if b else None)
-                    px = M107_RX["akmix"].search(s)                 # m107 (zad. 1): rozklad A/B do M5G5-1r
+                    px = M107_RX["akmix"].search(s)                 # m107 (zad. 1): rozklad A/B do M5G5-1n (INFO)
                     if px:
                         akmix[d] = px.groups()
             elif s.startswith("Klimat: wczytano") or s.startswith("Wyrzutki: wczytano") or s.startswith("Stany (ZC2): wczytanie"):
@@ -60625,16 +60628,17 @@ def m105gosp5_main(logp):
                 "INFO (klucz Ds Lord Relief Below Chest NIE, Dues Medieval NIE albo log sprzed m105 gosp5 - progi nizej opisuja bieg bez ulgi)", None)
     # ---- M5G5-1 M3W-2 wsi < 1000 zl (srednio 7 ostatnich dob)
     lo = [vil[d] for d in sorted(vil)[-7:] if vil[d]]
-    # m107 (zad. 1): ta sama miara co M3W-2 grupy m103wsie (kiesa < min(1000 zl, skrzynia)); log bez segmentu - stara miara (< 1000 zl)
-    akp5 = {d: (ak[d][1], None) for d in ak if ak[d][1]}
-    for d in akp5:
-        if d in akmix:
-            akp5[d] = (akp5[d][0], akmix[d])
-    if lo or akp5:
-        m107_m3w2(rep, "M5G5-1", lo, akp5, M5G5_POOR, f"(n32 12.8%, n31 18.3%, P0 1.0%; model gosp5 prolog 2.1-2.3%); tryb: {mode}; bieg ze starego zapisu bez prologu - niespelniony "
-                  "= DECYZJA (27 wsi bez wozow - Wolni Ludzie, Zelazne Wyspy, Ziemie Burzy - nie ma platnika)", "linia Akumulator kies / Przeplywy osad", decide=save)
+    if lo:
+        x = sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)
+        rep.add("M5G5-1: M3W-2 - wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (linia 'Przeplywy osad (kiesy wsi)')",
+                f"{100 * x:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]}); tryb: {mode}",
+                f"<= {100 * M5G5_POOR:.0f}% (n32 12.8%, n31 18.3%, P0 1.0%; model gosp5 prolog 2.1-2.3%); bieg ze starego zapisu bez prologu - niespelniony = DECYZJA (model 7.7%: "
+                "27 wsi bez wozow - Wolni Ludzie, Zelazne Wyspy, Ziemie Burzy - nie ma platnika, 19 wsi z pelna skrzynia < 1000 zl)", x <= M5G5_POOR, decide=save)
     else:
         rep.add("M5G5-1: M3W-2 - wsi z kiesa < 1000 zl", "brak linii 'Przeplywy osad (kiesy wsi)' z rozkladem", "INFO", None)
+    # m107 (zad. 1, poprawka recenzji ekonomii R1): nowa miara (kiesa < min(1000 zl, skrzynia)) i rozklad A/B tylko INFO (M5G5-1n); wiaze surowe '< 1000 zl' jak dotad
+    akp5 = {d: (ak[d][1], akmix.get(d)) for d in ak if ak[d][1]}
+    m107_m3w2(rep, "M5G5-1", lo, akp5)
     # ---- M5G5-2 wsie biedne (kiesa < min(1000 zl, skrzynia)) - cel M5G-7b
     akp = sorted(d for d in ak if ak[d][1])
     if akp:
@@ -61267,9 +61271,11 @@ M107_RX = {
                        r"\(bez kroku 8\)), najwieksze odchylenie targu (-|\S+ \S+ -?[\d.]+)"),
     "fachroom": re.compile(r"\| miejsce na targu od popytu - zjedzone we wszystkich okregach \(Ks Fach Market Room TAK\) \| czas fach \d+ ms\.$"),
     # zad. 5: tablica
+    # poprawka recenzji kodu R3: doba zapisu na koncu linii (opcjonalna - linie sprzed poprawki bez niej)
     "save": re.compile(r"Tablica \(m107\): zapis gry arm_board (nb[23]) (\d+) B \(.*?flagi \d+ B \((\d+)\), listy \d+ B \((\d+)\), szkody \d+ B \(band (\d+), wpisow (\d+)\)\), "
-                       r"proba odczytu (zgodna TAK|nb3 zgodna NIE - zapis nb2), eksport ([\d.]+) ms"),
+                       r"proba odczytu (zgodna TAK|nb3 zgodna NIE - zapis nb2), eksport ([\d.]+) ms(?:.*?; doba zapisu (-?\d+))?"),
     "saveempty": re.compile(r"Tablica \(m107\): zapis gry arm_board pusty \(0 B"),
+    "saveerr": re.compile(r"Tablica \(m107\): zapis gry arm_board BLAD eksportu \(0 B"),   # poprawka R4: null z wyjatku w Export
     "bad": re.compile(r"Tablica \(m107\): proba odczytu nb3 NIEZGODNA \(pierwsza roznica: (.*)\) - zapis nb2"),
     "load3": re.compile(r"Tablica ogloszen \(m102\): wczytano zapis arm_board nb3 \((\d+) B, doba zapisu (-?\d+), przedrostkow (\d+), miast (\d+)\) - flagi (\d+), listy (\d+), "
                         r"szkody band (\d+) \(wpisow (\d+)\)\."),
@@ -61305,15 +61311,21 @@ M107_TEST = {
             "czesciowo 192 (rece/ziemia 92, bez zysku 44, prog wyzywienia 56) | rece do fachu 2132.1 tys. (z: wheat_farm 696.8) | regale: wsie typu najpierw 2178.4 t/d z celu "
             "2304.9 t/d | najwiekszy niedobor (cel/w Planie szt./d): - | miejsce na targu od popytu - zjedzone we wszystkich okregach (Ks Fach Market Room TAK) | czas fach 1295 ms.",
     "save": "Tablica (m107): zapis gry arm_board nb3 9387 B (naglowek z przedrostkami i miastami (53) 690 B, flagi 3 B (0), listy 2917 B (105), szkody 5777 B (band 285, wpisow 758)), "
-            "proba odczytu zgodna TAK, eksport 0.66 ms; proby w sesji: zgodne 3, niezgodne 0",
+            "proba odczytu zgodna TAK, eksport 0.66 ms; proby w sesji: zgodne 3, niezgodne 0; doba zapisu 108878",
+    "saveerr": "Tablica (m107): zapis gry arm_board BLAD eksportu (0 B; wyjatek w Export - potkniecie, tablica bez zapisu), proba odczytu -, eksport 0.12 ms; doba zapisu 108878",
+    "vil": "Przeplywy osad (kiesy wsi): dzien 108900 | stan 1609737, zmiana +150555 [P], w tym: z utargu taborow +30341 [P] | rozklad [P]: osad 571, min 211, mediana 1959, "
+           "max 33170, ponizej 1000 zlota 20.",
     "load3": "Tablica ogloszen (m102): wczytano zapis arm_board nb3 (9387 B, doba zapisu 108878, przedrostkow 32, miast 53) - flagi 0, listy 105, szkody band 285 (wpisow 758).",
     "lday": "Listy goncze (m102): dzien 108900, klucz TAK, ... kasa ponizej Keep po wyplacie 0; zapis arm_board 9387 B; sklad zapisu nb3 (pomiar doby 108890): naglowek z "
             "przedrostkami i miastami (53) 690 B, flagi 3 B (0), listy 2917 B (105), szkody 5777 B (band 285, wpisow 758), stary format nb1 w tym samym stanie - ; szkody band 285; "
             "koszt 0.41 ms; potkniecia 0",
 }
 M107_ERR = ("ERROR in CartGuard.Wire", "ERROR in CartGuard.HoldCheck", "ERROR in M107Start", "ERROR in NoticeBoard.ExportSave", "ERROR in NoticeBoard.Watch.Parse3",
-            "ERROR in DsVillage.NoteReliefNoTake", "ERROR in SyncData.arm_board")
-M107_POOR = 0.05                  # M7G-11: M3W-2 w mierze 'kiesa < min(1000 zl, skrzynia)' (cel m103 bez zmiany liczby; 103h 3.15%, 103d 5.00%)
+            "ERROR in DsVillage.NoteReliefNoTake", "ERROR in SyncData.arm_board",
+            # poprawka recenzji kodu R4: sciezki m107 lapane przez try wolajacych - K1 w Home / NoCart (petla Guard), rozladunek, K2 w Pay i K3 w CastleIncomeCut (DsTowns.CastleDay /
+            # TownDay / SurplusReview - Stumble z przedrostkiem "DsTowns."), wyjatek eksportu tablicy, blad czesci F= odczytu nb2 we wspolnym Parse
+            "ERROR in CartGuard.Guard(woz)", "ERROR in CartGuard.Unload", "ERROR in DsTowns.", "ERROR in NoticeBoard.Export (", "ERROR in NoticeBoard.Watch.WatchImport2(")
+M107_POOR = 0.05                  # M7G-11: M3W-2 surowo 'kiesa < 1000 zl' (cel m103; poprawka R1 - nowa miara tylko INFO w M7G-11n; 103h 7.9%, 103d 8.7%)
 M107_FULLSMALL_SLOPE = 0.05       # M7G-12: liczba wsi z pelna mala skrzynia - nachylenie MNK 28 dob (wsi/d)
 M107_H1 = (0.5, 2)                # M7G-21: H1 'cel chwilowy = osada' w ostatnich 28 liniach - srednio / najwiecej (103h 4.57 / 6)
 M107_WZ_MS = 2.0                  # M7G-24: mediana czasu linii 'Wozy (m106): dzien' (ms)
@@ -61337,6 +61349,9 @@ def m107_selftest():
     m = M5G_RX["poor"].search(M107_TEST["ak"])                       # M5G5-2 / M5G-7 czytaja ten sam napis (bez zmian)
     if not m or m.groups() != ("18", "560"):
         return "poor (M5G5-2): napis 'm105 wsie biedne' zmieniony"
+    m = M3W_RX["lo"].search(M107_TEST["vil"])                         # M7G-11 (poprawka R1): surowo '< 1000 zl' z linii Przeplywy osad (jak M3W-2)
+    if not m or m.groups() != ("571", "1959", "20") or not M107_TEST["vil"].startswith(M3W_VIL):
+        return f"vil (M7G-11): {m.groups() if m else 'brak dopasowania'}"
     m = M107_RX["nolr"].search(M107_TEST["ds"])
     if not m or m.groups() != ("4", "1234"):
         return f"nolr: {m.groups() if m else 'brak dopasowania'}"
@@ -61377,8 +61392,13 @@ def m107_selftest():
     if not M107_RX["fachroom"].search(M107_TEST["fach"]) or not M106_RX["fach"].search(M107_TEST["fach"]):
         return "fach: dopisek K5 psuje wyrazenie WZ"
     m = M107_RX["save"].search(M107_TEST["save"])
-    if not m or m.groups() != ("nb3", "9387", "0", "105", "285", "758", "zgodna TAK", "0.66"):
+    if not m or m.groups() != ("nb3", "9387", "0", "105", "285", "758", "zgodna TAK", "0.66", "108878"):
         return f"save: {m.groups() if m else 'brak dopasowania'}"
+    m = M107_RX["save"].search(M107_TEST["save"].replace("; doba zapisu 108878", ""))   # linia sprzed poprawki R3 (bez doby)
+    if not m or m.groups()[8] is not None or m.group(2) != "9387":
+        return f"save (bez doby): {m.groups() if m else 'brak dopasowania'}"
+    if not M107_RX["saveerr"].search(M107_TEST["saveerr"]) or M107_RX["saveempty"].search(M107_TEST["saveerr"]) or M107_RX["save"].search(M107_TEST["saveerr"]):
+        return "saveerr"
     m = M107_RX["load3"].search(M107_TEST["load3"])
     if not m or m.groups() != ("9387", "108878", "32", "53", "0", "105", "285", "758"):
         return f"load3: {m.groups() if m else 'brak dopasowania'}"
@@ -61391,7 +61411,8 @@ def m107_selftest():
 def m107_collect(logp):
     """m107gosp: przebieg logu (strumieniowo) -> serie linii m107 i linii, ktore progi czytaja (Akumulator, Daniny DS, Wozy, Firmy DS, Plan, bilans, luka zapasu, tablica)."""
     D = {"start": [], "starts_at": [], "ak": {}, "ds": {}, "wz": {}, "wzms": {}, "h1": {}, "hold": [], "noc": [], "wire": None, "fz": {}, "plans": [], "bilm": {}, "gap": {},
-         "fach": [], "save": [], "bad": [], "load3": [], "load2": [], "events": [], "lday": {}, "err": 0, "err1": None, "unexp": {}, "ks_on": None, "loaded": False, "newc": False}
+         "fach": [], "save": [], "bad": [], "load3": [], "load2": [], "events": [], "lday": {}, "err": 0, "err1": None, "unexp": {}, "ks_on": None, "loaded": False, "newc": False,
+         "vil": {}, "saveerr": 0}
     nline = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -61419,6 +61440,12 @@ def m107_collect(logp):
                 if d is not None:
                     a = M107_RX["nolr"].search(s)
                     D["ds"][d] = a.groups() if a else None
+                continue
+            if s.startswith(M3W_VIL):                                    # M7G-11 (poprawka R1): surowo '< 1000 zl' (ta sama linia i wyrazenie co M3W-2)
+                d = num(r"dzien (-?\d+)", s[:60])
+                a = M3W_RX["lo"].search(s)
+                if d is not None and a:
+                    D["vil"][d] = a.groups()
                 continue
             if s.startswith(M106_HEAD):
                 d = num(r"dzien (-?\d+)", s[:40])
@@ -61456,7 +61483,8 @@ def m107_collect(logp):
                 d = num(r"plan doba (-?\d+)", s[:60])
                 if d is not None and "| BLAD rachunku" not in s:
                     mm = M107_RX["plan"].search(s)
-                    D["plans"].append((d, mm.groups() if mm else None, "| m107 rownowaga na targ" in s))
+                    tt = re.search(r"\| plan nr (\d+) .*?, czas ([\d.]+) s \(watek roboczy\)", s)   # M7G-45 (poprawka R7): czas Planu wlaczenia i cieplych osobno
+                    D["plans"].append((d, mm.groups() if mm else None, "| m107 rownowaga na targ" in s, (int(tt.group(1)), float(tt.group(2))) if tt else None))
                 continue
             if s.startswith("KS: bilans "):
                 mm = NKS_BILM.match(s)
@@ -61496,6 +61524,8 @@ def m107_collect(logp):
                     D["save"].append(mm.groups()); D["events"].append(("save", nline, mm.groups()))
                 elif M107_RX["saveempty"].search(s):
                     D["save"].append(("pusty",)); D["events"].append(("save", nline, ("pusty",)))
+                elif M107_RX["saveerr"].search(s):                      # poprawka R4: BLAD eksportu (wyjatek w Export) - nie "pusty"
+                    D["saveerr"] += 1; D["save"].append(("blad",)); D["events"].append(("save", nline, ("blad",)))
                 else:
                     mb = M107_RX["bad"].search(s)
                     if mb:
@@ -61533,7 +61563,8 @@ def m107_collect(logp):
 
 
 def m107_rows(rep, D, nks_rows=None):
-    """m107gosp: wiersze M7G-0, M7G-1x..5x, M7G-9 - opis w --help."""
+    """m107gosp: wiersze M7G-0, M7G-1x..5x, M7G-9 - opis w --help. Poprawki recenzji 22.10: R1 (M7G-11 surowo, M7G-11n INFO), R4 (M7G-23 0 / DECYZJA), R7 (M7G-45),
+    kod R3 (M7G-52 para po dobie zapisu), kod R4 (M107_ERR, BLAD eksportu), kod R5 (klucz TAK tylko z linii startu)."""
     import statistics
     st0 = [g for g in D["start"] if g]
     keys = st0[-1] if st0 else None
@@ -61541,18 +61572,30 @@ def m107_rows(rep, D, nks_rows=None):
     rep.add("M7G-0: linia 'Gospodarka (m107): start sesji' z 6 kluczami TAK (K1-K6) w kazdej sesji",
             f"startow {len(D['start'])}, z 6 kluczami TAK {sum(1 for g in st0 if g == ('TAK',) * 6)}" + (f"; ostatnia: {keys}" if keys and keys != ('TAK',) * 6 else ""),
             "kazda linia startu z 6 kluczami TAK (brak linii - INFO: log sprzed m107)", allon if D["start"] else None)
-    k1 = keys is None or keys[0] == "TAK"; k2 = keys is None or keys[1] == "TAK"; k3 = keys is None or keys[2] == "TAK"
-    k4 = keys is None or keys[3] == "TAK"; k6 = keys is None or keys[5] == "TAK"
+    # poprawka recenzji kodu R5: klucz liczy sie jako TAK tylko z linii startu m107 (log sprzed m107 - progi kluczy INFO, jak w opisie grupy)
+    k1 = keys is not None and keys[0] == "TAK"; k2 = keys is not None and keys[1] == "TAK"; k3 = keys is not None and keys[2] == "TAK"
+    k4 = keys is not None and keys[3] == "TAK"; k6 = keys is not None and keys[5] == "TAK"
     # ================= zad. 1 biedne wsie
+    # poprawka recenzji ekonomii R1: wiaze surowe 'kiesa < 1000 zl' (jak M3W-2); miara 'kiesa < min(1000 zl, skrzynia)' tylko INFO (M7G-11n) - skrzynia idzie za dochodem wsi
+    vd = sorted(D["vil"])
+    if vd:
+        lo = [D["vil"][d] for d in vd[-7:]]
+        x = sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)
+        rep.add("M7G-11: M3W-2 - wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (linia 'Przeplywy osad (kiesy wsi)'; bez klucza)",
+                f"{100 * x:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]})",
+                f"<= {100 * M107_POOR:.0f}% (cel m103; 103h 7.9%, 103d 8.7% - przyczyna w grze: wsie bez utargu wozow - 103h 41 biednych: 30 z plonem glownym 0 po Planie, "
+                "19 bez kursu wozu w oknie, Zelazne Wyspy 14, Nocna Straz 9; osobna praca)", x <= M107_POOR)
+    else:
+        rep.add("M7G-11: M3W-2 - wsi z kiesa < 1000 zl", "brak linii 'Przeplywy osad (kiesy wsi)' z rozkladem", "INFO", None)
     akd = sorted(d for d in D["ak"] if D["ak"][d][0])
     if akd:
         l7 = akd[-7:]
         x = sum(int(D["ak"][d][0][0]) / max(1, int(D["ak"][d][0][1])) for d in l7) / len(l7)
-        rep.add("M7G-11: M3W-2 w mierze 'kiesa < min(1000 zl, skrzynia)' (wies bez zapasu na czarna godzine), srednio 7 ostatnich dob (linia Akumulator kies)",
+        rep.add("M7G-11n: wsie biedne w mierze 'kiesa < min(1000 zl, skrzynia)' (bez zapasu na czarna godzine), srednio 7 ostatnich dob (linia Akumulator kies)",
                 f"{100 * x:.2f}% (ostatnia doba {D['ak'][akd[-1]][0][0]} z {D['ak'][akd[-1]][0][1]} wsi DS)",
-                f"<= {100 * M107_POOR:.0f}% (cel m103 bez zmiany; 103h 3.15%, 103d 5.00% - na granicy)", x <= M107_POOR)
+                "INFO (miara nie wiaze - skrzynia idzie za dochodem wsi, biedniejaca wies ma nizszy prog; 103h 3.15%, 103d 5.00%)", None)
     else:
-        rep.add("M7G-11: M3W-2 w nowej mierze", "brak segmentu 'm105 wsie biedne' w linii Akumulator kies", "INFO (Dues Medieval NIE albo log sprzed m105)", None)
+        rep.add("M7G-11n: wsie biedne w mierze 'kiesa < min(1000 zl, skrzynia)'", "brak segmentu 'm105 wsie biedne' w linii Akumulator kies", "INFO (Dues Medieval NIE albo log sprzed m105)", None)
     mx = sorted(d for d in D["ak"] if D["ak"][d][1])
     if mx:
         t28 = mx[-28:]
@@ -61610,8 +61653,10 @@ def m107_rows(rep, D, nks_rows=None):
         l30 = max(int(D["wz"][d][10]) for d in wzd)
         ex = [M107_RX["wzhold"].search(s) for s in D["hold"]]
         lng = sorted({(e.group(1), e.group(4)) for e in ex if e and int(e.group(3)) > 30})
+        # poprawka recenzji ekonomii R4: przy K1 TAK WZ-1b nie daje DECYZJI, a HoldCheck nie ma limitu dob - wies pod blokada band bez utargu bez konca; prog 0 (> 0 - DECYZJA)
         rep.add("M7G-23: wsie wstrzymane ponad 30 dob (blokady band-domow)", f"najwiecej {l30}; wsie i wrogowie z przykladow: " + (", ".join(f"{a} ({b})" for a, b in lng[:6]) or "-")
-                + (f"; latka zaladunku {'wpieta' if D['wire'] else 'BRAK'}" if D["wire"] is not None else ""), "INFO (wejscie do ewentualnej eskorty z milicji W2)", None)
+                + (f"; latka zaladunku {'wpieta' if D['wire'] else 'BRAK'}" if D["wire"] is not None else ""),
+                "0 (> 0 - DECYZJA: wies bez utargu pod blokada band; wejscie do ewentualnej eskorty z milicji W2; K1 NIE - INFO)", (l30 == 0) if (on and k1) else None, decide=l30 > 0)
         ms = [D["wzms"][d] for d in sorted(D["wzms"]) if d in D["wz"] and isinstance(D["wz"][d], tuple)]
         med = statistics.median(ms) if ms else 0.0
         rep.add("M7G-24: czas linii 'Wozy (m106): dzien' z K1 (sprawdzenia modelu AI) - mediana", f"{med:.2f} ms (najwiecej {max(ms) if ms else 0:.2f}; dob {len(ms)})",
@@ -61708,17 +61753,33 @@ def m107_rows(rep, D, nks_rows=None):
         fr = [x for x in D["fach"] if x is not None]
         if fr:
             rep.add("M7G-44: dopisek K5 w linii 'KS: fach wsi (m106)' (format, regex WZ bez zmian)", f"z dopiskiem {sum(1 for x in fr if x)} z {len(fr)}", "kazdy w formacie", all(fr))
+        # poprawka recenzji ekonomii R7: NKS-2 (<= 30 s, cieple Plany) osobno dla Planu wlaczenia (w grze jedyny z druga runda gradientu) i cieplych Planow po wlaczeniu
+        # (bramka: Plan 5 K4+K5 27.6 s wobec 11.3 s bazy, w grze cieple Plany do 28.7 s) - przy > 30 s albo M7G-42 bez poprawy najpierw K5 NIE (bez zmierzonego zysku), potem K4 NIE
+        tp = [p for p in pl if p[3]]
+        if tp:
+            on = D["ks_on"]
+            pre = [p for p in tp if on is None or p[0] <= on]
+            post = [p for p in tp if on is not None and p[0] > on and p[3][0] >= 2]
+            en = pre[-1] if (pre and on is not None) else None
+            ps = sorted(p[3][1] for p in post)
+            rep.add("M7G-45: czas Planu - Plan wlaczenia KS i cieple Plany po wlaczeniu osobno (NKS-2 <= 30 s)",
+                    (f"Plan wlaczenia doba {en[0]} (nr {en[3][0]}) {en[3][1]:.1f} s" if en else "Plan wlaczenia - brak (KS niewlaczona w tym logu)")
+                    + (f"; przed wlaczeniem max {max(p[3][1] for p in pre):.1f} s ({len(pre)})" if pre else "")
+                    + (f"; po wlaczeniu (nr >= 2) max {ps[-1]:.1f} s, mediana {ps[len(ps) // 2]:.1f} s ({len(ps)})" if ps else "; po wlaczeniu - brak"),
+                    "INFO (103h: Plan wlaczenia 15.3 s, po wlaczeniu do 28.7 s; > 30 s albo M7G-42 bez poprawy - najpierw K5 NIE, potem K4 NIE)", None)
     else:
         rep.add("M7G-41..44: Plany KS", "brak linii Planu", "INFO (KS nieczynne albo log bez Planu)", None)
     # ================= zad. 5 tablica
     sv = D["save"]
     if sv:
-        full = [g for g in sv if g[0] != "pusty"]
+        full = [g for g in sv if g[0] not in ("pusty", "blad")]
+        nerr = sum(1 for g in sv if g[0] == "blad")
         over = [g for g in full if int(g[1]) > M107_SAVE]
         nb2 = [g for g in full if g[0] != "nb3" or g[6] != "zgodna TAK"]
         rep.add("M7G-51: kazdy zapis gry - linia 'Tablica (m107): zapis gry', rozmiar arm_board, proba odczytu nb3 zgodna",
-                f"zapisow {len(sv)} (pustych {len(sv) - len(full)}), najwiekszy {max([int(g[1]) for g in full] or [0])} B, ponad {M107_SAVE} B {len(over)}, nb2 / niezgodna {len(nb2)}"
-                + (f"; NIEZGODNA: {D['bad'][0][:120]}" if D["bad"] else ""), f"<= {M107_SAVE} B i proba zgodna w 100% (niezgodnosc - zapis nb2, NIE)", (not over and not nb2 and not D["bad"]) if k6 else None)
+                f"zapisow {len(sv)} (pustych {len(sv) - len(full) - nerr}, BLAD eksportu {nerr}), najwiekszy {max([int(g[1]) for g in full] or [0])} B, ponad {M107_SAVE} B {len(over)}, "
+                f"nb2 / niezgodna {len(nb2)}" + (f"; NIEZGODNA: {D['bad'][0][:120]}" if D["bad"] else ""),
+                f"<= {M107_SAVE} B, proba zgodna w 100% i BLAD eksportu 0 (niezgodnosc - zapis nb2, NIE)", (not over and not nb2 and not D["bad"] and not nerr) if k6 else None)
     else:
         rep.add("M7G-51: zapis gry arm_board", "brak linii 'Tablica (m107): zapis gry' (bieg bez zapisu gry albo K6 NIE)", "INFO", None)
     ev = D["events"]
@@ -61726,15 +61787,19 @@ def m107_rows(rep, D, nks_rows=None):
     for i, e in enumerate(ev):
         if e[0] != "load3":
             continue
-        prev = [x for x in ev[:i] if x[0] == "save" and x[2][0] != "pusty"]
+        prev = [x for x in ev[:i] if x[0] == "save" and x[2][0] not in ("pusty", "blad")]
+        # poprawka recenzji kodu R3: linie zapisu z doba - para z ostatnim zapisem TEJ doby co wczytanie (autozapis miedzy zapisem a wczytaniem nie myli pary; zapisu tej
+        # doby w logu brak - wczytanie zapisu z innego logu, INFO); linie bez doby (sprzed poprawki) - ostatni niepusty zapis jak dotad
+        if prev and any(x[2][8] is not None for x in prev):
+            prev = [x for x in prev if x[2][8] is not None and x[2][8] == e[2][1]]
         if prev:
             g, l = prev[-1][2], e[2]
             pairs.append((g, l, (g[2], g[3], g[4], g[5]) == (l[4], l[5], l[6], l[7]) and int(g[1]) == int(l[0])))
     if D["load3"]:
         bp = [p for p in pairs if not p[2]]
-        rep.add("M7G-52: wczytanie nb3 - flagi, listy, bandy i wpisy szkod (i rozmiar) = liczby z ostatniej linii zapisu gry przed wczytaniem",
+        rep.add("M7G-52: wczytanie nb3 - flagi, listy, bandy i wpisy szkod (i rozmiar) = liczby z linii zapisu gry tej samej doby (linie bez doby - ostatni zapis przed wczytaniem)",
                 f"wczytan nb3 {len(D['load3'])}, z zapisem w tym logu {len(pairs)}, rozne {len(bp)}" + (f" (zapis {bp[0][0][1:6]} / wczytanie {bp[0][1][4:8]})" if bp else ""),
-                "rowne (wczytanie bez zapisu w tym logu - INFO)", (not bp) if pairs else None)
+                "rowne (wczytanie bez zapisu tej doby w tym logu - INFO)", (not bp) if pairs else None)
     else:
         rep.add("M7G-52: wczytanie zapisu nb3", "brak linii 'wczytano zapis arm_board nb3'", "INFO (bieg bez wczytania zapisu z nb3)", None)
     ld = sorted(D["lday"])
@@ -61751,35 +61816,39 @@ def m107_rows(rep, D, nks_rows=None):
     if l2:
         nxt = [e for e in ev[l2[0] + 1:] if e[0] == "save" and e[2][0] != "pusty"]
         ok = bool(nxt) and nxt[0][2][0] == "nb3" and nxt[0][2][6] == "zgodna TAK"
-        rep.add("M7G-54: pierwsze wczytanie nb2 (zapis sprzed m107) -> nastepny zapis gry nb3 z proba zgodna", (f"nastepny zapis {nxt[0][2][0]} {nxt[0][2][1]} B, proba {nxt[0][2][6]}" if nxt else "brak zapisu gry po wczytaniu"),
+        rep.add("M7G-54: pierwsze wczytanie nb2 (zapis sprzed m107) -> nastepny zapis gry nb3 z proba zgodna",
+                ((f"nastepny zapis {nxt[0][2][0]} {nxt[0][2][1]} B, proba {nxt[0][2][6]}" if len(nxt[0][2]) > 6 else "nastepny zapis - BLAD eksportu") if nxt else "brak zapisu gry po wczytaniu"),
                 "nb3 i zgodna TAK (bez zapisu gry po wczytaniu - INFO)", ok if (nxt and k6) else None)
     else:
         rep.add("M7G-54: wczytanie nb2 -> zapis nb3", "brak linii 'wczytano zapis arm_board nb2'", "INFO (bieg bez wczytania starego zapisu)", None)
     # ================= M7G-9 bledy
     raw = [d for d in D["wz"] if D["wz"][d] == "raw"]
-    rep.add("M7G-9: ERROR nowych funkcji m107 i potkniecia nowych segmentow", f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else "") + f", segment Wozy w zlym formacie {len(raw)}, "
-            f"proby nb3 niezgodne {len(D['bad'])}", "0 / 0 / 0", D["err"] == 0 and not raw and not D["bad"])
+    rep.add("M7G-9: ERROR nowych funkcji m107 (takze sciezki K1 w Guard, rozladunek, DsTowns, eksport i odczyt tablicy) i potkniecia nowych segmentow; bez klucza",
+            f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else "") + f", segment Wozy w zlym formacie {len(raw)}, proby nb3 niezgodne {len(D['bad'])}, "
+            f"zapis gry BLAD eksportu {D['saveerr']}", "0 / 0 / 0 / 0", D["err"] == 0 and not raw and not D["bad"] and not D["saveerr"])
 
 
 def m107_synth():
     """m107gosp - test syntetyczny: dobry i zly bieg przez m107_collect / m107_rows. None = werdykty zgodne z oczekiwanymi, inaczej opis roznicy."""
     import tempfile
     import shutil
-    def run(bad):
+    def run(bad, nostart=False):
         tmp = tempfile.mkdtemp(prefix="m107g_")
         try:
             logp = os.path.join(tmp, "Armoury-test.log")
-            L = ["[00:00:00] Prolog (m101): nowa kampania z PROLOGIEM 298 (test)", "[00:00:00] " + M107_TEST["start"], "[00:00:00] KS: WLACZONE doba 100005 (test)",
-                 "[00:00:00] Wozy (m107): latka VillagerCampaignBehavior.ThinkAboutSendingItemToTown wpieta (test)."]
+            L = ["[00:00:00] Prolog (m101): nowa kampania z PROLOGIEM 298 (test)"] + ([] if nostart else ["[00:00:00] " + M107_TEST["start"]]) + [
+                 "[00:00:00] KS: WLACZONE doba 100005 (test)", "[00:00:00] Wozy (m107): latka VillagerCampaignBehavior.ThinkAboutSendingItemToTown wpieta (test)."]
             for d in range(100000, 100040):
                 ak = M107_TEST["ak"].replace("dzien 108900", "dzien %d" % d)
                 if bad:
                     ak = ak.replace(") 18 z 560 wsi DS", ") 40 z 560 wsi DS").replace("< 1000 zl) 25,", "< 1000 zl) %d," % (25 + (d - 100000) // 4))
                 L.append("[00:00:00] " + ak)
+                # M7G-11 (poprawka R1): surowo '< 1000 zl' - dobry 20 z 571 (3.5%), zly 60 z 571 (10.5%)
+                L.append("[00:00:00] " + M107_TEST["vil"].replace("dzien 108900", "dzien %d" % d).replace("ponizej 1000 zlota 20", "ponizej 1000 zlota %d" % (60 if bad else 20)))
                 L.append("[00:00:00] " + M107_TEST["ds"].replace("dzien 108900", "dzien %d" % d))
                 wz = M107_TEST["wz"].replace("dzien 108900", "dzien %d" % d)
                 if not bad:
-                    wz = wz.replace("cel chwilowy = osada 1", "cel chwilowy = osada 0")
+                    wz = wz.replace("cel chwilowy = osada 1", "cel chwilowy = osada 0").replace("ponad 30 dob 1)", "ponad 30 dob 0)")   # M7G-23 (poprawka R4): 0 - TAK, 1 - DECYZJA
                 else:
                     wz = wz.replace("cel chwilowy = osada 1", "cel chwilowy = osada 4").replace("rozladowane 2 (szt. 340)", "rozladowane 0 (szt. 0)").replace("czas 1.10 ms", "czas 3.10 ms")
                 L.append("[00:00:00] " + wz)
@@ -61798,10 +61867,13 @@ def m107_synth():
                 L.append("[00:00:00] " + M107_TEST["fach"].replace("plan doba 108682", "plan doba %d" % pd))
             L.append("[00:00:00] Tablica ogloszen (m102): wczytano zapis arm_board nb2 (12000 B, doba zapisu 99990, przedrostkow 25) - flagi 0, listy 100, szkody band 280 (wpisow 750).")
             L.append("[00:00:00] " + (M107_TEST["save"] if not bad else M107_TEST["save"].replace("nb3 9387 B", "nb2 13000 B").replace("zgodna TAK", "nb3 zgodna NIE - zapis nb2")))
+            # poprawka R3: autozapis innej doby miedzy zapisem a wczytaniem - M7G-52 paruje wczytanie (doba zapisu 108878) z zapisem tej samej doby
+            L.append("[00:00:00] " + M107_TEST["save"].replace("doba zapisu 108878", "doba zapisu 108890").replace("nb3 9387 B", "nb3 9500 B").replace("listy 2917 B (105)", "listy 2950 B (107)"))
             L.append("[00:00:00] " + M107_TEST["load3"].replace("listy 105", "listy 105" if not bad else "listy 99"))
             if bad:
                 L.append("[00:00:00] Tablica (m107): proba odczytu nb3 NIEZGODNA (pierwsza roznica: list 1) - zapis nb2; niezgodnych w sesji 1, zgodnych 0.")
                 L.append("[00:00:00] ERROR in CartGuard.HoldCheck: System.Exception: test")
+                L.append("[00:00:00] " + M107_TEST["saveerr"])
             open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
             rep = Report()
             D = m107_collect(logp)
@@ -61809,20 +61881,26 @@ def m107_synth():
             return {r[0].split(":")[0].split(" ")[0]: r[3] for r in rep.rows}
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-    good, badr = run(False), run(True)
-    exp_good = {"M7G-0": "TAK", "M7G-11": "TAK", "M7G-12": "TAK", "M7G-21": "TAK", "M7G-22": "TAK", "M7G-24": "TAK", "M7G-31": "TAK", "M7G-32": "TAK", "M7G-33": "TAK",
-                "M7G-41": "TAK", "M7G-42": "TAK", "M7G-44": "TAK", "M7G-51": "TAK", "M7G-52": "TAK", "M7G-53": "TAK", "M7G-54": "TAK", "M7G-9": "TAK"}
-    exp_bad = {"M7G-11": "NIE", "M7G-12": "NIE", "M7G-21": "NIE", "M7G-22": "NIE", "M7G-24": "NIE", "M7G-31": "NIE", "M7G-32": "NIE", "M7G-33": "NIE", "M7G-42": "NIE",
-               "M7G-51": "NIE", "M7G-52": "NIE", "M7G-53": "NIE", "M7G-54": "NIE", "M7G-9": "NIE"}
+    good, badr, nost = run(False), run(True), run(False, True)
+    exp_good = {"M7G-0": "TAK", "M7G-11": "TAK", "M7G-11n": "INFO", "M7G-12": "TAK", "M7G-21": "TAK", "M7G-22": "TAK", "M7G-23": "TAK", "M7G-24": "TAK", "M7G-31": "TAK",
+                "M7G-32": "TAK", "M7G-33": "TAK", "M7G-41": "TAK", "M7G-42": "TAK", "M7G-44": "TAK", "M7G-45": "INFO", "M7G-51": "TAK", "M7G-52": "TAK", "M7G-53": "TAK",
+                "M7G-54": "TAK", "M7G-9": "TAK"}
+    exp_bad = {"M7G-11": "NIE", "M7G-12": "NIE", "M7G-21": "NIE", "M7G-22": "NIE", "M7G-23": "DECYZJA", "M7G-24": "NIE", "M7G-31": "NIE", "M7G-32": "NIE", "M7G-33": "NIE",
+               "M7G-42": "NIE", "M7G-51": "NIE", "M7G-52": "NIE", "M7G-53": "NIE", "M7G-54": "NIE", "M7G-9": "NIE"}
+    # poprawka recenzji kodu R5: log bez linii startu m107 - progi kluczy INFO (bez wyjatku); bez klucza dalej werdykt (M7G-11, M7G-9 i progi formatu / czasu)
+    exp_nost = {"M7G-0": "INFO", "M7G-21": "INFO", "M7G-22": "INFO", "M7G-23": "INFO", "M7G-32": "INFO", "M7G-42": "INFO", "M7G-51": "INFO", "M7G-54": "INFO",
+                "M7G-11": "TAK", "M7G-9": "TAK"}
     diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
     diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
+    diff += [f"bez startu {k}: {nost.get(k)} (oczekiwane {v})" for k, v in exp_nost.items() if nost.get(k) != v]
     return "; ".join(diff) if diff else None
 
 
 def m107gosp_main(logp, until=120):
     """m107gosp (22.10; projekt m107-gospodarka, zasady gospodarki Jeffa: z podazy i popytu, start neutralny, zmiany produkcji powoli, z biezacego zysku, zamknieta ekonomia,
-    100%): M7G-S, M7G-S2, M7G-0, M7G-11..15 (wsie), M7G-21..24 (wozy), M7G-31..35 (zamki), M7G-41..44 (ziarno), M7G-51..54 (tablica), M7G-9 - opis w --help. Strumieniowo;
-    M7G-22 - NKS-8 grupy nks na tym samym logu (przy Planach KS). Log bez linii m107 - wiersze INFO, bez wyjatku."""
+    100%): M7G-S, M7G-S2, M7G-0, M7G-11..15 (wsie), M7G-21..24 (wozy), M7G-31..35 (zamki), M7G-41..45 (ziarno), M7G-51..54 (tablica), M7G-9 - opis w --help. Strumieniowo;
+    M7G-22 - NKS-8 grupy nks na tym samym logu (przy Planach KS). Log bez linii m107 - progi kluczy INFO, bez wyjatku; M7G-11 (surowo '< 1000 zl'), M7G-9 i progi formatu /
+    czasu / poziomu przy obecnych liniach daja werdykt takze na logu sprzed m107 (poprawka recenzji kodu R5)."""
     import io
     import contextlib
     rep = Report()
