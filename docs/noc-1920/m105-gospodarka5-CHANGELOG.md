@@ -27,8 +27,8 @@ Slowami gracza: pan nie bierze swojej dzialki z wozu ani czynszu z zapasu wsi, d
 - Ulga konczy sie sama, gdy kiesa dojdzie do skrzyni.
 
 **(2) Czynsz - `DsVillage.RentPay`.**
-- Rata dnia tylko z kiesy ponad skrzynie: `pc = max(0, floor(kiesa - skrzynia))`; gdy `pc < rata`, roznica jest darowana bez zaleglosci (jak przy rabunku) - doliczona do kwoty "wstrzymane" linii DS (NDS-6c bez zmian), bez zmiany nawiasu z liczba wsi. Regula stoi przed G5 (skrzynia > koszyk 2 dob, wiec G5 ponizej skrzyni nic juz nie tnie).
-- Niezaplacona reszta (ulamek zlotowki, G5) idzie do ksiegi jak dotad: `shortDay = rata - zaplacone - darowane do skrzyni`.
+- Rata dnia tylko z kiesy ponad skrzynie: `pc = max(0, floor(kiesa - skrzynia))`; gdy `pc < rata` (cale zl raty, `dayR = floor(rata)` - takze przy kiesie mniejszej od raty albo 0, poprawka po recenzji), roznica `dayR - pc` jest darowana bez zaleglosci (jak przy rabunku) - doliczona do kwoty "wstrzymane" linii DS (NDS-6c bez zmian), bez zmiany nawiasu z liczba wsi. Regula stoi przed G5 (skrzynia > koszyk 2 dob, wiec G5 ponizej skrzyni nic juz nie tnie).
+- Niezaplacona reszta (ulamek zlotowki, G5) idzie do ksiegi jak dotad: `shortDay = rata - zaplacone - darowane do skrzyni` (ponizej skrzyni zawsze < 1 zl).
 - Rata zaleglosci tylko z `kiesa - rata dnia - max(koszyk, skrzynia)`.
 - Skrzynia liczona tylko, gdy jest rata albo zaleglosc (bez kosztu dla wsi bez czynszu).
 
@@ -95,9 +95,15 @@ Koszt panow (model): prolog n31 18.2 / 6.7 tys./d, n32 18.9 / 2.2 tys./d (pierws
 - **Koszt czasu.** Skrzynia przy wozie liczona raz na powrot wozu wsi DS, tylko gdy licznik pana urosl w oknie: `ChestToday` (slownik) albo - przed blokiem doby - `Chest` (DsVillageDay + dekret); w RentPay tylko przy racie albo zaleglosci. Sprawdzic czasy w liniach doby (oczekiwane bez zmian w granicach szumu).
 - **Brak testu w grze.** Wynik z modelu na csv; kod sprawdzony buildem i progami na syntetycznych liniach. Pierwszy bieg gry z kluczem - test koncowy.
 
+### Poprawki po recenzji (recenzja `fd388555..b7a9bc32`: 0 wywrotek, 0 zlych stanow, 2 drobne)
+
+- **Uwaga 1 (poprawiona): czynsz wsi z kiesa mniejsza od raty nie byl darowany w calosci.** Blok skrzyni w `RentPay` liczyl darowane od raty juz ograniczonej kiesa (`payDay = min(rata, kiesa)`): przy kiesie 5 zl i racie 17 zl darowal 5 zl, a 12 zl x rampa szlo do ksiegi zaleglosci; przy kiesie 0 blok nie biegl wcale (cala rata do ksiegi). Sprzeczne z opisem klucza i podpowiedzia MCM. Teraz darowane liczy sie od calej raty (`dayR = floor(rata)`): `chestRemit = dayR - pc`, `payDay = min(payDay, pc)` (= pc, bo pc <= kiesa), do ksiegi idzie tylko ulamek zlotowki. Zlota to nie rusza (zaleglosc wsi ponizej skrzyni i tak nie byla splacana - rata zaleglosci tylko ponad max(koszyk, skrzynia)); dotyczy glownie ok. 27 wsi bez wozow (ok. 17 zl/d kazda mniej nowej zaleglosci). Skutek w linii DS: "czynsz darowany do skrzyni" i "wstrzymane" wyzsze, "nowa zaleglosc" nizsza (NDS-6a/6b nizej, NDS-6c bez zmian albo wyzej). Klucz NIE - bez zmian (blok nie biegnie, `dayR` nieuzywane). Test: `pop/rent_sim.py` w scratchpadzie gosp5 - 432 przypadki (rata, kiesa, skrzynia, zaleglosc): bilans rata = zaplacone + darowane + do ksiegi, zaplacone <= kiesa, ponizej skrzyni do ksiegi < 1 zl, ponad skrzynie nic darowane, klucz NIE = `fd388555`, przy kiesie >= raty wynik jak w `b7a9bc32` - 0 bledow.
+- **Uwaga 2 (nie wdrozona, wybor projektu): ulga pana bez rampy DS (28 dob).** Inne nowe reguly DS wchodza x Ramp; ulga i darowany czynsz - od razu w calosci. W zapisie Jeffa Ramp = 1 (bez znaczenia); w prologu szczyt kosztu panow (18-19 tys./d) wypada w 28 dobach rampy. Nie wdrozone, bo progi wiazace leza poza rampa w biegu 230 dob (C-4c to INFO, wiazacy C-4c3 liczy od doby 120 pliku; NAKUM-7 - ostatnie 28 dob), a wczesne napelnianie skrzyn jest celem zmiany. Gotowa poprawka, gdyby C-4c3 albo NAKUM-7 wyszly NIE i nie chcialo sie wylaczac calego klucza: w `VillageTakings.LordRelief` `long back = (long)Math.Min(Math.Floor(got * DsVillage.Ramp), Math.Min(lack, int.MaxValue));` (M3W-2 na koncu biegu bez zmian, bo po 28 dobach Ramp = 1).
+
 ### Build i commity
 
 - `dotnet build Armoury/Armoury.csproj -c Release` - 0 bledow (7 starych ostrzezen); `python -I tools/gen_mcm.py` (McmSettings: wlasciwosc + przepisanie); `sprawdz_narzedzie.py` - ok.
 - `c99aa641` kod (Settings, McmSettings, VillageTakings.LordRelief, DsVillage RentPay/ReliefChest/NoteRelief/linia, TownFolk.DsAkum).
 - `c5c6314b` narzedzie (`--grupa m105gosp5`, M5G-8 po uldze).
 - ten wpis CHANGELOG.
+- poprawki po recenzji: uwaga 1 w `DsVillage.RentPay` (kod) i ten opis.
