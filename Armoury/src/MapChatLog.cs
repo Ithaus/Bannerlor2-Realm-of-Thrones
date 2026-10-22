@@ -72,6 +72,8 @@ namespace Armoury
         private static int _lastK;
         private static int _findWait;      // takty do nastepnego szukania po nieudanym (co 5 s)
         private static int _finds, _movesLogged, _backsLogged, _mapLogged;
+        private static bool _hiddenStory;  // noc 21/22.10 (zrzut 103c): dziennik schowany przy oknie wydarzenia ROT / Kroniki (w rogu nachodzil na tekst okna)
+        private static int _storyHides;
 
         // ---- klucze (z MCM wprost w kampanii, bez MCM z Settings.Current)
         private static bool _kClear = true, _kFrame = true, _kHide = true;
@@ -212,10 +214,23 @@ namespace Armoury
             if (!Alive())
             {
                 if (_w != null && _pos != PosGame) { try { _w.MarginLeft = _origLeft; _w.MarginBottom = _origBottom; } catch { } }   // odpadly widzet - marginesy prefabu
-                _w = null; _pos = PosGame;
+                _w = null; _pos = PosGame; _hiddenStory = false;
                 if (!onMap) return;
                 if (_findWait > 0) { _findWait--; return; }
                 if (!Find()) { _findWait = 20; return; }
+            }
+            // noc 21/22.10 (zrzut 103c): okno wydarzenia ROT albo Kroniki na stosie stanow - dziennik schowany pod tym samym kluczem co przesuniecie (w rogu
+            // nachodzil na tekst okna); po zamknieciu okna wraca. Dziennik nie ma powiazania IsVisible w prefabie - zmieniamy tylko my.
+            bool story = _kClear && StoryPictures.EventWindowOnStack();
+            if (story != _hiddenStory)
+            {
+                try
+                {
+                    _w.IsVisible = !story;
+                    _hiddenStory = story;
+                    if (story && ++_storyHides <= 3) Log.Info(P + "okno wydarzenia na wierzchu - dziennik schowany do jego zamkniecia (" + _storyHides + ". raz w sesji).");
+                }
+                catch (Exception e) { Stumble("StoryHide", e); }
             }
             bool clean = onMap && NoWindows(ms);
             int want = _kClear && clean ? (ms.IsInMenu ? PosMenu : PosMap) : PosGame;
@@ -669,6 +684,8 @@ namespace Armoury
             if (_w != null && _pos != PosGame) { try { _w.MarginLeft = _origLeft; _w.MarginBottom = _origBottom; } catch { } }
             _pos = PosGame;
             if (_frame != null) { try { _frame.IsVisible = false; } catch { } }
+            if (_hiddenStory && _w != null) { try { _w.IsVisible = true; } catch { } }
+            _hiddenStory = false; _storyHides = 0;
             _frameWasVis = false;
             _movesLogged = 0; _backsLogged = 0; _mapLogged = 0;
             MapChatLogStats.DayReset();
