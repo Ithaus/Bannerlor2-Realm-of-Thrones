@@ -61,7 +61,7 @@ namespace Armoury
         /// <summary>Wiesc z drogi: dokad jedzie woz i ile wartosci towaru (Item.Value x sztuki - jednostka polki; paczka 121: waga sztuki) wiezie w kazdej kategorii.</summary>
         private sealed class Haul { public Town To; public Dictionary<ItemCategory, int> Value; public double Day; public long Gold; }   // m105 G4: Gold - wycena kursu przy wyborze (rezerwacja kasy celu)
 
-        private sealed class Cand { public Town T; public float D; public double Rate; public double Ub; public List<Line> Load; public bool Full; public Dictionary<ItemCategory, int> News; public float D0; public bool Byp; }   // f19-e2: D0 - odleglosc przed obcieciem do 0, Byp - wlasne miasto mimo d <= 0 albo poza zasiegiem
+        private sealed class Cand { public Town T; public float D; public double Rate; public double Ub; public List<Line> Load; public bool Full; public Dictionary<ItemCategory, int> News; public float D0; public bool Byp; public double Sv = 1.0, Tr; public Settlement Gate; }   // f19-e2: D0 - odleglosc przed obcieciem do 0, Byp - wlasne miasto mimo d <= 0 albo poza zasiegiem; m106: Sv - przezywalnosc trasy (CartRisk), Tr - szacunek kursu T (doby), Gate - wroga twierdza na drodze
 
         /// <summary>f19-e2 (pomiar, klucz Measure Iron Wood Flow): ostatni wybor miasta wozu - linia "Drewno w wozach wsi (f4-pomiary)" pokazuje go dla wozow stojacych w domu
         /// ponad 14 dob. To = null - wybor bez miasta (Why: powod); D0 - odleglosc gry przed obcieciem (&lt;= 0 - bez drogi ladowej), Byp - wlasne miasto wsi miejskiej przeszlo
@@ -108,8 +108,42 @@ namespace Armoury
         /// ThinkAboutSendingItemToTown); razem ok. 0.49 doby.</summary>
         internal const double CycleWait = (1.0 / 0.20 + 1.0 / 0.15) / 24.0;
 
+        // ------------------------------------------------------------ m106-wozy W2 (linia "Wozy (m106): dzien" - CartGuard.Daily)
+        /// <summary>m106: liczniki doby wyboru miasta (W1 drogi, brama wroga, ryzyko trasy) i dosypki przy wyjezdzie - CartGuard.Daily bierze je przez TakeM106 (zeruje).</summary>
+        internal sealed class M106
+        {
+            public int W1Cut, W1Own, W1Fibre, GateCut, GateCarts, GateAll, RiskChanged, TuDone, TuUnits, TuWait, TuLost, Stumbles;
+            public string GateTop;
+        }
+        private static int _w1Cut, _w1Own, _w1Fibre, _gateCut, _gateAll, _riskChanged, _tuDone, _tuUnits, _tuWait, _tuLost, _m106St;
+        private static readonly HashSet<MobileParty> _gateCarts = new HashSet<MobileParty>();
+        private static readonly Dictionary<string, int> _gateBy = new Dictionary<string, int>(StringComparer.Ordinal);
+        /// <summary>m106 (Village Cart Top Up On Departure): dosypka magazynu czeka na wyjazd wozu z domu (MarketCarts.OnLeft) - wies, cel, plan z udzwigiem (capped), doba wyboru.</summary>
+        private sealed class Pending { public Settlement Home; public Settlement To; public bool Capped; public int Day; }
+        private static readonly Dictionary<MobileParty, Pending> _pending = new Dictionary<MobileParty, Pending>();
+
+        internal static M106 TakeM106()
+        {
+            string top = null; int bn = 0;
+            foreach (var kv in _gateBy) if (kv.Value > bn || (kv.Value == bn && top != null && string.CompareOrdinal(kv.Key, top) < 0)) { bn = kv.Value; top = kv.Key; }
+            var m = new M106 { W1Cut = _w1Cut, W1Own = _w1Own, W1Fibre = _w1Fibre, GateCut = _gateCut, GateCarts = _gateCarts.Count, GateAll = _gateAll, RiskChanged = _riskChanged,
+                               TuDone = _tuDone, TuUnits = _tuUnits, TuWait = _tuWait, TuLost = _tuLost, Stumbles = _m106St, GateTop = top != null ? top + " " + bn : null };
+            M106Clear();
+            return m;
+        }
+
+        private static void M106Clear()
+        {
+            _w1Cut = _w1Own = _w1Fibre = _gateCut = _gateAll = _riskChanged = _tuDone = _tuUnits = _tuWait = _tuLost = _m106St = 0;
+            _gateCarts.Clear(); _gateBy.Clear();
+        }
+
+        /// <summary>m106: brak drogi ladowej osada -> osada (CartGuard.NoLandRoad - prog BK 50000, w tym 1e30 NavalDLC i 1e8 poza tablica drog).</summary>
+        private static bool NoRoad(float d) { return CartGuard.NoLandRoad(d); }
+
         internal static void Reset()
         {
+            _pending.Clear(); M106Clear();                                       // m106-wozy: dosypka przy wyjezdzie i liczniki linii m106
             _hauls.Clear(); _news.Clear(); _errSites.Clear(); _last.Clear();   // f19-e2: _last - pomiar ostatniego wyboru
             _gold.Clear(); _gNew = _gChanged = _gExpired = 0;                  // m105 G4
             _absUsed.Clear(); _absDay = -1; Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2); _zMis = 0;   // ZC1
@@ -422,7 +456,9 @@ namespace Armoury
             return m.GetDistance(cart, to, false, MobileParty.NavigationType.Default, out lr);
         }
 
-        private static bool Hostile(MobileParty cart, Settlement home, Settlement to)
+        private static string SName(Settlement s) { try { return s != null && s.Name != null ? s.Name.ToString().Replace(',', ' ') : "?"; } catch { return "?"; } }   // m106: nazwa do linii
+
+        internal static bool Hostile(MobileParty cart, Settlement home, Settlement to)   // m106: takze CartGuard.NearestReachableTown
         {
             var a = cart.MapFaction ?? home.MapFaction;
             var b = to.MapFaction;
@@ -473,6 +509,9 @@ namespace Armoury
                     if (extra > 0) { full = Merged(load, plan); uFull = SellUnits(cart, full, bk); tfreeFull = Math.Max(0.0, 5.0 * (fill - (double)left / W)); }
                     if (uFull <= 0) full = null;
                 }
+                // m106-wozy W2: W1 drogi (Village Cart Land Road Only), brama wroga (Village Cart Enemy Gate), ryzyko trasy (Village Cart Route Risk) - kazdy klucz wylaczony = jak dotad
+                bool landOnly = s.VillageCartLandRoadOnly, gateOn = s.VillageCartEnemyGate, riskOn = s.VillageCartRouteRisk, ownCut = false;
+                List<Cand> gated = null;
                 var cands = new List<Cand>();
                 Cand ownC = null;
                 foreach (var t in Town.AllTowns)
@@ -481,6 +520,9 @@ namespace Armoury
                     if (st == null || st.IsUnderSiege || Hostile(cart, home, st)) continue;
                     bool isOwn = !castle && st == v.Bound;                             // wies miejska: swoje miasto zawsze kandydatem
                     float d = Dist(cart, at, st);
+                    // m106 W1: bez drogi ladowej (pamiec drog >= prog BK 50000 - 1e30 NavalDLC, 1e8 poza tablica; <= 0, NaN) nie jest kandydatem, takze wlasne miasto wsi
+                    // miejskiej (Harbay i Volmark na Harlaw - Lordsport na Pyke); dalej (wlokno, linia) wlasne miasto bez drogi nie istnieje (ownC == null)
+                    if (landOnly && NoRoad(d)) { _w1Cut++; if (isOwn) { _w1Own++; ownCut = true; } continue; }
                     // R3-05b (recenzja p5-handel): barka poszerza zasieg - droga nad ta sama rzeka liczy sie do zasiegu w polowie; czas kursu i przestoj magazynu
                     // dalej z prawdziwej drogi (woz jedzie caly kurs ladem), wiec dalekie miasto rzeczne wygrywa tylko, gdy naprawde da wiecej na dobe
                     float dr = d * (float)RiverBarges.CartFactor(home, st);
@@ -495,11 +537,37 @@ namespace Armoury
                     // miernik: utarg na sztuke x czesc kursu, w ktorej wies dalej produkuje (min(1, doby magazynu / doby kursu)) -
                     // dlugookresowy utarg wsi na dobe; dla zwyklego ladunku ta sama kolejnosc co wartosc / max(kurs, doby magazynu)
                     double tf = Math.Max(0.25, useFull ? tfreeFull : tfree);              // co najmniej 6 godzin: zatkany magazyn - wtedy liczy sie utarg na dobe drogi
-                    var c = new Cand { T = t, D = d, Load = ld, Full = useFull, News = news, D0 = d0, Byp = byp };
+                    var c = new Cand { T = t, D = d, Load = ld, Full = useFull, News = news, D0 = d0, Byp = byp, Tr = T };
                     c.Rate = (T > tf ? tf / T : 1.0) / (useFull ? uFull : uStd);
-                    c.Ub = Upper(t, cart, ld, news, bk, fair) * c.Rate;
+                    // m106 brama wroga: droga pod brama wrogiej twierdzy (d(zrodlo, F) + d(F, miasto) - d <= max(2, 2% d)) - na liste odlozonych (wybor z niej tylko, gdy innych brak)
+                    if (gateOn)
+                    {
+                        c.Gate = CartRisk.GateBlocked(cart, home, at, st, d0);
+                        if (c.Gate != null)
+                        {
+                            _gateCut++; _gateCarts.Add(cart);
+                            string gk = SName(st) + " przez " + SName(c.Gate); int gn; _gateBy.TryGetValue(gk, out gn); _gateBy[gk] = gn + 1;
+                            (gated ?? (gated = new List<Cand>())).Add(c);
+                            continue;
+                        }
+                    }
+                    // m106 ryzyko trasy: wynik wyboru x przezywalnosc trasy region wsi -> miasto (bez wiesci - przezywalnosc swiata, ta sama dla kazdego miasta: wybor jak dotad);
+                    // gorna granica tez (odciecie spojne z wynikiem); klucz wylaczony - Sv = 1 (mnozenie przez 1.0 dokladne: wynik bit w bit jak dotad)
+                    if (riskOn) c.Sv = Math.Max(1e-3, CartRisk.Survival(home, t));
+                    c.Ub = Upper(t, cart, ld, news, bk, fair) * c.Rate * c.Sv;
                     cands.Add(c);
                     if (own != null && st == own) ownC = c;
+                }
+                if (cands.Count == 0 && gated != null)
+                {
+                    // m106 brama: kazde miasto w zasiegu za brama wroga - wybor z nich (wynik x przezywalnosc - najbezpieczniejsze z oplacalnych)
+                    _gateAll++;
+                    foreach (var c in gated)
+                    {
+                        if (riskOn) c.Sv = Math.Max(1e-3, CartRisk.Survival(home, c.T));
+                        c.Ub = Upper(c.T, cart, c.Load, c.News, bk, fair) * c.Rate * c.Sv;
+                        cands.Add(c);
+                    }
                 }
                 if (cands.Count == 0) { _noTown++; NotePick(cart, null, -1f, false, 0, "bez miasta w zasiegu"); return null; }
                 cands.Sort((a, b) => a.Ub != b.Ub ? b.Ub.CompareTo(a.Ub) : a.D.CompareTo(b.D));
@@ -509,23 +577,30 @@ namespace Armoury
                 // bez limitu kasy - odciecie jak dotad (kandydaci z Ub >= wynik bez rezerwacji sa wycenieni)
                 bool ga = GoldAware(s);
                 Cand best0 = null; double bestSc0 = 0.0;
+                Cand bestNr = null; double bestScNr = 0.0;                             // m106: wybor bez ryzyka trasy (tylko licznik "wybor zmieniony przez ryzyko")
                 foreach (var c in cands)
                 {
                     if (best != null && c.Ub < bestSc) break;                          // gorna granica ponizej najlepszego - dalej juz nic
                     long resv = ga ? Reserved(c.T) : 0;
                     bool capped;
                     long val = Value(c.T, cart, c.Load, fair, c.News, bk, resv, out capped); _evals++;
-                    double sc = val * c.Rate;
+                    double sc = val * c.Rate * c.Sv;                                   // m106: x przezywalnosc trasy (klucz wylaczony - x 1.0)
                     if (best == null || sc > bestSc || (sc == bestSc && c.D < best.D)) { best = c; bestSc = sc; bestVal = val; }
+                    if (riskOn)
+                    {
+                        double scn = val * c.Rate;
+                        if (bestNr == null || scn > bestScNr || (scn == bestScNr && c.D < bestNr.D)) { bestNr = c; bestScNr = scn; }
+                    }
                     if (ga)
                     {
                         long v0 = val;
                         if (resv > 0 && capped) { bool c0; v0 = Value(c.T, cart, c.Load, fair, c.News, bk, 0, out c0); _evals++; }
-                        double sc0 = v0 * c.Rate;
+                        double sc0 = v0 * c.Rate * c.Sv;
                         if (best0 == null || sc0 > bestSc0 || (sc0 == bestSc0 && c.D < best0.D)) { best0 = c; bestSc0 = sc0; }
                     }
                 }
                 if (ga && best0 != null && !ReferenceEquals(best0, best)) _gChanged++;
+                if (riskOn && bestNr != null && !ReferenceEquals(bestNr, best)) _riskChanged++;
                 // N2-E3 (noc-ekonomia2, klucz VillageFibreToMarket): woz z lnem, welna albo skorami surowymi, gdy zapas tego towaru wsi (juki + magazyn) przekracza
                 // FibreToMarket.FibreDays dob jej produkcji - do miasta targowego wsi (ownC), takze ponizej ceny bazowej; wycena ownC jak kazdego kandydata (Value).
                 // ownC juz najlepsze, poza kandydatami albo nic nie zaplaci - wybor jak dotad
@@ -533,7 +608,10 @@ namespace Armoury
                 if (FibreToMarket.On && !ReferenceEquals(ownC, best))
                 {
                     int fu; double fd;
-                    if (FibreToMarket.Wants(v, home, load, ownC != null, out fu, out fd))
+                    int noOwn0 = FibreToMarket.NoOwnSeen;                              // m106 W1: licznik "wlokno bez drogi" - Wants z miastem targowym odcietym przez brak drogi ladowej
+                    bool wantsF = FibreToMarket.Wants(v, home, load, ownC != null, out fu, out fd);
+                    if (ownCut && FibreToMarket.NoOwnSeen > noOwn0) _w1Fibre++;
+                    if (wantsF)
                     {
                         bool ocap;
                         long ov = Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk, ga ? Reserved(ownC.T) : 0, out ocap); _evals++;   // m105 G4: ta sama kasa po rezerwacjach
@@ -546,15 +624,27 @@ namespace Armoury
                 int movedN = 0;                                                        // f19-e2 (pomiar): sztuk doladowanych z magazynu
                 if (best.Full && plan != null)
                 {
-                    int moved = TopUp(cart, home.ItemRoster, plan);
-                    movedN = moved;
-                    if (moved > 0)
+                    if (s.VillageCartTopUpOnDeparture && at == home)
                     {
-                        _full++; _fullUnits += moved;
-                        if (whole) { double kg = cart.TotalWeightCarried; _wholeKg += kg; if (kg > _wholeMaxKg) _wholeMaxKg = kg; }
+                        // m106 (Village Cart Top Up On Departure): reszta magazynu dopiero przy wyjezdzie z domu (OnLeft) - woz, ktory stoi, nie polyka magazynu przy kazdym
+                        // wyborze (diagnoza P4: King's Valley 154 doby, doladowano 335-1133 szt. co kilka dni); drugi wybor bez wyjazdu - licznik "czeka"
+                        if (_pending.ContainsKey(cart)) _tuWait++;
+                        _pending[cart] = new Pending { Home = home, To = best.T.Settlement, Capped = !whole, Day = (int)CampaignTime.Now.ToDays };
+                    }
+                    else
+                    {
+                        int moved = TopUp(cart, home.ItemRoster, plan);
+                        movedN = moved;
+                        if (moved > 0)
+                        {
+                            _full++; _fullUnits += moved;
+                            if (whole) { double kg = cart.TotalWeightCarried; _wholeKg += kg; if (kg > _wholeMaxKg) _wholeMaxKg = kg; }
+                        }
                     }
                 }
                 Note(cart, best.T, best.Load, bk, bestVal);
+                CartRisk.Start(cart, home, best.T);                                    // m106: kurs w toku (pamiec tras; klucz Route Risk wylaczony - nic)
+                CartGuard.NoteTrip(cart, best.T.Settlement, best.Tr);                  // m106: szacunek kursu T - prog straznika (klucz Stuck Guard wylaczony - nic)
                 // liczniki linii dobowej
                 _dec++; if (castle) _decCastle++;
                 if (own != null && best.T.Settlement == own) _toOwn++; else _toOther++;
@@ -759,6 +849,7 @@ namespace Armoury
             try
             {
                 Forget(__1);
+                CartRisk.Arrive(__1, __0);                                              // m106: przyjazd do miasta celu kursu - pamiec tras (postoj w zamku po drodze nie konczy kursu)
                 FibreToMarket.SellBegin(__0, __1);                                      // N2-E3: woz skierowany do miasta targowego - migawka wlokna i sakwy (licznik)
                 TownToll.CartBegin(__1);                                                // E3-G3: sakwa wozu przed sprzedaza (myto od utargu netto - w postfiksie)
                 TownFolk.FwCartPre(__0, __1);                                           // f4-opal: drewno w jukach przed sprzedaza w miescie (dowoz drewna - licznik)
@@ -853,6 +944,34 @@ namespace Armoury
             catch (Exception e) { Stumble("MarketCarts.SellPostfix", e); }            // blad = sprzedaz zostaje jak w grze
         }
 
+        // ------------------------------------------------------------ m106: dosypka przy wyjezdzie
+        /// <summary>m106 (Village Cart Top Up On Departure): CampaignEvents.OnSettlementLeftEvent (LeaveSettlementAction - watek glowny). Woz wsi z czekajaca dosypka wyjezdza
+        /// z domu z celem poza domem - reszta magazynu teraz (TopUpPlan z biezacego magazynu, ta sama regula co przy wyborze: caly magazyn albo do udzwigu; TopUp - najpierw
+        /// zdjecie z magazynu, potem do jukow). Wyjazd z innej osady, bez celu albo do domu - dosypka przepada (licznik). Wpis skreslany zawsze. Zloto bez zmian.</summary>
+        internal static void OnLeft(MobileParty p, Settlement s)
+        {
+            if (p == null || _pending.Count == 0 || !p.IsVillager) return;
+            Pending pe;
+            if (!_pending.TryGetValue(p, out pe)) return;
+            _pending.Remove(p);
+            try
+            {
+                var tg = p.TargetSettlement;
+                if (s == null || s != pe.Home || tg == null || tg == pe.Home || s.ItemRoster == null) { _tuLost++; return; }
+                int units, left;
+                var plan = TopUpPlan(p, s.ItemRoster, pe.Capped, out units, out left);
+                int moved = units > 0 ? TopUp(p, s.ItemRoster, plan) : 0;
+                if (moved <= 0) return;
+                _full++; _fullUnits += moved; _tuDone++; _tuUnits += moved;
+                if (!pe.Capped) { double kg = p.TotalWeightCarried; _wholeKg += kg; if (kg > _wholeMaxKg) _wholeMaxKg = kg; }
+                var lp = LastOf(p); if (lp != null) lp.Moved = moved;                  // f19-e2 (pomiar): doladowanie ostatniego wyboru
+            }
+            catch (Exception e) { _m106St++; Stumble("MarketCarts.OnLeft", e); }
+        }
+
+        /// <summary>m106: dosypka wozu skreslona (woz zniszczony, straznik rozladowal juki do magazynu).</summary>
+        internal static void ForgetPending(MobileParty p) { if (p != null) _pending.Remove(p); }
+
         // ------------------------------------------------------------ doba
         /// <summary>Raz na dobe: linia "Dowoz (wozy):" i porzadki we wiesci z drogi (wozy nieczynne albo w drodze ponad 30 dob).</summary>
         internal static void Daily()
@@ -860,6 +979,14 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null) return;
             double now = CampaignTime.Now.ToDays;
+            // m106: dosypka przy wyjezdzie - wpis wozu nieczynnego, poza domem (wyjazd bez zdarzenia) albo starszy niz 7 dob przepada (licznik "przepadla")
+            if (_pending.Count > 0)
+            {
+                List<MobileParty> lost = null;
+                foreach (var kv in _pending)
+                    if (kv.Key == null || !kv.Key.IsActive || kv.Key.CurrentSettlement != kv.Value.Home || (int)now - kv.Value.Day > 7) (lost ?? (lost = new List<MobileParty>())).Add(kv.Key);
+                if (lost != null) foreach (var mp in lost) { _pending.Remove(mp); _tuLost++; }
+            }
             List<MobileParty> stale = null;
             // recenzja: wiesc wygasa takze wtedy, gdy woz skrecil gdzie indziej bez nowego wyboru (gra odeslala go do domu - HourlyTickParty /
             // TrySendingVillagerPartyToVillage, BK - z zamku do domu) - inaczej jego ladunek "lezalby" na polce miasta do 30 dob

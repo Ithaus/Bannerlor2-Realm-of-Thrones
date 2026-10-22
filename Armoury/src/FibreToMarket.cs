@@ -50,6 +50,9 @@ namespace Armoury
         private static bool _errLogged;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.VillageFibreToMarket; } }
+        /// <summary>m106-wozy W1 (tylko odczyt licznika): wozy z zapasem wlokna ponad prog bez miasta targowego w kandydatach - MarketCarts.Choose liczy przyrost przy miescie
+        /// targowym odcietym przez brak drogi ladowej (linia "Wozy (m106)": wlokno bez drogi). Regula bez zmian.</summary>
+        internal static int NoOwnSeen { get { return _noOwn; } }
 
         private static bool Fibre(ItemObject it)
         {

@@ -404,6 +404,15 @@ namespace Armoury
                     else if (lp.To == null) e.Append('d').Append(lp.Day).Append(" brak miasta: ").Append(lp.Why ?? "?");
                     else e.Append('d').Append(lp.Day).Append(' ').Append(lp.To.StringId).Append(" d ").Append(lp.D0.ToString("0.0", Inv)).Append(lp.Byp ? " wlasne bez testu zasiegu" : "")
                           .Append(", doladowano ").Append(lp.Moved);
+                    // m106-wozy H1 (klucz Village Cart Stuck Guard): warunki gry przed wyjazdem z osady (MobileParty.CheckExitingSettlementParallel), tratwa, predkosc, waga / udzwig
+                    if (CartGuard.On)
+                    {
+                        float sp = 0f; try { sp = mp.Speed; } catch { sp = -1f; }
+                        var stt = mp.ShortTermTargetSettlement;
+                        e.Append(", chwilowe ").Append(mp.ShortTermBehavior.ToString()).Append(" -> ").Append(stt != null ? stt.StringId : "-")
+                         .Append(", AI ").Append(mp.Ai != null && mp.Ai.IsDisabled ? "wylaczone" : "czynne").Append(", tratwa ").Append(mp.IsInRaftState ? 1 : 0)
+                         .Append(", predkosc ").Append(sp.ToString("0.00", Inv)).Append(", waga ").Append(mp.TotalWeightCarried.ToString("0", Inv)).Append('/').Append(mp.InventoryCapacity);
+                    }
                     e.Append(')');
                     ex.Add(new KeyValuePair<long, string>((long)(day - rec.HomeSince) * 1000000L + rec.Wood, e.ToString()));
                 }
