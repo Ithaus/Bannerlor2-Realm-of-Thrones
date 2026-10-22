@@ -1048,8 +1048,9 @@ Uzycie (Python 3, tylko odczyt):
                     CrashScribe/armoury-dziennik.flag) python -I tools/sprawdz_logi.py --grupa m105dziennik <Armoury-*.log>. DZ-0 linie start i kampania (widok, pola MPChatVM,
                     latka tabliczek TAK), DZ-0b widget dziennika znaleziony i ramka dodana (przy kluczu ramki), DZ-1 ERROR MapChatLog 0, DZ-2 filtr handlu (doby z filtrem TAK:
                     przepuszczone 0, ukryte > 0; doby NIE: ukryte 0, przepuszczone > 0; zero zdarzen i zmiana klucza w dobie - INFO), DZ-3 potkniecia 0, DZ-4 proby testu
-                    w menu (>= 1, kazda: zachodzenie 0, ramka TAK przy kluczu, dol ramki <= 885, wynik TAK; proby na mapie INFO), DZ-5 przesuniecia >= 1 przy kluczu TAK
-                    (w autotescie gracz czeka w menu miasta). Log bez linii m105: INFO.
+                    w menu (>= 1, kazda: zachodzenie 0, ramka TAK przy kluczu, dol ramki <= granica PAUSED z linii testu (1080 - 195 przy 16:9), wynik TAK; brak prob
+                    przy pliku testu i przesunieciach - NIE), DZ-4b proby na mapie (wynik TAK: lewa krawedz >= 100 przy kluczu przesuniecia, ramka, dol nad paskiem),
+                    DZ-5 przesuniecia >= 1 przy kluczu TAK (w autotescie gracz czeka w menu miasta). Log bez linii m105: INFO.
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -38288,16 +38289,18 @@ M105D_DAY = re.compile(r"^dzien (\d+) - przesuniecia (\d+), powroty (\d+), ramka
 M105D_TEST = re.compile(r"^test - (menu|mapa): linie testowe (\d+)/3 .*, zachodzenie (\d+) px, ramka (TAK|NIE)\b.*, dol ramki y=(-?\d+) .* - (TAK|NIE)(?: \((.*)\))?\.$")
 M105D_NOPROBE = re.compile(r"^test - bez proby \((.*)\)\.")
 M105D_PROBE = re.compile(r"^test - start proby nr (\d+) \((menu|mapa)\)")
-M105D_PAUSED = 885
+M105D_LIMIT = re.compile(r"\(granica PAUSED (\d+), pasek (\d+)")   # recenzja R5: granice z linii (wysokosc ekranu w jednostkach UI - 16:10, UIScale)
+M105D_PAUSED = 885   # granica przy 16:9 i UIScale 1 - gdy linia testu jej nie podaje (stary format)
 
 
 def m105dziennik_main(logp):
     """m105dziennik (21.10; Jeff 21.10 "tak, rob dziennik"): DZ-0 linie start i kampania (widok GauntletChatLogView, pola MPChatVM, latka tabliczek TAK), DZ-0b widget
     znaleziony i ramka dodana (przy kluczu MapChatLogFrame TAK), DZ-1 ERROR MapChatLog 0, DZ-2 filtr handlu na tabliczkach (latka TAK; doby z filtrem TAK - przepuszczone 0
     i suma ukrytych > 0; doby NIE - ukryte 0, suma przepuszczonych > 0; doba z obiema liczbami > 0 = zmiana klucza w dobie - INFO; zero zdarzen - INFO: osada nie byla
-    w zasiegu), DZ-3 potkniecia (maksimum z linii doby) 0, DZ-4 proby testu w menu (>= 1; kazda: zachodzenie 0, ramka TAK przy kluczu ramki, dol ramki <= 885, wynik
-    TAK; brak prob - INFO; proby na mapie - INFO), DZ-5 przy MapChatLogClearOfMenu TAK suma przesuniec >= 1 (test autotestu NIE i zero przesuniec - INFO). Log bez
-    linii m105: INFO."""
+    w zasiegu), DZ-3 potkniecia (maksimum z linii doby) 0, DZ-4 proby testu w menu (>= 1; kazda: zachodzenie 0, ramka TAK przy kluczu ramki, dol ramki <= granica
+    PAUSED z linii testu (stary format 885), wynik TAK; brak prob - INFO, ale przy pliku testu i przesunieciach obok menu - NIE: autotest przeszedl bez pomiaru),
+    DZ-4b proby na mapie (wynik TAK - lewa krawedz >= 100 przy kluczu przesuniecia, ramka TAK przy kluczu, dol ramki nad paskiem), DZ-5 przy MapChatLogClearOfMenu
+    TAK suma przesuniec >= 1 (test autotestu NIE i zero przesuniec - INFO). Log bez linii m105: INFO."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("DZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -38318,7 +38321,11 @@ def m105dziennik_main(logp):
                                (M105D_NOPROBE, noprobe), (M105D_PROBE, probes)):
                 mm = rx.search(body)
                 if mm:
-                    bucket.append(mm.groups())
+                    g = mm.groups()
+                    if rx is M105D_TEST:
+                        ml = M105D_LIMIT.search(body)
+                        g = g + ((int(ml.group(1)) if ml else M105D_PAUSED),)   # t[7] = granica PAUSED tej proby
+                    bucket.append(g)
                     break
             else:
                 md = M105D_DAY.search(body)
@@ -38386,6 +38393,9 @@ def m105dziennik_main(logp):
     # DZ-4 proby testu
     menu = [t for t in tests if t[0] == "menu"]
     mapa = [t for t in tests if t[0] == "mapa"]
+    moves = sum(d[1] for d in days)
+    limits = sorted(set(t[7] for t in menu))
+    lim_txt = "/".join(str(x) for x in limits) if limits else str(M105D_PAUSED)
     if menu:
         bad = []
         for t in menu:
@@ -38394,23 +38404,27 @@ def m105dziennik_main(logp):
                 why.append(f"zachodzenie {t[2]}")
             if key_frame and t[3] != "TAK":
                 why.append("ramka NIE")
-            if t[3] == "TAK" and int(t[4]) > M105D_PAUSED:
-                why.append(f"dol ramki {t[4]}")
+            if t[3] == "TAK" and int(t[4]) > t[7]:
+                why.append(f"dol ramki {t[4]} > {t[7]}")
             if t[5] != "TAK":
                 why.append("wynik NIE" + (f" ({t[6]})" if t[6] else ""))
             if why:
                 bad.append("; ".join(why))
         val = f"menu {len(menu)} (TAK {len(menu) - len(bad)}), mapa {len(mapa)}, bez proby {len(noprobe)}" + (f" | zle: {' | '.join(bad)}" if bad else "")
-        rep.add("DZ-4: proby testu w menu", val, f">= 1, kazda: zachodzenie 0, ramka TAK (klucz ramki {('TAK' if key_frame else 'NIE')}), dol ramki <= {M105D_PAUSED}, wynik TAK", not bad)
+        rep.add("DZ-4: proby testu w menu", val, f">= 1, kazda: zachodzenie 0, ramka TAK (klucz ramki {('TAK' if key_frame else 'NIE')}), dol ramki <= granica PAUSED z linii ({lim_txt}), wynik TAK", not bad)
     elif not key_clear:
         rep.add("DZ-4: proby testu w menu", f"brak (klucz MapChatLogClearOfMenu NIE; mapa {len(mapa)})", "INFO - bez przesuniecia nie ma proby w menu", None)
+    elif test_on and (moves >= 1 or moved_lines >= 1):
+        # recenzja R4: plik testu i dziennik byl obok menu, a pomiaru w menu nie ma - autotest nie sprawdzil glownej zmiany
+        rep.add("DZ-4: proby testu w menu", f"brak (przesuniec {moves}, linii 'przesuniety' {moved_lines}, mapa {len(mapa)}, bez proby {len(noprobe)}, test autotestu TAK)",
+                ">= 1 pomiar w menu (plik testu i przesuniecia obok menu - pomiar powinien powstac)", False)
     else:
         rep.add("DZ-4: proby testu w menu", f"brak (mapa {len(mapa)}, bez proby {len(noprobe)}, test autotestu {'TAK' if test_on else 'NIE'})",
                 "INFO - bez pliku testu albo bieg bez menu", None)
     for t in mapa:
-        rep.add("DZ-4b: proba testu na mapie", f"linie {t[1]}/3, ramka {t[3]}, dol ramki y={t[4]}, wynik {t[5]}" + (f" ({t[6]})" if t[6] else ""), "INFO", None)
+        rep.add("DZ-4b: proba testu na mapie", f"linie {t[1]}/3, ramka {t[3]}, dol ramki y={t[4]}, wynik {t[5]}" + (f" ({t[6]})" if t[6] else ""),
+                "wynik TAK (lewa krawedz >= 100 przy kluczu przesuniecia, ramka TAK przy kluczu, dol ramki nad paskiem, linie 3/3)", t[5] == "TAK")
     # DZ-5 przesuniecia
-    moves = sum(d[1] for d in days)
     if not key_clear:
         rep.add("DZ-5: przesuniecia obok menu", f"{moves} (klucz NIE)", "INFO - klucz MapChatLogClearOfMenu NIE", None)
     elif moves >= 1 or moved_lines >= 1:
