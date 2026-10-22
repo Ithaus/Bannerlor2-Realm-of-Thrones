@@ -155,3 +155,10 @@ KOLEJKA (Jeff, po kolei):
 6. "Kronika Westeros" (Jeff "12 - tak, wiecej wydarzen") - lista 20-30 pomyslow do zaznaczenia przez Jeffa.
 7. Drobne: rabunek wioski noca jako praca (Jeff nie zaprotestowal - zrobic); markietani praczki/odziez; m102tablica L-8 arm_board 18.5 KB (odchudzic); m98plotki KP-1 SyncData.arm_drink; DrillCampOnlyAi domyslnie TAK w Settings.cs (u Jeffa juz w Armoury.json).
 DECYZJE JEFFA (21.10): prolog lekki + pakty Diplomacy, wydarzenia wedlug ksiazki, klimat obrazkow z serialu (bez fragmentow serialu - prawa HBO), postacie A/B/C/D + Jeyne zamiast Talisy, lektor tylko ENG, szkolenie AI tylko w obozie (wpisane), VoiceActingPatchRemake wylaczony (LauncherData.xml).
+
+## PRZEKAZANIE NOC 21/22.10 (stan 22.10 05:40 CEST - czas polski, zegar automatyczny)
+W GRZE: WGRANIE 102 (n32-calosc 77c17f3c, 21.10 15:40 PDT). Jeff spi; termin "premiera" 22.10 11:00 CEST.
+KANDYDAT WGRANIA 103: w-toku/n33-calosc b643aace (drzewo zb/n33-calosc) = 102 + m105-czcionki (postfiks Harmony NameplateFont) + m105-optym (KtSkip NIE) + m105-dziennik (obok menu, ramka, filtr handlu, chowany przy oknie wydarzenia) + m105-drobne (ludzie Gory, QuestGangAxes, Watchdog) + m105-miasta + m105-gospodarka4 + m105-gospodarka5 (DsLordReliefBelowChest) + Kronika K0 0ffd5d9f. DLL: test/n103d. Autotest CrashScribe: test/CrashScribe-at-n103.dll.
+TESTY: 103a/103b/103c (bez K0) kod 0; K0 k0a/k0b 22/22. TEST KONCOWY 103d w toku (testy-103.ps1 w scratchpad 7aee5f12...: -Dll n103d -Runs prolog,wczyt,bitwa,160; logi kopiowane do scratchpad/logi-noc/<bieg>; progi: tools/sprawdz_logi.py --grupa X).
+W TOKU: wf K0 wz5lay1g6 (recenzje -> poprawki -> krytyk -> styk na galezi w-toku/kronika-00-silnik); po nim: scalic galaz do n33, build, 1 bieg prologu, potem wgranie.
+WGRANIE 103: powershell -File tools/autotest-2026-10-17/wgraj-v5.ps1 -DllDir <test>/n103d (albo nowszy) -Tree zb/n33-calosc -Tag 2026-10-22-wgranie103; safely_exited=1; CHANGELOG.md wpis 103; RAPORT-NOCNY-2026-10-22.md (szkic juz jest); STAN-PRAC ### 110.
