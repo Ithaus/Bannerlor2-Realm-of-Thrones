@@ -1275,6 +1275,10 @@ namespace Armoury
                 {
                     if (r.Mode == "prolog" && !IsProlog()) { Resolve(r, day, Res.Skip, "tylko kampania z prologiem (klasyczny start)", null, null, false); continue; }
                     if (r.Mode == "classic" && IsProlog()) { Resolve(r, day, Res.Skip, "tylko klasyczny start (kampania z prologiem)", null, null, false); continue; }
+                    // m107-kronika: pozniejszy wiersz tej samej postaci juz WYKONANY - ten wiersz dopisano do danych po tamtym (w biegu kampanii wczesniejsze
+                    // sa zawsze rozstrzygniete przed wykonaniem pozniejszego) - bez wstecznej zmiany strony (np. m31/m32 Brienne przed m17 w starym zapisie)
+                    string later = LaterExecuted(r);
+                    if (later != null) { Resolve(r, day, Res.Skip, "wyprzedzona przez #" + later + " wykonana wczesniej (wiersz dopisany do zapisu po niej - bez wstecznej zmiany strony)", null, null, false); continue; }
                     bool never;
                     string stale;
                     bool f = Fires(r, day, out never, out stale);
@@ -1314,6 +1318,21 @@ namespace Armoury
                     catch (Exception e) { Stumble("Moves.Execute(" + r.Id + ")", e); break; }
                 }
             }
+        }
+
+        /// <summary>m107-kronika: id pozniejszego (w kolejnosci pliku) wiersza tej samej postaci, ktory zostal WYKONANY (ok); null - brak. Pominiete ("nigdy", tryb
+        /// prolog/classic, wyprzedzone) sie nie licza - tylko wykonanie mowi, ze opowiesc tej postaci juz poszla dalej.</summary>
+        private static string LaterExecuted(MoveRow r)
+        {
+            bool after = false;
+            foreach (var m in _moves)
+            {
+                if (m == r) { after = true; continue; }
+                if (!after || m.Who != r.Who) continue;
+                string v;
+                if (_done.TryGetValue(m.Id, out v) && v.EndsWith("|ok", StringComparison.Ordinal)) return m.Id;
+            }
+            return null;
         }
 
         private static string Side(Hero h)

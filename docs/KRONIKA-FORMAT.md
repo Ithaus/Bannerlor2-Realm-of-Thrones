@@ -24,7 +24,7 @@ Spis: 1 pliki | 2 budowa pliku | 3 #okno | 4 #wybor | 5 #tekst | 6 #banda | 7 #z
 
 | Plik | Co | Kto czyta |
 |---|---|---|
-| `Armoury/ModuleData/arm_kronika_k00.tsv` | 6 okien testowych silnika (000.1-000.6: okno, wariant miejsca, wybor z opcja wyszarzona, hide/unhide, wiesc z akcjami wiesc/plotka, zmienne i filtr wersji) - wczytywany TYLKO przy pliku `CrashScribe/armoury-kronika-test.flag` (i trybie autotestu CrashScribe 1/2) | K0, autotest K0a/K0b |
+| `Armoury/ModuleData/arm_kronika_k00.tsv` | 9 okien testowych silnika (000.1-000.6: okno, wariant miejsca, wybor z opcja wyszarzona, hide/unhide, wiesc z akcjami wiesc/plotka, zmienne i filtr wersji; m107: 000.7 wiersze smierc z `near:`/`region:` i `succeed`, 000.8 zrodlo `kr:~R`, 000.9 `kr:000.8~a` i `~0`) - wczytywany TYLKO przy pliku `CrashScribe/armoury-kronika-test.flag` (i trybie autotestu CrashScribe 1/2); m107: plik `CrashScribe/armoury-kronika-kanon-nie.flag` (tez tylko z flaga testu) = klucz Canon Deaths NIE bez zmiany MCM (autotest AT2) | K0, autotest K0a/K0b, AT1/AT2 |
 | `Armoury/ModuleData/arm_kronika_k01.tsv` ... `k10.tsv` | paczki K1-K10 (rozdz. 18) - jeden plik na paczke | K0 + paczki |
 | `Armoury/ModuleData/arm_kronika_tematy.tsv` | tematy obrazkow -> sprite'y ROT i obrazki prologu (rozdz. 14) | Chronicle.Pictures |
 | `Armoury/ModuleData/arm_canon_moves.tsv` | zmiany stron postaci kanonu (CanonCompanions) - Kronika dopisuje tu tylko termy `kr:` (rozdz. 8) | CanonCompanions |
@@ -289,6 +289,10 @@ Wiersze z samymi termami `kr:` (m28-m31, m33-m38) przy ChronicleOfWesteros=NIE n
 nowa kampania - start, stary zapis albo nowy wiersz - dzien wczytania). Term `kr:` okna rozstrzygnietego PRZED tym dniem, ktorego zaden wiersz jeszcze nie widzial
 prawdziwym (brak pamieci pierwszego dnia), jest dla tego wiersza "nigdy" - linia POMINIETA `wyzwalacz nie moze zajsc w tej kampanii (okno kr:... rozstrzygniete w dniu X,
 przed wierszem w zapisie (od dnia Y) - bez wstecznej zmiany strony)`. Wiersz w toku (CZEKA) - bez ochrony. Inne termy wiersza (ev:, rotday: ...) dzialaja jak dotad.
+Druga ochrona (bez zapisu): wiersz, za ktorym w pliku jest WYKONANY (ok) pozniejszy wiersz tej samej postaci, zostal dopisany po tamtym (w biegu kampanii wczesniejsze
+wiersze sa zawsze rozstrzygniete, zanim wykona sie pozniejszy) - POMINIETA `wyprzedzona przez #X wykonana wczesniej (wiersz dopisany do zapisu po niej ...)`. Przyklad:
+m31/m32 Brienne (przed m17) w zapisie, w ktorym m17 juz zaszedl - bez wstecznej niewoli i powrotu do Lannisterow (m32 ma tez `ev:JoffreyEvent+5`, ktorego pierwsza
+ochrona nie obejmuje). Pominiete wiersze ("nigdy", tryb prolog/classic) sie nie licza.
 
 ## 9. Sekcja #usuniete (nagrobki)
 

@@ -32,8 +32,23 @@ namespace Armoury
         internal static bool KeyWorld { get { var s = Settings.Current; return s == null || s.ChronicleWorldChanges; } }
         internal static bool KeyFull { get { var s = Settings.Current; return s != null && s.ChronicleFullVersions; } }
         internal static bool KeyChoices { get { var s = Settings.Current; return s == null || s.ChroniclePlayerChoices; } }
-        /// <summary>m107-kronika: klucz ChronicleCanonDeaths (domyslnie TAK) - wiersze wersja=smierc (smierci z kanonu w wersji lekkiej, KRONIKA-FORMAT 3.1).</summary>
-        internal static bool KeyCanon { get { var s = Settings.Current; return s == null || s.ChronicleCanonDeaths; } }
+        /// <summary>m107-kronika: klucz ChronicleCanonDeaths (domyslnie TAK) - wiersze wersja=smierc (smierci z kanonu w wersji lekkiej, KRONIKA-FORMAT 3.1).
+        /// Autotest AT2: plik CrashScribe/armoury-kronika-kanon-nie.flag (tylko z flaga testu Kroniki, tryb 1/2) = NIE bez zmiany MCM.</summary>
+        internal static bool KeyCanon { get { if (_canonOffTest) return false; var s = Settings.Current; return s == null || s.ChronicleCanonDeaths; } }
+        internal const string CanonOffFlagName = "armoury-kronika-kanon-nie.flag";
+        private static bool _canonOffTest;   // liczone przy Data.EnsureLoaded (start sesji)
+        internal static bool CanonOffTest { get { return _canonOffTest; } }
+
+        /// <summary>m107: plik flagi w katalogu CrashScribe (jak TestWanted).</summary>
+        private static bool CrashScribeFlag(string name)
+        {
+            try
+            {
+                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), name));
+            }
+            catch { return false; }
+        }
 
         // --- potkniecia (wspolne dla calej Kroniki): Log.Error tylko przy 1-5, potem licznik w liniach (plan G) ---
         private static int _st;
@@ -292,6 +307,7 @@ namespace Armoury
                 try
                 {
                     bool test = TestWanted();
+                    _canonOffTest = test && CrashScribeFlag(CanonOffFlagName);   // m107: autotest AT2 (Canon Deaths NIE bez MCM)
                     string dir = Dir();
                     var files = ListFiles(dir, test);
                     string stamp = Stamp(dir, files, test);

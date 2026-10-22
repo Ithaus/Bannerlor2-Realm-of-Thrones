@@ -214,7 +214,7 @@ namespace Armoury
                 if (next == null || w.Od < next.Od) next = w;
             }
             Log.Info(Tag + "start sesji | klucze: Chronicle Of Westeros " + YN(KeyOn) + ", World Changes " + YN(KeyWorld) + ", Full Versions " + YN(KeyFull)
-                     + ", Player Choices " + YN(KeyChoices) + ", Canon Deaths " + YN(KeyCanon) + " (wierszy smierci " + Data.DeathRows + ")"   // m107: prog KW-0
+                     + ", Player Choices " + YN(KeyChoices) + ", Canon Deaths " + YN(KeyCanon) + " (wierszy smierci " + Data.DeathRows + (CanonOffTest ? ", flaga testu " + CanonOffFlagName : "") + ")"   // m107: prog KW-0b
                      + " | " + Data.Summary()
                      + " | os x" + Terms.DocK().ToString("0.00", Inv) + ", plan Fabuli " + YN(Terms.PlanAvailable)
                      + " | " + Pictures.StartText()
