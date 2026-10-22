@@ -2668,7 +2668,7 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartStuckGuard { get; set; } = true;
 
-        [SettingPropertyBool("Village Cart Top Up On Departure", HintText = "with Village Cart Whole Store: the rest of the village storehouse is loaded onto the cart only when it actually rolls out of the village - a cart that stays at home no longer swallows the storehouse every few days. Off = loaded when the town is chosen, as before", RequireRestart = false)]
+        [SettingPropertyBool("Village Cart Top Up On Departure", HintText = "with Village Cart Whole Store or Village Cart Full Load Far: the rest of the village storehouse is loaded onto the cart only when it actually rolls out of the village - a cart that stays at home no longer swallows the storehouse every few days. Off = loaded when the town is chosen, as before", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartTopUpOnDeparture { get; set; } = true;
 

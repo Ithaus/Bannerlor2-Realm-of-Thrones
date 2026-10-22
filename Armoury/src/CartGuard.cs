@@ -23,13 +23,15 @@ namespace Armoury
     ///    sprzedazy w miescie). Pomijany tej doby, gdy bitwa, tratwa albo ucieczka (FleeToPoint);
     ///  - woz w obcej osadzie (zamek albo wies, nie dom; miasta - CartTownExit): od pierwszej obserwacji ponad max(2T, 3) dob - jak wyzej (nie przy oblezeniu i bitwie);
     ///  - woz w domu z jukami (towar bez koni) i rozkazem jazdy (GoToSettlement, cel nie dom): po 5 dobach (W = 5 dob produkcji) AI wlaczone i swiezy wybor miasta
-    ///    (MarketRoad.PickTown), po 10 dobach towar z jukow do magazynu wsi (konie zostaja; dosypka przy wyjezdzie skreslona) - gra wysle woz, gdy magazyn dojdzie do W;
-    ///    po 20 dobach od rozladunku bez wyjazdu - licznik "bez wyjscia" i koniec dzialan w tym epizodzie.
+    ///    (MarketRoad.PickTown; bez wyboru - stary cel, przy W1 bez drogi ladowej najblizsze miasto ladem), po 10 dobach towar z jukow do magazynu wsi (konie zostaja; dosypka
+    ///    przy wyjezdzie skreslona) i rozkaz do domu - gra zaladuje i wysle woz, gdy magazyn dojdzie do W; po 20 dobach od rozladunku woz wyslany ponownie i dalej stojacy -
+    ///    licznik "bez wyjscia" i koniec dzialan w tym epizodzie (niewyslany - koniec epizodu bez licznika).
+    ///  - woz w obcej osadzie: "do domu / do miasta" liczone nastepnej doby, gdy woz wyjechal (inaczej "rozkaz odrzucony"); "ponad 30 dob" od pierwszej doby w osadzie.
     /// Jednorazowo w pierwszej dobie sesji (klucz Village Cart Land Road Only): woz w polu, ktorego cel nie ma drogi ladowej z miejsca, gdzie stoi - do domu (zapisy z wozami
     /// juz stojacymi na brzegu). Zamknieta ekonomia: tylko rozkazy gry (MarketRoad.Move - trasa gry) i towar miedzy jukami a magazynem tej samej wsi; zloto sie nie rusza.
     /// H1 (tylko log): przyczyny, dla ktorych woz w domu z rozkazem nie wyjezdza (warunek gry MobileParty.CheckExitingSettlementParallel: AI wylaczone, Hold, cel chwilowy =
     /// ta osada; tratwa; predkosc), co 5 dob 5 przykladow.
-    /// Klucz wylaczony - nic (bez pamieci i dzialan; linia doby z zerami i dopiskiem WYLACZONY).
+    /// Klucz wylaczony - nic (bez pamieci i dzialan; linia doby z zerami i dopiskiem WYLACZONY); wszystkie piec kluczy W2 wylaczone - bez linii doby.
     /// </summary>
     internal static class CartGuard
     {
@@ -40,6 +42,8 @@ namespace Armoury
         {
             public Settlement To; public double T = -1; public int Start, LastProg, Acts; public float BestD = float.MaxValue; public bool NoExit;
             public Settlement InAt; public int InSince = -1;
+            public int FirstIn = -1;                                       // recenzja Z6: pierwsza doba w tej obcej osadzie (Act jej nie zeruje - licznik "ponad 30 dob")
+            public Settlement PendAt, PendGo;                              // recenzja Z6: rozkaz z obcej osady - sukces liczony nastepnej doby, gdy woz z niej wyjechal
             public int HomeSince = -1, Unload = -1; public bool Ordered, HomeDone;
         }
         private sealed class Note { public Settlement To; public double T; public int Day; }
@@ -168,8 +172,10 @@ namespace Armoury
         }
 
         /// <summary>Woz na nowy cel: do domu, gdy dom osiagalny ladem z miejsca wozu, inaczej do najblizszego osiagalnego niewrogiego miasta. AI wlaczone, gdy wylaczone
-        /// (MobilePartyAi.EnableAi). Rozkaz gry (trasa gry); kontrola jak w CartTownExit: GoToSettlement i cel = nadany. null - bez celu albo rozkaz odrzucony.</summary>
-        private static Settlement Rescue(MobileParty cart, Settlement home, VillagerCampaignBehavior vcb)
+        /// (MobilePartyAi.EnableAi). Rozkaz gry (trasa gry); kontrola jak w CartTownExit: GoToSettlement i cel = nadany. null - bez celu albo rozkaz odrzucony.
+        /// defer (woz w obcej osadzie, recenzja Z6): "do domu / do miasta" liczone dopiero nastepnej doby, gdy woz naprawde wyjechal (ucieczka gry - GetFleeBehavior - trzyma
+        /// woz w osadzie mimo przyjetego rozkazu).</summary>
+        private static Settlement Rescue(MobileParty cart, Settlement home, VillagerCampaignBehavior vcb, bool defer = false)
         {
             if (cart.Ai != null && cart.Ai.IsDisabled) { cart.Ai.EnableAi(); _aiOn++; }
             Settlement goal = null;
@@ -183,7 +189,7 @@ namespace Armoury
             MarketRoad.Move(vcb, cart, goal);
             if (cart.DefaultBehavior == AiBehavior.GoToSettlement && cart.TargetSettlement == goal)
             {
-                if (goal == home) _toHome++; else _toTown++;
+                if (!defer) { if (goal == home) _toHome++; else _toTown++; }
                 return goal;
             }
             _rejected++;
@@ -268,6 +274,13 @@ namespace Armoury
                 if (s.VillageCartLandRoadOnly) { try { Once(vcb); } catch (Exception e) { Stumble("CartGuard.Once", e); } }
             }
             bool on = s.VillageCartStuckGuard;
+            if (!on && !s.VillageCartLandRoadOnly && !s.VillageCartEnemyGate && !s.VillageCartRouteRisk && !s.VillageCartTopUpOnDeparture)
+            {
+                // recenzja Z11: wszystkie klucze W2 wylaczone - bez linii doby (kod jak w a7a767e8); liczniki doby tylko zerowane
+                _st.Clear(); _notes.Clear();
+                MarketCarts.TakeM106(); CartRisk.SkipDay(); ClearDay();
+                return;
+            }
             if (on) Guard(s, today, vcb, exDay ? ex : null);
             else { _st.Clear(); _notes.Clear(); }
             CartRisk.Tidy();
@@ -337,9 +350,15 @@ namespace Armoury
                     St st;
                     if (!_st.TryGetValue(cart, out st)) { st = new St(); _st[cart] = st; }
                     var home = cart.HomeSettlement; var at = cart.CurrentSettlement;
+                    if (st.PendAt != null)
+                    {
+                        // recenzja Z6: rozkaz wydany wczoraj w obcej osadzie - "do domu / do miasta" dopiero, gdy woz z niej wyjechal; stoi dalej - "rozkaz odrzucony"
+                        if (at != st.PendAt) { if (st.PendGo == home) _toHome++; else _toTown++; } else _rejected++;
+                        st.PendAt = st.PendGo = null;
+                    }
                     if (at == null) Field(cart, st, home, today, vcb, ex);
                     else if (at == home) Home(s, cart, st, v, home, today, vcb, ex);
-                    else if (at.IsTown) { ClearHome(st); st.InAt = null; st.InSince = -1; st.To = null; st.Acts = 0; st.NoExit = false; }   // miasto - CartTownExit; sprzedaz = koniec kursu
+                    else if (at.IsTown) { ClearHome(st); st.InAt = null; st.InSince = -1; st.FirstIn = -1; st.To = null; st.Acts = 0; st.NoExit = false; }   // miasto - CartTownExit; sprzedaz = koniec kursu
                     else Foreign(cart, st, at, home, today, vcb, ex);
                 }
                 catch (Exception e) { Stumble("CartGuard.Guard(woz)", e); }
@@ -356,7 +375,7 @@ namespace Armoury
 
         private static void Field(MobileParty cart, St st, Settlement home, int today, VillagerCampaignBehavior vcb, List<Exm> ex)
         {
-            ClearHome(st); st.InAt = null; st.InSince = -1;
+            ClearHome(st); st.InAt = null; st.InSince = -1; st.FirstIn = -1;
             var tg = cart.TargetSettlement;
             if (tg == null || cart.DefaultBehavior != AiBehavior.GoToSettlement) { st.To = null; return; }   // bez celu (Hold, ucieczka) - gra wyda rozkaz sama co godzine
             float d = DistParty(cart, tg);
@@ -381,46 +400,50 @@ namespace Armoury
         private static void Foreign(MobileParty cart, St st, Settlement at, Settlement home, int today, VillagerCampaignBehavior vcb, List<Exm> ex)
         {
             ClearHome(st);
-            if (st.InAt != at) { st.InAt = at; st.InSince = today; }
+            if (st.InAt != at) { st.InAt = at; st.InSince = today; st.FirstIn = today; }
             double T = st.T >= 0 ? st.T : Est(home, at);
             int idle = today - st.InSince, lim = Lim(T);
-            if (idle > LongDays) _y2++;
+            if (today - st.FirstIn > LongDays) _y2++;                       // recenzja Z6: od pierwszej doby w osadzie (InSince zeruje kazde dzialanie)
             if (idle <= lim) return;
             _overForeign++;
-            if (ex != null) ex.Add(new Exm(idle, cart, home, "w obcej osadzie " + (at.StringId ?? "?") + (at.IsCastle ? " (zamek)" : "") + " od " + idle + " dob (prog " + lim + ")"));
+            if (ex != null) ex.Add(new Exm(today - st.FirstIn, cart, home, "w obcej osadzie " + (at.StringId ?? "?") + (at.IsCastle ? " (zamek)" : "") + " od " + (today - st.FirstIn)
+                                                                               + " dob (prog " + lim + ", od ostatniego dzialania " + idle + ")"));
             if (at.IsUnderSiege || (at.Party != null && at.Party.MapEvent != null) || cart.MapEvent != null) return;
-            Act(cart, st, home, today, vcb);
+            var goal = Act(cart, st, home, today, vcb, true);
+            if (goal != null) { st.PendAt = at; st.PendGo = goal; }
             st.InSince = today;
         }
 
-        /// <summary>Dzialanie straznika na kurs: najwyzej MaxActs razy, potem licznik "bez wyjscia" (raz na kurs).</summary>
-        private static void Act(MobileParty cart, St st, Settlement home, int today, VillagerCampaignBehavior vcb)
+        /// <summary>Dzialanie straznika na kurs: najwyzej MaxActs razy, potem licznik "bez wyjscia" (raz na kurs). defer - woz w obcej osadzie (Rescue). Zwraca nowy cel albo null.</summary>
+        private static Settlement Act(MobileParty cart, St st, Settlement home, int today, VillagerCampaignBehavior vcb, bool defer = false)
         {
             if (st.Acts >= MaxActs)
             {
                 if (!st.NoExit) { st.NoExit = true; _noExit++; }
-                return;
+                return null;
             }
             st.Acts++;
-            var goal = Rescue(cart, home, vcb);
+            var goal = Rescue(cart, home, vcb, defer);
             st.LastProg = today;
             if (goal != null) { st.To = goal; st.Start = today; st.BestD = float.MaxValue; st.T = Est(home, goal); }
+            return goal;
         }
 
         private static void Home(Settings s, MobileParty cart, St st, Village v, Settlement home, int today, VillagerCampaignBehavior vcb, List<Exm> ex)
         {
-            st.To = null; st.Acts = 0; st.NoExit = false; st.InAt = null; st.InSince = -1; st.T = -1;   // powrot do domu - koniec kursu
+            st.To = null; st.Acts = 0; st.NoExit = false; st.InAt = null; st.InSince = -1; st.FirstIn = -1; st.T = -1;   // powrot do domu - koniec kursu
             bool load = HasLoad(cart);
             var tg = cart.TargetSettlement;
             bool order = cart.DefaultBehavior == AiBehavior.GoToSettlement && tg != null && tg != home;
+            bool lo = load && order;
             if (st.HomeSince < 0)
             {
-                if (!(load && order)) return;
+                if (!lo) return;
                 st.HomeSince = today; st.Unload = -1; st.Ordered = false; st.HomeDone = false;
             }
-            if (st.Unload < 0 && !(load && order)) { ClearHome(st); return; }   // przed rozladunkiem: woz bez towaru albo bez rozkazu - koniec epizodu
+            if (st.Unload < 0 && !lo) { ClearHome(st); return; }   // przed rozladunkiem: woz bez towaru albo bez rozkazu - koniec epizodu
             int age = today - st.HomeSince;
-            if (load && order)
+            if (lo && age > HomeOrderDays)                         // recenzja Z8: H1 tylko dla wozu, ktory stoi ponad zwykla chwile przed wyjazdem (gra wysyla w ticku, woz rusza w nastepnym)
             {
                 bool any = false;
                 if (cart.Ai != null && cart.Ai.IsDisabled) { _h1Ai++; any = true; }
@@ -431,10 +454,13 @@ namespace Armoury
                 if (sp >= 0f && sp < 0.1f) { _h1Speed++; any = true; }
                 if (!any) _h1Other++;
             }
-            if (age > LongDays) _y3++;
+            if (lo && age > LongDays) _y3++;                       // recenzja Z9: tylko woz z jukami i rozkazem (nie pusty woz po rozladunku, ktorego gra jeszcze nie wyslala)
             if (age <= HomeOrderDays) return;
-            _homeOver++;
-            if (ex != null) ex.Add(new Exm(age, cart, home, "w domu z jukami i rozkazem " + age + " dob" + (st.Unload >= 0 ? " (rozladowany " + (today - st.Unload) + " dob temu)" : "")));
+            if (lo)
+            {
+                _homeOver++;
+                if (ex != null) ex.Add(new Exm(age, cart, home, "w domu z jukami i rozkazem " + age + " dob" + (st.Unload >= 0 ? " (rozladowany " + (today - st.Unload) + " dob temu)" : "")));
+            }
             if (st.HomeDone) return;
             if (v.VillageState != Village.VillageStates.Normal || cart.MapEvent != null || (home.Party != null && home.Party.MapEvent != null)) return;
             if (!st.Ordered)
@@ -442,7 +468,13 @@ namespace Armoury
                 st.Ordered = true;
                 if (cart.Ai != null && cart.Ai.IsDisabled) { cart.Ai.EnableAi(); _aiOn++; }
                 var go = MarketRoad.PickTown(cart, home, v, s, false);
-                if (go == null) go = tg;                                         // bez miasta w zasiegu - ten sam cel od nowa (swiezy rozkaz gry)
+                if (go == null)
+                {
+                    go = tg;                                                     // bez miasta w zasiegu - ten sam cel od nowa (swiezy rozkaz gry)
+                    // recenzja D1 (klucz Village Cart Land Road Only): stary cel bez drogi ladowej z domu - najblizsze miasto osiagalne ladem; brak - bez rozkazu
+                    if (go != null && s.VillageCartLandRoadOnly && NoLandRoad(DistSS(home, go))) go = NearestReachableTown(cart, home, s.VillageCartEnemyGate);
+                }
+                if (go == null) return;
                 MarketRoad.Move(vcb, cart, go);
                 if (cart.DefaultBehavior == AiBehavior.GoToSettlement && cart.TargetSettlement == go) _homeOrder++; else _rejected++;
                 return;
@@ -454,9 +486,15 @@ namespace Armoury
                 st.Unload = today;
                 _homeUnload++; _homeUnloadUnits += n;
                 MarketCarts.ForgetPending(cart);
+                // recenzja R4: rozkaz do domu - woz bez celu poza domem (gra nie wysle pustego wozu w stary kurs; ThinkAboutSendingItemToTown zaladuje i wysle go, gdy magazyn dojdzie do W)
+                MarketRoad.Move(vcb, cart, home);
                 return;
             }
-            if (today - st.Unload > HomeNoExitDays) { st.HomeDone = true; _homeNoExit++; }
+            if (today - st.Unload > HomeNoExitDays)
+            {
+                if (lo) { st.HomeDone = true; _homeNoExit++; }   // gra wyslala woz ponownie, a on dalej stoi - "bez wyjscia"
+                else ClearHome(st);                              // gra jeszcze go nie wyslala (magazyn ponizej W) - koniec epizodu bez licznika
+            }
         }
 
         /// <summary>Przyklad do logu (co 5 dob): wies, stan, zachowania, cel chwilowy, AI, tratwa, predkosc, waga / udzwig, juki, magazyn / W, najblizszy wrog w 5 jedn.</summary>

@@ -295,6 +295,9 @@ namespace Armoury
             ClearDay();
         }
 
+        /// <summary>CartGuard.Daily przy wszystkich kluczach W2 wylaczonych (bez linii doby): liczniki doby od zera, kursy w toku - porzadki jak co dobe.</summary>
+        internal static void SkipDay() { Tidy(); ClearDay(); }
+
         internal static int StumblesDay { get { return _stumbles; } }
         internal static double WorldNow() { try { return WorldSurvival(Today()); } catch { return 1.0; } }
 

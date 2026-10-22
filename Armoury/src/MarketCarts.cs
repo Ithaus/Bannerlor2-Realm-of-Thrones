@@ -522,7 +522,8 @@ namespace Armoury
                     float d = Dist(cart, at, st);
                     // m106 W1: bez drogi ladowej (pamiec drog >= prog BK 50000 - 1e30 NavalDLC, 1e8 poza tablica; <= 0, NaN) nie jest kandydatem, takze wlasne miasto wsi
                     // miejskiej (Harbay i Volmark na Harlaw - Lordsport na Pyke); dalej (wlokno, linia) wlasne miasto bez drogi nie istnieje (ownC == null)
-                    if (landOnly && NoRoad(d)) { _w1Cut++; if (isOwn) { _w1Own++; ownCut = true; } continue; }
+                    // (recenzja Z12: licznik tylko kandydatow, ktorych dotad nie odcinal test zasiegu nizej - wlasne miasto i NaN; miasto za morzem z 1e30 i tak odpadalo)
+                    if (landOnly && NoRoad(d)) { if (isOwn || !(d <= 0f || (max > 0f && d > max))) _w1Cut++; if (isOwn) { _w1Own++; ownCut = true; } continue; }
                     // R3-05b (recenzja p5-handel): barka poszerza zasieg - droga nad ta sama rzeka liczy sie do zasiegu w polowie; czas kursu i przestoj magazynu
                     // dalej z prawdziwej drogi (woz jedzie caly kurs ladem), wiec dalekie miasto rzeczne wygrywa tylko, gdy naprawde da wiecej na dobe
                     float dr = d * (float)RiverBarges.CartFactor(home, st);
