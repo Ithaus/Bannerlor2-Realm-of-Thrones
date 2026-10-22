@@ -351,6 +351,17 @@ Zasady silnika K0 ustalone po paczkach K1-K10 (21.10):
 - **Akcja z rodem/bohaterem, ktorego nie ma w grze** (np. `relk:brotherhood`, gdy Bractwo nie ma przywodcy; `item` z rodu, w ktorym nikt nie nosi
   przedmiotu) = POMINIETA z powodem, reszta skutkow idzie dalej.
 
+**Stan po K0 krok B1 (galaz w-toku/kronika-00-silnik, 22.10): akcje swiata i ekonomii w silniku** (szczegoly: `docs/noc-1920/kronika-k0-CHANGELOG.md`, B1):
+- `gold` - platnik placi najwyzej to, co ma (`N%` - z jego biezacego zlota), niedoplata w linii `zloto NNN.w: platnik -> odbiorca kwota (zaplacone k...)`; nic
+  zaplacone = POMINIETA. Bohater ukryty (Disabled) i martwy nie placi i nie dostaje (kiesa poza obiegiem). Rod = kiesa glowy rodu (rod gracza = gracz).
+- `security`/`loyalty` - tylko miasto i zamek (wies = POMINIETA), wartosc gry 0-100.
+- `pop` - **dalej POMINIETA** ("akcja jeszcze niewspierana: ksiega ludzi bez przyczyny kronika"): ksiega ludzi nie ma jeszcze przyczyny `kronika`; ludzie bez zmian.
+- `garrison:<osada>:<n>:pula` = ochotnicy notabli osady i jej wsi (te same miejsca, z ktorych bierze autowerbunek zalogi), najwyzej tylu, ilu jest; `:<osada>` =
+  zdrowi zolnierze jej zalogi. Zaloga w bitwie = CZEKA.
+- `item` - cel gracz: ekwipunek druzyny; inna postac: pasujacy slot wyposazenia (zajety - zamiana, zdjety przedmiot wraca do dawnego posiadacza).
+- `wound:<b>:<dni>` - zycie 1 i rana trzymana co dobe do konca terminu (gracz tez nie walczy w tym czasie).
+- `skill` - poziom 0-330 (z XP), `ware` - najwyzej tyle towaru, ile ma rynek zrodla.
+
 ## 12. Uchwyty kod:<nazwa>
 
 Najwyzej 10 na cala Kronike (bez `test`). Nowy uchwyt = wpis w `KODY` w `kronika_check.py` (dozwolone wydarzenia, `gdzie`, opis) i tutaj.

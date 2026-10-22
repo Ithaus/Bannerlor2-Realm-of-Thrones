@@ -5,6 +5,58 @@ Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E
 Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
 wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
 
+## 2026-10-22 - K0 krok B1: akcje swiata i ekonomii (gold, security, loyalty, ware, garrison, item, wound, skill; pop - POMINIETA)
+
+**Problem:** akcje swiata z danych K1-K10 konczyly sie "POMINIETA (akcja jeszcze niewspierana)": gold 25 wierszy (26 uzyc), security 30, loyalty 30, pop 10 (22),
+wound 15 (16), garrison 5, item 4, skill 2 (4), ware 0 (skrypt scratchpadu 7aee5f12/kr-b1/akcje_uzycie.py: kolumny skutki okien i opcji, po_rozbiciu, nagroda;
+k00 pominiety). Uchwyty kod: w danych: wielka_rada 8, zaraza 1, dzwony 1 (poza zakresem B1).
+**Przyczyna:** nowa funkcja (plan E "Chronicle.Actions.cs", KRONIKA-FORMAT 11).
+**Zmiana (`Chronicle.Actions.cs`, procedury w Impl, wszystkie klasy S - klucz ChronicleWorldChanges NIE pomija je z linia jak dotad):**
+- `gold:<platnik>:<odbiorca>:<kwota|N%>` - kiesa (Purse): bohater (id i tokeny), rod (glowa; rod gracza - gracz), osada (kasa SettlementComponent), `@kasa:<osada>`,
+  `@skarbiec:<k>` (KingdomBudgetWallet). Bohater martwy albo Disabled (ukryty - kiesa poza obiegiem), rod wyeliminowany / bez glowy, krolestwo wyeliminowane,
+  platnik = odbiorca - POMINIETA. Zamknieta ekonomia: placi min(kwota, zloto platnika, miejsce w kiesie odbiorcy); N% - z biezacego zlota platnika. Bez skarbca -
+  zdarzenie gry GiveGoldAction (bohater-bohater, bohater->osada, osada->bohater i osada->osada przez partie osady - gra obcina do kasy; ApplyForSettlementToCharacter
+  celowo nie, bo nie obcina do kasy osady); ze skarbcem - arytmetyka "najpierw platnik, potem odbiorca dostaje dokladnie to, co zeszlo" + CrownIncome.ShiftSnapshot
+  (przelew poza wplywami dnia), CirculationWindows.NoteHeroGold, ClanIncomeBook.NoteInflow(KRansom) dla bohatera AI (wzor CapitalTreasury) i wiadomosc gracza (EN).
+  Linia przy kazdej probie przelewu: "zloto NNN.w: platnik -> odbiorca kwota (zaplacone k[, niedoplata n][, N% z m][, zdjete x - dopisane y])"; nic zaplacone - POMINIETA.
+- `security`/`loyalty:<osada>:<d>` - Town.Security/Loyalty wprost (gra trzyma 0-100), tylko miasto i zamek. Sprawdzone w kodzie: DailyLife i PeopleBook tych
+  wartosci nie zapisuja; zapisy wprost robia tylko jednorazowe ciosy (CitySack, WarLedger, TownDebt, KingdomTreasury.LordLevy, kredyty TownFolk, NoticeBoard);
+  modele (BKLoyaltyModel, model bezpieczenstwa + postfiksy KsHunger) licza dobowy dryf.
+- `pop:<osada>:<d>` - POMINIETA "akcja jeszcze niewspierana: ksiega ludzi bez przyczyny kronika ..." (KW-5b INFO) z liczba ludzi osady. PeopleBook ma drogi ruchu
+  (Move, TownShift, pula OutlawLaw), ale bez przyczyny "kronika" (FORMAT 11) - cudza przyczyna (rabunek MRaidFlee, podloga TakeForFloor, migracja) zepsulaby
+  rownania i progi ksiegi; nowa przyczyna (MKinds 54 + pula wyrzutkow z wlasnym licznikiem) to zmiana PeopleBook/OutlawLaw - osobna decyzja.
+- `ware:<z>:<do>:<towar>:<ilosc>` - Settlement.ItemRoster z rynku do rynku (miasto/zamek/wies), najwyzej tyle, ile zrodlo ma (sztuki z modyfikatorami), bez zlota.
+- `garrison:<osada>:<ludzi>:<skad>` - skad = osada: zdrowi zolnierze (bez bohaterow i wightow) z jej zalogi proporcjonalnie do skladu, PeopleBook.Transfer (FTransfer);
+  skad = pula: ochotnicy notabli osady i jej wsi (sloty VolunteerTypes - ten sam zasob, co autowerbunek zalogi gry), kazdy rekrut przez ksiege ludzi jak
+  PeopleBook.A5Post (Straz - WatchLaw.GiveLevy; pobor wylaczony - GiveNone; inaczej TakeLevy MLevyA5 + GiveNew FLevyA5, reszta ponizej podlogi - GiveNone FNoneFloor).
+  Niedobor w linii; zaloga w bitwie - CZEKA; osada bez GarrisonParty - POMINIETA.
+- `item:<bohater>:<przedmiot>:<skad>` - dragon_* POMINIETA (P4); posiadacz: bohater (wyposazenie, stroj, druzyna, ktora prowadzi), rod (zywi bohaterowie i ich druzyny),
+  osada (rynek, schowek). Nikt nie ma - POMINIETA. Cel: gracz - ekwipunek druzyny; inna postac - pasujacy slot BattleEquipment (pusty, inaczej zamiana - zdjety
+  przedmiot wraca na miejsce wzietego), bez slotu - druzyna postaci, inaczej cofniecie i POMINIETA. Juz u celu - OK bez zmian.
+- `wound:<bohater>:<dni>` - zycie do 1 i rejestr ran (`_wounds`, zapis "kj bohater do zrodlo" w arm_kronika); doba Kroniki (Actions.Daily, przed czekajacymi) trzyma
+  rane (zycie z powrotem do 1; gra leczy co godzine) do dnia konca, potem "rana ... koniec terminu"; smierc / brak postaci - wpis usuniety z linia; klucz World Changes
+  NIE - rana nie trzymana, termin plynie; druga rana - dluzszy termin; bohater w bitwie - CZEKA. Linia doby: ", rany n".
+- `skill:<bohater>:<umiejetnosc>:<d>` - HeroDeveloper.SetInitialSkillLevel(0-330) - poziom i XP razem (ChangeSkillLevel nie umie odjac; SetSkillValue bez XP cofalby
+  sie przy nastepnym XP); bez AddSkillXp, wiec ksiega umiejetnosci (SkillLedger) tego nie liczy jako nauki.
+- `tools/sprawdz_logi.py`: tylko opis INFO progu KW-5b (lista akcji wspieranych); sprawdz_narzedzie czysto, test_kw.py 35/35.
+- `docs/KRONIKA-FORMAT.md` rozdz. 11: notka "Stan po K0 krok B1".
+**Ryzyko / co sprawdzic:**
+- W grze nic nie sprawdzone (zakaz gry). Autotest: okna z gold (np. 058.2 K5 - skarbiec -> kasa -> wladca Strazy), security/loyalty (009.1 town_EW4),
+  garrison:pula (034.1 town_A2), item heartsbane (090.1), wound/skill (037.1 Jaime) - linie "akcja ... -> OK (przed -> po)" i "zloto ...", potkniecia 0, KW-6 bez "z niczego".
+- Przelewy ze skarbcem i kasa osady przez arytmetyke (bez zdarzenia gry): ksiegi obiegu widza zmiane pul (suma swiata bez zmian); dobowe "Przeplywy osad"/kasy moga
+  pokazac ja jako nierozpoznana - sprawdzic w pierwszym biegu z gold (te same wzory co CapitalTreasury i KingdomTreasury).
+- garrison:pula bez kroku BK DeduceManpower (A5Post wola go przy GarrisonLevyFromBk, metoda prywatna w PeopleBook) - BK nie zdejmie ludzi z populacji BK; ksiega
+  ludzi Armoury jest zamknieta. Rekruci Kroniki licza sie w liczniku "A5" ksiegi pochodzenia.
+- item: wyposazenie AI moze potem zmienic AiGear/HeroGear albo inny mod (unikat moze zostac sprzedany/zdjety) - Kronika przenosi tylko w chwili akcji.
+- wound trzyma zycie 1 co dobe: postac (tez gracz przy 050.2a) nie walczy przez caly termin (do 120 dni u lordow 4_21, 3_1, 1_5) - zgodne z danymi.
+- Harness A2 (stary): test "gold - niewspierana (A3)" teraz ZLE - oczekiwana zmiana (gold jest wspierane); poza gra Hero.MainHero rzuca NRE, akcja konczy sie
+  "POMINIETA (wyjatek ...)" z potknieciem - w grze tej sciezki nie ma.
+- Testy: harness B1 (scratchpad 7aee5f12/kr-b1/harness) 67/67 - rejestr (9 procedur, klasa S, 39 akcji), zle argumenty kazdej akcji (linie POMINIETA ze skladnia),
+  brak obiektow w swiecie bez wyjatku na zewnatrz (platnik/odbiorca/osada/bohater/przedmiot nieznany, dragon_*), klucz World Changes NIE dla wszystkich 9 (bez linii
+  zlota), zapis kj tam i z powrotem (Build -> Import -> Build identyczny), zle linie kj, doba z rana nieznanej postaci (wpis usuniety z linia), Reset. Stare harnessy:
+  A1 42/42, A2 34/35 (oczekiwane wyzej), A3 44/44, A4 43/43. kronika_check: WYNIK OK. Build Armoury: 0 bledow, 7 starych ostrzezen.
+**Status:** DO SPRAWDZENIA (autotest K0 z oknami akcji swiata przed wgraniem; nic nie wgrane).
+
 ## 2026-10-22 - K0 krok A4: ukrycie i powrot postaci (hide/unhide), term kr: w zmianach stron, progi m105kronika, skrypty wgrania
 
 **Problem:** (1) Kronika nie umiala ukryc postaci ani jej przywrocic (akcje hide/unhide "jeszcze niewspierane"; 31 hide i 15 unhide w danych K1-K10); wiersze
