@@ -2668,6 +2668,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartStuckGuard { get; set; } = true;
 
+        [SettingPropertyBool("Village Cart Flee Unload", HintText = "a loaded village cart that the game keeps holding at home because bands roam around its village - it flees back in every time it means to leave - unloads its goods into the village storehouse after three days, and the village sends out no new cart until the danger is gone (looked at once a day, by the game's own judgement of danger; the cart rolls out at most a day after the bands move off). Nothing is made or lost. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartFleeUnload { get; set; } = true;
+
         [SettingPropertyBool("Village Cart Top Up On Departure", HintText = "with Village Cart Whole Store or Village Cart Full Load Far: the rest of the village storehouse is loaded onto the cart only when it actually rolls out of the village - a cart that stays at home no longer swallows the storehouse every few days. Off = loaded when the town is chosen, as before", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartTopUpOnDeparture { get; set; } = true;
@@ -8576,6 +8580,14 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsCastleIncomeCut { get; set; } = true;
 
+        [SettingPropertyBool("Ds Castle Folk Part No Arrears", HintText = "with Ds Towns: the part of a castle's farm that its castle folk pay from their savings is paid only from what they hold above their hard-times reserve, and what they cannot pay is forgiven instead of written down as arrears - the same as a village's rent above its reserve. Such arrears left in an old save are paid from the folk's surplus at the first instalment and the rest is forgiven once. Towns keep their arrears as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsCastleFolkPartNoArrears { get; set; } = true;
+
+        [SettingPropertyBool("Ds Castle Fast Cut", HintText = "with Ds Castle Income Cut: a castle whose purse, after the coin it owes, is below its working coin, or that owes a whole instalment or more, has its farm lowered at once to what it really earns (a year of its net daily inflow over the last four weeks) - the same rule as Ds Farm Cut Below Reserve for towns - instead of a quarter every two weeks; the arrears its purse owes shrink by the same share, since they were reckoned on a farm above its takings. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsCastleFastCut { get; set; } = true;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -8916,6 +8928,14 @@ namespace Armoury
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public float KsSwitchMarketBand { get; set; } = 0.15f;
 
+        [SettingPropertyBool("Ks Plan Market Balance", HintText = "with Start Calibration: the last balance of the weekly plan judges a good that the villages mostly eat themselves (grain above all) by what reaches the market rather than by the whole harvest - two in a hundred off on the whole is about nine off at the town stalls - and keeps balancing until the market itself is within three in a hundred. Prices are reckoned as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool KsPlanMarketBalance { get; set; } = true;
+
+        [SettingPropertyBool("Ks Fach Market Room", HintText = "with Ks Village Trade Keep: the room a village's own trade has at the market is the market's demand less what all the villages of that market eat themselves, not only the villages with that trade - grain villages no longer grow grain for a market that is already full. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool KsFachMarketRoom { get; set; } = true;
+
         [SettingPropertyBool("Town Works Hire District", HintText = "with Ks Switch Signal Rule: towns with more coin than they need pay back what village rebuilding put into town purses (a week's average), as wages for carts and hands from their district villages - by households, raided villages get nothing. A town pays first for its own district, then for poorer towns. Only coin moves; nothing is built. Never below a town's own needs, not while besieged or just taken. Every town, the player's too. Off = the coin stays in the town purses, as before", RequireRestart = false)]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public bool TownWorksHireDistrict { get; set; } = true;
@@ -9135,6 +9155,10 @@ namespace Armoury
         [SettingPropertyBool("Headman Bounties", HintText = "when a band has plundered one of the town's villages in the last 30 days and the village headman has no other work to offer, his notice is pinned on the town's board: the same pay as the watch's (the wages of the town's guardsmen), paid from the village purse above what the village keeps for hard times (a notice at most a quarter of that), at once to whoever breaks the band; you also gain +2 with the headman. You speak with him in the village (the notice marks it on your map). Needs the notice board with its villages on. Off = no headmen's notices", RequireRestart = false)]
         [SettingPropertyGroup("Notice board")]
         public bool HeadmanBounties { get; set; } = true;
+
+        [SettingPropertyBool("Notice Board Lean Save", HintText = "the notice board keeps its bounties and the bands' misdeeds in a leaner save (about a third smaller) and reads every save back before writing it - if anything differs, the older form is written; the daily bounty round no longer builds the save text every day. Older saves load as before. A save made with this on cannot be read by an older version of the mod (bounties come back within days, the bands' misdeeds are forgotten). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool NoticeBoardLeanSave { get; set; } = true;
 
         [SettingPropertyBool("Prologue Enabled", HintText = "when you start a new campaign, choose between 'Prologue 298 - the King rides north' (the campaign begins 188 days before the story of Realm of Thrones, as King Robert leaves King's Landing for Winterfell; Robert and Eddard Stark live and the realms keep the King's peace) and 'Classic start 299' (as Realm of Thrones begins). Off = always the classic start, without asking. Only new campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
@@ -9906,6 +9930,7 @@ namespace Armoury
             s.VillageCartEnemyGate = VillageCartEnemyGate;
             s.VillageCartRouteRisk = VillageCartRouteRisk;
             s.VillageCartStuckGuard = VillageCartStuckGuard;
+            s.VillageCartFleeUnload = VillageCartFleeUnload;
             s.VillageCartTopUpOnDeparture = VillageCartTopUpOnDeparture;
             s.IslandRoadsFix = IslandRoadsFix;
             s.CaravanTownHourly = CaravanTownHourly;
@@ -11383,6 +11408,8 @@ namespace Armoury
             s.DsFarmCutBelowReserve = DsFarmCutBelowReserve;
             s.DsFarmFixShareCap = DsFarmFixShareCap;
             s.DsCastleIncomeCut = DsCastleIncomeCut;
+            s.DsCastleFolkPartNoArrears = DsCastleFolkPartNoArrears;
+            s.DsCastleFastCut = DsCastleFastCut;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;
@@ -11468,6 +11495,8 @@ namespace Armoury
             s.KsSwitchSignalRule = KsSwitchSignalRule;
             s.KsVillageTradeKeep = KsVillageTradeKeep;
             s.KsSwitchMarketBand = KsSwitchMarketBand;
+            s.KsPlanMarketBalance = KsPlanMarketBalance;
+            s.KsFachMarketRoom = KsFachMarketRoom;
             s.TownWorksHireDistrict = TownWorksHireDistrict;
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
@@ -11523,6 +11552,7 @@ namespace Armoury
             s.WatchBountyAiLords = WatchBountyAiLords;
             s.WatchBountyLordTopUp = WatchBountyLordTopUp;
             s.HeadmanBounties = HeadmanBounties;
+            s.NoticeBoardLeanSave = NoticeBoardLeanSave;
             s.PrologueEnabled = PrologueEnabled;
             s.ProloguePeace = ProloguePeace;
             s.ProloguePacts = ProloguePacts;
