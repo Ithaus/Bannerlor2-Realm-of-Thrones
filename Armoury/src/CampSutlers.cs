@@ -47,6 +47,12 @@ namespace Armoury
     /// zaplacil netto D (zmiana jego kiesy); narzut kupionego M = wartosc kupionego po cenie markietanow - po cenie miasta (w 0..D) idzie obiegiem uslug; reszta
     /// D - M do kasy miasta (towar po cenie miasta; ujemna = miasto placi za skup). Suma = D - nic z niczego. Anulowanie - gra cofa koszyk, nic sie nie zmienia.
     /// Stan (zapis arm_sutlerrow przez SaveText.Sync): doba, godzina zabawy, opatrzeni dzis, kupione dzis wedlug rodzaju, skup dzis, naprawione dzis. Wyjatek w menu - licznik potkniec, menu dziala.
+    /// m103-drobne (kolejka Jeffa pkt 7): 4. ODZIEZ (klucz SutlerRowClothing, wymaga ArmyClothingEnabled) - gracz z kiesy kupuje cale sztuki potrzeby odziezy swojej
+    /// druzyny (ArmyClothing: skora, sukno, plotno) z polki miasta-zrodla po cenie miasta x (1 + narzut), najwyzej SutlerRowStockPerStall x kramy sztuk rodzaju na dobe
+    /// (ten sam licznik dnia co sklep - _boughtToday); towar po cenie miasta do kasy miasta (ArmyClothing.RowSettle: NCloth, MixCloth), narzut obiegiem uslug (Spread);
+    /// potrzeba druzyny maleje o kupione sztuki (nie kupi ich drugi raz u markietanow T3-K1 ani przy wyjezdzie z miasta). 5. PRACZKI (klucz SutlerLaundry) - przez
+    /// SutlerLaundryDays dob narastanie potrzeby odziezy druzyny gracza (ArmyClothing.OnDailyTickParty) jest mniejsze o SutlerLaundryCutPercent; oplata = praczki
+    /// (1 na SutlerLaundryMenPerWasher ludzi, w gore) x doby x dniowka praczki (2/3 Workshop Wage Per Day) obiegiem uslug. Termin praczek - pole 8 zapisu arm_sutlerrow, ludzie objeci oplaconymi praczkami - pole 9 (ulga tylko na czesc objeta).
     /// </summary>
     internal static class CampSutlers
     {
@@ -65,10 +71,15 @@ namespace Armoury
         private static int _mendedToday;              // poprawka po recenzji: sztuki naprawione dzis przez platnerzy polowych
         private static readonly Dictionary<string, int> _boughtToday = new Dictionary<string, int>();
         private static bool _openFromArmy;            // opcja w army_wait (menu oczekiwania gry) podnosi flage, TickEvent przelacza (CLAUDE.md 7)
+        private const double NoLaundry = -1e9;
+        private static double _laundryUntil = NoLaundry;   // m103-drobne: godzina kampanii konca pracy praczek (zapis - pole 8)
+        private static int _laundryMen;                    // m103 poprawka po recenzji: ludzie objeci oplaconymi praczkami (praczki x ludzi na praczke, zapis - pole 9)
 
         // ------------------------------------------------------------ liczniki doby (linia doby) i potkniecia
         private static int _dVisits, _dTreated, _dRevels, _dTrades, _dPcsBought, _dPcsSold, _dMended, _dArmyVisits;
         private static long _dSurgeonGold, _dRevelGold, _dBuyNet, _dGoodsTown, _dMarkup, _dToTown, _dToFolk, _dToVill, _dToTax, _dPaid, _dMendGold, _dMendMat, _dCrown;
+        private static int _dClothe, _dClothePcs, _dLaundry;                   // m103-drobne: odziez z rzedu (zakupy, sztuki), praczki (najecia)
+        private static long _dClotheGold, _dClotheTown, _dLaundryGold;
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -90,6 +101,7 @@ namespace Armoury
         private static void Reset()
         {
             _day = -1; _lastRevel = NoRevel; _treatedToday = 0; _soldToday = 0; _mendedToday = 0; _boughtToday.Clear(); _openFromArmy = false;
+            _laundryUntil = NoLaundry; _laundryMen = 0;   // m103-drobne: praczki nie przechodza do nowej kampanii
             DayZero();
         }
 
@@ -97,11 +109,14 @@ namespace Armoury
         {
             _dVisits = _dTreated = _dRevels = _dTrades = _dPcsBought = _dPcsSold = _dMended = _dArmyVisits = 0;
             _dSurgeonGold = _dRevelGold = _dBuyNet = _dGoodsTown = _dMarkup = _dToTown = _dToFolk = _dToVill = _dToTax = _dPaid = _dMendGold = _dMendMat = _dCrown = 0;
+            _dClothe = _dClothePcs = _dLaundry = 0; _dClotheGold = _dClotheTown = _dLaundryGold = 0;   // m103-drobne
         }
 
         private static double HoursSinceRevel() { return _lastRevel <= NoRevel / 2 ? 1e9 : CampaignTime.Now.ToHours - _lastRevel; }
 
-        // ------------------------------------------------------------ zapis: "2|doba|godzina zabawy|opatrzeni|id:n,id:n|skup dzis|naprawione dzis" (stary "1|doba|zabawa 0/1|..." czytany)
+        // ------------------------------------------------------------ zapis: "2|doba|godzina zabawy|opatrzeni|id:n,id:n|skup dzis|naprawione dzis|koniec praczek|objeci praczkami"
+        // (stary "1|doba|zabawa 0/1|..." czytany; m103-drobne: pole 8 - godzina konca praczek; zapis bez pola = bez praczek, stary kod pole pomija; poprawka po recenzji:
+        // pole 9 - ludzie objeci oplaconymi praczkami)
         internal static string Export()
         {
             var sb = new StringBuilder(64);
@@ -115,6 +130,8 @@ namespace Armoury
                 first = false;
             }
             sb.Append('|').Append(_soldToday.ToString(Inv)).Append('|').Append(_mendedToday.ToString(Inv));
+            sb.Append('|').Append(_laundryUntil <= NoLaundry / 2 ? "-" : _laundryUntil.ToString("0.##", Inv));   // m103-drobne
+            sb.Append('|').Append(_laundryUntil <= NoLaundry / 2 ? "-" : _laundryMen.ToString(Inv));               // m103 poprawka po recenzji: pole 9
             return sb.ToString();
         }
 
@@ -141,6 +158,11 @@ namespace Armoury
                     if (int.TryParse(a[5], NumberStyles.Integer, Inv, out v)) _soldToday = Math.Max(0, v);
                     if (int.TryParse(a[6], NumberStyles.Integer, Inv, out v)) _mendedToday = Math.Max(0, v);
                 }
+                if (a.Length >= 8 && a[7] != "-" && double.TryParse(a[7], NumberStyles.Float, Inv, out h) && !double.IsNaN(h) && !double.IsInfinity(h)) _laundryUntil = h;   // m103-drobne
+                // m103 poprawka po recenzji: pole 9 - objeci praczkami. Zapis z polem 8 bez pola 9 (tylko build m103 sprzed poprawki, nigdy nie wgrany) - nie wiadomo,
+                // za ilu ludzi zaplacono, wiec praczki koncza prace (zadna ulga bez platnika)
+                if (a.Length >= 9 && int.TryParse(a[8], NumberStyles.Integer, Inv, out v)) _laundryMen = Math.Max(0, v);
+                if (_laundryMen <= 0) _laundryUntil = NoLaundry;
             }
             catch (Exception e) { Stumble("Import", e); }
         }
@@ -222,6 +244,8 @@ namespace Armoury
             starter.AddGameMenuOption(Menu, "arm_row_revel", "{=!}{ARM_ROW_REVEL}", RevelCondition, delegate (MenuCallbackArgs a) { Revel(); }, false, 2);
             starter.AddGameMenuOption(Menu, "arm_row_mend", "{=!}{ARM_ROW_MEND}", MendCondition, delegate (MenuCallbackArgs a) { Mend(); }, false, 1);
             starter.AddGameMenuOption(Menu, "arm_row_trade", "{=!}Trade with the sutlers", TradeCondition, delegate (MenuCallbackArgs a) { Trade(); }, false, 3);
+            starter.AddGameMenuOption(Menu, "arm_row_clothe", "{=!}{ARM_ROW_CLOTHE}", ClotheCondition, delegate (MenuCallbackArgs a) { Clothe(); }, false, 4);      // m103-drobne
+            starter.AddGameMenuOption(Menu, "arm_row_laundry", "{=!}{ARM_ROW_LAUNDRY}", LaundryCondition, delegate (MenuCallbackArgs a) { Laundry(); }, false, 5);  // m103-drobne
             starter.AddGameMenuOption(Menu, "arm_row_back", "{=!}Back to the camp",
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                 delegate (MenuCallbackArgs a)
@@ -246,7 +270,12 @@ namespace Armoury
                      + (MendMaterial.MenAndLordsOn ? " (robota + material z polki miasta)" : " (robota)") + " | zabawa " + RevelPer() + " na czlowieka, morale +" + RevelMorale()
                      + " do pulapu " + RevelCap() + ", co 24 h | towar " + StockPer() + " sztuk rodzaju na kram na dobe | gotowka skupu " + CashPer() + " na kram na dobe")
                      + " | stan dnia: doba " + _day + ", od zabawy " + (HoursSinceRevel() >= 1e8 ? "-" : HoursSinceRevel().ToString("0.0", Inv) + " h") + ", opatrzeni " + _treatedToday
-                     + ", naprawione " + _mendedToday + ", skup " + _soldToday + ", rodzajow kupionych " + _boughtToday.Count + ".");
+                     + ", naprawione " + _mendedToday + ", skup " + _soldToday + ", rodzajow kupionych " + _boughtToday.Count
+                     // m103-drobne: odziez i praczki
+                     + " | odziez z rzedu (Sutler Row Clothing) " + (ClotheOn ? "TAK" : "NIE") + ", praczki (Sutler Laundry) " + (LaundryOn ? "TAK - zuzycie -" + LaundryCut() + "% przez " + LaundryDays()
+                       + " dob, 1 praczka na " + MenPerWasher() + " ludzi, dniowka " + WasherWage().ToString("0.##", Inv) : "NIE")
+                     + (ArmyClothing.On ? "" : " (Army Clothing Enabled wylaczone - obie uslugi nieczynne)")
+                     + ", praczki czynne " + (LaundryLeftH() > 0 ? "jeszcze " + LaundryLeftH().ToString("0.0", Inv) + " h (objeci " + _laundryMen + " ludzi)" : "nie") + ".");
         }
 
         // ------------------------------------------------------------ liczby (przyciete jak suwaki MCM)
@@ -678,6 +707,208 @@ namespace Armoury
             catch (Exception e) { Stumble("Revel", e); }
         }
 
+        // ------------------------------------------------------------ 4. odziez (m103-drobne, klucz SutlerRowClothing)
+        // Cale sztuki potrzeby odziezy druzyny gracza (ArmyClothing) z polki miasta-zrodla po cenie miasta x (1 + narzut), najwyzej SutlerRowStockPerStall x kramy sztuk
+        // kazdego towaru na dobe (licznik _boughtToday - ten sam co sklep; skora/filc/plotno nie sa w towarze sklepu, wiec limity sie nie mieszaja). Gracz placi z kiesy;
+        // towar po cenie miasta do kasy miasta (ArmyClothing.RowSettle), narzut obiegiem uslug (Spread). Potrzeba druzyny maleje o kupione sztuki.
+        // Poprawka po recenzji: miasto-zrodlo oblezone - opcja szara (jak odziez markietanow T3-K1, ArmyClothing.FromSutlers: towar nie wyjdzie z oblezonego miasta;
+        // jedna zasada dla tych samych sztuk tej samej druzyny, niezaleznie od platnika).
+        private static bool ClotheOn { get { var s = Settings.Current; return s != null && s.SutlerRowClothing && ArmyClothing.On; } }
+
+        private static int[] ClotheCap(int stalls)
+        {
+            var cap = new int[3];
+            int per = stalls * StockPer();
+            for (int g = 0; g < 3; g++)
+            {
+                string id = ArmyClothing.IdOf(g);
+                int b = 0;
+                if (id != null) _boughtToday.TryGetValue(id, out b);
+                cap[g] = Math.Max(0, per - b);
+            }
+            return cap;
+        }
+
+        private static string Frac(float[] n)
+        {
+            return "leather " + n[0].ToString("0.##", Inv) + ", felt " + n[1].ToString("0.##", Inv) + ", linen " + n[2].ToString("0.##", Inv);
+        }
+
+        private static bool ClotheCondition(MenuCallbackArgs a)
+        {
+            try
+            {
+                if (!ClotheOn) return false;
+                a.optionLeaveType = GameMenuOption.LeaveType.Trade;
+                Roll();
+                MBTextManager.SetTextVariable("ARM_ROW_CLOTHE", "Clothe the men from the sutlers' carts", false);
+                int men, stalls; string why;
+                if (!Can(out men, out stalls, out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
+                var src = Source();
+                if (src == null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}No town is near enough to supply the sutlers."); return true; }
+                if (src.IsUnderSiege) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}The market of " + src.Name + " is under siege - the sutlers cannot bring cloth or leather out of it."); return true; }   // poprawka po recenzji
+                var need = ArmyClothing.PlayerNeed();
+                int whole = 0;
+                for (int g = 0; g < 3; g++) whole += (int)Math.Floor(Math.Max(0f, need[g]));
+                var cap = ClotheCap(stalls);
+                var got = new int[3]; long price; bool lacked;
+                int n = ArmyClothing.RowPreview(src, Markup(), cap, Math.Max(0, Hero.MainHero.Gold), got, out price, out lacked);
+                if (n > 0) MBTextManager.SetTextVariable("ARM_ROW_CLOTHE", "Clothe the men from the sutlers' carts (" + n + (n == 1 ? " piece" : " pieces") + ", about " + price + " denars)", false);
+                if (whole <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Your men have not yet worn out a whole piece of anything (" + Frac(need) + " of a piece). The sutlers also bring them what they wear out, from the men's own purse, once a day."); }
+                else if (n <= 0 && cap[0] + cap[1] + cap[2] <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}The carts have brought all the cloth and leather they could today (" + stalls * StockPer() + " pieces of each a day)."); }
+                else if (n <= 0 && lacked) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}The market of " + src.Name + " has none of the leather, felt or linen your men need."); }
+                else if (n <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You cannot pay for it."); }
+                else a.Tooltip = new TextObject("{=!}Leather, felt and linen from the market of " + src.Name + " at its prices plus " + (Markup() * 100f).ToString("0", Inv) + "% replace what your men have worn out: "
+                                                + ArmyClothing.ListEn(got) + ". Paid from your purse - the men's own purse is spared, and they need not buy it in the next town. At most "
+                                                + stalls * StockPer() + " pieces of each a day.");
+                return true;
+            }
+            catch (Exception e) { Stumble("ClotheCondition", e); return false; }
+        }
+
+        private static void Clothe()
+        {
+            try
+            {
+                Roll();
+                int men, stalls; string why;
+                if (!Can(out men, out stalls, out why)) { Log.Player(why, true); return; }
+                var src = Source();
+                if (src == null || !ClotheOn) { Log.Player("No sutlers can reach you here.", true); return; }
+                if (src.IsUnderSiege) { Log.Player("The market of " + src.Name + " is under siege.", true); return; }   // poprawka po recenzji: jak FromSutlers (T3-K1)
+                var need0 = ArmyClothing.PlayerNeed();
+                var cap = ClotheCap(stalls);
+                var got = new int[3];
+                var undo = new List<EquipmentElement>();
+                int paidTown, paidRow;
+                int gold0 = Hero.MainHero.Gold;
+                int n = ArmyClothing.RowBuy(src, Markup(), cap, Math.Max(0, gold0), got, out paidTown, out paidRow, undo);
+                if (n <= 0 || paidRow <= 0) { ArmyClothing.RowUndo(src, undo); Log.Player("The sutlers have nothing for your men now.", true); return; }
+                if (!TakeFromPlayer(paidRow)) { ArmyClothing.RowUndo(src, undo); Log.Player("You cannot pay the sutlers.", true); return; }
+                // ---- zloto zdjete: towar po cenie miasta do kasy miasta, narzut obiegiem uslug
+                int markup = Math.Max(0, paidRow - paidTown);
+                ArmyClothing.RowSettle(src, paidTown, markup, got);
+                int tt = 0, tf = 0, tv = 0, tx = 0;
+                string to = markup > 0 ? Spread(src, markup, out tt, out tf, out tv, out tx) : "-";
+                for (int g = 0; g < 3; g++)
+                {
+                    string id = ArmyClothing.IdOf(g);
+                    if (id == null || got[g] <= 0) continue;
+                    int b; _boughtToday.TryGetValue(id, out b); _boughtToday[id] = b + got[g];
+                }
+                _dClothe++; _dClothePcs += n; _dClotheGold += paidRow; _dClotheTown += paidTown;
+                if (PayNotes.On) PayNotes.Paid("markietani-odziez", paidRow, " to the sutlers for " + ArmyClothing.ListEn(got) + " for your men.");
+                Log.Player("The sutlers hand out " + ArmyClothing.ListEn(got) + " - your men are shod and clothed again.");
+                Log.Info(P + "odziez | oboz " + men + " ludzi (prog " + MinMen() + "), kramy " + stalls + " | druzyna gracza: potrzeba " + ArmyClothing.ListPl(need0) + " -> " + ArmyClothing.ListPl(ArmyClothing.PlayerNeed())
+                         + " | kupione " + ArmyClothing.ListPl(got) + " (najwyzej " + stalls * StockPer() + " rodzaju na dobe) | cena markietanow " + paidRow + ", miasta " + paidTown
+                         + " | gracz zaplacil " + paidRow + " (kiesa " + gold0 + " -> " + Hero.MainHero.Gold + ") -> towar do kasy miasta " + paidTown + " + narzut " + markup + " -> " + to
+                         + " | kontrola: " + paidRow + " = " + paidTown + " + " + (tt + tf + tv + tx) + " (roznica " + (paidRow - paidTown - tt - tf - tv - tx) + ") | zrodlo " + src.StringId + ".");
+                GameMenu.SwitchToMenu(Menu);
+            }
+            catch (Exception e) { Stumble("Clothe", e); }
+        }
+
+        // ------------------------------------------------------------ 5. praczki (m103-drobne, klucz SutlerLaundry)
+        // Przez SutlerLaundryDays dob narastanie potrzeby odziezy druzyny gracza (ArmyClothing.OnDailyTickParty, share) mniejsze o SutlerLaundryCutPercent - pranie i cerowanie
+        // przedluzaja zycie odziezy. Oplata = praczki (ceil(ludzie druzyny bez bohaterow / SutlerLaundryMenPerWasher)) x doby x dniowka praczki (2/3 Workshop Wage Per Day -
+        // dzien pracy kobiety ok. 2/3 dniowki rzemieslnika) obiegiem uslug (Spread). Nie da sie najac drugi raz, dopoki pracuja.
+        // Poprawka po recenzji: praczki obsluguja tylu ludzi, za ilu zaplacono (_laundryMen = praczki x ludzi na praczke, z chwili najecia). Gdy druzyna urosnie,
+        // ulga obejmuje czesc objeta: share = 1 - cut x min(1, objeci / ludzie) - rekruci ponad oplacone praczki zdzieraja odziez w pelni (kazda usluga ma platnika).
+        private static bool LaundryOn { get { var s = Settings.Current; return s != null && s.SutlerLaundry && ArmyClothing.On; } }
+        private static int LaundryCut() { var s = Settings.Current; return s != null ? Math.Max(0, Math.Min(75, s.SutlerLaundryCutPercent)) : 25; }
+        private static int LaundryDays() { var s = Settings.Current; return s != null ? Math.Max(1, Math.Min(28, s.SutlerLaundryDays)) : 7; }
+        private static int MenPerWasher() { var s = Settings.Current; return s != null ? Math.Max(5, Math.Min(100, s.SutlerLaundryMenPerWasher)) : 20; }
+        private static float WasherWage() { var s = Settings.Current; return Math.Max(0f, (s != null ? s.WorkshopWagePerDay : 3f) * 2f / 3f); }
+        private static double LaundryLeftH() { return _laundryUntil <= NoLaundry / 2 ? 0.0 : Math.Max(0.0, _laundryUntil - CampaignTime.Now.ToHours); }
+
+        /// <summary>m103-drobne: czesc doby zuzycia odziezy druzyny gracza (ArmyClothing.OnDailyTickParty) - 1 bez praczek, 1 - SutlerLaundryCutPercent x czesc objeta,
+        /// gdy pracuja (poprawka po recenzji: czesc objeta = min(1, objeci oplaconymi praczkami / `men` - ludzie druzyny bez bohaterow dzis).</summary>
+        internal static float LaundryShare(int men)
+        {
+            try
+            {
+                if (!LaundryOn || LaundryLeftH() <= 0.0 || men <= 0 || _laundryMen <= 0) return 1f;
+                return 1f - LaundryCut() / 100f * LaundryCover(men);
+            }
+            catch (Exception e) { Stumble("LaundryShare", e); return 1f; }
+        }
+
+        /// <summary>Poprawka po recenzji: czesc druzyny objeta oplaconymi praczkami (0-1).</summary>
+        private static float LaundryCover(int men) { return men <= 0 ? 0f : Math.Min(1f, _laundryMen / (float)men); }
+
+        /// <summary>Poprawka po recenzji: ludzie druzyny gracza bez bohaterow (ta sama miara co cena praczek i zuzycie odziezy) - do linii doby.</summary>
+        private static int PlayerMen() { var mp = MobileParty.MainParty; return mp != null && mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0; }
+
+        private static int LaundryPrice(out int men, out int washers)
+        {
+            var mp = MobileParty.MainParty;
+            men = mp != null && mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
+            washers = men > 0 ? (men + MenPerWasher() - 1) / MenPerWasher() : 0;
+            return (int)Math.Ceiling(washers * LaundryDays() * (double)WasherWage() - 1e-6);
+        }
+
+        private static bool LaundryCondition(MenuCallbackArgs a)
+        {
+            try
+            {
+                if (!LaundryOn) return false;
+                a.optionLeaveType = GameMenuOption.LeaveType.Manage;
+                int men, stalls; string why;
+                int pm, washers;
+                int price = LaundryPrice(out pm, out washers);
+                MBTextManager.SetTextVariable("ARM_ROW_LAUNDRY", "Hire the washerwomen for " + LaundryDays() + " days (" + price + " denars)", false);
+                if (!Can(out men, out stalls, out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
+                double left = LaundryLeftH();
+                if (left > 0.0)
+                {
+                    a.IsEnabled = false;
+                    a.Tooltip = new TextObject("{=!}The washerwomen are already at work for your men - " + Math.Ceiling(left / 24.0).ToString("0", Inv) + " more days. They look after the "
+                                               + _laundryMen + " men you paid for" + (pm > _laundryMen ? "; the other " + (pm - _laundryMen) + " of your " + pm + " men wear out their clothes as before." : "."));
+                    return true;
+                }
+                if (pm <= 0 || price <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You have no men for the washerwomen to look after."); return true; }
+                if (Hero.MainHero.Gold < price) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You cannot pay " + price + " denars."); return true; }
+                var wear = ArmyClothing.PlayerWearPerDay();
+                float saved = 0f;
+                for (int g = 0; g < 3; g++) saved += wear[g] * LaundryDays() * LaundryCut() / 100f;
+                a.Tooltip = new TextObject("{=!}" + washers + (washers == 1 ? " washerwoman washes" : " washerwomen wash") + " and darn" + (washers == 1 ? "s" : "") + " the clothes of your " + pm + " men for " + LaundryDays()
+                                           + " days: they wear out their shoes, clothes and linen " + LaundryCut() + "% more slowly - about " + saved.ToString("0.#", Inv) + " pieces of leather, felt and linen fewer to buy. "
+                                           + WasherWage().ToString("0.#", Inv) + " denars a day for each washerwoman, one for every " + MenPerWasher() + " men - they look after up to "
+                                           + washers * MenPerWasher() + " men; men you recruit beyond that are not looked after.");
+                return true;
+            }
+            catch (Exception e) { Stumble("LaundryCondition", e); return false; }
+        }
+
+        private static void Laundry()
+        {
+            try
+            {
+                int men, stalls; string why;
+                if (!Can(out men, out stalls, out why)) { Log.Player(why, true); return; }
+                if (!LaundryOn || LaundryLeftH() > 0.0) return;
+                var src = Source();
+                int pm, washers;
+                int price = LaundryPrice(out pm, out washers);
+                if (src == null || pm <= 0 || price <= 0 || !TakeFromPlayer(price)) { Log.Player("The washerwomen cannot work for you now.", true); return; }
+                int tt, tf, tv, tx;
+                string to = Spread(src, price, out tt, out tf, out tv, out tx);
+                _laundryUntil = CampaignTime.Now.ToHours + LaundryDays() * 24.0;
+                _laundryMen = washers * MenPerWasher();   // poprawka po recenzji: objeci = praczki x ludzi na praczke (MCM zmieniony pozniej nie zmienia oplaconej uslugi)
+                _dLaundry++; _dLaundryGold += price;
+                var wear = ArmyClothing.PlayerWearPerDay();
+                if (PayNotes.On) PayNotes.Paid("markietani-praczki", price, " to " + washers + (washers == 1 ? " washerwoman" : " washerwomen") + " for " + LaundryDays() + " days.");
+                Log.Player("The washerwomen take up their tubs and needles - for " + LaundryDays() + " days your men's clothes will last longer.");
+                Log.Info(P + "praczki | oboz " + men + " ludzi (prog " + MinMen() + "), kramy " + stalls + " | druzyna gracza " + pm + " ludzi (bez bohaterow) -> praczek " + washers + " (1 na " + MenPerWasher() + ") x "
+                         + LaundryDays() + " dob x dniowka " + WasherWage().ToString("0.##", Inv) + " = " + price + " | objeci do " + _laundryMen + " ludzi (praczki x " + MenPerWasher()
+                         + ", rekruci ponad to bez ulgi) | zuzycie odziezy -" + LaundryCut() + "% do godziny " + _laundryUntil.ToString("0.#", Inv)
+                         + " (zuzycie dzienne bez praczek: " + ArmyClothing.ListPl(wear) + ") | gracz zaplacil " + price + " -> " + to
+                         + " | kontrola: " + price + " = " + (tt + tf + tv + tx) + " (roznica " + (price - tt - tf - tv - tx) + ") | zrodlo " + src.StringId + ".");
+                GameMenu.SwitchToMenu(Menu);
+            }
+            catch (Exception e) { Stumble("Laundry", e); }
+        }
+
         // ------------------------------------------------------------ 3. sklep
         private static bool Sold(ItemObject it)
         {
@@ -856,12 +1087,16 @@ namespace Armoury
         // ------------------------------------------------------------ doba
         private static void Daily()
         {
-            bool any = _dVisits + _dTreated + _dRevels + _dTrades + _dMended > 0 || _stumbles > 0;
+            bool any = _dVisits + _dTreated + _dRevels + _dTrades + _dMended + _dClothe + _dLaundry > 0 || _stumbles > 0 || LaundryLeftH() > 0.0;   // m103-drobne: odziez, praczki
             if (any && Settings.Current != null && Settings.Current.LogEnabled)
                 Log.Info(P + "dzien " + (Today() - 1) + " | klucz " + (On ? "TAK" : "WYL") + " | wizyty " + _dVisits + " (z cudzej armii " + _dArmyVisits + ") | cyrulik: opatrzeni " + _dTreated + " za " + _dSurgeonGold
                          + " | platnerze: naprawione " + _dMended + " za " + _dMendGold + " (material do kas miast " + _dMendMat + ")"
                          + " | zabawa " + _dRevels + " za " + _dRevelGold + " | sklep " + _dTrades + ": kupione " + _dPcsBought + " sztuk, sprzedane " + _dPcsSold + ", gracz netto " + _dBuyNet
-                         + " = towar do kas miast " + _dGoodsTown + " + narzut " + _dMarkup + " | obrot uslug i narzutu " + _dPaid + " -> kasy miast " + _dToTown + " + lud " + _dToFolk
+                         + " = towar do kas miast " + _dGoodsTown + " + narzut " + _dMarkup
+                         + " | odziez " + _dClothe + ": sztuk " + _dClothePcs + " za " + _dClotheGold + " (towar do kas miast " + _dClotheTown + " + narzut " + (_dClotheGold - _dClotheTown) + ")"   // m103-drobne
+                         + " | praczki: najete " + _dLaundry + " za " + _dLaundryGold + ", czynne " + (LaundryLeftH() > 0.0 ? "jeszcze " + LaundryLeftH().ToString("0.0", Inv) + " h (zuzycie -" + LaundryCut() + "%"
+                           + ", objeci " + _laundryMen + " z " + PlayerMen() + " ludzi)" : "nie")   // poprawka po recenzji: objeci oplaconymi praczkami / ludzie druzyny teraz
+                         + " | obrot uslug i narzutu " + _dPaid + " -> kasy miast " + _dToTown + " + lud " + _dToFolk
                          + " + kiesy wsi " + _dToVill + " + danina " + _dToTax + " (w tym korona DS " + _dCrown + ") (roznica " + (_dPaid - _dToTown - _dToFolk - _dToVill - _dToTax) + ") | potkniecia " + _stumbles + ".");
             DayZero();
         }

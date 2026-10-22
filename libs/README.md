@@ -41,6 +41,17 @@ Gdy ich tu nie ma, `Armoury.csproj` bierze je wprost z katalogu modulu SandBox g
 Gdy jej tu nie ma, `Armoury.csproj` bierze ja wprost z katalogu modulu Native gry
 (wlasciwosc `NativeViewLibs`, domyslnie `C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/Native/bin/Win64_Shipping_Client`).
 
+## Z `Modules\ROT-Core\bin\Win64_Shipping_Client\` i `bin\Win64_Shipping_Client\` (Armoury: okna opowiesci i obrazki z plikow, m103-sceny)
+
+    ROT.dll                      <- ROT-Core (Realm of Thrones)
+    TaleWorlds.TwoDimension.dll  <- bin\Win64_Shipping_Client gry
+
+Gdy ich tu nie ma, `Armoury.csproj` bierze je wprost z katalogow gry (wlasciwosci `RotLibs`, domyslnie
+`C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/ROT-Core/bin/Win64_Shipping_Client`, i `TwoDimLibs`,
+domyslnie `C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/bin/Win64_Shipping_Client`). Kopii w libs/
+lepiej nie robic - dysk C zeruje pliki. Armoury dziedziczy po `ROT.Events.EventBase` (okno w wygladzie wydarzen ROT), wiec po aktualizacji
+ROT trzeba przebudowac Armoury i sprawdzic okno (typ ROT uzywany tylko w metodach NoInlining, zapas: zwykle okno gry z tym samym tekstem).
+
 ## Szybciej
 
 Zamiast kopiowac, wskaz katalogi wprost przy budowaniu:

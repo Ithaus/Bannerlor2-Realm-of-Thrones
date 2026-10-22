@@ -197,7 +197,7 @@ namespace Armoury
             _proofLeft--;
             var now = CampaignTime.Now;
             string shown = s.MapClockEnabled ? MapClock.BarText(now) : now.ToString();
-            Log.Info("Data na pasku (kalendarz): godzina " + now.GetHourOfDay + " - '" + shown + "' | dzien roku " + (now.GetDayOfYear + 1)
+            Log.Info("Data na pasku (kalendarz): godzina " + now.GetHourOfDay + " - '" + shown.Replace("\n", " / ") + "' | dzien roku " + (now.GetDayOfYear + 1)
                      + " | stary wzor dawal " + WesterosClimate.OldTextDay(ref now));
         }
     }

@@ -1,5 +1,117 @@
 # DZIENNIK ZMIAN
 
+## n32 + m103-gospodarka3 (kandydat WGRANIA 102) - 21.10.2026
+
+- Scalone: w-toku/m103-gospodarka3 (czesc 3: koszyk wsi ZC4 przy cenach polki z budzetu z biezacego utargu - klucz KsVillageBasketAtShelf; grupa m103wsie) bez konfliktow; gen_mcm Armoury 2273; build 5 modow kod 0; ast sprawdz_logi bez dubli.
+- Obrazki prologu od Jeffa (Midjourney): Armoury/Images/Prolog/prolog_01..03.png (1024x576, tools/obrazki_okien.py, md5 2914002 / 1f47e5e / 52915a7).
+- Status: DO SPRAWDZENIA (test koncowy 102: prolog 230 z KS, prolog z zapisu, bitwa).
+
+## 2026-10-21 (n32 (kandydat WGRANIA 102) = n31 + m104-e5 + m104-wojny (gospodarka cz.3 dojdzie))
+
+**Zmiana:** `w-toku/n32-calosc` = n31 (59a054b7: WGRANIE 101 + m103-drobne + m103-sceny + m103-lektor + m103-gospodarka cz.1-2) + m104-e5 (72fe7c1a; [CHANGELOG galezi](docs/noc-1920/m104-e5-CHANGELOG.md):
+sceny zmieniajace swiat prologu 298 - orszak krola Roberta do Winterfell i z powrotem, Turniej Reki w KP przez GrandTourney CanonApi, straz niewoli Tyriona (Orle Gniazdo 110-132) i Jaimego
+(Riverrun, nowy wiersz #p10 w arm_canon_moves.tsv, #m01 tylko classic), klany gorskie Doliny (Painted Dogs, Burned Men, Milk Snakes, Black Ears), ludzie Gory w Dorzeczu, oddzial Berica;
+7 kluczy Prologue*) + m104-wojny (cf47a43b; [CHANGELOG galezi](docs/noc-1920/m104-wojny-CHANGELOG.md): 6 wojen czysto essoskich na kalendarzu w prologu, Reach i Dorne z korona
+wedlug ksiazki, mlode smoki Daenerys; 4 klucze PrologueEssosWarsCalendar, CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow). Obie galezie z bazy 756e685f (m103-sceny).
+Scalenia: 50d5d94d (m104-e5, bez konfliktow), e3ef4422 (m104-wojny).
+**Konflikty (m104-wojny):** wszystkie to dopiski obu galezi przy pustej bazie (ours + theirs): Prologue.cs ResetCampaign - ResetWorld() (E5), potem ResetWars(); Settings.cs - klucze E5,
+potem PrologueEssosWarsCalendar i grupa "Wars of the books"; sprawdz_logi.py - opisy grup m104e5 i m104wojny w pomocy, dispatch kazdej grupy osobno z return; McmSettings.cs - --ours +
+gen_mcm. Prologue: Pack/Unpack, OnDaily, RegisterEvents (Hourly/BeforeSave/SaveOver/Tournament/MobilePartyDestroyed) zmienia tylko E5; wojny maja wlasne zachowanie CanonWarsBehavior
+(zapis arm_m104, SubModuleMain) i wolanie Prologue.DragonsApply w dobie ArmouryBehavior przed DragonFeed - scalone automatycznie obok lektora (SubModuleMain, ArmouryBehavior).
+**Bledy wykryte przy scaleniu (bez znacznikow konfliktu):** (1) partial class Prologue - obie galezie zdefiniowaly `WTag`, `_wStumbles`, `WStumble` (build CS0102/CS0111): w wojnach
+przemianowane na `CwTag`, `_cwStumbles`, `_cwStumblesDay`, `CwStumble` (Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs i wywolanie InstallEssos w Prologue.cs, 61 miejsc);
+tresc linii logu bez zmian ("Wojny kanonu (m104): ", bledy "CanonWars."). (2) sprawdz_logi.py - stala modulu `M104_TAG` w obu grupach (E5 "Prolog E5 (m104): ", wojny "Wojny kanonu
+(m104): "); ostatnia wygrywala i m104e5 szukalby linii wojen - stala wojen przemianowana na `M104W_TAG` (3 miejsca). Po poprawce ast: 0 dubli nazw na poziomie modulu.
+**Decyzja domyslna (Claude; Jeff moze zmienic):** ludzie Gory BEZ sztandaru, jak w ksiazce i w tekscie sceny 19 ("raiders flying no banners"). Juz zrobione w galezi E5 (R5, 89aefaa9):
+kod nie wola SetCustomBanner wcale (to nie jest jedna stala) - banda nosi sztandar klanu bandyckiego robber_knights, linia logu "nowa banda ... bez sztandaru", opis MCM PrologueMountainRaiders
+"flying no banners". Zmiana na sztandar Lannisterow = dopisanie SetCustomBanner(clan_vlandia_1) w Prologue.World.Raiders.cs. Reszta decyzji jak w galeziach (lista "Decyzje do
+potwierdzenia" w obu CHANGELOG galezi).
+**Kontrola calosci:** wspolne pliki E5/wojny z n31 tylko Settings/McmSettings/sprawdz_logi (+ ArmouryBehavior/SubModuleMain dla wojen - inne miejsca niz lektor). Latki E5
+(EndCaptivityAction.ApplyInternal, RansomOfferCampaignBehavior.DailyTickHero, BKFeastBehavior.HourlyTickPartyImpl, postfiks ShouldConsiderAttacking obok FreeFolkRaids.KinPost) i wojen
+(ROTStorylineWar.Enforced prefiks/finalizer obok CrashScribe Fabula, odczyt StoryStartOf) nie dziela celu; n31 dodal tylko latki EventScreen (obrazki, lektor). Zapis: E5 w arm_prologue
+(pola w*=), wojny w arm_m104. Scena 15 czeka na koniec Turnieju Reki (E5 R4) - lektor rozpoznaje okno po tytule, wiec gra nagranie prolog_15 wtedy, gdy okno sie pokaze. Bandy E5
+(RaidDraw, BandFood) sa na ladzie - BandFoodAtSea z gospodarki ich nie dotyczy; tablica ogloszen moze wystawic list gonczy za bande Ludzi Gory po rabunku (zwykle zachowanie bandy),
+a koniec prologu zostawia bande w zadaniu gracza (IsCurrentlyUsedByAQuest). Skrypt wgrania (repo tools/autotest-2026-10-17/wgraj-v5.ps1) kopiuje 5 DLL (z GrandTourney) i kazdy
+Armoury/ModuleData/arm_*.tsv - arm_canon_moves.tsv (#p10) pojdzie; wojny nie maja nowych plikow danych. Armoury.json Jeffa nie ma zadnego z 11 nowych kluczy (domyslne TAK zadzialaja).
+**Build / testy:** gen_mcm: Armoury 2272 ustawien (n31 2261; +7 E5, +4 wojny), RC 115, GT 44; po scaleniu E5 McmSettings z gen_mcm = wynik automatu. Build 5 modow kod 0 na e3ef4422
+(md5): Armoury d203b2b9, CrashScribe 9dbde0aa, GrandTourney 5ec21b72, RealisticCaptivity e0dec778, ForgeView e39f3163 (CrashScribe/RC/ForgeView bez zmian zrodel wobec n31 - autotest
+moze uzyc CrashScribe-at-n101.dll; inne md5 to hash commitu w wersji DLL). sprawdz_narzedzie: dispatch poza main 0, zle wstawki 0, duble def 0, duble grup 0. Logi syntetyczne:
+m104e5 - dobry 14 progow 0 NIE, zly 4 NIE, klasyczny INFO, zapis sprzed E5 (d160) 0 NIE, klucze NIE 0 NIE; m104wojny - 12 logow jak w galezi (dobre 0 NIE; zle: 2 - 5 NIE, 4 - 3 NIE,
+11 - WK-7, 12 - WK-3 i WK-4); log mieszany (linie E5 + linie wojen) - m104e5 0 NIE, m104wojny 0 NIE (sprawdza rozdzielenie M104_TAG / M104W_TAG). test_m103sceny 14/14 OK.
+Log P2 (Armoury-2026-10-21_10-08-39, sprzed galezi) kod 0: m104e5, m104wojny, m103lektor INFO (brak linii), m103sceny 3 progi 0 NIE (SC-0 INFO - brak linii scen), m101prolog 11/11 TAK, m103p3 13 progow NIE 1
+(M3P-7, jak w n31 - log bez kluczy P3).
+**Ryzyko / co sprawdzic:** autotest prologu wedlug planow obu galezi (>= 210 dob, wczytanie zapisu w srodku): --grupa m104e5, m104wojny, m101prolog, m101postacie, m103sceny,
+m103lektor (--crashscribe); w linii latek prologu "sceny E5: ..." i linia "latka wojen essoskich"; partie scen E5 i wojny Reach/Dorne nie wchodza sobie w droge (wojny dzialaja po starcie
+opowiesci, E5 konczy sie najpozniej w dniu 188). Gospodarka cz.3 dojdzie osobnym scaleniem.
+**Status:** DO SPRAWDZENIA - kandydat WGRANIA 102 (n31 + m104-e5 + m104-wojny); nic nie wgrane, gry nie uruchamialem.
+
+## 2026-10-21 (n31 (kandydat WGRANIA 102) - scalenie m103-drobne, m103-sceny, m103-lektor + m103-gospodarka (czesc 1 i 2))
+
+**Zmiana:** `w-toku/n31-calosc` = WGRANIE 101 (ed9273fa) + m103-drobne (7839c384: rabunek druzyny gracza liczy sie jak praca - RaidCountsAsWork, odziez z rzedu markietanow
+i praczki, zapis tablicy arm_board w formacie nb2, DrillCampOnlyAi domyslnie TAK; [CHANGELOG galezi](docs/noc-1920/m103-drobne-CHANGELOG.md)) + m103-sceny (756e685f: 23 sceny
+prologu 298 jako okna ROT, obrazki z plikow Armoury/Images, obrazki Jeffa w oknach ROT; klucze PrologueScenes, StoryImagesForRotWindows; [CHANGELOG galezi](docs/noc-1920/m103-sceny-CHANGELOG.md))
++ m103-lektor (1907414c: lektor David - okna ROT z nagran, plotki na zywo przez ElevenLabs z pamiecia nagran; 5 kluczy "Narrator ..."; [CHANGELOG galezi](docs/noc-1920/m103-lektor-CHANGELOG.md)).
+Scalenia: 620847f7 (drobne, bez konfliktow), 638c9381 (sceny, bez konfliktow), 4e90665e (lektor).
+**Konflikty (lektor):** SubModuleMain.cs - obie wstawki zostaja: RotWindowPictures.ApplyAll, potem Lektor.Install (rozne latki EventScreen: obrazki prefiks OnActivate / postfiks
+OnDeactivate, lektor postfiks OnActivate / prefiks OnDeactivate); StoryTick (sceny), potem Lektor.AppTick - oba PRZED returnem wiosek (Map Villages = off nie gasi scen ani lektora);
+pola _storyTickFails/_lektorFails i OnGameEnd scen. sprawdz_logi.py - pomoc: L-8 z m103-drobne + opis grupy m103lektor; dispatch m103sceny i m103lektor osobno, kazdy z return.
+McmSettings.cs - --ours + gen_mcm. Blad wykryty przy scaleniu: obie galezie zdefiniowaly stala modulu M103_TAG (sceny "Prolog (m103): ", lektor "Lektor (m103): ") - ostatnia
+wygrywala i m103sceny szukalby linii lektora; stale lektora przemianowane na M103L_* (25 miejsc), teraz zadnych dubli nazw na poziomie modulu (ast).
+**Dane lektora prologu (n31):** 23 nagrania prolog_01..prolog_23.wav (David v2, 24 kHz mono 16 bit, razem 918.6 s; naglowek 44 B, rozmiar = 44 + dane; najdluzszy ciag zer 1014 B
+< blok kontrolny 4096 B) w Armoury/ModuleData/Lektor/EN + 23 wiersze w arm_lektor.tsv (klucz prolog_NN, tytul okna, plik, md5). Tytuly zgodne co do znaku z Title scen
+w PrologueScenes.Data.cs i tools/prolog/prolog298_sceny.json (23/23); okno sceny to EventPopupState ROT z EventScreen, wiec lektor rozpoznaje je po EventTitle jak okna ROT.
+Razem 58 wierszy i 58 plikow, bez dubli tytulow (takze po obcieciu kropek, bez wielkosci liter), format jak wczytuje Lektor.LoadIndex (4 kolumny, md5 32 znaki, CRLF).
+**Rezerwa lektora:** LektorGossipReserveChars 14000 -> 3000 (14000 z recenzji galezi trzymalo znaki na nagranie prologu; prolog nagrany, plan 25724/38031). Settings.cs (wartosc
+i opis), zapas ReserveChars() w Lektor.Live.cs, McmSettings z gen_mcm. Armoury.json Jeffa nie ma kluczy Lektor* (sprawdzone), wiec domyslna zadziala.
+**Skrypty:** wgraj-v5.ps1 uzywany do wgran (repo tools/autotest-2026-10-17) mial blok obrazkow (sceny), ale nie mial bloku nagran lektora (galaz dopisala go do starej kopii
+w katalogu testow) - wgranie 102 nie skopiowaloby nagran. Jedna wersja obu skryptow (obrazki + lektor) w repo glownym (697c4885) i w katalogu testow 6ba92574/test
+(kopie *.bak-n31-przed). Proba: wgraj-v5 -DryRun na udawanym katalogu gry z drzewem n31 - kod 0, 59 wierszy Lektor (58 wav + tsv, md5 z tsv zgodne); parser PowerShell 0 bledow.
+**Build / testy:** gen_mcm: Armoury 2256 ustawien (101: 2243; +6 drobne, +2 sceny, +5 lektor), RC 115, GT 44. Build 5 modow kod 0 na e22ae0fb: Armoury 12e02669, CrashScribe 6b5e413e,
+RealisticCaptivity fef1a9db, GrandTourney d440ffaa, ForgeView 825dec01 (kod CrashScribe/RC/GT/ForgeView bez zmian wobec 101; kazda DLL ma w wersji hash commitu
+drzewa - 1.0.0+<commit> - wiec md5 zmienia sie z kazdym commitem przy tym samym kodzie: porownanie bajtow buildow 638c9381 i e22ae0fb - tylko hash, MVID i znacznik PE). sprawdz_narzedzie: dispatch poza main 0,
+zle wstawki 0, duble def 0, duble grup 0. sprawdz_logi --help kod 0; test_m103sceny 14/14 OK; m103lektor na logu syntetycznym 10/10 TAK (LK-3: 58 = wiersze tsv; z liczba 35 - NIE,
+jak trzeba); m97wioski (WP-7), m99markietani (MK-8, MK-9), m102tablica (L-8, L-8b), m98plotki (KP-1, KP-1b z --crashscribe), m103sceny, m103lektor na logu biegu 10:08
+(p2-prolog-ks, 230 dob) bez wyjatku (nowe wiersze INFO - log sprzed paczek).
+**Ryzyko / co sprawdzic:** w autotescie prologu: sceny z nagraniem (m103sceny + m103lektor --crashscribe: LK-5 start > 0, LK-6/LK-7), obrazki i lektor na tym samym EventScreen;
+w grze lektor gra 23 sceny prologu (ok. 40 s kazda) - Jeff moze zamknac okno wczesniej (stop). Plotki na zywo z rezerwa 3000 zuzywaja zapas planu do 3000 znakow.
+**+ m103-gospodarka (czesc 1 i 2)** (d1e44f8c; [CHANGELOG galezi](docs/noc-1920/m103-gospodarka-CHANGELOG.md)): P0 SideVillageVisit.Today bez NRE przy starcie nowej kampanii;
+P1 narzedzie progow W12-4/W12-6/GL2-8/VR-3 (i napisy logu TownFolk.Live); P6 piraci na morzu (BandFoodAtSea: paser miasta z portem, polow zalogi na brak porcji); P7a stocznia bierze pnie
+tylko ponad zapas rzemiosla (ShipyardWoodAboveCraftStock); P7b dymarka zostawia kuzniom miasta dobe ich zuzycia drewna (BloomeryShelfLeavesForges); P3 (a-f) sufit firm DS z doplywu
+netto (KsFarmSurplusCapNet, DsFarmFixShareCap) z poprawkami po recenzji (wspolczynnik swiata, jeden krok); D4 narzedzie NKS-7e/NKS-7. Scalenie 078276a1 BEZ konfliktow (Settings.cs,
+McmSettings.cs, sprawdz_logi.py scalone automatycznie; reszta plikow zmieniona tylko w gospodarce). McmSettings z gen_mcm = wynik automatu co do bajtu. sprawdz_logi.py: 0 dubli
+definicji na poziomie modulu (ast), sprawdz_narzedzie: dispatch poza main 0, zle wstawki 0, duble def 0, duble grup 0 (m103p3 osobno, z return). R5 z recenzji gospodarki (M103_TAG
+w scenach i lektorze) bylo juz rozwiazane przy scaleniu lektora (M103L_*). Settings.cs: 0 dubli pol.
+**Build / testy (z gospodarka):** gen_mcm: Armoury 2261 ustawien (+5: BandFoodAtSea, ShipyardWoodAboveCraftStock, BloomeryShelfLeavesForges, KsFarmSurplusCapNet, DsFarmFixShareCap;
+zadnego z nich nie ma w Armoury.json Jeffa - domyslne TAK zadzialaja), RC 115, GT 44. Build 5 modow kod 0 na f3091f49 (z poprawka VR nizej; md5): Armoury 8f767507, CrashScribe dc1c3177,
+RealisticCaptivity b67f0235, GrandTourney 5ff06a62, ForgeView 1d6056fe - kopie w katalogu testow 6ba92574/test/n102 (zastapily DLL z 078276a1). Grupy na logu P2 (Armoury-2026-10-21_10-08-39, sprzed
+zmian gospodarki, scen i lektora) kod 0: m103p3 (13 progow, NIE 1 - M3P-7 zaleglosci zamkow 270 tys., log bez kluczy P3), m96bandy (14, NIE 1 - MB-2 0.582, log sprzed P6; MB-13
+INFO "brak"), etap5 (389, NIE 18, DECYZJA 3), m103sceny i m103lektor (INFO - brak linii), m101prolog (11/11 TAK). CrashScribe bez zmian zrodel wobec 101 (git diff ed9273fa..HEAD
+-- CrashScribe pusty) - autotest moze uzyc CrashScribe-at-n101.dll.
+**Poprawka po scaleniu (f3091f49, MapRoadKinds.Audit):** komentarz `//` z recenzji gospodarki (c2117948) stal w srodku wyrazenia i wylaczal
+`.Append(" (na podlodze predkosci gry ").Append(lowFloor).Append(", sr. ")` - linia VR wychodzila jako "ponizej 5% lub na podlodze: 31.00%; sufit kolumny ...", regex
+M103_VALYRIA_LOW nie trafial, wiec VR-3 liczyl srednia razem z probkami z podlogi (poprawka P1 VR-3 nie dzialala w grze). Komentarz nad instrukcja; regex sprawdzony na wzorcu
+nowej linii. Kolizji gospodarki z drobne/sceny/lektor w kodzie brak (wspolne pliki tylko Settings/McmSettings/sprawdz_logi; SideVillageVisit - drobne czyta RaidActive,
+gospodarka zmienila Today0/ProtSync; odziez z rzedu i praczki - towar odziezy i kiesa gracza, gospodarka ich nie rusza).
+**Ryzyko / co sprawdzic (gospodarka):** w autotescie m103p3 (M3P-0 segment P3 w kazdej linii f5, M3P-1 0 podwyzek w rampie, M3P-7 zaleglosci zamkow <= 200 tys.), m96bandy
+(MB-13 odcinek "z morza" w kazdej dobie, MB-2 >= 0.85), linia Stocznie "dziala TAK", linia Zelazo "zostawione kuzniom"; P3 zmienia firmy miast pod KS (P2: 76.6 mln zl/rok bez P3).
+**Status:** DO SPRAWDZENIA - kandydat WGRANIA 102 (z m103-gospodarka czesc 1 i 2); DLL testu 6ba92574/test/n102, CrashScribe-at-n101.dll.
+
+## 2026-10-21 (WGRANIE 101 - prolog 298 (rdzen), postacie kanonu do rodow, tablica ogloszen)
+
+**Zakres (Jeff 21.10):** "Robimy wczesniejszy start"; "Ok wersje lekka robimy" + pakty Diplomacy z krolestwem Roberta; "zrob wydarzenia wedlug ksiazki"; postacie A do rodow ("pamietaj, ze potem
+Tyrion zmieni barwy"), B usunac, C/D do wynajecia, Jeyne Westerling zamiast Talisy; "rob tez 3 postacie"; "i rob 5 i 7" (7 = tablica ogloszen).
+**Zmiana:** `w-toku/n30-calosc` (26c795be) = WGRANIE 100 + m102-tablica (81ef8cc1: "Read the notice board" w menu miasta, karta ogloszenia, Go and see / Talk now / flaga, listy goncze
+kapitana strazy z kasy miasta, listy soltysow; 9 kluczy) + m101-postacie (8cb3e2a6: nowa kampania - 22 postacie kanonu do rodow, 9 nie powstaje, 36 zmian stron wedlug ksiazki w
+Armoury/ModuleData/arm_canon_moves.tsv, ratunek przy niszczeniu rodu przez ROT; klucze CanonCompanionsToClans, CanonCompanionsFollowStory) + m101-prolog (e7602988: wybor startu
+"Prologue 298", kalendarz od Year 298 Day 177, start opowiesci ROT 299 - latki 30/30 metod ROT, pokoj Westeros i pakty Diplomacy do dnia 186, Robert i Ned zyja, dzien 186 smierc
+Roberta - Joffrey, Ned w lochu, NedEvent - Ned stracony, Robb; klucze PrologueEnabled, ProloguePeace, ProloguePacts, PrologueKings) + podpiecie CanonCompanions.PrologDays pod Prologue.
+Sceny prologu (okna wedlug ksiazki, obrazki AI Jeffa) i sceny zmieniajace swiat - NASTEPNE (E4, E5). Armoury 2243 ustawien.
+**Testy (21.10):** 101-prolog 230/230 dob kod 0 (ERROR 0; KONIEC PROLOGU doba 186: Robert martwy, Joffrey krolem, Ned jeniec town_EW4; NedEvent dzien opowiesci 9: Ned martwy, Robb
+wladca Polnocy; m101prolog 11/11, m101postacie 14/14, m102tablica 21/21), 101-bitwa 4/4, 101-nowa 180/180 kod 0 (progi 3199/NIE 120; m102tablica L-8 zapis arm_board 18.5 KB > prog 16 KB -
+SaveText dzieli na kawalki, do odchudzenia). CrashScribe-at-n101 nowy (zb/n22-at + 26c795be).
+**Status:** WGRANE 101 (21.10 08:05, tag 2026-10-21-wgranie101; Armoury 059c6e6f, CrashScribe 384ac06f, RC 37adbf95, GT 14613e7b, ForgeView f9711156; nowy arm_canon_moves.tsv).
+Prolog i postacie dzialaja tylko w NOWEJ kampanii (wybor startu w tworzeniu postaci).
+
 ## 2026-10-21 (WGRANIE 100 - kryjowki bandytow: Zwiad, plotki, miejsca)
 
 **Zakres (Jeff 21.10 ok. 03:00):** "im wiecej masz scouting, tym lepiej widzisz kryjowki bandytow, ale ponizej 10 scoutingu masz szanse 0%, od 11 do 200 rosna do 100% ...

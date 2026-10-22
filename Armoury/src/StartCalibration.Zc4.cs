@@ -119,6 +119,26 @@ namespace Armoury
         }
         private static readonly double[] _p1M = new double[6];              // recenzja runda 3: drabina 1 wedlug rynku [m * 3 + chciane/bez towaru/bez kiesy] (NKS-13b)
         private static readonly double[] _p1Zl = new double[2];
+        // m103 wsie (klucz Ks Village Basket At Shelf): drabina 1 wsi od ostatniej linii wedlug rynku [m] - koszt koszyka zaplaconego z Planu przy cenach polki miasta
+        // targowego, budzet (lam x min(budzet Planu, wplyw netto x 0.95)), budzet Planu, wplyw netto x 0.95 (zakupy z pomiarem), przyciete zl i szt.; zakupow, przycietych,
+        // bez pomiaru wplywu; ziarno i sol ponad budzet (zl, zakupow) - kupione w calosci z oszczednosci
+        private static readonly double[] _shC = new double[2], _shB = new double[2], _shP = new double[2], _shN = new double[2], _shCutZl = new double[2], _shCutPcs = new double[2];
+        private static int _shV, _shCut, _shNoMeas, _shGsN; private static double _shGs;
+        // recenzja W1: przyciete rzeczy (szczebel 2, szt.) i narzedzia drabiny 1 (chciane / kupione / przyciete / bez towaru, szt.) wedlug rynku [m]
+        private static readonly double[] _shCut2 = new double[2], _shTw = new double[2], _shTg = new double[2], _shTc = new double[2], _shTm = new double[2];
+        /// <summary>m103 wsie (TownFolk.ShelfBudget): jeden zakup drabiny 1 - koszt przy cenach polki, budzet, budzet Planu, wplyw netto x 0.95 (-1 - bez pomiaru), przyciete zl
+        /// i szt., ziarno i sol ponad budzet (zl); recenzja W1: przyciete rzeczy (szczebel 2, szt.), narzedzia chciane / kupione / przyciete / bez towaru (szt.).</summary>
+        internal static void Zc4NoteShelf(Settlement mk, double cost, double bud, double plan, double net, double cutZl, double cutPcs, double gsOver,
+                                          double cut2, double toolsW, double toolsG, double toolsC, double toolsM)
+        {
+            int m = mk != null && mk.Town != null ? TownMarket(mk.Town) : MarketOfSettlement(mk);
+            if (m < 0 || m > 1) m = 0;
+            _shC[m] += cost; _shB[m] += bud; _shP[m] += plan; _shCutZl[m] += cutZl; _shCutPcs[m] += cutPcs; _shV++;
+            _shCut2[m] += cut2; _shTw[m] += toolsW; _shTg[m] += toolsG; _shTc[m] += toolsC; _shTm[m] += toolsM;
+            if (net >= 0) _shN[m] += net; else _shNoMeas++;
+            if (cutZl >= 0.5) _shCut++;
+            if (gsOver >= 0.5) { _shGs += gsOver; _shGsN++; }
+        }
         /// <summary>Recenzja runda 3: zl wydane przez wies w drabinie 1 (koszyk zaplacony z Planu) - linia ZC4, NKS-13.</summary>
         internal static void Zc4NotePass1Zl(Settlement mk, double zl) { if (zl <= 0) return; int m = MarketOfSettlement(mk); if (m == 0 || m == 1) _p1Zl[m] += zl; }
         private static Town _zcDictTown;                                     // miasto, ktorego slownik budzetu dnia jest juz w zlocie (BK CalculateBudget - bez zmian)
@@ -144,6 +164,8 @@ namespace Armoury
             _zDictN = _zLadderN = _zBrewN = _zBreadN = 0; _zBrewPcs = _zBreadPcs = _zDictOld = _zDictNew = 0;
             _zvGold = _zvPcs = _zvBrew = 0; _zvN = _zvNoGold = _zvNoGoods = 0; _zvWant = _zvGot = 0; _zvElse = 0;
             Array.Clear(_zvRung, 0, 3); Array.Clear(_zvRungWant, 0, 3);
+            for (int m = 0; m < 2; m++) { _shC[m] = _shB[m] = _shP[m] = _shN[m] = _shCutZl[m] = _shCutPcs[m] = 0; _shCut2[m] = _shTw[m] = _shTg[m] = _shTc[m] = _shTm[m] = 0; }   // m103 wsie
+            _shV = _shCut = _shNoMeas = _shGsN = 0; _shGs = 0;
             System.Threading.Interlocked.Exchange(ref _zTkDemand, 0); _zTkDict = _zTkVill = _zTkLadder = 0; _zDemandN = 0; _zFoodBud = _zLadCut = 0; _zvUnGold = 0;
             for (int m = 0; m < 2; m++) { _zvKcalW[m] = _zvKcalG[m] = _zvZlW[m] = _zvZlP[m] = _zvZlG[m] = 0; }
             _zTkBuild = 0;
@@ -987,6 +1009,23 @@ namespace Armoury
             sb.Append(" | kiesy wsi zastosowanych razem ").Append(AppliedVillagePurses()).Append(" zl")
               .Append(", czesc zaplacona koszyka miast ").Append(tpn > 0 ? (tpf / tpn).ToString("0.000", Inv) : "1 (bez Planu)").Append(" (").Append(tpn).Append(" miast)")
               .Append(", zakupy wsi w miescie obok (brak na polce targu) ").Append(F0(_zvElse)).Append(" szt.");
+            // m103 wsie (klucz Ks Village Basket At Shelf): drabina 1 przy cenach polki wobec budzetu z biezacego wplywu (bez klucza albo bez zakupow drabiny 1 - bez segmentu)
+            if (SwBasketAtShelf && _shV > 0)
+            {
+                string kr = (1.0 - VilReserve).ToString("0.00", Inv);
+                sb.Append(" | m103 wsie - drabina 1 przy cenach polki z budzetu z wplywu (Ks Village Basket At Shelf TAK)");
+                for (int m = 0; m < 2; m++)
+                    sb.Append(m == 0 ? ": Westeros" : "; Essos").Append(" koszt koszyka zaplaconego z Planu przy cenach polki ").Append(F0(_shC[m])).Append(" / budzet ").Append(F0(_shB[m]))
+                      .Append(" zl (budzet Planu ").Append(F0(_shP[m])).Append(", wplyw netto x ").Append(kr).Append(' ').Append(F0(_shN[m])).Append("), przyciete ").Append(F0(_shCutPcs[m]))
+                      .Append(" szt. (").Append(F0(_shCutZl[m])).Append(" zl)");
+                sb.Append("; zakupow ").Append(_shV).Append(", przycietych ").Append(_shCut).Append(", bez pomiaru wplywu ").Append(_shNoMeas)
+                  .Append("; ziarno i sol ponad budzet ").Append(F0(_shGs)).Append(" zl w ").Append(_shGsN).Append(" zakupach");
+                // recenzja W1: budzet tnie koniec drabiny (rzeczy po jedzeniu) - przyciete rzeczy osobno i narzedzia drabiny 1 (M3W-10b)
+                sb.Append("; przyciete rzeczy (szczebel 2: przedza, len, filc, skora, narzedzia, garnki, tran, futra) Westeros ").Append(F0(_shCut2[0])).Append(" szt., Essos ")
+                  .Append(F0(_shCut2[1])).Append(" szt.; narzedzia drabiny 1 (chciane/kupione/przyciete/bez towaru szt.) Westeros ").Append(F0(_shTw[0])).Append('/').Append(F0(_shTg[0]))
+                  .Append('/').Append(F0(_shTc[0])).Append('/').Append(F0(_shTm[0])).Append(", Essos ").Append(F0(_shTw[1])).Append('/').Append(F0(_shTg[1])).Append('/')
+                  .Append(F0(_shTc[1])).Append('/').Append(F0(_shTm[1]));
+            }
             // wsad przetworow i 1:1 w popycie ceny (sztuki/d przy lambdzie, wszystkie miasta)
             var der = new double[ZN]; var one = new double[ZN]; var dl = new double[3];
             foreach (var zt in map.Values) { for (int z = 0; z < ZN; z++) { der[z] += zt.Der[z] * zt.Lam; one[z] += zt.One[z] * zt.Lam; } for (int k = 0; k < 3; k++) dl[k] += zt.DerLive[k] * zt.Lam; }

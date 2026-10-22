@@ -69,6 +69,12 @@ namespace Armoury
         // liczniki doby gracza do linii switu (godziny marszu w godzinach obozu, obozy automatyczne, sny przerwane poza menu) i tresc komunikatow switu
         private static long _promptNight = -1, _warnNight = -1, _campMsgNight = -1, _raidNight = -1;   // _raidNight: n26 styk - linia logu godziny obozu w rabunku wioski raz na noc
         private static int _marchHoursDay, _autoCampDay, _sleepCutDay;
+        // m103-drobne (RaidCountsAsWork): chwila ostatniej klatki/godziny z rabunkiem druzyny gracza (jak CampDrill._lastDrillAt - bez zapisu), godziny rabunku doby
+        // bez odpoczynku (do linii switu) i dzien ksiegi ostatniej linii "godzina rabunku = praca" (raz na dobe od switu)
+        private static double _lastRaidAt = -1e9;
+        private static int _raidWorkHoursDay;
+        private static long _raidWorkLogDay = long.MinValue;
+        private static bool _lastRaidSide;   // ostatnia klatka z rabunkiem: wioska poboczna (true) czy wies gry - tylko do linii logu
         private static string _lastDawnMsg;
         // noc 15/16.10 (PlayerSleepGuard, poprawka recenzji 1): splata dlugu CALYM snem w menu - cel snu (NeededHours) i dlug w chwili polozenia sie
         // (SleepInit; -1 = nie bylo SleepInit w tej sesji - wtedy bez splaty paskiem) oraz liczba switow w tym snie (do linii pobudki). Tylko pamiec.
@@ -82,6 +88,35 @@ namespace Armoury
         internal static bool SleepingNow { get { return _sleeping; } }
         /// <summary>KA: sluzba ROT gracza (o snie decyduje lord) - karczma niedostepna.</summary>
         internal static bool EnlistedNow { get { return RotEnlisted(); } }
+
+        /// <summary>m103-drobne: druzyna gracza rabuje TERAZ - wioska poboczna (SideVillageVisit.RaidActive, menu oczekiwania arm_sidevil_raid bez MapEvent) albo wies gry
+        /// (zdarzenie rabunku gry, gracz po stronie napastnika: sam, jako wodz armii albo doczepiony - doczepiona partia dostaje strone zdarzenia wodza, MobileParty.AttachedTo).
+        /// Sam odczyt, bez alokacji (wolane co klatke z OnTickCore).</summary>
+        internal static bool PlayerRaidingNow(out bool side)
+        {
+            side = SideVillageVisit.RaidActive;
+            if (side) return true;
+            var mp = MobileParty.MainParty;
+            var me = mp != null ? mp.MapEvent : null;
+            return me != null && me.IsRaid && mp.MapEventSide != null && mp.MapEventSide == me.AttackerSide;
+        }
+
+        /// <summary>m103-drobne (klucz RaidCountsAsWork): w ostatniej godzinie gry druzyna gracza rabowala (klatka OnTickCore albo tick godzinowy) - ta godzina to
+        /// praca, nie odpoczynek (jak CampDrill.DrilledLastHour). Czyta ksiega snu gracza (OnHourly) i dzien odpoczynku armii gracza (ArmyRestDay).</summary>
+        internal static bool RaidedLastHour
+        {
+            get { var s = Settings.Current; return s != null && s.RaidCountsAsWork && CampaignTime.Now.ToHours - _lastRaidAt < 0.999; }
+        }
+
+        /// <summary>m103-drobne (klucz RaidCountsAsWork): godzina, ktora wlasnie minela, byla godzina rabunku druzyny gracza (stan teraz albo klatka z rabunkiem
+        /// w ostatniej godzinie). Dla dnia odpoczynku armii gracza (ArmyRestDay - rabunek wsi gry jest tam juz zajeciem przez MapEvent, wioska poboczna nie).</summary>
+        internal static bool RaidWorkHour()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.RaidCountsAsWork) return false;
+            bool side;
+            return PlayerRaidingNow(out side) || RaidedLastHour;
+        }
 
         /// <summary>KA: nocleg oplacony w karczmie (TownInns.Commit, opcja zwyklego menu - SwitchToMenu wolno) - ten sam sen w menu co w obozie.</summary>
         internal static void BeginInnSleep()
@@ -205,13 +240,32 @@ namespace Armoury
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
                 // m97-szkolenie (recenzja 4): godzina cwiczen z menu obozu ("Train the men") to praca, nie odpoczynek - jak w staminie (menu cwiczen poza InCampMenu)
                 bool drilled = CampDrill.DrilledLastHour;
-                if (resting && !forced && !drilled) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
-                InnDrink.RestHour(resting && !forced && !drilled ? (night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) : 0f, _sleeping);   // m98-plotki: odsypianie kufli tym samym odpoczynkiem (wlasny try)
+                bool enl = RotEnlisted();   // sluzba ROT raz na tick (odbicie) - dla nowych warunkow nocy gracza (m103-drobne: wyzej, czyta go tez rabunek)
+                // m103-drobne (RaidCountsAsWork, Jeff - rabunek jako praca): godzina rabunku druzyny gracza (wioska poboczna albo wies gry po stronie napastnika) to praca
+                // jak cwiczenia - bez odpoczynku tej godziny w ksiedze i w odsypianiu kufli; w sluzbie ROT o snie decyduje lord (resting jak dotad). Stan teraz albo
+                // klatka z rabunkiem w ostatniej godzinie (OnTickCore - rabunek skonczony w srodku godziny)
+                bool sideRaid = false;
+                bool raided = false;
+                if (s.RaidCountsAsWork && !enl) { raided = PlayerRaidingNow(out sideRaid); if (!raided && RaidedLastHour) { raided = true; sideRaid = _lastRaidSide; } }
+                bool work = drilled || raided;
+                if (raided && resting && !forced && !drilled)
+                {
+                    _raidWorkHoursDay++;
+                    long dayK = (long)Math.Floor((CampaignTime.Now.ToHours - PlayerDawn) / 24.0);   // doba od switu gracza (jak CampDrill.DawnIdx) - linia raz na dobe
+                    if (dayK != _raidWorkLogDay)
+                    {
+                        _raidWorkLogDay = dayK;
+                        Log.Info("Nocleg: gracz - godzina " + h + ":00 rabunku (" + (sideRaid ? "wioska poboczna" : "wies gry, gracz po stronie napastnika") + ") liczona jak praca - bez odpoczynku "
+                                 + F1(night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) + " h (Raid Counts As Work); odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt
+                                 + " - kolejne godziny rabunku tej doby w linii switu.");
+                    }
+                }
+                if (resting && !forced && !work) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                InnDrink.RestHour(resting && !forced && !work ? (night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) : 0f, _sleeping);   // m98-plotki: odsypianie kufli tym samym odpoczynkiem (wlasny try)
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);
                 bool captive = TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive;
-                bool enl = RotEnlisted();   // sluzba ROT raz na tick (odbicie) - dla nowych warunkow nocy gracza
                 // n26 styk (recenzja 97): rabunek wioski pobocznej (m97-wioski, menu oczekiwania bez MapEvent) to zajecie jak rabunek gry - bez namiotu, pytania,
                 // obozu z rozkazu i ostrzezenia marszu; noc NIE odhaczona (pytanie padnie w pierwszej godzinie obozu z ruchem po rabunku)
                 bool raidNow = SideVillageVisit.RaidActive;
@@ -338,7 +392,7 @@ namespace Armoury
                     ForcedMarch.Dawn(s, restBefore, sleepingNow);   // R3-08c recenzja: zanik zmeczenia z odpoczynkiem doby PO godzinie 5-6, przed zerowaniem doby
                     SettleNight(s);
                     LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts);
-                    _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0;
+                    _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _raidWorkHoursDay = 0;
                 }
                 // T10: AiNightCamp i AiBanditRest przeniesione do AiHourly (przed wyjscia gracza)
             }
@@ -459,6 +513,7 @@ namespace Armoury
                 _menuNeeded = -1f; _menuDebt0 = 0; _menuDawns = 0;
                 _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;
                 _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
+                _lastRaidAt = -1e9; _raidWorkHoursDay = 0; _raidWorkLogDay = long.MinValue;   // m103-drobne: rabunek gracza z poprzedniej kampanii nie jest praca tej godziny
                 // PlayerSleepGuard: flaga snu z poprzedniej kampanii / sprzed wczytania nie przechodzi (dotad zawieszony sen przezywal wczytanie zapisu
                 // z mapy); wczytanie zapisu z menu snu ustawia ja od nowa w SleepInit (menu wstaje po konstruktorze)
                 var sg = Settings.Current;
@@ -1981,6 +2036,8 @@ namespace Armoury
                 if (Campaign.Current != null) MasterSwitch(s);   // T10 poprawka recenzji: NightRestEnabled wylaczony w trakcie gry
                 // grupa11-p: ksiega snu AI z zapisu od pierwszej klatki po wczytaniu (kary AI od reki, jak dlug gracza) - raz, potem _aiPending == null
                 if (Campaign.Current != null) AiImportNow(s);
+                // m103-drobne (RaidCountsAsWork): klatka z rabunkiem druzyny gracza - chwila do ksiegi snu (rabunek skonczony w srodku godziny i tak czyni ja godzina pracy)
+                if (s.RaidCountsAsWork && Campaign.Current != null) { bool sideR; if (PlayerRaidingNow(out sideR)) { _lastRaidAt = CampaignTime.Now.ToHours; _lastRaidSide = sideR; } }
 
                 // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,
                 // wizerunek schodzi od reki (tick godzinowy bywal o godzine za pozno)

@@ -23,6 +23,9 @@ namespace CrashScribe
         private static bool _started;
         private static bool _dumpedThisStall;
         private static int _dumps;
+        // m105-drobne (8a): gra sie zamyka (OnSubModuleUnloaded / ProcessExit) - watek glowny przestaje bic na dobre, wiec straznik konczy czuwanie bez raportu.
+        // Test 102: hang-2026-10-21_15-35-43.log "main thread silent 61 s, no managed frames, outside a campaign" 62 s po "WYJSCIE: QuitGame" (falszywe zawieszenie).
+        private static volatile bool _closing;
 
         internal static void Init(Thread mainThread)
         {
@@ -44,6 +47,28 @@ namespace CrashScribe
             Scribe.Line("Straznik zawieszen czuwa (prog " + StallSeconds + " s).");
         }
 
+        /// <summary>m105-drobne (8a): gra sie zamyka - Module.FinalizeModule wola OnSubModuleUnloaded PO Game.OnFinalize i zapisie BannerlordConfig (zawieszenie
+        /// w konczeniu kampanii albo w zapisie nadal daje raport), potem silnik sprzata bez ticku aplikacji. Od tej chwili straznik nie robi Suspend i nie pisze
+        /// hang-*.log. Wolane z OnSubModuleUnloaded i ProcessExit (pierwsze wygrywa). Nie rzuca.</summary>
+        internal static void Closing(string why)
+        {
+            if (_closing) return;
+            _closing = true;
+            if (!_started) return;
+            try { Scribe.Line("Straznik zawieszen: gra sie zamyka (" + why + ") - koniec czuwania, bez raportu zawieszenia (przy wyjsciu watek glowny przestaje bic, ostatnie bicie " + QuietNow() + " s temu)."); }
+            catch { }
+        }
+
+        private static string QuietNow()
+        {
+            try
+            {
+                long last = Interlocked.Read(ref _lastBeat);
+                return ((int)(DateTime.UtcNow - new DateTime(last, DateTimeKind.Utc)).TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch { return "?"; }
+        }
+
         private static void Loop()
         {
             while (true)
@@ -51,12 +76,13 @@ namespace CrashScribe
                 try
                 {
                     Thread.Sleep(2000);
+                    if (_closing) return;   // m105-drobne (8a): gra sie zamyka - koniec czuwania
                     long last = Interlocked.Read(ref _lastBeat);
                     double quiet = (DateTime.UtcNow - new DateTime(last, DateTimeKind.Utc)).TotalSeconds;
 
                     int need = InMission() ? StallSeconds : QuietStallSeconds;
                     if (quiet < need) { _dumpedThisStall = false; continue; }
-                    if (_dumpedThisStall || _dumps >= MaxDumps) continue;
+                    if (_dumpedThisStall || _dumps >= MaxDumps || _closing) continue;
                     _dumpedThisStall = true;
                     _dumps++;
                     Dump(quiet);

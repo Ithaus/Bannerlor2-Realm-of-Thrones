@@ -1,0 +1,301 @@
+# m104-e5 - E5: sceny zmieniajace swiat w prologu 298 (orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric)
+
+Galaz `w-toku/m104-e5` (baza 756e685f = m103-sceny: prolog 298 + okna scen + obrazki; WGRANIE 101 + m103-sceny). Projekt: PROJEKT-PROLOG-298-2026-10-21.md
+pkt 2 (rodzaj "S") i pkt 4 (E5). Jeff 21.10: "Kod scen zmieniajacych swiat i wojen wedlug ksiazki - rob to teraz". Rozpoznanie: wlasne (dekompilacja 1.4.8, ROT 8.1.8,
+BK, GrandTourney/RC/Armoury) + rownolegle e5:A / e5:B (journal wf_d4f0c951-09f).
+Tylko kampania z prologiem, kazda scena pod swoim kluczem MCM, koniec najpozniej przy koncu prologu (dzien 186-188); kampania klasyczna bez zmian.
+
+## Stan pracy (aktualizowany po kazdym kroku)
+
+| Krok | Co | Stan |
+|---|---|---|
+| K1 | straz niewoli (pkt 3 i 4): CanonCompanions.HeldRow / Freeing, tabela #m01 classic + #p10 Riverrun, latki EndCaptivityAction.ApplyInternal i RansomOfferCampaignBehavior.DailyTickHero, klucze PrologueTyrionHeld / PrologueJaimeAtRiverrun + 5 kluczy scen | ZROBIONE (ff9d85e7, build 0, gen_mcm) |
+| K2 | orszak krola (pkt 1): rejestr partii sceny (flaga bez nowych decyzji poza zapisem, rozkazy przez wejscie metody, ukrycie przed AI), trasa KP-gospoda-Blizniaki-Winterfell-...-KP, eskorta Jaime/Tyrion/Ned, dosiadajacy w druzynie krola, dzieci przy przyjezdzie, Tyrion na Mur i do gospody; uczta BK pomija partie sceny; GT CanonApi.SkipSummon | ZROBIONE (9e4b8151, build Armoury + GT 0) |
+| K3 | Turniej Reki (pkt 2): uczestnicy kanonu do KP od d117, obwieszczenie GT d121 (CanonApi.ProclaimRoyal: Grand bez reguly osmiu i bez spadku do lokalnego, kanon w drabince najpierw), rozstrzygniecie gry d127, linie | ZROBIONE (b0ee6e05, build Armoury + GT 0) |
+| K4 | klany gorskie Doliny (pkt 5): od d118 do 4 band klanu hilltribesmen (Stone Crows, Burned Men, Milk Snakes, Black Ears) przy wsiach Gorskiego Traktu, ludzie z puli okregu (RaidDraw), uzupelnienie co 3 dni do d186, po prologu zwykle bandy | ZROBIONE (f3025c82, build 0) |
+| K5 | ludzie Gory (pkt 6): od d155 dwie bandy robber_knights 'The Mountain's Men' pod sztandarem Lannisterow z ludzi okregu wsi Clegane najblizszej Riverrun (Harrenhal), rabunek wsi Dorzecza po kolei (mechanika gry), na koniec prologu do domow (FreeFolkRaids.Home) | ZROBIONE (3705aa87, build 0) |
+| K6 | oddzial Berica (pkt 7): od d160 Beric (brotherhood) albo glowa rodu Dondarrion scigaja najblizsza bande Ludzi Gory (SetMoveEngageParty, ukrycie przed AI) do ich konca / d188 | ZROBIONE (53635f6b, build 0) |
+| P1 | przeglad wlasny: eskorta wjezdza do osady postoju krola, orszak/Ned/Tyrion koncza sie najpozniej d186, Ogar do KP po obwieszczeniu, turniej kanonu GT odwoluje tylko oblezenie/bunt, Ludzie Gory bez klucza po prologu bez sledzenia | ZROBIONE (b2815531, build Armoury + GT 0) |
+| K7 | grupa progow `--grupa m104e5` (E5-0..E5-11) + test na 3 logach syntetycznych | ZROBIONE (1ac12e1f; dobry 0 NIE, zly 4 NIE, klasyczny INFO) |
+| R1-R7 | poprawki po recenzji (11 uwag - wszystkie prawdziwe): straz w lochu z wiersza i do osi Fabuli, CanonApi zerowany, licznik kanonu w drabince, AI uczty BK, scena 15 po turnieju, Ludzie Gory bez sztandaru i "swoi nie bija swoich", Painted Dogs, progi INFO dla scen wylaczonych / pominietych | ZROBIONE (81d7540a..575d6ec7, build 5 modow 0, gen_mcm) |
+| AT | autotest: nowa kampania z flaga prologu (armoury-prolog.flag) >= 210 dob + wczytanie zapisu w srodku (np. d60 i d150) | DO ZROBIENIA (nie uruchamialem gry - zakaz zadania) |
+
+## K1 - straz niewoli: Tyrion w Orlim Gniezdzie (110-132), Jaime w Riverrun
+
+**Problem.** Tabela kanonu (m101-postacie) wsadza Tyriona do lochu Orlego Gniazda w dniu 110 (#p01) i uwalnia w 132 (#p02), a Jaimego (#m01) do Winterfell po wybuchu
+wojny Polnocy. Jeff: Jaime ma siedziec w Riverrun (jak w ksiazce) i obaj nie moga uciec ani byc wykupieni do uwolnienia z tabeli. Bez strazy gra wypuszcza ich sama.
+
+**Przyczyna (dekompilacja 1.4.8).** RealisticCaptivity dotyka tylko niewoli gracza (wszystkie latki RC na EndCaptivityAction maja warunek MainHero). Jeniec AI w lochu
+wychodzi przez: (a) ucieczke 4%/dobe (PrisonerReleaseCampaignBehavior.DailyHeroTick; 22 dni = ok. 59% szans), (b) zwolnienie przy pokoju i zmianie krolestwa rodu
+(ReleasePrisonersInternal - zwalnia kazdego bohatera, ktorego krolestwo NIE walczy z wlascicielem lochu: Tyrion i Dolina sa w pakcie, Jaime i Dorzecze moga nie byc
+w wojnie), (c) okup AI-AI (RansomOfferCampaignBehavior.DailyTickHero -> ConsiderRansomPrisoner, u nas prefiks Ransom178 - zloto plynie PRZED ApplyByRansom),
+(d) wypuszczenie przez porywacza i wykup (SellPrisonersAction).
+
+**Zmiana.**
+- `CanonCompanions`: mapa jencow trzymanych (`HeldRow`, `HeldDay`) - ostatni wykonany wiersz postaci to "prisoner", a pozniejszy "free" jeszcze nie zapadl; liczona
+  w dobie po Moves i przy starcie sesji; `Freeing` - na czas naszej akcji "free" (straz przepuszcza); `TemplateHero` - postac z wzoru dla scen.
+- `arm_canon_moves.tsv`: #m01 (Winterfell) tylko `classic`; nowy #p10 (ten sam wyzwalacz `war:battania:vlandia+5`) `prisoner:town_V2` (Riverrun) tylko `prolog`;
+  dalej #m02 (uwolnienie po Czarnym Nurcie) bez zmian. Kampania klasyczna - bez zmian (decyzja do potwierdzenia: czy Riverrun takze w klasycznej).
+- `Prologue.World.cs` (nowy, partial Prologue): prefiks `EndCaptivityAction.ApplyInternal` - jeniec trzymany przez scene (kampania z prologiem, klucz, czas,
+  loch OSADY) nie wychodzi przez ucieczke, pokoj, okup, wypuszczenie, wykup; smierc i "po bitwie" (upadek osady, zmiana pana) oraz gracz jako sprawca (rozbicie lochu,
+  okup gracza - zaplacil, wiec wychodzi) przechodza; prefiks `RansomOfferCampaignBehavior.DailyTickHero` - okup AI-AI nie zaczyna sie wcale (zloto nie plynie).
+  Czas: Tyrion najpozniej do dnia prologu 140 (zapas po #p02), Jaime najwyzej 364 dni od #p10 (R1: zmienione - do dnia opowiesci 177 x FabulaTimeScale + 150). Bez klucza CanonCompanionsFollowStory straz nie dziala (wiersz "free"
+  nie przyjdzie).
+- Latki wpinane w `InstallRest` (pierwsza kampania z prologiem w procesie) - klasyczny start: brak latek.
+- Klucze MCM (grupa "Prologue 298 (new campaign)"): PrologueRoyalProgress, PrologueHandTourney, PrologueTyrionHeld, PrologueJaimeAtRiverrun, PrologueHillClans,
+  PrologueMountainRaiders, PrologueBericHunt (wszystkie TAK; MCM Jeffa ich nie ma - domyslne).
+- Linie: `Prolog E5 (m104): start sesji | ...`, `... dzien N | Tyrion: ... | Jaime: ... | straz niewoli: zablokowane dzis ...`, `... straz niewoli: ZABLOKOWANE - <kto>
+  (#p01, jeniec town_EN1) - ucieczka ...` (raz na dobe na rodzaj), `... PRZEPUSZCZONE - ...`.
+
+**Ryzyko / co sprawdzic.** Prefiks na prywatnej, duzej metodzie gry (bez wklejania JIT); nikt inny jej nie latka (RC lata publiczne ApplyByEscape/ApplyByRansom tylko
+dla gracza - postfiksy). Pokoj: ReleasePrisonersInternal zostawia jenca w lochu (bez rozjazdu stanu). Okup gracza (barter) przechodzi - celowo (inaczej gracz zaplacilby
+za nic); decyzja Jeffa, czy zablokowac takze barter. #p10 wymaga wolnego Jaimego w chwili wyzwalacza (jak #m01).
+
+**Status.** DO SPRAWDZENIA (autotest z prologiem: dni 110-132 bez ucieczki Tyriona; Jaime w town_V2 po wojnie Polnocy).
+
+## K2 - orszak krola Roberta (pkt 1), Ned, Tyrion na Mur
+
+**Problem.** Projekt pkt 2: dzien 0 krol rusza Krolewskim Traktem do Winterfell z dworem (Cersei z dziecmi, Jaime, Tyrion, Ogar), dzien 35 Winterfell, 55 powrot z
+Nedem, Sansa i Arya, ok. 95 Krolewska Przystan; dzien 55 Tyrion na Mur, ok. 100 przez rozstaje. Dotad nic sie nie ruszalo - tylko okna scen.
+
+**Zmiana (Prologue.World.cs - wspolne, Prologue.World.Progress.cs - scena).**
+- Rejestr partii sceny (`Control` / `Uncontrol`, bez zapisu - sceny odbudowuja go co godzine): flaga gry `DoNotMakeNewDecisions` (mysl gry, ROT AIThinkPatch i wezwania
+  do armii ja pomijaja - rozpoznanie e5:A), rozkaz przez wejscie metody (`MethodInfo.Invoke` - bramka snu Armoury SleepGate i straznik drog BK dzialaja jak przy kazdym
+  rozkazie), ukrycie przed AI `IgnoreForHours(2)` odnawiane co godzine (AI nie wybiera partii za cel i nie zaczyna spotkania; gracz moze). Partia spiaca (NightRest) -
+  rozkaz nie ruszany do switu. Partia w armii - wychodzi (wodz - armia rozwiazana). Zapis gry: flaga zdejmowana w OnBeforeSave i wracajaca w OnSaveOver (wzor
+  FreeFolkRaids - po cofnieciu DLL nikt nie stoi zamrozony). Partia nieodswiezona w przebiegu scen (klucz wylaczony, koniec sceny) - od razu wraca do zwyklego AI.
+- Orszak: krol swoja druzyna lorda; trasa z postojami tylko w miastach i wsiach (gra kupuje tam jedzenie co godzine - PartiesBuyFoodCampaignBehavior.HourlyTickParty):
+  KP (d0) -> gospoda na rozstajach (od d1) -> Blizniaki (od d10) -> Winterfell (od d28) ... d55 -> Blizniaki -> gospoda (od d70) -> KP (od d88) = koniec. Odcinek bez
+  dojazdu 15 dni po terminie nastepnego - dalej (linia SPOZNIONY). Eskorta swoimi druzynami: Jaime, Tyrion (do d55), Ned (od wyjazdu z Winterfell), krolowa i Joffrey,
+  gdy maja druzyny. W druzynie krola (TeleportHeroAction do partii; ten sam rod): dorosli z rodu krola bez druzyny - Cersei, Joffrey, Ogar (namiestnik osady zostaje).
+  Dzieci (Myrcella, Tommen) do Winterfell przy przyjezdzie i do KP na koniec; Sansa i Arya do KP na koniec (tylko czynni, wolni, bez druzyny i bez urzedu).
+  Na koniec: dosiadajacy wysiadaja w KP, wszyscy wracaja do swojego AI. Krol jencem / bez druzyny - orszak przerwany (linia).
+- Ned (d50): druzyna do Winterfell, od wyjazdu orszaku eskorta do KP; bez druzyny - na koniec orszaku do KP (TeleportHeroAction, gdy wolny i nie namiestnik).
+- Tyrion (d55): na Mur (Czarny Zamek town_B5), postoj do d96, gospoda na rozstajach do d109 (potem wolne AI; #p01 w dniu 110 bierze go stamtad).
+- Uczta BK (prefiks `BKFeastBehavior.HourlyTickPartyImpl`): partia sceny nie jedzie na uczte (rozpoznanie e5:A: co godzine DisableAi + rozkaz do miasta uczty).
+- GrandTourney `CanonApi.SkipSummon` (Armoury podaje odbiciem `Prologue.Scripted`): herold nie wzywa partii sceny; bez Armoury / kampania klasyczna - null, jak dotad.
+- Zapis sprzed E5 wczytany w polowie prologu: orszak, Ned i Tyrion, ktorych czas minal, pominiete (bez nadrabiania).
+- Linie: `orszak RUSZA`, `orszak: odcinek k/7 -> <osada> (...)`, `orszak w WINTERFELL (dzien ...)`, `orszak w KROLEWSKIEJ PRZYSTANI - KONIEC (dzien ...)`,
+  `Ned: ...`, `Tyrion: ...`; w linii doby `orszak: odcinek ... krol <pozycja>, eskorta: ..., w druzynie krola: ...`.
+
+**Ryzyko / co sprawdzic.** (1) Czy druzyna krola istnieje w dniu 0 (gra daje ja glowie rodu przy nowej grze - wynik +1000 w GetHeroPartyCommandScore); bez druzyny do d3 -
+orszak pominiety. (2) Eskorta SetMoveEscortParty przy zamrozonej AI - czy jedzie za krolem i wchodzi z nim do osad (sprawdzic w autotescie odleglosci w linii doby).
+(3) BK gentry (BKGentryBehavior.OnPartyDailyTick: DisableForHours(72) + rozkaz do majatku) - nie latane (rody orszaku nie sa szlachta BK; rozpoznanie: GentryNoParties);
+jesli w logu eskorta "stoi" - dopisac te sama latke. (4) Postoj 22 dni w Winterfell - jedzenie kupowane co godzine przez gre (miasto); w zamkach postojow nie ma.
+(5) Gracz zaatakuje orszak - wojna z korona przez wrogosc gracza jak zawsze; trasa idzie dalej.
+
+**Status.** DO SPRAWDZENIA (autotest z prologiem 230 dob: linie orszaku, Winterfell przed d40, KP przed d100).
+
+## K3 - Turniej Reki (pkt 2)
+
+**Problem.** Projekt pkt 2: dzien 125 - turniej w Krolewskiej Przystani (Gora, Rycerz Kwiatow, Ogar), gracz moze startowac. GrandTourney sam turnieju nie zaklada
+w zadanym miescie i dniu; przy wojnie krolestwa (gdziekolwiek) robi z niego turniej LOKALNY bez wezwan, przy mniej niz 8 lordach - lokalny; w KP bywa 18-29 lordow,
+a drabinka ma 15 miejsc dla lordow (e5:A: "lordow w miescie 28, w drabince bylo 15, dolozono 0") - uczestnicy kanonu mogli nie wejsc.
+
+**Zmiana.**
+- GrandTourney `CanonApi.ProclaimRoyal(miasto, uczestnicy)` (publiczne, wolane odbiciem z Armoury): turniej nowy albo przejety, wpis `|c` w gt_events (5. pole - stary
+  DLL GT czyta 4 pierwsze, bez zmian), wezwania jak zawsze (SummonLords); w OnDailyTick wpis `|c` nie schodzi do lokalnego przy wojnie krolestwa i otwiera sie jako Grand
+  bez reguly osmiu; zjazd = GatherDays (4) z zamknietymi listami i bez konca turnieju (NoEarlyEnd - bez zmian). `CanonApi.SetHeroes` - uczestnicy kanonu (po wczytaniu
+  Armoury podaje ich ponownie); NoblesFightPatch: uczestnicy kanonu najpierw (OrderBy stabilny), przy braku miejsca zastepuja ostatniego lorda spoza kanonu (nie gracza);
+  linia "Szranki ... turniej kanonu: uczestnikow kanonu N, zastapionych lordow M". `CanonApi.Done` przy koncu / odwolaniu turnieju w tym miescie. Bez turnieju kanonu
+  wszystko jak dotad (petla drabinki ta sama, gdy kanonu brak).
+- Armoury `Prologue.World.Tourney.cs`: d117 Gregor (lord_4_21), Loras (lord_1_44), Jaime druzynami do KP (partia sceny, bez ukrycia; partia w armii - nie odciagamy, jak
+  herold GT), Ogar bez druzyny - przeniesiony do KP (raz; gra nie wyprowadza lordow z miasta z turniejem); d121 obwieszczenie (bez GT - turniej gry) i wiesc EN dla gracza;
+  d125 listy otwarte (GT); d127 - jesli nikt nie rozegral - `TournamentManager.ResolveTournament` (nagroda jak w kazdym turnieju gry); d128 albo koniec - uczestnicy do
+  swojego AI. TournamentFinished (KP, faza obwieszczenia) - linia `Turniej Reki ROZSTRZYGNIETY w town_EW4 (dzien ..., z graczem / AI gry / rozstrzygniecie gry w dniu 127)
+  | zwyciezca ... | uczestnicy kanonu w drabince: ... | gracz TAK/NIE` + wiesc EN (gdy gracz nie startowal). TournamentCancelled - `ODWOLANY`.
+
+**Ryzyko / co sprawdzic.** (1) GT otwiera listy, gdy minely 4 doby od obwieszczenia (dzien zapisany z 2 miejscami po przecinku - otwarcie d125 albo d126). (2) Gregor
+z Zachodu (ok. 310 jedn.) i Loras z Highgarden (ok. 300) jada ok. 4-5 dob z noclegami - od d117 zdazaja na d121-125. (3) Gra rozstrzyga turniej losowo po otwarciu (szansa
+konca) - w oknie 125-127 to w porzadku. (4) Gracz w arenie w dniu 127 - niemozliwe w ticku doby (misja wstrzymuje kampanie).
+
+**Status.** DO SPRAWDZENIA (autotest: linia ROZSTRZYGNIETY w d123-127, uczestnicy kanonu w drabince).
+
+## K4 - klany gorskie Doliny (pkt 5)
+
+**Problem.** Projekt pkt 2, dzien 118: klany gorskie napadaja na Gorskim Trakcie. W swiecie ROT nie ma klanow gorskich Doliny jako band (Burned Men, Milk Snakes,
+Black Ears - brak; Stone Crows i Moon Brothers to pomniejsze frakcje, nie bandy - rozpoznanie e5:B).
+
+**Zmiana (Prologue.World.Clans.cs).** Od dnia 118 do 186: najwyzej 4 bandy klanu bandyckiego `hilltribesmen` (Hill Tribesmen, kultura i oddzialy ROT) z nazwami
+klanow z ksiazki (Party.SetCustomName: Stone Crows, Burned Men, Milk Snakes, Black Ears; R6: Painted Dogs zamiast Stone Crows), dom bandy = wies na Gorskim Trakcie z najmniejsza liczba band sceny
+(Stoneyhead, Durlston, Shady Glen, Hollow's Creek, Monton - wsie Orlego Gniazda i Krwawej Bramy). Wzor FreeFolkRaids: `OutlawLaw.RaidDraw` z okregu wsi (pula wyrzutkow,
+potem domy wsi okregu - nikt z niczego), `BanditPartyComponent.CreateLooterParty` (AI band gry - patrol wokol domu, napady na podroznych), kiesa 0, `PeopleBook.Give`
+(pochodzenie FPoolBand), `PeopleLedger.FixCreatedMen`; nieudane utworzenie - `OutlawLaw.RaidUndraw` (ludzie wracaja do puli). W dniu 118 do 4 band, potem uzupelnienie
+po jednej co 3 dni. Bandy NIE sa zamrazane - to zwykle bandy (werbunek i jedzenie jak kazda banda). Po prologu (188) zostaja zwyklymi bandami (scena ich nie sledzi).
+Prawo wyrzutkow wylaczone - bez ludzi, bez band (linia). Linie: `klany gorskie: nowa banda '<nazwa>' (<id>, klan hilltribesmen) przy <wies> (okreg ...) - N ludzi
+(z puli ..., zabrani z domow ...) | w polu k/4`, w linii doby `klany gorskie: w polu k/4 (ludzi ...), od poczatku ...`.
+
+**Ryzyko / co sprawdzic.** (1) Okreg Doliny moze miec mala pule - wtedy bandy biora z domow wsi (jak glod Wolnych Ludzi) albo nie powstaja (linia "za malo ludzi").
+(2) Liczba band swiata rosnie o najwyzej 4 (twardy sufit sceny). (3) CommonerFor = lekki bandyta klanu (hilltribesmen_grunt), jak w RaidDraw.
+
+**Status.** DO SPRAWDZENIA (autotest: linie "nowa banda" w d118-119, w polu >= 1 w oknie 118-186).
+
+## K5 - ludzie Gory w Dorzeczu (pkt 6)
+
+**Problem.** Projekt pkt 2, dzien 155: grabiezcy Lannisterow pala wsie Dorzecza - bez wypowiadania wojny krolestw (pokoj krola w prologu).
+
+**Zmiana (Prologue.World.Raiders.cs).** Od dnia 155 dwie bandy klanu bandyckiego `robber_knights` (Robber Knights) z nazwa "The Mountain's Men" i sztandarem Lannisterow
+(Party.SetCustomName / SetCustomBanner - rod clan_vlandia_1; R5: zmienione - bez sztandaru, wedlug ksiazki). Klan bandycki jest w stalej wojnie z kazdym krolestwem (DefaultDiplomacyModel.GetShallowDiplomaticStance),
+wiec rabunek wsi Dorzecza idzie zwykla mechanika gry (EncounterManager: ShortTermBehavior RaidSettlement + IsAtWarAgainstFaction; precedens gry - bandy dezerterow
+w zadaniu ExtortionByDeserters) i nie potrzeba wojny krolestw. Ludzie: `OutlawLaw.RaidDraw` z okregu wsi zrodla = wies twierdzy rodu Clegane (clan_vlandia_5) najblizszej
+Riverrun (w ROT Harrenhal) - jak K4 (wzor FreeFolkRaids). Kazda banda: partia sceny (bez nowych decyzji, rozkaz `SetMoveRaidSettlement`) na najblizsza wies Dorzecza w stanie
+Normal (nie cel drugiej bandy, nie spalona przez nas w ostatnich 20 dniach); po spaleniu (wies Looted po naszym rabunku) - nastepna. W marszu do pierwszej wsi ukryta przed AI
+(wyjscie z ziem Clegane), potem widoczna - lordowie Dorzecza, Beric i gracz moga ja rozbic (prawda dopiero od R5 - partie korony juz jej nie atakuja z wlasnej woli). Straty rabunku ksieguje gra i Armoury jak kazdy rabunek (DistrictRaid;
+zlota bandy nie ma - SmallGold.PayRaidLoot wymaga wodza-bohatera). Dzien 188: `FreeFolkRaids.Home` (teraz internal): bohaterowie-jency uciekaja, lup do wsi zrodla (zloto
+do kiesy, towar do magazynu), ludzie do puli okregu zrodla, banda rozwiazana. Klucz wylaczony w trakcie - bandy zostaja zwyklymi bandami (bez rozwiazania).
+CampaignEvents.MobilePartyDestroyed - kto rozbil bande (linia; Beric liczy swoje zwyciestwa).
+Linie: `ludzie Gory: nowa banda 'The Mountain's Men' (<id>, klan robber_knights, sztandar Lannister) przy <wies> ... | pierwszy cel <wies>`, `... nowy cel ...`, `... SPALONA wies
+<nazwa> (<id>, riverlands) przez <id> ... | spalonych od poczatku N`, `... banda <id> ROZBITA albo rozwiazana (rozbili: ...)`, `... koniec prologu - <id> wraca do domow ...`.
+
+**Ryzyko / co sprawdzic.** (1) Okreg Harrenhal - pula / domy; bez ludzi banda nie powstaje (linia), proba do d160. (2) Rabunek wymaga HP wsi > 0 i braku innej bitwy przy wsi
+(PickRaidTarget to sprawdza). (3) Bandy na zywnosci BandFood i z werbunkiem OutlawLaw jak kazda banda (nie przesuwaja band - sprawdzone). (4) Sztandar Lannisterow vs tekst
+sceny 19 "raiders flying no banners" - decyzja Jeffa (jedna stala w kodzie).
+
+**Status.** DO SPRAWDZENIA (autotest: linie "nowa banda" d155-156, co najmniej jedna SPALONA wies do d186, powrot do domow w d188).
+
+## K6 - oddzial Berica (pkt 7)
+
+**Problem.** Projekt pkt 2, dzien 160 (scena 20): Ned jako Reka wysyla Berica Dondarriona z ludzmi na Gore.
+
+**Rozpoznanie.** W ROT Beric to przywodca pomniejszej frakcji "brotherhood" (Brotherhood without Banners; wzor ROTuniqueleader_spc_brotherhood_0, wyjeta spod prawa,
+kultura vlandia, dom Riverrun). DefaultDiplomacyModel.IsAtConstantWar: frakcja wyjeta spod prawa i krolestwo tej samej kultury = stala wojna - Beric jest w wojnie
+z krolestwem korony (vlandia) i nie wjedzie do Krolewskiej Przystani. Z Ludzmi Gory moze walczyc: bandycki kontra nie-bandycki = wojna (GetShallowDiplomaticStance; uwaga:
+FactionManager.IsNeutralWithFaction ma wyjatek dla "outlaw", ale IsAtWarAgainstFaction pyta najpierw IsAtConstantWar -> GetShallowDiplomaticStance = War).
+
+**Zmiana (Prologue.World.Beric.cs).** Od dnia 160: Beric (gdy prowadzi druzyne), inaczej glowa rodu Dondarrion (ROTclan_58, Blackhaven), gdy prowadzi druzyne; bez nich - do d165
+proba, potem POMINIETY (linia). Partia sceny: `SetMoveEngageParty` na najblizsza zywa bande Ludzi Gory (co godzine od nowa), ukryta przed AI (lordowie korony i bandy nie
+zaczepiaja jej po drodze; gracz moze). Koniec: brak Ludzi Gory w polu, druzyna stracona albo dzien 188 - wraca do swojego AI. Zwyciestwa liczone ze zdarzenia
+MobilePartyDestroyed (wodz zwyciezcy = bohater sceny). Ludzie i zloto bez zmian (zwykla druzyna). Linie: `Beric: rusza na Ludzi Gory - <kto> [Beric (brotherhood) / zapas ...]
+druzyna ... (frakcja ...)`, `Beric: KONIEC - ... (rozbite bandy Ludzi Gory: N)`; w linii doby `Beric: poscig - <kto> N ludzi, <pozycja>, cel <banda> N jedn.`.
+
+**Ryzyko / co sprawdzic.** (1) "Z Krolewskiej Przystani" z projektu - niemozliwe dla Berica z brotherhood (wojna z korona); rusza tam, gdzie jest. Decyzja Jeffa: czy
+na czas prologu przeniesc Berica do rodu korony (to zmiana rodu przywodcy frakcji - wieksza ingerencja). (2) Ukryta partia Berica moze dogonic bande tylko, gdy banda nie jest
+ukryta (Ludzie Gory sa ukryci tylko w marszu do pierwszej wsi) - inaczej spotkanie przy rabunku wsi.
+
+**Status.** DO SPRAWDZENIA (autotest: linia "Beric: rusza" w d160-165, cel w linii doby, ewentualne ROZBITA ... (rozbili: Beric ...)).
+
+Build koncowy (5 modow kod 0, gen_mcm bez zmian): Armoury.dll md5 f54b93ed, GrandTourney.dll e7f5df53 (CrashScribe, RealisticCaptivity, ForgeView bez zmian kodu).
+Wgrywac razem: Armoury.dll + GrandTourney.dll + Armoury/ModuleData/arm_canon_moves.tsv (#m01 classic, #p10).
+
+## P1 - poprawki przegladu wlasnego (przed autotestem)
+
+- Eskorta krola: eskorta gry (SetMoveEscortParty) czeka pod brama, gdy eskortowany jest w osadzie (MobileParty.ComputeIsWaiting), i wtedy nie kupuje jedzenia (gra kupuje
+  tylko partiom w osadzie - PartiesBuyFoodCampaignBehavior.HourlyTickParty). Teraz: krol w osadzie (postoj) - eskorta wjezdza do tej osady (rozkaz "do osady"); krol
+  w drodze - eskorta. 22 dni postoju w Winterfell bez glodu eskorty.
+- Orszak, Ned i Tyrion koncza sie najpozniej w dniu 186 (e5:A: blokady zdjete przed smiercia krola i aresztem Neda) - gdyby orszak utknal.
+- Turniej Reki: Ogar (bez druzyny) przenoszony do KP dopiero po obwieszczeniu (wczesniej gra mogla go wyprowadzic - lordow z miasta z turniejem nie rusza).
+- GrandTourney: turniej kanonu odwoluje tylko oblezenie albo bunt w miescie - nie "wrog z wojskiem w promieniu" (brotherhood jest w stalej wojnie z korona - DefaultDiplomacyModel
+  .IsAtConstantWar - i jej druzyna w okolicy KP zdejmowalaby krolewski turniej).
+- Ludzie Gory przy wylaczonym kluczu: po prologu scena przestaje je sledzic (zostaja zwyklymi bandami).
+
+## K7 - progi `--grupa m104e5`
+
+`python -I tools/sprawdz_logi.py --grupa m104e5 <Armoury-*.log>`: E5-0 linia startu E5 i latki (straz niewoli TAK, okup TAK), E5-1 ERROR scen i potkniecia E5 0,
+E5-2 orszak (rusza <= d3, Winterfell < d40, KP < d100; krotszy log - INFO; pominiety przez zapis sprzed E5 / brak Roberta - INFO), E5-3 Tyrion na Mur (INFO), E5-4 Turniej
+Reki ROZSTRZYGNIETY w town_EW4 w d123-127 (E5-4b uczestnicy kanonu w drabince - INFO), E5-5 Tyrion "jeniec town_EN1" w kazdej dobie 111-131 i 0 PRZEPUSZCZONYCH (poza
+smiercia), E5-6 Jaime #p10 do town_V2 (bez linii - INFO, gdy wojna Polnocy nie wybuchla; #m01 wykonana w prologu - NIE), E5-7 klany: pierwsza banda d118-119 i w polu
+>= 80% dob 119-186, E5-8 ludzie Gory: pierwsza banda d155-156 i w polu >= 80% dob 156-186 albo wszystkie rozbite, E5-8b spalona >= 1 wies, E5-9 Beric rusza d160-165
+(POMINIETY - INFO), E5-10 doba >= 189: partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu - INFO. Test: 3 logi syntetyczne (scratchpad t5): dobry 14 progow
+0 NIE, zly (Winterfell d45, turniej d130, Tyrion poza lochem d120, ERROR) 4 NIE, klasyczny - INFO.
+
+## Co sprawdzic w autotescie (plan)
+
+1. Nowa kampania z prologiem (plik `armoury-prolog.flag`), >= 210 dob (przejscie w start opowiesci ROT i NedEvent): `--grupa m104e5`, `--grupa m101prolog`,
+   `--grupa m101postacie`, `--grupa m103sceny`.
+2. W logu: `orszak RUSZA` w d0-1 (druzyna krola istnieje), odleglosci eskorty w linii doby (czy Jaime i Tyrion dojezdzaja do krola - eskorta przy zamrozonej AI), postoj
+   w Winterfell bez spadku liczebnosci eskorty, `Tyrion: w CZARNYM ZAMKU`, `w GOSPODZIE` przed d110, `#p01` w d110, Tyrion `jeniec town_EN1` do d131, `#p02` w d132.
+3. Turniej: `OBWIESZCZONY` d121, linia GT "Turniej kanonu (Armoury, prolog 298)", "Szranki King's Landing ... turniej kanonu: uczestnikow kanonu w drabince N/4, zastapionych
+   lordow M" (R2: N - naprawde w drabince), `ROZSTRZYGNIETY` d123-127 i w niej "uczestnicy kanonu w drabince: ... TAK/NIE" (E5-4b - na tej linii opiera sie test);
+   scena 15 dopiero po linii ROZSTRZYGNIETY (linia m103 "scena 15 ... czeka: Turniej Reki jeszcze trwa" w d125-127).
+4. Klany: 4 bandy w d118 (albo "za malo ludzi" - wtedy okreg Doliny bez puli); ludzie Gory: 2 bandy d155, "SPALONA wies" w kolejnych dniach, "koniec prologu - ... wraca do
+   domow" w d188; Beric "rusza" w d160 i cel w linii doby.
+5. Wczytanie zapisu w trakcie orszaku (np. d20) i po d155: linia startu E5, partie sceny odbudowane w pierwszej godzinie (rozkazy od wczoraj > 0 w nastepnej linii doby),
+   brak zamrozonych partii po wylaczeniu klucza (MCM) - nastepna godzina.
+6. Kampania klasyczna (bez pliku flagi): brak linii `Prolog E5`, w logu CanonCompanions `#p10 POMINIETA ... tylko kampania z prologiem`, #m01 jak dotad.
+
+## Decyzje do potwierdzenia przez Jeffa
+
+1. Jaime w Riverrun takze w kampanii KLASYCZNEJ? Dzis tylko prolog (#p10), klasyczna jak dotad (#m01 - Winterfell); zmiana = jedna kolumna w tabeli.
+2. (zamkniete w R5) Sztandar Ludzi Gory - wedlug ksiazki (decyzja Jeffa "wydarzenia wedlug ksiazki"): bez sztandaru.
+3. Beric z brotherhood (w stalej wojnie z korona - nie wjedzie do KP, rusza tam, gdzie jest) - zostawic, czy na czas prologu przeniesc go do rodu korony.
+4. Okup gracza (barter za Tyriona / Jaimego) przechodzi - gracz zaplacil; zablokowac takze barter?
+5. Dzieci (Myrcella, Tommen, Sansa, Arya) nie jada w druzynach (gra nie pozwala dzieciom w druzynie) - przenoszone do celu przy przyjezdzie orszaku; wystarczy?
+6. (recenzja) Robert i Ned po koncu orszaku (ok. d93) wracaja do swojego AI: Ned jako wladca Polnocy moze odjechac z Krolewskiej Przystani (sceny 11, 17, 20 pokazuja go
+   jako Reke w stolicy), a Robert w KP w d125 moze trafic do drabinki Turnieju Reki (GT NoblesFightPatch) i oddac konia i zbroje (TourneyRansom) - w ksiazce nie walczyl.
+   Trzymac Roberta i Neda w KP od konca orszaku do d186 (partie sceny "do miasta")?
+7. (recenzja) Wykluczyc Roberta i Neda z drabinki turnieju kanonu (lista wyjatkow w CanonApi, sprawdzana w NoblesFightPatch)?
+8. (recenzja) Scena 15 opowiada wynik z ksiazki (Loras oddaje final Ogarowi, Thoros wygrywa melee), a turniej na mapie ma wlasnego zwyciezce (komunikat "The Tourney of
+   the Hand is over. X is hailed as champion"). Od R4 okno idzie PO turnieju; zostawic tekst ksiazki (nagranie prolog_15.wav), czy dopisac do okna prawdziwego zwyciezce?
+9. (recenzja, R5) "Swoi nie bija swoich" dotyczy ataku z wlasnej woli (ShouldConsiderAttacking). Obrona napadnietej wsi (cel AI DefendSettlement i dolaczenie do bitwy
+   rabunku) idzie inna sciezka gry i nie jest latana - partie korony moga bronic wsi sojuszniczego Dorzecza przed Ludzmi Gory (niesprawdzone w grze; w ksiazce korona
+   wysyla na Gore Berica). Latac takze to?
+
+## Poprawki po recenzji (R1-R7)
+
+Recenzja: 11 uwag (5 "wazne", 6 "drobne"). Kazda sprawdzona w kodzie i dekompilacji (1.4.8, BannerKings.dll, ROT spclans.xml) - **wszystkie prawdziwe**, zadna nie odrzucona.
+Build koncowy: 5 modow kod 0, gen_mcm (zmiany opisow MCM w R1, R5, R6). Armoury.dll md5 02d8df93, GrandTourney.dll 8881d1b0 (CrashScribe, RealisticCaptivity, ForgeView
+bez zmian kodu). Wgrywac razem: Armoury.dll + GrandTourney.dll + Armoury/ModuleData/arm_canon_moves.tsv.
+
+**R1 (wazne x2) - straz niewoli: loch z wiersza i czas z osi Fabuli** (81d7540a).
+- Problem 1: straz sprawdzala tylko "loch jakiejs osady", a CanonCompanions.RebuildHeld co dobe dopisywal postac do trzymanych przy kazdym IsPrisoner, dopoki wiersz "free" nie
+  zapadl. Jaime wypuszczony z Riverrun droga, ktora straz przepuszcza (upadek osady - ReleasedAfterBattle), i znow pojmany trafialby pod straz w dowolnym lochu (takze gracza:
+  RansomDailyPrefix blokowal wtedy oferty okupu dla gracza). To samo Tyrion d110-132.
+- Problem 2: JaimeHoldMaxDays = 364 dni od #p10 (ok. 15. dzien opowiesci), a #m02 = done:BlackwaterEvent przychodzi po BlackwaterSiegeEvent - brama Fabuli 177 x 4.33 = ok. 766.
+  dzien opowiesci (CrashScribe Fabula.cs, Config.FabulaTimeScale). Straz gasla ok. 380. dnia, potem ucieczka 4%/dobe - Jaime wolny ok. 380 dni przed Catelyn.
+- Zmiana: CanonCompanions.HeldArg (cel wiersza niewoli - p01 town_EN1, p10 town_V2; liczony w RebuildHeld, zerowany w Reset). Prologue.HoldWhyNot: straz tylko w lochu
+  osady z wiersza i nigdy w lochu rodu gracza (wtedy decyduje gracz); powod w linii doby ("straz NIE: nie w lochu town_V2" / "loch rodu gracza"). Jaime: straz do dnia
+  opowiesci 177 x FabulaTimeScale + 150 (FabulaTimeScale odbiciem z CrashScribe.Config; brak - 4.33; przy 4.33 = dzien 917); w linii doby "straz TAK do dnia opowiesci N".
+  Opisy MCM PrologueTyrionHeld / PrologueJaimeAtRiverrun (tylko loch Orlego Gniazda / Riverrun, nigdy gdy osada jest gracza; zamiast "at most a year").
+- Ryzyko / co sprawdzic: ponowne osadzenie w Riverrun dalej trzyma (wiersz trwa); Fabula, ktora omija zatkany BlackwaterEvent, nie robi go "done" - wtedy straz gasnie
+  w dniu 917 i Jaime moze uciec jak kazdy jeniec (wiersz #m02 nadal czeka). CanonCompanions.HeldDay zostal bez uzycia (nieszkodliwy).
+
+**R2 (drobne x2) - GrandTourney: stan kanonu miedzy kampaniami i licznik drabinki** (07e3cd51).
+- Problem: CanonApi._town/_heroes (statyczne) czyscilo tylko Done (koniec / odwolanie turnieju GT). Prolog wyjety w d121-127 i wczytanie kampanii klasycznej w tym samym
+  procesie = kolejnosc kanonu i zamiana lordow w kazdym turnieju Krolewskiej Przystani. Linia "uczestnikow kanonu N" podawala liczbe id od Armoury (zawsze 4), nie drabinke.
+- Zmiana: konstruktor TourneyBehavior (kazda kampania, nowa i wczytana) - CanonApi.SetHeroes(null, null); Armoury GtClear (SetHeroes(null, null) odbiciem) przy TourneySkip
+  i sciezce "turnieju juz nie ma". NoblesFightPatch liczy uczestnikow kanonu w koncowej liscie: "turniej kanonu: uczestnikow kanonu w drabince N/M, zastapionych lordow K".
+- Ryzyko: brak - po wczytaniu kampanii z prologiem Armoury podaje uczestnikow ponownie (TourneyStep, _thHeroesSent zerowany w ResetTourney), juz po konstruktorze GT.
+
+**R3 (drobne) - AI wylaczone przez uczte BK** (6279c18f).
+- Problem (dekompilacja): BKFeastBehavior.HourlyTickPartyImpl - party.Ai.DisableAi() (termin "nigdy") + rozkaz do miasta uczty, gdy partia goscia jest poza nim; EnableAi tylko
+  przy glodzie (< 3 dni) i w Feast.Finish. Nasz prefiks pomija te metode dla partii sceny, wiec blokada zalozona PRZED przejeciem zostaje do konca uczty, a gra nie wypuszcza
+  z osady partii z Ai.IsDisabled (MobileParty.CheckExitingSettlementParallel). Ned (d50), uczestnicy turnieju (d117-121), Beric (d160) mogli siedziec w miescie uczty.
+- Zmiana: ApplyCtl - po bitwie / snie Armoury (SleepKind: oboz, sen dlugu, postoj w osadzie - rozkaz nie ruszany) i armii: Ai.IsDisabled (poza tratwa i morzem bez statkow,
+  jak IslandRoads) -> EnableAi, linia raz na partie w sesji ("partia sceny ... AI wylaczone przez inny mod (uczta BK?) - wlaczone dla rozkazu sceny"), licznik w linii doby
+  ("AI wlaczone (blokada innego moda) N").
+- Ryzyko / co sprawdzic: inne blokady bez terminu - statek BK (BKShippingBehavior.SetTravel) robi tez IsActive = false, a ApplyCtl pomija nieaktywne partie; BK BanditHero
+  i Retinue nie dotycza partii scen. Gentry BK (72 h) tez zdjete - partia sceny i tak ma rozkaz sceny.
+
+**R4 (wazne) - scena 15 po Turnieju Reki** (0a0c23f3).
+- Problem: scena 15 w d125 opowiada wynik turnieju, a turniej E5 dopiero otwiera listy (rozstrzygniecie najpozniej d127, losowy zwyciezca albo gracz, komunikat "The Tourney
+  of the Hand is over. X is hailed as champion") - dwa sprzeczne wyniki w dwa dni, a okno oglaszalo koniec przed szrankami gracza.
+- Zmiana: Prologue.Scenes NextScene - scena 15 czeka, dopoki Turniej Reki sceny E5 trwa (klucz PrologueHandTourney, faza 0-2), najdluzej do d137; linia "scena 15 'The Tourney
+  of the Hand' czeka: Turniej Reki jeszcze trwa (...)". Tekst i nagranie bez zmian (decyzja 8). SC-3 (--grupa m103sceny) dopuszcza scene 15 w d125-137.
+- Ryzyko: kolejne sceny czekaja za 15 (kolejka po kolei) - turniej rozstrzyga sie najpozniej w d127, scena 16 jest w d132.
+
+**R5 (wazne + drobne) - Ludzie Gory: bez sztandaru, swoi nie bija swoich** (89aefaa9).
+- Problem: ludzie Gory powstaja przy Harrenhal (rod Clegane, krolestwo vlandia), klan bandycki jest w wojnie z kazdym krolestwem - po pierwszym rabunku partie Clegane'ow,
+  Lannisterow i korony mogly ich atakowac. Sztandar Lannisterow przeczyl ksiazce i scenie 19 ("raiders flying no banners") - decyzja Jeffa "wedlug ksiazki" juz zapadla.
+- Zmiana: bandy bez wlasnego sztandaru (sztandar klanu bandyckiego), linia "nowa banda ... bez sztandaru"; postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking
+  (MountainKinPost, wzor FreeFolkRaids.KinPost, wpiety w ApplyWorld - tylko kampania z prologiem; linia latek "swoi Gory TAK"): partia krolestwa rodu Clegane nie atakuje
+  z wlasnej woli bandy Ludzi Gory i banda nie atakuje jej; migawka _mmKin (niezmienna, podmieniana w przebiegu scen co godzine; tylko bandy w polu przed koncem prologu
+  i przy kluczu), odmowy w linii doby ("swoi nie bija swoich: odmowy ataku w sesji N"). Opis MCM PrologueMountainRaiders ("flying no banners", lordowie krolestwa Clegane'ow
+  ich nie ruszaja; lordowie Dorzecza, Beric i gracz moga).
+- Ryzyko / co sprawdzic: obrona napadnietej wsi (DefendSettlement + dolaczenie do bitwy rabunku) nie idzie przez ShouldConsiderAttacking - decyzja 9. Drugi postfiks na tej
+  samej metodzie co KinPost - oba tylko zmieniaja true na false, kolejnosc bez znaczenia; NavalDLC wola BaseModel (jak przy KinPost).
+
+**R6 (drobne) - Painted Dogs zamiast Stone Crows** (90cf9a74).
+- Problem: w ROT Stone Crows to pomniejsza frakcja (spclans.xml stone_crows, dom town_EN2) - frakcja Shaggi z tabeli kanonu (p05, p06, m08) i ze sceny 16; od d132 chodzilyby
+  po Dolinie dwie rozne "Stone Crows" (sojusznicy Tyriona i wroga banda), takze po prologu.
+- Zmiana: nazwy band klanow gorskich: Painted Dogs, Burned Men, Milk Snakes, Black Ears (klan z ksiazki, ktorego nie ma w ROT); opis MCM PrologueHillClans.
+- Ryzyko: brak (bandy juz w polu w zapisie zachowuja swoje nazwy).
+
+**R7 (drobne) - progi --grupa m104e5 dla scen wylaczonych i pominietych** (575d6ec7).
+- Problem: E5-7, E5-8, E5-8b nie czytaly linii "klany gorskie POMINIETE - zapis sprzed E5" / "ludzie Gory POMINIECI - zapis sprzed E5", a klucz NIE w linii startu dawal NIE
+  w E5-2, E5-4, E5-7, E5-8, E5-9 (recenzent: 3 falszywe NIE na logu zapisu sprzed E5).
+- Zmiana: klucze z ostatniej linii startu E5 (orszak, Beric, ludzie Gory, klany, turniej; Tyrion i CanonCompanionsFollowStory dla E5-5) i linie POMINIETE/POMINIECI z "zapis sprzed
+  E5" -> INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
+- Test (logi syntetyczne, scratchpad t5 i r5): dobry 0 NIE, zly 4 NIE (jak przed zmiana), klasyczny INFO, zapis sprzed E5 wczytany w d160 - 0 NIE, wszystkie klucze scen NIE - 0 NIE.
+
+**Status.** DO SPRAWDZENIA (autotest - plan wyzej; dodatkowo: linia latek "swoi Gory TAK", w linii doby "AI wlaczone (blokada innego moda)" i odmowy "swoi nie bija swoich",
+Jaime "straz TAK do dnia opowiesci 917", scena 15 po linii ROZSTRZYGNIETY). Gry nie uruchamialem, nic nie wgrane.

@@ -236,6 +236,7 @@ namespace Armoury
         /// <summary>r4-wioska (prowadzacy): postfiks CalculateClanIncome czynnego modelu - rod gracza, BEZ pobrania (applyWithdrawals = false): naleznosc dnia wioski
         /// (ta sama co w podpowiedzi zlota). Tylko widok: pieniadze ida z Pay w OnDailyTick; dzienny przelew gry idzie przez CalculateClanGoldChange z pobraniem,
         /// nie przez ta metode, wiec nie ma podwojnej wyplaty.</summary>
+        // m105-optym KtKnownPatches (KingdomTreasury.Optim105.cs): przy applyWithdrawals = false tylko odczyt, bez MBRandom; zmiana tresci = przeglad KtSkip
         public static void IncomeViewPostfix(object __instance, Clan __0, bool __1, bool __2, ref ExplainedNumber __result)
         {
             try

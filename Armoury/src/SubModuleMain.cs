@@ -66,6 +66,10 @@ namespace Armoury
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
                 // m101-prolog: okno wyboru startu nowej kampanii (Prologue 298 / Classic 299) - prefiks MBGameManager.StartNewGame, raz na proces; wlasny try
                 try { Prologue.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Prologue.ApplyAll", e); }
+                // m103-sceny: obrazki Jeffa w oknach wydarzen ROT (prefiks / postfiks EventScreen OnActivate / OnDeactivate, odbicie - bez typow ROT); wlasny try
+                try { RotWindowPictures.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RotWindowPictures.ApplyAll", e); }
+                // m103-lektor: nagrania okien ROT (ModuleData/Lektor/EN) i latka ROT.Screens.EventScreen odbiciem (OnActivate po, OnDeactivate przed) - raz na proces; wlasny try
+                try { Lektor.Install(_harmony); } catch (Exception e) { Log.Error("Lektor.Install", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
@@ -98,6 +102,9 @@ namespace Armoury
                 // linia dziala tylko przy kluczu VillageOutputByPeople
                 try { VillageByPeople.ApplyTip(_harmony); } catch (Exception e) { Log.Error("VillageByPeople.ApplyTip", e); }
                 try { DistrictIcon.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DistrictIcon.ApplyAll", e); }   // inwest: ikona okregu (tabliczka, dymek osady, lista produkcji miasta) - latki UI raz na proces
+                // m105-dziennik: prefiks tabliczek osad (wiersze handlu karawan i wiesniakow - klucz MapHideTradeNotices) i odbicie widoku dziennika - raz na proces, przed
+                // pierwszym VM tabliczek; wlasny try (linia "Dziennik (m105): start")
+                try { MapChatLog.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapChatLog.ApplyAll", e); }
                 // ZC2 (16.10): linie "Estates (book)" i "Livelihood" w dymku osady (miasto, zamek - region, wies) - postfiks Low dymka gry i NavalDLC, PO GL1 (wstawia
                 // pod jego linie); wlasny try, linie tylko przy kluczu DailyLifeEstates
                 try { DailyLife.ApplyTip(_harmony); } catch (Exception e) { Log.Error("DailyLife.ApplyTip", e); }
@@ -438,6 +445,28 @@ namespace Armoury
                 try { RoadsideInnStay.AppTick(); }
                 catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
             }
+            // m103-sceny: straznik scen prologu 298 i okien opowiesci (4 razy na sekunde; zamkniecie okna bez przycisku, kolejka zwolnien obrazkow z plikow - w kazdej
+            // kampanii; sceny tylko w kampanii z prologiem; wlasny try w srodku) - tu tylko blad ladowania typu (okno dziedziczy po typie ROT), liczony; po 3 straznik
+            // nie startuje do konca sesji (gra bez zmian). PRZED returnem wiosek - inaczej klucz Map Villages = off wylaczylby sceny.
+            if (_storyTickFails < 3)
+            {
+                try { StoryTick(); }
+                catch (Exception e) { _storyTickFails++; Log.Error("Prologue.Scenes: straznik nie laduje sie (proba " + _storyTickFails + "/3)", e); }
+            }
+            // m103-lektor: lektor - koniec klipu, kontrola 0,5 s, straznik okna, wyniki watku nagran plotek (wlasny try w srodku, nic nie gra - od razu wyjscie);
+            // tu tylko blad ladowania typu, liczony (po 3 lektor nie startuje do konca sesji, gra bez zmian)
+            if (_lektorFails < 3)
+            {
+                try { Lektor.AppTick(); }
+                catch (Exception e) { _lektorFails++; Log.Error("Lektor.AppTick: nie laduje sie (proba " + _lektorFails + "/3)", e); }
+            }
+            // m105-dziennik: dziennik wiadomosci obok menu osady i ramka (4 razy na sekunde; poza taktem tylko licznik czasu; wlasny try w srodku) - tu tylko blad
+            // ladowania typu, liczony (po 3 dziennik zostaje jak w grze do konca sesji). PRZED returnem wiosek - klucz Map Villages = off nie wylacza dziennika.
+            if (_chatLogFails < 3)
+            {
+                try { ChatLogTick(dt); }
+                catch (Exception e) { _chatLogFails++; Log.Error("MapChatLog: nie laduje sie (proba " + _chatLogFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -459,6 +488,31 @@ namespace Armoury
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
         private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
+        private static int _storyTickFails;   // m103-sceny: blad ladowania typu straznika scen prologu (Prologue.ScenesAppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void StoryTick()
+        {
+            Prologue.ScenesAppTick();
+        }
+
+        private static int _chatLogFails;   // m105-dziennik: blad ladowania typu dziennika (MapChatLog.AppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ChatLogTick(float dt)
+        {
+            MapChatLog.AppTick(dt);
+        }
+
+        /// <summary>m103-sceny: wyjscie z kampanii - okno opowiesci zerowane, obrazki z plikow zwolnione od razu (StoryPictures.ReleaseAll).</summary>
+        public override void OnGameEnd(Game game)
+        {
+            base.OnGameEnd(game);
+            try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
+            try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
+            try { MapChatLog.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (dziennik m105)", e); }   // m105-dziennik: linia kampanii i test od nowa
+        }
+        private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RoadsideInnsTick()
@@ -610,6 +664,7 @@ namespace Armoury
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)
                 starter.AddBehavior(new CanonCompanionsBehavior()); // m101-postacie: postacie kanonu do rodow, usuniete, zmiany stron (flaga arm_canon_companions, tylko nowa kampania)
                 starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298
+                starter.AddBehavior(new CanonWarsBehavior());       // m104-wojny: wojny wedlug ksiazki - Essos na kalendarzu, Reach i Dorne z korona, smoki Daenerys (zapis arm_m104)
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

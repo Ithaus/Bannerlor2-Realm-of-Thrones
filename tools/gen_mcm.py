@@ -49,6 +49,10 @@ RANGES = {
     'SutlerRevelMorale': (0, 50, "0"),
     'SutlerRevelMoraleCap': (0, 100, "0"),
     'SutlerArmourerPerStall': (0, 100, "0"),
+    # m103-drobne: praczki - kod przycina do 0..75 %, 1..28 dob, 5..100 ludzi na praczke (CampSutlers.LaundryCut / LaundryDays / MenPerWasher)
+    'SutlerLaundryCutPercent': (0, 75, "0"),
+    'SutlerLaundryDays': (1, 28, "0"),
+    'SutlerLaundryMenPerWasher': (5, 100, "0"),
     'CartLoadKg': (100, 2000, "0"),
     'CartSpeedPenaltyPercent': (0, 50, "0"),
     'PackSaddleExtraKg': (0, 300, "0"),
@@ -537,8 +541,20 @@ RANGES = {
     # f9-predkosc (18.10): biegi przyciskow mapy - kod przycina do 2..16 i 2..32 (MapSpeed.FastOf / VeryFastOf)
     'MapSpeedFast': (2, 16, "0"),
     'MapSpeedVeryFast': (2, 32, "0"),
+    # m103-lektor (21.10): limit dzienny i rezerwa znakow ElevenLabs - kod przycina do 0..10000 i 0..30000 (Lektor.DailyMax / ReserveChars)
+    'LektorGossipDailyChars': (0, 10000, "0"),
+    'LektorGossipReserveChars': (0, 30000, "0"),
 }
 
+# m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
+# po angielsku); id pola w Armoury.json zostaje nazwa klucza. Reszta pol - jak dotad (podzial nazwy na slowa).
+LABELS = {
+    'LektorEnabled': 'Narrator Enabled',
+    'LektorEventWindows': 'Narrator Event Windows',
+    'LektorGossipLive': 'Narrator Gossip Live',
+    'LektorGossipDailyChars': 'Narrator Gossip Daily Chars',
+    'LektorGossipReserveChars': 'Narrator Gossip Reserve Chars',
+}
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial
 # RequireRestart, wiec KAZDA zmiana w MCM wylaczala gre. Teraz kazde pole dostaje RequireRestart = false, poza krotka lista ponizej.
@@ -683,7 +699,7 @@ def gen(module_dir, ns, display):
     out.append('        public override string FormatType => "json2";')
     out.append("")
     for typ, name, default, hint, grp in props:
-        label = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
+        label = LABELS.get(name) or re.sub(r'(?<!^)(?=[A-Z])', ' ', name)   # m103-lektor: LABELS - nazwa po angielsku dla kluczy Lektor*
         hint_txt = hint.replace('"', "'")
         # f18-mcm: restart tylko dla RESTART_KEYS; pola wchodzace po wczytaniu zapisu - dopisek, jesli opis jeszcze o tym nie mowi
         rr = "true" if name in restart else "false"

@@ -1,0 +1,368 @@
+## m103-drobne - piec drobnych zmian (punkt 7 kolejki Jeffa, 21.10)
+
+**Mod:** Armoury (+ tools/sprawdz_logi.py) | **Galaz:** `w-toku/m103-drobne` (od `ed9273fa` = WGRANIE 101) | **Tor:** S (bez gry - nie uruchamiano gry, nic nie wgrane;
+build kod 0, gen_mcm po kazdej zmianie Settings.cs) | **Status calosci:** DO SPRAWDZENIA (zbudowane, nie wgrane, nie testowane w grze).
+
+| Krok | Zmiana | Klucz MCM | Commit | Stan |
+|---|---|---|---|---|
+| 1 | Rabunek druzyny gracza liczy sie w ksiedze snu jak praca (nie odpoczynek) | `RaidCountsAsWork` (TAK) | `3360ba69` | zbudowane |
+| 2 | Rzad markietanow: odziez dla druzyny gracza z polki miasta (z kiesy gracza) i praczki (zuzycie odziezy -25% przez 7 dob) | `SutlerRowClothing`, `SutlerLaundry` (TAK), `SutlerLaundryCutPercent` 25, `SutlerLaundryDays` 7, `SutlerLaundryMenPerWasher` 20 | `e31227d0` | zbudowane |
+| 3 | Zapis tablicy ogloszen arm_board w formacie nb2 (ok. 53% nb1 w modelu; odczyt nb1 bez zmian) | - (format zapisu, bez klucza) | `ea848ab0`, `19f6fcff` | zbudowane, test w obie strony OK |
+| 4 | KP-1 (m98plotki) liczy bledy zapisu kufli `ERROR in SyncData.arm_drink` (i arm_rumours), KP-1b z logu CrashScribe | - (narzedzie) | `4c9bb421` | sprawdzone na logach 101 |
+| 5 | `DrillCampOnlyAi` domyslnie TAK (u Jeffa juz true) | `DrillCampOnlyAi` (TAK) | `0fa1695d` | zbudowane |
+| R | Poprawki po recenzji: praczki tylko dla oplaconych ludzi (pole 9 zapisu), odziez z rzedu szara przy oblezonym miescie; sprawdz_logi WP-7 w kazdej sesji, KP-1b zamyka blok na `#####`, MK-9 objeci | `SutlerLaundry`, `SutlerRowClothing` (bez nowych) | `5c30a953` | zbudowane |
+
+---
+
+### Krok 1. Rabunek jako praca (ksiega snu gracza)
+
+**Po ludzku (dla Jeffa):** dotad, gdy Twoja druzyna rabowala wioske (wioske poboczna z jej menu albo wies na mapie), stala w miejscu - a ksiega snu
+liczyla kazda taka godzine jak postoj, czyli odpoczynek. Rabunek dawal wiec sen. Teraz godzina rabunku liczy sie jak cwiczenia "Train the men": to praca,
+ludzie nie odpoczywaja. Kto rabuje cala noc, rano ma dlug snu, tak samo jak po nocnym marszu. Dzien rabowania wioski pobocznej nie jest tez dniem
+odpoczynku armii, ktora prowadzisz (rabunek wsi gry juz nim nie byl). Klucz w MCM: **Raid Counts As Work** (grupa "A night's rest"), wylaczony = jak dotad.
+
+**Problem:** propozycja z kolejki Jeffa (pkt 7, bez sprzeciwu): godzina rabunku wioski liczy sie w ksiedze snu jak postoj. Recenzja styku 97 (n26) dodala
+`raidNow = SideVillageVisit.RaidActive` w 4 warunkach `NightRest.OnHourly` (namiot automatyczny, pomijanie pytania ZB-6, pytanie "Night Falls", licznik
+marszu nocnego i ostrzezenie), ale nie w samym dodawaniu odpoczynku.
+
+**Przyczyna (kod):** `NightRest.OnHourly`: `resting = Drill.RestHour(mp, step) || ...` - `Drill.RestHour` daje true przy kroku <= 0.35 jedn. (`Drill.RestStep`),
+a w rabunku partia stoi (krok 0). Odpoczynek godziny (`_restTonight += noc 1 / dzien DayRestFactor`, `InnDrink.RestHour` - odsypianie kufli) wylaczaly tylko
+`forced` (marsz forsowny) i `drilled` (`CampDrill.DrilledLastHour`, recenzja 4 m97-szkolenie). Rabunek:
+- wioska poboczna (m97-wioski, `SideVillageVisit.Raid.cs`): menu oczekiwania `arm_sidevil_raid`, bez MapEvent, stan `_raid != null` (`RaidActive`);
+- wies gry (vanilla + `DistrictRaid` E7/R1-R2): zdarzenie `MapEvent.IsRaid`, menu `raiding_village`; gracz po stronie napastnika - sam, jako wodz armii albo
+  doczepiony do armii AI (dekompilacja `MobileParty` 1.4.8: doczepiona partia dostaje `MapEventSide` wodza - `Party.MapEventSide = _attachedTo.Party.MapEventSide`).
+  Te same 4 warunki wylaczaly go juz przez `mp.MapEvent == null`; odpoczynek - nie.
+
+**Zmiana:**
+- `NightRest.PlayerRaidingNow(out side)`: druzyna gracza rabuje teraz (`SideVillageVisit.RaidActive` albo `mp.MapEvent.IsRaid && mp.MapEventSide == me.AttackerSide`).
+  Sam odczyt, bez alokacji.
+- `NightRest.OnTickCore` (klatka, przy kluczu): klatka z rabunkiem zapisuje chwile `_lastRaidAt` (jak `CampDrill._lastDrillAt`, bez zapisu) - rabunek skonczony w
+  srodku godziny i tak czyni ja godzina pracy (ta sama zasada co cwiczenia z menu: jakakolwiek praca w minionej godzinie = godzina pracy).
+- `NightRest.OnHourly`: `raided = klucz && !sluzba ROT && (PlayerRaidingNow || RaidedLastHour)`; `work = drilled || raided`; odpoczynek godziny i odsypianie kufli
+  tylko przy `resting && !forced && !work`. Sluzba ROT bez zmian (o snie decyduje lord - `resting` jak dotad). `bool enl = RotEnlisted()` przeniesione wyzej
+  (ten sam jeden odczyt na tick, czyta go teraz takze rabunek). 4 warunki z `raidNow` (namiot, ZB-6, pytanie, marsz) bez zmian.
+- `ArmyRestDay.One`: doba armii gracza z godzina rabunku wioski pobocznej (bez MapEvent) liczy sie jak doba z zajeciem (`BusyH`) - tak jak rabunek wsi gry
+  (`Busy`: `lead.MapEvent != null`). Bez tego dzien rabunku wioski pobocznej dawal armii gracza premie dnia odpoczynku (spojnosc +2, morale +5). Ta sama zasada,
+  ten sam klucz (`NightRest.RaidWorkHour()`).
+- Reset `_lastRaidAt`, licznika i dnia linii w `ResetWorld` (nowa kampania / wczytanie - rabunek z poprzedniej kampanii nie jest praca tej godziny).
+- Klucz `RaidCountsAsWork` (domyslnie TAK) w `Settings.cs` -> `McmSettings.cs` (gen_mcm), grupa "A night's rest". W Armoury.json Jeffa go nie ma - wchodzi domyslna.
+
+**Linie logu:**
+- `Nocleg: gracz - godzina H:00 rabunku (wioska poboczna | wies gry, gracz po stronie napastnika) liczona jak praca - bez odpoczynku X h (Raid Counts As Work); odpoczynek doby Y h, dlug D - kolejne godziny rabunku tej doby w linii switu.` - raz na dobe (od switu gracza), przy pierwszej godzinie rabunku, ktora bez zmiany bylaby odpoczynkiem.
+- Linia `NocnyMarsz: gracz o swicie - ...` - nowe pole `godziny rabunku bez odpoczynku (Raid Counts As Work) N` (przed "; komunikat:"; regex NO_PLAYER/NO_PMARCH w sprawdz_logi czyta poczatek linii i inne pola - bez zmian).
+- sprawdz_logi grupa `m97wioski`: nowy prog **WP-7** (suma godzin w liniach switu >= liczba linii doby - 1; log sprzed zmiany - INFO).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: zmiana tylko ZABIERA odpoczynek godzinom rabunku druzyny gracza; klucz wylaczony = dokladnie stara sciezka (`raided` false, `RaidWorkHour` false).
+  Cwiczenia (`drilled`), marsz forsowny, sen w menu (`arm_sleep_wait` - w rabunku niedostepny), karczmy, stamina kowalska (menu rabunku i tak poza `InCampMenu` -
+  stawka marszu, jak cwiczenia) - bez zmian.
+- Wszystkie miejsca czytajace stan rabunku gracza: `NightRest.OnHourly` (4 warunki `raidNow` - bez zmian; odpoczynek i kufle - nowe `work`), `ArmyRestDay.One`
+  (nowe), `SideVillageVisit` (sam stan). `Drill.Observe` (maska postoju musztry) liczy godzine rabunku jako postoj, ale dla gracza godziny cwiczen to tylko
+  `CampDrill.PlayerOwed` (menu), a `CampDrill.AutoHour` (oboz oblezenia / cudza armia) konczy sie przy `mp.MapEvent != null` - rabunek wsi gry w cudzej armii nie
+  daje cwiczen; rabunek wioski pobocznej w cudzej armii jest zablokowany (`SideVillageVisit`: "You march in another lord's army - he decides.").
+- Kolizje: `ForcedMarch.Hour` liczy sie przed `work` (godzina marszu forsownego i rabunku naraz - i tak bez odpoczynku). Tick nadrabiany (NightClock.CatchUp)
+  powtarza `resting` poprzedniej godziny, a `raided` jest z czasu (jak `drilled`) - spojne.
+- Swiadomie BEZ zmian (do decyzji, jesli Jeff chce): ksiega snu AI (`NightMarch.AiHourly`) - partie AI, takze doczepione do armii gracza, rabujac licza postoj
+  jako odpoczynek, jak dotad. Zadanie dotyczylo druzyny gracza; jedna zasada dla AI to osobna zmiana (rabunki AI sa czeste - wplyw na dlug snu lordow).
+- Koszt: klatka - jedno pole statyczne i dwa odczyty pol `MapEvent` (bez alokacji); tick godzinowy - to samo raz.
+- Autotest: rabunek wioski pobocznej albo wsi gry przez gracza noca -> linia "godzina ... rabunku ... liczona jak praca", w linii switu pole > 0, odpoczynek doby
+  nie rosnie w godzinach rabunku; bez rabunku pole 0. Klucz NIE -> brak linii, pole 0.
+
+**Status:** DO SPRAWDZENIA.
+
+---
+
+### Krok 2. Markietani - odziez i praczki (rzad markietanow)
+
+**Po ludzku (dla Jeffa):** w rzedzie markietanow ("Visit the sutlers' row", duzy oboz) sa dwie nowe opcje.
+**Clothe the men from the sutlers' carts** - Twoi ludzie zdzieraja buty, ubrania i plotno (skora, sukno, plotno sa w modzie od dawna). Mozesz ich odziac od reki
+z Twojej kiesy: towar z targu miasta, z ktorym handluja markietani, po cenie miasta plus 30% za dowoz, tylko tyle calych sztuk, ile ludzie naprawde zdarli. Ich
+sakiewka zostaje nietknieta, a w nastepnym miescie nie kupia tego drugi raz. Uczciwie: markietani i tak raz na dobe przywoza Twoim ludziom odziez za pieniadze
+z ich sakiewki (od dawna, T3-K1) - nowa opcja przydaje sie, gdy sakiewka ludzi jest chuda albo gdy chcesz zaplacic sam; czesto bedzie szara z napisem "nic jeszcze
+nie zdarli". **Hire the washerwomen for 7 days** - praczki piora i ceruja: przez 7 dni Twoja druzyna zdziera odziez o 25% wolniej. Placisz dniowke praczek
+(1 praczka na 20 ludzi, 2 denary dziennie): druzyna 150 ludzi - 8 praczek x 7 dni x 2 = 112 denarow; oszczedza ok. 0.5 sztuki odziezy (przy dzisiejszych cenach
+ok. 220 denarow za sztuke - ok. 120 denarow). Pieniadze ida do miasta i wsi jak za kazda usluge rzedu.
+
+**Problem:** kolejka Jeffa pkt 7. Poprzednia recenzja (m99) odrzucila praczki, bo "pranie nie ma w modzie zadnego stanu". Zadanie: sprawdzic obieg odziezy
+wojska i (a) dac w rzedzie usluge odziezy z polek miasta-zrodla (jak sklep: polka + narzut, pieniadz do kasy miasta/wsi), (b) praczki - TYLKO, jesli ArmyClothing
+ma stan zuzycia na druzyne, ktory mozna uczciwie zmniejszyc.
+
+**Przyczyna / stan (kod):** `ArmyClothing.cs` (paczka 150) MA stan zuzycia na druzyne: `_need[StringId partii]` = ulamkowe sztuki skory, sukna i plotna
+czekajace na zakup, narastajace w `OnDailyTickParty` (`Accrue(id, ludzie bez bohaterow, field, share)`, stawki kg na czlowieka na rok: w polu 2/3/2.5 -
+log 101: na 1000 ludzi dziennie skora 0.55, sukno 0.82, plotno 0.69 sztuki), zapisywane w zapisie (Export/Import). Zakup: przy wyjezdzie z miasta (`MenPurse.OnLeft`
+-> `BuyForParty`) i raz na dobe u markietanow w polu (T3-K1, `Sutlers.One -> FromSutlers`, TAKZE druzyna gracza) - w obu z sakiewki ludzi po cenie miasta, sztuki
+znikaja z polki (zdarte ubranie zastapione), zloto do kasy miasta. `Accrue` ma juz parametr `share` (czesc doby zuzycia - uzywany dla garnizonow), wiec praczki
+moga uczciwie zmniejszyc narastanie potrzeby tylko druzyny gracza. Ceny z logu 101 (ostatnia linia: markietani kupili 205 sztuk za 45 930) - ok. 224 d za sztuke.
+
+**Zmiana:**
+- (a) `CampSutlers` 4. ODZIEZ - opcja "Clothe the men from the sutlers' carts (N pieces, about X denars)" (klucz `SutlerRowClothing`, wymaga `ArmyClothingEnabled`):
+  `ArmyClothing.RowBuy` - cale sztuki potrzeby druzyny gracza z polki miasta-zrodla (`Sutlers.NearestTown`, jak cala reszta rzedu), ta sama kolejnosc i ta sama
+  najtansza sztuka co `ArmyClothing.Buy` (skora, sukno, plotno po jednej, cena targu od nowa przed kazda sztuka), cena markietanow = ceil(cena miasta x 1.3),
+  najwyzej `SutlerRowStockPerStall x kramy` sztuk kazdego towaru na dobe (ten sam licznik dnia `_boughtToday` co sklep - skora/filc/plotno nie sa w towarze sklepu)
+  i najwyzej kiesa gracza. Zaplata: gracz -> `paidRow`; towar po cenie miasta `paidTown` do kasy miasta (`ArmyClothing.RowSettle`: `ChangeGold`, ksiega
+  przeplywow `NCloth`, sprzedaz kupcow `MixCloth` - jak zakup partii, bez tarczy zoldu, bo placi kiesa gracza); narzut `paidRow - paidTown` obiegiem uslug rzedu
+  (`Spread`: 85% miasto z hakiem 75/25, reszta wies z danina pana i udzialem korony DS). Potrzeba druzyny maleje o kupione sztuki. Zaplata nieudana -> `RowUndo`
+  (sztuki wracaja na polke, potrzeba wraca). Ramka ksiegi towarow `FArmyCloth` jak przy `Buy`.
+- (b) `CampSutlers` 5. PRACZKI - opcja "Hire the washerwomen for 7 days (X denars)" (klucz `SutlerLaundry`, wymaga `ArmyClothingEnabled`): oplata = praczki
+  (ceil(ludzie druzyny bez bohaterow / `SutlerLaundryMenPerWasher` 20)) x `SutlerLaundryDays` (7) x dniowka praczki (2/3 `WorkshopWagePerDay` = 2 d) obiegiem uslug;
+  przez 7 x 24 h `ArmyClothing.OnDailyTickParty` dla druzyny gracza liczy `share = 1 - SutlerLaundryCutPercent/100` (0.75). Drugi raz nie da sie najac, dopoki pracuja.
+  Termin (`_laundryUntil`, godzina kampanii) - pole 8 zapisu `arm_sutlerrow` (stary zapis bez pola = bez praczek; stary kod pole pomija). Reset w nowej kampanii.
+- Liczby (decyduje Claude): 25% - pranie i cerowanie wydluza zycie lnu i welny o ok. jedna czwarta (koszule i hajdawery prane zamiast zdzierane do konca; buty
+  smarowane) - mniej niz polowa, bo marsz i tak niszczy buty; 1 praczka na 20 ludzi (w armiach XVII-XVIII w. 4-6 kobiet na kompanie ok. 100 ludzi do prania - ok.
+  1 na 20); dniowka praczki 2/3 dniowki rzemieslnika (praca kobiety ok. 1/2-2/3 dniowki mezczyzny). Wynik: koszt ok. 0.75 d na czlowieka na tydzien, oszczednosc
+  ok. 0.8 d na czlowieka na tydzien przy cenach z biegu 101 - usluga prawie na zero, oplaca sie przy drogim suknie (sukna brakuje na polkach - log 101: "bez towaru
+  na polce: sukno 172").
+- Linie logu: `Markietani obozu (m99): odziez | ... potrzeba skora a, sukno b, plotno c -> ... | kupione ... | gracz zaplacil X -> towar do kasy miasta Y + narzut Z -> ... | kontrola: X = Y + Z (roznica 0)`,
+  `Markietani obozu (m99): praczki | ... -> praczek W (1 na 20) x 7 dob x dniowka 2 = X | zuzycie odziezy -25% do godziny H ... | kontrola: X = X (roznica 0)`;
+  linia doby rzedu - pola "odziez N: sztuk ... (towar do kas miast ... + narzut ...)" i "praczki: najete N za X, czynne ..."; linia startu sesji rzedu - klucze i liczby;
+  linia doby "Odziez wojska (150)" - pola "rzad markietanow (gracz, z kiesy): ..." i "praczki: druzyna gracza zdarla mniej o ... (dob z praczkami N)".
+- sprawdz_logi grupa `m99markietani`: MK-2/MK-3 licza tez "odziez" i "praczki" (duzy oboz, kontrola obiegu 0); nowe **MK-8** (potrzeba druzyny spada dokladnie o
+  kupione sztuki) i **MK-9** (cena praczek = praczki x doby x dniowka, w gore). Sprawdzone na sztucznym logu (obie TAK).
+- Klucze w `Settings.cs` -> `McmSettings.cs` (gen_mcm, grupa "Camp and baggage (night 20/21.10)"); suwaki w `tools/gen_mcm.py` RANGES zgodne z przycieciem w kodzie.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Nic z niczego: odziez - sztuka z polki miasta znika (jak kazdy zakup odziezy wojska), gracz placi `paidRow` = towar do kasy miasta + narzut w obiegu uslug
+  (kontrola w linii); praczki - cala oplata obiegiem uslug, bez towaru. Mniejsze zuzycie = mniej zakupow odziezy z sakiewki ludzi (mniej zlota do kas miast za
+  sukno) - w zamian oplata praczek idzie do tego samego miasta i wsi; zloto nie powstaje.
+- Kolizje: T3-K1 (markietani z sakiewki ludzi raz na dobe) i zakup przy wyjezdzie czytaja te sama potrzebe `_need` - usluga ja zmniejsza, wiec nie kupia drugi raz;
+  rezerwa sakiewki na odziez (`PendingCost`) spada, wiec markietani obiegu moga wziac z sakiewki ludzi gracza troche wiecej "na zycie" tej samej doby (spojne z T3-K1).
+  Limit sztuk dnia wspolny ze sklepem tylko po id (skora/filc/plotno - nie ma ich w `Sold()` sklepu). Praczki dzialaja tylko na `OnDailyTickParty` druzyny gracza
+  (`mp.IsMainParty`); AI bez zmian. Garnizony bez zmian.
+- Menu `arm_camp_sutlers` to ZWYKLE menu - `SwitchToMenu(Menu)` po akcji jak cyrulik/platnerz (bez menu oczekiwania). Warunek opcji liczy podglad bez zmiany polki
+  (`RowPreview`, cena pierwszej sztuki - podglad moze roznic sie o kilka denarow od dokladnej kwoty w `RowBuy`, stad "about").
+- Klucz wylaczony / `ArmyClothingEnabled` wylaczony - opcje ukryte (`return false`), `LaundryShare` = 1 (dokladnie stare narastanie). Praczki najete, a potem klucz
+  wylaczony - zuzycie wraca do pelnego (oplata przepada - jak kazda usluga).
+- Zapis: pole 8 `arm_sutlerrow` (kilka znakow); stary zapis Jeffa (101) czyta sie bez zmian.
+- Autotest: oboz >= 150 ludzi, kilka dob w polu z chuda sakiewka ludzi (albo `SutlerClothing` NIE), opcja odziezy - linia "odziez" z kontrola 0 i MK-8; praczki -
+  linia "praczki", przez 7 dob w linii "Odziez wojska (150)" pole "praczki: druzyna gracza zdarla mniej o ...", potem znika.
+
+**Status:** DO SPRAWDZENIA.
+
+---
+
+### Krok 3. Zapis tablicy ogloszen (arm_board) - format nb2
+
+**Po ludzku (dla Jeffa):** w grze nic sie nie zmienia. Zapis listow gonczych i "kto co zlupil" zajmowal w zapisie gry 18.5 KB (wiecej niz 16 KB, przy ktorych
+zapis dzieli sie na kawalki). Teraz ten sam stan zajmuje ok. polowe (model na danych biegu 101: ok. 9.7 KB). Twoje stare zapisy wczytuja sie bez zmian;
+po pierwszym zapisie gra pisze juz nowy, krotszy format. Uwaga na cofanie: DLL sprzed tej zmiany (WGRANIE 101) nie przeczyta nowego formatu - listy
+goncze i pamiec szkod band zaczna sie wtedy od zera (listy wroca same w ciagu kilku dni, nic wiecej nie ginie).
+
+**Problem:** bieg 101 (`Armoury-2026-10-21_07-17-36.log`, nowa kampania 180 dob): linia "Listy goncze (m102): dzien ..." - `zapis arm_board` do 18462 B
+(ostatnia doba 18403 B), prog L-8 grupy m102tablica (<= 16384 B) - NIE. SaveText kawalkuje napis powyzej 16 KB.
+
+**Przyczyna (skad objetosc - policzone):** format nb1: listy `miasto~banda~nazwa~ludzie~dni~doplata~kwota~doba wywieszenia~termin~flagi~S*100~rodzaj~soltys~wies~rod`
+(84 czynne listy x ok. 81 B = ok. 6.8 KB - wyliczone z 84 ostatnich linii "list -" logu 101) i szkody band `banda~doba,rodzaj,miasto,wies/...` (159 band, reszta
+ok. 11.5 KB = ok. 72 B na bande, ok. 2.2 wpisu). Najwiecej zajmuja: id band (95% z koncowka 10-cyfrowa, np. `looters_2147131604`, srednio 19 znakow) - w listach
+i w szkodach; pelne doby (6 cyfr: 109016) w kazdym wpisie; miasto powtarzane w kazdym wpisie szkody (dla rabunku wsi wynika z wsi - `Village.Bound`, tak je zapisuje
+`OnRaidCompleted`); pola, ktorych po wywieszeniu nikt nie czyta (sprawdzone grep w NoticeBoard*.cs): `Days`, `BonusPct`, `S`, `Posted` (tylko eksport), `Name` (puste).
+
+**Zmiana:**
+- Nowy format zapisu `nb2|D=doba|P=przedrostki|F=...|W=...|H=...` (`NoticeBoard.Export`, `WatchExport2`); odczyt `nb2` (`Import2`, `WatchImport2`) i - bez zmian -
+  `nb1` (stare zapisy Jeffa z 101; po wczytaniu nb1 linia "wczytano zapis arm_board w starym formacie nb1 ... nastepny zapis w formacie nb2").
+- Id (miasto, banda, wies, rod, soltys, flaga) przez tablice przedrostkow `P`: przedrostek do ostatniego `_` raz w naglowku, w tekscie `^nr_koncowka`
+  (`sea_raiders_246` -> `^1_246`), a koncowka liczbowa od 5 cyfr bez zera na przodzie - w base36 (`looters_2147131604` -> `^0:zichck`). Tylko gdy krocej; id z
+  przecinkiem, kropka, `/`, `^`, `:` - bez zmian.
+- Doby jako przesuniecie wzgledem `D` (doba zapisu zapisana w naglowku - odczyt nie zalezy od zegara gry w SyncData): termin listu `Due - D`, wpis szkody `D - doba`,
+  flaga `Until - D`.
+- Listy bez pol nieczytanych (`nazwa`, `dni`, `doplata`, `S`, `doba wywieszenia`); po wczytaniu nb2 te pola = 0 (nikt ich nie czyta; nazwa bandy liczona po
+  wczytaniu jak dotad). Soltys i wies tylko przy liscie soltysa (puste koncowe pola obciete).
+- Szkody: miasto puste, gdy wynika z wsi (`Village.Bound`, odczyt leniwy `HarmTown` -> `VilTown` z pamiecia), albo gdy jest takie samo jak w poprzednim wpisie
+  tej bandy bez wsi; wpisy starsze niz `HarmDays` (60 dob - HarmCount liczy 60, soltysi 30) pominiete; banda bez zywych wpisow - bez klucza.
+- `HarmCount` porownuje `HarmTown(h)` (zapisane miasto albo z wsi). Stary eksport nb1 (`ExportV1`) zostal tylko do pomiaru.
+- Linia doby listow: po `zapis arm_board N B;` nowy segment `sklad zapisu nb2: naglowek z przedrostkami a B, flagi b B, listy c B (n), szkody d B (band m, wpisow k),
+  stary format nb1 w tym samym stanie X B (Y%)` - pomiar w tym samym stanie przy kazdej dobie (poza kosztem doby L-9). Linia "wpiete" - `zapis arm_board nb2 (odczyt takze nb1)`.
+- sprawdz_logi `m102tablica`: L-8 prog `<= 12288 B` (cel m103), nowy **L-8b** (INFO: nb2 wobec nb1 w tym samym stanie). Na logu 101 L-8 = NIE (18462 B, stary format) -
+  tak ma byc; po zmianie oczekiwane TAK.
+
+**Pomiar / test:**
+- Model na danych biegu 101 (`model_nb.py` w scratchpadzie: 84 listy z linii "list -" logu, szkody 159 band dopasowane do sumy nb1 = 18 256 B): nb2 = 9 670 B (53%),
+  same listy 6 847 -> 3 212 B. Wariant bez wyliczania miasta z wsi: 9 693 B. Dokladny wynik w tym samym stanie - nowe pole linii doby w nastepnym biegu.
+- Test w obie strony bez gry (konsola net472, refleksja na Armoury.dll z HEAD): 13 id (w tym koncowki z zerami, 19 cyfr, bez `_`, krotkie) - `Enc` -> `Dec` bez zmian;
+  3 listy (kapitan, soltys z wsia, termin -1, flagi TL) i szkody (wies, inne miasto, wpis 70 dob - pominiety, banda tylko ze starym wpisem - bez klucza) -
+  `WatchExport2` -> `Import2` = stan wejsciowy; potem `ExportV1` -> `Import` (stara sciezka nb1) = ten sam stan. WYNIK: OK.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: odczyt nb1 nietkniety (ta sama sciezka); nb2 czyta wszystkie pola, ktore kod czyta po wywieszeniu (miasto, banda, ludzie, kwota, termin, przyjety,
+  pan doplaca, rodzaj, rod pana, soltys, wies). `HarmCount` - miasto z wsi tylko dla wpisow bez miasta (nb2); wpisy nb1 i nowe wpisy maja miasto jak dotad.
+- Cofniecie DLL do 101 po zapisie nb2: stara wersja pisze "zapis arm_board w nieznanej wersji (nb2) - pominiety" - listy i szkody od zera (nic poza tym).
+- Koszt: eksport raz na dobe (linia) i przy zapisie; drugi eksport nb1 tylko do pomiaru (ok. tyle co dotad, poza kosztem L-9). `VilTown` - `Settlement.Find` raz na wies
+  (pamiec), wolany przy eksporcie i w `HarmCount` tylko dla wpisow z miastem z wsi.
+- Autotest: linia "wpiete" z `nb2`; linia doby - `zapis arm_board` < 12 288 B i pole "sklad zapisu" (procent wobec nb1); po zapisie i wczytaniu - "Listy goncze" z ta sama
+  liczba czynnych listow (`czynne N`) i szkod band; wczytanie zapisu z 101 - linia "wczytano zapis arm_board w starym formacie nb1"; wczytanie zapisu nb2 - linia
+  "Tablica ogloszen (m102): wczytano zapis arm_board nb2 (N B, doba zapisu D, przedrostkow P) - flagi a, listy b, szkody band c (wpisow k)" (poprawka po przegladzie wlasnym,
+  ta sama liczba listow i band co w linii doby przed zapisem).
+
+**Status:** DO SPRAWDZENIA.
+
+---
+
+### Krok 4. Progi KP-1 (grupa m98plotki) - bledy zapisu kufli
+
+**Po ludzku (dla Jeffa):** tylko narzedzie do sprawdzania logow (gra bez zmian). Sprawdzian "kufli i plotek" nie zauwazal bledu przy zapisie/wczytaniu stanu kufli;
+teraz go liczy, a z logiem CrashScribe liczy tez bledy, ktore Armoury polknal po cichu.
+
+**Problem:** KP-1 (`tools/sprawdz_logi.py`, `m98plotki_main`) liczyl tylko linie z `ERROR in InnDrink.` i `ERROR in Rumours.`. Zapis stanu kufli idzie przez
+`ArmouryBehavior.SyncData` (`InnDrink.Export/Import` pod kluczem `arm_drink`), a wyjatek lapie `catch (Exception e) { Log.Error("SyncData.arm_drink", e); }` -
+w logu `ERROR in SyncData.arm_drink: ...` (Log.Error: "ERROR in " + where), czego KP-1 nie widzial. To samo dla ksiegi plotek (`SyncData.arm_rumours` - klasa Rumours,
+w ktorej siedzi tez Rumours.Drink z m98).
+
+**Zmiana (tylko sprawdz_logi):**
+- `M98P_ERR` = `ERROR in InnDrink.`, `ERROR in Rumours.`, `ERROR in SyncData.arm_drink`, `ERROR in SyncData.arm_rumours`; KP-1 podaje tez, ile z nich to zapis/odczyt.
+- Nowy **KP-1b** (z `--crashscribe <session-*.log>`): bloki `# ERROR ...` logu CrashScribe, w ktorych stos przechodzi przez `Armoury.InnDrink.` albo `Armoury.Rumours.`
+  (wyjatek polkniety w naszym try wychodzi w CrashScribe jako "ERROR CAUGHT FURTHER UP" ze stosem) - prog 0; bez logu CrashScribe - INFO.
+  `m98plotki_main(logp, csp=None)`, dispatch przekazuje `csp`.
+- Opis grupy w pomocy i docstring zaktualizowane.
+
+**Sprawdzone na logach biegu 101:** `python -I tools/sprawdz_logi.py --grupa m98plotki Armoury-2026-10-21_07-17-36.log --crashscribe session-2026-10-21_07-17-34.log`:
+KP-1 TAK (0, w tym SyncData 0), KP-1b TAK (0 blokow), reszta bez zmian (NIE 0). Sztuczny log (linia `ERROR in SyncData.arm_drink`, linia `ERROR in InnDrink.Hourly`
+i blok CrashScribe ze stosem `Armoury.InnDrink.Import`): KP-1 NIE (2, w tym SyncData 1), KP-1b NIE (1) - wzorce dzialaja.
+
+**Ryzyko:** brak (narzedzie). Wzorzec `SyncData.arm_rumours` to szersze niz samo m98 (ksiega plotek z sw-zajazdy) - to ta sama klasa Rumours, ktorej bledy KP-1 juz liczyl.
+
+**Status:** GOTOWE (narzedzie, sprawdzone na logach 101 i na sztucznym logu).
+
+---
+
+### Krok 5. DrillCampOnlyAi domyslnie TAK
+
+**Po ludzku (dla Jeffa):** u Ciebie nic sie nie zmienia - masz to juz wlaczone w MCM. Zmienia sie tylko wartosc domyslna w kodzie, zeby po resecie ustawien
+albo na nowej instalacji lordowie AI tez cwiczyli tylko na postoju za dnia (tak jak w Twojej grze).
+
+**Problem:** kolejka Jeffa pkt 7: `DrillCampOnlyAi` w `Settings.cs` mial domyslnie `false`, a u Jeffa w `Armoury.json` jest `"DrillCampOnlyAi": true`
+(sprawdzone w `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json`; `DrillLawAi` tez true).
+
+**Zmiana:** `Settings.cs`: `public bool DrillCampOnlyAi = true;` (z komentarzem), `python tools/gen_mcm.py` -> `McmSettings.cs` `= true` (jedyna zmiana w pliku MCM).
+sprawdz_logi `m97szkolenie` SZ-5 - tekst progu INFO (klucz domyslnie TAK od m103).
+
+**Kontrola calosci (co zaklada domyslne NIE):** grep calego repo (`*.cs`, `*.py`, `*.ps1`, `*.json`, `*.xml`): klucz czytaja tylko `CampDrill.RuleFor` (`s.DrillCampOnlyAi && s.DrillLawAi`)
+i linia startu CampDrill; `Drill.cs:671` - komentarz pomiaru (mierzy obie reguly niezaleznie od klucza). `Armoury/ModuleData/Armoury.settings.xml` klucza nie ma (start procesu - domyslne z kodu).
+Progi `m97szkolenie`: SZ-4 sprawdza tylko doby z "zasada AI TAK" (bez zalozenia o domyslnej), SZ-5 to INFO. Log biegu 101 (klucz true u Jeffa): "zasada AI TAK" 180/180 dob,
+SZ-4 TAK (XP z marszu 0), SZ-5 INFO: XP AI x0.67 (spadek 33%) - to stan, ktory Jeff juz gra. Zadnych testow ani skryptow autotestu z tym kluczem.
+
+**Ryzyko:** u Jeffa zero (wartosc z MCM nadpisuje domyslna); nowa instalacja / reset MCM - AI cwiczy wolniej (jak u Jeffa: ok. -33% XP AI w biegu 101).
+
+**Status:** GOTOWE (zbudowane; zachowanie u Jeffa bez zmian).
+
+---
+
+### Podsumowanie paczki m103-drobne (stan HEAD)
+
+- **Build:** Armoury, CrashScribe, GrandTourney, RealisticCaptivity, ForgeView - kod wyjscia 0, 0 bledow (Armoury pelne przebudowanie `--no-incremental`,
+  `Armoury.dll` md5 `e07b8266fcf765d7b9e867e8b5c1c049`). `python tools/gen_mcm.py` - bez zmian po ostatnim kroku. Pozostale mody nie czytaja zmienionych typow (grep).
+- **Ustawienia Armoury:** 2249 (bylo 2243; +6). **Nowe klucze (domyslnie):** `RaidCountsAsWork` TAK ("A night's rest"); `SutlerRowClothing` TAK, `SutlerLaundry` TAK,
+  `SutlerLaundryCutPercent` 25 (0-75), `SutlerLaundryDays` 7 (1-28), `SutlerLaundryMenPerWasher` 20 (5-100) ("Camp and baggage (night 20/21.10)"). **Zmieniona domyslna:**
+  `DrillCampOnlyAi` NIE -> TAK. W `Armoury.json` Jeffa nowych kluczy nie ma (wejda domyslne), `DrillCampOnlyAi` juz true.
+- **Zapis:** `arm_board` - format nb2 (odczyt nb1 bez zmian; DLL 101 nie czyta nb2); `arm_sutlerrow` - pole 8 (koniec praczek; stare zapisy bez zmian).
+- **Nowe linie / pola logu:** "Nocleg: gracz - godzina H:00 rabunku (...) liczona jak praca ..." (raz na dobe), pole "godziny rabunku bez odpoczynku (Raid Counts As Work) N"
+  w "NocnyMarsz: gracz o swicie"; "Markietani obozu (m99): odziez | ..." i "... praczki | ...", pola "odziez" i "praczki" w linii doby rzedu i w linii startu rzedu, pola
+  "rzad markietanow (gracz, z kiesy)" i "praczki: druzyna gracza zdarla mniej o ..." w "Odziez wojska (150): dzien"; "Listy goncze (m102): ... zapis arm_board N B; sklad zapisu nb2: ...",
+  "Tablica ogloszen (m102): wczytano zapis arm_board nb2 / w starym formacie nb1 ...", "wpiete ... zapis arm_board nb2 (odczyt takze nb1)".
+- **sprawdz_logi:** WP-7 (m97wioski), MK-2/MK-3 rozszerzone + MK-8, MK-9 (m99markietani), L-8 <= 12 KB + L-8b (m102tablica), KP-1 + KP-1b (m98plotki), tekst SZ-5 (m97szkolenie).
+
+**Co sprawdzic w autotescie (nikt jeszcze nie uruchomil gry z ta DLL):**
+1. Rabunek wioski pobocznej i wsi gry przez gracza (najlepiej noca): linia "godzina ... rabunku ... liczona jak praca", w linii switu pole > 0, odpoczynek doby nie rosnie
+   w godzinach rabunku; WP-7 TAK; armia gracza z rabunkiem wioski pobocznej - doba bez premii odpoczynku (linia "Dzien odpoczynku armii (R3-08a)").
+2. Rzad markietanow (oboz >= 150): opcja odziezy (po kilku dobach z chuda sakiewka ludzi albo `SutlerClothing` NIE) - linia "odziez" z kontrola 0, MK-3 i MK-8 TAK;
+   praczki - linia "praczki", MK-9 TAK, przez 7 dob pole "praczki" w "Odziez wojska (150)", potem znika; zapis/wczytanie w trakcie praczek - opcja dalej szara z dniami.
+3. Tablica: linia doby listow - `zapis arm_board` < 12 288 B i "sklad zapisu nb2 ... (Y% nb1)", L-8 TAK; zapis i wczytanie - linia "wczytano zapis arm_board nb2" z ta sama
+   liczba listow i band; wczytanie zapisu z 101 - linia "wczytano ... w starym formacie nb1"; wyplaty listow (L-3, L-10) bez zmian.
+4. KP-1/KP-1b: `--grupa m98plotki <Armoury-*.log> --crashscribe <session-*.log>` - 0 i 0.
+5. m97szkolenie: "zasada AI TAK" jak w 101 (u Jeffa bez zmian).
+
+---
+
+### Poprawki po recenzji (4 uwagi, wszystkie PRAWDA) - commit `5c30a953`
+
+**Po ludzku (dla Jeffa):** dwie drobne zmiany w grze i dwie w narzedziu do logow. (1) Praczki pracuja dla tylu ludzi, za ilu zaplaciles: najmujesz je dla 10 ludzi
+(1 praczka = 20 ludzi), potem werbujesz 200 - nowi rekruci zdzieraja odziez jak dawniej, ulga obejmuje tylko 20 objetych. Podpowiedz w menu mowi, ilu ludzi
+praczki obsluguja. (2) Gdy miasto, z ktorego markietani biora towar, jest oblezone, opcja "Clothe the men from the sutlers' carts" jest szara z napisem
+"The market of X is under siege" - tak samo jak markietani kupujacy odziez z sakiewki ludzi. (3) i (4) - tylko narzedzie sprawdzajace logi (gra bez zmian).
+
+| Uwaga | Werdykt | Co zrobiono |
+|---|---|---|
+| 1. Praczki: cena z liczby ludzi w chwili najecia, ulga na cala druzyne | PRAWDA | pole 9 `arm_sutlerrow` = objeci (praczki x ludzi na praczke), `LaundryShare(men)` = 1 - cut x min(1, objeci / ludzie) |
+| 2. WP-7 liczony na calym logu, licznik zeruje sie przy wczytaniu | PRAWDA | WP-7 osobno w kazdej sesji, w kazdej najwyzej 1 linia doby bez switu |
+| 3. KP-1b zamyka blok CrashScribe dopiero na nastepnym `# ERROR` | PRAWDA | blok konczy sie na 2. linii `#####` od naglowka albo na pierwszej linii `[HH:MM:SS]` |
+| 4. Odziez z rzedu bez sprawdzenia oblezenia (T3-K1 odmawia) | PRAWDA | `ClotheCondition` i `Clothe`: miasto-zrodlo oblezone - opcja szara z podpowiedzia, akcja odmawia |
+
+#### Uwaga 1. Praczki - ulga tylko dla oplaconych ludzi (PRAWDA)
+
+**Problem:** recenzja: gracz z 10 ludzmi doczepiony do duzej armii (Can liczy oboz armii) placi za 1 praczke 1 x 7 x 2 = 14 denarow, w ciagu 7 dob werbuje
+200 ludzi i ma -25% zuzycia dla 210 ludzi. Usluga dla nieoplaconych ludzi lamie regule "kazda usluga ma platnika"; wynik zalezy od kolejnosci ruchow gracza.
+
+**Przyczyna (sprawdzone w kodzie):** `CampSutlers.LaundryPrice` liczy praczki z `MemberRoster.TotalRegulars` w chwili najecia; `LaundryShare()` zwracal
+`1 - cut` przez caly termin bez wzgledu na liczbe ludzi; `ArmyClothing.OnDailyTickParty` mnozyl przez ten udzial zuzycie biezacej liczby ludzi (`Accrue(id, men, true, share)`).
+`CampSutlers.Can` liczy `CampMen` (oboz armii, gdy gracz jest w armii) - przyklad z recenzji jest mozliwy.
+
+**Zmiana:**
+- `CampSutlers._laundryMen` = praczki x `SutlerLaundryMenPerWasher` z chwili najecia (np. 10 ludzi -> 1 praczka -> objeci 20; 150 ludzi -> 8 praczek -> objeci 160).
+  Zmiana suwaka MCM w trakcie terminu nie zmienia oplaconej uslugi.
+- `LaundryShare(int men)` = `1 - cut x min(1, objeci / men)`; `ArmyClothing.OnDailyTickParty` przekazuje `men` (ta sama miara: ludzie bez bohaterow, jak cena praczek).
+  Pole "praczki: druzyna gracza zdarla mniej o ..." w linii "Odziez wojska (150)" liczy `(1 - share)` - pokazuje teraz rzeczywista ulge.
+- Zapis: pole 9 `arm_sutlerrow` (objeci; `-` bez praczek). Stary kod (101) czyta 7 pol - pole 8 i 9 pomija. Zapis z polem 8 bez pola 9 (tylko build m103 sprzed
+  poprawki - nigdy nie wgrany, nie uruchomiony) - praczki koncza prace (nie wiadomo, za ilu zaplacono). Reset w nowej kampanii (`_laundryMen = 0`).
+- Menu (po angielsku): podpowiedz najmu "... they look after up to N men; men you recruit beyond that are not looked after."; praczki czynne - "They look after
+  the N men you paid for; the other K of your M men wear out their clothes as before."
+
+**Linie logu:** "Markietani obozu (m99): praczki | ... = X | objeci do C ludzi (praczki x 20, rekruci ponad to bez ulgi) | zuzycie odziezy ..."; linia doby rzedu -
+"praczki: ... czynne jeszcze H h (zuzycie -25%, objeci C z M ludzi)"; linia startu rzedu - "praczki czynne jeszcze H h (objeci C ludzi)".
+sprawdz_logi **MK-9** sprawdza tez: objeci = praczki x ludzi na praczke i objeci >= ludzie w chwili najecia (linia bez pola - log sprzed poprawki, bez sprawdzenia).
+
+**Ryzyko / co sprawdzic (kontrola calosci):** jedyny czytelnik `LaundryShare` to `ArmyClothing.OnDailyTickParty` (grep); AI i garnizony bez zmian (`mp.IsMainParty`).
+Druzyna mniejsza niz objeci - pelna ulga (min 1), jak dotad. Nic z niczego: oplata bez zmian, ulga tylko mniejsza albo rowna dotychczasowej - zloto ani sztuki
+nie powstaja. Regex MK-9 (`M99M_WASH`) i linii doby (`M99M_DAY`) czyta nowe linie (sprawdzone na sztucznym logu). Autotest: najac praczki przy malej druzynie,
+zwerbowac wiecej - w linii doby rzedu "objeci C z M" (M > C), pole "praczki: druzyna gracza zdarla mniej o" mniejsze niz 25% zuzycia.
+
+**Klucz MCM:** `SutlerLaundry` (bez nowego klucza - poprawka zasady istniejacej uslugi). **Status:** DO SPRAWDZENIA.
+
+#### Uwaga 2. WP-7 osobno w kazdej sesji (PRAWDA)
+
+**Problem / przyczyna (sprawdzone):** `NightRest.ResetWorld` (z konstruktora `ArmouryBehavior`, wiec przy kazdym wczytaniu) zeruje `_raidWorkHoursDay` i
+`_raidWorkLogDay`. Zapis i wczytanie miedzy godzina rabunku a switem zostawia w logu linie "liczona jak praca", a jej godziny nie trafiaja do zadnej linii switu.
+WP-7 liczyl caly log razem z tolerancja 1 - dwa takie wczytania = falszywe NIE.
+
+**Zmiana (tylko sprawdz_logi):** granica sesji = linia "Nocleg (zegar ksiegi): start sesji" (`NightClock.Reset` wolane z `NightRest.ResetWorld` - ta sama chwila co
+zerowanie licznika; linia przy pierwszym ticku godzinowym, przed pierwsza godzina rabunku) albo "Wioski poboczne (WP): start sesji" (OnSessionLaunched).
+WP-7: w kazdej sesji z rabunkiem godziny w liniach switu >= linie doby - 1; wynik podaje liczbe sesji i niezgodnych.
+
+**Sprawdzone:** log 101 - WP-7 INFO jak dotad (brak pola). Sztuczny log: 3 sesje po 1 linii doby, swit tylko w ostatniej - stara wersja NIE (falszywe), nowa TAK;
+1 sesja z 3 liniami doby i 1 h w switach - NIE w obu (prawdziwy blad dalej wykrywany). **Status:** GOTOWE (narzedzie).
+
+#### Uwaga 3. KP-1b - blok bledu CrashScribe konczy sie na zamykajacym `#####` (PRAWDA)
+
+**Problem / przyczyna (sprawdzone w `CrashScribe/src/Scribe.cs` i logu 101):** blok `Scribe.Report` to `#####`, `# ERROR ...`, `#####`, tresc, `#####`; KP-1b
+doklejal do bloku wszystko do nastepnego naglowka `# ERROR`, takze zwykle linie `[07:17:43] Breadcrumb set...`, `[07:18:07] Net cast over Armoury...` (log 101
+po linii 230). Wzmianka `Armoury.InnDrink.` / `Armoury.Rumours.` w zwyklej linii dalaby falszywe NIE.
+
+**Zmiana (tylko sprawdz_logi):** blok konczy sie na drugiej linii `#####` od naglowka `# ERROR` (pierwsza zamyka naglowek) albo - blok urwany - na pierwszej linii
+`[HH:MM:SS] ` (`M98P_CS_TS`); dopiero wtedy szukanie `M98P_CS` w liniach bloku.
+
+**Sprawdzone:** log 101 - KP-1b TAK (0), jak dotad. Sztuczny log: blok bez stosu Armoury + zwykle linie z `Armoury.InnDrink.Hourly` i `Armoury.Rumours.Drink` - stara
+wersja NIE (falszywe, 1), nowa TAK (0); prawdziwy blok ze stosem `Armoury.InnDrink.Import` - NIE (1); blok urwany ze stosem `Armoury.Rumours.Hear` zakonczony linia
+`[HH:MM:SS]` - NIE (1). **Status:** GOTOWE (narzedzie).
+
+#### Uwaga 4. Odziez z rzedu przy oblezonym miescie-zrodle (PRAWDA)
+
+**Problem / przyczyna (sprawdzone):** `ArmyClothing.FromSutlers` (T3-K1, odziez markietanow z sakiewki ludzi, takze druzyny gracza) odmawia przy
+`town.IsUnderSiege` (`_dSutSiege`), a `CampSutlers.ClotheCondition` / `Clothe` -> `ArmyClothing.RowBuy` braly te same sztuki z polki oblezonego miasta bez
+sprawdzenia. Dwie zasady dla tych samych sztuk tej samej druzyny zaleznie od platnika. Ekonomia byla zamknieta (pieniadz i towar mialy platnika i odbiorce).
+
+**Zmiana:** `ClotheCondition` - `src.IsUnderSiege` -> opcja szara, podpowiedz "The market of X is under siege - the sutlers cannot bring cloth or leather out of it.";
+`Clothe` - ta sama kontrola przed `RowBuy` ("The market of X is under siege."). Miasto-zrodlo jak dotad (`Source()`, jak cala reszta rzedu) - bez szukania innego
+miasta, tak jak T3-K1 (pomija, nie szuka dalej).
+
+**Swiadomie BEZ zmian:** reszta rzedu (sklep, platnerze) i markietani obiegu (Sutlers) nie patrza na oblezenie (jak pisze recenzja) - to nie ta sama usluga co
+odziez T3-K1, wiec nie ma tam dwoch zasad dla tych samych sztuk; zmiana poza zakresem uwagi (CLAUDE.md 8.3). Okno lupu L3 (`CitySack.NoSpendCloth`) w T3-K1 dotyczy zoldu ludzi zdobywcy wydawanego w lupionym miescie - odziez rzedu placi
+kiesa gracza, wiec tej zasady nie przenoszono (to inny platnik, a wolanie z warunku menu nabijaloby licznik L3).
+
+**Ryzyko:** tylko mniej sytuacji, w ktorych opcja dziala; zapis i pieniadz bez zmian. **Klucz MCM:** `SutlerRowClothing`. **Status:** DO SPRAWDZENIA.
+
+#### Stan po poprawkach
+
+- **Build:** Armoury (`--no-incremental`), CrashScribe, GrandTourney, RealisticCaptivity, ForgeView - kod wyjscia 0, 0 bledow; `Armoury.dll` md5
+  `dd361fcb495e0758804c20c0cfa01b2f`. `python tools/gen_mcm.py` - bez zmian (2249 ustawien Armoury; Settings.cs nietkniety, bez nowych kluczy).
+- **Zapis:** `arm_sutlerrow` - pola 8 (koniec praczek) i 9 (objeci praczkami); stary zapis Jeffa (101) czyta sie bez zmian.
+- **sprawdz_logi na logach 101:** m97wioski - NIE 0 (WP-7 INFO); m98plotki - KP-1 TAK, KP-1b TAK; m99markietani - MK-8/MK-9 INFO (bez uzyc). Gra nie byla uruchamiana,
+  nic nie wgrane.
+- **Autotest (dopisek do listy powyzej):** pkt 2 - praczki przy malej druzynie, potem werbunek: linia doby rzedu "objeci C z M", MK-9 TAK; oblezone miasto-zrodlo -
+  opcja odziezy szara. Pkt 1 - zapis i wczytanie w trakcie rabunku: WP-7 dalej TAK.

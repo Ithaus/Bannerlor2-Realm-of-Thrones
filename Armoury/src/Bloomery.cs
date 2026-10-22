@@ -139,6 +139,7 @@ namespace Armoury
         // liczniki doby (tylko log)
         private static int _dBlooms, _dBurnt, _dWoods, _dBought, _dGold, _dShortShelf, _dShortGold, _dNoMarket, _dTicked, _dOver;
         private static int _dTownMine, _dTownMineWood, _dTownMineSkip;
+        private static int _dForgeLeft, _dTownMineKept;   // m103 P7b: drewno zostawione kuzniom miasta (dymarki z polki miasta handlowego), cykle kopaln BK w miastach pominiete przez zapas kuzni
         private static float _dUnwon;
         private static int _stumbles, _stumblesDay;
         // F4b: liczniki doby rachunku za drewno (tylko log) i stan "otwarty wczoraj" do kontroli (-1 = pierwsza linia sesji)
@@ -178,6 +179,17 @@ namespace Armoury
 
         /// <summary>Lupa obowiazuje w tej sesji (waga i cena ustawione przez HistoricalPrices.Apply).</summary>
         internal static bool On { get { return _applied; } }
+
+        /// <summary>m103 P7b: klucz BloomeryShelfLeavesForges - dymarki zostawiaja na polce miasta jedna dobe wlasnego zuzycia drewna miasta (kuznia pierwsza).</summary>
+        internal static bool ForgeKeepOn { get { var s = Settings.Current; return s != null && s.BloomeryShelfLeavesForges && _applied; } }
+
+        /// <summary>m103 P7b: ile drewna dymarka zostawia na polce miasta - jedna doba wlasnego zuzycia miasta bez dymarek (CaravanBulk.UseNowNoBloomery: kuznie
+        /// wedlug obecnych rak, domy, rzemioslo, linie warsztatow), w gore do pelnej sztuki. Szacunek z rak, nie z pomiaru polki - nie wpada w petle przy pustej polce.</summary>
+        private static int ForgeKeep(Town town, ItemObject wood)
+        {
+            try { float u = CaravanBulk.UseNowNoBloomery(town, wood); return u > 0f && !float.IsNaN(u) && !float.IsInfinity(u) ? (int)Math.Ceiling(u) : 0; }
+            catch (Exception e) { Stumble("ForgeKeep", e); return 0; }
+        }
 
         internal static bool IsBloom(ItemObject it) { return _applied && it != null && ReferenceEquals(it, _iron); }
 
@@ -528,6 +540,15 @@ namespace Armoury
                         if (town == null || shelf == null) { _dNoMarket += want; continue; }
                         int n = Math.Min(want, shelf.GetItemNumber(wood));
                         if (n < want) _dShortShelf += want - Math.Max(0, n);
+                        // m103 P7b (klucz BloomeryShelfLeavesForges): dymarka bierze z polki miasta handlowego tylko ponad jedna dobe wlasnego zuzycia miasta (kuznie wedlug
+                        // rak, domy, rzemioslo, linie warsztatow - bez dymarek; CaravanBulk.UseNowNoBloomery) - kuznia miasta pierwsza na wlasnej polce; kredyt F5Lend
+                        // i zakup ponizej biora najwyzej n, wiec zapas zostaje. "brak na polce" bez zmian (prawdziwy brak), zostawione - osobny licznik linii 214
+                        if (n > 0 && ForgeKeepOn)
+                        {
+                            int keepF = ForgeKeep(town, wood);
+                            int n2 = Math.Min(n, Math.Max(0, shelf.GetItemNumber(wood) - keepF));
+                            if (n2 < n) { _dForgeLeft += n - n2; n = n2; }
+                        }
                         if (n <= 0) continue;
                         int price = Math.Max(0, town.MarketData.GetPrice(el));
                         m.Price = price;
@@ -1025,6 +1046,7 @@ namespace Armoury
                 int need = wpb * count;
                 int price = Math.Max(0, town.MarketData.GetPrice(new EquipmentElement(wood)));
                 if (shelf.GetItemNumber(wood) < need || w.Capital < need * price) { _dTownMineSkip++; return true; }
+                if (ForgeKeepOn && shelf.GetItemNumber(wood) - ForgeKeep(town, wood) < need) { _dTownMineSkip++; _dTownMineKept++; return true; }   // m103 P7b: kopalnia BK w miescie to tez dymarka - kuznia pierwsza
                 if (player ? _cycleWiredPlayer : _cycleWired) { _pw = w; _pNeed = need; _pPrice = price; _pCount = count; return false; }
                 BuyTownMineWood(w, st, town, shelf, wood, need, price, count);
                 return false;
@@ -1090,6 +1112,7 @@ namespace Armoury
               .Append("; kopalni z tickiem ").Append(_dTicked).Append(", znanych ").Append(mines)
               .Append("); wegiel dymarek: spalone ").Append(_dBurnt).Append(" ladunkow drewna = ").Append(WoodPerBloom()).Append(" x lupy (roznica ").Append(_dBurnt - WoodPerBloom() * _dBlooms)
               .Append("), las okregu ").Append(_dWoods).Append(", targ ").Append(_dBought).Append(" za ").Append(_dGold).Append(" zl (brak na polce ").Append(_dShortShelf)
+              .Append(ForgeKeepOn ? ", zostawione kuzniom " + _dForgeLeft + (_dTownMineKept > 0 ? " i cykli kopaln BK w miastach " + _dTownMineKept : "") : "")   // m103 P7b (klucz BloomeryShelfLeavesForges)
               .Append(", brak zlota wsi ").Append(_dShortGold).Append(", bez miasta handlowego ").Append(_dNoMarket).Append(")")
               .Append("; kopalnia bez wegla ").Append(_dUnwon.ToString("0.#", inv)).Append(" lup (model ponad drewno w dymarce)")
               .Append(", lupy bez drewna ").Append(_dOver)
@@ -1176,6 +1199,7 @@ namespace Armoury
             try { F7Roll(); } catch (Exception e) { F7Stumble("Roll(NewDay)", e); }   // f7-wegiel: linia weglarzy z tozsamoscia drewna dymarek - PRZED zerowaniem licznikow doby
             _dBlooms = 0; _dBurnt = 0; _dWoods = 0; _dBought = 0; _dGold = 0; _dShortShelf = 0; _dShortGold = 0; _dNoMarket = 0; _dTicked = 0; _dOver = 0;
             _dTownMine = 0; _dTownMineWood = 0; _dTownMineSkip = 0; _dTownMineRej = 0; _dUnwon = 0f; _stumblesDay = 0;
+            _dForgeLeft = 0; _dTownMineKept = 0;   // m103 P7b
             // F4a: liczniki wozow i lupy niewytopione per kopalnia; stan "w drodze" do kontroli nastepnej doby
             _cCarts = 0; _cBought = 0; _cGold = 0; _cDaysSum = 0; _cArrCarts = 0; _cArr = 0; _cArrDays = 0; _cWait = 0; _cBack = 0; _cBackPcs = 0; _cRefund = 0; _cLost = 0;
             _cNoSurplus = 0; _cNoGold = 0; _cTicks = 0;

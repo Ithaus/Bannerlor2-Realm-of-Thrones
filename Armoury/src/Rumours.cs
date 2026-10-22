@@ -583,7 +583,11 @@ namespace Armoury
                 int k = i + 1;
                 next = () => { try { _dPagesTurned++; ShowPage(place, pages, k, heard); } catch (Exception e) { Stumble("NextPage", e); } };
             }
-            InformationManager.ShowInquiry(new InquiryData(title, pages[i], true, more, more ? "Hear more" : "Enough talk", more ? "Enough talk" : null, next, null), true);
+            // m103-lektor: lektor czyta naglowek i plotki tej strony (pamiec nagran albo ElevenLabs w tle - Lektor.Live; wlasny try w srodku); "Enough talk" zatrzymuje
+            // glos (akcja okna - dotad null; "Hear more" wola next -> nowa strona zastepuje stara). Klucz LektorEnabled wylaczony - obie wywolania nic nie robia.
+            Lektor.GossipPage(place, pages[i], i);
+            Action stop = Lektor.GossipStopAction;   // jeden delegat na proces - InquiryData.HasSameContentWith (porownuje akcje) jak dotad dla tej samej ostatniej strony
+            InformationManager.ShowInquiry(new InquiryData(title, pages[i], true, more, more ? "Hear more" : "Enough talk", more ? "Enough talk" : null, more ? next : stop, more ? stop : null), true);
         }
 
         private static string JoinInts(List<int> v)

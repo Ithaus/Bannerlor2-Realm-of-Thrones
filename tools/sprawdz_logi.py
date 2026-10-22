@@ -1026,16 +1026,62 @@ Uzycie (Python 3, tylko odczyt):
                     PR-2 latka startu opowiesci N/N (ROT 8.1.8: >= 30 metod, miejsca + zaciag >= 35) i reszta latek TAK, PR-3 Robert i Ned 2/2, PR-4 w prologu zadne wydarzenie ROT, PR-5 zadna
                     wojna Westeros-Westeros (bez Wolnych Ludzi), PR-6 pakty 3/3 + 6/6, PR-7 koniec prologu (Robert martwy, Joffrey krolem, Ned jencem), PR-8 NedEvent (Ned
                     martwy, Robb wladca Polnocy). Log bez prologu: INFO.
+--grupa m103sceny : (21.10, w-toku/m103-sceny; Armoury/src/Prologue.Scenes.cs, PrologueScenes.Data.cs, StoryWindow.cs, StoryPictures.cs, RotWindowPictures.cs; klucze
+                    PrologueScenes, StoryImagesForRotWindows) python -I tools/sprawdz_logi.py --grupa m103sceny <Armoury-*.log> [--crashscribe <session-*.log>]
+                    [--rgl <rgl_log_*.txt>]. SC-0 start (klucz, 23 sceny), SC-1 ERROR 0, SC-2 wszystkie nalezne pokazane, SC-3 kazda w swoim dniu, SC-4 kolejnosc bez
+                    powtorzen, SC-5 scena 23 po KONCU PROLOGU, SC-6 po jednej, SC-7 pominiete 0, SC-8 okna ROT (zapas 0), SC-9 obrazki z plikow (INFO), SC-10 bez
+                    zamkniec bez przycisku, SC-11 para z 'AUTOTEST: OKNO wydarzenie ROT', SC-12 po wczytaniu bez powtorek, SC-13 zwolnienie tekstury przy otwartym
+                    oknie 0 (linia Armoury 'ZWOLNIENIE PRZY OKNIE'; assert gry 'Trying to render a released texture' w grze wydaniowej nie trafia do logow - --rgl
+                    tylko dodatkowo), SC-14 obrazki okien ROT (INFO). Sceny zalatwione w zapisie (pokazane + pominiete z linii startu) SC-2 liczy jako zalatwione.
+                    Log bez prologu (kampania klasyczna): SC-0 INFO, SC-1 i SC-13 dalej licza (latka okien ROT i obrazki dzialaja w kazdej kampanii), SC-14 INFO.
+--grupa m104e5 : (21.10, w-toku/m104-e5; Armoury/src/Prologue.World*.cs, CanonCompanions.cs, arm_canon_moves.tsv #p10, GrandTourney/src/CanonApi.cs; klucze
+                    PrologueRoyalProgress, PrologueHandTourney, PrologueTyrionHeld, PrologueJaimeAtRiverrun, PrologueHillClans, PrologueMountainRaiders, PrologueBericHunt)
+                    python -I tools/sprawdz_logi.py --grupa m104e5 <Armoury-*.log>. E5-0 start i latki, E5-1 ERROR i potkniecia 0, E5-2 orszak (rusza <= d3, Winterfell
+                    < d40, KP < d100), E5-3 Tyrion na Mur (INFO), E5-4 Turniej Reki w KP d123-127 (E5-4b kanon w drabince INFO), E5-5 Tyrion jencem town_EN1 d111-131,
+                    E5-6 Jaime #p10 do town_V2, E5-7 klany gorskie d118-119 i >= 80% dob 119-186, E5-8 ludzie Gory d155-156 i >= 80% dob 156-186 (E5-8b spalona >= 1 wies),
+                    E5-8c bandy i szacunki celow (INFO, m105-drobne), E5-9 Beric rusza d160-173 po pierwszej SPALONEJ wsi albo od d168 (m105-drobne; dotad d160-165;
+                    liczba spalonych z linii 'Beric: rusza', gdy jest - wczytanie zapisu po spaleniu),
+                    E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
+                    kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
+--grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
+                    python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
+                    KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
+--grupa m105dziennik : (21.10, w-toku/m105-dziennik; Armoury/src/MapChatLog.cs; klucze MapChatLogClearOfMenu, MapChatLogFrame, MapHideTradeNotices; plik testu
+                    CrashScribe/armoury-dziennik.flag) python -I tools/sprawdz_logi.py --grupa m105dziennik <Armoury-*.log>. DZ-0 linie start i kampania (widok, pola MPChatVM,
+                    latka tabliczek TAK), DZ-0b widget dziennika znaleziony i ramka dodana (przy kluczu ramki), DZ-1 ERROR MapChatLog 0, DZ-2 filtr handlu (doby z filtrem TAK:
+                    przepuszczone 0, ukryte > 0; doby NIE: ukryte 0, przepuszczone > 0; zero zdarzen i zmiana klucza w dobie - INFO), DZ-3 potkniecia 0, DZ-4 proby testu
+                    w menu (>= 1, kazda: zachodzenie 0, ramka TAK przy kluczu, dol ramki <= granica PAUSED z linii testu (1080 - 195 przy 16:9), wynik TAK; brak prob
+                    przy pliku testu i przesunieciach - NIE), DZ-4b proby na mapie (wynik TAK: lewa krawedz >= 100 przy kluczu przesuniecia, ramka, dol nad paskiem),
+                    DZ-5 przesuniecia >= 1 przy kluczu TAK (w autotescie gracz czeka w menu miasta). Log bez linii m105: INFO.
+--grupa m105drobne : (21/22.10, w-toku/m105-drobne; Armoury/src/QuestGangAxes.cs, klucz QuestGangAxesFix; CrashScribe/src/Watchdog.cs) python -I tools/sprawdz_logi.py
+                    --grupa m105drobne <Armoury-*.log> [--crashscribe <session-*.log>]. DR-1 ERROR QuestGangAxes / QuestPay8.ShownReward 0 (T-4), DR-2 latka sprawy
+                    broni gangu WPIETA (i prefiksy getterow 2/2) w kazdej sesji z kluczem, DR-3 sprawy broni gangu - srednia po zmianie >= 1, ilosc siekier >= 1 i nagroda
+                    czytelna (brak spraw - INFO 'T-4 niesprawdzone'), DR-4 (z --crashscribe): po 'AUTOTEST: WYJSCIE: QuitGame' linia 'Straznik zawieszen: gra sie zamyka'
+                    i 0 blokow GAME HANG (bez QuitGame: po linii zamykania 0 GAME HANG; bez obu - INFO). Ludzie Gory (m105-drobne pkt 1): grupa m104e5 (E5-8b, E5-8c, E5-9).
+--grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
+                    CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
+                    WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
+                    essoskie od dnia kalendarza 21, WK-4 pary essoskie w wojnie w prologu (>= 90% dob od dnia 23), WK-5 Reach z korona (zdarzenie najwyzej raz, potem
+                    SOJUSZ TAK, Reach-Dorne bez wojny), WK-6 Dorne z korona od dnia zareczyn Myrcelli (PAKT, bez wojny), WK-7 smoki: etap wedlug dnia opowiesci i siodlo
+                    zgodne z etapem (smok pod siodlem tylko dorosly Drogon), WK-8 zdarzenia (INFO). Kampania klasyczna: WK-2..4 INFO; klucz Essos NIE: WK-2 tylko latka,
+                    WK-3/WK-4 INFO; zapis sprzed m104 ("nie dotyczy"): WK-5..7 INFO.
 --grupa m100kryjowki : (21.10, w-toku/m100-kryjowki; Armoury/src/HideoutSight.cs, klucze HideoutScoutingChance, HideoutRumourReveals, HideoutAwayFromSettlements,
                     HideoutRelocateAfterClear) python -I tools/sprawdz_logi.py --grupa m100kryjowki <Armoury-*.log>. KR-0 start, KR-1 ERROR i potkniecia 0, KR-2 latki 4/4,
                     KR-3 nowa kryjowka nie blizej niz prog, KR-4 Zwiad <= progu - wypatrzenie tylko z plotki, KR-5 po rozbiciu w innym miejscu, KR-6 uzycie (INFO). Log bez paczki: INFO.
 --grupa m102tablica : (21.10, w-toku/m102-tablica; Armoury/src/NoticeBoard*.cs, klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties i nast.)
                     python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
                     T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
-                    L-7 lordom <= 1% kas miast, L-8 zapis <= 16 KB, L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+                    L-7 lordom <= 1% kas miast, L-8 zapis <= 12 KB (m103-drobne, nb2), L-8b nb2 wobec nb1 (INFO), L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+--grupa m103lektor : (21.10, w-toku/m103-lektor; Armoury/src/Lektor.cs, Lektor.Live.cs, klucze LektorEnabled, LektorEventWindows, LektorGossipLive, LektorGossipDailyChars,
+                    LektorGossipReserveChars) python -I tools/sprawdz_logi.py --grupa m103lektor <Armoury-*.log> [--crashscribe <session-*.log>] (strumieniowo). LK-0 linia startu,
+                    LK-1 ERROR lektora i potkniecia 0 (takze watek nagran), LK-2 latka EventScreen OnActivate i OnDeactivate tak, LK-3 nagran okien = wiersze arm_lektor.tsv w repo
+                    (odrzucone 0), LK-4 w autotescie 0 zapytan API (bez "nowe nagranie", "konto ElevenLabs"; plik armoury-lektor-live.flag - INFO), LK-5 okna ROT z nagraniem
+                    odtworzone (start > 0; z --crashscribe: okna zamkniete przez autotest z tytulem z tsv -> start > 0), LK-6 grane po 0,5 s NIE 0 i koniec za wczesnie 0,
+                    LK-7 kazdy start okna ma stop albo koniec, LK-8 znaki dzis <= limit, LK-9 plotki (INFO). Log bez paczki: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
-                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale. Log bez paczki: INFO.
+                    MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
+                    MK-8 (m103) odziez z rzedu: potrzeba druzyny spada o kupione sztuki, MK-9 (m103) praczki: cena = praczki x doby x dniowka. Log bez paczki: INFO.
 --grupa m97posilki : (20.10, w-toku/m97-posilki - Jeff "wojsko za szybko pojawia sie ... im jest dalej, tym dluzej sie na nie czeka"; Armoury/src/DrMarchArrival.cs; klucz DrArrivalByMarch)
                     python -I tools/sprawdz_logi.py --grupa m97posilki <Armoury-*.log> (strumieniowo). P97-0 linia startu (latki 2/2), P97-1 potkniecia i ERROR 0,
                     P97-2 zaden przyjety ponad maks. godzin marszu, P97-3 czas rosnie z godzinami marszu, P97-4 dalecy ponad maks., P97-5 bitwy (INFO), P97-6 bez pomiaru 0.
@@ -1201,7 +1247,7 @@ Uzycie (Python 3, tylko odczyt):
                     Planu (krok 8: R i P >= 95% - od r4-koszyk wedlug P9: kcal JEDZENIA z linii "KS: tanszy koszyk miast (P9)", rzeczy INFO; log bez linii P9 - wartosc koszyka; punkt
                     staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru; feed-swiat recenzja: P9 liczy drabine przy cenach startu - to idzie do gry, narzut niedoboru
                     zostaje w Planie, wiec prog bez wyjatkow), NKS-6 zapasy miast rynku +-2%
-                    zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
+                    zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (D4 21.10: przy linii cen przed A "poza" tylko para oddalona przez KS o > 0.3 od celu wobec tej linii, takze NKS-7e; pasmo bezwzgledne - INFO "cel KS") (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
                     pieniadze (KS 0; 8b swiat wobec bazy +-0.5%; 8c koszyk niekupiony z braku pieniedzy: miasta <= 5%, wsie - kcal bez pokrycia (niekupione i nie robione
                     w domu) <= 5%; 8d reszta - INFO; 8e utarg wozow i podatek panow przed wlaczeniem i w oknie - INFO), NKS-7e kontrola wczesna D+7, NKS-9 doba KS <= 3 ms (9b z hakami ZC4/ZC5
                     <= 10 ms, 9c takt doby <= +10% bazy), NKS-10 ERROR i potkniecia 0, NKS-11 wlaczenie, NKS-12 lambda 0 w D i 1 w D+14, polki w D, NKS-13 koszyk ZC4
@@ -1609,6 +1655,24 @@ Uzycie (Python 3, tylko odczyt):
                     wierzyciele, odsetki i splaty (INFO), M96D-5 podatki nadzwyczajne i skutki (lojalnosc na podatek <= 5), M96D-6 czas, potkniecia, ERROR TownDebt,
                     M96D-7 zwolnienie DS po zdobyciu i czekanie na pule Banku (INFO).
                     python -I tools/sprawdz_logi.py --grupa m96dlugi_dlugi <Armoury-*.log>
+--grupa m103p3    : (21.10, galaz w-toku/m103-gospodarka P3 - decyzja D1 po biegu P2; Armoury/src/DsTowns.cs, KsFolkIncome.cs, klucze Ks Farm Surplus Cap Net i Ds Farm
+                    Fix Share Cap) linie f5 (segment "P3 sufit firm"), DS ("udzial firm w doplywie netto (m103 P3)", rampa, f14) i FIRMY USTALONE: M3P-0 segment w kazdej
+                    linii f5, M3P-1 zadnej podwyzki w rampie DS, M3P-2/3 podwyzki, przyciete sufitem, firmy od zera, obnizki z dochodu (INFO), M3P-4 wspolczynnik swiata
+                    przy ustaleniu (udzial po = min(1, przed), wspolczynnik = min(1, 1 / przed)), M3P-4b firmy bez doplywu przy ustaleniu (INFO), M3P-5 firmy przy
+                    ustaleniu (INFO), M3P-6 udzial na koniec <= 1.00, M3P-6b udzial z firmami bez doplywu na koniec (INFO), M3P-7 zaleglosci zamkow <= 200 tys., M3P-8
+                    firmy na koniec (INFO), M3P-9 czas f5 <= 0.2 ms, M3P-10 potkniecia i ERROR 0, M3P-11 pobor wobec doplywu 4 miast z kasy-miast.csv (INFO), M3P-12
+                    najdluzsza seria bez wplaty panu przy kasie > 1.5 x zapas (droga (f), INFO; poprawki po recenzji 21.10). Reszta celow D1 w grupach
+                    m96dlugi_dlugi (M96D-3), nakum (NAKUM-26/27), nkasy (NKA-3), drobne2 (D2K-5), etap5 (KR-9), etap8 (C-4c, G1-5a).
+                    python -I tools/sprawdz_logi.py --grupa m103p3 <Armoury-*.log>
+--grupa m103wsie  : (21.10, galaz w-toku/m103-gospodarka czesc 3 - wsie pod KS; Armoury/src/TownFolk.Ks.cs ShelfBudget, StartCalibration.Money.cs, klucz Ks Village
+                    Basket At Shelf) linie ZC4 (segment "m103 wsie", krok 8, drabina 1), "Przeplywy osad (kiesy wsi)", "Akumulator kies", "Towary ... tools": M3W-0 segment
+                    w kazdej linii ZC4 z zakupami wsi, M3W-1 kiesy wsi MNK 5 okien 26 dob >= -0.10%/d, M3W-2 wsi < 1000 zl <= 5%, M3W-3 zakupy / wplyw netto <= 0.95
+                    (surowo; bez daniny od skarbca w mianowniku tylko przy danienie > 40 tys./d - P2 1.03, 102g 0.96), M3W-4 ponad 3 x skrzynia >= 1.5 mln, M3W-5 danina
+                    od skarbca wsi do panow > 40 tys./d, M3W-6 koszyk wsi ZC4 (drabina 1 kupione / chciane, zamiast NE3-16) >= 15% i M3W-9 miasta stac na jedzenie >= 78%
+                    - straznicy 'nie gorzej' (P2 je spelnia - nie dowodza naprawy), M3W-7 bez pokrycia <= 10% (W, E), M3W-10 narzedzia wsi >= 30/d (DECYZJA, gdy koszyk ZC4
+                    chce mniej; ocena po biegu z W1 - budzet tnie koniec drabiny), M3W-10b narzedzia drabiny 1 chciane/kupione/przyciete (INFO), M3W-11/12 budzet z wplywu
+                    i przyciete, w tym rzeczy (INFO), M3W-13 potkniecia i ERROR 0. Reszta celow: nakum (NAKUM-26), etap8 (G1-5a, C-4c), nks (NKS-13, NKS-24).
+                    python -I tools/sprawdz_logi.py --grupa m103wsie <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -1948,9 +2012,20 @@ Uzycie (Python 3, tylko odczyt):
                     OB-0 start (klucz, udzial), OB-1 linie "ERROR in SideVillageVisit." 0, OB-2 kazda bitwa z obroncami zamknieta (druzyna nie przezywa bitwy; ostatnia
                     otwarta na koncu logu - INFO), OB-3 straty z ludnosci <= obroncow, OB-4 obroncow <= pulapu ludnosci (1/10 w domu, najwyzej 60), OB-5 druzyny
                     sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
+--grupa m99optym   : (21.10, galaz w-toku/m99-optym; Armoury/src/KingdomTreasury.Optim.cs) optymalizacja przelomu doby. python -I tools/sprawdz_logi.py --grupa m99optym
+                    <Armoury-*.log> [--baza-doby <Armoury-*.log bazy>]. MO-0 linia startu, MO-1 takt doby i KingdomTreasury.Daily wobec bazy (INFO), MO-2 Optim Verify
+                    roznice 0, MO-3 ERROR 0.
+--grupa m105optym  : (21.10, galaz w-toku/m105-optym; KingdomTreasury.Optim105.cs, SutlerNear.cs, BuildFunding.Optim105.cs, ClanIncomeBook.Optim105.cs) skroty
+                    przelomu doby. python -I tools/sprawdz_logi.py --grupa m105optym <Armoury-*.log> [--baza-doby <Armoury-*.log bazy>] (strumieniowo). M5-0 linia startu
+                    "Optym (m105): start", M5-1 takt doby i sekcje (KingdomTreasury, Sutlers, ClanIncomeBook, BuildFunding) ostatnich 60 dob wobec bazy (INFO), M5-2 Optim
+                    Verify: roznice 0 razem i porownan > 0 w kazdej czynnej czesci (model bez lenn - gdy pominiete > 0; najblizsze osady - gdy z tablic doby; delegaty
+                    BK - gdy linie ClanIncomeBook; BuildFunding - sama linia, 0 porownan = brak budow), M5-3 model KT pominiety (dob z pominietymi > 0; straznik nie
+                    wylaczyl), M5-4 Sutlers z tablic doby, M5-5 potkniecia 0 i ERROR Optim105 / SutlerNear 0, M5-6 linie ClanIncomeBook bez "BRAK" (delegaty BK
+                    zbudowane). Log sprzed galezi - INFO.
 --grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
-                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours." 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
+                    Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours" 0 (m103-drobne: z zapisem stanu),
+                    KP-1b (z --crashscribe <session-*.log>) bloki bledow CrashScribe ze stosem InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony i pieniadz u odbiorcy
                     (obieg 0), KP-4 turnieje i swaty prawdziwe w chwili sluchania, KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy upiciu / kacu,
                     KP-7 ruch doby (INFO), KP-8 pobudka z pelnym paskiem snu przy pijanym = odespane (recenzja technika). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -8076,6 +8151,8 @@ def etap5_wsie(rep, lines, start, until):
     st = st_on[-1]
     extra = fnum(r"dopisek pana z utargu wsi ([\d.]+)", st) or 0.0
     tempo = fnum(r"tempo nadwyzki ([\d.]+)/d", st)
+    if tempo is None:   # m103 P1: przy P3 linia stanu pisze "tempo W 1/60 (P3), place R/P 0.15/d" - tempo udzialu to juz tylko place R/P
+        tempo = fnum(r"place R/P ([\d.]+)/d", st)
     tithe_on = "dziesiecina tak" in st
     share = fnum(r"dziesiecina tak \(wsie ([\d.]+) utargu", st) or 0.0
     kie = by_day(lines, "Kiesa ludu: dzien")
@@ -8111,8 +8188,13 @@ def etap5_wsie(rep, lines, start, until):
         # nalezne wsi wobec utargu okna (linia Utarg wsi (112) - ta sama doba ksiegi)
         ut = by_day(lines, "Utarg wsi (112): dzien")
         handed = sum(num(r"powroty taborow z utargiem \d+: oddane (\d+)", ut.get(d, ""), int, 0) or 0 for d in w28 if d in ti)
+        # m103 P1 (W12-4): przy DS dziesiecine wsi bierze woz (DsVillage -> TownFolk.TitheVillageAtCart), a VillageTithe odejmuje ten utarg (DsTiSeen) -
+        # linia "Dziesiecina (E5/C3)" ma wtedy "wsie 0"; dziesiecina przy wozie z linii "Daniny wsi (DS)" (te same doby okna) liczy sie jako nalezna i zaplacona
+        dsl4 = by_day(lines, "Daniny wsi (DS): dzien")
+        dsti4 = sum(num(r"\| wozy: .*?, dziesiecina (\d+) \(", dsl4.get(d, ""), int, 0) or 0 for d in w28 if d in ti)
+        due += dsti4; tv += dsti4
         q4 = due / handed if handed > 0 else None
-        rep.add("W12-4: dziesiecina wsi nalezna wobec utargu taborow (sr28)", f"{q4 * 100:.2f}% (nalezne {due}, utarg {handed}; niezaplacone {due - tv})" if q4 is not None else "brak linii Utarg wsi (112)",
+        rep.add("W12-4: dziesiecina wsi nalezna wobec utargu taborow (sr28)", f"{q4 * 100:.2f}% (nalezne {due}" + (f", w tym przy wozie DS {dsti4}" if dsti4 else "") + f", utarg {handed}; niezaplacone {due - tv})" if q4 is not None else "brak linii Utarg wsi (112)",
                 f"{share * 100:.0f}% +-0.3 pp (Tithe Village Share)", (abs(q4 - share) <= 0.003) if q4 is not None else None)
     else:
         rep.add("W12-1: dziesiecina", "wylaczona (Temple Tithe 0)" + (f"; linii {len(ti)}" if ti else ""), "0 linii przy wylaczonej", len(ti) == 0)
@@ -8131,7 +8213,38 @@ def etap5_wsie(rep, lines, start, until):
     off = sum(num(r"oferta nadwyzki na jutro (\d+)", kie[d], int, 0) or 0 for d in w28)
     lok = sum(fnum(r"lokata \(kiesa W ponad zapas dni\) ([\d.]+)", kie[d], 0.0) or 0.0 for d in w28)
     q6 = off / lok if lok > 0 else None
-    rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.3f} (oferta {off / max(1, len(w28)):.0f}/d, lokata {lok / max(1, len(w28)):.0f})" if q6 is not None else "-",
+    # m103 P1 (W12-6): przy P3 (lista dostatku) LadderOffers nadpisuje oferte: W = nadwyzka / FolkSurplusSpendDays, R i P = 0.3 x nadwyzka / tyle samo dni (na wierzch);
+    # udzial 0.15 z linii stanu to wtedy tylko place R/P - prog = 1/FolkSurplusSpendDays z linii doby ("P3: oferta W 1/60"), tolerancja 2% w dol
+    p36 = None
+    for d in reversed(w28):
+        p36 = num(r"P3: oferta W 1/(\d+)", kie[d], int)
+        if p36:
+            break
+    # m103 recenzja (W12-6): "oferta nadwyzki na jutro" to suma ofert W+R+P (TownFolk.Live.cs d.OffT), a przy P3 oferta W = DOvC[0]/N - ta sama nadwyzka co lokata W,
+    # wiec suma / lokata >= 1/N z samej konstrukcji. Nowy log ma oferte W osobno ("P3: oferta W 1/N = X, R i P 0.3/N = Y"): prog dwustronny oferta W / lokata W
+    # = 1/N +-2% (doby z polem; lokata z tych samych dob), R+P jako INFO. Log bez pola - stary prog jednostronny z dopiskiem, ze licznik zawiera R/P.
+    ow6 = {}
+    if p36:
+        for d in w28:
+            m6 = re.search(r"P3: oferta W 1/\d+ = (\d+), R i P [\d.]+/\d+ = (-?\d+)", kie[d])
+            if m6:
+                ow6[d] = (int(m6.group(1)), int(m6.group(2)))
+    if p36 and ow6:
+        thr6 = 1.0 / p36
+        n6 = len(ow6)
+        offw6 = sum(v[0] for v in ow6.values()); offrp6 = sum(v[1] for v in ow6.values())
+        lokw6 = sum(fnum(r"lokata \(kiesa W ponad zapas dni\) ([\d.]+)", kie[d], 0.0) or 0.0 for d in ow6)
+        q6w = offw6 / lokw6 if lokw6 > 0 else None
+        rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", (f"{q6w:.5f}" + (f" = 1/{1.0 / q6w:.1f}" if q6w > 0 else "") + f" (oferta W {offw6 / n6:.0f}/d, lokata W {lokw6 / n6:.0f}; dob z polem {n6} z {len(w28)};"
+                f" INFO: oferta R+P na wierzch {offrp6 / n6:.0f}/d, suma W+R+P / lokata {q6:.4f})") if q6w is not None else "-",
+                f"1/{p36} = {thr6:.5f} +-2% dwustronnie (P3: oferta W = lokata W / FolkSurplusSpendDays; R/P i place R/P " + (f"{tempo:.2f}" if tempo is not None else "-") + " poza miara)",
+                (abs(q6w / thr6 - 1.0) <= 0.02) if q6w is not None else None)
+    if p36 and not ow6:
+        thr6 = 1.0 / p36
+        rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.4f} (oferta W+R+P {off / max(1, len(w28)):.0f}/d, lokata W {lok / max(1, len(w28)):.0f}; P3: oferta W 1/{p36};"
+                f" log bez oferty W osobno - licznik zawiera R/P)" if q6 is not None else "-",
+                f">= 1/{p36} = {thr6:.4f} -2% (P3: oferta W 1/FolkSurplusSpendDays, R/P na wierzch - prog jednostronny, nie lapie zawyzonej oferty; place R/P " + (f"{tempo:.2f}" if tempo is not None else "-") + " poza miara)", (q6 >= thr6 * 0.98) if q6 is not None else None)
+    if not p36: rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.3f} (oferta {off / max(1, len(w28)):.0f}/d, lokata {lok / max(1, len(w28)):.0f})" if q6 is not None else "-",
             f">= {tempo:.2f} - 0.002 (tempo z linii stanu; dotad 0.07)" if tempo is not None else ">= tempo", (q6 >= tempo - 0.002) if (q6 is not None and tempo is not None) else None)
     # ---- W12-7 zmiana kies wsi i ludu miast (cel decyzji: wsie i lud nie gromadza; przed: wsie +57.6 tys./d, lud miast +93.0 tys./d sr28 kopia-fin3)
     ps = by_day(lines, "Pieniadz swiata: dzien")
@@ -21291,7 +21404,45 @@ def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
     bdm = st.mean(bdn) if bdn else None
     bsm = st.mean(bsc) if bsc else None
     ok8 = (min(bd) >= 60) if bd else None
-    rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", (f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek")
+    # m103 P1 (GL2-8, ZMIANA PROGU - plan gospodarki 21.10, zalacznik "GL2-8 prog sprzeczny z regulami"): prog zgodny z regulami ludu zamiast 60 dni projektu [R]:
+    # dni oszczednosci grupy m_t > 1.5 >= zapas dni wazony potrzeba klas (W TownFolkReserveDays z linii stanu / R 21 / P 30 - TownFolk.cs:54; potrzeba klasy =
+    # kiesa / zapas dni z linii doby "Kiesa ludu" tej samej doby albo wczesniejszej) i GL2-8b (stac na pelny koszyk) srednio >= 95%. Nadwyzke ponad ten zapas
+    # zdejmuja z reguly danina P1, kiesa2, oferta P3 1/60 i place R/P (TownFolk.Live.cs krok 5), wiec 60 dni bylo nieosiagalne (baza W43 bez reguly: 51).
+    kl8 = by_day(lines, "Kiesa ludu: dzien")
+    kd8 = sorted(kl8)
+    so8 = [x for x in lines if x.startswith("Kiesa ludu (E5/B1): CZYNNA")]
+    rdw8 = (fnum(r"zapas W (\d+) dni", so8[-1]) if so8 else None) or 10.0
+    res8 = []
+    for d in wlast:
+        prev = [k for k in kd8 if k <= d]
+        if not prev:
+            continue
+        m8 = re.search(r"\| kiesy \d+ \(W (\d+) / R (\d+) / P (\d+)\), gminy -?\d+, zapas dni W ([\d.]+|\S+) / R ([\d.]+|\S+) / P ([\d.]+|\S+),", kl8[prev[-1]])
+        if not m8:
+            continue
+        nd8, wd8 = 0.0, 0.0
+        for kk, dd, rd in ((m8.group(1), m8.group(4), rdw8), (m8.group(2), m8.group(5), 21.0), (m8.group(3), m8.group(6), 30.0)):
+            try:
+                kv, dv = float(kk), float(dd)
+            except ValueError:
+                continue
+            if dv > 0:
+                nd8 += kv / dv; wd8 += rd * kv / dv
+        if nd8 > 0:
+            res8.append(wd8 / nd8)
+    thr8 = st.mean(res8) if res8 else None
+    if thr8 is not None:
+        ok8n = (min(bd) >= thr8 and bool(bs) and st.mean(bs) >= 95) if bd else None
+        # m103 recenzja (GL2-8): prog z regul ludu to podloga, nie wykrywanie regresji - przy biegu bazowym (--baza-doby: ten sam kod, klucze GL wylaczone)
+        # dodatkowo srednia >= 0.9 x baza (jak w starej sciezce: ponizej 0.9 x baza = NIE)
+        reg8 = bool(bd) and bdm is not None and st.mean(bd) < 0.9 * bdm
+        if ok8n and reg8:
+            ok8n = False
+        rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", (f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek")
+                + f"; zapas wazony potrzeba {thr8:.1f} dni (W {rdw8:.0f} / R 21 / P 30, dob {len(res8)})" + (f"; stac srednio {st.mean(bs):.0f}%" if bs else "; brak GL2-8b")
+                + (f"; baza {bdm:.0f}" + (" - REGRESJA: srednio < 0.9 x baza" if reg8 else "") if bdm is not None else ("; baza bez tabeli tygodnia GL2 (bieg sprzed paczki?)" if bdp else "; bez biegu bazowego (--baza-doby)")),
+                ">= zapas dni wazony potrzeba (regula ludu; ZMIANA PROGU 21.10 - dotad 60 dni projektu [R], nieosiagalne) i GL2-8b srednio >= 95%; z biegiem bazowym takze srednio >= 0.9 x baza", ok8n)
+    if thr8 is None: rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", (f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek")
             + (f"; baza {bdm:.0f}" if bdm is not None else ("; baza bez tabeli tygodnia GL2 (bieg sprzed paczki?)" if bdp else "; bez biegu bazowego (--baza-doby)")),
             ">= 60 (projekt [R]); ponizej, ale srednio >= 0.9 x baza = DECYZJA (baza W43 bez reguly: 51 - prog nieosiagalny przy zapasie ludu 10/21/30 dni)",
             ok8, decide=bool(bd) and bdm is not None and st.mean(bd) >= 0.9 * bdm)
@@ -36691,7 +36842,7 @@ def m97szkolenie_main(logp):
         rep.add("SZ-5: AI XP zasada obozu wobec dawnej reguly (decyzja: Drill Camp Only Ai)",
                 f"XP po broni razem dawna {old} -> obozu {camp} (x{ratio:.2f}, {'spadek' if ratio < 1 else 'wzrost'} {abs(1 - ratio) * 100:.0f}%); godzin postoju za dnia srednio {sum(hours) / len(hours):.2f};"
                 f" partio-doby 0 h {h0} ({100 * h0 / max(1, pd):.0f}%), 8 h {h8} ({100 * h8 / max(1, pd):.0f}%)",
-                "INFO (powyzej ok. 30% spadku - Jeff decyduje o kluczu)", None)
+                "INFO (klucz domyslnie TAK od m103-drobne, u Jeffa TAK; powyzej ok. 30% spadku - do oceny)", None)
         st_last = int(ais[-1][21])
         rep.add("SZ-6: potkniecia CampDrill (ostatnia linia AI)", str(st_last), "0", st_last == 0)
     else:
@@ -37594,6 +37745,1090 @@ def m101prolog_main(logp, csp=None):
     return 0
 
 
+# ------------------------------------------------------------ m104e5 (21.10, w-toku/m104-e5: sceny zmieniajace swiat prologu 298 - orszak krola, Turniej Reki, Tyrion i Jaime
+# jencami, klany gorskie Doliny, ludzie Gory, Beric; Armoury/src/Prologue.World*.cs, CanonCompanions.cs (HeldRow), arm_canon_moves.tsv (#p10), GrandTourney CanonApi;
+# klucze PrologueRoyalProgress, PrologueHandTourney, PrologueTyrionHeld, PrologueJaimeAtRiverrun, PrologueHillClans, PrologueMountainRaiders, PrologueBericHunt).
+# Korzysta z TS, Report, M101_TAG, M101_DAY, M101P_TAG.
+M104_TAG = "Prolog E5 (m104): "
+M104_DAY = re.compile(r"^dzien (\d+) \| (.*)")
+M104_EV_DAY = re.compile(r"\(dzien prologu ([0-9.]+)")
+M104_ERR = re.compile(r"^ERROR in Prologue\.(World|DailyWorld|ApplyWorld|WorldHourly|WorldBeforeSave|WorldSaveOver|WorldStartLine)|^ERROR in CanonCompanions\.RebuildHeld")
+M104_CANON = re.compile(r"zmiana strony #(p01|p02|p10|m01|m02)( POMINIETA)? - (.*)")
+# recenzja m104: klucze scen z linii startu E5 (scena wylaczona kluczem - INFO z powodem, nie NIE)
+M104_KEYS = re.compile(r"\| orszak (TAK|NIE), Beric (TAK|NIE), ludzie Gory (TAK|NIE), klany (TAK|NIE), turniej (TAK|NIE)")
+M104_HOLDKEYS = re.compile(r"klucze: Tyrion (TAK|NIE), Jaime (TAK|NIE) \(zmiany stron CanonCompanionsFollowStory (TAK|NIE)\)")
+
+
+def m104e5_main(logp):
+    """m104e5 (21.10, w-toku/m104-e5; Jeff 21.10 "Kod scen zmieniajacych swiat i wojen wedlug ksiazki - rob to teraz"): E5-0 linie startu E5 (latki straz niewoli i okup TAK),
+    E5-1 ERROR scen i potkniecia E5 0, E5-2 orszak: rusza do d3, Winterfell przed d40, Krolewska Przystan przed d100, E5-3 Tyrion na Mur (INFO), E5-4 Turniej Reki
+    rozstrzygniety w KP w d123-127 (E5-4b uczestnicy kanonu w drabince - INFO), E5-5 Tyrion jencem town_EN1 bez ucieczki w dniach 111-131 (linie doby) i bez
+    'PRZEPUSZCZONE' poza smiercia, E5-6 Jaime: #p10 do town_V2 (bez linii - INFO, gdy wojna Polnocy nie wybuchla), E5-7 klany gorskie: pierwsza banda d118-119 i w polu
+    >= 1 przez >= 80% dob 119-186, E5-8 ludzie Gory: pierwsza banda d155-156 i w polu przez >= 80% dob 156-186 (albo rozbici w bitwie), E5-8b spalona >= 1 wies,
+    E5-8c (m105-drobne, INFO) ludzie band przy narodzinach i szacunki 'szac. N dob na osade' w liniach celu, E5-9 Beric rusza w d160-173 po pierwszej SPALONEJ wsi
+    Ludzi Gory albo od d168 bez spalonej (m105-drobne: wezwanie po skargach ze spalonych wsi, na druzyne czeka 5 dni; dotad d160-165; POMINIETY - INFO z powodem),
+    E5-10 po prologu (doba >= 189) partie pod scena 0, E5-11 straz niewoli (INFO).
+    Log bez kampanii z prologiem: INFO (kampania klasyczna - E5 nie dziala)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("E5-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, n_err, err_ex = [], {}, 0, []
+    ev = {"rusza": [], "winterfell": [], "kp": [], "pominiety": [], "cb": [], "inn": [], "ty_end": [], "t_done": [], "t_skip": [], "t_proc": [],
+          "blocked": [], "passed": [], "kg_new": [], "kg_fail": [], "mm_new": [], "mm_burn": [], "mm_lost": [], "mm_home": [], "b_go": [], "b_skip": [], "b_end": [],
+          "kg_skip": [], "mm_skip": [], "mm_tgt": []}
+    canon = []
+    last_prol = -1
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if M104_ERR.match(s):
+                n_err += 1
+                if len(err_ex) < 3:
+                    err_ex.append(s[:140])
+                continue
+            if s.startswith(M101_TAG):
+                md = M101_DAY.match(s[len(M101_TAG):])
+                if md:
+                    last_prol = max(last_prol, int(md.group(1)))
+                continue
+            if s.startswith(M101P_TAG):
+                mc = M104_CANON.search(s[len(M101P_TAG):])
+                if mc:
+                    canon.append((mc.group(1), bool(mc.group(2)), mc.group(3)))
+                continue
+            if not s.startswith(M104_TAG):
+                continue
+            body = s[len(M104_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            md = M104_DAY.match(body)
+            if md:
+                days[int(md.group(1))] = md.group(2)
+                last_prol = max(last_prol, int(md.group(1)))
+                continue
+            me = M104_EV_DAY.search(body)
+            d = float(me.group(1)) if me else None
+            for key, pat in (("rusza", "orszak RUSZA"), ("winterfell", "orszak w WINTERFELL"), ("kp", "orszak w KROLEWSKIEJ PRZYSTANI - KONIEC"),
+                             ("pominiety", "orszak POMINIETY albo PRZERWANY"), ("cb", "Tyrion: w CZARNYM ZAMKU"), ("inn", "Tyrion: w GOSPODZIE NA ROZSTAJACH"),
+                             ("t_done", "Turniej Reki ROZSTRZYGNIETY"), ("t_skip", "Turniej Reki POMINIETY albo ODWOLANY"), ("t_proc", "Turniej Reki OBWIESZCZONY"),
+                             ("blocked", "straz niewoli: ZABLOKOWANE"), ("passed", "straz niewoli: PRZEPUSZCZONE"), ("kg_new", "klany gorskie: nowa banda"),
+                             ("kg_fail", "klany gorskie: banda"), ("mm_new", "ludzie Gory: nowa banda"), ("mm_burn", "ludzie Gory: SPALONA wies"),
+                             ("mm_lost", "ludzie Gory: banda "), ("mm_home", "ludzie Gory: koniec prologu"), ("b_go", "Beric: rusza"), ("b_skip", "Beric: POMINIETY"),
+                             ("b_end", "Beric: KONIEC"), ("kg_skip", "klany gorskie POMINIETE"), ("mm_skip", "ludzie Gory POMINIECI")):
+                if body.startswith(pat):
+                    if key == "kg_fail" and "NIE powstala" not in body:
+                        continue
+                    if key == "mm_lost" and "ROZBITA" not in body:
+                        continue
+                    ev[key].append((d, body))
+                    break
+            if body.startswith("ludzie Gory: ") and " - nowy cel " in body:
+                ev["mm_tgt"].append((d, body))   # m105-drobne: E5-8c (szacunek celu w linii 'nowy cel')
+    print(f"plik: {logp} | linii startu E5 {len(starts)}, dob E5 {len(days)}, ostatnia doba prologu {last_prol}, ERROR {n_err}, zmian kanonu (p01/p02/p10/m01/m02) {len(canon)}")
+    if not starts and not days:
+        rep.add("E5-0: linie 'Prolog E5 (m104): ...'", "brak w logu", "INFO (kampania klasyczna albo log sprzed paczki m104-e5)", None)
+        rep.show()
+        return 0
+    st = starts[-1] if starts else ""
+    rep.add("E5-0: linia startu E5 i latki", st[:200] if st else "brak linii startu (log od srodka sesji)", "latki 'straz niewoli TAK, okup TAK'",
+            ("straz niewoli TAK, okup TAK" in st) if st else None)
+    # recenzja m104: klucze z ostatniej linii startu - scena wylaczona kluczem albo pominieta przez zapis sprzed E5 daje INFO z powodem
+    keys = {}
+    mk = M104_KEYS.search(st) if st else None
+    if mk:
+        keys.update(zip(("orszak", "beric", "gora", "klany", "turniej"), mk.groups()))
+    mh = M104_HOLDKEYS.search(st) if st else None
+    if mh:
+        keys.update(zip(("tyrion", "jaime", "follow"), mh.groups()))
+
+    def off(k):
+        return keys.get(k) == "NIE"
+
+    def legacy(key):
+        return next((e for e in ev[key] if "zapis sprzed E5" in e[1]), None)
+    stumb = 0
+    for t in days.values():
+        mt = re.search(r"potkniecia E5 (\d+)", t)
+        if mt:
+            stumb = max(stumb, int(mt.group(1)))
+    rep.add("E5-1: ERROR scen E5 i potkniecia E5", f"ERROR {n_err}" + (f" ({err_ex[0]})" if err_ex else "") + f", potkniecia E5 (najwiecej w linii doby) {stumb}", "0 i 0",
+            n_err == 0 and stumb == 0)
+
+    def first(key):
+        return ev[key][0] if ev[key] else None
+
+    # E5-2 orszak
+    pom = first("pominiety")
+    if off("orszak") and not ev["rusza"]:
+        rep.add("E5-2: orszak krola", "klucz PrologueRoyalProgress NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    elif pom and ("zapis sprzed E5" in pom[1] or "nie ozywiony" in pom[1]):
+        rep.add("E5-2: orszak krola", f"POMINIETY: {pom[1][:140]}", "INFO (zapis sprzed E5 / Robert nie ozywiony)", None)
+    else:
+        r0, w0, k0 = first("rusza"), first("winterfell"), first("kp")
+        parts = [f"rusza d{r0[0]}" if r0 else "bez linii RUSZA", f"Winterfell d{w0[0]}" if w0 else "Winterfell -", f"KP d{k0[0]}" if k0 else "KP -"]
+        if pom:
+            parts.append("PRZERWANY: " + pom[1][:100])
+        ok = None
+        if r0 and r0[0] is not None and r0[0] > 3:
+            ok = False
+        elif last_prol >= 40 and not (w0 and w0[0] is not None and w0[0] < 40):
+            ok = False
+        elif last_prol >= 100 and not (k0 and k0[0] is not None and k0[0] < 100):
+            ok = False
+        elif r0 and (last_prol >= 100 or (w0 and last_prol >= 40)):
+            ok = True
+        rep.add("E5-2: orszak krola (rusza, Winterfell, Krolewska Przystan)", ", ".join(parts) + f" (log do d{last_prol})", "rusza <= d3, Winterfell < d40, KP < d100 (krotszy log - INFO)", ok)
+    cb, inn = first("cb"), first("inn")
+    rep.add("E5-3: Tyrion na Mur i do gospody", (f"Czarny Zamek d{cb[0]}" if cb else "Czarny Zamek -") + ", " + (f"gospoda d{inn[0]}" if inn else "gospoda -"), "INFO (Tyrion bez druzyny - bez drogi)", None)
+    # E5-4 turniej
+    td, ts = first("t_done"), first("t_skip")
+    if off("turniej") and not td and not ev["t_proc"]:
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", "klucz PrologueHandTourney NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    elif td:
+        mw = re.search(r"\| zwyciezca (.*?) \| uczestnicy kanonu w drabince: (.*?) \| gracz (TAK|NIE)", td[1])
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", f"ROZSTRZYGNIETY d{td[0]}" + (f", zwyciezca {mw.group(1)}, gracz {mw.group(3)}" if mw else ""), "d123-127",
+                td[0] is not None and 123 <= td[0] < 128 and "town_EW4" in td[1])
+        if mw:
+            rep.add("E5-4b: uczestnicy kanonu w drabince", mw.group(2), "INFO (Gregor, Loras, Ogar, Jaime - ilu weszlo)", None)
+    elif ts:
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", ts[1][:160], "INFO przy zapisie sprzed E5, inaczej NIE", None if "zapis sprzed E5" in ts[1] else False)
+    else:
+        rep.add("E5-4: Turniej Reki w Krolewskiej Przystani", f"brak linii ROZSTRZYGNIETY (obwieszczony: {'TAK d' + str(first('t_proc')[0]) if ev['t_proc'] else 'NIE'})",
+                "d123-127 (log krotszy niz 128 dob - INFO)", None if last_prol < 128 else False)
+    # E5-5 Tyrion 110-132
+    win = [d for d in sorted(days) if 111 <= d <= 131]
+    bad = []
+    for d in win:
+        mt = re.search(r"\| Tyrion: (.*?) \| Jaime:", days[d])
+        t = mt.group(1) if mt else ""
+        if "jeniec town_EN1" not in t:
+            bad.append((d, t[:80]))
+    pas = [p for p in ev["passed"] if p[0] is not None and 110 <= p[0] <= 132 and "Tyrion" in p[1] and "Death" not in p[1]]
+    blk = [p for p in ev["blocked"] if "Tyrion" in p[1]]
+    p01 = [c for c in canon if c[0] == "p01"]
+    if off("tyrion") or off("follow"):
+        rep.add("E5-5: Tyrion jencem w Orlim Gniezdzie 110-132", "klucz " + ("PrologueTyrionHeld" if off("tyrion") else "CanonCompanionsFollowStory") + " NIE (linia startu)",
+                "INFO (straz wylaczona kluczem)", None)
+    elif not win:
+        rep.add("E5-5: Tyrion jencem w Orlim Gniezdzie 110-132", f"brak dob 111-131 w logu (#p01: {'TAK' if p01 else 'brak linii'})", "INFO (log krotszy)", None)
+    else:
+        rep.add("E5-5: Tyrion jencem w Orlim Gniezdzie 110-132", f"dob w oknie {len(win)}, poza lochem town_EN1 {len(bad)}" + (f" (d{bad[0][0]}: {bad[0][1]})" if bad else "")
+                + f", przepuszczone (nie smierc) {len(pas)}, zablokowane linie {len(blk)}, #p01 {'POMINIETA' if p01 and p01[0][1] else ('TAK' if p01 else 'brak linii')}",
+                "kazda doba 111-131 'jeniec town_EN1', 0 przepuszczonych", len(bad) == 0 and len(pas) == 0)
+    # E5-6 Jaime
+    p10 = [c for c in canon if c[0] == "p10"]
+    m01 = [c for c in canon if c[0] == "m01"]
+    if p10:
+        c = p10[-1]
+        rep.add("E5-6: Jaime jencem w Riverrun (#p10)", ("POMINIETA: " if c[1] else "") + c[2][:160], "#p10 wykonana: akcja prisoner:town_V2 (POMINIETA - NIE)",
+                (not c[1]) and "prisoner:town_V2" in c[2])
+    else:
+        rep.add("E5-6: Jaime jencem w Riverrun (#p10)", "brak linii #p10" + (f" (#m01: {'POMINIETA' if m01[-1][1] else 'wykonana!'})" if m01 else ""),
+                "INFO, gdy wojna Polnocy z korona jeszcze nie wybuchla (wyzwalacz war:battania:vlandia+5)", None if not (m01 and not m01[-1][1]) else False)
+
+    def presence(prefix, lo, hi):
+        seen, ok = 0, 0
+        for d in sorted(days):
+            if lo <= d <= hi:
+                seen += 1
+                mm = re.search(re.escape(prefix) + r" w polu (\d+)/", days[d])
+                if mm and int(mm.group(1)) >= 1:
+                    ok += 1
+        return seen, ok
+
+    kg0 = first("kg_new")
+    seen, okd = presence("klany gorskie:", 119, 186)
+    if off("klany") and not kg0:
+        rep.add("E5-7: klany gorskie Doliny", "klucz PrologueHillClans NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    elif legacy("kg_skip") and not kg0:
+        rep.add("E5-7: klany gorskie Doliny", "POMINIETE: " + legacy("kg_skip")[1][:120], "INFO (zapis sprzed E5)", None)
+    elif last_prol < 119:
+        rep.add("E5-7: klany gorskie Doliny", f"log do d{last_prol}", "INFO (log krotszy niz 119 dob)", None)
+    else:
+        rep.add("E5-7: klany gorskie Doliny", (f"pierwsza banda d{kg0[0]}" if kg0 else "bez nowej bandy" + (f" ({ev['kg_fail'][0][1][:100]})" if ev["kg_fail"] else ""))
+                + f", band od poczatku {len(ev['kg_new'])}, dob z banda w polu {okd}/{seen} (d119-186)", "pierwsza d118-119, w polu >= 80% dob okna",
+                bool(kg0) and kg0[0] is not None and 118 <= kg0[0] < 120 and (seen == 0 or okd >= 0.8 * seen))
+    mm0 = first("mm_new")
+    seen2, ok2 = presence("ludzie Gory:", 156, 186)
+    lost_all = len(ev["mm_lost"]) >= max(1, len(ev["mm_new"]))
+    if (off("gora") or legacy("mm_skip")) and not mm0:
+        why = "klucz PrologueMountainRaiders NIE (linia startu)" if off("gora") else "POMINIECI: " + legacy("mm_skip")[1][:120]
+        rep.add("E5-8: ludzie Gory w Dorzeczu", why, "INFO (scena wylaczona kluczem albo zapis sprzed E5)", None)
+        rep.add("E5-8b: spalone wsie Dorzecza", why, "INFO (scena wylaczona kluczem albo zapis sprzed E5)", None)
+    elif last_prol < 156:
+        rep.add("E5-8: ludzie Gory w Dorzeczu", f"log do d{last_prol}", "INFO (log krotszy niz 156 dob)", None)
+    else:
+        rep.add("E5-8: ludzie Gory w Dorzeczu", (f"pierwsza banda d{mm0[0]}" if mm0 else "bez nowej bandy") + f", band {len(ev['mm_new'])}, dob z banda w polu {ok2}/{seen2} (d156-186), rozbite {len(ev['mm_lost'])}",
+                "pierwsza d155-156, w polu >= 80% dob okna albo wszystkie rozbite w bitwie", bool(mm0) and mm0[0] is not None and 155 <= mm0[0] < 157 and (seen2 == 0 or ok2 >= 0.8 * seen2 or lost_all))
+        rep.add("E5-8b: spalone wsie Dorzecza", f"{len(ev['mm_burn'])}" + (f" (pierwsza: {ev['mm_burn'][0][1][:90]})" if ev["mm_burn"] else "") + f", powrot do domow linii {len(ev['mm_home'])}",
+                ">= 1 do d186 (krotszy log - INFO)", (len(ev["mm_burn"]) >= 1) if last_prol >= 186 or ev["mm_burn"] else None)
+        # m105-drobne: E5-8c - ludzie band przy narodzinach (90-130, min 60) i szacunki celow ("szac. N dob na osade", "NIE ZDAZY do d186", "SILNA MILICJA")
+        men = [int(x.group(1)) for x in (re.search(r"\) - (\d+) ludzi \(z puli", e[1]) for e in ev["mm_new"]) if x]
+        est = [float(x.group(1)) for x in (re.search(r"szac\. ([0-9.]+) dob na osade", e[1]) for e in ev["mm_new"] + ev["mm_tgt"]) if x]
+        late = sum(1 for e in ev["mm_new"] + ev["mm_tgt"] if "NIE ZDAZY" in e[1])
+        strong = sum(1 for e in ev["mm_new"] + ev["mm_tgt"] if "SILNA MILICJA" in e[1])
+        rep.add("E5-8c: bandy Ludzi Gory i szacunki celow (m105-drobne)", f"ludzie band przy narodzinach {men or '-'}, szacunki dob na osade {[round(x, 1) for x in est] or '-'}"
+                f", cele 'NIE ZDAZY' {late}, 'SILNA MILICJA' {strong}, linii 'nowy cel' {len(ev['mm_tgt'])}", "INFO (bandy 90-130 ludzi, krok ok. 4-6 dob)", None)
+    bg, bs = first("b_go"), first("b_skip")
+    if bg:
+        # m105-drobne: wezwanie po pierwszej SPALONEJ wsi Ludzi Gory albo od d168 bez spalonej; na druzyne Beric czeka do 5 dni od wezwania (d160-173)
+        b0 = first("mm_burn")
+        burn_d = b0[0] if b0 else None
+        # recenzja m105 R5: linia 'Beric: rusza' niesie liczbe spalonych wsi (_mmBurned - takze z zapisu, pole 3 'wmm'); wczytanie zapisu z d160-168 po spaleniu nie ma
+        # linii 'SPALONA' w biezacym pliku - liczba z linii rozstrzyga; stary format linii (bez liczby, np. log 102) - jak dotad z linii 'SPALONA'
+        mbn = re.search(r"spalone wsie Ludzi Gory (\d+)\]", bg[1])
+        if mbn:
+            nbn = int(mbn.group(1))
+            okb = bg[0] is not None and 160 <= bg[0] < 174 and (nbn > 0 or bg[0] >= 168)
+        else:
+            okb = bg[0] is not None and 160 <= bg[0] < 174 and ((burn_d is not None and burn_d <= bg[0] + 0.05) or bg[0] >= 168)
+        rep.add("E5-9: oddzial Berica", bg[1][:200] + (f" | pierwsza spalona wies d{burn_d}" if burn_d is not None else " | bez spalonej wsi w tym logu przed ruszeniem")
+                + (f" | spalone wsie w linii Berica {mbn.group(1)}" if mbn else ""),
+                "rusza w d160-173 po pierwszej spalonej wsi albo od d168", okb)
+    elif bs:
+        rep.add("E5-9: oddzial Berica", bs[1][:170], "INFO (POMINIETY - powod w linii)", None)
+    elif off("beric"):
+        rep.add("E5-9: oddzial Berica", "klucz PrologueBericHunt NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
+    else:
+        rep.add("E5-9: oddzial Berica", "brak linii", "rusza w d160-173 (log krotszy niz 174 dob - INFO)", None if last_prol < 174 else False)
+    after = [d for d in sorted(days) if d >= 189]
+    if after:
+        mp = re.search(r"partie pod scena (\d+)", days[after[0]])
+        rep.add("E5-10: po prologu wszystko oddane", f"doba {after[0]}: partie pod scena {mp.group(1) if mp else '?'}", "0", (mp is not None and int(mp.group(1)) == 0))
+    else:
+        rep.add("E5-10: po prologu wszystko oddane", f"log do d{last_prol}", "INFO (log krotszy niz 189 dob)", None)
+    rep.add("E5-11: straz niewoli", f"zablokowane linie {len(ev['blocked'])}, przepuszczone linie {len(ev['passed'])}" + (f" (ostatnia: {ev['passed'][-1][1][:100]})" if ev["passed"] else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m103sceny (21.10, w-toku/m103-sceny: 23 sceny prologu 298 jako okna w wygladzie wydarzen ROT, kazda w swoim
+# dniu prologu - projekt PROJEKT-PROLOG-298 pkt 2; obrazki z plikow Images\Prolog / Images\ROT; Armoury/src/Prologue.Scenes.cs, PrologueScenes.Data.cs, StoryWindow.cs,
+# StoryPictures.cs, RotWindowPictures.cs; klucze PrologueScenes, StoryImagesForRotWindows). Korzysta z M101_TAG, M101_END, M101_DAY, TS, Report.
+M103_TAG = "Prolog (m103): "
+M103_PIC_TAG = "Obrazki (m103): "
+M103_DAYS = [0, 5, 12, 35, 40, 48, 55, 62, 75, 80, 95, 100, 110, 118, 125, 132, 138, 145, 155, 160, 172, 182, 186]
+M103_ARREST = 23   # numer sceny dnia 186 (po KONIEC PROLOGU)
+M103_TOURNEY, M103_TOURNEY_LAST = 15, 137   # recenzja m104: scena 15 (Turniej Reki) czeka na koniec turnieju sceny E5 ('czeka: Turniej Reki jeszcze trwa'), najdluzej do d137
+M103_START = re.compile(r"start sesji \| klucz Prologue Scenes (TAK|NIE) \| sceny pokazane (\d+)/(\d+), pominiete (\d+)(.*?)\| nastepna (\S+).*?\| katalog obrazkow (.*?) \| plikow: Prolog (\d+), ROT (\d+), Kronika (\d+) \| potkniecia (\d+)")
+M103_SHOW = re.compile(r"scena (\d\d) '(.*?)' pokazana \| dzien ([0-9.]+) \(nalezna od (\d+)\) \| obrazek (.*?) \| okno (.*?) \| gracz: (.*?) \| pokazane (\d+)/(\d+), pominiete (\d+) \| (\d+) ms\.")
+M103_CLOSE = re.compile(r"scena (\d\d) zamknieta po ([0-9.]+) s \((.*?)\)\.$")
+M103_SKIP = re.compile(r"POMINIETA scena (\d\d) '(.*?)' - (.*) \(dzien prologu ([0-9.]+)\)\.$")
+M103_WAIT = re.compile(r"scena (\d\d) '(.*?)' czeka: (.*) \(dzien prologu ([0-9.]+), nalezna od (\d+)\)\.$")
+M103_FAIL = re.compile(r"scena (\d\d) '(.*?)' - okno nie otworzylo sie \(proba (\d)/3\)")
+M103_END = re.compile(r"sceny prologu zakonczone \| pokazane (\d+)/(\d+), pominiete (\d+)")
+M103_ERR = re.compile(r"^ERROR in (Prologue\.Scenes|Prologue\.ScenesStartLine|Prologue\.RotWindowPictures|StoryWindow\.|StoryPictures\.|RotWindowPictures\.)")
+M103_CS_OKNO = re.compile(r"AUTOTEST: OKNO wydarzenie ROT \"(.*?)\"")
+M103_RELEASED = "Trying to render a released texture"   # assert gry - w grze wydaniowej nie trafia do logow (MBDebugManager.Assert puste); SC-13 liczy go tylko dodatkowo
+M103_HELD = "ZWOLNIENIE PRZY OKNIE"   # StoryPictures.AppTick: zwolnienie tekstury wstrzymane, bo okno ROT na wierzchu ja rysuje (recenzja m103)
+
+
+def m103sceny_main(logp, csp=None, rglp=None):
+    """m103sceny (21.10, w-toku/m103-sceny; Jeff 21.10 "I zrob wydarzenia wedlug ksiazki"): SC-0 linia startu scen (klucz TAK, 23 sceny), SC-1 ERROR scen / okna /
+    obrazkow 0, SC-2 pokazane wszystkie sceny nalezne do ostatniego dnia logu (23 przy logu >= 187 dni i KONCU PROLOGU), SC-3 kazda w swoim dniu (0 <= dzien - nalezny
+    < 1; scena 23 - w dobie KONCA PROLOGU), SC-4 kolejnosc rosnaca, bez powtorzen w calym logu, SC-5 scena 23 po linii KONIEC PROLOGU, SC-6 po jednej (zamknieta przed
+    nastepna), SC-7 pominiete 0 (poza zapisem sprzed scen - INFO), SC-8 okna ROT (zapas ShowInquiry = NIE), SC-9 obrazki z plikow i zle pliki (INFO), SC-10 zamkniecia
+    przyciskiem (bez przycisku = NIE), SC-11 para z CrashScribe (--crashscribe): kazda pokazana scena ma linie 'AUTOTEST: OKNO wydarzenie ROT "<tytul>"' w tej samej
+    kolejnosci, SC-12 po wczytaniu zapisu bez powtorek (pierwsza scena sesji = pokazane + pominiete + 1), SC-13 zwolnienie tekstury przy otwartym oknie 0 (linia
+    Armoury 'Obrazki (m103): ZWOLNIENIE PRZY OKNIE'; dodatkowo assert 'Trying to render a released texture' z --rgl i CrashScribe - w grze wydaniowej go tam nie ma),
+    SC-14 obrazki okien ROT (INFO). Recenzja m103: SC-2 liczy sceny zalatwione w zapisie (pokazane + pominiete z linii startu sesji) jako zalatwione (bieg z -LoadSave);
+    log bez kampanii z prologiem: SC-0 INFO, ale SC-1 (ERROR) i SC-13 dalej licza - latka okien ROT i obrazki dzialaja w kazdej kampanii."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("SC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sessions = []
+    cur = {"start": None, "ev": []}
+    n_err, err_ex, end_line, end_day, last_day = 0, [], None, None, -1.0
+    bad_files, rot_swaps, rot_nofile, ends = [], [], 0, []
+    held, rot_bw = [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for no, ln in enumerate(fh):
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if M103_ERR.match(s):
+                n_err += 1
+                if len(err_ex) < 3:
+                    err_ex.append(s[:140])
+                continue
+            if s.startswith(M101_TAG):
+                body = s[len(M101_TAG):]
+                me = M101_END.search(body)
+                if me and end_line is None:
+                    end_line, end_day = no, float(me.group(2))
+                md = M101_DAY.match(body)
+                if md:
+                    last_day = max(last_day, float(md.group(1)))
+                continue
+            if s.startswith(M103_PIC_TAG):
+                body = s[len(M103_PIC_TAG):]
+                if body.startswith("ZLY PLIK"):
+                    bad_files.append(body[:160])
+                elif body.startswith(M103_HELD):
+                    held.append(body[:160])
+                elif body.startswith("okno ROT ") and "prefab Blackwater" in body:
+                    rot_bw += 1
+                elif body.startswith("okno ROT ") and " - obrazek arm_" in body:
+                    rot_swaps.append(body.split(" '")[0][9:])
+                elif body.startswith("okno ROT ") and "brak pliku" in body:
+                    rot_nofile += 1
+                continue
+            if not s.startswith(M103_TAG):
+                continue
+            body = s[len(M103_TAG):]
+            mm = M103_START.search(body)
+            if mm:
+                if cur["start"] is not None or cur["ev"]:
+                    sessions.append(cur)
+                cur = {"start": mm.groups(), "ev": []}
+                continue
+            mm = M103_SHOW.search(body)
+            if mm:
+                d = float(mm.group(3))
+                last_day = max(last_day, d)
+                cur["ev"].append(("show", int(mm.group(1)), (d, int(mm.group(4)), mm.group(2), mm.group(5), mm.group(6)), no))
+                continue
+            mm = M103_CLOSE.search(body)
+            if mm:
+                cur["ev"].append(("close", int(mm.group(1)), (float(mm.group(2)), mm.group(3)), no))
+                continue
+            mm = M103_SKIP.search(body)
+            if mm:
+                cur["ev"].append(("skip", int(mm.group(1)), (mm.group(3), float(mm.group(4)), mm.group(2)), no))
+                continue
+            mm = M103_FAIL.search(body)
+            if mm:
+                cur["ev"].append(("fail", int(mm.group(1)), (int(mm.group(3)),), no))
+                continue
+            mm = M103_WAIT.search(body)
+            if mm:
+                cur["ev"].append(("wait", int(mm.group(1)), (mm.group(3), float(mm.group(4))), no))
+                continue
+            mm = M103_END.search(body)
+            if mm:
+                ends.append(mm.groups())
+                continue
+    if cur["start"] is not None or cur["ev"]:
+        sessions.append(cur)
+    cs_titles, cs_released = [], 0
+    if csp and os.path.isfile(csp):
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mc = M103_CS_OKNO.search(ln)
+                if mc:
+                    cs_titles.append(mc.group(1))
+                if M103_RELEASED in ln:
+                    cs_released += 1
+    rgl_released = None
+    if rglp and os.path.isfile(rglp):
+        rgl_released = 0
+        with open(rglp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if M103_RELEASED in ln:
+                    rgl_released += 1
+    starts = [x["start"] for x in sessions if x["start"]]
+    ev = [e for x in sessions for e in x["ev"]]
+    shows = [e for e in ev if e[0] == "show"]
+    closes = [e for e in ev if e[0] == "close"]
+    skips = [e for e in ev if e[0] == "skip"]
+    waits = [e for e in ev if e[0] == "wait"]
+    fails = [e for e in ev if e[0] == "fail"]
+    print(f"plik: {logp} | sesji {len(sessions)}, startow {len(starts)}, pokazanych {len(shows)}, zamknietych {len(closes)}, pominietych {len(skips)}, czeka {len(waits)}"
+          f", nieudanych otwarc {len(fails)}, ERROR {n_err}, ostatni dzien prologu {last_day:.1f}, KONIEC PROLOGU "
+          f"{'dzien ' + format(end_day, '.1f') if end_day is not None else 'brak'}")
+    def sc1():
+        rep.add("SC-1: ERROR scen, okna i obrazkow (Prologue.Scenes, StoryWindow, StoryPictures, RotWindowPictures)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+
+    def sc13():
+        n = len(held) + (rgl_released or 0) + cs_released
+        rep.add("SC-13: zwolnienie tekstury przy otwartym oknie", f"Armoury '{M103_HELD}' {len(held)}" + (f" ({held[0][:100]})" if held else "")
+                + f" | assert gry: rgl_log {rgl_released if rgl_released is not None else '-'}, CrashScribe {cs_released if csp else '-'}",
+                "0 (assert gry w buildzie wydaniowym nie trafia do logow - liczy sie linia Armoury)", n == 0)
+
+    if not starts and not ev:
+        rep.add("SC-0: linie 'Prolog (m103): ...'", "brak w logu", "INFO (klasyczna kampania albo log sprzed m103-sceny)", None)
+        sc1()   # latka okien ROT (prefiks/postfiks EventScreen), StoryWindow.Watch i StoryPictures.AppTick dzialaja takze w kampanii klasycznej
+        sc13()
+        if rot_swaps or rot_nofile or bad_files or rot_bw:
+            rep.add("SC-14: obrazki okien ROT", f"podmienionych {len(rot_swaps)} ({', '.join(rot_swaps[:4])}), okien bez pliku {rot_nofile}, prefab Blackwater (bez obrazka) {rot_bw}"
+                    f", zlych plikow {len(bad_files)}", "INFO", None)
+        rep.show()
+        return 0
+    st = starts[0] if starts else None
+    rep.add("SC-0: linia startu scen", (f"klucz {st[0]}, scen {st[2]}, pokazane {st[1]}, pominiete {st[3]}, nastepna {st[5]}" if st else "brak linii startu"),
+            "klucz TAK, scen 23", (st[0] == "TAK" and st[2] == "23") if st else False)
+    sc1()
+    shown_nr = [e[1] for e in shows]
+    skipped_nr = set(e[1] for e in skips)
+    # recenzja m103: sceny zalatwione w zapisie (maska sc=/sk= - zawsze od 01 w gore: straznik zalatwia je po kolei) - z linii startu kazdej sesji
+    saved = max([int(x[1]) + int(x[3]) for x in starts] or [0])
+    due = [k + 1 for k, d in enumerate(M103_DAYS) if d <= last_day and (k + 1 != M103_ARREST or end_line is not None)]
+    missing = [k for k in due if k not in shown_nr and k not in skipped_nr and k > saved]
+    rep.add("SC-2: pokazane sceny nalezne do ostatniego dnia logu", f"pokazanych {len(set(shown_nr))} z {len(due)} naleznych" + (f", zalatwionych w zapisie {saved}" if saved else "")
+            + (f" (brak: {missing[:8]})" if missing else ""),
+            "wszystkie nalezne (23 przy logu >= 187 dni i koncu prologu; sceny z zapisu - z linii startu)", len(missing) == 0)
+    late = []
+    for e in shows:
+        nr, (d, due_day, title, img, mode) = e[1], e[2]
+        if nr == M103_ARREST and end_day is not None:
+            if not (end_day <= d < end_day + 1.0):
+                late.append(f"{nr} dzien {d:.2f} (koniec prologu {end_day:.1f})")
+        elif nr == M103_TOURNEY and 0.0 <= d - due_day < M103_TOURNEY_LAST - due_day + 1.0:
+            pass   # recenzja m104: czekala na koniec Turnieju Reki (E5) - w oknie d125-137
+        elif not (0.0 <= d - due_day < 1.0):
+            late.append(f"{nr} dzien {d:.2f} (nalezna {due_day})")
+    rep.add("SC-3: kazda scena w swoim dniu", f"poza dniem {len(late)} z {len(shows)}" + (f" ({'; '.join(late[:4])})" if late else ""),
+            "0 <= dzien pokazania - dzien nalezny < 1 (scena 23: w dobie KONCA PROLOGU; scena 15: do d137 - czeka na koniec Turnieju Reki E5)", len(late) == 0 if shows else None)
+    bad_order = []
+    for a, b in zip(shown_nr, shown_nr[1:]):
+        if b <= a:
+            bad_order.append(f"{a}->{b}")
+    dup = sorted(set(n for n in shown_nr if shown_nr.count(n) > 1))
+    rep.add("SC-4: kolejnosc rosnaca, kazda scena raz w calym logu", f"naruszen kolejnosci {len(bad_order)}, powtorzonych {len(dup)}"
+            + (f" ({', '.join(bad_order[:4])}{'; powt. ' + str(dup[:6]) if dup else ''})" if bad_order or dup else ""), "0 i 0", (not bad_order and not dup) if shows else None)
+    arr = [e for e in shows if e[1] == M103_ARREST]
+    if arr:
+        rep.add("SC-5: scena 23 (areszt Neda) po KONCU PROLOGU", f"linia sceny {arr[0][3]}, linia KONCA PROLOGU {end_line if end_line is not None else 'brak'}",
+                "scena po linii KONIEC PROLOGU", end_line is not None and arr[0][3] > end_line)
+    else:
+        rep.add("SC-5: scena 23 (areszt Neda) po KONCU PROLOGU", "scena 23 nie pokazana" + (" (pominieta)" if M103_ARREST in skipped_nr else ""),
+                "INFO gdy log krotszy niz koniec prologu", None if end_line is None or M103_ARREST in skipped_nr else False)
+    overlap = []
+    for x in sessions:
+        open_nr = None
+        for e in x["ev"]:
+            if e[0] == "show":
+                if open_nr is not None:
+                    overlap.append(f"{e[1]} przy otwartej {open_nr}")
+                open_nr = e[1]
+            elif e[0] == "close" and e[1] == open_nr:
+                open_nr = None
+    rep.add("SC-6: po jednej scenie (zamknieta przed nastepna)", f"pokazanych {len(shows)}, zamknietych {len(closes)}, nalozen {len(overlap)}" + (f" ({overlap[0]})" if overlap else ""),
+            "nalozen 0, zamkniete = pokazane (ostatnia moze byc otwarta na koncu logu)", (len(overlap) == 0 and len(shows) - len(closes) in (0, 1)) if shows else None)
+    legacy = [e for e in skips if "zapis prologu sprzed scen" in e[2][0]]
+    other = [e for e in skips if e not in legacy]
+    rep.add("SC-7: pominiete sceny (poza zapisem sprzed scen)", f"{len(other)}" + (f" ({'; '.join(str(e[1]) + ': ' + e[2][0] for e in other[:3])})" if other else "")
+            + (f" | zapis sprzed scen: {len(legacy)} (INFO)" if legacy else ""), "0 w autotescie (bitwy i niewola - powod w linii)", len(other) == 0)
+    modes = {}
+    for e in shows:
+        k = "ROT" if e[2][4] == "ROT" else "zapas"
+        modes[k] = modes.get(k, 0) + 1
+    rep.add("SC-8: okno sceny w wygladzie ROT", f"ROT {modes.get('ROT', 0)}, zapas ShowInquiry {modes.get('zapas', 0)}, nieudanych otwarc {len(fails)}"
+            + (f" (zapas: {next(e[2][4] for e in shows if e[2][4] != 'ROT')[:90]})" if modes.get('zapas') else ""),
+            "zapas 0 i nieudanych 0 (zapas = okno ROT nie weszlo - powod w linii)", (modes.get("zapas", 0) == 0 and not fails) if shows else None)
+    from_file = [e for e in shows if "(plik " in e[2][3]]
+    rep.add("SC-9: obrazki scen z plikow (Images\\Prolog)", f"z pliku {len(from_file)} z {len(shows)}" + (f" | 1.: {shows[0][2][3][:80]}" if shows else "")
+            + (f" | katalog: {st[6][:70]}, plikow Prolog {st[7]}" if st else "") + (f" | ZLE PLIKI {len(bad_files)}: {bad_files[0][:90]}" if bad_files else ""),
+            "INFO (23/23 po dostarczeniu prolog_01..23.png; do tego czasu obrazki ROT); zle pliki - popraw tools/obrazki_okien.py", None)
+    nobtn = [e for e in closes if e[2][1].startswith("bez przycisku")]
+    rep.add("SC-10: zamkniecia okien scen", f"przyciskiem {len(closes) - len(nobtn)}, bez przycisku {len(nobtn)}" + (f" ({nobtn[0][2][1][:80]})" if nobtn else ""),
+            "bez przycisku 0 (ktos zdjal okno z ekranu)", len(nobtn) == 0 if closes else None)
+    if csp:
+        titles = [e[2][2] for e in shows if e[2][4] == "ROT"]   # zapas ShowInquiry nie jest oknem ROT - AutotestUi zamyka go jako zapytanie
+        ours = [t for t in cs_titles if t in set(titles)]
+        rep.add("SC-11: para z CrashScribe 'OKNO wydarzenie ROT'", f"linii z tytulami scen {len(ours)}, scen w oknie ROT {len(titles)}, kolejnosc " + ("zgodna" if ours == titles else "INNA"),
+                "= sceny w oknie ROT i ta sama kolejnosc", ours == titles if titles else None)
+    else:
+        rep.add("SC-11: para z CrashScribe 'OKNO wydarzenie ROT'", "bez --crashscribe", "INFO (podaj --crashscribe <session-*.log>)", None)
+    # sesje z wczytanym stanem scen: maska z zapisu (pokazane + pominiete > 0) albo zapis prologu sprzed scen (WGRANIE 101 - dopisek w linii startu)
+    loads = [x for x in sessions if x["start"] and ((int(x["start"][1]) + int(x["start"][3])) > 0 or "zapis sprzed scen" in x["start"][4])]
+    if loads:
+        bad = []
+        for x in loads:
+            first = next((e[1] for e in x["ev"] if e[0] in ("show", "skip")), None)
+            exp = int(x["start"][1]) + int(x["start"][3]) + 1
+            if first is not None and first != exp:
+                bad.append(f"pierwsza {first}, oczekiwana {exp}")
+        rep.add("SC-12: po wczytaniu zapisu bez powtorek", f"sesji z wczytanym stanem scen {len(loads)}, niezgodnych {len(bad)}" + (f" ({bad[0]})" if bad else ""),
+                "pierwsza scena sesji = pokazane + pominiete z zapisu + 1", len(bad) == 0)
+    else:
+        rep.add("SC-12: po wczytaniu zapisu bez powtorek", "brak sesji z wczytanym stanem scen", "INFO (bieg z -LoadSave zapisu z polowy prologu)", None)
+    sc13()
+    rep.add("SC-14: obrazki okien ROT (Images\\ROT)", f"podmienionych {len(rot_swaps)}" + (f" ({', '.join(rot_swaps[:4])})" if rot_swaps else "") + f", okien bez pliku {rot_nofile}"
+            + (f", prefab Blackwater (bez obrazka) {rot_bw}" if rot_bw else "")
+            + (f" | koniec scen: pokazane {ends[-1][0]}/{ends[-1][1]}, pominiete {ends[-1][2]}" if ends else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m105kolko (21.10, w-toku/m105-kolko: kolko najechania przy zajazdach i wioskach pobocznych -
+# Armoury/src/MapHoverRing.cs, RoadsideInnsView.cs, MapVillagesView.cs; klucz MapHoverRingOurObjects; autotest: plik CrashScribe/armoury-kolko.flag)
+M105K_TAG = "Kolko najechania (m105): "
+M105K_TEST = re.compile(r"test - (zajazd|wioska poboczna) '.*' .* - (TAK|NIE)\.$")
+M105K_DAY = re.compile(r"kolko najechania: pokazane (\d+) razy od uruchomienia gry, encji (\d+), potkniecia (\d+)")
+
+
+def m105kolko_main(logp):
+    """m105kolko (21.10; Jeff 21.10 "dodaj [kolko] do kazdego obiektu gdzie mozna wjechac, zajazdy, wioski poboczne", "zlotawe przy neutralnych"): KO-1 ERROR
+    MapHoverRing / RingTest 0, KO-2 proby testu (plik armoury-kolko.flag) - NIE 0 i co najmniej 1 TAK (brak prob - INFO: kamera bez zajazdu i wioski), KO-3 encja
+    kola postawiona (gdy TAK), KO-4 potkniecia w linii doby zajazdow 0. Log bez linii m105: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("KO-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, tests, made, none, days = 0, [], 0, 0, []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in MapHoverRing") or s.startswith("ERROR in RoadsideInnsView.RingTest") or s.startswith("ERROR in MapVillagesView.RingTest"):
+                n_err += 1
+                continue
+            md = M105K_DAY.search(s)
+            if md:
+                days.append(tuple(int(x) for x in md.groups()))
+            if not s.startswith(M105K_TAG):
+                continue
+            body = s[len(M105K_TAG):]
+            mt = M105K_TEST.search(body)
+            if mt:
+                tests.append(mt.groups())
+            elif "encja kola na scenie mapy postawiona" in body:
+                made += 1
+            elif "bez proby" in body:
+                none += 1
+    print(f"plik: {logp} | prob testu {len(tests)} (bez proby {none}), encji {made}, linii doby z kolkiem {len(days)}, ERROR {n_err}")
+    if not tests and not made and not days and not none:
+        rep.add("KO-0: linie 'Kolko najechania (m105): ...'", "brak w logu", "INFO (log sprzed paczki m105-kolko albo bez pliku testu)", None)
+        rep.add("KO-1: ERROR MapHoverRing / RingTest", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+    rep.add("KO-1: ERROR MapHoverRing / RingTest", f"ERROR {n_err}", "0", n_err == 0)
+    ok = [t for t in tests if t[1] == "TAK"]
+    bad = [t for t in tests if t[1] == "NIE"]
+    kinds = sorted(set(t[0] for t in ok))
+    if tests:
+        rep.add("KO-2: proby kola (autotest)", f"TAK {len(ok)} ({', '.join(kinds) or '-'}), NIE {len(bad)}", "NIE 0, TAK >= 1", not bad and bool(ok))
+    else:
+        rep.add("KO-2: proby kola (autotest)", f"brak prob (bez proby {none})", "INFO - przy kamerze nie stal zajazd ani wioska z wjazdem", None)
+    if ok:
+        rep.add("KO-3: encja kola postawiona", f"{made}", ">= 1 (gdy sa proby TAK)", made >= 1)
+    st = max((d[2] for d in days), default=0)
+    rep.add("KO-4: potkniecia kola (linia doby zajazdow)", f"{st} (linii doby {len(days)})", "0", st == 0)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m105dziennik (21.10, w-toku/m105-dziennik: dziennik wiadomosci na mapie obok menu osady, ramka w stylu ROT,
+# bez wierszy handlu karawan i wiesniakow nad miastami - Armoury/src/MapChatLog.cs; klucze MapChatLogClearOfMenu, MapChatLogFrame, MapHideTradeNotices;
+# autotest: plik CrashScribe/armoury-dziennik.flag)
+M105D_TAG = "Dziennik (m105): "
+M105D_START = re.compile(r"^start - latka tabliczek \(OnCaravanTransactionCompleted\) (TAK|BRAK) \((.*?)\), widok dziennika \(GauntletChatLogView\) (TAK|BRAK), "
+                         r"pola MPChatVM (TAK|BRAK)\.")
+M105D_CAMP = re.compile(r"^kampania - klucze MapChatLogClearOfMenu=(TAK|NIE), MapChatLogFrame=(TAK|NIE), MapHideTradeNotices=(TAK|NIE) .*widok dziennika (TAK|BRAK), "
+                        r"pola MPChatVM (TAK|BRAK), latka tabliczek (TAK|BRAK), test autotestu (TAK|NIE)\.")
+M105D_WIDGET = re.compile(r"^widget dziennika znaleziony \(.*\), ramka dodana (TAK|NIE)")
+M105D_LATE = re.compile(r"^ramka dodana pozniej .*\) (TAK|NIE)")
+M105D_DAY = re.compile(r"^dzien (\d+) - przesuniecia (\d+), powroty (\d+), ramka (\d+), handel na tabliczkach: filtr (TAK|NIE), ukryte (\d+) \(karawany (\d+), "
+                       r"wiesniacy (\d+)\), przepuszczone (\d+), potkniecia (\d+)\.")
+M105D_TEST = re.compile(r"^test - (menu|mapa): linie testowe (\d+)/3 .*, zachodzenie (\d+) px, ramka (TAK|NIE)\b.*, dol ramki y=(-?\d+) .* - (TAK|NIE)(?: \((.*)\))?\.$")
+M105D_NOPROBE = re.compile(r"^test - bez proby \((.*)\)\.")
+M105D_PROBE = re.compile(r"^test - start proby nr (\d+) \((menu|mapa)\)")
+M105D_LIMIT = re.compile(r"\(granica PAUSED (\d+), pasek (\d+)")   # recenzja R5: granice z linii (wysokosc ekranu w jednostkach UI - 16:10, UIScale)
+M105D_PAUSED = 885   # granica przy 16:9 i UIScale 1 - gdy linia testu jej nie podaje (stary format)
+
+
+def m105dziennik_main(logp):
+    """m105dziennik (21.10; Jeff 21.10 "tak, rob dziennik"): DZ-0 linie start i kampania (widok GauntletChatLogView, pola MPChatVM, latka tabliczek TAK), DZ-0b widget
+    znaleziony i ramka dodana (przy kluczu MapChatLogFrame TAK), DZ-1 ERROR MapChatLog 0, DZ-2 filtr handlu na tabliczkach (latka TAK; doby z filtrem TAK - przepuszczone 0
+    i suma ukrytych > 0; doby NIE - ukryte 0, suma przepuszczonych > 0; doba z obiema liczbami > 0 = zmiana klucza w dobie - INFO; zero zdarzen - INFO: osada nie byla
+    w zasiegu), DZ-3 potkniecia (maksimum z linii doby) 0, DZ-4 proby testu w menu (>= 1; kazda: zachodzenie 0, ramka TAK przy kluczu ramki, dol ramki <= granica
+    PAUSED z linii testu (stary format 885), wynik TAK; brak prob - INFO, ale przy pliku testu i przesunieciach obok menu - NIE: autotest przeszedl bez pomiaru),
+    DZ-4b proby na mapie (wynik TAK - lewa krawedz >= 100 przy kluczu przesuniecia, ramka TAK przy kluczu, dol ramki nad paskiem), DZ-5 przy MapChatLogClearOfMenu
+    TAK suma przesuniec >= 1 (test autotestu NIE i zero przesuniec - INFO). Log bez linii m105: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("DZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, starts, camps, widgets, lates, days, tests, noprobe, probes, moved_lines = 0, [], [], [], [], [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in MapChatLog"):
+                n_err += 1
+                continue
+            if not s.startswith(M105D_TAG):
+                continue
+            body = s[len(M105D_TAG):]
+            for rx, bucket in ((M105D_START, starts), (M105D_CAMP, camps), (M105D_WIDGET, widgets), (M105D_LATE, lates), (M105D_TEST, tests),
+                               (M105D_NOPROBE, noprobe), (M105D_PROBE, probes)):
+                mm = rx.search(body)
+                if mm:
+                    g = mm.groups()
+                    if rx is M105D_TEST:
+                        ml = M105D_LIMIT.search(body)
+                        g = g + ((int(ml.group(1)) if ml else M105D_PAUSED),)   # t[7] = granica PAUSED tej proby
+                    bucket.append(g)
+                    break
+            else:
+                md = M105D_DAY.search(body)
+                if md:
+                    g = md.groups()
+                    days.append(tuple(int(x) for x in g[:4]) + (g[4],) + tuple(int(x) for x in g[5:]))
+                elif body.startswith("przesuniety obok menu"):
+                    moved_lines += 1
+    print(f"plik: {logp} | start {len(starts)}, kampania {len(camps)}, widget {len(widgets)}, doby {len(days)}, proby testu {len(tests)} (bez proby {len(noprobe)}, "
+          f"wyslane {len(probes)}), ERROR {n_err}")
+    if not (starts or camps or widgets or days or tests or noprobe or probes):
+        rep.add("DZ-0: linie 'Dziennik (m105): ...'", "brak w logu", "INFO (log sprzed paczki m105-dziennik)", None)
+        rep.add("DZ-1: ERROR MapChatLog", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+    # DZ-0 linie start i kampania
+    st_ok = bool(starts) and all(x[0] == "TAK" and x[2] == "TAK" and x[3] == "TAK" for x in starts)
+    camp_ok = bool(camps) and all(x[3] == "TAK" and x[4] == "TAK" and x[5] == "TAK" for x in camps)
+    st_txt = (f"start {len(starts)} (latka {starts[-1][0]} - {starts[-1][1]}, widok {starts[-1][2]}, pola {starts[-1][3]})" if starts else "start brak")
+    camp_txt = (f"kampania {len(camps)} (klucze ClearOfMenu {camps[-1][0]}, Frame {camps[-1][1]}, HideTrade {camps[-1][2]}; test {camps[-1][6]})" if camps else "kampania brak")
+    rep.add("DZ-0: linie start i kampania", f"{st_txt}; {camp_txt}", "obie linie, widok / pola MPChatVM / latka tabliczek TAK", st_ok and camp_ok)
+    key_clear = camps[-1][0] == "TAK" if camps else True
+    key_frame = camps[-1][1] == "TAK" if camps else True
+    test_on = camps[-1][6] == "TAK" if camps else False
+    # DZ-0b widget i ramka
+    if camps:
+        fr_ok = any(w[0] == "TAK" for w in widgets) or any(x[0] == "TAK" for x in lates)
+        val = f"znaleziony {len(widgets)} razy, ramka dodana " + (", ".join(w[0] for w in widgets) or "-") + (f", pozniej {', '.join(x[0] for x in lates)}" if lates else "")
+        if key_frame:
+            rep.add("DZ-0b: widget dziennika i ramka", val, ">= 1 widget, ramka dodana TAK (klucz MapChatLogFrame TAK)", bool(widgets) and fr_ok)
+        else:
+            rep.add("DZ-0b: widget dziennika i ramka", val, ">= 1 widget (ramka - klucz NIE)", bool(widgets))
+    # DZ-1
+    rep.add("DZ-1: ERROR MapChatLog", f"ERROR {n_err}", "0", n_err == 0)
+    # DZ-2 filtr handlu
+    patch_ok = bool(starts) and starts[-1][0] == "TAK"
+    tak = [d for d in days if d[4] == "TAK"]
+    nie = [d for d in days if d[4] == "NIE"]
+    mixed = [d for d in days if d[5] > 0 and d[8] > 0]
+    bad_tak = [d for d in tak if d[8] > 0 and d[5] == 0]
+    bad_nie = [d for d in nie if d[5] > 0 and d[8] == 0]
+    sum_hid = sum(d[5] for d in tak)
+    sum_car = sum(d[6] for d in days)
+    sum_vil = sum(d[7] for d in days)
+    sum_pass_nie = sum(d[8] for d in nie)
+    events = sum(d[5] + d[8] for d in days)
+    val = (f"latka {starts[-1][0] if starts else '-'}; dob TAK {len(tak)} (ukryte {sum_hid}: karawany {sum_car}, wiesniacy {sum_vil}), dob NIE {len(nie)} "
+           f"(przepuszczone {sum_pass_nie}); zle doby TAK {len(bad_tak)}, zle doby NIE {len(bad_nie)}, zmiana klucza w dobie {len(mixed)}")
+    if not days:
+        rep.add("DZ-2: filtr handlu na tabliczkach", val + "; brak linii doby", "INFO (bieg krotszy niz doba)", None if patch_ok else False)
+    elif events == 0:
+        rep.add("DZ-2: filtr handlu na tabliczkach", val, "INFO - zero zdarzen handlu przy tabliczkach w zasiegu (latka TAK wymagana)", None if patch_ok else False)
+    else:
+        ok = patch_ok and not bad_tak and not bad_nie
+        if tak:
+            ok = ok and sum_hid > 0
+        elif nie:
+            ok = ok and sum_pass_nie > 0
+        rep.add("DZ-2: filtr handlu na tabliczkach", val, "latka TAK; doby TAK: przepuszczone 0 i ukryte > 0; doby NIE: ukryte 0 i przepuszczone > 0", ok)
+        if mixed:
+            rep.add("DZ-2b: zmiana klucza w trakcie doby", f"doby {', '.join(str(d[0]) for d in mixed)}", "INFO", None)
+    # DZ-3 potkniecia
+    stmax = max((d[9] for d in days), default=0)
+    rep.add("DZ-3: potkniecia (linia doby)", f"{stmax} (linii doby {len(days)})", "0", stmax == 0)
+    # DZ-4 proby testu
+    menu = [t for t in tests if t[0] == "menu"]
+    mapa = [t for t in tests if t[0] == "mapa"]
+    moves = sum(d[1] for d in days)
+    limits = sorted(set(t[7] for t in menu))
+    lim_txt = "/".join(str(x) for x in limits) if limits else str(M105D_PAUSED)
+    if menu:
+        bad = []
+        for t in menu:
+            why = []
+            if int(t[2]) != 0:
+                why.append(f"zachodzenie {t[2]}")
+            if key_frame and t[3] != "TAK":
+                why.append("ramka NIE")
+            if t[3] == "TAK" and int(t[4]) > t[7]:
+                why.append(f"dol ramki {t[4]} > {t[7]}")
+            if t[5] != "TAK":
+                why.append("wynik NIE" + (f" ({t[6]})" if t[6] else ""))
+            if why:
+                bad.append("; ".join(why))
+        val = f"menu {len(menu)} (TAK {len(menu) - len(bad)}), mapa {len(mapa)}, bez proby {len(noprobe)}" + (f" | zle: {' | '.join(bad)}" if bad else "")
+        rep.add("DZ-4: proby testu w menu", val, f">= 1, kazda: zachodzenie 0, ramka TAK (klucz ramki {('TAK' if key_frame else 'NIE')}), dol ramki <= granica PAUSED z linii ({lim_txt}), wynik TAK", not bad)
+    elif not key_clear:
+        rep.add("DZ-4: proby testu w menu", f"brak (klucz MapChatLogClearOfMenu NIE; mapa {len(mapa)})", "INFO - bez przesuniecia nie ma proby w menu", None)
+    elif test_on and (moves >= 1 or moved_lines >= 1):
+        # recenzja R4: plik testu i dziennik byl obok menu, a pomiaru w menu nie ma - autotest nie sprawdzil glownej zmiany
+        rep.add("DZ-4: proby testu w menu", f"brak (przesuniec {moves}, linii 'przesuniety' {moved_lines}, mapa {len(mapa)}, bez proby {len(noprobe)}, test autotestu TAK)",
+                ">= 1 pomiar w menu (plik testu i przesuniecia obok menu - pomiar powinien powstac)", False)
+    else:
+        rep.add("DZ-4: proby testu w menu", f"brak (mapa {len(mapa)}, bez proby {len(noprobe)}, test autotestu {'TAK' if test_on else 'NIE'})",
+                "INFO - bez pliku testu albo bieg bez menu", None)
+    for t in mapa:
+        rep.add("DZ-4b: proba testu na mapie", f"linie {t[1]}/3, ramka {t[3]}, dol ramki y={t[4]}, wynik {t[5]}" + (f" ({t[6]})" if t[6] else ""),
+                "wynik TAK (lewa krawedz >= 100 przy kluczu przesuniecia, ramka TAK przy kluczu, dol ramki nad paskiem, linie 3/3)", t[5] == "TAK")
+    # DZ-5 przesuniecia
+    if not key_clear:
+        rep.add("DZ-5: przesuniecia obok menu", f"{moves} (klucz NIE)", "INFO - klucz MapChatLogClearOfMenu NIE", None)
+    elif moves >= 1 or moved_lines >= 1:
+        rep.add("DZ-5: przesuniecia obok menu", f"{moves} w liniach doby, linii 'przesuniety' {moved_lines}", ">= 1", True)
+    elif test_on:
+        rep.add("DZ-5: przesuniecia obok menu", f"0 (linii 'przesuniety' 0)", ">= 1 (autotest: gracz czeka w menu miasta)", False)
+    else:
+        rep.add("DZ-5: przesuniecia obok menu", f"0 (bez pliku testu)", "INFO - log bez menu albo zwykla gra", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m105drobne (21/22.10, w-toku/m105-drobne: punkt 7 PRZEKAZANIE "Drobne" po tescie 102 -
+# (2) T-4 sprawa broni gangu ze srednia wazona ceny siekier (Armoury/src/QuestGangAxes.cs, klucz QuestGangAxesFix), (8a) straznik zawieszen CrashScribe milknie
+# przy zamykaniu gry (CrashScribe/src/Watchdog.cs - log CrashScribe przez --crashscribe). Ludzie Gory (pkt 1) - grupa m104e5 (E5-8b, E5-8c, E5-9).
+M105D_GA = "Bron gangu (T-4"
+M105D_GA_START = re.compile(r"^Bron gangu \(T-4, klucz Quest Gang Axes Fix (TAK|NIE)\): (.*?) \| sprawy broni gangu z zapisu (\d+), naprawione (\d+)")
+M105D_GA_ONE = re.compile(r"^Bron gangu \(T-4\): (NAPRAWIONA sprawa|nowa sprawa) .*? - srednia ceny siekier gry (-?\d+).*? -> (-?\d+) d \(")
+# recenzja m105 R2: ilosc siekier i nagroda gry bez skali w linii sprawy ('?' - getter rzucil / nagroda nieczytelna); brak pola - linia sprzed recenzji
+M105D_GA_QTY = re.compile(r"\| ilosc siekier (-?\d+|\?[^,|]*), nagroda gry \(bez skali\) (-?\d+|\?)")
+M105D_ERR = ("ERROR in QuestGangAxes.", "ERROR in QuestPay8.ShownReward")
+M105D_CS_CLOSE = "Straznik zawieszen: gra sie zamyka"
+M105D_CS_HANG = "# GAME HANG"
+M105D_CS_QUIT = "AUTOTEST: WYJSCIE: QuitGame"   # recenzja m105 R1: kotwica DR-4 w biegu autotestu (linia CrashScribe-at przed wyjsciem)
+
+
+def m105drobne_main(logp, csp):
+    """m105drobne (21/22.10, w-toku/m105-drobne; PRZEKAZANIE-2026-10-21 pkt 7 "Drobne" po tescie 102): DR-1 ERROR QuestGangAxes i QuestPay8.ShownReward 0 (T-4:
+    DivideByZero w sprawie broni gangu), DR-2 linia startu 'Bron gangu (T-4, ...)' w kazdej sesji z latka WPIETA i prefiksami getterow 2/2 (klucz NIE - INFO), DR-3
+    sprawy broni gangu nowe i naprawione - kazda srednia po zmianie >= 1, ilosc siekier >= 1 i nagroda gry czytelna (recenzja m105 R2; linie bez ilosci - sama
+    srednia; brak spraw - INFO 'T-4 niesprawdzone', recenzja R3), DR-4 (z --crashscribe <session-*.log>, recenzja R1): bieg autotestu (linia 'AUTOTEST: WYJSCIE:
+    QuitGame') - po niej linia 'Straznik zawieszen: gra sie zamyka' (brak - NIE, stara DLL CrashScribe) i zaden blok '# GAME HANG' (po QuitGame ani po linii
+    zamykania); bez QuitGame (gra Jeffa) - po linii zamykania 0 blokow; bez obu linii - INFO. Zawieszenia w trakcie gry - INFO z liczba. Log bez linii m105: INFO.
+    Kotwica NIE na SUMMARY: OnSubModuleUnloaded pisze linie zamykania przed Scribe.Summary(), a sesja bez bledow konczy sie 'Session ended with no errors.'."""
+    rep = Report()
+    if logp and not os.path.isfile(logp):
+        rep.add("DR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, err_ex, starts, ones = 0, [], [], []
+    if logp:
+        with open(logp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                m = TS.match(ln.rstrip("\n"))
+                s = m.group(2) if m else ln.rstrip("\n")
+                if s.startswith(M105D_ERR):
+                    n_err += 1
+                    if len(err_ex) < 2:
+                        err_ex.append(s[:120])
+                    continue
+                if not s.startswith(M105D_GA):
+                    continue
+                ms = M105D_GA_START.match(s)
+                if ms:
+                    starts.append(ms.groups())
+                    continue
+                mo = M105D_GA_ONE.match(s)
+                if mo:
+                    mq = M105D_GA_QTY.search(s)
+                    qv = rv = None
+                    if mq:
+                        qv = int(mq.group(1)) if re.fullmatch(r"-?\d+", mq.group(1)) else "?"
+                        rv = int(mq.group(2)) if re.fullmatch(r"-?\d+", mq.group(2)) else "?"
+                    ones.append((mo.group(1), int(mo.group(2)), int(mo.group(3)), qv, rv))
+        print(f"plik: {logp} | linii startu T-4 {len(starts)}, spraw broni gangu (nowe/naprawione) {len(ones)}, ERROR {n_err}")
+        rep.add("DR-1: ERROR QuestGangAxes / QuestPay8.ShownReward (T-4)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+        if not starts:
+            rep.add("DR-2: latka sprawy broni gangu (linia startu)", "brak linii 'Bron gangu (T-4, ...)'", "INFO (log sprzed paczki m105-drobne)", None)
+        else:
+            on = [x for x in starts if x[0] == "TAK"]
+            # recenzja m105 R-1: prefiksy getterow nagrody i ilosci - gdy linia je wymienia, musza byc 2/2 (linia sprzed recenzji - sama latka konstruktora)
+            bad = [x for x in on if "WPIETA" not in x[1] or ("prefiksy getterow" in x[1] and "prefiksy getterow nagrody i ilosci 2/2" not in x[1])]
+            fixed_load = sum(int(x[3]) for x in starts)
+            if not on:
+                rep.add("DR-2: latka sprawy broni gangu (linia startu)", f"sesji {len(starts)}, klucz NIE", "INFO (klucz Quest Gang Axes Fix wylaczony)", None)
+            else:
+                rep.add("DR-2: latka sprawy broni gangu (linia startu)", f"sesji z kluczem TAK {len(on)}, bez WPIETA / getterow 2/2 {len(bad)}" + (f" ({bad[0][1][:160]})" if bad else "")
+                        + f", spraw z zapisu naprawionych {fixed_load}", "kazda sesja z kluczem: WPIETA, prefiksy getterow 2/2", not bad)
+        if not ones:
+            rep.add("DR-3: sprawy broni gangu (nowe i naprawione)", "brak - T-4 niesprawdzone",
+                    "INFO (zadna sprawa 'Gang Leader Needs Weapons' nie powstala ani nie byla naprawiana - w raporcie 'T-4 niesprawdzone')", None)
+        else:
+            nfix = sum(1 for x in ones if x[0].startswith("NAPRAWIONA"))
+            low = [x for x in ones if x[2] < 1]
+            zero_game = sum(1 for x in ones if x[1] <= 0)
+            med_game = sorted(x[1] for x in ones)[len(ones) // 2]
+            med_new = sorted(x[2] for x in ones)[len(ones) // 2]
+            # recenzja m105 R2: ilosc siekier >= 1 (0 - sprawa bez towaru: srednia > 2000 przy trudnosci 0.1) i nagroda gry czytelna (> 0)
+            withq = [x for x in ones if x[3] is not None]
+            qbad = [x for x in withq if not (isinstance(x[3], int) and x[3] >= 1)]
+            rbad = [x for x in withq if not (isinstance(x[4], int) and x[4] > 0)]
+            qs = sorted(x[3] for x in withq if isinstance(x[3], int))
+            qtxt = (f", ilosc siekier mediana {qs[len(qs) // 2]} (min {qs[0]}, max {qs[-1]})" if qs else "") + (f", ilosc ponizej 1 / nieczytelna: {len(qbad)}, nagroda nieczytelna: {len(rbad)}"
+                    if withq else ", linie bez ilosci siekier (log sprzed recenzji m105 - sama srednia)")
+            rep.add("DR-3: sprawy broni gangu (nowe i naprawione)", f"{len(ones)} (naprawione {nfix}, srednia gry 0: {zero_game}), mediana sredniej gry {med_game} d -> nasza {med_new} d,"
+                    f" ponizej 1 d: {len(low)}" + qtxt, "kazda srednia po zmianie >= 1, ilosc siekier >= 1, nagroda gry czytelna", not low and not qbad and not rbad)
+    if csp:
+        if not os.path.isfile(csp):
+            rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"brak pliku {csp}", "podaj <session-*.log>", None)
+        else:
+            # recenzja m105 R1: kotwica na 'AUTOTEST: WYJSCIE: QuitGame' (NIE na SUMMARY - linia zamykania stoi przed Scribe.Summary()); stara DLL CrashScribe-at bez
+            # linii zamykania po QuitGame - NIE (dotad INFO: w tescie 102 kazdy '# GAME HANG' stal po QuitGame i SUMMARY, prog przechodzil bez NIE)
+            quit_seen = closing = close_after_quit = False
+            hang_before = hang_after_close = hang_after_quit = 0
+            with open(csp, encoding="utf-8", errors="replace") as fh:
+                for ln in fh:
+                    if M105D_CS_QUIT in ln:
+                        quit_seen = True
+                    elif M105D_CS_CLOSE in ln:
+                        closing = True
+                        if quit_seen:
+                            close_after_quit = True
+                    elif ln.startswith(M105D_CS_HANG):
+                        if quit_seen:
+                            hang_after_quit += 1
+                        if closing:
+                            hang_after_close += 1
+                        elif not quit_seen:
+                            hang_before += 1
+            if quit_seen:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"QuitGame TAK, linia zamykania po nim {'TAK' if close_after_quit else 'BRAK (stara DLL CrashScribe?)'}"
+                        f", GAME HANG po QuitGame {hang_after_quit}, po linii zamykania {hang_after_close}, w trakcie gry {hang_before} (INFO)",
+                        "po QuitGame: linia zamykania i 0 GAME HANG", close_after_quit and hang_after_quit == 0 and hang_after_close == 0)
+            elif not closing:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"brak linii '{M105D_CS_CLOSE}' i brak QuitGame (zawieszenia w grze {hang_before})",
+                        "INFO (log sprzed paczki m105-drobne albo gra nie zamknieta zwyczajnie)", None)
+            else:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"bez QuitGame (gra zwykla), po linii zamykania {hang_after_close}, w trakcie gry {hang_before} (INFO)",
+                        "po linii zamykania 0", hang_after_close == 0)
+    if not logp and not csp:
+        rep.add("DR-0: logi", "brak", "podaj <Armoury-*.log> i/albo --crashscribe <session-*.log>", None)
+    rep.show()
+    return 0
+
+# ------------------------------------------------------------ m104wojny (21.10, w-toku/m104-wojny: wojny wedlug ksiazki - (1) wojny fabularne ROT czysto essoskie na
+# kalendarzu w kampanii z prologiem, (2) Reach z korona po smierci Renly'ego (pokoj z Dorne, sojusz, pakt Reach-Dorne) i Dorne z korona po zareczynach Myrcelli (pakt),
+# (3) mlode smoki Daenerys - wierzchowiec wedlug etapu; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
+# CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow)
+M104W_TAG = "Wojny kanonu (m104): "
+M104_ESSOS_IDS = {"bravos", "nord", "pentos", "norvos", "qohor", "myr", "lys", "tyrosh", "volantis", "sarnor", "ibb", "qarth", "khuzait", "yiti", "summer", "valyrian"}
+M104_SD = re.compile(r"dzien opowiesci (-?[0-9.]+)")
+M104_CAL = re.compile(r"\(dzien kalendarza (\d+)\)")
+M104_ESSOS_N = re.compile(r"na kalendarzu (\d+) \((.*?)\), w wojnie (\d+)/(\d+)")
+M104_ESSOS_DECL = re.compile(r"ESSOS - wojna (\S+)-(\S+) (WYPOWIEDZIANA|NIE weszla).*?\(dzien kalendarza (\d+), dzien opowiesci (-?[0-9.]+)\)")
+M104_PATCH = re.compile(r"latka wojen essoskich \((.*?)\): ROTStorylineWar\.Enforced (\S+)\.")
+M104_DRAG = re.compile(r"\(3\) smoki Daenerys: klucz (TAK|NIE), (etap (\S+)(?: \(klucz NIE[^)]*\))? \| siodlo (\S+)(.*?)\(D=(\d+)\))?")
+M104_REACH = re.compile(r"\| \(2\) Reach: (.*?) \| Dorne: (.*?) \| \(3\)")
+M104_GONE = re.compile(r", zniszczone (\d+) \((.*?)\)")
+M104_SCOPE = re.compile(r"\| zakres \(2\) i \(3\): (.*?) \| \(2\)")
+M104_MYR = re.compile(r"zareczyny Myrcelli w dniu(?: opowiesci)? (\d+)")
+
+
+def m104_stage_of(sd, d):
+    if sd < 0:
+        return "jaja"
+    if sd >= 0.85 * d:
+        return "dorosle"
+    if sd >= 0.625 * d:
+        return "podrosle"
+    if sd >= 0.40 * d:
+        return "mlode"
+    return "smoczeta"
+
+
+def m104wojny_main(logp):
+    """m104wojny (21.10, w-toku/m104-wojny; Jeff 21.10 "Kod scen zmieniajacych swiat i wojen wedlug ksiazki - rob to teraz"): WK-0 linie startu, WK-1 ERROR CanonWars
+    i potkniecia 0, WK-2 latka Enforced TAK w kampanii z prologiem i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wojny wypowiedziane przez Armoury tylko
+    essoskie i od dnia kalendarza >= 21, WK-4 w prologu od dnia kalendarza 23 pary essoskie w wojnie (W = N w >= 90% dob), WK-5 Reach z korona po smierci Renly'ego
+    (REACH Z KORONA najwyzej raz na sesje, potem SOJUSZ TAK, Reach-Dorne bez WOJNY), WK-6 Dorne z korona od dnia zareczyn Myrcelli (PAKT, bez WOJNY korona-Dorne),
+    WK-7 smoki: etap zgodny z dniem opowiesci (D z linii, tolerancja 1 dzien), siodlo zgodne z etapem (smok tylko dorosly - recenzja R5), WK-8 zdarzenia (INFO).
+    Log bez linii m104: INFO. Recenzja: klucz Essos NIE - WK-2 tylko latka, WK-3/WK-4 INFO (R6); wojny ze strona zniszczona poza N ("zniszczone Z"), po starcie
+    opowiesci ROT usuwa je z listy - N + Z <= 6 (R7); zapis sprzed m104 bez prologu - "nie dotyczy", WK-5..7 INFO (R1)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("WK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, dailies, patches, decls, events, drag_changes = [], [], [], [], [], []
+    n_err, stumb = 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in CanonWars"):
+                n_err += 1
+                continue
+            if not s.startswith(M104W_TAG):
+                continue
+            body = s[len(M104W_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                mt = re.search(r"\| potkniecia (\d+)\.$", body)
+                if mt:
+                    stumb = max(stumb, int(mt.group(1)))
+                continue
+            if body.startswith("doba |"):
+                dailies.append(body)
+                mt = re.search(r"potkniecia dzis (\d+) \(razem (\d+)\)", body)
+                if mt:
+                    stumb = max(stumb, int(mt.group(1)), int(mt.group(2)))
+                continue
+            mm = M104_PATCH.search(body)
+            if mm:
+                patches.append(mm.groups())
+                continue
+            mm = M104_ESSOS_DECL.search(body)
+            if mm:
+                decls.append(mm.groups())
+                continue
+            if body.startswith("smoki Daenerys -"):
+                drag_changes.append(body)
+                continue
+            events.append(body)
+    print(f"plik: {logp} | startow sesji {len(starts)}, dob {len(dailies)}, latek {len(patches)}, wojen essoskich wypowiedzianych {len(decls)}, zdarzen {len(events)}, "
+          f"zmian smokow {len(drag_changes)}, ERROR {n_err}")
+    if not starts and not dailies:
+        rep.add("WK-0: linie 'Wojny kanonu (m104): ...'", "brak w logu", "INFO (log sprzed paczki m104-wojny)", None)
+        rep.show()
+        return 0
+    rep.add("WK-0: linia startu sesji", (starts[-1][:150] if starts else "brak (tylko linie doby)"), "co najmniej 1", bool(starts))
+    rep.add("WK-1: ERROR CanonWars i potkniecia", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    prolog = any("prolog TAK" in x for x in starts)
+    scopes = [ms.group(1) for ms in (M104_SCOPE.search(x) for x in starts) if ms]
+    rep.add("WK-0: zakres (2) i (3)", scopes[-1] if scopes else "brak w linii startu (log sprzed poprawek recenzji)",
+            "INFO - kampania z prologiem / nowa kampania (znacznik) / nie dotyczy (zapis sprzed m104 - decyzja Jeffa nr 5)", None)
+    # R6: klucz Essos NIE (linia startu albo linia doby) - WK-2 tylko latka, WK-3/WK-4 INFO
+    ess_off = prolog and (any("Essos na kalendarzu: klucz NIE" in x for x in starts) or any("(1) Essos: klucz NIE" in x for x in dailies))
+    # WK-2 latka i lista wojen essoskich
+    if prolog and ess_off:
+        pt = patches[-1] if patches else None
+        rep.add("WK-2: latka Enforced (klucz Essos NIE)", f"latka {pt[1] if pt else 'brak linii'}",
+                "latka TAK (lista wojen nie sprawdzana - klucz PrologueEssosWarsCalendar NIE, wojny czekaja na opowiesc)", pt is not None and pt[1] == "TAK")
+    elif prolog:
+        pt = patches[-1] if patches else None
+        ess, ess_line = None, ""
+        for x in starts:
+            me = M104_ESSOS_N.search(x)
+            if me:
+                ess, ess_line = me, x
+        lst = ess.group(2) if ess else ""
+        mg = M104_GONE.search(ess_line) if ess else None
+        n_gone = int(mg.group(1)) if mg else 0
+        lst_all = lst + (", " + mg.group(2) if mg else "")
+        msd = M104_SD.search(ess_line) if ess else None
+        in_prolog = msd is not None and float(msd.group(1)) < 1.0
+        pairs = re.findall(r"([a-z_]+)-([a-z_]+)", lst_all)
+        bad_ids = [p for p in pairs if p[0] not in M104_ESSOS_IDS or p[1] not in M104_ESSOS_IDS]
+        total = (int(ess.group(1)) + n_gone) if ess else -1
+        # R7: w prologu (bramka ROT zamknieta) lista pelna - N + Z = 6; po starcie opowiesci ROT EnforceWars usuwa wojny ze strona zniszczona - N + Z <= 6
+        n_ok = total == 6 if in_prolog else 0 <= total <= 6
+        ok = pt is not None and pt[1] == "TAK" and ess is not None and n_ok and "empire_s" not in lst_all and not bad_ids
+        rep.add("WK-2: latka Enforced i wojny essoskie na kalendarzu",
+                f"latka {pt[1] if pt else 'brak linii'}" + (f" | na kalendarzu {ess.group(1)} ({lst[:160]})" + (f", zniszczone {n_gone} ({mg.group(2)[:60]})" if mg else "")
+                                                             + f" | linia startu {'w prologu' if in_prolog else 'po starcie opowiesci'}" if ess else " | brak listy w linii startu"),
+                "latka TAK, w prologu 6 wojen razem ze zniszczonymi (bravos-nord, tyrosh-lys, pentos-myr, norvos-qohor, volantis-valyrian, sarnor-ibb), po starcie opowiesci"
+                " najwyzej 6 (ROT usuwa wojny ze strona zniszczona), bez empire_s (Daenerys - zegar opowiesci)", ok)
+    else:
+        rep.add("WK-2: latka Enforced i wojny essoskie", "kampania klasyczna", "INFO - Essos na kalendarzu tylko w kampanii z prologiem", None)
+    # WK-4 (liczone przed WK-3): pary essoskie w wojnie w prologu
+    rows = []
+    for x in dailies:
+        c = M104_CAL.search(x)
+        me = M104_ESSOS_N.search(x)
+        msd = M104_SD.search(x)
+        if c and me and msd and float(msd.group(1)) < 1.0 and int(c.group(1)) >= 23:
+            rows.append((int(c.group(1)), int(me.group(3)), int(me.group(4))))
+    full = [r for r in rows if r[1] == r[2]]
+    # WK-3 wypowiedzenia Armoury
+    cal_max = max([int(c.group(1)) for c in (M104_CAL.search(x) for x in dailies) if c] or [0])
+    bad = [d for d in decls if d[0] not in M104_ESSOS_IDS or d[1] not in M104_ESSOS_IDS]
+    early = [d for d in decls if int(d[3]) < 21]
+    late = [d for d in decls if float(d[4]) >= 1.0]
+    failed = [d for d in decls if d[2] != "WYPOWIEDZIANA"]
+    # R6: klucz NIE - nic; pary juz w wojnie (np. AI) - nic do wypowiedzenia; log bez dob prologu od dnia kalendarza 23 (np. sesja od dnia opowiesci 10) - nic do sprawdzenia
+    need = prolog and not ess_off and bool(rows) and len(full) != len(rows)
+    rep.add("WK-3: wojny wypowiedziane przez Armoury (prolog)",
+            f"{len(decls)} (spoza Essos {len(bad)}, przed dniem kalendarza 21 {len(early)}, po dniu opowiesci 1 {len(late)}, bez skutku {len(failed)})"
+            + (f" [pierwsza {decls[0][0]}-{decls[0][1]} dzien kalendarza {decls[0][3]}]" if decls else "") + f" | ostatni dzien kalendarza w logu {cal_max}",
+            "tylko pary essoskie, dzien kalendarza >= 21 (StartDay 5 x 4.33 = 22), przed dniem opowiesci 1, wszystkie WYPOWIEDZIANA; co najmniej 1, gdy prolog i log siega dnia 23"
+            " (0 dopuszczalne, gdy wszystkie pary juz byly w wojnie - WK-4; klucz Essos NIE albo log bez dob prologu >= 23 - INFO)",
+            (not bad and not early and not late and not failed and (bool(decls) or not need)) if (decls or need) else None)
+    first_gap = next((r[0] for r in rows if r[1] != r[2]), None)
+    rep.add("WK-4: w prologu (kalendarz >= 23) pary essoskie w wojnie", f"dob {len(rows)}, z W = N {len(full)}" + (f" (pierwsza bez pelnej: dzien {first_gap})" if first_gap is not None else "")
+            + (" | klucz Essos NIE" if ess_off else ""),
+            ">= 90% dob (pokoj Diplomacy ze zmeczenia wojna moze przerwac na dobe; N bez wojen ze strona zniszczona); klucz Essos NIE - INFO",
+            (len(full) >= 0.9 * len(rows)) if rows and not ess_off else None)
+    # WK-5 Reach
+    reach_ev = [e for e in events if e.startswith("REACH Z KORONA")]
+    reach_rows = []
+    for x in dailies:
+        mr = M104_REACH.search(x)
+        msd = M104_SD.search(x)
+        if mr and msd:
+            reach_rows.append((float(msd.group(1)), mr.group(1), mr.group(2)))
+    held = [r for r in reach_rows if "SOJUSZ TAK" in r[1]]
+    war_rd = [r for r in reach_rows if "Reach-Dorne WOJNA" in r[1]]
+    first_held = held[0][0] if held else None
+    lost = [r for r in reach_rows if first_held is not None and r[0] > first_held
+            and not ("SOJUSZ TAK" in r[1] or r[1].startswith("zakonczone") or r[1].startswith("klucz NIE") or "gracza" in r[1] or r[1].startswith("nie dotyczy"))]
+    m104_idle = ("czeka (Renly zyje)", "klucz NIE", "nie dotyczy", "krolestwo gracza")
+    if reach_ev or held or any(not r[1].startswith(m104_idle) for r in reach_rows):
+        rep.add("WK-5: Reach z korona po smierci Renly'ego",
+                f"zdarzen REACH Z KORONA {len(reach_ev)}" + (f" ({reach_ev[0][:140]})" if reach_ev else "")
+                + f" | dob SOJUSZ TAK {len(held)}, bez sojuszu po zalozeniu {len(lost)}, z wojna Reach-Dorne {len(war_rd)}"
+                + (f" | ostatni stan: {reach_rows[-1][1][:120]}" if reach_rows else ""),
+                "REACH Z KORONA najwyzej 1 na sesje; po pierwszym SOJUSZ TAK kazda doba SOJUSZ TAK (do najazdu Daenerys), Reach-Dorne bez WOJNY",
+                len(reach_ev) <= max(1, len(starts)) and not lost and not war_rd and bool(held))
+    else:
+        rep.add("WK-5: Reach z korona", (reach_rows[-1][1][:100] if reach_rows else "brak linii doby"),
+                "INFO - Renly zyje w calym logu (albo klucz NIE / nie dotyczy / krolestwo gracza)", None)
+    # WK-6 Dorne
+    dorne_ev = [e for e in events if e.startswith("DORNE Z KORONA")]
+    md = None
+    for x in starts + dailies:
+        mm2 = M104_MYR.search(x)
+        if mm2:
+            md = int(mm2.group(1))
+    late_wait = [r for r in reach_rows if md is not None and r[0] >= md + 1 and r[2].startswith("czeka (zareczyny")]
+    war_cd = [r for r in reach_rows if "korona-Dorne WOJNA" in r[2]]
+    pact = [r for r in reach_rows if r[2].startswith("PAKT")]
+    if dorne_ev or pact or late_wait:
+        rep.add("WK-6: Dorne z korona po zareczynach Myrcelli",
+                f"zdarzen DORNE Z KORONA {len(dorne_ev)}" + (f" ({dorne_ev[0][:120]})" if dorne_ev else "")
+                + f" | dob z PAKTEM {len(pact)}, czeka po dniu zareczyn {len(late_wait)}, wojna korona-Dorne {len(war_cd)}",
+                "od dnia zareczyn (+1) stan PAKT (zalozony albo juz jest), bez wojny korona-Dorne", not late_wait and not war_cd and bool(pact))
+    else:
+        rep.add("WK-6: Dorne z korona", (reach_rows[-1][2][:100] if reach_rows else "brak linii doby") + (f" | dzien zareczyn {md}" if md is not None else ""),
+                "INFO - log nie siega dnia zareczyn Myrcelli (albo klucz NIE / nie dotyczy)", None)
+    # WK-7 smoki
+    drows, bad_stage, bad_saddle = [], [], []
+    for x in starts + dailies:
+        mg = M104_DRAG.search(x)
+        msd = M104_SD.search(x)
+        if not mg or not msd or mg.group(1) != "TAK" or not mg.group(2):
+            continue
+        sd, stage, saddle, rest, d = float(msd.group(1)), mg.group(3), mg.group(4), mg.group(5) or "", int(mg.group(6))
+        drows.append((sd, stage, saddle))
+        if stage not in (m104_stage_of(sd - 1.0, d), m104_stage_of(sd, d), m104_stage_of(sd + 1.0, d)) and stage != "dorosle":
+            bad_stage.append((sd, stage, m104_stage_of(sd, d)))
+        if "czeka:" in rest:
+            continue
+        want = {"jaja": None, "smoczeta": None, "mlode": None, "podrosle": None, "dorosle": "dragon_black"}.get(stage)   # R5: smok pod siodlem tylko dorosly Drogon
+        if (want is None and saddle.startswith("dragon_")) or (want is not None and not saddle.startswith("dragon_")):
+            bad_saddle.append((sd, stage, saddle))
+    if drows:
+        rep.add("WK-7: smoki Daenerys - etap i siodlo",
+                f"linii {len(drows)} (ostatnia: dzien {drows[-1][0]:.0f}, etap {drows[-1][1]}, siodlo {drows[-1][2]}), zly etap {len(bad_stage)}"
+                + (f" {bad_stage[0]}" if bad_stage else "") + f", zle siodlo {len(bad_saddle)}" + (f" {bad_saddle[0]}" if bad_saddle else "")
+                + f" | zmian siodla {len(drag_changes)}" + (f" ({drag_changes[0][:110]})" if drag_changes else ""),
+                "etap wedlug dnia opowiesci (jaja < 0 <= smoczeta < 0.40 D <= mlode < 0.625 D <= podrosle < 0.85 D <= dorosle; najazd = dorosle), jaja/smoczeta/mlode/podrosle"
+                " bez smoka pod siodlem, dorosle na smoku (Drogon; inny tylko po kradziezy)", not bad_stage and not bad_saddle)
+    else:
+        rep.add("WK-7: smoki Daenerys", "brak linii z kluczem TAK i etapem", "INFO - klucz DaenerysDragonsGrow NIE, zapis poza zakresem (nie dotyczy) albo Daenerys bez zmian", None)
+    # WK-8 zdarzenia (INFO)
+    kinds = {}
+    for e in events:
+        k = e.split(" (")[0].split(":")[0][:40]
+        kinds[k] = kinds.get(k, 0) + 1
+    rep.add("WK-8: zdarzenia m104", ", ".join(f"{k} x{v}" for k, v in sorted(kinds.items())) or "brak", "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m100kryjowki (21.10, w-toku/m100-kryjowki: wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania,
 # nowe kryjowki z dala od osad i wiosek pobocznych, po rozbiciu w innym miejscu; Armoury/src/HideoutSight.cs; klucze HideoutScoutingChance, HideoutRumourReveals,
 # HideoutAwayFromSettlements, HideoutRelocateAfterClear)
@@ -37951,6 +39186,164 @@ def m100kryjowki_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m103lektor (21.10, w-toku/m103-lektor: lektor - okna wydarzen ROT czytane z nagran Davida (ModuleData/Lektor/EN),
+# plotki czytane na zywo przez ElevenLabs z trwala pamiecia nagran; Armoury/src/Lektor.cs, Lektor.Live.cs; klucze LektorEnabled, LektorEventWindows, LektorGossipLive ...)
+M103L_TAG = "Lektor (m103): "
+M103L_DAY = re.compile(r"dzien (\d+) \| okna ROT: otwarte (\d+), z nagraniem (\d+), odtworzone (\d+) \(grane po 0,5 s tak (\d+) / nie (\d+), koniec za wczesnie (\d+)\)"
+                      r", bez nagrania (\d+), uszkodzone (\d+)")
+M103L_DAY_API = re.compile(r"\| zapytania API (\d+) \(w sesji (\d+), nowych nagran w sesji (\d+)\), bledy API (\d+)")
+M103L_DAY_CHARS = re.compile(r"\| znaki dzis (\d+) / (\d+) \(doba ([0-9-]+)\)")
+M103L_DAY_GOS = re.compile(r"\| plotki: strony (\d+), kawalki (\d+), z pamieci (\d+), odtworzone (\d+) \(grane po 0,5 s nie (\d+), za wczesnie (\d+)\), nowe nagrania (\d+) \(znaki (\d+)\)")
+M103L_DAY_STUMB = re.compile(r"\| watek nagran: potkniecia (\d+) \| potkniecia (\d+) \(w sesji (\d+)\)")
+M103L_IDX = re.compile(r"nagran okien (\d+) \(([0-9]+) s; ([^,;)]*)(?:, odrzucone (\d+)[^)]*)?")
+M103L_WIN = re.compile(r'okno ROT "(.*)" (?:-> (\S+) \(([0-9.]+) s\) - start\.|- (stop|koniec) po ([0-9.]+) s|- grane po 0,5 s: (tak|NIE))')
+M103L_CS_WIN = re.compile(r'OKNO wydarzenie ROT "([^"]*)"')
+
+
+def m103lektor_tsv_rows():
+    """Wiersze arm_lektor.tsv w repo (obok tools/) - tytuly okien z nagraniem; brak pliku -> None."""
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Armoury", "ModuleData", "Lektor", "EN", "arm_lektor.tsv")
+    if not os.path.isfile(p):
+        return None
+    titles = []
+    with open(p, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            if not ln or ln.startswith("#"):
+                continue
+            c = ln.split("\t")
+            if len(c) >= 3:
+                titles.append(c[1].strip())
+    return titles
+
+
+def m103lektor_main(logp, csp=None):
+    """m103lektor (21.10, w-toku/m103-lektor; Jeff 21.10: lektor po angielsku, glos David ElevenLabs; plotki na zywo z pamiecia nagran - "zapisuj kazda nagrana plotke,
+    aby potem, jak jest cos nagrane, David nie czytal"): LK-0 linia startu sesji, LK-1 ERROR lektora (Lektor.*, M103LektorReset) i potkniecia 0 (doby, sesja, watek nagran),
+    LK-2 latka EventScreen "OnActivate tak, OnDeactivate tak", LK-3 nagran okien = wiersze arm_lektor.tsv w repo i odrzucone 0, LK-4 tryb autotestu: zapytania API 0, bez linii
+    "nowe nagranie plotki" i "konto ElevenLabs" (z plikiem armoury-lektor-live.flag - "API na zywo: tak" - INFO), LK-5 okna ROT z nagraniem odtworzone: linie start > 0, gdy
+    w dobach "z nagraniem" > 0 albo (z --crashscribe) autotest zamknal okno ROT o tytule z tsv; LK-6 "grane po 0,5 s: NIE" 0 i "koniec za wczesnie" 0 (okna i plotki),
+    LK-7 kazdy start okna ma stop albo koniec (ostatni moze trwac przy koncu logu), LK-8 znaki dzis <= limit dzienny, LK-9 plotki i zapytania (INFO). Log bez paczki: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("LK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, installs, days, n_err, err_first = [], [], [], 0, ""
+    win_start, win_end, win_05no, win_05yes, new_rec, konto, gos_05no = [], [], 0, 0, 0, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in Lektor") or s.startswith("ERROR in M103LektorReset") or (s.startswith("ERROR in ") and "Lektor." in s[:60]):
+                n_err += 1
+                err_first = err_first or s[:200]
+                continue
+            if not s.startswith(M103L_TAG):
+                continue
+            body = s[len(M103L_TAG):]
+            if body.startswith("start sesji"):
+                starts.append(body)
+                continue
+            if body.startswith("latka EventScreen"):
+                installs.append(body)
+                continue
+            if body.startswith("dzien "):
+                days.append(body)
+                continue
+            if body.startswith("nowe nagranie plotki"):
+                new_rec += 1
+                continue
+            if body.startswith("konto ElevenLabs"):
+                konto += 1
+                continue
+            if body.startswith("plotka ") and "grane po 0,5 s: NIE" in body:
+                gos_05no += 1
+                continue
+            mw = M103L_WIN.match(body)
+            if mw:
+                if mw.group(2):
+                    win_start.append(mw.group(1))
+                elif mw.group(4):
+                    win_end.append(mw.group(1))
+                elif mw.group(6) == "NIE":
+                    win_05no += 1
+                else:
+                    win_05yes += 1
+    print(f"plik: {logp} | startow {len(starts)}, wpiec {len(installs)}, dob {len(days)}, okien start {len(win_start)}, koniec/stop {len(win_end)}, ERROR {n_err}")
+    if not starts and not days and not installs:
+        rep.add("LK-0: linia 'Lektor (m103): start sesji'", "brak w logu", "INFO (log sprzed paczki m103-lektor albo menu glowne)", None)
+        rep.show()
+        return 0
+    last = starts[-1] if starts else ""
+    rep.add("LK-0: linia startu sesji", (last[:170] + "...") if last else "brak (sa inne linie lektora)", "jest", bool(last))
+    stumb = 0; wst = 0; sess = 0
+    for d in days:
+        ms = M103L_DAY_STUMB.search(d)
+        if ms:
+            wst = max(wst, int(ms.group(1))); stumb = max(stumb, int(ms.group(2))); sess = max(sess, int(ms.group(3)))
+    rep.add("LK-1: ERROR lektora i potkniecia", f"ERROR {n_err}" + (f" ({err_first})" if err_first else "") + f", potkniecia doby max {stumb}, w sesji max {sess}, watek nagran {wst}",
+            "0, 0, 0, 0", n_err == 0 and stumb == 0 and sess == 0 and wst == 0)
+    src = installs[-1] if installs else last
+    okp = "OnActivate tak, OnDeactivate tak" in src
+    pk = src.find("latka EventScreen: ") if src else -1
+    pv = src[pk + len("latka EventScreen: "):].split(" |")[0][:140] if pk >= 0 else (src[:140] if src else "brak")
+    rep.add("LK-2: latka EventScreen", pv, "OnActivate tak, OnDeactivate tak", okp if src else False)
+    mi = M103L_IDX.search(src) if src else None
+    titles = m103lektor_tsv_rows()
+    if mi:
+        n_idx, rej = int(mi.group(1)), int(mi.group(4) or 0)
+        want = len(titles) if titles is not None else None
+        rep.add("LK-3: nagran okien = wiersze tsv w repo, odrzucone 0", f"w logu {n_idx} (stan {mi.group(3)}), odrzucone {rej}, tsv w repo {want if want is not None else 'brak'}",
+                "rowne i 0", (n_idx == want and rej == 0) if want is not None else (n_idx > 0 and rej == 0))
+    else:
+        rep.add("LK-3: nagran okien", "brak liczby w linii", "linia 'nagran okien N'", False)
+    auto = any(("| tryb autotest" in x or "| tryb profil autotestu" in x or "| tryb nie rozpoznany" in x) for x in starts + days)   # tryb 3 - tez bez sieci (Lektor.LiveBlock)
+    live = any("API na zywo: tak" in x for x in starts)
+    req = sum(int(M103L_DAY_API.search(d).group(1)) for d in days if M103L_DAY_API.search(d))
+    if auto:
+        rep.add("LK-4: autotest / tryb nie rozpoznany - zapytania API 0", f"zapytania {req}, linie 'nowe nagranie plotki' {new_rec}, 'konto ElevenLabs' {konto}"
+                + (" (plik armoury-lektor-live.flag - API na zywo: tak)" if live else ""), "0, 0, 0", (req == 0 and new_rec == 0 and konto == 0) if not live else None)
+    else:
+        rep.add("LK-4: zapytania API (gra - INFO)", f"zapytania {req}, nowe nagrania {new_rec}, linie konta {konto}", "INFO (gra)", None)
+    rec_days = sum(int(M103L_DAY.search(d).group(3)) for d in days if M103L_DAY.search(d))
+    cs_rot, cs_known = 0, 0
+    if csp and os.path.isfile(csp):
+        tset = set(titles or [])
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mc = M103L_CS_WIN.search(ln)
+                if mc:
+                    cs_rot += 1
+                    if mc.group(1) in tset:
+                        cs_known += 1
+    need = rec_days > 0 or cs_known > 0
+    rep.add("LK-5: okna ROT z nagraniem odtworzone", f"start {len(win_start)}, okna z nagraniem w dobach {rec_days}"
+            + (f", autotest zamknal okien ROT {cs_rot} (z tytulem z tsv {cs_known})" if csp else ", bez --crashscribe"), "start > 0, gdy byly okna z nagraniem",
+            (len(win_start) > 0) if need else None)
+    early = sum(int(M103L_DAY.search(d).group(7)) for d in days if M103L_DAY.search(d))
+    gearly = sum(int(M103L_DAY_GOS.search(d).group(6)) for d in days if M103L_DAY_GOS.search(d))
+    rep.add("LK-6: grane po 0,5 s NIE i koniec za wczesnie", f"okna: grane tak {win_05yes} / NIE {win_05no}, za wczesnie {early}; plotki: NIE {gos_05no}, za wczesnie {gearly}",
+            "NIE 0, za wczesnie 0", (win_05no == 0 and early == 0 and gos_05no == 0 and gearly == 0) if (win_start or gos_05no or gearly) else None)
+    open_n = len(win_start) - len(win_end)
+    rep.add("LK-7: kazdy start okna ma stop albo koniec", f"start {len(win_start)}, stop/koniec {len(win_end)}", "roznica 0 (1 - okno otwarte przy koncu logu)",
+            (0 <= open_n <= 1) if win_start else None)
+    over = []
+    for d in days:
+        mc = M103L_DAY_CHARS.search(d)
+        if mc and int(mc.group(1)) > int(mc.group(2)):
+            over.append(d[:60])
+    rep.add("LK-8: znaki dzis <= limit dzienny", f"dob ponad limit {len(over)}" + (f" (np. {over[0]})" if over else ""), "0", (len(over) == 0) if days else None)
+    pages = hit = played = new = chars = 0
+    for d in days:
+        mg = M103L_DAY_GOS.search(d)
+        if mg:
+            pages += int(mg.group(1)); hit += int(mg.group(3)); played += int(mg.group(4)); new += int(mg.group(7)); chars += int(mg.group(8))
+    rep.add("LK-9: plotki (INFO)", f"strony {pages}, z pamieci {hit}, odtworzone {played}, nowe nagrania {new} ({chars} znakow), zapytania API {req}"
+            + (f" | ostatnia doba: {days[-1][:200]}" if days else ""), "INFO", None)
+    rep.show()
+    return 0
+
 # ------------------------------------------------------------ m102tablica (21.10, w-toku/m102-tablica: tablica ogloszen w miescie - zadania gry, rozmowa z tablicy,
 # "Your tasks", listy gonczne kapitana strazy z kasy miasta; Armoury/src/NoticeBoard*.cs; klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties ...)
 M102_TB = "Tablica ogloszen (m102): "
@@ -38107,7 +39500,18 @@ def m102tablica_main(logp):
     rep.add("L-7: wyplaty lordom w oknie <= 1% wplywow kas miast", f"lordom {lords} zl, wplywy kas miast w oknie {infl} zl ({(100.0 * lords / infl if infl else 0):.3f}%; lud za towar + przelewy gry do kas,"
             f" linii {len(inflows)}; srednia kas {avg:.0f})", "<= 1% (inaczej domyslne WatchBountyAiLords = false)", (lords <= 0.01 * infl) if infl else None)
     big = max([int(d.group(20)) for d in ldays] + [0])
-    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 16384 B", (big <= 16384) if ldays else None)
+    # m103-drobne: zapis nb2 (odchudzony) - cel < 12 KB (bieg 101 w nb1: 18.5 KB > 16 KB, SaveText kawalkowal); L-8b sklad i nb1 w tym samym stanie (pomiar)
+    rep.add("L-8: zapis arm_board", f"najwiecej {big} B", "<= 12288 B (m103-drobne nb2; nb1 do WGRANIA 101 - 18.5 KB)", (big <= 12288) if ldays else None)
+    v1 = []
+    for d in ldays:
+        mv = re.search(r"zapis arm_board (\d+) B; sklad zapisu nb2: .*?stary format nb1 w tym samym stanie (\d+) B", d.string)
+        if mv and int(mv.group(2)) > 0:
+            v1.append((int(mv.group(1)), int(mv.group(2))))
+    if v1:
+        bi = max(v1, key=lambda x: x[1])
+        rep.add("L-8b: nb2 wobec nb1 w tym samym stanie (pomiar)", f"dob {len(v1)}; najwiekszy nb1 {bi[1]} B -> nb2 {bi[0]} B ({100.0 * bi[0] / bi[1]:.0f}%)", "INFO", None)
+    else:
+        rep.add("L-8b: nb2 wobec nb1", "brak pola sklad zapisu (log sprzed m103-drobne)", "INFO", None)
     cost = max([float(d.group(21)) for d in ldays] + [0.0])
     rep.add("L-9: koszt doby listow", f"najwyzej {cost:.2f} ms", "<= 3 ms", (cost <= 3.0) if ldays else None)
     posted = {(p.group(1), p.group(2)) for p in posts} | {(p.group(2), p.group(3)) for p in hposts}
@@ -38138,6 +39542,11 @@ M99M_SHOP = re.compile(r"kupione (\d+) sztuk \(cena markietanow (-?\d+), miasta 
 M99M_DAY = re.compile(r"dzien (\d+) \|.*\(roznica (-?\d+)\) \| potkniecia (\d+)")
 M99M_SOLD = re.compile(r"\| skup dzis (\d+) z limitu (\d+)")                                   # poprawka po recenzji: limit skupu na dobe
 M99M_REV = re.compile(r"morale RecentEvents (-?[0-9.]+) -> (-?[0-9.]+) \(dodatek ([0-9.]+), pulap (\d+)\)")   # poprawka po recenzji: pulap zabawy
+# m103-drobne: odziez z rzedu (potrzeba druzyny przed -> po, kupione) i praczki (cena = praczki x doby x dniowka)
+M99M_CLO = re.compile(r"potrzeba skora ([0-9.]+), sukno ([0-9.]+), plotno ([0-9.]+) -> skora ([0-9.]+), sukno ([0-9.]+), plotno ([0-9.]+) \| kupione skora (\d+), sukno (\d+), plotno (\d+)")
+M99M_WASH = re.compile(r"-> praczek (\d+) \(1 na (\d+)\) x (\d+) dob x dniowka ([0-9.]+) = (\d+)")
+M99M_WASHMEN = re.compile(r"druzyna gracza (\d+) ludzi \(bez bohaterow\) -> praczek")              # poprawka po recenzji m103: ludzie w chwili najecia
+M99M_WASHCOV = re.compile(r"\| objeci do (\d+) ludzi \(praczki x (\d+)")                           # poprawka po recenzji m103: objeci oplaconymi praczkami
 
 
 def m99markietani_main(logp):
@@ -38152,6 +39561,7 @@ def m99markietani_main(logp):
         return 0
     starts, uses, ctl, shops, days, n_err, stumb, opened = [], [], [], [], [], 0, 0, 0
     solds, revs = [], []
+    clos, washes = [], []   # m103-drobne
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -38172,12 +39582,12 @@ def m99markietani_main(logp):
                 continue
             kind = body.split(" |", 1)[0]
             mc = M99M_CAMP.search(body)
-            if mc and kind in ("cyrulik", "platnerz", "zabawa", "sklep otwarty", "sklep zamkniety"):
+            if mc and kind in ("cyrulik", "platnerz", "zabawa", "sklep otwarty", "sklep zamkniety", "odziez", "praczki"):
                 uses.append((kind, int(mc.group(1)), int(mc.group(2)), int(mc.group(3))))
             if kind == "sklep otwarty":
                 opened += 1
             mk = M99M_CTL.search(body)
-            if mk and kind in ("cyrulik", "platnerz", "zabawa", "sklep zamkniety"):
+            if mk and kind in ("cyrulik", "platnerz", "zabawa", "sklep zamkniety", "odziez", "praczki"):
                 a, b, c, r = int(mk.group(1)), int(mk.group(2)), int(mk.group(3) or 0), int(mk.group(4))
                 ctl.append((kind, a, b + c, r))
             ms = M99M_SHOP.search(body)
@@ -38189,6 +39599,14 @@ def m99markietani_main(logp):
             mr = M99M_REV.search(body)
             if mr and kind == "zabawa":
                 revs.append((float(mr.group(1)), float(mr.group(2)), float(mr.group(3)), int(mr.group(4))))
+            mcl = M99M_CLO.search(body)
+            if mcl and kind == "odziez":
+                clos.append(tuple(float(mcl.group(i)) for i in range(1, 10)))
+            mw = M99M_WASH.search(body)
+            if mw and kind == "praczki":
+                mm, mv = M99M_WASHMEN.search(body), M99M_WASHCOV.search(body)
+                washes.append((int(mw.group(1)), int(mw.group(2)), int(mw.group(3)), float(mw.group(4)), int(mw.group(5)),
+                               int(mm.group(1)) if mm else None, int(mv.group(1)) if mv else None))
     print(f"plik: {logp} | startow {len(starts)}, uzyc {len(uses)} (sklep otwarty {opened}, zamkniety {len(shops)}), linii doby {len(days)}, ERROR {n_err}")
     if not starts and not uses:
         rep.add("MK-0: linia 'Markietani obozu (m99): start sesji'", "brak w logu", "INFO (log sprzed paczki m99-markietani albo menu glowne)", None)
@@ -38215,6 +39633,15 @@ def m99markietani_main(logp):
     rep.add("MK-7: zabawa w pulapie morale", f"ponad pulap albo dodatek < 1: {len(br)} z {len(revs)}" + (f" (np. {br[0][0]} -> {br[0][1]}, pulap {br[0][3]})" if br else ""), "0", (len(br) == 0) if revs else None)
     nc = sum(1 for u in uses if u[0] == "cyrulik"); nz = sum(1 for u in uses if u[0] == "zabawa"); npl = sum(1 for u in uses if u[0] == "platnerz")
     rep.add("MK-5: uzycie (INFO)", f"cyrulik {nc}, platnerz {npl}, zabawa {nz}, sklep {len(shops)}: kupione {tb} sztuk, sprzedane {ts}, gracz netto {net}, narzut {mk}", "INFO", None)
+    # m103-drobne: MK-8 odziez z rzedu - potrzeba druzyny spada dokladnie o kupione sztuki; MK-9 praczki - cena = praczki x doby x dniowka (w gore), praczek = ceil(ludzie / na praczke)
+    badc = [c for c in clos if any(abs((c[i] - c[i + 3]) - c[i + 6]) > 0.11 for i in range(3))]   # log: potrzeba 10-100 z jednym miejscem po przecinku (ArmyClothing.F)
+    rep.add("MK-8: odziez z rzedu - potrzeba druzyny spada o kupione sztuki", f"zakupow {len(clos)}, niezgodnych {len(badc)}" + (f" (np. {badc[0]})" if badc else ""),
+            "0 niezgodnych", (len(badc) == 0) if clos else None)
+    badw = [w for w in washes if not (0 <= w[4] - w[0] * w[2] * w[3] < 1.0 + 1e-6)]   # cena = sufit iloczynu (dniowka w logu do 0.01)
+    # poprawka po recenzji m103: objeci = praczki x ludzi na praczke i nie mniej niz ludzie w chwili najecia (linia bez pola - log sprzed poprawki, bez sprawdzenia)
+    badw += [w for w in washes if w[6] is not None and (w[6] != w[0] * w[1] or (w[5] is not None and w[6] < w[5])) and w not in badw]
+    rep.add("MK-9: praczki - cena = praczki x doby x dniowka, objeci = praczki x ludzi na praczke", f"najec {len(washes)}, niezgodnych {len(badw)}" + (f" (np. {badw[0]})" if badw else ""),
+            "0 niezgodnych", (len(badw) == 0) if washes else None)
     rep.show()
     return 0
 
@@ -43795,6 +45222,7 @@ def nks_main(logp, until=120, bdp=None):
     f4a7 = []   # f4-pomiary (NKS-19c): linie "KS: A7 diagnoza (f4-pomiary)"
     stum_sess = 0
     stum_hooks = 0
+    crewf = {}   # m103 P6: doba -> polow zalogi bandy na morzu (linia m96-bandy) - zrodlo i zjedzenie "bez rynku", NKS-5u odejmuje
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -43802,6 +45230,12 @@ def nks_main(logp, until=120, bdp=None):
             if s.startswith("ERROR in "):
                 if s.startswith(NKS_ERR):
                     errs += 1
+                continue
+            if s.startswith(M96BANDY_HEAD):   # m103 P6
+                mcf = M103_BANDSEA_RX.search(s)
+                dcf = num(r"dzien (\d+)", s)
+                if mcf and dcf is not None:
+                    crewf[dcf] = int(mcf.group(5))
                 continue
             if s.startswith("KS: koszt "):
                 # ks-koszt: pod-czasy doby KS (T0) i kontrola szybkich drog
@@ -44067,7 +45501,7 @@ def nks_main(logp, until=120, bdp=None):
                 elif s.startswith(NKS_K + "kontrola wczesna"):
                     mm = NKS_EARLY.match(s)
                     if mm:
-                        early.append((int(mm.group("day")), int(mm.group("k")), int(mm.group("ok")), int(mm.group("n")), mm.group("res")))
+                        early.append((int(mm.group("day")), int(mm.group("k")), int(mm.group("ok")), int(mm.group("n")), mm.group("res"), s))   # m103 D4: [5] linia (pary poza pasmem)
                 elif s.startswith(NKS_K + "zapis arm_ks"):
                     mm = NKS_SAVE.match(s)
                     if mm:
@@ -44440,6 +45874,8 @@ def nks_main(logp, until=120, bdp=None):
                 cb = ub[g][1] if g in ub else 0
                 if g in ow_w:
                     cb = max(0, cb - sum(ow_w[g]))      # KS-R4 P10: bez rynku bez wies je swoje i bez strat w drodze KS-H
+                if g == "fish" and crewf:   # m103 P6: polow zalogi bandy na morzu - ramki bez osady (zrodlo i zjedzenie od razu), poza targiem z zalozenia
+                    cb = max(0, cb - sum(v for dcf, v in crewf.items() if w0 <= dcf <= w1))
                 if cm + cb >= 1000 and cb > 0.02 * cm:
                     ub_bad.append(f"{g} {100.0 * cb / cm:.1f}%" if cm > 0 else f"{g} {cb} szt. przy 0 na rynkach")
         else:
@@ -44480,6 +45916,13 @@ def nks_main(logp, until=120, bdp=None):
                 (len(stk_bad) == 0) if (n and nd_win >= 7) else None, etap=len(stk_bad) < NKS_R3["nks6"])
         # NKS-7 ceny na rynek
         pr = [(d, v) for d, v in prices if w0 <= d <= w1 + 7]
+        # m103 D4 (decyzja 21.10 po P2): ceny startu z Planu sa przyciete do 0.7-1.5 (KsCore.StartIndex), a targ nie mial takich cen nigdy - takze bez KS (P0 3/24 w
+        # pasmie, P2 przed wlaczeniem 3/24). NKS-7 i NKS-7e licza pare rynek x towar jako "poza" tylko wtedy, gdy KS oddalil cene od celu o > 0.3 wobec linii
+        # "KS: ceny miast" z ostatniej doby przed A; pasmo bezwzgledne zostaje jako INFO ("cel KS"). Bez linii cen przed A (bieg z zapisu po wlaczeniu) - jak dotad.
+        nks_b0 = max((d for d, _ in prices if d < a), default=None)
+        nks_px0 = next((v for d, v in prices if d == nks_b0), None) if nks_b0 is not None else None
+        if nks_px0 is not None and not any(k >= 0 for (k, _g) in nks_px0):
+            nks_px0 = None                                                    # linia sprzed recenzji (sam swiat) - bez bazy rynkow
         if pr:
             far, cf, sl = [], [], []
             per_mk = any(k >= 0 for _, v in pr for (k, _g) in v)
@@ -44504,8 +45947,28 @@ def nks_main(logp, until=120, bdp=None):
                         slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den if den > 0 else 0.0
                         if my > 0 and abs(slope / my) > 0.005:
                             sl.append(f"{nm} {100 * slope / my:+.2f}%/d")
-            rep.add("NKS-7: ceny na rynek (mediana linii okna w pasmie ceny startu +-0.3)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
-                    + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)"), "towary rak kazdego rynku w pasmie", len(far) == 0, etap=len(far) < NKS_R3["nks7"])
+            far_rel = []                                                      # m103 D4: pary oddalone przez KS (mediana okna wobec linii cen przed A)
+            if nks_px0 is not None and per_mk:
+                for k in (0, 1):
+                    for g in NKS_MAIN:
+                        ser = [v[(k, g)][0] for _, v in pr if (k, g) in v]
+                        x0 = nks_px0.get((k, g))
+                        if not ser or x0 is None:
+                            continue
+                        med = nks_med(ser)
+                        sp = start_px.get((k, g))
+                        sp = sp if sp is not None else 1.0                    # bez linii cen startu - srodek pasma 0.7-1.3 (jak wyzej)
+                        if abs(med - sp) > 0.3 and abs(med - sp) > abs(x0[0] - sp) + 0.3:
+                            far_rel.append(f"{mk_names[k]} {g} {med:.2f} (przed A {x0[0]:.2f}, cel {sp:.2f})")
+            if nks_px0 is not None and per_mk:
+                rep.add("NKS-7: ceny na rynek (mediana linii okna; poza = KS oddalil cene od celu o > 0.3 wobec linii cen przed A)",
+                        f"linii {len(pr)}, baza doba {nks_b0}: poza {len(far_rel)}" + (f" ({', '.join(far_rel[:12])})" if far_rel else ""),
+                        "zadna para rynek x towar rak nie oddalona przez KS (D4 21.10)", len(far_rel) == 0, etap=len(far_rel) < NKS_R3["nks7"])
+                rep.add("NKS-7 (cel KS): ceny na rynek w pasmie ceny startu +-0.3 (pasmo bezwzgledne)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
+                        + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)"), "INFO (ceny startu Planu 0.7-1.5 nie sa cenami targu - luka sprzed KS; D4 21.10)", None)
+            else:
+                rep.add("NKS-7: ceny na rynek (mediana linii okna w pasmie ceny startu +-0.3)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
+                        + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)") + " (bez linii cen przed A - pasmo bezwzgledne)", "towary rak kazdego rynku w pasmie", len(far) == 0, etap=len(far) < NKS_R3["nks7"])
             rep.add("NKS-7b: sufit / podloga wzoru ceny", ", ".join(cf) if cf else "<= 20% miast", "zaden towar w > 20% miast", len(cf) == 0 if per_mk else None, etap=len(cf) < NKS_R3["nks7b"])
             rep.add("NKS-7c: nachylenie ceny w oknie", ", ".join(sl[:12]) if sl else "<= 0.5%/d", "|nachylenie| <= 0.5%/d", (len(sl) == 0) if len(pr) >= 3 else None)
         else:
@@ -44731,9 +46194,25 @@ def nks_main(logp, until=120, bdp=None):
         else:
             rep.add("NKS-29: rynek wsi BK u wsi z koszykiem ZC4", "brak liczb w linii ZC4", "<= 2%", None)
         # NKS-7e (recenzja 17.10): kontrola wczesna D+7 - wiekszosc cen poza pasmem = bieg przerwac (wynik NKS-7 znany z gory)
-        if early:
+        if early and nks_px0 is not None:
+            # m103 D4: pary poza pasmem z linii kontroli (cena od D i cena startu z tej linii) - "poza" tylko, gdy KS oddalil cene od celu o > 0.3 wobec linii cen
+            # przed A; pary w pasmie nie moga byc oddalone. Wynik jak w grze: PRZERWAC przy ponad polowie par
             e = early[0]
-            rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek)", f"doba {e[0]}: w pasmie {e[2]} z {e[3]}, wynik {e[4]}", "dalej (PRZERWAC - ponad polowa poza pasmem)", e[4] == "dalej")
+            rel7e = []
+            for mk, g, x, sp in re.findall(r"(Westeros|Essos) ([A-Za-z_]+) ([\d.]+) \(start ([\d.]+)\)", e[5]):
+                k, x, sp = (0 if mk == "Westeros" else 1), float(x), float(sp)
+                x0 = nks_px0.get((k, g))
+                if x0 is not None and abs(x - sp) > 0.3 and abs(x - sp) > abs(x0[0] - sp) + 0.3:
+                    rel7e.append(f"{mk} {g} {x:.2f} (przed A {x0[0]:.2f}, cel {sp:.2f})")
+            res7e = "PRZERWAC" if 2 * len(rel7e) > e[3] else "dalej"
+            rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek; poza = KS oddalil cene od celu o > 0.3 wobec linii cen przed A)",
+                    f"doba {e[0]}: poza {len(rel7e)} z {e[3]} (baza doba {nks_b0}), wynik {res7e}" + (f" ({', '.join(rel7e[:12])})" if rel7e else ""),
+                    "dalej (PRZERWAC - ponad polowa par oddalona przez KS; D4 21.10)", res7e == "dalej")
+            rep.add("NKS-7e (cel KS): kontrola wczesna D+7 - pasmo bezwzgledne ceny startu +-0.3 (linia gry)", f"doba {e[0]}: w pasmie {e[2]} z {e[3]}, wynik linii {e[4]}",
+                    "INFO (w grze tylko linia; ceny startu Planu 0.7-1.5 - luka sprzed KS, P0 bez KS 3/24)", None)
+        elif early:
+            e = early[0]
+            rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek)", f"doba {e[0]}: w pasmie {e[2]} z {e[3]}, wynik {e[4]} (bez linii cen przed A - pasmo bezwzgledne)", "dalej (PRZERWAC - ponad polowa poza pasmem)", e[4] == "dalej")
         elif lastp >= dd + 8:
             rep.add("NKS-7e: kontrola wczesna D+7 (ceny na rynek)", "brak linii 'KS: kontrola wczesna' (log sprzed 17.10)", "linia w D+7", None)
         # NKS-14 przetwory ZC5
@@ -54098,6 +55577,10 @@ M96VALYRIA_DAY = re.compile(r"Drogi Valyrii \(VR\): dzien (?P<day>-?\d+) \| kluc
 M96VALYRIA_AUD = re.compile(r" \| audyt (?P<k>Valyria|szlak): (?P<n>\d+) partii(?:, premia rzeczywista sr\. (?P<avg>-?\d+\.\d+)% \(min (?P<mn>-?\d+\.\d+), maks (?P<mx>-?\d+\.\d+)\), "
                             r"z wpisem '[^']*' (?P<lines>\d+))?, oczekiwane (?P<exp>\d+\.\d)%")
 M96VALYRIA_AI = re.compile(r"siec AI drog: mosty Valyrii (?P<b>\d+), krawedzie Valyrii (?P<lv>\d+) jedn\., szlakow karawan (?P<lc>\d+) jedn\. \(klasy (?P<cls>tak|nie)\)")
+# m103 P1 (VR-3): dopisek audytu za "oczekiwane X%" - probki z premia < 5% i powod (na podlodze predkosci gry: wynik bez premii na LimitMin, premia ginie w modelu gry)
+# m103 recenzja: nowy napis "ponizej 5% lub na podlodze" - na podlodze = wszystkie probki z podlogi (takze z premia >= 5%), jak AuditList traktow DR
+M103_VALYRIA_LOW = re.compile(r" \| audyt (?P<k>Valyria|szlak): [^|]*?, oczekiwane \d+\.\d%, ponizej 5%(?: lub na podlodze)?: (?P<low>\d+) \(na podlodze predkosci gry (?P<fl>\d+), sr\. (?P<fa>-?\d+\.\d+)%; "
+                              r"sufit kolumny (?P<cap>\d+); inne (?P<oth>\d+)\) \[(?P<ex>[^\]]*)\]")
 
 
 def m96valyria_main(logp):
@@ -54164,6 +55647,7 @@ def m96valyria_main(logp):
         # VR-3 / VR-4: audyty
         for kind, name in (("Valyria", "VR-3: audyt AI na drodze Valyrii"), ("szlak", "VR-4: audyt AI na szlaku karawan")):
             tn, ts, tl, mn, mx, exp = 0, 0.0, 0, None, None, None
+            fn, fs, lowN, capN, othN, fex = 0, 0.0, 0, 0, 0, ""   # m103 P1 (VR-3): probki na podlodze predkosci gry (poza srednia) i reszta premii < 5%
             for d in days:
                 for am in M96VALYRIA_AUD.finditer(d["audit"]):
                     if am["k"] != kind:
@@ -54174,11 +55658,25 @@ def m96valyria_main(logp):
                         tn += k; ts += float(am["avg"]) * k; tl += int(am["lines"])
                         mn = float(am["mn"]) if mn is None else min(mn, float(am["mn"]))
                         mx = float(am["mx"]) if mx is None else max(mx, float(am["mx"]))
+                for lm in M103_VALYRIA_LOW.finditer(d["audit"]):
+                    if lm["k"] != kind:
+                        continue
+                    fn += int(lm["fl"]); fs += float(lm["fa"]) * int(lm["fl"]); lowN += int(lm["low"]); capN += int(lm["cap"]); othN += int(lm["oth"])
+                    if not fex and int(lm["fl"]) > 0:
+                        fex = lm["ex"][:160]
             if tn == 0:
                 rep.add(name, "probek 0", "INFO (zadna partia AI w marszu na tym rodzaju drogi w takcie linii)", None)
                 continue
             avg = ts / tn
             ok = abs(avg - exp) <= 1.5 and tl == tn
+            if lowN and tn - fn > 0:   # m103 P1 (VR-3): srednia bez probek z podlogi predkosci gry (jak audyt traktow DR, MapRoads.AuditList); te osobno jako INFO
+                avgx = (ts - fs) / (tn - fn)
+                ok = abs(avgx - exp) <= 1.5 and tl == tn
+                rep.add(name, f"probek {tn}, poza srednia na podlodze predkosci gry {fn}; premia sr. bez podlogi {avgx:.2f}% (ze wszystkimi {avg:.2f}%, min {mn:.2f}, maks {mx:.2f}), z wpisem {tl}; oczekiwane {exp:.1f}%",
+                        f"sr. bez probek z podlogi = oczekiwana +-1.5 pp, wpis w kazdej probce" + (" (INFO dla szlaku)" if kind == "szlak" else ""), ok if kind == "Valyria" else (None if ok else False))
+                rep.add(name.split(":")[0] + "b: probki z podlogi gry albo z premia < 5% (podloga poza srednia)", f"ponizej 5% lub na podlodze {lowN}: na podlodze {fn} (sr. {fs / fn if fn else 0:.2f}%), sufit kolumny {capN}, inne {othN}"
+                        + (f"; przyklad: {fex}" if fex else ""), "INFO (partia z wynikiem bez premii na podlodze gry LimitMin - premia drogi ginie w modelu gry; inne > 0 do sprawdzenia)", None)
+                continue
             rep.add(name, f"probek {tn}, premia sr. {avg:.2f}% (min {mn:.2f}, maks {mx:.2f}), z wpisem {tl}; oczekiwane {exp:.1f}%",
                     f"sr. = oczekiwana +-1.5 pp, wpis w kazdej probce" + (" (INFO dla szlaku)" if kind == "szlak" else ""), ok if kind == "Valyria" else (None if ok else False))
         am = M96VALYRIA_AI.search(days[-1]["ai"])
@@ -54739,27 +56237,55 @@ def m96len_main(logp):
 
 # ============================================================ m97wioski (20.10, galaz w-toku/m97-wioski; Armoury/src/SideVillageVisit*.cs): wjazd do wiosek pobocznych
 M97W_PRE = "Wioski poboczne (WP): "
+# poprawka po recenzji (WP-7): granica sesji - linie wypisywane po kazdym wczytaniu / nowej kampanii przed pierwsza godzina rabunku (zegar ksiegi - NightClock.Reset
+# z NightRest.ResetWorld, ta sama chwila co zerowanie licznika godzin rabunku doby; start wiosek pobocznych - OnSessionLaunched)
+M97W_SESS = ("Nocleg (zegar ksiegi): start sesji", M97W_PRE + "start sesji")
 M97W_RX = {
     "trade": re.compile(r"handel w (.+?) zamkniety: gracz ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\), wies okregu (\S+) ([+-]?\d+) \(kiesa (-?\d+) -> (-?\d+)\)"),
     "trib": re.compile(r"okup (.+?) \(.*kontrola: gracz \+(-?\d+) / wies -(-?\d+)\)"),
     "raidend": re.compile(r"rabunek (.+?) \(.*\) - koniec: (.+?) \|.*lup .*: zloto (-?\d+) z kiesy wsi"),
     "day": re.compile(r"dzien (-?\d+) \| klucz (\S+) \| wjazdy (\d+) \(kliki (\d+)\) \| handel (\d+):.* \| noclegi (\d+) \(bez oplaty (\d+)\), obozy (\d+), okna prac (\d+)"),
     "st": re.compile(r"potkniecia doby (\d+), sesji (\d+)"),
+    # m103-drobne (RaidCountsAsWork): godzina rabunku gracza liczona jak praca (NightRest.OnHourly, raz na dobe) i suma doby w linii gracza o swicie
+    "work": re.compile(r"^Nocleg: gracz - godzina (\d+):00 rabunku \((wioska poboczna|wies gry, gracz po stronie napastnika)\) liczona jak praca"),
+    "workdawn": re.compile(r"godziny rabunku bez odpoczynku \(Raid Counts As Work\) (\d+)"),
 }
 
 
 def m97wioski_main(logp):
     """m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do kazdej wioski pobocznej - handel koszykiem, nocleg, oboz, prace, rabunek tej wioski, okup (SideVillageVisit).
     Log Armoury strumieniowo. Progi: WP-0 start sesji, WP-1 linie ERROR SideVillageVisit 0, WP-2 potkniecia doby 0, WP-3 kontrola handlu (kiesa wsi o -zysk gracza
-    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    i kiesa gracza o zysk), WP-4 kontrola okupu (gracz +X = wies -X), WP-5 rabunki wiosek (INFO), WP-6 ruch doby (INFO), WP-7 (m103-drobne) rabunek jako praca
+    w ksiedze snu: linie "godzina rabunku liczona jak praca" i suma godzin w linii gracza o swicie (suma >= liczba linii dobowych). Log bez galezi: INFO, bez wyjatku.
+    Poprawka po recenzji: WP-7 liczony osobno w kazdej sesji (licznik godzin rabunku doby zeruje sie przy kazdym wczytaniu - NightRest.ResetWorld z konstruktora
+    ArmouryBehavior; granica sesji = linia "Nocleg (zegar ksiegi): start sesji" albo "Wioski poboczne (WP): start sesji"), w kazdej sesji najwyzej 1 linia doby bez switu."""
     rep = Report()
     start, days, trades, tribs, raids, errs = [], [], [], [], [], 0
+    rw_lines, rw_kinds, rw_dawn, rw_dawn_lines = 0, {}, 0, 0
+    # poprawka po recenzji: WP-7 w kazdej sesji osobno - [linie doby, godziny w liniach switu] biezacej sesji; sesje z linia doby trafiaja do rw_sess przy granicy
+    rw_cur, rw_sess = [0, 0], []
+
+    def rw_close():
+        if rw_cur[0] or rw_cur[1]:
+            rw_sess.append((rw_cur[0], rw_cur[1]))
+        rw_cur[0] = rw_cur[1] = 0
+
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M97W_SESS):
+                rw_close()
             if "ERROR in SideVillageVisit." in s:
                 errs += 1
+            mw = M97W_RX["work"].search(s)
+            if mw:
+                rw_lines += 1; rw_cur[0] += 1
+                rw_kinds[mw.group(2)] = rw_kinds.get(mw.group(2), 0) + 1
+            if s.startswith("NocnyMarsz: gracz o swicie"):
+                md = M97W_RX["workdawn"].search(s)
+                if md:
+                    rw_dawn += int(md.group(1)); rw_dawn_lines += 1; rw_cur[1] += int(md.group(1))
             if not s.startswith(M97W_PRE):
                 continue
             t = s[len(M97W_PRE):]
@@ -54773,6 +56299,7 @@ def m97wioski_main(logp):
                 tribs.append(t)
             elif t.startswith("rabunek ") and " - koniec: " in t:
                 raids.append(t)
+    rw_close()
     print(f"plik: {logp} | start {len(start)}, doby {len(days)}, handel {len(trades)}, okupy {len(tribs)}, rabunki {len(raids)}, ERROR {errs}")
     if not start and not days:
         rep.add("WP-0: linia startu wiosek pobocznych", "brak linii", "INFO (log sprzed galezi m97-wioski)", None)
@@ -54820,6 +56347,14 @@ def m97wioski_main(logp):
         if m:
             ent += int(m.group(3)); tr += int(m.group(5)); rest += int(m.group(6)); camp += int(m.group(8)); inv += int(m.group(9))
     rep.add("WP-6: ruch doby (suma)", f"wjazdy {ent}, handel {tr}, noclegi {rest}, obozy {camp}, okna prac {inv}", "INFO", None)
+    if rw_dawn_lines:
+        rw_bad = [x for x in rw_sess if x[1] < x[0] - 1]
+        rep.add("WP-7: rabunek jako praca (Raid Counts As Work) - linie doby / godziny w liniach switu, w kazdej sesji",
+                f"linii {rw_lines} {rw_kinds}, godzin bez odpoczynku {rw_dawn} w {rw_dawn_lines} liniach switu; sesji z rabunkiem {len(rw_sess)}, niezgodnych {len(rw_bad)}"
+                + (f" (np. linii {rw_bad[0][0]}, godzin {rw_bad[0][1]})" if rw_bad else ""),
+                "w kazdej sesji godzin >= linii - 1 (kazda linia doby to co najmniej 1 h; ostatnia doba sesji - zapis/wczytanie albo koniec logu - bez switu)", not rw_bad)
+    else:
+        rep.add("WP-7: rabunek jako praca", f"linii {rw_lines}, brak pola w liniach switu (log sprzed m103-drobne)", "INFO", None)
     rep.show()
     return 0
 
@@ -54850,20 +56385,67 @@ def m98_per_drink(charm, pool, by_charm):
     return min(pool, 1 + max(0, (charm + 10) // 60))
 
 
-def m98plotki_main(logp):
+# m103-drobne (KP-1): bledy kufli w logu Armoury - takze zapis/odczyt stanu (SyncData.arm_drink - InnDrink.Export/Import; SyncData.arm_rumours - ksiega plotek Rumours,
+# ta sama klasa co Rumours.Drink), nie tylko potkniecia InnDrink./Rumours.
+M98P_ERR = ("ERROR in InnDrink.", "ERROR in Rumours.", "ERROR in SyncData.arm_drink", "ERROR in SyncData.arm_rumours")
+# KP-1b (z --crashscribe): bloki bledow CrashScribe ("# ERROR ...") ze stosem w kodzie kufli i plotek
+M98P_CS = ("Armoury.InnDrink.", "Armoury.Rumours.")
+M98P_CS_TS = re.compile(r"\[\d\d:\d\d:\d\d\] ")   # poprawka po recenzji: zwykla linia logu CrashScribe (poza blokiem bledu)
+
+
+def m98plotki_cs_errors(csp):
+    """KP-1b: bloki "# ERROR ..." logu sesji CrashScribe, w ktorych stos (STACK / CALLER) przechodzi przez Armoury.InnDrink. albo Armoury.Rumours. - (bloki, przyklad).
+    Poprawka po recenzji: blok (Scribe.Report: "#####", "# ERROR ...", "#####", tresc, "#####") konczy sie na drugiej linii "#####" od naglowka albo na pierwszej
+    zwyklej linii "[HH:MM:SS] ..." - zwykle linie CrashScribe po bloku (breadcrumb, Net, Mends) nie trafiaja do bloku."""
+    n, ex, block, seps = 0, None, [], 0
+
+    def close(b):
+        nonlocal n, ex
+        if b and any(k in x for x in b for k in M98P_CS):
+            n += 1
+            if ex is None:
+                ex = next((x.strip() for x in b if x.startswith("MESSAGE")), b[0].strip())[:140]
+
+    with open(csp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if ln.startswith("# ERROR"):
+                close(block)
+                block, seps = [ln], 0
+            elif block:
+                if ln.startswith("#####"):
+                    seps += 1
+                    block.append(ln)
+                    if seps >= 2:            # 1. "#####" zamyka naglowek, 2. - tresc bloku
+                        close(block)
+                        block = []
+                elif M98P_CS_TS.match(ln):   # zwykla linia logu CrashScribe - blok bez zamkniecia (urwany) konczy sie tutaj
+                    close(block)
+                    block = []
+                else:
+                    block.append(ln)
+    close(block)
+    return n, ex
+
+
+def m98plotki_main(logp, csp=None):
     """m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel (cena z beczki piwa, zloto do karczmarzy), plotek na kufel wedlug Uroku, turnieje i swaty
     tylko prawdziwe, pijanstwo i kac gracza. Log Armoury strumieniowo. KP-0 start sesji (klucze, krzywa Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 linie
     ERROR InnDrink./Rumours. 0, KP-2 potkniecia doby 0, KP-3 kufel zaplacony (zaplacil = cena, kiesa gracza -cena, odbiorcy razem = cena, kontrola obiegu 0),
     KP-4 turnieje i swaty prawdziwe w chwili sluchania (kufle i doby: nieprawdziwe 0), KP-5 plotek na kufel = krzywa Uroku, KP-6 kara predkosci tylko przy
-    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku."""
+    upiciu / kacu (godziny kary bez stanu 0, upicie tylko ponad prog), KP-7 ruch doby (INFO). Log bez galezi: INFO, bez wyjatku.
+    m103-drobne: KP-1 liczy tez "ERROR in SyncData.arm_drink" i "ERROR in SyncData.arm_rumours" (zapis/odczyt stanu kufli i plotek); KP-1b (z --crashscribe) - bloki
+    bledow CrashScribe ze stosem Armoury.InnDrink./Armoury.Rumours. 0."""
     rep = Report()
     start, cups, drunks, days, wakes, errs = [], [], [], [], [], 0
+    errs_sync = 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
-            if "ERROR in InnDrink." in s or "ERROR in Rumours." in s:
+            if any(k in s for k in M98P_ERR):
                 errs += 1
+                if "ERROR in SyncData." in s:
+                    errs_sync += 1
             if not s.startswith(M98P_PRE):
                 continue
             t = s[len(M98P_PRE):]
@@ -54888,7 +56470,12 @@ def m98plotki_main(logp):
     curve_ok = bool(mc) and (not by_charm or (mc.group(1), mc.group(2), mc.group(3), mc.group(5)) == ("1", "2", "3", "wszystkie"))
     rep.add("KP-0: linia startu sesji (klucze, krzywa Uroku 20/80/150/250)", (start[-1][:220] if start else "brak"), "jest; przy kluczu Urok: 1/2/3/wszystkie",
             bool(start) and bool(ms) and curve_ok)
-    rep.add("KP-1: linie ERROR in InnDrink./Rumours.", f"{errs}", "0", errs == 0)
+    rep.add("KP-1: linie ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours", f"{errs} (w tym zapis/odczyt SyncData {errs_sync})", "0", errs == 0)
+    if csp and os.path.isfile(csp):
+        ncs, excs = m98plotki_cs_errors(csp)
+        rep.add("KP-1b: CrashScribe - bloki bledow ze stosem InnDrink./Rumours.", f"{ncs}" + (f" (np. {excs})" if excs else ""), "0", ncs == 0)
+    else:
+        rep.add("KP-1b: CrashScribe - bloki bledow ze stosem InnDrink./Rumours.", "bez logu CrashScribe (--crashscribe <session-*.log>)", "INFO", None)
     st_sum = sum(int(m.group(18)) for m in (M98P_RX["day"].search(x) for x in days) if m)
     rep.add("KP-2: potkniecia doby (suma)", f"{st_sum} w {len(days)} dobach", "0", st_sum == 0)
     bad, badt, badn, unread, nopay = [], [], [], 0, 0
@@ -55078,6 +56665,254 @@ def m97obroncy_main(logp):
     return 0
 
 
+M99O_PRE = "Optym (m99): "
+M99O_PROF = re.compile(r"Profil doby \(E8/0\): dzien (\d+) \| takt doby ([\d.]+) ms \(wywolan \d+; top: (.*?)\); inne")
+M99O_CHK = re.compile(r"porownan (\d+), roznic (\d+) \(sesja")
+
+
+def m99optym_prof(logp):
+    """Linie "Profil doby (E8/0)": lista (takt doby, {sekcja: ms}) z calego logu (strumieniowo)."""
+    rows = []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "Profil doby (E8/0)" not in ln:
+                continue
+            m = M99O_PROF.search(ln)
+            if not m:
+                continue
+            secs = {}
+            for p in m.group(3).split(", "):
+                mm = re.match(r"(.+) ([\d.]+)$", p.strip())
+                if mm:
+                    secs[mm.group(1)] = float(mm.group(2))
+            rows.append((float(m.group(2)), secs))
+    return rows
+
+
+def m99optym_stat(rows, n=60):
+    """Mediana / srednia taktu doby i srednia KingdomTreasury.Daily w oknie ostatnich n dob (sekcja spoza "top" = 0)."""
+    w = rows[-n:]
+    if not w:
+        return None
+    tak = sorted(r[0] for r in w)
+    kt = [r[1].get("KingdomTreasury.Daily", 0.0) for r in w]
+    k = len(tak)
+    med = tak[k // 2] if k % 2 else (tak[k // 2 - 1] + tak[k // 2]) / 2.0   # recenzja m99: zwykla mediana (przy parzystym n srednia dwoch srodkowych) - jak w CHANGELOG
+    return {"n": len(w), "med": med, "avg": sum(tak) / len(tak), "kt": sum(kt) / len(kt)}
+
+
+M105_PRE = "Optym (m105): "
+M105_CHK = re.compile(r"kontrola \(Optim Verify\) ([^:]+): (?:zapytan \d+, z pamieci \d+, )?porownan (\d+), roznic (\d+) \(sesja")
+M105_KT = re.compile(r"KingdomTreasury\.Daily model dochodu: pominiety u (\d+) rodow \(z (\d+) ")
+M105_STUM = re.compile(r"\| potkniecia (\d+)")
+M105_SECS = ("KingdomTreasury.Daily", "Sutlers.Daily", "ClanIncomeBook.Daily", "BuildFunding.Daily")
+
+
+def m105optym_stat(rows, n=60):
+    """Mediana / srednia taktu doby i srednie sekcji M105_SECS w oknie ostatnich n dob (sekcja spoza "top" = 0)."""
+    w = rows[-n:]
+    if not w:
+        return None
+    tak = sorted(r[0] for r in w)
+    k = len(tak)
+    med = tak[k // 2] if k % 2 else (tak[k // 2 - 1] + tak[k // 2]) / 2.0
+    secs = {s: sum(r[1].get(s, 0.0) for r in w) / len(w) for s in M105_SECS}
+    return {"n": len(w), "med": med, "avg": sum(tak) / len(tak), "secs": secs}
+
+
+def m105optym_main(logp, basep=None):
+    """m105optym (21.10, galaz w-toku/m105-optym): skroty przelomu doby - model KT pominiety u rodow bez lenn (OptimKtSkipModel), najblizsze osady markietanow
+    z tablic doby (OptimSutlerNearest), wojna krolestwa w BuildFunding raz na krolestwo (OptimBuildWar), BK przez delegaty w ClanIncomeBook.StableBegin
+    (OptimStableDelegates). M5-0 linia startu; M5-1 takt doby i sekcje wobec bazy (INFO); M5-2 tryb kontrolny Optim Verify - roznice 0 razem i porownan > 0
+    w kazdej czynnej czesci (recenzja m105: czesc z 0 porownan nie moze przejsc dzieki innym; model bez lenn - gdy w liniach KT pominietych > 0, przy podstawie
+    nie-ziemia linii kontrolnej KT nie ma i to jest poprawne; najblizsze osady - gdy linia Sutlers "z tablic doby"; delegaty BK - gdy sa linie ClanIncomeBook;
+    BuildFunding - wymagana sama linia, 0 porownan = brak budow) (linia startu "Optim Verify TAK" bez porownan - NIE); M5-3 KT: doby z pominietymi modelami
+    (klucz TAK) - wiekszosc dob > 0, dzien "WYLACZONE" z powodu innego niz podstawa nie-ziemia - NIE; M5-4 Sutlers: "z tablic doby" w kazdej linii (klucz TAK);
+    M5-5 potkniecia w liniach m105 = 0 i ERROR Optim105 / SutlerNear = 0; M5-6 linie ClanIncomeBook bez "BRAK" (delegat nie powstal - skrot nie biegnie;
+    klucz TAK). Log sprzed galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, kt, sut, cib, chk, stum, errs = [], [], [], [], [], 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and ("Optim105" in s or "SutlerNear" in s):
+                errs += 1
+            if not s.startswith(M105_PRE):
+                continue
+            t = s[len(M105_PRE):]
+            if t.startswith("start"):
+                start.append(t)
+                continue
+            for mm in M105_CHK.finditer(t):
+                chk.append((mm.group(1).strip(), int(mm.group(2)), int(mm.group(3))))
+            ms = M105_STUM.search(t)
+            if ms:
+                stum += int(ms.group(1))
+            if "KingdomTreasury.Daily model dochodu" in t:
+                kt.append(t)
+            elif "Sutlers.Daily najblizsze osady" in t:
+                sut.append(t)
+            elif "ClanIncomeBook.StableBegin" in t:
+                cib.append(t)
+    rows = m99optym_prof(logp)
+    st = m105optym_stat(rows)
+    print(f"plik: {logp} | start {len(start)}, linie KT {len(kt)}, Sutlers {len(sut)}, ClanIncomeBook {len(cib)}, kontrolne {len(chk)}, doby profilu {len(rows)}, ERROR {errs}")
+    if not start and not kt and not sut and not cib:
+        rep.add("M5-0: linia startu Optym (m105)", "brak linii m105", "INFO (log sprzed galezi m105-optym)", None)
+        if st:
+            rep.add("M5-1: takt doby (ostatnie 60 dob)", f"mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms ({st['n']} dob)", "INFO", None)
+        rep.show()
+        return 0
+    last = start[-1] if start else ""
+    rep.add("M5-0: linia startu Optym (m105)", last[:220] if start else "brak linii startu (sa linie doby)", "jest", bool(start))
+    if st:
+        val = (f"takt doby mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms; "
+               + ", ".join(f"{k} {v:.1f}" for k, v in st["secs"].items()) + f" ms ({st['n']} dob)")
+        if basep:
+            bs = m105optym_stat(m99optym_prof(basep))
+            if bs:
+                val += (f" | baza: mediana {bs['med']:.1f} / srednia {bs['avg']:.1f}; "
+                        + ", ".join(f"{k} {v:.1f}" for k, v in bs["secs"].items())
+                        + f" | roznica mediany {st['med'] - bs['med']:+.1f} ms, sekcje "
+                        + ", ".join(f"{k} {st['secs'][k] - bs['secs'][k]:+.1f}" for k in M105_SECS))
+        rep.add("M5-1: takt doby i sekcje (ostatnie 60 dob) wobec bazy", val,
+                "INFO (zmiennosc biegu; oczekiwane KingdomTreasury.Daily nizej o ok. 20-30 ms, Sutlers o kilka ms)", None)
+    else:
+        rep.add("M5-1: takt doby i sekcje (ostatnie 60 dob) wobec bazy", "brak linii Profil doby (E8/0)", "INFO", None)
+    verify_on = "Optim Verify TAK" in last
+    on_part = last.split("| wylaczone")[0] if start else ""
+    if chk:
+        parts = {}
+        for name, c, d in chk:
+            pc, pd = parts.get(name, (0, 0))
+            parts[name] = (pc + c, pd + d)
+        tc = sum(v[0] for v in parts.values())
+        td = sum(v[1] for v in parts.values())
+        val = "; ".join(f"{k}: porownan {v[0]}, roznic {v[1]}" for k, v in sorted(parts.items()))
+        # recenzja m105: kazda czynna czesc z porownaniami > 0 (zero = skrot nie biegl w trybie kontrolnym - brak dowodu); bez linii startu / przy Verify NIE w
+        # ostatnim starcie - tylko suma (logi z kilku sesji)
+        miss = []
+        if start and verify_on:
+            need = []
+            if "Optim Kt Skip Model" in on_part and any(int(mk.group(1)) > 0 for mk in (M105_KT.search(x) for x in kt) if mk):
+                need.append("model bez lenn")
+            if "Optim Sutler Nearest" in on_part and any("z tablic doby" in x for x in sut):
+                need.append("najblizsze osady")
+            if "Optim Stable Delegates" in on_part and cib:
+                need.append("delegaty BK")
+            miss = [k for k in need if parts.get(k, (0, 0))[0] == 0]
+            if "Optim Build War" in on_part and "BuildFunding.Daily wojna krolestwa" not in parts:
+                miss.append("BuildFunding.Daily wojna krolestwa (brak linii)")
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi",
+                f"{val} | razem porownan {tc}, roznic {td}" + (f" | bez porownan: {', '.join(miss)}" if miss else ""),
+                "roznic 0, porownan > 0 w kazdej czynnej czesci", td == 0 and tc > 0 and not miss)
+    elif verify_on:
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", "linia startu: Optim Verify TAK, brak porownan",
+                "porownania > 0 (tryb kontrolny wlaczony, nic nie porownal)", False)
+    else:
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony)", None)
+    kt_on = ("Optim Kt Skip Model" in on_part) if start else bool(kt)
+    if kt_on and kt:
+        skipped, off, off_land = [], [], 0
+        for t in kt:
+            mk = M105_KT.search(t)
+            if mk:
+                skipped.append(int(mk.group(1)))
+            elif "pominiecie WYLACZONE" in t:
+                if "nie ziemia" in t:
+                    off_land += 1
+                else:
+                    off.append(t.split("pominiecie WYLACZONE - ", 1)[-1][:160])
+        pos = sum(1 for x in skipped if x > 0)
+        srt = sorted(skipped)
+        med = srt[len(srt) // 2] if srt else 0
+        val = (f"dob z linia {len(kt)}: pominiete > 0 w {pos}, mediana pominietych {med}, maks. {max(srt) if srt else 0}; WYLACZONE przez straznika {len(off)}"
+               + (f" (pierwszy powod: {off[0]})" if off else "") + (f"; podstawa nie-ziemia {off_land}" if off_land else ""))
+        name = "M5-3: KingdomTreasury - model pominiety (straznik nie wylaczyl)"
+        if off:
+            rep.add(name, val, "straznik nie wylacza (nieznana latka / model - do sprawdzenia)", False)
+        elif off_land and not skipped:
+            rep.add(name, val, "INFO (podstawa powinnosci nie ziemia - pominiecie nie dotyczy)", None)
+        else:
+            rep.add(name, val, "pominiete > 0 w wiekszosci dob (pierwsza doba po wczytaniu bez pomiaru D stalego - 0)", len(skipped) > 0 and pos * 2 >= len(skipped))
+    else:
+        rep.add("M5-3: KingdomTreasury - model pominiety (straznik nie wylaczyl)", "klucz Optim Kt Skip Model NIE albo brak linii", "INFO", None)
+    sut_on = ("Optim Sutler Nearest" in on_part) if start else bool(sut)
+    if sut_on and sut:
+        tab = sum(1 for t in sut if "z tablic doby" in t)
+        rep.add("M5-4: Sutlers - najblizsze osady z tablic doby", f"{tab} z {len(sut)} dob", "kazda doba z tablic", tab == len(sut))
+    else:
+        rep.add("M5-4: Sutlers - najblizsze osady z tablic doby", "klucz Optim Sutler Nearest NIE albo brak linii", "INFO", None)
+    rep.add("M5-5: potkniecia w liniach m105 i ERROR Optim105 / SutlerNear", f"potkniecia {stum}, ERROR {errs}", "0 i 0", stum == 0 and errs == 0)
+    cd_on = ("Optim Stable Delegates" in on_part) if start else bool(cib)
+    if cd_on and cib:
+        brak = [x for x in cib if "BRAK" in x]
+        rep.add("M5-6: ClanIncomeBook.StableBegin - delegaty BK zbudowane", f"BRAK w {len(brak)} z {len(cib)} dob" + (f" (pierwsza: {brak[0][:160]})" if brak else ""),
+                "zadnego BRAK", not brak)
+    else:
+        rep.add("M5-6: ClanIncomeBook.StableBegin - delegaty BK zbudowane", "klucz Optim Stable Delegates NIE albo brak linii", "INFO", None)
+    rep.show()
+    return 0
+
+def m99optym_main(logp, basep=None):
+    """m99optym (21.10, galaz w-toku/m99-optym): optymalizacja przelomu doby (KingdomTreasury.Optim.cs). MO-0 linia startu "Optym (m99): start" (klucze),
+    MO-1 takt doby i KingdomTreasury.Daily (mediana / srednia ostatnich 60 dob; z --baza-doby <log bazy> - roznica wobec bazy) - INFO z liczba,
+    MO-2 tryb kontrolny (Optim Verify): roznice starej i nowej drogi = 0 przy porownan > 0; linia startu z "Optim Verify TAK" bez linii kontrolnych - NIE
+    (bieg kontrolny bez porownan nic nie dowodzi); bez linii kontrolnych przy "Optim Verify NIE" albo bez linii startu - INFO. MO-3 linie ERROR KingdomTreasury /
+    OptimStartLine = 0.
+    Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, chk, errs = [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and ("KingdomTreasury" in s or "OptimStartLine" in s):
+                errs += 1
+            if not s.startswith(M99O_PRE):
+                continue
+            t = s[len(M99O_PRE):]
+            if t.startswith("start"):
+                start.append(t)
+            elif "kontrola (Optim Verify)" in t:
+                chk.append(t)
+    rows = m99optym_prof(logp)
+    st = m99optym_stat(rows)
+    print(f"plik: {logp} | start {len(start)}, linie kontrolne {len(chk)}, doby profilu {len(rows)}, ERROR {errs}")
+    if not start:
+        rep.add("MO-0: linia startu Optym (m99)", "brak linii", "INFO (log sprzed galezi m99-optym)", None)
+    else:
+        rep.add("MO-0: linia startu Optym (m99)", start[-1][:200], "jest", True)
+    if st:
+        val = f"takt doby mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms, KingdomTreasury.Daily srednio {st['kt']:.1f} ms ({st['n']} dob)"
+        if basep:
+            bs = m99optym_stat(m99optym_prof(basep))
+            if bs:
+                val += (f" | baza: mediana {bs['med']:.1f} / srednia {bs['avg']:.1f}, KingdomTreasury.Daily {bs['kt']:.1f} ms ({bs['n']} dob)"
+                        f" | roznica mediany {st['med'] - bs['med']:+.1f} ms, KingdomTreasury.Daily {st['kt'] - bs['kt']:+.1f} ms")
+        rep.add("MO-1: takt doby (ostatnie 60 dob) wobec bazy", val, "INFO (zmiennosc biegu; oczekiwane KingdomTreasury.Daily nizej o ok. 1-3 ms)", None)
+    else:
+        rep.add("MO-1: takt doby (ostatnie 60 dob) wobec bazy", "brak linii Profil doby (E8/0)", "INFO", None)
+    if chk:
+        cmp_sum, diff_sum = 0, 0
+        for t in chk:
+            m = M99O_CHK.search(t)
+            if m:
+                cmp_sum += int(m.group(1)); diff_sum += int(m.group(2))
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", f"porownan {cmp_sum}, roznic {diff_sum} w {len(chk)} dobach", "roznic 0 (porownan > 0)",
+                diff_sum == 0 and cmp_sum > 0)
+    elif any("Optim Verify TAK" in t for t in start):
+        # recenzja m99: bieg kontrolny bez ani jednego porownania (klucz nie wszedl, CrownDuesEnabled / LogEnabled NIE, Daily wyszedl przez blad) - nie dowodzi niczego
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "linia startu: Optim Verify TAK, brak linii kontrolnych",
+                "linie kontrolne z porownan > 0 (tryb kontrolny wlaczony, brak porownan)", False)
+    else:
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony albo log bez linii startu)", None)
+    rep.add("MO-3: linie ERROR KingdomTreasury / OptimStartLine", f"{errs}", "0", errs == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -55089,6 +56924,7 @@ def main(argv):
     horses = False   # P1 (kiesa1): progi dla biegu z regula koni roboczych
     tabp = None      # PROJEKT-LENNA (grupa lenna): katalog tabel biegu (ludzie-regiony.csv)
     need_ht = False  # nharmony (recenzja, uwaga 5): autotest galezi noc-harmony - brak linii HT albo stary format = NIE
+    rglp = None      # m103sceny (SC-13): rgl_log gry - assert "Trying to render a released texture"
     i = 0
     while i < len(args):
         a = args[i]
@@ -55118,6 +56954,8 @@ def main(argv):
             tabp = args[i + 1]; i += 2; continue
         if a == "--wymagaj-ht":
             need_ht = True; i += 1; continue
+        if a == "--rgl":
+            rglp = args[i + 1]; i += 2; continue
         logp = a; i += 1
     if group == "m96len":
         return m96len_main(logp)   # m96-len (20.10): Plan KS liczy plotno kupowane przez wsie w miastach; zapas lnu i plotna pod KS
@@ -55293,10 +57131,24 @@ def main(argv):
         return m101postacie_main(logp, csp)   # m101postacie (21.10, w-toku/m101-postacie): postacie kanonu do rodow, B nie powstaja, zmiany stron wedlug ksiazki (CanonCompanions)
     if group == "m101prolog" and logp:
         return m101prolog_main(logp, csp)   # m101prolog (21.10, w-toku/m101-prolog): prolog 298 - kalendarz, start opowiesci ROT, pokoj i pakty, Robert i Ned, koniec prologu
+    if group == "m103sceny" and logp:
+        return m103sceny_main(logp, csp, rglp)   # m103sceny (21.10, w-toku/m103-sceny): 23 sceny prologu jako okna ROT, obrazki z plikow, okna ROT z obrazkami Jeffa
+    if group == "m104e5" and logp:
+        return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
+    if group == "m105kolko" and logp:
+        return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
+    if group == "m105dziennik" and logp:
+        return m105dziennik_main(logp)   # m105dziennik (21.10, w-toku/m105-dziennik): dziennik obok menu osady, ramka w stylu ROT, bez wierszy handlu nad miastami (MapChatLog)
+    if group == "m105drobne" and (logp or csp):
+        return m105drobne_main(logp, csp)   # m105drobne (21/22.10, w-toku/m105-drobne): T-4 sprawa broni gangu (QuestGangAxes), straznik zawieszen CrashScribe przy zamykaniu gry (--crashscribe)
+    if group == "m104wojny" and logp:
+        return m104wojny_main(logp)   # m104wojny (21.10, w-toku/m104-wojny): Essos na kalendarzu w prologu, Reach i Dorne z korona, mlode smoki Daenerys (Prologue.Wars/Crown/Dragons)
     if group == "m100kryjowki" and logp:
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m102tablica" and logp:
         return m102tablica_main(logp)   # m102tablica (21.10, w-toku/m102-tablica): tablica ogloszen - zadania gry, rozmowa z tablicy, listy gonczne kapitana strazy (NoticeBoard)
+    if group == "m103lektor" and logp:
+        return m103lektor_main(logp, csp)   # m103lektor (21.10, w-toku/m103-lektor): lektor - okna wydarzen ROT z nagran Davida, plotki na zywo przez ElevenLabs z pamiecia nagran (Lektor)
     if group == "m99markietani" and logp:
         return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
     if group == "m97posilki" and logp:
@@ -55373,6 +57225,10 @@ def main(argv):
         return nkasy_main(logp)   # nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z): firmy DS miast przegladane co kwartal, pan splaca rachunki zywnosci wczesniej, zawrocony woz bez straty towaru (DsTowns, KsLordFood, KsFoodCarts)
     if group == "m96dlugi_dlugi" and logp:
         return m96dlugi_main(logp)   # m96dlugi_dlugi (20.10, galaz m96-dlugi): dlugi rad miast, podatek nadzwyczajny (TownDebt.cs)
+    if group == "m103p3" and logp:
+        return m103p3_main(logp)   # m103p3 (21.10, galaz m103-gospodarka P3): sufit firm DS miast z KS i firma przy ustaleniu najwyzej doplyw netto (DsTowns.cs, KsFolkIncome.cs)
+    if group == "m103wsie" and logp:
+        return m103wsie_main(logp)   # m103wsie (21.10, m103-gospodarka czesc 3): drabina 1 wsi przy cenach polki z budzetu z wplywu (TownFolk.Ks.cs, StartCalibration.Money.cs)
     if group == "p6a7" and logp:
         return p6a7_main(logp)   # p6a7 (20.10, fala 2 pomyslow, galaz p6-a7): A7 domyslnie TAK + roboty miast z rak okregu - odplyw kas miast do kies wsi (TownHire.cs)
     if group == "na7" and logp:
@@ -55413,8 +57269,12 @@ def main(argv):
         return m97obroncy_main(logp)   # m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs)
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+    if group == "m105optym" and logp:
+        return m105optym_main(logp, bdp)   # m105optym (21.10, galaz w-toku/m105-optym): skroty przelomu doby (model KT, markietani, budowy, delegaty BK), Optim Verify
+    if group == "m99optym" and logp:
+        return m99optym_main(logp, bdp)   # m99optym (21.10, galaz w-toku/m99-optym): takt doby wobec bazy, tryb kontrolny Optim Verify (KingdomTreasury.Optim.cs)
     if group == "m98plotki" and logp:
-        return m98plotki_main(logp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
+        return m98plotki_main(logp, csp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
@@ -56474,6 +58334,10 @@ M96BANDY_KEYS = ("bands", "need", "eaten", "bought", "boughtGold", "buyBands", "
                  "lifeKept", "lifeKeptGold", "lifeWhole", "pocket", "pocketBands", "pocketWant", "pocketShort", "lootAi", "lootAiN", "lootPl", "lootPlN",
                  "gold", "goldPl", "lordAi", "lordPl", "stum", "stumS")
 
+# m103 P6 (BandFoodAtSea): odcinek linii doby m96-bandy tuz przed "| potkniecia" - zakup u pasera portu i polow zalogi bandy na morzu (albo WYLACZONE)
+M103_BANDSEA_RX = re.compile(r"\| z morza: paser portu (\d+) szt\. za (\d+) zl \(band (\d+), miast portowych (\d+)\), polow zalogi (\d+) szt\. \(band (\d+), ponad limit \d+ szt\./d (\d+)\) \| potkniecia")
+M103_BANDSEA_OFF = "| z morza: WYLACZONE (Band Food At Sea)"
+
 
 def m96bandy_rows(path, extra=None):
     """Linie doby m96-bandy, "Paser:" (zywnosc sprzedana) i "Wyrzutki:" (band, ludzi) -> slowniki wedlug doby (strumieniowo). extra (slownik) dostaje
@@ -56499,6 +58363,10 @@ def m96bandy_rows(path, extra=None):
                 r = {"on": "| CZYNNE" in s, "bad": False}
                 for k, v in zip(M96BANDY_KEYS, mm.groups()):
                     r[k] = (float(v) if v != "-" else 0.0) if k in ("need", "stockDays") else int(v)
+                ms13 = M103_BANDSEA_RX.search(s)   # m103 P6: odcinek "z morza" (brak - log sprzed m103 albo nierozpoznany; WYLACZONE - klucz zdjety)
+                r["sea13"] = tuple(int(x) for x in ms13.groups()) if ms13 else None
+                r["sea13off"] = M103_BANDSEA_OFF in s
+                r["sea13any"] = "| z morza: " in s
                 rows[d] = r
             elif s.startswith("Paser: dzien "):
                 d = num(r"Paser: dzien (\d+)", s)
@@ -56623,6 +58491,18 @@ def m96bandy_main(logp, bdp=None):
     sb_ = sum(r["sea"] for r in ok)
     rep.add("MB-12: bandy na morzu (srednio na dobe)", f"{sb_ / n:.1f} band, glodne {sum(r['seaHungry'] for r in ok) / n:.1f}"
             + (f" ({sum(r['seaHungry'] for r in ok) / sb_:.3f})" if sb_ else "") + f", kupily z morza {sum(r['seaBuy'] for r in ok) / n:.1f}", "INFO", None)
+    # MB-13 (m103 P6, BandFoodAtSea): odcinek "z morza" linii doby czytelny w kazdej dobie z kluczem; zakup u pasera portu i polow zalogi (srednio na dobe)
+    s13 = [r for r in ok if r.get("sea13any")]
+    if s13:
+        on13 = [r for r in s13 if not r.get("sea13off")]
+        bad13 = [r for r in on13 if r.get("sea13") is None]
+        g13 = [r["sea13"] for r in on13 if r.get("sea13") is not None]
+        n13 = max(1, len(g13))
+        rep.add("MB-13: odcinek 'z morza' (paser portu, polow zalogi) - linia czytelna", f"dob z odcinkiem {len(s13)} (z kluczem {len(on13)}, nieczytelnych {len(bad13)}, WYLACZONE {len(s13) - len(on13)})"
+                + (f"; srednio na dobe: paser portu {sum(x[0] for x in g13) / n13:.1f} szt. za {sum(x[1] for x in g13) / n13:.0f} zl ({sum(x[2] for x in g13) / n13:.1f} band, {sum(x[3] for x in g13) / n13:.1f} miast), polow zalogi {sum(x[4] for x in g13) / n13:.1f} szt. ({sum(x[5] for x in g13) / n13:.1f} band, ponad limit {sum(x[6] for x in g13) / n13:.2f})" if g13 else ""),
+                "0 nieczytelnych przy kluczu Band Food At Sea (polow zalogi ok. potrzeby piratow 150-230 szt./d)", len(bad13) == 0 if on13 else None)
+    else:
+        rep.add("MB-13: odcinek 'z morza' linii doby", "brak (log sprzed m103-gospodarka P6)", "INFO", None)
     rep.show()
     return 0
 
@@ -56727,6 +58607,456 @@ def m96dlugi_main(logp, base_arr=209771):
     msd = sum(r["ms"] for r in rows) / len(rows); st = sum(r["stum"] for r in rows)
     rep.add("M96D-6: czas (ms na dobe), potkniecia i ERROR TownDebt", f"srednio {msd:.2f} ms (najwiecej {max(r['ms'] for r in rows):.2f}), potkniecia {st}, ERROR {errs}",
             "<= 2 ms/d, 0, 0", msd <= 2.0 and st == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
+# ---------------- m103p3 (21.10, galaz w-toku/m103-gospodarka P3 - decyzja D1 po biegu P2): sufit firm DS miast z KS (Ks Farm Surplus Cap Net) i firma przy ustaleniu
+# najwyzej doplyw netto okna (Ds Farm Fix Share Cap). DsTowns.cs (SurplusReview, IncomeCut, FromZero, Fix, ShareToday), KsFolkIncome.cs (segment linii f5).
+M3P_F5 = "Dochod ludu wedlug koszyka (f5-lud): dzien "
+M3P_DS = "Firmy miast i zamkow (DS): dzien "
+M3P_RX = {
+    "seg": re.compile(r"\| P3 sufit firm \(Ks Farm Surplus Cap Net TAK\): przyciete sufitem (\d+) \(-(\d+) zl/rok\), obnizki z dochodu (\d+) \(-(\d+) zl/rok\), "
+                      r"firmy od zera (\d+) \(\+(\d+) zl/rok\)"),
+    "raise": re.compile(r"\| przeglad firmy wedlug nadwyzki kasy: podwyzek dzis (\d+) \(\+(-?\d+) zl/rok\), od startu sesji (\d+) \(\+(-?\d+) zl/rok\)"),
+    "ms": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)"),
+    "ramp": re.compile(r"\| przejscie: rampa ([\d.]+)"),
+    "farms": re.compile(r"\| firmy od doby (-?\d+): miasta (\d+) - (\d+) zl/rok, zamki (\d+) - (\d+) zl/rok"),
+    "share": re.compile(r"\| udzial firm w doplywie netto \(m103 P3\): swiat ([\d.]+|-) \(miasta ([\d.]+|-), zamki ([\d.]+|-)\); osad z firma ponad doplyw (\d+) \(o (\d+) zl/rok\), "
+                        r"z firma bez doplywu \(doplyw <= 0 albo bez pomiaru\) (\d+) \(firmy (\d+) zl/rok\)"),
+    "arr": re.compile(r"zaleglosci wedlug osad \(f14-miary\): miasta (\d+) zl u (\d+) \(z zaleglosci >= raty \d+\), zamki (\d+) zl u (\d+) \("),
+    "stum": re.compile(r"\| potkniecia (\d+) \(w sesji (\d+)\)"),
+    "fix": re.compile(r"FIRMY USTALONE po (\d+) dobach pomiaru: (\d+) miast \(z kasy panom (\d+) zl/rok, koronie (\d+) zl/rok.*?\), (\d+) zamkow \(z kasy panom (\d+), koronie (\d+);"),
+    "fixsh": re.compile(r"udzial firmy w doplywie netto swiata ([\d.]+|-)"),
+    # poprawka po recenzji 21.10: (d) wspolczynnik swiata zamiast sufitu na osade (kod sprzed poprawki nie byl puszczany w grze - starego formatu nie ma w logach)
+    "fixcap": re.compile(r"\(Ds Farm Fix Share Cap TAK: przed sufitem ([\d.]+|-) \(miasta ([\d.]+|-), zamki ([\d.]+|-)\); wspolczynnik swiata ([\d.]+) - firmy z kasy wszystkich osad x wspolczynnik: miasta (\d+) o (\d+) zl/rok, "
+                         r"zamki (\d+) o (\d+) zl/rok; firmy bez doplywu netto okna \(doplyw <= 0 albo bez pomiaru\): (\d+) osad, (\d+) zl/rok; udzial z firmami bez doplywu ([\d.]+|-); "
+                         r"osad z pomiarem doplywu (\d+) z (\d+)\)"),
+    "share2": re.compile(r"; swiat z firmami bez doplywu ([\d.]+|-)"),
+}
+M3P_TOWNS = ("Volantis", "Dreadfort", "Harroway", "Gulltown")   # decyzja D1, test koncowy: pobor nie wiekszy niz doplyw netto (kasy-miast.csv)
+M3P_CASTLE_ARR = 200000          # decyzja D1: zaleglosci zamkow (f14) <= 200 tys. (P2 270 085, P0 146 700)
+M3P_F5_MS = 0.2                  # decyzja D1: czas linii f5 srednio <= 0.2 ms (P2 0.09)
+
+
+def _m3p_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _m3p_n(v):
+    """Liczba z odstepami tysiecy (jak w linii DS)."""
+    try:
+        return f"{int(v):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def m103p3_main(logp):
+    """m103p3: progi P3 (sufit firm DS) - linie f5 (segment P3), DS (rampa, udzial firm w doplywie netto, zaleglosci zamkow), FIRMY USTALONE, kasy-miast.csv (INFO)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M3P-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    f5, ds, fix, errs = {}, {}, None, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(M3P_F5):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is None:
+                    continue
+                r = {k: M3P_RX[k].search(s) for k in ("seg", "raise", "ms")}
+                f5[d] = {k: (v.groups() if v else None) for k, v in r.items()}
+            elif s.startswith(M3P_DS):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is None:
+                    continue
+                if "FIRMY USTALONE" in s:
+                    a, b, c = M3P_RX["fix"].search(s), M3P_RX["fixsh"].search(s), M3P_RX["fixcap"].search(s)
+                    fix = (d, a.groups() if a else None, b.group(1) if b else None, c.groups() if c else None)
+                    continue
+                if "| firmy od doby " not in s:
+                    continue
+                ds[d] = {k: (M3P_RX[k].search(s).groups() if M3P_RX[k].search(s) else None) for k in ("ramp", "farms", "share", "share2", "arr", "stum")}
+            elif "ERROR in DsTowns" in s or "ERROR in KsFolkIncome" in s:
+                errs += 1
+    seg = sorted(d for d, r in f5.items() if r["seg"])
+    print(f"plik: {logp} | linii f5 {len(f5)} (z segmentem P3 {len(seg)}), linii DS z firmami {len(ds)}, ustalenie firm {'tak (doba %d)' % fix[0] if fix else 'brak'}, ERROR {errs}")
+    on = bool(seg)
+    rep.add("M3P-0: segment P3 w linii f5 (klucz Ks Farm Surplus Cap Net)", f"linii z segmentem {len(seg)} z {len(f5)}" + (f" (doby {seg[0]}-{seg[-1]})" if seg else ""),
+            "kazda linia f5 przy kluczu TAK (brak - INFO: klucz NIE albo log sprzed m103 P3)", (len(seg) == len(f5)) if on else None)
+    # (c) bez podwyzek w rampie DS: linia f5 z podwyzkami tej doby, linia DS tej doby z rampa < 1 (DayStart i Daily w tym samym ticku)
+    bad_c = [d for d, r in f5.items() if r["raise"] and int(r["raise"][0]) > 0 and d in ds and ds[d]["ramp"] and float(ds[d]["ramp"][0]) < 0.999]
+    rep.add("M3P-1 (c): podwyzki wedlug nadwyzki w rampie DS (rampa < 1)", f"dob z podwyzka w rampie {len(bad_c)}" + (f" (np. {sorted(bad_c)[:5]})" if bad_c else ""),
+            "0 przy kluczu TAK (P2 bez klucza: pierwsza podwyzka 108718 w rampie 108703-108731)", (not bad_c) if on else None)
+    tot = [0, 0, 0, 0, 0, 0]
+    for d in seg:
+        for i, v in enumerate(f5[d]["seg"]):
+            tot[i] += int(v)
+    last_r = None
+    for d in sorted(f5):
+        if f5[d]["raise"]:
+            last_r = (d, f5[d]["raise"])
+    rep.add("M3P-2 (a, f): podwyzki, przyciete sufitem doplywu, firmy od zera (caly log)",
+            (f"podwyzek od startu sesji {last_r[1][2]} (+{_m3p_n(last_r[1][3])} zl/rok, doba {last_r[0]})" if last_r else "brak linii f5")
+            + (f"; przyciete sufitem {tot[0]} (-{_m3p_n(tot[1])} zl/rok), firmy od zera {tot[4]} (+{_m3p_n(tot[5])} zl/rok)" if on else ""),
+            "INFO (P2 bez klucza: 270 podwyzek, +35 759 182 zl/rok; cel D1: firmy miast na koniec wyraznie ponizej 76.6 mln zl/rok)", None)
+    rep.add("M3P-3 (e): obnizki z dochodu (caly log)", (f"{tot[2]} (-{_m3p_n(tot[3])} zl/rok)" if on else "brak segmentu P3"),
+            "INFO (P2: zapadka - jedna obnizka w 230 dobach; przy zaleglosciach albo kasie <= 1.5 x zapas firma ponad doplyw schodzi co 14 dob)", None)
+    # (d) ustalenie firm
+    if fix and fix[1]:
+        g = fix[1]
+        tw = int(g[2]) + int(g[3]); cw = int(g[5]) + int(g[6])
+        sh = _m3p_f(fix[2])
+        cap = fix[3]
+        # poprawka po recenzji 21.10: udzial po sufitcie <= 1.00 spelnia sie z konstrukcji (miara tylko z osad z doplywem > 0) - M3P-4 sprawdza teraz arytmetyke
+        # wspolczynnika swiata (udzial po = min(1, przed), wspolczynnik = min(1, 1 / przed)), firmy bez doplywu osobno w M3P-4b (INFO)
+        c = dict(zip(("pre", "preT", "preC", "k", "nT", "aT", "nC", "aC", "noN", "noA", "incl", "meas", "all"), cap)) if cap else {}
+        pre = _m3p_f(c.get("pre"))
+        kk = _m3p_f(c.get("k"))
+        ok4 = None
+        if cap and sh is not None and pre is not None and kk is not None and pre > 0:
+            ok4 = abs(sh - min(1.0, pre)) <= 0.0015 and abs(kk - min(1.0, 1.0 / pre)) <= 0.0015 and sh <= 1.0 + 1e-9
+        rep.add("M3P-4 (d): udzial firm w doplywie netto swiata przy ustaleniu - wspolczynnik swiata (linia FIRMY USTALONE)",
+                f"{fix[2]} (doba {fix[0]})" + (f"; przed sufitem {c['pre']} (miasta {c['preT']}, zamki {c['preC']}), wspolczynnik {c['k']}: miasta {c['nT']} o {_m3p_n(c['aT'])}, "
+                                               f"zamki {c['nC']} o {_m3p_n(c['aC'])} zl/rok; osad z pomiarem doplywu {c['meas']} z {c['all']}" if cap else " (bez segmentu Ds Farm Fix Share Cap)"),
+                "udzial po = min(1, przed sufitem) i wspolczynnik = min(1, 1 / przed sufitem) (+-0.0015) przy kluczu TAK - udzial <= 1.00 z konstrukcji "
+                "(P2 przed 1.270 -> wspolczynnik 0.787, P0 1.282 -> 0.780, 04-57-25 0.979 -> 1.000)", ok4 if cap else None)
+        if cap:
+            rep.add("M3P-4b (d): firmy bez doplywu netto okna przy ustaleniu (doplyw <= 0 albo bez pomiaru; po wspolczynniku)",
+                    f"{c['noN']} osad, {_m3p_n(c['noA'])} zl/rok; udzial swiata z nimi {c['incl']}",
+                    "INFO (kasy-miast.csv, same miasta, kod 101: P2 40 miast z 7 563 088 zl/rok, P0 38 z 5 435 105, 04-57-25 13 z 3 559 595; "
+                    "osady ponad wlasny doplyw sprowadza (e) z KS albo przeglad zwykly z udzialem <= 1)", None)
+        rep.add("M3P-5 (d): firmy z kasy przy ustaleniu", f"miasta {_m3p_n(tw)} zl/rok, zamki {_m3p_n(cw)} zl/rok",
+                "INFO (P2 35 163 000 / 10 245 000; decyzja D1: miasta ok. 28-33 mln; wspolczynnik swiata: P2 ok. 27.7 mln (35.16 / 1.270), "
+                "P0 ok. 27.9 mln (35.71 / 1.282), 04-57-25 bez zmiany (udzial 0.979))", None)
+    else:
+        rep.add("M3P-4 (d): udzial firm przy ustaleniu", "brak linii FIRMY USTALONE (bieg z zapisu po ustaleniu albo Ds Towns wylaczone)", "INFO", None)
+    dsd = sorted(ds)
+    shd = [d for d in dsd if ds[d]["share"]]
+    if shd:
+        z = ds[shd[-1]]["share"]
+        w28 = [_m3p_f(ds[d]["share"][0]) for d in shd if d > shd[-1] - 28 and _m3p_f(ds[d]["share"][0]) is not None]
+        v = _m3p_f(z[0])
+        rep.add("M3P-6: udzial firm w doplywie netto swiata na koniec (linia DS)",
+                f"{z[0]} (miasta {z[1]}, zamki {z[2]}; doba {shd[-1]}), ostatnie 28 dob najwyzej {max(w28):.3f}; osad z firma ponad doplyw {z[3]} (o {_m3p_n(z[4])} zl/rok), "
+                f"z firma bez doplywu {z[5]} ({_m3p_n(z[6])} zl/rok)" if w28 else f"{z[0]} (doba {shd[-1]})",
+                "<= 1.00 (decyzja D1; P2 przy ustaleniu 1.270; miara z osad z doplywem > 0 - firmy bez doplywu w M3P-6b)", (v is not None and v <= 1.0 + 1e-9))
+        z2 = ds[shd[-1]]["share2"]
+        rep.add("M3P-6b: udzial swiata z firmami bez doplywu na koniec (linia DS)",
+                (f"{z2[0]} (doba {shd[-1]}); firmy bez doplywu {z[5]} osad, {_m3p_n(z[6])} zl/rok" if z2 else "brak odcinka (log sprzed poprawki po recenzji)"),
+                "INFO (wszystkie firmy z kasy / doplyw osad z doplywem > 0; porownac z M3P-4b przy ustaleniu)", None)
+    else:
+        rep.add("M3P-6: udzial firm w doplywie netto (linia DS)", "brak segmentu 'udzial firm w doplywie netto (m103 P3)'", "INFO (klucze P3 wylaczone albo log sprzed m103 P3)", None)
+    ard = [d for d in dsd if ds[d]["arr"]]
+    if ard:
+        a = ds[ard[-1]]["arr"]
+        rep.add("M3P-7: zaleglosci zamkow (f14) na koniec", f"{_m3p_n(a[2])} zl u {a[3]} zamkow; miasta {_m3p_n(a[0])} zl u {a[1]} (doba {ard[-1]})",
+                f"<= {_m3p_n(M3P_CASTLE_ARR)} zl (decyzja D1; P2 270 085, P0 146 700)", int(a[2]) <= M3P_CASTLE_ARR)
+    fd = [d for d in dsd if ds[d]["farms"]]
+    if fd:
+        a = ds[fd[-1]]["farms"]
+        rep.add("M3P-8: firmy z kas na koniec (linia DS)", f"miasta {_m3p_n(a[2])}, zamki {_m3p_n(a[4])} zl/rok (doba {fd[-1]})",
+                "INFO (P2: miasta 76 629 894, zamki 10 256 494; bieg B z zapisu: miasta ponizej 231 mln)", None)
+    msv = [float(r["ms"][0]) for r in f5.values() if r["ms"]]
+    st5 = sum(int(r["ms"][1]) for r in f5.values() if r["ms"])
+    if msv:
+        rep.add("M3P-9: czas linii f5 (srednio / najwiecej) i potkniecia f5", f"{sum(msv) / len(msv):.3f} / {max(msv):.2f} ms, potkniecia {st5}",
+                f"srednio <= {M3P_F5_MS} ms, potkniecia 0", sum(msv) / len(msv) <= M3P_F5_MS and st5 == 0)
+    sts = [int(ds[d]["stum"][0]) for d in dsd if ds[d]["stum"]]
+    rep.add("M3P-10: potkniecia DsTowns (linia DS) i ERROR DsTowns / KsFolkIncome", f"dob z potknieciami {len(sts)} (razem {sum(sts)}), ERROR {errs}", "0, 0", not sts and errs == 0)
+    # kasy-miast.csv: pobor (raty, gersuma) wobec doplywu netto w ostatnich 28 dobach - 4 miasta z decyzji (INFO)
+    kp = csv_path_of(logp).replace("budzet-rodow.csv", "kasy-miast.csv")
+    if os.path.isfile(kp):
+        per = {}
+        with open(kp, encoding="utf-8-sig", errors="replace", newline="") as fcsv:
+            for r in csv.DictReader(fcsv, delimiter=";"):
+                if r.get("miasto") not in M3P_TOWNS:
+                    continue
+                try:
+                    per.setdefault(r["miasto"], []).append((int(r["dzien"]), float(r["pobrane"] or 0), float(r["doplyw_netto"] or 0), float(r["kasa"] or 0), float(r["zapas_kupcow"] or 0)))
+                except (ValueError, KeyError, TypeError):
+                    continue
+        parts = []
+        for town in M3P_TOWNS:
+            xs = sorted(per.get(town, []))
+            if not xs:
+                parts.append(f"{town} -")
+                continue
+            w = [x for x in xs if x[0] > xs[-1][0] - 28]
+            parts.append(f"{town} pobrane {sum(x[1] for x in w) / len(w):.0f}/d wobec doplywu {sum(x[2] for x in w) / len(w):.0f}/d, kasa {xs[-1][3]:.0f} (zapas {xs[-1][4]:.0f})")
+        rep.add("M3P-11: pobor wobec doplywu netto - ostatnie 28 dob (kasy-miast.csv)", "; ".join(parts),
+                "INFO (decyzja D1: pobor nie wiekszy niz doplyw; 'pobrane' obejmuje gersume i raty co 7 dob)", None)
+        # poprawka po recenzji 21.10 (cel D2K-5): droga (f) firmy od zera - najdluzsza seria dob z kasa > 1.5 x zapas kupcow i bez wplaty panu (zawor_do_pana 0);
+        # seria od nowa, gdy kasa schodzi do 1.5 x zapas (w kodzie cykl od nowa) albo pan dostal wplate. Firma > 0 placi co 7 dob - seria ponad 6 dob to firma 0
+        # (albo cala rata w zaleglosci). Kod (f): cykl 14 dob + do 7 dob do dnia raty (gersuma placi od doby (f)) = ok. 21 dob przy kasie stale ponad progiem
+        # i przyroscie kasy > 0; dluzej - kasa bez przyrostu (M6 zdejmuje nadwyzke - firma i gersuma 0 z reguly), domy najpierw albo kasa po naleznosciach pod progiem
+        runs = {}
+        with open(kp, encoding="utf-8-sig", errors="replace", newline="") as fcsv:
+            for r in csv.DictReader(fcsv, delimiter=";"):
+                try:
+                    runs.setdefault(r.get("miasto"), []).append((int(r["dzien"]), float(r["kasa"] or 0), float(r["zapas_kupcow"] or 0), float(r["zawor_do_pana"] or 0)))
+                except (ValueError, KeyError, TypeError):
+                    continue
+        best = []
+        for town, xs in runs.items():
+            xs.sort()
+            run, top, end = 0, 0, None
+            for dd, kasa, zap, z in xs:
+                if z <= 0 and zap > 0 and kasa > 1.5 * zap:
+                    run += 1
+                    if run > top:
+                        top, end = run, dd
+                else:
+                    run = 0
+            if top > 6:
+                best.append((top, town, end))
+        best.sort(reverse=True)
+        rep.add("M3P-12 (f): najdluzsza seria bez wplaty panu przy kasie > 1.5 x zapas kupcow (kasy-miast.csv)",
+                (f"{best[0][0]} dob ({best[0][1]}, do d{best[0][2]}); serii ponad 21 dob {sum(1 for b in best if b[0] > 21)}: "
+                 + ", ".join(f"{b[1]} {b[0]}" for b in best[:6]) if best else "brak serii ponad 6 dob"),
+                "INFO (kod (f): ok. 21 dob przy kasie stale ponad progiem i przyroscie > 0 - dluzsza seria: sprawdzic przyrost kasy, domy najpierw, naleznosci; "
+                "kod 101 bez (f): P2 i P0 - patrz CHANGELOG czesc 2, poprawki po recenzji)", None)
+    else:
+        rep.add("M3P-11: pobor wobec doplywu netto (kasy-miast.csv)", "brak kasy-miast.csv (" + kp + ")", "INFO", None)
+    rep.show()
+    return 0
+
+
+# ---------------- m103wsie (21.10, galaz w-toku/m103-gospodarka czesc 3 - wsie pod KS): drabina 1 koszyka wsi przy cenach polki z budzetu z biezacego wplywu
+# (klucz Ks Village Basket At Shelf; TownFolk.Ks.cs ShelfBudget/ZcTake, StartCalibration.Money.cs Zc4VillageNetDay/VilBasketMoney, segment linii ZC4).
+# Cele (bieg prologu z KS wobec P2 Armoury-2026-10-21_10-08-39.log): kiesy wsi >= -0.10%/d, wsi < 1000 zl <= 5%, zakupy / wplyw netto <= 0.95, ponad 3 x skrzynia
+# >= 50% P0, danina od skarbca wsi do panow > 40 tys./d, bez pokrycia <= 10%, stac na jedzenie nie gorzej niz P2; narzedzia wsi i koszyk wsi (dawne P2-5b, NE3-16) -
+# miary dla wsi z koszykiem ZC4 (dawne liczyly stara liste, ktora przy lambdzie 1 wynosi zero).
+M3W_ZC4 = "Koszyk stanow (ZC4): dzien "
+M3W_VIL = "Przeplywy osad (kiesy wsi): dzien "
+M3W_AK = "Akumulator kies (ds-akumulator): dzien "
+M3W_RX = {
+    "seg": re.compile(r"\| m103 wsie - drabina 1 przy cenach polki z budzetu z wplywu \(Ks Village Basket At Shelf TAK\): Westeros koszt koszyka zaplaconego z Planu przy cenach polki "
+                      r"(\d+) / budzet (\d+) zl \(budzet Planu (\d+), wplyw netto x [\d.]+ (\d+)\), przyciete (\d+) szt\. \((\d+) zl\); Essos koszt koszyka zaplaconego z Planu przy "
+                      r"cenach polki (\d+) / budzet (\d+) zl \(budzet Planu (\d+), wplyw netto x [\d.]+ (\d+)\), przyciete (\d+) szt\. \((\d+) zl\); zakupow (\d+), przycietych (\d+), "
+                      r"bez pomiaru wplywu (\d+); ziarno i sol ponad budzet (\d+) zl w (\d+) zakupach"),
+    # recenzja W1: przyciete rzeczy (szczebel 2) i narzedzia drabiny 1 - logi od poprawek po recenzji (wczesniejsze W1 bez tej czesci)
+    "seg2": re.compile(r"; przyciete rzeczy \(szczebel 2: [^)]*\) Westeros (\d+) szt\., Essos (\d+) szt\.; narzedzia drabiny 1 \(chciane/kupione/przyciete/bez towaru szt\.\) "
+                       r"Westeros (\d+)/(\d+)/(\d+)/(\d+), Essos (\d+)/(\d+)/(\d+)/(\d+)"),
+    "k8": re.compile(r"(Westeros|Essos) wartosc przy cenach polki chciana (\d+) / zaplacona z Planu (\d+) / kupiona (\d+) zl, kcal koszyka kupione ([\d.]+)% / robione w domu ([\d.]+)% / "
+                     r"z magazynu ([\d.]+)% / bez pokrycia ([\d.]+)%, wplyw do kies wsi \(utarg doby\) (\d+) zl \(netto z frachtem KS-H i bez wydatkow spoza koszyka (-?\d+) zl\)"),
+    "vb": re.compile(r"\| wsie: zakupow (\d+) za (\d+) zl, sztuk (\d+) \(chciane (\d+), kupione (\d+); zboze i sol (\d+)/(\d+), reszta jedzenia (\d+)/(\d+), rzeczy (\d+)/(\d+)\)"),
+    "p1": re.compile(r"\| drabina 1 \(zaplacone z Planu\): chciane (\d+) szt\., bez towaru (\d+) \([^)]*\), bez kiesy (\d+) "),
+    "eat": re.compile(r"stac na cale jedzenie: miasta ([\d.]+)%"),
+    "else": re.compile(r"zakupy wsi w miescie obok \(brak na polce targu\) (\d+) szt\."),
+    "tools": re.compile(r"[ ,]tools (\d+)\+(\d+) \("),
+    "stum": re.compile(r"\| potkniecia (\d+)\.$"),
+    "stan": re.compile(r"\| stan (-?\d+), zmiana"),
+    "lo": re.compile(r"rozklad \[P\]: osad (\d+), min -?\d+, mediana (-?\d+), max -?\d+, ponizej 1000 zlota (\d+)"),
+    "hoard": re.compile(r"danina od skarbca wsi \(Ds Hoard Due Villages\) tak: .*?ponad poziom normalny \(([\d.]+) x skrzynia\) (\d+), pobrano (\d+) \((\d+) wsi\) = do panow (\d+)"),
+    "akw": re.compile(r"wsi (\d+) \(wsie DS (\d+): mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+), kiesy (\d+), skrzynie (\d+)\)"),
+    "tw": re.compile(r"wsie \(zakupy w miescie, E5/B1\) (\d+)"),
+    "tb": re.compile(r"budowy (\d+)"),
+    "tp": re.compile(r"\| produkcja (\d+)"),
+}
+M3W_DRIFT = -0.0010      # cel m103 wsie: kiesy wsi >= -0.10%/d w kazdym z 5 okien MNK 26 dob (NDS-3a: -0.2%/d; P2 -0.205, P0 -0.064)
+M3W_POOR = 0.05          # cel: wsi z kiesa < 1000 zl <= 5% (NDS-3d: 15%; P2 24.3%, P0 1.0%)
+M3W_BUYNET = 0.95        # cel: zakupy wsi (drabina 1 + 2) / wplyw netto do kies <= 0.95 - surowo (P2 1.03, 102g 0.96); z mianownikiem bez daniny od skarbca
+                         # (pobor z oszczednosci ponad 3 x skrzynie) tylko, gdy ta danina > M3W_HOARD (bogate wsie - inaczej P2 0.93 przechodzi)
+M3W_OVER3 = 1500000      # cel: ponad 3 x skrzynia >= ok. 50% P0 (P0 3.11 mln na koniec, P2 0.53 mln)
+M3W_HOARD = 40000        # cel: danina od skarbca wsi do panow > 40 tys./d (P0 61-99 tys., P2 10 tys. na koniec)
+M3W_UNCOV = 10.0         # cel: bez pokrycia kcal koszyka wsi <= 10% (W i E osobno)
+M3W_EAT = 78.0           # straznik: miasta stac na cale jedzenie nie gorzej niz P2 (ta miara - 28 ostatnich linii ZC4 - P2 78.1%; okno NKS-13 81.8%; prog NKS-13 95%)
+M3W_TOOLS = 30.0         # cel zadania: narzedzia kupione przez wsie >= 30/d (P2 2.5, P0 55.4) - przy koszyku ZC4 potrzeba wsi ok. 8/d (DECYZJA)
+M3W_BASKET = 15.0        # straznik (cel zadania NE3-16 15%; P2 82.4% - nie dowodzi naprawy): koszyk wsi >= 15% (NE3-16 przy lambdzie 1 = 0% z konstrukcji) - tu
+                         # drabina 1 ZC4: kupione / chciane (W1 przycina - spada z zalozenia)
+
+
+def _m3w_ols(xs, ys):
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    sxx = sum((x - mx) ** 2 for x in xs)
+    sl = (sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx) if sxx > 0 else 0.0
+    return sl / max(1.0, my), sl
+
+
+def m103wsie_main(logp):
+    """m103wsie: drabina 1 wsi z budzetu z wplywu (segment linii ZC4), kiesy wsi (linia Przeplywy osad), danina od skarbca wsi (Akumulator kies), krok 8 linii ZC4
+    (zakupy, wplyw netto, kcal), narzedzia wsi (linia Towary) - progi celu m103 czesci 3."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M3W-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    z, vil, ak, tl, errs = {}, {}, {}, {}, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(M3W_ZC4):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is None:
+                    continue
+                r = {"seg": M3W_RX["seg"].search(s), "vb": M3W_RX["vb"].search(s), "p1": M3W_RX["p1"].search(s), "eat": M3W_RX["eat"].search(s),
+                     "else": M3W_RX["else"].search(s), "tools": M3W_RX["tools"].search(s), "stum": M3W_RX["stum"].search(s), "seg2": M3W_RX["seg2"].search(s)}
+                r = {k: (v.groups() if v else None) for k, v in r.items()}
+                r["k8"] = {g[0]: g[1:] for g in M3W_RX["k8"].findall(s)}
+                z[d] = r
+            elif s.startswith(M3W_VIL):
+                d = num(r"dzien (-?\d+)", s[:60])
+                a, b = M3W_RX["stan"].search(s), M3W_RX["lo"].search(s)
+                if d is not None and a:
+                    vil[d] = (int(a.group(1)), b.groups() if b else None)
+            elif s.startswith(M3W_AK):
+                d = num(r"dzien (-?\d+)", s[:60])
+                a, b = M3W_RX["hoard"].search(s), M3W_RX["akw"].search(s)
+                if d is not None:
+                    ak[d] = (a.groups() if a else None, b.groups() if b else None)
+            elif s.startswith("Towary: dzien ") and " - tools (" in s:
+                d = num(r"Towary: dzien (\d+)", s, int)
+                if d is not None:
+                    a, b, c = M3W_RX["tw"].search(s), M3W_RX["tb"].search(s), M3W_RX["tp"].search(s)
+                    tl[d] = (int(a.group(1)) if a else 0, int(b.group(1)) if b else 0, int(c.group(1)) if c else 0)
+            elif "Zc4BuyVillage(budzet z wplywu)" in s or "Zc4VillageNetDay" in s:
+                errs += 1
+    zd = sorted(z)
+    buyd = [d for d in zd if z[d]["vb"] and int(z[d]["vb"][0]) > 0]
+    seg = [d for d in buyd if z[d]["seg"]]
+    print(f"plik: {logp} | linii ZC4 {len(zd)} (z zakupami wsi {len(buyd)}, z segmentem m103 wsie {len(seg)}), linii kies wsi {len(vil)}, Akumulator {len(ak)}, Towary tools {len(tl)}")
+    on = bool(seg)
+    rep.add("M3W-0: segment 'm103 wsie' w linii ZC4 z zakupami wsi (klucz Ks Village Basket At Shelf)",
+            f"{len(seg)} z {len(buyd)} linii" + (f" (doby {seg[0]}-{seg[-1]})" if seg else ""),
+            "kazda linia z zakupami wsi przy kluczu TAK (brak - INFO: klucz NIE, KS niezastosowana albo log sprzed m103 wsie)", (len(seg) == len(buyd)) if on else None)
+    w28 = buyd[-28:]
+    # ---- M3W-1 kiesy wsi: MNK 5 okien 26 dob na koncu biegu (jak NDS-3a, okno z ostatnich 30 dob linii kies wsi)
+    vd = sorted(vil)
+    if len(vd) >= 26:
+        tail = vd[-30:]
+        wins = [tail[:len(tail) - k][-26:] for k in range(5) if len(tail) - k >= 26]
+        res = [_m3w_ols(w, [vil[d][0] for d in w]) for w in wins]
+        drs = [x[0] for x in res]
+        rep.add("M3W-1: kiesy wsi - dryf MNK 5 okien 26 dob na koncu biegu (linia 'Przeplywy osad (kiesy wsi)'; ta sama miara co NDS-3a, prog celu m103)",
+                " / ".join(f"{100 * x:+.3f}" for x in reversed(drs)) + f"%/d (najgorsze {100 * min(drs):+.3f}); stan {vil[tail[0]][0] / 1e6:.2f} -> {vil[tail[-1]][0] / 1e6:.2f} mln",
+                f">= {100 * M3W_DRIFT:.2f}%/d w kazdym oknie (P2 -0.205, P0 -0.064; NDS-3a >= -0.2)", min(drs) >= M3W_DRIFT)
+        lo = [vil[d][1] for d in vd[-7:] if vil[d][1]]
+        if lo:
+            x = sum(int(g[2]) / max(1, int(g[0])) for g in lo) / len(lo)
+            rep.add("M3W-2: wsi z kiesa < 1000 zl, srednio 7 ostatnich dob (jak NDS-3d, prog celu m103)",
+                    f"{100 * x:.1f}% (ostatnia doba {lo[-1][2]} z {lo[-1][0]}, mediana kiesy {lo[-1][1]})", f"<= {100 * M3W_POOR:.0f}% (P2 24.3%, P0 1.0%; NDS-3d <= 15%)", x <= M3W_POOR)
+    else:
+        rep.add("M3W-1: kiesy wsi", f"za malo linii 'Przeplywy osad (kiesy wsi)' ({len(vd)})", ">= 26 dob", None)
+    # ---- M3W-3 zakupy / wplyw netto (krok 8 linii ZC4, ostatnie 28 linii z zakupami)
+    if w28:
+        buy = sum(int(z[d]["k8"][m][2]) for d in w28 for m in z[d]["k8"])
+        net = sum(int(z[d]["k8"][m][8]) for d in w28 for m in z[d]["k8"])
+        inf = sum(int(z[d]["k8"][m][7]) for d in w28 for m in z[d]["k8"])
+        # "netto" linii ZC4 odejmuje wszystkie wydatki spoza koszyka - takze danine od skarbca wsi (3%/d ponad 3 x skrzynie: pobor z OSZCZEDNOSCI, nie z dochodu;
+        # przy kiesach jak w P0 60-100 tys./d). Recenzja W1 (niska): z ta danina w mianowniku P2 przechodzi (0.93; surowo 1.03) - prog liczy SUROWO (zakupy / netto),
+        # a mianownik bez daniny od skarbca tylko, gdy ta danina > M3W_HOARD (bogate wsie po naprawie: pobor z oszczednosci nie jest wydatkiem z dochodu)
+        hb = sum(int(ak[d][0][2]) for d in w28 if d in ak and ak[d][0])
+        hbd = hb / len(w28)
+        r3a = buy / (net + hb) if net + hb > 0 else None
+        r3r = buy / net if net > 0 else None
+        rich = hbd > M3W_HOARD
+        r3 = r3a if rich else r3r
+        rep.add(f"M3W-3: zakupy wsi (kupiona - drabina 1 i 2) / wplyw netto do kies (krok 8 linii ZC4 + Akumulator kies, ostatnie {len(w28)} linii)",
+                f"surowo {buy / len(w28):.0f} / {net / len(w28):.0f} zl/d = " + (f"{r3r:.2f}" if r3r is not None else "-")
+                + f"; bez daniny od skarbca {buy / len(w28):.0f} / ({net / len(w28):.0f} + {hbd:.0f}) = " + (f"{r3a:.2f}" if r3a is not None else "-")
+                + f" (prog liczy {'bez daniny - danina > ' + str(M3W_HOARD) if rich else 'surowo'}); wplyw brutto {inf / len(w28):.0f} zl/d",
+                f"<= {M3W_BUYNET:.2f} surowo; bez daniny od skarbca tylko przy danienie > {M3W_HOARD} zl/d (P2 surowo 1.03, 102g 0.96)",
+                (r3 <= M3W_BUYNET) if r3 is not None else None)
+        # ---- M3W-7 bez pokrycia, M3W-8 z magazynu (wies je swoje)
+        for mk in ("Westeros", "Essos"):
+            xs = [float(z[d]["k8"][mk][6]) for d in w28 if mk in z[d]["k8"]]
+            ow = [float(z[d]["k8"][mk][5]) for d in w28 if mk in z[d]["k8"]]
+            kb = [float(z[d]["k8"][mk][3]) for d in w28 if mk in z[d]["k8"]]
+            hm = [float(z[d]["k8"][mk][4]) for d in w28 if mk in z[d]["k8"]]
+            if xs:
+                u = sum(xs) / len(xs)
+                rep.add(f"M3W-7: bez pokrycia kcal koszyka wsi - {mk} (srednio {len(xs)} linii)",
+                        f"{u:.1f}% (kupione {sum(kb) / len(kb):.1f}%, robione w domu {sum(hm) / len(hm):.1f}%, z magazynu {sum(ow) / len(ow):.1f}%)",
+                        f"<= {M3W_UNCOV:.0f}% (z magazynu - wies je swoje: INFO, NKS-25 <= 8% kcal koszyka)", u <= M3W_UNCOV)
+        eat = [float(z[d]["eat"][0]) for d in w28 if z[d]["eat"]]
+        if eat:
+            e = sum(eat) / len(eat)
+            rep.add("M3W-9: miasta stac na cale jedzenie (linia ZC4, srednio) - straznik 'nie gorzej', nie dowod naprawy", f"{e:.1f}%",
+                    f">= {M3W_EAT:.0f}% (nie gorzej niz P2 78.1% w tej mierze; NKS-13 >= 95%)", e >= M3W_EAT)
+        # ---- M3W-6 koszyk wsi ZC4 (zamiast NE3-16: koszyk dnia + W1 = 0 przy lambdzie 1)
+        vb = [z[d]["vb"] for d in z if z[d]["vb"]][-10:]
+        if vb:
+            want, got = sum(int(g[3]) for g in vb), sum(int(g[4]) for g in vb)
+            els = [int(z[d]["else"][0]) for d in w28 if z[d]["else"]]
+            rz = (sum(int(g[9]) for g in vb), sum(int(g[10]) for g in vb))
+            real = 100.0 * got / want if want > 0 else 0.0
+            rep.add("M3W-6: koszyk wsi z koszykiem ZC4 - drabina 1 kupione / chciane (sztuki, 10 ostatnich linii; zamiast NE3-16 'koszyk dnia + W1', ktory przy lambdzie 1 = 0)"
+                    " - straznik 'nie gorzej', nie dowod naprawy",
+                    f"{real:.1f}% ({got} z {want} szt.; rzeczy {rz[0]}/{rz[1]}); zakupy w miastach obok (F2 - zastepuje woz W1) srednio {sum(els) / max(1, len(els)):.0f} szt./d",
+                    f">= {M3W_BASKET:.0f}% (cel zadania NE3-16; P2 82.4% - W1 przycina, spada z zalozenia)", real >= M3W_BASKET)
+        p1 = [z[d]["p1"] for d in w28 if z[d]["p1"]]
+        if p1 and on:
+            pw = sum(int(g[0]) for g in p1)
+            cut = sum(int(z[d]["seg"][4]) + int(z[d]["seg"][10]) for d in w28 if z[d]["seg"])
+            c2 = [z[d]["seg2"] for d in w28 if z[d]["seg2"]]
+            cut2 = sum(int(g[0]) + int(g[1]) for g in c2)
+            rep.add("M3W-12: drabina 1 - bez towaru / bez kiesy / przyciete budzetem z wplywu (% chcianych sztuk)",
+                    f"{100.0 * sum(int(g[1]) for g in p1) / max(1, pw):.1f}% / {100.0 * sum(int(g[2]) for g in p1) / max(1, pw):.1f}% / {100.0 * cut / max(1, pw):.1f}%"
+                    + (f" (w tym rzeczy - szczebel 2: len, skora, narzedzia, garnki - {cut2} szt. w {len(c2)} liniach)" if c2 else " (log bez podzialu przycietych na rzeczy)"),
+                    "INFO (przyciete - wies nie wydaje ponad wplyw, koniec drabiny czeka pierwszy; NKS-13b liczy bez towaru i bez kiesy)", None)
+    # ---- M3W-4/5 akumulator: ponad 3 x skrzynia i danina od skarbca wsi do panow
+    akd = sorted(d for d in ak if ak[d][0])
+    if akd:
+        o3 = [int(ak[d][0][1]) for d in akd[-7:]]
+        hp = [int(ak[d][0][4]) for d in akd[-28:]]
+        aw = ak[akd[-1]][1]
+        rep.add("M3W-4: kiesy wsi ponad 3 x skrzynia (linia Akumulator kies, srednio 7 ostatnich dob)",
+                f"{sum(o3) / len(o3) / 1e6:.2f} mln" + (f"; kiesy {int(aw[5]) / 1e6:.2f} mln, skrzynie {int(aw[6]) / 1e6:.2f} mln, mediana kiesa / skrzynia {aw[4]}" if aw else ""),
+                f">= {M3W_OVER3 / 1e6:.1f} mln (ok. 50% P0 3.11 mln; P2 0.53 mln)", sum(o3) / len(o3) >= M3W_OVER3)
+        h = sum(hp) / len(hp)
+        rep.add(f"M3W-5: danina od skarbca wsi do panow (srednio {len(hp)} ostatnich dob)", f"{h:.0f} zl/d", f"> {M3W_HOARD} (P0 61-99 tys., P2 10 tys. na koniec)", h > M3W_HOARD)
+    else:
+        rep.add("M3W-4/5: akumulator", "brak liczb 'danina od skarbca wsi' w linii Akumulator kies", "INFO", None)
+    # ---- M3W-10 narzedzia wsi (linia Towary) wobec potrzeby wsi z koszyka ZC4
+    td = sorted(tl)[-28:]
+    if td:
+        tv = sum(tl[d][0] for d in td) / len(td)
+        tb = sum(tl[d][1] for d in td) / len(td)
+        tp = sum(tl[d][2] for d in td) / len(td)
+        need = [int(z[d]["tools"][1]) for d in w28 if z[d]["tools"]]
+        nd = sum(need) / len(need) if need else None
+        rep.add(f"M3W-10: narzedzia kupione przez wsie (linia Towary, srednio {len(td)} dob) wobec potrzeby wsi z koszyka ZC4",
+                f"{tv:.1f}/d" + (f" przy potrzebie wsi ZC4 {nd:.0f}/d" if nd is not None else " (bez koszyka ZC4)") + f"; produkcja {tp:.0f}/d, budowy {tb:.0f}/d",
+                f">= {M3W_TOOLS:.0f}/d (cel zadania; DECYZJA, gdy koszyk ZC4 wsi chce mniej niz cel - narzedzia to potrzeba z tabeli stanow, a zuzycie swiata > produkcja: "
+                "o przydziale decyduje kolejnosc budowy przed wsiami; przy W1 budzet z wplywu tnie koniec drabiny - narzedzia - ocena DECYZJI po biegu z W1, M3W-10b)",
+                tv >= M3W_TOOLS, decide=(nd is not None and nd < M3W_TOOLS))
+    # ---- M3W-10b narzedzia drabiny 1 przy budzecie z wplywu (recenzja W1: ZTools 26. z 29 miejsc drabiny - za jedzeniem, przedza, lnem i skora)
+    t2 = [z[d]["seg2"] for d in w28 if z[d]["seg2"]]
+    if t2:
+        tw = sum(int(g[2]) + int(g[6]) for g in t2) / len(t2)
+        tg = sum(int(g[3]) + int(g[7]) for g in t2) / len(t2)
+        tc = sum(int(g[4]) + int(g[8]) for g in t2) / len(t2)
+        tm = sum(int(g[5]) + int(g[9]) for g in t2) / len(t2)
+        rep.add(f"M3W-10b: narzedzia drabiny 1 przy budzecie z wplywu (segment 'm103 wsie', srednio {len(t2)} linii)",
+                f"chciane {tw:.1f} / kupione {tg:.1f} / przyciete {tc:.1f} / bez towaru {tm:.1f} szt. na linie (kupione {100.0 * tg / max(1e-9, tw):.0f}%, przyciete "
+                f"{100.0 * tc / max(1e-9, tw):.0f}% chcianych)",
+                "INFO (narzedzia na koncu drabiny czekaja pierwsze, gdy budzet sie konczy - do oceny DECYZJI M3W-10: zwolnienie narzedzi z budzetu jak ziarno i sol)", None)
+    # ---- M3W-11 budzet z wplywu (INFO)
+    if seg:
+        s28 = [z[d]["seg"] for d in seg[-28:]]
+        c = sum(int(g[0]) + int(g[6]) for g in s28)
+        b = sum(int(g[1]) + int(g[7]) for g in s28)
+        pl = sum(int(g[2]) + int(g[8]) for g in s28)
+        nt = sum(int(g[3]) + int(g[9]) for g in s28)
+        cz = sum(int(g[5]) + int(g[11]) for g in s28)
+        v = sum(int(g[12]) for g in s28)
+        vc = sum(int(g[13]) for g in s28)
+        nm = sum(int(g[14]) for g in s28)
+        gs = sum(int(g[15]) for g in s28)
+        rep.add(f"M3W-11: drabina 1 - koszt koszyka zaplaconego przy cenach polki wobec budzetu z wplywu (srednio {len(s28)} linii)",
+                f"koszt {c / len(s28):.0f} / budzet {b / len(s28):.0f} zl/d = {c / max(1, b):.2f} (budzet Planu {pl / len(s28):.0f}, wplyw netto {nt / len(s28):.0f}); "
+                f"przyciete {cz / len(s28):.0f} zl/d; zakupow przycietych {100.0 * vc / max(1, v):.0f}%, bez pomiaru wplywu {nm}; ziarno i sol ponad budzet {gs / len(s28):.0f} zl/d",
+                "INFO (koszt / budzet > 1 - ceny polki ponad ceny startu Planu; przyciete wraca do kies wsi)", None)
+    st = sum(int(z[d]["stum"][0]) for d in zd if z[d]["stum"])
+    rep.add("M3W-13: potkniecia linii ZC4 i ERROR budzetu z wplywu", f"potkniecia {st}, ERROR {errs}", "0 / 0", st == 0 and errs == 0)
     rep.show()
     return 0
 

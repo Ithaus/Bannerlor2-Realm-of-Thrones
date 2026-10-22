@@ -88,6 +88,7 @@ namespace Armoury
             public long TaxW, TaxR, TaxP, TaxC, Guild, Farm, Held, NoLord, Player;
             public long LabT, TurnT, TopT, LabC, Cut, LabS, Skup; public double BaseFolk, BaseVill, BaseLife, BaseCourt, BaseSale, BaseCar, BaseGm, LabF, LabG, LabA;
             public long Rent, Heal, Serv, GmWage, GmMat, SurpWage; public long OffT, OffC;
+            public long OffW;   // m103 recenzja (W12-6): oferta klasy W miast na jutro (czesc OffT) - przy P3 1/FolkSurplusSpendDays lokaty W
             public long KW, KR, KP, KG, KC, CCr; public double NW, NR, NP, AW, AR, AP, NFW, NFR, NFP, AFW, AFR, AFP, CNeed, CAff, Lokata;
             public double CInc, CWg, CHeads;
             public long VBuy, VPieces; public double VNeed, VWant;
@@ -1111,6 +1112,7 @@ namespace Armoury
             }
             LadderOffers(f);                                           // P3 (zbytki): oferta na liste dostatku 1/60 nadwyzki po daninie; place R/P wyzej bez zmian
             for (int c = 0; c < 3; c++) d.OffT += f.Offer[c];
+            d.OffW += f.Offer[0];                                      // m103 recenzja (W12-6): sama oferta W (linia doby, dopisek P3)
             // ---- 6. kotwica na jutro
             double wf, wr; Predict(f, out wf, out wr);
             double r = Scale(f); f.DR = r;
@@ -1927,7 +1929,8 @@ namespace Armoury
               .Append(F2(Unit(s.TownFolkCastleProfitShare))).Append(", akcyza ").Append(s.TownFolkExcise.ToString("0.000", Inv)).Append(", zapas W ").Append(s.TownFolkReserveDays).Append(" dni")
               .Append(", wies: pan x").Append(F2(Unit(s.VillageLordScale))).Append(", zakupy ").Append(s.VillagePurchasePerHead.ToString("0.00", Inv)).Append(" zl/glowe/d, oplaty ")
               .Append(s.VillageDuesPerHeadYear.ToString("0.0", Inv)).Append(" zl/glowe/rok")
-              .Append(" | decyzja 12.10: dopisek pana z utargu wsi ").Append(F2(Unit(s.VillageLordExtraShare))).Append(", tempo nadwyzki ").Append(F2(SpendRate(s)))
+              .Append(" | decyzja 12.10: dopisek pana z utargu wsi ").Append(F2(Unit(s.VillageLordExtraShare)))
+              .Append(s.FolkLuxuryList ? ", tempo W 1/" + LxDays(s).ToString("0", Inv) + " (P3), place R/P " : ", tempo nadwyzki ").Append(F2(SpendRate(s)))   // m103 P1: przy P3 oferta W = 1/FolkSurplusSpendDays (LadderOffers), 0.15 to juz tylko place R/P
               .Append("/d (podzamcze ").Append(F2(SurplusRate)).Append("), dziesiecina ").Append(TitheKey ? "tak (wsie " + F2(TitheVillage(s)) + " utargu, lud W/R/P 1/2/3%)" : "nie")
               .Append(", kaplani BK: ").Append(TitheBkState())
               .Append(" | kotwica: ").Append(s.TownFolkAnchorBasket ? "tak" : "nie").Append(", kuchnia pana: ").Append(s.TownFolkCastleCourtFeeds ? "tak" : "nie")
@@ -1988,7 +1991,9 @@ namespace Armoury
               .Append(" | kiesy ").Append(d.KW + d.KR + d.KP).Append(" (W ").Append(d.KW).Append(" / R ").Append(d.KR).Append(" / P ").Append(d.KP).Append("), gminy ").Append(d.KG)
               .Append(", zapas dni W ").Append(F1(d.NW > 0 ? d.KW / d.NW : double.NaN)).Append(" / R ").Append(F1(d.NR > 0 ? d.KR / d.NR : double.NaN)).Append(" / P ").Append(F1(d.NP > 0 ? d.KP / d.NP : double.NaN))
               .Append(", lokata (kiesa W ponad zapas dni) ").Append(N0(d.Lokata)).Append(", oferta nadwyzki na jutro ").Append(d.OffT)
-              .Append(" (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)").Append(LadderOn ? " (P3: oferta W 1/60, R i P 0.3/60 - linia Zbytki)" : "")
+              .Append(LadderOn ? " (tempo W 1/" + LxDays(Settings.Current).ToString("0", Inv) + " (P3), place R/P " : " (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)")   // m103 P1: przy P3 0.15 to tylko place R/P
+              .Append(LadderOn ? " (P3: oferta W 1/" + LxDays(Settings.Current).ToString("0", Inv) + " = " + d.OffW.ToString(Inv) + ", R i P " + (1 - SurpWage).ToString("0.0", Inv) + "/" + LxDays(Settings.Current).ToString("0", Inv)
+                                 + " = " + (d.OffT - d.OffW).ToString(Inv) + " - linia Zbytki)" : "")   // m103 recenzja (W12-6): oferta W i R+P osobno (narzedzie: oferta W / lokata W = 1/N)
               .Append(" | stac jedzenie W/R/P ").Append(Pct(d.AFW, d.NFW)).Append(" / ").Append(Pct(d.AFR, d.NFR)).Append(" / ").Append(Pct(d.AFP, d.NFP))
               .Append(", pelny W/R/P ").Append(Pct(d.AW, d.NW)).Append(" / ").Append(Pct(d.AR, d.NR)).Append(" / ").Append(Pct(d.AP, d.NP))
               .Append(" (swiat ").Append(Pct(d.AW + d.AR + d.AP, d.NW + d.NR + d.NP)).Append(")")   // recenzja B1 (1-6): prog B1-T8 "swiat >= 98%" (waga potrzeb)

@@ -38,9 +38,15 @@ namespace Armoury
         private static string _storyState = "nie wpiete (brak kampanii z prologiem w tym procesie)";
         private static int _storySwapped;
 
-        /// <summary>Podmiana odczytu w ROT: start opowiesci (StoryStartTime modelu Armoury), inny model - jego CampaignStartTime (null - wyjatek jak w oryginale).</summary>
+        /// <summary>m104-wojny (1): &gt; 0 tylko na czas ROTStorylineWar.Enforced wojny czysto essoskiej w kampanii z prologiem (prefiks/finalizer Prologue.Wars) -
+        /// wtedy odczyt startu w ROT daje start KALENDARZA. Watek glowny; licznik, bo Enforced moze byc wolany z wnetrza innego Enforced (nigdy w ROT 8.1.8).</summary>
+        [ThreadStatic] private static int _calendarDepth;
+
+        /// <summary>Podmiana odczytu w ROT: start opowiesci (StoryStartTime modelu Armoury), inny model - jego CampaignStartTime (null - wyjatek jak w oryginale).
+        /// m104-wojny (1): w Enforced wojny essoskiej (kampania z prologiem, klucz PrologueEssosWarsCalendar) - start kalendarza.</summary>
         public static CampaignTime StoryStartOf(CampaignTimeModel model)
         {
+            if (_calendarDepth > 0) return model.CampaignStartTime;
             var l = model as LongYearTimeModel;
             return l != null ? l.StoryStartTime : model.CampaignStartTime;
         }

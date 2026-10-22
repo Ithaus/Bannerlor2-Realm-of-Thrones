@@ -20,6 +20,13 @@
          z modulu Native gry. Z libs/, a gdy jej tam nie ma - wprost z katalogu modulu Native gry (jak SandBox wyzej). -->
     <NativeViewLibs Condition="'$(NativeViewLibs)' == '' And Exists('$(GameLibs)/TaleWorlds.MountAndBlade.View.dll')">$(GameLibs)</NativeViewLibs>
     <NativeViewLibs Condition="'$(NativeViewLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/Native/bin/Win64_Shipping_Client</NativeViewLibs>
+    <!-- m103-sceny (E4, 21.10): okna opowiesci w wygladzie wydarzen ROT (ArmStoryEvent dziedziczy po ROT.Events.EventBase - ROT.dll z ROT-Core) i obrazki z plikow
+         PNG/JPG jako sprite'y Gauntlet (StoryPictures: TaleWorlds.TwoDimension.Sprite, Texture, SpriteData - TaleWorlds.TwoDimension.dll z bin gry). Z libs/, a gdy
+         ich tam nie ma - wprost z katalogow gry (jak SandBox i Native wyzej; kopii w libs nie robic - dysk C zeruje pliki). Private=false: gra laduje oba zestawy sama. -->
+    <RotLibs Condition="'$(RotLibs)' == '' And Exists('$(GameLibs)/ROT.dll')">$(GameLibs)</RotLibs>
+    <RotLibs Condition="'$(RotLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/ROT-Core/bin/Win64_Shipping_Client</RotLibs>
+    <TwoDimLibs Condition="'$(TwoDimLibs)' == '' And Exists('$(GameLibs)/TaleWorlds.TwoDimension.dll')">$(GameLibs)</TwoDimLibs>
+    <TwoDimLibs Condition="'$(TwoDimLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/bin/Win64_Shipping_Client</TwoDimLibs>
   </PropertyGroup>
   <PropertyGroup Condition="'$(T10Dry)' == 'true'">
     <!-- T10 (uwaga krytyki 6): DLL "na sucho" do pierwszego autotestu - ksiega snu AI i powody nocnego marszu tylko w logu,
@@ -66,5 +73,8 @@
     <Reference Include="SandBox"><HintPath>$(SandBoxLibs)/SandBox.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="SandBox.View"><HintPath>$(SandBoxLibs)/SandBox.View.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.MountAndBlade.View"><HintPath>$(NativeViewLibs)/TaleWorlds.MountAndBlade.View.dll</HintPath><Private>false</Private></Reference>
+    <!-- m103-sceny: okno opowiesci ROT (ArmStoryEvent) i obrazki z plikow (StoryPictures) - patrz RotLibs / TwoDimLibs wyzej -->
+    <Reference Include="ROT"><HintPath>$(RotLibs)/ROT.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.TwoDimension"><HintPath>$(TwoDimLibs)/TaleWorlds.TwoDimension.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>

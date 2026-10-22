@@ -308,6 +308,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ gra: AI w sluzbie nie dostaje nic z siebie (w kampanii - pulapka konstruktora statycznego)
+        // m105-optym KtKnownPatches (KingdomTreasury.Optim105.cs): przy applyWithdrawals = false tylko odczyt, bez MBRandom; zmiana tresci = przeglad KtSkip
         /// <summary>Prefiks DefaultClanFinanceModel.AddMercenaryIncome: AI w sluzbie - bez wplywu i bez zmiany MercenaryWallet (gracz bez zmian).</summary>
         public static bool MercIncomePrefix(Clan __0, bool __2)
         {
@@ -339,6 +340,7 @@ namespace Armoury
         /// <summary>Postfiks DefaultClanFinanceModel.CalculateClanIncomeInternal: "za tier" zdjete tym samym wpisem bez opisu - 185: AI w sluzbie z umowa bez lenn
         /// (Tier x (80 + 40)); E5/A7 (audyt zlota z niczego, wiersz 13; wylacznik TierIncomeAiOff): kazdy rod AI z warunkiem gry (bez lenn, poza krolestwem albo
         /// najemnik - G DefaultClanFinanceModel.cs:133-137: Tier x (80 + 40 u najemnika)). Gracz bez zmian (gra i tak go pomija).</summary>
+        // m105-optym KtKnownPatches (KingdomTreasury.Optim105.cs): przy applyWithdrawals = false tylko odczyt, bez MBRandom; zmiana tresci = przeglad KtSkip
         public static void TierPostfix(Clan __0, ref ExplainedNumber __1, bool __2)
         {
             try

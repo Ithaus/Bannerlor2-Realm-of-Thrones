@@ -1,0 +1,188 @@
+{
+ "scenes": [
+  {
+   "id": "prolog_01",
+   "day": 0,
+   "Title": "The King Rides North",
+   "UpperText": "Lord Jon Arryn, Hand of the King, is dead of a sudden fever, and his widow Lysa has fled to the Eyrie with their young son. Grieving and restless, King Robert leaves King's Landing by the Kingsroad with Queen Cersei, the royal children, the Lannister brothers and a great household, bound for Winterfell.",
+   "LowerText": "The king needs a new Hand, and there is only one man he trusts: his old friend Eddard Stark. For now the realm is at peace and its great houses stand with the crown. Few suspect how quickly that peace can break.",
+   "fallback_sprite": "kingslanding"
+  },
+  {
+   "id": "prolog_02",
+   "day": 5,
+   "Title": "Wolves in the Snow",
+   "UpperText": "Near Winterfell, Lord Eddard Stark beheads Gared, a deserter of the Night's Watch half mad with terror of what he saw beyond the Wall. Riding home, his sons find a dead direwolf with a stag's antler in her throat and her litter still alive: five pups for the trueborn Stark children, and a white runt found by Jon Snow.",
+   "LowerText": "The direwolf is the sigil of House Stark, and a stag killed the mother. Some call it an omen. The deserter's tale of things in the dark is dismissed as madness, yet beyond the Wall the rangers of the Watch keep vanishing.",
+   "fallback_sprite": "rickard"
+  },
+  {
+   "id": "prolog_03",
+   "day": 12,
+   "Title": "A Khal's Bride",
+   "UpperText": "Across the Narrow Sea, outside the Free City of Pentos, Viserys Targaryen gives his sister Daenerys in marriage to Khal Drogo, a Dothraki warlord who rides with tens of thousands. Magister Illyrio gifts the bride three dragon eggs turned to stone by the ages, and the exiled knight Ser Jorah Mormont joins their service.",
+   "LowerText": "Viserys believes the khal will repay him with an army to win back his father's throne. The Dothraki do not cross the sea lightly, but the realm's spies take note. Robert Baratheon never forgets a Targaryen.",
+   "fallback_sprite": "messenger-1"
+  },
+  {
+   "id": "prolog_04",
+   "day": 35,
+   "Title": "The King in Winterfell",
+   "UpperText": "After weeks on the Kingsroad, the royal column reaches Winterfell. Lord Eddard and Lady Catelyn welcome King Robert, his queen and their court with a great feast. In the crypts below the castle, Robert asks his old friend to be his Hand and proposes to wed Prince Joffrey to Sansa Stark.",
+   "LowerText": "That night a secret letter arrives from Lysa Arryn, claiming the Lannisters murdered her husband. Ned must choose between the duty he owes his king and the safety of his home. Either way, the North will be drawn into the games of the South.",
+   "fallback_sprite": "traveling_merchant"
+  },
+  {
+   "id": "prolog_05",
+   "day": 40,
+   "Title": "The Fall of Bran Stark",
+   "UpperText": "Young Bran Stark, who has climbed the walls of Winterfell since he could walk, falls from the old broken tower while most of the court is away hunting. He lives, but lies broken and senseless, and the maester cannot say if he will ever wake.",
+   "LowerText": "Lady Catelyn will not leave his bedside. Bran was the surest climber in the castle, and a careless slip seems unlike him. What he saw at the tower window is a secret that some in the queen's company would kill to keep.",
+   "fallback_sprite": "harrenhal"
+  },
+  {
+   "id": "prolog_06",
+   "day": 48,
+   "Title": "The King's Hand",
+   "UpperText": "Lord Eddard Stark accepts King Robert's offer and becomes Hand of the King. Sansa is promised to Prince Joffrey, and Arya will go south with her sister. Robb is to rule Winterfell as his father's heir, while Lady Catelyn stays with Bran.",
+   "LowerText": "Ned takes the office not for glory, but to guard his king and learn the truth behind Jon Arryn's death. The second seat of the realm now belongs to a northerner with no taste for intrigue. In King's Landing, many will be eager to test him.",
+   "fallback_sprite": "ned_stark"
+  },
+  {
+   "id": "prolog_07",
+   "day": 55,
+   "Title": "Roads South and North",
+   "UpperText": "The royal column leaves Winterfell for King's Landing, with Lord Eddard, Sansa and Arya in its train. On the same morning Jon Snow rides north with his uncle Benjen to serve in the Night's Watch, and Tyrion Lannister goes with them, eager to see the Wall with his own eyes.",
+   "LowerText": "Bran has still not woken. The Starks are now split between Winterfell, the Wall and the capital, and they may never be whole again. At their parting, Ned promises Jon that when next they meet, he will tell him of his mother.",
+   "fallback_sprite": "messenger-img"
+  },
+  {
+   "id": "prolog_08",
+   "day": 62,
+   "Title": "A Knife in the Night",
+   "UpperText": "While a fire draws the guards to Winterfell's library tower, a hired killer slips into Bran's sickroom with a fine dagger. Lady Catelyn fights him with her bare hands until Bran's direwolf tears out the man's throat. The blade is Valyrian steel, far too costly for a common cutthroat.",
+   "LowerText": "Certain that someone powerful wants her son dead, Catelyn sails south in secret with Ser Rodrik Cassel to warn her husband, leaving Robb to hold Winterfell. Soon after she is gone, Bran wakes, remembering nothing of his fall.",
+   "fallback_sprite": "ramsay"
+  },
+  {
+   "id": "prolog_09",
+   "day": 75,
+   "Title": "Blood at the Trident",
+   "UpperText": "Near the Ruby Ford, Prince Joffrey attacks Mycah, a butcher's boy who was sparring with Arya Stark. Arya's wolf Nymeria bites the prince, and Arya hurls his sword into the river. The queen demands blood: Nymeria has fled, so Sansa's gentle wolf Lady must die in her place, and the Hound rides down the butcher's boy.",
+   "LowerText": "Lord Eddard kills Lady himself rather than leave it to another. The quarrel poisons the bond between Stark and Lannister before the court has even reached the capital. Sansa blames her sister for Lady's death, and Arya will never forgive the Hound for the butcher's boy.",
+   "fallback_sprite": "event-bg"
+  },
+  {
+   "id": "prolog_10",
+   "day": 80,
+   "Title": "A Ranger Lost",
+   "UpperText": "Benjen Stark, First Ranger of the Night's Watch, rides out beyond the Wall to search for Ser Waymar Royce and the rangers who vanished with him. He does not return. Weeks pass, and no word of him reaches Castle Black.",
+   "LowerText": "With their best ranger gone, the black brothers grow uneasy. Wildlings are said to be gathering in numbers no one has seen before, and old tales of the dead walking are told more often by the fires. The Wall holds, for now.",
+   "fallback_sprite": "wallfall"
+  },
+  {
+   "id": "prolog_11",
+   "day": 95,
+   "Title": "The Small Council",
+   "UpperText": "Lord Eddard reaches King's Landing and takes his seat at the head of the small council, beside Varys the master of whisperers, Petyr Baelish the master of coin, Grand Maester Pycelle and Renly Baratheon. Lord Stannis has kept to Dragonstone since Jon Arryn's death.",
+   "LowerText": "Ned learns that the crown owes some six million gold dragons, much of it to the Lannisters, and that the king wants a costly tourney to honour his new Hand. Every man at the table has his own purposes. In this city, trust is spent as freely as gold.",
+   "fallback_sprite": "kingslanding"
+  },
+  {
+   "id": "prolog_12",
+   "day": 100,
+   "Title": "The Dragonbone Dagger",
+   "UpperText": "Lady Catelyn arrives secretly in King's Landing. Petyr Baelish, who loved her in their youth, hides her in one of his brothels and studies the dagger sent against Bran. He swears it was once his own, and that he lost it in a wager to Tyrion Lannister.",
+   "LowerText": "To the Starks, Littlefinger's word seems proof enough that the Imp hired the killer. Ned urges his wife to return home and vows to find the truth. From now on, every step they take in the capital is watched by Varys and his informers.",
+   "fallback_sprite": "messenger-2"
+  },
+  {
+   "id": "prolog_13",
+   "day": 110,
+   "Title": "The Inn at the Crossroads",
+   "UpperText": "Riding home with Ser Rodrik, Lady Catelyn meets Tyrion Lannister at the inn at the crossroads, on his way back from the Wall. Before a common room full of travellers and sworn swords of the river lords, she accuses him of plotting her son's murder and calls on them to help her seize him.",
+   "LowerText": "Tyrion is taken east into the Vale, to her sister Lysa at the Eyrie. When word reaches Casterly Rock, Lord Tywin will not let such an insult pass. Lannister and Tully are now one spark away from open war.",
+   "fallback_sprite": "riverlands"
+  },
+  {
+   "id": "prolog_14",
+   "day": 118,
+   "Title": "The Mountain Clans",
+   "UpperText": "On the high road through the Mountains of the Moon, Lady Catelyn's party is ambushed by wild hill clansmen. Her prisoner Tyrion Lannister fights beside his captors with an axe, and a sellsword named Bronn proves the deadliest blade among them.",
+   "LowerText": "The clans of the Vale answer to no lord and fall on any traveller they can catch. Several of Lady Catelyn's men die on the road before the party reaches the Bloody Gate, where her uncle Ser Brynden Tully, the Blackfish, rides out to meet them.",
+   "fallback_sprite": "freefolk1"
+  },
+  {
+   "id": "prolog_15",
+   "day": 125,
+   "Title": "The Tourney of the Hand",
+   "UpperText": "King's Landing honours its new Hand with a great tourney. In the lists, Ser Gregor Clegane, the Mountain, kills a young knight of the Vale with a lance through the throat. Ser Loras Tyrell, the Knight of Flowers, unhorses him, and when the Mountain draws steel on Loras, his own brother Sandor stands in the way.",
+   "LowerText": "Loras yields the final to the Hound, and Thoros of Myr wins the melee. Ned notes that the dead knight, Ser Hugh of the Vale, was newly knighted and had once been Jon Arryn's squire.",
+   "fallback_sprite": "kingslanding"
+  },
+  {
+   "id": "prolog_16",
+   "day": 132,
+   "Title": "Trial at the Eyrie",
+   "UpperText": "Held in a sky cell of the Eyrie, Tyrion demands a trial by combat. Lady Lysa's champion, Ser Vardis Egen, faces the sellsword Bronn, who fights for the Imp. Bronn wears down the heavily armoured knight and sends his body out through the Moon Door.",
+   "LowerText": "Tyrion walks free down the mountain, where he wins over the hill clans with promises of steel and gold. Shagga and his Stone Crows follow him toward the Riverlands, with Bronn at his side. Lady Lysa has made an enemy of the Rock.",
+   "fallback_sprite": "fist"
+  },
+  {
+   "id": "prolog_17",
+   "day": 138,
+   "Title": "Swords in the Street",
+   "UpperText": "Enraged by his brother's capture, Ser Jaime Lannister and his men waylay Lord Eddard in a street of King's Landing. Ned's guards are cut down, and Jory Cassel dies by Jaime's own hand. The Hand is left with a shattered leg when his horse falls on him.",
+   "LowerText": "Jaime flees the city to join his father's host in the West, and King Robert has no patience for the quarrel. A knight of the Kingsguard has spilled the blood of the Hand's household in the open street. The peace is starting to crack.",
+   "fallback_sprite": "ned_stark"
+  },
+  {
+   "id": "prolog_18",
+   "day": 145,
+   "Title": "A Crown of Gold",
+   "UpperText": "In Vaes Dothrak, a drunken Viserys Targaryen draws a sword in the sacred city and threatens his pregnant sister. Khal Drogo answers by giving the beggar king the crown he has demanded for so long: a pot of molten gold poured over his head.",
+   "LowerText": "Daenerys watches her brother die and finds she feels nothing for him. She carries Drogo's son, and the Dothraki whisper that the boy will one day ride to the ends of the world. The Targaryen claim lives on across the Narrow Sea.",
+   "fallback_sprite": "event-bg"
+  },
+  {
+   "id": "prolog_19",
+   "day": 155,
+   "Title": "The Riverlands Burn",
+   "UpperText": "Raiders flying no banners burn villages and holdfasts across the Riverlands, slaughtering the smallfolk and driving off their herds. Survivors speak of a giant knight in heavy plate, and every tale points to Ser Gregor Clegane, the Mountain, bannerman of Lord Tywin.",
+   "LowerText": "Lord Tywin answers the seizure of his son with fire, while pretending to have no hand in it. Refugees crowd the roads to Riverrun, and the river lords send survivors to King's Landing to beg the king's justice.",
+   "fallback_sprite": "riverlands"
+  },
+  {
+   "id": "prolog_20",
+   "day": 160,
+   "Title": "The King's Justice",
+   "UpperText": "With King Robert away hunting, Lord Eddard sits the Iron Throne and hears the smallfolk of the Riverlands. He strips Ser Gregor of his lands and titles and sends Lord Beric Dondarrion with six score men, Thoros of Myr among them, to bring the Mountain to justice.",
+   "LowerText": "Ned also summons Lord Tywin to court to answer for his bannerman's crimes. It is the act of an honest Hand, and it makes the Lannisters his open enemies. Lord Tywin does not come.",
+   "fallback_sprite": "kingslanding"
+  },
+  {
+   "id": "prolog_21",
+   "day": 172,
+   "Title": "A Cup of Wine",
+   "UpperText": "Learning that Daenerys is with child, King Robert orders her death over the protests of his Hand. In the market of Vaes Dothrak, a wine seller offers her his finest vintage, but Ser Jorah Mormont grows suspicious of the man and the poison is exposed before she drinks.",
+   "LowerText": "The attempt achieves what Viserys never could. Khal Drogo swears to lead his horse lords across the sea and win the Iron Throne for his son. In fearing the dragon, the king may have woken it.",
+   "fallback_sprite": "messenger-1"
+  },
+  {
+   "id": "prolog_22",
+   "day": 182,
+   "Title": "The Royal Hunt",
+   "UpperText": "Hunting in the Kingswood, King Robert, made reckless by the strongwine his squire keeps pouring, faces a great boar on foot. The beast gores him terribly before it dies. He is carried back to the Red Keep on a litter, and the maesters can do little but ease his pain.",
+   "LowerText": "On his deathbed Robert names Lord Eddard Protector of the Realm until his heir comes of age. Ned now holds the secret that killed Jon Arryn: the queen's children are not the king's. Whoever sits the Iron Throne next will decide the fate of the realm.",
+   "fallback_sprite": "stannis-slain"
+  },
+  {
+   "id": "prolog_23",
+   "day": 186,
+   "Title": "The Fall of the Hand",
+   "UpperText": "King Robert is dead, and Joffrey is proclaimed king. When Lord Eddard brings Robert's will to the throne room to claim the regency, the gold cloaks he paid for turn their spears on his men. Petyr Baelish holds a dagger to his throat, and the Hand is dragged to the black cells.",
+   "LowerText": "The Stark household in the Red Keep is put to the sword. Sansa is held as a hostage, while Arya escapes as her sword master Syrio Forel holds off the Kingsguard. In the North, Robb Stark calls the banners. The realm stands on the edge of war.",
+   "fallback_sprite": "joffrey"
+  }
+ ]
+}

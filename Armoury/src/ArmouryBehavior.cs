@@ -782,6 +782,9 @@ namespace Armoury
         // m102-tablica: tablica ogloszen - flagi z tablicy, listy gonczne kapitanow i soltysow od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak m96-dlugi)
         private readonly bool _m102TablicaReset = M102TablicaReset();
         private static bool M102TablicaReset() { try { NoticeBoard.Reset(); } catch (Exception e) { Log.Error("M102TablicaReset", e); } return true; }
+        // m103-lektor: lektor - klip, strona plotek i liczniki doby od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak m102-tablica)
+        private readonly bool _m103LektorReset = M103LektorReset();
+        private static bool M103LektorReset() { try { Lektor.Reset(); } catch (Exception e) { Log.Error("M103LektorReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -2191,6 +2194,7 @@ namespace Armoury
             try { CraftOrdersPurse.SessionStart(); } catch (Exception e) { Log.Error("CraftOrdersPurse.SessionStart", e); }   // NZ (16.10): zlecenia kowalskie z zapisu bez pokrycia w kiesie zleceniodawcy (suma jego zlecen) albo zmarlego zdjete; PO CraftOrders8.SessionStart (nagrody juz przeliczone)
             try { QuestPay8.SessionStart(this); } catch (Exception e) { Log.Error("QuestPay8.SessionStart", e); }   // E8/D1 (256): nagrody i wyplaty w zadaniach - nasluchy przyjecia zadan; skan metod zadan i latki raz na proces, W KAMPANII (CLAUDE.md 7)
             try { QuestQty28.SessionStart(this); } catch (Exception e) { Log.Error("QuestQty28.SessionStart", e); }   // f28-wyceny (A): ilosci w zadaniach od wartosci sprzed przeliczenia - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8 i HistoricalPrices.Apply
+            try { QuestGangAxes.SessionStart(); } catch (Exception e) { Log.Error("QuestGangAxes.SessionStart", e); }   // m105-drobne (T-4): sprawa broni gangu ze srednia wazona ceny siekier (gra: srednia 0 -> 20000 / 0) - latka konstruktora raz na proces W KAMPANII (CLAUDE.md 7), naprawa zepsutych spraw z zapisu
             try { RogueryXp28.SessionStart(); } catch (Exception e) { Log.Error("RogueryXp28.SessionStart", e); }   // f28-wyceny (B): XP Lotrostwa za najazd / rabunek / wymuszenie od wartosci towarow sprzed przeliczenia - latki raz na proces, W KAMPANII
             try { Wyceny20.SessionStart(); } catch (Exception e) { Log.Error("Wyceny20.SessionStart", e); }   // n20-wyceny: reszta audytu wycen (XP Handlu z warsztatow, lup AI, kryjowki, cel BK Acquire Book) - latki raz na proces, W KAMPANII, PO HistoricalPrices.Apply
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
@@ -2210,6 +2214,7 @@ namespace Armoury
             try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
             try { InnDrink.SessionStart(); } catch (Exception e) { Log.Error("InnDrink.SessionStart", e); }   // m98-plotki: linia "Kufle (m98): start sesji" - klucze, krzywa Uroku, prog upicia
+            try { Lektor.SessionStart(); } catch (Exception e) { Log.Error("Lektor.SessionStart", e); }   // m103-lektor: linia "Lektor (m103): start sesji" - klucze, nagrania okien, latka, pamiec plotek, klucz API jest/brak, tryb
             try { BanditLimit.SessionStart(); } catch (Exception e) { Log.Error("BanditLimit.SessionStart", e); }   // f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band ROT x2 z ludzi puli wyrzutkow, stopery kosztu band - latki W KAMPANII (raz na proces), linia "Bandy i limit (f8-bandy): start sesji"
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { CompanionWage.SessionStart(); } catch (Exception e) { Log.Error("CompanionWage.SessionStart", e); }   // CW (19.10): zold towarzyszy gracza wedlug poziomu - latki TroopWage i GetHeroWage, PO CompanionPay (BaseWage BK)
@@ -2283,6 +2288,7 @@ namespace Armoury
             try { SideVillageFief.EnsureHooks(); } catch (Exception e) { Log.Error("SideVillageFief.EnsureHooks", e); }   // n20-wioska: start BK "Indebted Lord" (TitleManager.GiveLordshipOnKingdomJoin) i linia podpowiedzi zlota - latki w kampanii (CLAUDE.md 7)   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { PerfD2.EnsureHooks(); } catch (Exception e) { Log.Error("PerfD2.EnsureHooks", e); }   // perf-d2d3: straznik i prefiks podatku miast BK (PerfTownTaxSkipBk) - PO PopulationLaw (SubModule), CouncilWages35 i Seal31B; linia startowa "Szybkosc doby (perf-d2d3)"   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
+            try { KingdomTreasury.OptimStartLine(); } catch (Exception e) { Log.Error("KingdomTreasury.OptimStartLine", e); }   // m99-optym: linia startu "Optym (m99): start" (wlaczone optymalizacje)
             try { FiefGrants.EnsureHooks(); } catch (Exception e) { Log.Error("FiefGrants.EnsureHooks", e); }   // PROJEKT-LENNA (14.10): regula N nadan zdobytych twierdz - latki na model BK / BKROT i decyzje gry w kampanii (raz na proces), linia "Nadania lenn (N)"
             try { BkrotChains.EnsureHooks(); } catch (Exception e) { Log.Error("BkrotChains.EnsureHooks", e); }   // P4 audytu (AM-13, AM-09, AM-19): lancuchy modeli pod BKROT (predkosc, mapa, morale w bitwie, zold) - latki raz na proces, linia "Lancuchy modeli BKROT (P4): start"
             try { ShipsToPort181.Reset(); } catch (Exception e) { Log.Error("ShipsToPort181.Reset", e); }   // 3.1/3.3 (33) 181: statki do portu - stan dzienny i konteksty od zera w kazdej kampanii (latki wpiete przy starcie gry)
@@ -2690,6 +2696,7 @@ namespace Armoury
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
             // 24c (14.10, klucz DragonsEatHerds): smoki jedza zwierzeta z taborow i stad wsi - PRZED ksiegami (ramka FDragon w tej samej dobie co linia "Smoki (24c)")
+            Prologue.DragonsApply("doba");   // m104-wojny (3): wierzchowiec Daenerys wedlug etapu smokow - PRZED karmieniem (DragonFeed widzi biezacy slot); bledy liczone w srodku
             try { DragonFeed.Daily(); } catch (Exception e) { Log.Error("DragonFeed.Daily", e); } DayProfile.Lap("DragonFeed.Daily");
             try { DragonFeed.Line(); } catch (Exception e) { Log.Error("DragonFeed.Line", e); }
             try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); } DayProfile.Lap("OreLedger.Daily");   // wpis 94: ksiega rudy (tylko log)
@@ -2817,8 +2824,10 @@ namespace Armoury
             try { MoneyLedger.Probe169("TownInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RoadsideInns.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("RoadsideInns.Daily", e); } DayProfile.Lap("RoadsideInns.Daily");   // sw-zajazdy: linia "Zajazdy (ZJ): dzien N" - wejscia, noclegi, kiesy wsi, kontrola obiegu, widok
             try { MoneyLedger.Probe169("RoadsideInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
+            try { MapChatLog.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("MapChatLog.Daily", e); } DayProfile.Lap("MapChatLog.Daily");   // m105-dziennik: linia "Dziennik (m105): dzien N" - przesuniecia, ramka, handel na tabliczkach (tylko log)
             try { Rumours.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Rumours.Daily", e); } DayProfile.Lap("Rumours.Daily");   // sw-zajazdy: linia "Plotki (PL): dzien N" - sluchane, ksiega band, wiesci
             try { InnDrink.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("InnDrink.Daily", e); }   // m98-plotki: linia "Kufle (m98): dzien N"
+            try { Lektor.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Lektor.Daily", e); }   // m103-lektor: linia "Lektor (m103): dzien N" - okna, plotki, znaki, bledy API
             try { MoneyLedger.Probe169("Rumours.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); } DayProfile.Lap("ClanIncomeBook.Daily");   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
             try { MoneyLedger.Probe169("ClanIncomeBook.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)

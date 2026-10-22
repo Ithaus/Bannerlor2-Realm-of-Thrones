@@ -48,6 +48,8 @@ namespace Armoury
         private MapScreen _screen;
         private bool _active, _finalized, _wasOff;
         private float _acc;
+        private float _ringAcc;          // m105-kolko: zegar testu kola (autotest z plikiem armoury-kolko.flag)
+        private int _ringTestNone;
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly List<Slot> _shown = new List<Slot>();
         private readonly Dictionary<string, MetaMesh> _meshes = new Dictionary<string, MetaMesh>(StringComparer.Ordinal);
@@ -108,6 +110,7 @@ namespace Armoury
             try
             {
                 bool sceneAlive = _screen != null && ReferenceEquals(MapScreen.Instance, _screen);
+                try { MapHoverRing.Release(sceneAlive ? _screen.MapScene : null, sceneAlive); } catch { }   // m105-kolko
                 foreach (var s in _slots)
                 {
                     if (s.Root != null && sceneAlive) { try { s.Root.Remove(111); removed++; } catch { } }
@@ -130,11 +133,14 @@ namespace Armoury
         public override void OnVisualTick(MapScreen screen, float realDt, float dt)
         {
             if (!_active || _finalized) return;
+            MapHoverRing.Tick(realDt);   // m105-kolko: co klatke - dymek na innym obiekcie = kolko znika
             _acc += realDt;
             if (_acc < TickEvery) return;
+            _ringAcc += _acc;
             _acc = 0f;
             try
             {
+                if (_ringAcc >= 40f) { _ringAcc = 0f; if (MapHoverRing.TestWanted()) RingTest(screen); }
                 if (!Settings.Current.RoadsideInns)
                 {
                     if (!_wasOff)
@@ -150,6 +156,34 @@ namespace Armoury
                 UpdateVisibility(screen);
             }
             catch (Exception e) { InnViewStats.StVis++; if (InnViewStats.StVis <= 3 || InnViewStats.StVis % 200 == 0) Log.Error("RoadsideInnsView.OnVisualTick (potkniecie " + InnViewStats.StVis + ")", e); }
+        }
+
+        /// <summary>m105-kolko, autotest: kolko na 8 s przy zajezdzie widocznym najblizej kamery (nikt nie najedzie myszka).</summary>
+        private void RingTest(MapScreen screen)
+        {
+            try
+            {
+                if (screen == null || screen.MapCameraView == null || screen.MapCameraView.Camera == null) return;
+                Vec3 cam = screen.MapCameraView.Camera.Position;
+                Slot best = null; float bd = float.MaxValue;
+                foreach (var s in _shown)
+                {
+                    if (s.Root == null) continue;
+                    float dx = s.Inn.Bx - cam.x, dy = s.Inn.By - cam.y, d = dx * dx + dy * dy;
+                    if (d < bd) { bd = d; best = s; }
+                }
+                if (best == null)
+                {
+                    if (++_ringTestNone <= 3) Log.Info("Kolko najechania (m105): test - zaden zajazd nie stoi teraz przy kamerze (wysokosc " + cam.z.ToString("0", Inv) + ") - bez proby.");
+                    return;
+                }
+                if (best.V == null) best.V = new Visual(best);
+                int ok0 = HoverRingStats.TestShows;
+                MapHoverRing.Show(best.V, best.Inn.Bx, best.Inn.By, MapHoverRing.InnScale, best.Inn.Village, true);
+                Log.Info("Kolko najechania (m105): test - zajazd '" + best.Inn.Name + "' (" + best.Inn.Bx.ToString("0.0", Inv) + ", " + best.Inn.By.ToString("0.0", Inv)
+                         + "), kolor " + MapHoverRing.ColorFor(best.Inn.Village).ToString("X8") + " - " + (HoverRingStats.TestShows > ok0 ? "TAK" : "NIE") + ".");
+            }
+            catch (Exception e) { HoverRingStats.TestFails++; Log.Error("RoadsideInnsView.RingTest", e); }
         }
 
         private static bool InnVisible(Slot s)
@@ -428,6 +462,7 @@ namespace Armoury
 
             public override void OnHover()
             {
+                MapHoverRing.Show(this, _s.Inn.Bx, _s.Inn.By, MapHoverRing.InnScale, _s.Inn.Village);   // m105-kolko: kolko jak przy wsi gry
                 try
                 {
                     var inn = _s.Inn;
@@ -445,6 +480,8 @@ namespace Armoury
                 }
                 catch (Exception e) { InnViewStats.StHover++; if (InnViewStats.StHover <= 3 || InnViewStats.StHover % 200 == 0) Log.Error("RoadsideInnsView.OnHover " + _s.Inn.Uid, e); }
             }
+
+            public override void OnHoverEnd() { MapHoverRing.Hide(this); }
 
             private static string Cap(string s) { return string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1); }
         }

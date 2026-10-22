@@ -347,7 +347,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Rate", e); return FallbackRate; }
         }
 
-        private static int RawReward(IssueBase issue)
+        internal static int RawReward(IssueBase issue)   // internal: linia logu QuestGangAxes (recenzja m105 R2 - nagroda gry bez skali)
         {
             if (issue == null || _rawReward == null) return 0;
             bool was = _raw;

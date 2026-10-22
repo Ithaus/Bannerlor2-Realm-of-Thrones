@@ -3740,6 +3740,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float BandHungerLeaveShare { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Band Food At Sea", HintText = "with Bands Eat Food: a band at sea buys its food through the fence of a port town (its home port, or the nearest port), and its crew fishes for whatever is still missing from the day's portion - eaten at once, never stored or sold, at most one catch an hour (24 a day); a band still hungry at sea takes no recruits, as on land. Off = at sea only the nearest town's fence (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BandFoodAtSea { get; set; } = true;
+
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ('Year 299, Day 256, Autumn')", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
@@ -4800,6 +4804,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int CampBackground { get; set; } = 1;
 
+        [SettingPropertyBool("Map Clock Season Second Line", HintText = "Jeff 21.10: the season and the hour on a second line under the date on the map bar ('Year 299, Day 256' / 'Autumn, 14:30'), so the text stays inside its frame", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool MapClockSeasonSecondLine { get; set; } = true;
+
         [SettingPropertyBool("Map Clock Enabled", HintText = "the hour of the day next to the date on the map bar ('Year 299, Day 256, Autumn - 14:30')", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool MapClockEnabled { get; set; } = true;
@@ -4915,6 +4923,10 @@ namespace Armoury
         [SettingPropertyBool("Night March Notice", HintText = "night marches are told plainly: the first camp hour your column is on the move (not only the camp-start hour) brings the nightfall question or your standing order, marching on brings a warning, standing still pitches camp with a note, and each dawn says how long the men rested and why they do or do not owe sleep; off = as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool NightMarchNotice { get; set; } = true;
+
+        [SettingPropertyBool("Raid Counts As Work", HintText = "raiding is work, not rest: the hours your party spends raiding (a hamlet from its own menu, or a village of the map as the raider - alone, leading an army or with another lord's army) count like drill, not like a halt - the men get no rest from them in the sleep ledger, and a day spent raiding a hamlet is no day of rest for the army you lead; off = as before (standing at the village while raiding counted as rest)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RaidCountsAsWork { get; set; } = true;
 
         [SettingPropertyBool("Forced March", HintText = "a forced march for your column: pick 'Forced march' with the O key or when night falls - your party (and the army you lead) moves this much faster, but nobody sleeps while it lasts (halts do not count as rest and no camp is pitched on its own), and on top of the nights they miss, every 24 hours of it costs one more sleepless night - so the sleep debt grows every 12 hours instead of once a day, and its penalties soon eat the gain. A shorter dash leaves weariness that counts toward the next one and fades by 2 hours a day of proper rest. It ends when you make camp, bed down, enter a settlement or put to sea. Needs Night Rest. Off = only the old 'March on'", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -5416,6 +5428,10 @@ namespace Armoury
         [SettingPropertyGroup("Quest rewards")]
         public bool QuestGoodsReal { get; set; } = true;
 
+        [SettingPropertyBool("Quest Gang Axes Fix", HintText = "the gang leader who needs weapons asks for one-handed axes at their real average price on the town shelves (each axe weighed by how many lie there; empty shelves - the average worth of trade axes). The game divided the sum of the axes' prices by the number of axes on the shelves, which with cheap axes and full shelves gives 0 or a few denars - the quest then broke (an unreadable reward on the notice board, an error in the conversation) or asked for far too many axes. Quests already in a save are mended only if broken; off = as the game", RequireRestart = false)]
+        [SettingPropertyGroup("Quest rewards")]
+        public bool QuestGangAxesFix { get; set; } = true;
+
         [SettingPropertyBool("Player Tourney Prize From Town", HintText = "the prize you win at a tournament is a real thing: it comes off the shelves of the host town, and when the town has no such piece in its stores it pays you its price from its treasury instead - only from what the treasury can spare, so a poor town pays less and you are told. The prize money and match bonuses of Tournaments XPanded are paid by the host town the same way (off = the prize and the coin appear out of thin air, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Player fees and bets")]
         public bool PlayerTourneyPrizeFromTown { get; set; } = true;
@@ -5744,6 +5760,18 @@ namespace Armoury
         [SettingPropertyGroup("Blood and race")]
         public bool FertilityYearScale { get; set; } = true;
 
+        [SettingPropertyBool("Map Chat Log Clear Of Menu", HintText = "Chat Log Clear Of Menus: while a settlement or encounter menu is open on the campaign map, the message log (ravens, captures, news) moves to the right of the menu, below the middle of the screen, so it no longer covers the menu; it moves back when the menu closes. On the open map with no window up it sits a little in from the left edge, clear of the army readiness button in the corner. Off = the log stays in the corner and over the menu, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public bool MapChatLogClearOfMenu { get; set; } = true;
+
+        [SettingPropertyBool("Map Chat Log Frame", HintText = "Chat Log Frame On The Map: messages in the log on the campaign map get a dark panel with the thin silver bars of the Realm of Thrones tooltips, sized to the lines on show; it goes away with the last line. Battles, other screens and windows over the map keep the game's look, and so does a settlement menu when the log is not moved clear of it. Off = bare text, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public bool MapChatLogFrame { get; set; } = true;
+
+        [SettingPropertyBool("Map Hide Trade Notices", HintText = "Hide Trade Notices Over Towns: the rows with portraits above town names that list what caravans and villagers sold or bought ('Caravan of X Sold Jewelry x1 ...', 'Villagers of Y Sold ...') are no longer shown. Trade itself and every other notice (recruits, prisoners, ships) are unchanged. Off = shown, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public bool MapHideTradeNotices { get; set; } = true;
+
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillagesEnabled { get; set; } = true;
@@ -5751,6 +5779,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Map Villages Hide Above Camera Height", 0.00f, 640.00f, "0.00", HintText = "map villages vanish when the camera rises above this height - from afar only the game's villages, castles and towns remain", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public float MapVillagesHideAboveCameraHeight { get; set; } = 160f;
+
+        [SettingPropertyBool("Map Hover Ring Our Objects", HintText = "Hover Ring On Inns And Side Villages: pointing at a roadside inn or a side village you can ride into shows the same ring on the ground as the game shows under its own villages - gold for neutral, red for enemies, green for your own realm, blue for allies. Off = no ring there, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapHoverRingOurObjects { get; set; } = true;
 
         [SettingPropertyBool("Map Village Names On Hover", HintText = "Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
@@ -5910,7 +5942,7 @@ namespace Armoury
 
         [SettingPropertyBool("Drill Camp Only Ai", HintText = "with Drill Camp Only: AI lords' men too drill only in the hours they stand still by day (settlement, siege camp, halted), at your pace - a full day (8 hours) x2.25, nothing on the march, training perks only with drill. Estimated from the 180-day test of 20.10: AI lords march most of their days, so their men would learn roughly 15 to 50 percent less (about a third in the middle) - slower promotions and less demand for better gear; the daily log line measures it exactly either way (off = AI drill as before: x1.5 on a day of rest, x0.9 on the march)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
-        public bool DrillCampOnlyAi { get; set; } = false;
+        public bool DrillCampOnlyAi { get; set; } = true;
 
         [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
@@ -6848,6 +6880,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryWoodDemand { get; set; } = true;
 
+        [SettingPropertyBool("Bloomery Shelf Leaves Forges", HintText = "with Bloomery At Mine: a mine's bloomery buys wood from its market town's shelf only above one day of the town's own use (its smiths, households and craftsmen), so the town's armourers and fletchers are served first - a smith earns more on a load of wood than a bloomery; a bloomery that falls short orders wood by cart from towns with a surplus. Off = the bloomery may empty the shelf, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryShelfLeavesForges { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Coal Before Lord Share", HintText = "with Bloomery At Mine: what a mining village paid for the wood of its bloomery comes out of its cart's market takings first, and the lord takes his share only of what is left - the difference moves from the lord's tax on those takings to the village's purse when the cart comes home, so no gold is made; the owners of Banner Kings estates keep their part (needs Village Takings Whole; off = the lord's share is counted on the whole takings, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryCoalBeforeLordShare { get; set; } = true;
@@ -7092,6 +7128,30 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfSutlerWageOnce { get; set; } = true;
 
+        [SettingPropertyBool("Optim Daily Cache", HintText = "at the turn of the day the crown dues ask once per kingdom whether that kingdom is at war, instead of once for every clan - the same dues, less work; off = asked for every clan, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimDailyCache { get; set; } = true;
+
+        [SettingPropertyBool("Optim Verify", HintText = "check mode for the day speed-ups: both ways are worked out, the game keeps the old one and the log counts any difference (for testing only - slower); off = only the fast way", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimVerify { get; set; } = false;
+
+        [SettingPropertyBool("Optim Kt Skip Model", HintText = "at the turn of the day the crown dues no longer work out the whole income of a vassal clan that holds no town, castle or village and whose head owns no workshop, when its dues are taken from its land anyway - that income was worked out only to be thrown away. The same dues, much less work. It stands aside on its own for the day (and says why in the log) when another mod hooks that income; off = worked out for every clan, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimKtSkipModel { get; set; } = true;
+
+        [SettingPropertyBool("Optim Sutler Nearest", HintText = "the sutlers of the bands in the field find the nearest town and village from a list of the map's settlements made once a day, instead of looking over every town and village again for each of some four hundred bands - the same town, the same village, the same coin; off = every settlement is looked over for each band, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimSutlerNearest { get; set; } = true;
+
+        [SettingPropertyBool("Optim Build War", HintText = "at the turn of the day the paid building works ask once per kingdom whether that kingdom is at war, instead of once for every town and castle with a building in progress - the same works stop and go; off = asked for every town and castle, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimBuildWar { get; set; } = true;
+
+        [SettingPropertyBool("Optim Stable Delegates", HintText = "the daily clan income book asks Banner Kings about village lords, village data, village tax and village titles through direct calls made once, instead of through slow reflection for every clan and village - the same answers, less work; off = through reflection, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimStableDelegates { get; set; } = true;
+
         [SettingPropertyBool("Perf Town Tax Fast Hooks", HintText = "the town tax with rents (the lines somebody really pays, the council wages) asks Banner Kings directly instead of through slow reflection - the same numbers, less work each time a town's tax is counted; off = through reflection, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfTownTaxFastHooks { get; set; } = true;
@@ -7155,6 +7215,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Shipyard Labour Share", 0.00f, 1.00f, "0.00", HintText = "share of a hull's worth the town pays its shipwrights for building it (paid from the town's purse above the merchants' reserve to the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Old loose ends (A17)")]
         public float ShipyardLabourShare { get; set; } = 0.1f;
+
+        [SettingPropertyBool("Shipyard Wood Above Craft Stock", HintText = "a shipyard building a ship takes timber off the town's market only above the stock the town keeps for its own smiths, bloomeries and workshops - the same rule as other building works (Build Wood Above Craft Stock); works only while Build Wood Above Craft Stock is on; planks as before. Off = the shipyard takes timber down to the last log, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool ShipyardWoodAboveCraftStock { get; set; } = true;
 
         [SettingPropertyBool("A17 Port Fish Pays Folk", HintText = "outside the start calibration, the coin a Banner Kings harbour town pays for its daily catch goes to the townsfolk as the fishermen's wages instead of vanishing (works together with the fish setting above); off = the coin vanishes, as in Banner Kings", RequireRestart = false)]
         [SettingPropertyGroup("Old loose ends (A17)")]
@@ -7916,6 +7980,10 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsVillagePaidFirst { get; set; } = true;
 
+        [SettingPropertyBool("Ks Village Basket At Shelf", HintText = "with Ks Village Paid First: a village buys the part of its basket the plan pays for at today's stall prices only with the money it really earns - the plan's basket money or the same reckoning made on its takings of the last four weeks (its share of the takings less the fixed dues, a twentieth kept back), whichever is less. Grain and salt are always bought in full, from savings if need be; the rest of that part is bought along the usual ladder (drink, then the cheapest meat, fish or cheese, then the rest) until that money is spent - so the last things on the ladder (yarn, cloth, leather, tools, pots) are the first to wait - and what the village could not afford stays unbought with the money in its purse. Off = the village buys the pieces the plan counted on at whatever the stall asks, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageBasketAtShelf { get; set; } = true;
+
         [SettingPropertyBool("Ks Own Food First", HintText = "with the calibration applied: a village that could not buy the food the plan counted on eats from its own store waiting for the cart (grain first, at most half of each good a day) instead of sending it to market; off = it sells everything and goes without", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsOwnFoodFirst { get; set; } = true;
@@ -8432,6 +8500,14 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool KsFarmCatchUpOneOff { get; set; } = true;
 
+        [SettingPropertyBool("Ks Farm Surplus Cap Net", HintText = "with Ks Farm Follows Surplus: a town's farm is raised for its merchants' surplus only up to what the merchants have really taken in over the last weeks (a year of their recent daily takings), by at most Ks Farm Surplus Review Max of the farm or of those takings, whichever is larger, at a time; the surplus is judged on the purse left after the coin it already owes, and nothing is measured or raised while the farms are still coming in after they were set. A town whose purse has fallen to one and a half times its working coin, or that owes part of its farm, has a farm above its merchants' takings lowered at the same pace (at most Ks Farm Surplus Review Max at a time, never below those takings). A town that pays no farm at all and keeps gathering coin gets a farm from its takings at that same pace, or pays the catch-up if it has no takings. The quarterly farm review of such a town never aims above its merchants' takings either. Off = raises up to Ks Farm Surplus Review Max of the farm whatever the takings, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool KsFarmSurplusCapNet { get; set; } = true;
+
+        [SettingPropertyBool("Ds Farm Fix Share Cap", HintText = "with Ds Towns: when the farms of towns and castles are set after the measuring weeks, all farms paid from the purse together are set no higher than what the merchants took in over those weeks - if the old dues took more, every farm is lowered by the same share (each place keeps its rank, also a place whose merchants took in nothing in those weeks), and a place still above its own takings is brought down later by the farm reviews. Off = the farm is what the old dues took, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmFixShareCap { get; set; } = true;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -8932,6 +9008,26 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerArmourerPerStall { get; set; } = 6;
 
+        [SettingPropertyBool("Sutler Row Clothing", HintText = "in the sutlers' row you can clothe your own men: leather, felt and linen from the market of the town the sutlers trade with, at its prices plus the sutlers' cut, for the whole pieces your men have worn out - paid from your purse, the men's purse is spared and they need not buy them in the next town. Up to Sutler Row Stock Per Stall pieces of each a day per stall. Needs Army Clothing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool SutlerRowClothing { get; set; } = true;
+
+        [SettingPropertyBool("Sutler Laundry", HintText = "in the sutlers' row you can hire the washerwomen: for Sutler Laundry Days days your party wears out its clothes, shoes and linen more slowly (by Sutler Laundry Cut Percent) - washing and darning make them last. They cost a washerwoman's day wage (two thirds of Workshop Wage Per Day) per washerwoman per day, one per Sutler Laundry Men Per Washer men; the money goes to the town and the village like every service of the row. Needs Army Clothing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool SutlerLaundry { get; set; } = true;
+
+        [SettingPropertyInteger("Sutler Laundry Cut Percent", 0, 75, "0", HintText = "how much less clothing your party wears out while the washerwomen work (0 to 75%)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerLaundryCutPercent { get; set; } = 25;
+
+        [SettingPropertyInteger("Sutler Laundry Days", 1, 28, "0", HintText = "how many days the hired washerwomen work for your party (1 to 28)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerLaundryDays { get; set; } = 7;
+
+        [SettingPropertyInteger("Sutler Laundry Men Per Washer", 5, 100, "0", HintText = "men of your party one washerwoman keeps in clean, darned clothes (5 to 100)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public int SutlerLaundryMenPerWasher { get; set; } = 20;
+
         [SettingPropertyBool("Notice Board", HintText = "'Read the notice board' in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board, and no bounties from the watch or the headmen either", RequireRestart = false)]
         [SettingPropertyGroup("Notice board")]
         public bool NoticeBoard { get; set; } = true;
@@ -8983,6 +9079,78 @@ namespace Armoury
         [SettingPropertyBool("Prologue Kings", HintText = "in a new Prologue 298 campaign King Robert Baratheon and Lord Eddard Stark are alive: Robert rules the crown's realm and House Baratheon of King's Landing, Ned rules the North and House Stark. On day 186 the King dies of wounds from a boar hunt, Joffrey takes the throne and Ned is thrown into the dungeons of King's Landing; his execution opens the story of Realm of Thrones. Off = both stay dead as in Realm of Thrones. Only new campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueKings { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Scenes", HintText = "in a Prologue 298 campaign the events of the half year before the War of the Five Kings are told in story windows like those of Realm of Thrones (23 scenes from A Game of Thrones, from the death of Jon Arryn to the arrest of Lord Eddard), each on its day while you are on the map; a scene missed in battle or captivity comes afterwards. Your own pictures: Modules/Armoury/Images/Prolog/prolog_01.png to prolog_23.png. Off = no story windows (the world changes the same)", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueScenes { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Royal Progress", HintText = "in a Prologue 298 campaign King Robert rides the Kingsroad to Winterfell with his household (days 0 to about 33) and back to King's Landing with Lord Eddard (days 55 to about 93): Jaime and Tyrion Lannister and later Ned ride beside him with their own men, the queen, the Hound and other grown members of the king's house ride in his party; the bands and lords of the realm leave the column alone (you may still attack it). On day 55 Tyrion rides north to the Wall and comes back south to the crossroads inn. At the end of each road the parties go back to their own business. Off = everyone keeps to his own business", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueRoyalProgress { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Hand Tourney", HintText = "in a Prologue 298 campaign King Robert holds the Tourney of the Hand at King's Landing (Grand Tourney): proclaimed on day 121, the lists open on day 125 and the tourney is decided by day 127; Ser Gregor Clegane, Ser Loras Tyrell, Sandor Clegane and Ser Jaime Lannister ride to the city and take their places in the lists first, and you may ride too. Off = no royal tourney", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueHandTourney { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Tyrion Held", HintText = "in a Prologue 298 campaign Tyrion Lannister, seized by Lady Catelyn on day 110, stays in the dungeon of the Eyrie until his trial by combat on day 132: no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of the Eyrie can end it sooner). The guard holds only in the dungeon of the Eyrie, and never while the Eyrie is yours. Needs Canon Companions Follow Story. Off = he may escape or be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueTyrionHeld { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Jaime At Riverrun", HintText = "in a Prologue 298 campaign Jaime Lannister, taken by Robb Stark's host when the war begins, is held at Riverrun until Lady Catelyn frees him (the canon table, after the Battle of the Blackwater; if that never comes, at most 150 days past the time the Blackwater is due in the story): no escape, ransom, release at peace or release by his captors (only what you do yourself, his death or the fall of Riverrun can end it sooner). The guard holds only in the dungeon of Riverrun, and never while Riverrun is yours. Needs Canon Companions Follow Story. Off = he is still taken to Riverrun, but may escape or be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueJaimeAtRiverrun { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Hill Clans", HintText = "in a Prologue 298 campaign from day 118 the clans of the Mountains of the Moon (Painted Dogs, Burned Men, Milk Snakes, Black Ears) come down on the roads of the Vale: up to four bands of hill tribesmen around the Eyrie and the Bloody Gate, raised from the outlaws and the poor of the Vale (no one out of nothing), who prey on travellers like any band; after the prologue they stay as ordinary bands. Off = no clan bands", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueHillClans { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Mountain Raiders", HintText = "in a Prologue 298 campaign from day 155 two bands of the Mountain's Men flying no banners, raised around Harrenhal (no one out of nothing), burn the villages of the Riverlands one after another (the game's raids - the losses go into the books like any raid), without a war between the realms; the lords and bands of the realm the Cleganes serve leave them alone (the river lords, Lord Beric and you may fight them); at the end of the prologue they go back to the woods and villages they came from. Off = no raiders", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueMountainRaiders { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Beric Hunt", HintText = "in a Prologue 298 campaign, once the Mountain's Men burn their first village (not before day 160, and on day 168 at the latest even if no village has burned), Lord Beric Dondarrion (or, without him, the head of House Dondarrion) rides with his men after the Mountain's Men until they are broken or the prologue ends; the lords and bands of the realm leave him alone on the way. Off = no hunt", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueBericHunt { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Essos Wars Calendar", HintText = "in a Prologue 298 campaign the storyline wars of Realm of Thrones fought between two realms of Essos (Braavos and Lorath, Tyrosh and Lys, Pentos and Myr, Norvos and Qohor, Volantis and Aegon, Sarnor and Ibben) count their days from the start of the campaign, so Essos is already at war during the prologue. Daenerys' wars and every war of Westeros still wait for the story. Off = every storyline war waits for the story", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueEssosWarsCalendar { get; set; } = true;
+
+        [SettingPropertyBool("Canon Reach Joins Crown", HintText = "after Renly's death the Reach of House Tyrell makes peace with Dorne and allies with the crown, as in the books; a non-aggression pact keeps the peace between the Reach and Dorne (Diplomacy). Held until Daenerys invades Westeros; never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = the Reach keeps its own wars and alliances", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonReachJoinsCrown { get; set; } = true;
+
+        [SettingPropertyBool("Canon Dorne Joins Crown", HintText = "after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = no pact", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonDorneJoinsCrown { get; set; } = true;
+
+        [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool DaenerysDragonsGrow { get; set; } = true;
+
+        [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyGroup("Story windows")]
+        public bool StoryImagesForRotWindows { get; set; } = true;
+
+        [SettingPropertyBool("Narrator Enabled", HintText = "a narrator with the voice of David reads aloud the Realm of Thrones story windows and the gossip you hear in inns and taverns; the voice stops when you close the window. Off = no narrator at all, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool LektorEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Narrator Event Windows", HintText = "the narrator reads the Realm of Thrones story windows (the execution of Ned Stark, the Red Wedding and the rest) from recordings that come with the mod - no internet needed. A window without a recording stays silent. Off = silent story windows", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool LektorEventWindows { get; set; } = true;
+
+        [SettingPropertyBool("Narrator Gossip Live", HintText = "gossip the narrator has never read is recorded on the spot through ElevenLabs (needs the internet and your key in the file .elevenlabs/key.txt in your user folder) and kept on your disk - next time they play from the disk at once. Words ElevenLabs has charged for are never sent again, even if the recording is later lost; only a try that brought no recording (a server error, no answer in 20 seconds) is repeated, once at most. Off = only gossip already on your disk is read", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool LektorGossipLive { get; set; } = true;
+
+        [SettingPropertyInteger("Narrator Gossip Daily Chars", 0, 10000, "0", HintText = "most letters of new gossip sent to ElevenLabs in one day (by your computer's calendar); past it the narrator reads only gossip already on your disk until the next day, and tells you so once", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public int LektorGossipDailyChars { get; set; } = 1000;
+
+        [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public int LektorGossipReserveChars { get; set; } = 3000;
 
         public void ApplyTo(Settings s)
         {
@@ -9918,6 +10086,7 @@ namespace Armoury
             s.BandFoodKeepDays = BandFoodKeepDays;
             s.BandPurseKeepDays = BandPurseKeepDays;
             s.BandHungerLeaveShare = BandHungerLeaveShare;
+            s.BandFoodAtSea = BandFoodAtSea;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;
@@ -10183,6 +10352,7 @@ namespace Armoury
             s.NightRestEnabled = NightRestEnabled;
             s.NightRestEveryModel = NightRestEveryModel;
             s.CampBackground = CampBackground;
+            s.MapClockSeasonSecondLine = MapClockSeasonSecondLine;
             s.MapClockEnabled = MapClockEnabled;
             s.ReadableDateEnabled = ReadableDateEnabled;
             s.FastForwardMultiplier = FastForwardMultiplier;
@@ -10212,6 +10382,7 @@ namespace Armoury
             s.NightLedgerClock = NightLedgerClock;
             s.PlayerSleepGuard = PlayerSleepGuard;
             s.NightMarchNotice = NightMarchNotice;
+            s.RaidCountsAsWork = RaidCountsAsWork;
             s.ForcedMarch = ForcedMarch;
             s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;
@@ -10337,6 +10508,7 @@ namespace Armoury
             s.QuestRewardInWageDays = QuestRewardInWageDays;
             s.QuestPlayerPaysSomeone = QuestPlayerPaysSomeone;
             s.QuestGoodsReal = QuestGoodsReal;
+            s.QuestGangAxesFix = QuestGangAxesFix;
             s.PlayerTourneyPrizeFromTown = PlayerTourneyPrizeFromTown;
             s.PlayerBetsCounterparty = PlayerBetsCounterparty;
             s.PlayerFeesHistorical = PlayerFeesHistorical;
@@ -10419,8 +10591,12 @@ namespace Armoury
             s.SameRaceOnly = SameRaceOnly;
             s.PregnancyDays = PregnancyDays;
             s.FertilityYearScale = FertilityYearScale;
+            s.MapChatLogClearOfMenu = MapChatLogClearOfMenu;
+            s.MapChatLogFrame = MapChatLogFrame;
+            s.MapHideTradeNotices = MapHideTradeNotices;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
+            s.MapHoverRingOurObjects = MapHoverRingOurObjects;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
             s.MillOnBank = MillOnBank;
             s.MapGallows = MapGallows;
@@ -10695,6 +10871,7 @@ namespace Armoury
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;
             s.BloomeryWoodDemand = BloomeryWoodDemand;
+            s.BloomeryShelfLeavesForges = BloomeryShelfLeavesForges;
             s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
             s.MineRegale = MineRegale;
             s.MineRegaleShare = MineRegaleShare;
@@ -10756,6 +10933,12 @@ namespace Armoury
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
+            s.OptimDailyCache = OptimDailyCache;
+            s.OptimVerify = OptimVerify;
+            s.OptimKtSkipModel = OptimKtSkipModel;
+            s.OptimSutlerNearest = OptimSutlerNearest;
+            s.OptimBuildWar = OptimBuildWar;
+            s.OptimStableDelegates = OptimStableDelegates;
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.PerfSutlerWageExact = PerfSutlerWageExact;
             s.PerfProbeEachPlace = PerfProbeEachPlace;
@@ -10772,6 +10955,7 @@ namespace Armoury
             s.A17ShipyardBuildsFromTimber = A17ShipyardBuildsFromTimber;
             s.ShipyardTimberPer1000 = ShipyardTimberPer1000;
             s.ShipyardLabourShare = ShipyardLabourShare;
+            s.ShipyardWoodAboveCraftStock = ShipyardWoodAboveCraftStock;
             s.A17PortFishPaysFolk = A17PortFishPaysFolk;
             s.A17AuthorLines = A17AuthorLines;
             s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;
@@ -10962,6 +11146,7 @@ namespace Armoury
             s.KsLandGradient = KsLandGradient;
             s.KsAlphaNet = KsAlphaNet;
             s.KsVillagePaidFirst = KsVillagePaidFirst;
+            s.KsVillageBasketAtShelf = KsVillageBasketAtShelf;
             s.KsOwnFoodFirst = KsOwnFoodFirst;
             s.KsPerishReach = KsPerishReach;
             s.KsRealOfftake = KsRealOfftake;
@@ -11091,6 +11276,8 @@ namespace Armoury
             s.KsFarmCatchUpShare = KsFarmCatchUpShare;
             s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
             s.KsFarmCatchUpOneOff = KsFarmCatchUpOneOff;
+            s.KsFarmSurplusCapNet = KsFarmSurplusCapNet;
+            s.DsFarmFixShareCap = DsFarmFixShareCap;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;
@@ -11216,6 +11403,11 @@ namespace Armoury
             s.SutlerRevelMorale = SutlerRevelMorale;
             s.SutlerRevelMoraleCap = SutlerRevelMoraleCap;
             s.SutlerArmourerPerStall = SutlerArmourerPerStall;
+            s.SutlerRowClothing = SutlerRowClothing;
+            s.SutlerLaundry = SutlerLaundry;
+            s.SutlerLaundryCutPercent = SutlerLaundryCutPercent;
+            s.SutlerLaundryDays = SutlerLaundryDays;
+            s.SutlerLaundryMenPerWasher = SutlerLaundryMenPerWasher;
             s.NoticeBoard = NoticeBoard;
             s.NoticeBoardVillages = NoticeBoardVillages;
             s.NoticeBoardOpening = NoticeBoardOpening;
@@ -11229,6 +11421,24 @@ namespace Armoury
             s.ProloguePeace = ProloguePeace;
             s.ProloguePacts = ProloguePacts;
             s.PrologueKings = PrologueKings;
+            s.PrologueScenes = PrologueScenes;
+            s.PrologueRoyalProgress = PrologueRoyalProgress;
+            s.PrologueHandTourney = PrologueHandTourney;
+            s.PrologueTyrionHeld = PrologueTyrionHeld;
+            s.PrologueJaimeAtRiverrun = PrologueJaimeAtRiverrun;
+            s.PrologueHillClans = PrologueHillClans;
+            s.PrologueMountainRaiders = PrologueMountainRaiders;
+            s.PrologueBericHunt = PrologueBericHunt;
+            s.PrologueEssosWarsCalendar = PrologueEssosWarsCalendar;
+            s.CanonReachJoinsCrown = CanonReachJoinsCrown;
+            s.CanonDorneJoinsCrown = CanonDorneJoinsCrown;
+            s.DaenerysDragonsGrow = DaenerysDragonsGrow;
+            s.StoryImagesForRotWindows = StoryImagesForRotWindows;
+            s.LektorEnabled = LektorEnabled;
+            s.LektorEventWindows = LektorEventWindows;
+            s.LektorGossipLive = LektorGossipLive;
+            s.LektorGossipDailyChars = LektorGossipDailyChars;
+            s.LektorGossipReserveChars = LektorGossipReserveChars;
         }
 
         internal static void Apply()
