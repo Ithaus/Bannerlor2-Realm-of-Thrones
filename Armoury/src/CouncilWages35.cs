@@ -404,6 +404,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ BK AddIncomes: odbiorca-glowa rodu
         /// <summary>3.5b: "Councillor role" glowy rodu zaplacone juz wprost u platnika - w prawdziwym rozliczeniu zdjete ta sama kwota i nazwa.</summary>
+        // m105-optym KtKnownPatches (KingdomTreasury.Optim105.cs): przy applyWithdrawals = false tylko odczyt, bez MBRandom; zmiana tresci = przeglad KtSkip
         public static void IncomesPostfix(Clan __0, ref ExplainedNumber __1, bool __2)
         {
             if (!__2 || __0 == null) return;

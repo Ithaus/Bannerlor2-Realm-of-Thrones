@@ -12,9 +12,10 @@ namespace Armoury
     /// m105-optym (OptimStableDelegates, domyslnie TAK; NIE = kod jak dotad 1:1): ClanIncomeBook.StableBegin (poczatek D stalego) wolal BK przez odbicie
     /// (MethodInfo.Invoke z new object[] i pakowaniem bool) ok. 570 razy dla rodow (GetActualVillages) i 2-3 razy na kazda wies (IsSettlementPopulated,
     /// podatek wsi BK, tytul wsi). Teraz te same metody przez delegaty zbudowane raz na proces (to samo wywolanie: ten sam obiekt, te same argumenty,
-    /// wywolanie wirtualne jak Invoke). Delegatu nie da sie zbudowac (inny podpis BK) - odbicie jak dotad. Optim Verify: odczyty czyste (wsie z tytulu, dane
-    /// osady, tytul) liczone obiema drogami - gra bierze stara, roznice do linii "Optym (m105)"; podatku wsi BK nie liczymy drugi raz (postfiks TownFolk
-    /// VillageTaxPostfix dopisuje liczniki okna) - w trybie kontrolnym idzie stara droga bez porownania.
+    /// wywolanie wirtualne jak Invoke). Delegatu nie da sie zbudowac (inny podpis BK) - odbicie jak dotad. Optim Verify: wszystkie cztery liczone obiema
+    /// drogami - gra bierze stara (liczona druga, wiec ostatni zapis BK jak dotad), roznice do linii "Optym (m105)". Podatek wsi BK dwa razy jest bezpieczny:
+    /// TownFolk.VillageTaxPostfix wisi na przeciazeniu (Village, int), nie na (Village, bool, bool); skutki uboczne BK (GetCouncil raz, DueWage = wynik x stala
+    /// pozycji, polityka domyslna raz) sa powtarzalne, bez MBRandom; osada bez danych BK tu nie trafia (IsSettlementPopulated przed podatkiem).
     /// </summary>
     internal static partial class ClanIncomeBook
     {
@@ -89,12 +90,16 @@ namespace Armoury
             return o;
         }
 
-        /// <summary>Podatek wsi BK - jak (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false }); Verify - stara droga bez porownania (liczniki TownFolk).</summary>
+        /// <summary>Podatek wsi BK - jak (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false }); Verify - obie drogi, gra bierze stara (liczona druga).</summary>
         private static ExplainedNumber CdVTax(object tax, Village v)
         {
-            if (!_cdOn || _cdVTax == null || _cdVerify) return (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false });
+            if (!_cdOn || _cdVTax == null) return (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false });
             _cdFast++;
-            return _cdVTax(tax, v, false, false);
+            var f = _cdVTax(tax, v, false, false);
+            if (!_cdVerify) return f;
+            var o = (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false });   // ostatni zapis DueWage - stara droga
+            CdNote(f.ResultNumber == o.ResultNumber, "podatek wsi " + (v != null ? v.StringId : "?"));
+            return o;
         }
 
         /// <summary>BK TitleManager.GetTitle(st) - jak _mGetTitle.Invoke(titleMgr, new object[] { st }).</summary>
@@ -139,7 +144,7 @@ namespace Armoury
                 if (s == null || !s.LogEnabled || !s.OptimStableDelegates) return;
                 Log.Info("Optym (m105): dzien " + (int)CampaignTime.Now.ToDays + " | ClanIncomeBook.StableBegin wywolania BK przez delegaty: " + _cdFast
                          + " (delegaty: wsie z tytulu " + (_cdActual != null ? "tak" : "BRAK") + ", dane osady " + (_cdPop != null ? "tak" : "BRAK")
-                         + ", podatek wsi " + (_cdVTax != null ? (_cdVerify ? "stara droga (kontrola)" : "tak") : "BRAK") + ", tytul " + (_cdTitle != null ? "tak" : "BRAK") + ")"
+                         + ", podatek wsi " + (_cdVTax != null ? "tak" : "BRAK") + ", tytul " + (_cdTitle != null ? "tak" : "BRAK") + ")"
                          + (_cdVerify ? " | kontrola (Optim Verify) delegaty BK: porownan " + _cdCmp + ", roznic " + _cdDiff + " (sesja: porownan " + _cdCmpSess + ", roznic " + _cdDiffSess + ")"
                                         + (_cdDiffNote != null ? "; pierwsza: " + _cdDiffNote : "") : "") + ".");
             }

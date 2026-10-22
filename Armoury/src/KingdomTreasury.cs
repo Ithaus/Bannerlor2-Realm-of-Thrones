@@ -86,12 +86,14 @@ namespace Armoury
                         double ktLand; bool ktSkip = KtSkip(c, out ktLand);
                         if (ktSkip && _ktSkipVerify) KtProbeBefore(c);
                         if (!ktSkip || _ktSkipVerify)
+                        {
                         try
                         {
                             income = model.CalculateClanIncome(c, false, false, false).ResultNumber;
                             ClanIncomeBook.NoteModelIncome(c, income);   // paczka 169b: tylko do porownania z (a) w D (inna chwila - D jej nie bierze); tylko zapis, wlasny try
                         }
                         catch (Exception e) { income = 0f; modelErr++; DuesError("model", c, e); }   // jak dotad: podstawa bez dochodu modelu (same renty) - teraz liczone
+                        }   // m105-optym: klamry - if steruje calym try/catch
                         int rent; PopulationLaw.RentToday.TryGetValue(c, out rent);
                         income += rent;
                         if (land)
