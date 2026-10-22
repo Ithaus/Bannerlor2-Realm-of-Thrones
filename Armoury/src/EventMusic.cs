@@ -135,7 +135,7 @@ namespace Armoury
             {
                 _active = false;
                 StopTrack("koniec wydarzenia");
-                if (_paused) { PsaiPause(false); _paused = false; }
+                _paused = false;
                 Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
             }
             if (!_active && _ducked) FadeUp(dt);
@@ -193,12 +193,13 @@ namespace Armoury
                 _cur = Math.Max(0f, _cur - dt * Math.Max(_saved, 0.1f) / FadeOutSec);
                 _mSetVol.Invoke(ps, new object[] { _cur });
             }
-            else if (!_paused)
+            else
             {
-                PsaiPause(true);
-                _paused = true;
+                if (_cur <= 0f) _mSetVol.Invoke(ps, new object[] { 0f });   // trzymamy 0 (gra moglaby podniesc)
+                if (_paused) return;
+                _paused = true;   // Jeff 22.10: "w bitwie muzyka chwile chodzi i nagle cichnie - wczesniej tak nie bylo" - SetPaused psai rozstraja zegar odcinkow na reszte sesji; tylko glosnosc 0
                 float got = (float)_mGetVol.Invoke(ps, null);
-                if (!_volLogged) { _volLogged = true; Log.Info(P + "muzyka gry wyciszona i wstrzymana (psai glosnosc teraz " + got.ToString("0.00", Inv) + ", zapamietana " + _saved.ToString("0.00", Inv) + ")."); }
+                if (!_volLogged) { _volLogged = true; Log.Info(P + "muzyka gry wyciszona (bez pauzy psai; psai glosnosc teraz " + got.ToString("0.00", Inv) + ", zapamietana " + _saved.ToString("0.00", Inv) + ")."); }
             }
         }
 
@@ -228,7 +229,6 @@ namespace Armoury
                     object ps = Psai();
                     if (ps != null)
                     {
-                        if (_paused) _mPause.Invoke(ps, new object[] { false });
                         _mSetVol.Invoke(ps, new object[] { _saved });
                     }
                     Log.Info(P + "muzyka gry przywrocona od razu (" + why + ").");
