@@ -5756,9 +5756,9 @@ namespace Armoury
         [SettingPropertyGroup("Blood and race")]
         public bool FertilityYearScale { get; set; } = true;
 
-        [SettingPropertyBool("Map Chat Log Clear Of Menu", HintText = "Chat Log Clear Of Menus: while a settlement or encounter menu is open on the campaign map, the message log (ravens, captures, news) moves to the right of the menu, below the middle of the screen, so it no longer covers the menu; it moves back when the menu closes. On the open map with no window up it sits a little in from the left edge, clear of the army readiness button in the corner. Off = the log stays in the corner and over the menu, as before", RequireRestart = false)]
+        [SettingPropertyBool("Map Chat Log Clear Of Menu", HintText = "OFF by default (Jeff 22.10: keep the log where the game puts it, just framed). Chat Log Clear Of Menus: while a settlement or encounter menu is open on the campaign map, the message log (ravens, captures, news) moves to the right of the menu, below the middle of the screen, so it no longer covers the menu; it moves back when the menu closes. On the open map with no window up it sits a little in from the left edge, clear of the army readiness button in the corner. Off = the log stays in the corner and over the menu, as before", RequireRestart = false)]
         [SettingPropertyGroup("Map news")]
-        public bool MapChatLogClearOfMenu { get; set; } = true;
+        public bool MapChatLogClearOfMenu { get; set; } = false;
 
         [SettingPropertyBool("Map Chat Log Frame", HintText = "Chat Log Frame On The Map: messages in the log on the campaign map get a dark panel with the thin silver bars of the Realm of Thrones tooltips, sized to the lines on show; it goes away with the last line. Battles, other screens and windows over the map keep the game's look, and so does a settlement menu when the log is not moved clear of it. Off = bare text, as before", RequireRestart = false)]
         [SettingPropertyGroup("Map news")]

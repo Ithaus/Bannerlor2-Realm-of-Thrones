@@ -221,7 +221,7 @@ namespace Armoury
             }
             // noc 21/22.10 (zrzut 103c): okno wydarzenia ROT albo Kroniki na stosie stanow - dziennik schowany pod tym samym kluczem co przesuniecie (w rogu
             // nachodzil na tekst okna); po zamknieciu okna wraca. Dziennik nie ma powiazania IsVisible w prefabie - zmieniamy tylko my.
-            bool story = _kClear && StoryPictures.EventWindowOnStack();
+            bool story = (_kClear || _kFrame) && StoryPictures.EventWindowOnStack();
             if (story != _hiddenStory)
             {
                 try
@@ -235,8 +235,9 @@ namespace Armoury
             bool clean = onMap && NoWindows(ms);
             int want = _kClear && clean ? (ms.IsInMenu ? PosMenu : PosMap) : PosGame;
             if (want != _pos) Move(want);
-            // ramka: mapa bez okien; w menu tylko przesuniety obok menu (klucz przesuniecia NIE - menu zostaje bez ciemnego panelu, jak w grze)
-            Frame(clean && (!ms.IsInMenu || _pos == PosMenu));
+            // ramka: mapa i menu osady bez okien, w miejscu, gdzie dziennik stoi (Jeff 22.10: "ramka z wiadomosciami moze byc w tym samym miejscu co wczesniej,
+            // tylko w ramce" - domyslnie dziennik zostaje w miejscu gry, MapChatLogClearOfMenu NIE; przesuniecie obok menu tylko z kluczem)
+            Frame(clean);
             if (onMap && _testOn) TestStep(ms);
         }
 
