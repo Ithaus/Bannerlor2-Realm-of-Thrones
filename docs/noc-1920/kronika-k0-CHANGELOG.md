@@ -5,6 +5,67 @@ Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E
 Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
 wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
 
+## 2026-10-22 - K0 POPRAWKI po trzech recenzjach (bezpieczenstwo, kontrakt, styk-api)
+
+**Problem:** recenzje silnika K0 (HEAD 0ffd5d9f) i ich weryfikacja w dekompilacji 1.4.8 - stan zly: ukrycie postaci w drodze (opozniony teleport gry
+przywracal ukrytego / robil dowodce w stanie Disabled), zbiorka `muster` do osady wroga (druzyna AI wchodzila do wrogiego miasta - 022.1 Ashemark, 023.1
+Deepwood Motte, 085.1 Winterfell Boltonow), powrot z ukrycia do osady wroga (SeatOf krok 4 / PickTown), klucz ChronicleOfWesteros NIE trzymal ukrytych na
+zawsze (HiddenDaily pomijal kazdy koniec, takze `rotday:`), `kr:` okna powracajacego nigdy nie bylo "nigdy" (Melisandre 092.1 do `kr:112.1` ukryta na zawsze),
+pusty `gracz` wariantu = kazdy gracz (105.1a, 073.1a/b), wariant bez tekstu bez zmiennych glownego (045.1a/b/c "villages around  more than once"), smierc glowy
+rodu bez innego dziedzica niszczyla rod razem z ukrytymi (gra pomija wylaczonych w GetHeirApparents). Drobne: zapis (wyjatek Export -> pusty stan, SaveText.Sync
+poza try, przyciecie rejestru gubilo pierwszy dzien instancji i nie przycinalo wyborow, powod POMINIETE w zapisie ponad 100 B), lista wyboru znikajaca bez konca,
+`p:vassal` u najemnika, `!term` z brakujacym tokenem = nigdy, zapis sprzed paczki pomijal okna z `do` przed soba, succeed przy wecie smierci (CanHeroDie),
+`leader` rodu bez glowy (NRE), zaraza w trakcie bitwy, `plan:BlackwaterEvent` poza osia Fabuli; narzedzia: KW-0/KW-1 bez nieznanych termow, KW-6 szukal
+napisu, ktorego silnik nie pisze, KW-15 bez die/succeed, KW-12 24 KB za nisko dla dlugiej kampanii; k00 bez okien hide/unhide (plan I K0a).
+**Przyczyna:** kod K0 krokow A2-B2 (opis w uwagach recenzji; kazda uwaga zweryfikowana - raporty "WERYFIKACJA" w poleceniu lancucha).
+**Zmiana:**
+- `CanonCompanions.cs`: Hide - `IsTraveling` = CZEKA ("w drodze (opozniony teleport gry)"); Hostile(Settlement, Hero) - Unhide: osada z akcji i siedziba rodu
+  bez osad wroga, PickTown(culture, hero, noEnemy) z filtrem tylko dla powrotu (wander bez zmian); BeforeHeroKilled (nowy sluchacz BeforeHeroKilledEvent
+  w CanonCompanionsBehavior): umiera glowa rodu, GetHeirApparents puste - pierwszy ukryty dorosly lord rodu wraca (Unhide) i gra robi go dziedzicem; linia
+  `Postacie kanonu (m101): KONIEC UKRYCIA (dziedzic) ...`.
+- `Chronicle.Canon.cs`: muster - osada w wojnie z krolestwem: SetMoveGoToPoint(GatePosition) bez wejscia (linia "zbiorka pod brama"); succeed - `CanDie(Murdered)`
+  przed zmiana glowy rodu (weto - POMINIETA bez sukcesji); leader - rod bez glowy POMINIETA; die/succeed z listy chronionych po wydarzeniu - `| lista
+  chronionych: X spelnione` w linii akcji.
+- `Chronicle.Actions.cs`: HiddenDaily(int) - koniec ukrycia liczony takze przy kluczu NIE (kr: = nigdy, FORMAT 3.3/11). `Chronicle.Codes.cs`: zaraza pomija
+  partie w bitwie (InBattle).
+- `Chronicle.cs`: CheckPacks - okno z `do` minione po `do`, bez `do` po `od` + 30; SyncData cale w try (potkniecie "SyncData"); wyjatek Export - LastGood()
+  (ostatni zapis albo wczytany napis, linia "zapis arm_kronika: blad Build - ..."); SaveWarnBytes 48 KB.
+- `Chronicle.State.cs`: Skip - powod w zapisie najwyzej 24 znaki (instancja) / 60 (okno); PruneInstances usuwa tez wybor (kc); zapis "ki NNN.w dzien" (pierwszy
+  dzien instancji okna) i wczytanie (minimum z kr i ki; stare zapisy bez ki jak dotad).
+- `Chronicle.Recurring.cs`: Exhausted(okno) - max:N zuzyty, zadna instancja w kolejce, nic rozstrzygniete; `Chronicle.Terms.cs`: KrTrue - wyczerpane = nigdy;
+  `p:vassal` bez najemnika (IsUnderMercenaryService); brak tokenu: `!term` = prawda.
+- `Chronicle.Data.cs`: CheckRows - wariant z pustym gracz bierze gracz glownego; wariant bez tekstu bierze zmienne glownego (wlasna NAZWA ma pierwszenstwo);
+  ScanTerms nie liczy dziedziczonego gracz drugi raz. `Chronicle.Choice.cs`: Pend.Lost - po 5 zniknieciach listy opcja bierna ("lista znikala 5 razy").
+- Dane: 092.1 `hide:lord_1_12:kr:112.1 | ev:NightKingDeathEvent | rotday:2600` (zapas, gdy 112.1 besieged:town_B2 nie ruszy); 032.1 `plan:BlackwaterSiegeEvent-25`
+  (BlackwaterEvent nie ma na osi Fabuli - term byl zawsze prawdziwy); k00: 000.3 (log/nic, `po kr:000.2+2`: `hide:ROTwanderer29:kr:000.4 ; hide:ROTwanderer30`
+  - Dick Crabb grupa C, Ser Harlan Blackhare grupa D, oba bez #move) i 000.4 (`po kr:000.3+3`: `unhide:ROTwanderer30`). Tekstow okien nie ruszalem (md5 lektora bez zmian).
+- `tools/kronika/kronika_check.py`: koniec ukrycia = pelny warunek (parse_cond); UWAGA - koniec tylko na `kr:` okna powracajacego; BLAD - `kr:<powracajace>=x`;
+  UWAGA - `plan:X` spoza osi (os z CrashScribe/src/Fabula.cs, zapas - lista); pusty gracz wariantu jak glowny przy UWADZE "inni bez kolumny gracz".
+- `tools/sprawdz_logi.py` (m105kronika): KW-0 + nieznane termy w danych 0; KW-1 + linie NIEZNANY TERM i "nieznane termy dzis"; KW-6 - linie zlota
+  z ", zdjete X - dopisane Y"; KW-12 < 48 KB; KW-15 + die/succeed z linii akcji; akcja w linii moze miec spacje; ukrycie z ' | ' w koncu; linia ukrytego dziedzica.
+- `docs/KRONIKA-FORMAT.md`: 3.1 (gracz i zmienne wariantu), 3.2 p.4, 3.3 (klucz NIE konczy ukrycia z kr:), 7, 10 (kr:/nic/okna powracajace/=x, plan:, p:vassal,
+  tokeny), 11 (hide - warunek, muster pod brama, alliance/pop stan K0, Melisandre z zapasem, osada wroga), 12 (stan zaraza/dzwony), 13 (odstep od okna, max,
+  1 widoczna na dobe, "ki"), 15 (linia "lista chronionych"), 17 (nowe reguly), notka "Stan po poprawkach K0".
+- Bez zmian (swiadomie): R6 (Vars akcji czekajacej - scenariusz niemozliwy, News nie czeka); kronika_silnik.py (nie czyta kolumny gracz); opcjonalna linia
+  "UKRYCIE przerwane - rod niszczony" w OnClanDestroyed (HiddenDaily loguje to dobe pozniej); progi w repo glownym PLANY-E5-WOJNY-KRONIKA H (KW-12 24 KB) - inny
+  katalog, do poprawy przy scaleniu.
+**Ryzyko / co sprawdzic:**
+- BeforeHeroKilled teleportuje ukrytego W TRAKCIE KillCharacterAction (przed wyborem dziedzica) - nowy wzorzec; w dekompilacji zdarzenie idzie bez zadnej petli po
+  bohaterach, ale autotest musi zabic glowe rodu z jedynym dziedzicem ukrytym (tez sciezka ApplyByDeathMark po bitwie).
+- R-1: pierwsza doba z kluczem NIE wypuszcza naraz wszystkich ukrytych z koncem `kr:` (zgodne z FORMAT 3.3/11) - decyzja Jeffa, gdyby to przeszkadzalo.
+- muster pod brama osady wroga: druzyny stoja pod wrogim zamkiem (AI moze zaczac oblezenie albo odejsc przy nastepnej mysli) - linia konca zbiorki liczy
+  odleglosc do bramy jak dotad.
+- Exhausted liczy max:N z licznika "kl" (rosnie przy WYDANIU instancji) - instancja wydana i potem pominieta po 30 dniach wyczerpuje okno (tak ma byc).
+- Zapis: "ki" to kilka linii po ok. 15 B; powody POMINIETE w zapisie skrocone - SkipWhy nikt nie czyta, pelny powod jest w linii logu.
+- Testy (scratchpad 7aee5f12/kr-fix): harness poprawek 52/52 (prawdziwy DLL odbiciem: R-1, R8, R7, N-1, R-2, R-7, R-3, R-4, R4, R-16, R9, R3, styk R1, dane);
+  stare harnessy na nowym DLL: A1 42/42, A2 33/35 (jak przed zmiana - oczekiwane od B1/B2), A3 44/44, A4 43/43 (wywolanie HiddenDaily/1), B1 67/67, B2 126/126;
+  testy syntetyczne m105kronika test_kw_fix.py 46/46 (stary test_kw_b2 36/38 - kw6 'z niczego' i kw12 25 KB maja nowe oczekiwania); kronika_check WYNIK OK
+  (0 bledow, 0 uwag po poprawce danych; przed poprawka danych 2 nowe UWAGI - 032.1 plan i 092.1 koniec ukrycia); kronika_silnik WYNIK OK; sprawdz_narzedzie czysto;
+  build Armoury 0 bledow, 7 starych ostrzezen.
+- NIEPEWNE do autotestu: wywrotka przy dowodcy Disabled (R1 - przed poprawka), oblezenie z wroga druzyna w srodku (R2 - przed poprawka), R-2 droga (b) (30 dni bez
+  okna przy zatorze kolejki), czestosc pustego @cel u rodow bez lenna (R-7), rozmiar zapisu w dlugim biegu (R8/R-16).
+**Status:** DO SPRAWDZENIA (autotest K0 z k00 000.3/000.4, 022.1 muster, smierc glowy rodu z ukrytym dziedzicem; nic nie wgrane).
+
 ## 2026-10-22 - K0 krok B2: bandy, zadania, akcje kanonu, tylko-pelne, turniej, zbiorka, uchwyty kod:, wyzwalacz brokenmen
 
 **Problem:** po B1 w danych K1-K10 dalej "POMINIETA (akcja jeszcze niewspierana)": band 31 wierszy, die 30 (43 uzycia), succeed 17, prisoner 13 (18), task 12 (13),
@@ -140,7 +201,8 @@ kr_*.ogg nie trafilyby do gry ("nagran Kroniki 0 ... odrzucone 293 (brak pliku)"
 - `Chronicle.Actions.cs`: procedury `hide`/`unhide` przez ApplyAction (term konca sklejany z SplitArgs, kontrola skladni Terms.Syntax; linie "ukryty <postac> (id)
   (NNN.w) do <term> | ..." i "powrot <postac> (id) -> <osada> (NNN.w) | ..."); `HiddenDaily(day, termsOn)` w dobie Kroniki (przed kluczem NIE): postac zmarla /
   przywrocona przez gre - "UKRYCIE przerwane ... wpis usuniety"; ukryty wybrany przez gre na glowe rodu / wladce - powrot "KONIEC UKRYCIA (glowa rodu)"; klucz TAK:
-  term konca prawdziwy albo "nigdy" (FORMAT 11) - powrot do siedziby "KONIEC UKRYCIA (term ...)"; klucz NIE - terminy czekaja (nic nie cofa). Hidden/HiddenText
+  term konca prawdziwy albo "nigdy" (FORMAT 11) - powrot do siedziby "KONIEC UKRYCIA (term ...)"; klucz NIE - terminy czekaja (nic nie cofa)
+  [ZMIENIONE w poprawkach K0 (R-1): koniec ukrycia liczony takze przy kluczu NIE - kr: = nigdy, wiec ukryci z koncem kr: wracaja]. Hidden/HiddenText
   z rejestru CanonCompanions ("n (Kronika a, #move b)") w liniach startu i doby.
 - `Chronicle.cs`: doba wola Actions.HiddenDaily po Terms.Daily; linia "okno ... pokazane" z "| godzina kampanii H" (prog KW-4).
 - `tools/sprawdz_logi.py`: grupa m105kronika (KW-0..KW-15 z planu H + KW-3b, KW-5b, KW-15b INFO), dispatch w main (osobny if/return), opis w pomocy; pary #para

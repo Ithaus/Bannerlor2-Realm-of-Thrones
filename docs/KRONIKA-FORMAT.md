@@ -66,7 +66,7 @@ i zero lub wiecej **wariantow** (`war` = jedna mala litera a-z) zaraz pod nim (m
 | `po` | opcjonalne | puste | warunek "po czym" (skladnia warunkow, zwykle jeden term z `+N`): okno nalezy sie dopiero, gdy jest prawdziwy | `kr:002.1+10`, `ev:RenlyDeathEvent+5`, `mv:m19` |
 | `przed` | opcjonalne | puste | kotwica "przed czym": JEDEN term `ev:X`, `done:X` (X = wydarzenie ROT) albo `kr:NNN.w`. Gdy kotwica juz zaszla, okno zamienia sie w wiesc (jest `_W`) albo przepada z powodem `X juz ruszylo` (P2) | `ev:RiverlandsDeclareWarEvent` |
 | `warunki` | opcjonalne | wymagane (albo `gracz`) | glowny: warunki CALEGO okna (dla kazdego wariantu); wariant: warunki DODATKOWE tego wariantu (razem z glownymi) | `alive:lord_5_1 & war:battania:vlandia` |
-| `gracz` | opcjonalne | opcjonalne | warunki "gracz widzi pelna forme". Gracz spelnia -> `forma`, nie spelnia -> `inni`. Puste = kazdy gracz dostaje `forma` | `p:vassal:battania` |
+| `gracz` | opcjonalne | opcjonalne (puste = jak glowny) | warunki "gracz widzi pelna forme". Gracz spelnia -> `forma`, nie spelnia -> `inni`. Puste w glownym = kazdy gracz dostaje `forma`; puste w wariancie = `gracz` wiersza glownego (poprawka K0 R-3, 22.10: 105.1a, 073.1a/b - tekst pytania zaklada miejsce gracza) | `p:vassal:battania` |
 | `forma` | wymagane | wymagane | `okno` (okno ROT z obrazkiem) \| `wiesc` (linia wiesci, tekst `_W`) \| `log` (tylko linia logu, bez niczego dla gracza) | `okno` |
 | `inni` | wymagane | wymagane | forma dla gracza spoza `gracz`: `okno` \| `wiesc` \| `nic` | `wiesc` |
 | `wersja` | wymagane | wymagane | `lekka` \| `pelna` \| `obie`. Klucz ChronicleFullVersions=NIE (domyslnie): biora udzial `lekka` i `obie`; TAK: `pelna` i `obie`, a `lekka` tylko gdy okno nie ma zadnego wiersza `pelna`. Pelna wersja = wariant z `wersja=pelna` | `lekka` |
@@ -80,7 +80,8 @@ i zero lub wiecej **wariantow** (`war` = jedna mala litera a-z) zaraz pod nim (m
 | `skutki` | opcjonalne | opcjonalne | akcje rozdzielone ` ; ` (rozdz. 11) - wykonywane raz, gdy okno sie rozstrzygnie jako okno/wiesc/log | `flag:k008_arya ; hide:lord_5_1_1` |
 | `powtorz` | opcjonalne | puste | wyzwalacz okna powracajacego (rozdz. 13); puste = okno jednorazowe | `siegehunger:3 ; prolog` |
 
-Wariant bez wlasnego tekstu (puste `tytul`, `gora`, `dol`) uzywa tekstu wiersza glownego. Jesli wariant ma tekst - to wszystkie trzy
+Wariant bez wlasnego tekstu (puste `tytul`, `gora`, `dol`) uzywa tekstu wiersza glownego RAZEM z jego `zmienne` (ta sama NAZWA we wlasnej kolumnie
+wariantu ma pierwszenstwo; poprawka K0 R-4, 22.10 - 045.1a/b/c pokazywaly pusta zmienna). Jesli wariant ma tekst - to wszystkie trzy
 pola z wlasnymi id (`..._1b_T`, `_1b_U`, `_1b_L`).
 
 ### 3.2 Kiedy okno sie nalezy, pokazuje i przepada (silnik K0)
@@ -92,7 +93,8 @@ pola z wlasnymi id (`..._1b_T`, `_1b_U`, `_1b_L`).
 3. **Forma**: gracz spelnia `gracz` (albo `gracz` puste) -> `forma`; nie -> `inni`. `nic` = nic dla gracza, ale skutki i tak sie wykonuja.
 4. **Przepada** (linia `POMINIETE ... z powodem`): term, ktory juz nigdy nie zajdzie (np. `alive:` martwego, `kr:` okna pominietego),
    kotwica `przed` juz zaszla (gdy jest `_W` - zamiast tego wiesc), spoznienie > 30 dni po `do` (tez wiesc, gdy jest `_W`),
-   zapis sprzed paczki (paczka wgrana po swoich dniach - bez lawiny).
+   zapis sprzed paczki (paczka wgrana po swoich dniach - bez lawiny): okno z `do` - gdy dzien opowiesci minal `do`; okno bez `do` - gdy minal
+   `od` o ponad 30 dni (poprawka K0 R-5, 22.10: wczesniej `od` + 30 pomijalo tez okna z `do` jeszcze przed soba).
 5. Tempo: najwyzej 2 okna Kroniki na dobe, 6 h odstepu od poprzedniego okna Kroniki albo okna ROT, 2 s spokoju na mapie (P2/E).
 6. Kolejnosc kilku naleznych: najnizsze `od`, potem id.
 
@@ -105,6 +107,9 @@ pola z wlasnymi id (`..._1b_T`, `_1b_U`, `_1b_L`).
   nieznany term w `CanonCompanions.BaseTrue`) - wiersz `#move` z wyzwalaczem `stary|kr:NNN.w` rusza wtedy od starego wyzwalacza, bo `|` = lub.
   (Poprawka 21.10: pierwsza wersja mowila "prawdziwe" - przy alternatywie `|` m02, m04, m18 i m22 ruszylyby w dniu startu kampanii;
   zglosili to wszyscy autorzy K1-K10.) Wiersz z samymi termami `kr:` przy wylaczonej Kronice nie rusza wcale (walidator: UWAGA).
+- Ten sam "nigdy" konczy ukrycie z koncem `kr:` (rozdz. 11): przy kluczu NIE ukryci z takim koncem wracaja w najblizszej dobie, a konce `rotday:`,
+  `ev:` itd. licza sie jak zawsze (poprawka K0 R-1, 22.10 - wczesniej doba przy kluczu NIE pomijala kazdy koniec ukrycia: Melisandre i Brienne
+  zostawaly ukryte na zawsze). Ponowne wlaczenie klucza nie ukrywa ich drugi raz.
 - Skutki opcji, ktore musza znac wybor gracza (np. uchwyt `kod:wielka_rada`), ida w skutkach KAZDEJ opcji - skutki okna sa wykonane przed lista.
 
 ### 3.4 Teksty i id TextObject
@@ -202,7 +207,8 @@ banda przegra bitwe, w ktorej druzyna gracza jest po stronie zwyciezcy (kontekst
 | `nagroda` | akcje przy wykonaniu (zloto zawsze z platnikiem) | `gold:clan_battania_2:@gracz:1500 ; relp:lord_5_3:10` |
 | `tytul`, `opis` | `{=ARM_KR_tNNN_T}` (<= 45 zn.), `{=ARM_KR_tNNN_D}` (<= 250 zn.) | |
 
-Wywolanie: `task:t014`. Wlasny rejestr bez QuestBase, wpis na NoticeBoard (Kind.Task). Format moze dostac kolumne w K2 - wtedy zmiana tu i w walidatorze.
+Wywolanie: `task:t014`. Wlasny rejestr bez QuestBase; plan mowil o wpisie na NoticeBoard (Kind.Task) - **w K0 bez wpisu tablicy** (notka B2 nizej).
+Format moze dostac kolumne w K2 - wtedy zmiana tu i w walidatorze.
 
 **Stan po K0 krok B2 (Chronicle.Tasks.cs):** wlasny rejestr (zapis "kz"), najwyzej 8 zadan naraz, to samo zadanie w trakcie = OK "juz trwa". **Bez wpisu na tablicy
 ogloszen**: wpisy NoticeBoard to dzis zadania gry (QuestBase, Kind.Task) i listy goncze - nowy rodzaj wpisu wymagalby zmian karty, warunkow i przyciskow tablicy;
@@ -261,7 +267,8 @@ Przed pierwszym wgraniem paczki id mozna jeszcze zmieniac bez nagrobka.
 - `!` przed termem = negacja (`!alive:lord_5_1`). `+N` na koncu termu = N dni od PIERWSZEGO dnia, w ktorym term byl prawdziwy (pamiec w zapisie,
   jak CanonCompanions); nie z `!` i nie przy `p:`.
 - Id w termach: bohater (ROT_heroes.xml albo ROTwanderer<N> = postac z szablonu), rod (spclans.xml), krolestwo, osada (ROT-Map settlements.xml).
-  Tokeny `@...` w termach tylko w oknach powracajacych (`@cel`, `@kto`, `@rodkto`, `@region`).
+  Tokeny `@...` w termach tylko w oknach powracajacych (`@cel`, `@kto`, `@rodkto`, `@region`). Instancja bez danego tokenu (np. `@cel` rodu bez
+  osady): term = nigdy, `!term` = prawda (poprawka K0 R-7).
 - **Jednostki dni:** `od`/`do` = dni opowiesci w skali dokumentu (przeliczane przez `k`); wszystko inne = dni KAMPANII bez przeliczenia, jak
   w CanonCompanions: `+N` w termach, `rotday:N` (StoryDay = dni kampanii od konca prologu), `prolday:N`, oraz dlugosci w akcjach i sekcjach
   (`wound`, `plotka`, `muster`, `#banda dni`, `#zadanie dni`).
@@ -282,18 +289,18 @@ Przed pierwszym wgraniem paczki id mozna jeszcze zmieniac bez nagrobka.
 | `own:<osada>:<rod\|krolestwo>` | | osada nalezy do rodu / krolestwa | CanonCompanions (+ rod nowy) |
 | `rotday:N` | dzien | dzien opowiesci >= N (StoryDay, ujemny w prologu) | CanonCompanions |
 | `prolday:N` | dzien | dzien kampanii >= N, tylko kampania z prologiem (inaczej nigdy) | CanonCompanions |
-| `kr:NNN.w` | okno | okno POKAZANE (okno/wiesc/log); okno pominiete = term nigdy | nowy |
-| `kr:NNN.w=x` | okno, opcja a-d | w oknie wybrano opcje x | nowy |
+| `kr:NNN.w` | okno | okno ROZSTRZYGNIETE (okno/wiesc/log/nic - poprawka K0 R-8); okno pominiete = term nigdy. Okno powracajace: rozstrzygnieta jakakolwiek instancja; `max:N` zuzyty i zadna instancja nie czeka w kolejce = nigdy (poprawka K0 R-2) | nowy |
+| `kr:NNN.w=x` | okno, opcja a-d | w oknie wybrano opcje x. NIE dla okna powracajacego - wybor instancji zapisuje sie pod `NNN.w#klucz` (walidator: BLAD, uzyj flagi z opcji; poprawka K0 R-10) | nowy |
 | `flag:<nazwa>` | male litery/cyfry/_ | flaga ustawiona akcja `flag:` (zalecana nazwa `kNNN_slowo`) | nowy |
 | `mv:<mNN>` | wiersz #move | wiersz rozstrzygniety (wykonany albo pominiety) | CanonCompanions.MoveState |
 | `mv:<mNN>=done` / `=skip` | | wiersz wykonany / pominiety | j.w. |
 | `cw:reach` / `cw:dorne` | | straznik Prologue.Crown trzyma sojusz korona-Reach / pakty Dorne | m104-wojny (odczyt) |
 | `season:<pora>` | winter\|spring\|summer\|autumn | pora roku WesterosClimate | nowy |
-| `plan:<X>-N` | wydarzenie ROT, N dni | dzien >= planowany dzien X z osi Fabuli minus N (P2). Brak planu (CrashScribe bez osi) = prawdziwy, decyduje `od` | nowy |
+| `plan:<X>-N` | wydarzenie ROT, N dni | dzien >= planowany dzien X z osi Fabuli minus N (P2). Brak planu (CrashScribe bez osi) = prawdziwy, decyduje `od`. X spoza osi (CrashScribe Fabula.cs - 21 wydarzen, np. bez BlackwaterEvent) = zawsze prawdziwy (walidator: UWAGA; poprawka K0 R-11) | nowy |
 | `p:region:<k>` | krolestwo | gracz jest na ziemiach krolestwa (najblizsza osada nalezy do k) | nowy |
 | `p:in:<osada>` | | gracz jest w osadzie | nowy |
 | `p:near:<osada>:<odl>` | odleglosc 1-500 (jednostki mapy) | gracz blisko osady | nowy |
-| `p:vassal:<k>` | | rod gracza jest w krolestwie (wasal albo wladca) | nowy |
+| `p:vassal:<k>` | | rod gracza jest w krolestwie (wasal albo wladca; najemnik - nie, poprawka K0 R-6) | nowy |
 | `p:army` | | gracz prowadzi armie albo jest w armii | nowy |
 | `p:rel:<bohater>:<min>` | min -100..100 | relacja gracza z bohaterem >= min | nowy |
 
@@ -327,14 +334,14 @@ Wzorce: "N dni przed wydarzeniem ROT X" = `warunki: plan:X-N` + `przed: ev:X` + 
 | `influence:<d>` / `influence:<rod>:<d>` | | R | K0 | wplywy |
 | `gold:<platnik>:<odbiorca>:<kwota\|N%>` | 1-1000000 albo 1-100% zlota platnika | S | K1 | **zawsze z platnikiem** (zamknieta ekonomia); brak srodkow = niedoplata z linia |
 | `security:<osada>:<d>` / `loyalty:<osada>:<d>` | miasto/zamek, -100..100 | S | K1 | bezpieczenstwo / lojalnosc |
-| `pop:<osada>:<d>` | | S | K2 | ludzie przez ksiege ludzi (PeopleBook, przyczyna "kronika"): minus = do puli regionu, plus = z puli - nigdy z niczego |
+| `pop:<osada>:<d>` | | S | K2 | ludzie przez ksiege ludzi (PeopleBook, przyczyna "kronika"): minus = do puli regionu, plus = z puli - nigdy z niczego. **Stan K0: POMINIETA** (notka B1 nizej) |
 | `ware:<z>:<do>:<towar>:<ilosc>` | osady | S | K6 | towar z rynku do rynku |
 | `garrison:<osada>:<ludzi>:<skad>` | skad = osada albo `pula` | S | K3+ | wojsko do zalogi z innej zalogi albo z puli ochotnikow regionu |
 | `band:<bNNN>` | z #banda | S | K1 | banda z puli wyrzutkow |
 | `task:<tNNN>` | z #zadanie | S | K2 | zadanie |
 | `tourney:<miasto>` | tylko miasto | S | K1 | turniej (jak GrandTourney, bez oplat gracza), gdy nie ma innego |
-| `muster:<krolestwo>:<osada>:<dni>` | dni 1-60 | S | K2 | miekki cel zbiorki lordow (jednorazowo, AI moze zignorowac) |
-| `hide:<bohater>[:<term konca>]` | term moze miec `:` | S | K1 | ukrycie (LeaveParty + Disable); koniec ukrycia = term (np. `kr:044.2`) albo akcja `unhide`. Zakaz: glowa rodu, wladca, gubernator, jeniec, gracz, lista chronionych (P3) |
+| `muster:<krolestwo>:<osada>:<dni>` | dni 1-60 | S | K2 | miekki cel zbiorki lordow (jednorazowo, AI moze zignorowac); osada krolestwa w wojnie z `<krolestwo>` = zbiorka POD BRAMA, bez wejscia (poprawka K0 R2: 022.1, 023.1, 085.1) |
+| `hide:<bohater>[:<koniec ukrycia>]` | koniec moze miec `:` | S | K1 | ukrycie (LeaveParty + Disable); koniec ukrycia = warunek (skladnia rozdz. 10, np. `kr:044.2` albo `kr:112.1 \| ev:NightKingDeathEvent \| rotday:2600`) albo akcja `unhide`. Koniec tylko na `kr:` okna powracajacego = UWAGA walidatora (bez wyzwalacza postac zostaje ukryta na zawsze - dopisac zapas). Zakaz: glowa rodu, wladca, gracz, lista chronionych (P3); jeniec, gubernator, postac w drodze (opozniony teleport gry) - CZEKA |
 | `unhide:<bohater>[:<osada>]` | | S | K1 | powrot (teleport do osady albo siedziby) |
 | `wound:<bohater>:<dni>` | 1-120 | S | K3 | rana |
 | `skill:<bohater>:<umiejetnosc>:<d>` | OneHanded, TwoHanded, Polearm, Bow, Crossbow, Throwing, Riding, Athletics, Crafting, Scouting, Tactics, Roguery, Charm, Leadership, Trade, Steward, Medicine, Engineering (+Mariner/Boatswain/Shipmaster) | S | K4 | zmiana umiejetnosci (Jaime nr 37) |
@@ -344,7 +351,7 @@ Wzorce: "N dni przed wydarzeniem ROT X" = `warunki: plan:X-N` + `przed: ev:X` + 
 | `own:<osada>:<rod>` | | S | K9 | zmiana wlasciciela - **tylko pelna** |
 | `ruler:<krolestwo>:<rod>` | | S | K9 | rod rzadzacy - **tylko pelna** |
 | `leader:<rod>:<bohater>` | | S | K9 | glowa rodu - **tylko pelna** |
-| `alliance:<k1>:<k2>` / `truce:<k1>:<k2>` | | S | K9/K10 | sojusz / rozejm - **tylko pelna**, wymaga wylacznika straznika Prologue.Crown i wpisu w CanonAlliances (P5) |
+| `alliance:<k1>:<k2>` / `truce:<k1>:<k2>` | | S | K9/K10 | sojusz / rozejm - **tylko pelna**, wymaga wylacznika straznika Prologue.Crown i wpisu w CanonAlliances (P5). **Stan K0: `alliance` zawsze POMINIETA** (notka B2 nizej) |
 
 Zakazane: `move:` (P1 - para w #para), `remove` (smierc bez sladu - `die` albo `hide`), przedmioty `dragon_*` (P4), sojusze w wersji lekkiej (P5).
 Kronika nie wola StartAlliance, nie rusza smokow (tekst i flaga), nie zmienia wojen ROT.
@@ -353,8 +360,10 @@ Zasady silnika K0 ustalone po paczkach K1-K10 (21.10):
 - **`hide` na postaci juz ukrytej przez Kronike**: nowy term konca ZASTEPUJE stary (linia logu `UKRYCIE: nowy koniec`). Przyklad: Arya - 008.1
   `hide:lord_5_1_1:rotday:2000`, potem 044.2 `hide:lord_5_1_1:kr:098.2`.
 - **Koniec ukrycia, ktory juz nigdy nie zajdzie** (`kr:` okna pominietego, `alive:` martwego itd. - rozdz. 3.2 p. 4) konczy ukrycie: `unhide`
-  do siedziby rodu postaci z linia `KONIEC UKRYCIA (term nigdy)`. Dzieki temu Rickon (026.2 do `kr:084.1`), Melisandre (092.1 do `kr:112.1`)
-  i Arya (do `kr:098.2`) nie zostaja ukryci na zawsze, gdy ich okno powrotu przepadnie. `hide` BEZ terminu = do akcji `unhide` albo na zawsze
+  do siedziby rodu postaci z linia `KONIEC UKRYCIA (term nigdy)`. Dzieki temu Rickon (026.2 do `kr:084.1`), Melisandre (092.1 do `kr:112.1 | ev:NightKingDeathEvent
+  | rotday:2600` - 112.1 to okno powracajace `besieged:town_B2 ; max:1`, ktore moze nie ruszyc wcale; poprawka K0 R-2) i Arya (do `kr:098.2`) nie zostaja
+  ukryci na zawsze, gdy ich okno powrotu przepadnie. Silnik nie wraca ukrytego do osady wroga (siedziba rodu albo miasto kultury w wojnie z postacia -
+  nastepna osada, na koncu CZEKA; poprawka K0 R3). `hide` BEZ terminu = do akcji `unhide` albo na zawsze
   (tak K10 zapisuje smierc postaci z wierszami `#move`: Jaime, Theon, Varys, Sandor, Qyburn - zniknieciem, nie `die`).
 - **`dragon_*`** = smoki (dragon_black ... dragon_smoke2, dragon_thumbnail w ROTassets.xml). `dragonglass_axe` i `dragonstone_*` to zwykly sprzet
   (wolno w `item`, gdy ma posiadacza - dzis topora z obsydianu nikt nie nosi, wiec akcja bylaby POMINIETA).
@@ -394,6 +403,15 @@ zgodnosc danych z silnikiem: `python -I tools/kronika/kronika_silnik.py`):
 - `alliance` - **zawsze POMINIETA z powodem** (straznik Prologue.Crown pilnuje albo sojusz spoza listy CanonAlliances CrashScribe; plan P5 - decyzja K9/K10).
 - `pop` - dalej POMINIETA (B1).
 
+**Stan po poprawkach K0 (22.10, recenzje bezpieczenstwo / kontrakt / styk-api; szczegoly: `docs/noc-1920/kronika-k0-CHANGELOG.md`):**
+- `hide` na postaci w drodze (opozniony teleport gry, np. gubernator wyslany przez AI) - CZEKA (teleport gry po dotarciu przywrocilby ukrytego).
+- Ukryty dorosly lord wraca sam, gdy umiera glowa jego rodu i NIKT inny nie moze dziedziczyc (gra pomija wylaczonych przy wyborze dziedzica i niszczy
+  rod razem z ukrytymi) - linia `Postacie kanonu (m101): KONIEC UKRYCIA (dziedzic)`. Gdy jest inny dziedzic - decyduje gra (ukryty nie dziedziczy).
+- `muster` do osady wroga - pod brame (bez wejscia); `succeed` przy wecie smierci (CanHeroDie: ROT, sceny prologu) - POMINIETA bez sukcesji;
+  `leader` rodu bez glowy - POMINIETA; `kod:zaraza` pomija partie w toczacej sie bitwie.
+- Zapis: powod POMINIETE skrocony (pelny w logu), wybory instancji przycinane z rejestrem, pierwszy dzien instancji okna w "ki"; wyjatek przy zapisie -
+  ostatni dobry stan zamiast pustego; lista wyboru znikajaca 5 razy - opcja bierna.
+
 ## 12. Uchwyty kod:<nazwa>
 
 Najwyzej 10 na cala Kronike (bez `test`). Nowy uchwyt = wpis w `KODY` w `kronika_check.py` (dozwolone wydarzenia, `gdzie`, opis) i tutaj.
@@ -412,8 +430,8 @@ Wspolne zasady dla programisty K0 (Chronicle.Codes.cs - jeden `switch` po nazwie
 | Nazwa | Okna | Gdzie | Od | Co robi - opis dla programisty K0 |
 |---|---|---|---|---|
 | `test` | 000.1 | okno | K0 | proba silnika: tylko linia logu `kod test`, bez zmian w swiecie (autotest K0a/K0b) |
-| `zaraza` | 076.2 | okno | K7 | **Blada klacz pod Meereen** (town_K1, wlasciciel z warunkow okna = empire_s). (1) Meereen traci 8-12% ludzi przez PeopleBook z przyczyna `choroba` (do puli regionu Zatoki - nie znikaja z ksiegi). (2) Partie stojace w promieniu ok. 30 jednostek od Meereen (oblegajace i obroncy, tez gracza) dostaja rannych: 10-20% zdrowych zolnierzy kazdej partii -> ranni (WoundedNumber), bez smierci. (3) security town_K1 -5. Ten sam rzut dla gracza i AI. Opcje 076.2 (oboz za zloto gracza / zamkniete bramy) sa osobno w `#wybor` - uchwyt ich nie czyta. Log: ludzi miasta przed/po, partii, rannych. Wersja lekka i pelna jednakowo. |
-| `dzwony` | 115.1 (wiersz glowny = wersja ostra, przy gniewie krolowej 113; wariant a lagodny NIE ma uchwytu) | okno | K10 | **Krolewska Przystan plonie** po zdobyciu przez empire_s (wyzwalacz `captured:town_EW4:empire_s`, max 1). (1) town_EW4 traci 25-35% ludzi przez PeopleBook z przyczyna `pozar` (do puli regionu korony). (2) Dobrobyt i zabudowa przez Devastation miasta (jak lupienie, poziom maksymalny) - bez kasowania budynkow. (3) Lup rodu zdobywcy: 30% kasy miasta (`@kasa:town_EW4`) -> glowa rodu-wlasciciela miasta po zdobyciu (platnik kasa miasta - zamknieta ekonomia). Udzial GRACZA nie nalezy do uchwytu: to opcja b (`gold:@kasa:town_EW4:@gracz:5000`) wykonana PO uchwycie, z tego, co zostalo w kasie (niedoplata z linia). Wersja lekka i pelna jednakowo (smierc Cersei/Jaimego to okno 115.2). |
+| `zaraza` | 076.2 | okno | K7 | **Stan K0: czesc (1) BEZ ZMIAN** (notka B2 nizej). **Blada klacz pod Meereen** (town_K1, wlasciciel z warunkow okna = empire_s). (1) Meereen traci 8-12% ludzi przez PeopleBook z przyczyna `choroba` (do puli regionu Zatoki - nie znikaja z ksiegi). (2) Partie stojace w promieniu ok. 30 jednostek od Meereen (oblegajace i obroncy, tez gracza) dostaja rannych: 10-20% zdrowych zolnierzy kazdej partii -> ranni (WoundedNumber), bez smierci. (3) security town_K1 -5. Ten sam rzut dla gracza i AI. Opcje 076.2 (oboz za zloto gracza / zamkniete bramy) sa osobno w `#wybor` - uchwyt ich nie czyta. Log: ludzi miasta przed/po, partii, rannych. Wersja lekka i pelna jednakowo. |
+| `dzwony` | 115.1 (wiersz glowny = wersja ostra, przy gniewie krolowej 113; wariant a lagodny NIE ma uchwytu) | okno | K10 | **Stan K0: czesci (1) i (2) BEZ ZMIAN** (notka B2 nizej). **Krolewska Przystan plonie** po zdobyciu przez empire_s (wyzwalacz `captured:town_EW4:empire_s`, max 1). (1) town_EW4 traci 25-35% ludzi przez PeopleBook z przyczyna `pozar` (do puli regionu korony). (2) Dobrobyt i zabudowa przez Devastation miasta (jak lupienie, poziom maksymalny) - bez kasowania budynkow. (3) Lup rodu zdobywcy: 30% kasy miasta (`@kasa:town_EW4`) -> glowa rodu-wlasciciela miasta po zdobyciu (platnik kasa miasta - zamknieta ekonomia). Udzial GRACZA nie nalezy do uchwytu: to opcja b (`gold:@kasa:town_EW4:@gracz:5000`) wykonana PO uchwycie, z tego, co zostalo w kasie (niedoplata z linia). Wersja lekka i pelna jednakowo (smierc Cersei/Jaimego to okno 115.2). |
 | `wielka_rada` | 117.1 i 117.1a - w skutkach kazdej opcji a-d | opcja | K10 | **Wielka Rada po smierci Daenerys**. Uchwyt czyta glos gracza `kr:117.1=a..d` (a Bran, b gracz, c Jon, d bez glosu - opcja bierna i autotest). LEKKA (ChronicleFullVersions=NIE): wynik rady = Bran (jak w tekscie okna), bez zmian wladcow, rodow i krolestw; uchwyt robi tylko relacje glow rodow krolestw Westeros (lista z kolumny `gracz` okna) z graczem: glos a +3, b -5, c -2, d 0 - i linie logu. PELNA (TAK): glosy glow rodow tych krolestw = slawa rodu + relacja z kandydatem; kandydaci: Bran (lord_5_7, zawsze, premia kanonu +25%), gracz (tylko przy glosie b), Jon (tylko zywy, przy glosie c); glos gracza liczy sie jak jego rod. Wynik w log i we flagach `k117_wynik_bran/gracz/jon`; zmiana korony (`ruler`/`leader` krolestwa trzymajacego town_EW4) wymaga wylacznika straznika Prologue.Crown (P5) i decyzji przy silniku K10, bo Bran jest glowa rodu Starkow (Polnoc) - korona dla niego oznacza rozdzielenie rodu albo krolestwa. Do tej decyzji pelna = jak lekka + flaga wyniku. Flagi `k117_bran/ja/jon/wstrzymal` ustawiaja same opcje. |
 
 **Stan po K0 krok B2 (Chronicle.Codes.cs, RunCode):** wszystkie 4 uchwyty maja galaz. `zaraza` - ranni w partiach w promieniu 30 od town_K1 (jeden rzut 10-20%
@@ -432,8 +450,11 @@ ktorych nie ma (oblezenie Winterfell przez Innych 112.1, smierc Nocnego Krola w 
 
 ## 13. Okna powracajace (kolumna `powtorz`)
 
-`powtorz` = `<wyzwalacz>[:arg]` i opcje ` ; prolog` (dziala tez w prologu), ` ; odstep:N` (dni miedzy instancjami tego samego klucza),
-` ; max:N` (najwyzej N instancji). Instancja = `NNN.w#klucz` w zapisie; najwyzej 1 instancja na dobe, rejestr kluczy 400 (P/E).
+`powtorz` = `<wyzwalacz>[:arg]` i opcje ` ; prolog` (dziala tez w prologu), ` ; odstep:N` (dni od ostatniej instancji TEGO OKNA - dowolny klucz),
+` ; max:N` (najwyzej N instancji okna w kampanii - licznik rosnie przy wydaniu instancji z kolejki; zuzyty i bez instancji w kolejce = `kr:` okna
+nigdy). Instancja = `NNN.w#klucz` w zapisie (ten sam klucz nie wraca); najwyzej 1 instancja WIDOCZNA (okno/wiesc) na dobe - log/nic bez limitu;
+rejestr kluczy 400 (P/E; przy przycieciu pierwszy dzien instancji okna zostaje w zapisie "ki", wiec `kr:NNN.w` dalej prawdziwe). (Poprawka K0 R-9, 22.10:
+wczesniejsze zdania mowily o odstepie "tego samego klucza" - silnik i dane liczyly zawsze od okna.)
 `od` = 0 albo dzien startu. Tokeny instancji: `@cel` (osada), `@kto` (bohater), `@rodkto` (jego rod), `@region` (krolestwo regionu),
 `@liczba`, `@pora` - w zmiennych i jako argumenty akcji/termow. Teksty z tokenami = bez lektora (staly akapit moze miec `lektor=1` tylko bez zmiennych).
 
@@ -494,7 +515,8 @@ Wydarzenia "wedlug regionu" (6, 39): osobne warianty z roznym `temat`.
 ## 15. Lista chronionych (P3/D; walidator i kod)
 
 Akcje `die`, `hide`, `succeed` (umierajacy) na postaci z listy - tylko gdy w warunkach okna (glownego albo wariantu) albo opcji jest
-**osobny skladnik** z wymaganym termem (`done:X` spelnia tez `ev:X`). Do tego zawsze: glowa rodu i wladca (XML na starcie) - `die` = BLAD (uzyj `succeed`),
+**osobny skladnik** z wymaganym termem (`done:X` spelnia tez `ev:X`). Silnik sprawdza to w chwili akcji (POMINIETA "jeszcze przed X") i przy wykonaniu
+pisze `| lista chronionych: <term> spelnione` dla wszystkich trzech akcji (prog KW-15 - poprawka K0 R-14). Do tego zawsze: glowa rodu i wladca (XML na starcie) - `die` = BLAD (uzyj `succeed`),
 `hide` = BLAD.
 
 | Postac | id | Wolno dopiero po |
@@ -582,6 +604,9 @@ Poprawki walidatora 21.10 (po paczkach K1-K10; kazda zgloszona przez autora i sp
 - tokeny w miejscach typu zlozonego (`osada|krolestwo`, `rod|krolestwo`, `captor`, `source`) - wczesniej zawsze BLAD;
 - `kod:` tylko w miejscu z rejestru (`gdzie` = okno/opcja) - nowa regula (Wielka Rada byla w skutkach okna, przed glosem);
 - `--stat`: okna, wiersze, wybory, bandy, zadania, okna i wiersze z `lektor=1`, znaki lektora (tytul+gora+dol bez prefiksu `{=...}`) i RAZEM k01-k10.
+Poprawki walidatora 22.10 (recenzje silnika K0): koniec ukrycia `hide` = pelny warunek (` & `, ` | `); UWAGA - koniec tylko na `kr:` okna powracajacego
+(R-2); BLAD - `kr:<okno powracajace>=x` (R-10); UWAGA - `plan:X` spoza osi Fabuli (os czytana z CrashScribe/src/Fabula.cs, R-11); pusty `gracz` wariantu
+liczony jak glowny przy UWADZE "inni bez kolumny gracz" (R-3).
 Testy nowych regul: scratchpad 7aee5f12/kr-final/neg3.py (6 BLEDOW, 4 UWAGI - kazda regula raz w obie strony); stare neg.py/neg2.py/pos.py bez zmian
 wyniku poza towarem `iron` (kr-final/old_*.txt vs new_*.txt).
 
