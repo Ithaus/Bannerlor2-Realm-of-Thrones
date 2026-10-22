@@ -278,27 +278,36 @@ kazdy blok pod ostatnim wierszem tej postaci), wszystkie z para `kr` w pliku pac
 | Wiersz | Postac | Wyzwalacz | Akcja | Kiedy |
 |---|---|---|---|---|
 | m28 | Theon (po m19) | `kr:072.3` | `free:clan_sturgia_1` | ucieczka z Winterfell (zostaje Greyjoyem) |
+| m40 | Theon (po m28; poprawka B1) | `kr:072.3~0+2` | `prisoner:clan_empire_west_3` | tylko wiersz glowny 072.3 (Stannis zyje): zwiadowcy Stannisa - jeniec rodu Smoczej Skaly (loch siedziby, V2 nr 72); wychodzi ucieczka/okupem/pokojem gry; jako jeniec nie plynie z Yara (087.1 bez Theona) |
 | m29 | Theon | `kr:087.1~a` | `clan:clan_empire_south_1` | tylko wariant 087.1a - ucieka z Yara do Daenerys |
 | m30 | Theon | `kr:108.1` | `clan:clan_battania_1` | po uwolnieniu Yary - pod Winterfell (112.3) |
 | m31 | Brienne (po m16, przed m17) | `kr:037.1` | `prisoner:ROT_town32` | Dzielni Kompanioni, Harrenhal |
-| m32 | Brienne | `kr:037.2\|kr:037.1+45\|ev:JoffreyEvent+5` | `free:clan_vlandia_1` | z Jaimem do Przystani (dwor Lannisterow, bez druzyny); ev:JoffreyEvent+5 - zawsze przed m17 (bez niewoli, ktora wstrzymalaby m17) |
+| m39 | Brienne (poprawka B2/T2) | `ev:JoffreyEvent+5` | `free:clan_battania_1` | jeniec z m31 piec dni po Purpurowych Godach - wolna, do Starkow (m16), wiec m17 nie czeka; wolna - bez zmian ("juz wolny; juz w tym rodzie"); pominiety, gdy m32 zajdzie wczesniej |
+| m32 | Brienne | `kr:037.2\|kr:037.1+45` | `free:clan_vlandia_1` | z Jaimem do Przystani (dwor Lannisterow, bez druzyny); poprawka B2/T2: bez `ev:JoffreyEvent+5` (bez 037.1 nie trafia juz na dwor Lannisterow) |
 | m17 (zmiana) | Brienne | `ev:JoffreyEvent+10\|rotday:1150` (bylo `done:RedWeddingEvent\|dead:lord_5_1`) | `wander:river` | po Purpurowych Godach szuka Sansy (904.1) |
 | m33 | Brienne | `kr:083.1~0b` | `court:clan_battania_1` | przysiega Sansie (nie 083.1a - Brienne martwa albo u Szarej Pani) |
 | m34 | Podrick (po m07) | `kr:083.1~0b` | `court:clan_battania_1` | z Brienne |
 | m35 | Jaime (po m02) | `kr:037.1` | `prisoner:ROT_town32` | Vargo Hoat (bez strazy prologu - HoldKey tylko p01/p10) |
 | m36 | Jaime | `kr:037.2\|kr:037.1+45` | `free:clan_vlandia_1` | wraca do rodu |
 | m37 | Jaime | `kr:107.1` | `court:clan_battania_1` | odchodzi od Cersei na Polnoc (111.1) |
-| m38 | Jaime | `kr:113.1\|kr:115.1` | `clan:clan_vlandia_1` | wraca do siostry przed 115.2 |
+| m38 | Jaime | `kr:113.1\|kr:115.1` | `court:clan_nord_1` | wraca do siostry przed 115.2 - poprawka B3: dworzanin rodu korony (siedziba Czerwona Twierdza ROT_castle61, ok. 5 od town_EW4; Gwardia Krolewska), bez druzyny; 115.2b/c/e sprawdzaja `near:ROTwanderer1:town_EW4:60` (Casterly Rock - ok. 350) |
 
-Wiersze z samymi termami `kr:` (m28-m31, m33-m38) przy ChronicleOfWesteros=NIE nie ruszaja (UWAGA walidatora - swiadomie: bez Kroniki zostaje stan sprzed m107).
+Wiersze z samymi termami `kr:` (m28-m38 i m40) przy ChronicleOfWesteros=NIE albo ChronicleWorldChanges=NIE (poprawka T1) nie ruszaja (UWAGA walidatora). Bez Kroniki
+(albo bez zmian swiata) zostaje stan sprzed m107 z jednym wyjatkiem: m39 (`ev:`) - Brienne wolna od m16 dostaje "juz wolny; juz w tym rodzie" (bez zmian i teleportu),
+a m17 rusza o Purpurowe Gody + 10 jak w kanonie (do poprawek m32 mialo `ev:JoffreyEvent+5` i przenosilo ja wtedy na 5 dni na dwor Lannisterow - recenzja T2).
+Akcja `prisoner:<rod>`: loch siedziby rodu (HomeSettlement - twierdza bez oblezenia, wlasciciel bez znaczenia poza graczem), dopiero bez niej druzyna glowy rodu
+(CanonCompanions.Captor; naglowek arm_canon_moves poprawiony - mowil odwrotnie). `prisoner` na jencu = POMINIETA "juz jeniec" - dlatego m40 idzie po m28 (`+2`).
+Odstepstwo od V2 (B4): m37 Jaime `court:clan_battania_1` (V2 nr 107: "jako wedrowiec") - dworzanin Starkow lepiej oddaje "jedzie do Winterfell" (111.1);
+`wander` wybiera losowe miasto kultury.
 **Ochrona wierszy dopisanych do trwajacej kampanii (m107):** CanonCompanions zapisuje dla kazdego wiersza dzien, od ktorego jest w kampanii (`seen` w arm_canon_companions;
 nowa kampania - start, stary zapis albo nowy wiersz - dzien wczytania). Term `kr:` okna rozstrzygnietego PRZED tym dniem, ktorego zaden wiersz jeszcze nie widzial
 prawdziwym (brak pamieci pierwszego dnia), jest dla tego wiersza "nigdy" - linia POMINIETA `wyzwalacz nie moze zajsc w tej kampanii (okno kr:... rozstrzygniete w dniu X,
 przed wierszem w zapisie (od dnia Y) - bez wstecznej zmiany strony)`. Wiersz w toku (CZEKA) - bez ochrony. Inne termy wiersza (ev:, rotday: ...) dzialaja jak dotad.
 Druga ochrona (bez zapisu): wiersz, za ktorym w pliku jest WYKONANY (ok) pozniejszy wiersz tej samej postaci, zostal dopisany po tamtym (w biegu kampanii wczesniejsze
 wiersze sa zawsze rozstrzygniete, zanim wykona sie pozniejszy) - POMINIETA `wyprzedzona przez #X wykonana wczesniej (wiersz dopisany do zapisu po niej ...)`. Przyklad:
-m31/m32 Brienne (przed m17) w zapisie, w ktorym m17 juz zaszedl - bez wstecznej niewoli i powrotu do Lannisterow (m32 ma tez `ev:JoffreyEvent+5`, ktorego pierwsza
-ochrona nie obejmuje). Pominiete wiersze ("nigdy", tryb prolog/classic) sie nie licza.
+m31/m39/m32 Brienne (przed m17) w zapisie, w ktorym m17 juz zaszedl - bez wstecznej niewoli i powrotu do Lannisterow albo Starkow (m39 ma `ev:JoffreyEvent+5`, ktorego
+pierwsza ochrona nie obejmuje). Pominiete wiersze ("nigdy", tryb prolog/classic) sie nie licza. Ochrona "seen" nie dotyczy termow z wyborem `kr:NNN.w=x` (poprawka T4 -
+wybor zapada pozniej niz dzien okna; ma go tylko stary wiersz m02).
 
 ## 9. Sekcja #usuniete (nagrobki)
 
@@ -612,7 +621,9 @@ pisze `| lista chronionych: <term> spelnione` dla wszystkich trzech akcji (prog 
    **(m107) Smierci z kanonu** (glowy rodow i wladcy z dziedzicem) w wersji lekkiej - wariant `wersja=smierc` nad wierszem glownym `obie` (zapas bez smierci).
    Warunki wariantu = "swiat jak w ksiazce": postac zyje, jest glowa rodu/wladca jak w ksiazce, nie jest jencem, jest tam, gdzie ksiazka (`near:`), dziedzic zyje
    w jej rodzie; tekst wariantu moze twierdzic tylko to, co warunki sprawdzaja (np. 081.2a: Brienne pod Winterfell - `near:ROTwanderer9:town_B2:150`). Stan 22.10:
-   081.2a/b (Stannis), 086.1a (Doran), 094.1a/094.2a (Walder i Freyowie), 095.1a (Mace, nowy), 104.2a (Randyll), 115.2b/c (Cersei), 116.2a (Daenerys).
+   081.2a/b (Stannis; po poprawce A4 tylko po spaleniu Shireen - `dead:lord_1_36`), 086.1a (Doran), 094.1a/094.2a (Walder i Freyowie), 095.1a (Mace, nowy), 104.2a (Randyll),
+   115.2b/c/e (Cersei; e - pelny kanon bez Tommena i Myrcelli, `succeed:lord_4_2:@dziedzic`), 115.3a/b (Euron -> Yara, z Qyburnem albo sam; 115.3c - sam Qyburn, obie),
+   115.4a (Gora -> Lorch po 115.2d, log/nic), 116.2a (Daenerys).
 5. **Lektor pozniej**: `lektor=1` dla okien bez `{ZMIENNYCH}` (w praktyce okno 1 kazdego wydarzenia i stale akapity). Tekst po nagraniu
    jest zamrozony (md5 w arm_lektor_kronika.tsv - walidator BLAD, gra cisza). Tekst nagrania = tytul bez koncowych `.!?` + `.` + pusta linia + gora +
    pusta linia + dol (bez `{=...}`), z zamiana wymowy `R'hllor` -> `the Red God` (nagraj_kronika.py = Chronicle.Voice = kronika_check). Zmiana tekstu
