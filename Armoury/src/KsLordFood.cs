@@ -177,6 +177,9 @@ namespace Armoury
             if (back > 0) k.KingdomBudgetWallet += (int)back;                      // nieprzyjete wraca do skarbca
             long took = w0 - k.KingdomBudgetWallet;
             KingdomTreasury.HoardUse(k, Math.Max(0, took));
+            // KsLordFood biegnie PO CrownIncome.End (SupplyDemand.DailyTrade po bloku korony): migawka skarbca dzisiejszego zamkniecia przesunieta o wyplate z zapasu -
+            // jutrzejsze "inne wplywy" dnia (skarbiec - migawka - wlasne) jej nie licza, wiec renty i wydatki dnia nie maleja drugi raz o te sama kwote
+            if (took != 0) CrownIncome.ShiftSnapshot(k, -took);
             _hfTook += took; _hfRecv += paid;
             if (paid > 0)
             {
