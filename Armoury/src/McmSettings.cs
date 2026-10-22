@@ -8488,7 +8488,7 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsFarmFixShareCap { get; set; } = true;
 
-        [SettingPropertyBool("Ds Castle Income Cut", HintText = "with Ks Farm Surplus Cap Net and the calibration applied: a castle whose purse, after the coin it already owes, has fallen to one and a half times its working coin, or that owes part of its farm, has a farm above its real takings lowered every Ks Farm Surplus Review Days by at most Ks Farm Surplus Review Max (never below those takings) - the same rule as for towns; castle farms are never raised by it, and the quarterly review never aims a castle's farm above its takings either. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ds Castle Income Cut", HintText = "with Ks Farm Surplus Cap Net and the calibration applied: a castle whose purse, after the coin it already owes, has fallen to one and a half times its working coin, or that owes part of its farm, has a farm above its real takings lowered every Ks Farm Surplus Review Days (a castle that owes part of its farm the first time after a week) by at most Ks Farm Surplus Review Max (never below those takings) - the same rule as for towns; castle farms are never raised by it, and the quarterly review never aims a castle's farm above its takings either. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsCastleIncomeCut { get; set; } = true;
 

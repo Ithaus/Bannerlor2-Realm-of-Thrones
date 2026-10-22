@@ -595,6 +595,15 @@ namespace Armoury
             int remit = RemitOf(st);
             if (gq <= OverReserve * CastlePurse.Reserve(t) || remit != 0 || arrears)
             {
+                // recenzja ekonomii R5: cykl obnizki i pamiec doplywu sa sesyjne (bez zapisu), sesje Jeffa trwaja 12-24 doby - zamek z zaleglosciami zaczyna cykl tak, zeby
+                // pierwsza obnizka wypadla po NetMinDays (7) dobach, nie po pelnym cyklu (dotad najwczesniej 15. doba po wczytaniu); probka doplywu zamku (CastleSample
+                // w CastlePurse.Daily) idzie PO tym przegladzie, a pierwsza po wczytaniu tylko zapamietuje kase - bez 7 probek (NetAvg NaN) IncomeCut zaczalby cykl od nowa,
+                // stad czekanie najmniej NetMinDays + 1 - NF dob; dalsze cykle jak dotad
+                if (arrears && remit == 0 && f.SLow < 0)
+                {
+                    int wait = Math.Min(days, Math.Max(NetMinDays, NetMinDays + 1 - f.NF));
+                    f.SLow = today - (days - wait);
+                }
                 double cut = IncomeCut(f, today, days, mx, remit != 0, true);
                 if (cut > 0) { _ccN++; _ccAmt += cut; _ccNS++; _ccAmtS += cut; }
             }
