@@ -5784,6 +5784,10 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public bool MapHoverRingOurObjects { get; set; } = true;
 
+        [SettingPropertyBool("Map Settlement Names Rot Font", HintText = "Settlement Names In The Game Of Thrones Font: the names of towns, castles and villages on the campaign map are written in the Realm of Thrones title font (the one on tooltips and menus). Takes effect after restarting the game. Off = the game's usual font, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapSettlementNamesRotFont { get; set; } = true;
+
         [SettingPropertyBool("Map Village Names On Hover", HintText = "Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update", RequireRestart = false)]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillageNamesOnHover { get; set; } = true;
@@ -10597,6 +10601,7 @@ namespace Armoury
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapHoverRingOurObjects = MapHoverRingOurObjects;
+            s.MapSettlementNamesRotFont = MapSettlementNamesRotFont;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
             s.MillOnBank = MillOnBank;
             s.MapGallows = MapGallows;
