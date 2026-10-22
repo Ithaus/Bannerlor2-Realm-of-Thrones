@@ -1723,9 +1723,11 @@ Uzycie (Python 3, tylko odczyt):
                     z 5 kluczami TAK, 'Wozy (m106): dzien' kazdej doby, 'KS: fach wsi (m106)' przy kazdym Planie; WZ-1a wozy w drodze i w obcej osadzie bez postepu > 30 dob (ostatnie 28
                     linii) 0; WZ-1b w domu z jukami i rozkazem > 30 dob 0 (> 0 przy przyczynie gry w H1 - DECYZJA); WZ-2 Harbay i Volmark wozow >= 1 w kazdym bloku 28 dob od 28. doby
                     (wsie-kiesy.csv) i 0 przykladow z celem Lordsport; WZ-3a wozy Wolnych Ludzi rozbite przez Straz <= 15/230 dob (nowa kampania) / 8/160 (zapis), WZ-3b wszystkie <= 50 / 30
-                    (bitwy.log H3 i linie doby, wieksza liczba), WZ-3c wybory do Last Hearth (INFO); WZ-4 wsie z glownym towarem 0 w 3 ostatnich pomiarach plon-wsi.csv <= 60 / 70 (KS z
-                    zapisu - INFO), WZ-4b Tarth ryby >= 10 szt./d; WZ-5 wsie z utargiem wozow < 30 zl/d (28 dob) <= 50 / 75; WZ-6 'bez wyjasnienia' w dobach rozladunku i dosypki <= 4 szt.
-                    i NKS-8 TAK; WZ-7 grupa nks na tym logu: NKS-2, NKS-3, NKS-19b TAK, NKS-5 poza pasmem <= baza + 3 (23 / 29), WZ-7b fach w Planie >= 50% celu, WZ-7c fach w A7 (INFO);
+                    (bitwy.log H3 i linie doby, wieksza liczba), WZ-3c wybory do Last Hearth (INFO); WZ-4 wsie z glownym towarem 0 w 3 ostatnich pomiarach plon-wsi.csv <= 135 / 135
+                    (harness po poprawkach 126; KS z zapisu - INFO), WZ-4b Tarth ryby >= 10 szt./d; WZ-5 wsie z utargiem wozow < 30 zl/d (28 dob) <= baza 70 / 97 (WZ-4b i WZ-5
+                    niespelnione przy WZ-4 TAK - DECYZJA, Ryzyko P1-1); WZ-6 'bez wyjasnienia' w dobach rozladunku straznika <= 4 szt. i NKS-8 TAK; WZ-7 grupa nks na tym logu: NKS-2,
+                    NKS-3, NKS-19b TAK, NKS-5 poza pasmem <= baza + 3 (23 / 29), WZ-7b fach w Planie >= 50% celu, WZ-7c fach w A7 (INFO), WZ-7d grupa npolnoc na tym logu: NKS-30b
+                    jedzenie wsi (Wolni Ludzie >= 0.60, Skagos >= 0.80...) TAK - niespelnione: DECYZJA (Ryzyko P1-1);
                     WZ-8 wycena miast mediana <= 1.3 x baza (44.0 / 35.7 ms/d) i linia m106 <= 2 ms/d; WZ-9 ERROR nowego kodu i potkniecia 0; WZ-10 arm_cart_risk <= 80 KB; WZ-H1 i INFO.
                     Tryb (nowa kampania / zapis) - z linii wczytania zapisu i linii nowej kampanii. Log bez linii m106 - INFO, bez wyjatku.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
@@ -60683,8 +60685,11 @@ M106_TEST = {
     "save": "Wozy (m106): zapis pamieci tras arm_cart_risk - par 412, znakow 15832, przyciete 3.",
 }
 M106_BASE = {   # tryb -> bazy (103e prolog / 103d zapis Jeffa)
-    "nowa kampania": {"days": 230, "ffnw": 15, "ffall": 50, "zero": 60, "poor": 50, "nks5": 23, "wyc": 44.0},
-    "zapis": {"days": 160, "ffnw": 8, "ffall": 30, "zero": 70, "poor": 75, "nks5": 29, "wyc": 35.7},
+    # recenzja Z2/Z3 (POPRAWKI m106): zero - harness Planu po poprawkach R1+R2 126 wsi (bez fachu 186-190; dotad 60/70 z projektu, harness przeczyl); poor - nie gorzej
+    # niz baza 103e 70 / 103d 97 (prognoza z wartosci calego targu wsi w obie strony: 70 -> ok. 74 - fach przy tanim towarze moze pogorszyc kilka wsi; dotad 50/75 z
+    # prognozy liczacej tylko zysk)
+    "nowa kampania": {"days": 230, "ffnw": 15, "ffall": 50, "zero": 135, "poor": 70, "nks5": 23, "wyc": 44.0},
+    "zapis": {"days": 160, "ffnw": 8, "ffall": 30, "zero": 135, "poor": 97, "nks5": 29, "wyc": 35.7},
 }
 M106_ERR = ("ERROR in CartGuard.", "ERROR in CartRisk.", "ERROR in StartCalibration.Fach", "ERROR in MarketCarts.OnLeft", "ERROR in SyncData.arm_cart_risk",
             "ERROR in MarketCarts.Choose", "ERROR in MarketRoad.RoutePrefix")
@@ -60828,9 +60833,10 @@ def _m106_csv(path):
         return list(csv.DictReader(f, delimiter=";"))
 
 
-def m106w_rows(rep, D, logp, tabp, nks_rows=None):
-    """m106wozy: wiersze WZ-0..WZ-10, WZ-H1, INFO - opis w --help."""
+def m106w_rows(rep, D, logp, tabp, nks_rows=None, npn_rows=None):
+    """m106wozy: wiersze WZ-0..WZ-10, WZ-H1, INFO - opis w --help. npn_rows - wiersze NKS-30b grupy npolnoc na tym samym logu (WZ-7d)."""
     import math
+    wz4_ok = None                                                     # WZ-4 TAK - fach zrobil swoje: WZ-4b / WZ-5 niespelnione to koszt "wies trzyma fach" (Ryzyko P1-1) - DECYZJA
     mode = D["mode"]; B = M106_BASE[mode]
     days = sorted(D["day"])
     nd = len(days)
@@ -60947,15 +60953,17 @@ def m106w_rows(rep, D, logp, tabp, nks_rows=None):
             series[dd] = sum(1 for vid, v in rows.items() if any(d == dd and y <= 1e-4 for d, y in v))
         if D["ks_on"] is not None:
             thr = B["zero"]
+            wz4_ok = zero <= thr
             rep.add(f"WZ-4: wsie z glownym towarem = 0 w 3 ostatnich pomiarach (plon-wsi.csv, KS od doby {apply_d}, {mode})", f"{zero}",
-                    f"<= {thr} (baza 103e 186, 103d 184)", zero <= thr)
+                    f"<= {thr} (baza 103e 186, 103d 184; harness Planu po poprawkach 126)", wz4_ok)
         else:
             rep.add(f"WZ-4: wsie z glownym towarem = 0 ({ksmode})", f"{zero}; ostatnie pomiary (wsi z zerem): " + ", ".join(f"d{k} {v}" for k, v in sorted(series.items())),
                     "INFO (T3 - KS z zapisu: trend malejacy)", None)
         t = rows.get(M106_TARTH, [])
         tv = sum(y for d, y in t[-3:]) / max(1, len(t[-3:])) if t else None
         rep.add("WZ-4b: Tarth (ROT_town8_village1) ryby na koniec (srednia 3 ostatnich pomiarow plon-wsi.csv)", f"{tv:.1f} szt./d" if tv is not None else "brak wiersza",
-                ">= 10 szt./d", (tv >= 10.0) if (tv is not None and D["ks_on"] is not None) else None)
+                ">= 10 szt./d (harness po poprawkach 0.7 szt./d - praca domowa kroku 8; ponizej przy WZ-4 TAK - DECYZJA, Ryzyko P1-1)",
+                (tv >= 10.0) if (tv is not None and D["ks_on"] is not None) else None, decide=bool(wz4_ok))
     else:
         rep.add("WZ-4: glowny towar (plon-wsi.csv)", f"brak {pp}", "INFO (podaj --tabele <katalog>)", None)
     # ---- WZ-5 utarg wozow (wsie-kiesy.csv, ostatnie 28 dob)
@@ -60969,9 +60977,12 @@ def m106w_rows(rep, D, logp, tabp, nks_rows=None):
                 a[0] += int(_m106_f(r.get("dob_okna"))); a[1] += int(_m106_f(r.get("woz_netto_do_kiesy")))
         low = sorted(v for v, a in agg.items() if a[0] > 0 and a[1] / float(a[0]) < 30.0)
         thr = B["poor"]
-        rep.add(f"WZ-5: wsie z utargiem wozow < 30 zl/d (woz_netto_do_kiesy, ostatnie 28 dob; {mode})", f"{len(low)} z {len(agg)}", f"<= {thr} (baza 103e 70, 103d 97)", len(low) <= thr)
-    # ---- WZ-6 bez wyjasnienia w dobach dzialan straznika i dosypki
-    act = [d for d in days if g(d, "guard", 14) > 0 or g(d, "tu", 1) > 0]
+        rep.add(f"WZ-5: wsie z utargiem wozow < 30 zl/d (woz_netto_do_kiesy, ostatnie 28 dob; {mode})", f"{len(low)} z {len(agg)}",
+                f"<= {thr} (nie gorzej niz baza 103e 70, 103d 97; prognoza po poprawkach ok. 74 - ponizej bazy przy WZ-4 TAK - DECYZJA, Ryzyko P1-1)", len(low) <= thr,
+                decide=bool(wz4_ok))
+    # ---- WZ-6 bez wyjasnienia w dobach rozladunku straznika (recenzja Z7: dosypka jest prawie kazdej doby - 103d 160/161, 103e 230/230 - wiec dotad prog obejmowal caly bieg,
+    # a 103d ma dwie doby z |N| do 786 w przetworach miast, niezwiazane z wozami)
+    act = [d for d in days if g(d, "guard", 14) > 0]
     vals = [max(D["unexp"].get(d, 0), D["unexp"].get(d + 1, 0)) for d in act]   # linia Towary tej doby i nastepnej (rozladunek w takcie doby - ksiega tej albo nastepnej)
     vmax = max(vals) if vals else 0
     k8 = None
@@ -60979,8 +60990,9 @@ def m106w_rows(rep, D, logp, tabp, nks_rows=None):
         for r in nks_rows:
             if r[0].startswith("NKS-8: kontrola pieniedzy KS"):
                 k8 = r[1]
-    rep.add("WZ-6: 'bez wyjasnienia' w liniach Towary w dobach z rozladunkiem straznika albo dosypka przy wyjezdzie (najwiekszy |N| na towar)",
-            f"dob {len(act)}, najwiekszy {vmax}" + (f"; NKS-8 {k8}" if k8 else ""), "<= 4 szt. (baza: +0; rozklad +-1-4) i NKS-8 TAK", (vmax <= 4 and (k8 is None or k8 == "TAK")) if act else None)
+    rep.add("WZ-6: 'bez wyjasnienia' w liniach Towary w dobach z rozladunkiem straznika (najwiekszy |N| na towar, ta doba i nastepna)",
+            f"dob {len(act)}, najwiekszy {vmax}" + (f"; NKS-8 {k8}" if k8 else ""), "<= 4 szt. (baza 103e 0 w kazdej dobie; 103d do 786 w dwoch dobach - przetwory miast) i NKS-8 TAK",
+            (vmax <= 4 and (k8 is None or k8 == "TAK")) if act else None)
     # ---- WZ-7 kalibracja KS (grupa nks na tym samym logu) i fach w Planie
     if nks_rows is not None:
         got = {}
@@ -61007,6 +61019,13 @@ def m106w_rows(rep, D, logp, tabp, nks_rows=None):
     if rl:
         rep.add("WZ-7c: fach w regule A7 (stan zastosowany)", f"linii {len(rl)}; razem: bloki trzymane {sum(int(r[0]) for r in rl)}, nacisk powrotu {sum(int(r[1]) for r in rl)}, "
                 f"przebudowy do fachu {sum(int(r[2]) for r in rl)}; na koniec wsi z niedoborem {rl[-1][4]} (cel {rl[-1][5]} szt./d, jest {rl[-1][6]})", "INFO (T3: start przebudow ok. doby 63)", None)
+    if npn_rows:
+        # recenzja Z1: fach a jedzenie wsi krain zimnych (Wolni Ludzie - prog Jeffa 0.60; harness po poprawkach 0.79/0.76 wobec 0.83/0.76 bez fachu, Skagos 0.93/0.91)
+        bad = [r for r in npn_rows if r[1] == "NIE"]
+        jud = [r for r in npn_rows if r[1] in ("TAK", "NIE")]
+        rep.add("WZ-7d: jedzenie wsi krain zimnych - NKS-30b grupy npolnoc na tym logu", "; ".join(f"{r[0].split('(')[0].replace('NKS-30b:', '').strip()} {r[1]} ({r[2][:40]})" for r in npn_rows),
+                "NKS-30b TAK (baza 103e Wolni Ludzie 0.81-0.84, 103d 0.69-0.70); niespelnione - DECYZJA (Ryzyko P1-1: krok 8 albo regale-first u Wolnych Ludzi)",
+                (not bad) if jud else None, decide=True)
     # ---- WZ-8 koszt
     wm = sorted(D["wyc"]); w_med = wm[len(wm) // 2] if wm else None
     ms = sorted(float(D["day"][d]["ms"][0]) for d in days if D["day"][d]["ms"]); m_med = ms[len(ms) // 2] if ms else None
@@ -61096,7 +61115,7 @@ def m106w_synth():
     good, badr = run(False), run(True)
     exp_good = {"WZ-0": "TAK", "WZ-1a": "TAK", "WZ-1b": "TAK", "WZ-2": "TAK", "WZ-3a": "TAK", "WZ-3b": "TAK", "WZ-4": "TAK", "WZ-4b": "TAK", "WZ-5": "TAK", "WZ-6": "TAK",
                 "WZ-7b": "TAK", "WZ-8": "TAK", "WZ-9": "TAK", "WZ-10": "TAK"}
-    exp_bad = {"WZ-1a": "NIE", "WZ-2": "NIE", "WZ-3a": "NIE", "WZ-4b": "NIE", "WZ-6": "NIE", "WZ-7b": "NIE", "WZ-8": "NIE", "WZ-9": "NIE"}
+    exp_bad = {"WZ-1a": "NIE", "WZ-2": "NIE", "WZ-3a": "NIE", "WZ-4b": "DECYZJA", "WZ-6": "NIE", "WZ-7b": "NIE", "WZ-8": "NIE", "WZ-9": "NIE"}   # WZ-4b: WZ-4 TAK - Ryzyko P1-1
     diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
     diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
     return "; ".join(diff) if diff else None
@@ -61105,7 +61124,7 @@ def m106w_synth():
 def m106wozy_main(logp, tabp=None, until=120):
     """m106wozy (22.10; projekt m106-wozy W2 i P1, decyzje Jeffa dla gospodarki: z podazy i popytu, start neutralny, zmiany produkcji powoli, z biezacego zysku, zamknieta
     ekonomia, 100%): WZ-0..WZ-10, WZ-H1, INFO - opis w --help. Strumieniowo; wsie-kiesy.csv, plon-wsi.csv i bitwy.log z --tabele <katalog> albo z katalogu sesji logu;
-    WZ-7 - grupa nks na tym samym logu (wiersze NKS-2, NKS-3, NKS-5, NKS-19b, NKS-8, NKS-8e). Log bez linii m106 - wiersze INFO, bez wyjatku."""
+    WZ-7 - grupa nks na tym samym logu (wiersze NKS-2, NKS-3, NKS-5, NKS-19b, NKS-8, NKS-8e), WZ-7d - grupa npolnoc (NKS-30b). Log bez linii m106 - wiersze INFO, bez wyjatku."""
     import io
     import contextlib
     rep = Report()
@@ -61135,9 +61154,23 @@ def m106wozy_main(logp, tabp=None, until=120):
         except Exception as e:
             nks_rows = None
             rep.add("WZ-7: grupa nks", f"wyjatek {type(e).__name__}: {e}", "INFO", None)
+    npn_rows = None
+    if D["plans"]:
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                npolnoc_main(logp, None)
+            npn_rows = []
+            for ln in buf.getvalue().splitlines():
+                parts = [p.strip() for p in ln.split(" | ")]
+                if len(parts) >= 4 and parts[0].startswith("NKS-30b:") and parts[1] in ("TAK", "NIE", "INFO", "ETAP", "DECYZJA"):
+                    npn_rows.append((parts[0], parts[1], parts[2]))
+        except Exception as e:
+            npn_rows = None
+            rep.add("WZ-7d: grupa npolnoc", f"wyjatek {type(e).__name__}: {e}", "INFO", None)
     print(f"plik: {logp} | tryb {D['mode']} | KS: {'wlaczone doba ' + str(D['ks_on']) if D['ks_on'] is not None else ('z zapisu' if D['ks_live'] else 'nieczynne')} | linii m106 doby "
           f"{len(D['day'])}, przykladow {len(D['ex'])}, Planow {len(D['plans'])}, linii fachu {len(D['fach'])}, ERROR {D['err']}")
-    m106w_rows(rep, D, logp, tabp, nks_rows)
+    m106w_rows(rep, D, logp, tabp, nks_rows, npn_rows)
     rep.show()
     return 0
 
